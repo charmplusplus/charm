@@ -60,26 +60,8 @@ class bar {
 #error "Use pup_c.h for C programs-- pup.h is for C++ programs"
 #endif
 
-#if 0
-#  include <converse.h> // <- for CmiBool
-#else
-#  include <conv-mach.h>
-#  include "conv-autoconfig.h"
-// you cannot define Bool twice !!
-#ifndef CONVERSE_H
-#if CMK_BOOL_UNDEFINED
-enum CmiBool {CmiFalse=0, CmiTrue=1};
-#else
-typedef bool CmiBool;
-#define CmiFalse false
-#define CmiTrue true
-#endif
-#endif
-/*
-#  define CmiBool bool
-#  define CmiTrue true
-#  define CmiFalse false
-*/
+#ifndef CHARM_H
+#  include <charm.h> // <- for CmiBool
 #endif
 
 
@@ -99,6 +81,7 @@ typedef enum {
   Tfloat,Tdouble,
   Tbool,
   Tbyte,
+  Tsync,
   dataType_last //<- for setting table lengths, etc.
 } dataType;
 
@@ -152,11 +135,10 @@ class er {
         TYPE_MASK   =0xFF00};
   unsigned int PUP_er_state;
 #if CMK_EXPLICIT
-  explicit er(unsigned int inType) //You don't want to create raw PUP::er's.
-#else
-  er(unsigned int inType) //You don't want to create raw PUP::er's.
+  explicit /* Makes constructor below behave better */
 #endif
-    {PUP_er_state=inType;}
+           er(unsigned int inType) //You don't want to create raw PUP::er's.
+              {PUP_er_state=inType;}
  public:
   virtual ~er();//<- does nothing, but might be needed by some child
   
@@ -234,6 +216,12 @@ class er {
   //For pre- or stack-allocated PUP::able objects-- just call object's pup
   void operator()(able& a)
     {a.pup(*this);}
+
+  //A descriptive (but entirely optional) human-readable comment field
+  virtual void comment(const char *message);
+
+  //A 32-bit synchronization marker (not human readable)
+  virtual void synchronize(unsigned int m);
  
  protected:
   //Generic bottleneck: pack/unpack n items of size itemSize 
@@ -335,6 +323,48 @@ class fromDisk : public disk {
   // (must be opened for binary read)
   fromDisk(FILE *f):disk(IS_UNPACKING,f) {}
 };
+
+
+/************** PUP::er -- Text *****************/
+class textUtil : public er {
+ private:
+  char *cur; /*Current output buffer*/
+  int level; /*Indentation distance*/
+  void beginEnv(const char *type,int n=0);
+  void endEnv(const char *type);
+  char *beginLine(void);
+  void endLine(void);
+ protected:
+  virtual char *advance(char *cur)=0; /*Consume current buffer and return next*/
+  textUtil(unsigned int inType,char *buf);
+ public:
+  virtual void comment(const char *message);
+  virtual void synchronize(unsigned int m);
+ protected:
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+  virtual void object(able** a);
+};
+class sizerText : public textUtil {
+ private:
+  char line[1000];
+  int charCount; /*Total characters seen so far*/
+ protected:
+  virtual char *advance(char *cur);
+ public:
+  sizerText(void);
+  int size(void) const {return charCount;}
+};
+class toText : public textUtil {
+ private:
+  char *buf;
+  int charCount; /*Total characters written so far*/
+ protected:
+  virtual char *advance(char *cur);
+ public:
+  toText(char *outBuf);
+  int size(void) const {return charCount;}
+};
+
 
 /********** PUP::er -- Heterogenous machine pack/unpack *********/
 //This object describes the data representation of a machine.

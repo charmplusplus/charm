@@ -15,11 +15,18 @@ virtual functions are defined here.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "converse.h"
+#include <ctype.h>
+#include "charm.h"
 #include "pup.h"
 #include "ckhashtable.h"
 
 PUP::er::~er() {}
+
+void PUP::er::comment(const char *message)
+  { /* ignored by default */ }
+
+void PUP::er::synchronize(unsigned int m)
+  { /* ignored by default */ }
 
 /*define CK_CHECK_PUP to get type and bounds checking during Pack and unpack.
 This checking substantially slows down PUPing, and increases the space
@@ -319,3 +326,150 @@ PUP::able::constructor_function PUP::able::get_constructor
 	CmiAbort("Unrecognzied PUP::able::PUP_ID passed to get_constructor!");
 	return NULL;
 }
+
+/****************** Text Pup ******************/
+
+char *PUP::textUtil::beginLine(void) {
+  //Indent level tabs over:
+  for (int i=0;i<level;i++) cur[i]='\t';
+  cur[level]=0;
+  return cur+level;
+}
+void PUP::textUtil::endLine(void) {
+  cur=advance(cur);
+}
+void PUP::textUtil::beginEnv(const char *type,int n)
+{
+  char *o=beginLine();
+  sprintf(o,"begin "); o+=strlen(o);
+  sprintf(o,type,n); o+=strlen(o);
+  sprintf(o," {\n");
+  endLine();
+  level++;
+}
+void PUP::textUtil::endEnv(const char *type)
+{
+  level--;
+  sprintf(beginLine(),"} end %s;\n",type);
+  endLine();
+}
+PUP::textUtil::textUtil(unsigned int inType,char *buf)
+  :er(inType)
+{
+  cur=buf;
+  level=0;
+}
+
+void PUP::textUtil::comment(const char *message)
+{
+  sprintf(beginLine(),"//%s\n",message); endLine();
+}
+
+void PUP::textUtil::synchronize(unsigned int m)
+{
+  char *o=beginLine();
+  sprintf(o,"sync=");o+=strlen(o);
+  const char *consonants="bcdfgjklmprstvxz";
+  const char *vowels="aeou";
+  for (int firstBit=0;firstBit<32;firstBit+=6) {
+	sprintf(o,"%c%c%c", consonants[0xf&(m>>firstBit)],
+		vowels[0x3&(m>>(firstBit+4))], 
+		(firstBit==30)?';':'-');
+	o+=strlen(o);
+  }
+  sprintf(o,"\n"); endLine();
+  
+}
+
+void PUP::textUtil::bytes(void *p,int n,size_t itemSize,dataType t) {
+  if (t==Tchar) 
+  { /*Character data is written out directly (rather than numerically)*/
+    char *o=beginLine();
+    sprintf(o,"string=");o+=strlen(o);
+    *o++='\"'; /*Leading quote*/
+    /*Copy each character, possibly escaped*/
+    const char *c=(const char *)p;
+    for (int i=0;i<n;i++) {
+      if (c[i]=='\n') {
+	sprintf(o,"\\n");o+=strlen(o);
+      } else if (iscntrl(c[i])) {
+	sprintf(o,"\\x%02X",(unsigned char)c[i]);o+=strlen(o);
+      } else if (c[i]=='\\' || c[i]=='\"') {
+	sprintf(o,"\\%c",c[i]);o+=strlen(o);
+      } else
+	*o++=c[i];
+    }
+    /*Add trailing quote and newline*/
+    sprintf(o,"\";\n");o+=strlen(o);
+    endLine();
+  } else if (t==Tbyte)
+  { /*Byte data is written out in hex (rather than decimal) */
+    beginEnv("byte %d",n);
+    const unsigned char *c=(const unsigned char *)p;
+    char *o=beginLine();
+    for (int i=0;i<n;i++) {
+      sprintf(o,"%02X ",c[i]);o+=strlen(o);
+      if (i%25==24 && (i+1!=n)) 
+      { /* This line is too long-- wrap it */
+	sprintf(o,"\n"); o+=strlen(o);
+	endLine(); o=beginLine();
+      }
+    }
+    sprintf(o,"\n");
+    endLine();
+    endEnv("byte");
+  }
+  else
+  { /*Ordinary number-- write out in decimal */
+    if (n!=1) beginEnv("array %d",n);
+    for (int i=0;i<n;i++) {
+      char *o=beginLine();
+      switch(t) {
+      case Tshort: sprintf(o,"short=%d;\n",((short *)p)[i]); break;
+      case Tushort: sprintf(o,"ushort=%u;\n",((unsigned short *)p)[i]); break;
+      case Tint: sprintf(o,"int=%d;\n",((int *)p)[i]); break;
+      case Tuint: sprintf(o,"uint=%u;\n",((unsigned int *)p)[i]); break;
+      case Tlong: sprintf(o,"long=%ld;\n",((long *)p)[i]); break;
+      case Tulong: sprintf(o,"ulong=%lu;\n",((unsigned long *)p)[i]); break;
+      case Tfloat: sprintf(o,"float=%.7g;\n",((float *)p)[i]); break;
+      case Tdouble: sprintf(o,"double=%.15g;\n",((double *)p)[i]); break;
+      case Tbool: sprintf(o,"bool=%s;\n",((CmiBool *)p)[i]?"true":"false"); break;
+      default:
+	CmiAbort("Unrecognized numeric type passed to PUP::textUtil::bytes!\n");
+      }
+      endLine();
+    }
+    if (n!=1) endEnv("array");
+  }
+}
+void PUP::textUtil::object(able** a) {
+  beginEnv("object");
+  PUP::er::object(a);
+  endEnv("object");
+}
+
+
+//Text sizer
+char *PUP::sizerText::advance(char *cur) {
+  charCount+=strlen(cur);
+  return line;
+}
+
+PUP::sizerText::sizerText(void)
+  :textUtil(IS_SIZING,line),charCount(0) { }
+
+//Text packer
+char *PUP::toText::advance(char *cur) {
+  charCount+=strlen(cur);
+  return buf+charCount;
+}
+
+PUP::toText::toText(char *outBuf)
+  :textUtil(IS_PACKING,outBuf),buf(outBuf),charCount(0) { }
+
+
+
+
+
+
+
