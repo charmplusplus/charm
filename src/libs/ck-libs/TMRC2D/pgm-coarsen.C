@@ -51,8 +51,8 @@ init(void)
 {
   CkPrintf("init started\n");
 
-  const char *eleName="out.1024.ele";
-  const char *nodeName="out.1024.node";
+  const char *eleName="small.ele";
+  const char *nodeName="small.node";
   int nPts=0; //Number of nodes
   vector2d *pts=0; //Node coordinates
 
@@ -508,7 +508,7 @@ CkPrintf("[%d] end init\n",myChunk);
       double *areas=new double[g.nelems];
 	//coarsen in the last step
 		curArea = curArea*2.4;
-      for (i=0;i<g.nelems;i++) {
+   /*   for (i=0;i<g.nelems;i++) {
       #if 0
         double origArea=8e-8; //Typical triangle size
 	if (fabs(g.S12[i])>1.0e8)
@@ -517,7 +517,8 @@ CkPrintf("[%d] end init\n",myChunk);
 		areas[i]=origArea; //Leave everything else big
       #endif
         areas[i]=curArea;
-      }
+      }*/
+	areas[0] = curArea;
 			//coarsen in the last step
 //      if(t >= tSteps-1){
 				CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements to %.3g\n",
