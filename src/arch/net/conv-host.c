@@ -2617,7 +2617,8 @@ int rsh_pump(p, nodeno, rank0no, argv)
   static char buf[1024];
   int len;
   xstr ibuf = p->ibuf;
-  int randno = rand();
+  /* int randno = rand(); */
+  int randno = CrnRand();
   
 #if CMK_DEBUG_MODE
   if(!arg_gdbinterface)
@@ -2931,7 +2932,8 @@ main(argc, argv)
 {
   unsigned int myIP, myPortNo;
 
-  srand(time(0));
+  /* srand(time(0)); */
+  CrnSrand((int) time(0));
   /* notify charm developers that charm is in use */
   ping_developers();
   /* Compute the values of all constants */
