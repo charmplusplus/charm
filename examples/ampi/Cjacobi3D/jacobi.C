@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 #include "mpi.h"
 
 #if CMK_BLUEGENE_CHARM
@@ -37,7 +36,7 @@ class chunk {
     double rbzp[DIMX*DIMY];
 };
 
-#ifdef AMPI
+#ifdef AMPI_MIG
 void chunk_pup(pup_er p, void *d)
 {
   chunk **cpp = (chunk **) d;
@@ -116,40 +115,33 @@ int main(int ac, char** av)
   chunk *cp;
   int thisIndex, ierr, nblocks;
   double *times;
-  double avgtime = 1.0;
+  double avgtime = 0.0;
   
   MPI_Init(&ac, &av);
   MPI_Comm_rank(MPI_COMM_WORLD, &thisIndex);
   MPI_Comm_size(MPI_COMM_WORLD, &nblocks);
 
-  if (ac < 4) {
+  if (ac < 2) {
     if (thisIndex == 0)
-      printf("Usage: jacobi X Y Z [nIter].\n");
+      printf("Usage: jacobi DIM [nIter].\n");
     MPI_Finalize();
   }
-  NX = atoi(av[1]);
-  NY = atoi(av[2]);
-  NZ = atoi(av[3]);
+  NX = NY = NZ = atoi(av[1]);
   if (NX*NY*NZ != nblocks) {
     if (thisIndex == 0) 
       printf("%d x %d x %d != %d\n", NX,NY,NZ, nblocks);
     MPI_Finalize();
   }
-  if (ac == 5)
-    niter = atoi(av[4]);
+  if (ac == 3)
+    niter = atoi(av[2]);
   else
-    niter = 20;
-  times = (double*)malloc(sizeof(double)*niter);
-
-/*
-  if(thisIndex == 0)
-    niter = 20;
-*/
+    niter = 100;
+  times = new double [niter];
 
   MPI_Bcast(&niter, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
   cp = new chunk;
-#if ! defined(NO_PUP) && defined(AMPI)
+#if ! defined(NO_PUP) && defined(AMPI_MIG)
   MPI_Register((void*)&cp, (MPI_PupFn) chunk_pup);
 #endif
 
@@ -219,35 +211,22 @@ int main(int ac, char** av)
             cp->t[k][j][i] = tval;
             if (error > maxerr) maxerr = error;
           }
-    MPI_Allreduce(&maxerr, &tmpmaxerr, 1, MPI_DOUBLE, MPI_MAX, 
-                   MPI_COMM_WORLD);
-    maxerr = tmpmaxerr;
     endtime = MPI_Wtime();
     itertime = endtime - starttime;
     double  it;
     MPI_Allreduce(&itertime, &it, 1, MPI_DOUBLE, MPI_SUM,
                    MPI_COMM_WORLD);
     itertime = it/nblocks;
-    if (thisIndex == 0){
-      printf("iter %d time: %lf maxerr: %lf\n", iter, itertime, maxerr);
-      times[iter-1] = itertime;
-    }
     starttime = MPI_Wtime();
-#if 0
-#ifdef AMPI
-    if(iter%20 == 10) {
-      MPI_Migrate();
-    }
-#endif
-#endif
   }
+
   for(iter=0;iter<niter;iter++){
-    avgtime *= times[iter];
+    avgtime += times[iter];
   }
-  avgtime = pow(avgtime, 1.0/(double)niter);
   if (thisIndex == 0){
-    printf("average time %lf\n", avgtime);
-  }  
+    printf("Average time %lf\n", avgtime/niter);
+  }
+  delete [] times;
   MPI_Finalize();
   return 0;
 }

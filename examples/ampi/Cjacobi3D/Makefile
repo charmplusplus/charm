@@ -3,11 +3,11 @@ CHARMC=../../../bin/charmc $(OPTS)
 ampi: jacobi
 
 mpi: jacobi.C
-	mpiCC -o jacobi jacobi.C  $(OPTS)
+	mpiCC -o jacobi.mpi jacobi.C  $(OPTS)
 
 jacobi: jacobi.C
 	$(CHARMC) -c jacobi.C
-	$(CHARMC) -o jacobi jacobi.o -language ampi -module EveryLB
+	$(CHARMC) -o jacobi jacobi.o -language ampi 
 
 jacobi.iso: jacobi.C
 	$(CHARMC) -c -DNO_PUP jacobi.C
