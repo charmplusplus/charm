@@ -4,7 +4,30 @@
 #include "fem.h"
 #include "fem_mesh.h"
 #include "femrefine.h"
+#include "ckhashtable.h"
 
+class intdual{
+	private:
+		int x,y;
+	public:
+		intdual(int _x,int _y){
+			x = _x; y=_y;
+		}
+		int getx(){return x;};
+		int gety(){return y;};
+		inline CkHashCode hash() const {
+			return (CkHashCode)(x+y);
+		}
+		static CkHashCode staticHash(const void *k,size_t){
+			return ((intdual *)k)->hash();
+		}
+		inline int compare(intdual &t) const{
+			return (t.getx() == x && t.gety() == y);
+		}
+		static int staticCompare(const void *a,const void *b,size_t){
+			return ((intdual *)a)->compare((*(intdual *)b));
+		}
+};
 
 void FEM_REFINE2D_Init(){
   REFINE2D_Init();	
@@ -96,6 +119,10 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 		CkAbort("Grrrr element without connectivity \n");
 	}
 	AllocTable2d<int> &connTable = ((FEM_IndexAttribute *)connAttr)->get();
+
+
+	//hashtable to store the new node number as a function of the two old numbers
+	CkHashtableT<intdual,int> newnodes;
 	
   for (int splitNo=0;splitNo<nSplits;splitNo++){
     int tri,A,B,C,D;
@@ -133,12 +160,14 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 				double Dy = coord[2*A+1]*(1-frac)+frac*coord[2*B+1];				
 				coordVec.push_back(Dx);
 				coordVec.push_back(Dy);
+				newnodes.put(intdual(A,B))=D;
 		}
 		//add a new triangle
 		/*TODO: replace  FEM_ELEM with parameter*/
 		int newTri =  FEM_Mesh_get_length(meshID,elemID);
     CkPrintf("---- Adding triangle %d after splitting %d \n",newTri,tri);
 		elem->setLength(newTri+1);
+		D = newnodes.get(intdual(A,B));
 		for(int j=0;j<elemattrs->size();j++){
 			if((*elemattrs)[j]->getAttr() == FEM_CONN){
 				CkPrintf("elem attr conn code %d \n",(*elemattrs)[j]->getAttr());
