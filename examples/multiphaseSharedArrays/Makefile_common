@@ -17,6 +17,9 @@ CHARMC=$(CDIR)/bin/charmc -language charm++ $(OPTS)
 
 all : opt
 
+test: $(PGM)
+	./charmrun +p4 $(PGM) $(TEST_ARGS)
+
 $(PGM) : $(PGM).o
 	$(CHARMC) -o $(PGM) -module msa $(PGM).o -lm
 
