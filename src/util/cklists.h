@@ -209,8 +209,8 @@ class CkVec : private CkSTLHelper<T> {
 /* Visual C++ 6.0's operator overloading is buggy,
    so use default operator|, which calls this pup routine. */
      void pup(PUP::er &p) {
-        int l=vec.pupbase(p);
-        for (int i=0;i<l;i++) p|vec[i];
+        int l=pupbase(p);
+        for (int i=0;i<l;i++) p|operator[](i);
      }
 #endif
 };
