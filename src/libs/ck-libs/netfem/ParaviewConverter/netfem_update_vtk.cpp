@@ -282,7 +282,7 @@ std::string NetFEM_update_vtk::vtkIndexFormat(int timestep, int numChunks) {
 	int n=f.getItems();
 	resp << f.getName() << ",";
   }
-  resp << "partition_num\">\n";
+  resp << "cell_partition_num\">\n";
 	
   for (int fn=0;fn<nf;fn++) {
 	const NetFEM_doubleField &f=el.getField(fn);
@@ -292,7 +292,7 @@ std::string NetFEM_update_vtk::vtkIndexFormat(int timestep, int numChunks) {
 	  
   }
 	
-  resp << "<PDataArray type=\"Float64\" Name=\"partition_num\" format=\"ascii\" NumberOfComponents=\"1\"/>\n";
+  resp << "<PDataArray type=\"Int32\" Name=\"cell_partition_num\" format=\"ascii\" NumberOfComponents=\"1\"/>\n";
 	
   resp << "</PCellData>\n\n";
 	
