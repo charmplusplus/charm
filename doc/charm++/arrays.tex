@@ -4,7 +4,7 @@ Arrays \index{arrays} are arbitrarily-sized collections of chares.  The
 entire array has a globally unique identifier of type \kw{CkArrayID}, and
 each element has a unique index of type \kw{CkArrayIndex}.  A \kw{CkArrayIndex}
 can be a single integer (i.e. 1D array), several integers (i.e. a
-multidimentional array), or an arbitrary string of bytes (e.g. a binary tree
+multidimensional array), or an arbitrary string of bytes (e.g. a binary tree
 index).
 
 Array elements can be dynamically created and destroyed on any processor,
@@ -15,7 +15,7 @@ contribute to array reductions.
 
 \subsubsection{Declaring a 1D Array}
 
-You can declare a one-dimentional \index{array}\index{chare array}chare array
+You can declare a one-dimensional \index{array}\index{chare array}chare array
 as:
 
 \begin{alltt}
@@ -163,7 +163,7 @@ are not universally needed; but are still often useful.
 
 \subsubsection{Declaring 2D, 3D, or User-defined Index Arrays}
 
-\charmpp{} contains direct support for multidimentional and
+\charmpp{} contains direct support for multidimensional and
 even user-defined index arrays.  These arrays can be declared as:
 
 \begin{alltt}
@@ -207,28 +207,28 @@ An array element has the same syntax and semantics no matter
 how it was created.
 
 
-\subsubsection{Advanced Array Creation: CkCreateOptions}
-\index{CkCreateOptions}
-\label{CkCreateOptions}
+\subsubsection{Advanced Array Creation: CkArrayOptions}
+\index{CkArrayOptions}
+\label{CkArrayOptions}
 
 The array creation method \kw{ckNew} actually takes a parameter
-of type \kw{CkCreateOptions}.  This object describes several
+of type \kw{CkArrayOptions}.  This object describes several
 optional attributes of the new array.
 
-The most common form of \kw{CkCreateOptions} is to set the number
-of initial array elements.  A \kw{CkCreateOptions} object will be 
+The most common form of \kw{CkArrayOptions} is to set the number
+of initial array elements.  A \kw{CkArrayOptions} object will be 
 constructed automatically in this special common case.  Thus
 the following code segments all do exactly the same thing:
 
 \begin{alltt}
-//Implicit CkCreateOptions
+//Implicit CkArrayOptions
   a1=CProxy_A1::ckNew(\uw{parameters},nElements);
 
-//Explicit CkCreateOptions
-  a1=CProxy_A1::ckNew(\uw{parameters},CkCreateOptions(nElements));
+//Explicit CkArrayOptions
+  a1=CProxy_A1::ckNew(\uw{parameters},CkArrayOptions(nElements));
 
-//Separate CkCreateOptions
-  CkCreateOptions opts(nElements);
+//Separate CkArrayOptions
+  CkArrayOptions opts(nElements);
   a1=CProxy_A1::ckNew(\uw{parameters},opts);
 \end{alltt}
 
@@ -243,7 +243,7 @@ out of date.
 \index{array map}
 \label{array map}
 
-You can use \kw{CkCreateOptions} to specify a ``map object''
+You can use \kw{CkArrayOptions} to specify a ``map object''
 for an array.  The map object is used by the array manager
 to determine the ``home'' processor of each element.  The
 home processor is the processor responsible for maintaining
@@ -271,14 +271,14 @@ public:
 
 Once you've instantiated a custom map object, you can use it to
 control the location of a new array's elements using the
-\kw{setMap} method of the \kw{CkCreateOptions} object described above.
+\kw{setMap} method of the \kw{CkArrayOptions} object described above.
 For example, if you've declared a map object named ``blockMap'':
 
 \begin{alltt}
 //Create the map group
   CProxy_blockMap myMap=CProxy_blockMap::ckNew();
 //Make a new array using that map
-  CkCreateOptions opts(nElements);
+  CkArrayOptions opts(nElements);
   opts.setMap(myMap);
   a1=CProxy_A1::ckNew(\uw{parameters},opts);
 \end{alltt}
@@ -303,7 +303,7 @@ own map object and overriding this virtual function of \kw{CkArrayMap}:
 \end{alltt}
 
 In this call, \kw{arrayHdl} is the value returned by \kw{registerArray},
-\kw{numInitial} is the number of elements passed to \kw{CkCreateOptions},
+\kw{numInitial} is the number of elements passed to \kw{CkArrayOptions},
 \kw{msg} is the constructor message to pass, and \kw{mgr} is the
 array to create.
 
@@ -337,7 +337,7 @@ Thus calling \kw{ckNew(10)} on a 3-processor machine would result in
 \index{bound arrays} \index{bindTo}
 \label{bound arrays}
 You can ``bind'' a new array to an existing array
-using the \kw{bindTo} method of \kw{CkCreateOptions}.  Bound arrays
+using the \kw{bindTo} method of \kw{CkArrayOptions}.  Bound arrays
 act like separate arrays in all ways except for migration--
 corresponding elements of bound arrays always migrate together.
 For example, this code creates two arrays A and B which are
@@ -347,7 +347,7 @@ bound together-- A[i] and B[i] will always be on the same processor.
 //Create the first array normally
   aProxy=CProxy_A::ckNew(\uw{parameters},nElements);
 //Create the second array bound to the first
-  CkCreateOptions opts(nElements);
+  CkArrayOptions opts(nElements);
   opts.bindTo(aProxy);
   bProxy=CProxy_B::ckNew(\uw{parameters},opts);
 \end{alltt}
