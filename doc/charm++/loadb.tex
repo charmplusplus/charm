@@ -15,11 +15,11 @@ load and communication pattern during execution and stores them into a
 \kw{load balancing database}. \charmpp{} then provides a collection of 
 \kw{load balancing strategies} whose job is to decide on a new mapping of 
 objects to processors based on information from the database.
-This is made possible because we can reasonably assume that objects 
-in \charmpp{} application tend to exhibit temporal correlation in 
-their computation and communication patterns, i.e. future can be to some 
-extent predicted using the historical measurement data, allowing effective 
-measurement-based load balancing without application-specific knowledge. 
+This is made possible because we can reasonably assume that objects
+in \charmpp{} application tend to exhibit temporal correlation in
+their computation and communication patterns, i.e. future can be to some
+extent predicted using the historical measurement data, allowing effective
+measurement-based load balancing without application-specific knowledge.
 
 Here are the two terms often used in \charmpp{} load balancing framework:
 \begin{itemize}
@@ -27,8 +27,8 @@ Here are the two terms often used in \charmpp{} load balancing framework:
    data and produces the new mapping of the objects. In \charmpp{}, it is
    implemented as Chare Group inherited from BaseLB.
 \item \kw{Load balancing database} provides the interface of almost all
-   load balancing calls. On each processor, it stores the load 
-   balancing instrument data and coordinates the load balancing manager and 
+   load balancing calls. On each processor, it stores the load
+   balancing instrument data and coordinates the load balancing manager and
    balancer. it is implemented as a Chare Group.
 \end{itemize}
 
@@ -50,7 +50,7 @@ descriptions:
 \item {\bf NeighborLB}:   A neighborhood load balancer
 \end{itemize}
 
-It is up to the users to choose which load balancing algorithm for the 
+It is up to the users to choose which load balancing algorithm for the
 application at compile or run-time. The compiler and run-time options
 are described at section \ref{lbOption}.
 
@@ -84,7 +84,7 @@ The users can either tell load balancer when is the good time to start
 load balancing({\em sync mode}) or simply say that he/she doesn't care
 ({\em without sync mode}). 
 In {\em automatic without sync mode}, application asserts
-that load balancer can start working at any time during the execution, and 
+that load balancer can start working at any time during the execution, and
 guarantees that the chare arrays are always ready to 
 migrate\footnote{All the state data of the array elements have to be 
 properly packed before migrating to 
@@ -154,7 +154,7 @@ all migrations are completed, the load balancer calls the
 virtual function \kw{ArrayElement::ResumeFromSync()} for each of the
 array element.  
 
-Note that {\em AtSync()} is not a blocking call, it just suggests to load 
+Note that {\em AtSync()} is not a blocking call, it just suggests to load
 balancing that it is time for load balancing. Between the calls to
 {\em AtSync} and {\em ResumeFromSync}, the object
 may be migrated. So the most commonly used approach is to stop sending
@@ -206,7 +206,7 @@ configure the load balancer, etc. These functions are:
       in an array element constructor to tell load balancer wether this object
       is migratable or not\footnote{Currently not all load balancers 
       recognize this setting though.}.
-\item {\bf lbdb->SetLBPeriod(double s)}: this function can be called 
+\item {\bf lbdb->SetLBPeriod(double s)}: this function can be called
       anywhere\footnote{except that it must be called after LBDatabase
       has been initialized in Charm++ init phase, so for example global 
       variable constructor is not a good place to call it.} to regulate 
@@ -294,7 +294,7 @@ when non NULL LB is doing its job.
 
 \end{enumerate}
 
-\subsection{Load Balancing Simulation}
+\subsubsection{Load Balancing Simulation}
 The simulation feature of load balancing framework allows the users to collect information
 about the compute wall/cpu time and communication of the chares during a particular run of
 the program and use this information to later test different load balancing strategies to
