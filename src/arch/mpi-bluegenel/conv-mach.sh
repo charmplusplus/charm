@@ -1,7 +1,9 @@
+[ -z "$BL_INSTALL" ] && echo "ERROR: BL_INSTALL not defined!" && exit 1
+
 BGL_BASE=/BlueLight/floor
+BGL_BIN=$BGL_BASE/blrts-gnu/bin
 BGL_INC=$BL_INSTALL/bglsys/include
 BGL_LIB=$BL_INSTALL/bglsys/lib
-BGL_BIN=$BGL_BASE/blrts-gnu/bin
 
 OPTS_CPP="$OPTS_CPP -I$BGL_INC "
 GCC_OPTS="-gdwarf-2 -Wno-deprecated"
@@ -34,3 +36,4 @@ CMK_MOD_NAME_ALLCAPS=1
 CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=1
 CMK_F90_MODINC="-p"
+CMK_QT="generic"
