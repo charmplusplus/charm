@@ -1,6 +1,9 @@
 #!/bin/sh
 
-if [ ! -r mkfiles/$1 ] ; then
+CHARMINC=".."
+. ../conv-config.sh
+
+if [ ! -r mkfiles/$CMK_QT ] ; then
     echo "Usage: configure <version>"
     echo ""
     echo "Available versions are:"
@@ -11,7 +14,7 @@ if [ ! -r mkfiles/$1 ] ; then
 fi
 
 rm -f Makefile
-cp mkfiles/$1 Makefile
+cp mkfiles/$CMK_QT Makefile
 
 cat >> Makefile << EOF
 
