@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.5  1995-11-01 21:36:09  jyelon
+% Revision 1.6  1995-11-01 22:01:32  jyelon
+% *** empty log message ***
+%
+% Revision 1.5  1995/11/01  21:36:09  jyelon
 % *** empty log message ***
 %
 % Revision 1.4  1995/11/01  20:28:01  jyelon
@@ -45,7 +48,6 @@ if you are installing the version of charm for networks of solaris
 machines, download {\tt net-sun.tar.Z}:
 
 \begin{verbatim}
-
     % ftp a.cs.uiuc.edu
     Connected to a.cs.uiuc.edu.
     220 a.cs.uiuc.edu FTP server ready.
@@ -68,18 +70,15 @@ machines, download {\tt net-sun.tar.Z}:
     local: net-sun.tar.Z remote: net-sun.tar.Z
     648211 bytes received in 38 seconds (17 Kbytes/s)
     ftp> quit
-
 \end{verbatim}
 
 Now that you have downloaded it, you are ready to install it: uncompress it,
 untar it, and move the directory thereby created to {\tt /usr/local/charm}:
 
 \begin{verbatim}
-
     % uncompress net-sun.tar.Z
     % tar xf net-sun.tar
     % mv net-sun /usr/local/charm
-
 \end{verbatim}
 
 You are almost ready to go.  The last thing you need to do is put the
@@ -87,22 +86,17 @@ charm binaries in your path.  There are two acceptable ways to do
 this.  The first is to simply reset your path:
 
 \begin{verbatim}
-
     % setenv PATH /usr/local/charm/bin:$PATH
-
 \end{verbatim}
 
-The second is to install the charm binaries in a common directory available
-to all users of your machine, such as {\tt /usr/local/bin}.  {\em DO NOT}
-move the charm binaries from their original location.  If you do, charm will
-cease to function correctly.  Do not copy them either.  The only reliable
-way to put the charm binaries in a common directory is to symbolically link
-them:
+The second is to install {\tt charmc} in a common directory available
+to all users of your machine, such as {\tt /usr/local/bin}.  {\em DO
+NOT} move or copy {\tt charmc}: If you do, all three programming
+systems will cease to function correctly.  The only reliable way to
+put {\tt charmc} in a common directory is to symbolically link it:
 
 \begin{verbatim}
-
-    % ln -s /usr/local/charm/bin/*   /usr/local/bin
-
+    % ln -s /usr/local/charm/bin/charmc /usr/local/bin/charmc
 \end{verbatim}
 
 The three programming systems, converse, charm, and charm++, are
@@ -114,10 +108,8 @@ binaries may be compiled for the wrong kind of CPU.  To correct this
 situation, you may need to rebuild the charm and charm++ compilers:
 
 \begin{verbatim}
-
     % cd /usr/local/charm/src
     % make all
-
 \end{verbatim}
 
 This should complete the installation process.  You are ready to test
@@ -160,13 +152,11 @@ conv-host} program with the notification code removed.  If you look
 within the charm {\tt bin} directory, you will find these programs:
 
 \begin{verbatim}
-
     % cd /usr/local/charm/bin
     % ls conv-host*
     conv-host
     conv-host.notify
     conv-host.silent
-
 \end{verbatim}
 
 The program {\tt conv-host.silent} has the notification code removed.  To
@@ -174,10 +164,8 @@ permanently deactivate notification, you may use the version without the
 notification code:
 
 \begin{verbatim}
-
     % cd /usr/local/charm/bin
     % cp conv-host.silent conv-host
-
 \end{verbatim}
 
 \subsection{Reducing disk usage}
@@ -243,40 +231,37 @@ Finally, you may {\tt strip} all the binaries in {\tt
 \subsection{Using more than one version of Charm on the same Machine}
 
 It is common to wish to install more than one version of charm on the
-same machine.  For example, we often use the {\tt uth-sol} version for
+same machine.  For example, we often use the uniprocessor version for
 debugging our programs (it supports {\tt gdb} in a simple way), and
-then we switch to the {\tt net-sol} version to run our programs in
+then we switch to the networked version to run our programs in
 parallel.
 
 To do this, you will need more than one charm directory.  For example,
 we use {\tt /usr/local/charm.uth} and {\tt /usr/local/charm.net}.
-Simply install the two versions independently, one at a time.
+Simply install the versions independently, one at a time.  All charm
+directories should be in the same parent directory.
 
-Now that both are installed, you must explicitly use one or the other
-to compile your programs.  This is done by explicitly specifying which
-{\tt charmc} to use.  For example, to compile a program with the {\tt
-uth-sol} version of charm, we do this:
+Each version contains the {\tt charmc} script.  Which {\tt charmc} you
+use to compile your programs determines which behavior the program
+will exhibit.  For example, if you install a uniprocessor version in
+{\tt /usr/local/charm.uth} and a networked version in {\tt
+/usr/local/charm.net}, and if you compile using {\tt
+/usr/local/charm.uth/bin/charmc}, then your programs will be
+uniprocessor programs.
+
+The exception to this rule is if you use the {\tt -machine} option of
+{\tt charmc}.  {\tt -machine} causes charm to look for another
+installed charm directory with the specified name.  For example, if
+you installed {\tt /usr/local/charm.uth} and {\tt
+/usr/local/charm.net} as described above, you could specify:
 
 \begin{verbatim}
-
-    % /usr/local/charm.uth/bin/charmc -c myprog.p
-    % /usr/local/charm.uth/bin/charmc -o myprog myprog.o
-
+    % /usr/local/charm.net/bin/charmc -machine charm.uth myprog.p
 \end{verbatim}
 
-When we are then ready to run it in parallel using the {\tt net-sol}
-version, we recompile it:
-
-\begin{verbatim}
-
-    % /usr/local/charm.net/bin/charmc -c myprog.p
-    % /usr/local/charm.net/bin/charmc -o myprog myprog.o
-
-\end{verbatim}
-
-It is common to automate this process with simple scripts.  Since sites
-are all unique, such scripts cannot be easily distributed, but they are
-easy to write.
+Even though you are running the {\tt charmc} script from the network
+version, it will produce uniprocessor binaries, since you told it
+explicitly to use that version.
 
 
 
