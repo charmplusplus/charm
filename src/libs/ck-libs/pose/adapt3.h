@@ -22,7 +22,7 @@ class adapt3 : public opt3 {
   adapt3() { 
     STRAT_T = ADAPT3_T; 
     timeLeash = POSE_TimeMax/2;
-    specTol = 0.25;
+    specTol = 0.1;
   }
   virtual void Step();
 };

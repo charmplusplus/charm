@@ -106,11 +106,22 @@ class rep
   void restore(rep *) { }
 #endif  
   void POSE_srand(unsigned int pseed) { prand_seed = pseed; }
-  int POSE_rand() { int rnum; srand(prand_seed); rnum = rand(); prand_seed = rnum+INT_MAX; return rnum; }
-  unsigned int POSE_urand() { int rnum; srand(prand_seed); rnum = rand(); prand_seed = rnum+INT_MAX; return prand_seed; }
-
- inline long int POSE_Linear_rand() { return nrand48(prand48_seed); }
- inline double POSE_Uniform_rand() { return erand48(prand48_seed); }
+  int POSE_rand() { 
+    int rnum; 
+    srand(prand_seed); 
+    rnum = rand(); 
+    prand_seed = rnum+INT_MAX; 
+    return rnum; 
+  }
+  unsigned int POSE_urand() { 
+    int rnum; 
+    srand(prand_seed); 
+    rnum = rand(); 
+    prand_seed = rnum+INT_MAX; 
+    return prand_seed;
+  }
+  inline long int POSE_Linear_rand() { return nrand48(prand48_seed); }
+  inline double POSE_Uniform_rand() { return erand48(prand48_seed); }
 
 };
 
