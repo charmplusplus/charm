@@ -146,7 +146,7 @@ class CkSparseContiguousReducer
   void contribute(ArrayElement *elem, CkReduction::reducerType type, const
 		  CkCallback &cb){
     int size = r.getNumElements()*sizeof(T) + sizeof(int) + sizeof(CkDataSegHeader);
-    unsigned char *ptr = new (unsigned char)[size];
+    unsigned char *ptr = new unsigned char[size];
     int count = 1;
     /* pack data */
     memcpy(ptr, &count, sizeof(int));
@@ -163,7 +163,7 @@ class CkSparseContiguousReducer
   */
   void contribute(ArrayElement *elem, CkReduction::reducerType type){
     int size = r.getNumElements()*sizeof(T) + sizeof(int) + sizeof(CkDataSegHeader);
-    unsigned char *ptr = new (unsigned char)[size];
+    unsigned char *ptr = new unsigned char[size];
     int count = 1;
     /* pack data */
     memcpy(ptr, &count, sizeof(int));
