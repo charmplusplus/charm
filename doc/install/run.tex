@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.11  1998-11-03 19:24:48  milind
+% Revision 1.12  1999-07-09 18:18:40  milind
+% Updated for new release 5.0.
+%
+% Revision 1.11  1998/11/03 19:24:48  milind
 % Added documentation for the new shell option in nodelist.
 %
 % Revision 1.10  1997/07/25 21:07:54  wilmarth
@@ -61,30 +64,27 @@ command line options is in Section~\ref{command line options}.
 
 \begin{itemize}
 
-\item \underline{\bf CM-5:} 
-	\begin{tabbing}
-	{\fexec pgm}
-	\end{tabbing}
-	will run program {\fparm pgm} interactively from one of the partition 
-	managers.  For programs with large resource requirements, use the utilities
-	{\fexec jrun} and {\fexec jstat}. See the man pages at your site for
-	more information. Also, the {\fexec +pN} option is recognized and runs {\fexec pgm} on {\fexec N} processors.
-
-\item \underline{\bf nCUBE/2:} 
-	\begin{tabbing}
-	{\fexec xnc -d4 pgm}
-	\end{tabbing}
-	runs {\fparm pgm} on a hypercube of dimension 4 (i.e. on 16 processors). 
-
-\item \underline{\bf Paragon running SunMos:} 
+\item \underline{\bf ASCI Red:} 
 	\begin{tabbing}
 	{\fexec yod -sz 4 pgm}
 	\end{tabbing}
 	runs {\fparm pgm} on four processors.
 
-\item \underline{\bf Paragon running OSF:} 
+\item \underline{\bf Cray T3E:} 
 	\begin{tabbing}
-	{\fexec pexec pgm -sz 4}
+	{\fexec mpprun -n 4 pgm}
+	\end{tabbing}
+	runs {\fparm pgm} on four processors.
+
+\item \underline{\bf SGI Origin2000 (origin-mpi):} 
+	\begin{tabbing}
+	{\fexec mpirun -np 4 pgm}
+	\end{tabbing}
+	runs {\fparm pgm} on four processors.
+
+\item \underline{\bf SGI Origin2000 (origin2000 or origin-pthreads):} 
+	\begin{tabbing}
+	{\fexec pgm +p4}
 	\end{tabbing}
 	runs {\fparm pgm} on four processors.
 
@@ -116,7 +116,7 @@ Each line of the nodes file is a command.  The most important command
 is:
 
 \begin{verbatim}
-host <hostname>
+host <hostname> <qualifiers>
 \end{verbatim}
 
 which specifies a host.  The other commands are qualifiers: they modify
@@ -137,39 +137,36 @@ shell\\
 \end{tabbing}
 
 {\bf Note:}
- By default, conv-host uses a remote shell "rsh" to spawn node processes
+By default, conv-host uses a remote shell ``rsh'' to spawn node processes
 on the remote hosts. The {\tt shell} qualifier can be used to override
-it with say, "ssh". One can set the {\tt CONV\_RSH} environment variable
+it with say, ``ssh''. One can set the {\tt CONV\_RSH} environment variable
 or use conv-host option {\tt ++remote-shell} to override the default remote 
 shell for all hosts with unspecified {\tt shell} qualifier.
 
-All qualifiers accept "*" as an argument, this resets the modifier to
+All qualifiers accept ``*'' as an argument, this resets the modifier to
 its default value.  Note that currently, the passwd, cpus, and speed
-factors are ignored.  Inline qualifiers will be added:
+factors are ignored.  Inline qualifiers are also allowed:
 
 \begin{verbatim}
-host beauty ++cpus 2
+host beauty ++cpus 2 ++shell ssh
 \end{verbatim}
 
-and also user-defined qualifiers.
+Except for ``group'', every other qualifier can be inlined, with the
+restriction that if the ``setup'' qualifier is inlined, it should be
+the last qualifier on the ``host'' or ``group'' statement line.
 
 Here is a simple nodes file:
 
 \begin{verbatim}
-        group kale-sun
-         
-        host charm.cs.uiuc.edu
-        host dp.cs.uiuc.edu
-        host grace.cs.uiuc.edu
-        host dagger.cs.uiuc.edu
-         
+        group kale-sun ++cpus 1
+          host charm.cs.uiuc.edu ++shell ssh
+          host dp.cs.uiuc.edu
+          host grace.cs.uiuc.edu
+          host dagger.cs.uiuc.edu
         group kale-sol
-         
-        host beauty.cs.uiuc.edu
-         
+          host beauty.cs.uiuc.edu ++cpus 2
         group main
-         
-        host localhost
+          host localhost
 \end{verbatim}
 
 This defines three groups of machines: group kale-sun, group kale-sol,
@@ -199,55 +196,11 @@ Since the new nodes file is incompatible with the old nodes file, it has
 been renamed.  It now is called ``.nodelist'', and all the options and
 environment variables pertaining to it have also been renamed {\tt nodelist}.
 
-%%
-%The list of nodes must be specified in a file, with one node entry per
-%line, each entry being in the format:
-%
-%{\fexec nodename [username] [passwd] [exec\_home] [extension] [setup\_command]}
-%
-%The {\fparm nodename} must be specified completely (e.g. sparc1.cs.uiuc.edu).
-%The {\fparm username} is optional; if the login id on that node is the
-%same as the current login id, it need not be specified.
-%The {\fparm password} argument is ignored in the current implementation.
-%The {\fparm exec\_home} argument is optional; if the directory path under
-%which the executable is found is the same as on the node running 
-%{\fexec conv-host}, it could be ignored. This argument is used for pathname
-%resolution as explained above.
-%The {\fparm extension} argument is useful when the names for executables 
-%on each node differ. If specified, {\fexec conv-host}
-%appends the extension to the name of the executable specified on the 
-%command line and executes the new program.
-%The {\fparm setup\_command} is optional; if specified,
-%the command is executed on the corresponding node before the program 
-%begins execution. The {\bf *} character may be used as a
-%placeholder for an absent argument.
-%The number of nodes specified in the nodes file must not be less
-%than the number of nodes specified with the {\fexec +p} command
-%line option. If the number of nodes specified in the nodes file is
-%greater than the number of nodes specified with the {\fexec +p} option,
-%{\fexec +p} entries in the nodes file will be used in succession, starting
-%with the first entry in the file.
-%The name of the nodes file\index{nodes file}\index{.nodes} itself is
-%obtained by  {\fexec conv-host} in the following order:
-%\begin{enumerate}
-%
-%\item	From the command line option {\fexec ++nodesfile}.
-%
-%\item	If the {\fexec ++nodesfile} option is not given, the value of the 
-%environment variable {\fexec NODES} is taken to be the nodes file.
-%
-%\item	If the environment variable {\fexec NODES} is not set, the file 
-%{\fparm .nodelist}\index{.nodelist}\index{nodes file} in the user's home
-%directory is taken to be the nodes file.
-%
-%\item	If the above file does not exist, the file 
-%{\fparm .nodelist}\index{.nodelist}\index{nodes file} in the current
-%directory is used as the nodes file.
-%
-%\end{enumerate}
-
 The user is required to set up remote login permissions on all nodes
-using the .rhosts file in the home directory.
+using the ``.rhosts'' file in the home directory if ``rsh'' is used for remote
+login into the hosts. If ``ssh'' is used, the user will have to setup
+password-less login to remote hosts either using ``.shosts'' file, or using
+RSA authentication based on a key-pair and adding public keys to ``.ssh/authorized\_keys'' file. See ``ssh'' documentation for more information.
 
 \end{itemize}
 
@@ -270,8 +223,6 @@ results.
 In order to run Charm and Charm++ programs with the simulator:
 \begin{itemize}
 
-\item link user program with \verb+<machine>/lib/libck-unimain.o+
-
 \item prepare a configuration file as described below
 
 \item to run, type \verb#pgm +pN# (and possibly other runtime options) where
@@ -279,8 +230,8 @@ In order to run Charm and Charm++ programs with the simulator:
 
 \end{itemize}
 Currently only Charm and Charm++ programs can take advantage of the
-simulator features, because the \verb+libck-unimain.o+ file is Charm
-specific.  In the future, a method to allow any Converse based program
+simulator features.
+In the future, a method to allow any Converse based program
 to use the simulator features will be devised.
 
 The basic task of the simulator is to manage the message passing

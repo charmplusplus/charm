@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.7  1997-09-18 00:00:59  jyelon
+% Revision 1.8  1999-07-09 18:18:39  milind
+% Updated for new release 5.0.
+%
+% Revision 1.7  1997/09/18 00:00:59  jyelon
 % *** empty log message ***
 %
 % Revision 1.6  1997/07/22 12:05:25  jyelon
@@ -49,15 +52,13 @@ has to add some command-line options in addition to the simplified
 syntax shown below.  The options are described next.
 
 \begin{verbatim}
- * Compile C                    charmc -o pgm.o pgm.c
- * Compile C++                  charmc -o pgm.o pgm.C
- * Compile Charm                charmc -o pgm.o pgm.p
- * Compile old-style Charm++    charmc -o pgm.o pgm.P
- * Link                         charmc -o pgm   obj1.o obj2.o obj3.o...
- * Compile + Link               charmc -o pgm   src1.c src2.C src3.p src4.P
- * Create Library               charmc -o lib.a obj1.o obj2.o obj3.o...
- * CPM preprocessing            charmc -gen-cpm file.c
- * Preprocess modern Charm++    charmc file.ci
+ * Compile C                        charmc -o pgm.o pgm.c
+ * Compile C++                      charmc -o pgm.o pgm.C
+ * Link                             charmc -o pgm   obj1.o obj2.o obj3.o...
+ * Compile + Link                   charmc -o pgm   src1.c src2.ci src3.C
+ * Create Library                   charmc -o lib.a obj1.o obj2.o obj3.o...
+ * CPM preprocessing                charmc -gen-cpm file.c
+ * Translate Charm++ Interface File charmc file.ci
 \end{verbatim}
 
 Charmc has been given data on how to invoke the compilers on each
@@ -164,7 +165,7 @@ example).  Usually, charmc prefers the less buggy of the two, but
 not always.  This option causes charmc to switch to the most reliable
 compiler, regardless of whether it produces slow code or not.
 
-\item[{\tt -language \{converse|converse++|charm|charm++\}}:]
+\item[{\tt -language \{converse|charm++|sdag|idl\}}:]
 
 When linking with charmc, one must specify the ``language''.  This
 is just a way to help charmc include the right libraries.  Pick the
@@ -172,16 +173,17 @@ is just a way to help charmc include the right libraries.  Pick the
 
 \begin{itemize}
 \item{{\bf Charm++} if your program includes Charm++, Charm, C++, and C.}
-\item{{\bf Charm} if your program includes Charm and C.}
-\item{{\bf Converse++} if your program includes C++ and C.}
-\item{{\bf Converse} if your program includes only C.}
+\item{{\bf Converse} if your program includes C or C++.}
+\item{{\bf sdag} if your program includes structured dagger.}
+\item{{\bf idl} if your program includes IDL bindings for Charm++.}
 \end{itemize}
 
 \item[{\tt -balance} {\em load-balance-strategy}:]
 
-When compiling Charm or Charm++, one must include a load-balancing
+When linking any Converse program (including any Charm++, sdag or IDL program),
+one must include a seed load-balancing
 library.  There are currently three to choose from: {\tt rand}, {\tt
-acwn}, and {\tt mngr} are supported.  Default is {\tt -balance rand}.
+test}, and {\tt graph} are supported.  Default is {\tt -balance rand}.
 
 \item[{\tt -tracemode} {\em tracing-mode}:]
 

@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.11  1998-03-16 20:17:29  milind
+% Revision 1.12  1999-07-09 18:18:39  milind
+% Updated for new release 5.0.
+%
+% Revision 1.11  1998/03/16 20:17:29  milind
 % 4.5 => 4.8
 %
 % Revision 1.10  1996/10/01 18:33:04  wilmarth
@@ -60,7 +63,8 @@ if not, you must mentally translate.
 
 Download the tar-file file appropriate to your machine.  For example,
 if you are installing the version of charm for networks of Sun
-workstations running SunOS 4.X, download {\tt net-sun.tar.Z}:
+workstations running Solaris, download {\tt net-sol.tar.Z} from PPL's
+website (preferred) {\tt http://charm.cs.uiuc.edu/} or using anonymous FTP:
 
 \begin{verbatim}
     % ftp a.cs.uiuc.edu
@@ -74,15 +78,15 @@ workstations running SunOS 4.X, download {\tt net-sun.tar.Z}:
     230-                 Dept. of Computer Science FTP server.
     230-
     230 Guest login ok, access restrictions apply.
-    ftp> cd pub/research-groups/CHARM/CHARM.4.8
+    ftp> cd pub/research-groups/CHARM/CHARM.5.0
     250 CWD command successful.
     ftp> binary
     200 Type set to I.
-    ftp> get net-sun.tar.gz
+    ftp> get net-sol.tar.gz
     200 PORT command successful.
-    150 Opening BINARY mode data connection for net-sun.tar.gz (648211 bytes).
+    150 Opening BINARY mode data connection for net-sol.tar.gz (648211 bytes).
     226 Transfer complete.
-    local: net-sun.tar.gz remote: net-sun.tar.gz
+    local: net-sol.tar.gz remote: net-sol.tar.gz
     648211 bytes received in 38 seconds (17 Kbytes/s)
     ftp> quit
 \end{verbatim}
@@ -91,9 +95,9 @@ Now that you have downloaded it, you are ready to install it: uncompress it,
 untar it, and move the directory thereby created to {\tt /usr/local/charm}:
 
 \begin{verbatim}
-    % gunzip net-sun.tar.gz
-    % tar xf net-sun.tar
-    % mv net-sun /usr/local/charm
+    % gunzip net-sol.tar.gz
+    % tar xf net-sol.tar
+    % mv net-sol /usr/local/charm
 \end{verbatim}
 
 You are almost ready to go.  The last thing you need to do is put the
@@ -106,21 +110,21 @@ this.  The first is to simply reset your path:
 
 The second is to install {\tt charmc} in a common directory available
 to all users of your machine, such as {\tt /usr/local/bin}.  {\em DO
-NOT} move or copy {\tt charmc}: If you do, all three programming
-systems will cease to function correctly.  The only reliable way to
+NOT} move or copy {\tt charmc}: If you do, it will cease to function correctly.
+The only reliable way to
 put {\tt charmc} in a common directory is to symbolically link it:
 
 \begin{verbatim}
     % ln -s /usr/local/charm/bin/charmc /usr/local/bin/charmc
 \end{verbatim}
 
-The three programming systems, converse, charm, and charm++, are
+The programming systems, converse and charm++, are
 probably ready to go.  However, there is one possible situation that
 they may not be.  If your parallel machine has a separate ``host''
 computer on which you do compilation, and if your ``host'' computer is
 of a type different from the one we anticipated, then some of the
 binaries may be compiled for the wrong kind of CPU.  To correct this
-situation, you may need to rebuild the charm and charm++ compilers:
+situation, you may need to rebuild the cpm, charm++, sdag, and IDL  compilers:
 
 \begin{verbatim}
     % cd /usr/local/charm/src
@@ -128,7 +132,7 @@ situation, you may need to rebuild the charm and charm++ compilers:
 \end{verbatim}
 
 This should complete the installation process.  You are ready to test
-converse, charm, and charm++.  However, there are a few things to
+converse and charm++.  However, there are a few things to
 attend to before you start using them on a regular basis.  These are
 security issues and disk space consumption.
 
@@ -136,15 +140,15 @@ security issues and disk space consumption.
 
 On most computers, charm programs are simple binaries, and they pose
 no more security issues than any other program would.  The exceptions
-to this rule are the network versions {\tt net-sun}, {\tt net-sol},
-{\tt net-hp}, and {\tt net-rs6k}.  This section only applies to users
+to this rule are the network versions {\tt net-*}.  
+This section only applies to users
 of the networked versions, all other users may skip it.
 
 The network versions utilize many unix processes communicating with
 each other via UDP.  No attempt is currently being made to filter out
 unauthorized packets.  Therefore, it is theoretically possible to
 mount a security attack by sending UDP packets to an executing
-converse, charm, or charm++ program's sockets.
+converse or charm++ program's sockets.
 
 The second security issue associated with networked programs is
 associated with the fact that we, the charm developers, need evidence
@@ -180,7 +184,7 @@ notification code:
     % cp conv-host.silent conv-host
 \end{verbatim}
 
-Although versions for some other machines (eg. ncube) contain
+Although versions for some other machines contain
 programs named {\tt conv-host.notify} and {\tt conv-host.silent}, they
 never actually notify us.  The existence of the extra files is just to
 make our compilation scripts more consistent across versions.  The
@@ -210,34 +214,6 @@ If you are not using charm++, you may delete the charm++ compiler:
 \begin{verbatim}
     % rm /usr/local/charm/bin/charmxlat++
     % rm /usr/local/charm/bin/charmfilter++
-\end{verbatim}
-
-Similarly, if you are not using charm, you may delete the charm compiler:
-
-\begin{verbatim}
-    % rm /usr/local/charm/bin/charmxlat
-    % rm /usr/local/charm/bin/charmfilter
-\end{verbatim}
-
-If you are using neither charm nor charm++, you may delete the
-combined charm/charm++ runtime library:
-
-\begin{verbatim}
-    % rm /usr/local/charm/lib/libck-*
-    % rm /usr/local/charm/lib/libcharm.a
-\end{verbatim}
-
-If you are using neither charm nor charm++, you may delete the charm
-and charm++ include files.  Everything in {\tt include} which doesn't
-start with {\tt conv} (eg, converse) is charm-related:
-
-\begin{verbatim}
-    % cd /usr/local/charm/include
-    % mkdir save
-    % mv conv* save
-    % rm *.h *.int
-    % mv save/* .
-    % rmdir save
 \end{verbatim}
 
 You may delete the programs {\tt conv-host.notify} and {\tt
@@ -274,7 +250,7 @@ you installed {\tt /usr/local/charm.uth} and {\tt
 /usr/local/charm.net} as described above, you could specify:
 
 \begin{verbatim}
-    % /usr/local/charm.net/bin/charmc -machine charm.uth myprog.p
+    % /usr/local/charm.net/bin/charmc -machine charm.uth myprog.C
 \end{verbatim}
 
 Even though you are running the {\tt charmc} script from the network

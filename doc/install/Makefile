@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.5  1997-08-18 18:37:34  jyelon
+# Revision 1.6  1999-07-09 18:18:39  milind
+# Updated for new release 5.0.
+#
+# Revision 1.5  1997/08/18 18:37:34  jyelon
 # *** empty log message ***
 #
 # Revision 1.4  1996/11/14 18:41:13  milind
@@ -54,9 +57,6 @@ install:
 	chmod 664 /expand1/groupMosaic/html-manuals/install.manual/*
 
 all: ps html install
-
-co:
-	co Makefile $(TEXFILES)
 
 clean:	
 	rm -f *.aux *.log *.dvi *.ps *.idx *.toc *~
