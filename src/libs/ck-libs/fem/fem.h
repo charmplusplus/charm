@@ -23,15 +23,18 @@ C interface file
 #define FEM_HEXAHEDRAL    8
 #define FEM_QUADRILATERAL 4
 
-#if FEM_FORTRAN
-typedef void (*FEM_PupFn)(pup_er, void*);
-#else
-typedef void *(*FEM_PupFn)(pup_er, void*);
-#endif
+/* initialization flags */
+#define FEM_INIT_READ    2
+#define FEM_INIT_WRITE   4
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+  typedef void (*FEM_PupFn)(pup_er, void*);
+
+  /*Attach a new FEM chunk to the existing TCharm array*/
+  void FEM_Attach(int flags);
+
   /*Utility*/
   int FEM_My_Partition(void);
   int FEM_Num_Partitions(void);
