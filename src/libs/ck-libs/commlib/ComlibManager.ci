@@ -1,8 +1,8 @@
-module ComlibModule { 
+module ComlibModule {
   initcall void initComlibManager();
   message DummyMsg;
 
-  group ComlibManager{
+  group [migratable] ComlibManager {
     entry ComlibManager(int s,int n=1);
     entry ComlibManager(CkPointer<Strategy> s, int n=1);
     entry ComlibManager();

@@ -121,13 +121,15 @@ class ComlibManager: public CkDelegateMgr{
     //flags
     int receivedTable, flushTable, barrierReached, barrier2Reached;
     int totalMsgCount, totalBytes, nIterations;
-   
+
     void init(); //initialization function
 
  public:
     ComlibManager();  //Receommended constructor
     ComlibManager(int strategyID,int eltPerPE=1);
     ComlibManager(Strategy *strat,int eltPerPE=1);
+    ComlibManager::ComlibManager(CkMigrateMessage *m){ }
+    int useDefCtor(void){ return 1; }
 
     void barrier(void);
     void barrier2(void);
