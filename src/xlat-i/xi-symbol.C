@@ -307,7 +307,7 @@ Chare::genChareDecls(XStr& str)
   str <<" public virtual _CK_CID";
   if(bases!=0) {
     str << ", ";
-    bases->genProxyNames(str);
+    bases->genProxyNames(str, "public ", "", ", ");
   }
   str.spew(CIChareStart, chare_prefix(), getBaseName());
   str << "    ";
@@ -337,7 +337,7 @@ Chare::genGroupDecls(XStr& str)
     str <<" public virtual _CK_NGID";
   if(bases!=0) {
     str << ", ";
-    bases->genProxyNames(str);
+    bases->genProxyNames(str, "public ", "", ", ");
   }
   str.spew(CIChareStart, group_prefix(), getBaseName());
   str << "    ";
@@ -402,13 +402,18 @@ Chare::genArrayDecls(XStr& str)
   str <<" public virtual _CK_AID";
   if(bases!=0) {
     str << ", ";
-    bases->genProxyNames(str);
+    bases->genProxyNames(str, "public ", "", ", ");
   }
   str.spew(CIChareStart, array_prefix(), getBaseName());
   str << "    ";
   str<<array_prefix();
   type->print(str);
-  str << "(CkAID _aid) { ckSetArrayId(_aid); }\n";
+  str << "(CkAID _aid) ";
+  if(bases !=0) {
+    str << ":";
+    bases->genProxyNames(str, "", "(_aid)", ", ");
+  }
+  str << "{ ckSetArrayId(_aid); }\n";
   str << "    CkAID ckGetArrayId(void) { return CkAID(_ck_aid, _elem); }\n";
   str << "    void ckSetArrayId(CkAID _aid) { \n";
   str << "      setAid(_aid._ck_aid); _elem = _aid._elem; \n";
@@ -823,15 +828,16 @@ void TParamList::genSpec(XStr& str)
   }
 }
 
-void TypeList::genProxyNames(XStr& str)
+void TypeList::genProxyNames(XStr& str, char *prefix, char *suffix, char *sep)
 {
   if(type) {
-    str << "public ";
+    str << prefix;
     type->genProxyName(str);
+    str << suffix;
   }
   if(next) {
-    str << ", ";
-    type->genProxyName(str);
+    str << sep;
+    next->genProxyNames(str, prefix, suffix, sep);
   }
 }
 
@@ -1433,8 +1439,12 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
     container->genVars(str);
   str << "::";
   container->genProxyName(str);
-  str << "(int numElements)\n";
-  str << "{\n";
+  str << "(int numElements)";
+  if(container->isDerived()) {
+    str << ": ";
+    container->genProxyBases(str, "", "(numElements)", ", ");
+  }
+  str << "\n{\n";
   str << "  setAid(Array1D::CreateArray(numElements, ChareIndex(RRMap),\n";
   str << "    ConstructorIndex(RRMap,ArrayMapCreateMessage),\n";
   str << "    __idx, ConstructorIndex(";

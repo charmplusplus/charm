@@ -85,7 +85,7 @@ class TypeList : public Printable {
   public:
     TypeList(Type *t, TypeList *n=0) : type(t), next(n) {}
     void print(XStr& str);
-    void genProxyNames(XStr& str);
+    void genProxyNames(XStr& str, char*, char*, char*);
 };
 
 /* EnType is the type of an entry method parameter, 
@@ -283,8 +283,12 @@ class Chare : public TEntity, public Construct {
       chareType(c), type(t), bases(b), list(l) {setTemplate(0);}
     int  getChareType(void) { return chareType; }
     void genProxyName(XStr& str){type->genProxyName(str);}
+    void genProxyBases(XStr& str, char* p, char* s, char* sep) {
+      bases->genProxyNames(str, p, s, sep);
+    }
     char *getBaseName(void) { return type->getBaseName(); }
-    int  isTemplated(void) { return !(templat==0); }
+    int  isTemplated(void) { return (templat!=0); }
+    int  isDerived(void) { return (bases!=0); }
     void print(XStr& str);
     void genChareDecls(XStr& str);
     void genGroupDecls(XStr& str);
