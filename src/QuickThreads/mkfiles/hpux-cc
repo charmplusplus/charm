@@ -1,5 +1,5 @@
 
-CC=cc -Aa -I. -O -D_HPUX_SOURCE
+CC=cc -Aa -I. -O -D_HPUX_SOURCE +DAportable
 
 all: qt stp testpgm
 
