@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.20  1997-07-26 16:41:10  jyelon
+ * Revision 2.21  1998-02-10 21:16:28  milind
+ * changed macros to include a msgtype parameter to support method name overloading.
+ *
+ * Revision 2.20  1997/07/26 16:41:10  jyelon
  * *** empty log message ***
  *
  * Revision 2.19  1996/07/15 21:01:41  jyelon
@@ -222,31 +225,31 @@
    They work only for preprocessors with ANSI concatenation, e.g. g++
    So they wont work with cpp.	*/
 
-#define GetEntryPtr(ChareType,EP) 	_CK_ep_##ChareType##_##EP
+#define GetEntryPtr(ChareType,EP, MsgType) 	_CK_ep_##ChareType##_##EP##_##MsgType
 
-#define CSendMsg(ChareType,EP,msg,ChareId) 	SendMsg(GetEntryPtr(ChareType,EP), msg, ChareId)
+#define CSendMsg(ChareType,EP,MsgType,msg,ChareId) 	SendMsg(GetEntryPtr(ChareType,EP,MsgType), msg, ChareId)
 
-#define CSendMsgBranch(ChareType,EP,msg,ChareId,Pe) 	GeneralSendMsgBranch(GetEntryPtr(ChareType,EP), msg, Pe, -1, ChareId)
+#define CSendMsgBranch(ChareType,EP,MsgType,msg,ChareId,Pe) 	GeneralSendMsgBranch(GetEntryPtr(ChareType,EP,MsgType), msg, Pe, -1, ChareId)
 
-#define CBroadcastMsgBranch(ChareType,EP,msg,ChareId) 	GeneralBroadcastMsgBranch(GetEntryPtr(ChareType,EP), msg, -1, ChareId)
+#define CBroadcastMsgBranch(ChareType,EP,MsgType,msg,ChareId) 	GeneralBroadcastMsgBranch(GetEntryPtr(ChareType,EP,MsgType), msg, -1, ChareId)
 
 #define CLocalBranch(BocType, BocId)	((BocType *)GetBocDataPtr(BocId))
 
-#define CRemoteCallBranch(BOC1, ep1 , m, g, p) CRemoteCallBranchFn(GetEntryPtr(BOC1,ep1), m, g, p)
+#define CRemoteCallBranch(BOC1, ep1 , mtype, m, g, p) CRemoteCallBranchFn(GetEntryPtr(BOC1,ep1,mtype), m, g, p)
 
-#define CRemoteCall(CH, ep, m, cid) CRemoteCallFn(GetEntryPtr(CH,ep),m,cid)
+#define CRemoteCall(CH, ep, mtype, m, cid) CRemoteCallFn(GetEntryPtr(CH,ep,mtype),m,cid)
 
 #define MsgIndex(MessageType)	_CK_msg_##MessageType
 
-#define new_chare(ChareType, msg)	CreateChare(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, 0, (0xFFF2))
+#define new_chare(ChareType, msgtype, msg)	CreateChare(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType,msgtype), msg, 0, (0xFFF2))
 
-#define new_chare2(ChareType, msg, vid, pe) 	CreateChare(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, vid, pe)
-
-
-#define new_group(ChareType, msg)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, -1, 0)
+#define new_chare2(ChareType, msgtype, msg, vid, pe) 	CreateChare(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType,msgtype), msg, vid, pe)
 
 
-#define new_group2(ChareType, msg, returnEP, returnID)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, returnEP, returnID)
+#define new_group(ChareType, msgtype, msg)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType,msgtype), msg, -1, 0)
+
+
+#define new_group2(ChareType, msgtype, msg, returnEP, returnID)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType,msgtype), msg, returnEP, returnID)
 
 
 
