@@ -238,6 +238,32 @@ CkReduction::reducerType LXORReducer;
 MAXMIN_MAP_TYPES(MAXMIN_INSTANTIATE)
 BITWISE_MAP_TYPES(BITWISE_INSTANTIATE)
 
+static void ampiSetupReductions(void) {
+  // add reducers for MPI_MINLOC/MPI_MAXLOC
+#if STUPID_SUN_TEMPLATES
+  /* Hideous: specify which version of the template
+     we want by type-casting a function pointer! */
+#  define MAXMIN_REGISTER(fn,V,I) \
+    fn##V##I##Reducer = CkReduction::addReducer( \
+	(CkReduction::reducerFn)(fn##V##I##Type)fn);
+#  define BITWISE_REGISTER(fn,T) \
+    fn##T##Reducer = CkReduction::addReducer( \
+	(CkReduction::reducerFn)(fn##T##Type)fn);
+#else
+  /* Sane compiler: just specify template using <> */
+#  define MAXMIN_REGISTER(fn,V,I) \
+    fn##V##I##Reducer = CkReduction::addReducer(fn<V,I>);
+#  define BITWISE_REGISTER(fn,T) \
+    fn##T##Reducer = CkReduction::addReducer(fn<T>);
+#endif
+  MAXMIN_MAP_TYPES(MAXMIN_REGISTER)
+  BITWISE_MAP_TYPES(BITWISE_REGISTER)
+  LXORReducer=CkReduction::addReducer(LXOR);
+}
+
+
+// ------------ startup support -----------
+
 int _ampi_fallback_setup_count;
 CDECL void MPI_Setup(void);
 FDECL void FTN_NAME(MPI_SETUP,mpi_setup)(void);
@@ -270,9 +296,12 @@ CDECL void MPI_Setup_Switch(void) {
 
 static int nodeinit_has_been_called=0;
 CtvDeclare(ampiParent*, ampiPtr);
+CtvDeclare(int, ampiInitDone);
 static void ampiNodeInit(void)
 {
   CtvInitialize(ampiParent*, ampiPtr);
+  CtvInitialize(int,ampiInitDone);
+  CtvAccess(ampiInitDone)=0;
   mpi_nworlds=0;
   for(int i=0;i<MPI_MAX_COMM_WORLDS; i++)
   {
@@ -280,26 +309,7 @@ static void ampiNodeInit(void)
   }
   TCHARM_Set_fallback_setup(MPI_Setup_Switch);
 
-  // add reducers for MPI_MINLOC/MPI_MAXLOC
-#if STUPID_SUN_TEMPLATES
-  /* Hideous: specify which version of the template
-     we want by type-casting a function pointer! */
-#  define MAXMIN_REGISTER(fn,V,I) \
-    fn##V##I##Reducer = CkReduction::addReducer( \
-	(CkReduction::reducerFn)(fn##V##I##Type)fn);
-#  define BITWISE_REGISTER(fn,T) \
-    fn##T##Reducer = CkReduction::addReducer( \
-	(CkReduction::reducerFn)(fn##T##Type)fn);
-#else
-  /* Sane compiler: just specify template using <> */
-#  define MAXMIN_REGISTER(fn,V,I) \
-    fn##V##I##Reducer = CkReduction::addReducer(fn<V,I>);
-#  define BITWISE_REGISTER(fn,T) \
-    fn##T##Reducer = CkReduction::addReducer(fn<T>);
-#endif
-  MAXMIN_MAP_TYPES(MAXMIN_REGISTER)
-  BITWISE_MAP_TYPES(BITWISE_REGISTER)
-  LXORReducer=CkReduction::addReducer(LXOR);
+  ampiSetupReductions();
 
   nodeinit_has_been_called=1;
 }
@@ -354,9 +364,8 @@ Called from MPI_Init, a collective initialization call:
 */
 static ampi *ampiInit(char **argv)
 {
+  if (CtvAccess(ampiInitDone)) return NULL; /* Already called ampiInit */
   STARTUP_DEBUG("ampiInit> begin")
-  ampi *ptr=(ampi *)TCharm::get()->semaPeek(AMPI_TCHARM_SEMAID);
-  if (ptr) return ptr; /* Already attached */
   
   // Parse command-line arguments (Commlib)
   int strat = USE_DIRECT;
@@ -415,7 +424,8 @@ static ampi *ampiInit(char **argv)
   }
   
   // Find our ampi object:
-  ptr=(ampi *)TCharm::get()->semaGets(AMPI_TCHARM_SEMAID);
+  ampi *ptr=(ampi *)TCharm::get()->semaGet(AMPI_TCHARM_SEMAID);
+  CtvAccess(ampiInitDone)=1;
   STARTUP_DEBUG("ampiInit> complete")
   
   return ptr;
@@ -982,7 +992,7 @@ CDECL int MPI_Initialized(int *isInit)
 {
   AMPIAPI("MPI_Initialized");
   if (nodeinit_has_been_called) {
-  	*isInit=(NULL!=CtvAccess(ampiPtr));
+  	*isInit=CtvAccess(ampiInitDone);
   } 
   else /* !nodeinit_has_been_called */ {
   	*isInit=nodeinit_has_been_called;
