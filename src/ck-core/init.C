@@ -1,6 +1,8 @@
 #include "ck.h"
 #include "trace.h"
 
+#define   DEBUGF(x) /* printf x */
+
 UChar _defaultQueueing = CK_QUEUEING_FIFO;
 
 UInt  _printCS = 0;
@@ -36,9 +38,9 @@ CpvDeclare(MsgPool*, _msgPool);
 CpvDeclare(_CkOutStream*, _ckout);
 CpvDeclare(_CkErrStream*, _ckerr);
 
-CpvStaticDeclare(UInt,  _numInitsRecd);
+CpvStaticDeclare(int,  _numInitsRecd); /* UInt changed to int */
 CpvStaticDeclare(PtrQ*, _buffQ);
-CpvStaticDeclare(PtrVec*, _bocInitVec);
+CpvStaticDeclare(PtrVec*, _bocInitVec) = 0;
 
 static PtrVec* _nodeBocInitVec;
 
@@ -46,7 +48,7 @@ static int    _exitHandlerIdx;
 
 static Stats** _allStats = 0;
 
-static UInt   _numStatsRecd = 0;
+static int   _numStatsRecd = 0;
 static int    _exitStarted = 0;
 
 #ifndef CMK_OPTIMIZE
@@ -207,6 +209,7 @@ static void _exitHandler(envelope *env)
 static inline void _processBufferedBocInits(void)
 {
   register envelope *env;
+  static   int j;
   CmiNumberHandler(_bocHandlerIdx, (CmiHandler)_processHandler);
   register int i = 0;
   register int len = CpvAccess(_bocInitVec)->length();
@@ -317,10 +320,10 @@ static void _initHandler(void *msg)
       _processROMsgMsg(env);
       break;
     case RODataMsg:
-      CpvAccess(_numInitsRecd)++;
+      CpvAccess(_numInitsRecd)+=2;  /*++;*/
       CpvAccess(_qd)->process();
       _numInitMsgs = env->getCount();
-      _processRODataMsg(env);
+	  _processRODataMsg(env);
       break;
     default:
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
@@ -438,137 +441,148 @@ extern void _registerLBDatabase(void);
 
 void _initCharm(int argc, char **argv)
 {
-  CpvInitialize(PtrQ*,_buffQ);
-  CpvInitialize(PtrVec*,_bocInitVec);
-  CpvInitialize(void*, _currentChare);
-  CpvInitialize(int,   _currentChareType);
-  CpvInitialize(CkGroupID, _currentGroup);
-  CpvInitialize(CkGroupID, _currentNodeGroup);
-  CpvInitialize(GroupTable*, _groupTable);
-  CpvInitialize(UInt, _numInitsRecd);
-  CpvInitialize(QdState*, _qd);
-  CpvInitialize(MsgPool*, _msgPool);
+	CpvInitialize(PtrQ*,_buffQ);
+	CpvInitialize(PtrVec*,_bocInitVec);
+	CpvInitialize(void*, _currentChare);
+	CpvInitialize(int,   _currentChareType);
+	CpvInitialize(CkGroupID, _currentGroup);
+	CpvInitialize(CkGroupID, _currentNodeGroup);
+	CpvInitialize(GroupTable*, _groupTable);
+	CpvInitialize(int, _numInitsRecd);
+	CpvInitialize(QdState*, _qd);
+	CpvInitialize(MsgPool*, _msgPool);
 
-  CpvInitialize(_CkOutStream*, _ckout);
-  CpvInitialize(_CkErrStream*, _ckerr);
+	CpvInitialize(_CkOutStream*, _ckout);
+	CpvInitialize(_CkErrStream*, _ckerr);
 
-  CpvInitialize(Stats*, _myStats);
+	CpvInitialize(Stats*, _myStats);
 
-  CpvAccess(_buffQ) = new PtrQ();
-  _MEMCHECK(CpvAccess(_buffQ));
-  CpvAccess(_bocInitVec) = new PtrVec();
-  _MEMCHECK(CpvAccess(_bocInitVec));
-  CpvAccess(_groupTable) = new GroupTable();
-  _MEMCHECK(CpvAccess(_groupTable));
-  if(CmiMyRank()==0) {
-    _nodeLock = CmiCreateLock();
-    _nodeGroupTable = new GroupTable();
-    _MEMCHECK(_nodeGroupTable);
-    _nodeBocInitVec = new PtrVec();
-    _MEMCHECK(_nodeBocInitVec);
-  }
-  CmiNodeBarrier();
-  CpvAccess(_qd) = new QdState();
-  _MEMCHECK(CpvAccess(_qd));
-  CpvAccess(_numInitsRecd) = 0;
+	CpvAccess(_buffQ) = new PtrQ();
+	_MEMCHECK(CpvAccess(_buffQ));
+	CpvAccess(_bocInitVec) = new PtrVec();
+	_MEMCHECK(CpvAccess(_bocInitVec));
+	CpvAccess(_groupTable) = new GroupTable();
+	_MEMCHECK(CpvAccess(_groupTable));
 
-  CpvAccess(_ckout) = new _CkOutStream();
-  _MEMCHECK(CpvAccess(_ckout));
-  CpvAccess(_ckerr) = new _CkErrStream();
-  _MEMCHECK(CpvAccess(_ckerr));
+	if(CmiMyRank()==0) 
+	{
+		_nodeLock = CmiCreateLock();
+		_nodeGroupTable = new GroupTable();
+		_MEMCHECK(_nodeGroupTable);
+		_nodeBocInitVec = new PtrVec();
+		_MEMCHECK(_nodeBocInitVec);
+	}
+  
+	CmiNodeBarrier();
+	CpvAccess(_qd) = new QdState();
+	_MEMCHECK(CpvAccess(_qd));
+	CpvAccess(_numInitsRecd) = -1;  /*0;*/
 
-  _charmHandlerIdx = CmiRegisterHandler((CmiHandler)_bufferHandler);
-  _initHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
-  _exitHandlerIdx = CmiRegisterHandler((CmiHandler)_bufferHandler);
-  _bocHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
-  _nodeBocHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
-  _qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
-  _infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
+	CpvAccess(_ckout) = new _CkOutStream();
+	_MEMCHECK(CpvAccess(_ckout));
+	CpvAccess(_ckerr) = new _CkErrStream();
+	_MEMCHECK(CpvAccess(_ckerr));
 
-  CthSetSuspendable(CthSelf(), 0);
+	_charmHandlerIdx = CmiRegisterHandler((CmiHandler)_bufferHandler);
+	_initHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
+	_exitHandlerIdx = CmiRegisterHandler((CmiHandler)_bufferHandler);
+	_bocHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
+	_nodeBocHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
+	_qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
+	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
 
-  CldRegisterEstimator((CldEstimator)_charmLoadEstimator);
+	CthSetSuspendable(CthSelf(), 0);
 
-#if CMK_DEBUG_MODE
-  handlerArrayRegister(_charmHandlerIdx, (hndlrIDFunction)fHeader, 
-                       (hndlrIDFunction)fContent);
-  handlerArrayRegister(_initHandlerIdx, (hndlrIDFunction)fHeader, 
-                       (hndlrIDFunction)fContent);
-#endif
-
-  _futuresModuleInit(); // part of futures implementation is a converse module
-  if(CmiMyRank()==0) {
-    argc = _parseCommandLineOpts(argc, argv);
-    _registerInit();
-    CkRegisterMsg("System", 0, 0, 0, sizeof(int));
-    CkRegisterChare("null", 0);
-    CkRegisterEp("null", (CkCallFnPtr)_nullFn, 0, 0);
-    _registerCkFutures();
-    _registerCkArray();
-    _registertempo();
-    _registerwaitqd();
-    _registerLBDatabase();
-    CkRegisterMainModule();
-  }
-  _TRACE_BEGIN_COMPUTATION();
-  CpvAccess(_myStats) = new Stats();
-  _MEMCHECK(CpvAccess(_myStats));
-  CpvAccess(_msgPool) = new MsgPool();
-  _MEMCHECK(CpvAccess(_msgPool));
-  CmiNodeBarrier();
-  if(CmiMyPe()==0) {
-    _allStats = new Stats*[CkNumPes()];
-    _MEMCHECK(_allStats);
-    register int i;
-    for(i=0;i<_numMains;i++) {
-      register int size = _chareTable[_mainTable[i]->chareIdx]->size;
-      register void *obj = malloc(size);
-      _MEMCHECK(obj);
-      CpvAccess(_currentChare) = obj;
-      CpvAccess(_currentChareType) = _mainTable[i]->chareIdx;
-      register CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
-      msg->argc = argc;
-      msg->argv = argv;
-      _entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
-    }
-    _STATS_RECORD_CREATE_CHARE_N(_numMains);
-    _STATS_RECORD_PROCESS_CHARE_N(_numMains);
-    for(i=0;i<_numReadonlyMsgs;i++) {
-      register void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
-      if(roMsg==0)
-        continue;
-      register envelope *env = UsrToEnv(roMsg);
-      env->setSrcPe(CkMyPe());
-      env->setMsgtype(ROMsgMsg);
-      env->setRoIdx(i);
-      CmiSetHandler(env, _initHandlerIdx);
-      CldEnqueue(CLD_BROADCAST, env, _infoIdx);
-      CpvAccess(_qd)->create(CkNumPes()-1);
-      _numInitMsgs++;
-    }
-    register int roSize = 0;
-    for(i=0;i<_numReadonlies;i++)
-      roSize += _readonlyTable[i]->size;
-    register envelope *env = _allocEnv(RODataMsg, roSize);
-    register char *tmp;
-    for(tmp=(char *)EnvToUsr(env), i=0;i<_numReadonlies;i++) {
-      memcpy(tmp, _readonlyTable[i]->ptr, _readonlyTable[i]->size);
-      tmp += _readonlyTable[i]->size;
-    }
-    env->setCount(++_numInitMsgs);
-    env->setSrcPe(CkMyPe());
-    CmiSetHandler(env, _initHandlerIdx);
-    CmiSyncBroadcastAndFree(env->getTotalsize(), env);
-    CpvAccess(_qd)->create(CkNumPes()-1);
-    _initDone();
-  }
+	CldRegisterEstimator((CldEstimator)_charmLoadEstimator);
 
 #if CMK_DEBUG_MODE
-  symbolTableFnArrayRegister(_charmHandlerIdx, _numEntries,
-			     (symbolTableFunction) makeCharmSymbolTableInfo,
-			     (indirectionFunction) getEpIdx);
+	handlerArrayRegister(_charmHandlerIdx, (hndlrIDFunction)fHeader, 
+		                   (hndlrIDFunction)fContent);
+	handlerArrayRegister(_initHandlerIdx, (hndlrIDFunction)fHeader, 
+		                   (hndlrIDFunction)fContent);
 #endif
 
+	_futuresModuleInit(); // part of futures implementation is a converse module
+	if(CmiMyRank()==0) 
+	{
+		argc = _parseCommandLineOpts(argc, argv);
+		_registerInit();
+		CkRegisterMsg("System", 0, 0, 0, sizeof(int));
+		CkRegisterChare("null", 0);
+		CkRegisterEp("null", (CkCallFnPtr)_nullFn, 0, 0);
+		_registerCkFutures();
+		_registerCkArray();
+		_registertempo();
+		_registerwaitqd();
+		_registerLBDatabase();
+		CkRegisterMainModule();
+	}
+
+	_TRACE_BEGIN_COMPUTATION();
+	CpvAccess(_myStats) = new Stats();
+	_MEMCHECK(CpvAccess(_myStats));
+	CpvAccess(_msgPool) = new MsgPool();
+	_MEMCHECK(CpvAccess(_msgPool));
+	CmiNodeBarrier();
+
+	if(CmiMyPe()==0) 
+	{
+		_allStats = new Stats*[CkNumPes()];
+		_MEMCHECK(_allStats);
+		register int i;
+		for(i=0;i<_numMains;i++) 
+		{
+			register int size = _chareTable[_mainTable[i]->chareIdx]->size;
+			register void *obj = malloc(size);
+			_MEMCHECK(obj);
+			CpvAccess(_currentChare) = obj;
+			CpvAccess(_currentChareType) = _mainTable[i]->chareIdx;
+			register CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
+			msg->argc = argc;
+			msg->argv = argv;
+			_entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
+		}
+
+		_STATS_RECORD_CREATE_CHARE_N(_numMains);
+		_STATS_RECORD_PROCESS_CHARE_N(_numMains);
+		for(i=0;i<_numReadonlyMsgs;i++) 
+		{
+			register void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
+			if(roMsg==0)
+				continue;
+			register envelope *env = UsrToEnv(roMsg);
+			env->setSrcPe(CkMyPe());
+			env->setMsgtype(ROMsgMsg);
+			env->setRoIdx(i);
+			CmiSetHandler(env, _initHandlerIdx);
+			CldEnqueue(CLD_BROADCAST, env, _infoIdx);
+			CpvAccess(_qd)->create(CkNumPes()-1);
+			_numInitMsgs++;
+		}
+		register int roSize = 0;
+		for(i=0;i<_numReadonlies;i++)
+			roSize += _readonlyTable[i]->size;
+		register envelope *env = _allocEnv(RODataMsg, roSize);
+		register char *tmp;
+		for(tmp=(char *)EnvToUsr(env), i=0;i<_numReadonlies;i++) 
+		{
+			memcpy(tmp, _readonlyTable[i]->ptr, _readonlyTable[i]->size);
+			tmp += _readonlyTable[i]->size;
+		}
+    
+		env->setCount(++_numInitMsgs);
+		env->setSrcPe(CkMyPe());
+		CmiSetHandler(env, _initHandlerIdx);
+		CmiSyncBroadcastAndFree(env->getTotalsize(), env);
+		CpvAccess(_qd)->create(CkNumPes()-1);
+		_initDone();
+	}
+
+#if CMK_DEBUG_MODE
+	symbolTableFnArrayRegister(_charmHandlerIdx, _numEntries,
+				     (symbolTableFunction) makeCharmSymbolTableInfo,
+				     (indirectionFunction) getEpIdx);
+#endif
 
 }
 
