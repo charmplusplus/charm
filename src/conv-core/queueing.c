@@ -17,7 +17,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.3  1995-10-12 18:14:52  jyelon
+ * Revision 1.4  1996-04-24 22:44:16  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.3  1995/10/12 18:14:52  jyelon
  * removed obsolete test program.
  *
  * Revision 1.2  1995/07/24  01:56:42  jyelon
@@ -375,6 +378,9 @@ Queue q; void *data; unsigned int strategy, priobits, *prioptr;
     else d=CqsPrioqGetDeq(&(q->negprioq), priobits, prioptr);
     CqsDeqEnqueueLifo(d, data);
     break;
+  default:
+    CmiError("CqsEnqueueGeneral: invalid queueing strategy.\n");
+    exit(1);
   }
   q->length++; if (q->length>q->maxlen) q->maxlen=q->length;
 }
