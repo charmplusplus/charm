@@ -503,22 +503,14 @@ CkPrintf("[%d] end init\n",myChunk);
 
       vector2d *loc=new vector2d[2*g.nnodes];
       for (i=0;i<g.nnodes;i++) {
-				loc[i]=g.coord[i];//+g.d[i];
+	loc[i]=g.coord[i];//+g.d[i];
       }
       double *areas=new double[g.nelems];
 	//coarsen in the last step
-		curArea = curArea*2.4;
-   /*   for (i=0;i<g.nelems;i++) {
-      #if 0
-        double origArea=8e-8; //Typical triangle size
-	if (fabs(g.S12[i])>1.0e8)
-		areas[i]=origArea*0.9; //Refine stuff that's stressed
-	else
-		areas[i]=origArea; //Leave everything else big
-      #endif
-        areas[i]=curArea;
-      }*/
-	areas[0] = curArea;
+      for (i=0;i<g.nelems;i++) {
+      	areas[i]=calcArea(g,i);
+      }
+	areas[0] *= 2.0;
 			//coarsen in the last step
 //      if(t >= tSteps-1){
 				CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements to %.3g\n",
