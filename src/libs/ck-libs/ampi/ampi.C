@@ -727,7 +727,9 @@ int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
   ampi *ptr = getAmpiInstance(comm);
   ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm);
 #ifndef CMK_OPTIMIZE
-  _LOG_E_AMPI_MSG_SEND(tag,dest,count,sizeof(msg))
+  int size=0;
+  MPI_Type_size(type,&size);
+  _LOG_E_AMPI_MSG_SEND(tag,dest,count,size)
 #endif		  
   return 0;
 }
@@ -741,7 +743,9 @@ int MPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
   ampi *ptr = getAmpiInstance(comm);
   ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm);
 #ifndef CMK_OPTIMIZE
-  _LOG_E_AMPI_MSG_SEND(tag,dest,count,sizeof(msg))
+  int size =0;
+  MPI_Type_size(type,&size);
+  _LOG_E_AMPI_MSG_SEND(tag,dest,count,size)
 #endif		  
   return 0;
 }
@@ -1241,7 +1245,7 @@ CDECL
 int MPI_Type_size(MPI_Datatype datatype, int *size)
 {
   AMPIAPI("MPI_Type_size");
-  getDDT()->getSize(datatype);
+  *size=getDDT()->getSize(datatype);
   return 0;
 }
 
