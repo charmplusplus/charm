@@ -577,16 +577,12 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
   if (!mapCreated) {
     char* mapping;
     if (0!=CmiGetArgString(argv, "+mapping", &mapping)){
-
       if(0==strcmp(mapping,"BLOCK_MAP")){
         mapID=CProxy_BlockMap::ckNew();
-      }
-     
+      }else
       if(0==strcmp(mapping,"RR_MAP")){
         mapID=CProxy_RRMap::ckNew();
-      }
-
-      if(0==strcmp(mapping,"PROP_MAP")){
+      }else{  // "PROP_MAP" or anything else
         mapID=CkCreatePropMap();
       }
     } else {
