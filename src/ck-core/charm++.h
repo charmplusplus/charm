@@ -325,6 +325,8 @@ class NodeGroup : public IrrGroup { //Superclass of all NodeGroups
     ~NodeGroup();
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
     inline CkGroupID CkGetNodeGroupID(void) const {return thisgroup;}
+    
+    virtual void pup(PUP::er &p);
 };
 
 
@@ -339,6 +341,9 @@ public:
 	CProxy_Derived thisProxy;
 	CBaseT(void) :Parent(), CBase_ProxyInits(this) {}
 	CBaseT(CkMigrateMessage *m) :Parent(m), CBase_ProxyInits(this) {}
+	void pup(PUP::er &p) {
+		Parent::pup(p);
+	}
 };
 
 /*Templated version of above for multiple (at least duplicate) inheritance:*/
@@ -350,6 +355,10 @@ public:
 		CBase_ProxyInits((Parent1 *)this) {}
 	CBaseT2(CkMigrateMessage *m) :Parent1(m), Parent2(m),
 		CBase_ProxyInits((Parent1 *)this) {} 
+	void pup(PUP::er &p) {
+		Parent1::pup(p);
+		Parent2::pup(p);
+	}
 
 //These overloads are needed to prevent ambiguity for multiple inheritance:
 	inline const CkChareID &ckGetChareID(void) const 

@@ -48,7 +48,17 @@ NodeGroup::NodeGroup(void) {
 NodeGroup::~NodeGroup() {
   CmiDestroyLock(__nodelock);
 }
+void NodeGroup::pup(PUP::er &p)
+{
+  IrrGroup::pup(p);
+  p|__nodelock;
+}
 
+void Group::pup(PUP::er &p) 
+{
+  CkReductionMgr::pup(p);
+  reductionInfo.pup(p);
+}
 
 CkComponent::~CkComponent() {}
 void CkComponent::pup(PUP::er &p) {}

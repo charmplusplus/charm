@@ -357,6 +357,7 @@ class Group : public CkReductionMgr
  public:
 	Group();
 	Group(CkMigrateMessage *msg):CkReductionMgr(msg) {}
+	virtual void pup(PUP::er &p);
 
 	CK_REDUCTION_CONTRIBUTE_METHODS_DECL
 };
