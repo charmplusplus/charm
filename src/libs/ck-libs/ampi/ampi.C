@@ -1250,6 +1250,26 @@ int MPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz)
   return incount*dttype->getSize() ;
 }
 
+/* Error handling */
+CDECL
+int MPI_Error_string(int errorcode, char *string, int *resultlen)
+{
+  AMPIAPI("MPI_Error_string");
+  const char *ret="";
+  switch(errorcode) {
+  case MPI_SUCCESS:
+	   ret="Success";
+	   break;
+  default:
+	   return 1;/*LIE: should be MPI_ERR_something */
+  };
+  *resultlen=strlen(ret);
+  strcpy(string,ret);
+  return MPI_SUCCESS;
+}
+
+
+/* Charm++ Extentions to MPI standard: */
 CDECL
 void MPI_Print(char *str)
 {

@@ -17,6 +17,10 @@ AMPI, e.g. for our bizarre MPI_Main.
 */
 #define AMPI
 
+/*Silently rename the user's main routine to "MPI_Main"*/
+#define main MPI_Main
+
+
 /* MPI prototypes and #defines here */
 #define MPI_SUCCESS 0
 /* Somebody needs to define MPI_ERRs here */
@@ -78,6 +82,12 @@ int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
              int tag, MPI_Comm comm);
 int MPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
              int tag, MPI_Comm comm);
+
+/*Silly: default send is buffering in Charm++*/
+#define MPI_Bsend MPI_Send
+#define MPI_Buffer_attach(buf,len) /*LIE: emtpy*/
+int MPI_Error_string(int errorcode, char *string, int *resultlen);
+
 int MPI_Recv(void *msg, int count, int type, int src, int tag,
              MPI_Comm comm, MPI_Status *status);
 int MPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
