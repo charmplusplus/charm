@@ -130,20 +130,22 @@ static const char *CcsImpl_authInit(SOCKET fd,CcsServer *svr)
  * Converse Client-Server Module: Client Side
  */
 
-int CcsConnect(CcsServer *svr, char *host, int port,CcsSec_secretKey *key){
+int CcsConnect(CcsServer *svr, const char *host, int port,const CcsSec_secretKey *key){
     return CcsConnectWithtimeout(svr, host, port, key, 120);
 }
 
-int CcsConnectWithtimeout(CcsServer *svr, char *host, int port,CcsSec_secretKey *key, int timeout)
+int CcsConnectWithtimeout(CcsServer *svr, const char *host, int port,
+	const CcsSec_secretKey *key, int timeout) 
 {
     return CcsConnectIpWithTimeout(svr,skt_lookup_ip(host),port,key, timeout);
 }
 
-int CcsConnectIp(CcsServer *svr, skt_ip_t ip, int port,CcsSec_secretKey *key){
+int CcsConnectIp(CcsServer *svr, skt_ip_t ip, int port,const CcsSec_secretKey *key){
     return CcsConnectIpWithTimeout(svr, ip, port, key, 120);
 }
 
-int CcsConnectIpWithTimeout(CcsServer *svr, skt_ip_t ip, int port,CcsSec_secretKey *key, int timeout)
+int CcsConnectIpWithTimeout(CcsServer *svr, skt_ip_t ip, int port,
+	const CcsSec_secretKey *key, int timeout)
 {
   unsigned int msg_len;char *msg_data;/*Reply message*/
   skt_init();
@@ -217,11 +219,11 @@ int CcsNodeSize(CcsServer *svr,int node)
   return svr->numProcs[node];
 }
 
-int CcsSendRequest(CcsServer *svr, char *hdlrID, int pe, unsigned int size, const char *msg){
+int CcsSendRequest(CcsServer *svr, const char *hdlrID, int pe, unsigned int size, const char *msg){
     CcsSendRequestWithTimeout(svr, hdlrID, pe, size, msg, 120);
 }
 
-int CcsSendRequestWithTimeout(CcsServer *svr, char *hdlrID, int pe, unsigned int size, const char *msg, int timeout)
+int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, unsigned int size, const char *msg, int timeout)
 {
   CcsMessageHeader hdr;/*CCS request header*/
   hdr.len=ChMessageInt_new(size);

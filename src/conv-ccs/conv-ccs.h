@@ -25,7 +25,12 @@ extern "C" {
 #define CMK_CCS_VERSION "2"
 
 extern int _ccsHandlerIdx;
-typedef struct {unsigned char val;} *CcsDelayedReply;
+
+typedef struct CcsDelayedReply_struct *CcsDelayedReply;
+
+struct CcsDelayedReply_struct {
+	unsigned char val;
+};
 
 #if CMK_CCS_AVAILABLE
 void CcsRegisterHandler(const char *id, CmiHandler fn);
