@@ -321,6 +321,32 @@ public:
 
 LBTOPO_MACRO(LBTopo_complete);
 
+//   k-ary tree
+
+template <int k>
+class LBTopo_karytree: public LBTopology {
+public:
+  LBTopo_karytree(int p): LBTopology(p) {}
+  virtual int max_neighbors() {
+    return k+1;     // parent + children
+  }
+  virtual void neighbors(int mype, int* _n, int &nb) {
+    nb = 0;
+    if (mype!=0) _n[nb++] = (mype-1)/k;
+    int firstchild = mype*k+1;
+    for (int i=0; i<k; i++)
+      if (firstchild+i < npes) _n[nb++] = firstchild+i;
+  }
+};
+
+typedef LBTopo_karytree<2> LBTopo_2_arytree;
+typedef LBTopo_karytree<3> LBTopo_3_arytree;
+typedef LBTopo_karytree<3> LBTopo_4_arytree;
+
+LBTOPO_MACRO(LBTopo_2_arytree);
+LBTOPO_MACRO(LBTopo_3_arytree);
+LBTOPO_MACRO(LBTopo_4_arytree);
+
 //
 
 class LBTopoMap {
@@ -347,6 +373,9 @@ public:
     lbTopos.push_back(new LBTopoMap("torus_nd_7", createLBTopo_torus_nd_7));
     lbTopos.push_back(new LBTopoMap("graph", createLBTopo_graph));
     lbTopos.push_back(new LBTopoMap("complete", createLBTopo_complete));
+    lbTopos.push_back(new LBTopoMap("2_arytree", createLBTopo_2_arytree));
+    lbTopos.push_back(new LBTopoMap("3_arytree", createLBTopo_3_arytree));
+    lbTopos.push_back(new LBTopoMap("4_arytree", createLBTopo_4_arytree));
   }
   ~LBTopoVec() {
     for (int i=0; i<lbTopos.length(); i++)
