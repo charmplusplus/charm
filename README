@@ -62,9 +62,6 @@ Charm version          OS        Communication     Compiler
 -------------       ---------    --------------   --------------------
 net-linux            PC Linux       UDP/Myrinet   GNU compiler
 net-linux-ia64       IA64 Linux     UDP/Myrinet   GNU compiler
-mpi-linux            PC Linux       MPI           GNU compiler
-mpi-axp-cc           Alpha          MPI           DIGITAL C++ compiler  
-mpi-linux-axp        Alpha Linux    MPI           GNU compiler
 net-axp-cc           Alpha          UDP           DIGITAL C++ compiler
 net-cygwin           Win32/cygwin   UDP           GNU compiler
 net-win32            Win32          UDP           MS Visual C++
@@ -72,14 +69,17 @@ net-sol-cc           Solaris        UDP           Sun WorkShop C++ Compiler
 net-sol              Solaris        UDP           GNU compiler
 net-irix             IRIX	    UDP           SGI C++ compiler
 net-irix-64          IRIX           UDP           SGI 64bits C++ compiler
-origin2000           Origin2000  shared-mem       SGI C++ compiler     
-mpi-origin           Origin2000     MPI           C++ compiler
 net-hp               HP-UX          UDP           GNU compiler
 net-hp-cc            HP-UX          UDP           HP-UX C++ compiler
 net-hp-acc           HP-UX          UDP           HP-UX aC++ compiler
+net-ppc-darwin       MacOS X        UDP           GNU C++ compiler
+mpi-linux            PC Linux       MPI           GNU compiler
+mpi-axp-cc           Alpha          MPI           DIGITAL C++ compiler  
+mpi-linux-axp        Alpha Linux    MPI           GNU compiler
+mpi-origin           Origin2000     MPI           C++ compiler
 mpi-sp               AIX            MPI           AIX xlC Compiler 
+origin2000           Origin2000  shared-mem       SGI C++ compiler     
 t3e                  Cray T3E    shared-mem       Cray C++ compiler
-net-ppc-darwin       Mac            UDP           GNU C++ compiler
 
 
 To choose <version>, your choice is determined by three options:
