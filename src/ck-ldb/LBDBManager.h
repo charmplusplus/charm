@@ -60,15 +60,10 @@ private:
 
 class LBDB {
 public:
-  LBDB() {
-    statsAreOn = CmiFalse;
-    omCount = objCount = oms_registering = 0;
-    obj_running = CmiFalse;
-    commTable = new LBCommTable;
-    obj_walltime = obj_cputime = 0;
-  }
-
+  LBDB();
   ~LBDB() { }
+
+  void SetPeriod(double secs) {batsync.setPeriod(secs);}
 
   void insert(LBOM *om);
 
@@ -162,6 +157,20 @@ private:
   MigrateCBList migrateCBList;
   CmiBool obj_running;
   LDObjHandle runningObj;
+
+  //This class controls the builtin-atsync frequency
+  class batsyncer {
+  private:
+    LBDB *db; //Enclosing LBDB object
+    double period;//Time (seconds) between builtin-atsyncs  
+    LDBarrierClient BH;//Handle for the builtin-atsync barrier 
+    static void gotoSync(void *bs);
+    static void resumeFromSync(void *bs);
+  public:
+    void init(LBDB *_db,double initPeriod);
+    void setPeriod(double p) {period=p;}
+  };
+  batsyncer batsync;
 
   LocalBarrier localBarrier;
   LBMachineUtil machineUtil;

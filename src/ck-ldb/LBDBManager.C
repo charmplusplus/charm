@@ -15,8 +15,47 @@
 struct MigrateCB;
 
 /*************************************************************
+ * Set up the builtin barrier-- the load balancer needs somebody
+ * to call AtSync on each PE in case there are no atSync array 
+ * elements.  The builtin-atSync caller (batsyncer) does this.
+ */
+
+//Called periodically-- starts next load balancing cycle
+void LBDB::batsyncer::gotoSync(void *bs)
+{
+  LBDB::batsyncer *s=(LBDB::batsyncer *)bs;
+  s->db->AtLocalBarrier(s->BH);
+}
+//Called at end of each load balancing cycle
+void LBDB::batsyncer::resumeFromSync(void *bs)
+{
+  LBDB::batsyncer *s=(LBDB::batsyncer *)bs;
+  CcdCallFnAfter((CcdVoidFn)gotoSync,(void *)s,(int)(1000*s->period));
+}
+
+void LBDB::batsyncer::init(LBDB *_db,double initPeriod)
+{
+  db=_db;
+  period=initPeriod;
+  BH = db->AddLocalBarrierClient((LDResumeFn)resumeFromSync,(void*)(this));
+  //This just does a CcdCallFnAfter
+  resumeFromSync((void *)this);
+}
+
+
+/*************************************************************
  * LBDB Code
  *************************************************************/
+
+LBDB::LBDB()
+{
+    statsAreOn = CmiFalse;
+    omCount = objCount = oms_registering = 0;
+    obj_running = CmiFalse;
+    commTable = new LBCommTable;
+    obj_walltime = obj_cputime = 0;
+    batsync.init(this,1.0);
+}
 
 LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData, 
 		       LDCallbacks _callbacks)
