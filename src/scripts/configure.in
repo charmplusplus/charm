@@ -14,7 +14,7 @@ fi
 
 test -r ./conv-mach-opt.sh && . ./conv-mach-opt.sh
 
-VERSION=050406
+VERSION=050600
 AC_DEFINE_UNQUOTED(CHARM_VERSION, $VERSION)
 
 AC_MSG_CHECKING(machine name)
@@ -122,6 +122,7 @@ EOT
 test_cxx "whether C++ signed char and char differ" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_SIGNEDCHAR_DIFF_CHAR, $pass)
 
+#### check if C++ casts work ####
 cat > $t <<EOT
 int foo(float *t) {return *reinterpret_cast<int *>(t);}
 EOT
@@ -130,6 +131,7 @@ AC_DEFINE_UNQUOTED(CMK_CPP_CAST_LEGAL, $pass)
 AC_DEFINE_UNQUOTED(CMK_CPP_CAST_ILLEGAL, $fail)
 
 
+#### check if templated members work ####
 cat > $t <<EOT
 typedef void (*func_t)(void);
 class foo_foo {
@@ -210,15 +212,31 @@ EOT
 test_cxx "whether it has poll" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass)
 
-#test if has sys/mman.h
+
+#### check if mmap exists ####
 cat > $t <<EOT
-#include <sys/types.h>
 #include <sys/mman.h>
-void foo(void) { 
+
+void *foo(void *a,int l,int fd) {
+	return mmap(a,l,PROT_READ+PROT_WRITE,
+                 MAP_FIXED+MAP_PRIVATE,fd,0);
 }
 EOT
-test_cxx "whether it has sys/mman.h" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_MMAN_H, $pass)
+test_cxx "whether mmap() exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_MMAP, $pass)
+
+#### check if mmap accepts MAP_ANON ####
+cat > $t <<EOT
+#include <sys/mman.h>
+
+void *foo(void *a,int l) {
+	return mmap(a,l,PROT_READ+PROT_WRITE,
+                MAP_FIXED+MAP_PRIVATE+MAP_ANON,-1,0);
+}
+EOT
+test_cxx "whether mmap() accepts MAP_ANON" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_MMAP_ANON, $pass)
+
 
 #test if has zlib
 cat > $t <<EOT
