@@ -137,6 +137,7 @@ int CcsConnect(CcsServer *svr, const char *host, int port,const CcsSec_secretKey
 int CcsConnectWithtimeout(CcsServer *svr, const char *host, int port,
 	const CcsSec_secretKey *key, int timeout) 
 {
+	skt_init();
     return CcsConnectIpWithTimeout(svr,skt_lookup_ip(host),port,key, timeout);
 }
 
@@ -220,7 +221,7 @@ int CcsNodeSize(CcsServer *svr,int node)
 }
 
 int CcsSendRequest(CcsServer *svr, const char *hdlrID, int pe, unsigned int size, const char *msg){
-    CcsSendRequestWithTimeout(svr, hdlrID, pe, size, msg, 120);
+    return CcsSendRequestWithTimeout(svr, hdlrID, pe, size, msg, 120);
 }
 
 int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, unsigned int size, const char *msg, int timeout)
@@ -229,9 +230,6 @@ int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, unsign
   hdr.len=ChMessageInt_new(size);
   hdr.pe=ChMessageInt_new(pe);
   strncpy(hdr.handler,hdlrID,CCS_HANDLERLEN);
-
-  /*Close the old connection (if any)*/
-  if (svr->replyFd!=-1) {skt_close(svr->replyFd);svr->replyFd=-1;}
 
   /*Connect to conv-host, and send the message */
   svr->replyFd=skt_connect(svr->hostIP, svr->hostPort,timeout);
@@ -291,6 +289,9 @@ int CcsRecvResponseMsg(CcsServer *svr, unsigned int *size,char **newBuf, int tim
   *size=len=ChMessageInt(netLen);
   *newBuf=(char *)malloc(len);
   if (-1==skt_recvN(fd,(char *)*newBuf,len)) return -1;
+
+  /*Close the connection*/
+  skt_close(svr->replyFd);svr->replyFd=-1;
   return len;
 }
 
@@ -307,6 +308,9 @@ int CcsRecvResponse(CcsServer *svr,  unsigned int maxsize, char *recvBuffer,int 
   if (len>maxsize) 
     {skt_close(fd);return -1;/*Buffer too small*/}
   if (-1==skt_recvN(fd,(char *)recvBuffer,len)) return -1;
+
+  /*Close the connection*/
+  skt_close(svr->replyFd);svr->replyFd=-1;
   return len;
 }
 
