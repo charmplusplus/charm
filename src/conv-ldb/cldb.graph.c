@@ -263,16 +263,20 @@ void CldGraphModuleInit()
     CmiRegisterHandler(CldLoadResponseHandler);
 
   if (CmiNumPes() > 1) {
-    if (CmiMyPe() == 0) {
-      sprintf(filename, "graph%d/graph%d", CmiNumPes(), CmiMyPe());
-      if ((fp = fopen(filename, "r")) == 0)
-	{
+    sprintf(filename, "graph%d/graph%d", CmiNumPes(), CmiMyPe());
+    if ((fp = fopen(filename, "r")) == 0)
+      {
+	if (CmiMyPe() == 0) {
 	  CmiPrintf("No proper graph%d directory exists in current directory.\n Generating...  ", CmiNumPes());
 	  gengraph(CmiNumPes(), (int)(sqrt(CmiNumPes())+0.5), 234);
 	  CmiPrintf("done.\n");
 	}
-      else fclose(fp);
-    }
+	else {
+	  while (!(fp = fopen(filename, "r"))) ;
+	  fclose(fp);
+	}
+      }
+    else fclose(fp);
     CldReadNeighborData();
     CldBalance();
   }
