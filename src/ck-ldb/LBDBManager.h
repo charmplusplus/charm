@@ -93,6 +93,8 @@ public:
        { return oms[h.handle]; };
   inline LBObj *LbObj(const LDObjHandle &h) const 
        { return objs[h.handle]; };
+  inline LBObj *LbObjIdx(int h) const 
+       { return objs[h]; };
   void DumpDatabase(void);
 
   inline void TurnStatsOn(void) 
