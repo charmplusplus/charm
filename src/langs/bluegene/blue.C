@@ -1141,7 +1141,7 @@ CmiStartFn bgMain(int argc, char **argv)
   BgInitTiming();		// timing module
 
   if (CmiMyPe() == 0) {
-    CmiPrintf("BG info> Simulating %dx%dx%d nodes with %d comm + %d work threads each.\n", cva(bgMach).x, cva(bgMach).y, cva(bgMach).z, cva(bgMach).numCth, cva(bgMach).numWth);
+    CmiPrintf("BG info> Simulating %dx%dx%d nodes with %d comm + %d work threads each on %d physical processors.\n", cva(bgMach).x, cva(bgMach).y, cva(bgMach).z, cva(bgMach).numCth, cva(bgMach).numWth, CmiNumPes());
     CmiPrintf("BG info> Network type: %s.\n", cva(bgMach).network->name());
     cva(bgMach).network->print();
     CmiPrintf("BG info> cpufactor is %f.\n", cva(bgMach).cpufactor);
