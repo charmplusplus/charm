@@ -118,12 +118,12 @@ int Refiner::refine()
   int i;
   for (i=0; i<P; i++) {
     if (processors[i].load > overLoad*averageLoad) {
-      CkPrintf("Processor %d is HEAVY: load:%f averageLoad:%f!\n",
-	       i, processors[i].load, averageLoad);
+      //      CkPrintf("Processor %d is HEAVY: load:%f averageLoad:%f!\n",
+      //	       i, processors[i].load, averageLoad);
       heavyProcessors->insert((InfoRecord *) &(processors[i]));
     } else if (processors[i].load < averageLoad) {
-      CkPrintf("Processor %d is LIGHT: load:%f averageLoad:%f!\n",
-	       i, processors[i].load, averageLoad);
+      //      CkPrintf("Processor %d is LIGHT: load:%f averageLoad:%f!\n",
+      //	       i, processors[i].load, averageLoad);
       lightProcessors->insert((InfoRecord *) &(processors[i]));
     }
   }
@@ -174,9 +174,9 @@ int Refiner::refine()
     }
 
     if (bestCompute) {
-      CkPrintf("Assign: [%d] with load: %f from %d to %d \n",
-	       bestCompute->id.id[0], bestCompute->load, 
-	       donor->Id, bestP->Id);
+      //      CkPrintf("Assign: [%d] with load: %f from %d to %d \n",
+      //	       bestCompute->id.id[0], bestCompute->load, 
+      //	       donor->Id, bestP->Id);
       deAssign(bestCompute, donor);      
       assign(bestCompute, bestP);
     } else {
@@ -219,8 +219,8 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
     while(c) {
       new_p[c->originalPE][c->originalIdx] = c->processor;
       if (c->oldProcessor != c->processor)
-	CkPrintf("Refiner::Refine: from %d to %d\n",
-		 c->oldProcessor, c->processor);
+	//	CkPrintf("Refiner::Refine: from %d to %d\n",
+	//		 c->oldProcessor, c->processor);
       nextCompute.id++;
       c = (computeInfo *) processors[pe].computeSet->
 	             next((Iterator *)&nextCompute);
