@@ -59,6 +59,7 @@ typedef struct PendingMsgStruct
   int mach_id;		/* receiver machine id */
   int dataport;		/* receiver data port */
   int node_idx;		/* receiver pe id */
+  int retry_count;      /* number of resent */
   struct PendingMsgStruct *next;
 }
 *PendingMsg;
@@ -76,6 +77,7 @@ void enqueue_sending(char *msg, int length, OtherNode node, int size)
   pm->node_idx = node-nodes;
   pm->size = size;
   pm->next = NULL;
+  pm->retry_count = 0;
   if (sendhead == NULL) {
     sendhead = sendtail = pm;
   }
@@ -406,25 +408,38 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
     DgramHeaderBreak(msg, rank, srcpe, magic, seqno);
     errmsg = getErrorMsg(status);
     CmiPrintf("GM Error> PE:%d send to msg %p node %d rank %d mach_id %d port %d len %d size %d failed to complete (error %d): %s\n", srcpe, msg, out->node_idx, rank, out->mach_id, out->dataport, out->length, out->size, status, errmsg); 
+    switch (status) {
 #ifdef __FAULT__ 
-    if (status != GM_SEND_DROPPED) {
-      gm_drop_sends (gmport, GM_LOW_PRIORITY, out->mach_id, out->dataport,
+      case GM_SEND_DROPPED: {
+        OtherNode node = nodes + out->node_idx;
+        if (out->mach_id == node->mach_id && out->dataport == node->dataport) {
+          /* it not crashed, resent */
+          gm_send_with_callback(gmport, msg, out->size, out->length, 
+                            GM_LOW_PRIORITY, out->mach_id, out->dataport, 
+                            send_callback, out);
+          return;
+        }
+      }
+      default: {
+        gm_drop_sends (gmport, GM_LOW_PRIORITY, out->mach_id, out->dataport,
 		                             drop_send_callback, out);
-      return;
-    }
-    else {
-      OtherNode node = nodes + out->node_idx;
-      if (out->mach_id == node->mach_id && out->dataport == node->dataport) {
-        /* it not crashed, resent */
+        return;
+      }
+#else
+      case GM_SEND_TIMED_OUT: {
+        OtherNode node = nodes + out->node_idx;
+	out->retry_count ++;
+	if (out->retry_count > 4) CmiAbort("gm send_callback failed with too many timeouts");
+ 	CmiPrintf("gm send_callback timeout, send again (%d)\n", out->retry_count ++);
         gm_send_with_callback(gmport, msg, out->size, out->length, 
                             GM_LOW_PRIORITY, out->mach_id, out->dataport, 
                             send_callback, out);
         return;
       }
-    }
-#else
-     CmiAbort("gm send_callback failed");
+      default:
+        CmiAbort("gm send_callback failed");
 #endif
+    }
   }
 
 #if !CMK_MSGPOOL
