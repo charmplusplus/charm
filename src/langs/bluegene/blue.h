@@ -1,7 +1,7 @@
 /*
   File: Blue.h -- header file defines the user API for Converse Bluegene 
         Emulator application. 
-  Emulator first written by Gengbin Zheng, gzheng@uiuc.edu on 2/20/2001
+  Emulator written by Gengbin Zheng, gzheng@uiuc.edu on 2/20/2001
 */ 
 
 #ifndef BLUEGENE_H

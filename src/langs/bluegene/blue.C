@@ -1,5 +1,7 @@
-// File: blue.C
-// Converse BlueGene Emulator Code
+/*
+  File: Blue.C -- Converse BlueGene Emulator Code
+  Emulator written by Gengbin Zheng, gzheng@uiuc.edu on 2/20/2001
+*/ 
 
 #include <stdio.h>
 #include <string.h>
@@ -9,8 +11,6 @@
 
 #include "blue.h"
 
-#define MAX_HANDLERS	32
-
 /* define system parameters */
 #define INBUFFER_SIZE	32
 
@@ -19,6 +19,9 @@
 #define CYCLE_TIME_FACTOR  0.001  /* one cycle = nanosecond = 10^(-3) us */
 /* end of system parameters */
 
+#define MAX_HANDLERS	32
+#define BROADCAST	-1
+#define BROADCASTALL	-2
 template<class T> class bgQueue;
 
 typedef char ThreadType;
@@ -31,7 +34,8 @@ public:
   int threadID;		/* the thread ID in the node */
   int handlerID;
   WorkType type;
-  double sendTime, recvTime;
+  int len;
+  double recvTime;
   char  first[1];	/* first byte of user data */
 public:
   bgMsg() {};
@@ -120,13 +124,14 @@ public:
   ~bgQueue() { delete[] data; }
   inline void initialize(int max) {  size = max; data = new T[max]; }
   T deq() {
-      T ret = 0;
       if (count > 0) {
-        ret = data[fp];
+        T ret = data[fp];
         fp = (fp+1)%size;
         count --;
+        return ret;
       }
-      return ret;
+      else
+        return 0;
   }
   void enq(T item) {
       ASSERT(count < size);
@@ -142,7 +147,7 @@ public:
         including a group of functions defining the mapping, terms used here:
         XYZ: (x,y,z)
         Global:  map (x,y,z) to a global serial number
-        Local:   local index of this nodeinfo in the node array
+        Local:   local index of this nodeinfo in the emulator's node 
 *****************************************************************************/
 
 class nodeInfo {
@@ -153,9 +158,9 @@ public:
   CthThread *threadTable;	/* thread table for both work and comm threads*/
   ckMsgQueue nodeQ;		/* non-affinity msg queue */
   ckMsgQueue *affinityQ;	/* affinity msg queue for each work thread */
-  char *udata;
+  char *udata;			/* node specific data pointer */
   double startTime;		/* start time for a thread */
-  char started;			/* flag indicate if this node is started up */
+  char started;			/* flag indicate if this node is started */
 
 public:
   nodeInfo(): udata(NULL), started(0) {
@@ -169,9 +174,11 @@ public:
 
   ~nodeInfo() {
     if (commThQ) delete commThQ;
+    delete [] affinityQ;
     delete [] threadTable;
   }
   
+    /* return the number of bg nodes on this physical emulator PE */
   inline static int numLocalNodes()
   {
     int n, m;
@@ -181,19 +188,19 @@ public:
     return n;
   }
 
-    /* map (x,y,z) to virtual node ++++ */
+    /* map global serial number to (x,y,z) ++++ */
   inline static void Global2XYZ(int seq, int *x, int *y, int *z) {
     *x = seq / (numY * numZ);
     *y = (seq - *x * numY * numZ) / numZ;
     *z = (seq - *x * numY * numZ) % numZ;
   }
 
-    /* calculate virtual node number of (x,y,z) ++++ */
+    /* calculate global serial number of (x,y,z) ++++ */
   inline static int XYZ2Global(int x, int y, int z) {
     return x*(numY * numZ) + y*numZ + z;
   }
 
-    /* map (x,y,z) to PE ++++ */
+    /* map (x,y,z) to emulator PE ++++ */
   inline static int XYZ2PE(int x, int y, int z) {
     return Global2PE(XYZ2Global(x,y,z));
   }
@@ -202,7 +209,7 @@ public:
     return Global2Local(XYZ2Global(x,y,z));
   }
 
-    /* local node number to x y z ++++ */
+    /* local node index number to x y z ++++ */
   inline static void Local2XYZ(int num, int *x, int *y, int *z)  {
     Global2XYZ(Local2Global(num), x, y, z);
   }
@@ -221,7 +228,7 @@ public:
 /*****************************************************************************
       ThreadInfo:  each thread has a thread private threadInfo structure.
       It has a local id, a global serial id. 
-      myNode: the myNode field point to the node it belongs to.
+      myNode: point to the nodeInfo it belongs to.
       currTime: is the elapse time for this thread;
       me:   point to the CthThread converse thread handler.
 *****************************************************************************/
@@ -231,7 +238,7 @@ public:
   int id;
   int globalId;
   ThreadType  type;
-  CthThread me;			/* thread handler */
+  CthThread me;			/* Converse thread handler */
   nodeInfo *myNode;		/* the node belonged to */
   double  currTime;		/* thread timer */
 
@@ -279,13 +286,12 @@ bgMsg * getFullBuffer()
     CmiAbort("GetFullBuffer called by a non-communication thread!\n");
 
   /* see if we have msg in inBuffer */
+  if (tINBUFFER.isEmpty()) return NULL;
   data = tINBUFFER.deq(); 
-  if (data) {
-    /* since we have at least one slot empty in inbuffer, add from msgbuffer */
-    tags[0] = CmmWildCard;
-    mb = (bgMsg *)CmmGet(tMSGBUFFER, 1, tags, ret_tags);
-    if (mb) tINBUFFER.enq(mb);
-  }
+  /* since we have just delete one from inbuffer, fill one from msgbuffer */
+  tags[0] = CmmWildCard;
+  mb = (bgMsg *)CmmGet(tMSGBUFFER, 1, tags, ret_tags);
+  if (mb) tINBUFFER.enq(mb);
 
   return data;
 }
@@ -321,7 +327,7 @@ void addBgThreadMessage(bgMsg *msgPtr, int threadID)
 void addBgNodeMessage(bgMsg *msgPtr)
 {
   /* find a idle worker thread */
-  /* FIXME:  flat search s bad if there is many work threads */
+  /* FIXME:  flat search is bad if there is many work threads */
   for (int i=0; i<numWth; i++)
     if (tMYNODE->affinityQ[i].length() == 0)
     {
@@ -330,6 +336,7 @@ void addBgNodeMessage(bgMsg *msgPtr)
       CthAwaken(tTHREADTABLE[i]);
       return;
     }
+  /* all worker threads are busy */   
   tNODEQ.enq(msgPtr);
 }
 
@@ -348,16 +355,23 @@ void sendPacket(int x, int y, int z, int msgSize,bgMsg *msg)
 /* handler to process the msg */
 CmiHandler msgHandlerFunc(char *msg)
 {
-  int nodeID;
-  bgMsg *bgmsg;
-
-  bgmsg = (bgMsg *)(msg+CmiMsgHeaderSizeBytes);
-  nodeID = nodeInfo::Global2Local(bgmsg->node);
-/*
-  tags[0] = nodeID;
-  CmmPut(inBuffer[nodeID], 1, tags, (char *)bgmsg);
-*/
-  addBgNodeInbuffer(bgmsg, nodeID);
+  /* bgmsg is CmiMsgHeaderSizeBytes offset of original message pointer */
+  bgMsg *bgmsg = (bgMsg *)(msg+CmiMsgHeaderSizeBytes);
+  int nodeID = bgmsg->node;
+  if (nodeID >= 0) {
+    nodeID = nodeInfo::Global2Local(nodeID);
+    addBgNodeInbuffer(bgmsg, nodeID);
+  }
+  else {
+    int len = bgmsg->len;
+    addBgNodeInbuffer(bgmsg, 0);
+    for (int i=1; i<numNodes; i++)
+    {
+      char *dupmsg = (char *)malloc(len);
+      memcpy(dupmsg, msg, len);
+      addBgNodeInbuffer((bgMsg*)(dupmsg+CmiMsgHeaderSizeBytes), i);
+    }
+  }
   return 0;
 }
 
@@ -374,28 +388,45 @@ static double MSGTIME(int ox, int oy, int oz, int nx, int ny, int nz)
 }
 
 /* send will copy data to msg buffer */
+/* user data is not freeed in this routine, user can reuse the data ! */
 void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* data, int local)
 {
-  void *sendmsg;
-  bgMsg *bgmsg;
-  int msgSize;
-  
-  msgSize = CmiMsgHeaderSizeBytes+sizeof(bgMsg)-1+numbytes;
-  sendmsg = CmiAlloc(msgSize);
+  int msgSize = CmiMsgHeaderSizeBytes+sizeof(bgMsg)-1+numbytes;
+  void *sendmsg = CmiAlloc(msgSize);
   CmiSetHandler(sendmsg, CpvAccess(msgHandler));
-  bgmsg = (bgMsg *)((char *)sendmsg+CmiMsgHeaderSizeBytes);
+  bgMsg *bgmsg = (bgMsg *)((char *)sendmsg+CmiMsgHeaderSizeBytes);
   bgmsg->node = nodeInfo::XYZ2Global(x,y,z);
   bgmsg->threadID = threadID;
   bgmsg->handlerID = handlerID;
   bgmsg->type = type;
-  bgmsg->sendTime = BgGetTime();
-  bgmsg->recvTime = MSGTIME(tMYX, tMYY, tMYZ, x,y,z) + bgmsg->sendTime;
+  bgmsg->len = msgSize;
+  bgmsg->recvTime = MSGTIME(tMYX, tMYY, tMYZ, x,y,z) + BgGetTime();
   if (numbytes) memcpy(bgmsg->first, data, numbytes);
 
   if (local)
     addBgNodeInbuffer(bgmsg, tMYNODEID);
   else
     CmiSyncSendAndFree(nodeInfo::XYZ2PE(x,y,z),msgSize,sendmsg);
+}
+
+/* broadcast will copy data to msg buffer */
+/* user data is not freeed in this routine, user can reuse the data ! */
+void broadcastPacket_(int bcasttype, int threadID, int handlerID, WorkType type, int numbytes, char* data)
+{
+  int msgSize = CmiMsgHeaderSizeBytes+sizeof(bgMsg)-1+numbytes;	
+  void *sendmsg = CmiAlloc(msgSize);	
+  CmiSetHandler(sendmsg, CpvAccess(msgHandler));	
+  bgMsg *bgmsg = (bgMsg *)((char *)sendmsg+CmiMsgHeaderSizeBytes);	
+  bgmsg->node = bcasttype;
+  bgmsg->threadID = threadID;	
+  bgmsg->handlerID = handlerID;	
+  bgmsg->type = type;	
+  bgmsg->len = msgSize;
+  /* FIXME */
+  bgmsg->recvTime = BgGetTime();	
+  if (numbytes) memcpy(bgmsg->first, data, numbytes);
+
+  CmiSyncBroadcastAndFree(msgSize,sendmsg);
 }
 
 /* sendPacket to route */
@@ -415,6 +446,7 @@ void BgSendLocalPacket(int threadID, int handlerID, WorkType type, int numbytes,
   sendPacket_(tMYX, tMYY, tMYZ, threadID, handlerID, type, numbytes, data, 1);
 }
 
+/* wrapper of the previous two functions */
 void BgSendPacket(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char * data)
 {
   if (tMYX == x && tMYY==y && tMYZ==z)
@@ -511,12 +543,17 @@ void BgShutdown()
   int msgSize = CmiMsgHeaderSizeBytes;
   void *sendmsg = CmiAlloc(msgSize);
   CmiSetHandler(sendmsg, CpvAccess(exitHandler));
+  
   /* broadcast to shutdown */
-  //CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
-  CmiAbort("\nBG> BlueGene simulator shutdown gracefully!\n");
+  CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
+  //CmiAbort("\nBG> BlueGene simulator shutdown gracefully!\n");
+  // CmiPrintf("\nBG> BlueGene simulator shutdown gracefully!\n");
   /* don't return */
+  // ConverseExit();
+  CmiDeliverMsgs(-1);
+  CmiPrintf("\nBG> BlueGene simulator shutdown gracefully!\n");
   ConverseExit();
-  //while (1) CmiDeliverMsgs(0);
+  exit(0);
   
 /*
   int i;
@@ -666,10 +703,10 @@ CmiHandler exitHandlerFunc(char *msg)
   for (i=0; i<numNodes; i++) CmmFree(msgBuffer[i]);
   delete [] msgBuffer;
 
+  //ConverseExit();
   CsdExitScheduler();
 
-  if (CmiMyPe() == 0)
-    CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
+  //if (CmiMyPe() == 0) CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
 
   return 0;
 }
