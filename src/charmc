@@ -650,7 +650,7 @@ if ($status) goto failure
 ########################################################################
 
 if (! { (egrep '^user_main$' < CHARMC-USR.TMP.nm >& /dev/null) }) then
-    set LOADER=($LOADER $CHARMLIB/libck-defmain.a)
+    set LOADER=($LOADER $CHARMLIB/libck-defmain.o)
 endif
 
 ########################################################################
