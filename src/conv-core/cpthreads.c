@@ -292,7 +292,7 @@ int Cpthread_create3(Cpthread_t *thread, Cpthread_attr_t *attr,
 int Cpthread_create(Cpthread_t *thread, Cpthread_attr_t *attr,
 		     voidfn fn, void *arg)
 {
-  Cpthread_create3(thread, attr, fn, arg, 0, 0);
+  return Cpthread_create3(thread, attr, fn, arg, 0, 0);
 }
 
 void Cpthread_exit(void *status)
@@ -580,7 +580,7 @@ int Cpthread_init()
   return 0;
 }
 
-void Cpthread_initialize()
+void CpthreadModuleInit()
 {
   CtvInitialize(Cpthread_t, Cpthread_current);
   CtvInitialize(int,        Cpthread_errcode);

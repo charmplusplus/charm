@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.1  1997-03-25 23:09:29  milind
+ * Revision 1.2  1997-07-26 16:42:32  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.1  1997/03/25 23:09:29  milind
  * Got threads to work on 64-bit irix. Had to add JB_TWEAKING_ORIGIN flag to
  * all the conv-mach.h files. Also, _PAGESZ was undefined on irix. Added
  * code to memory.c to make it a static variable.
@@ -97,6 +100,10 @@
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
+
+#define CMK_MEMORY_DISTRIBUTED                             0
+#define CMK_MEMORY_CLUSTERED                               0
+#define CMK_MEMORY_SHARED                                  1
 
 #define CMK_MSG_HEADER_SIZE_BYTES                          4
 #define CMK_MSG_HEADER_BLANK_SPACE                         0

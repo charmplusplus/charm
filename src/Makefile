@@ -23,18 +23,15 @@
 
 SHELL=/bin/sh
 
-all: charm++
-#	@echo 'try one of:'
-#	@echo '  make converse'
-#	@echo '  make charm'
-#	@echo '  make charm++'
-#	@echo '  make test-converse'
-#	@echo '  make test-charm'
-#	@echo '  make test-charm++'
+all: charm++ simplemsg pvmc
 
 charm: converse charmxlat charmlibs libcharm
 
 charm++: converse charmxlat charmlibs charmxlat++ charmfilter++ charmxi libcharm libck-cplus-y.a libck-defmain-cpp.a
+
+simplemsg: converse libsimplemsg.a
+
+pvmc: converse libpvmc.a
 
 translators: charmxlat charmfilter charmxlat++ charmfilter++ charmxi conv-cpm
 
@@ -56,7 +53,7 @@ CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 #
 ###############################################################################
 
-ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h cpthreads.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h qd.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h conv-mach.h internal.h quiescence.h simplemsg.h trace.h dag.h generic_redn.h charmFuturesInclude.h # pglib.h
+ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h cpthreads.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h qd.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h conv-mach.h internal.h quiescence.h simplemsg.h trace.h dag.h generic_redn.h pvmc.h pvm3.h # pglib.h
 
 ALLINTERFACES=GENERIC-ACC.int GENERIC-HIST.int GENERIC-REDN.int barrier_redn.int cache.int dacc_count.int dacc_hist.int dcountredn.int dmaxredn.int dminredn.int dprodredn.int dsumredn.int facc_count.int facc_hist.int fcountredn.int fmaxredn.int fminredn.int fprodredn.int fsumredn.int iacc_count.int iacc_hist.int icountredn.int imaxredn.int iminredn.int iprodredn.int isumredn.int pg.int
 
@@ -80,10 +77,6 @@ dirs+sources:
 	rm -rf ../bin ; mkdir ../bin
 	rm -rf ../lib ; mkdir ../lib
 	rm -rf ../src ; mkdir ../src
-	mkdir ../src/xlat
-	mkdir ../src/xlat++
-	mkdir ../src/xlat-i
-	mkdir ../src/xlatcpm
 	@echo
 	@echo 'Gathering source code in '`cat .vdir`'/tmp'
 	@echo
@@ -108,8 +101,20 @@ dirs+sources:
 	rt=`(cd ../.. ; pwd)` ; (cd ../.. ; find pgms -type f -print) | awk '{ print "ln -s '$$rt'/"$$1" ../"$$1; }' > tmp.sh
 	sh tmp.sh ; rm -f tmp.sh
 	@echo
+	@echo 'Gathering little languages in '`cat .vdir`/src
+	@echo
+	rm -rf ../src/langs
+	(cd ../../src/Common ; find langs -type d ! -name CVS -print) | sed -e 's@^@mkdir @' > tmp.sh
+	cd ../src ; sh ../tmp/tmp.sh ; rm -f ../tmp/tmp.sh
+	rt=`(cd ../../src/Common ; pwd)` ; (cd ../../src/Common ; find langs -type f -print) | grep -v '/CVS/' | awk '{ print "ln -s '$$rt'/"$$1" "$$1; }' > tmp.sh
+	cd ../src ; sh ../tmp/tmp.sh ; rm -f ../tmp/tmp.sh
+	@echo
 	@echo 'Gathering translator source in '`cat .vdir`/src
 	@echo
+	mkdir ../src/xlat
+	mkdir ../src/xlat++
+	mkdir ../src/xlat-i
+	mkdir ../src/xlatcpm
 	ln -s ../../src/Common/xlat/xl-*           ../src/xlat
 	ln -s ../../src/Common/xlat++/xp-*         ../src/xlat++
 	ln -s ../../src/Common/xlat-i/xi-*         ../src/xlat-i
@@ -119,6 +124,9 @@ dirs+sources:
 	ln -s ../../src/Common/Makefile            ../src/xlat-i
 	ln -s ../../src/Common/Makefile            ../src/xlatcpm
 	@echo
+	@echo 'Gathering little languages in '`cat .vdir`/src
+	@echo
+
 	@rm -f .vdir .gdir
 	touch dirs+sources
 
@@ -361,7 +369,7 @@ LIBCHARM=cache.o dag.o barrier_redn.o pglib.o \
          iminredn.o imaxredn.o isumredn.o iprodredn.o icountredn.o \
 	 fminredn.o fmaxredn.o fsumredn.o fprodredn.o \
 	 dminredn.o dmaxredn.o dsumredn.o dprodredn.o \
-	 charmFutures.o
+	 ckfutures.o
 
 libcharm: charmxlat libcharm.a
 
@@ -443,10 +451,9 @@ dprodredn.o: dprodredn.int $(GENERIC_REDN_H)
 dcountredn.o: dcountredn.int $(GENERIC_REDN_H)
 	$(CHARMC) -o dcountredn.o GENERIC-REDN.p -DHEAD='"dcountredn.int"'
 
-charmFutures.o: charmFutures.C
-	$(CHARMC) charmFutures.ci
-	$(CHARMC) -c charmFutures.C
-
+ckfutures.o: ckfutures.C ckfutures.ci
+	$(CHARMC) ckfutures.ci
+	$(CHARMC) -c ckfutures.C
 
 ###############################################################################
 #
@@ -565,12 +572,42 @@ xi-scan.o: xi-scan.C $(XIHEADERS)
 
 ###############################################################################
 #
-# Little languages.
+# Simple Messaging
 #
 ###############################################################################
 
 libsimplemsg.a: simplemsg.c simplemsg.h
 	$(CHARMC) -cp ../lib/ -o $@ simplemsg.c
+
+###############################################################################
+#
+# PVM
+#
+###############################################################################
+
+PVMC=pvmc_buf.o pvmc_comm.o pvmc_conv.o pvmc_main.o pvmc_pack.o pvmc_groups.o
+
+libpvmc.a: $(PVMC)
+	$(CHARMC) -cp ../lib -o libpvmc.a $(PVMC)
+
+pvmc_buf.o: pvmc_buf.c pvmc.h pvm3.h
+	$(CHARMC) -o $@ pvmc_buf.c
+
+pvmc_conv.o: pvmc_conv.c pvmc.h pvm3.h
+	$(CHARMC) -o $@ pvmc_conv.c
+
+pvmc_pack.o: pvmc_pack.c pvmc.h pvm3.h
+	$(CHARMC) -o $@ pvmc_pack.c
+
+pvmc_comm.o: pvmc_comm.c pvmc.h pvm3.h
+	$(CHARMC) -o $@ pvmc_comm.c
+
+pvmc_groups.o: pvmc_groups.c pvmc.h pvm3.h
+	$(CHARMC) -o $@ pvmc_groups.c
+
+pvmc_main.o: pvmc_main.c pvmc.h pvm3.h
+	$(CHARMC) -o $@ pvmc_main.c
+
 
 ###############################################################################
 #

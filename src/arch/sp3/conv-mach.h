@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.1  1997-07-08 22:10:55  milind
+ * Revision 1.2  1997-07-26 16:42:18  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.1  1997/07/08 22:10:55  milind
  * Added IBM SP3 version. Developed and Tested on ANL machine.
  *
  * Revision 2.30  1997/05/05 13:56:10  jyelon
@@ -97,6 +100,10 @@
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
+
+#define CMK_MEMORY_DISTRIBUTED                             1
+#define CMK_MEMORY_CLUSTERED                               0
+#define CMK_MEMORY_SHARED                                  0
 
 #define CMK_MSG_HEADER_SIZE_BYTES                          4
 #define CMK_MSG_HEADER_BLANK_SPACE                         0

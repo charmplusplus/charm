@@ -1,8 +1,8 @@
 readonly int futureBocNum;
 message FutureInitMsg;
 
-group Future {
-  entry Future(FutureInitMsg *);
+group FutureBOC {
+  entry FutureBOC(FutureInitMsg *);
   entry SetFuture(FutureInitMsg *);
 };
 

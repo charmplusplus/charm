@@ -187,6 +187,7 @@ void CthInit()
   CthCpvAccess(CthCurrent)=t;
   CthCpvAccess(CthDatasize)=1;
   CthCpvAccess(CthExiting)=0;
+  CthSetStrategyDefault(t);
 }
 
 CthThread CthSelf()

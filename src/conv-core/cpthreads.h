@@ -113,8 +113,17 @@ int Cpthread_init();
 void Cpthread_initialize();
 void Cpthread_start_main(CmiStartFn fn, int argc, char **argv);
 
+#define Cpthread_yield() (CthYield())
 
-#ifdef CPTHREAD_DEFINE_PTHREADS
+#ifndef SUPPRESS_PTHREADS
+
+#define _POSIX_THREADS
+#define _POSIX_THREAD_ATTR_STACKSIZE
+/* #define _POSIX_THREAD_ATTR_STACKADDR */
+/* #define _POSIX_THREAD_PRIORITY_SCHEDULING */
+/* #define _POSIX_THREAD_PRIO_INHERIT */
+/* #define _POSIX_THREAD_PRIO_PROTECT */
+/* #define _POSIX_THREAD_PROCESS_SHARED */
 
 #define PTHREAD_THREADS_MAX		CPTHREAD_THREADS_MAX
 #define PTHREAD_KEYS_MAX		CPTHREAD_KEYS_MAX
@@ -173,7 +182,9 @@ void Cpthread_start_main(CmiStartFn fn, int argc, char **argv);
 #define pthread_once                    Cpthread_once
 #define pthread_init                    Cpthread_init
 
-#endif /* CPTHREAD_DEFINE_PTHREADS */
+#define pthread_yield                   (CthYield())
+
+#endif /* SUPPRESS_PTHREADS */
 
 #endif /* CPTHREAD_H */
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.6  1997-04-25 20:48:11  jyelon
+ * Revision 1.7  1997-07-26 16:41:41  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.6  1997/04/25 20:48:11  jyelon
  * Corrected CmiNotifyIdle
  *
  * Revision 1.5  1997/04/24 22:37:00  jyelon
@@ -370,8 +373,6 @@ int node, neighbour;
 /* Following functions establishes a two dimensional torus connection */
 /* among the procesors (for any number of precessors > 0              */
    
-
-
 static neighbour_init(p)
 int p;
 {

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Revision 2.2  1997-07-26 16:41:09  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.1  1995/06/08 17:09:41  gursoy
  * Cpv macro changes done
  *
  * Revision 1.8  1995/04/23  21:23:15  sanjeev
@@ -100,6 +103,5 @@ typedef struct dummymsg {
 #include "prio_macros.h"
 #include "sys_macros.h"
 #include "communication.h"
-
 
 #endif

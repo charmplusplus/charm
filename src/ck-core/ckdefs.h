@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.19  1996-07-15 21:01:41  jyelon
+ * Revision 2.20  1997-07-26 16:41:10  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.19  1996/07/15 21:01:41  jyelon
  * Changed mach-flags from #ifdef to #if
  *
  * Revision 2.18  1996/03/28 21:53:31  sanjeev
@@ -228,6 +231,10 @@
 #define CBroadcastMsgBranch(ChareType,EP,msg,ChareId) 	GeneralBroadcastMsgBranch(GetEntryPtr(ChareType,EP), msg, -1, ChareId)
 
 #define CLocalBranch(BocType, BocId)	((BocType *)GetBocDataPtr(BocId))
+
+#define CRemoteCallBranch(BOC1, ep1 , m, g, p) CRemoteCallBranchFn(GetEntryPtr(BOC1,ep1), m, g, p)
+
+#define CRemoteCall(CH, ep, m, cid) CRemoteCallFn(GetEntryPtr(CH,ep),m,cid)
 
 #define MsgIndex(MessageType)	_CK_msg_##MessageType
 

@@ -1042,6 +1042,23 @@ static CmiMutex   Cmi_scanf_mutex;
 static char      *Cmi_scanf_data;
 static double     Cmi_clock;
 
+/******************************************************************************
+ *
+ * Node Numbers
+ *
+ *****************************************************************************/
+
+#if CMK_MEMORY_CLUSTERED
+
+int CmiMyNode()            { return Cmi_nodenum; }
+int CmiNumNodes()          { return Cmi_numnodes; }
+int CmiNodeFirst(int node) { return nodes[pe].nodestart; }
+int CmiNodeSize(int node)  { return nodes[pe].nodesize; }
+int CmiNodeOf(int pe)      { return (nodes_by_pe[pe] - nodes); }
+int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe].nodestart); }
+
+#endif
+
 /****************************************************************************
  *                                                                          
  * CheckSocketsReady

@@ -2,13 +2,23 @@
 
 typedef struct Cfuture_data_s
 {
-  CfutureValue value;
-  int          ready;
-  CthThread    waiters;
+  void      *value;
+  int        ready;
+  CthThread  waiters;
 }
 *futdata;
 
-#define field_offset(type, field) ((int)(&(((type)0)->field)))
+typedef struct CfutureValue_s
+{
+  char core[CmiMsgHeaderSizeBytes];
+  struct Cfuture_data_s *data;
+  int valsize;
+  double rest[1];
+}
+*CfutureValue;
+
+#define field_offset(t, f) ((int)(((t)0)->f))
+#define void_to_value(v) ((CfutureValue)(((char*)v)-field_offset(CfutureValue,rest)))
 
 CpvDeclare(int, CfutureStoreIndex);
 
@@ -24,25 +34,13 @@ Cfuture CfutureCreate()
   return result;
 }
 
-CfutureValue CfutureCreateValue(int bytes)
-{
-  int valsize = sizeof(struct CfutureValue_s) + bytes;
-  CfutureValue m = (CfutureValue)CmiAlloc(valsize);
-  CmiSetHandler(m, CpvAccess(CfutureStoreIndex));
-  m->valsize = valsize;
-  return m;
-}
-
 static void CfutureAwaken(futdata data, CfutureValue val)
 {
   CthThread t;
   data->value = val;
   data->ready = 1;
-  t = data->waiters;
-  while (t) {
+  for (t=data->waiters; t; t=CthGetNext(t))
     CthAwaken(t);
-    t = CthGetNext(t);
-  }
   data->waiters=0;
 }
 
@@ -52,8 +50,24 @@ static void CfutureStore(CfutureValue m)
   CfutureAwaken(m->data, m);
 }
 
-void CfutureSet(Cfuture f, CfutureValue m)
+void *CfutureCreateBuffer(int bytes)
 {
+  int valsize = sizeof(struct CfutureValue_s) + bytes;
+  CfutureValue m = (CfutureValue)CmiAlloc(valsize);
+  CmiSetHandler(m, CpvAccess(CfutureStoreIndex));
+  m->valsize = valsize;
+  return (void*)(m->rest);
+}
+
+void CfutureDestroyBuffer(void *v)
+{
+  CfutureValue value = void_to_value(v);
+  CmiFree(v);
+}
+
+void CfutureStoreBuffer(Cfuture f, void *value)
+{
+  CfutureValue m = void_to_value(value);
   futdata data;
   if (f.pe == CmiMyPe()) {
     CfutureAwaken(f.data, m);
@@ -63,7 +77,14 @@ void CfutureSet(Cfuture f, CfutureValue m)
   }
 }
 
-CfutureValue CfutureWait(Cfuture f, int freeflag)
+void CfutureSet(Cfuture f, void *value, int len)
+{
+  void *copy = CfutureCreateBuffer(len);
+  memcpy(copy, value, len);
+  CfutureStoreBuffer(f, copy);
+}
+
+void *CfutureWait(Cfuture f)
 {
   CthThread self; CfutureValue value; futdata data;
   if (f.pe != CmiMyPe()) {
@@ -78,8 +99,7 @@ CfutureValue CfutureWait(Cfuture f, int freeflag)
     CthSuspend();
   }
   value = data->value;
-  if (freeflag) free(data);
-  return value;
+  return (void*)(value->rest);
 }
 
 void CfutureDestroy(Cfuture f)
@@ -92,12 +112,8 @@ void CfutureDestroy(Cfuture f)
     CmiPrintf("error: CfutureDestroy: destroying an active future.\n");
     exit(1);
   }
+  if (f.data->value) free(f.data->value);
   free(f);
-}
-
-void CfutureDestroyValue(CfutureValue v)
-{
-  CmiFree(v);
 }
 
 void CfutureInit()

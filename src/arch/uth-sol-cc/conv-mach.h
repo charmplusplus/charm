@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.12  1997-05-05 13:57:16  jyelon
+ * Revision 1.13  1997-07-26 16:42:37  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.12  1997/05/05 13:57:16  jyelon
  * Updated for quickthreads
  *
  * Revision 1.11  1997/04/01 08:10:49  jyelon
@@ -94,6 +97,10 @@
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
+
+#define CMK_MEMORY_DISTRIBUTED                             0
+#define CMK_MEMORY_CLUSTERED                               0
+#define CMK_MEMORY_SHARED                                  1
 
 #define CMK_MSG_HEADER_SIZE_BYTES                          4
 #define CMK_MSG_HEADER_BLANK_SPACE                         0

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.29  1996-03-22 16:07:02  sanjeev
+ * Revision 2.30  1997-07-26 16:41:08  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.29  1996/03/22 16:07:02  sanjeev
  * changed "class chare" to "class chare_object"
  *
  * Revision 2.28  1996/03/22 15:58:56  sanjeev
@@ -228,6 +231,16 @@ extern "C" void          CkSetQueueing(void *, int);
 
 extern "C" ENVELOPE *CkCopyEnv(ENVELOPE *) ;
 
+
+extern "C" void  SetRefNumber(void *m, int n);
+extern "C" int   GetRefNumber(void *m);
+
+extern "C" void      futuresModuleInit();
+extern "C" void      futuresCreateBOC();
+extern "C" void*     CRemoteCallBranchFn(int entry, void * m, int g, int p);
+extern "C" void*     CRemoteCallFn(int entry, void *m, ChareIDType *id);
+extern "C" CthThread CthCreate(void (*)(...), void *, int);
+extern "C" void      CSendToFuture(void *m, int processor);
 
 
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.43  1997-07-18 21:21:07  milind
+ * Revision 2.44  1997-07-26 16:41:14  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.43  1997/07/18 21:21:07  milind
  * all files of the form perf-*.c have been changed to trace-*.c, with
  * name expansions. For example, perf-proj.c has been changed to
  * trace-projections.c.
@@ -313,6 +316,7 @@ char **argv;
   statModuleInit();
   tblModuleInit(); 
   CldModuleInit();
+  futuresModuleInit();
   traceModuleInit(&argc, argv); /* pass parameters */
 
   if (CmiMyRank() == 0) CmiNodeBarrier();
@@ -439,6 +443,8 @@ FUNCTION_PTR donehandler;
 		CpvAccess(InsideDataInit) = 1;
 
 		CldCreateBoc();
+
+		futuresCreateBOC();
 
 		CpvAccess(InsideDataInit) = 0;
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.67  1997-07-24 18:32:12  jyelon
+ * Revision 2.68  1997-07-26 16:41:16  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.67  1997/07/24 18:32:12  jyelon
  * *** empty log message ***
  *
  * Revision 2.66  1997/07/24 17:29:36  milind
@@ -801,23 +804,17 @@ typedef struct Cfuture_s
 }
 Cfuture;
 
-typedef struct CfutureValue_s
-{
-  char core[CmiMsgHeaderSizeBytes];
-  struct Cfuture_data_s *data;
-  int valsize;
-  double rest[1];
-}
-*CfutureValue;
-
 #define CfutureValueData(v) ((void*)((v)->rest))
 
 Cfuture       CfutureCreate(void);
+void          CfutureSet(Cfuture f, void *val, int len);
+void         *CfutureWait(Cfuture f);
 void          CfutureDestroy(Cfuture f);
-CfutureValue  CfutureCreateValue(int bytes);
-void          CfutureDestroyValue(CfutureValue v);
-void          CfutureSet(Cfuture f, CfutureValue val);
-CfutureValue  CfutureWait(Cfuture f, int freeflag);
+
+void         *CfutureCreateBuffer(int bytes);
+void          CfutureDestroyBuffer(void *val);
+void          CfutureStoreBuffer(Cfuture f, void *value);
+
 #define       CfuturePE(f) ((f).pe)
 
 void CfutureInit();
@@ -853,6 +850,32 @@ void CcdRaiseCondition CMK_PROTO((int condnum));
 void CcdCallOnCondition CMK_PROTO((int condnum, CcdVoidFn fnp, void *arg));
 
 void CcdCallBacks();
+
+/******** NODE NUMBERING *********/
+
+#if CMK_MEMORY_DISTRIBUTED
+
+#define CmiMyNode()         (CmiMyPe())
+#define CmiNumNodes()       (CmiNumPes())
+#define CmiNodeFirst(node)  (node)
+#define CmiNodeSize(node)   1
+#define CmiNodeOf(pe)       (pe)
+#define CmiRankOf(pe)       0
+
+#endif
+
+#if CMK_MEMORY_SHARED
+
+#define CmiMyNode()         0
+#define CmiNumNodes()       1
+#define CmiNodeFirst(node)  0
+#define CmiNodeSize(node)   (CmiNumPes())
+#define CmiNodeOf(pe)       0
+#define CmiRankOf(pe)       (pe)
+
+#endif
+
+/* (note: if cmk_memory_clustered, see machine.c for these fns) */
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 

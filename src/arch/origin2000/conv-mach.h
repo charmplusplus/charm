@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.2  1997-07-07 22:13:50  milind
+ * Revision 1.3  1997-07-26 16:42:03  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.2  1997/07/07 22:13:50  milind
  * Made threads to work.
  *
  * Revision 1.1  1997/03/28 17:38:23  milind
@@ -96,6 +99,10 @@
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          1
 #define CMK_MALLOC_USE_OS_BUILTIN                          0
+
+#define CMK_MEMORY_DISTRIBUTED                             0
+#define CMK_MEMORY_CLUSTERED                               1
+#define CMK_MEMORY_SHARED                                  0
 
 #define CMK_MSG_HEADER_SIZE_BYTES                          4
 #define CMK_MSG_HEADER_BLANK_SPACE                         0
