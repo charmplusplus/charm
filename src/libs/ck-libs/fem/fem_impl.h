@@ -30,7 +30,7 @@ class FEMinit {
 };
 PUPmarshall(FEMinit);
 
-/*This class describes a local-to-global index mapping.
+/*This class describes a local-to-global index mapping, used in FEM_Print.
 The default is the identity mapping.*/
 class l2g_t {
 public:
@@ -39,6 +39,29 @@ public:
 	//Return the global number associated with this local node
 	virtual int no(int localNo) const {return localNo;}
 };
+
+/* Map (user-assigned) numbers to T's */
+template <class T>
+class NumberedVec : public CkPupPtrVec<T> {
+	typedef CkPupPtrVec<T> super;
+	
+public:
+	//Extend the vector to have up to this element
+	void makeLonger(int toHaveElement)
+	{
+		int oldSize=size(), newSize=toHaveElement+1;
+		if (oldSize>=newSize) return; //Nothing to do
+		setSize(newSize);
+		length()=newSize;
+		for (int j=oldSize;j<newSize;j++)
+			(*(super *)this)[j]=new T;
+	}
+	
+	//Same old bracket operators, but return the actual object, not a pointer:
+	T &operator[](int i) {return *( (*(super *)this)[i] );}
+	const T &operator[](int i) const {return *( (*(const super *)this)[i] );}
+};
+
 
 /*Inner class used by commRec:*/
 class commShare {
@@ -140,76 +163,88 @@ public:
 	void print(const l2g_t &l2g);
 };
 
+/* Describes an FEM item-- a set of nodes or elements */
+class FEM_Item : public CkNoncopyable {
+public:
+	int n;//Number of objects
+	int dataPer;//Doubles of user data per object
+	double *udata;//User's data-- [dataPer x n]
+
+	int ghostStart; //Index of first ghost object
+	commCounts ghostSend; //Non-ghosts we send out
+	commCounts ghostRecv; //Ghosts we recv into
+	
+	FEM_Item() //Default constructor
+	  {n=dataPer=0;ghostStart=0;udata=NULL;}
+	~FEM_Item() 
+	  {delete [] udata;udata=NULL;}
+	void pup(PUP::er &p);
+	void print(const char *type,const l2g_t &l2g);
+
+	int isGhostIndex(int idx) const {
+		return idx>=ghostStart;
+	}
+		
+	void setUdata_r(const double *Nudata);
+	void setUdata_c(const double *NudataTranspose);
+	void getUdata_r(double *Nudata) const;
+	void getUdata_c(double *NudataTranspose) const;
+	void udataIs(int i,const double *src)
+	  {memcpy((void *)&udata[dataPer*i],(const void *)src,sizeof(double)*dataPer);}
+	const double *udataFor(int i) const {return &udata[dataPer*i];}
+	void allocUdata(void) //Create a new udata array
+	  {delete[] udata;udata=new double[udataCount()];}
+	int udataCount() const //Return total entries in user data array 
+	  {return n*dataPer;}
+};
+
+/* Describes one kind of FEM elements */
+class FEM_Elem:public FEM_Item {
+public:
+	//There's a separate elemCount for each kind of element
+	int nodesPer;//Number of nodes per element
+	int *conn;//Connectivity array-- [nodesPer x n]
+	
+	FEM_Elem():FEM_Item() {nodesPer=-1;conn=NULL;}
+	~FEM_Elem() //Free all stored memory
+	  {delete [] conn;conn=NULL;}
+	void allocConn(void)
+	{delete[] conn; conn=new int[connCount()];}
+	void pup(PUP::er &p);
+	void print(const char *type,const l2g_t &l2g);
+	int *connFor(int i) {return &conn[nodesPer*i];}
+	const int *connFor(int i) const {return &conn[nodesPer*i];}
+	int connCount() const //Return total entries in connectivity array
+	  {return n*nodesPer;}
+};
+
+
 /*This class describes the nodes and elements in
   a finite-element mesh or submesh*/
 class FEM_Mesh : public CkNoncopyable {
 public:
-	class count : public CkNoncopyable {
-	public:
-		int n;//Number of objects
-		int dataPer;//Doubles of user data per object
-		double *udata;//User's data-- [dataPer x n]
-
-		int ghostStart; //Index of first ghost object
-		commCounts ghostSend; //Non-ghosts we send out
-		commCounts ghostRecv; //Ghosts we recv into
-		
-		count() //Default constructor
-		  {n=dataPer=0;ghostStart=0;udata=NULL;}
-		~count() 
-		  {delete [] udata;udata=NULL;}
-		void pup(PUP::er &p);
-		void print(const char *type,const l2g_t &l2g);
-
-		int isGhostIndex(int idx) const {
-			return idx>=ghostStart;
-		}
-		
-		void setUdata_r(const double *Nudata);
-		void setUdata_c(const double *NudataTranspose);
-		void getUdata_r(double *Nudata) const;
-		void getUdata_c(double *NudataTranspose) const;
-		void udataIs(int i,const double *src)
-		  {memcpy((void *)&udata[dataPer*i],(const void *)src,sizeof(double)*dataPer);}
-		const double *udataFor(int i) const {return &udata[dataPer*i];}
-		void allocUdata(void) //Create a new udata array
-		  {delete[] udata;udata=new double[udataCount()];}
-		int udataCount() const //Return total entries in user data array 
-		  {return n*dataPer;}
-	};
-
-	count node; //Describes the nodes in the mesh
+	FEM_Item node; //Describes the nodes in the mesh
+	NumberedVec<FEM_Elem> elem;
 	
-#define FEM_MAX_ELEMTYPES 20 
-	class elemCount:public count {
-	public:
-		//There's a separate elemCount for each kind of element
-		int nodesPer;//Number of nodes per element
-		int *conn;//Connectivity array-- [nodesPer x n]
-		
-		elemCount():count() {nodesPer=-1;conn=NULL;}
-		~elemCount() //Free all stored memory
-		  {delete [] conn;conn=NULL;}
-		void allocConn(void)
-		{delete[] conn; conn=new int[connCount()];}
-		void pup(PUP::er &p);
-		void print(const char *type,const l2g_t &l2g);
-		int *connFor(int i) {return &conn[nodesPer*i];}
-		const int *connFor(int i) const {return &conn[nodesPer*i];}
-		int connCount() const //Return total entries in connectivity array
-		  {return n*nodesPer;}
-	};
-	int nElemTypes;//Length of array below
-	elemCount elem[FEM_MAX_ELEMTYPES];
-
-	count &getCount(int elTypeOrMinusOne);
+	//Return this type of element, given an element type
+	FEM_Item &getCount(int elTypeOrMinusOne) {
+		if (elTypeOrMinusOne==-1) return node;
+		else return elem[chkET(elTypeOrMinusOne)];
+	}
+	const FEM_Item &getCount(int elTypeOrMinusOne) const {
+		if (elTypeOrMinusOne==-1) return node;
+		else return elem[chkET(elTypeOrMinusOne)];
+	}
+	FEM_Elem &getElem(int elType) {return elem[chkET(elType)];}
+	const FEM_Elem &getElem(int elType) const {return elem[chkET(elType)];}
+	int chkET(int elType) const; //Check this element type-- abort if it's bad
 	
 	FEM_Mesh();
 	~FEM_Mesh();
 	void copyType(const FEM_Mesh &from);//Copies nElemTypes and *Per fields
 	
 	int nElems() const //Return total number of elements (of all types)
-	  {return nElems(nElemTypes);}
+	  {return nElems(elem.size());}
 	int nElems(int t) const;//Return total number of elements before type t
 	void pup(PUP::er &p); //For migration
 	void print(const l2g_t &l2g);//Write human-readable description to CkPrintf
@@ -314,8 +349,8 @@ class FEM_DataMsg : public CMessage_FEM_DataMsg
   static void *alloc(int, size_t, int*, int);
 };
 
+/* Maximum number of fields that can be registered */
 #define MAXDT 20
-#define FEM_MAXUDATA 20
 
 class FEMchunk : public ArrayElement1D
 {
@@ -420,7 +455,7 @@ private:
 void fem_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk);
 
 //Describes a single layer of ghost elements
-class ghostLayer {
+class ghostLayer : public CkNoncopyable {
 public:
 	int nodesPerTuple; //Number of shared nodes needed to connect elements
 	bool addNodes; //Add ghost nodes to the chunks
@@ -429,9 +464,10 @@ public:
 		bool add; //Add this kind of ghost element to the chunks
 		int tuplesPerElem; //# of tuples surrounding this element
 		const int *elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
-		elemGhostInfo(void) {add=false;}
+		elemGhostInfo(void) {add=false;tuplesPerElem=0; elem2tuple=NULL;}
+		~elemGhostInfo(void) {delete[] elem2tuple;}
 	};
-	elemGhostInfo elem[FEM_MAX_ELEMTYPES];
+	NumberedVec<elemGhostInfo> elem;
 };
 
 //Declare this at the start of every API routine:

@@ -168,8 +168,8 @@ void mesh2graph(const FEM_Mesh *m, Graph *g)
 
   //Build an inverse mapping, from node to list of surrounding elements
   int globalCount=0,t,e,n;
-  for(t=0;t<m->nElemTypes;t++) {
-    const FEM_Mesh::elemCount &k=m->elem[t];
+  for(t=0;t<m->elem.size();t++) {
+    const FEM_Elem &k=m->elem[t];
     for(e=0;e<k.n;e++,globalCount++)
       for(n=0;n<k.nodesPer;n++)
         nl.add(k.conn[e*k.nodesPer+n],globalCount);

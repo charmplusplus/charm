@@ -375,22 +375,22 @@ static void copyAdd(int nx,int ny,const int *in,int add,int *out)
     out[i] = in[i]+add;
 }
 
-void FEM_Mesh::count::setUdata_r(const double *Nudata)
+void FEM_Item::setUdata_r(const double *Nudata)
 {
 	allocUdata();
 	memcpy(udata,Nudata,udataCount()*sizeof(double));
 }
-void FEM_Mesh::count::setUdata_c(const double *Nudata)
+void FEM_Item::setUdata_c(const double *Nudata)
 {
 	allocUdata();
 	transpose(n,dataPer,Nudata,udata);
 }
 
-void FEM_Mesh::count::getUdata_r(double *Nudata) const
+void FEM_Item::getUdata_r(double *Nudata) const
 {
 	memcpy(Nudata,udata,udataCount()*sizeof(double));
 }
-void FEM_Mesh::count::getUdata_c(double *Nudata) const
+void FEM_Item::getUdata_c(double *Nudata) const
 {
 	transpose(dataPer,n,udata,Nudata);
 }
@@ -422,16 +422,6 @@ static const FEM_Mesh *getMesh(void) {
     }
     return _meshptr;
   }
-}
-
-//Check an element type field for validitity-- abort if bad
-static int chkET(int et)
-{
-  if (et<0 || et>2*FEM_MAX_ELEMTYPES)
-    CkAbort("FEM Error> Invalid element type!\n");
-  if (et>=FEM_MAX_ELEMTYPES)
-    CkAbort("FEM Error> Registered too many element types!\n");
-  return et;
 }
 
 /****** Custom Partitioning API *******/
@@ -475,9 +465,7 @@ CDECL void FEM_Set_Node_Data(const double *data)
 CDECL void FEM_Set_Elem(int elType,int nElem,int dataPer,int nodePer) {
 	FEMAPI("FEM_Set_Elem");
 	FEM_Mesh *m=setMesh();
-	chkET(elType);
-	if (m->nElemTypes<=elType)
-		m->nElemTypes=elType+1;
+	m->elem.makeLonger(elType);
 	m->elem[elType].n=nElem;
 	m->elem[elType].dataPer=dataPer;
 	m->elem[elType].nodesPer=nodePer;
@@ -485,11 +473,11 @@ CDECL void FEM_Set_Elem(int elType,int nElem,int dataPer,int nodePer) {
 CDECL void FEM_Set_Elem_Data(int elType,const double *data) 
 {
 	FEMAPI("FEM_Set_Elem_Data");
-	setMesh()->elem[chkET(elType)].setUdata_r(data);
+	setMesh()->getElem(elType).setUdata_r(data);
 }
 CDECL void FEM_Set_Elem_Conn(int elType,const int *conn) {
 	FEMAPI("FEM_Set_Elem_Conn");
-	FEM_Mesh::elemCount &c=setMesh()->elem[chkET(elType)];
+	FEM_Elem &c=setMesh()->getElem(elType);
 	c.allocConn();
 	memcpy(c.conn,conn,c.connCount()*sizeof(int));
 }
@@ -534,20 +522,20 @@ FDECL void FTN_NAME(FEM_SET_ELEM_DATA_R,fem_set_elem_data_r)
 	(int *elType,double *data)
 {
 	FEMAPI("FEM_set_elem_data_r");
-	setMesh()->elem[chkET(*elType-1)].setUdata_r(data);
+	setMesh()->getCount(*elType-1).setUdata_r(data);
 }
 FDECL void FTN_NAME(FEM_SET_ELEM_DATA_C,fem_set_elem_data_c)
 	(int *elType,double *data)
 {
 	FEMAPI("FEM_set_elem_data_c");
-	setMesh()->elem[chkET(*elType-1)].setUdata_c(data);
+	setMesh()->getCount(*elType-1).setUdata_c(data);
 }
 
 FDECL void FTN_NAME(FEM_SET_ELEM_CONN_R,fem_set_elem_conn_r)
 	(int *elType,int *conn_r)
 {
 	FEMAPI("FEM_set_elem_conn_r");
-	FEM_Mesh::elemCount &c=setMesh()->elem[chkET(*elType-1)];
+	FEM_Elem &c=setMesh()->getElem(*elType-1);
 	c.allocConn();
 	copyAdd(c.n,c.nodesPer,conn_r,-1,c.conn);
 }
@@ -555,7 +543,7 @@ FDECL void FTN_NAME(FEM_SET_ELEM_CONN_C,fem_set_elem_conn_c)
 	(int *elType,int *conn_c)
 {
 	FEMAPI("FEM_set_elem_conn_c");
-	FEM_Mesh::elemCount &c=setMesh()->elem[chkET(*elType-1)];
+	FEM_Elem &c=setMesh()->getElem(*elType-1);
 	c.allocConn();
 	transposeAdd(c.n,c.nodesPer,conn_c,-1,c.conn);
 }
@@ -590,7 +578,7 @@ CDECL void FEM_Get_Elem(int elType,int *nElem,int *dataPer,int *nodePer)
 {
 	FEMAPI("FEM_Get_Elem");
 	const FEM_Mesh *m=getMesh();
-	chkET(elType);
+	m->chkET(elType);
 	if (nElem!=NULL) *nElem=m->elem[elType].n;
 	if (dataPer!=NULL) *dataPer=m->elem[elType].dataPer;
 	if (nodePer!=NULL) *nodePer=m->elem[elType].nodesPer;
@@ -598,11 +586,11 @@ CDECL void FEM_Get_Elem(int elType,int *nElem,int *dataPer,int *nodePer)
 CDECL void FEM_Get_Elem_Data(int elType,double *data) 
 {
 	FEMAPI("FEM_Get_Elem_Data");
-	getMesh()->elem[chkET(elType)].getUdata_r(data);
+	getMesh()->getCount(elType).getUdata_r(data);
 }
 CDECL void FEM_Get_Elem_Conn(int elType,int *conn) {
 	FEMAPI("FEM_Get_Elem_Conn");
-	const FEM_Mesh::elemCount &c=getMesh()->elem[chkET(elType)];
+	const FEM_Elem &c=getMesh()->getElem(elType);
 	memcpy(conn,c.conn,c.n*c.nodesPer*sizeof(int));
 }
 
@@ -635,27 +623,27 @@ FDECL void FTN_NAME(FEM_GET_ELEM_DATA_R,fem_get_elem_data_r)
 	(int *elType,double *data) 
 {
 	FEMAPI("FEM_Get_elem_data_r");
-	getMesh()->elem[chkET(*elType-1)].getUdata_r(data);
+	getMesh()->getCount(*elType-1).getUdata_r(data);
 }
 FDECL void FTN_NAME(FEM_GET_ELEM_DATA_C,fem_get_elem_data_c)
 	(int *elType,double *data) 
 {
 	FEMAPI("FEM_Get_elem_data_c");
-	getMesh()->elem[chkET(*elType-1)].getUdata_c(data);
+	getMesh()->getCount(*elType-1).getUdata_c(data);
 }
 
 FDECL void FTN_NAME(FEM_GET_ELEM_CONN_R,fem_get_elem_conn_r)
 	(int *elType,int *conn)
 {
 	FEMAPI("FEM_Get_elem_conn_r");
-	const FEM_Mesh::elemCount &c=getMesh()->elem[chkET(*elType-1)];
+	const FEM_Elem &c=getMesh()->getElem(*elType-1);
 	copyAdd(c.nodesPer,c.n,c.conn,+1,conn);
 }
 FDECL void FTN_NAME(FEM_GET_ELEM_CONN_C,fem_get_elem_conn_c)
 	(int *elType,int *conn)
 {
 	FEMAPI("FEM_Get_elem_conn_c");
-	const FEM_Mesh::elemCount &c=getMesh()->elem[chkET(*elType-1)];
+	const FEM_Elem &c=getMesh()->getElem(*elType-1);
 	transposeAdd(c.nodesPer,c.n,c.conn,+1,conn);
 }
 
@@ -1091,8 +1079,8 @@ FEMchunk::update(int fid, void *nodes)
 void
 FEMchunk::updateGhost(int fid, int elemType, void *nodes)
 {
-  FEM_Mesh::count *cnt=&cur_mesh->m.getCount(elemType);
-  beginUpdate(nodes,fid,&cnt->ghostSend,&cnt->ghostRecv,GHOST_UPDATE);
+  FEM_Item &cnt=cur_mesh->m.getCount(elemType);
+  beginUpdate(nodes,fid,&cnt.ghostSend,&cnt.ghostRecv,GHOST_UPDATE);
   waitForUpdate();
 }
 
@@ -1192,7 +1180,7 @@ FEMchunk::updateMesh(int callMeshUpdated,int doRepartition) {
 
   //Copy over the old global element numbers, and fabricate the rest
   i=0;
-  for (t=0; t<cur_mesh->m.nElemTypes && t<updated_mesh->m.nElemTypes ;t++) {
+  for (t=0; t<cur_mesh->m.elem.size() && t<updated_mesh->m.elem.size() ;t++) {
     int oldElemStart=cur_mesh->m.nElems(t);
     int newElemStart=updated_mesh->m.nElems(t);
     int oldElems=cur_mesh->m.elem[t].n;
@@ -1619,6 +1607,7 @@ CDECL void FEM_Add_Ghost_Layer(int nodesPerTuple,int doAddNodes)
 	curGhostLayer=&ghostLayers[nGhostLayers++];
 	curGhostLayer->nodesPerTuple=nodesPerTuple;
 	curGhostLayer->addNodes=(doAddNodes!=0);
+	curGhostLayer->elem.makeLonger(getMesh()->elem.size());
 }
 FDECL void FTN_NAME(FEM_ADD_GHOST_LAYER,fem_add_ghost_layer)
 	(int *nodesPerTuple,int *doAddNodes)
@@ -1637,7 +1626,6 @@ CDECL void FEM_Add_Ghost_Elem(int elType,int tuplesPerElem,const int *elem2tuple
 	FEMAPI("FEM_Add_Ghost_Elem");
 	if (curGhostLayer==NULL)
 		CkAbort("You must call FEM_Add_Ghost_Layer before calling FEM_Add_Ghost_Elem!\n");
-	chkET(elType);
 	curGhostLayer->elem[elType].add=true;
 	curGhostLayer->elem[elType].tuplesPerElem=tuplesPerElem;
 	curGhostLayer->elem[elType].elem2tuple=copyArray(elem2tuple,
@@ -1651,7 +1639,7 @@ FDECL void FTN_NAME(FEM_ADD_GHOST_ELEM,fem_add_ghost_elem)
 	int tuplesPerElem=*FtuplesPerElem;
 	if (curGhostLayer==NULL)
 		CkAbort("You must call FEM_Add_Ghost_Layer before calling FEM_Add_Ghost_Elem!\n");
-	chkET(elType);
+	getMesh()->chkET(elType);
 	curGhostLayer->elem[elType].add=true;
 	curGhostLayer->elem[elType].tuplesPerElem=tuplesPerElem;
 	curGhostLayer->elem[elType].elem2tuple=copyArray(elem2tuple,
@@ -1670,7 +1658,7 @@ FDECL int FTN_NAME(FEM_GET_NODE_GHOST,fem_get_node_ghost)(void)
 
 CDECL int FEM_Get_Elem_Ghost(int elType) {
 	FEMAPI("FEM_Get_Elem_Ghost");
-	return getMesh()->elem[chkET(elType)].ghostStart;
+	return getMesh()->getCount(elType).ghostStart;
 }
 CDECL int FTN_NAME(FEM_GET_ELEM_GHOST,fem_get_elem_ghost)(int *elType) {
 	return FEM_Get_Elem_Ghost(*elType-1);
@@ -1833,7 +1821,7 @@ FDECL void FTN_NAME(FEM_GET_GHOST_LIST,fem_get_ghost_list)
 /********* Debugging mesh printouts *******/
 # define ARRSTART 0
 
-void FEM_Mesh::count::print(const char *type,const l2g_t &l2g)
+void FEM_Item::print(const char *type,const l2g_t &l2g)
 {
   CkPrintf("Number of %ss = %d\n", type, n);
   CkPrintf("User data doubles per %s = %d\n", type, dataPer);
@@ -1847,7 +1835,7 @@ void FEM_Mesh::count::print(const char *type,const l2g_t &l2g)
     }
 }
 
-void FEM_Mesh::elemCount::print(const char *type,const l2g_t &l2g)
+void FEM_Elem::print(const char *type,const l2g_t &l2g)
 {
   CkPrintf("Number of %ss = %d\n", type, n);
   CkPrintf("User data doubles per %s = %d\n", type, dataPer);
@@ -1871,11 +1859,11 @@ void FEM_Mesh::elemCount::print(const char *type,const l2g_t &l2g)
 void FEM_Mesh::print(const l2g_t &l2g)
 {
   node.print("node",l2g);
-  CkPrintf("%d kinds of element:\n",nElemTypes);
-  if (nElemTypes==1)
+  CkPrintf("%d kinds of element:\n",elem.size());
+  if (elem.size()==1)
 	elem[0].print("element",l2g);
   else 
-  	for (int elType=0;elType<nElemTypes;elType++) {
+  	for (int elType=0;elType<elem.size();elType++) {
   		char elName[50];
   		sprintf(elName,"El type %d",elType+ARRSTART);
   		elem[elType].print(elName,l2g);
@@ -1930,17 +1918,13 @@ FEMchunk::print(void)
 
 /***************** Mesh Utility Classes **********/
 
-FEM_Mesh::count &FEM_Mesh::getCount(int elType)
-{
-	if (elType==-1) return node;
-	else if ((elType<0)||(elType>=nElemTypes)) {
+int FEM_Mesh::chkET(int elType) const {
+	if ((elType<0)||(elType>=elem.size())) {
 		CkError("FEM Error! Bad element type %d!\n",elType);
 		CkAbort("FEM Error! Bad element type used!\n");
 	}
-	/*else elType<nElemTypes*/
-	return elem[elType];
+	return elType;
 }
-
 
 
 /*CommRec: lists the chunks that share a single item.
@@ -2085,7 +2069,6 @@ void commCounts::add(int myChunk,int myLocalNo,
 }
 
 FEM_Mesh::FEM_Mesh() {
-	nElemTypes=0;
 }
 void FEM_Mesh::pup(PUP::er &p)  //For migration
 {
@@ -2093,11 +2076,9 @@ void FEM_Mesh::pup(PUP::er &p)  //For migration
 	node.pup(p);
 
 	p.comment(" Number of element types:");
-	p(nElemTypes);
-	for (int t=0;t<nElemTypes;t++)
-		elem[t].pup(p);
+	elem.pup(p);
 }
-void FEM_Mesh::count::pup(PUP::er &p) {
+void FEM_Item::pup(PUP::er &p) {
 	p.comment(" <number of items, including ghosts> <first ghost> <data per> ");
 	p(n);p(ghostStart);p(dataPer);
 	p.comment(" Ghosts to send out: ");
@@ -2110,9 +2091,9 @@ void FEM_Mesh::count::pup(PUP::er &p) {
 		p(udata,udataCount());
 	}
 }
-void FEM_Mesh::elemCount::pup(PUP::er &p) {
+void FEM_Elem::pup(PUP::er &p) {
 	p.comment(" ------------- Element data ---------- ");
-	count::pup(p);
+	FEM_Item::pup(p);
 	p.comment(" <nodesPer> "); p(nodesPer);
 	if (conn==NULL) allocConn();
 	p.comment(" element connectivity array: ");
@@ -2125,9 +2106,9 @@ FEM_Mesh::~FEM_Mesh()
 
 void FEM_Mesh::copyType(const FEM_Mesh &from)//Copies nElemTypes and *Per fields
 {
-	nElemTypes=from.nElemTypes;
 	node.dataPer=from.node.dataPer;
-	for (int t=0;t<nElemTypes;t++) {
+	elem.makeLonger(from.elem.size()-1);
+	for (int t=0;t<from.elem.size();t++) {
 		elem[t].dataPer=from.elem[t].dataPer;
 		elem[t].nodesPer=from.elem[t].nodesPer;
 	}

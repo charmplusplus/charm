@@ -84,21 +84,17 @@ public:
 	public:
 		
 	};
-	elemCount elem[FEM_MAX_ELEMTYPES];
+	NumberedVec<elemCount> elem;
 	CkVec<int> node;
 	
-	//Return the next unused local number of this type
-	int nextElement(int type) const {return elem[type].size();}
+	//Add an element to this list
 	int addElement(int type,int globalNo) {
-		int ret=nextElement(type);
 		elem[type].push_back(globalNo);
-		return ret;
+		return elem[type].size()-1;
 	}
-	int nextNode(void) const {return node.size();}
 	int addNode(int globalNo) {
-		int ret=nextNode();
 		node.push_back(globalNo);
-		return ret;
+		return node.size()-1;
 	}
 };
 
@@ -115,7 +111,7 @@ class splitter {
 	dynChunk *chunks; //Growing list of output elements [nchunks]
 	
 //---- Used by ghost layer builder ---
-	peList *gElem[FEM_MAX_ELEMTYPES]; //Map global element to owning processors
+	CkVec<peList *> gElem;//Map global element to owning processors
 	unsigned char *ghostNode; //Flag: this node borders ghost elements [mesh->node.n]
 
 //Return true if any of these nodes are ghost nodes
@@ -132,7 +128,7 @@ bool hasGhostNodes(const int *conn,int nodesPer)
 // Returns false if this is not a good ghost pair.
 bool addGhost(int global,int srcPe,int destPe,
 	      CkVec<int> &destChunk, peList *gDest,
-	      FEM_Mesh::count &src,FEM_Mesh::count &dest)
+	      FEM_Item &src,FEM_Item &dest)
 {
 	if (srcPe==destPe) 
 		return false; //Never add ghosts from same pe!
@@ -183,16 +179,18 @@ splitter(const FEM_Mesh *mesh_,int *elem2chunk_,int nchunks_)
 	:mesh(mesh_), elem2chunk(elem2chunk_),nchunks(nchunks_)
 {
 	msgs=new MeshChunk* [nchunks];
+	chunks=new dynChunk[nchunks];
 	int c;//chunk number (to receive message)
 	for (c=0;c<nchunks;c++) {
 		msgs[c]=new MeshChunk; //Ctor starts all node and element counts at zero
 		msgs[c]->m.copyType(*mesh);
+		chunks[c].elem.makeLonger(mesh->elem.size()-1);
 	}
 	
-	chunks=new dynChunk[nchunks];
 	gNode=new peList[mesh->node.n];
 	//Initialize ghost data:
-	for (int t=0;t<mesh->nElemTypes;t++) {
+	gElem.setSize(mesh->elem.size());
+	for (int t=0;t<mesh->elem.size();t++) {
 		gElem[t]=new peList[mesh->elem[t].n];
 	}
 	ghostNode=NULL;
@@ -201,7 +199,7 @@ splitter(const FEM_Mesh *mesh_,int *elem2chunk_,int nchunks_)
 ~splitter() {
 	delete[] gNode;
 	delete[] chunks;
-	for (int t=0;t<mesh->nElemTypes;t++)
+	for (int t=0;t<mesh->elem.size();t++)
 		delete[] gElem[t];
 	for (int c=0;c<nchunks;c++)
 		delete msgs[c];
@@ -228,7 +226,7 @@ void consistencyCheck(void)
 	int t,c;
 	//Make sure everything in chunks is also in gElem[] and gNode[]
 	for (c=0;c<nchunks;c++) {
-		for (t=0;t<mesh->nElemTypes;t++) {
+		for (t=0;t<mesh->elem.size();t++) {
 			const CkVec<int> &srcIdx=chunks[c].elem[t];
 			int nEl=srcIdx.size();
 			for (int lNo=0;lNo<nEl;lNo++) {
@@ -247,7 +245,7 @@ void consistencyCheck(void)
 	}
 	
 	//Make sure everything in gElem and gNode is also in chunks
-	for (t=0;t<mesh->nElemTypes;t++) {
+	for (t=0;t<mesh->elem.size();t++) {
 		for (int gNo=0;gNo<mesh->elem[t].n;gNo++) {
 			for (peList *l=&gElem[t][gNo];l!=NULL;l=l->next) {
 				range(l->pe,0,nchunks,"gElem pe");
@@ -276,12 +274,11 @@ void splitter::buildCommLists(void)
 	int t;//Element type
 	int e;//Element number in type
 	int n;//Node number around element
-	for (t=0;t<mesh->nElemTypes;t++) {
+	for (t=0;t<mesh->elem.size();t++) {
 		int typeStart=mesh->nElems(t);//Number of elements before type t
-		const FEM_Mesh::elemCount &src=mesh->elem[t]; 
+		const FEM_Elem &src=mesh->elem[t]; 
 		for (e=0;e<src.n;e++) {
 			int c=elem2chunk[typeStart+e];
-			FEM_Mesh &dest=msgs[c]->m;
 			const int *srcConn=&src.conn[e*src.nodesPer];
 			gElem[t][e].set(c,chunks[c].addElement(t,e));
 			int lNo=chunks[c].node.size();
@@ -326,7 +323,7 @@ MeshChunk *splitter::createMessage(int c)
 //Make room in the chunk for the incoming data
 	dest.node.n=chunks[c].node.size();
 	dest.node.allocUdata();
-	for (t=0;t<dest.nElemTypes;t++) {
+	for (t=0;t<dest.elem.size();t++) {
 		dest.elem[t].n=chunks[c].elem[t].size();
 		dest.elem[t].allocUdata();
 		dest.elem[t].allocConn();
@@ -348,8 +345,8 @@ MeshChunk *splitter::createMessage(int c)
 
 //Add each local element
 	int localStart=0; //Local element counter, across all element types
-	for (t=0;t<dest.nElemTypes;t++) {
-		const FEM_Mesh::elemCount &src=mesh->elem[t];
+	for (t=0;t<dest.elem.size();t++) {
+		const FEM_Elem &src=mesh->elem[t];
 		const CkVec<int> &srcIdx=chunks[c].elem[t];
 		int nEl=srcIdx.size();
 		int globalStart=mesh->nElems(t);
@@ -396,7 +393,7 @@ void fem_split(const FEM_Mesh *mesh,int nchunks,int *elem2chunk,
 	//Check the elem2chunk mapping:
 	checkArrayEntries(elem2chunk,mesh->nElems(),nchunks,
 		"elem2chunk, from FEM_Set_Partition or metis,");
-	for (int t=0;t<mesh->nElemTypes;t++) {
+	for (int t=0;t<mesh->elem.size();t++) {
 	//Check the user's connectivity array
 		checkArrayEntries(mesh->elem[t].conn,mesh->elem[t].n,
 		     mesh->node.n, "element connectivity, from FEM_Set_Elem_Conn,");
@@ -450,7 +447,7 @@ void splitter::addGhosts(int nLayers,const ghostLayer *g)
 //Set up the ghostStart counts:
 	for (int c=0;c<nchunks;c++) {
 		msgs[c]->m.node.ghostStart=chunks[c].node.size();
-		for (int t=0;t<mesh->nElemTypes;t++) 
+		for (int t=0;t<mesh->elem.size();t++) 
 			msgs[c]->m.elem[t].ghostStart=chunks[c].elem[t].size();
 	}
 
@@ -463,7 +460,7 @@ void splitter::addGhosts(int nLayers,const ghostLayer *g)
 
 //Free up memory
 	delete[] ghostNode; ghostNode=NULL;
-	for (int t=0;t<mesh->nElemTypes;t++)
+	for (int t=0;t<mesh->elem.size();t++)
 	  {delete[] gElem[t];gElem[t]=NULL;}
 }
 
@@ -587,7 +584,7 @@ void splitter::add(const ghostLayer &g)
 	//Build table mapping node-tuples to adjacent elements
 	tupleTable table(g.nodesPerTuple);
 	for (int c=0;c<nchunks;c++) {
-	   for (int t=0;t<mesh->nElemTypes;t++) {
+	   for (int t=0;t<mesh->elem.size();t++) {
 		if (!g.elem[t].add) continue;
 		const CkVec<int> &src=chunks[c].elem[t];
 		const int *elem2tuple=g.elem[t].elem2tuple;
@@ -704,11 +701,11 @@ FEM_Mesh *fem_assemble(int nchunks,MeshChunk **msgs)
 	for (i=m->node.udataCount()-1;i>=0;i--)
 		m->node.udata[i]=0.0;
 	
-	m->nElemTypes=msgs[0]->m.nElemTypes;
-	int *minOld_e=new int[m->nElemTypes];
-	int *maxOld_e=new int[m->nElemTypes];	
+	int nElemTypes=msgs[0]->m.elem.size();
+	int *minOld_e=new int[nElemTypes];
+	int *maxOld_e=new int[nElemTypes];	
 	int new_e;
-	for (t=0;t<m->nElemTypes;t++) {
+	for (t=0;t<nElemTypes;t++) {
 		minOld_e[t]=1000000000;
 		maxOld_e[t]=0;
 		new_e=0;
@@ -755,7 +752,7 @@ FEM_Mesh *fem_assemble(int nchunks,MeshChunk **msgs)
 				msg->nodeNums[n]=g;
 			}
 	}
-	for (t=0;t<m->nElemTypes;t++) {
+	for (t=0;t<m->elem.size();t++) {
 		new_e=0;
 		for(c=0; c<nchunks;c++) {
 			const MeshChunk *msg=msgs[c];
