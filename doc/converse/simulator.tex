@@ -1,7 +1,7 @@
 Running with the simulator:
 
 
-Converse provides a simple parallel machine simulator for developing
+\converse{} provides a simple parallel machine simulator for developing
 and debugging purposes. It simulates a message passing system. The simulated
 machine is a collection of processing nodes connected with a communication
 network. Each node is composed of an application processor, local memory, and 
@@ -9,7 +9,7 @@ a communication coprocessor.
 The simulator is a beta version, particularly using the simulator timers
 for performance measurements has not been tested yet.
 
-In order to run Converse programs with the simulator:
+In order to run \converse{} programs with the simulator:
 \begin{item}
 \item link user program with <machine>/lib/libck-unimain.o
 \item prepare a configuration file as described below
@@ -87,14 +87,14 @@ is given below:
 \item[\verb+processor_scale+] The simulator scales the measured time
                       execution of code-blocks by this value.
 
-\item[\verb+periodic_interval+] Converse has periodic checks for
+\item[\verb+periodic_interval+] \converse{} has periodic checks for
                       various purposes. This is the time on seconds
                       those checks are called.
 \end{description}
 
 
 \begin{figure}
-\begin{verbatim}
+\begin{alltt}
 #latency parameters
 cpu_recv_cost 1E-6 1E-7              
 cpu_send_cost 1E-6 1E-7
@@ -129,7 +129,7 @@ latency-fixed
 
 processor_scale 1.0
 periodic_interval 0.1
-\end{verbatim}
+\end{alltt}
 \caption{A sample configuration file for the simulator}
 \label{fig:simconfig}
 \end{figure}

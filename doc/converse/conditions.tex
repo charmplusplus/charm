@@ -6,13 +6,10 @@ This module provides functions that allow users to insert hooks,
 i.e. user-supplied functions, that are called by the system at
 specified times, or as specific conditions arise.
 
-{\bf  CcdCallOnCondition}
-\begin{verbatim}
-void CcdCallOnCondition(condnum,fnp,arg)
-    int condnum;
-    CcdVoidFn fnp;
-    void *arg;      
-\end{verbatim}
+\function{void CcdCallOnCondition(condnum,fnp,arg)}
+\args{int condnum;}
+\args{CcdVoidFn fnp;}
+\args{void *arg;}
 
 This call instructs the system to call the function indicated by the
 function pointer {\tt fnp}, with the specified argument {\tt arg}, when the
@@ -29,12 +26,8 @@ PROGRAM), which is raised by the system when there are no entities
 (ready threads, messages for objects, posted handlers, etc.) in the
 scheduler's queue.
 
-\vspace*{0.2in}
-{\bf  CcdRaiseCondition}
-\begin{verbatim}
-void CcdRaiseCondition(condNum)
-     int condNum;
-\end{verbatim}
+\function{void CcdRaiseCondition(condNum)}
+\args{int condNum;}
 
 When this function is called, it invokes all the functions whose
 pointers were registered for the \verb#condNum# via a {\em prior} call
@@ -45,13 +38,9 @@ function is called, it loses its registration.  So, if users want the
 function to be called the next time the same condition arises, they
 must register the function again.
 
-\vspace*{0.2in}
-{\bf  CcdPeriodicallyCall}
-\begin{verbatim}
-void CcdPeriodicallyCall(fnp, arg)
-    CcdVoidFn fnp;
-    void *arg;  
-\end{verbatim}
+\function{void CcdPeriodicallyCall(fnp, arg)}
+\args{CcdVoidFn fnp;}
+\args{void *arg;}
 
 A function registered through this call is called periodically by the
 system's scheduler.  Typically, it would be called every time the
@@ -60,14 +49,10 @@ thread or before scheduling a message for an object, or before calling
 a posted handler. These functions don't have to be re-registered after
 every call, unlike the functions for the "conditions". 
 
-\vspace*{0.2in}
-{\bf  CcdCallFnAfter}
-\begin{verbatim}
-void CcdCallFnAfter(fnp, arg, deltaT)
-    CcdVoidFn fnp;
-    void *arg;
-    unsigned int deltaT; 
-\end{verbatim}
+\function{void CcdCallFnAfter(fnp, arg, deltaT)}
+\args{CcdVoidFn fnp;}
+\args{void *arg;}
+\args{unsigned int deltaT;}
 
 This call registers a function via a pointer to it, {\tt fnp},  that will be
 called at least {\tt deltaT} milliseconds later. 

@@ -112,12 +112,12 @@ together into queues.  This function sets the contents of the next field.}
 
 \section{Thread Scheduling and Blocking Restrictions}
 
-Converse threads use a scheduler queue, like any other threads
-package.  We chose to use the same queue as the one used for Converse
+\converse{} threads use a scheduler queue, like any other threads
+package.  We chose to use the same queue as the one used for \converse{}
 messages (see section \ref{schedqueue}).  Because of this, thread
 context-switching will not work unless there is a thread polling for
-messages.  A rule of thumb, with Converse, it is best to have a thread
-polling for messages at all times.  In Converse's normal mode (see
+messages.  A rule of thumb, with \converse{}, it is best to have a thread
+polling for messages at all times.  In \converse{}'s normal mode (see
 section \ref{initial}), this happens automatically.  However, in
 user-calls-scheduler mode, you must be aware of it.
 
@@ -129,16 +129,16 @@ blocking operations in these places:
 
 \begin{itemize}
 
-\item{In the code of a Converse handler (see sections \ref{handler1}
+\item{In the code of a \converse{} handler (see sections \ref{handler1}
 and \ref{handler2}).}
 
-\item{In the code of the Converse start-function (see section
+\item{In the code of the \converse{} start-function (see section
 \ref{initial}).}
 
 \end{itemize}
 
 These restrictions are usually easy to avoid.  For example, if you
-wanted to use a blocking operation inside a Converse handler, you
+wanted to use a blocking operation inside a \converse{} handler, you
 would restructure the code so that the handler just creates a new
 thread and returns.  The newly-created thread would then do the work
 that the handler originally did.
@@ -146,7 +146,7 @@ that the handler originally did.
 \section{Thread Scheduling Hooks}
 
 Normally, when you CthAwaken a thread, it goes into the primary
-ready-queue: namely, the main Converse queue described in section
+ready-queue: namely, the main \converse{} queue described in section
 \ref{schedqueue}.  However, it is possible to hook a thread to make
 it go into a different ready-queue.  That queue doesn't have to be
 priority-queue: it could be FIFO, or LIFO, or in fact it could handle
@@ -232,7 +232,7 @@ of the scheduling module, it is permitted for the scheduling module to
 resume {\tt t} whenever it so desires: presumably, the scheduling
 module knows when its threads want the CPU.
 
-\internal{
+\zap{
 \function{void CthSetVar(CthThread t, void **var, void *val)}
 \desc{Specifies that the global variable pointed to by {\tt
 var} should be set to value {\tt val} whenever thread {\tt t} is
@@ -242,12 +242,12 @@ thread-private data with thread {\tt t}.
 
 it is intended that this function be used as follows:}
 
-\begin{verbatim}
+\begin{alltt}
     /* User defines a struct th_info containing all the thread-private  */
     /* data he wishes to associate with threads.  He also defines       */
     /* a global variable 'current_thread_info' which will always hold   */
     /* the th_info of the currently-executing thread.                   */
-    struct th_info { ... } *current_thread_info;
+    struct th_info \{ ... \} *current_thread_info;
 
     /* User creates a thread 't', and allocates a block of memory       */
     /* 'tinfo' to hold the thread's private data.  User tells the       */
@@ -258,7 +258,7 @@ it is intended that this function be used as follows:}
     t = CthCreate( ... );
     tinfo = (struct th_info *)malloc(sizeof(struct th_info));
     CthSetVar(t, &current_thread_info, tinfo);
-\end{verbatim}
+\end{alltt}
 
 \desc{Note: you can use CthSetVar multiple times on a thread, thereby
 attaching multiple data items to it.  However, each data item slows

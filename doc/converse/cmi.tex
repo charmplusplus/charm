@@ -1,14 +1,14 @@
 \chapter{Machine Interface and Scheduler}
 
-This chapter describes two of Converse's modules: the CMI, and the
+This chapter describes two of \converse{}'s modules: the CMI, and the
 CSD.  Together, they serve to transmit messages and schedule the
 delivery of messages. First, we describe the machine model assumed by
-Converse.
+\converse{}.
 
 \section{Machine Model}
 \label{model}
 
-Converse treats the parallel machine as a collection of nodes, where
+\converse{} treats the parallel machine as a collection of nodes, where
 each node is comprised of a number of processors that share memory 
 In some cases, the number of processors per node may be exactly one  
 (e.g. Distributed memory multicomputers such as IBM SP.)  
@@ -32,7 +32,7 @@ number}, which specifies which handler function is to be executed when
 the message arrives.  Before you can send a message, you have to
 define the handler numbers.
 
-Converse maintains a table mapping handler numbers to function
+\converse{} maintains a table mapping handler numbers to function
 pointers.  Each processor has its own copy of the mapping.  There is a
 caution associated with this approach: it is the user's responsibility
 to ensure that all processors have identical mappings.  This is easy
@@ -43,12 +43,12 @@ The following functions are provided to define the handler numbers:
 
 \function{typedef void (*CmiHandler)(void *)}
 \index{CmiHandler}
-\desc{Functions that handle Converse messages must be of this type.}
+\desc{Functions that handle \converse{} messages must be of this type.}
 
 \function{int CmiRegisterHandler(CmiHandler h)}
 \index{CmiRegisterHandler}
 \desc{This represents the standard technique for associating numbers
-with functions.  To use this technique, the Converse user registers
+with functions.  To use this technique, the \converse{} user registers
 each of his functions, one by one, using CmiRegisterHandler.  One must
 register exactly the same functions in exactly the same order on all
 processors.  The system assigns monotonically increasing numbers to
@@ -58,9 +58,9 @@ chosen for the function being registered.}
 
 \function {int CmiRegisterHandlerGlobal(CmiHandler h)}
 \index{CmiRegisterHandlerLocal}
-\desc{This represents a second registration technique.   The Converse
+\desc{This represents a second registration technique.   The \converse{}
 user registers his functions on processor zero, using
-CmiRegisterHandlerGlobal.  The Converse user is then responsible for
+CmiRegisterHandlerGlobal.  The \converse{} user is then responsible for
 broadcasting those handler numbers to other processors, and installing
 them using CmiNumberHandler below.  The user should take care not to
 invoke those handlers until they are fully installed.}
@@ -97,17 +97,17 @@ occur as a result of this combination.
 A message handler function is just a C function that accepts a void
 pointer (to a message buffer) as an argument, and returns nothing.  The
 handler may use the message buffer until it returns, at which time
-Converse will automatically free the message buffer.  This behavior
+\converse{} will automatically free the message buffer.  This behavior
 can be overrided using CmiGrabBuffer:
 
 \function{void CmiGrabBuffer(void **pbuf)}
 \index{CmiGrabBuffer}
 \desc{A handler function receives a pointer to a message buffer
 as an argument.  Normally, it is supposed to copy the data out of the
-message buffer before it returns, at which time Converse automatically
+message buffer before it returns, at which time \converse{} automatically
 frees the message buffer.  However, a handler function may use
 CmiGrabBuffer to claim ownership of the message buffer (and therefore
-prevent Converse from freeing it).  Assuming, for example, that the
+prevent \converse{} from freeing it).  Assuming, for example, that the
 handler function called its argument {\tt msg}, it would call {\tt
 CmiGrabBuffer(\&msg)}.  Afterward, {\tt msg} contains a pointer to the
 message, or a copy of it.  From that point forward, it is the user's
@@ -117,11 +117,11 @@ responsibility to free the message using \param{CmiFree.}}
 \index{CmireleaseBuffer}
 \desc{A handler function receives a pointer to a message buffer
 as an argument.  Normally, it is supposed to copy the data out of the
-message buffer before it returns, at which time Converse automatically
+message buffer before it returns, at which time \converse{} automatically
 frees the message buffer or may reuse it for further communication.  
 However, a handler function may use
 CmiReleaseBuffer to give up ownership of the message buffer in the
-middle of handler execution (and therefore allowing Converse to reuse it).}
+middle of handler execution (and therefore allowing \converse{} to reuse it).}
 
 \section{Building Messages}
 
@@ -129,7 +129,7 @@ To send a message, one first creates a buffer to hold the message.
 The buffer must be large enough to hold the header and the data.
 The buffer can be in any kind of memory: it could be a local variable,
 it could be a global, it could be allocated with {\tt malloc}, and
-finally, it could be allocated with {\tt CmiAlloc}.  The Converse user
+finally, it could be allocated with {\tt CmiAlloc}.  The \converse{} user
 fills the buffer with the message data.  One puts a handler number
 in the message, thereby specifying which handler function the message
 should trigger when it arrives.  Finally, one uses a message-transmission
@@ -315,12 +315,12 @@ The {\bf msgComps[]} array is the array of the messages.
 
 The indexing in each array is from 0 to len - 1.
 
-{\bf Note:}
-
+\note{
 Before calling this function, the program needs to initialise the system
 to be able to provide this service. This is done by calling the function
 {\bf void CmiInitMultipleSendRoutine(void) }. Unless this function is
 called, the system will not be able to provide the service to the user.
+}
 }
 
 \section{Broadcasting Messages}
@@ -499,7 +499,7 @@ just like messages transmitted with Cmi functions.  Note that unlike
 the Cmi send functions, these cannot move messages across processors.
 
 Every message inserted into the queue has a priority associated with
-it.  Converse priorities are arbitrary-precision numbers between 0 and
+it.  \converse{} priorities are arbitrary-precision numbers between 0 and
 1.  Priorities closer to 0 get processed first, priorities closer to 1
 get processed last.  Arbitrary-precision priorities are very useful in
 AI search-tree applications. Suppose we have a heuristic suggesting
@@ -526,7 +526,7 @@ of the integer.
 
 Some people only want regular integers as priorities.  For
 simplicity's sake, we provide an easy way to convert integer
-priorities to Converse's built-in representation.
+priorities to \converse{}'s built-in representation.
 
 In addition to priorities, you may choose to enqueue a message
 ``LIFO'' or ``FIFO''.  Enqueueing a message ``FIFO'' simply pushes it
@@ -537,7 +537,7 @@ priority.
 Messages sent using the CMI functions take precedence over everything
 in the scheduler queue, regardless of priority.
 
-A recent addition to Converse scheduling mechanisms is the introduction of
+A recent addition to \converse{} scheduling mechanisms is the introduction of
 node-level scheduling designed to support low-overhead programming for the
 SMP clusters. These functions have ``Node'' in their names. All processors
 within the node has access to the node-level scheduler's queue, and thus
@@ -655,26 +655,26 @@ node-level queue is empty, zero otherwise.}
 \section{Polling for Messages}
 \label{polling}
 
-As we stated earlier, Converse messages trigger handler functions when
+As we stated earlier, \converse{} messages trigger handler functions when
 they arrive.  In fact, for this to work, the processor must
-occasionally poll for messages.  When the user starts Converse, he can
+occasionally poll for messages.  When the user starts \converse{}, he can
 put it into one of several modes.  In the normal mode, the message
 polling happens automatically.  However {\em user-calls-scheduler}
 mode is designed to let the user poll manually.  To do this, the user
 must use one of two polling functions: CmiDeliverMsgs, or
 CsdScheduler.  CsdScheduler is more general, it will notice any
-Converse event.  CmiDeliverMsgs is a lower-level function that ignores
+\converse{} event.  CmiDeliverMsgs is a lower-level function that ignores
 all events except for recently-arrived messages.  (In particular, it
 ignores messages in the scheduler queue).  You can save a tiny amount
 of overhead by using the lower-level function.  We recommend the use
 of CsdScheduler for all applications except those that are using only
-the lowest level of Converse, the Cmi.  A third polling function,
+the lowest level of \converse{}, the Cmi.  A third polling function,
 CmiDeliverSpecificMsg, is used when you know the exact event you want
 to wait for: it does not allow any other event to occur.
 
 \function {void CsdScheduler(int NumberOfMessages)}
 \index{CsdScheduler}
-\desc{This call invokes the Converse scheduler, which repeatedly
+\desc{This call invokes the \converse{} scheduler, which repeatedly
 delivers messages to their handlers (i.e. invokes the handler for each
 message it selects).  In each iteration, the scheduler first looks for
 any message that has arrived from another processor, and delivers it.
@@ -738,7 +738,7 @@ for idle and busy norifications.}
 idle (\param{fIdle}) or busy (\param{fBusy}). These functions can be
 overridden with another call to CsdSetNotifyIdle.}
 
-\internal{
+\zap{
 \section{Global Pointer}
 
 \function{int CmiGptrCreate(GlobalPtr *gptr, void *lptr, unsigned int size)}
@@ -821,7 +821,7 @@ send and blocking receive.}
 On machines with host, this is implemented on top of the messaging 
 layer using asynchronous sends.}
 
-\internal{
+\zap{
 \section{Processor Groups}
 
 \function{void CmiPgrpCreate(Pgrp *group)}
@@ -866,7 +866,7 @@ array should at least be of size \param{CmiNumChildren()}.}
 \section{Spanning Tree Calls}
 
 Sometimes, it is convenient to view the processors/nodes of the machine as a
-tree.  For this purpose, Converse defines a tree over processors/nodes.  We
+tree.  For this purpose, \converse{} defines a tree over processors/nodes.  We
 provide functions to obtain the parent and children of each processor/node.  On
 those machines where the communication topology is relevant, we
 arrange the tree to optimize communication performance. The root of

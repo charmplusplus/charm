@@ -1,50 +1,3 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% RCS INFORMATION:
-%
-%       $RCSfile$
-%       $Author$        $Locker$                $State$
-%       $Revision$      $Date$
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% DESCRIPTION:
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% REVISION HISTORY:
-%
-% $Log$
-% Revision 1.10  1999-07-29 20:50:37  milind
-% Added node-level functions.
-%
-% Revision 1.9  1997/07/29 20:55:30  milind
-% Updated machine model chapter and merged it with Cmi chapter.
-%
-% Revision 1.8  1997/07/19 23:51:52  wilmarth
-% Several changes to correct/clarify test were made.
-%
-% Revision 1.7  1997/06/26 05:16:22  jyelon
-% Still improving manual.
-%
-% Revision 1.6  1997/06/25 06:53:48  jyelon
-% Just trying to make this whole manual make more sense.
-%
-% Revision 1.5  1995/11/16 22:11:11  milind
-% removed hardwired reference.
-%
-% Revision 1.4  1995/11/01  21:16:23  milind
-% Added index entries.
-%
-% Revision 1.3  1995/10/30  17:33:54  milind
-% Changed Cth variables macros to Ctv macros.
-% Added "More on Shared Memory Machines" section.
-%
-% Revision 1.2  1995/10/27  21:02:54  milind
-% Integrated into Manual.
-%
-% Revision 1.1  1995/10/26  21:08:23  gursoy
-% Initial revision
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 \section{Global Variables and Utility functions}
 \label{globalvars}
 
@@ -58,11 +11,11 @@ each thread has its own copy of the global variables.
 The lack of consistency across vendors, makes it very hard to write a
 portable program.  The fact that most vendors make the globals shared
 is inconvenient as well, usually, you don't want your globals to be
-shared.  For these reasons, we added ``pseudoglobals'' to Converse.
+shared.  For these reasons, we added ``pseudoglobals'' to \converse{}.
 These act much like C global and static variables, except that you have
 explicit control over the degree of sharing.
 
-\subsection{Converse PseudoGlobals}
+\subsection{\converse{} PseudoGlobals}
 
 Three classes of pseudoglobal variables are supported: node-private,
 process-private, and thread-private variables.
@@ -82,20 +35,19 @@ and access. The declaration, static and extern specifications have the
 same meaning as in C. In order to support portability, however, the
 global variables must be installed properly, by using the
 initialization macros.  For example, if the underlying machine is a
-simulator for the machine model supported by Converse, then the
+simulator for the machine model supported by \converse{}, then the
 thread-private variables must be turned into arrays of variables.
 Initialize and Access macros hide these details from the user.  It is
 possible to use global variables without these macros, as supported by
 the underlying machine, but at the expense of portability.
 
 Macros for node-private variables:
-\begin{verbatim}
-CsvDeclare(type,variable)
-CsvStaticDeclare(type,variable)
-CsvExtern(type,variable)
-CsvInitialize(type,variable)
-CsvAccess(variable)
-\end{verbatim}
+
+\function{CsvDeclare(type,variable)}
+\function{CsvStaticDeclare(type,variable)}
+\function{CsvExtern(type,variable)}
+\function{CsvInitialize(type,variable)}
+\function{CsvAccess(variable)}
 
 \index{CsvDeclare}
 \index{CsvStaticDeclare}
@@ -104,13 +56,13 @@ CsvAccess(variable)
 \index{CsvAccess}
 
 Macros for process-private variables:
-\begin{verbatim}
-CpvDeclare(type,variable)
-CpvStaticDeclare(type,variable)
-CpvExtern(type,variable)
-CpvInitialize(type,variable)
-CpvAccess(variable)
-\end{verbatim}
+
+\function{CpvDeclare(type,variable)}
+\function{CpvStaticDeclare(type,variable)}
+\function{CpvExtern(type,variable)}
+\function{CpvInitialize(type,variable)}
+\function{CpvAccess(variable)}
+
 \index{CpvDeclare}
 \index{CpvStaticDeclare}
 \index{CpvExtern}
@@ -118,13 +70,13 @@ CpvAccess(variable)
 \index{CpvAccess}
 
 Macros for thread-private variables:
-\begin{verbatim}
-CtvDeclare(type,variable)
-CtvStaticDeclare(type,variable)
-CtvExtern(type,variable)
-CtvInitialize(type,variable)
-CtvAccess(variable)
-\end{verbatim}
+
+\function{CtvDeclare(type,variable)}
+\function{CtvStaticDeclare(type,variable)}
+\function{CtvExtern(type,variable)}
+\function{CtvInitialize(type,variable)}
+\function{CtvAccess(variable)}
+
 \index{CtvDeclare}
 \index{CtvStaticDeclare}
 \index{CtvExtern}
@@ -150,32 +102,32 @@ called at the beginning of execution to complete the installations of
 all global variables.
 
 \begin{figure}
-\begin{verbatim}
-File Module1.c
+\begin{alltt}
+File: Module1.c
 
     typedef struct point
-    {
+    \{
          float x,y;
-    } Point;
+    \} Point;
 
 
     CpvDeclare(int, a);
     CpvDeclare(Point, p);
 
     void ModuleInit()
-    {
+    \{
          CpvInitialize(int, a)
          CpvInitialize(Point, p);
 
          CpvAccess(a) = 0;
-    }
+    \}
 
     int func1() 
-    {
+    \{
          CpvAccess(p).x = 0;
          CpvAccess(p).y = CpvAccess(p).x + 1;
-    }
-\end{verbatim}
+    \}
+\end{alltt}
 \caption{An example code for global variable usage}
 \label{fig:cpv}
 \end{figure}
@@ -184,7 +136,7 @@ File Module1.c
 \label{utility}
 
 To further simplify programming with global variables on shared memory
-machines, Converse provides the following functions and/or
+machines, \converse{} provides the following functions and/or
 macros. \note{These functions are defined on machines other than
 shared-memory machines also, and have the effect of only one processor
 per node and only one thread per processor.}
@@ -231,7 +183,7 @@ processors belonging to the node participate in this barrier.}
 
 \function{typedef McDependentType CmiNodeLock}
 \index{CmiNodeLock}
-\desc{This is the type for all the node-level locks in Converse.}
+\desc{This is the type for all the node-level locks in \converse{}.}
 
 \function{CmiNodeLock CmiCreateLock(void)}
 \index{CmiCreateLock}
@@ -258,7 +210,7 @@ then compete for acquiring \param{lock}.}
 \desc{Frees any memory associated with \param{lock}. It is an error to
 perform any operations with \param{lock} after a call to this function.}
 
-\internal{
+\zap{
 \function{void *CmiSvAlloc(int size)}
 \index{CmiSvAlloc}
 \desc{Allocates a block of memory of \param{size} bytes from the heap in node's 

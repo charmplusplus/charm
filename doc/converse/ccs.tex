@@ -1,16 +1,16 @@
-\chapter{Converse Client-Server Interface}
+\chapter{\converse{} Client-Server Interface}
 
-This note attempts at explaining the design of CCS module of Converse. This
+This note attempts at explaining the design of CCS module of \converse{}. This
 module is responsible for enabling parallel servers to be written using
-Converse. Currently, this module will be implemented only on network of
+\converse{}. Currently, this module will be implemented only on network of
 workstations. Other parallel architectures will follow.
 
 The CCS module is split into two parts. One part consists of functions that can
-be used in Converse programs which act as servers. The other part consists of
+be used in \converse{} programs which act as servers. The other part consists of
 functions that can be used with clients that try to connect to servers written
 using CCS. The following sections describe both these parts. {\tt conv-host} is
 sometimes also referred to as {\tt server-host} in order to distinguish it from
-the individual converse processes which are sometimes referred to as {\tt
+the individual \converse{} processes which are sometimes referred to as {\tt
 server-processes}. Together, the {\tt server-host} and the {\tt
 server-processes} constitute a server. In general, the client does not need to
 know the difference.
@@ -18,7 +18,7 @@ know the difference.
 
 \section{CCS: Server-Side}
 
-On the network of workstations, any converse program is started using
+On the network of workstations, any \converse{} program is started using
 \begin{quotation} conv-host pgmname +pN conv-host-opts pgm-opts \end{quotation}
 In addition to the original options, now conv-host accepts one more option:
 {\tt ++server}.  Currently this option makes conv-host print out its own
@@ -52,7 +52,7 @@ normal remote invocation too. ({\tt CcsRegisterHandler} internally calls
 \linebreak {\tt CmiRegisterHandlerLocal}.)
 
 Handler functions responsible for remote requests have the same syntax and
-semantics as the normal Converse handlers. However, in the handler function
+semantics as the normal \converse{} handlers. However, in the handler function
 invoked by a remote request, {\tt CcsIsRemoteRequest() } returns {\tt  1}.
 Also, in that case, {\tt  CcsCallerId() } returns meaningful values for IP
 address and Port of the caller. No message format conversion is actually done

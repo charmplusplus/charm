@@ -1,86 +1,21 @@
-\documentclass[11pt]{report}
+\documentclass[10pt]{report}
+\usepackage{pplmanual}
+\input{../pplmanual}
 
-\newif\ifpdf
-\ifx\pdfoutput\undefined
-  \pdffalse
-\else
-  \pdfoutput=1
-  \pdftrue
-\fi
-
-\ifpdf
-  \pdfcompresslevel=9
-  \usepackage[pdftex,colorlinks=true,plainpages=false]{hyperref}
-\else
-\fi
-
-\setcounter{topnumber}{2}
-\def\topfraction{1}
-\setcounter{bottomnumber}{1}
-\def\bottomfraction{1}
-\setcounter{totalnumber}{3}
-\def\textfraction{0.2}
-\def\floatpagefraction{0.8}
- 
-\setlength{\parindent}{0.0in}
-\setlength{\parskip}{0.1in}
-\setlength{\textwidth}{6.5in}
-\setlength{\itemindent}{1in}
-\setlength{\textheight}{9.5in}
-\addtolength{\oddsidemargin}{0in}
-\addtolength{\topmargin}{-0.4in}
- 
-\parskip 0.05in
- 
-\newcommand{\internal}[1]{}
-\newcommand{\function}[1]{{\noindent{\bf {#1}}\\}}
-\newcommand{\param}[1]{{\tt {#1}}}
-\newcommand{\note}[1]{\noindent{(Note: {\em {#1}})}}
-\newcommand{\desc}[1]{{#1}}
-
-\newcommand{\basea}{\renewcommand{\baselinestretch}{1.0}}
-\newcommand{\baseb}{\renewcommand{\baselinestretch}{1.8}}
-\newcommand{\mycomment}[1]{} 
-\basea
- 
-\textwidth 6.4in
-\textheight 8.9in
-\topmargin -.4in
-\oddsidemargin 0.25in
-\evensidemargin 0.25in
-\parskip 0.1in
-
-\makeindex
-
-\begin{document}
-
-\begin{titlepage}
-\vspace*{2in}
-\Huge
-\begin{center}
-Converse\\
-Programming\\
-Manual\\
-\vspace*{0.7in}
-\today
-\end{center}
-\normalsize
-
-\vspace*{2.5in}
-\large
-
-Converse Parallel Programming Environment was developed as a group
+\title{\converse{}\\Programming\\Manual}
+\version{5.5}
+\credits{
+\converse{} Parallel Programming Environment was developed as a group
 effort at Parallel Programming Laboratory, University of Illinois at
 Urbana-Champaign.  The team consisted of Attila Gursoy, Sanjeev
 Krishnan, Joshua Yelon, Milind Bhandarkar, Narain Jagathesan, Robert
-Brunner and Laxmikant Kale. The most recent version of Converse has had inputs
+Brunner and Laxmikant Kale. The most recent version of \converse{} has had inputs
 from Milind Bhandarkar, Laxmikant Kale, Robert Brunner, Terry Wilmarth,
 Parthasarathy Ramachandran, Krishnan Varadarajan, and Jeffrey Wright.
+}
 
-\normalsize
-\end{titlepage}
-
-\tableofcontents
+\begin{document}
+\maketitle
 
 \input{usermain}
 \input{cmi}
