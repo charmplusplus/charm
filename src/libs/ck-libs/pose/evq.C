@@ -51,7 +51,7 @@ eventQueue::~eventQueue()
 }
 
 /// Insert e in the queue in timestamp order
-int eventQueue::InsertEvent(Event *e)
+void eventQueue::InsertEvent(Event *e)
 {
   //sanitize();
   Event *tmp = backPtr->prev; // start at back of queue
@@ -74,9 +74,7 @@ int eventQueue::InsertEvent(Event *e)
     // if e is inserted before currPtr, move currPtr back to avoid rollback
     if ((currentPtr->prev == e) && (currentPtr->done < 1))
       currentPtr = currentPtr->prev;
-    if (e->next->done == 1) return 0;
   }
-  return 1;
   //sanitize();
 }
 

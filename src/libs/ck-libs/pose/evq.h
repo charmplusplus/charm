@@ -28,7 +28,7 @@ class eventQueue {
   /// Insert e in the queue in timestamp order
   /** If executed events with same timestamp exist, insert e at the back of 
       these, returns 0 if rollback necessary, 1 otherwise. */
-  int InsertEvent(Event *e);      
+  void InsertEvent(Event *e);      
   /// Return front pointer
   Event *front() { return frontPtr; }
   /// Return back pointer
