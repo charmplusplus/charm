@@ -776,6 +776,7 @@ static int    Cmi_dgram_max_data;
 static int    Cmi_tickspeed;
 static int    Cmi_netpoll;
 static int    Cmi_syncprint;
+static int writeableAcks,writeableDgrams;/*Write-queue counts (to know when to sleep)*/
 
 static int Cmi_print_stats = 0;
 
@@ -1028,6 +1029,7 @@ int CheckSocketsReady(int withDelayMs)
   struct timeval tmo;
   int nreadable;
   
+  FD_ZERO(&rfds);FD_ZERO(&wfds);
   if (Cmi_charmrun_fd!=-1)
   	FD_SET(Cmi_charmrun_fd, &rfds);
   if (dataskt!=-1) {
@@ -2034,7 +2036,6 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
 int TransmitAcknowledgement()
 {
   int skip; static int nextnode=0; OtherNode node;
-  
   for (skip=0; skip<Cmi_numnodes; skip++) {
     node = nodes+nextnode;
     nextnode = (nextnode + 1) % Cmi_numnodes;
@@ -2153,6 +2154,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
  
   size = ogm->size - DGRAM_HEADER_SIZE;
   data = ogm->data + DGRAM_HEADER_SIZE;
+  writeableDgrams++;
   while (size > Cmi_dgram_max_data) {
     EnqueueOutgoingDgram(ogm, data, Cmi_dgram_max_data, node, rank);
     data += Cmi_dgram_max_data;
@@ -2182,14 +2184,10 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
 
   dst = ogm->dst;
   switch (dst) {
-  case NODE_BROADCAST_OTHERS:
-    for (i = 0; i<Cmi_numnodes; i++)
-      if (i!=Cmi_mynode)
-	DeliverViaNetwork(ogm, nodes + i, DGRAM_NODEMESSAGE);
-    GarbageCollectMsg(ogm);
-    break;
   case NODE_BROADCAST_ALL:
     PCQueuePush(CsvAccess(NodeRecv),CopyMsg(ogm->data,ogm->size));
+    /*case-fallthrough (no break)-- deliver to all other processors*/
+  case NODE_BROADCAST_OTHERS:
     for (i=0; i<Cmi_numnodes; i++)
       if (i!=Cmi_mynode)
 	DeliverViaNetwork(ogm, nodes + i, DGRAM_NODEMESSAGE);
@@ -2590,8 +2588,10 @@ static void CommunicationServer(int withDelayMs)
     CheckSocketsReady(withDelayMs);
     if (ctrlskt_ready_read) { ctrl_getone(); continue; }
     if (dataskt_ready_read) { ReceiveDatagram(); continue; }
-    if (dataskt_ready_write) { if (TransmitAcknowledgement()) continue; }
-    if (dataskt_ready_write) { if (TransmitDatagram()) continue; }
+    if (dataskt_ready_write) 
+      { if (0!=(writeableAcks=TransmitAcknowledgement())) continue; }
+    if (dataskt_ready_write) 
+      { if (0!=(writeableDgrams=TransmitDatagram())) continue; }
     break;
   }
   CmiCommUnlock();
@@ -2648,11 +2648,13 @@ void CmiNotifyIdle()
   static fd_set rfds;
   static fd_set wfds;
   tv.tv_sec=0; tv.tv_usec=5000;
+  FD_ZERO(&rfds); FD_ZERO(&wfds);
   if (Cmi_charmrun_fd!=-1)
     FD_SET(Cmi_charmrun_fd, &rfds);
   if (dataskt!=-1) {
     FD_SET(dataskt, &rfds);
-/*    FD_SET(dataskt, &wfds);      */
+    if (writeableDgrams || writeableAcks)
+      FD_SET(dataskt, &wfds); /*Outgoing queue is nonempty*/
   }
   select(FD_SETSIZE,&rfds,&wfds,0,&tv);
   if (Cmi_netpoll) CommunicationServer(5);
