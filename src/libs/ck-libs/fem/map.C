@@ -1,4 +1,40 @@
+#if CMK_SEQUENTIAL
+
+#include <stdio.h>
+#include <stdlib.h>
+#ifdef CkPrintf
+#undef CkPrintf
+#define CkPrintf printf
+#endif
+#ifdef CkError
+#undef CkError
+#define CkError  printf
+#endif
+#define CrnRand  rand
+#define CHK(p) do{\
+                 if((p)==0) {\
+                   printf("MAP>Memory Allocation failure.");\
+                   exit(1);\
+                 }\
+               }while(0)
+typedef struct _chunkMsg {
+  int nnodes, nelems, npes, nconn;
+  int *gNodeNums; // gNodeNums[nnodes]
+  int *primaryPart; // primaryPart[nnodes]
+  int *gElemNums; // gElemNums[nelems]
+  int *conn; // conn[nelems][nconn]
+  int *peNums; // peNums[npes]
+  int *numNodesPerPe; // numNodesPerPe[npes]
+  int *nodesPerPe; // nodesPerPe[npes][nodesPerPe[i]]
+} ChunkMsg;
+#define FEM_TRIANGULAR 1
+#define FEM_HEXAHEDRAL 3
+#else
+
 #include "fem.h"
+
+#endif
+
 #include <assert.h>
 
 /*
@@ -200,3 +236,93 @@ fem_map(int nelems, int nnodes, int ctype, int *connmat,
   delete[] ninfo;
   return;
 }
+
+#if MAP_MAIN
+
+extern "C" void
+METIS_PartMeshNodal(int*,int*,int*,int*,int*,int*,int*,int*,int*);
+
+static void
+usage(char *pgm)
+{
+  fprintf(stderr, "Usage: %s <meshfile> <nparts>\n", pgm);
+  exit(1);
+}
+
+int 
+main(int argc, char **argv)
+{
+  if(argc != 3) { usage(argv[0]); }
+  FILE *fp = fopen(argv[1], "r");
+  if(fp==0) { 
+    fprintf(stderr, "cannot open %s for reading.\n", argv[1]);
+    exit(1);
+  }
+  int nparts = atoi(argv[2]);
+  int nelems, nnodes, ctype;
+  fscanf(fp, "%d%d%d", &nelems, &nnodes, &ctype);
+  int esize = (ctype==FEM_TRIANGULAR) ? 3 :
+              ((ctype==FEM_HEXAHEDRAL) ? 8 :
+              4);
+  int *conn = new int[nelems*esize]; CHK(conn);
+  int i, j, k;
+  for(i=0;i<nelems;i++) {
+    for(j=0;j<esize;j++) {
+      fscanf(fp, "%d", &conn[i*esize+j]);
+    }
+  }
+  fclose(fp);
+#if FEM_FORTRAN
+  int numflag=1;
+#else
+  int numflag = 0;
+#endif
+  int ecut;
+  int *epart = new int[nelems]; CHK(epart);
+  int *npart = new int[nnodes]; CHK(npart);
+  METIS_PartMeshNodal(&nelems, &nnodes, conn, &ctype, &numflag, 
+                     &nparts, &ecut, epart, npart);
+  ChunkMsg **msgs = new ChunkMsg*[nparts]; CHK(msgs);
+  fem_map(nelems, nnodes, ctype, conn, nparts, epart, npart, msgs);
+  delete[] epart;
+  delete[] npart;
+  delete[] conn;
+  for(i=0;i<nparts;i++) {
+    ChunkMsg *m = msgs[i];
+    char filename[128];
+    sprintf(filename, "meshdata.Pe%d", i);
+    fp = fopen(filename, "w");
+    if(fp==0) { 
+      fprintf(stderr, "cannot open %s for writing.\n", filename);
+      exit(1);
+    }
+    // write nodes
+    fprintf(fp, "%d\n", m->nnodes);
+    for(j=0;j<(m->nnodes);j++) {
+      fprintf(fp, "%d %d\n", m->gNodeNums[j], m->primaryPart[j]);
+    }
+    // write elems
+    fprintf(fp, "%d %d\n", m->nelems, esize);
+    for(j=0;j<(m->nelems);j++) {
+      fprintf(fp, "%d ", m->gElemNums[j]);
+      for(k=0;k<esize;k++) {
+        fprintf(fp, "%d ", m->conn[j*esize+k]);
+      }
+      fprintf(fp, "\n");
+    }
+    // write comm
+    fprintf(fp, "%d\n", m->npes);
+    int idx = 0;
+    for(j=0; j<(m->npes); j++) {
+      fprintf(fp, "%d %d ", m->peNums[j], m->numNodesPerPe[j]);
+      for(k=0; k<(m->numNodesPerPe[j]); k++) {
+        fprintf(fp, "%d ", m->nodesPerPe[idx++]);
+      }
+    }
+    fclose(fp);
+    delete m;
+  }
+  return 0;
+}
+
+#endif
