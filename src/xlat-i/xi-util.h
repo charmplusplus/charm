@@ -9,7 +9,11 @@
 #define _XI_UTIL_H
 
 #include <string.h>
+//Jay, this include may cause problems--
+//not all compilers support ISO C++ include files (OSL, 4/3/2000)
 #include <string>
+using std::string;//<- and not all compilers support namespaces
+
 #include <iostream.h>
 #include <stdlib.h>
 #include <stdio.h>

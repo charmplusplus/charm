@@ -14,6 +14,7 @@
 #include <assert.h>
 #include <string>
 #include <map>
+using std::map;//<-- may cause problems for pre-ISO C++ compilers
 
 #include "xi-util.h"
 
