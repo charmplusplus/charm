@@ -58,3 +58,4 @@ then
 . $CHARMINC/conv-mach-opt.sh
 fi
 
+[ -n "$CMK_CC64" ] && CMK_QT="${CMK_QT}64"
