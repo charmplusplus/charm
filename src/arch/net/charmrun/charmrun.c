@@ -1281,19 +1281,54 @@ void req_ccs_connect(void)
 }
 
 /*
-Forward the CCS reply (if any) back to the original requestor,
-on the original request socket.
+Forward the CCS reply (if any) from this client back to the 
+original network requestor, on the original request socket.
  */
-void req_ccs_reply_fw(ChMessage *msg) {
-  CcsImplHeader *hdr=(CcsImplHeader *)msg->data;
-  CcsServer_sendReply(hdr,msg->len-sizeof(CcsImplHeader),
-		      msg->data+sizeof(CcsImplHeader));
-  ChMessage_free(msg);
+int req_ccs_reply_fw(ChMessage *msg,SOCKET srcFd) {
+  int len=msg->len; /* bytes of data remaining to receive */
+  
+  /* First pull down the CCS header sent by the client. */
+  CcsImplHeader hdr;
+  skt_recvN(srcFd,&hdr,sizeof(hdr)); len-=sizeof(hdr);
+  
+#define m (4*1024) /* packets of message to recv/send at once */
+  if (len<m || hdr.attr.auth) 
+  { /* short or authenticated message: grab the whole thing first */
+     void *data=malloc(len);
+     skt_recvN(srcFd,data,len);
+     CcsServer_sendReply(&hdr,len,data);
+     free(data);
+  } 
+  else 
+  { /* long messages: packetize (for pipelined sending; a 2x bandwidth improvement!) */
+    ChMessageInt_t outLen;
+    int destFd; /* destination for data */
+    skt_abortFn old=skt_set_abort(reply_abortFn);
+    int destErrs=0;
+    
+    destFd=ChMessageInt(hdr.replyFd);
+    outLen=ChMessageInt_new(len);
+    skt_sendN(destFd,&outLen,sizeof(outLen)); /* first comes the length */
+    while(len>0) {
+       char buf[m];
+       int r=m; if (r>len) r=len;
+       skt_recvN(srcFd,buf,r);
+       if (0==destErrs) /* don't keep sending to dead clients, but *do* clean out srcFd */
+          destErrs|=skt_sendN(destFd,buf,r);
+       len-=m;
+#undef m
+    }
+    skt_close(destFd);
+  
+    skt_set_abort(old);	
+  }
+  return 0;
 }
 
 #else
-void req_ccs_connect(void) {}
-void req_handle_ccs(void) {}
+int req_ccs_reply_fw(ChMessage *msg,SOCKET srcFd) {
+  
+}
 #endif /*CMK_CCS_AVAILABLE*/
 
 /****************************************************************************
@@ -1469,34 +1504,6 @@ int req_handle_crashack(ChMessage *msg,SOCKET fd)
 }
 #endif
 
-int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
-{
-  char *cmd=msg->header.type;
-  DEBUGF(("Got request '%s'\n",cmd,replyFd));
-  if (strcmp(cmd,"ping")==0)       return REQ_OK;
-#if CMK_CCS_AVAILABLE
-  else if (strcmp(cmd,"reply_fw")==0)   req_ccs_reply_fw(msg);
-#endif
-  else if (strcmp(cmd,"print")==0)      return req_handle_print(msg,replyFd);
-  else if (strcmp(cmd,"printerr")==0)   return req_handle_printerr(msg,replyFd);
-  else if (strcmp(cmd,"printsyn")==0)  return req_handle_printsyn(msg,replyFd);
-  else if (strcmp(cmd,"printerrsyn")==0) return req_handle_printerrsyn(msg,replyFd);
-  else if (strcmp(cmd,"scanf")==0)      return req_handle_scanf(msg,replyFd);
-  else if (strcmp(cmd,"ending")==0)     return req_handle_ending(msg,replyFd);
-  else if (strcmp(cmd,"abort")==0)      return req_handle_abort(msg,replyFd);
-#ifdef __FAULT__	
-  else if (strcmp(cmd,"crash_ack")==0)   return req_handle_crashack(msg,replyFd);
-#endif
-  else {
-#ifndef __FAULT__	
-        fprintf(stderr,"Charmrun> Bad control socket request '%s'\n",cmd); 
-        abort();
-	return REQ_OK;
-#endif				
-  }
-  return REQ_OK;
-}
-
 #ifdef __FAULT__
 void error_in_req_serve_client(SOCKET fd){
 	SOCKET * new_req_clients=(SOCKET *)malloc((req_nClients-1)*sizeof(SOCKET));
@@ -1537,19 +1544,52 @@ void error_in_req_serve_client(SOCKET fd){
 }
 #endif
 
+int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
+{
+  char *cmd=msg->header.type;
+  int recv_status;
+  DEBUGF(("Got request '%s'\n",cmd,replyFd));
+#if CMK_CCS_AVAILABLE   /* CCS *doesn't* want data yet, for faster forwarding */
+  if (strcmp(cmd,"reply_fw")==0)   return req_ccs_reply_fw(msg,replyFd);
+#endif
+
+  /* grab request data */
+  recv_status = ChMessageData_recv(replyFd,msg);
+#ifdef __FAULT__	
+  if(recv_status < 0)  error_in_req_serve_client(replyFd);
+#endif
+
+       if (strcmp(cmd,"ping")==0)       return REQ_OK;
+  else if (strcmp(cmd,"print")==0)      return req_handle_print(msg,replyFd);
+  else if (strcmp(cmd,"printerr")==0)   return req_handle_printerr(msg,replyFd);
+  else if (strcmp(cmd,"printsyn")==0)  return req_handle_printsyn(msg,replyFd);
+  else if (strcmp(cmd,"printerrsyn")==0) return req_handle_printerrsyn(msg,replyFd);
+  else if (strcmp(cmd,"scanf")==0)      return req_handle_scanf(msg,replyFd);
+  else if (strcmp(cmd,"ending")==0)     return req_handle_ending(msg,replyFd);
+  else if (strcmp(cmd,"abort")==0)      return req_handle_abort(msg,replyFd);
+#ifdef __FAULT__	
+  else if (strcmp(cmd,"crash_ack")==0)   return req_handle_crashack(msg,replyFd);
+#endif
+  else {
+#ifndef __FAULT__	
+        fprintf(stderr,"Charmrun> Bad control socket request '%s'\n",cmd); 
+        abort();
+	return REQ_OK;
+#endif				
+  }
+  return REQ_OK;
+}
+
 void req_serve_client(SOCKET fd)
 {
-	int recv_status;
+  int recv_status;
   int status;
   ChMessage msg;
   DEBUGF(("Getting message from client...\n"));
-  recv_status = ChMessage_recv(fd,&msg);
-	if(recv_status < 0){
+  recv_status = ChMessageHeader_recv(fd,&msg);
 #ifdef __FAULT__	
-		error_in_req_serve_client(fd);
-#endif		
-		return;
-	}
+  if(recv_status < 0) error_in_req_serve_client(fd);
+#endif
 	
   DEBUGF(("Message is '%s'\n",msg.header.type));
   status = req_handler_dispatch(&msg,fd);
@@ -1566,7 +1606,7 @@ void req_serve_client(SOCKET fd)
 
 
 int ignore_socket_errors(int c,const char *m)
-{/*Abandon on further socket errors during error shutdown*/
+{  /*Abandon on further socket errors during error shutdown*/
   
 #ifndef __FAULT__	
   exit(2);
