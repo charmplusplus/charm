@@ -33,7 +33,7 @@ private:
   double _lb_beeta;		// per byte send overhead
 public:
   CkLBArgs() {
-    _autoLbPeriod = 1.0;
+    _autoLbPeriod = 0.5;	// 0.5 second default
     _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = 0;
     _lb_migObjOnly = 0;
     _lb_statson = _lb_traceComm = 1;

@@ -62,8 +62,7 @@ LBDB::LBDB(): useBarrier(CmiTrue)
     obj_walltime = obj_cputime = 0;
     startLBFn_count = 0;
     predictCBFn = NULL;
-    if (CkNumPes()>1)
-      batsync.init(this, _lb_args.lbperiod());	    // original 1.0 second
+    batsync.init(this, _lb_args.lbperiod());	    // original 1.0 second
 }
 
 LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData, 
