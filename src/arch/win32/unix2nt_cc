@@ -165,7 +165,6 @@ do
 		LIBDIR="`cygpath -w $LIBDIR`"
 		LIBDIRS="$LIBDIRS `cygpath -u $LIBDIR`"
 		LINK=$LINK"	/LIBPATH:$LIBDIR"
-		shift
 		;;
 	-l*)
 		if [ "$arg" != "-lm" ]
