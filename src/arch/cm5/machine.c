@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-10-10 06:10:58  jyelon
+ * Revision 2.7  1995-10-27 21:45:35  jyelon
+ * Changed CmiNumPe --> CmiNumPes
+ *
+ * Revision 2.6  1995/10/10  06:10:58  jyelon
  * removed program_name
  *
  * Revision 2.5  1995/10/09  19:25:55  sanjeev
@@ -68,7 +71,7 @@ static int CmiProbe() ;
 
 CpvDeclare(void *, CmiLocalQueue) ;
 CpvDeclare(int, Cmi_mype) ;
-CpvDeclare(int, Cmi_numpe) ;
+CpvDeclare(int, Cmi_numpes) ;
 
 
 /**************************  TIMER FUNCTIONS **************************/
@@ -451,20 +454,20 @@ char **argv;
 
 	CpvAccess(Cmi_mype) = CMMD_self_address() ;
 
-        CpvAccess(Cmi_numpe) = numpes = CMMD_partition_size() ;
+        CpvAccess(Cmi_numpes) = numpes = CMMD_partition_size() ;
 
 	if ( argc >= 2 ) { /* Check if theres a +p #procs */
 		for ( i=1; i<argc; i++ ) {
 			if ( strncmp(argv[i], "+p", 2) != 0) 
 				continue ;
 			if ( strlen(argv[i]) > 2 ) {
-				CpvAccess(Cmi_numpe) = numpes = atoi(&(argv[i][2])) ;
+				CpvAccess(Cmi_numpes) = numpes = atoi(&(argv[i][2])) ;
 				for ( j=i; j<argc-1; j++ )
 					argv[j] = argv[j+1] ;
 				argc-- ;
 			}
 			else {
-				CpvAccess(Cmi_numpe) = numpes = atoi(argv[i+1]) ;
+				CpvAccess(Cmi_numpes) = numpes = atoi(argv[i+1]) ;
 				for ( j=i; j<argc-2; j++ )
 					argv[j] = argv[j+2] ;
 				argc -= 2 ;
@@ -473,7 +476,7 @@ char **argv;
 		}
 	}
 
-	if ( CpvAccess(Cmi_mype) >= CpvAccess(Cmi_numpe) )
+	if ( CpvAccess(Cmi_mype) >= CpvAccess(Cmi_numpes) )
 		exit(0) ;
 
 	/* find dim = log2(numpes), to pretend we are a hypercube */

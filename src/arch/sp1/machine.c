@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-10-10 06:10:58  jyelon
+ * Revision 2.6  1995-10-27 21:45:35  jyelon
+ * Changed CmiNumPe --> CmiNumPes
+ *
+ * Revision 2.5  1995/10/10  06:10:58  jyelon
  * removed program_name
  *
  * Revision 2.4  1995/09/29  09:50:07  jyelon
@@ -22,7 +25,7 @@
  * made the arg of CmiFree and CmiSize void*
  *
  * Revision 2.2  1995/09/08  02:38:26  gursoy
- * Cmi_mype Cmi_numpe CmiLocalQueue accessed thru macros now
+ * Cmi_mype Cmi_numpes CmiLocalQueue accessed thru macros now
  *
  * Revision 2.1  1995/07/17  17:46:05  knauff
  * Fixed problem with machine.c
@@ -60,7 +63,7 @@ static char ident[] = "@(#)$Header$";
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 
 CpvDeclare(int, Cmi_mype);
-CpvDeclare(int, Cmi_numpe);
+CpvDeclare(int, Cmi_numpes);
 CpvDeclare(void*, CmiLocalQueue);
 
 
@@ -446,10 +449,10 @@ char *argv[];
 	int n ;
 
         CpvInitialize(int, Cmi_mype);
-        CpvInitialize(int, Cmi_numpe);
+        CpvInitialize(int, Cmi_numpes);
 
-	mpc_environ(&CpvAccess(Cmi_numpe), &CpvAccess(Cmi_mype));
-	numpes = CpvAccess(Cmi_numpe);
+	mpc_environ(&CpvAccess(Cmi_numpes), &CpvAccess(Cmi_mype));
+	numpes = CpvAccess(Cmi_numpes);
 
 	/* find dim = log2(numpes), to pretend we are a hypercube */
 	for ( Cmi_dim=0,n=numpes; n>1; n/=2 )

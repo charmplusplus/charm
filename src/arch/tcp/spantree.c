@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-10-25 19:56:05  jyelon
+ * Revision 2.6  1995-10-27 21:45:35  jyelon
+ * Changed CmiNumPe --> CmiNumPes
+ *
+ * Revision 2.5  1995/10/25  19:56:05  jyelon
  * Changed CmiSyncSendFn --> CmiSyncSend
  *
  * Revision 2.4  1995/10/19  18:18:24  jyelon
@@ -71,7 +74,7 @@ void CmiSpanTreeChildren(node, children) int node, *children; {
     int i;
 
     for (i = 1; i <= MAXSPAN ; i++)
-	if (MAXSPAN * node + i < CmiNumPe())
+	if (MAXSPAN * node + i < CmiNumPes())
 	     children[i-1] = node * MAXSPAN + i;
 	else children[i-1] = -1;
 }
@@ -79,17 +82,17 @@ void CmiSpanTreeChildren(node, children) int node, *children; {
 
 int
 CmiNumSpanTreeChildren(node) int node; {
-    if ((node + 1) * MAXSPAN < CmiNumPe()) return MAXSPAN;
-    else if (node * MAXSPAN + 1 >= CmiNumPe()) return 0;
-    else return ((CmiNumPe() - 1) - node * MAXSPAN);
+    if ((node + 1) * MAXSPAN < CmiNumPes()) return MAXSPAN;
+    else if (node * MAXSPAN + 1 >= CmiNumPes()) return 0;
+    else return ((CmiNumPes() - 1) - node * MAXSPAN);
 }
 
 
 CmiSendToSpanTreeLeaves(size, msg) int size; char * msg; {
     int node;
 
-    for (node = (CmiNumPe() - 2) / MAXSPAN;   /* integer division */
-	 node < CmiNumPe(); node++)
+    for (node = (CmiNumPes() - 2) / MAXSPAN;   /* integer division */
+	 node < CmiNumPes(); node++)
 	CmiSyncSend(node,size,msg);
 }
 
@@ -98,7 +101,7 @@ CmiSendToSpanTreeLeaves(size, msg) int size; char * msg; {
 PrintSpanTree() {
     int i,j;
     int children[MAXSPAN];
-    for (i = 0; i < CmiNumPe(); i++) {
+    for (i = 0; i < CmiNumPes(); i++) {
 	CmiPrintf("node: %d, parent: %d, numchildren: %d, children: ",
 		 i, CmiSpanTreeParent(i), CmiNumSpanTreeChildren(i));
 	CmiSpanTreeChildren(i, children);

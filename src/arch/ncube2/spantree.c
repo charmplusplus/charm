@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-10-19 18:18:24  jyelon
+ * Revision 2.6  1995-10-27 21:45:35  jyelon
+ * Changed CmiNumPe --> CmiNumPes
+ *
+ * Revision 2.5  1995/10/19  18:18:24  jyelon
  * added "converse.h"
  *
  * Revision 2.4  1995/09/29  09:50:07  jyelon
@@ -67,7 +70,7 @@ CmiSpanTreeInit()
     int dim;
     
     dim      =  CmiNumNeighbours(0);
-    numnodes = CmiNumPe();
+    numnodes = CmiNumPes();
     SpanArray = (SpanTreeArray *)CmiAlloc(sizeof(SpanTreeArray) * numnodes);
     NodeStore = (int *) CmiAlloc(sizeof(int) * numnodes);
     visited[0] = 1;

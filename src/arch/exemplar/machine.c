@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.17  1995-10-19 20:42:45  jyelon
+ * Revision 2.18  1995-10-27 21:45:35  jyelon
+ * Changed CmiNumPe --> CmiNumPes
+ *
+ * Revision 2.17  1995/10/19  20:42:45  jyelon
  * added void to CmiNodeBarrier
  *
  * Revision 2.16  1995/10/19  20:40:17  jyelon
@@ -40,7 +43,7 @@
  * fixed a small bug - a typo
  *
  * Revision 2.8  1995/09/07  22:40:22  gursoy
- * Cmi_mype, Cmi_numpe and CmiLocalQueuea are accessed thru macros now
+ * Cmi_mype, Cmi_numpes and CmiLocalQueuea are accessed thru macros now
  *
  * Revision 2.7  1995/07/05  23:15:29  gursoy
  * minor change in +p code
@@ -96,7 +99,7 @@ static McQueue **MsgQueue;
 
 CpvDeclare(void*, CmiLocalQueue);
 CpvDeclare(int, Cmi_mype);
-CpvDeclare(int, Cmi_numpe);
+CpvDeclare(int, Cmi_numpes);
 
 static barrier_t barrier;
 static barrier_t *barr;
@@ -240,11 +243,11 @@ void *arg;
     usrparam = (USER_PARAMETERS *) arg;
 
     CpvInitialize(int, Cmi_mype);
-    CpvInitialize(int, Cmi_numpe);
+    CpvInitialize(int, Cmi_numpes);
     CpvInitialize(void*, CmiLocalQueue);
 
     CpvAccess(Cmi_mype)  = my_thread();
-    CpvAccess(Cmi_numpe) =  usrparam->npe;
+    CpvAccess(Cmi_numpes) =  usrparam->npe;
 
     user_main(usrparam->argc,usrparam->argv);
 }
@@ -326,7 +329,7 @@ int  size;
 char *msg;
 {
        int i;
-       for(i=0; i<CmiNumPe(); i++)
+       for(i=0; i<CmiNumPes(); i++)
          if (CmiMyPe() != i) CmiSyncSendFn(i,size,msg);
 }
 
@@ -354,7 +357,7 @@ char *msg;
     void *buf;
 
     int i;
-    for(i=0; i<CmiNumPe(); i++)
+    for(i=0; i<CmiNumPes(); i++)
        if (CmiMyPe() != i) CmiSyncSendFn(i,size,msg);
 
     buf=(void *)CmiAlloc(size);
@@ -384,7 +387,7 @@ int  size;
 char *msg;
 {
     int i;
-    for(i=0; i<CmiNumPe(); i++)
+    for(i=0; i<CmiNumPes(); i++)
        if (CmiMyPe() != i) CmiSyncSendFn(i,size,msg);
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
 }
@@ -511,8 +514,8 @@ int p;
 {
     int a,b,n;
 
-    a = (int) floor(sqrt((double)CmiNumPe()));
-    b = (int) ceil( ((double)CmiNumPe() / (double)a) );
+    a = (int) floor(sqrt((double)CmiNumPes()));
+    b = (int) ceil( ((double)CmiNumPes() / (double)a) );
 
    
     _MC_numofneighbour = 0;
@@ -522,14 +525,14 @@ int p;
            n = p-b+1;
     else {
            n = p+1;
-           if (n>=CmiNumPe()) n = (a-1)*b; /* west-south corner */
+           if (n>=CmiNumPes()) n = (a-1)*b; /* west-south corner */
     }
     if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
 
     /* west neigbour */
     if ( (p%b) == 0) {
           n = p+b-1;
-          if (n >= CmiNumPe()) n = CmiNumPe()-1;
+          if (n >= CmiNumPes()) n = CmiNumPes()-1;
        }
     else
           n = p-1;
@@ -538,7 +541,7 @@ int p;
     /* north neighbour */
     if ( (p/b) == 0) {
           n = (a-1)*b+p;
-          if (n >= CmiNumPe()) n = n-b;
+          if (n >= CmiNumPes()) n = n-b;
        }
     else
           n = p-b;
@@ -549,7 +552,7 @@ int p;
            n = p%b;
     else {
            n = p+b;
-           if (n >= CmiNumPe()) n = n%b;
+           if (n >= CmiNumPes()) n = n%b;
     } 
     if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
 

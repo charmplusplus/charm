@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-10-25 19:56:05  jyelon
+ * Revision 2.6  1995-10-27 21:45:35  jyelon
+ * Changed CmiNumPe --> CmiNumPes
+ *
+ * Revision 2.5  1995/10/25  19:56:05  jyelon
  * Changed CmiSyncSendFn --> CmiSyncSend
  *
  * Revision 2.4  1995/10/19  18:18:24  jyelon
@@ -64,7 +67,7 @@ int node, *children;
     int i;
 
     for (i = 1; i <= MAXSPAN ; i++)
-	if (MAXSPAN * node + i < CmiNumPe())
+	if (MAXSPAN * node + i < CmiNumPes())
 	     children[i-1] = node * MAXSPAN + i;
 	else children[i-1] = -1;
 }
@@ -73,11 +76,11 @@ int node, *children;
 int CmiNumSpanTreeChildren(node)
 int node;
 {
-    if ((node + 1) * MAXSPAN < CmiNumPe())
+    if ((node + 1) * MAXSPAN < CmiNumPes())
          return MAXSPAN;
-    else if (node * MAXSPAN + 1 >= CmiNumPe())
+    else if (node * MAXSPAN + 1 >= CmiNumPes())
 	 return 0;
-    else return ((CmiNumPe() - 1) - node * MAXSPAN);
+    else return ((CmiNumPes() - 1) - node * MAXSPAN);
 }
 
 CmiSendToSpanTreeLeaves(size, msg)
@@ -86,8 +89,8 @@ char * msg;
 {
     int node;
 
-    for (node = (CmiNumPe() - 2) / MAXSPAN;   /* integer division */
-	 node < CmiNumPe(); node++)
+    for (node = (CmiNumPes() - 2) / MAXSPAN;   /* integer division */
+	 node < CmiNumPes(); node++)
         CmiSyncSend(node, size, msg);
 }
 

@@ -567,7 +567,7 @@ static char   Topology;
 static char  *outputfile;
 
 CpvDeclare(int, Cmi_mype);
-CpvDeclare(int, Cmi_numpe);
+CpvDeclare(int, Cmi_numpes);
 
 static int    host_IP;
 static char   host_IP_str[16];
@@ -597,7 +597,7 @@ static void ParseNetstart()
   ns = getenv("NETSTART");
   if (ns==0) goto abort;
   nread = sscanf(ns, "%d%d%d%d%d",
-		 &CpvAccess(Cmi_mype),&CpvAccess(Cmi_numpe),&self_IP,&host_IP,&host_port);
+		 &CpvAccess(Cmi_mype),&CpvAccess(Cmi_numpes),&self_IP,&host_IP,&host_port);
   if (nread!=5) goto abort;
   return;
  abort:
@@ -679,7 +679,7 @@ char *msg;
   char buffer[1024]; int i;
   sprintf(buffer,"die %s",msg);
   KillIndividual(buffer, host_IP, host_port, 30);
-  for (i=0; i<CpvAccess(Cmi_numpe); i++)
+  for (i=0; i<CpvAccess(Cmi_numpes); i++)
     KillIndividual(buffer, node_table[i].IP, node_table[i].ctrlport, 3);
   exit(1);
 }
@@ -804,8 +804,8 @@ static void node_addresses_receive()
   ctrl_sendone(120, "aset addr %d %s.%d.%d\n",
 	       CpvAccess(Cmi_mype), self_IP_str, ctrl_port, data_port);
   ctrl_sendone(120, "aget %s %d addr 0 %d\n",
-    self_IP_str,ctrl_port,CpvAccess(Cmi_numpe)-1);
-  while (node_table_fill != CpvAccess(Cmi_numpe)) {
+    self_IP_str,ctrl_port,CpvAccess(Cmi_numpes)-1);
+  while (node_table_fill != CpvAccess(Cmi_numpes)) {
     if (wait_readable(ctrl_skt, 300)<0)
       { perror("waiting for data"); KillEveryoneCode(21323); }
     ctrl_getone();
@@ -819,8 +819,8 @@ static void node_addresses_store(addrs) char *addrs;
   p = skipblanks(addrs+10);
   p = readint(p,&lo);
   p = readint(p,&hi);
-  if ((lo!=0)||(hi!=CpvAccess(Cmi_numpe)-1)) KillEveryoneCode(824793);
-  for (i=0; i<CpvAccess(Cmi_numpe); i++) {
+  if ((lo!=0)||(hi!=CpvAccess(Cmi_numpes)-1)) KillEveryoneCode(824793);
+  for (i=0; i<CpvAccess(Cmi_numpes); i++) {
     unsigned int ip0,ip1,ip2,ip3,cport,dport;
     p = readint(p,&ip0);
     p = readint(p,&ip1);
@@ -834,7 +834,7 @@ static void node_addresses_store(addrs) char *addrs;
   }
   p = skipblanks(p);
   if (*p!=0) KillEveryoneCode(82283);
-  node_table_fill = CpvAccess(Cmi_numpe);
+  node_table_fill = CpvAccess(Cmi_numpes);
 }
 
 /*****************************************************************************
@@ -946,7 +946,7 @@ static int NumSends;
  * Neighbour-Lookup functions.                                               
  *                                                                           
  * the neighbour information is computed dynamically.  It is computed solely 
- * from the value of the Topology variable and the Cmi_numpe.             
+ * from the value of the Topology variable and the Cmi_numpes.             
  *                                                                           
  *****************************************************************************/
 
@@ -955,7 +955,7 @@ int CmiNumNeighbours(node)
 {
   switch (Topology) {
   case 'F': case 'f':		/* Full interconnectivity */
-    return CpvAccess(Cmi_numpe)-1;
+    return CpvAccess(Cmi_numpes)-1;
   default: KillEveryoneCode(233);
   }
 }
@@ -967,7 +967,7 @@ void CmiGetNodeNeighbours(node, nghbrs)
   switch (Topology) {
   case 'F': case 'f':		/* Full interconnectivity */
     for (i=0; i<node; i++) *nghbrs++ = i;
-    for (i=node+1; i<CpvAccess(Cmi_numpe); i++) *nghbrs++ = i;
+    for (i=node+1; i<CpvAccess(Cmi_numpes); i++) *nghbrs++ = i;
     break;
   default: KillEveryoneCode(234);
   }
@@ -1178,7 +1178,7 @@ msg_tuple(PeNum,msgid,ack_or_send) int PeNum,msgid,ack_or_send; {
 static void SendWindowInit()
 {
     int i,j;
-    int numpe = CpvAccess(Cmi_numpe);
+    int numpe = CpvAccess(Cmi_numpes);
     int mype = CpvAccess(Cmi_mype);
 
     send_window = (WindowElement **) CmiAlloc(numpe * sizeof(WindowElement *));
@@ -1358,7 +1358,7 @@ static int RetransmitPackets()
   struct sockaddr_in addr;
   int sending=0;
 
-  for (i = 0; i < CpvAccess(Cmi_numpe); i++) {
+  for (i = 0; i < CpvAccess(Cmi_numpes); i++) {
     index = first_window_index[i];
     if (cur_window_size[i] > 0) {
       sending = 1;
@@ -1449,7 +1449,7 @@ static void fragment_send(destPE,size,msg,full_size,msg_type, numfrags)
 static RecvWindowInit()
 {
     int i,j;
-    int numpe = CpvAccess(Cmi_numpe);
+    int numpe = CpvAccess(Cmi_numpes);
     int mype = CpvAccess(Cmi_mype);
 
     recv_window = (WindowElement **) CmiAlloc(numpe * sizeof(WindowElement *));
@@ -1590,7 +1590,7 @@ static void ConstructMessages()
   PacketQueueElem *packetelem;
 
   TRACE(CmiPrintf("Node %d: in ConstructMessages().\n",CpvAccess(Cmi_mype)));
-  for (i = 0; i < CpvAccess(Cmi_numpe); i++)
+  for (i = 0; i < CpvAccess(Cmi_numpes); i++)
     if (i != CpvAccess(Cmi_mype)) {
       packet = ExtractNextPacket(i);
       while (packet != NULL) {
@@ -1621,12 +1621,12 @@ static void ConstructMessages()
 static void AckReceivedMsgs()
 {
   int i;
-  for (i = 0; i < CpvAccess(Cmi_numpe); i++)
+  for (i = 0; i < CpvAccess(Cmi_numpes); i++)
     if (needack[i])	{
       needack[i] = 0;
       ack.SourcePeNum = i;
       ack.seq_num = expected_seq_num[i] - 1;
-      if (CpvAccess(Cmi_mype) < CpvAccess(Cmi_numpe))
+      if (CpvAccess(Cmi_mype) < CpvAccess(Cmi_numpes))
 	TRACE(CmiPrintf("Node %d: acking seq_num %d on window %d\n",
 		       CpvAccess(Cmi_mype), ack.seq_num, i)); 
       NumAcksSent++ ;
@@ -1863,7 +1863,7 @@ void CmiSyncBroadcastFn(size,msg)
      int size; char *msg;
 {
   int i;
-  for (i=0;i<CpvAccess(Cmi_numpe);i++) {
+  for (i=0;i<CpvAccess(Cmi_numpes);i++) {
     if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
   }
 }
@@ -1879,7 +1879,7 @@ void CmiFreeBroadcastFn(size,msg)
      int size; char *msg;
 {
   int i;
-  for (i=0;i<CpvAccess(Cmi_numpe);i++) {
+  for (i=0;i<CpvAccess(Cmi_numpes);i++) {
     if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
   }
   CmiFree(msg);
@@ -1890,7 +1890,7 @@ void CmiSyncBroadcastAllFn(size,msg)
 {
   int i;
   char *msg1;
-  for (i=0;i<CpvAccess(Cmi_numpe);i++)
+  for (i=0;i<CpvAccess(Cmi_numpes);i++)
     if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
   msg1 = (char *)CmiAlloc(size);
   memcpy(msg1,msg,size);
@@ -1908,7 +1908,7 @@ void CmiFreeBroadcastAllFn(size,msg)
      int size; char *msg;
 {
   int i;
-  for (i=0;i<CpvAccess(Cmi_numpe);i++)
+  for (i=0;i<CpvAccess(Cmi_numpes);i++)
     if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
 }
@@ -1973,7 +1973,7 @@ CmiExit()
   CmiInterruptsBlock();
 
   ctrl_sendone(120,"aget %s %d done 0 %d\n",
-	       self_IP_str,ctrl_port,CpvAccess(Cmi_numpe)-1);
+	       self_IP_str,ctrl_port,CpvAccess(Cmi_numpes)-1);
   ctrl_sendone(120,"aset done %d TRUE\n",CpvAccess(Cmi_mype));
   ctrl_sendone(120,"ending\n");
   begin = time(0);

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.3  1995-10-13 22:05:59  gursoy
+ * Revision 1.4  1995-10-27 21:45:35  jyelon
+ * Changed CmiNumPe --> CmiNumPes
+ *
+ * Revision 1.3  1995/10/13  22:05:59  gursoy
  * put CmiGrabBuffer init stuff
  *
  * Revision 1.2  1995/10/13  20:05:13  jyelon
@@ -40,7 +43,7 @@ static char ident[] = "@(#)$Header$";
 static void **McQueue;
 
 int Cmi_mype;
-int Cmi_numpe;
+int Cmi_numpes;
 
 
 CsvDeclare(int, CsdStopCount);
@@ -193,7 +196,7 @@ int size;
 char * msg;
 {
     int i;
-    for(i=0; i<Cmi_numpe; i++)
+    for(i=0; i<Cmi_numpes; i++)
        if (i!= Cmi_mype) CmiSyncSendFn(i,size,msg);
          
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
@@ -205,7 +208,7 @@ int size;
 char * msg;
 {
     int i;
-    for(i=0; i<Cmi_numpe; i++)
+    for(i=0; i<Cmi_numpes; i++)
        if (i!= Cmi_mype) CmiSyncSendFn(i,size,msg);
 }
 
@@ -218,7 +221,7 @@ char * msg;
 
      char *buf;
 
-     for(i=0; i<Cmi_numpe; i++)
+     for(i=0; i<Cmi_numpes; i++)
         if (i!= Cmi_mype) CmiSyncSendFn(i,size,msg);
 
      buf              =  (char *)malloc(size+8);
@@ -306,8 +309,8 @@ int p;
 {
     int a,b,n;
 
-    a = (int) floor(sqrt((double)CmiNumPe()));
-    b = (int) ceil( ((double)CmiNumPe() / (double)a) );
+    a = (int) floor(sqrt((double)CmiNumPes()));
+    b = (int) ceil( ((double)CmiNumPes() / (double)a) );
 
    
     _MC_numofneighbour = 0;
@@ -317,14 +320,14 @@ int p;
            n = p-b+1;
     else {
            n = p+1;
-           if (n>=CmiNumPe()) n = (a-1)*b; /* west-south corner */
+           if (n>=CmiNumPes()) n = (a-1)*b; /* west-south corner */
     }
     if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
 
     /* west neigbour */
     if ( (p%b) == 0) {
           n = p+b-1;
-          if (n >= CmiNumPe()) n = CmiNumPe()-1;
+          if (n >= CmiNumPes()) n = CmiNumPes()-1;
        }
     else
           n = p-1;
@@ -333,7 +336,7 @@ int p;
     /* north neighbour */
     if ( (p/b) == 0) {
           n = (a-1)*b+p;
-          if (n >= CmiNumPe()) n = n-b;
+          if (n >= CmiNumPes()) n = n-b;
        }
     else
           n = p-b;
@@ -344,7 +347,7 @@ int p;
            n = p%b;
     else {
            n = p+b;
-           if (n >= CmiNumPe()) n = n%b;
+           if (n >= CmiNumPes()) n = n%b;
     } 
     if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
 
@@ -409,7 +412,7 @@ char *argv[];
        exit();
     }
 
-    Cmi_numpe = requested_npe;
+    Cmi_numpes = requested_npe;
     Cmi_mype  = 0;
 
     CpvInitialize(void*, CmiLocalQueue);

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.7  1995-10-18 22:22:53  jyelon
+ * Revision 1.8  1995-10-27 21:45:35  jyelon
+ * Changed CmiNumPe --> CmiNumPes
+ *
+ * Revision 1.7  1995/10/18  22:22:53  jyelon
  * I forget.
  *
  * Revision 1.6  1995/10/13  22:36:29  jyelon
@@ -232,8 +235,8 @@ int p;
 {
     int a,b,n;
 
-    a = (int) floor(sqrt((double)CmiNumPe()));
-    b = (int) ceil( ((double)CmiNumPe() / (double)a) );
+    a = (int) floor(sqrt((double)CmiNumPes()));
+    b = (int) ceil( ((double)CmiNumPes() / (double)a) );
 
    
     _MC_numofneighbour = 0;
@@ -243,14 +246,14 @@ int p;
            n = p-b+1;
     else {
            n = p+1;
-           if (n>=CmiNumPe()) n = (a-1)*b; /* west-south corner */
+           if (n>=CmiNumPes()) n = (a-1)*b; /* west-south corner */
     }
     if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
 
     /* west neigbour */
     if ( (p%b) == 0) {
           n = p+b-1;
-          if (n >= CmiNumPe()) n = CmiNumPe()-1;
+          if (n >= CmiNumPes()) n = CmiNumPes()-1;
        }
     else
           n = p-1;
@@ -259,7 +262,7 @@ int p;
     /* north neighbour */
     if ( (p/b) == 0) {
           n = (a-1)*b+p;
-          if (n >= CmiNumPe()) n = n-b;
+          if (n >= CmiNumPes()) n = n-b;
        }
     else
           n = p-b;
@@ -270,7 +273,7 @@ int p;
            n = p%b;
     else {
            n = p+b;
-           if (n >= CmiNumPe()) n = n%b;
+           if (n >= CmiNumPes()) n = n%b;
     } 
     if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
 
@@ -295,7 +298,7 @@ int p,n;
 typedef void *Fifo;
 
 int        Cmi_mype;
-int        Cmi_numpe;
+int        Cmi_numpes;
 int        Cmi_stacksize = 64000;
 char     **CmiArgv;
 CthThread *CmiThreads;
@@ -327,12 +330,12 @@ CmiCommHandle c ;
 static void CmiNext()
 {
   CthThread t; int index; int orig;
-  index = (Cmi_mype+1) % Cmi_numpe;
+  index = (Cmi_mype+1) % Cmi_numpes;
   orig = index;
   while (1) {
     t = CmiThreads[index];
     if ((t)&&(!CmiBarred[index])) break;
-    index = (index+1) % Cmi_numpe;
+    index = (index+1) % Cmi_numpes;
     if (index == orig) exit(0);
   }
   Cmi_mype = index;
@@ -357,8 +360,8 @@ void CmiNodeBarrier()
   int i;
   CmiNumBarred++;
   CmiBarred[Cmi_mype] = 1;
-  if (CmiNumBarred == Cmi_numpe) {
-    for (i=0; i<Cmi_numpe; i++) CmiBarred[i]=0;
+  if (CmiNumBarred == Cmi_numpes) {
+    for (i=0; i<Cmi_numpes; i++) CmiBarred[i]=0;
     CmiNumBarred=0;
   }
   CmiYield();
@@ -407,7 +410,7 @@ int size;
 char * msg;
 {
   int i;
-  for(i=0; i<Cmi_numpe; i++)
+  for(i=0; i<Cmi_numpes; i++)
     if (i != Cmi_mype) CmiSyncSendFn(i,size,msg);
 }
 
@@ -432,7 +435,7 @@ int size;
 char * msg;
 {
   int i;
-  for(i=0; i<Cmi_numpe; i++)
+  for(i=0; i<Cmi_numpes; i++)
     CmiSyncSendFn(i,size,msg);
 }
 
@@ -449,7 +452,7 @@ int size;
 char * msg;
 {
   int i;
-  for(i=0; i<Cmi_numpe; i++)
+  for(i=0; i<Cmi_numpes; i++)
     if (i!=Cmi_mype) CmiSyncSendFn(i,size,msg);
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
 }
@@ -489,15 +492,15 @@ char **argv;
       Cmi_stacksize = atoi(*argp);
       DeleteArg(argp);
     } else if ((strcmp(*argp,"+p")==0)&&(argp[1])) {
-      Cmi_numpe = atoi(argp[1]);
+      Cmi_numpes = atoi(argp[1]);
       argp+=2;
-    } else if (sscanf(*argp, "+p%d", &Cmi_numpe) == 1) {
+    } else if (sscanf(*argp, "+p%d", &Cmi_numpes) == 1) {
       argp+=1;
     } else argp++;
   }
   
-  if (Cmi_numpe<1) {
-    printf("Error: must specify number of processors to simulate with +pXXX\n",Cmi_numpe);
+  if (Cmi_numpes<1) {
+    printf("Error: must specify number of processors to simulate with +pXXX\n",Cmi_numpes);
     exit(1);
   }
 }
@@ -514,12 +517,12 @@ char *argv[];
   CthInit(argv);
   
   CpvInitialize(void*, CmiLocalQueue);
-  CmiThreads = (CthThread *)CmiAlloc(Cmi_numpe*sizeof(CthThread));
-  CmiBarred  = (int       *)CmiAlloc(Cmi_numpe*sizeof(int));
-  CmiQueues  = (Fifo      *)CmiAlloc(Cmi_numpe*sizeof(Fifo));
+  CmiThreads = (CthThread *)CmiAlloc(Cmi_numpes*sizeof(CthThread));
+  CmiBarred  = (int       *)CmiAlloc(Cmi_numpes*sizeof(int));
+  CmiQueues  = (Fifo      *)CmiAlloc(Cmi_numpes*sizeof(Fifo));
   
   /* Create threads for all PE except PE 0 */
-  for(i=0; i<Cmi_numpe; i++) {
+  for(i=0; i<Cmi_numpes; i++) {
     t = (i==0) ? CthSelf() : CthCreate(CmiCallMain, 0, Cmi_stacksize);
     CmiThreads[i] = t;
     CmiBarred[i] = 0;
