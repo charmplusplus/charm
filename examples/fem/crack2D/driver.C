@@ -79,10 +79,10 @@ driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
   int i;
   int kk = -1;
   double prop, slope;
+  double stime, etime;
+  stime = CkTimer();
   for(i=0;i<gd->nTime;i++)
   {
-    if(gd->myid==0)
-      CkPrintf("Beginning iteration %d at time %lf\n", i, CkTimer());
     if (gd->ts_proportion[kk+1] == i)
     {
       kk++;
@@ -101,6 +101,9 @@ driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
     updateNodes(gd, prop, slope);
     FEM_Update_Field(rfield, gd->nodes);
   }
+  etime = CkTimer();
+  if(gd->myid == 0)
+    CkPrintf("Time per iteration = %lf seconds\n", (etime-stime)/gd->nTime);
 }
 
 extern "C" void

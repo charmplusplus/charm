@@ -55,9 +55,7 @@ void
 lst_NL(GlobalData *gd)
 {
   int idx;
-  // skip over cohesive elements
-  for(idx=0; idx<gd->ne && gd->nnums[idx]<gd->numCLST; idx++);
-  for(; idx<gd->ne; idx++) {
+  for(idx=gd->svol; idx<gd->evol; idx++) {
     Element *v = &(gd->elements[idx]);
     Node *n[6];
     int k;

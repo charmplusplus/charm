@@ -1,4 +1,4 @@
-CHARMC=../../../../bin/charmc $(OPTS) -TARG:exc_max=OZV:exc_min=OZV
+CHARMC=../../../../bin/charmc $(OPTS)
 
 all: getmesh pgm
 

@@ -29,7 +29,7 @@ void
 lst_coh2(GlobalData *gd) 
 {
   int idx;
-  for(idx=0; idx<gd->ne && gd->enums[idx]<gd->numCLST; idx++) {
+  for(idx=gd->scoh; idx<gd->ecoh; idx++) {
     Element *coh = &(gd->elements[idx]);
     Node *n[6];
     int k;
