@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.3  1995-10-25 19:59:30  jyelon
+# Revision 1.4  1995-10-30 20:31:35  jyelon
+# *** empty log message ***
+#
+# Revision 1.3  1995/10/25  19:59:30  jyelon
 # added CMK_CC_RELIABLE and CMK_CC_FASTEST
 #
 # Revision 1.2  1995/10/20  18:38:43  jyelon
@@ -53,5 +56,3 @@ set CMK_SEQ_CC='gcc'
 set CMK_SEQ_LD='gcc'
 set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | awk '{print "'$'"1;}'"
-set CMK_EXTRAS=''
-set CMK_CLEAN=''

@@ -136,6 +136,33 @@ void notify_die_init()
 
 /**************************************************************************
  *
+ * ping_developers
+ *
+ * Sends a single UDP packet to the charm developers notifying them
+ * that charm is in use.
+ *
+ **************************************************************************/
+
+void ping_developers()
+{
+#ifdef NOTIFY
+  char info[1000];
+  struct sockaddr_in addr;
+  int skt;
+  skt = socket(AF_INET, SOCK_DGRAM, 0);
+  if (skt < 0) return;
+  bzero(addr, sizeof(addr));
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(6571);
+  addr.sin_addr.s_addr = htonl(0x80aef1d3);
+  sprintf(info,"%d",getuid());
+  sendto(skt, info, strlen(info), 0, (struct sockaddr *)&addr, sizeof(addr));
+  close(skt);
+#endif /* NOTIFY */
+}
+
+/**************************************************************************
+ *
  * SKT - socket routines
  *
  * Uses Module: SCHED  [implicitly TIMEVAL, QUEUE, THREAD]
@@ -2137,6 +2164,8 @@ main(argc, argv)
     int argc; char **argv;
 {
   srand(time(0));
+  /* notify charm developers that charm is in use */
+  ping_developers();
   /* Compute the values of all constants */
   arg_init(argc, argv);
   /* Initialize the node-table by reading nodesfile */
