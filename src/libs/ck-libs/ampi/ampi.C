@@ -62,10 +62,16 @@ ArgsInfo::unpack(void *in)
 
 CtvDeclare(ampi*, ampiPtr);
 
-
+#if !CMK_LBDB_ON
+/*Fake definitions here, to prevent linking errors*/
+void CreateMetisLB(void) { }
+void _registerMetisLB(void) { }
+#endif
 ampi::ampi(AmpiStartMsg *msg)
 {
+#if CMK_LBDB_ON
   usesAtSync = CmiTrue;
+#endif
   commidx = msg->commidx;
   delete msg;
   msgs = CmmNew();
