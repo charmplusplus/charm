@@ -5,7 +5,7 @@ HEADERS=ampi.h ampif.h ampiimpl.h ampiProjections.h ampiOOQ.h
 HEADDEP=$(HEADERS) ampiimpl.h ampi.decl.h ampiEvents.h 
 COMPAT=compat_ampius.o compat_ampifus.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o
-OBJS=ampi.o ampif.o ampiProjections.o win_obj.o MPI_Win.o
+OBJS=ampi.o ampif.o ampiProjections.o 
 
 LIB=libmoduleampi
 LIBDIR=$(CDIR)/lib

@@ -12,6 +12,27 @@
 #include "ampiEvents.h" /*** for trace generation for projector *****/
 #include "ampiProjections.h"
 
+/* these MPI functions can be called in PMPI_Init() in mpi/machine.c */
+/* can not include mpi.h for these prototype */
+#if CMK_CONVERSE_MPI
+extern "C" {
+int PMPI_Type_contiguous(int, MPI_Datatype, MPI_Datatype *);
+int PMPI_Type_struct(int, int *, MPI_Aint *, MPI_Datatype *, MPI_Datatype *);
+int PMPI_Type_commit(MPI_Datatype *);
+int PMPI_Keyval_create(MPI_Copy_function *, MPI_Delete_function *, int *, void*);
+int PMPI_Keyval_free(int *);
+int PMPI_Attr_put(MPI_Comm, int, void*);
+int PMPI_Attr_get(MPI_Comm, int, void *, int *);
+int PMPI_Attr_delete(MPI_Comm, int);
+int PMPI_Errhandler_create(MPI_Handler_function *, MPI_Errhandler *);
+int PMPI_Errhandler_set(MPI_Comm, MPI_Errhandler);
+int PMPI_Errhandler_get(MPI_Comm, MPI_Errhandler *);
+int PMPI_Errhandler_free(MPI_Errhandler *);
+int PMPI_Error_string(int, char *, int *);
+int PMPI_Error_class(int, int *);
+}
+#endif
+
 #define CART_TOPOL 1
 
 /* change this define to "x" to trace all send/recv's */
@@ -305,6 +326,7 @@ CDECL void MPI_Setup_Switch(void) {
 }
 
 static int nodeinit_has_been_called=0;
+static int ampiInited = 0;        // used only for AMPI on top of MPI
 CtvDeclare(ampiParent*, ampiPtr);
 CtvDeclare(int, ampiInitDone);
 static void ampiNodeInit(void)
@@ -319,12 +341,13 @@ static void ampiNodeInit(void)
   ampiSetupReductions();
 
   nodeinit_has_been_called=1;
+  ampiInited = 1;
 }
 
 static void ampiProcInit(void){
   CtvInitialize(ampiParent*, ampiPtr);
   CtvInitialize(int,ampiInitDone);
-  REGISTER_AMPI;
+  REGISTER_AMPI
   initAmpiProjections();
 }
 
@@ -366,7 +389,7 @@ void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen)
 			  b.getData(), b.getSize());
 }
 
-/* TCharm Semaphore ID for AMPI startup */
+/* TCharm Semaphore ID's for AMPI startup */
 #define AMPI_TCHARM_SEMAID 0x00A34100 /* __AMPI__ */
 #define AMPI_BARRIER_SEMAID 0x00A34200 /* __AMPI__ */
 
@@ -425,7 +448,7 @@ static ampi *ampiInit(char **argv)
 	CkArrayID threads;
         opts=TCHARM_Attach_start(&threads,&_nchunks);
 	parent=CProxy_ampiParent::ckNew(new_world,threads,cinst, opts);
-
+	STARTUP_DEBUG("ampiInit> array size "<<_nchunks);
 #if AMPI_COMLIB
         //CProxy_ComlibManager comlib = CProxy_ComlibManager::ckNew(strat, 1);
 	//comlib.ckLocalBranch()->createId();
@@ -714,242 +737,6 @@ ampi::~ampi()
   delete[] nextseq;
   CmmFree(msgs);
 }
-
-//------------------------ Added by YAN for one-side commnunication ---------------------
-static ampiParent *getAmpiParent(void);
-
-int
-ampi::winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
-	     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win){
-  // Create a Future object 
-  AmpiMsg *msg = new AmpiMsg();
-  CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
-  AMPI_DEBUG("    Created Future with handle %d\n", ftHandle);
-  
-  CProxy_ampi pa(thisArrayID);
-  pa[rank].winRemotePut(orgcnt*sizeof(orgtype), (char*)orgaddr, orgtype, targdisp, targcnt, targtype, 
-  			win.index, ftHandle, CkMyPe());
-
-  // Wait on the Future object 
-  AMPI_DEBUG("    Future [%d] waiting\n", ftHandle);
-  msg = (AmpiMsg*)CkWaitFuture(ftHandle);
-  AMPI_DEBUG("    Future [%d] awaken\n", ftHandle);
-  
-  return MPI_SUCCESS;
-}
-
-void
-ampi::winRemotePut(int orgcnt, char* orgaddr, MPI_Datatype orgtype, 
-		   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-		   int winIndex, CkFutureID ftHandle, int pe_src) {
-  win_obj *winobj = winObjects[winIndex];	
-
-  winobj->put(orgaddr, orgcnt/sizeof(orgtype), orgtype, targdisp, targcnt, targtype);
-
-  int tmp = 0;
-  AmpiMsg *msg = new (&tmp, 0) AmpiMsg(-1, -1, -1, thisIndex, 0,myComm.getComm());
-  AMPI_DEBUG("    Rank[%d] Send to Future [%d] \n", thisIndex, ftHandle);
-  CkSendToFuture(ftHandle, (void *)msg, pe_src);
-}
-
-int 
-ampi::winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
-	     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win){
-  // Create a Future object 
-  AmpiMsg *msg = new AmpiMsg();
-  CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
-  AMPI_DEBUG("    Created Future with handle %d\n", ftHandle);
-
-  // Send the request to data and handle of Future to remote side 
-  CProxy_ampi pa(thisArrayID);
-  AMPI_DEBUG("    Rank[%d:%d] invoke Remote get at [%d]\n", thisIndex, myRank, rank);
-  pa[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win.index, ftHandle, CkMyPe());
-
-  // Wait on the Future object 
-  AMPI_DEBUG("    Future [%d] waiting\n", ftHandle);
-  msg = (AmpiMsg*)CkWaitFuture(ftHandle);
-  AMPI_DEBUG("    Future [%d] awaken\n", ftHandle);
-  
-  // Process the reply message and copy the data into desired memory position 
-  memcpy(orgaddr, msg->data, orgcnt*sizeof(orgtype));  
-  AMPI_DEBUG("    Rank[%d] got win  [%d] \n", thisIndex, *(int*)msg->data);
-  AMPI_DEBUG("    Rank[%d] got win  [%d] , size %d\n", thisIndex, *(int*)orgaddr, orgcnt);
-  return MPI_SUCCESS;
-}
-
-void
-ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt, 
-		   MPI_Datatype targtype, int winIndex, CkFutureID ftHandle, 
-		   int pe_src) {
-  AMPI_DEBUG("    RemoteGet invoked at Rank[%d:%d]\n", thisIndex, myRank);  
-  void * orgaddr = (void*) new char[orgcnt];
-
-  win_obj *winobj = winObjects[winIndex];
-  winobj->get(orgaddr, orgcnt, orgtype, targdisp, targcnt, targtype);
-  AMPI_DEBUG("    Rank[%d] get win  [%d] \n", thisIndex, *(int*)orgaddr);
-  
-
-  AmpiMsg *msg = new (&orgcnt, 0) AmpiMsg(-1, -1, -1, thisIndex, orgcnt,myComm.getComm());
-  memcpy(msg->data, orgaddr, orgcnt*sizeof(orgtype));
-  AMPI_DEBUG("    Rank[%d] copy win  [%d] \n", thisIndex, *(int*)msg->data);
-
-  AMPI_DEBUG("    Rank[%d] Send to Future [%d] \n", thisIndex, ftHandle);
-  CkSendToFuture(ftHandle, (void *)msg, pe_src);
- } 
- 
-int 
-ampi::winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
-       	            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
-		    MPI_Op op, MPI_Win win) {
-  // Create a Future object 
-  AmpiMsg *msg = new AmpiMsg();
-  CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
-  AMPI_DEBUG("    Created Future with handle %d\n", ftHandle);
-
-  // Send the request to data and handle of Future to remote side 
-  CProxy_ampi pa(thisArrayID);
-  AMPI_DEBUG("    Rank[%d:%d] invoke Remote accumulate at [%d]\n", thisIndex, myRank, rank);
-  pa[rank].winRemoteAccumulate(orgcnt*sizeof(orgtype), (char*)orgaddr, orgtype, targdisp, targcnt, targtype,
-  			       op, win.index, ftHandle, CkMyPe());
-
-  // Wait on the Future object 
-  AMPI_DEBUG("    Future [%d] waiting\n", ftHandle);
-  msg = (AmpiMsg*)CkWaitFuture(ftHandle);
-  AMPI_DEBUG("    Future [%d] awaken\n", ftHandle);
-  
-  return MPI_SUCCESS; 
-}
-
-void
-ampi::winRemoteAccumulate(int orgcnt, char* orgaddr, MPI_Datatype orgtype, MPI_Aint targdisp, 
-			  int targcnt, MPI_Datatype targtype, 
-		          MPI_Op op, int winIndex, CkFutureID ftHandle, 
-			  int pe_src) {
-  win_obj *winobj = winObjects[winIndex]; 
-  winobj->accumulate(orgaddr, orgcnt/sizeof(orgtype), orgtype, targdisp, targcnt, targtype, op);  
-  
-  int tmp = 0;
-  AmpiMsg *msg = new (&tmp, 0) AmpiMsg(-1, -1, -1, thisIndex, 0,myComm.getComm());
-
-  AMPI_DEBUG("    Rank[%d] Send to Future [%d] \n", thisIndex, ftHandle);
-  CkSendToFuture(ftHandle, (void *)msg, pe_src);
-}
-
-int 
-ampi::winLock(int lock_type, int rank, MPI_Win win) {
-  // Create a Future object 
-  AmpiMsg *msg = new AmpiMsg();
-  CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
-  AMPI_DEBUG("    [%d] Lock: Created Future with handle %d\n", thisIndex, ftHandle);
-
-  // Send the request to data and handle of Future to remote side 
-  CProxy_ampi pa(thisArrayID);
-  AMPI_DEBUG("    [%d] Lock: invoke Remote lock at [%d]\n", thisIndex, rank);
-  pa[rank].winRemoteLock(lock_type, win.index, ftHandle, CkMyPe(), thisIndex);
-
-  // Wait on the Future object 
-  AMPI_DEBUG("    [%d] Lock: Future [%d] waiting\n", thisIndex, ftHandle);
-  msg = (AmpiMsg*)CkWaitFuture(ftHandle);
-  AMPI_DEBUG("    [%d] Lock: Future [%d] awaken\n", thisIndex, ftHandle);
-  
-  return MPI_SUCCESS;
-}
-
-void 
-ampi::winRemoteLock(int lock_type, int winIndex, CkFutureID ftHandle, int pe_src, int requestRank) {
-  AMPI_DEBUG("    [%d] RemoteLock: invoked \n", thisIndex);
-  win_obj *winobj = winObjects[winIndex]; 
-
-  // check if any one else waiting in the queue 
-  if(winobj->owner > -1 && !(winobj->emptyQueue()))  {
-  // queue it if queue non-empty
-    winobj->enqueue(requestRank, pe_src, ftHandle, lock_type);	
-    AMPI_DEBUG("    [%d] RemoteLock: queue lock from [%d] \n", thisIndex, requestRank); 
-  }  
-  // if queue empty, get semaphore and queue it
-  else {
-    winobj->lock(requestRank, pe_src, ftHandle, lock_type);
-    winobj->enqueue(requestRank, pe_src, ftHandle, lock_type);	
-    AMPI_DEBUG("    [%d] RemoteLock: give lock to [%d] \n", thisIndex, requestRank);
-  }
-}
-
-int 
-ampi::winUnlock(int rank, MPI_Win win) {
-  // Create a Future object 
-  AmpiMsg *msg = new AmpiMsg();
-  CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
-  AMPI_DEBUG("    [%d] Unlock: Created Future with handle %d\n", thisIndex, ftHandle);
-  
-  // Send the request to data and handle of Future to remote side 
-  CProxy_ampi pa(thisArrayID);
-  AMPI_DEBUG("    [%d] Unlock: invoke Remote lock at [%d]\n", thisIndex, rank);
-  pa[rank].winRemoteUnlock(win.index, ftHandle, CkMyPe(), thisIndex);
-
-  // Wait on the Future object 
-  AMPI_DEBUG("    [%d] Unlock: Future [%d] waiting\n", thisIndex, ftHandle);
-  msg = (AmpiMsg*)CkWaitFuture(ftHandle);
-  AMPI_DEBUG("    [%d] Unlock: Future [%d] awaken\n", thisIndex, ftHandle);
-  
-  return MPI_SUCCESS;
-}
-
-void 
-ampi::winRemoteUnlock(int winIndex, CkFutureID ftHandle, int pe_src, int requestRank) {
-  AMPI_DEBUG("    [%d] RemoteUnlock: invoked \n", thisIndex);
-  win_obj *winobj = winObjects[winIndex];
-  winobj->unlock(requestRank, pe_src, ftHandle);  
-  AMPI_DEBUG("    [%d] RemoteUnlock: [%d] release lock\n", thisIndex, requestRank);
-
-  // if queue non-empty, get lock for the first waiting one and reply
-  if(!(winobj->emptyQueue())) {
-    AMPI_DEBUG("    [%d] RemoteUnlock: queue non-empty, give lock to \n", thisIndex );
-    winobj->lockTopQueue(); 
-  }
-}
-
-MPI_Win 
-ampi::createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info) {
-  AMPI_DEBUG("     Creating win obj {%d, %p}\n ", myComm.getComm(), base);
-  win_obj *newobj = new win_obj((char*)(NULL), base, size, disp_unit, myComm.getComm());
-  winObjects.push_back(newobj);
-  MPI_Win newwin;
-  newwin.comm=myComm.getComm();
-  newwin.index=winObjects.size()-1;
-  AMPI_DEBUG("     Creating MPI_WIN at (%p) with {%d, %d}\n", &newwin, myComm.getComm(), winObjects.size()-1);
-  return newwin;
-}
-
-int 
-ampi::deleteWinInstance(win_obj *win) {
-  // FIXME: delete from <Vec> 
-  win->free();
-  return MPI_SUCCESS;
-}
-
-int 
-ampi::winGetGroup(MPI_Win win, MPI_Group *group){
-   *group = getAmpiParent()->comm2group(win.comm);
-   return MPI_SUCCESS;
-}
-
-void 
-ampi::winSetName(MPI_Win win, char *name) {
-  win_obj *winobj = winObjects[win.index];
-  winobj->setName((const char*)name, strlen(name));
-}
-
-void 
-ampi::winGetName(MPI_Win win, char *name, int *length) {
-  win_obj *winobj = winObjects[win.index];
-  winobj->getName(name, length);
-}
-
-win_obj*
-ampi::getWinObjInstance(MPI_Win win) {
-  return winObjects[win.index];
-}
-//------------------------ End of Adding by YAN ---------------------
 
 //------------------------ Communicator Splitting ---------------------
 class ampiSplitKey {
@@ -1417,6 +1204,11 @@ int
 ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 {
   _LOG_E_END_AMPI_PROCESSING(thisIndex)
+#if CMK_BLUEGENE_CHARM
+  void *curLog;		// store current log in timeline
+  _TRACE_BG_TLINE_END(&curLog);
+  TRACE_BG_AMPI_SUSPEND();
+#endif
 
   if(isInter()){
     s = myComm.getIndexForRemoteRank(s);
@@ -1563,7 +1355,13 @@ static AmpiRequestList *getReqs(void) {
 CDECL void MPI_Migrate(void)
 {
   AMPIAPI("MPI_Migrate");
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_SUSPEND();
+#endif
   TCHARM_Migrate();
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_MIGRATE")
+#endif
 }
 
 CDECL void MPI_Setmigratable(MPI_Comm comm, int mig){
@@ -1644,6 +1442,7 @@ int MPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result)
 CDECL void MPI_Exit(int /*exitCode*/)
 {
   AMPIAPI("MPI_Exit");
+  ampiInited = 0;
   TCHARM_Done();
 }
 FDECL void FTN_NAME(MPI_EXIT,mpi_exit)(int *exitCode)
@@ -1655,6 +1454,9 @@ CDECL
 int MPI_Finalize(void)
 {
   AMPIAPI("MPI_Finalize");
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_SUSPEND();
+#endif
   MPI_Exit(0);
   return 0;
 }
@@ -2014,25 +1816,26 @@ int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
 }
 
 extern "C" void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* a, void* b) { // a[i] = a[i] op b[i]
+  int i;
   switch(datatype){
   case MPI_FLOAT:
     switch(op){
     case MPI_MAX:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         if(((float *)a)[i] < ((float *)b)[i])
           ((float *)a)[i] = ((float *)b)[i];
       break;
     case MPI_MIN:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         if(((float *)a)[i] > ((float *)b)[i]) 
           ((float *)a)[i] = ((float *)b)[i];
       break;
     case MPI_SUM:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         ((float *)a)[i] = (((float *)a)[i]) + (((float *)b)[i]);
       break;
     case MPI_PROD:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         ((float *)a)[i] = (((float *)a)[i]) * (((float *)b)[i]);
       break;
     default:
@@ -2043,21 +1846,21 @@ extern "C" void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* a, vo
   case MPI_DOUBLE:
     switch(op){
     case MPI_MAX:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         if(((double *)a)[i] < ((double *)b)[i]) 
           ((double *)a)[i] = ((double *)b)[i];
       break;
     case MPI_MIN:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         if(((double *)a)[i] > ((double *)b)[i]) 
           ((double *)a)[i] = ((double *)b)[i];
       break;
     case MPI_SUM:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         ((double *)a)[i] = (((double *)a)[i]) + (((double *)b)[i]);
       break;
     case MPI_PROD:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         ((double *)a)[i] = (((double *)a)[i]) * (((double *)b)[i]);
       break;
     default:
@@ -2068,21 +1871,21 @@ extern "C" void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* a, vo
   case MPI_INT:
     switch(op){
     case MPI_MAX:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         if(((int *)a)[i] < ((int *)b)[i]) 
           ((int *)a)[i] = ((int *)b)[i];
       break;
     case MPI_MIN:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         if(((int *)a)[i] > ((int *)b)[i]) 
           ((int *)a)[i] = ((int *)b)[i];
       break;
     case MPI_SUM:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         ((int *)a)[i] = (((int *)a)[i]) + (((int *)b)[i]);
       break;
     case MPI_PROD:
-      for(int i=0;i<count;i++)
+      for(i=0;i<count;i++)
         ((int *)a)[i] = (((int *)a)[i]) * (((int *)b)[i]);
       break;
     default:
@@ -2160,7 +1963,11 @@ CDECL
 double MPI_Wtime(void)
 {
   AMPIAPI("MPI_Wtime");
+#if CMK_BLUEGENE_CHARM
+  return BgGetTime();
+#else
   return TCHARM_Wall_timer();
+#endif
 }
 
 CDECL
@@ -2227,6 +2034,10 @@ int ATAReq::wait(MPI_Status *sts){
   		_TRACE_BG_TLINE_END(&myreqs[i].event);
 #endif
 	}
+#if CMK_BLUEGENE_CHARM
+  	TRACE_BG_AMPI_NEWSTART(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "ATAReq", myreqs[i].event, count);
+  	_TRACE_BG_TLINE_END(&event);
+#endif
 	return 0;
 }
 
@@ -2250,6 +2061,10 @@ int MPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
   for(int i=0;i<count;i++) {
     MPI_Wait(&request[i], sts+i);
   }
+#if CMK_BLUEGENE_CHARM
+  // in Blue Gene simulator, setup forward and backward dependence
+  TRACE_BG_AMPI_WAITALL();
+#endif
   return 0;
 }
 
@@ -2438,6 +2253,9 @@ CDECL
 int MPI_Type_contiguous(int count, MPI_Datatype oldtype,
                          MPI_Datatype *newtype)
 {
+#if CMK_CONVERSE_MPI
+  if (!ampiInited) return PMPI_Type_contiguous(count, oldtype, newtype);
+#endif
   AMPIAPI("MPI_Type_contiguous");
   getDDT()->newContiguous(count, oldtype, newtype);
   return 0;
@@ -2483,6 +2301,9 @@ extern  "C"
 int MPI_Type_struct(int count, int* arrBlength, int* arrDisp, 
                      MPI_Datatype* oldtype, MPI_Datatype*  newtype)
 {
+#if CMK_CONVERSE_MPI
+  if (!ampiInited) return PMPI_Type_struct(count, arrBlength, arrDisp, oldtype, newtype);
+#endif
   AMPIAPI("MPI_Type_struct");
   getDDT()->newStruct(count, arrBlength, arrDisp, oldtype, newtype);
   return 0 ;
@@ -2491,6 +2312,9 @@ int MPI_Type_struct(int count, int* arrBlength, int* arrDisp,
 CDECL
 int MPI_Type_commit(MPI_Datatype *datatype)
 {
+#if CMK_CONVERSE_MPI
+  if (!ampiInited) return PMPI_Type_commit(datatype);
+#endif
   AMPIAPI("MPI_Type_commit");
   return 0;
 }
@@ -2936,7 +2760,8 @@ int MPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm pcomm, int rleade
     MPI_Status sts;
 
     // local leader exchanges groupStruct with remote leader
-    for(int i=0;i<lsize;i++)
+    int i;
+    for(i=0;i<lsize;i++)
       larr[i] = lvec[i];
     MPI_Send(&lsize,1,MPI_INT,rleader,tag,pcomm);
     MPI_Recv(&rsize,1,MPI_INT,rleader,tag,pcomm,&sts);
@@ -2944,7 +2769,7 @@ int MPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm pcomm, int rleade
     rarr = new int [rsize];
     MPI_Send(larr,lsize,MPI_INT,rleader,tag+1,pcomm);
     MPI_Recv(rarr,rsize,MPI_INT,rleader,tag+1,pcomm,&sts);
-    for(int i=0;i<rsize;i++)
+    for(i=0;i<rsize;i++)
       rvec.push_back(rarr[i]);
 
     delete [] larr;
@@ -3081,30 +2906,45 @@ void error_handler ( MPI_Comm *, int * );
 
 CDECL
 int MPI_Errhandler_create(MPI_Handler_function *function, MPI_Errhandler *errhandler){
+#if CMK_CONVERSE_MPI
+  if (!ampiInited) return PMPI_Errhandler_create(function, errhandler);
+#endif
 	AMPIAPI("MPI_Errhandler_create");
 	return MPI_SUCCESS;
 }
 
 CDECL
 int MPI_Errhandler_set(MPI_Comm comm, MPI_Errhandler errhandler){
+#if CMK_CONVERSE_MPI
+  if (!ampiInited) return PMPI_Errhandler_set(comm, errhandler);
+#endif
 	AMPIAPI("MPI_Errhandler_set");
 	return MPI_SUCCESS;
 }
 
 CDECL
 int MPI_Errhandler_get(MPI_Comm comm, MPI_Errhandler *errhandler){
+#if CMK_CONVERSE_MPI
+  if (!ampiInited) return PMPI_Errhandler_get(comm, errhandler);
+#endif
 	AMPIAPI("MPI_Errhandler_get");
 	return MPI_SUCCESS;
 }
 
 CDECL
 int MPI_Errhandler_free(MPI_Errhandler *errhandler){
+#if CMK_CONVERSE_MPI
+  if (!ampiInited) return PMPI_Errhandler_free(errhandler);
+#endif
 	AMPIAPI("MPI_Errhandler_free");
 	return MPI_SUCCESS;
 }
 
 CDECL
 int MPI_Error_class(int errorcode, int *errorclass){
+#if CMK_CONVERSE_MPI
+  if (!ampiInited) return PMPI_Error_class(errorcode, errorclass);
+#endif
 	AMPIAPI("MPI_Error_class");
 	*errorclass = errorcode;
 	return MPI_SUCCESS;
@@ -3113,6 +2953,9 @@ int MPI_Error_class(int errorcode, int *errorclass){
 CDECL
 int MPI_Error_string(int errorcode, char *string, int *resultlen)
 {
+#if CMK_CONVERSE_MPI
+  if (!ampiInited) return PMPI_Error_string(errorcode, string, resultlen);
+#endif
   AMPIAPI("MPI_Error_string");
   const char *ret="";
   switch(errorcode) {
@@ -3126,6 +2969,7 @@ int MPI_Error_string(int errorcode, char *string, int *resultlen)
   strcpy(string,ret);
   return MPI_SUCCESS;
 }
+
 
 /* Group operations */
 CDECL
@@ -3328,30 +3172,45 @@ void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
 
 CDECL
 int MPI_Keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn, int *keyval, void* extra_state){
+#if CMK_CONVERSE_MPI
+  if (!ampiInited) return PMPI_Keyval_create(copy_fn, delete_fn, keyval, extra_state);
+#endif
   AMPIAPI("MPI_Keyval_create");
   return getAmpiParent()->createKeyval(copy_fn,delete_fn,keyval,extra_state);
 }
 
 CDECL
 int MPI_Keyval_free(int *keyval){
+#if CMK_CONVERSE_MPI
+  if (!ampiInited) return PMPI_Keyval_free(keyval);
+#endif
   AMPIAPI("MPI_Keyval_free");
   return getAmpiParent()->freeKeyval(keyval);
 }
 
 CDECL
 int MPI_Attr_put(MPI_Comm comm, int keyval, void* attribute_val){
+#if CMK_CONVERSE_MPI
+  if (!ampiInited) return PMPI_Attr_put(comm, keyval, attribute_val);
+#endif
   AMPIAPI("MPI_Attr_put");
   return getAmpiParent()->putAttr(comm,keyval,attribute_val);
 }
 
 CDECL
 int MPI_Attr_get(MPI_Comm comm, int keyval, void *attribute_val, int *flag){
+#if CMK_CONVERSE_MPI
+  if (!ampiInited) return PMPI_Attr_get(comm, keyval, attribute_val, flag);
+#endif
   AMPIAPI("MPI_Attr_get");
   return getAmpiParent()->getAttr(comm,keyval,attribute_val,flag);
 }
 
 CDECL
 int MPI_Attr_delete(MPI_Comm comm, int keyval){
+#if CMK_CONVERSE_MPI
+  if (!ampiInited) return PMPI_Attr_delete(comm, keyval);
+#endif
   AMPIAPI("MPI_Attr_delete");
   return getAmpiParent()->deleteAttr(comm,keyval);
 }
@@ -3433,12 +3292,13 @@ int MPI_Graph_create(MPI_Comm comm_old, int nnodes, int *index, int *edges,
   CkPupBasicVec<int> index_;
   CkPupBasicVec<int> edges_;
 
-  for (int i = 0; i < nnodes; i++)
+  int i;
+  for (i = 0; i < nnodes; i++)
     index_.push_back(index[i]);
   
   c.setindex(index_);
 
-  for (int i = 0; i < index[nnodes - 1]; i++)
+  for (i = 0; i < index[nnodes - 1]; i++)
     edges_.push_back(edges[i]);
 
   c.setedges(edges_);
@@ -3473,7 +3333,7 @@ int MPI_Cartdim_get(MPI_Comm comm, int *ndims) {
 CDECL
 int MPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods, 
 		 int *coords){
-  int ndims;
+  int i, ndims;
 
   AMPIAPI("MPI_Cart_get");
 
@@ -3486,12 +3346,12 @@ int MPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods,
   const CkPupBasicVec<int> &dims_ = c.getdims();
   const CkPupBasicVec<int> &periods_ = c.getperiods();
   
-  for (int i = 0; i < maxdims; i++) {
+  for (i = 0; i < maxdims; i++) {
     dims[i] = dims_[i];
     periods[i] = periods_[i];
   }
 
-  for (int i = ndims - 1; i >= 0; i--) {
+  for (i = ndims - 1; i >= 0; i--) {
     if (i < maxdims)
       coords[i] = rank % dims_[i];
     rank = (int) (rank / dims_[i]);
@@ -3602,10 +3462,11 @@ int MPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index,
   if (maxindex > index_.size())
     maxindex = index_.size();
 
-  for (int i = 0; i < maxindex; i++)
+  int i;
+  for (i = 0; i < maxindex; i++)
     index[i] = index_[i];
 
-  for (int i = 0; i < maxedges; i++)
+  for (i = 0; i < maxedges; i++)
     edges[i] = edges_[i];
 
   return 0;
@@ -3704,12 +3565,12 @@ CDECL
 int MPI_Dims_create(int nnodes, int ndims, int *dims) {
   AMPIAPI("MPI_Dims_create");
 
-  int n, d, *pdims;
+  int i, n, d, *pdims;
 
   n = nnodes;
   d = ndims;
 
-  for (int i = 0; i < ndims; i++)
+  for (i = 0; i < ndims; i++)
     if (dims[i] != 0)
       if (n % dims[i] != 0)
 	CkAbort("MPI_Dims_Create: Value in dimensions array infeasible!");
@@ -3724,7 +3585,7 @@ int MPI_Dims_create(int nnodes, int ndims, int *dims) {
     CkAbort("MPI_Dims_Create: Factorization failed. Wonder why?");
 
   int j = 0;
-  for (int i = 0; i < ndims; i++)
+  for (i = 0; i < ndims; i++)
     if (dims[i] == 0) {
       dims[i] = pdims[j];
       j++;
@@ -3744,7 +3605,7 @@ CDECL
 int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   AMPIAPI("MPI_Cart_sub");
 
-  int color, key, *coords, ndims, rank;
+  int i, color, key, *coords, ndims, rank;
 
   MPI_Comm_rank(comm, &rank);
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
@@ -3755,7 +3616,7 @@ int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   coords = new int [ndims];
   MPI_Cart_coords(comm, rank, ndims, coords);
 
-  for (int i = 0; i < ndims; i++)
+  for (i = 0; i < ndims; i++)
     if (remain_dims[i]) {
       /* key single integer encoding*/
       key = key * dims[i] + coords[i];
@@ -3773,7 +3634,7 @@ int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
   const CkPupBasicVec<int> &periods = c.getperiods();
   CkPupBasicVec<int> periodsv;
 
-  for (int i = 0; i < ndims; i++)
+  for (i = 0; i < ndims; i++)
     if (remain_dims[i]) {
       dimsv.push_back(dims[i]);
       periodsv.push_back(periods[i]);
