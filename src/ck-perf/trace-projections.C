@@ -123,15 +123,13 @@ void LogPool::closeLog(void)
   if(compressed) {
     if (nonDeltaLog) gzclose(zfp);
     if (deltaLog) gzclose(deltazfp);
-  } else {
-    if (nonDeltaLog) fclose(fp);
-    if (deltaLog)  fclose(deltafp); 
-  }
-#else
-  if (nonDeltaLog)  fclose(fp);
-  if (deltaLog) fclose(deltafp);
+    return;
+ }
 #endif
+ if (nonDeltaLog) { fsync(fileno(fp)); fclose(fp); }
+ if (deltaLog)  { fsync(fileno(deltafp)); fclose(deltafp);  }
 }
+
 /**
   For each TraceFoo module, _createTraceFoo() must be defined.
   This function is called in _createTraces() generated in moduleInit.C

@@ -135,13 +135,16 @@ private:
 public:
     TraceArray(): n(0) {}
     inline void addTrace(Trace *tr) { traces.push_back(tr); n++;}
+    // to allow traceCLose() to be called multiple times, remove trace module
+    // from the array in each individual trace, and clean up (clearTrace)
+    // after the loop.
     inline void removeTrace(Trace *tr) {    // remove a Trace from TraceArray
         int i;
         for (i=0; i<n; i++) if (tr == traces[i]) break;
         CmiAssert(i<n);
         traces[i] = NULL;
     }
-    inline void clearTrace() {    // remove void Trace from TraceArray
+    inline void clearTrace() {    // remove holes in TraceArray
 	int len = traces.length();
 	int removed = 0;
         for (int i=0; i<len; i++) {
