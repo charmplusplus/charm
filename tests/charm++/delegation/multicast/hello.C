@@ -12,7 +12,7 @@ CProxySection_Hello *mcast;
 #define SECTIONSIZE  5
 #define REDUCE_TIME  1000
 
-void client(CkSectionCookie sid, void *param, int dataSize, void *data);
+void client(CkSectionInfo sid, void *param, int dataSize, void *data);
 
 class HiMsg : public CkMcastBaseMsg, public CMessage_HiMsg
 {
@@ -68,7 +68,7 @@ public:
 class Hello : public CBase_Hello
 {
 private:
-  CkSectionCookie sid;
+  CkSectionInfo sid;
   int init;
   myReductionCounter cnt;
   CProxySection_Hello mcp;
@@ -118,7 +118,7 @@ CmiPrintf("start\n");
     mcp.SayHi(hiMsg);
   }
   
-//  void cb_client(CkSectionCookie sid, void *param, int dataSize, void *data)
+//  void cb_client(CkSectionInfo sid, void *param, int dataSize, void *data)
   void cb_client(CkReductionMsg *msg)
   {
     int dataSize = msg->getSize();
@@ -198,7 +198,7 @@ CmiPrintf("start\n");
 };
 
 #if 0
-void client(CkSectionCookie sid, void *param, int dataSize, void *data)
+void client(CkSectionInfo sid, void *param, int dataSize, void *data)
 {
   myReductionCounter *c=(myReductionCounter *)param;
   CmiPrintf("RESULT [%d]: %d\n", c->reductionNo, *(int *)data); 
