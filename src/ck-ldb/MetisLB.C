@@ -44,7 +44,7 @@ static void printStats(int count, int numobjs, double *cputimes,
     petimes[map[i]] += cputimes[i];
   }
   double maxpe = petimes[0], minpe = petimes[0];
-  CkPrintf("\tPE\tTime\n");
+  CkPrintf("\tPE\tTimexSpeed\n");
   for(i=0;i<count;i++) {
     CkPrintf("\t%d\t%lf\n",i,petimes[i]);
     if(maxpe < petimes[i])
@@ -93,8 +93,9 @@ extern "C" void METIS_mCPartGraphKway(int*, int*, int*, int*, int*, int*,
 
 void MetisLB::work(CentralLB::LDStats* stats, int count)
 {
-  // CkPrintf("entering MetisLB::Strategy...\n");
-  // CkPrintf("[%d] MetisLB strategy\n",CkMyPe());
+  if (_lb_args.debug() >= 2) {
+    CkPrintf("In MetisLB Strategy...\n");
+  }
   int i, j, m;
   int option = 0;
 
@@ -186,8 +187,10 @@ void MetisLB::work(CentralLB::LDStats* stats, int count)
     xadj[i+1] = count4all;
   }
 
-  //CkPrintf("Pre-LDB Statistics step %d\n", step());
-  //printStats(count, numobjs, objtime, comm, origmap);
+  if (_lb_args.debug() >= 2) {
+  CkPrintf("Pre-LDB Statistics step %d\n", step());
+  printStats(count, numobjs, objtime, comm, origmap);
+  }
 
   int wgtflag = 3; // Weights both on vertices and edges
   int numflag = 0; // C Style numbering
@@ -269,8 +272,10 @@ void MetisLB::work(CentralLB::LDStats* stats, int count)
       CkPrintf("multiple constraints not implemented yet.\n");
     }
   }
-  //CkPrintf("Post-LDB Statistics step %d\n", step());
-  //printStats(count, numobjs, objtime, comm, newmap);
+  if (_lb_args.debug() >= 2) {
+  CkPrintf("Post-LDB Statistics step %d\n", step());
+  printStats(count, numobjs, objtime, comm, newmap);
+  }
 
   for(i=0;i<numobjs;i++)
     delete[] comm[i];
@@ -286,6 +291,8 @@ void MetisLB::work(CentralLB::LDStats* stats, int count)
       if(origmap[i] != newmap[i]) {
 	CmiAssert(stats->from_proc[i] == origmap[i]);
 	stats->to_proc[i] =  newmap[i];
+	if (_lb_args.debug() >= 2)
+            CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),i,stats->from_proc[i],stats->to_proc[i]);
       }
     }
   }

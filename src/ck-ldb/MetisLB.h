@@ -21,7 +21,7 @@ void CreateMetisLB();
 class MetisLB : public CentralLB {
 public:
   MetisLB(const CkLBOptions &);
-  MetisLB(CkMigrateMessage *m):CentralLB(m) {}
+  MetisLB(CkMigrateMessage *m):CentralLB(m) { lbname = "MetisLB"; }
 private:
   CmiBool QueryBalanceNow(int step) { return CmiTrue; }
   void work(CentralLB::LDStats* stats, int count);
