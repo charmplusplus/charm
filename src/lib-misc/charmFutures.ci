@@ -1,0 +1,8 @@
+readonly int futureBocNum;
+message FutureInitMsg;
+
+group Future {
+  entry Future(FutureInitMsg *);
+  entry SetFuture(FutureInitMsg *);
+};
+
