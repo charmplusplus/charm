@@ -326,6 +326,7 @@ CDECL void MPI_Setup_Switch(void) {
 }
 
 static int nodeinit_has_been_called=0;
+static int ampiInited = 0;        // used only for AMPI on top of MPI
 CtvDeclare(ampiParent*, ampiPtr);
 CtvDeclare(int, ampiInitDone);
 static void ampiNodeInit(void)
@@ -340,6 +341,7 @@ static void ampiNodeInit(void)
   ampiSetupReductions();
 
   nodeinit_has_been_called=1;
+  ampiInited = 1;
 }
 
 static void ampiProcInit(void){
@@ -1436,7 +1438,7 @@ int MPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result)
 CDECL void MPI_Exit(int /*exitCode*/)
 {
   AMPIAPI("MPI_Exit");
-  nodeinit_has_been_called = 0;
+  ampiInited = 0;
   TCHARM_Done();
 }
 FDECL void FTN_NAME(MPI_EXIT,mpi_exit)(int *exitCode)
@@ -2241,7 +2243,7 @@ int MPI_Type_contiguous(int count, MPI_Datatype oldtype,
                          MPI_Datatype *newtype)
 {
 #if CMK_CONVERSE_MPI
-  if (!nodeinit_has_been_called) return PMPI_Type_contiguous(count, oldtype, newtype);
+  if (!ampiInited) return PMPI_Type_contiguous(count, oldtype, newtype);
 #endif
   AMPIAPI("MPI_Type_contiguous");
   getDDT()->newContiguous(count, oldtype, newtype);
@@ -2289,7 +2291,7 @@ int MPI_Type_struct(int count, int* arrBlength, int* arrDisp,
                      MPI_Datatype* oldtype, MPI_Datatype*  newtype)
 {
 #if CMK_CONVERSE_MPI
-  if (!nodeinit_has_been_called) return PMPI_Type_struct(count, arrBlength, arrDisp, oldtype, newtype);
+  if (!ampiInited) return PMPI_Type_struct(count, arrBlength, arrDisp, oldtype, newtype);
 #endif
   AMPIAPI("MPI_Type_struct");
   getDDT()->newStruct(count, arrBlength, arrDisp, oldtype, newtype);
@@ -2300,7 +2302,7 @@ CDECL
 int MPI_Type_commit(MPI_Datatype *datatype)
 {
 #if CMK_CONVERSE_MPI
-  if (!nodeinit_has_been_called) return PMPI_Type_commit(datatype);
+  if (!ampiInited) return PMPI_Type_commit(datatype);
 #endif
   AMPIAPI("MPI_Type_commit");
   return 0;
@@ -2892,7 +2894,7 @@ void error_handler ( MPI_Comm *, int * );
 CDECL
 int MPI_Errhandler_create(MPI_Handler_function *function, MPI_Errhandler *errhandler){
 #if CMK_CONVERSE_MPI
-  if (!nodeinit_has_been_called) return PMPI_Errhandler_create(function, errhandler);
+  if (!ampiInited) return PMPI_Errhandler_create(function, errhandler);
 #endif
 	AMPIAPI("MPI_Errhandler_create");
 	return MPI_SUCCESS;
@@ -2901,7 +2903,7 @@ int MPI_Errhandler_create(MPI_Handler_function *function, MPI_Errhandler *errhan
 CDECL
 int MPI_Errhandler_set(MPI_Comm comm, MPI_Errhandler errhandler){
 #if CMK_CONVERSE_MPI
-  if (!nodeinit_has_been_called) return PMPI_Errhandler_set(comm, errhandler);
+  if (!ampiInited) return PMPI_Errhandler_set(comm, errhandler);
 #endif
 	AMPIAPI("MPI_Errhandler_set");
 	return MPI_SUCCESS;
@@ -2910,7 +2912,7 @@ int MPI_Errhandler_set(MPI_Comm comm, MPI_Errhandler errhandler){
 CDECL
 int MPI_Errhandler_get(MPI_Comm comm, MPI_Errhandler *errhandler){
 #if CMK_CONVERSE_MPI
-  if (!nodeinit_has_been_called) return PMPI_Errhandler_get(comm, errhandler);
+  if (!ampiInited) return PMPI_Errhandler_get(comm, errhandler);
 #endif
 	AMPIAPI("MPI_Errhandler_get");
 	return MPI_SUCCESS;
@@ -2919,7 +2921,7 @@ int MPI_Errhandler_get(MPI_Comm comm, MPI_Errhandler *errhandler){
 CDECL
 int MPI_Errhandler_free(MPI_Errhandler *errhandler){
 #if CMK_CONVERSE_MPI
-  if (!nodeinit_has_been_called) return PMPI_Errhandler_free(errhandler);
+  if (!ampiInited) return PMPI_Errhandler_free(errhandler);
 #endif
 	AMPIAPI("MPI_Errhandler_free");
 	return MPI_SUCCESS;
@@ -2928,7 +2930,7 @@ int MPI_Errhandler_free(MPI_Errhandler *errhandler){
 CDECL
 int MPI_Error_class(int errorcode, int *errorclass){
 #if CMK_CONVERSE_MPI
-  if (!nodeinit_has_been_called) return PMPI_Error_class(errorcode, errorclass);
+  if (!ampiInited) return PMPI_Error_class(errorcode, errorclass);
 #endif
 	AMPIAPI("MPI_Error_class");
 	*errorclass = errorcode;
@@ -2939,7 +2941,7 @@ CDECL
 int MPI_Error_string(int errorcode, char *string, int *resultlen)
 {
 #if CMK_CONVERSE_MPI
-  if (!nodeinit_has_been_called) return PMPI_Error_string(errorcode, string, resultlen);
+  if (!ampiInited) return PMPI_Error_string(errorcode, string, resultlen);
 #endif
   AMPIAPI("MPI_Error_string");
   const char *ret="";
@@ -3158,7 +3160,7 @@ void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
 CDECL
 int MPI_Keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn, int *keyval, void* extra_state){
 #if CMK_CONVERSE_MPI
-  if (!nodeinit_has_been_called) return PMPI_Keyval_create(copy_fn, delete_fn, keyval, extra_state);
+  if (!ampiInited) return PMPI_Keyval_create(copy_fn, delete_fn, keyval, extra_state);
 #endif
   AMPIAPI("MPI_Keyval_create");
   return getAmpiParent()->createKeyval(copy_fn,delete_fn,keyval,extra_state);
@@ -3167,7 +3169,7 @@ int MPI_Keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn
 CDECL
 int MPI_Keyval_free(int *keyval){
 #if CMK_CONVERSE_MPI
-  if (!nodeinit_has_been_called) return PMPI_Keyval_free(keyval);
+  if (!ampiInited) return PMPI_Keyval_free(keyval);
 #endif
   AMPIAPI("MPI_Keyval_free");
   return getAmpiParent()->freeKeyval(keyval);
@@ -3176,7 +3178,7 @@ int MPI_Keyval_free(int *keyval){
 CDECL
 int MPI_Attr_put(MPI_Comm comm, int keyval, void* attribute_val){
 #if CMK_CONVERSE_MPI
-  if (!nodeinit_has_been_called) return PMPI_Attr_put(comm, keyval, attribute_val);
+  if (!ampiInited) return PMPI_Attr_put(comm, keyval, attribute_val);
 #endif
   AMPIAPI("MPI_Attr_put");
   return getAmpiParent()->putAttr(comm,keyval,attribute_val);
@@ -3185,7 +3187,7 @@ int MPI_Attr_put(MPI_Comm comm, int keyval, void* attribute_val){
 CDECL
 int MPI_Attr_get(MPI_Comm comm, int keyval, void *attribute_val, int *flag){
 #if CMK_CONVERSE_MPI
-  if (!nodeinit_has_been_called) return PMPI_Attr_get(comm, keyval, attribute_val, flag);
+  if (!ampiInited) return PMPI_Attr_get(comm, keyval, attribute_val, flag);
 #endif
   AMPIAPI("MPI_Attr_get");
   return getAmpiParent()->getAttr(comm,keyval,attribute_val,flag);
@@ -3194,7 +3196,7 @@ int MPI_Attr_get(MPI_Comm comm, int keyval, void *attribute_val, int *flag){
 CDECL
 int MPI_Attr_delete(MPI_Comm comm, int keyval){
 #if CMK_CONVERSE_MPI
-  if (!nodeinit_has_been_called) return PMPI_Attr_delete(comm, keyval);
+  if (!ampiInited) return PMPI_Attr_delete(comm, keyval);
 #endif
   AMPIAPI("MPI_Attr_delete");
   return getAmpiParent()->deleteAttr(comm,keyval);
