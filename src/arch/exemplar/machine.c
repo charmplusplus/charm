@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-07-05 23:07:28  gursoy
+ * Revision 2.7  1995-07-05 23:15:29  gursoy
+ * minor change in +p code
+ *
+ * Revision 2.6  1995/07/05  23:07:28  gursoy
  * fixed +p option
  *
  * Revision 2.5  1995/07/03  17:57:37  gursoy
@@ -161,6 +164,7 @@ char *argv[];
 
     /* figure out number of processors required */
     i =  0;
+    requested_npe = 0; 
     while (argv[i] != NULL)
     {
          if (strcmp(argv[i], "+p") == 0)
