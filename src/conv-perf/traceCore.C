@@ -43,11 +43,12 @@ TraceCore::TraceCore(char** argv)
 	REGISTER_CHARM
 	REGISTER_MACHINE
 	//REGISTER_AMPI
-	closePtc();
+	//closePtc();
 }
 
 TraceCore::~TraceCore()
 {
+	closePtc();
 	if(traceLogger) delete traceLogger; 
 }
 
@@ -304,7 +305,6 @@ void TraceEntry::write(FILE* fp, int prevLID, int prevSeek, int nextLID, int nex
 TraceLogger::TraceLogger(char* program, int b):
 	numLangs(1), numEntries(0), lastWriteFlag(0), prevLID(0), prevSeek(0)
 {
-  CmiPrintf("TraceLogger created\n");
   binary = b;
 
   
