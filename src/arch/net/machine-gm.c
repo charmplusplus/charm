@@ -9,6 +9,14 @@
 
   written by 
   Gengbin Zheng, gzheng@uiuc.edu  4/22/2001
+  
+  ChangeLog:
+  * 3/7/2004,  Gengbin Zheng
+    implemented fault tolerant gm layer. When GM detects a catastrophic error,
+    it temporarily disables the delivery of all messages with the same sender 
+    port, target port, and priority as the message that experienced the error. 
+    This layer needs to properly handle the error message of GM and resume 
+    the port.
 
   TODO:
   1. DMAable buffer reuse;
@@ -43,7 +51,9 @@ typedef struct PendingMsgStruct
   void *msg;
   int length;		/* length of message */
   int size;		/* size of message, usually around log2(length)  */
-  OtherNode   node;	/* receiver node */
+  int mach_id;		/* receiver machine id */
+  int dataport;		/* receiver data port */
+  int node_idx;		/* receiver pe id */
   struct PendingMsgStruct *next;
 }
 *PendingMsg;
@@ -56,7 +66,9 @@ void enqueue_sending(char *msg, int length, OtherNode node, int size)
   PendingMsg pm = (PendingMsg) malloc(sizeof(struct PendingMsgStruct));
   pm->msg = msg;
   pm->length = length;
-  pm->node = node;
+  pm->mach_id = node->mach_id;
+  pm->dataport = node->dataport;
+  pm->node_idx = node-nodes;
   pm->size = size;
   pm->next = NULL;
   if (sendhead == NULL) {
@@ -314,7 +326,7 @@ static void processMessage(char *msg, int len)
       }
     } 
     else {
-      CmiPrintf("message ignored1: magic not agree:%d != %d!\n", magic, Cmi_charmrun_pid&DGRAM_MAGIC_MASK);
+      CmiPrintf("[%d] message ignored1: magic not agree:%d != %d!\n", CmiMyPe(), magic, Cmi_charmrun_pid&DGRAM_MAGIC_MASK);
       CmiPrintf("recv: rank:%d src:%d mag:%d\n", rank, srcpe, magic);
     }
   } 
@@ -344,21 +356,57 @@ static int processEvent(gm_recv_event_t *e)
     default:
       MACHSTATE1(3,"Unrecognized GM event %d",evt)
       gm_unknown(gmport, e);
-    }
-    return status;
+  }
+  return status;
 }
 
 
-void send_callback(struct gm_port *p, void *msg, gm_status_t status)
+void drop_send_callback(struct gm_port *p, void *context, gm_status_t status)
 {
+  PendingMsg out = (PendingMsg)context;
+  void *msg = out->msg;
+
+  printf("[%d] drop_send_callback dropped msg: %p\n", CmiMyPe(), msg);
+#if !CMK_MSGPOOL
+  gm_dma_free(gmport, msg);
+#else
+  putPool(msg);
+#endif
+
+  free(out);
+}
+
+void send_callback(struct gm_port *p, void *context, gm_status_t status)
+{
+  PendingMsg out = (PendingMsg)context;
+  void *msg = out->msg;
+
   if (status != GM_SUCCESS) { 
     int srcpe, seqno, magic;
     char rank;
     char *errmsg;
     DgramHeaderBreak(msg, rank, srcpe, magic, seqno);
     errmsg = getErrorMsg(status);
-    CmiPrintf("GM Error> PE:%d send to %d failed to complete (error %d): %s\n", srcpe, rank, status, errmsg); 
-    CmiAbort("");
+    CmiPrintf("GM Error> PE:%d send to msg %p node %d rank %d mach_id %d port %d failed to complete (error %d): %s\n", srcpe, msg, out->node_idx, rank, out->mach_id, out->dataport, status, errmsg); 
+#ifdef __FAULT__ 
+    if (status != GM_SEND_DROPPED) {
+      gm_drop_sends (gmport, GM_LOW_PRIORITY, out->mach_id, out->dataport,
+		                             drop_send_callback, out);
+      return;
+    }
+    else {
+      OtherNode node = nodes + out->node_idx;
+      if (out->mach_id == node->mach_id && out->dataport == node->dataport) {
+        /* it not crashed, resent */
+        gm_send_with_callback(gmport, msg, out->size, out->length, 
+                            GM_LOW_PRIORITY, out->mach_id, out->dataport, 
+                            send_callback, out);
+        return;
+      }
+    }
+#else
+     CmiAbort("send_callback");
+#endif
   }
 
 #if !CMK_MSGPOOL
@@ -366,7 +414,9 @@ void send_callback(struct gm_port *p, void *msg, gm_status_t status)
 #else
   putPool(msg);
 #endif
+
   gm_free_send_token (gmport, GM_LOW_PRIORITY);
+  free(out);
 
   /* since we have one free send token, start next send */
   send_progress();
@@ -381,13 +431,10 @@ static void send_progress()
   {
     out = peek_sending();
     if (out && gm_alloc_send_token(gmport, GM_LOW_PRIORITY)) {
-      OtherNode node = out->node;
-      char *msg = out->msg;
-      gm_send_with_callback(gmport, msg, out->size, out->length, 
-                            GM_LOW_PRIORITY, node->mach_id, node->dataport, 
-                            send_callback, msg);
+      gm_send_with_callback(gmport, out->msg, out->size, out->length, 
+                            GM_LOW_PRIORITY, out->mach_id, out->dataport, 
+                            send_callback, out);
       dequeue_sending();
-      free(out);
     }
     else break;
   }
@@ -425,6 +472,9 @@ void EnqueueOutgoingDgram
   memcpy(buf+DGRAM_HEADER_SIZE, ptr, dlen);
   size = gm_min_size_for_length(len);
 
+  enqueue_sending(buf, len, node, size);
+  send_progress();
+#if 0
   /* if queue is not empty, enqueue msg. this is to guarantee the order */
   if (pendinglen != 0) {
     while (pendinglen == MAXPENDINGSEND) {
@@ -445,6 +495,7 @@ void EnqueueOutgoingDgram
   gm_send_with_callback(gmport, buf, size, len, 
                         GM_LOW_PRIORITY, node->mach_id, node->dataport, 
                         send_callback, buf);
+#endif
 }
 
 void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
@@ -554,6 +605,15 @@ void CmiMachineInit()
 
 }
 
+void CmiGmConvertMachineID(unsigned int *mach_id)
+{
+#if CMK_USE_GM2 
+    gm_status_t status;
+    int newid;
+    status = gm_global_id_to_node_id(gmport, *mach_id, &newid);
+    if (status == GM_SUCCESS) *mach_id = newid;
+#endif
+}
 
 /* make sure other gm nodes are accessible in routing table */
 void CmiCheckGmStatus()
@@ -561,15 +621,10 @@ void CmiCheckGmStatus()
   int i;
   int doabort = 0;
   if (gmport == NULL) machine_exit(1);
-  /*CmiPrintf("[%d] Cmi_mach_id: %d\n", CmiMyPe(), Cmi_mach_id);*/
   for (i=0; i<_Cmi_numnodes; i++) {
     gm_status_t status;
     char uid[6], str[100];
     unsigned int mach_id=nodes[i].mach_id;
-#if CMK_USE_GM2 
-    gm_global_id_to_node_id(gmport, mach_id, &nodes[i].mach_id);
-#endif
-    mach_id=nodes[i].mach_id;
     status = gm_node_id_to_unique_id(gmport, mach_id, uid);
     if (status != GM_SUCCESS || ( uid[0]==0 && uid[1]== 0 
          && uid[2]==0 && uid[3]==0 && uid[4]==0 && uid[5]==0)) { 
@@ -598,6 +653,10 @@ static char *getErrorMsg(gm_status_t status)
     errmsg = "send rejected"; break;
   case GM_SEND_TARGET_NODE_UNREACHABLE:
     errmsg = "target node unreachable"; break;
+  case GM_SEND_TARGET_PORT_CLOSED:
+    errmsg = "target port closed"; break;
+  case GM_SEND_DROPPED:
+    errmsg = "send dropped"; break;
   default:
     errmsg = ""; break;
   }

@@ -304,6 +304,8 @@ static void OtherNode_init(OtherNode node)
 static OtherNode *nodes_by_pe;  /* OtherNodes indexed by processor number */
 static OtherNode  nodes;        /* Indexed only by ``node number'' */
 
+extern void CmiGmConvertMachineID(unsigned int *mach_id);
+
 /* initnode node table reply format:
  +------------------------------------------------------- 
  | 4 bytes  |   Number of nodes n                       ^
@@ -333,6 +335,9 @@ static void node_addresses_store(ChMessage *msg)
     nodes[i].nodestart = nodestart;
     nodes[i].nodesize  = ChMessageInt(d[i].nPE);
     nodes[i].mach_id = ChMessageInt(d[i].mach_id);
+#if CMK_USE_GM
+    CmiGmConvertMachineID(& nodes[i].mach_id);
+#endif
     nodes[i].IP=d[i].IP;
     if (i==_Cmi_mynode) {
       Cmi_nodestart=nodes[i].nodestart;
