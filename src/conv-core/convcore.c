@@ -1622,7 +1622,10 @@ void CmiGroupInit()
 
 void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
 {
-  CmiError("ListSend not implemented.");
+  int i;
+  for(i=0;i<npes;i++) {
+    CmiSyncSend(pes[i], len, msg);
+  }
 }
 
 CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
@@ -1633,7 +1636,6 @@ CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
 
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {
-  /*CmiError("ListSend not implemented.");*/
   int i;
   for(i=0;i<npes-1;i++) {
     CmiSyncSend(pes[i], len, msg);

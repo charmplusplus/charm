@@ -1888,7 +1888,11 @@ void CmiReleaseCommHandle(CmiCommHandle handle)
                                                                                 
 void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
 {
-  CmiError("ListSend not implemented.");
+  int i;
+  for(i=0;i<npes;i++) {
+    CmiReference(msg);
+    CmiSyncSendAndFree(pes[i], len, msg);
+  }
 }
                                                                                 
 CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
