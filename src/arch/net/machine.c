@@ -1186,6 +1186,7 @@ void CmiDestroyLock(CmiNodeLock lk)
   free(lk);
 }
 
+#define CmiYield() (thr_yield())
 
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
@@ -1218,6 +1219,7 @@ static void *call_startfn(void *vindex)
   ConverseInitPE();
   Cmi_startfn(CountArgs(Cmi_argv), Cmi_argv);
   if (Cmi_usrsched == 0) CsdScheduler(-1);
+  ConverseExit();
   thr_exit(0);
 }
 
@@ -1225,6 +1227,7 @@ static void CmiStartThreads()
 {
   int i, pid, ok;
   
+  thr_setconcurrency(Cmi_mynodesize);
   thr_keycreate(&Cmi_state_key, 0);
   Cmi_state_vector =
     (CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
@@ -1258,6 +1261,8 @@ int Cmi_myrank;
 static int comm_flag;
 #define CmiCommLock() (comm_flag=1)
 #define CmiCommUnlock() (comm_flag=0)
+
+#define CmiYield() (sleep(1))
 
 static void CommunicationInterrupt()
 {
@@ -2127,7 +2132,7 @@ void ConverseInitPE()
 void ConverseExit()
 {
   ctrl_sendone(120,"aset done %d TRUE\n",CmiMyPe());
-  while (Cmi_shutdown_done == 0) pause();
+  while (Cmi_shutdown_done == 0) CmiYield();
   ctrl_sendone(120,"ending\n");
   if (CmiMyRank()==0) log_done();
 }
@@ -2152,10 +2157,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   ctrl_sendone(120,"aget %s %d done 0 %d\n",
 	       Cmi_self_IP_str,ctrlport,Cmi_numpes-1);
   node_addresses_obtain();
+  Cmi_scanf_mutex = CmiCreateLock();
   CmiTimerInit();
   CmiStartThreads();
   ConverseInitPE();
-  Cmi_scanf_mutex = CmiCreateLock();
   if (ret==0) {
     fn(argc, argv);
     if (usc==0) CsdScheduler(-1);

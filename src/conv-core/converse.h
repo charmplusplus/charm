@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.72  1997-07-30 17:31:06  jyelon
+ * Revision 2.73  1997-07-31 00:28:25  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.72  1997/07/30 17:31:06  jyelon
  * *** empty log message ***
  *
  *
@@ -194,7 +197,7 @@ extern int CmiRankOf(int pe);
 #define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvInitialize(t,v)\
-  { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0);\
+  { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0) thr_yield();\
     else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize()); }}
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
 
