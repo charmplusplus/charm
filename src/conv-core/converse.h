@@ -977,10 +977,11 @@ void CmiDelayImmediate();
 	CmiSetXHandler(msg,CmiGetHandler(msg)); \
 	CmiSetHandler(msg,CpvAccessOther(CmiImmediateMsgHandlerIdx,0)); \
      } while (0)
+int CmiImmIsRunning();
 #else
 #  define CmiBecomeImmediate(msg) /* empty */
+#  define CmiImmIsRunning()       (0)
 #endif
-int CmiIsImmRunning();
 
 /******** Trace ********/
 
