@@ -186,18 +186,19 @@ private:
   }
 public:
   LBTopo_torus_nd(int p): LBTopology(p) /*inherited :npes(p) */ {
+    int i;
     CmiAssert(dimension>=1 && dimension<=16);
     CmiAssert(p>=1);
 
     Cardinality = new int[dimension];
     TempCo = new int[dimension];
     double pp = p;
-    for(int i=0;i<dimension;i++) {
+    for(i=0;i<dimension;i++) {
       Cardinality[i] = (int)ceil(pow(pp,1.0/(dimension-i))-1e-5);
       pp = pp / Cardinality[i];
     }
     VirtualProcessorCount = 1;
-    for(int i=0;i<dimension;i++) {
+    for(i=0;i<dimension;i++) {
       VirtualProcessorCount *= Cardinality[i];
     }
   }
@@ -228,12 +229,13 @@ public:
     return true;
   }
   virtual bool get_processor_id(const int* processor_coordinates, int* processor_id) {
+    int i;
     CmiAssert( processor_coordinates != NULL );
     CmiAssert( processor_id != NULL );
-    for(int i=dimension-1;i>=0;i--) 
+    for(i=dimension-1;i>=0;i--) 
       CmiAssert( 0<=processor_coordinates[i] && processor_coordinates[i]<Cardinality[i]);
     (*processor_id) = 0;
-    for(int i=dimension-1;i>=0;i--) {
+    for(i=dimension-1;i>=0;i--) {
       (*processor_id) = (*processor_id)* Cardinality[i] + processor_coordinates[i];
     }
     return true;
