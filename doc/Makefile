@@ -12,6 +12,7 @@ ps:
 	( cd ck; make ps )
 	( cd libraries; make ps )
 	( cd f90charm; make ps )
+	( cd fem; make ps )
 
 pdf:
 	if [ ! -d $(IDIR)/pdf ] ; then mkdir $(IDIR)/pdf ; fi
@@ -23,6 +24,7 @@ pdf:
 	( cd ck; make pdf )
 	( cd libraries; make pdf )
 	( cd f90charm; make pdf )
+	( cd fem; make pdf )
 
 html:
 	if [ ! -d $(IDIR)/html ] ; then mkdir $(IDIR)/html ; fi
@@ -34,6 +36,7 @@ html:
 	( cd ck; make html )
 	( cd libraries; make html )
 	( cd f90charm; make html )
+	( cd fem; make html )
 
 clean:
 	( cd install; make clean )
@@ -44,3 +47,4 @@ clean:
 	( cd ck; make clean )
 	( cd libraries; make clean )
 	( cd f90charm; make clean )
+	( cd fem; make clean )
