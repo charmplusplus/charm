@@ -13,19 +13,7 @@
 #include "manager.h"
 
 
-CreateLBFunc_Def (GridCommLB);
-
-
-/**************************************************************************
-**
-*/
-static void lbinit (void)
-{
-  LBRegisterBalancer ("GridCommLB", 
-		      CreateGridCommLB, 
-		      AllocateGridCommLB, 
-		      "Load balancer for Grid computing environments");
-}
+CreateLBFunc_Def (GridCommLB, "Load balancer for Grid computing environments");
 
 
 /**************************************************************************
