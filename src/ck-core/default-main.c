@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-06-18 21:55:06  sanjeev
+ * Revision 2.6  1995-07-03 17:55:55  gursoy
+ * changed charm_main to user_main
+ *
+ * Revision 2.5  1995/06/18  21:55:06  sanjeev
  * removed loop from charm_main, put in CsdScheduler()
  *
  * Revision 2.4  1995/06/13  17:00:16  jyelon
@@ -51,7 +54,7 @@ void defaultmainModuleInit()
 {
 }
 
-charm_main(argc, argv)
+user_main(argc, argv)
 int argc;
 char *argv[];
 {

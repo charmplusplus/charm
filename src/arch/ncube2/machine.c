@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-13 16:01:23  gursoy
+ * Revision 2.3  1995-07-03 17:58:04  gursoy
+ * changed charm_main to user_main
+ *
+ * Revision 2.2  1995/06/13  16:01:23  gursoy
  * fixed a minor syntax error
  *
  * Revision 2.1  1995/06/09  21:23:01  gursoy
@@ -296,6 +299,6 @@ main(argc,argv)
 int argc;
 char *argv[];
 {
-    charm_main(argc,argv);
+    user_main(argc,argv);
 }
 

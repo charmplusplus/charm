@@ -1969,5 +1969,5 @@ main(argc, argv)
 int argc;
 char **argv;
 {
-charm_main(argc, argv);
+user_main(argc, argv);
 }

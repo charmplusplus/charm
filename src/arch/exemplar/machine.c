@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-06-28 15:31:54  gursoy
+ * Revision 2.5  1995-07-03 17:57:37  gursoy
+ * changed charm_main to user_main
+ *
+ * Revision 2.4  1995/06/28  15:31:54  gursoy
  * *** empty log message ***
  *
  * Revision 2.3  1995/06/16  21:42:10  gursoy
@@ -188,7 +191,7 @@ void *arg;
     Cmi_mype  = my_thread();
     Cmi_numpe =  usrparam->npe;
 
-    charm_main(usrparam->argc,usrparam->argv);
+    user_main(usrparam->argc,usrparam->argv);
 }
 
 
