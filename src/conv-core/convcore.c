@@ -2582,6 +2582,7 @@ void ConverseCommonInit(char **argv)
   }
 #endif
   CldModuleInit();
+  CrnInit();
 }
 
 void ConverseCommonExit(void)
