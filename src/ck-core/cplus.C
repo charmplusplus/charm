@@ -68,7 +68,9 @@ _CK_Object::~_CK_Object() {
 
 char *
 _CK_Object::showHeader(){
-  return("Default Header");  
+  char *ret  = (char *)malloc(sizeof(strlen("Default Header")));
+  strcpy(ret, "Default Header");
+  return(ret);  
 }
 
 char *
