@@ -122,7 +122,7 @@
 #define CPP_LOCATION "/usr/ccs/lib/cpp"
 
 #define CMK_BOOL_DEFINED				   0
-#define CMK_BOOL_UNDEFINED				   1
+#define CMK_BOOL_UNDEFINED				   0
 
 #endif
 
