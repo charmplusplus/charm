@@ -266,7 +266,7 @@ QuickThreads/libqt.a:
 	rm -f QuickThreads/libqt.a
 	cd QuickThreads ; make qt  OPTS='$(OPTS)'
 	cp QuickThreads/libqt.a ../lib/libckqt.a
-	-@ cp -r QuickThreads/libqt.a.dir libqt.a.dir ../lib/libckqt.a.dir
+	-@ cp -r QuickThreads/libqt.a.dir ../lib/libckqt.a.dir
 
 METIS:
 	cd libs/conv-libs/metis; make OPTS='$(OPTS)'
