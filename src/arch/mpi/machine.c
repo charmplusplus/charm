@@ -177,6 +177,8 @@ void CmiMemUnlock(void) {}
 #define CmiGetState() (&Cmi_state)
 #define CmiGetStateN(n) (&Cmi_state)
 
+void CmiYield(void) { sleep(0); }
+
 static void CmiStartThreads(char **argv)
 {
   CmiStateInit(Cmi_nodestart, 0, &Cmi_state);
@@ -336,6 +338,7 @@ static int MsgQueueEmpty()
   return 1;
 }
 
+#if CMK_SMP
 /**
 CommunicationServer calls MPI to send messages in the queues and probe message from network.
 */
@@ -361,6 +364,7 @@ static void CommunicationServer(int sleepTime)
     exit(0);   
   }
 }
+#endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
 char *CmiGetNonLocalNodeQ(void)
