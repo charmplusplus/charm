@@ -1,4 +1,4 @@
-\section{Inheritance and Templates in Charm++}
+\chapter{Inheritance and Templates in Charm++}
 \label{inheritance and templates}
 
 \charmpp\ 5.0 supports inheritance among \charmpp\ objects such as
@@ -6,7 +6,7 @@ chares, groups, and messages. This, along with facilities for generic
 programming using \CC\ style templates for \charmpp\ objects, is a
 major enhancement over the previous version of \charmpp.
 
-\subsection{Chare Inheritance}
+\section{Chare Inheritance}
 \index{inheritance}
 Chare inheritance makes it possible to remotely invoke methods of a base
 chare \index{base chare} from a proxy of a derived
@@ -93,7 +93,7 @@ chareID of the concrete derived chare. Invoking methods on this proxy
 object would invoke those methods remotely on the concrete derived
 class instance.
 
-\subsection{Inheritance for Messages}
+\section{Inheritance for Messages}
 \index{message inheritance}
 
 Similar to Chares, messages can also be derived from base messages. One needs
@@ -102,7 +102,7 @@ inheritance specification (that is, without the \kw{public} access specifier.)
 Message inheritance makes it possible to send a message of derived type to
 the method expecting a base class message.
 
-\subsection{Generic Programming Using Templates}
+\section{Generic Programming Using Templates}
 \index{templates}
 
 One can write ``templated'' code for Chares, Groups, Messages and other 

@@ -1,4 +1,4 @@
-\subsection{Chare Arrays}
+\section{Chare Arrays}
 
 Chare arrays \index{arrays} are arbitrarily-sized collections of chares.
 The entire array is has a globally unique identifier of type 
@@ -15,7 +15,7 @@ Array elements can be migrated, allowing arrays to be efficiently
 load balanced.  Array elements can also receive array broadcasts and
 contribute to array reductions.
 
-\subsubsection{Creating an Array}
+\subsection{Creating an Array}
 
 You can declare a one-dimentional \index{array}\index{chare array}chare array
 as:
@@ -57,7 +57,7 @@ information on the \kw{CkMigrateMessage}
 constructor. 
 
 
-\subsubsection{Inserting and Destroying Array Elements}
+\subsection{Inserting and Destroying Array Elements}
 
 You create an array using the \kw{CProxy\_Array::ckNew}
 routine.  You insert elements into the array with the
@@ -137,7 +137,7 @@ After destroying an element, you may insert a new element at
 its index.
 
 
-\subsubsection{Messages and Broadcasts}
+\subsection{Messages and Broadcasts}
 
 \charmpp contains direct support for 1D, 2D, 3D, and user-defined
 index arrays.  These arrays can be declared as:
@@ -218,7 +218,7 @@ simply omit the index, as:
 a3.e(new MyMsg(7)); //<- invokes e(7) on each array element
 \end{verbatim}
 
-\subsubsection{Migratable Array Elements}
+\subsection{Migratable Array Elements}
 Array objects can \index{migrate}migrate from one PE to another.
 For example, the load balancer (see section ``Load Balancing Chare Arrays'')
 might migrate array elements to better balance the load between
@@ -332,7 +332,7 @@ public:
 \end{verbatim}
 
 
-\subsubsection{Load Balancing Chare Arrays}
+\subsection{Load Balancing Chare Arrays}
 \charmpp includes a run-time load balancer which works
 on array elements.  The idea is to run programs more efficiently
 by migrating array elements away from overloaded processors.
@@ -362,7 +362,7 @@ a implemented as a global barrier.
 
 
 
-\subsubsection{Reductions on Chare Arrays}
+\subsection{Reductions on Chare Arrays}
 A \index{reduction}reduction applies a single operation (e.g. add,
 max, min, ...) to data items scattered across many processors and
 collects the result in one place.  \charmpp supports reductions on the
@@ -427,7 +427,7 @@ handler can use \uw{param}, \uw{dataSize}, and the data in any
 fashion; but the data will be deleted after the handler returns.
 
 
-\subsubsection{Built-in Array Reduction Types}
+\subsection{Built-in Array Reduction Types}
 \charmpp includes several built-in reduction types, used to combine the contributions from different array elements.  Any of them may be passed as an \kw{ArrayReductionFn} type to \kw{ArrayElement::contribute}.
 
 The first four reductions (sum, product, max, and min) work on int,
@@ -480,7 +480,7 @@ To extract the contribution of each array element from a reduction set, use the 
 
 The reduction set order is undefined.  Add a source field to your contribution if you need to know which array element gave a particular contribution.
 
-\subsubsection{Defining a new array index type}
+\subsection{Defining a new array index type}
 \charmpp array indices are arbitrary collections of bytes.
 To define a new array index, you create an ordinary C++ class 
 which inherits from \kw{CkArrayIndex} and overrides the \kw{getKey} method.  
@@ -539,7 +539,7 @@ AF::AF()
 \end{verbatim}
 
 
-\subsubsection{Array Syntax Changes}
+\subsection{Array Syntax Changes}
 The syntax for arrays changed in April, 2000 in the following ways:
 
 \begin{itemize}

@@ -1,86 +1,12 @@
-\documentclass[11pt]{article}
-
-\newif\ifpdf
-\ifx\pdfoutout\undefined
-  \pdffalse
-\else
-  \pdfoutput=1
-  \pdftrue
-\fi
-
-\ifpdf
-  \pdfcompresslevel=9
-  \usepackage[pdftex,colorlinks=true,plainpages=false]{hyperref}
-\else
-\fi
+\documentclass[10pt]{report}
 
 \usepackage{../pplmanual}
 \input{../pplmanual}
 
-%
-% Old page dimensions, superceded by pplmanual.sty
-% commented by Chee Wai 12/20/2000
-%
-%\usepackage{fullpage}
-%\pagestyle{headings}
-%\setlength{\parskip}{0.1in}
-%\setlength{\textheight}{9.5in}
-%\setlength{\textwidth}{6.5in}
-%\setlength{\parindent}{0in}
-%\setlength{\topmargin}{-.5in}
-%\parskip 0.1in
-
-%
-% Constants
-%
-% \version command superceded by pplmanual.sty
-% commented by Chee Wai 12/20/2000
-%
-%\newcommand{\version}{5.0}		%%% The current version number
-\newcommand{\prevversion}{4.9}	%%% The previous version number
-
-%
-% Commands
-%
-% \zap, \note command superceded by pplmanual.sty
-% commented by Chee Wai 12/20/2000
-%
-%\newcommand{\zap}[1]{ }
-\newcommand{\fcmd}{\bf}		%%% Font for Charm commands
-\newcommand{\fparm}{\it\sf}	%%% Font for parameters to Charm commands
-\newcommand{\fexec}{\bf}	%%% Font for compile/execute cmds/options
-\newcommand{\atitle}[1]{{\it #1}}
-\newcommand{\keyword}[1]{{\textbf{#1}}}
-\newcommand{\userword}[1]{{\fparm \textsf{#1}}}
-\newcommand{\constraint}[1]{Note: {\it #1}}
-%\newcommand{\note}[1]{Note: {\it #1}}
-
-%
-% Conveniences
-%
-% \uw and \kw superceded by new definitions in pplmanual.tex
-% commented by Chee Wai 12/20/2000
-% 
-%\newcommand{\uw}[1]{\userword{#1}}
-%\newcommand{\kw}[1]{\keyword{#1}}
-\newcommand{\CLocalBranch}{\keyword{CLocalBranch}}
-
-%
-%       \CC gives "C++" that looks good.
-%
-% all commands superceded by pplmanual.sty
-% commented by Chee Wai 12/20/2000
-%
-%\newcommand{\CC}{C\kern -0.0em\raise 0.5ex\hbox{\normalsize++}}
-%\newcommand{\emCC}{C\kern -0.0em\raise 0.4ex\hbox{\normalsize\em++}}
-%\newcommand{\charmpp}{{\sc Charm++}}
-
-\makeindex
-
 \title{The\\ \charmpp\\ Programming Language\\ Manual}
-\version{5.0}
+\version{5.5}
 \credits{
-The Charm software was developed as a group effort.  The earliest
+{\small The Charm software was developed as a group effort.  The earliest
 prototype, Chare Kernel(1.0), was developed by Wennie Shu and Kevin
 Nomura working with Laxmikant Kale.  The second prototype, Chare
 Kernel(2.0), a complete re-write with major design changes, was
@@ -99,17 +25,17 @@ interoperability among modules written using different paradigms
 within a single application. \charmpp\ runtime system was re-targetted
 at Converse. Syntactic extensions in \charmpp\ were dropped, and a
 simple interface translator was developed that, along with the \charmpp\
-runtime, became the \charmpp\ language.  The current version (5.0)
+runtime, became the \charmpp\ language.  The current version (5.5)
 includes a complete rewrite of the \charmpp\ runtime system (using \CC)
 and the interface translator (done by Milind Bhandarkar).  It also
 includes several new features such as Chare Arrays (developed by
-Robert Brunner), and various libraries (written by Terry Wilmarth,
+Robert Brunner and Orion Lawlor), and various libraries 
+(written by Terry Wilmarth,
 Gengbin Zheng, Laxmikant Kale, Zehra Sura, Milind Bhandarkar, Robert
 Brunner, and Krishnan Varadarajan.) A coordination language
 ``Structured Dagger'' has been implemented on top of \charmpp\ (Milind
-Bhandarkar), and included in this version.  IDL bindings for \charmpp\ 
-were developed by Jayant Desouza, Milind Bhandarkar and Gengbin
-Zheng. Several features have also been added to Converse. Dynamic
+Bhandarkar), and included in this version.  
+Several features have also been added to Converse. Dynamic
 seed-based load balancing has been implemented (Terry Wilmarth and
 Joshua Yelon), a client-server interface for Converse programs, and
 debugging support has been added (Parthasarathy Ramachandran, Jeff
@@ -120,39 +46,17 @@ Brunner), and SGI Origin2000 (Milind Bhandarkar).  The test suite for
 Hu. Projections, the performance visualization and analysis tool, was
 redesigned and rewritten using Java by Michael Denardo.
 }
+}
 
 \begin{document}
 
 \maketitle
 
-%\begin{titlepage}
-%\vspace*{2in}
-%\Huge
-%\begin{center}
-%The \\
-%\charmpp \\
-%Programming Language \\
-%Manual\\
-%\vspace*{0.5in}
-%Version 5.0\\
-%\vspace*{0.7in}
-%\today
-%\end{center}
-%\normalsize
-%\end{titlepage}
-
-%\input{ack}
-
-%\newpage
-%\tableofcontents
-
-\newpage
 \input{intro}
 
-\newpage
 \input{overview}
 
-\section{The \charmpp\ Language}
+\chapter{The \charmpp\ Language}
   \input{modules}	
   \input{messages}
   \input{seqobjs}
@@ -165,29 +69,16 @@ redesigned and rewritten using Java by Michael Denardo.
   \input{io}
   \input{othercalls}    
 
-\newpage
 \input{inhertmplt}
 
-\newpage
 \appendix
 
-\input{comprundebug}
-
 \input{keywords}
-
-\input{syntaxchange}
 
 \input{sdag}
 
 \input{further}
 
-\newpage
-\addtocontents{toc}{\contentsline {section}{\numberline {}References}{46}}
-\bibliographystyle{plain}
-\bibliography{group}
-
-\newpage
-\addtocontents{toc}{\contentsline {section}{\numberline {}Index}{47}}
 \input{index}
 
 \end{document}

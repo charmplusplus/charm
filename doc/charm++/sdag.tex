@@ -1,4 +1,4 @@
-\section{Structured Dagger}
+\chapter{Structured Dagger}
 
 \newcommand{\sdag}{Structured Dagger}
 \newcommand{\charm}{Charm}
@@ -188,7 +188,7 @@ xx\=xx\=xx\=xx\=xx\=xx\kill
 \label{figsdagexample}
 \end{figure}
 
-\sdag\ \cite{StructDaggerEURO96}  is a coordination language built on top of
+\sdag\ is a coordination language built on top of
 \charmpp\ that supports the sequencing mentioned above,
 while overcoming limitations of thread-based languages, and
 facilitating a clear expression of flow of control within the object
@@ -210,9 +210,9 @@ entries in \charmpp\ interface file. The implementation of the
 entry methods that contain the when-block is written using the \sdag\
 language. Grammar of \sdag\ is given in the EBNF form below.
 
-\subsection{Grammar}
+\section{Grammar}
 
-\subsubsection{Tokens}
+\subsection{Tokens}
 
 \begin{verbatim}
   <ident> = Valid C++ identifier 
@@ -220,7 +220,7 @@ language. Grammar of \sdag\ is given in the EBNF form below.
   <c++-code> = Valid C++ code 
 \end{verbatim}
 
-\subsubsection{Grammar in EBNF Form}
+\subsection{Grammar in EBNF Form}
 
 \begin{verbatim}
 <sdag> := <class-decl> <sdagentry>+ 

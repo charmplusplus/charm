@@ -1,6 +1,6 @@
-\subsection{Modules}
+\section{Modules}
 
-\subsubsection{Structure of a \charmpp\ Program}
+\subsection{Structure of a \charmpp\ Program}
 
 A \charmpp\ program is structurally similar to a C++ program.  Most of
 a \charmpp\ program {\em is} C++ code
@@ -134,7 +134,7 @@ will then print
 ``Hello World...'' and then call the \uw{Wait} method 
 of \uw{HelloMain}. The Wait method calls CkExit() after all group members have called it (i.e., they have finished printing ``Hello World...''), and the \charmpp program exits.
 
-\subsubsection{Functions in the ``decl.h'' and ``def.h'' files}
+\subsection{Functions in the ``decl.h'' and ``def.h'' files}
 
 	The \uw{decl.h} file provides declarations for the proxy classes of the concurrent objects declared in the ``.ci'' file (from which the \uw{decl.h} file is generated). So the \uw{Hello.decl.h} file will have the declaration of the class CProxy\_HelloMain. Similarly it will also have the declaration for the HelloGroup class. 
 

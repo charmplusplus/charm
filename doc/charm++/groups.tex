@@ -1,12 +1,12 @@
-\subsection{Group Objects}
+\section{Group Objects}
 
 A {\sl group\footnote{Originally called {\em Branch Office Chare} or 
 {\em Branched Chare}}} \index{group}is a collection of chares where 
 there exists \index{chare}one chare (or {\sl branch}) on each
 processor.   Each branch has its own data members.  Groups have
 a definition syntax similar to normal chares, except that they must
-inherit from the system defined class \keyword{Group}, rather than
-\keyword{Chare}.
+inherit from the system defined class \kw{Group}, rather than
+\kw{Chare}.
 
 In the interface file, we declare
 
@@ -42,7 +42,7 @@ can broadcast messages to all branches of a group.  There can be many
 instances corresponding to a group type.  Each instance has a
 different group handle, and its own set of branches.
 
-\subsubsection{Group Creation}
+\subsection{Group Creation}
 
 \noindent {\bf Chare Group Declaration}:
 
@@ -76,7 +76,7 @@ CkGroupID gid = CProxy_G::ckNew(m1);
 CProxy_G g(gid);
 \end{verbatim}
 
-\subsubsection{Method Invocation on Groups}
+\subsection{Method Invocation on Groups}
 
 Before sending a message to a \index{group}group via an entry
 method, we need to get a proxy of that group using the group identifier (a
