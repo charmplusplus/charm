@@ -9,6 +9,7 @@ qt: md/axp.h qt.c  md/axp.s
 	$(CC) -c -o qt.o qt.c
 	as -o qtmds.o md/axp.s
 	ar q libqt.a qt.o qtmds.o
+	$(CC) -shared -o libqt.so qt.o qtmds.o
 
 stp:
 	$(CC) -c stp.c
