@@ -1765,7 +1765,7 @@ FDECL void FTN_NAME(FEM_ADD_NODE,fem_add_node)
 	(int *localIdx,int *nBetween,int *betweenNodes)
 {
 	FEMAPI("FEM_add_node");
-	addNode(*localIdx-1,*nBetween-1,betweenNodes,1);
+	addNode(*localIdx-1,*nBetween,betweenNodes,1);	
 }
 
 //Item list exchange:
