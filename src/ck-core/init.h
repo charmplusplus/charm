@@ -15,7 +15,7 @@ class TableEntry {
   public:
     TableEntry(void) {init();}
     void init(void) { obj=0; pending=0; }
-    IrrGroup* getObj(void) { return obj; }
+    inline IrrGroup* getObj(void) { return obj; }
     void setObj(void *_obj) { obj=(IrrGroup *)_obj; }
     PtrQ* getPending(void) { return pending; }
     void enqMsg(void *msg) {
@@ -25,43 +25,24 @@ class TableEntry {
     }
 };
 
-// new GroupIdxArray
 template <class dtype>
 class GroupIdxArray {
-#if CMK_BLUEGENE_CHARM
-  enum {MAXBINSPE0=256,MAXBINSOTHER=0};			// MAXBINSOTHER is not used now
-#else
-  enum {MAXBINSPE0=256,MAXBINSOTHER=16};
-#endif
+  enum {MAXBINSPE0=256};
 
   dtype *tab;                           // direct entry table for processor 0
   CkHashtable_c hashTab;
   int max;
-
-  public:
-     GroupIdxArray() {tab=NULL;max=0;hashTab=NULL;}
-     void init(void) {
-      max = MAXBINSPE0;
-      tab = new dtype[max];
-      for(int i=0;i<max;i++)
-       tab[i].init();
-      hashTab=NULL;
-     }
-
-    dtype& find(CkGroupID n) {
+  
+  //This non-inline version of "find", below, allows the (much simpler)
+  // common case to be inlined.
+  dtype& nonInlineFind(CkGroupID n) {
 #ifndef CMK_OPTIMIZE
-       if (n.idx==0) CkAbort("Group ID is zero-- invalid!\n");
-       if (n.idx>=max) { CkAbort("Group ID is too large!\n");}
+      if (n.idx==0) CkAbort("Group ID is zero-- invalid!\n");
+      else if (n.idx>=max) { CkAbort("Group ID is too large!\n");}
+      else 
 #endif
-
-// TODO: make the table extensible. i.e. if (unsigned)n.idx<max then return tab[n.idx]
-// else if (n.idx<0)    then hashtable things
-// else extend the table
-
-      if(n.idx>0)
-        return tab[n.idx];
-      else
-      {
+      /*n.idx < 0*/
+      { /*Groups created on processors other than 0 go into a hashtable:*/
         if(hashTab == NULL)
                 hashTab = CkCreateHashtable_int(sizeof(dtype),17);
 
@@ -74,6 +55,29 @@ class GroupIdxArray {
         }
         return *ret;
       }
+   }
+
+  public:
+     GroupIdxArray() {tab=NULL;max=0;hashTab=NULL;}
+     ~GroupIdxArray() {delete[] tab; if (hashTab!=NULL) CkDeleteHashtable(hashTab);}
+     void init(void) {
+      max = MAXBINSPE0;
+      tab = new dtype[max];
+      for(int i=0;i<max;i++)
+       tab[i].init();
+      hashTab=NULL;
+     }
+
+     inline dtype& find(CkGroupID n) {
+
+// TODO: make the table extensible. i.e. if (unsigned)n.idx<max then return tab[n.idx]
+// else if (n.idx<0)    then hashtable things
+// else extend the table
+
+      if(n.idx>0 && n.idx<MAXBINSPE0)
+        return tab[n.idx];
+      else
+        return nonInlineFind(n);
     }
 };
 
