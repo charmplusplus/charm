@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-09-19 23:10:24  jyelon
+ * Revision 2.12  1996-06-28 21:28:09  jyelon
+ * Added special code for simulator version.
+ *
+ * Revision 2.11  1995/09/19 23:10:24  jyelon
  * added function pointer to 'StartCharm' arglist.
  *
  * Revision 2.10  1995/09/19  17:56:25  sanjeev
@@ -61,11 +64,11 @@ static char ident[] = "@(#)$Header$";
 #include "converse.h"
 
 
+#ifdef CMK_USE_STANDARD_DEFAULT_MAIN
+
 CpvExtern(int, numHeapEntries);
 CpvExtern(int, numCondChkArryElts);
 CpvExtern(int, CsdStopFlag);
-
-
 
 user_main(argc, argv)
 int argc;
@@ -83,4 +86,53 @@ char *argv[];
   EndCharm();
   ConverseExit() ;
 }
+
+#endif
+
+#ifdef CMK_USE_SIMULATOR_DEFAULT_MAIN
+
+CpvExtern(int, numHeapEntries);
+CpvExtern(int, numCondChkArryElts);
+CpvExtern(int, CsdStopFlag);
+CsvExtern(int, CsdStopCount);
+
+void defaultmainModuleInit()
+{
+}
+
+user_main(argc, argv)
+int argc;
+char *argv[];
+{
+  int i;
+
+
+  for(i=0; i<CmiNumPes(); i++) 
+  {
+        CmiUniContextSwitch(i); 
+        InitializeCharm(argv);
+  }
+
+  for(i=0; i<CmiNumPes(); i++) {CmiUniContextSwitch(i); ConverseInit(argv); }
+
+  for(i=0; i<CmiNumPes(); i++) {
+          CmiUniContextSwitch(i); 
+          StartCharm(argv, (void *)0); 
+  }
+
+  for(i=0; i<CmiNumPes(); i++) {CmiUniContextSwitch(i);CpvAccess(CsdStopFlag)=0;}
+  CsvAccess(CsdStopCount) = CmiNumPes();
+  CmiUniContextSwitch(0);
+  CsdUniScheduler(-1) ;
+
+  for(i=0; i<CmiNumPes(); i++) { CmiUniContextSwitch(i); CkEndCharm();}
+  for(i=0; i<CmiNumPes(); i++) {CmiUniContextSwitch(i);CpvAccess(CsdStopFlag)=0;}
+  CsvAccess(CsdStopCount) = CmiNumPes();
+  CmiUniContextSwitch(0);
+  CsdUniScheduler(-1) ;
+
+  for(i=0; i<CmiNumPes(); i++) { CmiUniContextSwitch(i); ConverseExit() ;}
+}
+
+#endif
 
