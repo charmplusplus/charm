@@ -173,7 +173,7 @@ void _loadbalancerInit()
 
   // set up init value for LBPeriod time in seconds
   // it can also be set calling LDSetLBPeriod()
-  CmiGetArgDoubleDesc(argv,"+LBPeriod", &_lb_args.lbperiod(),"specify the period for automatic load balancing in seconds (for non atSync mode)");
+  CmiGetArgDoubleDesc(argv,"+LBPeriod", &_lb_args.lbperiod(),"the minimum time period in seconds allowed for two consecutive automatic load balancing");
 
   // now called in cldb.c: CldModuleGeneralInit()
   // registerLBTopos();
