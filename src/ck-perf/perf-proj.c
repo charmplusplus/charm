@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-07-27 20:48:27  jyelon
+ * Revision 2.6  1995-09-22 20:44:02  sanjeev
+ * bug fixes for working with new runtime
+ *
+ * Revision 2.5  1995/07/27  20:48:27  jyelon
  * *** empty log message ***
  *
  * Revision 2.4  1995/07/12  21:36:20  brunner
@@ -58,7 +61,6 @@ static char ident[] = "@(#)$Header$";
 #undef MAIN_PERF
 
 CpvDeclare(char*,pgm);
-CpvDeclare(char*,machine);
 
 CpvExtern(int,RecdPerfMsg);
 
@@ -86,14 +88,14 @@ CpvDeclare(FILE*,state_file_fd);
 CpvExtern(int,chareCount);
 CpvExtern(int,pseudoCount);
 CpvExtern(int,msgCount);
+CpvExtern(int, chareEpsCount);
+
+
 
 perfModuleInit(prog_name)
 char *prog_name;
 {
-  char nodename[80];
-
   CpvInitialize(char*,pgm);
-  CpvInitialize(char*,machine);
   CpvInitialize(char*,log_file_name);
   CpvInitialize(int,current_event);
   CpvInitialize(LOGARR,logbuf);
@@ -106,8 +108,8 @@ char *prog_name;
   CpvInitialize(int,begin_event);
   CpvInitialize(un_int,begin_processing_time);
   CpvInitialize(FILE*,state_file_fd);
-  sprintf(nodename,"%d",CmiMyPe());
-  program_name(prog_name,nodename);
+
+  program_name(prog_name);
 }
 
 void PrintStsFile(str)
@@ -341,45 +343,51 @@ close_log()
 		strcat(state_file, ".sts");
 		CpvAccess(state_file_fd) = (FILE *) fopen(state_file, "w");
 		
+		CmiPrintf("Creating %s file\n",state_file) ;
 
-		fprintf(CpvAccess(state_file_fd), "MACHINE %s\n", CpvAccess(machine));
+		fprintf(CpvAccess(state_file_fd), "MACHINE %s\n",CMK_MACHINE_NAME );
 		fprintf(CpvAccess(state_file_fd), "PROCESSORS %d\n", CmiNumPe());
-		fprintf(CpvAccess(state_file_fd), "TOTAL_CHARES %d\n", CpvAccess(chareCount));
+		fprintf(CpvAccess(state_file_fd), "TOTAL_CHARES %d\n", 
+													CpvAccess(chareCount));
 		fprintf(CpvAccess(state_file_fd), "TOTAL_EPS %d\n", 
-		   /*	  TotalEps+TotalBocEps+1);   */
-		   	  TotalEps+1);   
+					   	  CpvAccess(chareEpsCount)+1);   
 
-		fprintf(CpvAccess(state_file_fd), "TOTAL_MSGS %d\n", CpvAccess(msgCount));
-		fprintf(CpvAccess(state_file_fd), "TOTAL_PSEUDOS %d\n", CpvAccess(pseudoCount)-1);
+		fprintf(CpvAccess(state_file_fd), "TOTAL_MSGS %d\n", 
+												CpvAccess(msgCount));
+		fprintf(CpvAccess(state_file_fd), "TOTAL_PSEUDOS %d\n", 
+												CpvAccess(pseudoCount));
 
-        	for (i=0; i<CpvAccess(chareCount)-1; i++)
-           		fprintf(CpvAccess(state_file_fd), "CHARE %d %s\n",
-			 	i, ChareNamesTable[i]);
+		/* first 3 chares are NULLCHARE, CkChare_ACC, CkChare_MONO */
+		for (i=0; i<CpvAccess(chareCount); i++)
+			fprintf(CpvAccess(state_file_fd), "CHARE %d %s\n", i, 
+										CsvAccess(ChareNamesTable)[i]);
 
-       		for (i=CsvAccess(NumSysBocEps); i<TotalEps; i++) {
-		    if ( EpChareTypeTable[i] == CHARE ) {
-           			fprintf(CpvAccess(state_file_fd), "ENTRY CHARE %d %s %d %d\n",
-               			i, EpNameTable[i], EpChareTable[i],
-						EpToMsgTable[i]);
+   		for (i=CsvAccess(NumSysBocEps); i<CpvAccess(chareEpsCount); i++) {
+		    if ( CsvAccess(EpInfoTable)[i].chare_or_boc == CHARE ) {
+       			fprintf(CpvAccess(state_file_fd), "ENTRY CHARE %d %s %d %d\n",
+               			i, CsvAccess(EpInfoTable)[i].name, 
+						CsvAccess(EpInfoTable)[i].chareindex,
+						CsvAccess(EpInfoTable)[i].messageindex);
 		    }
 		    else {
-           			fprintf(CpvAccess(state_file_fd), "ENTRY BOC %d %s %d %d\n",
-               		i, EpNameTable[i], EpChareTable[i],
-					EpToMsgTable[i]);
+       			fprintf(CpvAccess(state_file_fd), "ENTRY BOC %d %s %d %d\n",
+               		i, CsvAccess(EpInfoTable)[i].name, 
+					CsvAccess(EpInfoTable)[i].chareindex,
+					CsvAccess(EpInfoTable)[i].messageindex);
 		    }
 		}
 
-       		for (i=0; i<CpvAccess(msgCount); i++)
-           			fprintf(CpvAccess(state_file_fd), "MESSAGE %d %d\n",
-               		i, MsgToStructTable[i].size);
+   		for (i=0; i<CpvAccess(msgCount); i++)
+   			fprintf(CpvAccess(state_file_fd), "MESSAGE %d %d\n",
+               					i, CsvAccess(MsgToStructTable)[i].size);
 
-       		for (i=0; i<CpvAccess(pseudoCount)-1; i++)
-           			fprintf(CpvAccess(state_file_fd), "PSEUDO %d %d %s\n",
-               			i, PseudoTable[i].type,
-						PseudoTable[i].name);
+   		for (i=0; i<CpvAccess(pseudoCount); i++)
+   			fprintf(CpvAccess(state_file_fd), "PSEUDO %d %d %s\n",
+               					i, CsvAccess(PseudoTable)[i].type,
+								CsvAccess(PseudoTable)[i].name);
 
 
-         	fprintf(CpvAccess(state_file_fd), "END\n");
+   		fprintf(CpvAccess(state_file_fd), "END\n");
 		fflush(CpvAccess(state_file_fd));
 		fclose(CpvAccess(state_file_fd));
 	}
@@ -389,14 +397,11 @@ close_log()
 /***********************************************************************/ 
 /***  This function is used to determine the name of the program.     **/
 /***********************************************************************/ 
-
-program_name(s, m)
-char *s, *m;
+program_name(s)
+char *s;
 {
 	CpvAccess(pgm) = (char *) malloc(strlen(s) + 1);
 	strcpy(CpvAccess(pgm), s);
-	CpvAccess(machine) = (char *) malloc(strlen(m) + 1);
-	strcpy(CpvAccess(machine), m);
 }
 
 
