@@ -1,5 +1,6 @@
 #include "image.h"
-#include "stdlib.h"
+#include <stdlib.h>
+#include <string.h>
 #include "iostream.h"
 
 // Constructor Methods
