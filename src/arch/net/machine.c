@@ -1039,7 +1039,7 @@ static OtherNode  nodes;        /* Indexed only by ``node number'' */
 
 static volatile int          Cmi_shutdown_initiated;
 static CmiNodeLock  Cmi_scanf_mutex;
-static char        *Cmi_scanf_data;
+static volatile char        *Cmi_scanf_data;
 static double       Cmi_clock;
 
 /****************************************************************************
