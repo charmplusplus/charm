@@ -212,6 +212,10 @@ static Slot *Slot_fmUser(void *user) {
 
 /********** meta_ routines ***********/
 
+/* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
+#include "memory-gnu.c"
+
+
 /*Return the system page size*/
 static int meta_getpagesize(void)
 {
@@ -224,14 +228,9 @@ static int meta_getpagesize(void)
 	return cache;
 }
 
-
-/* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
-#include "memory-gnu.c"
-
-
 static void meta_init(char **argv)
 {
-  CmiPrintf("Converse -memory mode: wary\n");
+  CmiPrintf("[%d] Converse -memory mode: paranoid\n",CmiMyPe());
 }
 
 static void *meta_malloc(size_t size)
