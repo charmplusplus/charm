@@ -150,6 +150,7 @@ typedef struct CthThreadBase
   int aliasStackHandle; /* handle for aliased stack */
   void      *stack; /*Pointer to thread stack*/
   int        stacksize; /*Size of thread stack (bytes)*/
+	struct CthThreadListener *listener; /* pointer to the first of the listeners */
 } CthThreadBase;
 
 /*Macros to convert between base and specific thread types*/
@@ -345,6 +346,8 @@ static void CthThreadBaseInit(CthThreadBase *th)
   th->tid.id[0] = CmiMyPe();
   th->tid.id[1] = serialno++;
   th->tid.id[2] = 0;
+	
+	th->listener = NULL;
 }
 
 static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useMigratable)
@@ -369,6 +372,15 @@ static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useMigratable
 }
 static void CthThreadBaseFree(CthThreadBase *th)
 {
+	/* Call the free function pointer on all the listeners on
+			this thread and also delete the thread listener objects
+	*/
+	struct CthThreadListener *l,*lnext;
+	for(l=th->listener;l!=NULL;l=lnext){
+			l->free(l);
+			lnext=l->next;
+			free(l);
+	}
   free(th->data);
   if (th->isMigratable) {
 #if CMK_THREADS_ALIAS_STACK
@@ -474,6 +486,10 @@ void CthSetStrategy(CthThread t, CthAwkFn awkfn, CthThFn chsfn)
 
 static void CthBaseResume(CthThread t)
 {
+	struct CthThreadListener *l;
+	for(l=B(t)->listener;l!=NULL;l=l->next){
+			l->resume(l);
+	}
   CpvAccess(_numSwitches)++;
   CthFixData(t); /*Thread-local storage may have changed in other thread.*/
   CthCpvAccess(CthCurrent) = t;
@@ -500,6 +516,14 @@ void CthSuspend(void)
   if (cur->suspendable == 0)
     CmiAbort("Fatal Error> trying to suspend a non-suspendable thread!\n");
   
+	/*
+		Call the suspend function on listeners
+	*/
+	struct CthThreadListener *l;
+	for(l=cur->listener;l!=NULL;l=l->next){
+			l->suspend(l);
+	}
+	
   if (cur->choosefn == 0) CthNoStrategy();
   next = cur->choosefn();
 #ifndef CMK_OPTIMIZE
@@ -547,6 +571,24 @@ void CthYieldPrio(int s, int pb, unsigned int *prio)
   CthSuspend();
 }
 
+/*
+	Add a new thread listener to a thread 
+*/
+void CthAddListener(CthThread t,struct CthThreadListener *l){
+		struct CthThreadListener *p=B(t)->listener;
+		if(p== NULL){
+			B(t)->listener=l;
+			l->thread = t;
+			l->next=NULL;
+			return;	
+		}
+		while(p->next != NULL){
+			p = p->next;
+		}
+		p->next = l;
+		l->next = NULL;
+		l->thread = t;
+}
 
 /*************************** Stack-Copying Threads (obsolete) *******************
 Basic idea: switch from thread A (currently running) to thread B by copying
@@ -573,7 +615,7 @@ typedef struct CthThreadStruct
   qt_t      *savedstack; /* pointer to saved stack */
   int        savedsize;  /* length of saved stack (zero when running) */	
   int        stacklen;   /* length of the allocated savedstack >= savedsize */
-  qt_t      *savedptr;   /* stack pointer */
+  qt_t      *savedptr;   /* stack pointer */	
 } CthThreadStruct;
 
 CthThread CthPup(pup_er p, CthThread t)
@@ -625,7 +667,8 @@ void CthFree(t)
 CthThread t;
 {
   if (t==NULL) return;
-  CthProcInfo proc = CthCpvAccess(CthProc);
+  CthProcInfo proc = CthCpvAccess(CthProc);	
+
   if (t != CthSelf()) {
     CthThreadFree(t);
   } else

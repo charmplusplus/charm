@@ -1,6 +1,6 @@
 /*****************************************************************************
  * $Source$
- * $Author$
+ * $Author$ 
  * $Date$
  * $Revision$
  *****************************************************************************/
@@ -877,6 +877,53 @@ void CtgInstall(CtgGlobals g);
 CtgGlobals CtgPup(pup_er, CtgGlobals g);
 /** Delete this (not currently installed) set of globals. */
 void CtgFree(CtgGlobals g);
+
+/* The thread listener structure. The user must register one such listener
+	if he wants to find out when a thread is suspended or when it starts running
+	or gets destroyed. It can be used for tracing etc.
+*/
+
+struct CthThreadListener;
+
+typedef void (*CthThreadListener_suspend)(struct CthThreadListener *l);
+typedef void (*CthThreadListener_resume)(struct CthThreadListener *l);
+typedef void (*CthThreadListener_free)(struct CthThreadListener *l);
+
+struct CthThreadListener {
+       /** This thread is about to block. */
+       CthThreadListener_suspend suspend;
+
+       /** This thread is about to begin execution after blocking. */
+       CthThreadListener_resume resume;
+
+       /** This thread is being destroyed.  Should also
+       free this listener struct.
+       */
+       CthThreadListener_free free;
+
+       /** Pointer to listener-specific data (if needed).
+           Set by listener.
+       */
+       void *data;
+
+       /** Pointer to the thread this listener controls.
+           Set by CthAddListener.
+        */
+       CthThread thread;
+
+       /** The next listener, or NULL at end of chain.
+           Set by CthAddListener, and used only by threads.c.
+       */
+       struct CthThreadListener *next;
+};
+/**
+  This listener is about to begin receiving suspend and
+resume events for this thread.  "suspend", "resume", "free",
+and "data" fields must all already be set.  When this thread
+exits, l->free will be called on this listener, which should
+deallocate the listener memory.
+*/
+void CthAddListener(CthThread th,struct CthThreadListener *l);
 
 
 /****** CTH: THREAD-PRIVATE VARIABLES ******/
