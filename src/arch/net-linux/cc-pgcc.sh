@@ -1,8 +1,0 @@
-CMK_CPP_C='pgcc -E '
-CMK_CC='pgcc '
-CMK_CC_RELIABLE='gcc '
-CMK_CC_FASTEST='pgcc '
-CMK_CXX='pgCC '
-CMK_CXXPP='pgCC -E '
-CMK_LD='pgcc'
-CMK_LDXX='pgCC'

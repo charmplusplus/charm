@@ -1,8 +1,0 @@
-CMK_CPP_C='icc -E '
-CMK_CC='icc '
-CMK_CC_RELIABLE='icc '
-CMK_CC_FASTEST='icc '
-CMK_CXX='icpc '
-CMK_CXXPP='icpc -E '
-CMK_LD='icc -static'
-CMK_LDXX='icpc -static'
