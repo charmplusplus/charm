@@ -723,7 +723,7 @@ if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
                       $BAL_OBJ $OBJECTFILES $LIBRARIES \
 		      CHARMC-MOD.TMP.o -lck-core -lck-trace-$TRACEMODE \
                       -lck-cplus-n -lconv-cplus-n -lconv-core \
-		      -lck-defmain-std -lcharm $CMK_LIBS -lm)
+		      -lck-defmain-std -lcharm -lm $CMK_LIBS)
     else if ($LANGUAGE == charm++) then
 	echo '_CK_module_init_fn() {}' > CHARMC-MOD.TMP.c
 	($ECHOCMD ; $CMK_CC $OPTS_CC -c -o CHARMC-MOD.TMP.o CHARMC-MOD.TMP.c)
@@ -731,7 +731,7 @@ if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
 		      $BAL_OBJ $OBJECTFILES $LIBRARIES \
 		      CHARMC-MOD.TMP.o -lck-core -lck-trace-$TRACEMODE \
                       -lck-cplus-y -lconv-cplus-y -lconv-core \
-		      -lck-defmain-cpp -lcharm $CMK_LIBS -lm)
+		      -lck-defmain-cpp -lcharm -lm $CMK_LIBS)
     endif
     rm -f CHARMC-PRE.TMP.nm
     strings -a CHARMC-PRE.TMP.xxx | awk '/^charmc autoinit / { print $3; }' > CHARMC-PRE.TMP.nm
@@ -759,26 +759,26 @@ switch ($LANGUAGE)
                       CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
                       $LIBRARIES -lck-core -lck-trace-$TRACEMODE \
                       -lck-cplus-n -lconv-cplus-n -lconv-core \
-		      -lck-defmain-std -lcharm $CMK_LIBS -lm)
+		      -lck-defmain-std -lcharm -lm $CMK_LIBS)
         breaksw
     case "charm++"
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \
 		      CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
                       $LIBRARIES -lck-core -lck-trace-$TRACEMODE \
                       -lck-cplus-y -lconv-cplus-y -lconv-core \
-		      -lck-defmain-cpp -lcharm $CMK_LIBS -lm)
+		      -lck-defmain-cpp -lcharm -lm $CMK_LIBS)
         breaksw
     case "converse"
         ($ECHOCMD ; $CMK_LD $OPTS_LD -o $OBJECT -L$CHARMLIB \
 		      $OBJECTFILES $LIBRARIES -lconv-cplus-n -lconv-core\
 		      -lck-trace-$TRACEMODE \
-		      $CMK_LIBS -lm)
+		      -lm $CMK_LIBS)
         breaksw
     case "converse++"
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \
 		      $OBJECTFILES $LIBRARIES -lconv-cplus-y -lconv-core \
 		      -lck-trace-$TRACEMODE \
-		      $CMK_LIBS -lm)
+		      -lm $CMK_LIBS)
         breaksw
 endsw
 

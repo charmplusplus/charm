@@ -1869,7 +1869,7 @@ void gen_func_recv()
 	gen_dimension_required();
       fprintf(file_cpm, "CpmA%d = (%s *)(CpmX+(CpmS->f%d));\n", i, func_args[i], i);
       fprintf(file_cpm, "for (i=0; i<CpmA%d; i++) {\n", i-1);
-      fprintf(file_cpm, "  CpmA%d[i] = CpmM + (unsigned int)(CpmA%d[i]);\n", i, i);
+      fprintf(file_cpm, "  CpmA%d[i] = CpmM + (size_t)(CpmA%d[i]);\n", i, i);
       fprintf(file_cpm, "  CpmPtrUnpack_%s(CpmA%d[i]);\n", func_args[i], i);
       fprintf(file_cpm, "}\n");
       break;

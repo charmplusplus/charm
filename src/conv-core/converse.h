@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.74  1997-10-29 18:47:05  jyelon
+ * Revision 2.75  1997-11-26 19:17:24  milind
+ * Fixed some portability bugs due to varying integer and pointer sizes.
+ *
+ * Revision 2.74  1997/10/29 18:47:05  jyelon
  * Added CmiHandlerToFunction
  *
  * Revision 2.73  1997/07/31 00:28:25  jyelon
@@ -263,6 +266,54 @@ extern void CmiNodeBarrier();
 #define CmiSvAlloc CmiAlloc
 
 typedef int *CmiNodeLock;
+extern CmiNodeLock  CmiCreateLock(void);
+extern void         CmiLock(CmiNodeLock lock);
+extern void         CmiUnlock(CmiNodeLock lock);
+extern int          CmiTryLock(CmiNodeLock lock);
+extern void         CmiDestroyLock(CmiNodeLock lock);
+
+#endif
+
+#if CMK_SHARED_VARS_PTHREADS
+
+#include <pthread.h>
+#include <sched.h>
+
+extern int CmiMyPe();
+extern int Cmi_numpes;
+
+#define CmiNumPes()            Cmi_numpes
+#define CmiMyRank()            CmiMyPe()
+#define CmiMyNodeSize()        Cmi_numpes
+#define CmiMyNode()            0
+#define CmiNumNodes()          1
+#define CmiNodeFirst(node)     0
+#define CmiNodeSize(node)      Cmi_numpes
+#define CmiNodeOf(pe)          0
+#define CmiRankOf(pe)          (pe)
+
+#define SHARED_DECL
+
+#define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvInitialize(t,v)\
+  { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0) sched_yield();\
+    else { CMK_CONCAT(Cpv_Var_,v)=(t*)CmiAlloc(sizeof(t)*CmiMyNodeSize()); }}
+#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
+
+#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
+#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
+#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
+#define CsvInitialize(t,v)
+#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
+
+extern void CmiMemLock();
+extern void CmiMemUnlock();
+extern void CmiNodeBarrier();
+#define CmiSvAlloc CmiAlloc
+
+typedef pthread_mutex_t *CmiNodeLock;
 extern CmiNodeLock  CmiCreateLock(void);
 extern void         CmiLock(CmiNodeLock lock);
 extern void         CmiUnlock(CmiNodeLock lock);
