@@ -853,7 +853,7 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 	firstFree=localLen=0;
 	duringMigration=CmiFalse;
 	nSprings=0;
-	CcdCallOnConditionKeepOnPE(CcdPERIODIC_100ms,staticSpringCleaning,(void *)this, CkMyPe());
+	CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
 
 //Register with the map object
 	mapID=mapID_;
