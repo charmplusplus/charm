@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1997-07-15 21:09:58  jyelon
+ * Revision 2.11  1997-07-17 15:51:40  milind
+ * Fixed module initialization on SP3.
+ *
+ * Revision 2.10  1997/07/15 21:09:58  jyelon
  * Got rid of the ^$#*&&$ NM stuff once and for all!
  *
  * Revision 2.9  1997/03/18 20:25:57  milind
@@ -270,6 +273,7 @@ void GenerateStructsFns()
 
 	epfile = headerfile ;
 
+        fprintf(epfile, "extern char *_CK_%s_id;\n",CoreName);
 /* Output all chare and boc names */
 	for ( i=0; i<=charecount; i++ ) {
 		if ( ChareTable[i]->eps != NULL )
@@ -292,7 +296,7 @@ void GenerateStructsFns()
 			thisismain = 1 ;
 		if ( chare->eps->defined ) {
 		    for  ( ep=chare->eps; ep!=NULL; ep=ep->next,TotalEps++ ) {
-			fprintf(epfile,"\tint _CK_ep_%s_%s =0 ;\n",chare->name,ep->epname) ;
+			fprintf(epfile,"\tint _CK_ep_%s_%s = _CK_%s_id[0] ;\n",chare->name,ep->epname,CoreName) ;
 			if (thisismain && strcmp(ep->epname,"main")==0) {
         			foundMain = 1 ;
                 		fprintf(outfile,"\nextern \"C\" void _CK_call_main_main(void *junk, void *obj, int argc, char *argv[]) ;\n");

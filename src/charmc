@@ -729,7 +729,7 @@ if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
                       -lck-cplus-y -lconv-cplus-y -lconv-core -lck-defmain-cpp\
 		      $CMK_LIBS -lm)
     endif
-    strings CHARMC-PRE.TMP.xxx | awk '/^charmc autoinit / { print $3; }' > CHARMC-PRE.TMP.nm
+    strings -a CHARMC-PRE.TMP.xxx | awk '/^charmc autoinit / { print $3; }' > CHARMC-PRE.TMP.nm
     if ($status) goto failure
     sort < CHARMC-PRE.TMP.nm | uniq > CHARMC-MOD.TMP.dat
     echo 'Charm Modules: '`cat CHARMC-MOD.TMP.dat`

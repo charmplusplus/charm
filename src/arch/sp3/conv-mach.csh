@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.2  1997-07-09 21:06:25  milind
+# Revision 1.3  1997-07-17 15:51:43  milind
+# Fixed module initialization on SP3.
+#
+# Revision 1.2  1997/07/09 21:06:25  milind
 # Fixed the nm bug on SP3. Charm module finding still seems to be broken.
 # Will try to fix it soon.
 #
@@ -97,7 +100,7 @@
 set CMK_CPP_CHARM    = '/usr/lib/cpp -P -D_NO_PROTO '
 set CMK_CPP_C        = '/usr/lib/cpp -P -D_NO_PROTO '
 set CMK_LDRO         = 'ld -r -o '
-set CMK_LDRO_WORKS   = 1
+set CMK_LDRO_WORKS   = 0
 set CMK_CC           = 'mpcc '
 set CMK_CC_RELIABLE  = 'mpcc '
 set CMK_CC_FASTEST   = 'mpcc '
@@ -108,8 +111,8 @@ set CMK_C_DEBUG      = '-g'
 set CMK_C_OPTIMIZE   = '-O3 -qstrict -Q -qarch=pwr -qtune=pwr  '
 set CMK_CXX_DEBUG    = '-g'
 set CMK_CXX_OPTIMIZE = '-O3 -qstrict -Q -qarch=pwr -qtune=pwr  '
-set CMK_LD           = 'mpcc  -w '
-set CMK_LDXX         = 'mpCC  -w '
+set CMK_LD           = 'mpcc -w -u_CK7CharmInit'
+set CMK_LDXX         = 'mpCC  -w -u_CK_call_main_main'
 set CMK_LD77         = ''
 set CMK_M4           = 'm4'
 set CMK_SUF          = 'o'

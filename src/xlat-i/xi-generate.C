@@ -95,6 +95,9 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
   bot << "CpvExtern(CHARE_BLOCK *,currentChareBlock);" << endl ;
 //  bot << "#endif\n";
 
+  sprintf(str,"extern char *_CK_%s_id;", thismodule->name);
+  top << str << endl;
+
   /* Output all chare and EP id variables. Note : if this chare is not
      defined in this module, put "extern" and dont initialize.  */
 
@@ -103,7 +106,7 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
     sprintf(str,"extern int _CK_chare_%s ;",c->name) ;
     top << str << endl ;
     if (!c->isExtern()){
-      sprintf(str,"int _CK_chare_%s = 0 ;",c->name) ;
+      sprintf(str,"int _CK_chare_%s = _CK_%s_id[0];",c->name, thismodule->name) ;
       bot << str << endl ;
     }
 
@@ -111,7 +114,7 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
       sprintf(str,"extern int _CK_ep_%s_%s;",c->name,e->name) ;
       top << str << endl ;
       if (!c->isExtern()) {
-        sprintf(str,"int _CK_ep_%s_%s = 0 ;",c->name,e->name) ;
+        sprintf(str,"int _CK_ep_%s_%s = _CK_%s_id[0] ;",c->name,e->name,thismodule->name) ;
         bot << str << endl ;
       }
     } // endfor e
@@ -127,6 +130,8 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
       // If this is the main::main EP
       if ( strcmp(c->name,"main")==0 && 
             strcmp(e->name,"main")==0 ) {
+        bot << "extern \"C\" void _CK_call_main_main(void *m, void *obj, ";
+	bot << "int argc, char *argv[]);" << endl ;
         bot << "void _CK_call_main_main(void *m, void *obj, ";
 	bot << "int argc, char *argv[])" << endl ;
         bot << "{" << endl ;
