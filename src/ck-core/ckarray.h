@@ -80,6 +80,12 @@ public: short int index[6];
 	CkArrayIndex6D(short int i0,short int i1,short int i2,short int i3,short int i4,short int i5) {
 		index[0]=i0;index[1]=i1;index[2]=i2;index[3]=i3;index[4]=i4;index[5]=i5;nInts=3;
 	}
+	CkArrayIndex6D &operator=(const CkArrayIndex6D &that)  {
+		CmiAssert(that.nInts == 3);
+		nInts = that.nInts;
+		memcpy(index, that.index, sizeof(short int)*6);;
+		return *this;
+	}
 };
 
 /** A slightly more complex array index: the key is an object
