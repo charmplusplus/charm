@@ -376,6 +376,7 @@ chunk::chunk(void)
   seqnum = 1;
   wait_for = 0;
   tid = 0;
+  valid_udata = 0;
 }
 
 void
@@ -716,6 +717,104 @@ chunk::readChunk(ChunkMsg *msg)
 }
 
 void
+chunk::pup(PUP::er &p)
+{
+  ArrayElement1D::pup(p);
+  p(numNodes);
+  p(numElems);
+  p(numPes);
+  p(numNodesPerElem);
+  if(p.isUnpacking())
+  {
+    gNodeNums = new int[numNodes];
+    isPrimary = new int[numNodes];
+    gElemNums = new int[numElems];
+    conn = new int[numElems*numNodesPerElem];
+    peNums = new int[numPes];
+    numNodesPerPe = new int[numPes];
+    gPeToIdx = new int[numElements];
+    nodesPerPe = new int*[numPes];
+  }
+  p(gNodeNums, numNodes);
+  p(isPrimary, numNodes);
+  p(gElemNums, numElems);
+  p(conn, numElems*numNodesPerElem);
+  p(peNums, numPes);
+  p(numNodesPerPe,numPes);
+  int i;
+  for(i=0;i<numPes;i++)
+  {
+    if(p.isUnpacking())
+      nodesPerPe[i] = new int[numNodesPerPe[i]];
+    p(nodesPerPe[i], numNodesPerPe[i]);
+    if(p.isPacking())
+      delete[] nodesPerPe[i];
+  }
+  p(gPeToIdx, numElements);
+  if(p.isPacking())
+  {
+    delete[] gNodeNums;
+    delete[] isPrimary;
+    delete[] gElemNums;
+    delete[] conn;
+    delete[] peNums;
+    delete[] numNodesPerPe;
+    delete[] gPeToIdx;
+    delete[] nodesPerPe;
+  }
+  p(ntypes);
+  p((void*)dtypes, MAXDT*sizeof(DType));
+  if(p.isUnpacking())
+    messages = CmmNew();
+  if(p.isPacking())
+  {
+    DataMsg *dm;
+    int snum = CmmWildCard;
+    CProxy_chunk cp(thisArrayID);
+    while (dm = (DataMsg*)CmmGet(messages, 1, &snum, 0))
+      cp[thisIndex].recv(dm);
+  }
+  p(wait_for);
+  if(p.isSizing())
+    tsize = CthPackBufSize(tid);
+  p(tsize);
+  if(p.isPacking())
+  {
+    CthPackThread(tid,p.getBuf());
+    p.advance(tsize);
+  }
+  if(p.isUnpacking())
+  {
+    tid = CthUnpackThread(p.getBuf());
+    p.advance(tsize);
+    CthAwaken(tid);
+    // FIXME: we have to somehow set the _femptr Ctv variable of tid to this.
+  }
+  p(seqnum);
+  p(nRecd);
+  // update should not be in progress when migrating, so curbuf is not valid
+  p(doneCalled);
+  // fp is not valid, because it has been closed a long time ago
+  p(valid_udata);
+  if(valid_udata != 0)
+  {
+    if(p.isSizing())
+      usize = pksz(userdata);
+    p(usize);
+    if(p.isPacking())
+    {
+      pk(userdata,p.getBuf());
+      p.advance(usize);
+    }
+    if(p.isUnpacking())
+    {
+      userdata = upk(p.getBuf());
+      p.advance(usize);
+    }
+  }
+}
+
+void
 chunk::print(void)
 {
   // FIXME: str will eventually overflow. replace it by xstr
@@ -765,6 +864,48 @@ chunk::print(void)
     strcat(str,tmpstr);
   }
   CkPrintf("%s", str);
+}
+
+extern "C" void 
+FEM_Register(void *_userdata, FEM_Packsize_Fn _pksz, FEM_Pack_Fn _pk,
+                    FEM_Unpack_Fn _upk)
+{
+  chunk *cptr = CtvAccess(_femptr);
+  cptr->register_userdata(_userdata,_pksz, _pk, _upk);
+}
+
+extern "C" int *
+FEM_Get_Node_Nums(void)
+{
+  chunk *cptr = CtvAccess(_femptr);
+  return cptr->get_nodenums();
+}
+
+extern "C" int *
+FEM_Get_Elem_Nums(void)
+{
+  chunk *cptr = CtvAccess(_femptr);
+  return cptr->get_elemnums();
+}
+
+extern "C" int *
+FEM_Get_Conn(void)
+{
+  chunk *cptr = CtvAccess(_femptr);
+  return cptr->get_conn();
+}
+
+extern "C" void *
+FEM_Get_Userdata(void)
+{
+  chunk *cptr = CtvAccess(_femptr);
+  return cptr->get_userdata();
+}
+
+// FIXME: Place Holder
+extern "C" void
+FEM_Migrate(void)
+{
 }
 
 extern "C" void 

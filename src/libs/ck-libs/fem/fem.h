@@ -27,6 +27,10 @@ extern unsigned int _nchunks;
 #define FEM_HEXAHEDRAL    3
 #define FEM_QUADRILATERAL 4
 
+typedef int (*FEM_Packsize_Fn)(void*);
+typedef void (*FEM_Pack_Fn)(void*, void*);
+typedef void* (*FEM_Unpack_Fn)(void*);
+
 // temporary Datatype representation
 // will go away once MPI user-defined datatypes are ready
 struct DType {
@@ -122,14 +126,22 @@ class chunk : public ArrayElement1D
   CmmTable messages; // messages to be processed
   int wait_for; // which tag is tid waiting for ? 0 if not waiting
   CthThread tid; // waiting thread, 0 if no one is waiting
+  int tsize; // cached packbuf size for thread
 
   int seqnum; // sequence number for update operation
   int nRecd; // number of messages received for this seqnum
   void *curbuf; // data addr for current update operation
 
+  int valid_udata;
+  void *userdata;
+  FEM_Packsize_Fn pksz;
+  FEM_Pack_Fn pk;
+  FEM_Unpack_Fn upk;
+  int usize; // cached size of user's data structure
  public:
 
   int doneCalled;
+
   chunk(void);
   chunk(CkMigrateMessage *) {}
   void run(void);
@@ -151,6 +163,20 @@ class chunk : public ArrayElement1D
   int id(void) { return thisIndex; }
   int total(void) { return numElements; }
   void print(void);
+  int *get_nodenums(void) { return gNodeNums; }
+  int *get_elemnums(void) { return gElemNums; }
+  int *get_conn(void) { return conn; }
+  void *get_userdata(void) { return userdata; }
+  void register_userdata(void *_userdata, FEM_Packsize_Fn _pksz,
+                         FEM_Pack_Fn _pk, FEM_Unpack_Fn _upk)
+  {
+    userdata = _userdata;
+    pksz = _pksz;
+    pk = _pk;
+    upk = _upk;
+    valid_udata = 1;
+  }
+  void pup(PUP::er &p);
  private:
   FILE *fp;
   void update_field(DataMsg *);
@@ -177,7 +203,13 @@ extern "C" {
   void FEM_Set_Mesh_Transform(int nelem, int nnodes, int ctype, int* connmat, 
                               int *permute);
   void FEM_Print_Partition(void);
-
+  void FEM_Register(void *_userdata, FEM_Packsize_Fn _pksz, FEM_Pack_Fn _pk,
+                    FEM_Unpack_Fn _upk);
+  int *FEM_Get_Node_Nums(void);
+  int *FEM_Get_Elem_Nums(void);
+  int *FEM_Get_Conn(void);
+  void *FEM_Get_Userdata(void);
+  void FEM_Migrate(void);
   // Fortran Bindings
 
 #if FEM_FORTRAN
