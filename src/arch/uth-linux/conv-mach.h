@@ -112,10 +112,5 @@
 #define CMK_LBDB_ON					   0
 #define CMK_LBDB_OFF					   1
 
-
-
-
-
-#define CMK_FORTRAN_USES_ALLCAPS                           1
 #endif
 
