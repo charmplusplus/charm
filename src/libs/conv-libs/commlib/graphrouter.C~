@@ -1,0 +1,190 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
+#include "graphrouter.h"
+
+#define gmap(pe) {if (gpes) pe=gpes[pe];}
+
+GraphRouter::GraphRouter(int, int){
+    
+}
+
+void GraphRouter::init(int n, int me, TopologyDescriptor *tp)
+{
+    //CmiPrintf("PE=%d me=%d NUMPES=%d\n", MyPe, me, n);
+  
+    NumPes=n;
+    MyPe=me;
+    gpes=NULL;
+    this->tp = tp;
+
+    PeGraph = new PeTable(NumPes);
+    pesToSend = new int[NumPes];
+    
+    tp->getNeighbors(MyPe, numNeighbors, neighborPeList);
+    nstages = tp->getNumStages();
+    currentIteration = 0;
+
+    recvExpected = new int[nstages];
+    recvCount = new int[nstages];
+    bzero(recvCount, nstages *sizeof(int));
+    for(int count = 0; count < nstages; count++)
+        recvExpected[count] = tp->getNumMessagesExpected(count);
+
+#if CMK_PERSISTENT_COMM
+    handlerArrayOdd = new PersistentHandle[numNeighbors];
+    handlerArrayEven = new PersistentHandle[numNeighbors];
+#endif
+}
+
+GraphRouter::~GraphRouter()
+{
+    delete PeGraph;
+    delete pesToSend;
+    delete tp;
+}
+
+void GraphRouter::NumDeposits(comID, int num)
+{
+}
+
+void GraphRouter::EachToAllMulticast(comID id, int size, void *msg, int more)
+{
+    int npe=NumPes;
+    int * destpes=(int *)CmiAlloc(sizeof(int)*npe);
+    for (int i=0;i<npe;i++) destpes[i]=i;
+    EachToManyMulticast(id, size, msg, npe, destpes, more);
+}
+
+void GraphRouter::sendMessages(int cur_stage){
+    int nsteps = tp->getNumSteps(cur_stage);
+    int nextpe = 0, npestosend = 0;
+    
+    for(int stepcount = 0; stepcount < nsteps; stepcount ++){
+        tp->getPesToSend(stepcount, cur_stage, npestosend, pesToSend, nextpe);
+        
+        gmap(nextpe);
+        ComlibPrintf("%d:sending to %d in step %d\n", MyPe, nextpe,stepcount);
+
+        int len;
+	char *newmsg;
+        newmsg=PeGraph->ExtractAndPack(MyID, cur_stage, npestosend, pesToSend, 
+                                       &len);
+        
+#if CMK_PERSISTENT_COMM
+        if(len < PERSISTENT_BUFSIZE)
+            if(currentIteration % 2)
+                CmiUsePersistentHandle(&handlerArrayOdd[i], 1);
+            else
+                CmiUsePersistentHandle(&handlerArrayEven[i], 1);
+#endif          
+        
+	if (newmsg) {
+            CmiSetHandler(newmsg, CpvAccess(RecvHandle));
+            CmiSyncSendAndFree(nextpe, len, newmsg);
+        }
+	else {
+            KSendDummyMsg(MyID, nextpe, cur_stage);
+	}
+        
+#if CMK_PERSISTENT_COMM
+        if(len < PERSISTENT_BUFSIZE)
+            CmiUsePersistentHandle(NULL, 0);
+#endif          
+    }
+}
+
+void GraphRouter::EachToManyMulticast(comID id, int size, void *msg, 
+                                      int numpes, int *destpes, int more)
+{
+    PeGraph->InsertMsgs(numpes, destpes, size, msg);
+    if (more) return;
+
+    ComlibPrintf("All messages received %d\n", MyPe);
+
+    sendMessages(0);
+}
+
+void GraphRouter::RecvManyMsg(comID id, char *msg)
+{
+    int curstage = 0;
+    curstage = PeGraph->UnpackAndInsert(msg);
+    
+    recvCount[curstage] ++;
+    if (recvCount[curstage] == recvExpected[curstage]) {
+        ComlibPrintf("%d recvcount=%d recvexpected = %d refno=%d\n", MyPe, recvCount, recvExpected, KMyActiveRefno(MyID));
+        
+        sendMessages(curstage);
+        recvCount[curstage] = 0;
+        PeGraph->ExtractAndDeliverLocalMsgs(MyPe);
+    }
+}
+
+void GraphRouter::DummyEP(comID id, int stage)
+{
+    if(stage < nstages - 1) {
+        recvCount[stage] ++;
+        if (recvCount[stage] == recvExpected[stage]) {
+            ComlibPrintf("%d recvcount=%d recvexpected = %d refno=%d\n", MyPe, recvCount, recvExpected, KMyActiveRefno(MyID));
+            
+            sendMessages(stage);
+            recvCount[stage] = 0;
+        }
+    }
+    else 
+        ProcManyMsg(id, NULL);
+}
+
+void GraphRouter:: ProcManyMsg(comID id, char *m)
+{
+    int stage = nstages - 1;
+    if(m)
+        PeGraph->UnpackAndInsert(m);
+    ComlibPrintf("%d proc many msg %d\n", MyPe, stage);
+
+    recvCount[stage] ++;
+    if(recvCount[stage] == recvExpected[stage]) {
+        PeGraph->Purge();
+        KDone(MyID);
+        currentIteration ++;
+        recvCount[stage] = 0;
+        PeGraph->ExtractAndDeliverLocalMsgs(MyPe);
+    }
+}
+
+Router * newgraphobject(int n, int me)
+{
+    Router *obj=new GraphRouter(n, me);
+    return(obj);
+}
+
+void GraphRouter::SetID(comID id)
+{
+    MyID=id;
+}
+
+void GraphRouter :: SetMap(int *pes)
+{
+    gpes=pes;
+
+#if CMK_PERSISTENT_COMM
+    //Persistent handlers for all the neighbors
+    int pcount = 0;
+    for (pcount = 0; pcount < numNeoghbors; pcount++) {
+        int dest = neighborPeList[pcount];
+        gmap(dest);
+        ComlibPrintf("%d:Creating Persistent Buffer of size %d at %d\n", MyPe,
+                     PERSISTENT_BUFSIZE, dest);
+        handlerArrayOdd[pcount] = CmiCreatePersistent(dest, 
+                                                      PERSISTENT_BUFSIZE);
+        ComlibPrintf("%d:Creating Even Persistent Buffer of size %d at %d\n",
+                     MyPe, PERSISTENT_BUFSIZE, dest);
+        handleArrayEven[pcount] = CmiCreatePersistent(dest, 
+                                                      PERSISTENT_BUFSIZE);
+    }
+#endif
+}

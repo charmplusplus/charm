@@ -1,6 +1,6 @@
 CHARMC= ../../../../bin/charmc $(OPTS)
 OBJS=commlib.o gridrouter.o de.o treerouter.o petable.o overlapper.o \
-     rsend.o bcast.o 3dgridrouter.o
+     rsend.o bcast.o 3dgridrouter.o graphrouter.o hypercubetopology.o
 
 all: libcomm.a
 	rm -f ../../../../include/commlib.h
@@ -26,6 +26,12 @@ treerouter.o:  treerouter.C  treerouter.h commlib.h
 
 gridrouter.o:  gridrouter.C commlib.h gridrouter.h 
 	$(CHARMC)  -c gridrouter.C
+
+graphrouter.o:  graphrouter.C commlib.h graphrouter.h 
+	$(CHARMC)  -c graphrouter.C
+
+hypercubetopology.o: hypercubetopology.C hypercubetopology.h
+	$(CHARMC)  -c hypercubetopology.C
 
 3dgridrouter.o:  3dgridrouter.C commlib.h 3dgridrouter.h 
 	$(CHARMC)  -c 3dgridrouter.C
