@@ -637,11 +637,13 @@ TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0)
   // (for compatibility).
   // Generating just the non delta log takes precedence over generating
   // both logs (if both arguments appear on the command line).
-  deltaLog = 0;
+  deltaLog = 1;
   nonDeltaLog = CmiGetArgFlagDesc(argv, "+logNonDelta",
 				  "Generate Delta encoded and simple timestamped log files");
   int oldLogOnly = CmiGetArgFlagDesc(argv, "+logNonDeltaOnly", 
 				     "No Delta Encoding for Log Files");
+  // switch to OLD log format until everything works // Gengbin
+  oldLogOnly = 1;
   if (oldLogOnly) {
     deltaLog = 0;
     nonDeltaLog = 1;
