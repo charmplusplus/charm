@@ -8,7 +8,12 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.41  1998-06-15 22:11:18  jyelon
+ * Revision 1.42  1998-06-16 17:02:36  milind
+ * Fixed typedefs for net-rs6k and sp3.
+ * Also fixed a longstanding charm translator bug to deal with quirks of
+ * ld on AIX.
+ *
+ * Revision 1.41  1998/06/15 22:11:18  jyelon
  * changed the way converse headers are done.
  *
  * Revision 1.40  1998/06/15 19:51:28  jyelon
@@ -178,14 +183,14 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                1
 
-#define CMK_TYPEDEF_INT2 unknown
-#define CMK_TYPEDEF_INT4 unknown
-#define CMK_TYPEDEF_INT8 unknown
-#define CMK_TYPEDEF_UINT2 unknown
-#define CMK_TYPEDEF_UINT4 unknown
-#define CMK_TYPEDEF_UINT8 unknown
-#define CMK_TYPEDEF_FLOAT4 unknown
-#define CMK_TYPEDEF_FLOAT8 unknown
+#define CMK_TYPEDEF_INT2 short
+#define CMK_TYPEDEF_INT4 int
+#define CMK_TYPEDEF_INT8 long
+#define CMK_TYPEDEF_UINT2 unsigned short
+#define CMK_TYPEDEF_UINT4 unsigned int
+#define CMK_TYPEDEF_UINT8 unsigned long
+#define CMK_TYPEDEF_FLOAT4 float
+#define CMK_TYPEDEF_FLOAT8 double
 
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1

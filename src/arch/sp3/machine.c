@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.9  1998-05-01 21:47:28  milind
+ * Revision 1.10  1998-06-16 17:02:37  milind
+ * Fixed typedefs for net-rs6k and sp3.
+ * Also fixed a longstanding charm translator bug to deal with quirks of
+ * ld on AIX.
+ *
+ * Revision 1.9  1998/05/01 21:47:28  milind
  * Fixed a bug in getNonLocal.
  *
  * Revision 1.8  1998/03/05 17:15:06  milind
@@ -132,7 +137,7 @@ static int allmsg, dontcare, msgtype;
 
 /**************************  TIMER FUNCTIONS **************************/
 
-static void CmiTimerInit(void)
+void CmiTimerInit(void)
 {
   timebasestruct_t time;
   read_real_time(&time, TIMEBASE_SZ);

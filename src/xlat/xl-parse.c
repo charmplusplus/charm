@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-15 20:57:00  jyelon
+ * Revision 2.2  1998-06-16 17:02:34  milind
+ * Fixed typedefs for net-rs6k and sp3.
+ * Also fixed a longstanding charm translator bug to deal with quirks of
+ * ld on AIX.
+ *
+ * Revision 2.1  1995/06/15 20:57:00  jyelon
  * *** empty log message ***
  *
  * Revision 2.0  1995/06/05  18:52:05  brunner
@@ -139,7 +144,11 @@ char *module,*chare,*name;
  
   dummy=GetMapNode(module,chare,name);
   dummy->mapid=FUNCTIONCOUNT++;
-  sprintf(string,"%s%d%s",CkPrefix_,dummy->mapid,name);
+  if(strcmp(name,"CharmInit")==0) {
+    sprintf(string,"%s7%s",CkPrefix_,name);
+  } else {
+    sprintf(string,"%s%d%s",CkPrefix_,dummy->mapid,name);
+  }
   dummy->mappedname=MakeString(string);
   dummy->next=MapHead->next;MapHead->next=dummy;
   return(dummy);
