@@ -1,0 +1,70 @@
+\subsection{Checkpoint/Restart}
+\index{Checkpoint/Restart}
+\label{sec:checkpoint}
+
+\charmpp{} offers fault tolerance capabilities such as 
+checkpoint/restart. Usual Chare array-based \charmpp{} application 
+can be checkpointed to disk files and later on restarting from the files.
+
+The basic idea behind this is straightforward: Checkpointing an 
+application is like migrating its parallel objects from the processors
+onto disks, and restarting is the reverse. Thanks to the migration 
+utilities like PUP'ing(Section~\ref{sec:pup}), users can decide what 
+data to save in checkpoints and how to save them.
+
+\subsubsection{Checkpointing}
+	The API to checkpoint the application is:
+
+\begin{alltt} 
+  void CkStartCheckpoint(char* dirname,const CkCallback& cb);
+\end{alltt}
+
+The string {\it dirname} is the destination directory where the checkpoint
+files will be stored, and {\it cb} is the callback function which will be
+invoked after the checkpoint is done, as well as when the restart is
+complete. Here is an example of a typical use:
+
+\begin{alltt} 
+  . . .
+  CkCallback cb(CkIndex_Hello::SayHi(),helloProxy);
+  CkStartCheckpoint("log",cb);
+\end{alltt}
+
+A chare array usually has a PUP routine for the sake of migration. 
+The PUP routine is also used in the checkpointing and restarting process.
+Therefore, it is up to the programmer what to save and restore for
+the application. One illustration of this flexbility is a complicated
+scientific computation application with 9 matrices, 8 of which holding 
+the intermediate results and 1 holding the final results of each timestep.
+To save resource, the PUP routine can well omit the 8 intermediate matrices
+and checkpoint the matrix with final results of each timestep. 
+
+Group and nodegroup objects(Section~\ref{sec:group}) are normally not 
+meant to be migrated. In order to checkpoint them, however, the user 
+wants to write PUP routines for the groups and declare them as 
+{\tt [migratable]} in the .ci file.
+
+After {\tt CkStartCheckpoint} is executed, a directory of the designated
+name is created and a collection of checkpoint files are written into it. 
+
+
+\subsubsection{Restarting}
+
+The user can choose to run the \charmpp{} application in restart mode, i.e.,
+restarting execution from last checkpoint. The command line option {\tt
+-restart DIRNAME} is required to invoke this mode. For example:
+
+\begin{alltt}
+  > ./charmrun hello +p4 +restart log
+\end{alltt}
+
+Restarting is the reverse process of checkpointing. \charmpp{} allows 
+restarting the old checkpoint on different number of physical processor.
+This provides the flexibility to expand or shrink your application when
+the availability of computing resource changes. 
+
+Note that on restart, if the old reduction client was set to a static 
+function, the function pointer might be lost and the user needs to register
+it again. A better alternative is to always use entry method of a chare
+object. Since all the entry methods are registered inside \charmpp{} system,
+in restart phase, the reduction client will be automatically restored.
