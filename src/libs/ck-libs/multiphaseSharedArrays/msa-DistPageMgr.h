@@ -426,14 +426,15 @@ template <
 	unsigned int ENTRIES_PER_PAGE=MSA_DEFAULT_ENTRIES_PER_PAGE
 >
 class MSA_PageT {
+    unsigned int n; // number of entries on this page.  Used to send page updates.
 	/** The contents of this page: array of ENTRIES_PER_PAGE items */
 	ENTRY *data;
 	/** Merger object */
 	MERGER m;
-    bool do_not_delete;
+    bool duplicate;
 
 public:
-	MSA_PageT():do_not_delete(false) {
+	MSA_PageT():duplicate(false), n(ENTRIES_PER_PAGE) {
 		data=new ENTRY[ENTRIES_PER_PAGE];
 		for (int i=0;i<ENTRIES_PER_PAGE;i++)
 			data[i]=m.getIdentity();
@@ -443,16 +444,19 @@ public:
     // the pointer.  When it comes time to destruct the object, we
     // need to ensure we do NOT delete the data but just discard the
     // pointer.
-	MSA_PageT(ENTRY *d):data(d), do_not_delete(true) {
+	MSA_PageT(ENTRY *d):data(d), duplicate(true), n(ENTRIES_PER_PAGE) {
+    }
+	MSA_PageT(ENTRY *d, unsigned int n_):data(d), duplicate(true), n(n_) {
     }
 	virtual ~MSA_PageT() {
- 		if (do_not_delete==false) {
+ 		if (!duplicate) {
             delete [] data;
         }
 	}
-	
+
 	virtual void pup(PUP::er &p) {
-		for (int i=0;i<ENTRIES_PER_PAGE;i++)
+        p | n;
+		for (int i=0;i<n;i++)
 			p|data[i];
 	}
 
@@ -463,7 +467,7 @@ public:
 
 	// These accessors might be used by the templated code.
  	inline ENTRY &operator[](int i) {return data[i];}
-// 	inline const ENTRY &operator[](int i) const {return data[i];}
+ 	inline const ENTRY &operator[](int i) const {return data[i];}
 };
 
 //=============================== Cache Manager =================================
@@ -739,19 +743,20 @@ protected:
         int nSpans=stateN(page)->writeSpans(writeSpans);
         if (nSpans==1) 
         { /* common case: can make very fast */
-                pageArray[page].ReceiveRLEPage(writeSpans,nSpans,
-                    &writePage[writeSpans[0].start],writeSpans[0].end-writeSpans[0].start,
-                    CkMyPe(),stateN(page)->state);
+            int nEntries=writeSpans[0].end-writeSpans[0].start;
+            pageArray[page].ReceiveRLEPage(writeSpans,nSpans,
+                page_t(&writePage[writeSpans[0].start],nEntries),nEntries,
+                CkMyPe(),stateN(page)->state);
         } 
         else /* nSpans>1 */ 
         { /* must copy separate spans into a single output buffer (luckily rare) */
             int nEntries=0;
             for (int s=0;s<nSpans;s++) {
                 for (int i=writeSpans[s].start;i<writeSpans[s].end;i++)
-                    writeEntries[nEntries++]=writePage[i];
+                    writeEntries[nEntries++]=writePage[i]; // calls assign
             }
             pageArray[page].ReceiveRLEPage(writeSpans,nSpans,
-                                           writeEntries,nEntries,
+                                           page_t(writeEntries,nEntries),nEntries,
                                            CkMyPe(),stateN(page)->state);
         }
     }
@@ -1293,7 +1298,7 @@ public:
     /// Receive a runlength encoded page from the network:
     inline void ReceiveRLEPage(
     	const MSA_WriteSpan_t *spans, unsigned int nSpans, 
-        const ENTRY_TYPE *entries, unsigned int nEntries, 
+        const MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> &entries, unsigned int nEntries, 
         int pe, MSA_Page_Fault_t pageState)
     {
         allocatePage(pageState);

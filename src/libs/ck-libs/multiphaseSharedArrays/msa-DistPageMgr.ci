@@ -29,7 +29,7 @@ module msa
 	
         entry void GetPage(int pe);
         entry void PAReceivePage(ENTRY_TYPE page[ENTRIES_PER_PAGE], int pe, MSA_Page_Fault_t pageState);
-        entry void ReceiveRLEPage(MSA_WriteSpan_t spans[nSpans], unsigned int nSpans, ENTRY_TYPE entries[nEntries], unsigned int nEntries, int pe, MSA_Page_Fault_t pageState);
+        entry void ReceiveRLEPage(MSA_WriteSpan_t spans[nSpans], unsigned int nSpans, MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> entries, unsigned int nEntries, int pe, MSA_Page_Fault_t pageState);
         entry void Sync();
 	
         // for debugging purposes only
