@@ -48,9 +48,6 @@ void PVT::startPhase()
 	if ((optPVT < 0) || ((objs.objs[i].getOVT() < optPVT) && 
 			     (objs.objs[i].getOVT() > POSE_UnsetTS))) {
 	  optPVT = objs.objs[i].getOVT();
-	  /*if (!(simdone || ((objs.objs[i].getOVT() >= estGVT) ||
-			    (objs.objs[i].getOVT() == POSE_UnsetTS))))
-			    CkPrintf("BWAH! PE %d obj %d estGVT=%d st=%d ovt=%d repPVT=%d\n", CkMyPe(), i, estGVT, objs.objs[i].getOVT(), objs.objs[i].getOVT(), repPVT);*/
 	  CkAssert(simdone || ((objs.objs[i].getOVT() >= estGVT) ||
 			       (objs.objs[i].getOVT() == POSE_UnsetTS)));
 	}
@@ -70,7 +67,10 @@ void PVT::startPhase()
   if ((iterMin < pvt) && (iterMin > POSE_UnsetTS)) pvt = iterMin;
   if (waitForFirst) {
     waitForFirst = 0;
-    SendsAndRecvs->Restructure(estGVT, pvt, POSE_UnsetTS);
+    if (pvt == POSE_UnsetTS)
+      SendsAndRecvs->Restructure(estGVT, estGVT, POSE_UnsetTS);
+    else
+      SendsAndRecvs->Restructure(estGVT, pvt, POSE_UnsetTS);
   }
 
   //CkPrintf("[%d] pvt=%d gvt=%d optPVT=%d iterMin=%d\n", CkMyPe(), pvt, estGVT, optPVT, iterMin);
@@ -422,10 +422,6 @@ void GVT::addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne)
   SRentry *tab = (*SRs);
   SRentry *tmp = tab;
 
-  for (i=0; i<ne-1; i++) {
-    if (e[i].timestamp > e[i+1].timestamp)
-      CkPrintf("Array of entries is not sorted! Whoops!  There goes the pre-condition!\n");
-  }
   for (i=0; i<ne; i++) {
     if ((e[i].timestamp < og) || (og == POSE_UnsetTS)) {
       if (!tmp) { // no entries yet

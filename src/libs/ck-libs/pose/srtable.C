@@ -72,7 +72,7 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
   ofSends = ofRecvs = 0;
   offset = newGVTest;
   POSE_TimeType d = firstTS - offset;
-  if (d < 0) d = 0;
+  CkAssert(d>=0);
   if ((d > MAX_B) || (d == 0)) b = MAX_B;
   size_b = 1 + d/b;
   for (i=0; i<b; i++) {
@@ -313,6 +313,11 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
       tmp = tmp->next;
     }
   }
+
+  for (i=0; i<entryIdx-1; i++) {
+    if (um->SRs[i].timestamp > um->SRs[i+1].timestamp)
+      CkPrintf("WARNING: SRtable sorting code is broken!\n");
+  }
   CkAssert(entryIdx <= nEntries);
   //if ((um->SRs[0].timestamp < pvt) || (pvt == POSE_UnsetTS))
   //CkPrintf("PE %d sending %d sr entries earliest=%d pvt=%d\n", CkMyPe(), 
@@ -324,7 +329,7 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
   return um;
 }
 
-/// CompressAndSort all buckets with timestamps <= pvt
+/// CompressAndSort all buckets
 void SRtable::SortTable()
 {
 #ifdef SR_SANITIZE
