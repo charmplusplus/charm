@@ -293,6 +293,13 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
   CmiFree(msg);
 }
 
+<<<<<<< machine.c
+/***********************************************************************
+ *
+ * Abort function:
+ *
+ ************************************************************************/
+=======
 /**********************************************************************
  * CMI memory calls
  */
@@ -323,16 +330,10 @@ void *CmiAlloc(int size)
   return (void *)(res+8);
 }
 
-int CmiSize(void *blk)
+void CmiAbort(char *message)
 {
-  return ((int *)( ((char *) blk) - 8))[0];
-}
-
-void CmiFree(void *blk)
-{
-  /*  printf("[%d] freeing %d at %d\n",Cmi_mype,*((int *)blk - 1),blk); */
-  McMemAllocated -= (((int *)( ((char *) blk) - 8))[0] + 8);
-  free( ((char *)blk) - 8);
+  CmiError(message);
+  exit(1);
 }
 
 /**********************************************************************

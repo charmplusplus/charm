@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.32  1997-12-10 21:59:23  jyelon
+ * Revision 1.33  1998-02-13 23:55:30  pramacha
+ * Removed CmiAlloc, CmiFree and CmiSize
+ * Added CmiAbort
+ *
+ * Revision 1.32  1997/12/10 21:59:23  jyelon
  * Modified CmiDeliverSpecificMsg so that it works with uth version.
  *
  * Revision 1.31  1997/12/10 21:01:28  jyelon
@@ -155,32 +159,16 @@ int CountArgs(argv)
   return n;
 }
 
-/*****************************************************************************
+/***********************************************************************
  *
- * Memory management.
- * 
- ****************************************************************************/
+ * Abort function:
+ *
+ ************************************************************************/
 
-void *CmiAlloc(size)
-int size;
+void CmiAbort(char *message)
 {
-char *res;
-res =(char *)malloc(size+8);
-if (res==0) printf("Memory allocation failed.");
-((int *)res)[0]=size;
-return (void *)(res+8);
-}
-
-int CmiSize(blk)
-void *blk;
-{
-return ((int *)(((char *)blk)-8))[0];
-}
-
-void CmiFree(blk)
-void *blk;
-{
-free( ((char *)blk)-8);
+  CmiError(message);
+  exit(1);
 }
 
 /*****************************************************************************

@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.29  1997-12-10 21:01:34  jyelon
+ * Revision 2.30  1998-02-13 23:55:43  pramacha
+ * Removed CmiAlloc, CmiFree and CmiSize
+ * Added CmiAbort
+ *
+ * Revision 2.29  1997/12/10 21:01:34  jyelon
  * *** empty log message ***
  *
  * Revision 2.28  1997/10/03 19:51:56  milind
@@ -146,27 +150,18 @@ static node_private int requested_npe;
 
 static void threadInit();
 
-void *CmiAlloc(size)
-int size;
+/***********************************************************************
+ *
+ * Abort function:
+ *
+ ************************************************************************/
+
+void CmiAbort(char *message)
 {
-  char *res;
-  res =(char *) malloc(size+8);
-  if (res==(char *)0) { CmiError("%d:Memory allocation failed.",CmiMyPe()); exit(1); }
-  ((int *)res)[0]=size;
-  return (void *)(res+8);
+  CmiError(message);
+  exit(1);
 }
 
-int CmiSize(blk)
-void *blk;
-{
-  return ((int *)( ((char *) blk) - 8))[0];
-}
-
-void CmiFree(blk)
-void *blk;
-{
-  free( ((char *)blk) - 8);
-}
 
 
 void *CmiSvAlloc(size)

@@ -89,32 +89,16 @@ extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
 static void CmiSleep();
 
-/*****************************************************************************
+/***********************************************************************
  *
- * CmiAlloc, CmiSize, and CmiFree
+ * Abort function:
  *
- *****************************************************************************/
+ ************************************************************************/
 
-void *CmiAlloc(size)
-int size;
+void CmiAbort(char *message)
 {
-char *res;
-res =(char *)malloc(size+8);
-if (res==0) KillEveryone("Memory allocation failed.");
-((int *)res)[0]=size;
-return (void *)(res+8);
-}
-
-int CmiSize(blk)
-void *blk;
-{
-return ((int *)(((char *)blk)-8))[0];
-}
-
-void CmiFree(blk)
-void *blk;
-{
-free(((char *)blk)-8);
+  CmiError(message);
+  KillEveryone("");
 }
 
 /*****************************************************************************

@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.2  1997-10-03 19:52:07  milind
+ * Revision 1.3  1998-02-13 23:56:16  pramacha
+ * Removed CmiAlloc, CmiFree and CmiSize
+ * Added CmiAbort
+ *
+ * Revision 1.2  1997/10/03 19:52:07  milind
  * Made charmc to work again, after inserting trace calls in converse part,
  * i.e. threads and user events.
  *
@@ -89,31 +93,17 @@ static void mulpkt_send();
 typedef void (*FM_HANDLER)(void *, int) ;
 typedef int (*FUNCTION_PTR)();   
 
+/***********************************************************************
+ *
+ * Abort function:
+ *
+ ************************************************************************/
 
-
-void *CmiAlloc(size)
-int size;
+void CmiAbort(char *message)
 {
-char *res;
-res =(char *)malloc(size+8);
-if (res==0) printf("Memory allocation failed.");
-((int *)res)[0]=size;
-return (void *)(res+8);
+  CmiError(message);
+  exit(1);
 }
-
-int CmiSize(blk)
-void *blk;
-{
-return ((int *)( ((char *)blk)-8))[0];
-}
-
-void CmiFree(blk)
-void *blk;
-{
-free( ((char *)blk)-8);
-}
-
-
 
 /**************************  TIMER FUNCTIONS **************************/
 

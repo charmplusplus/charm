@@ -102,28 +102,17 @@ int CmiMyPe()
   return mype;
 }
 
-void *CmiAlloc(int size)
-{
-  char *res;
-  res =(char *) malloc(size+8);
-  if (res==(char *)0) { 
-    CmiError("%d:Memory allocation failed.",CmiMyPe()); 
-    abort();
-  }
-  ((int *)res)[0]=size;
-  return (void *)(res+8);
-}
+/***********************************************************************
+ *
+ * Abort function:
+ *
+ ************************************************************************/
 
-int CmiSize(void *blk)
+void CmiAbort(char *message)
 {
-  return ((int *)( ((char *) blk) - 8))[0];
+  CmiError(message);
+  abort();
 }
-
-void CmiFree(void *blk)
-{
-  free( ((char *)blk) - 8);
-}
-
 
 int CmiAsyncMsgSent(CmiCommHandle msgid)
 {

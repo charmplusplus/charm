@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.9  1997-12-10 21:01:22  jyelon
+ * Revision 1.10  1998-02-13 23:55:09  pramacha
+ * Removed CmiAlloc, CmiFree and CmiSize
+ * Added CmiAbort
+ *
+ * Revision 1.9  1997/12/10 21:01:22  jyelon
  * *** empty log message ***
  *
  * Revision 1.8  1997/10/03 19:51:51  milind
@@ -94,27 +98,16 @@ static esize_t hclockinitvalue;
 static unsigned int clockinitvalue;
 extern unsigned long mclock();
 
+/***********************************************************************
+ *
+ * Abort function:
+ *
+ ************************************************************************/
 
-void *CmiAlloc(size)
-int size;
+void CmiAbort(char *message)
 {
-char *res;
-res =(char *)malloc(size+8);
-if (res==0) printf("Memory allocation failed.");
-((int *)res)[0]=size;
-return (void *)(res+8);
-}
-
-int CmiSize(blk)
-void *blk;
-{
-return ((int *)( ((char *)blk)-8))[0];
-}
-
-void CmiFree(blk)
-void *blk;
-{
-free( ((char *)blk)-8);
+  CmiError(message);
+  exit(1);
 }
 
 

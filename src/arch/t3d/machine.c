@@ -222,37 +222,16 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
   CmiFree(msg);
 }
 
-/**********************************************************************
- * CMI memory calls
- */
-void *CmiAlloc(int size)
+/***********************************************************************
+ *
+ * Abort function:
+ *
+ ************************************************************************/
+
+void CmiAbort(char *message)
 {
-  char *res;
-
-#ifdef DEBUG
-  printf("[%d] Allocating %d really %d\n",Cmi_mype,size,size+8);
-#endif
-
-  res =(char *) malloc(size+8);
-  if (res==(char *)0) { 
-    CmiError("%d:Memory allocation failed.",CmiMyPe()); 
-    abort();
-  }
-  ((int *)res)[0]=size;
-  return (void *)(res+8);
-}
-
-int CmiSize(void *blk)
-{
-  return ((int *)( ((char *) blk) - 8))[0];
-}
-
-void CmiFree(void *blk)
-{
-#ifdef DEBUG
-  printf("[%d] freeing %lx\n",Cmi_mype,blk);
-#endif
-  free( ((char *)blk) - 8);
+  CmiError(message);
+  exit(1);
 }
 
 /**********************************************************************

@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.6  1998-01-16 18:29:05  milind
+ * Revision 1.7  1998-02-13 23:56:06  pramacha
+ * Removed CmiAlloc, CmiFree and CmiSize
+ * Added CmiAbort
+ *
+ * Revision 1.6  1998/01/16 18:29:05  milind
  * Used high resolution timers in SP3 version.
  *
  * Revision 1.5  1998/01/15 22:25:52  milind
@@ -434,34 +438,14 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   }
 }
 
-/*****************************************************************************
+/***********************************************************************
  *
- * CmiAlloc, CmiSize, and CmiFree
+ * Abort function:
  *
- *****************************************************************************/
- 
-void *CmiAlloc(int size)
-{
-  char *res;
-  res =(char *)malloc(size+8);
-  if (res==0) {
-    CmiReleaseSentMessages();
-    res =(char *)malloc(size+8);
-    if(res==0) {
-      fprintf(stderr, "Memory allocation failed.");
-      mpc_stopall(1);
-    }
-  }
-  ((int *)res)[0]=size;
-  return (void *)(res+8);
-}
+ ************************************************************************/
 
-int CmiSize(void *blk)
+void CmiAbort(char *message)
 {
-  return ((int *)( ((char *)blk)-8))[0];
-}
- 
-void CmiFree(void *blk)
-{
-  free( ((char*)blk)-8);
+  CmiError(message);
+  exit(1);
 }

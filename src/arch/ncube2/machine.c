@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.19  1997-12-10 21:01:36  jyelon
+ * Revision 2.20  1998-02-13 23:55:48  pramacha
+ * Removed CmiAlloc, CmiFree and CmiSize
+ * Added CmiAbort
+ *
+ * Revision 2.19  1997/12/10 21:01:36  jyelon
  * *** empty log message ***
  *
  * Revision 2.18  1997/10/03 19:51:57  milind
@@ -103,34 +107,17 @@ static int process, host, cflag, source, type;
 static double uclockinitvalue;
 extern double amicclk();
 
+/***********************************************************************
+ *
+ * Abort function:
+ *
+ ************************************************************************/
 
-
-
-void *CmiAlloc(size)
-int size;
+void CmiAbort(char *message)
 {
-char *res;
-res =(char *)malloc(size+8);
-if (res==0) printf("Memory allocation failed.");
-((int *)res)[0]=size;
-return (void *)(res+8);
+  CmiError(message);
+  exit(1);
 }
-
-int CmiSize(blk)
-void *blk;
-{
-return ((int *)(((char *)blk)- 8))[0];
-}
-
-void CmiFree(blk)
-void *blk;
-{
-free( ((char *)blk) - 8);
-}
-
-
-
-
 
 /**************************  TIMER FUNCTIONS **************************/
 

@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.17  1997-12-10 21:01:39  jyelon
+ * Revision 2.18  1998-02-13 23:56:02  pramacha
+ * Removed CmiAlloc, CmiFree and CmiSize
+ * Added CmiAbort
+ *
+ * Revision 2.17  1997/12/10 21:01:39  jyelon
  * *** empty log message ***
  *
  * Revision 2.16  1997/10/03 19:52:01  milind
@@ -492,33 +496,14 @@ int usched, initret;
   }
 }
 
-/*****************************************************************************
+/***********************************************************************
  *
- * CmiAlloc, CmiSize, and CmiFree
+ * Abort function:
  *
- *****************************************************************************/
- 
-void *CmiAlloc(size)
-int size;
-{
-     char *res;
-     res =(char *)malloc(size+8);
-     if (res==0) {
-	    fprintf(stderr, "Memory allocation failed.");
-		 mpc_stopall(1);
-	  }
-     ((int *)res)[0]=size;
-     return (void *)(res+8);
-}
+ ************************************************************************/
 
-int CmiSize(blk)
-void *blk;
+void CmiAbort(char *message)
 {
-	return ((int *)( ((char *)blk)-8))[0];
-}
- 
-void CmiFree(blk)
-void *blk;
-{
-	free( ((char*)blk)-8);
+  CmiError(message);
+  exit(1);
 }

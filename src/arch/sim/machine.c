@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.16  1997-12-10 21:01:26  jyelon
+ * Revision 1.17  1998-02-13 23:55:14  pramacha
+ * Removed CmiAlloc, CmiFree and CmiSize
+ * Added CmiAbort
+ *
+ * Revision 1.16  1997/12/10 21:01:26  jyelon
  * *** empty log message ***
  *
  * Revision 1.15  1997/08/06 20:35:36  jyelon
@@ -149,28 +153,17 @@ void CmiNotifyIdle()
 #endif
 }
 
-void *CmiAlloc(size)
-int size;
-{
-char *res;
-res =(char *)malloc(size+8);
-if (res==0) printf("Memory allocation failed.");
-((int *)res)[0]=size;
-return (void *)(res+8);
-}
+/***********************************************************************
+ *
+ * Abort function:
+ *
+ ************************************************************************/
 
-int CmiSize(blk)
-void *blk;
+void CmiAbort(char *message)
 {
-return ((int *)( ((char *)blk)-8))[0];
+  CmiError(message);
+  exit(1);
 }
-
-void CmiFree(blk)
-void *blk;
-{
-free( ((char *)blk)-8);
-}
-
 
 
 
