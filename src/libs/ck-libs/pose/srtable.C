@@ -284,12 +284,12 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
   POSE_TimeType destBkt;  // which bucket?
   SRentry *tmp;
 
-  if (pvt == -1) destBkt = b-1;
+  if (pvt == -1) destBkt = b;
   else destBkt = (pvt-offset)/size_b;
 
   SortTable();
   nBkts = destBkt;
-  if (destBkt > b) { 
+  if (destBkt >= b) { 
     nEntries += numOverflow;
     nBkts = b-1;
   }
@@ -305,7 +305,7 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
       tmp = tmp->next;
     }
   }
-  if (destBkt > b) {
+  if (destBkt >= b) {
     tmp = overflow;
     while (tmp && (tmp->timestamp < pvt)) {
       um->SRs[entryIdx] = *tmp;
