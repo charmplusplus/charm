@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-06-29 21:44:50  narain
+ * Added macros for Ldb_StripMsg and Ldb_NewChare_FromNet
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.11  1995/05/03  20:57:07  sanjeev
@@ -63,6 +66,8 @@ static char ident[] = "@(#)$Header$";
 #include "globals.h"
 #include "performance.h"
 
+#define LdbStripMsg(env) LdbStripLDB(LDB_ELEMENT_PTR(env))
+#define Ldb_NewChare_FromNet(env) Ldb_NewMsg_FromNet(USER_MSG_PTR(env))
 
 /* This is the "processMsg()" for Charm and Charm++ */
 int CallProcessMsg() ;
