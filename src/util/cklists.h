@@ -379,8 +379,8 @@ class CkPupPtrVec : public CkVec< CkZeroPtr<T, PUP_PTR> > {
   CkPupPtrVec(int size) :super(size) {}
   
   ~CkPupPtrVec() {
-    for (int i=0;i<length();i++)
-    operator[] (i).destroy();
+    for (int i=0;i<this->length();i++)
+      this->operator[] (i).destroy();
   }
   void pup(PUP::er &p) { pupCkVec(p,*this); }
   friend void operator|(PUP::er &p,this_type &v) {v.pup(p);}
@@ -407,9 +407,9 @@ class CkPupAblePtrVec : public CkVec< CkZeroPtr<T, CkPupAblePtr<T> > > {
 			push_back((T *)t[i]->clone());
 	}
 	void destroy(void) {
-		for (int i=0;i<length();i++)
-			operator[] (i).destroy();
-		length()=0;
+		for (int i=0;i<this->length();i++)
+			this->operator[] (i).destroy();
+		this->length()=0;
 	}
 	~CkPupAblePtrVec() {
 		destroy();
