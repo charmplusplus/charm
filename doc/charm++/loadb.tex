@@ -309,7 +309,7 @@ lbdb->SetLBPeriod(5);
 LBDatabase *lbdb = LBDatabase::Object();
 lbdb->SetLBPeriod(5);
 \end{alltt}
-      Alternatively, one can specify +LBPeriod <second> at command line.
+      Alternatively, one can specify +LBPeriod \{seconds\} at command line.
 \end{itemize}
 
 \subsubsection{Compiler and run-time options to use load balancing module}
@@ -399,12 +399,12 @@ load balancer is created.
 There are a few other run-time options for load balancing that may be useful:
 
 \begin{itemize}
-\item {\em +LBDebug <verbose level>} \\
-     <verbose level> can be an integer. 0 to turn off. 
+\item {\em +LBDebug \{verbose level\}} \\
+     \{verbose level\} can be any positive integer number. 0 to turn off. 
      This option asks load balancer to output more information to stdout 
 about load balancing. The bigger the verbose level, the more verbose the output is.
-\item {\em +LBPeriod <seconds>} \\
-     <seconds> can be any float number. This sets the minimum period time in 
+\item {\em +LBPeriod \{seconds\}} \\
+     \{seconds\} can be any float number. This sets the minimum period time in 
 seconds between two consecutive load balancing steps. The default value is 
 1 second. That is to say a second load balancing step won't happen until
 after 1 second since the last load balancing step.
