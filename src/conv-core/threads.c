@@ -177,7 +177,8 @@ static void CthFixData(CthThread t)
   int newsize = CthCpvAccess(CthDatasize);
   int oldsize = B(t)->datasize;
   if (oldsize < newsize) {
-    B(t)->datasize = 2*newsize;
+    newsize = 2*newsize;
+    B(t)->datasize = newsize;
     /* Note: realloc(NULL,size) is equivalent to malloc(size) */
     B(t)->data = (char *)realloc(B(t)->data, newsize);
     memset(B(t)->data+oldsize, 0, newsize-oldsize);
