@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1997-10-29 23:52:46  milind
+ * Revision 2.15  1997-11-10 16:36:53  milind
+ * Changed size_t to CMK_SIZE_T.
+ *
+ * Revision 2.14  1997/10/29 23:52:46  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 2.13  1997/03/24 23:10:13  milind
@@ -136,7 +139,7 @@ typedef struct envelope {
 /*********************************************************/
 /** Arrangement for i_tag2                              **/
 /*********************************************************/
-#define GetEnv_count(e)		        ((size_t)(((ENVELOPE *)(e))->i_tag2))
+#define GetEnv_count(e)		        ((CMK_SIZE_T)(((ENVELOPE *)(e))->i_tag2))
 #define SetEnv_count(e,x)		(((ENVELOPE *)(e))->i_tag2=((void *)(x)))
 
 #define GetEnv_chareBlockPtr(e)	        ((CHARE_BLOCK *)(((ENVELOPE *)(e))->i_tag2))
@@ -145,7 +148,7 @@ typedef struct envelope {
 #define SetEnv_vidBlockPtr(e,x)	        (((ENVELOPE *)(e))->i_tag2=(x))
 #define GetEnv_vidBlockPtr(e)		((CHARE_BLOCK *)(((ENVELOPE *)(e))->i_tag2))
 
-#define GetEnv_boc_num(e) 		((size_t)(((ENVELOPE *)(e))->i_tag2))
+#define GetEnv_boc_num(e) 		((CMK_SIZE_T)(((ENVELOPE *)(e))->i_tag2))
 #define SetEnv_boc_num(e,x) 		(((ENVELOPE *)(e))->i_tag2=((void *)(x)))
 
 /*********************************************************/

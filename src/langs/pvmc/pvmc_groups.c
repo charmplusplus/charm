@@ -16,8 +16,8 @@ void pvmc_init_groups()
   CpvInitialize(int,pvmc_at_barrier_num);
   CpvAccess(pvmc_at_barrier_num)=0;
   CpvInitialize(int,pvmc_last_barrier_num);
-  CpvAccess(pvmc_last_at_barrier_num)=0;
-  CpvInitialize(int,pvmc_last_barrier_num);
+  CpvAccess(pvmc_last_barrier_num)=0;
+  CpvInitialize(int,pvmc_last_at_barrier_num);
   CpvAccess(pvmc_last_at_barrier_num)=0;
 }
 
