@@ -157,9 +157,9 @@ cmk_clean:
 CKHEADERS=chare.h const.h msg_macros.h prio_macros.h env_macros.h globals.h\
 	  sys_macros.h communication.h performance.h $(CVHEADERS)
 
-CK_LDB_N=libckn-ldb-rand.o  libckn-ldbcfns.o #libckn-ldb-acwn.o  libckn-ldb-mngr.o libckn-ldb-priomngr.o libckn-ldb-recv.o libckn-ldb-tok.o libckn-ldb-btok.o
+CK_LDB_N=libckn-ldb-rand.o #libckn-ldb-acwn.o  libckn-ldb-mngr.o libckn-ldb-priomngr.o libckn-ldb-recv.o libckn-ldb-tok.o libckn-ldb-btok.o
 
-CK_LDB_D= libckd-ldb-rand.o libckd-ldbcfns.o #libckd-ldb-acwn.o libckd-ldb-mngr.o libckd-ldb-priomngr.o libckd-ldb-recv.o libckd-ldb-tok.o libckd-ldb-btok.o 
+CK_LDB_D= libckd-ldb-rand.o #libckd-ldb-acwn.o libckd-ldb-mngr.o libckd-ldb-priomngr.o libckd-ldb-recv.o libckd-ldb-tok.o libckd-ldb-btok.o 
 
 CK_CPLUS_N=libckn-cplus-n.o
 
