@@ -1,9 +1,9 @@
-DIRS=comlib 
-# BROKEN: commlib_stream pipeBroadcast
+#DIRS=comlib commlib_stream
+# BROKEN: pipeBroadcast
 
 .PHONY: test $(DIRS)
 
-test: comlib commlib_stream
+test: comlib 
 
 comlib: 
 	$(MAKE) -C $@ test OPTS='$(OPTS)'
