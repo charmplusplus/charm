@@ -312,7 +312,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
   int len = ogm->size;
   int alloclen, allocSize;
 
-//CmiPrintf("DeliverViaNetwork: size:%d\n", size);
+/* CmiPrintf("DeliverViaNetwork: size:%d\n", size); */
 
   DgramHeaderMake(ogm->data, rank, ogm->src, Cmi_charmrun_pid, node->send_next);
 
@@ -329,7 +329,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
   if (pendinglen != 0) {
     while (pendinglen == MAXPENDINGSEND) {
       /* pending max len exceeded, busy wait until get a token */
-//      CmiPrintf("pending max len exceeded.\n");
+/*      CmiPrintf("pending max len exceeded.\n"); */
         CommunicationServer(0);
     }
     enqueue_sending(buf, len, node, size);
@@ -449,7 +449,7 @@ void CmiCheckGmStatus()
       CmiPrintf("Error> gm node %d doesn't know node %d. \n", CmiMyPe(), i);
       doabort = 1;
     }
-//    CmiPrintf("%d: ip:%d %d %d %d\n", CmiMyPe(), nodes[i].IP,uid[0], uid[3], uid[5]);
+/*    CmiPrintf("%d: ip:%d %d %d %d\n", CmiMyPe(), nodes[i].IP,uid[0], uid[3], uid[5]); */
   }
   if (doabort) CmiAbort("");
 }
