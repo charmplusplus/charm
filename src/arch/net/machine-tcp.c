@@ -408,8 +408,8 @@ static void IntegrateMessageDatagram(char **msg, int len)
       if (rank == DGRAM_BROADCAST
 #if CMK_NODE_QUEUE_AVAILABLE
           || rank == DGRAM_NODEBROADCAST
-         )
 #endif
+         )
         SendHypercube(NULL, 0, len, newmsg+node->asm_fill-len, broot, rank);
 #endif
     } 
