@@ -52,18 +52,21 @@ unsigned int PARAMLIST[3][2] = {{0x87b0b0fdU, 0x27bb2ee6U},
 /************************************************************************/
 
 CpvStaticDeclare(int, nstreams);
+CpvStaticDeclare(CrnStream, _defaultStream);
 
 void CrnInit(void)
 {
   CpvInitialize(int, nstreams);
   CpvAccess(nstreams) = 0;
+  CpvInitialize(CrnStream, _defaultStream);
+  CrnInitStream(&CpvAccess(_defaultStream), 0, 0);
 }
 
 /* Initialize random number stream */
 
 void CrnInitStream(CrnStream *genptr, int seed, int type)
 {
-  int gennum = CmiMyPe()+CpvAccess(nstreams)*CmiNumPes();
+  int gennum = seed+CpvAccess(nstreams)*CmiNumPes();
   int i;
 
   genptr->prime = prime_list[gennum%MAX_STREAMS];
@@ -78,6 +81,7 @@ void CrnInitStream(CrnStream *genptr, int seed, int type)
 
   for(i=0; i<(1000+gennum); i++)
     CrnDouble(genptr);
+  CpvAccess(nstreams)++;
 } 
 
 
@@ -113,6 +117,21 @@ int CrnInt(CrnStream *genptr)
 float CrnFloat(CrnStream *genptr)
 {
     return (float) CrnDouble(genptr);
+}
+
+void CrnSrand(int seed)
+{
+  CrnInitStream(&CpvAccess(_defaultStream), seed, 0);
+}
+
+int CrnRand(void)
+{
+  return CrnInt(&CpvAccess(_defaultStream));
+}
+
+double CrnDrand(void)
+{
+  return CrnDouble(&CpvAccess(_defaultStream));
 }
 
 unsigned int prime_list[MAX_STREAMS] = 

@@ -1153,6 +1153,9 @@ void CrnInitStream(CrnStream *, int, int);
 int CrnInt(CrnStream *);
 double CrnDouble(CrnStream *);
 float CrnFloat(CrnStream *);
+void CrnSrand(int);
+int CrnRand(void);
+double CrnDrand(void);
 
 #include "conv-trace.h"
 
