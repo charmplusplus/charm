@@ -248,13 +248,14 @@ class CharismaGraph
       }
       int *vwgt = new int[n];
       int *adjwgt = new int[tadj];
+      int i;
       // currently all vertices are assumed to be of same wgt
       // this will change after embellishing the connection code
-      for(int i=0;i<n; i++)
+      for(i=0;i<n; i++)
         vwgt[i] = 1;
       // currently all vertices are assumed to be of same wgt
       // this will change after embellishing the connection code
-      for(int i=0;i<tadj; i++)
+      for(i=0;i<tadj; i++)
         adjwgt[i] = 1;
       int wgtflag = 3; // weights on both vertices and edges
       int numflag = 0; // we use C-style numbering (starting with 0)
