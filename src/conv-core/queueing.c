@@ -108,9 +108,11 @@ void CqsPrioqRehash(pq)
   unsigned int hashval;
   prioqelt pe, pe1;
   int i,j;
-  pq->hash_key_size = newHsize;
+
   prioqelt *ohashtab = pq->hashtab;
   prioqelt *nhashtab = (prioqelt *)CmiAlloc(newHsize*sizeof(prioqelt));
+
+  pq->hash_key_size = newHsize;
 
   for(i=0; i<newHsize; i++)
     nhashtab[i] = 0;
