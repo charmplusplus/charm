@@ -9,7 +9,7 @@ syntax() {
   echo '<versions>: ' 
   ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | pr -3 -t )
   echo ''
-  echo '<options>: help cc cc64 cxx kcc pgcc acc icc smp gm vmi scyld '
+  echo '<options>: help cc cc64 cxx kcc pgcc acc icc gcc3 smp gm vmi scyld '
   echo ''
   echo '<charmc-options>: e.g. -g -save -verbose'
   echo 'Note: This script:'
@@ -95,6 +95,7 @@ done
 #generate VERSION name combining all options.
 if test -n "$MORE"
 then
+  MORE=`echo $MORE | awk  '{ for (i = 1; i <= NF; ++i) print $i }' | sort`
   for i in $MORE
   do
     VERSION=$VERSION-$i
