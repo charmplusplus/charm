@@ -1,5 +1,6 @@
 
 #include <stdio.h>
+#include "converse.h"
 
 typedef struct fifo_queue {
         void **block;
