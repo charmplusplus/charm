@@ -96,6 +96,7 @@ CkpvExtern(CkGroupID,_currentGroup);
 CkpvExtern(GroupTable, _groupTable);
 CkpvExtern(unsigned int, _numGroups);
 extern unsigned int _numNodeGroups;
+CpvExtern(char **,Ck_argv);
 
 static inline IrrGroup *_localBranch(CkGroupID gID)
 {

@@ -240,7 +240,8 @@ extern void *CkLocalChare(const CkChareID *chare);
 extern void  CkExit(void);
 extern void CkPrintEntryMethod(int epIdx);
 extern void CkPrintChareName(int chareIdx);
-
+extern char **CkGetArgv(void);
+extern int  CkGetArgc(void);
 extern void CkSummary_MarkEvent(int);
 extern void CkSummary_StartPhase(int);
 

@@ -421,6 +421,7 @@ void _initCharm(int argc, char **argv)
 //	CkpvInitialize(UInt, _numNodeGroups);
 	CkpvInitialize(int, _numInitsRecd);
 	CpvInitialize(QdState*, _qd);
+	CpvInitialize(char**, Ck_argv); CpvAccess(Ck_argv)=argv;
 	CkpvInitialize(MsgPool*, _msgPool);
 
 	CkpvInitialize(_CkOutStream*, _ckout);
