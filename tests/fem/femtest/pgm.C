@@ -29,7 +29,7 @@ pupMyGlobals(pup_er p)
 {
 	//CkPrintf("pupMyGlobals on PE %d\n",CkMyPe());
 	pup_int(p,&tsteps);
-	if (pup_isUnpacking(p))
+	if (reduceValues==NULL)
 		reduceValues=new double[tsteps];
 	pup_doubles(p,reduceValues,tsteps);
 	pup_doubles(p,sparseSum,2);
