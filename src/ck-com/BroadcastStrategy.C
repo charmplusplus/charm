@@ -75,7 +75,8 @@ void BroadcastStrategy::insertMessage(CharmMessageHolder *cmsg){
         //conv_header->root = CkMyPe();
         conv_header->xhdl = CkMyPe();
     
-    handleMessage((char *)UsrToEnv(msg));
+    CkPackMessage(&env);
+    handleMessage((char *) env);
     
     delete cmsg;
 }

@@ -187,6 +187,7 @@ class ComlibArrayInfo {
    node groups, groups and arrays */
 
 class CharmStrategy : public Strategy {
+    
  protected:
     int forwardOnMigration;
     ComlibLearner *learner;
@@ -242,9 +243,12 @@ class CharmStrategy : public Strategy {
     //a result of a learning decision
     virtual void finalizeProcessing(){}
 
-    virtual ComlibLearner *getLearner() {return learner;}
-    virtual void setLearner(ComlibLearner *l) {learner = l;}
-
+    //Called when a message is received in the strategy handler
+    virtual void handleMessage(void *msg) {}
+    
+    ComlibLearner *getLearner() {return learner;}
+    void setLearner(ComlibLearner *l) {learner = l;}
+    
     virtual void pup(PUP::er &p);
     PUPable_decl(CharmStrategy);
 

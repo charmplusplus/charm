@@ -19,6 +19,7 @@
 
 CkpvExtern(CkGroupID, cmgrID);
 
+/*
 void *DMHandler(void *msg){
     ComlibPrintf("[%d]:In CallbackHandler\n", CkMyPe());
     DirectMulticastStrategy *nm_mgr;    
@@ -30,11 +31,10 @@ void *DMHandler(void *msg){
         CProxy_ComlibManager(CkpvAccess(cmgrID)).
         ckLocalBranch()->getStrategy(instid);
     
-    envelope *env = (envelope *) msg;
-    RECORD_RECV_STATS(instid, env->getTotalsize(), env->getSrcPe());
     nm_mgr->handleMulticastMessage(msg);
     return NULL;
 }
+*/
 
 DirectMulticastStrategy::DirectMulticastStrategy(CkArrayID aid)
     :  CharmStrategy() {
@@ -188,7 +188,10 @@ void DirectMulticastStrategy::remoteMulticast(envelope *env,
         return;    
     }
     
-    CmiSetHandler(env, handlerId);
+    //CmiSetHandler(env, handlerId);
+    CmiSetHandler(env, CkpvAccess(strategy_handlerid));
+
+    ((CmiMsgHeaderBasic *) env)->stratid = getInstance();
 
     //Collect Multicast Statistics
     RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), pelist, npes);
@@ -205,7 +208,7 @@ void DirectMulticastStrategy::pup(PUP::er &p){
 
 void DirectMulticastStrategy::beginProcessing(int numElements){
     
-    handlerId = CkRegisterHandler((CmiHandler)DMHandler);    
+    //handlerId = CkRegisterHandler((CmiHandler)DMHandler);    
     
     CkArrayID dest;
     int nidx;
@@ -218,8 +221,9 @@ void DirectMulticastStrategy::beginProcessing(int numElements){
     setLearner(learner);
 }
 
-void DirectMulticastStrategy::handleMulticastMessage(void *msg){
-    register envelope *env = (envelope *)msg;
+void DirectMulticastStrategy::handleMessage(void *msg){
+    envelope *env = (envelope *)msg;
+    RECORD_RECV_STATS(getInstance(), env->getTotalsize(), env->getSrcPe());
 
     //Section multicast base message
     CkMcastBaseMsg *cbmsg = (CkMcastBaseMsg *)EnvToUsr(env);
@@ -247,7 +251,7 @@ void DirectMulticastStrategy::handleMulticastMessage(void *msg){
 
 
 void DirectMulticastStrategy::handleNewMulticastMessage(envelope *env) {
-
+    
     ComlibPrintf("%d : In handleNewMulticastMessage\n", CkMyPe());
 
     CkUnpackMessage(&env);    

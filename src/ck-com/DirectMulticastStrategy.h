@@ -8,7 +8,7 @@ void *DMHandler(void *msg);
 
 class DirectMulticastStrategy: public CharmStrategy {
  protected:
-    int handlerId;    
+    //   int handlerId;    
     ComlibSectionInfo sinfo;
     
     //Array section support
@@ -53,7 +53,7 @@ class DirectMulticastStrategy: public CharmStrategy {
     virtual void doneInserting();
 
     //Called by the converse handler function
-    void handleMulticastMessage(void *msg);    
+    virtual void handleMessage(void *msg);    
 
     virtual void pup(PUP::er &p);    
     virtual void beginProcessing(int nelements);
