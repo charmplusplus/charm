@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1995-10-19 20:40:17  jyelon
+ * Revision 2.17  1995-10-19 20:42:45  jyelon
+ * added void to CmiNodeBarrier
+ *
+ * Revision 2.16  1995/10/19  20:40:17  jyelon
  * void * -> char *
  *
  * Revision 2.15  1995/10/19  20:38:08  jyelon
@@ -395,7 +398,7 @@ CmiMyRank()
 
 
 
-CmiNodeBarrier()
+void CmiNodeBarrier()
 {
    cps_barrier(barr,nthreads);
 }
