@@ -506,9 +506,6 @@ public:
       return (MPI_Group)(s.getComm());
     }
 
-    void checkpoint(int len, char dname[]);
-    void restart(int len, char dname[]);
-
     CkDDT myDDTsto;
     CkDDT *myDDT;
     ampiPersRequests pers;
@@ -567,12 +564,6 @@ class ampi : public ArrayElement1D {
     static void bcastraw(void* buf, int len, CkArrayID aid);
     void split(int color,int key,MPI_Comm *dest);
     void commCreate(const groupStruct vec,MPI_Comm *newcomm);
-
-    void stopthread();
-    void checkpoint(int len, char dname[]);
-    void restart(int len, char dname[]);
-    void checkpointthread(int len, char dname[]);
-    void restartthread(int len, char dname[]);
 
     inline int getRank(void) const {return myRank;}
     inline int getSize(void) const {return myComm.getSize();}

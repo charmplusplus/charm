@@ -389,7 +389,7 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
   myDDT=&myDDTsto;
   prepareCtv();
 }
-ampiParent::ampiParent(CkMigrateMessage *msg) {
+ampiParent::ampiParent(CkMigrateMessage *msg):ArrayElement1D(msg) {
   thread=NULL;
   worldPtr=NULL;
   myDDT=&myDDTsto;
@@ -449,18 +449,6 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
   return thread;
 }
 
-void ampiParent::checkpoint(int len, char dname[]){
-//  char str[256];
-//  sprintf(str, "%s/%d.cpt",dname, thisIndex);
-//  CkCheckpoint(str);
-}
-
-void ampiParent::restart(int len, char dname[]){
-//  char str[256];
-//  sprintf(str, "%s/%d.cpt",dname, thisIndex);
-//  ckRestart(str);
-//CkPrintf("[%d]ampiParent::restart this=%p\n",thisIndex,this);
-}
 
 //----------------------- ampi -------------------------
 ampi::ampi()
@@ -497,6 +485,7 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
 }
 
 ampi::ampi(CkMigrateMessage *msg)
+	  : ArrayElement1D(msg)
 {
   parent=NULL;
   thread=NULL;
@@ -546,52 +535,6 @@ ampi::~ampi()
   delete[] nextseq;
   CmmFree(msgs);
 }
-
-//------------------- maintainance -----------------
-void ampi::stopthread(){
-  thread->stop();
-}
-
-void ampi::checkpoint(int len, char dname[])
-{
-/*
-  char str[256];
-  sprintf(str, "%s/%d.cpt",dname,thisIndex);
-  ckCheckpoint(str);
-*/
-}
-
-void ampi::checkpointthread(int len, char dname[]){
-/*
-  char str[256];
-  sprintf(str, "%s/thread%d.cpt", dname, thisIndex);
-  thread->ckCheckpoint(str);
-  thread->resume();
-*/
-}
-
-void ampi::restart(int len, char dname[]){
-/*
-  char str[256];
-  sprintf(str, "%s/%d.cpt",dname,thisIndex);
-  ckRestart(str);
-//CkPrintf("[%d]ampi::restart this=%p\n",thisIndex,this);
-*/
-}
-
-void ampi::restartthread(int len, char dname[]){
-/*
-//CkPrintf("[%d]ampi::restartthread\n",thisIndex);
-  char str[256];
-  sprintf(str, "%s/thread%d.cpt", dname, thisIndex);
-//CkPrintf("[%d] me: %p\n", thisIndex, CthSelf());
-  thread->clear();
-  thread->ckRestart(str);
-  thread->start();
-//CkPrintf("[%d]ampi::restartthread end\n",thisIndex);
-*/
-}
-
 
 //------------------------ Communicator Splitting ---------------------
 class ampiSplitKey {
@@ -2152,49 +2095,15 @@ int MPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
 CDECL
 void MPI_Restart(char *dname)
 {
-  int len;
-  char str[256];
   AMPIAPI("MPI_Restart");
-  MPI_Barrier(MPI_COMM_WORLD);
-  mkdir(dname,0777);
-
-  ampiParent *parentptr = getAmpiParent();
-  sprintf(str, "%s/ampiParent", dname);
-  len = strlen(str)+1;
-  parentptr->restart(len,str);
-
-  ampi *ampiptr = getAmpiInstance(MPI_COMM_WORLD);
-  sprintf(str, "%s/ampi%d", dname, ampiptr->getComm());
-  len = strlen(str)+1;
-  ampiptr->restart(len,str); //getProxy()[ampiptr->thisIndex].
-//CkPrintf("before me: %p\n", CthSelf());
-  ampiptr->getProxy()[ampiptr->thisIndex].restartthread(len,str);
-  ampiptr->stopthread();
+  CkPrintf("MPI_Restart not implemented\n");
 }
 
 CDECL
 void MPI_Checkpoint(char *dname)
 {
-  int len;
-  char str[256];
   AMPIAPI("MPI_Checkpoint");
-  MPI_Barrier(MPI_COMM_WORLD);
-  mkdir(dname,0777);
-
-  ampiParent *parentptr = getAmpiParent();
-  sprintf(str, "%s/ampiParent", dname);
-  mkdir(str, 0777);
-  len = strlen(str);
-  parentptr->checkpoint(len,str);
-
-  ampi *ampiptr = getAmpiInstance(MPI_COMM_WORLD);
-  sprintf(str, "%s/ampi%d", dname, ampiptr->getComm());
-  mkdir(str, 0777);
-  len = strlen(str)+1;
-  ampiptr->checkpoint(len,str);
-
-  ampiptr->getProxy()[ampiptr->thisIndex].checkpointthread(len,str);
-  ampiptr->stopthread();
+  CkPrintf("MPI_Checkpoint not implemented\n");
 }
 
 CDECL
