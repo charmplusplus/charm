@@ -235,7 +235,7 @@ CVLIBS=$(L)/libconv-core.a \
 
 LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o random.o traceCore.o traceCoreCommon.o \
-	charmProjections.o converseProjections.o machineProjections.o ampiProjections.o\
+	charmProjections.o converseProjections.o machineProjections.o \
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
 	quiescence.o isomalloc.o
 
@@ -643,11 +643,11 @@ LIBTRACE_BG=trace-bluegene.o trace-common.o
 $(L)/libtrace-bluegene.a:$(LIBTRACE_BG)
 	$(CHARMC) -o $@ $(LIBTRACE_BG)
 
-LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-common.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o ampiProjections.o
+LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-common.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o 
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
 	
-LIBTRACE_PROJECTOR=trace-projector.o trace-common.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o ampiProjections.o
+LIBTRACE_PROJECTOR=trace-projector.o trace-common.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o 
 $(L)/libtrace-projector.a: $(LIBTRACE_PROJECTOR)
 	$(CHARMC) -o  $@ $(LIBTRACE_PROJECTOR)
 
@@ -684,9 +684,6 @@ traceCoreCommon.o: traceCoreCommon.C $(CVHEADERS)
 
 charmProjections.o: charmProjections.C $(CVHEADERS)
 	$(CHARMC) charmProjections.C
-	
-ampiProjections.o: ampiProjections.C $(CVHEADERS)
-	$(CHARMC) ampiProjections.C
 
 converseProjections.o: converseProjections.C $(CVHEADERS)
 	$(CHARMC) converseProjections.C
