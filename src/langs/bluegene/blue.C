@@ -58,6 +58,7 @@ CpvDeclare(int, inEmulatorInit);
 
 static void sendCorrectionStats();
 extern "C" void defaultBgHandler(char *, void *);
+static void writeToDisk();
 
 static int arg_argc;
 static char **arg_argv;
@@ -1174,6 +1175,8 @@ CmiHandler exitHandlerFunc(char *msg)
 #endif
   if (genTimeLog) sendCorrectionStats();
 
+  if (genTimeLog) writeToDisk();
+
 //  if (tTHREADTYPE == WORK_THREAD)
   {
   int origPe = -2;
@@ -1622,4 +1625,74 @@ void correctMsgTime(char *msg)
      }
    }
 }
+
+
+//TODO: Right now works only for BG/L
+static void writeToDisk()
+{
+
+  char* d = new char[10];
+  //Num of simulated procs on this real pe
+  int numProcs = cva(numNodes)*cva(numWth);
+
+  if(CmiMyPe()==0){
+    
+    FILE *f2 = fopen("bgTrace","w");
+    //Total real and toal BG processors
+    int numPes=CmiNumPes();
+    int totalProcs = BgNumNodes()*cva(numWth);
+
+    if(f2==NULL)
+      CmiPrintf("Creating bgTrace failed\n");
+    PUP::toDisk p(f2);
+    p|totalProcs;
+    p|cva(numX); p|cva(numY); p|cva(numZ);
+    p|cva(numCth);p|cva(numWth);
+    p|numPes;
+    
+    CmiPrintf("Number is %d %d %d %d %d %d %d\n",cva(numX),cva(numY),cva(numZ),cva(numCth),cva(numWth),numPes,totalProcs);
+    
+    fclose(f2);
+  }
+  
+  CmiPrintf("seq correct called on %d",CmiMyPe());
+  sprintf(d,"bgTrace%d",CmiMyPe());
+  FILE *f = fopen(d,"w");
+ 
+  int headerSize = (numProcs)*sizeof(int);
+  int *procOffsets = new int[numProcs];
+  if(f==NULL)
+    CmiPrintf("Creating bgTrace%d failed\n",CmiMyPe());
+  PUP::toDisk p(f);
+  
+  p|numProcs;
+
+  CmiPrintf("Timelines are: \n");
+  fseek(f,headerSize,SEEK_CUR); 
+
+  for (int j=0; j<cva(numNodes); j++){
+    for(int i=0;i<cva(numWth);i++){
+    BgTimeLineRec &t = cva(nodeinfo)[j].timelines[i];
+    procOffsets[j*cva(numWth) + i] = ftell(f);
+    //  CmiPrintf("Timeline %d is has offset: %d\n",j,procOffsets[j]);
+    /*    CmiPrintf("\nTimeline j is\n");
+    for(int i=0;i<t.length();i++)
+      CmiPrintf("\tName: %s",t[i]->name);
+    */
+    // t[i]->print(-1,-1);
+    
+    t.pup(p);
+    }
+  }
+  
+  fseek(f,sizeof(int),SEEK_SET);
+  p(procOffsets,numProcs);
+  fclose(f);
+
+  CmiPrintf("Wrote to disk %d %d \n", cva(numNodes),cva(numWth));
+}
+
+
+
+
 
