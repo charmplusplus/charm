@@ -50,23 +50,23 @@ summary:    $(PGM).summary
 
 $(PGM):	$(SIM_OBJECTS) 
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM) \
-	-lpose -language charm++
+	-module pose -language charm++
 
 $(PGM).comm:	$(SIM_OBJECTS) 
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).comm \
-	-lpose -language charm++ -module commlib -memory paranoid
+	-module pose -language charm++ -module commlib -memory paranoid
 
 $(PGM).pure:	$(SIM_OBJECTS)
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).pure \
-	-lpose -language charm++ -purify
+	-module pose -language charm++ -purify
 
 $(PGM).proj:	$(SIM_OBJECTS)
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).proj \
-	-lpose -language charm++ -tracemode projections
+	-module pose -language charm++ -tracemode projections
 
 $(PGM).summary:	$(SIM_OBJECTS)
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).summary \
-	-lpose -language charm++ -tracemode summary
+	-module pose -language charm++ -tracemode summary
 
 # HOUSE-KEEPING RULES
 # - DO NOT MODIFY
