@@ -39,6 +39,7 @@ extern "C" {
 #define CkNumNodes	CmiNumNodes
 #define CkNodeFirst	CmiNodeFirst
 #define CkNodeSize	CmiNodeSize
+#define CkMyNodeSize	CmiMyNodeSize
 #define CkNodeOf	CmiNodeOf
 #define CkRankOf	CmiRankOf
 
