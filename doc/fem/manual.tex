@@ -37,16 +37,15 @@
 \parskip 0.05in
 
 \newcommand{\internal}[1]{}
-\newcommand{\function}[1]{{\noindent{\bf {#1}}\\}}
-\newcommand{\args}[1]{\hspace*{2em}{\tt {#1}}\\}
-\newcommand{\param}[1]{{\tt {#1}}}
-\newcommand{\kw}[1]{{\sf{#1}}}
+\newcommand{\function}[1]{{\noindent{\textsf{\textbf{#1}}}\\}}
+\newcommand{\args}[1]{\hspace*{2em}{\textsf{#1}}\\}
+\newcommand{\param}[1]{{\textsf{#1}}}
+\newcommand{\kw}[1]{{\textsf{\textbf{#1}}}}
 \newcommand{\note}[1]{\noindent{(Note: {\em {#1}})}}
 
-\newcommand{\basea}{\renewcommand{\baselinestretch}{1.0}}
-\newcommand{\baseb}{\renewcommand{\baselinestretch}{1.8}}
+\newcommand{\basea}{\renewcommand{\baselinestretch}{1.2}}
+\newcommand{\baseb}{\renewcommand{\baselinestretch}{1.0}}
 \newcommand{\mycomment}[1]{}
-\basea
 
 \textwidth 6.4in
 \textheight 8.9in
@@ -60,26 +59,30 @@
 \begin{document}
 
 \begin{titlepage}
-\vspace*{2in}
-\Huge
-\begin{center}
-Charm++\\
-Finite Element Framework\\
-Manual\\
-Version 1.0\\
-\vspace*{0.7in}
-\today
-\end{center}
-\normalsize
-
-\vspace*{2.5in}\large
-
+\begin{flushright}
+{\Large 
+  Parallel Programming Laboratory\\
+  University of Illinois at Urbana-Champaign\\
+}
+\end{flushright}
+\rule{\textwidth}{3pt}
+\vspace{\fill}
+\begin{flushright}
+\textsf{
+ {\Huge Charm++\\ Finite Element Framework\\ Manual \\}
+}
+\end{flushright}
+\vspace{\fill}
 Initial version of Charm++ Finite Element Framework was developed
 by Milind Bhandarkar with inputs from Timothy Hinrichs and Kathikeyan
 Mahesh. The current version is almost completely rewritten by
 Orion Lawlor.
 
-\normalsize
+\rule{\textwidth}{3pt}
+
+\begin{flushright}
+{\large Version 1.0}
+\end{flushright}
 \end{titlepage}
 
 \tableofcontents
