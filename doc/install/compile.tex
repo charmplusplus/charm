@@ -140,6 +140,25 @@ more information.  Currently supported modes are {\tt none}, {\tt
 summary}, and {\tt projections}. Default is {\tt -tracemode none}.
 
 
+\item[{\tt -memory} {\em memory-mode}:]
+Selects the implementation of \kw{malloc} and \kw{free}
+to use.  Select a memory mode from the table below.
+
+\begin{itemize}
+\item{{\bf os} Use the operating system's standard memory routines.}
+\item{{\bf gnu} Use a set of GNU memory routines.}
+\item{{\bf paranoid} Use an error-checking set of routines.
+These routines will detect common mistakes such as buffer
+overruns, underruns, double-deletes, and use-after-delete.
+The extra checks slow down programs, so this version should
+not be used in production code.}
+\item{{\bf verbose} Use a tracing set of memory routines.
+Every memory-related call results in a line printed to 
+standard out. This version is useful for detecting memory leaks.}
+\item{{\bf default} Use the default, which depends on the version of \charmpp.}
+\end{itemize}
+
+
 \item[{\tt -c++} {\em C++ compiler}:]
 
 Forces the specified C++ compiler to be used.
