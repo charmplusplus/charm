@@ -1003,30 +1003,32 @@ void Entry::genGroupDecl(XStr& str)
     genGroupStaticConstructorDecl(str);
   } else {
     // entry method broadcast declaration
-    str << "    ";
-    if(retType==0) {
-      cerr << "Entry methods must specify a return type: ";
-      cerr << "use void if necessary\n";
-      exit(1);
-    }
-    retType->print(str);
-    str << " " << name;
-    str << "(";
-    if(param) {
-      param->print(str);
+    if(!isSync()) {
+      str << "    ";
+      if(retType==0) {
+        cerr << "Entry methods must specify a return type: ";
+        cerr << "use void if necessary\n";
+        exit(1);
+      }
+      retType->print(str);
+      str << " " << name;
+      str << "(";
+      if(param) {
+        param->print(str);
+        if(!param->isVoid())
+          str << "msg";
+      }
+      str<< ") {\n";
+      str << "      CkBroadcastMsgBranch(__idx_";
+      genEpIdx(str);
+      str << ", ";
       if(!param->isVoid())
-        str << "msg";
+        str << "msg, ";
+      else
+        str << "CkAllocSysMsg(), ";
+      str << "_ck_gid);\n";
+      str << "    }\n";
     }
-    str<< ") {\n";
-    str << "      CkBroadcastMsgBranch(__idx_";
-    genEpIdx(str);
-    str << ", ";
-    if(!param->isVoid())
-      str << "msg, ";
-    else
-      str << "CkAllocSysMsg(), ";
-    str << "_ck_gid);\n";
-    str << "    }\n";
     // entry method onPE declaration
     str << "    ";
     retType->print(str);
@@ -1037,15 +1039,33 @@ void Entry::genGroupDecl(XStr& str)
       str << "msg, ";
     }
     str<< "int onPE) {\n";
-    str << "      CkSendMsgBranch(__idx_";
-    genEpIdx(str);
-    str << ", ";
-    if(!param->isVoid())
-      str << "msg, ";
-    else
-      str << "CkAllocSysMsg(), ";
-    str << "onPE, _ck_gid);\n";
-    str << "    }\n";
+    if(isSync()) {
+      if(retType->isVoid()) {
+        str << "    CkFreeSysMsg(CkRemoteBranchCall(__idx_";
+      } else {
+        str << "      return (";
+        retType->print(str);
+        str << ") (CkRemoteBranchCall(__idx_";
+      }
+      genEpIdx(str);
+      str << ", ";
+      if(!param->isVoid())
+        str << "msg, ";
+      else
+        str << "CkAllocSysMsg(), ";
+      str << "_ck_gid, onPE));\n";
+      str << "    }\n";
+    } else {
+      str << "      CkSendMsgBranch(__idx_";
+      genEpIdx(str);
+      str << ", ";
+      if(!param->isVoid())
+        str << "msg, ";
+      else
+        str << "CkAllocSysMsg(), ";
+      str << "onPE, _ck_gid);\n";
+      str << "    }\n";
+    }
     // entry ptr declaration
     str << "    static int ckIdx_" << name << "(";
     assert(param!=0);
@@ -1401,9 +1421,22 @@ void Entry::genChareDefs(XStr& str)
     str << ")\n{\n";
     if(param->isVoid())
       str << "  void *msg = CkAllocSysMsg();\n";
-    str << "  CkSendMsg(__idx_";
-    genEpIdx(str);
-    str << ", msg, &_ck_cid);\n";
+    if(isSync()) {
+      if(retType->isVoid()) {
+        str << "  CkFreeSysMsg(CkRemoteCall(__idx_";
+        genEpIdx(str);
+        str << ", msg, &_ck_cid));\n";
+      } else {
+        str << "  return ("; retType->print(str);
+        str << ") CkRemoteCall(__idx_";
+        genEpIdx(str);
+        str << ", msg, &_ck_cid);\n";
+      }
+    } else {
+      str << "  CkSendMsg(__idx_";
+      genEpIdx(str);
+      str << ", msg, &_ck_cid);\n";
+    }
     str << "}\n";
   }
 }
@@ -1468,6 +1501,44 @@ void Entry::genDefs(XStr& str)
     if(container->isTemplated())
       container->genVars(str);
     str << "((ArrayElementMigrateMessage*)msg);\n}\n";
+  } else if(isSync()) {
+    if(isConstructor()) {
+      cerr << "Constructors cannot be sync methods." << endl;
+      exit(1);
+    }
+    if(container->isTemplated())
+      container->genSpec(str);
+    str << " void ";
+    container->genProxyName(str);
+    if(container->isTemplated())
+      container->genVars(str);
+    str << "::_call_";
+    genEpIdx(str);
+    str << "(void* msg, ";
+    str << container->getBaseName();
+    if(container->isTemplated())
+      container->genVars(str);
+    str<< "* obj)\n";
+    str << "{\n";
+    str << "  int ref = CkGetRefNum(msg);\n";
+    str << "  int src = CkGetSrcPe(msg);\n";
+    str << "  void *retMsg;\n";
+    if(retType->isVoid()) {
+      str << "  retMsg = CkAllocSysMsg();\n";
+      str << "  obj->" << name << "(";
+    } else {
+      str << "  retMsg = (void *) obj->" << name << "(";
+    }
+    if(param->isVoid()) {
+      str << ");\n";
+      str << "  CkFreeSysMsg(msg);\n";
+    } else {
+      str << "(";
+      param->print(str);
+      str << ") msg);\n";
+    }
+    str << "  CkSendToFuture(ref, retMsg, src);\n";
+    str << "}\n";
   } else {
     if(container->isTemplated())
       container->genSpec(str);
