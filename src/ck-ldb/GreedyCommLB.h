@@ -10,16 +10,16 @@
 */
 /*@{*/
 
-#ifndef _COMMLB_H_
-#define _COMMLB_H_
+#ifndef _GREEDYCOMMLB_H_
+#define _GREEDYCOMMLB_H_
 
 #include "CentralLB.h"
-#include "CommLB.decl.h"
+#include "GreedyCommLB.decl.h"
 
 #include "CommLBHeap.h"
 #define CUT_OFF_FACTOR 1.200
 
-void CreateCommLB();
+void CreateGreedyCommLB();
 
 struct graph{
   int id;
@@ -28,13 +28,13 @@ struct graph{
   struct graph * next;
 };
 
-class CommLB : public CentralLB {
+class GreedyCommLB : public CentralLB {
 public:
   int nobj,npe, nmigobj;
   double ** alloc_array;
   graph * object_graph;
-  CommLB(const CkLBOptions &);
-  CommLB(CkMigrateMessage *m);
+  GreedyCommLB(const CkLBOptions &);
+  GreedyCommLB(CkMigrateMessage *m);
 private:
   CentralLB::LDStats* stats;
   CmiBool QueryBalanceNow(int step);

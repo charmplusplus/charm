@@ -27,49 +27,49 @@ Status:
 
 #include "cklists.h"
 
-#include "CommLB.h"
+#include "GreedyCommLB.h"
 
 #define alpha PER_MESSAGE_SEND_OVERHEAD  /*Startup time per message, seconds*/
 #define beeta PER_BYTE_SEND_OVERHEAD     /*Long-message time per byte, seconds*/
 
-CreateLBFunc_Def(CommLB);
+CreateLBFunc_Def(GreedyCommLB);
 
 static void lbinit(void) {
-  LBRegisterBalancer("CommLB", CreateCommLB, "Greedy algorithm which takes communication graph into account");
+  LBRegisterBalancer("GreedyCommLB", CreateGreedyCommLB, "Greedy algorithm which takes communication graph into account");
 }
 
-#include "CommLB.def.h"
+#include "GreedyCommLB.def.h"
 
 #include "manager.h"
 
-CommLB::CommLB(const CkLBOptions &opt): CentralLB(opt)
+GreedyCommLB::GreedyCommLB(const CkLBOptions &opt): CentralLB(opt)
 {
-    lbname = "CommLB";
+    lbname = "GreedyCommLB";
     if (CkMyPe() == 0)
-	CkPrintf("[%d] CommLB created\n",CkMyPe());
+	CkPrintf("[%d] GreedyCommLB created\n",CkMyPe());
     manager_init();
 }
 
-CommLB::CommLB(CkMigrateMessage *m):CentralLB(m) {
-    lbname = "CommLB";
+GreedyCommLB::GreedyCommLB(CkMigrateMessage *m):CentralLB(m) {
+    lbname = "GreedyCommLB";
     manager_init();
 }
 
-CmiBool CommLB::QueryBalanceNow(int _step)
+CmiBool GreedyCommLB::QueryBalanceNow(int _step)
 {
     //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
     return CmiTrue;
 }
 
 // assign id to processor pe, load including both computation and communication
-void CommLB::alloc(int pe,int id,double load){
+void GreedyCommLB::alloc(int pe,int id,double load){
     //  CkPrintf("alloc %d ,%d\n",pe,id);
     alloc_array[npe][id] = 1.0;
     alloc_array[pe][id] = load;
     alloc_array[pe][nobj] += load;
 }
 
-double CommLB::compute_com(int id, int pe){
+double GreedyCommLB::compute_com(int id, int pe){
     int j,com_data=0,com_msg=0;
     double total_time;
     graph * ptr;
@@ -90,7 +90,7 @@ double CommLB::compute_com(int id, int pe){
     return total_time;
 }
 
-void CommLB::update(int id, int pe){
+void GreedyCommLB::update(int id, int pe){
     graph * ptr = object_graph[id].next;
     
     for(int j=0;(j<2*nobj)&&(ptr != NULL);j++,ptr=ptr->next){
@@ -109,7 +109,7 @@ void CommLB::update(int id, int pe){
 
 // add comm between obj x and y
 // two direction
-void CommLB::add_graph(int x, int y, int data, int nmsg){
+void GreedyCommLB::add_graph(int x, int y, int data, int nmsg){
     graph * ptr, *temp;
     
     ptr = &(object_graph[x]);  
@@ -149,12 +149,12 @@ void init(double **a, graph * object_graph, int l, int b){
     }
 }
 
-void CommLB::work(CentralLB::LDStats* _stats, int count)
+void GreedyCommLB::work(CentralLB::LDStats* _stats, int count)
 {
     int pe,obj,com;
     ObjectRecord *x;
     
-    //  CkPrintf("[%d] CommLB strategy\n",CkMyPe());
+    //  CkPrintf("[%d] GreedyCommLB strategy\n",CkMyPe());
     stats = _stats; 
     npe = count;
     nobj = stats->n_objs;

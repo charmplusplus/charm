@@ -17,7 +17,7 @@
 #include "Comm1LB.decl.h"
 
 #include "CommLBHeap.h"
-#include "CommLB.h"
+#include "GreedyCommLB.h"
 
 #define CUT_OFF_FACTOR 1.200
 
