@@ -1,4 +1,7 @@
 
+#ifndef PUP_CMIALLOC_H__
+#define PUP_CMIALLOC_H__
+
 #include "pup.h"
 #include "converse.h"
 
@@ -19,8 +22,6 @@
 #define ALIGN8_LONG(x)       (long)((~7)&((x)+7))
 
 //Assuming Size of CmiChunkHeader is a multiple of 8 bytes!!
-
-
 
 /*For CMI alloc'ed memory
   CmiAlloc currently has the following memory footprint
@@ -89,10 +90,10 @@ class PUP_cmiAllocSizer : public PUP::sizer {
  public:
     //Write data to the given buffer
     PUP_cmiAllocSizer(void): PUP::sizer() {}
-    
+        
     //Must be a CmiAlloced buf while packing
     void pupCmiAllocBuf(void **msg);
-    
+        
     //In case source is not CmiAlloced the size can be passed and any
     //user buf can be converted into a cmialloc'ed buf
     void pupCmiAllocBuf(void **msg, int msg_size);
@@ -143,3 +144,5 @@ class PUP_fromCmiAllocMem : public PUP::fromMem {
         pupCmiAllocBuf(msg);
     }
 };
+
+#endif
