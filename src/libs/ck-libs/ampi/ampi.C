@@ -2520,7 +2520,7 @@ CDECL
 int AMPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
               int tag, MPI_Comm comm, MPI_Request *request)
 {
-  if(src==MPI_PROC_NULL) { request = NULL; return 0; }
+  if(src==MPI_PROC_NULL) { *request = MPI_REQUEST_NULL; return 0; }
   AMPIAPI("AMPI_Irecv");
   USER_CALL_DEBUG("AMPI_Irecv("<<type<<","<<src<<","<<tag<<","<<comm<<")");
   AmpiRequestList* reqs = getReqs();
