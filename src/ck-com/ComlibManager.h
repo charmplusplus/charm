@@ -73,7 +73,8 @@ class ComlibInstanceHandle {
     ComlibInstanceHandle();
     ComlibInstanceHandle(const ComlibInstanceHandle &h);
     ComlibInstanceHandle(int instid, CkGroupID dmid);    
-    
+   
+    void setForwardingOnMigration(){toForward = 1;} 
     void init();
     void beginIteration();
     void endIteration();
@@ -83,17 +84,14 @@ class ComlibInstanceHandle {
     CharmStrategy *getStrategy();        
     int getSourcePe() {return _srcPe;}
 
+    void setSourcePe() {_srcPe = CkMyPe();}
+
     friend class ComlibManager;
     void pup(PUP::er &p) {
         p | _instid;
         p | _dmid;
         p | _srcPe;
         p | toForward;
-
-        //Fresh instance handle, so set My processor
-        if(p.isUnpacking())
-            if(_srcPe == -1)
-                _srcPe = CkMyPe();
     }
 };
 

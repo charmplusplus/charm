@@ -758,7 +758,7 @@ ComlibInstanceHandle::ComlibInstanceHandle(const ComlibInstanceHandle &h){
 
     //We DO NOT copy the source processor
     //Source PE is initialized here
-    _srcPe = CkMyPe();
+    _srcPe = h._srcPe;
 }
 
 void ComlibInstanceHandle::init(){
@@ -783,7 +783,7 @@ void ComlibInstanceHandle::beginIteration() {
     //into the constructor of an array and is using it directly from
     //Main :: main
     if(_srcPe == -1) {
-        ComlibPrintf("Warning:Instance Handle needs to be a readonly or a private variable of an array element\n");
+        //ComlibPrintf("Warning:Instance Handle needs to be a readonly or a private variable of an array element\n");
         _srcPe = CkMyPe();
     }
 
