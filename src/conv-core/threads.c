@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.28  1997-03-19 05:36:50  jyelon
+ * Revision 1.29  1997-03-21 02:18:05  milind
+ * Fixed a bug due to thread_current not accessed thru Cpv macros.
+ *
+ * Revision 1.28  1997/03/19 05:36:50  jyelon
  * Made some corrections to the ALLOCA version --- trying to get IRIX working.
  *
  * Revision 1.27  1997/01/17 19:20:48  milind
@@ -407,7 +410,7 @@ CthThread t;
 static void CthInitHold(CthThread f, CthThread t)
 {
   if (setjmp(t->jb)==0)
-    longjmp(thread_current->jb, 1);
+    longjmp(CthCpvAccess(thread_current)->jb, 1);
 }
 
 static void CthBeginThread(CthThread f, CthThread t)
