@@ -30,7 +30,7 @@
 #include "pcqueue.h"
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
-#define MAX_QLEN 200
+#define MAX_QLEN 64
 
 /*
     To reduce the buffer used in broadcast and distribute the load from 
@@ -541,12 +541,12 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 
   //  CmiPrintf("Sending Message to %d from %d %d TAG = %d\n", destPE, CmiMyNode(), size, (size <= SMALL_MESSAGE_SIZE)? TAG_SMALL : TAG_LARGE);
   msg_tmp->e = elan_tportTxStart(elan_port, 0, destPE, CmiMyNode(), (size <= SMALL_MESSAGE_SIZE)? TAG_SMALL : TAG_LARGE, msg, size);
-
+  
   /*
-  if(size <= SMALL_MESSAGE_SIZE)
+    if(size <= SMALL_MESSAGE_SIZE)
     elan_tportTxWait(msg_tmp->e);
   */
-
+  
   MsgQueueLen++;
   if(sent_msgs==0)
     sent_msgs = msg_tmp;
@@ -823,6 +823,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   MPI_Comm_rank(MPI_COMM_WORLD, &Cmi_mynode);
   */
 
+  putenv("LIBELAN_SHM_ENABLE=0");
+
   if (!(elan_base = elan_baseInit())) {
     perror("Failed elan_baseInit()");
     exit(1);
@@ -834,11 +836,16 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     exit (1);
   }
   
-  
+  int nslots = 32 ; /* elan_base->tport_nslots;*/
+  if(nslots < elan_base->state->nvp)
+    nslots = elan_base->state->nvp;
+  if(nslots > 256)
+    nslots = 256;
+
   if (!(elan_port = elan_tportInit(elan_base->state,
 				   (ELAN_QUEUE *)elan_q,
 				   /*elan_main2elan(elan_base->state, q),*/
-				   elan_base->tport_nslots, 
+				   nslots /*elan_base->tport_nslots*/, 
 				   elan_base->tport_smallmsg,
 				   elan_base->tport_bigmsg,
 				   elan_base->waitType, elan_base->retryCount,
