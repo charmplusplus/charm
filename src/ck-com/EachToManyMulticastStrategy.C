@@ -234,9 +234,12 @@ void EachToManyMulticastStrategy::pup(PUP::er &p){
 	handlerId = CkRegisterHandler((CmiHandler)E2MHandler);
         int handler = CkRegisterHandler((CmiHandler)itrDoneHandler);        
         
-        rstrat = new RouterStrategy(routerID, handler, npes, pelist);
-        setConverseStrategy(rstrat);
-        MyPe = rstrat->getProcMap()[CkMyPe()];
+        if(npes > 0) {
+            rstrat = new RouterStrategy(routerID, handler, npes, pelist);
+            setConverseStrategy(rstrat);
+            MyPe = rstrat->getProcMap()[CkMyPe()];
+        }
+        else MyPe = -1;
     }
     
     ComlibPrintf("[%d] End of pup\n", CkMyPe());

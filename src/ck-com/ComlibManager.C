@@ -279,6 +279,8 @@ void ComlibManager::receiveTable(StrategyWrapper &sw,
     receivedTable = 1;
 
     delete CkpvAccess(locationTable);
+    //Delete all records in it too !!!!!!!!!!
+
     CkpvAccess(locationTable) =  NULL;
 
     CkpvAccess(locationTable) = new 
