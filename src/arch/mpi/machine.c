@@ -348,9 +348,9 @@ static int PumpMsgs(void)
 /* blocking version */
 static int PumpMsgsBlocking(void)
 {
-  static int nbytes = 5000000;
+  static int maxbytes = 5000000;
   static char *buf = NULL;
-  int size, flg, res;
+  int nbytes, flg, res;
   MPI_Status sts;
   char *msg;
   int recd=0;
@@ -362,14 +362,14 @@ static int PumpMsgsBlocking(void)
 
   // CmiPrintf("[%d] PumpMsgsBlocking. \n", CmiMyPe());
 
-  if (buf == NULL) buf = (char *) CmiAlloc(nbytes);
+  if (buf == NULL) buf = (char *) CmiAlloc(maxbytes);
 
   while(1) {
-    if (MPI_SUCCESS != PMPI_Recv(buf,nbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
+    if (MPI_SUCCESS != PMPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
       CmiAbort("PumpMsgs: PMP_Recv failed!\n");
-    PMPI_Get_count(&sts, MPI_BYTE, &size);
-    msg = (char *) CmiAlloc(size);
-    memcpy(msg, buf, size);
+    PMPI_Get_count(&sts, MPI_BYTE, &nbytes);
+    msg = (char *) CmiAlloc(nbytes);
+    memcpy(msg, buf, nbytes);
 
 #if CMK_NODE_QUEUE_AVAILABLE
     if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
@@ -977,7 +977,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
   idleblock = CmiGetArgFlag(argv, "+idleblocking");
   if (idleblock && Cmi_mynode == 0) {
-    CmiPrintf("Running with idle blocking mode.\n");
+    CmiPrintf("Charm++: Running in idle blocking mode.\n");
   }
   Cmi_numpes = Cmi_numnodes * Cmi_mynodesize;
   Cmi_nodestart = Cmi_mynode * Cmi_mynodesize;
