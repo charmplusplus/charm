@@ -183,14 +183,6 @@ TempoArray::ckTempoBcast(int sender, int tag, void *buffer, int buflen)
   nGOps++;
 }
 
-void
-TempoArray::ckTempoBcast(int tag, void *buffer, int buflen, CkArrayID aid)
-{
-  int i, n=aid.ckLocalBranch()->array_size();
-  for(i=0;i<n;i++)
-    ckTempoSendElem(tag, BCAST_TAG, buffer, buflen, aid, i);
-}
-
 static void doOp(int op, int type, int count, void *inbuf, void *outbuf)
 {
   switch(type) {

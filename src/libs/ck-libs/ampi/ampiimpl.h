@@ -215,6 +215,11 @@ class ampi : public ArrayElement1D {
     ampi(AmpiStartMsg *);
     ampi(CkMigrateMessage *msg) {}
     ~ampi();
+
+    int getIndex(void) const {return thisIndex;}
+    int getArraySize(void) const {return numElements;}
+
+
     void run(ArgsInfo *);
     void run(void);
     void generic(AmpiMsg *);
@@ -259,15 +264,11 @@ class ampi : public ArrayElement1D {
     }
     void start_running(void)
     {
-#if CMK_LBDB_ON
-      thisArray->the_lbdb->ObjectStart(ldHandle);
-#endif
+      ckStartTiming();
     }
     void stop_running(void)
     {
-#if CMK_LBDB_ON
-      thisArray->the_lbdb->ObjectStop(ldHandle);
-#endif
+      ckStopTiming();
     }
 
   public: // to be used by AMPI_* functions

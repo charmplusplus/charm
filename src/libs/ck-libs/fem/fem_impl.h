@@ -301,15 +301,11 @@ private:
   void start_running(void)
   {
     ampi::prepareCtv();
-#if CMK_LBDB_ON
-    thisArray->the_lbdb->ObjectStart(ldHandle);
-#endif
+    ckStartTiming();
   }
   void stop_running(void)
   {
-#if CMK_LBDB_ON
-    thisArray->the_lbdb->ObjectStop(ldHandle);
-#endif
+    ckStopTiming();
   }
 
   void update_field(DataMsg *);
