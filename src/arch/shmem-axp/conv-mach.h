@@ -99,6 +99,7 @@
 #define CMK_LBDB_OFF					   0
 
 #define CMK_SHMEM_H					<shmem.h>
+#define CMK_SHMEM_INIT					   shmem_init()
 #define CMK_SHMEM_LOCK					   1
 
 #define CMK_TRACE_LOGFILE_NUM_CONTROL                      0
