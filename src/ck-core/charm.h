@@ -192,6 +192,8 @@ extern CkGroupID   CkGetGroupID(void);
 extern CkGroupID   CkGetNodeGroupID(void);
 extern void  CkExit(void);
 
+extern void CkSummary_MarkEvent(int);
+
 #ifdef __cplusplus
 }
 #endif
