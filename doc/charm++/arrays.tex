@@ -746,20 +746,20 @@ CkMulticast library.
 Since an array element can be members for multiple array sections, 
 there has to be a way for each array element to tell for which array
 section it wants to contribute. For this purpose, a data structure 
-called ''CkSectionCookie'' is created by CkMulticastMgr for each 
+called ''CkSectionInfo'' is created by CkMulticastMgr for each 
 array section that the array element belongs to.
 When doing section reduction, the array element needs to pass the 
-\kw{CkSectionCookie} as a parameter in the \kw{contribute()}. 
-The \kw{CkSectionCookie} can be retrieved
+\kw{CkSectionInfo} as a parameter in the \kw{contribute()}. 
+The \kw{CkSectionInfo} can be retrieved
 from a message in a multicast entry function using function call 
-\kw{CkGetSectionCookie}:
+\kw{CkGetSectionInfo}:
 
 \begin{alltt}
-  CkSectionCookie cookie;
+  CkSectionInfo cookie;
 
   void SayHi(HiMsg *msg)
   \{
-    CkGetSectionCookie(cookie, msg);     // update section cookie every time
+    CkGetSectionInfo(cookie, msg);     // update section cookie every time
     int data = thisIndex;
     mcastGrp->contribute(sizeof(int), &data, CkReduction::sum_int, cookie);
   \}
@@ -768,7 +768,7 @@ from a message in a multicast entry function using function call
 Note that the cookie cannot be used as a one-time local variable in the 
 function, the same cookie is needed for the next contribute. This is 
 because cookie includes some context sensive information for example the 
-reduction counter. Function \kw{CkGetSectionCookie()} only update some part 
+reduction counter. Function \kw{CkGetSectionInfo()} only update some part 
 of the data in cookie, not creating a brand new one.
 
 Similar to array reduction, to use section based reduction, a reduction
@@ -800,12 +800,12 @@ types(Section~\ref{builtin_reduction}) or define his/her own reducer functions
 
 \paragraph{Array section multicast/reduction when migration happens}
 Using multicast/reduction, you don't need to worry about array migrations.
-When migration happens, you can still use the \kw{CkSectionCookie} for
+When migration happens, you can still use the \kw{CkSectionInfo} for
 reduction. Reduction messages will be correctly delivered but 
 may not be as efficient until a new multicast spanning tree is updated
-internally in \kw{CkMulticastMgr}. A new updated \kw{CkSectionCookie} is always
+internally in \kw{CkMulticastMgr}. A new updated \kw{CkSectionInfo} is always
 contained in a multicast message, so it is recommended that 
-\kw{CkGetSectionCookie()} function is called everytime time when a multicast 
+\kw{CkGetSectionInfo()} function is called everytime time when a multicast 
 message arrives(as shown in the above SayHi example).
 
 
