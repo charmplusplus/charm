@@ -38,12 +38,13 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
   sanitize();
 #endif
   register int i;
+  POSE_TimeType long_i;
   // Backup the table to make new one in its place
   int sumS_old=0, sumR_old=0, sumS=0, sumR=0;
-  int keepBkt = (newGVTest-offset)/size_b;
+  POSE_TimeType keepBkt = (newGVTest-offset)/size_b;
   if (keepBkt < b)
-    for (i=keepBkt; i<b; i++)
-      CompressAndSortBucket(i, 0);
+    for (long_i=keepBkt; long_i<b; long_i++)
+      CompressAndSortBucket(long_i, 0);
   CompressAndSortBucket(b, 1);
   int b_old = b, size_b_old = size_b, offset_old = offset;
   SRentry *buckets_old[MAX_B], *end_bucket_old[MAX_B], 
@@ -79,16 +80,16 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
 #endif
 
   if (keepBkt < b_old) {
-    for (i=0; i<keepBkt; i++) { // throw all these away
-      tmp = buckets_old[i];
+    for (long_i=0; long_i<keepBkt; long_i++) { // throw all these away
+      tmp = buckets_old[long_i];
       while (tmp) {
-	buckets_old[i] = tmp->next;
+	buckets_old[long_i] = tmp->next;
 	delete tmp;
-	tmp = buckets_old[i];
+	tmp = buckets_old[long_i];
       }
-      sumS_old -= sends_old[i];
-      sumR_old -= recvs_old[i];
-      sends_old[i] = recvs_old[i] = 0;
+      sumS_old -= sends_old[long_i];
+      sumR_old -= recvs_old[long_i];
+      sends_old[long_i] = recvs_old[long_i] = 0;
     }
 #ifdef SR_SANITIZE
     sanitize();
@@ -110,10 +111,10 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
 #ifdef SR_SANITIZE
     sanitize();
 #endif
-    for (i=keepBkt+1; i<b_old; i++) { // keep all of these
-      if (buckets_old[i])
-	MapToBuckets(buckets_old[i], end_bucket_old[i], 
-		     &sends_old[i], &recvs_old[i]);
+    for (long_i=keepBkt+1; long_i<b_old; long_i++) { // keep all of these
+      if (buckets_old[long_i])
+	MapToBuckets(buckets_old[long_i], end_bucket_old[long_i], 
+		     &sends_old[long_i], &recvs_old[long_i]);
     }
 #ifdef SR_SANITIZE
     sanitize();
@@ -174,8 +175,8 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
 void SRtable::MapToBuckets(SRentry *bkt, SRentry *endBkt, int *s, 
 			   int *r)
 {
-  int destBkt1 = (bkt->timestamp-offset)/size_b;  
-  int destBkt2 = (endBkt->timestamp-offset)/size_b;
+  POSE_TimeType destBkt1 = (bkt->timestamp-offset)/size_b;  
+  POSE_TimeType destBkt2 = (endBkt->timestamp-offset)/size_b;
   SRentry *tmp = bkt;
   CkAssert(destBkt1 <= destBkt2);
   while (destBkt1 != destBkt2) {
@@ -273,8 +274,9 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
   sanitize();
 #endif
   register int i;
-  int packSize = 0, nEntries = 0, entryIdx = 0, nBkts = 0;
-  int destBkt;  // which bucket?
+  int packSize = 0, nEntries = 0, entryIdx = 0;
+  POSE_TimeType nBkts = 0;
+  POSE_TimeType destBkt;  // which bucket?
   SRentry *tmp;
 
   if (pvt == -1) destBkt = b-1;

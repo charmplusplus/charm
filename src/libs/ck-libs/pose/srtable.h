@@ -125,7 +125,7 @@ class SRtable {
     CmiAssert(ts >= offset);
     CmiAssert((sr == 0) || (sr == 1));
     if (size_b == -1) size_b = (ts+1)/b;
-    int destBkt = (ts-offset)/size_b;  // which bucket?
+    POSE_TimeType destBkt = (ts-offset)/size_b;  // which bucket?
     SRentry *e = new SRentry(ts, sr, NULL);
     if (destBkt >= b) { // put in overflow bucket
       if (overflow) {
@@ -171,7 +171,7 @@ class SRtable {
 #endif
     CmiAssert(e != NULL);
     CmiAssert(e->timestamp >= offset);
-    int destBkt = (e->timestamp-offset)/size_b;
+    POSE_TimeType destBkt = (e->timestamp-offset)/size_b;
     e->next = NULL;
     if (destBkt >= b) { // put in overflow bucket
       if (overflow) {
