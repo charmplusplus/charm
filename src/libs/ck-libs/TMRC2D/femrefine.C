@@ -340,7 +340,9 @@ FDECL void FTN_NAME(FEM_REFINE2D_SPLIT_EDGE,fem_refine2d_split_edge)(int *meshID
 	FEM_REFINE2D_Split(*meshID,*nodeID,coord,*elemID,desiredAreas,*sparseID);
 }
 
-
+FDECL void FTN_NAME(CMIMEMORYCHECK,cmimemorycheck)(){
+	CmiMemoryCheck();
+}
 
 void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas){
 	int nnodes = FEM_Mesh_get_length(meshID,nodeID);
