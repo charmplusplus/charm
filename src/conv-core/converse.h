@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.54  1997-02-07 02:15:37  jyelon
+ * Revision 2.55  1997-02-13 09:31:02  jyelon
+ * Modified everything for new main/ConverseInit structure
+ *
+ * Revision 2.54  1997/02/07 02:15:37  jyelon
  * Added stuff for byte-order conversion.
  *
  * Revision 2.53  1997/02/06 19:53:37  jyelon
@@ -769,6 +772,13 @@ void       CmmPut CMK_PROTO((CmmTable t, int ntags, int *tags, void *msg));
 void      *CmmFind CMK_PROTO((CmmTable t, int ntags, int *tags, int *returntags, int del));
 #define    CmmGet(t,nt,tg,rt)   (CmmFind((t),(nt),(tg),(rt),1))
 #define    CmmProbe(t,nt,tg,rt) (CmmFind((t),(nt),(tg),(rt),0))
+
+/******** ConverseInit and ConverseExit ********/
+
+typedef void (*CmiStartFn) CMK_PROTO((int argc, char **argv));
+
+void ConverseInit CMK_PROTO((int, char**, CmiStartFn fn));
+void ConverseExit CMK_PROTO((void));
 
 /******** CONVCONDS ********/
 

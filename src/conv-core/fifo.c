@@ -24,6 +24,11 @@ void *FIFO_Create()
   return (void *)queue;
 }
 
+int FIFO_Fill(queue)
+     FIFO_QUEUE *queue;
+{
+  return queue->fill;
+}
 
 int FIFO_Empty(queue)
      FIFO_QUEUE *queue;

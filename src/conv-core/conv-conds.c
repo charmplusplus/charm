@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-10-13 18:14:10  jyelon
+ * Revision 2.8  1997-02-13 09:31:01  jyelon
+ * Modified everything for new main/ConverseInit structure
+ *
+ * Revision 2.7  1995/10/13 18:14:10  jyelon
  * K&R changes, etc.
  *
  * Revision 2.6  1995/07/10  07:03:07  narain
@@ -81,7 +84,7 @@ CpvDeclare(int, CcdNumChecks);
 
 extern double CmiTimer();
 
-void conv_condsModuleInit()
+void CcdModuleInit()
 {
    int i;
 

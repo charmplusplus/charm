@@ -398,43 +398,39 @@ int fd;
 
 #if CMK_SIGNAL_USE_SIGACTION
 #include <signal.h>
-void CmiSignal(sig, handler)
-int sig;
+void CmiSignal(sig1, sig2, sig3, handler)
+int sig1, sig2, sig3;
 void (*handler)();
 {
   struct sigaction in, out ;
   in.sa_handler = handler;
   sigemptyset(&in.sa_mask);
-  sigaddset(&in.sa_mask, SIGALRM);
-  sigaddset(&in.sa_mask, SIGIO);
+  if (sig1) sigaddset(&in.sa_mask, sig1);
+  if (sig2) sigaddset(&in.sa_mask, sig2);
+  if (sig3) sigaddset(&in.sa_mask, sig2);
   in.sa_flags = 0;
-  sigaction(sig, &in, &out);
+  if (sig1) if (sigaction(sig1, &in, &out)<0) exit(1);
+  if (sig2) if (sigaction(sig2, &in, &out)<0) exit(1);
+  if (sig3) if (sigaction(sig3, &in, &out)<0) exit(1);
 }
 #endif
 
 #if CMK_SIGNAL_USE_SIGACTION_WITH_RESTART
 #include <signal.h>
-void CmiSignal(sig, handler)
-int sig;
+void CmiSignal(sig1, sig2, sig3, handler)
+int sig1, sig2, sig3;
 void (*handler)();
 {
   struct sigaction in, out ;
-  in.sa_handler = handler ;
+  in.sa_handler = handler;
   sigemptyset(&in.sa_mask);
-  sigaddset(&in.sa_mask, SIGALRM);
-  sigaddset(&in.sa_mask, SIGIO);
-  in.sa_flags = SA_RESTART; 
-  if(sigaction(sig, &in, &out)<0) exit(1);
-}
-#endif
-
-#if CMK_SIGNAL_IS_A_BUILTIN
-#include <signal.h>
-void CmiSignal(sig, handler)
-int sig;
-void (*handler)();
-{
-  signal(sig, handler);
+  if (sig1) sigaddset(&in.sa_mask, sig1);
+  if (sig2) sigaddset(&in.sa_mask, sig2);
+  if (sig3) sigaddset(&in.sa_mask, sig2);
+  in.sa_flags = SA_RESTART;
+  if (sig1) if (sigaction(sig1, &in, &out)<0) exit(1);
+  if (sig2) if (sigaction(sig2, &in, &out)<0) exit(1);
+  if (sig3) if (sigaction(sig3, &in, &out)<0) exit(1);
 }
 #endif
 
@@ -767,30 +763,18 @@ char **msgs;
 
 /*****************************************************************************
  *
- * ConverseInit and ConverseExit
+ * Converse Initialization
  *
  *****************************************************************************/
 
-ConverseInit(argv)
-char **argv;
+ConverseCommonInit(char *argv)
 {
   CstatsInit(argv);
-  conv_condsModuleInit(argv);
+  CcdModuleInit(argv);
   CmiHandlerInit();
   CmiMemoryInit(argv);
   CmiDeliversInit();
-  /* CmiSpanTreeInit(argv); done in CmiInitMc()  -- Sanjeev 3/5/96 */
-  CmiInitMc(argv);
   CsdInit(argv);
-#if CMK_CTHINIT_IS_IN_CONVERSEINIT
-  CthInit(argv);
-#endif
   CthSchedInit();
 }
-
-ConverseExit()
-{
-  CmiExit();
-}
-
 
