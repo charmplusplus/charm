@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.14  1995-10-13 22:33:36  jyelon
+ * Revision 1.15  1995-10-18 01:58:43  jyelon
+ * added ifdef around 'alloca.h'
+ *
+ * Revision 1.14  1995/10/13  22:33:36  jyelon
  * There was some bizzare test in CthCreate which I think was supposed
  * to check for failure of some kind, but it didn't work.
  *
@@ -253,12 +256,15 @@ CthThread t;
  *
  *****************************************************************************/
 
-#ifdef CMK_THREADS_USE_ALLOCA
+#ifdef CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE
+#include <alloca.h>
+#define CMK_THREADS_USE_ALLOCA
+#endif
 
+#ifdef CMK_THREADS_USE_ALLOCA
 #include <stdio.h>
 #include <setjmp.h>
 #include <sys/types.h>
-#include <alloca.h>
 
 #define STACKSIZE (32768)
 #define SLACK     256
