@@ -133,7 +133,7 @@ class CkVec {
       T *newblk = new T[newlen];
       if (block!=NULL)
          memcpy(newblk, block, sizeof(T)*blklen);
-      for(int i=blklen; i<newlen; i++) newblk[i] = T(0);
+      for(int i=blklen; i<newlen; i++) newblk[i] = T();
       delete[] block; block = newblk;
       blklen = newlen;
     }
