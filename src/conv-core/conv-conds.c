@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1997-02-13 09:31:01  jyelon
+ * Revision 2.9  1997-07-22 14:22:33  kale
+ * set the function-list  pointer to null AT THE BEGINNING of raisecondition
+ * function.
+ *
+ * Revision 2.8  1997/02/13 09:31:01  jyelon
  * Modified everything for new main/ConverseInit structure
  *
  * Revision 2.7  1995/10/13 18:14:10  jyelon
@@ -161,6 +165,7 @@ void CcdRaiseCondition(condNum)
 {
   FN_ARG *temp, *del;
   temp = CpvAccess(CondArr)[condNum].fn_arg_list;
+  CpvAccess(CondArr)[condNum].fn_arg_list = NULL;
   while(temp)
     {
       (*(temp->fn))(temp->arg); /* Any freeing of the argument structure should
@@ -169,7 +174,7 @@ void CcdRaiseCondition(condNum)
       temp = temp->next;
       free(del);
     }
-  CpvAccess(CondArr)[condNum].fn_arg_list = NULL;
+  /*CpvAccess(CondArr)[condNum].fn_arg_list= NULL; moved up -- sanjay 7/22/97*/
 }
 
 /*****************************************************************************
