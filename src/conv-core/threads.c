@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.21  1995-10-31 19:53:21  jyelon
+ * Revision 1.22  1996-07-02 21:01:39  jyelon
+ * Added CMK_THREADS_USE_JB_TWEAKING
+ *
+ * Revision 1.21  1995/10/31 19:53:21  jyelon
  * Added 'CMK_THREADS_USE_ALLOCA_WITH_PRAGMA'
  *
  * Revision 1.20  1995/10/31  19:49:30  jyelon
@@ -325,11 +328,11 @@ CthVoidFn fn; void *arg; int size;
   result = (CthThread)CmiAlloc(sizeof(struct CthThreadStruct) + size);
   oldsp = (char *)alloca(0);
   if (thread_growsdown) {
-      newsp = ((char *)(result->stack)) + size - SLACK;
-      offs = oldsp - newsp;
+    newsp = ((char *)(result->stack)) + size - SLACK;
+    offs = oldsp - newsp;
   } else {
-      newsp = ((char *)(result->stack)) + SLACK;
-      offs = newsp - oldsp;
+    newsp = ((char *)(result->stack)) + SLACK;
+    offs = newsp - oldsp;
   }
   result->fn = fn;
   result->arg = arg;
@@ -399,7 +402,7 @@ int size;
   int result;
   int align = 1;
   while (size>align) align<<=1;
-  thread_datasize = (thread_datasize+align-1) & (align-1);
+  thread_datasize = (thread_datasize+align-1) & ~(align-1);
   result = thread_datasize;
   thread_datasize += size;
   CthFixData(thread_current);
@@ -411,7 +414,244 @@ int size;
 
 /*****************************************************************************
  *
+ * threads: implementation CMK_THREADS_USE_JB_TWEAKING
+ *
+ * This threads implementation saves and restores state using setjmp
+ * and longjmp, and it creates new states by doing a setjmp and then
+ * twiddling the contents of the jmp_buf.  It uses a heuristic to find
+ * the places in the jmp_buf it needs to adjust to change the stack
+ * pointer.  It sometimes works.  It has the advantage that it doesn't
+ * require alloca.
+ *
+ ****************************************************************************/
+
+#ifdef CMK_THREADS_USE_JB_TWEAKING
+
+#include <stdio.h>
+#include <setjmp.h>
+#include <sys/types.h>
+
+#define STACKSIZE (32768)
+#define SLACK     256
+
+char *CthData;
+
+typedef struct { jmp_buf jb; } jmpb;
+
+struct CthThreadStruct
+{
+  char cmicore[CmiMsgHeaderSizeBytes]; /* So we can enqueue them */
+  jmp_buf    jb;
+  CthVoidFn  fn;
+  void      *arg;
+  CthVoidFn  awakenfn;
+  CthThFn    choosefn;
+  char      *data;
+  int        datasize;
+  double     stack[1];
+};
+
+
+static jmp_buf    thread_launching;
+static CthThread  thread_current;
+static CthThread  thread_exiting;
+static int        thread_growsdown;
+static int        thread_datasize;
+static int        thread_jb_offsets[10];
+static int        thread_jb_count;
+
+#define ABS(a) (((a) > 0)? (a) : -(a) )
+
+int CthImplemented()
+    { return 1; }
+
+static void CthInitSub1(jmpb *bufs, int *frames, int n)
+{
+  double d;
+  frames[n] = (int)(&d);
+  setjmp(bufs[n].jb);
+  if (n==0) return;
+  CthInitSub1(bufs, frames, n-1);
+}
+
+static void CthInitSub2()
+{
+  if (setjmp(thread_launching)) {
+    (thread_current->fn)(thread_current->arg);
+    exit(1);
+  }
+}
+
+void CthInit()
+{
+  int frames[2];
+  jmpb bufs[2];
+  int i, j, delta, size, *p0, *p1;
+
+  thread_datasize=1;
+  thread_current=(CthThread)CmiAlloc(sizeof(struct CthThreadStruct));
+  thread_current->fn=0;
+  thread_current->arg=0;
+  thread_current->data=0;
+  thread_current->datasize=0;
+  thread_current->awakenfn = 0;
+  thread_current->choosefn = 0;
+
+  /* analyze the activation record. */
+  CthInitSub1(bufs, frames, 1);
+  CthInitSub2();
+  thread_growsdown = (frames[0] < frames[1]);
+  size = (sizeof(jmpb)/sizeof(int));
+  delta = frames[0]-frames[1];
+  p0 = (int *)(bufs+0);
+  p1 = (int *)(bufs+1);
+  thread_jb_count = 0;
+  for (i=0; i<size; i++) {
+    if (thread_jb_count==10) goto fail;
+    if ((p0[i]-p1[i])==delta) {
+      thread_jb_offsets[thread_jb_count++] = i;
+      ((int *)(&thread_launching))[i] -= (int)(frames[1]);
+    }
+  }
+  if (thread_jb_count == 0) goto fail;
+  return;
+fail:
+  CmiPrintf("Thread initialization failed.\n");
+  exit(1);
+}
+
+CthThread CthSelf()
+{
+  return thread_current;
+}
+
+static void CthTransfer(t)
+CthThread t;
+{
+  thread_current = t;
+  CthData = t->data;
+  longjmp(t->jb, 1);
+}
+
+void CthFixData(t)
+CthThread t;
+{
+  if (t->data == 0) {
+    t->datasize = thread_datasize;
+    t->data = (char *)malloc(thread_datasize);
+    return;
+  }
+  if (t->datasize != thread_datasize) {
+    t->datasize = thread_datasize;
+    t->data = (char *)realloc(t->data, t->datasize);
+    return;
+  }
+}
+
+static void CthFreeNow(t)
+CthThread t;
+{
+  if (t->data) free(t->data); 
+  CmiFree(t);
+}
+
+void CthResume(t)
+CthThread t;
+{
+  int i;
+  if (t == thread_current) return;
+  CthFixData(t);
+  if ((setjmp(thread_current->jb))==0)
+    CthTransfer(t);
+  if (thread_exiting)
+    { CthFreeNow(thread_exiting); thread_exiting=0; }
+}
+
+CthThread CthCreate(fn, arg, size)
+CthVoidFn fn; void *arg; int size;
+{
+  CthThread  result; int i, sp;
+  if (size==0) size = STACKSIZE;
+  result = (CthThread)CmiAlloc(sizeof(struct CthThreadStruct) + size);
+  sp = ((int)(result->stack));
+  sp += (thread_growsdown) ? (size - SLACK) : SLACK;
+  result->fn = fn;
+  result->arg = arg;
+  result->awakenfn = 0;
+  result->choosefn = 0;
+  result->data = 0;
+  result->datasize = 0;
+  memcpy(&(result->jb), &thread_launching, sizeof(thread_launching));
+  for (i=0; i<thread_jb_count; i++)
+    ((int *)(&(result->jb)))[thread_jb_offsets[i]] += sp;
+  return result;
+}
+
+void CthFree(t)
+CthThread t;
+{
+  if (t==thread_current) {
+    thread_exiting = t;
+  } else CthFreeNow(t);
+}
+
+static void CthNoStrategy()
+{
+  CmiPrintf("Called CthAwaken or CthSuspend before calling CthSetStrategy.\n");
+  exit(1);
+}
+
+void CthSuspend()
+{
+  CthThread next;
+  if (thread_current->choosefn == 0) CthNoStrategy();
+  next = thread_current->choosefn();
+  CthResume(next);
+}
+
+void CthAwaken(th)
+CthThread th;
+{
+  if (th->awakenfn == 0) CthNoStrategy();
+  th->awakenfn(th);
+}
+
+void CthSetStrategy(t, awkfn, chsfn)
+CthThread t;
+CthVoidFn awkfn;
+CthThFn chsfn;
+{
+  t->awakenfn = awkfn;
+  t->choosefn = chsfn;
+}
+
+void CthYield()
+{
+  CthAwaken(thread_current);
+  CthSuspend();
+}
+
+int CthRegister(size)
+int size;
+{
+  int result;
+  int align = 1;
+  while (size>align) align<<=1;
+  thread_datasize = (thread_datasize+align-1) & ~(align-1);
+  result = thread_datasize;
+  thread_datasize += size;
+  CthFixData(thread_current);
+  CthData = thread_current->data;
+  return result;
+}
+
+#endif CMK_THREADS_USE_JB_TWEAKING
+
+/*****************************************************************************
+ *
  * threads: implementation CMK_THREADS_USE_EATSTACK
+ *
+ * This thing just doesn't work.  Maybe I'll figure out why someday.
  *
  * I got the idea for this from a Dr. Dobb's journal, of all places.
  * Threads are in the stack segment.  The topmost thread in the stack segment
@@ -553,7 +793,7 @@ int size;
   int result;
   int align = 1;
   while (size>align) align<<=1;
-  dsize = (dsize + align-1) & (align-1);
+  dsize = (dsize + align-1) & ~(align-1);
   result = dsize;
   dsize += size;
   CpvAccess(CthDatasize) = dsize;
@@ -697,6 +937,7 @@ char **argv;
 }
 
 #endif /* CMK_THREADS_USE_EATSTACK */
+
 
 /*****************************************************************************
  *

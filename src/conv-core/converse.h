@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.43  1996-06-24 18:56:25  jyelon
+ * Revision 2.44  1996-07-02 21:01:55  jyelon
+ * Added CMK_THREADS_USE_JB_TWEAKING
+ *
+ * Revision 2.43  1996/06/24 18:56:25  jyelon
  * *** empty log message ***
  *
  * Revision 2.42  1996/04/17 18:54:36  jyelon
@@ -425,59 +428,32 @@ void       CthYield               CMK_PROTO((void));
 #ifdef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
 extern char *CthData;
 extern int CthRegister CMK_PROTO((int));
-#define CtvOffs(v) CtvOffs##v
-#define CtvType(v) CtvType##v
-#define CtvDeclare(t,v)         typedef t CtvType(v); int CtvOffs(v)
-#define CtvStaticDeclare(t,v)   typedef t CtvType(v); static int CtvOffs(v)
-#define CtvExtern(t,v)          typedef t CtvType(v); extern int CtvOffs(v)
-#define CtvAccess(v)            (*((CtvType(v) *)(CthData+CtvOffs(v))))
-#define CtvInitialize(t,v)      (CtvOffs(v)=CthRegister(sizeof(CtvType(v))))
+#define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
+#define CtvStaticDeclare(t,v)   typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
+#define CtvExtern(t,v)          typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
+#define CtvAccess(v)            (*((CtvType##v *)(CthData+CsvAccess(CtvOffs##v))))
+#define CtvInitialize(t,v)      if (CmiMyRank()==0) (CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)));
 #endif /* CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION */
 #endif /* CMK_THREADS_USE_ALLOCA */
 
 
-
-#ifdef CMK_THREADS_USE_ALLOCA
-#ifdef CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
+#ifdef CMK_THREADS_USE_JB_TWEAKING
+#ifdef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
 extern char *CthData;
 extern int CthRegister CMK_PROTO((int));
-#define CtvDeclare(t,v)         int v;          struct v { t data; }
-#define CtvStaticDeclare(t,v)   static int v;   struct v { t data; }
-#define CtvExtern(t,v)          extern int v;   struct v { t data; }
-#define CtvAccess(v)            (((struct v *)(CthData+(v)))->data)
-#define CtvInitialize(t,v)      (v=CthRegister(sizeof(struct v)))
-#endif /* CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION */
-#endif /* CMK_THREADS_USE_ALLOCA */
-
-
-
-#ifdef CMK_THREADS_USE_EATSTACK
-#ifdef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
-CpvExtern(char *, CthData);
-extern int CthRegister CMK_PROTO((int));
-#define CtvOffs(v) CtvOffs##v
-#define CtvType(v) CtvType##v
-#define CtvDeclare(t,v)      typedef t CtvType(v); int CtvOffs(v)
-#define CtvStaticDeclare(t,v)typedef t CtvType(v); static int CtvOffs(v)
-#define CtvExtern(t,v)       typedef t CtvType(v); extern int CtvOffs(v)
-#define CtvAccess(v)         (*((CtvType(v) *)(CpvAccess(CthData)+CtvOffs(v))))
-#define CtvInitialize(t,v)   (CtvOffs(v)=CthRegister(sizeof(CtvType(v))))
+#define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
+#define CtvStaticDeclare(t,v)   typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
+#define CtvExtern(t,v)          typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
+#define CtvAccess(v)            (*((CtvType##v *)(CthData+CsvAccess(CtvOffs##v))))
+#define CtvInitialize(t,v)      if (CmiMyRank()==0) (CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)));
 #endif /* CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION */
-#endif /* CMK_THREADS_USE_EATSTACK */
+#endif /* CMK_THREADS_USE_JB_TWEAKING */
 
 
 
-#ifdef CMK_THREADS_USE_EATSTACK
-#ifdef CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
-CpvDeclare(char *, CthData);
-extern int CthRegister CMK_PROTO((int));
-#define CtvDeclare(t,v)         int v;          struct v { t data; }
-#define CtvStaticDeclare(t,v)   static int v;   struct v { t data; }
-#define CtvExtern(t,v)          extern int v;   struct v { t data; }
-#define CtvAccess(v)            (((struct v *)(CpvAccess(CthData)+(v)))->data)
-#define CtvInitialize(t,v)      (v=CthRegister(sizeof(struct v)))
-#endif /* CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION */
-#endif /* CMK_THREADS_USE_EATSTACK */
+#ifndef CtvDeclare
+error Barf.
+#endif
 
 
 /************************************************************************
