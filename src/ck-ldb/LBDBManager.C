@@ -5,7 +5,7 @@
  * $Revision$
  *****************************************************************************/
 
-#include <converse.h>
+#include <charm++.h>
 
 #if CMK_LBDB_ON
 
@@ -54,7 +54,7 @@ LBDB::LBDB()
     obj_running = CmiFalse;
     commTable = new LBCommTable;
     obj_walltime = obj_cputime = 0;
-    batsync.init(this,1.0);
+//    batsync.init(this,1.0);
 }
 
 LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData, 
@@ -142,7 +142,7 @@ void LBDB::Send(LDOMHandle destOM, LDObjid destid, unsigned int bytes)
     LBCommData item(runningObj,destOM.id,destid);
     item_ptr = commTable->HashInsertUnique(item);
   } else {
-    LBCommData item(CmiMyPe(),destOM.id,destid);
+    LBCommData item(CkMyPe(),destOM.id,destid);
     item_ptr = commTable->HashInsertUnique(item);
   }  
   item_ptr->addMessage(bytes);
@@ -185,10 +185,10 @@ void LBDB::GetObjData(LDObjData *dp)
 void LBDB::Migrate(LDObjHandle h, int dest)
 {
   if (h.handle > objCount)
-    CmiPrintf("[%d] Handle %d out of range 0-%d\n",CmiMyPe(),h.handle,objCount);
+    CmiPrintf("[%d] Handle %d out of range 0-%d\n",CkMyPe(),h.handle,objCount);
   else if (!(objs[h.handle])->registered)
     CmiPrintf("[%d] Handle %d no longer registered, range 0-%d\n",
-	    CmiMyPe(),h.handle,objCount);
+	    CkMyPe(),h.handle,objCount);
 
   if ((h.handle < objCount) && ((objs[h.handle])->registered)) {
     LBOM *const om = oms[(objs[h.handle])->parentOM.handle];
