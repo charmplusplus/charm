@@ -13,12 +13,14 @@ NormalRealSlabArray::doFFT(int src_id, int dst_id)
     CkAssert(fftinfo.transformType == REAL_TO_COMPLEX);
     
     int rplaneSize = fftinfo.srcSize[0] * fftinfo.srcSize[1];
-    int cplaneSize = (fftinfo.srcSize[0]/2+1) * fftinfo.srcSize[1];
+    int cplaneSize = (fftinfo.srcSize[0]/2) * fftinfo.srcSize[1];
     int lineSize = fftinfo.srcSize[1];
 
     double *dataPtr = (double*)fftinfo.dataPtr;
     complex *outData = new complex[cplaneSize * fftinfo.srcPlanesPerSlab];
+    complex *outData2 = new complex[cplaneSize * fftinfo.srcPlanesPerSlab];
     complex *outDataPtr = outData;
+    complex *outDataPtr2 = outData2;
 
 	// do the 2D forward ffts
     CmiAssert(rfwd1DXPlan!=NULL && fwd1DYPlan!=NULL);
@@ -28,33 +30,53 @@ NormalRealSlabArray::doFFT(int src_id, int dst_id)
         // real_to_complex on X dimension
 	rfftw(rfwd1DXPlan, fftinfo.srcSize[1], 
 	      (fftw_real*)dataPtr, fftinfo.srcSize[0], 1, 
-	      (fftw_real*)outDataPtr, fftinfo.srcSize[0]/2+1, 1);
-	fftw(fwd1DYPlan, fftinfo.srcSize[0]/2+1, 
-	     (fftw_complex*)outDataPtr, fftinfo.srcSize[0]/2+1, 1,
-	     NULL, 0, 0);
-    }
+	      (fftw_real*)outDataPtr, 1, fftinfo.srcSize[0]);
 
+#if 1	
+	CkPrintf("[%d] after RFFT \n", thisIndex);
+	for(int pi=0; pi<cplaneSize; pi++){
+	    CkPrintf("%d -- {%.5g %.5g}\n", pi, outDataPtr[pi].re, outDataPtr[pi].im);
+	}
+#endif
+
+	fftw(fwd1DYPlan, fftinfo.srcSize[0]/2,
+	     (fftw_complex*)outDataPtr, fftinfo.srcSize[0]/2, 1, 
+	     (fftw_complex*)outDataPtr2, 1, fftinfo.srcSize[0]/2);
+
+#if 1	
+	CkPrintf("[%d] after FFT \n", thisIndex);
+	for(int pi=0; pi<cplaneSize; pi++){
+	    CkPrintf("%d -- {%.5g %.5g}\n", pi, outDataPtr2[pi].re, outDataPtr2[pi].im);
+	}
+#endif
+
+	dataPtr += rplaneSize;
+	outDataPtr += cplaneSize;
+	outDataPtr2 += cplaneSize;
+    }
+    
+    dataPtr = (double*)fftinfo.dataPtr;
+    outDataPtr2 = outData2;
     // allocating the data for sending to destination side
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
     complex *temp;
     // i <> pe if destPlanesPerSlab is not 1
     int pe, i;
-    for(i = 0, pe = 0; i < fftinfo.srcSize[0]/2+1; i += fftinfo.destPlanesPerSlab, pe++) {
+    for(i = 0, pe = 0; i < fftinfo.srcSize[0]/2; i += fftinfo.destPlanesPerSlab, pe++) {
 	int ti;
 	temp = sendData;
-	for(ti = i; ti < i + fftinfo.destPlanesPerSlab && ti < fftinfo.srcSize[0]/2+1; ti++)
+	for(ti = i; ti < i + fftinfo.destPlanesPerSlab && ti < fftinfo.srcSize[0]/2; ti++)
 	    for(p = 0; p < fftinfo.srcPlanesPerSlab; p++) {
 		memcpy(temp, 
-		       outData + p * cplaneSize + ti * lineSize,
+		       outDataPtr2 + p * cplaneSize + ti * lineSize,
 		       sizeof(complex) * lineSize);
 		temp += lineSize;
 	    }
-	
-//	CkPrintf("[%d] Sending out to acceptFFT [%d]\n", thisIndex, pe);
 	((CProxy_NormalRealSlabArray)fftinfo.destProxy)(pe).acceptDataForFFT(lineSize * fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab, sendData, thisIndex, dst_id);
     }
     delete [] sendData;
     delete [] outData;
+    delete [] outData2;
 }
 
 /*
@@ -82,6 +104,7 @@ NormalRealSlabArray::acceptDataForFFT(int numPoints, complex *points, int posn, 
 	       sizeof(complex) * lineSize * fftinfo.srcPlanesPerSlab);
 	points += lineSize * fftinfo.srcPlanesPerSlab;
     }
+
     if (counts[info_id] == fftinfo.destSize[0] / fftinfo.srcPlanesPerSlab) {
 	counts[info_id] = 0;
 	CkAssert(fwd1DZPlan != NULL);
@@ -91,6 +114,13 @@ NormalRealSlabArray::acceptDataForFFT(int numPoints, complex *points, int posn, 
 		     (fftw_complex*)dataPtr + p * planeSize,
 		     lineSize, 1, //stride, nextFFT
 		     NULL, 0, 0);
+#if 1	
+		CkPrintf("[%d] acceptFFT  after FFTW\n", thisIndex);
+		for(int pi=0; pi<planeSize; pi++){
+		    CkPrintf("%d -- {%.5g %.5g}\n", pi, dataPtr[pi].re, dataPtr[pi].im);
+		}
+#endif
+
 	}
 	doneFFT(info_id);
     }
@@ -120,6 +150,12 @@ NormalRealSlabArray::doIFFT(int src_id, int dst_id)
 	fftw(bwd1DYPlan, fftinfo.destSize[1], 
 	     (fftw_complex*)dataPtr+p*planeSize, 1, fftinfo.destSize[1], 
 	     NULL, 0, 0);
+#if 1	
+	CkPrintf("[%d] IFFT  after FFTW\n", thisIndex);
+	for(int pi=0; pi<planeSize; pi++){
+	    CkPrintf("%d -- {%.5g %.5g}\n", pi, dataPtr[pi].re, dataPtr[pi].im);
+	}
+#endif
     }
   
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
@@ -128,14 +164,19 @@ NormalRealSlabArray::doIFFT(int src_id, int dst_id)
     for (i = 0, pe = 0; i < fftinfo.destSize[0]; i += fftinfo.srcPlanesPerSlab, pe++) {
 	int ti;
 	temp = sendData;
-	for (ti = i; ti < i + fftinfo.srcPlanesPerSlab && ti < fftinfo.destSize[0]/2+1; ti++)
+	for (ti = i; ti < i + fftinfo.srcPlanesPerSlab && ti < fftinfo.destSize[0]; ti++)
 	    for (p = 0; p < fftinfo.destPlanesPerSlab; p++) {
 		memcpy(temp,
 		       dataPtr + p * planeSize + ti * lineSize,
 		       sizeof(complex) * lineSize);
 		temp += lineSize;
 	    }
-//	CkPrintf("[%d] Sending out to acceptIFFT [%d]\n", thisIndex, pe);
+#if 1
+	CkPrintf("[%d] Sending out to acceptIFFT [%d]\n", thisIndex, pe);
+	for(int pi=0; pi<lineSize; pi++)
+	    CkPrintf("%d -- {%.5g %.5g}\n", pi, sendData[pi].re, sendData[pi].im);
+#endif
+
 	((CProxy_NormalRealSlabArray)fftinfo.srcProxy)(pe).acceptDataForIFFT(lineSize * fftinfo.destPlanesPerSlab * fftinfo.srcPlanesPerSlab, sendData, thisIndex, dst_id);
     }
     delete [] sendData;
@@ -148,50 +189,87 @@ NormalRealSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn,
     CkAssert(fftinfo.transformType == REAL_TO_COMPLEX);
 
     int rplaneSize = fftinfo.srcSize[0] * fftinfo.srcSize[1];
-    int cplaneSize = (fftinfo.srcSize[0]/2+1) * fftinfo.srcSize[1];
+    int cplaneSize = (fftinfo.srcSize[0]/2) * fftinfo.srcSize[1];
     int planeSize = fftinfo.destSize[0] * fftinfo.destSize[1];
     int lineSize = fftinfo.destSize[1];
     double *dataPtr = (double*)fftinfo.dataPtr;
-    complex *inData = new complex[fftinfo.srcPlanesPerSlab * cplaneSize];
+//    complex *inData = new complex[fftinfo.srcPlanesPerSlab * cplaneSize];
+    complex *inData = (complex*)dataPtr;
 #if CAREFUL
     CkAssert(numPoints == fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize);
 #endif
-    
+
+#if 1
+	CkPrintf("[%d] Recving from acceptIFFT [%d]\n", thisIndex, posn);
+	for(int pi=0; pi<lineSize; pi++)
+	    CkPrintf("%d -- {%.5g %.5g}\n", pi, points[pi].re, points[pi].im);
+#endif
+
     counts[info_id]++;
     int p;
     for(p = 0; p < fftinfo.srcPlanesPerSlab; p++) {
-	memcpy(dataPtr + p * planeSize + posn * lineSize * fftinfo.destPlanesPerSlab,
+/*
+	memcpy(inData + p * planeSize + posn * lineSize * fftinfo.destPlanesPerSlab,
 	       points, 
 	       sizeof(complex) * lineSize * fftinfo.destPlanesPerSlab);
 	points += lineSize * fftinfo.destPlanesPerSlab;
+*/
+	dataPtr = (double*)((complex*)dataPtr + p * planeSize + posn * lineSize * fftinfo.destPlanesPerSlab);
+	for(int pi=0; pi<lineSize* fftinfo.destPlanesPerSlab; pi++){
+	    dataPtr[pi] = points[pi].re;
+	    dataPtr[pi+lineSize] = points[pi].im;
+	}
     }
+#if 1
+	    CkPrintf("[%d] acceptIFFT copied\n", thisIndex);
+	    for(int pi=0; pi<cplaneSize; pi++)
+		CkPrintf("%d -- {%.5g %.5g}\n", pi, inData[pi].re, inData[pi].im);
+#endif
     
-    int expectedCount = (fftinfo.srcSize[0]/2+1)%fftinfo.destPlanesPerSlab==0 ? 
-	(fftinfo.srcSize[0]/2+1) / fftinfo.destPlanesPerSlab : (fftinfo.srcSize[0]/2+1) / fftinfo.destPlanesPerSlab+1;
+    int expectedCount = (fftinfo.srcSize[0]/2)%fftinfo.destPlanesPerSlab==0 ? 
+	(fftinfo.srcSize[0]/2) / fftinfo.destPlanesPerSlab : (fftinfo.srcSize[0]/2) / fftinfo.destPlanesPerSlab+1;
     if (counts[info_id] == expectedCount) {
 	counts[info_id] = 0;
 	CmiAssert(rbwd1DXPlan!=NULL);
+	double *dataPtr2 = new double[rplaneSize*fftinfo.srcPlanesPerSlab];
 	for(p = 0; p < fftinfo.srcPlanesPerSlab; p++) {
+#if 1
+	    CkPrintf("[%d] acceptIFFT before RFFTW\n", thisIndex);
+	    for(int pi=0; pi<cplaneSize; pi++)
+		CkPrintf("%d -- {%.5g %.5g}\n", pi, inData[pi].re, inData[pi].im);
+#endif
 	    // complex_to_real transform
 		rfftw(rbwd1DXPlan,
 		      lineSize,
-		      (fftw_real*)inData + p * cplaneSize,
+		      (fftw_real*)(inData + p * cplaneSize),
 		      lineSize, 1, //stride, nextFFT
-		      (fftw_real*)dataPtr + p * planeSize, lineSize, 1);
+		      (fftw_real*)dataPtr2 + p * planeSize, 
+		      lineSize, 1);
+#if 1	
+		CkPrintf("[%d] acceptIFFT  after RFFTW\n", thisIndex);
+		for(int pi=0; pi<planeSize; pi++){
+		    CkPrintf("%d -- {%.5g}\n", pi, dataPtr[pi]);
+		}
+#endif
 	}
+
+	memcpy(inData, dataPtr2, sizeof(double)*rplaneSize*fftinfo.srcPlanesPerSlab);
 	doneIFFT(info_id);
+	delete [] dataPtr2;
     }
-    delete [] inData;
+
+//    delete [] inData;
 }
 void NormalRealSlabArray::createPlans(NormalFFTinfo &info)
 {
     if (info.isSrcSlab) {
 	rfwd1DXPlan = rfftw_create_plan(info.srcSize[0], FFTW_REAL_TO_COMPLEX, FFTW_MEASURE|FFTW_OUT_OF_PLACE);
-	fwd1DYPlan = fftw_create_plan(info.srcSize[1], FFTW_BACKWARD, FFTW_MEASURE|FFTW_IN_PLACE); 
-	rbwd1DXPlan = rfftw_create_plan(info.srcSize[0], FFTW_BACKWARD, FFTW_MEASURE|FFTW_OUT_OF_PLACE);
+	//fwd1DYPlan = fftw_create_plan(info.srcSize[1], FFTW_BACKWARD, FFTW_MEASURE|FFTW_IN_PLACE); 
+	fwd1DYPlan = fftw_create_plan(info.srcSize[1], FFTW_BACKWARD, FFTW_MEASURE|FFTW_OUT_OF_PLACE); 
+	rbwd1DXPlan = rfftw_create_plan(info.srcSize[0], FFTW_COMPLEX_TO_REAL, FFTW_MEASURE|FFTW_OUT_OF_PLACE);
     }
     else {
-	bwd1DZPlan = fftw_create_plan(info.destSize[0], FFTW_COMPLEX_TO_REAL, FFTW_MEASURE|FFTW_IN_PLACE);
+	bwd1DZPlan = fftw_create_plan(info.destSize[0], FFTW_BACKWARD, FFTW_MEASURE|FFTW_IN_PLACE);
 	bwd1DYPlan = fftw_create_plan(info.destSize[1], FFTW_BACKWARD, FFTW_MEASURE|FFTW_IN_PLACE);
 	fwd1DZPlan = fftw_create_plan(info.destSize[0], FFTW_FORWARD, FFTW_MEASURE|FFTW_IN_PLACE);
     }
