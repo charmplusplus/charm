@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1997-12-30 23:50:24  jyelon
+ * Revision 2.2  1998-05-04 17:45:22  rbrunner
+ * Random numbers different on nodes
+ *
+ * Revision 2.1  1997/12/30 23:50:24  jyelon
  * Random LDB based on converse --- no charm involved.
  *
  * Revision 2.4  1997/12/22 21:57:23  jyelon
@@ -78,7 +81,7 @@ void CldNewSeedFromLocal(msgst,ldb,sendfn,queueing,priolen,prioptr)
      void (*sendfn)();
      unsigned int queueing, priolen, *prioptr;
 {
-  int pe = rand() % CmiNumPes();
+  int pe = (rand()+CmiMyPe()) % CmiNumPes();
   if (pe == CmiMyPe())
     CsdEnqueueGeneral(msgst, queueing, priolen, prioptr);
   else
