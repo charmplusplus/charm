@@ -10,7 +10,7 @@ CkGroupID mCastGrpId;
 CProxySection_Hello *mcast;
 
 #define SECTIONSIZE  5
-#define REDUCE_TIME  100
+#define REDUCE_TIME  1000
 
 void client(CkSectionCookie sid, void *param, int dataSize, void *data);
 
@@ -22,10 +22,14 @@ public:
 };
 
 
-typedef struct {
+class myReductionCounter {
+public:
   int reductionNo;
   int reductionsRemaining;
-} myReductionCounter;
+public:
+  myReductionCounter(): reductionNo(0), reductionsRemaining(0) {}
+};
+PUPbytes(myReductionCounter);
 
 class main : public Chare
 {
@@ -66,7 +70,7 @@ class Hello : public CBase_Hello
 private:
   CkSectionCookie sid;
   int init;
-  myReductionCounter *cnt;
+  myReductionCounter cnt;
   CProxySection_Hello mcp;
 
 public:
@@ -74,7 +78,6 @@ public:
   {
     CkPrintf("Hello %d created\n",thisIndex);
     init = 0;
-    cnt = NULL;
   }
 
   Hello(CkMigrateMessage *m) {}
@@ -92,7 +95,7 @@ CmiPrintf("start\n");
     mcast = new CProxySection_Hello(thisArrayID, al, SECTIONSIZE, mCastGrpId);
 #endif
     mcp = CProxySection_Hello::ckNew(thisArrayID, al, SECTIONSIZE);
-    mcp.ckDelegate(mCastGrpId);
+    mcp.ckDelegate(mg);
 
     mg->setSection(mcp);
 
@@ -104,9 +107,8 @@ CmiPrintf("start\n");
     mg->setSection(sid);
 #endif
 
-    cnt=new myReductionCounter;
-    cnt->reductionsRemaining=REDUCE_TIME;
-    cnt->reductionNo=0;
+    cnt.reductionsRemaining=REDUCE_TIME;
+    cnt.reductionNo=0;
 //    mg->setReductionClient(mcp, client, cnt);
     CkCallback *cb = new CkCallback(CkIndex_Hello::cb_client(NULL), CkArrayIndex1D(0), thisProxy);
     mg->setReductionClient(mcp, cb);
@@ -121,15 +123,15 @@ CmiPrintf("start\n");
   {
     int dataSize = msg->getSize();
     void *data = msg->getData();
-    CmiPrintf("RESULT [%d]: %d\n", cnt->reductionNo, *(int *)data); 
+    CmiPrintf("RESULT [%d]: %d\n", cnt.reductionNo, *(int *)data); 
 
     // check correctness
     int result;
-    if (cnt->reductionNo%3 == 0) {
+    if (cnt.reductionNo%3 == 0) {
       result = 0;
       for (int i=0; i<SECTIONSIZE; i++) result+=i;
     }
-    else if (cnt->reductionNo%3 == 2) {
+    else if (cnt.reductionNo%3 == 2) {
       result = 1;
       for (int i=1; i<SECTIONSIZE+1; i++) result*=i;
     }
@@ -140,23 +142,25 @@ CmiPrintf("start\n");
       CmiAbort("reduction result is wrong!");
     }
   
-    cnt->reductionsRemaining--;
-    if (cnt->reductionsRemaining<=0) {
+    cnt.reductionsRemaining--;
+    if (cnt.reductionsRemaining<=0) {
       CProxy_main mproxy(mid);
       mproxy.maindone();
-      cnt->reductionNo++;
+      cnt.reductionNo++;
     }
     else {
+#if 0
       CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
       if (cnt->reductionNo % 32 == 0)
         mg->rebuild(mcp.ckGetSectionCookie());
+#endif
   
-      if (cnt->reductionNo%3 == 0) {
+      if (cnt.reductionNo%3 == 0) {
         HiMsg *hiMsg = new (1, 0) HiMsg;
-        hiMsg->data[0] = 18+cnt->reductionNo;
+        hiMsg->data[0] = 18+cnt.reductionNo;
         mcp.SayHi(hiMsg);
       }
-      cnt->reductionNo++;
+      cnt.reductionNo++;
     }
     delete msg;
   }
@@ -178,6 +182,16 @@ CmiPrintf("start\n");
     data = thisIndex+1;
     mg->contribute(sizeof(int), &data,CkReduction::product_int, sid);
     delete m;
+    if (1)
+    ckMigrate((CkMyPe()+1)%CkNumPes());
+  }
+
+  void pup(PUP::er &p) {
+    ArrayElement1D::pup(p);//Call superclass
+    p|sid;
+    p(init);
+    p|cnt;
+    p|mcp;
   }
 };
 
