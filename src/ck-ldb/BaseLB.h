@@ -39,25 +39,28 @@ private:
   void initLB(const CkLBOptions &);
 public:
   struct ProcStats {  // per processor data
+    int   n_objs;
+    int   pe_speed;
     double total_walltime;
     double total_cputime;
     double idletime;
     double bg_walltime;
     double bg_cputime;
     //double utilization;
-    int   n_objs;
-    int   pe_speed;
+    int   pe;			// proc #
     CmiBool available;
-    ProcStats(): total_walltime(0.0), total_cputime(0.0), idletime(0.0),
-	   	 bg_walltime(0.0), bg_cputime(0.0), n_objs(0), 
-		 pe_speed(1), available(CmiTrue)  {}
+    ProcStats(): n_objs(0), pe_speed(1), 
+                 total_walltime(0.0), total_cputime(0.0), idletime(0.0),
+	   	 bg_walltime(0.0), bg_cputime(0.0), 
+                 pe(-1), available(CmiTrue)  {}
     inline void pup(PUP::er &p) {
       p|total_walltime;  p|total_cputime; p|idletime;
       p|bg_walltime; p|bg_cputime; p|pe_speed;
       if (_lb_args.lbversion() < 1 && p.isUnpacking()) {
-         double dummy;  p|dummy;    // for old utilization
+         double dummy;  p|dummy;    // for old format with utilization
       }
       p|available; p|n_objs;
+      if (_lb_args.lbversion()>=2) p|pe; 
     }
   };
 
@@ -75,7 +78,7 @@ public:
     int *objHash; 
     int  hashSize;
 
-    LDStats();
+    LDStats(int c=0);
     void assign(int oid, int pe) { CmiAssert(procs[pe].available); to_proc[oid] = pe; }
       // build hash table
     void makeCommHash();
@@ -94,6 +97,8 @@ public:
     }
     void print();
     double computeAverageLoad();
+    // edit functions
+    void removeObject(int obj);
     void pup(PUP::er &p);
     int useMem();
   };
@@ -125,41 +130,52 @@ struct MigrateInfo {
 */
 class LBMigrateMsg : public CMessage_LBMigrateMsg {
 public:
-  int n_moves;
+  int level;			// which level in hierarchy, used in hybridLB
+
+  int n_moves;			// number of moves
   MigrateInfo* moves;
 
-  char * avail_vector;
-  int next_lb;
+  char * avail_vector;		// processor bit vector
+  int next_lb;			// next load balancer
 
-  double * expectedLoad;
+  double * expectedLoad;	// expected load for future
+
+public:
+  LBMigrateMsg(): level(0), n_moves(0), next_lb(0) {}
 };
 
 // for a FooLB, the following macro defines these functions for each LB:
-// CreateFooLB(): which register with LBDatabase with sequence ticket
-// , 
-// AllocateFooLB(): which only locally allocate the class
-// static void lbinit(): which is an init call
+// CreateFooLB():        create BOC and register with LBDatabase with a 
+//                       sequence ticket,
+// AllocateFooLB():      allocate the class instead of a BOC
+// static void lbinit(): an init call for charm module registration
 #if CMK_LBDB_ON
+
 #define CreateLBFunc_Def(x, str)		\
 void Create##x(void) { 	\
   int seqno = LBDatabaseObj()->getLoadbalancerTicket();	\
   CProxy_##x::ckNew(CkLBOptions(seqno)); 	\
 }	\
+\
 BaseLB *Allocate##x(void) { \
   return new x((CkMigrateMessage*)NULL);	\
 }	\
+\
 static void lbinit(void) {	\
   LBRegisterBalancer(#x,	\
                      Create##x,	\
                      Allocate##x,	\
                      str);	\
 }
+
 #else		/* CMK_LBDB_ON */
+
 #define CreateLBFunc_Def(x, str)	\
 void Create##x(void) {} 	\
 BaseLB *Allocate##x(void) { return NULL; }	\
 static void lbinit(void) {}
-#endif
+
+#endif		/* CMK_LBDB_ON */
 
 #endif
 

@@ -75,11 +75,13 @@ inline static int ObjKey(const LDObjid &oid, const int hashSize) {
 	 |i_abs(oid.id[0])) % hashSize;
 }
 
-BaseLB::LDStats::LDStats()
+BaseLB::LDStats::LDStats(int c)
 	: n_objs(0), n_migrateobjs(0), n_comm(0), 
           objHash(NULL) 
 {
-  procs = new ProcStats[CkNumPes()]; 
+  count = c;
+  if (count == 0) count = CkNumPes();
+  procs = new ProcStats[count]; 
 }
 
 const static unsigned int doublingPrimes[] = {
@@ -229,8 +231,8 @@ void BaseLB::LDStats::print()
     struct ProcStats &proc = procs[pe];
 
     CkPrintf(
-      "Proc %d Sp %d Total(wall,cpu) = (%f %f) Idle = %f Bg = (%f %f) nObjs = %d\n",
-      pe,proc.pe_speed,proc.total_walltime,proc.total_cputime,
+      "Proc %d(%d) Sp %d Total(wall,cpu) = (%f %f) Idle = %f Bg = (%f %f) nObjs = %d\n",
+      pe,proc.pe,proc.pe_speed,proc.total_walltime,proc.total_cputime,
       proc.idletime,proc.bg_walltime,proc.bg_cputime,proc.n_objs);
   }
 
@@ -290,6 +292,31 @@ double BaseLB::LDStats::computeAverageLoad()
   return averageLoad;
 }
 
+// remove the obj-th object from database
+void BaseLB::LDStats::removeObject(int obj)
+{
+  CmiAssert(obj < objData.size());
+  LDObjData odata = objData[obj];
+  LDObjKey okey;
+  okey.omID() = odata.omID();
+  okey.objID() = odata.objID();
+
+  objData.remove(obj);
+  from_proc.remove(obj);
+  to_proc.remove(obj);
+  n_objs --;
+  if (odata.migratable) n_migrateobjs --;
+
+  // search for sender
+  for (int com=0; com<n_comm; com++) {
+    LDCommData &cdata = commData[com];
+    if(!cdata.from_proc() && cdata.sender == okey) {
+      commData.remove(com);
+      break;
+    }
+  }
+}
+
 void BaseLB::LDStats::pup(PUP::er &p)
 {
   int i;
@@ -326,6 +353,8 @@ void BaseLB::LDStats::pup(PUP::er &p)
     count = LBSimulation::simProcs;
   if (p.isUnpacking()) {
     objHash = NULL;
+    if (_lb_args.lbversion() <= 1) 
+      for (i=0; i<count; i++) procs[i].pe = i;
   }
 }
 
