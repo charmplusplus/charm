@@ -1,8 +1,6 @@
 /// Queue of executed and unexecuted events on a poser
 #include "pose.h"
 
-//#define EQ_SANITIZE 1
-
 /// Basic Constructor
 eventQueue::eventQueue()
 {
@@ -140,31 +138,6 @@ void eventQueue::InsertEventDeterministic(Event *e)
 	       (e->evID < currentPtr->evID))))
       SetRBevent(e);
   }
-#ifdef EQ_SANITIZE
-  sanitize();
-#endif
-}
-
-/// Move currentPtr to next event in queue
-void eventQueue::ShiftEvent() { 
-  Event *e;
-#ifdef EQ_SANITIZE
-  sanitize();
-#endif
-  CmiAssert(currentPtr->next != NULL);
-  currentPtr = currentPtr->next; // set currentPtr to next event
-  if ((currentPtr == backPtr) && (eqh->top)) { // currentPtr on back sentinel
-    e = eqh->GetAndRemoveTopEvent(); // get next event from heap
-    // insert event in list
-    e->prev = currentPtr->prev;
-    e->next = currentPtr;
-    currentPtr->prev = e;
-    e->prev->next = e;
-    currentPtr = e;
-  }
-  if (currentPtr == backPtr) largest = POSE_UnsetTS;
-  else FindLargest();
-  eventCount--;
 #ifdef EQ_SANITIZE
   sanitize();
 #endif
@@ -309,19 +282,6 @@ void eventQueue::SetCurrentPtr(Event *e) {
   }
 }
 
-/// Return first (earliest) unexecuted event before currentPtr
-Event *eventQueue::RecomputeRollbackTime() 
-{
-#ifdef EQ_SANITIZE
-  sanitize();
-#endif
-  Event *ev = frontPtr->next; // start at front
-  //  while ((ev->done == 1) && (ev != currentPtr)) ev = ev->next;
-  while (ev->done == 1) ev = ev->next;
-  if (ev == currentPtr) return NULL; // no unexecuted events up to currentPtr
-  return ev;
-}
-
 /// Delete event and reconnect surrounding events in queue
 void eventQueue::DeleteEvent(Event *ev) 
 {
@@ -353,31 +313,6 @@ void eventQueue::DeleteEvent(Event *ev)
 #ifdef EQ_SANITIZE
   sanitize();
 #endif
-}
-
-/// Find largest timestamp of the unexecuted events
-void eventQueue::FindLargest()
-{
-  POSE_TimeType hs = eqh->FindMax();
-  if (backPtr->prev->done == 0) largest = backPtr->prev->timestamp;
-  else largest = POSE_UnsetTS;
-  if (largest < hs) largest = hs;
-}
-
-/// Add id, e and ts as an entry in currentPtr's spawned list
-void eventQueue::AddSpawnToCurrent(int id, eventID e, POSE_TimeType ts) 
-{
-  SpawnedEvent *newnode = new SpawnedEvent(id, e, ts, currentPtr->spawnedList);
-  CmiAssert(currentPtr->done == 2);
-  currentPtr->spawnedList = newnode;
-}
-
-/// Return the first entry in currentPtr's spawned list and remove it
-SpawnedEvent *eventQueue::GetNextCurrentSpawn() 
-{
-  SpawnedEvent *tmp = currentPtr->spawnedList;
-  if (tmp) currentPtr->spawnedList = tmp->next;
-  return tmp;
 }
 
 /// Dump the event queue

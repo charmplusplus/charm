@@ -26,23 +26,6 @@ pvtObjects::pvtObjects()
   for (i=0; i<size; i++) objs[i].set(-1, -1, 0, 0, NULL);
 }
 
-/// Wake up all posers in list
-void pvtObjects::Wake() 
-{
-  register int i;
-  for (i=0; i<numSpaces; i++)
-    if (objs[i].isPresent()) (objs[i].localObjPtr)->Status();
-}
-
-/// Call Commit on all posers
-void pvtObjects::Commit() 
-{
-  register int i;
-  for (i=0; i<numSpaces; i++)
-    if (objs[i].isPresent()) (objs[i].localObjPtr)->Commit();
-}
-
-
 /// Insert poser in list
 int pvtObjects::Insert(int index, int ovt, int sync, sim *myPtr)
 {
@@ -77,6 +60,19 @@ int pvtObjects::Insert(int index, int ovt, int sync, sim *myPtr)
     firstEmpty++;
   }   
   return idx;
+}
+
+/// Wake up all posers in list
+void pvtObjects::Wake() {
+  register int i;
+  for (i=0; i<numSpaces; i++)
+    if (objs[i].isPresent()) (objs[i].localObjPtr)->Status();
+}
+/// Call Commit on all posers
+void pvtObjects::Commit() {
+  register int i;
+  for (i=0; i<numSpaces; i++)
+    if (objs[i].isPresent()) (objs[i].localObjPtr)->Commit();
 }
 
 /// Dump data fields

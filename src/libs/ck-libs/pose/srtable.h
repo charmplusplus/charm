@@ -5,6 +5,8 @@
 
 #define MAX_B 10
 
+//#define SR_SANITIZE 1
+
 class UpdateMsg; // from gvt.h
 
 /// An entry for storing the number of sends and recvs at a timestamp
@@ -116,9 +118,82 @@ class SRtable {
   /// Initialize table to a minimum size
   void Initialize();
   /// Insert send/recv record sr at timestamp ts
-  void Insert(POSE_TimeType ts, int sr); 
+  void Insert(POSE_TimeType ts, int sr) {
+#ifdef SR_SANITIZE
+    sanitize();
+#endif
+    CmiAssert(ts >= offset);
+    CmiAssert((sr == 0) || (sr == 1));
+    int destBkt = (ts-offset)/size_b;  // which bucket?
+    SRentry *e = new SRentry(ts, sr, NULL);
+    if (destBkt >= b) { // put in overflow bucket
+      if (overflow) {
+	if (end_overflow->timestamp == ts) { // an entry at ts exists
+	  if (sr == SEND) end_overflow->sends++;
+	  else end_overflow->recvs++;
+	  delete e;
+	}
+	else { // no entry with that timestamp is handy
+	  end_overflow->next = e;
+	  end_overflow = e;
+	}
+      }
+      else overflow = end_overflow = e;
+      if (sr == SEND) ofSends++;
+      else ofRecvs++;
+    }
+    else { // put in buckets[destBkt]
+      if (buckets[destBkt]) {
+	if (end_bucket[destBkt]->timestamp == ts) { 
+	  // an entry at that timestamp exists
+	  if (sr == SEND) end_bucket[destBkt]->sends++;
+	  else end_bucket[destBkt]->recvs++;
+	  delete e;
+	}
+	else { // no entry with that timestamp is handy
+	  end_bucket[destBkt]->next = e;
+	  end_bucket[destBkt] = e;
+	}
+      }
+      else buckets[destBkt] = end_bucket[destBkt] = e;
+      if (sr == SEND) sends[destBkt]++;
+      else recvs[destBkt]++;
+    }
+#ifdef SR_SANITIZE
+    sanitize();
+#endif
+  } 
   /// Insert an existing SRentry e
-  void Insert(SRentry *e); 
+  void Insert(SRentry *e) {
+#ifdef SR_SANITIZE
+    sanitize();
+#endif
+    CmiAssert(e != NULL);
+    CmiAssert(e->timestamp >= offset);
+    int destBkt = (e->timestamp-offset)/size_b;
+    e->next = NULL;
+    if (destBkt >= b) { // put in overflow bucket
+      if (overflow) {
+	end_overflow->next = e;
+	end_overflow = e;
+      }
+      else overflow = end_overflow = e;
+      ofSends += e->sends;
+      ofRecvs += e->recvs;
+    }
+    else { // put in buckets[destBkt]
+      if (buckets[destBkt]) {
+	end_bucket[destBkt]->next = e;
+	end_bucket[destBkt] = e;
+      }
+      else buckets[destBkt] = end_bucket[destBkt] = e;
+      sends[destBkt] += e->sends;
+      recvs[destBkt] += e->recvs;
+    }
+#ifdef SR_SANITIZE
+    sanitize();
+#endif
+  }
   /// Restructure the table according to new GVT estimate and first send/recv
   /** Number of buckets and bucket size are determined from firstTS, and
       entries below newGVTest are discarded. */

@@ -6,8 +6,6 @@
 #include "srtable.h"
 #include "gvt.h"
 
-//#define SR_SANITIZE 1
-
 /// Basic constructor
 SRtable::SRtable() 
 { 
@@ -25,88 +23,6 @@ SRtable::SRtable()
 void SRtable::Initialize()
 {
   offset = 0; b = MAX_B; size_b = 1;
-#ifdef SR_SANITIZE
-  sanitize();
-#endif
-}
-
-/// Insert send/recv record sr at timestamp ts
-/* NOTE: buckets roughly ordered with decreasing timestamps */
-void SRtable::Insert(POSE_TimeType ts, int sr)
-{
-#ifdef SR_SANITIZE
-  sanitize();
-#endif
-  CmiAssert(ts >= offset);
-  CmiAssert((sr == 0) || (sr == 1));
-  int destBkt = (ts-offset)/size_b;  // which bucket?
-  SRentry *e = new SRentry(ts, sr, NULL);
-  if (destBkt >= b) { // put in overflow bucket
-    if (overflow) {
-      if (end_overflow->timestamp == ts) { // an entry at that timestamp exists
-	if (sr == SEND) end_overflow->sends++;
-	else end_overflow->recvs++;
-	delete e;
-      }
-      else { // no entry with that timestamp is handy
-	end_overflow->next = e;
-	end_overflow = e;
-      }
-    }
-    else overflow = end_overflow = e;
-    if (sr == SEND) ofSends++;
-    else ofRecvs++;
-  }
-  else { // put in buckets[destBkt]
-    if (buckets[destBkt]) {
-      if (end_bucket[destBkt]->timestamp == ts) { 
-	// an entry at that timestamp exists
-	if (sr == SEND) end_bucket[destBkt]->sends++;
-	else end_bucket[destBkt]->recvs++;
-	delete e;
-      }
-      else { // no entry with that timestamp is handy
-	end_bucket[destBkt]->next = e;
-	end_bucket[destBkt] = e;
-      }
-    }
-    else buckets[destBkt] = end_bucket[destBkt] = e;
-    if (sr == SEND) sends[destBkt]++;
-    else recvs[destBkt]++;
-  }
-#ifdef SR_SANITIZE
-  sanitize();
-#endif
-}
-
-/// Insert an existing SRentry e
-void SRtable::Insert(SRentry *e)
-{
-#ifdef SR_SANITIZE
-  sanitize();
-#endif
-  CmiAssert(e != NULL);
-  CmiAssert(e->timestamp >= offset);
-  int destBkt = (e->timestamp-offset)/size_b;
-  e->next = NULL;
-  if (destBkt >= b) { // put in overflow bucket
-    if (overflow) {
-      end_overflow->next = e;
-      end_overflow = e;
-    }
-    else overflow = end_overflow = e;
-    ofSends += e->sends;
-    ofRecvs += e->recvs;
-  }
-  else { // put in buckets[destBkt]
-    if (buckets[destBkt]) {
-      end_bucket[destBkt]->next = e;
-      end_bucket[destBkt] = e;
-    }
-    else buckets[destBkt] = end_bucket[destBkt] = e;
-    sends[destBkt] += e->sends;
-    recvs[destBkt] += e->recvs;
-  }
 #ifdef SR_SANITIZE
   sanitize();
 #endif

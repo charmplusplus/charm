@@ -37,7 +37,15 @@ class HeapNode
   /// Remove heap node matching evID
   int remove(eventID evID, POSE_TimeType timestamp);  
   /// Find maximum element
-  POSE_TimeType findMax();
+  POSE_TimeType findMax() {
+    POSE_TimeType max = e->timestamp, leftTS, rightTS;
+    leftTS = rightTS = POSE_UnsetTS;
+    if (left) leftTS = left->findMax();
+    if (right) rightTS = right->findMax();
+    if (max < leftTS) max = leftTS;
+    if (max < rightTS) max = rightTS;
+    return max;
+  }
   /// Dump all data fields
   void dump();                 
   /// Pack/unpack/sizing operator
@@ -72,7 +80,10 @@ class EqHeap {
       found in the heap */
   int DeleteEvent(eventID evID, POSE_TimeType timestamp);  
   /// Find maximum element
-  POSE_TimeType FindMax();
+  POSE_TimeType FindMax() {
+    if (top) return top->findMax();
+    return POSE_UnsetTS;
+  }
   /// Dump entire heap
   void dump();                      
   /// Pack/unpack/sizing operator

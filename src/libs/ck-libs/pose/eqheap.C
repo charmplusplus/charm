@@ -187,18 +187,6 @@ int HeapNode::remove(eventID evID, POSE_TimeType timestamp)
   return found; // exit with found status
 }
 
-/// Find maximum element
-POSE_TimeType HeapNode::findMax()
-{
-  POSE_TimeType max = e->timestamp, leftTS, rightTS;
-  leftTS = rightTS = POSE_UnsetTS;
-  if (left) leftTS = left->findMax();
-  if (right) rightTS = right->findMax();
-  if (max < leftTS) max = leftTS;
-  if (max < rightTS) max = rightTS;
-  return max;
-}
-
 /// Dump all data fields in entire subheap
 void HeapNode::dump()
 {
@@ -396,13 +384,6 @@ int EqHeap::DeleteEvent(eventID evID, POSE_TimeType timestamp)
 #endif
     return result;
   }
-}
-
-/// Find maximum element
-POSE_TimeType EqHeap::FindMax()
-{
-  if (top) return top->findMax();
-  return POSE_UnsetTS;
 }
 
 /// Pack/unpack/sizing operator

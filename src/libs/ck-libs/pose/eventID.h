@@ -19,9 +19,15 @@ class eventID
   eventID() { id = 0; pe = CkMyPe(); obj = 0; }          
   /// Get next value for eventID
   /** increments id field for this eventID */
-  void incEventID();                            
+  void incEventID() {
+    id++;
+    if (id == 0) CkPrintf("WARNING: event ID rollover occurred!\n");
+  }
   /// Assignment operator
-  eventID& operator=(const eventID& e);         
+  eventID& operator=(const eventID& e) { 
+    CmiAssert((e.pe >= 0) || (e.pe < CkNumPes()));
+    id = e.id;  pe = e.pe;  obj = e.obj; return *this;
+  }
   /// get source PE
   int getPE() { return pe; }
   /// get source obj
@@ -29,13 +35,19 @@ class eventID
   /// set source obj
   void setObj(int objIdx) { obj = objIdx; }
   /// Equality comparison operator
-  int operator==(const eventID& obj);           
+  int operator==(const eventID& o) {
+    return ((id == o.id) && (pe == o.pe) && (obj == o.obj));
+  }
   /// Less than/equality comparison operator
   /** Provides a way to sort events by event ID */
-  int operator<=(const eventID& obj);           
+  int operator<=(const eventID& o) {
+    return ((obj < o.obj) || ((obj == o.obj) && (id <= o.id)));
+  }
   /// Less than comparison operator
   /** Provides a way to sort events by event ID */
-  int operator<(const eventID& obj);           
+  int operator<(const eventID& o) {
+    return ((obj < o.obj) || ((obj == o.obj) && (id < o.id)));
+  }
   /// Dump all data fields
   void dump() { 
     CmiAssert((pe >= 0) && (pe < CkNumPes())); 

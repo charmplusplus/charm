@@ -41,11 +41,13 @@ class rep
 #endif
   }
   /// Initializing Constructor
-  rep(POSE_TimeType init_ovt) { ovt = init_ovt; ort = 0.0; copy = 0; anti_methods = 0; }
+  rep(POSE_TimeType init_ovt) { 
+    ovt = init_ovt; ort = 0.0; copy = 0; anti_methods = 0; 
+  }
   /// Destructor
   virtual ~rep() { }
   /// Initializer called from poser wrapper constructor
-  void init(eventMsg *m);  
+  void init(eventMsg *m);
   /// Return the OVT
   POSE_TimeType OVT() { return ovt; }
   /// Set the OVT to t

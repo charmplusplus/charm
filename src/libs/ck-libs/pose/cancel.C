@@ -2,30 +2,6 @@
 #include "eventID.h"
 #include "pose.h"
 
-/// Insert an event at beginning of cancellations list
-void CancelList::Insert(POSE_TimeType ts, eventID e) 
-{
-  CancelNode *newnode = new CancelNode(ts, e);
-  count++;
-  if (count%1000 == 0) CkPrintf("WARNING: CancelList has %d events!\n", count);
-  if ((ts < earliest) || (earliest < 0)) // new event has earliest timestamp
-    earliest = ts;
-  newnode->next = cancellations; // place at front of list
-  cancellations = newnode;
-  if (!current) current = newnode; // set current if list was empty
-}
-
-/// Return a pointer to a node in list
-CancelNode *CancelList::GetItem() 
-{
-  CancelNode *result;
-  if (!current) CkPrintf("ERROR: CancelList::GetItem: CancelList is empty\n");
-  result = current;
-  if (current->next) current = current->next;
-  else current = cancellations;
-  return result;
-}
-
 /// Remove a specific cancellation from the list
 void CancelList::RemoveItem(CancelNode *item)
 {
@@ -55,14 +31,6 @@ void CancelList::RemoveItem(CancelNode *item)
       tmp = tmp->next;
     }
   }
-}
-
-/// Test if cancellations is empty
-int CancelList::IsEmpty() 
-{ 
-  CmiAssert(((count == 0) && (cancellations == NULL)) ||
-	    ((count > 0) && (cancellations != NULL)));
-  return (count == 0);
 }
 
 /// Dump all data fields
