@@ -12,7 +12,7 @@ include Makefile.client
 HEADERS=lv3d0.h lv3d0_server.h lv3d1_server.h \
 	liveViz3d.decl.h lv3d0.decl.h lv3d1.decl.h ckviewable.h ckviewpoint.h
 HEADDEP=$(HEADERS) 
-OBJS=$(COBJS) lv3d0_server.o lv3d1_server.o
+OBJS=$(LV3D_CLIENT_OBJS) lv3d0_server.o lv3d1_server.o
 
 $(DEST): $(OBJS) $(COMPAT) headers
 	$(CHARMC) $(OBJS) $(COMPAT) -o $@

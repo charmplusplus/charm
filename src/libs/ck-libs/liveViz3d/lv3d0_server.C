@@ -313,6 +313,25 @@ extern "C" void LV3D0_getViews(char *msg) {
 	mgrProxy.ckLocalBranch()->getViews(clientID);
 }
 
+/*
+"lv3d_qd" CCS handler:
+	Sent by the client to wait until all views have been
+updated and sent back.  No input or output data: control flow only.
+*/
+static void qdDoneFn(void *param,void *msg) 
+{
+	CcsDelayedReply *repl=(CcsDelayedReply *)param;
+	CcsSendDelayedReply(*repl,0,0);
+}
+extern "C" void LV3D0_qd(char *msg) 
+{
+	CmiFree(msg);
+	CcsDelayedReply *repl=new CcsDelayedReply(CcsDelayReply());
+	CkCallback cb(qdDoneFn,repl);
+	CkStartQD(cb); /* finish CCS reply after quiescence */
+}
+
+
 /**
 Register for libsixty redraw requests.  This routine
 must be called exactly once on processor 0.
@@ -326,6 +345,7 @@ void LV3D0_Init(LV3D_Universe *clientUniverse,const CkCallback &frameUpdate_)
 	CcsRegisterHandler("lv3d_setup",(CmiHandler)LV3D0_setup);
 	CcsRegisterHandler("lv3d_newViewpoint",(CmiHandler)LV3D0_newViewpoint);
 	CcsRegisterHandler("lv3d_getViews",(CmiHandler)LV3D0_getViews);
+	CcsRegisterHandler("lv3d_qd",(CmiHandler)LV3D0_qd);
 	CProxy_LV3D0_Manager::ckNew();
 }
 
