@@ -211,11 +211,8 @@ static inline void _processBufferedBocInits(void)
   for(i=0; i<len; i++) {
     env = (envelope *) vec[i];
     if(env==0) continue;
-    if(env->isPacked() && _msgTable[env->getMsgIdx()]->unpack) {
-      _TRACE_BEGIN_UNPACK();
-      env = UsrToEnv(_msgTable[env->getMsgIdx()]->unpack(EnvToUsr(env)));
-      _TRACE_END_UNPACK();
-    }
+    if(env->isPacked()) 
+      CkUnpackMessage(&env);
     _processBocInitMsg(env);
   }
   delete CpvAccess(_bocInitVec);
@@ -231,11 +228,8 @@ static inline void _processBufferedNodeBocInits(void)
   for(i=0; i<len; i++) {
     env = (envelope *) vec[i];
     if(env==0) continue;
-    if(env->isPacked() && _msgTable[env->getMsgIdx()]->unpack) {
-      _TRACE_BEGIN_UNPACK();
-      env = UsrToEnv(_msgTable[env->getMsgIdx()]->unpack(EnvToUsr(env)));
-      _TRACE_END_UNPACK();
-    }
+    if(env->isPacked())
+      CkUnpackMessage(&env);
     _processNodeBocInitMsg(env);
   }
   delete _nodeBocInitVec;
@@ -343,7 +337,7 @@ static void _initHandler(void *msg)
     case ROMsgMsg:
       CpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
-      if(env->isPacked()) _unpackFn((void **)&env);
+      if(env->isPacked()) CkUnpackMessage(&env);
       _processROMsgMsg(env);
       break;
     case RODataMsg:
@@ -389,84 +383,6 @@ static void _nullFn(void *, void *)
 {
   CmiAbort("Null-Method Called. Program may have Unregistered Module!!\n");
 }
-
-#if CMK_DEBUG_MODE
-int getCharmMsgHandlers(int *handleArray)
-{
-  *(handleArray) = _charmHandlerIdx;
-  *(handleArray+1) = _initHandlerIdx;
-  return(2);
-}
-
-char* getEnvInfo(envelope *env)
-{
-  char *returnInfo;
-  int size;
-  int chareIndex;
-  int epIndex = env->getEpIdx();
-  size = strlen(_entryTable[epIndex]->name)+1;
-  chareIndex = _entryTable[epIndex]->chareIdx;
-  size += strlen(_chareTable[chareIndex]->name)+1;
-  
-  returnInfo = (char *)malloc((size + 2) * sizeof(char));
-  _MEMCHECK(returnInfo);
-  strcpy(returnInfo, _entryTable[epIndex]->name);
-  strcat(returnInfo, "%");
-  strcat(returnInfo, _chareTable[chareIndex]->name);
-  strcat(returnInfo, "#");
-  return(returnInfo);
-}
-
-char* makeCharmSymbolTableInfo(void)
-{
-  int i, chareIndex;
-  int size;
-  char *returnInfo;
-   
-  size = _numEntries * 100;
-  returnInfo = (char *)malloc(size * sizeof(char));
-  _MEMCHECK(returnInfo);
-  strcpy(returnInfo, "");
-  for(i = 0; i < _numEntries; i++){
-    strcat(returnInfo, "EP : ");
-    strcat(returnInfo, _entryTable[i]->name);
-    strcat(returnInfo, " ");
-    strcat(returnInfo, "ChareName : ");
-    chareIndex = _entryTable[i]->chareIdx;
-    strcat(returnInfo, _chareTable[chareIndex]->name);
-    strcat(returnInfo, "#");
-  }
-
-  return(returnInfo);
-}
-
-int getEpIdx(char *msg)
-{
-  envelope *env;
-  
-  env = (envelope *)msg;
-  return(env->getEpIdx());
-}
-
-static char* fHeader(char* msg)
-{
-  return(getEnvInfo((envelope *)msg));
-}
-
-static const char *_contentStr = 
-"Contents not known in this implementation"
-;
-
-static char* fContent(char *msg)
-{
-  char *temp;
-
-  temp = (char *)malloc(strlen(_contentStr) + 1);
-  _MEMCHECK(temp);
-  strcpy(temp, _contentStr);
-  return(temp);
-}
-#endif
 
 extern void _registerLBDatabase(void);
 extern void _ckModuleInit(void);
@@ -529,13 +445,6 @@ void _initCharm(int argc, char **argv)
 
 	CldRegisterEstimator((CldEstimator)_charmLoadEstimator);
 
-#if CMK_DEBUG_MODE
-	handlerArrayRegister(_charmHandlerIdx, (hndlrIDFunction)fHeader, 
-		                   (hndlrIDFunction)fContent);
-	handlerArrayRegister(_initHandlerIdx, (hndlrIDFunction)fHeader, 
-		                   (hndlrIDFunction)fContent);
-#endif
-
 	_futuresModuleInit(); // part of futures implementation is a converse module
 	if(CmiMyRank()==0) 
 	{
@@ -543,6 +452,8 @@ void _initCharm(int argc, char **argv)
 		_registerInit();
 		CkRegisterMsg("System", 0, 0, 0, sizeof(int));
 		CkRegisterChare("null", 0);
+		CkIndex_Chare::__idx=CkRegisterChare("Chare", sizeof(Chare));
+		CkIndex_Group::__idx=CkRegisterChare("Group", sizeof(Group));
 		CkRegisterEp("null", (CkCallFnPtr)_nullFn, 0, 0);
 		_registerCkFutures();
 		_registerCkArray();
@@ -592,10 +503,10 @@ void _initCharm(int argc, char **argv)
 			env->setRoIdx(i);
 			CmiSetHandler(env, _initHandlerIdx);
 			if (!env->isPacked() &&  _msgTable[msgIdx]->pack)
-				_packFn((void **) &env);
+				CkPackMessage(&env);
 			CmiSyncBroadcast(env->getTotalsize(), env);
 			if (env->isPacked() && _msgTable[msgIdx]->unpack)
-				_unpackFn((void **) &env);
+				CkUnpackMessage(&env);
 			CpvAccess(_qd)->create(CkNumPes()-1);
 			_numInitMsgs++;
 		}
@@ -617,12 +528,6 @@ void _initCharm(int argc, char **argv)
 		CpvAccess(_qd)->create(CkNumPes()-1);
 		_initDone();
 	}
-
-#if CMK_DEBUG_MODE
-	symbolTableFnArrayRegister(_charmHandlerIdx, _numEntries,
-				     (symbolTableFunction) makeCharmSymbolTableInfo,
-				     (indirectionFunction) getEpIdx);
-#endif
 
 }
 
