@@ -105,7 +105,7 @@ class dynChunk {
 public:
 	class elemCount : public CkVec<int> {
 	public:
-		
+		void pup(PUP::er &p) {CkAbort("FEM> Can't call dynChunk::elemCount pup!");}
 	};
 	NumberedVec<elemCount> elem;
 	CkVec<int> node;
