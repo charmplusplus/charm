@@ -15,16 +15,20 @@
 /* define system parameters */
 #define INBUFFER_SIZE	32
 
-#define LEMIEUX_SETUP  1
+#define BLUEGENE_SETUP  1
+#define LEMIEUX_SETUP   0
 
 #if LEMIEUX_SETUP
 #define ALPHACOST          (8E-6)
 #define BANDWIDTH          (256E6)
-#else
+#elif BLUEGENE_SETUP
 #define CYCLES_PER_HOP     5
 #define CYCLES_PER_CORNER  75
 #define CYCLE_TIME_FACTOR  (0.001)  /* one cycle = nanosecond = 10^(-3) us */
 #define ALPHACOST          (0.1E-6)
+#define PACKETSIZE         1024
+#else
+#error "No default communication system setup!"
 #endif
 /* end of system parameters */
 
