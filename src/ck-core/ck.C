@@ -131,18 +131,18 @@ int CkGetSrcNode(void *msg)
 extern "C"
 void CkGetChareID(CkChareID *pCid) {
   pCid->onPE = CkMyPe();
-  pCid->objPtr = CpvAccess(_currentChare);
-  //  pCid->magic = _GETIDX(CpvAccess(_currentChareType));
+  pCid->objPtr = CkpvAccess(_currentChare);
+  //  pCid->magic = _GETIDX(CkpvAccess(_currentChareType));
 }
 
 extern "C"
 CkGroupID CkGetGroupID(void) {
-  return CpvAccess(_currentGroup);
+  return CkpvAccess(_currentGroup);
 }
 
 extern "C"
 CkGroupID CkGetNodeGroupID(void) {
-  return CpvAccess(_currentNodeGroup);
+  return CkpvAccess(_currentNodeGroup);
 }
 
 extern "C"
@@ -214,25 +214,25 @@ void _createGroupMember(CkGroupID groupID, int eIdx, void *msg)
   register int gIdx = _entryTable[eIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
-  CpvAccess(_groupTable).find(groupID).setObj(obj);
-  PtrQ *ptrq = CpvAccess(_groupTable).find(groupID).getPending();
+  CkpvAccess(_groupTable).find(groupID).setObj(obj);
+  PtrQ *ptrq = CkpvAccess(_groupTable).find(groupID).getPending();
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0)
       CldEnqueue(CkMyPe(), pending, _infoIdx);
     delete ptrq;
   }
-  register void *prev = CpvAccess(_currentChare);
-  register int prevtype = CpvAccess(_currentChareType);
-  CpvAccess(_currentChare) = obj;
-  CpvAccess(_currentChareType) = gIdx;
-  register CkGroupID prevGrp = CpvAccess(_currentGroup);
-  CpvAccess(_currentGroup) = groupID;
+  register void *prev = CkpvAccess(_currentChare);
+  register int prevtype = CkpvAccess(_currentChareType);
+  CkpvAccess(_currentChare) = obj;
+  CkpvAccess(_currentChareType) = gIdx;
+  register CkGroupID prevGrp = CkpvAccess(_currentGroup);
+  CkpvAccess(_currentGroup) = groupID;
   _SET_USED(UsrToEnv(msg), 0);
   _entryTable[eIdx]->call(msg, obj);
-  CpvAccess(_currentChare) = prev;
-  CpvAccess(_currentChareType) = prevtype;
-  CpvAccess(_currentGroup) = prevGrp;
+  CkpvAccess(_currentChare) = prev;
+  CkpvAccess(_currentChareType) = prevtype;
+  CkpvAccess(_currentGroup) = prevGrp;
   _STATS_RECORD_PROCESS_GROUP_1();
 }
 
@@ -251,17 +251,17 @@ void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *msg)
       CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
     delete ptrq;
   }
-  register void *prev = CpvAccess(_currentChare);
-  register int prevtype = CpvAccess(_currentChareType);
-  CpvAccess(_currentChare) = obj;
-  CpvAccess(_currentChareType) = gIdx;
-  register CkGroupID prevGrp = CpvAccess(_currentNodeGroup);
-  CpvAccess(_currentNodeGroup) = groupID;
+  register void *prev = CkpvAccess(_currentChare);
+  register int prevtype = CkpvAccess(_currentChareType);
+  CkpvAccess(_currentChare) = obj;
+  CkpvAccess(_currentChareType) = gIdx;
+  register CkGroupID prevGrp = CkpvAccess(_currentNodeGroup);
+  CkpvAccess(_currentNodeGroup) = groupID;
   _SET_USED(UsrToEnv(msg), 0);
   _entryTable[eIdx]->call(msg, obj);
-  CpvAccess(_currentChare) = prev;
-  CpvAccess(_currentChareType) = prevtype;
-  CpvAccess(_currentNodeGroup) = prevGrp;
+  CkpvAccess(_currentChare) = prev;
+  CkpvAccess(_currentChareType) = prevtype;
+  CkpvAccess(_currentNodeGroup) = prevGrp;
   _STATS_RECORD_PROCESS_NODE_GROUP_1();
 }
 
@@ -284,7 +284,7 @@ void _createGroup(CkGroupID groupID, envelope *env)
     env = UsrToEnv(msg);
     CmiSetHandler(env, _bocHandlerIdx);
     _numInitMsgs++;
-    CmiSyncBroadcast(env->getTotalsize(), env);
+    CmiSyncBroadcast(env->getTotalsize(), (char *)env);
     CpvAccess(_qd)->create(CkNumPes()-1);
     if(env->isPacked() && _msgTable[msgIdx]->unpack) {
       _TRACE_BEGIN_UNPACK();
@@ -317,7 +317,7 @@ void _createNodeGroup(CkGroupID groupID, envelope *env)
     CmiSetHandler(env, _bocHandlerIdx);
     _numInitMsgs++;
     _numInitNodeMsgs++;
-    CmiSyncNodeBroadcast(env->getTotalsize(), env);
+    CmiSyncNodeBroadcast(env->getTotalsize(), (char *)env);
     CpvAccess(_qd)->create(CkNumNodes()-1);
     if(env->isPacked() && _msgTable[msgIdx]->unpack) {
       _TRACE_BEGIN_UNPACK();
@@ -334,7 +334,7 @@ static CkGroupID _groupCreate(envelope *env)
 {
   register CkGroupID groupNum;
   groupNum.pe = CkMyPe();
-  groupNum.idx = CpvAccess(_numGroups)++;
+  groupNum.idx = CkpvAccess(_numGroups)++;
   _createGroup(groupNum, env);
   return groupNum;
 }
@@ -386,8 +386,8 @@ static void _processNewChareMsg(envelope *env)
 {
   register void *obj = _allocNewChare(env);
   register void *msg = EnvToUsr(env);
-  CpvAccess(_currentChare) = obj;
-  CpvAccess(_currentChareType)=_entryTable[env->getEpIdx()]->chareIdx;
+  CkpvAccess(_currentChare) = obj;
+  CkpvAccess(_currentChareType)=_entryTable[env->getEpIdx()]->chareIdx;
   _TRACE_BEGIN_EXECUTE(env);
   _SET_USED(env, 0);
   _entryTable[env->getEpIdx()]->call(msg, obj);
@@ -407,10 +407,10 @@ static void _processNewVChareMsg(envelope *env)
   register int srcPe = env->getSrcPe();
   ret->setSrcPe(CkMyPe());
   CmiSetHandler(ret, _charmHandlerIdx);
-  CmiSyncSendAndFree(srcPe, ret->getTotalsize(), ret);
+  CmiSyncSendAndFree(srcPe, ret->getTotalsize(), (char *)ret);
   CpvAccess(_qd)->create();
-  CpvAccess(_currentChare) = obj;
-  CpvAccess(_currentChareType)=_entryTable[env->getEpIdx()]->chareIdx;
+  CkpvAccess(_currentChare) = obj;
+  CkpvAccess(_currentChareType)=_entryTable[env->getEpIdx()]->chareIdx;
   register void *msg = EnvToUsr(env);
   _TRACE_BEGIN_EXECUTE(env);
   _SET_USED(env, 0);
@@ -425,8 +425,8 @@ static inline void _processForChareMsg(envelope *env)
   register void *msg = EnvToUsr(env);
   register int epIdx = env->getEpIdx();
   register void *obj = env->getObjPtr();
-  CpvAccess(_currentChare) = obj;
-  CpvAccess(_currentChareType)=_entryTable[epIdx]->chareIdx;
+  CkpvAccess(_currentChare) = obj;
+  CkpvAccess(_currentChareType)=_entryTable[epIdx]->chareIdx;
   _TRACE_BEGIN_EXECUTE(env);
   _SET_USED(env, 0);
   _entryTable[epIdx]->call(msg, obj);
@@ -438,11 +438,11 @@ static inline void _processForBocMsg(envelope *env)
   register CkGroupID groupID =  env->getGroupNum();
   register Group *obj = _localBranch(groupID);
   if(!obj) { // groupmember not yet created
-    CpvAccess(_groupTable).find(groupID).enqMsg(env);
+    CkpvAccess(_groupTable).find(groupID).enqMsg(env);
     return;
   }
   CpvAccess(_qd)->process();
-  CpvAccess(_currentGroup) = groupID;
+  CkpvAccess(_currentGroup) = groupID;
   register int epIdx = env->getEpIdx();
   _SET_USED(env, 0);
   CmiBool tracingEnabled=obj->ckTracingEnabled();
@@ -467,7 +467,7 @@ static inline void _processForNodeBocMsg(envelope *env)
   CpvAccess(_qd)->process();
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
-  CpvAccess(_currentNodeGroup) = groupID;
+  CkpvAccess(_currentNodeGroup) = groupID;
   _processForChareMsg(env);
   _STATS_RECORD_PROCESS_NODE_BRANCH_1();
 }
@@ -614,26 +614,34 @@ static void _skipCldHandler(void *msg)
 {
   register envelope *env = (envelope *)(msg);
   CmiSetHandler(msg, CmiGetXHandler(msg));
+#if CMK_BLUEGENE_CHARM
+  CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), (char *)env);
+#else
   CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
+#endif
 }
 
 static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 {
   if (pe == CkMyPe()) {
+#if CMK_BLUEGENE_CHARM
+    CmiSyncSendAndFree(pe, env->getTotalsize(), (char *)env);
+#else
     CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
+#endif
   } else {
     CkPackMessage(&env);
     int len=env->getTotalsize();
     CmiSetXHandler(env,CmiGetHandler(env));
     CmiSetHandler(env,index_skipCldHandler);
     CmiSetInfo(env,infoFn);
-    if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, env); }
-    else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, env); }
-    else CmiSyncSendAndFree(pe, len, env);
+    if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
+    else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, (char *)env); }
+    else CmiSyncSendAndFree(pe, len, (char *)env);
   }
 }
 
@@ -781,7 +789,7 @@ void CkNodeGroupMsgPrep(int eIdx, void *msg, CkGroupID gID)
 { _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg); }
 
 void _ckModuleInit(void) {
-	index_skipCldHandler = CmiRegisterHandler((CmiHandler)_skipCldHandler);
+	index_skipCldHandler = CkRegisterHandler((CmiHandler)_skipCldHandler);
 }
 
 #include "CkMarshall.def.h"
