@@ -13,8 +13,6 @@
 #ifndef _LDMACHINEUTIL_H_
 #define _LDMACHINEUTIL_H_
 
-#include "charm++.h"
-
 class LBMachineUtil {
 public:
   LBMachineUtil();

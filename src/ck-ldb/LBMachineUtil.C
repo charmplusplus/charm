@@ -10,8 +10,9 @@
 */
 /*@{*/
 
-#include "LBMachineUtil.h"
 #include <stdlib.h>
+#include "LBDatabase.h"
+#include "LBMachineUtil.h"
 
 inline void LBMachineUtil::IdleStart(double curWallTime)
 {

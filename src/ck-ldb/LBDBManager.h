@@ -170,7 +170,7 @@ public:
     runningObj records the obj handler index so that load balancer
     knows if an event(e.g. Send) is in an entry function or not.
     An index is enough here because LDObjHandle can be retrieved from 
-    objs array. Copyinh LDObjHandle is expensive.
+    objs array. Copying LDObjHandle is expensive.
   */
   inline void SetRunningObj(const LDObjHandle &_h) 
        { runningObj = _h.handle; obj_running = CmiTrue; };

@@ -15,6 +15,7 @@
 
 #include <math.h>
 #include "lbdb.h"
+#include "LBDBManager.h"
 
 // command line options
 class CkLBArgs
@@ -183,8 +184,16 @@ public:
     LDObjTime(h,walltime,cputime);
   };
 
-  inline int RunningObject(LDObjHandle* _o) { 
-    return LDRunningObject(myLDHandle,_o);
+  inline int RunningObject(LDObjHandle* _o) const { 
+#if CMK_LBDB_ON
+      LBDB *const db = (LBDB*)(myLDHandle.handle);
+      if (db->ObjIsRunning()) {
+        *_o = db->RunningObj();
+        return 1;
+      } 
+#endif
+      return 0;
+      //return LDRunningObject(myLDHandle,_o);
   };
   inline const LDObjHandle &GetObjHandle(int idx) { return LDGetObjHandle(myLDHandle, idx);}
   inline void ObjectStart(const LDObjHandle &_h) { LDObjectStart(_h); };

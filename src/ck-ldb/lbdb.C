@@ -17,6 +17,7 @@
 #include "lbdb.h"
 #include "LBObj.h"
 #include "LBOM.h"
+#include "LBDatabase.h"
 #include "LBDBManager.h"
   
 #if CMK_LBDB_ON
@@ -188,6 +189,7 @@ extern "C" int LDRunningObject(LDHandle _h, LDObjHandle* _o)
 {
   LBDB *const db = (LBDB*)(_h.handle);
 
+  // same as LBDatabase::RunningObject
   if (db->ObjIsRunning()) {
     *_o = db->RunningObj();
     return 1;
