@@ -49,6 +49,7 @@ compilationUnit
         )?
 		(importDefinition)* // skip
 		(c:typeDefinition  //           { ((ClassNode)c).print(); }
+            //{ System.out.println(((ASTJ)c).toStringTree()); }
         )*
         {
             String name = J.pE(p.getFirstChild());
@@ -92,6 +93,7 @@ compilationUnit
                 System.out.println(e);
                 e.printStackTrace();
             }
+
         }
 	;
 
