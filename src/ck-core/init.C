@@ -371,7 +371,7 @@ static void _initHandler(void *msg)
 //   then drop into the scheduler so the user's
 //   method never returns (which would be confusing).
 extern "C"
-void CkExit(void) 
+void _CkExit(void) 
 {
   CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
   CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
@@ -395,6 +395,23 @@ void CkExit(void)
   //Wait for stats, which will call ConverseExit when finished:
   CsdScheduler(-1);
 #endif
+}
+
+CkQ<CkExitFn> CkExitFnVec;
+
+// wrapper of CkExit
+// traverse CkExitFnVec to call registered user exit functions
+// CkExitFn will call CkExit() when finished to make sure other
+// registered functions get called.
+extern "C"
+void CkExit(void)
+{
+  if (!CkExitFnVec.isEmpty()) {
+    CkExitFn fn = CkExitFnVec.deq();
+    fn();
+  }
+  else
+    _CkExit();
 }
 
 static void _nullFn(void *, void *)
@@ -612,4 +629,14 @@ extern "C" void fmain_(int *argc,char _argv[][80],int length[])
 
   ConverseInit(*argc, argv, (CmiStartFn) _initCharm, 0, 0);
 }
+
+// user callable function to register an exit function, this function
+// will perform task of collecting of info from all pes to pe0, and call 
+// CkExit() on pe0 again to recursively traverse the registered exitFn.
+// see trace-summary for an example.
+void registerExitFn(CkExitFn fn)
+{
+  CkExitFnVec.enq(fn);
+}
+
 

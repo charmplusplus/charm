@@ -107,6 +107,11 @@ extern GroupTable*  _nodeGroupTable;
 
 extern void _initCharm(int argc, char **argv);
 
+typedef  void  (*CkExitFn) (void);
+
+extern CkQ<CkExitFn> CkExitFnVec;
+extern void registerExitFn(CkExitFn);
+
 #endif
 
 
