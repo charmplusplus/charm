@@ -78,7 +78,8 @@ class Position {
 		return ret;
 	}
 
-	int getId() { return(x+y*netLength+z*netLength*netHeight); }
+//	int getId() { return(x+y*netLength+z*netLength*netHeight); }
+	int getId() { return(x*netHeight*netWidth+y*netWidth+z); }
 
 	void getNeighbours(int *next) {
 		Position tmp = *this,tmp2;
