@@ -7,13 +7,22 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "converse.h"
-#include "conv-trace.h"
-#include "conv-ccs.h"
 #include <errno.h>
-
 #ifndef WIN32
 #include <sys/file.h>
+#endif
+
+#include "converse.h"
+#include "conv-trace.h"
+#include "sockRoutines.h"
+
+#include "conv-ccs.h"
+#include "ccs-server.h"
+
+#if NODE_0_IS_CONVHOST
+extern int ccs_socket_ready;
+extern void CHostInit(int withCCS);
+extern void CHostProcess(void);
 #endif
 
 #ifdef WIN32
@@ -29,16 +38,6 @@ extern int  CqsPrioGT(prio, prio);
 extern prio CqsGetPriority(Queue);
 #define DEBUGF(x)  printf x
 #endif
-
-/*
-#if NODE_0_IS_CONVHOST
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <sys/time.h>
-#endif
-*/
 
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
 #include <sys/types.h>
@@ -65,16 +64,6 @@ extern prio CqsGetPriority(Queue);
 #endif
 
 #include "fifo.h"
-
-#if NODE_0_IS_CONVHOST
-extern int serverFlag;
-extern int hostport, hostskt;
-extern int hostskt_ready_read;
-extern unsigned int *nodeIPs;
-extern unsigned int *nodePorts;
-extern void skt_server(int *, int *);
-extern void CommunicationServer();
-#endif
 
 /*****************************************************************************
  *
@@ -713,8 +702,6 @@ void CmiHandleMessage(void *msg)
   char *freezeReply;
   int fd;
 
-  extern int skt_connect(unsigned int, int, int);
-  extern void writeall(int, char *, int);
 #endif
 
   CtvAccess(CmiBufferGrabbed) = 0;
@@ -745,8 +732,8 @@ void CmiHandleMessage(void *msg)
     sprintf(freezeReply, "freezing@%s", breakPointHeader);
     fd = skt_connect(freezeIP, freezePort, 120);
     if(fd > 0){
-      writeall(fd, freezeReply, strlen(freezeReply) + 1);
-      close(fd);
+      skt_sendN(fd, freezeReply, strlen(freezeReply) + 1);
+      skt_close(fd);
     } else {
       CmiPrintf("unable to connect");
     }
@@ -775,8 +762,8 @@ void CmiHandleMessage(void *msg)
     sprintf(freezeReply, "freezing@%s", breakPointHeader);
     fd = skt_connect(freezeIP, freezePort, 120);
     if(fd > 0){
-      writeall(fd, freezeReply, strlen(freezeReply) + 1);
-      close(fd);
+      skt_sendN(fd, freezeReply, strlen(freezeReply) + 1);
+      skt_close(fd);
     } else {
       CmiPrintf("unable to connect");
     }
@@ -818,7 +805,7 @@ int CsdScheduler(int maxmsgs)
 
   while (1) {
 #if NODE_0_IS_CONVHOST
-    if(hostskt_ready_read) CHostGetOne();
+    if (ccs_socket_ready) CHostProcess();
 #endif
     msg = CmiGetNonLocal();
 #if CMK_DEBUG_MODE
@@ -1611,10 +1598,6 @@ static void memChop(char *msgWhole)
 
 extern void CrnInit(void);
 
-#if CMK_CCS_AVAILABLE
-extern void CcsInit(void);
-#endif
-
 static unsigned int idle_timeout = 0;
 CpvStaticDeclare(int, call_cancel);
 
@@ -1637,10 +1620,20 @@ static void on_busy(void *tmp)
   CpvAccess(call_cancel) = 1;
 }
 
+/*Delete the given argument from the list*/
+static void del_arg(char **argv,int doomed)
+{
+  int i;
+  for (i=doomed;argv[i];i++)
+    argv[i]=argv[i+1];
+}
+
 void ConverseCommonInit(char **argv)
 {
-  int i,j;
-  char *ptr;
+  int i;
+#if NODE_0_IS_CONVHOST
+  int ccs_serverFlag=0,ccs_serverPort=0;
+#endif
   CmiTimerInit();
   CstatsInit(argv);
   CcdModuleInit(argv);
@@ -1663,36 +1656,28 @@ void ConverseCommonInit(char **argv)
   CWebInit();
 #endif
 #if NODE_0_IS_CONVHOST
-  CHostInit();
-  skt_server(&hostport, &hostskt);
-  CmiSignal(SIGALRM, SIGIO, 0, CommunicationServer);
-  CmiEnableAsyncIO(hostskt);
-  CHostRegister();
- 
-  /*  if(CmiMyPe() == 0){ */
-  i = 0;
-  for(ptr = argv[i]; ptr != 0; i++, ptr = argv[i]) {
-    if(strcmp(ptr, "++server") == 0) {
-      if (CmiMyPe() == 0)
-	serverFlag = 1;
-      for(j = i; argv[j] != 0; j++)
-	argv[j] = argv[j+1];
-      break;
+  for(i=0;argv[i]!=NULL;i++)
+    if(strcmp(argv[i], "++server") == 0)
+    {
+      ccs_serverFlag = 1; 
+      del_arg(argv,i--); break; 
     }
-  }
-  /*   } */
+    else if (strcmp(argv[i],"++server-port")==0) {
+      ccs_serverFlag=1;
+      sscanf(argv[i+1],"%d",&ccs_serverPort);
+      del_arg(argv,i--);del_arg(argv,i--);break;
+    }
+  if ((CmiMyPe()==0)&&ccs_serverFlag)
+    CHostInit(ccs_serverPort);
 #endif
+
   CldModuleInit();
   CrnInit();
-  i = 0;
-  for(ptr = argv[i]; ptr != 0; i++, ptr = argv[i]) {
-    if(strcmp(ptr, "+idle-timeout") == 0) {
+  for(i=0;argv[i]!=NULL;i++)
+    if(strcmp(argv[i], "+idle-timeout") == 0) {
       sscanf(argv[i+1], "%u", &idle_timeout);
-      for(j = i; argv[j] != 0; j++)
-	argv[j] = argv[j+2];
-      break;
+      del_arg(argv,i--);del_arg(argv,i--);break;
     }
-  }
   if(idle_timeout != 0) {
     CcdCallOnCondition(CcdPROCESSORIDLE, on_idle, 0);
     CcdCallOnCondition(CcdPROCESSORBUSY, on_busy, 0);
@@ -1703,15 +1688,8 @@ void ConverseCommonInit(char **argv)
 
 void ConverseCommonExit(void)
 {
-#if NODE_0_IS_CONVHOST
-  if((CmiMyPe() == 0) && (clientIP != 0)){
-    int fd;
-    fd = skt_connect(clientIP, clientKillPort, 120);
-    if (fd>0){ 
-      write(fd, "die\n", strlen("die\n"));
-    }
-  }
-#endif
+  CcsImpl_kill();
+
 #ifndef CMK_OPTIMIZE
   traceClose();
 #endif
