@@ -293,7 +293,7 @@ static void CmiReleaseSentMessages(void)
 #ifndef CMK_OPTIMIZE 
   double rel_end_time = CmiWallTimer();
   if(rel_end_time > rel_start_time + 5.0/1e6)
-    traceUserBracketEvent(20, rel_start_time);
+    traceUserBracketEvent(20, rel_start_time, rel_end_time);
 #endif
 }
 
@@ -438,7 +438,7 @@ int PumpMsgs(int retflag)
 #ifndef CMK_OPTIMIZE 
       double pmp_end_time = CmiWallTimer();
       if(pmp_end_time > pmp_start_time + 5.0/1e6)
-	traceUserBracketEvent(10, pmp_start_time);
+	traceUserBracketEvent(10, pmp_start_time, pmp_end_time);
 #endif
       return recd;    
     }
@@ -447,7 +447,7 @@ int PumpMsgs(int retflag)
 #ifndef CMK_OPTIMIZE 
       double pmp_end_time = CmiWallTimer();
       if(pmp_end_time > pmp_start_time + 5.0/1e6)
-	traceUserBracketEvent(10, pmp_start_time);
+	traceUserBracketEvent(10, pmp_start_time, pmp_end_time);
 #endif
       return flg;
     }
@@ -575,7 +575,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
 #ifndef CMK_OPTIMIZE 
   double snd_end_time = CmiWallTimer();
   if(snd_end_time > snd_start_time + 5.0/1e6)
-    traceUserBracketEvent(10, snd_start_time);
+    traceUserBracketEvent(10, snd_start_time, snd_end_time);
 #endif
 }
 
