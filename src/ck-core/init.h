@@ -50,7 +50,7 @@ class GroupTable {
   };
   TableEntry *bins[MAXBINS];
   public:
-    GroupTable() { for(int i=0;i<MAXBINS;i++) bins[i] = 0;}
+    GroupTable();
     void add(int n, void *obj) {
       int slot = n%MAXBINS;
       bins[slot] = new TableEntry(n, obj, bins[slot]);

@@ -25,7 +25,9 @@ CpvExtern(int, CtrLogBufSize);
 
 class LogEntry {
   public:
+    void *operator new(size_t s) { return malloc(s); }
     void *operator new(size_t, void *ptr) { return ptr; }
+    void operator delete(void *ptr) { free(ptr); }
     LogEntry() {}
     LogEntry(double tm, UChar t, UShort m=0, UShort e=0, int ev=0, int p=0) { 
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm;

@@ -351,3 +351,9 @@ void _initCharm(int argc, char **argv)
     _initDone();
   }
 }
+
+GroupTable::GroupTable() 
+{ 
+  for(int i=0;i<MAXBINS;i++) 
+    bins[i] = 0;
+}

@@ -173,11 +173,7 @@ class MsgPool {
       return EnvToUsr(env);
     }
   public:
-    MsgPool() { 
-      for(int i=0;i<MAXMSGS;i++)
-        msgs[i] = _alloc();
-      num = MAXMSGS;
-    }
+    MsgPool();
     void *get(void) {
       return (num ? msgs[--num] : _alloc());
     }

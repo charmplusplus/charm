@@ -18,6 +18,8 @@ class Chare {
     CkChareID thishandle;
   public:
     void *operator new(size_t, void *ptr) { return ptr; }
+    void *operator new(size_t s) { return malloc(s); }
+    void operator delete(void *ptr) { free(ptr); }
 #if CMK_DEBUG_MODE
     Chare() { CkGetChareID(&thishandle); putObject(this); }
     ~Chare() { removeObject(this); }
@@ -55,6 +57,7 @@ class _CK_GID : public _CK_CID {
 
 class CkQdMsg {
   public:
+    void *operator new(size_t s) { return CkAllocMsg(0,s,0); }
     void operator delete(void* ptr) { CkFreeMsg(ptr); }
 };
 

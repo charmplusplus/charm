@@ -82,3 +82,12 @@ void* CkPriorityPtr(void *msg)
   return UsrToEnv(msg)->getPrioPtr();
 }
 
+// This cannot be in the header file because for loop cannot be expanded
+// inline by the stupid HP C++ compiler.
+
+MsgPool::MsgPool() 
+{ 
+  for(int i=0;i<MAXMSGS;i++)
+    msgs[i] = _alloc();
+  num = MAXMSGS;
+}
