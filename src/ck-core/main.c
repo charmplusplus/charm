@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.23  1995-11-06 00:17:26  sanjeev
+ * Revision 2.24  1996-02-10 18:11:11  sanjeev
+ * fixed bug: if(CpvAccess(InsideDataInit)) CldStripLdb(LDB_ELEMENT_PTR(env));
+ *
+ * Revision 2.23  1995/11/06 00:17:26  sanjeev
  * in CkProcess_ForChareMsg, magic number taken from chareblock, not env
  *
  * Revision 2.22  1995/10/13  18:15:53  jyelon
@@ -282,7 +285,7 @@ ENVELOPE *env;
 
   CmiGrabBuffer(&env);
   UNPACK(env);
-  if(CpvAccess(InsideDataInit))
+  if(!CpvAccess(InsideDataInit))
       CldStripLdb(LDB_ELEMENT_PTR(env));
   switch (type)
     {
