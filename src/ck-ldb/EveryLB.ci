@@ -7,6 +7,7 @@ module EveryLB {
    extern module RefineCommLB;
    extern module GreedyLB;
    extern module GreedyCommLB;
+   extern module GreedyAgentLB;
    extern module Comm1LB;
    extern module OrbLB;
    extern module RecBisectBfLB;
