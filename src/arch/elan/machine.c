@@ -839,11 +839,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   int nslots = elan_base->tport_nslots;
   if(nslots < elan_base->state->nvp)
     nslots = elan_base->state->nvp;
-  //  if(nslots > 256)
-  //nslots = 256;
-  nslots += 16;
+  if(nslots > 256)
+    nslots += 16;
 
-  //  nslots = 256;
 
   if (!(elan_port = elan_tportInit(elan_base->state,
 				   (ELAN_QUEUE *)elan_q,
