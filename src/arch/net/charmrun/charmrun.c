@@ -932,19 +932,9 @@ void nodetab_init()
 		char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
 		char *b3 = skipblanks(e2);
 		if (subeqs(b1,e1,"host")) {
-#if CMK_USE_GM
-			/*  host [hostname] [port] ...  */
-                        char *b4 = b3;
-                        char *e4 = skipstuff(b3);
-                        b3 = skipblanks(e4);
-#endif
 			if (rightgroup) {
 				host=group;
 				nodetab_args(b3,&host);
-#if CMK_USE_GM
-				host.dataport = atoi(b4);
-                                if (host.dataport == 0) { fprintf(stderr, "Missing port number!\n"); exit(1); }
-#endif
 				for (host.rank=0; host.rank<host.cpus; host.rank++)
 					nodetab_makehost(substr(b2,e2),&host);
 			}
@@ -1032,16 +1022,9 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 		{fprintf(stderr,"Unexpected node %d registered!\n",node);exit(1);}
 	nt=nodetab_rank0_table[node];/*Nodetable index for this node*/
 	i.nPE=ChMessageInt_new(nodetab_cpus(nt));
-#if CMK_USE_GM
-        *(int *)&i.IP = ChMessageInt(i.dataport);
-        if (ChMessageInt(i.dataport)==0) {
-          fprintf(stderr, "Error> Node %d:%s, cannot open GM gm_port %d!\n", nt, nodetab_name(nt), nodetab_dataport(nt));
-          portOk = 0;
-        }
-        i.dataport=ChMessageInt_new(nodetab_dataport(nt));
-#else
 	i.IP=nodetab_ip(nt);
-#endif
+	if (0==ChMessageInt(i.dataport))
+		{fprintf(stderr,"Node %d could not initialize network!\n",node);exit(1);}
 	nodeinfo_arr[node]=i;
 	for (pe=0;pe<nodetab_cpus(nt);pe++)
 	  {
@@ -1589,11 +1572,7 @@ string return idiom.
 char *create_netstart(int node)
 {
   static char dest[1024];
-  int port = 0;
-#if CMK_USE_GM
-  /* send myrinet port to node program */
-  port = nodetab_dataport(node);
-#endif
+  int port=0;
   sprintf(dest,"%d %s %d %d %d",node,server_addr,server_port,getpid()&0x7FFF, port);
   return dest;
 }
