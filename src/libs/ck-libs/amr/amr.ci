@@ -7,14 +7,16 @@ module amr {
  message _RefineMsg;
  message _RedMsg;
  message StartUpMsg;
-
-
+ message _DummyMsg;
+ message _StatCollMsg;
+ message _CreateStatCollMsg;
 
  chare AmrCoordinator
  {
   	entry AmrCoordinator(_DMsg*);
 	entry AmrCoordinator(StartUpMsg*);
 	entry void synchronise(_RedMsg*);
+	entry void reportStats(_StatCollMsg*);
  };
 
  array [BitVec] Cell
@@ -28,15 +30,26 @@ module amr {
 	entry void synchronise(_RedMsg*);
 	entry void refineExec(_DMsg*);
 	entry void checkRefine(_RefineChkMsg*);
+	entry void goToAtSync(_DMsg*);
  };
 
-array [BitVec] Cell1D :Cell
+ array [BitVec] Cell1D :Cell
  {
-	entry Cell1D(_ArrInitMsg*);
+	entry [createhere]Cell1D(_ArrInitMsg*);
  };
 
-array [BitVec] Cell2D :Cell
+ array [BitVec] Cell2D :Cell
  {
-	entry Cell2D(_ArrInitMsg*);
+	entry[createhere] Cell2D(_ArrInitMsg*);
+ };
+
+ array [BitVec] Cell3D :Cell
+ {
+	entry[createhere] Cell3D(_ArrInitMsg*);
+ };
+
+ group StatCollector {
+    entry StatCollector(_CreateStatCollMsg*);
+    entry void sendStat(_DummyMsg*);
  };
 };

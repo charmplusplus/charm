@@ -3,8 +3,8 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-OBJS = 	amr.o fifo.o
-HEADERS=amr.h bitvec.h fifo.h amr.decl.h amr.def.h
+OBJS = 	amr.o fifo.o statcoll.o
+HEADERS=amr.h bitvec.h fifo.h amr.decl.h amr.def.h statcoll.h
 
 all: libamr.a headers
 
@@ -22,6 +22,9 @@ amr.o: amr.C $(HEADERS)
 
 fifo.o: fifo.c fifo.h
 	$(CHARMC) -c fifo.c
+
+statcoll.o: statcoll.C statcoll.h
+	$(CHARMC) -c statcoll.C
 
 clean:
 	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache
