@@ -25,8 +25,11 @@ done
 
 # Try to guess the number of nodes
 nodes=$pes
+ppn=0
+[ ! "$RMS_NODES" = "" ] && ppn=`expr $RMS_PROCS / $RMS_NODES`
 for i in 4 2 3
 do
+  [ $ppn -ne 0 -a $i -gt $ppn ] && continue
   if [ `expr $pes / $i '*' $i` -eq $pes ]
   then
 	nodes=`expr $pes / $i`
