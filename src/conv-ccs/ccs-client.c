@@ -292,6 +292,7 @@ int CcsRecvResponseMsg(CcsServer *svr, unsigned int *size,char **newBuf, int tim
   unsigned int len;  
   SOCKET fd=svr->replyFd;
   if (-1==CcsImpl_recvReplyAuth(svr)) return -1;
+  if (1!=skt_select1(fd,1000*timeout)) return -1;
   if (-1==skt_recvN(fd,(char *)&netLen,sizeof(netLen))) return -1;
   *size=len=ChMessageInt(netLen);
   *newBuf=(char *)malloc(len);
@@ -310,6 +311,7 @@ int CcsRecvResponse(CcsServer *svr,  unsigned int maxsize, char *recvBuffer,int 
   unsigned int len;
   SOCKET fd=svr->replyFd;
   if (-1==CcsImpl_recvReplyAuth(svr)) return -1;
+  if (1!=skt_select1(fd,1000*timeout)) return -1;
   if (-1==skt_recvN(fd,(char *)&netLen,sizeof(netLen))) return -1;
   len=ChMessageInt(netLen);
   DEBUGF(("[%.3f] recv'd reply length\n",CmiWallTimer()));
