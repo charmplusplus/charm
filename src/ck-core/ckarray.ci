@@ -29,7 +29,6 @@ module CkArray {
 
   group RRMap : ArrayMap {
     entry RRMap(void);
-    entry void registerArray(ArrayMapRegisterMessage *);
   };
 
   mainchare ArrayInit {
