@@ -3,9 +3,6 @@
 CpvDeclare(int, RecvmsgHandle);
 CpvDeclare(int, RecvdummyHandle);
 
-CkGroupID cmgrID;
-extern CkGroupID delegateMgr;
-
 #ifdef CHARM_MPI
 MPI_Comm groupComm;
 MPI_Group group, groupWorld;
@@ -124,11 +121,9 @@ void ComlibManager::done(){
 
         if(npes != CkNumPes()) {
 	    ComlibPrintf("Calling receive id\n");
-	    //#ifdef CHARM_MPI
-	    //cgproxy.receiveID(npes, pelist, comid, groupComm);
-	    //#else
 	    cgproxy.receiveID(npes, pelist, comid);
-	    //#endif
+            
+            delete [] this->pelist;
 	}
         else
             cgproxy.receiveID(comid);
@@ -156,8 +151,10 @@ void ComlibManager::createId(int *pelist, int npes){
 	comid = ComlibEstablishGroup(comid, npes, pelist);
     }
 
-    this->pelist = pelist;
+    this->pelist = new int[npes];
     this->npes = npes;
+
+    memcpy(this->pelist, pelist, npes * sizeof(int));
 
     ComlibPrintf("[%d]Creating comid with %d processors\n", CkMyPe(), npes);
     
@@ -165,11 +162,8 @@ void ComlibManager::createId(int *pelist, int npes){
 	ComlibPrintf("Calling receive id\n");
 	CProxy_ComlibManager cgproxy(cmgrID);
 	
-	//#ifdef CHARM_MPI
-	//cgproxy.receiveID(npes, pelist, comid, groupComm);
-	//#else
 	cgproxy.receiveID(npes, pelist, comid);
-	//#endif
+        delete [] this->pelist;
     }
     createDone = 1;
 }
@@ -351,17 +345,15 @@ void ComlibManager::endIteration(){
 
 
 void ComlibManager::receiveID(comID id){
-    //#ifdef CHARM_MPI
-    //receiveID(CkNumPes(), NULL, id, MPI_COMM_WORLD);
-    //#else
     receiveID(CkNumPes(), NULL, id);
-    //#endif
 }
 
 void ComlibManager::receiveID(int npes, int *pelist, comID id){
 
     this->npes = npes;
-    this->pelist = pelist;
+    this->pelist = new int[npes];
+
+    memcpy(this->pelist, pelist, sizeof(int) * npes);
 
 #ifdef CHARM_MPI
     if(npes < CkNumPes()){

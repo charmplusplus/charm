@@ -61,7 +61,8 @@ class ComlibMsg: public CMessage_ComlibMsg {
 };
 
 class ComlibManager: public CkDelegateMgr{
-    
+
+    CkGroupID cmgrID;
     CharmMessageHolder * messageBuf;
 
     int *procMap;
