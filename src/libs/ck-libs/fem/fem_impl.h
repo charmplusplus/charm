@@ -189,7 +189,14 @@ public:
 
   //The current finite-element mesh
   FEM_Mesh *cur_mesh;
-  
+
+  CkMagicNumber<double> magic;
+#ifdef CMK_OPTIMIZE /* Skip the check, for speed. */
+  inline void check(const char *where) { }
+#else /* Do an extensive self-check */
+  void check(const char *where);
+#endif
+
 private:
   FEMinit init;
 

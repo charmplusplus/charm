@@ -456,11 +456,26 @@ int *CkCopyArray(const int *src,int len,int indexBase)
 
 
 /***** Mesh getting and setting state ****/
+#ifndef CMK_OPTIMIZE
+void FEMchunk::check(const char *where) {
+	magic.check(where,0,this);
+	if (thisIndex<0 || thisIndex> thread->getNumElements()
+		|| thisIndex!=thread->getElement()
+		|| doneCalled!=0 ) 
+	{
+		CkError("FEM Chunk corrupted at %s (thisIndex==%d)\n",
+			where,thisIndex);
+		CkAbort("FEM Chunk is corrupted");
+	}
+}
+#endif
 
 FEMchunk *FEMchunk::lookup(const char *callingRoutine) {
 	if(TCharm::getState()!=inDriver) 
 		FEM_Abort(callingRoutine,"Can only be called from driver (from parallel context)");
-	return CtvAccess(_femptr);
+	FEMchunk *ret=CtvAccess(_femptr);
+	ret->check("FEMchunk::lookup");
+	return ret;
 }
 
 static FEM_Mesh *setMesh(void) {
@@ -630,6 +645,7 @@ FEMchunk::setMesh(FEM_Mesh *msg)
 void
 FEMchunk::reduce_field(int fid, const void *nodes, void *outbuf, int op)
 {
+  check("reduce_field precondition");
   // first reduce over local nodes
   const IDXL_Layout &dt = layouts.get(fid,"FEM_Reduce_field");
   const byte *src = (const byte *) nodes;
@@ -643,11 +659,13 @@ FEMchunk::reduce_field(int fid, const void *nodes, void *outbuf, int op)
   }
   // and now reduce over partitions
   reduce(fid, outbuf, outbuf, op);
+  check("reduce_field postcondition");
 }
 
 void
 FEMchunk::reduce(int fid, const void *inbuf, void *outbuf, int op)
 {
+  check("reduce precondition");
   const IDXL_Layout &dt = layouts.get(fid,"FEM_Reduce");
   int len = dt.compressedBytes();
   if(numElements==1) {
@@ -688,11 +706,13 @@ FEMchunk::reduce(int fid, const void *inbuf, void *outbuf, int op)
   contribute(len, (void *)inbuf, rtype);
   reductionBuf = outbuf;
   thread->suspend();
+  check("reduce precondition");
 }
 
 void
 FEMchunk::reductionResult(int length,const char *data)
 {
+  check("reductionResult");
   memcpy(reductionBuf, data, length);
   reductionBuf=NULL;
   thread->resume();
@@ -701,6 +721,7 @@ FEMchunk::reductionResult(int length,const char *data)
 //Called by user to ask us to contribute our updated mesh chunk
 void 
 FEMchunk::updateMesh(int doWhat) {
+  check("updateMesh precondition");
   if (updated_mesh==NULL)
     CkAbort("FEM_Update_Mesh> You must first set the mesh before updating it!\n");
   
@@ -723,6 +744,7 @@ FEMchunk::updateMesh(int doWhat) {
   updated_mesh=NULL;
   if (doWhat!=FEM_MESH_OUTPUT)
     thread->suspend();//Sleep until repartitioned mesh arrives
+  check("updateMesh postcondition");
 }
 
 //Called by coordinator with a new, repartitioned mesh chunk for us
@@ -893,6 +915,7 @@ FEM_Print(const char *str)
   TCharmAPIRoutine apiRoutineSentry;
   if(TCharm::getState()==inDriver) {
     FEMchunk *cptr = getCurChunk();
+    cptr->check("FEM_Print");
     CkPrintf("[%d] %s\n", cptr->thisIndex, str);
   } else {
     CkPrintf("%s\n", str);
@@ -903,6 +926,7 @@ static void do_print_partition(int idxBase) {
   FEMAPI("FEM_Print_Partition");
   if(TCharm::getState()==inDriver) {
     FEMchunk *cptr = getCurChunk();
+    cptr->check("FEM_Print_partition");
     cptr->print(idxBase);
   } else {
     ((FEM_Mesh *)getMesh())->print(idxBase);
@@ -1155,6 +1179,7 @@ in FEM_Barrier calls.
 void FEMchunk::exchangeGhostLists(int elemType,
 	     int inLen,const int *inList,int idxbase)
 {
+	check("exchangeGhostLists");
 	const FEM_Comm &cnt=cur_mesh->getCount(elemType).getGhostSend();
 	
 //Send off a list to each neighbor
@@ -1191,6 +1216,7 @@ void FEMchunk::exchangeGhostLists(int elemType,
 
 void FEMchunk::recvList(int elemType,int fmChk,int nIdx,const int *idx)
 {
+	check("recvList");
 	int i;
 	const FEM_Entity &e=cur_mesh->getCount(elemType);
 	int firstGhost=e.size();
