@@ -28,8 +28,64 @@ This is needed so we can call the routine as a new thread.
 #endif
 
 /* MPI prototypes and #defines here */
-#define MPI_SUCCESS 0
-/* Somebody needs to define MPI_ERRs here */
+#define MPI_SUCCESS 			0
+/* MPI-1 Errors */
+#define MPI_ERR_BUFFER			1
+#define MPI_ERR_COUNT                   2
+#define MPI_ERR_TYPE                    3
+#define MPI_ERR_TAG                     4
+#define MPI_ERR_COMM                    5
+#define MPI_ERR_RANK                    6
+#define MPI_ERR_REQUEST                 7
+#define MPI_ERR_ROOT                    8
+#define MPI_ERR_GROUP                   9
+#define MPI_ERR_OP                      10
+#define MPI_ERR_TOPOLOGY                11
+#define MPI_ERR_DIMS                    12
+#define MPI_ERR_ARG                     13
+#define MPI_ERR_UNKNOWN                 14
+#define MPI_ERR_TRUNCATE                15
+#define MPI_ERR_OTHER                   16
+#define MPI_ERR_INTERN                  17
+#define MPI_ERR_IN_STATUS               18
+#define MPI_ERR_PENDING                 19
+/* MPI-2 Errors follow */
+#define MPI_ERR_ACCESS			20
+#define MPI_ERR_AMODE			21
+#define MPI_ERR_ASSERT			22
+#define MPI_ERR_BAD_FILE		23
+#define MPI_ERR_BASE			24
+#define MPI_ERR_CONVERSION		25
+#define MPI_ERR_DISP			26
+#define MPI_ERR_DUP_DATAREP		27
+#define MPI_ERR_FILE_EXISTS		28
+#define MPI_ERR_FILE_IN_USE		29
+#define MPI_ERR_FILE			30
+#define MPI_ERR_INFO_KEY		31
+#define MPI_ERR_INFO_NOKEY		32
+#define MPI_ERR_INFO_VALUE		33
+#define MPI_ERR_INFO			34
+#define MPI_ERR_IO			35
+#define MPI_ERR_KEYVAL			36
+#define MPI_ERR_LOCKTYPE		37
+#define MPI_ERR_NAME			38
+#define MPI_ERR_NO_MEM			39
+#define MPI_ERR_NOT_SAME		40
+#define MPI_ERR_NO_SPACE		41
+#define MPI_ERR_NO_SUCH_FILE		42
+#define MPI_ERR_PORT			43
+#define MPI_ERR_QUOTA			44
+#define MPI_ERR_READ_ONLY		45
+#define MPI_ERR_RMA_CONFLICT		46
+#define MPI_ERR_RMA_SYNC		47
+#define MPI_ERR_SERVICE		        48
+#define MPI_ERR_SIZE			49
+#define MPI_ERR_SPAWN			50
+#define MPI_ERR_UNSUPPORTED_DATAREP	51
+#define MPI_ERR_UNSUPPORTED_OPERATION	52
+#define MPI_ERR_WIN			53
+#define MPI_ERR_LASTCODE                53
+/* 0=MPI_SUCCESS<MPI_ERRs(...)<MPI_ERR<=MPI_ERR_LASTCODE */
 
 /* these values have to match values in ampif.h */
 #define MPI_DATATYPE_NULL -1

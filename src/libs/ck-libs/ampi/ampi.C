@@ -366,7 +366,7 @@ static ampi *ampiInit(char **argv)
 {
   if (CtvAccess(ampiInitDone)) return NULL; /* Already called ampiInit */
   STARTUP_DEBUG("ampiInit> begin")
-  
+
   // Parse command-line arguments (Commlib)
   int strat = USE_DIRECT;
   char *comlibStrat;
@@ -382,11 +382,11 @@ static ampi *ampiInit(char **argv)
 			strat = USE_HYPERCUBE;
 		}
   }
-  
-  if (TCHARM_Element()==0) 
+
+  if (TCHARM_Element()==0)
   { /* I'm responsible for building the arrays: */
 	STARTUP_DEBUG("ampiInit> creating arrays")
-	
+
 // FIXME: Need to serialize global communicator allocation in one place.
 	//Allocate the next communicator
 	if(mpi_nworlds == MPI_MAX_COMM_WORLDS)
@@ -422,12 +422,12 @@ static ampi *ampiInit(char **argv)
 		ampiWorldsGroup.add(newComm);
 	STARTUP_DEBUG("ampiInit> arrays created")
   }
-  
+
   // Find our ampi object:
   ampi *ptr=(ampi *)TCharm::get()->semaGet(AMPI_TCHARM_SEMAID);
   CtvAccess(ampiInitDone)=1;
   STARTUP_DEBUG("ampiInit> complete")
-  
+
   return ptr;
 }
 
@@ -438,6 +438,8 @@ public:
         ampiWorldsGroup=thisgroup;
         add(nextWorld);
     }
+    ampiWorlds(){ /* this group is not meant to be PUP'ed(?) */ }
+    int useDefCtor(void){ return 1; }
     void add(const ampiCommStruct &nextWorld) {
         int new_idx=nextWorld.getComm()-(MPI_COMM_WORLD+1);
         mpi_worlds[new_idx].comm=nextWorld;
@@ -524,6 +526,20 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
   return thread;
 }
 
+void ampiParent::startCheckpoint(char* dname){
+  if(thisIndex==0) thisProxy[thisIndex].Checkpoint(strlen(dname),dname);
+  thread->stop();
+}
+void ampiParent::Checkpoint(int len, char* dname){
+  char dirname[256];
+  strncpy(dirname,dname,len);
+  dirname[len]='\0';
+  CkCallback cb(CkIndex_ampiParent::ResumeThread(),thisArrayID);
+  CkStartCheckpoint(dirname,cb);
+}
+void ampiParent::ResumeThread(void){
+  thread->resume();
+}
 
 //----------------------- ampi -------------------------
 ampi::ampi()
@@ -2266,7 +2282,8 @@ CDECL
 void MPI_Checkpoint(char *dname)
 {
   AMPIAPI("MPI_Checkpoint");
-  CkPrintf("MPI_Checkpoint not implemented\n");
+  MPI_Barrier(MPI_COMM_WORLD);
+  getAmpiParent()->startCheckpoint(dname);
 }
 
 CDECL

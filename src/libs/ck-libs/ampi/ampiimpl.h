@@ -617,6 +617,10 @@ public:
 
     void pup(PUP::er &p);
 
+    void startCheckpoint(char* dname);
+    void Checkpoint(int len, char* dname);
+    void ResumeThread(void);
+
     inline const ampiCommStruct &comm2proxy(MPI_Comm comm) {
       if (comm==MPI_COMM_WORLD) return worldStruct;
       if (comm==MPI_COMM_SELF) return selfStruct;

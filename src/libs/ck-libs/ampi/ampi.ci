@@ -6,6 +6,8 @@ module ampi {
 
   array[1D] ampiParent {
     entry ampiParent(int universeNo,CProxy_TCharm threads_,CProxy_ComlibManager comlib_);
+    entry void ResumeThread();
+    entry void Checkpoint(int len, char dname[len]);
   };
   array[1D] ampi {
     entry ampi();
@@ -16,6 +18,7 @@ module ampi {
     entry void commCreatePhase1(CkReductionMsg *msg);
   };
   group ampiWorlds {
+    entry ampiWorlds();
     entry ampiWorlds(ampiCommStruct nextWorld);
     entry void add(ampiCommStruct nextWorld);
   };
