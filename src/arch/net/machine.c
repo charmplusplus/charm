@@ -106,6 +106,8 @@ extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
 
 
+static int NumAlloc, NumFree;
+
 /*****************************************************************************
  *
  * CmiAlloc, CmiSize, and CmiFree
@@ -115,34 +117,31 @@ extern void CmemCallWhenMemAvail();
 void *CmiAlloc(size)
 int size;
 {
-char *res;
-res =(char *)malloc(size+8);
-if (res==0) KillEveryone("Memory allocation failed.");
-((int *)res)[0]=size;
-return (void *)(res+8);
+  char *res;
+  NumAlloc++;
+  res =(char *)malloc(size+8);
+  if (res==0) KillEveryone("Memory allocation failed.");
+  ((int *)res)[0]=size;
+  return (void *)(res+8);
 }
 
 int CmiSize(blk)
 void *blk;
 {
-return ((int *)(((char *)blk)-8))[0];
+  return ((int *)(((char *)blk)-8))[0];
 }
 
 void CmiFree(blk)
 void *blk;
 {
-free(((char *)blk)-8);
+  NumFree++;
+  free(((char *)blk)-8);
 }
 
 /*****************************************************************************
  *
  *     Utility routines for network machine interface.
  *
- *
- * Bcopy(char *s1, char *s2, int size)
- *
- *    - Temporary bcopy routine.  There seems to be a problem with the
- *      usual one
  *
  * zap_newline(char *s)
  *
@@ -165,21 +164,12 @@ free(((char *)blk)-8);
  *   - return a freshly-allocated duplicate of a string
  *
  * int my_sendto
- *     (int s, char *msg, int len, int flags, struct sockaddr *to, int tolen)
+ *     (int s, char *msg, int len, int flags, (struct sockaddr *)to, int tolen)
  * 
  *   - performs a "sendto", automatically retrying on trivial errors.
  *
  *****************************************************************************/
 
-
-static void Bcopy (s1,s2,size) char *s1,*s2; int size;
-{
-  int i;
-  for (i=0;i<size;i++) s2[i]=s1[i];
-  memcpy(s2, s1, size);
-}
-
-#define Bcopy(s1,s2,size) memcpy(s2,s1,size)
 
 static void zap_newline(s) char *s;
 {
@@ -243,10 +233,7 @@ int s; char *msg; int len; int flags; struct sockaddr *to; int tolen;
   nwritable = select(FD_SETSIZE, NULL, &wfds, NULL, NULL);  
 */
 
-  while (1) {
-    ok = sendto(s, msg, len, flags, to, tolen);
-    if (ok>=0) break;
-  }
+  while((ok = sendto(s, msg, len, flags, to, tolen))<0);
   if (ok != len) KillEveryoneCode(21);
   return ok;
 }
@@ -260,13 +247,14 @@ static int wait_readable(fd, sec) int fd; int sec;
   begin = time(0);
   FD_ZERO(&rfds);
   FD_SET(fd, &rfds);
- retry:
-  tmo.tv_sec = (time(0) - begin) + sec;
-  tmo.tv_usec = 0;
-  nreadable = select(FD_SETSIZE, &rfds, NULL, NULL, &tmo);
-  if ((nreadable<0)&&(errno==EINTR)) goto retry;
-  if (nreadable == 0) { errno=ETIMEDOUT; return -1; }
-  return 0;
+  while(1) {
+    tmo.tv_sec = (time(0) - begin) + sec;
+    tmo.tv_usec = 0;
+    nreadable = select(FD_SETSIZE, &rfds, NULL, NULL, &tmo);
+    if ((nreadable<0)&&(errno==EINTR)) continue;
+    if (nreadable == 0) { errno=ETIMEDOUT; return -1; }
+    return 0;
+  }
 }
 
 /*****************************************************************************
@@ -663,6 +651,7 @@ typedef struct {
 static node_info node_table[MAX_NODES];
 static int       node_table_fill;
 
+static struct sockaddr_in addr_table[MAX_NODES];
 
 static void ParseNetstart()
 {
@@ -671,7 +660,7 @@ static void ParseNetstart()
   ns = getenv("NETSTART");
   if (ns==0) goto abort;
   nread = sscanf(ns, "%d%d%d%d%d",
-		 &CpvAccess(Cmi_mype),&CpvAccess(Cmi_numpes),&self_IP,&host_IP,&host_port);
+     &CpvAccess(Cmi_mype),&CpvAccess(Cmi_numpes),&self_IP,&host_IP,&host_port);
   if (nread!=5) goto abort;
   return;
  abort:
@@ -723,11 +712,11 @@ static void InitializePorts()
   skt_server(&ctrl_port, &ctrl_skt);
   
   sprintf(self_IP_str,"%d.%d.%d.%d",
-	  (self_IP>>24)&0xFF,(self_IP>>16)&0xFF,
-	  (self_IP>>8)&0xFF,self_IP&0xFF);
+    (self_IP>>24)&0xFF,(self_IP>>16)&0xFF,
+    (self_IP>>8)&0xFF,self_IP&0xFF);
   sprintf(host_IP_str,"%d.%d.%d.%d",
-	  (host_IP>>24)&0xFF,(host_IP>>16)&0xFF,
-	  (host_IP>>8)&0xFF,host_IP&0xFF);
+    (host_IP>>24)&0xFF,(host_IP>>16)&0xFF,
+    (host_IP>>8)&0xFF,host_IP&0xFF);
 }
 
 /****************************************************************************
@@ -876,7 +865,7 @@ static void ctrl_getone()
 static void node_addresses_receive()
 {
   ctrl_sendone(120, "aset addr %d %s.%d.%d\n",
-	       CpvAccess(Cmi_mype), self_IP_str, ctrl_port, data_port);
+         CpvAccess(Cmi_mype), self_IP_str, ctrl_port, data_port);
   ctrl_sendone(120, "aget %s %d addr 0 %d\n",
     self_IP_str,ctrl_port,CpvAccess(Cmi_numpes)-1);
   while (node_table_fill != CpvAccess(Cmi_numpes)) {
@@ -905,6 +894,9 @@ static void node_addresses_store(addrs) char *addrs;
     node_table[i].IP = (ip0<<24)+(ip1<<16)+(ip2<<8)+ip3;
     node_table[i].ctrlport = cport;
     node_table[i].dataport = dport;
+    addr_table[i].sin_family      = AF_INET;
+    addr_table[i].sin_port        = htons(dport);
+    addr_table[i].sin_addr.s_addr = htonl(node_table[i].IP);
   }
   p = skipblanks(p);
   if (*p!=0) KillEveryoneCode(82283);
@@ -1015,11 +1007,13 @@ static int NumRetransmits;
 static int NumAcksSent;
 static int NumUseless;
 static int NumSends;
+static unsigned int NumEvents;
 
 CmiNetPrintUdpStatistics()
 {
-CmiPrintf("[%d]: NumIntr= %d, NumRetransmits= %d, NumAcksSent= %d, NumSends= %d\n",
-	  CmiMyPe(), NumIntr, NumRetransmits, NumAcksSent, NumSends);
+  CmiPrintf("[%d]: NumIntr= %d, NumRetransmits= %d, NumAcksSent= %d, NumSends= %d\n",
+    CmiMyPe(), NumIntr, NumRetransmits, NumAcksSent, NumSends);
+  CmiPrintf("[%d]: NumAlloc = %d, NumFree = %d NumEvents=%u\n", CmiMyPe(), NumAlloc, NumFree, NumEvents);
 }
 
 /*****************************************************************************
@@ -1082,27 +1076,25 @@ int node, nbr;
  *****************************************************************************/
 
 /* Types of messages. */
-# define SEND	1
-# define ACK	2
+
+# define SEND  1
+# define ACK  2
 
 typedef unsigned char BYTE;
 
 /* In bytes.  Make sure this is greater than zero! */
 /* Works out to be about 2018 bytes. */
-# define MAX_FRAG_SIZE (CMK_MAX_DGRAM_SIZE - sizeof(DATA_HDR))
+
+# define MAXDSIZE (CMK_MAX_DGRAM_SIZE - sizeof(DATA_HDR))
 
 /* Format of the header sent with each fragment. */
 typedef struct DATA_HDR
 {
-  unsigned int seq_num;
-  BYTE send_or_ack;		/* SEND or ACK (acknowledgment). */
-  BYTE msg_type;		/* Currently, always 1. */
-  BYTE pad1, pad2;              /* Purify was driving me crazy. */
-  unsigned int SourcePeNum;
-  unsigned int DestPeNum;
-  unsigned int numfrags;
-  unsigned int size;		/* size of message, not including header. */
-  unsigned int full_size;	/* Size of complete message */
+  unsigned int seq_num;   /* Sequence Number */
+  unsigned int PeNum;     /* always penum of the originator*/
+  unsigned int pktidx;    /* Index of packet within message */
+  unsigned int rem_size;  /*Size of remaining message including this packet*/
+                          /*If this is zero, it is ACK otherwise SEND */
 }
 DATA_HDR;
 
@@ -1110,7 +1102,7 @@ DATA_HDR;
 typedef struct msgspace
 {
   DATA_HDR hd;
-  char data[CMK_MAX_DGRAM_SIZE-sizeof(DATA_HDR)];
+  char data[MAXDSIZE];
 }
 msgspace;
 
@@ -1131,7 +1123,7 @@ PacketQueueElem;
 
 typedef struct msg_queue_elem
 {
-  PacketQueueElem *packetlist;
+  char *mesg;
   struct msg_queue_elem *nextptr;
 }
 MsgQueueElem;
@@ -1139,7 +1131,8 @@ MsgQueueElem;
 typedef struct new_msg
 {
   int numpackets;
-  PacketQueueElem *packetlist;
+  int numfrags;
+  char *mesg;
 }
 NewMessage;
 
@@ -1151,14 +1144,14 @@ static int free_send=0;
 static int alloc_ack=0;
 static int alloc_send=0;
 
-static int Communication_init;	/* Communication set up yet? */
+static int Communication_init;  /* Communication set up yet? */
 
 
 static WindowElement **send_window;       /* packets awaiting acks  */
 
 static PacketQueueElem **transmit_head;   /* packets awaiting transmission */
 static PacketQueueElem **transmit_tail; 
-						    
+                
 
 static int *first_window_index;     
 static int *last_window_index;     
@@ -1200,41 +1193,18 @@ static double CmiNow;
 /****************************************************************************/
 
 
-/* Send an acknowledging message to the source PE named in the message header.
-** The acknowledgement has the same header, except that the message type is
-** changed to ACK. (So, the "size" field in the header will be
-** incorrect for ACK's).
+/* Send an acknowledging message to the PE penum.
+** The acknowledgement has the same header, except that rem_size == 0
 */
-static void send_ack(packet) 
+static void send_ack(packet,penum) 
      DATA_HDR *packet; 
+     int penum;
 {
-  node_info *dest = node_table + packet->SourcePeNum;
-  struct sockaddr_in addr;
-  addr.sin_family      = AF_INET;
-  addr.sin_port        = htons(dest->dataport);
-  addr.sin_addr.s_addr = htonl(dest->IP);
   NumSends++;
-  my_sendto(data_skt, (char *)packet, sizeof(DATA_HDR), 0, (struct sockaddr *)&addr, sizeof(addr));
+  my_sendto(data_skt, (char *)packet, sizeof(DATA_HDR), 0, 
+    (struct sockaddr *)&addr_table[penum],
+    sizeof(struct sockaddr_in));
 }
-
-
-static char *
-msg_tuple(PeNum,msgid,ack_or_send) int PeNum,msgid,ack_or_send; {
-   static char buf[100];
-   char type;
-
-   switch(ack_or_send) {
-   case ACK:type='A';
-      break;
-   case SEND:type='S';
-      break;
-   default:type='?';
-      break;
-   }
-   sprintf(buf,"(%d,%d,%c)",PeNum,msgid,type);
-   return buf;
-}
-
 
 
 /* This section implements a send sliding window protocol for the IPnet 
@@ -1258,51 +1228,46 @@ msg_tuple(PeNum,msgid,ack_or_send) int PeNum,msgid,ack_or_send; {
 
               Questions, Comments and Criticisms to be directed to
 
-      			 Balkrishna Ramkumar
-      			ramkumar@crhc.uiuc.edu
+             Balkrishna Ramkumar
+            ramkumar@crhc.uiuc.edu
 
 */
    
       
 static void SendWindowInit()
 {
-    int i,j;
-    int numpe = CpvAccess(Cmi_numpes);
-    int mype = CpvAccess(Cmi_mype);
+  int i,j;
+  int numpe = CpvAccess(Cmi_numpes);
+  int mype = CpvAccess(Cmi_mype);
 
-    send_window = (WindowElement **) CmiAlloc(numpe * sizeof(WindowElement *));
-    transmit_head = (PacketQueueElem **) CmiAlloc(numpe * sizeof(PacketQueueElem *));
-    transmit_tail = (PacketQueueElem **) CmiAlloc(numpe * sizeof(PacketQueueElem *));
-    first_window_index = (int *) CmiAlloc(numpe * sizeof(int));
-    last_window_index = (int *) CmiAlloc(numpe * sizeof(int));
-    cur_window_size = (int *) CmiAlloc(numpe * sizeof(int));
-    next_seq_num = (unsigned int  *) CmiAlloc(numpe * sizeof(unsigned int ));
-/* Sanjeev */
-    timeout_factor = (int *)CmiAlloc(numpe * sizeof(int)) ;
+  send_window = (WindowElement **)CmiAlloc(numpe*sizeof(WindowElement *));
+  transmit_head=(PacketQueueElem **)CmiAlloc(numpe*sizeof(PacketQueueElem *));
+  transmit_tail=(PacketQueueElem **)CmiAlloc(numpe*sizeof(PacketQueueElem *));
+  first_window_index = (int *) CmiAlloc(numpe*sizeof(int));
+  last_window_index = (int *) CmiAlloc(numpe * sizeof(int));
+  cur_window_size = (int *) CmiAlloc(numpe * sizeof(int));
+  next_seq_num = (unsigned int  *) CmiAlloc(numpe * sizeof(unsigned int ));
+  timeout_factor = (int *)CmiAlloc(numpe * sizeof(int)) ;
 
-    for (i = 0; i < numpe; i++)
-    {
-	if (i != mype)
-	{
-	    send_window[i] = (WindowElement *) CmiAlloc(WINDOW_SIZE * sizeof(WindowElement));
-	    for (j = 0; j < WINDOW_SIZE; j++)
-	    {
-		send_window[i][j].packet = NULL;
-		send_window[i][j].seq_num = 0;
-		send_window[i][j].send_time = 0.0;
-	    }
-	}
-	else send_window[i] = NULL;  /* never used */
-
-	first_window_index[i] = 0;
-	last_window_index[i] = 0;
-	cur_window_size[i] = 0;
-	next_seq_num[i] = 0;
-	transmit_head[i] = NULL;
-	transmit_tail[i] = NULL;
-    /* Sanjeev */
-	timeout_factor[i] = 1 ;
+  for (i = 0; i < numpe; i++) {
+    if (i != mype) {
+       send_window[i]=(WindowElement *)CmiAlloc(WINDOW_SIZE*sizeof(WindowElement));
+      for (j = 0; j < WINDOW_SIZE; j++) {
+        send_window[i][j].packet = NULL;
+        send_window[i][j].seq_num = 0;
+        send_window[i][j].send_time = 0.0;
+      }
     }
+    else send_window[i] = NULL;  /* never used */
+
+    first_window_index[i] = 0;
+    last_window_index[i] = 0;
+    cur_window_size[i] = 0;
+    next_seq_num[i] = 0;
+    transmit_head[i] = NULL;
+    transmit_tail[i] = NULL;
+    timeout_factor[i] = 1 ;
+  }
 }
 
 /* This routine adds a packet to the tail of the transmit queue */
@@ -1311,15 +1276,16 @@ static void InsertInTransmitQueue(packet, destpe)
 DATA_HDR *packet;
 int destpe;
 {
-    PacketQueueElem *newelem;
+  PacketQueueElem *newelem;
 
-    newelem = (PacketQueueElem *) CmiAlloc(sizeof(PacketQueueElem));
-    newelem->packet = packet;
-    newelem->nextptr = NULL;
-    if  (transmit_tail[destpe] == NULL)
-	 transmit_head[destpe] = newelem;
-    else transmit_tail[destpe]->nextptr = newelem;
-    transmit_tail[destpe] = newelem;
+  newelem = (PacketQueueElem *) CmiAlloc(sizeof(PacketQueueElem));
+  newelem->packet = packet;
+  newelem->nextptr = NULL;
+  if  (transmit_tail[destpe] == NULL)
+    transmit_head[destpe] = newelem;
+  else 
+    transmit_tail[destpe]->nextptr = newelem;
+  transmit_tail[destpe] = newelem;
 }
 
 
@@ -1329,21 +1295,18 @@ int destpe;
 static DATA_HDR *GetTransmitPacket(destpe)
 int destpe;
 {
-    PacketQueueElem *elem;
-    DATA_HDR *packet;
+  PacketQueueElem *elem;
+  DATA_HDR *packet;
 
-    if  (transmit_head[destpe] == NULL)
-        return NULL;
-    else 
-    {
-	elem = transmit_head[destpe];
-	transmit_head[destpe] = transmit_head[destpe]->nextptr;
-	if (transmit_head[destpe] == NULL)
-	    transmit_tail[destpe] = NULL;
-	packet = elem->packet;
-	CmiFree(elem);
-	return packet;
-    }
+  if  (transmit_head[destpe] == NULL)
+    return NULL;
+  elem = transmit_head[destpe];
+  transmit_head[destpe] = transmit_head[destpe]->nextptr;
+  if (transmit_head[destpe] == NULL)
+    transmit_tail[destpe] = NULL;
+  packet = elem->packet;
+  CmiFree(elem);
+  return packet;
 }
 
 /* This routine adds the packet to the send window. If the addition is
@@ -1355,44 +1318,42 @@ static int AddToSendWindow(packet, destpe)
 DATA_HDR *packet;
 int destpe;
 {
-    send_window[destpe][last_window_index[destpe]].packet =  packet;
-    send_window[destpe][last_window_index[destpe]].seq_num = next_seq_num[destpe];
-    send_window[destpe][last_window_index[destpe]].send_time = CmiNow;
-    packet->seq_num = next_seq_num[destpe];
-    next_seq_num[destpe]++;
-    last_window_index[destpe] = (last_window_index[destpe] + 1) % WINDOW_SIZE;
-    cur_window_size[destpe]++;
-    return 1;
+  send_window[destpe][last_window_index[destpe]].packet =  packet;
+  send_window[destpe][last_window_index[destpe]].seq_num = next_seq_num[destpe];
+  send_window[destpe][last_window_index[destpe]].send_time = CmiNow;
+  packet->seq_num = next_seq_num[destpe];
+  next_seq_num[destpe]++;
+  last_window_index[destpe] = (last_window_index[destpe] + 1) % WINDOW_SIZE;
+  cur_window_size[destpe]++;
+  return 1;
 }
 
 static SendPackets(destpe)
 int destpe;
 {
-    DATA_HDR *GetTransmitPacket();
-    DATA_HDR *packet;
-    int bytes_sent;
-    int i;
-    struct sockaddr_in addr;
+  DATA_HDR *GetTransmitPacket();
+  DATA_HDR *packet;
+  int bytes_sent;
+  unsigned int act_size;
+  int i;
 
-    CmiNow = CmiTimerWallClock();
-    while (cur_window_size[destpe] < WINDOW_SIZE &&
-	   ((packet = GetTransmitPacket(destpe)) != NULL))
-    {
-	AddToSendWindow(packet, destpe);
-	TRACE(CmiPrintf("Node %d: sending packet seq_num=%d, num_frags=%d fullsize=%d\n",
-		       CpvAccess(Cmi_mype),
-		       packet->seq_num, packet->numfrags, 
-		       packet->full_size));
+  CmiNow = CmiTimerWallClock();
+  while (cur_window_size[destpe] < WINDOW_SIZE &&
+     ((packet = GetTransmitPacket(destpe)) != NULL))
+  {
+    AddToSendWindow(packet, destpe);
+    TRACE(CmiPrintf("Node %d: sending packet seq_num=%d, rem_size=%d\n",
+           CpvAccess(Cmi_mype),
+           packet->seq_num, 
+           packet->rem_size));
 
-        addr.sin_family      = AF_INET;
-        addr.sin_port        = htons(node_table[destpe].dataport);
-        addr.sin_addr.s_addr = htonl(node_table[destpe].IP);
-
-        NumSends++ ;
-	bytes_sent = my_sendto(data_skt, (char *)packet,
-			    packet->size + sizeof(DATA_HDR),
-			    0, (struct sockaddr *)&addr, sizeof(addr));
-    }
+    NumSends++ ;
+    act_size=(packet->rem_size<MAXDSIZE)?packet->rem_size:MAXDSIZE;
+    bytes_sent = my_sendto(data_skt, (char *)packet,
+          act_size + sizeof(DATA_HDR),
+          0, (struct sockaddr *)&addr_table[destpe],
+          sizeof(struct sockaddr_in));
+  }
 }
 
 /* This routine updates the send window upon receipt of an ack. Old acks
@@ -1402,41 +1363,38 @@ static UpdateSendWindow(ack, sourcepe)
 DATA_HDR *ack;
 int sourcepe;
 {
-    int i, index;
-    int found;
-    int count;
+  int i, index, found, count;
+  DATA_HDR *PacketsToBeFreed[WINDOW_SIZE];
 
-    if (cur_window_size[sourcepe] == 0)  /* empty window */
-        return;
+  if (cur_window_size[sourcepe] == 0)  /* empty window */
+    return;
 
+  index = first_window_index[sourcepe];
+  found = 0;
+  count = 0;
+  while (count < cur_window_size[sourcepe] && !found) 
+  {
+    found = (send_window[sourcepe][index].seq_num == ack->seq_num);
+    index = (index + 1) % WINDOW_SIZE;
+    count++;
+  }
+  if (found) {
+    TRACE(CmiPrintf("Node %d: received ack with seq_num %d\n",
+           CpvAccess(Cmi_mype), ack->seq_num)); 
     index = first_window_index[sourcepe];
-    found = 0;
-    count = 0;
-    while (count < cur_window_size[sourcepe] && !found) 
+    for (i = 0; i < count; i++)
     {
-	found = (send_window[sourcepe][index].seq_num == ack->seq_num);
-	index = (index + 1) % WINDOW_SIZE;
-	count++;
+      PacketsToBeFreed[i] = send_window[sourcepe][index].packet;
+      send_window[sourcepe][index].packet = NULL;
+      index = (index + 1) % WINDOW_SIZE;
     }
-    if (found)
-    {
-	TRACE(CmiPrintf("Node %d: received ack with seq_num %d\n",
-		       CpvAccess(Cmi_mype), ack->seq_num)); 
-	index = first_window_index[sourcepe];
-	for (i = 0; i < count; i++)
-	{
-	    CmiFree(send_window[sourcepe][index].packet);
-	    /* In the interest of sending more packets early, we should remove 
-	       these calls to cmifree from the critical path. Store the 
-	       pointers in an array, and free them after the SendPackets call 
-	       below. --- Sanjay 1/30/96*/
-	    send_window[sourcepe][index].packet = NULL;
-	    index = (index + 1) % WINDOW_SIZE;
-	}
-        first_window_index[sourcepe] = index;
-	cur_window_size[sourcepe] -= count;
-    }
-    SendPackets(sourcepe);   /* any untransmitted pkts */
+    first_window_index[sourcepe] = index;
+    cur_window_size[sourcepe] -= count;
+  }
+  SendPackets(sourcepe);   /* any untransmitted pkts */
+  if(found)
+    for(i=0;i<count;i++)
+	    CmiFree(PacketsToBeFreed[i]);
 }
 
 /* This routine extracts a packet with a given sequence number. It returns
@@ -1446,9 +1404,8 @@ int sourcepe;
 
 static int RetransmitPackets()
 {
-  int i, index, fnord;
+  int i, index, fnord, act_size;
   DATA_HDR *packet;
-  struct sockaddr_in addr;
   int sending=0;
 
   CmiNow = CmiTimerWallClock();
@@ -1457,62 +1414,22 @@ static int RetransmitPackets()
     if (cur_window_size[i] > 0) {
       sending = 1;
       if ((CmiNow - send_window[i][index].send_time) > 
-	  (resend_wait * timeout_factor[i])) {
-	/* timeout_factor[i] *= 2 ;  for exponential backoff */
-	if (resend_wait * timeout_factor[i] > resend_fail) {
-	  KillEveryone("retransmission failed, timeout.");
-	}
-    	packet = send_window[i][index].packet;
-	addr.sin_family      = AF_INET;
-	addr.sin_port        = htons(node_table[i].dataport);
-	addr.sin_addr.s_addr = htonl(node_table[i].IP);
-	
-	NumRetransmits++ ;
-	NumSends++;
-	my_sendto(data_skt, (char *)packet,
-		  packet->size + sizeof(DATA_HDR), 0, (struct sockaddr *)&addr, sizeof(addr)); 
-	send_window[i][index].send_time = CmiNow;
+          (resend_wait * timeout_factor[i])) {
+        if (resend_wait * timeout_factor[i] > resend_fail) {
+          KillEveryone("retransmission failed, timeout.");
+        }
+        packet = send_window[i][index].packet;
+        NumRetransmits++ ;
+        NumSends++;
+        act_size=(packet->rem_size<MAXDSIZE)?packet->rem_size:MAXDSIZE;
+        my_sendto(data_skt, (char *)packet,
+            act_size + sizeof(DATA_HDR), 0, (struct sockaddr *)&addr_table[i],
+            sizeof(struct sockaddr_in)); 
+        send_window[i][index].send_time = CmiNow;
       }
     }
   }
   return sending;
-}
-
-
-static void fragment_send(destPE,size,msg,full_size,msg_type, numfrags)
-     int destPE;
-     int size;
-     char *msg; 
-     int full_size; 
-     int msg_type; 
-     int numfrags;
-{
-  int send_timeout();
-  int bytes_sent=0;
-  DATA_HDR *hd;
-  
-  /* Is datagram too small to hold fragment and data header? */ 
-  if (MAX_FRAG_SIZE + sizeof(DATA_HDR) > CMK_MAX_DGRAM_SIZE)
-    KillEveryoneCode(5);
-  
-  /* Initialize the data header part of the send space. */
-  hd = (DATA_HDR *)CmiAlloc(sizeof(DATA_HDR) + size);
-  if ( hd == NULL ) {
-    CmiPrintf("*** ERROR *** Memory Allocation Failed.\n");
-    return ;
-  }
-  hd->pad1 = hd->pad2 = 0;
-  hd->DestPeNum = destPE;
-  hd->size = size;
-  hd->full_size = full_size;
-  hd->msg_type = msg_type;
-  hd->send_or_ack = SEND;
-  hd->SourcePeNum = CpvAccess(Cmi_mype);
-  hd->numfrags = numfrags;
-  
-  /* Transfer the data to the data part of the send space. */
-  Bcopy(msg, (hd + 1), size);
-  InsertInTransmitQueue(hd, destPE);
 }
 
 
@@ -1531,47 +1448,46 @@ static void fragment_send(destPE,size,msg,full_size,msg_type, numfrags)
 
               Questions, Comments and Criticisms to be directed to
 
-      			 Balkrishna Ramkumar
-      			ramkumar@crhc.uiuc.edu
+             Balkrishna Ramkumar
+            ramkumar@crhc.uiuc.edu
 */
    
 
 static RecvWindowInit()
 {
-    int i,j;
-    int numpe = CpvAccess(Cmi_numpes);
-    int mype = CpvAccess(Cmi_mype);
+  int i,j;
+  int numpe = CpvAccess(Cmi_numpes);
+  int mype = CpvAccess(Cmi_mype);
 
-    recv_window = (WindowElement **) CmiAlloc(numpe * sizeof(WindowElement *));
-    next_window_index = (int *) CmiAlloc(numpe * sizeof(int));
-    expected_seq_num = (unsigned int *) CmiAlloc(numpe * sizeof(unsigned int));
-    recd_messages = (NewMessage *) CmiAlloc(numpe * sizeof(NewMessage));
-    needack = (int *) CmiAlloc(numpe * sizeof(int));
-    for (i = 0; i < numpe; i++)
-    {
-	if (i != mype)
-	{
-	    recv_window[i] = (WindowElement *) CmiAlloc(WINDOW_SIZE * sizeof(WindowElement));
-	    for (j = 0; j < WINDOW_SIZE; j++)
-	    {
-		recv_window[i][j].packet = NULL;
-		recv_window[i][j].seq_num = 0;
-		recv_window[i][j].send_time = 0.0;
-	    }
-	}
-	else recv_window[i] = NULL;  /* never used */
-
-	next_window_index[i] = 0;
-	expected_seq_num[i] = 0;
-	recd_messages[i].numpackets = 0;
-	recd_messages[i].packetlist = NULL;
-	needack[i] = 0;
+  recv_window = (WindowElement **) CmiAlloc(numpe * sizeof(WindowElement *));
+  next_window_index = (int *) CmiAlloc(numpe * sizeof(int));
+  expected_seq_num = (unsigned int *) CmiAlloc(numpe * sizeof(unsigned int));
+  recd_messages = (NewMessage *) CmiAlloc(numpe * sizeof(NewMessage));
+  needack = (int *) CmiAlloc(numpe * sizeof(int));
+  for (i = 0; i < numpe; i++) {
+    if (i != mype) {
+      recv_window[i]=(WindowElement *)CmiAlloc(WINDOW_SIZE*sizeof(WindowElement));
+      for (j = 0; j < WINDOW_SIZE; j++) {
+        recv_window[i][j].packet = NULL;
+        recv_window[i][j].seq_num = 0;
+        recv_window[i][j].send_time = 0.0;
+      }
     }
-    recd_msg_head = NULL;
-    recd_msg_tail = NULL;
+    else 
+      recv_window[i] = NULL;  /* never used */
 
-    ack.DestPeNum = CpvAccess(Cmi_mype);
-    ack.send_or_ack = ACK;
+    next_window_index[i] = 0;
+    expected_seq_num[i] = 0;
+    recd_messages[i].numpackets = 0;
+    recd_messages[i].numfrags = 0;
+    recd_messages[i].mesg = NULL;
+    needack[i] = 0;
+  }
+  recd_msg_head = NULL;
+  recd_msg_tail = NULL;
+
+  ack.PeNum = CpvAccess(Cmi_mype);
+  ack.rem_size = 0;
 }
 
 
@@ -1597,32 +1513,30 @@ static int AddToReceiveWindow(packet, sourcepe)
      If that were the case, 
      expected_seq_num[sourcepe] > > last_seq_num - WINDOW_SIZE,
      which is a contradiction
-     */
+   */
 
-  if (expected_seq_num[sourcepe] < last_seq_num)
-    {
-      if (seq_num < expected_seq_num[sourcepe])
-	{
-	  CmiFree(packet);	/* already received */
-	  needack[sourcepe] = 1;
-	  NumUseless++ ;
-	  return 0;
-	}
-      else 
-	{
-	  index = (next_window_index[sourcepe] + 
-		   seq_num - expected_seq_num[sourcepe]) % WINDOW_SIZE;
-	  /* put needack and NumUseless++ here ??? */
-	  if (recv_window[sourcepe][index].packet) CmiFree(packet);
-	  else {
-	    recv_window[sourcepe][index].packet = packet;
-	    recv_window[sourcepe][index].seq_num = seq_num;
-	    TRACE(CmiPrintf("Node %d: Inserting packet %d at index %d in recv window\n",
-			   CpvAccess(Cmi_mype),
-			   seq_num, index)); 
-	  }
-	}
+  if (expected_seq_num[sourcepe] < last_seq_num) {
+    if (seq_num < expected_seq_num[sourcepe]) {
+      CmiFree(packet);  /* already received */
+      needack[sourcepe] = 1;
+      NumUseless++ ;
+      return 0;
     }
+    else {
+      index = (next_window_index[sourcepe] + 
+      seq_num - expected_seq_num[sourcepe]) % WINDOW_SIZE;
+      /* put needack and NumUseless++ here ??? */
+      if (recv_window[sourcepe][index].packet) 
+        CmiFree(packet);
+      else {
+        recv_window[sourcepe][index].packet = packet;
+        recv_window[sourcepe][index].seq_num = seq_num;
+        TRACE(CmiPrintf("Node %d: Inserting packet %d at index %d in recv window\n",
+               CpvAccess(Cmi_mype),
+               seq_num, index)); 
+      }
+    }
+  }
   return 1;
 }
 
@@ -1639,36 +1553,31 @@ static DATA_HDR *ExtractNextPacket(sourcepe)
   int index = next_window_index[sourcepe];
 
   packet = recv_window[sourcepe][index].packet;
-  if (packet != NULL)
-    {
-      recv_window[sourcepe][index].packet = NULL;
-      needack[sourcepe] = 1;
-      expected_seq_num[sourcepe]++;
-      next_window_index[sourcepe] = (next_window_index[sourcepe] + 1) % WINDOW_SIZE;
-    }
+  if (packet != NULL) {
+    recv_window[sourcepe][index].packet = NULL;
+    needack[sourcepe] = 1;
+    expected_seq_num[sourcepe]++;
+    next_window_index[sourcepe]=(next_window_index[sourcepe] + 1) % WINDOW_SIZE;
+  }
   return packet;
 }
 
 
-/* This routine inserts a completed messages as a list of packets in reverse
-   order into the recd_msg queue */
+/* This routine inserts a completed messages into the recd_msg queue */
 
-static InsertInMessageQueue(packetlist)
-     PacketQueueElem *packetlist;
+static InsertInMessageQueue(mesg)
+     char *mesg;
 {
   MsgQueueElem *newelem;
 
   newelem = (MsgQueueElem *) CmiAlloc(sizeof(MsgQueueElem));
-  newelem->packetlist = packetlist;
+  newelem->mesg = mesg;
   newelem->nextptr = NULL;
   if  (recd_msg_tail == NULL)
     recd_msg_head = newelem;
-  else recd_msg_tail->nextptr = newelem;
+  else 
+    recd_msg_tail->nextptr = newelem;
   recd_msg_tail = newelem;
-  TRACE(CmiPrintf("Node %d: inserted seqnum=%d fullsize=%d in message queue\n", 
-		 CpvAccess(Cmi_mype),
-		 recd_msg_head->packetlist->packet->seq_num,
-		 recd_msg_head->packetlist->packet->full_size));
 }
 
 
@@ -1677,33 +1586,35 @@ static void ConstructMessages()
   int i;
   DATA_HDR *packet;
   DATA_HDR *ExtractNextPacket();
-  PacketQueueElem *packetelem;
+  NewMessage *msg;
+  unsigned int numfrags, msglength, rsize, offset;
 
   TRACE(CmiPrintf("Node %d: in ConstructMessages().\n",CpvAccess(Cmi_mype)));
-  for (i = 0; i < CpvAccess(Cmi_numpes); i++)
+  for (i=0; i < CpvAccess(Cmi_numpes); i++) {
     if (i != CpvAccess(Cmi_mype)) {
+      msg = &recd_messages[i];
       packet = ExtractNextPacket(i);
       while (packet != NULL) {
-	packetelem = (PacketQueueElem *) CmiAlloc(sizeof(PacketQueueElem));
-	packetelem->packet = packet;
-	/* Note: we are stacking it in reverse order */
-	packetelem->nextptr = recd_messages[i].packetlist; 
-	recd_messages[i].packetlist = packetelem; 
-	recd_messages[i].numpackets++;
-	if (recd_messages[i].numpackets == packet->numfrags) {
-	  /* msg complete */
-	  if (packet->msg_type == 1) {
-	    TRACE(CmiPrintf("Node %d: CK packet complete seqnum=%d numfrags=%d\n",
-			   CpvAccess(Cmi_mype),
-			   packet->seq_num, packet->numfrags));
-	    InsertInMessageQueue(recd_messages[i].packetlist);
-	  }
-	  recd_messages[i].packetlist = NULL;
-	  recd_messages[i].numpackets = 0;
-	}
-	packet = ExtractNextPacket(i);
+        offset = packet->pktidx*MAXDSIZE;
+        rsize = packet->rem_size;
+        if(msg->numpackets==0) {
+          msglength = offset + packet->rem_size;
+          msg->mesg = (char *) CmiAlloc(msglength);
+          msg->numfrags = packet->pktidx + 
+                 ((packet->rem_size-1)/MAXDSIZE) + 1;
+        }
+        memcpy(msg->mesg+offset,packet+1,(rsize<MAXDSIZE)?rsize:MAXDSIZE);
+        msg->numpackets++;
+        CmiFree(packet);
+        if (msg->numpackets == msg->numfrags) {
+          /* msg complete */
+          InsertInMessageQueue(msg->mesg);
+          msg->numpackets = 0;
+        }
+        packet = ExtractNextPacket(i);
       }
     }
+  }
 }
 
 
@@ -1711,17 +1622,17 @@ static void ConstructMessages()
 static void AckReceivedMsgs()
 {
   int i;
-  for (i = 0; i < CpvAccess(Cmi_numpes); i++)
-    if (needack[i])	{
+  for (i = 0; i < CpvAccess(Cmi_numpes); i++) {
+    if (needack[i])  {
       needack[i] = 0;
-      ack.SourcePeNum = i;
       ack.seq_num = expected_seq_num[i] - 1;
       if (CpvAccess(Cmi_mype) < CpvAccess(Cmi_numpes))
-	TRACE(CmiPrintf("Node %d: acking seq_num %d on window %d\n",
-		       CpvAccess(Cmi_mype), ack.seq_num, i)); 
+        TRACE(CmiPrintf("Node %d: acking seq_num %d on window %d\n",
+            CpvAccess(Cmi_mype), ack.seq_num, i)); 
       NumAcksSent++ ;
-      send_ack(&ack);
+      send_ack(&ack,i);
     }
+  }
 }
 
 static int data_getone()
@@ -1729,7 +1640,6 @@ static int data_getone()
   msgspace *recv_buf=NULL;
   struct sockaddr_in src;
   int i, srclen=sizeof(struct sockaddr_in);
-  int arrived = 0;
   node_info *sender; int kind;
   int AddToReceiveWindow();
   int n;
@@ -1738,26 +1648,16 @@ static int data_getone()
   do n=recvfrom(data_skt,(char *)recv_buf,CMK_MAX_DGRAM_SIZE,0,(struct sockaddr *)&src,&srclen);
   while ((n<0)&&(errno==EINTR));
   if (n<0) { KillEveryone(strerror(errno)); }
-  kind = recv_buf->hd.send_or_ack;
-  if (kind == ACK)
-    {
-      /* remove it from the socket */
-      if (recv_buf->hd.SourcePeNum != CpvAccess(Cmi_mype)) 
-	KillEveryoneCode(7);
-      UpdateSendWindow(recv_buf, (int) recv_buf->hd.DestPeNum);
-      CmiFree(recv_buf);
-    }
-  else if (kind == SEND)
-    {
-      sender = node_table + recv_buf->hd.SourcePeNum;
-      /* sender->IP       = htonl(src.sin_addr.s_addr); */
-      if((sender->dataport)&&(sender->dataport!=htons(src.sin_port)))
-	KillEveryoneCode(38473);
-      sender->dataport = htons(src.sin_port);
-      arrived = 1;
-      AddToReceiveWindow(recv_buf, (int) recv_buf->hd.SourcePeNum);
-    }
-  else KillEveryoneCode(8); /* invalid datagram type. */
+  kind = (recv_buf->hd.rem_size)?SEND:ACK;
+  if (kind == ACK) {
+    UpdateSendWindow(recv_buf, (int) recv_buf->hd.PeNum);
+    CmiFree(recv_buf);
+  } else if (kind == SEND) {
+    sender = node_table + recv_buf->hd.PeNum;
+    if((sender->dataport)&&(sender->dataport!=htons(src.sin_port)))
+      KillEveryoneCode(38473);
+    AddToReceiveWindow(recv_buf, (int) recv_buf->hd.PeNum);
+  } 
   return kind;
 }
 
@@ -1817,15 +1717,16 @@ static void InterruptInit()
 
 /*
 ** Synchronized send of "msg", of "size" bytes, to "destPE".
-** Returns the number of bytes of "msg" actually sent.
-** 
 ** -CW
 */
-static int netSend(destPE, size, msg, msg_type) 
+static int netSend(destPE, size, msg) 
      int destPE, size; 
      char * msg; 
-     int msg_type;
 {
+  DATA_HDR *hd;
+  unsigned int pktnum = 0;
+  unsigned int numfrag = ((size-1)/MAXDSIZE) + 1;
+
   CmiInterruptsBlock();
   
   if (!Communication_init) return -1;
@@ -1835,23 +1736,22 @@ static int netSend(destPE, size, msg, msg_type)
     exit(1);
   } 
   
-  if (size > MAX_FRAG_SIZE) {
-    /* Break the message into pieces and send each piece; start numbering
-     ** fragments with one.
-     */
-    int i;
-    int frags = ((size-1)/MAX_FRAG_SIZE) + 1;
-    
-    for(i=1;i<frags;i++) 
-      fragment_send(destPE, MAX_FRAG_SIZE, msg+((i-1)*MAX_FRAG_SIZE), 
-		    size, msg_type, frags);
-    
-    /* Last fragment is (probably) a different size. */
-    fragment_send(destPE, size - MAX_FRAG_SIZE*(frags-1),
-		  msg+(frags-1)*MAX_FRAG_SIZE,  size, msg_type, frags);
-    
-  } 
-  else fragment_send(destPE, size, msg, size, msg_type, 1);
+  for(;pktnum<(numfrag-1);pktnum++) {
+    hd = (DATA_HDR *)CmiAlloc(CMK_MAX_DGRAM_SIZE);
+    hd->pktidx = pktnum;
+    hd->rem_size = size;
+    hd->PeNum = CpvAccess(Cmi_mype);
+    memcpy((hd+1), msg, MAXDSIZE);
+    InsertInTransmitQueue(hd, destPE);
+    msg += MAXDSIZE;
+    size -= MAXDSIZE;
+  }
+  hd = (DATA_HDR *)CmiAlloc(sizeof(DATA_HDR)+size);
+  hd->pktidx = pktnum;
+  hd->rem_size = size;
+  hd->PeNum = CpvAccess(Cmi_mype);
+  memcpy((hd+1), msg, size);
+  InsertInTransmitQueue(hd, destPE);
   
   SendPackets(destPE);
   
@@ -1876,43 +1776,24 @@ static int CmiProbe()
 void *CmiGetNonLocal()
 {
   int i;
-  char *nextptr;
-  PacketQueueElem *packetelem, *nextpacket;
   MsgQueueElem *msgelem;
-  DATA_HDR *packet;
-  char *newmsg;
-  int msglength;
+  char *newmsg=NULL;
 
   CmiInterruptsBlock();
 
   dgram_scan();
   RetransmitPackets();
-  if (recd_msg_head==NULL) { newmsg=NULL; goto done; }
-  
-  msgelem = recd_msg_head;
-  packetelem = msgelem->packetlist;
-  if (recd_msg_head == recd_msg_tail) {
-    recd_msg_head = NULL;
-    recd_msg_tail = NULL;
-  }
-  else recd_msg_head = recd_msg_head->nextptr;
-  CmiFree(msgelem);
-  
-  /* now construct message */
-  msglength = packetelem->packet->full_size;
-  newmsg = (char *)CmiAlloc(msglength);
-  nextptr = newmsg + msglength;
-  while (packetelem != NULL) {
-    nextpacket = packetelem->nextptr;
-    packet = packetelem->packet;
-    nextptr -= packet->size;
-    Bcopy(packet+1, nextptr, packet->size);
-    CmiFree(packetelem);
-    CmiFree(packet);
-    packetelem = nextpacket;
-  }
-
- done:
+  if (recd_msg_head!=NULL) {
+    msgelem = recd_msg_head;
+    newmsg = msgelem->mesg;
+    if (recd_msg_head == recd_msg_tail) {
+      recd_msg_head = NULL;
+      recd_msg_tail = NULL;
+    }
+    else 
+      recd_msg_head = recd_msg_head->nextptr;
+    CmiFree(msgelem);
+  } 
   CmiInterruptsRelease();
   return newmsg;
 }
@@ -1926,7 +1807,7 @@ char *msg;
     char *msg1 = (char *)CmiAlloc(size);
     memcpy(msg1,msg,size);
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg1);
-  } else netSend(destPE,size,msg,1);
+  } else netSend(destPE,size,msg);
 }
 
 CmiCommHandle CmiAsyncSendFn(destPE, size, msg)
@@ -1954,7 +1835,8 @@ void CmiSyncBroadcastFn(size,msg)
 {
   int i;
   for (i=0;i<CpvAccess(Cmi_numpes);i++) {
-    if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
+    if (i != CpvAccess(Cmi_mype)) 
+      netSend(i,size,msg);
   }
 }
 
@@ -1970,7 +1852,8 @@ void CmiFreeBroadcastFn(size,msg)
 {
   int i;
   for (i=0;i<CpvAccess(Cmi_numpes);i++) {
-    if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
+    if (i != CpvAccess(Cmi_mype)) 
+      netSend(i,size,msg);
   }
   CmiFree(msg);
 }
@@ -1981,7 +1864,8 @@ void CmiSyncBroadcastAllFn(size,msg)
   int i;
   char *msg1;
   for (i=0;i<CpvAccess(Cmi_numpes);i++)
-    if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
+    if (i != CpvAccess(Cmi_mype)) 
+      netSend(i,size,msg);
   msg1 = (char *)CmiAlloc(size);
   memcpy(msg1,msg,size);
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg1);
@@ -1999,7 +1883,8 @@ void CmiFreeBroadcastAllFn(size,msg)
 {
   int i;
   for (i=0;i<CpvAccess(Cmi_numpes);i++)
-    if (i != CpvAccess(Cmi_mype)) netSend(i,size,msg,1);
+    if (i != CpvAccess(Cmi_mype)) 
+      netSend(i,size,msg);
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
 }
 
@@ -2063,7 +1948,7 @@ CmiExit()
   CmiInterruptsBlock();
 
   ctrl_sendone(120,"aget %s %d done 0 %d\n",
-	       self_IP_str,ctrl_port,CpvAccess(Cmi_numpes)-1);
+         self_IP_str,ctrl_port,CpvAccess(Cmi_numpes)-1);
   ctrl_sendone(120,"aset done %d TRUE\n",CpvAccess(Cmi_mype));
   ctrl_sendone(120,"ending\n");
   begin = time(0);
