@@ -146,8 +146,8 @@ Such messages are declared in the {\tt .ci} file as:
 \verb+message [packed] PMessage;+
 
 The class \uw{PMessage} needs to inherit from \uw{CMessage\_PMessage}
-and needs to provide two {\em static} methods: \function{pack}, \index{pack}
-and \function{unpack} \index{unpack}. These methods are called by the
+and needs to provide two {\em static} methods: \kw{pack}
+and \kw{unpack}. These methods are called by the
 \charmpp\ runtime system, when the message is determined to be
 crossing address-space boundary. The prototypes for these methods are
 as follows:
@@ -161,8 +161,7 @@ Typically, the following tasks are done in \kw{pack} method:
 
 \begin{itemize}
 \item Determine size of the buffer needed to serialize message data.
-\item Allocate buffer using the \function{CkAllocBuffer}
-\index{CkAllocBuffer} function. This
+\item Allocate buffer using the \kw{CkAllocBuffer} function. This
 function takes in two parameters: input message, and size of the
 buffer needed, and returns the buffer.
 \item Serialize message data into buffer (alongwith any control
@@ -179,7 +178,7 @@ method:
 use \kw{new} to allocate message here. If the message constructor has
 to be called, it can be done using the in-place \kw{new} operator.}
 \item De-serialize message data from input buffer into the allocated message.
-\item Free the input buffer using \function{CkFreeMsg}\index{CkFreeMsg}.
+\item Free the input buffer using \kw{CkFreeMsg}.
 \end{itemize}
 
 Here is an example of a {\em packed} message implementation:
@@ -271,9 +270,8 @@ making use of a \kw{varsize} message.
 
 A \kw{varsize} message is declared as {\tt message [varsize] mtype} in
 \charmpp\ interface file. The class \uw{mtype} has to inherit from
-\uw{CMessage\_mtype} AND has to provide \function{pack}\index{pack},
-\function{unpack}\index{unpack}, AND
-\function{alloc}\index{alloc} class methods.
+\uw{CMessage\_mtype} AND has to provide \kw{pack},
+\kw{unpack}, AND \kw{alloc} class methods.
 
 Thus, a varsize message is declared in the interface as: 
 
@@ -295,7 +293,7 @@ The \kw{alloc} method will be called when the message is allocated using
 the \CC\ \kw{new} operator. The programmer never needs to explicitly
 call it.  Note that all elements of the message are allocated when the message is created with \kw{new}.  There is no need to call \kw{new} to allocate any of the fields of the message.  This differs from a \kw{packed} message where each field requires individual allocation.     
 The \kw{alloc} method should actually allocate the message using
-\function{CkAllocMsg}\index{CkAllocMsg}, whose signature is given below:
+\kw{CkAllocMsg}, whose signature is given below:
 
 \begin{verbatim}
 void *CkAllocMsg(int msgnum, int size, int priobits); 
@@ -410,41 +408,36 @@ over the order in which messages are processed.  \charmpp\ allows you
 to control queueing behavior on a per-message basis.
 
 The simplest call available to change the order in which messages
-are processed is \function{CkSetQueueing}\index{CkSetQueueing}.
+are processed is \kw{CkSetQueueing}.
 
-\begin{tabbing}
-~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
-\> \function{void CkSetQueueing}(\uw{MsgType} {\it message}, \kw{int} {\it
-queueingtype}) \\
-\end{tabbing}
+\function{void CkSetQueueing(MsgType message, int queueingtype)}
 
-where {\it queueingtype}\index{queueing types} is one of the following
+where \uw{queueingtype} is one of the following
 constants:
 
-\begin{tabbing}
-~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
-\> \kw{CK\_QUEUEING\_FIFO}\\
-\> \kw{CK\_QUEUEING\_LIFO}\\
-\> \kw{CK\_QUEUEING\_IFIFO}\\
-\> \kw{CK\_QUEUEING\_ILIFO}\\
-\> \kw{CK\_QUEUEING\_BFIFO}\\
-\> \kw{CK\_QUEUEING\_BLIFO}
-\end{tabbing}
+\begin{alltt}
+  CK_QUEUEING_FIFO
+  CK_QUEUEING_LIFO
+  CK_QUEUEING_IFIFO
+  CK_QUEUEING_ILIFO
+  CK_QUEUEING_BFIFO
+  CK_QUEUEING_BLIFO
+\end{alltt}
 
 The first two options,  \kw{CK\_QUEUEING\_FIFO} and
 \kw{CK\_QUEUEING\_LIFO}, are used as follows: 
 
-\begin{verbatim}
+\begin{alltt}
   MsgType *msg1 = new MsgType ;
   CkSetQueueing(msg1, CK_QUEUEING_FIFO);
 
   MsgType *msg2 = new MsgType ;
   CkSetQueueing(msg2, CK_QUEUEING_LIFO);
-\end{verbatim}
+\end{alltt}
 
-When message {\tt msg1} arrives at its destination, it will be pushed
-onto the end of the message queue as usual.  However, when {\tt msg2}
-arrives, it will be pushed onto the {\it front} of the message queue.
+When message \kw{msg1} arrives at its destination, it will be pushed
+onto the end of the message queue as usual.  However, when \kw{msg2}
+arrives, it will be pushed onto the {\em front} of the message queue.
 
 The other four options involve the use of
 priorities\index{priorities}.  To attach a priority field to a
@@ -457,10 +450,7 @@ the priority field is specified in bits, it is always padded to an
 integral number of {\tt int}s.  A pointer to the priority part of the
 message buffer can be obtained with this call:
 
-\begin{tabbing}
-~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
-\> \kw{unsigned int} *\kw{CkPriorityPtr}(\uw{MsgType} {\it msg}) \\
-\end{tabbing}
+\function{unsigned int *CkPriorityPtr(MsgType msg)}
 \index{CkPriorityPtr}
 \index{priority pointer}
 
@@ -471,13 +461,13 @@ straightforward.  One allocates a message, setting aside enough space
 (in bits) in the message to hold the priority, which is an integer.
 One then stores the priority in the message.  Finally, one informs the
 system that the message contains an integer priority using
-\function{CkSetQueueing}\index{CkSetQueueing}:
+\kw{CkSetQueueing}:
 
-\begin{verbatim}
+\begin{alltt}
   MsgType *msg = new (8*sizeof(int)) MsgType;
   *CkPriorityPtr(msg) = prio;
   CkSetQueueing(msg, CK_QUEUEING_IFIFO);
-\end{verbatim}
+\end{alltt}
 
 The predefined constant  \kw{CK\_QUEUEING\_IFIFO} indicates that the
 message contains an integer priority, and that if there are other
