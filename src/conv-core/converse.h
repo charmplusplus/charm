@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.84  1998-04-21 17:32:42  milind
+ * Revision 2.85  1998-05-06 20:39:47  milind
+ * Added CmiGrabBuffer prototype.
+ *
+ * Revision 2.84  1998/04/21 17:32:42  milind
  * Implemented Converse Client-Srver (CCS) module.
  *
  * Revision 2.83  1998/03/24 12:50:53  jyelon
@@ -504,6 +507,7 @@ extern void CsdExitScheduler CMK_PROTO((void));
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)++)
 #endif
 
+void     CmiGrabBuffer           CMK_PROTO((void **ppbuf));
 int      CmiSpanTreeRoot         CMK_PROTO(()) ;
 int      CmiNumSpanTreeChildren  CMK_PROTO((int)) ;
 int      CmiSpanTreeParent       CMK_PROTO((int)) ;
