@@ -392,10 +392,10 @@ class CBaseT2 : public Parent1, public Parent2 {
 public:
 	CBASE_PROXY_MEMBERS(CProxy_Derived)
 
-	CBaseT2(void) :Parent1(), Parent2(),
-		thisProxy((Parent1 *)this) {}
-	CBaseT2(CkMigrateMessage *m) :Parent1(m), Parent2(m),
-		thisProxy((Parent1 *)this) {} 
+	CBaseT2(void) :Parent1(), Parent2()
+		{ thisProxy = (Parent1 *)this; }
+	CBaseT2(CkMigrateMessage *m) :Parent1(m), Parent2(m)
+		{ thisProxy = (Parent1 *)this; } 
 	void pup(PUP::er &p) {
 		Parent1::pup(p);
 		Parent2::pup(p);
