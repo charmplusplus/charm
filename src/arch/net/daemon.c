@@ -38,7 +38,7 @@ int abort_writelog(int code,const char *msg) {
 }
 
 char startProgram(const char *exeName, const char *args, 
-				const char *cwd, const char *env);
+				const char *cwd, char *env);
 
 void goFaceless(void);
 
@@ -164,7 +164,7 @@ void envCat(char *dest,LPTSTR oldEnv)
 
 
 char startProgram(const char *exeName, const char *args, 
-				const char *cwd, const char *env)
+				const char *cwd, char *env)
 {
   int ret;
   PROCESS_INFORMATION pi;         /* process Information for the process spawned */
@@ -257,7 +257,7 @@ char ** args2argv(const char *args,char **argv) {
 
 
 char startProgram(const char *exeName, const char *args, 
-				const char *cwd, const char *env)
+				const char *cwd, char *env)
 {
 	int ret=0,fd;
 	if (0!=access(cwd,F_OK)) return 'D';

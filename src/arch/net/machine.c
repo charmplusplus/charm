@@ -1253,7 +1253,7 @@ static void ctrl_sendone_locking(const char *type,
 
 static double Cmi_check_last;
 
-static void pingCharmrun(int ignored) 
+static void pingCharmrun(void *ignored) 
 {
   double clock=GetClock();
   if (clock > Cmi_check_last + Cmi_check_delay) {
@@ -1271,7 +1271,7 @@ static void pingCharmrun(int ignored)
 }
 
 /* periodic charm ping, for gm and netpoll */
-static void pingCharmrunPeriodic(int ignored)
+static void pingCharmrunPeriodic(void *ignored)
 {
   pingCharmrun(ignored);
   CcdCallFnAfter(pingCharmrunPeriodic,NULL,1000);
@@ -2137,17 +2137,21 @@ static void ConverseRunPE(int everReturn)
 
   ConverseCommonInit(CmiMyArgv);
   
-  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,CmiNotifyBeginIdle,(void *)s);
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,CmiNotifyStillIdle,(void *)s);
+  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
+      (CcdVoidFn) CmiNotifyBeginIdle, (void *) s);
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
+      (CcdVoidFn) CmiNotifyStillIdle, (void *) s);
 #if CMK_SHARED_VARS_UNAVAILABLE
   if (Cmi_netpoll) /*Repeatedly call CommServer*/
-    CcdCallOnConditionKeep(CcdPERIODIC,CommunicationPeriodic,NULL);
+    CcdCallOnConditionKeep(CcdPERIODIC, 
+        (CcdVoidFn) CommunicationPeriodic, NULL);
   else /*Only need this for retransmits*/
-    CcdCallOnConditionKeep(CcdPERIODIC_10ms,CommunicationPeriodic,NULL);
+    CcdCallOnConditionKeep(CcdPERIODIC_10ms, 
+        (CcdVoidFn) CommunicationPeriodic, NULL);
 #endif
 
   if (CmiMyRank()==0 && Cmi_charmrun_fd!=-1) {
-    CcdCallOnConditionKeep(CcdPERIODIC_10ms,CmiStdoutFlush,NULL);
+    CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn) CmiStdoutFlush, NULL);
 #if CMK_SHARED_VARS_UNAVAILABLE
     if (Cmi_netpoll == 1) {
     /* gm cannot live with setitimer */
