@@ -196,6 +196,4 @@ class TraceProjections : public Trace {
     void endComputation(void);
 };
 
-extern "C" void Ck_Summary_MarkEvent(int eventType);
-
 #endif
