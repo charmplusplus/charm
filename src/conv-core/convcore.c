@@ -875,13 +875,14 @@ void CmiHandleMessage(void *msg)
  	CpvAccess(cQdState)->mProcessed++;
 */
 	 CmiHandlerInfo *h;
-#ifndef CMK_OPTIMIZE	
-	_LOG_E_HANDLER_BEGIN(CmiGetHandler(msg)); /* projector */
+#ifndef CMK_OPTIMIZE
+	int handler=CmiGetHandler(msg); /* Save handler for use after msg is gone */
+	_LOG_E_HANDLER_BEGIN(handler); /* projector */
 #endif
 	h=&CmiGetHandlerInfo(msg);
 	(h->hdlr)(msg,h->userPtr);
-#ifndef CMK_OPTIMIZE	
-	_LOG_E_HANDLER_END(CmiGetHandler(msg)); 	/* projector */
+#ifndef CMK_OPTIMIZE
+	_LOG_E_HANDLER_END(handler); 	/* projector */
 #endif
 }
 
