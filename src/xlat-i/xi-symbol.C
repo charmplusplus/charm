@@ -742,6 +742,7 @@ XStr indexSuffix2object(const XStr &indexSuffix) {
 	if (indexSuffix==(const char*)"1D") return "CkIndex1D";
 	if (indexSuffix==(const char*)"2D") return "CkIndex2D";
 	if (indexSuffix==(const char*)"3D") return "CkIndex3D";
+	if (indexSuffix==(const char*)"Max") return "CkIndexMax";
 	else return indexSuffix;
 }
 
