@@ -121,7 +121,7 @@ class ComlibManager: public CkDelegateMgr{
     int nstrats, curStratID;      //Number of strategies created by the user.
 
     //flags
-    int receivedTable, flushTable, barrierReached;
+    int receivedTable, flushTable, barrierReached, barrier2Reached;
     int totalMsgCount, totalBytes, nIterations;
    
     void init(); //initialization function
@@ -132,6 +132,9 @@ class ComlibManager: public CkDelegateMgr{
     ComlibManager(int s, int n); //strategy, nelements
 
     void barrier(void);
+    void barrier2(void);
+    void resumeFromBarrier2(void);
+
     void localElement();
     void registerElement(int strat);    //Register a chare for an instance
     void unRegisterElement(int strat);  //UnRegister a chare for an instance
@@ -142,7 +145,8 @@ class ComlibManager: public CkDelegateMgr{
 
     void ArraySend(int ep, void *msg, const CkArrayIndexMax &idx, CkArrayID a);
     void GroupSend(int ep, void *msg, int onpe, CkGroupID gid);
-    
+    void multicast(void *charm_msg); //charm_message here.
+
     void beginIteration();
     void beginIteration(int id); //Notify begining of an iteration 
                                  //with strategy identifier

@@ -4,10 +4,11 @@
 #include "StreamingStrategy.h"
 #include "DummyStrategy.h"
 #include "MPIStrategy.h"
+#include "NodeMulticast.h"
 
 CpvDeclare(int, RecvmsgHandle);
 CpvDeclare(int, RecvdummyHandle);
-int *procMap;
+//int *procMap;
 
 PUPable_def(Strategy);
 
@@ -60,7 +61,7 @@ Strategy* createStrategy(int s, int n){
 //An initialization routine which does prelimnary initialization of the 
 //communications library and registers the strategies with the PUP:able interface.
 void initComlibManager(void){
-    //comm_debug = 1;
+  //    comm_debug = 1;
     ComlibInit();
     ComlibPrintf("Init Call\n");
     //Called once on each processor 
@@ -69,6 +70,7 @@ void initComlibManager(void){
     PUPable_reg(DummyStrategy); 
     PUPable_reg(MPIStrategy); 
     PUPable_reg(StreamingStrategy);     
+    PUPable_reg(NodeMulticast);     
 
     CpvInitialize(int, RecvmsgHandle);
     CpvAccess(RecvmsgHandle) = CmiRegisterHandler((CmiHandler)recv_msg);
@@ -77,7 +79,7 @@ void initComlibManager(void){
     
     CpvInitialize(int, RecvdummyHandle);
     CpvAccess(RecvdummyHandle) = CmiRegisterHandler((CmiHandler)recv_dummy);
-
+    //ComlibPrintf("After Init Call\n");
 }
 
 //ComlibManager Constructor with 1 int the strategy id being passed
@@ -114,10 +116,11 @@ ComlibManager::ComlibManager(){
 
 void ComlibManager::init(){
 
-    //    comm_debug = 1;
+  //    comm_debug = 1;
     
     npes = CkNumPes();
     pelist = NULL;
+    nstrats = 0;
 
     cmgrID = thisgroup;
 
@@ -132,9 +135,9 @@ void ComlibManager::init(){
       strategyTable[count].call_doneInserting = 0;
     }
         
-    procMap = new int[CkNumPes()];
-    for(int count = 0; count < CkNumPes(); count++)
-        procMap[count] = count;
+    //procMap = new int[CkNumPes()];
+    //for(int count = 0; count < CkNumPes(); count++)
+    //  procMap[count] = count;
     
     receivedTable = 0;
     flushTable = 0;
@@ -142,6 +145,7 @@ void ComlibManager::init(){
     totalBytes = 0;
     nIterations = 0;
     barrierReached = 0;
+    barrier2Reached = 0;
 
     CProxy_ComlibManager cgproxy(cmgrID);
     cgproxy[0].barrier();
@@ -151,10 +155,22 @@ void ComlibManager::barrier(){
   static int bcount = 0;
   if(CkMyPe() == 0) {
     bcount ++;
-    //    CkPrintf("In barrier %d\n", bcount);
+    ComlibPrintf("In barrier %d\n", bcount);
     if(bcount == CkNumPes()){
       barrierReached = 1;
       doneCreating();
+    }
+  }
+}
+
+void ComlibManager::barrier2(){
+  static int bcount = 0;
+  if(CkMyPe() == 0) {
+    bcount ++;
+    ComlibPrintf("In barrier2 %d\n", bcount);
+    if(bcount == CkNumPes()) {
+      CProxy_ComlibManager cgproxy(cmgrID);
+      cgproxy.resumeFromBarrier2();
     }
   }
 }
@@ -188,7 +204,7 @@ void ComlibManager::doneCreating() {
     if(!barrierReached)
       return;
 
-    //    CmiPrintf("Sending Strategies\n");
+    ComlibPrintf("Sending Strategies\n");
 
     StrategyWrapper sw;
     sw.s_table = new Strategy* [nstrats];
@@ -213,8 +229,8 @@ void ComlibManager::registerElement(int stratID){
 }
 
 void ComlibManager::unRegisterElement(int stratID){
-     ComlibPrintf("In Un Register Element\n");
-     strategyTable[stratID].numElements --;
+    ComlibPrintf("In Un Register Element\n");
+    strategyTable[stratID].numElements --;
 }
 
 //Called when the array element starts sending messages
@@ -276,7 +292,11 @@ void ComlibManager::receiveTable(StrategyWrapper sw){
 
     ComlibPrintf("receivedTable %d\n", nstrats);
 
-    if (flushTable) {
+    CProxy_ComlibManager cgproxy(cmgrID);
+    cgproxy[0].barrier2();
+
+    /*
+    if (flushTable && barrier2Reached) {
       for (count = 0; count < nstrats; count ++) {
 	if (!strategyTable[count].tmplist.isEmpty()) {
 	  CharmMessageHolder *cptr;
@@ -288,7 +308,26 @@ void ComlibManager::receiveTable(StrategyWrapper sw){
 	if (strategyTable[count].call_doneInserting)
 	  strategyTable[count].strategy->doneInserting();
       }
+      flushTable = 0;
     }
+    */
+}
+
+void ComlibManager::resumeFromBarrier2(){
+  barrier2Reached = 1;
+  if(flushTable) {
+    for (int count = 0; count < nstrats; count ++) {
+      if (!strategyTable[count].tmplist.isEmpty()) {
+	CharmMessageHolder *cptr;
+	while (!strategyTable[count].tmplist.isEmpty())
+	  strategyTable[count].strategy->insertMessage
+	    (strategyTable[count].tmplist.deq());
+      }
+      
+      if (strategyTable[count].call_doneInserting)
+	strategyTable[count].strategy->doneInserting();
+    }
+  }
 }
 
 extern int _charmHandlerIdx;
@@ -341,6 +380,34 @@ void ComlibManager::ArraySend(int ep, void *msg,
     }
 
     //CmiPrintf("After Insert\n");
+}
+
+void ComlibManager::multicast(void *msg) {
+    register envelope * env = UsrToEnv(msg);
+    
+    ComlibPrintf("[%d]: In multicast\n", CkMyPe());
+
+    env->setUsed(0);    
+    CkPackMessage(&env);
+    CmiSetHandler(env, CpvAccess(RecvmsgHandle));
+    
+    totalMsgCount ++;
+    totalBytes += env->getTotalsize();
+
+    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg, 0); 
+    //Provide a dummy dest proc as it does not matter for mulitcast 
+    //get rid of the new.
+    
+    if (receivedTable)
+	strategyTable[curStratID].strategy->insertMessage(cmsg);
+    else {
+        flushTable = 1;
+	cmsg->next = NULL;
+	ComlibPrintf("Enqueuing message in tmplist\n");
+        strategyTable[curStratID].tmplist.enq(cmsg);
+    }
+
+    ComlibPrintf("After multicast\n");
 }
 
 #include "qd.h"

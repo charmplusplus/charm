@@ -5,7 +5,7 @@ COMMLIBDIR=../../conv-libs/commlib
 LIB = libcomm.a
 
 STRATEGY_OBJS = EachToManyStrategy.o MPIStrategy.o StreamingStrategy.o \
-		DummyStrategy.o 
+		DummyStrategy.o NodeMulticast.o
 
 CONVERSE_COM_OBJS = $(COMMLIBDIR)/commlib.o $(COMMLIBDIR)/gridrouter.o \
 	$(COMMLIBDIR)/de.o $(COMMLIBDIR)/treerouter.o $(COMMLIBDIR)/petable.o \
@@ -21,6 +21,8 @@ all: cifiles conversecom $(LIB)
 	cp  EachToManyStrategy.h $(CDIR)/include
 	rm -f $(CDIR)/include/DummyStrategy.h
 	cp  DummyStrategy.h $(CDIR)/include
+	rm -f $(CDIR)/include/NodeMulticast.h
+	cp  NodeMulticast.h $(CDIR)/include
 	rm -f $(CDIR)/include/StreamingStrategy.h
 	cp  StreamingStrategy.h $(CDIR)/include
 	rm -f $(CDIR)/include/ComlibModule.decl.h
@@ -52,6 +54,9 @@ StreamingStrategy.o: StreamingStrategy.C StreamingStrategy.h ComlibManager.h
 
 DummyStrategy.o: DummyStrategy.C DummyStrategy.h ComlibManager.h
 	$(CHARMC) -c DummyStrategy.C
+
+NodeMulticast.o: NodeMulticast.C NodeMulticast.h ComlibManager.h
+	$(CHARMC) -c NodeMulticast.C
 
 cifiles: ComlibManager.ci
 	$(CHARMC) ComlibManager.ci
