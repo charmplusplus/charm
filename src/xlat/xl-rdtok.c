@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-05 18:52:05  brunner
+ * Revision 2.1  1995-07-07 02:05:38  narain
+ * Definition for the ImmSendMsgBranch command
+ *
+ * Revision 2.0  1995/06/05  18:52:05  brunner
  * Reorganized file structure
  *
  * Revision 1.2  1995/04/23  18:30:18  milind
@@ -167,6 +170,7 @@ char *SyscallData[]=
 "CmiMyPe",
 "_CK_CreateBoc",
 "_CK_SendMsgBranch",
+"_CK_ImmSendMsgBranch",
 "_CK_BroadcastMsgBranch",
 "_CK_MyBocNum",
 "ReadValue",
