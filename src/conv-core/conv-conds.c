@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-06-26 19:46:14  sanjeev
+ * Revision 2.5  1995-07-07 14:42:49  gursoy
+ * fixed a bug (initialized PeriodicCalls to NULL)
+ *
+ * Revision 2.4  1995/06/26  19:46:14  sanjeev
  * removed CkExit
  *
  * Revision 2.3  1995/06/19  17:45:44  sanjeev
@@ -70,6 +73,7 @@ void conv_condsModuleInit()
   
    CpvAccess(CcdNumChecks) = 0;
    CpvAccess(numHeapEntries) = 0;
+   CpvAccess(PeriodicCalls) = (FN_ARG *) NULL;
    for(i = 0; i < MAXCONDCHKARRAYELTS; i++) {
      CpvAccess(CondArr)[i].fn_arg_list = NULL;
    }
