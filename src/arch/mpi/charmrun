@@ -59,7 +59,7 @@ then
 	hostname=`hostname`
 	case "$hostname" in
 	turing*.turing.uiuc.edu) 
-		ppn='#PBS -l nodes='$pes':ppn=1:myr2'
+		ppn='#PBS -l nodes='$pes':ppn=1:myr'
 		extra='-machinefile $PBS_NODEFILE'
 		;;
 	tg-login*)
@@ -154,7 +154,7 @@ End() {
 	done
 	echo "Job enqueued under job ID $jobid"
 # kill job if interrupted
-	trap 'End 1' 2
+	trap 'End 1' 2 3
 	retry=0
 # Wait for the job to complete, by checking its status
         while [ true ]
