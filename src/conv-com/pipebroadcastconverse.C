@@ -78,7 +78,10 @@ void PipeBroadcastConverse::propagate(char *env, int isFragmented, int srcPeNumb
     */
 
     //CmiSyncListSend(num_pes, dest_pes, env->getTotalsize(), (char *)env);
-    CmiSyncSend(dest_pes[k], totalSendingSize, env);
+    for (k=0; k<num_pes; ++k) {
+      ComlibPrintf("[%d] PipeBroadcast sending to %d\n",CkMyPe(), dest_pes[k]);
+      CmiSyncSend(dest_pes[k], totalSendingSize, env);
+    }
     //sizeToSend = pipeSize<totalSendingSize ? pipeSize : totalSendingSize;
     //for (k=0; k<num_pes; ++k) CmiSyncSend(dest_pes[k], sizeToSend, env);
     free(dest_pes);
