@@ -64,12 +64,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
     if (pe != CmiMyPe())
       CpvAccess(CldRelocatedMessages)++;
   }
-  if (pe == CmiMyPe()
-#if CMK_IMMEDIATE_MSG
-      && !CmiIsImmRunning()
-#endif
-     ) 
-  {
+  if (pe == CmiMyPe() && !CmiImmIsRunning()) {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     /* CsdEnqueueGeneral is not thread or SIGIO safe */
     CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
@@ -97,12 +92,7 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
     if (node != CmiMyNode())
       CpvAccess(CldRelocatedMessages)++;
   }
-  if (node == CmiMyNode()
-#if CMK_IMMEDIATE_MSG
-      && !CmiIsImmRunning()
-#endif
-     )
-  {
+  if (node == CmiMyNode() && !CmiImmIsRunning()) {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     CsdNodeEnqueueGeneral(msg, queueing, priobits, prioptr);
   } else {
