@@ -21,12 +21,11 @@
 #define CMK_NODE_QUEUE_AVAILABLE                           0
 
 /* the following definitions set the type of shared variables to be used. only
-   one of them should be 1, all the others 0. The different implementations are
-   in convserve.h */
-#define CMK_SHARED_VARS_UNAVAILABLE                        1
+   one of them must be 1, all the others 0. The different implementations are in
+   convserve.h */
+#define CMK_SHARED_VARS_UNAVAILABLE                        1 /* non SMP versions */
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 #define CMK_SHARED_VARS_EXEMPLAR                           0
-#define CMK_SHARED_VARS_SUN_THREADS                        0
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  0
 #define CMK_SHARED_VARS_PTHREADS                           0
 #define CMK_SHARED_VARS_NT_THREADS                         0
@@ -59,6 +58,7 @@
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
+#define CMK_TIMER_USE_BLUEGENEL                            0
 
 
 /* In order to have a type with a fixed length across machines, these define the

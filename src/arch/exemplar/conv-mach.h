@@ -43,7 +43,6 @@
 
 #define CMK_SHARED_VARS_EXEMPLAR                           1
 #define CMK_SHARED_VARS_UNAVAILABLE                        0
-#define CMK_SHARED_VARS_SUN_THREADS                            0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
 #define CMK_SIGNAL_NOT_NEEDED                              1
