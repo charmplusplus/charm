@@ -85,11 +85,11 @@ ComlibManager::ComlibManager(int stratID,int eltPerPE){
 //ComlibManager Constructor with 2 ints the strategy id and the 
 //number of array elements being passed. For Streaming the second 
 //int can be used for 
-ComlibManager::ComlibManager(Strategy *strat,int eltPerPE){
+ComlibManager::ComlibManager(Strategy &strat,int eltPerPE){
     init();
     strategyID = -1;
     strategyTable[0].numElements = eltPerPE;
-    createInstance(strat);
+    createInstance(&strat);
 }
 
 ComlibManager::ComlibManager(){

@@ -4,7 +4,7 @@ module ComlibModule {
 
   group ComlibManager{
     entry ComlibManager(int s,int n=1);
-    entry ComlibManager(Strategy *s, int n=1);
+    entry ComlibManager(Strategy &s, int n=1);
     entry ComlibManager();
 
     entry void barrier(void);
