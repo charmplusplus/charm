@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.4  1995-10-10 21:40:41  jyelon
+# Revision 1.5  1995-10-30 16:06:49  milind
+# Added one more latex stage to remove undefined references.
+#
+# Revision 1.4  1995/10/10  21:40:41  jyelon
 # *** empty log message ***
 #
 # Revision 1.3  1995/09/21  21:42:21  milind
@@ -47,6 +50,7 @@ manual.ps: manual.dvi
 	dvips -o manual.ps manual.dvi
 
 manual.dvi: $(TEXFILES)
+	latex manual.tex
 	latex manual.tex
 
 co:
