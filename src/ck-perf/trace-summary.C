@@ -1,5 +1,7 @@
 #include "trace-summary.h"
 
+#define VER   "1.0"
+
 CpvDeclare(Trace*, _trace);
 CpvDeclare(int, traceOn);
 CpvDeclare(int, CtrLogBufSize);
@@ -123,7 +125,7 @@ void traceClose(void)
 void LogPool::write(void) 
 {
   int i;
-  fprintf(fp, "%d/%d count:%d ep:%d interval:%le\n", CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize));
+  fprintf(fp, "%d/%d count:%d ep:%d interval:%le ver:%s\n", CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize), VER);
   for(i=0; i<numEntries; i++)
     pool[i].write(fp);
   fprintf(fp, "\n");
