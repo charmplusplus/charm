@@ -1,4 +1,5 @@
-DIRS=commlib tcharm ampi idxl fem ifem armci collide mblock barrier \
+DIRS=commlib fftlib sparseContiguousReducer tcharm ampi idxl fem ifem \
+        armci collide mblock barrier \
 	multicast irecv netfem liveViz liveViz3d taskGraph search datatransfer
 CHARMC=../../bin/charmc $(OPTS)
 
