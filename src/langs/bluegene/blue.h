@@ -217,6 +217,10 @@ double BgGetRecvTime();
 void BgResetRecvTime();
 void BgSkipEndExecuteEvent();
 
+/************************ Supporting AMPI ************************/
+
+void BgAttach(CthThread t);
+
 #if defined(__cplusplus)
 }
 #endif

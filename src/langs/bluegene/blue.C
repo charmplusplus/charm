@@ -237,7 +237,7 @@ char *nodeInfo::getFullBuffer()
 
   /* see if we have msg in inBuffer */
   if (inBuffer.isEmpty()) return NULL;
-  data = tINBUFFER.deq(); 
+  data = inBuffer.deq(); 
 
   /* since we have just delete one from inbuffer, fill one from msgbuffer */
   tags[0] = CmmWildCard;
@@ -290,7 +290,7 @@ void nodeInfo::addBgNodeMessage(char *msgPtr)
   }
 #else
     // only awake rank 0 thread
-  threadinfo[0]->addBgThreadMessage(msgPtr);
+  threadinfo[0]->addAffMessage(msgPtr);
 /*
   affinityQ[0].enq(msgPtr);
   CthThread tid = threadTable[0];
@@ -306,7 +306,7 @@ void nodeInfo::addBgNodeMessage(char *msgPtr)
 /**
   threadInfo methods
 */
-void threadInfo::addBgThreadMessage(char *msgPtr)
+void threadInfo::addAffMessage(char *msgPtr)
 {
   ckMsgQueue &que = myNode->affinityQ[id];
   que.enq(msgPtr);
@@ -415,7 +415,7 @@ void addBgThreadMessage(char *msgPtr, int threadID)
   if (threadID >= cva(numWth)) CmiAbort("ThreadID is out of range!");
 #endif
   threadInfo *tInfo = tMYNODE->threadinfo[threadID];
-  tInfo->addBgThreadMessage(msgPtr);
+  tInfo->addAffMessage(msgPtr);
 }
 
 /** BG API Func 
@@ -802,6 +802,10 @@ void BgSetNumCommThread(int num)
   cva(numCth) = num;
 }
 
+/*****************************************************************************
+      BG Timing Functions
+*****************************************************************************/
+
 static inline void startVTimer()
 {
   if (timingMethod == BG_WALLTIME)
@@ -878,87 +882,12 @@ double BgGetCurTime()
   return tCURRTIME;
 }
 
-// quiescence detection callback
-// only used when doing timing correction to wait for 
-static void BroadcastShutdown(void *null)
+extern "C" 
+void BgElapse(double t)
 {
-  /* broadcast to shutdown */
-  CmiPrintf("BG> In BroadcastShutdown after quiescence. \n");
-
-  int msgSize = CmiBlueGeneMsgHeaderSizeBytes;
-  void *sendmsg = CmiAlloc(msgSize);
-  CmiSetHandler(sendmsg, cva(exitHandler));
-  CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
-
-  CmiDeliverMsgs(-1);
-  CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
-  CsdExitScheduler();
-/*
-  ConverseExit();
-  exit(0);
-*/
-}
-
-void BgShutdown()
-{
-  // timing
-#if BLUEGENE_TIMING
-  // moved to exitHandlerFunc()
-  if (0)
-  if (genTimeLog) {
-    for (int j=0; j<cva(numNodes); j++)
-    for (int i=0; i<cva(numWth); i++) {
-      BgTimeLine &log = cva(nodeinfo)[j].timelines[i].timeline;
-//      BgPrintThreadTimeLine(nodeInfo::Local2Global(j), i, log);
-      int x,y,z;
-      nodeInfo::Local2XYZ(j, &x, &y, &z);
-      BgWriteThreadTimeLine(arg_argv, x, y, z, i, log);
-    }
-  }
-#endif
-
-  /* when doing timing correction, do a converse quiescence detection
-     to wait for all timing correction messages
-  */
-
-  if (!correctTimeLog) {
-    /* broadcast to shutdown */
-    int msgSize = CmiBlueGeneMsgHeaderSizeBytes;
-    void *sendmsg = CmiAlloc(msgSize);
-    
-    CmiSetHandler(sendmsg, cva(exitHandler));  
-    CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
-    
-    //CmiAbort("\nBG> BlueGene emulator shutdown gracefully!\n");
-    // CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
-    /* don't return */
-    // ConverseExit();
-    CmiDeliverMsgs(-1);
-    CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
-    ConverseExit();
-    exit(0);
-  }
-  else {
-  
-    int msgSize = CmiBlueGeneMsgHeaderSizeBytes;
-    void *sendmsg = CmiAlloc(msgSize); 
-CmiPrintf("\n\n\nBroadcast begin EXIT\n");
-    CmiSetHandler(sendmsg, cva(beginExitHandler));  
-    CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
-
-    CmiStartQD(BroadcastShutdown, NULL);
-
-#if 0
-    // trapped here, so close the log
-    BG_ENTRYEND();
-    stopVTimer();
-    // hack to remove the pending message for this work thread
-    tAFFINITYQ.deq();
-
-    CmiDeliverMsgs(-1);
-    ConverseExit();
-#endif
-  }
+//  ASSERT(tTHREADTYPE == WORK_THREAD);
+  if (timingMethod == BG_ELAPSE)
+    tCURRTIME += t;
 }
 
 /*****************************************************************************
@@ -1016,11 +945,8 @@ static inline void ProcessMessage(char *msg)
 
 void correctMsgTime(char *msg);
 
-void comm_thread(threadInfo *tinfo)
+void threadInfo::run_comm_thread()
 {
-  /* set the thread-private threadinfo */
-  cta(threadinfo) = tinfo;
-
   tSTARTTIME = CmiWallTimer();
 
   if (!tSTARTED) {
@@ -1030,11 +956,13 @@ void comm_thread(threadInfo *tinfo)
     /* bnv should be initialized */
   }
 
+  threadQueue *commQ = myNode->commThQ;
+
   for (;;) {
     char *msg = getFullBuffer();
     if (!msg) { 
 //      tCURRTIME += (CmiWallTimer()-tSTARTTIME);
-      tCOMMTHQ->enq(CthSelf());
+      commQ->enq(CthSelf());
       DEBUGF(("[%d] comm thread suspend.\n", BgMyNode()));
       CthSuspend(); 
       DEBUGF(("[%d] comm thread assume.\n", BgMyNode()));
@@ -1072,13 +1000,6 @@ void comm_thread(threadInfo *tinfo)
   }
 }
 
-extern "C" 
-void BgElapse(double t)
-{
-//  ASSERT(tTHREADTYPE == WORK_THREAD);
-  if (timingMethod == BG_ELAPSE)
-    tCURRTIME += t;
-}
 
 void scheduleWorkerThread(char *msg)
 {
@@ -1087,29 +1008,27 @@ void scheduleWorkerThread(char *msg)
   CthAwaken(tid);
 }
 
-
-void work_thread(threadInfo *tinfo)
+void threadInfo::run_work_thread()
 {
-  cta(threadinfo) = tinfo;
-
   tSTARTTIME = CmiWallTimer();
 
 //  InitHandlerTable();
   if (workStartFunc) {
-    DEBUGF(("[N%d] work thread %d start.\n", BgMyNode(), tMYID));
-    char **Cmi_argvcopy = CmiCopyArgs(arg_argv);
+    DEBUGF(("[N%d] work thread %d start.\n", BgMyNode(), id));
     // timing
     startVTimer();
     BG_ENTRYSTART(-1, NULL);
+    char **Cmi_argvcopy = CmiCopyArgs(arg_argv);
     workStartFunc(arg_argc, Cmi_argvcopy);
     BG_ENTRYEND();
     stopVTimer();
   }
 
+  ckMsgQueue &q1 = myNode->nodeQ;
+  ckMsgQueue &q2 = myNode->affinityQ[id];
+
   for (;;) {
     char *msg=NULL;
-    ckMsgQueue &q1 = tNODEQ;
-    ckMsgQueue &q2 = tAFFINITYQ;
     int e1 = q1.isEmpty();
     int e2 = q2.isEmpty();
     int fromQ2 = 0;		// delay the deq of msg from affinity queue
@@ -1132,7 +1051,7 @@ void work_thread(threadInfo *tinfo)
     if ( msg == NULL ) {
 //      tCURRTIME += (CmiWallTimer()-tSTARTTIME);
       CthSuspend();
-      DEBUGF(("[N%d] work thread T%d awakened.\n", BgMyNode(), tMYID));
+      DEBUGF(("[N%d] work thread T%d awakened.\n", BgMyNode(), id));
       continue;
     }
 #if BLUEGENE_TIMING
@@ -1148,12 +1067,12 @@ void work_thread(threadInfo *tinfo)
     }
 #endif
 #endif   /* TIMING */
-    DEBUGF(("[N%d] work thread T%d has a msg.\n", BgMyNode(), tMYID));
+    DEBUGF(("[N%d] work thread T%d has a msg.\n", BgMyNode(), id));
 
 //if (tMYNODEID==0)
 //CmiPrintf("[%d] recvT: %e\n", tMYNODEID, CmiBgMsgRecvTime(msg));
 
-    if (CmiBgMsgRecvTime(msg) > tCURRTIME) {
+    if (CmiBgMsgRecvTime(msg) > currTime) {
       tCURRTIME = CmiBgMsgRecvTime(msg);
     }
 
@@ -1168,17 +1087,32 @@ void work_thread(threadInfo *tinfo)
     if (fromQ2 == 1) q2.deq();
     else q1.deq();
 
-    DEBUGF(("[N%d] work thread T%d finish a msg.\n", BgMyNode(), tMYID));
+    DEBUGF(("[N%d] work thread T%d finish a msg.\n", BgMyNode(), id));
 
     /* let other work thread do their jobs */
 #if SCHEDULE_WORK
     DEBUGF(("[N%d] work thread T%d suspend when done - %d to go.\n", BgMyNode(), tMYID, q2.length()));
     CthSuspend();
-    DEBUGF(("[N%d] work thread T%d awakened here.\n", BgMyNode(), tMYID));
+    DEBUGF(("[N%d] work thread T%d awakened here.\n", BgMyNode(), id));
 #else
     CthYield();
 #endif
   }
+}
+
+// comm thread entry
+void comm_thread(threadInfo *tinfo)
+{
+  /* set the thread-private threadinfo */
+  cta(threadinfo) = tinfo;
+  tinfo->run_comm_thread();
+}
+
+// worker thread entry
+void work_thread(threadInfo *tinfo)
+{
+  cta(threadinfo) = tinfo;
+  tinfo->run_work_thread();
 }
 
 /* should be done only once per bg node */
@@ -1403,12 +1337,6 @@ CmiStartFn bgMain(int argc, char **argv)
   return 0;
 }
 
-int main(int argc,char *argv[])
-{
-  ConverseInit(argc,argv,(CmiStartFn)bgMain,0,0);
-  return 0;
-}
-
 // for conv-conds:
 // if -2 untouch
 // if -1 main thread
@@ -1421,7 +1349,8 @@ extern "C" int CmiSwitchToPE(int pe)
 //  ASSERT(tTHREADTYPE != COMM_THREAD);
   if (tMYNODE == NULL) oldpe = -1;
   else if (tTHREADTYPE == COMM_THREAD) oldpe = -BgGetThreadID();
-  else oldpe = BgGetGlobalWorkerThreadID();
+  else if (tTHREADTYPE == WORK_THREAD) oldpe = BgGetGlobalWorkerThreadID();
+  else oldpe = -1;
 //CmiPrintf("CmiSwitchToPE from %d to %d\n", oldpe, pe);
   if (pe == -1) {
     CthSwitchThread(cva(mainThread));

@@ -117,15 +117,11 @@ CpvExtern(nodeInfo *, nodeinfo);
 #define tMYY		tMYNODE->y
 #define tMYZ		tMYNODE->z
 #define tMYNODEID	tMYNODE->id
-#define tCOMMTHQ	tMYNODE->commThQ
 #define tTIMELINEREC	tMYNODE->timelines[tMYID]
 #define tTIMELINE	tMYNODE->timelines[tMYID].timeline
 #define tINBUFFER	tMYNODE->inBuffer
-#define tMSGBUFFER	tMYNODE->msgBuffer
 #define tUSERDATA	tMYNODE->udata
 #define tTHREADTABLE    tMYNODE->threadTable
-#define tAFFINITYQ      tMYNODE->affinityQ[tMYID]
-#define tNODEQ          tMYNODE->nodeQ
 #define tSTARTED        tMYNODE->started
 
 extern int bgSize;
@@ -346,7 +342,9 @@ public:
   }
   inline void setThread(CthThread t) { me = t; }
   inline const CthThread getThread() const { return me; }
-  void addBgThreadMessage(char *msgPtr);        ///  add msg to affinity queue
+  void addAffMessage(char *msgPtr);        ///  add msg to affinity queue
+  void run_work_thread();
+  void run_comm_thread();
 }; 
 
 extern double BgGetCurTime();
