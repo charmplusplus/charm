@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.26  1998-02-27 11:51:51  jyelon
+ * Revision 2.27  1998-06-15 22:16:29  milind
+ * Reduced Charm++ overhead by reducing variable accesses.
+ *
+ * Revision 2.26  1998/02/27 11:51:51  jyelon
  * Cleaned up header files, replaced load-balancer.
  *
  * Revision 2.25  1998/01/28 17:52:47  milind
@@ -423,7 +426,7 @@ int destPE;
   
   if(CpvAccess(traceOn))
     trace_creation(NewChareMsg, Entry, env);
-  QDCountThisCreation(Entry, USERcat, NewChareMsg, 1);
+  QDCountThisCreation(1);
 
   SetEnv_msgType(env, NewChareMsg);
   if (destPE == CK_PE_ANY) destPE = CLD_ANYWHERE;
@@ -446,7 +449,7 @@ ChareIDType * pChareID;
   SetEnv_EP(env, Entry);
   SetEnv_chareBlockPtr(env, GetID_chareBlockPtr((*pChareID)));
   SetEnv_chare_magic_number(env, GetID_chare_magic_number((*pChareID)));
-  QDCountThisCreation(Entry, USERcat, ForChareMsg, 1);
+  QDCountThisCreation(1);
   if(CpvAccess(traceOn))
     trace_creation(GetEnv_msgType(env), Entry, env);
   CmiSetHandler(env, CpvAccess(HANDLE_INCOMING_MSG_Index));
@@ -492,32 +495,30 @@ int kind;
 void CkUnpack(ENVELOPE **henv)
 {
   ENVELOPE *envelope = *henv;
-  if (GetEnv_isPACKED(envelope) == PACKED) {
-    void *unpackedUsrMsg; 
-    void *usrMsg = USER_MSG_PTR(envelope); 
-    if(CpvAccess(traceOn)) 
-      trace_begin_unpack(); 
-    (*(CsvAccess(MsgToStructTable)[GetEnv_packid(envelope)].unpackfn)) 
-      (usrMsg, &unpackedUsrMsg); 
-    if(CpvAccess(traceOn)) 
-      trace_end_unpack(); 
-    if (usrMsg != unpackedUsrMsg) 
-      /* else unpacked in place */ 
-      { 
-	int temp_i; 
-	int temp_size; 
-	char *temp1, *temp2; 
-	/* copy envelope */ 
-	temp1 = (char *) envelope; 
-	temp2 = (char *) ENVELOPE_UPTR(unpackedUsrMsg); 
-	temp_size = (char *) usrMsg - temp1; 
-	for (temp_i = 0; temp_i<temp_size; temp_i++) 
-	  *temp2++ = *temp1++; 
-	CmiFree(envelope); 
-	envelope = ENVELOPE_UPTR(unpackedUsrMsg); 
-      } 
-    SetEnv_isPACKED(envelope, UNPACKED); 
-  }
+  void *unpackedUsrMsg; 
+  void *usrMsg = USER_MSG_PTR(envelope); 
+  if(CpvAccess(traceOn)) 
+    trace_begin_unpack(); 
+  (*(CsvAccess(MsgToStructTable)[GetEnv_packid(envelope)].unpackfn)) 
+    (usrMsg, &unpackedUsrMsg); 
+  if(CpvAccess(traceOn)) 
+    trace_end_unpack(); 
+  if (usrMsg != unpackedUsrMsg) 
+    /* else unpacked in place */ 
+  { 
+    int temp_i; 
+    int temp_size; 
+    char *temp1, *temp2; 
+    /* copy envelope */ 
+    temp1 = (char *) envelope; 
+    temp2 = (char *) ENVELOPE_UPTR(unpackedUsrMsg); 
+    temp_size = (char *) usrMsg - temp1; 
+    for (temp_i = 0; temp_i<temp_size; temp_i++) 
+    *temp2++ = *temp1++; 
+    CmiFree(envelope); 
+    envelope = ENVELOPE_UPTR(unpackedUsrMsg); 
+   } 
+   SetEnv_isPACKED(envelope, UNPACKED); 
   *henv = envelope;
 }
 

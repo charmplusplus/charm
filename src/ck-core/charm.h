@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1998-05-13 19:58:19  milind
+ * Revision 2.4  1998-06-15 22:16:25  milind
+ * Reduced Charm++ overhead by reducing variable accesses.
+ *
+ * Revision 2.3  1998/05/13 19:58:19  milind
  * Added Wall Timers.
  *
  * Revision 2.2  1998/03/07 09:07:51  jyelon
@@ -425,7 +428,9 @@ extern void          CkPrioConcatFn    CMK_PROTO((void *,void *,unsigned int));
 #define CkTraceOff() CpvAccess(traceOn)=0
 
 #define PACK(x)    CkPack(&x)
-#define UNPACK(x)  CkUnpack(&x)
+#define UNPACK(x)  if (GetEnv_isPACKED((x)) == PACKED) {\
+		     CkUnpack(&x);\
+                   }
 
 /******************************************************************************
  *
@@ -471,8 +476,6 @@ CpvExtern(int,  HEADER_SIZE);
 CpvExtern(int,  LDB_ELEM_SIZE);
 CpvExtern(int, _CK_Env_To_Usr);
 CpvExtern(int, _CK_Ldb_To_Usr);
-CpvExtern(int, _CK_Usr_To_Env);
-CpvExtern(int, _CK_Usr_To_Ldb);
 
 #define TOTAL_MSG_SIZE(usrsize, priowords)\
     (CpvAccess(HEADER_SIZE)+((priowords)*sizeof(int))+(usrsize))
@@ -491,10 +494,10 @@ CpvExtern(int, _CK_Usr_To_Ldb);
 	(CHARRED(ldbptr) + CpvAccess(_CK_Ldb_To_Usr))
 
 #define ENVELOPE_UPTR(usrptr)\
-	(ENVELOPE *) (CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Env))
+	(ENVELOPE *) (CHARRED(usrptr) - CpvAccess(_CK_Env_To_Usr))
 
 #define LDB_UPTR(usrptr)\
-        (LDB_ELEMENT *) (CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Ldb))
+        (LDB_ELEMENT *) (CHARRED(usrptr) - CpvAccess(_CK_Ldb_To_Usr))
 
 /******************************************************************************
  *
@@ -529,13 +532,9 @@ typedef struct {
 #define CkMemError(ptr) if (ptr == NULL) \
                 CmiPrintf("*** ERROR *** Memory Allocation Failed --- consider +m command-line option.\n");
 
-#define QDCountThisProcessing(msgType) \
-         if ((msgType != QdBocMsg) && (msgType != QdBroadcastBocMsg) && \
-			(msgType != LdbMsg)) CpvAccess(msgs_processed)++; 
+#define QDCountThisProcessing() CpvAccess(msgs_processed)++
 
-#define QDCountThisCreation(ep, category, type, x) \
-         if ((type != QdBocMsg) && (type != QdBroadcastBocMsg) && \
-			(type != LdbMsg)) CpvAccess(msgs_created) += x;
+#define QDCountThisCreation(x) CpvAccess(msgs_created) += (x)
 
 
 #define ReadValue(v) 			(v)

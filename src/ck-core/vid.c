@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1998-03-18 15:38:14  milind
+ * Revision 2.15  1998-06-15 22:16:44  milind
+ * Reduced Charm++ overhead by reducing variable accesses.
+ *
+ * Revision 2.14  1998/03/18 15:38:14  milind
  * Fixed a memory leak caused by vid_queue not being destroyed.
  *
  * Revision 2.13  1998/02/27 11:52:24  jyelon
@@ -125,7 +128,7 @@ ENVELOPE *env;
     trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
   CldEnqueue(GetID_onPE(vid->x.realID), env,
 	     CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
-  QDCountThisCreation(GetEnv_EP(env), USERcat, ForChareMsg, 1);
+  QDCountThisCreation(1);
 }
 
 /************************************************************************/
@@ -170,7 +173,7 @@ void *data_area;
 	  trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
 	CldEnqueue(chare_pe, env,
 		   CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
-	QDCountThisCreation(GetEnv_EP(env), USERcat, ForChareMsg, 1);
+	QDCountThisCreation(1);
    }
    FIFO_Destroy(vidqueue);
    vidblock->charekind = CHAREKIND_FVID;
@@ -200,7 +203,7 @@ CHARE_BLOCK *vidBlockPtr;
     SetEnv_vidBlockPtr(env, vidBlockPtr);
     SetEnv_EP(env, 0);
 
-    QDCountThisCreation(0, IMMEDIATEcat, VidSendOverMsg, 1);
+    QDCountThisCreation(1);
     if(CpvAccess(traceOn))
       trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
     CmiSetHandler(env, CpvAccess(HANDLE_INCOMING_MSG_Index));

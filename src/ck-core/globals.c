@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.17  1998-02-27 11:52:02  jyelon
+ * Revision 2.18  1998-06-15 22:16:36  milind
+ * Reduced Charm++ overhead by reducing variable accesses.
+ *
+ * Revision 2.17  1998/02/27 11:52:02  jyelon
  * Cleaned up header files, replaced load-balancer.
  *
  * Revision 2.16  1997/10/03 19:51:33  milind
@@ -111,8 +114,6 @@ CpvDeclare(int, PAD_SIZE);
 CpvDeclare(int, HEADER_SIZE);
 CpvDeclare(int, _CK_Env_To_Usr);
 CpvDeclare(int, _CK_Ldb_To_Usr);
-CpvDeclare(int, _CK_Usr_To_Env);
-CpvDeclare(int, _CK_Usr_To_Ldb);
 
 
 
@@ -256,8 +257,6 @@ void globalsModuleInit()
    CpvInitialize(int, HEADER_SIZE);
    CpvInitialize(int, _CK_Env_To_Usr);
    CpvInitialize(int, _CK_Ldb_To_Usr);
-   CpvInitialize(int, _CK_Usr_To_Env);
-   CpvInitialize(int, _CK_Usr_To_Ldb);
    CpvInitialize(int, NumReadMsg);
    CpvInitialize(int, MsgCount); 
    CpvInitialize(int, InsideDataInit);

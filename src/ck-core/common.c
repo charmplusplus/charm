@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1998-02-27 11:51:53  jyelon
+ * Revision 2.5  1998-06-15 22:16:33  milind
+ * Reduced Charm++ overhead by reducing variable accesses.
+ *
+ * Revision 2.4  1998/02/27 11:51:53  jyelon
  * Cleaned up header files, replaced load-balancer.
  *
  * Revision 2.3  1997/10/29 23:52:44  milind
@@ -91,8 +94,4 @@ void InitializeMessageMacros(void)
  	CpvAccess(_CK_Ldb_To_Usr) = CLD_FIELDSIZE + CpvAccess(PAD_SIZE) ;
 
 
-	/******************* USR *********************************************/
-
- 	CpvAccess(_CK_Usr_To_Env) = -(ENVELOPE_SIZE + CLD_FIELDSIZE + CpvAccess(PAD_SIZE)) ;
- 	CpvAccess(_CK_Usr_To_Ldb) = -(CLD_FIELDSIZE + CpvAccess(PAD_SIZE));
 }	

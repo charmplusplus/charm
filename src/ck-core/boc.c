@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.17  1998-02-27 11:51:48  jyelon
+ * Revision 2.18  1998-06-15 22:16:22  milind
+ * Reduced Charm++ overhead by reducing variable accesses.
+ *
+ * Revision 2.17  1998/02/27 11:51:48  jyelon
  * Cleaned up header files, replaced load-balancer.
  *
  * Revision 2.16  1998/01/28 17:52:45  milind
@@ -464,7 +467,8 @@ ChareNumType bocnum;
   
   CmiSetHandler(env, CpvAccess(HANDLE_INCOMING_MSG_Index));
   CldEnqueue(destPE, env, CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
-  QDCountThisCreation(ep, category, type, 1);
+  if((type!=QdBocMsg)&&(type!=QdBroadcastBocMsg)&&(type!=LdbMsg))
+    QDCountThisCreation(1);
 }
 
 
@@ -497,7 +501,8 @@ ChareNumType bocnum;
     trace_creation(GetEnv_msgType(env), ep, env);
   CmiSetHandler(env,CpvAccess(HANDLE_INCOMING_MSG_Index));
   CldEnqueue(CLD_BROADCAST_ALL, env, CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
-  QDCountThisCreation(ep, category, type, CmiNumPes());
+  if((type!=QdBocMsg)&&(type!=QdBroadcastBocMsg)&&(type!=LdbMsg))
+    QDCountThisCreation(CmiNumPes());
 }
 
 
@@ -558,7 +563,7 @@ char *mydata;
   CmiSetHandler(env,CpvAccess(HANDLE_INCOMING_MSG_Index));
   CldEnqueue(CLD_BROADCAST_ALL, env, CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
   
-  QDCountThisCreation(ep, USERcat, DynamicBocInitMsg,CmiNumPes());
+  QDCountThisCreation(CmiNumPes());
 }
 
 void DynamicBocInit(void)

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.30  1998-05-07 21:20:14  rbrunner
+ * Revision 2.31  1998-06-15 22:16:40  milind
+ * Reduced Charm++ overhead by reducing variable accesses.
+ *
+ * Revision 2.30  1998/05/07 21:20:14  rbrunner
  * Added correct prototypes for CmiGrabBuffer, to match changes in converse.h
  *
  * Revision 2.29  1998/02/27 11:52:06  jyelon
@@ -194,7 +197,7 @@ ENVELOPE *env;
   VidEnqueueMsg(env);
   if(CpvAccess(traceOn))
     trace_end_execute(0, ForChareMsg, 0);
-  QDCountThisProcessing(ForChareMsg);
+  QDCountThisProcessing();
 }
 
 void CkProcess_ForChareMsg_to_FVID(env)
@@ -205,7 +208,7 @@ ENVELOPE *env;
   VidForwardMsg(env);
   if(CpvAccess(traceOn))
     trace_end_execute(0, ForChareMsg, 0);
-  QDCountThisProcessing(ForChareMsg);
+  QDCountThisProcessing();
 }
 
 void CkProcess_ForChareMsg_to_Chare(env)
@@ -222,17 +225,21 @@ ENVELOPE *env;
   current_ep      = GetEnv_EP(env);
   current_epinfo  = CsvAccess(EpInfoTable) + current_ep;
   current_usr     = USER_MSG_PTR(env);
-  current_magic   = chareblock->selfID.magic;
   current_msgType = GetEnv_msgType(env);
 
   CpvAccess(currentChareBlock) = (void *)chareblock;
   CpvAccess(nodeforCharesProcessed)++;
-  if(CpvAccess(traceOn))
+  if(CpvAccess(traceOn)) {
+    current_magic   = chareblock->selfID.magic;
     trace_begin_execute(env);
-  (current_epinfo->function)(current_usr,chareblock->chareptr);
-  if(CpvAccess(traceOn))
+    (current_epinfo->function)(current_usr,chareblock->chareptr);
     trace_end_execute(current_magic, current_msgType, current_ep);
-  QDCountThisProcessing(current_msgType);
+  } else {
+    (current_epinfo->function)(current_usr,chareblock->chareptr);
+  }
+  if((current_msgType!=QdBocMsg)&&(current_msgType!=QdBroadcastBocMsg)&&
+     (current_msgType!=LdbMsg))
+    QDCountThisProcessing();
 }
 
 void CkProcess_ForChareMsg(env)
@@ -241,10 +248,10 @@ ENVELOPE *env;
   CHARE_BLOCK *chare = GetEnv_chareBlockPtr(env);
   CheckMagicNumber(chare, env);
   switch (chare->charekind) {
-  case CHAREKIND_UVID: CkProcess_ForChareMsg_to_UVID(env); break;
-  case CHAREKIND_FVID: CkProcess_ForChareMsg_to_FVID(env); break;
-  case CHAREKIND_CHARE: CkProcess_ForChareMsg_to_Chare(env); break;
-  case CHAREKIND_BOCNODE: CkProcess_ForChareMsg_to_Chare(env); break;
+    case CHAREKIND_UVID: CkProcess_ForChareMsg_to_UVID(env); break;
+    case CHAREKIND_FVID: CkProcess_ForChareMsg_to_FVID(env); break;
+    case CHAREKIND_CHARE: CkProcess_ForChareMsg_to_Chare(env); break;
+    case CHAREKIND_BOCNODE: CkProcess_ForChareMsg_to_Chare(env); break;
   }
 }
 
@@ -268,7 +275,9 @@ ENVELOPE *env;
   current_msgType = GetEnv_msgType(env);
   executing_boc_num = ProcessBocInitMsg(env);
   RegisterDynamicBocInitMsg(&executing_boc_num, NULL);
-  QDCountThisProcessing(current_msgType);
+  if((current_msgType!=QdBocMsg)&&(current_msgType!=QdBroadcastBocMsg)&&
+     (current_msgType!=LdbMsg))
+    QDCountThisProcessing();
 }
 
 void CkProcess_NewChareMsg(env)
@@ -309,7 +318,9 @@ ENVELOPE *env;
   (current_epinfo->function)(current_usr, current_block->chareptr);
   if(CpvAccess(traceOn))
     trace_end_execute(current_magic, current_msgType, current_ep);
-  QDCountThisProcessing(current_msgType);
+  if((current_msgType!=QdBocMsg)&&(current_msgType!=QdBroadcastBocMsg)&&
+     (current_msgType!=LdbMsg))
+    QDCountThisProcessing();
 }
 
 void CkProcess_VidSendOverMsg(env)
@@ -324,7 +335,9 @@ ENVELOPE *env;
   VidSendOverMessages(current_usr, NULL);
   if(CpvAccess(traceOn))
     trace_end_execute(0, current_msgType, 0);
-  QDCountThisProcessing(current_msgType);
+  if((current_msgType!=QdBocMsg)&&(current_msgType!=QdBroadcastBocMsg)&&
+     (current_msgType!=LdbMsg))
+  QDCountThisProcessing();
 }
 
 
