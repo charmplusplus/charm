@@ -1,5 +1,7 @@
-CMK_CC="$CMK_CC -I/usr/local/vmi/mpich/include "
-CMK_CXX="$CMK_CXX -I/usr/local/vmi/mpich/include "
-CMK_LD="$CMK_LD -L /usr/local/vmi/mpich/lib/gcc"
-CMK_LDXX="$CMK_LDXX -L /usr/local/vmi/mpich/lib/gcc"
+test -z "$CMK_INCDIR" && CMK_INCDIR='-I /usr/local/vmi/mpich/include'
+test -z "$CMK_LIBDIR" && CMK_LIBDIR='-L /usr/local/vmi/mpich/lib/gcc'
+CMK_CC="$CMK_CC $CMK_INCDIR "
+CMK_CXX="$CMK_CXX $CMK_INCDIR "
+CMK_LD="$CMK_LD $CMK_LIBDIR "
+CMK_LDXX="$CMK_LDXX $CMK_LIBDIR "
 CMK_LIBS="$CMK_LIBS -lmpich -lvmi -ldl -lpthread"
