@@ -65,3 +65,15 @@ supported by the sim version.
 \desc{This function is only used in ConverseInit-returns mode, described
 above.}
 
+\function{void CmiAbort(char *msg)}
+\index{CmiAbort}
+\desc{This function can be used portably to abnormally terminate a \converse{}
+  program. Before termination, it prints a message supplied as {\tt msg}.}
+
+
+\function{void CmiAssert(int expr)}
+\index{CmiAssert}
+\desc{This macro terminates the Converse program after printing an informative
+ message if \texttt{expr} evaluates to 0. It can be used in place of 
+ \texttt{assert}. In order to turn off \texttt{CmiAssert}, one should define
+ CMK_OPTIMIZE as 1.}
