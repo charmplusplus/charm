@@ -125,14 +125,7 @@ void WSLB::AtSync()
 
   WSLBStatsMsg* msg = AssembleStats();
 
-  int i;
-  for(i=1; i < num_neighbors(); i++) {
-    WSLBStatsMsg* m2 = (WSLBStatsMsg*) CkCopyMsg((void**)&msg);
-    CProxy_WSLB(thisgroup).ReceiveStats(m2,neighbor_pes[i]);
-  }
-  if (0 < num_neighbors()) {
-    CProxy_WSLB(thisgroup).ReceiveStats(msg,neighbor_pes[0]);
-  } else delete msg;
+  CProxy_WSLB(thisgroup).ReceiveStats(msg,num_neighbors(),neighbor_pes);
 
   // Tell our own node that we are ready
   ReceiveStats((WSLBStatsMsg*)0);
@@ -282,13 +275,8 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
     }
     
     // Now, send migrate messages to neighbors
-    for(i=1; i < num_neighbors(); i++) {
-      WSLBMigrateMsg* m2 = (WSLBMigrateMsg*) CkCopyMsg((void**)&migrateMsg);
-      CProxy_WSLB(thisgroup).ReceiveMigration(m2,neighbor_pes[i]);
-    }
-    if (0 < num_neighbors())
-      CProxy_WSLB(thisgroup).ReceiveMigration(migrateMsg,neighbor_pes[0]);
-    else delete migrateMsg;
+    CProxy_WSLB(thisgroup).ReceiveMigration(migrateMsg,
+    	num_neighbors(),neighbor_pes);
     
     // Zero out data structures for next cycle
     for(i=0; i < clients; i++) {
@@ -358,7 +346,7 @@ void WSLB::MigrationDone()
   migrates_expected = -1;
   // Increment to next step
   mystep++;
-  CProxy_WSLB(thisgroup).ResumeClients(CkMyPe());
+  (CProxy_WSLB(thisgroup))[CkMyPe()].ResumeClients();
 }
 
 void WSLB::ResumeClients()

@@ -116,10 +116,10 @@ void NborBaseLB::AtSync()
   int i;
   for(i=1; i < num_neighbors(); i++) {
     NLBStatsMsg* m2 = (NLBStatsMsg*) CkCopyMsg((void**)&msg);
-    CProxy_NborBaseLB(thisgroup).ReceiveStats(m2,neighbor_pes[i]);
+    (CProxy_NborBaseLB(thisgroup))[neighbor_pes[i]].ReceiveStats(m2);
   }
   if (0 < num_neighbors()) {
-    CProxy_NborBaseLB(thisgroup).ReceiveStats(msg,neighbor_pes[0]);
+    (CProxy_NborBaseLB(thisgroup))[neighbor_pes[i]].ReceiveStats(msg);
   } else delete msg;
 
   // Tell our own node that we are ready
@@ -239,11 +239,10 @@ void NborBaseLB::ReceiveStats(NLBStatsMsg *m)
     // Now, send migrate messages to neighbors
     for(i=1; i < num_neighbors(); i++) {
       NLBMigrateMsg* m2 = (NLBMigrateMsg*) CkCopyMsg((void**)&migrateMsg);
-      CProxy_NborBaseLB(thisgroup).ReceiveMigration(m2,neighbor_pes[i]);
+      (CProxy_NborBaseLB(thisgroup))[neighbor_pes[i]].ReceiveMigration(m2);
     }
     if (0 < num_neighbors())
-      CProxy_NborBaseLB(thisgroup).ReceiveMigration(migrateMsg,
-						    neighbor_pes[0]);
+      (CProxy_NborBaseLB(thisgroup))[neighbor_pes[0]].ReceiveMigration(migrateMsg);
     else delete migrateMsg;
     
     // Zero out data structures for next cycle
@@ -314,7 +313,7 @@ void NborBaseLB::MigrationDone()
   migrates_expected = -1;
   // Increment to next step
   mystep++;
-  CProxy_NborBaseLB(thisgroup).ResumeClients(CkMyPe());
+  (CProxy_NborBaseLB(thisgroup))[CkMyPe()].ResumeClients();
 }
 
 void NborBaseLB::ResumeClients()

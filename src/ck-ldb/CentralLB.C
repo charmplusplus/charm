@@ -94,7 +94,7 @@ void CentralLB::AtSync()
     MigrationDone();
     return;
   }
-  CProxy_CentralLB(thisgroup).ProcessAtSync(CkMyPe());
+  (CProxy_CentralLB(thisgroup))[CkMyPe()].ProcessAtSync();
 }
 
 void CentralLB::ProcessAtSync()
@@ -141,7 +141,7 @@ void CentralLB::ProcessAtSync()
       msg->next_lb = new_ld_balancer;
   }
 
-  CProxy_CentralLB(thisgroup).ReceiveStats(msg,cur_ld_balancer);
+  (CProxy_CentralLB(thisgroup))[cur_ld_balancer].ReceiveStats(msg);
 }
 
 void CentralLB::Migrated(LDObjHandle h)
@@ -263,7 +263,7 @@ void CentralLB::MigrationDone()
   migrates_expected = -1;
   // Increment to next step
   mystep++;
-  CProxy_CentralLB(thisgroup).ResumeClients(CkMyPe());
+  (CProxy_CentralLB(thisgroup))[CkMyPe()].ResumeClients();
 }
 
 void CentralLB::ResumeClients()
