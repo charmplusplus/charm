@@ -1,4 +1,5 @@
-\section{Mesh}
+\section{Mesh Nodes and Elements}
+\label{sec:entities}
 
 These routines describe and retreive the finite element mesh for this
 computation.  A \term{mesh}, from the framework's perspective, is a list of
@@ -21,7 +22,7 @@ A more complex program might set an initial mesh in init; then get,
 work on, reassemble and repartition the mesh several times in driver 
 via \kw{FEM\_Update\_mesh}.
 
-\subsection{Entities}
+\subsection{Mesh Entity Types}
 A mesh consists of \term{entities}, such as nodes and elements.
 Entities always have a \term{local number}, which is just the entities'
 current index in its array.  Entites may also have a \term{global number}, 
@@ -131,12 +132,12 @@ is partitioned.
 
 
 
-\subsection{Mesh Manipulation Routines}
+\subsection{Mesh Entity Manipulation}
 
 
 \prototype{FEM\_Mesh\_default\_read}
 \function{int FEM\_Mesh\_default\_read(void);}
-\function{integer function :: FEM\_Mesh\_default\_read()}
+\function{INTEGER function :: FEM\_Mesh\_default\_read()}
 
 Return the default reading mesh.  This routine is valid:
 
@@ -147,7 +148,7 @@ Return the default reading mesh.  This routine is valid:
 
 \prototype{FEM\_Mesh\_default\_write}
 \function{int FEM\_Mesh\_default\_write(void);}
-\function{integer function :: FEM\_Mesh\_default\_write()}
+\function{INTEGER function :: FEM\_Mesh\_default\_write()}
 
 Return the default writing mesh.  This routine is valid:
 
@@ -160,15 +161,19 @@ Return the default writing mesh.  This routine is valid:
 
 \prototype{FEM\_Mesh\_get\_length}  
 \function{int FEM\_Mesh\_get\_length(int mesh,int entity);}
-\function{integer function :: FEM\_Mesh\_get\_length(mesh,entity)}
-  \args{integer, intent(in) :: mesh,entity) }
+\function{INTEGER function :: FEM\_Mesh\_get\_length(mesh,entity)}
+  \args{INTEGER, INTENT(IN) :: mesh,entity) }
 
 Return the number of \uw{entity}s that exist in this \uw{mesh}.
 
 This call can be used with any entity.
-For example, to get the number of ghost nodes, 
+For example, to get the number of nodes,
   \begin{alltt}
-  	nGhostNodes=FEM\_Mesh\_get\_length(\uw{mesh},\kw{FEM\_GHOST}+\kw{FEM\_NODE})
+      nNodes=FEM\_Mesh\_get\_length(\uw{mesh},\kw{FEM\_NODE})
+  \end{alltt}
+To get the number of ghost nodes, 
+  \begin{alltt}
+      nGhostNodes=FEM\_Mesh\_get\_length(\uw{mesh},\kw{FEM\_GHOST}+\kw{FEM\_NODE})
   \end{alltt}
 To get the number of real elements of type 2,
   \begin{alltt}
@@ -179,8 +184,8 @@ To get the number of real elements of type 2,
 \prototype{FEM\_Mesh\_data}  
 \function{void FEM\_Mesh\_data(int mesh,int entity,int attr,
         void *data, int first, int length, int datatype,int width);}
-\function{subroutine FEM\_Mesh\_data(mesh,entity,attr,data,first,length,datatype,width)}
-  \args{integer, intent(in) :: mesh,entity,attr,data,first,length,datatype,width}
+\function{SUBROUTINE FEM\_Mesh\_data(mesh,entity,attr,data,first,length,datatype,width)}
+  \args{INTEGER, INTENT(IN) :: mesh,entity,attr,first,length,datatype,width}
   \args{datatype, intent(inout) :: data(width,length) }
 
 This is the one routine for getting or setting entity's attributes 
@@ -257,23 +262,223 @@ user data "tag", for example 13, and:
   \end{alltt}
 
 
-\subsection{Advanced Mesh Manipulation Routines}
+\subsection{Advanced Entity Manipulation}
 
-\prototype{FEM\_Mesh\_offset}  
-\function{void FEM\_Mesh\_offset(int mesh,int entity,int attr,
+\prototype{FEM\_Mesh\_get\_width}  
+\function{int FEM\_Mesh\_get\_width(int mesh,int entity,int attr);}
+\function{INTEGER function :: FEM\_Mesh\_get\_width(mesh,entity,attr)}
+  \args{INTEGER, INTENT(IN) :: mesh,entity,attr) }
+
+Return the width of the attribute \uw{attr} of \uw{entity} of \uw{mesh}.
+This is the value previously passed as ``width'' to FEM\_Mesh\_data.
+
+
+\prototype{FEM\_Mesh\_data\_offset}  
+\function{void FEM\_Mesh\_data\_offset(int mesh,int entity,int attr,
         void *data, int first, int length, int datatype,int width,
 	int offsetBytes,int distanceBytes,int skewBytes);}
-\function{subroutine FEM\_Mesh\_data(mesh,entity,attr,data,first,length,datatype,width,
+\function{SUBROUTINE FEM\_Mesh\_data\_offset(mesh,entity,attr,data,first,length,datatype,width,
 	offsetBytes,distanceBytes,skewBytes)}
-  \args{integer, intent(in) :: mesh,entity,attr,data,first,length,datatype,width}
-  \args{integer, intent(in) :: offsetBytes,distanceBytes,skewBytes }
+  \args{INTEGER, INTENT(IN) :: mesh,entity,attr,first,length,datatype,width}
+  \args{INTEGER, INTENT(IN) :: offsetBytes,distanceBytes,skewBytes }
   \args{datatype, intent(inout) :: data(width,length) }
 
-This routine allows you to get or set a mesh field directly
+This routine is a more complicated version of FEM\_Mesh\_data.
+It allows you to get or set a mesh field directly
 from a user-defined structure.  See the documentation of
-IDXL\_Layout\_offset in Section~\ref{sec:IDXL_Layout_offset}
+IDXL\_Layout\_offset in Section~\ref{sec:IDXLLayoutoffset}
 for details on how to set offsetBytes, distanceBytes, and skewBytes.
 
+\prototype{FEM\_Mesh\_data\_layout}
+\function{
+void FEM\_Mesh\_data\_layout(int mesh,int entity,int attr,
+      void *data, int firstItem, int length, IDXL\_Layout\_t layout);
+}
+\function{SUBROUTINE FEM\_Mesh\_data\_layout(mesh,entity,attr,data,first,length,layout)}
+  \args{INTEGER, INTENT(IN) :: mesh,entity,attr,first,length,layout}
+  \args{INTEGER, INTENT(IN) :: layout}
+
+This routine is a more complicated version of FEM\_Mesh\_data.
+Like FEM\_Mesh\_data\_offset, it allows you to get or set a mesh
+field directly from a user-defined structure; but this routine
+expects the structure to be described by an IDXL\_Layout object.
+
+%%%%%%%%%%%%%%%%%%%%%% Mesh Creation %%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Meshes}
+\label{sec:mesh}
+
+A "mesh" is a collection of nodes and elements 
+bundled together on a single processor.
+Meshes are always referred to by an integer that 
+serves as a handle to the mesh.
+
+This section describes routines to manipulate entire meshes
+at once: this includes calls to create and delete meshes,
+read and write meshes,
+partition and reassemble meshes, and send meshes between
+processors.
+
+Only a few of the mesh routines are collective; 
+most of them only describe local data and hence 
+operate independently on each chunk.
+
+
+\subsection{Mesh Routines}
+
+\prototype{FEM\_Mesh\_allocate}
+\function{int FEM\_Mesh\_allocate(void);}
+\function{INTEGER FUNCTION :: FEM\_Mesh\_allocate()}
+
+Create a new local mesh object.  The mesh is initially empty,
+but it is a setting mesh, so call FEM\_Mesh\_data 
+to fill the mesh with data.
+
+
+\prototype{FEM\_Mesh\_deallocate}
+\function{int FEM\_Mesh\_deallocate(int mesh);}
+\function{SUBROUTINE FEM\_Mesh\_deallocate(mesh)}
+  \args{INTEGER, INTENT(IN) :: mesh}
+
+Destroy this local mesh object, and its associated
+data.
+
+
+\prototype{FEM\_Mesh\_copy}
+\function{int FEM\_Mesh\_copy(int mesh);}
+\function{INTEGER FUNCTION FEM\_Mesh\_copy(mesh)}
+  \args{INTEGER, INTENT(IN) :: mesh}
+
+Create a new mesh object with a separate copy of the data 
+stored in this old mesh object.
+
+
+\prototype{FEM\_Mesh\_write}
+\function{void FEM\_Mesh\_write(int mesh,const char *prefix,int partNo,int nParts);}
+\function{SUBROUTINE FEM\_Mesh\_write(mesh,prefix,partNo,nParts)}
+  \args{INTEGER, INTENT(IN) :: mesh}
+  \args{INTEGER, INTENT(IN) :: partNo,nParts}
+  \args{character (LEN=*), INTENT(IN) :: prefix}
+
+Write this mesh to the file ``\uw{prefix}\_vp\uw{partNo}\_\uw{nParts}.dat''.
+
+By convention, \uw{partNo} begins at 0; but no index conversion is
+performed so you can assign any meaning to \uw{partNo} and \uw{nParts}.
+In particular, this routine is not collective--you can read any
+mesh from any processor.
+For example, if \uw{prefix} is ``foo/bar'', the data for the 
+first of 7 chunks would be stored in ``foo/bar\_vp0\_7.dat''
+and could be read using FEM\_Mesh\_read('foo/bar',0,7).
+
+Meshes are stored in a machine-portable format internal to FEM.
+The format is currently ASCII based, but it is subject to change.
+We strongly recommend using the FEM routines to read and write 
+these files rather than trying to prepare or parse them yourself.
+
+
+\prototype{FEM\_Mesh\_read}
+\function{int FEM\_Mesh\_read(const char *prefix,int partNo,int nParts);}
+\function{INTEGER FUNCTION :: FEM\_Mesh\_read(prefix,partNo,nParts)}
+  \args{INTEGER, INTENT(IN) :: partNo,nParts}
+  \args{character (LEN=*), INTENT(IN) :: prefix}
+
+Read a new mesh from the file ``\uw{prefix}\_vp\uw{partNo}\_\uw{nParts}.dat''.
+The new mesh begins in getting mode, so you can read the 
+data out of the mesh using calls to FEM\_Mesh\_data.
+
+
+
+\prototype{FEM\_Mesh\_broadcast}
+  \function{int FEM\_Mesh\_broadcast(int mesh,int fromRank,FEM\_Comm\_t comm\_context);}
+  \function{INTEGER FUNCTION :: FEM\_Mesh\_broadcast(mesh,fromRank,comm\_context)}
+     \args{INTEGER, INTENT(IN) :: mesh,fromRank,comm\_context}
+
+Take the mesh \uw{mesh} on processor \uw{fromRank} (normally 0), 
+partition the mesh into one piece per processor (in the MPI communicator
+\uw{comm\_context}, and return each processor its own piece 
+of the partitioned mesh.  This call is collective, but only 
+processor \uw{fromRank} needs to pass in a \uw{mesh}; the 
+\uw{mesh} value is ignored on other processors.
+
+For example, if rank 0 has a mesh named ``src'', we can 
+partition src for all the processors using:
+\begin{alltt}
+  m=FEM_Mesh_broadcast(src,0,MPI_COMM_WORLD);
+\end{alltt}
+
+The new, partitioned mesh is in getting mode, so 
+you can read the partitioned data using calls to FEM\_Mesh\_data.
+This call does not affect \uw{mesh} in any way.
+
+  
+\prototype{FEM\_Mesh\_reduce}
+  \function{int FEM\_Mesh\_reduce(int mesh,int toRank,FEM\_Comm\_t comm\_context);}
+  \function{INTEGER FUNCTION :: FEM\_Mesh\_reduce(mesh,toRank,comm\_context);}
+     \args{INTEGER, INTENT(IN) :: mesh,toRank,comm\_context}
+
+This call is the reverse operation of FEM\_Mesh\_broadcast:
+each processor passes in a mesh in \uw{mesh}, the mesh is 
+assembled, and the function returns the assembled mesh
+to processor \uw{toRank}.  This call is collective, but 
+only processor \uw{toRank} is returned a mesh; all other
+processors are returned the non-mesh value 0.
+
+The new, reassembled mesh is in getting mode.
+This call does not affect \uw{mesh}.
+
+
+\prototype{FEM\_Mesh\_print}
+\function{void FEM\_Mesh\_print(int mesh);}
+\function{SUBROUTINE FEM\_Mesh\_print(mesh)}
+    \args{INTEGER, INTENT(IN) :: mesh}
+
+Print out a text description of the nodes and elements 
+of this mesh.
+
+
+
+\subsection{Advanced Mesh Manipulation}
+
+\prototype{FEM\_Mesh\_send}
+  \function{void FEM\_Mesh\_send(int mesh,int toRank,int tag,FEM\_Comm\_t comm\_context);}
+  Send the mesh \uw{mesh} 
+  
+\prototype{FEM\_Mesh\_recv}
+  \function{int FEM\_Mesh\_recv(int fromRank,int tag,FEM\_Comm\_t comm\_context);}
+  
+
+\prototype{FEM\_Mesh\_partition}
+  \function{void FEM\_Mesh\_partition(int mesh,int nParts,int *destMeshes);}
+  \function{SUBROUTINE FEM\_Mesh\_partition(mesh,nParts,destMeshes)}
+    \args{INTEGER, INTENT(IN) :: mesh,nParts}
+    \args{INTEGER, INTENT(OUT) :: destMeshes(nParts)}
+
+Divide \uw{mesh} into \uw{nParts} pieces, and store the pieces
+into the array \uw{destMeshes}. 
+
+The partitioned mesh is returned in getting mode.
+This call does not affect the source mesh \uw{mesh}.
+  
+\prototype{FEM\_Mesh\_assemble}
+  \function{int FEM\_Mesh\_assemble(int nParts,const int *srcMeshes);}
+  \function{INTEGER FUNCTION FEM\_Mesh\_assemble(nParts,srcMeshes)}
+    \args{INTEGER, INTENT(IN) :: nParts, srcMeshes(nParts)}
+
+Assemble the \uw{nParts} meshes listed in \uw{srcMeshes} into
+a single mesh.  
+
+The assembled mesh is returned in getting mode.
+This call does not affect the source meshes.
+
+
+\prototype{FEM\_Mesh\_copy\_globalno}
+  \function{void FEM\_Mesh\_copy\_globalno(int src\_mesh,int dest\_mesh);}
+  \function{SUBROUTINE FEM\_Mesh\_copy\_globalno(src\_mesh,dest\_mesh)}
+    \args{INTEGER, INTENT(IN) :: src\_mesh,dest\_mesh}
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%% Ghosts %%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Mesh Ghosts}
 \label{sec:ghost}
@@ -316,7 +521,7 @@ real elements.
 
 
 \subsection{Ghost Numbering}
-\label{sec:ghost_num}
+\label{sec:ghostnum}
 Ghosts and real entities are stored by the framework
 in separate lists---to access the ghost entity type, add \kw{FEM\_GHOST}
 to the real entity's type.  For example, \kw{FEM\_GHOST}+\kw{FEM\_ELEM}+1 
@@ -372,14 +577,14 @@ stored in FEM\_ELEM+2 would be:
 
 \begin{alltt}
 /* C version */
-  int nReal=FEM_Mesh_get_length(mesh,FEM_ELEM+2);
-  int nGhost=FEM_Mesh_get_length(mesh,FEM_GHOST+FEM_ELEM+2);
+  int nReal=FEM\_Mesh\_get\_length(mesh,FEM\_ELEM+2);
+  int nGhost=FEM\_Mesh\_get\_length(mesh,FEM\_GHOST+FEM\_ELEM+2);
   typedef int intTriplet[3];
   intTriplet *conn=new intTriplet[nReal+nGhost];
   /* Extract real triangles into conn[0..nReal-1] */
-  FEM_Mesh_data(mesh,FEM_ELEM+2,FEM_CONN, &conn[0][0], 0,nReal, 3,FEM_INDEX_0);
+  FEM\_Mesh\_data(mesh,FEM\_ELEM+2,FEM\_CONN, &conn[0][0], 0,nReal, 3,FEM\_INDEX\_0);
   /* Extract ghost triangles into conn[nReal..nReal+nGhost-1] */
-  FEM_Mesh_data(mesh,FEM_GHOST+FEM_ELEM+2,FEM_CONN, &conn[nReal][0], 0,nGhost, 3,FEM_INDEX_0);
+  FEM\_Mesh\_data(mesh,FEM\_GHOST+FEM\_ELEM+2,FEM\_CONN, &conn[nReal][0], 0,nGhost, 3,FEM\_INDEX\_0);
   
   /* Renumber the ghost triangle connectivity */
   for (int t=nReal;t<nReal+nGhost;t++)
@@ -387,9 +592,9 @@ stored in FEM\_ELEM+2 would be:
       int in=conn[t][i]; /* uses FEM ghost node numbering */
       int out; /* uses application's ghost numbering */
       if (in==-1) \{ 
-        out=some_value_for_missing_nodes; 
-      \} else if (FEM_Is_ghost_index(in)) \{
-        out=first_application_ghost+FEM_From_ghost_index(in);
+        out=some\_value\_for\_missing\_nodes; 
+      \} else if (FEM\_Is\_ghost\_index(in)) \{
+        out=first\_application\_ghost+FEM\_From\_ghost\_index(in);
       \} else /*regular real node*/ \{
         out=in;
       \}
@@ -399,20 +604,20 @@ stored in FEM\_ELEM+2 would be:
 ! F90 version
   INTEGER, ALLOCATABLE :: conn(3,:)
   INTEGER :: nReal,nGhost,t,i,in,out
-  nReal=FEM_Mesh_get_length(mesh,FEM_ELEM+2)
-  nGhost=FEM_Mesh_get_length(mesh,FEM_GHOST+FEM_ELEM+2)
+  nReal=FEM\_Mesh\_get\_length(mesh,FEM\_ELEM+2)
+  nGhost=FEM\_Mesh\_get\_length(mesh,FEM\_GHOST+FEM\_ELEM+2)
   ALLOCATE(conn(3,nReal+nGhost))
   ! Extract real triangles into conn[1..nReal] 
-  CALL FEM_Mesh_data(mesh,FEM_ELEM+2,FEM_CONN, conn, 1,nReal, 3,FEM_INDEX_1)
+  CALL FEM\_Mesh\_data(mesh,FEM\_ELEM+2,FEM\_CONN, conn, 1,nReal, 3,FEM\_INDEX\_1)
   ! Extract ghost triangles into conn[nReal+1..nReal+nGhost] 
-  CALL FEM_Mesh_data(mesh,FEM_GHOST+FEM_ELEM+2,FEM_CONN, conn(1,nReal+1), 1,nGhost, 3,FEM_INDEX_1)
+  CALL FEM\_Mesh\_data(mesh,FEM\_GHOST+FEM\_ELEM+2,FEM\_CONN, conn(1,nReal+1), 1,nGhost, 3,FEM\_INDEX\_1)
   
   ! Renumber the ghost triangle connectivity 
   DO t=nReal+1,nReal+nGhost
     DO i=1,3
       in=conn(i,t) 
-      IF (in .EQ. 0) out=some_value_for_missing_nodes
-      IF (in .LT. 0) out=first_application_ghost-1+(-in)
+      IF (in .EQ. 0) out=some\_value\_for\_missing\_nodes
+      IF (in .LT. 0) out=first\_application\_ghost-1+(-in)
       IF (in .GT. 0) out=in
       conn(i,t)=out
     END DO
@@ -431,8 +636,8 @@ The framework's ghost handling is element-centric. You specify which kinds of el
 
 \prototype{FEM\_Add\_ghost\_layer}
 \function{void FEM\_Add\_ghost\_layer(int nodesPerFace,int doAddNodes);}
-\function{subroutine FEM\_Add\_ghost\_layer(nodesPerFace,doAddNodes)}
-  \args{integer, intent(in) :: nodesPerFace,doAddNodes}
+\function{SUBROUTINE FEM\_Add\_ghost\_layer(nodesPerFace,doAddNodes)}
+  \args{INTEGER, INTENT(IN) :: nodesPerFace,doAddNodes}
 This routine creates a new layer of ghosts around each FEM chunk. \kw{nodesPerFace} is the number of shared nodes that together form a ``face''. \kw{doAddNodes} specifies that you want ghost nodes as well as elements.
 
 A face is an unordered ``tuple'' of nodes, and is an abstract way to describe which ghosts
@@ -448,9 +653,9 @@ Calling this routine several times creates several layers of ghost elements, and
 \item
 \prototype{FEM\_Add\_ghost\_elem}
 \function{void FEM\_Add\_ghost\_elem(int elType,int facesPerElem,const int *elem2face);}
-\function{subroutine FEM\_Add\_ghost\_elem(elType,facesPerElem,elem2face)}
-  \args{integer, intent(in) :: elType,facesPerElem}
-  \args{integer, intent(in) :: elem2face(nodesPerFace,facesPerElem)}
+\function{SUBROUTINE FEM\_Add\_ghost\_elem(elType,facesPerElem,elem2face)}
+  \args{INTEGER, INTENT(IN) :: elType,facesPerElem}
+  \args{INTEGER, INTENT(IN) :: elem2face(nodesPerFace,facesPerElem)}
 
 This call is used to specify which type of element is to be added to the current ghost layer. \kw{facesPerElem} and \kw{elem2face} specify a mapping between each element and the surrounding faces.  The \kw{elem2face} table lists, for each face, the nodes of this element which form the face, specified as element-local numbers---indices into this element's connectivity entry. The \kw{elem2face} table should have nodesPerFace*facesPerElem entries, and no entry should be greater than nodePerEl for that element type.
 
@@ -516,9 +721,9 @@ has no ghosts.
 \function{
 SUBROUTINE FEM\_Add\_linear\_periodicity(nFaces,nPer,facesA,facesB,
                                 nNodes,nodeLocs)}
-  \args{integer, intent(in) :: nFaces, nPer, nNodes}
-  \args{integer, intent(in) :: facesA(nPer,nFaces), facesB(nPer,nFaces)}
-  \args{double precision, intent(in) :: nodeLocs(3,nNodes)}
+  \args{INTEGER, INTENT(IN) :: nFaces, nPer, nNodes}
+  \args{INTEGER, INTENT(IN) :: facesA(nPer,nFaces), facesB(nPer,nFaces)}
+  \args{double precision, INTENT(IN) :: nodeLocs(3,nNodes)}
 
 Make facesA and facesB match up under linear translation.
 Each face of facesA must match up with exactly one face of
@@ -534,7 +739,7 @@ directions.  This call can only be issued from \kw{init()}.
 \prototype{FEM\_Sym\_coordinates}
 \function{void FEM\_Sym\_coordinates(int elTypeOrMinusOne,double *locs);}
 \function{SUBROUTINE FEM\_Sym\_coordinates(elTypeOrZero,locs)}
-  \args{integer, intent(in) :: elTypeOrZero}
+  \args{INTEGER, INTENT(IN) :: elTypeOrZero}
   \args{double precision, intent(inout) :: locs(3,<number of items>)}
 
 This call adjusts the 3d locations listed in \kw{locs} so they respect the symmetries
@@ -562,8 +767,8 @@ a thin wrapper around this lower, more difficult to use layer.
 \prototype{FEM\_Set\_sym\_nodes}
 \function{void FEM\_Set\_sym\_nodes(const int *canon,const int *sym);}
 \function{SUBROUTINE FEM\_Set\_sym\_nodes(canon,sym)}
-  \args{integer, intent(in) :: canon(nNodes)}
-  \args{integer, intent(in) :: sym(nNodes)}
+  \args{INTEGER, INTENT(IN) :: canon(nNodes)}
+  \args{INTEGER, INTENT(IN) :: sym(nNodes)}
 
 This call describes all possible symmetries in an extremely terse format.
 It can only be called from \kw{init()}.
@@ -620,8 +825,8 @@ marking each node with its symmetries.
 \prototype{FEM\_Get\_sym}
 \function{void FEM\_Get\_sym(int elTypeOrMinusOne,int *destSym);}
 \function{void FEM\_Get\_sym(elTypeOrZero,destSym);}
-  \args{integer, intent(in) :: elTypeOrMinusOne }
-  \args{integer, intent(out) :: destSym(nItems)}
+  \args{INTEGER, INTENT(IN) :: elTypeOrMinusOne }
+  \args{INTEGER, INTENT(OUT) :: destSym(nItems)}
 
 This call extracts the list of symmetry conditions that apply to 
 an item type.  If elType is an element type, it returns the
@@ -636,23 +841,23 @@ multiple layers of symmetry ghosts, but both should be easy to add
 without changing this interface.
 
 % FIXME: document these
-% void FEM_Set_partition(int *elem2chunk)
-% int FTN_NAME(FEM_GET_COMM_PARTNERS,fem_get_comm_partners)(void)
-% int FTN_NAME(FEM_GET_COMM_PARTNER,fem_get_comm_partner)(int *partnerNo)
-% int FTN_NAME(FEM_GET_COMM_COUNT,fem_get_comm_count)(int *partnerNo)
-% void FTN_NAME(FEM_GET_COMM_NODES,fem_get_comm_nodes)(int *pNo,int *nodeNos)
-% void FTN_NAME(FEM_GET_ELEM_NUMBERS,fem_get_elem_numbers)(int *gNo)
-% void fem_get_node_numbers(int *gNo)
+% void FEM\_Set\_partition(int *elem2chunk)
+% int FTN\_NAME(FEM\_GET\_COMM\_PARTNERS,fem\_get\_comm\_partners)(void)
+% int FTN\_NAME(FEM\_GET\_COMM\_PARTNER,fem\_get\_comm\_partner)(int *partnerNo)
+% int FTN\_NAME(FEM\_GET\_COMM\_COUNT,fem\_get\_comm\_count)(int *partnerNo)
+% void FTN\_NAME(FEM\_GET\_COMM\_NODES,fem\_get\_comm\_nodes)(int *pNo,int *nodeNos)
+% void FTN\_NAME(FEM\_GET\_ELEM\_NUMBERS,fem\_get\_elem\_numbers)(int *gNo)
+% void fem\_get\_node\_numbers(int *gNo)
 
 
 
 
 
-
+%%%%%%%%%%%%%%%%%%%%%% Old Mesh %%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Older Mesh Routines}
 These routines have a simpler, but less flexible interface
-than the general routines described above.  Because they are 
+than the general routines described in Section~\ref{sec:entities}.  Because they are 
 easy to implement in terms of the new routines, they will remain
 part of the framework indefinitely.
 These routines always use the default mesh, as returned by 
@@ -662,11 +867,11 @@ These routines always use the default mesh, as returned by
 \prototype{FEM\_Get/Set\_elem}
 \function{void FEM\_Set\_elem(int elType,int  nEl,int  doublePerEl,int  nodePerEl);}
 \function{void FEM\_Get\_elem(int elType,int *nEl,int *doublePerEl,int *nodePerEl);}
-\function{subroutine FEM\_Set\_elem(elType,nEl,doublePerEl,nodePerEl)}
-  \args{integer, intent(in)  :: elType,nEl,doublePerEl,nodePerEl}
-\function{subroutine FEM\_Get\_elem(elType,nEl,doublePerEl,nodePerEl)}
-  \args{integer, intent(in)  :: elType}
-  \args{integer, intent(out) :: nEl,doublePerEl,nodePerEl}
+\function{SUBROUTINE FEM\_Set\_elem(elType,nEl,doublePerEl,nodePerEl)}
+  \args{INTEGER, INTENT(IN)  :: elType,nEl,doublePerEl,nodePerEl}
+\function{SUBROUTINE FEM\_Get\_elem(elType,nEl,doublePerEl,nodePerEl)}
+  \args{INTEGER, INTENT(IN)  :: elType}
+  \args{INTEGER, INTENT(OUT) :: nEl,doublePerEl,nodePerEl}
 
      Describe/retreive the number and type of elements.  \kw{ElType} is a
 user-defined small, unique element type tag.  \kw{nEl} is the number of elements 
@@ -683,18 +888,18 @@ to make them in linearly increasing order.  However, for a given type of element
 \prototype{FEM\_Get/Set\_elem\_conn}
 \function{void FEM\_Set\_elem\_conn(int elType,const int *conn);}
 \function{void FEM\_Get\_elem\_conn(int elType,int *conn);}
-\function{subroutine FEM\_Set\_elem\_conn\_r(elType,conn)}
-  \args{integer, intent(in)  :: elType}
-  \args{integer, intent(in),  dimension(nodePerEl,nEl) :: conn}
-\function{subroutine FEM\_Get\_elem\_conn\_r(elType,conn)}
-  \args{integer, intent(in)  :: elType}
-  \args{integer, intent(out), dimension(nodePerEl,nEl) :: conn}
-\function{subroutine FEM\_Set\_elem\_conn\_c(elType,conn)}
-  \args{integer, intent(in)  :: elType}
-  \args{integer, intent(in),  dimension(nEl,nodePerEl) :: conn}
-\function{subroutine FEM\_Get\_elem\_conn\_c(elType,conn)}
-  \args{integer, intent(in)  :: elType}
-  \args{integer, intent(out), dimension(nEl,nodePerEl) :: conn}
+\function{SUBROUTINE FEM\_Set\_elem\_conn\_r(elType,conn)}
+  \args{INTEGER, INTENT(IN)  :: elType}
+  \args{INTEGER, INTENT(IN),  dimension(nodePerEl,nEl) :: conn}
+\function{SUBROUTINE FEM\_Get\_elem\_conn\_r(elType,conn)}
+  \args{INTEGER, INTENT(IN)  :: elType}
+  \args{INTEGER, INTENT(OUT), dimension(nodePerEl,nEl) :: conn}
+\function{SUBROUTINE FEM\_Set\_elem\_conn\_c(elType,conn)}
+  \args{INTEGER, INTENT(IN)  :: elType}
+  \args{INTEGER, INTENT(IN),  dimension(nEl,nodePerEl) :: conn}
+\function{SUBROUTINE FEM\_Get\_elem\_conn\_c(elType,conn)}
+  \args{INTEGER, INTENT(IN)  :: elType}
+  \args{INTEGER, INTENT(OUT), dimension(nEl,nodePerEl) :: conn}
 
      Describe/retreive the element connectivity array for this element
      type.  The connectivity array is indexed by the element number,
@@ -714,10 +919,10 @@ to make them in linearly increasing order.  However, for a given type of element
 \prototype{FEM\_Get/Set\_node}
 \function{void FEM\_Set\_node(int  nNode,int  doublePerNode);}
 \function{void FEM\_Get\_node(int *nNode,int *doublePerNode);}
-\function{subroutine FEM\_Set\_node(nNode,doublePerNode)}
-  \args{integer, intent(in)  :: nNode,doublePerNode}
-\function{subroutine FEM\_Get\_node(nNode,doublePerNode)}
-  \args{integer, intent(out) :: nNode,doublePerNode}
+\function{SUBROUTINE FEM\_Set\_node(nNode,doublePerNode)}
+  \args{INTEGER, INTENT(IN)  :: nNode,doublePerNode}
+\function{SUBROUTINE FEM\_Get\_node(nNode,doublePerNode)}
+  \args{INTEGER, INTENT(OUT) :: nNode,doublePerNode}
 
      Describe/retreive the number of nodes and doubles of user data
      associated with each node.  There is only one type of node, so no
@@ -733,27 +938,27 @@ to make them in linearly increasing order.  However, for a given type of element
 \function{void FEM\_Get\_node\_data(double *data);}
 \function{void FEM\_Set\_elem\_data(int elType,const double *data);}
 \function{void FEM\_Get\_elem\_data(int elType,double *data);}
-\function{subroutine FEM\_Set\_node\_data\_r(data)}
-  \args{REAL*8, intent(in),  dimension(doublePerNode,nNode)  :: data}
-\function{subroutine FEM\_Get\_node\_data\_r(data)}
-  \args{REAL*8, intent(out), dimension(doublePerNode,nNode)  :: data}
-\function{subroutine FEM\_Set\_node\_data\_c(data)}
-  \args{REAL*8, intent(in),  dimension(nNode,doublePerNode)  :: data}
-\function{subroutine FEM\_Get\_node\_data\_c(data)}
-  \args{REAL*8, intent(out), dimension(nNode,doublePerNode)  :: data}
+\function{SUBROUTINE FEM\_Set\_node\_data\_r(data)}
+  \args{REAL*8, INTENT(IN),  dimension(doublePerNode,nNode)  :: data}
+\function{SUBROUTINE FEM\_Get\_node\_data\_r(data)}
+  \args{REAL*8, INTENT(OUT), dimension(doublePerNode,nNode)  :: data}
+\function{SUBROUTINE FEM\_Set\_node\_data\_c(data)}
+  \args{REAL*8, INTENT(IN),  dimension(nNode,doublePerNode)  :: data}
+\function{SUBROUTINE FEM\_Get\_node\_data\_c(data)}
+  \args{REAL*8, INTENT(OUT), dimension(nNode,doublePerNode)  :: data}
 
-\function{subroutine FEM\_Set\_elem\_data\_r(elType,data)}
-  \args{integer, intent(in)  :: elType}
-  \args{REAL*8, intent(in),  dimension(doublePerElem,nElem)  :: data}
-\function{subroutine FEM\_Get\_elem\_data\_r(elType,data)}
-  \args{integer, intent(in)  :: elType}
-  \args{REAL*8, intent(out), dimension(doublePerElem,nElem)  :: data}
-\function{subroutine FEM\_Set\_elem\_data\_c(elType,data)}
-  \args{integer, intent(in)  :: elType}
-  \args{REAL*8, intent(in),  dimension(nElem,doublePerElem)  :: data}
-\function{subroutine FEM\_Get\_elem\_data\_c(elType,data)}
-  \args{integer, intent(in)  :: elType}
-  \args{REAL*8, intent(out), dimension(nElem,doublePerElem)  :: data}
+\function{SUBROUTINE FEM\_Set\_elem\_data\_r(elType,data)}
+  \args{INTEGER, INTENT(IN)  :: elType}
+  \args{REAL*8, INTENT(IN),  dimension(doublePerElem,nElem)  :: data}
+\function{SUBROUTINE FEM\_Get\_elem\_data\_r(elType,data)}
+  \args{INTEGER, INTENT(IN)  :: elType}
+  \args{REAL*8, INTENT(OUT), dimension(doublePerElem,nElem)  :: data}
+\function{SUBROUTINE FEM\_Set\_elem\_data\_c(elType,data)}
+  \args{INTEGER, INTENT(IN)  :: elType}
+  \args{REAL*8, INTENT(IN),  dimension(nElem,doublePerElem)  :: data}
+\function{SUBROUTINE FEM\_Get\_elem\_data\_c(elType,data)}
+  \args{INTEGER, INTENT(IN)  :: elType}
+  \args{REAL*8, INTENT(OUT), dimension(nElem,doublePerElem)  :: data}
 
      Describe/retrieve the optional, uninterpreted user data associated with
 each node and element.  This user data is partitioned and reassembled along
@@ -773,7 +978,7 @@ In this older version of the framework, FEM\_Get\_node and FEM\_Get\_elem return
 return the index of the first ghost node or element, where ghosts are numbered
 after all the real elements.  This old ghost numbering scheme does not work
 well when adding new ghosts, which is why the new ghost numbering scheme
-describes in Section~\ref{sec:ghost_num} is used in the new API.
+describes in Section~\ref{sec:ghostnum} is used in the new API.
 
 
 \begin{figure}[h]
@@ -826,9 +1031,9 @@ Fortran version:
           FEM\_Set\_elem\_Conn(0,conn);
 \end{alltt}
 
-\function{subroutine FEM\_Set\_mesh(nElem,nNodes,nodePerEl,conn)}
-    \args{integer, intent(in) :: nElem, nNodes, nodePerEl}
-    \args{integer, intent(in), dimension(nElem,nodePerEl) :: conn;}
+\function{SUBROUTINE FEM\_Set\_mesh(nElem,nNodes,nodePerEl,conn)}
+    \args{INTEGER, INTENT(IN) :: nElem, nNodes, nodePerEl}
+    \args{INTEGER, INTENT(IN), dimension(nElem,nodePerEl) :: conn;}
 
      This is a convenience routine equivalent to:
 \begin{alltt}
@@ -851,10 +1056,10 @@ applies to some ``sparse'' subset of the nodes or elements.
 \function{void FEM\_Set\_sparse(int S\_id,int nRec,
          const int *nodes,int nodesPerRec,
          const void *data,int dataPerRec,int dataType);}
-\function{subroutine FEM\_Set\_sparse(S\_id,nRec,nodes,nodesPerRec,data,dataPerRec,dataType)}
-  \args{integer, intent(in) :: S\_id,nRec,nodesPerRec,dataPerRec,dataType}
-  \args{integer, intent(in) :: nodes(nodesPerRec,nRec)}
-  \args{varies,  intent(in) :: data(dataPerRec,nRec)}
+\function{SUBROUTINE FEM\_Set\_sparse(S\_id,nRec,nodes,nodesPerRec,data,dataPerRec,dataType)}
+  \args{INTEGER, INTENT(IN) :: S\_id,nRec,nodesPerRec,dataPerRec,dataType}
+  \args{INTEGER, INTENT(IN) :: nodes(nodesPerRec,nRec)}
+  \args{varies,  INTENT(IN) :: data(dataPerRec,nRec)}
 
 Register \kw{nRec} sparse data records with the framework under the number \kw{S\_id}. 
 The first call to \kw{FEM\_Set\_sparse} must give a \kw{S\_id} of zero in C (1 in fortran);
@@ -880,16 +1085,16 @@ containing 2 nodes stored in \kw{bNodes} and 3 integers stored in \kw{bDesc},
 we would make the call:
 \begin{alltt}
 /*C version*/
-  FEM_Set_sparse(0,17, bNodes,2, bDesc,3,FEM_INT);
+  FEM\_Set\_sparse(0,17, bNodes,2, bDesc,3,FEM\_INT);
 ! Fortran version
-  CALL FEM_Set_sparse(1,17, bNodes,2, bDesc,3,FEM_INT)
+  CALL FEM\_Set\_sparse(1,17, bNodes,2, bDesc,3,FEM\_INT)
 \end{alltt}
 
 \prototype{FEM\_Set\_sparse\_elem}
 \function{void FEM\_Set\_sparse\_elem(int S\_id,const int *rec2elem);}
-\function{subroutine FEM\_Set\_sparse\_elem(S\_id,rec2elem)}
-  \args{integer, intent(in) :: S\_id}
-  \args{integer, intent(in) :: rec2elem(2,nRec)}
+\function{SUBROUTINE FEM\_Set\_sparse\_elem(S\_id,rec2elem)}
+  \args{INTEGER, INTENT(IN) :: S\_id}
+  \args{INTEGER, INTENT(IN) :: rec2elem(2,nRec)}
 
 Attach the previously-set sparse records \kw{S\_id} to the given elements.
 \kw{rec2elem} consists of pairs of integers---one for each sparse data record.
@@ -902,12 +1107,12 @@ of the element type \kw{elType}, use:
 \begin{alltt}
 /*C version*/
   int rec2elem[]={elType,10, elType,11, elType,12};
-  FEM_Set_sparse_elem(S_id,rec2elem);
+  FEM\_Set\_sparse\_elem(S\_id,rec2elem);
 ! Fortran version
   integer :: rec2elem(2,3);
   rec2elem(1,:)=elType
   rec2elem(2,1)=10; rec2elem(2,2)=11; rec2elem(2,3)=12;
-  CALL FEM_Set_sparse_elem(S_id,rec2elem)
+  CALL FEM\_Set\_sparse\_elem(S\_id,rec2elem)
 \end{alltt}
 
 
@@ -915,12 +1120,12 @@ of the element type \kw{elType}, use:
 \function{int  FEM\_Get\_sparse\_length(int S\_id);}
 \function{void FEM\_Get\_sparse(int S\_id,int *nodes,void *data);}
 \function{function FEM\_Get\_sparse\_length(S\_id);}
-  \args{integer, intent(in) :: S\_id}
-  \args{integer, intent(out) :: FEM\_Get\_sparse\_Length}
-\function{subroutine FEM\_Get\_sparse(S\_id,nodes,data);}
-  \args{integer, intent(in) :: S\_id}
-  \args{integer, intent(out) :: nodes(nodesPerRec,FEM\_Get\_sparse\_Length(S\_id))}
-  \args{varies,  intent(out) :: data(dataPerRec,FEM\_Get\_sparse\_Length(S\_id))}
+  \args{INTEGER, INTENT(IN) :: S\_id}
+  \args{INTEGER, INTENT(OUT) :: FEM\_Get\_sparse\_Length}
+\function{SUBROUTINE FEM\_Get\_sparse(S\_id,nodes,data);}
+  \args{INTEGER, INTENT(IN) :: S\_id}
+  \args{INTEGER, INTENT(OUT) :: nodes(nodesPerRec,FEM\_Get\_sparse\_Length(S\_id))}
+  \args{varies,  INTENT(OUT) :: data(dataPerRec,FEM\_Get\_sparse\_Length(S\_id))}
 
 Retrieve the previously registered sparse data from the framework.
 \kw{FEM\_Get\_sparse\_length} returns the number of records of sparse
@@ -940,9 +1145,9 @@ In this old interface, there is no way to access sparse ghosts.
 
 \prototype{FEM\_Update\_mesh}
 \function{void FEM\_Update\_mesh(FEM\_Update\_mesh\_fn routine, int callMeshUpdated,int doWhat);}
-\function{subroutine FEM\_Update\_mesh(routine,callMeshUpdated,doWhat)}
-    \args{external, intent(in) :: routine}
-    \args{integer, intent(in) :: callMeshUpdated,doWhat}
+\function{SUBROUTINE FEM\_Update\_mesh(routine,callMeshUpdated,doWhat)}
+    \args{external, INTENT(IN) :: routine}
+    \args{INTEGER, INTENT(IN) :: callMeshUpdated,doWhat}
 
 Reassemble the mesh chunks from each partition into a single serial mesh,
 and call the given \kw{routine} on the assembled mesh.

@@ -303,7 +303,7 @@ or from whatever TCHARM code executes before the \kw{FEM\_Attach}.
 
 \prototype{FEM\_Print\_partition}
 \function{void FEM\_Print\_partition();}
-\function{subroutine FEM\_Print\_partition()}
+\function{SUBROUTINE FEM\_Print\_partition()}
 
      Print a debugging representation of the current chunk's mesh.
      Prints the entire connectivity array, and data associated with
@@ -311,11 +311,14 @@ or from whatever TCHARM code executes before the \kw{FEM\_Attach}.
 
 \prototype{FEM\_Print}
 \function{void FEM\_Print(const char *str);}
-\function{subroutine FEM\_Print(str)}
-\args{  character*, intent(in) :: str}
+\function{SUBROUTINE FEM\_Print(str)}
+\args{  character*, INTENT(IN) :: str}
 
-     Print the given string.  Works on all machines; unlike \kw{printf} or
-     \kw{print *}, which may not work on all parallel machines.
+     Print the given string, with "[<chunk number>]" printed 
+     before the text.  
+
+     This routine is no longer required: you can now use 
+     the usual printf, PRINT, or WRITE statements.
 
 
 \input{mesh}
@@ -346,8 +349,8 @@ reduction over node values), or one of the other routines described below.
 
 \prototype{FEM\_Update\_field}
 \function{void FEM\_Update\_field(int Fid,void *nodes);}
-\function{subroutine FEM\_Update\_field(Fid,nodes)}
-  \args{integer, intent(in)  :: Fid}
+\function{SUBROUTINE FEM\_Update\_field(Fid,nodes)}
+  \args{INTEGER, INTENT(IN)  :: Fid}
   \args{varies, intent(inout) :: nodes}
 
      Combine a field of all shared nodes with the other chunks.  Sums
@@ -366,10 +369,10 @@ reduction over node values), or one of the other routines described below.
 
 \prototype{FEM\_Read\_field}
 \function{void FEM\_Read\_field(int Fid,void *nodes,char *fName);}
-\function{subroutine FEM\_Read\_field(Fid,nodes,fName)}
-  \args{integer, intent(in)  :: Fid}
-  \args{varies, intent(out) :: nodes}
-  \args{character*, intent(in) :: fName}
+\function{SUBROUTINE FEM\_Read\_field(Fid,nodes,fName)}
+  \args{INTEGER, INTENT(IN)  :: Fid}
+  \args{varies, INTENT(OUT) :: nodes}
+  \args{character*, INTENT(IN) :: fName}
 
      Read a field out of the given serial input file.  The serial input
      file is line-oriented ASCII-- each line begins with the global
@@ -396,10 +399,10 @@ reduction over node values), or one of the other routines described below.
 
 \prototype{FEM\_Reduce\_field}
 \function{void FEM\_Reduce\_field(int Fid,const void *nodes,void *out,int op);}
-\function{subroutine FEM\_Reduce\_field(Fid,nodes,outVal,op)}
-  \args{integer, intent(in)  :: Fid,op}
-  \args{varies, intent(in) :: nodes}
-  \args{varies, intent(out) :: outVal}
+\function{SUBROUTINE FEM\_Reduce\_field(Fid,nodes,outVal,op)}
+  \args{INTEGER, INTENT(IN)  :: Fid,op}
+  \args{varies, INTENT(IN) :: nodes}
+  \args{varies, INTENT(OUT) :: outVal}
 
 Combine one record per node of this field, according to op, across all chunks.
 Shared nodes are not double-counted-- only one copy will contribute to the
@@ -425,10 +428,10 @@ value among the corresponding field of all nodes
 
 \prototype{FEM\_Reduce}
 \function{void FEM\_Reduce(int Fid,const void *inVal,void *outVal,int op);}
-\function{subroutine FEM\_Reduce(Fid,inVal,outVal,op)}
-  \args{integer, intent(in)  :: Fid,op}
-  \args{varies, intent(in) :: inVal}
-  \args{varies, intent(out) :: outVal}
+\function{SUBROUTINE FEM\_Reduce(Fid,inVal,outVal,op)}
+  \args{INTEGER, INTENT(IN)  :: Fid,op}
+  \args{varies, INTENT(IN) :: inVal}
+  \args{varies, INTENT(OUT) :: outVal}
 
      Combine one record of this field from each chunk, acoording to \kw{op}, 
  across all chunks.
@@ -463,8 +466,8 @@ It is possible to get values for a chunk's ghost nodes and elements from the nei
 
 \prototype{FEM\_Update\_ghost\_field}
 \function{void FEM\_Update\_ghost\_field(int Fid, int elTypeOrMinusOne, void *data);}
-\function{subroutine FEM\_Update\_ghost\_field(Fid,elTypeOrZero,data)}
-  \args{integer, intent(in)  :: Fid,elTypeOrZero}
+\function{SUBROUTINE FEM\_Update\_ghost\_field(Fid,elTypeOrZero,data)}
+  \args{INTEGER, INTENT(IN)  :: Fid,elTypeOrZero}
   \args{varies, intent(inout) :: data}
 
 This has the same requirements and call sequence as \kw{FEM\_Update\_field}, except it applies to ghosts. You specify which type of element to exchange using the elType parameter. Specify -1 (C version) or 0 (fortran version) to exchange node values.  
@@ -476,9 +479,9 @@ It is possible to exchange sparse lists of ghost elements between FEM chunks.
 
 \prototype{FEM\_Exchange\_ghost\_lists}
 \function{void FEM\_Exchange\_ghost\_lists(int elemType,int nIdx,const int *localIdx);}
-\function{subroutine FEM\_Exchange\_ghost\_lists(elemType,nIdx,localIdx)}
-  \args{integer, intent(in)  :: elemType,nIdx}
-  \args{integer, intent(in) :: localIdx[nIdx]}
+\function{SUBROUTINE FEM\_Exchange\_ghost\_lists(elemType,nIdx,localIdx)}
+  \args{INTEGER, INTENT(IN)  :: elemType,nIdx}
+  \args{INTEGER, INTENT(IN) :: localIdx[nIdx]}
 
 This routine sends the local element indices in localIdx to those neighboring chunks that connect to its ghost elements on the other side.  That is, if the element
 \kw{localIdx[i]} has a ghost on some chunk \kw{c}, \kw{localIdx[i]} will be sent to 
@@ -491,8 +494,8 @@ other chunks passed to their call to \kw{FEM\_Exchange\_ghost\_lists}.
 
 \prototype{FEM\_Get\_ghost\_list}
 \function{void FEM\_Get\_ghost\_list(int *retLocalIdx);}
-\function{subroutine FEM\_Get\_ghost\_list(retLocalIdx)}
-  \args{integer, intent(out) :: retLocalIdx[FEM\_Get\_ghost\_list\_length()]}
+\function{SUBROUTINE FEM\_Get\_ghost\_list(retLocalIdx)}
+  \args{INTEGER, INTENT(OUT) :: retLocalIdx[FEM\_Get\_ghost\_list\_length()]}
 
 These routines access the list of local elements sent by other chunks.  
 The returned indices will all refer to ghost elements in my chunk.
