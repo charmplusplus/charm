@@ -1,5 +1,5 @@
 CMK_CPP_C="ecc -E "
-CMK_CC="ecc -fpic "
+CMK_CC="ecc -fpic $CMK_CFLAGS "
 CMK_CC_RELIABLE="ecc "
 CMK_CC_FASTEST="ecc "
 CMK_CXX="ecpc -fpic "
