@@ -599,7 +599,7 @@ double CmiTimerWallClock()
   struct timeval tv;
   double currenttime;
 
-  getttimeofday(&tv);
+  gettimeofday(&tv);
   currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
   return currenttime - inittime_wallclock;
 }
