@@ -23,6 +23,7 @@ void nodeBeginStep(MeshData *mesh)
 
 void nodeFinishStep(MeshData *mesh, NodeSlope *sl,int tstep)
 {
+  tstep++; /* subtle: timesteps are 1-based in the .inp file, so make tstep 1-based */
   // Slowly ramp up boundary conditions:
   if (config.ts_proportion[sl->kk+1] == tstep)
   {
