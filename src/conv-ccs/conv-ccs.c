@@ -8,9 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-#ifndef  WIN32
-#include <sys/time.h>
-#endif
 #include <string.h>
 
 #include "converse.h"
@@ -21,310 +18,6 @@
 
 #if CMK_CCS_AVAILABLE
 
-/**********************************************
-Builtin CCS request handlers:
-  "ccs_getinfo"-- no data
-    Return the number of parallel nodes, and
-      the number of processors per node as an array
-      of 4-byte big-endian ints.
-
-  "ccs_killport"-- one 4-byte big-endian port number
-    Register a "client kill port".  When this program exits,
-    it will connect to this TCP port and write "die\n\0" it.
-*/
-
-static void ccs_getinfo(char *msg)
-{
-  int nNode=CmiNumNodes();
-  int len=(1+nNode)*sizeof(ChMessageInt_t);
-  ChMessageInt_t *table=(ChMessageInt_t *)malloc(len);
-  int n;
-  table[0]=ChMessageInt_new(nNode);
-  for (n=0;n<nNode;n++)
-    table[1+n]=ChMessageInt_new(CmiNodeSize(n));
-  CcsSendReply(len,(const char *)table);
-  free(table);
-  CmiFree(msg);
-}
-
-typedef struct killPortStruct{
-  int ip,port;
-  struct killPortStruct *next;
-} killPortStruct;
-/*Only 1 kill list per node-- no Cpv needed*/
-static killPortStruct *killList=NULL;
-
-static void ccs_killport(char *msg)
-{
-  killPortStruct *oldList=killList;
-  int port=ChMessageInt(*(ChMessageInt_t *)(msg+CmiMsgHeaderSizeBytes));
-  unsigned int ip,connPort;
-  CcsCallerId(&ip,&connPort);
-  killList=(killPortStruct *)malloc(sizeof(killPortStruct));
-  killList->ip=ip;
-  killList->port=port;
-  killList->next=oldList;
-  CmiFree(msg);
-}
-/*Send any registered clients kill messages before we exit*/
-static int noMoreErrors(int c,const char *m) {return -1;}
-void CcsImpl_kill(void)
-{
-  skt_set_abort(noMoreErrors);
-  while (killList!=NULL)
-  {
-    SOCKET fd=skt_connect(killList->ip,killList->port,20);
-    if (fd!=INVALID_SOCKET) {
-      skt_sendN(fd,"die\n",strlen("die\n")+1);
-      skt_close(fd);
-    }
-    killList=killList->next;
-  }
-}
-
-#if CMK_WEB_MODE
-/******************************************************
-Web performance monitoring interface:
-	Clients will register for performance data with 
-processor 0.  Every WEB_INTERVAL (few seconds), this code
-calls all registered web performance functions on all processors.  
-The resulting integers are sent back to the client.  The current
-reply format is ASCII and rather nasty. 
-
-	Like the debugger support above, there's no good reason 
-for this to be defined here.
-
-The actual call sequence is:
-CCS Client->CWebHandler->...  (processor 0)
-  ...->CWeb_Collect->... (all processors)
-...->CWeb_Reduce->CWeb_Deliver (processor 0 again)
-*/
-
-
-#define WEB_INTERVAL 2000 /*Time, in milliseconds, between performance snapshots*/
-#define MAXFNS 20 /*Largest number of performance functions to expect*/
-
-typedef struct {
-	char hdr[CmiMsgHeaderSizeBytes];
-	int fromPE;/*Source processor*/
-	int perfData[MAXFNS];/*Performance numbers*/
-} CWeb_CollectedData;
-
-/*This needs to be made into a list of registered clients*/
-static int hasApplet=0;
-static CcsDelayedReply appletReply;
-
-typedef int (*CWebFunction)(void);
-static CWebFunction CWebPerformanceFunctionArray[MAXFNS];
-static int CWebNoOfFns;
-static int CWeb_ReduceIndex;
-static int CWeb_CollectIndex;
-
-/*Deliver the reduced web performance data to the waiting client:
-*/
-static int collectedCount;
-static CWeb_CollectedData **collectedValues;
-
-static void CWeb_Deliver(void)
-{
-  int i,j;
-
-  if (hasApplet) {
-    /*Send the performance data off to the applet*/
-    char *reply=(char *)malloc(6+14*CmiNumPes()*CWebNoOfFns);
-    sprintf(reply,"perf");
-  
-    for(i=0; i<CmiNumPes(); i++){
-      for (j=0;j<CWebNoOfFns;j++)
-      {
-        char buf[20];
-        sprintf(buf," %d",collectedValues[i]->perfData[j]);
-        strcat(reply,buf);
-      }
-    }
-    CcsSendDelayedReply(appletReply,strlen(reply) + 1, reply);
-    free(reply);
-    hasApplet=0;
-  }
-  
-  /* Free saved performance data */
-  for(i = 0; i < CmiNumPes(); i++){
-    CmiFree(collectedValues[i]);
-    collectedValues[i] = 0;
-  }
-  collectedCount = 0;
-}
-
-/*On PE 0, this handler accumulates all the performace data
-*/
-static void CWeb_Reduce(void *msg){
-  CWeb_CollectedData *cur,*prev;
-  int src;
-
-  if(CmiMyPe() != 0){
-    CmiAbort("CWeb performance data sent to wrong processor...\n");
-  }
-  cur=(CWeb_CollectedData *)msg;
-  src=cur->fromPE;
-  prev = collectedValues[src]; /* Previous value, ideally 0 */
-  collectedValues[src] = cur;
-  if(prev == 0) collectedCount++;
-  else CmiFree(prev); /*<- caused by out-of-order perf. data delivery*/
-
-  if(collectedCount == CmiNumPes()){
-    CWeb_Deliver();
-  }
-}
-
-/*On each PE, this handler collects the performance data
-and sends it to PE 0.
-*/
-static void CWeb_Collect(void *dummy)
-{
-  CWeb_CollectedData *msg;
-  int i;
-
-  msg = (CWeb_CollectedData *)CmiAlloc(sizeof(CWeb_CollectedData));
-  msg->fromPE = CmiMyPe();
-  
-  /* Evaluate each performance function*/
-  for(i = 0; i < CWebNoOfFns; i++)
-    msg->perfData[i] = CWebPerformanceFunctionArray[i] ();
-
-  /* Send result off to node 0 */  
-  CmiSetHandler(msg, CWeb_ReduceIndex);
-  CmiSyncSendAndFree(0, sizeof(CWeb_CollectedData), msg);
-
-  /* Re-call this function after a delay */
-  CcdCallFnAfter(CWeb_Collect, 0, WEB_INTERVAL);
-}
-
-void CWebPerformanceRegisterFunction(CWebFunction fn)
-{
-  CWebPerformanceFunctionArray[CWebNoOfFns] = fn;
-  CWebNoOfFns++;
-}
-
-/*This is called on PE 0 by clients that wish
-to receive performance data.
-*/
-static void CWebHandler(char *ignoredMsg){
-  if(CcsIsRemoteRequest()) {
-    static int startedCollection=0;
-    
-    hasApplet=1;
-    appletReply=CcsDelayReply();
-    
-    if(startedCollection == 0){
-      int i;
-      startedCollection=1;
-      collectedCount=0;
-      collectedValues = (CWeb_CollectedData **)malloc(sizeof(void *) * CmiNumPes());
-      for(i = 0; i < CmiNumPes(); i++)
-        collectedValues[i] = 0;
-      
-      /*Start collecting data on each processor*/
-      for(i = 0; i < CmiNumPes(); i++){
-        char *msg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
-        CmiSetHandler(msg, CWeb_CollectIndex);
-        CmiSyncSendAndFree(i, CmiMsgHeaderSizeBytes,msg);
-      }
-    }
-  }
-}
-
-/** This "usage" section keeps track of percent of wall clock time
-spent actually processing messages on each processor.   
-It's a simple performance measure collected by the CWeb framework.
-
-It really aught to be integrated with the tracemode facility.
-**/
-
-CpvStaticDeclare(double, startTime);
-CpvStaticDeclare(double, beginTime);
-CpvStaticDeclare(double, usedTime);
-CpvStaticDeclare(int, PROCESSING);
-
-/* Called when processor becomes busy
-*/
-static void usageStart()
-{
-   if(CpvAccess(PROCESSING)) return;
-
-   CpvAccess(startTime)  = CmiWallTimer();
-   CpvAccess(PROCESSING) = 1;
-}
-
-/* Called when processor becomes idle
-*/
-static void usageStop()
-{
-   if(!CpvAccess(PROCESSING)) return;
-
-   CpvAccess(usedTime)   += CmiWallTimer() - CpvAccess(startTime);
-   CpvAccess(PROCESSING) = 0;
-}
-
-/* Call this when the program is started
- -> Whenever traceModuleInit would be called
- -> -> see conv-core/convcore.c
-*/
-static void initUsage()
-{
-   CpvInitialize(double, startTime);
-   CpvInitialize(double, beginTime);
-   CpvInitialize(double, usedTime);
-   CpvInitialize(int, PROCESSING);
-   CpvAccess(startTime)  = CmiWallTimer();
-   CpvAccess(beginTime)  = CmiWallTimer();
-   CpvAccess(usedTime)   = 0.;
-   CpvAccess(PROCESSING) = 1;
-   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,usageStart,0);
-   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,usageStop,0);      
-}
-
-static int getUsage(void)
-{
-   int usage = 0;
-   double time      = CmiWallTimer();
-   double totalTime = time - CpvAccess(beginTime);
-
-   if(CpvAccess(PROCESSING))
-   {
-      CpvAccess(usedTime) += time - CpvAccess(startTime);
-      CpvAccess(startTime) = time;
-   }
-   if(totalTime > 0.)
-      usage = (int)((100 * CpvAccess(usedTime))/totalTime);
-   CpvAccess(usedTime)  = 0.;
-   CpvAccess(beginTime) = time;
-
-   return usage;
-}
-
-static int getSchedQlen()
-{
-  return(CqsLength(CpvAccess(CsdSchedQueue)));
-}
-
-void CWebInit(void)
-{
-  CcsRegisterHandler("perf_monitor", CWebHandler);
-  
-  CWeb_CollectIndex=CmiRegisterHandler(CWeb_Collect);
-  CWeb_ReduceIndex=CmiRegisterHandler(CWeb_Reduce);
-  
-  initUsage();
-  CWebPerformanceRegisterFunction(getUsage);
-  CWebPerformanceRegisterFunction(getSchedQlen);
-
-}
-
-#endif /*CMK_WEB_MODE*/
-
-/* \move */
-
-
 /*****************************************************************************
  *
  * Converse Client-Server Functions
@@ -333,22 +26,15 @@ void CWebInit(void)
  
 #include "ckhashtable.h"
 
-/*This struct describes a single CCS handler*/
+/*Table maps handler name to handler fn*/
 typedef CkHashtable_c CcsHandlerTable;
-CpvStaticDeclare(CcsHandlerTable, ccsTab);/*Maps handler name to handler index*/
+CpvStaticDeclare(CcsHandlerTable, ccsTab);
 
-CpvStaticDeclare(CcsImplHeader,ccsReq);/*Identifies CCS requestor (client)*/
+CpvStaticDeclare(CcsImplHeader*,ccsReq);/*Identifies CCS requestor (client)*/
 
-void CcsUseHandler(char *name, int hdlr)
+void CcsRegisterHandler(const char *name, CmiHandler fn)
 {
-  *(int *)CkHashtablePut(CpvAccess(ccsTab),(void *)&name)=hdlr;
-}
-
-int CcsRegisterHandler(char *name, CmiHandler fn)
-{
-  int hdlr = CmiRegisterHandlerLocal(fn);
-  CcsUseHandler(name, hdlr);
-  return hdlr;
+  *(CmiHandler *)CkHashtablePut(CpvAccess(ccsTab),(void *)&name)=fn;
 }
 
 int CcsEnabled(void)
@@ -358,37 +44,35 @@ int CcsEnabled(void)
 
 int CcsIsRemoteRequest(void)
 {
-  return (ChMessageInt(CpvAccess(ccsReq).ip) != 0);
+  return CpvAccess(ccsReq)!=NULL;
 }
 
-void CcsCallerId(unsigned int *pip, unsigned int *pport)
+void CcsCallerId(skt_ip_t *pip, unsigned int *pport)
 {
-  *pip = ChMessageInt(CpvAccess(ccsReq).ip);
-  *pport = ChMessageInt(CpvAccess(ccsReq).port);
+  *pip = CpvAccess(ccsReq)->attr.ip;
+  *pport = ChMessageInt(CpvAccess(ccsReq)->attr.port);
 }
 
 CcsDelayedReply CcsDelayReply(void)
 {
-  ChMessageInt_t fd=CpvAccess(ccsReq).replyFd;
-  if (ChMessageInt(fd)==0)
-     CmiAbort("CCS: Cannot delay reply to same request twice.\n");
-  CpvAccess(ccsReq).replyFd=ChMessageInt_new(0);
-  return *(CcsDelayedReply *)&fd;
+  CcsImplHeader *ret=(CcsImplHeader *)malloc(sizeof(CcsImplHeader));
+  *ret=*CpvAccess(ccsReq);
+  CpvAccess(ccsReq)=NULL;
+  return (CcsDelayedReply)ret;
 }
 
 void CcsSendReply(int size, const void *msg)
 {
-  int fd=ChMessageInt(CpvAccess(ccsReq).replyFd);
-  if (fd==0)
-      CmiAbort("CCS: Cannot reply to same request twice.\n");
-  CcsImpl_reply(fd,size,msg);
-  CpvAccess(ccsReq).replyFd=ChMessageInt_new(0);
+  if (CpvAccess(ccsReq)==NULL)
+    CmiAbort("CcsSendReply: reply already sent!\n");
+  CcsImpl_reply(CpvAccess(ccsReq),size,msg);
+  CpvAccess(ccsReq) = NULL;
 }
 
 void CcsSendDelayedReply(CcsDelayedReply d,int size, const void *msg)
 {
-  int fd=ChMessageInt( *(ChMessageInt_t *)&d );
-  CcsImpl_reply(fd,size,msg);
+  CcsImpl_reply((CcsImplHeader *)d,size,msg);
+  free(d);
 }
 
 
@@ -409,28 +93,26 @@ static void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 /*Look up handler's converse ID*/
   char *handlerStr=hdr->handler;
   void *hdlrPtr=CkHashtableGet(CpvAccess(ccsTab),(void *)&handlerStr);
-  int hdlrID;
+  CmiHandler fn;
   if (hdlrPtr==NULL) {
     CmiPrintf("CCS: Unknown CCS handler name '%s' requested!\n",
 	      hdr->handler);
     return;
  /*   CmiAbort("CCS: Unknown CCS handler name.\n");*/
   }
-  hdlrID=*(int *)hdlrPtr;
+  fn=*(CmiHandler *)hdlrPtr;
 
-/*Pack user data into a converse message*/
+/*Pack user data into a converse message (why bother?)*/
   cmsg = (char *) CmiAlloc(CmiMsgHeaderSizeBytes+reqLen);
   memcpy(cmsg+CmiMsgHeaderSizeBytes, reqData, reqLen);
 
 /* Call the handler */
-  CmiSetHandler(cmsg, hdlrID);
-  CpvAccess(ccsReq)=*hdr;
-  CmiHandleMessage(cmsg);
+  CpvAccess(ccsReq)=hdr;
+  (fn)(cmsg);
   
 /*Check if a reply was sent*/
-  if (ChMessageInt(CpvAccess(ccsReq).replyFd)!=0)
+  if (CpvAccess(ccsReq)!=NULL)
     CcsSendReply(0,NULL);/*Send an empty reply if not*/
-  CpvAccess(ccsReq).ip = ChMessageInt_new(0);
 }
 
 /*Unpacks request message to call above routine*/
@@ -460,8 +142,15 @@ char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_le
 void CcsImpl_netRequest(CcsImplHeader *hdr,const void *reqData)
 {
   int len,repPE=ChMessageInt(hdr->pe);
-  char *msg=CcsImpl_ccs2converse(hdr,reqData,&len);
-  CmiSyncSendAndFree(repPE,len,msg);
+  if (repPE<0 && repPE>=CmiNumPes()) {
+	repPE=0;
+	hdr->pe=ChMessageInt_new(repPE);
+  }
+
+  {
+    char *msg=CcsImpl_ccs2converse(hdr,reqData,&len);
+    CmiSyncSendAndFree(repPE,len,msg);
+  }
 }
 
 
@@ -507,21 +196,20 @@ Note: on Net- versions, CcsImpl_reply is implemented in machine.c
 */
 static int rep_fw_handler_idx;
 
-void CcsImpl_reply(SOCKET repFd,int repLen,const void *repData)
+void CcsImpl_reply(CcsImplHeader *rep,int repLen,const void *repData)
 {
   const int repPE=0;
-
+  rep->len=ChMessageInt_new(repLen);
   if (CmiMyPe()==repPE) {
     /*Actually deliver reply data*/
-    CcsServer_sendReply(repFd,repLen,repData);
+    CcsServer_sendReply(rep,repLen,repData);
   } else {
     /*Forward data & socket # to the replyPE*/
     int len=CmiMsgHeaderSizeBytes+
-	       sizeof(SOCKET)+sizeof(int)+repLen;
+	       sizeof(CcsImplHeader)+repLen;
     char *msg=CmiAlloc(len);
     char *r=msg;
-    *(SOCKET *)r=repFd; r+=sizeof(SOCKET);
-    *(int *)r=repLen; r+=sizeof(int);
+    *(CcsImplHeader *)r=*rep; r+=sizeof(CcsImplHeader);
     memcpy(r,repData,repLen);
     CmiSetHandler(msg,rep_fw_handler_idx);
     CmiSyncSendAndFree(repPE,len,msg);
@@ -533,28 +221,25 @@ static void rep_fw_handler(char *msg)
 {
   int len;
   char *r=msg;
-  SOCKET fd=*(SOCKET *)r; r+=sizeof(SOCKET);
-  len=*(int *)r; r+=sizeof(int);
-  CcsImpl_reply(fd,len,r);
+  CcsImplHeader *hdr=(CcsImplHeader *)r; 
+  r+=sizeof(CcsImplHeader);
+  len=ChMessageInt(hdr->len);
+  CcsImpl_reply(hdr,len,r);
   CmiFree(msg);
 }
 
-#endif /*NODE_0_IS_CONVHOST*/
-
-#if NODE_0_IS_CONVHOST
 /*
 We have to run a CCS server socket here on
 node 0.  To keep the speed impact minimal,
-we only probe for new connections (in CommunicationInterrupt)
-occasionally.  Convcore's main scheduler loop
-will check our ccs_socket_ready flag, and call
-CHostProcess if needed.
+we only probe for new connections (with CcsServerCheck)
+occasionally.  
  */
 #include <signal.h>
 #include "ccs-server.c" /*Include implementation here in this case*/
+#include "ccs-auth.c"
 
 /*Check for ready Ccs messages:*/
-static void CcsServerCheck(void)
+void CcsServerCheck(void)
 {
   while (1==skt_select1(CcsServer_fd(),0)) {
     CcsImplHeader hdr;
@@ -571,24 +256,36 @@ static void CcsServerCheck(void)
 
 #endif /*NODE_0_IS_CONVHOST*/
 
+int _isCcsHandlerIdx(int hIdx) {
+  if (hIdx==_ccsHandlerIdx) return 1;
+#if NODE_0_IS_CONVHOST 
+  if (hIdx==rep_fw_handler_idx) return 1;
+#endif
+  return 0;
+}
+
+void CcsBuiltinsInit(char **argv);
+
 void CcsInit(char **argv)
 {
   int ccs_serverPort=0;
+  char *ccs_serverAuth=NULL;
   CpvInitialize(CkHashtable_c, ccsTab);
-  CpvAccess(ccsTab) = CkCreateHashtable_string(sizeof(int),5);
-  CpvInitialize(CcsImplHeader, ccsReq);
-  CpvAccess(ccsReq).ip = ChMessageInt_new(0);
+  CpvAccess(ccsTab) = CkCreateHashtable_string(sizeof(CmiHandler),5);
+  CpvInitialize(CcsImplHeader *, ccsReq);
+  CpvAccess(ccsReq) = NULL;
   _ccsHandlerIdx = CmiRegisterHandler(req_fw_handler);
-  CcsRegisterHandler("ccs_getinfo",ccs_getinfo);
-  CcsRegisterHandler("ccs_killport",ccs_killport);
+
+  CcsBuiltinsInit(argv);
 
 #if NODE_0_IS_CONVHOST
   rep_fw_handler_idx = CmiRegisterHandler(rep_fw_handler);
   if (CmiGetArgFlag(argv,"++server") | 
-      CmiGetArgInt(argv,"++server-port",&ccs_serverPort)) 
+      CmiGetArgInt(argv,"++server-port",&ccs_serverPort) |
+      CmiGetArgString(argv,"++server-auth",&ccs_serverAuth)) 
     if (CmiMyPe()==0)
     {/*Create and occasionally poll on a CCS server port*/
-      CcsServer_new(NULL,&ccs_serverPort);
+      CcsServer_new(NULL,&ccs_serverPort,ccs_serverAuth);
       CcdPeriodicCallKeep(CcsServerCheck,NULL);
     }
 #endif

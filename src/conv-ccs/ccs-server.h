@@ -28,27 +28,33 @@ extern "C" {
 
 #if CMK_CCS_AVAILABLE
 
+/*Security attributes for a CCS request*/
+typedef struct {
+  skt_ip_t ip;/*Source machine (or firewall)*/
+  ChMessageInt_t port;
+  ChMessageInt_t replySalt;/*Salt value for reply hash*/
+  unsigned char auth;/*1-- message authenticated; 0-- no authentication*/
+  unsigned char level;/*Security level-- 0 to 255*/
+} CcsSecAttr;
+
 /*Used within CCS implementation to identify requestor*/
 #define CCS_MAXHANDLER 32 /*Longest possible handler name*/
 typedef struct {
+  CcsSecAttr     attr; /*Source information*/
   char handler[CCS_MAXHANDLER];/*Handler name for message to follow*/
   ChMessageInt_t pe;/*Dest. processor # (global numbering)*/
-  ChMessageInt_t ip,port;/*Requestor's IP and port (for caller ID)*/
   ChMessageInt_t replyFd;/*Send reply back here*/
   ChMessageInt_t len;/*Bytes of message data to follow*/
 } CcsImplHeader;
-void CcsImplHeader_new(char *handler,
-		       int pe,int ip,int port,
-		       SOCKET replyFd,int userBytes,
-		       CcsImplHeader *imp);
+
 /********* CCS Implementation (not in ccs-server.c) ********/
 /*Deliver this request data to the appropriate PE. */
 void CcsImpl_netRequest(CcsImplHeader *hdr,const void *reqData);
 
 /*Deliver this reply data to this reply socket.
-  The data will have to be forwarded to CCS server.
+  The data will eventually be sent to the CCS server.
 */
-void CcsImpl_reply(SOCKET replFd,int repLen,const void *repData);
+void CcsImpl_reply(CcsImplHeader *hdr,int repLen,const void *repData);
 
 /*Send any registered clients kill messages before we exit*/
 void CcsImpl_kill(void);
@@ -60,7 +66,7 @@ char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_le
 /*Make a new Ccs Server socket, on the given port.
 Returns the actual port and IP address.
 */
-void CcsServer_new(int *ret_ip,int *use_port);
+void CcsServer_new(skt_ip_t *ret_ip,int *use_port,const char *securityFile);
 
 /*Get the Ccs Server socket.  This socket can
 be added to the rdfs list for calling select().
@@ -78,7 +84,7 @@ int CcsServer_recvRequest(CcsImplHeader *hdr,void **reqData);
 /*Send a Ccs reply down the given socket.
 Closes the socket afterwards.
 */
-void CcsServer_sendReply(SOCKET fd,int repBytes,const void *repData);
+void CcsServer_sendReply(CcsImplHeader *hdr,int repBytes,const void *repData);
 
 #else /*CCS not available*/
 

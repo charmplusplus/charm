@@ -42,7 +42,7 @@ CCS Reply ----------------------------------
 --------------------------------------------
 
  */
-#include "ccs.h"
+#include "ccs-client.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -50,6 +50,7 @@ CCS Reply ----------------------------------
 /*Include the socket and message interface routines
   here *whole*, which keeps client linking simple.*/
 #include "sockRoutines.c"
+#include "ccs-auth.c"
 
 #define DEBUGF(x) printf x
 
@@ -73,6 +74,7 @@ static void printSvr(CcsServer *svr)
   int i;
   DEBUGF(("hostIP: %d\n", svr->hostIP));
   DEBUGF(("hostPort: %d\n", svr->hostPort));
+  DEBUGF(("authentication: %d\n", svr->isAuth));
   DEBUGF(("replyFd: %d\n", svr->replyFd));
   DEBUGF(("numNodes: %d\n", svr->numNodes));
   DEBUGF(("numPes: %d\n", svr->numPes));
@@ -81,21 +83,83 @@ static void printSvr(CcsServer *svr)
   }
 }
 
+/* Authenticate with this CCS server.
+ */
+static const char *CcsImpl_authInit(SOCKET fd,CcsServer *svr)
+{
+  struct {
+    unsigned char type[4];
+    ChMessageInt_t s1;
+  } request;
+  int s1;
+  ChMessageInt_t s2;
+  SHA1_hash_t s2hash;
+  struct {
+    SHA1_hash_t s1hash;
+    ChMessageInt_t clientID;
+    ChMessageInt_t clientSalt;
+  } reply;
+  if (fd==-1)
+    return "ERROR> Contacting server";
+  request.type[0]=0x80; /*SHA-1 authentication*/
+  request.type[1]=0x00; /*Version 0*/
+  request.type[2]=0x01; /*Request for salt*/
+  request.type[3]=svr->level; /*Security level*/
+  s1=CCS_RAND_next(&svr->rand);
+  request.s1=ChMessageInt_new(s1);
+  if (-1==skt_sendN(fd,&request,sizeof(request))) 
+    return "ERROR> AuthInit request send";
+  if (-1==skt_recvN(fd,&s2,sizeof(s2)))  
+    return "ERROR> AuthInit challenge recv";
+  CCS_AUTH_hash(&svr->key,ChMessageInt(s2),NULL,&s2hash);
+  if (-1==skt_sendN(fd,&s2hash,sizeof(s2hash))) 
+    return "ERROR> AuthInit challenge reply send";
+  if (-1==skt_recvN(fd,&reply,sizeof(reply))) 
+    return "ERROR> AuthInit final recv (authentication failure?)";
+  if (CCS_AUTH_differ(&svr->key,s1,NULL,&reply.s1hash))
+    return "ERROR> AuthInit server key does not match";
+  
+  svr->clientID=ChMessageInt(reply.clientID);
+  svr->clientSalt=ChMessageInt(reply.clientSalt);
+  return 0;
+}
+
+
 /**
  * Converse Client-Server Module: Client Side
  */
-void CcsConnect(CcsServer *svr, char *host, int port)
+int CcsConnect(CcsServer *svr, char *host, int port,CcsSec_secretKey *key)
 {
   skt_init();
-  CcsConnectIp(svr,skt_lookup_ip(host),port);
+  return CcsConnectIp(svr,skt_lookup_ip(host),port,key);
 }
-void CcsConnectIp(CcsServer *svr, int ip, int port)
+int CcsConnectIp(CcsServer *svr, int ip, int port,CcsSec_secretKey *key)
 {
   unsigned int msg_len;char *msg_data;/*Reply message*/
   skt_init();
   svr->hostIP = ip;
   svr->hostPort = port;
   svr->replyFd=INVALID_SOCKET;
+
+  svr->clientID=svr->clientSalt=-1;
+  if (key==NULL) 
+    svr->isAuth=0;
+  else 
+  { /*Authenticate with server*/
+    SOCKET fd;
+    const char *err;
+    svr->isAuth=1;
+    svr->level=0; /*HACK: hardcoded at security level 0*/
+    svr->key=*key;
+    CCS_RAND_new(&svr->rand);
+    fd=skt_connect(svr->hostIP, svr->hostPort,120);
+    if (NULL!=(err=CcsImpl_authInit(fd,svr))) {
+      fprintf(stderr,"CCS Client error> %s\n",err);
+      skt_close(fd);
+      return -1;
+    }
+    skt_close(fd);
+  }
 
   /*Request the parallel machine's node info*/
   CcsSendRequest(svr,"ccs_getinfo",0,0,NULL);
@@ -107,6 +171,7 @@ void CcsConnectIp(CcsServer *svr, int ip, int port)
   free(msg_data);
   
   /**/ printSvr(svr);/**/
+  return 0;
 }
 
 int CcsNumNodes(CcsServer *svr)
@@ -133,23 +198,61 @@ int CcsNodeSize(CcsServer *svr,int node)
   return svr->numProcs[node];
 }
 
-void CcsSendRequest(CcsServer *svr, char *hdlrID, int pe, unsigned int size, const char *msg)
+int CcsSendRequest(CcsServer *svr, char *hdlrID, int pe, unsigned int size, const char *msg)
 {
   CcsMessageHeader hdr;/*CCS request header*/
+  hdr.len=ChMessageInt_new(size);
+  hdr.pe=ChMessageInt_new(pe);
+  strncpy(hdr.handler,hdlrID,CCS_HANDLERLEN);
 
   /*Close the old connection (if any)*/
   if (svr->replyFd!=-1) {skt_close(svr->replyFd);svr->replyFd=-1;}
 
   /*Connect to conv-host, and send the message */
   svr->replyFd=skt_connect(svr->hostIP, svr->hostPort,120);
-
-  hdr.len=ChMessageInt_new(size);
-  hdr.pe=ChMessageInt_new(pe);
-  strncpy(hdr.handler,hdlrID,CCS_HANDLERLEN);
-  skt_sendN(svr->replyFd, (char *)&hdr, sizeof(hdr));
-  skt_sendN(svr->replyFd, msg, size);
+  if (svr->replyFd==-1) return -1;
+  
+  if (svr->isAuth==1) 
+  {/*Authenticate*/
+    struct {
+      unsigned char type[4];
+      ChMessageInt_t clientID;
+      ChMessageInt_t replySalt;
+      SHA1_hash_t hash;
+      CcsMessageHeader hdr;
+    } auth;
+    auth.type[0]=0x80; /*SHA-1 authentication*/
+    auth.type[1]=0x00; /*Version 0*/
+    auth.type[2]=0x00; /*Ordinary message*/   
+    auth.type[3]=svr->level; /*Security level*/    
+    auth.clientID=ChMessageInt_new(svr->clientID);
+    svr->replySalt=CCS_RAND_next(&svr->rand);
+    auth.replySalt=ChMessageInt_new(svr->replySalt);
+    CCS_AUTH_hash(&svr->key,svr->clientSalt++,
+		  &hdr,&auth.hash);
+    auth.hdr=hdr;
+    if (-1==skt_sendN(svr->replyFd, &auth, sizeof(auth))) return -1;
+  }
+  else
+  {/*No authentication*/
+    if (-1==skt_sendN(svr->replyFd, &hdr, sizeof(hdr))) return -1;
+  }
+  if (-1==skt_sendN(svr->replyFd, msg, size)) return -1;
   /*Leave socket open for reply*/
+  return 0;
 }
+
+/*Receive and check server reply authentication*/
+int CcsImpl_recvReplyAuth(CcsServer *svr)
+{
+  SHA1_hash_t hash;
+  if (!svr->isAuth) return 0;
+  if (-1==skt_recvN(svr->replyFd,&hash,sizeof(hash))) return -1;
+  if (CCS_AUTH_differ(&svr->key,svr->replySalt,
+		  NULL,&hash)) return -1;
+  return 0;
+}
+
 
 /*Receive data back from the server. (Arbitrary length response)
 */
@@ -158,10 +261,11 @@ int CcsRecvResponseMsg(CcsServer *svr, unsigned int *size,char **newBuf, int tim
   ChMessageInt_t netLen;
   unsigned int len;  
   SOCKET fd=svr->replyFd;
-  skt_recvN(fd,(char *)&netLen,sizeof(netLen));
+  if (-1==CcsImpl_recvReplyAuth(svr)) return -1;
+  if (-1==skt_recvN(fd,(char *)&netLen,sizeof(netLen))) return -1;
   *size=len=ChMessageInt(netLen);
   *newBuf=(char *)malloc(len);
-  skt_recvN(fd,(char *)*newBuf,len);
+  if (-1==skt_recvN(fd,(char *)*newBuf,len)) return -1;
   return len;
 }
 
@@ -172,11 +276,12 @@ int CcsRecvResponse(CcsServer *svr,  unsigned int maxsize, char *recvBuffer,int 
   ChMessageInt_t netLen;
   unsigned int len;
   SOCKET fd=svr->replyFd;
-  skt_recvN(fd,(char *)&netLen,sizeof(netLen));
+  if (-1==CcsImpl_recvReplyAuth(svr)) return -1;
+  if (-1==skt_recvN(fd,(char *)&netLen,sizeof(netLen))) return -1;
   len=ChMessageInt(netLen);
   if (len>maxsize) 
     {skt_close(fd);return -1;/*Buffer too small*/}
-  skt_recvN(fd,(char *)recvBuffer,len);
+  if (-1==skt_recvN(fd,(char *)recvBuffer,len)) return -1;
   return len;
 }
 

@@ -14,6 +14,7 @@ but it can use the CcsSendReply function.
 #define CONV_CCS_H
 
 #include "converse.h"
+#include "sockRoutines.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,23 +25,21 @@ extern "C" {
 #define CMK_CCS_VERSION "2"
 
 extern int _ccsHandlerIdx;
-typedef struct {unsigned char hidden[4];} CcsDelayedReply;
+typedef struct {unsigned char val;} *CcsDelayedReply;
 
 #if CMK_CCS_AVAILABLE
-void CcsUseHandler(char *id, int hdlr);
-int CcsRegisterHandler(char *id, CmiHandler fn);
+void CcsRegisterHandler(const char *id, CmiHandler fn);
 
 void CcsInit(char **argv);
 int CcsEnabled(void);
 int CcsIsRemoteRequest(void);
-void CcsCallerId(unsigned int *pip, unsigned int *pport);
+void CcsCallerId(skt_ip_t *pip, unsigned int *pport);
 void CcsSendReply(int size, const void *reply);
 CcsDelayedReply CcsDelayReply(void);
 void CcsSendDelayedReply(CcsDelayedReply d,int size, const void *reply);
 
 #else
 #define CcsInit(argv) /*empty*/
-#define CcsUseHandler(x,y) /*empty*/ 
 #define CcsRegisterHandler(x,y) 0
 #define CcsEnabled() 0
 #define CcsIsRemoteRequest() 0
