@@ -16,6 +16,8 @@ CpvDeclare(int, CldMessageChunks);
 CpvDeclare(int, CldLoadNotify);
 extern void LoadNotifyFn(int);
 
+char* _lbtopo = "mesh2d";
+
 /* Estimator stuff.  Of any use? */
 /*
 CpvStaticDeclare(CldEstimatorTable, _estfns);
@@ -199,7 +201,9 @@ void CldSetPEBitVector(const char *newBV)
 
 /* End Bit Vector Stuff */
 
-void CldModuleGeneralInit(void)
+extern void registerLBTopos();   /* defined in LBTopology.h */
+
+void CldModuleGeneralInit(char **argv)
 {
   CldToken sentinel = (CldToken)CmiAlloc(sizeof(struct CldToken_s));
   CldProcInfo proc;
@@ -219,6 +223,8 @@ void CldModuleGeneralInit(void)
   proc->sentinel = sentinel;
   sentinel->succ = sentinel;
   sentinel->pred = sentinel;
+
+  registerLBTopos();
 }
 
 void CldMultipleSend(int pe, int numToSend)
