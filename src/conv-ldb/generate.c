@@ -88,17 +88,17 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 {int i,j,w,x,y;
 /* first add edges for a C-way spanning tree.*/
 int c1;
-c1 = C-1;
+if (C>1) c1 = C-1;
 
 for (i=0; i< V/c1; i++)
   for (j=0; j<c1; j++) {
-    w = c1*i + j +1; 
-    /*      printf("considering (%d, %d)\n", i, w); */
+      w = c1*i + j +1; 
+      /* printf("considering (%d, %d)\n", i, w);  */
       if (w < V) {
 	addEdge(EdgeList,i,w);
-	/* printf(" --- added.\n");*/
+	/* printf(" --- added.\n"); */
       }
-      /*      else printf(" not added.\n"); */
+      else /*printf(" not added.\n")*/; 
   }
 n -= (V-1);
 
@@ -106,12 +106,12 @@ n -= (V-1);
    {
      do {
        do {
-	 /* x = rand() % V; */
-	 x = CrnRand() % V;
+	 x = rand() % V;
+	 /* x = CrnRand() % V; */
        } while (connections(x) >= C);
        do {
-	 /* y = rand() % V; */
-	 y = CrnRand() % V; 
+	 y = rand() % V;
+	 /* y = CrnRand() % V; */
        } while ((y == x) || connections(y) >= C);
      } while (edgeExists(x,y));
      addEdge(EdgeList, x, y);
@@ -335,7 +335,7 @@ static void diameter(void)
   average = average / (V*V);
   printf("the diameter is: %d, average internode distance = %f\n", 
 	 dia, average);
-  /*   for (i = 0; i< 6; i++) printf("histo[%d] = %d\n", i, histogram[i]);*/
+  /*for (i = 0; i< 6; i++) printf("histo[%d] = %d\n", i, histogram[i]);*/
 }
 
 /* ------------------------------------------------- */
