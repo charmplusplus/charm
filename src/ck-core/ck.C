@@ -10,6 +10,7 @@
 
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
 
+int CMessage_CkMessage::__idx=-1;
 int CMessage_CkArgMsg::__idx=0;
 int CkIndex_Chare::__idx;
 int CkIndex_Group::__idx;
@@ -60,7 +61,7 @@ void CkDelegateMgr::ArrayBroadcast(int ep,void *m,CkArrayID a)
 	CProxy_ArrayBase ap(a);
 	ap.ckBroadcast((CkArrayMessage *)m,ep);
 }
-void CkDelegateMgr::ArraySectionSend(int ep,void *m, CkArrayID a,CkSectionID &s)
+void CkDelegateMgr::ArraySectionSend(int ep,void *m, CkArrayID a,const CkSectionID &s)
 {
 	CmiAbort("ArraySectionSend is not implemented!\n");
 /*

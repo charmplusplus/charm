@@ -22,22 +22,44 @@ public: static int __idx;
 #include "pup.h"
 #include "debug-charm.h"
 
-void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty=1);
-
-class Message { //Superclass of all Charm++ messages
+class CkMessage { //Superclass of all Charm++ messages
+	//Don't use these: use CkCopyMsg
+	CkMessage(const CkMessage &);
+	void operator=(const CkMessage &);
 public:
+	CkMessage() {}
 	void operator delete(void *ptr) { CkFreeMsg(ptr); }
 	/* This pup routine only packs the message itself, *not* the
 	message header.  Use CkPupMessage instead of calling this directly. */
 	void pup(PUP::er &p);
 };
+class CMessage_CkMessage {
+ public:
+	static int __idx;
+};
 
+//Used by parameter marshalling:
 #include "CkMarshall.decl.h"
-
 class CkMarshallMsg : public CMessage_CkMarshallMsg {
 public: 
 	char *msgBuf;
 };
+
+void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty=1);
+//For passing a Charm++ message via parameter marshalling
+class CkMarshalledMessage {
+	void *msg;
+	//Don't use these: only pass by reference
+	CkMarshalledMessage(const CkMarshalledMessage &);
+	void operator=(const CkMarshalledMessage &);
+ public:
+	CkMarshalledMessage(void) {msg=NULL;}
+	CkMarshalledMessage(CkMessage *m) {msg=m;} //Takes ownership of message
+	~CkMarshalledMessage() {if (msg) CkFreeMsg(msg);}
+	CkMessage *getMessage(void) {void *ret=msg; msg=NULL; return (CkMessage *)ret;}
+	void pup(PUP::er &p) {CkPupMessage(p,&msg,1);}
+};
+PUPmarshall(CkMarshalledMessage);
 
 /********************* Superclass of all Chares ******************/
 class Chare {
@@ -130,6 +152,7 @@ class CProxy_Chare : public CProxyBase_Delegatable {
     }
     CProxy_Chare(const CkChareID &c) : _ck_cid(c) {}
     const CkChareID &ckGetChareID(void) const {return _ck_cid;}
+    operator const CkChareID &(void) const {return ckGetChareID();}
     void ckSetChareID(const CkChareID &c) {_ck_cid=c;}
     void pup(PUP::er &p) {
     	CProxyBase_Delegatable::pup(p);
@@ -145,6 +168,7 @@ PUPmarshall(CProxy_Chare)
 	CK_DISAMBIG_DELEGATABLE(super) \
 	const CkChareID &ckGetChareID(void) const\
     	   {return super::ckGetChareID();} \
+        operator const CkChareID &(void) const {return ckGetChareID();}
 
 
 class CProxy_Group : public CProxyBase_Delegatable {
@@ -274,7 +298,7 @@ class CkDelegateMgr : public Group {
     virtual void ArrayCreate(int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a);
     virtual void ArraySend(int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a);
     virtual void ArrayBroadcast(int ep,void *m,CkArrayID a);
-    virtual void ArraySectionSend(int ep,void *m,CkArrayID a,CkSectionID &s);
+    virtual void ArraySectionSend(int ep,void *m,CkArrayID a,const CkSectionID &s);
 };
 
 
