@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.87  1998-06-15 19:50:41  jyelon
+ * Revision 2.88  1998-06-15 22:10:48  jyelon
+ * changed the way converse headers are done.
+ *
+ * Revision 2.87  1998/06/15 19:50:41  jyelon
  * Adding new typedef stuff.
  *
  * Revision 2.86  1998/06/09 17:03:11  milind
@@ -367,7 +370,14 @@ extern void         CmiDestroyLock(CmiNodeLock lock);
 
 /******** CMI: TYPE DEFINITIONS ********/
 
-#define CmiMsgHeaderSizeBytes CMK_MSG_HEADER_SIZE_BYTES
+typedef CMK_TYPEDEF_INT2      CmiInt2;
+typedef CMK_TYPEDEF_INT4      CmiInt4;
+typedef CMK_TYPEDEF_INT8      CmiInt8;
+typedef CMK_TYPEDEF_UINT2     CmiUInt2;
+typedef CMK_TYPEDEF_UINT4     CmiUInt4;
+typedef CMK_TYPEDEF_UINT8     CmiUInt8;
+typedef CMK_TYPEDEF_FLOAT4    CmiFloat4;
+typedef CMK_TYPEDEF_FLOAT8    CmiFloat8;
 
 #if CMK_COMMHANDLE_IS_A_POINTER
 typedef void  *CmiCommHandle;
@@ -377,22 +387,13 @@ typedef void  *CmiCommHandle;
 typedef int    CmiCommHandle;
 #endif
 
-
 typedef void (*CmiHandler)();
 
-/******** Basic Types ********/
+typedef struct CMK_MSG_HEADER_BASIC CmiMsgHeaderBasic;
+typedef struct CMK_MSG_HEADER_EXT   CmiMsgHeaderExt;
 
-
-typedef CMK_TYPEDEF_INT2              CmiInt2;
-typedef CMK_TYPEDEF_INT4              CmiInt4;
-typedef CMK_TYPEDEF_INT8              CmiInt8;
-typedef unsigned CMK_TYPEDEF_INT2     CmiUInt2;
-typedef unsigned CMK_TYPEDEF_INT4     CmiUInt4;
-typedef unsigned CMK_TYPEDEF_INT8     CmiUInt8;
-typedef CMK_TYPEDEF_FLOAT4            CmiFloat4;
-typedef CMK_TYPEDEF_FLOAT8            CmiFloat8;
-typedef CMK_TYPEDEF_FLOAT16           CmiFloat16;
-
+#define CmiMsgHeaderSizeBytes (sizeof(CmiMsgHeaderBasic))
+#define CmiExtHeaderSizeBytes (sizeof(CmiMsgHeaderExt))
 
 /******** CMI, CSD: MANY LOW-LEVEL OPERATIONS ********/
 
@@ -456,11 +457,14 @@ extern void CmiNumberHandler CMK_PROTO((int, CmiHandler));
 #define CmiConvertFloat8(m,p) 0
 #define CmiConvertFloat16(m,p) 0
 
-#define CmiHandlerAccess(m)\
-  (*((int*)(((char *)(m))+CMK_MSG_HEADER_BLANK_SPACE)))
+#define CmiGetHandler(m)  (((CmiMsgHeaderExt*)m)->hdl)
+#define CmiGetXHandler(m) (((CmiMsgHeaderExt*)m)->xhdl)
+#define CmiGetInfo(m)     (((CmiMsgHeaderExt*)m)->info)
 
-#define CmiGetHandler(env)  (CmiHandlerAccess(env))
-#define CmiSetHandler(env,x)  (CmiHandlerAccess(env) = (x))
+#define CmiSetHandler(m,v)  ((((CmiMsgHeaderExt*)m)->hdl)=(v))
+#define CmiSetXHandler(m,v) ((((CmiMsgHeaderExt*)m)->xhdl)=(v))
+#define CmiSetInfo(m,v)     ((((CmiMsgHeaderExt*)m)->info)=(v))
+
 #define CmiHandlerToFunction(n) (CpvAccess(CmiHandlerTable)[n])
 #define CmiGetHandlerFunction(env) (CmiHandlerToFunction(CmiGetHandler(env)))
 

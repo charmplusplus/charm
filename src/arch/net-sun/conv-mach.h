@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.43  1998-06-15 19:51:41  jyelon
+ * Revision 2.44  1998-06-15 22:11:30  jyelon
+ * changed the way converse headers are done.
+ *
+ * Revision 2.43  1998/06/15 19:51:41  jyelon
  * Adding new typedef stuff.
  *
  * Revision 2.42  1998/05/22 22:07:05  milind
@@ -128,8 +131,8 @@
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             0
 
-#define CMK_MSG_HEADER_SIZE_BYTES                         16
-#define CMK_MSG_HEADER_BLANK_SPACE                        12
+#define CMK_MSG_HEADER_BASIC  { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,d7; }
+#define CMK_MSG_HEADER_EXT    { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,xhdl,info,d9,da,db; }
 
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
@@ -179,12 +182,14 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 
-#define CMK_TYPEDEF_INT2    short
-#define CMK_TYPEDEF_INT4    int
-#define CMK_TYPEDEF_INT8    long long
-#define CMK_TYPEDEF_FLOAT4  float
-#define CMK_TYPEDEF_FLOAT8  double
-#define CMK_TYPEDEF_FLOAT16 struct { char d[16]; }
+#define CMK_TYPEDEF_INT2 unknown
+#define CMK_TYPEDEF_INT4 unknown
+#define CMK_TYPEDEF_INT8 unknown
+#define CMK_TYPEDEF_UINT2 unknown
+#define CMK_TYPEDEF_UINT4 unknown
+#define CMK_TYPEDEF_UINT8 unknown
+#define CMK_TYPEDEF_FLOAT4 unknown
+#define CMK_TYPEDEF_FLOAT8 unknown
 
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
