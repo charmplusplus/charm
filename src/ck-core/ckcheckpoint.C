@@ -242,7 +242,7 @@ void CkPupNodeGroupData(PUP::er &p)
 	  if(CkMyPe()==0){ CksvAccess(_numNodeGroups) = numNodeGroups+1; }
 	  else { CksvAccess(_numNodeGroups) = 1; }
 	}
-	DEBCHK("[%d] CkPupNodeGroupData %s: numNpapers/ampiSC2002/odeGroups = %d\n",CkMyPe(),p.typeString(),numNodeGroups);
+	DEBCHK("[%d] CkPupNodeGroupData %s: numNodeGroups = %d\n",CkMyPe(),p.typeString(),numNodeGroups);
 
 	GroupInfo *tmpInfo = new GroupInfo [numNodeGroups];
 	if (!p.isUnpacking()) {
