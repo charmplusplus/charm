@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1996-05-16 15:59:43  gursoy
+ * Revision 1.2  1996-06-28 20:30:51  gursoy
+ * *** empty log message ***
+ *
+ * Revision 1.1  1996/05/16  15:59:43  gursoy
  * Initial revision
  *
  ***************************************************************************/
@@ -34,20 +37,29 @@ static int _MC_numofneighbour;
 static long ticksPerSecond;
 static long beginTicks;
 static int  remainingMsgCount;
-
+static int  lastMsgType;
+static int  singlepktMsgLen;
+static void *singlepktMsg;
 
 static void singlepkt_msg_handler();
 static void mulpkt_header_handler();
 static void mulpkt_data_handler();
 static void mulpkt_send();
 
-#define MAX_PACKET_SIZE 16384
-#define DATA_PACKET_SIZE (MAX_PACKET_SIZE - sizeof(int))
+/* default value used by FM is 1024 bytes */
+#define MAX_PACKET_SIZE 1024
+
+#define DATA_SIZE (MAX_PACKET_SIZE - sizeof(int))
+
+#define RESET         0
+#define SINGLEPKT_MSG 1
+#define MULTIPKT_MSG  2
+
 #define machine_send(dest, size, msg)  \
-    ((size <= MAX_PACKET_SIZE) \
-     ? (FMf_send(dest, singlepkt_msg_handler, msg, size))\
-     : (mulpkt_send(dest, size, msg)) \
-    )
+    { if (size <= MAX_PACKET_SIZE) \
+        { FMs_send(dest, singlepkt_msg_handler, msg, size);\
+          FMs_complete_send();}\
+      else mulpkt_send(dest, size, msg);}\
 
 typedef void (*FM_HANDLER)(void *, int) ;
 typedef int (*FUNCTION_PTR)();   
@@ -112,9 +124,15 @@ void CmiDeliversInit()
 
 
 
-void CmiGrabBuffer()
+void CmiGrabBuffer(void **msg)
 {
   CpvAccess(CmiBufferGrabbed) = 1;
+
+  if (lastMsgType == SINGLEPKT_MSG)
+  {
+       *msg = (void *) CmiAlloc(singlepktMsgLen);
+       memcpy(*msg, singlepktMsg, singlepktMsgLen);
+  }
 }
 
 
@@ -128,7 +146,7 @@ int maxmsgs;
 
     while (1)
     {
-        n = FMf_extract_1();
+        n = FMs_extract_1();
         if (remainingMsgCount==0) break;
 
         FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
@@ -152,19 +170,13 @@ int maxmsgs;
 
 
 
-
-
-
-
-/* not implemented */ 
 int CmiAsyncMsgSent(c)
 CmiCommHandle c ;
 {
-    return 0;
+    return 1;
 }
 
 
-/* not implemented */
 void CmiReleaseCommHandle(c)
 CmiCommHandle c ;
 {
@@ -325,7 +337,10 @@ char *argv[];
     CmiSpanTreeInit();
 
     FM_set_parameter(MAX_MSG_SIZE_FINC, MAX_PACKET_SIZE) ;
-    FM_set_parameter(MSG_BUFFER_SIZE_FINC, 64) ;
+
+    /* 512 is the default value used by FM */
+    FM_set_parameter(MSG_BUFFER_SIZE_FINC, 512);
+
     FM_initialize() ;
 
     CmiTimerInit();
@@ -474,11 +489,13 @@ static void singlepkt_msg_handler(buf,len)
 int *buf;
 int len;
 {
-   void *msg = (void *) CmiAlloc(len);
-   memcpy(msg, buf, len);
-   ( (FUNCTION_PTR) CmiGetHandlerFunction(msg) ) (msg);
-   if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg); 
+   lastMsgType     = SINGLEPKT_MSG;
+   singlepktMsgLen = len;
+   singlepktMsg    = buf;
+   CpvAccess(CmiBufferGrabbed)=0;
+   ( (FUNCTION_PTR) CmiGetHandlerFunction((void *)buf) ) ((void *)buf);
    remainingMsgCount--;
+   lastMsgType = RESET;
 }
 
 
@@ -497,10 +514,11 @@ int firstWord;
            3-      number of packets that will follow this 
            4-      the first word of the first packet in the sequence
 
-           The fourth filed is necessary because packey will have the 
+           The fourth field is necessary because packey will have the 
            source pe in its first word. Therefore, The data of that word
            will be sent with previous word.
         */
+
 
 	MsgTable[sourcePe].length         = len ;
         MsgTable[sourcePe].remainingPckts = nPackets;
@@ -535,13 +553,27 @@ int len ; /* in bytes */
         if (MsgTable[sourcePe].remainingPckts == 0)  /* last packet */
         {
             /* the last data packet is received */
+            char *bufPtr = (char *)buf;
             char *msgPtr;     
             /* byte by byte copy */
-            msgPtr =  MsgTable[sourcePe].beginPtr;
-            for(i=0; i<len; i++) *(msgPtr++) = *(buf++);
+            /* starting from the last poition we were left */
+            msgPtr =  MsgTable[sourcePe].currentPtr;
+            for(i=0; i<len; i++) *(msgPtr++) = *(bufPtr++);
 
+            /* message is assembled, point to the beginning */ 
             msgPtr = MsgTable[sourcePe].beginPtr;
+
+
+
+            lastMsgType = MULTIPKT_MSG;
+
+            CpvAccess(CmiBufferGrabbed)=0;
+
+            /* call the handler (converse) */
             ((FUNCTION_PTR)CmiGetHandlerFunction(msgPtr))(msgPtr) ;
+
+            lastMsgType =  RESET;
+
             if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msgPtr);
 
             remainingMsgCount--;
@@ -560,7 +592,8 @@ int len ; /* in bytes */
            int *bufPtr = buf;
            int *msgPtr =  (int *) MsgTable[sourcePe].currentPtr;
            MsgTable[sourcePe].currentPtr += len;
-           len = len >> 3; /* divide by 8 */
+           /* copy int by int for faster copying */
+           len = len >> 3; /* divide by sizeof(int)==8 bytes*/
            for(i=0; i<len; i++) *msgPtr++ = *buf++;
         }
 }
@@ -581,24 +614,22 @@ int *msg;
      int i, numPackets,lastsize;
      char *nextPacketPtr;
 
+     /* data packets are of length (DATA_SIZE + sizeof(int) (which is equal */
+     /* to  MAX_PACKET_SIZE). The first integer is the control info and */
+     /* the rest is the real data  */
 
-     /* data packets are of length (DATA_PACKET_SIZE + 1 == MAX_PACKET_SIZE) */
-     /* the last word carries the value of the first word of the next packet */
-     /* we need this trick beacause the first word of each packet has control*/
-     /* info (which is source pe number                                      */
+     numPackets = size / DATA_SIZE;
 
-     numPackets = size / DATA_PACKET_SIZE;
-
-     lastsize = size % DATA_PACKET_SIZE;
+     lastsize = size % DATA_SIZE;
      if ( lastsize ) 
         numPackets++; /* add the last short packet */
      else
-        lastsize = DATA_PACKET_SIZE; /* there is no shoart packet at the end */
+        lastsize = DATA_SIZE; /* there is no short packet at the end */
 
 
      /* send header packet */
-     FMf_send_4(dest,mulpkt_header_handler,size,CmiMyPe(),numPackets,*msg);
-
+     FMs_send_4(dest,mulpkt_header_handler,size,CmiMyPe(),numPackets,*msg);
+     FMs_complete_send();
      /* send the data packets */
      /* numPackets-1  packets are of size  MAX_PACKET_SIZE, for sure */
 
@@ -606,11 +637,13 @@ int *msg;
      nextPacketPtr = (char *) msg; 
      for(i=0; i<numPackets-1; i++)
      {
-         FMf_send(dest, mulpkt_data_handler, nextPacketPtr, MAX_PACKET_SIZE);
-         nextPacketPtr += MAX_PACKET_SIZE;
+         FMs_send(dest, mulpkt_data_handler, nextPacketPtr, MAX_PACKET_SIZE);
+         FMs_complete_send();
+         nextPacketPtr += DATA_SIZE;
          *((int *)nextPacketPtr) = CmiMyPe();
      }
 
      /* last packet could be shorter */
-     FMf_send(dest, mulpkt_data_handler, nextPacketPtr, lastsize);
+     FMs_send(dest, mulpkt_data_handler, nextPacketPtr, lastsize);
+     FMs_complete_send();
 }
