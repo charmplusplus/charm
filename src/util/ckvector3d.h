@@ -28,6 +28,15 @@ public:
 	CkVector3dT(const real Nx,const real Ny,const real Nz) {x=Nx;y=Ny;z=Nz;}
 	//real array constructor
 	CkVector3dT(const real *arr) {x=arr[0];y=arr[1];z=arr[2];}
+
+	//Constructors from other types of CkVector:
+	CkVector3dT(const CkVector3dT<float> &src) 
+	  {x=(real)src.x; y=(real)src.y; z=(real)src.z;}
+	CkVector3dT(const CkVector3dT<double> &src) 
+	  {x=(real)src.x; y=(real)src.y; z=(real)src.z;}
+	CkVector3dT(const CkVector3dT<int> &src) 
+	  {x=(real)src.x; y=(real)src.y; z=(real)src.z;}
+
 	//Copy constructor & assignment operator by default
 	
 	//This lets you typecast a vector to a real array
@@ -92,6 +101,8 @@ public:
 };
 
 typedef CkVector3dT<double> CkVector3d;
+typedef CkVector3dT<float> CkVector3f;
+typedef CkVector3dT<int> CkVector3i;
 
 //MS Visual C++ defines max/min as a (cursed) macro
 #ifdef max
