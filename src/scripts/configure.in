@@ -1,0 +1,187 @@
+
+AC_INIT(./Makefile)
+
+AC_CONFIG_HEADER(./conv-autoconfig.h)
+
+if test ! -r ./conv-mach.sh 
+then
+        echo "Cannot find ./conv-mach.sh"
+        exit 1
+fi
+. ./conv-mach.sh
+
+AC_MSG_CHECKING(machine name)
+version=`pwd | awk -F/ '{print $(NF-1)}'`
+AC_DEFINE_UNQUOTED(CMK_MACHINE_NAME, "$version")
+AC_MSG_RESULT($version)
+
+t="test.cpp"
+
+# Test: tries to compile C++ file $t (described by $1).
+#  If successful, prints $2 and sets $pass/clears $fail
+#  If failure, prints $3 and sets $pass/clears $fail
+test_cxx() {
+        AC_MSG_CHECKING("$1")
+	$CMK_CXX -I../include -c $t -o test.o > /dev/null 2>&1
+	if test $? -eq 0
+	then
+                AC_MSG_RESULT("$2")
+		pass="1"
+		fail="0"
+	else
+                AC_MSG_RESULT("$3")
+		pass="0"
+		fail="1"
+	fi
+}
+
+test_finish() {
+	rm -f $t test.o	> /dev/null 2>&1
+	return $1
+}
+
+cat > $t <<EOT
+#include <stdio.h>
+void foo(void) {
+	printf("Hello, world!\n");
+}
+EOT
+test_cxx "whether C++ compiler works" "ok" "no"
+if test $fail -eq 1
+then
+	echo "Cannot compile C++ programs with $CMK_CXX"
+	echo " (check your charm++ version)"
+	test_finish 1
+fi
+
+
+# Perform the tests
+
+cat > $t <<EOT
+#include <stdlib.h>
+bool foo(void) { return true; }
+EOT
+test_cxx "whether C++ bool works" "ok" "no"
+AC_DEFINE_UNQUOTED(CMK_BOOL_DEFINED, $pass)
+AC_DEFINE_UNQUOTED(CMK_BOOL_UNDEFINED, $fail)
+
+cat > $t <<EOT
+int foo(float *t) {return *reinterpret_cast<int *>(t);}
+EOT
+test_cxx "whether C++ *_casts<> work" "ok" "no"
+AC_DEFINE_UNQUOTED(CMK_CPP_CAST_LEGAL, $pass)
+AC_DEFINE_UNQUOTED(CMK_CPP_CAST_ILLEGAL, $fail)
+
+
+cat > $t <<EOT
+typedef void (*func_t)(void);
+class foo {
+public:
+	template<func_t f> //Templated member function
+	void memb(void) {f();}
+};
+inline void fn(void) {}
+void myfunc(void)
+{
+  foo x;
+  x.template memb<fn>();
+}
+EOT
+test_cxx "whether templated member functions work" "ok" "no"
+AC_DEFINE_UNQUOTED(CMK_TEMPLATE_MEMBERS_BROKEN, $fail)
+
+
+cat > $t <<EOT
+#include <iostream>
+void foo(void) {}
+EOT
+test_cxx "whether including STL <foo> works" "ok" "no"
+AC_DEFINE_UNQUOTED(CMK_STL_USE_DOT_H, $fail)
+AC_DEFINE_UNQUOTED(CMK_STL_DONT_USE_DOT_H, $pass)
+
+cat > $t <<EOT
+namespace foo {
+	int x;
+};
+EOT
+test_cxx "whether namespaces work" "ok" "no"
+AC_DEFINE_UNQUOTED(CMK_NAMESPACES_BROKEN, $fail)
+
+#test fortran subroutine name
+FCC=`echo $CMK_CF90 | cut -d' ' -f1`
+
+AC_CHECK_PROG(FCL, "$FCC", "$FCC" )
+if test -n "$FCL"
+then
+  AC_MSG_CHECKING(subroutine name used by Fortran compiler)
+  AC_CACHE_VAL(fortran_postfix,
+  cat > conftest.f <<EOF
+      SUBROUTINE FOO_FOO
+      END
+EOF
+  $CMK_CF90 -c conftest.f > /dev/null 2> /dev/null
+
+  NAME=`nm conftest.o | grep "foo_foo__"`
+  if test "$NAME" != ""
+  then
+    fortran_postfix=TWOSCORE
+  else
+    NAME=`nm conftest.o | grep "foo_foo_"`
+    if test "$NAME" != ""
+    then
+      fortran_postfix=ONESCORE
+    else
+      NAME=`nm conftest.o | grep "foo_foo"`
+      if test "$NAME" != ""
+      then
+        fortran_postfix=NONSCORE
+      else
+        NAME=`nm conftest.o | grep "FOO_FOO"`
+        if test "$NAME" != ""
+        then
+          fortran_postfix=ALLCAPS
+          AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_ALLCAPS, 1)
+        else
+          echo "FORTRAM compiler generated name not supported yet"
+          exit 1
+        fi
+      fi
+    fi
+  fi
+  rm -f conftest.f conftest.o
+  )
+  AC_MSG_RESULT($fortran_postfix)
+fi
+
+
+#go get libpthread.a from charm website
+if test $version = net-linux-smp  || test $version = mpi-linux-vmi
+then
+  if test ! -f ../lib/libpthread.a
+  then
+    AC_CHECK_PROG(WGET, wget, wget )
+    AC_CHECK_PROG(LYNX, lynx, lynx )
+    
+    URL='http://charm.cs.uiuc.edu/distrib/libpthread.a'
+    printf "getting libpthread.a from $URL ..."
+    if test -n "$WGET"
+    then
+      (cd ../lib; $WGET $URL > /dev/null 2>&1)
+    elif test -n "$LYNX"
+    then
+      (cd ../lib; $LYNX -source $URL > libpthread.a)
+    fi
+    if test ! -f ../lib/libpthread.a
+    then
+      echo "failed"
+      echo "#####################################################################"
+      echo "You must install wget or lynx to get libpthread.a from charm website."
+      echo "#####################################################################"
+      exit 1
+    else
+     echo "done"
+    fi
+  fi
+fi
+
+AC_OUTPUT()
