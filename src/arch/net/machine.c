@@ -2145,6 +2145,7 @@ void PumpPersistent()
       /* return messagePtr directly and user MUST make sure not to delete it. */
       /*CmiPrintf("[%d] %p size:%d rank:%d root:%d\n", CmiMyPe(), msg, size, CMI_DEST_RANK(msg), CMI_BROADCAST_ROOT(msg));*/
 
+      CmiReference(msg);
 #endif
 
       CmiPushPE(CMI_DEST_RANK(msg), msg);
