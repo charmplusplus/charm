@@ -1,0 +1,44 @@
+#########################################################################################
+MODULES PER LANGUAGE
+#########################################################################################
+
+TRACER
+------
+LanguageID RegisterLanguage(Language)
+	- could be done at runtime or manually
+
+EventID RegisterEvent(LanguageID, EventNameString, EventDataPrototype)
+	- EventNameString is a string identifying the event 
+	- EventDataPrototype could be a string in language specific format
+	  OR variable number of arguments identifying the data structure for that event
+
+void LogEvent(LanguageID, EventID, EventData)
+	- EventData could be a string in language specific format
+	  OR variable number of arguments specifying the value of attributes of EventDataPrototype
+
+
+INTERPRETOR
+-----------
+void RegisterEventInterpretor(Language/ID, EventInterpretor)
+	- Language/ID is Language or LanguageID depending upon whether it was runtime 
+	  registered or manually registered
+	- EventInterpretor could be a function pointer [Single Per Lanuage]
+
+ANALYSER
+--------
+void RegisterTraceAnalyser(Language/ID, TraceAnalyser)
+	- Language/ID is Language or LanguageID depending upon whether it was runtime 
+	  registered or manually registered
+	- TraceAnalyser could be a function pointer [Multiple Per Lanuage]
+
+
+VIZUALIZER
+----------
+void RegisterTraceVizualizer(Language/ID, TraceVisualizer)
+	- Language/ID is Language or LanguageID depending upon whether it was runtime 
+	  registered or manually registered
+	- TraceVisualizer could be a function pointer [Multiple Per Lanuage]
+
+
+
+
