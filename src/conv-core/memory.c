@@ -16,6 +16,23 @@
 
 /*****************************************************************************
  *
+ * CMK_USE_OS_MALLOC
+ *
+ * Just use the OS's built-in malloc.  All we provide is CmiMemoryInit.
+ *
+ *****************************************************************************/
+
+#ifdef CMK_USE_OS_MALLOC
+
+void CmiMemoryInit(argv)
+  char **argv;
+{
+}
+
+#endif
+
+/*****************************************************************************
+ *
  * CMK_USE_GNU_MALLOC
  *
  * The GNU memory allocator is a good all-round memory allocator for
@@ -24,6 +41,12 @@
  *****************************************************************************/
 
 #ifdef CMK_USE_GNU_MALLOC
+
+void CmiMemoryInit(argv)
+  char **argv;
+{
+}
+
 #undef sun /* I don't care if it's a sun, dangit.  No special treatment. */
 #undef BSD /* I don't care if it's BSD.  Same thing. */
 #include "gnumalloc.c"
@@ -49,13 +72,13 @@
 
 #ifdef CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT
 
-#define malloc   Cmem_gnu_malloc
-#define free     Cmem_gnu_free
-#define calloc   Cmem_gnu_calloc
-#define cfree    Cmem_gnu_cfree
-#define realloc  Cmem_gnu_realloc
-#define memalign Cmem_gnu_memalign
-#define valloc   Cmem_gnu_valloc
+#define malloc   CmiMemory_Gnu_malloc
+#define free     CmiMemory_Gnu_free
+#define calloc   CmiMemory_Gnu_calloc
+#define cfree    CmiMemory_Gnu_cfree
+#define realloc  CmiMemory_Gnu_realloc
+#define memalign CmiMemory_Gnu_memalign
+#define valloc   CmiMemory_Gnu_valloc
 
 #undef sun /* I don't care if it's a sun, dangit.  No special treatment. */
 #undef BSD /* I don't care if it's BSD.  Same thing. */
@@ -69,12 +92,17 @@
 #undef memalign
 #undef valloc
 
+void CmiMemoryInit(argv)
+  char **argv;
+{
+}
+
 char *malloc(size)
     unsigned size;
 {
     char *result;
     CmiInterruptsBlock();
-    result = Cmem_gnu_malloc(size);
+    result = CmiMemory_Gnu_malloc(size);
     CmiInterruptsRelease();
     return result;
 }
@@ -83,7 +111,7 @@ void free(mem)
     char *mem;
 {
     CmiInterruptsBlock();
-    Cmem_gnu_free(mem);
+    CmiMemory_Gnu_free(mem);
     CmiInterruptsRelease();
 }
 
@@ -92,7 +120,7 @@ char *calloc(nelem, size)
 {
     char *result;
     CmiInterruptsBlock();
-    result = Cmem_gnu_calloc(nelem, size);
+    result = CmiMemory_Gnu_calloc(nelem, size);
     CmiInterruptsRelease();
     return result;
 }
@@ -101,7 +129,7 @@ void cfree(mem)
     char *mem;
 {
     CmiInterruptsBlock();
-    Cmem_gnu_cfree(mem);
+    CmiMemory_Gnu_cfree(mem);
     CmiInterruptsRelease();
 }
 
@@ -111,7 +139,7 @@ char *realloc(mem, size)
 {
     char *result;
     CmiInterruptsBlock();
-    result = Cmem_gnu_realloc(mem, size);
+    result = CmiMemory_Gnu_realloc(mem, size);
     CmiInterruptsRelease();
     return result;
 }
@@ -121,7 +149,7 @@ char *memalign(align, size)
 {
     char *result;
     CmiInterruptsBlock();
-    result = Cmem_gnu_memalign(align, size);
+    result = CmiMemory_Gnu_memalign(align, size);
     CmiInterruptsRelease();
     return result;
 }
@@ -131,7 +159,7 @@ char *valloc(size)
 {
     char *result;
     CmiInterruptsBlock();
-    result = Cmem_gnu_valloc(size);
+    result = CmiMemory_Gnu_valloc(size);
     CmiInterruptsRelease();
     return result;
 }

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-07-10 07:03:07  narain
+ * Revision 2.7  1995-10-13 18:14:10  jyelon
+ * K&R changes, etc.
+ *
+ * Revision 2.6  1995/07/10  07:03:07  narain
  * Made the timer field double
  *
  * Revision 2.5  1995/07/07  14:42:49  gursoy
@@ -40,14 +43,33 @@ static char ident[] = "@(#)$Header$";
 #include <stdio.h>
 
 #include "converse.h"
-#include "conv-mach.h"
-#include "conv-conds.h"
 
-/**** these variables are local to this file but are persistant *****/
+static void InsertInHeap     CMK_PROTO((double Time, CcdVoidFn fnp, void *arg));
+static void RemoveFromHeap   CMK_PROTO((int index));
+static void SwapHeapEntries  CMK_PROTO((int index1, int index2));
+
+typedef struct fn_arg {
+  CcdVoidFn fn;
+  void *arg;
+  struct fn_arg *next;
+} FN_ARG;
+
+/* We have a fixed number of these elements .. */
+typedef struct {
+  FN_ARG *fn_arg_list;
+} CONDS;
+
+typedef struct {
+    double timeVal;     /* the actual time value we sort on           */
+    CcdVoidFn fn; 
+    void *arg; 
+} HeapIndexType;
+
+#define MAXTIMERHEAPENTRIES       512
+#define MAXCONDCHKARRAYELTS       512
 
 /** Note : The heap is only stored in elements 
                   timerHeap[0] to timerHeap[numHeapEntries] */
-
 
 
 CpvStaticDeclare(HeapIndexType*, timerHeap); 
@@ -85,7 +107,10 @@ void conv_condsModuleInit()
 /*****************************************************************************
   Add a function that will be called when a particular condition is raised
  *****************************************************************************/
-void CcdCallOnCondition(int condnum, FN_PTR fnp, void *arg)
+void CcdCallOnCondition(condnum,fnp,arg)
+    int condnum;
+    CcdVoidFn fnp;
+    void *arg;
 {
   FN_ARG *newEntry;
   
@@ -106,7 +131,9 @@ void CcdCallOnCondition(int condnum, FN_PTR fnp, void *arg)
 /*****************************************************************************
   Add a function that will be called during each call to PeriodicChecks
  *****************************************************************************/
-void CcdPeriodicallyCall(FN_PTR fnp, void *arg)
+void CcdPeriodicallyCall(fnp, arg)
+    CcdVoidFn fnp;
+    void *arg;
 {
   FN_ARG *temp;
   
@@ -145,7 +172,10 @@ void CcdRaiseCondition(condNum)
 /*****************************************************************************
   Call the function with the provided argument after a minimum delay of deltaT
  *****************************************************************************/
-void CcdCallFnAfter(FN_PTR fnp, void *arg, unsigned int deltaT)
+void CcdCallFnAfter(fnp, arg, deltaT)
+    CcdVoidFn fnp;
+    void *arg;
+    unsigned int deltaT;
 {
   double tPrime, currT;
   currT  = CmiTimer();                    /* get current time */
@@ -195,7 +225,10 @@ void CcdCallBacks()
   These are internal functions
   ****************************************************************************/
 
-static void InsertInHeap(double theTime, FN_PTR fnp, void *arg)
+static void InsertInHeap(theTime, fnp, arg)
+    double theTime;
+    CcdVoidFn fnp;
+    void *arg;
 {
   int child, parent;
   
@@ -222,7 +255,8 @@ static void InsertInHeap(double theTime, FN_PTR fnp, void *arg)
     }
 } 
 
-static void RemoveFromHeap(int index)
+static void RemoveFromHeap(index)
+    int index;
 {
   int parent,child;
   
@@ -257,7 +291,8 @@ static void RemoveFromHeap(int index)
     } 
 } 
 
-static void SwapHeapEntries(int index1, int index2)
+static void SwapHeapEntries(index1, index2)
+    int index1; int index2;
 {
   HeapIndexType temp;
   

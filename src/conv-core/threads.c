@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.12  1995-10-10 06:15:23  jyelon
+ * Revision 1.13  1995-10-13 18:14:10  jyelon
+ * K&R changes, etc.
+ *
+ * Revision 1.12  1995/10/10  06:15:23  jyelon
  * Fixed a bug.
  *
  * Revision 1.11  1995/09/30  15:03:33  jyelon
@@ -251,6 +254,7 @@ CthThread t;
 #include <stdio.h>
 #include <setjmp.h>
 #include <sys/types.h>
+#include <alloca.h>
 
 #define STACKSIZE (32768)
 #define SLACK     256

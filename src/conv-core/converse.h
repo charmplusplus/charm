@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.26  1995-10-12 20:18:19  sanjeev
+ * Revision 2.27  1995-10-13 18:14:10  jyelon
+ * K&R changes, etc.
+ *
+ * Revision 2.26  1995/10/12  20:18:19  sanjeev
  * modified prototype for CmiPrintf etc.
  *
  * Revision 2.25  1995/10/12  18:14:18  jyelon
@@ -105,9 +108,8 @@ extern "C" {
 #define CMK_PROTO(x) ()
 #endif
 
-#ifdef CMK_PREPROCESSOR_USES_K_AND_R_STANDARD_CONCATENATION
-#define CMK_QUOTE(x)x
-#define CMK_CONCAT(x,y) CMK_QUOTE(x)y
+#ifdef CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
+#define CMK_CONCAT(x,y) y
 #endif
 
 #ifdef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
@@ -377,6 +379,21 @@ CpvExtern(CthVoidFn, CmiInterruptFuncSaved);
         if (f) { CpvAccess(CmiInterruptFuncSaved)=0; (f)(); }\
     }\
 }
+
+
+/******** CONVCONDS ********/
+
+typedef void (*CcdVoidFn)();
+
+#define CcdPROCESSORIDLE 1
+
+void CcdCallFnAfter CMK_PROTO((CcdVoidFn fnp, void *arg, unsigned int msecs));
+void CcdPeriodicallyCall CMK_PROTO((CcdVoidFn fnp, void *arg));
+
+void CcdRaiseCondition CMK_PROTO((int condnum));
+void CcdCallOnCondition CMK_PROTO((int condnum, CcdVoidFn fnp, void *arg));
+
+void CcdCallBacks();
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 

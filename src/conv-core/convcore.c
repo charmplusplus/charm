@@ -16,8 +16,6 @@ static char ident[] = "@(#)$Header$";
 
 #include <stdio.h>
 #include "converse.h"
-#include "conv-mach.h"
-#include "conv-conds.h"
 
 #define MAX_HANDLERS 512
 
@@ -131,26 +129,75 @@ static void CmiHandlerInit()
 
 /*****************************************************************************
  *
- * The following are some CMI functions.  Having this code here makes
- * the module boundaries for the Cmi quite blurry.
+ * The following are the CmiDeliverXXX functions.  A common implementation
+ * is provided below.  The machine layer can provide an alternate 
+ * implementation if it so desires.
+ *
+ * void CmiDeliversInit()
+ *
+ *      - CmiInit promises to call this before calling CmiDeliverMsgs
+ *        or any of the other functions in this section.
+ *
+ * int CmiDeliverMsgs(int maxmsgs)
+ *
+ *      - CmiDeliverMsgs will retrieve up to maxmsgs that were transmitted
+ *        with the Cmi, and will invoke their handlers.  It does not wait
+ *        if no message is unavailable.  Instead, it returns the quantity
+ *        (maxmsgs-delivered), where delivered is the number of messages it
+ *        delivered.
+ *
+ * void CmiDeliverSpecificMsg(int handlerno)
+ *
+ *      - Waits for a message with the specified handler to show up, then
+ *        invokes the message's handler.  Note that unlike CmiDeliverMsgs,
+ *        This function _does_ wait.
+ *
+ * void CmiGrabBuffer(void **bufptrptr)
+ *
+ *      - When CmiDeliverMsgs or CmiDeliverSpecificMsgs calls a handler,
+ *        the handler receives a pointer to a buffer containing the message.
+ *        The buffer does not belong to the handler, eg, the handler may not
+ *        free the buffer.  Instead, the buffer will be automatically reused
+ *        or freed as soon as the handler returns.  If the handler wishes to
+ *        keep a copy of the data after the handler returns, it may do so by
+ *        calling CmiGrabBuffer and passing it a pointer to a variable which
+ *        in turn contains a pointer to the system buffer.  The variable will
+ *        be updated to contain a pointer to a handler-owned buffer containing
+ *        the same data as before.  The handler then has the responsibility of
+ *        making sure the buffer eventually gets freed.  Example:
+ *
+ * void myhandler(void *msg)
+ * {
+ *    CmiGrabBuffer(&msg);      // Claim ownership of the message buffer
+ *    ... rest of handler ...
+ *    CmiFree(msg);             // I have the right to free it or
+ *                              // keep it, as I wish.
+ * }
+ *
+ *
+ * For this common implementation to work, the machine layer must provide the
+ * following:
+ *
+ * void *CmiGetNonLocal()
+ *
+ *      - returns a message just retrieved from some other PE, not from
+ *        local.  If no such message exists, returns 0.
+ *
+ * CpvExtern(FIFO_Queue, CmiLocalQueue);
+ *
+ *      - a FIFO queue containing all messages from the local processor.
  *
  *****************************************************************************/
 
 #ifdef CMK_USES_COMMON_CMIDELIVERS
 
-CpvDeclare(int, CmiBufferGrabbed);
-CpvExtern(void*,      CmiLocalQueue);
+CpvStaticDeclare(int, CmiBufferGrabbed);
+CpvExtern(void*, CmiLocalQueue);
 
-void CmiInit(argv)
-char **argv;
+void CmiDeliversInit()
 {
-  void *FIFO_Create();
-
-  CmiHandlerInit();
   CpvInitialize(int, CmiBufferGrabbed);
   CpvAccess(CmiBufferGrabbed) = 0;
-  CmiInitMc(argv);
-  CmiSpanTreeInit(argv);
 }
 
 void CmiGrabBuffer()
@@ -238,7 +285,8 @@ int handler;
  ***************************************************************************/
 
 
-CsdInit(char **argv)
+CsdInit(argv)
+  char **argv;
 {
   void *CqsCreate();
 
@@ -285,42 +333,6 @@ int maxmsgs;
  
 /*****************************************************************************
  *
- * Initialization for the memory module.  Of course, there isn't any
- * memory-module right now.
- *
- *****************************************************************************/
-
-static int CmemInit(argv)
-    char **argv;
-{
-  int sysmem;
-  /*
-   * configure the chare kernel according to command line parameters.
-   * by convention, chare kernel parameters begin with '+'.
-   */
-  while (*argv) {
-    if (strcmp(*argv, "+m") == 0) {
-      DeleteArg(argv);
-      DeleteArg(argv);
-    } else
-    if (sscanf(*argv, "+m%d", &sysmem) == 1) {
-      DeleteArg(argv);
-    } else
-    if (strcmp(*argv, "+mm") == 0) {
-      DeleteArg(argv);
-      DeleteArg(argv);
-    } else
-    if (sscanf(*argv, "+mm%d", &sysmem) == 1) {
-      DeleteArg(argv);
-      DeleteArg(argv);
-    } else
-    argv++;
-  }
-}
-
-
-/*****************************************************************************
- *
  * Fast Interrupt Blocking Device
  *
  * This is totally portable.  Go figure.  (The rest of it is just macros,
@@ -331,13 +343,22 @@ static int CmemInit(argv)
 CpvDeclare(int,       CmiInterruptsBlocked);
 CpvDeclare(CthVoidFn, CmiInterruptFuncSaved);
 
+/*****************************************************************************
+ *
+ * ConverseInit and ConverseExit
+ *
+ *****************************************************************************/
+
 ConverseInit(argv)
 char **argv;
 {
   CstatsInit(argv);
   conv_condsModuleInit(argv);
-  CmemInit(argv);
-  CmiInit(argv);
+  CmiHandlerInit();
+  CmiMemoryInit(argv);
+  CmiDeliversInit();
+  CmiSpanTreeInit(argv);
+  CmiInitMc(argv);
   CsdInit(argv);
 #ifdef CMK_CTHINIT_IS_IN_CONVERSEINIT
   CthInit(argv);
