@@ -161,14 +161,16 @@ void CldEnqueue(int pe, void *msg, int infofn)
       pe = CmiMyPe();
     else
       pe = CpvAccess(MinProc);
+    /* always pack the message because the message may be move away
+       to a different processor later by CldGetToken() */
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    if (pfn) {
+       pfn(&msg);
+       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    }
     if (pe != CmiMyPe()) {
       CpvAccess(neighbors)[CpvAccess(Mindex)].load++;
       CpvAccess(CldRelocatedMessages)++;
-      ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-      if (pfn) {
-	pfn(&msg);
-	ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-      }
       CmiSetInfo(msg,infofn);
       CldSwitchHandler(msg, CpvAccess(CldBalanceHandlerIndex));
       CmiSyncSendAndFree(pe, len, msg);
