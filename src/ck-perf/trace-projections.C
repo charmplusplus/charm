@@ -527,7 +527,8 @@ void LogEntry::pup(PUP::er &p)
   p|ret;
 }
 
-TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0), inEntry(0)
+TraceProjections::TraceProjections(char **argv): 
+curevent(0), isIdle(0), inEntry(0), computationStarted(0)
 {
   if (TRACE_CHARM_PE() == 0) return;
 
@@ -626,11 +627,13 @@ void TraceProjections::traceEnd(void)
 
 void TraceProjections::userEvent(int e)
 {
+  if (!computationStarted) return;
   _logPool->add(USER_EVENT, e, 0, TraceTimer(),curevent++,CkMyPe());
 }
 
 void TraceProjections::userBracketEvent(int e, double bt, double et)
 {
+  if (!computationStarted) return;
   // two events record Begin/End of event e.
   _logPool->add(USER_EVENT_PAIR, e, 0, TraceTimer(bt), curevent, CkMyPe());
   _logPool->add(USER_EVENT_PAIR, e, 0, TraceTimer(et), curevent++, CkMyPe());
@@ -801,6 +804,7 @@ void TraceProjections::dequeue(envelope *) {}
 
 void TraceProjections::beginComputation(void)
 {
+  computationStarted = 1;
   _logPool->add(BEGIN_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
 }
 
