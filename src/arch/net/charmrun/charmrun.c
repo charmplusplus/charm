@@ -1934,7 +1934,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   	"  loc=''\n"
   	"  for dir in `echo $PATH | sed -e 's/:/ /g'`\n"
   	"  do\n"
-  	"    test -f $dir/$1 && loc=$dir/$1\n"
+  	"    test -f \"$dir/$1\" && loc=\"$dir/$1\"\n"
   	"  done\n"
   	"  if [ \"x$loc\" = x ]\n"
   	"  then\n"
@@ -1946,7 +1946,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   
   if (arg_verbose) fprintf(f,"Echo 'remote responding...'\n");
   
-  fprintf(f,"test -f $HOME/.charmrunrc && . $HOME/.charmrunrc\n");
+  fprintf(f,"test -f \"$HOME/.charmrunrc\" && . \"$HOME/.charmrunrc\"\n");
   if (arg_display)
     fprintf(f,"DISPLAY='%s';export DISPLAY\n",arg_display);
   netstart = create_netstart(rank0no);
@@ -1986,13 +1986,13 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
     fprintf(f,"fi\n");
   }
   
-  fprintf(f,"if test ! -x %s\nthen\n",arg_nodeprog_r);
+  fprintf(f,"if test ! -x \"%s\"\nthen\n",arg_nodeprog_r);
   fprintf(f,"  Echo 'Cannot locate this node-program:'\n");
   fprintf(f,"  Echo '%s'\n",arg_nodeprog_r);
   fprintf(f,"  Exit 1\n");
   fprintf(f,"fi\n");
   
-  fprintf(f,"cd %s\n",arg_currdir_r);
+  fprintf(f,"cd \"%s\"\n",arg_currdir_r);
   fprintf(f,"if test $? = 1\nthen\n");
   fprintf(f,"  Echo 'Cannot propagate this current directory:'\n"); 
   fprintf(f,"  Echo '%s'\n",arg_currdir_r);
@@ -2070,7 +2070,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
     fprintf(f," -e /tmp/inx%08x", randno);
     fprintf(f,CLOSE_ALL "\n");
   } else {
-    fprintf(f,"%s",arg_nodeprog_r);
+    fprintf(f,"\"%s\"",arg_nodeprog_r);
     fprint_arg(f,argv);
     fprintf(f,CLOSE_ALL "\n");
   }
