@@ -1,112 +1,151 @@
 #ifndef COMMLIBSTRATEGY_H
 #define COMMLIBSTRATEGY_H
 
-//An abstract data structure that holds a charm++ message 
-//and provides utility functions to manage it.
-class CharmMessageHolder {
+#include "charm++.h"
+#include "convcomlibstrategy.h"
+
+//Class managing Charm++ messages in the communication library.
+//It is aware of envelopes, arrays, etc
+class CharmMessageHolder : public MessageHolder{
  public:
-    int dest_proc;
-    char *data;
-    CharmMessageHolder *next; // also used for the refield at the receiver
-    int isDummy;
-    
-    //For multicast, the user can pass the pelist and list of Pes he
-    //wants to send the data to.
-    int npes;
-    int *pelist;
-    
-    /*//Using Section ID instead
-    //For array multicast
-    int nIndices;
-    CkArrayIndexMax *indexlist;
-    */
-    
     CkSectionID *sec_id;
 
+    CharmMessageHolder() : MessageHolder() {sec_id = NULL;}
+    CharmMessageHolder(CkMigrateMessage *m) : MessageHolder(m) {}
+    
     CharmMessageHolder(char * msg, int dest_proc);
     ~CharmMessageHolder();
 
     char * getCharmMessage();
-};
-
-//Class that defines the entry methods that a strategy must define.
-//To write a new strategy inherit from this class and define the
-//virtual methods.  Every strategy can also define its own constructor
-//and have any number of arguments. Also call the parent class methods
-//in those methods.
-
-#include "charm++.h"
-
-class Strategy : public PUP::able{
- protected:
-    int isArray;
-    int isGroup;
-    int isStrategyBracketed;
-
-    CkArrayID aid;
-    CkGroupID gid;
-
-    CkArrayIndexMax *elements; //src array elements
-    int nIndices;              //number of source indices    
     
-    int *srcpelist, nsrcpes; //src processors for the elements
-
-    int myInstanceID;
-    CkVec<CkArrayIndexMax> localSrcIndices;
-
- public:
-    Strategy();
-    Strategy(CkMigrateMessage *) {};
-
-    void setSourceArray(CkArrayID aid, CkArrayIndexMax *e=0, int nind=0);
-    void setSourceGroup(CkGroupID gid, int *srcpelist=0, int nsrcpes=0) ;    
-    void setBracketed(){isStrategyBracketed = 1;}
-
-    int isSourceArray(){return isArray;}
-    int isSourceGroup(){return isGroup;}
-    int isBracketed(){return isStrategyBracketed;}
-
-    void getSourceArray(CkArrayID &aid, CkArrayIndexMax *&e, int &nind);
-    void getSourceGroup(CkGroupID &gid, int *&pelist, int &npes);
-
-    //Called for each message
-    virtual void insertMessage(CharmMessageHolder *msg) {};
-
-    //Called after all chares and groups have finished depositing their 
-    //messages on that processor.
-    virtual void doneInserting() {};
-
-    //Each strategy must define his own Pup interface.
     virtual void pup(PUP::er &p);
-
-    virtual void beginProcessing(int nelements){};
-
-    virtual void setInstance(int instid){myInstanceID = instid;}
-    virtual int getInstance(){return myInstanceID;}
-    
-    //virtual void insertLocalIndex(CkArrayIndexMax idx)
-    // {localSrcIndices.insertAtEnd(idx);}    
-    //virtual void removeLocalIndex(CkArrayIndexMax);
-
-    PUPable_decl(Strategy);
+    PUPable_decl(CharmMessageHolder);
 };
 
-class StrategyWrapper  {
+//Info classes that help bracketed streategies manage objects
+//Each info class points to a list of source (or destination) objects
+//ArrayInfo also access the array listener interface
+
+class ComlibNodeGroupInfo {
+ protected:
+    CkNodeGroupID ngid;
+    int isNodeGroup;
+
  public:
-    Strategy **s_table;
-    int nstrats;
+    ComlibNodeGroupInfo();
+
+    void setSourceNodeGroup(CkNodeGroupID gid) {
+        ngid = gid;
+        isNodeGroup = 1;
+    }
+
+    int isSourceNodeGroup(){return isNodeGroup;}
+    CkNodeGroupID getSourceNodeGroup();
 
     void pup(PUP::er &p);
 };
-PUPmarshall(StrategyWrapper);
 
-struct StrategyTable {
-    Strategy *strategy;
-    CkQ<CharmMessageHolder*> tmplist;
-    int numElements;
-    int elementCount;
-    int nEndItr;
-    int call_doneInserting;
+class ComlibGroupInfo {
+ protected:
+    CkGroupID gid;
+    int *srcpelist, nsrcpes; //src processors for the elements
+    int isGroup;   
+
+ public:
+    ComlibGroupInfo();
+
+    void setSourceGroup(CkGroupID gid, int *srcpelist=0, int nsrcpes=0);
+    int isSourceGroup(){return isGroup;}
+    void getSourceGroup(CkGroupID &gid, int *&pelist, int &npes);
+    
+    void pup(PUP::er &p);
+};
+
+class ComlibMulticastMsg;
+
+/* Array strategy helper class.
+   Stores the source and destination arrays.
+   Computes most recent processor maps of source and destinaton arrays.
+   
+   Array section helper functions, make use of sections easier for the
+   communication library.
+*/
+
+class ComlibArrayInfo {
+ protected:
+    CkArrayID src_aid;
+    CkArrayIndexMax *src_elements; //src array elements
+    int nSrcIndices;              //number of source indices   
+    int isSrcArray;
+
+    CkArrayID dest_aid;
+    CkArrayIndexMax *dest_elements; //dest array elements
+    int nDestIndices;              //number of destintation indices   
+    int isDestArray;
+
+    CkVec<CkArrayIndexMax> localDestIndexVec;
+    
+ public:
+    ComlibArrayInfo();
+
+    void setSourceArray(CkArrayID aid, CkArrayIndexMax *e=0, int nind=0);
+    int isSourceArray(){return isSrcArray;}
+    void getSourceArray(CkArrayID &aid, CkArrayIndexMax *&e, int &nind);
+    
+    void setDestinationArray(CkArrayID aid, CkArrayIndexMax *e=0, int nind=0);
+    int isDestinationArray(){return isDestArray;}
+    void getDestinationArray(CkArrayID &aid, CkArrayIndexMax *&e, int &nind);
+
+    void localMulticast(envelope *env);
+    void localMulticast(CkVec<CkArrayIndexMax> *idx_vec,envelope *env);
+
+    void getSourcePeList(int *&pelist, int &npes);
+    void getDestinationPeList(int *&pelist, int &npes);
+    void getCombinedPeList(int *&pelist, int &npes);
+    
+    void initSectionID(CkSectionID *sid);
+    ComlibMulticastMsg * getNewMulticastMessage(CharmMessageHolder *cmsg);
+
+    void pup(PUP::er &p);
+};
+
+
+/* All Charm++ communication library strategies should inherit from
+   this strategy. They should specify their object domain by setting
+   Strategy::type. They have three helpers predefined for them for
+   node groups, groups and arrays */
+
+class CharmStrategy : public Strategy {
+
+ public:
+    ComlibGroupInfo ginfo;
+    ComlibNodeGroupInfo nginfo;
+    ComlibArrayInfo ainfo;    
+
+    CharmStrategy() : Strategy() {setType(GROUP_STRATEGY);}
+    CharmStrategy(CkMigrateMessage *m) : Strategy(m){}
+
+    //Called for each message
+    //Function inserts a Charm++ message
+    virtual void insertMessage(CharmMessageHolder *msg) {
+        CkAbort("Bummer Should Not come here:CharmStrategy is abstract\n");
+    }
+
+    //Removed the virtual!
+    //Charm strategies should not use Message Holder
+    void insertMessage(MessageHolder *msg);
+    
+    //Called after all chares and groups have finished depositing their 
+    //messages on that processor.
+    virtual void doneInserting() {}
+
+    //Added a new call that is called after the strategy had be
+    //created on every processor.
+    //DOES NOT exist in Converse Strategies
+    virtual void beginProcessing(int nelements){}
+
+    virtual void pup(PUP::er &p);
+    PUPable_decl(CharmStrategy);
 };
 
 #endif

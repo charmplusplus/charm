@@ -18,24 +18,26 @@ ComlibArrayListener::ComlibArrayListener (CkMigrateMessage *m)
 void ComlibArrayListener::pup(PUP::er &p) {}
 
 void ComlibArrayListener::ckElementCreating(ArrayElement *elt){
-    addElement(elt);
+    addElement(elt, CmiFalse);
     //CkPrintf("[%d] Element Created\n", CkMyPe());
 }
 
 void ComlibArrayListener::ckElementDied(ArrayElement *elt){
-    deleteElement(elt);
+    deleteElement(elt, CmiFalse);
 }
 
 void ComlibArrayListener::ckElementLeaving(ArrayElement *elt){
-    deleteElement(elt);
+    deleteElement(elt, CmiTrue);
 }
 
 CmiBool ComlibArrayListener::ckElementArriving(ArrayElement *elt){
-    addElement(elt);
+    addElement(elt, CmiTrue);
     return CmiTrue;
 }
 
-void ComlibArrayListener::addElement(ArrayElement *elt){
+
+void ComlibArrayListener::addElement(ArrayElement *elt, 
+                                     CmiBool migration_flag){
     if(nElements == 0)
         thisArrayID = elt->ckGetArrayID();
 
@@ -43,38 +45,47 @@ void ComlibArrayListener::addElement(ArrayElement *elt){
     //elt->thisIndexMax.print();
     nElements ++;
 
-    for(int count = 0; count < strategyList.length(); count++){
-        Strategy *strategy = strategyList[count]->strategy;
-        if(isRegistered(elt, strategy)) {
-            strategyList[count]->numElements ++;
-            //strategyList[count]->strategy->insertLocalIndex(elt->thisIndexMax);
-        }
-    }   
+    if(!migration_flag) {
+        for(int count = 0; count < strategyList.length(); count++){
+            CharmStrategy *strategy = (CharmStrategy *)
+                strategyList[count]->strategy;
+            if(isRegistered(elt, strategy)) {
+                strategyList[count]->numElements ++;
+            }
+        }   
+    }
 }
 
-void ComlibArrayListener::deleteElement(ArrayElement *elt){
+void ComlibArrayListener::deleteElement(ArrayElement *elt, 
+                                        CmiBool migration_flag){
     ht->remove(elt->thisIndexMax);
     nElements --;
     
-    for(int count = 0; count < strategyList.length(); count++){
-        Strategy *strategy = strategyList[count]->strategy;
-        if(isRegistered(elt, strategy)) {
-            strategyList[count]->numElements --;
-            //strategyList[count]->strategy->removeLocalIndex(elt->thisIndexMax);
-        }
-    }   
+    if(!migration_flag) {
+        for(int count = 0; count < strategyList.length(); count++){
+            CharmStrategy *strategy = (CharmStrategy *)
+                strategyList[count]->strategy;
+            if(isRegistered(elt, strategy)) {
+                strategyList[count]->numElements --;
+            }
+        }   
+    }
 }
 
-int ComlibArrayListener::isRegistered(ArrayElement *elt, Strategy *strat){
+int ComlibArrayListener::isRegistered(ArrayElement *elt, 
+                                      CharmStrategy *strat){
     CkArrayIndexMax idx = elt->thisIndexMax;
 
     CkArrayID st_aid;
     int st_nelements;
     CkArrayIndexMax *st_elem;
-    strat->getSourceArray(st_aid, st_elem, st_nelements);
+    strat->ainfo.getSourceArray(st_aid, st_elem, st_nelements);
 
-    if(st_nelements <= 0)
-        return 1;
+    if(st_nelements < 0)
+        CkAbort("Not an Array Strategy\n");
+    
+    if(st_nelements == 0)
+        return 1;   
 
     for(int count = 0; count < st_nelements; count ++)
         if(st_elem[count].compare(idx))
@@ -84,17 +95,17 @@ int ComlibArrayListener::isRegistered(ArrayElement *elt, Strategy *strat){
 }
  
 //Assumes strategy is already present in the strategy table   
-void ComlibArrayListener::registerStrategy(StrategyTable *stable_entry){    
+void ComlibArrayListener::registerStrategy(StrategyTableEntry *stable_entry) {
     strategyList.insertAtEnd(stable_entry);
 
-    Strategy *strat = stable_entry->strategy;
+    CharmStrategy *strat = (CharmStrategy *) stable_entry->strategy;
 
     CkArrayID st_aid;
     int st_nelements;
     CkArrayIndexMax *st_elem;
-    strat->getSourceArray(st_aid, st_elem, st_nelements);
+    strat->ainfo.getSourceArray(st_aid, st_elem, st_nelements);
 
-    if(st_nelements <= 0) {//All elements of array in strategy
+    if(st_nelements == 0) {//All elements of array in strategy
         stable_entry->numElements += nElements;
         /*
         CkHashtableIterator *ht_iterator = ht->iterator();
@@ -106,13 +117,15 @@ void ComlibArrayListener::registerStrategy(StrategyTable *stable_entry){
         }
         */
     }
-    else { //Only some elements belong to strategy
+    else if (st_nelements > 0){ //Only some elements belong to strategy
         for(int count = 0; count < st_nelements; count ++)
             if(ht->get(st_elem[count]) != NULL) {
                 stable_entry->numElements ++;
-                //stable_entry->strategy->insertLocalIndex(st_elem[count]);
             }
     }
+    else 
+        CkAbort("NOT an Array Strategy\n");
+
 }
 
 void ComlibArrayListener::getLocalIndices(CkVec<CkArrayIndexMax> &vec){

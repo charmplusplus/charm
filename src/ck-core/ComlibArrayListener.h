@@ -7,12 +7,12 @@
 class ComlibArrayListener : public CkArrayListener{
     int nElements;
     CkArrayID thisArrayID;
-    CkVec <StrategyTable *> strategyList;
+    CkVec <StrategyTableEntry *> strategyList;
     CkHashtableT<CkArrayIndexMax, CkArrayIndexMax*> *ht;
     
-    int isRegistered(ArrayElement *elt, Strategy *strat);
-    void addElement(ArrayElement *elt);
-    void deleteElement(ArrayElement *elt);
+    int isRegistered(ArrayElement *elt, CharmStrategy *astrat);
+    void addElement(ArrayElement *elt, CmiBool mogration_flag);
+    void deleteElement(ArrayElement *elt, CmiBool migration_flag);
     
  public:
     ComlibArrayListener();
@@ -24,7 +24,7 @@ class ComlibArrayListener : public CkArrayListener{
     void ckElementLeaving(ArrayElement *elt);
     CmiBool ckElementArriving(ArrayElement *elt);
     
-    void registerStrategy(StrategyTable *);
+    void registerStrategy(StrategyTableEntry *);
 
     void getLocalIndices(CkVec<CkArrayIndexMax> &vec);
 

@@ -17,7 +17,6 @@ module CkArray {
   PUPable CkArrayBroadcaster;
   PUPable CkArrayReducer;
   PUPable ComlibArrayListener;
-  PUPable Strategy;
 
   initnode void _ckArrayInit(void);
 
