@@ -1,11 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include "charm++.h"
 #include "tcharmc.h"
 #include "fem.h"
 
-#define TEST_ARGS 0 /* Test out command-line arguments */
 #define TEST_SPARSE 1 /* Test out sparse data */
 #define TEST_GHOST 1 /* Test out ghost layers */
 #define TEST_SERIAL 0 /* Test out bizarre FEM_Serial_split */
@@ -35,25 +33,25 @@ pupMyGlobals(pup_er p,void *ignored)
 	pup_doubles(p,sparseSum,2);
 }
 
-void printargs(void) {
-  CkPrintf("Args for pe %d: ",CkMyPe());
-  for (int i=0;i<CkGetArgc();i++) {
-    CkPrintf("'%s' ",CkGetArgv()[i]);
-  }
-  CkPrintf("\n");
-}
-
 void tryPrint(int fem_mesh) {
   int nNodes=FEM_Mesh_get_length(fem_mesh,FEM_NODE);
   if (nNodes<50) 
     FEM_Mesh_print(fem_mesh);
 }
+void bad(const char *why) {
+  fprintf(stderr,"FATAL ERROR: %s\n",why);
+  exit(1);
+}
+
+/* Needed for linking in fem_alone mode: 
+extern "C" void NONMANGLED_init(void) {init();}
+extern "C" void NONMANGLED_driver(void) {driver();}
+*/
 
 extern "C" void
 init(void)
 {
-  CkPrintf("init called for %d chunks\n",FEM_Num_partitions());
-  if (TEST_ARGS) printargs();
+  printf("init called for %d chunks\n",FEM_Num_partitions());
   tsteps=10;
   reduceValues=new double[tsteps];
   int *conn=new int[dim*dim*np];
@@ -223,12 +221,12 @@ typedef struct _element {
 
 void testEqual(double is,double shouldBe,const char *what) {
 	if (fabs(is-shouldBe)<0.000001) {
-		//CkPrintf("[chunk %d] %s test passed.\n",FEM_My_partition(),what);
+		//printf("[chunk %d] %s test passed.\n",FEM_My_partition(),what);
 	} 
 	else {/*test failed*/
-		CkPrintf("[chunk %d] %s test FAILED-- expected %f, got %f (pe %d)\n",
-                        FEM_My_partition(),what,shouldBe,is,CkMyPe());
-		CkAbort("FEM Test failed\n");
+		printf("[chunk %d] %s test FAILED-- expected %f, got %f\n",
+                        FEM_My_partition(),what,shouldBe,is);
+		exit(1);
 	}
 }
 
@@ -236,13 +234,13 @@ void testAssert(int shouldBe,const char *what,int myPartition=-1)
 {
 	if (myPartition==-1) myPartition=FEM_My_partition();
 	if (shouldBe) {
-		// CkPrintf("[chunk %d] %s test passed.\n",myPartition,what);
+		// printf("[chunk %d] %s test passed.\n",myPartition,what);
 	}
 	else /*test failed-- should not be*/
 	{
-		CkPrintf("[chunk %d] %s test FAILED! (pe %d)\n",
-			myPartition,what,CkMyPe());
-		CkAbort("FEM Test failed\n");
+		printf("[chunk %d] %s test FAILED!\n",
+			myPartition,what);
+		exit(1);
 	}
 }
 
@@ -306,7 +304,7 @@ driver(void)
   { //Grab and check the sparse data:
     for (int sparseNo=0;sparseNo<2;sparseNo++) {
       int nSparse=FEM_Get_sparse_length(sparseNo);
-      //CkPrintf("FEM Chunk %d has %d sparse entries (pass %d)\n",myId,nSparse,sparseNo);
+      //printf("FEM Chunk %d has %d sparse entries (pass %d)\n",myId,nSparse,sparseNo);
       int *nodes=new int[2*nSparse];
       double *data=new double[3*nSparse];
       FEM_Get_sparse(sparseNo,nodes,data);
@@ -341,7 +339,7 @@ driver(void)
   ngnodes=nnodes; ngelems=nelems;
   nnodes=FEM_Get_node_ghost();
   nelems=FEM_Get_elem_ghost(0);
-  CkPrintf("Chunk %d: %d (%dg) nodes; %d (%dg) elems\n",
+  printf("Chunk %d: %d (%dg) nodes; %d (%dg) elems\n",
   	myId, nnodes,ngnodes, nelems,ngelems);
   
   if (TEST_GHOST) {//Update ghost field test
@@ -356,7 +354,7 @@ driver(void)
       for (int g=0;g<gCount;g++) {
         int src=IDXL_Get_source(elComm,g);
 	if (src==myId || src<0) 
-		CkAbort("Bad chunk number returned by IDXL_Get_source");
+		bad("Bad chunk number returned by IDXL_Get_source");
       }
       
       IDXL_t sumComm=IDXL_Create();
@@ -427,7 +425,7 @@ driver(void)
       double thresh=2.0;
       for (i=0;i<nelems;i++)
     	      if (elGnum[i]%2) {
-    		      //CkPrintf("[%d] List: Local %d, global %d)\n",myId,i,elGnum[i]);
+    		      //printf("[%d] List: Local %d, global %d)\n",myId,i,elGnum[i]);
     		      elList[elListLen++]=i;
     	      }
       
@@ -435,7 +433,7 @@ driver(void)
       FEM_Exchange_ghost_lists(0,elListLen,elList);
       elListLen=FEM_Get_ghost_list_length();
       FEM_Get_ghost_list(elList);
-      //CkPrintf("[%d] My ghost list has %d entries\n",myId,elListLen);
+      //printf("[%d] My ghost list has %d entries\n",myId,elListLen);
       //Make sure everything on the list are actually ghosts and
       // actually have large values
       for (i=0;i<elListLen;i++) {
@@ -447,9 +445,9 @@ driver(void)
     }
 
 #if ENABLE_MIG /*Only works with -memory isomalloc*/
-    CkPrintf("Before migrate: Thread %d on pe %d\n",myId,CkMyPe());
+    printf("Before migrate: Thread %d on pe %d\n",myId,CkMyPe());
     FEM_Migrate();
-    CkPrintf("After migrate: Thread %d on pe %d\n",myId,CkMyPe());
+    printf("After migrate: Thread %d on pe %d\n",myId,CkMyPe());
 #endif
 
   }
@@ -498,13 +496,13 @@ extern "C" void
 mesh_updated(int param)
 {
   int nnodes,nelems,i,nodePer,dataPer;
-  // CkPrintf("mesh_updated(%d) called.\n",param);
+  // printf("mesh_updated(%d) called.\n",param);
   testEqual(param,123,"mesh_updated param");
 
   tryPrint(FEM_Mesh_default_read());
   
   FEM_Get_node(&nnodes,&dataPer);
-  // CkPrintf("Getting %d nodes (%d data per)\n",nnodes,dataPer);
+  // printf("Getting %d nodes (%d data per)\n",nnodes,dataPer);
   double *ndata=new double[nnodes*dataPer];
   FEM_Get_node_data(ndata);
   for (i=0;i<nnodes;i++) {
@@ -513,17 +511,11 @@ mesh_updated(int param)
   delete[] ndata;
   
   FEM_Get_elem(0,&nelems,&dataPer,&nodePer);
-  // CkPrintf("Getting %d elems (%d data per)\n",nelems,dataPer);
+  // printf("Getting %d elems (%d data per)\n",nelems,dataPer);
   double *ldata=new double[nelems*dataPer];
   FEM_Get_elem_data(0,ldata);
   for (i=0;i<nelems;i++) {
     testEqual(ldata[i],0.1*i,"mesh_updated elem values");
   }
   delete[] ldata;
-}
-
-extern "C" void
-finalize(int ignored)
-{
-  CkPrintf("finalize called\n");
 }
