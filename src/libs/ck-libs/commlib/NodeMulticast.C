@@ -29,14 +29,15 @@ void NodeMulticast::setDestinationArray(CkArrayID a, int nelem,
     mode = ARRAY_MODE;
     messageBuf = NULL;
     pes_per_node = 4;
-    //if(getenv("RMS_NODES") != NULL)
-    //pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
+    if(getenv("RMS_NODES") != NULL)
+        pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
 
     mAid = a;
     nelements = nelem;
     entryPoint = ep;
   
     numNodes = CkNumPes()/pes_per_node;
+    numCurDestPes = CkNumPes();
     myRank = 0;
     nodeMap = new int[numNodes];
   
@@ -68,6 +69,8 @@ void NodeMulticast::setPeList(int npes, int *pelist, ComlibMulticastHandler hand
     this->handler = (long)handler;
   
     numNodes = CkNumPes()/pes_per_node;
+    numCurDestPes = npes;
+    
     myRank = 0;
     nodeMap = new int[numNodes];
   
@@ -116,23 +119,31 @@ void NodeMulticast::recvHandler(void *msg) {
       CkUnpackMessage(&env);
       for(int count = 0; count < pes_per_node; count++) 
 	if(validRank[count]){
-	  void *newcharmmsg = CkCopyMsg(&charm_msg); 
-	  envelope* newenv = UsrToEnv(newcharmmsg);
+            void *newcharmmsg;
+            envelope* newenv;
 	  
-	  CmiSetHandler(newenv, NodeMulticastCallbackHandlerId);
-	  
-	  ComlibPrintf("[%d] In receive Handler (proc mode), sending message to %d at handler %d\n", 
-		       CkMyPe(), (CkMyPe()/pes_per_node) * pes_per_node + count, 
-		       NodeMulticastCallbackHandlerId);
-	  
-	  CkPackMessage(&newenv);
-	  CmiSyncSendAndFree((CkMyPe()/pes_per_node) *pes_per_node + count, 
-			     newenv->getTotalsize(), (char *)newenv);
+            if(count <  pes_per_node - 1) {
+                newcharmmsg = CkCopyMsg(&charm_msg); 
+                newenv = UsrToEnv(newcharmmsg);
+            }
+            else {
+                newcharmmsg = charm_msg;
+                newenv = UsrToEnv(newcharmmsg);
+            }
+
+            CmiSetHandler(newenv, NodeMulticastCallbackHandlerId);
+            ComlibPrintf("[%d] In receive Handler (proc mode), sending message to %d at handler %d\n", 
+                         CkMyPe(), (CkMyPe()/pes_per_node) * pes_per_node 
+                         + count, NodeMulticastCallbackHandlerId);
+            
+            CkPackMessage(&newenv);
+            CmiSyncSendAndFree((CkMyPe()/pes_per_node) *pes_per_node + count, 
+                               newenv->getTotalsize(), (char *)newenv);
 	}
-      
     }
-    ComlibPrintf("[%d] CmiFree (Code) (%x)\n", CkMyPe(), (long) msg - 2*sizeof(int));
-    CmiFree(msg);
+    ComlibPrintf("[%d] CmiFree (Code) (%x)\n", CkMyPe(), 
+                 (long) msg - 2*sizeof(int));
+    //CmiFree(msg);
 }
 
 void NodeMulticast::insertMessage(CharmMessageHolder *cmsg){
@@ -181,6 +192,7 @@ void NodeMulticast::doneInserting(){
         */
     }
     else if (messageBuf->length() == 1){
+        int count = 0;
         ComlibPrintf("Sending Node Multicast\n");
         cmsg = messageBuf->deq();
         msg = cmsg->getCharmMessage();
@@ -193,31 +205,46 @@ void NodeMulticast::doneInserting(){
         CmiSetHandler(env, NodeMulticastHandlerId);
         ComlibPrintf("After set handler\n");
         
-        for(int count = 0; count < numNodes; count++) {
-	    int dest_node = count ^ (CkMyPe()/pes_per_node);
+        if((mode != ARRAY_MODE) && cmsg->npes < numCurDestPes) {
+            numCurDestPes = cmsg->npes;
+            for(count = 0; count < cmsg->npes; count++) 
+                nodeMap[(cmsg->pelist[count])/pes_per_node] = 1;        
+        }
+        
+        for(count = 0; count < numNodes; count++) {
+	    int dest_node = count;
 	    //int dest_node = count ^ (CkMyPe()/pes_per_node);
 	    if(nodeMap[dest_node]) {
-		void *newcharmmsg = CkCopyMsg((void **)&msg); 
-		envelope *newenv = UsrToEnv(newcharmmsg);
+                void *newcharmmsg;
+                envelope* newenv;
+                
+                if(count < numNodes - 1) {
+                    newcharmmsg = CkCopyMsg((void **)&msg); 
+                    newenv = UsrToEnv(newcharmmsg);
+                }
+                else {
+                    newcharmmsg = msg;
+                    newenv = UsrToEnv(newcharmmsg);
+                }
 		
 		ComlibPrintf("[%d]In cmisyncsend to %d\n", CkMyPe(), 
 			     dest_node * pes_per_node + myRank);
 #if CMK_PERSISTENT_COMM
 		if(env->getTotalsize() < MAX_BUF_SIZE)
-		  CmiUsePersistentHandle(&persistentHandlerArray[dest_node],1);
+                    CmiUsePersistentHandle(&persistentHandlerArray[dest_node],1);
 #endif
 		CkPackMessage(&newenv);
 		CmiSyncSendAndFree(dest_node * pes_per_node + myRank, 
 				   newenv->getTotalsize(), (char *)newenv);
 #if CMK_PERSISTENT_COMM
 		if(env->getTotalsize() < MAX_BUF_SIZE)
-		  CmiUsePersistentHandle(NULL, 0);
+                    CmiUsePersistentHandle(NULL, 0);
 #endif          
 	  }
 	}
 
         ComlibPrintf("[%d] CmiFree (Code) (%x)\n", CkMyPe(), (char *)env - 2*sizeof(int));
-        CmiFree(env);
+        //CmiFree(env);
         delete cmsg;
     }
 }
@@ -275,9 +302,9 @@ void NodeMulticast::pup(PUP::er &p){
 #if CMK_PERSISTENT_COMM
 	persistentHandlerArray = new PersistentHandle[numNodes];
 	for(int count = 0; count < numNodes; count ++)
-	  //if(nodeMap[count])
-	  persistentHandlerArray[count] = CmiCreatePersistent(count * pes_per_node 
-							      + myRank, MAX_BUF_SIZE);
+            //if(nodeMap[count])
+            persistentHandlerArray[count] = CmiCreatePersistent
+                (count * pes_per_node + myRank, MAX_BUF_SIZE);
 #endif
     }
 }

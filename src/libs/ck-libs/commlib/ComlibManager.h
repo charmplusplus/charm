@@ -142,6 +142,8 @@ class ComlibManager: public CkDelegateMgr{
     void ArraySend(int ep, void *msg, const CkArrayIndexMax &idx, CkArrayID a);
     void GroupSend(int ep, void *msg, int onpe, CkGroupID gid);
     void multicast(void *charm_msg); //charm_message here.
+    void multicast(void *charm_msg, int npes, int *pelist); 
+    //charm_message for multicast for a section of that group
 
     void beginIteration();
     void beginIteration(int id); //Notify begining of an iteration 

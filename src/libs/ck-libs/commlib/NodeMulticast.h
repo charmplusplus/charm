@@ -12,7 +12,7 @@
 
 class NodeMulticast : public Strategy {
     CkQ <CharmMessageHolder*> *messageBuf;
-    int pes_per_node, *nodeMap, numNodes, myRank;
+    int pes_per_node, *nodeMap, numNodes, myRank, numCurDestPes;
     int mode; //Array destinations or processor destinations
 
     CkArrayID mAid;

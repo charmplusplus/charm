@@ -397,6 +397,38 @@ void ComlibManager::multicast(void *msg) {
     CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg, 0); 
     //Provide a dummy dest proc as it does not matter for mulitcast 
     //get rid of the new.
+    cmsg->npes = CkNumPes();
+    cmsg->pelist = NULL;
+
+    if (receivedTable)
+	strategyTable[curStratID].strategy->insertMessage(cmsg);
+    else {
+        flushTable = 1;
+	cmsg->next = NULL;
+	ComlibPrintf("Enqueuing message in tmplist\n");
+        strategyTable[curStratID].tmplist.enq(cmsg);
+    }
+
+    ComlibPrintf("After multicast\n");
+}
+
+void ComlibManager::multicast(void *msg, int npes, int *pelist) {
+    register envelope * env = UsrToEnv(msg);
+    
+    ComlibPrintf("[%d]: In multicast\n", CkMyPe());
+
+    env->setUsed(0);    
+    CkPackMessage(&env);
+    CmiSetHandler(env, CpvAccess(RecvmsgHandle));
+    
+    totalMsgCount ++;
+    totalBytes += env->getTotalsize();
+
+    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg, 0);
+    cmsg->npes = npes;
+    cmsg->pelist = pelist;
+    //Provide a dummy dest proc as it does not matter for mulitcast 
+    //get rid of the new.
     
     if (receivedTable)
 	strategyTable[curStratID].strategy->insertMessage(cmsg);
@@ -409,6 +441,7 @@ void ComlibManager::multicast(void *msg) {
 
     ComlibPrintf("After multicast\n");
 }
+
 
 #include "qd.h"
 //CpvExtern(QdState*, _qd);

@@ -10,7 +10,7 @@ STRATEGY_OBJS = EachToManyStrategy.o MPIStrategy.o StreamingStrategy.o \
 CONVERSE_COM_OBJS = $(COMMLIBDIR)/commlib.o $(COMMLIBDIR)/gridrouter.o \
 	$(COMMLIBDIR)/de.o $(COMMLIBDIR)/treerouter.o $(COMMLIBDIR)/petable.o \
 	$(COMMLIBDIR)/overlapper.o $(COMMLIBDIR)/rsend.o $(COMMLIBDIR)/bcast.o \
-	$(COMMLIBDIR)/3dgridrouter.o
+	$(COMMLIBDIR)/3dgridrouter.o  $(COMMLIBDIR)/graphrouter.o  $(COMMLIBDIR)/hypercubetopology.o
 
 OBJS = ComlibManager.o $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 
