@@ -574,7 +574,8 @@ Chare::genDefs(XStr& str)
   str << "/* DEFS: "; print(str); str << " */\n";
   if (fortranMode) { // For Fortran90
     if (!isArray()) { // Currently, only arrays are supported
-      cerr << baseName() << ": only chare arrays are currently supported\n";
+      cerr << (char*) baseName()  
+	   << ": only chare arrays are currently supported\n";
       exit(1);
     }
     // We have to generate the chare array itself
