@@ -171,9 +171,9 @@ CK_CORE_N=libckn-core-notrace.o libckn-core-summary.o
 
 CK_CORE_D=libckd-core-proj.o libckd-core-replay.o libckd-core-record.o
 
-CK_LIBS_N=$(CK_LDB_N) $(CK_CPLUS_N) $(CK_CORE_N) libckn-defmain.o
+CK_LIBS_N=$(CK_LDB_N) $(CK_CPLUS_N) $(CK_CORE_N) libckn-defmain.o libckn-unimain.o
 
-CK_LIBS_D=$(CK_LDB_D) $(CK_CPLUS_D) $(CK_CORE_D) libckd-defmain.o
+CK_LIBS_D=$(CK_LDB_D) $(CK_CPLUS_D) $(CK_CORE_D) libckd-defmain.o libckd-unimain.o
 
 LIBCKN_CORE=common.n.o globals.n.o init.n.o register.n.o boc.n.o condsend.n.o qd.n.o vid.n.o rdonly.n.o stat.n.o wrtone.n.o acc.n.o mono.n.o tbl.n.o memstuff.n.o
 
@@ -266,8 +266,14 @@ libckd-cplus-n.o: dummy.cplus.c
 libckn-defmain.o: default-main.c
 	$(CHARMC) -cp ../lib/ -o $@ default-main.c
 
+libckn-unimain.o: uni_user_main.c
+	$(CHARMC) -cp ../lib/ -o $@ uni_user_main.c
+
 libckd-defmain.o: default-main.c
 	$(CHARMC) -cp ../lib/ -o $@ default-main.c -DDEBUGGING_MODE
+
+libckd-unimain.o: uni_user_main.c
+	$(CHARMC) -cp ../lib/ -o $@ uni_user_main.c -DDEBUGGING_MODE
 
 common.n.o common.d.o: common.c $(CKHEADERS)
 	$(CHARMC) -o common.n.o common.c
