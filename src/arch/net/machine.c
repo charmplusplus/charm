@@ -1581,7 +1581,8 @@ CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
 #if CMK_IMMEDIATE_MSG
     /* execute the immediate message right away */
   if (node == CmiMyNode() && CmiIsImmediate(data)) {
-    CmiHandleImmediateMessage(data);
+    CmiPushImmediateMsg(data);
+    if (!_immRunning) CmiHandleImmediate();
     return;
   }
 #endif
@@ -1622,18 +1623,20 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   }
   
   if (pe == cs->pe) {
-#if CMK_IMMEDIATE_MSG
-      /* execute the immediate message right away */
-    if (CmiIsImmediate(data)) {
-      CmiHandleImmediateMessage(data);
-      return 0;
-    }
-#endif
 #if ! CMK_SMP
     if (!_immRunning) /* CdsFifo_Enqueue, below, isn't SIGIO or thread safe.  
                       The SMP comm thread never gets here, because of the pe test. */
 #endif
     {
+#if CMK_IMMEDIATE_MSG
+      /* execute the immediate message right away */
+      /* but to avoid infinite recursive call, don't do this if _immRunning */
+    if (CmiIsImmediate(data)) {
+      CmiPushImmediateMsg(data);
+      CmiHandleImmediate();
+      return 0;
+    }
+#endif
     CdsFifo_Enqueue(cs->localqueue, data);
     if (freemode == 'A') {
       MallocOutgoingMsg(ogm);
