@@ -151,7 +151,7 @@ void GridRouter::EachToAllMulticast(comID id, int size, void *msg, int more)
 
 void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, int *destpes, int more)
 {
-  int i;
+  int i=0;
   static int step = 0;
   PeMesh->InsertMsgs(numpes, destpes, size, msg);
   
@@ -166,15 +166,22 @@ void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, 
   int MYCOL = MyPe%COLLEN;
   int myrep=MYROW*COLLEN;
   
-  for (int colcount= MYCOL; colcount < ROWLEN + MYCOL; colcount++) {
+  for (int colcount= MYCOL; colcount < ROWLEN + MYCOL; ++colcount) {
       i = colcount % ROWLEN;
       int nextpe= myrep + i;
-
+      
       if (nextpe >= NumPes) {
           //Previously hole assigned to elements in the same row as nextpe
           // Now they are spread across the grid in the same column as nextpe
-          nextpe = COLLEN * (MYCOL % MYROW) + i;
-      }
+          int new_row = MYCOL % (MYROW+1);
+          
+          if(new_row >= MYROW)
+              new_row = 0;
+
+          ComlibPrintf("%d: %d %d %d\n\n", nextpe, new_row, i);
+          nextpe = COLLEN * new_row + i;
+          ComlibPrintf("%d: %d %d %d\n\n", nextpe, new_row, i);
+      }            
 
       int length = (NumPes - 1)/COLLEN + 1;
       if((length - 1)* COLLEN + i >= NumPes)
@@ -189,6 +196,7 @@ void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, 
           continue;
       }
     
+      ComlibPrintf("%d: before gmap sending to %d of column %d\n", MyPe, nextpe, i);
       gmap(nextpe);
       ComlibPrintf("%d:sending to %d of column %d\n", MyPe, nextpe, i);
 
