@@ -529,8 +529,8 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
   CkPrintf("TMRC2D: multipleCoarsen DONE.\n");
 }
 
-// check this for kosherness....
-void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_, int idxOffset)
+void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_, 
+		    int idxOffset)
 {
   int i, j;
   CkPrintf("TMRC2D: newMesh on chunk %d...\n", cid);
@@ -580,14 +580,12 @@ void chunk::deriveEdges(int *conn, int *gid)
   edgeRef newEdge;
 
   deriveNodes(); // now numNodes and theNodes have values
-  
   CkPrintf("TMRC2D: Deriving edges...\n");
   for (i=0; i<numElements; i++) {
     elemRef myRef(cid,i);
     for (j=0; j<3; j++) {
       n1localIdx = j;
       n2localIdx = (j+1) % 3;
-
       // look for edge
       if (theElements[i].edges[j] == nullRef) { // the edge doesn't exist yet
 	// get nbr ref
@@ -596,7 +594,6 @@ void chunk::deriveEdges(int *conn, int *gid)
 				      theElements[i].nodes[n2localIdx], 
 				      conn, numGhosts, gid, i, &nbrRef); 
 	if (edgeLocal(myRef, nbrRef)) { // make edge here
-	  CkPrintf("TMRC2D: Edge local...\n");
 	  newEdge = addEdge();
 	  CkPrintf("TMRC2D: New edge (%d,%d) added between nodes %d and %d\n",
 		   newEdge.cid, newEdge.idx, theElements[i].nodes[n1localIdx], 
@@ -607,18 +604,12 @@ void chunk::deriveEdges(int *conn, int *gid)
 	  // point elem i's edge j at the edge
 	  theElements[i].set(j, newEdge);
 	  // point nbrRef at the edge
-	  if (nbrRef.cid==cid) { // Local neighbor
-	    CkPrintf("TMRC2D: On chunk %d, element %d adding edgeRef for (%d,%d) to local neighbor %d...\n", cid, i, cid, newEdge.idx, nbrRef.idx);
+	  if (nbrRef.cid==cid) // Local neighbor
 	    theElements[nbrRef.idx].set(edgeIdx, newEdge);
-	  }
 	  else if (nbrRef.cid != -1) // Remote neighbor
 	    mesh[nbrRef.cid].addRemoteEdge(nbrRef.idx, edgeIdx, newEdge);
 	}
-	else {
-	  // else edge will be made on a different chunk
-	  CkPrintf("TMRC2D: Edge non-local: myRef=(%d,%d) nbrRef=(%d,%d)...\n",
-		   myRef.cid, myRef.idx, nbrRef.cid, nbrRef.idx);
-	}
+	// else edge will be made on a different chunk
       }
     }
   }
@@ -646,10 +637,6 @@ void chunk::deriveNodes()
 
 int chunk::edgeLocal(elemRef e1, elemRef e2)
 {
-  CkPrintf("TMRC2D: e1=(%d,%d) e2=(%d,%d) reporting local=%d\n", e1.cid, 
-	   e1.idx, e2.cid, e2.idx, 
-	   ((e1.cid==-1 || e2.cid==-1) || (e1.cid > e2.cid) ||
-	    ((e1.cid == e2.cid) && (e1.idx < e2.idx))));
   return ((e1.cid==-1 || e2.cid==-1) || (e1.cid > e2.cid) ||
 	  ((e1.cid == e2.cid) && (e1.idx < e2.idx)));
 }
@@ -670,19 +657,12 @@ int chunk::getNbrRefOnEdge(int n1, int n2, int *conn, int nGhost, int *gid,
 int chunk::hasEdge(int n1, int n2, int *conn, int idx) 
 {
   int i, j;
-  
   for (i=0; i<3; i++)
     for (j=i+1; j<3; j++) 
       if (((conn[idx*3+i] == n1) && (conn[idx*3+j] == n2)) ||
 	  ((conn[idx*3+j] == n1) && (conn[idx*3+i] == n2)))
 	return i+j-1;
   return -1;
-	
-}
-
-void chunk::freshen()
-{
-  for (int i=0; i<numElements; i++) theElements[i].resetTargetArea(-1.0);
 }
 
 void chunk::deriveBorderNodes()

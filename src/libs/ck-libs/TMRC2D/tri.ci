@@ -40,7 +40,6 @@ module refine {
     entry void reportPos(int, double, double);
     entry [sync, threaded] void print();
     entry [sync, threaded] void out_print();
-    entry void freshen();
     entry void deriveBorderNodes();
     entry void tweakMesh();
     entry void improveChunk();

@@ -126,7 +126,6 @@ class chunk : public TCharmClient1D {
   void sanityCheck(void);
  
   // entry methods
-  void freshen();
   void deriveBorderNodes();
   void tweakMesh();
   void improveChunk();
