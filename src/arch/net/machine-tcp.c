@@ -18,6 +18,7 @@
 #include <sys/socket.h>
 
 #define NO_NAGLE_ALG		1
+#define FRAGMENTATION		0
 
 void ReceiveDatagram(SOCKET fd);
 int TransmitDatagram(int pe);
@@ -110,6 +111,7 @@ static void CmiCheckSocks()
       }
       if (fds[n].revents & POLLOUT) {
         MACHSTATE1(2,"go to TransmitDatagram %d", pe)
+	dataskt_ready_write = 1;
 	TransmitDatagram(pe);
       }
       n++;
@@ -156,6 +158,7 @@ static void CmiCheckSocks()
 	ReceiveDatagram(nodes[i].sock);
       }
       if (FD_ISSET(nodes[i].sock, &wfds)) {
+	dataskt_ready_write = 1;
 	TransmitDatagram(i);
       }
     }
@@ -236,30 +239,23 @@ static void CommunicationServer(int sleepTime)
   sleepTime=0;
 #endif
   CmiCommLock();
-/*  CommunicationsClock(); */
   /*Don't sleep if a signal has stored messages for us*/
   if (sleepTime&&CmiGetState()->idle.hasMessages) sleepTime=0;
-  MACHSTATE(2," enter CheckSocket") 
   while (CheckSocketsReady(sleepTime)>0) {
     int again=0;
-    MACHSTATE(2," after CheckSocket") 
     sleepTime=0;
     if (ctrlskt_ready_read) {again=1;ctrl_getone();}
-    if (dataskt_ready_read) {again=1;}
-    break;
+    if (dataskt_ready_read || dataskt_ready_write) {again=1;}
     if (!again) break; /* Nothing more to do */
-#if 0
     if ((nTimes++ &16)==15) {
-      /*We just grabbed a whole pile of packets-- try to retire a few*/
-      CommunicationsClock();
+      break;
     }
-#endif
   }
   CmiCommUnlock();
   MACHSTATE(2,"} CommunicationServer") 
 }
 
-static void processMessage(char *msg, int len)
+static void IntegrateMessageDatagram(char *msg, int len)
 {
   char *newmsg;
   int rank, srcpe, seqno, magic, i;
@@ -272,11 +268,15 @@ static void processMessage(char *msg, int len)
       newmsg = node->asm_msg;
       if (newmsg == 0) {
         size = CmiMsgHeaderGetLength(msg);
+        if (size < len) KillEveryoneCode(4559312);
+#if FRAGMENTATION
         newmsg = (char *)CmiAlloc(size);
         if (!newmsg)
           fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
-        if (size < len) KillEveryoneCode(4559312);
         memcpy(newmsg, msg, len);
+#else
+        newmsg = msg;
+#endif
         node->asm_rank = rank;
         node->asm_total = size;
         node->asm_fill = len;
@@ -320,18 +320,19 @@ void ReceiveDatagram(SOCKET fd)
   int ok;
   double t;
 
-  if (!buf) buf = (int *)malloc(Cmi_dgram_max_data+DGRAM_HEADER_SIZE);
-/*
-  if (-1==ChMessage_recv(fd,&msg))
-    CmiAbort("Error in ReceiveDatagram.");
-*/
   if (-1==skt_recvN(fd, &size, sizeof(int)))
     CmiAbort("Error in ReceiveDatagram.");
+
+#if FRAGMENTATION
+  if (!buf) buf = (int *)CmiAlloc(Cmi_dgram_max_data+DGRAM_HEADER_SIZE);
+#else
+  buf = (int *)CmiAlloc(size);
+#endif
   buf[0] = size;
   if (-1==skt_recvN(fd, buf+1, size-sizeof(int)))
     CmiAbort("Error in ReceiveDatagram.");
 
-  processMessage(buf, size);
+  IntegrateMessageDatagram(buf, size);
 }
 
 
@@ -445,7 +446,11 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
 
 void CmiMachineInit()
 {
-  Cmi_dgram_max_data = 1400-DGRAM_HEADER_SIZE;
+#if FRAGMENTATION
+  Cmi_dgram_max_data = 1400-DGRAM_HEADER_SIZE; 
+#else
+  Cmi_dgram_max_data = 1000000000;
+#endif
 }
 
 
@@ -454,6 +459,7 @@ static void open_tcp_sockets()
   int i, ok, pe, flag;
   int mype, numpes;
   SOCKET skt;
+  int val;
 
   mype = Cmi_mynode;
   numpes = Cmi_numnodes;
@@ -470,6 +476,8 @@ static void open_tcp_sockets()
     ok = skt_recvN(skt, &pe, sizeof(int));
     if (ok<0) KillEveryoneCode(98246556);
     nodes[pe].sock = skt;
+    if ((val = fcntl(skt, F_GETFL, 0)) < 0) KillEveryoneCode(98246557);
+    if (fcntl(skt, F_SETFL, val|O_NONBLOCK) < 0) KillEveryoneCode(98246558);
   }
   for (pe=mype+1; pe<numpes; pe++) {
     skt = skt_connect(nodes[pe].IP, nodes[pe].dataport, 300);
@@ -481,6 +489,8 @@ static void open_tcp_sockets()
     ok = skt_sendN(skt, &mype, sizeof(int));
     if (ok<0) KillEveryoneCode(98246556);
     nodes[pe].sock = skt;
+    if ((val = fcntl(skt, F_GETFL, 0)) < 0) KillEveryoneCode(98246557);
+    if (fcntl(skt, F_SETFL, val|O_NONBLOCK) < 0) KillEveryoneCode(98246558);
   }
 }
 
