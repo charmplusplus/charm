@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Conv-host for ASCI Red:
+#  Translates +pN-style conv-host options into 
+# yod options.
+
+args=""
+pes=1
+
+while [ $# -gt 0 ]
+do
+	case $1 in
+	+p)
+		pes=$2
+		shift
+		;;
+	+p*)
+		pes=`echo $1 | awk '{print substr($1,3)}'`
+		;;
+	*) 
+		args=$args" "'"'$1'"'
+		;;
+	esac
+	shift
+done
+
+echo "Running on $pes processors: $args"
+
+yod -sz $pes $args
