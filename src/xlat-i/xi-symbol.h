@@ -225,9 +225,7 @@ class Parameter {
     void marshallArraySizes(XStr &str);
     void marshallArrayData(XStr &str);
     void beginUnmarshall(XStr &str);
-    void unmarshall(XStr &str);
-    void unmarshallAddress(XStr &str);
-    void endUnmarshall(XStr &str);
+    void unmarshallArrayData(XStr &str);
   public:
     Parameter(int Nline,Type *Ntype,const char *Nname=0,
     	const char *NarrLen=0,Value *Nvalue=0);

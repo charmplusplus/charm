@@ -2201,57 +2201,53 @@ void ParamList::beginUnmarshall(XStr &str)
 {
     	if (isMarshalled()) 
     	{
-    		str<<"  //Unmarshall: ";print(str,0);str<<"\n";
+    		str<<"  //Unmarshall pup'd fields: ";print(str,0);str<<"\n";
     		str<<"  char *impl_buf=((CkMarshallMsg *)impl_msg)->msgBuf;\n";
     		str<<"  PUP::fromMem implP(impl_buf);\n";
     		callEach(&Parameter::beginUnmarshall,str);
     		str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
+		str<<"  //Unmarshall arrays:\n";
+		callEach(&Parameter::unmarshallArrayData,str);
     	}
 	else if (isVoid()) {str<<"  CkFreeSysMsg(impl_msg);\n";}
 }
 void Parameter::beginUnmarshall(XStr &str) 
-{
+{ //First pass: unpack pup'd entries
 	Type *dt=type->deref();//Type, without &
 	if (isArray())
 		str<<"  int impl_off_"<<name<<"; implP|impl_off_"<<name<<";\n";
 	else
 		str<<"  "<<dt<<" "<<name<<"; implP|"<<name<<";\n";
 }
-void ParamList::unmarshall(XStr &str) 
+void Parameter::unmarshallArrayData(XStr &str) 
+{ //Second pass: unpack pointed-to arrays
+	if (isArray()) {
+		Type *dt=type->deref();//Type, without &
+		str<<"  "<<dt<<" *"<<name<<"=("<<dt<<" *)(impl_buf+impl_off_"<<name<<");\n";
+	}
+}
+void ParamList::unmarshall(XStr &str)  //Pass-by-value
 {
     	if (isMessage()) str<<"("<<param->type<<")impl_msg";
     	else if (isMarshalled()) {
-    		param->unmarshall(str);
-    		if (next) {
+    		str<<param->getName();
+		if (next) {
     			str<<", ";
     			next->unmarshall(str);
     		}
     	}
 }
-void Parameter::unmarshall(XStr &str)
-{
-	if (isArray())
-		str<<"("<<type->deref()<<" *)(impl_buf+impl_off_"<<name<<")";
-	else
-		str<<name;
-}
-void ParamList::unmarshallAddress(XStr &str) 
+void ParamList::unmarshallAddress(XStr &str)  //Pass-by-reference, for Fortran
 {
     	if (isMessage()) str<<"("<<param->type<<")impl_msg";
     	else if (isMarshalled()) {
-    		param->unmarshallAddress(str);
-    		if (next) {
+    		if (param->isArray()) str<<param->getName(); //Arrays are already pointers
+		else str<<"& "<<param->getName(); //Take address of simple types and structs
+		if (next) {
     			str<<", ";
     			next->unmarshallAddress(str);
     		}
     	}
-}
-void Parameter::unmarshallAddress(XStr &str)
-{
-	if (isArray())
-		str<<"("<<type->deref()<<" *)(impl_buf+impl_off_"<<name<<")";
-	else
-		str<<"&" <<name;
 }
 void ParamList::endUnmarshall(XStr &str) 
 {
