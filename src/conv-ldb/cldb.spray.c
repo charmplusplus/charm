@@ -53,6 +53,11 @@ struct reqmsg {
 
 void CldPropagateLoad(double load);
 
+int CldEstimate(void)
+{
+  return CldLoad();
+}
+
 void CldInitiateReduction()
 {
   double load = CldEstimate();
@@ -179,6 +184,32 @@ void CldEnqueue(int pe, void *msg, int infofn)
     CmiSetXHandler(msg, CmiGetHandler(msg));
     CmiSetHandler(msg, pinf->HopHandler);
     CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
+  }
+}
+
+void CldNodeEnqueue(int node, void *msg, int infofn)
+{
+  int len, queueing, priobits; unsigned int *prioptr;
+  CldInfoFn ifn; CldPackFn pfn;
+  peinfo *pinf = &(CpvAccess(peinf));
+  ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  if (node != CLD_ANYWHERE) {
+    if (pfn && (node != CmiMyNode())) {
+      pfn(&msg);
+      ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    }
+    CmiSetInfo(msg, infofn);
+    CmiSetXHandler(msg, CmiGetHandler(msg));
+    CmiSetHandler(msg, pinf->EnqueueHandler);
+    if (node==CLD_BROADCAST) CmiSyncNodeBroadcastAndFree(len, msg);
+    else if (node==CLD_BROADCAST_ALL) CmiSyncNodeBroadcastAllAndFree(len, msg);
+    else CmiSyncNodeSendAndFree(node, len, msg);
+  } else {
+    CmiSetInfo(msg, infofn);
+    CmiSetXHandler(msg, CmiGetHandler(msg));
+    CmiSetHandler(msg, pinf->HopHandler);
+    CsdNodeEnqueueGeneral(msg, queueing, priobits, prioptr);
   }
 }
 
