@@ -41,15 +41,15 @@ void CollideGrid3d::init(const vector3d &Norigin,//Grid voxel corner 0,0,0
                 //  to nearest smaller power of two
                 double s=(1<<20);
                 while (s>(1.25*desiredSize[i])) s*=0.5;
-                sizes[i]=s;
-                hakShift[i]=(1.5*(1<<23)-0.5)*s-origin[i];
+                ((double*)sizes)[i]=s;
+                hakShift[i]=(1.5*(1<<23)-0.5)*s-((double*)origin)[i];
                 float o=(float)(hakShift[i]);
                 hakStart[i]=*(int *)&o;
 #else
                 sizes[i]=desiredSize[i];
 #endif
-                scales[i]=1.0/sizes[i];
-                testMapping(*this,i,origin[i],sizes[i]);
+                ((double *)scales)[i]=1.0/((double *)sizes)[i];
+                testMapping(*this,i,((double *)origin)[i],((double *)sizes)[i]);
         }
         
 }
