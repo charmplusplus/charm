@@ -62,8 +62,23 @@ protected:
   };
 
   LBDatabase* theLbdb;
+  struct {
+    int proc_speed;
+    double total_walltime;
+    double total_cputime;
+    double idletime;
+    double bg_walltime;
+    double bg_cputime;
+    int obj_data_sz;
+    LDObjData* objData;
+    int comm_data_sz;
+    LDCommData* commData;
+    double obj_walltime;
+    double obj_cputime;
+  } myStats;
 
 private:
+  void FindNeighbors();
   NLBStatsMsg* AssembleStats();
 
   int mystep;
@@ -76,11 +91,6 @@ private:
   int mig_msgs_received;
   int mig_msgs_expected;
   int* neighbor_pes;
-  int proc_speed;
-  LDObjData* myObjData;
-  int obj_data_sz;
-  LDCommData* myCommData;
-  int comm_data_sz;
   int receive_stats_ready;
 };
 

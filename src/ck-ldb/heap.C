@@ -18,6 +18,11 @@ minHeap::minHeap(int nsize)
   count = 0;
 }
 
+minHeap::~minHeap()
+{
+  delete [] h;
+}
+
 int minHeap::numElements()
 {
   return count;
@@ -25,15 +30,17 @@ int minHeap::numElements()
 
 int minHeap::insert(InfoRecord *x)
 {
-  h[count].info = x;
-  h[count].deleted = 0;
+  int current;
 
-  int current = count;
-  count++;
-
-  if (count >= size) {
+  if (count < size) {
+    h[count].info = x;
+    h[count].deleted = 0;
+    current = count;
+    count++;
+  } else {
     cout << "minHeap overflow. \n" ; 
-    return -1;}
+    return -1;
+  }
 
   int parent = (current - 1)/2;
   while (current != 0)
@@ -110,6 +117,11 @@ maxHeap::maxHeap(int nsize)
   count = 0;
 }
 
+maxHeap::~maxHeap()
+{
+  delete [] h;
+}
+
 int maxHeap::numElements()
 {
   return count;
@@ -117,14 +129,17 @@ int maxHeap::numElements()
 
 int maxHeap::insert(InfoRecord *x)
 {
-  h[count].info = x;
-  h[count].deleted  = 0;
-  int current = count;
-  count++;
+  int current;
 
-  if (count >= size) {
+  if (count < size) {
+    h[count].info = x;
+    h[count].deleted  = 0;
+    current = count;
+    count++;
+  } else {
     cout << "maxHeap overflow. \n" ; 
-    return -1;}
+    return -1;
+  }
 
   int parent = (current - 1)/2;
   while (current != 0)

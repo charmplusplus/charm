@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <charm++.h>
 #include <LBDatabase.h>
 #include "NeighborLB.h"
@@ -37,24 +38,25 @@ NeighborLB::NeighborLB()
     NotifyMigrated(reinterpret_cast<LDMigratedFn>(staticMigrated),
 		   static_cast<void*>(this));
 
+
+  // I had to move neighbor initialization outside the constructor
+  // in order to get the virtual functions of any derived classes
+  // so I'll just set them to illegal values here.
+  neighbor_pes = 0;
   stats_msg_count = 0;
-  statsMsgsList = new NLBStatsMsg*[num_neighbors()];
-  for(int i=0; i < CkNumPes(); i++)
-    statsMsgsList[i] = 0;
-  statsDataList = new LDStats[num_neighbors()];
-
-  neighbor_pes = new int[num_neighbors()];
-  neighbors(neighbor_pes);
-
+  statsMsgsList = 0;
+  statsDataList = 0;
   migrates_completed = 0;
   migrates_expected = -1;
   mig_msgs_received = 0;
-  mig_msgs_expected = num_neighbors();
-  mig_msgs = new NLBMigrateMsg*[num_neighbors()];
+  mig_msgs = 0;
 
-  proc_speed = theLbdb->ProcessorSpeed();
-  obj_data_sz = 0;
-  comm_data_sz = 0;
+  myStats.proc_speed = theLbdb->ProcessorSpeed();
+  char hostname[80];
+  gethostname(hostname,79);
+  CkPrintf("[%d] host %s speed %d\n",CkMyPe(),hostname,myStats.proc_speed);
+  myStats.obj_data_sz = 0;
+  myStats.comm_data_sz = 0;
   receive_stats_ready = 0;
 
   theLbdb->CollectStatsOn();
@@ -65,9 +67,29 @@ NeighborLB::~NeighborLB()
   CkPrintf("Going away\n");
 }
 
+void NeighborLB::FindNeighbors()
+{
+  if (neighbor_pes == 0) { // Neighbors never initialized, so init them
+                           // and other things that depend on the number
+                           // of neighbors
+    statsMsgsList = new NLBStatsMsg*[num_neighbors()];
+    for(int i=0; i < num_neighbors(); i++)
+      statsMsgsList[i] = 0;
+    statsDataList = new LDStats[num_neighbors()];
+
+    neighbor_pes = new int[num_neighbors()];
+    neighbors(neighbor_pes);
+    mig_msgs_expected = num_neighbors();
+    mig_msgs = new NLBMigrateMsg*[num_neighbors()];
+  }
+
+}
+
 void NeighborLB::AtSync()
 {
-  CkPrintf("[%d] NeighborLB At Sync step %d!!!!\n",CkMyPe(),mystep);
+  //  CkPrintf("[%d] NeighborLB At Sync step %d!!!!\n",CkMyPe(),mystep);
+
+  if (neighbor_pes == 0) FindNeighbors();
 
   if (!QueryBalanceNow(step()) || num_neighbors() == 0) {
     MigrationDone();
@@ -85,45 +107,48 @@ void NeighborLB::AtSync()
     CProxy_NeighborLB(thisgroup).ReceiveStats(msg,neighbor_pes[0]);
   } else delete msg;
 
-  //  delete msg;
   // Tell our own node that we are ready
   ReceiveStats((NLBStatsMsg*)0);
-  CkPrintf("[%d] done with AtSync\n",CkMyPe());
 }
 
 NLBStatsMsg* NeighborLB::AssembleStats()
 {
-  // Send stats
-  obj_data_sz = theLbdb->GetObjDataSz();
-  myObjData = new LDObjData[obj_data_sz];
-  theLbdb->GetObjData(myObjData);
+  // Get stats
+  theLbdb->TotalTime(&myStats.total_walltime,&myStats.total_cputime);
+  theLbdb->IdleTime(&myStats.idletime);
+  theLbdb->BackgroundLoad(&myStats.bg_walltime,&myStats.bg_cputime);
+  myStats.obj_data_sz = theLbdb->GetObjDataSz();
+  myStats.objData = new LDObjData[myStats.obj_data_sz];
+  theLbdb->GetObjData(myStats.objData);
 
-  comm_data_sz = theLbdb->GetCommDataSz();
-  myCommData = new LDCommData[comm_data_sz];
-  theLbdb->GetCommData(myCommData);
-  
+  myStats.comm_data_sz = theLbdb->GetCommDataSz();
+  myStats.commData = new LDCommData[myStats.comm_data_sz];
+  theLbdb->GetCommData(myStats.commData);
+
+  myStats.obj_walltime = myStats.obj_cputime = 0;
+  for(int i=0; i < myStats.obj_data_sz; i++) {
+    myStats.obj_walltime += myStats.objData[i].wallTime;
+    myStats.obj_cputime += myStats.objData[i].cpuTime;
+  }    
+
   NLBStatsMsg* msg = new NLBStatsMsg;
 
   msg->from_pe = CkMyPe();
   msg->serial = rand();
+  msg->proc_speed = myStats.proc_speed;
+  msg->total_walltime = myStats.total_walltime;
+  msg->total_cputime = myStats.total_cputime;
+  msg->idletime = myStats.idletime;
+  msg->bg_walltime = myStats.bg_walltime;
+  msg->bg_cputime = myStats.bg_cputime;
+  msg->obj_walltime += myStats.obj_walltime;
+  msg->obj_cputime += myStats.obj_cputime;
 
-  theLbdb->TotalTime(&msg->total_walltime,&msg->total_cputime);
-  theLbdb->IdleTime(&msg->idletime);
-  theLbdb->BackgroundLoad(&msg->bg_walltime,&msg->bg_cputime);
-  msg->proc_speed = proc_speed;
-
-  msg->obj_walltime = msg->obj_cputime = 0;
-
-  for(int i=0; i < obj_data_sz; i++) {
-    msg->obj_walltime += myObjData[i].wallTime;
-    msg->obj_cputime += myObjData[i].cpuTime;
-  }    
-
-  CkPrintf(
-    "Proc %d speed=%d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f Obj=%f %f\n",
-    CkMyPe(),msg->proc_speed,msg->total_walltime,msg->total_cputime,
-    msg->idletime,msg->bg_walltime,msg->bg_cputime,
-    msg->obj_walltime,msg->obj_cputime);
+  //  CkPrintf(
+  //    "Proc %d speed=%d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f Obj=%f %f\n",
+  //    CkMyPe(),msg->proc_speed,msg->total_walltime,msg->total_cputime,
+  //    msg->idletime,msg->bg_walltime,msg->bg_cputime,
+  //    msg->obj_walltime,msg->obj_cputime);
 
   //  CkPrintf("PE %d sending %d to ReceiveStats %d objs, %d comm\n",
   //	   CkMyPe(),msg->serial,msg->n_objs,msg->n_comm);
@@ -142,6 +167,8 @@ void NeighborLB::Migrated(LDObjHandle h)
 
 void NeighborLB::ReceiveStats(NLBStatsMsg *m)
 {
+  if (neighbor_pes == 0) FindNeighbors();
+
   if (m == 0) { // This is from our own node
     receive_stats_ready = 1;
   } else {
@@ -185,7 +212,6 @@ void NeighborLB::ReceiveStats(NLBStatsMsg *m)
       MigrateInfo& move = migrateMsg->moves[i];
       const int me = CkMyPe();
       if (move.from_pe == me && move.to_pe != me) {
-	CkPrintf("[%d] migrating object to %d\n",move.from_pe,move.to_pe);
 	theLbdb->Migrate(move.obj,move.to_pe);
       } else if (move.from_pe != me) {
 	CkPrintf("[%d] error, strategy wants to move from %d to  %d\n",
@@ -209,28 +235,33 @@ void NeighborLB::ReceiveStats(NLBStatsMsg *m)
       statsMsgsList[i]=0;
     }
     stats_msg_count=0;
+
+    theLbdb->ClearLoads();
   }
   
-  theLbdb->ClearLoads();
 }
 
 void NeighborLB::ReceiveMigration(NLBMigrateMsg *msg)
 {
+  if (neighbor_pes == 0) FindNeighbors();
+
+  if (mig_msgs_received == 0) migrates_expected = 0;
+
   mig_msgs[mig_msgs_received] = msg;
   mig_msgs_received++;
   //  CkPrintf("[%d] Received migration msg %d of %d\n",
   //	   CkMyPe(),mig_msgs_received,mig_msgs_expected);
 
-  if (mig_msgs_received < mig_msgs_expected)
-    return;
-  else if (mig_msgs_received < mig_msgs_expected) {
+  if (mig_msgs_received > mig_msgs_expected) {
     CkPrintf("[%d] NeighborLB Error! Too many migration messages received\n",
 	     CkMyPe());
+  }
+
+  if (mig_msgs_received != mig_msgs_expected) {
     return;
   }
 
   //  CkPrintf("[%d] in ReceiveMigration %d moves\n",CkMyPe(),msg->n_moves);
-  migrates_expected = 0;
   for(int neigh=0; neigh < mig_msgs_received;neigh++) {
     NLBMigrateMsg* m = mig_msgs[neigh];
     for(int i=0; i < m->n_moves; i++) {
@@ -257,7 +288,6 @@ void NeighborLB::MigrationDone()
   migrates_expected = -1;
   // Increment to next step
   mystep++;
-  //  CkPrintf("[%d] Resuming clients\n",CkMyPe());
   CProxy_NeighborLB(thisgroup).ResumeClients(CkMyPe());
 }
 
@@ -277,10 +307,10 @@ NLBMigrateMsg* NeighborLB::Strategy(LDStats* stats,int count)
     stats[j].obj_walltime,stats[j].obj_cputime);
   }
 
-  delete [] myObjData;
-  obj_data_sz = 0;
-  delete [] myCommData;
-  comm_data_sz = 0;
+  delete [] myStats.objData;
+  myStats.obj_data_sz = 0;
+  delete [] myStats.commData;
+  myStats.comm_data_sz = 0;
 
   int sizes=0;
   NLBMigrateMsg* msg = new(&sizes,1) NLBMigrateMsg;

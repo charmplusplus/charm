@@ -1,0 +1,9 @@
+module WSLB {
+
+extern module NeighborLB;
+
+group WSLB : NeighborLB {
+  entry void WSLB(void);  
+};
+
+};

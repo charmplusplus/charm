@@ -23,15 +23,15 @@ private:
   heapRecord *h;
   int count;
   int size;
-  void swap(int i, int j) 
-    {
-      heapRecord temp = h[i];
-      h[i] = h[j];
-      h[j] = temp;
-    }
+  void swap(int i, int j) {
+    heapRecord temp = h[i];
+    h[i] = h[j];
+    h[j] = temp;
+  }
   
 public:
   minHeap(int size);
+  ~minHeap();
   int numElements();
   int insert(InfoRecord *);
   InfoRecord *deleteMin();
@@ -46,15 +46,15 @@ private:
   int count;
   int size;
 
-  void swap(int i, int j) 
-    {
-      heapRecord temp = h[i];
-      h[i] = h[j];
-      h[j] = temp;
-    }
+  void swap(int i, int j) {
+    heapRecord temp = h[i];
+    h[i] = h[j];
+    h[j] = temp;
+  }
   
 public:  
   maxHeap(int size);
+  ~maxHeap();
   int numElements();
   int insert(InfoRecord *);
   InfoRecord *deleteMax();
