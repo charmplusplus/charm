@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-10-27 21:31:25  jyelon
+ * Revision 2.11  1995-11-02 18:24:35  sanjeev
+ * modified Charm++ macros
+ *
+ * Revision 2.10  1995/10/27  21:31:25  jyelon
  * changed NumPe --> NumPes
  *
  * Revision 2.9  1995/10/27  09:09:31  jyelon
@@ -160,11 +163,11 @@
 
 /* Charm++ names for charm functions */
 
-#define CPrioPtr                CkPrioPtr
-#define CPrioSizeBits           CkPrioSizeBits
-#define CPrioSizeBytes          CkPrioSizeBytes
-#define CPrioSizeWords          CkPrioSizeWords
-#define CPrioConcat             CkPrioConcat
+#define CPriorityPtr                CkPrioPtr
+#define CPrioritySizeBits           CkPrioSizeBits
+#define CPrioritySizeBytes          CkPrioSizeBytes
+#define CPrioritySizeWords          CkPrioSizeWords
+#define CPriorityConcat             CkPrioConcat
 
 #define CFunctionNameToRef	FunctionNameToRef
 #define CFunctionRefToName	FunctionRefToName

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-07-27 20:29:34  jyelon
+ * Revision 2.6  1995-11-02 18:24:35  sanjeev
+ * modified Charm++ macros
+ *
+ * Revision 2.5  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.4  1995/07/24  01:54:40  jyelon
@@ -62,8 +65,15 @@
 #define ReadInit(v) 
 
 #define CkTimer()  			(int)(CmiTimer() * 1000.0)
+#define CTimer()  			(int)(CmiTimer() * 1000.0)
 #define CkUTimer()			(int)(CmiTimer() * 1000000.0)
+#define CUTimer()			(int)(CmiTimer() * 1000000.0)
 #define CkHTimer()			(int)(CmiTimer() / 3600.0)
+#define CHTimer()			(int)(CmiTimer() / 3600.0)
+
+#define CharmExit()			CkExit()
+
+#define new_packbuffer			CkAllocPackBuffer
 
 #define _CK_4MonoDataAreaType 		MONO_DATA 
 #define _CK_9LockMonoDataArea(x)
