@@ -149,6 +149,8 @@ private:
       env->setPacked(0);
       env->setImmediate(0);
       _SET_USED(env, 0);
+      //for record-replay
+      env->setEvent(0);
       return env;
     }
     UShort getEpIdx(void) const { return epIdx; }
