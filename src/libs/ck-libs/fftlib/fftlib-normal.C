@@ -151,12 +151,12 @@ NormalSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn, int
 #if CAREFUL
     CkAssert(numPoints == fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize);
 #endif
-    
     counts[info_id]++;
     int p;
 #ifdef IFFT_DUMP
     char ofile[80];
-    snprintf(ofile,80,"fftlibaccepted%d_%d.out",info_id,thisIndex);
+    CkPrintf("accept data for ifft info_id %d thisIndex %d posn %d\n",info_id,thisIndex, posn);
+    snprintf(ofile,80,"fftlibaccepted%d_%d_%d.out",info_id,thisIndex,posn);
     FILE *ifd=fopen(ofile,"w");
 #endif    
     for(p = 0; p < fftinfo.srcPlanesPerSlab; p++) {
