@@ -13,7 +13,8 @@ public:
   char *str;
   UsrEvent(int _e, char* _s): e(_e),str(_s) {}
 };
-CkpvStaticDeclare(CkVec<UsrEvent *>, usrEvents);
+typedef CkVec<UsrEvent *>   UsrEventVec;
+CkpvStaticDeclare(UsrEventVec, usrEvents);
 
 
 #ifdef CMK_OPTIMIZE

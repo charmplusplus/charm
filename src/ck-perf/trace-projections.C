@@ -29,7 +29,8 @@ int checknested=0;		// check illegal nested begin/end execute
 CkpvStaticDeclare(Trace*, _trace);
 CtvStaticDeclare(int,curThreadEvent);
 
-CkpvStaticDeclare(CkVec<char *>, usrEventlist);
+typedef CkVec<char *>  usrEventVec;
+CkpvStaticDeclare(usrEventVec, usrEventlist);
 class UsrEvent {
 public:
   int e;
