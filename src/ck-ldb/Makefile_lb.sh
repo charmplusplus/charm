@@ -18,6 +18,8 @@ echo >> $out
 
 for bal in $LOADBALANCERS 
 do 
+	dep=""
+	[ -r libmodule$bal.dep ] && dep="cp libmodule$bal.dep "'$'"(L)/"
 	cat >> $out << EOB 
 $bal.decl.h: $bal.ci charmxi
 	\$(CHARMC) $bal.ci
@@ -27,6 +29,7 @@ $bal.o: $bal.C $bal.decl.h \$(CKHEADERS)
 
 \$(L)/libmodule$bal.a: $bal.o
 	\$(CHARMC) -o \$(L)/libmodule$bal.a $bal.o
+	$dep
 
 EOB
 done
@@ -55,5 +58,5 @@ EveryLB.decl.h: EveryLB.ci
 
 \$(L)/libmoduleEveryLB.a: \$(LB_OBJ)
 	\$(CHARMC) -o \$(L)/libmoduleEveryLB.a \$(LB_OBJ)
-
+	cp libmoduleEveryLB.dep \$(L)/
 EOB
