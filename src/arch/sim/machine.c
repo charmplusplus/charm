@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.5  1995-11-07 23:22:56  jyelon
+ * Revision 1.6  1995-11-08 00:40:20  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.5  1995/11/07  23:22:56  jyelon
  * Fixed the neighbour functions.
  *
  * Revision 1.4  1995/10/27  21:45:35  jyelon
@@ -371,7 +374,8 @@ char *argv[];
     user_main(argc,argv);
 }
 
-static void mycpy(double *dst, double *src, int bytes)
+static void mycpy(dst, src, bytes)
+double *dst; double *src; int bytes;
 {
         unsigned char *cdst, *csrc;
 
