@@ -579,19 +579,19 @@ void fooStart(void); //Client implements this routine to carry out the parallel 
 
 //Startup routine to if the user does not define their own
 static void FooFallbackSetup(void)
-{
+\{
   //creates the TCharm threads and attaches client's routine to them
   TCharmCreate(TCharmGetNumChunks(), fooStart);
   //Could call some user routine here to do some startup work
   Foo\_Attach();
-}
+\}
 
 void FooInit(void)
-{
+\{
   //initialize thread private variable her, mentioned later.
   .......
   TCharmSetFallbackSetup(FooFallbackSetup);
-}
+\}
 \end{alltt}
 
 \item Create your array and attach it to the TCharm threads. The user's main 
@@ -601,7 +601,7 @@ parallel routine will start as soon as you call thread->ready()
 //This is either called by FooFallbackSetuo mentioned above, or by the user
 //directly (for multi-module programs)
 void Foo\_Attach(void)
-{
+\{
   TCharmSetupcookie * tc = TCharmSetupCookie::get();
   CkArrayOptions opt(tc->getNumElements());
   if (!tc->hasThreads())
@@ -612,7 +612,7 @@ void Foo\_Attach(void)
   //actually create the library array here (FooChunk in this case)
   CkArrayID aid = CProxy\_FooChunk::ckNew(opt);
   tc->addClient(aid);
-}
+\}
 \end{alltt}
 
 \item Set up a thread-private variable(Ctv) to point to the library object. 
@@ -625,42 +625,42 @@ CtvStaticDeclare(FooChunk *, \_fooptr);
 
 /* The following routine is listed as an initcall in the .ci file */
 void FooInit(void)
-{
+\{
   CtvInitialize(FooChunk*, \_fooptr);
   TCharmSetFallbackSetup(FooFallbackSetup);
-}
+\}
 \end{alltt}
 
 \item Define the array used by the library
 
 \begin{alltt}
-class FooChunk: public TCharmClient1D {
+class FooChunk: public TCharmClient1D \{
    CProxy\_FooChunk thisProxy;
 protected:
    //called by TCharmClient1D when thread changes
    virtual void setupThreadPrivate(CthThread forThread)
-   {
+   \{
       CtvAccessOther(forThread, \_fooptr) = this;
-   }
+   \}
    
    FooChunk(CkArrayID aid):TCharmClient1D(aid)
-   {
+   \{
       thisProxy = this;
       tCharmClientInit();
       //add any other initialization here
       thread->ready(); //starts parallel work  
-   }
+   \}
 
-   virtual void pup(PUP::er &p) {
+   virtual void pup(PUP::er &p) \{
      TCharmClient1D::pup(p);
      //usual pup calls
-   }
+   \}
    
    //other calls, defined later
    int doCommunicate(...);
    void recvReply(someReplyMsg *m);
    ........
-}
+\}
 \end{alltt}
 
 \item Block a thread for communication using thread->suspend and
@@ -668,19 +668,19 @@ thread->resume
 
 \begin{alltt}
 int FooChunk::doCommunicate(...)
-{
+\{
    replyGoesHere = NULL;
    thisProxy[destChunk].sendRequest(...);
    thread->suspend(); //wait for reply to come back
    return replyGoesHere->data;
-}
+\}
 
 void FooChunk::recvReply(someReplyMsg *m)
-{
+\{
   if(replyGoesHere!=NULL) CkAbort("FooChunk: unexpected reply\\n");
   replyGoesHere = m;
   thread->resume(); //Got the reply -- start client again
-}
+\}
 \end{alltt}
 
 \item Add API calls. This is how user code running in the thread interacts
@@ -690,20 +690,20 @@ these disable isomalloc allocation. charm-api.h macros v.i.z CDECL, FDECL and
 FTN\_NAME can be used to provide both C and FORTRAN versions of each API call.
 
 \begin{alltt}
-CDECL void FOO\_Communicate(int x, double y, int * arr) {
+CDECL void FOO\_Communicate(int x, double y, int * arr) \{
    TCHARM\_API\_TRACE("FOO\_Communicate", "foo"); //2nd parameter is the name of the library
    FooChunk *f = CtvAccess(\_fooptr);
    f->doCommunicate(x, y, arr);
-}
+\}
 
 //In fortran, everything is passed via pointers
 FDECL void FTN\_NAME(FOOCOMMUNICATE, foocommunicate)
      (int *x, double *y, int *arr)
-{
+\{
    TCHARM\_API\_TRACE("FOOCOOMMUNICATE", "foo");
    FooChunk *f = CtvAccess(\_fooptr);
    f->doCommunicate(*x, *y, arr); 
-}
+\}
 \end{alltt}
 
 \end{itemize}
