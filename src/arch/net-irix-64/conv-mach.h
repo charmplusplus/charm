@@ -36,7 +36,7 @@
 #define CMK_MALLOC_USE_GNU_MALLOC                          1
 #define CMK_MALLOC_USE_OS_BUILTIN                          0
 
-#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PAGESIZE                                16384
 #define CMK_MEMORY_PROTECTABLE                             0
 
 #define CMK_MSG_HEADER_BASIC  { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,d7; }
@@ -101,6 +101,9 @@
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
+
+#define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
+#define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
 #define CMK_USE_HP_MAIN_FIX                                0
 #define CMK_DONT_USE_HP_MAIN_FIX                           1
