@@ -320,7 +320,6 @@ Module::generate()
     }
     defstr << 
     "  _register"<<name<<"();\n"
-   // "  _REGISTER_DONE();\n"
     "}\n";
   }
   defstr << "#endif\n";
@@ -563,7 +562,6 @@ Chare::genRegisterMethodDef(XStr& str)
   "void "<<indexName()<<"::__register(const char *s, size_t size) {\n"
   "  __idx = CkRegisterChare(s, size);\n";
   // register all bases
-  //genIndexNames(str, "  _REGISTER_BASE(__idx, ",NULL, "::__idx);\n", "");
   genIndexNames(str, "  CkRegisterBase(__idx, ",NULL, "::__idx);\n", "");
   genSubRegisterMethodDef(str);
   if(list)
@@ -2483,7 +2481,20 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
 		name=new char[50];
 		sprintf((char *)name,"impl_noname_%x",unnamedCount++);
 	}
-	byReference=(type->isNamed())&&(arrLen==NULL)&&(val==NULL);
+	byReference=false;
+	if ((arrLen==NULL)&&(val==NULL)) 
+	{ /* Consider passing type by reference: */
+		if (type->isNamed()) 
+		{ /* Some user-defined type: pass by reference */
+			byReference=true;
+		}
+		if (type->isReference()) {
+			byReference=true;
+			/* Clip off the ampersand--we'll add
+			   it back ourselves in Parameter::print. */
+			type=type->deref();
+		}
+	}
 }
 
 void ParamList::print(XStr &str,int withDefaultValues)
@@ -2505,7 +2516,7 @@ void Parameter::print(XStr &str,int withDefaultValues)
 		if (byReference) 
 		{ //Pass named types by const C++ reference 
 			str<<"const "<<type<<" &";
-	                if (name!=NULL) str<<name;
+		        if (name!=NULL) str<<name;
 		}
 		else 
 		{ //Pass everything else by value
