@@ -177,9 +177,13 @@ void globalStat::DOPcalc(int gvt, double grt)
     fclose(fp);
   }
   int avgPEs = 0;
+  int zed = 0;
   fp = fopen("dop_mod.out", "w");
   for (i=0; i<gvtp; i++) {
-    fprintf(fp, "%d %d\n", i, gvtDOP[i]);
+    if ((gvtDOP[i] != 0) || (zed == 0))
+      fprintf(fp, "%d %d\n", i, gvtDOP[i]);
+    if (gvtDOP[i] == 0) zed = 1;
+    else zed = 0;
     avgPEs += gvtDOP[i];
     if (gvtDOP[i] > modelPEs) modelPEs = gvtDOP[i];
   }

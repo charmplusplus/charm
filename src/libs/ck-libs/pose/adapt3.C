@@ -20,12 +20,12 @@ void adapt3::Step()
       timeLeash == avgRBoffset;
     else timeLeash = avgRBoffset/2;
   }
-  if (specEventCount > (specTol*eventCount)) {
-    timeLeash--;
-    if (timeLeash == 0) timeLeash = 1;
+  if (specEventCount > (specTol*eventCount + eventCount)) {
+    timeLeash -= avgRBoffset;
+    if (timeLeash < 1) timeLeash = 1;
   }
-  else if (specEventCount < (specTol*eventCount)) {
-    timeLeash++;
+  else if (specEventCount <= (specTol*eventCount + eventCount)) {
+    timeLeash += avgRBoffset;
   }
   /*
   if (rbFlag) timeLeash = 1;
@@ -38,11 +38,14 @@ void adapt3::Step()
     timeLeash = (timeLeash + avgRBoffset)/2;
   */
   
-  // Shorten the leash as we near POSE_endtime
-  if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
-    timeLeash = POSE_endtime - lastGVT;
   // Prepare to execute an event
   offset = lastGVT + timeLeash;
+  if (offset < 0) offset = POSE_TimeMax;
+  // Shorten the leash as we near POSE_endtime
+  if ((POSE_endtime > POSE_UnsetTS) && ((lastGVT+offset > POSE_endtime) ||
+					(lastGVT+offset <= POSE_UnsetTS)))
+    offset = POSE_endtime - lastGVT;
+
   ev = eq->currentPtr;
   while ((ev->timestamp > POSE_UnsetTS) && (ev->timestamp <= offset)) { 
 #ifdef MEM_COARSE
