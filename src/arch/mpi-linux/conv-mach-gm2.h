@@ -1,10 +1,4 @@
-
-/*
- two solutions 
- gnumalloc with context thread, or
- os malloc with pthread
-*/
-#if 1
+#if 0
 
 #undef CMK_MALLOC_USE_GNU_MALLOC
 #undef CMK_MALLOC_USE_OS_BUILTIN
