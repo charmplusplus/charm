@@ -5,7 +5,6 @@ module refine {
   // ----------------------------- Messages ---------------------------------
   message chunkMsg;
   message splitOutMsg;
-  message collapseOutMsg;
   message refMsg; 
   message intMsg;
   message doubleMsg;
@@ -24,11 +23,11 @@ module refine {
     entry [threaded] void coarseningElements();	
     entry [sync] void setBorder(int);
     entry [sync] intMsg *safeToMoveNode(int, double, double);
-    entry [sync,threaded] splitOutMsg *split(int, elemRef, node, node);
-    entry [sync] collapseOutMsg *collapse(int, elemRef, node, node);
-    entry [sync] intMsg *nodeLockup(int, node, edgeRef, edgeRef, elemRef, 
+    entry [sync, threaded] splitOutMsg *split(int, elemRef, node, node);
+    entry [sync, threaded] intMsg *collapse(int, elemRef, node, node);
+    entry [sync, threaded] intMsg *nodeLockup(int, node, edgeRef, edgeRef, elemRef, 
 	double);
-    entry [sync] intMsg *nodeLockupER(int, node, edgeRef, elemRef, elemRef, 
+    entry [sync, threaded] intMsg *nodeLockupER(int, node, edgeRef, elemRef, elemRef, 
 	double);
     entry void checkPending(int, objRef);
     entry void checkPending(int, objRef, objRef);

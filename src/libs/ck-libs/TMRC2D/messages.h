@@ -19,13 +19,6 @@ public:
   int result, local, first, nullNbr;
 };
 
-// collapseOutMsg: output data from collapse edge
-class collapseOutMsg : public CMessage_collapseOutMsg {
-public:
-  node n;
-  int result;
-};
-
 // refMsg: generic message for sending/receiving a reference to/from an element
 class refMsg : public CMessage_refMsg {
 public:

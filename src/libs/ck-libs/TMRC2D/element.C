@@ -197,7 +197,6 @@ void element::collapse(int shortEdge)
   keepEdge = (shortEdge + 1) % 3;
   keepNode = keepEdge;
 
-  /*
   if ((result=edges[shortEdge].collapse(myRef, C->theNodes[nodes[keepNode]],
 					C->theNodes[nodes[delNode]])) == 1) {
     // collapse successful; keepNode is node to keep
@@ -235,7 +234,6 @@ void element::collapse(int shortEdge)
     // update of keepNode
   }
   // else collapse failed; try again later
-  */
 }
 
 int element::nodeLockup(node n, edgeRef from, edgeRef start, elemRef end, 

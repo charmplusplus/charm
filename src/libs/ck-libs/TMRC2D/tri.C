@@ -138,13 +138,13 @@ splitOutMsg *chunk::split(int idx, elemRef e, node in, node fn)
   return som;
 }
 
-collapseOutMsg *chunk::collapse(int idx, elemRef e, node kn, node dn)
+intMsg *chunk::collapse(int idx, elemRef e, node kn, node dn)
 {
-  collapseOutMsg *com = new collapseOutMsg;
+  intMsg *im = new intMsg;
   accessLock();
-  com->result = theEdges[idx].collapse(e, kn, dn);
+  im->anInt = theEdges[idx].collapse(e, kn, dn);
   releaseLock();
-  return com;
+  return im;
 }
 
 void chunk::collapseHelp(int idx, edgeRef er, node n1, node n2)

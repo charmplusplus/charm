@@ -97,7 +97,7 @@ int edge::collapse(elemRef requester, node kNode, node dNode)
   // element requester has asked this edge to collapse and give back new node
   // coordinates resulting node; return value is 1 if successful, 0 if
   // dNode is the node that is kept
-  /*
+
   elemRef nbr = getNot(requester), nullRef;
   nullRef.reset();
   if (pending && (waitingFor == requester)) { // collapsed; awaiting requester
@@ -114,6 +114,7 @@ int edge::collapse(elemRef requester, node kNode, node dNode)
   }
   else { // Need to do the collapse
     // need to lock adjacent nodes
+    /*
     intMsg *im = mesh[requester.cid].nodeLockup(requester.idx, kNode, myRef, myRef,
 						nbr, length);
     if (im->anInt == -1) 
@@ -129,7 +130,7 @@ int edge::collapse(elemRef requester, node kNode, node dNode)
       if (!im->anInt) return -1;
     }
     // both nodes locked
-  CkPrintf("TMRC2D: edge::collapse: ** PART 1! ** On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);
+    CkPrintf("TMRC2D: edge::collapse: ** PART 1! ** On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);
     setPending();
     kNode.midpoint(dNode, newNode);
     incidentNode = dNode;
@@ -145,8 +146,8 @@ int edge::collapse(elemRef requester, node kNode, node dNode)
       //delete dNode
     }
     return 1;
+    */
   }
-  */
 }
 
 int edge::nodeLockup(node n, edgeRef start, elemRef from, elemRef end, 
