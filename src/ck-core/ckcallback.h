@@ -89,30 +89,37 @@ public:
 		:type(sendArray) 
 		{d.array.ep=ep; d.array.id=id; d.array.idx.asMax()=idx;}
 
-/*Interface used by threaded callbacks:
-  Libraries should call these from their "start" entry points.
-  Use "return cb.thread_delay()" to suspend the thread before
-  the return.
-  It's a no-op for everything but threads.
-*/
+
+	int isInvalid(void) const {return type==invalid;}
+
+/**
+ * Interface used by threaded callbacks:
+ * Libraries should call these from their "start" entry points.
+ * Use "return cb.thread_delay()" to suspend the thread before
+ * the return.
+ * It's a no-op for everything but threads.
+ */
 	void *thread_delay(void) const {
 		if (type==resumeThread) return impl_thread_delay();
 		return NULL;
 	}
 
-/*Libraries should call this from their "done" entry points.
-  It takes the given message and handles it appropriately.
-  After the send(), this callback is finished and cannot be reused.
-*/
+/**
+ * Libraries should call this from their "done" entry points.
+ * It takes the given message and handles it appropriately.
+ * After the send(), this callback is finished and cannot be reused.
+ */
 	void send(void *msg=NULL) const;
 };
 
 
-//Convenience class: a thread-suspending callback.  
-// Makes sure the thread actually gets delayed, even if the 
-//   library can't or won't call "thread_delay".
-// The return value is lost, so your library needs to call
-//   thread_delay itself if you want a return value.
+/**
+ * Convenience class: a thread-suspending callback.  
+ * Makes sure the thread actually gets delayed, even if the 
+ *   library can't or won't call "thread_delay".
+ * The return value is lost, so your library needs to call
+ *   thread_delay itself if you want a return value.
+ */
 class CkCallbackResumeThread : public CkCallback {
  public:
 	CkCallbackResumeThread(void)
