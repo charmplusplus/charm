@@ -150,7 +150,7 @@ int Refiner::isLight(processorInfo *p)
 }
 
 // move the compute jobs out from unavailable PE
-int Refiner::removeComputes()
+void Refiner::removeComputes()
 {
   int first;
   Iterator nextCompute;

@@ -37,7 +37,7 @@ private:
   double computeMax();
   int isHeavy(processorInfo *p);
   int isLight(processorInfo *p);
-  int removeComputes();
+  void removeComputes();
 
   double overLoad;
   double averageLoad;
