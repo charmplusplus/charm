@@ -786,7 +786,6 @@ CthThread CthPup(pup_er p, CthThread t)
 CthThread CthCreateMigratable(CthVoidFn fn,void *arg,int size)
 {
   /*Fibers are never migratable, unless we can figure out how to set their stacks*/
-  CmiPrintf("(Fiber CthCreateMigratable) WARNING: Threads will not be able to migrate!\n");
   return CthCreate(fn,arg,size);
 }
 
@@ -909,7 +908,6 @@ CthThread CthPup(pup_er p, CthThread t)
 CthThread CthCreateMigratable(CthVoidFn fn,void *arg,int size)
 {
   /*Pthreads are never migratable, unless we can figure out how to set their stacks*/
-  CmiPrintf("(Pthread CthCreateMigratable) WARNING: Threads will not be able to migrate!\n");
   return CthCreate(fn,arg,size);
 }
 

@@ -236,7 +236,7 @@ map_slots(int slot, int nslots)
 		map_warned=1;
 		if (CmiMyPe()==0)
 			CmiError("isomalloc.c> Warning: since mmap() doesn't work,"
-			" you won't be able to migrate\n");
+			" you won't be able to migrate threads\n");
 	}
 
 	return malloc(slotsize*nslots);
