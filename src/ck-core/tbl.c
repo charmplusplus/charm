@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-10-27 21:31:25  jyelon
+ * Revision 2.9  1997-03-24 23:09:34  milind
+ * Corrected alignment problems on 64-bit machines.
+ *
+ * Revision 2.8  1995/10/27 21:31:25  jyelon
  * changed NumPe --> NumPes
  *
  * Revision 2.7  1995/09/06  21:48:50  jyelon
@@ -82,6 +85,7 @@ TblBocInit()
     	TRACE(CmiPrintf("Node %d: TblBocInit: BocDataTbl entry filled.\n",CmiMyPe()));
 }
 
+#define align(var) ((var+sizeof(void *)-1)&(~(sizeof(void *)-1)))
 
 /************************************************************************/
 /*	This entry point unpacks the packed stuff and does the required */
@@ -121,7 +125,7 @@ TRACE(CmiPrintf("[%d] Unpack:: ptr=0x%x\n", CmiMyPe(), ptr));
 	else
 	{
 		data = (char *)  ptr;
-		ptr += *size_data;
+		ptr += align(*size_data);
 	}
 	entry  =(int *) ptr;
 	ptr += size;
@@ -130,6 +134,8 @@ TRACE(CmiPrintf("[%d] Unpack:: index=%d, key=%d, size_data=%d, entry=%d\n",
 		CmiMyPe(), *index, *key, *size_data, *entry));
 
 	size_chareid = (int *) ptr;
+	ptr += size;
+	option = (int *) ptr;
 	ptr += size;
 
 TRACE(CmiPrintf("[%d] Unpack:: size_chareid=%d\n",
@@ -142,7 +148,6 @@ TRACE(CmiPrintf("[%d] Unpack:: size_chareid=%d\n",
 		chareid = (ChareIDType *) ptr; 	
 		ptr += *size_chareid;
 	}
-	option = (int *) ptr;
 
 TRACE(CmiPrintf("[%d] Unpack:: option=%d\n",
 		CmiMyPe(), *option));
@@ -292,7 +297,7 @@ TRACE(CmiPrintf("[%d] Pack :: operation=%d, penum=%d, key=%d, entry=%d\n",
 			size_chareid = 0;
 		else 
 			size_chareid = SIZE_CHARE_ID;
-		total_size = 9*size + sized + size_chareid;
+		total_size = 9*size + align(sized) + size_chareid;
 
 TRACE(CmiPrintf("[%d] Pack:: size_chareid=%d, total_size=%d\n",
 		CmiMyPe(), size_chareid, total_size));
@@ -313,18 +318,19 @@ TRACE(CmiPrintf("[%d] Pack:: size_chareid=%d, total_size=%d\n",
 		if (sized != 0)
 		{
 			structure_copy(ptr, data, sized);
-			ptr += sized;
+			ptr += align(sized);
 		}
 		structure_copy(ptr, entry, size);
 		ptr += size;
 		structure_copy(ptr, &size_chareid, size);
+		ptr += size;
+		structure_copy(ptr, option, size);
 		ptr += size;
 		if (size_chareid != 0)
 		{
 			structure_copy(ptr, chareid, size_chareid);
 			ptr += size_chareid;
 		}
-		structure_copy(ptr, option, size);
 	TRACE(CmiPrintf("Pack :: sending key %d to penum %d\n", 
 			*((int *) key), penum));
 		GeneralSendMsgBranch(CsvAccess(CkEp_Tbl_Unpack), original,

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1995-10-27 09:09:31  jyelon
+ * Revision 2.15  1997-03-24 23:09:35  milind
+ * Corrected alignment problems on 64-bit machines.
+ *
+ * Revision 2.14  1995/10/27 09:09:31  jyelon
  * *** empty log message ***
  *
  * Revision 2.13  1995/09/29  09:51:12  jyelon
@@ -76,7 +79,7 @@
 #include "chare.h"
 #undef _CK_MEMORY_MANAGER
 
-#define align(var) ((var+sizeof(int)-1)&(~(sizeof(int)-1)))
+#define align(var) ((var+sizeof(void *)-1)&(~(sizeof(void *)-1)))
 
 #include "globals.h" 
 #include "trans_defs.h"
