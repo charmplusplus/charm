@@ -120,11 +120,9 @@ dirs+sources:
 
 CVHEADERS=converse.h conv-mach.h conv-mach.csh
 
-TRACELIBS=libck-trace-none.a libck-trace-summary.a libck-trace-projections.a
+CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o libtrace-none.a libtrace-summary.a libtrace-projections.a
 
-CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a $(TRACELIBS)
-
-LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o
+LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o ldbcfns.o
 
 converse: basics QuickThreads/libqt.a $(CVLIBS) conv-host-if-needed conv-cpm
 
@@ -184,6 +182,13 @@ cpthreads.o: cpthreads.c $(CVHEADERS)
 memory.o: memory.c $(CVHEADERS)
 	$(CHARMC) memory.c
 
+ldbcfns.o: ldbcfns.c $(CVHEADERS)
+	$(CHARMC) ldbcfns.c
+
+libldb-rand.o: ldb.rand.c $(CVHEADERS)
+	$(CHARMC) -cp ../lib/ -o $@ ldb.rand.c
+
+
 ###############################################################################
 #
 # Charm Libraries
@@ -195,63 +200,42 @@ CKHEADERS=chare.h const.h msg_macros.h prio_macros.h env_macros.h globals.h\
 
 CK_LIBS_CORE=libck-core.a
 
-CK_LIBS_LDB=libck-ldb-rand.o libck-ldb-acwn.o libck-ldb-mngr.o # libck-ldb-priomngr.o libck-ldb-recv.o libck-ldb-tok.o libck-ldb-btok.o
+CK_LIBS_LDB=libldb-acwn.o libldb-mngr.o
 
 CK_LIBS_CPLUS=libck-cplus-n.a libck-defmain-std.a
 
 CK_LIBS=$(CK_LIBS_CORE) $(CK_LIBS_LDB) $(CK_LIBS_CPLUS)
 
-LIBCK_CORE=common.o globals.o init.o register.o boc.o condsend.o qd.o vid.o rdonly.o stat.o wrtone.o acc.o mono.o tbl.o memstuff.o ldbcfns.o ck.o main.o
+LIBCK_CORE=common.o globals.o init.o register.o boc.o condsend.o qd.o vid.o rdonly.o stat.o wrtone.o acc.o mono.o tbl.o memstuff.o ck.o main.o
 
 charmlibs: converse $(CK_LIBS)
 
 libck-core.a: $(LIBCK_CORE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE)
 
-LIBCK_TRACE_NONE=trace-none.o
-libck-trace-none.a: $(LIBCK_TRACE_NONE)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_TRACE_NONE)
+LIBTRACE_NONE=trace-none.o
+libtrace-none.a: $(LIBTRACE_NONE)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBTRACE_NONE)
 
-LIBCK_TRACE_SUMMARY=trace-summary.o traceio.o
-libck-trace-summary.a: $(LIBCK_TRACE_SUMMARY)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_TRACE_SUMMARY)
+LIBTRACE_SUMMARY=trace-summary.o traceio.o
+libtrace-summary.a: $(LIBTRACE_SUMMARY)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBTRACE_SUMMARY)
 
-LIBCK_TRACE_PROJ=trace-projections.o traceio.o
-libck-trace-projections.a: $(LIBCK_TRACE_PROJ)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_TRACE_PROJ)
+LIBTRACE_PROJ=trace-projections.o traceio.o
+libtrace-projections.a: $(LIBTRACE_PROJ)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBTRACE_PROJ)
 
-libck-ldb-acwn.o: ldb.acwn.p ldb.h $(CKHEADERS)
+libldb-acwn.o: ldb.acwn.p ldb.h $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ ldb.acwn.p
 
-libck-ldb-rand.o: ldb.rand.p ldb.h $(CKHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ ldb.rand.p
-
-libck-ldb-mngr.o: ldb.mngr.p ldb.h $(CKHEADERS)
+libldb-mngr.o: ldb.mngr.p ldb.h $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ ldb.mngr.p
-
-libck-ldb-priomngr.o: ldb.priomngr.p ldb.h $(CKHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ ldb.priomngr.p
-
-libck-ldb-tok.o: ldb.tok.p ldb.h $(CKHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ ldb.tok.p
-
-libck-ldb-btok.o: ldb.btok.p ldb.h $(CKHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ ldb.tok.p -DBITVECTOR
-
-libck-ldb-repl.o: ldb.repl.p ldb.h $(CKHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ ldb.repl.p
-
-libck-ldb-recv.o: ldb.recv.p ldb.h $(CKHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ ldb.recv.p
 
 libck-cplus-n.a: dummy.cplus.c $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ dummy.cplus.c
 
 libck-defmain-std.a: defmain-std.c $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ defmain-std.c
-
-ldbcfns.o: ldbcfns.c $(CKHEADERS)
-	$(CHARMC) -o ldbcfns.o ldbcfns.c
 
 common.o: common.c $(CKHEADERS)
 	$(CHARMC) -o common.o common.c

@@ -638,16 +638,16 @@ endsw
 
 if (($LANGUAGE == charm) || ($LANGUAGE == charm++) || ($LANGUAGE == converse) || ($LANGUAGE == converse++) ) then
 
-    if (! -e $CHARMLIB/libck-trace-none.a) then
+    if (! -e $CHARMLIB/libtrace-none.a) then
         echo "charmc: trace libraries not installed."
         goto failure
     endif
     
     if ($?TRACEMODE == 0) set TRACEMODE=none
 
-    if (! -e $CHARMLIB/libck-trace-$TRACEMODE.a) then
+    if (! -e $CHARMLIB/libtrace-$TRACEMODE.a) then
        echo "charmc : No such tracemode $TRACEMODE"
-       (cd $CHARMLIB ; ls -al libck-trace-*)
+       (cd $CHARMLIB ; ls -al libtrace-*)
        goto failure
     endif
 
@@ -655,42 +655,30 @@ endif
 
 # Check for valid choice of BALANCE
 
-if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
+if ($?BALANCE == 0) set BALANCE=rand
 
-    if ($?BALANCE == 0) set BALANCE=rand
-
-    # Check that TRACEMODE is compatible with BALANCE
-
-    if ($TRACEMODE == replay) then
-        if ($?BALANCE == 0) set BALANCE=replay
-        if ($BALANCE != replay) then
-            echo "Ignoring -balance $BALANCE, incompatible with -tracemode replay"
-        endif
-        set BALANCE=replay
+if ($TRACEMODE == replay) then
+    if ($?BALANCE == 0) set BALANCE=replay
+    if ($BALANCE != replay) then
+        echo "Ignoring -balance $BALANCE, incompatible with -tracemode replay"
     endif
-
+    set BALANCE=replay
 endif
 
-# Check that the BAL_OBJ exists
-
-if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
-
-    if ($BALANCE:h == $BALANCE) then
-       set BAL_OBJ = $CHARMLIB/libck-ldb-$BALANCE.o
-    else
-       set BAL_OBJ = $BALANCE
-    endif
+if ($BALANCE:h == $BALANCE) then
+   set BAL_OBJ = $CHARMLIB/libldb-$BALANCE.o
+else
+   set BAL_OBJ = $BALANCE
+endif
     
-    if (! -e $BAL_OBJ) then
-       if ($BALANCE == $BAL_OBJ) then
-    	echo "charmc : Could not find load balancer object $BAL_OBJ"
-       else
-    	echo "charmc : Unknown load balancer $BALANCE"
-    	(cd $CHARMLIB ; ls -al libck-ldb-*)
-       endif
-       goto failure
+if (! -e $BAL_OBJ) then
+    if ($BALANCE == $BAL_OBJ) then
+        echo "charmc : Could not find load balancer object $BAL_OBJ"
+    else
+	echo "charmc : Unknown load balancer $BALANCE"
+    	(cd $CHARMLIB ; ls -al libldb-*)
     endif
-
+    goto failure
 endif
 
 ###############################################################################
@@ -721,7 +709,7 @@ if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
 	($ECHOCMD ; $CMK_CC $OPTS_CC -c -o CHARMC-MOD.TMP.o CHARMC-MOD.TMP.c)
         ($ECHOCMD ; $CMK_LD $OPTS_LD -o CHARMC-PRE.TMP.xxx -L$CHARMLIB \
                       $BAL_OBJ $OBJECTFILES $LIBRARIES \
-		      CHARMC-MOD.TMP.o -lck-core -lck-trace-$TRACEMODE \
+		      CHARMC-MOD.TMP.o -lck-core -ltrace-$TRACEMODE \
                       -lck-cplus-n -lconv-cplus-n -lconv-core \
 		      -lck-defmain-std -lcharm -lm $CMK_LIBS)
     else if ($LANGUAGE == charm++) then
@@ -729,7 +717,7 @@ if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
 	($ECHOCMD ; $CMK_CC $OPTS_CC -c -o CHARMC-MOD.TMP.o CHARMC-MOD.TMP.c)
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o CHARMC-PRE.TMP.xxx -L$CHARMLIB \
 		      $BAL_OBJ $OBJECTFILES $LIBRARIES \
-		      CHARMC-MOD.TMP.o -lck-core -lck-trace-$TRACEMODE \
+		      CHARMC-MOD.TMP.o -lck-core -ltrace-$TRACEMODE \
                       -lck-cplus-y -lconv-cplus-y -lconv-core \
 		      -lck-defmain-cpp -lcharm -lm $CMK_LIBS)
     endif
@@ -757,27 +745,27 @@ switch ($LANGUAGE)
     case "charm"
         ($ECHOCMD ; $CMK_LD $OPTS_LD -o $OBJECT -L$CHARMLIB \
                       CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
-                      $LIBRARIES -lck-core -lck-trace-$TRACEMODE \
+                      $LIBRARIES -lck-core -ltrace-$TRACEMODE \
                       -lck-cplus-n -lconv-cplus-n -lconv-core \
 		      -lck-defmain-std -lcharm -lm $CMK_LIBS)
         breaksw
     case "charm++"
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \
 		      CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
-                      $LIBRARIES -lck-core -lck-trace-$TRACEMODE \
+                      $LIBRARIES -lck-core -ltrace-$TRACEMODE \
                       -lck-cplus-y -lconv-cplus-y -lconv-core \
 		      -lck-defmain-cpp -lcharm -lm $CMK_LIBS)
         breaksw
     case "converse"
-        ($ECHOCMD ; $CMK_LD $OPTS_LD -o $OBJECT -L$CHARMLIB \
+        ($ECHOCMD ; $CMK_LD $OPTS_LD -o $OBJECT -L$CHARMLIB $BAL_OBJ \
 		      $OBJECTFILES $LIBRARIES -lconv-cplus-n -lconv-core\
-		      -lck-trace-$TRACEMODE \
+		      -ltrace-$TRACEMODE \
 		      -lm $CMK_LIBS)
         breaksw
     case "converse++"
-        ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \
+        ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB $BAL_OBJ \
 		      $OBJECTFILES $LIBRARIES -lconv-cplus-y -lconv-core \
-		      -lck-trace-$TRACEMODE \
+		      -ltrace-$TRACEMODE \
 		      -lm $CMK_LIBS)
         breaksw
 endsw
