@@ -559,8 +559,13 @@ int TraceProjections::traceRegisterUserEvent(const char* evt, int e)
   int biggest = -1;
   for (int i=0; i<CkpvAccess(usrEvents)->length(); i++) {
     int cur = (*CkpvAccess(usrEvents))[i]->e;
-    if (cur == e) 
-      CmiAbort("UserEvent double registered!");
+    if (cur == e) {
+      //CmiPrintf("%s %s\n", (*CkpvAccess(usrEvents))[i]->str, evt);
+      if (strcmp((*CkpvAccess(usrEvents))[i]->str, evt) == 0) 
+        return e;
+      else
+        CmiAbort("UserEvent double registered!");
+    }
     if (cur > biggest) biggest = cur;
   }
   // if no user events have so far been registered. biggest will be -1
