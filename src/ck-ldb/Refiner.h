@@ -34,11 +34,12 @@ public:
 
 protected:
   void create(int count, CentralLB::LDStats* stats, int* cur_p);
-  int refine();
+  virtual int refine();
+  int multirefine();
   void assign(computeInfo *c, int p);
   void assign(computeInfo *c, processorInfo *p);
   void deAssign(computeInfo *c, processorInfo *pRec);
-  void computeAverage();
+  virtual void computeAverage();
   double computeMax();
   int isHeavy(processorInfo *p);
   int isLight(processorInfo *p);

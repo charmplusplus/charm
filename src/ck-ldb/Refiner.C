@@ -263,6 +263,55 @@ int Refiner::refine()
   return finish;
 }
 
+int Refiner::multirefine()
+{
+  computeAverage();
+  double avg = averageLoad;
+  double max = computeMax();
+
+  const double overloadStep = 0.01;
+  const double overloadStart = 1.001;
+  double dCurOverload = max / avg;
+                                                                                
+  int minOverload = 0;
+  int maxOverload = (int)((dCurOverload - overloadStart)/overloadStep + 1);
+  double dMinOverload = minOverload * overloadStep + overloadStart;
+  double dMaxOverload = maxOverload * overloadStep + overloadStart;
+  int curOverload;
+  int refineDone = 0;
+  if (_lb_debug)
+    CmiPrintf("dMinOverload: %f dMaxOverload: %f\n", dMinOverload, dMaxOverload);
+                                                                                
+  overLoad = dMinOverload;
+  if (refine())
+    refineDone = 1;
+  else {
+    overLoad = dMaxOverload;
+    if (!refine()) {
+      CmiPrintf("ERROR: Could not refine at max overload\n");
+      refineDone = 1;
+    }
+  }
+                                                                                
+  // Scan up, until we find a refine that works
+  while (!refineDone) {
+    if (maxOverload - minOverload <= 1)
+      refineDone = 1;
+    else {
+      curOverload = (maxOverload + minOverload ) / 2;
+                                                                                
+      overLoad = curOverload * overloadStep + overloadStart;
+      if (_lb_debug)
+      CmiPrintf("Testing curOverload %d = %f [min,max]= %d, %d\n", curOverload, overLoad, minOverload, maxOverload);
+      if (refine())
+        maxOverload = curOverload;
+      else
+        minOverload = curOverload;
+    }
+  }
+
+}
+
 void Refiner::Refine(int count, CentralLB::LDStats* stats, 
 		     int* cur_p, int* new_p)
 {
@@ -284,7 +333,7 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
 
   computeAverage();
 
-  refine();
+  multirefine();
 
   for (int pe=0; pe < P; pe++) {
     Iterator nextCompute;

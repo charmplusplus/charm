@@ -63,8 +63,8 @@ private:
   void assign(computeInfo *c, int p);
   void assign(computeInfo *c, processorInfo *p);
   void deAssign(computeInfo *c, processorInfo *pRec);
-  int refine();
-  void computeAverageWithComm();
+  virtual int refine();
+  virtual void computeAverage();
   void objCommCost(int c, int pe, Messages &m);
   void commAffinity(int c, int pe, Messages &m);
   inline void printLoad() {

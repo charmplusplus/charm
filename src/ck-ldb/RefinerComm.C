@@ -44,7 +44,7 @@ void RefinerComm::create(int count, CentralLB::LDStats* _stats, int* procs)
   }
 }
 
-void RefinerComm::computeAverageWithComm()
+void RefinerComm::computeAverage()
 {
   int i;
   double total = 0.;
@@ -263,17 +263,17 @@ int RefinerComm::refine()
 {
   int i;
   int finish = 1;
-  maxHeap *heavyProcessors = new maxHeap(P);
 
+  maxHeap *heavyProcessors = new maxHeap(P);
   Set *lightProcessors = new Set();
   for (i=0; i<P; i++) {
     if (isHeavy(&processors[i])) {  
       //      CkPrintf("Processor %d is HEAVY: load:%f averageLoad:%f!\n",
-      //	       i, processors[i].load, averageLoad);
+     // 	       i, processors[i].load, averageLoad);
       heavyProcessors->insert((InfoRecord *) &(processors[i]));
     } else if (isLight(&processors[i])) {
       //      CkPrintf("Processor %d is LIGHT: load:%f averageLoad:%f!\n",
-      //	       i, processors[i].load, averageLoad);
+     // 	       i, processors[i].load, averageLoad);
       lightProcessors->insert((InfoRecord *) &(processors[i]));
     }
   }
@@ -301,8 +301,7 @@ int RefinerComm::refine()
       nextCompute.id = 0;
       computeInfo *c = (computeInfo *) 
 	donor->computeSet->iterator((Iterator *)&nextCompute);
-      // iout << iINFO << "Considering Procsessor : " 
-      //      << p->Id << "\n" << endi;
+      //CmiPrintf("Considering Procsessor : %d with load: %f for donor: %d\n", p->Id, p->load, donor->Id);
       while (c) {
         if (!c->migratable) {
 	  nextCompute.id++;
@@ -313,20 +312,16 @@ int RefinerComm::refine()
 	//CkPrintf("c->load: %f p->load:%f overLoad*averageLoad:%f \n",
 	//c->load, p->load, overLoad*averageLoad);
         Messages m;
-        double commgain;
-        commAffinity(c->Id, p->Id, m);
-        commgain = m.cost();
-        commAffinity(c->Id, p->Id, m);
-        commgain -= m.cost();
-        objCommCost(c->Id, p->Id, m);
+        objCommCost(c->Id, donor->Id, m);
         double commcost = m.cost();
-	if ( c->load + p->load + commcost < overLoad*averageLoad) {
-	  // iout << iINFO << "Considering Compute : " 
-	  //      << c->Id << " with load " 
-	  //      << c->load << "\n" << endi;
-	  if(c->load + commgain + commcost > bestSize) {
-            //CmiPrintf("[%d] comm gain %f bestSize:%f\n", c->Id, commgain, bestSize);
-	    bestSize = c->load + commgain + commcost ;
+        commAffinity(c->Id, p->Id, m);
+        double commgain = m.cost();;
+
+        //CmiPrintf("Considering Compute: %d with load %f commcost:%f commgain:%f\n", c->Id, c->load, commcost, commgain);
+	if ( c->load + p->load + commcost - commgain < overLoad*averageLoad) {
+          //CmiPrintf("[%d] comm gain %f bestSize:%f\n", c->Id, commgain, bestSize);
+	  if(c->load + commcost - commgain > bestSize) {
+	    bestSize = c->load + commcost - commgain;
 	    bestCompute = c;
 	    bestP = p;
 	  }
@@ -341,7 +336,7 @@ int RefinerComm::refine()
 
     if (bestCompute) {
       if (_lb_debug)
-      CkPrintf("Assign: [%d] with load: %f from %d to %d \n",
+        CkPrintf("Assign: [%d] with load: %f from %d to %d \n",
       	       bestCompute->Id, bestCompute->load, 
                donor->Id, bestP->Id);
       deAssign(bestCompute, donor);      
@@ -351,7 +346,20 @@ int RefinerComm::refine()
       if (_lb_debug)  printLoad();
 
       // update commnication
-      computeAverageWithComm();
+      computeAverage();
+      delete heavyProcessors;
+      delete lightProcessors;
+      heavyProcessors = new maxHeap(P);
+      lightProcessors = new Set();
+      for (i=0; i<P; i++) {
+        if (isHeavy(&processors[i])) {  
+          //      CkPrintf("Processor %d is HEAVY: load:%f averageLoad:%f!\n",
+          //	       i, processors[i].load, averageLoad);
+          heavyProcessors->insert((InfoRecord *) &(processors[i]));
+        } else if (isLight(&processors[i])) {
+          lightProcessors->insert((InfoRecord *) &(processors[i]));
+        }
+      }
       if (_lb_debug) CmiPrintf("averageLoad after assignment: %f\n", averageLoad);
     } else {
       finish = 0;
@@ -359,6 +367,7 @@ int RefinerComm::refine()
     }
 
 
+/*
     if (bestP->load > averageLoad)
       lightProcessors->remove(bestP);
     
@@ -366,6 +375,7 @@ int RefinerComm::refine()
       heavyProcessors->insert((InfoRecord *) donor);
     else if (isLight(donor))
       lightProcessors->insert((InfoRecord *) donor);
+*/
   }  
 
   delete heavyProcessors;
@@ -403,10 +413,10 @@ void RefinerComm::Refine(int count, CentralLB::LDStats* stats,
   removeComputes();
   if (_lb_debug)  printLoad();
 
-  computeAverageWithComm();
+  computeAverage();
   if (_lb_debug) CmiPrintf("averageLoad: %f\n", averageLoad);
 
-  refine();
+  multirefine();
 
   for (int pe=0; pe < P; pe++) {
     Iterator nextCompute;
