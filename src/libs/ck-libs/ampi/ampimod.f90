@@ -152,4 +152,14 @@ module MPIINCL
   external MPI_Get
   external MPI_Accumulate
 
+  external AMPI_Info_create
+  external AMPI_Info_set
+  external AMPI_Info_delete
+  external AMPI_Info_get
+  external AMPI_Info_get_valuelen
+  external AMPI_Info_get_nkeys
+  external AMPI_Info_get_nthkey
+  external AMPI_Info_dup
+  external AMPI_Info_free
+
 end module MPIINCL

@@ -570,10 +570,9 @@ int AMPI_Type_get_contents(MPI_Datatype datatype, int max_integers, int max_addr
                           MPI_Datatype array_of_datatypes[]);
 
 
-/*********************One sided communication routines *******************/ 
+/*********************One sided communication routines *****************/ 
 /*  MPI_Win : an index into a list in ampiParent (just like MPI_Group) */
-#define MAXWINNUMBER 9 
-#define MPI_MAX_OBJECT_NAME 100
+#define MPI_MAX_OBJECT_NAME 255  // name length for COMM, TYPE and WIN
 #define MPI_MAX_INFO_KEY 255
 #define MPI_MAX_INFO_VAL 1024
 
@@ -621,6 +620,25 @@ int AMPI_Get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
 int AMPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
 		   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
 		   MPI_Op op, MPI_Win win);
+
+#define MPI_Info_create AMPI_Info_create
+int AMPI_Info_create(MPI_Info *info);
+#define MPI_Info_set AMPI_Info_set
+int AMPI_Info_set(MPI_Info info, char *key, char *value);
+#define MPI_Info_delete AMPI_Info_delete
+int AMPI_Info_delete(MPI_Info info, char *key);
+#define MPI_Info_get AMPI_Info_get
+int AMPI_Info_get(MPI_Info info, char *key, int valuelen, char *value, int *flag);
+#define MPI_Info_get_valuelen AMPI_Info_get_valuelen
+int AMPI_Info_get_valuelen(MPI_Info info, char *key, int *valuelen, int *flag);
+#define MPI_Info_get_nkeys AMPI_Info_get_nkeys
+int AMPI_Info_get_nkeys(MPI_Info info, int *nkeys);
+#define MPI_Info_get_nthkey AMPI_Info_get_nthkey
+int AMPI_Info_get_nthkey(MPI_Info info, int n, char *key);
+#define MPI_Info_dup AMPI_Info_dup
+int AMPI_Info_dup(MPI_Info info, MPI_Info *newinfo);
+#define MPI_Info_free AMPI_Info_free
+int AMPI_Info_free(MPI_Info *info);
 
 #include "ampiProjections.h"
 #ifdef __cplusplus

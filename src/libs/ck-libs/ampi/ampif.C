@@ -157,6 +157,17 @@ FDECL {
 #define mpi_get  FTN_NAME ( MPI_GET  , mpi_get )
 #define mpi_accumulate  FTN_NAME ( MPI_ACCUMULATE  , mpi_accumulate )
 
+#define mpi_info_create FTN_NAME ( MPI_INFO_CREATE , mpi_info_create )
+#define mpi_info_set FTN_NAME ( MPI_INFO_SET , mpi_info_set )
+#define mpi_info_delete FTN_NAME ( MPI_INFO_DELETE , mpi_info_delete )
+#define mpi_info_get FTN_NAME ( MPI_INFO_GET , mpi_info_get )
+#define mpi_info_get_valuelen FTN_NAME ( MPI_INFO_GET_VALUELEN , mpi_info_get_valuelen )
+#define mpi_info_get_nkeys FTN_NAME ( MPI_INFO_GET_NKEYS , mpi_info_get_nkeys )
+#define mpi_info_get_nthkey FTN_NAME ( MPI_INFO_GET_NTHKEYS , mpi_info_get_nthkey )
+#define mpi_info_dup FTN_NAME ( MPI_INFO_DUP , mpi_info_dup )
+#define mpi_info_free FTN_NAME ( MPI_INFO_FREE , mpi_info_free )
+
+
 void mpi_init_universe(int *unicomm)
 {
   AMPIAPI("mpi_init_universe");
@@ -886,5 +897,35 @@ void mpi_accumulate(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
 		   int *op, int win, int *ierr){
   *ierr = AMPI_Accumulate(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, *op, win);
 }
+
+void mpi_info_create(int* info, int* ierr){
+  *ierr = MPI_Info_create(info);
+}
+void mpi_info_set(int* info, char *key, char *value, int* ierr){
+  *ierr = MPI_Info_set(*info, key, value);
+}
+void mpi_info_delete(int* info, char* key, int* ierr){
+  *ierr = MPI_Info_delete(*info, key);
+}
+void mpi_info_get(int* info, char *key, int *valuelen, char *value, int *flag, int* ierr){
+  *ierr = MPI_Info_get(*info, key, *valuelen, value, flag);
+}
+void mpi_info_get_valuelen(int* info, char *key, int *valuelen, int *flag, int* ierr){
+  *ierr = MPI_Info_get_valuelen(*info, key, valuelen, flag);
+}
+void mpi_info_get_nkeys(int* info, int *nkeys, int* ierr){
+  *ierr = MPI_Info_get_nkeys(*info, nkeys);
+}
+void mpi_info_get_nthkey(int* info, int *n, char *key, int* ierr){
+  *ierr = MPI_Info_get_nthkey(*info, *n, key);
+}
+void mpi_info_dup(int* info, int* newinfo, int* ierr){
+  *ierr = MPI_Info_dup(*info, newinfo);
+}
+void mpi_info_free(int* info, int* ierr){
+  *ierr = MPI_Info_free(info);
+}
+
+
 } // extern "C"
 

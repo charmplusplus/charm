@@ -13,6 +13,12 @@
 #include "EachToManyMulticastStrategy.h" /* for ComlibManager Strategy*/
 #include <string.h> /* for strlen */
 
+#if 0
+#define AMPI_DEBUG CkPrintf
+#else
+#define AMPI_DEBUG /* empty */
+#endif
+
 typedef struct mpiComplex_{ double re, im; } mpiComplex;
 
 //------------------- added by YAN for one-sided communication -----------
@@ -93,6 +99,45 @@ class win_obj {
   bool emptyQueue();
 };
 //-----------------------End of code by YAN ----------------------
+
+class KeyvalPair{
+protected:
+  int klen, vlen;
+  char* key;
+  char* val;
+public:
+  KeyvalPair(void){ }
+  KeyvalPair(char* k, char* v);
+  ~KeyvalPair(void);
+  void pup(PUP::er& p){
+    p|klen; p|vlen;
+    if(p.isUnpacking()){
+      key=new char[klen];
+      val=new char[vlen];
+    }
+    p(key,klen);
+    p(val,vlen);
+  }
+friend class InfoStruct;
+};
+
+class InfoStruct{
+  CkPupPtrVec<KeyvalPair> nodes;
+  bool valid;
+public:
+  InfoStruct(void):valid(true) { }
+  void setvalid(bool valid_){ valid = valid_; }
+  bool getvalid(void){ return valid; }
+  void set(char* k, char* v);
+  void dup(InfoStruct& src);
+  int get(char* k, int vl, char*& v); // return flag
+  int deletek(char* k); // return -1 when not found
+  int get_valuelen(char* k, int* vl); // return flag
+  int get_nkeys(void) { return nodes.size(); }
+  int get_nthkey(int n,char* k);
+  void myfree(void);
+  void pup(PUP::er& p);
+};
 
 class CProxy_ampi;
 class CProxyElement_ampi;
@@ -696,29 +741,17 @@ class AmpiOOQ {
   void _expand (void);
 
 public:
-
   AmpiOOQ () {}
-  
   void init (int numP);
-
   ~AmpiOOQ ();
-  
   void pup(PUP::er &p);
-
   int length () { return (m_totalNodes - m_availNodes); }
-
   int length (int p) { return m_q[p].m_size; }
-
   int isEmpty (int p) { return (0 == m_q[p].m_size); }
-
   bool isEmpty () { return (m_totalNodes == m_availNodes); }
-
   AmpiMsg* deq (int p);
-
   void insert (int p, int pos, AmpiMsg*& elt);
-
   void enq (int p, AmpiMsg*& elt);
-
   AmpiMsg* peek (int p, int pos);
 };
 
@@ -726,15 +759,11 @@ class AmpiSeqQ : private CkNoncopyable {
   int *next;
   AmpiOOQ q;
   int seqEntries;
-  
-  public:
-  
+
+public:
   AmpiSeqQ () {}
- 
   AmpiSeqQ(int p) { init(p); }
-  
   ~AmpiSeqQ () { delete [] next; }
-  
   void init(int p) {
     seqEntries = p;
     q.init (p);
@@ -742,7 +771,6 @@ class AmpiSeqQ : private CkNoncopyable {
     for (int i=0; i<p; i++)
       next [i] = 0;
   }
-  
   AmpiMsg *get(int p)
   {
     if(q.isEmpty(p) || ((q.peek(p,0))->seq != next [p])) {
@@ -771,9 +799,7 @@ class AmpiSeqQ : private CkNoncopyable {
     p|q;
   }
 };
-
 PUPmarshall(AmpiSeqQ);
-
 
 inline CProxy_ampi ampiCommStruct::getProxy(void) const {return ampiID;}
 const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo);
@@ -821,7 +847,8 @@ class ampiParent : public CBase_ampiParent {
 
     CkPupPtrVec<groupStruct> groups; // "Wild" groups that don't have a communicator
     CkPupPtrVec<WinStruct> winStructList;   //List of windows for one-sided communication
-       
+    CkPupPtrVec<InfoStruct> infos; // list of all MPI_Infos
+    
     inline int isSplit(MPI_Comm comm) const {
       return (comm>=MPI_COMM_FIRST_SPLIT && comm<MPI_COMM_FIRST_GROUP);
     }
@@ -1030,7 +1057,18 @@ public:
     
     int addWinStruct(WinStruct* win);
     WinStruct getWinStruct(MPI_Win win);
-    void removeWinStruct(WinStruct win); 
+    void removeWinStruct(WinStruct win);
+
+public:
+    MPI_Info createInfo(void);
+    MPI_Info dupInfo(MPI_Info info);
+    void setInfo(MPI_Info info, char *key, char *value);
+    int deleteInfo(MPI_Info info, char *key);    
+    int getInfo(MPI_Info info, char *key, int valuelen, char *value);
+    int getInfoValuelen(MPI_Info info, char *key, int *valuelen);
+    int getInfoNkeys(MPI_Info info);
+    int getInfoNthkey(MPI_Info info, int n, char *key);
+    void freeInfo(MPI_Info info);
 };
 
 /*
@@ -1145,52 +1183,36 @@ class ampi : public CBase_ampi {
     int nbcasts;
     //------------------------ Added by YAN ---------------------
  private:
-    //win_obj winObjects;  
     CkPupPtrVec<win_obj> winObjects;
-    	
  public:
     MPI_Win createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info); 
-
     int deleteWinInstance(MPI_Win win);
-
     int winGetGroup(WinStruct win, MPI_Group *group); 
-
     int winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
 	       MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win);
-
     int winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
 	       MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win);
-
-
     void winRemotePut(int orgcnt, char* orgaddr, MPI_Datatype orgtype,
 		      MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
 		      int winIndex, CkFutureID ftHandle, int pe_src);
-
     void winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, 
 		      int targcnt, MPI_Datatype targtype, 
     		      int winIndex, CkFutureID ftHandle, int pe_src);
-
     int winLock(int lock_type, int rank, WinStruct win);
     int winUnlock(int rank, WinStruct win);
-    
     void winRemoteLock(int lock_type, int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
     void winRemoteUnlock(int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
-    
     int winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
 	    	      MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
 		      MPI_Op op, WinStruct win);
-    
     void winRemoteAccumulate(int orgcnt, char* orgaddr, MPI_Datatype orgtype, MPI_Aint targdisp, 
 	  		    int targcnt, MPI_Datatype targtype, 
 		            MPI_Op op, int winIndex, CkFutureID ftHandle, 
 			    int pe_src);
-
     void winSetName(WinStruct win, char *name);
     void winGetName(WinStruct win, char *name, int *length);
-			    	      
     win_obj* getWinObjInstance(WinStruct win); 
     int getNewSemaId(); 
-	
     //------------------------ End of code by YAN ---------------------
 };
 

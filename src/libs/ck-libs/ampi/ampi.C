@@ -18,12 +18,6 @@
 #define MSG_ORDER_DEBUG(x) /* empty */
 #define STARTUP_DEBUG(x)  /* ckout<<"ampi[pe "<<CkMyPe()<<"] "<< x <<endl; */
 
-#if 0
-#define AMPI_DEBUG CkPrintf
-#else
-#define AMPI_DEBUG /* empty */
-#endif
-
 #ifndef AMPI_COMLIB
 #  define AMPI_COMLIB 0
 #endif
@@ -537,6 +531,8 @@ void ampiParent::pup(PUP::er &p) {
   p|ampiReqs;
   p|RProxyCnt;
   p|tmpRProxy;
+  p|winStructList;
+  p|infos;
 }
 void ampiParent::prepareCtv(void) {
   thread=threads[thisIndex].ckLocal();
@@ -758,251 +754,6 @@ ampi::~ampi()
   delete[] nextseq;
   CmmFree(msgs);
 }
-
-// ----------------- Added by Yan for one-sided communication ---------
-int ampiParent::addWinStruct(WinStruct* win) { 
-	winStructList.push_back(win);
-	return winStructList.size()-1;
-}
-
-WinStruct ampiParent::getWinStruct(MPI_Win win) {
-	return *(winStructList[(int)win]);
-}
-   
-void ampiParent::removeWinStruct(WinStruct win) {/*winStructList.remove(win);*/}
-
-int
-ampi::winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
-	     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win){
-  // Create a Future object 
-  AmpiMsg *msg = new AmpiMsg();
-  CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
-  AMPI_DEBUG("    Created Future with handle %d\n", ftHandle);
-  
-  CProxy_ampi pa(thisArrayID);
-  pa[rank].winRemotePut(orgcnt*sizeof(orgtype), (char*)orgaddr, orgtype, targdisp, targcnt, targtype, 
-  			win.index, ftHandle, CkMyPe());
-
-  // Wait on the Future object 
-  AMPI_DEBUG("    Future [%d] waiting\n", ftHandle);
-  msg = (AmpiMsg*)CkWaitFuture(ftHandle);
-  AMPI_DEBUG("    Future [%d] awaken\n", ftHandle);
-  
-  return MPI_SUCCESS;
-}
-
-void
-ampi::winRemotePut(int orgcnt, char* orgaddr, MPI_Datatype orgtype, 
-		   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-		   int winIndex, CkFutureID ftHandle, int pe_src) {
-  win_obj *winobj = winObjects[winIndex];	
-
-  winobj->put(orgaddr, orgcnt/sizeof(orgtype), orgtype, targdisp, targcnt, targtype);
-
-  int tmp = 0;
-  AmpiMsg *msg = new (&tmp, 0) AmpiMsg(-1, -1, -1, thisIndex, 0,myComm.getComm());
-  AMPI_DEBUG("    Rank[%d] Send to Future [%d] \n", thisIndex, ftHandle);
-  CkSendToFuture(ftHandle, (void *)msg, pe_src);
-}
-
-int 
-ampi::winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank, 
-	     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct win){
-  // Create a Future object 
-  AmpiMsg *msg = new AmpiMsg();
-  CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
-  AMPI_DEBUG("    Created Future with handle %d\n", ftHandle);
-
-  // Send the request to data and handle of Future to remote side 
-  CProxy_ampi pa(thisArrayID);
-  AMPI_DEBUG("    Rank[%d:%d] invoke Remote get at [%d]\n", thisIndex, myRank, rank);
-  pa[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win.index, ftHandle, CkMyPe());
-
-  // Wait on the Future object 
-  AMPI_DEBUG("    Future [%d] waiting\n", ftHandle);
-  msg = (AmpiMsg*)CkWaitFuture(ftHandle);
-  AMPI_DEBUG("    Future [%d] awaken\n", ftHandle);
-  
-  // Process the reply message and copy the data into desired memory position 
-  memcpy(orgaddr, msg->data, orgcnt*sizeof(orgtype));  
-  AMPI_DEBUG("    Rank[%d] got win  [%d] \n", thisIndex, *(int*)msg->data);
-  AMPI_DEBUG("    Rank[%d] got win  [%d] , size %d\n", thisIndex, *(int*)orgaddr, orgcnt);
-  return MPI_SUCCESS;
-}
-
-void
-ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt, 
-		   MPI_Datatype targtype, int winIndex, CkFutureID ftHandle, 
-		   int pe_src) {
-  AMPI_DEBUG("    RemoteGet invoked at Rank[%d:%d]\n", thisIndex, myRank);  
-  void * orgaddr = (void*) new char[orgcnt];
-
-  win_obj *winobj = winObjects[winIndex];
-  winobj->get(orgaddr, orgcnt, orgtype, targdisp, targcnt, targtype);
-  AMPI_DEBUG("    Rank[%d] get win  [%d] \n", thisIndex, *(int*)orgaddr);
-  
-
-  AmpiMsg *msg = new (&orgcnt, 0) AmpiMsg(-1, -1, -1, thisIndex, orgcnt,myComm.getComm());
-  memcpy(msg->data, orgaddr, orgcnt*sizeof(orgtype));
-  AMPI_DEBUG("    Rank[%d] copy win  [%d] \n", thisIndex, *(int*)msg->data);
-
-  AMPI_DEBUG("    Rank[%d] Send to Future [%d] \n", thisIndex, ftHandle);
-  CkSendToFuture(ftHandle, (void *)msg, pe_src);
- } 
- 
-int 
-ampi::winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
-       	            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
-		    MPI_Op op, WinStruct win) {
-  // Create a Future object 
-  AmpiMsg *msg = new AmpiMsg();
-  CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
-  AMPI_DEBUG("    Created Future with handle %d\n", ftHandle);
-
-  // Send the request to data and handle of Future to remote side 
-  CProxy_ampi pa(thisArrayID);
-  AMPI_DEBUG("    Rank[%d:%d] invoke Remote accumulate at [%d]\n", thisIndex, myRank, rank);
-  pa[rank].winRemoteAccumulate(orgcnt*sizeof(orgtype), (char*)orgaddr, orgtype, targdisp, targcnt, targtype,
-  			       op, win.index, ftHandle, CkMyPe());
-
-  // Wait on the Future object 
-  AMPI_DEBUG("    Future [%d] waiting\n", ftHandle);
-  msg = (AmpiMsg*)CkWaitFuture(ftHandle);
-  AMPI_DEBUG("    Future [%d] awaken\n", ftHandle);
-  
-  return MPI_SUCCESS; 
-}
-
-void
-ampi::winRemoteAccumulate(int orgcnt, char* orgaddr, MPI_Datatype orgtype, MPI_Aint targdisp, 
-			  int targcnt, MPI_Datatype targtype, 
-		          MPI_Op op, int winIndex, CkFutureID ftHandle, 
-			  int pe_src) {
-  win_obj *winobj = winObjects[winIndex]; 
-  winobj->accumulate(orgaddr, orgcnt/sizeof(orgtype), orgtype, targdisp, targcnt, targtype, op);  
-  
-  int tmp = 0;
-  AmpiMsg *msg = new (&tmp, 0) AmpiMsg(-1, -1, -1, thisIndex, 0,myComm.getComm());
-
-  AMPI_DEBUG("    Rank[%d] Send to Future [%d] \n", thisIndex, ftHandle);
-  CkSendToFuture(ftHandle, (void *)msg, pe_src);
-}
-
-int 
-ampi::winLock(int lock_type, int rank, WinStruct win) {
-  // Create a Future object 
-  AmpiMsg *msg = new AmpiMsg();
-  CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
-  AMPI_DEBUG("    [%d] Lock: Created Future with handle %d\n", thisIndex, ftHandle);
-
-  // Send the request to data and handle of Future to remote side 
-  CProxy_ampi pa(thisArrayID);
-  AMPI_DEBUG("    [%d] Lock: invoke Remote lock at [%d]\n", thisIndex, rank);
-  pa[rank].winRemoteLock(lock_type, win.index, ftHandle, CkMyPe(), thisIndex);
-
-  // Wait on the Future object 
-  AMPI_DEBUG("    [%d] Lock: Future [%d] waiting\n", thisIndex, ftHandle);
-  msg = (AmpiMsg*)CkWaitFuture(ftHandle);
-  AMPI_DEBUG("    [%d] Lock: Future [%d] awaken\n", thisIndex, ftHandle);
-  
-  return MPI_SUCCESS;
-}
-
-void 
-ampi::winRemoteLock(int lock_type, int winIndex, CkFutureID ftHandle, int pe_src, int requestRank) {
-  AMPI_DEBUG("    [%d] RemoteLock: invoked \n", thisIndex);
-  win_obj *winobj = winObjects[winIndex]; 
-
-  // check if any one else waiting in the queue 
-  if(winobj->owner > -1 && !(winobj->emptyQueue()))  {
-  // queue it if queue non-empty
-    winobj->enqueue(requestRank, pe_src, ftHandle, lock_type);	
-    AMPI_DEBUG("    [%d] RemoteLock: queue lock from [%d] \n", thisIndex, requestRank); 
-  }  
-  // if queue empty, get semaphore and queue it
-  else {
-    winobj->lock(requestRank, pe_src, ftHandle, lock_type);
-    winobj->enqueue(requestRank, pe_src, ftHandle, lock_type);	
-    AMPI_DEBUG("    [%d] RemoteLock: give lock to [%d] \n", thisIndex, requestRank);
-  }
-}
-
-int 
-ampi::winUnlock(int rank, WinStruct win) {
-  // Create a Future object 
-  AmpiMsg *msg = new AmpiMsg();
-  CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
-  AMPI_DEBUG("    [%d] Unlock: Created Future with handle %d\n", thisIndex, ftHandle);
-  
-  // Send the request to data and handle of Future to remote side 
-  CProxy_ampi pa(thisArrayID);
-  AMPI_DEBUG("    [%d] Unlock: invoke Remote lock at [%d]\n", thisIndex, rank);
-  pa[rank].winRemoteUnlock(win.index, ftHandle, CkMyPe(), thisIndex);
-
-  // Wait on the Future object 
-  AMPI_DEBUG("    [%d] Unlock: Future [%d] waiting\n", thisIndex, ftHandle);
-  msg = (AmpiMsg*)CkWaitFuture(ftHandle);
-  AMPI_DEBUG("    [%d] Unlock: Future [%d] awaken\n", thisIndex, ftHandle);
-  
-  return MPI_SUCCESS;
-}
-
-void 
-ampi::winRemoteUnlock(int winIndex, CkFutureID ftHandle, int pe_src, int requestRank) {
-  AMPI_DEBUG("    [%d] RemoteUnlock: invoked \n", thisIndex);
-  win_obj *winobj = winObjects[winIndex];
-  winobj->unlock(requestRank, pe_src, ftHandle);  
-  AMPI_DEBUG("    [%d] RemoteUnlock: [%d] release lock\n", thisIndex, requestRank);
-
-  // if queue non-empty, get lock for the first waiting one and reply
-  if(!(winobj->emptyQueue())) {
-    AMPI_DEBUG("    [%d] RemoteUnlock: queue non-empty, give lock to \n", thisIndex );
-    winobj->lockTopQueue(); 
-  }
-}
-
-MPI_Win 
-ampi::createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info) {
-  AMPI_DEBUG("     Creating win obj {%d, %p}\n ", myComm.getComm(), base);
-  win_obj *newobj = new win_obj((char*)(NULL), base, size, disp_unit, myComm.getComm());
-  winObjects.push_back(newobj);
-  WinStruct *newwin = new WinStruct(myComm.getComm(),winObjects.size()-1);
-  AMPI_DEBUG("     Creating MPI_WIN at (%p) with {%d, %d}\n", &newwin, myComm.getComm(), winObjects.size()-1);
-  return (parent->addWinStruct(newwin));
-}
-
-int 
-ampi::deleteWinInstance(MPI_Win win) {
-  WinStruct winStruct = parent->getWinStruct(win);
-  win_obj *winobj = winObjects[winStruct.index];
-  parent->removeWinStruct(winStruct); // really it does nothing at all
-  winobj->free();
-  return MPI_SUCCESS;
-}
-
-int 
-ampi::winGetGroup(WinStruct win, MPI_Group *group){
-   *group = parent->comm2group(win.comm);
-   return MPI_SUCCESS;
-}
-
-void 
-ampi::winSetName(WinStruct win, char *name) {
-  win_obj *winobj = winObjects[win.index];
-  winobj->setName((const char*)name, strlen(name));
-}
-
-void 
-ampi::winGetName(WinStruct win, char *name, int *length) {
-  win_obj *winobj = winObjects[win.index];
-  winobj->getName(name, length);
-}
-
-win_obj*
-ampi::getWinObjInstance(WinStruct win) {
-  return winObjects[win.index];
-}
-//------------------------ End of Adding by YAN ---------------------
 
 //------------------------ Communicator Splitting ---------------------
 class ampiSplitKey {
@@ -1596,6 +1347,126 @@ int MPI_null_delete_fn (MPI_Comm comm, int keyval, void *attr, void *extra_state
   return (MPI_SUCCESS);
 }
 
+void AmpiOOQ::_expand (void) {
+  AmpiNode* list;
+  list = new AmpiNode [m_totalNodes + INITIAL_Q_SIZE];
+  memcpy (list, m_list, sizeof (AmpiNode)*m_totalNodes);
+  delete [] m_list;
+  m_list = list;
+  m_freeNode = m_totalNodes;
+  for (int i=m_totalNodes; i<m_totalNodes+INITIAL_Q_SIZE; i++) {
+    m_list [i].m_next = i+1;
+  }
+  m_totalNodes += INITIAL_Q_SIZE;
+  m_list [m_totalNodes-1].m_next = -1;
+  m_availNodes = INITIAL_Q_SIZE;
+}
+
+void AmpiOOQ::init (int numP) {
+  m_numP       = numP;
+  m_totalNodes = INITIAL_Q_SIZE;
+  m_freeNode   = 0;
+  m_availNodes = m_totalNodes;
+  m_q          = new Que [numP];
+  m_list       = new AmpiNode [m_totalNodes];
+  for (int i=0; i<m_totalNodes; i++) {
+    m_list [i].m_next = i+1;
+  }
+  m_list [m_totalNodes-1].m_next = -1;
+}
+
+AmpiOOQ::~AmpiOOQ () {
+  delete [] m_list;
+  delete [] m_q;
+}
+  
+void AmpiOOQ::pup(PUP::er &p) {
+  p|m_numP;
+  p|m_totalNodes;
+  p|m_freeNode;
+  p|m_availNodes;
+   
+  if (p.isUnpacking()) {
+    m_q    = new Que [m_numP];
+    m_list = new AmpiNode [m_totalNodes];
+  }
+  p(m_q,m_numP);
+  p(m_list,m_totalNodes);
+}
+
+AmpiMsg* AmpiOOQ::deq (int p) {
+  if (-1 != m_q[p].m_head) {
+    int index                     = m_q[p].m_head;
+    AmpiMsg*& ret                 = m_list [index].m_data;
+    m_q[p].m_head                 = m_list [index].m_next;
+    m_list [index].m_next         = m_freeNode;
+    m_freeNode                    = index;
+    m_q[p].m_size --;
+    m_availNodes ++;
+    if (-1 == m_q[p].m_head)
+      m_q[p].m_tail = -1;
+    return ret;
+ } else return NULL;
+}
+
+void AmpiOOQ::insert (int p, int pos, AmpiMsg*& elt) {
+  if (-1 == m_freeNode) _expand ();
+
+  if ((0 == m_q[p].m_size) || (pos == m_q[p].m_size)) {
+    enq (p, elt);
+  } else {
+    int index = m_freeNode;
+    m_list [index].m_data = elt;
+    m_availNodes --;
+    m_freeNode = m_list [index].m_next;
+    m_q[p].m_size ++;
+    // insert the message at proper position
+    if (0 == pos) {
+      // insert before the current head of queue
+      m_list [index].m_next = m_q[p].m_head;
+      m_q[p].m_head = index;
+    } else {
+      // find the position between head and tail
+      int curr = m_q[p].m_head;
+      int next = m_list[curr].m_next;
+      for (int i=0; i<pos-1; i++) {
+        curr = next;
+        next = m_list[curr].m_next;
+      }
+      m_list [curr].m_next = index;
+      m_list [index].m_next = next;
+    }
+  }
+}
+
+void AmpiOOQ::enq (int p, AmpiMsg*& elt) {
+  if (-1 == m_freeNode) _expand ();
+
+  m_list [m_freeNode].m_data = elt;
+  m_availNodes --;
+  m_q[p].m_size ++;
+  if (-1 != m_q[p].m_tail) {
+    m_list [m_q[p].m_tail].m_next = m_freeNode;
+  } else {
+    m_q[p].m_head = m_freeNode;
+  }
+  m_q[p].m_tail = m_freeNode;
+  m_freeNode = m_list [m_freeNode].m_next;
+  m_list [m_q[p].m_tail].m_next = -1;
+}
+
+AmpiMsg* AmpiOOQ::peek (int p, int pos) {
+  int index = m_q[p].m_head;
+  if (pos >= m_q[p].m_size)
+    return NULL;
+  else {
+    for (int i=0; i<pos; i++) {
+      index = m_list [index].m_next;
+    }
+    return m_list [index].m_data;
+  }
+}
+  
 //------------------ External Interface -----------------
 ampiParent *getAmpiParent(void) {
   ampiParent *p = CtvAccess(ampiPtr);
@@ -3912,133 +3783,5 @@ int AMPI_Resume(int dest, int comm) {
 	return 0;
 }
 
-void AmpiOOQ::_expand (void) {
-  AmpiNode* list;
-
-  list = new AmpiNode [m_totalNodes + INITIAL_Q_SIZE];
-  memcpy (list, m_list, sizeof (AmpiNode)*m_totalNodes);
-
-  delete [] m_list;
-  m_list = list;
-
-  m_freeNode = m_totalNodes;
-  for (int i=m_totalNodes; i<m_totalNodes+INITIAL_Q_SIZE; i++) {
-    m_list [i].m_next = i+1;
-  }
-  m_totalNodes += INITIAL_Q_SIZE;
-  m_list [m_totalNodes-1].m_next = -1;
-  m_availNodes = INITIAL_Q_SIZE;
-}
-
-void AmpiOOQ::init (int numP) {
-  m_numP       = numP;
-  m_totalNodes = INITIAL_Q_SIZE;
-  m_freeNode   = 0;
-  m_availNodes = m_totalNodes;
-  m_q          = new Que [numP];
-  m_list       = new AmpiNode [m_totalNodes];
-  for (int i=0; i<m_totalNodes; i++) {
-    m_list [i].m_next = i+1;
-  }
-  m_list [m_totalNodes-1].m_next = -1;
-}
-
-AmpiOOQ::~AmpiOOQ () {
-  delete [] m_list;
-  delete [] m_q;
-}
-  
-void AmpiOOQ::pup(PUP::er &p) {
-  p|m_numP;
-  p|m_totalNodes;
-  p|m_freeNode;
-  p|m_availNodes;
-   
-  if (p.isUnpacking()) {
-    m_q    = new Que [m_numP];
-    m_list = new AmpiNode [m_totalNodes];
-  }
-  p(m_q,m_numP);
-  p(m_list,m_totalNodes);
-}
-
-AmpiMsg* AmpiOOQ::deq (int p) {
-  if (-1 != m_q[p].m_head) {
-    int index                     = m_q[p].m_head;
-    AmpiMsg*& ret                 = m_list [index].m_data;
-    m_q[p].m_head                 = m_list [index].m_next;
-    m_list [index].m_next         = m_freeNode;
-    m_freeNode                    = index;
-    m_q[p].m_size --;
-    m_availNodes ++;
-    if (-1 == m_q[p].m_head)
-      m_q[p].m_tail = -1;
-    return ret;
- } else return NULL;
-}
-
-void AmpiOOQ::insert (int p, int pos, AmpiMsg*& elt) {
-  if (-1 == m_freeNode) _expand ();
-
-  if ((0 == m_q[p].m_size) || (pos == m_q[p].m_size)) {
-    enq (p, elt);
-  } else {
-    int index = m_freeNode;
-
-    m_list [index].m_data = elt;
-    m_availNodes --;
-    m_freeNode = m_list [index].m_next;
-    m_q[p].m_size ++;
-
-    // insert the message at proper position
-    if (0 == pos) {
-      // insert before the current head of queue
-      m_list [index].m_next = m_q[p].m_head;
-      m_q[p].m_head = index;
-    } else {
-      // find the position between head and tail
-      int curr = m_q[p].m_head;
-      int next = m_list[curr].m_next;
-        
-      for (int i=0; i<pos-1; i++) {
-        curr = next;
-        next = m_list[curr].m_next;
-      }
-
-      m_list [curr].m_next = index;
-      m_list [index].m_next = next;
-    }
-  }
-}
-
-void AmpiOOQ::enq (int p, AmpiMsg*& elt) {
-  if (-1 == m_freeNode) _expand ();
-
-  m_list [m_freeNode].m_data = elt;
-  m_availNodes --;
-  m_q[p].m_size ++;
-  if (-1 != m_q[p].m_tail) {
-    m_list [m_q[p].m_tail].m_next = m_freeNode;
-  } else {
-    m_q[p].m_head = m_freeNode;
-  }
-  m_q[p].m_tail = m_freeNode;
-  m_freeNode = m_list [m_freeNode].m_next;
-  m_list [m_q[p].m_tail].m_next = -1;
-}
-
-AmpiMsg* AmpiOOQ::peek (int p, int pos) {
-  int index = m_q[p].m_head;
-
-  if (pos >= m_q[p].m_size)
-    return NULL;
-  else {
-    for (int i=0; i<pos; i++) {
-      index = m_list [index].m_next;
-    }
-    return m_list [index].m_data;
-  }
-}
-  
 #include "ampi.def.h"
 
