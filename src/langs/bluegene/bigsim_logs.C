@@ -207,9 +207,9 @@ void BgTimeLog::print(int node, int th)
 void BgTimeLog::write(FILE *fp)
 { 
   int i;
-//  fprintf(fp,"<<==  %p ep:%d name:%s (srcnode:%d msgID:%d) startTime:%f endTime:%f recvime:%f effRecvTime:%e seqno:%d startevent:%d\n", this, ep, name, msgId.node(), msgId.msgID(), startTime, endTime, recvTime, effRecvTime, seqno, isStartEvent());
-  fprintf(fp,"<<==  %p name:%s (srcnode:%d msgID:%d) ep:%d %s\n", this, name, msgId.node(), msgId.msgID(), ep, isStartEvent()?"STARTEVENT":"");
-  fprintf(fp,"[[  recvime:%f startTime:%f endTime:%f ]]\n", recvTime, startTime, endTime);
+//  fprintf(fp,"%p ep:%d name:%s (srcnode:%d msgID:%d) startTime:%f endTime:%f recvime:%f effRecvTime:%e seqno:%d startevent:%d\n", this, ep, name, msgId.node(), msgId.msgID(), startTime, endTime, recvTime, effRecvTime, seqno, isStartEvent());
+  fprintf(fp,"%p name:%s (srcnode:%d msgID:%d) ep:%d %s\n", this, name, msgId.node(), msgId.msgID(), ep, isStartEvent()?"STARTEVENT":"");
+  fprintf(fp," recvtime:%f startTime:%f endTime:%f \n", recvTime, startTime, endTime);
   for (i=0; i<msgs.length(); i++)
     msgs[i]->write(fp);
   for (i=0; i<evts.length(); i++)
@@ -223,7 +223,7 @@ void BgTimeLog::write(FILE *fp)
   for (i=0; i<forwardDeps.length(); i++)
     fprintf(fp,"[%p %d] ",forwardDeps[i], forwardDeps[i]->seqno);
   fprintf(fp, "\n");
-  fprintf(fp, "==>>\n");
+  fprintf(fp, "\n");
 }
 
 void BgTimeLog::addMsgBackwardDep(BgTimeLineRec &tlinerec, void* msg){
