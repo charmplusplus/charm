@@ -4,20 +4,29 @@
 NodeMulticast *nm_mgr;
 
 void* NodeMulticastHandler(void *msg){
-  ComlibPrintf("In Node MulticastHandler\n");
-  nm_mgr->recvHandler(msg);
-  return NULL;
+    ComlibPrintf("In Node MulticastHandler\n");
+    nm_mgr->recvHandler(msg);
+    return NULL;
+}
+
+void* NodeMulticastCallbackHandler(void *msg){
+    ComlibPrintf("[%d]:In Node MulticastCallbackHandler\n", CkMyPe());
+    register envelope *env = (envelope *)msg;
+    CkUnpackMessage(&env);
+    nm_mgr->getCallback().send(EnvToUsr(env));
+    return NULL;
 }
 
 //Handles multicast by sending only one message to a nodes and making 
 //them multicast locally
 void NodeMulticast::setDestinationArray(CkArrayID a, int nelem, 
 					CkArrayIndexMax **idx, int ep){
-  
+
+    mode = ARRAY_MODE;
     messageBuf = NULL;
     pes_per_node = 4;
-    if(getenv("RMS_NODES") != NULL)
-	pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
+    //if(getenv("RMS_NODES") != NULL)
+    //pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
 
     mAid = a;
     nelements = nelem;
@@ -45,41 +54,76 @@ void NodeMulticast::setDestinationArray(CkArrayID a, int nelem,
     ComlibPrintf("After SetDestinationArray\n");
 }
 
+void NodeMulticast::setPeList(int npes, int *pelist, CkCallback callback){
+    mode = PROCESSOR_MODE;
+    messageBuf = NULL;
+    pes_per_node = 4;
+    //if(getenv("RMS_NODES") != NULL)
+    //pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
+
+    cb = callback;
+  
+    numNodes = CkNumPes()/pes_per_node;
+    myRank = 0;
+    nodeMap = new int[numNodes];
+  
+    this->npes = npes;
+    this->pelist = new int[npes];
+    memcpy(this->pelist, pelist, npes * sizeof(int));
+
+    ComlibPrintf("In setPeList %d, %d, %d\n", numNodes, 
+                 pes_per_node, npes);
+    
+    for(int count = 0; count < npes; count++)
+        nodeMap[pelist[count]/pes_per_node] = 1;        
+    
+    ComlibPrintf("After setPeList\n");
+}
+
 void NodeMulticast::recvHandler(void *msg) {
     register envelope* env = (envelope *)msg;
     void *charm_msg = (void *)EnvToUsr(env);
 
     env->setUsed(0);
-    env->array_mgr()=mAid;
-    //  env->array_srcPe()=CkMyPe();
-    env->array_ep()=entryPoint;
-    env->array_hops()=0;
-
-    //CkUnpackMessage(&env);
-    
     ComlibPrintf("In receive Handler\n");
-    
-    for(int count = 0; count < pes_per_node; count ++){
-	int dest_pe = (CkMyPe()/pes_per_node) * pes_per_node + count;
-	int size = indexVec[dest_pe].size();
-        
-        ComlibPrintf("[%d], %d elements to send to %d of size %d\n", CkMyPe(), size, dest_pe, env->getTotalsize());
-        
-        CkArrayIndexMax * idx_arr = indexVec[dest_pe].getVec();
-        for(int itr = 0; itr < size; itr ++) {
-            void *newcharmmsg = CkCopyMsg(&charm_msg); //(char *)CmiAlloc(env->getTotalsize());
-            //memcpy(newmsg, msg, env->getTotalsize());
-            envelope* newenv = UsrToEnv(newcharmmsg);
-            
-            //CkArrayIndex1D idx(dest_pe);
-            //idx_arr[itr].print();
-            CProxyElement_ArrayBase ap(mAid, idx_arr[itr]);
-            ComlibPrintf("%d:Array Base created %x\n", CkMyPe(), (char *)newenv -  2*sizeof(int));
-            
-            newenv->array_index()=idx_arr[itr];
-            //CmiSetHandler(env, 0);
-            ap.ckSend((CkArrayMessage *)newcharmmsg, entryPoint);
-        }
+    if(mode == ARRAY_MODE) {
+        env->array_mgr()=mAid;
+	env->array_ep()=entryPoint;
+	env->array_hops()=0;	
+	CkUnpackMessage(&env);
+
+	for(int count = 0; count < pes_per_node; count ++){
+	    int dest_pe = (CkMyPe()/pes_per_node) * pes_per_node + count;
+	    int size = indexVec[dest_pe].size();
+	    
+	    ComlibPrintf("[%d], %d elements to send to %d of size %d\n", CkMyPe(), size, dest_pe, env->getTotalsize());
+	    
+	    CkArrayIndexMax * idx_arr = indexVec[dest_pe].getVec();
+	    for(int itr = 0; itr < size; itr ++) {
+		void *newcharmmsg = CkCopyMsg(&charm_msg); 
+		envelope* newenv = UsrToEnv(newcharmmsg);
+		CProxyElement_ArrayBase ap(mAid, idx_arr[itr]);		
+		newenv->array_index()=idx_arr[itr];
+		ap.ckSend((CkArrayMessage *)newcharmmsg, entryPoint);
+	    }
+	}
+    }
+    else {
+	for(int count = 0; count < pes_per_node; count++)
+	    if(validRank[count]){
+		void *newcharmmsg = CkCopyMsg(&charm_msg); 
+		envelope* newenv = UsrToEnv(newcharmmsg);
+		
+		CmiSetHandler(newenv, NodeMulticastCallbackHandlerId);
+		
+		ComlibPrintf("[%d] In receive Handler (proc mode), sending message to %d at handler %d\n", 
+			     CkMyPe(), (CkMyPe()/pes_per_node) * pes_per_node + count, 
+			     NodeMulticastCallbackHandlerId);
+
+		CmiSyncSendAndFree((CkMyPe()/pes_per_node) *pes_per_node + count, 
+				   newenv->getTotalsize(), (char *)newenv);
+	    }
+	    
     }
     ComlibPrintf("[%d] CmiFree (Code) (%x)\n", CkMyPe(), (long) msg - 2*sizeof(int));
     CmiFree(msg);
@@ -135,20 +179,22 @@ void NodeMulticast::doneInserting(){
         cmsg = messageBuf->deq();
         msg = cmsg->getCharmMessage();
         env = UsrToEnv(msg);
-        env->array_srcPe()=CkMyPe();
+	
+	if(mode == ARRAY_MODE)
+	    env->array_srcPe()=CkMyPe();
 	CkPackMessage(&env);
 
         CmiSetHandler(env, NodeMulticastHandlerId);
         ComlibPrintf("After set handler\n");
         
         for(int count = 0; count < numNodes; count++) 
-	  if(nodeMap[count]) {
-	      void *newcharmmsg = CkCopyMsg((void **)&msg); 
-	      envelope *newenv = UsrToEnv(newcharmmsg);
+	    if(nodeMap[count]) {
+		void *newcharmmsg = CkCopyMsg((void **)&msg); 
+		envelope *newenv = UsrToEnv(newcharmmsg);
 		
-	      ComlibPrintf("In cmisyncsend to %d\n", count * pes_per_node + myRank);
-	      CmiSyncSendAndFree(count * pes_per_node + myRank, env->getTotalsize(), 
-				 (char *)newenv);
+		ComlibPrintf("[%d]In cmisyncsend to %d\n", CkMyPe(), count * pes_per_node + myRank);
+		CmiSyncSendAndFree(count * pes_per_node + myRank, env->getTotalsize(), 
+				   (char *)newenv);
 	  }
         
         ComlibPrintf("[%d] CmiFree (Code) (%x)\n", CkMyPe(), (char *)env - 2*sizeof(int));
@@ -165,17 +211,29 @@ void NodeMulticast::pup(PUP::er &p){
     p | numNodes;
     p | nelements;
     p | entryPoint;
-    
+    p | npes;
+    p | mode;
+
     p | mAid;
     
     if(p.isUnpacking()) {
         nodeMap = new int[numNodes];
-        indexVec = new CkVec<CkArrayIndexMax> [CkNumPes()];
+	
+	if(mode == ARRAY_MODE)
+	    indexVec = new CkVec<CkArrayIndexMax> [CkNumPes()];
+
+	if(mode == PROCESSOR_MODE)
+	    pelist = new int[npes];
     }
-    
+
+    p | cb;
     p(nodeMap, numNodes);
-    
-    for(int count = 0; count < CkNumPes(); count++)
+
+    if(mode == PROCESSOR_MODE)
+      p(pelist, npes);
+
+    if(mode == ARRAY_MODE)
+      for(int count = 0; count < CkNumPes(); count++)
         p | indexVec[count];
     
     if(p.isUnpacking()) {
@@ -183,7 +241,16 @@ void NodeMulticast::pup(PUP::er &p){
         myRank = CkMyPe() % pes_per_node;
         
         NodeMulticastHandlerId = CmiRegisterHandler((CmiHandler)NodeMulticastHandler);
+	NodeMulticastCallbackHandlerId = CmiRegisterHandler
+	    ((CmiHandler)NodeMulticastCallbackHandler);
+	
         nm_mgr = this;
+
+	validRank[0] =  validRank[1] = validRank[2] = validRank[3] = 0;
+	for(int count = 0; count < npes; count ++){
+	    if(CkMyPe()/pes_per_node == pelist[count] / pes_per_node)
+		validRank[pelist[count] % pes_per_node] = 1;
+	}
     }
 }
 
