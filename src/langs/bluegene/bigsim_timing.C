@@ -218,7 +218,7 @@ void BgGetMsgStartTime(bgTimeLog* tLog, BgTimeLineRec &tline, int* index)
 	int low = tline.startIdx, high = tline.commit;
 	int idx = 0;
 	double endOfDeps = tLog->getEndOfBackwardDeps();
-	double effRecvTime  = max(tLog->recvTime, endOfDeps);
+	double effRecvTime  = MAX(tLog->recvTime, endOfDeps);
   	int commit = tline.commit;
 	
         if (commit>0 && tline[commit-1]->effRecvTime<effRecvTime) {
@@ -273,7 +273,7 @@ void updateEffRecvTime(minHeap<bgTimeLog*>* inpQPtr, bgTimeLog *log){
       CmiAssert(j<inpQPtr->length());
 #endif
       double oldEffRecvTime = l->effRecvTime;
-      l->effRecvTime = max(l->getEndOfBackwardDeps(), l->recvTime);
+      l->effRecvTime = MAX(l->getEndOfBackwardDeps(), l->recvTime);
       if (oldEffRecvTime != l->effRecvTime) nChanged++;
     }
     if (nChanged) 
@@ -282,7 +282,7 @@ void updateEffRecvTime(minHeap<bgTimeLog*>* inpQPtr, bgTimeLog *log){
   else {
     for(i=0;i<(inpQPtr->length());i++)  {
       (*inpQPtr)[i]->effRecvTime 
-         = max((*inpQPtr)[i]->getEndOfBackwardDeps(), (*inpQPtr)[i]->recvTime);
+         = MAX((*inpQPtr)[i]->getEndOfBackwardDeps(), (*inpQPtr)[i]->recvTime);
 //      inpQPtr->update(i);
     }
     inpQPtr->buildHeap();
@@ -370,7 +370,7 @@ int BgAdjustTimeLineFromIndex(int index, BgTimeLineRec &tlinerec, int mynode)
     BgGetMsgStartTime(clog, tlinerec, &idx);
     if (idx < commit) commit = idx;
   }
-  index = min(index, commit);
+  index = MIN(index, commit);
 
   //Two pass initialization
   //First Pass: Infinite ERT for all but the first
@@ -464,11 +464,11 @@ CmiPrintf("BgAdjustTimeLineByIndex BEGIN\n");
     BgGetMsgStartTime(clog, tlinerec, &idx);
     if (idx < commit) commit = idx;
   }
-  idx = min(commit, oldIdx);
+  idx = MIN(commit, oldIdx);
   tlog = tlinerec[oldIdx];
   tlog->recvTime = tAdjustAbs;
   BgGetMsgStartTime(tlog, tlinerec, &newIdx);
-  idx = min(idx,newIdx);
+  idx = MIN(idx,newIdx);
 
   if (idx == len) return -1;
 
@@ -805,10 +805,10 @@ static inline int batchHandleCorrectionMsg(int mynode, BgTimeLineRec *tlinerecs,
 	  double oldRecvTime = tlog->effRecvTime;
           tlog->recvTime = cm->tAdjust;
           double endOfDeps = tlog->getEndOfBackwardDeps();
-//        double effRecvTime  = max(tlog->recvTime, endOfDeps);
+//        double effRecvTime  = MAX(tlog->recvTime, endOfDeps);
           double effRecvTime  = tlog->recvTime;
-	  if (endOfDeps != INVALIDTIME) effRecvTime =  max(effRecvTime,endOfDeps);
-	  effRecvTime = min(oldRecvTime, effRecvTime);
+	  if (endOfDeps != INVALIDTIME) effRecvTime =  MAX(effRecvTime,endOfDeps);
+	  effRecvTime = MIN(oldRecvTime, effRecvTime);
 	  if (effRecvTime != INVALIDTIME && (isLess(effRecvTime,minTime) ||
             isEqual(effRecvTime, minTime) && tlog->seqno < minLog->seqno)) {
 	    minTime = effRecvTime; 
@@ -825,7 +825,7 @@ static inline int batchHandleCorrectionMsg(int mynode, BgTimeLineRec *tlinerecs,
   }  /* for */
   if (minLog != NULL) {
     minIdx = BgGetIndexFromTime(minTime, minLog->seqno, tlinerec);
-    minIdx = min(minIdx, tlinerec.commit);
+    minIdx = MIN(minIdx, tlinerec.commit);
   }
 
   int qlen = tmpQ.length();
@@ -1140,11 +1140,11 @@ void heartbeatHandlerFunc(char *msg)
   static StateCounters  oldCount, newCount;
   reported ++;
   HeartBeatMsg *m = (HeartBeatMsg*)msg;
-  localGvt = min(localGvt, m->gvt);
+  localGvt = MIN(localGvt, m->gvt);
   newCount.add(m->counters);
   CmiFree(msg);
   if (reported == nChildren || (nChildren==0 && parent==-1)) {
-    localGvt = min(localGvt, findLeastTime());
+    localGvt = MIN(localGvt, findLeastTime());
     newCount.add(stateCounters);
     if (parent != -1) {
       sendHeartbeat(localGvt, newCount);
@@ -1166,7 +1166,7 @@ void heartbeatHandlerFunc(char *msg)
       }
       else if (localGvt != INVALIDTIME) {
         lastGvt=localGvt;
-//      gvt = max(localGvt, gvt);
+//      gvt = MAX(localGvt, gvt);
         gvt = localGvt;
       }
       // compute the new heart beat interval
@@ -1179,8 +1179,8 @@ void heartbeatHandlerFunc(char *msg)
         else if (processed < oldProcessed*0.6)  hearbeatInterval+=1;
         else if (processed > oldProcessed*1.2)  hearbeatInterval-=2;
       }
-      hearbeatInterval=min(hearbeatInterval, HEARTBEAT_MAX);
-      hearbeatInterval=max(hearbeatInterval, HEARTBEAT_MIN);
+      hearbeatInterval=MIN(hearbeatInterval, HEARTBEAT_MAX);
+      hearbeatInterval=MAX(hearbeatInterval, HEARTBEAT_MIN);
       oldProcessed = processed;
       }
       CmiPrintf("HEART BEAT %f local:%f Count:r%d p%d e%d cr%d cc%d rc%d ival:%d %d at %f\n", gvt, localGvt==INVALIDTIME?-1:localGvt, newCount.realMsgProcCnt,newCount.corrMsgProcCnt,newCount.corrMsgEnqCnt,newCount.corrMsgCRCnt,newCount.corrMsgCCCnt,newCount.corrMsgRCCnt,hearbeatInterval, programExit,CmiWallTimer());

@@ -135,7 +135,7 @@ public:
     double maxEndTime =0.0;
     for(int i=0;i<backwardDeps.length();i++)
 //    maxEndTime = max(maxEndTime,backwardDeps[i]->endTime);
-      maxEndTime = max(maxEndTime,backwardDeps[i]->effRecvTime);
+      maxEndTime = MAX(maxEndTime,backwardDeps[i]->effRecvTime);
       
     return maxEndTime;
   }

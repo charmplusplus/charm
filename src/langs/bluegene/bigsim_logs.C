@@ -194,7 +194,7 @@ void bgTimeLog::addBackwardDep(bgTimeLog* log){
       if (backwardDeps[i] == log) return;	// already exist
     backwardDeps.insertAtEnd(log);
     log->forwardDeps.insertAtEnd(this);
-    effRecvTime = max(effRecvTime, log->effRecvTime);
+    effRecvTime = MAX(effRecvTime, log->effRecvTime);
   }
 }
 
