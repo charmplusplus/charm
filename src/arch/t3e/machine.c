@@ -439,7 +439,7 @@ void CmiFreeMulticastFn(CmiGroup grp, int size, char *msg)
 void CmiAbort(char *message)
 {
   CmiError(message);
-  exit(1);
+  globalexit(1);
 }
 
 /**********************************************************************
@@ -477,7 +477,7 @@ ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 void ConverseExit()
 {
   ConverseCommonExit();
-  exit(0);
+  globalexit(0);
 }
 
 void CmiNotifyIdle(void)
@@ -644,7 +644,7 @@ static void McRetrieveRemote(void)
     if (cur_msg ==NULL)
     {
       CmiError("%s:%d Cannot Allocate Memory\n",__FILE__,__LINE__);
-      exit(1);
+      globalexit(1);
     }
 
     shmem_get(cur_msg, cur_node->nxt_addr,
