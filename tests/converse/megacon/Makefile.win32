@@ -8,7 +8,7 @@ CPP_PROJ=/nologo /MT /w /GX /Z7 /Od $(INC)\
  /Fo /FD /c
 
 LINK=link.exe
-LINK_FLAGS = /nologo /LIBPATH:"..\..\..\lib"
+LINK_FLAGS = /nologo /LIBPATH:"..\..\..\lib" /nodefaultlib:libc
 LINK_OTHER = libldb-rand.obj libconv-core.lib libtrace-none.lib libconv-cplus-y.lib ws2_32.lib kernel32.lib
 
 OBJS=blkinhand.obj megacon.obj ringsimple.obj ring.obj fibobj.obj fibthr.obj broadc.obj priotest.obj deadlock.obj vars.obj nodenum.obj specmsg.obj bigmsg.obj vecsend.obj posixth.obj future.obj multicast.obj multisend.obj
