@@ -561,6 +561,7 @@ fi
 
 #Add generic options to the compiler- and linker-options
 OPTSC="$OPTS $OPTSC"
+OPTS_F90="$OPTS $OPTS_F90"
 OPTSL="$OPTS $OPTSL"
 
 # There's really no analog for this in the Bourne shell: 
@@ -587,7 +588,7 @@ case "$LANGUAGE" in
 "charm"|"charm++"|"converse"|"converse++")
 	[ -z "$SEQUENTIAL" ] || Abort "Language $LANGUAGE is for parallel programs"
 	;;
-"fem"|"femf"|"ampi"|"ampif"|"f90charm"|"bluegene"|"ckbluegene")
+"fem"|"femf"|"ampi"|"ampif"|"mblock"|"mblockf"|"f90charm"|"bluegene"|"ckbluegene")
 	[ -z "$SEQUENTIAL" ] || Abort "Language $LANGUAGE is for parallel programs"
 	;;
 *)
@@ -863,6 +864,8 @@ MEM_OBJ="$CHARMLIB/libmemory-$MEMORY.o"
 
 Debug "About to perform final link..."
 
+IS_F90="n"
+
 case "$LANGUAGE" in
 "ampi")
         PRE_LIBRARIES="$PRE_LIBRARIES -lampi -lddt "
@@ -871,13 +874,7 @@ case "$LANGUAGE" in
 "ampif")
         PRE_LIBRARIES="$PRE_LIBRARIES -lampif -lddt -lconv-utilf "
         POST_LIBRARIES="$POST_LIBRARIES -lmetis $CMK_F90LIBS"
-        if [ ! -z "$CMK_F90OBJS" ] 
-        then
-          for f90obj in $CMK_F90OBJS
-          do
-            OBJECTFILES="$OBJECTFILES $CHARMLIB/$f90obj"
-          done
-        fi
+	IS_F90="y"
 	;;
 "fem")
         PRE_LIBRARIES="$PRE_LIBRARIES -lfem -lddt "
@@ -886,24 +883,21 @@ case "$LANGUAGE" in
 "femf")
         PRE_LIBRARIES="$PRE_LIBRARIES -lfemf -lcollide -lampilib -lddt -lconv-utilf"
         POST_LIBRARIES="$POST_LIBRARIES -lmetis $CMK_F90LIBS"
-        if [ ! -z "$CMK_F90OBJS" ] 
-        then
-          for f90obj in $CMK_F90OBJS
-          do
-            OBJECTFILES="$OBJECTFILES $CHARMLIB/$f90obj"
-          done
-        fi
+	IS_F90="y"
+	;;
+"mblock")
+        PRE_LIBRARIES="$PRE_LIBRARIES -lfem -lddt "
+        POST_LIBRARIES="$POST_LIBRARIES -lmetis "
+	;;
+"mblockf")
+        PRE_LIBRARIES="$PRE_LIBRARIES -lmblockf -lddt"
+        POST_LIBRARIES="$POST_LIBRARIES -lmetis $CMK_F90LIBS"
+	IS_F90="y"
 	;;
 "f90charm")
         PRE_LIBRARIES="$PRE_LIBRARIES -lf90charm "
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
-#        if [ ! -z "$CMK_F90OBJS" ] 
-#        then
-#          for f90obj in $CMK_F90OBJS
-#          do
-#            OBJECTFILES="$OBJECTFILES $CHARMLIB/$f90obj"
-#          done
-#        fi
+#       IS_F90="y"
 	;;
 "bluegene")
         PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene"
@@ -913,11 +907,22 @@ case "$LANGUAGE" in
 	;;
 esac
 
+if [ $IS_F90 = "y" ]
+then
+        if [ ! -z "$CMK_F90OBJS" ] 
+        then
+          for f90obj in $CMK_F90OBJS
+          do
+            OBJECTFILES="$OBJECTFILES $CHARMLIB/$f90obj"
+          done
+        fi
+fi
+
 LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $PRE_LIBRARIES"
 CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ $MEM_OBJ "
 
 case "$LANGUAGE" in
-"charm"|"charm++"|"f90charm"|"ampi"|"ampif"|"fem"|"femf"|"ckbluegene")
+"charm"|"charm++"|"f90charm"|"ampi"|"ampif"|"fem"|"femf"|"mblock"|"mblockf"|"ckbluegene")
 	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lck -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
