@@ -301,7 +301,7 @@ TraceSummary::TraceSummary(char **argv):curevent(0),binStart(0.0),bin(0.0),msgNu
   CmiGetArgDoubleDesc(argv,"+epInterval",&epInterval,
   	"Execution time histogram bin size");
 
-  sumonly = CmiGetArgFlag(argv, "+sumonly");
+  sumonly = CmiGetArgFlagDesc(argv, "+sumonly", "merge histogram bins on processor 0");
 
   _logPool = new SumLogPool(CkpvAccess(traceRoot));
   execEp=INVALIDEP;
