@@ -67,6 +67,7 @@
 
 #define CMK_LBDB_ON					   1
 
+#define CMK_STACKSIZE_DEFAULT				   65536
 /*
 #define CMK_NO_ISO_MALLOC				   1
 */
