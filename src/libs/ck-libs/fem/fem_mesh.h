@@ -753,7 +753,7 @@ void FEM_Is_NULL(const char *callingRoutine,const char *entityType,int type);
  */
 template <class T>
 class FEM_Entity_Types {
-	CkPupPtrVec<T> types; // Our main storage for different entity types
+	CkVec<T *> types; // Our main storage for different entity types
 	const FEM_Mesh &mesh;
 	const char *name; //FEM_SPARSE or FEM_ELEM, or some such.
 public:
@@ -770,6 +770,11 @@ public:
 			if (!isNULL) set(i,"pup").pup(p);
 		}
 	}
+	~FEM_Entity_Types() {
+		for (int i=0;i<types.size();i++)
+			if (types[i]) delete types[i];
+	}
+	
 	void registerIDXL(IDXL_Chunk *c) {
 		for (int i=0;i<size();i++) if (has(i)) types[i]->registerIDXL(c);
 	}
