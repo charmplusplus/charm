@@ -462,9 +462,6 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(UInt,_numInitNodeMsgs);
 	CkpvInitialize(int,_charmEpoch);
 	CkpvAccess(_charmEpoch)=0;
-
-	CkpvInitialize(_CkOutStream*, _ckout);
-	CkpvInitialize(_CkErrStream*, _ckerr);
 	CkpvInitialize(Stats*, _myStats);
 
 	CkpvAccess(_groupIDTable) = new GroupIDTable(0);
