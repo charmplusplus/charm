@@ -1072,7 +1072,6 @@ void CsdInit(argv)
   CpvInitialize(void *, CsdSchedQueue);
   CpvInitialize(int,   CsdStopFlag);
   CpvInitialize(int,   CsdStopNotifyFlag);
-  CpvInitialize(int,   CsdIdleDetectedFlag);
   CpvInitialize(CmiHandler,   CsdNotifyIdle);
   CpvInitialize(CmiHandler,   CsdNotifyBusy);
   
