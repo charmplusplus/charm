@@ -98,10 +98,10 @@ public:
 
 	curTime = CkWallTimer();
 
-        for(count = 0; count < nElements; count++)            
-            arr[count].start(size);
+        //for(count = 0; count < nElements; count++)            
+        //  arr[count].start(size);
 
-        //arr.start();
+        arr.start(size);
     };
     
     void send(void) {
@@ -120,9 +120,9 @@ public:
 	if(pass == NUMPASS)
 	  done();
 	else {
-            for(int count = 0; count < nElements; count++)            
-                arr[count].start(size);
-            //arr.start(size);
+            //for(int count = 0; count < nElements; count++)            
+            //  arr[count].start(size);
+            arr.start(size);
         }
       }
     }
@@ -145,9 +145,9 @@ public:
           else if(superpass < 50)
               size += 500;
           
-          for(int count = 0; count < nElements; count++)            
-              arr[count].start(size);
-          //arr.start(size);
+          //for(int count = 0; count < nElements; count++)            
+          //  arr[count].start(size);
+          arr.start(size);
       }
     }
 };
@@ -184,7 +184,7 @@ public:
     }
     
     Bench(CkMigrateMessage *m) {
-        CkPrintf("Migrated to %d\n", CkMyPe());
+        //CkPrintf("Migrated to %d\n", CkMyPe());
         //myInst = cinst;
     }
     
@@ -246,14 +246,14 @@ public:
     }
 
     void ResumeFromSync() {
-        CkPrintf("%d: resuming\n", CkMyPe());
+        //        CkPrintf("%d: resuming\n", CkMyPe());
         myInst.setSourcePe();
 	sendMessage();
     }
 
     void pup(PUP::er &p) {
-        if(p.isPacking())
-            CkPrintf("Migrating from %d\n", CkMyPe());
+        //if(p.isPacking())
+        //  CkPrintf("Migrating from %d\n", CkMyPe());
 
         ArrayElement1D::pup(p);
         p | pass ;

@@ -48,7 +48,7 @@ test: all
 	./charmrun hello +p4 10 4
 	./charmrun hello +p4 10 5
 	./charmrun hello +p2 1
-#	./charmrun bench +p2 100 1 +balancer RefineLB
+	./charmrun bench +p2 100 1 +balancer RefineLB
 	./charmrun bench +p2 100 2 +balancer RefineLB
 	./charmrun bench +p2 100 4 +balancer RefineLB
 	./charmrun bench +p4 100 2 +balancer RefineLB

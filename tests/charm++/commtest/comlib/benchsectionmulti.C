@@ -79,7 +79,7 @@ public:
 
 	RingMulticastStrategy *rstrat = new RingMulticastStrategy(arr.ckGetArrayID());
 
-        CkPrintf("After creating array\n");
+        //        CkPrintf("After creating array\n");
 	CkArrayID aid = arr.ckGetArrayID();
 
         ComlibInstanceHandle cinst = CkGetComlibInstance();        
@@ -92,7 +92,7 @@ public:
         
 	curTime = CkWallTimer();
 	arr.sendMessage();
-        CkPrintf("After Main\n");
+        //        CkPrintf("After Main\n");
     };
     
     void send(void) {
@@ -152,8 +152,8 @@ class Bench : public CBase_Bench
 public:
 
     void pup(PUP::er &p) {
-        if(p.isPacking())
-            CkPrintf("Migrating from %d\n", CkMyPe());
+        //if(p.isPacking())
+        //            CkPrintf("Migrating from %d\n", CkMyPe());
 
         ArrayElement1D::pup(p);
         p | pass ;
@@ -190,7 +190,7 @@ public:
     }
     
     Bench(CkMigrateMessage *m) {
-        CkPrintf(" Migrated to %d\n", CkMyPe());
+        //CkPrintf(" Migrated to %d\n", CkMyPe());
     }
     
     void sendMessage()
@@ -239,7 +239,7 @@ public:
 	MESSAGESIZE = messagesize;
         
         if(firstEntryFlag) {
-            CkPrintf("Calling AtSync\n");
+            //            CkPrintf("Calling AtSync\n");
             AtSync();
         }
         else
