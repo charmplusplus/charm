@@ -915,30 +915,33 @@ static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 #   define  _skipCldEnqueue   CldEnqueue
 #endif
 
+// by pass Charm++ priority queue, send as Converse message
 static void _noCldEnqueue(int pe, envelope *env)
 {
+/*
   if (pe == CkMyPe()) {
     CmiHandleMessage(env);
-  } else {
-    CkPackMessage(&env);
-    int len=env->getTotalsize();
-    if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
-    else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, (char *)env); }
-    else CmiSyncSendAndFree(pe, len, (char *)env);
-  }
+  } else 
+*/
+  CkPackMessage(&env);
+  int len=env->getTotalsize();
+  if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
+  else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, (char *)env); }
+  else CmiSyncSendAndFree(pe, len, (char *)env);
 }
 
 static void _noCldNodeEnqueue(int node, envelope *env)
 {
+/*
   if (node == CkMyNode()) {
     CmiHandleMessage(env);
   } else {
-    CkPackMessage(&env);
-    int len=env->getTotalsize();
-    if (node==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, (char *)env); }
-    else if (node==CLD_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, (char *)env); }
-    else CmiSyncNodeSendAndFree(node, len, (char *)env);
-  }
+*/
+  CkPackMessage(&env);
+  int len=env->getTotalsize();
+  if (node==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, (char *)env); }
+  else if (node==CLD_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, (char *)env); }
+  else CmiSyncNodeSendAndFree(node, len, (char *)env);
 }
 
 static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
@@ -994,7 +997,7 @@ extern "C"
 void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
 {
   if (opts & CK_MSG_INLINE) {
-    CkSendMsgInline(entryIdx, msg, pCid);
+    CkSendMsgInline(entryIdx, msg, pCid, opts);
     return;
   }
 #ifndef CMK_OPTIMIZE
@@ -1016,7 +1019,7 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
 }
 
 extern "C"
-void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid)
+void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 {
   if (pCid->onPE==CkMyPe())
   { //Just directly call the chare (skip QD handling & scheduler)
@@ -1027,7 +1030,7 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid)
   }
   else {
     //No way to inline a cross-processor message:
-    CkSendMsg(entryIndex,msg,pCid);
+    CkSendMsg(entryIndex,msg,pCid,opts&!CK_MSG_INLINE);
   }
 }
 
@@ -1075,7 +1078,7 @@ static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
 }
 
 extern "C"
-void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID)
+void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int opts)
 {
   if (destPE==CkMyPe())
   {
@@ -1087,15 +1090,15 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID)
       return;
     }
   }
-  //Can't inline-- send the usual way
-  CkSendMsgBranch(eIdx,msg,destPE,gID);
+  //Can't inline-- send the usual way, clear CK_MSG_INLINE
+  CkSendMsgBranch(eIdx,msg,destPE,gID,opts&!CK_MSG_INLINE);
 }
 
 extern "C"
 void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID, int opts)
 {
   if (opts & CK_MSG_INLINE) {
-    CkSendMsgBranchInline(eIdx, msg, pe, gID);
+    CkSendMsgBranchInline(eIdx, msg, pe, gID, opts);
     return;
   }
 #ifndef CMK_OPTIMIZE
@@ -1165,7 +1168,7 @@ void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
 }
 
 extern "C"
-void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID)
+void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int opts)
 {
   if (node==CkMyNode()) 
   { 
@@ -1180,14 +1183,14 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID)
     }
   }
   //Can't inline-- send the usual way
-  CkSendMsgNodeBranch(eIdx,msg,node,gID);
+  CkSendMsgNodeBranch(eIdx,msg,node,gID,opts&!CK_MSG_INLINE);
 }
 
 extern "C"
 void CkSendMsgNodeBranch(int eIdx, void *msg, int node, CkGroupID gID, int opts)
 {
   if (opts & CK_MSG_INLINE) {
-    CkSendMsgNodeBranchInline(eIdx, msg, node, gID);
+    CkSendMsgNodeBranchInline(eIdx, msg, node, gID, opts);
     return;
   }
   if (opts & CK_MSG_IMMEDIATE) {

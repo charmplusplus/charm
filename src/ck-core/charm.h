@@ -203,7 +203,7 @@ extern void CkCreateLocalNodeGroup(CkGroupID groupID, int constructorIdx, envelo
 #define CK_MSG_INLINE      	0x1
 #define CK_MSG_IMMEDIATE   	0x2
 #define CK_MSG_SKIPSCHEDULER	0x4
-#define CK_MSG_KEEP		0x8
+#define CK_MSG_KEEP		0x8    /* send without freeing message */
 
 #ifdef __cplusplus
 #define CK_MSGOPTIONAL =0
@@ -213,14 +213,14 @@ extern void CkCreateLocalNodeGroup(CkGroupID groupID, int constructorIdx, envelo
 
 extern void CkSendMsg(int entryIndex, void *msg, const CkChareID *chare, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgBranch(int eIdx, void *msg, int destPE, CkGroupID gID, int opts CK_MSGOPTIONAL);
-extern void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *chare);
-extern void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID);
+extern void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *chare, int opts CK_MSGOPTIONAL);
+extern void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgBranchMulti(int eIdx, void *msg, int npes, int *pes, 
                                  CkGroupID gID);
 extern void CkSendMsgNodeBranch(int eIdx, void *msg, int destNode, 
                                 CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgNodeBranchInline(int eIdx, void *msg, int destNode, 
-                                CkGroupID gID);
+                                CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 
