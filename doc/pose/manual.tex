@@ -517,6 +517,13 @@ main program and any other source needed with {\tt charmc}, linking
 with {\tt -lpose} and {\tt -language charm++}.  The ASIM example has a
 Makefile that shows this process.
 
+\subsection{Etrans}
+
+{etrans.pl} is a source to source translator.  Given a module name it will translate the {\tt module.h}, {\tt module.ci}, and {\tt module.C} files into {\tt module\_sim.h}, {\tt module\_sim.ci}, and {\tt module\_sim.C} files.  The translation operation adds wrapper classes for \pose{} objects and handles the interface with strategies and other poser options. 
+
+To facilitate code organization, the {\tt module.C} file can be broken up into multiple files and those files can appended to the {etrans.pl} command line after the module name.  These additional .C files will be translated and their output appended to the {\tt module\_sim.C} file.  
+
+
 \section{Configuring \pose{}}
 
 Currently, \pose{} is configured by altering values in the {\tt
