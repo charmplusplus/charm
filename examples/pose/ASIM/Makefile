@@ -52,6 +52,10 @@ $(PGM):	$(SIM_OBJECTS)
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM) \
 	-module pose -language charm++
 
+$(PGM).seq:	$(SIM_OBJECTS) 
+	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).seq \
+	-module seqpose -language charm++
+
 $(PGM).alt:	$(SIM_OBJECTS) 
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).alt \
 	-lpose -language charm++
