@@ -1,10 +1,10 @@
 OPTS=-g
-CHARMC=../../../bin/charmc $(OPTS)
+CHARMC=../../../../bin/charmc $(OPTS)
 
 all: jacobi
 
 jacobi: parallelJacobi.o
-	$(CHARMC) -language charm++ -o jacobi parallelJacobi.o #-tracemode projections  #-memory paranoid
+	$(CHARMC) -language charm++ -o jacobi parallelJacobi.o -tracemode projections  #-memory paranoid
 
 parallelJacobi.o: parallelJacobi.decl.h parallelJacobi.def.h parallelJacobi.h parallelJacobi.C
 	$(CHARMC) -c parallelJacobi.C 

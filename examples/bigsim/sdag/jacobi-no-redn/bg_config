@@ -10,7 +10,7 @@ timing  bgelapse
 cpufactor   1.0
 fpfactor    5e-7
 traceroot     .
-log      yes
-correct  yes
+log      no
+correct  no
 network   lemieux
 #projections 2,4-8
