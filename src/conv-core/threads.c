@@ -895,7 +895,7 @@ CthThread t;
   } else {
     QT_BLOCK((qt_helper_t*)CthBlockHelp, tc, 0, t->stackp);
   }
-  if (tc!=CthCpvAccess(CthCurrent)) { CmiError("Fugged up.\n"); exit(1); }
+  if (tc!=CthCpvAccess(CthCurrent)) { CmiError("Stack corrupted?\n"); exit(1); }
 }
 
 static void CthOnly(void *arg, void *vt, qt_userf_t fn)
