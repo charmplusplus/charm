@@ -208,3 +208,9 @@ void pose::exit(void)
     CkExit();
 }
 
+// this is a HACK to get module seqpose working
+void _registerseqpose(void)
+{
+  _registerpose();
+}
+
