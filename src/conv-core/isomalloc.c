@@ -25,8 +25,9 @@ static int slotsize;
 /*Total number of slots per processor*/
 static int numslots;
 
-/*Start of isomalloc-managed addresses*/
+/*Start and end of isomalloc-managed addresses*/
 static char *isomallocStart;
+static char *isomallocEnd;
 
 /*Utility conversion functions*/
 static int addr2slot(void *addr) {
@@ -436,6 +437,7 @@ static void init_ranges(char **argv)
 
     /*Allocate stacks in unused region*/
     isomallocStart=freeRegion.start;
+    isomallocEnd=freeRegion.start+freeRegion.len;
     numslots=(freeRegion.len/slotsize)/CmiNumPes();
 
 #if CMK_THREADS_DEBUG
@@ -584,6 +586,11 @@ void CmiIsomallocFree(CmiIsomallocBlock *b)
 	all_slotOP(&freeOP,s,n);
 }
 
+/*Return true if this address is in the region managed by isomalloc*/
+int CmiIsomallocInRange(void *addr)
+{
+	return (isomallocStart<=((char *)addr)) && (((char *)addr)<isomallocEnd);
+}
 
 void CmiIsomallocInit(char **argv)
 {

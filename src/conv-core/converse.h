@@ -696,6 +696,7 @@ typedef struct CmiIsomallocBlock CmiIsomallocBlock;
 void *CmiIsomalloc(int size,CmiIsomallocBlock *b);
 void *CmiIsomallocPup(pup_er p,CmiIsomallocBlock *b);
 void  CmiIsomallocFree(CmiIsomallocBlock *b);
+int   CmiIsomallocInRange(void *addr);
 
 /****** CTH: THE LOW-LEVEL THREADS PACKAGE ******/
 
