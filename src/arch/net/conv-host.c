@@ -56,6 +56,11 @@ extern char *sys_errlist[];
 #define RSH_CMD "remsh"
 #endif
 
+#if CMK_CCS_AVAILABLE
+int CcsClientFd;
+int myFd;
+#endif
+
 static void jsleep(int sec, int usec)
 {
   int ntimes,i;
@@ -1692,7 +1697,9 @@ int req_handle_getinfo(line)
 {
   char reply[1024], ans[1024], pre[100];
   char cmd[100], *res, *origres;
-  int ip, port, nread, i;
+  int port, nread, i;
+  int ip;
+
   nread = sscanf(line, "%s%d%d", cmd, &ip, &port);
   if(nread != 3) return REQ_FAILED;
   origres = res = arvar_get("addr", 0, nodetab_rank0_size);
@@ -1792,12 +1799,25 @@ void req_write_to_host(int fd, char *buf, int size)
 
 void req_serve_client(int workerno)
 {
-  req_pipe worker = req_pipes+workerno;
-  xstr buffer = worker->buffer;
+  req_pipe worker;
+  xstr buffer;
   int status, nread, len; char *head;
   req_node n;
-  
-  nread = xstr_read(buffer, worker->fd[0]);
+  int CcsActiveFlag = 0;
+
+  if(workerno == -1){
+    buffer = xstr_alloc();
+    nread = xstr_read(buffer, CcsClientFd);
+
+    /* read the rest */
+    nread = xstr_read(buffer, CcsClientFd);
+  }
+  else{
+    worker = req_pipes+workerno;
+    buffer = worker->buffer;
+    nread = xstr_read(buffer, worker->fd[0]);
+  }
+
   if (nread<0) {
     fprintf(stderr,"aborting: node terminated abnormally.\n");
     exit(1);
@@ -1806,11 +1826,17 @@ void req_serve_client(int workerno)
   while (1) {
     head = xstr_lptr(buffer);
     len = strlen(head);
-    if (head+len == xstr_rptr(buffer)) break;
+    if ((head+len == xstr_rptr(buffer)) && (workerno != -1)) {
+      break;
+    }
     status = req_handle(head);
     switch (status) {
-    case REQ_OK: break;
-    case REQ_FAILED: fprintf(stderr,"bad request: %s\n",head); break;
+    case REQ_OK: 
+      if(workerno == -1) CcsActiveFlag = 1;
+      break;
+    case REQ_FAILED: 
+      fprintf(stderr,"bad request: %s: %d\n",head, strlen(head)); 
+      break;
     case REQ_OK_AWAKEN: req_run_saved(); break;
     case REQ_POSTPONE:
       n = (req_node)malloc(sizeof(struct req_node)+len);
@@ -1818,20 +1844,31 @@ void req_serve_client(int workerno)
       n->next = req_saved;
       req_saved = n;
     }
+
     xstr_lshrink(buffer, len+1);
+    
+    if(CcsActiveFlag == 1) break;
   }
 }
+
 
 void req_poll()
 {
   fd_set rfds; int status, i;
+  int clientIP, clientPortNo;
+
   FD_ZERO(&rfds);
   for (i=0; i<req_numworkers; i++)
     FD_SET(req_pipes[i].fd[0], &rfds);
+  FD_SET(myFd, &rfds);
   status = select(FD_SETSIZE, &rfds, 0, 0, 0);
   for (i=0; i<req_numworkers; i++)
     if (FD_ISSET(req_pipes[i].fd[0], &rfds))
       req_serve_client(i);
+  if(FD_ISSET(myFd, &rfds)){
+    skt_accept(myFd, &clientIP, &clientPortNo, &CcsClientFd);
+    req_serve_client(-1);
+  }
 }
 
 void req_worker(int workerno)
@@ -2189,6 +2226,8 @@ int start_nodes()
 main(argc, argv)
     int argc; char **argv;
 {
+  unsigned int myIP, myPortNo;
+
   srand(time(0));
   /* notify charm developers that charm is in use */
   ping_developers();
@@ -2206,6 +2245,12 @@ main(argc, argv)
   input_init();
   /* start the node processes */
   start_nodes();
+
+  if(arg_server == 1){
+    skt_server(&myIP, &myPortNo, &myFd);
+    printf("Server IP = %u, Server port = %u\n", myIP, myPortNo);
+  }
+
   /* enter request-service mode */
   while (1) req_poll();
 }

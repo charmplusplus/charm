@@ -1661,6 +1661,7 @@ static void ctrl_getone()
 {
   char line[10000];
   int ok, ip, port, fd;  FILE *f;
+
   skt_accept(ctrlskt, &ip, &port, &fd);
   f = fdopen(fd,"r");
   while (fgets(line, 9999, f)) {
