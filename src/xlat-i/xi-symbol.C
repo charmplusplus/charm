@@ -1159,7 +1159,10 @@ void Entry::genGroupDecl(XStr& str)
     }
     // entry ptr declaration
     str << "    static int ckIdx_"<<name<<"(";
-    assert(param!=0);
+    if(param==0) {
+      cerr << "No entry parameter specified.\n";
+      exit(1);
+    }
     param->print(str);
     str << ") { return "<<epIdx();
     str << "; }\n";
@@ -1219,7 +1222,10 @@ void Entry::genDecls(XStr& str)
     if(param) {
       str << "void* msg, ";
     } else {
-      assert(isConstructor());
+      if(!isConstructor()) {
+        cerr << "Only constructors allowed to have empty parameter list\n";
+        exit(1);
+      }
       str << "CkArgMsg* msg, ";
     }
     str << container->baseName();
