@@ -54,8 +54,12 @@ void commonStuff(ofstream& top, ofstream& bot, Chare *c, Entry *e)
   /* This is the constructor EP */
   if ( strcmp(c->name, e->name) == 0 ) {
 
-    sprintf(str,"\tnew (obj) %s((%s *)m) ;",
-        c->name, e->msgtype->name) ;
+    if (e->isMessage())
+      sprintf(str,"\tnew (obj) %s((%s *)m) ;",
+	      c->name, e->msgtype->name) ;
+    else
+      sprintf(str,"\tnew (obj) %s() ;", c->name);
+
     bot << str << endl ;
 
     // ERROR if isReturnMsg()
@@ -336,9 +340,11 @@ void GenerateRegisterCalls(ofstream& top, ofstream& bot)
 
       if ( strcmp(chare->name,"main")==0 && strcmp(ep->name,"main")==0 ) 
         sprintf(str,"0, _CK_chare_%s) ;\n\n",chare->name) ;
-      else
+      else if (ep->isMessage())
         sprintf(str,"_CK_msg_%s, _CK_chare_%s) ;\n\n",
           ep->msgtype->name, chare->name) ;
+      else
+        sprintf(str,"0, _CK_chare_%s) ;\n\n", chare->name) ;
       bot << str ;
 
 //if (ep->isThreaded()){
