@@ -54,11 +54,11 @@ static void CldStillIdle(void *dummy)
 
   double t = CmiWallTimer();
   double lt = cldData->lastIdle;
-  cldData->lastIdle = t;
   /* only ask for work every 5ms */
   if (lt!=-1 && t-lt<0.005) {
     return;
   }
+  cldData->lastIdle = t;
 
 #ifndef CMK_OPTIMIZE
   startT = CmiWallTimer();
@@ -90,7 +90,6 @@ static void CldAskLoadHandler(loadmsg *msg)
     CldMultipleSend(receiver, sendLoad);
   }
   CmiFree(msg);
-
 }
 
 /* balancing by exchanging load among neighbors */
@@ -176,8 +175,8 @@ void CldBalance()
 #ifndef CMK_OPTIMIZE
   traceUserBracketEvent(CpvAccess(CldData)->balanceEvt, startT, CmiWallTimer());
 #endif
-  CcdCallFnAfter((CcdVoidFn)CldBalance, NULL, PERIOD);
-  CcdCallBacksReset(0);
+  CcdCallFnAfterOnPE((CcdVoidFn)CldBalance, NULL, PERIOD, CmiMyPe());
+//  CcdCallBacksReset(0);
 }
 
 void CldLoadResponseHandler(loadmsg *msg)
@@ -469,6 +468,8 @@ void CldGraphModuleInit(char **argv)
       (CcdVoidFn) CldStillIdle, NULL);
 */
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
+      (CcdVoidFn) CldStillIdle, NULL);
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
       (CcdVoidFn) CldStillIdle, NULL);
 #endif
 #if 0
