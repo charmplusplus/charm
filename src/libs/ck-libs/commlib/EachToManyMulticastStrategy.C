@@ -375,7 +375,7 @@ void EachToManyMulticastStrategy::beginProcessing(int numElements){
     if(expectedDeposits > 0)
         return;
     
-    if(MyPe != -1)
+    if(expectedDeposits == 0 && MyPe >= 0)
         doneInserting();
 }
 
@@ -444,3 +444,4 @@ void EachToManyMulticastStrategy::localMulticast(CkVec<CkArrayIndexMax> vec,
         ap.ckSend((CkArrayMessage *)newmsg, newenv->array_ep());
     }
 }
+
