@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.5  1998-01-15 22:25:52  milind
+ * Revision 1.6  1998-01-16 18:29:05  milind
+ * Used high resolution timers in SP3 version.
+ *
+ * Revision 1.5  1998/01/15 22:25:52  milind
  * Fixed bugs in latencyBWtest and optimized SP3 communication.
  *
  * Revision 1.4  1997/12/10 21:01:41  jyelon
@@ -84,6 +87,7 @@ static char ident[] = "@(#)$Header$";
 #include <sys/time.h>
 #include "converse.h"
 #include <mpproto.h>
+#include <sys/systemcfg.h>
 
 void CmiMemLock() {}
 void CmiMemUnlock() {}
@@ -114,39 +118,37 @@ static int allmsg, dontcare, msgtype;
 
 static void CmiTimerInit(void)
 {
-  struct timestruc_t time;
-  gettimer(TIMEOFDAY,&time);
-  itime=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
+  timebasestruct_t time;
+  read_real_time(&time, TIMEBASE_SZ);
+  time_base_to_time(&time, TIMEBASE_SZ);
+  itime=(double)time.tb_high + 1.0e-9*((double) time.tb_low);
 }
 
 double CmiTimer(void)
 {
   double t;
-  struct timestruc_t time;
+  timebasestruct_t time;
   
-  gettimer(TIMEOFDAY,&time);
-  t=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
+  read_real_time(&time, TIMEBASE_SZ);
+  time_base_to_time(&time, TIMEBASE_SZ);
+  t=(double)time.tb_high + 1.0e-9*((double) time.tb_low);
   return (t-itime);
 }
 
 double CmiWallTimer(void)
 {
   double t;
-  struct timestruc_t time;
+  timebasestruct_t time;
   
-  gettimer(TIMEOFDAY,&time);
-  t=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
+  read_real_time(&time, TIMEBASE_SZ);
+  time_base_to_time(&time, TIMEBASE_SZ);
+  t=(double)time.tb_high + 1.0e-9*((double) time.tb_low);
   return (t-itime);
 }
 
 double CmiCpuTimer(void)
 {
-  double t;
-  struct timestruc_t time;
-  
-  gettimer(TIMEOFDAY,&time);
-  t=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
-  return (t-itime);
+  return CmiTimer();
 }
 
 static int CmiAllAsyncMsgsSent(void)
