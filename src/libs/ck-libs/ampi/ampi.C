@@ -1206,8 +1206,10 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 	    len, count, type,
 	    msg->length, msg->srcRank);
     CkAbort(einfo);
+  }else if(msg->length < len){ // only at rare case shall we reset count by using divide
+    count = msg->length/(ddt->getSize(1));
   }
-  ddt->serialize((char*)buf, (char*)msg->data, msg->length/(ddt->getSize(1)), (-1));
+  ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
   delete msg;
 
   _LOG_E_BEGIN_AMPI_PROCESSING(thisIndex,s,count)
