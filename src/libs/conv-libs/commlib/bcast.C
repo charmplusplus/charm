@@ -15,6 +15,7 @@
 #ifdef   WIN32
 #include <string.h>
 #else
+#include <string.h>   /* net-linux-kcc has memcopy in string.h -RKB*/
 #include <strings.h>
 #endif
 #include "bcast.h"
