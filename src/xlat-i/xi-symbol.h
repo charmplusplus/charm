@@ -658,6 +658,7 @@ class Entry : public Member {
     int isSync(void) { return (attribs & SSYNC); }
     int isConstructor(void) { return !strcmp(name, container->baseName(0).get_string());}
     int isExclusive(void) { return (attribs & SLOCKED); }
+    int isImmediate(void) { return (attribs & SIMMEDIATE); }
     int isCreate(void) { return (attribs & SCREATEHERE)||(attribs & SCREATEHOME); }
     int isCreateHome(void) { return (attribs & SCREATEHOME); }
     int isCreateHere(void) { return (attribs & SCREATEHERE); }

@@ -1592,6 +1592,7 @@ void Entry::genChareDecl(XStr& str)
 
 void Entry::genChareDefs(XStr& str)
 {
+  const char *immediate = isImmediate()?"Immediate":"";
   if(isConstructor()) {
     genChareStaticConstructorDefs(str);
   } else {
@@ -1607,7 +1608,7 @@ void Entry::genChareDefs(XStr& str)
       str << "    int destPE=CkChareMsgPrep("<<params<<");\n";
       str << "    if (destPE!=-1) ckDelegatedTo()->ChareSend("<<params<<",destPE);\n";
       str << "  }\n";
-      str << "  else CkSendMsg("<<params<<");\n";
+      str << "  else CkSendMsg"<<immediate<<"("<<params<<");\n";
     }
     str << "}\n";
   }
@@ -1659,6 +1660,7 @@ void Entry::genArrayDecl(XStr& str)
 
 void Entry::genArrayDefs(XStr& str)
 {
+  const char *immediate = isImmediate()?"Immediate":"";
   if (isConstructor())
     genArrayStaticConstructorDefs(str);
   else
@@ -1680,7 +1682,7 @@ void Entry::genArrayDefs(XStr& str)
     else 
     {
       if (container->isForElement() || container->isForSection())
-        str << "    ckSend(impl_amsg, "<<epIdx()<<");\n";
+        str << "    ckSend"<<immediate<<"(impl_amsg, "<<epIdx()<<");\n";
       else
         str << "    ckBroadcast(impl_amsg, "<<epIdx()<<");\n";
     }
@@ -1722,6 +1724,7 @@ void Entry::genGroupDecl(XStr& str)
 {  
   //Selects between NodeGroup and Group
   char *node = (char *)(container->isNodeGroup()?"Node":"");
+  const char *immediate = isImmediate()?"Immediate":"";
 
   if(isConstructor()) {
     genGroupStaticConstructorDecl(str);
@@ -1747,7 +1750,7 @@ void Entry::genGroupDecl(XStr& str)
         str << "      if (ckIsDelegated()) {\n";
         str << "         Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
 	str << "         ckDelegatedTo()->"<<node<<"GroupSend("<<parampg<<");\n";
-        str << "      } else CkSendMsg"<<node<<"Branch("<<parampg<<");\n";
+        str << "      } else CkSendMsg"<<node<<"Branch"<<immediate<<"("<<parampg<<");\n";
       }
       else
       {// Broadcast
