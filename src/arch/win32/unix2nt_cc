@@ -145,12 +145,12 @@ do
 		CL="$CL /D$def"
 		;;
 	-I)
-		CL="$CL /I$1"
+		CL="$CL /I`cygpath -w $1`"
 		shift
 		;;
 	-I*)
 		path=`echo $arg | awk -F@ '{print substr($1,3)}'`
-		CL="$CL /I$path"
+		CL="$CL /I`cygpath -w $path`"
 		;;
 	-L)
 		LIBDIR="$1"
