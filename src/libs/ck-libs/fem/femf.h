@@ -33,6 +33,9 @@
        external FEM_Get_Node_Data_c
        external FEM_Set_Elem_Data_c
        external FEM_Get_Elem_Data_c
+       
+       external FEM_Set_Sparse
+       external FEM_Get_Sparse
 
        external FEM_Set_Partition
        external FEM_Serial_Split
@@ -83,6 +86,11 @@
        function FEM_Get_Ghost_List_Length()
          integer :: FEM_Get_Ghost_List_Length
        end function
+
+       function FEM_Get_Sparse_Length(uniqueID)
+         integer :: FEM_Get_Sparse_Length
+         integer, intent(in) ::uniqueID
+       end function
        
        function FEM_Get_Comm_Partners()
          integer :: FEM_Get_Comm_Partners
@@ -95,6 +103,11 @@
          integer, intent(in) :: partnerNo
          integer :: FEM_Get_Comm_Count
        end function
+
+       function FEM_Create_Simple_Field(base_type, vec_len)
+          integer, intent(in)  :: base_type, vec_len
+          integer  :: FEM_Create_Simple_Field
+       end function 
 
        function FEM_Create_Field(base_type, vec_len, init_offset, distance)
           integer, intent(in)  :: base_type, vec_len, init_offset, distance

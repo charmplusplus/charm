@@ -55,12 +55,17 @@ extern "C" {
   void FEM_Set_Elem(int elType,int nElem,int doublePerElem,int nodePerElem);
   void FEM_Set_Elem_Data(int elType,const double *data);
   void FEM_Set_Elem_Conn(int elType,const int *conn);
+  void FEM_Set_Sparse(int uniqueIdentifier,int nRecords,
+  	const int *nodes,int nodesPerRec,
+  	const void *data,int dataPerRec,int dataType);
 
   void FEM_Get_Node(int *nNodes,int *doublePerNode);
   void FEM_Get_Node_Data(double *data);
   void FEM_Get_Elem(int elType,int *nElem,int *doublePerElem,int *nodePerElem);
   void FEM_Get_Elem_Data(int elType,double *data);
   void FEM_Get_Elem_Conn(int elType,int *conn);
+  int  FEM_Get_Sparse_Length(int uniqueIdentifier); //Returns nRecords
+  void FEM_Get_Sparse(int uniqueIdentifier,int *nodes,void *data);
 
   void FEM_Update_Mesh(int callMeshUpdated,int doRepartition);
   
@@ -80,6 +85,7 @@ extern "C" {
   void FEM_Get_Comm_Nodes(int partnerNo,int *nodeNos);
 
   /*Node update*/
+  int FEM_Create_Simple_Field(int base_type,int vec_len);
   int FEM_Create_Field(int base_type, int vec_len, int init_offset, 
                        int distance);
   void FEM_Update_Field(int fid, void *nodes);
