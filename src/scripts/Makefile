@@ -423,7 +423,7 @@ LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o ObjGraph.o graph.o  \
            Refiner.o bitvecset.o Set.o heap.o CommLBHeap.o NullLB.o \
-	   compat_regmm.o SimResults.o
+	   SimResults.o
 
 CHARMLIBS: charm++
 	cd libs; make charmlibs OPTS='$(OPTS)'
@@ -579,9 +579,6 @@ WSLB.o: WSLB.C WSLB.decl.h $(CKHEADERS)
 
 CommLBHeap.o: CommLBHeap.C $(CKHEADERS)
 	$(CHARMC) -c CommLBHeap.C
-
-compat_regmm.o: compat_regmm.c
-	$(CHARMC) -c compat_regmm.c
 
 SimResults.o : SimResults.h SimResults.C
 	$(CHARMC) -c SimResults.C
