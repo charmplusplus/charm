@@ -632,7 +632,7 @@ public:
 		bool ptrWasNull=(ptr==0);
 		
 		PUP::able *ptr_able=ptr; // T must inherit from PUP::able!
-		ptr_able->pup(p); //Pack as a PUP::able *
+		p(&ptr_able); //Pack as a PUP::able *
 		ptr=(T *)ptr_able;
 		
 		if (ptrWasNull) 
