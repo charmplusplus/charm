@@ -92,11 +92,11 @@ dirs+sources:
 	sh tmp.sh
 	rm -f tmp.sh
 	@echo
-	@echo 'Gathering source-code in '`cat .vdir`'/src'
+	@echo 'Gathering translator source in '`cat .vdir`'/src'
 	@echo
 	rm -rf ../src ; mkdir ../src
-	cp xl-* ../src
-	cp xp-* ../src
+	cp xl-*.c xl-*.h ../src
+	cp xp-*.c xp-*.h ../src
 	cp Maketrans ../src/Makefile
 	@echo
 	@rm -f .vdir .gdir
@@ -115,7 +115,10 @@ CVLIBS=libconv-core.a $(CVLIBS_QS)
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o machine.o spantree.o queueing.o fifo.o msgmgr.o memory.o
 
-converse: basics $(CVLIBS) conv-host
+converse: basics $(CVLIBS) conv-host-if-needed
+
+conv-host-if-needed:
+	if [ -f conv-host.c ] ; then make conv-host OPTS='$(OPTS)' ; fi
 
 conv-host: conv-host.c
 	../bin/charmc -cp ../bin -seq -DNOTIFY -o conv-host-notify conv-host.c
