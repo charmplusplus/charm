@@ -120,7 +120,7 @@ CVHEADERS=converse.h conv-mach.h conv-mach.csh
 
 TRACELIBS=libtrace-none.a libtrace-summary.a libtrace-projections.a
 
-CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o libldb-spray.o libldb-graph.o $(TRACELIBS)
+CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o libldb-spray.o libldb-graph.o libldb-test.o $(TRACELIBS)
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o
 
@@ -199,6 +199,9 @@ libldb-graph.o: cldb.graph.c ../../src/Common/conv-ldb/cldb.graph.h $(CVHEADERS)
 
 libldb-spray.o: cldb.spray.c $(CVHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ cldb.spray.c
+
+libldb-test.o: cldb.test.c $(CVHEADERS)
+	$(CHARMC) -cp ../lib/ -o $@ cldb.test.c
 
 ###############################################################################
 #
