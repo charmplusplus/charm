@@ -35,7 +35,7 @@ extern "C" void BgAttach(CthThread t)
 
 // quiescence detection callback
 // only used when doing timing correction to wait for 
-static void BroadcastShutdown(void *null)
+static void BroadcastShutdown(void *null, double t)
 {
   /* broadcast to shutdown */
   CmiPrintf("BG> In BroadcastShutdown after quiescence. \n");
