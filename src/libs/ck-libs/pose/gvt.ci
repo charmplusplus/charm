@@ -1,22 +1,23 @@
-// File: gvt.ci
-
-// Defines the Global Virtual Time (GVT) and the Processor Virtual Time (PVT)
-
+/// Global Virtual Time estimation for POSE
 module gvt {
+  /// Global handles ThePVT and TheGVT are declared in gvt.C, used everywhere
   readonly CkGroupID ThePVT;
   readonly CkGroupID TheGVT;
+  /// Message to send info to GVT 
   message UpdateMsg;
+  /// Message to send GVT estimate back to PVT
   message GVTMsg;
 
+  /// PVT chare group for computing local processor virtual time 
   group PVT {
     entry PVT(void);
     entry void startPhase(void);
     entry void setGVT(GVTMsg *);
   };
 
+  /// GVT chare group for estimating GVT
   group GVT {
     entry GVT(void);
-    entry void runGVT(void);
     entry void runGVT(UpdateMsg *);
     entry void computeGVT(UpdateMsg *);
   };

@@ -1,8 +1,4 @@
-// File: srtable.C
-// SRtable is a table that stores timestamped send/recv events of all
-// events and cancellations.
-
-// NOTE TO SELF: run w/ +memory_checkfreq=1
+/// SendRecvTable for POSE GVT calculations
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -10,174 +6,156 @@
 #include "srtable.h"
 #include "gvt.h"
 
-// Basic constructor
+/// Basic constructor
 SRtable::SRtable() 
 { 
-  residuals = NULL;
+  for (int i=0; i<GVT_WINDOW; i++) sends[i] = recvs[i] = 0;
   offset = 0;
-  for (int i=0; i<GVT_WINDOW; i++)
-    sends[i] = recvs[i] = 0;
+  residuals = NULL;
 }
 
-// Destructor: needed to free linked lists
-SRtable::~SRtable()
-{ // implement me
-  CkPrintf("WARNING: SRtable::~SRtable(): not implemented.\n");
-}
-
-// Makes an SRentry out of parameters and sends to other Insert
+/// Insert send/recv record at timestamp
 void SRtable::Insert(int timestamp, int srSt)
 {
+  sanitize();
   CmiAssert(timestamp >= offset);
-  //sanitize();
+  CmiAssert((srSt == 0) || (srSt == 1));
   if (timestamp >= offset + GVT_WINDOW) // insert in residuals
-    listInsert(timestamp, srSt);
+    listInsert(timestamp, srSt); // call helper
   else { // insert in table
-    if (srSt == SEND)
-      sends[timestamp - offset]++;
-    else
-      recvs[timestamp - offset]++;
+    if (srSt == SEND) sends[timestamp - offset]++;
+    else recvs[timestamp - offset]++;
   }
-  //sanitize();
+  sanitize();
 }
 
+/// Helper function to Insert
 void SRtable::listInsert(int timestamp, int srSt)
 {
-  //sanitize();
+  sanitize();
   SRentry *tmp;
-  if (!residuals)
-    residuals = new SRentry(timestamp, NULL);
+  if (!residuals) // no residuals yet
+    residuals = new SRentry(timestamp, srSt, NULL);
   else {
-    if (timestamp < residuals->timestamp) {
-      residuals = new SRentry(timestamp, residuals);
+    if (timestamp < residuals->timestamp()) // goes before first residual
+      residuals = new SRentry(timestamp, srSt, residuals);
+    else if (timestamp == residuals->timestamp()) { // goes in first residual
       if (srSt == SEND) residuals->incSends();
       else residuals->incRecvs();
     }
-    else if (timestamp == residuals->timestamp) {
-      if (srSt == SEND) residuals->incSends();
-      else residuals->incRecvs();
-    }
-    else {
+    else { // search for position
       tmp = residuals;
-      while (tmp->next && (timestamp > tmp->next->timestamp))
-	tmp = tmp->next;
-      if (!tmp->next) {
-	tmp->next = new SRentry(timestamp, NULL);
-	if (srSt == SEND) tmp->next->incSends();
-	else tmp->next->incRecvs();
+      while (tmp->next() && (timestamp > tmp->next()->timestamp()))
+	tmp = tmp->next();
+      if (!tmp->next())  // goes at end of residual list
+	tmp->setNext(new SRentry(timestamp, srSt, NULL));
+      else if (timestamp == tmp->next()->timestamp()) { // goes in tmp->next
+	if (srSt == SEND) tmp->next()->incSends();
+	else tmp->next()->incRecvs();
       }
-      else if (timestamp == tmp->next->timestamp) {
-	if (srSt == SEND) tmp->next->incSends();
-	else tmp->next->incRecvs();
-      }
-      else { //timestamp < tmp->next->timestamp
-	tmp->next = new SRentry(timestamp, tmp->next);
-	if (srSt == SEND) tmp->next->incSends();
-	else tmp->next->incRecvs();
-      }
+      else // goes after tmp but before tmp->next
+	tmp->setNext(new SRentry(timestamp, srSt, tmp->next()));
     }
   }
-  //sanitize();
+  sanitize();
 }
 
-// purge tables below timestamp ts
+/// Purge entries from table with timestamp below ts
 void SRtable::PurgeBelow(int ts)
 {
-  //sanitize();
-  int start = ts - offset, i;
+  sanitize();
+  CmiAssert(ts >= offset);
+  int i;
   if (ts >= offset + GVT_WINDOW) { // purge everything 
     offset = ts;
-    for (i=0; i<GVT_WINDOW; i++)
-      sends[i] = recvs[i] = 0;
+    for (i=0; i<GVT_WINDOW; i++) sends[i] = recvs[i] = 0;
   }
-  else { // purge a range and move high entries down
+  else { // move high entries down
+    int start = ts - offset;
     offset = ts;
-    int offIdx;
     for (i=start; i<GVT_WINDOW; i++) {
-      offIdx = i-start;
-      sends[offIdx] = sends[i];
-      sends[i] = 0;
-      recvs[offIdx] = recvs[i];
-      recvs[i] = 0;
+      sends[i-start] = sends[i];
+      recvs[i-start] = recvs[i];
     }
-    for (i=(GVT_WINDOW-start); i<start; i++) // purge in-betweens
+    for (i=(GVT_WINDOW-start); i<GVT_WINDOW; i++) // purge high entries
       sends[i] = recvs[i] = 0;
   }
-  //sanitize();
+  sanitize();
 }
 
-// try to file each residual event in table
+/// Move entries to table from residuals if timestamp < offset+GVT_WINDOW
 void SRtable::FileResiduals()
 {
-  //sanitize();
-  SRentry *tmp, *current;
+  sanitize();
+  SRentry *tmp = residuals, *current;
   int end = offset+GVT_WINDOW;
-
-  tmp = residuals;
-  while (tmp && (tmp->timestamp < end)) {
+  while (tmp && (tmp->timestamp() < end)) {
     current = tmp;
-    tmp = tmp->next;
-    sends[current->timestamp - offset] += current->sendCount;
-    recvs[current->timestamp - offset] += current->recvCount;
+    tmp = tmp->next();
+    sends[current->timestamp() - offset] += current->sends();
+    recvs[current->timestamp() - offset] += current->recvs();
     delete current;
   }
   residuals = tmp;
-  //sanitize();
+  sanitize();
 }
 
-UpdateMsg *SRtable::packTable()
-{ // packs entries with two earliest timestamps from buckets into an UpdateMsg
-  UpdateMsg *um = new UpdateMsg;
-
-  //sanitize();
-  um->earlyTS = um->nextTS = -1;
-  um->earlySends = um->earlyRecvs = um->nextSends = um->nextRecvs = 0;
-  FindEarliest(&(um->earlyTS), &(um->earlySends), &(um->earlyRecvs), 
-	       &(um->nextTS), &(um->nextSends), &(um->nextRecvs));
-  return um;
-}
-
-void SRtable::FindEarliest(int *eTS, int *eS, int *eR, int *nTS, int *nS, int *nR) 
+/// Find earliest timestamp in table and associated send/recv counts
+void SRtable::FindEarliest(int *eTS, int *eS, int *eR)
 {
-  int found1=0, found2=0;
+  sanitize();
+  // search in arrays for earliest timestamp
   for (int i=0; i<GVT_WINDOW; i++)
     if ((sends[i] > 0) || (recvs[i] > 0)) {
-      found1 = 1;  *eTS = offset+i;  *eS = sends[i];  *eR = recvs[i];
-      for (int j=i+1; j<GVT_WINDOW; j++)
-	if ((sends[j] > 0) || (recvs[j] > 0)) {
-	  found2 = 1;  *nTS = offset+j; *nS = sends[j]; *nR = recvs[j];
-	  return;
-	}
+      *eTS = offset+i;  *eS = sends[i];  *eR = recvs[i];
+      return;
     }
-  // 0 or 1 earliest timestamps found; look at residuals
-  if (found1 && !found2) {
-    if (residuals) {
-      *nTS = residuals->timestamp;
-      *nS = residuals->sendCount;
-      *nR = residuals->recvCount;
-    }
-    return;
-  }
-  else {
-    if (residuals) {
-      *eTS = residuals->timestamp;
-      *eS = residuals->sendCount;
-      *eR = residuals->recvCount;
-      if (residuals->next) {
-	*nTS = residuals->next->timestamp;
-	*nS = residuals->next->sendCount;
-	*nR = residuals->next->recvCount;
-      }
-    }
+  if (residuals) {
+    *eTS = residuals->timestamp();
+    *eS = residuals->sends();
+    *eR = residuals->recvs();
   }
 }
 
+/// Free residual entries, reset counters and pointers
+void SRtable::FreeTable() {
+  sanitize();
+  SRentry *tmp = residuals;
+  while (tmp) { 
+    residuals = tmp->next();
+    delete(tmp);
+    tmp = residuals;
+  }
+  for (int i=0; i<GVT_WINDOW; i++) sends[i] = recvs[i] = 0;
+  offset = 0;
+}
+
+/// Dump data fields
 void SRtable::dump()
 {
-  CkPrintf("WARNING: SRtable::dump(): not implemented.\n");
+  SRentry *tmp = residuals;
+  CkPrintf("Offset:%d\nSENDS: ");
+  for (int i=0; i<GVT_WINDOW; i++) CkPrintf("%d:%d ", i, sends[i]);
+  CkPrintf("\nRECVS: ");
+  for (int i=0; i<GVT_WINDOW; i++) CkPrintf("%d:%d ", i, recvs[i]);
+  CkPrintf("\nRESIDUALS: ");
+  while (tmp) {
+    tmp->dump();
+    tmp = tmp->next();
+  }
 }
 
+/// Check validity of data fields
 void SRtable::sanitize()
 {
-  CkPrintf("WARNING: SRtable::sanitize(): not implemented.\n");
+  SRentry *tmp = residuals;
+  CmiAssert(offset >= 0);
+  for (int i=0; i<GVT_WINDOW; i++) {
+    CmiAssert(sends[i] >= 0);
+    CmiAssert(recvs[i] >= 0);
+  }
+  while (tmp) {
+    tmp->sanitize();
+    tmp = tmp->next();
+  }
 }

@@ -104,6 +104,7 @@ void sim::Status()
   //  if (st == localPVT->getGVT())
   //    CkPrintf("Object %d has safeTime == GVT...\n", thisIndex);
   //localPVT->objUpdate(myPVTidx, st, -1, -1);
+  localPVT = (PVT *)CkLocalBranch(ThePVT);
   localPVT->objUpdate(myPVTidx, myStrat->SafeTime(), -1, -1);
 }
 
@@ -116,7 +117,7 @@ void sim::Commit()
   if (!tstat)  localStats->TimerStart(MISC_TIMER);
   else localStats->SwitchTimer(MISC_TIMER);
 #endif
-
+  localPVT = (PVT *)CkLocalBranch(ThePVT);
   if (localPVT->done() && (POSE_endtime == -1)) { //commit all events in queue
     eq->CommitEvents(this, -1);
     objID->terminus();
@@ -171,6 +172,7 @@ void sim::Cancel(cancelMsg *m)
 #ifdef POSE_STATS_ON
   localStats->TimerStart(CAN_TIMER);
 #endif
+  localPVT = (PVT *)CkLocalBranch(ThePVT);
   cancels.Insert(m->timestamp, m->evID);    // add to cancellations list
   localPVT->objUpdate(m->timestamp, RECV);
   CkFreeMsg(m);

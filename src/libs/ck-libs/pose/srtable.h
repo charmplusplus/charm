@@ -1,60 +1,129 @@
-// File: srtable.h
-// SendRecvTable is a table that stores timestamps of sends and recvs of all
-// events and cancellations.
-// Used in gvt.*.  
-
+/// SendRecvTable for POSE GVT calculations
 #ifndef SRTABLE_H
 #define SRTABLE_H
 #include "pose.h"
 
-class UpdateMsg;
+class UpdateMsg; // from gvt.h
 
-class SRentry { // A record for a set of send/recv w/same timestamp
+/// An entry for storing the number of sends and recvs at a timestamp
+/** This class is used in SendRecvTable to store residual send/recv data */
+class SRentry {
+  /// Timestamp of the message
+  int theTimestamp;  
+  /// The number of messages sent with theTimestamp
+  int sendCount;
+  /// The number of messages sent with theTimestamp
+  int recvCount;
+  /// Next SRentry in list
+  SRentry *nextPtr;
  public:
-  int timestamp;  // timestamp of the message
-  int sendCount, recvCount;  // number of messages with this timestamp
-  SRentry *next;  // this type is used almost always in linked lists
-  SRentry() { timestamp = -1; sendCount = recvCount = 0; next = NULL; }
-  ~SRentry() { }
-  SRentry(int ts, SRentry *p) { 
-    timestamp = ts; sendCount = recvCount = 0; next = p; 
+  /// Basic constructor
+  /** Initializes all data members */
+  SRentry() { 
+    theTimestamp = -1; sendCount = recvCount = 0; nextPtr = NULL; 
   }
-  void incSends() { sendCount++; }
+  /// Initializing constructor 1
+  /** Initializes theTimestamp & nextPtr w/parameters, 
+      sendCount & recvCount to 0 */
+  SRentry(int ts, SRentry *p) { 
+    theTimestamp = ts; sendCount = recvCount = 0; nextPtr = p; 
+  }
+  /// Initializing constructor 2
+  /** Initializes theTimestamp, send/recv count and nextPtr
+      w/parameters */
+  SRentry(int ts, int sr, SRentry *p) {
+    theTimestamp = ts;  nextPtr = p; 
+    if (sr == SEND) { sendCount = 1; recvCount = 0; }
+    else { sendCount = 0; recvCount = 1; }
+  }
+  /// Set timestamp
+  void setTimestamp(int ts) { theTimestamp = ts; }
+  /// Set next pointer
+  void setNext(SRentry *p) { nextPtr = p; }
+  /// Set sendCount
+  void setSends(int n) { sendCount = n; }
+  /// Set recvCount
+  void setRecvs(int n) { recvCount = n; }
+  /// Increment sendCount
+  void incSends() { sendCount++; } 
+  /// Increment recvCount
   void incRecvs() { recvCount++; }
-  void dump() { 
-    CkPrintf("TS:%d #s:%d #r:%d", timestamp, sendCount, recvCount); 
+  /// Get timestamp
+  int timestamp() { return theTimestamp; }
+  /// Get next pointer
+  SRentry *next() { return nextPtr; }
+  /// Get sendCount
+  int sends() { return sendCount; }
+  /// Get recvCount
+  int recvs() { return recvCount; }
+  /// Dump data fields
+  void dump() {
+    if (nextPtr)
+      CkPrintf("TS:%d #s:%d #r:%d n:!NULL ", theTimestamp, sendCount, 
+	       recvCount); 
+    else CkPrintf("TS:%d #s:%d #r:%d n:NULL ",theTimestamp, sendCount, 
+		  recvCount);
+  }
+  /// Check validity of data fields
+  void sanitize() {
+    CmiAssert(theTimestamp >= -1); // should be -1 or > if initialized
+    CmiAssert(sendCount >= 0);  // cannot be less than zero
+    CmiAssert(recvCount >= 0);  // cannot be less than zero
+    if (nextPtr == NULL) return;   // nextPtr can be NULL
+    // if nextPtr != NULL, check if pointer looks valid
+    int test_ts = nextPtr->timestamp();
+    int test_sendCount = nextPtr->sends();
+    int test_recvCount = nextPtr->recvs();
+    SRentry *test_next = nextPtr->next();
+    nextPtr->setTimestamp(test_ts);
+    nextPtr->setSends(test_sendCount);
+    nextPtr->setRecvs(test_recvCount);
+    nextPtr->setNext(test_next);
   }
 };
 
+/// An table for storing the number of sends and recvs at a timestamp
+/** This class is used in GVT to keep track of messages sent/received */
 class SRtable {
  private:
-  SRentry *residuals;  // all other send/recv events
+  /// sends[i] is number of sends at timestamp offset+i
+  /** Size of table GVT_WINDOW specified in pose.h */
+  int sends[GVT_WINDOW];
+  /// recvs[i] is number of receives at timestamp offset+i
+  /** Size of table GVT_WINDOW specified in pose.h */
+  int recvs[GVT_WINDOW];
+  /// Base timestamp to index tables
+  /** offset is the current GVT */
+  int offset;
+  /// Stores send/recv records ith timestamp >= offset+GVT_WINDOW
+  /** One entry per timestamp, all sends/recvs stored in same entry */
+  SRentry *residuals;
+  /// Helper function to Insert
+  /** Stores new send/recv record in residuals */
   void listInsert(int timestamp, int srSt);
  public:
-  int sends[GVT_WINDOW], recvs[GVT_WINDOW]; // send/recv events occurring 
-  int offset;                   // gvt offset
-  SRtable();                    // basic constructor
-  ~SRtable();                   // needed to free up the linked lists
-  void Insert(int timestamp, int srSt); // insert s/r at timestamp
-  void FindEarliest(int *eTS, int *eS, int *eR, int *nTS, int *nS, int *nR);
-  void PurgeBelow(int ts);      // purge table below timestamp ts
-  void FileResiduals();         // try to file each residual event in table
-  void ClearTable() {           // reset counters & ptrs; free all
-    //sanitize();
-    SRentry *tmp;
-    offset = 0;
-    for (int i=0; i<GVT_WINDOW; i++)
-      sends[i] = recvs[i] = 0;
-    tmp = residuals;
-    while (tmp) { 
-      residuals = tmp->next;
-      delete(tmp);
-      tmp = residuals;
-    }
-  }
-  UpdateMsg *packTable();
-  void dump();                  // dump the table
+  /// Basic constructor
+  /** Initializes all data fields, including entire sends and recvs arrays */
+  SRtable();
+  /// Destructor
+  ~SRtable() { FreeTable(); }
+  /// Insert send/recv record at timestamp
+  void Insert(int timestamp, int srSt); 
+  /// Purge entries from table with timestamp below ts
+  void PurgeBelow(int ts);      
+  /// Move entries to table from residuals if timestamp < offset+GVT_WINDOW
+  void FileResiduals();         
+  /// Find earliest timestamp in table and associated send/recv counts
+  /** Returns results by reference */
+  void FindEarliest(int *eTS, int *eS, int *eR);
+  /// Free residual entries, reset counters and pointers
+  void FreeTable();
+  /// Dump data fields
+  void dump();    
+  /// Check validity of data fields
   void sanitize();
+  /// Test this class
+  void self_test();
 };
 
 #endif

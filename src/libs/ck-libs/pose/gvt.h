@@ -1,84 +1,138 @@
-// File: gvt.h
-
-// Implements the Global Virtual Time (GVT) algorithm; provides chare
-// groups PVT and GVT. Objects interact with the local PVT branch.
-// PVT branches summarize object info and report to the single
-// floating GVT object, which broadcasts results to all PVT branches.
+/// Global Virtual Time estimation for POSE
+/** Implements the Global Virtual Time (GVT) algorithm; provides chare
+    groups PVT and GVT. Objects interact with the local PVT branch.
+    PVT branches summarize object info and report to the single
+    floating GVT object, which broadcasts results to all PVT branches. */
 
 #ifndef GVT_H
 #define GVT_H
+#include "gvt.decl.h"
 
-// synchronization strategies
+/// synchronization strategies
 #define OPTIMISTIC 0
 #define CONSERVATIVE 1
 
-#include "gvt.decl.h"
-
-// Global handles ThePVT and TheGVT are declared in gvt.C, used everywhere
+/// Global handles ThePVT and TheGVT are declared in gvt.C, used everywhere
 extern CkGroupID ThePVT;  
 extern CkGroupID TheGVT;
 
-class SRentry;
-class SRtable;
+class SRtable;  // from srtable.h
 
-// data structure used to send info to GVT
+/// Message to send info to GVT 
+/** PVT sends processor virtual time and send/recv information to GVT.  
+    GVT also sends info to next GVT index for next GVT invocation. */
 class UpdateMsg : public CMessage_UpdateMsg {
 public:
-  int optPVT, conPVT;         // pvts of local optimistic/conservative objects
-  int earlyTS, earlySends, earlyRecvs;
-  int nextTS, nextSends, nextRecvs;
-  int inactive, inactiveTime;
-  int nextLB;                 // iterations of GVT since last LB
+  /// PVT of local optimistic objects
+  /** Used to send estimated GVT from one GVT invocation to next */
+  int optPVT;
+  /// PVT of local conservative objects
+  int conPVT;
+  /// Earliest send/recv timestamp on this processor
+  /** Used to send last earliest timestamp from GVT to next GVT invocation */
+  int earlyTS;
+  /// Number of sends at earlyTS
+  int earlySends;
+  /// Number of receives at earlyTS
+  int earlyRecvs;
+  /// Inactive status (GVT only)
+  int inactive;
+  /// Inactive time (GVT only)
+  int inactiveTime;
+  /// Iterations of GVT since last LB (GVT only)
+  int nextLB;
 };
 
-// Message for the exchange of basic info between PVT & GVT
+/// Message to send GVT estimate back to PVT
 class GVTMsg : public CMessage_GVTMsg {
 public:
-  int estGVT, done;
+  /// GVT estimate
+  int estGVT;
+  /// Termination flag
+  int done;
 };
 
-class PVT : public Group {  // PVT chare group
-private:
+/// PVT chare group for computing local processor virtual time 
+/** Keeps track of local sends/recvs and computes processor virtual time.
+    Interacts with GVT to obtain new estimate and invokes fossil 
+    collection and forward execution on objects with new estimate. */
+class PVT : public Group {  
+ private:
 #ifdef POSE_STATS_ON
   localStat *localStats;
 #endif
-  int optPVT, conPVT, estGVT;        // PVT and GVT estimates
-  int simdone;                       // simulation done flag
-  int waitingForGVT;                 // flag to synchronize PVTs with GVT
-  SRtable *SendsAndRecvs;            // Send and Recv events
-  pvtObjects objs;                   // list of registered objects
-public:
+  /// PVT of local optimistic posers
+  int optPVT;
+  /// PVT of local conservative posers
+  int conPVT;
+  /// Last GVT estimate
+  int estGVT;       
+  /// Simulation termination flag
+  int simdone;
+  /// Flag to synchronize PVTs with GVT to avoid overlap
+  int waitingForGVT;                 
+  /// Table to store send/recv timestamps
+  SRtable *SendsAndRecvs;            
+  /// List of objects registered with this PVT branch
+  pvtObjects objs;                   
+ public:
+  /// Basic Constructor
   PVT(void);
   PVT(CkMigrateMessage *) { };
-  void startPhase(void);             // starts off a PVT cycle
-  void setGVT(GVTMsg *m);            // set gvt on local branch (used by GVT)
-  // non-entry methods
-  int getGVT() { return estGVT; }    // objects get the current gvt estimate
-  int done() { return simdone; }     // objects check if the simulation is done
+  /// ENTRY: runs the PVT calculation and reports to GVT
+  void startPhase(void);             
+  /// ENTRY: receive GVT estimate; wake up objects
+  /** Receives the new GVT estimate and termination flag; wakes up objects
+      for fossil collection and forward execution with new GVT estimate. */
+  void setGVT(GVTMsg *m);            
+  /// Returns GVT estimate
+  int getGVT() { return estGVT; }    
+  /// Returns termination flag
+  int done() { return simdone; }
+  /// Register poser with PVT
   int objRegister(int arrIdx, int safeTime, int sync, sim *myPtr);
-  void objRemove(int pvtIdx);        // unregister object
-  void objUpdate(int timestamp, int sr); // update send/recv, ovt
+  /// Unregister poser from PVT
+  void objRemove(int pvtIdx);
+  /// Update send/recv table at timestamp
+  void objUpdate(int timestamp, int sr); 
+  /// Update PVT with safeTime and send/recv table at timestamp
   void objUpdate(int pvtIdx, int safeTime, int timestamp, int sr);
 };
 
-class GVT : public Group { // GVT chare
+/// GVT chare group for estimating GVT
+/** Responsibility for GVT estimation shifts between branches after each
+    GVT invocation. */
+class GVT : public Group { 
 private:
-  int estGVT;                        // GVT estimates
-  int inactive, inactiveTime;        // #iterations since change in state
-  int nextLBstart;                   // #iterations since last LB run
-  int lastEarliest, lastSends, lastRecvs;
-  int lastNextEarliest, lastNextSends, lastNextRecvs;
 #ifdef POSE_STATS_ON
   localStat *localStats;
 #endif
-  int maxEndtime(int Pend, int optEst, int conEst);
+  /// Latest GVT estimate
+  int estGVT; 
+  /// Inactivity status: number of iterations since GVT has changed
+  int inactive;
+  /// Time at which GVT last went inactive
+  int inactiveTime;
+  /// Number of GVT iterations since last LB run
+  int nextLBstart; 
+  /// Earliest send/recv timestamp in previous GVT invocation
+  int lastEarliest;
+  /// Number of sends at lastEarliest
+  int lastSends;
+  /// Number of receives at lastEarliest
+  int lastRecvs;
 public:
+  /// Basic Constructor
   GVT(void);
   GVT(CkMigrateMessage *) { };
-  static void _runGVT(UpdateMsg *);
-  void runGVT(void);            // starts a GVT cycle locally
-  void runGVT(UpdateMsg *);     // starts a GVT cycle remotely
-  void computeGVT(UpdateMsg *); // gathers PVT reports; sends GVT estimate
+  //Use this for Ccd calls
+  //static void _runGVT(UpdateMsg *);
+  /// ENTRY: Run the GVT
+  /** Updates data fields with info from previous GVT estimation.  Fires
+      off PVT calculations on all PVT branches. */
+  void runGVT(UpdateMsg *);
+  /// ENTRY: Gathers PVT reports; calculates and broadcasts GVT to PVTs
+  void computeGVT(UpdateMsg *); 
 };
 
 #endif

@@ -16,7 +16,7 @@ extern int eventMsgsRecvd;
 extern int eventMsgsDiscarded;
 
 // Primary versions
-//#define POSE_STATS_ON 1
+#define POSE_STATS_ON 1
 //#define POSE_COMM_ON 1
 //#define LB_ON 1
 
@@ -29,9 +29,9 @@ extern int eventMsgsDiscarded;
 
 // Strategy variables
 #define STORE_RATE 100           // default store rate: 1 for every n events
-#define SPEC_WINDOW 20         // speculative event window
+#define SPEC_WINDOW 50         // speculative event window
 #define MIN_LEASH 10            // min spec window for adaptive strategy
-#define MAX_LEASH 500         // max  "     "     "     "        " 
+#define MAX_LEASH 100         // max  "     "     "     "        " 
 #define LEASH_FLEX 1           // leash increment
 #define GVT_WINDOW 500          // Maximum time GVT can advance
 

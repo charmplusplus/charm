@@ -46,7 +46,7 @@ void chpt<StateType>::checkpoint(StateType *data)
   localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
   localStats->SwitchTimer(CP_TIMER);
 #endif
-  if (myStrat->currentEvent->cpData) {
+  if (parent->myStrat->currentEvent->cpData) {
     CkPrintf("ERROR: chpt::checkpoint: cpData exists already\n");
     CkExit();
   }
