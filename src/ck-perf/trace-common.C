@@ -36,12 +36,12 @@ CkpvDeclare(char*, traceRoot);
 /// decide parameters from command line
 static void traceCommonInit(char **argv)
 {
-  int i;
   DEBUGF(("[%d] in traceCommonInit.\n", CkMyPe()));
+  CkpvInitialize(double, traceInitTime);
+  CkpvAccess(traceInitTime) = TRACE_TIMER();
   CpvInitialize(int, traceOn);
   CkpvInitialize(int, CtrLogBufSize);
   CkpvInitialize(char*, traceRoot);
-  CkpvInitialize(double, traceInitTime);
   CpvAccess(traceOn) = 0;
   CkpvAccess(CtrLogBufSize) = LogBufSize;
   CmiGetArgInt(argv,"+logsize",&CkpvAccess(CtrLogBufSize));
@@ -97,8 +97,6 @@ static inline void _traceInit(char **argv)
 
   // in moduleInit.C
   _createTraces(argv);
-
-  CkpvAccess(traceInitTime) = TRACE_TIMER();
 
   if (CkpvAccess(_traces)->length() && !CmiGetArgFlag(argv,"+traceoff"))
     traceBegin();

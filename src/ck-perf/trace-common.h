@@ -36,10 +36,11 @@ CkpvExtern(double, traceInitTime);
 
 #if CMK_BLUEGENE_CHARM
 #define  TRACE_TIMER   BgGetTime
+inline double TraceTimer() { return TRACE_TIMER(); }
 #else
 #define  TRACE_TIMER   CmiWallTimer
-#endif
 inline double TraceTimer() { return TRACE_TIMER() - CkpvAccess(traceInitTime); }
+#endif
 
 #endif
 
