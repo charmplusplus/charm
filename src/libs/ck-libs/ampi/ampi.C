@@ -126,8 +126,8 @@ ampi::recv(int t1, int t2, void* buf, int count, int type)
     start_running();
   }
   if (msg->length < len) {
-    CkError("AMPI: Expecting message of length %d, received %d\n",
-            len, msg->length);
+    CkError("AMPI: (type=%d, count=%d) Expecting message of length %d, received %d\n",
+            type, count, len, msg->length);
     CkAbort("Exiting.\n");
   }
   ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
@@ -463,7 +463,10 @@ int AMPI_Start(AMPI_Request *reqnum)
   if(req->sndrcv == 1) { // send request
     ptr->send(req->tag, ptr->getIndex(), req->buf, req->count, req->type, 
               req->proc);
-  } // recv request is handled in waitall
+  } else {
+    ptr->recv(req->tag, req->proc, req->buf, req->count, req->type);
+  }
+  // NO: recv request is handled in waitall
   return 0;
 }
 
@@ -476,10 +479,10 @@ int AMPI_Waitall(int count, AMPI_Request *request, AMPI_Status *sts)
     if(request[i] == (-1))
       continue;
     if(request[i] < 100) { // persistent request
-      PersReq *req = &(ptr->requests[request[i]]);
-      if(req->sndrcv == 2) { // recv request
-        ptr->recv(req->tag, req->proc, req->buf, req->count, req->type);
-      }
+      // PersReq *req = &(ptr->requests[request[i]]);
+      // if(req->sndrcv == 2) { // recv request
+        // ptr->recv(req->tag, req->proc, req->buf, req->count, req->type);
+      // }
     } else { // irecv request
       int index = request[i] - 100;
       PersReq *req = &(ptr->irequests[index]);

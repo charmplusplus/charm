@@ -30,12 +30,14 @@ SAVE=""
 PURIFY=""
 OVERRIDE_CC=""
 OVERRIDE_CXX=""
+OVERRIDE_F90=""
 OVERRIDE_LD=""
 OVERRIDE_LDXX=""
 OPTS_CPP=""
 OPTS_LDRO="" 
 OPTS_CC=""
 OPTS_CXX="" 
+OPTS_F90=""
 OPTS_LD=""  
 OPTS_LDXX=""  
 OBJECT=""
@@ -254,6 +256,11 @@ do
 		shift
 		;;
 
+	"-f90")
+		OVERRIDE_F90="$1"
+		shift
+		;;
+
 	"-ld")
 		OVERRIDE_LD="$1"
 		shift
@@ -281,6 +288,11 @@ do
 
 	"-c++-option")
 		OPTS_CXX="$OPTS_CXX $1"
+		shift
+		;;
+
+	"-f90-option")
+		OPTS_F90="$OPTS_F90 $1"
 		shift
 		;;
 
@@ -327,12 +339,14 @@ do
 		OPTS_CPP="$OPTS_CPP $arg"
 		OPTS_CC="$OPTS_CC  $arg"
 		OPTS_CXX="$OPTS_CXX $arg"
+		OPTS_F90="$OPTS_F90 $arg"
 		;;
 
 	-I*)
 		OPTS_CPP="$OPTS_CPP $arg"
 		OPTS_CC="$OPTS_CC  $arg"
 		OPTS_CXX="$OPTS_CXX $arg"
+		OPTS_F90="$OPTS_F90 $arg"
 		;;
 
 	-LANG*)
@@ -340,6 +354,7 @@ do
 		OPTS_CPP="$OPTS_CPP  $arg"
 		OPTS_CC="$OPTS_CC   $arg"
 		OPTS_CXX="$OPTS_CXX  $arg"
+		OPTS_F90="$OPTS_F90  $arg"
 		;;
 	-L*)
 		OPTS_LDRO="$OPTS_LDRO $arg"
@@ -362,6 +377,7 @@ do
 	"-pg")
 		OPTS_CC="$OPTS_CC $arg"
 		OPTS_CXX="$OPTS_CXX $arg"
+		OPTS_F90="$OPTS_F90 $arg"
 		OPTS_LD="$OPTS_LD $arg"
 		OPTS_LDXX="$OPTS_LDXX $arg"
 		;;
@@ -369,6 +385,7 @@ do
 	-O*)
 		OPTS_CC="$OPTS_CC $arg"
 		OPTS_CXX="$OPTS_CXX $arg"
+		OPTS_F90="$OPTS_F90 $arg"
 		;;
 
 	-l*)
@@ -393,6 +410,7 @@ do
 		OPTS_CPP="$OPTS_CPP  $arg"
 		OPTS_CC="$OPTS_CC   $arg"
 		OPTS_CXX="$OPTS_CXX  $arg"
+		OPTS_F90="$OPTS_F90  $arg"
 		OPTS_LD="$OPTS_LD   $arg"
 		OPTS_LDXX="$OPTS_LDXX $arg"
 		OPTS_LDRO="$OPTS_LDRO $arg"
@@ -516,6 +534,7 @@ then
     CMK_CC="$CMK_SEQ_CC -DCMK_SEQUENTIAL=1 "
     CMK_LD="$CMK_SEQ_LD"
     CMK_CXX="$CMK_SEQ_CXX -DCMK_SEQUENTIAL=1 " 
+    CMK_F90="$CMK_SEQ_F90 -DCMK_SEQUENTIAL=1 " 
     CMK_LDXX="$CMK_SEQ_LDXX" 
     if [ -n "$CMK_SEQ_AR" ]
     then
@@ -535,6 +554,11 @@ Debug "set 2"
 if [ -n "$OVERRIDE_CXX" ]
 then
     CMK_CXX="$OVERRIDE_CXX $CMK_CXX "
+fi
+
+if [ -n "$OVERRIDE_F90" ]
+then
+    CMK_F90="$OVERRIDE_F90 $CMK_F90 "
 fi
 
 if [ -n "$OVERRIDE_LD" ]
@@ -557,6 +581,7 @@ if [ -n "$DEBUG_MODE" ]
 then
     OPTS_CC="$CMK_C_DEBUG $OPTS_CC"
     OPTS_CXX="$CMK_CXX_DEBUG $OPTS_CXX"
+    OPTS_F90="$CMK_F90_DEBUG $OPTS_F90"
     OPTS_LD="$CMK_C_DEBUG $OPTS_LD"
     OPTS_LDXX="$CMK_CXX_DEBUG $OPTS_LDXX"
 fi
@@ -565,6 +590,7 @@ if [ -n "$OPTIMIZE_MODE" ]
 then
     OPTS_CC="$CMK_C_OPTIMIZE $OPTS_CC"
     OPTS_CXX="$CMK_CXX_OPTIMIZE $OPTS_CXX"
+    OPTS_F90="$CMK_F90_OPTIMIZE $OPTS_F90"
     OPTS_LD="$CMK_C_OPTIMIZE $OPTS_LD"
     OPTS_LDXX="$CMK_CXX_OPTIMIZE $OPTS_LDXX"
 fi
@@ -722,14 +748,11 @@ do
 		NU_OBJ=$BASE.o
 		;;
 	*.f|*.F)
-		Do $CMK_CF77 -I$CHARMINC -c $FILE -o $BASE.o
+		Do $CMK_CF90 $OPTS_F90 -freeform -I$CHARMINC -c $FILE -o $BASE.o
 		NU_OBJ=$BASE.o
 		;;
-	*.f90)
-		Do $CMK_CF90 -I$CHARMINC -c $BASE.f90 -o $BASE.o
-		;;
-	*.F90)
-		Do $CMK_CF90 -I$CHARMINC -c $BASE.F90 -o $BASE.o
+	*.f90|*.F90)
+		Do $CMK_CF90 $OPTS_F90 -I$CHARMINC -c $FILE -o $BASE.o
 		;;
 	*.fc|*.FC)
 		Abort "I'm not yet smart enough to compile $FILE"
