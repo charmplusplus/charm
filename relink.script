@@ -1,15 +1,32 @@
 #!/bin/sh
+#
+# The essential directories for the proper functioning of charm++ is
+# usually linked to the latest build version. For the convenience of
+# users wishing to alternate between different builds of charm++,
+# a simple script has been provided.
+#
+# Usage: relink.script <build-version-name-string>
+#
+# Example: relink.script net-linux-smp.
+# 10/13/2003 by Chee Wai Lee
+#
+# rewritten by
+# Gengbin Zheng  1/15/2004
 
 if test ! -d "$1" 
 then
- echo "$0 <directory>"
- exit 1
+ echo "$0 <directory>" && exit 1
 fi
 
-rm -f bin include lib lib_so tmp
+subdirs="bin include lib lib_so tmp"
 
-ln -s $1/bin bin
-ln -s $1/include include
-ln -s $1/lib lib
-ln -s $1/lib_so lib_so
-ln -s $1/tmp tmp
+# remove symbolic link
+rm -f $subdirs
+
+for i in $subdirs
+do
+# skip nonexistent subdir
+  test ! -d $1/$i && continue;
+  echo ln -s $1/$i $i
+  ln -s $1/$i $i
+done
