@@ -1663,6 +1663,269 @@ CthThread CthPup(pup_er p, CthThread t)
   return 0;
 }
 
+#elif  CMK_THREADS_USE_CONTEXT
+
+#include <ucontext.h>
+
+#define STACKSIZE (32768)
+static int _stksize = 0;
+
+#define CMK_MEMORY_PAGESIZE  16384
+
+struct CthThreadStruct
+{
+  char cmicore[CmiMsgHeaderSizeBytes];
+  CthAwkFn  awakenfn;
+  CthThFn    choosefn;
+  int        autoyield_enable;
+  int        autoyield_blocks;
+  char      *data;
+  int        datasize;
+  int        suspendable;
+  int        Event;
+  CthThread  qnext;
+  char      *stack;
+  ucontext_t *stackp;
+};
+
+char *CthGetData(CthThread t) { return t->data; }
+
+CthCpvDeclare(char *,    CthData);
+CthCpvStatic(CthThread,  CthCurrent);
+CthCpvStatic(int,        CthExiting);
+CthCpvStatic(int,        CthDatasize);
+
+static void CthThreadInit(t)
+CthThread t;
+{
+  t->awakenfn = 0;
+  t->choosefn = 0;
+  t->data=0;
+  t->datasize=0;
+  t->qnext=0;
+  t->autoyield_enable = 0;
+  t->autoyield_blocks = 0;
+  t->suspendable = 1;
+}
+
+void CthFixData(t)
+CthThread t;
+{
+  int datasize = CthCpvAccess(CthDatasize);
+  if (t->data == 0) {
+    t->datasize = datasize;
+    t->data = (char *)malloc(datasize);
+    _MEMCHECK(t->data);
+    return;
+  }
+  if (t->datasize != datasize) {
+    t->datasize = datasize;
+    t->data = (char *)realloc(t->data, datasize);
+    return;
+  }
+}
+
+void CthInit(char **argv)
+{
+  CthThread t;
+
+  CmiGetArgInt(argv,"+stacksize",&_stksize);
+  CpvInitialize(int, _numSwitches);
+  CpvAccess(_numSwitches) = 0;
+
+  CthCpvInitialize(char *,     CthData);
+  CthCpvInitialize(CthThread,  CthCurrent);
+  CthCpvInitialize(int,        CthDatasize);
+  CthCpvInitialize(int,        CthExiting);
+
+  t = (CthThread)malloc(sizeof(struct CthThreadStruct));
+  _MEMCHECK(t);
+  CthThreadInit(t);
+  t->stackp = (ucontext_t*)malloc(sizeof(ucontext_t));
+  getcontext(t->stackp);
+CmiPrintf("MAIN:%p\n", t->stackp);
+  CthCpvAccess(CthData)=0;
+  CthCpvAccess(CthCurrent)=t;
+  CthCpvAccess(CthDatasize)=1;
+  CthCpvAccess(CthExiting)=0;
+  CthSetStrategyDefault(t);
+}
+
+CthThread CthSelf()
+{
+  return CthCpvAccess(CthCurrent);
+}
+
+void CthFree(t)
+CthThread t;
+{
+  if (t==CthCpvAccess(CthCurrent)) {
+    CthCpvAccess(CthExiting) = 1;
+  } else {
+    if (t->data) free(t->data);
+    free(t->stack);
+    free(t);
+  }
+}
+
+static void *CthAbortHelp(ucontext_t *sp, CthThread old, void *null)
+{
+  if (old->data) free(old->data);
+  free(old->stack);
+  free(old->stackp);
+  free(old);
+  return (void *) 0;
+}
+
+static void *CthBlockHelp(ucontext_t *sp, CthThread old, void *null)
+{
+  old->stackp = sp;
+  return (void *) 0;
+}
+
+void CthResume(CthThread t)
+{
+  CthThread tc;
+  tc = CthCpvAccess(CthCurrent);
+  if (t == tc) return;
+  CpvAccess(_numSwitches)++;
+  CthFixData(t);
+  CthCpvAccess(CthCurrent) = t;
+  CthCpvAccess(CthData) = t->data;
+  if (CthCpvAccess(CthExiting)) {
+    CthCpvAccess(CthExiting)=0;
+CmiPrintf("qt_abort\n");
+    CthAbortHelp(tc->stackp, tc, 0);
+    setcontext(t->stackp);
+  } else {
+CmiPrintf("swap stack tc:%p t:%p pos:%p\n", tc->stackp, t->stackp, &tc);
+    swapcontext(tc->stackp, t->stackp);
+CmiPrintf("here: stack:%p %p %p pos:%p\n", tc->stackp, tc, CthCpvAccess(CthCurrent), &tc);
+  }
+  if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
+}
+
+void CthOnly(void *arg, void *vt, qt_userf_t fn)
+{
+  fn(arg);
+  CthCpvAccess(CthExiting) = 1;
+  CthSuspend();
+CmiAbort("ERROR to be here\n");
+}
+
+char *sigst[2048];
+
+CthThread CthCreate(fn, arg, size)
+CthVoidFn fn; void *arg; int size;
+{
+  CthThread result; char *stack, *stackbase;
+  ucontext_t *jb;
+  stack_t st;
+  int oldc;
+  sigset_t set;
+//  size = (size) ? size : ((_stksize) ? _stksize : STACKSIZE);
+  size = 16384;
+  stack = (char*)malloc(size);
+  _MEMCHECK(stack);
+  result = (CthThread)malloc(sizeof(struct CthThreadStruct));
+  _MEMCHECK(result);
+  CthThreadInit(result);
+//  stackbase = QT_SP(stack, 16384);
+//  t->stk = (void *)ROUND (((iaddr_t)t->stk), QT_STKALIGN);
+//  stackbase = QT_SP(stack, QT_STKBASE);
+  stackbase = stack;
+  jb = (ucontext_t*)malloc(sizeof(ucontext_t));
+  getcontext(jb);
+  st.ss_sp = sigst;
+  st.ss_size = 2048;
+  sigaltstack(&st,0);
+  jb->uc_stack.ss_sp = stackbase;
+  jb->uc_stack.ss_size = 8192;
+  sigemptyset(&jb->_u._mc.sc_mask);
+  jb->uc_link = 0;
+  makecontext(jb, (void (*) (void))CthOnly, 3, arg, result, fn);
+CmiPrintf("created: %p stack:%p\n", result, jb);
+  result->stackp = jb;
+  result->stack = stack;
+  CthSetStrategyDefault(result);
+  return result;
+}
+
+void CthSuspend()
+{
+  CthThread next;
+#if CMK_WEB_MODE
+  void usageStop();
+#endif
+  if(!(CthCpvAccess(CthCurrent)->suspendable))
+    CmiAbort("trying to suspend main thread!!\n");
+  if (CthCpvAccess(CthCurrent)->choosefn == 0) CthNoStrategy();
+  next = CthCpvAccess(CthCurrent)->choosefn();
+#ifndef CMK_OPTIMIZE
+  if(CpvAccess(traceOn))
+    traceSuspend();
+#endif
+#if CMK_WEB_MODE
+  usageStop();
+#endif
+  CthResume(next);
+}
+
+void CthAwaken(th)
+CthThread th;
+{
+  if (th->awakenfn == 0) CthNoStrategy();
+  CpvAccess(curThread) = th;
+#ifndef CMK_OPTIMIZE
+  if(CpvAccess(traceOn))
+    traceAwaken();
+#endif
+  th->awakenfn(th, CQS_QUEUEING_FIFO, 0, 0);
+}
+
+void CthYield()
+{
+  CthAwaken(CthCpvAccess(CthCurrent));
+  CthSuspend();
+}
+
+void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
+{
+  if (th->awakenfn == 0) CthNoStrategy();
+  CpvAccess(curThread) = th;
+#ifndef CMK_OPTIMIZE
+  if(CpvAccess(traceOn))
+    traceAwaken();
+#endif
+  th->awakenfn(th, s, pb, prio);
+}
+
+void CthYieldPrio(int s, int pb, unsigned int *prio)
+{
+  CthAwakenPrio(CthCpvAccess(CthCurrent), s, pb, prio);
+  CthSuspend();
+}
+
+int CthRegister(size)
+int size;
+{
+  int result;
+  int align = 1;
+  while (size>align) align<<=1;
+  CthCpvAccess(CthDatasize) = (CthCpvAccess(CthDatasize)+align-1) & ~(align-1);
+  result = CthCpvAccess(CthDatasize);
+  CthCpvAccess(CthDatasize) += size;
+  CthFixData(CthCpvAccess(CthCurrent));
+  CthCpvAccess(CthData) = CthCpvAccess(CthCurrent)->data;
+  return result;
+}
+
+CthThread CthPup(pup_er p, CthThread t)
+{
+  CmiAbort("CthPup not implemented.\n");
+  return 0;
+}
+
 #else /*Default, stack-on-heap threads*/
 
 #define STACKSIZE (32768)
