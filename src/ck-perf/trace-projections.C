@@ -124,10 +124,20 @@ void LogPool::closeLog(void)
     if (nonDeltaLog) gzclose(zfp);
     if (deltaLog) gzclose(deltazfp);
     return;
- }
+  }
 #endif
- if (nonDeltaLog) { fsync(fileno(fp)); fclose(fp); }
- if (deltaLog)  { fsync(fileno(deltafp)); fclose(deltafp);  }
+  if (nonDeltaLog) { 
+#if !defined(_WIN32) || defined(__CYGWIN__)
+    fsync(fileno(fp)); 
+#endif
+    fclose(fp); 
+  }
+  if (deltaLog)  { 
+#if !defined(_WIN32) || defined(__CYGWIN__)
+    fsync(fileno(deltafp)); 
+#endif
+    fclose(deltafp);  
+  }
 }
 
 /**
