@@ -440,7 +440,9 @@ void CkMemCheckPT::recvData(CkArrayCheckPTMessage *msg)
 void CkMemCheckPT::syncFiles(CkReductionMsg *m)
 {
   delete m;
+#if CMK_HAS_SYNC
   system("sync");
+#endif
   thisProxy[cpStarter].cpFinish();
 }
 
