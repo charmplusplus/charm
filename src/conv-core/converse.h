@@ -1085,26 +1085,7 @@ int  CQdGetProcessed(CQdState);
 void CQdRegisterCallback(CQdVoidFn, void *);
 void CmiStartQD(CQdVoidFn, void *);
 
-/*****************************************************************************
- *
- *    Converse Random Numbers
- *
- *****************************************************************************/
-
-typedef struct rngen_
-{
-  unsigned int prime;
-  double state[3], multiplier[3];/* simulate 64 bit arithmetic */
-} CrnStream;
-
-void CrnInitStream(CrnStream *, int, int);
-int CrnInt(CrnStream *);
-double CrnDouble(CrnStream *);
-float CrnFloat(CrnStream *);
-void CrnSrand(int);
-int CrnRand(void);
-double CrnDrand(void);
-
+#include "conv-random.h"
 #include "conv-lists.h"
 #include "conv-trace.h"
 
