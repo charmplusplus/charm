@@ -530,7 +530,7 @@ CK_LIBS_CORE=$(L)/libck.a
 LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o 	\
 	   msgalloc.o ckfutures.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
-           tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o ckobjQ.o	\
+           tempo.o waitqd.o LBDatabase.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
 	   ckcheckpoint.o ckmemcheckpoint.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   BaseLB.o CentralLB.o CentralPredictor.o NborBaseLB.o WSLB.o \
