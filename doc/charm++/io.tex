@@ -26,7 +26,7 @@ send, meaning that the call to \kw{CkPrintf} returns immediately after the
 message has been sent, and most likely before the message has actually
 been received, processed, and displayed. \footnote{Because of
 communication latencies, the following scenario is actually possible:
-Chare 1 does a \kw{Ckprintf} from processor 1, then creates chare 2 on
+Chare 1 does a \kw{CkPrintf} from processor 1, then creates chare 2 on
 processor 2.  After chare 2's creation, it calls \kw{CkPrintf}, and the
 message from chare 2 is displayed before the one from chare 1.}
 }
