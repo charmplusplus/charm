@@ -1,164 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.28  1998-06-15 23:49:20  milind
- * Fixed charm++ message macros to adhere to the new LDB structure.
- *
- * Revision 2.27  1998/06/15 22:16:29  milind
- * Reduced Charm++ overhead by reducing variable accesses.
- *
- * Revision 2.26  1998/02/27 11:51:51  jyelon
- * Cleaned up header files, replaced load-balancer.
- *
- * Revision 2.25  1998/01/28 17:52:47  milind
- * Removed unnecessary function calls to tracing functions.
- * Added macros to turn tracing on and off at runtime.
- *
- * Revision 2.24  1998/01/13 17:03:20  milind
- * Made charm++ to compile and run with Solaris 2.6.
- * In particular, changed INTBITS to CINTBITS, and handled EALREADY.
- *
- * Revision 2.23  1997/10/03 19:51:31  milind
- * Made charmc to work again, after inserting trace calls in converse part,
- * i.e. threads and user events.
- *
- * Revision 2.22  1997/07/18 21:21:03  milind
- * all files of the form perf-*.c have been changed to trace-*.c, with
- * name expansions. For example, perf-proj.c has been changed to
- * trace-projections.c.
- * performance.h has been renamed as trace.h, and perfio.c has been
- * renamed as traceio.c.
- * Corresponding changes have been made in the Makefile too.
- * Earlier, there used to be three libck-core-*.a where * was projections,
- * summary or none. Now, there will be a single libck-core.a and
- * three libck-trace-*.a where *=projections, summary and none.
- * The execmode parameter to charmc script has been renamed as
- * tracemode.
- * Also, the perfModuleInit function has been renamed as traceModuleInit,
- * RecdPerfMsg => RecdTraceMsg
- * CollectPerfFromNodes => CollectTraceFromNodes
- *
- * Revision 2.21  1997/04/21 20:58:48  jyelon
- * Simplified the shutdown protocol a little.
- *
- * Revision 2.20  1997/03/24 23:14:01  milind
- * Made Charm-runtime 64-bit safe by removing conversions of pointers to
- * integers. Also, removed charm runtime's dependence of unused argv[]
- * elements being 0. Also, added sim-irix-64 version. It works.
- *
- * Revision 2.19  1995/11/13 04:04:33  gursoy
- * made changes related to initial msg synchronization
- *
- * Revision 2.18  1995/11/07  17:53:45  sanjeev
- * fixed bugs in statistics collection
- *
- * Revision 2.17  1995/11/05  18:26:26  sanjeev
- * removed trace_creation in CkLdbSend
- *
- * Revision 2.16  1995/10/27  23:56:49  jyelon
- * removed more ansi
- *
- * Revision 2.15  1995/10/27  21:31:25  jyelon
- * changed NumPe --> NumPes
- *
- * Revision 2.14  1995/10/27  09:09:31  jyelon
- * *** empty log message ***
- *
- * Revision 2.13  1995/10/11  17:54:40  sanjeev
- * fixed Charm++ chare creation
- *
- * Revision 2.12  1995/09/06  21:48:50  jyelon
- * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
- *
- * Revision 2.11  1995/09/01  02:13:17  jyelon
- * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
- *
- * Revision 2.10  1995/08/24  15:48:26  gursoy
- * worng cpv-macro usage for EpInfoTable (it is a Csv type not Cpv)
- * fixed
- *
- * Revision 2.9  1995/07/27  20:29:34  jyelon
- * Improvements to runtime system, general cleanup.
- *
- * Revision 2.8  1995/07/25  00:29:31  jyelon
- * *** empty log message ***
- *
- * Revision 2.7  1995/07/24  01:54:40  jyelon
- * *** empty log message ***
- *
- * Revision 2.6  1995/07/22  23:44:13  jyelon
- * *** empty log message ***
- *
- * Revision 2.5  1995/07/19  22:15:22  jyelon
- * *** empty log message ***
- *
- * Revision 2.4  1995/07/12  16:28:45  jyelon
- * *** empty log message ***
- *
- * Revision 2.3  1995/07/06  22:42:11  narain
- * Changes for LDB interface revision
- *
- * Revision 2.2  1995/06/29  21:38:00  narain
- * Added #define CldNewChareFromLocal, and code for CkMakeFreeCharesMessage,
- * CkQueueFreeCharesMessage, and SetNewChareMsg
- *
- * Revision 2.1  1995/06/08  17:09:41  gursoy
- * Cpv macro changes done
- *
- * Revision 1.13  1995/05/04  22:02:40  jyelon
- * *** empty log message ***
- *
- * Revision 1.12  1995/04/23  20:52:58  sanjeev
- * Removed Core....
- *
- * Revision 1.11  1995/04/23  14:27:44  brunner
- * Now includes converse.h, to get declaration of sysDone
- *
- * Revision 1.10  1995/04/14  21:05:01  milind
- * Changed HostPeNum to NumPes
- *
- * Revision 1.9  1995/04/13  20:53:15  sanjeev
- * Changed Mc to Cmi
- *
- * Revision 1.8  1995/04/02  00:47:39  sanjeev
- * changes for separating Converse
- *
- * Revision 1.7  1995/03/25  18:24:05  sanjeev
- * *** empty log message ***
- *
- * Revision 1.6  1995/03/24  16:41:38  sanjeev
- * *** empty log message ***
- *
- * Revision 1.5  1995/03/17  23:36:25  sanjeev
- * changes for better message format
- *
- * Revision 1.4  1994/12/01  23:55:30  sanjeev
- * interop stuff
- *
- * Revision 1.3  1994/11/18  20:33:53  narain
- * Changed CkExit() into CkEndCharm and CkExit() with CkExit only setting the
- * value of sysDone to 1. (CkExit messages now have encoded sequence numbers
- *   - Sanjeev and Narain
- *
- * Revision 1.2  1994/11/09  21:43:18  sanjeev
- * printf consts
- *
- * Revision 1.1  1994/11/03  17:38:49  brunner
- * Initial revision
- *
- ***************************************************************************/
-static char ident[] = "@(#)$Header$";
 #include "charm.h"
 
 #include "trace.h"
@@ -177,7 +16,6 @@ CpvStaticDeclare(int, num_exits);
 CpvStaticDeclare(int, num_endcharms);
 CpvDeclare(int, CkInfo_Index);
 CpvDeclare(int, CkPack_Index);
-CpvDeclare(int, CkUnpack_Index);
 
 void ckModuleInit()
 {
@@ -185,13 +23,11 @@ void ckModuleInit()
    CpvInitialize(int, num_endcharms);
    CpvInitialize(int, CkInfo_Index);
    CpvInitialize(int, CkPack_Index);
-   CpvInitialize(int, CkUnpack_Index);
 
    CpvAccess(num_exits)=0;
    CpvAccess(num_endcharms)=0;
    CpvAccess(CkInfo_Index) = CldRegisterInfoFn(CkInfo);
    CpvAccess(CkPack_Index) = CldRegisterPackFn((CldPackFn)CkPack);
-   CpvAccess(CkUnpack_Index) = CldRegisterPackFn((CldPackFn)CkUnpack);
 }
 
 

@@ -72,13 +72,16 @@ void CldEnqueue(int pe, void *msg, int infofn, int packfn)
 {
   int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
-  CldPackFn pfn = (CldPackFn)CmiHandlerToFunction(packfn);
+  CldPackFn pfn;
+/* This is just for debugging anyway: mab
   if (CmiGetHandler(msg) >= CpvAccess(CmiHandlerMax)) *((int*)0)=0;
+*/
   if (pe == CLD_ANYWHERE) pe = (((rand()+CmiMyPe())&0x7FFFFFFF)%CmiNumPes());
   if (pe == CmiMyPe()) {
     ifn(msg, &len, &queueing, &priobits, &prioptr);
     CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
   } else {
+    pfn = (CldPackFn)CmiHandlerToFunction(packfn);
     pfn(&msg);
     ifn(msg, &len, &queueing, &priobits, &prioptr);
     CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));

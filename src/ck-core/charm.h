@@ -1,35 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.5  1998-06-15 23:49:19  milind
- * Fixed charm++ message macros to adhere to the new LDB structure.
- *
- * Revision 2.4  1998/06/15 22:16:25  milind
- * Reduced Charm++ overhead by reducing variable accesses.
- *
- * Revision 2.3  1998/05/13 19:58:19  milind
- * Added Wall Timers.
- *
- * Revision 2.2  1998/03/07 09:07:51  jyelon
- * Added stdio.h --- this gets us NULL and size_t the right way.
- *
- * Revision 2.1  1998/03/02 14:58:04  jyelon
- * Forgot to check these in last time.
- *
- *
- ***************************************************************************/
-
 #ifndef CHARM_H
 #define CHARM_H
 
@@ -442,7 +410,7 @@ extern void          CkPrioConcatFn    CMK_PROTO((void *,void *,unsigned int));
  * sections of a message. The organisation of a message is as follows 
  *
  *           -------------------------------
- *           | env | ldb | user | priority |
+ *           | env + ldb | user | priority |
  *           -------------------------------
  * 
  *   The sizes of the fields are as follows:
@@ -775,7 +743,6 @@ CsvExtern(int, BUFFER_INCOMING_MSG_Index);
 CsvExtern(int, MAIN_HANDLE_INCOMING_MSG_Index);
 CsvExtern(int, HANDLE_INIT_MSG_Index);
 CpvExtern(int, CkPack_Index);
-CpvExtern(int, CkUnpack_Index);
 CpvExtern(int, CkInfo_Index);
 
 /* System-defined chare numbers */

@@ -451,16 +451,15 @@ void McQueueAddToBack(McQueue *queue, void *element)
 
 void * McQueueRemoveFromFront(McQueue *queue)
 {
-  void *element;
+  void *element = (void *) 0;
   void *localmsg = (void *) 0;
-  uspsema(queue->sema);
-  element = (void *) 0;
   if(queue->len) {
+    uspsema(queue->sema);
     element = queue->blk[queue->first++];
     queue->first = (queue->first+queue->blk_len)%queue->blk_len;
     queue->len--;
+    usvsema(queue->sema);
   }
-  usvsema(queue->sema);
   if(element) {
 #ifdef DEBUG
     printf("[%d] received message of size %d\n", CmiMyPe(), CmiSize(element));
