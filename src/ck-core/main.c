@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.27  1997-12-12 05:03:43  jyelon
+ * Revision 2.28  1998-01-28 17:52:49  milind
+ * Removed unnecessary function calls to tracing functions.
+ * Added macros to turn tracing on and off at runtime.
+ *
+ * Revision 2.27  1997/12/12 05:03:43  jyelon
  * Fixed bug, wasn't doing CmiGrabBuffer.
  *
  * Revision 2.26  1997/07/18 21:21:09  milind
@@ -168,9 +172,11 @@ void mainModuleInit()
 void CkProcess_ForChareMsg_to_UVID(env)
 ENVELOPE *env;
 {
-  trace_begin_execute(env);
+  if(CpvAccess(traceOn))
+    trace_begin_execute(env);
   VidEnqueueMsg(env);
-  trace_end_execute(0, ForChareMsg, 0);
+  if(CpvAccess(traceOn))
+    trace_end_execute(0, ForChareMsg, 0);
   QDCountThisProcessing(ForChareMsg);
 }
 
@@ -184,9 +190,11 @@ ENVELOPE *env;
 void CkProcess_ForChareMsg_to_FVID(env)
 ENVELOPE *env;
 {
-  trace_begin_execute(env);
+  if(CpvAccess(traceOn))
+    trace_begin_execute(env);
   VidForwardMsg(env);
-  trace_end_execute(0, ForChareMsg, 0);
+  if(CpvAccess(traceOn))
+    trace_end_execute(0, ForChareMsg, 0);
   QDCountThisProcessing(ForChareMsg);
 }
 
@@ -216,9 +224,11 @@ ENVELOPE *env;
 
   CpvAccess(currentChareBlock) = (void *)chareblock;
   CpvAccess(nodeforCharesProcessed)++;
-  trace_begin_execute(env);
+  if(CpvAccess(traceOn))
+    trace_begin_execute(env);
   (current_epinfo->function)(current_usr,chareblock->chareptr);
-  trace_end_execute(current_magic, current_msgType, current_ep);
+  if(CpvAccess(traceOn))
+    trace_end_execute(current_magic, current_msgType, current_ep);
   QDCountThisProcessing(current_msgType);
 }
 
@@ -283,9 +293,11 @@ ENVELOPE *env;
      Charm and Charm++, so it allocates the correct amount of space.
      - Sanjeev 10/10/95 */
 
-  trace_begin_execute(env);
+  if(CpvAccess(traceOn))
+    trace_begin_execute(env);
   (current_epinfo->function)(current_usr, current_block->chareptr);
-  trace_end_execute(current_magic, current_msgType, current_ep);
+  if(CpvAccess(traceOn))
+    trace_end_execute(current_magic, current_msgType, current_ep);
   QDCountThisProcessing(current_msgType);
 }
 
@@ -303,9 +315,11 @@ ENVELOPE *env;
   
   current_msgType = GetEnv_msgType(env);
   current_usr = USER_MSG_PTR(env);
-  trace_begin_execute(env);
+  if(CpvAccess(traceOn))
+    trace_begin_execute(env);
   VidSendOverMessages(current_usr, NULL);
-  trace_end_execute(0, current_msgType, 0);
+  if(CpvAccess(traceOn))
+    trace_end_execute(0, current_msgType, 0);
   QDCountThisProcessing(current_msgType);
 }
 
@@ -356,7 +370,8 @@ ENVELOPE *env;
   
   CmiGrabBuffer(&env);
   UNPACK(env);
-  trace_enqueue(env);
+  if(CpvAccess(traceOn))
+    trace_enqueue(env);
   if(!CpvAccess(InsideDataInit))
     CldStripLdb(LDB_ELEMENT_PTR(env));
   switch (type) {

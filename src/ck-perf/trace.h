@@ -45,6 +45,7 @@ typedef struct logstr {         /* structure of the log entry 		*/
     unsigned int time1;     /* time in microseconds of event        */
 } LOGSTR;
 
+CpvExtern(int, traceOn);
 
 #ifdef MAIN_PERF
 

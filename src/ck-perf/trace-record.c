@@ -13,6 +13,8 @@ int CtrRecdTraceMsg = 1;
 char *log_file_name;		/* log file name      	*/
 LOGSTR logbuf[MAXLOGBUFSIZE];
 
+CpvExtern(int, traceOn);
+
 int  logcnt;        		/* no. of log entries 	*/
 int iteration;
 int current_event, begin_event, begin_pe;
@@ -21,6 +23,13 @@ extern int TotalChares;
 
 FILE *state_file_fd;
 
+void traceModuleInit(pargc, argv)
+int *pargc;
+char **argv;
+{
+  CpvInitialize(int, traceOn);
+  CpvAccess(traceOn) = 0;
+}
 
 void PrintStsFile(str)
 char *str ;

@@ -2,10 +2,13 @@
 
 CpvExtern(int, CtrRecdTraceMsg);
 CpvExtern(CthThread, cThread);
+CpvExtern(int, traceOn);
 
 void traceModuleInit(pargc, argv) int *pargc; char **argv; 
 {
   CpvInitialize(CthThread, cThread);
+  CpvInitialize(int, traceOn);
+  CpvAccess(traceOn) = 0;
 }
 
 void program_name(s,m) char *s, *m; {}

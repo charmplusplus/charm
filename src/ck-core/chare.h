@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1997-07-26 16:41:09  jyelon
+ * Revision 2.3  1998-01-28 17:52:46  milind
+ * Removed unnecessary function calls to tracing functions.
+ * Added macros to turn tracing on and off at runtime.
+ *
+ * Revision 2.2  1997/07/26 16:41:09  jyelon
  * *** empty log message ***
  *
  * Revision 2.1  1995/06/08 17:09:41  gursoy
@@ -66,6 +70,8 @@
 #define UNPACKED	1
 #define PACKED		2
 
+#define CkTraceOn() CpvAccess(traceOn)=1
+#define CkTraceOff() CpvAccess(traceOn)=0
 
 
 /* ---------------- the message declarations follow  ----------------------*/

@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.24  1998-01-13 17:03:20  milind
+ * Revision 2.25  1998-01-28 17:52:47  milind
+ * Removed unnecessary function calls to tracing functions.
+ * Added macros to turn tracing on and off at runtime.
+ *
+ * Revision 2.24  1998/01/13 17:03:20  milind
  * Made charm++ to compile and run with Solaris 2.6.
  * In particular, changed INTBITS to CINTBITS, and handled EALREADY.
  *
@@ -404,7 +408,8 @@ int destPE;
     SetEnv_vidBlockPtr(env, NULL);
   }
   
-  trace_creation(NewChareMsg, Entry, env);
+  if(CpvAccess(traceOn))
+    trace_creation(NewChareMsg, Entry, env);
   QDCountThisCreation(Entry, USERcat, NewChareMsg, 1);
 
   if (CK_PE_SPECIAL(destPE)) {
@@ -444,7 +449,8 @@ ChareIDType * pChareID;
   SetEnv_chareBlockPtr(env, GetID_chareBlockPtr((*pChareID)));
   SetEnv_chare_magic_number(env, GetID_chare_magic_number((*pChareID)));
   QDCountThisCreation(Entry, USERcat, ForChareMsg, 1);
-  trace_creation(GetEnv_msgType(env), Entry, env);
+  if(CpvAccess(traceOn))
+    trace_creation(GetEnv_msgType(env), Entry, env);
   CkCheck_and_Send(destPE, env);
 }
 
@@ -491,10 +497,6 @@ void CkLdbSend(msgst, destPE)
      int destPE;
 {
   ENVELOPE *env = (ENVELOPE *)msgst;
-
-/* trace_creation is NOT needed here because it has already been done in
-   the CreateChare
-  trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);  */
 
   CkCheck_and_Send(destPE, env);
 }

@@ -16,6 +16,7 @@ static char ident[] = "@(#)$Header$";
 
 #include <stdio.h>
 #include "converse.h"
+#include "trace.h"
 #include <errno.h>
 
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
@@ -88,6 +89,7 @@ static char *DeleteArg(argv)
  */
 
 CpvDeclare(int, CtrRecdTraceMsg);
+CpvDeclare(int, traceOn);
 CpvDeclare(int, CtrLogBufSize);
 
 /*****************************************************************************
@@ -540,7 +542,8 @@ void CsdEndIdle()
     CpvAccess(CsdIdleDetectedFlag) = 0;
     if(!CpvAccess(CsdStopNotifyFlag)) {
       (CpvAccess(CsdNotifyBusy))();
-      trace_end_idle();
+      if(CpvAccess(traceOn))
+        trace_end_idle();
     }
   }
 }
@@ -551,7 +554,8 @@ void CsdBeginIdle()
     CpvAccess(CsdIdleDetectedFlag) = 1;
     if(!CpvAccess(CsdStopNotifyFlag)) {
       (CpvAccess(CsdNotifyIdle))();
-      trace_begin_idle();
+      if(CpvAccess(traceOn))
+        trace_begin_idle();
     }
   }
 
@@ -723,7 +727,8 @@ static void CthResumeNormalThread(CthThread t)
   CmiGrabBuffer(&t);
   /** addition for tracing */
   CpvAccess(cThread) = t;
-  trace_begin_execute(0);
+  if(CpvAccess(traceOn))
+    trace_begin_execute(0);
   /* end addition */
   CthResume(t);
 }

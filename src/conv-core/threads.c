@@ -114,6 +114,7 @@
  
 #include "converse.h"
 #include "qt.h"
+#include "trace.h"
 
 #define STACKSIZE (32768)
 
@@ -320,7 +321,8 @@ void CthSuspend()
   if (CthCpvAccess(CthCurrent)->choosefn == 0) CthNoStrategy();
   next = CthCpvAccess(CthCurrent)->choosefn();
   /** addition for tracing */
-  trace_end_execute(0, -1, 0);
+  if(CpvAccess(traceOn))
+    trace_end_execute(0, -1, 0);
   /* end addition */
   CthResume(next);
 }
@@ -331,7 +333,8 @@ CthThread th;
   if (th->awakenfn == 0) CthNoStrategy();
   /** addition for tracing */
   CpvAccess(cThread) = th;
-  trace_creation(0,0,0);
+  if(CpvAccess(traceOn))
+    trace_creation(0,0,0);
   /* end addition */
   th->awakenfn(th);
 }

@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1997-12-03 21:36:08  rbrunner
+ * Revision 2.16  1998-01-28 17:52:45  milind
+ * Removed unnecessary function calls to tracing functions.
+ * Added macros to turn tracing on and off at runtime.
+ *
+ * Revision 2.15  1997/12/03 21:36:08  rbrunner
  * I fixed a bug with nested BOC creation.  The BOC number returned would
  * be incorrect for BOC X if the constructor for BOC X creates a second
  * BOC.
@@ -353,7 +357,8 @@ ChareIDType *ReturnID;
       SetEnv_boc_num(env, ++CpvAccess(currentBocNum));
       SetEnv_EP(env, Entry);
       SetEnv_msgType(env, BocInitMsg);
-      trace_creation(GetEnv_msgType(env), Entry, env);
+      if(CpvAccess(traceOn))
+        trace_creation(GetEnv_msgType(env), Entry, env);
       CkCheck_and_BcastInitNFNL(env);
       /* env becomes the usrMsg, hence should not be freed by us */
       executing_boc_num = ProcessBocInitMsg(env);
@@ -448,7 +453,8 @@ TRACE(CmiPrintf("[%d] GeneralSend: type=%d, msgType=%d\n",
 	/* if (bocnum >= NumSysBoc) */
         CpvAccess(nodebocMsgsCreated)++;
 
-	trace_creation(GetEnv_msgType(env), ep, env);
+        if(CpvAccess(traceOn))
+	  trace_creation(GetEnv_msgType(env), ep, env);
 	CkCheck_and_Send(destPE, env);
 	QDCountThisCreation(ep, category, type, 1);
 }
@@ -480,7 +486,8 @@ TRACE(CmiPrintf("[%d] GeneralBroadcast: type=%d, msgType=%d\n",
 	/* if (bocnum >= NumSysBoc) */
         CpvAccess(nodebocMsgsCreated)+=CmiNumPes();
 
-	trace_creation(GetEnv_msgType(env), ep, env);
+        if(CpvAccess(traceOn))
+	  trace_creation(GetEnv_msgType(env), ep, env);
 	CkCheck_and_BroadcastAll(env); /* Asynchronous broadcast */
 	QDCountThisCreation(ep, category, type, CmiNumPes());
 }
@@ -538,7 +545,8 @@ TRACE(CmiPrintf("[%d] InitiateDynamicBocBroadcast: ref=%d, boc=%d, ep=%d\n",
         SetEnv_EP(env, ep);
         SetEnv_msgType(env, DynamicBocInitMsg);
 
-	trace_creation(GetEnv_msgType(env), ep, env);
+        if(CpvAccess(traceOn))
+	  trace_creation(GetEnv_msgType(env), ep, env);
         CkCheck_and_BroadcastAll(env);
 
         QDCountThisCreation(ep, USERcat, DynamicBocInitMsg,CmiNumPes());

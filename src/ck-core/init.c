@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.50  1997-12-22 21:57:09  jyelon
+ * Revision 2.51  1998-01-28 17:52:48  milind
+ * Removed unnecessary function calls to tracing functions.
+ * Added macros to turn tracing on and off at runtime.
+ *
+ * Revision 2.50  1997/12/22 21:57:09  jyelon
  * Changed LDB initialization scheme.
  *
  * Revision 2.49  1997/12/12 05:03:41  jyelon
@@ -442,7 +446,8 @@ FUNCTION_PTR donehandler;
   
  
         /* log_init(); Moved to convcore.c */
-        trace_begin_computation();
+        if(CpvAccess(traceOn))
+          trace_begin_computation();
         SysBocInit();
         CpvAccess(msgs_created) = CpvAccess(msgs_processed) = 0;
 
@@ -468,7 +473,8 @@ FUNCTION_PTR donehandler;
 
 		CpvAccess(InsideDataInit) = 0;
 
-		trace_begin_charminit();
+                if(CpvAccess(traceOn))
+		  trace_begin_charminit();
 		 
 		CpvAccess(MainDataSize) = CsvAccess(ChareSizesTable)
 					      [CsvAccess(_CK_MainChareIndex)];
@@ -491,7 +497,8 @@ FUNCTION_PTR donehandler;
 				   CpvAccess(userArgc), CpvAccess(userArgv));
 		
 		CpvAccess(InsideDataInit) = 0;
-		trace_end_charminit();
+                if(CpvAccess(traceOn))
+		  trace_end_charminit();
 
 		/* create the buffer for the read only variables */
 		ReadBufMsg = (char *) CkAllocMsg(CsvAccess(ReadBuffSize));
@@ -641,9 +648,11 @@ ENVELOPE       *envelope;
   bocBlock->x.boc_num = current_bocnum;
 
   SetBocBlockPtr(current_bocnum, bocBlock);
-  trace_begin_execute(envelope);
+  if(CpvAccess(traceOn))
+    trace_begin_execute(envelope);
   (current_epinfo->function)(usrMsg, bocBlock->chareptr);
-  trace_end_execute(current_magic, current_msgType, current_ep);
+  if(CpvAccess(traceOn))
+    trace_end_execute(current_magic, current_msgType, current_ep);
   CpvAccess(currentChareBlock) = prev_chare_block;
 
   /* for dynamic BOC creation, used in node_main.c */

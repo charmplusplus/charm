@@ -41,6 +41,8 @@ CpvExtern(int,eventCount);
 CpvExtern(int,msgCount);
 CpvExtern(int, chareEpsCount);
 
+CpvExtern(int, traceOn);
+
 /* Addition for threads tracing */
 CpvDeclare(int, threadChare);
 CpvDeclare(int, threadMsg);
@@ -65,6 +67,8 @@ char **argv;
   CpvInitialize(char*,log_file_name);
   CpvInitialize(int,current_event);
   CpvAccess(current_event) = 0 ;
+  CpvInitialize(int, traceOn);
+  CpvAccess(traceOn) = 1;
 
   CpvInitialize(LOGARR,logbuf);
   CpvInitialize(int,logcnt);        /* no. of log entries   */

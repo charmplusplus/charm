@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1997-10-29 23:52:54  milind
+ * Revision 2.12  1998-01-28 17:52:51  milind
+ * Removed unnecessary function calls to tracing functions.
+ * Added macros to turn tracing on and off at runtime.
+ *
+ * Revision 2.11  1997/10/29 23:52:54  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 2.10  1997/07/18 21:21:13  milind
@@ -105,7 +109,8 @@ ENVELOPE *env;
   CHARE_BLOCK *vid = GetEnv_chareBlockPtr(env);
   SetEnv_chareBlockPtr(env, GetID_chareBlockPtr(vid->x.realID));
   SetEnv_chare_magic_number(env, GetID_chare_magic_number(vid->x.realID));
-  trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
+  if(CpvAccess(traceOn))
+    trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
   CkCheck_and_Send(GetID_onPE(vid->x.realID), env);
   QDCountThisCreation(GetEnv_EP(env), USERcat, ForChareMsg, 1);
 }
@@ -148,7 +153,8 @@ void *data_area;
 	FIFO_DeQueue(vidqueue, &env);
 	SetEnv_chareBlockPtr(env, chare_block);
 	SetEnv_chare_magic_number(env, chare_magic);
-	trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
+        if(CpvAccess(traceOn))
+	  trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
 	CkCheck_and_Send(chare_pe, env);
 	QDCountThisCreation(GetEnv_EP(env), USERcat, ForChareMsg, 1);
    }
@@ -180,6 +186,7 @@ CHARE_BLOCK *vidBlockPtr;
     SetEnv_EP(env, 0);
 
     QDCountThisCreation(0, IMMEDIATEcat, VidSendOverMsg, 1);
-    trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
+    if(CpvAccess(traceOn))
+      trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
     CkCheck_and_Send(vidPE, env);
 }

@@ -32,6 +32,8 @@ int CtrRecdTraceMsg = 1;
 char *event_file_name;			/* log file name      	*/
 int debug_replay, projections_replay;
 
+CpvExtern(int, traceOn);
+
 int event_count=0, translation_count, creation_count;
 int  event_index=0, translation_index=0, creation_index=0;
 long fevent_position, ftranslation_position, fcreation_position;

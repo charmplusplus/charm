@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1997-10-29 23:52:53  milind
+ * Revision 2.12  1998-01-28 17:52:50  milind
+ * Removed unnecessary function calls to tracing functions.
+ * Added macros to turn tracing on and off at runtime.
+ *
+ * Revision 2.11  1997/10/29 23:52:53  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 2.10  1997/07/18 21:21:12  milind
@@ -388,10 +392,12 @@ int option;
 	if (index == -1)
 		place = Hash(tbl, key);
 	
-	if (index == -1)
-		trace_table(INSERT, tbl, key, place->penum);
-	else 
-		trace_table(INSERT, tbl, key, CmiMyPe());
+        if(CpvAccess(traceOn)) {
+	  if (index == -1)
+		    trace_table(INSERT, tbl, key, place->penum);
+	  else 
+		    trace_table(INSERT, tbl, key, CmiMyPe());
+        }
 
 	if (!data)  {
 		CmiPrintf("*** ERROR *** Insert on processor %d has null data.\n",
@@ -480,10 +486,12 @@ int option;
 	if (index == -1)
 		place = Hash(tbl, key);	
 
-	if (index == -1)
-		trace_table(DELETE, tbl, key, place->penum);
-	else 
-		trace_table(DELETE, tbl, key, CmiMyPe());
+        if(CpvAccess(traceOn)) {
+	  if (index == -1)
+		    trace_table(DELETE, tbl, key, place->penum);
+	  else 
+		    trace_table(DELETE, tbl, key, CmiMyPe());
+        }
 
 	if ( (index == -1) && ( place->penum != CmiMyPe()))
 		pack((char *) &operation, (char *) &tbl, (char *) &(place->index), place->penum,
@@ -556,10 +564,12 @@ int option;
 			CmiPrintf("***error*** TblFind :: Unknown option chosen\n");
 	place = Hash(tbl, key);	
 
-	if (index == -1)
-		trace_table(FIND, tbl, key, place->penum);
-	else 
-		trace_table(FIND, tbl, key, CmiMyPe());
+        if(CpvAccess(traceOn)) {
+	  if (index == -1)
+		    trace_table(FIND, tbl, key, place->penum);
+	  else 
+		    trace_table(FIND, tbl, key, CmiMyPe());
+        }
 
 
 	if ( (index == -1) && (place->penum != CmiMyPe()))

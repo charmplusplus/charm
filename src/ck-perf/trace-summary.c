@@ -26,6 +26,7 @@ CpvDeclare(int,start_processing_time);
 CpvDeclare(int,num_childmsgs);
 
 CpvExtern(int,RecdStatMsg);
+CpvExtern(int, traceOn);
 
 void adjust_time_interval(unsigned int);
 void adjust_timestep();
@@ -49,6 +50,8 @@ char **argv;
   CpvInitialize(int,init_time);
   CpvInitialize(int,start_processing_time);
   CpvInitialize(int,num_childmsgs);
+  CpvInitialize(int, traceOn);
+  CpvAccess(traceOn) = 1;
 
   sprintf(nodename,"%d",CmiMyPe());
   program_name(argv[0],nodename);
