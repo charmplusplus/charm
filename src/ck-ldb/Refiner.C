@@ -50,6 +50,7 @@ void Refiner::create(int count, CentralLB::LDStats* stats, int** procs)
   processors = new processorInfo[count];
 
   int index = 0;
+  numAvail = 0;
   for(j=0; j < count; j++) {
     processors[j].Id = j;
     processors[j].backgroundLoad = stats[j].bg_cputime;
@@ -59,6 +60,7 @@ void Refiner::create(int count, CentralLB::LDStats* stats, int** procs)
     processors[j].pe_speed = stats[j].pe_speed;
     processors[j].utilization = stats[j].utilization;
     processors[j].available = stats[j].available;
+    if (processors[j].available == CmiTrue) numAvail++;
 
     LDObjData *odata = stats[j].objData;
     const int osz = stats[j].n_objs;  
@@ -116,7 +118,7 @@ void Refiner::computeAverage()
     if (processors[i].available == CmiTrue) 
 	total += processors[i].backgroundLoad;
 
-  averageLoad = total/P;
+  averageLoad = total/numAvail;
 }
 
 double Refiner::computeMax()
@@ -145,6 +147,32 @@ int Refiner::isLight(processorInfo *p)
      return p->load < averageLoad;
   else 
      return 0;
+}
+
+// move the compute jobs out from unavailable PE
+int Refiner::removeComputes()
+{
+  int first;
+  Iterator nextCompute;
+
+  if (numAvail < P) {
+    if (numAvail == 0) CmiAbort("No processor available!");
+    for (first=0; first<P; first++)
+      if (processors[first].available == CmiTrue) break;
+    for (int i=0; i<P; i++) {
+      if (processors[i].available == CmiFalse) {
+          computeInfo *c = (computeInfo *)
+	           processors[i].computeSet->iterator((Iterator *)&nextCompute);
+	  while (c) {
+	    deAssign(c, &processors[i]);
+	    assign(c, &processors[first]);
+	    nextCompute.id++;
+            c = (computeInfo *)
+	           processors[i].computeSet->next((Iterator *)&nextCompute);
+	  }
+      }
+    }
+  }
 }
 
 int Refiner::refine()
@@ -249,6 +277,8 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
     assign((computeInfo *) &(computes[i]),
            (processorInfo *) &(processors[computes[i].oldProcessor]));
 
+  removeComputes();
+
   computeAverage();
 
   refine();
@@ -260,9 +290,9 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
       processors[pe].computeSet->iterator((Iterator *)&nextCompute);
     while(c) {
       new_p[c->originalPE][c->originalIdx] = c->processor;
-      // if (c->oldProcessor != c->processor)
-      //	CkPrintf("Refiner::Refine: from %d to %d\n",
-      //		 c->oldProcessor, c->processor);
+//       if (c->oldProcessor != c->processor)
+//      	CkPrintf("Refiner::Refine: from %d to %d\n",
+//      		 c->oldProcessor, c->processor);
       nextCompute.id++;
       c = (computeInfo *) processors[pe].computeSet->
 	             next((Iterator *)&nextCompute);

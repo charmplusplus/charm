@@ -37,10 +37,12 @@ private:
   double computeMax();
   int isHeavy(processorInfo *p);
   int isLight(processorInfo *p);
+  int removeComputes();
 
   double overLoad;
   double averageLoad;
   int P;
+  int numAvail;
   int numComputes;
   computeInfo* computes;
   processorInfo* processors;
