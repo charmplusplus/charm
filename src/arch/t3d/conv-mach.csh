@@ -17,6 +17,7 @@
 set CMK_CPP_CHARM='/usr/lib/cpp -P'
 set CMK_CPP_C='/mpp/bin/cc -E'
 set CMK_LDRO='/mpp/bin/mppldr -o'
+set CMK_LDRO_WORKS=0
 set CMK_CC='/mpp/bin/cc -T cray-t3d'
 set CMK_CC_RELIABLE='/mpp/bin/cc -T cray-t3d'
 set CMK_CC_FASTEST='/mpp/bin/cc -T cray-t3d'

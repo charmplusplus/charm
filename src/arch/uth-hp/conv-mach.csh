@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.11  1996-08-01 21:11:12  jyelon
+# Revision 1.12  1996-08-04 04:19:50  jyelon
+# Added CMK_LDRO_WORKS
+#
+# Revision 1.11  1996/08/01 21:11:12  jyelon
 # added two options to charmxlat++   -w -p
 #
 # Revision 1.10  1996/07/02 21:22:24  jyelon
@@ -56,6 +59,7 @@
 set CMK_CPP_CHARM='/lib/cpp -P'
 set CMK_CPP_C='gcc -E'
 set CMK_LDRO='ld -r -o'
+set CMK_LDRO_WORKS=1
 set CMK_CC='gcc'
 set CMK_CC_RELIABLE='gcc'
 set CMK_CC_FASTEST='gcc'

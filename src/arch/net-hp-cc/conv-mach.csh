@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.2  1996-08-01 21:11:12  jyelon
+# Revision 1.3  1996-08-04 04:19:50  jyelon
+# Added CMK_LDRO_WORKS
+#
+# Revision 1.2  1996/08/01 21:11:12  jyelon
 # added two options to charmxlat++   -w -p
 #
 # Revision 1.1  1996/04/30 19:51:39  brunner
@@ -24,6 +27,7 @@
 set CMK_CPP_CHARM='/lib/cpp -P'
 set CMK_CPP_C='cc -E'
 set CMK_LDRO='ld -r -o'
+set CMK_LDRO_WORKS=1
 set CMK_CC='cc -Aa -D_HPUX_SOURCE '
 set CMK_CC_RELIABLE='cc -Aa -D_HPUX_SOURCE '
 set CMK_CC_FASTEST='cc -Aa -D_HPUX_SOURCE '

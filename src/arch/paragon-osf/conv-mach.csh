@@ -17,6 +17,7 @@
 set CMK_CPP_CHARM='/usr/lib/cpp -P'
 set CMK_CPP_C='icc -E'
 set CMK_LDRO='ld860 -r -o'
+set CMK_LDRO_WORKS=1
 set CMK_CC='icc -nx'
 set CMK_CC_RELIABLE='icc -nx'
 set CMK_CC_FASTEST='icc -nx'

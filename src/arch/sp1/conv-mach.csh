@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.17  1996-08-01 21:11:12  jyelon
+# Revision 2.18  1996-08-04 04:19:50  jyelon
+# Added CMK_LDRO_WORKS
+#
+# Revision 2.17  1996/08/01 21:11:12  jyelon
 # added two options to charmxlat++   -w -p
 #
 # Revision 2.16  1996/07/24 22:03:49  milind
@@ -71,6 +74,7 @@
 set CMK_CPP_CHARM		= '/usr/lib/cpp -D_NO_PROTO '
 set CMK_CPP_C                   = '/usr/lib/cpp -D_NO_PROTO '
 set CMK_LDRO			= 'ld -r -o '
+set CMK_LDRO_WORKS=1
 set CMK_CC			= 'mpcc '
 set CMK_CC_RELIABLE		= 'mpcc '
 set CMK_CC_FASTEST		= 'mpcc '

@@ -18,6 +18,7 @@ set CMMD_ROOT='/'
 set CMK_CPP_CHARM='/usr/lib/cpp -P'
 set CMK_CPP_C='gcc -E'
 set CMK_LDRO='ld -r -o'
+set CMK_LDRO_WORKS=1
 set CMK_CC='gcc'
 set CMK_CC_RELIABLE='gcc'
 set CMK_CC_FASTEST='gcc'

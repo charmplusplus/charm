@@ -17,6 +17,7 @@
 set CMK_CPP_CHARM='/usr/lib/cpp -P'
 set CMK_CPP_C='ngcc -E'
 set CMK_LDRO='nld -r -o'
+set CMK_LDRO_WORKS=1
 set CMK_CC='ncc -g'
 set CMK_CC_RELIABLE='ngcc -g'
 set CMK_CC_FASTEST='ncc -g'
