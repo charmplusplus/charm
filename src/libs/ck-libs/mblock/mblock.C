@@ -216,9 +216,6 @@ combine(const DType& dt, int op)
 
 void MBlockChunk::commonInit(void)
 {
-#if CMK_LBDB_ON
-  usesAtSync = CmiTrue;
-#endif
   nfields = 0;
   thisproxy=thisArrayID;
 
