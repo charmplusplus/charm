@@ -41,8 +41,9 @@ int CommLB::search(LDObjid oid, LDOMid mid){
     hash = (oid.id[0] | oid.id[1]) % nobj;
     
     for(id=0;id<nobj;id++){
-	if((translate[htable[(id+hash)%nobj]].oid.id[0] == oid.id[0])&&(translate[htable[(id+hash)%nobj]].oid.id[1] == oid.id[1])&&(translate[htable[(id+hash)%nobj]].oid.id[2] == oid.id[2])&&(translate[htable[(id+hash)%nobj]].oid.id[3] == oid.id[3])&&(translate[htable[(id+hash)%nobj]].mid.id == mid.id))
-	    return htable[(id + hash)%nobj];
+	int index = (id+hash)%nobj;
+	if((translate[htable[index]].oid.id[0] == oid.id[0])&&(translate[htable[index]].oid.id[1] == oid.id[1])&&(translate[htable[index]].oid.id[2] == oid.id[2])&&(translate[htable[index]].oid.id[3] == oid.id[3])&&(translate[htable[index]].mid.id == mid.id))
+	    return htable[index];
     }
     //  CkPrintf("not found \n");
     return -1;
@@ -219,6 +220,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
     maxid = x->id;
     spe = x->pe;
     mpos = x->pos;
+    delete x;
     //  CkPrintf("before alloc firstpe = %d\n",pe);
     alloc(pe,maxid,stats[spe].objData[mpos].wallTime);
     if(pe != spe){
@@ -268,6 +270,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 	    migrateMe->to_pe = minpe;
 	    migrateInfo.insertAtEnd(migrateMe);
 	}
+	delete x;   // gzheng
     }
     
     int migrate_count = migrateInfo.length();

@@ -202,6 +202,9 @@ CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
     cpuData[location] = minCpu;
   }
 
+  delete [] cpuData;
+  delete [] objData;
+
   int migrate_count=migrateInfo.length();
   CkPrintf("HeapCentLB migrating %d elements\n",migrate_count);
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
