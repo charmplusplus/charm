@@ -21,7 +21,7 @@ class adapt3 : public opt3 {
  public:
   adapt3() { 
     timeLeash = 10; STRAT_T = ADAPT3_T; 
-    specTol = 1.25 + 0.1*(log((double)CkNumPes())/log(2.0));
+    specTol = 1.2 + 0.1*(log((double)CkNumPes())/log(2.0));
     //if (specTol > 1.2) specTol = 1.2;
   }
   virtual void Step();

@@ -16,7 +16,9 @@ void adapt3::Step()
   parent->Status();
 
   if (rbFlag) { 
-    timeLeash == avgRBoffset;
+    if (timeLeash > avgRBoffset)
+      timeLeash == avgRBoffset;
+    else timeLeash = avgRBoffset/2;
   }
   if (specEventCount > (specTol*eventCount)) {
     timeLeash--;
