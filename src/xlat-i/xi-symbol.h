@@ -99,6 +99,8 @@ class Type : public Printable {
     virtual int isTemplated(void) const { return 0; }
     virtual int isPointer(void) const {return 0;}
     virtual int isNamed(void) const { return 0; }
+    virtual int isCkArgMsgPtr(void) const {return 0;}
+    virtual int isCkArgMsg(void) const {return 0;}
     virtual Type *deref(void) {return this;}
     virtual const char *getBaseName(void) = 0;
     virtual void genProxyName(XStr &str,forWhom forElement);
@@ -132,6 +134,7 @@ class NamedType : public Type {
     NamedType(const char* n, TParamList* t=0)
        : name(n), tparams(t) {}
     int isTemplated(void) const { return (tparams!=0); }
+    int isCkArgMsg(void) const {return 0==strcmp(name,"CkArgMsg");}
     void print(XStr& str);
     int isNamed(void) const {return 1;}
     const char *getBaseName(void) { return name; }
@@ -154,6 +157,7 @@ class PtrType : public Type {
   public:
     PtrType(Type *t) : type(t), numstars(1) {}
     int isPointer(void) const {return 1;}
+    int isCkArgMsgPtr(void) const {return numstars==1 && type->isCkArgMsg();}
     int isMessage(void) const {return numstars==1 && !type->isBuiltin();}
     void indirect(void) { numstars++; }
     void print(XStr& str);
@@ -231,6 +235,7 @@ class Parameter {
     void printValue(XStr &str);
     int isMessage(void) const {return type->isMessage();}
     int isVoid(void) const {return type->isVoid();}
+    int isCkArgMsgPtr(void) const {return type->isCkArgMsgPtr();}
     int isArray(void) const {return arrLen!=NULL;}
     Type *getType(void) {return type;}
     const char *getName(void) const {return name;}
@@ -261,6 +266,9 @@ class ParamList {
     }
     int isMarshalled(void) const {
     	return !isVoid() && !isMessage();
+    }
+    int isCkArgMsgPtr(void) const {
+        return (next==NULL) && param->isCkArgMsgPtr();
     }
     const char *getBaseName(void) {
     	return param->type->getBaseName();

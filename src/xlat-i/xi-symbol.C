@@ -1974,7 +1974,7 @@ void Entry::genReg(XStr& str)
   }
   str << ", __idx);\n";
   if (isConstructor()) {
-    if(container->isMainChare())
+    if(container->isMainChare() && param->isCkArgMsgPtr())
       str << "  CkRegisterMainChare(__idx, "<<epIdx(0)<<");\n";
     if(param->isVoid())
       str << "  CkRegisterDefaultCtor(__idx, "<<epIdx(0)<<");\n";
