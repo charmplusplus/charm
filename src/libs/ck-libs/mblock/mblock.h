@@ -1,0 +1,83 @@
+/*Charm++ Multiblock CFD Framework:
+C interface file
+*/
+#ifndef _MBLK_H
+#define _MBLK_H
+#include "converse.h"
+#include "pup_c.h"
+
+/* base types: keep in sync with mblockf.h */
+#define MBLK_BYTE   0
+#define MBLK_INT    1
+#define MBLK_REAL   2
+#define MBLK_DOUBLE 3
+
+/* reduction operations: keep in synch with mblockf.h */
+#define MBLK_SUM 0
+#define MBLK_MAX 1
+#define MBLK_MIN 2
+
+/* return codes */
+#define MBLK_SUCCESS 1
+#define MBLK_FAILURE 0
+
+/* async comm test */
+#define MBLK_DONE 1
+#define MBLK_NOTDONE 0
+
+#if MBLK_FORTRAN
+typedef void (*MBLK_PupFn)(pup_er, void*);
+#else
+typedef void *(*MBLK_PupFn)(pup_er, void*);
+#endif
+
+typedef void (*MBLK_BcFn)(void *);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+  /*Utility*/
+  int MBLK_Get_nblocks(int *n);
+  int MBLK_Get_myblock(int *m);
+  int MBLK_Get_blocksize(int *start, int *end);
+  int MBLK_Get_extent(int *start, int *end);
+  double MBLK_Timer(void);
+  void MBLK_Print(const char *str);
+  void MBLK_Print_block(void);
+
+  /* caled from init */
+  int MBLK_Set_prefix(const char *prefix);
+  int MBLK_Set_nblocks(const int n);
+  int MBLK_Set_dim(const int n);
+
+  /* field creation */
+  int MBLK_Create_field(const int base_type, const int vec_len,
+      const int offset, const int dist, int *fid);
+
+  /* field update */
+  int MBLK_Update_field(const int fid, void *ingrid, void *outgrid);
+  int MBLK_Iupdate_field(const int fid, void *ingrid, void *outgrid);
+  int MBLK_Test_update(int *status);
+  int MBLK_Wait_update(void);
+
+  /* reduction */
+  int MBLK_Reduce_field(const int fid, void *grid, void *out, const int op);
+  int MBLK_Reduce(const int fid, void *in, void *out, const int op);
+
+  /* boundary conditions */
+  int MBLK_Register_bc(const int bcnum, const MBLK_BcFn bcfn);
+  int MBLK_Apply_bc(const int bcnum, void *grid);
+  int MBLK_Apply_bc_all(void *grid);
+  int MBLK_Get_boundary_extent(int *start, int *end);
+
+  /*Migration */
+  int MBLK_Register(void *userData, MBLK_PupFn _pup_ud, int *rid);
+  int MBLK_Migrate(void);
+  int MBLK_Get_registered(int rid, void ** block);
+  
+#ifdef __cplusplus
+}
+#endif
+
+#endif
+

@@ -1,0 +1,18 @@
+mainmodule mblock {
+  extern module MetisLB;
+  readonly CkChareID _mainhandle;
+  readonly CkArrayID _mblockaid;
+  readonly int _nchunks;
+  message DataMsg;
+  message ChunkMsg;
+  mainchare main {
+    entry main();
+    entry void done(void);
+  };
+  array [1D] chunk {
+    entry chunk();
+    entry [threaded] void run(ChunkMsg*);
+    entry void recv(DataMsg *);
+    entry void reductionResult(DataMsg *);
+  };
+};

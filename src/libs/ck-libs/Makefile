@@ -5,6 +5,7 @@ all:
 	cd irecv; make all OPTS='$(OPTS)'
 	cd collide; make all OPTS='$(OPTS)'
 	cd fem; make all OPTS='$(OPTS)'
+	cd mblock; make all OPTS='$(OPTS)'
 
 clean:
 	cd barrier; make clean
@@ -12,4 +13,5 @@ clean:
 	cd fem; make clean
 	cd collide; make clean
 	cd amr; make clean
+	cd mblock; make clean
 
