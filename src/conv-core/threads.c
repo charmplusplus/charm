@@ -120,11 +120,13 @@
 #if CMK_MEMORY_PROTECTABLE
 
 #include "sys/mman.h"
+#define CthMemAlign(x,n) memalign((x),(n))
 #define CthMemoryProtect(p,l) mprotect(p,l,PROT_NONE)
 #define CthMemoryUnprotect(p,l) mprotect(p,l,PROT_READ | PROT_WRITE)
 
 #else
 
+#define CthMemAlign(x,n) malloc(n)
 #define CthMemoryProtect(p,l) 
 #define CthMemoryUnprotect(p,l)
 
@@ -292,7 +294,7 @@ CthVoidFn fn; void *arg; int size;
   CthThread result; qt_t *stack, *stackbase, *stackp;
   if (size==0) size = STACKSIZE;
   size = (size+(CMK_MEMORY_PAGESIZE*2)-1) & ~(CMK_MEMORY_PAGESIZE-1);
-  stack = (qt_t*)memalign(CMK_MEMORY_PAGESIZE, size);
+  stack = (qt_t*)CthMemAlign(CMK_MEMORY_PAGESIZE, size);
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   if ((stack==0)||(result==0)) { CmiError("Out of memory."); exit(1); }
   CthThreadInit(result);
