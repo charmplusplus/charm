@@ -601,7 +601,7 @@ bool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,int epIdx) {
 	if (msg) {
 		envelope *env=UsrToEnv(msg);
 		_TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(),
-		      ForChareMsg,epIdx,env->array_srcPe());
+		     ForChareMsg,epIdx,env->array_srcPe(), env->getTotalsize());
 	}
 	_entryTable[epIdx]->call(msg, obj);
 	if (msg) _TRACE_END_EXECUTE();
