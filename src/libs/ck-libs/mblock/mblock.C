@@ -495,10 +495,6 @@ CDECL int
 MBLK_Get_blocksize(int *dim)
 {
   MBLOCKAPI("MBLK_Get_blocksize");
-  if(TCharm::getState() != inDriver) {
-    CkError("MBLK_Get_blocksize  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
   MBlockChunk *cptr = getCurMBlockChunk();
   blockDim d = cptr->b->getDim();
   /*Subtract one to get to voxel coordinates*/
@@ -509,10 +505,6 @@ MBLK_Get_blocksize(int *dim)
 CDECL int 
 MBLK_Get_nodelocs(const int *nodedim,double *nodeloc) {
   MBLOCKAPI("MBLK_Get_nodelocs");
-  if(TCharm::getState() != inDriver) {
-    CkError("MBLK_Get_nodelocs  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
   block *b=getCurMBlockChunk()->b;
   blockDim d = b->getDim();
   for (int i=0;i<3;i++)
@@ -544,11 +536,7 @@ CDECL void
 MBLK_Print(const char *str)
 {
   MBLOCKAPI("MBLK_Print");
-  if(TCharm::getState()==inDriver) {
-    CkPrintf("[%d] %s\n", TCHARM_Element(), str);
-  } else {
-    CkPrintf("%s\n", str);
-  }
+  CkPrintf("[%d] %s\n", TCHARM_Element(), str);
 }
 
 CDECL int 
@@ -580,10 +568,6 @@ MBLK_Create_field(int *dims,int isVoxel,
 		  int *fid)
 {
   MBLOCKAPI("MBLK_Create_field");
-  if(TCharm::getState() != inDriver) {
-    CkError("MBLK_Create_field  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
   field_t *f=new field_t(DType(base_type,vec_len,init_offset,distance),
 			 blockDim(dims[0],dims[1],dims[2]),isVoxel==1);
   *fid = getCurMBlockChunk()->add_field(f);
@@ -594,10 +578,6 @@ CDECL int
 MBLK_Update_field(int fid, int ghostWidth, void *grid)
 {
   MBLOCKAPI("MBLK_Update_field");
-  if(TCharm::getState() != inDriver) {
-    CkError("MBLK_Update_field  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
   MBLK_Iupdate_field(fid, ghostWidth, grid, grid);
   return MBLK_Wait_update();
 }
@@ -606,10 +586,6 @@ CDECL int
 MBLK_Iupdate_field(int fid, int ghostWidth, void *ingrid, void *outgrid)
 {
   MBLOCKAPI("MBLK_Iupdate_field");
-  if(TCharm::getState() != inDriver) {
-    CkError("MBLK_Iupdate_field  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
   getCurMBlockChunk()->start_update(fid,extrudeMethod(ghostWidth),ingrid,outgrid);
   return MBLK_SUCCESS;
 }
@@ -618,10 +594,6 @@ CDECL int
 MBLK_Test_update(int *status)
 {
   MBLOCKAPI("MBLK_Test_update");
-  if(TCharm::getState() != inDriver) {
-    CkError("MBLK_Test_update  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
   *status=getCurMBlockChunk()->test_update();
   return MBLK_SUCCESS; 
 }
@@ -630,10 +602,6 @@ CDECL int
 MBLK_Wait_update(void)
 {
   MBLOCKAPI("MBLK_Wait_update");
-  if(TCharm::getState() != inDriver) {
-    CkError("MBLK_Wait_update  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
   return getCurMBlockChunk()->wait_update();
 }
 
@@ -641,10 +609,6 @@ CDECL int
 MBLK_Reduce_field(int fid, void *ingrid, void *outbuf, int op)
 {
   MBLOCKAPI("MBLK_Reduce_field");
-  if(TCharm::getState() != inDriver) {
-    CkError("MBLK_Reduce_field  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
   getCurMBlockChunk()->reduce_field(fid, ingrid, outbuf, op);
   return MBLK_SUCCESS;
 }
@@ -653,10 +617,6 @@ CDECL int
 MBLK_Reduce(int fid, void *inbuf, void *outbuf, int op)
 {
   MBLOCKAPI("MBLK_Reduce");
-  if(TCharm::getState() != inDriver) {
-    CkError("MBLK_Reduce  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
   getCurMBlockChunk()->reduce(fid, inbuf, outbuf, op);
   return MBLK_SUCCESS;
 }
@@ -665,10 +625,6 @@ CDECL int
 MBLK_Register_bc(const int bcnum, int ghostWidth,const MBLK_BcFn bcfn)
 {
   MBLOCKAPI("MBLK_Register_bc");
-  if(TCharm::getState() != inDriver) {
-    CkError("MBLK_Register_bc  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
   return getCurMBlockChunk()->register_bc(bcnum, bcfn, extrudeMethod(ghostWidth), false);
 }
 
@@ -676,10 +632,6 @@ CDECL int
 MBLK_Apply_bc(const int bcnum, void *p1,void *p2)
 {
   MBLOCKAPI("MBLK_Apply_bc");
-  if(TCharm::getState() != inDriver) {
-    CkError("MBLK_Apply_bc  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
   int retval =  getCurMBlockChunk()->apply_bc(bcnum, p1,p2);
   return retval;
 }
@@ -688,10 +640,6 @@ CDECL int
 MBLK_Apply_bc_all(void *p1,void *p2)
 {
   MBLOCKAPI("MBLK_Apply_bc_all");
-  if(TCharm::getState() != inDriver) {
-    CkError("MBLK_Apply_bc_all  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
   int retval =  getCurMBlockChunk()->apply_bc_all(p1,p2);
   return retval;
 }
@@ -700,10 +648,8 @@ CDECL void
 MBLK_Print_block(void)
 {
   MBLOCKAPI("MBLK_Print_block");
-  if(TCharm::getState()==inDriver) {
-    MBlockChunk *cptr = getCurMBlockChunk();
-    cptr->print();
-  }
+  MBlockChunk *cptr = getCurMBlockChunk();
+  cptr->print();
 }
 
 /************************ Fortran Bindings *********************************/
@@ -821,12 +767,7 @@ FDECL void FTN_NAME(MBLK_REGISTER_BC, mblk_register_bc)
   (int *bcnum, int *ghostWidth,MBLK_BcFn bcfn, int *ret)
 {
   MBLOCKAPI("MBLK_register_bc");
-  if(TCharm::getState() != inDriver) {
-    CkError("MBLK_Register_bc  called from outside driver\n");
-    *ret=MBLK_FAILURE;
-  } else {
-    *ret=getCurMBlockChunk()->register_bc(*bcnum, bcfn, extrudeMethod(*ghostWidth), true);	
-  }
+  *ret=getCurMBlockChunk()->register_bc(*bcnum, bcfn, extrudeMethod(*ghostWidth), true);	
 }
 
 FDECL void FTN_NAME(MBLK_APPLY_BC, mblk_apply_bc)
