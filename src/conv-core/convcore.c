@@ -1526,10 +1526,13 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {
   /*CmiError("ListSend not implemented.");*/
   int i;
-  for(i=0;i<npes;i++) {
+  for(i=0;i<npes-1;i++) {
     CmiSyncSend(pes[i], len, msg);
   }
-  CmiFree(msg);
+  if (npes)
+    CmiSyncSendAndFree(pes[npes-1], len, msg);
+  else 
+    CmiFree(msg);
 }
 
 #endif
@@ -2182,11 +2185,11 @@ void ConverseCommonInit(char **argv)
   CmiHandlerInit();
   CIdleTimeoutInit(argv);
   
-  CmiProcessPriority(argv);
 #ifndef CMK_OPTIMIZE
   traceInit(argv);
 /*initTraceCore(argv);*/ /* projector */
 #endif
+  CmiProcessPriority(argv);
 
 #if CMK_CCS_AVAILABLE
   CcsInit(argv);
