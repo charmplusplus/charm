@@ -593,6 +593,7 @@ char *arg_server_auth=NULL;
 int   arg_startpe;
 int   arg_endpe;
 int   arg_singlemaster;
+int   arg_skipmaster;
 #endif
 
 void arg_init(int argc, char **argv)
@@ -632,6 +633,11 @@ void arg_init(int argc, char **argv)
   pparam_int(&arg_startpe,   0, "startpe",   "first pe to start job(SCYLD)");
   pparam_int(&arg_endpe,  1000000, "endpe",   "last pe to start job(SCYLD)");
   pparam_flag(&arg_singlemaster, 0, "singlemaster", "Only assign one process to master node(SCYLD)");
+  pparam_flag(&arg_skipmaster, 0, "skipmaster", "Donot assign any process to master node(SCYLD)");
+  if (arg_skipmaster && arg_singlemaster) {
+    printf("Charmrun> 'singlemaster' is ignored due to 'skipmaster'. \n");
+    arg_singlemaster = 0;
+  }
 #endif
   pparam_flag(&arg_help,	0, "help", "print help messages");
   pparam_int(&arg_ppn,          0, "ppn",             "number of pes per node");
@@ -1804,6 +1810,7 @@ void nodetab_init_for_scyld()
     char hostname[256];
     if (bproc_nodestatus(i) != bproc_node_up) continue;
     if (i!= -1 && i<arg_startpe) continue;
+    if (i==-1 && arg_skipmaster) continue;
     sprintf(hostname, "%d", i);
     if (npes + arg_ppn > arg_requested_pes) group.cpus = arg_requested_pes-npes;
     else group.cpus = arg_ppn;
@@ -1822,15 +1829,16 @@ void nodetab_init_for_scyld()
   /* expand node table to arg_requested_pes */
   if (arg_requested_pes > npes) {
     int orig_size = npes;
-    int node = 0;
-    if (arg_singlemaster && nodetab_rank0_size > 1) 
-    	node = arg_ppn;      /* skip -1 if we can */
+    int startnode = 0;
+    if (arg_singlemaster && nodetab_rank0_size > 1 && !arg_skipmaster) 
+    	startnode = arg_ppn;      /* skip -1 if we can */
+    int node = startnode; 
     while (npes < arg_requested_pes) {
       if (npes+arg_ppn > arg_requested_pes) group.cpus = arg_requested_pes-npes;
       else group.cpus = arg_ppn;
       for (group.rank = 0; group.rank<arg_ppn; group.rank++) {
         nodetab_makehost(nodetab_name(node), &group);
-        if (++node == orig_size) node = arg_ppn;
+        if (++node == orig_size) node = startnode;
         if (++npes == arg_requested_pes) break;
       } 
     }
