@@ -12,20 +12,7 @@
  * handled, it can no longer be retreived.  CldGetToken removes a
  * message that was placed in the scheduler queue in this way.
  * CldCountTokens tells you how many tokens are currently retreivable.
- *
- * Caution: these functions are using the function "CmiReference"
- * which I just added to the Cmi memory allocator (it increases the
- * reference count field, making it possible to free the memory
- * twice.)  I'm not sure how well this is going to work.  I need this
- * because the message should not be freed until it's out of the
- * scheduler queue AND out of the user's hands.  It needs to stay
- * around while it's in the scheduler queue because it may contain
- * a priority.  I should probably rewrite these subroutines so that
- * they simply copy the priority, I would feel safer that way.
- *
  */
-
-CpvDeclare(int, CldAvgLoad);
 
 int CldRegisterInfoFn(CldInfoFn fn)
 {
@@ -131,9 +118,7 @@ void CldModuleGeneralInit()
   CldProcInfo proc;
 
   CpvInitialize(CldProcInfo, CldProc);
-  CpvInitialize(int, CldAvgLoad);
   CpvAccess(CldProc) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
-  CpvAccess(CldAvgLoad) = 0;
   proc = CpvAccess(CldProc);
   proc->load = 0;
   proc->tokenhandleridx = CmiRegisterHandler((CmiHandler)CldTokenHandler);
