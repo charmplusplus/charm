@@ -17,9 +17,11 @@ void spec::Step()
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT + 1;
-  
+
+  int iter = 0;
   while ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
     // do all events within the speculative window
+    iter++;
     currentEvent = ev;
     ev->done = 2;
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
@@ -27,5 +29,8 @@ void spec::Step()
     eq->ShiftEvent(); // shift to next event
     ev = eq->currentPtr; // reset ev
   }
+#ifdef POSE_STATS_ON
+  if (iter > 0) localStats->Loop();
+#endif  
 }
 

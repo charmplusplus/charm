@@ -16,8 +16,10 @@ void opt2::Step()
   if ((ev->timestamp >= 0) && 
       ((POSE_endtime == POSE_UnsetTS) || (ev->timestamp <= POSE_endtime))){
     POSE_TimeType fix_time = ev->timestamp;
+    int iter = 0;
     while (ev->timestamp == fix_time) {
       // do all events at the first available timestamp
+      iter++;
       currentEvent = ev;
       ev->done = 2;
       parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
@@ -25,6 +27,9 @@ void opt2::Step()
       eq->ShiftEvent(); // shift to next event
       ev = eq->currentPtr; // reset ev
     }
+#ifdef POSE_STATS_ON
+    if (iter > 0) localStats->Loop();
+#endif  
     if (eq->currentPtr->timestamp >= 0) { // if more events, schedule the next
       prioMsg *pm = new prioMsg;
       pm->setPriority(eq->currentPtr->timestamp-POSE_TimeMax);

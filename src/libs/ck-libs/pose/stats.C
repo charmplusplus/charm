@@ -12,8 +12,7 @@ extern void POSE_exit();
 void localStat::SendStats()
 {
   CProxy_globalStat gstat(theGlobalStats);
-  localStatSummary *m;
-  m = new localStatSummary;
+  localStatSummary *m = new localStatSummary;
   m->doTime = totalTime;
   m->rbTime = rollbackTime;
   m->gvtTime = gvtTime;
@@ -97,6 +96,9 @@ void globalStat::localStatReport(localStatSummary *m)
     maxTime = tmpMax;
   reporting++;
 
+  CkAssert(totalGvts > 0);
+  CkAssert(totalDos > 0);
+  CkAssert(totalLoops > 0);
   GvtTime = gvtAvg/totalGvts;
   if (reporting == CkNumPes()) { //all local stats are in; compute final values
     avgDo = doAvg / totalDos;
@@ -121,12 +123,14 @@ void globalStat::localStatReport(localStatSummary *m)
 #endif
 
     POSE_exit();
+    /*
     reporting = 0;
     doAvg = doMax = rbAvg = rbMax = gvtAvg = gvtMax = simAvg = simMax = 
       cpAvg = cpMax = canAvg = canMax = lbAvg = lbMax = miscAvg = miscMax = 
       maxTime = maxDo = minDo = avgDo = GvtTime = 0.0; 
     cpBytes = reporting = totalDos = totalUndos = totalCommits = totalLoops = 
       totalGvts = maxChkPts = 0;
+    */
   }
 }
 

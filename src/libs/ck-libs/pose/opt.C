@@ -32,6 +32,9 @@ void opt::Step()
       POSE_Objects[parent->thisIndex].Step(pm);
     }
   }
+#ifdef POSE_STATS_ON
+  localStats->Loop();
+#endif  
 }
 
 /// Rollback to predetermined RBevent

@@ -19,8 +19,10 @@ void opt3::Step()
   
   if ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
     POSE_TimeType fix_time = ev->timestamp;
+    int iter = 0;
     while (ev->timestamp == fix_time) {
       // do all events at the first available timestamp
+      iter++;
       currentEvent = ev;
       ev->done = 2;
       parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
@@ -28,6 +30,9 @@ void opt3::Step()
       eq->ShiftEvent(); // shift to next event
       ev = eq->currentPtr; // reset ev
     }
+#ifdef POSE_STATS_ON
+    if (iter > 0) localStats->Loop();
+#endif  
     if (eq->currentPtr->timestamp >= 0) {
       // execute next event if there is one
       prioMsg *pm = new prioMsg;
