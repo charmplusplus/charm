@@ -197,7 +197,7 @@ By default, the number of mesh chunks is equal to the number of
 physical processors (set with {\tt +p} $p$).
 
 
-\item {\tt +write}
+\item {\tt -write}
 
 Skip \kw{driver()}.
 After running \kw{init()} normally, the framework partitions the mesh, 
@@ -205,22 +205,22 @@ writes the mesh partitions to files, and exits.  As usual, the
 {\tt +vp} $v$ option controls the number of mesh partitions.
 
 
-\item {\tt +read}
+\item {\tt -read}
 
 Skip \kw{init()}.
 The framework reads the partitioned input mesh from files
-and calls \kw{driver()}.  Together with {\tt +write}, this option
+and calls \kw{driver()}.  Together with {\tt -write}, this option
 allows you to separate out the mesh preparation and partitioning 
 phase from the actual parallel solution run.
 
 This can be useful, for example, if \kw{init()} requires more memory 
 to hold the unpartitioned mesh than is available on one processor of 
 the parallel machine.  To avoid this limitation, you can run the program
-with {\tt +write} on a machine with a lot of memory to prepare the input
-files, then copy the files and run with {\tt +read} on a machine with 
+with {\tt -write} on a machine with a lot of memory to prepare the input
+files, then copy the files and run with {\tt -read} on a machine with 
 a lot of processors.
 
-{\tt +read} can also be useful during debugging or performance tuning, 
+{\tt -read} can also be useful during debugging or performance tuning, 
 by skipping the (potentially slow) mesh preparation phase.
 
 
