@@ -1,5 +1,8 @@
+// README: in order for this library to work, there should be a link
+// from /usr/include/python to the current python include version
+
 #include "ckcallback-ccs.h"
-#include "python2.2/Python.h"
+#include "python/Python.h"
 #include "PythonCCS.decl.h"
 #include "string"
 #include "map"
