@@ -5,10 +5,13 @@
 
 #include <charm++.h>
 #include <string.h>
-#include "msa-common.h"
-#include "msa.decl.h"
 #include <list>
 #include <stack>
+template<class T> class DefaultEntry;  // needed in msa-DistPageMgr.ci, i.e. in msa.decl.h
+typedef DefaultEntry<int> DefaultEntryInt_;
+typedef DefaultEntry<double> DefaultEntryDbl_;
+#include "msa-common.h"
+#include "msa.decl.h"
 
 using namespace std;
 
@@ -72,9 +75,111 @@ public:
     }
 };
 
-class CacheGroup : public CBase_CacheGroup
+//================================================================
+
+/** This is the interface used to perform the accumulate operation on
+    an Entry.  T is the data type.  It may be a primitive one or a
+    class.  It must support assignment, copy constructor, += operator,
+    and typecast from 0.
+*/
+template <class T>
+class DefaultEntry {
+public:
+//     T assign(T &lhs, const T rhs){ lhs = rhs; return lhs;};
+    inline virtual T accumulate(T& a, const T& b) { a += b;  return a; }
+    // identity for initializing at start of accumulate
+    inline virtual T getIdentity() { return (T)0; }
+};
+
+template <class T>
+class ProductEntry : public DefaultEntry<T> {
+public:
+    inline T accumulate(T& a, const T& b) { a *= b;  return a; }
+    inline T getIdentity() { return (T)1; }
+};
+
+template <class T, T minVal>
+class MaxEntry : public DefaultEntry<T> {
+public:
+    inline T accumulate(T& a, const T& b) { a = (a<b)?b:a;  return a; }
+    inline T getIdentity() { return minVal; }
+};
+
+//================================================================
+
+/**
+  Holds the untyped data for one MSA page.
+  This is the interface CacheGroup uses to access a cached page.
+  CacheGroup asks the templated code to create a MSA_Page
+  for each new page, then talks to the page directly.
+*/
+class MSA_Page {
+public:
+	virtual ~MSA_Page();
+
+	/**
+	  Pack or unpack the data in this page.
+	  Used to send and receive pages from the network
+	  (or even disk, if somebody needs it.)
+	*/
+	virtual void pup(PUP::er &p) =0;
+
+	/**
+	  Merge this page's data into our own.
+	  Only parts of this page may have been set.
+	*/
+	virtual void merge(MSA_Page &otherPage) =0;
+};
+
+/**
+  Holds the typed data for one MSA page.
+  Implementation of puppedPage used by the templated code.
+*/
+template <
+	class ENTRY, 
+	class MERGER=DefaultEntry<ENTRY>,
+	unsigned int ENTRIES_PER_PAGE=MSA_DEFAULT_ENTRIES_PER_PAGE
+>
+class MSA_PageT : public MSA_Page {
+	/** The contents of this page: array of ENTRIES_PER_PAGE items */
+	ENTRY *data;
+	/** Merger object */
+	MERGER m;
+public:
+	MSA_PageT() {
+		data=new ENTRY[ENTRIES_PER_PAGE];
+		for (int i=0;i<ENTRIES_PER_PAGE;i++)
+			data[i]=m.getIdentity();
+	}
+	virtual ~MSA_PageT() {
+		delete[] data;
+	}
+	
+	virtual void pup(PUP::er &p) {
+		for (int i=0;i<ENTRIES_PER_PAGE;i++)
+			p|data[i];
+	}
+
+	virtual void merge(MSA_Page &otherPage) {
+		for (int i=0;i<ENTRIES_PER_PAGE;i++)
+			m.accumulate(data[i],otherPage.data[i]);
+	}
+
+	// These accessors might be used by the templated code.
+// 	inline ENTRY &operator[](int i) {return data[i];}
+// 	inline const ENTRY &operator[](int i) const {return data[i];}
+};
+
+//================================================================
+
+template <class ENTRY_TYPE, class ENTRY_OPS_CLASS>
+class CacheGroup : public Group
 {
+// private:
+//     CkIndex_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> ignore_me;  // just for template instantiation.
+
 protected:
+    ENTRY_OPS_CLASS *entryOpsObject;
     unsigned int numberOfWorkerThreads;      // number of worker threads across all processors for this shared array
     // @@ migration?
     unsigned int numberLocalWorkerThreads;   // number of worker threads on THIS processor for this shared array
@@ -90,7 +195,7 @@ protected:
     char* pageLock;                 // is this page locked (and hence can't be replaced) or not
                                     // 0 = not locked, 1 = locked
 
-    CProxy_PageArray pageArray;     // a proxy to the page array
+    CProxy_PageArray<ENTRY_TYPE, ENTRY_OPS_CLASS> pageArray;     // a proxy to the page array
 
     /** This defines the queue of threads waiting for an event or events **/
     typedef struct {
@@ -386,7 +491,7 @@ protected:
     // this function assumes that there are no overlapping writes in the list
     inline void sendChangesToPageArray(const unsigned int page, const int async)
     {
-        list<writebounds_t>::iterator iter;
+        typename list<writebounds_t>::iterator iter;
         unsigned int i;
         // do a run length encoding of the writes. This encoding has the
         // following format:
@@ -466,7 +571,7 @@ protected:
         CkAssert(begin < bytesPerPage && end < bytesPerPage && begin < end);
 
         // combine consecutive spans into a single span
-        list<writebounds_t>::iterator i;
+        typename list<writebounds_t>::iterator i;
         for(i = writes[page]->begin(); i != writes[page]->end(); i++)
         {
             if(i->begin <= begin && i->end >= end)
@@ -493,23 +598,29 @@ protected:
     }
 
     // TODO: call type specific combiner here, right now assume int
+    // CacheGroup::
     void combine(unsigned int page, const void* entry, unsigned int begin, unsigned int end)
     {
-        double* pagePtr = (double*)((char*)pageTable[page] + begin);
-        double* entryPtr = (double*)entry;
+        ENTRY_TYPE* pagePtr = (ENTRY_TYPE*)((char*)pageTable[page] + begin);
+        ENTRY_TYPE* entryPtr = (ENTRY_TYPE*)entry;
 
-        for(unsigned int i = 0; i < (end - begin + 1)/sizeof(double); i++)
-            pagePtr[i] += entryPtr[i];
+        for(unsigned int i = 0; i < (end - begin + 1)/sizeof(ENTRY_TYPE); i++)
+            entryOpsObject->accumulate(pagePtr[i], entryPtr[i]);
     }
 
     // TODO: call type specific initializer here
     // begin, end are byte offsets
+    // CacheGroup::
+    //
+    // Rename this function.  zero actually means identity, e.g. if
+    // accumulate is SUM, then identity is 0; if product, identity is
+    // 1.
     void zero(unsigned int page, unsigned int begin, unsigned int end)
     {
         // @@ assert ((end-begin +1)%sizeof(double) == 0)
-        double* pagePtr = (double*)((char*)pageTable[page] + begin);
-        for(unsigned int i = 0; i < (end - begin + 1)/sizeof(double); i++)
-            pagePtr[i] = 0.0;
+        ENTRY_TYPE* pagePtr = (ENTRY_TYPE*)((char*)pageTable[page] + begin);
+        for(unsigned int i = 0; i < (end - begin + 1)/sizeof(ENTRY_TYPE); i++)
+            pagePtr[i] = entryOpsObject->getIdentity();
     }
 
     // Returns 1 if any page is locked, 0 if no page is locked.
@@ -532,10 +643,11 @@ public:
 
         nPages = nPages_;
         bytesPerPage = bytesPerPage_;
-        pageArray = CProxy_PageArray(pageArrayID);
+        pageArray = CProxy_PageArray<ENTRY_TYPE, ENTRY_OPS_CLASS>(pageArrayID);
         bytes = 0;
         outOfBufferInPrefetch = 0;
         max_bytes = max_bytes_;
+        entryOpsObject = new ENTRY_OPS_CLASS();
 
         // initialize the page table
         pageTable = new page_ptr_t[nPages];
@@ -570,6 +682,12 @@ public:
         delete[] pageLock; pageLock = 0;
         delete[] writes; writes = 0;
         delete[] pageQueue; pageQueue = 0;
+    }
+
+    /* To change the accumulate function */
+    inline void changeEntryOpsObject(ENTRY_OPS_CLASS *e) {
+        entryOpsObject = e;
+        pageArray.changeEntryOpsObject(e);
     }
 
     // CacheGroup::
@@ -717,7 +835,7 @@ public:
     {
         if(single)
         {
-            CProxy_CacheGroup self = thisgroup;
+            CProxy_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> self = thisgroup;
             /*ask all the caches to send their updates to the page array, but we don't need to empty the caches on the other PEs*/
             SingleSync();
             EmptyCache();
@@ -775,7 +893,7 @@ public:
         numberLocalWorkerThreads++;
         // @@ how to ensure that enroll is called only once?
 
-        CProxy_CacheGroup self = thisgroup;
+        CProxy_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> self = thisgroup;
         //ckout << "[" << CkMyPe() << "] sending sync ack to PE 0" << endl;
         self[0].enrollAck();
         //ckout << "[" << CkMyPe() << "] suspening thread in Sync() " << endl;
@@ -797,7 +915,7 @@ public:
             ckout << "[" << CkMyPe() << "]" << "Enroll operation is almost done" << endl;
             syncAckCount = 0;
             enrollDoneq = 1;
-            CProxy_CacheGroup self = thisgroup;
+            CProxy_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> self = thisgroup;
             // What if fewer worker threads than pe's ?  Handled in
             // enrollDone.
             for(unsigned int i = 0; i < CmiNumPes(); i++){
@@ -884,7 +1002,7 @@ public:
         // a reduction over a group
         if(CkMyPe() != 0)
         {
-            CProxy_CacheGroup self = thisgroup;
+            CProxy_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> self = thisgroup;
             //ckout << "[" << CkMyPe() << "] sending sync ack to PE 0" << endl;
             self[0].SyncAck();
             //ckout << "[" << CkMyPe() << "] suspening thread in Sync() " << endl;
@@ -923,7 +1041,7 @@ public:
     }
 
     inline unsigned int getNumEntries() { return nEntries; }
-    inline CProxy_PageArray getArray() { return pageArray; }
+    inline CProxy_PageArray<ENTRY_TYPE, ENTRY_OPS_CLASS> getArray() { return pageArray; }
 
     // TODO: Can this SyncAck and other simple Acks be made efficient?
     inline void SyncAck()
@@ -1074,13 +1192,16 @@ public:
 //
 // The size of the page in bytes is not stored, its assumed
 // to be explicitly given with each call.
-class PageArray : public CBase_PageArray
+template<class ENTRY_TYPE, class ENTRY_OPS_CLASS> 
+class PageArray : public ArrayElement1D
 {
 protected:
     page_ptr_t page;                // the page data
     unsigned int pageSize;          // the size of the page
     unsigned char accumInit;        // flag to indicate whether the page has been initialized for
                                     // accumulate mode
+    ENTRY_OPS_CLASS *entryOpsObject;
+
     unsigned int pageNo() { return thisIndex; }
 
     inline void allocatePage(unsigned int bytesPerPage)
@@ -1100,34 +1221,41 @@ protected:
     }
 
     // TODO: do type specific combining, right now assume int
+    // PageArray::
     inline void combine(const char* buffer, unsigned int begin, unsigned int end)
     {
-        const double* buf = (double*)buffer;
-        double* pagePtr = (double*)((char*)page + begin);
+        const ENTRY_TYPE* buf = (ENTRY_TYPE*)buffer;
+        ENTRY_TYPE* pagePtr = (ENTRY_TYPE*)((char*)page + begin);
 
-        for(unsigned int i = 0; i < (end - begin + 1)/sizeof(double); i++)
-            pagePtr[i] += buf[i];
+        for(unsigned int i = 0; i < (end - begin + 1)/sizeof(ENTRY_TYPE); i++)
+            entryOpsObject->accumulate(pagePtr[i], buf[i]);
     }
 
     // TODO: to type specific initialization, right now assume int
+    // PageArray::
     inline void zero()
     {
-        double* pagePtr = (double*)page;
+        ENTRY_TYPE* pagePtr = (ENTRY_TYPE*)page;
 
-        for(unsigned int i = 0; i < pageSize/sizeof(double); i++)
-            pagePtr[i] = 0.0;
+        for(unsigned int i = 0; i < pageSize/sizeof(ENTRY_TYPE); i++)
+            pagePtr[i] = entryOpsObject->getIdentity();
     }
 
 public:
-    inline PageArray() : page(NULL), pageSize(0), accumInit(0) {}
+    inline PageArray() : page(NULL), pageSize(0), accumInit(0) { entryOpsObject= new ENTRY_OPS_CLASS();}
     inline PageArray(CkMigrateMessage* m) { delete m; }
     inline ~PageArray()
     {
         if(page) free(page);
     }
 
+    /* To change the accumulate function */
+    inline void changeEntryOpsObject(ENTRY_OPS_CLASS *e) {
+        entryOpsObject = e;
+    }
+
     // pe = to which to send page
-    inline void GetPage(CProxy_CacheGroup cache, int pe, unsigned int bytesPerPage)
+    inline void GetPage(CProxy_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> cache, int pe, unsigned int bytesPerPage)
     {
         if(page == NULL)
             cache[pe].ReceivePage(pageNo(), (char*)NULL, 1, 0); // send empty page
@@ -1135,7 +1263,7 @@ public:
             cache[pe].ReceivePage(pageNo(), (char*)page, 0, bytesPerPage);
     }
 
-    inline void ReceiveRLEPage(char* buffer, unsigned int size, unsigned int bytesPerPage, CProxy_CacheGroup cache, int pe, int pageState)
+    inline void ReceiveRLEPage(char* buffer, unsigned int size, unsigned int bytesPerPage, CProxy_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> cache, int pe, int pageState)
     {
         allocatePage(bytesPerPage);
 
@@ -1203,5 +1331,8 @@ public:
     }
 };
 
+#define CK_TEMPLATES_ONLY
 #include "msa.def.h"
+#undef CK_TEMPLATES_ONLY
+
 #endif

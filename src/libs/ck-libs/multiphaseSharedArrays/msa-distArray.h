@@ -9,13 +9,13 @@
    ENTRIES_PER_PAGE data items per "page".  It is implemented as a
    Chare Array of pages, and a Group representing the local cache.
    The maximum size of the local cache in bytes is maxBytes. */
-template<class ENTRY, unsigned int ENTRIES_PER_PAGE=MSA_DEFAULT_ENTRIES_PER_PAGE>
+template<class ENTRY, class ENTRY_OPS_CLASS, unsigned int ENTRIES_PER_PAGE=MSA_DEFAULT_ENTRIES_PER_PAGE>
 class MSA1D
 {
 protected:
     unsigned int nEntries;
-    CacheGroup* cache;
-    CProxy_CacheGroup cg;
+    CacheGroup<ENTRY, ENTRY_OPS_CLASS>* cache;
+    CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS> cg;
 
     inline const ENTRY* readablePage(unsigned int page)
     {
@@ -45,9 +45,9 @@ public:
         // first create an array and the cache for the pages
         unsigned int nPages = (nEntries + ENTRIES_PER_PAGE - 1)/ENTRIES_PER_PAGE;
         unsigned int bytesPerPage = ENTRIES_PER_PAGE * sizeof(ENTRY);
-        CProxy_PageArray pageArray = CProxy_PageArray::ckNew(nPages);
-        cg = CProxy_CacheGroup::ckNew(nPages, bytesPerPage, pageArray, maxBytes, nEntries, num_wrkrs);
-        pageArray.ckSetReductionClient(new CkCallback(CkIndex_CacheGroup::SyncDone(), cg));
+        CProxy_PageArray<ENTRY, ENTRY_OPS_CLASS> pageArray = CProxy_PageArray<ENTRY, ENTRY_OPS_CLASS>::ckNew(nPages);
+        cg = CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS>::ckNew(nPages, bytesPerPage, pageArray, maxBytes, nEntries, num_wrkrs);
+        pageArray.ckSetReductionClient(new CkCallback(CkIndex_CacheGroup<ENTRY, ENTRY_OPS_CLASS>::SyncDone(), cg));
         cache = cg.ckLocalBranch();
     }
 
@@ -75,7 +75,7 @@ public:
         //cache->FreeMem();
     }
 
-    inline MSA1D(CProxy_CacheGroup cg_) : cg(cg_)
+    inline MSA1D(CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS> cg_) : cg(cg_)
     {
         cache = cg.ckLocalBranch();
         nEntries = cache->getNumEntries();
@@ -118,7 +118,7 @@ public:
 
     inline void sync(int single=0) { cache->SyncReq(single); }
 
-    inline CProxy_CacheGroup getCacheGroup() { return cg; }
+    inline CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS> getCacheGroup() { return cg; }
 
     inline void accumulate(unsigned int idx, const ENTRY& ent)
     {
@@ -174,8 +174,8 @@ public:
 
 // define a 2d distributed array based on the 1D array, support row major and column
 // major arrangement of data
-template<class ENTRY, unsigned int ENTRIES_PER_PAGE=MSA_DEFAULT_ENTRIES_PER_PAGE, int ROW_MAJOR=1>
-class MSA2D : public MSA1D<ENTRY, ENTRIES_PER_PAGE>
+template<class ENTRY, class ENTRY_OPS_CLASS, unsigned int ENTRIES_PER_PAGE=MSA_DEFAULT_ENTRIES_PER_PAGE, int ROW_MAJOR=1>
+class MSA2D : public MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>
 {
 protected:
     unsigned int rows, cols;
@@ -195,30 +195,30 @@ protected:
 
 public:
     // @@ Needed for Jade
-    inline MSA2D() : MSA1D<ENTRY, ENTRIES_PER_PAGE>() {}
+    inline MSA2D() : MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>() {}
     virtual void pup(PUP::er &p){ ckout << "PUP of MSA2D not implemented yet."; CkExit(); };
 
-    inline MSA2D(unsigned int rows_, unsigned int cols_, unsigned int numwrkrs, unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES) : MSA1D<ENTRY, ENTRIES_PER_PAGE>(rows_*cols_, numwrkrs, maxBytes)
+    inline MSA2D(unsigned int rows_, unsigned int cols_, unsigned int numwrkrs, unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES) : MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>(rows_*cols_, numwrkrs, maxBytes)
     {
         rows = rows_; cols = cols_;
     }
 
-    inline MSA2D(unsigned int rows_, unsigned int cols_, CProxy_CacheGroup cg_) : rows(rows_), cols(cols_), MSA1D<ENTRY, ENTRIES_PER_PAGE>(cg_) {}
+    inline MSA2D(unsigned int rows_, unsigned int cols_, CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS> cg_) : rows(rows_), cols(cols_), MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>(cg_) {}
 
     inline const ENTRY& get(unsigned int row, unsigned int col)
     {
-        return MSA1D<ENTRY, ENTRIES_PER_PAGE>::get(getIndex(row, col));
+        return MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::get(getIndex(row, col));
     }
 
     inline const ENTRY& get2(unsigned int row, unsigned int col)
     {
-        return MSA1D<ENTRY, ENTRIES_PER_PAGE>::get2(getIndex(row, col));
+        return MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::get2(getIndex(row, col));
     }
 
     // MSA2D::
     inline ENTRY& set(unsigned int row, unsigned int col)
     {
-        return MSA1D<ENTRY, ENTRIES_PER_PAGE>::set(getIndex(row, col));
+        return MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::set(getIndex(row, col));
     }
 
     inline void Prefetch(unsigned int start, unsigned int end)
@@ -234,7 +234,7 @@ public:
         unsigned int index1 = (ROW_MAJOR) ? getIndex(start, 0) : getIndex(0, start);
         unsigned int index2 = (ROW_MAJOR) ? getIndex(end, cols-1) : getIndex(rows-1, end);
 
-        MSA1D<ENTRY, ENTRIES_PER_PAGE>::Prefetch(index1, index2);
+        MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::Prefetch(index1, index2);
     }
 
     inline void UnlockPages(unsigned int start, unsigned int end)
@@ -249,7 +249,7 @@ public:
         unsigned int index1 = (ROW_MAJOR) ? getIndex(start, 0) : getIndex(0, start);
         unsigned int index2 = (ROW_MAJOR) ? getIndex(end, cols-1) : getIndex(rows-1, end);
 
-        MSA1D<ENTRY, ENTRIES_PER_PAGE>::Unlock(index1, index2);
+        MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::Unlock(index1, index2);
     }
 };
 

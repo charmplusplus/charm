@@ -4,9 +4,9 @@
 module msa
 {
     // this is the per processor cache of pages.
-    group CacheGroup
+    template<class ENTRY_TYPE, class ENTRY_OPS_CLASS> group CacheGroup
     {
-        entry void CacheGroup(unsigned int nPages, unsigned int bytesPerPage, CkArrayID pageArrayID,
+        entry CacheGroup(unsigned int nPages, unsigned int bytesPerPage, CkArrayID pageArrayID,
                               unsigned int max_bytes, unsigned int nEntries, unsigned int numberOfWorkerThreads);
         entry void AckRLEPage(unsigned int numReceived);
         entry void ReceivePage(unsigned int page, char pageData[bpp], int isEmpty, int bpp);
@@ -20,12 +20,15 @@ module msa
 
     // this array is the storage for the pages. It in effect
     // virtualizes the storage for the pages
-    array[1D] PageArray
+    template<class ENTRY_TYPE, class ENTRY_OPS_CLASS> array[1D] PageArray
     {
-        entry void PageArray();
-        entry void GetPage(CProxy_CacheGroup cache, int pe, unsigned int bytesPerPage);
-        entry void ReceiveRLEPage(char buffer[size], unsigned int size, unsigned int bytesPerPage, CProxy_CacheGroup cache, int pe, int pageState);
+        entry PageArray(void);
+        entry void GetPage(CProxy_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> cache, int pe, unsigned int bytesPerPage);
+        entry void ReceiveRLEPage(char buffer[size], unsigned int size, unsigned int bytesPerPage, CProxy_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS> cache, int pe, int pageState);
         entry void Sync();
         entry void emit(int offset);
     };
+
+    group CacheGroup<double, DefaultEntryDbl_ >;
+    array [1D] PageArray<double, DefaultEntryDbl_ >;
 };
