@@ -33,6 +33,63 @@ protected:
 private:
   void initLB(const CkLBOptions &);
 public:
+  struct ProcStats {  // per processor data
+    double total_walltime;
+    double total_cputime;
+    double idletime;
+    double bg_walltime;
+    double bg_cputime;
+    int pe_speed;
+    double utilization;
+    CmiBool available;
+    int   n_objs;
+    ProcStats(): total_walltime(0.0), total_cputime(0.0), idletime(0.0),
+	   	 bg_walltime(0.0), bg_cputime(0.0), pe_speed(1),
+		 utilization(1.0), available(CmiTrue), n_objs(0)  {}
+    inline void pup(PUP::er &p) {
+      p|total_walltime;  p|total_cputime; p|idletime;
+      p|bg_walltime; p|bg_cputime; p|pe_speed;
+      p|utilization; p|available; p|n_objs;
+    }
+  };
+
+  struct LDStats {  // Passed to Strategy
+    ProcStats  *procs;
+    int count; 
+    
+    int   n_objs;
+    int   n_migrateobjs;
+    LDObjData* objData;
+    int   n_comm;
+    LDCommData* commData;
+    int  *from_proc, *to_proc;
+
+    int *objHash; 
+    int  hashSize;
+
+    LDStats();
+    void assign(int oid, int pe) { CmiAssert(procs[pe].available); to_proc[oid] = pe; }
+      // build hash table
+    void makeCommHash();
+    void deleteCommHash();
+    int getHash(const LDObjKey &);
+    int getHash(const LDObjid &oid, const LDOMid &mid);
+    int getSendHash(LDCommData &cData);
+    int getRecvHash(LDCommData &cData);
+    void clear() {
+      n_objs = n_comm = 0;
+      delete [] objData;
+      delete [] commData;
+      delete [] from_proc;
+      delete [] to_proc;
+      deleteCommHash();
+    }
+    void print();
+    double computeAverageLoad();
+    void pup(PUP::er &p);
+    int useMem();
+  };
+
   BaseLB(const CkLBOptions &opt)  { initLB(opt); }
   BaseLB(CkMigrateMessage *m):CBase_BaseLB(m) {}
   virtual ~BaseLB();

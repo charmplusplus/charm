@@ -10,8 +10,9 @@
 */
 /*@{*/
 
-#include <charm++.h>
-#include <BaseLB.h>
+#include "charm++.h"
+#include "BaseLB.h"
+#include "LBSimulation.h"
 
 #if CMK_LBDB_ON
 
@@ -63,6 +64,277 @@ void BaseLB::unregister() {}
 void BaseLB::pup(PUP::er &p) {}
 void BaseLB::flushStates() {}
 #endif
+
+static inline int i_abs(int c) { return c>0?c:-c; }
+
+// assume integer is 32 bits
+inline static int ObjKey(const LDObjid &oid, const int hashSize) {
+  // make sure all positive
+  return (((i_abs(oid.id[2]) & 0x7F)<<24)
+	 |((i_abs(oid.id[1]) & 0xFF)<<16)
+	 |i_abs(oid.id[0])) % hashSize;
+}
+
+BaseLB::LDStats::LDStats():  
+	n_objs(0), n_migrateobjs(0), objData(NULL), 
+        n_comm(0), commData(NULL), from_proc(NULL), to_proc(NULL), 
+        objHash(NULL) { 
+  procs = new ProcStats[CkNumPes()]; 
+}
+
+const static unsigned int doublingPrimes[] = {
+3,
+7,
+17,
+37,
+73,
+157,
+307,
+617,
+1217,
+2417,
+4817,
+9677,
+20117,
+40177,
+80177,
+160117,
+320107,
+640007,
+1280107,
+2560171,
+5120117,
+10000079,
+20000077,
+40000217,
+80000111,
+160000177,
+320000171,
+640000171,
+1280000017,
+2560000217u,
+4200000071u
+/* extra primes larger than an unsigned 32-bit integer:
+51200000077,
+100000000171,
+200000000171,
+400000000171,
+800000000117,
+1600000000021,
+3200000000051,
+6400000000081,
+12800000000003,
+25600000000021,
+51200000000077,
+100000000000067,
+200000000000027,
+400000000000063,
+800000000000017,
+1600000000000007,
+3200000000000059,
+6400000000000007,
+12800000000000009,
+25600000000000003,
+51200000000000023,
+100000000000000003,
+200000000000000003,
+400000000000000013,
+800000000000000119,
+1600000000000000031,
+3200000000000000059 //This is a 62-bit number
+*/
+};
+
+//This routine returns an arbitrary prime larger than x
+static unsigned int primeLargerThan(unsigned int x)
+{
+	int i=0;
+	while (doublingPrimes[i]<=x) i++;
+	return doublingPrimes[i];
+}
+
+void BaseLB::LDStats::makeCommHash() {
+  // hash table is already build
+  if (objHash) return;
+   
+  int i;
+  hashSize = n_objs*2;
+  hashSize = primeLargerThan(hashSize);
+  objHash = new int[hashSize];
+  for(i=0;i<hashSize;i++)
+        objHash[i] = -1;
+   
+  for(i=0;i<n_objs;i++){
+        const LDObjid &oid = objData[i].objID();
+        int hash = ObjKey(oid, hashSize);
+	CmiAssert(hash != -1);
+        while(objHash[hash] != -1)
+            hash = (hash+1)%hashSize;
+        objHash[hash] = i;
+  }
+}
+
+void BaseLB::LDStats::deleteCommHash() {
+  if (objHash) delete [] objHash;
+  objHash = NULL;
+}
+
+int BaseLB::LDStats::getHash(const LDObjid &oid, const LDOMid &mid)
+{
+#if CMK_LBDB_ON
+    CmiAssert(hashSize > 0);
+    int hash = ObjKey(oid, hashSize);
+
+    for(int id=0;id<hashSize;id++){
+        int index = (id+hash)%hashSize;
+	if (index == -1 || objHash[index] == -1) return -1;
+        if (LDObjIDEqual(objData[objHash[index]].objID(), oid) &&
+            LDOMidEqual(objData[objHash[index]].omID(), mid))
+            return objHash[index];
+    }
+    //  CkPrintf("not found \n");
+#endif
+    return -1;
+}
+
+int BaseLB::LDStats::getHash(const LDObjKey &objKey)
+{
+  const LDObjid &oid = objKey.objID();
+  const LDOMid  &mid = objKey.omID();
+  return getHash(oid, mid);
+}
+
+int BaseLB::LDStats::getSendHash(LDCommData &cData)
+{
+  if (cData.sendHash == -1) {
+    cData.sendHash = getHash(cData.sender);
+  }
+  return cData.sendHash;
+}
+
+int BaseLB::LDStats::getRecvHash(LDCommData &cData)
+{
+  if (cData.recvHash == -1) {
+    cData.recvHash =  getHash(cData.receiver.get_destObj());
+  }
+  return cData.recvHash;
+}
+
+void BaseLB::LDStats::print()
+{
+#if CMK_LBDB_ON
+  int i;
+  CkPrintf("------------- Processor Data: %d -------------\n", count);
+  for(int pe=0; pe < count; pe++) {
+    struct ProcStats &proc = procs[pe];
+
+    CkPrintf(
+      "Proc %d Sp %d Total(wall,cpu) = (%f %f) Idle = %f Bg = (%f %f) nObjs = %d\n",
+      pe,proc.pe_speed,proc.total_walltime,proc.total_cputime,
+      proc.idletime,proc.bg_walltime,proc.bg_cputime,proc.n_objs);
+  }
+
+  CkPrintf("------------- Object Data: %d objects -------------\n", n_objs);
+  for(i=0; i < n_objs; i++) {
+      LDObjData &odata = objData[i];
+      CkPrintf("Object %d\n",i);
+      CkPrintf("     id = %d %d %d %d\n",odata.objID().id[0],odata.objID().id[1
+], odata.objID().id[2], odata.objID().id[3]);
+      CkPrintf("  OM id = %d\t",odata.omID().id);
+      CkPrintf("   Mig. = %d\n",odata.migratable);
+      CkPrintf("    CPU = %f\t",odata.cpuTime);
+      CkPrintf("   Wall = %f\n",odata.wallTime);
+  }
+
+  CkPrintf("------------- Comm Data: %d records -------------\n", n_comm);
+  LDCommData *cdata = commData;
+  for(i=0; i < n_comm; i++) {
+      CkPrintf("Link %d\n",i);
+
+      LDObjid &sid = cdata[i].sender.objID();
+      if (cdata[i].from_proc())
+	CkPrintf("    sender PE = %d\t",cdata[i].src_proc);
+      else
+	CkPrintf("    sender id = %d:[%d %d %d %d]\t",
+		 cdata[i].sender.omID().id,sid.id[0], sid.id[1], sid.id[2], sid.id[3]);
+
+      LDObjid &rid = cdata[i].receiver.get_destObj().objID();
+      if (cdata[i].recv_type() == LD_PROC_MSG)
+	CkPrintf("  receiver PE = %d\n",cdata[i].receiver.proc());
+      else	
+	CkPrintf("  receiver id = %d:[%d %d %d %d]\n",
+		 cdata[i].receiver.get_destObj().omID().id,rid.id[0],rid.id[1],rid.id[2],rid.id[3]);
+      
+      CkPrintf("     messages = %d\t",cdata[i].messages);
+      CkPrintf("        bytes = %d\n",cdata[i].bytes);
+  }
+  CkPrintf("------------- Object to PE mapping -------------\n");
+  for (i=0; i<n_objs; i++) CkPrintf(" %d", from_proc[i]);
+  CkPrintf("\n");
+#endif
+}
+
+double BaseLB::LDStats::computeAverageLoad()
+{
+  int i, numAvail=0;
+  double total = 0;
+  for (i=0; i<n_objs; i++) total += objData[i].wallTime;
+                                                                                
+  for (i=0; i<count; i++)
+    if (procs[i].available == CmiTrue) {
+        total += procs[i].bg_walltime;
+	numAvail++;
+    }
+                                                                                
+  double averageLoad = total/numAvail;
+  return averageLoad;
+}
+
+void BaseLB::LDStats::pup(PUP::er &p)
+{
+  int i;
+  p(count);  
+  p(n_objs);
+  p(n_migrateobjs);
+  p(n_comm);
+  if (p.isUnpacking()) {
+    // user can specify simulated processors other than the real # of procs.
+    int maxpe = count>LBSimulation::simProcs?count:LBSimulation::simProcs;
+    procs = new ProcStats[maxpe];
+    objData = new LDObjData[n_objs];
+    commData = new LDCommData[n_comm];
+    from_proc = new int[n_objs];
+    to_proc = new int[n_objs];
+    objHash = NULL;
+  }
+  // ignore the background load when unpacking if the user change the # of procs
+  // otherwise load everything
+  if (p.isUnpacking() && LBSimulation::procsChanged) {
+    ProcStats dummy;
+    for (i=0; i<count; i++) p|dummy; 
+  }
+  else
+    for (i=0; i<count; i++) p|procs[i];
+  for (i=0; i<n_objs; i++) p|objData[i]; 
+  p(from_proc, n_objs);
+  p(to_proc, n_objs);
+  // reset to_proc when unpacking
+  if (p.isUnpacking())
+    for (i=0; i<n_objs; i++) to_proc[i] = from_proc[i];
+  for (i=0; i<n_comm; i++) p|commData[i];
+  if (p.isUnpacking())
+    count = LBSimulation::simProcs;
+  if (p.isUnpacking()) {
+    objHash = NULL;
+  }
+}
+
+int BaseLB::LDStats::useMem() { 
+  // calculate the memory usage of this LB (superclass).
+  return sizeof(LDStats) + sizeof(ProcStats)*count + 
+	 (sizeof(LDObjData) + 2*sizeof(int)) * n_objs +
+ 	 sizeof(LDCommData) * n_comm;
+}
 
 #include "BaseLB.def.h"
 
