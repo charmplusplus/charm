@@ -124,6 +124,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       tempo.decl.h waitqd.decl.h \
       CommLB.decl.h Comm1LB.decl.h  \
       charisma.decl.h \
+      TraceSummary.decl.h	\
       BlueGene.decl.h blue.h
 
 # The .c files are there to be #included by clients whole
@@ -438,6 +439,9 @@ NullLB.decl.h NullLB.def.h : NullLB.ci charmxi
 BaseLB.decl.h BaseLB.def.h : BaseLB.ci charmxi
 	$(CHARMC) BaseLB.ci
 
+TraceSummary.decl.h TraceSummary.def.h: trace-summary.ci charmxi
+	$(CHARMC) trace-summary.ci
+
 init.o: init.C $(CKHEADERS)
 	$(CHARMC) -o init.o init.C
 
@@ -592,7 +596,7 @@ trace-common.o: trace-common.C $(CKHEADERS)
 trace-projections.o:trace-projections.C trace-projections.h trace-common.h $(CKHEADERS)
 	$(CHARMC) -o trace-projections.o trace-projections.C
 
-trace-summary.o:trace-summary.C trace-summary.h trace-common.h $(CKHEADERS)
+trace-summary.o:trace-summary.C trace-summary.h trace-common.h trace-summaryBOC.h $(CKHEADERS)
 	$(CHARMC) -o trace-summary.o trace-summary.C
 
 trace-counter.o:trace-counter.C trace-counter.h trace-common.h $(CKHEADERS)

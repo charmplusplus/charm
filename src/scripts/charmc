@@ -995,6 +995,12 @@ DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
 for module in $MODULES; do
     echo "extern void _register$module(void);" >> $modInitSrc
 done
+for trace in $TRACEMODE; do
+    if test $trace = "summary"
+    then
+      echo "  extern void _registerTraceSummary();" >> $modInitSrc
+    fi
+done
 if test -n "$BALANCER"
 then
     echo "extern void LBSetDefaultCreate(void (*fn)(void));" >> $modInitSrc
@@ -1004,6 +1010,12 @@ echo "void _registerExternalModules(char **argv) {" >> $modInitSrc
 for module in $MODULES; do
     [ -n "$VERBOSE" ] && echo "Adding registration for module $module"
     echo "  _register$module();" >> $modInitSrc
+done
+for trace in $TRACEMODE; do
+    if test $trace = "summary"
+    then
+      echo "  _registerTraceSummary();" >> $modInitSrc
+    fi
 done
 if test -n "$BALANCER"
 then
