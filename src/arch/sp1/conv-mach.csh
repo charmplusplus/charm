@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.2  1995-07-17 17:47:00  knauff
+# Revision 2.3  1995-07-19 20:56:47  knauff
+# Changed CMK_CXX to mpCC
+#
+# Revision 2.2  1995/07/17  17:47:00  knauff
 # *** empty log message ***
 #
 # Revision 2.1  1995/07/10  22:22:51  knauff
@@ -27,7 +30,7 @@ set CMK_CPP			= '/usr/lib/cpp -P -D_NO_PROTO'
 
 set CMK_LDRO			= 'ld -r -o '
 set CMK_CC			= 'mpcc'
-set CMK_CXX			= 'g++ -I/usr/lpp/poe/include'
+set CMK_CXX			= 'mpCC'
 set CMK_CF77			= 'mpxlf'
 set CMK_LD			= 'mpcc -us'
 set CMK_LDXX			= 'mpCC -us'
