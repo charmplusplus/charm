@@ -28,38 +28,6 @@ public:
     inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
 };
 
-
-
-/// MPI_Bcast, but using a T with a pup routine
-template <class T>
-inline void MPI_Bcast_pup(T &t, int root,MPI_Comm comm) {
-	int len=PUP::size(t); 
-	char *buf=new char[len];
-	PUP::toMemBuf(t,buf,len);
-	MPI_Bcast(buf,len,MPI_BYTE, root,comm);
-	PUP::fromMemBuf(t,buf,len);
-	delete [] buf;
-};
-
-template <class T>
-inline void MPI_Bcast_var_pup(T &t, int root,MPI_Comm comm) {
-	int myRank;
-	MPI_Comm_rank(comm,&myRank);
-	int len;
-	if(myRank == root){
-		len=PUP::size(t); 
-	}
-	MPI_Bcast(&len,1,MPI_INT,root,comm);
-	char *buf=new char[len];
-	if(myRank == root){
-		PUP::toMemBuf(t,buf,len);
-	}	
-	MPI_Bcast(buf,len,MPI_BYTE, root,comm);
-	PUP::fromMemBuf(t,buf,len);
-	delete [] buf;
-};
-
-
 template <class T>
 class ElemList{
 public:

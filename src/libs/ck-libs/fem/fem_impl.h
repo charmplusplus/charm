@@ -14,6 +14,8 @@ Orion Sky Lawlor, olawlor@acm.org, 9/28/00
 
 #include "charm-api.h"
 #include "ckvector3d.h"
+#include "pup_mpi.h"
+#define checkMPI pup_checkMPI
 #include "tcharm.h"
 #include "fem.h"
 
@@ -446,49 +448,6 @@ void FEM_Mesh_split(FEM_Mesh *mesh,int nchunks,
 
 //Make a new[]'d copy of this (len-entry) array, changing the index as spec'd
 int *CkCopyArray(const int *src,int len,int indexBase);
-
-
-/*******************************************************
-  Communication tools
-*/
-
-#define checkMPI(err) checkMPIerr(err,__FILE__,__LINE__);
-static inline void checkMPIerr(int mpi_err,const char *file,int line) {
-	if (mpi_err!=MPI_SUCCESS) {
-		CkError("MPI Routine returned error %d at %s:%d\n",
-			mpi_err,file,line);
-		CkAbort("MPI Routine returned error code");
-	}
-}
-
-/// Return the number of dt's in the next message from/tag/comm
-static int myMPI_Incoming(MPI_Datatype dt,int from,int tag,MPI_Comm comm) {
-	MPI_Status sts;
-	checkMPI(MPI_Probe(from,tag,comm,&sts));
-	int len; checkMPI(MPI_Get_count(&sts,dt,&len));
-	return len;
-}
-
-/// MPI_Recv, but using a T with a pup routine
-template <class T>
-inline void MPI_Recv_pup(T &t, int from,int tag,MPI_Comm comm) {
-	int len=myMPI_Incoming(MPI_BYTE,from,tag,comm);
-	MPI_Status sts;
-	char *buf=new char[len];
-	checkMPI(MPI_Recv(buf,len,MPI_BYTE, from,tag,comm,&sts));
-	PUP::fromMemBuf(t,buf,len);
-	delete[] buf;
-}
-
-/// MPI_Send, but using a T with a pup routine
-template <class T>
-inline void MPI_Send_pup(T &t, int to,int tag,MPI_Comm comm) {
-	int len=PUP::size(t); char *buf=new char[len];
-	PUP::toMemBuf(t,buf,len);
-	checkMPI(MPI_Send(buf,len,MPI_BYTE, to,tag,comm));
-	delete[] buf;
-}
-
 
 
 /*\@}*/

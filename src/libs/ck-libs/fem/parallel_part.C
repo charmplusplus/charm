@@ -162,7 +162,7 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
 		Broadcast  the user data to all the meshes
 	*/
 	DEBUG(printf("[%d] Length of udata vector in master %d \n",masterRank,m->udata.size()));
-	MPI_Bcast_var_pup(m->udata,masterRank,(MPI_Comm)comm_context);
+	MPI_Bcast_pup(m->udata,masterRank,(MPI_Comm)comm_context);
 	me.m->udata = m->udata;
 	
 	
@@ -172,7 +172,7 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
 	*/
 	struct ghostdata *gdata = gatherGhosts();
 	printf("[%d] number of ghost layers %d \n",masterRank,gdata->numLayers);
-	MPI_Bcast_var_pup(*gdata,masterRank,(MPI_Comm)comm_context);
+	MPI_Bcast_pup(*gdata,masterRank,(MPI_Comm)comm_context);
 
 	/*
 		make ghosts for this mesh
@@ -270,13 +270,13 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 	/*
 		Receive the user data from master
 	*/
-	MPI_Bcast_var_pup(me.m->udata,masterRank,(MPI_Comm)comm_context);
+	MPI_Bcast_pup(me.m->udata,masterRank,(MPI_Comm)comm_context);
 	DEBUG(printf("[%d] Length of udata vector %d \n",myRank,me.m->udata.size()));
 	
 	delete partdata;
 	
 	struct ghostdata *gdata = new ghostdata;
-	MPI_Bcast_var_pup(*gdata,masterRank,(MPI_Comm)comm_context);
+	MPI_Bcast_pup(*gdata,masterRank,(MPI_Comm)comm_context);
 	printf("[%d] number of ghost layers %d \n",myRank,gdata->numLayers);
 	
 	/*

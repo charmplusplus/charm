@@ -24,47 +24,6 @@ void FEM_Abort(const char *caller,const char *sprintf_msg,
 	FEM_Abort(msg);
 }
 
-/*******************************************************
-  Communication tools
-*/
-/*
-#define checkMPI(err) checkMPIerr(err,__FILE__,__LINE__);
-inline void checkMPIerr(int mpi_err,const char *file,int line) {
-	if (mpi_err!=MPI_SUCCESS) {
-		CkError("MPI Routine returned error %d at %s:%d\n",
-			mpi_err,file,line);
-		CkAbort("MPI Routine returned error code");
-	}
-}
-
-/// Return the number of dt's in the next message from/tag/comm
-int myMPI_Incoming(MPI_Datatype dt,int from,int tag,MPI_Comm comm) {
-	MPI_Status sts;
-	checkMPI(MPI_Probe(from,tag,comm,&sts));
-	int len; checkMPI(MPI_Get_count(&sts,dt,&len));
-	return len;
-}
-
-/// MPI_Recv, but using a T with a pup routine
-template <class T>
-inline void MPI_Recv_pup(T &t, int from,int tag,MPI_Comm comm) {
-	int len=myMPI_Incoming(MPI_BYTE,from,tag,comm);
-	MPI_Status sts;
-	char *buf=new char[len];
-	checkMPI(MPI_Recv(buf,len,MPI_BYTE, from,tag,comm,&sts));
-	PUP::fromMemBuf(t,buf,len);
-	delete[] buf;
-}
-
-/// MPI_Send, but using a T with a pup routine
-template <class T>
-inline void MPI_Send_pup(T &t, int to,int tag,MPI_Comm comm) {
-	int len=PUP::size(t); char *buf=new char[len];
-	PUP::toMemBuf(t,buf,len);
-	checkMPI(MPI_Send(buf,len,MPI_BYTE, to,tag,comm));
-	delete[] buf;
-}
-*/
 /******** Startup and initialization *******/
 
 // This is our TCharm global ID:
@@ -1093,7 +1052,7 @@ void FEMchunk::exchangeGhostLists(int elemType,
 	int listStart=0;
 	for (chk=0;chk<e.getGhostRecv().size();chk++) {
 		int src=e.getGhostRecv().getLocalList(chk).getDest();
-		int nRecv=myMPI_Incoming(MPI_INT,src,tag,comm);
+		int nRecv=MPI_Incoming_pup(MPI_INT,src,tag,comm);
 		listTmp.resize(listStart+nRecv);
 		int *list=&listTmp[listStart];
 		MPI_Status sts;
