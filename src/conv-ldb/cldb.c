@@ -228,8 +228,6 @@ void CldSetPEBitVector(const char *newBV)
 
 /* End Bit Vector Stuff */
 
-extern void registerLBTopos();   /* defined in LBTopology.h */
-
 void CldModuleGeneralInit(char **argv)
 {
   CldToken sentinel = (CldToken)CmiAlloc(sizeof(struct CldToken_s));
@@ -255,9 +253,6 @@ void CldModuleGeneralInit(char **argv)
   /* lock to protect token queue for immediate message and smp */
   CpvInitialize(CmiNodeLock, cldLock);
   CpvAccess(cldLock) = CmiCreateLock();
-
-  /* register load balancing virtual topologies */
-  registerLBTopos();
 }
 
 /* function can be called in an immediate handler at node level

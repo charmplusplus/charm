@@ -79,7 +79,6 @@ typedef  void* (*LBtopoFn)();
 #ifdef __cplusplus
 extern "C" {
 #endif
-void registerLBTopos();
 LBtopoFn LBTopoLookup(char *);
 int getTopoMaxNeighbors(void *topo);
 void getTopoNeighbors(void *topo, int myid, int* na, int *n);

@@ -313,26 +313,39 @@ public:
   LBtopoFn fn;
   LBTopoMap(char *s, LBtopoFn f): name(s), fn(f) {}
 };
-static CkVec<LBTopoMap *>  lbTopoMap;
 
-
-extern "C"
-void registerLBTopos()
-{
-  if (lbTopoMap.length()==0) {
-  lbTopoMap.push_back(new LBTopoMap("ring", createLBTopo_ring));
-  lbTopoMap.push_back(new LBTopoMap("torus2d", createLBTopo_torus2d));
-  lbTopoMap.push_back(new LBTopoMap("torus3d", createLBTopo_torus3d));
-  lbTopoMap.push_back(new LBTopoMap("torus_nd_1", createLBTopo_torus_nd_1));
-  lbTopoMap.push_back(new LBTopoMap("torus_nd_2", createLBTopo_torus_nd_2));
-  lbTopoMap.push_back(new LBTopoMap("torus_nd_3", createLBTopo_torus_nd_3));
-  lbTopoMap.push_back(new LBTopoMap("torus_nd_4", createLBTopo_torus_nd_4));
-  lbTopoMap.push_back(new LBTopoMap("torus_nd_5", createLBTopo_torus_nd_5));
-  lbTopoMap.push_back(new LBTopoMap("torus_nd_6", createLBTopo_torus_nd_6));
-  lbTopoMap.push_back(new LBTopoMap("torus_nd_7", createLBTopo_torus_nd_7));
-  lbTopoMap.push_back(new LBTopoMap("graph", createLBTopo_graph));
+class LBTopoVec {
+  CkVec<LBTopoMap *> lbTopos;
+public:
+  LBTopoVec() {
+    // register all topos
+    lbTopos.push_back(new LBTopoMap("ring", createLBTopo_ring));
+    lbTopos.push_back(new LBTopoMap("torus2d", createLBTopo_torus2d));
+    lbTopos.push_back(new LBTopoMap("torus3d", createLBTopo_torus3d));
+    lbTopos.push_back(new LBTopoMap("torus_nd_1", createLBTopo_torus_nd_1));
+    lbTopos.push_back(new LBTopoMap("torus_nd_2", createLBTopo_torus_nd_2));
+    lbTopos.push_back(new LBTopoMap("torus_nd_3", createLBTopo_torus_nd_3));
+    lbTopos.push_back(new LBTopoMap("torus_nd_4", createLBTopo_torus_nd_4));
+    lbTopos.push_back(new LBTopoMap("torus_nd_5", createLBTopo_torus_nd_5));
+    lbTopos.push_back(new LBTopoMap("torus_nd_6", createLBTopo_torus_nd_6));
+    lbTopos.push_back(new LBTopoMap("torus_nd_7", createLBTopo_torus_nd_7));
+    lbTopos.push_back(new LBTopoMap("graph", createLBTopo_graph));
   }
-}
+  ~LBTopoVec() {
+    for (int i=0; i<lbTopos.length(); i++)
+      delete lbTopos[i];
+  }
+  void push_back(LBTopoMap *map) { lbTopos.push_back(map); }
+  int length() { return lbTopos.length(); }
+  LBTopoMap * operator[](size_t n) { return lbTopos[n]; }
+  void print() {
+    for (int i=0; i<lbTopos.length(); i++) {
+      CmiPrintf("  %s\n", lbTopos[i]->name);
+    }
+  }
+};
+
+static LBTopoVec lbTopoMap;
 
 extern "C"
 LBtopoFn LBTopoLookup(char *name)
@@ -356,8 +369,6 @@ extern "C" int getTopoMaxNeighbors(void *topo)
 
 extern "C" void printoutTopo()
 {
-  for (int i=0; i<lbTopoMap.length(); i++) {
-    CmiPrintf("  %s\n", lbTopoMap[i]->name);
-  }
+  lbTopoMap.print();
 }
 
