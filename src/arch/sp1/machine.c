@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-07-10 22:12:39  knauff
+ * Revision 2.1  1995-07-17 17:46:05  knauff
+ * Fixed problem with machine.c
+ *
+ * Revision 2.0  1995/07/10  22:12:39  knauff
  * Initial revision
  *
  ***************************************************************************/
@@ -68,14 +71,14 @@ CmiUTimerInit()
 
 double CmiTimer()
 {
-    unsigned int tmsec;
+    double tmsec;
     double t;
     struct timestruc_t time;
 
     gettimer(TIMEOFDAY,&time);
     t=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
-    tmsec = (unsigned int) (1.0e3*(t-itime));
-    return (double) tmsec;
+    tmsec = (double) (1.0e3*(t-itime));
+    return tmsec / 1000.0;
 }
 
 
@@ -152,6 +155,25 @@ CmiAllAsyncMsgsSent()
      }
      return 1;
 }
+
+int CmiAsyncMsgSent(CmiCommHandle c) {
+     
+     MSG_LIST *msg_tmp = sent_msgs;
+
+     while ((msg_tmp) && ((CmiCommHandle)msg_tmp->msgid != c))
+	  msg_tmp = msg_tmp->next;
+     
+     if ((msg_tmp) && (mpc_status(msg_tmp->msgid)<0))
+	  return 0;
+     else
+	  return 1;
+
+}
+
+void CmiReleaseCommHandle(CmiCommHandle c)
+{
+}
+
 
 CmiReleaseSentMessages()
 {
@@ -239,6 +261,10 @@ McSyncReceive(size, buffer)
      mpc_brecv(buffer, size, &src, &type, &nbytes);
 }
 
+void CmiGrabBuffer(pbuf)
+void **pbuf ;
+{
+}
 
 /*********************** BROADCAST FUNCTIONS **********************/
 
