@@ -469,18 +469,7 @@ void CkReductionMgr::finishReduction(void)
 #endif
   
   // Find our node reduction manager, and pass reduction to him:
-  CkArrayReductionMgr *nodeMgr;
-//FIXME: this race condition resolution code is horrific--
-//  we need to adjust the semantics of nodegroup creation to 
-//  make this code simpler. (OSL, 2003/8/18)
-  while (NULL== (nodeMgr=nodeProxy[CkMyNode()].ckLocalBranch()) ) 
-  { /* Nodegroup creation race: spin until our nodegroup element is created */
-    // CkPrintf("RACE: nodeMgr not initialized yet!\n");
-    CsdScheduler(0);
-  }
-  while (!nodeMgr->ctorDoneFlag) {
-    // CkPrintf("RACE: nodeMgr not done with constructor yet!\n");
-  }
+  CkArrayReductionMgr *nodeMgr=nodeProxy[CkMyNode()].ckLocalBranch();
   nodeMgr->contributeArrayReduction(result);
 
   //House Keeping Operations will have to check later what needs to be changed

@@ -177,12 +177,22 @@ void *CkLocalBranch(CkGroupID gID) {
   return _localBranch(gID);
 }
 
-extern "C"
-void *CkLocalNodeBranch(CkGroupID groupID)
-{
+static 
+void *_ckLocalNodeBranch(CkGroupID groupID) {
   CmiLock(CksvAccess(_nodeLock));
   void *retval = CksvAccess(_nodeGroupTable)->find(groupID).getObj();
   CmiUnlock(CksvAccess(_nodeLock));
+  return retval;
+}
+
+extern "C"
+void *CkLocalNodeBranch(CkGroupID groupID)
+{
+  void *retval;
+  while (NULL== (retval=_ckLocalNodeBranch(groupID))) 
+  { // Nodegroup hasn't finished being created yet-- schedule...
+    CsdScheduler(0);
+  }
   return retval;
 }
 
@@ -320,9 +330,13 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   int objSize=_chareTable[gIdx]->size;
   register void *obj = malloc(objSize);
   _MEMCHECK(obj);
-  /* Zero out the storage for nodegroups, to allow them to use
-     "I'm done with my constructor" flags. */
-  memset(obj,0,objSize);
+  CkpvAccess(_currentGroup) = groupID;
+  _invokeEntryNoTrace(epIdx,env,obj);
+  _STATS_RECORD_PROCESS_NODE_GROUP_1();
+  
+// Now that the NodeGroup is created, add it to the table.
+//  NodeGroups can be accessed by multiple processors, so 
+//  this is in the opposite order from groups.
   CmiLock(CksvAccess(_nodeLock));
   CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
   CksvAccess(_nodeGroupTable)->find(groupID).setcIdx(gIdx);
@@ -335,9 +349,6 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
       CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
     delete ptrq;
   }
-  CkpvAccess(_currentGroup) = groupID;
-  _invokeEntryNoTrace(epIdx,env,obj);
-  _STATS_RECORD_PROCESS_NODE_GROUP_1();
 }
 
 void _createGroup(CkGroupID groupID, envelope *env)
