@@ -971,7 +971,7 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
       status = VMI_Stream_Send ((&CMI_VMI_Processes[destrank])->connection,
 				bufHandles, addrs, sz, 1,
 				CMI_VMI_Stream_Completion_Handler,
-				(PVOID) &handle, TRUE);
+				(PVOID) handle, TRUE);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send()");
     }
 

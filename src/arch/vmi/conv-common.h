@@ -26,11 +26,7 @@
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 #endif
 
-// There is a bug in the spanning tree code uncovered during runs
-// of NAMD on very large numbers of hosts across clusters.
-// Leave commented until this can be fixed.
-//#define CMK_BROADCAST_SPANNING_TREE                        1
-#define CMK_BROADCAST_SPANNING_TREE                        0
+#define CMK_BROADCAST_SPANNING_TREE                        1
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
 #define CMK_SPANTREE_USE_SPECIAL_CODE                      0
