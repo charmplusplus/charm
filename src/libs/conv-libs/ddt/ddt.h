@@ -21,8 +21,6 @@
 #define DDT_UNSIGNED_LONG  13
 #define DDT_LONG_DOUBLE    14
 
-#define MAX_TYPES  100  
-
 #define DDT_TYPE_NULL  -1
 #define DDT_PRIMITIVE  14
 #define DDT_CONTIGUOUS 15
@@ -67,16 +65,18 @@ class DDT ;
 class DDT_DataType {
 
   private:
-    int datatype ;
-    int refCount ;
+    int datatype;
+    int refCount;
 
   protected:
-    int size ;
-    int extent ;
-    int count ;
+    int size;
+    int extent;
+    int count;
 
-    int  baseSize ;
-    int  baseExtent ;
+    int baseSize;
+    int baseExtent;
+    DDT_DataType *baseType;
+    int baseIndex;
 
   public:
     DDT_DataType() { } ;
@@ -89,7 +89,7 @@ class DDT_DataType {
     virtual int getExtent();
     virtual void inrRefCount() ;
     virtual int getRefCount() ;
-    virtual void pup(PUP::er  &p) ;
+    virtual void pupType(PUP::er &p, DDT* ddt) ;
 
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
 };
@@ -98,22 +98,17 @@ class DDT_DataType {
   This class maintains the type Contiguous. 
   It constructs a typemap consisting of the
   replication of a datatype into contiguous locations. 
-
-  baseType -  It holds the type of the datatype of which 
-              this contiguous datatype is made of.
 */
 
 class DDT_Contiguous : public DDT_DataType {
   
-  DDT_DataType* baseType ;
-
   public:
   DDT_Contiguous() { };
-  DDT_Contiguous(int count, DDT_DataType* oldType);
+  DDT_Contiguous(int count, int index, DDT_DataType* oldType);
   DDT_Contiguous(const DDT_Contiguous& obj) ;
   DDT_Contiguous& operator=(const DDT_Contiguous& obj);
   virtual int serialize(char* userdata, char* buffer, int num, int dir);
-  virtual  void pup(PUP::er  &p) ;
+  virtual  void pupType(PUP::er &p, DDT* ddt) ;
 };
 
 /*
@@ -124,8 +119,6 @@ class DDT_Contiguous : public DDT_DataType {
    same number of copies of the old datatype. 
    The spacing between blocks is a multiple of the
    extent of the old datatype.
-
-   baseType - holds type of the Old Datatype.
 */
 
 class DDT_Vector : public DDT_DataType {
@@ -133,16 +126,15 @@ class DDT_Vector : public DDT_DataType {
   protected:
     int blockLength ;
     int strideLength ;
-    DDT_DataType* baseType ;
-
   public:
-    DDT_Vector(int count, int blocklength, int stride, DDT_DataType* type);
+    DDT_Vector(int count, int blklen, int stride, int index,
+               DDT_DataType* type);
     DDT_Vector(const DDT_Vector& obj) ;
     DDT_Vector& operator=(const DDT_Vector& obj);
     DDT_Vector() { } ;
     ~DDT_Vector() { } ;
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
-    virtual  void pup(PUP::er  &p) ;
+    virtual  void pupType(PUP::er &p, DDT* ddt) ;
 };
 
 /*
@@ -155,20 +147,19 @@ class DDT_Vector : public DDT_DataType {
   is a multiple of the oldtype
   extent. HVector type allows a stride which consists of an 
   arbitrary number of bytes.
-
-  baseType - holds type of the Old Datatype.
 */
 
 class DDT_HVector : public DDT_Vector {
 
   public:
     DDT_HVector() { } ;
-    DDT_HVector(int nCount, int blength, int strideLength, DDT_DataType* type);
+    DDT_HVector(int nCount,int blength,int strideLen,int index,
+                DDT_DataType* type);
     ~DDT_HVector() { } ;
     DDT_HVector(const DDT_HVector& obj) ;
     DDT_HVector& operator=(const DDT_HVector& obj);
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
-    virtual void pup(PUP::er &p);
+    virtual void pupType(PUP::er &p, DDT* ddt);
 };
 
 /*
@@ -181,7 +172,6 @@ class DDT_HVector : public DDT_Vector {
 
   arrayBlockLength - holds the array of block lengths 
   arrayDisplacements - holds the array of displacements.
-  baseType - holds the old datatype.
 */
 
 class DDT_Indexed : public DDT_DataType {
@@ -189,17 +179,17 @@ class DDT_Indexed : public DDT_DataType {
   protected:
     int* arrayBlockLength ;
     int* arrayDisplacements ;
-    DDT_DataType* baseType ;
 
   public:
 
-    DDT_Indexed(int count, int* arrBlock, int* arrDisp, DDT_DataType* type);
+    DDT_Indexed(int count, int* arrBlock, int* arrDisp, int index, 
+                DDT_DataType* type);
     DDT_Indexed(const DDT_Indexed& obj);
     DDT_Indexed& operator=(const DDT_Indexed& obj) ;
     DDT_Indexed() { } ;
     ~DDT_Indexed() ;
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
-    virtual  void pup(PUP::er  &p) ;
+    virtual  void pupType(PUP::er &p, DDT* ddt) ;
 };
 
 /*
@@ -213,17 +203,17 @@ class DDT_Indexed : public DDT_DataType {
 
   arrayBlockLength - holds the array of block lengths 
   arrayDisplacements - holds the array of displacements.
-  baseType - holds the old datatype.
 */
 class DDT_HIndexed : public DDT_Indexed {
 
   public:
     DDT_HIndexed() { } ;
-    DDT_HIndexed(int count, int* arrBlock, int* arrDisp, DDT_DataType* type);
+    DDT_HIndexed(int count, int* arrBlock, int* arrDisp, int index, 
+                 DDT_DataType* type);
     DDT_HIndexed(const DDT_HIndexed& obj);
     DDT_HIndexed& operator=(const DDT_HIndexed& obj) ;
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
-    virtual void pup(PUP::er &p);
+    virtual void pupType(PUP::er &p, DDT* ddt);
 };
 
 /*
@@ -244,16 +234,17 @@ class DDT_Struct : public DDT_DataType {
   protected:
     int* arrayBlockLength ;
     int* arrayDisplacements ;
-    int* types;
-    DDT_DataType* arrayDataType[MAX_TYPES] ; 
+    int* index;
+    DDT_DataType** arrayDataType; 
 
   public:
     DDT_Struct() { } ;
-    DDT_Struct(DDT* ddt,int count, int* arrBlock, int* arrDisp, DDT_Type *type);
+    DDT_Struct(int count, int* arrBlock, int* arrDisp, int *index, 
+               DDT_DataType **type);
     DDT_Struct(const DDT_Struct& obj);
     DDT_Struct& operator=(const DDT_Struct& obj) ;
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
-    virtual  void pup(PUP::er  &p) ;
+    virtual  void pupType(PUP::er &p, DDT* ddt) ;
 };
 
 /*
@@ -275,15 +266,17 @@ class DDT_Struct : public DDT_DataType {
 
 class DDT {
   private:
-    DDT_DataType*  typeTable[MAX_TYPES] ;
-    int  types[MAX_TYPES] ; //used for pup
-    int currentIndex ;
-    int  nextFreeIndex ;
+    DDT_DataType**  typeTable;
+    int*  types; //used for pup
+    int max_types;
+    int num_types;
 
   public:
 
   DDT()
   {
+    max_types = 20;
+    typeTable = new DDT_DataType*[max_types];
     typeTable[0] = new DDT_DataType(DDT_DOUBLE);
     typeTable[1] = new DDT_DataType(DDT_INT);
     typeTable[2] = new DDT_DataType(DDT_FLOAT);
@@ -299,22 +292,27 @@ class DDT {
     typeTable[12] = new DDT_DataType(DDT_UNSIGNED);
     typeTable[13] = new DDT_DataType(DDT_UNSIGNED_SHORT);
     typeTable[14] = new DDT_DataType(DDT_LONG_DOUBLE);
-    for(int i = 0 ; i < 15; i++)
+    num_types = 15;
+    int i;
+    for(i=0 ; i < num_types; i++)
       types[i] = DDT_PRIMITIVE ;
-    currentIndex = 14 ;
-    nextFreeIndex = 15 ;
+    for(i=num_types ; i < max_types; i++)
+    {
+      typeTable[i] = 0;
+      types[i] = DDT_TYPE_NULL ;
+    }
   }
 
-  int newContiguous(int count, DDT_Type  oldType, DDT_Type* newType);
-  int newVector(int count, int blocklength, int stride, DDT_Type oldtype, 
+  void newContiguous(int count, DDT_Type  oldType, DDT_Type* newType);
+  void newVector(int count, int blocklength, int stride, DDT_Type oldtype, 
                 DDT_Type* newtype);
-  int newHVector(int count, int blocklength, int stride, DDT_Type oldtype, 
+  void newHVector(int count, int blocklength, int stride, DDT_Type oldtype, 
                  DDT_Type* newtype);
-  int newIndexed(int count, int* arrbLength, int* arrDisp , DDT_Type oldtype, 
+  void newIndexed(int count, int* arrbLength, int* arrDisp , DDT_Type oldtype, 
                  DDT_Type* newtype);
-  int newHIndexed(int count, int* arrbLength, int* arrDisp , DDT_Type oldtype, 
+  void newHIndexed(int count, int* arrbLength, int* arrDisp , DDT_Type oldtype, 
                   DDT_Type* newtype);
-  int newStruct(int count, int* arrbLength, int* arrDisp , DDT_Type *oldtype, 
+  void newStruct(int count, int* arrbLength, int* arrDisp , DDT_Type *oldtype, 
                 DDT_Type* newtype);
   void  freeType(int* index);
   int   getNextFreeIndex(void) ;
