@@ -1,7 +1,7 @@
 include ../Makefile.in
 
 
-CFLAGS = $(COPTIONS) $(OPTFLAGS) -I. $(INCDIR)
+CFLAGS = $(OPTFLAGS) -I. 
 
 
 OBJS = comm.o util.o debug.o setup.o grsetup.o timer.o \
@@ -22,7 +22,9 @@ OBJS = comm.o util.o debug.o setup.o grsetup.o timer.o \
 	$(CC) $(CFLAGS) -c $*.c
 
 
-../libparmetis.a: $(OBJS)
+DEST=$(LIBDIR)/libparmetis.a
+
+$(DEST): $(OBJS)
 	$(CC) -o $@ $(OBJS)
 
 clean:
