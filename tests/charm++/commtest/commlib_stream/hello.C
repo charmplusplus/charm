@@ -9,51 +9,53 @@
 
 #define TEST_HI 4001
 #define MAX_COUNT 200
+#define NUM_RINGS 200 
 
 ComlibInstanceHandle ss_inst;
 ComlibInstanceHandle mss_inst;
 ComlibInstanceHandle samp_inst;
+ComlibInstanceHandle dummy_inst;
 
 /*mainchare*/
 class Main : public Chare
 {
-  double startTime;
+    double startTime;
 public:
-  Main(CkArgMsg* m)
-  {
-      //Process command-line arguments
-      nElements=5;
-      if(m->argc >1 ) nElements=atoi(m->argv[1]);
-      delete m;
-      
-      //Start the computation
-      CkPrintf("Running Hello on %d processors for %d elements\n",
-               CkNumPes(),nElements);
-      mainProxy = thishandle;
-      
-      CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
-      
-      StreamingStrategy *strat=new StreamingStrategy(1,400);
-      MeshStreamingStrategy *mstrat=new MeshStreamingStrategy(1,400);
-      
-      //strat->enableShortArrayMessagePacking();
-      //strat->disableIdleFlush();
-      
-      mstrat->enableShortArrayMessagePacking();
-
-      ComlibInstanceHandle cinst = CkGetComlibInstance();
-      cinst.setStrategy(strat); 
-      
-      //ComlibInstanceHandle cinst1 = CkGetComlibInstance();
-
-      //cinst1.setStrategy(mstrat);
-
-      startTime=CkWallTimer();
-      CkPrintf("Starting ring...\n");
-
-      arr.start();
-  };
-
+    Main(CkArgMsg* m)
+    {
+	//Process command-line arguments
+	nElements=5;
+	if(m->argc >1 ) nElements=atoi(m->argv[1]);
+	delete m;
+	
+	//Start the computation
+	CkPrintf("Running Hello on %d processors for %d elements\n",
+		 CkNumPes(),nElements);
+	mainProxy = thishandle;
+	
+	CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
+	
+	StreamingStrategy *strat=new StreamingStrategy(1,400);
+	MeshStreamingStrategy *mstrat=new MeshStreamingStrategy(1,400);
+	
+	//strat->enableShortArrayMessagePacking();
+	//strat->disableIdleFlush();
+	
+	mstrat->enableShortArrayMessagePacking();
+	
+	ComlibInstanceHandle cinst = CkGetComlibInstance();
+	cinst.setStrategy(strat); 
+	
+	//ComlibInstanceHandle cinst1 = CkGetComlibInstance();
+	
+	//cinst1.setStrategy(mstrat);
+	
+	startTime=CkWallTimer();
+	CkPrintf("Starting ring...\n");
+	
+	arr.start();
+    };
+    
     void done(void)
     {
         CkPrintf("All done: %d elements in %f seconds\n", nElements,
@@ -65,16 +67,17 @@ public:
 /*array [1D]*/
 class Hello : public CBase_Hello 
 {
+    int c;
+    
 public:
-    Hello()
-    {
-        
+    Hello() {
+	c = 0;
     }
     
     Hello(CkMigrateMessage *m) {}
     
     void start() {
-        for(int count = 0; count < 2000; count++)
+        for(int count = 0; count < NUM_RINGS; count++)
             SayHi(TEST_HI, 0);
     }
     
@@ -103,13 +106,12 @@ public:
             next = 0;
         
         if(hcount < MAX_COUNT)
-            //Pass the hello on:
-            array_proxy[next].SayHi(hiNo+1, hcount+1);
-      else{
-          static int c=0;
-	  c++;
-	  if (c==2000) mainProxy.done();    
-      }
+	    //Pass the hello on:
+	    array_proxy[next].SayHi(hiNo+1, hcount+1);
+	else{
+	    c++;
+	    if (c == NUM_RINGS) mainProxy.done();    
+	}
     }
 };
 

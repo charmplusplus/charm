@@ -11,12 +11,13 @@ int NUM_MSGS;
 
 #define TEST_HI 4001
 #define MAX_COUNT 2000
-int STREAMING_BUCKET_SIZE=400;
+int STREAMING_BUCKET_SIZE=100;
 #define MAX_PER_ITR 2*STREAMING_BUCKET_SIZE
 
 ComlibInstanceHandle ss_inst;  //basic streaming strategy
 ComlibInstanceHandle mss_inst;  //mesh streaming strategy
 ComlibInstanceHandle samp_inst; //streaming with short message packing
+ComlibInstanceHandle dummy_inst; //streaming with short message packing
 
 /*mainchare*/
 class Main : public Chare
@@ -49,7 +50,7 @@ public:
         StreamingStrategy *sstrat=new StreamingStrategy(1,STREAMING_BUCKET_SIZE);
 
         MeshStreamingStrategy *mstrat=new 
-            MeshStreamingStrategy(1, STREAMING_BUCKET_SIZE);
+	  MeshStreamingStrategy(1, STREAMING_BUCKET_SIZE);
         
         sstrat->enableShortArrayMessagePacking();
         
@@ -57,11 +58,11 @@ public:
         
         ss_inst = CkGetComlibInstance();
         mss_inst = CkGetComlibInstance();
-        samp_inst = CkGetComlibInstance();
+	samp_inst = CkGetComlibInstance();
 
         ss_inst.setStrategy(strat); 
         mss_inst.setStrategy(mstrat); 
-        samp_inst.setStrategy(sstrat);         
+	samp_inst.setStrategy(sstrat);         
 
         startTime=CkWallTimer();
         CkPrintf("Starting ring...\n");
@@ -74,12 +75,12 @@ public:
         recv_count ++;
         
         if(recv_count == CkNumPes()) {
-            char stype[256];
+	    char stype[256];
 
             if(step_count == 1)
                 sprintf(stype, "");
             else if(step_count == 2)
-                sprintf(stype, "Mesh ");
+	        sprintf(stype, "Mesh ");
             else if(step_count == 3)
                 sprintf(stype, "SAMP ");
 
@@ -116,7 +117,7 @@ public:
     
     void start() {
         if(step_count == 0)
-            ss_inst.beginIteration();
+	    ss_inst.beginIteration();
         else if(step_count == 1)            
             mss_inst.beginIteration();
         else
