@@ -1,5 +1,5 @@
 module fem {
-  initcall void FEMnodeInit(void);
+  initnode void FEMnodeInit(void);
 
   chare FEMcoordinator {
     entry FEMcoordinator(int nChunks);

@@ -1,1 +1,1 @@
--module tcharm -lmetis -module idxl -lmodulefem-compat
+-module tcharm -lmetis -module idxl -lfem-compat

@@ -10,7 +10,7 @@ LIB=libmodulefem
 
 LIBDIR=$(CDIR)/lib
 DEST=$(LIBDIR)/$(LIB).a
-COMPATLIB=$(LIBDIR)/libmodulefem-compat.a
+COMPATLIB=$(LIBDIR)/libfem-compat.a
 
 all: $(DEST) $(COMPATLIB)
 
