@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-11-07 00:41:00  sanjeev
+ * Revision 2.11  1996-02-08 23:52:06  sanjeev
+ * added notes
+ *
+ * Revision 2.10  1995/11/07 00:41:00  sanjeev
  * fixed bug
  *
  * Revision 2.9  1995/11/07  00:03:48  sanjeev
@@ -55,6 +58,41 @@
 /* * * * * * * * The ACWN Load Balancing Strategy* * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+
+/******* Following explanatory notes made by Sanjeev on 2/8/96. ***********
+
+LDB_ELEMENT has srcPE, piggybackLoad, and msgHops.
+ 
+FillLDB fills srcPE, piggybackLoad, then calls SentUpdateStatus,
+which stores the load sent to the receiving pe.
+ 
+StripLDB calls RecvUpdateStatus which stores the load of sender and
+sets leastLoadedPe and leastLoad.
+ 
+NewMsg_FromLocal and NewMsg_FromNet both call Strategy().
+ 
+UpdateMinMaxHops sets the number of hops (less hops if heavy load,
+more hops if light loads in nbrhood).
+ 
+Strategy calls LeastLoadPe(), UpdateMinMaxHops(). 
+If msgHops < minHops, the msg is sent to leastLoadedPe.
+If msgHops > maxHops, msg is processed locally
+else if lightly loaded neighbourhood: Send msg to least loaded PE
+else if moderate load, send to least-loaded pe if difference is > deltaLoad
+else if heavy load, process locally.
+ 
+PeriodicRedist : if neighborhood not heavily loaded,
+sends load to least loaded pe if difference > deltaLoad.
+ 
+PeriodicStatus : if my current load is different from last load sent to 
+nbr by deltaStatus, send my load again to nbr.
+ 
+
+***************************************************************************/
+
+
+
 
 module ldb {
 #include "ldb.h"
