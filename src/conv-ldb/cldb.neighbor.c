@@ -95,12 +95,12 @@ static void CldStillIdle(void *dummy)
 /* send some work to requested proc */
 static void CldAskLoadHandler(requestmsg *msg)
 {
-  int receiver, rank;
+  int receiver, rank, recvIdx, i;
   int myload = CldLoad();
   double now = CmiWallTimer();
 
   /* only give you work if I have more than 1 */
-  if (myload>1) {
+  if (myload>0) {
     int sendLoad;
     receiver = msg->from_pe;
     rank = CmiMyRank();
@@ -116,6 +116,10 @@ static void CldAskLoadHandler(requestmsg *msg)
     sendLoad = myload / CpvAccess(numNeighbors) / 2;
     if (sendLoad < 1) sendLoad = 1;
     sendLoad = 1;
+    for (i=0; i<CpvAccess(numNeighbors); i++) 
+      if (CpvAccess(neighbors)[i].pe == receiver) break;
+    CmiAssert(i<CpvAccess(numNeighbors));
+    CpvAccess(neighbors)[i].load += sendLoad;
     CldMultipleSend(receiver, sendLoad, rank);
 #if 0
 #if !defined(CMK_OPTIMIZE) && TRACE_USEREVENTS
@@ -416,12 +420,18 @@ static void CldComputeNeighborData()
   pes = (int *)malloc(npe*sizeof(int));
   getTopoNeighbors(topo, CmiMyPe(), pes, &npe);
 #if 0
-  CmiPrintf("Neighors (%d) for: %d\n", npe, CmiMyPe());
+  {
+  char buf[512], *ptr;
+  sprintf(buf, "Neighors (%d) for: %d = ", npe, CmiMyPe());
+  ptr = buf + strlen(buf);
   for (i=0; i<npe; i++) {
-    CmiAssert(pes[i] < CmiNumPes());
-    CmiPrintf(" %d ", pes[i]);
+    CmiAssert(pes[i] < CmiNumPes() && pes[i] != CmiMyPe());
+    sprintf(ptr, " %d ", pes[i]);
+    ptr += strlen(ptr);
   }
-  CmiPrintf("\n");
+  strcat(ptr, "\n");
+  CmiPrintf(buf);
+  }
 #endif
 
   CpvAccess(numNeighbors) = npe;
