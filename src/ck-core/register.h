@@ -152,9 +152,10 @@ class ChareInfo {
 /// Describes a mainchare's constructor.  These are all executed at startup.
 class MainInfo {
   public:
+    const char *name;
     int chareIdx;
     int entryIdx;
-    MainInfo(int c, int e) : chareIdx(c), entryIdx(e) {}
+    MainInfo(int c, int e) : name("main"), chareIdx(c), entryIdx(e) {}
 };
 
 /// Describes a readonly global variable.
@@ -201,6 +202,15 @@ class ReadonlyMsgInfo {
 template <class T>
 class CkRegisteredInfo {
 	CkVec<T *> vec;
+	
+	void outOfBounds(int idx) {
+		const char *exampleName="";
+		if (vec.size()>0) exampleName=vec[0]->name;
+		CkPrintf("register.h> CkRegisteredInfo<%d,%s> called with invalid index "
+			"%d (should be less than %d)\n", sizeof(T),exampleName,
+			idx, vec.size());
+		CkAbort("Registered idx is out of bounds-- is message or memory corrupted?");
+	}
 public:
 	/**
 	Subtle: we *don't* want to call vec's constructor,
@@ -234,8 +244,7 @@ public:
 	T *operator[](int idx) {
 #ifndef CMK_OPTIMIZE
 		/* Bounds-check the index: */
-		if (idx<0 || idx>=vec.size())
-			CkAbort("Registered idx is out of bounds");
+		if (idx<0 || idx>=vec.size()) outOfBounds(idx);
 #endif
 		return vec[idx];
 	}
