@@ -1394,11 +1394,11 @@ void start_nodes_rsh(void);
 void nodetab_init_for_scyld(void);
 void start_nodes_scyld(void);
 #endif
-void start_nodes_local(void);
+void start_nodes_local(char ** envp);
 
 static void fast_idleFn(void) {sleep(0);}
 
-int main(int argc, char **argv)
+int main(int argc, char **argv, char **envp)
 {
   srand(time(0));
   skt_init();
@@ -1433,7 +1433,7 @@ int main(int argc, char **argv)
     if (!arg_local)
       start_nodes_rsh();
     else
-      start_nodes_local();
+      start_nodes_local(envp);
 #endif
 
   if(arg_verbose) fprintf(stderr, "Charmrun> node programs all started\n");
@@ -2456,13 +2456,18 @@ void start_nodes_rsh(void)
 
 /* simple version of charmrun that avoids the rshd or charmd,   */
 /* it spawn the node program just on local machine using exec. */
-void start_nodes_local(void)
+void start_nodes_local(char ** env)
 {
-  char *envp[2];
-  int i;
+  char **envp;
+  int i, envc;
 
-  envp[0] = (char *)malloc(256);
-  envp[1] = 0;
+  /* copy environ and expanded to hold NETSTART */ 
+  for (envc=0; env[envc]; envc++);  envc--;
+  envp = (char **)malloc((envc+2)*sizeof(void *));
+  for (i=0; i<envc; i++) envp[i] = env[i];
+  envp[envc] = (char *)malloc(256);
+  envp[envc+1] = 0;
+
   for (i=0; i<arg_requested_pes; i++)
   {
     int status = 0;
@@ -2470,7 +2475,7 @@ void start_nodes_local(void)
 
     if (arg_verbose)
       printf("Charmrun> start %d node program on localhost.\n", i);
-    sprintf(envp[0], "NETSTART=%s",  create_netstart(i));
+    sprintf(envp[envc], "NETSTART=%s",  create_netstart(i));
     pid = 0;
     pid = fork();
     if (pid < 0) exit(1);
@@ -2487,7 +2492,8 @@ void start_nodes_local(void)
       exit(1);
     }
   }
-  free(envp[0]);
+  free(envp[envc]);
+  free(envp);
 }
 
 #endif /*CMK_USE_RSH*/
