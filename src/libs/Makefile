@@ -1,14 +1,12 @@
 CHARMC=../../bin/charmc $(OPTS)
 
-all: convlibs charmlibs irecvlibs otherlibs
+all: convlibs charmlibs otherlibs
 
 convlibs:
 	cd conv-libs; make all OPTS='$(OPTS)'
 
 charmlibs:
 	cd ck-libs; make all OPTS='$(OPTS)'
-
-irecvlibs:
 	cd irecv; make all OPTS='$(OPTS)'
 
 otherlibs:
