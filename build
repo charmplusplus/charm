@@ -59,6 +59,7 @@ then
 	echo "Copying compilers for win32 into cygwin /bin directory"
 	cp src/Common.win32/unix2nt* /bin
 	cp src/Common.win32/system_ln $VERSION/tmp
+	cp src/Common.win32/unistd.h $VERSION/tmp
 else
 	cat > $VERSION/tmp/system_ln <<EOF
 #!/bin/sh
