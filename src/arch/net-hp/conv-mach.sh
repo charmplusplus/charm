@@ -10,9 +10,9 @@ CMK_LIBS='-lckqt'
 CMK_LD_SHARED="-r"
 CMK_LD_LIBRARY_PATH="-Wl,+b$CHARMLIBSO/"
 CMK_SHARED_SUF="sl"
-CMK_SEQ_LIBS=''
-CMK_SEQ_LD='gcc -static '
-CMK_SEQ_LDXX='g++ -static '
+CMK_NATIVE_LIBS=''
+CMK_NATIVE_LD='gcc -static '
+CMK_NATIVE_LDXX='g++ -static '
 CMK_QT='hpux-gcc'
 CMK_XIOPTS=''
 

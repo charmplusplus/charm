@@ -7,7 +7,7 @@ CMK_CF77="ftn -O ssp"
 CMK_CF90="ftn -O ssp"
 CMK_RANLIB="true"
 CMK_LIBS="-lmpi -lCx "
-CMK_SEQ_LDXX="$CMK_CXX -lCx"
+CMK_NATIVE_LDXX="$CMK_CXX -lCx"
 CMK_QT="none"
 
 #CMK_F90LIBS="-L/usr/absoft/lib -L/opt/absoft/lib -lf90math -lfio -lU77 -lf77math "

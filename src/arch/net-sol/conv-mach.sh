@@ -10,6 +10,6 @@ CMK_RANLIB='true'
 CMK_LIBS=' -lnsl -lsocket -lckqt'
 CMK_LD_SHARED="-G"
 CMK_LD_LIBRARY_PATH="-R $CHARMLIBSO/"
-CMK_SEQ_LIBS=' -lnsl -lsocket'
+CMK_NATIVE_LIBS=' -lnsl -lsocket'
 CMK_QT='solaris-gcc'
 CMK_XIOPTS=''
