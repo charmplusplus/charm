@@ -8,6 +8,8 @@
 #include "ck.h"
 #include "trace.h"
 
+VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
+
 extern "C"
 void CkSetRefNum(void *msg, int ref)
 {

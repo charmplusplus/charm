@@ -15,10 +15,7 @@ class PtrQ {
     int first;
     int len;
   public:
-    PtrQ() :len(0), first(0) {
-      block = new void*[blklen=BLKSZ];
-      _MEMCHECK(block);
-    }
+    PtrQ();
     ~PtrQ() { delete[] block; }
     int length(void) { return len; }
     void *deq(void) {

@@ -41,7 +41,7 @@ class VidBlock {
     PtrQ *msgQ;
     CkChareID actualID;
   public:
-    VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
+    VidBlock() ;
     void send(envelope *env) {
       if(state==UNFILLED) {
         msgQ->enq((void *)env);
