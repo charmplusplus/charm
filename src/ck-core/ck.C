@@ -28,6 +28,10 @@ Chare::Chare(void) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
 }
+Chare::Chare(CkMigrateMessage* m) {
+  thishandle.onPE=CkMyPe();
+  thishandle.objPtr=this;
+}
 Chare::~Chare() {}
 
 void Chare::pup(PUP::er &p)

@@ -25,15 +25,15 @@ class NullLB : public BaseLB
 {
 public:
   NullLB(const CkLBOptions &opt): BaseLB(opt) 
-	{init(); lbname=(char*)"NullLB";}
-  NullLB(CkMigrateMessage *m):BaseLB(m) 
-	{init(); lbname=(char*)"NullLB";}
+	{init(); lbname="NullLB";}
+  NullLB(CkMigrateMessage *m):BaseLB(m){ }
   ~NullLB();
 
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
 
   void migrationsDone(void);
+  void pup(PUP::er &p){ BaseLB::pup(p); init(); lbname="NullLB"; }
 private:
   CProxy_NullLB thisProxy;
   void init();

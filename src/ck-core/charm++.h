@@ -331,7 +331,7 @@ class Chare {
   protected:
     CkChareID thishandle;
   public:
-    Chare(CkMigrateMessage *m) {}
+    Chare(CkMigrateMessage *m);
     Chare();
     virtual ~Chare(); //<- needed for *any* child to have a virtual destructor
     virtual void pup(PUP::er &p);//<- pack/unpack routine

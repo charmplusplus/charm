@@ -62,6 +62,7 @@ CksvDeclare(UInt,_numInitNodeMsgs);
 int   _infoIdx;
 int   _charmHandlerIdx;
 int   _initHandlerIdx;
+int   _roHandlerIdx;
 int   _bocHandlerIdx;
 int   _nodeBocHandlerIdx;
 int   _qdHandlerIdx;
@@ -384,6 +385,16 @@ static inline void _processRODataMsg(envelope *env)
   CmiFree(env);
 }
 
+static void _roHandler(void *msg)
+{
+  CkAssert(CkMyPe()!=0);
+  register envelope *env = (envelope *) msg;
+  CkpvAccess(_numInitsRecd)+=2;  /*++;*/
+  CpvAccess(_qd)->process();
+  _numExpectInitMsgs = env->getCount();
+  _processRODataMsg(env);
+}
+
 static void _initHandler(void *msg)
 {
   CkAssert(CkMyPe()!=0);
@@ -573,6 +584,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	_charmHandlerIdx = CkRegisterHandler((CmiHandler)_bufferHandler);
 	_initHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
+	_roHandlerIdx = CkRegisterHandler((CmiHandler)_roHandler);
 	_exitHandlerIdx = CkRegisterHandler((CmiHandler)_exitHandler);
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 	_nodeBocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);

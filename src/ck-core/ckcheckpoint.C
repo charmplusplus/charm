@@ -12,7 +12,7 @@ More documentation goes here...
 #include "ck.h"
 //#include "ckcheckpoint.h"
 
-#if 0
+#if 1
 #define DEBCHK CkPrintf
 #else
 #define DEBCHK //CkPrintf
@@ -26,6 +26,23 @@ typedef struct _GroupInfo{
 	int useDefCtor;
 	char name[256];
 } GroupInfo;
+
+static void bdcastRO(void){
+	int i;
+	//Determine the size of the RODataMessage
+	PUP::sizer ps;
+	for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
+
+	//Allocate and fill out the RODataMessage
+	envelope *env = _allocEnv(RODataMsg, ps.size());
+	PUP::toMem pp((char *)EnvToUsr(env));
+	for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
+	
+	env->setCount(++_numInitMsgs);
+	env->setSrcPe(CkMyPe());
+	CmiSetHandler(env, _roHandlerIdx);
+	CmiSyncBroadcastAndFree(env->getTotalsize(), (char *)env);
+}
 
 // Print out an array index to this string as decimal fields
 // separated by underscores.
@@ -258,6 +275,7 @@ void CkRestartMain(const char* dirname){
 	char filename[1024];
 	CkCallback cb;
 	int numGroups,numNodeGroups;
+	
 	// restore readonlys
 	sprintf(filename,"%s/RO.dat",dirname);
 	FILE* fRO = fopen(filename,"rb");
@@ -294,6 +312,7 @@ void CkRestartMain(const char* dirname){
 	}
 	fclose(fMain);
 	DEBCHK("[%d]CkRestartMain: mainchares restored\n",CkMyPe());
+	if(CkMyPe()==0) bdcastRO(); // to update mainchare proxy	
 	
 	// restore groups
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
