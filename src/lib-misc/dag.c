@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.3  1997-03-25 15:04:56  milind
+ * Revision 1.4  1997-08-18 18:02:03  milind
+ * Located and fixed a bug reported by Ed. dag.c was using CmiFree to free
+ * charm messages instead of CkFreeMsg.
+ *
+ * Revision 1.3  1997/03/25 15:04:56  milind
  * Made changes suggested by Ed Kornkven to fix bugs in Dagger.
  *
  * Revision 1.2  1996/03/09 18:11:20  jyelon
@@ -497,12 +501,12 @@ _dag3_RLNODE   *rlnode;
                   msgarray = (void **) buffer->msg;
                   if (msgarray) {
                     n = (int) (msgarray[0]);
-                    for(j=1; j<=n; j++) if (msgarray[j]) CmiFree(msgarray[j]);
+                    for(j=1; j<=n; j++) if (msgarray[j]) CkFreeMsg(msgarray[j]);
                     CmiFree(msgarray);
                    }
                  }
                else {
-                  if (buffer->msg) CmiFree(buffer->msg);
+                  if (buffer->msg) CkFreeMsg(buffer->msg);
                }
 
                *(buffer->prev) = buffer->next;
