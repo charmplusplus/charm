@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.11  1995-11-02 23:29:09  sanjeev
+# Revision 2.12  1995-11-13 16:36:19  jyelon
+# repaired CMK_NM_FILTER
+#
+# Revision 2.11  1995/11/02  23:29:09  sanjeev
 # removed -x c++
 #
 # Revision 2.10  1995/11/02  22:45:43  sanjeev
@@ -65,5 +68,5 @@ set CMK_SEQ_LIBS=''
 set CMK_SEQ_CC='gcc '
 set CMK_SEQ_LD='gcc '
 set CMK_NM='nm'
-set CMK_NM_FILTER="grep '|extern|' | awk '{print "'$'"1;}'"
+set CMK_NM_FILTER="grep '|extern|' | sed -e 's@ *|.*@@'"
 set CMK_CPP_SUFFIX="ii"
