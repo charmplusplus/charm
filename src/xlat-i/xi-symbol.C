@@ -7,7 +7,7 @@
 
 #include <iostream.h>
 #include <fstream.h>
-#include <string>
+//  #include <string>
 #include <stdlib.h>
 #include "xi-symbol.h"
 #include <ctype.h> // for tolower()
@@ -17,12 +17,13 @@ MessageList message_list;
 int fortranMode;
 
 // Make the name lower case
-string fortranify(const char *s)
+char* fortranify(const char *s)
 {
-  string retVal;
+  char *retVal = new char[strlen(s)+1];
   int i;
   for(i = 0; i < strlen(s); i++)
-    retVal += tolower(s[i]);
+    retVal[i] = tolower(s[i]);
+  retVal[strlen(s)+1] = 0;
 
   return retVal;
 }
@@ -1594,7 +1595,7 @@ void Entry::genDefs(XStr& str)
 
     if (fortranMode) { // Fortran90
       const char* msg_name = param->getBaseName();
-      TypeList *msg_contents = (message_list[msg_name])->getContents();
+      TypeList *msg_contents = (message_list.find(msg_name))->getContents();
 
       // Declare the Fortran Entry Function
       // This is called from C++
@@ -1652,7 +1653,7 @@ void Entry::genDefs(XStr& str)
         str << "  " << fortranify(name)
             << "_((char **)(obj->user_data), &index, ";
         const char* msg_name = param->getBaseName();
-        TypeList *msg_contents = (message_list[msg_name])->getContents();
+        TypeList *msg_contents = (message_list.find(msg_name))->getContents();
         msg_contents->genUnmarshalList1(str, param->getBaseName());
         str << ");\n";
       } else {

@@ -12,9 +12,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <string>
-#include <map>
-using std::map;//<-- may cause problems for pre-ISO C++ compilers
+//  #include <string>
+//  #include <map>
+//  using std::map;//<-- may cause problems for pre-ISO C++ compilers
 
 #include "xi-util.h"
 
@@ -383,7 +383,38 @@ class NodeGroup : public Group {
 #define SVARSIZE 0x02
 
 class Message; // forward declaration
-typedef map< string, Message* > MessageList;
+//  typedef map< string, Message* > MessageList;
+class MessageList {
+  char *messageName;
+  Message *message;
+  MessageList *next;
+public:
+  MessageList():messageName(0), message(0), next(0) {};
+  void add(const char *n, Message *m)
+  {
+    MessageList *item = new MessageList;
+    item->next = next;
+    item->messageName = new char[1+strlen(n)];
+    strcpy(item->messageName, n);
+    item->message = m;
+    next = item;
+  }
+  Message * find(const char *n) const
+  {
+    if (messageName == 0) // first item is a dummy
+      return next->find(n);
+
+    if (strncmp(messageName, n, strlen(n)) == 0)
+      return message;
+    else if (next != 0)
+      return next->find(n);
+    else {
+      cerr << "Unable to find message: " << n;
+      exit(1);
+    }
+  }
+};
+
 extern MessageList message_list;
 
 class Message : public TEntity, public Construct {
@@ -397,7 +428,7 @@ class Message : public TEntity, public Construct {
     Message(int l, NamedType *t, int a, TypeList *c=0)
       : attrib(a), type(t), contents(c) 
       { line=l; setTemplate(0);
-        message_list[type->getBaseName()] = this; }
+        message_list.add(type->getBaseName(), this); }
     void print(XStr& str);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
