@@ -107,7 +107,7 @@ public:
 
   void ReceiveStats(CkMarshalledCLBStatsMessage &m, int fromlevel); 
   void ResumeClients(CkReductionMsg *msg);
-  void ResumeClients();
+  void ResumeClients(int balancing);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
 
   // Migrated-element callback

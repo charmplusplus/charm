@@ -135,8 +135,8 @@ void HybridBaseLB::ProcessAtSync()
   if (CkMyPe() == 0) {
     start_lb_time = CkWallTimer();
     if (_lb_args.debug())
-      CkPrintf("Load balancing step %d starting at %f\n",
-	       step(), CkWallTimer());
+      CkPrintf("[%s] Load balancing step %d starting at %f\n",
+	       lbName(), step(), CkWallTimer());
   }
 
   // assemble LB database
@@ -714,13 +714,6 @@ void HybridBaseLB::MigrationDone(int balancing)
 
   DEBUGF(("[%d] HybridBaseLB::MigrationDone!\n", CkMyPe()));
 
-  if (CkMyPe() == 0 && start_lb_time != 0.0) {
-    double end_lb_time = CkWallTimer();
-    if (_lb_args.debug())
-      CkPrintf("Load balancing step %d finished at %f duration %f\n",
-	        step(),end_lb_time,end_lb_time - start_lb_time);
-  }
-
   theLbdb->incStep();
 
   // reset 
@@ -735,20 +728,28 @@ void HybridBaseLB::MigrationDone(int balancing)
     contribute(0, NULL, CkReduction::sum_int, cb);
   }
   else
-    thisProxy[CkMyPe()].ResumeClients();
+    thisProxy[CkMyPe()].ResumeClients(balancing);
 #endif
 }
 
 void HybridBaseLB::ResumeClients(CkReductionMsg *msg)
 {
-  ResumeClients();
+  ResumeClients(1);
   delete msg;
 }
 
-void HybridBaseLB::ResumeClients()
+void HybridBaseLB::ResumeClients(int balancing)
 {
 #if CMK_LBDB_ON
   DEBUGF(("[%d] ResumeClients. \n", CkMyPe()));
+
+  if (CkMyPe() == 0 && balancing) {
+    double end_lb_time = CkWallTimer();
+    if (_lb_args.debug())
+      CkPrintf("[%s] Load balancing step %d finished at %f duration %f\n",
+	        lbName(), step()-1,end_lb_time,end_lb_time - start_lb_time);
+  }
+
   // zero out stats
   theLbdb->ClearLoads();
 
