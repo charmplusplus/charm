@@ -164,6 +164,9 @@ int BGMach::read(char *file)
       else CmiAbort("BG> unknown timing method");
       continue;
     }
+    if (!strcmp(parameterName, "cpufactor")) {
+      cpufactor = atof(parameterValue);
+    }
     if (!strcmp(parameterName, "log")) {
       if (!strcmp(parameterValue, "yes"))
         genTimeLog = 1;

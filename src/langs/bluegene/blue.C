@@ -666,7 +666,8 @@ void stopVTimer()
   tTIMERON = 0;
   if (cva(bgMach).timingMethod == BG_WALLTIME) {
     const double tp = CmiWallTimer();
-    const double inc = tp-tSTARTTIME;
+    double inc = tp-tSTARTTIME;
+    inc *= cva(bgMach).cpufactor;
     tCURRTIME += inc;
     tSTARTTIME = tp;
   }
@@ -692,7 +693,8 @@ double BgGetTime()
     /* accumulate time since last starttime, and reset starttime */
     if (tTIMERON) {
       const double tp2= CmiWallTimer();
-      const double inc = tp2 - tSTARTTIME;
+      double inc = tp2 - tSTARTTIME;
+      inc *= cva(bgMach).cpufactor;
       tCURRTIME += inc;
       tSTARTTIME = tp2;
     }

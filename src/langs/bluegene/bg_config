@@ -5,6 +5,7 @@ cth 1
 wth 1
 stacksize  4000
 timing  walltime
+cpufactor   1.0
 log    no
 correct  no
 traceroot     .

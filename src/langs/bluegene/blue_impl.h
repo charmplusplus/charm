@@ -26,12 +26,19 @@ public:
   int numCth, numWth;           /* number of threads */
   int stacksize;		/* bg thread stack size */
   int timingMethod;		/* timing method */
+  double cpufactor;		/* cpu factor to multiply to the time */
   char *traceroot;		/* bgTraceFile prefix */
   BigSimNetwork *network;	/* network setup */
 public:
   BGMach() {  nullify(); }
   ~BGMach() { if (network) delete network; }
-  void nullify() { x=y=z=0; numCth=numWth=0; stacksize=0; timingMethod = BG_ELAPSE; traceroot=NULL; network=new BlueGeneNetwork;}
+  void nullify() { 
+	x=y=z=0; 
+	numCth=numWth=0; stacksize=0; 
+	timingMethod = BG_ELAPSE; cpufactor=1.0; 
+	traceroot=NULL; 
+	network=new BlueGeneNetwork;
+  }
   void setSize(int xx, int yy, int zz) 
 	{ x=xx; y=yy; z=zz; }
   void getSize(int *xx, int *yy, int *zz) 
