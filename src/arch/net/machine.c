@@ -1803,6 +1803,10 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
     GarbageCollectMsg(ogm);
     break;
   default:
+#ifndef CMK_OPTIMIZE
+    if (dst<0 || dst>=CmiNumPes())
+      CmiAbort("Send to out-of-bounds processor!");
+#endif
     node = nodes_by_pe[dst];
     rank = dst - node->nodestart;
     if (node->nodestart != Cmi_nodestart) {
