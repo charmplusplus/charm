@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.13  2000-01-31 21:10:49  milind
+% Revision 1.14  2000-12-06 21:46:26  milind
+% conv-host => charmrun
+%
+% Revision 1.13  2000/01/31 21:10:49  milind
 % fixed bugs pointed out by quantum TA
 %
 % Revision 1.12  1999/07/09 18:18:39  milind
@@ -157,9 +160,9 @@ The second security issue associated with networked programs is
 associated with the fact that we, the charm developers, need evidence
 that our tools are being used.  (Such evidence is useful in convincing
 funding agencies to continue to support our work.)  To this end, we
-have inserted code in the network {\tt conv-host} program (described
+have inserted code in the network {\tt charmrun} program (described
 later) to notify us that our software is being used.
-Implementationally speaking, the {\tt conv-host} program sends a
+Implementationally speaking, the {\tt charmrun} program sends a
 single {\tt UDP} packet to {\tt charm.cs.uiuc.edu}.  This data is put
 to one use only: it is gathered into tables recording the internet
 domains in which our software is being used, the number of individuals
@@ -167,28 +170,28 @@ at each internet domain, and the frequency with which it is used.
 
 We recognize that some users may have objections to our notification
 code.  Therefore, we have provided a second copy of the {\tt
-conv-host} program with the notification code removed.  If you look
+charmrun} program with the notification code removed.  If you look
 within the charm {\tt bin} directory, you will find these programs:
 
 \begin{verbatim}
     % cd /usr/local/charm/bin
-    % ls conv-host*
-    conv-host
-    conv-host.notify
-    conv-host.silent
+    % ls charmrun*
+    charmrun
+    charmrun.notify
+    charmrun.silent
 \end{verbatim}
 
-The program {\tt conv-host.silent} has the notification code removed.  To
+The program {\tt charmrun.silent} has the notification code removed.  To
 permanently deactivate notification, you may use the version without the
 notification code:
 
 \begin{verbatim}
     % cd /usr/local/charm/bin
-    % cp conv-host.silent conv-host
+    % cp charmrun.silent charmrun
 \end{verbatim}
 
 Although versions for some other machines contain
-programs named {\tt conv-host.notify} and {\tt conv-host.silent}, they
+programs named {\tt charmrun.notify} and {\tt charmrun.silent}, they
 never actually notify us.  The existence of the extra files is just to
 make our compilation scripts more consistent across versions.  The
 {\em only} versions that ever notify us are the network versions.
@@ -212,8 +215,8 @@ binaries are operational:
     % rm -r /usr/local/charm/src
 \end{verbatim}
 
-You may delete the programs {\tt conv-host-notify} and {\tt
-conv-host-silent}, although please read the section on security first.
+You may delete the programs {\tt charmrun-notify} and {\tt
+charmrun-silent}, although please read the section on security first.
 
 Finally, you may {\tt strip} all the binaries in {\tt
 /usr/local/charm/bin}, if we have not already done so.

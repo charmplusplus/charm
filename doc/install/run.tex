@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.14  2000-01-31 21:10:49  milind
+% Revision 1.15  2000-12-06 21:46:26  milind
+% conv-host => charmrun
+%
+% Revision 1.14  2000/01/31 21:10:49  milind
 % fixed bugs pointed out by quantum TA
 %
 % Revision 1.13  1999/09/23 17:02:38  milind
@@ -63,7 +66,7 @@
 
 The Charm linker produces one executable file.  On machines with a host
 (such as a network of workstations), a link to the proper host program
-{\fexec conv-host} is created in the user program directory.  Sample
+{\fexec charmrun} is created in the user program directory.  Sample
 execution examples are given below (the executable is called {\fparm
 pgm}). Exact details will differ from site to site.  The list of Charm
 command line options is in Section~\ref{command line options}.
@@ -96,7 +99,7 @@ command line options is in Section~\ref{command line options}.
 
 \item \underline{\bf Network of workstations:} 
 	\begin{tabbing}
-	{\fexec conv-host pgm +p4}
+	{\fexec charmrun pgm +p4}
 	\end{tabbing}
 	executes {\fparm pgm} on 4 nodes.  In a network environment, Charm must
 	be able to locate the directory of the executable.  If all workstations
@@ -143,10 +146,10 @@ shell\\
 \end{tabbing}
 
 {\bf Note:}
-By default, conv-host uses a remote shell ``rsh'' to spawn node processes
+By default, charmrun uses a remote shell ``rsh'' to spawn node processes
 on the remote hosts. The {\tt shell} qualifier can be used to override
 it with say, ``ssh''. One can set the {\tt CONV\_RSH} environment variable
-or use conv-host option {\tt ++remote-shell} to override the default remote 
+or use charmrun option {\tt ++remote-shell} to override the default remote 
 shell for all hosts with unspecified {\tt shell} qualifier.
 
 All qualifiers accept ``*'' as an argument, this resets the modifier to
@@ -182,7 +185,7 @@ more nodes than there are hosts in the group, it will reuse
 hosts. Thus,
 
 \begin{verbatim}
-        conv-host pgm ++nodegroup kale-sun +p6
+        charmrun pgm ++nodegroup kale-sun +p6
 \end{verbatim}
 
 uses hosts (charm, dp, grace, dagger, charm, dp) respectively as
@@ -192,7 +195,7 @@ If you don't specify a ++nodegroup, the default is ++nodegroup main.
 Thus, if one specifies
 
 \begin{verbatim}
-        conv-host pgm +p4
+        charmrun pgm +p4
 \end{verbatim}
 
 it will use ``localhost'' four times.  ``localhost'' is a Unix
