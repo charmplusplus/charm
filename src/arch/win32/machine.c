@@ -3424,8 +3424,8 @@ void ConverseExit()
     if(Cmi_print_stats)
       printNetStatistics();
     log_done();
-    ConverseCommonExit();
   }
+  ConverseCommonExit();
   ctrl_sendone(120,"ending"); /* this causes host to go away
     (It also causes a write error-- OSL, 12/4/1999) */
   Cmi_check_delay = 2.0;
