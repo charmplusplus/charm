@@ -13,9 +13,9 @@
 #ifndef _PROJECTIONS_H
 #define _PROJECTIONS_H
 
+#include <stdio.h>
+#include <errno.h>
 #include "trace.h"
-#include "stdio.h"
-#include "errno.h"
 
 #if CMK_PROJECTIONS_USE_ZLIB
 #include <zlib.h>

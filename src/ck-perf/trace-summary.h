@@ -15,8 +15,10 @@
 
 #include <stdio.h>
 #include <errno.h>
+
 #include "trace.h"
-#include "ck.h"
+#include "envelope.h"
+#include "register.h"
 #include "trace-common.h"
 
 // initial bin size, time in seconds

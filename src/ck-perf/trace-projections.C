@@ -12,7 +12,7 @@
 /*@{*/
 
 #include "charm++.h"
-#include "ck.h"
+#include "envelope.h"
 #include "trace-common.h"
 #include "trace-projections.h"
 
