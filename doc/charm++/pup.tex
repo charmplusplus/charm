@@ -36,53 +36,92 @@ send \uw{foo} objects in messages, translate \uw{foo}s across processors,
 inspect and modify \uw{foo} objects in the debugger, and checkpoint 
 calculations involving \uw{foo}s.
 
-As shown, data is described by passing it to an object of type 
+As shown, you describe foo's contents by writing a routine called ``pup''
+which passes the parts of foo to an object of type 
 \index{PUP::er} \kw{PUP::er}.  You can apply a \kw{PUP::er} to any 
-primitive variable or variable with a pup routine using ``p|a;''.
+primitive variable or any variable with a pup routine using ``p|a;''.
 For an array of primitive variables, you apply the array and an integer
 that gives the length of the array, as in ``p(q,3);''.  You can pass a 
 simple run of bytes 
 by calling the \kw{PUP::er} with a ``void *'' and number of bytes
-(bytes, however, prevents cross-platform operation).
+Sending data as bytes, however, prevents cross-platform operation,
+and should be avoided if possible.
 
 
-\subsubsection{Using PUPs}
+\subsubsection{PUP contract}
 \label{sec:pupmodes}
 
-The system uses the one pup routine to do both packing and unpacking by
-passing different types of \kw{PUP::er}s to it.  You can determine
-what type of \kw{PUP::er} has been passed to you with the
-\kw{p.isPacking()}, \kw{p.isUnpacking()}, and \kw{p.isSizing()} methods.
-The \kw{p.isDeleting()} method returns true if the pupped object
-will be deleted after packing.
+\charmpp{} uses your pup routine to both pack and unpack, 
+by passing different types of \kw{PUP::er}s to it.  The routine
+\kw{p.isUnpacking()} returns true if your object is being unpacked---that 
+is, your object is being filled with values.  Your pup routine must
+properly save and restore data in both saving and unpacking modes.
 
-Your \kw{PUP::er} will be called in one of the modes (i.e. packing,
-unpacking, deleting, sizing) at various points in its usage.  It must
-support the behavior correct for your data fields in all modes in
-which you expect the \kw{PUP::er} to be used.  Note that packing and
-unpacking are used in migration and parameter marshalling and
-therefore must be supported if you intend to use those features.
 Simple data types, and objects with their own
-\kw{PUP::er} methods, are handled automatically for you in the ``p|a''
+\kw{PUP::er} methods, can be handled directly using the ``p|a''
 syntax.  Complex types, particularly dynamically allocated data types,
 usually require special attention. Typically this only requires
-conditional blocks for
-\kw{p.isPacking()} and
-\kw{p.isUnpacking()} where you perform the appropriate allocation and deallocation.  See Section~\ref{sec:pupdynalloc} for more
+a \kw{p.isUnpacking()} conditional block, where you perform the 
+appropriate allocation.  See Section~\ref{sec:pupdynalloc} for more
 information and examples.   
 
+There are three separate types of \kw{PUP::er}: sizing, which 
+only computes the size of your data without modifying it;
+packing, which reads values out of your data; and unpacking,
+which writes values into your data.  You can determine
+exactly which type of \kw{PUP::er} was passed to you using the
+\kw{p.isSizing()}, \kw{p.isPacking()}, and \kw{p.isUnpacking()}
+routines, however, sizing and packing should almost always be 
+handled identically, so most programs should use \kw{p.isUnpacking()}
+and \kw{!p.isUnpacking()}.  Any program that calls \kw{p.isPacking()} 
+and does not also call \kw{p.isSizing()} is probably a bug; because
+sizing and packing must see the same data.
+
+The \kw{p.isDeleting()} flag indicates the object will be deleted
+after calling the pup routine.  This is normally only needed for
+pup routines called via the C or f90 interface, as provided by 
+AMPI or the FEM framework.  Other \charmpp{} array elements, 
+marshalled parameters, and other C++ interface objects 
+have their destructor called when they are deleted, so the 
+\kw{p.isDeleting()} call is not normally required.
+
+
 \paragraph{PUP operator |}
+\label{sec:pupstl}
 
-The easiest syntax to use for PUPs is the style developed for
-parameter marshalling ``p|a'' where p is the name of the \kw{PUP::er}
-and a is the object to be PUPed.  This is equivalent to ``p(a)'' in
-most cases.  It works wherever a is a simple type, or a is PUP::able
-(\ref{sec:pup::able}), or a has a \kw{PUP::er} defined, and \kw{operator |}
-is not overridden for a.  
+The recommended way to pup an object a is to simply call ``p|a''.
 
-If you know that all your data fields can be handled by a simple byte
-to byte copy then
-\kw{\#define~CK\_DEFAULT\_BITWISE\_PUP=1} will default  \kw{operator |} for all user defined types to a bitwise copy operation.  We do not recommended it.  It creates a potential for difficult to trace errors to occur when new types are added which are not correctly handled bitwise and the programmer neglects to write a proper PUP.
+The ``p|a'' syntax works wherever a is:
+
+\begin{itemize}
+ \item A simple type, including char, short, int, long, float, or double.
+    In this case, ``p|a'' is equivalent to ``p(a)''.  
+ \item An object with a pup routine.
+    In this case, ``p|a'' is equivalent to ``a.pup(p)''.  
+ \item A pointer to a PUP::able object, as described in Section~\ref{sec:pup::able}.
+ \item An object with a \kw{PUPbytes}(\uw{myClass}) declaration in the header.
+ \item An object with a custom \kw{operator |} defined.
+\end{itemize}
+
+If the variable a is from the C++ Standard Template Library, you can include 
+operator\verb.|.'s for the STL types vector, map, list, pair, and string 
+by including the header ``pup\_stl.h''.
+
+If the object does not have a pup routine, but can be packed as raw bytes,
+add the macro \kw{PUPbytes}(\uw{myClass}) in the header.  This will define
+an operator\verb.|. to pup the class as sizeof(myClass) raw bytes.
+
+If the object does not have a pup routine, and you cannot add one or use 
+PUPbytes, you can define an operator\verb.|. to pup the object.
+For example, if \uw{myClass} contains two fields \uw{a} and \uw{b}, the 
+operator\verb.|. might look like:
+
+\begin{alltt}
+  inline void operator|(PUP::er &p,myClass &c) \{
+    p|c.a;
+    p|c.b;
+  \}
+\end{alltt}
 
 \paragraph{PUP overhead}
 \label{sec:pupoverhead}
@@ -98,30 +137,6 @@ normally a simple memory-to-memory binary copy.
 The pup syntax ``p\verb.|.a'' normally results in a call to a's pup routine. 
 Note that this syntax is also used by parameter marshalling and copying readonly
 variables.
-
-\paragraph{PUPs for STL}
-\label{sec:pupstl}
-
-If the variable a is from the C++ Standard Template Library, you must include the 
-operator\verb.|.'s for STL types by including the header ``pup\_stl.h''.
-If a is from some class \uw{myClass} that does not have a pup routine, you will 
-have to either write a pup routine or else define an operator\verb.|. for \uw{myClass}:
-
-\begin{itemize}
-\item Use the macro \kw{PUPbytes}(\uw{myClass}) in the header, which defines
-an operator\verb.|. to pup the class as sizeof(myClass) raw bytes.
-\item Define an operator\verb.|. for \uw{myClass} that does the appropriate packing.
-For example, if \uw{myClass} contains two fields \uw{a} and \uw{b}, the 
-operator\verb.|. might look like:
-
-\begin{alltt}
-  inline void operator|(PUP::er &p,myClass &c) \{
-    p|c.a;
-    p|c.b;
-  \}
-\end{alltt}
-
-\end{itemize}
 
 \paragraph{PUP structured dagger}
 \label{sec:pupsdag}
@@ -173,6 +188,7 @@ actually deallocate all data when passed a deleting \kw{pup\_er}.
 C and Fortran users cannot use \kw{PUP::able} objects, 
 seeking, or write custom \kw{PUP::er}s. Using the \CC\
 interface is recommended.
+
 
 \subsubsection{Dynamic Allocation}
 \label{sec:pupdynalloc}
