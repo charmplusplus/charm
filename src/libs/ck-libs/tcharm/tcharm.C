@@ -137,7 +137,10 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
   threadInfo.thisElement=thisIndex;
   threadInfo.numElements=initMsg->numElements;
-  heapBlocks=CmiIsomallocBlockListNew();
+  if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+  	heapBlocks=CmiIsomallocBlockListNew();
+  else
+  	heapBlocks=0;
   nUd=0;
   usesAtSync=CmiTrue;
   run();
@@ -150,6 +153,7 @@ TCharm::TCharm(CkMigrateMessage *msg)
   tid=NULL;
   threadGlobals=NULL;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
+  heapBlocks=0;
 }
 
 void checkPupMismatch(PUP::er &p,int expected,const char *where)
@@ -236,7 +240,8 @@ void TCharm::pupThread(PUP::er &pc) {
       BgAttach(tid);
 #endif
     }
-    CmiIsomallocBlockListPup(p,&heapBlocks);
+    if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+      CmiIsomallocBlockListPup(p,&heapBlocks);
     threadGlobals=CtgPup(p,threadGlobals);
     checkPupMismatch(pc,5139,"after TCHARM thread");
 }
@@ -266,7 +271,7 @@ void TCharm::UserData::pup(PUP::er &p)
 
 TCharm::~TCharm()
 {
-  CmiIsomallocBlockListDelete(heapBlocks);
+  if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
   CthFree(tid);
   CtgFree(threadGlobals);
   delete initMsg;
@@ -293,7 +298,7 @@ void TCharm::ckJustMigrated(void) {
 // clear the data before restarting from disk
 void TCharm::clear()
 {
-  CmiIsomallocBlockListDelete(heapBlocks);
+  if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
   CthFree(tid);
   delete initMsg;
 }

@@ -208,8 +208,10 @@ class TCharm: public CBase_TCharm
 	static void activateThread(void) {
 		TCharm *tc=CtvAccess(_curTCharm);
 		if (tc!=NULL) {
-			CmiIsomallocBlockListActivate(tc->heapBlocks);
-			CtgInstall(tc->threadGlobals);
+			if (tc->heapBlocks)
+				CmiIsomallocBlockListActivate(tc->heapBlocks);
+			if (tc->threadGlobals)
+				CtgInstall(tc->threadGlobals);
 		}
 	}
 	//Leaving this thread's context: turn stuff back off
