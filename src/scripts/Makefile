@@ -200,6 +200,12 @@ cpthreads.o: cpthreads.c $(CVHEADERS)
 memory.o: memory.c $(CVHEADERS)
 	$(CHARMC) memory.c
 
+edgelist.o : edgelist.c ../../src/Common/conv-ldb/typedefs.h $(CVHEADERS)
+	$(CHARMC) -I../../src/Common/conv-ldb/ edgelist.c
+
+generate.o : generate.c ../../src/Common/conv-ldb/typedefs.h $(CVHEADERS)
+	$(CHARMC) -I../../src/Common/conv-ldb/ generate.c
+
 cldb.o: cldb.c ../../src/Common/conv-ldb/cldb.h $(CVHEADERS)
 	$(CHARMC) -I../../src/Common/conv-ldb/ cldb.c
 
