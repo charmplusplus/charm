@@ -110,6 +110,7 @@ public:
       delete [] to_proc;
       deleteCommHash();
     }
+    double computeAverageLoad();
     void pup(PUP::er &p);
     int useMem();
   };

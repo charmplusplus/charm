@@ -773,6 +773,22 @@ int CentralLB::LDStats::getHash(const LDObjKey &objKey)
   return getHash(oid, mid);
 }
 
+double CentralLB::LDStats::computeAverageLoad()
+{
+  int i, numAvail=0;
+  double total = 0;
+  for (i=0; i<n_objs; i++) total += objData[i].wallTime;
+                                                                                
+  for (i=0; i<count; i++)
+    if (procs[i].available == CmiTrue) {
+        total += procs[i].bg_walltime;
+	numAvail++;
+    }
+                                                                                
+  double averageLoad = total/numAvail;
+  return averageLoad;
+}
+
 void CentralLB::LDStats::pup(PUP::er &p)
 {
   int i;
