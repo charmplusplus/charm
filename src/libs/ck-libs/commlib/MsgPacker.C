@@ -2,7 +2,7 @@
 #include "register.h"
 #include "ComlibManager.h"
 
-CpvExtern(int, RecvCombinedShortMsgHdlrIdx);
+CkpvExtern(int, RecvCombinedShortMsgHdlrIdx);
 
 void short_envelope::pup(PUP::er &p){
     p | idx;
@@ -75,7 +75,7 @@ void MsgPacker::getMessage(CombinedMessage *&cmb_msg, int &total_size){
     cmb_msg->aid = aid;
     cmb_msg->nmsgs = nShortMsgs;
 
-    CmiSetHandler(cmb_msg, CpvAccess(RecvCombinedShortMsgHdlrIdx));
+    CmiSetHandler(cmb_msg, CkpvAccess(RecvCombinedShortMsgHdlrIdx));
 }
 
 

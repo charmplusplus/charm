@@ -26,7 +26,7 @@ CkHashCode ComlibSectionHashKey::staticHash(const void *v,size_t){
     return ((const ComlibSectionHashKey *)v)->hash();
 }
 
-CpvExtern(CkGroupID, cmgrID);
+CkpvExtern(CkGroupID, cmgrID);
 
 void *DMHandler(void *msg){
     ComlibPrintf("[%d]:In CallbackHandler\n", CkMyPe());
@@ -36,7 +36,7 @@ void *DMHandler(void *msg){
     int instid = bmsg->_cookie.sInfo.cInfo.instId;
     
     nm_mgr = (DirectMulticastStrategy *) 
-        CProxy_ComlibManager(CpvAccess(cmgrID)).
+        CProxy_ComlibManager(CkpvAccess(cmgrID)).
         ckLocalBranch()->getStrategy(instid);
     
     nm_mgr->handleMulticastMessage(msg);
@@ -167,7 +167,7 @@ void DirectMulticastStrategy::pup(PUP::er &p){
 void DirectMulticastStrategy::beginProcessing(int numElements){
     
     messageBuf = new CkQ<CharmMessageHolder *>;    
-    handlerId = CmiRegisterHandler((CmiHandler)DMHandler);    
+    handlerId = CkRegisterHandler((CmiHandler)DMHandler);    
     
     if(isDestinationArray) {
         CkArray *dest_array = CkArrayID::CkLocalBranch(destArrayID);

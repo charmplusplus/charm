@@ -3,8 +3,8 @@
 #include "string.h"
 
 //EachToManyMulticastStrategy CODE
-CpvExtern(int, RecvdummyHandle);
-CpvExtern(CkGroupID, cmgrID);
+CkpvExtern(int, RecvdummyHandle);
+CkpvExtern(CkGroupID, cmgrID);
 
 void *itrDoneHandler(void *msg){
 
@@ -18,7 +18,7 @@ void *itrDoneHandler(void *msg){
     ComlibPrintf("[%d] Iteration finished %d\n", CkMyPe(), instid);
 
     StrategyTable *sentry = 
-        CProxy_ComlibManager(CpvAccess(cmgrID)).ckLocalBranch()
+        CProxy_ComlibManager(CkpvAccess(cmgrID)).ckLocalBranch()
         ->getStrategyTableEntry(instid);
     int nexpected = sentry->numElements;
     
@@ -39,7 +39,7 @@ void *E2MHandler(void *msg){
     int instid = bmsg->_cookie.sInfo.cInfo.instId;
     
     nm_mgr = (EachToManyMulticastStrategy *) 
-        CProxy_ComlibManager(CpvAccess(cmgrID)).
+        CProxy_ComlibManager(CkpvAccess(cmgrID)).
         ckLocalBranch()->getStrategy(instid);
     
     nm_mgr->localMulticast(msg);
@@ -307,7 +307,7 @@ void EachToManyMulticastStrategy::doneInserting(){
         ComlibDummyMsg * dummymsg = new ComlibDummyMsg;
         ComlibPrintf("[%d] Creating a dummy message\n", CkMyPe());
         CmiSetHandler(UsrToEnv(dummymsg), 
-                      CpvAccess(RecvdummyHandle));
+                      CkpvAccess(RecvdummyHandle));
         
         CharmMessageHolder *cmsg = new CharmMessageHolder((char *)dummymsg, 
                                                           CkMyPe());
@@ -394,7 +394,7 @@ void EachToManyMulticastStrategy::pup(PUP::er &p){
     
     if(p.isUnpacking()){
 	messageBuf = new CkQ<CharmMessageHolder *>;
-	handlerId = CmiRegisterHandler((CmiHandler)E2MHandler);
+	handlerId = CkRegisterHandler((CmiHandler)E2MHandler);
 
         MyPe = procMap[CkMyPe()];
         
@@ -416,7 +416,7 @@ void EachToManyMulticastStrategy::pup(PUP::er &p){
 }
 
 void EachToManyMulticastStrategy::beginProcessing(int numElements){
-    int handler = CmiRegisterHandler((CmiHandler)itrDoneHandler);
+    int handler = CkRegisterHandler((CmiHandler)itrDoneHandler);
     ComlibPrintf("[%d]Registering Callback Handler\n", CkMyPe());
     comid.callbackHandler = handler;
     comid.instanceID = myInstanceID;
@@ -425,7 +425,7 @@ void EachToManyMulticastStrategy::beginProcessing(int numElements){
     MaxSectionID = 0;
     if(isArray) 
         expectedDeposits = 
-            CProxy_ComlibManager(CpvAccess(cmgrID)).ckLocalBranch()->
+            CProxy_ComlibManager(CkpvAccess(cmgrID)).ckLocalBranch()->
             getStrategyTableEntry(myInstanceID)->numElements;        
     
     if(isGroup) {
@@ -436,7 +436,7 @@ void EachToManyMulticastStrategy::beginProcessing(int numElements){
             }
         
         StrategyTable *sentry = 
-            CProxy_ComlibManager(CpvAccess(cmgrID)).ckLocalBranch()
+            CProxy_ComlibManager(CkpvAccess(cmgrID)).ckLocalBranch()
             ->getStrategyTableEntry(myInstanceID);
         sentry->numElements = expectedDeposits;
     }

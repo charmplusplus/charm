@@ -45,8 +45,8 @@
 #define BLKSTART(m) (((CmiChunkHeader *)(m))-1)
 
 // These externs are defined inside ComlibManager.C.
-CpvExtern(CkGroupID, cmgrID);
-CpvExtern(int, RecvmsgHandle);
+CkpvExtern(CkGroupID, cmgrID);
+CkpvExtern(int, RecvmsgHandle);
 
 
 /**************************************************************************
@@ -139,7 +139,7 @@ void column_handler (char *msg)
   num_msgs = ((int *) (msg + CmiMsgHeaderSizeBytes))[1];
 
   classptr = (MeshStreamingStrategy *)
-             CProxy_ComlibManager (CpvAccess (cmgrID)).
+             CProxy_ComlibManager (CkpvAccess (cmgrID)).
              ckLocalBranch()->getStrategy (strategy_id);
 
   row_length = classptr->GetRowLength ();
@@ -350,10 +350,10 @@ void MeshStreamingStrategy::beginProcessing (int ignored)
 
   row_bucket = new CkQ<char *>[num_rows];
 
-  column_handler_id = CmiRegisterHandler ((CmiHandler) column_handler);
+  column_handler_id = CkRegisterHandler ((CmiHandler) column_handler);
 
-  CcdCallOnConditionKeep (CcdPROCESSOR_BEGIN_IDLE, idle_flush_handler,
-			  (void *) this);
+  CcdCallOnConditionKeepOnPE(CcdPROCESSOR_BEGIN_IDLE, idle_flush_handler,
+			  (void *) this, CkMyPe());
   RegisterPeriodicFlush ();
 }
 
@@ -367,7 +367,7 @@ void MeshStreamingStrategy::RegisterPeriodicFlush (void)
 {
   ComlibPrintf ("[%d] MeshStreamingStrategy::RegisterPeriodicFlush() invoked.\n", CkMyPe());
 
-  CcdCallFnAfter (periodic_flush_handler, (void *) this, flush_period);
+  CcdCallFnAfterOnPE(periodic_flush_handler, (void *) this, flush_period, CkMyPe());
 }
 
 
@@ -514,7 +514,7 @@ void MeshStreamingStrategy::FlushRow (int row)
 
     for (i = 0; i < num_msgs; i++) {
       msg = row_bucket[row].deq ();
-      CmiSetHandler (msg, CpvAccess(RecvmsgHandle));
+      CmiSetHandler (msg, CkpvAccess(RecvmsgHandle));
       sizes[i] = SIZEFIELD (msg);
       msgComps[i] = msg;
     }

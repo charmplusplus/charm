@@ -81,7 +81,7 @@ void MPIStrategy::doneInserting(){
         if((recv_msg_size > 0) && recv_msg_size < MPI_MAX_MSG_SIZE) {
             ComlibPrintf("[%d] Receiving message of size %d\n", CkMyPe(), 
                          recv_msg_size);
-            CmiSyncSend(CmiMyPe(), recv_msg_size, recv_msg);
+            CmiSyncSend(CkMyPe(), recv_msg_size, recv_msg);
         }
         buf_ptr += MPI_MAX_MSG_SIZE;
     }

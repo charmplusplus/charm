@@ -115,7 +115,7 @@ static void call_delayFlush(void *arg,double curWallTime){
 
 void StreamingStrategy::registerFlush(void) {
     // CkPrintf("[%d] Will call function again every %d ms\n",CkMyPe(),PERIOD);
-    CcdCallFnAfter((CcdVoidFn)call_delayFlush, (void *)this, PERIOD);
+    CcdCallFnAfterOnPE((CcdVoidFn)call_delayFlush, (void *)this, PERIOD, CkMyPe());
 }
 
 /// This routine is called via CcdCallOnCondition to flush all messages:
@@ -129,8 +129,8 @@ void StreamingStrategy::beginProcessing(int ignored) {
     registerFlush();
     
     if(idleFlush)
-        CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
-                               (CcdVoidFn)call_idleFlush, (void *)this);
+        CcdCallOnConditionKeepOnPE(CcdPROCESSOR_BEGIN_IDLE,
+                            (CcdVoidFn)call_idleFlush, (void *)this, CkMyPe());
 }
 
 void StreamingStrategy::pup(PUP::er &p){

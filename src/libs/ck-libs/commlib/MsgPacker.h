@@ -20,9 +20,15 @@ class short_envelope {
 };
 PUPmarshall(short_envelope);
 
+#if CMK_BLUEGENE_CHARM
+#define CmiReservedHeaderSize   CmiBlueGeneMsgHeaderSizeBytes
+#else
+#define CmiReservedHeaderSize   CmiMsgHeaderSizeBytes
+#endif
+
 struct CombinedMessage{
 
-    char header[CmiMsgHeaderSizeBytes];
+    char header[CmiReservedHeaderSize];
     CkArrayID aid;
     int nmsgs;
 };

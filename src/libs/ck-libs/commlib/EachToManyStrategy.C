@@ -1,7 +1,7 @@
 #include "EachToManyStrategy.h"
 
-CpvExtern(int, RecvmsgHandle);
-CpvExtern(int, RecvdummyHandle);
+CkpvExtern(int, RecvmsgHandle);
+CkpvExtern(int, RecvdummyHandle);
 
 void setReverseMap(int *procMap, int *pelist, int npes){
     int pcount;
@@ -107,7 +107,7 @@ void EachToManyStrategy::doneInserting(){
         ComlibPrintf("Creating a dummy message\n");
         
         CmiSetHandler(UsrToEnv(dummymsg), 
-                      CpvAccess(RecvdummyHandle));
+                      CkpvAccess(RecvdummyHandle));
 
         CharmMessageHolder *cmsg = new CharmMessageHolder((char *)dummymsg, 
                                                           CkMyPe());

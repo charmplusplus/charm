@@ -258,8 +258,8 @@ void NodeMulticast::doneInserting(){
             prevCount ++;
             if((prevCount % MAX_SENDS_PER_BATCH == 0) &&
                (prevCount != numNodes)) {
-                CcdCallFnAfter((CcdVoidFn)call_doneInserting, (void *)this, 
-                               MULTICAST_DELAY);
+                CcdCallFnAfterOnPE((CcdVoidFn)call_doneInserting, (void *)this, 
+                               MULTICAST_DELAY, CkMyPe());
                 return;
             }
             prevCount = 0;
@@ -312,8 +312,8 @@ void NodeMulticast::pup(PUP::er &p){
         messageBuf = new CkQ <CharmMessageHolder *>;
         myRank = CkMyPe() % pes_per_node;
         
-        NodeMulticastHandlerId = CmiRegisterHandler((CmiHandler)NodeMulticastHandler);
-	NodeMulticastCallbackHandlerId = CmiRegisterHandler
+        NodeMulticastHandlerId = CkRegisterHandler((CmiHandler)NodeMulticastHandler);
+	NodeMulticastCallbackHandlerId = CkRegisterHandler
 	    ((CmiHandler)NodeMulticastCallbackHandler);
 	
         nm_mgr = this;
