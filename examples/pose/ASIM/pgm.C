@@ -84,7 +84,12 @@ main::main(CkArgMsg *m)
 
   POSE_init();
   //POSE_useQD();
+#if USE_LONG_TIMESTAMPS
+  POSE_useET(atoll(m->argv[7]));
+#else
   POSE_useET(atoi(m->argv[7]));
+#endif
+
   //  POSE_useID();
 
   // create all the workers

@@ -35,7 +35,8 @@ class WorkerData {
   int numObjs, numMsgs, msgSize, distribution, connectivity, locality;
   int grainSize, elapsePattern, offsetPattern, sendPattern;
   double granularity;
-  int elapseTimes[5], numSends[5], offsets[5], neighbors[100];
+  POSE_TimeType elapseTimes[5];
+  int numSends[5], offsets[5], neighbors[100];
   int numNbrs;
   WorkerData& operator=(const WorkerData& obj) {
     int i;
