@@ -13,6 +13,7 @@
 CpvDeclare(int, traceOn); /* For threads.c */
 CpvDeclare(int, _traceCoreOn);   /* For cursed projector core */
 int _threadEP=-123; /* for charmProjections.C */
+int traceBluegeneLinked = 0;
 
 void traceInit(char **argv) {
   CpvInitialize(int, traceOn);
