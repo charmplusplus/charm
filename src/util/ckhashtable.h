@@ -49,6 +49,8 @@ void CkHashtableRemove(CkHashtable_c h,const void *doomedKey);
 #ifndef __OSL_HASH_TABLE_CPP
 #define __OSL_HASH_TABLE_CPP
 
+#include <stdio.h>
+
 //This data type is used to index into the hash table.
 // For best results, all the bits of the hashCode should be
 // meaningful (especially the high bits).
@@ -86,8 +88,8 @@ private:
 	void operator=(const CkHashtable &);
 protected:
 	int len;//Vertical dimention of below array (best if prime)
-	short kb,ob;//Bytes per key; bytes per object. eb=kb+ob
-	short eb; //Bytes per hash entry-- horizontal dimention of below array
+	unsigned short kb,ob;//Bytes per key; bytes per object. eb=kb+ob
+	unsigned short eb; //Bytes per hash entry-- horizontal dimention of below array
 	typedef char *entry_t;
 	entry_t *table;//Storage for keys and objects (len rows; eb columns)
 	
@@ -138,6 +140,9 @@ public:
 	
 	//Remove this object from the hashtable (re-hashing if needed)
 	void remove(const void *key);
+
+	//Remove all objects and keys
+	void empty(void);
 	
 	int numObjects(void) const { return nObj; } 
 	
@@ -173,6 +178,7 @@ public:
 	void *next(void **retKey=NULL);
 };
 
+
 /////////////////// Templated Hashtable /////////////////
 /*
 This class provides a thin typesafe layer over the (unsafe)
@@ -181,12 +187,13 @@ comes at zero time and space cost over the unsafe version.
 The unsafe version exists to avoid the code bloat associated
 with profligate use of templates.
 */
+
 template <class KEY, class OBJ> 
-class CkHashtableT:public CkHashtable {
+class CkHashtableTslow:public CkHashtable {
 public:
 	//Constructor-- create an empty hash table of at least the given size
-	CkHashtableT(
-		int initLen=5,float NloadFactor=0.75,
+	CkHashtableTslow(
+		int initLen=5,float NloadFactor=0.5,
 		CkHashFunction Nhash=CkHashFunction_default,
 		CkHashCompare Ncompare=CkHashCompare_default)
 	 :CkHashtable(sizeof(KEY),sizeof(OBJ),initLen,NloadFactor,Nhash,Ncompare)
@@ -198,32 +205,73 @@ public:
 		if (r==NULL) return OBJ(0);
 		else return *(OBJ *)r;
 	}
+	//Use this version when you're sure the entry exists
+	OBJ &getRef(const KEY &key) {
+		return *(OBJ *)CkHashtable::get((const void *)&key);
+	}
 	void remove(const KEY &key) {CkHashtable::remove((const void *)&key);}
+};
 
-#if !CMK_TEMPLATE_MEMBERS_BROKEN
-	//Declare the HASH & COMPARE functions inline for a 
-	// completely inlined (very fast) hashtable lookup.
-	// Be sure the hash and compare functions return the same
-	//  values as the non-inlined versions.
-	typedef CkHashCode (*CkHashFunction_fast)(const KEY &keyData);
-	typedef int (*CkHashCompare_fast)(const KEY &key1,const KEY &key2);
+//Declare the KEY.hash & KEY.compare functions inline for a 
+// completely inlined (very fast) hashtable lookup.	
+// Be sure the hash and compare functions return the same
+//  values as the non-inlined versions passed to the constructor.
+template <class KEY, class OBJ> 
+class CkHashtableT:public CkHashtableTslow<KEY,OBJ> {
+public:
+	//Constructor-- create an empty hash table of at least the given size
+	CkHashtableT(
+		int initLen=5,float NloadFactor=0.5,
+		CkHashFunction Nhash=KEY::staticHash,
+		CkHashCompare Ncompare=KEY::staticCompare)
+		:CkHashtableTslow<KEY,OBJ>(initLen,NloadFactor,Nhash,Ncompare)
+	 {}
 	
-	template <CkHashFunction_fast HASH,CkHashCompare_fast COMPARE>
-	OBJ get_fast(const KEY &key) {
-		int i=HASH(key)%len;
+	OBJ get(const KEY &key) {
+		int i=key.hash()%len;
 		while(true) {//Assumes key or empty slot will be found
 			entry_t *cur=table+i*(sizeof(KEY)+sizeof(OBJ));
 			//Is this the key?
-			if (COMPARE(key,*(const KEY *)cur))
+			if (key.compare(*(const KEY *)cur))
 				return *(OBJ *)(cur+sizeof(KEY));
 			//An empty slot indicates the key is not here
 			if (-17==*(int *)cur) return OBJ(0);
 			inc(i);
 		};
 	}
-#endif
+	//Use this version when you're sure the entry exists
+	OBJ &getRef(const KEY &key) {
+		int i=key.hash()%len;
+		while(true) {//Assumes key or empty slot will be found
+			entry_t *cur=table+i*(sizeof(KEY)+sizeof(OBJ));
+			//Is this the key?
+			if (key.compare(*(const KEY *)cur))
+				return *(OBJ *)(cur+sizeof(KEY));
+			inc(i);
+		};
+	}
 };
-
+/*A useful adaptor class for using basic (memory only)
+  types like int, short, char, etc. as hashtable keys.
+ */
+template <class T> class CkHashtableAdaptorT {
+	T val;
+public:
+	CkHashtableAdaptorT<T>(const T &v):val(v) {}
+	operator T & () {return val;}
+	operator const T & () const {return val;}
+	inline CkHashCode hash(void) const 
+		{return (CkHashCode)val;}
+	static CkHashCode staticHash(const void *k,size_t) 
+		{return ((CkHashtableAdaptorT<T> *)k)->hash();}
+	inline int compare(const CkHashtableAdaptorT<T> &t) const
+		{return val==t.val;}
+	static int staticCompare(const void *a,const void *b,size_t) 
+	{
+		return ((CkHashtableAdaptorT<T> *)a)->
+		     compare(*(CkHashtableAdaptorT<T> *)b);
+	}
+};
 
 #endif /*__OSL_HASH_TABLE_C++*/
 

@@ -174,6 +174,15 @@ CkHashtable::~CkHashtable()
 	nObj=-1;
 }
 
+//Remove all keys and objects
+void CkHashtable::empty(void)
+{
+	for (int i=0;i<len;i++) {
+		entry_t *dest=entry(i);
+		emptyKey(e2k(dest));
+	}
+}
+
 //Add the given object to this table under the given key
 // Returns pointer to object storage.
 // Table will be resized if needed.
