@@ -220,6 +220,7 @@ public:
 	inline int getLength(void) const {return dataSize;}
 	inline int getSize(void) const {return dataSize;}
 	inline void *getData(void) {return data;}
+	inline const void *getData(void) const {return data;}
 
 	inline int getGcount(void){return gcount;}
 	inline CkReduction::reducerType getReducer(void){return reducer;}
