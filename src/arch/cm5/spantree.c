@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-10-18 22:22:15  jyelon
+ * Revision 2.5  1995-10-23 22:37:48  jyelon
+ * Removed references to Ck, again.
+ *
+ * Revision 2.4  1995/10/18  22:22:15  jyelon
  * Corrected CkPrintf-->CmiPrintf (??!!)
  *
  * Revision 2.3  1995/09/29  09:50:07  jyelon
@@ -95,7 +98,7 @@ CmiSpanTreeInit()
 
     for (i = 0; i < numnodes; i++)  /* check */
 	if (!visited[i])
-	   CkError("node %d not part of spanning tree: initialization error!\n",i);
+	   CmiError("node %d not part of spanning tree: initialization error!\n",i);
 }
 
 
@@ -138,11 +141,11 @@ static PrintSpanTree()
 
     for (i = 0; i < numnodes; i++)
     {
-	CkPrintf("node: %d, parent: %d, numchildren: %d, children: ",
+	CmiPrintf("node: %d, parent: %d, numchildren: %d, children: ",
 		 i, SpanArray[i].parent, SpanArray[i].noofchildren); 
 	for (j = 0; j < SpanArray[i].noofchildren; j++)
-	     CkPrintf("%d ",SpanArray[i].children[j]);
-	CkPrintf("\n");
+	     CmiPrintf("%d ",SpanArray[i].children[j]);
+	CmiPrintf("\n");
     }
 }
 
