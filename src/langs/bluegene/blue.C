@@ -277,12 +277,12 @@ void nodeInfo::addBgNodeMessage(char *msgPtr)
   }
   /* all worker threads are busy */   
   DEBUGF(("all work threads are busy.\n"));
-  nodeQ.enq(msgPtr);
 #if SCHEDULE_WORK
+#if 0
   DEBUGF(("[N%d] activate all work threads on N%d.\n", id));
   double nextT = CmiBgMsgRecvTime(msgPtr);
   unsigned int prio = (unsigned int)(nextT*PRIO_FACTOR)+1;
-#if 0
+  nodeQ.enq(msgPtr);
   for (i=0; i<cva(numWth); i++) 
   {
       CthThread tid = threadTable[i];
@@ -290,9 +290,16 @@ void nodeInfo::addBgNodeMessage(char *msgPtr)
   }
 #else
     // only awake rank 0 thread
+  threadinfo[0]->addBgThreadMessage(msgPtr);
+/*
+  affinityQ[0].enq(msgPtr);
   CthThread tid = threadTable[0];
   CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
+*/
 #endif
+
+#else
+  nodeQ.enq(msgPtr);
 #endif
 }
 
@@ -1107,6 +1114,7 @@ void work_thread(threadInfo *tinfo)
     int e2 = q2.isEmpty();
     int fromQ2 = 0;		// delay the deq of msg from affinity queue
 
+    // not deq from nodeQ assuming no interrupt in the handler
     if (e1 && !e2) { msg = q2[0]; fromQ2 = 1;}
 //    else if (e2 && !e1) { msg = q1.deq(); }
     else if (e2 && !e1) { msg = q1[0]; }
