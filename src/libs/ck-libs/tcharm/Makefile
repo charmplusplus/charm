@@ -3,7 +3,7 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=tcharm_impl.h tcharm.h tcharmc.h tcharmf.h tcharm.decl.h
 OBJS=tcharm.o
-COMPAT=compat_uns.o compat_us.o compat_funs.o compat_fus.o
+COMPAT=compat_uns.o compat_us.o compat_funs.o compat_fus.o compat_regmm.o
 DEST=$(CDIR)/lib/libmoduletcharm.a
 
 all: $(DEST)
