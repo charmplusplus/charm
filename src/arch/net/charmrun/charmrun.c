@@ -71,7 +71,7 @@
 #  endif
 #endif
 
-#include "../daemon.h"
+#include "daemon.h"
 
 /*#define DEBUGF(x) printf x*/
 #define DEBUGF(x) 
@@ -1672,14 +1672,19 @@ int main(int argc, char **argv, char **envp)
 #if !CMK_RSH_KILL
   finish_nodes();
 #endif
+#if ! CONVERSE_VERSION_VMI
+  /* vmi version clients don't connect back */
   req_client_connect();
+#endif
 #if CMK_RSH_KILL
   kill_nodes();
 #endif
   if(arg_verbose) fprintf(stderr, "Charmrun> node programs all connected\n");
 
   /* enter request-service mode */
+#if ! CONVERSE_VERSION_VMI
   while (1) req_poll();
+#endif
 }
 
 /*This little snippet creates a NETSTART 
@@ -2064,7 +2069,11 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   char *arg_nodeprog_r,*arg_currdir_r;
   char *dbg=nodetab_debugger(nodeno);
   char *host=nodetab_name(nodeno);
+#if ! CONVERSE_VERSION_VMI
 #define CLOSE_ALL " < /dev/null 1> /dev/null 2> /dev/null &"
+#else
+#define CLOSE_ALL " < /dev/null &"
+#endif
 
   fprintf(f, /*Echo: prints out status message*/
   	"Echo() {\n"
@@ -2108,6 +2117,11 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   fprintf(f,"CmiMyNode='%d'; export CmiMyNode\n",nodeno);
   fprintf(f,"CmiMyNodeSize='%d'; export CmiMyNodeSize\n",nodetab_getnodeinfo(nodeno)->cpus);
   fprintf(f,"CmiNumNodes='%d'; export CmiNumNodes\n",nodetab_rank0_size);
+#if CONVERSE_VERSION_VMI
+  /* VMI environment variable */
+  fprintf(f,"VMI_PROCS='%d'; export VMI_PROCS\n",arg_requested_pes);
+  fprintf(f,"VMI_KEY='charmrun%d'; export VMI_KEY\n",getpid());
+#endif
   
   if (arg_verbose) {
     printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, rank0no);
