@@ -2605,7 +2605,8 @@ void Entry::genReg(XStr& str)
   /* attributes */
   str << ", 0";
   if (attribs & SNOKEEP) str << "+CK_EP_NOKEEP";
-  if (attribs & SIMMEDIATE) str << "+CK_EP_TRACEDIABLE";
+  if (attribs & SNOTRACE) str << "+CK_EP_TRACEDISABLE";
+  if (attribs & SIMMEDIATE) str << "+CK_EP_TRACEDISABLE";
   if (internalMode) str << "+CK_EP_INTRINSIC";
   str << ");\n";
   if (isConstructor()) {

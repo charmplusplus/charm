@@ -692,7 +692,8 @@ class Message : public TEntity {
 #define SCREATEHOME   0x80 //<- is a create-at-home-if-nonexistant
 #define SIMMEDIATE    0x100 //<- is a immediate
 #define SNOKEEP       0x200
-#define SSKIPSCHED    0x400 //<- is a message skipping charm scheduler
+#define SNOTRACE      0x400
+#define SSKIPSCHED    0x800 //<- is a message skipping charm scheduler
 
 /* An entry construct */
 class Entry : public Member {

@@ -57,35 +57,36 @@
      CREATEHERE = 283,
      CREATEHOME = 284,
      NOKEEP = 285,
-     VOID = 286,
-     CONST = 287,
-     PACKED = 288,
-     VARSIZE = 289,
-     ENTRY = 290,
-     FOR = 291,
-     FORALL = 292,
-     WHILE = 293,
-     WHEN = 294,
-     OVERLAP = 295,
-     ATOMIC = 296,
-     FORWARD = 297,
-     IF = 298,
-     ELSE = 299,
-     CONNECT = 300,
-     PUBLISHES = 301,
-     IDENT = 302,
-     NUMBER = 303,
-     LITERAL = 304,
-     CPROGRAM = 305,
-     HASHIF = 306,
-     HASHIFDEF = 307,
-     INT = 308,
-     LONG = 309,
-     SHORT = 310,
-     CHAR = 311,
-     FLOAT = 312,
-     DOUBLE = 313,
-     UNSIGNED = 314
+     NOTRACE = 286,
+     VOID = 287,
+     CONST = 288,
+     PACKED = 289,
+     VARSIZE = 290,
+     ENTRY = 291,
+     FOR = 292,
+     FORALL = 293,
+     WHILE = 294,
+     WHEN = 295,
+     OVERLAP = 296,
+     ATOMIC = 297,
+     FORWARD = 298,
+     IF = 299,
+     ELSE = 300,
+     CONNECT = 301,
+     PUBLISHES = 302,
+     IDENT = 303,
+     NUMBER = 304,
+     LITERAL = 305,
+     CPROGRAM = 306,
+     HASHIF = 307,
+     HASHIFDEF = 308,
+     INT = 309,
+     LONG = 310,
+     SHORT = 311,
+     CHAR = 312,
+     FLOAT = 313,
+     DOUBLE = 314,
+     UNSIGNED = 315
    };
 #endif
 #define MODULE 258
@@ -116,35 +117,36 @@
 #define CREATEHERE 283
 #define CREATEHOME 284
 #define NOKEEP 285
-#define VOID 286
-#define CONST 287
-#define PACKED 288
-#define VARSIZE 289
-#define ENTRY 290
-#define FOR 291
-#define FORALL 292
-#define WHILE 293
-#define WHEN 294
-#define OVERLAP 295
-#define ATOMIC 296
-#define FORWARD 297
-#define IF 298
-#define ELSE 299
-#define CONNECT 300
-#define PUBLISHES 301
-#define IDENT 302
-#define NUMBER 303
-#define LITERAL 304
-#define CPROGRAM 305
-#define HASHIF 306
-#define HASHIFDEF 307
-#define INT 308
-#define LONG 309
-#define SHORT 310
-#define CHAR 311
-#define FLOAT 312
-#define DOUBLE 313
-#define UNSIGNED 314
+#define NOTRACE 286
+#define VOID 287
+#define CONST 288
+#define PACKED 289
+#define VARSIZE 290
+#define ENTRY 291
+#define FOR 292
+#define FORALL 293
+#define WHILE 294
+#define WHEN 295
+#define OVERLAP 296
+#define ATOMIC 297
+#define FORWARD 298
+#define IF 299
+#define ELSE 300
+#define CONNECT 301
+#define PUBLISHES 302
+#define IDENT 303
+#define NUMBER 304
+#define LITERAL 305
+#define CPROGRAM 306
+#define HASHIF 307
+#define HASHIFDEF 308
+#define INT 309
+#define LONG 310
+#define SHORT 311
+#define CHAR 312
+#define FLOAT 313
+#define DOUBLE 314
+#define UNSIGNED 315
 
 
 
@@ -187,7 +189,7 @@ typedef union YYSTYPE {
   SdagConstruct *sc;
 } YYSTYPE;
 /* Line 1249 of yacc.c.  */
-#line 190 "y.tab.h"
+#line 192 "y.tab.h"
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
 # define YYSTYPE_IS_TRIVIAL 1

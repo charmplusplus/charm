@@ -65,7 +65,7 @@ extern int macroDefined(char *str, int istrue);
 %token THREADED
 %token TEMPLATE
 %token SYNC EXCLUSIVE IMMEDIATE SKIPSCHED VIRTUAL MIGRATABLE 
-%token CREATEHERE CREATEHOME NOKEEP
+%token CREATEHERE CREATEHOME NOKEEP NOTRACE
 %token VOID
 %token CONST
 %token PACKED
@@ -634,6 +634,8 @@ EAttrib		: THREADED
 		{ $$ = SCREATEHOME; }
 		| NOKEEP
 		{ $$ = SNOKEEP; }
+		| NOTRACE
+		{ $$ = SNOTRACE; }
 		| IMMEDIATE
                 { $$ = SIMMEDIATE; }
 		| SKIPSCHED
