@@ -200,7 +200,7 @@ a private copy of the global variables.
 The second method we have employed is called ``dimension increment''. Here, the
 dimension of global data items is increased by one. This added dimension is
 used to access thread private data by indexing it with the thread number (which
-can be obtained with \texttt{AMPI\_Comm\_rank} subroutine.) This scheme has a
+can be obtained with \texttt{MPI\_Comm\_rank} subroutine.) This scheme has a
 distinct disadvantage of wastage of space. Therefore it should be used only in
 case of small global data. There is another disadvantage, that of false
 sharing, if the global data items are not aligned properly.  \footnote{ Another
@@ -244,7 +244,7 @@ END SUBROUTINE
 
 \ampi{} executes the main program inside a user-level thread as a subroutine.
 For this purpose, the main program needs to be changed to be a subroutine with
-the name \verb+AMPI_Main+.
+the name \verb+MPI_Main+.
 
 Now we transform this program using the first strategy. We first group the
 shared data into a user-defined type.
@@ -263,19 +263,19 @@ references to them. Subroutine \texttt{subA} is then modified to take this data
 as argument.
 
 \begin{alltt}
-SUBROUTINE AMPI_Main
+SUBROUTINE MPI_Main
   USE shareddata
   USE AMPI
   INTEGER :: i, ierr
   \emph{TYPE(chunk), pointer :: c}
-  CALL AMPI_Init(ierr)
+  CALL MPI_Init(ierr)
   \emph{ALLOCATE(c)}
-  CALL AMPI_Comm_rank(AMPI_COMM_WORLD, c\%myrank, ierr)
+  CALL MPI_Comm_rank(MPI_COMM_WORLD, c\%myrank, ierr)
   DO i = 1, 100
     \emph{c\%xyz(i) =  i + c\%myrank}
   END DO
   CALL subA(c)
-  CALL AMPI_Finalize(ierr)
+  CALL MPI_Finalize(ierr)
 END SUBROUTINE
 
 SUBROUTINE subA(c)
@@ -290,7 +290,7 @@ END SUBROUTINE
 
 With these changes, the above program can be made thread-safe. Note that it is
 not really necessary to dynamically allocate \texttt{chunk}. One could have
-declared it as a local variable in subroutine \texttt{AMPI\_Main}.  (Or for a
+declared it as a local variable in subroutine \texttt{MPI\_Main}.  (Or for a
 small example such as this, one could have just removed the \texttt{shareddata}
 module, and instead declared both variables \texttt{xyz} and \texttt{myrank} as
 local variables). This is indeed a good idea if shared data are small in size.
@@ -312,25 +312,25 @@ Next we change the references to these shared data, by adding an additional
 level of indexing:
 
 \begin{alltt}
-SUBROUTINE AMPI_Main
+SUBROUTINE MPI_Main
   USE shareddata
   USE AMPI
   INTEGER :: i, trank, ierr
-  CALL AMPI_Init(ierr)
-  CALL AMPI_Comm_rank(AMPI_COMM_WORLD, trank, ierr)
+  CALL MPI_Init(ierr)
+  CALL MPI_Comm_rank(MPI_COMM_WORLD, trank, ierr)
   \emph{myrank(trank) = trank}
   DO i = 1, 100
     \emph{xyz(trank, i) =  i + myrank(trank)}
   END DO
   CALL subA()
-  CALL AMPI_Finalize(ierr)
+  CALL MPI_Finalize(ierr)
 END SUBROUTINE
 
 SUBROUTINE subA(c)
   USE shareddata
   USE AMPI
   INTEGER :: i, trank, ierr
-  CALL AMPI_Comm_rank(AMPI_COMM_WORLD, trank, ierr)
+  CALL MPI_Comm_rank(MPI_COMM_WORLD, trank, ierr)
   DO i = 1, 100
     \emph{xyz(trank, i) = xyz(trank, i) + 1.0}
   END DO
@@ -344,57 +344,43 @@ Now, this program is also thread-safe and ready to run with \ampi{}.
 Currently the following subset of MPI 1.1 standard is supported in \ampi{}.
 
 \begin{alltt}
-  AMPI_Wtime           AMPI_Init          AMPI_Comm_rank       
-  AMPI_Comm_size       AMPI_Finalize      AMPI_Send         
-  AMPI_Recv            AMPI_Isend         AMPI_Irecv        
-  AMPI_Sendrecv        AMPI_Barrier       AMPI_Bcast
-  AMPI_Reduce          AMPI_Allreduce     AMPI_Start           
-  AMPI_Waitall         AMPI_Send_init     AMPI_Recv_init    
-  AMPI_Type_contiguous AMPI_Type_vector   AMPI_Type_hvector 
-  AMPI_Type_indexed    AMPI_Type_hindexed AMPI_Type_struct
-  AMPI_Type_commit     AMPI_Type_free     AMPI_Type_extent     
-  AMPI_Type_size       AMPI_Allgatherv    AMPI_Allgather    
-  AMPI_Gatherv         AMPI_Gather        AMPI_Alltoallv    
-  AMPI_Alltoall        AMPI_Comm_dup      AMPI_Comm_free
-  AMPI_Abort           AMPI_Probe         AMPI_Iprobe
-  AMPI_Testall         AMPI_Get_count     AMPI_Pack
-  AMPI_Unpack          AMPI_Pack_size
+  MPI_Wtime           MPI_Init          MPI_Comm_rank       
+  MPI_Comm_size       MPI_Finalize      MPI_Send         
+  MPI_Recv            MPI_Isend         MPI_Irecv        
+  MPI_Sendrecv        MPI_Barrier       MPI_Bcast
+  MPI_Reduce          MPI_Allreduce     MPI_Start           
+  MPI_Waitall         MPI_Send_init     MPI_Recv_init    
+  MPI_Type_contiguous MPI_Type_vector   MPI_Type_hvector 
+  MPI_Type_indexed    MPI_Type_hindexed MPI_Type_struct
+  MPI_Type_commit     MPI_Type_free     MPI_Type_extent     
+  MPI_Type_size       MPI_Allgatherv    MPI_Allgather    
+  MPI_Gatherv         MPI_Gather        MPI_Alltoallv    
+  MPI_Alltoall        MPI_Comm_dup      MPI_Comm_free
+  MPI_Abort           MPI_Probe         MPI_Iprobe
+  MPI_Testall         MPI_Get_count     MPI_Pack
+  MPI_Unpack          MPI_Pack_size
 \end{alltt}
 
 Following MPI 1.1 basic datatypes are supported in \ampi{}.
 
 \begin{alltt}
-AMPI_DOUBLE_PRECISION AMPI_INTEGER       AMPI_REAL          
-AMPI_COMPLEX          AMPI_LOGICAL       AMPI_CHARACTER     
-AMPI_BYTE             AMPI_PACKED        AMPI_SHORT            
-AMPI_LONG             AMPI_UNSIGNED_CHAR AMPI_UNSIGNED_SHORT
-AMPI_UNSIGNED         AMPI_UNSIGNED_LONG AMPI_LONG_DOUBLE
+MPI_DOUBLE_PRECISION MPI_INTEGER       MPI_REAL          
+MPI_COMPLEX          MPI_LOGICAL       MPI_CHARACTER     
+MPI_BYTE             MPI_PACKED        MPI_SHORT            
+MPI_LONG             MPI_UNSIGNED_CHAR MPI_UNSIGNED_SHORT
+MPI_UNSIGNED         MPI_UNSIGNED_LONG MPI_LONG_DOUBLE
 \end{alltt}
 
 Following MPI 1.1 reduction operations are supported in \ampi{}.
 
 \begin{alltt}
-AMPI_MAX  AMPI_MIN  AMPI_SUM  AMPI_PROD
+MPI_MAX  MPI_MIN  MPI_SUM  MPI_PROD
 \end{alltt}
 
-Notice that all \ampi{} functions (and literals such as
-\texttt{AMPI\_COMM\_WORLD} begin with ``AMPI\_'' and not ``MPI\_'' like the MPI
-1.1 standard. This is because on some parallel machines, \charmpp{} (actually
-\converse{}) is implemented on top of MPI. For correct execution, the user
-program should link with our \ampi{} library, while \charmpp{} should link with
-the system's MPI implementation. Unfortunately, the linkers have no way of
-distinguishing between calls to MPI if both AMPI and MPI calls have the same
-names.
-
-Thus another transformation that needs to be made to the user's MPI code is to
-change the names of all MPI functions to begin with ``\texttt{AMPI\_}'' instead
-of ``\texttt{MPI\_}''. We are experimenting with Fortran90 modules and
-subroutine overloading and module procedures to get rid of this inconvenience.
-
-Also, unlike the MPI 1.1 standard, the ``\texttt{mpif.h}'' should not be
-included in the \ampi{} program, neither should ``\texttt{use mpi}'' be used.
-Instead one needs to put the ``\texttt{use ampi}'' statement in program units
-that use \ampi{}.
+Also, unlike the MPI 1.1 standard, the Fortran90 statement ``\texttt{use mpi}'' 
+should not be used.
+Instead one needs to put the ``\texttt{use ampi}'' statement in Fortran
+program units that use \ampi{}.
 
 \subsection{Extensions for Migrations}
 
@@ -419,12 +405,12 @@ cannot determine what size the data is, or whether the registered data contains
 pointers to other places in memory. For this purpose, a packing subroutine also
 needs to be provided to the \ampi{} runtime system alongwith registered data.
 (See next section for writing packing subroutines.) The call provided by
-\ampi{} for doing this is \texttt{AMPI\_Register}. This function takes two
+\ampi{} for doing this is \texttt{MPI\_Register}. This function takes two
 arguments: A data item to be transported alongwith the chunk, and the pack
 subroutine, and returns an integer denoting the registration identifier. In
 C/\CC{} programs, it may be necessary to use this return value after migration
 completes and control returns to the chunk, using function
-\texttt{AMPI\_Get\_userdata}. Therefore, the return value should be stored in a
+\texttt{MPI\_Get\_userdata}. Therefore, the return value should be stored in a
 local variable.
 
 \subsubsection{Migration}
@@ -440,11 +426,11 @@ only once in the beginning, load imbalance at that stage would not matter much.
 Therefore, we want the demand to perform load balance check to be initiated by
 the application.
 
-\ampi{} provides a subroutine \texttt{AMPI\_Migrate} for this purpose. Each
-chunk periodically calls \texttt{AMPI\_Migrate}. Typical CSE applications are
+\ampi{} provides a subroutine \texttt{MPI\_Migrate} for this purpose. Each
+chunk periodically calls \texttt{MPI\_Migrate}. Typical CSE applications are
 iterative and perform multiple time-steps. One should call
-\texttt{AMPI\_Migrate} in each chunk at the end of some fixed number of
-timesteps. The frequency of \texttt{AMPI\_Migrate} should be determined by a
+\texttt{MPI\_Migrate} in each chunk at the end of some fixed number of
+timesteps. The frequency of \texttt{MPI\_Migrate} should be determined by a
 tradeoff between conflicting factors such as the load balancing overhead, and
 performance degradation caused by load imbalance. In some other applications,
 where application suspects that load imbalance may have occurred, as in the
@@ -452,9 +438,9 @@ case of adaptive mesh refinement; it would be more effective if it performs a
 couple of timesteps before telling the system to re-map chunks. This will give
 the \ampi{} runtime system some time to collect the new load and communication
 statistics upon which it bases its migration decisions. Note that
-\texttt{AMPI\_Migrate} does NOT tell the system to migrate the chunk, but
+\texttt{MPI\_Migrate} does NOT tell the system to migrate the chunk, but
 merely tells the system to check the load balance after all the chunks call
-\texttt{AMPI\_Migrate}. To migrate the chunk or not is decided only by the
+\texttt{MPI\_Migrate}. To migrate the chunk or not is decided only by the
 system's load balancing strategy.
 
 \subsubsection{Packing/Unpacking Thread Data}
@@ -462,7 +448,7 @@ system's load balancing strategy.
 Once the \ampi{} runtime system decides which chunks to send to which
 processors, it calls the specified pack subroutine for that chunk, with the
 chunk-specific data that was registered with the system using
-\texttt{AMPI\_Register}. This section explains how a subroutine should be
+\texttt{MPI\_Register}. This section explains how a subroutine should be
 written for performing pack/unpack.
 
 There are three steps to transporting the chunk's data to other processor.
@@ -592,7 +578,7 @@ program were to crash abruptly, or if the allocated time for the program
 expires before completing execution, the program can be restarted from the
 previously checkpointed state. Thus, the pack-unpack subroutines act as the key facility for checkpointing in addition to their usual role for migration.
 
-A subroutine, \texttt{AMPI\_Checkpoint} has been added to AMPI. This subroutine
+A subroutine, \texttt{MPI\_Checkpoint} has been added to AMPI. This subroutine
 takes a directory name as its argument. Every chunk in the program needs to
 call this subroutine and specify the same directory name. (Typically, in an
 iterative AMPI program, the iteration number, converted to a character string,
@@ -614,22 +600,22 @@ transform each individual code to run correctly under \ampi{} as standalone
 codes. This involves the usual ``chunkification'' transformation so that
 multiple chunks from the application can run on the same processor without
 overwriting each other's data. This also involves making the main program into
-a subroutine and naming it \texttt{AMPI\_Main}.
+a subroutine and naming it \texttt{MPI\_Main}.
 
-Thus now, we have two \texttt{AMPI\_Main}s, one for the fluids code and one for
+Thus now, we have two \texttt{MPI\_Main}s, one for the fluids code and one for
 the solids code. We now make these codes co-exist within the same executable,
-by first renaming these \texttt{AMPI\_Main}s as \texttt{Fluids\_Main} and
+by first renaming these \texttt{MPI\_Main}s as \texttt{Fluids\_Main} and
 \texttt{Solids\_Main}\footnote{Currently, we assume that the interface code,
 which does mapping and interpolation among the boundary values of Fluids and
 Solids domain, is integrated with one of Fluids and Solids.} writing a
-subroutine called \texttt{AMPI\_Setup}.
+subroutine called \texttt{MPI\_Setup}.
 
 \begin{alltt}
-SUBROUTINE AMPI_Setup
+SUBROUTINE MPI_Setup
   USE ampi
 
-  CALL AMPI_Register_main(Solids_Main)
-  CALL AMPI_Register_main(Fluids_Main)
+  CALL MPI_Register_main(Solids_Main)
+  CALL MPI_Register_main(Fluids_Main)
 
 END SUBROUTINE
 \end{alltt}
@@ -652,24 +638,24 @@ Fluids on 32 physical processors, one would specify those with multiple
 This will ensure that multiple chunk types representing different complete
 applications can co-exist within the same executable. They can also continue to
 communicate among their own chunk-types using the same \ampi{} function calls
-to send and receive with communicator argument as \texttt{AMPI\_COMM\_WORLD}.
+to send and receive with communicator argument as \texttt{MPI\_COMM\_WORLD}.
 But this would be completely useless if these individual applications cannot
 communicate with each other, which is essential for building efficient coupled
 codes.  For this purpose, we have extended the \ampi{} functionality to allow
 multiple ``\texttt{COMM\_WORLD}s''; one for each application. These \emph{world
 communicators} form a ``communicator universe'': an array of communicators
-aptly called \emph{AMPI\_COMM\_UNIVERSE}. This array of communicators in
-indexed $1\cdots\texttt{AMPI\_MAX\_COMM}$. In the current implementation,
-\texttt{AMPI\_MAX\_COMM} is 8, that is, maximum of 8 applications can co-exist
+aptly called \emph{MPI\_COMM\_UNIVERSE}. This array of communicators in
+indexed $1\cdots\texttt{MPI\_MAX\_COMM}$. In the current implementation,
+\texttt{MPI\_MAX\_COMM} is 8, that is, maximum of 8 applications can co-exist
 within the same executable.
 
-The order of these \texttt{COMM\_WORLD}s within \texttt{AMPI\_COMM\_UNIVERSE}
+The order of these \texttt{COMM\_WORLD}s within \texttt{MPI\_COMM\_UNIVERSE}
 is determined by the order in which individual applications are registered in
-\texttt{AMPI\_Setup}.
+\texttt{MPI\_Setup}.
 
 Thus, in the above example, the communicator for the Solids module would be
-\texttt{AMPI\_COMM\_UNIVERSE(1)} and communicator for Fluids module would be
-\texttt{AMPI\_COMM\_UNIVERSE(2)}.
+\texttt{MPI\_COMM\_UNIVERSE(1)} and communicator for Fluids module would be
+\texttt{MPI\_COMM\_UNIVERSE(2)}.
 
 Now any chunk within one application can communicate with any chunk in the
 other application using the familiar send or receive \ampi{} calls by
@@ -679,8 +665,8 @@ data to chunk number 47 within the Fluids module, it calls:
 
 \begin{alltt}
 INTEGER , PARAMETER :: Fluids_Comm = 2
-CALL AMPI_Send(InitialTime, 1, AMPI_Double_Precision, tag, &
-        \emph{47, AMPI_Comm_Universe(Fluids_Comm)}, ierr)
+CALL MPI_Send(InitialTime, 1, MPI_Double_Precision, tag, &
+        \emph{47, MPI_Comm_Universe(Fluids_Comm)}, ierr)
 \end{alltt}
 
 The Fluids chunk has to issue a corresponding receive call to receive this
@@ -688,8 +674,8 @@ data:
 
 \begin{alltt}
 INTEGER , PARAMETER :: Solids_Comm = 1
-CALL AMPI_Recv(InitialTime, 1, AMPI_Double_Precision, tag, &
-        \emph{36, AMPI_Comm_Universe(Solids_Comm)}, stat, ierr)
+CALL MPI_Recv(InitialTime, 1, MPI_Double_Precision, tag, &
+        \emph{36, MPI_Comm_Universe(Solids_Comm)}, stat, ierr)
 \end{alltt}
 
 \subsection{Compiling AMPI Programs}
