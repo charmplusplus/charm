@@ -49,6 +49,10 @@ public:
     LDCommData* commData;
   };
 
+   CLBMigrateMsg* callStrategy(LDStats* stats,int count){
+	return Strategy(stats,count);
+   };
+
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CLBMigrateMsg* Strategy(LDStats* stats,int count);
