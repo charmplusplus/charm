@@ -119,8 +119,6 @@ public:
 //Communication (library-private)
 	//Sent down the reduction tree (used by barren PEs)
 	void ReductionStarting(CkReductionNumberMsg *m);
-	//Sent up the reduction tree with reduced data
-	void RecvMsg(CkReductionMsg *m);
 	//Sent to root of the reduction tree with late migrant data
 	void LateMigrantMsg(CkReductionMsg *m);
 	//A late migrating contributor will never contribute

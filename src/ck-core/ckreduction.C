@@ -383,22 +383,7 @@ void CkReductionMgr::MigrantDied(CkReductionNumberMsg *m)
   finishReduction();
   delete m;
 }
-//Sent up the reduction tree with reduced data
-void CkReductionMgr::RecvMsg(CkReductionMsg *m)
-{
-  if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
-    DEBR((AA"Recv'd remote contribution %d for #%d at %d\n"AB,nRemote,m->redNo,this));
-    startReduction(m->redNo);
-    msgs.enq(m);
-    nRemote++;
-    finishReduction();
-  }
-  else if (isFuture(m->redNo)) {
-    DEBR((AA"Recv'd early remote contribution %d for #%d\n"AB,nRemote,m->redNo));
-    futureRemoteMsgs.enq(m);
-  }
-  else CkAbort("Recv'd late remote contribution!\n");
-}
+
 //////////// Reduction Manager State /////////////
 void CkReductionMgr::startReduction(int number)
 {
