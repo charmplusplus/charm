@@ -390,3 +390,47 @@ This will collect data on files data.dat.{2,3,4,5}. Then, we can use this data t
 ./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 
                +LBDumpFile dump.dat [+LBSimProcs 900]
 \end{verbatim}
+
+
+\subsection{Load Balancing Chares - seed load balancers}
+\label{seedlb}
+
+Seed load balancing involves the movement of object creation messages, or 
+"seeds", to create a balance of work across a set of processors. 
+This load balancing scheme is used for load balancing 
+chares~\footnote{as opposed to chare arrays which are not balanced by seed load balancers}
+ at creation time. 
+When the chare is created on a processor, there is no movement of chares
+due to the seed load balancer. 
+
+Several variations of strategies have been being designed and analyzed. 
+\begin{enumerate}
+\item {\em random}\\  
+ A strategy that places seeds randomly when they are created and does
+no movement of seeds thereafter. This is used as the default seed 
+load balancer.
+\item {\em spray}\\  
+ a strategy which imposes a spanning tree organization on the processors,
+ results in communication amongst neighborhood processors (parent and 
+children processors) to compute global average load via periodic reduction. 
+ It uses averaging of loads to determine how seeds should be
+distributed.
+\item {\em graph}\\  
+ a strategy which imposes a dense graph organization on the processors,
+ load exchange happens to neighbors only. The overloaded processors
+ initiate the load balancing, where a processor send work to elsewhere
+ when it becomes overloaded.
+\end{enumerate}
+
+Other strategies can also be explored follow the simple API of the 
+seed load balancer.
+
+\subsubsection{Compiler option}
+
+{\bf -balance foo} links with a seed load balancer module. 
+All seed laod balaner modules should be compiled in the form of library
+under charm/lib, named as libcldb-foo.a, where foo is the strategy 
+name also used in the link time option.
+
+
+
