@@ -1616,9 +1616,9 @@ void Entry::genDefs(XStr& str)
       // This is called from Fortran to send the message to a chare.
       str << "extern \"C\" void "
         //<< container->proxyName() << "_" 
-          << fortranify("SendTo")
+          << fortranify("SendTo_")
           << fortranify(container->baseName())
-          << fortranify(name)
+          << "_" << fortranify(name)
           << "_(long* aindex, int *index, ";
       msg_contents->genUnmarshalList3(str);
       str << ")\n";
