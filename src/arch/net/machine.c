@@ -2189,7 +2189,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   CmiStartThreads();
   ConverseInitPE();
   if (ret==0) {
-    fn(argc, argv);
+    fn(CountArgs(argv), argv);
     if (usc==0) CsdScheduler(-1);
     ConverseExit();
   }

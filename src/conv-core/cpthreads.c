@@ -20,6 +20,7 @@
  */
 
 #define CPTHREAD_IS_HERE
+#define SUPPRESS_PTHREADS
 #include "cpthreads.h"
 #include <sys/errno.h>
 

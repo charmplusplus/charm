@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.29  1997-10-03 19:51:52  milind
+ * Revision 1.30  1997-10-10 18:26:23  jyelon
+ * I have no idea what i changed.
+ *
+ * Revision 1.29  1997/10/03 19:51:52  milind
  * Made charmc to work again, after inserting trace calls in converse part,
  * i.e. threads and user events.
  *
@@ -136,6 +139,14 @@ static char *DeleteArg(argv)
   if (res==0) { CmiError("Bad arglist."); exit(1); }
   while (*argv) { argv[0]=argv[1]; argv++; }
   return res;
+}
+
+int CountArgs(argv)
+  char **argv;
+{
+  int n = 0;
+  while (*argv) { n++; argv++; }
+  return n;
 }
 
 /*****************************************************************************
@@ -636,7 +647,7 @@ int usched, initret;
   Cmi_mype = 0;
   CmiInitPE();
   if (initret==0) {
-    fn(argc, argv);
+    fn(CountArgs(argv), argv);
     if (usched==0) CsdScheduler(-1);
     ConverseExit();
   }
