@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.18  1996-03-28 21:53:31  sanjeev
+ * Revision 2.19  1996-07-15 21:01:41  jyelon
+ * Changed mach-flags from #ifdef to #if
+ *
+ * Revision 2.18  1996/03/28 21:53:31  sanjeev
  * *** empty log message ***
  *
  * Revision 2.17  1996/03/28 15:25:21  sanjeev
@@ -107,11 +110,11 @@
 #define NULL 0
 #endif
 
-#ifdef CMK_COMPILER_LIKES_STATIC_PROTO
+#if CMK_STATIC_PROTO_WORKS
 #define PROTO_PUB_PRIV static
 #endif
 
-#ifdef CMK_COMPILER_HATES_STATIC_PROTO
+#if CMK_STATIC_PROTO_FAILS
 #define PROTO_PUB_PRIV extern
 #endif
 
