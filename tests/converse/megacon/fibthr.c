@@ -4,7 +4,7 @@ void Cpm_megacon_ack();
 
 /* an accumulator datatype, which can have one pending thread */
 
-#define STACKSIZE_DEFAULT 64000
+#define STACKSIZE_DEFAULT 0
 
 typedef struct accum
 {
