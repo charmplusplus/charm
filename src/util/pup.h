@@ -276,7 +276,7 @@ class sizer : public er {
   virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc);
  public:
   //Write data to the given buffer
-  sizer(void):er(IS_PACKING) {nBytes=0;}
+  sizer(void):er(IS_SIZING) {nBytes=0;}
   
   //Return the current number of bytes to be packed
   int size(void) const {return nBytes;}
