@@ -1,4 +1,4 @@
-\section{Message Manager Calls}
+\chapter{Message Manager Calls}
 
 To use the following calls, include the file ``SM.h''.
 
@@ -39,11 +39,11 @@ message manager \param{mm} with the tag(s) into the address pointed to by
 \param{mm} with the tag(s) and returns this address in \param{*addr}. 
 The return value is the length of the message.}
 
-\section{Thread Manipulation}
+\chapter{Thread Manipulation}
 
 To use the following calls, include the file ``thr\_defns.h''.
 
-\subsection{Thread Object Calls}
+\section{Thread Object Calls}
 
 \function{int CthInit(void)}
 \desc{This call initializes some variables that are used by the thread calls 
@@ -138,8 +138,8 @@ given that it is now in CthSuspend's ready-pool.}
 
 \mycomment{
 % Sanjay wanted this out
-\subsection{Elementary Queues}
-This subsection describes an elementary queue of threads that can be used
+\section{Elementary Queues}
+This section describes an elementary queue of threads that can be used
 to manage lists of threads.
 
 \function{QUEUE *CthNewQueue()}
@@ -158,6 +158,7 @@ to manage lists of threads.
 \desc{This call pops a thread from the front of the queue and returns NULL if 
 the queue is empty.}
 }
+
 \section{Synchronization Mechanisms}
 To use the following calls, include the file ``sync.h''
 

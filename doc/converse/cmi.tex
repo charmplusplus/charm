@@ -1,7 +1,7 @@
-\section{Converse Machine Interface}
+\chapter{Converse Machine Interface}
 
 \internal{
-\subsection{Initialization and Wrap-Up}
+\section{Initialization and Wrap-Up}
 
 \function{void CmiInit(int argc, char *argv[])}
 \desc{ This function initializes the machine interface. It should be
@@ -20,7 +20,7 @@ achieve this.}}
 }
 
 
-\subsection{Message Handler Calls}
+\section{Message Handler Calls}
 
 
 \function {int CmiMsgHeaderSizeBytes(void)}
@@ -42,7 +42,7 @@ handler index which can be subsequently used to specify the handler
 for a message.}
 
 
-\subsection{Timer Calls}
+\section{Timer Calls}
 
 \function{double CmiTimer(void)}
 \desc{Returns current value of the timer in seconds. This is
@@ -50,7 +50,7 @@ typically the time spent since the \param{CmiInit()} call.
 The precision of this timer is the best available on the particular machine,
 and usually has at least microsecond accuracy.}
 
-\subsection{Point-To-Point Communication}
+\section{Point-To-Point Communication}
 
 \function{void *CmiGetSpecificMsg(int HandlerId)}
 \desc{This call waits until a message for the specified handler is
@@ -124,7 +124,7 @@ communication is complete.}
 system buffer, CMI copies the buffer contents to newly allocated user
 space and updates \param{*pbuf} to point to the new buffer.}
 
-\subsection{Global Pointer}
+\section{Global Pointer}
 
 \function{int CmiGptrCreate(GlobalPtr *gptr, void *lptr, unsigned int size)}
 \desc{This function creates a global pointer by initializing contents of
@@ -159,7 +159,7 @@ memory pointed to by \param{lptr} to the memory pointed to by global
 pointer \param{gptr}.  This function returns a  communication handle
 which could be used to  enquire about the status of this operation.}
 
-\subsection{Group Communication}
+\section{Group Communication}
 
 \function{void CmiSyncBroadcast(unsigned int size, void *msg)}
 \desc{Sends \param{msg} of length \param{size} bytes to all processors
@@ -192,7 +192,7 @@ could be used to check the status of this send using
 \param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
 freed before the communication is complete.}
 
-\subsection{Processor Ids}
+\section{Processor Ids}
 
 \function{int CmiNumPe(void)}
 \desc{ Returns total number of processors in the machine on which the 
@@ -202,7 +202,7 @@ parallel program is being run.}
 \desc{ Returns the logical processor identifier of processor on which the 
 caller resides. A processor Id is between \param{0} and \param{CmiNumPe()-1}.}
 
-\subsection{Input/Output}
+\section{Input/Output}
 
 \function{void CmiPrintf(char *format, arg1, arg2, ...)}
 \desc{This function does an atomic \param{printf()} on \param{stdout}. 
@@ -220,7 +220,7 @@ send and blocking receive.}
 On machine with host, this is implemented on top of the messaging 
 layer using asynchronous sends.}
 
-\subsection{Processor Groups}
+\section{Processor Groups}
 
 \function{void CmiPgrpCreate(Pgrp *group)}
 \desc{Creates a processor-group with calling processsor as the root processor.}
