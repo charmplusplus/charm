@@ -26,6 +26,7 @@ public:
   void Migrated(LDObjHandle h);
 
   void MigrationDone(void);  // Call when migration is complete
+  int step() { return mystep; };
 
   struct MigrateInfo {  // Used in CLBMigrateMsg
     LDObjHandle obj;
@@ -46,7 +47,7 @@ protected:
   LBDatabase* theLbdb;
 
 private:  
-  int step;
+  int mystep;
   int stats_msg_count;
   CLBStatsMsg** statsMsgsList;
   LDStats* statsDataList;

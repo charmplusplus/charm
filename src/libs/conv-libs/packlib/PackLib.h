@@ -2,6 +2,9 @@
 
 #define PACKLIB_H
 
+#include <stdio.h>
+#include <stdlib.h>
+
 enum PackErr { EOk = 0, EOverflow = -1, EType = -2 };
 
 class Packer {
@@ -9,7 +12,9 @@ public:
   enum ItemType { t_voidp, t_char, t_uchar, t_int, t_uint, 
 		  t_long, t_ulong, t_float, t_double };
 
-  Packer() { head = tail = 0; bytes = 0; };
+  Packer(bool _debug = false) { 
+    head = tail = 0; bytes = 0;  debug = _debug;
+  };
 
   ~Packer() {
     item* i = head;
@@ -83,7 +88,15 @@ public:
       } else if (cur_item->type == t_voidp) {
 	item_ptr = static_cast<const void*>(cur_item->arr);
       } else return EType;
+
       const int ibytes = cur_item->size;
+      if (debug && buf_bytes >= sizeof(int)) {
+	const char* cptr = reinterpret_cast<const char*>(&ibytes);
+	for(int i=0; i < sizeof(int); i++)
+	  *buf_ptr++ = *cptr++;
+	buf_bytes -= sizeof(int);
+      }
+      
       const char* cptr = static_cast<const char*>(item_ptr);
       if (buf_bytes >= ibytes) {
 	for(int i=0; i < ibytes; i++) {
@@ -236,6 +249,7 @@ private:
       tail = tail->nxt;
     }
     bytes += _item->size;
+    if (debug) bytes += sizeof(int);
   };
 
   item* dequeue() {
@@ -243,6 +257,7 @@ private:
     if (ret != 0) {
       head = ret->nxt;
       bytes -= ret->size;
+      if (debug) bytes -= sizeof(int);
     }
     return ret;
   };
@@ -250,16 +265,19 @@ private:
   item* head;
   item* tail;
   int bytes;
+  bool debug;
 };
 
 class Unpacker {
 public:
-  Unpacker(const void *const _buffer) {
+  Unpacker(const void *const _buffer, bool _debug = false) {
     buffer = _buffer;
     bufsz = *(static_cast<const int*>(buffer)) - sizeof(int);
     buf_ptr = static_cast<const char*>(buffer) + sizeof(int);
+    unpacked = sizeof(int);
+    debug = _debug;
   };
-    
+
   PackErr unpack(char *const i) { 
     return unpack_item(static_cast<void*>(i), sizeof(char));
   };
@@ -312,14 +330,31 @@ public:
     return unpack_item(static_cast<void*>(i), sizeof(double)*items);
   };
 
+  int bytes_unpacked() { return unpacked; };
+
  private:
   PackErr unpack_item(void *const item, int bytes) {
-    char* item_ptr = static_cast<char*>(item);
+    if (debug) {
+      int item_sz;
+      char* item_ptr = reinterpret_cast<char*>(&item_sz);
+      if (bufsz >= sizeof(int)) {
+	for(int i=0; i<sizeof(int); i++)
+	  *item_ptr++ = *buf_ptr++;
+	bufsz -= sizeof(int);
+	unpacked += sizeof(int);
+      }
+      if (item_sz != bytes) {
+	printf("Unpack mismatch, hanging\n");
+	while (1) ;
+      }
+    }
     
+    char* item_ptr = static_cast<char*>(item);
     if (bufsz >= bytes) {
       for(int i=0; i<bytes; i++)
 	*item_ptr++ = *buf_ptr++;
       bufsz -= bytes;
+      unpacked += bytes;
     } else return EOverflow;
     return EOk;
   };
@@ -327,6 +362,8 @@ public:
   const void* buffer;
   const char* buf_ptr;
   int bufsz;
+  int unpacked;
+  bool debug;
 };
 
 #endif /* PACKLIB_H */

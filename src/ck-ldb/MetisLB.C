@@ -176,7 +176,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 
   if(count > 1) {
     newmap = new int[numobjs];
-    if(step == 2) {
+    if(step() == 2) {
       delete[] edgewt;
       edgewt = 0;
       wgtflag = 2;

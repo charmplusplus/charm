@@ -305,11 +305,13 @@ void Array1D::RecvForElement(ArrayMessage *msg)
 
 void Array1D::migrateMe(int index, int where)
 {
-  int bufSize = elementIDs[index].element->packsize();
+  elementIDs[index].state = moving_to;
+  elementIDs[index].pe = where;
+
   //  CkPrintf("[%d] Element %d migrating to %d\n",CkMyPe(),index,where);
 
+  int bufSize = elementIDs[index].element->packsize();
   ArrayMigrateMessage *msg = new (&bufSize, 0) ArrayMigrateMessage;
-
   msg->index = index;
   msg->from = CkMyPe();
   msg->elementSize = bufSize;
@@ -319,8 +321,6 @@ void Array1D::migrateMe(int index, int where)
 #endif
 
   elementIDs[index].element->pack(msg->elementData);
-  elementIDs[index].state = moving_to;
-  elementIDs[index].pe = where;
 
 #if CMK_LBDB_ON
   the_lbdb->UnregisterObj(elementIDs[index].ldHandle);

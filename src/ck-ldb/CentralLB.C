@@ -28,7 +28,7 @@ void CentralLB::staticAtSync(void* data)
 
 CentralLB::CentralLB()
 {
-  step = 0;
+  mystep = 0;
   theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
   theLbdb->
     AddLocalBarrierReceiver(reinterpret_cast<LDBarrierFn>(staticAtSync),
@@ -55,9 +55,9 @@ CentralLB::~CentralLB()
 
 void CentralLB::AtSync()
 {
-  CkPrintf("[%d] CentralLB At Sync step %d!!!!\n",CkMyPe(),step);
+  CkPrintf("[%d] CentralLB At Sync step %d!!!!\n",CkMyPe(),mystep);
 
-  if (!QueryBalanceNow(step)) {
+  if (!QueryBalanceNow(step())) {
     MigrationDone();
     return;
   }
@@ -149,7 +149,7 @@ void CentralLB::MigrationDone()
   migrates_completed = 0;
   migrates_expected = -1;
   // Increment to next step
-  step++;
+  mystep++;
   theLbdb->ResumeClients();
 }
 
