@@ -98,12 +98,15 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 
 	// save nodegroups into NodeGroups.dat
 	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
-	sprintf(fileName,"%s/NodeGroups_%d.dat",dirname,CkMyPe());
-	FILE* fNodeGroups = fopen(fileName,"wb");
-	if(!fNodeGroups) CkAbort("Failed to create checkpoint file for nodegroup table!");
-	PUP::toDisk pNodeGroups(fNodeGroups);
-	CkPupNodeGroupData(pNodeGroups);
-	fclose(fNodeGroups);
+	if (CkMyRank() == 0) {
+	  sprintf(fileName,"%s/NodeGroups_%d.dat",dirname,CkMyNode());
+	  FILE* fNodeGroups = fopen(fileName,"wb");
+	  if(!fNodeGroups) 
+	    CkAbort("Failed to create checkpoint file for nodegroup table!");
+	  PUP::toDisk pNodeGroups(fNodeGroups);
+	  CkPupNodeGroupData(pNodeGroups);
+	  fclose(fNodeGroups);
+  	}
 
 	//DEBCHK("[%d]CkCheckpointMgr::Checkpoint called dirname={%s}\n",CkMyPe(),dirname);
 	sprintf(fileName,"%s/arr_%d.dat",dirname, CkMyPe());
@@ -435,7 +438,7 @@ void CkRestartMain(const char* dirname){
 		if(CkNumPes() != _numPes)
 			sprintf(filename,"%s/NodeGroups_0.dat",dirname);
 		else
-			sprintf(filename,"%s/NodeGroups_%d.dat",dirname,CkMyPe());
+			sprintf(filename,"%s/NodeGroups_%d.dat",dirname,CkMyNode());
 		FILE* fNodeGroups = fopen(filename,"rb");
 		if(!fNodeGroups) CkAbort("Failed to open checkpoint file for nodegroup table!");
 		PUP::fromDisk pNodeGroups(fNodeGroups);
