@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-10-11 17:55:49  sanjeev
+ * Revision 2.5  1995-11-02 23:22:52  sanjeev
+ * preprocessor problems fixes
+ *
+ * Revision 2.4  1995/10/11  17:55:49  sanjeev
  * fixed Charm++ chare creation
  *
  * Revision 2.3  1995/10/03  19:53:33  sanjeev
@@ -179,16 +182,13 @@ char *argv[] ;
 		exit(1) ;
 	}
 	
+/**** not needed any more : these are added by charmc 
 	fprintf(outfile,"#define CPLUS_FILE\n") ;
 	fprintf(outfile,"#include \"ckdefs.h\" \n") ;
-/*	fprintf(outfile,"#include \"env_macros.h\" \n") ;  Amitabh put this */
 	fprintf(outfile,"#include \"chare.h\" \n") ;
 	fprintf(outfile,"#include \"c++interface.h\" \n") ;
 	fprintf(outfile,"#include \"%s\"\n",headername) ;
-/*	fprintf(outfile,"#include \"stdio.h\"\n") ; */
-/*	fprintf(outfile,"#line 1 \"%s.P\"\n",CoreName) ;   */
-
-/*	fprintf(outfile,"extern \"C\" char * sprintf(char *, const char* ...);") ;	*/
+*/
 
 	strcpy(prevtoken,"") ;
 	strcpy(OutBuf,"") ;
@@ -242,8 +242,6 @@ void GenerateStructsFns()
 	TotalEps = 0 ;
 
 	epfile = headerfile ;
-	fprintf(epfile,"\n\n\n/******************************************************************/\n\n") ;
-	fprintf(outfile,"\n\n\n/******************************************************************/\n\n") ;
 
 /* Output all chare and boc names */
 	for ( i=0; i<=charecount; i++ ) {
@@ -278,7 +276,7 @@ void GenerateStructsFns()
 				}
                 		else {
                        			fprintf(outfile,"\targc = 0 ;\n") ;
-                       			fprintf(outfile,"\targv = NULL ;\n") ;
+                       			fprintf(outfile,"\targv = 0 ;\n") ;
                        		/*	fprintf(outfile,"\t((main *)obj)->_CKmain() ;\n") ; */
                                         fprintf(outfile,"\tnew (obj) main() ;\n}\n") ;
                 		}
@@ -378,8 +376,6 @@ void GenerateStructsFns()
 /* generate the _CK_ModuleName struct which holds all the _CK_msg_MessageType 
    variables.	*/
 
-	fprintf(headerfile,"\n\n\n/******************************************************************/\n\n") ;
-
 	strcpy(InitStr,"0") ;
 	for ( i=1; i<TotalMsgs; i++ ) 
 		strcat(InitStr,",0") ;
@@ -416,10 +412,12 @@ void GenerateStructsFns()
 		    fprintf(outfile,"static void *_CK_alloc_%s(int msgno, int size, int *array, int prio)\n{\n",nam) ; 
 		    fprintf(outfile,"\tint totsize=0, temp, dummy, sarray[%d] ;\n",nv) ;
 		    fprintf(outfile,"\t%s * ptr ;\n",nam) ;
-		    fprintf(outfile,"\ttotsize = temp = (size%%_CK_VARSIZE_UNIT)?_CK_VARSIZE_UNIT*((size+_CK_VARSIZE_UNIT)/_CK_VARSIZE_UNIT):size;\n\n") ;
+		    /* NOTE : 8 is _CK_VARSIZE_UNIT */
+		    fprintf(outfile,"\ttotsize = temp = (size%%8)?8*((size+8)/8):size;\n\n") ;
 		    for ( j=0; j<nv; j++ ) {
 		    	fprintf(outfile,"\tsize = sizeof(%s)*array[%d];\n",vs[j].type,j) ;
-		    	fprintf(outfile,"\tdummy = (size%%_CK_VARSIZE_UNIT)?_CK_VARSIZE_UNIT*((size+_CK_VARSIZE_UNIT)/_CK_VARSIZE_UNIT):size;\n") ;
+		        /* NOTE : 8 is _CK_VARSIZE_UNIT */
+		    	fprintf(outfile,"\tdummy = (size%%8)?8*((size+8)/8):size;\n") ;
 		    	fprintf(outfile,"\tsarray[%d]=dummy;\n",j) ;
 		    	fprintf(outfile,"\ttotsize += dummy;\n") ;
 		    }
@@ -485,7 +483,7 @@ void GenerateRegisterCalls()
 			fprintf(outfile,"(FUNCTION_PTR)&_CK_alloc_%s, ",nam) ;
 
 		if ( MessageTable[i].pack == FALSE ) 
-			fprintf(outfile,"NULL, NULL, ") ; 
+			fprintf(outfile,"0, 0, ") ; 
 		else 
 			fprintf(outfile,"(FUNCTION_PTR)&_CK_pack_%s, (FUNCTION_PTR)&_CK_unpack_%s, ", nam, nam) ;
 
@@ -511,14 +509,14 @@ void GenerateRegisterCalls()
 		if ( !chare->eps->defined ) 
 			continue ;
 
-		fprintf(outfile,"_CK_chare_%s = registerChare(\"%s\", sizeof(%s), NULL) ;\n\n",chare->name,chare->name,chare->name) ;
+		fprintf(outfile,"_CK_chare_%s = registerChare(\"%s\", sizeof(%s), 0) ;\n\n",chare->name,chare->name,chare->name) ;
 
                 for  ( ep=chare->eps; ep!=NULL; ep=ep->next ) {
 			if ( j == 0 ) 
-				fprintf(outfile,"_CK_ep_%s_%s = registerEp(\"%s\", (FUNCTION_PTR)&_CK_call_%s_%s, CHARMPLUSPLUS,", chare->name,
+				fprintf(outfile,"_CK_ep_%s_%s = registerEp(\"%s\", (FUNCTION_PTR)&_CK_call_%s_%s, 1,", chare->name,
 										ep->epname, ep->epname, chare->name,ep->epname) ;
 			else
-				fprintf(outfile,"_CK_ep_%s_%s = registerBocEp(\"%s\", (FUNCTION_PTR)&_CK_call_%s_%s, CHARMPLUSPLUS,",chare->name,
+				fprintf(outfile,"_CK_ep_%s_%s = registerBocEp(\"%s\", (FUNCTION_PTR)&_CK_call_%s_%s, 1,",chare->name,
 										ep->epname, ep->epname, chare->name,ep->epname) ;
 
 			if ( j==0 && strcmp(chare->name,"main")==0 && 
@@ -535,7 +533,7 @@ void GenerateRegisterCalls()
 
 /* register the main chare */
 	if ( foundMain ) 
-		fprintf(outfile,"registerMainChare(_CK_chare_main, _CK_ep_main_main, CHARMPLUSPLUS) ;\n\n\n") ;
+		fprintf(outfile,"registerMainChare(_CK_chare_main, _CK_ep_main_main, 1) ;\n\n\n") ;
 	fprintf(outfile,"\n\n") ;
 
 
@@ -550,16 +548,16 @@ void GenerateRegisterCalls()
 /* now register all accs, monotonics, tables */
         for ( i=0; i<TotalAccs; i++ ) {
                 if ( AccTable[i]->defined )
-                	fprintf(outfile,"_CK_acc_%s = registerAccumulator(\"%s\", (FUNCTION_PTR)&_CK_create_%s, NULL, NULL, CHARMPLUSPLUS) ;\n",
+                	fprintf(outfile,"_CK_acc_%s = registerAccumulator(\"%s\", (FUNCTION_PTR)&_CK_create_%s, 0, 0, 1) ;\n",
 									AccTable[i]->name,AccTable[i]->name,AccTable[i]->name) ;
         }
         for ( i=0; i<TotalMonos; i++ ) {
                 if ( MonoTable[i]->defined )
-                	fprintf(outfile,"_CK_mono_%s = registerMonotonic(\"%s\", (FUNCTION_PTR)&_CK_create_%s, NULL, CHARMPLUSPLUS) ;\n",
+                	fprintf(outfile,"_CK_mono_%s = registerMonotonic(\"%s\", (FUNCTION_PTR)&_CK_create_%s, 0, 1) ;\n",
 									MonoTable[i]->name,MonoTable[i]->name,MonoTable[i]->name) ;
         }
         for ( i=0; i<TotalDTables; i++ ) {
-                fprintf(outfile,"%s.SetId(registerTable(\"%s\", NULL, NULL)) ;\n",DTableTable[i],DTableTable[i]) ;
+                fprintf(outfile,"%s.SetId(registerTable(\"%s\", 0, 0)) ;\n",DTableTable[i],DTableTable[i]) ;
         }
 	fprintf(outfile,"\n\n") ;
 

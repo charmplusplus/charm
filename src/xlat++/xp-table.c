@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1995-11-01 23:05:43  sanjeev
+ * Revision 2.15  1995-11-02 23:22:52  sanjeev
+ * preprocessor problems fixes
+ *
+ * Revision 2.14  1995/11/01  23:05:43  sanjeev
  * fixed bugs from CM5
  *
  * Revision 2.13  1995/10/27  20:48:17  sanjeev
@@ -544,13 +547,13 @@ char *SendPe;
 				CurrentChare, CurrentEP, charename, SendEP) ;
 	}
 	else if ( SendType == BRANCH ) {
-		fprintf(outfile,"_CK_SendMsgBranch(%s_CK_ep_%s_%s,(void *)%s,(int)(%s),%s",scopestr,charename,SendEP,msg,SendChare,SendPe) ;
+		fprintf(outfile,"GeneralSendMsgBranch(%s_CK_ep_%s_%s,(void *)%s,%s,-1,(int)(%s)",scopestr,charename,SendEP,msg,SendPe,SendChare) ;
 		if ( MakeGraph )
 			fprintf(graphfile,"SENDBOC %s %s : %s %s %s\n", 
 			CurrentChare, CurrentEP, charename, SendEP, SendPe) ;
 	}
 	else if ( SendType == BROADCAST ) {
-		fprintf(outfile,"_CK_BroadcastMsgBranch(%s_CK_ep_%s_%s,(void *)%s,(int)(%s)",scopestr,charename,SendEP,msg,SendChare) ;
+		fprintf(outfile,"GeneralBroadcastMsgBranch(%s_CK_ep_%s_%s,(void *)%s,-1,(int)(%s)",scopestr,charename,SendEP,msg,SendChare) ;
 		if ( MakeGraph )
 			fprintf(graphfile,"BROADCASTBOC %s %s : %s %s\n", 
 				CurrentChare, CurrentEP, charename, SendEP) ;
@@ -566,11 +569,11 @@ char *SendPe;
 								SendChare) ;
 	}
 	else if ( SendType == BRANCH ){
-		fprintf(outfile,"_CK_SendMsgBranch(%s,(void *)%s,(int)(%s),%s",
-						SendEP,msg,SendChare,SendPe) ;
+		fprintf(outfile,"GeneralSendMsgBranch(%s,(void *)%s,%s,-1,(int)(%s)",
+						SendEP,msg,SendPe,SendChare) ;
 	}
 	else if ( SendType == BROADCAST ){
-		fprintf(outfile,"_CK_BroadcastMsgBranch(%s,(void *)%s,(int)(%s)",SendEP,msg,SendChare) ;
+		fprintf(outfile,"GeneralBroadcastMsgBranch(%s,(void *)%s,-1,(int)(%s)",SendEP,msg,SendChare) ;
 	}
 	else 
 		fprintf(stderr,"TRANSLATOR ERROR: SendType unknown\n");
@@ -1311,15 +1314,16 @@ OutputNewChareMsg(name, arg, placement)
 		
 		if ( type == CHARE ) {
 			if ( placement == NULL || *placement=='\0' ) 
-				fprintf(outfile,"_CK_CreateChare(_CK_chare_%s, _CK_ep_%s_%s, %s, NULL_VID, CK_PE_ANY",name, name, name, arg) ;
+				/* (0xFFF2) is CK_PE_ANY */
+				fprintf(outfile,"CreateChare(_CK_chare_%s, _CK_ep_%s_%s, %s, 0, (0xFFF2)",name, name, name, arg) ; 
 			else 
-				fprintf(outfile,"_CK_CreateChare(_CK_chare_%s, _CK_ep_%s_%s, %s, %s",name, name, name, arg, placement) ;
+				fprintf(outfile,"CreateChare(_CK_chare_%s, _CK_ep_%s_%s, %s, %s",name, name, name, arg, placement) ;
 		}
 		else {
 			if ( placement == NULL || *placement=='\0' ) 
-				fprintf(outfile,"_CK_CreateBoc(_CK_chare_%s, _CK_ep_%s_%s, %s, -1, NULL",name, name, name, arg) ;
+				fprintf(outfile,"CreateBoc(_CK_chare_%s, _CK_ep_%s_%s, %s, -1, 0",name, name, name, arg) ;
 			else 
-				fprintf(outfile,"_CK_CreateBoc(_CK_chare_%s, _CK_ep_%s_%s, %s, %s",name, name, name, arg, placement) ;
+				fprintf(outfile,"CreateBoc(_CK_chare_%s, _CK_ep_%s_%s, %s, %s",name, name, name, arg, placement) ;
 		}
 	}
 	else if ( type == ACCUMULATOR ) {
@@ -1327,18 +1331,18 @@ OutputNewChareMsg(name, arg, placement)
 			fprintf(stderr,"TRANSLATOR ERROR : %s, line %d : new accumulator has more than one arg.\n",CurrentFileName,CurrentLine) ;
 		
 		if ( placement == NULL || *placement=='\0' ) 
-			fprintf(outfile,"_CK_CreateAcc(_CK_acc_%s, %s, -1, NULL",name, arg) ;
+			fprintf(outfile,"CreateAcc(_CK_acc_%s, %s, -1, 0",name, arg) ;
 		else 
-			fprintf(outfile,"_CK_CreateAcc(_CK_acc_%s, %s, %s",name, arg, placement) ;
+			fprintf(outfile,"CreateAcc(_CK_acc_%s, %s, %s",name, arg, placement) ;
 	}
 	else if ( type == MONOTONIC ) {
 		if ( strchr(arg,',') != NULL )
 			fprintf(stderr,"TRANSLATOR ERROR : %s, line %d : new monotonic has more than one arg.\n",CurrentFileName,CurrentLine) ;
 		
 		if ( placement == NULL || *placement=='\0' ) 
-			fprintf(outfile,"_CK_CreateMono(_CK_mono_%s, %s, -1, NULL",name, arg) ;
+			fprintf(outfile,"CreateMono(_CK_mono_%s, %s, -1, 0",name, arg) ;
 		else 
-			fprintf(outfile,"_CK_CreateMono(_CK_mono_%s, %s, %s",name, arg, placement) ;
+			fprintf(outfile,"CreateMono(_CK_mono_%s, %s, %s",name, arg, placement) ;
 	}
 	else { /* type == MESSAGE */
 		if ( placement == NULL || *placement=='\0' ) 
