@@ -17,6 +17,7 @@ virtual functions are defined here.
 #include <string.h>
 #include "converse.h"
 #include "pup.h"
+#include "ckhashtable.h"
 
 PUP::er::~er() {}
 
@@ -37,7 +38,7 @@ void PUP::toDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/,const char 
 void PUP::fromDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/,const char *desc)
 	{fread(p,itemSize,n,F);}
 
-/*************************************
+/****************** Seek support *******************
 For seeking:
 Occasionally, one will need to pack and unpack items in different
 orders (e.g., pack the user data, then the runtime support; but
@@ -137,3 +138,102 @@ void PUP::xlater::impl_seek(seekBlock &s,int off) /*Seek to the given offset*/
   {myUnpacker.impl_seek(s,off);}
 void PUP::xlater::impl_endSeek(seekBlock &s) /*Finish a seeking block*/
   {myUnpacker.impl_endSeek(s);}
+  
+
+/**************** PUP::able support **********************
+If a class C inherits from PUP::able, 
+and you keep a new/delete pointer to C "C *cptr" somewhere,
+you can call "p(cptr)" in your pup routine, and the object
+will be saved/delete'd/new'd/restored properly with no 
+additional effort, even if C has virtual methods or is actually
+a subclass of C.  There is no space or time overhead for C 
+objects other than the virtual function.
+
+This is implemented by registering a constructor and PUP::ID
+for each PUP::able class.  A packer can then write the PUP::ID
+before the class; and unpacker can look up the constructor
+from the PUP::ID.
+ */
+
+//For allocatable objects: new/delete object and call pup routine
+void PUP::er::object(able** a,const char *desc)
+{
+	if (isUnpacking()) 
+	{ //Find the object type; create the object
+		PUP::able::ID id;//The object's id
+		(*this)(id.hash,PUP::able::ID::len,desc);
+		//Find the object's constructor and invoke it (calls new)
+		*a=PUP::able::get_constructor(id) ();
+	} else //Just write out the object type
+		(*this)((unsigned char *)((*a)->get_PUP_ID().hash),
+			PUP::able::ID::len,desc);
+	(*a)->pup(*this);
+	if (isDeleting())
+	{
+		delete *a;
+		*a=0;
+	}
+}
+
+//Empty destructor
+PUP::able::~able() {}
+void PUP::able::pup(PUP::er &p) {}
+
+
+//Compute a good hash of the given string 
+// (registration-time only-- allowed to be slow)
+void PUP::able::ID::setName(const char *name)
+{
+	int i,o,n=strlen(name);
+	int t[len]={0};
+	for (o=0;o<n;o++)
+		for (i=0;i<len;i++) {
+			unsigned char c=name[o];
+			int shift1=(((o+2)*(i+1)*5+4)%13);
+			int shift2=(((o+2)*(i+1)*3+2)%11)+13;
+			t[i]+=(c<<shift1)+(c<<shift2);
+		}
+	for (i=0;i<len;i++) 
+		hash[i]=(unsigned char)(t[i]%20117 + t[i]%1217 + t[i]%157);
+}
+
+//Registration routines-- called at global initialization time
+class PUP_regEntry {
+public:
+	PUP::able::ID id;
+	const char *name;
+	PUP::able::constructor_function ctor;
+	PUP_regEntry(const char *Nname,
+		const PUP::able::ID &Nid,PUP::able::constructor_function Nctor)
+		:name(Nname),id(Nid),ctor(Nctor) {}
+	PUP_regEntry(int zero) {
+		name=NULL; //For marking "not found"
+	}
+};
+
+typedef CkHashtableT<PUP::able::ID,PUP_regEntry> PUP_registry;
+
+static PUP_registry *PUP_getRegistry(void) {
+	static PUP_registry *reg=NULL;
+	if (reg==NULL)
+		reg=new PUP_registry();
+	return reg;
+}
+
+PUP::able::ID PUP::able::register_constructor
+	(const char *className,constructor_function fn)
+{
+	PUP::able::ID id(className);
+	PUP_getRegistry()->put(id)=PUP_regEntry(className,id,fn);
+	return id;
+}
+PUP::able::constructor_function PUP::able::get_constructor
+	(const PUP::able::ID &id)
+{
+	const PUP_regEntry &cur=PUP_getRegistry()->get(id);
+	if (cur.name!=NULL)
+		return cur.ctor; 
+	//Error! ID not in list-- unknown class
+	CmiAbort("Unrecognzied PUP::able::ID passed to get_constructor!");
+	return NULL;
+}

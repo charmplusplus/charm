@@ -13,7 +13,7 @@ unpack from disk.  These functions all perform the exact same function--
 namely, they list the members of the array, struct, or object.
 Further, all the functions must agree, or the unpacked data will 
 be garbage.  This library allows the user to write *one* function,
-which will perform all needed packing/unpacking.
+pup, which will perform all needed packing/unpacking.
 
 A simple example is:
 class foo {
@@ -69,6 +69,7 @@ class bar {
 
 class PUP {//<- Should be "namespace", once all compilers support them
  public:
+ 
 //Item data types-- these are used to do byte swapping, etc.
 typedef enum {
 //(this list must exactly match that in PUPer_xlate)
@@ -85,6 +86,7 @@ typedef unsigned char myByte;
 
 //Forward declarations
 class er;
+class able;
 class xlater;
 
 //Used for out-of-order unpacking
@@ -192,12 +194,17 @@ class er {
   //For raw memory (n gives number of bytes)
   void operator()(void *a,int nBytes,const char *desc=NULL)
     {bytes((void *)a,nBytes,1,Tbyte,desc);}
+  
+  //For allocatable objects (system will new/delete object and call pup routine)
+  void operator()(able** a,const char *desc=NULL)
+    {object(a,desc);}
  
  protected:
   //Generic bottleneck: pack/unpack n items of size itemSize 
   // and data type t from p.  Desc describes the data item
   friend class xlater;
   virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc) =0;
+  virtual void object(able** a,const char *desc);
    
   //For seeking (pack/unpack in different orders)
   friend class seekBlock;
@@ -207,6 +214,60 @@ class er {
   virtual void impl_endSeek(seekBlock &s);/*End a seeking block*/
 };
 
+/*************** PUP::able support ***************/
+
+//The base class of all allocatable objects with pup routines
+class able {
+public:
+	//A globally-unique, persistent identifier for an allocatable object
+	class ID {
+	public:
+		enum {len=4};
+		unsigned char hash[len];
+		ID() {}
+		ID(const char *name) {setName(name);}
+		void setName(const char *name);//Write name into hash
+		bool operator==(const ID &other) const {
+			for (int i=0;i<len;i++) 
+				if (hash[i]!=other.hash[i])
+					return false;
+			return true;
+		}
+	};
+	
+	//Tag for identifying PUP::able migration constructors
+	struct constructor {};
+	typedef able* (*constructor_function)(void);
+	static ID register_constructor(const char *className,
+		constructor_function fn);
+	static constructor_function get_constructor(const ID &id);
+	
+	able() {}
+	able(constructor *) {}
+	virtual ~able();//Virtual destructor may be needed by some child
+	virtual void pup(er &p);
+	virtual const ID &get_PUP_ID(void) const =0;
+	
+};
+
+//Declarations to include in a PUP::able's body
+#define DECLARE_PUPable(className,superName) \
+	className(PUP::able::constructor *c) :superName(c) {} \
+	static PUP::able *call_PUP_constructor(void); \
+	static PUP::able::ID my_PUP_ID;\
+	virtual const PUP::able::ID &get_PUP_ID(void) const;
+
+//Definitions to include exactly once at the top level
+#define DEFINE_PUPable(className) \
+	PUP::able *className::call_PUP_constructor(void) \
+		{ return new className((PUP::able::constructor *)0);}\
+	PUP::able::ID className::my_PUP_ID=\
+		PUP::able::register_constructor(\
+		  #className,className::call_PUP_constructor);\
+	const PUP::able::ID &className::get_PUP_ID(void) const\
+		{ return className::my_PUP_ID; }
+
+/************** PUP::er -- Sizer ******************/
 //For finding the number of bytes to pack (e.g., to preallocate a memory buffer)
 class sizer : public er {
  protected:
@@ -221,7 +282,7 @@ class sizer : public er {
   int size(void) const {return nBytes;}
 };
 
-/********** For binary memory buffer pack/unpack *********/
+/********** PUP::er -- Binary memory buffer pack/unpack *********/
 class mem : public er { //Memory-buffer packers and unpackers
  protected:
   myByte *buf;//Memory buffer (stuff gets packed into/out of here)
@@ -253,7 +314,7 @@ class fromMem : public mem {
   fromMem(const void *Nbuf):mem(IS_UNPACKING,(myByte *)Nbuf) {}
 };
 
-/********** For binary disk file pack/unpack *********/
+/********** PUP::er -- Binary disk file pack/unpack *********/
 class disk : public er {
  protected:
   FILE *F;//Disk file to read from/write to
@@ -288,7 +349,7 @@ class fromDisk : public disk {
   fromDisk(FILE *f):disk(IS_UNPACKING,f) {}
 };
 
-/********** For heterogenous machine pack/unpack *********/
+/********** PUP::er -- Heterogenous machine pack/unpack *********/
 //This object describes the data representation of a machine.
 class machineInfo {
  public:
