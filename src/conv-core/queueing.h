@@ -64,6 +64,7 @@ typedef struct Queue_struct
 *Queue;
 
 Queue CqsCreate(void);
+void CqsDelete(Queue);
 void CqsEnqueue(Queue, void *msg);
 void CqsEnqueueFifo(Queue, void *msg);
 void CqsEnqueueLifo(Queue, void *msg);

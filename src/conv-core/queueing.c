@@ -239,6 +239,13 @@ Queue CqsCreate(void)
   return q;
 }
 
+void CqsDelete(Queue q)
+{
+  CmiFree(q->negprioq.heap);
+  CmiFree(q->posprioq.heap);
+  CmiFree(q);
+}
+
 unsigned int CqsLength(Queue q)
 {
   return q->length;
