@@ -506,7 +506,7 @@ Array::genSubDecls(XStr& str)
     str << ";";
     return;
   }
-  str << ": public virtual _CK_AID";
+  str << ": public virtual CkArrayID";
   if(bases!=0) {
     str << ", ";
     bases->genProxyNames(str, "public virtual ", "", ", ");
@@ -527,20 +527,10 @@ Array::genSubDecls(XStr& str)
     bases->genProxyNames2(str, "", "((const ", " &)_arr)", ", ");
   }
   str << "{ *this = _arr;}\n";
-  str << "    "<<ptype<<"(CkChareID __cid) ";
-  if(bases !=0) {
-    str << ":";
-    bases->genProxyNames(str, "", "(__cid)", ", ");
-  }
-  str << "{ ckSetChareId(__cid);}\n";
   str << 
   "    CkArrayID ckGetArrayId(void) { return CkArrayID(_ck_aid, _elem); }\n"
   "    void ckSetArrayId(CkArrayID _aid) { \n"
-  "      _setChare(0); _setAid(_aid._ck_aid); _elem = _aid._elem; \n"
-  "    }\n"
-  "    CkChareID ckGetChareId(void) { return _cid; }\n"
-  "    void ckSetChareId(CkChareID __cid) { \n"
-  "      _CHECK_CID(__cid, __idx); _setChare(1); _setCid(__cid); \n"
+  "      _setAid(_aid._ck_aid); _elem = _aid._elem; \n"
   "    }\n"
   "    "<<ptype<<" operator [] (int idx) {\n"
   "      return "<<ptype<<"(CkArrayID(_ck_aid, idx));\n"
@@ -1068,7 +1058,7 @@ void Entry::genArrayStaticConstructorDecl(XStr& str)
   str << "\n"
   "    {\n"
   "        _setAid(ckNew_GID(numElements,mapID)); \n"
-  "        _setChare(0); _elem=-1;\n"
+  "        _elem=-1;\n"
   "    }\n";
   
   // entry ptr declaration
@@ -1172,9 +1162,7 @@ void Entry::genArrayDecl(XStr& str)
     // entry method broadcast declaration
     str << "    "<<Virtual()<<retType<<" "<<name<<"("<<paramComma()<<"int index=-2) {\n";
     str << "      if(index==-2) index=_elem;\n";
-    str << "      if(_isChare())\n";
-    str << "        CkSendMsg("<<epIdx()<<", "<<msg<<", &_cid);\n";
-    str << "      else if(_elem==(-1)) \n";
+    str << "      if(index==(-1)) \n";
     str << "        _array->broadcast((ArrayMessage*) "<<msg<<", "<<epIdx()<<");\n";
     str << "      else _array->send((ArrayMessage*) "<<msg<<", index, "<<epIdx()<<");\n";
     str << "    }\n";
