@@ -425,9 +425,6 @@ CsvExtern(void*,       CsdNodeQueue);
 CsvExtern(CmiNodeLock, CsdNodeQueueLock);
 #endif
 CpvExtern(int,         CsdStopFlag);
-CpvExtern(CmiHandler,  CsdNotifyIdle);
-CpvExtern(CmiHandler,  CsdNotifyBusy);
-CpvExtern(int,         CsdStopNotifyFlag);
 
 extern int CmiRegisterHandler(CmiHandler);
 extern int CmiRegisterHandlerLocal(CmiHandler);
@@ -588,14 +585,14 @@ typedef void (*CmiStartFn)(int argc, char **argv);
 /********* CSD - THE SCHEDULER ********/
 
 CpvExtern(int, _ccd_numchecks);
+extern void  CcdCallBacks();
+extern void  CsdEndIdle(void);
+extern void  CsdStillIdle(void);
+extern void  CsdBeginIdle(void);
+
 extern void  *CmiGetNonLocal(void);
 extern void   CmiNotifyIdle(void);
 extern  int CsdScheduler(int);
-#define CsdSetNotifyIdle(f1,f2) do {CpvAccess(CsdNotifyIdle)=(f1);\
-                                 CpvAccess(CsdNotifyBusy)=(f2);} while(0)
-#define CsdStartNotifyIdle() (CpvAccess(CsdStopNotifyFlag)=0)
-#define CsdStopNotifyIdle() (CpvAccess(CsdStopNotifyFlag)=1)
-
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)++)
 
 #if CMK_SPANTREE_USE_COMMON_CODE
@@ -1091,11 +1088,23 @@ void CPathMsgFree(void *msg);
 
 typedef void (*CcdVoidFn)();
 
-#define CcdPROCESSORBUSY 0
-#define CcdPROCESSORIDLE 1
-#define CcdSIGUSR1 2
-#define CcdSIGUSR2 3
-#define CcdQUIESCENCE 4
+/*CPU conditions*/
+#define CcdPROCESSOR_BEGIN_BUSY 0
+#define CcdPROCESSOR_END_IDLE 0 /*Synonym*/
+#define CcdPROCESSOR_BEGIN_IDLE 1
+#define CcdPROCESSOR_END_BUSY 1 /*Synonym*/
+#define CcdPROCESSOR_STILL_IDLE 2
+
+/*Thread conditions*/
+#define CcdTHREAD_SUSPEND 5
+#define CcdTHREAD_RESUME  6
+#define CcdTHREAD_SUSPEND 5
+
+/*Other conditiions*/
+#define CcdQUIESCENCE 30
+#define CcdSIGUSR0 32+0
+#define CcdSIGUSR1 32+1
+#define CcdSIGUSR2 32+2
 
 void CcdCallFnAfter(CcdVoidFn fnp, void *arg, unsigned int msecs);
 int CcdPeriodicCall(CcdVoidFn fnp, void *arg);

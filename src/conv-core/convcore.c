@@ -17,13 +17,6 @@
 #include "conv-ccs.h"
 #include "ccs-server.h"
 
-
-#if NODE_0_IS_CONVHOST
-extern int ccs_socket_ready;
-extern void CHostInit(int withCCS);
-extern void CHostProcess(void);
-#endif
-
 extern void CcdModuleInit(char **);
 extern void CmiMemoryInit(char **);
 extern void CldModuleInit(void);
@@ -211,14 +204,8 @@ CpvStaticDeclare(int, CstatPrintQueueStatsFlag);
 CpvStaticDeclare(int, CstatPrintMemStatsFlag);
 
 #if CMK_WEB_MODE
-extern void initUsage(void);
-extern void usageStart(void);
-extern void usageStop(void);
 extern void CWebInit(void);
 #else
-#define initUsage()
-#define usageStart()
-#define usageStop()
 #define CWebInit()
 #endif
 
@@ -259,8 +246,6 @@ char **argv;
 #ifndef CMK_OPTIMIZE
   traceInit(argv);
 #endif
-
-  initUsage();
 }
 
 int CstatMemory(i)
@@ -595,44 +580,20 @@ void (*handler)();
  *
  *****************************************************************************/
 
-
-extern void CcdCallBacks(void);
-
-CpvDeclare(CmiHandler, CsdNotifyIdle);
-CpvDeclare(CmiHandler, CsdNotifyBusy);
-CpvDeclare(int, CsdStopNotifyFlag);
-
 void CsdBeginIdle(void)
 {
-  if(!CpvAccess(CsdStopNotifyFlag)) {
-    (CpvAccess(CsdNotifyIdle))();
-  }
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceBeginIdle();
-#endif
-  usageStop();  
-  CmiNotifyIdle();
-  CcdRaiseCondition(CcdPROCESSORIDLE) ;
+  CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
 }
 
 void CsdStillIdle(void)
 {
-  CmiNotifyIdle();
-  CcdRaiseCondition(CcdPROCESSORIDLE) ;
+  CcdCallBacks();
+  CcdRaiseCondition(CcdPROCESSOR_STILL_IDLE);
 }
 
 void CsdEndIdle(void)
 {
-  if(!CpvAccess(CsdStopNotifyFlag)) {
-    (CpvAccess(CsdNotifyBusy))();
-  }
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceEndIdle();
-#endif
-  usageStart();  
-  CcdRaiseCondition(CcdPROCESSORBUSY) ;
+  CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
 
 
@@ -657,9 +618,6 @@ int CsdScheduler(int maxmsgs)
   int isIdle=0;
   
   while (1) {
-#if NODE_0_IS_CONVHOST
-    if (ccs_socket_ready) CHostProcess();
-#endif
     msg = CmiGetNonLocal();
     if (msg==0) msg = CdsFifo_Dequeue(localqueue);
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -682,7 +640,11 @@ int CsdScheduler(int maxmsgs)
       maxmsgs--; if (maxmsgs==0) return maxmsgs;
       if (CpvAccess(CsdStopFlag) != cycle) return maxmsgs;
     } else { /*No message available-- go (or remain) idle*/
-      if (!isIdle) {isIdle=1;CsdBeginIdle();}
+      if (!isIdle) {
+	isIdle=1;
+	
+	CsdBeginIdle();
+      }
       else CsdStillIdle();
       if(pollmode) return maxmsgs;
       if (CpvAccess(CsdStopFlag) != cycle) {
@@ -749,9 +711,6 @@ CpvStaticDeclare(CthThread, CthSleepingStandins);
 CpvStaticDeclare(int      , CthResumeNormalThreadIdx);
 CpvStaticDeclare(int      , CthResumeSchedulingThreadIdx);
 
-/** addition for tracing */
-CpvDeclare(CthThread, curThread);
-/* end addition */
 
 void CthStandinCode()
 {
@@ -785,14 +744,6 @@ CthThread CthSuspendSchedulingThread()
 
 void CthResumeNormalThread(CthThread t)
 {
-  /** addition for tracing */
-  CpvAccess(curThread) = t;
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceResume();
-#endif
-  /* end addition */
-  usageStart();  
   CthResume(t);
 }
 
@@ -838,8 +789,6 @@ void CthSchedInit()
   CpvInitialize(int      , CthResumeNormalThreadIdx);
   CpvInitialize(int      , CthResumeSchedulingThreadIdx);
 
-  CpvInitialize(CthThread, curThread);
-
   CpvAccess(CthMainThread) = CthSelf();
   CpvAccess(CthSchedulingThread) = CthSelf();
   CpvAccess(CthSleepingStandins) = 0;
@@ -857,9 +806,6 @@ void CsdInit(argv)
 {
   CpvInitialize(void *, CsdSchedQueue);
   CpvInitialize(int,   CsdStopFlag);
-  CpvInitialize(int,   CsdStopNotifyFlag);
-  CpvInitialize(CmiHandler,   CsdNotifyIdle);
-  CpvInitialize(CmiHandler,   CsdNotifyBusy);
   
   CpvAccess(CsdSchedQueue) = (void *)CqsCreate();
 
@@ -874,7 +820,6 @@ void CsdInit(argv)
 #endif
 
   CpvAccess(CsdStopFlag)  = 0;
-  CpvAccess(CsdStopNotifyFlag) = 1;
 }
 
 
@@ -1433,6 +1378,49 @@ static void memChop(char *msgWhole)
 }
 
 
+
+/******** Idle timeout module (+idletimeout=30) *********/
+
+typedef struct {
+  int idle_timeout;/*Milliseconds to wait idle before aborting*/
+  int is_idle;/*Boolean currently-idle flag*/
+  int call_count;/*Number of timeout calls currently in flight*/
+} cmi_cpu_idlerec;
+
+static void on_timeout(cmi_cpu_idlerec *rec)
+{
+  rec->call_count--;
+  if(rec->call_count==0 && rec->is_idle==1) {
+    CmiError("Idle time on PE %d exceeded specified timeout.\n", CmiMyPe());
+    CmiAbort("Exiting.\n");
+  }
+}
+static void on_idle(cmi_cpu_idlerec *rec)
+{
+  CcdCallFnAfter(on_timeout, rec, rec->idle_timeout);
+  rec->call_count++; /*Keeps track of overlapping timeout calls.*/  
+  rec->is_idle = 1;
+}
+static void on_busy(cmi_cpu_idlerec *rec)
+{
+  rec->is_idle = 0;
+}
+static void CIdleTimeoutInit(char **argv)
+{
+  int idle_timeout=0; /*Seconds to wait*/
+  CmiGetArgInt(argv,"+idle-timeout",&idle_timeout);
+  if(idle_timeout != 0) {
+    cmi_cpu_idlerec *rec=(cmi_cpu_idlerec *)malloc(sizeof(cmi_cpu_idlerec));
+    _MEMCHECK(rec);
+    rec->idle_timeout=idle_timeout*1000;
+    rec->is_idle=0;
+    rec->call_count=0;
+    CcdCallOnCondition(CcdPROCESSOR_BEGIN_IDLE, on_idle, rec);
+    CcdCallOnCondition(CcdPROCESSOR_BEGIN_BUSY, on_busy, rec);
+  }
+}
+
+
 /*****************************************************************************
  *
  * Converse Initialization
@@ -1441,28 +1429,6 @@ static void memChop(char *msgWhole)
 
 extern void CrnInit(void);
 
-static unsigned int idle_timeout = 0;
-CpvStaticDeclare(int, call_cancel);
-
-static void on_timeout(void *tmp)
-{
-  if(CpvAccess(call_cancel)==0) {
-    CmiError("Idle time on PE %d exceeded specified timeout.\n", CmiMyPe());
-    CmiAbort("Exiting.\n");
-  }
-}
-
-static void on_idle(void *tmp)
-{
-  CcdCallFnAfter(on_timeout, 0, idle_timeout);
-  CpvAccess(call_cancel) = 0;
-}
-
-static void on_busy(void *tmp)
-{
-  CpvAccess(call_cancel) = 1;
-}
-
 #if CMK_THREADS_USE_ISOMALLOC
 extern void CthHandlerInit(void);
 #endif
@@ -1470,9 +1436,7 @@ extern void CthHandlerInit(void);
 void ConverseCommonInit(char **argv)
 {
   int i;
-#if NODE_0_IS_CONVHOST
-  int ccs_serverFlag=0,ccs_serverPort=0;
-#endif
+
   CmiTimerInit();
   CstatsInit(argv);
   CcdModuleInit(argv);
@@ -1489,30 +1453,18 @@ void ConverseCommonInit(char **argv)
   CmiInitMultipleSend();
   CQdInit();
 #if CMK_CCS_AVAILABLE
-  CcsInit();
+  CcsInit(argv);
 #endif
 #if CMK_DEBUG_MODE
   CpdInit();
 #endif
   CWebInit();
-#if NODE_0_IS_CONVHOST
-  if (CmiGetArgFlag(argv,"++server"))
-    ccs_serverFlag=1;
-  if (CmiGetArgInt(argv,"++server-port",&ccs_serverPort))
-    ccs_serverFlag=1;
-  if ((CmiMyPe()==0)&&ccs_serverFlag)
-    CHostInit(ccs_serverPort);
-#endif
 
   CldModuleInit();
   CrnInit();
-  CmiGetArgInt(argv,"+idle-timeout",&idle_timeout);
-  if(idle_timeout != 0) {
-    CcdCallOnCondition(CcdPROCESSORIDLE, on_idle, 0);
-    CcdCallOnCondition(CcdPROCESSORBUSY, on_busy, 0);
-    CpvInitialize(int, call_cancel);
-    CpvAccess(call_cancel) = 1;
-  }
+  CIdleTimeoutInit(argv);  
+
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,CmiNotifyIdle,0);
 }
 
 void ConverseCommonExit(void)
