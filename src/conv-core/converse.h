@@ -101,19 +101,6 @@ typedef int CmiNodeLock;
 #define CmiTryLock(lock)  ((lock)?1:((lock)=1,0))
 #define CmiDestroyLock(lock) /*empty*/
 
-extern int _immdtMsgLock;
-extern int _immdtMsgFlag;
-/* before and after critical code */
-#define CmiLockImmdtMsg() {_immdtMsgLock=1;}
-#define CmiUnlockImmdtMsg() \
-  { _immdtMsgLock=0; \
-    if(_immdtMsgFlag) \
-      CmiProbeImmediateMsg(); }
-/* before handling interrupt */
-#define CmiTryImmdtMsgLock() \
-  (_immdtMsgLock?((_immdtMsgFlag=1),1):0)
-#define CmiClearImmdtMsgFlag() {_immdtMsgFlag=0;}
-
 #endif
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the net-*-smp versions*/
@@ -157,12 +144,6 @@ extern void CmiDestroyLock(CmiNodeLock lock);
 extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemLock() do{if (CmiMemLock_lock) CmiLock(CmiMemLock_lock);} while (0)
 #define CmiMemUnlock() do{if (CmiMemLock_lock) CmiUnlock(CmiMemLock_lock);} while (0)
-
-extern int _immdtMsgLock;
-#define CmiLockImmdtMsg() { _immdtMsgLock=1; }
-#define CmiUnlockImmdtMsg() { _immdtMsgLock=0; } 
-#define CmiTryImmdtMsgLock() (_immdtMsgLock)
-#define CmiClearImmdtMsgFlag() 
 
 #endif
 
@@ -316,6 +297,32 @@ extern  void CmiDestroyLock(CmiNodeLock lock);
 extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemLock() do{if (CmiMemLock_lock) CmiLock(CmiMemLock_lock);} while (0)
 #define CmiMemUnlock() do{if (CmiMemLock_lock) CmiUnlock(CmiMemLock_lock);} while (0)
+
+#endif
+
+#if CMK_SHARED_VARS_UNAVAILABLE   /* non-SMP version */
+
+typedef int CmiImmediateLockType;
+extern int _immediateLock;
+extern int _immediateFlag;
+#define CmiCreateImmediateLock() (0)
+#define CmiImmediateLock(ignored) { _immediateLock++; }
+#define CmiImmediateUnlock(ignored) \
+  { _immediateLock--; \
+    if(_immediateFlag) \
+      CmiProbeImmediateMsg(); } 
+#define CmiCheckImmediateLock(ignored) \
+  ((_immediateLock)?((_immediateFlag=1),1):0)
+#define CmiClearImmediateFlag() { _immediateFlag=0; }
+
+#else /* SMP and all other weird versions */
+
+typedef CmiNodeLock CmiImmediateLockType;
+#define CmiCreateImmediateLock() CmiCreateLock()
+#define CmiImmediateLock(immediateLock) CmiLock((immediateLock))
+#define CmiImmediateUnlock(immediateLock) CmiUnlock((immediateLock)) 
+#define CmiCheckImmediateLock(ignored)  (0)
+#define CmiClearImmediateFlag() 
 
 #endif
 

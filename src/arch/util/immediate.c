@@ -6,8 +6,10 @@ int _immediateReady = 0;
 
 int _immRunning=0; /* if set, somebody's inside an immediate message */
 
-int _immdtMsgLock = 0; /* if set, all immediate message handling will be delayed. */
-int _immdtMsgFlag = 0; /* if set, there is delayed immediate message. */
+#if CMK_SHARED_VARS_UNAVAILABLE /* SMP and all other weird versions */
+int _immediateLock = 0; /* if locked, all immediate message handling will be delayed. */
+int _immediateFlag = 0; /* if set, there is delayed immediate message. */
+#endif
 
 #if CMK_IMMEDIATE_MSG
 
@@ -114,7 +116,7 @@ void CmiHandleImmediate()
    
    CmiUnlock(CsvAccess(NodeState).immRecvLock);
 
-   CmiClearImmdtMsgFlag();
+   CmiClearImmediateFlag();
 }
 
 #endif
