@@ -130,6 +130,7 @@
 #define CthMemAlign(x,n) malloc(n)
 #define CthMemoryProtect(p,l) 
 #define CthMemoryUnprotect(p,l)
+#define memalign(m, a) valloc(a)
 
 #endif
 
