@@ -143,7 +143,7 @@ class TraceProjections : public Trace {
     TraceProjections() { 
       curevent=0; msgNum=0; binStart=0.0;
       epSize = 1000;
-      CkPrintf("NUM OF ENTRIES: %d\n", _numEntries);
+//      CkPrintf("NUM OF ENTRIES: %d\n", _numEntries);
       epTime = new double[epSize];
       epCount = new int[epSize];
       for (int i=0; i< epSize; i++) {

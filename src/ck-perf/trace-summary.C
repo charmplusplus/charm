@@ -178,7 +178,7 @@ void TraceProjections::beginExecute(envelope *e)
     epCount[execEp] ++;
   }
   double t = CmiTimer();
-CmiPrintf("start: %f \n", start);
+//CmiPrintf("start: %f \n", start);
 /*
   msgNum++;
   if (start == t) {
@@ -203,7 +203,7 @@ void TraceProjections::endExecute(void)
   // duplicate messages
   if (msgNum != 0) return;
 */
-CmiPrintf("end:msgNum: %d bin:%f\n", msgNum, bin);
+//CmiPrintf("end:msgNum: %d bin:%f\n", msgNum, bin);
   double t = CmiTimer();
   double ts = start;
   double nts = binStart;
