@@ -1791,7 +1791,7 @@ convcomlibmanager.o: convcomlibmanager.C convcomlibmanager.h converse.h \
   3dgridrouter.h
 	$(CHARMC) -c -I. convcomlibmanager.C
 
-pipebroadcaststrategy.o: pipebroadcaststrategy.C pipebroadcaststrategy.h \
+pipebroadcastconverse.o: pipebroadcastconverse.C pipebroadcastconverse.h \
   ckhashtable.h pup.h converse.h conv-config.h conv-common.h conv-mach.h \
   conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h conv-cpath.h \
   conv-qd.h conv-random.h conv-lists.h conv-trace.h persistent.h \
@@ -1807,5 +1807,5 @@ pipebroadcaststrategy.o: pipebroadcaststrategy.C pipebroadcaststrategy.h \
   waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h envelope.h \
   convcomlibmanager.h comlib.h router.h
-	$(CHARMC) -c -I. pipebroadcaststrategy.C
+	$(CHARMC) -c -I. pipebroadcastconverse.C
 

@@ -1,7 +1,7 @@
 #ifndef PIPE_BROADCAST_STRATEGY
 #define PIPE_BROADCAST_STRATEGY
 #include "ComlibManager.h"
-#include "pipebroadcaststrategy.h"
+#include "pipebroadcastconverse.h"
 
 class PipeBroadcastStrategy : public CharmStrategy {
  protected:

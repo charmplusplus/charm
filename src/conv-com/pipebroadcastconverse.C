@@ -1,4 +1,4 @@
-#include "pipebroadcaststrategy.h"
+#include "pipebroadcastconverse.h"
 
 //PipeBcastHashKey CODE
 int PipeBcastHashKey::staticCompare(const void *k1,const void *k2,size_t ){
