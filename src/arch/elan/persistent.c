@@ -178,7 +178,7 @@ void persistentRequestHandler(void *env)
 
   PersistentHandle h = getFreeRecvSlot();
   PersistentReceivesTable *slot = (PersistentReceivesTable *)h;
-  slot->messagePtr = CmiAlloc(msg->maxBytes);
+  slot->messagePtr = elan_CmiStaticAlloc(msg->maxBytes);
   _MEMCHECK(slot->messagePtr);
   slot->sizeMax = msg->maxBytes;
 
@@ -385,7 +385,7 @@ void persistentDestoryHandler(void *env)
   else
     persistentReceivesTableTail = slot->prev;
 
-  if (slot->messagePtr) CmiFree(slot->messagePtr);
+  if (slot->messagePtr) elan_CmiStaticFree(slot->messagePtr);
   CmiFree(slot);
 }
 
@@ -426,7 +426,7 @@ void CmiDestoryAllPersistent()
     PersistentReceivesTable *next = slot->next;
     if (slot->recvSize)
       CmiPrintf("Warning: CmiDestoryAllPersistent destoried buffered undelivered message.\n");
-    if (slot->messagePtr) CmiFree(slot->messagePtr);
+    if (slot->messagePtr) elan_CmiStaticFree(slot->messagePtr);
     CmiFree(slot);
     slot = next;
   }
