@@ -83,6 +83,14 @@ void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
       }
 #endif
 
+#if CMK_BLUEGENE_NODE
+static int BgMyPe() { return BgMyNode(); }
+static int BgNumPes() { int x,y,z; BgGetSize(&x, &y, &z); return (x*y*z); }
+#else
+static int BgMyPe() { return BgGetGlobalWorkerThreadID(); }
+static int BgNumPes() { return BgGetTotalSize()*BgGetNumWorkThread(); }
+#endif
+
 void CldEnqueue(int pe, void *msg, int infofn)
 {
   int len, queueing, priobits; unsigned int *prioptr;
@@ -94,15 +102,15 @@ void CldEnqueue(int pe, void *msg, int infofn)
 
   DEBUGF(("[%d>] CldEnqueue pe: %d infofn:%d\n", BgMyNode(), pe, infofn));
   if (pe == CLD_ANYWHERE) {
-    pe = (((CrnRand()+CmiMyPe())&0x7FFFFFFF)%CmiNumPes());
+    pe = (((CrnRand()+BgMyPe())&0x7FFFFFFF)%BgNumPes());
     while (!CldPresentPE(pe))
-      pe = (((CrnRand()+CmiMyPe())&0x7FFFFFFF)%CmiNumPes());
-    if (pe != CmiMyPe())
+      pe = (((CrnRand()+BgMyPe())&0x7FFFFFFF)%BgNumPes());
+    if (pe != BgMyPe())
       CpvAccess(CldRelocatedMessages)++;
-    if (pe == CmiMyPe()) {
+    if (pe == BgMyPe()) {
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
       CmiSetInfo(msg,infofn);
-      DEBUGF(("CldEnqueue CLD_ANYWHERE (pe == CmiMyPe)\n"));
+      DEBUGF(("CldEnqueue CLD_ANYWHERE (pe == BgMyPe)\n"));
 /*
       CldPutToken((char *)msg);
 */
