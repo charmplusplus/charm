@@ -1,0 +1,27 @@
+BLUELIGHT_INC=/BlueLight/floor/bglsys/include
+BLUELIGHT_LIB=/BlueLight/floor/bglsys/lib
+BLUELIGHT_BIN=/BlueLight/floor/blrts-gnu/bin
+
+CMK_CPP_CHARM="$BLUELIGHT_BIN/powerpc-bgl-blrts-gnu-cpp -P"
+CMK_CPP_C="$BLUELIGHT_BIN/powerpc-bgl-blrts-gnu-cpp -E "
+CMK_CC="$BLUELIGHT_BIN/powerpc-bgl-blrts-gnu-gcc -I$BLUELIGHT_INC -gdwarf-2 -Wno-deprecated "
+CMK_CXX="$BLUELIGHT_BIN/powerpc-bgl-blrts-gnu-g++ -I$BLUELIGHT_INC -gdwarf-2 -Wno-deprecated "
+CMK_CXXPP="$BLUELIGHT_BIN/powerpc-bgl-blrts-gnu-g++ -E "
+CMK_CF77="$BLUELIGHT_BIN/powerpc-bgl-blrts-gnu-g77 "
+CMK_CF90='f90'
+CMK_RANLIB="$BLUELIGHT_BIN/powerpc-bgl-blrts-gnu-ranlib "
+CMK_AR="$BLUELIGHT_BIN/powerpc-bgl-blrts-gnu-ar q "
+CMK_LD="$CMK_CC -L $BLUELIGHT_LIB "
+CMK_LDXX="$CMK_CXX -L $BLUELIGHT_LIB "
+CMK_LIBS='-lckqt -lmpich.rts -lvdevices.rts -lcoprocessor.rts -lspad.rts -ldevices.rts -lrts.rts '
+CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
+CMK_SEQ_LIBS=''
+CMK_SEQ_CC="gcc -Wno-deprecated "
+CMK_SEQ_LD='gcc'
+CMK_SEQ_CXX='g++ -Wno-deprecated '
+CMK_SEQ_LDXX='g++'
+CMK_F90LIBS='-L/usr/absoft/lib -L/opt/absoft/lib -lf90math -lfio -lU77 -lf77math '
+CMK_MOD_NAME_ALLCAPS=1
+CMK_MOD_EXT="mod"
+CMK_F90_USE_MODDIR=1
+CMK_F90_MODINC="-p"
