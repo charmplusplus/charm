@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.36  1995-11-14 23:22:08  jyelon
+ * Revision 2.37  1996-03-05 16:09:56  sanjeev
+ * removed CmiSpanTreeInit from StartCharm
+ *
+ * Revision 2.36  1995/11/14 23:22:08  jyelon
  * handle_bocinitmsg now saves and restores currentChareBlock.
  *
  * Revision 2.35  1995/11/13  04:04:33  gursoy
@@ -365,7 +368,7 @@ FUNCTION_PTR donehandler;
 
 	InitializeMessageMacros();
 
-	CmiSpanTreeInit();
+	/* CmiSpanTreeInit();  already done in CmiInitMc  -- Sanjeev 3/5/96 */
 
         /* OtherQsInit(); this was combined with CsdInitialize */
         StatInit();
