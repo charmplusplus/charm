@@ -1214,7 +1214,7 @@ char *CmiCopyMsg(char *msg, int len);
   receive from 0 in the first step but then it has only proc pow(2,n)+1 as
   destination, so most of the other dimentions will be skipped.
 */
-int HypercubeGetBcastDestinations(int k, int *dest_pes);
+int HypercubeGetBcastDestinations(int mype, int total_pes, int k, int *dest_pes);
 
 /******** Immediate Messages ********/
 
