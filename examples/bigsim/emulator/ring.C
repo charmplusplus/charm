@@ -40,7 +40,7 @@ void BgEmulatorInit(int argc, char **argv)
 
 void BgNodeStart(int argc, char **argv)  {
     int x,y,z, nx, ny, nz;  
-    RingMsg *msg = new RingMsg;                             
+    RingMsg *msg = (RingMsg*) CmiAlloc(sizeof(RingMsg));
     msg->data =  888;
     passRingID = BgRegisterHandler(passRing);
     BgGetMyXYZ(&x, &y, &z);           
@@ -55,8 +55,9 @@ void passRing(char *msg)  {
      int x, y, z,  nx, ny, nz;
      BgGetMyXYZ(&x, &y, &z);            
      nextxyz(x, y, z, &nx, &ny, &nz);
-     if (x==0 && y==0 && z==0)     if (++iter == MAXITER) BgShutdown();
      printf("%d %d %d => %d %d %d\n", x,y,z,nx,ny,nz);
-     BgSendPacket(nx, ny, nz, ANYTHREAD, passRingID, LARGE_WORK, sizeof(RingMsg), msg);
+     if (x==0 && y==0 && z==0)     if (++iter == MAXITER) { BgShutdown(); return; }
+     CmiAssert(((RingMsg*)msg)->data == 888);
+     BgSendPacket(nx, ny, nz, ANYTHREAD, passRingID, LARGE_WORK, sizeof(RingMsg), (char*)msg);
 }
 
