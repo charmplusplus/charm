@@ -1,3 +1,10 @@
+/*
+Triangle Mesh Refinement (TMR) demo code.
+
+Reads in a Triangle mesh.
+Passes it to the REFINE2D subsystem.
+Asks for refinements occasionally.
+*/
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -158,7 +165,7 @@ void pup_myGlobals(pup_er p,myGlobals *g)
 }
 
 
-//Return the area of triangle i
+//Return the signed area of triangle i
 double calcArea(myGlobals &g, int i)
 {
 	int n1=g.conn[i][0];
@@ -168,8 +175,23 @@ double calcArea(myGlobals &g, int i)
 	vector2d b=g.coord[n2];
 	vector2d c=g.coord[n3];
 	c-=a; b-=a;
-	double area=0.5*fabs(b.x*c.y-c.x*b.y);
+	double area=0.5*(b.x*c.y-c.x*b.y);
 	return area;
+}
+
+// Check the quality of triangle i
+void checkTriangle(myGlobals &g, int i)
+{
+	double area=calcArea(g,i);
+	if (area<0) {
+		CkError("Triangle %d of chunk %d is inverted! (area=%g)\n",
+			i,FEM_My_partition(),area);
+		CkAbort("Inverted triangle");
+	}
+	if (area<1.0e-15) {
+		CkError("Triangle %d of chunk %d is a sliver!\n",i,FEM_My_partition());
+		CkAbort("Sliver triangle");
+	}
 }
 
 class myRefineClient {
@@ -188,6 +210,8 @@ public:
   void split(int triNo,int A,int B,int C, double frac) {
     CkPrintf("---- Splitting edge %d-%d (%d), of triangle %d at %.2f\n",
     	A,B,C, triNo, frac);
+    checkTriangle(g,triNo);
+    
     //Figure out what we're adding:
     connRec &oldConn=g.conn[triNo];
     int D; //New node
@@ -232,8 +256,8 @@ public:
     //Insert new triangle CAD
     newConn[0]=C; newConn[1]=A; newConn[2]=D;
     
-    if (calcArea(g,triNo)<1.0e-15) CkAbort("Update triangle to sliver!");
-    if (calcArea(g,newTri)<1.0e-15) CkAbort("Created new sliver triangle!");
+    checkTriangle(g,triNo);
+    checkTriangle(g,newTri);
   }
 };
 
@@ -381,6 +405,9 @@ CkPrintf("[%d] end init\n",myChunk);
   }
 
   int fid=FEM_Create_field(FEM_DOUBLE,2,0,sizeof(vector2d));
+  
+  for (i=0;i<g.nelems;i++)
+    checkTriangle(g,i);
 
   //Timeloop
   if (CkMyPe()==0)
@@ -388,7 +415,7 @@ CkPrintf("[%d] end init\n",myChunk);
   int tSteps=0x70FF00FF;
   calcMasses(g);
   double startTime=CkWallTimer();
-  double curArea=1.0e-5;
+  double curArea=2.0e-5;
   for (int t=0;t<tSteps;t++) {
     if (1) { //Structural mechanics
     //Compute forces on nodes exerted by elements
