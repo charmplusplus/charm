@@ -298,9 +298,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   register void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
   CkpvAccess(_groupTable)->find(groupID).setObj(obj);
-  CkpvAccess(_groupTable)->find(groupID).setDefCtor(_chareTable[gIdx]->defCtor);
-  CkpvAccess(_groupTable)->find(groupID).setMigCtor(_chareTable[gIdx]->migCtor);
-  CkpvAccess(_groupTable)->find(groupID).setName(_chareTable[gIdx]->name);
+  CkpvAccess(_groupTable)->find(groupID).setcIdx(gIdx);
   CkpvAccess(_groupIDTable)->push_back(groupID);
   PtrQ *ptrq = CkpvAccess(_groupTable)->find(groupID).getPending();
   if(ptrq) {
@@ -323,9 +321,7 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   _MEMCHECK(obj);
   CmiLock(CksvAccess(_nodeLock));
   CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
-  CksvAccess(_nodeGroupTable)->find(groupID).setDefCtor(_chareTable[gIdx]->defCtor);
-  CksvAccess(_nodeGroupTable)->find(groupID).setMigCtor(_chareTable[gIdx]->migCtor);
-  CksvAccess(_nodeGroupTable)->find(groupID).setName(_chareTable[gIdx]->name);
+  CksvAccess(_nodeGroupTable)->find(groupID).setcIdx(gIdx);
   CksvAccess(_nodeGroupIDTable).push_back(groupID);
   CmiUnlock(CksvAccess(_nodeLock));
   PtrQ *ptrq = CksvAccess(_nodeGroupTable)->find(groupID).getPending();

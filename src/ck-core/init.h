@@ -13,12 +13,13 @@ class IrrGroup;
 class TableEntry {
     IrrGroup *obj;
     PtrQ *pending; //Buffers msgs recv'd before group is created
+    int cIdx;
     char gName[256];
     int defCtor,migCtor; // the index of default and migration constructors in _entryTable,
 			 // to be fed in CkCreateLocalGroup
   public:
     TableEntry(void) {init();}
-    void init(void) { obj=0; pending=0; defCtor=migCtor=-1; }
+    void init(void) { obj=0; pending=0; cIdx=defCtor=migCtor=-1; }
     inline IrrGroup* getObj(void) { return obj; }
     void setObj(void *_obj) { obj=(IrrGroup *)_obj; }
     PtrQ* getPending(void) { return pending; }
@@ -27,12 +28,10 @@ class TableEntry {
         pending=new PtrQ();
       pending->enq(msg);
     }
-    inline int getDefCtor(void){ return defCtor; }
-    void setDefCtor(int defCtor_){ defCtor = defCtor_; }
-    inline int getMigCtor(void){ return migCtor; }
-    void setMigCtor(int migCtor_){ migCtor = migCtor_; }
-    inline char* getName(void){ return gName; }
-    void setName(const char* gName_){ strcpy(gName,gName_); }
+    void setcIdx(int cIdx_){
+      cIdx = cIdx_;
+    }
+    inline const int getcIdx(void){ return cIdx; }
 };
 
 template <class dtype>
