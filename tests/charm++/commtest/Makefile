@@ -1,10 +1,15 @@
 DIRS=comlib commlib_stream 
 # BROKEN: pipeBroadcast
 
-test:
-	for d in $(DIRS); do \
-		(cd $$d; $(MAKE) test OPTS='$(OPTS)' || exit 1) || exit 1; \
-	done
+.PHONY: test $(DIRS)
+
+test: comlib commlib_stream
+
+comlib: 
+	$(MAKE) -C $@ test OPTS='$(OPTS)'
+
+commlib_stream:
+	$(MAKE) -C $@ test OPTS='$(OPTS)'
 
 bgtest:
 	for d in $(DIRS); do \
