@@ -363,8 +363,6 @@ void Refiner::Refine(int count, BaseLB::LDStats* stats,
     CkPrintf("New PE load: ");
     for (i=0; i<count; i++) CkPrintf("%f ", processors[i].load);
     CkPrintf("\n");
-    for (i=0; i<numComputes; i++) CkPrintf("%d ", new_p[i]);
-    CkPrintf("\n");
   }
   if (_lb_args.debug()) CkPrintf("Refiner: moving %d obejcts. \n", nmoves);
   delete [] computes;
