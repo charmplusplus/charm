@@ -8,6 +8,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#include "conv-common.h"
+
 #define CMK_ORIGIN2000					   1
 #define CMK_CCS_AVAILABLE                                  1
 
@@ -103,7 +105,7 @@
 #define CMK_LBDB_ON					   1
 #define CMK_LBDB_OFF					   0
 
-
+#include "conv-mach-opt.h"
 
 
 
