@@ -32,7 +32,7 @@ CHARM++ : CONVERSE TRANSLATORS LIBS
 
 TRANSLATORS : $(CHARMXI) CONVCPM
 
-AMPI: CHARM++ $(LIB_DIR)\libampi.lib $(LIB_DIR)\libampif.lib
+AMPI: CHARM++ $(LIBS_DIR)\libampi.lib $(LIBS_DIR)\libampif.lib
 
 .SILENT:
 LIBS : CONVLIBS CHARMLIBS
@@ -112,7 +112,7 @@ CVHEADERS=converse.h conv-mach.h \
 
 TRACELIBS=libtrace-none.lib libtrace-projections.lib libtrace-summary.lib
 
-CVLIBS=$(LIB_DIR)\libconv-core.lib libconv-cplus-n.lib libconv-cplus-y.lib \
+CVLIBS=$(LIBS_DIR)\libconv-core.lib libconv-cplus-n.lib libconv-cplus-y.lib \
 libldb-rand.obj libldb-spray.obj libldb-graph.obj libldb-test.obj $(TRACELIBS)
 
 
@@ -174,7 +174,7 @@ PACKLIB :
 	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libpacklib.lib" \
 	packc.obj packf77.obj
 
-$(LIB_DIR)\libconv-core.lib : $(LIBCONV_CORE)
+$(LIBS_DIR)\libconv-core.lib : $(LIBCONV_CORE)
 	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-core.lib" \
 	$(LIBCONV_CORE)
 
@@ -267,7 +267,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
 	  ampi.h ampif.h \
 	  $(CVHEADERS)
 
-CK_LIBS_CORE=$(LIB_DIR)\libck.lib
+CK_LIBS_CORE=$(LIBS_DIR)\libck.lib
 
 LIBCK_CORE=init.obj register.obj qd.obj ck.obj main.obj msgalloc.obj ckfutures.obj \
            ckarray.obj pup_util.obj pup_xlater.obj ckreduction.obj ckhashtable.obj \
