@@ -3,29 +3,29 @@
 // entities in the distributed array implementation
 module msa
 {
-	// this is the per processor cache of pages.
-	group CacheGroup
-	{
-		entry void CacheGroup(unsigned int nPages, unsigned int bytesPerPage, CkArrayID pageArrayID,
+    // this is the per processor cache of pages.
+    group CacheGroup
+    {
+        entry void CacheGroup(unsigned int nPages, unsigned int bytesPerPage, CkArrayID pageArrayID,
                               unsigned int max_bytes, unsigned int nEntries, unsigned int numberOfWorkerThreads);
-		entry void AckRLEPage(unsigned int numReceived);
-		entry void ReceivePage(unsigned int page, char pageData[bpp], int isEmpty, int bpp);
-		entry void enroll(unsigned int numberOfWorkerThreads);
-		entry void enrollAck();  // internal method
-		entry void enrollDone();  // internal mathod
-		entry void SyncAck();
-		entry void SyncDone();
-		entry void emit(int offset);
-	};
+        entry void AckRLEPage(unsigned int numReceived);
+        entry void ReceivePage(unsigned int page, char pageData[bpp], int isEmpty, int bpp);
+        entry void enroll(unsigned int numberOfWorkerThreads);
+        entry void enrollAck();  // internal method
+        entry void enrollDone();  // internal mathod
+        entry void SyncAck();
+        entry void SyncDone();
+        entry void emit(int offset);
+    };
 
-	// this array is the storage for the pages. It in effect
-	// virtualizes the storage for the pages
-	array[1D] PageArray
-	{
-		entry void PageArray();
-		entry void GetPage(CProxy_CacheGroup cache, int pe, unsigned int bytesPerPage);
-		entry void ReceiveRLEPage(char buffer[size], unsigned int size, unsigned int bytesPerPage, CProxy_CacheGroup cache, int pe, int pageState);
-		entry void Sync();
-		entry void emit(int offset);
-	};
+    // this array is the storage for the pages. It in effect
+    // virtualizes the storage for the pages
+    array[1D] PageArray
+    {
+        entry void PageArray();
+        entry void GetPage(CProxy_CacheGroup cache, int pe, unsigned int bytesPerPage);
+        entry void ReceiveRLEPage(char buffer[size], unsigned int size, unsigned int bytesPerPage, CProxy_CacheGroup cache, int pe, int pageState);
+        entry void Sync();
+        entry void emit(int offset);
+    };
 };
