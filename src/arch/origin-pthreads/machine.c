@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <limits.h>
 #include <unistd.h>
 
@@ -127,7 +128,8 @@ typedef struct {
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
-  int i;
+  int i,j;
+  char **uargv;
   USER_PARAMETERS *usrparam;
   pthread_t *aThread;
  
@@ -171,9 +173,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   pthread_mutex_init(&barrier_mutex, (pthread_mutexattr_t *) 0);
 
   aThread = (pthread_t *) CmiAlloc(sizeof(pthread_t) * Cmi_numpes);
-  for(i=0; i<Cmi_numpes; i++) {
-    int j;
-    char **uargv = (char **) CmiAlloc(sizeof(char *) * (Cmi_argc+1));
+  for(i=1; i<Cmi_numpes; i++) {
+    uargv = (char **) CmiAlloc(sizeof(char *) * (Cmi_argc+1));
 
     for (j=0;j<Cmi_argc;j++)
       uargv[j] = argv[j];
@@ -185,10 +186,14 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
     pthread_create(&aThread[i],(pthread_attr_t *)0,threadInit,(void *)usrparam);
   }
-  for(i=0;i<Cmi_numpes;i++) {
-    void *retVal;
-    pthread_join(aThread[i], &retVal);
-  }
+  uargv = (char **) CmiAlloc(sizeof(char *) * (Cmi_argc+1));
+  for (j=0;j<Cmi_argc;j++)
+    uargv[j] = argv[j];
+  uargv[j] = 0;
+  usrparam = (USER_PARAMETERS *) CmiAlloc(sizeof(USER_PARAMETERS));
+  usrparam->argv = uargv;
+  usrparam->mype = 0;
+  threadInit(usrparam);
 }
 
 static void neighbour_init(int);
@@ -221,6 +226,7 @@ static void *threadInit(void *arg)
 void ConverseExit(void)
 {
   ConverseCommonExit();
+  CmiNodeBarrier();
 }
 
 
@@ -232,10 +238,13 @@ void CmiDeclareArgs(void)
 void CmiNotifyIdle()
 {
   McQueue *queue = MsgQueue[CmiMyPe()];
+  struct timespec ts;
   pthread_mutex_lock(&(queue->mutex));
   if(!queue->len){
     queue->waiting++;
-    pthread_cond_wait(&(queue->cond), &(queue->mutex));
+    ts.tv_sec = (time_t) 0;
+    ts.tv_nsec = 10000000L;
+    pthread_cond_timedwait(&(queue->cond), &(queue->mutex), &ts);
     queue->waiting--;
   }
   pthread_mutex_unlock(&(queue->mutex));
