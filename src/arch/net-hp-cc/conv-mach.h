@@ -8,7 +8,11 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.7  1996-08-08 20:16:53  jyelon
+ * Revision 1.8  1996-10-22 19:08:32  milind
+ * Added +z option to produce position independent code.
+ * Needed for parallel perl.
+ *
+ * Revision 1.7  1996/08/08 20:16:53  jyelon
  * *** empty log message ***
  *
  * Revision 1.6  1996/07/16 17:23:37  jyelon
@@ -26,11 +30,11 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_ASYNC_DOESNT_WORK_USE_TIMER_INSTEAD            0
+#define CMK_ASYNC_DOESNT_WORK_USE_TIMER_INSTEAD            1
 #define CMK_ASYNC_NOT_NEEDED                               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
-#define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         1
+#define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
 #define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 0
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
@@ -104,11 +108,11 @@
 #define CMK_STRINGS_USE_STRINGS_H                          0
 #define CMK_STRINGS_USE_STRING_H                           1
 
-#define CMK_THREADS_UNAVAILABLE                            1
+#define CMK_THREADS_UNAVAILABLE                            0
 #define CMK_THREADS_USE_ALLOCA                             0
 #define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE            0
 #define CMK_THREADS_USE_ALLOCA_WITH_PRAGMA                 0
-#define CMK_THREADS_USE_JB_TWEAKING                        0
+#define CMK_THREADS_USE_JB_TWEAKING                        1
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
