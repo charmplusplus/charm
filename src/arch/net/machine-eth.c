@@ -289,7 +289,6 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
   myNode->sent_bytes += ogm->size;
   /*Try to immediately send the packets off*/
   writeableDgrams=1;
-  CommunicationServer(0);
 }
 
 /***********************************************************************
