@@ -1,65 +1,7 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% RCS INFORMATION:
-%
-%       $RCSfile$
-%       $Author$        $Locker$                $State$
-%       $Revision$      $Date$
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% DESCRIPTION:
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% REVISION HISTORY:
-%
-% $Log$
-% Revision 1.14  2000-12-06 21:46:26  milind
-% conv-host => charmrun
-%
-% Revision 1.13  2000/01/31 21:10:49  milind
-% fixed bugs pointed out by quantum TA
-%
-% Revision 1.12  1999/07/09 18:18:39  milind
-% Updated for new release 5.0.
-%
-% Revision 1.11  1998/03/16 20:17:29  milind
-% 4.5 => 4.8
-%
-% Revision 1.10  1996/10/01 18:33:04  wilmarth
-% Fixed ftp path, .Z -> .gz, .inc -> .int ...tlw
-%
-% Revision 1.9  1995/11/17 17:19:37  brunner
-% Incorporated proofreading comments from 11-16 afternoon
-%
-% Revision 1.8  1995/11/01  22:13:37  jyelon
-% *** empty log message ***
-%
-% Revision 1.7  1995/11/01  22:06:30  jyelon
-% *** empty log message ***
-%
-% Revision 1.6  1995/11/01  22:01:32  jyelon
-% *** empty log message ***
-%
-% Revision 1.5  1995/11/01  21:36:09  jyelon
-% *** empty log message ***
-%
-% Revision 1.4  1995/11/01  20:28:01  jyelon
-% *** empty log message ***
-%
-% Revision 1.3  1995/11/01  20:18:51  jyelon
-% *** empty log message ***
-%
-% Revision 1.2  1995/11/01  19:53:54  jyelon
-% *** empty log message ***
-%
-% Revision 1.1  1995/10/31  22:27:53  milind
-% Initial revision
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Installing \converse{} and \charmpp{}}
 
-\section{Installing Converse, Charm, and Charm++}
-
-The three programming systems are distributed as a single package ---
-one always installs all three.  They will all be installed in a single
+The two programming systems are distributed as a single package ---
+one always installs both.  They will all be installed in a single
 directory which, for lack of a better term, we will call the ``charm''
 directory.  It would be typical to choose {\tt /usr/local/charm} as
 the location for the charm directory, although any location will do.
@@ -68,11 +10,11 @@ Our explanation of the installation process will assume that {\tt
 if not, you must mentally translate.
 
 Download the tar-file file appropriate to your machine.  For example,
-if you are installing the version of charm for networks of Sun
-workstations running Solaris, download {\tt net-sol.tar.Z} from PPL's
+if you are installing the version of \converse{}/\charmpp{} for networks of Sun
+workstations running Solaris, download {\tt net-sol.tar.gz} from PPL's
 website (preferred) {\tt http://charm.cs.uiuc.edu/} or using anonymous FTP:
 
-\begin{verbatim}
+\begin{alltt}
     % ftp a.cs.uiuc.edu
     Connected to a.cs.uiuc.edu.
     220 a.cs.uiuc.edu FTP server ready.
@@ -95,24 +37,24 @@ website (preferred) {\tt http://charm.cs.uiuc.edu/} or using anonymous FTP:
     local: net-sol.tar.gz remote: net-sol.tar.gz
     648211 bytes received in 38 seconds (17 Kbytes/s)
     ftp> quit
-\end{verbatim}
+\end{alltt}
 
 Now that you have downloaded it, you are ready to install it: uncompress it,
 untar it, and move the directory thereby created to {\tt /usr/local/charm}:
 
-\begin{verbatim}
+\begin{alltt}
     % gunzip net-sol.tar.gz
     % tar xf net-sol.tar
     % mv net-sol/* /usr/local/charm
-\end{verbatim}
+\end{alltt}
 
 You are almost ready to go.  The last thing you need to do is put the
 charm binaries in your path.  There are two acceptable ways to do
 this.  The first is to simply reset your path:
 
-\begin{verbatim}
+\begin{alltt}
     % setenv PATH /usr/local/charm/bin:$PATH
-\end{verbatim}
+\end{alltt}
 
 The second is to install {\tt charmc} in a common directory available
 to all users of your machine, such as {\tt /usr/local/bin}.  {\em DO
@@ -120,31 +62,29 @@ NOT} move or copy {\tt charmc}: If you do, it will cease to function correctly.
 The only reliable way to
 put {\tt charmc} in a common directory is to symbolically link it:
 
-\begin{verbatim}
+\begin{alltt}
     % ln -s /usr/local/charm/bin/charmc /usr/local/bin/charmc
-\end{verbatim}
+\end{alltt}
 
-The programming systems, converse and charm++, are
+The programming systems, \converse{} and \charmpp{}, are
 probably ready to go.  However, there is one possible situation that
 they may not be.  If your parallel machine has a separate ``host''
 computer on which you do compilation, and if your ``host'' computer is
 of a type different from the one we anticipated, then some of the
 binaries may be compiled for the wrong kind of CPU.  To correct this
-situation, you may need to rebuild the cpm, charm++, sdag, and IDL  compilers:
-
-\begin{verbatim}
-    % cd /usr/local/charm/src
-    % make all
-\end{verbatim}
+situation, you may need to rebuild the cpm, \charmpp{}, and sdag compilers.
+We suggest that you get the source distribution from the above locations,
+and compile them yourself. Instructions to compile from source
+distributions are included as a {\tt README} file in the sources.
 
 This should complete the installation process.  You are ready to test
-converse and charm++.  However, there are a few things to
+\converse{} and \charmpp{}.  However, there are a few things to
 attend to before you start using them on a regular basis.  These are
 security issues and disk space consumption.
 
 \subsection{Security Issues}
 
-On most computers, charm programs are simple binaries, and they pose
+On most computers, \charmpp{} programs are simple binaries, and they pose
 no more security issues than any other program would.  The exceptions
 to this rule are the network versions {\tt net-*}.  
 This section only applies to users
@@ -154,10 +94,10 @@ The network versions utilize many unix processes communicating with
 each other via UDP.  No attempt is currently being made to filter out
 unauthorized packets.  Therefore, it is theoretically possible to
 mount a security attack by sending UDP packets to an executing
-converse or charm++ program's sockets.
+\converse{} or \charmpp{} program's sockets.
 
 The second security issue associated with networked programs is
-associated with the fact that we, the charm developers, need evidence
+associated with the fact that we, the \charmpp{} developers, need evidence
 that our tools are being used.  (Such evidence is useful in convincing
 funding agencies to continue to support our work.)  To this end, we
 have inserted code in the network {\tt charmrun} program (described
@@ -173,22 +113,22 @@ code.  Therefore, we have provided a second copy of the {\tt
 charmrun} program with the notification code removed.  If you look
 within the charm {\tt bin} directory, you will find these programs:
 
-\begin{verbatim}
+\begin{alltt}
     % cd /usr/local/charm/bin
     % ls charmrun*
     charmrun
     charmrun.notify
     charmrun.silent
-\end{verbatim}
+\end{alltt}
 
 The program {\tt charmrun.silent} has the notification code removed.  To
 permanently deactivate notification, you may use the version without the
 notification code:
 
-\begin{verbatim}
+\begin{alltt}
     % cd /usr/local/charm/bin
     % cp charmrun.silent charmrun
-\end{verbatim}
+\end{alltt}
 
 Although versions for some other machines contain
 programs named {\tt charmrun.notify} and {\tt charmrun.silent}, they
@@ -204,16 +144,9 @@ save disk space.
 The charm directory contains a collection of example-programs and
 test-programs.  These may be deleted with no other effects:
 
-\begin{verbatim}
+\begin{alltt}
     % rm -r /usr/local/charm/pgms
-\end{verbatim}
-
-The source code for the translators may be deleted, if you know the
-binaries are operational:
-
-\begin{verbatim}
-    % rm -r /usr/local/charm/src
-\end{verbatim}
+\end{alltt}
 
 You may delete the programs {\tt charmrun-notify} and {\tt
 charmrun-silent}, although please read the section on security first.
@@ -221,9 +154,9 @@ charmrun-silent}, although please read the section on security first.
 Finally, you may {\tt strip} all the binaries in {\tt
 /usr/local/charm/bin}, if we have not already done so.
 
-\subsection{Using more than one version of Charm on the same Machine}
+\subsection{Using more than one version of \charmpp{} on the same Machine}
 
-It is common to wish to install more than one version of charm on the
+It is common to wish to install more than one version of \charmpp{} on the
 same machine.  For example, we often use the uniprocessor version for
 debugging our programs (it supports {\tt gdb} in a simple way), and
 then we switch to the networked version to run our programs in
@@ -248,9 +181,9 @@ installed charm directory with the specified name.  For example, if
 you installed {\tt /usr/local/charm.uth} and {\tt
 /usr/local/charm.net} as described above, you could specify:
 
-\begin{verbatim}
+\begin{alltt}
     % /usr/local/charm.net/bin/charmc -machine charm.uth myprog.C
-\end{verbatim}
+\end{alltt}
 
 Even though you are running the {\tt charmc} script from the network
 version, it will produce uniprocessor binaries, since you told it

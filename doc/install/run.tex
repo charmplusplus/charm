@@ -1,132 +1,45 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% RCS INFORMATION:
-%
-%       $RCSfile$
-%       $Author$        $Locker$           $State$
-%       $Revision$      $Date$
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% DESCRIPTION:
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% REVISION HISTORY:
-%
-% $Log$
-% Revision 1.15  2000-12-06 21:46:26  milind
-% conv-host => charmrun
-%
-% Revision 1.14  2000/01/31 21:10:49  milind
-% fixed bugs pointed out by quantum TA
-%
-% Revision 1.13  1999/09/23 17:02:38  milind
-% nodesfile->nodelist
-%
-% Revision 1.12  1999/07/09 18:18:40  milind
-% Updated for new release 5.0.
-%
-% Revision 1.11  1998/11/03 19:24:48  milind
-% Added documentation for the new shell option in nodelist.
-%
-% Revision 1.10  1997/07/25 21:07:54  wilmarth
-% Made a few more nodes file changes.
-%
-% Revision 1.9  1997/07/23 17:29:14  wilmarth
-% Updated with latest nodes file format.
-%
-% Revision 1.8  1996/11/14 18:41:14  milind
-% Modified to reflect the changes made to the nodesfile format.
-% Also, changed the Makefile to install into proper directories.
-%
-% Revision 1.7  1995/11/20 20:14:22  brunner
-% Made the comments about simulator and Converse more sensible.
-%
-% Revision 1.6  1995/11/20  16:47:00  brunner
-% Added comments about simulator only working for Charm/Charm++
-%
-% Revision 1.5  1995/11/17  17:19:37  brunner
-% Incorporated proofreading comments from 11-16 afternoon
-%
-% Revision 1.4  1995/11/16  23:59:02  brunner
-% incorporated Attila's simulator section
-%
-% Revision 1.3  1995/11/16  20:58:57  brunner
-% Added some paragon information
-%
-% Revision 1.2  1995/11/16  19:05:03  milind
-% *** empty log message ***
-%
-% Revision 1.1  1995/10/31  22:27:53  milind
-% Initial revision
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\section[Executing Converse/Charm/Charm++ Programs]
-	{Executing Converse/Charm/Charm++ Programs}
+\section{Executing \converse{}/\charmpp{} Programs}
 \label{executing charm programs}
 
-The Charm linker produces one executable file.  On machines with a host
-(such as a network of workstations), a link to the proper host program
-{\fexec charmrun} is created in the user program directory.  Sample
-execution examples are given below (the executable is called {\fparm
-pgm}). Exact details will differ from site to site.  The list of Charm
+The charmc linker produces one executable file.  On most machines
+a link to the proper host program
+{\tt charmrun} is created in the user program directory.  Sample
+execution example is given below (the executable is called {\tt
+pgm}). Exact details will differ from site to site.  The list of {\tt charmrun}
 command line options is in Section~\ref{command line options}.
 
-\begin{itemize}
+\begin{alltt}
+charmrun pgm +p4
+\end{alltt}
 
-\item \underline{\bf ASCI Red:} 
-	\begin{tabbing}
-	{\fexec yod -sz 4 pgm}
-	\end{tabbing}
-	runs {\fparm pgm} on four processors.
+Executes {\tt pgm} on 4 nodes.  In a network environment, {\tt charmrun} must
+be able to locate the directory of the executable.  If all workstations
+share a common file name space this is trivial.  If they don't, {\tt charmrun}
+will attempt to find the executable in a directory with the same path
+from the {\bf \$HOME} directory.  Pathname resolution is performed as 
+follows:
+\begin{enumerate}
+	\item The system computes the absolute path of {\tt pgm}.
+	\item If the absolute path starts with the equivalent of {\bf \$HOME} 
+	or the current working directory, the beginning part of the 
+        path 
+	is replaced with the environment variable {\bf \$HOME} or the 
+	current working directory. However, if {\tt exec\_home} is 
+        specified in the nodes file (see below), the beginning part of
+        the path is replaced with {\tt exec\_home}.
+	\item The system tries to locate this program (with modified 
+	pathname and appended extension if specified) on all nodes.
+\end{enumerate}
 
-\item \underline{\bf Cray T3E:} 
-	\begin{tabbing}
-	{\fexec mpprun -n 4 pgm}
-	\end{tabbing}
-	runs {\fparm pgm} on four processors.
-
-\item \underline{\bf SGI Origin2000 (origin-mpi):} 
-	\begin{tabbing}
-	{\fexec mpirun -np 4 pgm}
-	\end{tabbing}
-	runs {\fparm pgm} on four processors.
-
-\item \underline{\bf SGI Origin2000 (origin2000 or origin-pthreads):} 
-	\begin{tabbing}
-	{\fexec pgm +p4}
-	\end{tabbing}
-	runs {\fparm pgm} on four processors.
-
-\item \underline{\bf Network of workstations:} 
-	\begin{tabbing}
-	{\fexec charmrun pgm +p4}
-	\end{tabbing}
-	executes {\fparm pgm} on 4 nodes.  In a network environment, Charm must
-	be able to locate the directory of the executable.  If all workstations
-	share a common file name space this is trivial.  If they don't, Charm
-	will attempt to find the executable in a directory with the same path
-	from the {\bf \$HOME} directory.  Pathname resolution is performed as 
-	follows:
-	\begin{enumerate}
-		\item The system computes the absolute path of {\fexec pgm}.
-		\item If the absolute path starts with the equivalent of {\bf \$HOME} 
-			or the current working directory, the beginning part of the path 
-			is replaced with the environment variable {\bf \$HOME} or the 
-			current working directory. However, if {\fparm exec\_home} is 
-            specified in the nodes file (see below), the beginning part of
-            the path is replaced with {\fparm exec\_home}.
-		\item The system tries to locate this program (with modified 
-			pathname and appended extension if specified) on all nodes.
-	\end{enumerate}
-
-The list of nodes must be specified in a file.  The format of this file
+For network of workstations,
+the list of nodes must be specified in a file.  The format of this file
 allows you to define groups of machines, giving each group a name.
 Each line of the nodes file is a command.  The most important command
 is:
 
-\begin{verbatim}
+\begin{alltt}
 host <hostname> <qualifiers>
-\end{verbatim}
+\end{alltt}
 
 which specifies a host.  The other commands are qualifiers: they modify
 the properties of all hosts that follow them.  The qualifiers are:
@@ -156,9 +69,9 @@ All qualifiers accept ``*'' as an argument, this resets the modifier to
 its default value.  Note that currently, the passwd, cpus, and speed
 factors are ignored.  Inline qualifiers are also allowed:
 
-\begin{verbatim}
+\begin{alltt}
 host beauty ++cpus 2 ++shell ssh
-\end{verbatim}
+\end{alltt}
 
 Except for ``group'', every other qualifier can be inlined, with the
 restriction that if the ``setup'' qualifier is inlined, it should be
@@ -166,7 +79,7 @@ the last qualifier on the ``host'' or ``group'' statement line.
 
 Here is a simple nodes file:
 
-\begin{verbatim}
+\begin{alltt}
         group kale-sun ++cpus 1
           host charm.cs.uiuc.edu ++shell ssh
           host dp.cs.uiuc.edu
@@ -176,7 +89,7 @@ Here is a simple nodes file:
           host beauty.cs.uiuc.edu ++cpus 2
         group main
           host localhost
-\end{verbatim}
+\end{alltt}
 
 This defines three groups of machines: group kale-sun, group kale-sol,
 and group main.  The ++nodegroup option is used to specify which group
@@ -184,9 +97,9 @@ of machines to use.  Note that there is wraparound: if you specify
 more nodes than there are hosts in the group, it will reuse
 hosts. Thus,
 
-\begin{verbatim}
+\begin{alltt}
         charmrun pgm ++nodegroup kale-sun +p6
-\end{verbatim}
+\end{alltt}
 
 uses hosts (charm, dp, grace, dagger, charm, dp) respectively as
 nodes (0, 1, 2, 3, 4, 5).
@@ -194,9 +107,9 @@ nodes (0, 1, 2, 3, 4, 5).
 If you don't specify a ++nodegroup, the default is ++nodegroup main.
 Thus, if one specifies
 
-\begin{verbatim}
+\begin{alltt}
         charmrun pgm +p4
-\end{verbatim}
+\end{alltt}
 
 it will use ``localhost'' four times.  ``localhost'' is a Unix
 trick; it always find a name for whatever machine you're on.
@@ -211,15 +124,13 @@ login into the hosts. If ``ssh'' is used, the user will have to setup
 password-less login to remote hosts either using ``.shosts'' file, or using
 RSA authentication based on a key-pair and adding public keys to ``.ssh/authorized\_keys'' file. See ``ssh'' documentation for more information.
 
-\end{itemize}
-
-Note that the Charm linker will provide the correct 
+Note that the charmc linker will provide the correct 
 executable. The user, however, needs to know how programs are run for
 the particular machine.
 
-\subsection[Running with the simulator]{Running with the simulator}
+\subsection{Running with the simulator}
 
-Converse provides a simple parallel machine simulator for developing
+\converse{} provides a simple parallel machine simulator for developing
 and debugging purposes.  It simulates a message passing system
 composed of a collection of processing nodes connected with a
 communication network. Each node is composed of an application
@@ -229,7 +140,7 @@ simulator timers for performance measurements produce realistic
 results.
 
 
-In order to run Charm and Charm++ programs with the simulator:
+In order to run \charmpp{} programs with the simulator:
 \begin{itemize}
 
 \item prepare a configuration file as described below
@@ -238,9 +149,9 @@ In order to run Charm and Charm++ programs with the simulator:
    N is the number of processors.
 
 \end{itemize}
-Currently only Charm and Charm++ programs can take advantage of the
+Currently only \charmpp{} programs can take advantage of the
 simulator features.
-In the future, a method to allow any Converse based program
+In the future, a method to allow any \converse{} based program
 to use the simulator features will be devised.
 
 The basic task of the simulator is to manage the message passing
@@ -367,26 +278,16 @@ periodic_interval 0.1
 \label{command line options}
 \index{command line options}
 
-A Charm program accepts the following command line options:
+A \charmpp{} program accepts the following command line options:
 \begin{description}
 
-\item[{\fexec +pN}] Run the program with N processors. The default is 1.
-Note that on some nonshared memory machines, e.g., nCUBE/2, the user must
-specify the number of processors using the command provided for that
-machine (e.g. {\fexec xnc} on the nCUBE/2).
-In such cases the {\fexec +p} option is ignored.
+\item[{\tt +pN}] Run the program with N processors. The default is 1.
 
-%\item[{\fexec +mM}] Run the program with M Kwords of memory per
-%processor. The default is 50 Kwords of memory per processor.
-
-%\item[{\fexec +mmM}] Run the program with M Kwords of memory for
-%processor 0.
-
-\item[{\fexec +ss}] Print summary statistics about chare creation.  This option
+\item[{\tt +ss}] Print summary statistics about chare creation.  This option
 prints the total number of chare creation requests, and the total number of
 chare creation requests processed across all processors.
 
-\item[{\fexec +cs}] Print statistics about the number of create chare messages
+\item[{\tt +cs}] Print statistics about the number of create chare messages
 requested and processed, the number of messages for chares requested and 
 processed, and the number of messages for branch office chares requested and
 processed, on a per processor basis.  Note that the number of messages 
@@ -394,88 +295,70 @@ created and processed for a particular type of message on a given node
 may not be the same, since a message may be processed by a different
 processor from the one originating the request.
 
-%\item[{\fexec +mems}] Print the Memory Usage Statistics at the end, including
-%the number of memory allocation requests and memory free requests, based on
-%the size of the memory allocated or freed.
-
-\item[{\fexec user\_options}] Options that are be interpreted by the user
+\item[{\tt user\_options}] Options that are be interpreted by the user
 program may be included after all the system options. 
-However, {\fexec user\_options} cannot start with +.
-The {\fexec user\_options} will be passed as arguments to the user program 
-via the usual {\fcmd argc/argv} construct to the {\fcmd main}\index{main}
+However, {\tt user\_options} cannot start with +.
+The {\tt user\_options} will be passed as arguments to the user program 
+via the usual {\tt argc/argv} construct to the {\tt main}
 entry point of the main chare. 
-Charm system options will not appear in {\fcmd argc/argv}.
+\charmpp{} system options will not appear in {\tt argc/argv}.
 
 \end{description}
 
-\subsubsection[Additional Uniprocessor Command Line Options]
-{Additional Uniprocessor Command Line Options}
+\subsubsection{Additional Uniprocessor Command Line Options}
 \label{uniprocessor command line options}
 
 The uniprocessor versions can be used to simulate multiple
-processors on a single workstation\index{uniprocessor command line
-options}.  Any number of processors between 1 and 32 can be simulated by
-using the {\fexec +p} option, limited only by the available memory on the
+processors on a single workstation
+Any number of processors between 1 and 32 can be simulated by
+using the {\tt +p} option, limited only by the available memory on the
 uniprocessor workstation.  By default, the uniprocessor versions handle
 a single message from each processor, going in order from processor 0
 thru $P-1$ (where $P$ is the number of processors) repeatedly.  
-%If the
-%user supplies the {\fexec +seed} \index{+seed} command line option
-%followed by an 
-%integer value, the processors will be accessed in a random (but
-%deterministic) order.  {\fexec +seed} is only recognized by the
-%uniprocessor version.
 
-\subsubsection[Additional Network Command Line Options]
-{Additional Network Command Line Options}
+\subsubsection{Additional Network Command Line Options}
 \label{network command line options}
 
-The following {\fexec ++} command line options are available in
-the network version\index{network command line options}:
+The following {\tt ++} command line options are available in
+the network version:
 \begin{description}
 
-\item[{\fexec ++debug}] Run each node under gdb in an xterm window, prompting
+\item[{\tt ++debug}] Run each node under gdb in an xterm window, prompting
 the user to begin execution.
-\index{++debug}
 
-\item[{\fexec ++debug-no-pause}] Run each node under gdb in an xterm window
+\item[{\tt ++debug-no-pause}] Run each node under gdb in an xterm window
 immediately (i.e. without prompting the user to begin execution).
-\index{++debug-no-pause}
 
-\item[{\fexec ++maxrsh}] Maximum number of {\fcmd rsh}'s to run at a
+\item[{\tt ++maxrsh}] Maximum number of {\tt rsh}'s to run at a
 time.
-\index{++maxrsh}
 
-\item[{\fexec ++resend-wait}] Timeout before retransmitting datagrams
+\item[{\tt ++resend-wait}] Timeout before retransmitting datagrams
 (in msec).
-\index{++resend-wait}
 
-\item[{\fexec ++resend-fail}] Timeout before retransmission fails (in
-msec).\index{++resend-fail}
+\item[{\tt ++resend-fail}] Timeout before retransmission fails (in
+msec).
 This parameter can help the user kill ``runaway'' processes, which may not
 be killed otherwise when the user interrupts the program before it 
 completes execution.
 Currently a bug exists in the network version that may cause programs to
-terminate prematurely if this value is set too low and {\fexec scanf} 
+terminate prematurely if this value is set too low and {\tt scanf} 
 operations are being performed.
 
-\item[{\fexec ++nodelist}] File containing list of nodes.
-\index{++nodelist}\index{.nodes}\index{nodes file}
+\item[{\tt ++nodelist}] File containing list of nodes.
 
 \end{description}
 
-If using the {\fexec ++debug} option, the user must ensure the
+If using the {\tt ++debug} option, the user must ensure the
 following:
-\index{++debug}
 \begin{enumerate}
 
-\item {\fexec xterm}, {\fexec xdpyinfo},  and {\fexec gdb} must be in
+\item {\tt xterm}, {\tt xdpyinfo},  and {\tt gdb} must be in
 the user's path.
 
-\item The path must be set in the {\fexec .cshrc} file, not the {\fexec .login}
-file, because {\fexec rsh} does not run the {\fexec .login} file. 
+\item The path must be set in the {\tt .cshrc} file, not the {\tt .login}
+file, because {\tt rsh} does not run the {\tt .login} file. 
 
 \item The nodes must be authorized to create windows on the host machine (see
-man pages for {\fexec xhost} and {\fexec xauth}).
+man pages for {\tt xhost} and {\tt xauth}).
 
 \end{enumerate}

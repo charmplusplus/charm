@@ -1,103 +1,27 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% RCS INFORMATION:
-%
-%       $RCSfile$
-%       $Author$        $Locker$                $State$
-%       $Revision$      $Date$
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% DESCRIPTION:
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% REVISION HISTORY:
-%
-% $Log$
-% Revision 1.10  2000-06-22 22:38:05  milind
-% Minor fixes.
-%
-% Revision 1.9  2000/06/22 22:21:08  milind
-% Added table of contents to the PDF file, and also cleaned up the clean
-% target.
-%
-% Revision 1.8  2000/06/22 15:04:53  milind
-% Made compatible with pdflatex as well.
-%
-% Revision 1.7  1999/07/09 18:18:40  milind
-% Updated for new release 5.0.
-%
-% Revision 1.6  1998/11/03 19:24:48  milind
-% Added documentation for the new shell option in nodelist.
-%
-% Revision 1.5  1997/07/25 21:20:35  wilmarth
-% Added IT Charm++ info.
-%
-% Revision 1.4  1996/10/01 18:19:51  milind
-% Added a word , various..
-%
-% Revision 1.3  1995/11/17 17:48:18  brunner
-% New title page, but I can't get rid of page number
-%
-% Revision 1.2  1995/11/01  20:02:08  milind
-% *** empty log message ***
-%
-% Revision 1.1  1995/10/31  22:27:53  milind
-% Initial revision
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[10pt]{article}
+\usepackage{pplmanual}
+\input{../pplmanual}
 
-\documentclass[11pt]{article}
-
-\newif\ifpdf
-\ifx\pdfoutput\undefined
-  \pdffalse
-\else
-  \pdfoutput=1
-  \pdftrue
-\fi
-
-\ifpdf
-  \pdfcompresslevel=9
-  \usepackage[pdftex,colorlinks=true,plainpages=false]{hyperref}
-\else
-\fi
-
-\pagestyle{empty}
-\setlength{\textwidth}{6.5in}
-\setlength{\textheight}{9in}
-\setlength{\parindent}{0in}
-\setlength{\topmargin}{-.5in}
-\parskip 0.1in
-\newcommand{\zap}[1]{ }
-\newcommand{\fcmd}{\bf}                 %%% Font for Charm commands
-\newcommand{\fparm}{\bf\sf}             %%% Font for parameters to Charm commands
-\newcommand{\fexec}{\bf}                %%% Font for compile/execute cmds/options
-
-\begin{document}
- 
-\begin{titlepage}
-
-\title{
-\vspace*{3in}
-Charm/Charm++/Converse Installation and Usage
+\title{\charmpp{}/\converse{}\\Installation and Usage}
+\version{5.5}
+\credits{
+\converse{} Parallel Programming Environment was developed as a group
+effort at Parallel Programming Laboratory, University of Illinois at
+Urbana-Champaign.  The team consisted of Attila Gursoy, Sanjeev
+Krishnan, Joshua Yelon, Milind Bhandarkar, Narain Jagathesan, Robert
+Brunner and Laxmikant Kale. The most recent version of \converse{} has had inputs
+from Milind Bhandarkar, Laxmikant Kale, Robert Brunner, Terry Wilmarth,
+Parthasarathy Ramachandran, Krishnan Varadarajan, and Jeffrey Wright.
 }
 
-\author{Parallel Programming Laboratory\\
-	Department of Computer Science\\
-	University of Illinois at Urbana--Champaign}
-\date{\today}
-
+\begin{document}
 \maketitle
 
-\end{titlepage}
-
-\newpage
-\pagestyle{headings}
-
 \section{Introduction}
-In this manual, we describe how to install Charm++ and
-Converse, how to compile and execute programs, and the available
+In this manual, we describe how to install \charmpp{} and
+\converse{}, how to compile and execute programs, and the available
 command line options.  We also describe various queueing and load balancing
-strategies, and the various modes of execution of Converse and Charm++
+strategies, and the various modes of execution of \converse{} and \charmpp{}
 programs.
 
 \include{install}

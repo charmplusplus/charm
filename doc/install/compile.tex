@@ -1,57 +1,16 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% RCS INFORMATION:
-%
-%       $RCSfile$
-%       $Author$        $Locker$       $State$
-%       $Revision$      $Date$
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% DESCRIPTION:
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% REVISION HISTORY:
-%
-% $Log$
-% Revision 1.8  1999-07-09 18:18:39  milind
-% Updated for new release 5.0.
-%
-% Revision 1.7  1997/09/18 00:00:59  jyelon
-% *** empty log message ***
-%
-% Revision 1.6  1997/07/22 12:05:25  jyelon
-% Rewrote section on charmc.
-%
-% Revision 1.5  1995/11/17 17:19:37  brunner
-% Incorporated proofreading comments from 11-16 afternoon
-%
-% Revision 1.4  1995/11/16  23:58:29  brunner
-% Alphabetized option list
-%
-% Revision 1.3  1995/11/14  21:23:55  brunner
-% Added paragraph on including a user-defined load balance strategy.
-%
-% Revision 1.2  1995/11/02  22:40:39  brunner
-% Includes short description of what charmc does, and description
-% of options
-%
-% Revision 1.1  1995/10/31  22:27:53  milind
-% Initial revision
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\section{Compiling Converse, Charm, and Charm++ Programs}
+\section{Compiling \converse{} and \charmpp{} Programs}
 
 The {\tt charmc} program standardizes compiling and linking procedures
 among various machines and operating systems.  The word ``charmc'' is
 slightly misleading, this is a general-purpose tool for compiling and
-linking, not restricted to charm programs at all.
+linking, not restricted to \charmpp{} programs at all.
 
 Charmc can perform the following tasks.  The (simplified) syntax for
 each of these modes is shown.  Caution: in reality, one almost always
 has to add some command-line options in addition to the simplified
 syntax shown below.  The options are described next.
 
-\begin{verbatim}
+\begin{alltt}
  * Compile C                        charmc -o pgm.o pgm.c
  * Compile C++                      charmc -o pgm.o pgm.C
  * Link                             charmc -o pgm   obj1.o obj2.o obj3.o...
@@ -59,13 +18,14 @@ syntax shown below.  The options are described next.
  * Create Library                   charmc -o lib.a obj1.o obj2.o obj3.o...
  * CPM preprocessing                charmc -gen-cpm file.c
  * Translate Charm++ Interface File charmc file.ci
-\end{verbatim}
+\end{alltt}
 
 Charmc has been given data on how to invoke the compilers on each
-different platform.  This data is in a file named {\tt conv-mach.csh},
-which can be found in the same directory where {\tt charmc} resides.
+different platform.  This data is in a file named {\tt conv-mach.sh},
+which can be found in the {\tt include} directory where 
+{\tt bin/charmc} resides.
 Local modifications to the commands or options {\tt charmc} uses may
-usually be accomplished by editing {\tt conv-mach.csh}.
+usually be accomplished by editing {\tt conv-mach.sh}.
 
 Charmc automatically figures out where the charm lib and include
 directories are --- at no point do you have to configure this
@@ -130,10 +90,6 @@ This is just a convenience for simple-minded makefiles.
 Strip the executable of debugging symbols.  Only meaningful when
 producing an executable.
 
-\item[{\tt -save}:]
-
-Intermediate files produced by the Charm or Charm++ translator are saved.
-
 \item[{\tt -verbose}:]
 
 All commands executed by charmc are echoed to stdout.
@@ -165,30 +121,29 @@ example).  Usually, charmc prefers the less buggy of the two, but
 not always.  This option causes charmc to switch to the most reliable
 compiler, regardless of whether it produces slow code or not.
 
-\item[{\tt -language \{converse|charm++|sdag|idl\}}:]
+\item[{\tt -language \{converse|charm++|sdag|ampi|fem\}}:]
 
 When linking with charmc, one must specify the ``language''.  This
 is just a way to help charmc include the right libraries.  Pick the
 ``language'' according to this table:
 
 \begin{itemize}
-\item{{\bf Charm++} if your program includes Charm++, Charm, C++, and C.}
+\item{{\bf Charm++} if your program includes \charmpp{}, C++, and C.}
 \item{{\bf Converse} if your program includes C or C++.}
 \item{{\bf sdag} if your program includes structured dagger.}
-\item{{\bf idl} if your program includes IDL bindings for Charm++.}
 \end{itemize}
 
 \item[{\tt -balance} {\em load-balance-strategy}:]
 
-When linking any Converse program (including any Charm++, sdag or IDL program),
+When linking any \converse{} program (including any \charmpp{} or sdag program),
 one must include a seed load-balancing
 library.  There are currently three to choose from: {\tt rand}, {\tt
 test}, and {\tt graph} are supported.  Default is {\tt -balance rand}.
 
 \item[{\tt -tracemode} {\em tracing-mode}:]
 
-Selects the desired degree of tracing for Charm and Charm++ programs.
-See the Charm manual and the Projections and SummaryTool manuals for
+Selects the desired degree of tracing for \charmpp{} programs.
+See the \charmpp{} manual and the \projections{} manuals for
 more information.  Currently supported modes are {\tt none}, {\tt
 summary}, and {\tt projections}. Default is {\tt -tracemode none}.
 
@@ -225,7 +180,7 @@ Options passed to the linker for {\tt -language charm++}.
 
 \item[{\tt -ld-option} {\em options}:]
 
-Options passed to the linker for {\tt -language charm}.
+Options passed to the linker for {\tt -language converse}.
 
 \item[{\tt -ldro-option} {\em options}:]
 
