@@ -13,6 +13,10 @@
  *
  * ************************************************************************ */
 
+#ifdef log2
+#undef log2
+#endif
+
 typedef unsigned int prio_t;
 
 class CkBitVector {
