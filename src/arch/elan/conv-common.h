@@ -7,8 +7,9 @@
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 /* Type of the message tells whether it is a statically or dynamically allocated message, 0 for dynamic and 1 for static */
-#define CMK_MSG_HEADER_EXT      {CmiUInt4 size; CmiUInt2 rank,root,hdl,xhdl,info,stratid; }
-#define CMK_MSG_HEADER_BLUEGENE {CmiUInt4 size; CmiUInt2 rank,root,hdl,xhdl,info,stratid,padding1,padding2; int nd, n; double rt; CmiInt2 tID; CmiUInt2 hID; char t; int msgID; int srcPe;}
+#define CMK_MSG_HEADER_EXT_     CmiUInt4 size; CmiUInt2 rank,root,hdl,xhdl,info,stratid;
+#define CMK_MSG_HEADER_EXT      {CMK_MSG_HEADER_EXT_}
+#define CMK_MSG_HEADER_BLUEGENE {CMK_MSG_HEADER_EXT_ CMK_BLUEGENE_FIELDS}
 
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
