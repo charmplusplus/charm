@@ -25,16 +25,16 @@ pdf: $(TEXFILES)
 	pdflatex manual.tex
 
 install:
-	rm -f /expand1/groupMosaic/distrib/newcharm++.manual.ps.gz
-	cp manual.ps /expand1/groupMosaic/distrib/newcharm++.manual.ps
-	gzip /expand1/groupMosaic/distrib/newcharm++.manual.ps
-	chmod 664 /expand1/groupMosaic/distrib/newcharm++.manual.ps.gz
-	rm -f /expand1/groupMosaic/distrib/newcharm++.manual.pdf
-	cp manual.pdf /expand1/groupMosaic/distrib/newcharm++.manual.pdf
-	chmod 664 /expand1/groupMosaic/distrib/newcharm++.manual.pdf
-	rm -f /expand1/groupMosaic/html-manuals/newcharm++.manual/*
-	cp manual/* /expand1/groupMosaic/html-manuals/newcharm++.manual/
-	chmod 664 /expand1/groupMosaic/html-manuals/newcharm++.manual/*
+	rm -f /expand1/groupMosaic/distrib/charm++5.0v2.ps.gz
+	cp manual.ps /expand1/groupMosaic/distrib/charm++5.0v2.ps
+	gzip /expand1/groupMosaic/distrib/charm++5.0v2.ps
+	chmod 664 /expand1/groupMosaic/distrib/charm++5.0v2.ps.gz
+	rm -f /expand1/groupMosaic/distrib/charm++5.0v2.pdf
+	cp manual.pdf /expand1/groupMosaic/distrib/charm++5.0v2.pdf
+	chmod 664 /expand1/groupMosaic/distrib/charm++5.0v2.pdf
+	rm -f /expand1/groupMosaic/html-manuals/charm++5.0v2/*
+	cp manual/* /expand1/groupMosaic/html-manuals/charm++5.0v2/
+	chmod 664 /expand1/groupMosaic/html-manuals/charm++5.0v2/*
 
 all: ps pdf html install
 
