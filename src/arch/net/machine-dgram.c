@@ -461,8 +461,8 @@ int CheckSocketsReady(int withDelayMs)
     return nreadable;
   }
   if (nreadable==-1) {
-	if (errno!=EINTR)
-		KillEveryone("Socket error in CheckSocketsReady!\n");
+    if (errno && errno!=EINTR)
+      KillEveryone("Socket error in CheckSocketsReady!\n");
     MACHSTATE(2,"} CheckSocketsReady (INTERRUPTED!)")
     return CheckSocketsReady(0);
   }
