@@ -22,7 +22,7 @@
 #include "CList.h"
 #include <stdio.h>
 #include "CStateVar.h"
-#include "CParsedFile.h"
+#include "xiParsedFile.h"
 
 /******************* Utilities ****************/
 
@@ -454,20 +454,20 @@ class TVarList : public Printable {
 
 /* Member of a chare or group, i.e. entry, RO or ROM */
 class Member : public Construct {
-   //friend class CParsedFile;
+   //friend class xiParsedFile;
   protected:
     Chare *container;
   public:
     virtual void setChare(Chare *c) { container = c; }
     virtual int isSdag(void) { return 0; }
-    virtual void collectSdagCode(CParsedFile *pf, int& sdagPresent) { return; }
+    virtual void collectSdagCode(xiParsedFile *pf, int& sdagPresent) { return; }
     XStr makeDecl(const XStr &returnType,int forProxy=0);
     virtual void genIndexDecls(XStr& str)=0;
 };
 
 /* List of members of a chare or group */
 class MemberList : public Printable {
-    //friend class CParsedFile;
+    //friend class xiParsedFile;
     Member *member;
     MemberList *next;
   public:
@@ -478,7 +478,7 @@ class MemberList : public Printable {
     void genIndexDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
-    void collectSdagCode(CParsedFile *pf, int& sdagPresent);
+    void collectSdagCode(xiParsedFile *pf, int& sdagPresent);
 };
 
 /* Chare or group is a templated entity */
@@ -655,7 +655,7 @@ class Entry : public Member {
     XStr proxyName(void) {return container->proxyName();}
     XStr indexName(void) {return container->indexName();}
 
-//    friend class CParsedFile;
+//    friend class xiParsedFile;
     int hasCallMarshall;
     void genCall(XStr &dest,const XStr &preCall);
 
@@ -716,7 +716,7 @@ class Entry : public Member {
     void genReg(XStr& str);
     char *getEntryName() { return name; }
     void generateEntryList(TList<CEntry*>&, SdagConstruct *);
-    void collectSdagCode(CParsedFile *pf, int& sdagPresent);
+    void collectSdagCode(xiParsedFile *pf, int& sdagPresent);
     void propagateState(int);
 };
 

@@ -548,7 +548,7 @@ Chare::genRegisterMethodDef(XStr& str)
   str << "#endif\n";
 }
 
-//extern void sdag_trans(XStr& classname, CParsedFile *input, XStr& output);
+//extern void sdag_trans(XStr& classname, xiParsedFile *input, XStr& output);
 
 void
 Chare::genDecls(XStr& str)
@@ -593,7 +593,7 @@ Chare::genDecls(XStr& str)
   if(list) {
     int sdagPresent = 0;
     XStr sdagStr;
-    CParsedFile *myParsedFile = new CParsedFile();
+    xiParsedFile *myParsedFile = new xiParsedFile();
     list->collectSdagCode(myParsedFile, sdagPresent);
     if(sdagPresent) {
       XStr classname;
@@ -1446,7 +1446,7 @@ void MemberList::genDecls(XStr& str)
   }
 }
 
-void MemberList::collectSdagCode(CParsedFile *pf, int& sdagPresent)
+void MemberList::collectSdagCode(xiParsedFile *pf, int& sdagPresent)
 {
   if(member){
     member->collectSdagCode(pf, sdagPresent);
@@ -1477,8 +1477,8 @@ void MemberList::genReg(XStr& str)
   }
 }
 
-///////////////////////////// CPARSEDFILE //////////////////////
-/*void CParsedFile::print(int indent)
+///////////////////////////// xiPARSEDFILE //////////////////////
+/*void xiParsedFile::print(int indent)
 {
   for(CEntry *ce=entryList.begin(); !entryList.end(); ce=entryList.next())
   {
@@ -1492,7 +1492,7 @@ void MemberList::genReg(XStr& str)
   }
 }
 */
-void CParsedFile::numberNodes(void)
+void xiParsedFile::numberNodes(void)
 {
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
     if (cn->sdagCon != 0) {
@@ -1501,7 +1501,7 @@ void CParsedFile::numberNodes(void)
   }
 }
 
-void CParsedFile::labelNodes(void)
+void xiParsedFile::labelNodes(void)
 {
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
     if (cn->sdagCon != 0) 
@@ -1509,21 +1509,21 @@ void CParsedFile::labelNodes(void)
   }
 }
 
-void CParsedFile::propagateState(void)
+void xiParsedFile::propagateState(void)
 {
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
     cn->sdagCon->propagateState(0);
   }
 }
 
-void CParsedFile::generateEntryList(void)
+void xiParsedFile::generateEntryList(void)
 {
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
     cn->sdagCon->generateEntryList(entryList, 0);
   }
 }
 
-void CParsedFile::generateCode(XStr& op)
+void xiParsedFile::generateCode(XStr& op)
 {
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
     cn->sdagCon->setNext(0,0);
@@ -1531,7 +1531,7 @@ void CParsedFile::generateCode(XStr& op)
   }
 }
 
-void CParsedFile::generateEntries(XStr& op)
+void xiParsedFile::generateEntries(XStr& op)
 {
   CEntry *en;
   op << "public:\n";
@@ -1540,7 +1540,7 @@ void CParsedFile::generateEntries(XStr& op)
   }
 }
 
-void CParsedFile::generateInitFunction(XStr& op)
+void xiParsedFile::generateInitFunction(XStr& op)
 {
   op << "private:\n";
   op << "  CDep *__cDep;\n";
@@ -1553,7 +1553,7 @@ void CParsedFile::generateInitFunction(XStr& op)
   op << "  }\n";
 }
 
-void CParsedFile::generatePupFunction(XStr& op)
+void xiParsedFile::generatePupFunction(XStr& op)
 {
   op << "public:\n";
   op << "  void __sdag_pup(PUP::er& p) {\n";
@@ -1666,7 +1666,7 @@ XStr Entry::eo(int withDefaultVals,int priorComma) {
   return str;
 }
 
-void Entry::collectSdagCode(CParsedFile *pf, int& sdagPresent)
+void Entry::collectSdagCode(xiParsedFile *pf, int& sdagPresent)
 {
   if (isSdag()) {
     sdagPresent = 1;
