@@ -12,6 +12,16 @@ Image::Image(Point ulc, Point lrc, byte * imgData)
 	m_imgData = imgData;
 }
 
+Image::Image(CkRect rect, byte * imgData)
+{
+        m_ulc.x = rect.l;
+        m_lrc.x = rect.r;
+        m_ulc.y = rect.t;
+        m_lrc.y = rect.b;
+        m_imgData = imgData;
+}
+
+
 Image::Image()
 {
 	m_ulc.x = 0;

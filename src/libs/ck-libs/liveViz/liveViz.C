@@ -4,7 +4,6 @@
 Orion Sky Lawlor, olawlor@acm.org, 6/11/2002
 */
 #include "point.h"
-#include "xSortedImageList.h"
 #include "image.h"
 #include "liveViz.h"
 #include "liveViz_impl.h"
@@ -85,27 +84,43 @@ void liveVizDeposit(const liveVizRequest &req,
     CkPrintf("liveVizDeposit> Deposited image at (%d,%d), (%d x %d) pixels, on pe %d\n",startx,starty,sizex,sizey,CkMyPe());
   // Implement image clipping -- to do
 
-  Point ulc, lrc;
-
-  ulc.x = startx;
-  ulc.y = starty;
-  lrc.x = startx + sizex-1;
-  lrc.y = starty + sizey-1;
-
-  // copy the image data, so that liveViz lib does not delete the actual pointer passed by the user.
-  byte *imageData = new byte[sizex*sizey*lv_config.getBytesPerPixel()];
-  memcpy(imageData,src,sizex*sizey*lv_config.getBytesPerPixel());
-
-  Image *img = new Image(ulc,lrc,(byte *)imageData);
   XSortedImageList list(lv_config.getBytesPerPixel());
-  list.add(img, req);
+  if(src != NULL)
+  {
+     Point ulc, lrc;
+
+     ulc.x = startx;
+     ulc.y = starty;
+     lrc.x = startx + sizex-1;
+     lrc.y = starty + sizey-1;
+
+     // copy the image data, so that liveViz lib does not delete the actual pointer passed by the user.
+     byte *imageData = new byte[sizex*sizey*lv_config.getBytesPerPixel()];
+     memcpy(imageData,src,sizex*sizey*lv_config.getBytesPerPixel());
+
+     Image *img = new Image(ulc,lrc,(byte *)imageData);
+     list.add(img, req);
+  }
+
   byte* packedData = (byte*)list.pack(&req);
+
   CkReductionMsg* msg = CkReductionMsg::buildNew(list.packedDataSize(),packedData, imageCombineReducer);
 
   //Contribute this image to the reduction
   msg->setCallback(CkCallback(vizReductionHandler));
   client->contribute(msg);
 }
+
+void liveVizDeposit(const liveVizRequest &req, LiveVizImageList &list, ArrayElement* client)
+{
+  byte *packedData = (byte*)list.pack(&req);
+  CkReductionMsg* msg = CkReductionMsg::buildNew(list.packedDataSize(), packedData, imageCombineReducer);
+
+  // Contribute this list of images to the reduction
+  msg->setCallback(CkCallback(vizReductionHandler));
+  client->contribute(msg);
+}
+
 
 /*
 Called by the reduction manager to combine all the source images
@@ -148,27 +163,39 @@ void vizReductionHandler(void *r_msg)
   liveVizRequest * req = list.unPack(msg->getData());
   Image *image = list.combineImage();
 
-  if (lv_config.getVerbose(2))
-    CkPrintf("vizReductionHandler> pe %d image is (%d,%d, %d,%d)\n", CkMyPe(), image->m_ulc.x, image->m_ulc.y, image->m_lrc.x, image->m_lrc.y);
-
-  int bpp=lv_config.getBytesPerPixel();
-  CkRect destRect(0,0,req->wid-1,req->ht-1);
-  CkRect srcRect(0,0,image->getImageWidth()-1, image->getImageHeight()-1);
-  if (destRect==srcRect)
+  if(image != NULL)
   {
-  //Client contributed entire image-- pass along unmodified
-    liveViz0Deposit(*req,image->m_imgData);
-    image->m_imgData = NULL; // don't delete the image buffer.
-    delete image;
+    if (lv_config.getVerbose(2))
+      CkPrintf("vizReductionHandler> pe %d image is (%d,%d, %d,%d)\n", CkMyPe(), image->m_ulc.x, image->m_ulc.y, image->m_lrc.x, image->m_lrc.y);
+
+    int bpp=lv_config.getBytesPerPixel();
+    CkRect destRect(0,0,req->wid-1,req->ht-1);
+    CkRect srcRect(0,0,image->getImageWidth()-1, image->getImageHeight()-1);
+    if (destRect == srcRect)
+    {
+      //Client contributed entire image-- pass along unmodified
+      liveViz0Deposit(*req,image->m_imgData);
+      image->m_imgData = NULL; // don't delete the image buffer.
+      delete image;
+    }
+    else
+    { //Client didn't quite cover whole image-- have to pad
+      CkImage src(image->getImageWidth(), image->getImageHeight(), bpp,image->m_imgData);
+      CkAllocImage dest(req->wid,req->ht,bpp);
+      dest.clear();
+      dest.put(image->m_ulc.x,image->m_ulc.y,src);
+      liveViz0Deposit(*req,dest.getData());
+      delete image;
+    }
   }
   else
-  { //Client didn't quite cover whole image-- have to pad
-    CkImage src(image->getImageWidth(), image->getImageHeight(), bpp,image->m_imgData);
-    CkAllocImage dest(req->wid,req->ht,bpp);
-    dest.clear();
-    dest.put(image->m_ulc.x,image->m_ulc.y,src);
-    liveViz0Deposit(*req,dest.getData());
-    delete image;
+  {
+    // Blank Image
+    int imageSize = (req->wid)*(req->ht)*(lv_config.getBytesPerPixel());
+    byte *imageData = new byte[imageSize];
+    for(int i=0; i<imageSize; i++)
+      imageData[i] = 0;
+    liveViz0Deposit(*req, imageData);
   }
 
   delete req;

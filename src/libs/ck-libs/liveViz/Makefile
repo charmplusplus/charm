@@ -1,7 +1,7 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=liveViz.h liveViz.decl.h liveVizPoll.decl.h liveViz0.h colorScale.h 
+HEADERS=liveViz.h liveViz.decl.h liveVizPoll.decl.h liveViz0.h colorScale.h xSortedImageList.h imagelist.h imagenode.h image.h point.h defines.h
 HEADDEP=$(HEADERS) liveViz.def.h networkVar.h \
 	point.h image.h imagelist.h imagenode.h xSortedImageList.h
 OBJS=liveViz0.o liveViz.o liveVizPoll.o networkVar.o colorScale.o point.o image.o imagenode.o imagelist.o xSortedImageList.o

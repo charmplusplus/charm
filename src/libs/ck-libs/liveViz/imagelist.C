@@ -1,4 +1,5 @@
 #include "imagelist.h"
+#include "ckimage.h"
 
 ImageList::ImageList(unsigned bytesPerPixel)
 {
@@ -113,6 +114,7 @@ void ImageList::removeNodeFromList(ImageNode* node)
 
 void * ImageList::pack(const liveVizRequest *req)
 {
+	//CkPrintf("Entering ImageList::pack() \n");
 	unsigned size = packedDataSize();
 	if(size == 0)
 		return NULL;
@@ -122,35 +124,34 @@ void * ImageList::pack(const liveVizRequest *req)
 	memcpy(ptr+sizeof(unsigned),req,sizeof(liveVizRequest));
 
 	byte * headptr = ptr + sizeof(unsigned)+sizeof(liveVizRequest);
-	byte * imageptr = headptr + m_nodeCount*sizeof(Image);
-	byte * imageref = imageptr;
+	byte * imageptr = headptr + m_nodeCount*sizeof(CkRect);
 
-	Image image;
+	CkRect rect;
 	ImageNode *temp = m_list;
 
 	while(temp != NULL)
 	{
-		image.m_ulc.x = temp->m_img->m_ulc.x;
-		image.m_lrc.x = temp->m_img->m_lrc.x;
-		image.m_ulc.y = temp->m_img->m_ulc.y;
-		image.m_lrc.y = temp->m_img->m_lrc.y;
-		image.m_imgData = (byte*)(imageptr - imageref);
+		rect.l = temp->m_img->m_ulc.x;
+		rect.r = temp->m_img->m_lrc.x;
+		rect.t = temp->m_img->m_ulc.y;
+		rect.b = temp->m_img->m_lrc.y;
 
-		memcpy(headptr,&image,sizeof(Image));
+		memcpy(headptr, &rect, sizeof(CkRect));
 
 		temp->m_img->copyImageData(imageptr, m_bytesPerPixel);
 
-		headptr += sizeof(Image);
+		headptr += sizeof(CkRect);
 		imageptr += temp->m_img->getImageSize(m_bytesPerPixel);
 		temp = temp->m_next;
 	}
-	image.m_imgData = NULL;
+	//CkPrintf("Exiting ImageList::pack(), nodeCount = %d \n", m_nodeCount);
 
 	return ptr;
 }
 
 liveVizRequest* ImageList::unPack(void *ptr)
 {
+	//CkPrintf("Entering ImageList::unPack() \n");
 	liveVizRequest *req = new liveVizRequest;
 
 	if(ptr == NULL)
@@ -161,29 +162,31 @@ liveVizRequest* ImageList::unPack(void *ptr)
 	memcpy(req,(byte*)ptr + sizeof(unsigned), sizeof(liveVizRequest));
 
 	byte * headptr = (byte*)ptr + sizeof(unsigned) + sizeof(liveVizRequest);
-	byte * imageptr = headptr + sizeof(Image)*nodeCount;
+	byte * imageptr = headptr + sizeof(CkRect)*nodeCount;
 
-	Image image;
+	CkRect rect;
 	Image *temp = NULL;
 	unsigned imageSize;
 
 	for(int i=0; i<nodeCount; i++)
 	{
-		memcpy(&image,headptr,sizeof(Image));
+		memcpy(&rect, headptr, sizeof(CkRect));
 
-		imageSize = image.getImageSize(m_bytesPerPixel);
+		temp = new Image(rect, NULL);
+
+		imageSize = temp->getImageSize(m_bytesPerPixel);
 
 		byte * imgData = new byte[imageSize];
 		memcpy(imgData,imageptr,imageSize);
 
-		temp = new Image(image.m_ulc, image.m_lrc, imgData);
+		temp->m_imgData = imgData; //new Image(image.m_ulc, image.m_lrc, imgData);
 
 		add(temp, *req);
 
-		headptr += sizeof(Image);
+		headptr += sizeof(CkRect);
 		imageptr += imageSize;
 	}
-	image.m_imgData = NULL;
+	//CkPrintf("Exiting ImageList::unPack(), nodeCount = %d \n", nodeCount);
 	return req;
 }
 
@@ -198,38 +201,42 @@ unsigned ImageList::packedDataSize()
 		temp = temp->m_next;
 	}
 
-	return(size + m_nodeCount*sizeof(Image) + sizeof(unsigned) + sizeof(liveVizRequest));
+	return(size + m_nodeCount*sizeof(CkRect) + sizeof(unsigned) + sizeof(liveVizRequest));
 
 }
 
 Image * ImageList::combineImage(void)
 {
-	Point ulc,lrc;
-	int size = getImageSize(ulc,lrc);
-	//printf("%d %d %d %d \n",ulc.x,ulc.y,lrc.x,lrc.y);
-	//printf("size = %d #node %d, size of byte=%d\n",size,m_nodeCount,sizeof(byte));
-	byte * imageData = new byte[size];
-	//printf(" Allocated Image Buffer\n");
-	for(int i=0; i<size; i++)
-		imageData[i] = 0;
-	ImageNode *temp = m_list;
-	int newImageWidth = lrc.x - ulc.x + 1;
-
-	for(int i=0; i<m_nodeCount; i++)
+	if(m_nodeCount != 0)
 	{
-		int width = temp->m_img->m_lrc.x - temp->m_img->m_ulc.x + 1;
-		int height = temp->m_img->m_lrc.y - temp->m_img->m_ulc.y + 1;
-		for(int y=0; y<height; y++)
-			for(int x=0; x<width; x++)
-			{
-				for(int j=0; j<m_bytesPerPixel; j++)
-					imageData[((temp->m_img->m_ulc.y - ulc.y + y)*newImageWidth +
-							(temp->m_img->m_ulc.x - ulc.x + x))*m_bytesPerPixel + j] =
-							temp->m_img->m_imgData[(y*width + x)*m_bytesPerPixel + j];
- 			}
- 		temp = temp->m_next;
- 	}
-	return new Image(ulc, lrc, imageData);
+		Point ulc,lrc;
+
+		int size = getImageSize(ulc,lrc);
+
+		byte * imageData = new byte[size];
+
+		for(int i=0; i<size; i++)
+			imageData[i] = 0;
+		ImageNode *temp = m_list;
+		int newImageWidth = lrc.x - ulc.x + 1;
+
+		for(int i=0; i<m_nodeCount; i++)
+		{
+			int width = temp->m_img->m_lrc.x - temp->m_img->m_ulc.x + 1;
+			int height = temp->m_img->m_lrc.y - temp->m_img->m_ulc.y + 1;
+			for(int y=0; y<height; y++)
+				for(int x=0; x<width; x++)
+				{
+					for(int j=0; j<m_bytesPerPixel; j++)
+						imageData[((temp->m_img->m_ulc.y - ulc.y + y)*newImageWidth +
+								(temp->m_img->m_ulc.x - ulc.x + x))*m_bytesPerPixel + j] =
+								temp->m_img->m_imgData[(y*width + x)*m_bytesPerPixel + j];
+ 				}
+ 			temp = temp->m_next;
+ 		}
+		return new Image(ulc, lrc, imageData);
+	}
+	return NULL;
 
 }
 
