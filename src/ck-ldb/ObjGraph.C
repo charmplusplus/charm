@@ -107,7 +107,7 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
 
     Node* to_node = find_node(newedgedata.receiver.get_destObj());
     if (to_node == 0) {
-      if (!_lb_args.ignoreBgLoad()) 
+      if (!_lb_args.migObjOnly()) 
         CkPrintf("ObjGraph::find_node: Didn't locate to node match!\n");
       continue;
     }
