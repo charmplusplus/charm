@@ -1097,6 +1097,7 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   result->context.uc_stack.ss_size = size;
   result->context.uc_stack.ss_flags = 0;
   result->context.uc_link = 0;
+  errno = 0;
   makecontext(&result->context, (void (*) (void))CthStartThread, 2, fn, arg);
   if(errno !=0) { 
     perror("makecontext"); 
