@@ -33,7 +33,7 @@ BV_Set * makeSet(int *list, int size, int max)
 }
 
 
-bvset_insert(BV_Set * s, int value)
+void bvset_insert(BV_Set * s, int value)
   {
     if (value > s->max) 
       printf("BV_Set error. inserting value %d in a set where max is %d\n",
@@ -51,9 +51,11 @@ bvset_insert(BV_Set * s, int value)
 
 int bvset_find(BV_Set * s, int value)
   {
-    if (value > s->max)  
+    if (value > s->max) {
       printf("BV_Set error.  *find* on a value %d in a set where max is %d\n",
 	     value, s->max);
+      return -1;
+    }
     else 
       return (s->vector[value]);
   }
@@ -62,7 +64,7 @@ int bvset_size(BV_Set * s) {
   return s->size;
 }
 
-bvset_enumerate(BV_Set * s, int **list, int *size)
+void bvset_enumerate(BV_Set * s, int **list, int *size)
 {
   int i, j;
 

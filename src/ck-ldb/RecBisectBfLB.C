@@ -17,18 +17,18 @@ int fifoInt_dequeue(IntQueue *q);
 
 extern "C" {
   Graph * initGraph(int v, int e);
-  nextVertex(Graph *g, int v, float w);
-  finishVertex(Graph *g);
-  addEdge(Graph *g, int w, float w2);
-  graph_weightof(Graph *g, int vertex);
-  numNeighbors(Graph *g, int node);
-  getNeighbor(Graph *g, int d , int i);
-  printGraph(Graph *g);
+  void nextVertex(Graph *g, int v, float w);
+  void finishVertex(Graph *g);
+  void addEdge(Graph *g, int w, float w2);
+  float graph_weightof(Graph *g, int vertex);
+  int numNeighbors(Graph *g, int node);
+  int getNeighbor(Graph *g, int d , int i);
+  void printGraph(Graph *g);
 
   int bvset_size(BV_Set *);
   int bvset_find(BV_Set *, int i);
-  bvset_enumerate(BV_Set * s1, int **p1, int *numP1);
-  bvset_insert(BV_Set *ss1, int t1);
+  void bvset_enumerate(BV_Set * s1, int **p1, int *numP1);
+  void bvset_insert(BV_Set *ss1, int t1);
   BV_Set *makeSet(int *nodes, int numNodes, int V);
   BV_Set *makeEmptySet( int V);
 
@@ -121,7 +121,7 @@ CLBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats, int numPartiti
   int migrate_count=migrateInfo.size();
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
-  for(int i=0; i < migrate_count; i++) {
+  for(i=0; i < migrate_count; i++) {
     MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
     msg->moves[i] = *item;
     delete item;
@@ -137,7 +137,7 @@ RecBisectBfLB::convertGraph(ObjGraph *og) {
 
   Graph *g;
   
-  int V, E, i, j;
+  int V, E, i;
 
 
   V = og->NodeCount();
@@ -178,7 +178,7 @@ void RecBisectBfLB::partitionInTwo(Graph *g, int nodes[], int numNodes,
 	       int ** pp1, int *numP1, int **pp2, int *numP2, 
 	       int ratio1, int ratio2)
 {
-  int r1, r2, t1, t2, doneUpto, weight1, weight2;
+  int r1, r2, weight1, weight2;
   BV_Set *all, *s1, *s2; //, *makeSet(int * nodes, int num, int max);
   IntQueue * q1, *q2;
   int * p1, *p2;
@@ -190,7 +190,6 @@ void RecBisectBfLB::partitionInTwo(Graph *g, int nodes[], int numNodes,
   all = makeSet(nodes, numNodes, g->V);
   s1 = makeEmptySet(g->V);
   s2 = makeEmptySet(g->V);
-  doneUpto = 0;
 
   q1 = fifoInt_create(g->V);
   q2 = fifoInt_create(g->V);
@@ -288,7 +287,7 @@ void RecBisectBfLB::recursivePartition(int numParts, Graph *g, int nodes[], int 
 		   PartitionList *partitions) {
   
   int *p1, *p2;
-  int first, second,i ;
+  int first, second;
   int numP1, numP2;
   
   if (numParts < 2) {
