@@ -67,6 +67,15 @@ class CkQ : private CkNoncopyable {
       if (pos > len) len = pos+1;
       else len++;
     }
+    // delete an element at pos
+    T remove(int pos) {
+      if (pos >= len) return T(0);
+      T ret = block[(pos+first)%blklen];
+      for (int i=pos; i<len-1; i++)
+        block[(i+first)%blklen] = block[(i+1+first)%blklen];
+      len--;
+      return ret;
+    }
     //Peek at the n'th item from the queue
     T& operator[](size_t n) 
     {
