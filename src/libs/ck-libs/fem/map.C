@@ -501,8 +501,8 @@ void splitter::copySparseChunks(const FEM_Sparse &src,int s,bool forGhost)
 		for (const chunkList *cur=&gNode[nodes[0]];cur!=NULL;cur=cur->next)
 		{
 			int testchunk=cur->chunk;
-			bool hasGhost=false; //True if some of our nodes are ghost
-			for (int i=1;i<nNodes;i++) {
+			bool hasGhost=false; //Some of our nodes are ghost
+			for (int i=0;i<nNodes;i++) {
 				const chunkList *li=gNode[nodes[i]].onChunk(testchunk,sym);
 				if (li==NULL) //List i does not contain testchunk
 					{ testchunk=-1; break; /* jump out */ }
