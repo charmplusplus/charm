@@ -282,12 +282,16 @@ There are several utility functions that can be called in applications to
 configure the load balancer, etc. These functions are:
 
 \begin{itemize}
+\item {\bf LBTurnInstrumentOn()} and {\bf LBTurnInstrumentOff()}: are plain C
+      functions to control the load balancing statistics instrumentation
+      on or off on the calling processor. No implicit broadcast or 
+      synchronization exists in these functions.
 \item {\bf setMigratable(CmiBool migratable)}: is a member function of array
       element. This function can be called 
       in an array element constructor to tell load balancer whether this object
       is migratable or not\footnote{Currently not all load balancers 
       recognize this setting though.}.
-\item {\bf lbdb->SetLBPeriod(double s)}: this function can be called
+\item {\bf lbdb$->$SetLBPeriod(double s)}: this function can be called
       anywhere\footnote{except that it must be called after LBDatabase
       has been initialized in Charm++ init phase, so for example global 
       variable constructor is not a good place to call it.} to regulate 
