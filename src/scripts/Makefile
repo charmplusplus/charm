@@ -170,11 +170,8 @@ headerlinks: dirs+sources Makefile $(ALLHEADERS)
 
 dirs+sources:
 	rm -f .gdir
-	echo HHH $(PWD)
 	(cd .. ; basename "`pwd`" | sed -e 's@-.*@@') 	> .gdir
-	echo HHH $(PWD)
 	pwd
-	cat .gdir
 	find . -type l -exec rm {} \;
 	rm -rf QuickThreads
 	rm -rf libs
@@ -183,27 +180,21 @@ dirs+sources:
 	rm -rf ../pgms
 	rm -rf ../doc ; ln -s ../doc ../doc
 	../../src/scripts/gatherflat ../../src/scripts .
-	cat .gdir
 	./gatherflat ../../src/conv-core        .
 	./gatherflat ../../src/conv-ldb         .
-	cat .gdir
 	./gatherflat ../../src/conv-ccs         .
 	./gatherflat ../../src/conv-perf	.
 	./gatherflat ../../src/ck-core          .
-	cat .gdir
 	./gatherflat ../../src/util             .
 	./gatherflat ../../src/ck-perf          .
 	./gatherflat ../../src/ck-ldb           .
-	cat .gdir
 	./gatherflat ../../src/langs/simplemsg  .
 	./gatherflat ../../src/langs/pvmc       .
 	./gatherflat ../../src/langs/bluegene   .
 	./gatherflat ../../src/langs/f90charm   .
-	cat .gdir
 	./gatherflat ../../src/xlat-i           .
 	./gatherflat ../../src/xlatcpm          .
 	./gathertree ../../src/QuickThreads QuickThreads
-	cat .gdir
 	./gathertree ../../src/libs libs
 	./gathertree ../../src/arch/util      .
 	./gathertree ../../src/langs langs
