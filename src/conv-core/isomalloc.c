@@ -62,7 +62,7 @@ static int slot2pe(int slot) {
 static int pe2slot(int pe) {
 	return pe*numslots;
 }
-//Return the number of slots in a block with n user data bytes
+/*Return the number of slots in a block with n user data bytes*/
 static int length2slots(int nBytes) {
 	return (sizeof(CmiIsomallocBlock)+nBytes+slotsize-1)/slotsize;
 }
