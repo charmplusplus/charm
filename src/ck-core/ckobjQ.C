@@ -47,6 +47,7 @@ CkObjectMsgQ::~CkObjectMsgQ()
 // must be re-entrant
 void CkObjectMsgQ::process() 
 {
+#if CMK_OBJECT_QUEUE_AVAILABLE
   if (objQ == NULL) return;
 //  if (inprocessing) return;
   int mlen = length();
@@ -71,6 +72,7 @@ void CkObjectMsgQ::process()
       CkpvAccess(_tokenPool)->put(tok);
     CqsDequeue((Queue)objQ, (void **)&tok);
   }
+#endif
 }
 
 // find out the object pointer from a charm message envelope

@@ -327,9 +327,8 @@ PUPmarshall(CkArrayID)
     void operator delete(void *ptr) { free(ptr); }
 #endif
 
-#if CMK_OBJECT_QUEUE_AVAILABLE
+// for object message queue
 #include "ckobjQ.h"
-#endif
 
 class Chare {
   protected:
