@@ -186,7 +186,6 @@
 #include <setjmp.h>
 #include <signal.h>
 #include <stdarg.h> /*<- was <varargs.h>*/
-#include <strings.h>
 #include <string.h>
 
 #include "conv-ccs.h"
