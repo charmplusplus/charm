@@ -57,41 +57,23 @@ int  CmiScanf();
 #include <sys/time.h>
 #include <varargs.h>
 
-#ifdef CMK_HAVE_STRINGS_H
+#if CMK_STRINGS_USE_STRINGS_H
 #include <strings.h>
 #endif
 
-#ifdef CMK_HAVE_STRING_H
+#if CMK_STRINGS_USE_STRING_H
 #include <string.h>
 #endif
 
-#ifdef CMK_TIMER_USE_TIMES
-#include <sys/times.h>
-#endif
-
-#ifdef CMK_JUST_DECLARE_STRING_FNS
+#if CMK_STRINGS_USE_OWN_DECLARATIONS
 char *strchr(), *strrchr(), *strdup();
 #endif
 
-#ifdef CMK_RSH_IS_A_COMMAND
+#if CMK_RSH_IS_A_COMMAND
 #define RSH_CMD "rsh"
 #endif
-#ifdef CMK_RSH_USE_REMSH
+#if CMK_RSH_USE_REMSH
 #define RSH_CMD "remsh"
-#endif
-
-#ifdef CMK_STRERROR_USE_SYS_ERRLIST
-extern char *sys_errlist[];
-#define strerror(i) (sys_errlist[i])
-#endif
-
-#ifdef CMK_SIGHOLD_USE_SIGMASK
-int sighold(sig) int sig;
-{ if (sigblock(sigmask(sig)) < 0) return -1;
-  else return 0; }
-int sigrelse(sig) int sig;
-{ if (sigsetmask(sigblock(0)&(~sigmask(sig))) < 0) return -1;
-  else return 0; }
 #endif
 
 static void KillEveryone();
@@ -297,118 +279,6 @@ static void outlog_output(buf) char *buf;
   }
 }
 
-
-/**************************************************************************
- *
- * enable_async (enables signal-driven IO on a single descriptor)
- *
- **************************************************************************/
-
-#ifdef CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN
-#include <sys/filio.h>
-static void enable_async(fd)
-int fd;
-{
-  int pid = getpid();
-  int async = 1;
-  if ( ioctl(fd, FIOSETOWN, &pid) < 0  ) {
-    CmiError("setting socket owner: %s\n", strerror(errno)) ;
-    KillEveryoneCode(65788) ;
-  }
-  if ( ioctl(fd, FIOASYNC, &async) < 0 ) {
-    CmiError("setting socket async: %s\n", strerror(errno)) ;
-    KillEveryoneCode(94458) ;
-  }
-}
-#endif
-
-#ifdef CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP
-#include <sys/filio.h>
-static void enable_async(fd)
-int fd;
-{
-  int pid = -getpid();
-  int async = 1;
-  if ( ioctl(fd, SIOCSPGRP, &pid) < 0  ) {
-    CmiError("setting socket owner: %s\n", strerror(errno)) ;
-    KillEveryoneCode(65788) ;
-  }
-  if ( ioctl(fd, FIOASYNC, &async) < 0 ) {
-    CmiError("setting socket async: %s\n", strerror(errno)) ;
-    KillEveryoneCode(94458) ;
-  }
-}
-#endif
-
-#ifdef CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN
-#include <sys/ioctl.h>
-static void enable_async(fd)
-int fd;
-{
-  int pid = getpid();
-  int async = 1;
-  if ( ioctl(fd, FIOSSAIOOWN, &pid) < 0  ) {
-    CmiError("setting socket owner: %s\n", strerror(errno)) ;
-    KillEveryoneCode(65788) ;
-  }
-  if ( ioctl(fd, FIOSSAIOSTAT, &async) < 0 ) {
-    CmiError("setting socket async: %s\n", strerror(errno)) ;
-    KillEveryoneCode(94458) ;
-  }
-}
-#endif
-
-#ifdef CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN
-static void enable_async(fd)
-int fd;
-{
-  if ( fcntl(fd, F_SETOWN, getpid()) < 0 ) {
-    CmiError("setting socket owner: %s\n", strerror(errno)) ;
-    KillEveryoneCode(8789) ;
-  }
-  if ( fcntl(fd, F_SETFL, FASYNC) < 0 ) {
-    CmiError("setting socket async: %s\n", strerror(errno)) ;
-    KillEveryoneCode(28379) ;
-  }
-}
-#endif
-
-#ifdef CMK_SIGNAL_USE_SIGACTION
-static void jsignal(sig, handler)
-int sig;
-void (*handler)();
-{
-  struct sigaction in, out ;
-  in.sa_handler = handler;
-  sigemptyset(&in.sa_mask);
-  in.sa_flags = 0;
-  sigaction(sig, &in, &out);
-}
-#endif
-
-#ifdef CMK_SIGNAL_USE_SIGACTION_WITH_RESTART
-static void jsignal(sig, handler)
-int sig;
-void (*handler)();
-{
-  struct sigaction in, out ;
-  in.sa_handler = handler ;
-  sigemptyset(&in.sa_mask);
-  in.sa_flags = SA_RESTART; 
-  if(sigaction(sig, &in, &out) == -1)
-      KillEveryone("sigaction failed.");
-}
-#endif
-
-#ifdef CMK_SIGNAL_IS_A_BUILTIN
-static void jsignal(sig, handler)
-int sig;
-void (*handler)();
-{
-  signal(sig, handler) ;
-}
-#endif
-
 /**************************************************************************
  *
  * SKT - socket routines
@@ -518,101 +388,6 @@ unsigned int ip; int port; int seconds;
   return fd;
 }
 
-/******************************************************************************
- *
- * CmiTimer
- *
- *****************************************************************************/
-
-#ifdef CMK_TIMER_USE_TIMES
-
-static double  clocktick;
-static int     inittime_wallclock;
-static int     inittime_virtual;
-
-static void CmiTimerInit()
-{
-  struct tms temp;
-  inittime_wallclock = times(&temp);
-  inittime_virtual = temp.tms_utime + temp.tms_stime;
-  clocktick = 1.0 / (sysconf(_SC_CLK_TCK));
-}
-
-double CmiTimerWallClock()
-{
-  struct tms temp;
-  double currenttime;
-  int now;
-
-  now = times(&temp);
-  currenttime = (now - inittime_wallclock) * clocktick;
-  return (currenttime);
-}
-
-double CmiTimerVirtual()
-{
-  struct tms temp;
-  double currenttime;
-  int now;
-
-  times(&temp);
-  now = temp.tms_stime + temp.tms_utime;
-  currenttime = (now - inittime_virtual) * clocktick;
-  return (currenttime);
-}
-
-double CmiTimer()
-{
-  return CmiTimerVirtual();
-}
-
-#endif
-
-#ifdef CMK_TIMER_USE_GETRUSAGE
-
-static double inittime_wallclock;
-static double inittime_virtual;
-
-static void CmiTimerInit()
-{
-  struct timeval tv;
-  struct rusage ru;
-  gettimeofday(&tv);
-  inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
-  getrusage(0, &ru); 
-  inittime_virtual =
-    (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
-    (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
-}
-
-double CmiTimerVirtual()
-{
-  struct rusage ru;
-  double currenttime;
-
-  getrusage(0, &ru);
-  currenttime =
-    (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
-    (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
-  return currenttime - inittime_virtual;
-}
-
-double CmiTimerWallClock()
-{
-  struct timeval tv;
-  double currenttime;
-
-  getttimeofday(&tv);
-  currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
-  return currenttime - inittime_wallclock;
-}
-
-double CmiTimer()
-{
-  return CmiTimerVirtual();
-}
-
-#endif
 
 /*****************************************************************************
  *
@@ -1154,7 +929,7 @@ int pumpmsgs()
   }
 }
 
-#ifdef CMK_ASYNC_DOESNT_WORK_USE_TIMER_INSTEAD
+#if CMK_ASYNC_DOESNT_WORK_USE_TIMER_INSTEAD
 
 static int ticker_countup = 0;
 
@@ -1189,7 +964,7 @@ static void InterruptInit()
   FD_ZERO(&fds_read);
   FD_ZERO(&fds_write);
   FD_SET(ctrl_skt, &fds_read);
-  jsignal(SIGALRM, InterruptHandler);
+  CmiSignal(SIGALRM, InterruptHandler);
   ticker_reset();
   for (i=0; i<CpvAccess(Cmi_numpes); i++) {
     if (i!=CpvAccess(Cmi_mype)) {
@@ -1212,10 +987,10 @@ static void InterruptInit()
   FD_ZERO(&fds_read);
   FD_ZERO(&fds_write);
   FD_SET(ctrl_skt, &fds_read);
-  jsignal(SIGIO, InterruptHandler);
+  CmiSignal(SIGIO, InterruptHandler);
   for (i=0; i<CpvAccess(Cmi_numpes); i++) {
     if (i!=CpvAccess(Cmi_mype)) {
-      enable_async(node_table[i].talk_skt);
+      CmiEnableAsyncIO(node_table[i].talk_skt);
       FD_SET(node_table[i].talk_skt, &fds_read);
     }
   }

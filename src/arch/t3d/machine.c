@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.2  1996-06-28 20:30:51  gursoy
+ * Revision 1.3  1996-07-15 20:59:22  jyelon
+ * Moved much timer, signal, etc code into common.
+ *
+ * Revision 1.2  1996/06/28 20:30:51  gursoy
  * *** empty log message ***
  *
  * Revision 1.1  1996/05/16  15:59:43  gursoy
@@ -92,27 +95,32 @@ free( ((char *)blk)-8);
 
 /**************************  TIMER FUNCTIONS **************************/
 
-double CmiTimer()
+double CmiWallTimer()
 {
-     double t;
-     t = (double) (rtclock() - beginTicks); 
-     return (double) (t/(double)ticksPerSecond) ;
+  double t;
+  t = (double) (rtclock() - beginTicks); 
+  return (double) (t/(double)ticksPerSecond);
 }
 
+double CmiCpuTimer()
+{
+  double t;
+  t = (double) (rtclock() - beginTicks); 
+  return (double) (t/(double)ticksPerSecond);
+}
 
-
+double CmiTimer()
+{
+  double t;
+  t = (double) (rtclock() - beginTicks); 
+  return (double) (t/(double)ticksPerSecond);
+}
 
 static void CmiTimerInit()
 {
-     ticksPerSecond = sysconf(_SC_CLK_TCK) ;
-     beginTicks = rtclock() ;
+  ticksPerSecond = sysconf(_SC_CLK_TCK) ;
+  beginTicks = rtclock() ;
 }
-
-
-
-
-
-
 
 /********************* MESSAGE RECEIVE FUNCTIONS ******************/
 

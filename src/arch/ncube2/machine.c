@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-11-13 22:51:32  gursoy
+ * Revision 2.13  1996-07-15 20:59:22  jyelon
+ * Moved much timer, signal, etc code into common.
+ *
+ * Revision 2.12  1995/11/13 22:51:32  gursoy
  * fixed a syntax error
  *
  * Revision 2.11  1995/11/08  23:36:13  gursoy
@@ -114,17 +117,23 @@ free( ((char *)blk) - 8);
 
 double CmiTimer()
 {
-    return ( (amicclk() - uclockinitvalue) / 1000000.0 );
+  return ( (amicclk() - uclockinitvalue) / 1000000.0 );
 }
 
+double CmiWallTimer()
+{
+  return ( (amicclk() - uclockinitvalue) / 1000000.0 );
+}
 
-
+double CmiCpuTimer()
+{
+  return ( (amicclk() - uclockinitvalue) / 1000000.0 );
+}
 
 static void CmiTimerInit()
 {
-     uclockinitvalue = amicclk();
+  uclockinitvalue = amicclk();
 }
-
 
 int CmiAsyncMsgSent(c)
 CmiCommHandle c ;

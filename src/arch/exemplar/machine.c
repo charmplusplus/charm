@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.19  1995-11-09 22:00:55  gursoy
+ * Revision 2.20  1996-07-15 20:59:22  jyelon
+ * Moved much timer, signal, etc code into common.
+ *
+ * Revision 2.19  1995/11/09 22:00:55  gursoy
  * fixed varsize related bug (CmiFreeSend...)
  *
  * Revision 2.18  1995/10/27  21:45:35  jyelon
@@ -111,20 +114,6 @@ static int requested_npe;
 
 static void mycpy();
 static void threadInit();
-
-
-
-double CmiTimer()
-{
-    return (double) 0.0;
-}
-
-
-static void CmiTimerInit()
-{
-}
-
-
 
 void *CmiAlloc(size)
 int size;

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1996-04-18 22:40:35  sanjeev
+ * Revision 2.12  1996-07-15 20:59:22  jyelon
+ * Moved much timer, signal, etc code into common.
+ *
+ * Revision 2.11  1996/04/18 22:40:35  sanjeev
  * CmiFreeSendFn uses CMMD_send_async
  *
  * Revision 2.8  1995/11/08 23:32:31  sanjeev
@@ -78,16 +81,40 @@ CpvDeclare(int, Cmi_numpes) ;
 /**************************  TIMER FUNCTIONS **************************/
 #define TIMER_ID 1
 
+double CmiWallTimer()
+{
+  double t ;
+  
+  CMMD_node_timer_stop(TIMER_ID) ;	
+  t = CMMD_node_timer_busy(TIMER_ID) ;  /* returns time in sec */
+  CMMD_node_timer_start(TIMER_ID) ;     /* restart immediately */	
+  return t ;
+}
+
+double CmiCpuTimer()
+{
+  double t ;
+  
+  CMMD_node_timer_stop(TIMER_ID) ;	
+  t = CMMD_node_timer_busy(TIMER_ID) ;  /* returns time in sec */
+  CMMD_node_timer_start(TIMER_ID) ;     /* restart immediately */	
+  return t ;
+}
 
 double CmiTimer()
 {
-	double t ;
+  double t ;
+  
+  CMMD_node_timer_stop(TIMER_ID) ;	
+  t = CMMD_node_timer_busy(TIMER_ID) ;  /* returns time in sec */
+  CMMD_node_timer_start(TIMER_ID) ;     /* restart immediately */	
+  return t ;
+}
 
-	CMMD_node_timer_stop(TIMER_ID) ;	
-	t = CMMD_node_timer_busy(TIMER_ID) ;  /* returns time in sec */
-	CMMD_node_timer_start(TIMER_ID) ;     /* restart immediately */	
-	
-	return t ;
+double CmiTimerInit()
+{
+  CMMD_node_timer_clear(TIMER_ID);
+  CMMD_node_timer_start(TIMER_ID);
 }
 
 /********************* MESSAGE RECEIVE FUNCTIONS ******************/
@@ -470,9 +497,7 @@ char **argv;
 		Cmi_dim++ ;
 
 	/* Initialize timers */
-	CMMD_node_timer_clear(TIMER_ID) ;
-	CMMD_node_timer_start(TIMER_ID) ;
-
+	CmiTimerInit();
 	user_main(argc, argv);
 }
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.14  1996-07-02 21:25:22  jyelon
+ * Revision 1.15  1996-07-15 20:59:22  jyelon
+ * Moved much timer, signal, etc code into common.
+ *
+ * Revision 1.14  1996/07/02 21:25:22  jyelon
  * *** empty log message ***
  *
  * Revision 1.13  1996/02/10 18:57:29  sanjeev
@@ -81,16 +84,6 @@ static char ident[] = "@(#)$Header$";
 #include <math.h>
 #include "converse.h"
 
-#ifdef CMK_TIMER_USE_TIMES
-#include <sys/times.h>
-#include <sys/unistd.h>
-#endif
-
-#ifdef CMK_TIMER_USE_GETRUSAGE
-#include <sys/time.h>
-#include <sys/resource.h>
-#endif
-
 static char *DeleteArg(argv)
   char **argv;
 {
@@ -118,63 +111,6 @@ static void mycpy(dst, src, bytes)
                 bytes--;
         }
 }
-
-
-
-/******************************************************************************
- *
- * CmiTimer
- *
- *****************************************************************************/
-#ifdef CMK_TIMER_USE_TIMES
-
-static struct tms inittime;
-
-static void CmiTimerInit()
-{
-  times(&inittime);
-}
-
-double CmiTimer()
-{
-  double currenttime;
-  int clk_tck;
-    struct tms temp;
-
-    times(&temp);
-    clk_tck=sysconf(_SC_CLK_TCK);
-    currenttime = 
-     (((temp.tms_utime - inittime.tms_utime)+
-       (temp.tms_stime - inittime.tms_stime))*1.0)/clk_tck;
-    return (currenttime);
-}
-
-#endif
-
-#ifdef CMK_TIMER_USE_GETRUSAGE
-
-static struct rusage inittime;
-
-static void CmiTimerInit()
-{
-  getrusage(0, &inittime); 
-}
-
-double CmiTimer() {
-  double currenttime;
-
-  struct rusage temp;
-  getrusage(0, &temp);
-  currenttime =
-    (temp.ru_utime.tv_usec - inittime.ru_utime.tv_usec) * 0.000001+
-      (temp.ru_utime.tv_sec - inittime.ru_utime.tv_sec) +
-	(temp.ru_stime.tv_usec - inittime.ru_stime.tv_usec) * 0.000001+
-	  (temp.ru_stime.tv_sec - inittime.ru_stime.tv_sec) ; 
-  
-  return (currenttime);
-}
-
-#endif
 
 /*****************************************************************************
  *

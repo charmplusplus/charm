@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.8  1995-11-08 23:40:58  gursoy
+ * Revision 1.9  1996-07-15 20:59:22  jyelon
+ * Moved much timer, signal, etc code into common.
+ *
+ * Revision 1.8  1995/11/08 23:40:58  gursoy
  * fixed varsize msg related bug
  *
  * Revision 1.7  1995/11/08  00:42:13  jyelon
@@ -44,14 +47,6 @@ static char ident[] = "@(#)$Header$";
 #include "machine.h"
 #include "converse.h"
 
-#ifdef CMK_TIMER_USE_TIMES
-#include <sys/times.h>
-#include <sys/unistd.h>
-#endif
-#ifdef CMK_TIMER_USE_GETRUSAGE
-#include <sys/time.h>
-#include <sys/resource.h>
-#endif
 static void **McQueue;
 
 int Cmi_mype;
@@ -419,7 +414,7 @@ void CsdExitScheduler()
 
 
 
-#ifdef CMK_TIMER_USE_TIMES
+#if CMK_TIMER_USE_TIMES
 
 static struct tms inittime;
 
@@ -444,7 +439,7 @@ static double CsiTimer()
 
 #endif
 
-#ifdef CMK_TIMER_USE_GETRUSAGE
+#if CMK_TIMER_USE_GETRUSAGE
 
 static struct rusage inittime;
 
@@ -477,14 +472,20 @@ static double Csi_start_time;
 
 
 
-
 double CmiTimer()
 {
-    return (CsiTimer() - Csi_start_time  + Csi_global_time);
+  return (CsiTimer() - Csi_start_time  + Csi_global_time);
 }
 
+double CmiWallTimer()
+{
+  return (CsiTimer() - Csi_start_time  + Csi_global_time);
+}
 
-
+double CmiCpuTimer()
+{
+  return (CsiTimer() - Csi_start_time  + Csi_global_time);
+}
 
 void CsdUniScheduler(count)
 int count;

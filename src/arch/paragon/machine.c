@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1995-11-15 18:17:30  gursoy
+ * Revision 1.2  1996-07-15 20:59:22  jyelon
+ * Moved much timer, signal, etc code into common.
+ *
+ * Revision 1.1  1995/11/15 18:17:30  gursoy
  * Initial revision
  *
  * Revision 2.8  1995/11/08  23:29:00  gursoy
@@ -99,39 +102,32 @@ unsigned int utimerinit[2] ;
 
 double CmiTimer()
 {
-/* Code below by Sanjeev : 10/24/95 */
-/* HWHZ is defined as 10000000 in /usr/iparagon/current/paragon/include/nx.h */
-/* However, to make the mclock and hwclock timings tally, I need to put in
-   the 50000000 constant below : that makes them exactly the same, except
-   of course, hwclock gives more precision */
-
-   unsigned int tim[2] ;
-   double t ;
+   unsigned int tim[2]; double t;
  
-   hwclock(tim) ;
- 
-   t = (double)(tim[0]-utimerinit[0])/50000000.0 ;
-
-   return t ;
-
-/* NOTE : mclock returns time in milliseconds */
-/*    return ( (mclock() - clockinitvalue) / 1000.0 );	*/
+   hwclock(tim);
+   return (double)(tim[0]-utimerinit[0])/50000000.0;
 }
 
+double CmiWallTimer()
+{
+   unsigned int tim[2]; double t;
+ 
+   hwclock(tim);
+   return (double)(tim[0]-utimerinit[0])/50000000.0;
+}
 
-
+double CmiCpuTimer()
+{
+   unsigned int tim[2]; double t;
+ 
+   hwclock(tim);
+   return (double)(tim[0]-utimerinit[0])/50000000.0;
+}
 
 static void CmiTimerInit()
 {
    hwclock(utimerinit) ;
-
-   /* clockinitvalue = mclock();	*/
 }
-
-
-
-
-
 
 
 /********************* MESSAGE RECEIVE FUNCTIONS ******************/

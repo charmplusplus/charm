@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1996-01-29 16:34:02  milind
+ * Revision 2.9  1996-07-15 20:59:22  jyelon
+ * Moved much timer, signal, etc code into common.
+ *
+ * Revision 2.8  1996/01/29 16:34:02  milind
  * Corrected a minor bug in CmiReleaseSetntMessages
  *
  * Revision 2.7  1995/11/09  18:23:11  milind
@@ -92,57 +95,43 @@ static MSG_LIST *end_sent=0;
 
 static void CmiTimerInit()
 {
-    struct timestruc_t time;
-
-    gettimer(TIMEOFDAY,&time);
-    itime=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
+  struct timestruc_t time;
+  gettimer(TIMEOFDAY,&time);
+  itime=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
 }
-
-CmiUTimerInit()
-{
-/* Nothing, since we use just one timer for both usec and msec. */
-}
-
 
 double CmiTimer()
 {
-    double tmsec;
-    double t;
-    struct timestruc_t time;
-
-    gettimer(TIMEOFDAY,&time);
-    t=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
-    tmsec = (double) (1.0e3*(t-itime));
-    return tmsec / 1000.0;
+  double tmsec, t;
+  struct timestruc_t time;
+  
+  gettimer(TIMEOFDAY,&time);
+  t=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
+  tmsec = (double) (1.0e3*(t-itime));
+  return tmsec / 1000.0;
 }
 
-
-/* These functions are for backward compatibility... */
-double CmiUTimer()
+double CmiWallTimer()
 {
-    unsigned int tusec;
-    double t;
-    struct timestruc_t time;
-
-    gettimer(TIMEOFDAY,&time);
-    t=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
-    tusec = (unsigned int) (1.0e6*(t-itime));
-    return (double) tusec;
+  double tmsec, t;
+  struct timestruc_t time;
+  
+  gettimer(TIMEOFDAY,&time);
+  t=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
+  tmsec = (double) (1.0e3*(t-itime));
+  return tmsec / 1000.0;
 }
 
-
-double CmiHTimer()
+double CmiCpuTimer()
 {
-    unsigned int thr;
-    double t;
-    struct timestruc_t time;
-
-    gettimer(TIMEOFDAY,&time);
-    t=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
-    thr = (unsigned int) ((t-itime)/3600.0);
-    return (double) thr;
+  double tmsec, t;
+  struct timestruc_t time;
+  
+  gettimer(TIMEOFDAY,&time);
+  t=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
+  tmsec = (double) (1.0e3*(t-itime));
+  return tmsec / 1000.0;
 }
-
 
 CmiAllAsyncMsgsSent()
 {

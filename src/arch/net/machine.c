@@ -56,41 +56,27 @@ int  CmiScanf();
 #include <sys/time.h>
 #include <varargs.h>
 
-#ifdef CMK_HAVE_STRINGS_H
+#if CMK_STRINGS_USE_STRINGS_H
 #include <strings.h>
 #endif
 
-#ifdef CMK_HAVE_STRING_H
+#if CMK_STRINGS_USE_STRING_H
 #include <string.h>
 #endif
 
-#ifdef CMK_TIMER_USE_TIMES
+#if CMK_TIMER_USE_TIMES
 #include <sys/times.h>
 #endif
 
-#ifdef CMK_JUST_DECLARE_STRING_FNS
+#if CMK_STRINGS_USE_OWN_DECLARATIONS
 char *strchr(), *strrchr(), *strdup();
 #endif
 
-#ifdef CMK_RSH_IS_A_COMMAND
+#if CMK_RSH_IS_A_COMMAND
 #define RSH_CMD "rsh"
 #endif
-#ifdef CMK_RSH_USE_REMSH
+#if CMK_RSH_USE_REMSH
 #define RSH_CMD "remsh"
-#endif
-
-#ifdef CMK_STRERROR_USE_SYS_ERRLIST
-extern char *sys_errlist[];
-#define strerror(i) (sys_errlist[i])
-#endif
-
-#ifdef CMK_SIGHOLD_USE_SIGMASK
-int sighold(sig) int sig;
-{ if (sigblock(sigmask(sig)) < 0) return -1;
-  else return 0; }
-int sigrelse(sig) int sig;
-{ if (sigsetmask(sigblock(0)&(~sigmask(sig))) < 0) return -1;
-  else return 0; }
 #endif
 
 static void KillEveryone();
@@ -290,117 +276,6 @@ static void outlog_output(buf) char *buf;
 
 /**************************************************************************
  *
- * enable_async (enables signal-driven IO on a single descriptor)
- *
- **************************************************************************/
-
-#ifdef CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN
-#include <sys/filio.h>
-static void enable_async(fd)
-int fd;
-{
-  int pid = getpid();
-  int async = 1;
-  if ( ioctl(fd, FIOSETOWN, &pid) < 0  ) {
-    CmiError("setting socket owner: %s\n", strerror(errno)) ;
-    KillEveryoneCode(65788) ;
-  }
-  if ( ioctl(fd, FIOASYNC, &async) < 0 ) {
-    CmiError("setting socket async: %s\n", strerror(errno)) ;
-    KillEveryoneCode(94458) ;
-  }
-}
-#endif
-
-#ifdef CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP
-#include <sys/filio.h>
-static void enable_async(fd)
-int fd;
-{
-  int pid = -getpid();
-  int async = 1;
-  if ( ioctl(fd, SIOCSPGRP, &pid) < 0  ) {
-    CmiError("setting socket owner: %s\n", strerror(errno)) ;
-    KillEveryoneCode(65788) ;
-  }
-  if ( ioctl(fd, FIOASYNC, &async) < 0 ) {
-    CmiError("setting socket async: %s\n", strerror(errno)) ;
-    KillEveryoneCode(94458) ;
-  }
-}
-#endif
-
-#ifdef CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN
-#include <sys/ioctl.h>
-static void enable_async(fd)
-int fd;
-{
-  int pid = getpid();
-  int async = 1;
-  if ( ioctl(fd, FIOSSAIOOWN, &pid) < 0  ) {
-    CmiError("setting socket owner: %s\n", strerror(errno)) ;
-    KillEveryoneCode(65788) ;
-  }
-  if ( ioctl(fd, FIOSSAIOSTAT, &async) < 0 ) {
-    CmiError("setting socket async: %s\n", strerror(errno)) ;
-    KillEveryoneCode(94458) ;
-  }
-}
-#endif
-
-#ifdef CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN
-static void enable_async(fd)
-int fd;
-{
-  if ( fcntl(fd, F_SETOWN, getpid()) < 0 ) {
-    CmiError("setting socket owner: %s\n", strerror(errno)) ;
-    KillEveryoneCode(8789) ;
-  }
-  if ( fcntl(fd, F_SETFL, FASYNC) < 0 ) {
-    CmiError("setting socket async: %s\n", strerror(errno)) ;
-    KillEveryoneCode(28379) ;
-  }
-}
-#endif
-
-#ifdef CMK_SIGNAL_USE_SIGACTION
-static void jsignal(sig, handler)
-int sig;
-void (*handler)();
-{
-  struct sigaction in, out ;
-  in.sa_handler = handler;
-  sigemptyset(&in.sa_mask);
-  in.sa_flags = 0;
-  sigaction(sig, &in, &out);
-}
-#endif
-
-#ifdef CMK_SIGNAL_USE_SIGACTION_WITH_RESTART
-static void jsignal(sig, handler)
-int sig;
-void (*handler)();
-{
-  struct sigaction in, out ;
-  in.sa_handler = handler ;
-  sigemptyset(&in.sa_mask);
-  in.sa_flags = SA_RESTART; 
-  if(sigaction(sig, &in, &out) == -1)
-      KillEveryone("sigaction failed.");
-}
-#endif
-
-#ifdef CMK_SIGNAL_IS_A_BUILTIN
-static void jsignal(sig, handler)
-int sig;
-void (*handler)();
-{
-  signal(sig, handler) ;
-}
-#endif
-
-/**************************************************************************
- *
  * SKT - socket routines
  *
  *
@@ -485,7 +360,7 @@ unsigned int *pfd;
 
   optlen = 4;
   /*  getsockopt(skt, SOL_SOCKET , SO_RCVBUF , (char *) &optval, &optlen); */
-  optval = DGRAM_BUF_SIZE;
+  optval = CMK_DGRAM_BUF_SIZE;
   if (setsockopt(skt, SOL_SOCKET , SO_RCVBUF , (char *) &optval, optlen) < 0)
     {perror("setting socket rcv bufer size");
      KillEveryoneCode(35782); }
@@ -549,102 +424,6 @@ unsigned int ip; int port; int seconds;
   }
   return fd;
 }
-
-/******************************************************************************
- *
- * CmiTimer
- *
- *****************************************************************************/
-
-#ifdef CMK_TIMER_USE_TIMES
-
-static double  clocktick;
-static int     inittime_wallclock;
-static int     inittime_virtual;
-
-static void CmiTimerInit()
-{
-  struct tms temp;
-  inittime_wallclock = times(&temp);
-  inittime_virtual = temp.tms_utime + temp.tms_stime;
-  clocktick = 1.0 / (sysconf(_SC_CLK_TCK));
-}
-
-double CmiTimerWallClock()
-{
-  struct tms temp;
-  double currenttime;
-  int now;
-
-  now = times(&temp);
-  currenttime = (now - inittime_wallclock) * clocktick;
-  return (currenttime);
-}
-
-double CmiTimerVirtual()
-{
-  struct tms temp;
-  double currenttime;
-  int now;
-
-  times(&temp);
-  now = temp.tms_stime + temp.tms_utime;
-  currenttime = (now - inittime_virtual) * clocktick;
-  return (currenttime);
-}
-
-double CmiTimer()
-{
-  return CmiTimerVirtual();
-}
-
-#endif
-
-#ifdef CMK_TIMER_USE_GETRUSAGE
-
-static double inittime_wallclock;
-static double inittime_virtual;
-
-static void CmiTimerInit()
-{
-  struct timeval tv;
-  struct rusage ru;
-  gettimeofday(&tv);
-  inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
-  getrusage(0, &ru); 
-  inittime_virtual =
-    (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
-    (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
-}
-
-double CmiTimerVirtual()
-{
-  struct rusage ru;
-  double currenttime;
-
-  getrusage(0, &ru);
-  currenttime =
-    (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
-    (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
-  return currenttime - inittime_virtual;
-}
-
-double CmiTimerWallClock()
-{
-  struct timeval tv;
-  double currenttime;
-
-  gettimeofday(&tv);
-  currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
-  return currenttime - inittime_wallclock;
-}
-
-double CmiTimer()
-{
-  return CmiTimerVirtual();
-}
-
-#endif
 
 /*****************************************************************************
  *
@@ -1124,7 +903,7 @@ typedef unsigned char BYTE;
 /* In bytes.  Make sure this is greater than zero! */
 /* Works out to be about 2018 bytes. */
 
-# define MAXDSIZE (CMK_MAX_DGRAM_SIZE - sizeof(DATA_HDR))
+# define MAXDSIZE (CMK_DGRAM_MAX_SIZE - sizeof(DATA_HDR))
 
 /* Format of the header sent with each fragment. */
 typedef struct DATA_HDR
@@ -1251,7 +1030,7 @@ static void send_ack(packet,penum)
    implementation are as follows:
 
    1) The sends are not synchronous, i.e. every pack is not acknowledged before
-      the next packet is sent. Instead, packets are sent until WINDOW_SIZE 
+      the next packet is sent. Instead, packets are sent until CMK_DGRAM_WINDOW_SIZE 
       packets remain unacknowledged.
 
    2) An ack packet with sequence number N acknowledges all packets upto and
@@ -1290,8 +1069,8 @@ static void SendWindowInit()
 
   for (i = 0; i < numpe; i++) {
     if (i != mype) {
-       send_window[i]=(WindowElement *)CmiAlloc(WINDOW_SIZE*sizeof(WindowElement));
-      for (j = 0; j < WINDOW_SIZE; j++) {
+       send_window[i]=(WindowElement *)CmiAlloc(CMK_DGRAM_WINDOW_SIZE*sizeof(WindowElement));
+      for (j = 0; j < CMK_DGRAM_WINDOW_SIZE; j++) {
         send_window[i][j].packet = NULL;
         send_window[i][j].seq_num = 0;
         send_window[i][j].send_time = 0.0;
@@ -1362,7 +1141,7 @@ int destpe;
   send_window[destpe][last_window_index[destpe]].send_time = CmiNow;
   packet->seq_num = next_seq_num[destpe];
   next_seq_num[destpe]++;
-  last_window_index[destpe] = (last_window_index[destpe] + 1) % WINDOW_SIZE;
+  last_window_index[destpe] = (last_window_index[destpe] + 1) % CMK_DGRAM_WINDOW_SIZE;
   cur_window_size[destpe]++;
   return 1;
 }
@@ -1376,8 +1155,8 @@ int destpe;
   unsigned int act_size;
   int i;
 
-  CmiNow = CmiTimerWallClock();
-  while (cur_window_size[destpe] < WINDOW_SIZE &&
+  CmiNow = CmiWallTimer();
+  while (cur_window_size[destpe] < CMK_DGRAM_WINDOW_SIZE &&
      ((packet = GetTransmitPacket(destpe)) != NULL))
   {
     AddToSendWindow(packet, destpe);
@@ -1403,7 +1182,7 @@ DATA_HDR *ack;
 int sourcepe;
 {
   int i, index, found, count;
-  DATA_HDR *PacketsToBeFreed[WINDOW_SIZE];
+  DATA_HDR *PacketsToBeFreed[CMK_DGRAM_WINDOW_SIZE];
 
   if (cur_window_size[sourcepe] == 0)  /* empty window */
     return;
@@ -1414,7 +1193,7 @@ int sourcepe;
   while (count < cur_window_size[sourcepe] && !found) 
   {
     found = (send_window[sourcepe][index].seq_num == ack->seq_num);
-    index = (index + 1) % WINDOW_SIZE;
+    index = (index + 1) % CMK_DGRAM_WINDOW_SIZE;
     count++;
   }
   if (found) {
@@ -1425,7 +1204,7 @@ int sourcepe;
     {
       PacketsToBeFreed[i] = send_window[sourcepe][index].packet;
       send_window[sourcepe][index].packet = NULL;
-      index = (index + 1) % WINDOW_SIZE;
+      index = (index + 1) % CMK_DGRAM_WINDOW_SIZE;
     }
     first_window_index[sourcepe] = index;
     cur_window_size[sourcepe] -= count;
@@ -1447,7 +1226,7 @@ static int RetransmitPackets()
   DATA_HDR *packet;
   int sending=0;
 
-  CmiNow = CmiTimerWallClock();
+  CmiNow = CmiWallTimer();
   for (i = 0; i < CpvAccess(Cmi_numpes); i++) {
     index = first_window_index[i];
     if (cur_window_size[i] > 0) {
@@ -1505,8 +1284,8 @@ static RecvWindowInit()
   needack = (int *) CmiAlloc(numpe * sizeof(int));
   for (i = 0; i < numpe; i++) {
     if (i != mype) {
-      recv_window[i]=(WindowElement *)CmiAlloc(WINDOW_SIZE*sizeof(WindowElement));
-      for (j = 0; j < WINDOW_SIZE; j++) {
+      recv_window[i]=(WindowElement *)CmiAlloc(CMK_DGRAM_WINDOW_SIZE*sizeof(WindowElement));
+      for (j = 0; j < CMK_DGRAM_WINDOW_SIZE; j++) {
         recv_window[i][j].packet = NULL;
         recv_window[i][j].seq_num = 0;
         recv_window[i][j].send_time = 0.0;
@@ -1544,13 +1323,13 @@ static int AddToReceiveWindow(packet, sourcepe)
 {
   int index;
   unsigned int seq_num = packet->seq_num;
-  unsigned int last_seq_num = expected_seq_num[sourcepe] + WINDOW_SIZE - 1;
+  unsigned int last_seq_num = expected_seq_num[sourcepe] + CMK_DGRAM_WINDOW_SIZE - 1;
 
   /* 
      Note that seq_num cannot be > last_seq_num.
-     Otherwise,  > last_seq_num - WINDOW_SIZE has been ack'd.
+     Otherwise,  > last_seq_num - CMK_DGRAM_WINDOW_SIZE has been ack'd.
      If that were the case, 
-     expected_seq_num[sourcepe] > > last_seq_num - WINDOW_SIZE,
+     expected_seq_num[sourcepe] > > last_seq_num - CMK_DGRAM_WINDOW_SIZE,
      which is a contradiction
    */
 
@@ -1563,7 +1342,7 @@ static int AddToReceiveWindow(packet, sourcepe)
     }
     else {
       index = (next_window_index[sourcepe] + 
-      seq_num - expected_seq_num[sourcepe]) % WINDOW_SIZE;
+      seq_num - expected_seq_num[sourcepe]) % CMK_DGRAM_WINDOW_SIZE;
       /* put needack and NumUseless++ here ??? */
       if (recv_window[sourcepe][index].packet) 
         CmiFree(packet);
@@ -1596,7 +1375,7 @@ static DATA_HDR *ExtractNextPacket(sourcepe)
     recv_window[sourcepe][index].packet = NULL;
     needack[sourcepe] = 1;
     expected_seq_num[sourcepe]++;
-    next_window_index[sourcepe]=(next_window_index[sourcepe] + 1) % WINDOW_SIZE;
+    next_window_index[sourcepe]=(next_window_index[sourcepe] + 1) % CMK_DGRAM_WINDOW_SIZE;
   }
   return packet;
 }
@@ -1683,8 +1462,8 @@ static int data_getone()
   int AddToReceiveWindow();
   int n;
 
-  recv_buf = (msgspace *)CmiAlloc(CMK_MAX_DGRAM_SIZE);
-  do n=recvfrom(data_skt,(char *)recv_buf,CMK_MAX_DGRAM_SIZE,0,(struct sockaddr *)&src,&srclen);
+  recv_buf = (msgspace *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
+  do n=recvfrom(data_skt,(char *)recv_buf,CMK_DGRAM_MAX_SIZE,0,(struct sockaddr *)&src,&srclen);
   while ((n<0)&&(errno==EINTR));
   if (n<0) { KillEveryone(strerror(errno)); }
   kind = (recv_buf->hd.rem_size)?SEND:ACK;
@@ -1729,7 +1508,7 @@ static int dgram_scan()
   return gotsend;
 }
 
-#ifdef CMK_ASYNC_DOESNT_WORK_USE_TIMER_INSTEAD
+#if CMK_ASYNC_DOESNT_WORK_USE_TIMER_INSTEAD
 
 static int ticker_countup = 0;
 
@@ -1772,7 +1551,7 @@ static void InterruptHandler()
 static void InterruptInit()
 {
   if (Cmi_enableinterrupts) {
-    jsignal(SIGALRM, InterruptHandler);
+    CmiSignal(SIGALRM, InterruptHandler);
     ticker_reset();
   }
 }
@@ -1799,8 +1578,8 @@ static void InterruptHandler()
 static void InterruptInit()
 {
   if (Cmi_enableinterrupts) {
-    jsignal(SIGIO, InterruptHandler);
-    enable_async(data_skt);
+    CmiSignal(SIGIO, InterruptHandler);
+    CmiEnableAsyncIO(data_skt);
   }
 }
 
@@ -1828,7 +1607,7 @@ static int netSend(destPE, size, msg)
   } 
   
   for(;pktnum<(numfrag-1);pktnum++) {
-    hd = (DATA_HDR *)CmiAlloc(CMK_MAX_DGRAM_SIZE);
+    hd = (DATA_HDR *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
     hd->pktidx = pktnum;
     hd->rem_size = size;
     hd->PeNum = CpvAccess(Cmi_mype);
@@ -1877,7 +1656,7 @@ static int netSendV(destPE, n, sizes, msgs)
   tmpsrc = msgs[0];
 
   for(;pktnum<(numfrag-1);pktnum++) {
-    hd = (DATA_HDR *)CmiAlloc(CMK_MAX_DGRAM_SIZE);
+    hd = (DATA_HDR *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
     hd->pktidx = pktnum;
     hd->rem_size = size;
     hd->PeNum = CpvAccess(Cmi_mype);
