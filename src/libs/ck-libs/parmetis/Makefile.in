@@ -1,29 +1,32 @@
 
+CDIR=../../../../..
+LIBDIR=$(CDIR)/lib
+
 # Which compiler to use
 CC = ../../../../../bin/charmc
 
 
 # What optimization level to use
-OPTFLAGS = -O3 
+OPTFLAGS = $(OPTS) 
 
 # Include directories for the compiler
-INCDIR = -I/opt/local/include
+#INCDIR = -I/opt/local/include
 
 # What options to be used by the compiler
-COPTIONS = -language AMPI
+#COPTIONS = -language AMPI
 
 # Which loader to use
-LD = ../../../../../bin/charmc 
+LD = $(CC)
 
 # In which directories to look for any additional libraries
-LIBDIR = -L/opt/local/lib -L/usr/lib
+#LIBDIR = -L/opt/local/lib -L/usr/lib
 
 # What additional libraries to link the programs with (eg., -lmpi)
 #XTRALIBS = -lefence
-XTRALIBS = -language ampi
+#XTRALIBS = -language ampi
 
 # What archiving to use
-AR = ar rv
+AR = $(CC)
 
 # What to use for indexing the archive
 #RANLIB = ranlib
