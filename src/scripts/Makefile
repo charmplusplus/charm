@@ -241,7 +241,7 @@ dirs+sources:
 # Converse Libraries
 #
 ###############################################################################
-CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-neighbor.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
+CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-neighbor.o $(L)/libldb-none.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
 TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a \
           $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
 	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a
@@ -364,6 +364,9 @@ conv-lists.o: conv-lists.C $(UTILHEADERS) $(CVHEADERS)
 	$(CHARMC) -o conv-lists.o conv-lists.C
 
 ## Converse load balancers (seed balancers, -balance)
+$(L)/libldb-none.o: cldb.none.c $(CVHEADERS)
+	$(CHARMC) -o $@ cldb.none.c
+
 $(L)/libldb-rand.o: cldb.rand.c cldb.h $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.rand.c
 
