@@ -13,9 +13,10 @@ all: $(LIBDEST)
 
 $(LIBDEST) : $(LIB)
 	/bin/cp $(LIB) $(LIBDEST)
-	/bin/cp $(HEADERS) $(CDIR)/include
 
 $(LIB): $(LIBOBJ)
+	mkdir $(CDIR)/include/msa/
+	/bin/cp $(HEADERS) $(CDIR)/include/msa/
 	$(CHARMC) -o $(LIB) $(LIBOBJ) 
 
 msa-distArray.o: msa-distArray.C msa-DistPageMgr.ci $(HEADERS)
