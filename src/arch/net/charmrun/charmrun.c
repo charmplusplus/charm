@@ -88,15 +88,6 @@ int probefile(path)
 	return 1;
 }
 
-/**************************************************************************
- *
- * ping_developers
- *
- * Sends a single UDP packet to the charm developers notifying them
- * that charm is in use.
- *
- **************************************************************************/
-
 char *mylogin(void)
 {
 #if defined(_WIN32) && !defined(__CYGWIN__)
@@ -112,6 +103,15 @@ char *mylogin(void)
   return self->pw_name;
 #endif
 } 
+
+/**************************************************************************
+ *
+ * ping_developers
+ *
+ * Sends a single UDP packet to the charm developers notifying them
+ * that charm is in use.
+ *
+ **************************************************************************/
 
 void ping_developers()
 {
@@ -619,6 +619,7 @@ void arg_init(int argc, char **argv)
   arg_argc = pparam_countargs(arg_argv);
   if (arg_argc<1) {
     fprintf(stderr,"ERROR> You must specify a node-program.\n");
+    pparam_printdocs();
     exit(1);
   }
   arg_argv++; arg_argc--;
@@ -1346,13 +1347,14 @@ void req_poll()
   for (i=0;i<req_nClients;i++)
 	if (FD_ISSET(req_clients[i],&rfds))
 	/*This client is ready to read*/
-		  req_serve_client(req_clients[i]);
+		do { req_serve_client(req_clients[i]); }
+		while (1==skt_select1(req_clients[i],0));
 
   if (CcsServer_fd()!=INVALID_SOCKET)
 	 if (FD_ISSET(CcsServer_fd(),&rfds)) {
 		  DEBUGF(("Activity on CCS server port...\n"));
 		  req_ccs_connect();
-	   }
+	 }
 }
 
 
@@ -1362,7 +1364,7 @@ static SOCKET server_fd;
 
 int client_connect_problem(int code,const char *msg)
 {/*Called when something goes wrong during a client connect*/
-	fprintf(stderr,"Charmrun> error attaching to node %d:\n"
+	fprintf(stderr,"Charmrun> error %d attaching to node:\n"
 		"%s\n",code,msg);
 	exit(1);
 	return -1;
@@ -1379,7 +1381,7 @@ void req_client_connect(void)
 	for (client=0;client<req_nClients;client++)
 	{/*Wait for the next client to connect to our server port.*/
 		unsigned int clientIP,clientPort;/*These are actually ignored*/
-		if (arg_verbose) printf("Charmrun> Waiting %d-th client to connect.\n",client+1);
+		if (arg_verbose) printf("Charmrun> Waiting for %d-th client to connect.\n",client);
 		if (0==skt_select1(server_fd,arg_timeout*1000))
 			client_connect_problem(client,"Timeout waiting for node-program to connect");
 		req_clients[client]=skt_accept(server_fd,&clientIP,&clientPort);
@@ -1734,355 +1736,6 @@ void start_nodes_scyld(void)
 
 #else
 /*Unix systems can use Rsh normally*/
-/************* RSH-ONLY CODE ***************************
- *                                                                           
- * xstr                                                                      
- *                                                                           
- *  extendable (and otherwise dynamically-changing) strings.                 
- *                                                                           
- *  These are handy for implementing character buffers of all types.         
- *                                                                           
- *  This module tries to guarantee reasonable speed efficiency for all       
- *  operations.                                                              
- *                                                                           
- *  Each xstr takes around 3*len bytes (where 'len' is the length of the     
- *  string being stored), so it isn't very space efficient.  This is done    
- *  to improve the efficiency of updates.                                    
- *                                                                           
- *  xstr_alloc()                                                             
- *                                                                           
- *      - allocates an empty buffer.                                         
- *                                                                           
- *  xstr_free(str)                                                           
- *                                                                           
- *      - frees an allocated buffer.                                         
- *                                                                           
- *  xstr_lptr(s)                                                             
- *                                                                           
- *      - returns a pointer to leftmost char in buffer.                      
- *                                                                           
- *  xstr_rptr(s)                                                             
- *                                                                           
- *      - returns a pointer beyond rightmost char in buffer.                 
- *                                                                           
- *  xstr_rexpand(str, nbytes)                                                
- *                                                                           
- *     - add uninitialized bytes to the right end of the string.             
- *                                                                           
- *  xstr_lexpand(str, nbytes)                                                
- *                                                                           
- *     - add uninitialized bytes to the left end of the string.              
- *                                                                           
- *  xstr_rshrink(str, nbytes)                                                
- *                                                                           
- *     - remove bytes from the right end of the string.                      
- *                                                                           
- *  xstr_lshrink(str, nbytes)                                                
- *                                                                           
- *     - remove bytes from the left end of the string.                       
- *                                                                           
- *  xstr_read(str, fd)
- *
- *     - read bytes from the specified FD into the right end of xstr.
- *
- *  xstr_write(str, bytes, nbytes)                                           
- *                                                                           
- *     - append the specified bytes to the right end of the xstr.            
- *                                                                           
- *  xstr_printf(str, ...)                                                    
- *                                                                           
- *     - print the specified message onto the end of the xstr.               
- *                                                                           
- *****************************************************************************/
-
-typedef struct xstr
-    {
-    char *lptr;
-    char *rptr;
-    char *lend;
-    char *rend;
-    }
-    *xstr;
-
-char *xstr_lptr(l) xstr l; { return l->lptr; }
-char *xstr_rptr(l) xstr l; { return l->rptr; }
-
-int xstr_len(l)
-    xstr l;
-{
-  return l->rptr - l->lptr;
-}
-
-xstr xstr_alloc()
-{
-  xstr res = (xstr)malloc(sizeof(struct xstr));
-  res->lend = (char *)malloc(257);
-  res->lptr = res->lend + 128;
-  res->rptr = res->lend + 128;
-  res->rend = res->lend + 256;
-  *(res->rptr) = 0;
-  return res;
-}
-
-void xstr_free(s)
-    xstr s;
-{
-  free(s->lend);
-  free(s);
-}
-
-void xstr_rexpand(l, nbytes)
-    xstr l; int nbytes;
-{
-  int uspace, needed; char *nbuf;
-  if (l->rend - l->rptr>=nbytes) { l->rptr += nbytes; return; }
-  uspace = (l->rptr - l->lptr);
-  needed = uspace + nbytes;
-  if (needed<64) needed=64;
-  nbuf = (char *)malloc(1+(needed*3));
-  memcpy(nbuf+needed, l->lptr, uspace);
-  free(l->lend);
-  l->lend = nbuf;
-  l->lptr = nbuf + needed;
-  l->rptr = nbuf + needed + uspace + nbytes;
-  l->rend = nbuf + needed + needed + needed;
-  *(l->rptr) = 0;
-}
-
-void xstr_lexpand(l, nbytes)
-    xstr l; int nbytes;
-{
-  int uspace, needed; char *nbuf;
-  if (l->rend - l->rptr>=nbytes) { l->rptr += nbytes; return; }
-  uspace = (l->rptr - l->lptr);
-  needed = uspace + nbytes;
-  if (needed<64) needed=64;
-  nbuf = (char *)malloc(1+(needed*3));
-  memcpy(nbuf+needed+nbytes, l->lptr, uspace);
-  free(l->lend);
-  l->lend = nbuf;
-  l->lptr = nbuf + needed;
-  l->rptr = nbuf + needed + uspace + nbytes;
-  l->rend = nbuf + needed + needed + needed;
-  *(l->rptr) = 0;
-}
-
-void xstr_rshrink(l, nbytes)
-    xstr l; int nbytes;
-{
-  if (l->rptr - l->lptr < nbytes) { l->rptr=l->lptr; return; }
-  l->rptr -= nbytes;
-  *(l->rptr) = 0;
-}
-
-void xstr_lshrink(l, nbytes)
-    xstr l; int nbytes;
-{
-  if (l->rptr - l->lptr < nbytes) { l->lptr=l->rptr; return; }
-  l->lptr += nbytes;
-}
-
-void xstr_write(l, bytes, nbytes)
-    xstr l; char *bytes; int nbytes;
-{
-  xstr_rexpand(l, nbytes);
-  memcpy(xstr_lptr(l)+xstr_len(l)-nbytes, bytes, nbytes);
-}
-
-int xstr_read(xstr l, int fd)
-{
-  int nread;
-  xstr_rexpand(l, 1024);
-  nread = read(fd, xstr_rptr(l)-1024, 1024);
-  if (nread<0) xstr_rshrink(l, 1024);
-  else xstr_rshrink(l, 1024-nread);
-  return nread;
-}
-
-
-#if 0
-void xstr_printf(xstr l, char *fmt, ...)
-{
-  va_list p;
-  char buffer[10000];
-  va_start(p, fmt);
-  vsprintf(buffer, fmt, p);
-  xstr_write(l, buffer, strlen(buffer));
-  va_end(p);
-}
-#else
-void xstr_printf(va_alist) va_dcl
-{
-  char buffer[10000];
-  xstr l; char *fmt;
-  va_list p;
-  va_start(p);
-  l = va_arg(p, xstr);
-  fmt = va_arg(p, char *);
-  vsprintf(buffer, fmt, p);
-  xstr_write(l, buffer, strlen(buffer));
-}
-#endif
-
-char *xstr_gets(buff, size, s)
-    char *buff; int size; xstr s;
-{
-  char *p; int len;
-  xstr_rptr(s)[0]=0;
-  p = strchr(xstr_lptr(s),'\n');
-  if (p==0) return 0;
-  *p = 0;
-  len = p - xstr_lptr(s);
-  if (len > size) len=size;
-  memcpy(buff, xstr_lptr(s), len);
-  buff[len] = 0;
-  xstr_lshrink(s, len+1);
-  return buff;
-}
-
-/******** RSH-ONLY CODE ****************************************************
- *
- * PROG - much like 'popen', but better.
- *
- *
- * typedef prog
- *
- *  - represents an opened, running program.
- *
- * prog prog_start(char *prog, char **argv, use_err)
- *
- *  - starts a program in the background (with the same args as execv).
- *    The prog returned can be used to read the standard input and standard
- *    output of the resulting program.  'use_err' is a flag, if zero, then
- *    the program's standard error is merged with its standard output,
- *    otherwise it is kept separate.
- *
- *    The program P has three file descriptors (P->ifd, P->ofd, P->efd)
- *    which can be used to access its standard input, output, and error.
- *    In addition, it has three xstr buffers (P->ibuf, P->obuf, P->ebuf)
- *    which are used for buffered IO on those descriptors.
- *
- * int prog_flush(prog p)
- *
- *  - flushes the contents of P->ibuf into P->ifd.
- *
- * void prog_iclose(prog p)
- * 
- *  - close the input-side of the specified program.  You may not write to
- *    the standard input of the program after prog_iclose.
- *
- * void prog_close(prog p)
- *
- *  - close the standard inputs and outputs of the specified program,
- *    and free all resources used by the handle.  The program may continue
- *    to exist in the background if it is capable of doing so without a
- *    standard input and output.
- *
- ****************************************************************************/
-
-#include <sys/wait.h>
-
-typedef struct prog
-{
-  int ifd; xstr ibuf;
-  int ofd; xstr obuf;
-  int efd; xstr ebuf;
-  int pid;
-}
-*prog;
-
-int prog_flush(c)
-    prog c;
-{
-  xstr ibuf = c->ibuf;
-  int ifd = c->ifd;
-  
-  if (ibuf==0) return -1;
-  while (xstr_lptr(ibuf)!=xstr_rptr(ibuf))
-    {
-      int nwrote = write(ifd, xstr_lptr(ibuf), xstr_len(ibuf));
-      if (nwrote < 0) return -1;
-      if (nwrote==0)
-	{ fprintf(stderr,"ERROR> write returned 0???\n"); exit(1); }
-      xstr_lshrink(ibuf, nwrote);
-    }
-  return 0;
-}
-
-void prog_iclose(c)
-    prog c;
-{
-  prog_flush(c);
-  if (c->ibuf) { xstr_free(c->ibuf); close(c->ifd); }
-  c->ibuf = 0;
-}
-
-void prog_close(c)
-    prog c;
-{
-  int status=0;
-  prog_flush(c);
-  kill(c->pid,SIGKILL);
-  waitpid(c->pid,&status,0);
-  if (c->ibuf) { xstr_free(c->ibuf); close(c->ifd); }
-  if (c->obuf) { xstr_free(c->obuf); close(c->ofd); }
-  if (c->ebuf) { xstr_free(c->ebuf); close(c->efd); }
-  free(c);
-}
-
-prog prog_make(ifd, ofd, efd, pid)
-    int ifd, ofd, efd, pid;
-{
-  prog res = (prog)malloc(sizeof(struct prog));
-  res->ifd = ifd;
-  res->ofd = ofd;
-  res->efd = efd;
-  res->ibuf = (ifd >= 0) ? xstr_alloc() : NULL;
-  res->obuf = (ofd >= 0) ? xstr_alloc() : NULL;
-  res->ebuf = (efd >= 0) ? xstr_alloc() : NULL;
-  res->pid = pid;
-  return res;
-}
-
-prog prog_start(p, argv, useerr)
-    char *p; char **argv; int useerr;
-{
-  int p_stdin[2];
-  int p_stdout[2];
-  int p_stderr[2];
-  int pid;
-  p_stdin[0]= -1; p_stdout[0]= -1; p_stderr[0]= -1;
-  p_stdin[1]= -1; p_stdout[1]= -1; p_stderr[1]= -1;
-  if (pipe(p_stdin )<0) goto abort;
-  if (pipe(p_stdout)<0) goto abort;
-  if (pipe(p_stderr)<0) goto abort;
-  pid = 0;
-  pid = fork();
-  if (pid < 0) goto abort;
-  if (pid == 0)
-    {
-      int i;
-      dup2(p_stdin[0],0);
-      dup2(p_stdout[1],1);
-      dup2(useerr?p_stderr[1]:p_stdout[1],2);
-      for(i=3; i<1024; i++) close(i);
-      execvp(p, argv);
-      exit(1);
-    }
-  close(p_stdin[0]);
-  close(p_stdout[1]);
-  close(p_stderr[1]);
-  return prog_make(p_stdin[1], p_stdout[0], p_stderr[0], pid);
- abort:
-  if (p_stdin[0]!= -1) close(p_stdin[0]);
-  if (p_stdin[1]!= -1) close(p_stdin[1]);
-  if (p_stdout[0]!= -1) close(p_stdout[0]);
-  if (p_stdout[1]!= -1) close(p_stdout[1]);
-  if (p_stderr[0]!= -1) close(p_stderr[0]);
-  if (p_stderr[1]!= -1) close(p_stderr[1]);
-  return 0;
-}
-
 /********** RSH-ONLY CODE *****************************************/
 /*                                                                          */
 /* Rsh_etc                                                                  */
@@ -2090,60 +1743,95 @@ prog prog_start(p, argv, useerr)
 /* this starts all the node programs.  It executes fully in the background. */
 /*                                                                          */
 /****************************************************************************/
+#include <sys/wait.h>
 
-prog rsh_start(nodeno)
-    int nodeno;
+int rsh_start(int nodeno,const char *startScript)
 {
   char *rshargv[6];
-  prog rsh;
+  int pid;
   
   rshargv[0]=nodetab_shell(nodeno);
   rshargv[1]=nodetab_name(nodeno);
   rshargv[2]="-l";
   rshargv[3]=nodetab_login(nodeno);
   rshargv[4]="exec /bin/sh -f";
-#if CMK_CONV_HOST_WANT_CSH
-  rshargv[4]="exec /bin/csh -f";
-#endif
   rshargv[5]=0;
   if (arg_verbose) printf("Charmrun> Starting %s %s -l %s %s\n",nodetab_shell(nodeno), nodetab_name(nodeno),nodetab_login(nodeno), rshargv[4]);
-
-  rsh = prog_start(nodetab_shell(nodeno), rshargv, 1);
-  if ((rsh==0)&&(errno!=EMFILE)) { perror("ERROR> starting rsh"); exit(1); }
-  if (rsh==0)
-    {
-      fprintf(stderr,"caution: cannot start specified number of rsh's\n");
-      fprintf(stderr,"(not enough file descriptors available?)\n");
-    }
-  if (rsh && arg_verbose)
-    fprintf(stderr,"Charmrun> node %d: rsh initiated...\n",nodeno);
-  return rsh;
+  
+  pid = fork();
+  if (pid < 0) 
+  	{ perror("ERROR> starting rsh"); exit(1); }
+  if (pid == 0)
+  {/*Child process*/
+      int i;
+      int fdScript=open(startScript,O_RDONLY);
+  /**/  unlink(startScript); /**/
+      dup2(fdScript,0);/*Open script as standard input*/
+      for(i=3; i<1024; i++) close(i);
+      execvp(rshargv[0], rshargv);
+      exit(1);
+  }
+  if (arg_verbose)
+    fprintf(stderr,"Charmrun> rsh (%s:%dd) started\n",
+    	nodetab_name(nodeno),nodeno);
+  return pid;
 }
 
-
-void rsh_pump_sh(p, nodeno, rank0no, argv)
-    prog p; int nodeno, rank0no; char **argv;
+void fprint_arg(FILE *f,char **argv)
+{
+  while (*argv) { 
+  	fprintf(f," %s",*argv); 
+  	argv++; 
+  }
+}
+void rsh_Find(FILE *f,const char *program,const char *dest)
+{
+    fprintf(f,"Find %s\n",program);
+    fprintf(f,"%s=$loc\n",dest,dest);
+}
+void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
 {
   char *netstart;
   char *arg_nodeprog_r,*arg_currdir_r;
   char *dbg=nodetab_debugger(nodeno);
-  xstr ibuf = p->ibuf;
+  char *host=nodetab_name(nodeno);
   int randno = rand();
-  /* int randno = CrnRand(); */
+#define CLOSE_ALL " < /dev/null 1> /dev/null 2> /dev/null &"
+
+  fprintf(f, /*Echo: prints out status message*/
+  	"Echo() {\n"
+  	"  echo 'Charmrun (%s.%d)>' $*\n"
+  	"}\n",host,nodeno);
   
-  xstr_printf(ibuf,"echo 'remote responding...'\n");
-
-  xstr_printf(ibuf,"test -f $HOME/.charmrunrc && . $HOME/.charmrunrc\n");
+  fprintf(f, /*Find: locates a binary program in PATH, sets loc*/
+  	"Find() {\n"
+  	"  loc=''\n"
+  	"  for dir in `echo $PATH | sed -e 's/:/ /g'`\n"
+  	"  do\n"
+  	"    test -f $dir/$1 && loc=$dir/$1\n"
+  	"  done\n"
+  	"  if [ \"x$loc\" = x ]\n"
+  	"  then\n"
+  	"    Echo $1 not found in your PATH \"($PATH)\"--\n"
+  	"    Echo set your path in your ~/.charmrunrc\n"
+  	"    exit 1\n"
+  	"  fi\n"
+  	"}\n",host,nodeno);
+  
+  if (arg_verbose) fprintf(f,"Echo 'remote responding...'\n");
+  
+  fprintf(f,"test -f $HOME/.charmrunrc && . $HOME/.charmrunrc\n");
   if (arg_display)
-    xstr_printf(ibuf,"DISPLAY=%s;export DISPLAY\n",arg_display);
+    fprintf(f,"DISPLAY='%s';export DISPLAY\n",arg_display);
   netstart = create_netstart(rank0no);
-  xstr_printf(ibuf,"NETSTART='%s';export NETSTART\n",netstart);
-  prog_flush(p);
-
+  fprintf(f,"NETSTART='%s';export NETSTART\n",netstart);
+  
   if (arg_verbose) {
     printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, rank0no);
   }
-
+  fprintf(f,"PATH=\"$PATH:/bin:/usr/bin:/usr/X/bin:/usr/X11/bin:/usr/local/bin:"
+  	"/usr/X11R6/bin:/usr/openwin/bin\"\n");
+  
   /* find the node-program */
   arg_nodeprog_r = pathfix(arg_nodeprog_a, nodetab_pathfixes(nodeno));
   
@@ -2151,442 +1839,153 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
   arg_currdir_r = pathfix(arg_currdir_a, nodetab_pathfixes(nodeno));
 
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
-    xstr_printf(ibuf,"for dir in `echo $PATH | sed -e 's/:/ /g'`; do\n");
-    xstr_printf(ibuf,"  test -f $dir/%s && F_XTERM=$dir/%s && export F_XTERM\n", 
-                     nodetab_xterm(nodeno), nodetab_xterm(nodeno));
-    xstr_printf(ibuf,"  test -f $dir/xrdb && F_XRDB=$dir/xrdb && export F_XRDB\n");
-    xstr_printf(ibuf,"done\n");
-    xstr_printf(ibuf,"if test -z \"$F_XTERM\";  then\n");
-    xstr_printf(ibuf,"   echo '%s not in path --- set your path in your ~/.charmrunrc or profile.'\n", nodetab_xterm(nodeno));
-    xstr_printf(ibuf,"   test -f /bin/sync && /bin/sync\n");
-    xstr_printf(ibuf,"   exit 1\n");
-    xstr_printf(ibuf,"fi\n");
-    xstr_printf(ibuf,"if test -z \"$F_XRDB\"; then\n");
-    xstr_printf(ibuf,"   echo 'xrdb not in path - set your path in your ~/.charmrunrc or profile.'\n");
-    xstr_printf(ibuf,"   test -f /bin/sync && /bin/sync\n");
-    xstr_printf(ibuf,"   exit 1\n");
-    xstr_printf(ibuf,"fi\n");
-    if(arg_verbose) xstr_printf(ibuf,"echo 'using xterm' $F_XTERM\n");
-    prog_flush(p);
+    rsh_Find(f,nodetab_xterm(nodeno),"F_XTERM");
+    rsh_Find(f,"xrdb","F_XRDB");
+    if(arg_verbose) fprintf(f,"Echo 'using xterm' $F_XTERM\n");
   }
 
   if (arg_debug || arg_debug_no_pause)
-  	{
-          xstr_printf(ibuf,"for dir in `echo $PATH | sed -e 's/:/ /g'`; do\n");
-          xstr_printf(ibuf,"  test -f $dir/%s && F_DBG=$dir/%s && export F_DBG\n",dbg,dbg);
-          xstr_printf(ibuf,"done\n");
-          xstr_printf(ibuf,"if test -z \"$F_DBG\"; then\n");
-          xstr_printf(ibuf,"   echo '%s not in path - set your path in your cshrc.'\n",dbg);
-          xstr_printf(ibuf,"   test -f /bin/sync && /bin/sync\n");
-          xstr_printf(ibuf,"   exit 1\n");
-          xstr_printf(ibuf,"fi\n");
-          if(arg_verbose) xstr_printf(ibuf,"echo 'using debugger' $F_DBG\n");
-          prog_flush(p);
-       }
+  {/*Look through PATH for debugger*/
+    rsh_Find(f,dbg,"F_DBG");
+    if (arg_verbose) fprintf(f,"Echo 'using debugger' $F_DBG\n");
+  }
 
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
-    xstr_printf(ibuf,"$F_XRDB -query > /dev/null\n");
-    xstr_printf(ibuf,"if test $? != 0; then\n");
-    xstr_printf(ibuf,"  echo 'Cannot contact X Server '$DISPLAY'.  You probably'\n");
-    xstr_printf(ibuf,"  echo 'need to run xhost to authorize connections.'\n");
-    xstr_printf(ibuf,"  echo '(See manual for xhost for security issues)'\n");
-    xstr_printf(ibuf,"  test -f /bin/sync && /bin/sync\n");
-    xstr_printf(ibuf,"  exit 1\n");
-    xstr_printf(ibuf,"fi\n");
-    prog_flush(p);
+    fprintf(f,"$F_XRDB -query > /dev/null\n");
+    fprintf(f,"if test $? != 0\nthen\n");
+    fprintf(f,"  Echo 'Cannot contact X Server '$DISPLAY'.  You probably'\n");
+    fprintf(f,"  Echo 'need to run xhost to authorize connections.'\n");
+    fprintf(f,"  Echo '(See manual for xhost for security issues)'\n");
+    fprintf(f,"  exit 1\n");
+    fprintf(f,"fi\n");
   }
   
-  xstr_printf(ibuf,"if test ! -x %s; then\n",arg_nodeprog_r);
-  xstr_printf(ibuf,"  echo 'Cannot locate this node-program:'\n");
-  xstr_printf(ibuf,"  echo '%s'\n",arg_nodeprog_r);
-  xstr_printf(ibuf,"  test -f /bin/sync && /bin/sync\n");
-  xstr_printf(ibuf,"  exit 1\n");
-  xstr_printf(ibuf,"fi\n");
+  fprintf(f,"if test ! -x %s\nthen\n",arg_nodeprog_r);
+  fprintf(f,"  Echo 'Cannot locate this node-program:'\n");
+  fprintf(f,"  Echo '%s'\n",arg_nodeprog_r);
+  fprintf(f,"  exit 1\n");
+  fprintf(f,"fi\n");
   
-  xstr_printf(ibuf,"cd %s\n",arg_currdir_r);
-  xstr_printf(ibuf,"if test $? = 1; then\n");
-  xstr_printf(ibuf,"  echo 'Cannot propagate this current directory:'\n"); 
-  xstr_printf(ibuf,"  echo '%s'\n",arg_currdir_r);
-  xstr_printf(ibuf,"  test -f /bin/sync && /bin/sync\n");
-  xstr_printf(ibuf,"  exit 1\n");
-  xstr_printf(ibuf,"fi\n");
+  fprintf(f,"cd %s\n",arg_currdir_r);
+  fprintf(f,"if test $? = 1\nthen\n");
+  fprintf(f,"  Echo 'Cannot propagate this current directory:'\n"); 
+  fprintf(f,"  Echo '%s'\n",arg_currdir_r);
+  fprintf(f,"  exit 1\n");
+  fprintf(f,"fi\n");
   
   if (strcmp(nodetab_setup(nodeno),"*")) {
-    xstr_printf(ibuf,"cd .\n");
-    xstr_printf(ibuf,"%s\n",nodetab_setup(nodeno));
-    xstr_printf(ibuf,"if test $? = 1; then\n");
-    xstr_printf(ibuf,"  echo 'this initialization command failed:'\n");
-    xstr_printf(ibuf,"  echo '\"%s\"'\n",nodetab_setup(nodeno));
-    xstr_printf(ibuf,"  echo 'edit your nodes file to fix it.'\n");
-    xstr_printf(ibuf,"  test -f /bin/sync && /bin/sync\n");
-    xstr_printf(ibuf,"  exit 1\n");
-    xstr_printf(ibuf,"fi\n");
+    fprintf(f,"%s\n",nodetab_setup(nodeno));
+    fprintf(f,"if test $? = 1\nthen\n");
+    fprintf(f,"  Echo 'this initialization command failed:'\n");
+    fprintf(f,"  Echo '\"%s\"'\n",nodetab_setup(nodeno));
+    fprintf(f,"  Echo 'edit your nodes file to fix it.'\n");
+    fprintf(f,"  exit 1\n");
+    fprintf(f,"fi\n");
   }
 
-  if(arg_verbose) xstr_printf(ibuf,"echo 'starting node-program...'\n");  
+  if(arg_verbose) fprintf(f,"Echo 'starting node-program...'\n");  
   if (arg_debug || arg_debug_no_pause ) {
 	 if ( strcmp(dbg, "gdb") == 0 ) {
-           xstr_printf(ibuf,"cat > /tmp/gdb%08x << END_OF_SCRIPT\n",randno);
-           xstr_printf(ibuf,"shell /bin/rm -f /tmp/gdb%08x\n",randno);
-           xstr_printf(ibuf,"handle SIGPIPE nostop noprint\n");
-           xstr_printf(ibuf,"handle SIGWINCH nostop noprint\n");
-           xstr_printf(ibuf,"handle SIGWAITING nostop noprint\n");
-           xstr_printf(ibuf,"set args");
-           while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
-           xstr_printf(ibuf,"\n");
-           if (arg_debug_no_pause) xstr_printf(ibuf,"run\n");
-           xstr_printf(ibuf,"END_OF_SCRIPT\n");
-           if( arg_debug || arg_debug_no_pause){
-             xstr_printf(ibuf,"$F_XTERM");
-             xstr_printf(ibuf," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-             xstr_printf(ibuf," -e $F_DBG %s -x /tmp/gdb%08x",arg_nodeprog_r,randno);
-             xstr_printf(ibuf," < /dev/null 2> /dev/null &");
-             xstr_printf(ibuf,"\n");
-           }
-        } else if ( strcmp(dbg, "dbx") == 0 ) {
-          xstr_printf(ibuf,"cat > /tmp/dbx%08x << END_OF_SCRIPT\n",randno);
-          xstr_printf(ibuf,"sh /bin/rm -f /tmp/dbx%08x\n",randno);
-          xstr_printf(ibuf,"dbxenv suppress_startup_message 5.0\n");
-          xstr_printf(ibuf,"ignore SIGPOLL\n");
-          xstr_printf(ibuf,"ignore SIGPIPE\n");
-          xstr_printf(ibuf,"ignore SIGWINCH\n");
-          xstr_printf(ibuf,"ignore SIGWAITING\n");
-          xstr_printf(ibuf,"END_OF_SCRIPT\n");
-          if( arg_debug || arg_debug_no_pause){
-            xstr_printf(ibuf,"$F_XTERM");
-            xstr_printf(ibuf," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-            xstr_printf(ibuf," -e $F_DBG %s ",arg_debug_no_pause?"-r":"");
-	    if(arg_debug) {
-              xstr_printf(ibuf,"-c \'runargs ");
-              while (*argv) { xstr_printf(ibuf,"%s ",*argv); argv++; }
-              xstr_printf(ibuf,"\' ");
-	    }
-	    xstr_printf(ibuf, "-s/tmp/dbx%08x %s",randno,arg_nodeprog_r);
-	    if(arg_debug_no_pause) {
-              while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
-	    }
-            xstr_printf(ibuf," < /dev/null 2> /dev/null &");
-            xstr_printf(ibuf,"\n");
-          }
-	} else { 
+           fprintf(f,"cat > /tmp/gdb%08x << END_OF_SCRIPT\n",randno);
+           fprintf(f,"shell /bin/rm -f /tmp/gdb%08x\n",randno);
+           fprintf(f,"handle SIGPIPE nostop noprint\n");
+           fprintf(f,"handle SIGWINCH nostop noprint\n");
+           fprintf(f,"handle SIGWAITING nostop noprint\n");
+           fprintf(f,"set args");
+           fprint_arg(f,argv);
+           fprintf(f,"\n");
+           if (arg_debug_no_pause) fprintf(f,"run\n");
+           fprintf(f,"END_OF_SCRIPT\n");
+           fprintf(f,"$F_XTERM");
+           fprintf(f," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
+           fprintf(f," -e $F_DBG %s -x /tmp/gdb%08x"CLOSE_ALL"\n",
+           	arg_nodeprog_r,randno);
+         } else if ( strcmp(dbg, "dbx") == 0 ) {
+           fprintf(f,"cat > /tmp/dbx%08x << END_OF_SCRIPT\n",randno);
+           fprintf(f,"sh /bin/rm -f /tmp/dbx%08x\n",randno);
+           fprintf(f,"dbxenv suppress_startup_message 5.0\n");
+           fprintf(f,"ignore SIGPOLL\n");
+           fprintf(f,"ignore SIGPIPE\n");
+           fprintf(f,"ignore SIGWINCH\n");
+           fprintf(f,"ignore SIGWAITING\n");
+           fprintf(f,"END_OF_SCRIPT\n");
+           fprintf(f,"$F_XTERM");
+           fprintf(f," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
+           fprintf(f," -e $F_DBG %s ",arg_debug_no_pause?"-r":"");
+	   if(arg_debug) {
+              fprintf(f,"-c \'runargs ");
+              fprint_arg(f,argv);
+              fprintf(f,"\' ");
+	   }
+	   fprintf(f, "-s/tmp/dbx%08x %s",randno,arg_nodeprog_r);
+	   if(arg_debug_no_pause) 
+              fprint_arg(f,argv);
+           fprintf(f,CLOSE_ALL "\n");
+	 } else { 
 	  fprintf(stderr, "Unknown debugger: %s.\n Exiting.\n", 
 	    nodetab_debugger(nodeno));
-	  exit(1);
-	}
+	 }
   } else if (arg_in_xterm) {
-    if(arg_verbose) {
+    if(arg_verbose)
       fprintf(stderr, "Charmrun> node %d: xterm is %s\n", 
               nodeno, nodetab_xterm(nodeno));
-    }
-    xstr_printf(ibuf,"cat > /tmp/inx%08x << END_OF_SCRIPT\n", randno);
-    xstr_printf(ibuf,"#!/bin/sh\n");
-    xstr_printf(ibuf,"/bin/rm -f /tmp/inx%08x\n",randno);
-    xstr_printf(ibuf,"%s", arg_nodeprog_r);
-    while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
-    xstr_printf(ibuf,"\n");
-    xstr_printf(ibuf,"echo 'program exited with code '\\$?\n");
-    xstr_printf(ibuf,"read eoln\n");
-    xstr_printf(ibuf,"END_OF_SCRIPT\n");
-    xstr_printf(ibuf,"chmod 700 /tmp/inx%08x\n", randno);
-    xstr_printf(ibuf,"$F_XTERM");
-    xstr_printf(ibuf," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-    xstr_printf(ibuf," -sl 5000");
-    xstr_printf(ibuf," -e /tmp/inx%08x", randno);
-    xstr_printf(ibuf," < /dev/null 2> /dev/null &");
-    xstr_printf(ibuf,"\n");
+    fprintf(f,"cat > /tmp/inx%08x << END_OF_SCRIPT\n", randno);
+    fprintf(f,"#!/bin/sh\n");
+    fprintf(f,"/bin/rm -f /tmp/inx%08x\n",randno);
+    fprintf(f,"%s", arg_nodeprog_r);
+    fprint_arg(f,argv);
+    fprintf(f,"\n");
+    fprintf(f,"echo 'program exited with code '\\$?\n");
+    fprintf(f,"read eoln\n");
+    fprintf(f,"END_OF_SCRIPT\n");
+    fprintf(f,"chmod 700 /tmp/inx%08x\n", randno);
+    fprintf(f,"$F_XTERM -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
+    fprintf(f," -sl 5000");
+    fprintf(f," -e /tmp/inx%08x", randno);
+    fprintf(f,CLOSE_ALL "\n");
   } else {
-    xstr_printf(ibuf,"%s",arg_nodeprog_r);
-    while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
-    xstr_printf(ibuf," < /dev/null 2> /dev/null &");
-    xstr_printf(ibuf,"\n");
+    fprintf(f,"%s",arg_nodeprog_r);
+    fprint_arg(f,argv);
+    fprintf(f,CLOSE_ALL "\n");
   }
-  
-  xstr_printf(ibuf,"echo 'rsh phase successful.'\n");
-  xstr_printf(ibuf,"test -f /bin/sync && /bin/sync\n");
-  xstr_printf(ibuf,"exit 0\n");
-  prog_flush(p);
-  
-}
-
-#if CMK_CONV_HOST_WANT_CSH
-void rsh_pump_csh(p, nodeno, rank0no, argv)
-    prog p; int nodeno, rank0no; char **argv;
-{
-  char *netstart;
-  char *arg_nodeprog_r,*arg_currdir_r;
-  char *dbg=nodetab_debugger(nodeno);
-  xstr ibuf = p->ibuf;
-  int randno = rand();
-  /* int randno = CrnRand(); */
-  
-  xstr_printf(ibuf,"echo 'remote responding...'\n");
-
-  xstr_printf(ibuf,"if ( -x ~/.charmrunrc )   source ~/.charmrunrc\n");
-  if (arg_display)
-    xstr_printf(ibuf,"setenv DISPLAY %s\n",arg_display);
-  netstart = create_netstart(rank0no);
-  xstr_printf(ibuf,"setenv NETSTART '%s'\n",netstart);
-  prog_flush(p);
-
-  if (arg_verbose) {
-    printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, rank0no);
-  }
-
-  /* find the node-program */
-  arg_nodeprog_r = pathfix(arg_nodeprog_a, nodetab_pathfixes(nodeno));
-  
-  /* find the current directory, relative version */
-  arg_currdir_r = pathfix(arg_currdir_a, nodetab_pathfixes(nodeno));
-
-  if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
-    xstr_printf(ibuf,"foreach dir ($path)\n");
-    xstr_printf(ibuf,"  if (-e $dir/%s) setenv F_XTERM $dir/%s\n", 
-                     nodetab_xterm(nodeno), nodetab_xterm(nodeno));
-    xstr_printf(ibuf,"  if (-e $dir/xrdb) setenv F_XRDB $dir/xrdb\n");
-    xstr_printf(ibuf,"end\n");
-    xstr_printf(ibuf,"if ($?F_XTERM == 0) then\n");
-    xstr_printf(ibuf,"   echo '%s not in path --- set your path in your cshrc.'\n", nodetab_xterm(nodeno));
-    xstr_printf(ibuf,"   exit 1\n");
-    xstr_printf(ibuf,"endif\n");
-    xstr_printf(ibuf,"if ($?F_XRDB == 0) then\n");
-    xstr_printf(ibuf,"   echo 'xrdb not in path - set your path in your cshrc.'\n");
-    xstr_printf(ibuf,"   exit 1\n");
-    xstr_printf(ibuf,"endif\n");
-    if(arg_verbose) xstr_printf(ibuf,"echo 'using xterm' $F_XTERM\n");
-    prog_flush(p);
-  }
-
-  if (arg_debug || arg_debug_no_pause)
-  	{
-	  xstr_printf(ibuf,"foreach dir ($path)\n");
-          xstr_printf(ibuf,"  if (-e $dir/%s) setenv F_DBG $dir/%s\n",dbg,dbg);
-          xstr_printf(ibuf,"end\n");
-          xstr_printf(ibuf,"if ($?F_DBG == 0) then\n");
-          xstr_printf(ibuf,"   echo '%s not in path - set your path in your cshrc.'\n",dbg);
-          xstr_printf(ibuf,"   exit 1\n");
-          xstr_printf(ibuf,"endif\n");
-          if(arg_verbose) xstr_printf(ibuf,"echo 'using debugger' $F_DBG\n");
-          prog_flush(p);
-       }
-
-  if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
-    xstr_printf(ibuf,"xrdb -query > /dev/null\n");
-    xstr_printf(ibuf,"if ($status != 0) then\n");
-    xstr_printf(ibuf,"  echo 'Cannot contact X Server '$DISPLAY'.  You probably'\n");
-    xstr_printf(ibuf,"  echo 'need to run xhost to authorize connections.'\n");
-    xstr_printf(ibuf,"  echo '(See manual for xhost for security issues)'\n");
-    xstr_printf(ibuf,"  exit 1\n");
-    xstr_printf(ibuf,"endif\n");
-    prog_flush(p);
-  }
-  
-  xstr_printf(ibuf,"if (! -x %s) then\n",arg_nodeprog_r);
-  xstr_printf(ibuf,"  echo 'Cannot locate this node-program:'\n");
-  xstr_printf(ibuf,"  echo '%s'\n",arg_nodeprog_r);
-  xstr_printf(ibuf,"  exit 1\n");
-  xstr_printf(ibuf,"endif\n");
-  
-  xstr_printf(ibuf,"cd %s\n",arg_currdir_r);
-  xstr_printf(ibuf,"if ($status == 1) then\n");
-  xstr_printf(ibuf,"  echo 'Cannot propagate this current directory:'\n"); 
-  xstr_printf(ibuf,"  echo '%s'\n",arg_currdir_r);
-  xstr_printf(ibuf,"  exit 1\n");
-  xstr_printf(ibuf,"endif\n");
-  
-  if (strcmp(nodetab_setup(nodeno),"*")) {
-    xstr_printf(ibuf,"cd .\n");
-    xstr_printf(ibuf,"%s\n",nodetab_setup(nodeno));
-    xstr_printf(ibuf,"if ($status == 1) then\n");
-    xstr_printf(ibuf,"  echo 'this initialization command failed:'\n");
-    xstr_printf(ibuf,"  echo '\"%s\"'\n",nodetab_setup(nodeno));
-    xstr_printf(ibuf,"  echo 'edit your nodes file to fix it.'\n");
-    xstr_printf(ibuf,"  exit 1\n");
-    xstr_printf(ibuf,"endif\n");
-  }
-
-  if(arg_verbose) xstr_printf(ibuf,"echo 'starting node-program...'\n");  
-  if (arg_debug || arg_debug_no_pause ) {
-	 if ( strcmp(dbg, "gdb") == 0 ) {
-           xstr_printf(ibuf,"cat > /tmp/gdb%08x << END_OF_SCRIPT\n",randno);
-           xstr_printf(ibuf,"shell rm -f /tmp/gdb%08x\n",randno);
-           xstr_printf(ibuf,"handle SIGPIPE nostop noprint\n");
-           xstr_printf(ibuf,"handle SIGWINCH nostop noprint\n");
-           xstr_printf(ibuf,"handle SIGWAITING nostop noprint\n");
-           xstr_printf(ibuf,"set args");
-           while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
-           xstr_printf(ibuf,"\n");
-           if (arg_debug_no_pause) xstr_printf(ibuf,"run\n");
-           xstr_printf(ibuf,"END_OF_SCRIPT\n");
-           if( arg_debug || arg_debug_no_pause){
-             xstr_printf(ibuf,"$F_XTERM");
-             xstr_printf(ibuf," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-             xstr_printf(ibuf," -e $F_DBG %s -x /tmp/gdb%08x",arg_nodeprog_r,randno);
-             xstr_printf(ibuf," < /dev/null >& /dev/null &");
-             xstr_printf(ibuf,"\n");
-           }
-        } else if ( strcmp(dbg, "dbx") == 0 ) {
-          xstr_printf(ibuf,"cat > /tmp/dbx%08x << END_OF_SCRIPT\n",randno);
-          xstr_printf(ibuf,"sh rm -f /tmp/dbx%08x\n",randno);
-          xstr_printf(ibuf,"dbxenv suppress_startup_message 5.0\n");
-          xstr_printf(ibuf,"ignore SIGPOLL\n");
-          xstr_printf(ibuf,"ignore SIGPIPE\n");
-          xstr_printf(ibuf,"ignore SIGWINCH\n");
-          xstr_printf(ibuf,"ignore SIGWAITING\n");
-          xstr_printf(ibuf,"END_OF_SCRIPT\n");
-          if( arg_debug || arg_debug_no_pause){
-            xstr_printf(ibuf,"$F_XTERM");
-            xstr_printf(ibuf," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-            xstr_printf(ibuf," -e $F_DBG %s ",arg_debug_no_pause?"-r":"");
-	    if(arg_debug) {
-              xstr_printf(ibuf,"-c \'runargs ");
-              while (*argv) { xstr_printf(ibuf,"%s ",*argv); argv++; }
-              xstr_printf(ibuf,"\' ");
-	    }
-	    xstr_printf(ibuf, "-s/tmp/dbx%08x %s",randno,arg_nodeprog_r);
-	    if(arg_debug_no_pause) {
-              while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
-	    }
-            xstr_printf(ibuf," < /dev/null >& /dev/null &");
-            xstr_printf(ibuf,"\n");
-          }
-	} else { 
-	  fprintf(stderr, "Unknown debugger: %s.\n Exiting.\n", 
-	    nodetab_debugger(nodeno));
-	  exit(1);
-	}
-  } else if (arg_in_xterm) {
-    if(arg_verbose) {
-      fprintf(stderr, "Charmrun> node %d: xterm is %s\n", 
-              nodeno, nodetab_xterm(nodeno));
-    }
-    xstr_printf(ibuf,"cat > /tmp/inx%08x << END_OF_SCRIPT\n", randno);
-    xstr_printf(ibuf,"#!/bin/sh\n");
-    xstr_printf(ibuf,"rm -f /tmp/inx%08x\n",randno);
-    xstr_printf(ibuf,"%s", arg_nodeprog_r);
-    while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
-    xstr_printf(ibuf,"\n");
-    xstr_printf(ibuf,"echo 'program exited with code '\\$?\n");
-    xstr_printf(ibuf,"read eoln\n");
-    xstr_printf(ibuf,"END_OF_SCRIPT\n");
-    xstr_printf(ibuf,"chmod 700 /tmp/inx%08x\n", randno);
-    xstr_printf(ibuf,"$F_XTERM");
-    xstr_printf(ibuf," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-    xstr_printf(ibuf," -sl 5000");
-    xstr_printf(ibuf," -e /tmp/inx%08x", randno);
-    xstr_printf(ibuf," < /dev/null >& /dev/null &");
-    xstr_printf(ibuf,"\n");
-  } else {
-    xstr_printf(ibuf,"%s",arg_nodeprog_r);
-    while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
-    xstr_printf(ibuf," < /dev/null >& /dev/null &");
-    xstr_printf(ibuf,"\n");
-  }
-  
-    xstr_printf(ibuf,"echo 'rsh phase successful.'\n");
-    xstr_printf(ibuf,"exit 0\n");
-  prog_flush(p);
-  
-}
-#endif
-
-
-void rsh_pump(p, nodeno, rank0no, argv)
-    prog p; int nodeno, rank0no; char **argv;
-{
-#if CMK_CONV_HOST_WANT_CSH
-  rsh_pump_csh(p, nodeno, rank0no, argv);
-#else
-  rsh_pump_sh(p, nodeno, rank0no, argv);
-#endif
+  if (arg_verbose) fprintf(f,"Echo 'rsh phase successful.'\n");
+  fprintf(f,"exit 0\n");
 }
 
 void start_nodes_rsh()
 {
-  prog        rsh_prog[200];
-  int         rsh_node[200];
-  int         rsh_nstarted;
-  int         rsh_nfinished;
-  int         rsh_maxsim;
-  fd_set rfds; int i; prog p; int pe;
-
-
-  /* Return immediately.  That way, the nodes which are starting */
-  /* Will be able to establish communication with the host */
-  /* if (fork()) return; */
-
-  /* Obtain the values from the command line options */
-  rsh_maxsim = arg_maxrsh;
-  if (rsh_maxsim < 1) rsh_maxsim=1;
-  if (rsh_maxsim > nodetab_rank0_size) rsh_maxsim=nodetab_rank0_size;
-  if (rsh_maxsim > 200) rsh_maxsim=200;
-
-  /* start initial group of rsh's */
-  for (i=0; i<rsh_maxsim; i++) {
-    pe = nodetab_rank0_table[i];
-    p = rsh_start(pe);
-    if (p==0) { rsh_maxsim=i; break; }
-    rsh_pump(p, pe, i, arg_argv);
-    rsh_prog[i] = p;
-    rsh_node[i] = pe;
+  int rank0no;
+  int *pids=(int *)malloc(sizeof(int)*nodetab_rank0_size);
+  /*Start up the user program, by sending a message
+  to PE 0 on each node.*/
+  for (rank0no=0;rank0no<nodetab_rank0_size;rank0no++)
+  {
+     int pe=nodetab_rank0_table[rank0no];
+     FILE *f;
+     char startScript[200];
+     sprintf(startScript,"/tmp/charmrun.%d.%d",getpid(),pe);
+     f=fopen(startScript,"w");
+     rsh_script(f,pe,rank0no,arg_argv);
+     fclose(f);
+     pids[rank0no]=rsh_start(pe,startScript);
   }
-  if (rsh_maxsim==0) { perror("ERROR> starting rsh"); exit(1); }
-  rsh_nstarted = rsh_maxsim;
-  rsh_nfinished = 0;
-
-  while (rsh_nfinished < nodetab_rank0_size) {
-    int maxfd=0; int ok;
-    FD_ZERO(&rfds);
-    for (i=0; i<rsh_maxsim; i++) {
-      p = rsh_prog[i];
-      if (p==0) continue;
-      FD_SET(p->ofd, &rfds);
-      if (p->ofd > maxfd) maxfd = p->ofd;
-    }
-    do ok = select(maxfd+1, &rfds, NULL, NULL, NULL);
-    while ((ok<0)&&(errno==EINTR));
-    if (ok<0) { perror("ERROR> select"); exit(1); }
-    do ok = waitpid((pid_t)(-1), NULL, WNOHANG);
-    while (ok>0);
-    for (i=0; i<rsh_maxsim; i++) {
-      char *line = 0;
-      char buffer[1000];
-      int nread, done = 0;
-      p = rsh_prog[i];
-      if (p==0) continue;
-      if (!FD_ISSET(p->ofd, &rfds)) continue;
-      do nread = read(p->ofd, buffer, 1000);
-      while ((nread<0)&&(errno==EINTR));
-      if (nread<0) { perror("ERROR> read"); exit(1); }
-      if (nread==0) {
-        fprintf(stderr,"ERROR> node %d: rsh phase failed.\n",rsh_node[i]);
-        exit(1);
-      }
-      xstr_write(p->obuf, buffer, nread);
-      while (1) {
-        line = xstr_gets(buffer, 999, p->obuf);
-        if (line==0) break;
-          if (strncmp(line,"[1] ",4)==0) continue;
-          if (arg_verbose ||
-              (strcmp(line,"rsh phase successful.")
-               &&strcmp(line,"remote responding...")))
-            fprintf(stderr,"Charmrun> node %d: %s\n",rsh_node[i],line);
-          if (strcmp(line,"rsh phase successful.")==0) { done=1; break; }
-      }
-      if (!done) continue;
-      rsh_nfinished++;
-
-      prog_close(rsh_prog[i]);
-      rsh_prog[i] = 0;
-      if (rsh_nstarted==nodetab_rank0_size) break;
-      pe = nodetab_rank0_table[rsh_nstarted];
-      p = rsh_start(pe);
-      if (p==0) { perror("ERROR> starting rsh"); exit(1); }
-      rsh_pump(p, pe, rsh_nstarted, arg_argv);
-      rsh_prog[i] = p;
-      rsh_node[i] = pe;
-      rsh_nstarted++;
-    }
+  /*Now wait for all the rsh'es to finish*/
+  for (rank0no=0;rank0no<nodetab_rank0_size;rank0no++)
+  {
+     const char *host=nodetab_name(nodetab_rank0_table[rank0no]);
+     int status=0;
+     if (arg_verbose) printf("Charmrun> waiting for rsh (%s:%d)\n",host,rank0no);
+     do {
+     	waitpid(pids[rank0no],&status,0);
+     } while (!WIFEXITED(status));
+     if (WEXITSTATUS(status)!=0)
+     {
+     	fprintf(stderr,"Charmrun> Error %d returned from rsh (%s:%d)\n",
+     		WEXITSTATUS(status),host,rank0no);
+     	exit(1);
+     }
   }
+  free(pids);
 }
 
 
@@ -2633,3 +2032,7 @@ void start_nodes_local(char ** env)
 }
 
 #endif /*CMK_USE_RSH*/
+
+
+
+
