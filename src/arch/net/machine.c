@@ -795,7 +795,7 @@ static void CmiPushPE(int pe,void *msg)
   CmiState cs=CmiGetStateN(pe);
   MACHSTATE1(2,"Pushing message into %d's queue",pe);
 #if CMK_IMMEDIATE_MSG
-  if (CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0)) {
+  if (CpvAccess(CmiImmediateMsgHandlerIdx) && (CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0))) {
     CdsFifo_Enqueue(CsvAccess(NodeState).imm, msg);
     return;
   }
@@ -1691,7 +1691,7 @@ void CmiHandleImmediate()
    while (!CdsFifo_Empty(CsvAccess(NodeState).imm)) {
      void *msg = CdsFifo_Dequeue(CsvAccess(NodeState).imm);
 /*CmiPrintf("[%d] CmiHandleMessage\n", CmiMyNode());*/
-     CmiHandleMessage(msg);
+     CmiCommHandleMessage(msg);
 /*CmiPrintf("[%d] CmiHandleMessage done\n", CmiMyNode());*/
    }
 }
