@@ -646,3 +646,105 @@ where {\em foo} is the strategy name.  Compile it in the form of library
 under charm/lib, named as {\em libcldb-foo.a}, where {\em foo} is the strategy 
 name used above. Now one can use {\bf -balance foo} as compile time option
 to {\bf charmc} to link with the {\em foo} seed load balancer.
+
+\subsubsection{Simple Load Balancer Usage Example - Automatic with Sync LB}
+\label{lbexample}
+A simple example of how to use a load balancer in sync mode in one's application is presented below.
+
+\begin{verbatim}
+/*** lbexample.ci ***/
+mainmodule lbexample {
+  readonly CProxy_Main mainProxy;
+  readonly int nElements;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void done(void);
+  };
+
+  array [1D] LBExample {
+    entry LBExample(void);
+    entry void doWork();
+  };
+};
+\end{verbatim}
+----------------------------------------------------------------------------------------------------------
+\begin{verbatim}
+/*** lbexample.C ***/
+#include <stdio.h>
+#include "lbexample.decl.h"
+
+/*readonly*/ CProxy_Main mainProxy;
+/*readonly*/ int nElements;
+
+#define MAX_WORK_CNT 50
+#define LB_INTERVAL 5
+
+/*mainchare*/
+class Main : public Chare
+{
+private:
+  int count;
+public:
+  Main(CkArgMsg* m)
+  {
+    /*....Initialization....*/
+    mainProxy = thishandle;
+    CProxy_LBExample arr = CProxy_LBExample::ckNew(nElements);
+    arr.doWork();
+  };
+
+  void done(void)
+  {
+    count++;
+    if(count==nElements){
+      CkPrintf("All done\n");
+      CkExit();
+    }
+  };
+};
+
+/*array [1D]*/
+class LBExample : public CBase_LBExample
+{
+private:
+  int workcnt;
+public:
+  LBExample()
+  {
+    workcnt=0;
+    /* May initialize some variables to be used in doWork */
+    //Must be set to CmiTrue to make AtSync work
+    usesAtSync=CmiTrue;
+  }
+
+  LBExample(CkMigrateMessage *m) { /* Migration constructor -- invoked when chare migrates */ }
+  
+  /* Must be written for migration to succeed */
+  void pup(PUP::er &p){
+    CBase_LBExample::pup(p);
+    p|workcnt;
+    /* There may be some more variables used in doWork */
+  }
+	
+  void doWork()
+  {
+    /* Do work proportional to the chare index to see the effects of LB */
+    
+    workcnt++;
+    if(workcnt==MAX_WORK_CNT)
+      mainProxy.done();
+    
+    if(workcnt%LB_INTERVAL==0)
+      AtSync();
+    else
+      doWork();
+  }
+  
+  void ResumeFromSync(){
+    doWork();
+  }
+};
+
+#include "lbexample.def.h"
+\end{verbatim}
