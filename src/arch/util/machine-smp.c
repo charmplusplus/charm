@@ -18,6 +18,7 @@ CmiIdleLock_checkMessage
 #include "machine-smp.h"
 
 void CmiStateInit(int pe, int rank, CmiState state);
+void CommunicationServerInit();
 
 /******************************************************************************
  *
@@ -149,6 +150,7 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
   if (index<Cmi_mynodesize)
 	  ConverseRunPE(0); /*Regular worker thread*/
   else { /*Communication thread*/
+	  CommunicationServerInit();
 	  if (Cmi_charmrun_fd!=-1)
 		  while (1) CommunicationServer(5);
   } 
@@ -204,7 +206,8 @@ static void CmiStartThreads(char **argv)
   for (i=0; i<Cmi_mynodesize; i++)
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
   /*Create a fake state structure for the comm. thread*/
-  CmiStateInit(-1,Cmi_mynodesize,CmiGetStateN(Cmi_mynodesize));
+/*  CmiStateInit(-1,Cmi_mynodesize,CmiGetStateN(Cmi_mynodesize)); */
+  CmiStateInit(Cmi_mynode+CmiNumPes(),Cmi_mynodesize,CmiGetStateN(Cmi_mynodesize));
   
   for (i=1; i<=Cmi_mynodesize; i++) {
     if((thr = CreateThread(NULL, 0, call_startfn, (LPVOID)i, 0, &threadID)) 
@@ -312,13 +315,13 @@ static void *call_startfn(void *vindex)
 	  ConverseRunPE(0); /*Regular worker thread*/
   else 
   { /*Communication thread*/
+	  CommunicationServerInit();
 	  if (Cmi_charmrun_fd!=-1)
 		  while (1) CommunicationServer(5);
   }
   
   return 0;
 }
-
 
 static void CmiStartThreads(char **argv)
 {
@@ -335,7 +338,8 @@ static void CmiStartThreads(char **argv)
   for (i=0; i<Cmi_mynodesize; i++)
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
   /*Create a fake state structure for the comm. thread*/
-  CmiStateInit(-1,Cmi_mynodesize,CmiGetStateN(Cmi_mynodesize));
+/*  CmiStateInit(-1,Cmi_mynodesize,CmiGetStateN(Cmi_mynodesize)); */
+  CmiStateInit(Cmi_mynode+CmiNumPes(),Cmi_mynodesize,CmiGetStateN(Cmi_mynodesize));
 
   for (i=1; i<=Cmi_mynodesize; i++) {
     pthread_attr_init(&attr);
@@ -462,7 +466,7 @@ void CmiStateInit(int pe, int rank, CmiState state)
 {
   state->pe = pe;
   state->rank = rank;
-  if (pe==-1) return; /* Communications thread */
+  if (rank==Cmi_mynodesize) return; /* Communications thread */
   state->recv = PCQueueCreate();
   state->localqueue = CdsFifo_Create();
   CmiIdleLock_init(&state->idle);
