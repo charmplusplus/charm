@@ -569,7 +569,8 @@ the largest usable free region on the machine.
 static int find_largest_free_region(memRegion_t *destRegion) {
     char *staticData =(char *) __static_data_loc();
     char *code = (char *)&find_free_region;
-    char *codeDll = (char *)&errno;
+    char *threadData = (char *)&errno;
+    char *codeDll = (char *)fprintf;
     char *heapLil = (char*) malloc(1);
     char *heapBig = (char*) malloc(6*meg);
     char *stack = (char *)__cur_stack_frame();
@@ -604,6 +605,9 @@ static int find_largest_free_region(memRegion_t *destRegion) {
 
     regions[7].type="Result of a non-fixed call to mmap";
     regions[7].start=mmapAny; regions[7].len=1u*gig; 
+
+    regions[8].type="Thread private data";
+    regions[8].start=threadData; regions[8].len=256u*meg; 
 
     _MEMCHECK(heapBig); free(heapBig);
     _MEMCHECK(heapLil); free(heapLil); 
