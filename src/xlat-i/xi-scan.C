@@ -364,9 +364,9 @@ static char *yy_last_accepting_cpos;
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
 char *yytext;
-#line 1 "xi-scan.l"
+#line 1 "xi-scan.flex"
 #define INITIAL 0
-#line 3 "xi-scan.l"
+#line 3 "xi-scan.flex"
 
 #include "xi-symbol.h"
 #include "xi-parse.tab.h"
@@ -388,6 +388,7 @@ static int check_name(char *);
 #ifdef yywrap
 #undef yywrap
 #endif
+#line 392 "lex.yy.c"
 
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
@@ -538,8 +539,9 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
 
-#line 47 "xi-scan.l"
+#line 47 "xi-scan.flex"
 
+#line 545 "lex.yy.c"
 
 	if ( yy_init )
 		{
@@ -624,44 +626,45 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 48 "xi-scan.l"
+#line 48 "xi-scan.flex"
 { /* ignore single line comments */ }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 49 "xi-scan.l"
+#line 49 "xi-scan.flex"
 { in_comment = TRUE; /* Single line C-style comments */ }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 50 "xi-scan.l"
+#line 50 "xi-scan.flex"
 { in_comment = FALSE; }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 51 "xi-scan.l"
+#line 51 "xi-scan.flex"
 { /* ignore white space */ }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 52 "xi-scan.l"
+#line 52 "xi-scan.flex"
 { lineno++; /* Return Token(NL); */ }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 53 "xi-scan.l"
+#line 53 "xi-scan.flex"
 { Return Token(check_name(yytext)); }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 54 "xi-scan.l"
+#line 54 "xi-scan.flex"
 { Return Token(yytext[0]); }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 55 "xi-scan.l"
+#line 55 "xi-scan.flex"
 ECHO;
 	YY_BREAK
+#line 668 "lex.yy.c"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -1537,7 +1540,7 @@ int main()
 	return 0;
 	}
 #endif
-#line 55 "xi-scan.l"
+#line 55 "xi-scan.flex"
 
 
 /* {nl}/{nl}	{ lineno++; } */
@@ -1547,7 +1550,7 @@ struct rwtable {
 
 /* Reserved word table */
 struct rwtable rwtable[] = {
-	"",		9,
+	"",		10,
 /* MUST BE IN SORTED ORDER */
 	"boc",		BOC,
 	"chare",	CHARE,
@@ -1555,6 +1558,7 @@ struct rwtable rwtable[] = {
 	"extern",	EXTERN,
 	"group",	BOC,
 	"message",	MESSAGE,
+	"packmessage",	PACKMESSAGE,
 	"readonly",	READONLY,
 	"table",	TABLE,
 	"threaded",	THREADED,
