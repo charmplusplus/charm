@@ -32,6 +32,8 @@ doc:
 	/bin/cp manual.pdf $(DOCDIR)/pdf/ck.pdf
 	/bin/rm -rf $(DOCDIR)/html/ck
 	/bin/cp -R manual $(DOCDIR)/html/ck
+	find $(WEBDIR) -type f -exec chmod 664 {} \;
+	find $(WEBDIR) -type d -exec chmod 775 {} \;
 
 web:
 	make all

@@ -39,6 +39,8 @@ web:
 	/bin/cp manual.pdf $(WEBDIR)/pdf/convext.pdf
 	/bin/rm -rf $(WEBDIR)/html/convext
 	/bin/cp -R manual $(WEBDIR)/html/convext
+	find $(WEBDIR) -type f -exec chmod 664 {} \;
+	find $(WEBDIR) -type d -exec chmod 775 {} \;
 
 clean:
 	/bin/rm -f *.ps *.pdf *.ilg *.aux *.log *.dvi *.idx *.toc 

@@ -39,6 +39,8 @@ web:
 	/bin/cp manual.pdf $(WEBDIR)/pdf/charm++.pdf
 	/bin/rm -rf $(WEBDIR)/html/charm++
 	/bin/cp -R manual $(WEBDIR)/html/charm++
+	find $(WEBDIR) -type f -exec chmod 664 {} \;
+	find $(WEBDIR) -type d -exec chmod 775 {} \;
 
 clean:
 	/bin/rm -f *.ps *.pdf *.ilg *.aux *.log *.dvi *.idx *.toc 

@@ -39,6 +39,8 @@ web:
 	/bin/cp manual.pdf $(WEBDIR)/pdf/install.pdf
 	/bin/rm -rf $(WEBDIR)/html/install
 	/bin/cp -R manual $(WEBDIR)/html/install
+	find $(WEBDIR) -type f -exec chmod 664 {} \;
+	find $(WEBDIR) -type d -exec chmod 775 {} \;
 
 clean:
 	/bin/rm -f *.ps *.pdf *.ilg *.aux *.log *.dvi *.idx *.toc 
