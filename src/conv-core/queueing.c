@@ -17,7 +17,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.2  1995-07-24 01:56:42  jyelon
+ * Revision 1.3  1995-10-12 18:14:52  jyelon
+ * removed obsolete test program.
+ *
+ * Revision 1.2  1995/07/24  01:56:42  jyelon
  * *** empty log message ***
  *
  * Revision 1.1  1995/07/18  19:31:34  jyelon
@@ -427,31 +430,4 @@ Queue q;
 {
   return CqsGetPriority(q);
 }
-
-#if 0
-#include <stdio.h>
-test1()
-{
-  char line[1000];
-  Queue q = CqsCreate();
-  while (gets(line)) {
-    if (line[0]=='i') {
-      char *str, *cpy; int len, bytes;
-      str = line + 1;
-      len = strlen(str);
-      str[len]=0; str[len+1]=0; str[len+2]=0; str[len+3]=0;
-      bytes = (len+4)&(~3);
-      cpy = malloc(bytes);
-      memcpy(cpy, str, bytes);
-      CqsEnqueueBPrioFifo(q, cpy, len*8, cpy);
-    }
-    else {
-      char *data;
-      CqsDequeue(q, (void *)&data);
-      if (data) printf("%s\n",data);
-      else printf("(null)\n");
-    }
-  }
-}
-#endif
 
