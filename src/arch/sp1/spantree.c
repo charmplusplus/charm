@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-09-08 02:38:48  gursoy
+ * Revision 2.3  1995-09-20 15:57:05  sanjeev
+ * put void before CmiSpanTreeChildren
+ *
+ * Revision 2.2  1995/09/08  02:38:48  gursoy
  * Cmi_dim is no more exported from machine.c. now thru a function call
  *
  * Revision 2.1  1995/07/17  17:47:17  knauff
@@ -109,7 +112,7 @@ int node;
 }
 
 
-CmiSpanTreeChildren(node, children)
+void CmiSpanTreeChildren(node, children)
 int node, *children;
 {
     int i;

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-12 22:49:59  jyelon
+ * Revision 2.2  1995-09-20 15:57:05  sanjeev
+ * put void before CmiSpanTreeChildren
+ *
+ * Revision 2.1  1995/06/12  22:49:59  jyelon
  * *** empty log message ***
  *
  * Revision 1.2  1995/04/13  05:51:12  narain
@@ -54,7 +57,7 @@ int
 CmiSpanTreeRoot() { return 0; }
 
 
-CmiSpanTreeChildren(node, children) int node, *children; {
+void CmiSpanTreeChildren(node, children) int node, *children; {
     int i;
 
     for (i = 1; i <= MAXSPAN ; i++)

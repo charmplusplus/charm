@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-07-05 22:14:42  sanjeev
+ * Revision 2.2  1995-09-20 15:57:05  sanjeev
+ * put void before CmiSpanTreeChildren
+ *
+ * Revision 2.1  1995/07/05  22:14:42  sanjeev
  * Megatest++ runs
  *
  * Revision 2.0  1995/06/15  20:14:52  sanjeev
@@ -103,7 +106,7 @@ int node;
 }
 
 
-CmiSpanTreeChildren(node, children)
+void CmiSpanTreeChildren(node, children)
 int node, *children;
 {
     int i;

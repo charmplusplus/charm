@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-09-07 22:52:18  gursoy
+ * Revision 2.3  1995-09-20 15:57:05  sanjeev
+ * put void before CmiSpanTreeChildren
+ *
+ * Revision 2.2  1995/09/07  22:52:18  gursoy
  * Cmi_dim is replaced qith a fucntion call to machine.c
  *
  * Revision 2.1  1995/06/09  21:23:01  gursoy
@@ -115,7 +118,7 @@ int node;
 }
 
 
-CmiSpanTreeChildren(node, children)
+void CmiSpanTreeChildren(node, children)
 int node, *children;
 {
     int i;
