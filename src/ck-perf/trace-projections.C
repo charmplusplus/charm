@@ -241,6 +241,17 @@ void LogPool::writeSts(void)
   fclose(stsfp);
 }
 
+#if CMK_BLUEGENE_CHARM
+static void updateProjLog(void *data, double t, double recvT, void *ptr)
+{
+  LogEntry *log = (LogEntry *)data;
+  FILE *fp = (FILE *)ptr;
+  log->time = t;
+  log->recvTime = recvT;
+  log->write(fp);
+}
+#endif
+
 void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml, CmiObjId *id, double recvT) 
 {
   new (&pool[numEntries++])
@@ -271,17 +282,6 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
   }
 #endif
 }
-
-#if CMK_BLUEGENE_CHARM
-static void updateProjLog(void *data, double t, double recvT, void *ptr)
-{
-  LogEntry *log = (LogEntry *)data;
-  FILE *fp = (FILE *)ptr;
-  log->time = t;
-  log->recvTime = recvT;
-  log->write(fp);
-}
-#endif
 
 void LogPool::postProcessLog()
 {
