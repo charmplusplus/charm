@@ -1842,10 +1842,11 @@ void nodetab_init_for_scyld()
   /* expand node table to arg_requested_pes */
   if (arg_requested_pes > npes) {
     int orig_size = npes;
+    int node;
     int startnode = 0;
     if (arg_singlemaster && nodetab_rank0_size > 1 && !arg_skipmaster) 
     	startnode = arg_ppn;      /* skip -1 */
-    int node = startnode; 
+    node = startnode; 
     while (npes < arg_requested_pes) {
 #if ! CMK_SHARED_VARS_UNAVAILABLE
       if (npes+arg_ppn > arg_requested_pes) group.cpus = arg_requested_pes-npes;
