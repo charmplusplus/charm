@@ -107,8 +107,12 @@ class TraceCounter : public Trace {
       char*       desc;
       CounterArg* next;
 
+      CounterArg(): code(-1), arg(NULL), desc(NULL), next(NULL) { }
       CounterArg(int c, char* a, char* d): 
 	code(c), arg(a), desc(d), next(NULL) { }
+      void setValues(int _code, char* _arg, char* _desc) {
+	code = _code;  arg = _arg;  desc = _desc;
+      }
     };
 
   private:

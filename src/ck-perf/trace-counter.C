@@ -20,8 +20,8 @@
 #define VER 1.0
 
 // for performance monitoring
-extern "C" int start_counters( int e0, int e1 );
-extern "C" int read_counters( int e0, long long *c0, int e1, long long *c1);
+extern "C" int start_counters(int e0, int e1);
+extern "C" int read_counters(int e0, long long *c0, int e1, long long *c1);
 
 CpvStaticDeclare(Trace*, _trace);
 CpvStaticDeclare(CountLogPool*, _logPool);
@@ -32,53 +32,50 @@ static int _packMsg, _packChare, _packEP;
 static int _unpackMsg, _unpackChare, _unpackEP;
 CpvDeclare(double, version);
 
-//! the following is the list of arguments that can be passed to 
-//! the +counter{1|2} command line arguments
-//! to add or change, create a CounterArg struct with 
-//! three constructor arguments:
-//!   1) the code (for SGI libperfex) associated with counter
-//!   2) the string to be entered on the command line
-//!   3) a string that is the description of the counter
-//! then go to the TraceCounter::TraceCounter() definition and make 
-//! sure the CounterArg struct is registered via the registerArg call
-static TraceCounter::CounterArg arg0(0, "CYCLE",      "Cycles");
-static TraceCounter::CounterArg arg1(1, "INSTR",      "Issued instructions");
-static TraceCounter::CounterArg arg2(2, "LOAD",       "Issued loads");
-static TraceCounter::CounterArg arg3(3, "STORE",      "Issued stores");
-static TraceCounter::CounterArg arg4(4, "STORE_COND", "Issued store conditionals");
-static TraceCounter::CounterArg arg5(5, "FAIL_COND",  "Failed store conditionals");
-static TraceCounter::CounterArg arg6(6, "DECODE_BR",  "Decoded branches.  (This changes meaning in 3.x versions of R10000.  It becomes resolved branches)");
-static TraceCounter::CounterArg arg7(7, "QUADWORDS",  "Quadwords written back from secondary cache");
-
-/*
-7 = 
-8 = Correctable secondary cache data array ECC errors
-9 = Primary (L1) instruction cache misses
-10 = Secondary (L2) instruction cache misses
-11 = Instruction misprediction from secondary cache way prediction table
-12 = External interventions
-13 = External invalidations
-14 = Virtual coherency conditions.  (This changes meaning in 3.x
-     versions of R10000.  It becomes ALU/FPU forward progress
-     cycles.  On the R12000, this counter is always 0).
-15 = Graduated instructions
-16 = Cycles
-17 = Graduated instructions
-18 = Graduated loads
-19 = Graduated stores
-20 = Graduated store conditionals
-21 = Graduated floating point instructions
-22 = Quadwords written back from primary data cache
-23 = TLB misses
-24 = Mispredicted branches
-25 = Primary (L1) data cache misses
-26 = Secondary (L2) data cache misses
-27 = Data misprediction from secondary cache way prediction table
-28 = External intervention hits in secondary cache (L2)
-29 = External invalidation hits in secondary cache
-30 = Store/prefetch exclusive to clean block in secondary cache
-31 = Store/prefetch exclusive to shared block in secondary cache";
-*/
+//! The following is the list of arguments that can be passed to 
+//!   the +counter{1|2} command line arguments.
+//! To add or change, change NUM_COUNTER_ARGS and follow the examples
+//! Use three constructor arguments:
+//!   1) Code (for SGI libperfex) associated with counter.
+//!   2) String to be entered on the command line.
+//!   3) String that is the description of the counter.
+//! All NUM_COUNTER_ARGS are automatically registered via
+//!   TraceCounter::TraceCounter() definition.
+static const int NUM_COUNTER_ARGS = 32;
+static TraceCounter::CounterArg COUNTER_ARG[NUM_COUNTER_ARGS] = 
+{ TraceCounter::CounterArg( 0, "CYCLES0",      "Cycles (also see code 16)"),
+  TraceCounter::CounterArg( 1, "INSTR",        "Issued instructions"),
+  TraceCounter::CounterArg( 2, "LOAD",         "Issued loads"),
+  TraceCounter::CounterArg( 3, "STORE",        "Issued stores"),
+  TraceCounter::CounterArg( 4, "STORE_COND",   "Issued store conditionals"),
+  TraceCounter::CounterArg( 5, "FAIL_COND",    "Failed store conditionals"),
+  TraceCounter::CounterArg( 6, "DECODE_BR",    "Decoded branches.  (This changes meaning in 3.x versions of R10000.  It becomes resolved branches)"),
+  TraceCounter::CounterArg( 7, "QUADWORDS2",   "Quadwords written back from secondary cache"),
+  TraceCounter::CounterArg( 8, "CACHE_ER2",    "Correctable secondary cache data array ECC errors"),
+  TraceCounter::CounterArg( 9, "L1_IMISS",     "Primary (L1) instruction cache misses"),
+  TraceCounter::CounterArg(10, "L2_IMISS",     "Secondary (L2) instruction cache misses"),
+  TraceCounter::CounterArg(11, "INSTRMISPR",   "Instruction misprediction from secondary cache way prediction table"),
+  TraceCounter::CounterArg(12, "EXT_INTERV",   "External interventions"),
+  TraceCounter::CounterArg(13, "EXT_INVAL",    "External invalidations"),
+  TraceCounter::CounterArg(14, "VIRT_COHER",   "Virtual coherency conditions.  (This changes meaning in 3.x versions of R10000.  It becomes ALU/FPU forward progress cycles.  On the R12000, this counter is always 0)."),
+  TraceCounter::CounterArg(15, "GR_INSTR15",   "Graduated instructions (also see code 17)"),
+  TraceCounter::CounterArg(16, "CYCLES16",     "Cycles (also see code 0)"),
+  TraceCounter::CounterArg(17, "GR_INSTR17",   "Graduated instructions (also see code 15)"),
+  TraceCounter::CounterArg(18, "GR_LOAD" ,     "Graduated loads"),
+  TraceCounter::CounterArg(19, "GR_STORE",     "Graduated stores"),
+  TraceCounter::CounterArg(20, "GR_ST_COND",   "Graduated store conditionals"),
+  TraceCounter::CounterArg(21, "GR_FLOPS",     "Graduated floating point instructions"),
+  TraceCounter::CounterArg(22, "QUADWORDS1",   "Quadwords written back from primary data cache"),
+  TraceCounter::CounterArg(23, "TLB_MISS",     "TLB misses"),
+  TraceCounter::CounterArg(24, "MIS_BR",       "Mispredicted branches"),
+  TraceCounter::CounterArg(25, "L1_DMISS",     "Primary (L1) data cache misses"),
+  TraceCounter::CounterArg(26, "L2_DMISS",     "Primary (L2) data cache misses"),
+  TraceCounter::CounterArg(27, "DATA_MIS",     "Data misprediction from secondary cache way predicition table"),
+  TraceCounter::CounterArg(28, "EXT_INTERV2",  "External intervention hits in secondary cache (L2)"),
+  TraceCounter::CounterArg(29, "EXT_INVAL2",   "External invalidation hits in secondary cache"),
+  TraceCounter::CounterArg(30, "CLEAN_ST_PRE", "Store/prefetch exclusive to clean block in secondary cache"),
+  TraceCounter::CounterArg(31, "SHARE_ST_PRE", "Store/prefetch exclusive to shared block in secondary cache") 
+};
 
 void _createTracecounter(char **argv)
 {
@@ -250,14 +247,7 @@ TraceCounter::TraceCounter() :
   lastArg_     (NULL),
   argStrSize_  (0)
 {
-  registerArg(&arg0);
-  registerArg(&arg1);
-  registerArg(&arg2);
-  registerArg(&arg3);
-  registerArg(&arg4);
-  registerArg(&arg5);
-  registerArg(&arg6);
-  registerArg(&arg7);
+  for (int i=0; i<NUM_COUNTER_ARGS; i++) { registerArg(&COUNTER_ARG[i]); }
 }
 
 void TraceCounter::traceInit(char **argv)
@@ -317,6 +307,7 @@ void TraceCounter::traceInit(char **argv)
   }
   counter1_ = counterArg1.code;
   counter2_ = counterArg2.code;
+  DEBUGF(("Counter1=%d Counter2=%d\n", counter1_, counter2_));
   char* args[2];  // prepare arguments for creating log pool
   args[0] = counterArg1.arg;
   args[1] = counterArg2.arg;
@@ -364,23 +355,31 @@ void TraceCounter::beginExecute
   // DEBUGF(("start: %f \n", start));
 
   if ((genStart_=start_counters(counter1_, counter2_)) < 0) {
-    CmiAbort("ERROR: start_counters()");
+    CmiPrintf("counter1=%d counter2=%d\n", counter1_, counter2_);
+    CmiAbort("ERROR: start_counters()\n");
   }
+
+  DEBUGF(("beginExecute EP %d genStart %d\n", ep, genStart_));
 }
 
 void TraceCounter::endExecute(void)
 {
+  DEBUGF(("endExecute EP %d genStart_ %d ", execEP_, genStart_));
+
   long long value1 = 0, value2 = 0;
   int genRead;
   if ((genRead=read_counters(counter1_, &value1, counter2_, &value2)) < 0 ||
       genRead != genStart_)
   {
-    CmiAbort("ERROR: read_counters()");
+    traceWriteSts();
+    CmiPrintf("genRead %d genStart_ %d counter1 %ld counter2 %ld\n",
+	      genRead, genStart_, value1, value2);
+    CmiAbort("ERROR: read_counters()\n");
   }
   double t = TraceTimer();
 
-  DEBUGF(("EP %d Time %f counter1 %d counter2 %ld\n", 
-	  execEP_, t-startEP_, value1, value2));
+  DEBUGF(("genRead %d Time %f counter1 %d counter2 %ld\n", 
+	  genRead, t-startEP_, value1, value2));
   if (execEP_ != -1) { 
     CpvAccess(_logPool)->setEp(execEP_, value1, value2, t-startEP_); 
   }
@@ -390,18 +389,25 @@ void TraceCounter::beginPack(void)
 { 
   startPack_ = CmiWallTimer(); 
   if ((genStart_=start_counters(counter1_, counter2_)) < 0) {
-    CmiAbort("ERROR: start_counters()");
+    CmiPrintf("counter1=%d counter2=%d\n", counter1_, counter2_);
+    CmiAbort("ERROR: start_counters()\n");
   }
+  DEBUGF(("beginPack genStart %d\n", genStart_));
 }
 
 void TraceCounter::endPack(void) 
 {
+  DEBUGF(("endPack "));
+
   long long value1 = 0, value2 = 0;
   int genRead;
   if ((genRead=read_counters(counter1_, &value1, counter2_, &value2)) < 0 ||
       genRead != genStart_)
   {
-    CmiAbort("ERROR: read_counters()");
+    traceWriteSts();
+    CmiPrintf("genRead %d genStart_ %d counter1 %ld counter2 %ld\n",
+	      genRead, genStart_, value1, value2);
+    CmiAbort("ERROR: read_counters()\n");
   }
   double t = CmiWallTimer();
 
@@ -414,18 +420,25 @@ void TraceCounter::beginUnpack(void)
 { 
   startUnpack_ = CmiWallTimer(); 
   if ((genStart_=start_counters(counter1_, counter2_)) < 0) {
-    CmiAbort("ERROR: start_counters()");
+    CmiPrintf("counter1=%d counter2=%d\n", counter1_, counter2_);
+    CmiAbort("ERROR: start_counters()\n");
   }
+  DEBUGF(("beginUnpack genStart %d\n", genStart_));
 }
 
 void TraceCounter::endUnpack(void) 
 {
+  DEBUGF(("endUnpack "));
+
   long long value1 = 0, value2 = 0;
   int genRead;
   if ((genRead=read_counters(counter1_, &value1, counter2_, &value2)) < 0 ||
       genRead != genStart_)
   {
-    CmiAbort("ERROR: read_counters()");
+    traceWriteSts();
+    CmiPrintf("genRead %d genStart_ %d counter1 %ld counter2 %ld\n",
+	      genRead, genStart_, value1, value2);
+    CmiAbort("ERROR: read_counters()\n");
   }
   double t = CmiWallTimer();
 
@@ -459,6 +472,19 @@ void TraceCounter::registerArg(CounterArg* arg)
     argStrSize_ = strlen(arg->arg);
   }
   else { 
+    // check to see if any redundancy 
+    CounterArg* check = firstArg_;
+    while (check != NULL) {
+      if (strcmp(check->arg, arg->arg)==0 || check->code == arg->code) {
+	if (CkMyPe()==0) { 
+	  CmiPrintf("Two args with same name %s or code %d\n", 
+		    arg->arg, arg->code); 
+	}
+	CmiAbort("TraceCounter::registerArg()\n");
+      }
+      check = check->next;
+    }
+
     lastArg_->next = arg;
     lastArg_ = arg;
     int len = strlen(arg->arg);
@@ -487,6 +513,7 @@ bool TraceCounter::matchArg(CounterArg* arg)
     }
     else if (matchArg->code == matchCode) {
       match = true;
+      arg->code = matchArg->code;
       arg->arg = matchArg->arg;
       arg->desc = matchArg->desc;
     }
