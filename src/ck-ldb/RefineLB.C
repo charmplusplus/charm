@@ -38,10 +38,9 @@ CmiBool RefineLB::QueryBalanceNow(int _step)
   return CmiTrue;
 }
 
-LBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
+void RefineLB::work(CentralLB::LDStats* stats, int count)
 {
   int obj;
-
   //  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());
 
   // RemoveNonMigratable(stats, count);
@@ -60,38 +59,19 @@ LBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
 
   refiner.Refine(count,stats,from_procs,to_procs);
 
-  CkVec<MigrateInfo*> migrateInfo;
-
   // Save output
   for(obj=0;obj<stats->n_objs;obj++) {
       int pe = stats->from_proc[obj];
       if (to_procs[obj] != pe) {
 	// CkPrintf("[%d] Obj %d migrating from %d to %d\n",
 	//	 CkMyPe(),obj,pe,to_procs[obj]);
-	MigrateInfo *migrateMe = new MigrateInfo;
-	migrateMe->obj = stats->objData[obj].handle;
-	migrateMe->from_pe = pe;
-	migrateMe->to_pe = to_procs[obj];
-	migrateInfo.insertAtEnd(migrateMe);
-    }
-  }
-
-  int migrate_count=migrateInfo.length();
-  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
-  msg->n_moves = migrate_count;
-  if (lb_debug) CmiPrintf("RefineLB> migrating %d objects.\n", migrate_count);
-  for(int i=0; i < migrate_count; i++) {
-    MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
-    msg->moves[i] = *item;
-    delete item;
-    migrateInfo[i] = 0;
+	stats->to_proc[obj] = to_procs[obj];
+      }
   }
 
   // Free the refine buffers
   Refiner::FreeProcs(from_procs);
   Refiner::FreeProcs(to_procs);
-
-  return msg;
 };
 
 #endif

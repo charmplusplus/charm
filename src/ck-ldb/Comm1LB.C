@@ -150,12 +150,11 @@ void init(alloc_struct **a, graph * object_graph, int l, int b){
   }
 }
 
-LBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
+void Comm1LB::work(CentralLB::LDStats* stats, int count)
 {
   int pe,obj,com;
   double mean_load =0.0;
   ObjectRecord *x;
-  CkVec<MigrateInfo*> migrateInfo;
 
   //  CkPrintf("[%d] Comm1LB strategy\n",CkMyPe());
 
@@ -215,11 +214,8 @@ LBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
   alloc(pe,maxid,stats->objData[mpos].wallTime,0,0);
   if(pe != spe){
     //      CkPrintf("**Moving from %d to %d\n",spe,pe);
-    MigrateInfo* migrateMe = new MigrateInfo;
-    migrateMe->obj = stats->objData[mpos].handle;
-    migrateMe->from_pe = spe;
-    migrateMe->to_pe = pe;
-    migrateInfo.insertAtEnd(migrateMe);
+    CmiAssert(stats->from_proc[mpos] == spe);
+    stats->to_proc[mpos] = pe;
   }
 
   int out_msg,out_byte,min_msg,min_byte;
@@ -267,25 +263,10 @@ LBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
 
     if(minpe != spe){
       //      CkPrintf("**Moving from %d to %d\n",spe,minpe);
-      MigrateInfo *migrateMe = new MigrateInfo;
-      migrateMe->obj = stats->objData[mpos].handle;
-      migrateMe->from_pe = spe;
-      migrateMe->to_pe = minpe;
-      migrateInfo.insertAtEnd(migrateMe);
+      CmiAssert(stats->from_proc[mpos] == spe);
+      stats->to_proc[mpos] = minpe;
     }
   }
-
-  int migrate_count = migrateInfo.length();
-  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
-  msg->n_moves = migrate_count;
-  for(int i=0; i < migrate_count; i++) {
-    MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
-    msg->moves[i] = *item;
-    delete item;
-    migrateInfo[i] = 0;
-  }
-
-  return msg;
 }
 
 

@@ -102,12 +102,10 @@ extern "C" void METIS_mCPartGraphKway(int*, int*, int*, int*, int*, int*,
 LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count,
 				 int option=0)
 */
-LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
+void MetisLB::work(CentralLB::LDStats* stats, int count)
 {
   // CkPrintf("entering MetisLB::Strategy...\n");
   // CkPrintf("[%d] MetisLB strategy\n",CkMyPe());
-  CkVec<MigrateInfo*> migrateInfo;
-
   int i, j, m;
   int option = 0;
   int numobjs = stats->n_objs;
@@ -125,7 +123,6 @@ LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
     origmap[i] = 0;
   }
 
-  int k=0;
   for (i=0; i<stats->n_objs; i++) {
       LDObjData &odata = stats->objData[i];
       if (!odata.migratable) 
@@ -136,10 +133,9 @@ LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
       handles[odata[i].id.id[0]] = odata[i].handle;
       */
       int frompe = stats->from_proc[i];
-      origmap[k] = frompe;
-      objtime[k] = odata.wallTime*stats->procs[frompe].pe_speed;
-      handles[k] = odata.handle;
-      k++;
+      origmap[i] = frompe;
+      objtime[i] = odata.wallTime*stats->procs[frompe].pe_speed;
+      handles[i] = odata.handle;
   }
 
   // to convert the weights on vertices to integers
@@ -298,11 +294,8 @@ LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   if(!sameMapFlag) {
     for(i=0; i<numobjs; i++) {
       if(origmap[i] != newmap[i]) {
-	MigrateInfo* migrateMe = new MigrateInfo;
-	migrateMe->obj = handles[i];
-	migrateMe->from_pe = origmap[i];
-	migrateMe->to_pe = newmap[i];
-	migrateInfo.insertAtEnd(migrateMe);
+	CmiAssert(stats->from_proc[i] == origmap[i]);
+	stats->to_proc[i] =  newmap[i];
       }
     }
   }
@@ -310,19 +303,6 @@ LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   delete[] origmap;
   if(newmap != origmap)
     delete[] newmap;
-
-  int migrate_count=migrateInfo.length();
-  //  CkPrintf("Migration Count = %d\n", migrate_count);
-  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
-  msg->n_moves = migrate_count;
-  for(i=0; i < migrate_count; i++) {
-    MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
-    msg->moves[i] = *item;
-    delete item;
-    migrateInfo[i] = 0;
-  }
-
-  return msg;
 }
 
 #endif
