@@ -661,25 +661,17 @@ static void _skipCldHandler(void *msg)
 {
   register envelope *env = (envelope *)(msg);
   CmiSetHandler(msg, CmiGetXHandler(msg));
-#if CMK_BLUEGENE_CHARM
-  CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), (char *)env);
-#else
   CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
-#endif
 }
 
 static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 {
   if (pe == CkMyPe()) {
-#if CMK_BLUEGENE_CHARM
-    CmiSyncSendAndFree(pe, env->getTotalsize(), (char *)env);
-#else
     CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
-#endif
   } else {
     CkPackMessage(&env);
     int len=env->getTotalsize();
@@ -691,6 +683,10 @@ static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     else CmiSyncSendAndFree(pe, len, (char *)env);
   }
 }
+
+#if CMK_BLUEGENE_CHARM
+#   define  _skipCldEnqueue   CldEnqueue
+#endif
 
 static int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
 {
