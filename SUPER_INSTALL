@@ -50,8 +50,10 @@ done
 ( echo $VERSION | egrep -s '^Common' ) && syntax
 [ -d src/$VERSION ] || goto syntax
 
-[ -d $VERSION ] || echo "Creating dir: $VERSION" || mkdir $VERSION
-[ -d $VERSION/tmp ] || echo "Creating dir: $VERSION/tmp" || mkdir $VERSION/tmp
+[ -d $VERSION ] || echo "Creating dir: $VERSION" 
+[ -d $VERSION ] || mkdir $VERSION
+[ -d $VERSION/tmp ] || echo "Creating dir: $VERSION/tmp" 
+[ -d $VERSION/tmp ] || mkdir $VERSION/tmp
 echo "Copying src/Common/scripts/Makefile to $VERSION/tmp"
 rm -f $VERSION/tmp/Makefile
 ln -s "../../src/Common/scripts/Makefile" $VERSION/tmp/Makefile
