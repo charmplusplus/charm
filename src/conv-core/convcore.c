@@ -113,6 +113,7 @@ char **argv;
      CmiNodeBarrier();
   }
   CmiInitMc(argv);
+  CmiSpanTreeInit(argv);
 }
 
 void *CmiGetMsg()

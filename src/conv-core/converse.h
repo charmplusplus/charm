@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.20  1995-09-26 18:26:00  jyelon
+ * Revision 2.21  1995-09-27 22:23:15  jyelon
+ * Many bug-fixes.  Added Cpv macros to threads package.
+ *
+ * Revision 2.20  1995/09/26  18:26:00  jyelon
  * Added CthSetStrategyDefault, and cleaned up a bit.
  *
  * Revision 2.19  1995/09/20  17:22:14  jyelon
@@ -280,7 +283,19 @@ void       CthSetVar   CMK_PROTO((CthThread, void **, void *));
 void      *CthGetVar   CMK_PROTO((CthThread, void **));
 
 
-/******** PROTOTYPES FOR CSD FUNCTIONS AND MACROS ********/
+/****** CMM: THE MESSAGE MANAGER ******/
+
+typedef struct CmmTableStruct *CmmTable;
+
+#define CmmWildCard (-1)
+
+CmmTable   CmmNew();
+void       CmmFree(CmmTable t);
+void       CmmPut(CmmTable t, int ntags, int *tags, void *msg);
+void      *CmmFind(CmmTable t, int ntags, int *tags, int *returntags, int del);
+#define    CmmGet(t,nt,tg,rt)   (CmmFind(t,nt,tg,rt,1))
+#define    CmmProbe(t,nt,tg,rt) (CmmFind(t,nt,tg,rt,0))
+
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 

@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.8  1995-09-26 18:30:46  jyelon
+ * Revision 1.9  1995-09-27 22:23:15  jyelon
+ * Many bug-fixes.  Added Cpv macros to threads package.
+ *
+ * Revision 1.8  1995/09/26  18:30:46  jyelon
  * *** empty log message ***
  *
  * Revision 1.7  1995/09/26  18:26:00  jyelon
@@ -192,13 +195,15 @@ static CthThread CthSchedThread()
   return CpvAccess(CthSchedThreadVar);
 }
 
-static void CthSchedResume(CthThread t)
+static void CthSchedResume(t)
+CthThread t;
 {
   CpvAccess(CthSchedThreadVar) = CthSelf();
   CthResume(t);
 }
 
-static void CthSchedEnqueue(CthThread t)
+static void CthSchedEnqueue(t)
+CthThread t;
 {
   CmiSetHandler(t, CpvAccess(CthSchedResumeIndex));
   CsdEnqueueFifo(t);
@@ -211,7 +216,8 @@ static void CthSchedInit()
   CpvAccess(CthSchedResumeIndex) = CmiRegisterHandler(CthSchedResume);
 }
 
-void CthSetStrategyDefault(CthThread t)
+void CthSetStrategyDefault(t)
+CthThread t;
 {
   CthSetStrategy(t, CthSchedEnqueue, CthSchedThread);
 }
@@ -251,9 +257,9 @@ struct CthThreadStruct
   double     stack[1];
 };
 
-static CthThread thread_current;
-static CthThread thread_exiting;
-static int       thread_growsdown;
+CpvStaticDeclare(CthThread, thread_current);
+CpvStaticDeclare(CthThread, thread_exiting);
+CpvStaticDeclare(int,       thread_growsdown);
 
 #define ABS(a) (((a) > 0)? (a) : -(a) )
 
@@ -264,23 +270,28 @@ void CthInit()
 {
   char *sp1 = alloca(8);
   char *sp2 = alloca(8);
-  if (sp2<sp1) thread_growsdown = 1;
-  else         thread_growsdown = 0;
-  thread_current = (CthThread)malloc(sizeof(struct CthThreadStruct));
-  thread_current->fn=0;
-  thread_current->arg=0;
-  thread_current->data_count=0;
-  thread_current->awakenfn = CthSchedEnqueue;
-  thread_current->choosefn = CthSchedThread;
+  CpvInitialize(CthThread, thread_current);
+  CpvInitialize(CthThread, thread_exiting);
+  CpvInitialize(int      , thread_growsdown);
+  if (sp2<sp1) CpvAccess(thread_growsdown) = 1;
+  else         CpvAccess(thread_growsdown) = 0;
+  CpvAccess(thread_current)=
+    (CthThread)CmiAlloc(sizeof(struct CthThreadStruct));
+  CpvAccess(thread_current)->fn=0;
+  CpvAccess(thread_current)->arg=0;
+  CpvAccess(thread_current)->data_count=0;
+  CpvAccess(thread_current)->awakenfn = CthSchedEnqueue;
+  CpvAccess(thread_current)->choosefn = CthSchedThread;
   CthSchedInit();
 }
 
 CthThread CthSelf()
 {
-  return thread_current;
+  return CpvAccess(thread_current);
 }
 
-static void CthTransfer(CthThread t)
+static void CthTransfer(t)
+CthThread t;
 {    
   char *oldsp, *newsp;
   /* Put the stack pointer in such a position such that   */
@@ -289,38 +300,39 @@ static void CthTransfer(CthThread t)
   /* inactive stack frame"                                */
   oldsp = alloca(0);
   newsp = t->top;
-  thread_current->top = oldsp;
-  if (thread_growsdown) {
+  CpvAccess(thread_current)->top = oldsp;
+  if (CpvAccess(thread_growsdown)) {
     newsp -= SLACK;
     alloca(oldsp - newsp);
   } else {
     newsp += SLACK;
     alloca(newsp - oldsp);
   }
-  thread_current = t;
+  CpvAccess(thread_current) = t;
   longjmp(t->jb, 1);
 }
 
 void CthResume(t)
-     CthThread t;
+CthThread t;
 {
   int i;
   for (i=0; i<t->data_count; i++)
     *(t->data_var[i]) = t->data_val[i];
-  if (t == thread_current) return;
-  if ((setjmp(thread_current->jb))==0)
+  if (t == CpvAccess(thread_current)) return;
+  if ((setjmp(CpvAccess(thread_current)->jb))==0)
     CthTransfer(t);
-  if (thread_exiting) { free(thread_exiting); thread_exiting=0; }
+  if (CpvAccess(thread_exiting))
+    { CmiFree(CpvAccess(thread_exiting)); CpvAccess(thread_exiting)=0; }
 }
 
 CthThread CthCreate(fn, arg, size)
-  CthVoidFn fn; void *arg; int size;
+CthVoidFn fn; void *arg; int size;
 {
   CthThread  result; char *oldsp, *newsp; int offs, erralloc;
   if (size==0) size = STACKSIZE;
-  result = (CthThread)malloc(sizeof(struct CthThreadStruct) + size);
+  result = (CthThread)CmiAlloc(sizeof(struct CthThreadStruct) + size);
   oldsp = alloca(0);
-  if (thread_growsdown) {
+  if (CpvAccess(thread_growsdown)) {
       newsp = ((char *)(result->stack)) + size - SLACK;
       offs = oldsp - newsp;
   } else {
@@ -337,19 +349,21 @@ CthThread CthCreate(fn, arg, size)
   if (ABS(erralloc) >= SLACK) 
     { printf("error #83742.\n"); exit(1); }
   if (setjmp(result->jb)) {
-    if (thread_exiting) { free(thread_exiting); thread_exiting=0; }
-    (thread_current->fn)(thread_current->arg);
-    thread_exiting = thread_current;
+    if (CpvAccess(thread_exiting))
+      { CmiFree(CpvAccess(thread_exiting)); CpvAccess(thread_exiting)=0; }
+    (CpvAccess(thread_current)->fn)(CpvAccess(thread_current)->arg);
+    CpvAccess(thread_exiting) = CpvAccess(thread_current);
     CthSuspend();
   }
   else return result;
 }
 
-void CthFree(CthThread t)
+void CthFree(t)
+CthThread t;
 {
-  if (t==thread_current) {
-    thread_exiting = t;
-  } else free(t);
+  if (t==CpvAccess(thread_current)) {
+    CpvAccess(thread_exiting) = t;
+  } else CmiFree(t);
 }
 
 static void CthNoStrategy()
@@ -361,22 +375,22 @@ static void CthNoStrategy()
 void CthSuspend()
 {
   CthThread next;
-  if (thread_current->choosefn == 0) CthNoStrategy();
-  next = thread_current->choosefn();
+  if (CpvAccess(thread_current)->choosefn == 0) CthNoStrategy();
+  next = CpvAccess(thread_current)->choosefn();
   CthResume(next);
 }
 
 void CthAwaken(th)
-     CthThread th;
+CthThread th;
 {
   if (th->awakenfn == 0) CthNoStrategy();
   th->awakenfn(th);
 }
 
 void CthSetStrategy(t, awkfn, chsfn)
-  CthThread t;
-  CthVoidFn awkfn;
-  CthThFn chsfn;
+CthThread t;
+CthVoidFn awkfn;
+CthThFn chsfn;
 {
   t->awakenfn = awkfn;
   t->choosefn = chsfn;
@@ -384,11 +398,14 @@ void CthSetStrategy(t, awkfn, chsfn)
 
 void CthYield()
 {
-  CthAwaken(thread_current);
+  CthAwaken(CpvAccess(thread_current));
   CthSuspend();
 }
 
-void CthSetVar(CthThread thr, void **var, void *val)
+void CthSetVar(thr, var, val)
+CthThread thr;
+void **var;
+void *val;
 {
   int i;
   int data_count = thr->data_count;
@@ -404,7 +421,9 @@ void CthSetVar(CthThread thr, void **var, void *val)
   thr->data_count++;
 }
 
-void *CthGetVar(CthThread thr, void **var)
+void *CthGetVar(thr, var)
+CthThread thr;
+void **var;
 {
   int i;
   int data_count = thr->data_count;
@@ -478,3 +497,4 @@ void CthInit()
     { CthSchedInit(); }
 
 #endif /* CMK_THREADS_UNAVAILABLE */
+
