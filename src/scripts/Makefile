@@ -182,6 +182,7 @@ dirs+sources:
 	./gatherflat ../../src/conv-core        .
 	./gatherflat ../../src/conv-ldb         .
 	./gatherflat ../../src/conv-ccs         .
+	./gatherflat ../../src/conv-perf	.
 	./gatherflat ../../src/ck-core          .
 	./gatherflat ../../src/util             .
 	./gatherflat ../../src/ck-perf          .
@@ -200,6 +201,8 @@ dirs+sources:
 	./gathertree ../../src/arch/`cat .gdir`      .
 	./gatherflat ../../src/arch/`cat .vdir`      .
 	./gathertree ../../pgms ../pgms
+	cat .gdir
+	cat .vdir
 	rm -f ../bin/charmc ; cp charmc ../bin/
 	chmod +x ../bin/charmc
 	rm -f .gdir
@@ -208,7 +211,7 @@ dirs+sources:
 	-./system_ln  ../tmp/cc-*.*h ../include
 	if [ ! -f conv-common.h ] ; then ( touch conv-common.h ) ; fi
 	touch dirs+sources
-
+	
 
 ###############################################################################
 #
@@ -216,7 +219,8 @@ dirs+sources:
 #
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-graph.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
-TRACELIBS=$(L)/libtrace-projections.a $(L)/libtrace-summary.a $(L)/libtrace-counter.a $(L)/libtrace-all.a
+TRACELIBS=$(L)/libtrace-projections.a $(L)/libtrace-summary.a $(L)/libtrace-counter.a \
+	$(L)/libtrace-projector.a $(L)/libtrace-all.a
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
    $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o $(L)/libmemory-isomalloc.o
 
@@ -226,9 +230,12 @@ CVLIBS=libconv-core.a \
 	libccs-client.a
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o msgmgr.o \
-	cpm.o cpthreads.o futures.o cldb.o random.o trace-common.o \
+	cpm.o cpthreads.o futures.o cldb.o random.o trace-common.o traceCore.o traceCoreCommon.o \
+	charmProjections.o converseProjections.o machineProjections.o\
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
-	quiescence.o isomalloc.o
+	quiescence.o isomalloc.o \
+	
+
 
 LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o \
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o conv-lists.o
@@ -294,6 +301,8 @@ threads.o: threads.c $(CVHEADERS)
 
 convcore.o: convcore.c $(CVHEADERS)
 	$(CHARMC) convcore.c
+
+
 
 conv-ccs.o: conv-ccs.c $(CVHEADERS)
 	$(CHARMC) conv-ccs.c
@@ -584,7 +593,7 @@ SimResults.o : SimResults.h SimResults.C
 	$(CHARMC) -c SimResults.C
 
 ## Tracing libraries (profiling, -tracemode)
-LIBTRACE_PROJ=trace-projections.o trace-common.o
+LIBTRACE_PROJ=trace-projections.o trace-common.o 
 $(L)/libtrace-projections.a: $(LIBTRACE_PROJ)
 	$(CHARMC) -o $@ $(LIBTRACE_PROJ)
 
@@ -596,21 +605,45 @@ LIBTRACE_COUNT=trace-counter.o trace-common.o
 $(L)/libtrace-counter.a: $(LIBTRACE_COUNT)
 	$(CHARMC) -o $@ $(LIBTRACE_COUNT)
 
-LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-common.o
+LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-common.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
-
+	
+LIBTRACE_PROJECTOR=trace-projector.o trace-common.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o
+$(L)/libtrace-projector.a: $(LIBTRACE_PROJECTOR)
+	$(CHARMC) -o  $@ $(LIBTRACE_PROJECTOR)
+	
 trace-common.o: trace-common.C $(CKHEADERS)
 	$(CHARMC) trace-common.C
 
-trace-projections.o:trace-projections.C trace-projections.h trace-common.h $(CKHEADERS)
+trace-projections.o: trace-projections.C trace-projections.h trace-common.h  $(CKHEADERS)
 	$(CHARMC) -o trace-projections.o trace-projections.C
 
+trace-projector.o: trace-projector.C trace-projector.h $(CKHEADERS) 
+	$(CHARMC) -o trace-projector.o trace-projector.C
+	
 trace-summary.o:trace-summary.C trace-summary.h trace-common.h trace-summaryBOC.h $(CKHEADERS)
 	$(CHARMC) -o trace-summary.o trace-summary.C
 
 trace-counter.o:trace-counter.C trace-counter.h trace-common.h $(CKHEADERS)
 	$(CHARMC) -o trace-counter.o trace-counter.C
+
+traceCore.o: traceCore.C $(CVHEADERS)
+	$(CHARMC) traceCore.C
+
+traceCoreCommon.o: traceCoreCommon.C $(CVHEADERS)
+	$(CHARMC) traceCoreCommon.C
+
+charmProjections.o: charmProjections.C $(CVHEADERS)
+	$(CHARMC) charmProjections.C
+
+converseProjections.o: converseProjections.C $(CVHEADERS)
+	$(CHARMC) converseProjections.C
+
+machineProjections.o: machineProjections.C $(CVHEADERS)
+	$(CHARMC) machineProjections.C
+
+
 
 trace-all.o:trace-all.C 
 	$(CHARMC) -o trace-all.o trace-all.C
