@@ -56,7 +56,6 @@ LBCommData* LBCommTable::HashSearch(const LBCommData data)
 LBCommData* LBCommTable::HashInsertUnique(const LBCommData data)
 {
   LBCommData* item = HashSearch(data);
-  LBCommData* item = 0;
   if (!item) {
     item = HashInsert(data);
   }
