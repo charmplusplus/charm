@@ -15,7 +15,7 @@ using namespace Mgc;
 using namespace std;
 
 //----------------------------------------------------------------------------
-static void SplitAndDecompose (Tetrahedron kTetra, const Plane& rkPlane,
+static void SplitAndDecompose (const Tetrahedron &kTetraP, const Plane& rkPlane,
     vector<Tetrahedron>& rkInside)
 {
     // determine on which side of the plane the points of the tetrahedron lie
@@ -25,7 +25,7 @@ static void SplitAndDecompose (Tetrahedron kTetra, const Plane& rkPlane,
 
     for (i = 0; i < 4; i++)
     {
-        afC[i] = rkPlane.DistanceTo(kTetra[i]);
+        afC[i] = rkPlane.DistanceTo(kTetraP[i]);
         if ( afC[i] > 0.0f )
             aiP[iPositive++] = i;
         else if ( afC[i] < 0.0f )
@@ -46,7 +46,7 @@ static void SplitAndDecompose (Tetrahedron kTetra, const Plane& rkPlane,
     if ( iPositive == 0 )
     {
         // tetrahedron is completely on the negative side of plane
-        rkInside.push_back(kTetra);
+        rkInside.push_back(kTetraP);
         return;
     }
 
@@ -54,6 +54,7 @@ static void SplitAndDecompose (Tetrahedron kTetra, const Plane& rkPlane,
     // decompose the negative-side portion into tetrahedra (6 cases).
     Real fW0, fW1, fInvCDiff;
     Vector3 akIntp[4];
+    Tetrahedron kTetra(kTetraP); // so we can modify kTetra's points
 
     if ( iPositive == 3 )
     {
@@ -160,25 +161,62 @@ static void SplitAndDecompose (Tetrahedron kTetra, const Plane& rkPlane,
         }
     }
 }
+
+//----------------------------------------------------------------------------
+// Return true if *all* the points of this tet lie outside of *any* of these planes 
+bool allOutside(const Plane *p,int nPlane,const Tetrahedron& rk) 
+{
+    for (int l=0;l<nPlane;l++) {
+        for (int v=0;v<4;v++) {
+		if (p[l].DistanceTo(rk[v])<=0.0f) 
+			goto tryNextPlane; // This point is inside-- forget it
+	}
+	// Every vertex is outside plane l: we're done
+	return true;
+    tryNextPlane:
+        ;	
+    }
+    // If we got here, no plane outs every vertex
+    return false;
+}
+
 //----------------------------------------------------------------------------
 void Mgc::FindIntersection (const Tetrahedron& rkT0, const Tetrahedron& rkT1,
     vector<Tetrahedron>& rkIntr)
 {
     // build planar faces of T0
-    Plane akPlane[4];
+    const int planePer=4;
+    Plane akPlane[planePer];
     rkT0.GetPlanes(akPlane);
-
-    // initial object to clip is T1
+    
+    // Return set is initially empty
     rkIntr.clear();
+    
+/* early-exit test for non-overlapping tets */
+    if (1) {
+        Plane ak1Plane[planePer];
+        rkT1.GetPlanes(ak1Plane);
+        if (allOutside(akPlane,planePer,rkT1) || allOutside(ak1Plane,planePer,rkT0))
+            return; /* tets do not overlap */
+    }
+    
+    // initial object to clip is T1
     rkIntr.push_back(rkT1);
+    vector<Tetrahedron> rkTemp; // pour tets back and forth from here
 
     // clip T1 against planes of T0
-    for (int iP = 0; iP < 4; iP++)
+    for (int iP = 0; iP < planePer; iP++)
     {
-        vector<Tetrahedron> kInside;
-        for (int iT = 0; iT < (int)rkIntr.size(); iT++)
-            SplitAndDecompose(rkIntr[iT],akPlane[iP],kInside);
-        rkIntr = kInside;
+	vector<Tetrahedron> *src, *dest;
+	if ((iP%2)==0) { // Read from rkIntr, write to rkTemp
+		src=&rkIntr; dest=&rkTemp;
+	} else { // Vice versa: last loop writes to rkIntr
+		src=&rkTemp; dest=&rkIntr;
+	}
+	dest->clear();
+	if (src->size()==0) return; /* clipped away to nothing */
+	for (int iT = 0; iT < (int)src->size(); iT++)
+	    SplitAndDecompose((*src)[iT],akPlane[iP],*dest);
     }
 }
 //----------------------------------------------------------------------------

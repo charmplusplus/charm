@@ -20,35 +20,6 @@ const Vector3 Vector3::UNIT_Z(0.0f,0.0f,1.0f);
 Real Vector3::FUZZ = 0.0f;
 
 //----------------------------------------------------------------------------
-Vector3::Vector3 (Real fX, Real fY, Real fZ)
-{
-    x = fX;
-    y = fY;
-    z = fZ;
-}
-//----------------------------------------------------------------------------
-Vector3::Vector3 (Real afCoordinate[3])
-{
-    x = afCoordinate[0];
-    y = afCoordinate[1];
-    z = afCoordinate[2];
-}
-//----------------------------------------------------------------------------
-Vector3::Vector3 (const Vector3& rkVector)
-{
-    x = rkVector.x;
-    y = rkVector.y;
-    z = rkVector.z;
-}
-//----------------------------------------------------------------------------
-Vector3& Vector3::operator= (const Vector3& rkVector)
-{
-    x = rkVector.x;
-    y = rkVector.y;
-    z = rkVector.z;
-    return *this;
-}
-//----------------------------------------------------------------------------
 bool Vector3::operator== (const Vector3& rkVector) const
 {
     if ( FUZZ == 0.0f )
@@ -217,21 +188,6 @@ bool Vector3::operator>= (const Vector3& rkVector) const
     return uiTest0 >= uiTest1;
 }
 //----------------------------------------------------------------------------
-Vector3 Vector3::operator+ (const Vector3& rkVector) const
-{
-    return Vector3(x+rkVector.x,y+rkVector.y,z+rkVector.z);
-}
-//----------------------------------------------------------------------------
-Vector3 Vector3::operator- (const Vector3& rkVector) const
-{
-    return Vector3(x-rkVector.x,y-rkVector.y,z-rkVector.z);
-}
-//----------------------------------------------------------------------------
-Vector3 Vector3::operator* (Real fScalar) const
-{
-    return Vector3(fScalar*x,fScalar*y,fScalar*z);
-}
-//----------------------------------------------------------------------------
 Vector3 Vector3::operator/ (Real fScalar) const
 {
     Vector3 kQuot;
@@ -249,41 +205,7 @@ Vector3 Vector3::operator/ (Real fScalar) const
         return Vector3(Math::MAX_REAL,Math::MAX_REAL,Math::MAX_REAL);
     }
 }
-//----------------------------------------------------------------------------
-Vector3 Vector3::operator- () const
-{
-    return Vector3(-x,-y,-z);
-}
-//----------------------------------------------------------------------------
-Vector3 Mgc::operator* (Real fScalar, const Vector3& rkVector)
-{
-    return Vector3(fScalar*rkVector.x,fScalar*rkVector.y,
-        fScalar*rkVector.z);
-}
-//----------------------------------------------------------------------------
-Vector3& Vector3::operator+= (const Vector3& rkVector)
-{
-    x += rkVector.x;
-    y += rkVector.y;
-    z += rkVector.z;
-    return *this;
-}
-//----------------------------------------------------------------------------
-Vector3& Vector3::operator-= (const Vector3& rkVector)
-{
-    x -= rkVector.x;
-    y -= rkVector.y;
-    z -= rkVector.z;
-    return *this;
-}
-//----------------------------------------------------------------------------
-Vector3& Vector3::operator*= (Real fScalar)
-{
-    x *= fScalar;
-    y *= fScalar;
-    z *= fScalar;
-    return *this;
-}
+
 //----------------------------------------------------------------------------
 Vector3& Vector3::operator/= (Real fScalar)
 {
@@ -304,25 +226,9 @@ Vector3& Vector3::operator/= (Real fScalar)
     return *this;
 }
 //----------------------------------------------------------------------------
-Real Vector3::SquaredLength () const
-{
-    return x*x + y*y + z*z;
-}
-//----------------------------------------------------------------------------
 Real Vector3::Length () const
 {
     return Math::Sqrt(x*x + y*y + z*z);
-}
-//----------------------------------------------------------------------------
-Real Vector3::Dot (const Vector3& rkVector) const
-{
-    return x*rkVector.x + y*rkVector.y + z*rkVector.z;
-}
-//----------------------------------------------------------------------------
-Vector3 Vector3::Cross (const Vector3& rkVector) const
-{
-    return Vector3(y*rkVector.z-z*rkVector.y,z*rkVector.x-x*rkVector.z,
-        x*rkVector.y-y*rkVector.x);
 }
 //----------------------------------------------------------------------------
 Vector3 Vector3::UnitCross (const Vector3& rkVector) const
