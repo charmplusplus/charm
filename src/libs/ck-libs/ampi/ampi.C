@@ -508,9 +508,12 @@ static ampi *ampiInit(char **argv)
   {
 	//Make a new ampi array
 	CkArrayID empty;
-	ampiCommStruct worldComm(new_world,empty,_nchunks);
-	CProxy_ampi arr;
-	arr=CProxy_ampi::ckNew(parent,worldComm,opts);
+
+        CkPupBasicVec<int> _indices;
+        for(int i=0;i<_nchunks;i++) _indices.push_back(i);
+        ampiCommStruct worldComm(new_world,empty,_nchunks,_indices);
+        CProxy_ampi arr;
+        arr=CProxy_ampi::ckNew(parent,worldComm,opts);
 
 	//Broadcast info. to the mpi_worlds array
 	// FIXME: remove race condition from MPI_COMM_UNIVERSE broadcast
