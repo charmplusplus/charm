@@ -32,13 +32,6 @@
 #define CMK_SIGNAL_USE_SIGACTION                           1
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
-#define CMK_STRERROR_IS_A_BUILTIN                          1
-#define CMK_STRERROR_USE_SYS_ERRLIST                       0
-
-#define CMK_STRINGS_USE_OWN_DECLARATIONS                   0
-#define CMK_STRINGS_USE_STRINGS_H                          0
-#define CMK_STRINGS_USE_STRING_H                           1
-
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 #define CMK_THREADS_USE_CONTEXT                            1
 
