@@ -30,8 +30,8 @@ static int slotsize;
 static int numslots;
 
 /*Start and end of isomalloc-managed addresses*/
-static char *isomallocStart;
-static char *isomallocEnd;
+static char *isomallocStart=NULL;
+static char *isomallocEnd=NULL;
 
 /*Utility conversion functions*/
 static int addr2slot(void *addr) {
@@ -396,6 +396,7 @@ static void check_range(char *start,char *end,memRegion_t *max)
   memRange_t searchQuantStart=128u*1024*1024; /*Shift search location by this far*/
   memRange_t searchQuant;
   void *addr;
+  char *initialStart=start, *initialEnd=end;
 
   if (start>=end) return; /*Ran out of hole*/
   len=(memRange_t)end-(memRange_t)start;
@@ -407,7 +408,7 @@ static void check_range(char *start,char *end,memRegion_t *max)
   /* Trim off start of range until we hit usable memory*/  
   searchQuant=searchQuantStart;
   while (bad_range(start)) {
-	start+=searchQuant;
+	start=initialStart+searchQuant;
         if (start>=end) return; /*Ran out of hole*/
 	searchQuant*=2; /*Exponential search*/
         if (searchQuant==0) return; /*SearchQuant overflowed-- no good memory anywhere*/
@@ -416,7 +417,7 @@ static void check_range(char *start,char *end,memRegion_t *max)
   /* Trim off end of range until we hit usable memory*/
   searchQuant=searchQuantStart;
   while (bad_range(end-slotsize)) {
-	end-=searchQuant;
+	end=initialEnd-searchQuant;
         if (start>=end) return; /*Ran out of hole*/
 	searchQuant*=2;
         if (searchQuant==0) return; /*SearchQuant overflowed-- no good memory anywhere*/
@@ -470,6 +471,8 @@ static void init_ranges(char **argv)
 {
   /*Largest value a signed int can hold*/
   memRange_t intMax=((memRange_t)1)<<(sizeof(int)*8-1)-1;
+
+  if (isomallocStart!=NULL) return; /*Must already be initialized.*/
 
   /*Round slot size up to nearest page size*/
   slotsize=16*1024;
