@@ -178,15 +178,28 @@ Debug() {
     fi
 }
 
+# Return success if $1 is not in any of the other arguments
+notInList() {
+	search=$1
+	shift
+	while [ $# -gt 0 ]
+	do
+		if [ "$search" = "$1" ]
+		then
+			# It's already in there-- fail
+			return 1
+		fi
+		shift
+	done
+	# It's missing--succeed
+	return 0
+}
+
+# Add arguments to our modules list, avoiding duplicates
 AddModules() {
     for M in $*
     do
-      OK=1
-      for i in `echo $MODULES`
-      do
-        test "$M" = "$i" && OK=0
-      done
-      test $OK = 1 && MODULES="$MODULES $M"
+      notInList $M $MODULES && MODULES="$MODULES $M"
     done
 }
 
@@ -205,6 +218,7 @@ TEMP_BASE="/tmp/charmc_tmp.$$"
 
 [ $# -eq 0 ] && printUsage "Error: No arguments given."
 
+processArgs() {
 while [ ! $# -eq 0 ]
 do
 	arg="$1"
@@ -221,8 +235,19 @@ do
 		;;
 
 	"-language")
-		LANGUAGE="$1"
-		POST_LANGUAGE=1
+		# Parse out some fake languages (that are actually modules)
+		case "$1" in
+		"ampi") AddModules ampi ;;
+		"ampif") AddModules ampif ;;
+		"fem") AddModules fem ;;
+		"femf") AddModules fem ; USE_F90_LIBRARIES="1" ;;
+		"mblock") AddModules mblock ;;
+		"mblockf") AddModules mblock ; USE_F90_LIBRARIES="1" ;;
+		*) 
+			LANGUAGE="$1"
+			POST_LANGUAGE=1
+			;;
+		esac
 		shift
 		;;
 
@@ -434,6 +459,12 @@ do
 		;;
 	esac
 done
+}
+
+
+# Process original command-line arguments
+processArgs $@
+
 
 ##############################################################################
 #
@@ -485,6 +516,55 @@ fi
 
 CHARMLIB="$CHARMBIN/../lib"
 CHARMINC="$CHARMBIN/../include"
+
+
+##############################################################################
+#
+# Load module dependencies.
+#
+##############################################################################
+
+PROCESSED_MODULES=""
+
+# Look up and add the dependencies for module $1
+findModuleDep() {
+	M=$1
+	notInList $M $PROCESSED_MODULES || return
+	PROCESSED_MODULES="$PROCESSED_MODULES $M"
+	
+	dep=""
+# fixme: should search everything in the -L library paths:
+	for dir in `echo . $CHARMLIB`
+	do
+		d="$dir/libmodule$M.dep"
+		[ -r "$d" ] && dep=$d
+	done
+	if [ -r "$dep" ]
+	then
+		# Add the module dependencies in this file
+		# Debugf "Adding module" $M "dependencies from" $dep
+		deps=`cat $dep`
+		Debugf "Module" $M "adds dependencies:" $deps
+		processArgs $deps
+	fi
+}
+
+# Repeat the module-dependency search until we find no
+#  new modules:
+START_MODULES=""
+while [ "$START_MODULES" != "$MODULES" ]
+do
+	Debugf "----------- Module dependency search ------------"
+	START_MODULES="$MODULES"
+	for m in $MODULES
+	do
+		findModuleDep $m
+	done
+done
+
+Debugf "----------- Module dependency search complete ------------"
+
+
 
 ##############################################################################
 #
@@ -918,51 +998,9 @@ MEM_OBJ="$CHARMLIB/libmemory-$MEMORY.o"
 [ ! -r $MEM_OBJ ] && Abort "charmc : No such memory mode $MEMORY"
 
 ############ Determine the language and libraries ##########
-IS_F90="n"
-
-# Parse out the pseudo-languages (just libraries, but easier to say)
-case "$LANGUAGE" in
-"ampi")
-	MODULES="$MODULES ampi"
-	POST_LIBRARIES="$POST_LIBRARIES -lddt -lmetis"
-	LANGUAGE="tcharm"
-	;;
-"ampif")
-	MODULES="$MODULES ampif"
-	POST_LIBRARIES="$POST_LIBRARIES -lddt -lmetis"
-	LANGUAGE="tcharmf"
-	;;
-"fem")
-	MODULES="$MODULES fem"
-	POST_LIBRARIES="$POST_LIBRARIES -lddt -lmetis"
-	LANGUAGE="tcharm"
-	;;
-"femf")
-	MODULES="$MODULES fem"
-	POST_LIBRARIES="$POST_LIBRARIES -lddt -lmetis"
-	LANGUAGE="tcharmf"
-	;;
-"mblock")
-	MODULES="$MODULES mblock"
-	POST_LIBRARIES="$POST_LIBRARIES -lddt -lmetis"
-	LANGUAGE="tcharm"
-	;;
-"mblockf")
-	MODULES="$MODULES mblock"
-	POST_LIBRARIES="$POST_LIBRARIES -lddt -lmetis"
-	LANGUAGE="tcharmf"
-	;;
-esac
 
 # Parse out the real languages
 case "$LANGUAGE" in
-"tcharm")
-	MODULES="$MODULES tcharm"
-	;;
-"tcharmf")
-	MODULES="$MODULES tcharm"
-	USE_F90_LIBRARIES="1"
-	;;
 "charm++f")
 	LANGUAGE="charm++"
 	USE_F90_LIBRARIES="1"
@@ -970,7 +1008,6 @@ case "$LANGUAGE" in
 "f90charm")
         PRE_LIBRARIES="$PRE_LIBRARIES -lf90charm "
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
-#       IS_F90="y"
 	;;
 "bluegene")
         PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene"
@@ -982,6 +1019,7 @@ case "$LANGUAGE" in
         PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene"
 	;;
 esac
+[ -r $CHARMLIB/libconv-utilf.a ] || USE_F90_LIBRARIES="0"
 
 if [ $USE_F90_LIBRARIES = "1" ]
 then
@@ -1062,7 +1100,7 @@ LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRAR
 CORE_LIBS="$LINK_MODULES -lconv-core -lconv-util $TRACE_OBJ $MEM_OBJ "
 
 case "$LANGUAGE" in
-"charm"|"charm++"|"f90charm"|"tcharm"|"tcharmf"|"ckbluegene"|"bgcharm++")
+"charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
 	Do $CMK_LDXX $OPTS_LD $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lck -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
