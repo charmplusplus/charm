@@ -144,8 +144,8 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 	      if (w < V) {
 		addEdge(EdgeList,i,w);
 		count++;
-	      }
-	  }
+			      }
+	     	  }
 	
 	/*varr is array of vertices and free connection for each vertex*/
 	
@@ -165,32 +165,33 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 	/*for all edges except last 10 , edge is formed by randomly selecting vertices from varr*/
 
 	n -= count;
-	if (n>10)
+
+	/*if (n>10)
 	for (j=0; j<n-10; j++) 
 	   {
-	     flag=0;
-	     do {
+	     	flag=0;
+		do {
 		     x = rand() % varrlen;
 		     do {
 			     y = rand() % varrlen;
 		        } while (y == x) ;
-	     }while (edgeExists(varr[x][0],varr[y][0]));
+	        }while (edgeExists(varr[x][0],varr[y][0]));
 	     addEdge(EdgeList, varr[x][0], varr[y][0]);
              
              varr[x][1]=varr[x][1]-1;
 	     varr[y][1]=varr[y][1]-1;
 
-	     /*If no free connections left for a vertex remove it from varr */	
+	     //If no free connections left for a vertex remove it from varr 	
 
 	     if (varr[x][1]==0) {
 				 flag=1;
 				 for (i=x;i<varrlen-1;i++)
-				 {	
-				   varr[i][0]=varr[i+1][0];
-				   varr[i][1]=varr[i+1][1];
-				 }
+					{	
+				 	 varr[i][0]=varr[i+1][0];
+					 varr[i][1]=varr[i+1][1];
+					}
 				 varrlen--;
-	     }
+				}
 	     if ((y>x)&&(flag)) {
 				         
 				 	if (varr[y-1][1]==0)   
@@ -213,9 +214,11 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 				}
 	   }
 
-	/*for last 10 edges, first vertex is one with max free connections and other vertex is randomly chosen */
+	//for last 10 edges, first vertex is one with max free connections and other vertex is randomly chosen 
 
-	if (n>10) k=10; else k = n;
+	if (n>10) k=10; else k = n;*/
+
+	k=n;
 	for (j=0;j<k;j++)
 		{
 				flag=0;
@@ -227,12 +230,14 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 				do {
 				     y = rand() % varrlen;
 				   } while (y == x) ;
-				if (j==k-1) addspEdge(EdgeList,varr[x][0],varr[y][0]);
-			        else do {
-				     		y = rand() % varrlen;
-				          } while (y == x);
-				if ((j!=k-1)||(!edgeExists(varr[x][0],varr[y][0])))
-				addEdge(EdgeList,varr[x][0],varr[y][0]); 
+
+				if (edgeExists(varr[x][0],varr[y][0])) 
+					if (j==k-1) addspEdge(EdgeList,varr[x][0],varr[y][0]);
+			        	else do {
+				     			y = rand() % varrlen;
+				         	 } while (y == x);
+				else addEdge(EdgeList,varr[x][0],varr[y][0]); 
+
 				varr[x][1]=varr[x][1]-1;
 	     			varr[y][1]=varr[y][1]-1;
 						
@@ -269,6 +274,7 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 					}
 			}	      
 }
+
 
 void fillAdjArray(Edge *edges, VerticesListType *vlist, int V, int E);
 void sortAdjArrays(VerticesListType *vlist);
