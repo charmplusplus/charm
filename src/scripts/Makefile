@@ -1050,4 +1050,4 @@ veryclean:
 
 
 configure: configure.in
-	autoconf && autoheader 
+	-autoconf && autoheader 
