@@ -500,7 +500,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
     data += Cmi_dgram_max_data;
     size -= Cmi_dgram_max_data;
   }
-  EnqueueOutgoingDgram(ogm, data, size, node, rank);
+  if (size) EnqueueOutgoingDgram(ogm, data, size, node, rank);
 }
 
 /***********************************************************************
