@@ -405,7 +405,7 @@ if(CpvAccess(staticNumEntries)>= poolSize) {
  /*   for(int i=0;i<numEntries;i++){
 	    delete pool[i];
     }*/
-    new (&pool[0]) TraceEntry(pool[CpvAccess(staticNumEntries-1)]);
+    new (&pool[0]) TraceEntry(pool[CpvAccess(staticNumEntries)-1]);
     //numEntries = 1;
     CpvAccess(staticNumEntries)=1;
 	//TODO
