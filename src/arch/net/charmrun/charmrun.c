@@ -1347,10 +1347,21 @@ int req_handle_initnodetab(ChMessage *msg,SOCKET fd)
 	return REQ_OK;
 }
 
+/* Check this return code from "printf". */
+static void checkPrintfError(int err) {
+  if (err<0) {
+    static int warned=0;
+    if (!warned) {
+      perror("charmrun WARNING> error in printf");
+      warned=1;
+    }
+  }
+}
+
 int req_handle_print(ChMessage *msg,SOCKET fd)
 {
-  printf("%s",msg->data);
-  fflush(stdout);
+  checkPrintfError(printf("%s",msg->data));
+  checkPrintfError(fflush(stdout));
   return REQ_OK;
 }
 
@@ -1365,8 +1376,8 @@ int req_handle_printerr(ChMessage *msg,SOCKET fd)
 
 int req_handle_printsyn(ChMessage *msg,SOCKET fd)
 {
-  printf("%s",msg->data);
-  fflush(stdout);
+  checkPrintfError(printf("%s",msg->data));
+  checkPrintfError(fflush(stdout));
   req_reply(fd, "printdone", "", 1);
   return REQ_OK;
 }
