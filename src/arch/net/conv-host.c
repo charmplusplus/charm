@@ -1995,10 +1995,10 @@ int rsh_pump(p, nodeno, rank0no, argv)
 
   if (arg_display)
     xstr_printf(ibuf,"setenv DISPLAY %s\n",arg_display);
-  xstr_printf(ibuf,"setenv NETSTART '%d %d %d %d %d %d %d %d'\n",
+  xstr_printf(ibuf,"setenv NETSTART '%d %d %d %d %d %d %d %d %d'\n",
 	      nodetab_rank0_size, rank0no,
 	      nodeno, nodetab_cpus(nodeno), nodetab_size,
-	      nodetab_ip(nodeno), req_ip, req_port);
+	      nodetab_ip(nodeno), req_ip, req_port, (getpid()&0x7FFF));
   prog_flush(p);
   
   /* find the node-program, relative version */

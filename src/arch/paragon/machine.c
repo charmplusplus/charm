@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.4  1997-03-19 04:31:19  jyelon
+ * Revision 1.5  1997-04-24 22:37:00  jyelon
+ * Added CmiNotifyIdle
+ *
+ * Revision 1.4  1997/03/19 04:31:19  jyelon
  * Redesigned ConverseInit
  *
  * Revision 1.3  1997/02/13 09:31:35  jyelon
@@ -157,36 +160,6 @@ void *CmiGetNonLocal()
 		return 0;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 int CmiAsyncMsgSent(c)
 CmiCommHandle c ;
 {
@@ -199,14 +172,13 @@ CmiCommHandle c ;
 {
 }
 
-
-
-
-
-
-
-
-
+void CmiNotifyIdle()
+{
+#ifdef CMK_WHEN_PROCESSOR_IDLE_USLEEP
+  tv.tv_sec=0; tv.tv_usec=5000;
+  select(0,0,0,0,&tv);
+#endif
+}
 
 /********************* MESSAGE SEND FUNCTIONS ******************/
 

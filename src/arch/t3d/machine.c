@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.6  1997-03-19 04:31:55  jyelon
+ * Revision 1.7  1997-04-24 22:37:11  jyelon
+ * Added CmiNotifyIdle
+ *
+ * Revision 1.6  1997/03/19 04:31:55  jyelon
  * Redesigned ConverseInit
  *
  * Revision 1.5  1997/02/13 09:31:57  jyelon
@@ -217,9 +220,14 @@ CmiCommHandle c ;
 {
 }
 
-
-
-
+void CmiNotifyIdle()
+{
+#ifdef CMK_WHEN_PROCESSOR_IDLE_USLEEP
+  tv.tv_sec=0; tv.tv_usec=5000;
+  select(0,0,0,0,&tv);
+#endif
+}
+ 
 
 
 

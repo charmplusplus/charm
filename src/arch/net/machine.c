@@ -438,6 +438,7 @@ static char     **Cmi_argv;
 static int        Cmi_host_IP;
 static int        Cmi_self_IP;
 static int        Cmi_host_port;
+static int        Cmi_host_pid;
 static char       Cmi_host_IP_str[16];
 static char       Cmi_self_IP_str[16];
 
@@ -458,7 +459,7 @@ static void parse_netstart()
   nread = sscanf(ns, "%d%d%d%d%d%d%d%d",
 		 &Cmi_numnodes, &Cmi_nodenum,
 		 &Cmi_nodestart, &Cmi_nodesize, &Cmi_numpes,
-		 &Cmi_self_IP, &Cmi_host_IP, &Cmi_host_port);
+		 &Cmi_self_IP, &Cmi_host_IP, &Cmi_host_port, &Cmi_host_pid);
   if (nread!=8) goto abort;
   sprintf(Cmi_self_IP_str,"%d.%d.%d.%d",
 	  (Cmi_self_IP>>24)&0xFF,(Cmi_self_IP>>16)&0xFF,
@@ -811,7 +812,6 @@ int node, nbr;
  *****************************************************************************/
 
 #define DGRAM_HEADER_SIZE 8
-#define DGRAM_MAGIC 0x1234
 
 #define CmiMsgHeaderSetLength(msg, len) (((int*)(msg))[2] = (len))
 #define CmiMsgHeaderGetLength(msg)      (((int*)(msg))[2])
@@ -1623,7 +1623,7 @@ int TransmitAcknowledgement()
   FIFO_Pop(ack_queue);
   
   DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE,
-		  Cmi_nodestart, 0x1234, node->recv_next);
+		  Cmi_nodestart, Cmi_host_pid, node->recv_next);
   extra = 0;
   for (i=0; i<Cmi_window_size; i++) {
     if (node->recv_window[i]) {
@@ -1676,7 +1676,7 @@ void TransmitImplicitDgram(ImplicitDgram dg)
   head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
   temp = *head;
   dest = dg->dest;
-  DgramHeaderMake(head, dg->rank, dg->srcpe, DGRAM_MAGIC, dg->seqno);
+  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_host_pid, dg->seqno);
   LOG(Cmi_clock, Cmi_nodestart, 'T', dest->nodestart, dg->seqno);
   ok = sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
 	      (struct sockaddr *)&(dest->addr), sizeof(struct sockaddr_in));
@@ -1911,7 +1911,7 @@ void ReceiveDatagram()
   dg->len = ok;
   if (ok >= DGRAM_HEADER_SIZE) {
     DgramHeaderBreak(dg->data, dg->rank, dg->srcpe, magic, dg->seqno);
-    if (magic == 0x1234) {
+    if (magic == Cmi_host_pid) {
       if (dg->rank == DGRAM_ACKNOWLEDGE)
 	IntegrateAckDatagram(dg);
       else IntegrateMessageDatagram(dg);
@@ -1956,6 +1956,24 @@ char *CmiGetNonLocal()
   CmiState cs = CmiGetState();
   void *result = PCQueuePop(cs->recv);
   return result;
+}
+
+/******************************************************************************
+ *
+ * CmiNotifyIdle()
+ *
+ *****************************************************************************/
+
+void CmiNotifyIdle()
+{
+  struct timeval tv;
+  CmiCommLock();
+  CommunicationServer();
+  CmiCommUnlock();
+#ifdef CMK_WHEN_PROCESSOR_IDLE_USLEEP
+  tv.tv_sec=0; tv.tv_usec=5000;
+  select(0,0,0,0,&tv);
+#endif
 }
 
 /******************************************************************************

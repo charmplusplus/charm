@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1997-03-19 04:31:45  jyelon
+ * Revision 2.16  1997-04-24 22:37:06  jyelon
+ * Added CmiNotifyIdle
+ *
+ * Revision 2.15  1997/03/19 04:31:45  jyelon
  * Redesigned ConverseInit
  *
  * Revision 2.14  1997/02/13 09:31:43  jyelon
@@ -178,7 +181,14 @@ void *CmiGetNonLocal()
 		return 0;
 }
 
-
+void CmiNotifyIdle()
+{
+#ifdef CMK_WHEN_PROCESSOR_IDLE_USLEEP
+  tv.tv_sec=0; tv.tv_usec=5000;
+  select(0,0,0,0,&tv);
+#endif
+}
+ 
 CmiSyncReceive(size, buffer)
 int size;
 char *buffer;

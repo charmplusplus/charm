@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.22  1997-03-21 19:23:57  milind
+ * Revision 1.23  1997-04-24 22:37:02  jyelon
+ * Added CmiNotifyIdle
+ *
+ * Revision 1.22  1997/03/21 19:23:57  milind
  * removed the alignment bug in Common.uth/machine.c
  *
  * Revision 1.21  1997/03/19 04:31:36  jyelon
@@ -400,6 +403,14 @@ int handler;
   if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
 }
 
+void CmiNotifyIdle()
+{
+#ifdef CMK_WHEN_PROCESSOR_IDLE_USLEEP
+  tv.tv_sec=0; tv.tv_usec=5000;
+  select(0,0,0,0,&tv);
+#endif
+}
+ 
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
 void CmiSyncSendFn(destPE, size, msg)

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1997-03-19 04:31:41  jyelon
+ * Revision 2.15  1997-04-24 22:37:04  jyelon
+ * Added CmiNotifyIdle
+ *
+ * Revision 2.14  1997/03/19 04:31:41  jyelon
  * Redesigned ConverseInit
  *
  * Revision 2.13  1997/02/13 09:31:40  jyelon
@@ -160,7 +163,14 @@ void *CmiGetNonLocal()
 }
 
 
-
+void CmiNotifyIdle()
+{
+#ifdef CMK_WHEN_PROCESSOR_IDLE_USLEEP
+  tv.tv_sec=0; tv.tv_usec=5000;
+  select(0,0,0,0,&tv);
+#endif
+}
+ 
 /********************* MESSAGE SEND INTERNAL FUNCTIONS ******************/
  
 CpvExtern(int, CmiInterruptsBlocked) ;

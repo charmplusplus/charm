@@ -58,6 +58,7 @@ int sigrelse(sig) int sig;
 #define MAX_HANDLERS 512
 
 void  *CmiGetNonLocal();
+void   CmiNotifyIdle();
 
 CpvDeclare(int, disable_sys_msgs);
 CpvExtern(int,    CcdNumChecks) ;
@@ -726,13 +727,7 @@ int maxmsgs;
         CpvAccess(CsdIdleDetectedFlag) = 1;
         if(!CpvAccess(CsdStopNotifyFlag)) (CpvAccess(CsdNotifyIdle))();
       }
-#if CMK_WHEN_PROCESSOR_IDLE_USLEEP
-      {
-        struct timeval tv;
-        tv.tv_usec=5000; tv.tv_sec=0;
-        select(0,0,0,0,&tv);
-      }
-#endif
+      CmiNotifyIdle();
       CcdRaiseCondition(CcdPROCESSORIDLE) ;
       if (CpvAccess(CsdStopFlag)) { 
         if(CpvAccess(CsdIdleDetectedFlag)) {

@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.35  1997-04-01 08:10:26  jyelon
+ * Revision 2.36  1997-04-24 22:37:08  jyelon
+ * Added CmiNotifyIdle
+ *
+ * Revision 2.35  1997/04/01 08:10:26  jyelon
  * Added CMK_GETPAGESIZE_AVAILABLE
  *
  * Revision 2.34  1997/03/25 23:09:10  milind
@@ -150,7 +153,8 @@
 #define CMK_WAIT_USES_WAITFLAGS_H                          0
 
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   0
-#define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1
+#define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
+#define CMK_WHEN_PROCESSOR_IDLE_NOTIFY_CMI                 1
 
 #define CMK_USE_HP_MAIN_FIX                                0
 #define CMK_DONT_USE_HP_MAIN_FIX                           1

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1997-03-21 20:06:55  milind
+ * Revision 2.14  1997-04-24 22:37:09  jyelon
+ * Added CmiNotifyIdle
+ *
+ * Revision 2.13  1997/03/21 20:06:55  milind
  * Fixed a prototype mismatch.
  *
  * Revision 2.12  1997/03/19 04:31:52  jyelon
@@ -264,6 +267,14 @@ void *CmiGetNonLocal()
 	  return msg;
 }
 
+void CmiNotifyIdle()
+{
+#ifdef CMK_WHEN_PROCESSOR_IDLE_USLEEP
+  tv.tv_sec=0; tv.tv_usec=5000;
+  select(0,0,0,0,&tv);
+#endif
+}
+ 
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
 void CmiSyncSendFn(destPE, size, msg)
