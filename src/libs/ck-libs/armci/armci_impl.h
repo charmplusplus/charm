@@ -21,6 +21,8 @@ extern CkArrayID armciVPAid;
 
 void mallocClient(void *param, int datasize, void *data);
 
+#define ARMCI_TCHARM_SEMAID 0x00A53C10 /* __ARMCI_ */
+
 // virtual processor class declaration
 // ARMCI is supposed to be platform neutral, so calling this a thread did
 // not seem like a proper abstraction.

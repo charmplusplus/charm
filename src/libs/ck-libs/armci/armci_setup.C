@@ -14,24 +14,25 @@ extern "C" void armciLibStart(void) {
 static void ArmciDefaultSetup(void) {
   // Create the base threads on TCharm using user-defined start routine.
   TCHARM_Create(TCHARM_Get_num_chunks(), armciLibStart);
-  // Attach the array of TCShmemThreads to the corresponding TCharm threads.
-  ARMCI_Attach();
 }
 
 // Bind the virtual processors in the armci library to TCharm's.
-// This can be called by default using ArmciDefaultSetup or directly
-// invoked by the user of the armci library if the user chooses to use
-// his/her own startup routine and/or employ multi-module programs.
-void ARMCI_Attach(void) {
-  CkArrayID _tc_aid;
-  CkArrayOptions opt = TCHARM_Attach_start(&_tc_aid, NULL);
-  CkArrayID aid = CProxy_ArmciVirtualProcessor::ckNew(_tc_aid, opt);
-  CProxy_ArmciVirtualProcessor vpProxy = CProxy_ArmciVirtualProcessor(aid);
-  CkArrayID *clientAid = new CkArrayID;
-  *clientAid = aid;
-  vpProxy.setReductionClient(mallocClient, (void *)clientAid);
-  TCHARM_Attach_finish(aid);
-  armci_nproc = TCHARM_Num_elements();
+// This is called by the user's thread when it starts up.
+CDECL int ARMCI_Init(void) {
+  if (TCHARM_Element()==0) {
+    CkArrayID _tc_aid;
+    CkArrayOptions opt = TCHARM_Attach_start(&_tc_aid, NULL);
+    CkArrayID aid = CProxy_ArmciVirtualProcessor::ckNew(_tc_aid, opt);
+    CProxy_ArmciVirtualProcessor vpProxy = CProxy_ArmciVirtualProcessor(aid);
+    // FIXME: should do reductions to element 0 of the array, not some bizarre malloc'd thing.
+    CkArrayID *clientAid = new CkArrayID;
+    *clientAid = aid;
+    vpProxy.setReductionClient(mallocClient, (void *)clientAid);
+  }
+  
+  ArmciVirtualProcessor *vp=(ArmciVirtualProcessor *)
+  	TCharm::get()->semaGet(ARMCI_TCHARM_SEMAID);
+  return 0;
 }
 
 

@@ -10,12 +10,6 @@ int armci_nproc;
 
 // initialization api
 
-// these are no-ops because of this implementation's associations with the
-// TCharm initialization process.
-int ARMCI_Init(void) {
-  return 0;
-}
-
 int ARMCI_Finalize(void) {
   return 0;
 }

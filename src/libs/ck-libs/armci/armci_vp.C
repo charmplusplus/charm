@@ -8,7 +8,8 @@ ArmciVirtualProcessor::ArmciVirtualProcessor(const CProxy_TCharm &_thr_proxy)
   memBlock = CmiIsomallocBlockListNew();
   thisProxy = CProxy_ArmciVirtualProcessor(thisArrayID);
   addressReply = NULL;
-  thread->ready();
+  // Save ourselves for the waiting ARMCI_Init
+  thread->semaPut(ARMCI_TCHARM_SEMAID,this);
 }
 
 ArmciVirtualProcessor::ArmciVirtualProcessor(CkMigrateMessage *m) 
@@ -27,6 +28,7 @@ ArmciVirtualProcessor::~ArmciVirtualProcessor()
 
 void ArmciVirtualProcessor::setupThreadPrivate(CthThread forThread) {
   CtvAccessOther(forThread, _armci_ptr) = this;
+  armci_nproc = thread->getNumElements();
 }
 
 void ArmciVirtualProcessor::getAddresses(AddressMessage *msg) {
