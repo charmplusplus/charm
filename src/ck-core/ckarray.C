@@ -893,9 +893,14 @@ int Array1D::expectedLocalMessages(void)
 	int i,nExpected=0;
 	//We expect one message from each local who hasn't yet contributed
 	for (i=0;i<numElements;i++)
-		if (elementIDs[i].state==here || elementIDs[i].state==creating)
+	{
+		if (elementIDs[i].state==here)
 			if (elementIDs[i].element->nContributions<reductionNo)
 				nExpected++;
+		if (elementIDs[i].state==creating)
+			nExpected++;
+	}
+			      
 	//We also expect one message from each occupant of the future file
 	for (i=0;i<nFuture;i++)
 		if (futureBuffer[i]->reductionNo==reductionNo)/*<-is this reduction*/
