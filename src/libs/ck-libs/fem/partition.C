@@ -192,9 +192,14 @@ void mesh2graph(const FEM_Mesh *m, Graph *g)
 }
 
 
-//FIXME: Shouldn't this prototype come from some METIS header file?
+//FIXME: Shouldn't these prototypes come from some METIS header file?
+typedef int idxtype;
+extern "C" void 
+METIS_PartGraphRecursive(int *, int *, int *, idxtype *, idxtype *, 
+int *, int *, int *, int *, int *, idxtype *);
+
 extern "C" void
-  METIS_PartGraphKway (int* nv, int* xadj, int* adjncy, int* vwgt, int* adjwgt,
+METIS_PartGraphKway (int* nv, int* xadj, int* adjncy, int* vwgt, int* adjwgt,
                        int* wgtflag, int* numflag, int* nparts, int* options,
                        int* edgecut, int* part);
 
@@ -220,7 +225,11 @@ void fem_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
 	int opts[5];
 	opts[0] = 0; //use default values
 	printf("calling metis partitioner...\n");
-	METIS_PartGraphKway(&nelems, adjStart, adjList, 0, 0, &wgtflag, &numflag, 
+	if (nchunks<8) /*Metis manual says recursive version is higher-quality here*/
+	  METIS_PartGraphRecursive(&nelems, adjStart, adjList, 0, 0, &wgtflag, &numflag, 
+                        &nchunks, opts, &ecut, elem2chunk);
+	else /*For many chunks, Kway is supposedly faster */
+	  METIS_PartGraphKway(&nelems, adjStart, adjList, 0, 0, &wgtflag, &numflag, 
                         &nchunks, opts, &ecut, elem2chunk);
 	printf("metis partitioner returned...\n");
 	delete[] adjStart;
