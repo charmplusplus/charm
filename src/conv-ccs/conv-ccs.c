@@ -2,6 +2,7 @@
 /* #include <sys/timer.h> */
 #include <sys/time.h>
 #include <sys/unistd.h>
+#include <errno.h>
 
 #include "conv-ccs.h"
 
