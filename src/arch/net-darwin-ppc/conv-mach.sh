@@ -1,13 +1,23 @@
-CMK_CPP_CHARM='/lib/cpp -P'
-CMK_CPP_C='cc -E'
-CMK_CC="cc -Wno-long-double "
-CMK_CXX="c++ -Wno-long-double "
-CMK_CXXPP='c++ -x c++ -E '
-CMK_CF77='f77'
-CMK_CF90='f90'
-CMK_RANLIB='ranlib'
-CMK_LIBS='-lckqt'
-CMK_QT='generic'
-CMK_XIOPTS=''
+CMK_CPP_CHARM="/lib/cpp -P"
+CMK_CPP_C="cc -E"
+CMK_CC="cc -Wno-long-double -fPIC -dynamic -fno-common "
+CMK_CXX="c++ -Wno-long-double -fPIC -dynamic -fno-common "
+CMK_CXXPP="c++ -x c++ -E "
+CMK_LDXX="$CMK_CXX -multiply_defined suppress "
+CMK_CF77="f77"
+CMK_CF90="f90 -qnocommon -qextname"
+CMK_RANLIB="ranlib"
+CMK_LIBS="-lckqt"
+CMK_QT="generic"
+CMK_XIOPTS=""
 # Assumes IBM xlf90 compiler:
 CMK_F90LIBS="-L/opt/ibmcmp/xlf/8.1/lib -lxlf90 -lxlopt -lxl -lxlfmath"
+CMK_MOD_EXT="mod"
+# setting for shared lib
+# need -lstdc++ for c++ reference, and it needs to be put at very last 
+# of command line.
+# Mac environment varaible
+export MACOSX_DEPLOYMENT_TARGET=10.3
+CMK_SHARED_SUF="dylib"
+CMK_LD_SHARED=" -dynamic -dynamiclib -undefined dynamic_lookup "
+CMK_LD_SHARED_LIBS="-lstdc++"
