@@ -89,8 +89,10 @@ static int checksum_flag = 0;
  to avoid MPI's in order delivery, changing MPI Tag all the time
 */
 #define TAG     1375
+/*
 static int mpi_tag = TAG;
 #define NEW_MPI_TAG	mpi_tag++; if (mpi_tag == MPI_TAG_UB) mpi_tag=TAG;
+*/
 
 int _Cmi_numpes;
 int               _Cmi_mynode;    /* Which address space am I */
@@ -462,14 +464,14 @@ static int PumpMsgs(void)
   MACHSTATE(2,"PumpMsgs begin {");
   while(1) {
     flg = 0;
-    res = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flg, &sts);
+    res = MPI_Iprobe(MPI_ANY_SOURCE, TAG, MPI_COMM_WORLD, &flg, &sts);
     if(res != MPI_SUCCESS)
       CmiAbort("MPI_Iprobe failed\n");
     if(!flg) break;
     recd = 1;
     MPI_Get_count(&sts, MPI_BYTE, &nbytes);
     msg = (char *) CmiAlloc(nbytes);
-    if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,MPI_ANY_TAG, MPI_COMM_WORLD,&sts)) 
+    if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, MPI_COMM_WORLD,&sts)) 
       CmiAbort("PumpMsgs: MPI_Recv failed!\n");
 
     MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
@@ -525,7 +527,7 @@ static void PumpMsgsBlocking(void)
     _MEMCHECK(buf);
   }
 
-  if (MPI_SUCCESS != MPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,MPI_ANY_TAG, MPI_COMM_WORLD,&sts)) 
+  if (MPI_SUCCESS != MPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
       CmiAbort("PumpMsgs: PMP_Recv failed!\n");
    MPI_Get_count(&sts, MPI_BYTE, &nbytes);
    msg = (char *) CmiAlloc(nbytes);
@@ -773,9 +775,8 @@ static int SendMsgBuf()
       MACHSTATE2(3,"MPI_send to node %d rank: %d{", node, CMI_DEST_RANK(msg));
       CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
       CMI_SET_CHECKSUM(msg, size);
-      if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,mpi_tag,MPI_COMM_WORLD,&(msg_tmp->req))) 
+      if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
         CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
-      NEW_MPI_TAG;
       MACHSTATE(3,"}MPI_send end");
       MsgQueueLen++;
       if(sent_msgs==0)
@@ -846,9 +847,8 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
   }
   CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
   CMI_SET_CHECKSUM(msg, size);
-  if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,mpi_tag,MPI_COMM_WORLD,&(msg_tmp->req))) 
+  if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
     CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
-  NEW_MPI_TAG;
   MsgQueueLen++;
   if(sent_msgs==0)
     sent_msgs = msg_tmp;
