@@ -52,6 +52,7 @@ void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
   int len, queueing, priobits,i; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
+CmiAbort("CldEnqueueMulti!\n");
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
   if (pfn) {
     pfn(&msg);
@@ -83,7 +84,7 @@ static int BgNumPes() { int x,y,z; BgGetSize(&x, &y, &z); return (x*y*z); }
 
 #elif CMK_BLUEGENE_THREAD
 static int BgMyPe() { return BgGetGlobalWorkerThreadID(); }
-static int BgNumPes() { return BgGetTotalSize()*BgGetNumWorkThread(); }
+static int BgNumPes() { return BgNumNodes()*BgGetNumWorkThread(); }
 #   define BGSENDPE(pe, msg, len)  {	\
       int x,y,z,t;	\
       t = (pe)%BgGetNumWorkThread();	\
@@ -96,6 +97,17 @@ static int BgNumPes() { return BgGetTotalSize()*BgGetNumWorkThread(); }
       BgThreadBroadcastAllPacket(CmiGetHandler(msg), LARGE_WORK, len, msg);
 #   define BGBDCAST(len, msg) 	\
       BgThreadBroadcastPacketExcept(BgMyNode(), BgGetThreadID(), \
+                                    CmiGetHandler(msg), LARGE_WORK, len, msg);
+#   define BGSENDNODE(node, msg, len)  {	\
+      int x,y,z;	\
+      BgGetXYZ(node, &x, &y, &z);	\
+      DEBUGF(("send to: (%d %d %d) handle:%d\n", x,y,z, CmiGetHandler(msg)));  \
+      BgSendPacket(x,y,z, ANYTHREAD, CmiGetHandler(msg), LARGE_WORK, len, (char *)msg);	\
+      }
+#   define BGNODEBDCASTALL(len, msg) 	\
+      BgBroadcastAllPacket(CmiGetHandler(msg), LARGE_WORK, len, msg);
+#   define BGNODEBDCAST(len, msg) 	\
+      BgBroadcastPacketExcept(BgMyNode(), ANYTHREAD,\
                                     CmiGetHandler(msg), LARGE_WORK, len, msg);
 #endif
 
@@ -189,13 +201,16 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
   CldPackFn pfn;
   if (node == CLD_ANYWHERE) {
     /* node = (((rand()+CmiMyNode())&0x7FFFFFFF)%CmiNumNodes()); */
-    node = (((CrnRand()+CmiMyNode())&0x7FFFFFFF)%CmiNumNodes());
-    if (node != CmiMyNode())
+    node = (((CrnRand()+BgMyNode())&0x7FFFFFFF)%BgNumNodes());
+    if (node != BgMyNode())
       CpvAccess(CldRelocatedMessages)++;
   }
-  if (node == CmiMyNode()) {
+  if (node == BgMyNode()) {
+/*
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     CsdNodeEnqueueGeneral(msg, queueing, priobits, prioptr);
+*/
+    BGSENDNODE(node, msg, len);
   } 
   else {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -203,11 +218,22 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
       pfn(&msg);
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     }
+/*
     CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
+*/
     CmiSetInfo(msg,infofn);
-    if (node==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, (char *)msg); }
-    else if (node==CLD_BROADCAST_ALL){CmiSyncNodeBroadcastAllAndFree(len,(char *)msg);}
-    else CmiSyncNodeSendAndFree(node, len, (char *)msg);
+    if (node==CLD_BROADCAST) { 
+/*      CmiSyncNodeBroadcastAndFree(len, (char *)msg);  */
+      BGNODEBDCAST(len, (char *)msg);
+    }
+    else if (node==CLD_BROADCAST_ALL){
+/*      CmiSyncNodeBroadcastAllAndFree(len,(char *)msg); */
+      BGNODEBDCASTALL(len, (char *)msg);
+    }
+    else {
+/*      CmiSyncNodeSendAndFree(node, len, (char *)msg);  */
+      BGSENDNODE(node, msg, len);
+    }
   }
 }
 
