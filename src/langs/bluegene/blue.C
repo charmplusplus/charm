@@ -744,17 +744,6 @@ void BgShutdown()
     CmiStartQD(BroadcastShutdown, NULL);
     CmiDeliverMsgs(-1);
   }
-  
-/*
-  int i;
-  // TODO: free memory 
-  delete [] cva(nodeinfo);
-  delete [] inBuffer;
-  for (i=0; i<numNodes; i++) CmmFree(msgBuffer[i]);
-  delete [] msgBuffer;
-
-  CmiAbort("\nBG> BlueGene emulator shutdown gracefully!\n");
-*/
 }
 
 /*****************************************************************************
@@ -1282,7 +1271,7 @@ void bgAddProjEvent(void *data, double t)
   CmiAssert(log.length() > 0);
   bgTimeLog *tline = log[log.length()-1];
   // make sure this time log entry is not closed
-  if (tline->endTime != 0.0) tline->addEvent(data, t);
+  if (tline->endTime == 0.0) tline->addEvent(data, t);
 }
 
 
