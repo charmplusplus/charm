@@ -424,17 +424,12 @@ void pparam_printdocs()
       if (len>maxdoc) maxdoc=len;
     }
   fprintf(stderr,"\n");
-  fprintf(stderr,"parameters recognized are:\n");
+  fprintf(stderr,"The parameters Charmrun recognizes are:\n");
   fprintf(stderr,"\n");
   for (def=ppdefs; def; def=def->next)
     {
-      len = strlen(def->lname);
-      fprintf(stderr,"  %c%c%s ",pparam_optc,pparam_optc,def->lname);
-      for(i=0; i<maxname-len; i++) fprintf(stderr," ");
-      len = strlen(def->doc);
-      fprintf(stderr,"  %s ",def->doc);
-      for(i=0; i<maxdoc-len; i++) fprintf(stderr," ");
-      fprintf(stderr,"[%s]\n",pparam_getdef(def));
+      fprintf(stderr,"  %c%c%-*s ",pparam_optc,pparam_optc,maxname,def->lname);
+      fprintf(stderr,"  %-*s [%s]\n",maxdoc,def->doc,pparam_getdef(def));
     }
   fprintf(stderr,"\n");
 }
@@ -687,9 +682,20 @@ void arg_init(int argc, char **argv)
   /* find the current directory, absolute version */
   getcwd(buf, 1023);
   arg_currdir_a = strdup(buf);
-  
+    
   /* find the node-program, absolute version */
   arg_nodeprog_r = argv[1];
+
+  if (arg_nodeprog_r[0]=='-' || arg_nodeprog_r[0]=='+') 
+  { /*If it starts with - or +, it ain't a node program.
+      Chances are, the user screwed up and passed some unknown flag to charmrun*/
+     printf("Charmrun does not recognize the flag '%s'.\n",arg_nodeprog_r);
+     if (arg_nodeprog_r[0]=='+')
+       printf("Charm++'s flags need to be placed *after* the program name.\n");
+     pparam_printdocs();
+     exit(1);
+  }
+
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
   if (argv[1][1]==':') { /*E.g.: "C:\foo\bar.exe*/
