@@ -49,7 +49,8 @@ ItemList:	Item
 	|	ItemList Item
 	;
 
-Item	:	Boc | Chare | Message | ReadOnly | Table
+Item	:	Boc | Chare | Message | ReadOnly | Table |
+PackMessage
 	;
 
 OptionalExtern
