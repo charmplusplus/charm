@@ -14,11 +14,7 @@ More documentation goes here...
 #include "ck.h"
 //#include "ckcheckpoint.h"
 
-#if 1
 #define DEBCHK CkPrintf
-#else
-#define DEBCHK //CkPrintf
-#endif
 
 CkGroupID _sysChkptMgr;
 
@@ -57,6 +53,8 @@ public:
         }
 };
 
+
+extern void _initDone();
 
 static void bdcastRO(void){
 	int i;
@@ -452,6 +450,8 @@ void CkRestartMain(const char* dirname){
 	      fclose(datFile);
             }
 	  }
+
+   	_initDone();
 
 	if(CkMyPe()==0) {
 		CmiPrintf("[%d]CkRestartMain done. sending out callback.\n",CkMyPe());

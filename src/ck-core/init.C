@@ -46,7 +46,6 @@ which is probably overly complex.
 #include "ck.h"
 #include "trace.h"
 
-void CkStartCheckpoint(const char* dirname,const CkCallback& cb);
 void CkRestartMain(const char* dirname);
 
 #define  DEBUGF(x)    // CmiPrintf x;
@@ -118,7 +117,9 @@ static InitCallTable _initCallTable;
           CmiPrintf("stats unavailable in optimized version. ignoring...\n");
 #endif
 
-static int _doRestart;
+// fault tolerance
+typedef void (*CkFtFn)(const char *);
+static CkFtFn  faultFunc = NULL;
 static char* _restartDir;
 
 static inline void _parseCommandLineOpts(char **argv)
@@ -140,9 +141,15 @@ static inline void _parseCommandLineOpts(char **argv)
   if (CmiGetArgFlagDesc(argv,"+blifo", "Default to bitvector-prioritized LIFO queuing"))
       _defaultQueueing = CK_QUEUEING_BLIFO;
   if(CmiGetArgString(argv,"+restart",&_restartDir))
-      _doRestart=1;
-  else
-      _doRestart=0;
+      faultFunc = CkRestartMain;
+#if __FAULT__
+  if (CmiGetArgFlagDesc(argv,"+restartaftercrash","restarting this processor after a crash")){	
+# if CMK_MEM_CHECKPOINT
+      faultFunc = CkMemRestart;
+# endif
+      CmiPrintf("[%d] Restarting after crash \n",CmiMyPe());
+  }
+#endif
 }
 
 static void _bufferHandler(void *msg)
@@ -345,7 +352,7 @@ static void _sendTriggers(void)
   CmiUnlock(CksvAccess(_nodeLock));
 }
 
-static inline void _initDone(void)
+void _initDone(void)
 {
   DEBUGF(("[%d] _initDone.\n", CkMyPe()));
   if (!_triggersSent) _sendTriggers();
@@ -638,6 +645,9 @@ void _initCharm(int unused_argc, char **argv)
 		_registerwaitqd();
 		_registercharisma();
 		_registerCkCheckpoint();
+#if CMK_MEM_CHECKPOINT
+		_registerCkMemCheckpoint();
+#endif
 		_registerExternalModules(argv);
 		CkRegisterMainModule();
 		_registerDone();
@@ -658,10 +668,9 @@ void _initCharm(int unused_argc, char **argv)
 	  _TRACE_BEGIN_COMPUTATION();
 	}
 
-	if(_doRestart){
+	if (faultFunc) {
 		_allStats = new Stats*[CkNumPes()];
-		CkRestartMain(_restartDir);
-		_initDone();
+		faultFunc(_restartDir);
 	}else if(CkMyPe()==0){
 		_allStats = new Stats*[CkNumPes()];
 		register int i, nMains=_mainTable.size();
