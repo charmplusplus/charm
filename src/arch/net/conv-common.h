@@ -36,4 +36,4 @@
 
 #define CMK_OBJECT_QUEUE_AVAILABLE		   	   0
 
-
+#define CMK_MACHINE_PROGRESS_DEFINED                       1

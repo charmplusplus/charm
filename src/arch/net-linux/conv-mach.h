@@ -68,8 +68,6 @@
 
 #define CMK_LBDB_ON					   1
 
-#define CMK_MACHINE_PROGRESS_DEFINED                       1
-
 #endif
 
 
