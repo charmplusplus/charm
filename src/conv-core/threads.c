@@ -998,6 +998,8 @@ CthThread t;
   CthThreadBaseInit(&t->base);
 }
 
+CpvStaticDeclare(void *, stackPool);
+
 void CthInit(char **argv)
 {
   CthThread t;
@@ -1007,10 +1009,17 @@ void CthInit(char **argv)
   _MEMCHECK(t);
   CthCpvAccess(CthCurrent)=t;
   CthThreadInit(t);
+  CpvInitialize(void *, stackPool);
+  CpvAccess(stackPool) = NULL;
 }
 
 static void CthThreadFree(CthThread t)
 {
+  /* avoid freeing stack since it is being used, store in stackPool and 
+     free it next time, note the last stack in stackPool won't be free'd! */
+  if (CpvAccess(stackPool) != NULL) free(CpvAccess(stackPool));
+  CpvAccess(stackPool) = t->base.stack;
+  t->base.stack = NULL;
   CthThreadBaseFree(&t->base);
   free(t);
 }
