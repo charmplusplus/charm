@@ -123,6 +123,7 @@ extern CmiNodeLock CmiCreateLock(void);
 
 #include <thread.h>
 #include <synch.h>
+#include <stdlib.h>
 
 extern int Cmi_numpes;
 extern int Cmi_mynodesize;

@@ -119,7 +119,7 @@ void *realloc(mem, size)
   return (void *) result;
 }
 
-char *memalign(align, size)
+void *memalign(align, size)
     int align, size;
 {
   char *result;

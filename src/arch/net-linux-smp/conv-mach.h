@@ -78,6 +78,7 @@
 #define CMK_STRINGS_USE_STRING_H                           1
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
+#define CMK_THREADS_COPY_STACK                             0
 
 #define CMK_TIMER_USE_GETRUSAGE                            1
 #define CMK_TIMER_USE_SPECIAL                              0
