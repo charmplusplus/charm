@@ -10,10 +10,11 @@
 #endif
 
 /** Initialize the IDXL library.  Must have already called MPI_Init. */
-void IDXL_Init(void);
+void IDXL_Init(int comm);
 
 /** An index list, the fundamental datatype of this library. */
 typedef int IDXL_t;
+#define IDXL_FIRST_IDXL_T 1550000000
 
 /** Create a new, empty index list. Must eventually call IDXL_Destroy on this list. */
 IDXL_t IDXL_Create(void);
@@ -48,16 +49,20 @@ void IDXL_Sort_3d(IDXL_t l,double *coord3d);
 void IDXL_Destroy(IDXL_t l);
 
 
-/** Extract the information from this index list
+/** Extract the indices out of this index list:
+ */
 typedef int IDXL_Side_t;
+#define IDXL_SHIFT_SIDE_T_SEND 1000000 /* 1551000000 */
+#define IDXL_SHIFT_SIDE_T_RECV 2000000 /* 1552000000 */
 IDXL_Side_t IDXL_Get_send(IDXL_t l);
 IDXL_Side_t IDXL_Get_recv(IDXL_t l);
-int IDXL_Get_partners(IDXL_Side_t l);
-int IDXL_Get_partner(IDXL_Side_t l,int partnerNo);
-int IDXL_Get_count(IDXL_Side_t l,int partnerNo);
-void IDXL_Get_list(IDXL_Side_t l,int partnerNo,int *list);
-int IDXL_Get(IDXL_Side_t l,int partnerNo,int listIndex);
- */
+int IDXL_Get_partners(IDXL_Side_t s);
+int IDXL_Get_partner(IDXL_Side_t s,int partnerNo);
+int IDXL_Get_count(IDXL_Side_t s,int partnerNo);
+void IDXL_Get_list(IDXL_Side_t s,int partnerNo,int *list);
+int IDXL_Get_index(IDXL_Side_t s,int partnerNo,int listIndex);
+void IDXL_Get_end(IDXL_Side_t l);
+
 /** Return the chunk this (ghost) local number is received from */
 int IDXL_Get_source(IDXL_t l,int localNo);
 
@@ -77,6 +82,7 @@ int IDXL_Get_source(IDXL_t l,int localNo);
 
 /** An IDXL_Layout_t describes the in-memory layout of a user data array */
 typedef int IDXL_Layout_t;
+#define IDXL_FIRST_IDXL_LAYOUT_T 1560000000
 
 IDXL_Layout_t IDXL_Layout_create(int type,int width);
 IDXL_Layout_t IDXL_Layout_offset(
@@ -95,7 +101,8 @@ typedef int IDXL_Comm_t;
  * a collective routine, and exactly one exchange can be outstanding;
  * but these restrictions may be relaxed later. 
  * @param tag a user-defined "tag" for this exchange.
- * @param context an MPI communicator, or 0 for the default. */
+ * @param context an MPI communicator, or 0 for the default. 
+ */
 IDXL_Comm_t IDXL_Comm_begin(int tag, int context); 
 
 /** Remote-copy this data on flush/wait. If m is zero, includes begin&wait. */

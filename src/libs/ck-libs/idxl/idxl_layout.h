@@ -101,7 +101,7 @@ reduction_combine_fn reduction_combine(const IDXL_Layout& dt, int op,const char 
 
 /// Keeps a list of dynamically-allocated IDXL_Layout objects:
 class IDXL_Layout_List {
-  enum {FIRST_DT=1560000000, MAX_DT=20};
+  enum {FIRST_DT=IDXL_FIRST_IDXL_LAYOUT_T, MAX_DT=20};
   IDXL_Layout *list[MAX_DT]; 
   void badLayout(IDXL_Layout_t l,const char *callingRoutine) const;
 public:

@@ -22,7 +22,8 @@
        
        
        interface
-       subroutine IDXL_Init()
+       subroutine IDXL_Init(mpi_comm)
+         integer,intent (in) :: mpi_comm
        end subroutine
        integer function IDXL_Create()
        end function
@@ -57,38 +58,56 @@
          integer,intent (in) :: l
        end subroutine    
        
-       function IDXL_Get_source(l,localNo)
+       integer function IDXL_Get_send(l) 
+         integer,intent(in) :: l
+       end function
+       integer function IDXL_Get_recv(l) 
+         integer,intent(in) :: l
+       end function
+       integer function IDXL_Get_partners(s) 
+         integer,intent(in) :: s
+       end function
+       integer function IDXL_Get_partner(s,partnerNo) 
+         integer,intent(in) :: s, partnerNo
+       end function
+       integer function IDXL_Get_count(s,partnerNo) 
+         integer,intent(in) :: s, partnerNo
+       end function
+       subroutine IDXL_Get_list(s,partnerNo,list) 
+         integer,intent(in) :: s, partnerNo
+         integer,intent(out) :: list(*)
+       end subroutine
+       integer function IDXL_Get_index(s,partnerNo,index) 
+         integer,intent(in) :: s, partnerNo, index
+       end function
+       subroutine IDXL_Get_end(s) 
+         integer,intent(in) :: s
+       end subroutine
+       integer function IDXL_Get_source(l,localNo)
           integer, intent(in) :: l,localNo
-          integer :: IDXL_Get_source
        end function
 
-       function IDXL_Layout_create(type,width)
+       integer function IDXL_Layout_create(type,width)
           integer, intent(in) :: type, width
-          integer :: IDXL_Layout_create
        end function
-       function IDXL_Layout_offset(type,width,off,dist,skew)
+       integer function IDXL_Layout_offset(type,width,off,dist,skew)
           integer, intent(in) :: type, width, off, dist, skew
-          integer :: IDXL_Layout_offset
        end function
-       function IDXL_Get_layout_type(l)
+       integer function IDXL_Get_layout_type(l)
           integer, intent(in) :: l
-          integer :: IDXL_Get_layout_type
        end function
-       function IDXL_Get_layout_width(l)
+       integer function IDXL_Get_layout_width(l)
           integer, intent(in) :: l
-          integer :: IDXL_Get_layout_width
        end function
-       function IDXL_Get_layout_distance(l)
+       integer function IDXL_Get_layout_distance(l)
           integer, intent(in) :: l
-          integer :: IDXL_Get_layout_distance
        end function
        subroutine IDXL_Layout_destroy(l)
          integer,intent (in) :: l
        end subroutine
        
-       function IDXL_Comm_begin(tag,context) 
+       integer function IDXL_Comm_begin(tag,context) 
          integer,intent (in) :: tag,context
-         integer :: IDXL_Comm_begin
        end function
        subroutine IDXL_Comm_flush(comm)
          integer,intent (in) :: comm

@@ -43,16 +43,16 @@ IDXL_Chunk *IDXL_Chunk::get(const char *callingRoutine) {
 }
 
 CDECL void
-IDXL_Init(void) {
+IDXL_Init(int mpi_comm) {
 	if (!TCHARM_Get_global(IDXL_globalID)) {
-		IDXL_Chunk *c=new IDXL_Chunk();
+		IDXL_Chunk *c=new IDXL_Chunk(mpi_comm);
 		TCHARM_Set_global(IDXL_globalID,c,pupIDXL_Chunk);
 	}
 }
-FORTRAN_AS_C(IDXL_INIT,IDXL_Init,idxl_init,  (void), ())
+FORTRAN_AS_C(IDXL_INIT,IDXL_Init,idxl_init,  (int *comm), (*comm))
 
-IDXL_Chunk::IDXL_Chunk(void) 
-	:currentComm(0)
+IDXL_Chunk::IDXL_Chunk(int mpi_comm_) 
+	:mpi_comm(mpi_comm_), currentComm(0)
 {
 	init();
 }
@@ -65,6 +65,8 @@ void IDXL_Chunk::init(void) {
 }
 
 void IDXL_Chunk::pup(PUP::er &p) {
+	p|mpi_comm;
+
 	p|layouts;
 	if (currentComm) CkAbort("Cannot migrate with ongoing IDXL communication");
 	
@@ -162,6 +164,7 @@ IDXL_Layout_List &IDXL_Layout_List::get(void)
 IDXL_Comm_t IDXL_Chunk::addComm(int tag,int context)
 {
 	if (currentComm) CkAbort("Cannot start two IDXL_Comms at once");
+	if (context==0) context=mpi_comm;
 	currentComm=new IDXL_Comm(tag,context);
 	return 27; //FIXME: there's only one outstanding comm!
 }

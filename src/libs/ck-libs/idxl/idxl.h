@@ -105,11 +105,13 @@ public:
  * For IDXL_Chunk to do its job, you're supposed to inherit from it.
  */
 class IDXL_Chunk {
+  // MPI Communicator to use by default
+  int mpi_comm;
   
   // List of index lists: 
   // first has a static part for stuff we can't throw away (indices 0..STATIC_IDXL-1)
   // then a dynamic part for user-allocated stuff (indices STATIC_IDXL...LAST_IDXL-1)
-  enum {FIRST_IDXL=1550000000, STATIC_IDXL=32, LAST_IDXL=64};
+  enum {FIRST_IDXL=IDXL_FIRST_IDXL_T, STATIC_IDXL=32, LAST_IDXL=64};
   IDXL *idxls[LAST_IDXL];
 
   // Lists ongoing communications (FIXME: add list here)
@@ -117,7 +119,7 @@ class IDXL_Chunk {
   
   void init(void);
 public:
-	IDXL_Chunk(void);
+	IDXL_Chunk(int mpi_comm_);
 	IDXL_Chunk(CkMigrateMessage *m);
 	void pup(PUP::er &p);
 	~IDXL_Chunk();
