@@ -1,15 +1,17 @@
 CHARMC=../../bin/charmc $(OPTS)
 
-all: convlibs charmlibs otherlibs
+all: 
+	$(MAKE) convlibs 
+	$(MAKE) charmlibs otherlibs
 
 convlibs:
-	cd conv-libs; make all OPTS='$(OPTS)'
+	cd conv-libs; $(MAKE) all OPTS='$(OPTS)'
 
 charmlibs:
-	cd ck-libs; make all OPTS='$(OPTS)'
+	cd ck-libs; $(MAKE) all OPTS='$(OPTS)'
 
 otherlibs:
-	cd other; make all OPTS='$(OPTS)'
+	cd other; $(MAKE) all OPTS='$(OPTS)'
 
 clean:
 	cd conv-libs; make clean
