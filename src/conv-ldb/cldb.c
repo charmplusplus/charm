@@ -25,6 +25,8 @@
  *
  */
 
+CpvDeclare(int, CldAvgLoad);
+
 int CldRegisterInfoFn(CldInfoFn fn)
 {
   return CmiRegisterHandler((CmiHandler)fn);
@@ -62,6 +64,7 @@ typedef struct CldProcInfo_s {
 } *CldProcInfo;
 
 CpvDeclare(CldProcInfo, CldProc);
+extern void CldNotify(int);
 
 static void CldTokenHandler(CldToken tok)
 {
@@ -72,6 +75,7 @@ static void CldTokenHandler(CldToken tok)
     tok->succ->pred = tok->pred;
     proc->load --;
     CmiHandleMessage(tok->msg);
+    CldNotify(proc->load);
   } else {
     /* CmiFree(tok->msg); */
   }
@@ -103,6 +107,8 @@ void CldPutToken(void *msg)
   /* add token to the scheduler */
   CmiSetHandler(tok, proc->tokenhandleridx);
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+
+  queueing = CQS_QUEUEING_LIFO; 
   CsdEnqueueGeneral(tok, queueing, priobits, prioptr);
 }
 
@@ -129,7 +135,9 @@ void CldModuleGeneralInit()
   CldProcInfo proc;
 
   CpvInitialize(CldProcInfo, CldProc);
+  CpvInitialize(int, CldAvgLoad);
   CpvAccess(CldProc) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
+  CpvAccess(CldAvgLoad) = 0;
   proc = CpvAccess(CldProc);
   proc->load = 0;
   proc->tokenhandleridx = CmiRegisterHandler((CmiHandler)CldTokenHandler);
