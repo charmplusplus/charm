@@ -285,7 +285,7 @@ RUNNING A PROGRAM
 
 Following the previous example, to run the program on two processors, type
 
-     > ./charmrun ./pgm 12 100 +p2
+     > ./charmrun ./pgm 12 6 +p2
 
 This should run for a few seconds, and print out:
 There are 14200 Solutions to 12 queens. Finish time=4.030000
