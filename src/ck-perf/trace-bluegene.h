@@ -88,14 +88,14 @@ extern int traceBluegeneLinked;
                 _TRACE_BG_ADD_BACKWARD_DEP(event);	\
         }	\
 	}
-#define TRACE_BG_AMPI_WAITALL() 	\
-	TRACE_BG_AMPI_SUSPEND();	\
+#define TRACE_BG_AMPI_WAITALL(reqs) 	\
+        {	\
   	TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_WAITALL")	\
-  	AmpiRequestList* reqs = getReqs();	\
   	for(int i=0;i<count;i++) {	\
     	  void *log = (*reqs)[request[i]]->event;	\
     	  _TRACE_BG_ADD_BACKWARD_DEP(log);	\
-        }
+        }	\
+	}
 #else
 # define BgPrint(x)  
 # define _TRACE_BG_TLINE_END(x)
@@ -104,6 +104,7 @@ extern int traceBluegeneLinked;
 # define TRACE_BG_AMPI_RESUME(t, msg, str, log)
 # define TRACE_BG_AMPI_START(t, str)
 # define TRACE_BG_NEWSTART(t, str, events, count)
+#define TRACE_BG_AMPI_WAITALL(reqs)
 #endif   /* CMK_TRACE_IN_CHARM */
 
 #endif
