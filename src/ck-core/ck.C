@@ -827,5 +827,12 @@ void _ckModuleInit(void) {
 	index_skipCldHandler = CkRegisterHandler((CmiHandler)_skipCldHandler);
 }
 
+// helper functions
+int CkIsCharmMessage(char *msg)
+{
+  return (CmiGetHandler(msg) == _charmHandlerIdx) &&
+         (CmiGetHandlerFunction(msg) == (CmiHandler)_processHandler);
+}
+
 #include "CkMarshall.def.h"
 
