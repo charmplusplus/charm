@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-10-20 20:26:45  sanjeev
+ * Revision 2.11  1995-10-23 22:37:48  jyelon
+ * Enabled alloca-based threads.
+ *
+ * Revision 2.10  1995/10/20  20:26:45  sanjeev
  * added CMK_SIZE_T
  *
  * Revision 2.9  1995/10/18  22:20:57  jyelon
@@ -88,9 +91,9 @@
 #define CMK_CMIPRINTF_IS_JUST_PRINTF
 
 /* #define CMK_THREADS_USE_ALLOCA */
-/* #define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE */
 /* #define CMK_THREADS_UNAVAILABLE */
-#define CMK_THREADS_USE_EATSTACK
+/* #define CMK_THREADS_USE_EATSTACK */
+#define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE
 
 
 
