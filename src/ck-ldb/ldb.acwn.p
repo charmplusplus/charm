@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-10-27 22:09:16  jyelon
+ * Revision 2.6  1995-11-06 17:55:09  milind
+ * Changed to conform to the definition of functions NewSeedFrom*
+ *
+ * Revision 2.5  1995/10/27  22:09:16  jyelon
  * Changed Cmi to Ck in all charm files.
  *
  * Revision 2.4  1995/10/27  21:35:54  jyelon
@@ -119,18 +122,20 @@ void *ldb;
 }
 
 
-export_to_C CldNewSeedFromNet(msgst, ldb, sendfn) 
+export_to_C CldNewSeedFromNet(msgst, ldb, sendfn,queuing,priolen,prioptr) 
 void *msgst, *ldb;
 void (*sendfn)();
+unsigned int queuing, priolen, *prioptr;
 {
-	BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromNet(msgst, ldb, sendfn));
+	BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromNet(msgst, ldb, sendfn,queuing,priolen,prioptr));
 }
 
-export_to_C CldNewSeedFromLocal(msgst, ldb, sendfn)
+export_to_C CldNewSeedFromLocal(msgst, ldb, sendfn,queuing,priolen,prioptr)
 void *msgst, *ldb;
 void (*sendfn)();
+unsigned int queuing, priolen, *prioptr;
 {
-	BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromLocal(msgst, ldb, sendfn));
+	BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromLocal(msgst, ldb, sendfn,queuing,priolen,prioptr));
 }
 
 export_to_C CldProcessMsg(msgPtr, localdataPtr)
@@ -190,7 +195,7 @@ int peNum;
 
     if (peNum >=0)
     {
-    	i = CkNeighboursIndex(myPE, peNum);
+    	i = CmiNeighboursIndex(myPE, peNum);
     	if (i > -1)
     	{
 	 	statusList[i].myLoadSent = CldMyLoad();
@@ -250,9 +255,10 @@ private UpdateMinMaxHops()
 }
 
 
-private Strategy(msg, ldbptr, sendfn)
+private Strategy(msg, ldbptr, sendfn,queuing,priolen,prioptr)
 void *msg, *ldbptr;
 void (*sendfn)();
+unsigned int queuing,priolen,*prioptr;
 {
     LDB_ELEMENT * ldb;
     int MyPeLoad;
@@ -275,7 +281,7 @@ void (*sendfn)();
     {
 
 	TRACE(CkPrintf("LdbNodeStrategy:Node %d: Hops>=maxHops(%d), Enqueue Msg 0x%x\n", myPE, maxHops, msg));
-	CldAddToken(msg, sendfn);
+	CldAddToken(msg, sendfn,queuing,priolen,prioptr);
     }
     /* Msg has travelled between minHops and maxHops */
     else /* ( (minHops <= ldb->msgHops) && (ldb->msgHops < maxHops) ) */
@@ -297,13 +303,13 @@ void (*sendfn)();
 		(*sendfn)(msg, leastLoadedPe);
 	      }
 	    else
-	      CldAddToken(msg, sendfn);
+	      CldAddToken(msg, sendfn,queuing,priolen,prioptr);
 	    break;
 
     	    /*  Heavily Loaded Neighbourhood:
        	        maxHops = 0, such that NewChares are Enqueued at local PE.  */
 	  case HEAVY:
-	    CldAddToken(msg, sendfn);
+	    CldAddToken(msg, sendfn,queuing,priolen,prioptr);
 	    break;
 	}
     }
@@ -315,7 +321,7 @@ LDB_ELEMENT * ldb;
 {
     int i;
 
-    i = CkNeighboursIndex(myPE, ldb->srcPE);
+    i = CmiNeighboursIndex(myPE, ldb->srcPE);
     if (i > -1)
     {
         statusList[i].peLoad = ldb->piggybackLoad;
@@ -362,7 +368,7 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 	ReadInit(LdbBocNum);
 	numPe = CkNumPes();
 	myPE = CkMyPe();
-	numNeighbours = CkNumNeighbours(myPE);
+	numNeighbours = CmiNumNeighbours(myPE);
 	lastPeZeroLoadIndex = 0;
 
 	Cldbtokensinit();
@@ -371,7 +377,7 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 	{
 	    neighboursList = (int *) CkAlloc( numNeighbours * sizeof(int) );
 /*            CkMemError(neighboursList); */
-	    CkGetNodeNeighbours(myPE, neighboursList );
+	    CmiGetNodeNeighbours(myPE, neighboursList );
 	    statusList = (LDB_STATUS *) CkAlloc(numNeighbours * sizeof(LDB_STATUS)); 
 	    
 /*            CkMemError(statusList); */
@@ -440,24 +446,26 @@ LDB_ELEMENT *ldb;
 }
 
 
-public NewMsg_FromNet(msgst, ldb, sendfn)
+public NewMsg_FromNet(msgst, ldb, sendfn,queuing,priolen,prioptr)
 void *msgst, *ldb;
 void (*sendfn)();
+unsigned int queuing, priolen, *prioptr;
 {
-	PrivateCall(Strategy(msgst, ldb, sendfn));
+	PrivateCall(Strategy(msgst, ldb, sendfn,queuing,priolen,prioptr));
 }
 
 
-public NewMsg_FromLocal(msgst, ldbptr, sendfn)
+public NewMsg_FromLocal(msgst, ldbptr, sendfn,queuing,priolen,prioptr)
 void *msgst, *ldbptr;
 void (*sendfn)();
+unsigned int queuing, priolen, *prioptr;
 {
     LDB_ELEMENT * ldb;
 
     ldb = (LDB_ELEMENT *)ldbptr;
     ldb->msgHops = 0;  /* This stmt and the previous two moved here
  			  on 5/22/93, by Sanjay   */
-    PrivateCall(Strategy(msgst, ldbptr, sendfn));
+    PrivateCall(Strategy(msgst, ldbptr, sendfn,queuing,priolen,prioptr));
 }
 
 /* 

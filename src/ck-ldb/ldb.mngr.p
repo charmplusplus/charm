@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-10-27 22:09:16  jyelon
+ * Revision 2.5  1995-11-06 17:55:09  milind
+ * Changed to conform to the definition of functions NewSeedFrom*
+ *
+ * Revision 2.4  1995/10/27  22:09:16  jyelon
  * Changed Cmi to Ck in all charm files.
  *
  * Revision 2.3  1995/10/27  21:35:54  jyelon
@@ -97,7 +100,7 @@ extern void *CqsCreate();
 
 export_to_C CldGetLdbSize()
 {
-       printf("%d:CldGetLdbSize()\n",CkMyPe());
+       TRACE(CkPrintf("%d:CldGetLdbSize()\n",CkMyPe()));
        return sizeof(LDB_ELEMENT);
 }
 
@@ -106,7 +109,7 @@ export_to_C CldCreateBoc()
 {
   DUMMYMSG *msg;
   
-  printf("%d:CldCreateBoc()\n",CkMyPe());
+  TRACE(CkPrintf("%d:CldCreateBoc()\n",CkMyPe()));
   msg = (DUMMYMSG *)CkAllocMsg(DUMMYMSG);	
   CreateBoc(LDB, LDB@BranchInit, msg);
 }
@@ -116,58 +119,60 @@ export_to_C CldFillLdb(destPe, ldb)
   int destPe;
   void *ldb;
 {
-  printf("%d:CldFillLdb(%d,%x)\n",CkMyPe(),destPe,ldb);
+  TRACE(CkPrintf("%d:CldFillLdb(%d,%x)\n",CkMyPe(),destPe,ldb));
   BranchCall(ReadValue(LdbBocNum), LDB@FillLDB(destPe, (LDB_ELEMENT *)ldb));
 }
 
 export_to_C CldStripLdb(ldb)
      void *ldb;
 {
-  printf("%d:CldStripLdb(%x)\n",CkMyPe(),ldb);
+  TRACE(CkPrintf("%d:CldStripLdb(%x)\n",CkMyPe(),ldb));
   BranchCall(ReadValue(LdbBocNum), LDB@StripLDB((LDB_ELEMENT *)ldb));
 }
 
 
 
-export_to_C CldNewSeedFromNet(msgst, ldb, sendfn) 
+export_to_C CldNewSeedFromNet(msgst, ldb, sendfn,queuing,priolen,prioptr) 
      void *msgst, *ldb;
      void (*sendfn)();
+     unsigned int queuing, priolen, *prioptr;
 {
-  printf("%d:CldNewSeedFromNet(%x,%x,%x)\n",CkMyPe(),msgst,ldb,sendfn);
-  BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromNet(msgst, ldb, sendfn) );
+  TRACE(CkPrintf("%d:CldNewSeedFromNet(%x,%x,%x)\n",CkMyPe(),msgst,ldb,sendfn));
+  BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromNet(msgst, ldb, sendfn,queuing,priolen,prioptr) );
 }
 
-export_to_C CldNewSeedFromLocal( msgst, ldb, sendfn)
+export_to_C CldNewSeedFromLocal( msgst, ldb, sendfn,queuing,priolen,prioptr)
      void *msgst, *ldb;
      void (*sendfn)();
+     unsigned int queuing, priolen, *prioptr;
 {
-  printf("%d:CldNewSeedFromLocal(%x,%x,%x)\n",CkMyPe(),msgst,ldb,sendfn);
-  BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromLocal(msgst, ldb, sendfn) );
+  TRACE(CkPrintf("%d:CldNewSeedFromLocal(%x,%x,%x)\n",CkMyPe(),msgst,ldb,sendfn));
+  BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromLocal(msgst, ldb, sendfn,queuing,priolen,prioptr) );
 }
 
 export_to_C CldProcessMsg(msgPtr, localdataPtr)
      void *msgPtr, *localdataPtr;
 {
-  printf("%d:CldProcessMsg(%x,%x)\n",CkMyPe(),msgPtr,localdataPtr);
+  TRACE(CkPrintf("%d:CldProcessMsg(%x,%x)\n",CkMyPe(),msgPtr,localdataPtr));
   BranchCall(ReadValue(LdbBocNum), LDB@ProcessMsg(msgPtr, localdataPtr));
 }
 
 export_to_C CldProcessorIdle()
 {
-  printf("%d:CldProcessorIdle()\n",CkMyPe());
+  TRACE(CkPrintf("%d:CldProcessorIdle()\n",CkMyPe()));
   BranchCall(ReadValue(LdbBocNum), LDB@ProcessorIdle());
 }
 
 
 export_to_C CldPeriodicCheckInit()
 {
-  printf("%d:CldPeriodicCheckInit()\n",CkMyPe());
+  TRACE(CkPrintf("%d:CldPeriodicCheckInit()\n",CkMyPe()));
   BranchCall(ReadValue(LdbBocNum), LDB@PeriodicCheckInit());
 }
 
 export_to_C void CldPeriodicBossesRedist()
 {
-  printf("%d:CldPeriodicBossesRedist()\n",CkMyPe());
+  TRACE(CkPrintf("%d:CldPeriodicBossesRedist()\n",CkMyPe()));
   BranchCall(ReadValue(LdbBocNum), LDB@PeriodicBossesRedist());
 }
 
@@ -188,7 +193,7 @@ export_to_C void CldPeriodicRedist()
   /*
     LdbPeriodicBossesRedist(bocNum);
     */
-  printf("%d:CldPeriodicRedist()\n",CkMyPe());
+  TRACE(CkPrintf("%d:CldPeriodicRedist()\n",CkMyPe()));
   BranchCall(ReadValue(LdbBocNum), LDB@PeriodicKidsRedist());
   CallBocAfter(CldPeriodicRedist, ReadValue(LdbBocNum), 
 	       BOSS_REDIST_UPDATE_INTERVAL);
@@ -201,8 +206,9 @@ typedef struct msginfo {
    void (*sendfn)();
 } MSGINFO;
 
-MSGINFO *new_MSGINFO(msg, ldb, sendfn)
+MSGINFO *new_MSGINFO(msg, ldb, sendfn,queuing,priolen,prioptr)
 void *msg, *ldb, (*sendfn)();
+     unsigned int queuing, priolen, *prioptr;
 {
    MSGINFO *ret;
    ret = (struct msginfo *)CkAlloc(sizeof(MSGINFO));
@@ -331,7 +337,7 @@ BranchOffice LDB {
   
   private int MyLoad()
     {
-/*      printf("MyLoad=%d\n",CqsLength(LdbFreeChareQueue)); */
+/*      TRACE(CkPrintf("MyLoad=%d\n",CqsLength(LdbFreeChareQueue))); */
 /*      return CqsLength(LdbFreeChareQueue); */
 	return CldMyLoad();
     }
@@ -371,8 +377,8 @@ BranchOffice LDB {
     number = MAX_EXCHANGES/2;
 #endif
     
-    printf("[%d] do_redist: my_load=%d, other_load=%d, number = %d\n",
-		   myPE, my_load, other_load, number);	
+    TRACE(CkPrintf("[%d] do_redist: my_load=%d, other_load=%d, number = %d\n",
+		   myPE, my_load, other_load, number));	
     
     if (number > MAX_EXCHANGES)
       number = MAX_EXCHANGES;
@@ -447,18 +453,19 @@ BranchOffice LDB {
   
   private EmptyQueue()
     {
-      printf("Don't know what to empty\n");
+      TRACE(CkPrintf("Don't know what to empty\n"));
 /*      return CqsEmpty(LdbFreeChareQueue); */
     }
 
   
   
   
-  private EnqMsg(msg, ldb, sendfn)
+  private EnqMsg(msg, ldb, sendfn,queuing,priolen,prioptr)
     void *msg, *ldb, (*sendfn)();
+     unsigned int queuing, priolen, *prioptr;
   {
-    CldAddToken(msg, sendfn);
-/*    CqsEnqueue(LdbFreeChareQueue, new_MSGINFO(msg, ldb, sendfn)); */
+    CldAddToken(msg, sendfn,queuing,priolen,prioptr);
+/*    CqsEnqueue(LdbFreeChareQueue, new_MSGINFO(msg, ldb, sendfn,queuing,priolen,prioptr)); */
   }
   
   public PeriodicCheckInit()
@@ -564,8 +571,9 @@ BranchOffice LDB {
       PrivateCall(RecvUpdateStatus(ldb));
   }
   
-  private Strategy(msg, ldbptr, sendfn)
+  private Strategy(msg, ldbptr, sendfn,queuing,priolen,prioptr)
     void *msg, *ldbptr, (*sendfn)();
+     unsigned int queuing, priolen, *prioptr;
   {
     int load;
     LDB_ELEMENT *ldb;
@@ -592,21 +600,22 @@ BranchOffice LDB {
 	else
 #endif
 	  {
-	    PrivateCall(EnqMsg(msg, ldbptr, sendfn));
+	    PrivateCall(EnqMsg(msg, ldbptr, sendfn,queuing,priolen,prioptr));
 	    if (PrivateCall(SendFreeChare(least_loaded_pe)))
 	      PrivateCall(increment_load(least_loaded_pe));
 	  }
       }
     else
-      PrivateCall(EnqMsg(msg, ldbptr, sendfn));
+      PrivateCall(EnqMsg(msg, ldbptr, sendfn,queuing,priolen,prioptr));
   }
 
-  public NewMsg_FromNet(msgst, ldb, sendfn)
+  public NewMsg_FromNet(msgst, ldb, sendfn,queuing,priolen,prioptr)
     void *msgst, *ldb;
     void (*sendfn)();
+     unsigned int queuing, priolen, *prioptr;
   {
     if (controller)
-      PrivateCall(Strategy(msgst, ldb, sendfn));
+      PrivateCall(Strategy(msgst, ldb, sendfn,queuing,priolen,prioptr));
     else
       { 
 	TRACE(CkPrintf("[%d] Ldb_NewChare_Net:: Message from outside. \n",
@@ -616,15 +625,16 @@ BranchOffice LDB {
   }
   
 
-  public NewMsg_FromLocal(msgst, ldb, sendfn)
+  public NewMsg_FromLocal(msgst, ldb, sendfn,queuing,priolen,prioptr)
     void *msgst, *ldb;
     void (*sendfn)();
+     unsigned int queuing, priolen, *prioptr;
   {
     if (controller)
       {
 	TRACE(CkPrintf("[%d] Ldb_NewChare_Local:: Queuing up.\n",
 		       myPE));
-      PrivateCall(EnqMsg(msgst, ldb, sendfn));
+      PrivateCall(EnqMsg(msgst, ldb, sendfn,queuing,priolen,prioptr));
       }
     else
       {
