@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.31  1997-04-01 08:09:51  jyelon
+ * Revision 1.32  1997-04-03 19:42:10  jyelon
+ * Working on threads stuff.
+ *
+ * Revision 1.31  1997/04/01 08:09:51  jyelon
  * Spent a few hours integrating three versions of the threads package into one,
  * in preparation for the addition of preemption-support.
  *
@@ -265,6 +268,20 @@ void CthSetStrategy(t, awkfn, chsfn)
 void CthYield()
     { CthFail(); }
 
+void CthAutoYield(t, sec)
+    CthThread t; double sec;
+    { CthFail(); }
+
+int  CthAutoYielding(t)
+    CthThread t;
+    { CthFail(); }
+
+void CthAutoYieldBlock()
+    { CthFail(); }
+
+void CthAutoYieldUnblock()
+    { CthFail(); }
+
 void CthInit()
     {  }
 
@@ -306,11 +323,12 @@ struct CthThreadStruct
   char      *top;
   CthVoidFn  awakenfn;
   CthThFn    choosefn;
+  int        autoyield_enable;
+  int        autoyield_blocks;
   char      *data;
   int        datasize;
   double     stack[1];
 };
-
 
 CthCpvStatic(CthThread,  thread_current);
 CthCpvStatic(CthThread,  thread_exiting);
@@ -321,6 +339,19 @@ CthCpvStatic(int,        thread_datasize);
 
 int CthImplemented()
     { return 1; }
+
+static void CthThreadInit(t)
+CthThread t;
+{
+  t->fn=0;
+  t->arg=0;
+  t->awakenfn = 0;
+  t->choosefn = 0;
+  t->data=0;
+  t->datasize=0;
+  t->autoyield_enable = 0;
+  t->autoyield_blocks = 0;
+}
 
 void CthInit()
 {
@@ -337,12 +368,7 @@ void CthInit()
   if (sp2<sp1) CthCpvAccess(thread_growsdown) = 1;
   else         CthCpvAccess(thread_growsdown) = 0;
   t = (CthThread)CmiAlloc(sizeof(struct CthThreadStruct));
-  t->fn=0;
-  t->arg=0;
-  t->data=0;
-  t->datasize=0;
-  t->awakenfn = 0;
-  t->choosefn = 0;
+  CthThreadInit(t);
   CthCpvAccess(thread_current)=t;
   CthCpvAccess(thread_datasize)=1;
   CthCpvAccess(thread_exiting)=0;
@@ -444,13 +470,10 @@ CthVoidFn fn; void *arg; int size;
     newsp = ((char *)(result->stack)) + SLACK;
     offs = newsp - oldsp;
   }
+  CthThreadInit(result);
   result->fn = fn;
   result->arg = arg;
   result->top = newsp;
-  result->awakenfn = 0;
-  result->choosefn = 0;
-  result->data = 0;
-  result->datasize = 0;
   if (setjmp(CthCpvAccess(thread_current)->jb)==0) {
     alloca(offs);
     CthBeginThread(CthCpvAccess(thread_current), result);
@@ -516,6 +539,26 @@ int size;
   return result;
 }
 
+void CthAutoYield(CthThread t, int flag)
+{
+  t->autoyield_enable = flag;
+}
+
+int CthAutoYielding(CthThread t)
+{
+  return t->autoyield_enable;
+}
+
+void CthAutoYieldBlock()
+{
+  CthCpvAccess(thread_current)->autoyield_blocks ++;
+}
+
+void CthAutoYieldUnblock()
+{
+  CthCpvAccess(thread_current)->autoyield_blocks --;
+}
+
 #endif /* CMK_THREADS_USE_ALLOCA */
 
 /*****************************************************************************
@@ -554,6 +597,8 @@ struct CthThreadStruct
   CthThFn    choosefn;
   char      *data;
   int        datasize;
+  int        autoyield_enable;
+  int        autoyield_blocks;
   double     stack[1];
 };
 
@@ -612,6 +657,8 @@ void CthInit()
   CthCpvAccess(thread_current)->datasize=0;
   CthCpvAccess(thread_current)->awakenfn = 0;
   CthCpvAccess(thread_current)->choosefn = 0;
+  CthCpvAccess(thread_current)->autoyield_enable = 0;
+  CthCpvAccess(thread_current)->autoyield_blocks = 0;
 
   /* analyze the activation record. */
   CthInitSub1(bufs, frames, 1);
@@ -693,10 +740,12 @@ CthVoidFn fn; void *arg; int size;
   sp += (CthCpvAccess(thread_growsdown)) ? (size - SLACK) : SLACK;
   result->fn = fn;
   result->arg = arg;
-  result->awakenfn = 0;
-  result->choosefn = 0;
   result->data = 0;
   result->datasize = 0;
+  result->awakenfn = 0;
+  result->choosefn = 0;
+  result->autoyield_enable = 0;
+  result->autoyield_blocks = 0;
   memcpy(&(result->jb), &CthCpvAccess(thread_launching), sizeof(CthCpvAccess(thread_launching)));
   for (i=0; i<CthCpvAccess(thread_jb_count); i++)
     ((size_t *)(&(result->jb)))[CthCpvAccess(thread_jb_offsets)[i]] += sp;
@@ -761,5 +810,24 @@ int size;
   return result;
 }
 
-#endif
+void CthAutoYield(CthThread t, int flag)
+{
+  t->autoyield_enable = flag;
+}
 
+int  CthAutoYielding(CthThread t)
+{
+  return t->autoyield_enable;
+}
+
+void CthAutoYieldBlock()
+{
+  CthCpvAccess(thread_current)->autoyield_blocks++;
+}
+
+void CthAutoYieldUnblock()
+{
+  CthCpvAccess(thread_current)->autoyield_blocks--;
+}
+
+#endif
