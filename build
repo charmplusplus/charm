@@ -9,7 +9,7 @@ syntax() {
   echo '<versions>: ' 
   ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | pr -3 -t )
   echo ''
-  echo '<options>: help cc cc64 cxx kcc pgcc acc ecc gcc3 mpcc smp gm tcp vmi scyld bluegene'
+  echo '<options>: help cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc smp gm tcp vmi scyld bluegene'
   echo ''
   echo '<charmc-options>: e.g. -g -save -verbose'
   echo 'Note: This script:'
@@ -84,7 +84,7 @@ do
           while [ ! $# -eq 0 ]
           do
             case "$1" in
-	    "pgcc"|"ecc"|"cxx"|"kcc"|"cc"|"cc64"|"acc"|"gcc3"|"mpcc")
+	    "pgcc"|"ecc"|"icc"|"cxx"|"kcc"|"cc"|"cc64"|"acc"|"gcc3"|"mpcc")
                 TestIfSupported $1
                 COMPILER=$1; shift
 	        ;;
