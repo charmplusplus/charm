@@ -11,12 +11,23 @@
 
 #if AMPI_FORTRAN
 #include "ampimain.decl.h"
+#if CMK_FORTRAN_USES_ALLCAPS
+extern "C" void AMPIMAIN(int, char **);
+extern "C" void GET_SIZE(int *, int *, int *, int *);
+extern "C" void PACK(char*,int*,int*,int*,float*,int*,int*,int*);
+extern "C" void UNPACK(char*,int*,int*,int*,float*,int*,int*,int*);
+#else
 extern "C" void ampimain_(int, char **);
-#endif
+extern "C" void get_size_(int *, int *, int *, int *);
+extern "C" void pack_(char*,int*,int*,int*,float*,int*,int*,int*);
+extern "C" void unpack_(char*,int*,int*,int*,float*,int*,int*,int*);
+#endif // CMK_FORTRAN_USES_ALLCAPS
+#else // not AMPI_FORTRAN
 // FIXME: find good names for these user-provided functions
 extern "C" void get_size_(int *, int *, int *, int *);
 extern "C" void pack_(char*,int*,int*,int*,float*,int*,int*,int*);
 extern "C" void unpack_(char*,int*,int*,int*,float*,int*,int*,int*);
+#endif // AMPI_FORTRAN
 
 int _redntype;
 int _rednroot;
@@ -198,7 +209,12 @@ ampi::run(ArgsInfo *msg)
   CtvInitialize(int, numMigrateCalls);
   CtvAccess(numMigrateCalls) = 0;
 
-  ampimain_(msg->argc, msg->argv);
+#if CMK_FORTRAN_USES_ALLCAPS
+  AMPIMAIN
+#else
+  ampimain_
+#endif
+    (msg->argc, msg->argv);
 
   CProxy_ampimain mp(mainhandle);
   mp.done();
@@ -230,8 +246,17 @@ ampi::start(void)
 // migrate to next processor every 2 iterations
 // needs to be changed in a major way
 // to provide some sort of user control over migration
-extern "C" 
-void migrate_(void *gptr)
+extern "C" void 
+#if AMPI_FORTRAN
+#if CMK_FORTRAN_USES_ALLCAPS
+MIGRATE
+#else // ! CMK_FORTRAN_USES_ALLCAPS
+migrate_
+#endif // CMK_FORTRAN_USES_ALLCAPS
+#else // ! AMPI_FORTRAN
+migrate_
+#endif // AMPI_FORTRAN
+  (void *gptr)
 {
   ampi *ptr = CtvAccess(ampiPtr);;
   CtvAccess(numMigrateCalls)++;
@@ -243,14 +268,32 @@ void migrate_(void *gptr)
     CProxy_migrator pmg(migHandle);
     pmg.migrateElement(new MigrateInfo(ptr, where), CkMyPe());
     int csize, isize, rsize, fsize;
-    get_size_(&csize, &isize, &rsize, &fsize);
+#if AMPI_FORTRAN
+#if CMK_FORTRAN_USES_ALLCAPS
+    GET_SIZE
+#else // ! CMK_FORTRAN_USES_ALLCAPS
+    get_size_
+#endif // CMK_FORTRAN_USES_ALLCAPS
+#else // ! AMPI_FORTRAN
+    get_size_
+#endif // AMPI_FORTRAN
+      (&csize, &isize, &rsize, &fsize);
     int totsize = MyAlign8(csize)+isize+rsize+fsize;
     void *pb = malloc(totsize);
     char *cb = (char *)pb;
     int *ib = (int *) (cb+MyAlign8(csize));
     float *rb = (float *)(ib+isize/sizeof(int));
     int *fb = (int *)(rb+rsize/sizeof(float));
-    pack_(cb, &csize, ib, &isize, rb, &rsize, fb, &fsize);
+#if AMPI_FORTRAN
+#if CMK_FORTRAN_USES_ALLCAPS
+    PACK
+#else // ! CMK_FORTRAN_USES_ALLCAPS
+    pack_
+#endif // CMK_FORTRAN_USES_ALLCAPS
+#else // ! AMPI_FORTRAN
+    pack_
+#endif // AMPI_FORTRAN
+      (cb, &csize, ib, &isize, rb, &rsize, fb, &fsize);
     ptr->csize = csize; ptr->isize = isize; ptr->rsize = rsize; 
     ptr->fsize = fsize; ptr->totsize = totsize; ptr->packedBlock = pb;
     CthSuspend();
@@ -262,7 +305,16 @@ void migrate_(void *gptr)
     ib = (int *) (cb+MyAlign8(csize));
     rb = (float *)(ib+isize/sizeof(int));
     fb = (int *)(rb+rsize/sizeof(float));
-    unpack_(cb, &csize, ib, &isize, rb, &rsize, fb, &fsize);
+#if AMPI_FORTRAN
+#if CMK_FORTRAN_USES_ALLCAPS
+    UNPACK
+#else // ! CMK_FORTRAN_USES_ALLCAPS
+    unpack_
+#endif // CMK_FORTRAN_USES_ALLCAPS
+#else // ! AMPI_FORTRAN
+    unpack_
+#endif // AMPI_FORTRAN
+      (cb, &csize, ib, &isize, rb, &rsize, fb, &fsize);
     free(pb);
   }
 }
