@@ -345,8 +345,9 @@ static char *strdupl(s) char *s;
 
 double GetClock()
 {
-  struct timeval tv;
-  gettimeofday(&tv);
+  struct timeval tv; int ok;
+  ok = gettimeofday(&tv, NULL);
+  if (ok<0) KillEveryoneCode(9343112);
   return (tv.tv_sec * 1.0 + tv.tv_usec * 1.0E-6);
 }
 
@@ -934,7 +935,7 @@ static OutgoingMsg   Cmi_freelist_outgoing;
  *
  *****************************************************************************/
 
-#define LOGGING 0
+#define LOGGING 1
 
 #if LOGGING
 
@@ -1834,8 +1835,9 @@ void AssembleReceivedDatagrams(OtherNode node)
 
 void IntegrateMessageDatagram(ExplicitDgram dg)
 {
-  unsigned int seqno, slot; OtherNode node;
+  unsigned int seqno, slot; OtherNode node; char *p;
 
+  p = log + log_size;
   LOG(("%1.4f %d M %d %d\n", Cmi_clock, Cmi_nodestart, dg->srcpe, dg->seqno));
   node = nodes_by_pe[dg->srcpe];
   seqno = dg->seqno;
@@ -1850,6 +1852,7 @@ void IntegrateMessageDatagram(ExplicitDgram dg)
     }
   }
   FreeExplicitDgram(dg);
+  if (*p==0) *((int*)0)=0;
 }
 
 void IntegrateAcknowledgement(OtherNode node, unsigned int seqno)

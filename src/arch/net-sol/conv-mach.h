@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.29  1997-02-06 19:55:19  jyelon
+ * Revision 2.30  1997-02-07 02:16:37  jyelon
+ * Nothing major.
+ *
+ * Revision 2.29  1997/02/06 19:55:19  jyelon
  * Added new DGRAM parameters.
  *
  * Revision 2.28  1997/01/17 15:50:26  jyelon
@@ -73,7 +76,6 @@
 #define CMK_DGRAM_WINDOW_SIZE                              50
 #define CMK_DGRAM_DELAY_RETRANSMIT                         (0.050)
 #define CMK_DGRAM_ACK_DELAY                                (0.025)
-#define CMK_DGRAM_ACK_MAXGROUP                             999
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
 
@@ -84,6 +86,7 @@
 
 #define CMK_MSG_HEADER_SIZE_BYTES                         16
 #define CMK_MSG_HEADER_BLANK_SPACE                        12
+#define CMK_MSG_HEADER_INCLUDES_BACKWARDS_FLAG             0
 
 #define CMK_IS_HETERO                                      0
 

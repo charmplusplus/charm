@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.28  1997-02-06 20:20:45  jyelon
+ * Revision 2.29  1997-02-07 02:16:42  jyelon
+ * Nothing major.
+ *
+ * Revision 2.28  1997/02/06 20:20:45  jyelon
  * Added BLANK_SPACE bla bla.
  *
  * Revision 2.27  1997/01/17 15:50:28  jyelon
@@ -74,13 +77,13 @@
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
 #define CMK_DEFAULT_MAIN_USES_SIMULATOR_CODE               0
 
-#define CMK_DGRAM_BUF_SIZE                                 52000
-#define CMK_DGRAM_MAX_SIZE                                 4096
-#define CMK_DGRAM_WINDOW_SIZE                              12
+#define CMK_DGRAM_MAX_SIZE                                 2048
+#define CMK_DGRAM_BUF_SIZE                                 50000
+#define CMK_DGRAM_WINDOW_SIZE                              50
+#define CMK_DGRAM_DELAY_RETRANSMIT                         (0.050)
+#define CMK_DGRAM_ACK_DELAY                                (0.025)
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
-
-#define CMK_IS_HETERO                                      1
 
 #define CMK_MACHINE_NAME                                   "net-sun"
 
@@ -102,7 +105,7 @@
 
 #define CMK_SHARED_VARS_EXEMPLAR                           0
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
-#define CMK_SHARED_VARS_SUN_THREADS                            0
+#define CMK_SHARED_VARS_SUN_THREADS                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
 #define CMK_SIGHOLD_IS_A_BUILTIN                           0
@@ -139,8 +142,8 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 
-#define CMK_VECTOR_SEND_USES_COMMON_CODE                        0
-#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                        1
+#define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
+#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
 
 #define CMK_WAIT_NOT_NEEDED                                0
 #define CMK_WAIT_USES_SYS_WAIT_H                           1
