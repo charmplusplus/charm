@@ -5,6 +5,8 @@
 
 CkGroupID loadbalancer;
 
+#if CMK_LBDB_ON
+
 void CreateCentralLB()
 {
   loadbalancer = CProxy_CentralLB::ckNew();
@@ -251,3 +253,5 @@ CLBMigrateMsg* CLBMigrateMsg::unpack(void *m)
 
   return ret_val;
 }
+
+#endif

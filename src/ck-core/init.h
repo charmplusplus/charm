@@ -42,11 +42,7 @@ class PtrVec {
     void **block;
     int blklen;
   public:
-    PtrVec() {
-      block = new void*[blklen=BLKSZ];
-      for(int i=0; i<blklen; i++) block[i] = 0;
-      _MEMCHECK(block);
-    }
+    PtrVec();
     ~PtrVec() { delete[] block; }
     int length(void) { return blklen; }
     void **getVec(void) { return block; }

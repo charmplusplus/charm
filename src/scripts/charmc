@@ -684,7 +684,7 @@ endif
 switch ($LANGUAGE)
     case "charm"
     case "charm++"
-        ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \
+        ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB -I$CHARMINC \
 		      $BAL_OBJ $OBJECTFILES \
                       $LIBRARIES -lck \
                       -lconv-cplus-y -lconv-core  -ltrace-$TRACEMODE \

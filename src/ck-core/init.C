@@ -575,3 +575,8 @@ GroupTable::GroupTable()
     bins[i] = 0;
 }
 
+PtrVec::PtrVec() {
+      block = new void*[blklen=BLKSZ];
+      for(int i=0; i<blklen; i++) block[i] = 0;
+      _MEMCHECK(block);
+}

@@ -330,6 +330,11 @@ void ConverseExit(void)
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   int n,i ;
+#if CMK_USE_HP_MAIN_FIX
+#if FOR_CPLUS
+  _main(argc,argv);
+#endif
+#endif
   
   Cmi_myrank = 0;
   MPI_Init(&argc, &argv);
