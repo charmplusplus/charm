@@ -98,6 +98,7 @@ public:
 	}
 	void pup(PUP::er &p);
 	void sort2d(double *coord);
+	void sort3d(double *coord);
 };
 PUPmarshall(IDXL_List)
 
@@ -192,6 +193,8 @@ public:
 	void print(const IDXL_Print_Map *idxmap=NULL) const;
 
 	void sort2d(double *coord);
+
+	void sort3d(double *coord);
 };
 
 /**
@@ -256,6 +259,8 @@ public:
 	const IDXL_Side &getRecv(void) const {return *recv;}
 
 	void sort2d(double *coord);
+
+	void sort3d(double *coord);
 };
 
 #endif

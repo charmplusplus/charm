@@ -135,6 +135,13 @@ CDECL void IDXL_Sort_2d(IDXL_t l_t,double *coord2d){
 
 /** Sort the indices in this list by these 3D coordinates */
 // FIXME: void IDXL_Sort_3d(IDXL_t l,double *coord3d);
+CDECL void IDXL_Sort_3d(IDXL_t l_t,double *coord3d){
+	const char *caller = "IDXL_Sort_3d";
+	IDXLAPI(caller); IDXL_Chunk *c=IDXL_Chunk::get(caller);
+	IDXL &l=c->lookup(l_t,caller);
+	l.sort3d(coord3d);
+};
+
 
 
 //Add a new entity at the given local index.  Copy the communication
@@ -144,22 +151,28 @@ static void splitEntity(IDXL_Side &c,
 {
 	//Find the commRecs for the surrounding nodes
 	const IDXL_Rec *tween[20];
-	int w;
-	for (w=0;w<nBetween;w++) {
-		tween[w]=c.getRec(between[w]-idxbase);
-		if (tween[w]==NULL) 
-			return; //An unshared entity! Thus a private-only addition
+	int w,w1;
+	for (w1=0;w1<nBetween;w1++) {
+	  tween[w1]=c.getRec(between[w1]-idxbase);
+	  if (tween[w1]==NULL) 
+	    return; //An unshared entity! Thus a private-only addition
 	}
+	
 	//Make a new commRec as the interesection of the surrounding entities--
 	// we loop over the first entity's comm. list
 	for (int zs=tween[0]->getShared()-1;zs>=0;zs--) {
+	  for (w1=0;w1<nBetween;w1++) {
+	    tween[w1]=c.getRec(between[w1]-idxbase);
+	  }
 		int chk=tween[0]->getChk(zs);
 		//Make sure this processor shares all our entities
 		for (w=0;w<nBetween;w++)
 			if (!tween[w]->hasChk(chk))
 				break;
-		if (w==nBetween) //The new node is shared with chk
+		if (w==nBetween) {//The new node is shared with chk
 			c.addNode(localIdx,chk);
+			//break;
+		}
 	}
 }
 
