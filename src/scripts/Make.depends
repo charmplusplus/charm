@@ -1389,7 +1389,7 @@ ComlibManager.o: ComlibManager.C ComlibManager.h charm++.h charm.h \
   gridrouter.h petable.h graphrouter.h de.h treerouter.h 3dgridrouter.h \
   DirectMulticastStrategy.h StreamingStrategy.h DummyStrategy.h \
   MPIStrategy.h NodeMulticast.h MsgPacker.h RingMulticastStrategy.h \
-  PipeBroadcastStrategy.h pipebroadcaststrategy.h BroadcastStrategy.h \
+  PipeBroadcastStrategy.h pipebroadcastconverse.h BroadcastStrategy.h \
   MeshStreamingStrategy.h PrioStreaming.h qd.h comlib.def.h
 	$(CHARMC) -c -I. ComlibManager.C
 
@@ -1576,7 +1576,7 @@ PipeBroadcastStrategy.o: PipeBroadcastStrategy.C PipeBroadcastStrategy.h \
   tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
   envelope.h comlib.h router.h convcomlibmanager.h comlib.decl.h \
-  pipebroadcaststrategy.h
+  pipebroadcastconverse.h
 	$(CHARMC) -c -I. PipeBroadcastStrategy.C
 
 MeshStreamingStrategy.o: MeshStreamingStrategy.C MeshStreamingStrategy.h \
