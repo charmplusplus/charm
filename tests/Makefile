@@ -1,4 +1,4 @@
-DIRS=charm++ converse ampi fem
+DIRS=util charm++ converse ampi fem
 
 test:
 	for d in $(DIRS); do \
