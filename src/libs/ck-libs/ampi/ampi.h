@@ -273,7 +273,7 @@ void MPI_Register_main(MPI_MainFn mainFn, const char *name);
 /*Attach a new AMPI to each existing threads array element*/
 void MPI_Attach(const char *name);
 
-int AMPI_Async_reduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, int root, MPI_Comm comm, MPI_Request *request);
+int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, int root, MPI_Comm comm, MPI_Request *request);
 
 #ifdef __cplusplus
 }

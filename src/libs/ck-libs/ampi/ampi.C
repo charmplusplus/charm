@@ -1191,7 +1191,7 @@ int MPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
   return 0;
 }
 
-int AMPI_Async_reduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, int root, MPI_Comm comm, MPI_Request *request)
+int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, int root, MPI_Comm comm, MPI_Request *request)
 {
   ampi *ptr = getAmpiInstance(comm);
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,op);
@@ -1203,7 +1203,7 @@ int AMPI_Async_reduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op 
   if (ptr->thisIndex == rootIdx){
   ampiPersRequests *ptr = getPers();
   if(ptr->nirequests == 100) {
-    CmiAbort("Too many Irecv requests in AMPI_Async_reduce.\n");
+    CmiAbort("Too many Irecv requests in MPI_Ireduce.\n");
   }
 
   // using irecv instead recv to non-block the call and get request pointer
