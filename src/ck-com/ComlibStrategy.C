@@ -494,12 +494,16 @@ void ComlibArrayInfo::deliver(envelope *env){
 }
 
 void ComlibNotifyMigrationDone() {
-    if(CpvInitialized(migrationDoneHandlerID)) 
+    if(CkpvInitialized(migrationDoneHandlerID)) 
         if(CkpvAccess(migrationDoneHandlerID) > 0) {
             char *msg = (char *)CmiAlloc(CmiReservedHeaderSize);
             CmiSetHandler(msg, CkpvAccess(migrationDoneHandlerID));
-            //CmiSyncSendAndFree(CkMyPe(), CmiReservedHeaderSize, msg);
+#if CMK_BLUEGENE_CHARM
+	    // bluegene charm should avoid directly calling converse
+            CmiSyncSendAndFree(CkMyPe(), CmiReservedHeaderSize, msg);
+#else
             CmiHandleMessage(msg);
+#endif
         }
 }
 
@@ -508,7 +512,7 @@ void ComlibNotifyMigrationDone() {
 //strategies.  Since hash table returns a reference to the object
 //and for an int that will be 0, the actual value stored is pe +
 //CkNumPes so 0 would mean processor -CkNumPes which is invalid.
-CpvDeclare(ClibLocationTableType *, locationTable);
+CkpvDeclare(ClibLocationTableType *, locationTable);
 
 int ComlibGetLastKnown(CkArrayID aid, CkArrayIndexMax idx) {
     //CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
@@ -518,20 +522,20 @@ int ComlibGetLastKnown(CkArrayID aid, CkArrayIndexMax idx) {
         CkAbort("Uninitialized table\n");
     }
 
-    if(CpvAccess(locationTable) == NULL)
+    if(CkpvAccess(locationTable) == NULL)
         CkAbort("comlib location table is NULL\n");
 
     ClibGlobalArrayIndex cidx;
     cidx.aid = aid;
     cidx.idx = idx;
-    int pe = CpvAccess(locationTable)->get(cidx);
+    int pe = CkpvAccess(locationTable)->get(cidx);
     
     if(pe == 0) {
         //Array element does not exist in the table
         
         CkArray *array = CkArrayID::CkLocalBranch(aid);
         pe = array->lastKnown(idx) + CkNumPes();
-        CpvAccess(locationTable)->put(cidx) = pe;
+        CkpvAccess(locationTable)->put(cidx) = pe;
     }
     //CkPrintf("last pe = %d \n", pe - CkNumPes());
     
