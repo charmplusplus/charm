@@ -837,7 +837,9 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 			_TRACE_END_EXECUTE();
 	}
 #endif
+#if CMK_LBDB_ON
         if (!isDeleted) checkBufferedMigration();   // check if should migrate
+#endif
 	if (isDeleted) return CmiFalse;//We were deleted
 	deletedMarker=NULL;
 	stopTiming();
@@ -1595,7 +1597,9 @@ void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 		new (doubleSize, 0) CkArrayElementMigrateMessage;
 	msg->idx=idx;
 	msg->length=bufSize;
+#if CMK_LBDB_ON
 	msg->ignoreArrival = rec->isUsingReadyMigrate()?1:0;
+#endif
 	{
 		PUP::toMem p(msg->packData); 
 		p.becomeDeleting(); 
