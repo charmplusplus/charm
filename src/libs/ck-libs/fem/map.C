@@ -1059,6 +1059,8 @@ public:
 		if (g==-1) { //Find a new unused global number
 			g=nextUnoccupied();
 			occupied[g]=1;
+			//Mark this local entity's new global number:
+			l_src.setGlobalno(l,g);
 		}
 		if (g_dest.size()<=g) g_dest.setLength(g+1);
 		g_dest.copyEntity(g,l_src,l);
@@ -1079,9 +1081,10 @@ static void renumberConn(const FEM_Elem &src_e,int l,FEM_Elem &dest_e,int g,
 
 FEM_Mesh *FEM_Mesh_assemble(int nChunks,FEM_Mesh **chunks)
 {
-	FEM_Mesh *m=new FEM_Mesh;
-	m->copyShape(*chunks[0]); //Copy datatypes from some random chunk
 	int t,c;
+	FEM_Mesh *m=new FEM_Mesh;
+	for(c=0; c<nChunks;c++) //Union up all possible shapes
+		m->copyShape(*chunks[c]);
 
 // Copy over nodes:
 	FEM_Entity_numberer nodeNum;
@@ -1089,7 +1092,7 @@ FEM_Mesh *FEM_Mesh_assemble(int nChunks,FEM_Mesh **chunks)
 	for(c=0; c<nChunks;c++) nodeNum.add(chunks[c]->node,m->node);
 	
 // Copy over elements
-	int nElemTypes=chunks[0]->elem.size();
+	int nElemTypes=m->elem.size();
 	for (t=0;t<nElemTypes;t++) {
 		FEM_Entity_numberer elemNum;
 		for(c=0; c<nChunks;c++) 
@@ -1109,7 +1112,7 @@ FEM_Mesh *FEM_Mesh_assemble(int nChunks,FEM_Mesh **chunks)
 	}
 
 // Copy over sparse data
-	int nSparseTypes=chunks[0]->sparse.size();
+	int nSparseTypes=m->sparse.size();
 	for (t=0;t<nSparseTypes;t++) {
 		FEM_Entity_numberer sparseNum;
 		for(c=0; c<nChunks;c++) 
