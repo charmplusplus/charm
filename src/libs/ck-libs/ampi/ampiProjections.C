@@ -115,7 +115,7 @@ extern "C" void ampi_beginFunc(int funcNo,MPI_Comm comm){
 	int iData[2];
 	iData[0] = myindex;
 	iData[1] = funcNo;
-	LogEvent3(_AMPI_LANG_ID,_E_AMPI_BEGIN_FUNC,2,iData,strlen(funcTable[funcNo]->funcName+1),funcTable[funcNo]->funcName);
+	LogEvent3(_AMPI_LANG_ID,_E_AMPI_BEGIN_FUNC,2,iData,strlen(funcTable[funcNo]->funcName)+1,funcTable[funcNo]->funcName);
 }
 
 
