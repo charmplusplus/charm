@@ -852,7 +852,9 @@ void CkArray::InsertElement(CkArrayMessage *m)
 	//Build the element
 	CkArrayIndex *elIdx=m->copyIndex();
 	ArrayElement *el=newElement(type.chareType,elIdx);
-	el->usesAtSync=CmiFalse;
+#if CMK_LBDB_ON //Load balancer utilities:
+	el->usesAtSync=false;
+#endif
 	el->bcastNo=bcastNo;
 	contributorCreated(&el->reductionInfo);
 	
