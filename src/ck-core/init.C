@@ -293,10 +293,11 @@ static inline void _initDone(void)
   DEBUGF(("[%d] _initDone.\n", CkMyPe()));
   if (!_triggersSent) _sendTriggers(); 
   CkNumberHandler(_triggerHandlerIdx, (CmiHandler)_discardHandler); 
-  _processBufferedBocInits();
   if(CkMyRank() == 0) {
     _processBufferedNodeBocInits();
   }
+  CmiNodeBarrier(); // wait for all nodegroups to be created
+  _processBufferedBocInits();
   DEBUGF(("Reached CmiNodeBarrier(), pe = %d, rank = %d\n", CkMyPe(), CkMyRank()));
   CmiNodeBarrier();
   DEBUGF(("Crossed CmiNodeBarrier(), pe = %d, rank = %d\n", CkMyPe(), CkMyRank()));
