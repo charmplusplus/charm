@@ -1,0 +1,124 @@
+\chapter{Load Balancing}
+
+This module defines a function CldEnqueue that sends a message
+to a lightly-loaded processor.  It automates the process of finding a
+lightly-loaded processor.  
+
+The function CldEnqueue is extremely sophisticated.  It does not
+choose a processor, send the message, and forget it.  Rather, it puts
+the message into a pool of movable work.  The pool of movable work
+gradually shrinks as it is consumed (processed), but in most programs,
+there is usually quite a bit of movable work available at any given
+time.  As load conditions shift, the load balancers shifts the pool
+around, compensating.  Any given message may be shifted more than
+once, as part of the pool.
+
+CldEnqueue also accounts for priorities.  Normal load-balancers
+try to make sure that all processors have some work to do.  The
+function CldEnqueue goes a step further: it tries to make sure
+that all processors have some reasonably high-priority work to do.
+This can be extremely helpful in AI search applications.
+
+The two assertions above should be qualified: CldEnqueue can use
+these sophisticated strategies, but it is also possible to configure
+it for simpler behavior.  When you compile and link your program, you
+choose a ``load-balancing strategy''.  That means you link in one of
+several implementations of the load-balancer.  Most are sophisticated,
+as described above.  But some are simple and cheap, like the random
+strategy.  The process of choosing a strategy is described in the
+manual {\em Converse Installation and Usage}.
+
+For efficiency reasons, the load-balancing module needs to be able to
+cache some data in the messages it manipulates.  Every message sent
+using CldEnqueue must contain a small empty space where the
+load-balancer can cache its data.  This region is called the CLD
+field.  The size of the empty space must be {\tt CLD\_FIELDSIZE}.
+There is no particular place in the message where this empty space has
+to be, but it must be in there somewhere.
+
+Before you send a message using CldEnqueue, you must write an
+``info'' function with this prototype:
+
+\function{void InfoFn(void *msg, int *len, void *cldfield, int *queueing, int *priobits, int **prioptr);}
+\desc{The load balancer will call the info function when it
+needs to know various things about the message.  The load balancer
+will pass in the message via the parameter \param{msg}.  The info
+function's job is to ``fill in'' the other parameters.  It must
+compute the length of the message, and store it at \param{*len}.  It
+must find the CLD field in the message, and store a pointer to it at
+\param{*cldfield}.  It must identify the priority of the message, and
+the queueing strategy that must be used, storing this information
+at \param{*queueing}, \param{*priobits}, and \param{*prioptr}.
+Caution: the priority will not be copied, so the \param{*prioptr} should
+probably be made to point to the message itself.}
+
+After the user of CldEnqueue writes the ``info'' function, the
+user must register it, using this:
+
+\function{int CldRegisterInfoFn(void *fn)}
+\desc{Accepts a pointer to an info-function.  Returns an integer
+index for the info-function.  This index will be needed in CldEnqueue.}
+
+Normally, when you send a message, you pack up a bunch of data into a
+message, send it, and unpack it at the receiving end.  It is sometimes
+possible to perform an optimization, though.  If the message is bound
+for a processor within the same address space, it isn't always
+necessary to copy all the data into the message.  Instead, it may be
+sufficient to send a message containing only a pointer to the data.
+This saves much packing, unpacking, and copying effort.  It is
+frequently useful, since in a properly load-balanced program, a great
+many messages stay inside a single address space.
+
+With CldEnqueue, you don't know in advance whether a message is
+going to cross address-space boundaries or not.  If it's to cross
+address spaces, you need to use the ``long form'', but if it's to stay
+inside an address space, you want to use the faster ``short form''.
+We call this ``conditional packing.''  When you send a message with
+CldEnqueue, you should initially assume it will not cross
+address space boundaries.  In other words, you should send the ``short
+form'' of the message, containing pointers.  If the message is about
+to leave the address space, the load balancer will call your pack
+function, which must have this prototype:
+
+\function{void PackFn(void **msg)}
+\desc{The pack function is handed a pointer to a pointer to the
+message (yes, a pointer to a pointer).  The pack function is allowed
+to alter the message in place, or replace the message with a
+completely different message.  The intent is that the pack function
+should replace the ``short form'' of the message with the ``long
+form'' of the message.  Note that if it replaces the message, it
+should CmiFree the old message.}
+
+Of course, sometimes you don't use conditional packing.  In that case,
+there is only one form of the message.  In that case, your pack
+function can be a no-op.
+
+Pack functions must be registered using this:
+
+\function{int CldRegisterInfoFn(void *fn)}
+\desc{Accepts a pointer to an pack-function.  Returns an integer
+index for the pack-function.  This index will be needed in CldEnqueue.}
+
+Normally, CldEnqueue sends a message to a lightly-loaded
+processor.  After doing this, it enqueues the message with the
+appropriate priority.  The function CldEnqueue can also be used
+as a mechanism to simply enqueue a message on a remote processor with
+a priority.  In other words, it can be used as a prioritized
+send-function.  To do this, one of the CldEnqueue parameters
+allows you to override the load-balancing behavior and lets you choose
+a processor yourself.
+
+The prototype for CldEnqueue is as follows:
+
+\function{void CldEnqueue(int pe, void *msg, int infofn, int packfn)}
+\index{CldEnqueue}
+\desc{The argument \param{msg} is a pointer to the message.
+The parameter \param{infofn} represents a function that can analyze
+the message.  The parameter \param{packfn} represents a function that
+can pack the message.  If the parameter \param{pe} is {\tt CLD\_ANYWHERE},
+the message is sent to a lightly-loaded processor and enqueued with
+the appropriate priority.  If the parameter \param{pe} is a processor
+number, the message is sent to the specified processor and enqueued
+with the appropriate priority.  CldEnqueue frees the message buffer
+using CmiFree.}
+
