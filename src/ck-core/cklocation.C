@@ -1152,7 +1152,8 @@ CkMigratableList *CkLocMgr::addManager(CkArrayID id,CkArrMgr *mgr)
 	CK_MAGICNUMBER_CHECK
 	DEBC((AA"Adding new array manager\n"AB));
 	//Link new manager into list
-	ManagerRec *n=&managers.find(id);
+	ManagerRec *n=new ManagerRec;
+	managers.find(id)=n;
 	n->next=firstManager;
 	n->mgr=mgr;
 	n->elts.setSize(localLen);
@@ -1238,7 +1239,7 @@ CmiBool CkLocMgr::addElement(CkArrayID id,const CkArrayIndex &idx,
 		rec=((CkLocRec_local *)oldRec);
 		rec->addedElement();
 	}
-	if (!addElementToRec(rec,&managers.find(id),elt,ctorIdx,ctorMsg)) return CmiFalse;
+	if (!addElementToRec(rec,managers.find(id),elt,ctorIdx,ctorMsg)) return CmiFalse;
 	elt->ckFinishConstruction();
 	return CmiTrue;
 }
@@ -1354,7 +1355,7 @@ CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg,CkDeliver_t type)
 	else
 	{ // We *are* the home processor:
 	//Check if the element's array manager has been registered yet:
-	  CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->getsetArrayMgr()).mgr;
+	  CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->getsetArrayMgr())->mgr;
 	  if (!mgr) { //No manager yet-- postpone the message (stupidly)
 	    CkArrayManagerDeliver(CkMyPe(),msg); 
 	  }
@@ -1391,7 +1392,7 @@ CmiBool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t t
 	
 	//Find the manager and build the element
 	DEBC((AA"Demand-creating element %s on pe %d\n"AB,idx2str(idx),onPe));
-	CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->getsetArrayMgr()).mgr;
+	CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->getsetArrayMgr())->mgr;
 	if (!mgr) CkAbort("Tried to demand-create for nonexistent arrMgr");
 	return mgr->demandCreateElement(idx,onPe,ctor,type);
 }

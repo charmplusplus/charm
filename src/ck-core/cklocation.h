@@ -501,10 +501,10 @@ public:
 	//Look up the object with this local index
 	inline CkMigratable *lookupLocal(int localIdx,CkArrayID arrayID) {
 #ifndef CMK_OPTIMIZE
-		if (managers.find(arrayID).mgr==NULL)
+		if (managers.find(arrayID)->mgr==NULL)
 			CkAbort("CkLocMgr::lookupLocal called for unknown array!\n");
 #endif
-		return managers.find(arrayID).elts.get(localIdx);
+		return managers.find(arrayID)->elts.get(localIdx);
 	}
 
 	//Migrate us to another processor
@@ -602,7 +602,7 @@ private:
 			return elts.get(localIdx);
 		}
 	};
-	GroupIdxArray<ManagerRec> managers;
+	GroupIdxArray<ManagerRec *> managers;
 	int nManagers;
 	ManagerRec *firstManager; //First non-null array manager
 
