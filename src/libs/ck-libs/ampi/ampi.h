@@ -14,11 +14,10 @@ extern "C" {
 
 /* MPI prototypes and #defines here */
 
-// these values have to match values in ampif.h
-
+/* these values have to match values in ampif.h */
 #define AMPI_DOUBLE 0
 #define AMPI_INT 1
-#define AMPI_REAL 2
+#define AMPI_FLOAT 2
 #define AMPI_COMPLEX 3
 #define AMPI_LOGICAL 4
 #define AMPI_CHARACTER 5
@@ -27,6 +26,8 @@ extern "C" {
 
 #define AMPI_COMM_WORLD 0
 #define AMPI_ANY_SOURCE (-1)
+#define AMPI_ANY_TAG (-1)
+#define AMPI_REQUEST_NULL (-1)
 
 #define AMPI_MAX 1
 #define AMPI_MIN 2
@@ -91,6 +92,9 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
 int AMPI_Alltoall(void *sendbuf, int sendcount, AMPI_Datatype sendtype, 
                  void *recvbuf, int recvcount, AMPI_Datatype recvtype, 
                  AMPI_Comm comm);
+int AMPI_Comm_dup(AMPI_Comm comm, AMPI_Comm *newcomm);
+int AMPI_Comm_free(AMPI_Comm *comm);
+int AMPI_Abort(AMPI_Comm comm, int errorcode);
 #ifdef __cplusplus
 }
 #endif

@@ -76,7 +76,7 @@ main::qd(void)
   return;
 }
 
-CpvExtern(int, _numSwitches);
+//CpvExtern(int, _numSwitches);
 
 void
 main::done(void)
@@ -266,7 +266,7 @@ static int typesize(int type, int count, ampi* ptr)
   switch(type) {
     case AMPI_DOUBLE : return count*sizeof(double);
     case AMPI_INT : return count*sizeof(int);
-    case AMPI_REAL : return count*sizeof(float);
+    case AMPI_FLOAT : return count*sizeof(float);
     case AMPI_COMPLEX: return 2*count*sizeof(double);
     case AMPI_LOGICAL: return count*sizeof(int);
     case AMPI_CHARACTER: return count*sizeof(char);
@@ -384,7 +384,7 @@ static void optype(int inop, int intype, int *outop, int *outtype)
       CmiAbort("exiting");
   }
   switch(intype) {
-    case AMPI_REAL : *outtype = TEMPO_FLOAT; break;
+    case AMPI_FLOAT : *outtype = TEMPO_FLOAT; break;
     case AMPI_INT : *outtype = TEMPO_INT; break;
     case AMPI_DOUBLE : *outtype = TEMPO_DOUBLE; break;
     default:
@@ -419,7 +419,7 @@ extern "C" int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   switch(op) {
     case AMPI_MAX :
       switch(type) {
-        case AMPI_REAL : mytype = CkReduction::max_float; break;
+        case AMPI_FLOAT : mytype = CkReduction::max_float; break;
         case AMPI_INT : mytype = CkReduction::max_int; break;
         case AMPI_DOUBLE : mytype = CkReduction::max_double; break;
         default:
@@ -429,7 +429,7 @@ extern "C" int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
       break;
     case AMPI_MIN :
       switch(type) {
-        case AMPI_REAL : mytype = CkReduction::min_float; break;
+        case AMPI_FLOAT : mytype = CkReduction::min_float; break;
         case AMPI_INT : mytype = CkReduction::min_int; break;
         case AMPI_DOUBLE : mytype = CkReduction::min_double; break;
         default:
@@ -439,7 +439,7 @@ extern "C" int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
       break;
     case AMPI_SUM :
       switch(type) {
-        case AMPI_REAL : mytype = CkReduction::sum_float; break;
+        case AMPI_FLOAT : mytype = CkReduction::sum_float; break;
         case AMPI_INT : mytype = CkReduction::sum_int; break;
         case AMPI_DOUBLE : mytype = CkReduction::sum_double; break;
         default:
@@ -449,7 +449,7 @@ extern "C" int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
       break;
     case AMPI_PROD :
       switch(type) {
-        case AMPI_REAL : mytype = CkReduction::product_float; break;
+        case AMPI_FLOAT : mytype = CkReduction::product_float; break;
         case AMPI_INT : mytype = CkReduction::product_int; break;
         case AMPI_DOUBLE : mytype = CkReduction::product_double; break;
         default:
@@ -878,6 +878,46 @@ void ampi_alltoall_(void *sendbuf, int *sendcount, int *sendtype,
 {
   *ierr = AMPI_Alltoall(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                        *recvtype, *comm);
+}
+
+extern "C"
+int AMPI_Comm_dup(int comm, int *newcomm)
+{
+  *newcomm = comm;
+  return 0;
+}
+
+extern "C"
+void ampi_comm_dup_(int *comm, int *newcomm, int *ierr)
+{
+  *newcomm = *comm;
+  *ierr = 0;
+}
+
+extern "C"
+int AMPI_Comm_free(int *comm)
+{
+  return 0;
+}
+
+extern "C"
+void ampi_comm_free_(int *comm, int *ierr)
+{
+  *ierr = 0;
+}
+
+extern "C"
+int AMPI_Abort(int comm, int errorcode)
+{
+  CmiAbort("MPI_Abort!\n");
+  return errorcode;
+}
+
+extern "C"
+void ampi_abort_(int *comm, int *errorcode, int *ierr)
+{
+  CmiAbort("MPI_Abort!\n");
+  *ierr = 0;
 }
 
 #include "ampi.def.h"
