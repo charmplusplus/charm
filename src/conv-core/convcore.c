@@ -4,6 +4,16 @@
  * $Date$
  * $Revision$
  *****************************************************************************/
+/**
+\file
+\brief Converse--a parallel portability layer.
+*/
+/**
+\addtogroup Converse
+\brief Converse--a parallel portability layer.
+
+*/
+/*@{*/
 
 #include <stdio.h>
 #include <stdlib.h>
