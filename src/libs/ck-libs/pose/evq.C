@@ -38,7 +38,7 @@ eventQueue::eventQueue()
   // link them together
   frontPtr->next = backPtr;
   backPtr->prev = frontPtr;
-  //sanitize();
+  sanitize();
 }
 
 /// Destructor
@@ -57,7 +57,7 @@ eventQueue::~eventQueue()
 /// Insert e in the queue in timestamp order
 void eventQueue::InsertEvent(Event *e)
 {
-  //sanitize();
+  sanitize();
 #ifdef DETERMINISTIC_EVENTS
   InsertEventDeterministic(e);
 #else
@@ -85,7 +85,7 @@ void eventQueue::InsertEvent(Event *e)
     if ((currentPtr->prev == e) && (currentPtr->done < 1))
       currentPtr = currentPtr->prev;
   }
-  //sanitize();
+  sanitize();
 #endif
 }
 
@@ -123,13 +123,13 @@ void eventQueue::InsertEventDeterministic(Event *e)
     if ((currentPtr->prev == e) && (currentPtr->done < 1))
       currentPtr = currentPtr->prev;
   }
-  //sanitize();
+  sanitize();
 }
 
 /// Move currentPtr to next event in queue
 void eventQueue::ShiftEvent() { 
   Event *e;
-  //sanitize();
+  sanitize();
   CmiAssert(currentPtr->next != NULL);
   currentPtr = currentPtr->next; // set currentPtr to next event
   if ((currentPtr == backPtr) && (eqh->top)) { // currentPtr on back sentinel
@@ -144,7 +144,7 @@ void eventQueue::ShiftEvent() {
   if (currentPtr == backPtr) largest = POSE_UnsetTS;
   else FindLargest();
   eventCount--;
-  //sanitize();
+  sanitize();
 }
 
 void eventQueue::CommitStatsHelper(Event *commitPtr)
@@ -175,7 +175,7 @@ void eventQueue::CommitStatsHelper(Event *commitPtr)
 /// Commit (delete) events before target timestamp ts
 void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
 {
-  //sanitize();
+  sanitize();
   Event *target = frontPtr->next, *commitPtr = frontPtr->next;
   if (ts == POSE_UnsetTS) {
     CommitAll(obj);
@@ -225,13 +225,13 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
   }
   frontPtr->next = link;
   link->prev = frontPtr;
-  //sanitize();
+  sanitize();
 }
 
 /// Commit (delete) all events
 void eventQueue::CommitAll(sim *obj)
 {
-  //sanitize();
+  sanitize();
   Event *commitPtr = frontPtr->next;
   
   while (commitPtr != backPtr) {
@@ -255,7 +255,7 @@ void eventQueue::CommitAll(sim *obj)
   }
   frontPtr->next = link;
   link->prev = frontPtr;
-  //sanitize();
+  sanitize();
 }
 
 /// Change currentPtr to point to event e
@@ -279,7 +279,7 @@ void eventQueue::SetCurrentPtr(Event *e) {
 /// Return first (earliest) unexecuted event before currentPtr
 Event *eventQueue::RecomputeRollbackTime() 
 {
-  //  //sanitize();
+  sanitize();
   Event *ev = frontPtr->next; // start at front
   //  while ((ev->done == 1) && (ev != currentPtr)) ev = ev->next;
   while (ev->done == 1) ev = ev->next;
@@ -290,7 +290,7 @@ Event *eventQueue::RecomputeRollbackTime()
 /// Delete event and reconnect surrounding events in queue
 void eventQueue::DeleteEvent(Event *ev) 
 {
-  //sanitize();
+  sanitize();
   CmiAssert(ev != currentPtr);
   CmiAssert(ev->spawnedList == NULL);
   CmiAssert(ev != frontPtr);
@@ -302,7 +302,7 @@ void eventQueue::DeleteEvent(Event *ev)
   if (!ev->done) eventCount--;
   delete ev; // then delete the event
   if (ts == largest) FindLargest();
-  //sanitize();
+  sanitize();
 }
 
 /// Find largest timestamp of the unexecuted events
@@ -440,6 +440,8 @@ void eventQueue::sanitize()
   tmp = currentPtr;
   while (tmp != backPtr) {
     CmiAssert(tmp->next != NULL);
+    CmiAssert((tmp->next == backPtr) || 
+	      (tmp->timestamp <= tmp->next->timestamp));
     tmp = tmp->next;
   } // tmp is now at backptr
   // traverse backward to currentPtr

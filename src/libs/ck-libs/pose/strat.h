@@ -64,6 +64,8 @@ class strat
   void ResetRBevent(Event *e) { 
     if (!RBevent) RBevent = e; 
     else if (RBevent->timestamp > e->timestamp) RBevent = e;
+    CmiAssert(RBevent->prev->next == RBevent);
+    CmiAssert(RBevent->next->prev == RBevent);
   }
 };
 

@@ -40,7 +40,9 @@ class CancelList {
   CancelNode *current; 
  public:
   /// Initializing Constructor
-  CancelList() { count = 0; earliest = POSE_UnsetTS; cancellations = current = NULL; }
+  CancelList() { 
+    count = 0; earliest = POSE_UnsetTS; cancellations = current = NULL; 
+  }
   /// Insert an event at beginning of cancellations list
   /** Inserts an event at beginning of list; increments count and sets earliest
       if applicable; sets current if list was previously empty */

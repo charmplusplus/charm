@@ -5,27 +5,15 @@
 void opt::Step()
 {
   Event *ev;
-  static POSE_TimeType lastGVT = POSE_UnsetTS;
+  static POSE_TimeType lastGVT = localPVT->getGVT();
 
-  lastGVT = localPVT->getGVT();
-  if (!parent->cancels.IsEmpty()) { // Cancel as much as possible
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(CAN_TIMER);      
-#endif
-    CancelEvents();
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(SIM_TIMER);      
-#endif
-  }
-  if (RBevent) { // Rollback if necessary
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(RB_TIMER);      
-#endif
-    Rollback(); 
-#ifdef POSE_STATS_ON
-    localStats->SwitchTimer(SIM_TIMER);      
-#endif
-  }
+  CmiAssert(this == parent->myStrat);
+  CmiAssert(eq == parent->eq);
+  CmiAssert(userObj == parent->objID);
+
+
+  if (RBevent) Rollback(); 
+  if (!parent->cancels.IsEmpty()) CancelEvents();
 
   // Execute an event
   ev = eq->currentPtr;
@@ -49,7 +37,11 @@ void opt::Step()
 /// Rollback to predetermined RBevent
 void opt::Rollback()
 {
+#ifdef POSE_STATS_ON
+    localStats->SwitchTimer(RB_TIMER);      
+#endif
   Event *ev = eq->currentPtr->prev, *recoveryPoint;
+  eq->sanitize();
   // find earliest event that must be undone
   recoveryPoint = RBevent;
   // skip forward over other stragglers
@@ -59,8 +51,12 @@ void opt::Rollback()
   CmiAssert(recoveryPoint != eq->back());
   if (recoveryPoint == eq->currentPtr) {
     eq->SetCurrentPtr(RBevent);
+    eq->sanitize();
     return;
   }
+
+    CmiAssert(RBevent->prev->next == RBevent);
+    CmiAssert(RBevent->next->prev == RBevent);
 
   rbCount++;
   rbFlag = 1;
@@ -73,6 +69,7 @@ void opt::Rollback()
     ev = ev->prev;     
   }
 
+  eq->sanitize();
   // ev is now at recovery point
   if (userObj->usesAntimethods()) {
     targetEvent = recoveryPoint;
@@ -89,11 +86,19 @@ void opt::Rollback()
     }
   }
 
+  eq->sanitize();
+    CmiAssert(RBevent->prev->next == RBevent);
+    CmiAssert(RBevent->next->prev == RBevent);
   eq->SetCurrentPtr(RBevent); // adjust currentPtr
+  eq->sanitize();
   avgRBoffset = 
     (avgRBoffset*(rbCount-1)+(eq->currentPtr->timestamp-localPVT->getGVT()))/rbCount;
   eq->FindLargest();
   RBevent = targetEvent = NULL; // reset RBevent & targetEvent
+  eq->sanitize();
+#ifdef POSE_STATS_ON
+    localStats->SwitchTimer(SIM_TIMER);      
+#endif
 }
 
 /// Undo a single event, cancelling its spawned events
@@ -123,10 +128,14 @@ void opt::UndoEvent(Event *e)
 /// Cancel events in cancellation list that have arrived
 void opt::CancelEvents() 
 {
+#ifdef POSE_STATS_ON
+    localStats->SwitchTimer(CAN_TIMER);      
+#endif
   Event *ev, *tmp, *recoveryPoint;
   int found;
   CancelNode *it=NULL, *last=NULL;
 
+  eq->sanitize();
   last = parent->cancels.GetItem(); // make note of last item to examine
   while (!parent->cancels.IsEmpty()) { // loop through all cancellations
     it = parent->cancels.GetItem();
@@ -164,7 +173,7 @@ void opt::CancelEvents()
 	}
       }
       if (!found) { // "it" event has not arrived yet
-	if (it == last) return; // seen all cancellations during this call
+	if (it == last) {  eq->sanitize();return; }// seen all cancellations during this call
 	it = parent->cancels.GetItem(); // try the next cancellation
       }
     }
@@ -219,14 +228,15 @@ void opt::CancelEvents()
     }
     if (it == last) {
       parent->cancels.RemoveItem(it); // Clean up
-      if (RBevent && (RBevent->timestamp > eq->currentPtr->timestamp))
-	RBevent = NULL;
+      eq->sanitize();
       return;
     }
     else parent->cancels.RemoveItem(it); // Clean up
   } // end outer while which loops through entire cancellations list
-  if (RBevent && (RBevent->timestamp > eq->currentPtr->timestamp))
-    RBevent = NULL;
+  eq->sanitize();
+#ifdef POSE_STATS_ON
+    localStats->SwitchTimer(SIM_TIMER);      
+#endif
 }
 
 /// Recover checkpointed state prior to ev
