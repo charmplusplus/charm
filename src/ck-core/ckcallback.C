@@ -101,13 +101,25 @@ void CkCallback::send(void *msg) const
 		if (!msg) msg=CkAllocSysMsg();
 		CkSendMsg(d.chare.ep,msg,&d.chare.id);
 		break;
+	case isendChare: //inline send-to-chare
+		if (!msg) msg=CkAllocSysMsg();
+		CkSendMsgInline(d.chare.ep,msg,&d.chare.id);
+		break;
 	case sendGroup: //Send message to a group element
 		if (!msg) msg=CkAllocSysMsg();
 		CkSendMsgBranch(d.group.ep,msg,d.group.onPE,d.group.id);
 		break;
+	case isendGroup: //inline send-to-group element
+		if (!msg) msg=CkAllocSysMsg();
+		CkSendMsgBranchInline(d.group.ep,msg,d.group.onPE,d.group.id);
+		break;
 	case sendArray: //Send message to an array element
 		if (!msg) msg=CkAllocSysMsg();
 		CkSendMsgArray(d.array.ep,msg,d.array.id,d.array.idx.asMax());
+		break;
+	case isendArray: //inline send-to-array element
+		if (!msg) msg=CkAllocSysMsg();
+		CkSendMsgArrayInline(d.array.ep,msg,d.array.id,d.array.idx.asMax());
 		break;
 	case bcastGroup:
 		if (!msg) msg=CkAllocSysMsg();

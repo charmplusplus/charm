@@ -25,6 +25,9 @@ public:
 	sendChare, //Send to a chare (d.chare)
 	sendGroup, //Send to a group (d.group)
 	sendArray, //Send to an array (d.array)
+	isendChare, //Inlined send to a chare (d.chare)
+	isendGroup, //Inlined send to a group (d.group)
+	isendArray, //Inlined send to an array (d.array)
 	bcastGroup, //Broadcast to a group (d.group)
 	bcastArray //Broadcast to an array (d.array)
 	} callbackType;
@@ -71,24 +74,23 @@ public:
 		:type(callCFn) 
 		{d.cfn.onPE=CkMyPe(); d.cfn.fn=fn; d.cfn.param=param;}
 
-	CkCallback(int ep,const CkChareID &id)
-		:type(sendChare) 
+	CkCallback(int ep,const CkChareID &id,bool doInline=false)
+		:type(doInline?isendChare:sendChare) 
 		{d.chare.ep=ep; d.chare.id=id;}
 
 	CkCallback(int ep,const CkGroupID &id)
 		:type(bcastGroup) 
 		{d.group.ep=ep; d.group.id=id;}
-	CkCallback(int ep,int onPE,const CkGroupID &id)
-		:type(sendGroup) 
+	CkCallback(int ep,int onPE,const CkGroupID &id,bool doInline=false)
+		:type(doInline?isendGroup:sendGroup) 
 		{d.group.ep=ep; d.group.id=id; d.group.onPE=onPE;}
 	
 	CkCallback(int ep,const CkArrayID &id)
 		:type(bcastArray) 
 		{d.array.ep=ep; d.array.id=id;}
-	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id)
-		:type(sendArray) 
+	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id,bool doInline=false)
+		:type(doInline?isendArray:sendArray) 
 		{d.array.ep=ep; d.array.id=id; d.array.idx.asMax()=idx;}
-
 
 	int isInvalid(void) const {return type==invalid;}
 
