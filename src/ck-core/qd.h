@@ -52,9 +52,11 @@ class QdState {
       cCreated = 0; cProcessed = 0; cDirty = 0;
       oProcessed = 0;
       callbacks = new PtrQ();
+      _MEMCHECK(callbacks);
       nChildren = CmiNumSpanTreeChildren(CkMyPe());
       parent = CmiSpanTreeParent(CkMyPe());
       children = new int[nChildren];
+      _MEMCHECK(children);
       CmiSpanTreeChildren(CkMyPe(), children);
     }
     void propagate(QdMsg *msg) {

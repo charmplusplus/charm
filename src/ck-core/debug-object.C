@@ -57,6 +57,7 @@ void HashTable::putObject(Chare* charePtr)
   
   chareIndex = (size_t)charePtr;
   node = (struct HashTableElement *)malloc(sizeof(struct HashTableElement));
+  _MEMCHECK(node);
   node->charePtr = charePtr;
   node->chareIndex = chareIndex;
   pigeonHole = chareIndex % PRIME;
@@ -100,6 +101,7 @@ char* HashTable::getObjectList(void)
   int maxLength = PRIME * 20 * sizeof(char);
   
   list = (char *)malloc(maxLength);
+  _MEMCHECK(list);
   strcpy(list, "");
   for(int i = 0; i < PRIME; i++){
     node = array[i];
@@ -110,6 +112,7 @@ char* HashTable::getObjectList(void)
 	  maxLength *= 2;
 	  oldlist = list;
 	  list = (char *)malloc(maxLength);
+          _MEMCHECK(list);
 	  strcpy(list, oldlist);
 	  free(oldlist);
 	}
@@ -144,6 +147,7 @@ extern "C"
 void CpdInitializeObjectTable(void)
 {
   objectTable = new HashTable();
+  _MEMCHECK(objectTable);
 }
 
 #endif

@@ -105,6 +105,7 @@ int Cpthread_key_create(Cpthread_key_t *keyp, void (*destructo)(void *))
     keys_inactive = key->next;
   } else {
     key = (Cpthread_key_t)malloc(sizeof(struct Cpthread_key_s));
+    _MEMCHECK(key);
     key->offset = CthRegister(sizeof(void *));
   }
   key->magic = KEY_MAGIC;
@@ -175,6 +176,7 @@ void Cpthread_cleanup_push(void (*routine)(void*), void *arg)
   Cpthread_t pt = CtvAccess(Cpthread_current);
   Cpthread_cleanup_t c =
     (Cpthread_cleanup_t)malloc(sizeof(struct Cpthread_cleanup_s));
+  _MEMCHECK(c);
   c->routine = routine;
   c->argument = arg;
   c->next = pt->cleanups;
@@ -279,6 +281,7 @@ int Cpthread_create3(Cpthread_t *thread, Cpthread_attr_t *attr,
   Cpthread_t pt;
   if (attr->magic != ATTR_MAGIC) errcode(EINVAL);
   pt = (Cpthread_t)malloc(sizeof(struct Cpthread_s));
+  _MEMCHECK(pt);
   pt->magic = PT_MAGIC;
   pt->startfn = fn;
   pt->startarg1 = a1;

@@ -31,8 +31,11 @@ static inline void _bcastQD2(QdState* state, QdMsg *msg)
 static inline void _handlePhase0(QdState *state, QdMsg *msg)
 {
   assert(CkMyPe()==0 || state->getStage()==0);
-  if(CkMyPe()==0)
-    state->enq(new QdCallback(msg->getEp(), msg->getCid()));
+  if(CkMyPe()==0) {
+    QdCallback *qdcb = new QdCallback(msg->getEp(), msg->getCid());
+    _MEMCHECK(qdcb);
+    state->enq(qdcb);
+  }
   if(state->getStage()==0)
     _bcastQD1(state, msg);
   else

@@ -7,7 +7,9 @@ FIFO_QUEUE *FIFO_Create(void)
 {
   FIFO_QUEUE *queue;
   queue = (FIFO_QUEUE *)malloc(sizeof(FIFO_QUEUE));
+  _MEMCHECK(queue);
   queue->block = (void **) malloc(_FIFO_BLK_LEN * sizeof(void *));
+  _MEMCHECK(queue->block);
   queue->size = _FIFO_BLK_LEN;
   queue->push = queue->pull = 0;
   queue->fill = 0;
@@ -32,6 +34,7 @@ static void FIFO_Expand(FIFO_QUEUE *queue)
   void **block = queue->block;
   newsize = size * 3;
   newblock = (void**)malloc(newsize * sizeof(void *));
+  _MEMCHECK(newblock);
   rest = size - pull;
   memcpy(newblock, block + pull, rest * sizeof(void *));
   memcpy(newblock + rest, block, pull * sizeof(void *));
@@ -96,6 +99,7 @@ void FIFO_Enumerate(FIFO_QUEUE *queue, void ***element)
   if(num == 0)
     return;
   *element = (void **)malloc(num * sizeof(void *));
+  _MEMCHECK(*element);
   while(num > 0){
     (*element)[i++] = queue->block[pull];
     pull = (pull + 1) % queue->size;

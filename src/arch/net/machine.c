@@ -331,6 +331,7 @@ static char *strdupl(s) char *s;
 {
   int len = strlen(s);
   char *res = (char *)malloc(len+1);
+  _MEMCHECK(res);
   strcpy(res, s);
   return res;
 }
@@ -658,6 +659,7 @@ PCQueue PCQueueCreate()
   circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));
 
   Q = (PCQueue)malloc(sizeof(struct PCQueueStruct));
+  _MEMCHECK(Q);
   Q->head = circ;
   Q->tail = circ;
   return Q;
@@ -951,8 +953,9 @@ static OutgoingMsg   Cmi_freelist_outgoing;
 
 #define MallocImplicitDgram(dg) {\
   ImplicitDgram d = Cmi_freelist_implicit;\
-  if (d==0) d = ((ImplicitDgram)malloc(sizeof(struct ImplicitDgramStruct)));\
-  else Cmi_freelist_implicit = d->next;\
+  if (d==0) {d = ((ImplicitDgram)malloc(sizeof(struct ImplicitDgramStruct)));\
+             _MEMCHECK(d);\
+  } else Cmi_freelist_implicit = d->next;\
   dg = d;\
 }
 
@@ -964,9 +967,10 @@ static OutgoingMsg   Cmi_freelist_outgoing;
 
 #define MallocExplicitDgram(dg) {\
   ExplicitDgram d = Cmi_freelist_explicit;\
-  if (d==0) d = ((ExplicitDgram)malloc \
+  if (d==0) { d = ((ExplicitDgram)malloc \
 		   (sizeof(struct ExplicitDgramStruct) + Cmi_max_dgram_size));\
-  else Cmi_freelist_explicit = d->next;\
+              _MEMCHECK(d);\
+  } else Cmi_freelist_explicit = d->next;\
   dg = d;\
 }
 
@@ -974,7 +978,7 @@ static OutgoingMsg   Cmi_freelist_outgoing;
 
 #define FreeOutgoingMsg(m) (free(m))
 #define MallocOutgoingMsg(m)\
-   (m=(OutgoingMsg)malloc(sizeof(struct OutgoingMsgStruct)))
+    {(m=(OutgoingMsg)malloc(sizeof(struct OutgoingMsgStruct))); _MEMCHECK(m);}
 
 /******************************************************************************
  *
@@ -1168,6 +1172,7 @@ int    log_wrap;
 static void log_init()
 {
   log = (logent)malloc(50000 * sizeof(struct logent));
+  _MEMCHECK(log);
   log_pos = 0;
   log_wrap = 0;
 }
@@ -1380,6 +1385,7 @@ int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe]->nodestart); }
 CmiNodeLock CmiCreateLock()
 {
   CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(mutex_t));
+  _MEMCHECK(lk);
   mutex_init(lk,0,0);
   return lk;
 }
@@ -1504,6 +1510,7 @@ int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe]->nodestart); }
 CmiNodeLock CmiCreateLock()
 {
   CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(pthread_mutex_t));
+  _MEMCHECK(lk);
   pthread_mutex_init(lk,(pthread_mutexattr_t *)0);
   return lk;
 }
@@ -1751,6 +1758,7 @@ static void ctrl_getone()
       msg[CmiMsgHeaderSizeBytes+len+size] = '\0';
       if(CpvAccess(stateAvailable) == 0){
 	CcsRequest qmsg = (CcsRequest)malloc(sizeof(struct CcsRequestNode));
+        _MEMCHECK(qmsg);
 	qmsg->ptr = msg;
 	qmsg->pe = pe;
 	FIFO_EnQueue(CpvAccess(CcsRequestQueue), qmsg);
@@ -1851,6 +1859,7 @@ static void node_addresses_store(addrs) char *addrs;
   p = skipblanks(p);
   if (*p!=0) KillEveryoneCode(82283);
   bype = (OtherNode*)malloc(Cmi_numpes * sizeof(OtherNode));
+  _MEMCHECK(bype);
   for (i=0; i<Cmi_numnodes; i++) {
     OtherNode node = ntab + i;
     node->sent_msgs = 0;
@@ -2840,6 +2849,7 @@ void ConverseInitPE()
   CmiState cs = CmiGetState();
   CpvInitialize(char *, internal_printf_buffer);
   CpvAccess(internal_printf_buffer) = (char *) malloc(PRINTBUFSIZE);
+  _MEMCHECK(CpvAccess(internal_printf_buffer));
   CthInit(Cmi_argv);
 #if CMK_CCS_AVAILABLE
   CpvInitialize(void *, CcsRequestQueue);

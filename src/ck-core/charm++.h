@@ -29,11 +29,13 @@ class Chare {
     virtual ~Chare() { removeObject(this); }
     virtual char *showHeader(void) {
       char *ret = (char *)malloc(strlen("Default Header")+1);
+      _MEMCHECK(ret);
       strcpy(ret,"Default Header");
       return ret;
     }
     virtual char *showContents(void) {
       char *ret = (char *)malloc(strlen("Default Content")+1);
+      _MEMCHECK(ret);
       strcpy(ret,"Default Content");
       return ret;
     }

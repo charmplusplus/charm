@@ -100,6 +100,7 @@ char* genericViewMsgFunction(char *msg, int type){
   if(f == 0){
     // Undefined Content/Header function
     temp = (char *)malloc(strlen(HeaderUnknownFormat)+1);
+    _MEMCHECK(temp);
     strcpy(temp, HeaderUnknownFormat);
     return(temp);
   } else{
@@ -121,6 +122,7 @@ char* getMsgListSched(void)
   }
   maxLength = ending * sizeof(char) * 20 + 1;
   list = (char *)malloc(maxLength);
+  _MEMCHECK(list);
   strcpy(list, "");
 
   for(int i = schedIndex; i < ending + schedIndex; i++){
@@ -148,6 +150,7 @@ char* getMsgListPCQueue(void)
   char *list;
 
   list = (char *)malloc(strlen(NotImpl)+1);
+  _MEMCHECK(list);
   strcpy(list, NotImpl);
   return(list);
 }
@@ -167,6 +170,7 @@ char* getMsgListFIFO(void)
   }
   maxLength = ending * sizeof(char) * 20 + 1;
   list = (char *)malloc(maxLength);
+  _MEMCHECK(list);
   strcpy(list, "");
 
   for(int i=FIFOIndex; i < FIFOIndex+ending; i++){
@@ -202,6 +206,7 @@ char* getMsgListDebug(void)
   }
   maxLength = ending * sizeof(char) * 20 + 1;
   list = (char *)malloc(maxLength);
+  _MEMCHECK(list);
   strcpy(list, "");
 
   if(DQueue != 0) free(DQueue);
@@ -234,6 +239,7 @@ char* getMsgContentsPCQueue(int index)
 {
   char *temp;
   temp = (char *)malloc(strlen(NotImpl)+1);
+  _MEMCHECK(temp);
   strcpy(temp, NotImpl);
   return(temp);
 }

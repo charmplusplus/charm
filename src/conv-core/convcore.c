@@ -253,6 +253,7 @@ static void CmiHandlerInit()
   CpvAccess(CmiHandlerGlobal) = 2;
   CpvAccess(CmiHandlerMax) = 100;
   CpvAccess(CmiHandlerTable) = (CmiHandler *)malloc(100*sizeof(CmiHandler)) ;
+  _MEMCHECK(CpvAccess(CmiHandlerTable));
 }
 
 
@@ -706,7 +707,9 @@ void CHostHandler(char *msg)
 void CHostInit()
 {
   nodeIPs = (unsigned int *)malloc(CmiNumPes() * sizeof(unsigned int));
+  _MEMCHECK(nodeIPs);
   nodePorts = (unsigned int *)malloc(CmiNumPes() * sizeof(unsigned int));
+  _MEMCHECK(nodePorts);
   CpvInitialize(int, CHostHandlerIndex);
   CpvAccess(CHostHandlerIndex) = CmiRegisterHandler(CHostHandler);
 }
@@ -1002,6 +1005,7 @@ static void CpdDebugHandler(char *msg)
       }
       else{
 	reply = (char *)malloc(strlen(breakPointHeader) + strlen(breakPointContents) + 1);
+        _MEMCHECK(reply);
 	strcpy(reply, breakPointHeader);
 	strcat(reply, "@");
 	strcat(reply, breakPointContents);
@@ -1099,6 +1103,7 @@ static void sendDataFunction(void)
   len+=6; /* for 'perf ' and the \0 at the end */
 
   reply = (char *)malloc(len * sizeof(char));
+  _MEMCHECK(reply);
   strcpy(reply, "perf ");
 
   for(i=0; i<CmiNumPes(); i++){
@@ -1191,6 +1196,7 @@ static void CWebHandler(char *msg){
       appletPort = port;
 
       valueArray = (char **)malloc(sizeof(char *) * CmiNumPes());
+      _MEMCHECK(valueArray);
       for(i = 0; i < CmiNumPes(); i++)
         valueArray[i] = 0;
 
@@ -1470,6 +1476,7 @@ void CmiHandleMessage(void *msg)
     /* Freeze and send a message back */
     CpdFreeze();
     freezeReply = (char *)malloc(strlen("freezing@")+strlen(breakPointHeader)+1);
+    _MEMCHECK(freezeReply);
     sprintf(freezeReply, "freezing@%s", breakPointHeader);
     fd = skt_connect(freezeIP, freezePort, 120);
     if(fd > 0){
@@ -1499,6 +1506,7 @@ void CmiHandleMessage(void *msg)
     /* Freeze and send a message back */
     CpdFreeze();
     freezeReply = (char *)malloc(strlen("freezing@")+strlen(breakPointHeader)+1);
+    _MEMCHECK(freezeReply);
     sprintf(freezeReply, "freezing@%s", breakPointHeader);
     fd = skt_connect(freezeIP, freezePort, 120);
     if(fd > 0){
@@ -2119,7 +2127,7 @@ int size;
 {
   char *res;
   res =(char *)malloc(size+2*sizeof(int));
-  if (res==0) CmiAbort("Memory allocation failed.");
+  _MEMCHECK(res);
 
 #ifdef MEMMONITOR
   CpvAccess(MemoryUsage) += size+2*sizeof(int);
@@ -2440,11 +2448,13 @@ void CcsUseHandler(char *name, int hdlr)
   CcsListNode *list=CpvAccess(ccsList);
   if(list==0) {
     list = (CcsListNode *)malloc(sizeof(CcsListNode));
+    _MEMCHECK(list);
     CpvAccess(ccsList) = list;
   } else {
     while(list->next != 0) 
       list = list->next;
     list->next = (CcsListNode *)malloc(sizeof(CcsListNode));
+    _MEMCHECK(list->next);
     list = list->next;
   }
   strcpy(list->name, name);

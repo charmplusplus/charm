@@ -43,7 +43,9 @@ CkGroupID CkGetNodeGroupID(void) {
 
 static inline void *_allocNewChare(envelope *env)
 {
-  return malloc(_chareTable[_entryTable[env->getEpIdx()]->chareIdx]->size);
+  void *tmp=malloc(_chareTable[_entryTable[env->getEpIdx()]->chareIdx]->size);
+  _MEMCHECK(tmp);
+  return tmp;
 }
  
 static void _processNewChareMsg(envelope *env)
@@ -344,6 +346,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   } else {
     pCid->onPE = (-(CkMyPe()+1));
     pCid->objPtr = (void *) new VidBlock();
+    _MEMCHECK(pCid->objPtr);
     env->setMsgtype(NewVChareMsg);
     env->setVidPtr(pCid->objPtr);
   }
@@ -365,6 +368,7 @@ void _createGroupMember(CkGroupID groupID, int eIdx, void *msg)
 {
   register int gIdx = _entryTable[eIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
+  _MEMCHECK(obj);
   CpvAccess(_groupTable)->add(groupID, obj);
   register void *prev = CpvAccess(_currentChare);
   CpvAccess(_currentChare) = obj;
@@ -381,6 +385,7 @@ void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *msg)
 {
   register int gIdx = _entryTable[eIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
+  _MEMCHECK(obj);
   CmiLock(_nodeLock);
   _nodeGroupTable->add(groupID, obj);
   CmiUnlock(_nodeLock);

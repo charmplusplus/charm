@@ -87,6 +87,7 @@ void Array1D::RecvMapID(ArrayMap *mPtr, CkChareID mHandle,
   mapGroup = mGroup;
 
   elementIDs = new ElementIDs[numElements];
+  _MEMCHECK(elementIDs);
   elementIDsReported = 0;
   numLocalElements=0;
   int i;

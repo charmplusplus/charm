@@ -192,6 +192,7 @@ single CPathGetSingle(CPath *path, int *indices)
   }
   
   result = (single)malloc(sizeof(struct single));
+  _MEMCHECK(result);
   result->path = *path;
   result->eltno = eltno;
   result->waiting = 0;
@@ -636,6 +637,7 @@ reduction CPathGetReduction(eltset set, int ntags, int *tags,
   }
   
   red = (reduction)malloc(sizeof(struct reduction) + ntags*sizeof(int));
+  _MEMCHECK(red);
   
   red->over = set;
   red->ntags = ntags;
@@ -814,4 +816,5 @@ void CPathModuleInit()
   
   CpvAccess(PEflags) = (char*)calloc(1,CmiNumPes());
   CpvAccess(PElist) = (int*)malloc(CmiNumPes()*sizeof(int));
+  _MEMCHECK(CpvAccess(PElist));
 }

@@ -938,6 +938,12 @@ void ConverseExit(void);
 
 void CmiAbort(const char *);
 
+#ifndef CMK_OPTIMIZE
+#define _MEMCHECK(p) { if ((p)==0) CmiAbort("Memory Allocation Failure.\n"); }
+#else
+#define _MEMCHECK(p)
+#endif
+
 /*********** CPATH ***********/
 
 typedef struct

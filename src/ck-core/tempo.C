@@ -238,6 +238,7 @@ TempoArray::ckTempoReduce(int root, int op, void *inbuf, void *outbuf,
   if(thisIndex==root) {
     memcpy(outbuf, inbuf, size);
     void *tbuf = malloc(size);
+    _MEMCHECK(tbuf);
     for(int i=0; i<numElements-1; i++) {
       ckTempoRecv(REDUCE_TAG, tbuf, size);
       doOp(op, type, count, tbuf, outbuf);

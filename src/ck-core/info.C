@@ -22,6 +22,7 @@ char *makeSymbolTableInfo(void)
   int i;
 
   returnInfo = (char *)malloc(1);
+  _MEMCHECK(returnInfo);
   returnInfo[0] = '\0';
   for(i = 0; i < MAX_NUM_HANDLERS; i++){
     if((f = CpvAccess(SymbolTableFnArray)[i]) != 0){
@@ -29,6 +30,7 @@ char *makeSymbolTableInfo(void)
 
       p = (*f)();
       newReturnInfo = (char *)malloc(strlen(p) + strlen(returnInfo) + 1);
+      _MEMCHECK(newReturnInfo);
       strcpy(newReturnInfo, returnInfo);
       strcat(newReturnInfo, p);
       free(returnInfo);
@@ -94,11 +96,13 @@ char *getBreakPoints(void)
   if(CsvAccess(BreakPoints) == 0){
     CsvAccess(BreakPoints) = (int *)malloc(CpvAccess(numBreakPoints) 
 					   *sizeof(int));
+    _MEMCHECK(CsvAccess(BreakPoints));
     for(i = 0; i < CpvAccess(numBreakPoints); i++)
       CsvAccess(BreakPoints)[i] = 0;
   }
 
   temp = (char *)malloc(CpvAccess(numBreakPoints)*2*sizeof(char)+6);
+  _MEMCHECK(temp);
   strcpy(temp, "");
   sprintf(temp, "%d#", CpvAccess(numBreakPoints));
   for(i = 0; i < CpvAccess(numBreakPoints); i++){
@@ -117,6 +121,7 @@ int isBreakPoint(char *msg)
   if(CsvAccess(BreakPoints) == 0){
     CsvAccess(BreakPoints) = (int *)malloc(CpvAccess(numBreakPoints)
 					   *sizeof(int));
+    _MEMCHECK(CsvAccess(BreakPoints));
     for(i = 0; i < CpvAccess(numBreakPoints); i++)
       CsvAccess(BreakPoints)[i] = 0;
   }

@@ -26,6 +26,7 @@ Cfuture CfutureCreate()
 {
   futdata data = (futdata)malloc(sizeof(struct Cfuture_data_s));
   Cfuture result;
+  _MEMCHECK(data);
   data->value = 0;
   data->ready = 0;
   data->waiters = 0;

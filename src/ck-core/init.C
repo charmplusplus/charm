@@ -110,6 +110,7 @@ static inline void _printStats(void)
   int i;
   if(_printSS || _printCS) {
     Stats *total = new Stats();
+    _MEMCHECK(total);
     for(i=0;i<CkNumPes();i++)
       total->combine(_allStats[i]);
     CkPrintf("Charm Kernel Summary Statistics:\n");
@@ -357,6 +358,7 @@ char* getEnvInfo(envelope *env)
   size += strlen(_chareTable[chareIndex]->name)+1;
   
   returnInfo = (char *)malloc((size + 2) * sizeof(char));
+  _MEMCHECK(returnInfo);
   strcpy(returnInfo, _entryTable[epIndex]->name);
   strcat(returnInfo, "%");
   strcat(returnInfo, _chareTable[chareIndex]->name);
@@ -372,6 +374,7 @@ char* makeCharmSymbolTableInfo(void)
    
   size = _numEntries * 100;
   returnInfo = (char *)malloc(size * sizeof(char));
+  _MEMCHECK(returnInfo);
   strcpy(returnInfo, "");
   for(i = 0; i < _numEntries; i++){
     strcat(returnInfo, "EP : ");
@@ -408,6 +411,7 @@ static char* fContent(char *msg)
   char *temp;
 
   temp = (char *)malloc(strlen(_contentStr) + 1);
+  _MEMCHECK(temp);
   strcpy(temp, _contentStr);
   return(temp);
 }
@@ -432,19 +436,27 @@ void _initCharm(int argc, char **argv)
   CpvInitialize(Stats*, _myStats);
 
   CpvAccess(_buffQ) = new PtrQ();
+  _MEMCHECK(CpvAccess(_buffQ));
   CpvAccess(_bocInitQ) = new PtrQ();
+  _MEMCHECK(CpvAccess(_bocInitQ));
   CpvAccess(_nodeBocInitQ) = new PtrQ();
+  _MEMCHECK(CpvAccess(_nodeBocInitQ));
   CpvAccess(_groupTable) = new GroupTable();
+  _MEMCHECK(CpvAccess(_groupTable));
   if(CmiMyRank()==0) {
     _nodeLock = CmiCreateLock();
     _nodeGroupTable = new GroupTable();
+    _MEMCHECK(_nodeGroupTable);
   }
   CmiNodeBarrier();
   CpvAccess(_qd) = new QdState();
+  _MEMCHECK(CpvAccess(_qd));
   CpvAccess(_numInitsRecd) = 0;
 
   CpvAccess(_ckout) = new _CkOutStream();
+  _MEMCHECK(CpvAccess(_ckout));
   CpvAccess(_ckerr) = new _CkErrStream();
+  _MEMCHECK(CpvAccess(_ckerr));
 
   _charmHandlerIdx = CmiRegisterHandler((CmiHandler)_bufferHandler);
   _initHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
@@ -477,14 +489,18 @@ void _initCharm(int argc, char **argv)
   }
   _TRACE_BEGIN_COMPUTATION();
   CpvAccess(_myStats) = new Stats();
+  _MEMCHECK(CpvAccess(_myStats));
   CpvAccess(_msgPool) = new MsgPool();
+  _MEMCHECK(CpvAccess(_msgPool));
   CmiNodeBarrier();
   if(CmiMyPe()==0) {
     _allStats = new Stats*[CkNumPes()];
+    _MEMCHECK(_allStats);
     register int i;
     for(i=0;i<_numMains;i++) {
       register int size = _chareTable[_mainTable[i]->chareIdx]->size;
       register void *obj = malloc(size);
+      _MEMCHECK(obj);
       CpvAccess(_currentChare) = obj;
       register CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
       msg->argc = argc;

@@ -159,11 +159,14 @@ void CthPackThread(CthThread t, void *buffer)
 CthThread CthUnpackThread(void *buffer)
 {
   CthThread t = (CthThread) malloc(sizeof(CthThreadStruct));
+  _MEMCHECK(t);
   memcpy((void*) t, buffer, sizeof(CthThreadStruct));
   t->data = (char *) malloc(t->datasize);
+  _MEMCHECK(t->data);
   memcpy((void*)t->data, ((char*)buffer)+sizeof(CthThreadStruct),
          t->datasize);
   t->savedstack = (qt_t*) malloc(t->savedsize);
+  _MEMCHECK(t->savedstack);
   t->stacklen = t->savedsize;
   memcpy((void*)t->savedstack, 
          ((char*)buffer)+sizeof(CthThreadStruct)+t->datasize, t->savedsize);
@@ -222,6 +225,7 @@ void CthFixData(CthThread t)
   if (t->data == 0) {
     t->datasize = datasize;
     t->data = (char *)malloc(datasize);
+    _MEMCHECK(t->data);
     return;
   }
   if (t->datasize != datasize) {
@@ -259,7 +263,9 @@ void CthInit()
   CthCpvInitialize(CthProcInfo, CthProc);
 
   t = (CthThread)malloc(sizeof(struct CthThreadStruct));
+  _MEMCHECK(t);
   p = (CthProcInfo)malloc(sizeof(struct CthProcInfo));
+  _MEMCHECK(p);
   CthThreadInit(t,0,0);
   CthCpvAccess(CthData)=0;
   CthCpvAccess(CthProc)=p;
@@ -269,6 +275,7 @@ void CthInit()
   p->current = t;
   p->datasize = 0;
   switchbuf = (qt_t*)malloc(QT_STKALIGN + SWITCHBUF_SIZE);
+  _MEMCHECK(switchbuf);
   switchbuf = (qt_t*)((((size_t)switchbuf)+QT_STKALIGN) & ~(QT_STKALIGN-1));
   p->switchbuf = switchbuf;
   sp = QT_SP(switchbuf, SWITCHBUF_SIZE);
@@ -307,6 +314,7 @@ static void CthResume1(qt_t *sp, CthProcInfo proc, CthThread t)
     if(bytes > old->stacklen) {
       if(old->savedstack) free((void *)old->savedstack);
       old->savedstack = (qt_t*)malloc(bytes);
+      _MEMCHECK(old->savedstack);
       old->stacklen = bytes;
     }
     old->savedsize = bytes;
@@ -344,6 +352,7 @@ CthThread CthCreate(fn, arg, size)
 CthVoidFn fn; void *arg; int size;
 {
   CthThread result = (CthThread)malloc(sizeof(struct CthThreadStruct));
+  _MEMCHECK(result);
   CthThreadInit(result, fn, arg);
   return result;
 }
@@ -503,6 +512,7 @@ CthThread t;
   if (t->data == 0) {
     t->datasize = datasize;
     t->data = (char *)malloc(datasize);
+    _MEMCHECK(t->data);
     return;
   }
   if (t->datasize != datasize) {
@@ -522,6 +532,7 @@ void CthInit()
   CthCpvInitialize(int,        CthExiting);
 
   t = (CthThread)malloc(sizeof(struct CthThreadStruct));
+  _MEMCHECK(t);
   t->protect = 0;
   t->protlen = 0;
   CthThreadInit(t);
@@ -596,8 +607,9 @@ CthVoidFn fn; void *arg; int size;
   if (size==0) size = STACKSIZE;
   size = (size+(CMK_MEMORY_PAGESIZE*2)-1) & ~(CMK_MEMORY_PAGESIZE-1);
   stack = (qt_t*)CthMemAlign(CMK_MEMORY_PAGESIZE, size);
+  _MEMCHECK(stack);
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
-  if ((stack==0)||(result==0)) { CmiError("Out of memory."); exit(1); }
+  _MEMCHECK(result);
   CthThreadInit(result);
   stackbase = QT_SP(stack, size);
   stackp = QT_ARGS(stackbase, arg, result, (qt_userf_t *)fn, CthOnly);

@@ -50,7 +50,9 @@ void CcdModuleInit(void)
 
    CpvAccess(timerHeap) = 
      (HeapIndexType*) malloc(sizeof(HeapIndexType)*(MAXTIMERHEAPENTRIES + 1));
+   _MEMCHECK(CpvAccess(timerHeap));
    CpvAccess(CondArr) = (CONDS*) malloc(sizeof(CONDS)*(MAXCONDCHKARRAYELTS));
+   _MEMCHECK(CpvAccess(CondArr));
    CpvAccess(CcdNumChecks) = 0;
    CpvAccess(numHeapEntries) = 0;
    CpvAccess(PeriodicCalls) = (FN_ARG *) 0;
@@ -66,6 +68,7 @@ void CcdModuleInit(void)
 void CcdCallOnCondition(int condnum,CcdVoidFn fnp,void *arg)
 {
   FN_ARG *newEntry = (FN_ARG *) malloc(sizeof(FN_ARG)); 
+  _MEMCHECK(newEntry);
   newEntry->fn = fnp;  
   newEntry->arg  = arg;
   newEntry->next = CpvAccess(CondArr)[condnum].fn_arg_list;
@@ -78,6 +81,7 @@ void CcdCallOnCondition(int condnum,CcdVoidFn fnp,void *arg)
 void CcdPeriodicallyCall(CcdVoidFn fnp, void *arg)
 {
   FN_ARG *temp = (FN_ARG *) malloc(sizeof(FN_ARG)); 
+  _MEMCHECK(temp);
   temp->fn = fnp;
   temp->arg = arg;
   temp->next = CpvAccess(PeriodicCalls);

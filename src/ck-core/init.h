@@ -10,6 +10,7 @@ class PtrQ {
   public:
     PtrQ() :len(0), first(0) {
       block = new void*[blklen=BLKSZ];
+      _MEMCHECK(block);
     }
     ~PtrQ() { delete[] block; }
     int length(void) { return len; }
@@ -25,6 +26,7 @@ class PtrQ {
     void enq(void *elt) {
       if(len==blklen) {
         void **newblk = new void*[blklen+BLKSZ];
+        _MEMCHECK(newblk);
         memcpy(newblk, block+first, sizeof(void*)*(blklen-first));
         memcpy(newblk+blklen-first, block, sizeof(void*)*first);
         delete[] block; block = newblk;
@@ -55,6 +57,7 @@ class GroupTable {
     void add(CkGroupID n, void *obj) {
       int slot = n%MAXBINS;
       bins[slot] = new TableEntry(n, obj, bins[slot]);
+      _MEMCHECK(bins[slot]);
     }
     void *find(CkGroupID n) {
       TableEntry *next = bins[n%MAXBINS];

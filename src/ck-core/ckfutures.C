@@ -115,6 +115,7 @@ void _futuresModuleInit(void)
 {
   CpvInitialize(FutureState, futurestate);
   CpvAccess(futurestate).array = (Future *)malloc(10*sizeof(Future));
+  _MEMCHECK(CpvAccess(futurestate).array);
   CpvAccess(futurestate).max   = 10;
   CpvAccess(futurestate).freelist = -1;
   addedFutures(0,10);
