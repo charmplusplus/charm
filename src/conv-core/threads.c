@@ -1837,7 +1837,7 @@ CthVoidFn fn; void *arg; int size;
   }
 #endif
   stackbase = stack;
-/*  stackbase = STP_STKALIGN(stackbase, 16); */
+  stackbase = STP_STKALIGN(stackbase, 16);
   getcontext(&result->stackp);
 #if ! CMK_SOLARIS
   result->stackp.uc_stack.ss_sp = stackbase+8192;
