@@ -61,9 +61,9 @@ GridRouter::GridRouter(int n, int me)
           //We have a processor which wants to send data to that hole
           recvExpected ++;
       
-      if((myrow == 0) && (NumPes%COLLEN == COLLEN - 1))
+      if((myrow == 0) && (NumPes == ROWLEN*(COLLEN-1) - 1))
           //Special case with one hole only
-          recvExpected ++;      
+	  recvExpected ++;      
   }
 
   /*
@@ -80,7 +80,7 @@ GridRouter::GridRouter(int n, int me)
     }
   */
   
-  //CkPrintf("%d LPMsgExpected=%d\n", MyPe, LPMsgExpected);
+  //  CkPrintf("%d LPMsgExpected=%d\n", MyPe, LPMsgExpected);
 
   PeMesh = new PeTable(/*CmiNumPes()*/NumPes);
 
@@ -163,7 +163,7 @@ void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, 
     //    ComlibPrintf("nummappedpes = %d, NumPes = %d, nextrowrep = %d, nextpe = %d, mype = %d\n", nummappedpes, NumPes, nextrowrep,  nextpe, MyPe);
 
     gmap(nextpe);
-    ComlibPrintf("sending to column %d in %d\n", i, CmiMyPe());
+    //    CkPrintf("%d:sending to %d of column %d\n", MyPe, nextpe, i);
     GRIDSENDFN(MyID, 0, 0, length, onerow, CpvAccess(RecvHandle), nextpe); 
   }
 }
@@ -175,7 +175,7 @@ void GridRouter::RecvManyMsg(comID id, char *msg)
 
   recvCount++;
   if (recvCount == recvExpected) {
-      CkPrintf("%d recvcount=%d recvexpected = %d refno=%d\n", MyPe, recvCount, recvExpected, KMyActiveRefno(MyID));
+    //    CkPrintf("%d recvcount=%d recvexpected = %d refno=%d\n", MyPe, recvCount, recvExpected, KMyActiveRefno(MyID));
 
     for (int i=0;i<COLLEN;i++) {
       int myrow=MyPe/COLLEN;
@@ -228,10 +228,10 @@ void GridRouter:: LocalProcMsg()
   PeMesh->ExtractAndDeliverLocalMsgs(MyPe);
 
   if (LPMsgCount==LPMsgExpected) {
-      CkPrintf("%d local procmsg called\n", MyPe);
-      PeMesh->Purge();
-      InitVars();
-      KDone(MyID);
+    //    CkPrintf("%d local procmsg called\n", MyPe);
+    PeMesh->Purge();
+    InitVars();
+    KDone(MyID);
   }
 
 }
