@@ -149,6 +149,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  RefineLB.h OrbLB.h GreedyLB.h CommLB.h Comm1LB.h manager.h \
 	  MetisLB.h NborBaseLB.h \
 	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h \
+          ComlibStrategy.h ComlibArrayListener.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
 	  $(CVHEADERS)
 
@@ -213,7 +214,6 @@ dirs+sources:
 	-./system_ln  ../tmp/cc-*.*h ../include
 	if [ ! -f conv-common.h ] ; then ( touch conv-common.h ) ; fi
 	touch dirs+sources
-	
 
 ###############################################################################
 #
@@ -458,7 +458,7 @@ LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o \
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o ObjGraph.o graph.o  \
            Refiner.o bitvecset.o Set.o heap.o CommLBHeap.o NullLB.o \
-	   LBSimulation.o
+	   LBSimulation.o ComlibStrategy.o ComlibArrayListener.o
 
 CHARMLIBS: charm++
 	cd libs; make charmlibs OPTS='$(OPTS)'
@@ -625,6 +625,14 @@ CommLBHeap.o: CommLBHeap.C $(CKHEADERS)
 
 LBSimulation.o : LBSimulation.h LBSimulation.C
 	$(CHARMC) -c LBSimulation.C
+
+## Communication Library array listener code
+ComlibArrayListener.o : ComlibArrayListener.C ComlibArrayListener.h 
+	$(CHARMC) -c ComlibArrayListener.C
+
+ComlibStrategy.o : ComlibStrategy.C ComlibStrategy.h
+	$(CHARMC) -c ComlibStrategy.C
+
 
 ## Tracing libraries (profiling, -tracemode)
 LIBTRACE_PROJ=trace-projections.o trace-common.o 
