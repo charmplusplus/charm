@@ -1140,12 +1140,12 @@ void CthInit(char **argv)
     /* Align heap to a 1G boundary to leave space to grow */
     /* Align stack to a 256M boundary  to leave space to grow */
 #ifdef QT_GROW_UP
-    CpvAccess(heapbdry) = (void *)(((size_t)heap-(1<<30))&(~((1<<30)-1)));
+    CpvAccess(heapbdry) = (void *)(((size_t)heap-(2<<30))&(~((1<<30)-1)));
     stackbdry = (void *)(((size_t)stack+(1<<28))&(~((1<<28)-1)));
     numslots = (((size_t)CpvAccess(heapbdry)-(size_t)stackbdry)/stacksize)
                  / CmiNumPes();
 #else
-    CpvAccess(heapbdry) = (void *)(((size_t)heap+(1<<30))&(~((1<<30)-1)));
+    CpvAccess(heapbdry) = (void *)(((size_t)heap+(2<<30))&(~((1<<30)-1)));
     stackbdry = (void *)(((size_t)stack-(1<<28))&(~((1<<28)-1)));
     numslots = (((size_t)stackbdry-(size_t)CpvAccess(heapbdry))/stacksize)
                  / CmiNumPes();
@@ -1383,6 +1383,7 @@ CthThread CthPup(pup_er p, CthThread t)
 {
   qt_t *stackbase,*stack;
   int ssz;
+  int i;
 
 #ifndef CMK_OPTIMIZE
   if (pup_isPacking(p))
