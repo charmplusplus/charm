@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-10-27 21:31:25  jyelon
+ * Revision 2.11  1995-11-02 20:10:44  sanjeev
+ * GeneralSendMsgBranch sets type to BocMsg if it is -1, used by Charm++
+ *
+ * Revision 2.10  1995/10/27  21:31:25  jyelon
  * changed NumPe --> NumPes
  *
  * Revision 2.9  1995/09/07  05:24:58  gursoy
@@ -397,6 +400,11 @@ ChareNumType bocnum;
 {
 	ENVELOPE *env;
 
+	/* Charm++ translator puts type as -1 to avoid using the 
+	   BocMsg macro. */
+	if ( type == -1 ) 
+		type = BocMsg ;
+
 	env  = ENVELOPE_UPTR(msg);
 
 	SetEnv_msgType(env, type);
@@ -423,6 +431,11 @@ MsgTypes type;
 ChareNumType bocnum;
 {
 	ENVELOPE *env;
+
+	/* Charm++ translator puts type as -1 to avoid using the 
+	   BroadcastBocMsg macro. */
+	if ( type == -1 ) 
+		type = BroadcastBocMsg ;
 
 	env = ENVELOPE_UPTR(msg);
 
