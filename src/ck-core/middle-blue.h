@@ -1,3 +1,7 @@
+/*****************************************************************************
+          Blue Gene Middle Layer for Charm++ program
+*****************************************************************************/
+
 #ifndef _MIDDLE_BLUE_H_
 #define _MIDDLE_BLUE_H_
 
@@ -57,6 +61,7 @@ inline int CkMyRank() { return 0; }
 inline int BgNodeRank() { return BgMyRank(); }
 inline int CkMyNodeSize() { return 1; }
 
+#if 0
 static inline void CmiSyncSend(int pe, int nb, char *m) 
 {
   int x,y,z;
@@ -104,9 +109,9 @@ static inline void CmiSyncBroadcastAllAndFree(int nb, char *m)
   /* broadcast to all nodes */
   BgBroadcastAllPacket(CmiGetHandler(m), LARGE_WORK, nb, m);
 }
+#endif
 
 }  /* end of namespace */
-
 
 
 #else
@@ -138,109 +143,23 @@ static inline int CkMyNode() { return BgMyNode(); }
 static inline int CkNumNodes() { return BgNumNodes(); }
 static inline int CkMyNodeSize() { return BgGetNumWorkThread(); }
 
-static inline void CmiSyncSend(int pe, int nb, char *m) 
-{
-  int x,y,z,t;
-  char *dupm = (char *)CmiAlloc(nb);
-
-//CmiPrintf("[%d] CmiSyncSend handle:%d\n", CkMyPe(), CmiGetHandler(m));
-  memcpy(dupm, m, nb);
-  t = pe%BgGetNumWorkThread();
-  pe = pe/BgGetNumWorkThread();
-  BgGetXYZ(pe, &x, &y, &z);
-  BgSendPacket(x,y,z, t, CmiGetHandler(m), LARGE_WORK, nb, dupm);
-}
-
-static inline void CmiSyncSendAndFree(int pe, int nb, char *m)
-{
-  int x,y,z,t;
-//CmiPrintf("[%d] CmiSyncSendAndFree handle:%d\n", CkMyPe(), CmiGetHandler(m));
-  t = pe%BgGetNumWorkThread();
-  pe = pe/BgGetNumWorkThread();
-  BgGetXYZ(pe, &x, &y, &z);
-  BgSendPacket(x,y,z, t, CmiGetHandler(m), LARGE_WORK, nb, m);
-}
-
-static inline void CmiSyncBroadcast(int nb, char *m)
-{
-  char *dupm = (char *)CmiAlloc(nb);
-//CmiPrintf("[%d] CmiSyncBroadcast handle:%d\n", CkMyPe(), CmiGetHandler(m));
-  memcpy(dupm, m, nb);
-  BgThreadBroadcastPacketExcept(BgMyNode(), BgGetThreadID(), CmiGetHandler(m), LARGE_WORK, nb, dupm);
-}
-
-static inline void CmiSyncBroadcastAndFree(int nb, char *m)
-{
-//CmiPrintf("CmiSyncBroadcastAndFree handle:%d node:%d tid:%d\n", CmiGetHandler(m), BgMyNode(), BgGetThreadID());
-  BgThreadBroadcastPacketExcept(BgMyNode(), BgGetThreadID(), CmiGetHandler(m), LARGE_WORK, nb, m);
-}
-
-static inline void CmiSyncBroadcastAll(int nb, char *m)
-{
-  char *dupm = (char *)CmiAlloc(nb);
-//CmiPrintf("CmiSyncBroadcastAll: handle:%d\n", CmiGetHandler(m));
-  memcpy(dupm, m, nb);
-  BgThreadBroadcastAllPacket(CmiGetHandler(m), LARGE_WORK, nb, dupm);
-}
-
-static inline void CmiSyncBroadcastAllAndFree(int nb, char *m)
-{
-//CmiPrintf("CmiSyncBroadcastAllAndFree: handle:%d\n", CmiGetHandler(m));
-  /* broadcast to all nodes */
-  BgThreadBroadcastAllPacket(CmiGetHandler(m), LARGE_WORK, nb, m);
-}
-
-static inline void CmiSyncNodeSend(int node, int nb, char *m)
-{
-  int x,y,z,t;
-  char *dupm = (char *)CmiAlloc(nb);
-
-//CmiPrintf("[%d] CmiSyncNodeSend handle:%d\n", CkMyPe(), CmiGetHandler(m));
-  memcpy(dupm, m, nb);
-  BgGetXYZ(node, &x, &y, &z);
-  BgSendPacket(x,y,z, ANYTHREAD, CmiGetHandler(m), LARGE_WORK, nb, dupm);
-}
-
-static inline void CmiSyncNodeSendAndFree(int node, int nb, char *m)
-{
-  int x,y,z,t;
-//CmiPrintf("[%d] CmiSyncNodeSendAndFree handle:%d\n", CkMyPe(), CmiGetHandler(m));
-  BgGetXYZ(node, &x, &y, &z);
-  BgSendPacket(x,y,z, ANYTHREAD, CmiGetHandler(m), LARGE_WORK, nb, m);
-}
-
-static inline void CmiSyncNodeBroadcast(int nb, char *m)
-{
-  char *dupm = (char *)CmiAlloc(nb);
-//CmiPrintf("[%d] CmiSyncBroadcast handle:%d\n", CkMyPe(), CmiGetHandler(m));
-  memcpy(dupm, m, nb);
-  BgBroadcastPacketExcept(CkMyNode(), ANYTHREAD, CmiGetHandler(m), LARGE_WORK, nb, dupm);
-}
-
-static inline void CmiSyncNodeBroadcastAndFree(int nb, char *m)
-{
-//CmiPrintf("CmiSyncBroadcastAndFree handle:%d node:%d tid:%d\n", CmiGetHandler(m), BgMyNode(), BgGetThreadID());
-  BgBroadcastPacketExcept(CkMyNode(), ANYTHREAD, CmiGetHandler(m), LARGE_WORK, nb, m);
-}
-
-static inline void CmiSyncNodeBroadcastAll(int nb, char *m)
-{
-  char *dupm = (char *)CmiAlloc(nb);
-//CmiPrintf("CmiSyncBroadcastAll: handle:%d\n", CmiGetHandler(m));
-  memcpy(dupm, m, nb);
-  BgBroadcastAllPacket(CmiGetHandler(m), LARGE_WORK, nb, dupm);
-}
-
-static inline void CmiSyncNodeBroadcastAllAndFree(int nb, char *m)
-{
-//CmiPrintf("CmiSyncBroadcastAllAndFree: handle:%d\n", CmiGetHandler(m));
-  /* broadcast to all nodes */
-  BgBroadcastAllPacket(CmiGetHandler(m), LARGE_WORK, nb, m);
-}
-
 }  /* end of namespace */
 
 #endif
+
+#define CmiSyncSend			BgSyncSend
+#define CmiSyncSendAndFree		BgSyncSendAndFree
+#define CmiSyncBroadcast		BgSyncBroadcast
+#define CmiSyncBroadcastAndFree 	BgSyncBroadcastAndFree
+#define CmiSyncBroadcastAll		BgSyncBroadcastAll
+#define CmiSyncBroadcastAllAndFree	BgSyncBroadcastAllAndFree
+
+#define CmiSyncNodeSend			BgSyncNodeSend
+#define CmiSyncNodeSendAndFree		BgSyncNodeSendAndFree
+#define CmiSyncNodeBroadcast		BgSyncNodeBroadcast
+#define CmiSyncNodeBroadcastAndFree	BgSyncNodeBroadcastAndFree
+#define CmiSyncNodeBroadcastAll		BgSyncNodeBroadcastAll
+#define CmiSyncNodeBroadcastAllAndFree	BgSyncNodeBroadcastAllAndFree
 
 
 /** common functions for two versions */

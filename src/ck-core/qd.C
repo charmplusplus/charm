@@ -12,6 +12,7 @@
 #if CMK_BLUEGENE_CHARM
 // this is a hack for bgcharm++, I need to figure out a better
 // way to do this
+#undef CmiSyncSendAndFree
 #define CmiSyncSendAndFree    CmiFreeSendFn
 #endif
 
