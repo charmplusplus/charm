@@ -1,6 +1,10 @@
 #ifndef _READONLY_H
 #define _READONLY_H
 
+#if CMK_HAS_TYPEINFO
+# include <typeinfo>
+#endif
+
 #include <stdlib.h>
 #include "charm.h"
 
@@ -14,10 +18,17 @@ template <class dtype> class readonly
     // dynamically allocate readonly variables
     // cannot return 0 in operator new
     void *operator new(size_t sz) { return malloc(sz); }
+    
   public:
     readonly()
     {
-      CkRegisterReadonly(sizeof(dtype), (void*) &data);
+      CkRegisterReadonly(
+#if 0 /*CMK_HAS_TYPEINFO*/
+	typeid(*this).name(),typeid(dtype).name()
+#else
+	"readonly<>","unknown"
+#endif
+	,sizeof(dtype), (void*)&data,NULL);
     }
     readonly<dtype>& operator=(dtype d)
     {
@@ -62,7 +73,13 @@ template <class dtype, int len> class roarray
   public:
     roarray()
     {
-      CkRegisterReadonly(len*sizeof(_roatom<dtype>), (void*) &data[0]);
+      CkRegisterReadonly(
+#if 0 /*CMK_HAS_TYPEINFO*/
+	typeid(*this).name(),typeid(data).name()
+#else
+	"roarray<>","unknown"
+#endif
+	,len*sizeof(_roatom<dtype>), (void*)&data[0],NULL);
     }
     _roatom<dtype> &operator[](int idx) { 
       if(idx <0 || idx>=len)
@@ -89,7 +106,13 @@ template <class dtype> class romsg
   public:
     romsg()
     {
-      CkRegisterReadonlyMsg((void**) &msg);
+      CkRegisterReadonlyMsg(
+#if 0 /*CMK_HAS_TYPEINFO */
+	typeid(*this).name(),typeid(dtype).name()
+#else
+	"romsg<>","unknown"
+#endif
+	,(void**) &msg);
     }
     romsg<dtype>& operator=(dtype *d)
     {

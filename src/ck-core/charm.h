@@ -120,8 +120,11 @@ extern int CkRegisterChare(const char *name, int dataSz);
 extern int CkRegisterMainChare(int chareIndex, int epIndex);
 extern void CkRegisterDefaultCtor(int chareIndex, int ctorEpIndex);
 extern void CkRegisterMigCtor(int chareIndex, int ctorEpIndex);
-extern void CkRegisterReadonly(int size, void *ptr);
-extern void CkRegisterReadonlyMsg(void** pMsg);
+typedef void (*CkPupReadonlyFnPtr)(void *pup_er);
+extern void CkRegisterReadonly(const char *name,const char *type,
+	int size, void *ptr,CkPupReadonlyFnPtr pup_fn);
+extern void CkRegisterReadonlyMsg(const char *name,const char *type,
+	void** pMsg);
 extern void CkRegisterMainModule(void);
 
 /******************************************************************************
