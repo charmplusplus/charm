@@ -46,7 +46,7 @@ void PipeBroadcastStrategy::propagate(envelope *env, int isFragmented){
   case USE_HYPERCUBE:
     num_pes=0;
     tmp = srcPeNumber ^ CmiMyPe();
-    k = int(log(CmiNumPes()) * log_of_2_inv + 2);
+    k = int(log((double)CmiNumPes()) * log_of_2_inv + 2);
     if (tmp) {
       do {--k;} while (!(tmp>>k));
     }
@@ -199,7 +199,7 @@ PipeBroadcastStrategy::PipeBroadcastStrategy(int _topology, CkArrayID aid, int _
 }
 
 void PipeBroadcastStrategy::commonInit(){
-  log_of_2_inv = 1/log(2);
+  log_of_2_inv = 1/log((double)2);
   seqNumber = 0;
 }
 
@@ -276,7 +276,7 @@ void PipeBroadcastStrategy::pup(PUP::er &p){
   p|destArrayID;
 
   if (p.isUnpacking()) {
-    log_of_2_inv = 1/log(2);
+    log_of_2_inv = 1/log((double)2);
     messageBuf = new CkQ<CharmMessageHolder *>;
     propagateHandle = CmiRegisterHandler((CmiHandler)propagate_handler);
     propagateHandle_frag = CmiRegisterHandler((CmiHandler)propagate_handler_frag);
