@@ -599,6 +599,12 @@ int CmiDeliverMsgs(int maxmsgs)
   return CsdScheduler(maxmsgs);
 }
 
+void CmiHandleMessage(void *msg)
+{
+	CpvAccess(cQdState)->mProcessed++;
+	(CmiGetHandlerFunction(msg))(msg);
+}
+
 void CsdSchedulerState_new(CsdSchedulerState_t *s)
 {
 	s->localQ=CpvAccess(CmiLocalQueue);
@@ -631,35 +637,76 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 
 int CsdScheduler(int maxmsgs)
 {
-  void *msg;
-  int cycle = CpvAccess(CsdStopFlag);
-  int pollmode = (maxmsgs==0);
+	if (maxmsgs<0) CsdScheduleForever();	
+	else if (maxmsgs==0)
+		CsdSchedulePoll();
+	else /*(maxmsgs>0)*/ 
+		return CsdScheduleCount(maxmsgs);
+	return 0;
+}
+
+/*Declare the standard scheduler housekeeping*/
+#define SCHEDULE_TOP \
+      void *msg;\
+      int cycle = CpvAccess(CsdStopFlag); \
+      CsdSchedulerState_t state;\
+      CsdSchedulerState_new(&state);\
+
+/*A message is available-- process it*/
+#define SCHEDULE_MESSAGE \
+      CmiHandleMessage(msg);\
+      if (CpvAccess(CsdStopFlag) != cycle) break;\
+
+/*No message available-- go (or remain) idle*/
+#define SCHEDULE_IDLE \
+      if (!isIdle) {isIdle=1;CsdBeginIdle();}\
+      else CsdStillIdle();\
+      if (CpvAccess(CsdStopFlag) != cycle) {\
+	CsdEndIdle();\
+	break;\
+      }\
+
+void CsdScheduleForever(void)
+{
   int isIdle=0;
-  CsdSchedulerState_t state;
-  CsdSchedulerState_new(&state);
-  
+  SCHEDULE_TOP
   while (1) {
     msg = CsdNextMessage(&state);
-    if (msg) CpvAccess(cQdState)->mProcessed++;
-    if (msg) {
+    if (msg) { /*A message is available-- process it*/
       if (isIdle) {isIdle=0;CsdEndIdle();}
-      CmiHandleMessage(msg);
-      maxmsgs--; if (maxmsgs==0) return maxmsgs;
-      if (CpvAccess(CsdStopFlag) != cycle) return maxmsgs;
+      SCHEDULE_MESSAGE
     } else { /*No message available-- go (or remain) idle*/
-      if (!isIdle) {
-	isIdle=1;	
-	CsdBeginIdle();
-      }
-      else CsdStillIdle();
-      if(pollmode) return maxmsgs;
-      if (CpvAccess(CsdStopFlag) != cycle) {
-	CsdEndIdle();
-	return maxmsgs;
-      }
+      SCHEDULE_IDLE
     }
-    if (CpvAccess(_ccd_numchecks)-- <= 0)
-      CcdCallBacks();
+    if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks();
+  }
+}
+int CsdScheduleCount(int maxmsgs)
+{
+  int isIdle=0;
+  SCHEDULE_TOP
+  while (1) {
+    msg = CsdNextMessage(&state);
+    if (msg) { /*A message is available-- process it*/
+      if (isIdle) {isIdle=0;CsdEndIdle();}
+      maxmsgs--; 
+      SCHEDULE_MESSAGE
+      if (maxmsgs==0) break;
+    } else { /*No message available-- go (or remain) idle*/
+      SCHEDULE_IDLE
+    }
+    if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks();
+  }
+  return maxmsgs;
+}
+
+void CsdSchedulePoll(void)
+{
+  SCHEDULE_TOP
+  while (NULL!=(msg = CsdNextMessage(&state)))
+  {
+     SCHEDULE_MESSAGE 
+     if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks();
   }
 }
 
