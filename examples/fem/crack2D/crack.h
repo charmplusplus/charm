@@ -88,6 +88,7 @@ const double   w3          = 0.555555555555555;
 const double   pi          = 3.14159265358979;
 
 struct GlobalData {
+  int myid;
   int numNP;               //number of nodal points (numnp)
   int numLST;              //number of LST elements (numlst)
   int numCLST;             //number of LST cohesive elements (numclst)

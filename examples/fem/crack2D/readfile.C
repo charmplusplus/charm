@@ -1,9 +1,10 @@
 #include "crack.h"
 #include <fstream.h>
+#include <math.h>
 
 #define MAXLINE 1024
 #define cl(fd, buffer, n) do {\
-                               for(int i=0; i<n; i++) \
+                               for(int _i=0; _i<(n); _i++) \
                                  fd.getline(buffer, MAXLINE);\
                              } while(0)
 void
@@ -79,13 +80,14 @@ readFile(GlobalData *gd)
   int curline = 0;
   for(i=0; i<gd->nn; i++)
   {
-    cl(fg, buf, gd->nnums[i]-curline);
+    cl(fm, buf, gd->nnums[i]-curline);
     curline = gd->nnums[i];
     Node *np = &(gd->nodes[i]);
     fm >> itmp >> np->pos.x >> np->pos.y;
     if(itmp != gd->nnums[i]+1)
     {
-      CkError("Expected to read node %d got %d\n", gd->nnums[i]+1, itmp);
+      CkError("[%d] Expected to read node %d got %d\n", gd->myid, 
+              gd->nnums[i]+1, itmp);
       CkAbort("");
     }
     np->xM.x = np->xM.y = 0;
@@ -93,7 +95,7 @@ readFile(GlobalData *gd)
     np->vel.x = np->vel.y = 0.0;
     np->accel.x = np->accel.y = 0.0;
   }
-  cl(fg, buf, gd->numNP-curline);
+  cl(fm, buf, gd->numNP-curline);
   //read nodal boundary conditions
   fm >> gd->numBound;
   for (i=0; i<gd->numBound; i++)
@@ -122,7 +124,7 @@ readFile(GlobalData *gd)
   gd->evol = gd->ne;
   for(i=0; i<gd->ne && gd->enums[i]<gd->numCLST; i++)
   {
-    cl(fg, buf, gd->enums[i]-curline);
+    cl(fm, buf, gd->enums[i]-curline);
     curline = gd->enums[i];
     Element *ep = &(gd->elements[i]);
     fm >> ep->material; ep->material--;
@@ -131,8 +133,8 @@ readFile(GlobalData *gd)
       fm >> itmp;
     }
     fm >> itmp;
-    Node *np1 = &(gd->nodes[gd->conn[6*gd->enums[i]+1]]);
-    Node *np2 = &(gd->nodes[gd->conn[6*gd->enums[i]]]);
+    Node *np1 = &(gd->nodes[gd->conn[6*i+1]]);
+    Node *np2 = &(gd->nodes[gd->conn[6*i]]);
     Coh *coh = &(ep->c);
     coh->Sthresh[2] = coh->Sthresh[1] =
       coh->Sthresh[0] = gd->cohm[ep->material].Sinit;
@@ -142,7 +144,7 @@ readFile(GlobalData *gd)
     coh->sidel[1] = x/coh->sidel[0];
     coh->sidel[2] = y/coh->sidel[0];
   }
-  cl(fm, buf, gd->numCLST-curline-1);
+  cl(fm, buf, gd->numCLST-curline);
   fm >> itmp >> gd->numLST >> itmp;
   cl(fm,buf,1);
   curline = gd->numCLST;

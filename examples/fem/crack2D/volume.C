@@ -69,15 +69,4 @@ vol_elem(GlobalData *gd)
       n[k]->xM.y+=mass*16.0;
     }
   }  
-  // FIXME: Do an FEM_Update here
-}
-
-// FIXME: incorporate this
-void updateElementMass(Element *v, Node **n)
-{
-  for(int k=0;k<3;k++) {
-    v->v.s11l[k] = 0.0;
-    v->v.s22l[k] = 0.0;
-    v->v.s12l[k] = 0.0;
-  }
 }

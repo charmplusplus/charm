@@ -1,4 +1,5 @@
 #include <fstream.h>
+#include <stddef.h>
 #include "crack.h"
 
 extern "C" void
@@ -57,10 +58,10 @@ updateNodes(GlobalData *gd, double prop, double slope)
 extern "C" void
 driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
 {
-  int myid = FEM_My_Partition();
   GlobalData *gd = new GlobalData;
   Node *nodes = new Node[nn];
   Element *elements = new Element[ne];
+  gd->myid = FEM_My_Partition();
   gd->nn = nn;
   gd->nnums = nnums;
   gd->ne = ne;
@@ -70,12 +71,18 @@ driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
   gd->nodes = nodes;
   gd->elements = elements;
   readFile(gd);
+  int massfield = FEM_Create_Field(FEM_DOUBLE, 2, offsetof(Node, xM), 
+                                   sizeof(Node));
+  int rfield = FEM_Create_Field(FEM_DOUBLE, 4, offsetof(Node, Rin), 
+                                sizeof(Node));
+  FEM_Update_Field(massfield, gd->nodes);
   int i;
   int kk = -1;
   double prop, slope;
   for(i=0;i<gd->nTime;i++)
   {
-    CkPrintf("[%d] Beginning iteration %d\n", myid, i);
+    if(gd->myid==0)
+      CkPrintf("Beginning iteration %d at time %lf\n", i, CkTimer());
     if (gd->ts_proportion[kk+1] == i)
     {
       kk++;
@@ -92,7 +99,7 @@ driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
     lst_NL(gd);
     lst_coh2(gd);
     updateNodes(gd, prop, slope);
-    // FIXME: fem_update here.
+    FEM_Update_Field(rfield, gd->nodes);
   }
 }
 

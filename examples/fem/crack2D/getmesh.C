@@ -1,4 +1,5 @@
 #include <fstream.h>
+#include <stdio.h>
 
 int 
 main(int, char**)
