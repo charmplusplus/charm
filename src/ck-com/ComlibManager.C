@@ -401,6 +401,13 @@ void ComlibManager::receiveTable(StrategyWrapper &sw,
 
 void ComlibManager::resumeFromBarrier2(){
 
+    if(!receivedTable) 
+        //Application called atsync inbetween, receiveTable 
+        //and resumeFromBarrier2. This will only happen when there
+        //is no element on this processor and an element arrived, 
+        //leading to a resumeFromSync and hence an AtSync in comlib.
+        return; //A new resumeFromBarrier2 is on its way
+    
     setupComplete = 1;
 
     barrier2Reached = 1;
@@ -408,7 +415,8 @@ void ComlibManager::resumeFromBarrier2(){
 
     clibIteration ++;
 
-    ComlibPrintf("[%d] Barrier 2 reached nstrats = %d, ite = %d\n", CkMyPe(), CkpvAccess(conv_com_ptr)->nstrats, clibIteration);
+    ComlibPrintf("[%d] Barrier 2 reached nstrats = %d, ite = %d\n", 
+                 CkMyPe(), CkpvAccess(conv_com_ptr)->nstrats, clibIteration);
 
     for (int count = 0; count < CkpvAccess(conv_com_ptr)->nstrats; 
          count ++) {
@@ -492,7 +500,7 @@ void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg,
     //With migration some array messages may be directly sent Also no
     //message processing should happen before the comlib barriers have
     //gone through
-    if(dest_proc == CkMyPe() && receivedTable /*setupComplete*/){           
+    if(dest_proc == CkMyPe() && setupComplete){  
         CkArray *amgr = (CkArray *)_localBranch(a);
         amgr->deliver((CkArrayMessage *)msg, CkDeliver_queue);
         
@@ -508,7 +516,7 @@ void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg,
     
     ComlibPrintf("[%d] Before Insert on strat %d received = %d\n", CkMyPe(), curStratID, setupComplete);
     
-    if (receivedTable /*setupComplete*/)        
+    if (setupComplete)        
         (* strategyTable)[curStratID].strategy->insertMessage(cmsg);
     else 
         (* strategyTable)[curStratID].tmplist.enq(cmsg);
@@ -534,7 +542,7 @@ void ComlibManager::GroupSend(CkDelegateData *pd,int ep, void *msg, int onPE, Ck
                  UsrToEnv(msg)->getTotalsize());
 
     register envelope * env = UsrToEnv(msg);
-    if(dest_proc == CkMyPe() && receivedTable){
+    if(dest_proc == CkMyPe() && setupComplete){
         _SET_USED(env, 0);
         CkSendMsgBranch(ep, msg, dest_proc, gid);
         return;
@@ -555,7 +563,7 @@ void ComlibManager::GroupSend(CkDelegateData *pd,int ep, void *msg, int onPE, Ck
     CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg, dest_proc); 
     //get rid of the new.
     
-    if(receivedTable)
+    if(setupComplete)
         (* strategyTable)[curStratID].strategy->insertMessage(cmsg);
     else {
         (* strategyTable)[curStratID].tmplist.enq(cmsg);
@@ -679,7 +687,7 @@ void ComlibManager::multicast(CharmMessageHolder *cmsg) {
 
     //Will be used to detect multicast message for learning
     
-    if (receivedTable)
+    if (setupComplete)
 	(* strategyTable)[curStratID].strategy->insertMessage(cmsg);
     else {
 	ComlibPrintf("Enqueuing message in tmplist at %d\n", curStratID);
