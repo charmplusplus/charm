@@ -632,20 +632,23 @@ pvmc_groups.o: pvmc_groups.c pvmc.h pvm3.h
 pvmc_main.o: pvmc_main.c pvmc.h pvm3.h
 	$(CHARMC) -o $@ pvmc_main.c
 
-libampi.a: ampi.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h ampimain.decl.h \
-        ampimain.def.h
+libampi.a: ampi.C ampi.h ampiimpl.h ampi-defmain.C \
+           ampi.decl.h ampi.def.h ampimain.decl.h \
+           ampimain.def.h
 	$(CHARMC) -DAMPI_FORTRAN=0 -c ampi.C
-	$(CHARMC) -cp ../lib -o libampi.a ampi.o
+	$(CHARMC) -DAMPI_FORTRAN=0 -c ampi-defmain.C
+	$(CHARMC) -cp ../lib -o libampi.a ampi.o ampi-defmain.o
 
 libampif.a: ampi.C ampimain.C ampif.C ampimod.f90 ampi.h ampiimpl.h \
-            ampi.decl.h ampi.def.h \
+            ampi-defmain.C ampi.decl.h ampi.def.h \
             ampimain.decl.h ampimain.def.h
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampi.C
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampimain.C
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampif.C
+	$(CHARMC) -DAMPI_FORTRAN=1 -c ampi-defmain.C
 	$(CHARMC) -c ampimod.f90
 	$(CHARMC) -cpmod ../include ampi.M
-	$(CHARMC) -cp ../lib -o libampif.a ampimain.o ampi.o ampif.o ampimod.o
+	$(CHARMC) -cp ../lib -o libampif.a ampimain.o ampi.o ampif.o ampimod.o ampi-defmain.o
 
 libf90charm.a: f90main.ci f90main.h f90main.C charmf.h charmf.C futil.f90
 	$(CHARMC) f90main.ci
