@@ -34,11 +34,8 @@ void _createTracebluegene(char** argv)
 static void writeData(void *data, double t, double recvT, void *ptr)
 {
   FILE *fp = (FILE *)ptr;
-#if 0
-  if(fp !=0)
-    fprintf(fp,(char*)data,t);
-#endif
   TraceBluegene *traceBluegene = (TraceBluegene *)ptr;
+  CmiAssert(fp && traceBluegene);
   traceBluegene->writePrint((char*)data, t);
 }
 
@@ -48,23 +45,21 @@ void TraceBluegene::writePrint(char* str, double t){
   fprintf(pfp,str,t);
 }
 
-TraceBluegene::TraceBluegene(char** argv)
+TraceBluegene::TraceBluegene(char** argv): stsfp(NULL), pfp(NULL)
 {
   if(CkMyPe() == 0){
     stsfp = fopen("bgTraceFile", "w");
     if(stsfp==0)
       CmiAbort("Cannot open Bluegene sts file for writing.\n");
   }
-  
-  pfp = NULL;
 }
 
 void TraceBluegene::traceClose() {
   bgUpdateProj(2);
-  if(pfp != 0)
-    fclose(pfp);
-  if((CkMyPe() == 0)&&(stsfp !=0))
-    fclose(stsfp);
+  if(pfp != 0)  fclose(pfp);
+  if((CkMyPe() == 0)&&(stsfp !=0)) fclose(stsfp);
+  pfp = stsfp = NULL;
+  CkpvAccess(_traces)->removeTrace(this);
 }
 
 TraceBluegene::~TraceBluegene(){
