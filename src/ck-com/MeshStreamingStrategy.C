@@ -41,10 +41,12 @@
 #include "pup_cmialloc.h"
 #include "MsgPacker.h"
 
+/**** not needed any-more after pup_CmiAlloc 
 // These macros are taken directly from convcore.c.
 #define SIZEFIELD(m) (((CmiChunkHeader *)(m))[-1].size)
 #define REFFIELD(m) (((CmiChunkHeader *)(m))[-1].ref)
 #define BLKSTART(m) (((CmiChunkHeader *)(m))-1)
+***/
 
 // These externs are defined inside ComlibManager.C.
 CkpvExtern(CkGroupID, cmgrID);
@@ -181,7 +183,7 @@ void column_handler (char *msg)
         //Returns a part of a message as an independent message and
         //updates the reference count of the container message.
         fp.pupCmiAllocBuf((void **)&newmsg);
-        int msgsize = SIZEFIELD(newmsg);
+        int msgsize = ((envelope*)newmsg)->getTotalsize();
 
         if (dest_pe == my_pe) {
             CmiSyncSendAndFree (my_pe, msgsize, newmsg);
@@ -312,8 +314,10 @@ void MeshStreamingStrategy::insertMessage (CharmMessageHolder *cmsg)
     dest_col = dest_pe % num_columns;
     usr = cmsg->getCharmMessage ();
     env = (char *) UsrToEnv (usr);
+    
     //blk = (char *) BLKSTART (env);
-    env_size = SIZEFIELD (env);
+    env_size = ((envelope *)env)->getTotalsize();
+
     //misc_size = (env - blk);
     total_size = sizeof (int) + sizeof(CmiChunkHeader) + env_size;
     
@@ -353,6 +357,12 @@ void MeshStreamingStrategy::doneInserting ()
 {
     ComlibPrintf ("[%d] MeshStreamingStrategy::doneInserting() invoked.\n", CkMyPe());    
     // Empty for this strategy.
+
+    //FlushBuffers();
+    //Only want to flush local outgoing messages
+    for (int column = 0; column < num_columns; column++) {
+      FlushColumn ((column+my_column)%num_columns);
+    }
 }
 
 
@@ -447,7 +457,7 @@ void MeshStreamingStrategy::RegisterPeriodicFlush (void)
 
 void MeshStreamingStrategy::FlushColumn (int column)
 {
-    int dest_pe;
+    int dest_column_pe;
     int num_msgs;
     int newmsgsize;
     int msgsize;
@@ -455,74 +465,87 @@ void MeshStreamingStrategy::FlushColumn (int column)
     char *newmsgptr;
     char *msgptr;
     
-    ComlibPrintf ("[%d] MeshStreamingStrategy::FlushColumn() invoked.\n", 
-                  CkMyPe());
 
     assert (column < num_columns);
     
-    dest_pe = column + (my_row * row_length);
-    if (dest_pe >= num_pe) {
-        // This means that there is a hole in the mesh.
-        dest_pe = column + ((my_row % (num_rows - 1) - 1) * row_length);
+    dest_column_pe = column + (my_row * row_length);
+    if (dest_column_pe >= num_pe) {
+      // This means that there is a hole in the mesh.
+      //dest_column_pe = column + ((my_row % (num_rows - 1) - 1) * row_length);
+      int new_row = my_column % (my_row + 1);
+      if(new_row >= my_row)
+	new_row = 0;
+
+      dest_column_pe = column + new_row * row_length;
     }
     
     num_msgs = column_bucket[column].length ();
-        
-    if (num_msgs > 0) {
-        PUP_cmiAllocSizer sp;        
-        int i = 0;
-        MeshStreamingHeader mhdr;
+    
+    if(num_msgs == 0)
+      return;
+    
+    ComlibPrintf ("[%d] MeshStreamingStrategy::FlushColumn() invoked. to %d\n", 
+		  CkMyPe(), dest_column_pe);    
 
-        mhdr.strategy_id = strategy_id;
-        mhdr.num_msgs = num_msgs;
-        sp | mhdr;
-        
-        for (i = 0; i < num_msgs; i++) {
-            void *msg = column_bucket[column][i];
-            int size = SIZEFIELD(msg);
-            
-            int dest_pe = column_destQ[column][i];
-            sp | dest_pe;
-            sp.pupCmiAllocBuf((void **)&msg, size);
-        }
-
-        newmsgsize = sp.size();
-        newmsg = (char *) CmiAlloc (newmsgsize);
-        
-        //((int *) (newmsg + CmiMsgHeaderSizeBytes))[0] = strategy_id;
-        //((int *) (newmsg + CmiMsgHeaderSizeBytes))[1] = num_msgs;
-
-        PUP_toCmiAllocMem mp(newmsg);
-        //make a structure header
-        mp | mhdr;
-        
-        /*
-          newmsgptr = (char *) (newmsg + CmiMsgHeaderSizeBytes + 2 * sizeof (int));               
-          for (int i = 0; i < num_msgs; i++) {
-          msgptr = column_bucket[column].deq ();            
-          msgsize = ((int *) msgptr)[1] + (3 * sizeof (int));
-          memcpy (newmsgptr, msgptr, msgsize);
-          
-          newmsgptr += msgsize;
-          
-            delete [] msgptr;
-            }
-        */
-        
-        for (i = 0; i < num_msgs; i++) {
-            void *msg = column_bucket[column].deq();
-            int destpe = column_destQ[column].deq();
-            int size = SIZEFIELD(msg);
-            
-            mp | destpe;
-            mp.pupCmiAllocBuf((void **)&msg, size);
-            CmiFree(msg);
-        }
-        
-        column_bytes[column] = 0;        
-        CmiSetHandler (newmsg, column_handler_id);        
-        CmiSyncSendAndFree (dest_pe, newmsgsize, newmsg);
+    PUP_cmiAllocSizer sp;        
+    int i = 0;
+    MeshStreamingHeader mhdr;
+    
+    mhdr.strategy_id = strategy_id;
+    mhdr.num_msgs = num_msgs;
+    sp | mhdr;
+    
+    for (i = 0; i < num_msgs; i++) {
+      void *msg = column_bucket[column][i];
+      int size = ((envelope *)msg)->getTotalsize();
+      
+      int destpe = column_destQ[column][i];
+      sp | destpe;
+      sp.pupCmiAllocBuf((void **)&msg, size);
     }
+    
+    newmsgsize = sp.size();
+    newmsg = (char *) CmiAlloc (newmsgsize);
+    
+    //((int *) (newmsg + CmiMsgHeaderSizeBytes))[0] = strategy_id;
+    //((int *) (newmsg + CmiMsgHeaderSizeBytes))[1] = num_msgs;
+    
+    PUP_toCmiAllocMem mp(newmsg);
+    //make a structure header
+    mp | mhdr;
+    
+    /*
+      newmsgptr = (char *) (newmsg + CmiMsgHeaderSizeBytes + 2 * sizeof (int));               
+      for (int i = 0; i < num_msgs; i++) {
+      msgptr = column_bucket[column].deq ();            
+      msgsize = ((int *) msgptr)[1] + (3 * sizeof (int));
+      memcpy (newmsgptr, msgptr, msgsize);
+      
+      newmsgptr += msgsize;
+      
+      delete [] msgptr;
+      }
+    */
+    
+    for (i = 0; i < num_msgs; i++) {
+      void *msg = column_bucket[column][i];
+      int destpe = column_destQ[column][i];
+      int size = ((envelope*)msg)->getTotalsize();
+      
+      mp | destpe;
+      mp.pupCmiAllocBuf((void **)&msg, size);
+    }
+    
+    for (i = 0; i < num_msgs; i++) {
+      void *msg = column_bucket[column].deq();
+      CmiFree(msg);
+      
+      column_destQ[column].deq();
+    }
+    
+    column_bytes[column] = 0;        
+    CmiSetHandler (newmsg, column_handler_id);        
+    CmiSyncSendAndFree (dest_column_pe, newmsgsize, newmsg);
 }
 
 
@@ -578,7 +601,7 @@ void MeshStreamingStrategy::FlushRow (int row)
         
         //Strip charm++ envelopes from messages
         if(shortMsgPackingFlag) {
-            MsgPacker mpack(row_bucket[row], num_msgs);
+	    MsgPacker mpack(row_bucket[row], num_msgs);
             CombinedMessage *msg; 
             int size;
             mpack.getMessage(msg, size);
@@ -594,7 +617,7 @@ void MeshStreamingStrategy::FlushRow (int row)
         for (i = 0; i < num_msgs; i++) {
             msg = row_bucket[row].deq ();
             CmiSetHandler (msg, CkpvAccess(RecvmsgHandle));
-            sizes[i] = SIZEFIELD (msg);
+            sizes[i] = ((envelope *)msg)->getTotalsize();
             msgComps[i] = msg;
         }
         
@@ -621,11 +644,11 @@ void MeshStreamingStrategy::FlushBuffers (void)
                   CkMyPe());
 
     for (int column = 0; column < num_columns; column++) {
-        FlushColumn (column);
+      FlushColumn ((column+my_column)%num_columns);
     }
     
     for (int row = 0; row < num_rows; row++) {
-        FlushRow (row);
+      FlushRow ((row+my_row)%num_rows);
     }
 }
 

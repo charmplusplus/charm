@@ -14,6 +14,8 @@ void DummyStrategy::insertMessage(CharmMessageHolder *cmsg){
 void DummyStrategy::doneInserting(){
 }
 
-void DummyStrategy::pup(PUP::er &p){}
+void DummyStrategy::pup(PUP::er &p){
+   CharmStrategy::pup(p);
+}
 
 //PUPable_def(DummyStrategy);
