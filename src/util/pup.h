@@ -68,7 +68,6 @@ class bar {
 // constructor from all other constructors-- the type
 // itself has no meaningful fields.
 typedef struct {int is_only_a_name;} CkMigrateMessage;
-void _pupModuleInit(); //declared in pup_paged.h and defined in pup_paged.C
 
 class PUP {//<- Should be "namespace", once all compilers support them
  public:
