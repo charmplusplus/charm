@@ -200,14 +200,14 @@ public:
   virtual RecType type(void)=0;
   
   //Accept a message for this element
-  virtual bool deliver(CkArrayMessage *m,bool viaScheduler)=0;
+  virtual CmiBool deliver(CkArrayMessage *m,CmiBool viaScheduler)=0;
   
   //This is called when this ArrayRec is about to be replaced.
   // It is only used to deliver buffered element messages.
   virtual void beenReplaced(void);
   
   //Return if this rec is now obsolete
-  virtual bool isObsolete(int nSprings,const CkArrayIndex &idx)=0; 
+  virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx)=0; 
 
   //Return the represented array element; or NULL if there is none
   virtual CkMigratable *lookupElement(CkArrayID aid);
@@ -218,12 +218,12 @@ public:
 class CkLocRec_local : public CkLocRec {
   CkArrayIndexMax idx;//Array index
   int localIdx; //Local index
-  bool running; //Inside a startTiming/stopTiming pair
-  bool *deletedMarker; //Set this if we're deleted during processing
+  CmiBool running; //Inside a startTiming/stopTiming pair
+  CmiBool *deletedMarker; //Set this if we're deleted during processing
   CkQ<CkArrayMessage *> halfCreated; //Messages for nonexistent siblings of existing elements
 public:
   //Creation and Destruction:
-  CkLocRec_local(CkLocMgr *mgr,bool fromMigration,
+  CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
   	const CkArrayIndex &idx_,int localIdx_);
   void migrateMe(int toPe); //Leave this processor
   void destroy(void); //User called destructor
@@ -234,14 +234,14 @@ public:
 
   //Accept a message for this element
   // Returns false if the element died in transit
-  virtual bool deliver(CkArrayMessage *m,bool viaScheduler);
+  virtual CmiBool deliver(CkArrayMessage *m,CmiBool viaScheduler);
   
   //Invoke the given entry method on this element
   // Returns false if the element died in transit
-  bool invokeEntry(CkMigratable *obj,void *msg,int idx);
+  CmiBool invokeEntry(CkMigratable *obj,void *msg,int idx);
 
   virtual RecType type(void);
-  virtual bool isObsolete(int nSprings,const CkArrayIndex &idx);
+  virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx);
   
 #if CMK_LBDB_ON  //For load balancing:
   //Load balancer
@@ -306,7 +306,7 @@ public:
 
   //Execute the given entry method.  Returns false if the element 
   // deleted itself or migrated away during execution.
-  inline bool ckInvokeEntry(int epIdx,void *msg) 
+  inline CmiBool ckInvokeEntry(int epIdx,void *msg) 
 	  {return myRec->invokeEntry(this,msg,epIdx);}
 
 protected:
@@ -408,7 +408,7 @@ public:
 	//Demand-create an element at this index on this processor
 	// Returns true if the element was successfully added;
 	// false if the element migrated away or deleted itself.
-	virtual bool demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor) =0;
+	virtual CmiBool demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor) =0;
 };
 
 //A group which manages the location of an indexed set of
@@ -437,7 +437,7 @@ public:
 	//Add a new local array element, calling element's constructor
 	// Returns true if the element was successfully added;
 	// false if the element migrated away or deleted itself.
-	bool addElement(CkArrayID aid,const CkArrayIndex &idx,
+	CmiBool addElement(CkArrayID aid,const CkArrayIndex &idx,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
 	
 	//Deliver message to this element, going via the scheduler if local
@@ -479,21 +479,21 @@ public:
 
 	int getSpringCount(void) const { return nSprings; }
 
-	bool demandCreateElement(CkArrayMessage *msg,int onPe);
+	CmiBool demandCreateElement(CkArrayMessage *msg,int onPe);
 	
 //Interface used by external users:
 	//Home mapping
 	inline int homePe(const CkArrayIndex &idx) const
 		{return map->procNum(mapHandle,idx);}	
-	inline bool isHome(const CkArrayIndex &idx) const
-		{return homePe(idx)==CkMyPe();}
+	inline CmiBool isHome(const CkArrayIndex &idx) const
+		{return (CmiBool)(homePe(idx)==CkMyPe());}
 	//Look up the object with this array index, or return NULL
 	CkMigratable *lookup(const CkArrayIndex &idx,CkArrayID aid);
 	//"Last-known" location (returns a processor number)
 	int lastKnown(const CkArrayIndex &idx) const;
 
 //Communication:
-	bool deliver(CkMessage *m);
+	CmiBool deliver(CkMessage *m);
 	void migrateIncoming(CkArrayElementMigrateMessage *msg);
 	void updateLocation(const CkArrayIndexMax &idx,int nowOnPe);
 	void reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe);
@@ -514,7 +514,7 @@ private:
 	CkLocRec *elementNrec(const CkArrayIndex &idx);
 
 	void pupElementsFor(PUP::er &p,CkLocRec_local *rec);
-	bool deliverUnknown(CkArrayMessage *msg);
+	CmiBool deliverUnknown(CkArrayMessage *msg);
 
 //Data Members:
 	//Map array ID to manager and elements
@@ -536,7 +536,7 @@ private:
 	int nManagers;
 	ManagerRec *firstManager; //First non-null array manager
 
-	bool addElementToRec(CkLocRec_local *rec,ManagerRec *m,
+	CmiBool addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
 	
 	//For keeping track of free local indices
@@ -550,7 +550,7 @@ private:
 	CkHashtableT<CkArrayIndexMax,CkLocRec *> hash;
 	
 	//This flag is set while we delete an old copy of a migrator
-	bool duringMigration;
+	CmiBool duringMigration;
 	
 	//Occasionally clear out stale remote pointers
 	static void staticSpringCleaning(void *mgr);

@@ -15,6 +15,8 @@
 #if CMK_NAMESPACES_BROKEN
 # if CMK_BLUEGENE_CHARM
 #  error "BLUEGENE Charm++ cannot be compiled without namespace support"
+# else
+#  include "middle.h"
 # endif
 #else
 # if CMK_BLUEGENE_CHARM
@@ -76,11 +78,18 @@ class CkMarshalledMessage {
 PUPmarshall(CkMarshalledMessage);
 
 /********************* Superclass of all Chares ******************/
+#if CMK_MULTIPLE_DELETE
 #define CHARM_INPLACE_NEW \
     void *operator new(size_t, void *ptr) { return ptr; }; \
     void operator delete(void*, void*) {}; \
     void *operator new(size_t s) { return malloc(s); } \
     void operator delete(void *ptr) { free(ptr); }
+#else
+#define CHARM_INPLACE_NEW \
+    void *operator new(size_t, void *ptr) { return ptr; }; \
+    void *operator new(size_t s) { return malloc(s); } \
+    void operator delete(void *ptr) { free(ptr); }
+#endif
 
 class Chare {
   protected:
@@ -105,7 +114,7 @@ class IrrGroup : public Chare {
     inline CmiBool ckTracingEnabled(void) {return ckEnableTracing;}
 
     IrrGroup(CkMigrateMessage *m) { }
-    IrrGroup() { thisgroup = CkGetGroupID(); ckEnableTracing=true; }
+    IrrGroup() { thisgroup = CkGetGroupID(); ckEnableTracing=CmiTrue; }
     virtual ~IrrGroup(); //<- needed for *any* child to have a virtual destructor
 
     virtual void pup(PUP::er &p);//<- pack/unpack routine
@@ -349,7 +358,7 @@ public:
 	CkArrayID() : _gid() { }
 	CkArrayID(CkGroupID g) :_gid(g) {}
 	inline void setZero(void) {_gid.setZero();}
-	inline bool isZero(void) const {return _gid.isZero();}
+	inline int isZero(void) const {return _gid.isZero();}
 	operator CkGroupID() const {return _gid;}
 	CkArray *ckLocalBranch(void) const
 		{ return (CkArray *)CkLocalBranch(_gid); }

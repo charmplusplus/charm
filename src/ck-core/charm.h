@@ -100,7 +100,7 @@ typedef struct _ckGroupID{
   void pup(PUP::er &p) { p(pe); p(idx); }
   int isZero(void) const { return (idx==0); }
   void setZero(void) { idx=0; }
-  CmiBool operator==(const struct _ckGroupID& gid) const { 
+  int operator==(const struct _ckGroupID& gid) const { 
     return ((gid.pe==pe) && (gid.idx==idx));
   }
 #endif

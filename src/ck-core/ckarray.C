@@ -79,7 +79,7 @@ public:
   CkArray *thisArray;
   CkArrayID thisArrayID;
   int bcastNo,numInitial;
-  bool fromMigration;
+  CmiBool fromMigration;
 };
 
 CkpvStaticDeclare(ArrayElement_initInfo,initInfo);
@@ -306,9 +306,9 @@ CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg)
 
 CkMigratable *CkArray::allocateMigrated(int elChareType,const CkArrayIndex &idx) 
 {
-	return allocate(elChareType,idx,-1,true);
+	return allocate(elChareType,idx,-1,CmiTrue);
 }
-ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,int bcast,bool fromMigration) 
+ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,int bcast,CmiBool fromMigration) 
 {
 	//Stash the element's initialization information in the global "initInfo"
 	ArrayElement_initInfo &init=CkpvAccess(initInfo);
@@ -324,17 +324,17 @@ ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,int bcas
 }
 
 //This method is called by the user to add an element.
-bool CkArray::insertElement(CkMessage *me)
+CmiBool CkArray::insertElement(CkMessage *me)
 {
   magic.check();
   CkArrayMessage *m=(CkArrayMessage *)me;
   const CkArrayIndex &idx=m->array_index();
   int ctorIdx=m->array_ep();
   int chareType=_entryTable[ctorIdx]->chareIdx;
-  ArrayElement *elt=allocate(chareType,idx,UsrToEnv(m)->array_broadcastCount(),false);
-  if (!locMgr->addElement(thisgroup,idx,elt,ctorIdx,(void *)m)) return false;
-  if (!bringBroadcastUpToDate(elt)) return false;
-  return true;
+  ArrayElement *elt=allocate(chareType,idx,UsrToEnv(m)->array_broadcastCount(),CmiFalse);
+  if (!locMgr->addElement(thisgroup,idx,elt,ctorIdx,(void *)m)) return CmiFalse;
+  if (!bringBroadcastUpToDate(elt)) return CmiFalse;
+  return CmiTrue;
 }
 
 void CProxy_ArrayBase::doneInserting(void)
@@ -361,7 +361,7 @@ void CkArray::remoteDoneInserting(void)
   }
 }
 
-bool CkArray::demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor)
+CmiBool CkArray::demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor)
 {
 	CkArrayMessage *m=(CkArrayMessage *)CkAllocSysMsg();
 	prepareArrayCtorMsg(this,m,onPe,idx);
@@ -371,7 +371,7 @@ bool CkArray::demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor)
 		return insertElement(m);
 	else
 		thisProxy[onPe].insertElement(m);
-	return true;
+	return CmiTrue;
 }
 
 void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg)
@@ -490,7 +490,7 @@ void CkArray::deliverBroadcast(CkArrayMessage *bcast)
 }
 
 //Deliver a copy of the given broadcast to the given local element
-bool CkArray::deliverBroadcast(CkArrayMessage *bcast,ArrayElement *el)
+CmiBool CkArray::deliverBroadcast(CkArrayMessage *bcast,ArrayElement *el)
 {
 	el->bcastNo++;
 	void *newMsg=CkCopyMsg((void **)&bcast);
@@ -499,7 +499,7 @@ bool CkArray::deliverBroadcast(CkArrayMessage *bcast,ArrayElement *el)
 	return el->ckInvokeEntry(epIdx,newMsg);
 }
 //Deliver all needed broadcasts to the given local element
-bool CkArray::bringBroadcastUpToDate(ArrayElement *el)
+CmiBool CkArray::bringBroadcastUpToDate(ArrayElement *el)
 {
 	if (el->bcastNo<bcastNo)
 	{//This element needs some broadcasts-- it must have
@@ -516,11 +516,11 @@ bool CkArray::bringBroadcastUpToDate(ArrayElement *el)
 			oldBcasts.enq(msg);
 			if (!deliverBroadcast(msg,el)) 
 				//Element migrated away
-				return false;
+				return CmiFalse;
 		}
 	}
 	//Otherwise, the element survived
-	return true;
+	return CmiTrue;
 }
 
 #include "CkArray.def.h"

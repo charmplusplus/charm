@@ -334,10 +334,10 @@ public:
   void remoteDoneInserting(void);
 
   //Create manually:
-  virtual bool insertElement(CkMessage *);
+  virtual CmiBool insertElement(CkMessage *);
 
 //Demand-creation:
-  bool demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor);
+  CmiBool demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor);
 
 //Broadcast communication:
   void sendBroadcast(CkMessage *msg);
@@ -349,7 +349,7 @@ private:
 
 //Allocate space for a new array element
   ArrayElement *allocate(int elChareType,const CkArrayIndex &idx,
-	int bcast,bool fromMigration);
+	int bcast,CmiBool fromMigration);
   
 //Broadcast support
   int bcastNo;//Number of broadcasts received (also serial number)
@@ -357,9 +357,9 @@ private:
   //This queue stores old broadcasts (in case a migrant arrives
   // and needs to be brought up to date)
   CkQ<CkArrayMessage *> oldBcasts;
-  bool bringBroadcastUpToDate(ArrayElement *el);
+  CmiBool bringBroadcastUpToDate(ArrayElement *el);
   void deliverBroadcast(CkArrayMessage *bcast);
-  bool deliverBroadcast(CkArrayMessage *bcast,ArrayElement *el);
+  CmiBool deliverBroadcast(CkArrayMessage *bcast,ArrayElement *el);
 
 //Spring cleaning
   void springCleaning(void);
