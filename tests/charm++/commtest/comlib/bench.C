@@ -14,7 +14,7 @@
 
 #define USELIB  1
 #define MAXITER 100
-#define NUMPASS 2
+#define NUMPASS 1
 
 /*readonly*/ CkChareID mid;
 /*readonly*/ CProxy_Bench arr;
@@ -213,8 +213,7 @@ public:
             pass ++;            
             CProxy_Main mainProxy(mid);
             if(pass == MAXITER){
-		pass = 0;
-                
+		pass = 0;                
 		mainProxy.send();
             }
             else
