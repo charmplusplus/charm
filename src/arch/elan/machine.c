@@ -35,7 +35,7 @@ Developed by Sameer Kumar
 #define MAX_QLEN 1000
 #define MAX_BYTES 1000000
 
-#define USE_SHM 1
+#define USE_SHM 0
 
 /*
   To reduce the buffer used in broadcast and distribute the load from 
@@ -75,10 +75,14 @@ int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages
                                /* Message sizes greater will be 
                                   sent synchronously thus avoiding copying*/
 
-#define NON_BLOCKING_MSG  16     /* Message sizes greater 
+#define NON_BLOCKING_MSG  4     /* Message sizes greater 
                                     than this will be sent asynchronously*/
-#define RECV_MSG_Q_SIZE 8
-#define MID_MSG_Q_SIZE  4
+#define RECV_MSG_Q_SIZE  8   //Maximim queue size for short messages
+#define MID_MSG_Q_SIZE   4   //Maximum queue size for mid-range messages
+
+//Actual sizes, can also be set from the command line
+int smallQSize = RECV_MSG_Q_SIZE;
+int midQSize = MID_MSG_Q_SIZE;
 
 ELAN_EVENT *esmall[RECV_MSG_Q_SIZE], *emid[MID_MSG_Q_SIZE], *elarge;
 
@@ -524,8 +528,8 @@ int PumpMsgs(int retflag)
         msg = 0;
         
         ecount = 0;
-        for(rcount = 0; rcount < RECV_MSG_Q_SIZE; rcount ++){
-            ecount = (rcount + post_idx) % RECV_MSG_Q_SIZE;
+        for(rcount = 0; rcount < smallQSize; rcount ++){
+            ecount = (rcount + post_idx) % smallQSize;
             if(!recv_small_done[ecount]) {
                 sbuf[ecount] = (char *) CmiAlloc(SMALL_MESSAGE_SIZE);
 		
@@ -535,15 +539,15 @@ int PumpMsgs(int retflag)
                 recv_small_done[ecount] = 1;
             }
             else {
-                ecount = (ecount + RECV_MSG_Q_SIZE - 1) % RECV_MSG_Q_SIZE;
+                ecount = (ecount + smallQSize - 1) % smallQSize;
                 break;
             }
         }
         post_idx = ecount + 1;
 
         emcount = 0;
-        for(mcount = 0; mcount < MID_MSG_Q_SIZE; mcount ++){
-            emcount = (mcount + post_m_idx) % MID_MSG_Q_SIZE;
+        for(mcount = 0; mcount < midQSize; mcount ++){
+            emcount = (mcount + post_m_idx) % midQSize;
             if(!recv_mid_done[emcount]) {
                 mbuf[emcount] = (char *) CmiAlloc(MID_MESSAGE_SIZE);
 						
@@ -553,7 +557,7 @@ int PumpMsgs(int retflag)
                 recv_mid_done[emcount] = 1;
             }
             else {
-                emcount = (emcount + MID_MSG_Q_SIZE - 1) % MID_MSG_Q_SIZE;
+                emcount = (emcount + midQSize - 1) % midQSize;
                 break;
             }
         }
@@ -593,8 +597,8 @@ int PumpMsgs(int retflag)
         }
 
         emcount = 0;
-        for(mcount = 0; mcount < MID_MSG_Q_SIZE; mcount ++){
-            emcount = (mcount + event_m_idx) % MID_MSG_Q_SIZE;
+        for(mcount = 0; mcount < midQSize; mcount ++){
+            emcount = (mcount + event_m_idx) % midQSize;
             if(elan_tportRxDone(emid[emcount])) {
                 elan_tportRxWait(emid[emcount], NULL, NULL, &size);
                 
@@ -619,15 +623,15 @@ int PumpMsgs(int retflag)
 #else 
                 ;
 #endif
-                emcount = (emcount + MID_MSG_Q_SIZE - 1) % MID_MSG_Q_SIZE;
+                emcount = (emcount + midQSize - 1) % midQSize;
                 break;
             }
         }
         event_m_idx = emcount + 1;
         
         ecount = 0;
-        for(rcount = 0; rcount < RECV_MSG_Q_SIZE; rcount ++){
-            ecount = (rcount + event_idx) % RECV_MSG_Q_SIZE;
+        for(rcount = 0; rcount < smallQSize; rcount ++){
+            ecount = (rcount + event_idx) % smallQSize;
             if(elan_tportRxDone(esmall[ecount]) || 
                (retflag == 3 && nlarge_torecv == 0 && !flg)) {
                 elan_tportRxWait(esmall[ecount], &src, &tag, &size );
@@ -663,7 +667,7 @@ int PumpMsgs(int retflag)
 #else 
                 ;
 #endif
-                ecount = (ecount + RECV_MSG_Q_SIZE - 1) % RECV_MSG_Q_SIZE;
+                ecount = (ecount + smallQSize - 1) % smallQSize;
                 break;
             }
         }
@@ -770,20 +774,38 @@ void disableBlockingReceives(){
     blockingReceiveFlag = 0;
 }
 
+static int toggle = 0;  //Blocking receive posted only after all idle
+                        //handlers are called
+
 void CmiNotifyIdle(void)
+{
+    static int toggle = 0;
+    static int previousSleepTime = 0;
+    CmiReleaseSentMessages();
+    ElanSendQueuedMessages();
+
+    PumpMsgs(1);    
+    toggle = 0;
+}
+
+void CmiNotifyStillIdle(void)
 {
     static int previousSleepTime = 0;
     CmiReleaseSentMessages();
     ElanSendQueuedMessages();
     
-    if(!PumpMsgs(1) && blockingReceiveFlag){
+    if(!PumpMsgs(1) && blockingReceiveFlag && toggle){
         if (!PCQueueEmpty(CmiGetState()->recv)) return; 
         if (!CdsFifo_Empty(CpvAccess(CmiLocalQueue))) return;
         if (!CqsEmpty(CpvAccess(CsdSchedQueue))) return;
+        if (sent_msgs) return;
         if (cur_unsent) return;
         PumpMsgs(3); 
     }
+    toggle = 1;
 }
+
+
  
 #if CMK_IMMEDIATE_MSG
 void CmiProbeImmediateMsg()
@@ -1283,7 +1305,7 @@ static void ConverseRunPE(int everReturn)
 
   ConverseCommonInit(CmiMyArgv);
 
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
   
   PumpMsgs(0);
@@ -1621,6 +1643,20 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
   CmiGetArgInt(argv,"+smallMessageSize", &SMALL_MESSAGE_SIZE);
   CmiGetArgInt(argv,"+midMessageSize", &MID_MESSAGE_SIZE);
+
+  CmiGetArgInt(argv,"+smallQSize", &smallQSize);
+  CmiGetArgInt(argv,"+midQSize", &midQSize);
+
+  if(smallQSize > RECV_MSG_Q_SIZE) {
+      CmiPrintf("Warning : resetting smallQSize to %d\n", RECV_MSG_Q_SIZE);
+      smallQSize = RECV_MSG_Q_SIZE;
+  }
+  
+  if(midQSize > MID_MSG_Q_SIZE) {
+      CmiPrintf("Warning : resetting midQSize to %d\n", MID_MSG_Q_SIZE);
+      midQSize = MID_MSG_Q_SIZE;
+  }
+
   enableGetBasedSend = CmiGetArgFlag(argv,"+enableGetBasedSend");
 
   //CmiPrintf("SMALL_MESSAGE_SIZE = %d\n", SMALL_MESSAGE_SIZE);
