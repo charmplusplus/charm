@@ -85,7 +85,6 @@ void printIndex(const CkArrayIndex &idx,char *dest) {
 	}
 }
 
-static double chkptStartTimer;
 static void checkpointOne(const char* dirname, CkCallback& cb);
 
 // broadcast
@@ -139,7 +138,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 void CkCheckpointMgr::SendRestartCB(CkReductionMsg *m){ 
 	delete m; 
 	DEBCHK("[%d]Sending out the cb\n",CkMyPe());
-	CkPrintf("Checkpoint to disk finished in %fs, sedning out the cb...\n", CmiWallTimer() - chkptStartTimer);
+	CkPrintf("Checkpoint to disk finished in %fs, sending out the cb...\n", CmiWallTimer() - chkptStartTimer);
 	restartCB.send(); 
 }
 

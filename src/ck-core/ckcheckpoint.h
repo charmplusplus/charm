@@ -39,6 +39,7 @@ void printIndex(const CkArrayIndex &idx,char *dest);
 class CkCheckpointMgr : public CBase_CkCheckpointMgr {
 private:
 	CkCallback restartCB;
+	double chkptStartTimer;
 public:
 	CkCheckpointMgr() { }
 	CkCheckpointMgr(CkMigrateMessage *m):CBase_CkCheckpointMgr(m) { }
