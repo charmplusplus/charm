@@ -291,7 +291,7 @@ void MetisLB::work(CentralLB::LDStats* stats, int count)
       if(origmap[i] != newmap[i]) {
 	CmiAssert(stats->from_proc[i] == origmap[i]);
 	stats->to_proc[i] =  newmap[i];
-	if (_lb_args.debug() >= 2)
+	if (_lb_args.debug() >= 3)
             CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),i,stats->from_proc[i],stats->to_proc[i]);
       }
     }

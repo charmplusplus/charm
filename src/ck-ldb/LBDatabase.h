@@ -24,6 +24,7 @@ private:
   int _lb_debug;		// 1 or greater
   int _lb_ignoreBgLoad;
   int _lb_syncResume;
+  int _lb_samePeSpeed;		// ignore cpu speed
 public:
   CkLBArgs() {
     _autoLbPeriod = 1.0;
@@ -33,6 +34,7 @@ public:
   int & debug() { return _lb_debug; }
   int & ignoreBgLoad() { return _lb_ignoreBgLoad; }
   int & syncResume() { return _lb_syncResume; }
+  int & samePeSpeed() { return _lb_samePeSpeed; }
 };
 extern CkLBArgs _lb_args;
 

@@ -231,7 +231,11 @@ void _loadbalancerInit()
   					     "Turn on LB debugging printouts");
 
   _lb_args.ignoreBgLoad() = CmiGetArgFlagDesc(argv, "+LBObjOnly", 
-                            "Load balancer ignores the background load.");
+                           "Load balancer ignores the background load.");
+
+  _lb_args.samePeSpeed() = CmiGetArgFlagDesc(argv, "+LBSameCpus", 
+                           "Load balancer assumes all CPUs are of same speed.");
+
   if (CkMyPe() == 0) {
     if (_lb_args.debug()) {
       CmiPrintf("LB> Load balancer running with verbose mode, period time: %gs.\n", _lb_args.lbperiod());
@@ -239,6 +243,8 @@ void _loadbalancerInit()
     }
     if (_lb_args.ignoreBgLoad())
       CmiPrintf("LB> Load balancer only balance migratable object.\n");
+    if (_lb_args.samePeSpeed())
+      CmiPrintf("LB> Load balancer assumes all CPUs are same.\n");
     if (LBSimulation::doSimulation)
       CmiPrintf("LB> Load balancer running in simulation mode.\n");
   }

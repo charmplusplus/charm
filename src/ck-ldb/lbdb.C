@@ -386,7 +386,7 @@ extern "C" int LDProcessorSpeed()
   // we can skip the other processors by remember the number here
   static int thisProcessorSpeed = -1;
 
-  if (CkNumPes() == 1)  // I think it is safe to assume that we can
+  if (_lb_args.samePeSpeed() || CkNumPes() == 1)  // I think it is safe to assume that we can
     return 1;            // skip this if we are only using 1 PE
   
   if (thisProcessorSpeed != -1) return thisProcessorSpeed;
