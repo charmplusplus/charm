@@ -574,7 +574,7 @@ do
 		OPTS="$OPTS $arg"
 		;;
 
-	"-p")
+	"-fmoddir")
 		F90_MODDIR="$F90_MODDIR $1"
 		shift
 		;;
