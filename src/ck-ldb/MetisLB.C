@@ -72,6 +72,12 @@ static void printStats(int count, int numobjs, double *cputimes,
 extern "C" void METIS_PartGraphKway(int*, int*, int*, int*, int*,
                                     int*, int*, int*, int*,
                                     int*, int*);
+extern "C" void METIS_PartGraphRecursive(int*, int*, int*, int*, int*,
+                                    int*, int*, int*, int*,
+                                    int*, int*);
+extern "C" void METIS_PartGraphVKway(int*, int*, int*, int*, int*,
+                                    int*, int*, int*, int*,
+                                    int*, int*);
 
 CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 {
@@ -108,13 +114,32 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
       handles[odata[i].id.id[0]] = odata[i].handle;
     }
   }
+#if 0
   double min_cputime = cputime[0];
+  double max_cputime = cputime[0];
   for(i=0; i<numobjs; i++) {
     if(min_cputime > cputime[i])
       min_cputime = cputime[i];
+    if(max_cputime < cputime[i])
+      max_cputime = cputime[i];
   }
+  double ratio = 100.0/(max_cputime - min_cputime);
   for(i=0; i<numobjs; i++) {
-    objwt[i] = (int)((cputime[i]-min_cputime)*100.0);
+    objwt[i] = (int)((cputime[i]-min_cputime)*ratio)+1;
+  }
+  int hist[102];
+  for(i=0;i<102;i++)
+    hist[i] = 0;
+  for(i=0;i<numobjs;i++)
+    hist[objwt[i]]++;
+  for(i=0;i<102;i++) {
+    if(hist[i]!=0)
+      CkPrintf("h[%d]=%d ", i, hist[i]);
+  }
+  CkPrintf("\n");
+#endif
+  for(i=0; i<numobjs; i++) {
+    objwt[i] = (int)(cputime[i]*10000.0);
   }
 
   int **comm = new int*[numobjs];
@@ -164,7 +189,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
     xadj[i+1] = count4all;
   }
 
-  CkPrintf("Pre-LDB Statistics\n");
+  CkPrintf("Pre-LDB Statistics step %d\n", step);
   printStats(count, numobjs, cputime, comm, origmap);
 
   int wgtflag = 3; // Weights both on vertices and edges
@@ -176,18 +201,25 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 
   if(count > 1) {
     newmap = new int[numobjs];
-    if(step() == 2) {
+    if(step >= 0) {
+      for(i=0;i<(numobjs+1);i++)
+        xadj[i] = 0;
       delete[] edgewt;
       edgewt = 0;
       wgtflag = 2;
+    } else {
+      delete[] objwt;
+      objwt = 0;
+      wgtflag = 1;
     }
-    METIS_PartGraphKway(&numobjs, xadj, adjncy, objwt, edgewt, 
-                        &wgtflag, &numflag, &count, options, 
-                        &edgecut, newmap);
+    METIS_PartGraphRecursive(&numobjs, xadj, adjncy, objwt, edgewt, 
+                         &wgtflag, &numflag, &count, options, 
+                         &edgecut, newmap);
+    CkPrintf("Edgecut = %d\n", edgecut);
   } else {
     newmap = origmap;
   }
-  CkPrintf("Post-LDB Statistics\n");
+  CkPrintf("Post-LDB Statistics step %d\n", step);
   printStats(count, numobjs, cputime, comm, newmap);
 
   for(i=0;i<numobjs;i++)
@@ -196,7 +228,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   delete[] cputime;
   delete[] xadj;
   delete[] adjncy;
-  delete[] objwt;
+  if(objwt) delete[] objwt;
   if(edgewt) delete[] edgewt;
 
   for(i=0; i<numobjs; i++) {
