@@ -445,11 +445,14 @@ xp-space.o: xp-space.c $(XPHEADERS)
 
 ###############################################################################
 #
-# make yacc++
+# Rules for Charm++ translator and spacefilter
 #
 ###############################################################################
 
-yacc++:
+yacc++: xlat++yacc xlat++lex sfilter++lex
+	touch xlat++yacc xlat++lex sfilter++lex
+
+xlat++yacc: xp-t.y
 	byacc -d -r xp-t.y
 	cat y.tab.h > xp-ytab.h
 	rm -f y.tab.h
@@ -457,12 +460,17 @@ yacc++:
 	rm -f y.tab.c
 	cat y.code.c > xp-ycode.c
 	rm -f y.code.c
-	flex xp-sfilter
-	cat lex.yy.c > xp-space.c
-	rm -f lex.yy.c
+
+xlat++lex: xp-t.l
 	flex xp-t.l
 	cat lex.yy.c > xp-lexyy.c
 	rm -f lex.yy.c
+
+sfilter++lex: xp-sfilter
+	flex xp-sfilter
+	cat lex.yy.c > xp-space.c
+	rm -f lex.yy.c
+
 
 ###############################################################################
 #
