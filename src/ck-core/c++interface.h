@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.26  1995-11-15 16:45:28  sanjeev
+ * Revision 2.27  1995-11-15 16:48:16  sanjeev
+ * same as previous msg
+ *
+ * Revision 2.26  1995/11/15  16:45:28  sanjeev
  * fixes to prevent iCC from complaining about unused variables
  *
  * Revision 2.25  1995/11/03  02:48:29  sanjeev
@@ -320,7 +323,7 @@ public:
         void * operator new(size_t size, void *buf) ;
 
  	void operator delete(void *obj) {
-		obj += 0 ;	// to prevent CC from generating "obj unused"
+		obj = obj ;	// to prevent CC from generating "obj unused"
 		ChareExit() ;
 	}
 } ;
