@@ -345,7 +345,7 @@ CkReduction::reducerType AmpiReducer;
 // ------------ startup support -----------
 int _ampi_fallback_setup_count;
 CDECL void AMPI_Setup(void);
-FDECL void FTN_NAME(MPI_SETUP,mpi_setup)(void);
+FDECL void FTN_NAME(AMPI_SETUP,ampi_setup)(void);
 
 FDECL void FTN_NAME(MPI_MAIN,mpi_main)(void);
 
@@ -363,7 +363,7 @@ void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen);
  */
 CDECL void AMPI_Setup_Switch(void) {
   _ampi_fallback_setup_count=0;
-  FTN_NAME(MPI_SETUP,mpi_setup)();
+  FTN_NAME(AMPI_SETUP,ampi_setup)();
   AMPI_Setup();
   if (_ampi_fallback_setup_count==2)
   { //Missing AMPI_Setup in both C and Fortran:
