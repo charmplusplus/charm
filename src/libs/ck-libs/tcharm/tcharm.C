@@ -872,4 +872,39 @@ void *TCharm::semaPeek(int id) {
 	return s->data;
 }
 
+/****** System Call support ******/
+/*
+TCHARM_System exists to work around a bug where Linux ia32
+glibc2.2.x with pthreads crashes at the fork() site when 
+called from a user-levelthread. 
+
+The fix is to call system from the main thread, by 
+passing the request out of the thread to our array element 
+before calling system().
+*/
+
+CDECL int 
+TCHARM_System(const char *shell_command)
+{
+	return TCharm::get()->system(shell_command);
+}
+int TCharm::system(const char *cmd)
+{
+	int ret=-1778;
+	callSystemStruct s;
+	s.cmd=cmd;
+	s.ret=&ret;
+	thisProxy[thisIndex].callSystem(s);
+	suspend();
+	return ret;
+}
+
+void TCharm::callSystem(const callSystemStruct &s)
+{
+	*s.ret = ::system(s.cmd);
+	resume();
+}
+
+
+
 #include "tcharm.def.h"

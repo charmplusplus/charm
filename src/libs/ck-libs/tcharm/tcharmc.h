@@ -47,6 +47,7 @@ void TCHARM_Migrate(void);
 void TCHARM_Async_Migrate(void);
 void TCHARM_Allow_Migrate(void);
 void TCHARM_Migrate_to(int destPE);
+int TCHARM_System(const char *shell_command);
 void TCHARM_Done(void);
 void TCHARM_Yield(void);
 

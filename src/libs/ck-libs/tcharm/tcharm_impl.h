@@ -19,6 +19,15 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 
 class TCharmTraceLibList;
 
+/// Used to ship around system calls.
+class callSystemStruct {
+public:
+	const char *cmd; ///< Shell command to execute.
+	int *ret; ///< Place to store command's return value.
+};
+PUPbytes(callSystemStruct);
+
+
 #include "tcharm.decl.h"
 
 class TCharm;
@@ -149,7 +158,6 @@ class TCharm: public CBase_TCharm
 	void migrateDelayed(int destPE);
 	void atBarrier(CkReductionMsg *);
 	void atExit(CkReductionMsg *);
-
 	void clear();
 
 	//Pup routine packs the user data and migrates the thread
@@ -221,6 +229,10 @@ class TCharm: public CBase_TCharm
 		CmiIsomallocBlockListActivate(NULL);
 		CtgInstall(NULL);		
 	}
+	
+	/// System() call emulation:
+	int system(const char *cmd);
+	void callSystem(const callSystemStruct &s);
 };
 
 
