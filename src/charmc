@@ -204,6 +204,7 @@ while ($argindex <= $#argv)
             breaksw
 
         case "-L*"
+            set OPTS_LDRO=( $OPTS_LDRO "$arg" )
             set OPTS_LD=  ( $OPTS_LD   "$arg" )
             set OPTS_LDXX=( $OPTS_LDXX "$arg" )
             breaksw
