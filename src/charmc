@@ -388,29 +388,42 @@ if ($?OPTIMIZE_MODE) then
     set OPTS_CXX = ( $CMK_CXX_OPTIMIZE $OPTS_CXX )
 endif
 
+onintr failure
+
 ##############################################################################
 #
 # Check for valid choice of LANGUAGE
 #
 ##############################################################################
 
-if ($?LANGUAGE == 0) set LANGUAGE=charm
+if ($?LANGUAGE == 0) then
+    set LANGUAGE=charm
+    if ($?SEQUENTIAL) set LANGUAGE=c
+endif
 
 switch ($LANGUAGE)
     case "c"
     case "C"
     case "c++"
     case "C++"
+	if ($?SEQUENTIAL == 0) then
+	    echo "Language $LANGUAGE is for sequential programs"
+	    goto failure
+	endif
+	breaksw
     case "charm" 
     case "charm++" 
     case "converse"
     case "converse++"
+	if ($?SEQUENTIAL == 1) then
+	    echo "Language $LANGUAGE is for parallel programs"
+	    goto failure
+	endif
         breaksw
     default:
         echo "charmc: Unrecognized choice of language $LANGUAGE"
+	goto failure
 endsw
-
-onintr failure
 
 cd $ORIGDIR
 
@@ -529,11 +542,14 @@ end
 
 ##############################################################################
 #
-# Link-Step: there are three kinds of link-phases.
+#                        POSSIBLY, SKIP LINK-STEP
 #
-# 1. If $OBJECT is a ".a" file, a library is created from $OBJECTFILES.
-# 2. If $OBJECT is a ".o" file, then an "LDRO" is created from $OBJECTFILES.
-# 3. If $OBJECT is otherwise, then an executable is created.
+# 1. No $OBJECT may be specified at all --- its just a compilation.
+# 2. If $OBJECT is a ".a" file, a library is created from $OBJECTFILES.
+# 3. If $OBJECT is a ".o" file, then an "LDRO" is created from $OBJECTFILES.
+# 4. Language may be sequential.  Do a quick and easy linkage.
+#
+#               in any of these cases, the full link step is skipped.
 #
 ##############################################################################
 
@@ -561,10 +577,21 @@ switch ($OBJECT)
     ($ECHOCMD ; $CMK_RANLIB $OBJECT)
     if ($status) goto failure
     goto copyobj
+endsw
 
-  default:
-    goto exelink
-
+switch ($LANGUAGE)
+    case "c"
+    case "C"
+        ($ECHOCMD ; $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS)
+        if ($status) goto failure
+        goto copyobj
+        breaksw
+    case "c++"
+    case "C++"    
+        ($ECHOCMD ; $CMK_SEQ_LDXX $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS)
+        if ($status) goto failure
+        goto copyobj
+        breaksw
 endsw
 
 ##############################################################################
@@ -579,30 +606,9 @@ endsw
 #
 ##############################################################################
 
-exelink:
-
-if ($?SEQUENTIAL) then
-    switch ($LANGUAGE)
-        case "charm"
-        case "c"
-        case "C"
-            ($ECHOCMD ; $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS)
-            breaksw
-        case "c++"
-        case "C++"    
-            ($ECHOCMD ; $CMK_SEQ_LDXX $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS)
-            breaksw
-        default
-            echo 'Illegal choice of language for sequential program'
-            goto failure
-    endsw
-    if ($status) goto failure
-    goto copyobj
-endif
-
 # Check for valid choice of EXECMODE
 
-if ($LANGUAGE != converse) then
+if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
 
     if (! -e $CHARMLIB/libck-core-notrace.a) then
         echo "charmc: charm libraries not installed."
@@ -621,7 +627,7 @@ endif
 
 # Check for valid choice of BALANCE
 
-if ($LANGUAGE != converse) then
+if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
 
     if ($?BALANCE == 0) set BALANCE=rand
 
@@ -639,7 +645,7 @@ endif
 
 # Check that the BAL_OBJ exists
 
-if ($LANGUAGE != converse) then
+if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
 
     if ($BALANCE:h == $BALANCE) then
        set BAL_OBJ = $CHARMLIB/libck-ldb-$BALANCE.o
@@ -659,89 +665,92 @@ if ($LANGUAGE != converse) then
 
 endif
 
-########################################################################
+###############################################################################
+# 
+# Make sure all temp-files created during linkage get deleted.
 #
-# Select linkers and libraries based on language.
-#
-########################################################################
+###############################################################################
 
-switch ($LANGUAGE)
-    case "c"
-    case "C"
-    case "c++"
-    case "C++"
-        echo 'Illegal choice of language for parallel program'
-        goto failure
-    case "charm"
-	set LOADER=($CMK_LD $OPTS_LD -L$CHARMLIB \
-                      CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
-                      $LIBRARIES -lck-core-$EXECMODE \
-                      -lck-cplus-n -lconv-core -lck-defmain \
-		      $CMK_LIBS -lm )
-        breaksw
-    case "charm++"
-        set LOADER =($CMK_LDXX $OPTS_LDXX -L$CHARMLIB \
-		      CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
-                      $LIBRARIES -lck-core-$EXECMODE \
-                      -lck-cplus-y -lconv-core -lck-defmain \
-		      $CMK_LIBS -lm )
-        breaksw
-    case "converse"
-        set LOADER = ($CMK_LD $OPTS_LD -L$CHARMLIB \
-		      CHARMC-MOD.TMP.o \
-                      $OBJECTFILES $LIBRARIES \
-        	      -lconv-core $CMK_LIBS -lm )
-        breaksw
-    case "converse++"
-        set LOADER = ($CMK_LDXX $OPTS_LD -L$CHARMLIB \
-		      CHARMC-MOD.TMP.o \
-                      $OBJECTFILES $LIBRARIES \
-                      -lconv-core $CMK_LIBS -lm )
-        breaksw
-endsw
-
-########################################################################
-#
-# Linkage is wierd.  First, we create a dummy module-init function
-# with nothing in it.  We then do a trial linkage.  We use NM to scan
-# the executable thereby produced, to see which modules need
-# initialization.  We then build a true module-init function, and
-# redo the linkage.
-#
-########################################################################
-
-set DELETE=(CHARMC-PGM.TMP.exe CHARMC-PGM.TMP.nm $DELETE)
+set DELETE=(CHARMC-PRE.TMP.xxx CHARMC-PRE.TMP.nm $DELETE)
 set DELETE=(CHARMC-MOD.TMP.dat CHARMC-MOD.TMP.c CHARMC-MOD.TMP.o $DELETE)
-rm -f CHARMC-PGM.TMP.exe CHARMC-MOD.TMP.nm
+rm -f CHARMC-PRE.TMP.xxx CHARMC-PRE.TMP.nm
 rm -f CHARMC-MOD.TMP.dat CHARMC-MOD.TMP.c CHARMC-MOD.TMP.o
 
-if ($?VERBOSE) echo "Creating dummy CHARMC-MOD.TMP.c"
-echo '_CK_module_init_fn() {}' > CHARMC-MOD.TMP.c
-($ECHOCMD ; $CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c)
-if ($status) goto failure
-($ECHOCMD ; $LOADER -o CHARMC-PGM.TMP.exe)
-if ($status) goto failure
-$CMK_NM CHARMC-PGM.TMP.exe | csh -fc "$CMK_NM_FILTER" > CHARMC-PGM.TMP.nm
-if ($status) goto failure
-awk '(/^_CK_.*_init$/&&(\!/^_CK_.*_struct_init$/)) { print substr($1, 5, length($1)-9); }' < CHARMC-PGM.TMP.nm | sort | uniq > CHARMC-MOD.TMP.dat
-if ( -z CHARMC-MOD.TMP.dat ) then
-    echo 'Charm Modules: none.'
-    /bin/mv CHARMC-PGM.TMP.exe $OBJECT
-else
+###############################################################################
+#
+# 			Create CHARMC-MOD.TMP.c
+#
+# This file contains the function _CK_module_init_fn, which
+# initializes each charm or charm++ module in turn.   Its creation
+# is highly system-dependent, which is why I have all these
+# nested if-statements here.
+#
+###############################################################################
+
+if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
+    if ($CMK_LDRO_WORKS) then
+        ($ECHOCMD ; $CMK_LDRO CHARMC-PRE.TMP.xxx $OPTS_LDRO -L$CHARMLIB $OBJECTFILES $LIBRARIES $BAL_OBJ)
+    else if ($LANGUAGE == charm) then
+	echo '_CK_module_init_fn() {}' > CHARMC-MOD.TMP.c
+	($ECHOCMD ; $CMK_CC $OPTS_CC -c -o CHARMC-MOD.TMP.o CHARMC-MOD.TMP.c)
+        ($ECHOCMD ; $CMK_LD $OPTS_LD -o CHARMC-PRE.TMP.xxx -L$CHARMLIB \
+                      $BAL_OBJ $OBJECTFILES $LIBRARIES \
+		      CHARMC-MOD.TMP.o -lck-core-$EXECMODE \
+                      -lck-cplus-n -lconv-core -lck-defmain \
+		      $CMK_LIBS -lm)
+    else if ($LANGUAGE == charm++) then
+	echo '_CK_module_init_fn() {}' > CHARMC-MOD.TMP.c
+	($ECHOCMD ; $CMK_CC $OPTS_CC -c -o CHARMC-MOD.TMP.o CHARMC-MOD.TMP.c)
+        ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o CHARMC-PRE.TMP.xxx -L$CHARMLIB \
+		      $BAL_OBJ $OBJECTFILES $LIBRARIES \
+		      CHARMC-MOD.TMP.o -lck-core-$EXECMODE \
+                      -lck-cplus-y -lconv-core -lck-defmain \
+		      $CMK_LIBS -lm)
+    endif
+    $CMK_NM CHARMC-PRE.TMP.xxx | csh -fc "$CMK_NM_FILTER" > CHARMC-PRE.TMP.nm
+    if ($status) goto failure
+    awk '(/^_CK_.*_init$/&&(\!/^_CK_.*_struct_init$/)) { print substr($1, 5, length($1)-9); }' < CHARMC-PRE.TMP.nm | sort | uniq > CHARMC-MOD.TMP.dat
     echo 'Charm Modules: '`cat CHARMC-MOD.TMP.dat`
-    if ($?VERBOSE) echo "Creating real CHARMC-MOD.TMP.c"
-    awk '{print "extern void _CK_"$1"_init();";}' < CHARMC-MOD.TMP.dat >> CHARMC-MOD.TMP.c
     rm -f CHARMC-MOD.TMP.c
-    echo '_CK_module_init_fn()' > CHARMC-MOD.TMP.c
+    awk '{print "extern void _CK_"$1"_init();";}' < CHARMC-MOD.TMP.dat >> CHARMC-MOD.TMP.c
+    echo '_CK_module_init_fn()' >> CHARMC-MOD.TMP.c
     echo '{' >> CHARMC-MOD.TMP.c
     awk '{print "_CK_"$1"_init();";}' < CHARMC-MOD.TMP.dat >> CHARMC-MOD.TMP.c
     echo '}' >> CHARMC-MOD.TMP.c
     ($ECHOCMD ; $CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c)
     if ($status) goto failure
-    echo "linking $OBJECT with -language $LANGUAGE"
-    ($ECHOCMD ; $LOADER -o $OBJECT)
-    if ($status) goto failure
 endif
+
+###############################################################################
+#
+#                               Finally, LINK
+#
+###############################################################################
+
+switch ($LANGUAGE)
+    case "charm"
+        ($ECHOCMD ; $CMK_LD $OPTS_LD -o $OBJECT -L$CHARMLIB \
+                      CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
+                      $LIBRARIES -lck-core-$EXECMODE \
+                      -lck-cplus-n -lconv-core -lck-defmain \
+		      $CMK_LIBS -lm)
+        breaksw
+    case "charm++"
+        ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \
+		      CHARMC-MOD.TMP.o $BAL_OBJ $OBJECTFILES \
+                      $LIBRARIES -lck-core-$EXECMODE \
+                      -lck-cplus-y -lconv-core -lck-defmain \
+		      $CMK_LIBS -lm)
+        breaksw
+    case "converse"
+        ($ECHOCMD ; $CMK_LD $OPTS_LD -o $OBJECT -L$CHARMLIB \
+		      $OBJECTFILES $LIBRARIES -lconv-core $CMK_LIBS -lm)
+        breaksw
+    case "converse++"
+        ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \
+		      $OBJECTFILES $LIBRARIES -lconv-core $CMK_LIBS -lm)
+        breaksw
+endsw
 
 ########################################################################
 #
