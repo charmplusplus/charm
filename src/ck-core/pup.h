@@ -90,6 +90,9 @@ public:
 	virtual CmiBool isSizing(void) const;
 	virtual CmiBool isPacking(void) const;//<- these all default to false
 	virtual CmiBool isUnpacking(void) const;
+        //required for optimizations for thread migrators
+        virtual void *getBuf(void);
+        virtual void advance(int n);
 //For single elements, pretend it's an array containing one element
 	void operator()(signed char &v,const char *desc=NULL)     {(*this)(&v,1,desc);}
 	void operator()(char &v,const char *desc=NULL)            {(*this)(&v,1,desc);}
@@ -168,6 +171,7 @@ public:
 	//Write data to the given buffer
 	sizer(void) {nBytes=0;}
 	virtual CmiBool isSizing(void) const;
+        virtual void advance(int n);
 	
 	//Return the current number of bytes to be packed
 	int size(void) const {return nBytes;}
@@ -182,6 +186,8 @@ protected:
 public:
 	//Write data to the given buffer
 	toMem(void *Nbuf) {buf=(myByte *)Nbuf;}
+        virtual void* getBuf(void);
+        virtual void advance(int n);
 };
 
 //For unpacking from a memory buffer
@@ -193,6 +199,8 @@ protected:
 public:
 	//Read data from the given buffer
 	fromMem(const void *Nbuf) {buf=(const myByte *)Nbuf;}
+        virtual void* getBuf(void);
+        virtual void advance(int n);
 };
 
 //For packing to a disk file

@@ -21,6 +21,8 @@ PUP::er::~er() {} //<- might be needed by some child
 CmiBool PUP::er::isSizing(void) const {return CmiFalse;}
 CmiBool PUP::er::isPacking(void) const {return CmiFalse;}
 CmiBool PUP::er::isUnpacking(void) const {return CmiFalse;}
+void* PUP::er::getBuf(void) { return 0; }
+void PUP::er::advance(int /*n*/) {}
 
 CmiBool PUP::packer::isPacking(void) const {return CmiTrue;}
 CmiBool PUP::unpacker::isUnpacking(void) const {return CmiTrue;}
@@ -28,11 +30,20 @@ CmiBool PUP::unpacker::isUnpacking(void) const {return CmiTrue;}
 void PUP::sizer::bytes(void * /*p*/,int n,size_t itemSize,dataType /*t*/,const char *desc)
 	{nBytes+=n*itemSize;}
 CmiBool PUP::sizer::isSizing(void) const {return CmiTrue;}
+void PUP::sizer::advance(int n) { nBytes += n; }
 
 void PUP::toMem::bytes(void *p,int n,size_t itemSize,dataType /*t*/,const char *desc)
 	{n*=itemSize; memcpy((void *)buf,p,n); buf+=n;}
+void* PUP::toMem::getBuf(void)
+  { return (void*) buf; }
+void PUP::toMem::advance(int n)
+  { buf += n; }
 void PUP::fromMem::bytes(void *p,int n,size_t itemSize,dataType /*t*/,const char *desc)
 	{n*=itemSize; memcpy(p,(const void *)buf,n); buf+=n;}
+void* PUP::fromMem::getBuf(void)
+  { return (void*) buf; }
+void PUP::fromMem::advance(int n)
+  { buf += n; }
 
 void PUP::toDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/,const char *desc)
 	{fwrite(p,itemSize,n,outF);}
