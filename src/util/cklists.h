@@ -204,7 +204,7 @@ class CkVec : private CkSTLHelper<T> {
     
     /// Reserve at least this much space (changes capacity, size unchanged)
     void reserve(int newcapacity) {
-      if (newcapacity<blklen) return; /* already there */
+      if (newcapacity<=blklen) return; /* already there */
       T *oldBlock=block; 
       makeBlock(newcapacity,len);
       elementCopy(block,oldBlock,len);
