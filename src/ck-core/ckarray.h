@@ -29,7 +29,6 @@ Orion Sky Lawlor, olawlor@acm.org
 #define __CKARRAY_H
 
 #include "cklocation.h"
-#include "ckreduction.h"
 
 /***********************************************************
 	Utility defines, includes, etc.

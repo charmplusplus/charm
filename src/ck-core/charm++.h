@@ -94,24 +94,25 @@ class Chare {
     CHARM_INPLACE_NEW
 };
 
-class Group : public Chare { //Superclass of all Groups
+//Superclass of all Groups that cannot participate in reductions.
+//  Undocumented: should only be used inside Charm++.
+/*forward*/ class Group;
+class IrrGroup : public Chare { 
   protected:
     CkGroupID thisgroup;
     CmiBool ckEnableTracing; //Normally true, except for array manager
   public:
     inline CmiBool ckTracingEnabled(void) {return ckEnableTracing;}
 
-    Group(CkMigrateMessage *m) { }
-    Group() { thisgroup = CkGetGroupID(); ckEnableTracing=true; }
-    virtual ~Group(); //<- needed for *any* child to have a virtual destructor
+    IrrGroup(CkMigrateMessage *m) { }
+    IrrGroup() { thisgroup = CkGetGroupID(); ckEnableTracing=true; }
+    virtual ~IrrGroup(); //<- needed for *any* child to have a virtual destructor
 
     virtual void pup(PUP::er &p);//<- pack/unpack routine
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
 };
 
-class NodeGroup : public Chare { //Superclass of all NodeGroups
-  protected:
-    CkGroupID thisgroup;
+class NodeGroup : public IrrGroup { //Superclass of all NodeGroups
   public:
     CmiNodeLock __nodelock;
     NodeGroup() { thisgroup=CkGetNodeGroupID(); __nodelock=CmiCreateLock();}
@@ -223,6 +224,16 @@ PUPmarshall(CProxy_Chare)
     	   {return super::ckGetChareID();} \
         operator const CkChareID &(void) const {return ckGetChareID();}
 
+//Silly: need the type of a reduction client here.
+//  This declaration should go away once we have "CkContinuation".
+        //A clientFn is called on PE 0 when all contributions
+        // have been received and reduced.
+        //  param can be ignored, or used to pass any client-specific data you $
+        //  dataSize gives the size (in bytes) of the data array
+        //  data gives the reduced contributions--
+        //       it will be disposed of after this procedure returns.
+        typedef void (*CkReductionClientFn)(void *param,int dataSize,void *data);
+
 
 class CProxy_Group : public CProxy {
   private:
@@ -233,7 +244,7 @@ class CProxy_Group : public CProxy {
     	:CProxy(),_ck_gid(g) {}
     CProxy_Group(CkGroupID g,CkGroupID dTo) 
     	:CProxy(dTo),_ck_gid(g) {}
-    CProxy_Group(const Group *g) 
+    CProxy_Group(const IrrGroup *g) 
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}
     CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}
@@ -250,6 +261,7 @@ class CProxy_Group : public CProxy {
     	CProxy::pup(p);
 	p | _ck_gid;
     }
+    void setReductionClient(CkReductionClientFn client,void *param=NULL);
 };
 PUPmarshall(CProxy_Group)
 #define CK_DISAMBIG_GROUP(super) \
@@ -258,7 +270,8 @@ PUPmarshall(CProxy_Group)
     	   {return super::ckGetChareID();} \
 	CkGroupID ckGetGroupID(void) const\
     	   {return super::ckGetGroupID();} \
-	
+	void setReductionClient(CkReductionClientFn client,void *param=NULL) \
+	   {super::setReductionClient(client,param);}
 
 
 class CProxyElement_Group : public CProxy_Group {
@@ -270,7 +283,7 @@ class CProxyElement_Group : public CProxy_Group {
 	: CProxy_Group(g),_onPE(onPE) {}
     CProxyElement_Group(CkGroupID g,int onPE,CkGroupID dTo)
 	: CProxy_Group(g,dTo),_onPE(onPE) {}
-    CProxyElement_Group(const Group *g) 
+    CProxyElement_Group(const IrrGroup *g) 
         :CProxy_Group(g), _onPE(CkMyPe()) {}
     CProxyElement_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy_Group(g), _onPE(CkMyPe()) {}
@@ -301,8 +314,11 @@ class CkIndex_Group { public:
 };
 
 typedef CkIndex_Group CkIndex_NodeGroup;
+typedef CkIndex_Group CkIndex_IrrGroup;
 typedef CProxy_Group CProxy_NodeGroup;
+typedef CProxy_Group CProxy_IrrGroup;
 typedef CProxyElement_Group CProxyElement_NodeGroup;
+typedef CProxyElement_Group CProxyElement_IrrGroup;
 typedef CkGroupID CkNodeGroupID;
 
 
@@ -353,7 +369,7 @@ public:
 
 //an "interface" class-- all delegated messages are routed via a DelegateMgr.  
 // The default action is to deliver the message directly.
-class CkDelegateMgr : public Group {
+class CkDelegateMgr : public IrrGroup {
   public:
     virtual ~CkDelegateMgr(); //<- so children can have virtual destructor
     virtual void ChareSend(int ep,void *m,const CkChareID *c,int onPE);
@@ -370,6 +386,8 @@ class CkDelegateMgr : public Group {
     virtual void ArraySectionSend(int ep,void *m,CkArrayID a,CkSectionCookie &s);
 };
 
+//Defines the actual "Group"
+#include "ckreduction.h"
 
 class CkQdMsg {
   public:

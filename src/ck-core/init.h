@@ -6,14 +6,14 @@
 typedef CkQ<void *> PtrQ;
 typedef CkVec<void *> PtrVec;
 
-class Group;
+class IrrGroup;
 class TableEntry {
-    Group *obj;
+    IrrGroup *obj;
     PtrQ *pending; //Buffers msgs recv'd before group is created
   public:
     void init(void) { obj=0; pending=0; }
-    Group* getObj(void) { return obj; }
-    void setObj(void *_obj) { obj=(Group *)_obj; }
+    IrrGroup* getObj(void) { return obj; }
+    void setObj(void *_obj) { obj=(IrrGroup *)_obj; }
     PtrQ* getPending(void) { return pending; }
     void enqMsg(void *msg) {
       if (pending==0)
@@ -84,7 +84,7 @@ CkpvExtern(GroupTable, _groupTable);
 CkpvExtern(unsigned int, _numGroups);
 extern unsigned int _numNodeGroups;
 
-static inline Group *_localBranch(CkGroupID gID)
+static inline IrrGroup *_localBranch(CkGroupID gID)
 {
   return CkpvAccess(_groupTable).find(gID).getObj();
 }

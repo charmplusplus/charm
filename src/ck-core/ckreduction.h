@@ -109,16 +109,15 @@ private:
 	void *param;
 };
 
-class CkGroupInitCallback : public Group {
+class CkGroupInitCallback : public IrrGroup {
 public:
 	CkGroupInitCallback(void);
 	CkGroupInitCallback(CkMigrateMessage *m) {}
 	void callMeBack(CkGroupCallbackMsg *m);
-	virtual void pup(PUP::er &p) { Group::pup(p); }
 };
 
 
-class CkGroupReadyCallback : public Group {
+class CkGroupReadyCallback : public IrrGroup {
 private:
   int _isReady;
   CkQ<CkGroupCallbackMsg *> _msgs;
@@ -127,7 +126,6 @@ public:
 	CkGroupReadyCallback(void);
 	CkGroupReadyCallback(CkMigrateMessage *m) {}
 	void callMeBack(CkGroupCallbackMsg *m);
-	virtual void pup(PUP::er &p) { Group::pup(p); p(_isReady); }
 	int isReady(void) { return _isReady; }
 protected:
 	void setReady(void) {_isReady = 1; callBuffered(); }
@@ -148,13 +146,7 @@ public:
 	CkReductionMgr(void);
 	CkReductionMgr(CkMigrateMessage *m):thisProxy(this) {}
 	
-	//A clientFn is called on PE 0 when all contributions
-	// have been received and reduced.
-	//  param can be ignored, or used to pass any client-specific data you like
-	//  dataSize gives the size (in bytes) of the data array
-	//  data gives the reduced contributions--
-	//       it will be disposed of after this procedure returns.
-	typedef void (*clientFn)(void *param,int dataSize,void *data);
+	typedef CkReductionClientFn clientFn;
 
 	//Add the given client function.  Overwrites any previous client.
 	void setClient(clientFn client,void *param=NULL);
@@ -318,12 +310,12 @@ void me::contribute(int dataSize,const void *data,CkReduction::reducerType type)
 }
 
 //A group that can contribute to reductions
-class CkReductionGroup : public CkReductionMgr
+class Group : public CkReductionMgr
 {
 	CkReductionMgr::contributorInfo reductionInfo;//My reduction information
  public:
-	CkReductionGroup();
-	CkReductionGroup(CkMigrateMessage *msg):CkReductionMgr(msg) {}
+	Group();
+	Group(CkMigrateMessage *msg):CkReductionMgr(msg) {}
 
 	CK_REDUCTION_CONTRIBUTE_METHODS_DECL
 };

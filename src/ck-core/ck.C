@@ -16,7 +16,7 @@ int CkIndex_Chare::__idx;
 int CkIndex_Group::__idx;
 int CkIndex_ArrayBase::__idx=-1;
 
-Group::~Group() {}
+IrrGroup::~IrrGroup() {}
 
 //Chare virtual functions: declaring these here results in a smaller executable
 Chare::~Chare() {}
@@ -28,7 +28,7 @@ void Chare::pup(PUP::er &p)
 	 thishandle.objPtr=(void *)this;
 } 
 
-void Group::pup(PUP::er &p) 
+void IrrGroup::pup(PUP::er &p) 
 {
 	Chare::pup(p);
 	p|thisgroup;
@@ -436,7 +436,7 @@ static inline void _processForChareMsg(envelope *env)
 static inline void _processForBocMsg(envelope *env)
 {
   register CkGroupID groupID =  env->getGroupNum();
-  register Group *obj = _localBranch(groupID);
+  register IrrGroup *obj = _localBranch(groupID);
   if(!obj) { // groupmember not yet created
     CkpvAccess(_groupTable).find(groupID).enqMsg(env);
     return;

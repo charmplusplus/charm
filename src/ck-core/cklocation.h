@@ -152,7 +152,7 @@ extern CkGroupID _RRMapID;
 class CkLocMgr;
 class CkArrMgr;
 
-class CkArrayMap : public Group // : public CkGroupReadyCallback
+class CkArrayMap : public IrrGroup // : public CkGroupReadyCallback
 {
 public:
   CkArrayMap(void);
@@ -413,7 +413,7 @@ public:
 
 //A group which manages the location of an indexed set of
 // migratable objects.
-class CkLocMgr : public Group {
+class CkLocMgr : public IrrGroup {
 	CkMagicNumber<CkMigratable> magic; //To detect heap corruption
 public:
 	CkLocMgr(CkGroupID map,CkGroupID lbdb,int numInitial);

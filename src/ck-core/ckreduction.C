@@ -63,15 +63,23 @@ waits for the migrant contributions to straggle in.
 #define RED_DEB(x) //CkPrintf x
 #endif
 
-CkReductionGroup::CkReductionGroup() 
+Group::Group() 
 {
 	creatingContributors();
 	contributorCreated(&reductionInfo);
 	doneCreatingContributors();
 }
-CK_REDUCTION_CONTRIBUTE_METHODS_DEF(CkReductionGroup,
+CK_REDUCTION_CONTRIBUTE_METHODS_DEF(Group,
 				    ((CkReductionMgr *)this),
 				    reductionInfo);
+
+void CProxy_Group::setReductionClient(CkReductionClientFn client,void 
+*param)
+{
+	Group *g=(Group *)CkLocalBranch(_ck_gid);
+	g->setClient(client,param);
+}
+
 
 CkGroupInitCallback::CkGroupInitCallback(void) {}
 /*
@@ -407,13 +415,15 @@ void CkReductionMgr::finishReduction(void)
   for (i=0;i<n;i++)
   {
     CkReductionMsg *m=futureMsgs.deq();
-    addContribution(m);//<- if *still* early, puts it back in the queue
+    if (m!=NULL) //One of these addContributions may have finished us. 
+      addContribution(m);//<- if *still* early, puts it back in the queue
   }
   n=futureRemoteMsgs.length();
   for (i=0;i<n;i++)
   {
     CkReductionMsg *m=futureRemoteMsgs.deq();
-    RecvMsg(m);//<- if *still* early, puts it back in the queue
+    if (m!=NULL)
+      RecvMsg(m);//<- if *still* early, puts it back in the queue
   }
 }
 
