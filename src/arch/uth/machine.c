@@ -174,7 +174,9 @@ void CmiNodeBarrier()
 
 CmiNodeLock CmiCreateLock()
 {
-  return (CmiNodeLock)malloc(sizeof(int));
+  CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(int));
+  *lk = 0;
+  return lk;
 }
 
 void CmiLock(CmiNodeLock lk)
