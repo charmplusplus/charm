@@ -10,6 +10,7 @@ can be sent as bytes.  Another option would be to use a virtual
 Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 */
 #include "charm++.h"
+#include "ckcallback-ccs.h"
 #include "CkCallback.decl.h"
 
 /*readonly*/ CProxy_ckcallback_group ckcallbackgroup;
@@ -28,6 +29,7 @@ public:
 class ckcallback_group : public CBase_ckcallback_group {
 public:
 	ckcallback_group() { /*empty*/ }
+	void registerCcsCallback(const char *name,const CkCallback &cb);
 	void call(CkCallback &c,CkMarshalledMessage &msg) {
 		c.send(msg.getMessage());
 	}
@@ -159,6 +161,32 @@ void CkCallback::send(void *msg) const
 		CmiAbort("Called send on corrupted callback");
 		break;
 	};
+}
+
+
+/****** Callback-from-CCS ******/
+
+// This function is called by CCS when a request comes in-- it maps the 
+// request to a Charm++ message and passes the message to its callback.
+extern "C" void ccsHandlerToCallback(void *cbPtr,int reqLen,const void *reqData) 
+{
+	CkCallback *cb=(CkCallback *)cbPtr;
+	CkCcsRequestMsg *msg=new (reqLen,0) CkCcsRequestMsg;
+	msg->reply=CcsDelayReply();
+	msg->length=reqLen;
+	memcpy(msg->data,reqData,reqLen);
+	cb->send(msg);
+}
+
+// Register this callback with CCS.
+void ckcallback_group::registerCcsCallback(const char *name,const CkCallback &cb)
+{
+	CcsRegisterHandlerFn(name,ccsHandlerToCallback,new CkCallback(cb));
+}
+
+// Broadcast this callback registration to all processors
+void CcsRegisterHandler(const char *ccs_handlername,const CkCallback &cb) {
+	ckcallbackgroup.registerCcsCallback(ccs_handlername,cb);
 }
 
 

@@ -1,10 +1,15 @@
 module CkCallback {
 	readonly CProxy_ckcallback_group ckcallbackgroup;
+	message CkCcsRequestMsg {
+		char data[];
+ 	};
 	mainchare ckcallback_main {
 		entry ckcallback_main(CkArgMsg *m);
 	};
 	group ckcallback_group {
 		entry ckcallback_group();
+		entry void registerCcsCallback(char name[strlen(name)+1],
+			CkCallback cb);
 		entry void call(CkCallback c,CkMarshalledMessage msg);
 	};
 };

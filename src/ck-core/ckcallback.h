@@ -146,7 +146,6 @@ class CkCallbackResumeThread : public CkCallback {
 	}
 };
 
-
 void _registerCkCallback(void); //used by init
 
 #endif
