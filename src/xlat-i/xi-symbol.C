@@ -548,11 +548,7 @@ Message::genDefs(XStr& str)
     }
   }
   if(!templat) {
-    if(external) {
-      str << "extern int " << msg_prefix();
-      type->print(str);
-      str << "::__idx;\n";
-    } else {
+    if(!external) {
       str << "int " << msg_prefix();
       type->print(str);
       str << "::__idx=0;\n";
@@ -834,6 +830,14 @@ void Entry::genChareStaticConstructorDecl(XStr& str)
     }
   }
   str << "int onPE=CK_PE_ANY);\n";
+  str << "    static void ckNew(";
+  if(param) {
+    if(!param->isVoid()) {
+      param->print(str);
+      str << ", ";
+    }
+  }
+  str << "CkChareID* pcid, int onPE=CK_PE_ANY);\n";
   str << "    ";
   container->genProxyName(str);
   str << "(";
@@ -1023,6 +1027,27 @@ void Entry::genChareStaticConstructorDefs(XStr& str)
   str << "  CkCreateChare(__idx, __idx_";
   genEpIdx(str);
   str << ", msg, 0, onPE);\n";
+  str << "}\n";
+
+  if(container->isTemplated())
+    container->genSpec(str);
+  str << "void ";
+  container->genProxyName(str);
+  if(container->isTemplated())
+    container->genVars(str);
+  str << "::ckNew(";
+  if(param && !param->isVoid()) {
+    param->print(str);
+    str << "msg, ";
+  }
+  str << "CkChareID* pcid, int onPE)\n";
+  str << "{\n";
+  if(!param || param->isVoid()) {
+    str << "  void *msg = CkAllocSysMsg();\n";
+  }
+  str << "  CkCreateChare(__idx, __idx_";
+  genEpIdx(str);
+  str << ", msg, pcid, onPE);\n";
   str << "}\n";
 
   if(container->isTemplated())
