@@ -10,13 +10,13 @@
 extern "C"
 void *CkAllocSysMsg(void)
 {
-  return CpvAccess(_msgPool)->get();
+  return CkpvAccess(_msgPool)->get();
 }
 
 extern "C"
 void CkFreeSysMsg(void *m)
 {
-  CpvAccess(_msgPool)->put(m);
+  CkpvAccess(_msgPool)->put(m);
 }
 
 extern "C"
