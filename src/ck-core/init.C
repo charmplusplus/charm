@@ -122,6 +122,8 @@ typedef void (*CkFtFn)(const char *);
 static CkFtFn  faultFunc = NULL;
 static char* _restartDir;
 
+int _defaultObjectQ = 0;            // for obejct queue
+
 static inline void _parseCommandLineOpts(char **argv)
 {
   if (CmiGetArgFlagDesc(argv,"+cs", "Print extensive statistics at shutdown"))
@@ -140,6 +142,16 @@ static inline void _parseCommandLineOpts(char **argv)
       _defaultQueueing = CK_QUEUEING_BFIFO;
   if (CmiGetArgFlagDesc(argv,"+blifo", "Default to bitvector-prioritized LIFO queuing"))
       _defaultQueueing = CK_QUEUEING_BLIFO;
+  if (CmiGetArgFlagDesc(argv,"+objq", "Default to use object queue for every obejct"))
+  {
+#if CMK_OBJECT_QUEUE_AVAILABLE
+      _defaultObjectQ = 1;
+      if (CkMyPe()==0)
+        CmiPrintf("Charm++> Create object queue for every Charm object.\n");
+#else
+      CmiAbort("Charm++> Object queue not enabled, recompile Charm++ with CMK_OBJECT_QUEUE_AVAILABLE defined to 1.");
+#endif
+  }
   if(CmiGetArgString(argv,"+restart",&_restartDir))
       faultFunc = CkRestartMain;
 #if __FAULT__
