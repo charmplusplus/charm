@@ -33,8 +33,7 @@ CpvDeclare(int, CtrLogBufSize);
 CpvDeclare(char*, traceRoot);
 
 /// decide parameters from command line
-extern "C" 
-void traceCommonInit(char **argv)
+static void traceCommonInit(char **argv)
 {
   int i;
   DEBUGF(("[%d] in traceCommonInit.\n", CkMyPe()));
