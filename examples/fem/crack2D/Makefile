@@ -26,4 +26,7 @@ lst_coh2.o: lst_coh2.C crack.h
 
 clean:
 	rm -rf *.o pgm *.sts *.log *.bak *~ SunWS_cache ii_files ti_files
-	rm -f conv-host getmesh *.mesh meshdata.*
+	rm -f conv-host getmesh
+
+veryclean: clean
+	rm -f *.mesh *.graph meshdata.*

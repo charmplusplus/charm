@@ -143,8 +143,9 @@ driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
   int numparts = FEM_Num_Partitions();
   // CkPrintf("[%d] starting driver\n", myid);
   GlobalData *gd = new GlobalData;
-  FEM_Register((void*)gd, (FEM_Packsize_Fn)mypksz, (FEM_Pack_Fn)mypk,
-               (FEM_Unpack_Fn)myupk);
+  int uidx;
+  uidx = FEM_Register((void*)gd, (FEM_Packsize_Fn)mypksz, (FEM_Pack_Fn)mypk,
+                      (FEM_Unpack_Fn)myupk);
   Node *nodes = new Node[nn];
   Element *elements = new Element[ne];
   gd->myid = myid;
@@ -208,7 +209,7 @@ driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
         phase++;
       // }
       FEM_Migrate();
-      gd = (GlobalData*) FEM_Get_Userdata();
+      gd = (GlobalData*) FEM_Get_Userdata(uidx);
       gd->nnums = FEM_Get_Node_Nums();
       gd->enums = FEM_Get_Elem_Nums();
       gd->conn = FEM_Get_Conn();
