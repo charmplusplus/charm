@@ -16,7 +16,7 @@
 #include <stdlib.h>
 
 /* OSX does not use malloc.h, but provides malloc functionality in stdlib.h */
-#ifndef __MACH__ && __APPLE_CC__
+#if CMK_HAS_MALLOC_H
 #include <malloc.h>
 #endif
 
