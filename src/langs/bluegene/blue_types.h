@@ -52,6 +52,13 @@ private:
     h[i] = h[j];
     h[j] = temp;
   }
+
+  inline int isLess(char *lhs, char *rhs) {
+     if (CmiBgMsgRecvTime(lhs) < CmiBgMsgRecvTime(rhs)) return 1;
+     else if (CmiBgMsgRecvTime(lhs)  == CmiBgMsgRecvTime(rhs) &&
+              CmiBgMsgID(lhs) < CmiBgMsgID(rhs))  return 1;
+     return 0;
+  }
   
 public:
   minMsgHeap() {
@@ -90,7 +97,7 @@ public:
       int parent = (current - 1)/2;
       while (current != 0)
         {
-          if (CmiBgMsgRecvTime(h[current]) < CmiBgMsgRecvTime(h[parent]))
+          if (isLess(h[current], h[parent]))
             {
               swap(current, parent);
               current = parent;
@@ -119,12 +126,12 @@ public:
 	best = c1;
       else
 	{
-	  if (CmiBgMsgRecvTime(h[c1]) < CmiBgMsgRecvTime(h[c2]))
+	  if (isLess(h[c1], h[c2]))
 	    best = c1;
 	  else
 	    best = c2;
 	}
-      if (CmiBgMsgRecvTime(h[best]) < CmiBgMsgRecvTime(h[current]))
+      if (isLess(h[best], h[current]))
 	{
 	  swap(best, current);
 	  current = best;
@@ -143,12 +150,12 @@ public:
   int least(int a, int b, int c){
     int smaller;
 
-    if(CmiBgMsgRecvTime(h[a])<CmiBgMsgRecvTime(h[b]))
+    if(isLess(h[a], h[b]))
       smaller=a;
     else
       smaller=b;
     
-    if(CmiBgMsgRecvTime(h[smaller])<CmiBgMsgRecvTime(h[c]))
+    if(isLess(h[smaller], h[c]))
       return smaller;
     else
       return c;
@@ -160,7 +167,7 @@ public:
     int parent = (index-1)/2;
    
     //if((index != 0) && (h[parent]->key() > h[index]->key())){
-      if((index != 0) && (CmiBgMsgRecvTime(h[index])<CmiBgMsgRecvTime(h[parent]))) {
+      if((index != 0) && isLess(h[index], h[parent])) {
       swap(parent,index);
       update(parent);
     }
@@ -177,7 +184,7 @@ public:
       }
     }
     //if(c1<length() && (h[index]->key() > h[c1]->key())){
-         if(c1<length() && (CmiBgMsgRecvTime(h[c1])<CmiBgMsgRecvTime(h[index]))){
+    if(c1<length() && isLess(h[c1], h[index])) {
       swap(c1,index);
       update(c1);
       return;

@@ -120,14 +120,14 @@ void workThreadInfo::run()
       if (CmiBgMsgRecvTime(msg) > gvt+ LEASH) {
 	double nextT = CmiBgMsgRecvTime(msg);
 	unsigned int prio = (unsigned int)(nextT*PRIO_FACTOR)+1;
-// CmiPrintf("Thread %d YieldPrio: %g gvt: %g leash: %g\n", id, nextT, gvt, LEASH);
+ // CmiPrintf("Thread %d YieldPrio: %g gvt: %g leash: %g\n", id, nextT, gvt, LEASH);
 	CthYieldPrio(CQS_QUEUEING_IFIFO, sizeof(int), &prio);
 	continue;
       }
     }
 #endif
 #endif   /* TIMING */
-    DEBUGF(("[N%d] work thread T%d has a msg.\n", BgMyNode(), id));
+    DEBUGF(("[N%d] work thread T%d has a msg with recvT:%e msgId:%d.\n", BgMyNode(), id, CmiBgMsgRecvTime(msg), CmiBgMsgID(msg)));
 
 //if (tMYNODEID==0)
 //CmiPrintf("[%d] recvT: %e\n", tMYNODEID, CmiBgMsgRecvTime(msg));

@@ -430,7 +430,7 @@ static inline void threadBroadcastPacketExcept_(int node, CmiInt2 threadID, int 
   BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, 0);
 #endif
 
-  DEBUGF(("[%d]CmiSyncBroadcastAllAndFree node: %d tid:%d\n", BgMyNode(), node, threadID));
+  DEBUGF(("[%d]CmiSyncBroadcastAllAndFree node: %d tid:%d recvT:%f\n", BgMyNode(), node, threadID, CmiBgMsgRecvTime(sendmsg)));
 #if DELAY_SEND
   if (!correctTimeLog)
 #endif
@@ -709,18 +709,6 @@ void BgSetWorkerThreadStart(BgStartHandler f)
 {
   workStartFunc = f;
 }
-
-#if 0
-static void InitHandlerTable()
-{
-  /* init handlerTable */
-  BGInitialize(int, handlerTableCount);
-  BGAccess(handlerTableCount) = 1;
-  BGInitialize(BgHandler*, handlerTable);
-  BGAccess(handlerTable) = (BgHandler *)malloc(MAX_HANDLERS * sizeof(BgHandler));
-  for (int i=0; i<MAX_HANDLERS; i++) BGAccess(handlerTable)[i] = defaultBgHandler;
-}
-#endif
 
 void BgProcessMessage(char *msg)
 {
@@ -1111,27 +1099,6 @@ int updateRealMsgs(bgCorrectionMsg *cm, int nodeidx)
   stateCounters.corrMsgCRCnt++;
   return 1;       /* invalidate this msg */
 }
-
-#if 0
-  ckMsgQueue &affinityQ = cva(nodeinfo)[nodeidx].affinityQ[cm->tID];
-  for (int i=0; i<affinityQ.length(); i++)  {
-    char *msg = affinityQ[i];
-//    if (CkMsgDoCorrect(msg) == 0) return 0;
-    int msgID = CmiBgMsgID(msg);
-    int srcnode = CmiBgMsgSrcPe(msg);
-    if (msgID == cm->msgID && srcnode == cm->srcNode) {
-	CmiBgMsgRecvTime(msg) = cm->tAdjust;
-        affinityQ.update(i);
-        CthThread tid = cva(nodeinfo)[nodeidx].threadTable[cm->tID];
-  	unsigned int prio = (unsigned int)(cm->tAdjust*PRIO_FACTOR)+1;
-        CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
-        stateCounters.corrMsgCRCnt++;
-	return 1;       /* invalidate this msg */
-    }
-  }
-  return 0;
-}
-#endif
 
 extern void processBufferCorrectionMsgs(void *ignored);
 

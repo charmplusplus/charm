@@ -68,9 +68,9 @@ inline int isEqual(double v1, double v2){
 	BgLogEntryCommit(tTIMELINEREC);
 
 #define BG_ADDMSG(m, node, tid, local)  	\
+        BgGetTime();		\
+	BgMsgSetTiming(m); 	\
         if (genTimeLog)	{ \
-          BgGetTime();		\
-	  BgMsgSetTiming(m); 	\
 	  if (tTHREADTYPE == WORK_THREAD) {	\
             BgTimeLineRec &tlinerec = tTIMELINEREC;	\
             int n = tlinerec.length();			\
@@ -79,6 +79,7 @@ inline int isEqual(double v1, double v2){
 	      if (tlog->endTime == 0.0)			\
                 tlog->addMsg(m, node, tid, local);	\
 	      else {	 /* standalone msg */		\
+		  /*CmiAssert(0);*/ 			\
 		  double curT = CmiBgMsgRecvTime(m);		\
 		  bgTimeLog *newLog = new bgTimeLog(-1, "addMsg", curT, curT); \
 		  newLog->recvTime = newLog->effRecvTime = curT;	\
