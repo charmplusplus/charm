@@ -95,15 +95,19 @@ ampimain::checkpoint(void)
 {
   qwait++;
   if(qwait == nobjs)
+    CkStartQD(CProxy_ampimain::ckIdx_checkpointOnQd(), &thishandle);
+}
+
+void
+ampimain::checkpointOnQd(void)
+{
+  for(int i=0;i<ncomms;i++)
   {
-    for(int i=0;i<ncomms;i++)
-    {
-      CProxy_ampi jarray(ampi_comms[i].aid);
-      for(int j=0; j<ampi_comms[i].nobj; j++)
-        jarray[j].saveState();
-    }
-    qwait = 0;
+    CProxy_ampi jarray(ampi_comms[i].aid);
+    for(int j=0; j<ampi_comms[i].nobj; j++)
+      jarray[j].saveState();
   }
+  qwait = 0;
 }
 
 extern "C" void 

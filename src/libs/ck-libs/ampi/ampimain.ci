@@ -7,5 +7,6 @@ mainmodule ampimain {
     entry ampimain();
     entry void done(void);
     entry void checkpoint(void);
+    entry void checkpointOnQd(void);
   };
 }

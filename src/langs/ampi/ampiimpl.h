@@ -49,6 +49,7 @@ class ampimain : public Chare
     ampimain(CkMigrateMessage *m) {}
     void done(void);
     void checkpoint(void);
+    void checkpointOnQd(void);
 };
 
 static inline void 
