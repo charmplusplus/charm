@@ -79,6 +79,8 @@ Array1D::Array1D(ArrayCreateMessage *msg)
 
 #if CMK_LBDB_ON
   the_lbdb = CProxy_LBDatabase(msg->loadbalancer).ckLocalBranch();
+  if (the_lbdb == 0)
+    CkPrintf("[%d] LBDatabase not created?\n",CkMyPe());
 
   //  int iii=0;
   //  CkPrintf("%d Hi from Array1D[%d]\n",iii++,CkMyPe());

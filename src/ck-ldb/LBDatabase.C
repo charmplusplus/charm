@@ -14,7 +14,7 @@ CkGroupID lbdb;
 void CreateLBDatabase()
 {
   lbdb = CProxy_LBDatabase::ckNew();
-  CkPrintf("New database created\n");
+  CkPrintf("[%d] New database created\n",CkMyPe());
 }
 
 #endif // CMK_LBDB_ON

@@ -126,8 +126,8 @@
 #define CMK_COMPILEMODE_ORIG                               1
 #define CMK_COMPILEMODE_ANSI                               0
 
-#define CMK_LBDB_ON					   1
-#define CMK_LBDB_OFF					   0
+#define CMK_LBDB_ON					   0
+#define CMK_LBDB_OFF					   1
 
 #define CMK_STL_USE_DOT_H                                  0
 #define CMK_STL_DONT_USE_DOT_H                             1
