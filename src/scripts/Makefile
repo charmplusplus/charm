@@ -99,7 +99,7 @@ CVHEADERS=cpthreads.h converse.h conv-mach.h conv-mach.sh \
 	  ampi.decl.h ampimain.decl.h
 
 UTILHEADERS=pup.h pup_c.h ckhashtable.h \
-	sockRoutines.c sockRoutines.h
+	sockRoutines.h
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
       ckfutures.h ckarray.h ckreduction.h $(UTILHEADERS) \
@@ -231,7 +231,7 @@ convcore.o: convcore.c $(CVHEADERS)
 conv-ccs.o: conv-ccs.c $(CVHEADERS)
 	$(CHARMC) conv-ccs.c
 
-sockRoutines.o: sockRoutines.c $(CVHEADERS)
+sockRoutines.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) sockRoutines.c
 
 random.o: random.c $(CVHEADERS)
