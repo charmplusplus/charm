@@ -27,7 +27,7 @@
 //! track statistics for all entry points
 class StatTable {
   public:
-    StatTable();
+    StatTable(char** args, int argc);
     ~StatTable();
     //! one entry is called for 'time' seconds, value is counter reading 
     void setEp(int epidx, int stat, UInt value, double time);
@@ -57,7 +57,7 @@ class StatTable {
 // counter log pool
 class CountLogPool {
   public:
-    CountLogPool(char* pgm);
+    CountLogPool(char* pgm, char** args, int argc);
     ~CountLogPool();
     void write(void) ;
     void writeSts(void);
