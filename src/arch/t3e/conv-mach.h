@@ -130,5 +130,8 @@
 #define CMK_BOOL_DEFINED				   1
 #define CMK_BOOL_UNDEFINED				   0
 
+#define CMK_CPP_CAST_ILLEGAL                               0
+#define CMK_CPP_CAST_LEGAL                                 1
+
 #endif
 

@@ -122,5 +122,8 @@
 
 #define CPP_LOCATION "/lib/cpp"
 
+#define CMK_CPP_CAST_ILLEGAL                               0
+#define CMK_CPP_CAST_LEGAL                                 1
+
 #endif
 
