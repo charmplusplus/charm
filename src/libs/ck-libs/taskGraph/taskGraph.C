@@ -20,12 +20,12 @@ void taskGraphDelete(CkArrayID id, CkArrayIndexMax taskID) {
  */
 taskGraphArray::taskGraphArray(
 	CkVec<CkArrayIndexMax> deps,
-	PUPable_marshall<taskGraphSolver> &data,
+	taskGraphSolver *data,
 	CkCallback returnResults
 ) : Waiting() {
   // Set some state variables
   ReturnResults = returnResults;
-  Self = data.release();
+  Self = data;
   isSolved = false;
 
   // Save everything I need to know about
@@ -79,9 +79,9 @@ void taskGraphArray::requestData(CkArrayIndexMax from) {
 }
 
 
-void taskGraphArray::depositData(PUPable_marshall<taskGraphSolver> &data) {
+void taskGraphArray::depositData(taskGraphSolver *data) {
   // Someone sent me data back.
-  DepsData[DepsReceived++] = data.release();
+  DepsData[DepsReceived++] = data;
 
   // Now that we got that data try and solve the problem
   tryToSolve();

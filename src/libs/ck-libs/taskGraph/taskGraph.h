@@ -124,11 +124,11 @@ protected:
 
 public:
   taskGraphArray(CkVec<CkArrayIndexMax> deps,
-                 PUPable_marshall<taskGraphSolver> &data,
+                 taskGraphSolver *data,
 		 CkCallback returnResults);
   taskGraphArray(CkMigrateMessage *m) {};
   void requestData(CkArrayIndexMax from);
-  void depositData(PUPable_marshall<taskGraphSolver> &data);
+  void depositData(taskGraphSolver *data);
   void deleteElement();
 };
 

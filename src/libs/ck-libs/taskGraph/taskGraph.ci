@@ -3,10 +3,10 @@ module taskGraph {
 
   array [Max] taskGraphArray {
     entry taskGraphArray(CkVec<CkArrayIndexMax> deps,
-    			 PUPable_marshall<taskGraphSolver> data,
+    			 CkPointer<taskGraphSolver> data,
 			 CkCallback returnResults);
     entry void requestData(CkArrayIndexMax from);
-    entry void depositData(PUPable_marshall<taskGraphSolver> data);
+    entry void depositData(CkPointer<taskGraphSolver> data);
     entry void deleteElement();
   };
 }
