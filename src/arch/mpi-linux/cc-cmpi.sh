@@ -16,9 +16,9 @@ CMK_SEQ_LD="icpc  -fPIC -cxxlib-gcc "
 CMK_SEQ_LDXX="icpc  -fPIC -cxxlib-gcc "
 
 # fortran compiler
-CMK_CF77="cmpifc -ifc "
-CMK_CF90="cmpif90c -ifc "
-CMK_CF90_FIXED="cmpif90c -ifc "
+CMK_CF77="cmpifc -ifc -auto "
+CMK_CF90="cmpif90c -ifc -auto "
+CMK_CF90_FIXED="cmpif90c -ifc -auto "
 CMK_F90LIBS="-lifcore $F90MAIN "
 # for_main.o is important for main() in f90 code
 F90DIR=`which ifort 2> /dev/null`
