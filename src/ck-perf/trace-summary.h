@@ -8,18 +8,22 @@
 #ifndef _SUMMARY_H
 #define _SUMMARY_H
 
+#include <stdio.h>
+#include <errno.h>
+
 #include "trace.h"
 #include "ck.h"
-#include "stdio.h"
 
 #define LogBufSize      10000
 
 // in second
 #define  BIN_SIZE	0.001
 
-#define  MAX_ENTRIES      1000
+#define  MAX_ENTRIES      500
 
 #define  MAX_MARKS       256
+
+#define  MAX_PHASES       10
 
 #define  CREATION           1
 #define  BEGIN_PROCESSING   2
@@ -46,9 +50,6 @@ class LogEntry {
     void *operator new(size_t, void *ptr) { return ptr; }
     void operator delete(void *ptr) { free(ptr); }
     LogEntry() {}
-    LogEntry(double tm, UChar t, UShort m=0, UShort e=0, int ev=0, int p=0) { 
-      type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm;
-    }
     LogEntry(double t, int p=0) { 
       time = t; pe = p;
     }
@@ -58,13 +59,8 @@ class LogEntry {
     double time;
     int event;
     int pe;
-    UShort mIdx;
-    UShort eIdx;
-    UChar type; 
     void write(FILE *fp);
 };
-
-#include <errno.h>
 
 typedef struct _MarkEntry {
 double time;
@@ -74,6 +70,72 @@ struct _MarkEntry *next;
 typedef struct _LogMark {
 MarkEntry *marks;
 } LogMark;
+
+class PhaseEntry {
+  private:
+    int count[MAX_ENTRIES];
+    double times[MAX_ENTRIES];
+  public:
+    PhaseEntry() {
+	for (int i=0; i<MAX_ENTRIES; i++) {
+	    count[i] = 0;
+	    times[i] = 0.0;
+	}
+    }
+    void setEp(int epidx, double time) {
+	if (epidx>=MAX_ENTRIES) CmiAbort("Too many entry functions!\n");
+	count[epidx]++;
+	times[epidx] += time;
+    }
+    void write(FILE *fp) {
+	for (int i=0; i<_numEntries; i++) {
+	    fprintf(fp, "%d %ld ", count[i], (long)(times[i]*1.0e6) );
+	}
+	fprintf(fp, "\n");
+    }
+};
+
+class PhaseTable {
+  private:
+    PhaseEntry **phases;
+    int numPhase;
+    int cur_phase;
+    int phaseCalled;
+  public:
+    PhaseTable(int n) : numPhase(n){
+	phases = new PhaseEntry*[n];
+	_MEMCHECK(phases);
+	for (int i=0; i<n; i++) phases[i] = NULL;
+	cur_phase = -1;
+	phaseCalled = 0;
+    }
+    ~PhaseTable() {
+	for (int i=0; i<numPhase; i++) delete phases[i];
+	delete [] phases;
+    }
+    void startPhase(int p) { 
+	if (p>=numPhase) CmiAbort("Too Many Phases. \n");
+	cur_phase = p; 
+	if (phases[cur_phase] == NULL) {
+	    phases[cur_phase] = new PhaseEntry;
+	    _MEMCHECK(phases[cur_phase]);
+	    phaseCalled ++;
+        }
+    }
+    void setEp(int epidx, double time) {
+	if (cur_phase == -1) return;
+	if (phases[cur_phase] == NULL) CmiAbort("No current phase!\n");
+	phases[cur_phase]->setEp(epidx, time);
+    }
+    void write(FILE *fp) {
+	fprintf(fp, "phases: %d\n", phaseCalled);
+	for (int i=0; i<numPhase; i++ )
+	    if (phases[i]) { 
+	        fprintf(fp, "[%d] ", i);
+		phases[i]->write(fp);
+            }
+    }
+};
 
 class LogPool {
   private:
@@ -86,10 +148,14 @@ class LogPool {
     int *epCount;
     int epSize;
 
+    // for marks
     LogMark events[MAX_MARKS];
     int markcount;
+
+    // for phases
+    PhaseTable phaseTab;
   public:
-    LogPool(char *pgm) {
+    LogPool(char *pgm) : phaseTab(MAX_PHASES) {
       int i;
       poolSize = CpvAccess(CtrLogBufSize);
       if (poolSize % 2) poolSize++;	// make sure it is even
@@ -103,15 +169,13 @@ class LogPool {
       sprintf(fname, "%s.%s.sum", pgm, pestr);
       fp = NULL;
       //CmiPrintf("TRACE: %s:%d\n", fname, errno);
-      do
-      {
+      do {
       fp = fopen(fname, "w+");
       } while (!fp && errno == EINTR);
       delete[] fname;
       if(!fp) {
         CmiAbort("Cannot open Projections Trace File for writing...\n");
       }
-//      fprintf(fp, "SUMMARY-RECORD\n");
 
       epSize = MAX_ENTRIES;
       epTime = new double[epSize];
@@ -144,37 +208,8 @@ class LogPool {
     }
     void write(void) ;
     void writeSts(void);
-    void add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe) {
-      new (&pool[numEntries++])
-        LogEntry(time, type, mIdx, eIdx, event, pe);
-      if(poolSize==numEntries) {
-        double writeTime = CkTimer();
-        write();
-        numEntries = 0;
-        new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
-        new (&pool[numEntries++]) LogEntry(CkTimer(), END_INTERRUPT);
-      }
-    }
-    // TODO
-    void add(double time, int pe) {
-      new (&pool[numEntries++])
-        LogEntry(time, pe);
-      if(poolSize==numEntries) {
-/*
-        write();
-        numEntries = 0;
-*/
-        shrink();
-      }
-    }
-    void setEp(int epidx, double time) {
-      if (epidx >= epSize) {
-        CmiAbort("Too many entry points!!\n");
-      }
-      //CmiPrintf("set EP: %d %e \n", epidx, time);
-      epTime[epidx] += time;
-      epCount[epidx] ++;
-    }
+    void add(double time, int pe);
+    void setEp(int epidx, double time);
     void clearEps() {
       for(int i=0; i < epSize; i++) {
 	epTime[i]  = 0.;
@@ -183,6 +218,7 @@ class LogPool {
     }
     void shrink(void) ;
     void addEventType(int eventType, double time);
+    void startPhase(int phase) { phaseTab.startPhase(phase); }
 };
 
 class TraceProjections : public Trace {

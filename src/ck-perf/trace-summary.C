@@ -5,14 +5,6 @@
  * $Revision$
  *****************************************************************************/
 
-/*
-include 
-Pack
-Unpack
-into utilization time?
-*/
-
-
 #include "trace-summary.h"
 
 #define VER   2.0
@@ -118,7 +110,6 @@ void traceSuspend(void)
 extern "C"
 void traceAwaken(void)
 {
-//  CpvAccess(_trace)->creation(0);
 }
 
 extern "C"
@@ -148,7 +139,15 @@ void traceClearEps(void)
   CpvAccess(_logPool)->clearEps();
 }
 
-extern "C" void Ck_Summary_MarkEvent(int eventType)
+extern "C" 
+void CkSummary_StartPhase(int phase)
+{
+   CpvAccess(_logPool)->startPhase(phase);
+}
+
+// for marks
+extern "C" 
+void CkSummary_MarkEvent(int eventType)
 {
    CpvAccess(_logPool)->addEventType(eventType, CmiTimer());
 }
@@ -192,6 +191,8 @@ void LogPool::write(void)
   }
   fprintf(fp, "\n");
   }
+  // write phases
+  phaseTab.write(fp);
 }
 
 void LogPool::writeSts(void)
@@ -224,17 +225,28 @@ void LogPool::writeSts(void)
   fclose(sts);
 }
 
+void LogPool::add(double time, int pe) 
+{
+  new (&pool[numEntries++])
+  LogEntry(time, pe);
+  if(poolSize==numEntries) shrink();
+}
+
+void LogPool::setEp(int epidx, double time) 
+{
+  if (epidx >= epSize) {
+        CmiAbort("Too many entry points!!\n");
+  }
+  //CmiPrintf("set EP: %d %e \n", epidx, time);
+  epTime[epidx] += time;
+  epCount[epidx] ++;
+  // set phase table counter
+  phaseTab.setEp(epidx, time);
+}
+
 void LogPool::shrink(void)
 {
-/*
-  for (int i=0; i<numEntries; i++)
-  {
-     pool[i].setTime(pool[i*2].getTime() + pool[i*2+1].getTime());
-  }
-  numEntries /= 2;
-*/
   int entries = numEntries/2;
-//  if (numEntries%2) entries++;
   for (int i=0; i<entries; i++)
   {
      pool[i].setTime(pool[i*2].getTime() + pool[i*2+1].getTime());
