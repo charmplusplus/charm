@@ -170,6 +170,7 @@ void element::split(int longEdge)
 void element::coarsen()
 {
   int shortEdge = findShortestEdge();
+  CkPrintf("TMRC2D: Coarsen element %d\n", myRef.idx);
   collapse(shortEdge);
 }
 
@@ -211,8 +212,9 @@ void element::collapse(int shortEdge)
     // collapse successful; keepNode is node to keep
     // tell delNbr to replace delEdge with keepEdge
     delNbr = edges[delEdge].getNbr(myRef);
-    mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
-				       edges[keepEdge]);
+    if (delNbr.cid != -1)
+      mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
+					 edges[keepEdge]);
     // tell keepEdge to replace myRef with delNbr
     edges[keepEdge].update(myRef, delNbr);
     // remove self
@@ -231,8 +233,9 @@ void element::collapse(int shortEdge)
     delNode = delEdge;
     // tell delNbr to replace delEdge with keepEdge
     delNbr = edges[delEdge].getNbr(myRef);
-    mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
-				       edges[keepEdge]);
+    if (delNbr.cid != -1)
+      mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
+					 edges[keepEdge]);
     // tell keepEdge to replace myRef with delNbr
     edges[keepEdge].update(myRef, delNbr);
     // remove self
@@ -254,17 +257,17 @@ int element::nodeLockup(node n, edgeRef from, edgeRef start, elemRef end,
   }
   CkAssert((nIdx > -1) && (nIdx < 3));
   CkAssert((fIdx > -1) && (fIdx < 3));
-  int lockResult = C->theNodes[nIdx].lock(l, start);
+  int lockResult = C->theNodes[nodes[nIdx]].lock(l, start);
   if (!lockResult) return 0;
   if (myRef == end) return 1;
   if (nIdx == fIdx) nextIdx = (nIdx + 2) % 3;
   else nextIdx = nIdx;
-  CkPrintf("TMRC2D: In element[%d]::nodeLockup: from=%d nIdx=%d fIdx=%d nextIdx=%d\n", 
-	   myRef.idx, from.idx, nIdx, fIdx, nextIdx);
+  CkPrintf("TMRC2D: In element[%d]::nodeLockup: from=%d nodes[nIdx]=%d fIdx=%d nextIdx=%d\n", 
+	   myRef.idx, from.idx, nodes[nIdx], fIdx, nextIdx);
   edgeRef nextRef = edges[nextIdx];
   intMsg *im = mesh[nextRef.cid].nodeLockupER(nextRef.idx, n, start, myRef, 
 					      end, l);
-  if (im->anInt == 0) C->theNodes[nIdx].unlock();
+  if (im->anInt == 0) C->theNodes[nodes[nIdx]].unlock();
   return im->anInt;
 }
 
@@ -273,13 +276,20 @@ int element::nodeUpdate(node n, edgeRef from, elemRef end, node newNode)
   int nIdx, fIdx, nextIdx;
   for (int i=0; i<3; i++) {
     if (n == C->theNodes[nodes[i]]) nIdx = i;
+    else if (newNode == C->theNodes[nodes[i]]) nIdx = i;
     if (from == edges[i]) fIdx = i;
   }
-  C->theNodes[nIdx].unlock();
-  C->theNodes[nIdx].set(newNode.X(), newNode.Y());
+  CkAssert((nIdx > -1) && (nIdx < 3));
+  CkAssert((fIdx > -1) && (fIdx < 3));
+  C->theNodes[nodes[nIdx]].unlock();
+  CkPrintf("TMRC2D: about to set node %d to [%f,%f]\n", nodes[nIdx], newNode.X(), 
+	   newNode.Y());
+  C->theNodes[nodes[nIdx]].set(newNode.X(), newNode.Y());
   if (myRef == end) return 1;
   if (nIdx == fIdx) nextIdx = (nIdx + 2) % 3;
   else nextIdx = nIdx;
+  CkPrintf("TMRC2D: In element[%d]::nodeUpdate: from=%d nodes[nIdx]=%d fIdx=%d nextIdx=%d\n", 
+	   myRef.idx, from.idx, nodes[nIdx], fIdx, nextIdx);
   edgeRef nextRef = edges[nextIdx];
   intMsg *im = mesh[nextRef.cid].nodeUpdateER(nextRef.idx, n, myRef, end, 
 					      newNode);
@@ -293,7 +303,7 @@ int element::nodeDelete(node n, edgeRef from, elemRef end)
     if (n == C->theNodes[nodes[i]]) nIdx = i;
     if (from == edges[i]) fIdx = i;
   }
-  C->theNodes[nIdx].unlock();
+  C->theNodes[nodes[nIdx]].unlock();
   C->removeNode(nIdx);
   if (myRef == end) return 1;
   if (nIdx == fIdx) nextIdx = (nIdx + 2) % 3;
@@ -397,12 +407,12 @@ node element::tweak(node n[3], int i)
 }
 */
 
-void element::sanityCheck(chunk *c, elemRef shouldRef) 
+void element::sanityCheck(chunk *c, elemRef shouldRef, int n) 
 {
   CkAssert(myRef == shouldRef);
   CkAssert(C == c);
   for (int i=0;i<3;i++) {
-    CkAssert((nodes[i] < C->numNodes) && (nodes[i] > -1));
+    CkAssert((nodes[i] < n) && (nodes[i] > -1));
     CkAssert(!(edges[i].isNull()));
     edges[i].sanityCheck();
   }

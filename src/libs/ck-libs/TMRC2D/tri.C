@@ -95,6 +95,9 @@ void chunk::coarseningElements()
     i = 0;
     modified = 0;
     while (i < elementSlots) { // loop through the elements
+      if (theElements[i].isPresent())
+	CkPrintf("TMRC2D: Coarsen element %d: area=%f target=%f\n", i, 
+		 theElements[i].getArea(), theElements[i].getTargetArea());
       if (theElements[i].isPresent() && 
 	  (theElements[i].getTargetArea() > theElements[i].getArea()) && 
 	  (theElements[i].getTargetArea() >= 0.0)) {
@@ -107,6 +110,7 @@ void chunk::coarseningElements()
     CthYield(); // give other chunks on the same PE a chance
   }
   coarsenInProgress = 0;  // turn coarsen loop off
+  sanityCheck(); // quietly make sure mesh is in shape
 }
 
 // many remote access methods follow
@@ -628,10 +632,15 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
   //dump();
   sanityCheck(); // quietly make sure mesh is in shape
 
-  for (i=0; i<elementSlots; i++)  // set desired areas for elements
+  for (i=0; i<elementSlots; i++) { // set desired areas for elements
+    CkPrintf("TMRC2D: desiredArea[%d]=%f present? %d area=%f\n", i, desiredArea[i], theElements[i].isPresent(), theElements[i].getArea());
     if ((theElements[i].isPresent()) &&
-	(desiredArea[i] > theElements[i].getArea()))
-      theElements[i].setTargetArea(desiredArea[i]);
+	(desiredArea[i] > theElements[i].getArea())) {
+      theElements[i].resetTargetArea(desiredArea[i]);
+      CkPrintf("TMRC2D: Setting target on element %d to %f\n", i, desiredArea[i]);
+    }
+  }
+
   // start coarsening
   modified = 1;
   if (!coarsenInProgress) {
@@ -853,7 +862,7 @@ void chunk::sanityCheck(void)
   CkAssert(firstFreeNode == i);
   for (i=0; i<elementSlots; i++) 
     if (theElements[i].isPresent())
-      theElements[i].sanityCheck(this, elemRef(cid,i));
+      theElements[i].sanityCheck(this, elemRef(cid,i), nodeSlots);
   for (i=0; i<edgeSlots; i++)
     if (theEdges[i].isPresent())
       theEdges[i].sanityCheck(this, edgeRef(cid,i));

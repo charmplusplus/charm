@@ -167,7 +167,7 @@ class element {  // triangular elements defined by three node references,
   //void tweakNodes();
   //node tweak(node n[3], int i);
 
-  void sanityCheck(chunk *c,elemRef shouldRef);
+  void sanityCheck(chunk *c, elemRef shouldRef, int n);
 };
 
 #endif

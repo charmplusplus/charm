@@ -148,7 +148,7 @@ int edge::collapse(elemRef requester, node kNode, node dNode)
 						myRef, nbr, length);
     intMsg *jm;
     if (im->anInt == 0) return -1;
-    if (im->anInt == -1) {
+    if ((im->anInt == -1) && (nbr.cid != -1)) {
       im = mesh[nbr.cid].nodeLockup(nbr.idx, kNode, myRef, myRef, requester, 
 				    length);
       if (im->anInt == 0) {
@@ -167,7 +167,7 @@ int edge::collapse(elemRef requester, node kNode, node dNode)
 	jm = mesh[nbr.cid].nodeUpdate(nbr.idx,kNode,myRef,requester,kNode);
       return -1;
     }
-    else if (im->anInt == -1) {
+    else if ((im->anInt == -1) && (nbr.cid != -1)) {
       im = mesh[nbr.cid].nodeLockup(nbr.idx, dNode, myRef, myRef, requester, 
 				    length);
       if (im->anInt == 0) {
@@ -182,26 +182,26 @@ int edge::collapse(elemRef requester, node kNode, node dNode)
     // both nodes locked
     CkPrintf("TMRC2D: edge::collapse: LOCKS obtained... On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);
     setPending();
-    kNode.midpoint(dNode, newNode);
     incidentNode = dNode;
     fixNode = kNode;
+    newNode = kNode.midpoint(dNode);
     if (nbr.cid != -1) {
       waitingFor = nbr;
       double nbrArea = nbr.getArea();
       mesh[nbr.cid].coarsenElement(nbr.idx, nbrArea);
     }
     else {
-      CkPrintf("TMRC2D: removing edge %d on %d\n", myRef.idx, myRef.cid);
-      C->removeEdge(myRef.idx);
       CkPrintf("TMRC2D: moving node %f,%f to %f,%f\n", kNode.X(), kNode.Y(), 
 	       newNode.X(), newNode.Y());
       im = mesh[requester.cid].nodeUpdate(requester.idx,kNode,myRef,nbr,newNode);
-      if (im->anInt == -1)
+      if ((im->anInt == -1) && (nbr.cid != -1))
 	im = mesh[nbr.cid].nodeUpdate(nbr.idx,kNode,myRef,requester,newNode);
       CkPrintf("TMRC2D: deleting node %f,%f\n", dNode.X(), dNode.Y());
       im = mesh[requester.cid].nodeDelete(requester.idx,dNode,myRef,nbr);
-      if (im->anInt == -1)
+      if ((im->anInt == -1) && (nbr.cid != -1))
 	im = mesh[nbr.cid].nodeDelete(nbr.idx,dNode,myRef,requester);
+      CkPrintf("TMRC2D: removing edge %d on %d\n", myRef.idx, myRef.cid);
+      C->removeEdge(myRef.idx);
     }
     return 1;
   }
@@ -221,6 +221,8 @@ int edge::nodeLockup(node n, edgeRef start, elemRef from, elemRef end,
 int edge::nodeUpdate(node n, elemRef from, elemRef end, node newNode)
 {
   elemRef next = getNot(from);
+  CkPrintf("TMRC2D: In edge[%d]::nodeUpdate: from=%d next=%d\n", 
+	   myRef.idx, from.idx, next.idx);
   if (next.cid == -1) return -1;
   intMsg *im = mesh[next.cid].nodeUpdate(next.idx, n, myRef, end, newNode);
   return im->anInt;
