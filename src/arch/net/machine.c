@@ -866,7 +866,7 @@ static void CmiPushNode(void *msg)
   
 #if CMK_IMMEDIATE_MSG
   if (CmiIsImmediate(msg)) {
-  MACHSTATE(2,"Pushing Immediate message into queue");
+    MACHSTATE(2,"Pushing Immediate message into queue");
     CmiPushImmediateMsg(msg);
     return;
   }
@@ -1565,7 +1565,7 @@ static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char
  *
  *****************************************************************************/
 
-CmiCommHandle CmiGeneralNodeSend(int pe, int size, int freemode, char *data)
+CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
 {
   
   CmiState cs = CmiGetState(); OutgoingMsg ogm;
@@ -1578,7 +1578,14 @@ CmiCommHandle CmiGeneralNodeSend(int pe, int size, int freemode, char *data)
     data = copy; freemode = 'F';
   }
 
-  ogm=PrepareOutgoing(cs,pe,size,freemode,data);
+#if CMK_IMMEDIATE_MSG
+    /* execute the immediate message right away */
+  if (node == CmiMyNode() && CmiIsImmediate(data)) {
+    CmiHandleImmediateMessage(data);
+    return;
+  }
+#endif
+  ogm=PrepareOutgoing(cs,node,size,freemode,data);
   CmiCommLock();
   DeliverOutgoingNodeMessage(ogm);
   CmiCommUnlock();
