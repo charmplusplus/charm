@@ -18,8 +18,8 @@ TODO:
 #include "converse.h"
 
 #ifdef CMK_ORIGIN2000
-extern "C" int start_counters(int e0, int e1);
-extern "C" int read_counters(int e0, long long *c0, int e1, long long *c1);
+int start_counters(int e0, int e1);
+int read_counters(int e0, long long *c0, int e1, long long *c1);
 #elif CMK_HAS_COUNTER_PAPI
 #include <papi.h>
 #endif
