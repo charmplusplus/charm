@@ -128,7 +128,7 @@ headerlinks: dirs+sources Makefile
 	rm -f ../bin/charmc ; cp charmc ../bin/
 	chmod +x ../bin/charmc
 	rm -rf ../include ; mkdir ../include
-	-for hdr in $(ALLHEADERS) ; do test ! -f "../include/$$hdr" && ln -fs "../tmp/$$hdr" ../include ; done
+	-for hdr in $(ALLHEADERS) ; do test ! -f "../include/$$hdr" && ln -f -s "../tmp/$$hdr" ../include ; done
 	touch headerlinks	
 
 dirs+sources:
