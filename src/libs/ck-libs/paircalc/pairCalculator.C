@@ -2,17 +2,28 @@
 #include "ckPairCalculator.h"
 #include "pairCalculator.h"
 
-void createPairCalculator(bool sym, int s, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, CkCallback cb, PairCalcID* pcid, int comlib_flag) {
+void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, CkCallback cb, PairCalcID* pcid, int comlib_flag, CkGroupID *mapid) {
+
+    //CkPrintf("create pair calculator %d, %d\n", s, grainSize);
+
 
   CProxy_PairCalcReducer pairCalcReducerProxy = CProxy_PairCalcReducer::ckNew();
   pairCalcReducerProxy.ckSetReductionClient(&cb); 
 
-  CProxy_PairCalculator pairCalculatorProxy = CProxy_PairCalculator::ckNew();
-  pairCalculatorProxy.ckSetReductionClient(&cb);  
-
   // FIXME: to choose grain size and block size instead of hard-coding
-  int grainSize = s/4;
   int blkSize = 1;
+  
+  CkArrayOptions options;
+  CProxy_PairCalculator pairCalculatorProxy;
+  if(!mapid) {
+      pairCalculatorProxy = CProxy_PairCalculator::ckNew();
+  }
+  else {
+      options.setMap(*mapid);
+      pairCalculatorProxy = CProxy_PairCalculator::ckNew(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), options);
+  }
+
+  pairCalculatorProxy.ckSetReductionClient(&cb);  
 
   int proc = 0, n_paircalc = 0;
   /*
@@ -25,38 +36,71 @@ void createPairCalculator(bool sym, int s, int numZ, int* z, int op1, FuncType f
 
   pcid->Init(pairCalculatorProxy.ckGetArrayID(), pairCalcReducerProxy.ckGetGroupID(), grainSize, blkSize, s, sym, comlib_flag, bcastInstance._instid, bcastInstance._dmid);
   
+  
+  if(mapid) {
+      if(sym){
+          for(int numX = 0; numX < numZ; numX += blkSize){
+              for (int s1 = 0; s1 < s; s1 += grainSize) {
+                  for (int s2 = s1; s2 < s; s2 += grainSize) {
+                      for (int c = 0; c < blkSize; c++) {
+                          pairCalculatorProxy(CkArrayIndexIndex4D(z[numX],s1,s2,c)).
+                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID());
+                          n_paircalc++;
+                      }
+                  }
+              }
+          }
+      }
+      else {   // for non-symmetric
+          for(int numX = 0; numX < numZ; numX += blkSize){
+              for (int s1 = 0; s1 < s; s1 += grainSize) {
+                  for (int s2 = 0; s2 < s; s2 += grainSize) {
+                      for (int c = 0; c < blkSize; c++) {
+                          pairCalculatorProxy(CkArrayIndexIndex4D(z[numX],s1,s2,c)).
+                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID());
+                          n_paircalc++;
+                          proc++;
+                          if (proc >= CkNumPes()) proc = 0;
+                      }
+                  }
+              }
+          }
+      }   
+      
+  }
+  else {
+      if(sym){
+          for(int numX = 0; numX < numZ; numX += blkSize){
+              for (int s1 = 0; s1 < s; s1 += grainSize) {
+                  for (int s2 = s1; s2 < s; s2 += grainSize) {
+                      for (int c = 0; c < blkSize; c++) {
+                          pairCalculatorProxy(CkArrayIndexIndex4D(z[numX],s1,s2,c)).
+                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), proc);
+                          n_paircalc++;
+                          proc++;
+                          if (proc >= CkNumPes()) proc = 0;
+                      }
+                  }
+              }
+          }
+      }
+      else {   // for non-symmetric
+          for(int numX = 0; numX < numZ; numX += blkSize){
+              for (int s1 = 0; s1 < s; s1 += grainSize) {
+                  for (int s2 = 0; s2 < s; s2 += grainSize) {
+                      for (int c = 0; c < blkSize; c++) {
+                          pairCalculatorProxy(CkArrayIndexIndex4D(z[numX],s1,s2,c)).
+                              insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), proc);
+                          n_paircalc++;
+                          proc++;
+                          if (proc >= CkNumPes()) proc = 0;
+                      }
+                  }
+              }
+          }
+      }   
+  }
 
-  if(sym){
-    for(int numX = 0; numX < numZ; numX += blkSize){
-      for (int s1 = 0; s1 < s; s1 += grainSize) {
-	for (int s2 = s1; s2 < s; s2 += grainSize) {
-	  for (int c = 0; c < blkSize; c++) {
-	    pairCalculatorProxy(CkArrayIndexIndex4D(z[numX],s1,s2,c)).
-	      insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), proc, 0);
-	    n_paircalc++;
-	    proc++;
-	    if (proc >= CkNumPes()) proc = 0;
-	  }
-	}
-      }
-    }
-  }
-  else {   // for non-symmetric
-    for(int numX = 0; numX < numZ; numX += blkSize){
-      for (int s1 = 0; s1 < s; s1 += grainSize) {
-	for (int s2 = 0; s2 < s; s2 += grainSize) {
-	  for (int c = 0; c < blkSize; c++) {
-	    pairCalculatorProxy(CkArrayIndexIndex4D(z[numX],s1,s2,c)).
-	      insert(sym, grainSize, s, blkSize, op1, f1, op2, f2, cb, pairCalcReducerProxy.ckGetGroupID(), proc, 0);
-	    n_paircalc++;
-	    proc++;
-	    if (proc >= CkNumPes()) proc = 0;
-	  }
-	}
-      }
-    }
-  }
-     
   pairCalculatorProxy.doneInserting();
 
 #ifdef _DEBUG_

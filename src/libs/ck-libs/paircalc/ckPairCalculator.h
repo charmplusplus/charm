@@ -16,10 +16,13 @@ class mySendMsg : public CMessage_mySendMsg {
   int N;
   complex *data;
   friend class CMessage_mySendMsg;
+
+  /*
   mySendMsg(int N, complex *data) {
     this->N = N;
     memcpy(this->data, data, N*sizeof(complex));
   }
+  */
 };
 
 class partialResultMsg : public CMessage_partialResultMsg {
@@ -46,10 +49,12 @@ class priorSumMsg : public CMessage_priorSumMsg {
   CkCallback cb;
   complex *result;
   friend class CMessage_priorSumMsg;
+  /*
   priorSumMsg(int ipriority,unsigned int iN,   CkCallback icb,complex *iresult) : priority(ipriority), N(iN), cb(icb)
     {
       memcpy(this->result,iresult,N*sizeof(complex));
     }
+  */
 };
 
 class PairCalculator: public CBase_PairCalculator {

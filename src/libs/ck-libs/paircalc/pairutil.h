@@ -85,7 +85,7 @@ struct complex {
         
 #if PAIR_USE_SSE
         __m128d dreg1 = _mm_loadu_pd((double *)this);
-        __m128d dreg2 = _mm_set_pd(a.im, a.re);
+        __m128d dreg2 = _mm_loadu_pd((double *)&a);
         
         _mm_storeu_pd((double *)this, _mm_add_pd(dreg1, dreg2));
 #else

@@ -40,7 +40,7 @@ class PairCalcID {
   }
 };
 
-extern "C" void createPairCalculator(bool sym, int w, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, const CkCallback cb, PairCalcID* aid, int flag=0);
+extern "C" void createPairCalculator(bool sym, int w, int grainSize, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, const CkCallback cb, PairCalcID* aid, int flag=0, CkGroupID *gid = 0);
 
 void startPairCalcLeft(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 
