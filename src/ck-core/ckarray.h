@@ -20,10 +20,8 @@ elements (a subclass of Chare).
 CkArrayIndex is an arbitrary run of bytes,
 used to index into the CkArray hashtable.
 
-
 Converted from 1-D arrays 2/27/2000 by
 Orion Sky Lawlor, olawlor@acm.org
-
 */
 #ifndef __CKARRAY_H
 #define __CKARRAY_H
@@ -35,6 +33,13 @@ Orion Sky Lawlor, olawlor@acm.org
 */
 extern void _registerCkArray(void);
 
+/**
+\addtogroup CkArray
+\brief Migratable Chare Arrays: user-visible classes.
+
+All these classes are defined in ckarray.C.
+*/
+/*@{*/
 
 /// Simple ArrayIndex classes: the key is just integer indices.
 class CkArrayIndex1D : public CkArrayIndex {
@@ -118,6 +123,7 @@ class CkArrayListener : public PUP::able {
     { return CmiTrue; }
 };
 
+/*@}*/
 
 //This simple arrayListener just prints each event to stdout:
 class CkVerboseListener : public CkArrayListener {
@@ -139,6 +145,10 @@ class CkVerboseListener : public CkArrayListener {
   virtual CmiBool ckElementArriving(ArrayElement *elt);
 };
 
+/**
+\addtogroup CkArray
+*/
+/*@{*/
 /*********************** CkArrayOptions *******************************/
 /// Arguments for array creation:
 class CkArrayOptions {
@@ -427,9 +437,14 @@ typedef ArrayElementT<CkIndex1D> ArrayElement1D;
 typedef ArrayElementT<CkIndex2D> ArrayElement2D;
 typedef ArrayElementT<CkIndex3D> ArrayElement3D;
 typedef ArrayElementT<CkIndexMax> ArrayElementMax;
+/*@}*/
 
 
 /*********************** Array Manager BOC *******************/
+/**
+\addtogroup CkArrayImpl
+*/
+/*@{*/
 
 #include "CkArray.decl.h"
 #include "CkArrayReductionMgr.decl.h"
@@ -599,5 +614,6 @@ private:
   CkArrayReducer *reducer; //Read-only copy of default reducer
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
 };
+/*@}*/
 
 #endif

@@ -4,7 +4,14 @@
  * $Date$
  * $Revision$
  *****************************************************************************/
+/**
+\addtogroup Ck
 
+These routines implement a basic remote-method-invocation system
+consisting of chares and groups.  There is no migration. All
+the bindings are written to the C language, although most
+clients, including the rest of Charm++, are actually C++.
+*/
 #include "ck.h"
 #include "trace.h"
 

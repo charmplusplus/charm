@@ -4,21 +4,26 @@
  * $Date$
  * $Revision$
  *****************************************************************************/
+/**
+\file
+\addtogroup CkFutures
 
+To call [sync] entry methods, we need a way to block
+the current Converse thread until the called method returns.
+
+A "future" represents a thread of control that has been passed
+to another processor.  It provides a place for a (local) thread to
+block and the machinery for resuming control based on a remote
+event.  Futures are thus used to implement Charm++'s "[sync]" methods.
+
+This "sequential futures abstraction" is a well-studied concept
+in remote process control.
+*/
+/*@{*/
 #include "charm++.h"
 #include "ck.h"
 #include "ckfutures.h"
 #include <stdlib.h>
-
-/******************************************************************************
- *
- * The sequential future abstraction:
- *  A "future" represents a thread of control that has been passed
- * to another processor.  It provides a place for a (local) thread to
- * block and the machinery for resuming control.  Futures are used to
- * implement Charm++'s "[sync]" methods.
- *
- *****************************************************************************/
 
 typedef struct Future_s {
   int ready;
@@ -378,4 +383,6 @@ void CkSemaDestroy(CkSemaID id)
   CpvAccess(semapool)->release(id.idx);
 }
 
+/*@}*/
 #include "CkFutures.def.h"
+

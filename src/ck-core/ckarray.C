@@ -1,17 +1,17 @@
-/* Generalized Chare Arrays
+/**
+\file
+\addtogroup CkArray
 
 An Array is a collection of array elements (Chares) which
 can be indexed by an arbitary run of bytes (a CkArrayIndex).
 Elements can be inserted or removed from the array,
 or migrated between processors.  Arrays are integrated with
 the run-time load balancer.
-
 Elements can also receive broadcasts and participate in
 reductions.
 
 Converted from 1-D arrays 2/27/2000 by
 Orion Sky Lawlor, olawlor@acm.org
-
 */
 #include "charm++.h"
 #include "register.h"

@@ -81,6 +81,11 @@ extern CkGroupID _RRMapID;
 class CkLocMgr;
 class CkArrMgr;
 
+/**
+\addtogroup CkArray
+*/
+/*@{*/
+
 /** The "map" is used by the array manager to map an array index to 
  * a home processor number.
  */
@@ -95,7 +100,13 @@ public:
   virtual int procNum(int arrayHdl,const CkArrayIndex &element) =0;
 //  virtual void pup(PUP::er &p) { CkGroupReadyCallback::pup(p); }
 };
+/*@}*/
 
+/**
+\addtogroup CkArrayImpl
+\brief Migratable Chare Arrays: Implementation classes.
+*/
+/*@{*/
 static inline CkGroupID CkCreatePropMap(void)
 {
   return CProxy_PropMap::ckNew();
@@ -625,5 +636,6 @@ private:
 	void initLB(CkGroupID lbdbID);
 };
 
+/*@}*/
 
 #endif /*def(thisHeader)*/

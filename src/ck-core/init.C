@@ -4,6 +4,44 @@
  * $Date$
  * $Revision$
  *****************************************************************************/
+/**
+\addtogroup CkInit
+\brief Controls the Charm++ startup process.
+
+This file runs the entire Charm++ startup process.
+
+The process begins with every processor finishing the 
+Converse startup process and calling _initCharm.
+This routine runs almost the entire Charm++ setup process.
+It begins by setting up various Cpvs and subsystems.
+
+The rank 0 processor of each node then does
+the Charm++ registration, by calling the various _register
+routines.  
+
+Now processor 0:
+<ol>
+<li>Creates each mainchare, by allocating the chares
+ and calling their constructors with argc/argv.
+ This typically results in a number of chare/group creations.
+<li>Sends off all readonly data to the other processors.
+</ol>
+After _initCharm, processor 0 immediately begins work.
+
+The other processors, however, must wait until they recieve 
+the readonly data and all group creations.  They do this by 
+setting the _charmHandlerIdx to a special "_bufferHandler"
+which simply saves all normal messages into a special queue.  
+
+As the startup data (readonlies and group creations) streams
+into _initHandler, it counts messages until it is fully 
+initialized, then calls _initDone to clean out the queues 
+and resume normal operation.  
+
+Possible race conditions abound during this process,
+which is probably overly complex.
+*/
+/*@{*/
 
 #include "ck.h"
 #include "trace.h"
@@ -687,4 +725,4 @@ void registerExitFn(CkExitFn fn)
   CkExitFnVec.enq(fn);
 }
 
-
+/*@}*/

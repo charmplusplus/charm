@@ -4,7 +4,10 @@
  * $Date$
  * $Revision$
  *****************************************************************************/
-
+/**
+\file
+\brief Charm Kernel--the groups and chares level of Charm++.
+*/
 #ifndef CHARM_H
 #define CHARM_H
 
@@ -22,6 +25,7 @@ extern "C" {
  *
  *****************************************************************************/
 
+/** Queueing types, for use with CkSetQueueing: */
 #define CK_QUEUEING_FIFO   CQS_QUEUEING_FIFO
 #define CK_QUEUEING_LIFO   CQS_QUEUEING_LIFO
 #define CK_QUEUEING_IFIFO  CQS_QUEUEING_IFIFO
@@ -48,6 +52,9 @@ extern "C" {
 #define CkError                 CmiError
 #define CkAbort                 CmiAbort
 #define CkAssert                CmiAssert
+extern void  CkExit(void);
+extern char **CkGetArgv(void);
+extern int  CkGetArgc(void);
 
 /******************************************************************************
  *
@@ -88,6 +95,72 @@ typedef struct _ckargmsg {
 #endif
 } CkArgMsg;
 
+/*********************************************************/
+/**
+\addtogroup CkRegister
+\brief Charm Registration--keeps track of the possible chare and method types.
+
+These are implemented in register.C.
+*/
+/*@{*/
+/** Message pack function: convert a message into a buffer. */
+typedef void* (*CkPackFnPtr)(void *msg);
+/** Message unpack function: convert a buffer into a message. */
+typedef void* (*CkUnpackFnPtr)(void *buf);
+typedef void* (*CkCoerceFnPtr)(void *buf);
+
+/** Register this message name, with this basic size and pack and unpack functions. */
+extern int CkRegisterMsg(const char *name, CkPackFnPtr pack, 
+                       CkUnpackFnPtr unpack, CkCoerceFnPtr coerce, size_t size);
+
+/** This entry point flag indicates the method does not keep the passed-in message. */
+#define CK_EP_NOKEEP (1<<2) 
+
+/** A "call function" to invoke a method on an object. See EntryInfo */
+typedef void  (*CkCallFnPtr) (void *msg, void *obj);
+/** Register this entry point, with this call function and flags.
+    Returns the entry point's index in the _entryTable. */
+extern int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, 
+                        int chareIdx,int ck_ep_flags);
+
+/** Register this type of chare (group, or array), with this size.
+    Returns the Chare's index in the _chareTable. */
+extern int CkRegisterChare(const char *name, int dataSz);
+/** Register this chare as a mainchare, with this entry point as its constructor.*/
+extern int CkRegisterMainChare(int chareIndex, int epIndex);
+/** Register a default constructor for this chare.*/
+extern void CkRegisterDefaultCtor(int chareIndex, int ctorEpIndex);
+/** Register a migration constructor for this chare.*/
+extern void CkRegisterMigCtor(int chareIndex, int ctorEpIndex);
+/** Indicate whether this group is an IrrGroup. */
+extern void CkRegisterGroupIrr(int chareIndex,int isIrr);
+
+/** This function pup's a global variable.*/
+typedef void (*CkPupReadonlyFnPtr)(void *pup_er);
+/** Register this readonly global variable.*/
+extern void CkRegisterReadonly(const char *name,const char *type,
+	int size, void *ptr,CkPupReadonlyFnPtr pup_fn);
+/** Register this readonly message.*/
+extern void CkRegisterReadonlyMsg(const char *name,const char *type,
+	void** pMsg);
+
+/** A "marshall unpack" function: pups out parameters and calls a method. */
+typedef int (*CkMarshallUnpackFn)(char *marshall_buf,void *object);
+/** Register this marshall unpack function with this entry point.*/
+extern void CkRegisterMarshallUnpackFn(int epIndex,CkMarshallUnpackFn m);
+/** Lookup the marshall unpack function, if any, for this entry point.*/
+extern CkMarshallUnpackFn CkLookupMarshallUnpackFn(int epIndex);
+/*@}*/
+
+/*********************************************************/
+/**
+\addtogroup Ck
+\brief Charm Kernel--the groups and chares level of Charm++.
+
+These routines are implemented in ck.C.
+*/
+/*@{*/
+
 typedef struct {
   int   onPE;
   void* objPtr;
@@ -106,48 +179,6 @@ typedef struct _ckGroupID{
 } CkGroupID;
 
 typedef CkGroupID CkNodeGroupID;
-
-typedef int CkFutureID;
-
-/******************************************************************************
- *
- * Function Pointer Types
- *
- *****************************************************************************/
-
-typedef void* (*CkPackFnPtr)(void *msg);
-typedef void* (*CkUnpackFnPtr)(void *buf);
-typedef void* (*CkCoerceFnPtr)(void *buf);
-typedef void  (*CkCallFnPtr) (void *msg, void *obj);
-
-/******************************************************************************
- *
- * Registration Calls
- *
- *****************************************************************************/
-
-extern int CkRegisterMsg(const char *name, CkPackFnPtr pack, 
-                       CkUnpackFnPtr unpack, CkCoerceFnPtr coerce, size_t size);
-
-#define CK_EP_NOKEEP (1<<2) /* Entry method does not keep passed-in message */
-extern int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, 
-                        int chareIdx,int ck_ep_flags);
-
-extern void CkRegisterGroupIrr(int chareIndex,int isIrr);
-extern int CkRegisterChare(const char *name, int dataSz);
-extern int CkRegisterMainChare(int chareIndex, int epIndex);
-extern void CkRegisterDefaultCtor(int chareIndex, int ctorEpIndex);
-extern void CkRegisterMigCtor(int chareIndex, int ctorEpIndex);
-typedef void (*CkPupReadonlyFnPtr)(void *pup_er);
-extern void CkRegisterReadonly(const char *name,const char *type,
-	int size, void *ptr,CkPupReadonlyFnPtr pup_fn);
-extern void CkRegisterReadonlyMsg(const char *name,const char *type,
-	void** pMsg);
-extern void CkRegisterMainModule(void);
-
-typedef int (*CkMarshallUnpackFn)(char *marshall_buf,void *object);
-extern void CkRegisterMarshallUnpackFn(int epIndex,CkMarshallUnpackFn m);
-extern CkMarshallUnpackFn CkLookupMarshallUnpackFn(int epIndex);
 
 /******************************************************************************
  *
@@ -193,12 +224,22 @@ extern int  CkGetSrcNode(void *msg);
 extern void CkDeliverMessageFree(int epIdx,void *msg,void *object);
 extern void CkDeliverMessageReadonly(int epIdx,const void *msg,void *object);
 
-/******************************************************************************
- *
- * Blocking Method Invocation Calls
- *
- *****************************************************************************/
+extern void *CkLocalBranch(CkGroupID gID);
+extern void *CkLocalNodeBranch(CkGroupID gID);
+extern void *CkLocalChare(const CkChareID *chare);
+/*@}*/
 
+
+
+/*********************************************************/
+/**
+\addtogroup CkFutures
+\brief Futures--ways to block Converse threads on remote events.
+
+These routines are implemented in ckfutures.C.
+*/
+/*@{*/
+typedef int CkFutureID;
 extern void* CkRemoteCall(int eIdx, void *msg,const CkChareID *chare);
 extern void* CkRemoteBranchCall(int eIdx, void *msg, CkGroupID gID, int pe);
 extern void* CkRemoteNodeBranchCall(int eIdx, void *msg, CkGroupID gID, int node);
@@ -207,6 +248,7 @@ extern CkFutureID CkRemoteBranchCallAsync(int eIdx, void *msg, CkGroupID gID,
                                           int pe);
 extern CkFutureID CkRemoteNodeBranchCallAsync(int eIdx, void *msg, 
                                               CkGroupID gID, int node);
+
 extern void* CkWaitFuture(CkFutureID futNum);
 extern void CkWaitVoidFuture(CkFutureID futNum);
 extern void CkReleaseFuture(CkFutureID futNum);
@@ -235,15 +277,27 @@ extern void *CkSemaWait(CkSemaID id);
 extern void CkSemaWaitN(CkSemaID id, int n, void *marray[]);
 extern void CkSemaSignal(CkSemaID id, void *m);
 extern void CkSemaDestroy(CkSemaID id);
+/*@}*/
+
 
 /******************************************************************************
  *
  * Quiescence Calls
  *
  *****************************************************************************/
+/**
+\addtogroup CkQD
+\brief Quiescence Detection--a way to tell when nothing is happening.
 
+These routines are implemented in qd.C and waitqd.C.
+*/
+/*@{*/
+
+/** When quiescence occurs, send a message to this entry point of this Chare. */
 extern void CkStartQD(int eIdx,const CkChareID *chare);
+/** Block until quiescence occurs. */
 extern void CkWaitQD(void);
+/*@}*/
 
 /******************************************************************************
  *
@@ -251,14 +305,8 @@ extern void CkWaitQD(void);
  *
  *****************************************************************************/
 
-extern void *CkLocalBranch(CkGroupID gID);
-extern void *CkLocalNodeBranch(CkGroupID gID);
-extern void *CkLocalChare(const CkChareID *chare);
-extern void  CkExit(void);
 extern void CkPrintEntryMethod(int epIdx);
 extern void CkPrintChareName(int chareIdx);
-extern char **CkGetArgv(void);
-extern int  CkGetArgc(void);
 extern void CkSummary_MarkEvent(int);
 extern void CkSummary_StartPhase(int);
 extern int CkDisableTracing(int epIdx);

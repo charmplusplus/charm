@@ -4,7 +4,19 @@
  * $Date$
  * $Revision$
  *****************************************************************************/
+/**
+\addtogroup CkRegister
 
+These routines keep track of the various chares 
+(see ChareInfo and the _chareTable in register.h)
+and entry methods (see EntryInfo and the _entryTable)
+that exist in the program.
+
+These routines are normally called by a translator-generated
+_registerModule routine in the .def file.  Because these routines
+fill out global tables, they are normally called exactly 
+once per node at Charm startup time.
+*/
 #include "ck.h"
 
 EntryInfo**        _entryTable;
@@ -161,8 +173,7 @@ void CkEnableTracing(int epIdx) {
 }
 
 
-// temporarily here for satisfying NAMD, it should go to tracing module
-
+/// Temporarily here for satisfying NAMD, it should go to tracing module:
 extern "C"
 int registerEvent(char *name)
 {
@@ -171,11 +182,13 @@ int registerEvent(char *name)
   return 0;
 }
 
+/// This was once used to check downcasts on chare proxies.
 int _GETIDX(int cidx)
 {
   return _chareTable[cidx]->getClassIdx();
 }
 
+/// This weird-looking routine should be named CkRegisterBase. 
 void _REGISTER_BASE(int didx, int bidx)
 {
   if (bidx!=-1)

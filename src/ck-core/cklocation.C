@@ -1,6 +1,9 @@
-/*
-Location manager: keeps track of an indexed set of migratable
-objects.  Used by the array manager to locate array elements,
+/**
+\file
+\addtogroup CkArrayImpl
+
+The location manager keeps track of an indexed set of migratable
+objects.  It is used by the array manager to locate array elements,
 interact with the load balancer, and perform migrations.
 
 Orion Sky Lawlor, olawlor@acm.org 9/29/2001
