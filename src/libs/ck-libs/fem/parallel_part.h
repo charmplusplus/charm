@@ -11,7 +11,7 @@
 
 //#define PARALLEL_DEBUG
 
-#if PARALLEL_DEBUG
+#ifdef PARALLEL_DEBUG
 #define DEBUG(x) x
 #else
 #define DEBUG(x)

@@ -312,9 +312,12 @@ struct partconndata * FEM_call_parmetis(struct conndata &data,FEM_Comm_t comm_co
 		supplies the data for in the call to parmetis.
 	*/
 	int *elmdist = new int[numChunks+1];
+	DEBUG(printf("[%d] elmdist \n",myRank));
 	for(int i=0;i<=numChunks;i++){
 		elmdist[i] = (i*nelem)/numChunks;
+		DEBUG(printf(" %d ",elmdist[i]));
 	}
+	DEBUG(printf("\n"));
 	int startindex = elmdist[myRank];
 	int endindex = elmdist[myRank+1];	
 	data.arr1.sync();
@@ -339,8 +342,8 @@ struct partconndata * FEM_call_parmetis(struct conndata &data,FEM_Comm_t comm_co
 		}
 	}
 	eptr[numindices] = endConn - startConn;
-
-/*	printf("%d eptr ",myRank);
+/*
+	printf("%d eptr ",myRank);
 	for(int i=0;i<=numindices;i++){
 		printf(" %d",eptr[i]);
 	}
@@ -355,19 +358,20 @@ struct partconndata * FEM_call_parmetis(struct conndata &data,FEM_Comm_t comm_co
 	data.arr1.sync();
 	data.arr2.sync();
 	int wgtflag=0,numflag=0,ncon=1,ncommonnodes=2,options[5],edgecut=0;
-	float ubvec = 1.05;
-	float *tpwgts = new float[numChunks];
+	double ubvec = 1.05;
+	double *tpwgts = new double[numChunks];
 	int *parts = new int[numindices+1];
 	for(int i=0;i<numChunks;i++){
-		tpwgts[i]=1/(float)numChunks;
+		tpwgts[i]=1/(double)numChunks;
 	}
 	options[0]=0;
+	MPI_Barrier((MPI_Comm)comm_context);
 	ParMETIS_V3_PartMeshKway (elmdist,eptr,eind,NULL,&wgtflag,&numflag,&ncon,&ncommonnodes,&numChunks,tpwgts,&ubvec,options,&edgecut,parts,(MPI_Comm *)&comm_context);
 	DEBUG(CkPrintf("%d partition ",myRank);)
 	for(int i=0;i<numindices;i++){
-		DEBUG(CkPrintf("index %d %d",i+startindex,parts[i]));
+		DEBUG(CkPrintf(" <%d %d> ",i+startindex,parts[i]));
 	}
-	CkPrintf("\n");
+	DEBUG(CkPrintf("\n"));
 	delete []elmdist;
 	delete []tpwgts;
 	struct partconndata *retval = new struct partconndata;
