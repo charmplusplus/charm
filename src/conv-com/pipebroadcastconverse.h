@@ -75,7 +75,7 @@ class PipeBroadcastConverse : public Strategy {
   int propagateHandle_frag;
 
  public:
-  PipeBroadcastConverse(int, int, Strategy*);
+  PipeBroadcastConverse(int top=USE_HYPERCUBE, int size=DEFAULT_PIPE, Strategy* st=NULL);
   PipeBroadcastConverse(CkMigrateMessage *) {};
   int getPipeSize() { return pipeSize; };
   void commonInit();

@@ -51,6 +51,10 @@ class MessageHolder : public PUP::able {
         return data;
     }
 
+    inline int getSize() {
+      return size;
+    }
+
     virtual void pup(PUP::er &p);
     PUPable_decl(MessageHolder);
 };
