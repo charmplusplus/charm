@@ -271,7 +271,7 @@ void CthSuspend()
   next = CthCpvAccess(CthCurrent)->choosefn();
   /** addition for tracing */
   if(next != CthCpvAccess(CthCurrent)) {
-    trace_end_execution(0, -1, 0);
+    trace_end_execute(0, -1, 0);
   }
   /* end addition */
   CthResume(next);
