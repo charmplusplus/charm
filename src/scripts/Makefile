@@ -118,7 +118,8 @@ dirs+sources:
 
 CVHEADERS=converse.h conv-mach.h conv-mach.csh \
           ../include/CkFutures.decl.h ../include/CkFutures.def.h \
-          ../include/CkArray.decl.h ../include/CkArray.def.h
+          ../include/CkArray.decl.h ../include/CkArray.def.h \
+          ../include/tempo.decl.h ../include/tempo.def.h
 
 TRACELIBS=libtrace-none.a libtrace-projections.a
 
@@ -211,13 +212,14 @@ libldb-test.o: cldb.test.c $(CVHEADERS)
 ###############################################################################
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
-          ckfutures.h ckarray.h $(CVHEADERS)
+          ckfutures.h ckarray.h tempo.h $(CVHEADERS)
 
 CK_LIBS_CORE=libck.a
 
 CK_LIBS=$(CK_LIBS_CORE)
 
-LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o ckarray.o
+LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
+           ckarray.o tempo.o
 
 charmlibs: converse $(CK_LIBS)
 
@@ -247,6 +249,15 @@ libtrace-projections.a: $(LIBTRACE_PROJ)
 CkFutures.decl.h CkFutures.def.h : ckfutures.ci charmxi
 	$(CHARMC) ckfutures.ci
 
+../include/tempo.decl.h : tempo.decl.h
+	/bin/cp tempo.decl.h ../include
+
+../include/tempo.def.h : tempo.def.h
+	/bin/cp tempo.def.h ../include
+
+tempo.decl.h tempo.def.h : tempo.ci charmxi
+	$(CHARMC) tempo.ci
+
 CkArray.decl.h CkArray.def.h : ckarray.ci charmxi
 	$(CHARMC) ckarray.ci
 
@@ -261,6 +272,9 @@ register.o: register.C $(CKHEADERS)
 
 ckfutures.o: ckfutures.C $(CKHEADERS)
 	$(CHARMC) -o ckfutures.o ckfutures.C
+
+tempo.o: tempo.C $(CKHEADERS)
+	$(CHARMC) -o tempo.o tempo.C
 
 ckarray.o: ckarray.C $(CKHEADERS)
 	$(CHARMC) -o ckarray.o ckarray.C
