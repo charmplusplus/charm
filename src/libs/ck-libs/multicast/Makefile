@@ -15,11 +15,8 @@ $(HEADERS): CkMulticast.decl.h ckmulticast.h
 	/bin/cp CkMulticast.def.h $(CDIR)/include
 	/bin/cp ckmulticast.h $(CDIR)/include
 
-$(LIBDEST) : $(LIB)
-	/bin/cp $(LIB) $(LIBDEST)
-
-$(LIB): $(LIBOBJ)
-	$(CHARMC) -o $(LIB) $(LIBOBJ) 
+$(LIBDEST): $(LIBOBJ)
+	$(CHARMC) -o $(LIBDEST) $(LIBOBJ) 
 
 ckmulticast.o: ckmulticast.C ckmulticast.h CkMulticast.decl.h CkMulticast.def.h
 	$(CHARMC) -c ckmulticast.C
