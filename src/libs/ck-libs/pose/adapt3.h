@@ -18,7 +18,7 @@
 
 class adapt3 : public opt3 {
  public:
-  adapt3() { timeLeash = 1; STRAT_T = ADAPT3_T; }
+  adapt3() { timeLeash = 2; STRAT_T = ADAPT3_T; }
   virtual void Step();
 };
 

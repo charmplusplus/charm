@@ -96,11 +96,9 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
 #ifdef SR_SANITIZE
   sanitize();
 #endif
-  CkPrintf("SRtable::Restructure(%d, %d, %d)\n", newGVTest,firstTS,firstSR);
-  CkPrintf("bar 1\n");
   // Backup the table to make new one in its place
-  int b_old = b, size_b_old = size_b, offset_old = offset;
   int keepBkt = (newGVTest-offset)/size_b;
+  int b_old = b, size_b_old = size_b, offset_old = offset;
   SRentry *buckets_old[MAX_B], *overflow_old = overflow, *tmp;
   for (int i=0; i<b_old; i++) {
     buckets_old[i] = buckets[i];
@@ -113,36 +111,43 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
   if ((b > MAX_B) || (b == 0)) b = MAX_B;
   size_b = 1 + (firstTS - offset)/b;
 
-  CkPrintf("bar 2: keepBkt=%d offset_old=%d size_b_old=%d\n", keepBkt, offset_old, size_b);
-  for (int j=0; j<keepBkt; j++) { // throw all these away
-    tmp = buckets_old[j];
-    while (tmp) {
-      buckets_old[j] = tmp->next;
-      delete tmp;
+  if (keepBkt < b_old) {
+    for (int j=0; j<keepBkt; j++) { // throw all these away
       tmp = buckets_old[j];
+      while (tmp) {
+	buckets_old[j] = tmp->next;
+	delete tmp;
+	tmp = buckets_old[j];
+      }
     }
-  }
-
-  CkPrintf("bar 3\n");
-  // carefully sort through this bucket
-  tmp = buckets_old[keepBkt];
-  while (tmp) {
-    buckets_old[keepBkt] = tmp->next;
-    if (tmp->timestamp < offset) delete tmp;
-    else Insert(tmp);
+    // carefully sort through this bucket
     tmp = buckets_old[keepBkt];
-  }
-
-  CkPrintf("bar 4\n");
-  for (int j=keepBkt+1; j<b_old; j++) { // keep all of these
-    tmp = buckets_old[j];
     while (tmp) {
-      buckets_old[j] = tmp->next;
-      Insert(tmp);
+      buckets_old[keepBkt] = tmp->next;
+      if (tmp->timestamp < offset) delete tmp;
+      else Insert(tmp);
+      tmp = buckets_old[keepBkt];
+    }
+    for (int j=keepBkt+1; j<b_old; j++) { // keep all of these
       tmp = buckets_old[j];
+      while (tmp) {
+	buckets_old[j] = tmp->next;
+	Insert(tmp);
+	tmp = buckets_old[j];
+      }
     }
   }
-  CkPrintf("bar 5\n");
+  else { // throw all buckets away
+    for (int j=0; j<b_old; j++) {
+      tmp = buckets_old[j];
+      while (tmp) {
+	buckets_old[j] = tmp->next;
+	delete tmp;
+	tmp = buckets_old[j];
+      }
+    }
+  }
+
   tmp = overflow_old;
   if (keepBkt < b_old) { // keep all of overflow
     while (tmp) {
@@ -160,7 +165,6 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
     }
   }
 
-  CkPrintf("bar 6\n");
   if (firstSR != -1) Insert(firstTS, firstSR);
 #ifdef SR_SANITIZE
   sanitize();

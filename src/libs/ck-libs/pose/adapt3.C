@@ -10,6 +10,7 @@ void adapt3::Step()
   int iter=0;
 
   lastGVT = localPVT->getGVT();
+  if (lastGVT == POSE_UnsetTS) lastGVT = 0;
   rbFlag = 0;
   if (!parent->cancels.IsEmpty()) { // Cancel as much as possible
 #ifdef POSE_STATS_ON
