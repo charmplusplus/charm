@@ -116,6 +116,7 @@ class chunk : public ArrayElement1D {
   elemRef findNeighbor(nodeRef nr1, nodeRef nr2, nodeRef nr3, int lidx);
   refMsg *findRemoteNeighbor(threeNodeMsg *);
   intMsg *checkFace(int idx, elemRef face);
+  intMsg *checkFace(int idx, node n1, node n2, node n3, elemRef nbr);
   intMsg *lockLF(int idx, node n1, node n2, node n3, node n4, 
 		 elemRef requester, double prio);
   splitResponse *splitLF(int idx,node in1, node in2, node in3, node in4,

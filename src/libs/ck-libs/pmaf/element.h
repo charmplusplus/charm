@@ -51,6 +51,7 @@ class element {
   void setFace(int a, int b, int c, elemRef er) { faceElements[a+b+c-3] = er; }
   void setFace(int idx, elemRef er) { faceElements[idx] = er; }
   int hasFace(elemRef face);
+  int checkFace(node n1, node n2, node n3, elemRef nbr);
   void updateFace(int cid, int idx) {
     faceElements[0].cid = cid; faceElements[0].idx = idx;
   }
@@ -125,16 +126,7 @@ class element {
 
   // element refine tests
   int LEtest();
-  int LFtest() {
-    double lf=0.0, lf2=0.0, f[4];
-    f[0] = getArea(0,1,2);
-    f[1] = getArea(0,1,3);
-    f[2] = getArea(0,2,3);
-    f[3] = getArea(1,2,3);
-    for (int i=0; i<4; i++) if (f[i] > lf) { lf2 = lf; lf = f[i]; }
-    if (lf2 + (0.25*lf2) <= lf) return 1;
-    return 0;
-  }
+  int LFtest();
   int CPtest();
 };
 

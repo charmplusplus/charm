@@ -72,6 +72,7 @@ module PMAF {
     entry [sync] void resetTargetVolume(doubleMsg *);
     entry [sync] refMsg *findRemoteNeighbor(threeNodeMsg *);
     entry [sync] intMsg *checkFace(int idx, elemRef face);
+    entry [sync] intMsg *checkFace(int idx, node n1, node n2, node n3, elemRef nbr);
     entry [sync] intMsg *lockLF(int idx, node n1, node n2, node n3, node n4, 
 	elemRef myRef, double prio);
     entry [sync] splitResponse *splitLF(int idx, node in1, node in2, node in3,

@@ -63,6 +63,31 @@ int element::getNodeIdx(nodeRef n)
   }
 }
 
+int element::checkFace(node n1, node n2, node n3, elemRef nbr)
+{
+  int a=-1, b=-1, c=-1, d=-1;
+  elemRef abc, abd, acd, bcd;
+  double Aabc, Aabd, Aacd, Abcd;
+  // align nodes with requester
+  a = getNode(n1);
+  b = getNode(n2);
+  c = getNode(n3);
+  d = 6-a-b-c;
+  abc = faceElements[a+b+c-3];
+  abd = faceElements[a+b+d-3];
+  acd = faceElements[a+c+d-3];
+  bcd = faceElements[b+c+d-3];
+  CmiAssert(abc == nbr);
+  Aabc = getArea(a, b, c);
+  Aabd = getArea(a, b, d);
+  Aacd = getArea(a, c, d);
+  Abcd = getArea(b, c, d);
+  if ((Aabc >= Aabd) && (Aabc >= Aacd) && (Aabc >= Abcd))
+    return 1;
+  mesh[myRef.cid].refineElement(myRef.idx, getVolume()/2.0);
+  return 0;
+}
+
 double element::getVolume()
 { // get a cached volume calculation; if none, computes it
   if (currentVolume < 0.0)
@@ -499,7 +524,32 @@ void element::refineLF()
   elemRef abc, acd, bcd;
   double f[4], length; // to store face areas
 
-  //CmiAssert(connectTest());
+  // Check if neighbor on largest face needs refinement
+  // find largest face
+  f[0] = getArea(0,1,2);
+  f[1] = getArea(0,1,3);
+  f[2] = getArea(0,2,3);
+  f[3] = getArea(1,2,3);
+  lf = start;
+  for (int i=0; i<4; i++) if (f[i] > f[lf]) lf = i;
+  // make abc largest face
+  a = (lf == 3) ? 1 : 0; 
+  b = (lf > 1) ? 2 : 1; 
+  c = (lf == 0) ? 2 : 3;
+  CmiAssert(a+b+c-3 == lf);
+  abc = faceElements[a+b+c-3];
+  // check abc on neighbor
+  if (abc.cid != -1) {
+    n1 = C->theNodes[nodes[a].idx];
+    n2 = C->theNodes[nodes[b].idx];
+    n3 = C->theNodes[nodes[c].idx];
+    intMsg *im = mesh[abc.cid].checkFace(abc.idx, n1, n2, n3, myRef);
+    if (!im->anInt) {
+      CkFreeMsg(im);
+      return;
+    }
+  }
+
   //CkPrintf("Refine: %d on %d: volume=%lf target=%lf\n",
   //   myRef.idx, myRef.cid, currentVolume, targetVolume);
   if ((currentVolume < targetVolume) || (currentVolume == 0.0) 
@@ -694,10 +744,12 @@ void element::refineLF()
       if (abc.cid != -1) {
 	mesh[abc.cid].updateFace(theResult->ance, newElem3.cid, newElem3.idx);
 	mesh[abc.cid].updateFace(theResult->bnce, newElem4.cid, newElem4.idx);
+	/* SMOOTHING
 	double smooth = targetVolume / C->smoothness;
 	mesh[abc.cid].refineElement(theResult->ance, smooth);
 	mesh[abc.cid].refineElement(theResult->bnce, smooth);
 	mesh[abc.cid].refineElement(abc.idx, smooth);
+	*/
       }
     }
     else if (theResult->success == 0) { // wait for split
@@ -1181,9 +1233,11 @@ LEsplitResult *element::LEsplit(elemRef root, elemRef parent,
   nodes[b] = newNodeRef;
   calculateVolume();
 
+  /*
   double smooth = targetVol / C->smoothness;
   mesh[myRef.cid].refineElement(myRef.idx, smooth);
   mesh[myRef.cid].refineElement(myNewElem.idx, smooth);
+  */
 
   //printf("3: LEsplit: O[%d,%d] from [%d,%d] on [%d,%d] dest [%d,%d] vol=%lf->%lf  \n", 
   //   root.idx, root.cid, parent.idx, parent.cid, myRef.idx, myRef.cid, targetElem.idx, targetElem.cid,
@@ -1243,6 +1297,17 @@ lockResult *element::lockArc(elemRef prioRef, elemRef parentRef, double prio,
     else if (c == -1)  c = i;
     else  d = i;
   }
+  int ap, bp, cp, dp;
+  double length = findLongestEdge(&ap, &bp, &cp, &dp);
+  if (!(((ap == a) && (bp == b)) || ((ap == b) && (bp == a)) ||
+	(length == prio))) {
+    mesh[myRef.cid].refineElement(myRef.idx, getVolume()/2.0);
+    myResult->result = 0;
+    CkPrintf("Nbr failed LE test...\n");
+    C->unlockLocalChunk(prioRef.cid);
+    return myResult;
+  }
+
   CmiAssert((a!=-1)&&(b!=-1)&&(c!=-1)&&(d!=-1));
   //printf("---> 2:LockArc: O[%d,%d] on [%d,%d] dest [%d,%d]\n", prioRef.idx, 
   //   prioRef.cid, myRef.idx, myRef.cid, destRef.idx, destRef.cid);
@@ -1672,7 +1737,19 @@ int element::LEtest()
 	ml = l[i][j];
       }
     }
-  if (ml3 + (0.1*ml3) <= ml) return 1;
+  if (ml3 + (0.33*ml3) <= ml) return 1;
+  return 0;
+}
+
+int element::LFtest() 
+{
+  double lf=0.0, lf2=0.0, f[4];
+  f[0] = getArea(0,1,2);
+  f[1] = getArea(0,1,3);
+  f[2] = getArea(0,2,3);
+  f[3] = getArea(1,2,3);
+  for (int i=0; i<4; i++) if (f[i] > lf) { lf2 = lf; lf = f[i]; }
+  if (lf2 + (0.25*lf2) <= lf) return 1;
   return 0;
 }
 
@@ -1687,9 +1764,9 @@ int element::CPtest()
   avg = avg / 6.0;
   for (int i=0; i<4; i++)
     for (int j=i+1; j<4; j++) {
-      if ((l[i][j] > avg) && (l[i][j] - l[i][j]*0.1 > avg))
+      if ((l[i][j] > avg) && (l[i][j] - l[i][j]*0.25 > avg))
 	return 0;
-      else if ((l[i][j] < avg) && (l[i][j] + l[i][j]*0.1 < avg))
+      else if ((l[i][j] < avg) && (l[i][j] + l[i][j]*0.25 < avg))
 	return 0;
     }
   return 1; 

@@ -76,7 +76,7 @@ void chunk::refiningElements()
 	modified = 1; // something's bound to change
 	if (theElements[i].LEtest())
 	  theElements[i].refineLE(); // refine the element
-	else if (theElements[i].LFtest())
+        else if (theElements[i].LFtest())
 	  theElements[i].refineLF(); // refine the element
 	else if (theElements[i].CPtest())
 	  theElements[i].refineCP(); // refine the element
@@ -172,16 +172,16 @@ int chunk::lockLocalChunk(int lh, double prio)
     insertLock(lh, prio);
     if ((lockList->prio == prio) && (lockList->holder == lh)) {
       prioLockStruct *tmp = lockList;
-      CkPrintf("[%d]LOCK chunk %d by %d prio %.10f LOCKED (was %d[%d:%.10f])\n", 
-	       CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
+      //CkPrintf("[%d]LOCK chunk %d by %d prio %.10f LOCKED(was %d[%d:%.10f])\n",
+      //	       CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
       lock = 1; lockHolder = lh; lockPrio = prio; lockCount = 1;
       lockList = lockList->next;
       free(tmp);
       return 1;
     }
     removeLock(lh);
-    //CkPrintf("[%d]LOCK chunk %d by %d prio %.10f REFUSED (was %d[%d:%.10f])\n", 
-    //     CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
+    //    CkPrintf("[%d]LOCK chunk %d by %d prio %.10f REFUSED (was %d[%d:%.10f])\n",
+    //	     CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
     return 0;
   }
   else { // this chunk is LOCKED
@@ -189,19 +189,23 @@ int chunk::lockLocalChunk(int lh, double prio)
       lockCount++;
       return 1;
     }
+    if (lh == lockHolder) {
+      CkPrintf("ERROR: chunk holding lock trying to relock with different prio! lockHolder=%d prio=%f newprio=%f\n", lockHolder, lockPrio, prio);
+      CmiAssert(lh != lockHolder);
+    }
     removeLock(lh);
     insertLock(lh, prio);
     if ((lockList->prio == prio) && (lockList->holder == lh)) {
       if ((prio > lockPrio) ||
 	  ((prio == lockPrio) && (lh < lockHolder))) { // lh might be next
-	//CkPrintf("[%d]LOCK chunk %d by %d prio %.10f RESERVED (was %d[%d:%.10f])\n",
-	//	 CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
+	//	CkPrintf("[%d]LOCK chunk %d by %d prio %.10f RESERVED (was %d[%d:%.10f])\n",
+	//		 CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
 	return -1; 
       }
     }
     removeLock(lh);
-    //CkPrintf("[%d]LOCK chunk %d by %d prio %.10f REFUSED (was %d[%d:%.10f])\n", 
-    //   CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
+    //    CkPrintf("[%d]LOCK chunk %d by %d prio %.10f REFUSED (was %d[%d:%.10f])\n",
+    //	     CkMyPe(), cid, lh, prio, lock, lockHolder, lockPrio);
     return 0;
   }
 }
@@ -268,7 +272,7 @@ void chunk::unlockLocalChunk(int lh)
       lock = 0; 
       lockHolder = -1;
       lockPrio = -1.0;
-      CkPrintf("[%d]UNLOCK chunk %d by holder %d\n", CkMyPe(), cid, lh);
+      //CkPrintf("[%d]UNLOCK chunk %d by holder %d\n", CkMyPe(), cid, lh);
     }
   }
 }
@@ -412,6 +416,15 @@ intMsg *chunk::checkFace(int idx, elemRef face)
   return result;
 }
 
+intMsg *chunk::checkFace(int idx, node n1, node n2, node n3, elemRef nbr)
+{
+  intMsg *im = new intMsg;
+  getAccessLock();
+  im->anInt = theElements[idx].checkFace(n1, n2, n3, nbr);
+  releaseAccessLock();
+  return im;
+}
+
 // local methods
 
 void chunk::debug_print(int c)
@@ -435,10 +448,10 @@ void chunk::debug_print(int c)
     else fprintf(fp, "0.5 0.75 1.0\n");
     */
     if (i % 3 == 0)
-      fprintf(fp, "1.0 1.0 1.0\n");
+      fprintf(fp, "0.0 0.0 0.1\n");
     else if (i % 3 == 1)
-      fprintf(fp, "0.5 0.5 1.0\n");
-    else fprintf(fp, "0.0 0.0 1.0\n");
+      fprintf(fp, "0.0 0.0 0.1\n");
+    else fprintf(fp, "0.0 0.0 0.1\n");
   }
   fprintf(fp, "foo\n");
   for (i=0; i<numElements; i++) {
@@ -952,7 +965,7 @@ void chunk::refine()
   // this happens on all chunks!
   if (cid == 0) {
   //for (int i=0; i<numElements; i++) {
-    theElements[0].setTargetVolume(theElements[0].getVolume()/2000.0);
+    theElements[0].setTargetVolume(theElements[0].getVolume()/3000.0);
   }
   //  }
 }
