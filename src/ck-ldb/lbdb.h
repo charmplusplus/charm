@@ -126,7 +126,7 @@ typedef struct _LDCommDesc {
   } dest;
 #ifdef __cplusplus
   char &get_type() { return type; }
-  char const get_type() const { return type; }
+  char get_type() const { return type; }
   int proc() const { return type==1?dest.destProc:-1; }
   LDObjKey &get_destObj() 
 	{ CmiAssert(type==LD_OBJ_MSG); return dest.destObj; }
