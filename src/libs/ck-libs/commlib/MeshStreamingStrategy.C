@@ -117,7 +117,7 @@ void periodic_flush_handler (void *ptr, double curT)
 ** InsertIntoRowBucket().  When messages are delivered from the row
 ** bucket, they are freed by CmiFree().
 */
-void *column_handler (char *msg)
+void column_handler (char *msg)
 {
   int dest_pe;
   int dest_row;
@@ -499,7 +499,7 @@ void MeshStreamingStrategy::FlushRow (int row)
   int *sizes;
   char *msg;
   char **msgComps;
-
+  int i;
 
   ComlibPrintf ("[%d] MeshStreamingStrategy::FlushRow() invoked.\n", CkMyPe());
 
@@ -510,9 +510,9 @@ void MeshStreamingStrategy::FlushRow (int row)
   num_msgs = row_bucket[row].length ();
   if (num_msgs > 0) {
     sizes = new int[num_msgs];
-    msgComps = new (char *)[num_msgs];
+    msgComps = new char *[num_msgs];
 
-    for (int i = 0; i < num_msgs; i++) {
+    for (i = 0; i < num_msgs; i++) {
       msg = row_bucket[row].deq ();
       CmiSetHandler (msg, CpvAccess(RecvmsgHandle));
       sizes[i] = SIZEFIELD (msg);
@@ -521,7 +521,7 @@ void MeshStreamingStrategy::FlushRow (int row)
 
     CmiMultipleSend (dest_pe, num_msgs, sizes, msgComps);
 
-    for (int i = 0; i < num_msgs; i++) {
+    for (i = 0; i < num_msgs; i++) {
       CmiFree (msgComps[i]);
     }
 
@@ -593,6 +593,7 @@ int MeshStreamingStrategy::GetRowLength (void)
 */
 void MeshStreamingStrategy::pup (PUP::er &p)
 {
+  int i;
   ComlibPrintf ("[%d] MeshStreamingStrategy::pup() invoked.\n", CkMyPe());
 
   // Call the superclass method -- easy.
@@ -622,7 +623,7 @@ void MeshStreamingStrategy::pup (PUP::er &p)
     column_bucket = new CkQ<char *>[num_columns];
   }
 
-  for (int i = 0; i < num_columns; i++) {
+  for (i = 0; i < num_columns; i++) {
     int length = column_bucket[i].length ();
 
     p | length;
@@ -649,7 +650,7 @@ void MeshStreamingStrategy::pup (PUP::er &p)
     row_bucket = new CkQ<char *>[num_rows];
   }
 
-  for (int i = 0; i < num_rows; i++) {
+  for (i = 0; i < num_rows; i++) {
     int length = row_bucket[i].length ();
 
     p | length;
