@@ -61,6 +61,9 @@ AMPIF: AMPIC libconv-utilf.a
 
 f90charm: charm++ libf90charm.a
 
+multicast:
+	cd libs/ck-libs/multicast && make
+
 translators: charmxi conv-cpm
 
 LIBS: CONVLIBS CHARMLIBS
@@ -488,7 +491,7 @@ LBDatabase.o: LBDatabase.C $(CKHEADERS)
 	$(CHARMC) -o LBDatabase.o LBDatabase.C
 
 NullLB.o: NullLB.C $(CKHEADERS)
-	$(CHARMC) NullLB.C
+	$(CHARMC) -c NullLB.C
 
 Refiner.o: Refiner.C $(CKHEADERS)
 	$(CHARMC) -o Refiner.o Refiner.C
