@@ -58,8 +58,8 @@
  *     the socket can recv or accept, or (failing that) in the given
  *     number of milliseconds.  Returns 0 on timeout; 1 on readable.
  *
- * void skt_recvN(SOCKET fd,unsigned char *buf,int nBytes)
- * void skt_sendN(SOCKET fd,unsigned char *buf,int nBytes)
+ * void skt_recvN(SOCKET fd,      char *buf,int nBytes)
+ * void skt_sendN(SOCKET fd,const char *buf,int nBytes)
  *   - Blocking send/recv nBytes on the given socket.
  *     Retries if possible (e.g., if interrupted), but aborts 
  *     on serious errors.
@@ -129,8 +129,8 @@ void skt_close(SOCKET fd);
 int skt_select1(SOCKET fd,int msec);
 
 /*Blocking Send/Recv*/
-void skt_sendN(SOCKET hSocket,const unsigned char *pBuff,int nBytes);
-void skt_recvN(SOCKET hSocket,unsigned char *pBuff,int nBytes);
+void skt_sendN(SOCKET hSocket,const char *pBuff,int nBytes);
+void skt_recvN(SOCKET hSocket,      char *pBuff,int nBytes);
 
 
 /***********************************
@@ -181,7 +181,7 @@ typedef struct ChMessageHeader {
 typedef struct ChMessage {
   ChMessageHeader header;
   int len; /*Length of message data below*/
-  void *data; /*Pointer to heap-allocated data*/
+  char *data; /*Pointer to heap-allocated data*/
 } ChMessage;
 void ChMessage_recv(SOCKET fd,ChMessage *dst);
 void ChMessage_free(ChMessage *doomed);
@@ -194,8 +194,8 @@ void ChMessage_send(SOCKET fd,const ChMessage *src); /*You must free after send*
 /******* CCS Message type (included here for convenience) *******/
 #define CCS_HANDLERLEN 32 /*Maximum length for the handler field*/
 typedef struct {
-  /* Conv-host message header (above) goes here */
-  ChMessageInt_t pe;/*Destination PE number on the recieving node.*/
+  ChMessageInt_t len;/*Length of user data to follow header*/
+  ChMessageInt_t pe;/*Destination processor number*/
   char handler[CCS_HANDLERLEN];/*Handler name for message to follow*/
 } CcsMessageHeader;
 

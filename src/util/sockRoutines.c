@@ -92,19 +92,21 @@ int skt_select1(SOCKET fd,int msec)
   int sec=msec/1000;
   fd_set  rfds;
   struct timeval tmo;
+  int  secLeft;
   int            begin, nreadable;
   
   FD_ZERO(&rfds);
   FD_SET(fd, &rfds);
   begin = time(0);
-  while(0<=(tmo.tv_sec = (time(0) - begin) + sec)) 
-  {
-    tmo.tv_usec = msec*1000;
+  while(0<=(secLeft = sec - (time(0) - begin))) 
+  { 
+    tmo.tv_sec=secLeft;
+    tmo.tv_usec = (msec-1000*sec)*1000;
     nreadable = select(FD_SETSIZE, &rfds, NULL, NULL, &tmo);
     
     if (nreadable < 0) {
 		if (skt_should_retry()) continue;
-		else skt_abort(93207,"Fatal error in select");
+		else skt_abort(93200,"Fatal error in select");
 	}
     if (nreadable >0) return 1; /*We gotta good socket*/
   }
@@ -120,7 +122,7 @@ unsigned long skt_my_ip(void)
   
   if (ip==0) 
   {
-    if (gethostname(hostname, 999)<0) 
+    if (gethostname(hostname, 999)==0) 
 		ip=skt_lookup_ip(hostname);
   }
   if (ip==0) ip=self_ip;
@@ -135,8 +137,10 @@ unsigned long skt_lookup_ip(const char *name)
 	  return ntohl(ret);
   else {/*Try a DNS lookup*/
     struct hostent *h = gethostbyname(name);
+    unsigned long ip;
     if (h==0) return 0;
-    return ntohl(*((unsigned long *)(h->h_addr_list[0])));
+    ip=ntohl(*((unsigned long *)(h->h_addr_list[0])));
+    return ip;
   }
 }
 struct sockaddr_in skt_build_addr(unsigned int IP,unsigned int port)
@@ -247,26 +251,30 @@ SOCKET skt_connect(unsigned int ip, int port, int timeout)
 	else { /*Bad connect*/
 	  skt_close(ret);
 	  if (skt_should_retry()) continue;
-	  else return INVALID_SOCKET;
+	  else skt_abort(93515,"Error connecting to socket\n");
     }
   }
   /*Timeout*/
-  skt_abort(93517,"Timeout in socket connect\n");
+  if (timeout==60)
+     skt_abort(93517,"Timeout in socket connect\n");
   return INVALID_SOCKET;
 }
 
-void skt_recvN(SOCKET hSocket,unsigned char *pBuff,int nBytes)
+void skt_recvN(SOCKET hSocket,char *pBuff,int nBytes)
 {
   int nLeft,nRead;
 
   nLeft = nBytes;
   while (0 < nLeft)
   {
+    if (0==skt_select1(hSocket,60*1000))
+	skt_abort(93610,"Timeout on socket recv!");
     nRead = recv(hSocket,pBuff,nLeft,0);
-    if (nRead<0)
+    if (nRead<=0)
     {
-	  if (skt_should_retry()) continue;/*Try again*/
-	  else skt_abort(93600+hSocket,"Error on socket recv!");
+       if (nRead==0) skt_abort(93620,"Socket closed before recv.");
+       if (skt_should_retry()) continue;/*Try again*/
+       else skt_abort(93650+hSocket,"Error on socket recv!");
     }
     else
     {
@@ -276,7 +284,7 @@ void skt_recvN(SOCKET hSocket,unsigned char *pBuff,int nBytes)
   }
 }
 
-void skt_sendN(SOCKET hSocket,const unsigned char *pBuff,int nBytes)
+void skt_sendN(SOCKET hSocket,const char *pBuff,int nBytes)
 {
   int nLeft,nWritten;
 
@@ -284,8 +292,9 @@ void skt_sendN(SOCKET hSocket,const unsigned char *pBuff,int nBytes)
   while (0 < nLeft)
   {
     nWritten = send(hSocket,pBuff,nLeft,0);
-    if (nWritten<0)
+    if (nWritten<=0)
     {
+          if (nWritten==0) skt_abort(93720,"Socket closed before send.");
 	  if (skt_should_retry()) continue;/*Try again*/
 	  else skt_abort(93700+hSocket,"Error on socket send!");
     }
@@ -345,12 +354,12 @@ unsigned int ChMessageInt(ChMessageInt_t src)
 void ChMessage_recv(SOCKET fd,ChMessage *dst)
 {
   /*Get the binary header*/
-  skt_recvN(fd,(unsigned char *)&dst->header,sizeof(dst->header));
+  skt_recvN(fd,(char *)&dst->header,sizeof(dst->header));
   /*Allocate a recieve buffer*/
   dst->len=ChMessageInt(dst->header.len);
-  dst->data=(void *)malloc(dst->len);
+  dst->data=(char *)malloc(dst->len);
   /*Get the actual data*/
-  skt_recvN(fd,(unsigned char *)dst->data,dst->len);
+  skt_recvN(fd,dst->data,dst->len);
 }
 void ChMessage_free(ChMessage *doomed)
 {
@@ -371,12 +380,12 @@ void ChMessage_new(const char *type,unsigned int len,
 {
   ChMessageHeader_new(type,len,&dst->header);
   dst->len=len;
-  dst->data=(void *)malloc(dst->len);
+  dst->data=(char *)malloc(dst->len);
 }
 void ChMessage_send(SOCKET fd,const ChMessage *src)
 {
-  skt_sendN(fd,(const unsigned char *)&src->header,sizeof(src->header));
-  skt_sendN(fd,(const unsigned char *)src->data,src->len);
+  skt_sendN(fd,(const char *)&src->header,sizeof(src->header));
+  skt_sendN(fd,(const char *)src->data,src->len);
 } /*You must free after send*/
 
 
