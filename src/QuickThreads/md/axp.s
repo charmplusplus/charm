@@ -86,7 +86,7 @@ qt_start:
 	.end qt_start
 
 
-	.ent qt_vstart:
+	.ent qt_vstart
 qt_vstart:
 	/* Call startup function. */
 	addq $9,$31, $16	/* Arg0 to `startup'. */
@@ -106,7 +106,7 @@ qt_vstart:
 	ldq $19,72($30)
 	ldq $20,80($30)
 	ldq $21,88($30)
-	addq $30,96 $30		/* Pop 6*2*8 saved arg regs. */
+	addq $30,96, $30		/* Pop 6*2*8 saved arg regs. */
 	addq $11,$31, $27	/* Set procedure value. */
 	jsr $26,($27),0		/* Call `vuserf'. */
 
