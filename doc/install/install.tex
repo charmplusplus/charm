@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.3  1995-11-01 20:18:51  jyelon
+% Revision 1.4  1995-11-01 20:28:01  jyelon
+% *** empty log message ***
+%
+% Revision 1.3  1995/11/01  20:18:51  jyelon
 % *** empty log message ***
 %
 % Revision 1.2  1995/11/01  19:53:54  jyelon
@@ -181,28 +184,53 @@ This section describes how you may delete parts of the distribution to
 save disk space.  
 
 The charm directory contains a collection of example-programs and
-test-programs {\tt /usr/local/charm/pgms}.  These may be deleted with
-no other effects.
+test-programs.  These may be deleted with no other effects:
+
+\begin{verbatim}
+    % rm -r /usr/local/charm/pgms
+\end{verbatim}
 
 The source code for the translators may be deleted, if you know the
-binaries are operational.  Simply delete {\tt /usr/local/charm/src}.
+binaries are operational:
+
+\begin{verbatim}
+    % rm -r /usr/local/charm/src
+\end{verbatim}
 
 If you are not using charm++, you may delete the charm++ compiler:
-remove {\tt /usr/local/charm/bin/charmxlat++} and {\tt
-/usr/local/charm/bin/charmfilter++}.
+
+\begin{verbatim}
+    % rm /usr/local/charm/bin/charmxlat++
+    % rm /usr/local/charm/bin/charmfilter++
+\end{verbatim}
 
 Similarly, if you are not using charm, you may delete the charm compiler:
-remove {\tt /usr/local/charm/bin/charmxlat} and {\tt
-/usr/local/charm/bin/charmfilter}.
+
+\begin{verbatim}
+    % rm /usr/local/charm/bin/charmxlat
+    % rm /usr/local/charm/bin/charmfilter
+\end{verbatim}
 
 If you are using neither charm nor charm++, you may delete the
-combined charm/charm++ runtime library: {\tt rm -f
-/usr/local/charm/lib/libck-*} and {\tt rm -f
-/usr/local/charm/lib/libcharm.a}.
+combined charm/charm++ runtime library:
+
+\begin{verbatim}
+    % rm /usr/local/charm/lib/libck-*
+    % rm /usr/local/charm/lib/libcharm.a
+\end{verbatim}
 
 If you are using neither charm nor charm++, you may delete the charm
-and charm++ include files: everything in {\tt /usr/local/charm/include}
-which doesn't start with {\tt conv} (eg, converse) is charm-related.
+and charm++ include files: everything in {\tt include} which doesn't
+start with {\tt conv} (eg, converse) is charm-related:
+
+\begin{verbatim}
+    % cd /usr/local/charm/include
+    % mkdir save
+    % mv conv* save
+    % rm *.h *.inc
+    % mv save/* .
+    % rmdir save
+\end{verbatim}
 
 You may delete the programs {\tt conv-host.notify} and {\tt
 conv-host.silent}, although please read the section on security first.
@@ -219,19 +247,18 @@ then we switch to the {\tt net-sol} version to run our programs in
 parallel.
 
 To do this, you will need more than one charm directory.  For example,
-we use {\tt /usr/local/charm-uth-sol} and {\tt
-/usr/local/charm-net-sol}.  Simply install the two versions
-independently, one at a time.
+we use {\tt /usr/local/charm.uth} and {\tt /usr/local/charm.net}.
+Simply install the two versions independently, one at a time.
 
 Now that both are installed, you must explicitly use one or the other
 to compile your programs.  This is done by explicitly specifying which
-{\tt charmc} to use.  For example, to compile a program with the {\tt uth-sol}
-version of charm, we do this:
+{\tt charmc} to use.  For example, to compile a program with the {\tt
+uth-sol} version of charm, we do this:
 
 \begin{verbatim}
 
-    % /usr/local/charm-uth-sol/bin/charmc -c myprog.p
-    % /usr/local/charm-uth-sol/bin/charmc -o myprog myprog.o
+    % /usr/local/charm.uth/bin/charmc -c myprog.p
+    % /usr/local/charm.uth/bin/charmc -o myprog myprog.o
 
 \end{verbatim}
 
@@ -240,8 +267,8 @@ version, we recompile it:
 
 \begin{verbatim}
 
-    % /usr/local/charm-net-sol/bin/charmc -c myprog.p
-    % /usr/local/charm-net-sol/bin/charmc -o myprog myprog.o
+    % /usr/local/charm.net/bin/charmc -c myprog.p
+    % /usr/local/charm.net/bin/charmc -o myprog myprog.o
 
 \end{verbatim}
 
