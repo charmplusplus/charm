@@ -507,6 +507,45 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
 /* assuming no other flying messages */
 static void send_callback_nothing(struct gm_port *p, void *context, gm_status_t status)
 {
+  gm_dma_free(gmport, context);
+}
+
+static void sendBarrierMessage(int pe)
+{
+  int len = 32;
+  char *buf = (char *)gm_dma_malloc(gmport, len);
+  int size = gm_min_size_for_length(len);
+  OtherNode  node = nodes + pe;
+  CmiAssert(buf);
+  gm_send_with_callback(gmport, buf, size, len,
+              GM_LOW_PRIORITY, node->mach_id, node->dataport,
+              send_callback_nothing, buf);
+}
+
+static void recvBarrierMessage()
+{
+  gm_recv_event_t *e;
+  int size, len;
+  char *msg;
+  while (1) {
+    e = gm_receive(gmport);
+    switch (gm_ntohc(e->recv.type))
+    {
+      case GM_HIGH_RECV_EVENT:
+      case GM_RECV_EVENT:
+        MACHSTATE(4,"Incoming message")
+        size = gm_ntohc(e->recv.size);
+        msg = gm_ntohp(e->recv.buffer);
+        len = gm_ntohl(e->recv.length);
+        gm_provide_receive_buffer(gmport, msg, size, GM_LOW_PRIORITY);
+        return;
+      case GM_NO_RECV_EVENT:
+        continue ;
+      default:
+        MACHSTATE1(3,"Unrecognized GM event %d",evt)
+        gm_unknown(gmport, e);
+    }
+  }
 }
 
 void CmiBarrier()
@@ -515,95 +554,54 @@ void CmiBarrier()
   int status;
   int count = 0;
   OtherNode node;
-  gm_recv_event_t *e;
-  char *buf, *msg;
   /* every one send to pe 0 */
   if (CmiMyPe() != 0) {
-    len = 32;
-    buf = (char *)gm_dma_malloc(gmport, len);
-    size = gm_min_size_for_length(len);
-    node = nodes;
-    gm_send_with_callback(gmport, buf, size, len,
-                            GM_LOW_PRIORITY, node->mach_id, node->dataport,
-                            send_callback_nothing, NULL);
+    sendBarrierMessage(0);
   }
   /* printf("[%d] HERE\n", CmiMyPe()); */
   if (CmiMyPe() == 0) 
   {
-    count = 1;
-    while (count != CmiNumPes()) 
+    for (count = 1; count < CmiNumPes(); count ++) 
     {
-      e = gm_receive(gmport);
-      switch (gm_ntohc(e->recv.type))
-      {
-        case GM_HIGH_RECV_EVENT:
-        case GM_RECV_EVENT:
-          MACHSTATE(4,"Incoming message")
-          size = gm_ntohc(e->recv.size);
-          msg = gm_ntohp(e->recv.buffer);
-          len = gm_ntohl(e->recv.length);
-          count ++;
-          gm_provide_receive_buffer(gmport, msg, size, GM_LOW_PRIORITY);
-          break;
-        case GM_NO_RECV_EVENT:
-          continue ;
-        default:
-          MACHSTATE1(3,"Unrecognized GM event %d",evt)
-          gm_unknown(gmport, e);
-      }
+      recvBarrierMessage();
     }
     /* pe 0 broadcast */
     for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
-      int p = CmiMyPe();
-      p = BROADCAST_SPANNING_FACTOR*p + i;
+      int p = i;
       if (p > _Cmi_numpes - 1) break;
-      len = 32;
-      buf = (char *)gm_dma_malloc(gmport, len);
-      size = gm_min_size_for_length(len);
-      node = nodes + p;
       /* printf("[%d] BD => %d \n", CmiMyPe(), p); */
-      gm_send_with_callback(gmport, buf, size, len,
-                            GM_LOW_PRIORITY, node->mach_id, node->dataport,
-                            send_callback_nothing, NULL);
+      sendBarrierMessage(p);
     }
   }
   /* non 0 pe waiting */
   if (CmiMyPe() != 0) 
   {
-   retry:
-    e = gm_receive(gmport);
-    switch (gm_ntohc(e->recv.type))
-    {
-      case GM_HIGH_RECV_EVENT:
-      case GM_RECV_EVENT:
-        size = gm_ntohc(e->recv.size);
-        msg = gm_ntohp(e->recv.buffer);
-        len = gm_ntohl(e->recv.length);
-        gm_provide_receive_buffer(gmport, msg, size, GM_LOW_PRIORITY);
-        break;
-      case GM_NO_RECV_EVENT:
-      case GM_ALARM_EVENT:
-        goto retry;
-      default:
-        gm_unknown(gmport, e);
-        goto retry;
-    }
+    recvBarrierMessage();
     for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
       int p = CmiMyPe();
       p = BROADCAST_SPANNING_FACTOR*p + i;
       if (p > _Cmi_numpes - 1) break;
       p = p%_Cmi_numpes;
-      len = 32;
-      buf = (char *)gm_dma_malloc(gmport, len);
-      size = gm_min_size_for_length(len);
-      node = nodes + p;
       /* printf("[%d] RELAY => %d \n", CmiMyPe(), p); */
-      gm_send_with_callback(gmport, buf, size, len,
-                            GM_LOW_PRIORITY, node->mach_id, node->dataport,
-                            send_callback_nothing, NULL);
+      sendBarrierMessage(p);
     }
   }
-  /* printf("[%d] OUT of barrier \n", CmiMyPe());  */
+  /* printf("[%d] OUT of barrier \n", CmiMyPe()); */
+}
+
+void CmiBarrierZero()
+{
+  int i;
+
+  if (CmiMyPe()) {
+      sendBarrierMessage(0);
+  }
+  else {
+    for (i=0; i<CmiNumPes()-1; i++)
+    {
+      recvBarrierMessage();
+    }
+  }
 }
 
 /***********************************************************************
