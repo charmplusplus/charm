@@ -409,6 +409,10 @@ void GVT::addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne)
   SRentry *tab = (*SRs);
   SRentry *tmp = tab;
 
+  for (i=0; i<ne-1; i++) {
+    if (e[i].timestamp > e[i+1].timestamp)
+      CkPrintf("Array of entries is not sorted! Whoops!  There goes the pre-condition!\n");
+  }
   for (i=0; i<ne; i++) {
     if ((e[i].timestamp < og) || (og == POSE_UnsetTS)) {
       if (!tmp) { // no entries yet
