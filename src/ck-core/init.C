@@ -120,22 +120,27 @@ static inline void _printStats(void)
              total->getCharesCreated(), total->getCharesProcessed());
   }
   if(_printCS) {
-    CkPrintf("Charm Kernel Detailed Statistics:\n");
-    CkPrintf("PE\tCC\tCP\tFCC\tFCP\tGC\tNGC\tGP\tNGP\tFGC\tFNGC\tFGP\tFNGP\n");
+    CkPrintf("Charm Kernel Detailed Statistics (R=requested P=processed):\n\n");
+
+    CkPrintf("         Create    Mesgs     Create    Mesgs     Create    Mesgs\n");
+    CkPrintf("         Chare     for       Group     for       Nodegroup for\n");
+    CkPrintf("PE   R/P Mesgs     Chares    Mesgs     Groups    Mesgs     Nodegroups\n");
+    CkPrintf("---- --- --------- --------- --------- --------- --------- ----------\n");
+
     for(i=0;i<CkNumPes();i++) {
-      CkPrintf("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",i,
+      CkPrintf("%4d  R  %9d %9d %9d %9d %9d %9d\n      P  %9d %9d %9d %9d %9d %9d\n",i,
                _allStats[i]->getCharesCreated(),
-               _allStats[i]->getCharesProcessed(),
                _allStats[i]->getForCharesCreated(),
-               _allStats[i]->getForCharesProcessed(),
                _allStats[i]->getGroupsCreated(),
-               _allStats[i]->getNodeGroupsCreated(),
-               _allStats[i]->getGroupsProcessed(),
-               _allStats[i]->getNodeGroupsProcessed(),
                _allStats[i]->getGroupMsgsCreated(),
+               _allStats[i]->getNodeGroupsCreated(),
                _allStats[i]->getNodeGroupMsgsCreated(),
-               _allStats[i]->getGroupMsgsProcessed(),
-               _allStats[i]->getNodeGroupMsgsProcessed());
+               _allStats[i]->getCharesProcessed(),
+               _allStats[i]->getForCharesProcessed(),
+               _allStats[i]->getGroupsProcessed(),
+               _allStats[i]->getGroupMsgsProcessed(), 
+               _allStats[i]->getNodeGroupsProcessed(),
+	       _allStats[i]->getNodeGroupMsgsProcessed());
     }
   }
 }
