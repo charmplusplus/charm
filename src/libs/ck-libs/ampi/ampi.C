@@ -135,7 +135,7 @@ ampi::sendraw(int t1, int t2, void* buf, int len, CkArrayID aid, int idx)
 }
 
 void 
-ampi::recv(int t1, int t2, void* buf, int count, int type, int comm)
+ampi::recv(int t1, int t2, void* buf, int count, int type, int comm, int *sts)
 {
   int tags[3];
   AmpiMsg *msg = 0;
@@ -143,7 +143,7 @@ ampi::recv(int t1, int t2, void* buf, int count, int type, int comm)
   int len = ddt->getSize(count);
   while(1) {
     tags[0] = t1; tags[1] = t2; tags[2] = comm;
-    msg = (AmpiMsg *) CmmGet(msgs, 3, tags, 0);
+    msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
     if (msg) break;
     thread_id = CthSelf();
     stop_running();
@@ -152,6 +152,8 @@ ampi::recv(int t1, int t2, void* buf, int count, int type, int comm)
       CkAbort("thread_id not 0 upon return !!\n");
     start_running();
   }
+  if(sts)
+    ((AMPI_Status*)sts)->AMPI_LENGTH = msg->length;
   if (msg->length < len) {
     CkError("AMPI: (type=%d, count=%d) Expecting msg of len %d, received %d\n",
             type, count, len, msg->length);
@@ -162,6 +164,44 @@ ampi::recv(int t1, int t2, void* buf, int count, int type, int comm)
 }
 
 void 
+ampi::probe(int t1, int t2, int comm, int *sts)
+{
+  int tags[3];
+  AmpiMsg *msg = 0;
+  while(1) {
+    tags[0] = t1; tags[1] = t2; tags[2] = comm;
+    msg = (AmpiMsg *) CmmProbe(msgs, 3, tags, sts);
+    if (msg) break;
+    thread_id = CthSelf();
+    stop_running();
+    CthSuspend();
+    if(thread_id != 0)
+      CkAbort("thread_id not 0 upon return !!\n");
+    start_running();
+  }
+  if(sts)
+    ((AMPI_Status*)sts)->AMPI_LENGTH = msg->length;
+}
+
+int 
+ampi::iprobe(int t1, int t2, int comm, int *sts)
+{
+  int tags[3];
+  AmpiMsg *msg = 0;
+  tags[0] = t1; tags[1] = t2; tags[2] = comm;
+  msg = (AmpiMsg *) CmmProbe(msgs, 3, tags, sts);
+  if (msg) {
+    if(sts)
+      ((AMPI_Status*)sts)->AMPI_LENGTH = msg->length;
+    return 1;
+  }
+  stop_running();
+  CthYield();
+  start_running();
+  return 0;
+}
+
+void 
 ampi::barrier(void)
 {
   if(thisIndex) {
@@ -169,8 +209,10 @@ ampi::barrier(void)
     recv(AMPI_BARR_TAG, 0, 0, 0, 0, AMPI_COMM_WORLD);
   } else {
     int i;
-    for(i=1;i<numElements;i++) recv(AMPI_BARR_TAG, 0, 0, 0, 0, AMPI_COMM_WORLD);
-    for(i=1;i<numElements;i++) send(AMPI_BARR_TAG, 0, 0, 0, 0, i, AMPI_COMM_WORLD);
+    for(i=1;i<numElements;i++) 
+      recv(AMPI_BARR_TAG, 0, 0, 0, 0, AMPI_COMM_WORLD);
+    for(i=1;i<numElements;i++) 
+      send(AMPI_BARR_TAG, 0, 0, 0, 0, i, AMPI_COMM_WORLD);
   }
 }
 
@@ -431,7 +473,23 @@ int AMPI_Recv(void *msg, int count, AMPI_Datatype type, int src, int tag,
               AMPI_Comm comm, AMPI_Status *status)
 {
   ampi *ptr = CtvAccess(ampiPtr);
-  ptr->recv(tag,src,msg,count,type, comm);
+  ptr->recv(tag,src,msg,count,type, comm, (int*) status);
+  return 0;
+}
+
+extern "C" 
+int AMPI_Probe(int src, int tag, AMPI_Comm comm, AMPI_Status *status)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  ptr->probe(tag,src, comm, (int*) status);
+  return 0;
+}
+
+extern "C" 
+int AMPI_Iprobe(int src,int tag,AMPI_Comm comm,int *flag,AMPI_Status *status)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  *flag = ptr->iprobe(tag,src,comm,(int*) status);
   return 0;
 }
 
@@ -596,13 +654,13 @@ int AMPI_Waitall(int count, AMPI_Request *request, AMPI_Status *sts)
       PersReq *req = &(ptr->requests[request[i]]);
       if(req->sndrcv == 2) { // recv request
         ptr->recv(req->tag, req->proc, req->buf, req->count, 
-                  req->type, req->comm);
+                  req->type, req->comm, (int*)(sts+i));
       }
     } else { // irecv request
       int index = request[i] - 100;
       PersReq *req = &(ptr->irequests[index]);
       ptr->recv(req->tag, req->proc, req->buf, req->count, 
-                req->type, req->comm);
+                req->type, req->comm, (int*) (sts+i));
       // now free the request
       ptr->nirequests--;
       PersReq *ireq = &(ptr->irequests[0]);
@@ -612,6 +670,42 @@ int AMPI_Waitall(int count, AMPI_Request *request, AMPI_Status *sts)
       ireq[req->nextfree].prevfree = index;
       ptr->firstfree = index;
     }
+  }
+  return 0;
+}
+
+extern "C" 
+int AMPI_Test(AMPI_Request *request, int *flag, AMPI_Status *sts)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  if(*request==(-1)) {
+    *flag = 1;
+    return 0;
+  }
+  if(*request < 100) { // persistent request
+    PersReq *req = &(ptr->requests[*request]);
+    if(req->sndrcv == 2) // recv request
+      *flag = ptr->iprobe(req->tag, req->proc, req->comm, (int*)sts);
+    else
+      *flag = 1; // send request
+  } else { // irecv request
+    int index = *request - 100;
+    PersReq *req = &(ptr->irequests[index]);
+    *flag = ptr->iprobe(req->tag, req->proc, req->comm, (int*) sts);
+  }
+  return 0;
+}
+
+extern "C" 
+int AMPI_Testall(int count, AMPI_Request *request, int *flag, AMPI_Status *sts)
+{
+  int i;
+  int tmpflag;
+  *flag = 1;
+  for(i=0;i<count;i++)
+  {
+    AMPI_Test(&request[i], &tmpflag, sts+i);
+    *flag = *flag && tmpflag;
   }
   return 0;
 }
@@ -968,6 +1062,48 @@ int AMPI_Abort(int comm, int errorcode)
 {
   CkAbort("AMPI: User called MPI_Abort!\n");
   return errorcode;
+}
+
+extern "C"
+int AMPI_Get_count(AMPI_Status *sts, AMPI_Datatype dtype, int *count)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  DDT_DataType* dttype = ptr->myDDT->getType(dtype) ;
+  int itemsize = dttype->getSize() ;
+  *count = sts->AMPI_LENGTH/itemsize;
+  return 0;
+}
+
+extern "C"
+int AMPI_Pack(void *inbuf, int incount, AMPI_Datatype dtype, void *outbuf,
+              int outsize, int *position, AMPI_Comm comm)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  DDT_DataType* dttype = ptr->myDDT->getType(dtype) ;
+  int itemsize = dttype->getSize();
+  dttype->serialize((char*)inbuf, ((char*)outbuf)+(*position), incount, 1);
+  *position += (itemsize*incount);
+  return 0;
+}
+
+extern "C"
+int AMPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
+              int outcount, AMPI_Datatype dtype, AMPI_Comm comm)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  DDT_DataType* dttype = ptr->myDDT->getType(dtype) ;
+  int itemsize = dttype->getSize();
+  dttype->serialize(((char*)inbuf+(*position)), (char*)outbuf, outcount, 1);
+  *position += (itemsize*outcount);
+  return 0;
+}
+
+extern "C"
+int AMPI_Pack_size(int incount,AMPI_Datatype datatype,AMPI_Comm comm,int *sz)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  DDT_DataType* dttype = ptr->myDDT->getType(datatype) ;
+  return incount*dttype->getSize() ;
 }
 
 extern "C"

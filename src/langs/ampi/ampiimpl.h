@@ -235,7 +235,9 @@ class ampi : public ArrayElement1D {
     void send(int t1, int t2, void* buf, int count, int type, int idx, int comm);
     static void sendraw(int t1, int t2, void* buf, int len, CkArrayID aid, 
                         int idx);
-    void recv(int t1, int t2, void* buf, int count, int type, int comm);
+    void recv(int t1,int t2,void* buf,int count,int type,int comm,int *sts=0);
+    void probe(int t1,int t2,int comm,int *sts);
+    int iprobe(int t1,int t2,int comm,int *sts);
     void barrier(void);
     void bcast(int root, void* buf, int count, int type);
     static void bcastraw(void* buf, int len, CkArrayID aid);

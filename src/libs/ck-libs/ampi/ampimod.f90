@@ -1,7 +1,7 @@
 module AMPI
 
   integer, parameter :: AMPI_COMM_WORLD=0
-  integer, parameter :: AMPI_STATUS_SIZE=3
+  integer, parameter :: AMPI_STATUS_SIZE=4
   integer, parameter :: AMPI_MAX_COMM=8
 
   integer, parameter :: AMPI_DOUBLE_PRECISION=0
@@ -25,6 +25,10 @@ module AMPI
   integer, parameter :: AMPI_MIN=2
   integer, parameter :: AMPI_SUM=3
   integer, parameter :: AMPI_PROD=4
+
+  integer, parameter :: AMPI_SOURCE=2
+  integer, parameter :: AMPI_TAG=1
+  integer, parameter :: AMPI_COMM=3
 
   integer :: AMPI_COMM_UNIVERSE(1:AMPI_MAX_COMM)
 

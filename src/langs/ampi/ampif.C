@@ -19,6 +19,8 @@ extern "C" {
 #define ampi_finalize                AMPI_FINALIZE
 #define ampi_send                    AMPI_SEND
 #define ampi_recv                    AMPI_RECV
+#define ampi_probe                   AMPI_PROBE
+#define ampi_iprobe                  AMPI_IPROBE
 #define ampi_isend                   AMPI_ISEND
 #define ampi_irecv                   AMPI_IRECV
 #define ampi_sendrecv                AMPI_SENDRECV
@@ -29,6 +31,8 @@ extern "C" {
 #define ampi_wtime                   AMPI_WTIME
 #define ampi_start                   AMPI_START
 #define ampi_waitall                 AMPI_WAITALL
+#define ampi_testall                 AMPI_TESTALL
+#define ampi_test                    AMPI_TEST
 #define ampi_send_init               AMPI_SEND_INIT
 #define ampi_recv_init               AMPI_RECV_INIT
 #define ampi_type_contiguous         AMPI_TYPE_CONTIGUOUS
@@ -41,6 +45,9 @@ extern "C" {
 #define ampi_type_free               AMPI_TYPE_FREE
 #define ampi_type_extent             AMPI_TYPE_EXTENT
 #define ampi_type_size               AMPI_TYPE_SIZE
+#define ampi_pack                    AMPI_PACK
+#define ampi_unpack                  AMPI_UNPACK
+#define ampi_pack_size               AMPI_PACK_SIZE
 #define ampi_allgatherv              AMPI_ALLGATHERV
 #define ampi_allgather               AMPI_ALLGATHER
 #define ampi_gatherv                 AMPI_GATHERV
@@ -53,6 +60,7 @@ extern "C" {
 #define ampi_print                   AMPI_PRINT
 #define ampi_migrate                 AMPI_MIGRATE
 #define ampi_register                AMPI_REGISTER
+#define ampi_get_count               AMPI_GET_COUNT
 
 #else
 
@@ -62,6 +70,8 @@ extern "C" {
 #define ampi_finalize                FNAME(ampi_finalize)
 #define ampi_send                    FNAME(ampi_send)
 #define ampi_recv                    FNAME(ampi_recv)
+#define ampi_probe                   FNAME(ampi_probe)
+#define ampi_iprobe                  FNAME(ampi_iprobe)
 #define ampi_isend                   FNAME(ampi_isend)
 #define ampi_irecv                   FNAME(ampi_irecv)
 #define ampi_sendrecv                FNAME(ampi_sendrecv)
@@ -72,6 +82,8 @@ extern "C" {
 #define ampi_wtime                   FNAME(ampi_wtime)
 #define ampi_start                   FNAME(ampi_start)
 #define ampi_waitall                 FNAME(ampi_waitall)
+#define ampi_testall                 FNAME(ampi_testall)
+#define ampi_test                    FNAME(ampi_test)
 #define ampi_send_init               FNAME(ampi_send_init)
 #define ampi_recv_init               FNAME(ampi_recv_init)
 #define ampi_type_contiguous         FNAME(ampi_type_contiguous)
@@ -84,6 +96,9 @@ extern "C" {
 #define ampi_type_free               FNAME(ampi_type_free)
 #define ampi_type_extent             FNAME(ampi_type_extent)
 #define ampi_type_size               FNAME(ampi_type_size)
+#define ampi_pack                    FNAME(ampi_pack)
+#define ampi_unpack                  FNAME(ampi_unpack)
+#define ampi_pack_size               FNAME(ampi_pack_size)
 #define ampi_allgatherv              FNAME(ampi_allgatherv)
 #define ampi_allgather               FNAME(ampi_allgather)
 #define ampi_gatherv                 FNAME(ampi_gatherv)
@@ -96,6 +111,7 @@ extern "C" {
 #define ampi_print                   FNAME(ampi_print)
 #define ampi_migrate                 FNAME(ampi_migrate)
 #define ampi_register                FNAME(ampi_register)
+#define ampi_get_count               FNAME(ampi_get_count)
 
 #endif
 
@@ -135,6 +151,16 @@ void ampi_recv(void *msg, int *count, int *type, int *src,
 {
   *ierr = AMPI_Recv(msg, *count, *type, *src, *tag, *comm, 
                     (AMPI_Status*) status);
+}
+
+void ampi_probe(int *src, int *tag, int *comm, int *status, int *ierr)
+{
+  *ierr = AMPI_Probe(*src, *tag, *comm, (AMPI_Status*) status);
+}
+
+void ampi_iprobe(int *src,int *tag,int *comm,int *flag,int *status,int *ierr)
+{
+  *ierr = AMPI_Iprobe(*src, *tag, *comm, flag, (AMPI_Status*) status);
 }
 
 void ampi_sendrecv(void *sndbuf, int *sndcount, int *sndtype, 
@@ -183,6 +209,17 @@ void ampi_start(int *reqnum, int *ierr)
 void ampi_waitall(int *count, int *request, int *status, int *ierr)
 {
   *ierr = AMPI_Waitall(*count, (AMPI_Request*) request, (AMPI_Status*) status);
+}
+
+void ampi_testall(int *count, int *request, int *flag, int *status, int *ierr)
+{
+  *ierr = AMPI_TestAll(*count, (AMPI_Request*) request, flag, 
+      (AMPI_Status*) status);
+}
+
+void ampi_test(int *request, int *flag, int *status, int *ierr)
+{
+  *ierr = AMPI_Test((AMPI_Request*) request, flag, (AMPI_Status*) status);
 }
 
 void ampi_recv_init(void *buf, int *count, int *type, int *srcpe,
@@ -252,6 +289,25 @@ void  ampi_type_extent(int* type, int* extent, int* ierr)
 void  ampi_type_size(int* type, int* size, int* ierr)
 {
   *ierr = AMPI_Type_size(*type, size);
+}
+
+void ampi_pack(void *inbuf, int *incount, int *datatype, void *outbuf, 
+    int *outsize, int *position, int *comm, int *ierr)
+{
+  *ierr = AMPI_Pack(inbuf, *incount, (AMPI_Datatype)*datatype, outbuf, 
+      *outsize, position, *comm);
+}
+
+void ampi_unpack(void *inbuf, int *insize, int *position, void *outbuf, 
+    int *outcount, int *datatype, int *comm, int *ierr)
+{
+  *ierr = AMPI_Unpack(inbuf, *insize, position, outbuf, *outcount, 
+      (AMPI_Datatype) *datatype, (AMPI_Comm) *comm);
+}
+
+void ampi_pack_size(int *incount, int *datatype, int *comm, int *size, int *ierr)
+{
+  *ierr = AMPI_Pack_size(*incount, (AMPI_Datatype) *datatype, *comm, size);
 }
 
 void ampi_isend(void *buf, int *count, int *datatype, int *dest,
@@ -328,6 +384,11 @@ void ampi_comm_free(int *comm, int *ierr)
 void ampi_abort(int *comm, int *errorcode, int *ierr)
 {
   *ierr = AMPI_Abort(*comm, *errorcode);
+}
+
+void ampi_get_count(int *sts, int *dtype, int *cnt, int *ierr)
+{
+  *ierr = AMPI_Get_count(sts, *dtype, cnt);
 }
 
 void ampi_print(char *str, int len)

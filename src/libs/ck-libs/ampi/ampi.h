@@ -47,7 +47,7 @@ typedef int AMPI_Comm;
 typedef int AMPI_Op;
 typedef int AMPI_Request;
 typedef struct {
-  int one, two, three;
+  int AMPI_TAG, AMPI_SOURCE, AMPI_COMM, AMPI_LENGTH;
 } AMPI_Status;
 
 typedef int AMPI_Datatype;
@@ -77,7 +77,11 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
                   AMPI_Op op, AMPI_Comm comm);
 double AMPI_Wtime(void);
 int AMPI_Start(AMPI_Request *reqnum);
+int AMPI_Probe(int source, int tag, AMPI_Comm comm, AMPI_Status *sts);
+int AMPI_Iprobe(int src, int tag, AMPI_Comm comm, int *flag, AMPI_Status *sts);
 int AMPI_Waitall(int count, AMPI_Request *request, AMPI_Status *sts);
+int AMPI_Test(AMPI_Request *request, int *flag, AMPI_Status *sts);
+int AMPI_Testall(int count, AMPI_Request *request, int *flag, AMPI_Status *sts);
 int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
                   AMPI_Comm comm, AMPI_Request *req);
 int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
@@ -99,6 +103,12 @@ int AMPI_Type_commit(AMPI_Datatype *datatype);
 int AMPI_Type_free(AMPI_Datatype *datatype);
 int  AMPI_Type_extent(AMPI_Datatype datatype, AMPI_Aint extent);
 int  AMPI_Type_size(AMPI_Datatype datatype, AMPI_Aint size);
+
+int AMPI_Pack(void *inbuf, int incount, AMPI_Datatype dtype, void *outbuf,
+              int outsize, int *position, AMPI_Comm comm);
+int AMPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
+              int outcount, AMPI_Datatype dtype, AMPI_Comm comm);
+int AMPI_Pack_size(int incount,AMPI_Datatype datatype,AMPI_Comm comm,int *sz);
 
 int AMPI_Isend(void *buf, int count, AMPI_Datatype datatype, int dest, 
               int tag, AMPI_Comm comm, AMPI_Request *request);
