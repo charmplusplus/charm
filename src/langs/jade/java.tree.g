@@ -125,10 +125,7 @@ typeDefinition
                     s.append(": public ");
                     AST i = e.getFirstChild();
                     while (null != i) {
-                        if (i.getText().equalsIgnoreCase(J.strChare)
-                            || i.getText().equalsIgnoreCase(J.strChareArray1D)
-                            || i.getText().equalsIgnoreCase(J.strChareArray2D)
-                        ) {
+                        if (J.isStrChareStar(i.getText()) ) {
                             s.append("CBase_" + #IDENT.getText());
                         } else {
                             s.append(J.pE(i));
@@ -148,7 +145,7 @@ typeDefinition
 //                     //((#m.getFirstChild()==null)?"":"modi_here ")  +
 //                     #IDENT.getText() + " {");
 //             }
-            o:objBlock[#IDENT, e.getFirstChild().getText().equalsIgnoreCase(J.strChareArray1D) || e.getFirstChild().getText().equalsIgnoreCase(J.strChareArray2D) ]
+            o:objBlock[#IDENT, J.isStrChareArray(e.getFirstChild().getText()) ]
         ) { J.tmp.pop(); }
 	|	#(INTERFACE_DEF modifiers IDENT extendsClause interfaceBlock )  // skip
 	;
@@ -541,10 +538,7 @@ variableDef[boolean classVarq, boolean outputOnNewLine]
                 // local variable, "new" chare, i.e. Chare a = new Hello(params);
                 // or, ChareArray a = new Hello[5];
                 else if (
-                    (ts.getFirstChild().getText().equalsIgnoreCase(J.strChare)
-                      || ts.getFirstChild().getText().equalsIgnoreCase(J.strChareArray1D)
-                      || ts.getFirstChild().getText().equalsIgnoreCase(J.strChareArray2D)
-                    )
+                    J.isStrChareStar(ts.getFirstChild().getText())
                     && vi != null
                     && EXPR == vi.getFirstChild().getType()
                     && LITERAL_new == vi.getFirstChild().getFirstChild().getType()) {
