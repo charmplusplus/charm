@@ -17,7 +17,6 @@ CpvDeclare(int, heartbeatHandler);
 CpvDeclare(int, heartbeatBcastHandler);
 
 extern int programExit;
-extern int traceBluegeneLinked;
 extern int delayCheckFlag;
 static int deadlock = 0;
 
@@ -32,7 +31,6 @@ double minCorrectTimestamp = INVALIDTIME;
 
 /**  Externs **/
 
-CpvExtern(int,bgStatCollectHandler);
 extern void statsCollectionHandlerFunc(void *msg);
 
 void bgCorrectionFunc(char *msg);
@@ -59,22 +57,10 @@ void BgInitTiming()
 #if BLUEGENE_TIMING
   CpvInitialize(int,bgCorrectionHandler);
   cva(bgCorrectionHandler) = CmiRegisterHandler((CmiHandler) bgCorrectionFunc);
-  CpvInitialize(int,bgStatCollectHandler);
-  cva(bgStatCollectHandler) = CmiRegisterHandler((CmiHandler) statsCollectionHandlerFunc);
+  cva(simState).bgStatCollectHandler = CmiRegisterHandler((CmiHandler) statsCollectionHandlerFunc);
 #endif
 
   initHeartbeat();
-}
-
-// close current log
-void BgSkipEndExecuteEvent() {
-  bgSkipEndFlag=1; 
-  if (genTimeLog && traceBluegeneLinked) {
-    BgTimeLine &tline = tTIMELINE;
-    CmiAssert(tline.length()>0); 
-    bgTimeLog *log = tline[tline.length()-1];
-    log->closeLog();
-  }
 }
 
 void *BgCreateEvent(int eidx)
@@ -128,10 +114,8 @@ void BgLogEntryCommit(BgTimeLineRec &tlinerec) {
   if (!genTimeLog) return;
   tlinerec.logEntryClose();
   BgTimeLine &timeline = tlinerec.timeline;
-  if(bgSkipEndFlag == 0)
-	timeline[timeline.length()-1]->closeLog();
-  else
-        bgSkipEndFlag=0;
+  timeline[timeline.length()-1]->closeLog();
+
   CmiAssert(tlinerec.bgCurLog == NULL);
   if (correctTimeLog) {
 	BgAdjustTimeLineInsert(tlinerec);
@@ -700,7 +684,7 @@ static bgTimeLog *BgGetTimeLogOnThread(BgTimeLineRec &tline, int srcnode, int ms
 bgTimeLog *BgGetTimeLog(BgTimeLineRec *tline, CmiInt2 tID, int srcnode, int msgID, int *index)
 {
   if (tID == ANYTHREAD) {
-    for (int i=0; i<cva(numWth); i++) {
+    for (int i=0; i<cva(bgMach).numWth; i++) {
       bgTimeLog *tlog = BgGetTimeLogOnThread(tline[i], srcnode, msgID, index);
       if (tlog) return tlog;
     }
@@ -799,7 +783,7 @@ static inline int handleCorrectionMsg(int mynode, BgTimeLineRec *logs, bgCorrect
 	CmiInt2 tID = m->tID;
 	if (tID == ANYTHREAD) {
 	  int found = 0;
-	  for (tID=0; tID<cva(numWth); tID++) {
+	  for (tID=0; tID<cva(bgMach).numWth; tID++) {
 	    // search for the msg
             BgTimeLine &tline = logs[tID].timeline;	
 	    for (int j=0; j<tline.length(); j++)
@@ -932,7 +916,7 @@ void processCorrectionMsg(int nodeidx)
     BGSTATE1(2,"processCorrectionMsg (len:%d) {", len);
 //CmiPrintf("[%d:%d] processCorrectionMsg len:%d\n", CmiMyPe(), nodeidx, len);
 
-    for (tID=0; tID<cva(numWth); tID++) {
+    for (tID=0; tID<cva(bgMach).numWth; tID++) {
       worked = batchHandleCorrectionMsg(nodeidx, tlinerec, tID, cmsg, &minIdx);
       if (worked && minIdx !=-1)
         BgFinishCorrection(tlinerec[tID], nodeidx, tID, minIdx);
@@ -1027,7 +1011,7 @@ void bgCorrectionFunc(char *msg)
           lnodeID = nodeInfo::Global2Local(gnodeID);
       }
       for (i=0; i<BgNodeSize(); i++) {
-	for (CmiInt2 j=0; j<cva(numWth); j++) {
+	for (CmiInt2 j=0; j<cva(bgMach).numWth; j++) {
           if (i == lnodeID && (j == tID || tID == ANYTHREAD)) continue;
 	  bgCorrectionMsg *newMsg = (bgCorrectionMsg*)CmiCopyMsg(msg, sizeof(bgCorrectionMsg));
 	  newMsg->destNode = nodeInfo::Local2Global(i);   // global node seqno
@@ -1040,7 +1024,7 @@ void bgCorrectionFunc(char *msg)
     else {
       nodeidx = nodeInfo::Global2Local(nodeidx);	
       if (tID == ANYTHREAD) {
-	for (CmiInt2 j=0; j<cva(numWth); j++) {
+	for (CmiInt2 j=0; j<cva(bgMach).numWth; j++) {
 	  bgCorrectionMsg *newMsg = (bgCorrectionMsg*)CmiCopyMsg(msg, sizeof(bgCorrectionMsg));
 	  newMsg->tID = j;
           enqueueCorrectionMsg(nodeidx, newMsg);
@@ -1135,7 +1119,7 @@ static double findLeastTime()
       }
     }
     //min in affinityQ
-    for(i=0;i<cva(numWth);i++){
+    for(i=0;i<cva(bgMach).numWth;i++){
 	ckMsgQueue &aQ = affinityQs[i];
 #if 0
 	if (aQ.length() && deadlock)  {

@@ -6,7 +6,6 @@
 int genTimeLog = 0;			// was 1 for guna 's seq correction
 int correctTimeLog = 0;
 int bgcorroff = 0;
-int bgSkipEndFlag=0;
 
 extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
@@ -207,23 +206,6 @@ void BgTimeLineRec::logEntryStart(char *msg) {
   enq(bgCurLog, 1);
 }
 
-#if 0
-void BgTimeLineRec::logEntryCommit() {
-  if (!genTimeLog) return;
-  if(bgSkipEndFlag == 0)
-	timeline[timeline.length()-1]->closeLog();
-  else
-        bgSkipEndFlag=0;
-  if (correctTimeLog) {
-	BgAdjustTimeLineInsert(*this);
-	if (timeline.length()) 
-          tCURRTIME = timeline[timeline.length()-1]->endTime;
-	clearSendingLogs();
-  }
-  bgCurLog = NULL;
-}
-#endif
-
 void BgTimeLineRec::logEntryInsert(bgTimeLog* log)
 {
 //CmiPrintf("[%d] BgTimeLineRec::logEntryInsert\n", BgGetGlobalWorkerThreadID());
@@ -254,13 +236,7 @@ void BgTimeLineRec::logEntrySplit()
   if (!genTimeLog) return;
   CmiAssert(bgCurLog != NULL);
   bgTimeLog *rootLog = bgCurLog;
-  if (bgSkipEndFlag == 0) {
-    logEntryClose();
-  }
-  else {
-    bgCurLog=NULL;
-    bgSkipEndFlag = 0;
-  }
+  logEntryClose();
 
   // make up a new bglog to start, setting up dependencies.
   bgTimeLog *newLog = new bgTimeLog(-1, "broadcast", timerFunc());

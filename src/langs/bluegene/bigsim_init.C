@@ -24,9 +24,6 @@
 #include "blue_impl.h"    	// implementation header file
 #include "blue_timing.h" 	// timing module
 
-CpvExtern(int,exitHandler);
-CpvExtern(int,beginExitHandler);
-
 extern CmiStartFn bgMain(int argc, char **argv);
 
 /* called by a AMPI thread of certan rank to attatch itself */
@@ -45,7 +42,7 @@ static void BroadcastShutdown(void *null)
 
   int msgSize = CmiBlueGeneMsgHeaderSizeBytes;
   void *sendmsg = CmiAlloc(msgSize);
-  CmiSetHandler(sendmsg, cva(exitHandler));
+  CmiSetHandler(sendmsg, cva(simState).exitHandler);
   CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
 
   CmiDeliverMsgs(-1);
@@ -68,7 +65,7 @@ void BgShutdown()
     int msgSize = CmiBlueGeneMsgHeaderSizeBytes;
     void *sendmsg = CmiAlloc(msgSize);
     
-    CmiSetHandler(sendmsg, cva(exitHandler));  
+    CmiSetHandler(sendmsg, cva(simState).exitHandler);
     CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
     
     //CmiAbort("\nBG> BlueGene emulator shutdown gracefully!\n");
@@ -85,7 +82,7 @@ void BgShutdown()
     int msgSize = CmiBlueGeneMsgHeaderSizeBytes;
     void *sendmsg = CmiAlloc(msgSize); 
 CmiPrintf("\n\n\nBroadcast begin EXIT\n");
-    CmiSetHandler(sendmsg, cva(beginExitHandler));  
+    CmiSetHandler(sendmsg, cva(simState).beginExitHandler);
     CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
 
     CmiStartQD(BroadcastShutdown, NULL);

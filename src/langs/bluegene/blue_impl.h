@@ -23,11 +23,42 @@
 
 #define MAX_HANDLERS	100
 
-CpvExtern(int, numX);	/* size of bluegene nodes in cube */
-CpvExtern(int, numY);
-CpvExtern(int, numZ);
-CpvExtern(int, numCth);	/* number of threads */
-CpvExtern(int, numWth);
+class BGMach {
+public:
+  int x, y, z;         /* size of bluegene nodes in cube */
+  int numCth, numWth;           /* number of threads */
+public:
+  BGMach() {  nullify(); }
+  void nullify() { x=y=z=0; numCth=numWth=0; }
+  void setSize(int xx, int yy, int zz) 
+	{ x=xx; y=yy; z=zz; }
+  void getSize(int *xx, int *yy, int *zz) 
+	{ *xx=x; *yy=y; *zz=z; }
+  int numTh()
+	{ return numCth + numWth; }
+  int getNodeSize()  { return x*y*z; }
+  int isWorkThread(int tid) { return tid>=0 && tid<numWth; }
+  void pup(PUP::er &p) 
+	{ p|x; p|y; p|z; p|numCth; p|numWth; }
+};
+
+// simulation state
+// one copy per host machine processor  (Cpv)
+class SimState {
+public:
+  // converse handlers
+  int msgHandler;
+  int nBcastMsgHandler;
+  int tBcastMsgHandler;
+  int exitHandler;
+  int beginExitHandler;
+  int bgStatCollectHandler;
+  // state variables
+  int inEmulatorInit;
+};
+
+CpvExtern(BGMach, bgMach);	/* BG machine size */
+CpvExtern(SimState, simState);	/* simulation state variables */
 CpvExtern(int, numNodes);	/* number of bg nodes on this PE */
 
 typedef char ThreadType;
@@ -146,15 +177,15 @@ public:
 
     /* map global serial number to (x,y,z) ++++ */
   inline static void Global2XYZ(int seq, int *x, int *y, int *z) {
-    *x = seq / (cva(numY) * cva(numZ));
-    *y = (seq - *x * cva(numY) * cva(numZ)) / cva(numZ);
-    *z = (seq - *x * cva(numY) * cva(numZ)) % cva(numZ);
+    *x = seq / (cva(bgMach).y * cva(bgMach).z);
+    *y = (seq - *x * cva(bgMach).y * cva(bgMach).z) / cva(bgMach).z;
+    *z = (seq - *x * cva(bgMach).y * cva(bgMach).z) % cva(bgMach).z;
   }
 
 
     /* calculate global serial number of (x,y,z) ++++ */
   inline static int XYZ2Global(int x, int y, int z) {
-    return x*(cva(numY) * cva(numZ)) + y*cva(numZ) + z;
+    return x*(cva(bgMach).y * cva(bgMach).z) + y*cva(bgMach).z + z;
   }
 
     /* map (x,y,z) to emulator PE ++++ */
@@ -232,15 +263,15 @@ public:
 
     /* map global serial number to (x,y,z) ++++ */
   inline static void Global2XYZ(int seq, int *x, int *y, int *z) {
-    *x = seq / (cva(numY) * cva(numZ));
-    *y = (seq - *x * cva(numY) * cva(numZ)) / cva(numZ);
-    *z = (seq - *x * cva(numY) * cva(numZ)) % cva(numZ);
+    *x = seq / (cva(bgMach).y * cva(bgMach).z);
+    *y = (seq - *x * cva(bgMach).y * cva(bgMach).z) / cva(bgMach).z;
+    *z = (seq - *x * cva(bgMach).y * cva(bgMach).z) % cva(bgMach).z;
   }
 
 
     /* calculate global serial number of (x,y,z) ++++ */
   inline static int XYZ2Global(int x, int y, int z) {
-    return x*(cva(numY) * cva(numZ)) + y*cva(numZ) + z;
+    return x*(cva(bgMach).y * cva(bgMach).z) + y*cva(bgMach).z + z;
   }
 
     /* map (x,y,z) to emulator PE ++++ */
@@ -352,6 +383,7 @@ class workThreadInfo : public threadInfo {
 public:
   workThreadInfo(int _id, ThreadType _type, nodeInfo *_node): 
         threadInfo(_id, _type, _node) {}
+  void addAffMessage(char *msgPtr);        ///  add msg to affinity queue
   void run();
 };
 
@@ -359,7 +391,6 @@ class commThreadInfo : public threadInfo {
 public:
   commThreadInfo(int _id, ThreadType _type, nodeInfo *_node): 
         threadInfo(_id, _type, _node) {}
-  void addAffMessage(char *msgPtr);        ///  add msg to affinity queue
   void run();
 };
 

@@ -10,7 +10,6 @@ extern double gvt;
 //extern int realMsgProcCount,corrMsgProcCount;
 extern int  genTimeLog;
 extern int  correctTimeLog;
-extern int bgSkipEndFlag;
 
 class StateCounters{
   public:

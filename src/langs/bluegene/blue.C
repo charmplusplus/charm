@@ -16,13 +16,12 @@
 #include <stdlib.h>
 
 #include "cklists.h"
-
-#define  DEBUGF(x)      //CmiPrintf x;
-
 #include "queueing.h"
 #include "blue.h"
 #include "blue_impl.h"    	// implementation header file
 #include "blue_timing.h" 	// timing module
+
+#define  DEBUGF(x)      //CmiPrintf x;
 
 #ifdef CMK_ORIGIN2000
 extern "C" int start_counters(int e0, int e1);
@@ -39,62 +38,42 @@ CtvDeclare(threadInfo *, threadinfo);	/* represent a bluegene thread */
 CpvStaticDeclare(CthThread, mainThread);
 
 /* BG machine parameter */
-CpvDeclare(int, numX);    /* size of bluegene nodes in cube */
-CpvDeclare(int, numY);
-CpvDeclare(int, numZ);
-CpvDeclare(int, numCth);  /* number of threads */
-CpvDeclare(int, numWth);
+CpvDeclare(BGMach, bgMach);	/* BG machine size description */
 CpvDeclare(int, numNodes);        /* number of bg nodes on this PE */
 
 /* emulator node level variables */
-CpvDeclare(int,msgHandler);
-CpvDeclare(int,nBcastMsgHandler);
-CpvDeclare(int,tBcastMsgHandler);
-CpvDeclare(int,exitHandler);
-CpvDeclare(int,beginExitHandler);
-CpvDeclare(int,bgStatCollectHandler);
-CpvDeclare(int, inEmulatorInit);
-
-extern "C" void defaultBgHandler(char *, void *);
+CpvDeclare(SimState, simState);
 
 static int arg_argc;
 static char **arg_argv;
 
-int bgSize = 0;
+int bgSize = 0;			// short cut of blue gene node size
 static int timingMethod = BG_ELAPSE;
 int delayCheckFlag = 1;          // when enabled, only check correction 
 					// messages after some interval
 int programExit = 0;
 
-int bgstats = 0;
+static int bgstats_flag = 0;		// flag print stats at end of simulation
+
+// for debugging log
 FILE *bgDebugLog;			// for debugging
 
-#define BGARGSCHECK   	\
-  if (cva(numX)==0 || cva(numY)==0 || cva(numZ)==0)  { if (CmiMyPe() == 0) { CmiPrintf("\nMissing parameters for BlueGene machine size!\n<tip> use command line options: +x, +y, or +z.\n");} BgShutdown(); } \
-  else if (cva(numCth)==0 || cva(numWth)==0) { if (CmiMyPe() == 0) { CmiPrintf("\nMissing parameters for number of communication/worker threads!\n<tip> use command line options: +cth or +wth.\n");} BgShutdown(); }	\
-  else if (cva(numX)*cva(numY)*cva(numZ)<CmiNumPes()) {	\
-    CmiAbort("\nToo few BlueGene nodes!\n");	\
-  }
 
-
-StateCounters stateCounters;
-
-
-class StatsMessage {
-  char core[CmiBlueGeneMsgHeaderSizeBytes];
-public:
-  int processCount;
-  int corrMsgCount;
-  int realMsgCount;
-  int maxTimelineLen, minTimelineLen;
-};
+/****************************************************************************
+     little utility functions
+****************************************************************************/
 
 char **BgGetArgv() { return arg_argv; }
 int    BgGetArgc() { return arg_argc; }
 
 /*****************************************************************************
      Handler Table, one per thread
-*****************************************************************************/
+****************************************************************************/
+
+extern "C" void defaultBgHandler(char *null, void *uPtr)
+{
+  CmiAbort("BG> Invalid Handler called!\n");
+}
 
 HandlerTable::HandlerTable()
 {
@@ -108,7 +87,7 @@ HandlerTable::HandlerTable()
 
 inline int HandlerTable::registerHandler(BgHandler h)
 {
-    ASSERT(!cva(inEmulatorInit));
+    ASSERT(!cva(simState).inEmulatorInit);
     /* leave 0 as blank, so it can report error luckily */
     int cur = handlerTableCount++;
     if (cur >= MAX_HANDLERS)
@@ -120,7 +99,7 @@ inline int HandlerTable::registerHandler(BgHandler h)
 
 inline void HandlerTable::numberHandler(int idx, BgHandler h)
 {
-    ASSERT(!cva(inEmulatorInit));
+    ASSERT(!cva(simState).inEmulatorInit);
     if (idx >= handlerTableCount || idx < 1)
       CmiAbort("BG> HandlerID exceed the maximum!\n");
     handlerTable[idx].fnPtr = (BgHandlerEx)h;
@@ -129,7 +108,7 @@ inline void HandlerTable::numberHandler(int idx, BgHandler h)
 
 inline void HandlerTable::numberHandlerEx(int idx, BgHandlerEx h, void *uPtr)
 {
-    ASSERT(!cva(inEmulatorInit));
+    ASSERT(!cva(simState).inEmulatorInit);
     if (idx >= handlerTableCount || idx < 1)
       CmiAbort("BG> HandlerID exceed the maximum!\n");
     handlerTable[idx].fnPtr = h;
@@ -152,14 +131,9 @@ inline BgHandlerInfo * HandlerTable::getHandle(int handler)
       low level API
 *****************************************************************************/
 
-extern "C" void defaultBgHandler(char *null, void *uPtr)
-{
-  CmiAbort("BG> Invalid Handler called!\n");
-}
-
 int BgRegisterHandler(BgHandler h)
 {
-  ASSERT(!cva(inEmulatorInit));
+  ASSERT(!cva(simState).inEmulatorInit);
   int cur;
 #if CMK_BLUEGENE_NODE
   return tMYNODE->handlerTable.registerHandler(h);
@@ -175,7 +149,7 @@ int BgRegisterHandler(BgHandler h)
 
 void BgNumberHandler(int idx, BgHandler h)
 {
-  ASSERT(!cva(inEmulatorInit));
+  ASSERT(!cva(simState).inEmulatorInit);
 #if CMK_BLUEGENE_NODE
   tMYNODE->handlerTable.numberHandler(idx,h);
 #else
@@ -190,7 +164,7 @@ void BgNumberHandler(int idx, BgHandler h)
 
 void BgNumberHandlerEx(int idx, BgHandlerEx h, void *uPtr)
 {
-  ASSERT(!cva(inEmulatorInit));
+  ASSERT(!cva(simState).inEmulatorInit);
 #if CMK_BLUEGENE_NODE
   tMYNODE->handlerTable.numberHandlerEx(idx,h,uPtr);
 #else
@@ -236,9 +210,9 @@ void addBgNodeInbuffer(char *msgPtr, int lnodeID)
 void addBgThreadMessage(char *msgPtr, int threadID)
 {
 #ifndef CMK_OPTIMIZE
-  if (threadID >= cva(numWth)) CmiAbort("ThreadID is out of range!");
+  if (!cva(bgMach).isWorkThread(threadID)) CmiAbort("ThreadID is out of range!");
 #endif
-  commThreadInfo *tInfo = (commThreadInfo *)tMYNODE->threadinfo[threadID];
+  workThreadInfo *tInfo = (workThreadInfo *)tMYNODE->threadinfo[threadID];
   tInfo->addAffMessage(msgPtr);
 }
 
@@ -338,7 +312,7 @@ void threadBCastMsgHandlerFunc(char *msg)
   int len = CmiBgMsgLength(msg);
   for (int i=0; i<cva(numNodes); i++)
   {
-    for (int j=0; j<cva(numWth); j++) {
+    for (int j=0; j<cva(bgMach).numWth; j++) {
       if (i==lnodeID && j==threadID) continue;
       char *dupmsg = CmiCopyMsg(msg, len);
       CmiBgMsgNodeID(dupmsg) = nodeInfo::Local2Global(i);
@@ -378,7 +352,7 @@ void CmiSendPacket(int x, int y, int z, int msgSize,char *msg)
 /* user data is not freeed in this routine, user can reuse the data ! */
 void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* sendmsg, int local)
 {
-  CmiSetHandler(sendmsg, cva(msgHandler));
+  CmiSetHandler(sendmsg, cva(simState).msgHandler);
   CmiBgMsgNodeID(sendmsg) = nodeInfo::XYZ2Global(x,y,z);
   CmiBgMsgThreadID(sendmsg) = threadID;
   CmiBgMsgHandle(sendmsg) = handlerID;
@@ -399,7 +373,7 @@ void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type
 /* broadcast will copy data to msg buffer */
 static inline void nodeBroadcastPacketExcept_(int node, CmiInt2 threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
 {
-  CmiSetHandler(sendmsg, cva(nBcastMsgHandler));	
+  CmiSetHandler(sendmsg, cva(simState).nBcastMsgHandler);
   if (node >= 0)
     CmiBgMsgNodeID(sendmsg) = -node-100;
   else
@@ -425,7 +399,7 @@ static inline void nodeBroadcastPacketExcept_(int node, CmiInt2 threadID, int ha
 /* broadcast will copy data to msg buffer */
 static inline void threadBroadcastPacketExcept_(int node, CmiInt2 threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
 {
-  CmiSetHandler(sendmsg, cva(tBcastMsgHandler));	
+  CmiSetHandler(sendmsg, cva(simState).tBcastMsgHandler);	
   if (node >= 0)
     CmiBgMsgNodeID(sendmsg) = -node-100;
   else
@@ -467,7 +441,7 @@ static inline void threadBroadcastPacketExcept_(int node, CmiInt2 threadID, int 
 /* this function can be called by any thread */
 void BgSendNonLocalPacket(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char * data)
 {
-  if (x<0 || y<0 || z<0 || x>=cva(numX) || y>=cva(numY) || z>=cva(numZ)) {
+  if (x<0 || y<0 || z<0 || x>=cva(bgMach).x || y>=cva(bgMach).y || z>=cva(bgMach).z) {
     CmiPrintf("Trying to send packet to a nonexisting node: (%d %d %d)!\n", x,y,z);
     CmiAbort("Abort!\n");
   }
@@ -516,7 +490,7 @@ void BgThreadBroadcastAllPacket(int handlerID, WorkType type, int numbytes, char
 /* must be called in a communication or worker thread */
 void BgGetMyXYZ(int *x, int *y, int *z)
 {
-  ASSERT(!cva(inEmulatorInit));
+  ASSERT(!cva(simState).inEmulatorInit);
   *x = tMYX; *y = tMYY; *z = tMYZ;
 }
 
@@ -527,7 +501,7 @@ void BgGetXYZ(int seq, int *x, int *y, int *z)
 
 void BgGetSize(int *sx, int *sy, int *sz)
 {
-  *sx = cva(numX); *sy = cva(numY); *sz = cva(numZ);
+  cva(bgMach).getSize(sx, sy, sz);
 }
 
 /* return the total number of Blue gene nodes */
@@ -539,14 +513,14 @@ int BgNumNodes()
 /* can only called in emulatorinit */
 void BgSetSize(int sx, int sy, int sz)
 {
-  ASSERT(cva(inEmulatorInit));
-  cva(numX) = sx; cva(numY) = sy; cva(numZ) = sz;
+  ASSERT(cva(simState).inEmulatorInit);
+  cva(bgMach).setSize(sx, sy, sz);
 }
 
 /* return number of bg nodes on this emulator node */
 int BgNodeSize()
 {
-  ASSERT(!cva(inEmulatorInit));
+  ASSERT(!cva(simState).inEmulatorInit);
   return cva(numNodes);
 }
 
@@ -556,7 +530,7 @@ int BgMyRank()
 #ifndef CMK_OPTIMIZE
   if (tMYNODE == NULL) CmiAbort("Calling BgMyRank in the main thread!");
 #endif
-  ASSERT(!cva(inEmulatorInit));
+  ASSERT(!cva(simState).inEmulatorInit);
   return tMYNODEID;
 }
 
@@ -584,14 +558,14 @@ int BgGetThreadID()
 int BgGetGlobalThreadID()
 {
   ASSERT(tTHREADTYPE == WORK_THREAD || tTHREADTYPE == COMM_THREAD);
-  return nodeInfo::Local2Global(tMYNODE->id)*(cva(numCth)+cva(numWth))+tMYID;
+  return nodeInfo::Local2Global(tMYNODE->id)*(cva(bgMach).numTh())+tMYID;
 //  return tMYGLOBALID;
 }
 
 int BgGetGlobalWorkerThreadID()
 {
   ASSERT(tTHREADTYPE == WORK_THREAD);
-  return nodeInfo::Local2Global(tMYNODE->id)*cva(numWth)+tMYID;
+  return nodeInfo::Local2Global(tMYNODE->id)*cva(bgMach).numWth+tMYID;
 //  return tMYGLOBALID;
 }
 
@@ -602,30 +576,30 @@ char *BgGetNodeData()
 
 void BgSetNodeData(char *data)
 {
-  ASSERT(!cva(inEmulatorInit));
+  ASSERT(!cva(simState).inEmulatorInit);
   tUSERDATA = data;
 }
 
 int BgGetNumWorkThread()
 {
-  return cva(numWth);
+  return cva(bgMach).numWth;
 }
 
 void BgSetNumWorkThread(int num)
 {
-  ASSERT(cva(inEmulatorInit));
-  cva(numWth) = num;
+  ASSERT(cva(simState).inEmulatorInit);
+  cva(bgMach).numWth = num;
 }
 
 int BgGetNumCommThread()
 {
-  return cva(numCth);
+  return cva(bgMach).numCth;
 }
 
 void BgSetNumCommThread(int num)
 {
-  ASSERT(cva(inEmulatorInit));
-  cva(numCth) = num;
+  ASSERT(cva(simState).inEmulatorInit);
+  cva(bgMach).numCth = num;
 }
 
 /*****************************************************************************
@@ -657,7 +631,6 @@ void stopVTimer()
   if (timingMethod == BG_WALLTIME) {
     const double tp = CmiWallTimer();
     const double inc = tp-tSTARTTIME;
-    CmiAssert(inc < 2);
     tCURRTIME += inc;
     tSTARTTIME = tp;
   }
@@ -773,9 +746,7 @@ void BgProcessMessage(char *msg)
 
   // don't count thread overhead and timing overhead
   startVTimer();
-
   entryFunc(msg, handInfo->userPtr);
-
   stopVTimer();
 }
 
@@ -807,7 +778,7 @@ void BgNodeInitialize(nodeInfo *ninfo)
   tSTARTTIME = CmiWallTimer();
 
   /* creat work threads */
-  for (i=0; i< cva(numWth); i++)
+  for (i=0; i< cva(bgMach).numWth; i++)
   {
     threadInfo *tinfo = ninfo->threadinfo[i];
     t = CthCreate((CthVoidFn)run_thread, tinfo, 0);
@@ -819,9 +790,9 @@ void BgNodeInitialize(nodeInfo *ninfo)
   }
 
   /* creat communication thread */
-  for (i=0; i< cva(numCth); i++)
+  for (i=0; i< cva(bgMach).numCth; i++)
   {
-    threadInfo *tinfo = ninfo->threadinfo[i+cva(numWth)];
+    threadInfo *tinfo = ninfo->threadinfo[i+cva(bgMach).numWth];
     t = CthCreate((CthVoidFn)run_thread, tinfo, 0);
     if (t == NULL) CmiAbort("BG> Failed to create communication thread. \n");
     tinfo->setThread(t);
@@ -847,7 +818,7 @@ CmiHandler exitHandlerFunc(char *msg)
   if (0)	// detail
   if (genTimeLog) {
     for (j=0; j<cva(numNodes); j++)
-    for (i=0; i<cva(numWth); i++) {
+    for (i=0; i<cva(bgMach).numWth; i++) {
       BgTimeLine &log = cva(nodeinfo)[j].timelines[i].timeline;	
 //      BgPrintThreadTimeLine(nodeInfo::Local2Global(j), i, log);
       int x,y,z;
@@ -866,8 +837,8 @@ CmiHandler exitHandlerFunc(char *msg)
   int origPe = -2;
   // close all tracing modules
   for (j=0; j<cva(numNodes); j++)
-    for (i=0; i<cva(numWth); i++) {
-      int oldPe = CmiSwitchToPE(nodeInfo::Local2Global(j)*cva(numWth)+i);
+    for (i=0; i<cva(bgMach).numWth; i++) {
+      int oldPe = CmiSwitchToPE(nodeInfo::Local2Global(j)*cva(bgMach).numWth+i);
       if (origPe == -2) origPe = oldPe;
       traceCharmClose();
 //      CmiSwitchToPE(oldPe);
@@ -893,25 +864,43 @@ CmiHandler exitHandlerFunc(char *msg)
   return 0;
 }
 
+static void sanityCheck()
+{
+  if (cva(bgMach).x==0 || cva(bgMach).y==0 || cva(bgMach).z==0)  {
+    if (CmiMyPe() == 0)
+      CmiPrintf("\nMissing parameters for BlueGene machine size!\n<tip> use command line options: +x, +y, or +z.\n");
+    BgShutdown(); 
+  } 
+  else if (cva(bgMach).numCth==0 || cva(bgMach).numWth==0) { 
+    if (CmiMyPe() == 0)
+      CmiPrintf("\nMissing parameters for number of communication/worker threads!\n<tip> use command line options: +cth or +wth.\n");
+    BgShutdown(); 
+  }
+  else if (cva(bgMach).getNodeSize()<CmiNumPes()) {
+    CmiAbort("\nToo few BlueGene nodes!\n");
+  }
+}
+
+// main
 CmiStartFn bgMain(int argc, char **argv)
 {
   int i;
 
   /* initialize all processor level data */
-  CpvInitialize(int,numX);
-  CpvInitialize(int,numY);
-  CpvInitialize(int,numZ);
-  CpvInitialize(int,numCth);
-  CpvInitialize(int,numWth);
-  cva(numX) = cva(numY) = cva(numZ) = 0;
-  cva(numCth) = cva(numWth) = 0;
+  CpvInitialize(BGMach,bgMach);
+  cva(bgMach).nullify();
 
   CmiArgGroup("Charm++","BlueGene Simulator");
-  CmiGetArgIntDesc(argv, "+x", &cva(numX), "The x size of the grid of nodes");
-  CmiGetArgIntDesc(argv, "+y", &cva(numY), "The y size of the grid of nodes");
-  CmiGetArgIntDesc(argv, "+z", &cva(numZ), "The z size of the grid of nodes");
-  CmiGetArgIntDesc(argv, "+cth", &cva(numCth), "The number of simulated communication threads per node");
-  CmiGetArgIntDesc(argv, "+wth", &cva(numWth), "The number of simulated worker threads per node");
+  CmiGetArgIntDesc(argv, "+x", &cva(bgMach).x, 
+		"The x size of the grid of nodes");
+  CmiGetArgIntDesc(argv, "+y", &cva(bgMach).y, 
+		"The y size of the grid of nodes");
+  CmiGetArgIntDesc(argv, "+z", &cva(bgMach).z, 
+		"The z size of the grid of nodes");
+  CmiGetArgIntDesc(argv, "+cth", &cva(bgMach).numCth, 
+		"The number of simulated communication threads per node");
+  CmiGetArgIntDesc(argv, "+wth", &cva(bgMach).numWth, 
+		"The number of simulated worker threads per node");
 
   genTimeLog = CmiGetArgFlagDesc(argv, "+bglog", "Write events to log file");
   correctTimeLog = CmiGetArgFlagDesc(argv, "+bgcorrect", "Apply timestamp correction to logs");
@@ -931,9 +920,9 @@ CmiStartFn bgMain(int argc, char **argv)
   if(CmiGetArgFlagDesc(argv, "+bgcorroff", "Start with correction off")) 
     bgcorroff = 1;
 
-  bgstats=0;
+  bgstats_flag=0;
   if(CmiGetArgFlagDesc(argv, "+bgstats", "Print correction statistics")) 
-    bgstats = 1;
+    bgstats_flag = 1;
 
 #if BLUEGENE_DEBUG_LOG
   {
@@ -947,34 +936,29 @@ CmiStartFn bgMain(int argc, char **argv)
   arg_argc = CmiGetArgc(argv);
 
   /* msg handler */
-  CpvInitialize(int,msgHandler);
-  cva(msgHandler) = CmiRegisterHandler((CmiHandler) msgHandlerFunc);
-  CpvInitialize(int,nBcastMsgHandler);
-  cva(nBcastMsgHandler) = CmiRegisterHandler((CmiHandler)nodeBCastMsgHandlerFunc);
-  CpvInitialize(int,tBcastMsgHandler);
-  cva(tBcastMsgHandler) = CmiRegisterHandler((CmiHandler)threadBCastMsgHandlerFunc);
+  CpvInitialize(SimState, simState);
+  cva(simState).msgHandler = CmiRegisterHandler((CmiHandler) msgHandlerFunc);
+  cva(simState).nBcastMsgHandler = CmiRegisterHandler((CmiHandler)nodeBCastMsgHandlerFunc);
+  cva(simState).tBcastMsgHandler = CmiRegisterHandler((CmiHandler)threadBCastMsgHandlerFunc);
+  cva(simState).exitHandler = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
 
-  CpvInitialize(int,exitHandler);
-  cva(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
-
-  CpvInitialize(int,beginExitHandler);
-  cva(beginExitHandler) = CmiRegisterHandler((CmiHandler) beginExitHandlerFunc);
-
-  CpvInitialize(int, inEmulatorInit);
-  cva(inEmulatorInit) = 1;
+  cva(simState).beginExitHandler = CmiRegisterHandler((CmiHandler) beginExitHandlerFunc);
+  cva(simState).inEmulatorInit = 1;
   /* call user defined BgEmulatorInit */
   BgEmulatorInit(arg_argc, arg_argv);
-  cva(inEmulatorInit) = 0;
+  cva(simState).inEmulatorInit = 0;
 
   /* check if all bluegene node size and thread information are set */
-  BGARGSCHECK;
+  sanityCheck();
+
+  bgSize = cva(bgMach).getNodeSize(); 
 
   timerFunc = BgGetTime;
 
   BgInitTiming();		// timing module
 
   if (CmiMyPe() == 0) {
-    CmiPrintf("BG info> Simulating %dx%dx%d nodes with %d comm + %d work threads each.\n", cva(numX), cva(numY), cva(numZ), cva(numCth), cva(numWth));
+    CmiPrintf("BG info> Simulating %dx%dx%d nodes with %d comm + %d work threads each.\n", cva(bgMach).x, cva(bgMach).y, cva(bgMach).z, cva(bgMach).numCth, cva(bgMach).numWth);
     if (timingMethod == BG_ELAPSE) 
       CmiPrintf("BG info> Using BgElapse calls for timing method. \n");
     else if (timingMethod == BG_WALLTIME)
@@ -986,8 +970,6 @@ CmiStartFn bgMain(int argc, char **argv)
     if (correctTimeLog)
       CmiPrintf("BG info> Perform timing log correction. \n");
   }
-
-  bgSize = cva(numX)*cva(numY)*cva(numZ);
 
   CtvInitialize(threadInfo *, threadinfo);
 
@@ -1045,8 +1027,8 @@ extern "C" int CmiSwitchToPE(int pe)
   else if (pe < 0) {
   }
   else {
-    int t = pe%cva(numWth);
-    int newpe = nodeInfo::Global2Local(pe/cva(numWth));
+    int t = pe%cva(bgMach).numWth;
+    int newpe = nodeInfo::Global2Local(pe/cva(bgMach).numWth);
     nodeInfo *ninfo = cva(nodeinfo) + newpe;;
     threadInfo *tinfo = ninfo->threadinfo[t];
     CthSwitchThread(tinfo->me);
@@ -1098,12 +1080,14 @@ static inline char* searchInAffinityQueue(int nodeidx, int msgID, int srcnode, C
 // return the msg pointer, thread id and the index of the message in the affinity queue.
 static char* searchInAffinityQueueInNode(int nodeidx, int msgID, int srcnode, CmiInt2 &tID, int &index)
 {
-  for (tID=0; tID<cva(numWth); tID++) {
+  for (tID=0; tID<cva(bgMach).numWth; tID++) {
     char *msg = searchInAffinityQueue(nodeidx, msgID, srcnode, tID, index);
     if (msg) return msg;
   }
   return NULL;
 }
+
+StateCounters stateCounters;
 
 int updateRealMsgs(bgCorrectionMsg *cm, int nodeidx)
 {
@@ -1206,7 +1190,7 @@ void computeUtilForAll(int* array, int *nReal)
 
   for (int nodeidx=0; nodeidx<cva(numNodes); nodeidx++) {
     BgTimeLineRec *tlinerec = cva(nodeinfo)[nodeidx].timelines;
-    for (int tID=0; tID<cva(numWth); tID++) {
+    for (int tID=0; tID<cva(bgMach).numWth; tID++) {
       int util = (int)(scale*(tlinerec[tID].computeUtil(nReal)));
 
       if (util >= max) util=max-1;
@@ -1214,6 +1198,15 @@ void computeUtilForAll(int* array, int *nReal)
     }
   }
 }
+
+class StatsMessage {
+  char core[CmiBlueGeneMsgHeaderSizeBytes];
+public:
+  int processCount;
+  int corrMsgCount;
+  int realMsgCount;
+  int maxTimelineLen, minTimelineLen;
+};
 
 extern int processCount, corrMsgCount;
 
@@ -1226,10 +1219,10 @@ static void sendCorrectionStats()
   int numMsgs=0;
   int maxTimelineLen=-1, minTimelineLen=CMK_MAXINT;
   int totalMem = 0;
-  if (bgstats) {
+  if (bgstats_flag) {
   for (int nodeidx=0; nodeidx<cva(numNodes); nodeidx++) {
     BgTimeLineRec *tlines = cva(nodeinfo)[nodeidx].timelines;
-    for (int tID=0; tID<cva(numWth); tID++) {
+    for (int tID=0; tID<cva(bgMach).numWth; tID++) {
         BgTimeLineRec &tlinerec = tlines[tID];
 	int tlen = tlinerec.length();
 	if (tlen>maxTimelineLen) maxTimelineLen=tlen;
@@ -1249,7 +1242,7 @@ static void sendCorrectionStats()
   statsMsg->minTimelineLen = minTimelineLen;
   }  // end if
 
-  CmiSetHandler(statsMsg, cva(bgStatCollectHandler));
+  CmiSetHandler(statsMsg, cva(simState).bgStatCollectHandler);
   CmiSyncSendAndFree(0, msgSize, statsMsg);
 }
 
@@ -1276,7 +1269,7 @@ void statsCollectionHandlerFunc(void *msg)
   int *array = (int *)(m+1);
   for (i=0; i<HISTOGRAM_SIZE; i++) histArray[i] += array[i];
   if (count == CmiNumPes()) {
-    if (bgstats) {
+    if (bgstats_flag) {
       CmiPrintf("Total procCount:%d corrMsgCount:%d realMsg:%d timeline:%d-%d\n", pc, cc, realMsgCount, minTimelineLen, maxTimelineLen);
       for (i=0; i<HISTOGRAM_SIZE; i++) CmiPrintf("%d ", histArray[i]);
       CmiPrintf("\n");
@@ -1321,7 +1314,7 @@ static void writeToDisk()
 
   char* d = new char[10];
   //Num of simulated procs on this real pe
-  int numProcs = cva(numNodes)*cva(numWth);
+  int numProcs = cva(numNodes)*cva(bgMach).numWth;
 
   const PUP::machineInfo &machInfo = PUP::machineInfo::current();
 
@@ -1331,7 +1324,7 @@ static void writeToDisk()
     FILE *f2 = fopen("bgTrace","w");
     //Total real and toal BG processors
     int numPes=CmiNumPes();
-    int totalProcs = BgNumNodes()*cva(numWth);
+    int totalProcs = BgNumNodes()*cva(bgMach).numWth;
 
     if(f2==NULL)
       CmiPrintf("Creating bgTrace failed\n");
@@ -1339,11 +1332,10 @@ static void writeToDisk()
     PUP::toDisk p(f2);
     p((char *)&machInfo, sizeof(machInfo));
     p|totalProcs;
-    p|cva(numX); p|cva(numY); p|cva(numZ);
-    p|cva(numCth);p|cva(numWth);
+    p|cva(bgMach);
     p|numPes;
     
-    CmiPrintf("[0] Number is numX:%d numY:%d numZ:%d numCth:%d numWth:%d numPes:%d totalProcs:%d\n",cva(numX),cva(numY),cva(numZ),cva(numCth),cva(numWth),numPes,totalProcs);
+    CmiPrintf("[0] Number is numX:%d numY:%d numZ:%d numCth:%d numWth:%d numPes:%d totalProcs:%d\n",cva(bgMach).x,cva(bgMach).y,cva(bgMach).z,cva(bgMach).numCth,cva(bgMach).numWth,numPes,totalProcs);
     
     fclose(f2);
   }
@@ -1366,9 +1358,9 @@ static void writeToDisk()
   fseek(f,procTableSize,SEEK_CUR); 
 
   for (int j=0; j<cva(numNodes); j++){
-    for(int i=0;i<cva(numWth);i++){
+    for(int i=0;i<cva(bgMach).numWth;i++){
     BgTimeLineRec &t = cva(nodeinfo)[j].timelines[i];
-    procOffsets[j*cva(numWth) + i] = ftell(f);
+    procOffsets[j*cva(bgMach).numWth + i] = ftell(f);
     //  CmiPrintf("Timeline %d is has offset: %d\n",j,procOffsets[j]);
     /*    CmiPrintf("\nTimeline j is\n");
     for(int i=0;i<t.length();i++)
@@ -1384,7 +1376,7 @@ static void writeToDisk()
   p(procOffsets,numProcs);
   fclose(f);
 
-  CmiPrintf("[%d] Wrote to disk for BG node:%d work:%d \n", CmiMyPe(), cva(numNodes),cva(numWth));
+  CmiPrintf("[%d] Wrote to disk for BG node:%d work:%d \n", CmiMyPe(), cva(numNodes),cva(bgMach).numWth);
 }
 
 

@@ -189,8 +189,6 @@ void BgShutdown();
 */
 double BgGetTime();
 
-CpvExtern(int, inEmulatorInit);
-
 /**
    get and set user-defined node private data 
 */
@@ -215,7 +213,6 @@ void bgAddProjEvent(void *data, int idx, double t,
 void bgUpdateProj(int eType);
 double BgGetRecvTime();
 void BgResetRecvTime();
-void BgSkipEndExecuteEvent();
 
 /************************ Supporting AMPI ************************/
 

@@ -12,24 +12,6 @@ void correctMsgTime(char *msg);
 /**
   threadInfo methods
 */
-void commThreadInfo::addAffMessage(char *msgPtr)
-{
-  ckMsgQueue &que = myNode->affinityQ[id];
-  que.enq(msgPtr);
-#if SCHEDULE_WORK
-  /* don't awake directly, put into a priority queue sorted by recv time */
-  double nextT = CmiBgMsgRecvTime(msgPtr);
-  CthThread tid = me;
-  unsigned int prio = (unsigned int)(nextT*PRIO_FACTOR)+1;
-  DEBUGF(("[%d] awaken worker thread with prio %d.\n", tMYNODEID, prio));
-  CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
-#else
-  if (que.length() == 1) {
-    CthAwaken(me);
-  }
-#endif
-}
-
 void commThreadInfo::run()
 {
   tSTARTTIME = CmiWallTimer();
@@ -176,5 +158,23 @@ void workThreadInfo::run()
     CthYield();
 #endif
   }
+}
+
+void workThreadInfo::addAffMessage(char *msgPtr)
+{
+  ckMsgQueue &que = myNode->affinityQ[id];
+  que.enq(msgPtr);
+#if SCHEDULE_WORK
+  /* don't awake directly, put into a priority queue sorted by recv time */
+  double nextT = CmiBgMsgRecvTime(msgPtr);
+  CthThread tid = me;
+  unsigned int prio = (unsigned int)(nextT*PRIO_FACTOR)+1;
+  DEBUGF(("[%d] awaken worker thread with prio %d.\n", tMYNODEID, prio));
+  CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
+#else
+  if (que.length() == 1) {
+    CthAwaken(me);
+  }
+#endif
 }
 

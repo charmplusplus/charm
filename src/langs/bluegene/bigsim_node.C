@@ -12,34 +12,35 @@
 nodeInfo::nodeInfo(): lastW(0), udata(NULL), started(0), timeron_flag(0)
 {
     int i;
+    const int numWth = cva(bgMach).numWth;
 
     inBuffer.initialize(INBUFFER_SIZE);
     msgBuffer = CmmNew();
 
     commThQ = new threadQueue;
-    commThQ->initialize(cva(numCth));
+    commThQ->initialize(cva(bgMach).numCth);
 
-    threadTable = new CthThread[cva(numWth)+cva(numCth)];
+    threadTable = new CthThread[cva(bgMach).numTh()];
     _MEMCHECK(threadTable);
-    threadinfo = new threadInfo*[cva(numWth)+cva(numCth)];
+    threadinfo = new threadInfo*[cva(bgMach).numTh()];
     _MEMCHECK(threadinfo);
 
-    affinityQ = new ckMsgQueue[cva(numWth)];
+    affinityQ = new ckMsgQueue[numWth];
     _MEMCHECK(affinityQ);
 
     // create threadinfo
-    for (i=0; i< cva(numWth); i++)
+    for (i=0; i< numWth; i++)
     {
       threadinfo[i] = new workThreadInfo(i, WORK_THREAD, this);
       _MEMCHECK(threadinfo[i]);
     }
-    for (i=0; i< cva(numCth); i++)
+    for (i=0; i< cva(bgMach).numCth; i++)
     {
-      threadinfo[i+cva(numWth)] = new commThreadInfo(i+cva(numWth), COMM_THREAD, this);
-      _MEMCHECK(threadinfo[i+cva(numWth)]);
+      threadinfo[i+numWth] = new commThreadInfo(i+numWth, COMM_THREAD, this);
+      _MEMCHECK(threadinfo[i+numWth]);
     }
 #if BLUEGENE_TIMING
-    timelines = new BgTimeLineRec[cva(numWth)]; // set default size 1024
+    timelines = new BgTimeLineRec[numWth]; // set default size 1024
     _MEMCHECK(timelines);
 #endif
   }
@@ -105,10 +106,10 @@ void nodeInfo::addBgNodeMessage(char *msgPtr)
   /* find a idle worker thread */
   /* FIXME:  flat search is bad if there is many work threads */
   int wID = lastW;
-  for (i=0; i<cva(numWth); i++) 
+  for (i=0; i<cva(bgMach).numWth; i++) 
   {
     wID ++;
-    if (wID == cva(numWth)) wID = 0;
+    if (wID == cva(bgMach).numWth) wID = 0;
     if (affinityQ[wID].length() == 0)
     {
       /* this work thread is idle, schedule the msg here */
@@ -141,7 +142,7 @@ void nodeInfo::addBgNodeMessage(char *msgPtr)
   }
 #else
     // only awake rank 0 thread, which is a comm thread
-  ((commThreadInfo *)threadinfo[0])->addAffMessage(msgPtr);
+  ((workThreadInfo *)threadinfo[0])->addAffMessage(msgPtr);
 /*
   affinityQ[0].enq(msgPtr);
   CthThread tid = threadTable[0];
