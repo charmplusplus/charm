@@ -510,6 +510,17 @@ EOT
 test_cxx "whether has alloca.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_ALLOCA_H, $pass, [whether has alloca.h])
 
+#### test if has malloc.h ####
+cat > $t <<EOT
+#include <malloc.h>
+int main() { 
+  int * d = (int *)malloc(sizeof(int));
+  return 0;
+}
+EOT
+test_cxx "whether has malloc.h " "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_MALLOC_H, $pass, [whether has malloc.h])
+
 #### test if has elf.h ####
 cat > $t <<EOT
 #include <elf.h>
