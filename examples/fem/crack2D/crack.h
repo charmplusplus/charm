@@ -1,5 +1,9 @@
+/**
+ * Main header file for crack propagation code.
+ */
 #include <string>
 #include <stdlib.h>
+#include <math.h>
 #include "fem.h"
 
 //Coord describes a property with X and Y components
@@ -13,6 +17,8 @@ struct Coord
 // These are 6-vertex triangles (each side has an extra vertex)
 struct Vol
 {
+  int material; //VolMaterial type
+  int conn[6]; // 6 nodes around this element
   double s11l[3], s22l[3], s12l[3];//Stress coefficients
 };
 
@@ -21,23 +27,14 @@ struct Vol
 //  These are 6-vertex rectangles (long sides have an extra vertex)
 struct Coh
 {
+  int material; //CohMaterial type
+  int conn[6]; // 6 nodes around this element
   Coord T[3];//Tractions at each sample point
   double sidel[3];//[0]->length of element; 
                 //[1],[2] give cosine and sine of orientation
   double Sthresh[3];//The threshold, and damage for this edge
 };
 
-// Declaration for class Element (generic elements)
-struct Element
-{
-  int material;          // matlst, matclst, matc
-  union {
-    Vol v;
-    Coh c;
-  };
-};
-
-  
 // Declaration for class Material
 struct Material
 {
@@ -66,20 +63,20 @@ struct CohMaterial : public Material
   
 struct Node
 {
-  Coord Rin;             //Internal force
-  Coord Rco;             //Cohesive traction load
-  Coord xM;              //Mass at this node (xM.x==xM.y, too)
+  Coord Rin;   //Internal force, from volumetric elements
+  Coord Rco;   //Cohesive traction load, from cohesive elements
+  Coord xM;    //Mass at this node (xM.x==xM.y)
   Coord vel;
   Coord accel;
-  Coord disp;
-  Coord pos;
-  Coord r;
-  unsigned char id1, id2;
-  unsigned char isbnd;
+  Coord disp;  //Distance this node has moved
+  Coord pos;   //Undeformed position of this node
+  //FIXME: boundary conditions should be stored in a separate array
+  Coord r; //Boundary condition vector
+  unsigned char isbnd; //Flag: is this a boundary node?
+  unsigned char id1, id2; //Boundary condition flags
 };
 
 //Global constants
-const int    numBoundMax = 1123;   // Maximum number of boundary nodes
 const double   g1          = -0.774596669241483;
 const double   g3          = 0.774596669241483;
 const double   w1          = 0.555555555555555;
@@ -87,25 +84,35 @@ const double   w2          = 0.888888888888888;
 const double   w3          = 0.555555555555555;
 const double   pi          = 3.14159265358979;
 
-struct GlobalData {
-  int myid;
-  int numNP;               //number of nodal points (numnp)
-  int numLST;              //number of LST elements (numlst)
-  int numCLST;             //number of LST cohesive elements (numclst)
-  int numBound;            //number of boundary nodes w/loads
+/// Contains data read from the configuration file that
+/// never changes during the run.
+struct ConfigurationData {
+  /// Simulation control
   int nTime;               //total number of time steps
-  int steps;               //ratio of delta and Courant cond
-  double delta;            //timestep
-  double delta2;           //delta squared times 2????
-  int *ts_proportion;      //time step for given constant
-  double *proportion;      //load proportionality constant
-
-  int lin;                 //elastic formulation, 0=nl, 1=linear
-  int ncoh;                //type of cohesive law, 0=exp., 1=linear
-  int nplane;              //type of plane analysis, 0=stress, 1=strain
   int tsintFull;          //output interval in time steps
   int tsintEnergy;        //partial output interval
   int restart;
+  
+  /// Timestep control
+  int steps;               //ratio of delta and Courant cond
+  double delta;            //timestep
+  double delta2;           //delta squared times 2????
+  int numProp;             //number of proportionality constants
+  int *ts_proportion;      //time step to apply proportionality constant at
+  double *proportion;      //boundary load proportionality constant
+
+  /// Material formulation
+  int lin;                 //elastic formulation, 0=nl, 1=linear
+  int ncoh;                //type of cohesive law, 0=exp., 1=linear
+  int nplane;              //type of plane analysis, 0=stress, 1=strain
+  
+  /// Material properties
+  int numMatVol;           //number of volumetric materials (numat_vol)
+  int numMatCoh;           //number of cohesive materials (numat_coh)
+  VolMaterial *volm;  // Properties of volumetric materials
+  CohMaterial *cohm;  // Properties of cohesive materials
+  
+  /// "Impact": special boundary condition on just one node
   int imp;                //Is there impact?
   double voImp;         //Velocity of impactor
   double dImp;             //Displacement
@@ -113,26 +120,50 @@ struct GlobalData {
   double vImp;             //Velocity
   double xnuImp,eImp,eTop,radiusImp;   //Impact parameters
   double indent;           //indentation of impactor
-  int nImp;            //node hit
   double fImp;             //contact force
   double massImp;          //mass
-
-  int numMatVol;           //number of volumetric materials (numat_vol)
-  int numMatCoh;           //number of cohesive materials (numat_coh)
-  int numProp;             //number of proportionality constants
-  VolMaterial *volm;
-  CohMaterial *cohm;
-
-  double *itimes;
-
-  int nn, ne, npere;
-  int *nnums, *enums, *conn;
-  Node *nodes;
-  Element *elements;
-  int scoh, ecoh, svol, evol;
 };
 
-extern void readFile(GlobalData *gd);
-extern void vol_elem(GlobalData *gd);
-extern void lst_NL(GlobalData *gd);
-extern void lst_coh2(GlobalData *gd);
+extern ConfigurationData config;
+void readConfig(const char *configFile,const char *meshFile);
+
+/// This structure describes the nodes and elements of a mesh:
+struct MeshData {
+  int nn;               //number of nodal points (numnp)
+  int ne;              //number of LST elements (numlst)
+  int nc;             //number of LST cohesive elements (numclst)
+  int numBound;            //number of boundary nodes w/loads
+  int nImp;            //node hit by impactor
+
+  Node *nodes;
+  Vol *vols;
+  Coh *cohs;
+};
+
+//Serial mesh routines: in mesh.C
+void readMesh(MeshData *mesh,const char *meshFile);
+void setupMesh(MeshData *mesh); //Initialize newly-read mesh
+void deleteMesh(MeshData *mesh); //Free storage allocated in mesh
+
+//Parallel mesh routines: in fem_mesh.C
+void sendMesh(MeshData *mesh,int fem_mesh);
+void recvMesh(MeshData *mesh,int fem_mesh);
+extern "C" void pupMesh(pup_er p,MeshData *mesh); //For migration
+
+
+//Node physics: in node.C
+struct NodeSlope {
+  int kk; //Index into config.ts_proportion array
+  double prop; //Proportion of boundary conditions to apply
+  double slope; //Slope of prop
+};
+void nodeSetup(NodeSlope *sl);
+void nodeBeginStep(MeshData *mesh);
+void nodeFinishStep(MeshData *mesh, NodeSlope *sl,int tstep);
+
+//Element physics: in lst_NL.C, lst_coh2.C
+extern void lst_NL(MeshData *mesh);
+extern void lst_coh2(MeshData *mesh);
+
+
+void crack_abort(const char *why);

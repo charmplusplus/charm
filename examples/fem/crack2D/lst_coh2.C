@@ -1,40 +1,43 @@
+/**
+ * Cohesive element physics for crack propagation code.
+ */
 #include "crack.h"
 #include <math.h>
 
 
 //Update cohesive element traction itNo given Dn, Dt
 static void 
-updateTraction(double Dn, double Dt,Element *coh,CohMaterial *m,int itNo)
+updateTraction(double Dn, double Dt,Coh *coh,CohMaterial *m,int itNo)
 {
   double Tn, Tt;
-  double c=coh->c.sidel[1],s=coh->c.sidel[2];
+  double c=coh->sidel[1],s=coh->sidel[2];
   double x = 1.0 - sqrt(Dn*Dn+Dt*Dt);
   
   if (x <= 0.0) {
-    coh->c.Sthresh[itNo] = 0.0;
-  } else if (x <= coh->c.Sthresh[itNo])
-    coh->c.Sthresh[itNo] = x;
+    coh->Sthresh[itNo] = 0.0;
+  } else if (x <= coh->Sthresh[itNo])
+    coh->Sthresh[itNo] = x;
   
   if (Dn > 0.0)
-    Tn = coh->c.Sthresh[itNo]/(1.0-coh->c.Sthresh[itNo])*m->sigmax*Dn;
+    Tn = coh->Sthresh[itNo]/(1.0-coh->Sthresh[itNo])*m->sigmax*Dn;
   else
     Tn = m->Sinit/(1.0-m->Sinit)*m->sigmax*Dn;
   
-  Tt = coh->c.Sthresh[itNo]/(1.0-coh->c.Sthresh[itNo])*m->taumax*Dt;
-  coh->c.T[itNo].x = c*Tt - s*Tn;
-  coh->c.T[itNo].y = s*Tt + c*Tn;
-}       
+  Tt = coh->Sthresh[itNo]/(1.0-coh->Sthresh[itNo])*m->taumax*Dt;
+  coh->T[itNo].x = c*Tt - s*Tn;
+  coh->T[itNo].y = s*Tt + c*Tn;
+}
 
 void
-lst_coh2(GlobalData *gd) 
+lst_coh2(MeshData *mesh) 
 {
   int idx;
-  for(idx=gd->scoh; idx<gd->ecoh; idx++) {
-    Element *coh = &(gd->elements[idx]);
+  for(idx=0; idx<mesh->nc; idx++) {
+    Coh *coh = &(mesh->cohs[idx]);
     Node *n[6];
     int k;
     for(k=0;k<6;k++)
-      n[k] = &(gd->nodes[gd->conn[idx*6+k]]);
+      n[k] = &(mesh->nodes[coh->conn[k]]);
 
     // local variables:
     double deltn, deltt;  // the char length of current element
@@ -51,13 +54,13 @@ lst_coh2(GlobalData *gd)
     // g1,g3: gauss quadrature points
     // w1,w2,w3: weights; w1=w2, w3=w4
     
-    CohMaterial *m = &(gd->cohm[coh->material]);
+    CohMaterial *m = &(config.cohm[coh->material]);
       
     deltn = (double)1.0 / m->deltan;
     deltt = (double)1.0 / m->deltat;
-    length = coh->c.sidel[0] * (double)0.5;
-    c = coh->c.sidel[1];
-    s = coh->c.sidel[2];
+    length = coh->sidel[0] * (double)0.5;
+    c = coh->sidel[1];
+    s = coh->sidel[2];
     
     Dx1 = n[3]->disp.x - n[0]->disp.x;
     Dy1 = n[3]->disp.y - n[0]->disp.y;
@@ -87,12 +90,12 @@ lst_coh2(GlobalData *gd)
   
     // cohesive forces
     x = length*w1*g1*0.5;
-    Rx1 = (coh->c.T[0].x*(g1-1.0)+coh->c.T[2].x*(g1+1.0))*x;
-    Ry1 = (coh->c.T[0].y*(g1-1.0)+coh->c.T[2].y*(g1+1.0))*x;
-    Rx2 = (coh->c.T[0].x*(g1+1.0)+coh->c.T[2].x*(g1-1.0))*x;
-    Ry2 = (coh->c.T[0].y*(g1+1.0)+coh->c.T[2].y*(g1-1.0))*x;
-    Rx3 = ((coh->c.T[0].x+coh->c.T[2].x)*w1*(1.0-g1*g1)+coh->c.T[1].x*w2)*length;
-    Ry3 = ((coh->c.T[0].y+coh->c.T[2].y)*w1*(1.0-g1*g1)+coh->c.T[1].y*w2)*length;
+    Rx1 = (coh->T[0].x*(g1-1.0)+coh->T[2].x*(g1+1.0))*x;
+    Ry1 = (coh->T[0].y*(g1-1.0)+coh->T[2].y*(g1+1.0))*x;
+    Rx2 = (coh->T[0].x*(g1+1.0)+coh->T[2].x*(g1-1.0))*x;
+    Ry2 = (coh->T[0].y*(g1+1.0)+coh->T[2].y*(g1-1.0))*x;
+    Rx3 = ((coh->T[0].x+coh->T[2].x)*w1*(1.0-g1*g1)+coh->T[1].x*w2)*length;
+    Ry3 = ((coh->T[0].y+coh->T[2].y)*w1*(1.0-g1*g1)+coh->T[1].y*w2)*length;
     n[0]->Rco.x += Rx1;
     n[0]->Rco.y += Ry1;
     n[3]->Rco.x -= Rx1;

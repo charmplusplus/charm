@@ -1,7 +1,7 @@
 prefix of output files
 crck_bar
 Execution: ntime,nsteps,ntsint_full,ntsint_energy,restart(0=no,1=yes)
-        2000 20 500 15003 0
+        10000 20 500 15003 0
 nplane(0=stress,1=strain,2=axi) ncoh(0=exp,1=lin) lin(0=nonlin,1=linear)
         0 1 0
 number of volumetric material sets : numat_vol

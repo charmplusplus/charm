@@ -1,8 +1,7 @@
-/*Subroutine: 
-  lst_NL:  converted from Fortran on 9/7/99 by Orion Sky Lawlor
-           Computes each node's Rin.
-*/
-
+/**
+ * Volumetric element physics for crack propagation code.
+ *  converted from Fortran on 9/7/99 by Orion Sky Lawlor
+ */
 #include "crack.h"
 
 //BtoR: sum the "B" spatial derivative array into the
@@ -10,7 +9,7 @@
 
 static void BtoR(const Coord *B/*6-array*/,
     Coord *R/*6-array*/,Node **n/*6-array*/,
-    Element *v,const VolMaterial *vm,
+    Vol *v,const VolMaterial *vm,
     int pkCount,double iaa)
 
 {
@@ -36,9 +35,9 @@ static void BtoR(const Coord *B/*6-array*/,
 //C-----Calculate the pkCount'th Piola-Kirchhoff stress (S)
   
   double s11c,s12c,s22c;
-  s11c=v->v.s11l[pkCount] = E11*vm->c[0] + E22*vm->c[1];
-  s22c=v->v.s22l[pkCount] = E11*vm->c[1] + E22*vm->c[2];
-  s12c=v->v.s12l[pkCount] = E12*vm->c[3];
+  s11c=v->s11l[pkCount] = E11*vm->c[0] + E22*vm->c[1];
+  s22c=v->s22l[pkCount] = E11*vm->c[1] + E22*vm->c[2];
+  s12c=v->s12l[pkCount] = E12*vm->c[3];
   
 //Update R
   for (k=0;k<6;k++) {
@@ -52,15 +51,15 @@ static void BtoR(const Coord *B/*6-array*/,
 
 
 void
-lst_NL(GlobalData *gd)
+lst_NL(MeshData *mesh)
 {
   int idx;
-  for(idx=gd->svol; idx<gd->evol; idx++) {
-    Element *v = &(gd->elements[idx]);
+  for(idx=0; idx<mesh->ne; idx++) {
+    Vol *v = &(mesh->vols[idx]);
     Node *n[6];
     int k;
     for(k=0;k<6;k++)
-      n[k] = &(gd->nodes[gd->conn[idx*6+k]]);
+      n[k] = &(mesh->nodes[v->conn[k]]);
 
     const double c5v3 = 1.66666666666667;
     const double c1v3 = 0.33333333333333;
@@ -76,7 +75,7 @@ lst_NL(GlobalData *gd)
     //Nodes 0, 1, and 2 are the outer corners;
     //Nodes 4, 5, and 6 are on the midpoints of the sides.
       
-    VolMaterial *vm = &(gd->volm[v->material]); //Current material
+    VolMaterial *vm = &(config.volm[v->material]); //Current material
       
     for (k=0;k<6;k++) {
         R[k].x=R[k].y=0.0;
