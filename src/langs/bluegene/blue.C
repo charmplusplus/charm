@@ -22,17 +22,6 @@
 
 #define  DEBUGF(x)      //CmiPrintf x;
 
-#ifdef CMK_ORIGIN2000
-extern "C" int start_counters(int e0, int e1);
-extern "C" int read_counters(int e0, long long *c0, int e1, long long *c1);
-inline double Count2Time(long long c) { return c*5.e-7; }
-#elif CMK_HAS_COUNTER_PAPI
-#include <papi.h>
-int papiEvents[2] = { PAPI_TOT_CYC, PAPI_FP_INS };
-long_long papiValues[2];
-inline double Count2Time(long long c) { return c*5.e-7; }
-#endif
-
 /* node level variables */
 CpvDeclare(nodeInfo*, nodeinfo);		/* represent a bluegene node */
 
@@ -60,6 +49,17 @@ static int bgstats_flag = 0;		// flag print stats at end of simulation
 
 // for debugging log
 FILE *bgDebugLog;			// for debugging
+
+#ifdef CMK_ORIGIN2000
+extern "C" int start_counters(int e0, int e1);
+extern "C" int read_counters(int e0, long long *c0, int e1, long long *c1);
+inline double Count2Time(long long c) { return c*5.e-7; }
+#elif CMK_HAS_COUNTER_PAPI
+#include <papi.h>
+int papiEvents[2] = { PAPI_TOT_CYC, PAPI_FP_INS };
+long_long papiValues[2];
+inline double Count2Time(long long c) { return c*cva(bgMach).fpfactor; }
+#endif
 
 
 /****************************************************************************
@@ -1043,6 +1043,7 @@ CmiStartFn bgMain(int argc, char **argv)
     CmiPrintf("BG info> Network type: %s.\n", cva(bgMach).network->name());
     cva(bgMach).network->print();
     CmiPrintf("BG info> cpufactor is %f.\n", cva(bgMach).cpufactor);
+    CmiPrintf("BG info> floating point factor is %f.\n", cva(bgMach).fpfactor);
     if (cva(bgMach).stacksize)
       CmiPrintf("BG info> BG stack size: %d bytes. \n", cva(bgMach).stacksize);
     if (cva(bgMach).timingMethod == BG_ELAPSE) 

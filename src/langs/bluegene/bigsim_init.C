@@ -170,6 +170,10 @@ int BGMach::read(char *file)
       cpufactor = atof(parameterValue);
       continue;
     }
+    if (!strcmp(parameterName, "fpfactor")) {
+      fpfactor = atof(parameterValue);
+      continue;
+    }
     if (!strcmp(parameterName, "log")) {
       if (!strcmp(parameterValue, "yes"))
         genTimeLog = 1;

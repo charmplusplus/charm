@@ -25,8 +25,9 @@ public:
   int x, y, z;         /* size of bluegene nodes in cube */
   int numCth, numWth;           /* number of threads */
   int stacksize;		/* bg thread stack size */
-  int timingMethod;		/* timing method */
-  double cpufactor;		/* cpu factor to multiply to the time */
+  int timingMethod;	   /* timing method */
+  double cpufactor;	   /* cpu factor to multiply to the time for walltime */
+  double fpfactor;     /* fp time factor */
   char *traceroot;		/* bgTraceFile prefix */
   BigSimNetwork *network;	/* network setup */
 public:
@@ -35,7 +36,7 @@ public:
   void nullify() { 
 	x=y=z=0; 
 	numCth=numWth=0; stacksize=0; 
-	timingMethod = BG_ELAPSE; cpufactor=1.0; 
+	timingMethod = BG_ELAPSE; cpufactor=1.0; fpfactor=0.0;
 	traceroot=NULL; 
 	network=new BlueGeneNetwork;
   }
@@ -50,7 +51,7 @@ public:
   int read(char *file);
   void pup(PUP::er &p) { 
         p|x; p|y; p|z; p|numCth; p|numWth; 
-	p|stacksize; p|timingMethod;
+	p|stacksize; p|timingMethod; 
        }
 };
 
