@@ -499,20 +499,37 @@ FDECL void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
 		  void *threadData,int *threadDataLen)
 { TCHARM_Create_data(*nThreads,threadFn,threadData,*threadDataLen); }
 
-static int propMapCreated=0;
-static CkGroupID propMapID;
+static int mapCreated=0;
+static CkGroupID mapID;
 CkGroupID CkCreatePropMap(void);
 
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
 {
-	CkArrayOptions opts(msg->numElements);
-	if (!propMapCreated) {
-		propMapCreated=1;
-		propMapID=CkCreatePropMap();
-	}
-	opts.setMap(propMapID);
-	int nElem=msg->numElements; //<- save it because msg will be deleted.
-	return CProxy_TCharm::ckNew(msg,opts);
+  char** argv = CkGetArgv();
+  CkArrayOptions opts(msg->numElements);
+  if (!mapCreated) {
+    char* mapping;
+    if (0!=CmiGetArgString(argv, "+mapping", &mapping)){
+
+      if(0==strcmp(mapping,"BLOCK_MAP")){
+        mapID=CProxy_BlockMap::ckNew();
+      }
+     
+      if(0==strcmp(mapping,"RR_MAP")){
+        mapID=CProxy_RRMap::ckNew();
+      }
+
+      if(0==strcmp(mapping,"PROP_MAP")){
+        mapID=CkCreatePropMap();
+      }
+    } else {
+      mapID=CkCreatePropMap();
+    }
+    mapCreated=1;
+  }
+  opts.setMap(mapID);
+  int nElem=msg->numElements; //<- save it because msg will be deleted.
+  return CProxy_TCharm::ckNew(msg,opts);
 }
 
 // Helper used when creating a new array bound to the TCHARM threads:
