@@ -86,9 +86,51 @@ CpvDeclare(int,   CsdStopFlag);
 
 /*****************************************************************************
  *
- * Argument parsing routines.
+ * Command-Line Argument (CLA) parsing routines.
  *
  *****************************************************************************/
+
+
+
+static int usageChecked=0; /* set when argv has been searched for a usage request */
+static int printUsage=0; /* if set, print command-line usage information */
+static const char *CLAformatString="%20s %12s %s\n";
+
+/* Print out the CLA header */
+static void CmiPrintCLAs(void) {
+	int i;
+	if (CmiMyPe()!=0) return; /*Don't bother if we're not PE 0*/
+	CmiPrintf("Accepted Command Line Options:\n ");
+	CmiPrintf(CLAformatString,"Option:","Parameter:","Description:");
+}
+
+/**
+ * Return true if command-line usage information should be printed--
+ * that is, if a "-?", "-h", or "--help" flag is present.
+ */
+int CmiDoPrintUsage(char **argv) {
+	if (!usageChecked) {
+		/* Look for usage request in command line */
+		int i;
+		for (i=0;argv[i]!=NULL;i++)
+		{
+			if (0==strcmp(argv[i],"-?") ||
+			    0==strcmp(argv[i],"-h") ||
+			    0==strcmp(argv[i],"--help")) 
+			{
+				printUsage=1;
+				CmiDeleteArgs(&argv[i],1);
+				CmiPrintCLAs();
+			}
+		}
+		usageChecked=1;
+	}
+	if (CmiMyPe()!=0) 
+		return 0; /* Only processor 0 gets to print usage info... */
+	else /* CmiMyPe()==0 */
+		return printUsage;
+}
+
 
 /*Count the number of non-NULL arguments in list*/
 int CmiGetArgc(char **argv)
@@ -129,9 +171,11 @@ e.g., arg=="-name" returns "bob" from
 argv=={"a.out","foo","-name","bob","bar"},
 and sets argv={"a.out","foo","bar"};
 */
-int CmiGetArgString(char **argv,const char *arg,char **optDest)
+int CmiGetArgStringDesc(char **argv,const char *arg,char **optDest,const char *desc)
 {
 	int i;
+	if (CmiDoPrintUsage(argv))
+		CmiPrintf(CLAformatString,arg,"string",desc);
 	for (i=0;argv[i]!=NULL;i++)
 		if (0==strcmp(argv[i],arg))
 		{/*We found the argument*/
@@ -142,6 +186,9 @@ int CmiGetArgString(char **argv,const char *arg,char **optDest)
 		}
 	return 0;/*Didn't find the argument*/
 }
+int CmiGetArgString(char **argv,const char *arg,char **optDest) {
+	return CmiGetArgStringDesc(argv,arg,optDest,"");
+}
 
 /*Find the given argument and numeric option in argv.
 If the argument is present, parse and set the numeric option,
@@ -150,10 +197,12 @@ e.g., arg=="-pack" matches argv=={...,"-pack","27",...},
 argv=={...,"-pack0xf8",...}, and argv=={...,"-pack=0777",...};
 but not argv=={...,"-packsize",...}.
 */
-int CmiGetArgInt(char **argv,const char *arg,int *optDest)
+int CmiGetArgIntDesc(char **argv,const char *arg,int *optDest,const char *desc)
 {
 	int i;
 	int argLen=strlen(arg);
+	if (CmiDoPrintUsage(argv))
+		CmiPrintf(CLAformatString,arg,"integer",desc);
 	for (i=0;argv[i]!=NULL;i++)
 		if (0==strncmp(argv[i],arg,argLen))
 		{/*We *may* have found the argument*/
@@ -184,15 +233,20 @@ int CmiGetArgInt(char **argv,const char *arg,int *optDest)
 		}
 	return 0;/*Didn't find the argument-- dest is unchanged*/	
 }
+int CmiGetArgInt(char **argv,const char *arg,int *optDest) {
+	return CmiGetArgIntDesc(argv,arg,optDest,"");
+}
 
 /*Find the given argument in argv.  If present, delete
 it and return 1; if not present, return 0.
 e.g., arg=="-foo" matches argv=={...,"-foo",...} but not
 argv={...,"-foobar",...}.
 */
-int CmiGetArgFlag(char **argv,const char *arg)
+int CmiGetArgFlagDesc(char **argv,const char *arg,const char *desc)
 {
 	int i;
+	if (CmiDoPrintUsage(argv))
+		CmiPrintf(CLAformatString,arg,"none",desc);
 	for (i=0;argv[i]!=NULL;i++)
 		if (0==strcmp(argv[i],arg))
 		{/*We found the argument*/
@@ -201,6 +255,10 @@ int CmiGetArgFlag(char **argv,const char *arg)
 		}
 	return 0;/*Didn't find the argument*/
 }
+int CmiGetArgFlag(char **argv,const char *arg) {
+	return CmiGetArgFlagDesc(argv,arg,"");
+}
+
 
 /*****************************************************************************
  *

@@ -923,11 +923,16 @@ void CcdRaiseCondition(int condnum);
 
 /* Command-Line-Argument handling */
 int CmiGetArgString(char **argv,const char *arg,char **optDest);
+int CmiGetArgStringDesc(char **argv,const char *arg,char **optDest,const char *desc);
 int CmiGetArgInt(char **argv,const char *arg,int *optDest);
+int CmiGetArgIntDesc(char **argv,const char *arg,int *optDest,const char *desc);
 int CmiGetArgFlag(char **argv,const char *arg);
+int CmiGetArgFlagDesc(char **argv,const char *arg,const char *desc);
 void CmiDeleteArgs(char **argv,int k);
 int CmiGetArgc(char **argv);
 char **CmiCopyArgs(char **argv);
+int CmiDoPrintUsage(char **argv);
+void CmiCheckUsage(char **argv); 
 
 /* Return the names of the functions that have been called
    up to this point in a malloc'd pointer array.*/
