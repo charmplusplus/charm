@@ -18,23 +18,7 @@
 #include "stdio.h"
 #include "errno.h"
 
-#define  CREATION           1
-#define  BEGIN_PROCESSING   2
-#define  END_PROCESSING     3
-#define  ENQUEUE            4
-#define  DEQUEUE            5
-#define  BEGIN_COMPUTATION  6
-#define  END_COMPUTATION    7
-#define  BEGIN_INTERRUPT    8
-#define  END_INTERRUPT      9
-#define  USER_EVENT         13
-#define  BEGIN_IDLE         14
-#define  END_IDLE           15
-#define  BEGIN_PACK         16
-#define  END_PACK           17
-#define  BEGIN_UNPACK       18
-#define  END_UNPACK         19
-
+#include "trace-common.h"
 
 /// a log entry in trace projection
 class LogEntry {
