@@ -312,3 +312,14 @@ int usched, initret;
   }
 }
 
+#if CMK_CONDS_USE_SPECIAL_CODE
+int CmiSwitchToPE(int newpe)
+{
+  int oldpe = Cmi_mype;
+  if (newpe == CcdIGNOREPE) return CcdIGNOREPE;
+  Cmi_mype = newpe;
+  return oldpe;
+}
+#endif
+
+
