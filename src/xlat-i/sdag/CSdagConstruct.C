@@ -1538,7 +1538,7 @@ void SdagConstruct::generateEndExec(XStr& op){
 void SdagConstruct::generateBeginTime(XStr& op)
 {
   //Record begin time for tracing
-  op<< "    double __begintime = BgGetTime(); \n";
+  op<< "    double __begintime = CkVTimer(); \n";
 }
 
 void SdagConstruct::generateTlineEndCall(XStr& op)
@@ -1550,7 +1550,7 @@ void SdagConstruct::generateTlineEndCall(XStr& op)
 void SdagConstruct::generateEndSeq(XStr& op)
 {
   op<<  "    void* _bgParentLog = NULL;\n";
-  op<<  "    BgElapse(0.01e-6);\n";
+  op<<  "    CkElapse(0.01e-6);\n";
   //op<<  "    BgElapse(1e-6);\n";
   generateTlineEndCall(op);
   generateTraceEndCall(op);
@@ -1560,12 +1560,12 @@ void SdagConstruct::generateEndSeq(XStr& op)
 void SdagConstruct::generateEventBracket(XStr& op, int eventType)
 {
   //Trace this event
-  op<<"     _TRACE_BG_USER_EVENT_BRACKET(\""<<nameStr<<"\", __begintime, BgGetTime(),&_bgParentLog); \n"; 
+  op<<"     _TRACE_BG_USER_EVENT_BRACKET(\""<<nameStr<<"\", __begintime, CkVTimer(),&_bgParentLog); \n"; 
 }
 
 void SdagConstruct::generateListEventBracket(XStr& op, int eventType){
 
-  op<<"    _TRACE_BGLIST_USER_EVENT_BRACKET(\""<<nameStr<<"\",__begintime,BgGetTime(),&_bgParentLog, "<<label->charstar()<<"_bgLogList);\n";
+  op<<"    _TRACE_BGLIST_USER_EVENT_BRACKET(\""<<nameStr<<"\",__begintime,CkVTimer(),&_bgParentLog, "<<label->charstar()<<"_bgLogList);\n";
 }
 
 void SdagConstruct::generateRegisterEp(XStr& op)          // for trace

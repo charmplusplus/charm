@@ -56,7 +56,7 @@ void CEntry::generateCode(XStr& op)
   op <<  ") {\n";
   op << "    CWhenTrigger *tr;\n";
   op<<  "    void* _bgParentLog = NULL;\n";
-  op<<  "    BgElapse(0.01e-6);\n";
+  op<<  "    CkElapse(0.01e-6);\n";
   cn->generateTlineEndCall(op);
 
   op << "    CMsgBuffer* cmsgbuf;\n";
