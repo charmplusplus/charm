@@ -253,7 +253,6 @@ CK_LIBS_CORE=libck.a
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            ckarray.o tempo.o waitqd.o \
 	   LBDatabase.o lbdb.o LBDB.o LBComm.o LBObj.o CentralLB.o \
-	   LBDatabase.o lbdb.o LBDB.o LBComm.o LBObj.o CentralLB.o \
 	   RandCentLB.o MetisLB.o RefineLB.o Set.o HeapCentLB.o heap.o
 
 charmlibs: converse $(CK_LIBS_CORE)
