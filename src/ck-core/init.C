@@ -31,9 +31,6 @@ int   _triggerHandlerIdx;
 int   _mainDone = 0;
 static int   _triggersSent = 0;
 
-CkOutStream ckout;
-CkErrStream ckerr;
-CkInStream  ckin;
 
 CkpvDeclare(void*,       _currentChare);
 CkpvDeclare(int,         _currentChareType);
@@ -55,9 +52,6 @@ CkpvDeclare(int, _charmEpoch);
 
 CkpvDeclare(Stats*, _myStats);
 CkpvDeclare(MsgPool*, _msgPool);
-
-CkpvDeclare(_CkOutStream*, _ckout);
-CkpvDeclare(_CkErrStream*, _ckerr);
 
 CkpvStaticDeclare(int,  _numInitsRecd); /* UInt changed to int */
 CkpvStaticDeclare(PtrQ*, _buffQ);
@@ -501,8 +495,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	CkpvAccess(_numInitsRecd) = -1;  /*0;*/
 
-	CkpvAccess(_ckout) = new _CkOutStream();
-	CkpvAccess(_ckerr) = new _CkErrStream();
+	CkStreamInit(argv);
 
 	_charmHandlerIdx = CkRegisterHandler((CmiHandler)_bufferHandler);
 	_initHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
