@@ -2186,3 +2186,11 @@ char *CmiCopyMsg(char *msg, int len)
   return copy;
 }
 
+unsigned char computeCheckSum(unsigned char *data, int len)
+{
+  int i;
+  unsigned char ret = 0;
+  for (i=0; i<len; i++) ret ^= (unsigned char)data[i];
+  return ret;
+}
+
