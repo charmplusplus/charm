@@ -30,18 +30,53 @@ EachToManyStrategy::EachToManyStrategy(int substrategy){
     ComlibPrintf("After Constructor\n");
 }
 
+void EachToManyStrategy::checkPeList(){
+  int flag = 0, count , pos;
+  for(count = 0; count < npes; count++){
+    for(pos = 0; pos < npes; pos ++)
+      if(pelist[count] == pelist[pos]){
+	flag = 1;
+	break;
+      }
+    if( flag )
+      break;
+  }
+
+  int *newpelist = new int[npes], newpos = 0;
+  if( flag ) {
+    for(count = 0; count < npes; count++){
+      int flag1 = 0;
+      for(pos = 0; pos < newpos; pos ++)
+	if(newpelist[pos] == pelist[count])
+	  flag1 = 1;
+      
+      if(!flag1)
+	newpelist[newpos++] = pelist[count];
+
+      flag1 = 0;
+    }
+  }
+    
+  npes = newpos;
+  pelist = newpelist;
+}
+
 EachToManyStrategy::EachToManyStrategy(int substrategy, int npes, int *pelist){
+
+    this->npes = npes;
+    this->pelist = pelist;
+    checkPeList();
+
     routerID = substrategy;
     messageBuf = NULL;
     messageCount = 0;
 
     procMap = new int[CkNumPes()];
-    setReverseMap(procMap, pelist, npes);
+    setReverseMap(procMap, this->pelist, this->npes);
     
     comid = ComlibInstance(routerID, CkNumPes());
     if(npes < CkNumPes())
-      comid = ComlibEstablishGroup(comid, npes, pelist);
-    this->npes = npes;
+      comid = ComlibEstablishGroup(comid, this->npes, this->pelist);
 }
 
 void EachToManyStrategy::insertMessage(CharmMessageHolder *cmsg){

@@ -180,7 +180,7 @@ void ComlibManager::registerElement(int stratID){
     strategyTable[stratID].numElements ++;
 }
 
- void ComlibManager::unRegisterElement(int stratID){
+void ComlibManager::unRegisterElement(int stratID){
      ComlibPrintf("In Un Register Element\n");
      strategyTable[stratID].numElements --;
 }

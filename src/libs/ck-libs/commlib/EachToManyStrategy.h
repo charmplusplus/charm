@@ -9,6 +9,9 @@ class EachToManyStrategy : public Strategy {
     comID comid;
     int *procMap;
     int npes;
+    int *pelist;
+    
+    void checkPeList();
 
  public:
     EachToManyStrategy(int substrategy);
