@@ -649,7 +649,7 @@ create:
 \end{alltt}
 
 Note, to use CkMulticast library, all multicast messages must inherit from 
-CkMcastBaseMsg. You will need multiple inheritance, as following:
+CkMcastBaseMsg, as following:
 
 \begin{alltt}
 class HiMsg : public CkMcastBaseMsg, public CMessage_HiMsg
@@ -688,9 +688,11 @@ cookie when talking to the delegation:
 \end{alltt}
 
 Note, cookie is retrieved from the multicast message and contains information
-about the multicast section spanning tree information and reduction counter.
+about the multicast spanning tree information and reduction counter.
 You need to keep this cookie for next uses(i.e. define cookie outside of the 
-entry function instead of a local variable).
+entry function instead of a local variable). Using multicast/reduction, you
+don't need to worry about array migrations, the CkMulticast library can 
+automatically update multicast spanning tree for efficient communication.
 
 \subsubsection{Array Syntax Changes}
 
