@@ -168,9 +168,9 @@ class ampiCommStruct {
 		for (int i=0;i<size;i++) ind->push_back(i);
 	}
 public:
-	ampiCommStruct(int ignored=0) {size=-1;isWorld=-1;}
+	ampiCommStruct(int ignored=0) {size=-1;isWorld=-1;isInter=0;}
 	ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_)
-		:comm(comm_), ampiID(id_),size(size_), isWorld(1) {}
+		:comm(comm_), ampiID(id_),size(size_), isWorld(1), isInter(0) {}
 	ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
 		int size_,const CkPupBasicVec<int> &indices_)
 		:comm(comm_), ampiID(id_),size(size_),isInter(0),
@@ -180,7 +180,6 @@ public:
 		const CkPupBasicVec<int> &remoteIndices_)
 		:comm(comm_),ampiID(id_),size(size_),isWorld(0),isInter(1),
 		indices(indices_),remoteIndices(remoteIndices_) {}
-
 	void setArrayID(const CkArrayID &nID) {ampiID=nID;}
 
 	MPI_Comm getComm(void) const {return comm;}
