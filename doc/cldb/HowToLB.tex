@@ -1,17 +1,31 @@
 \documentstyle[11pt,fullpage]{article}
+
+\newif\ifpdf
+\ifx\pdfoutput\undefined
+  \pdffalse
+\else
+  \pdfoutput=1
+  \pdftrue
+\fi
+
+\ifpdf
+  \pdfcompresslevel=9
+\else
+\fi
+
 \pagestyle{headings}
-\setlength{\textwidth}{6.5in}
-\setlength{\textheight}{9in}
-\setlength{\parindent}{0in}
-\setlength{\topmargin}{-.5in}
-\parskip 0.1in
+%\setlength{\textwidth}{6.5in}
+%\setlength{\textheight}{9in}
+%\setlength{\parindent}{0in}
+%\setlength{\topmargin}{-.5in}
+%\parskip 0.1in
 
 
 %
 % Constants
 %
-\newcommand{\version}{4.5}		%%% The current version number
-\newcommand{\prevversion}{4.3}	%%% The previous version number
+%\newcommand{\version}{4.5}		%%% The current version number
+%\newcommand{\prevversion}{4.3}	%%% The previous version number
 
 %
 % Commands
