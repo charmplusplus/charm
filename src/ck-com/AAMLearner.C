@@ -108,7 +108,7 @@ double AAMLearner::computeHypercube(double P, double m, double d) {
 //P = number of processors, m = msgsize, d = degree
 double AAMLearner::computeGrid(double P, double m, double d) {
     double cost = 0.0;
-    cost = 3 * cbrt((double) P) * alpha;
+    cost = 3 * cubeRoot((double) P) * alpha;
     cost += d * m * (beta + gamma);
     
     return cost;

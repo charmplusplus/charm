@@ -125,7 +125,7 @@ double AAPLearner::computeHypercube(double P, double m, double d) {
 //P = number of processors, m = msgsize, d = degree
 double AAPLearner::computeGrid(double P, double m, double d) {
     double cost = 0.0;
-    cost = 3 * cbrt((double) P) * alpha;
+    cost = 3 * cubeRoot((double) P) * alpha;
     cost += 3 * d * m * beta;
     
     return cost;

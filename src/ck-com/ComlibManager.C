@@ -70,7 +70,7 @@ void ComlibManager::init(){
     PUPable_reg(CharmStrategy);
     PUPable_reg(CharmMessageHolder);
     
-    //comm_debug = 1;
+    comm_debug = 1;
     
     numStatsReceived = 0;
     curComlibController = 0;
@@ -779,7 +779,7 @@ void ComlibManager::sendRemote(){
 
 void ComlibManager::AtSync() {
 
-    //comm_debug = 1;
+    comm_debug = 1;
     ComlibPrintf("[%d] In ComlibManager::Atsync, controller %d, ite %d\n", CkMyPe(), curComlibController, clibIteration);
 
     barrier2Reached = 0;
