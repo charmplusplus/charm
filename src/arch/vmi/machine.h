@@ -19,16 +19,30 @@
 #include "vmi.h"
 
 
+/*
+  These settings are used to control behavior of this machine layer
+  configured at compile time.  In some cases, these settings can also be
+  overridden at runtime by setting similarly-named environment variables.
+*/
 #define CMI_VMI_OPTIMIZE                0
 #define CMI_VMI_USE_MEMORY_POOL         1
 #define CMI_VMI_CONNECTION_TIMEOUT      300
 #define CMI_VMI_MAXIMUM_HANDLES         10000
-#define CMI_VMI_SMALL_MESSAGE_BOUNDARY  512
-#define CMI_VMI_MEDIUM_MESSAGE_BOUNDARY 4096
+#define CMI_VMI_SMALL_MESSAGE_BOUNDARY  1024
+#define CMI_VMI_MEDIUM_MESSAGE_BOUNDARY 16384
 #define CMI_VMI_RDMA_CHUNK_COUNT        3
 #define CMI_VMI_RDMA_CHUNK_SIZE         262144
 
 
+
+/*
+  If CMI_VMI_OPTIMIZE is defined, all of the checks for success for
+  calls to VMI are removed by the use of the following macro.  The
+  performance improvements seen by this are probably not worth the
+  headaches caused when error conditions within VMI are not immediately
+  discovered, however most of the code from NCSA that uses VMI skips
+  checking VMI return codes, so we provide the same option here.
+*/
 #if CMI_VMI_OPTIMIZE
 #define CMI_VMI_CHECK_SUCCESS(status,message)
 #else
@@ -39,32 +53,23 @@
 #endif
 
 
-#define SIZEFIELD(m) (((CmiChunkHeader *)(m))[-1].size)
 
+/*
+  The following settings are used to describe the startup methods that
+  may be used to assign ranks to the processes in the computation.
+  (So far, only startup via the Charm++ Resource Manager (CRM) is possible.)
+*/
+#define CMI_VMI_STARTUP_TYPE_CRM 0
 
-#define CMI_VMI_MESSAGE_TYPE(msg) ((CmiMsgHeaderBasic *)msg)->vmitype
-#define CMI_VMI_MESSAGE_TYPE_STANDARD   1
-#define CMI_VMI_MESSAGE_TYPE_RENDEZVOUS 2
 
 
 /*
-  If CMK_BROADCAST_SPANNING_TREE is defined, broadcasts are done via a
-  spanning tree.  (Otherwise, broadcasts are done by iterating through
-  each process in the process list and sending a separate message.)
+  If the memory pool is enabled, the following settings determine the
+  sizes of the memory pool buckets as well as the number of entries in
+  each bucket to pre-define and by which to grow.  The memory pool
+  provides an efficient method of allocating and deallocating memory
+  that does not need to call malloc() and free() repeatedly.
 */
-#if CMK_BROADCAST_SPANNING_TREE
-#ifndef CMI_VMI_BROADCAST_SPANNING_FACTOR
-#define CMI_VMI_BROADCAST_SPANNING_FACTOR 4
-#endif
-
-#define CMI_BROADCAST_ROOT(msg)   ((CmiMsgHeaderBasic *)msg)->root
-#define CMI_DEST_RANK(msg)        ((CmiMsgHeaderBasic *)msg)->rank
-
-#define CMI_SET_BROADCAST_ROOT(msg,root)   CMI_BROADCAST_ROOT(msg) = (root);
-#endif
-
-
-
 #if CMI_VMI_USE_MEMORY_POOL
 #define CMI_VMI_BUCKET1_SIZE 1024
 #define CMI_VMI_BUCKET2_SIZE 2048
@@ -90,18 +95,12 @@
 
 
 
-
-
-
-#define CMI_VMI_STARTUP_TYPE_CRM 0
-
-
-
-
-
-
-
-/* The following data structures hold the per-process state information. */
+/*
+  The following data structure holds per-process state information for
+  each process in the computation.  The machine layer determines the
+  total number of processes in the computation (from the CRM, during
+  startup) and then creates an array of CMI_VMI_Process_T structures.
+*/
 typedef enum
 {
   CMI_VMI_CONNECTION_CONNECTING,
@@ -121,31 +120,100 @@ typedef struct
 
 
 
+/*
+  If CMK_BROADCAST_SPANNING_TREE is defined, broadcasts are done via a
+  spanning tree.  (Otherwise, broadcasts are done by iterating through
+  each process in the process list and sending a separate message.)
+*/
+#if CMK_BROADCAST_SPANNING_TREE
+#ifndef CMI_VMI_BROADCAST_SPANNING_FACTOR
+#define CMI_VMI_BROADCAST_SPANNING_FACTOR 4
+#endif
 
+#define CMI_BROADCAST_ROOT(msg)   ((CmiMsgHeaderBasic *)msg)->root
+#define CMI_DEST_RANK(msg)        ((CmiMsgHeaderBasic *)msg)->rank
+
+#define CMI_SET_BROADCAST_ROOT(msg,root)   CMI_BROADCAST_ROOT(msg) = (root);
+#endif
 
 
 
 /*
+  Messages sent from one process to another using the VMI machine layer
+  are tagged with a "type" field which is part of the Converse message
+  header.  So far, there are two message types.  "Standard" messages
+  are simply placed into the Converse remote message queue when they
+  received.  "Rendezvous" messages are used to signal the start of a
+  rendezvous message to set up an RDMA send between processes.
+*/
+#define CMI_VMI_MESSAGE_TYPE(msg) ((CmiMsgHeaderBasic *)msg)->vmitype
+#define CMI_VMI_MESSAGE_TYPE_STANDARD   1
+#define CMI_VMI_MESSAGE_TYPE_RENDEZVOUS 2
+
+
+
+/*
+  The following structures define messages that are sent within the VMI
+  machine layer.
+
   CMI_VMI_Connect_Message_T are connect messages that are only sent during
   the connection setup phase.
+
+  CMI_VMI_Rendezvous_Message_T are used to set up an RDMA send between
+  processes.
+
+  The "Persistent" messages are used to create a persistent RDMA channel
+  between a pair of processes via Gengbin's API.
 */
 typedef struct
 {
   int rank;
 } CMI_VMI_Connect_Message_T;
 
+typedef struct
+{
+  char header[CmiMsgHeaderSizeBytes];
+  int rank;
+  int msgsize;
+  VMI_virt_addr_t context;
+} CMI_VMI_Rendezvous_Message_T;
+
+#if CMK_PERSISTENT_COMM
+typedef struct
+{
+  char header[CmiMsgHeaderSizeBytes];
+  int rank;
+  int maxsize;
+  VMI_virt_addr_t context;
+} CMI_VMI_Persistent_Request_Message_T;
+
+typedef struct
+{
+  char header[CmiMsgHeaderSizeBytes];
+  VMI_virt_addr_t context;
+  int rdma_receive_index;
+} CMI_VMI_Persistent_Grant_Message_T;
+
+typedef struct
+{
+  char header[CmiMsgHeaderSizeBytes];
+  int rdma_receive_index;
+} CMI_VMI_Persistent_Destroy_Message_T;
+#endif   /* CMK_PERSISTENT_COMM */
 
 
 
-
-
-/* These are send and receive handle structures. */
+/*
+  Send and receive operations which cannot be completed immediately need
+  to have some amount of state associated with them.  The following data
+  structures are used to hold state for these operations in Send and
+  Receive handles.
+*/
 typedef enum
 {
   CMI_VMI_HANDLE_TYPE_SEND,
   CMI_VMI_HANDLE_TYPE_RECEIVE
 } CMI_VMI_Handle_Type_T;
-
 
 typedef enum
 {
@@ -155,12 +223,17 @@ typedef enum
   CMI_VMI_SEND_HANDLE_TYPE_PERSISTENT
 } CMI_VMI_Send_Handle_Type_T;
 
+typedef enum
+{
+  CMI_VMI_MESSAGE_DISPOSITION_NONE,
+  CMI_VMI_MESSAGE_DISPOSITION_FREE,
+  CMI_VMI_MESSAGE_DISPOSITION_ENQUEUE
+} CMI_VMI_Message_Disposition_T;
 
 typedef struct
 {
   PVMI_CACHE_ENTRY cacheentry;
 } CMI_VMI_Send_Handle_Stream_T;
-
 
 typedef struct
 {
@@ -169,14 +242,12 @@ typedef struct
   PVMI_CACHE_ENTRY cacheentry;
 } CMI_VMI_Send_Handle_RDMA_T;
 
-
 typedef struct
 {
   int chunk_size;
   int *bytes_sent;
   PVMI_CACHE_ENTRY *cacheentry;
 } CMI_VMI_Send_Handle_RDMABROAD_T;
-
 
 typedef struct
 {
@@ -189,11 +260,10 @@ typedef struct
   PVMI_CACHE_ENTRY   cacheentry;
 } CMI_VMI_Send_Handle_Persistent_T;
 
-
 typedef struct
 {
-  CMI_VMI_Send_Handle_Type_T  send_handle_type;
-  BOOLEAN                     free_message;
+  CMI_VMI_Send_Handle_Type_T    send_handle_type;
+  CMI_VMI_Message_Disposition_T message_disposition;
 
   union
   {
@@ -204,13 +274,11 @@ typedef struct
   } data;
 } CMI_VMI_Send_Handle_T;
 
-
 typedef enum
 {
   CMI_VMI_RECEIVE_HANDLE_TYPE_RDMA,
   CMI_VMI_RECEIVE_HANDLE_TYPE_PERSISTENT
 } CMI_VMI_Receive_Handle_Type_T;
-
 
 typedef struct
 {
@@ -225,13 +293,11 @@ typedef struct
   VMI_virt_addr_t  remote_handle_address;
 } CMI_VMI_Receive_Handle_RDMA_T;
 
-
 typedef struct
 {
   PVMI_CACHE_ENTRY cacheentry;
   VMI_virt_addr_t  remote_handle_address;
 } CMI_VMI_Receive_Handle_Persistent_T;
-
 
 typedef struct
 {
@@ -243,7 +309,6 @@ typedef struct
     CMI_VMI_Receive_Handle_Persistent_T persistent;
   } data;
 } CMI_VMI_Receive_Handle_T;
-
 
 typedef struct
 {
@@ -262,49 +327,10 @@ typedef struct
 
 
 
-
-typedef struct
-{
-  char header[CmiMsgHeaderSizeBytes];
-  int rank;
-  int msgsize;
-  VMI_virt_addr_t context;
-} CMI_VMI_Rendezvous_Message_T;
-
-
-typedef struct
-{
-  char header[CmiMsgHeaderSizeBytes];
-  int rank;
-  int maxsize;
-  VMI_virt_addr_t context;
-} CMI_VMI_Persistent_Request_Message_T;
-
-
-typedef struct
-{
-  char header[CmiMsgHeaderSizeBytes];
-  VMI_virt_addr_t context;
-  int rdma_receive_index;
-} CMI_VMI_Persistent_Grant_Message_T;
-
-
-typedef struct
-{
-  char header[CmiMsgHeaderSizeBytes];
-  int rdma_receive_index;
-} CMI_VMI_Persistent_Destroy_Message_T;
-
-
-
-
-
-
-
-/*********************/
-/* BEGIN CRUFTY CODE */
-/*********************/
-
+/*
+  The following bits of code are taken directly from the NCSA version
+  of the CRM.  This is very old code that should be rewritten sometime.
+*/
 #define MAX_STR_LENGTH 256
 #define CRM_DEFAULT_PORT 7777
 #define SOCKET_ERROR -1
@@ -360,17 +386,11 @@ typedef struct CRM_Msg{
   } msg;
 } CRM_Msg, *PCRM_Msg;
 
-/*******************/
-/* END CRUFTY CODE */
-/*******************/
 
 
-
-
-
-
-
-/* Function prototypes appear here. */
+/*
+  Function prototypes follow.
+*/
 int CMI_VMI_CRM_Register (char *key, int numProcesses, BOOLEAN reg);
 int CMI_VMI_Startup_CRM (char *key);
 VMI_CONNECT_RESPONSE
