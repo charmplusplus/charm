@@ -86,24 +86,25 @@ load balancing({\em sync mode}) or simply say that he/she doesn't care
 In {\em automatic without sync mode}, application asserts
 that load balancer can start working at any time during the execution, and 
 guarantees that the chare arrays are always ready to 
-migrate\footnote{all the state data of the array elements have to be 
+migrate\footnote{All the state data of the array elements have to be 
 properly packed before migrating to 
-other processors}. In this mode, load balancer works in the 
-background and application doesn't need to stop waiting for load 
+other processors}. In this mode, load balancer works in parallel with 
+the application so application doesn't need to stop waiting for load 
 balancing to complete. However, in most cases, 
 application doesn't want load balancing to occur arbitarily because it knows 
-when is the proper time for load balancing\footnote{for example, in the 
-application with multiple iterations, load balancing best happens after 
+when is the proper time for load balancing\footnote{For example, in the 
+application with multiple iterations, load balancing best happens 
 every a few iterations}. {\em Automatic with sync} mode is designed for this 
 scenario. In this mode, user inserts {\em AtSync()} calls at certain points 
 in application where load balancing is desired. Load balancing takes 
 control after all the local array elements reach the sync 
 point\footnote{It is implemented as a local barrier of all the array elements
-on one processor}, and starts load balancing phases from there. The 
-application would take a break and wait for the load balancing and 
-migration complete until it regains 
-the control when load balancer calls back {\em ResumeFromSync()}, which is a 
-virtual function of array element that must be defined in this mode.
+on one processor}, and starts load balancing phases from there. The common
+practice is that the application would choose to take a break and 
+wait for the load balancing and migration complete until it regains 
+the control when load balancer calls back {\em ResumeFromSync()} for every
+array element. {\em ResumeFromSync()} is a virtual function of array element 
+base class which can be redefined in application.
 
 The two {\em automatic} load balancing modes described above hide nicely
 the details of invoking load balancer into the array implemetation itself,
@@ -116,6 +117,16 @@ local array elements for the sync barrier
 in order to tell if {\it everybody} is ready for load balancing, but
  dynamic inserting of array elements makes it impossible. In this case,
 users have to use the {\em manual mode} to start load balancer themselves.
+
+A few more words about {\em ResumeFromSync()}\footnote{It used to 
+only work in automatic with sync mode.}. It works in all above three
+load balancing modes. To array element(whether it is migrated or not), 
+it is more like getting a notification from load
+balancer about the completeness of load balancing phase.
+Users can choose to handle it by writing their own
+code for {\em ResumeFromSync()}, or just ignore it. The proper use of both 
+{\em AtSync()} and {\em ResumeFromSync()} gives you the effect of 
+load balancing barrier.
 
 The detailed APIs of these three methods are described as follows:
 \begin{enumerate}
