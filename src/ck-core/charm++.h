@@ -28,11 +28,6 @@ extern void removeObject(Chare *);
 #include "init.h"
 #include "pup.h"
 
-//We need CkMigrateMessage only to distinguish the migration
-// constructor from all other constructors-- the type
-// itself has no meaningful fields.
-typedef struct {int is_only_a_name;} CkMigrateMessage;
-
 class Chare {
   protected:
     CkChareID thishandle;
