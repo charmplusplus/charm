@@ -10,6 +10,12 @@
 */
 /*@{*/
 
+/*
+ status:
+  * support processor avail bitvector
+  * support nonmigratable attrib
+*/
+
 #include <charm++.h>
 
 #if CMK_LBDB_ON
@@ -114,13 +120,17 @@ GreedyLB::BuildObjectArray(CentralLB::LDStats* stats,
   objData  = new HeapData[*objCount];
   *objCount = 0; 
   for(obj=0; obj < stats->n_objs; obj++) {
-//      if (stats[pe].objData[obj].migratable == CmiTrue) {
-	int pe = stats->from_proc[obj];
-        objData[*objCount].load = 
-          stats->objData[obj].wallTime * stats->procs[pe].pe_speed;
-        objData[*objCount].pe = pe;
-        objData[*objCount].id = obj;
-        (*objCount)++;
+    LDObjData &oData = stats->objData[obj];
+    int pe = stats->from_proc[obj];
+    if (!oData.migratable) {
+      if (!stats->procs[pe].available) 
+        CmiAbort("GreedyLB cannot handle nonmigratable object on an unavial processor!\n");
+      continue;
+    }
+    objData[*objCount].load = oData.wallTime * stats->procs[pe].pe_speed;
+    objData[*objCount].pe = pe;
+    objData[*objCount].id = obj;
+    (*objCount)++;
   }
   
   HeapSort(objData, *objCount-1, GT);
@@ -131,52 +141,63 @@ GreedyLB::HeapData*
 GreedyLB::BuildCpuArray(CentralLB::LDStats* stats, 
                           int count, int *peCount)
 {
-  HeapData           *data;
-  CentralLB::ProcStats *peData;
-  
-  *peCount = 0;
   int pe;
-  for (pe = 0; pe < count; pe++)
-    if (stats->procs[pe].available == CmiTrue) (*peCount)++;
 
-  data = new HeapData[*peCount];
+  *peCount = 0;
+  for (pe = 0; pe < count; pe++)
+    if (stats->procs[pe].available) (*peCount)++;
+  HeapData *data = new HeapData[*peCount];
+  int *map = new int[count];
   
   *peCount = 0;
   for (pe=0; pe < count; pe++) {
-    data[*peCount].load = 0.0;
-    peData = &(stats->procs[pe]);
+    CentralLB::ProcStats &peData = stats->procs[pe];
  
-    if (peData->available == CmiTrue) 
-	{
-/*  Use of the migratable flag is not yet defined
-	  for (int obj = 0; obj < peData->n_objs; obj++) 
-	  { 
-		if (peData->objData[obj].migratable == CmiFalse) 
-			data[*peCount].load -= 
-				peData->objData[obj].wallTime * peData->pe_speed;
-	  }
-*/        
-	  data[*peCount].load += peData->bg_walltime * peData->pe_speed;
-// (peData->total_walltime - peData->bg_walltime) * peData->pe_speed;
+    data[*peCount].load = 0.0;
+    map[pe] = -1;
+    if (peData.available) 
+    {
+      data[*peCount].load += peData.bg_walltime;
       data[*peCount].pe = data[*peCount].id = pe;
+      map[pe] = *peCount;
       (*peCount)++;
     }
   }
-  BuildHeap(data, *peCount-1, LT);
+
+  // take non migratbale object load as background load
+  for (int obj = 0; obj < stats->n_objs; obj++) 
+  { 
+      LDObjData &oData = stats->objData[obj];
+      if (!oData.migratable)  {
+        int pe = stats->from_proc[obj];
+        pe = map[pe];
+        if (pe==-1) 
+          CmiAbort("GreedyLB: nonmigratable object on an unavail processor!\n");
+        data[pe].load += oData.wallTime;
+      }
+  }
+
+  // considering cpu speed
+  for (pe = 0; pe<*peCount; pe++)
+    data[pe].load *= stats->procs[data[pe].pe].pe_speed;
+
+  BuildHeap(data, *peCount-1, LT);     // minHeap
+  delete [] map;
   return data;
 }
 
 void GreedyLB::work(CentralLB::LDStats* stats, int count)
 {
-  int      obj, heapSize, objCount;
+  int  obj, heapSize, objCount;
+  int *pemap = new int [count];
   HeapData *cpuData = BuildCpuArray(stats, count, &heapSize);
   HeapData *objData = BuildObjectArray(stats, count, &objCount);
 
   //  CkPrintf("[%d] GreedyLB strategy\n",CkMyPe());
 
   heapSize--;
-  HeapData minCpu;  
   for (obj=0; obj < objCount; obj++) {
+    HeapData minCpu;  
     // Operation of extracting the the least loaded processor
     // from the heap
     minCpu = cpuData[0];
@@ -194,15 +215,8 @@ void GreedyLB::work(CentralLB::LDStats* stats, int count)
     const int id   = objData[obj].id;
     if (dest != pe) {
       stats->to_proc[id] = dest;
-      //      CkPrintf("[%d] Obj %d migrating from %d to %d\n",
-      //         CkMyPe(),obj,pe,dest);
-/*
-      MigrateInfo *migrateMe = new MigrateInfo;
-      migrateMe->obj = stats->objData[id].data.handle;
-      migrateMe->from_pe = pe;
-      migrateMe->to_pe = dest;
-      migrateInfo.insertAtEnd(migrateMe);
-*/
+      //  CkPrintf("[%d] Obj %d migrating from %d to %d\n",
+      //           CkMyPe(),obj,pe,dest);
     }
 
     //Insert the least loaded processor with load updated back into the heap
