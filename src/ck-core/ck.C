@@ -80,7 +80,11 @@ IrrGroup::IrrGroup(void) {
 
 IrrGroup::~IrrGroup() {
   // remove the object pointer
+  CmiImmediateLockType immLock = CmiCreateImmediateLock();
+  CmiImmediateLock(immLock);
   CkpvAccess(_groupTable)->find(thisgroup).setObj(NULL);
+  CmiImmediateUnlock(immLock);
+  CmiDestroyLock(immLock);
 }
 
 void IrrGroup::pup(PUP::er &p)
@@ -399,6 +403,8 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   register int gIdx = _entryTable[epIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
+  CmiImmediateLockType immLock = CmiCreateImmediateLock();
+  CmiImmediateLock(immLock);
   CkpvAccess(_groupTable)->find(groupID).setObj(obj);
   CkpvAccess(_groupTable)->find(groupID).setcIdx(gIdx);
   CkpvAccess(_groupIDTable)->push_back(groupID);
@@ -409,6 +415,8 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
       CldEnqueue(CkMyPe(), pending, _infoIdx);
     delete ptrq;
   }
+  CmiImmediateUnlock(immLock);
+  CmiDestroyLock(immLock);
 
   CkpvAccess(_currentGroup) = groupID;
   CkpvAccess(_currentGroupRednMgr) = env->getRednMgr();
@@ -1078,6 +1086,31 @@ static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
 }
 
 extern "C"
+void CkSendMsgBranchImmediate(int eIdx, void *msg, int destPE, CkGroupID gID)
+{
+#if CMK_IMMEDIATE_MSG
+  if (destPE==CkMyPe()) 
+  { 
+    CkSendMsgBranchInline(eIdx, msg, destPE, gID);
+    return;
+  }
+  //Can't inline-- send the usual way
+  register envelope *env = UsrToEnv(msg);
+  int numPes;
+  _TRACE_ONLY(numPes = (destPE==CLD_BROADCAST_ALL?CkNumPes():1));
+  env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
+  _TRACE_CREATION_N(env, numPes);
+  _noCldEnqueue(destPE, env);
+  _STATS_RECORD_SEND_BRANCH_1();
+  CkpvAccess(_coreState)->create();
+  _TRACE_CREATION_DONE(numPes);
+#else
+  // no support for immediate message, send inline
+  CkSendMsgBranchInline(eIdx, msg, destPE, gID);
+#endif
+}
+
+extern "C"
 void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int opts)
 {
   if (destPE==CkMyPe())
@@ -1103,7 +1136,9 @@ void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID, int opts)
   }
 #ifndef CMK_OPTIMIZE
   if (opts & CK_MSG_IMMEDIATE) {
-    CmiAbort("Immediate message is not allowed in Group!");
+    CkSendMsgBranchImmediate(eIdx,msg,pe,gID);
+    return;
+//     CmiAbort("Immediate message is not allowed in Group!");
   }
 #endif
   _sendMsgBranch(eIdx, msg, gID, pe, opts);
@@ -1267,11 +1302,15 @@ void CkDeleteChares() {
 
   // delete all groups
   int numGroups = CkpvAccess(_groupIDTable)->size();
+  CmiImmediateLockType immLock = CmiCreateImmediateLock();
+  CmiImmediateLock(immLock);
   for(i=0;i<numGroups;i++) {
     CkGroupID gID = (*CkpvAccess(_groupIDTable))[i];
     IrrGroup *obj = CkpvAccess(_groupTable)->find(gID).getObj();
     if (obj) delete obj;
   }
+  CmiImmediateUnlock(immLock);
+  CmiDestroyLock(immLock);
   // delete all node groups
   if (CkMyRank() == 0) {
     int numNodeGroups = CksvAccess(_nodeGroupIDTable).size();

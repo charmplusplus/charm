@@ -2143,10 +2143,12 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
 
 void Entry::genGroupDecl(XStr& str)
 {  
+#if 0
   if (isImmediate() && !container->isNodeGroup()) {
       cerr << (char *)container->baseName() << ": Group does not allow immediate message.\n";
       exit(1);
   }
+#endif
 
   //Selects between NodeGroup and Group
   char *node = (char *)(container->isNodeGroup()?"Node":"");
@@ -2414,6 +2416,7 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
   
   str << "  CthThread tid = CthCreate((CthVoidFn)"<<procFull
    <<", new CkThrCallArg(impl_msg,impl_obj), "<<getStackSize()<<");\n";
+  str << "  CthUserAddListeners(tid);\n";
 #if CMK_BLUEGENE_CHARM
   str << "  BgAttach(tid);\n";
 #endif

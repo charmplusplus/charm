@@ -1104,6 +1104,8 @@ inline void CkLocMgr::springCleaning(void)
   //Poke through the hash table for old ArrayRecs.
   void *objp;
   void *keyp;
+  CmiImmediateLockType immLock = CmiCreateImmediateLock();
+  
   CkHashtableIterator *it=hash.iterator();
   while (NULL!=(objp=it->next(&keyp))) {
     CkLocRec *rec=*(CkLocRec **)objp;
@@ -1111,11 +1113,14 @@ inline void CkLocMgr::springCleaning(void)
     if (rec->isObsolete(nSprings,idx)) {
       //This record is obsolete-- remove it from the table
       DEBK((AA"Cleaning out old record %s\n"AB,idx2str(idx)));
+      CmiImmediateLock(immLock);
       hash.remove(*(CkArrayIndexMax *)&idx);
+      CmiImmediateUnlock(immLock);
       delete rec;
       it->seek(-1);//retry this hash slot
     }
   }
+  CmiDestroyLock(immLock);
   delete it;
 }
 void CkLocMgr::staticSpringCleaning(void *forWhom,double curWallTime) {
@@ -1128,12 +1133,16 @@ void CkLocMgr::flushAllRecs(void)
 {
   void *objp;
   void *keyp;
+  CmiImmediateLockType immLock = CmiCreateImmediateLock();
+  
   CkHashtableIterator *it=hash.iterator();
   while (NULL!=(objp=it->next(&keyp))) {
     CkLocRec *rec=*(CkLocRec **)objp;
     CkArrayIndex &idx=*(CkArrayIndex *)keyp;
     if (rec->type() != CkLocRec::local) {
+      CmiImmediateLock(immLock);
       hash.remove(*(CkArrayIndexMax *)&idx);
+      CmiImmediateUnlock(immLock);
       delete rec;
       it->seek(-1);//retry this hash slot
     }
@@ -1143,6 +1152,7 @@ void CkLocMgr::flushAllRecs(void)
     }
   }
   delete it;
+  CmiDestroyLock(immLock);
 }
 
 /*************************** LocMgr: CREATION *****************************/
@@ -1380,7 +1390,11 @@ void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
 	if (NULL==elementNrec(idx))
 		CkAbort("CkLocMgr::removeFromTable called on invalid index!");
 #endif
+        CmiImmediateLockType immLock = CmiCreateImmediateLock();
+        CmiImmediateLock(immLock);
 	hash.remove(*(CkArrayIndexMax *)&idx);
+        CmiImmediateUnlock(immLock);
+  	CmiDestroyLock(immLock);
 #ifndef CMK_OPTIMIZE
 	//Make sure it's really gone
 	if (NULL!=elementNrec(idx))
@@ -1766,7 +1780,11 @@ void CkLocMgr::insertRec(CkLocRec *rec,const CkArrayIndex &idx) {
 //Add given record, when there is guarenteed to be no prior record
 void CkLocMgr::insertRecN(CkLocRec *rec,const CkArrayIndex &idx) {
 	DEBC((AA"  adding new rec(%s) for %s\n"AB,rec2str[rec->type()],idx2str(idx)));
+        CmiImmediateLockType immLock = CmiCreateImmediateLock();
+        CmiImmediateLock(immLock);
 	hash.put(*(CkArrayIndexMax *)&idx)=rec;
+        CmiImmediateUnlock(immLock);
+  	CmiDestroyLock(immLock);
 }
 
 //Call this on an unrecognized array index

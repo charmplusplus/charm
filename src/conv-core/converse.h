@@ -896,9 +896,7 @@ struct CthThreadListener {
        /** This thread is about to begin execution after blocking. */
        CthThreadListener_resume resume;
 
-       /** This thread is being destroyed.  Should also
-       free this listener struct.
-       */
+       /** This thread is being destroyed.  */
        CthThreadListener_free free;
 
        /** Pointer to listener-specific data (if needed).
@@ -916,6 +914,7 @@ struct CthThreadListener {
        */
        struct CthThreadListener *next;
 };
+
 /**
   This listener is about to begin receiving suspend and
 resume events for this thread.  "suspend", "resume", "free",
@@ -924,6 +923,13 @@ exits, l->free will be called on this listener, which should
 deallocate the listener memory.
 */
 void CthAddListener(CthThread th,struct CthThreadListener *l);
+
+/**
+  This is function is inserted into .def.h after thread creation.
+  It serves as an interface for the user to add the listeners 
+  as needed. User has to implement this somewhere in the system.
+*/
+void CthUserAddListeners(CthThread th);
 
 
 /****** CTH: THREAD-PRIVATE VARIABLES ******/
