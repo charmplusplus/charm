@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-09 21:23:01  gursoy
+ * Revision 2.2  1995-06-13 16:01:23  gursoy
+ * fixed a minor syntax error
+ *
+ * Revision 2.1  1995/06/09  21:23:01  gursoy
  * Cpv macros moved to converse
  *
  * Revision 2.0  1995/06/08  16:39:47  gursoy
@@ -291,7 +294,7 @@ void CmiDeclareArgs()
 
 main(argc,argv)
 int argc;
-charn *argv[];
+char *argv[];
 {
     charm_main(argc,argv);
 }
