@@ -48,8 +48,7 @@
 	  RegisterEvent(_CHARM_LANG_ID, _E_USER_EVENT_PAIR  ); \
 	  \
 	}
-#define _LOG_E_CREATION_1(env) 		{ charm_creation(env); }
-#define _LOG_E_CREATION_N(env, n) 	{ charm_creation(env, n); }
+#define _LOG_E_CREATION_N(env, ep, n) 	{ charm_creation(env, ep, n); }
 #define _LOG_E_BEGIN_EXECUTE(env) 	{ charm_beginExecute(env); }
 #define _LOG_E_BEGIN_EXECUTE_DETAILED(event, msgType, ep, srcPe, ml) \
 	{ charm_beginExecuteDetailed(event, msgType, ep, srcPe, ml); }

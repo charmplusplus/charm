@@ -11,7 +11,7 @@ extern "C" {
 void initCharmProjections();
 //int  traceRegisterUserEvent(const char*);	//TODO
 
-void charm_creation(envelope *e, int num=1);
+void charm_creation(envelope *e, int ep, int num=1);
 void charm_beginExecute(envelope *e);
 void charm_beginExecuteDetailed(int event,int msgType,int ep,int srcPe,int ml);
 void charm_endExecute(void);

@@ -6,12 +6,12 @@
 #include "traceCoreCommon.h"
 #include "charmEvents.h"
 #include "ck.h"
+#include "trace-common.h" // for _threadEP
 
 
 CtvStaticDeclare(int,curThreadEvent);
 
 static int _numEvents = 0;
-static int _threadMsg, _threadChare, _threadEP;
 static int curEvent;
 static int execEvent;
 static int execEp;
@@ -29,14 +29,13 @@ extern "C" void initCharmProjections()
 //extern "C" int  traceRegisterUserEvent(const char*) 
 //{return -1;}	
 
-extern "C" void charm_creation(envelope *e, int num)
+extern "C" void charm_creation(envelope *e, int ep, int num)
 {
-	
   if(e==0) {
     CtvAccess(curThreadEvent)=curEvent;
 	int* iData = (int*)malloc(sizeof(int)*4); 
 	iData[0] = ForChareMsg;
-	iData[1] = _threadEP;
+	iData[1] = ep;
 	iData[2] = curEvent++;
 	iData[3] = CkMyPe();
 	LogEvent1(_CHARM_LANG_ID, _E_CREATION, 4, iData); 
@@ -45,7 +44,7 @@ extern "C" void charm_creation(envelope *e, int num)
     for(int i=0; i<num; i++) {
 		int* iData = (int*)malloc(sizeof(int)*5); 
 		iData[0] = e->getMsgtype();
-		iData[1] = e->getEpIdx();
+		iData[1] = ep;
 		iData[2] = curEvent+i;
 		iData[3] = CkMyPe();
 		iData[4] = e->getTotalsize();
@@ -131,12 +130,6 @@ extern "C" void charm_dequeueMsg(envelope *e) {
 
 extern "C" void charm_beginComputation(void)
 {
-  	if(CkMyRank()==0) {
-		//DOUBT: what are these registrations ? ... cocurrently running with projections => problem 
-    	//_threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
-    	//_threadChare = CkRegisterChare("dummy_thread_chare", 0);
-    	//_threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare);
-  	}
 	LogEvent1(_CHARM_LANG_ID, _E_BEGIN_COMPUTATION, 0, NULL); 
 }
 
