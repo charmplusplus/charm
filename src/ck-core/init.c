@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.28  1995-10-11 17:52:51  sanjeev
+ * Revision 2.29  1995-10-25 15:48:43  gursoy
+ * added BocInitQueueDestroy function to realese the memory
+ *
+ * Revision 2.28  1995/10/11  17:52:51  sanjeev
  * fixed Charm++ chare creation
  *
  * Revision 2.27  1995/09/30  14:49:36  jyelon
@@ -164,8 +167,11 @@ CpvDeclare(char*, ReadFromBuffer);
 CpvStaticDeclare(BOCINIT_QUEUE*, BocInitQueueHead);
 CpvStaticDeclare(ENVELOPE*, readvarmsg);
 
-void *BocInitQueueCreate() ;
-ENVELOPE *DeQueueBocInitMsgs() ;
+static int EmptyBocInitMsgs();
+static void *BocInitQueueCreate();
+static void BocInitQueueDestroy();
+static void EnQueueBocInitMsgs();
+static ENVELOPE *DeQueueBocInitMsgs() ;
 
 /* these store argc, argv for use by CharmInit */
 CpvStaticDeclare(int,   userArgc);
@@ -288,6 +294,7 @@ static void EndInitPhase()
   
     while ( (bocMsg=DeQueueBocInitMsgs()) != NULL )
       ProcessBocInitMsg(bocMsg);
+    BocInitQueueDestroy();
   }
   
   
@@ -816,14 +823,14 @@ BroadcastCount()
         CkCheck_and_BcastInitNL(env);
 }
 
-int 
+static int 
 EmptyBocInitMsgs()
 {
 	return (CpvAccess(BocInitQueueHead)->length == 0);
 }
 
 
-void           *
+static void           *
 BocInitQueueCreate()
 {
 	BOCINIT_QUEUE  *queue;
@@ -836,7 +843,18 @@ BocInitQueueCreate()
 }
 
 
-EnQueueBocInitMsgs(envelope)
+static void BocInitQueueDestroy()
+{
+    if (CpvAccess(BocInitQueueHead))
+    { 
+       if (CpvAccess(BocInitQueueHead)->block)
+          CmiFree(CpvAccess(BocInitQueueHead)->block);
+       CmiFree(CpvAccess(BocInitQueueHead));
+    } 
+}
+
+
+static void EnQueueBocInitMsgs(envelope)
 ENVELOPE       *envelope;
 {
 	int             num = GetEnv_boc_num(envelope);
@@ -864,7 +882,7 @@ ENVELOPE       *envelope;
 }
 
 
-ENVELOPE *DeQueueBocInitMsgs()
+static ENVELOPE *DeQueueBocInitMsgs()
 {
 	ENVELOPE      *envelope;
 	if (CpvAccess(BocInitQueueHead)->length)
