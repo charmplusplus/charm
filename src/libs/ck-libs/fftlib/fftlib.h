@@ -153,9 +153,11 @@ class NormalSlabArray: public SlabArray {
 		fwd2DPlan = bwd2DPlan = (fftwnd_plan) NULL;
 		fwd1DPlan = bwd1DPlan = (fftw_plan) NULL;
 	}
+	void setup(NormalFFTinfo &info);
 
-	NormalSlabArray(NormalFFTinfo &info); 
+	NormalSlabArray(NormalFFTinfo &info) { setup(info); }
 	~NormalSlabArray();
+
 
 	void acceptDataForFFT(int, complex *, int, int);
 	void acceptDataForIFFT(int, complex *, int, int);
