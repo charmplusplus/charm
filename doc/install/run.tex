@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.4  1995-11-16 23:59:02  brunner
+% Revision 1.5  1995-11-17 17:19:37  brunner
+% Incorporated proofreading comments from 11-16 afternoon
+%
+% Revision 1.4  1995/11/16  23:59:02  brunner
 % incorporated Attila's simulator section
 %
 % Revision 1.3  1995/11/16  20:58:57  brunner
@@ -26,7 +29,8 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section[Executing Charm Programs]{Executing Charm programs}
+\section[Executing Converse/Charm/Charm++ Programs]
+	{Executing Converse/Charm/Charm++ Programs}
 \label{executing charm programs}
 
 The Charm linker produces one executable file.  On machines with a host
@@ -101,22 +105,28 @@ placeholder for an absent argument.
 The number of nodes specified in the nodes file must not be less
 than the number of nodes specified with the {\fexec +p} command
 line option. If the number of nodes specified in the nodes file is
-less than the number of nodes specified with the {\fexec +p} option,
+greater than the number of nodes specified with the {\fexec +p} option,
 {\fexec +p} entries in the nodes file will be used in succession, starting
 with the first entry in the file.
 The name of the nodes fil\index{nodes file}\index{.nodes} itself is
 obtained by  {\fexec conv-host} in the following order:
 \begin{enumerate}
+
 \item	From the command line option {\fexec ++nodesfile}.
+
 \item	If the {\fexec ++nodesfile} option is not given, the value of the 
 environment variable {\fexec NODES} is taken to be the nodes file.
+
 \item	If the environment variable {\fexec NODES} is not set, the file 
-{\fparm .nodes}\index{.nodes}\index{nodes file} in the user's home directory is taken 
-to be the nodes file.
+{\fparm .nodes}\index{.nodes}\index{nodes file} in the user's home
+directory is taken to be the nodes file.
+
 \item	If the above file does not exist, the file 
 {\fparm .nodes}\index{.nodes}\index{nodes file} in the current
-directory is used as  the nodes file.
+directory is used as the nodes file.
+
 \end{enumerate}
+
 The user is required to set up remote login permissions on all nodes
 using the .rhosts file in the home directory.
 
@@ -133,15 +143,20 @@ and debugging purposes. It simulates a message passing system. The
 simulated machine is a collection of processing nodes connected with a
 communication network. Each node is composed of an application
 processor, local memory, and a communication coprocessor.  The
-simulator is a beta version, particularly using the simulator timers
-for performance measurements has not been tested yet.
+simulator is a beta version, and it is not yet proven that the
+simulator timers for performance measurements produce realistic
+results.
 
 In order to run Converse programs with the simulator:
 \begin{itemize}
+
 \item link user program with \verb+<machine>/lib/libck-unimain.o+
+
 \item prepare a configuration file as described below
+
 \item to run, type \verb#pgm +pN# (and possibly other runtime options) where
    N is the number of processors.
+
 \end{itemize}
 
 The basic task of the simulator is to manage the message passing
@@ -162,27 +177,34 @@ treated as comments. Each line contains a keyword followed by some
 numbers. The explanation of each keyword is given below:
 
 \begin{description}
+
 \item[{\tt cpu\_recv\_cost}] $\alpha$ and  $\beta$ values  for the software
                             cost of a message-receive at the application
                             processor.
+
 \item[{\tt cpu\_send\_cost}] $\alpha$ and  $\beta$ values  for the software
                             cost of a message-send at the application
                             processor.
+
 \item[{\tt rcp\_cost}] $\alpha$ and  $\beta$ values for a message-receive 
                        at the communication processor.
+
 \item[{\tt scp\_cost}] $\alpha$ and  $\beta$ values for a message-send
                        at the communication processor.
+
 \item[{\tt net\_cost}] $\alpha$ and  $\beta$ values for a message-send
                        in the netowrk.
+
 \item[{\tt cpu\_queue\_threshold\_number}] max number of messages queued
                        at the application processors's incoming message queue.
-\item[{\tt cpu\_queue\_threshold\_size}] max cumulative size of messages in bytes
-                       queued at the application processors's incoming message 
-                       queue.
+
+\item[{\tt cpu\_queue\_threshold\_size}] max cumulative size of
+		       messages in bytes queued at the application
+		       processors's incoming message queue.
 
 
 \item[{\tt cpu\_queue\_threshold\_number}] max number of messages in the incoming
-                       message queue of communication processor.   
+                       message queue of communication processor.
 
 
 \item[{\tt rcp\_queue\_threshold\_number}] max number of messages in the 
@@ -263,18 +285,23 @@ periodic_interval 0.1
 
 A Charm program accepts the following command line options:
 \begin{description}
+
 \item[{\fexec +pN}] Run the program with N processors. The default is 1.
 Note that on some nonshared memory machines, e.g., nCUBE/2, the user must
 specify the number of processors using the command provided for that
 machine (e.g. {\fexec xnc} on the nCUBE/2).
 In such cases the {\fexec +p} option is ignored.
+
 %\item[{\fexec +mM}] Run the program with M Kwords of memory per
 %processor. The default is 50 Kwords of memory per processor.
+
 %\item[{\fexec +mmM}] Run the program with M Kwords of memory for
 %processor 0.
+
 \item[{\fexec +ss}] Print summary statistics about chare creation.  This option
 prints the total number of chare creation requests, and the total number of
 chare creation requests processed across all processors.
+
 \item[{\fexec +cs}] Print statistics about the number of create chare messages
 requested and processed, the number of messages for chares requested and 
 processed, and the number of messages for branch office chares requested and
@@ -282,9 +309,11 @@ processed, on a per processor basis.  Note that the number of messages
 created and processed for a particular type of message on a given node 
 may not be the same, since a message may be processed by a different
 processor from the one originating the request.
-\item[{\fexec +mems}] Print the Memory Usage Statistics at the end, including
-the number of memory allocation requests and memory free requests, based on
-the size of the memory allocated or freed.
+
+%\item[{\fexec +mems}] Print the Memory Usage Statistics at the end, including
+%the number of memory allocation requests and memory free requests, based on
+%the size of the memory allocated or freed.
+
 \item[{\fexec user\_options}] Options that are be interpreted by the user
 program may be included after all the system options. 
 However, {\fexec user\_options} cannot start with +.
@@ -292,6 +321,7 @@ The {\fexec user\_options} will be passed as arguments to the user program
 via the usual {\fcmd argc/argv} construct to the {\fcmd main}\index{main}
 entry point of the main chare. 
 Charm system options will not appear in {\fcmd argc/argv}.
+
 \end{description}
 
 \subsubsection[Additional Uniprocessor Command Line Options]
@@ -319,18 +349,23 @@ thru $P-1$ (where $P$ is the number of processors) repeatedly.
 The following {\fexec ++} command line options are available in
 the network version\index{network command line options}:
 \begin{description}
+
 \item[{\fexec ++debug}] Run each node under gdb in an xterm window, prompting
 the user to begin execution.
 \index{++debug}
+
 \item[{\fexec ++debug-no-pause}] Run each node under gdb in an xterm window
 immediately (i.e. without prompting the user to begin execution).
 \index{++debug-no-pause}
+
 \item[{\fexec ++maxrsh}] Maximum number of {\fcmd rsh}'s to run at a
 time.
 \index{++maxrsh}
+
 \item[{\fexec ++resend-wait}] Timeout before retransmitting datagrams
 (in msec).
 \index{++resend-wait}
+
 \item[{\fexec ++resend-fail}] Timeout before retransmission fails (in
 msec).\index{++resend-fail}
 This parameter can help the user kill ``runaway'' processes, which may not
@@ -342,15 +377,21 @@ operations are being performed.
 
 \item[{\fexec ++nodesfile}] File containing list of nodes.
 \index{++nodesfile}\index{.nodes}\index{nodes file}
+
 \end{description}
 
 If using the {\fexec ++debug} option, the user must ensure the
 following:
 \index{++debug}
 \begin{enumerate}
-\item {\fexec xterm} and {\fexec gdb} must be in the user's path.
+
+\item {\fexec xterm}, {\fexec xdpyinfo},  and {\fexec gdb} must be in
+the user's path.
+
 \item The path must be set in the {\fexec .cshrc} file, not the {\fexec .login}
 file, because {\fexec rsh} does not run the {\fexec .login} file. 
+
 \item The nodes must be authorized to create windows on the host machine (see
-man page for {\fexec xhost}).
+man page for {\fexec xhost} {\fexec xauth}).
+
 \end{enumerate}

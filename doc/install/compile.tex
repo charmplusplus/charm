@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.4  1995-11-16 23:58:29  brunner
+% Revision 1.5  1995-11-17 17:19:37  brunner
+% Incorporated proofreading comments from 11-16 afternoon
+%
+% Revision 1.4  1995/11/16  23:58:29  brunner
 % Alphabetized option list
 %
 % Revision 1.3  1995/11/14  21:23:55  brunner
@@ -29,13 +32,12 @@
 
 \section{Compiling Converse, Charm, and Charm++ Programs}
 
-The shell script, {\tt charmc}, is a versatile program to standardize
+The {\tt charmc} program standardizes compiling and linking procedures
 compiling and linking procedures among various machines and operating
-systems.  The script selects the appropriate libraries to compile
-Charm, Charm++, or Converse programs.  It also standardizes compiling
-and linking procedures and options for sequential C and C++ programs
-on the supported systems.  The {\tt charmc} program is executed in the
-following way:
+systems.  The program selects the appropriate libraries to compile
+Charm, Charm++, or Converse programs.  It also allows a standard
+compiling method for sequential C and C++ programs on the supported
+systems.  The {\tt charmc} program is executed in as follows:
 
 \begin{verbatim}
 charmc [options] input-files
@@ -43,13 +45,29 @@ charmc [options] input-files
 
 Files with the following extensions are handled by {\verb+charmc+}
 \begin{description}
-\item[{\verb+.p+}] Charm code
-\item[{\verb+.P+}] Charm++ code
-\item[{\verb+.c+}] C code
-\item[{\verb+.C+}] C++ code
-\item[{\verb+.o+}] Object files
-\item[{\verb+.a+}] Library files
+\item[{\verb+.p+} -- ] Charm code
+\item[{\verb+.P+} -- ] Charm++ code
+\item[{\verb+.c+} -- ] C code
+\item[{\verb+.C+} -- ] C++ code
+\item[{\verb+.o+} -- ] Object files
+\item[{\verb+.a+} -- ] Library files
 \end{description}
+
+Many of the machine dependent commands and options used by {\tt
+charmc} are configured in the file {\tt conv-mach.csh}, which can be
+found in the same directory where {\tt charmc} resides.  Local
+modifications to the commands or options {\tt charmc} uses may usually
+be accomplished by editing {\tt conv-mach.csh}.
+
+When {\tt charmc} is run, it first identifies where the Charm
+directory resides by examining the {\tt CHARMBIN} environment
+variable, and then by looking at the parent directory that {\tt
+charmc} was run from.  If it can't find the charm system files, it
+exits.  Then it examines the filenames passed to it, and runs the
+command specified on the command line (see below) or in {\tt
+conv-mach.csh} according to the file suffix.  Finally, it removes any
+temporary files it created, unless overridden by the {\tt -save}
+option.
 
 \subsection{Compiling with a user-defined load-balance strategy}
 
@@ -63,146 +81,156 @@ placed in the {\em Converse} library directory.  Then that strategy
 can be linked with a user program using the {\tt -balance} option.
 
 \subsection{Command line options for {\tt charmc}}
+
 The following options are supported by charmc:
+
 \begin{description}
 
-\item[{\tt -balance} {\em load-balance-strategy}]
+\item[{\tt -balance} {\em load-balance-strategy}:]
 
 Selects the desired load balancing strategies.  Currently, only {\tt
 rand}, {\tt acwn}, and {\tt mngr} are supported. If a user-defined
 strategy has been placed in the charm library directory, it may also
 be selected with this option.  Default is {\tt -balance rand}.
 	
-\item[{\tt -c}]
+\item[{\tt -c}:]
 
 Ignored.  For compatibility with {\tt cc} and {\tt ld}.
 
-\item[{\tt -c++} {\em C++ compiler}]
+\item[{\tt -c++} {\em C++ compiler}:]
 
 Forces the specified C++ compiler to be used.
 
-\item[{\tt -cc} {\em C-compiler}]
+\item[{\tt -cc} {\em C-compiler}:]
 
 Forces the specified C compiler to be used.
 
-\item[{\tt -cp} {\em copy-file}]
+\item[{\tt -cp} {\em copy-file}:]
 
 Creates a copy of the output file in {\em copy-file}.
 
-\item[{\tt -cpp-option} {\em options}]
+\item[{\tt -cpp-option} {\em options}:]
 
 Options passed to the C pre-processor.
 
-\item[{\tt -D*}]
+\item[{\tt -D*}:]
 
-Passed to C preprocessor, C and C++ compilers.
+Passed to C preprocessor, C and C++ compilers.  Commonly used to
+define preprocessor variables from the command line at compile
+time.
 
-\item[{\tt -execmode} {\em execution-mode}]
+\item[{\tt -execmode} {\em execution-mode}:]
 
-Selects the desired execution mode.  Currently supported modes are
-{\tt none}, {\tt summary}, and {\tt projections}. Default is {\tt
--execmode none}.
+Selects the desired execution mode for Charm and Charm++ programs.
+See the Charm manual and the Projections and SummaryTool manuals for
+more information.  Currently supported modes are {\tt none}, {\tt
+summary}, and {\tt projections}. Default is {\tt -execmode none}.
 
-\item[{\tt -I*}]
+\item[{\tt -I*}:]
 
-Passed to C preprocessor, C and C++ compilers.
+Passed to C preprocessor, C and C++ compilers.  Commonly used to
+define a directory search path for preprocessor include files.
 
-\item[{\tt -g}]
+\item[{\tt -g}:]
 
-Causes compiled files to include debugging information.
+Causes compiled files to include debugging information. Default.
 
-\item[{\tt -L*}]
+\item[{\tt -L*}:]
 
-Passed to all linkers.
+Passed to all linkers.  Commonly used to define a directory search
+path for libraries selected by the {\tt -l} command.
 
-\item[{\tt -language \{converse|charm|charm++\}}]
+\item[{\tt -l*}:]
+
+Specifies libraries which are passed to all linkers.
+
+\item[{\tt -language \{converse|charm|charm++\}}:]
 
 Selects compiler and linker options, and appropriate libraries
 to compile the selected language.  Default is {\tt -language charm}.
 
-\item[{\tt -ld} {\em linker}]
+\item[{\tt -ld} {\em linker}:]
 
 Forces the specified linker to be used for {\tt -language charm}.
 
-\item[{\tt -ld++} {\em linker}]
+\item[{\tt -ld++} {\em linker}:]
 
 Forces the specified linker to be used for {\tt -language charm++}.
 
-\item[{\tt -ld++-option} {\em options}]
+\item[{\tt -ld++-option} {\em options}:]
 
 Options passed to the linker for {\tt -language charm++}.
 
-\item[{\tt -ld-option} {\em options}]
+\item[{\tt -ld-option} {\em options}:]
 
 Options passed to the linker for {\tt -language charm}.
 
-\item[{\tt -ldro-option} {\em options}]
+\item[{\tt -ldro-option} {\em options}:]
 
 Options passes to the linker when linking {\tt .o} files.
 
-\item[{\tt -machine} {\em machine-type}]
+\item[{\tt -machine} {\em machine-type}:]
 
-If more than one version of converse/charm/charm++ has been installed,
-allows selection of versions other than the default.  The default
-version is the version last installed. For a list of machine types
-currently supported, see the previous section.
+If more than one version of converse/charm/charm++ has been installed
+in the same charm directory, this option allows selection of versions
+other than the default.  The default {\em machine-type} is the version
+in which the {\tt charmc} being run resides.
 
-\item[{\tt -memory}]
+\item[{\tt -memory}:]
 
 Currently ignored
 
-\item[{\tt -o} {\em output-file}]
+\item[{\tt -NO}:]
+
+Causes no optimization to be used.  Overrides {\tt -O}.
+
+\item[{\tt -O}:]
+
+Causes files to be compiled with default optimization.
+
+\item[{\tt -O*}:]
+
+Passed to C/C++ compiler.  Generally allows the selection of optional
+optimizations.
+
+\item[{\tt -o} {\em output-file}:]
 
 Output file name.
 
-\item[{\tt -queue} {\em queueing strategy}]
+\item[{\tt -queue} {\em queueing strategy}:]
 
 Currently ignored
 
-\item[{\tt -save}]
+\item[{\tt -s}:]
+
+Passed to C and C++ linkers.  Commonly causes symbol table information
+to be stripped from object files, reducing files size, but reducing
+the information available for debugging programs.
+
+\item[{\tt -save}:]
 
 Intermediate files produced by the Charm or Charm++ translator are saved.
 
-\item[{\tt -seq}]
+\item[{\tt -seq}:]
 
 Compiles C and C++ files using the system's sequential/front end
 compilers.
 
-\item[{\tt -use-fastest-cc}]
+\item[{\tt -use-fastest-cc}:]
 
 Some environments provide more than one C compiler (cc and gcc, for
 example).  This option selects the compiler most likely to produce
 faster executing code.
 
-\item[{\tt -use-reliable-cc}]
+\item[{\tt -use-reliable-cc}:]
 
 Some environments provide more than one C compiler (cc and gcc, for
 example).  This option selects the compiler most likely to succesfully
 compile C code.
 
-\item[{\tt -verbose}]
+\item[{\tt -verbose}:]
 
 All commands executed by charmc are echoed to stdout.
-
-\item[{\tt -O}]
-
-Causes files to be compiled with default optimization.  Default.
-
-\item[{\tt -NO}]
-
-Causes no optimization to be used.  Overrides {\tt -O}.
-
-\item[{\tt -O*}]
-
-Passed to C/C++ compiler.
-
-\item[{\tt -l*}]
-
-Specifies libraries which are passed to all linkers.
-
-\item[{\tt -s}]
-
-Passed to C and C++ linkers.
 
 \end{description}
 
