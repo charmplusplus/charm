@@ -1,29 +1,18 @@
-#define CHK(p) do\
-               {\
-                 if ((p)==0)\
-                 {\
-                   printf("mesh2graph>Memory Allocation failure.");\
-                   exit(1);\
-                 }\
-               } while (0)
+/*Charm++ Finite Element Framework:
+C++ implementation file
 
+This code implements exactly one routine: fem_partition.
+This partitions a mesh's elements into n chunks, and writes
+out each element's 0-based chunk number to an array.
+
+The partitioning is done using metis.
+
+Originally written by Karthik Mahesh, September 2000.
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-
-class Mesh
-{
-  int _nelems, _nnodes, _esize;
-  int *conn;
- public:
-  Mesh() { conn = 0; _nelems = _nnodes = _esize = 0; }
-  ~Mesh() { delete [] conn; }
-  void load(char *file);	// Load a mesh from file
-  int nelems() { return _nelems; }
-  int nnodes() { return _nnodes; }
-  int esize() { return _esize; }
-  int node(int elem, int nnode);
-};
+#include "fem_impl.h"
 
 class NList
 {
@@ -75,37 +64,8 @@ class Graph
     assert(elem<nelems);
     return nbrs[elem].getnn();
   }
-  void save(char *file, Mesh *m);
+  void toAdjList(int *&adjStart,int *&adjList);
 };
-
-void Mesh::load(char *file)
-{
-  fprintf(stderr, "reading mesh file\n");
-
-  FILE *fp;
-
-  if((fp=fopen(file, "r")) == NULL) {
-    perror(file);
-    exit(1);
-  }
-
-  fscanf(fp, "%d%d%d", &_nelems, &_nnodes, &_esize);
-
-  conn = new int[_nelems*_esize]; CHK(conn);
-  int i, j;
-  for (i=0;i<_nelems;i++)
-    for (j=0;j<_esize;j++)
-      fscanf(fp, "%d", &conn[i*_esize+j]);
-  fclose(fp);
-
-}
-
-int Mesh::node(int elem, int nnode) 
-{
-  assert(elem < _nelems);
-  assert(nnode < _esize);
-  return conn[elem*_esize + nnode];
-}
 
 int NList::cmp(const void *v1, const void *v2)
 {
@@ -186,61 +146,40 @@ void Graph::add(int elem1, int elem2)
   }
 }
 
-void Graph::save(char *file, Mesh *m) 
+
+void Graph::toAdjList(int *&adjStart,int *&adjList)
 {
-  FILE *fp;
-
-  if((fp = fopen(file, "w")) == NULL) {
-    perror(file);
-    exit(1);
-  }
-
-  printf("writing graph file...\n");
-    
-  fprintf(fp, "%d %d %d\n", m->nelems(), m->nnodes(), m->esize());
-
-  int i, j;
-  for(i=0; i<m->nelems(); i++) {
-    for(j = 0; j < m->esize(); j++)
-      fprintf(fp, "%d ", m->node(i, j));
-    fprintf(fp, "\n");
-  }
-
-  int *xadj = new int[nelems+1];
-  xadj[0] = 0;
-  for(i=1; i<nelems+1; i++)
-    xadj[i] = xadj[i-1] + elems(i-1);
-
-  for(i = 0; i < nelems+1; i++)
-    fprintf(fp, "%d\n", xadj[i]);
-
-  for(i = 0; i < nelems; i++) {
-    nbrs[i].sort();
-    for(j = 0; j < nbrs[i].getnn(); j++)
-      fprintf(fp, "%d ", nbrs[i].getelt(j));
-    fprintf(fp, "\n");
-  }
-
-  fclose(fp);
+	int e,i;
+	adjStart=new int[nelems+1];
+	adjStart[0]=0;
+	for (e=0;e<nelems;e++)
+		adjStart[e+1]=adjStart[e]+elems(e);
+	adjList=new int[adjStart[nelems]];
+	int *adjOut=adjList;
+	for (e=0;e<nelems;e++)
+		for (i=nbrs[e].getnn()-1;i>=0;i--)
+			*(adjOut++)=nbrs[e].getelt(i);
 }
 
-void mesh2graph(Mesh *m, Graph *g)
+
+void mesh2graph(const FEM_Mesh *m, Graph *g)
 {
-  int nelems = m->nelems();
-  int nnodes = m->nnodes();
-  int esize = m->esize();
+  Nodes nl(m->node.n);
 
-  Nodes nl(nnodes);
-
-  int i, j;
-  for(i = 0; i < nelems; i++)
-    for(j = 0; j < esize; j++) {
-      nl.add(m->node(i, j), i);
-    }
-
-  // nl to graph
-    
-  for(i = 0; i < nnodes; i++) {
+  //Build an inverse mapping, from node to list of surrounding elements
+  int globalCount=0,t,e,n;
+  for(t=0;t<m->nElemTypes;t++) {
+    const FEM_Mesh::elemCount &k=m->elem[t];
+    for(e=0;e<k.n;e++,globalCount++)
+      for(n=0;n<k.nodesPer;n++)
+        nl.add(k.conn[e*k.nodesPer+n],globalCount);
+  }
+  
+  //Convert nodelists to graph:
+  // Elements become nodes of graph; nodes become edges of graph.
+  // Metis can partition this graph.
+  int i, j;    
+  for(i = 0; i < m->node.n; i++) {
     int nn = nl.nelems(i);
     for(j = 0; j < nn; j++) {
       int e1 = nl.getelt(i, j);
@@ -252,25 +191,38 @@ void mesh2graph(Mesh *m, Graph *g)
   }
 }
 
-int main(int argc, char **argv) 
+
+//FIXME: Shouldn't this prototype come from some METIS header file?
+extern "C" void
+  METIS_PartGraphKway (int* nv, int* xadj, int* adjncy, int* vwgt, int* adjwgt,
+                       int* wgtflag, int* numflag, int* nparts, int* options,
+                       int* edgecut, int* part);
+
+
+/*Partition this mesh's elements into n chunks,
+ writing each element's 0-based chunk number to elem2chunk.
+*/
+void fem_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
 {
-  Mesh *m = new Mesh; CHK(m);
-
-  if(argc != 3) {
-    fprintf(stderr, "Usage: %s <mesh-file> <graph-file>\n", argv[0]);
-    exit(0);
-  }
-
-  m->load(argv[1]);
-
-  Graph* g = new Graph(m->nelems()); CHK(g);
-
-  mesh2graph(m, g);
-
-  g->save(argv[2], m);
-
-  delete m;
-  delete g;
-
-  return 0;
+	int nelems=mesh->nElems();
+	if (nchunks==1) {//Metis can't handle this case (!)
+		for (int i=0;i<nelems;i++) elem2chunk[i]=0;
+		return;
+	}
+	Graph g(nelems);
+	mesh2graph(mesh,&g);
+	
+	int *adjStart; /*Maps elem # -> start index in adjacency list*/
+	int *adjList; /*Lists adjacent vertices for each element*/
+	g.toAdjList(adjStart,adjList);
+	int ecut,numflag=0;
+	int wgtflag = 0; // no weights associated with elements or edges
+	int opts[5];
+	opts[0] = 0; //use default values
+	printf("calling metis partitioner...\n");
+	METIS_PartGraphKway(&nelems, adjStart, adjList, 0, 0, &wgtflag, &numflag, 
+                        &nchunks, opts, &ecut, elem2chunk);
+	printf("metis partitioner returned...\n");
+	delete[] adjStart;
+	delete[] adjList;
 }

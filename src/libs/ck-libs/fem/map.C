@@ -1,432 +1,343 @@
-#if CMK_SEQUENTIAL
+/*Charm++ Finite Element Framework:
+C++ implementation file
 
+This code implements fem_map and fem_assemble.
+Fem_map takes a mesh and partitioning table (which maps elements
+to chunks) and creates a sub-mesh for each chunk,
+including the communication lists. Fem_assemble is the inverse.
+
+The fem_map algorithm is O(n) in space and time (with n nodes,
+e elements, p processors; and n>e>p^2).  The central data structure
+is a bit unusual-- it's a table that maps nodes to lists of processors
+(all the processors that share the node).  For any reasonable problem,
+the vast majority of nodes are not shared between processors; 
+this algorithm uses this to keep space and time costs low.
+
+Memory usage for the large temporary arrays is n*sizeof(peList)
++p^2*sizeof(peList), all allocated contiguously.  Shared nodes
+will result in a few independently allocated peList entries,
+but shared nodes should be rare so this should not be expensive.
+
+Note that the implementation could be significantly simplified
+with judicious use of std::vector (or similar class); as 
+have to do a size pass, allocate, then a copy pass.
+
+Originally written by Orion Sky Lawlor, olawlor@acm.org, 9/28/2000
+*/
 #include <stdio.h>
 #include <stdlib.h>
-#ifdef CkPrintf
-#undef CkPrintf
-#define CkPrintf printf
-#endif
-#ifdef CkError
-#undef CkError
-#define CkError  printf
-#endif
-#define CrnRand  rand
-#define CHK(p) do\
-               {\
-                 if ((p)==0)\
-                 {\
-                   printf("MAP>Memory Allocation failure.");\
-                   exit(1);\
-                 }\
-               } while (0)
-typedef struct _chunkMsg {
-  int nnodes, nelems, npes, nconn;
-  int *gNodeNums; // gNodeNums[nnodes]
-  int *primaryPart; // primaryPart[nnodes]
-  int *gElemNums; // gElemNums[nelems]
-  int *conn; // conn[nelems][nconn]
-  int *peNums; // peNums[npes]
-  int *numNodesPerPe; // numNodesPerPe[npes]
-  int *nodesPerPe; // nodesPerPe[npes][nodesPerPe[i]]
-} ChunkMsg;
-#define FEM_TRIANGULAR 1
-#define FEM_HEXAHEDRAL 3
-#else
-
-#include "fem.h"
-
-#endif
-
 #include <assert.h>
+#include "fem_impl.h"
 
-/*
- * subroutine fem_map takes in the original mesh, as well as
- * partitioning produced by metis, and creates messages to be sent to
- * individual partitions. These messages contain information related to
- * that partition only. The connectivity matrix refers to the local
- * node numbers, and is indexed by local element numbers. Similarly, the
- * communication information, which contains the nodes to be communicated
- * to different partitions in fem_update, also refer to local node
- * numbers.
- *
- * nelems: (in) total number of elements
- * nnodes: (in) total number of nodes
- * esize: (in) nodes per element
- * connmat: (in) total connectivity matrix, always row major[nelems][esize]
- * nparts: (in) required number of partitions
- * epart: (in) element partitioning by metis, 
- *        epart[i] contains partition for elem i
- * msgs: (out) messages produced by this routine
- */
+/*This object maps a single node to a list of the PEs
+that have a copy of it.  For the vast majority
+of nodes, the list will contain exactly one element.
+*/
+class peList {
+public:
+	int pe;
+	int localNo;//Local number of this node on this PE
+	peList *next;
+	peList() {pe=-1;next=NULL;}
+	peList(int Npe,int NlocalNo) {
+		pe=Npe;
+		localNo=NlocalNo;
+		next=NULL;
+	}
+	~peList() {delete next;}
+	int addPE(int p,int l) {
+		//Add PE p to the list with local index l,
+		// if it's not there already
+		if (pe==p) return 0;//Already in the list
+		if (pe==-1) {pe=p;localNo=l;return 1;}
+		if (next==NULL) {next=new peList(p,l);return 1;}
+		else return next->addPE(p,l);
+	}
+	void addAlways(int p,int l) {
+		//Add PE p to the list with local index l
+		if (pe==-1) {pe=p;localNo=l;}
+		else {
+			peList *nu=new peList(p,l);
+			nu->next=next;
+			next=nu;
+		}
+	}
+	int localOnPE(int p) {
+		//Return this node's local number on PE p
+		if (pe==p) return localNo;
+		else return next->localOnPE(p);
+	}
+	int isEmpty(void) //Return 1 if this is an empty list 
+		{return (pe==-1);}
+	int length(void) {
+		if (next==NULL) return isEmpty()?0:1;
+		else return 1+next->length();
+	}
+	peList &operator[](int i) {
+		if (i==0) return *this;
+		else return (*next)[i-1];
+	}
+};
 
-void
-fem_map (int nelems, int nnodes, int esize, int *connmat,
-         int nparts, int *epart, ChunkMsg *msgs[])
+
+
+/*Create a sub-mesh for each chunk's elements,
+including communication lists between chunks.
+*/
+void fem_map(const FEM_Mesh *mesh,int nchunks,int *elem2chunk,ChunkMsg **msgs)
 {
-  int i,j,k;
-  int *pinfo = new int[nparts]; CHK(pinfo);
-  int *ninfo = new int[nnodes]; CHK(ninfo);
-  for (i=0;i<nparts;i++)
-  {
-    msgs[i] = new ChunkMsg; CHK(msgs[i]);
-    msgs[i]->nelems = 0;
-    msgs[i]->nconn = esize;
-  }
-#if FEM_FORTRAN
-  // Make everything 0-based
-  for (i=0;i<nelems;i++)
-    epart[i]--;
-  for (i=0;i<(nelems*esize);i++)
-    connmat[i]--;
-#endif 
-  // count the number of elements assigned to each partition
-  for (i=0;i<nelems;i++)
-    msgs[epart[i]]->nelems++;
-  for (i=0;i<nparts;i++)
-  { 
-    msgs[i]->gElemNums = new int[msgs[i]->nelems]; CHK(msgs[i]->gElemNums);
-    msgs[i]->conn = new int[msgs[i]->nelems*esize]; CHK(msgs[i]->conn);
-  }
-  // pinfo[i] contains filled global element numbers for partition i
-  for (i=0;i<nparts;i++)
-    pinfo[i] = 0;
-  // fill in the global element numbers
-  for (i=0;i<nelems;i++)
-  { 
-    int ep = epart[i];
-    msgs[ep]->gElemNums[pinfo[ep]++] = i;
-  }
-  for (i=0;i<nparts;i++)
-  {
-    ChunkMsg *m = msgs[i];
-    m->nnodes = 0;
-    // ninfo[j] is true if node j appears in partition i
-    for (j=0;j<nnodes;j++)
-      ninfo[j] = 0;
-    // scan the connectivity matrix to see which nodes appear in a partition
-    // a node appears in a partition if at least one element connected to it
-    // belongs to that partition
-    for (j=0;j<nelems;j++)
-    {
-      // check if element belongs to this partition
-      if (epart[j]==i)
-      {
-        // make all its bordering nodes belong to this partition
-        // if not already here
-        for (k=0;k<esize;k++)
-        {
-          if (ninfo[connmat[j*esize+k]]==0)
-          {
-            ninfo[connmat[j*esize+k]] = 1;
-            m->nnodes++;
-          }
-        }
-      }
-    }
-    m->gNodeNums = new int[m->nnodes]; CHK(m->gNodeNums);
-    m->primaryPart = new int[m->nnodes]; CHK(m->primaryPart);
-    m->nnodes = 0;
-    for (j=0;j<nnodes;j++)
-    {
-      if (ninfo[j]==1)
-      {
-        m->gNodeNums[m->nnodes] = j;
-        // ninfo now contains the local index for a node
-        ninfo[j] = m->nnodes++;
-      }
-      else
-      {
-        // 0 is a valid local index, so set to (-1) to denote absence
-        ninfo[j] = (-1);
-      }
-    }
-    // now fill in the connectivity matrix with local node numbers
-    for (j=0;j<m->nelems;j++)
-    {
-      int telem = m->gElemNums[j];
-      for (k=0;k<esize;k++)
-      {
-        int tnode = connmat[telem*esize+k];
-        assert(ninfo[tnode]>=0 && ninfo[tnode]<m->nnodes);
-        m->conn[j*esize+k] = ninfo[tnode];
-      }
-    }
-  }
-  // now find the communication information
-  int *comm = new int[nnodes*nparts]; CHK(comm);
-  // comm[i][j] contains the local index of node i in partition j
-  // if i belongs to j; otherwise it contains -1
-  for (i=0;i<(nnodes*nparts);i++)
-    comm[i] = (-1);
-  // fill comm
-  for (j=0;j<nparts;j++)
-  {
-    ChunkMsg *m = msgs[j];
-    for (i=0;i<(m->nnodes);i++)
-    {
-      // tnode is the i'th node of partition j
-      int tnode = m->gNodeNums[i];
-      comm[tnode*nparts+j] = i;
-    }
-  }
-  // now find the primary partition
-  // ninfo[i] contains the number of partitions that node i belongs to
-  for (i=0;i<nnodes;i++)
-    ninfo[i] = 0;
-  for (i=0;i<nnodes;i++)
-  {
-    for (j=0;j<nparts;j++)
-    {
-      // if node i belongs to partition j, increment ninfo[i]
-      if (comm[i*nparts+j] != (-1))
-        ninfo[i]++;
-    }
-  }
-  // now generate a random partition number among those 
-  // that the node belongs to. At the end of this loop, ninfo[i] contains
-  // the primary partition number for node i
-  for (i=0;i<nnodes;i++)
-  {
-    assert(ninfo[i]>=1);
-    int ridx = CrnRand()%ninfo[i];
-    k = (-1);
-    for (j=0;j<nparts;j++)
-    {
-      if (comm[i*nparts+j] != (-1))
-      { 
-        k++; 
-        if (k==ridx)
-          break;
-      }
-    }
-    assert(j!=nparts);
-    ninfo[i] = j;
-  }
-  // now assign the primary partition number to nodes in each of the messages
-  for (i=0;i<nparts;i++)
-  {
-    ChunkMsg *m = msgs[i];
-    for (j=0;j<(m->nnodes);j++)
-      m->primaryPart[j] = ninfo[m->gNodeNums[j]];
-  }
-  for (i=0;i<nparts;i++)
-  {
-    ChunkMsg *m = msgs[i];
-    m->npes = 0;
-    // pinfo[j] contains number of nodes that partition i needs to 
-    // communicate with partition j
-    for (j=0;j<nparts;j++)
-      pinfo[j] = 0;
-    for (j=0;j<nparts;j++)
-    {
-      if (i==j)
-        continue;
-      for (k=0;k<(m->nnodes);k++)
-      {
-        int tnode = m->gNodeNums[k];
-        // if tnode also belongs to partition j, i has to communicate with j
-        if (comm[tnode*nparts+j] != (-1))
-        {
-          if (pinfo[j]==0)
-            m->npes++;
-          pinfo[j]++;
-        }
-      }
-    }
-    m->numNodesPerPe = new int[m->npes]; CHK(m->numNodesPerPe);
-    m->peNums = new int[m->npes]; CHK(m->peNums);
-    for (j=0,k=0; j<nparts; j++)
-    {
-      if (pinfo[j]>0)
-      {
-        m->numNodesPerPe[k] = pinfo[j];
-        m->peNums[k] = j;
-        k++;
-      }
-    }
-    int tcomm = 0;
-    for (j=0; j<(m->npes); j++)
-      tcomm += m->numNodesPerPe[j];
-    m->nodesPerPe = new int[tcomm]; CHK(m->nodesPerPe);
-    int icomm = 0;
-    for (j=0;j<(m->npes); j++)
-    {
-      int tpe = m->peNums[j];
-      for (k=0;k<(m->nnodes);k++)
-      {
-        int tnode = m->gNodeNums[k];
-        if (comm[tnode*nparts+tpe] != (-1))
-          m->nodesPerPe[icomm++] = k;
-      }
-    }
-    assert(icomm==tcomm);
-  }
-  delete[] comm;
+//Allocate messages to return
+	int c;//chunk number (to receive message)
+	for (c=0;c<nchunks;c++) {
+		msgs[c]=new ChunkMsg; //Ctor starts all node and element counts at zero
+		msgs[c]->m.copyType(*mesh);
+	}
+	
+//First pass, build a list of the PEs that share each node
+//  (also find the local element and node counts)
+	peList *nodes=new peList[mesh->node.n];
+	int t;//Element type
+	int e;//Element number in type
+	int n;//Node number around element
+	for (t=0;t<mesh->nElemTypes;t++) {
+		int typeStart=mesh->nElems(t);//Number of elements before type t
+		const FEM_Mesh::elemCount src=mesh->elem[t]; 
+		for (e=0;e<src.n;e++) {
+			c=elem2chunk[typeStart+e];
+			FEM_Mesh &dest=msgs[c]->m;
+			const int *srcConn=&src.conn[e*src.nodesPer];
+			dest.elem[t].n++;//Found a new local element
+			for (n=0;n<src.nodesPer;n++)
+				if (nodes[srcConn[n]].addPE(c,dest.node.n))
+					dest.node.n++;//Found a new local node
+		}
+		
+	}
 
-// Epilogue:
-#if FEM_FORTRAN
-  // Make everything 1-based again
-  for (i=0;i<nparts;i++)
-  {
-    ChunkMsg *m = msgs[i];
-    for (j=0;j<(m->nnodes);j++)
-      m->gNodeNums[j]++;
-    for (j=0;j<(m->nelems);j++)
-      m->gElemNums[j]++;
-    for (j=0;j<(m->nelems*m->nconn);j++)
-      m->conn[j]++;
-  }
-#endif 
-  delete[] pinfo;
-  delete[] ninfo;
-  return;
+//Allocate memory for all local elements and nodes
+	int *curElem=new int[nchunks]; //Next local element number to add
+	int *curElem_type=new int[nchunks]; //Next element-type-local element number to add
+	for (c=0;c<nchunks;c++) {
+		FEM_Mesh &dest=msgs[c]->m;
+		dest.node.allocUdata();
+		for (t=0;t<mesh->nElemTypes;t++) {
+			dest.elem[t].allocUdata();
+			dest.elem[t].allocConn();
+		}
+		msgs[c]->elemNums=new int[dest.nElems()];
+		msgs[c]->nodeNums=new int[dest.node.n];
+		for (n=0;n<dest.node.n;n++) msgs[c]->nodeNums[n]=-1;
+		msgs[c]->isPrimary=new int[dest.node.n];
+		for (n=0;n<dest.node.n;n++) msgs[c]->isPrimary[n]=0;
+		curElem[c]=0;
+	}
+
+//Second pass, add each local element and node to the local lists.
+//  If we used std::vector instead of just int [], we could do this all in one pass!
+	for (t=0;t<mesh->nElemTypes;t++) {
+		for (c=0;c<nchunks;c++) curElem_type[c]=0;//Restart type-local count
+		int typeStart=mesh->nElems(t);//Number of elements before type t
+		const FEM_Mesh::elemCount &src=mesh->elem[t]; 
+		const FEM_Mesh::count &nsrc=mesh->node; 
+		for (e=0;e<src.n;e++) {
+			c=elem2chunk[typeStart+e];
+			FEM_Mesh::elemCount &dest=msgs[c]->m.elem[t];
+			FEM_Mesh::count &ndest=msgs[c]->m.node;
+			msgs[c]->elemNums[curElem[c]++]=typeStart+e;
+			//Compute this element's global and local (type-specific) number
+			int geNo=e;
+			int leNo=curElem_type[c]++;
+			dest.udataIs(leNo,src.udataFor(geNo));
+
+			for (n=0;n<src.nodesPer;n++)
+			{//Compute each node's local and global number
+				int gnNo=src.conn[geNo*src.nodesPer+n];
+				int lnNo=nodes[gnNo].localOnPE(c);
+				dest.conn[leNo*dest.nodesPer+n]=lnNo;
+				if (msgs[c]->nodeNums[lnNo]==-1) {
+					msgs[c]->nodeNums[lnNo]=gnNo;
+					ndest.udataIs(lnNo,nsrc.udataFor(gnNo));
+				}
+			}
+		}
+	}
+	delete[] curElem;
+	delete[] curElem_type;
+	
+//Find chunk comm. lists
+//  (also set primary PEs)
+	peList *commLists=new peList[nchunks*nchunks];
+	for (n=0;n<mesh->node.n;n++) {
+		int len=nodes[n].length();
+		if (len==1) {//Usual case: a private node
+			msgs[nodes[n].pe]->isPrimary[nodes[n].localNo]=1;
+		} else if (len==0) {
+			CkPrintf("FEM> Warning!  Node %d is not referenced by any element!\n",n);
+		} else {/*Node is referenced by more than one processor-- 
+			Add it to all the processor's comm. lists.*/
+			//Make the node primary on the first processor
+			msgs[nodes[n].pe]->isPrimary[nodes[n].localNo]=1;
+			for (int bi=0;bi<len;bi++)
+				for (int ai=0;ai<bi;ai++)
+	       			{
+		       			peList &a=nodes[n][ai];
+		       			peList &b=nodes[n][bi];
+		       			commLists[a.pe*nchunks+b.pe].addAlways(b.pe,a.localNo);
+		       			commLists[b.pe*nchunks+a.pe].addAlways(a.pe,b.localNo);
+		       		}
+		}
+	}
+	delete[] nodes;
+	
+//Copy chunk comm. lists into comm. arrays
+	for (int a=0;a<nchunks;a++) {
+		int b;
+		commCounts &comm=msgs[a]->comm;
+		//First pass: compute communicating processors
+		comm.nPes=0;
+		for (b=0;b<nchunks;b++) 
+			if (!commLists[a*nchunks+b].isEmpty())
+			//Processor a communicates with processor b
+				comm.nPes++;
+		
+		comm.allocate();//Now that we know nPes...
+		
+		//Second pass: add all shared nodes
+		int curPe=0;
+		for (b=0;b<nchunks;b++) 
+		{
+			int len=commLists[a*nchunks+b].length();
+			if (len>0)
+			{
+				comm.peNums[curPe]=b;
+				comm.numNodesPerPe[curPe]=len;
+				comm.nodesPerPe[curPe]=new int[len];
+				peList *l=&commLists[a*nchunks+b];
+				for (int i=0;i<len;i++) {
+					comm.nodesPerPe[curPe][i]=l->localNo;
+					l=l->next;
+				}
+				curPe++;
+			}
+		}
+	}
+	delete[] commLists;
 }
 
-#if MAP_MAIN
+/****************** Assembly ******************
+The inverse of fem_map: reassemble split chunks into a 
+single mesh.  If nodes and elements elements aren't added 
+or removed, this is straightforward; but the desired semantics
+under additions and deletions is unclear to me.
 
-#if FEM_FORTRAN
-  static int numflag=1;
-#else
-  static int numflag = 0;
-#endif
-
-#if MAP_GRAPH
-  extern "C" void
-  METIS_PartGraphKway (int* nv, int* xadj, int* adjncy, int* vwgt, int* adjwgt,
-                       int* wgtflag, int* numflag, int* nparts, int* options,
-                       int* edgecut, int* part);
-#else
-  extern "C" void
-  METIS_PartMeshNodal (int* ne, int* nn, int* elmnts, int* etype, int* numflag,
-                       int* nparts, int* edgecut, int* epart, int* npart);
-#endif
-
-static void
-write_partitions (ChunkMsg **msgs, int nparts, int esize)
+For now, deleted nodes and elements leave a hole in the
+global-numbered node- and element- table; and added nodes
+and elements are added at the end. 
+*/
+FEM_Mesh *fem_assemble(int nchunks,ChunkMsg **msgs)
 {
-  int i, j, k;
-  for (i=0;i<nparts;i++)
-  {
-    ChunkMsg *m = msgs[i];
-    char filename[128];
-    sprintf(filename, "meshdata.Pe%d", i);
-    FILE *fp = fopen(filename, "w");
-    if (fp==0)
-    { 
-      fprintf(stderr, "cannot open %s for writing.\n", filename);
-      exit(1);
-    }
-    // write nodes
-    fprintf(fp, "%d\n", m->nnodes);
-    for (j=0;j<(m->nnodes);j++)
-      fprintf(fp, "%d %d\n", m->gNodeNums[j], m->primaryPart[j]);
-    // write elems
-    fprintf(fp, "%d %d\n", m->nelems, esize);
-    for (j=0;j<(m->nelems);j++)
-    {
-      fprintf(fp, "%d ", m->gElemNums[j]);
-      for (k=0;k<esize;k++)
-        fprintf(fp, "%d ", m->conn[j*esize+k]);
-      fprintf(fp, "\n");
-    }
-    // write comm
-    fprintf(fp, "%d\n", m->npes);
-    int idx = 0;
-    for (j=0; j<(m->npes); j++)
-    {
-      fprintf(fp, "%d %d ", m->peNums[j], m->numNodesPerPe[j]);
-      for (k=0; k<(m->numNodesPerPe[j]); k++)
-      {
-        fprintf(fp, "%d ", m->nodesPerPe[idx++]);
-      }
-    }
-    fclose(fp);
-  }
-}
+	FEM_Mesh *m=new FEM_Mesh;
+	int i,t,c,e,n;
 
-static void
-usage (char *pgm)
-{
-  fprintf(stderr, "Usage: %s <meshfile> <nparts>\n", pgm);
-  exit(1);
-}
+//Find the global total number of nodes and elements
+	int minOld_n=1000000000,maxOld_n=0,new_n=0; //Pre-existing and newly-created nodes
+	for(c=0; c<nchunks;c++) {
+		const ChunkMsg *msg=msgs[c];
+		for (n=0;n<msg->m.node.n;n++)
+			if (msg->isPrimary[n])
+			{
+				int g=msg->nodeNums[n];
+				if (g==-1) new_n++; //Newly-created node
+				else {//pre-existing node
+					if (maxOld_n<=g) maxOld_n=g+1; 
+					if (minOld_n>=g) minOld_n=g; 
+				}
+			}
+	}
+	if (minOld_n>maxOld_n) minOld_n=maxOld_n;
+	m->node.n=(maxOld_n-minOld_n)+new_n;
+	m->node.dataPer=msgs[0]->m.node.dataPer;
+	m->node.allocUdata();
+	for (i=m->node.udataCount()-1;i>=0;i--)
+		m->node.udata[i]=0.0;
+	
+	m->nElemTypes=msgs[0]->m.nElemTypes;
+	int *minOld_e=new int[m->nElemTypes];
+	int *maxOld_e=new int[m->nElemTypes];	
+	int new_e;
+	for (t=0;t<m->nElemTypes;t++) {
+		minOld_e[t]=1000000000;
+		maxOld_e[t]=0;
+		new_e=0;
+		for(c=0; c<nchunks;c++) {
+			const ChunkMsg *msg=msgs[c];
+			int startDex=msg->m.nElems(t);
+			for (e=0;e<msg->m.elem[t].n;e++)
+			{
+				int g=msg->elemNums[startDex+e];
+				if (g==-1) new_e++; //Newly-created element
+				else {//pre-existing element
+					if (maxOld_e[t]<=g) maxOld_e[t]=g+1; 
+					if (minOld_e[t]>=g) minOld_e[t]=g; 
+				}
+			}
+		}
+		if (minOld_e[t]>maxOld_e[t]) minOld_e[t]=maxOld_e[t];
+		m->elem[t].n=(maxOld_e[t]-minOld_e[t])+new_e;
+		m->elem[t].dataPer=msgs[0]->m.elem[t].dataPer;
+		m->elem[t].allocUdata();
+		for (i=m->elem[t].udataCount()-1;i>=0;i--)
+			m->elem[t].udata[i]=0.0;
+		m->elem[t].nodesPer=msgs[0]->m.elem[t].nodesPer;
+		m->elem[t].allocConn();
+		for (i=m->elem[t].connCount()-1;i>=0;i--)
+			m->elem[t].conn[i]=-1;
+	}
+	
+//Now copy over the local data and connectivity into the global mesh
+	new_n=0;
+	for(c=0; c<nchunks;c++) {
+		ChunkMsg *msg=msgs[c];
+		for (n=0;n<msg->m.node.n;n++)
+			if (msg->isPrimary[n])
+			{
+				int g=msg->nodeNums[n];
+				if (g==-1) //Newly-created node-- assign a global number
+					g=(maxOld_n-minOld_n)+new_n++;
+				else //An existing node
+					g-=minOld_n;
+				
+				//Copy over user data
+				m->node.udataIs(g-minOld_n,msg->m.node.udataFor(n));
+				msg->nodeNums[n]=g;
+			}
+	}
+	for (t=0;t<m->nElemTypes;t++) {
+		new_e=0;
+		for(c=0; c<nchunks;c++) {
+			const ChunkMsg *msg=msgs[c];
+			int startDex=msg->m.nElems(t);
+			for (e=0;e<msg->m.elem[t].n;e++)
+			{
+				int g=msg->elemNums[startDex+e];
+				if (g==-1)//Newly-created element
+					g=(maxOld_e[t]-minOld_e[t])+new_e++;
+				else //An existing element
+					g-=minOld_e[t];
+				
+				//Copy over user data
+				m->elem[t].udataIs(g-minOld_e[t],msg->m.elem[t].udataFor(i));
+				
+				//Copy over connectivity, translating from local to global
+				const int *srcConn=msg->m.elem[t].connFor(e);
+				int *dstConn=m->elem[t].connFor(g-minOld_e[t]);
+				for (n=0;n<msg->m.elem[t].nodesPer;n++)
+					dstConn[n]=msg->nodeNums[srcConn[n]];
+			}
+		}
+	}
 
-int 
-main (int argc, char **argv)
-{
-  if (argc != 3)
-    usage(argv[0]);
-  FILE *fp = fopen(argv[1], "r");
-  if (fp==0)
-  { 
-    fprintf(stderr, "cannot open %s for reading.\n", argv[1]);
-    exit(1);
-  }
-  int nparts = atoi(argv[2]);
-  int nelems, nnodes, ctype;
-  printf("reading mesh file...\n");
-  fscanf(fp, "%d%d%d", &nelems, &nnodes, &ctype);
-#if MAP_GRAPH
-  int esize = ctype;
-#else
-  int esize = (ctype==FEM_TRIANGULAR) ? 3 :
-              ((ctype==FEM_HEXAHEDRAL) ? 8 :
-              4);
-#endif
-  int *conn = new int[nelems*esize]; CHK(conn);
-  int i, j;
-  for (i=0;i<nelems;i++)
-  {
-    for (j=0;j<esize;j++)
-      fscanf(fp, "%d", &conn[i*esize+j]);
-  }
-#if MAP_GRAPH
-  int *xadj = new int[nelems+1]; CHK(xadj);
-  for(i=0;i<=nelems;i++)
-    fscanf(fp, "%d", &xadj[i]);
-  int *adjncy = new int[xadj[nelems]]; CHK(adjncy);
-  for(i=0;i<nelems;i++)
-    for(j=xadj[i]; j<xadj[i+1]; j++)
-      fscanf(fp, "%d", &adjncy[j]);
-#endif
-  fclose(fp);
-  printf("finished reading mesh file...\n");
-  int ecut;
-  int *epart = new int[nelems]; CHK(epart);
-  for(i=0;i<nelems;i++)
-  {
-    epart[i] = numflag;
-  }
-  if (nparts>1)
-  {
-#if MAP_GRAPH
-    int wgtflag = 0; // no weights associated with elements or edges
-    int opts[5];
-    opts[0] = 0; //use default values
-    printf("calling metis partitioner...\n");
-    METIS_PartGraphKway(&nelems, xadj, adjncy, 0, 0, &wgtflag, &numflag, 
-                        &nparts, opts, &ecut, epart);
-    printf("metis partitioner returned...\n");
-#else
-    int *npart = new int[nnodes]; CHK(npart);
-    METIS_PartMeshNodal(&nelems, &nnodes, conn, &ctype, &numflag, 
-                        &nparts, &ecut, epart, npart);
-    delete[] npart;
-#endif
-  }
-  printf("calling mapper...\n");
-  ChunkMsg **msgs = new ChunkMsg*[nparts]; CHK(msgs);
-  fem_map(nelems, nnodes, esize, conn, nparts, epart, msgs);
-  printf("mapper returned...\n");
-  delete[] epart;
-  delete[] conn;
-  printf("writing partitions...\n");
-  write_partitions(msgs, nparts, esize);
-  printf("partitions written...\n");
-  for (i=0;i<nparts;i++) 
-    delete msgs[i];
-  delete[] msgs;
-  return 0;
+	delete[] minOld_e;
+	delete[] maxOld_e;
+	return m;
 }
-
-#endif
