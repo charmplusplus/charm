@@ -244,7 +244,8 @@ dirs+sources:
 CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-neighbor.o $(L)/libldb-none.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
 TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a \
           $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
-	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a
+	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a \
+          $(L)/libtrace-recordreplay.a
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
           $(L)/libmemory-gnuold.o $(L)/libmemory-verbose.o 	\
 	  $(L)/libmemory-paranoid.o \
@@ -564,6 +565,10 @@ LIBTRACE_SUMM=trace-summary.o trace-common.o
 $(L)/libtrace-summary.a: $(LIBTRACE_SUMM)
 	$(CHARMC) -o $@ $(LIBTRACE_SUMM)
 
+LIBTRACE_RECREP=trace-recordreplay.o trace-common.o
+$(L)/libtrace-recordreplay.a: $(LIBTRACE_RECREP)
+	$(CHARMC) -o $@ $(LIBTRACE_RECREP)
+
 LIBTRACE_COUNT=trace-counter.o trace-common.o
 $(L)/libtrace-counter.a: $(LIBTRACE_COUNT)
 	$(CHARMC) -o $@ $(LIBTRACE_COUNT)
@@ -572,7 +577,7 @@ LIBTRACE_BG=trace-bluegene.o trace-common.o
 $(L)/libtrace-bluegene.a:$(LIBTRACE_BG)
 	$(CHARMC) -o $@ $(LIBTRACE_BG)
 
-LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-common.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o 
+LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-recordreplay.o trace-common.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o 
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
 	
@@ -586,7 +591,8 @@ $(L)/libtrace-converse.a: $(LIBTRACE_CONVERSE)
 
 # used for make depends
 TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-counter.o	\
-	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o
+	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o \
+              trace-recordreplay.o
 
 ###############################################################################
 #
