@@ -48,8 +48,8 @@ void PVT::startPhase()
 	if ((optPVT < 0) || ((objs.objs[i].getOVT() < optPVT) && 
 			     (objs.objs[i].getOVT() > POSE_UnsetTS))) {
 	  optPVT = objs.objs[i].getOVT();
-	  CkAssert((objs.objs[i].getOVT() >= estGVT) ||
-		   (objs.objs[i].getOVT() == POSE_UnsetTS));
+	  CkAssert(simdone || ((objs.objs[i].getOVT() >= estGVT) ||
+			       (objs.objs[i].getOVT() == POSE_UnsetTS)));
 	}
       }
       else if (objs.objs[i].isConservative()) { // check conPVT
