@@ -1516,8 +1516,8 @@ CmiCommHandle CmiGeneralNodeSend(int pe, int size, int freemode, char *data)
   CmiCommLock();
   DeliverOutgoingNodeMessage(ogm);
   CmiCommUnlock();
-#if 1
-/*CMK_SHARED_VARS_UNAVAILABLE*/
+#if CMK_SHARED_VARS_UNAVAILABLE
+  /* Check if any packets have arrived recently (preserves kernel network buffers). */
   CommunicationServer(0);
 #endif
   return (CmiCommHandle)ogm;
@@ -1568,8 +1568,8 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   CmiCommLock();
   DeliverOutgoingMessage(ogm);
   CmiCommUnlock();
-#if 1
-/*CMK_SHARED_VARS_UNAVAILABLE*/
+#if CMK_SHARED_VARS_UNAVAILABLE
+  /* Check if any packets have arrived recently (preserves kernel network buffers). */
   CommunicationServer(0);
 #endif
   return (CmiCommHandle)ogm;
