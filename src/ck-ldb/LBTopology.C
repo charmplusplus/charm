@@ -14,6 +14,7 @@
 #include <math.h>
 
 #include "charm++.h"
+#include "LBDatabase.h"
 #include "LBTopology.h"
 
 // ring
