@@ -2,7 +2,7 @@ CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 OBJS=netfem.o netfem_data.o
-HEADERS=netfem.h netfemf.h
+HEADERS=netfem.h netfemf.h netfem_data.h
 DEST=$(CDIR)/lib/libmodulenetfem.a
 
 all: $(DEST) headers
