@@ -157,8 +157,8 @@ class ComlibManager: public CkDelegateMgr{
                                  //with strategy identifier
     void endIteration();         //Notify end
 
-    //void createId();                 //depricated
-    //void createId(int *, int);       //depricated
+    void createId();                 //depricated
+    void createId(int *, int);       //depricated
     int createInstance(Strategy *);  //To create a new strategy, 
                                      //returns index to the strategy table;
     void doneCreating();             //Done creating instances

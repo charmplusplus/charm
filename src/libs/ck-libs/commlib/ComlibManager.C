@@ -155,7 +155,6 @@ void ComlibManager::barrier2(){
   }
 }
 
-/*
 void ComlibManager::createId(){
     doneCreating();
 }
@@ -172,7 +171,6 @@ void ComlibManager::createId(int *pelist, int npes){
     ListOfStrategies.insert(0, strat);
     doneCreating();
 }
-*/
 
 int ComlibManager::createInstance(Strategy *strat) {
   
