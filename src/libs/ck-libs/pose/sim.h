@@ -36,6 +36,7 @@ public:
   int msgSize;    // used for message recycling
   int fromPE;     // used for comm-based LB
   eventMsg() { }
+  virtual ~eventMsg() { }
   void Timestamp(int t) { 
     timestamp = t; evID = GetEventID(); 
     setPriority(t-INT_MAX); 
@@ -59,7 +60,7 @@ public:
     return msg;
     //}
   }
-  void operator delete(void *p) { 
+  //  void operator delete(void *p) { 
     //EventMsgPool *localPool = (EventMsgPool *)CkLocalBranch(EvmPoolID);
     //if (localPool->CheckPool(MapSizeToIdx(((eventMsg *)p)->msgSize)) 
     //< MAX_POOL_SIZE) {
@@ -69,8 +70,8 @@ public:
     //localPool->PutEventMsg(MapSizeToIdx(msgSize), p);
     //}
     //else
-    CkFreeMsg(p);
-  }
+  //CkFreeMsg(p);
+  //  }
   void setPriority(int prio) {  // sets priority field
     *((int*)CkPriorityPtr(this)) = prio;
     CkSetQueueing(this, CK_QUEUEING_IFIFO);

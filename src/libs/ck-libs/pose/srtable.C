@@ -13,82 +13,69 @@
 // Basic constructor
 SRtable::SRtable() 
 { 
-  gvtWindow = GVT_WINDOW;
-  availableBuckets = numBuckets = gvtWindow/GVT_BUCKET_SZ;
-  residuals = residualsTail = recyc = recycTail = NULL;
-  recycCount = 0;
-  inBuckets = 0;
+  residuals = NULL;
   offset = 0;
-  bktSz = gvtWindow / numBuckets;
-  sends = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
-  recvs = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
-  for (int i=0; i<numBuckets; i++) {
-    sends[i].initBucket(bktSz, offset+i*bktSz);
-    recvs[i].initBucket(bktSz, offset+i*bktSz);
-  }
-  offset = -1;
+  for (int i=0; i<GVT_WINDOW; i++)
+    sends[i] = recvs[i] = 0;
 }
 
 // Destructor: needed to free linked lists
 SRtable::~SRtable()
-{ // why on earth is this implemented like this?
-  /*  
-  SRentry *next, *current=residuals;
-  while (current) {
-    next = current->next;
-    current->next = recyc;
-    recyc = current;
-    current = next;
-  }
-  for (int i=0; i<numBuckets; i++) {
-    sends[i].emptyOutBucket(recyc);
-    recvs[i].emptyOutBucket(recyc);
-  }
-  */
+{ // implement me
+  CkPrintf("WARNING: SRtable::~SRtable(): not implemented.\n");
 }
 
 // Makes an SRentry out of parameters and sends to other Insert
 void SRtable::Insert(int timestamp, int srSt)
 {
-  SRentry *entry;
   CmiAssert(timestamp >= offset);
-  if (offset == -1) offset = 0;
   //sanitize();
-  if (timestamp >= offset+gvtWindow) {
-    if (recyc) {
-      entry = recyc;
-      recyc = recyc->next;
-      if (!recyc) recycTail = NULL;
-      recycCount--;
-      entry->Set(timestamp, srSt, residuals);
-      if (residualsTail)
-	residuals = entry;
-      else
-	residuals = residualsTail = entry;
+  if (timestamp >= offset + GVT_WINDOW) // insert in residuals
+    listInsert(timestamp, srSt);
+  else { // insert in table
+    if (srSt == SEND)
+      sends[timestamp - offset]++;
+    else
+      recvs[timestamp - offset]++;
+  }
+  //sanitize();
+}
+
+void SRtable::listInsert(int timestamp, int srSt)
+{
+  //sanitize();
+  SRentry *tmp;
+  if (!residuals)
+    residuals = new SRentry(timestamp, NULL);
+  else {
+    if (timestamp < residuals->timestamp) {
+      residuals = new SRentry(timestamp, residuals);
+      if (srSt == SEND) residuals->incSends();
+      else residuals->incRecvs();
+    }
+    else if (timestamp == residuals->timestamp) {
+      if (srSt == SEND) residuals->incSends();
+      else residuals->incRecvs();
     }
     else {
-      entry = new SRentry(timestamp, srSt, residuals);
-      if (residualsTail)
-	residuals = entry;
-      else
-	residuals = residualsTail = entry;
+      tmp = residuals;
+      while (tmp->next && (timestamp > tmp->next->timestamp))
+	tmp = tmp->next;
+      if (!tmp->next) {
+	tmp->next = new SRentry(timestamp, NULL);
+	if (srSt == SEND) tmp->next->incSends();
+	else tmp->next->incRecvs();
+      }
+      else if (timestamp == tmp->next->timestamp) {
+	if (srSt == SEND) tmp->next->incSends();
+	else tmp->next->incRecvs();
+      }
+      else { //timestamp < tmp->next->timestamp
+	tmp->next = new SRentry(timestamp, tmp->next);
+	if (srSt == SEND) tmp->next->incSends();
+	else tmp->next->incRecvs();
+      }
     }
-  }
-  else {
-    //    CmiAssert(timestamp >= offset);
-    inBuckets++;
-    if (recyc) {
-      entry = recyc;
-      recyc = recyc->next;
-      if (!recyc) recycTail = NULL;
-      recycCount--;
-      entry->Set(timestamp, srSt, NULL);
-    }
-    else
-      entry = new SRentry(timestamp, srSt, NULL);
-    int bkt = (timestamp - offset)/bktSz;
-    if (srSt == SEND)  sends[bkt].addToBucket(entry);
-    else  recvs[bkt].addToBucket(entry);
   }
   //sanitize();
 }
@@ -97,73 +84,25 @@ void SRtable::Insert(int timestamp, int srSt)
 void SRtable::PurgeBelow(int ts)
 {
   //sanitize();
-  int start = (ts - offset)/bktSz, i;
-  if (ts < offset+bktSz) { // purge nothing: ts is in zero-th bucket
+  int start = ts - offset, i;
+  if (ts >= offset + GVT_WINDOW) { // purge everything 
+    offset = ts;
+    for (i=0; i<GVT_WINDOW; i++)
+      sends[i] = recvs[i] = 0;
   }
-  else if (ts >= offset + gvtWindow) { // purge everything in buckets
-    offset = offset + gvtWindow;
-    int bktOffset;
-    for (i=0; i<numBuckets; i++) {
-      sends[i].emptyOutBucket(recyc, recycTail, &recycCount);
-      recvs[i].emptyOutBucket(recyc, recycTail, &recycCount);
-      bktOffset = offset+i*bktSz;
-      sends[i].setBucketOffset(bktOffset);
-      recvs[i].setBucketOffset(bktOffset);
-    }
-    inBuckets = 0;
-  }
-  else { // purge a range of buckets and move higher buckets down
-    //CmiAssert((start >= 0) && (start < numBuckets));
-    offset = offset + bktSz*start;
-    int offIdx, bktOffset;
-    for (i=start; i<numBuckets; i++) {
+  else { // purge a range and move high entries down
+    offset = ts;
+    int offIdx;
+    for (i=start; i<GVT_WINDOW; i++) {
       offIdx = i-start;
-      bktOffset = offset+i*bktSz;
-      inBuckets -= sends[offIdx].count;
-      sends[offIdx].emptyOutBucket(recyc, recycTail, &recycCount);
-      sends[offIdx].count = sends[i].count;
-      sends[offIdx].bucket = sends[i].bucket;
-      sends[offIdx].bucketTail = sends[i].bucketTail;
-      sends[i].initBucket(bktSz, bktOffset);
-      inBuckets -= recvs[offIdx].count;
-      recvs[offIdx].emptyOutBucket(recyc, recycTail, &recycCount);
-      recvs[offIdx].count = recvs[i].count;
-      recvs[offIdx].bucket = recvs[i].bucket;
-      recvs[offIdx].bucketTail = recvs[i].bucketTail;
-      recvs[i].initBucket(bktSz, bktOffset);
-      sends[offIdx].offset = recvs[offIdx].offset = offset+offIdx*bktSz;
+      sends[offIdx] = sends[i];
+      sends[i] = 0;
+      recvs[offIdx] = recvs[i];
+      recvs[i] = 0;
     }
-    for (i=(numBuckets-start); i<start; i++) {
-      // purge the in between buckets if there are any
-      bktOffset = offset+i*bktSz;
-      inBuckets -= sends[i].count;
-      inBuckets -= recvs[i].count;
-      sends[i].emptyOutBucket(recyc, recycTail, &recycCount);
-      recvs[i].emptyOutBucket(recyc, recycTail, &recycCount);
-      sends[i].setBucketOffset(bktOffset);
-      recvs[i].setBucketOffset(bktOffset);
-    }
-    //CmiAssert(offset <= (offset + bktSz*start));
+    for (i=(GVT_WINDOW-start); i<start; i++) // purge in-betweens
+      sends[i] = recvs[i] = 0;
   }
-  //sanitize();
-  // purge entries in first bucket with timestamp < ts
-  SRentry *tmp;
-  while (sends[0].bucket && (sends[0].bucket->timestamp < ts)) {
-    tmp = sends[0].bucket;
-    sends[0].bucket = tmp->next;
-    sends[0].count--;
-    delete(tmp);
-    inBuckets--;
-  }
-  if (!sends[0].bucket) sends[0].bucketTail = NULL;
-  while (recvs[0].bucket && (recvs[0].bucket->timestamp < ts)) {
-    tmp = recvs[0].bucket;
-    recvs[0].bucket = tmp->next;
-    recvs[0].count--;
-    delete(tmp);
-    inBuckets--;
-  }
-  if (!recvs[0].bucket) recvs[0].bucketTail = NULL;
   //sanitize();
 }
 
@@ -171,27 +110,18 @@ void SRtable::PurgeBelow(int ts)
 void SRtable::FileResiduals()
 {
   //sanitize();
-  SRentry *tmp = residuals, *current;
-  int bkt;
+  SRentry *tmp, *current;
+  int end = offset+GVT_WINDOW;
 
-  residuals = residualsTail = NULL;
-  while (tmp) {
+  tmp = residuals;
+  while (tmp && (tmp->timestamp < end)) {
     current = tmp;
     tmp = tmp->next;
-    current->next = NULL;
-    if (current->timestamp >= offset+gvtWindow) { // entry not in window
-      // put back into residuals
-      current->next = residuals;
-      if (residuals) residuals = current;
-      else residuals = residualsTail = current;
-    }
-    else { // entry in window; place it in a bucket
-      bkt = (current->timestamp - offset)/bktSz;
-      inBuckets++;
-      if (current->sr == SEND)  sends[bkt].addToBucket(current);
-      else  recvs[bkt].addToBucket(current);
-    }
+    sends[current->timestamp - offset] += current->sendCount;
+    recvs[current->timestamp - offset] += current->recvCount;
+    delete current;
   }
+  residuals = tmp;
   //sanitize();
 }
 
@@ -200,105 +130,55 @@ UpdateMsg *SRtable::packTable()
   UpdateMsg *um = new UpdateMsg;
 
   //sanitize();
+  um->earlyTS = um->nextTS = -1;
+  um->earlySends = um->earlyRecvs = um->nextSends = um->nextRecvs = 0;
   FindEarliest(&(um->earlyTS), &(um->earlySends), &(um->earlyRecvs), 
 	       &(um->nextTS), &(um->nextSends), &(um->nextRecvs));
   return um;
 }
 
-void SRtable::shrink()
-{ // This code shrinks by a single bucket
-  int oldNumBuckets = numBuckets, i;
-  SRentry *tmp;
-
-  //sanitize();
-  if (gvtWindow > 2*bktSz) gvtWindow = gvtWindow-bktSz;
-  else return;
-  numBuckets = gvtWindow/bktSz;
-  // move elements from last bucket to residuals
-  inBuckets = inBuckets - sends[oldNumBuckets-1].count - recvs[oldNumBuckets-1].count;
-  sends[oldNumBuckets-1].emptyOutBucket(residuals, residualsTail, NULL);
-  recvs[oldNumBuckets-1].emptyOutBucket(residuals, residualsTail, NULL);
-  //sanitize();
-}
-
-void SRtable::expand()
-{   // This code expands by a single bucket
-  int oldNumBuckets = numBuckets, i;
-  SRentry *tmp;
-
-  //sanitize();
-  if (gvtWindow > MAX_GVT_WINDOW) return;
-  gvtWindow = gvtWindow*2;
-  numBuckets = gvtWindow/bktSz;
-  if (numBuckets > availableBuckets) { // need to actually expand table
-    // move all elements to residuals
-    for (i=0; i<oldNumBuckets; i++) {
-      sends[i].emptyOutBucket(residuals, residualsTail, NULL);
-      recvs[i].emptyOutBucket(residuals, residualsTail, NULL);
+void SRtable::FindEarliest(int *eTS, int *eS, int *eR, int *nTS, int *nS, int *nR) 
+{
+  int found1=0, found2=0;
+  for (int i=0; i<GVT_WINDOW; i++)
+    if ((sends[i] > 0) || (recvs[i] > 0)) {
+      found1 = 1;  *eTS = offset+i;  *eS = sends[i];  *eR = recvs[i];
+      for (int j=i+1; j<GVT_WINDOW; j++)
+	if ((sends[j] > 0) || (recvs[j] > 0)) {
+	  found2 = 1;  *nTS = offset+j; *nS = sends[j]; *nR = recvs[j];
+	  return;
+	}
+      return;
     }
-    // free and re-malloc arrays (fastest for expand -- avoids copy)
-    free(sends);
-    free(recvs);
-    inBuckets = 0;
-    sends = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
-    recvs = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
-    SetOffset(offset);
+  // 0 or 1 earliest timestamps found; look at residuals
+  if (found1 && !found2) {
+    if (residuals) {
+      *nTS = residuals->timestamp;
+      *nS = residuals->sendCount;
+      *nR = residuals->recvCount;
+    }
+    return;
   }
-  FileResiduals();
-  //sanitize();
+  else {
+    if (residuals) {
+      *eTS = residuals->timestamp;
+      *eS = residuals->sendCount;
+      *eR = residuals->recvCount;
+      if (residuals->next) {
+	*nTS = residuals->next->timestamp;
+	*nS = residuals->next->sendCount;
+	*nR = residuals->next->recvCount;
+      }
+    }
+  }
 }
 
 void SRtable::dump()
 {
-  CkPrintf("SRtable::dump():\n");
-  CkPrintf("OFFSET=%d #inBuckets=%d gvtWindow=%d numBuckets=%d bktSz=%d\n",
-	   offset, inBuckets, gvtWindow, numBuckets, bktSz);
-  if (residuals) CkPrintf("Residuals is non-empty.  ");
-  else CkPrintf("Residuals is empty.  ");
-  if (recyc) CkPrintf("Recyc is non-empty (%d entries).\n", recycCount);
-  else CkPrintf("Recyc is empty.\n");
-  for (int i=0; i<numBuckets; i++) sends[i].dump();
-  for (int j=0; j<numBuckets; j++) recvs[j].dump();    
+  CkPrintf("WARNING: SRtable::dump(): not implemented.\n");
 }
 
 void SRtable::sanitize()
 {
-  int totalCount=0, bktCount;
-  SRentry *current;
-  for (int i=0; i<numBuckets; i++) {
-    CmiAssert(sends[i].offset == offset+i*bktSz);
-    bktCount = 0;
-    current = sends[i].bucket;
-    CmiAssert((sends[i].bucket && sends[i].bucketTail) || 
-	      (!sends[i].bucket && !sends[i].bucketTail));
-    while (current) {
-      bktCount++;
-      CmiAssert((current->timestamp >= offset) && 
-		(current->timestamp < offset+gvtWindow));
-      CmiAssert(current->sr == 0);
-      CmiAssert((current->timestamp >= sends[i].offset) && 
-		(current->timestamp < sends[i].offset+bktSz));
-      current = current->next;
-    }
-    CmiAssert(bktCount == sends[i].count);
-    totalCount += bktCount;
-    bktCount = 0;
-    current = recvs[i].bucket;
-    CmiAssert((recvs[i].bucket && recvs[i].bucketTail) || 
-	      (!recvs[i].bucket && !recvs[i].bucketTail));
-    while (current) {
-      bktCount++;
-      CmiAssert((current->timestamp >= offset) && 
-		(current->timestamp < offset+gvtWindow));
-      CmiAssert(current->sr == 1);
-      CmiAssert((current->timestamp >= recvs[i].offset) && 
-		(current->timestamp < recvs[i].offset+bktSz));
-     current = current->next;
-    }
-    CmiAssert(bktCount == recvs[i].count);
-    totalCount += bktCount;
-  }
-  CmiAssert(totalCount == inBuckets);
-  CmiAssert((residuals && residualsTail) || (!residuals && !residualsTail));
-  CmiAssert((recyc && recycTail) || (!recyc && !recycTail));
+  CkPrintf("WARNING: SRtable::sanitize(): not implemented.\n");
 }

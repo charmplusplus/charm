@@ -11,6 +11,15 @@ CkGroupID dmid;
 #endif
 double busyWait;
 int POSE_endtime;
+int cancelNodeCount=0;
+int heapNodeCount=0;
+int spawnedEventCount=0;
+int eventCount=0;
+int srEntryCount=0;
+int repCount=0;
+int eventMsgCount=0;
+int eventMsgsRecvd=0;
+int eventMsgsDiscarded=0;
 
 // Debugging statement indentation for pretty printing of data dumps
 void pdb_indent(int pdb_level)

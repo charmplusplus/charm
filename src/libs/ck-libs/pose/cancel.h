@@ -10,8 +10,9 @@ class CancelNode { // CancelList is comprised of these nodes
   int timestamp;   // timestamp of event to be cancelled
   eventID evID;    // eventID of event to be cancelled
   CancelNode *next;
-  CancelNode() { timestamp = -1; next = NULL; }
+  CancelNode() { }
   CancelNode(int ts, eventID e) { timestamp = ts; evID = e; next = NULL; }
+  ~CancelNode() { }
   void dump() {
     CkPrintf("[timestamp=%d ", timestamp);
     evID.dump();

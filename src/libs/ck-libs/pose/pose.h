@@ -5,6 +5,16 @@
 #ifndef POSE_H
 #define POSE_H
 
+extern int cancelNodeCount;
+extern int heapNodeCount;
+extern int spawnedEventCount;
+extern int eventCount;
+extern int srEntryCount;
+extern int repCount;
+extern int eventMsgCount;
+extern int eventMsgsRecvd;
+extern int eventMsgsDiscarded;
+
 // Primary versions
 #define POSE_STATS_ON 1
 //#define POSE_COMM_ON 1
@@ -16,15 +26,12 @@
 #include "pose.decl.h"
 
 // Strategy variables
-#define STORE_RATE 50           // default store rate: 1 for every n events
-#define SPEC_WINDOW 100         // speculative event window
+#define STORE_RATE 10000           // default store rate: 1 for every n events
+#define SPEC_WINDOW 1000         // speculative event window
 #define MIN_LEASH 10            // min spec window for adaptive strategy
-#define MAX_LEASH 1000          // max  "     "     "     "        " 
-#define LEASH_FLEX 10           // leash increment
-#define GVT_WINDOW 512          // Maximum time GVT can advance
-#define GVT_BUCKET_SZ 8         // Must divide GVT_WINDOW evenly
-#define TBL_THRESHOLD 1000      // max # entries in table before it shrinks
-#define MAX_GVT_WINDOW 10000    // don't expand GVT SRtable beyond this
+#define MAX_LEASH 2000         // max  "     "     "     "        " 
+#define LEASH_FLEX 1           // leash increment
+#define GVT_WINDOW 100000          // Maximum time GVT can advance
 
 // Load balancer variables
 #define LB_SKIP 51           // LB done 1/LB_SKIP times GVT iterations

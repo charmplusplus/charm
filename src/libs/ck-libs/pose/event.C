@@ -5,10 +5,7 @@
 #include "pose.h"
 
 // initializing constructor
-SpawnedEvent::SpawnedEvent() 
-{ 
-  objIdx = timestamp = -1; next = NULL;
-}
+SpawnedEvent::SpawnedEvent() { objIdx = timestamp = -1; next = NULL; }
 
 // Set constructor
 SpawnedEvent::SpawnedEvent(int idx, eventID e, int ts, SpawnedEvent *n) 
@@ -32,7 +29,7 @@ Event::~Event()
 {                                   
   SpawnedEvent *tmp;
 
-  //double start=CmiWallTimer();
+  //  double start=CmiWallTimer();
   delete msg;
   /*
   double elapsed=CmiWallTimer()-start;

@@ -10,7 +10,7 @@ eventQueue::eventQueue()
 {
   Event *e;
 
-  eqCount = 0;
+  //eqCount = 0;
   eqh = new EqHeap();  // create the heap for incoming events
 
   // create the front sentinel node; initialize data fields
@@ -117,7 +117,7 @@ void eventQueue::CommitEvents(sim *obj, int ts)
     target = currentPtr;
   }
   while (commitPtr != target) { // commit up to next checkpoint
-    //CmiAssert(commitPtr->done == 1);  // only commit executed events
+    CmiAssert(commitPtr->done == 1);  // only commit executed events
     obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg); // commit fn
     if (commitPtr->commitBfrLen > 0)  { // print buffered I/O
       CkPrintf("%s", commitPtr->commitBfr);
@@ -131,8 +131,6 @@ void eventQueue::CommitEvents(sim *obj, int ts)
     if (commitPtr->prev->cpData)
       delete commitPtr->prev->cpData; 
     delete commitPtr->prev;  // delete committed event
-    //    eqCount--; 
-    //    CkPrintf("<%d> ", eqCount);
   }
   commitPtr->prev = frontPtr;  // reattach front sentinel node
   frontPtr->next = commitPtr;

@@ -66,6 +66,7 @@ private:
   int inactive, inactiveTime;        // #iterations since change in state
   int nextLBstart;                   // #iterations since last LB run
   int lastEarliest, lastSends, lastRecvs;
+  int lastNextEarliest, lastNextSends, lastNextRecvs;
 #ifdef POSE_STATS_ON
   localStat *localStats;
 #endif

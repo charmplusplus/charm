@@ -18,6 +18,7 @@ class SpawnedEvent {
   SpawnedEvent *next;
   SpawnedEvent();         // initializing constructor
   SpawnedEvent(int idx, eventID e, int ts, SpawnedEvent *n); // set constructor
+  ~SpawnedEvent() { }
   void pup(PUP::er &p) { p(objIdx); p(timestamp); evID.pup(p); } // pup one
 };
 
