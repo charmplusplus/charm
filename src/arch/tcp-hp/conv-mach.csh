@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.9  1995-10-30 20:53:35  jyelon
+# Revision 2.10  1995-11-02 22:45:43  sanjeev
+# added CMK_CPP_SUFFIX
+#
+# Revision 2.9  1995/10/30  20:53:35  jyelon
 # *** empty log message ***
 #
 # Revision 2.8  1995/10/30  20:31:35  jyelon
@@ -60,3 +63,4 @@ set CMK_SEQ_CC='gcc '
 set CMK_SEQ_LD='gcc '
 set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | awk '{print "'$'"1;}'"
+set CMK_CPP_SUFFIX="ii"

@@ -39,3 +39,4 @@ set CMK_SEQ_CC='gcc'
 set CMK_SEQ_LD='gcc'
 set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | sed -e 's@ *|.*@@'"
+set CMK_CPP_SUFFIX="ii"

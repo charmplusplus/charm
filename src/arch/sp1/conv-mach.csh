@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.11  1995-11-02 21:14:01  milind
+# Revision 2.12  1995-11-02 22:45:43  sanjeev
+# added CMK_CPP_SUFFIX
+#
+# Revision 2.11  1995/11/02  21:14:01  milind
 # removed -C from CMK_CPP command.
 #
 # Revision 2.10  1995/11/01  23:14:05  knauff
@@ -76,3 +79,4 @@ set CMK_SEQ_CC			= 'gcc'
 set CMK_SEQ_LD			= 'gcc'
 set CMK_NM			= 'nm'
 set CMK_NM_FILTER		= "colrm 1 11 | sed -e 's/\.//'"
+set CMK_CPP_SUFFIX="i"
