@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.10  1998-02-13 23:55:09  pramacha
+ * Revision 1.11  1998-06-15 22:14:50  jyelon
+ * Added support for ASCI RED
+ *
+ * Revision 1.10  1998/02/13 23:55:09  pramacha
  * Removed CmiAlloc, CmiFree and CmiSize
  * Added CmiAbort
  *
@@ -87,8 +90,8 @@ static char ident[] = "@(#)$Header$";
 #define ALL_NODES -1
 
 
-CpvDeclare(int,  Cmi_mype);
-CpvDeclare(int, Cmi_numpes);
+int  Cmi_mype;
+int  Cmi_numpes;
 CpvDeclare(void*, CmiLocalQueue);
 
 
@@ -194,7 +197,7 @@ int size;
 char * msg;
 {
     char *temp;
-    if (CpvAccess(Cmi_mype) == destPE)
+    if (Cmi_mype == destPE)
        {
           temp = (char *)CmiAlloc(size) ;
           memcpy(temp, msg, size) ;
@@ -223,7 +226,7 @@ void CmiFreeSendFn(destPE, size, msg)
      int destPE, size;
      char *msg;
 {
-    if (CpvAccess(Cmi_mype) == destPE)
+    if (Cmi_mype == destPE)
        {
           FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
        }
@@ -240,7 +243,7 @@ void CmiSyncBroadcastFn(size, msg)        /* ALL_EXCEPT_ME  */
 int size;
 char * msg;
 {
-    if (CpvAccess(Cmi_numpes) > 1) 
+    if (Cmi_numpes > 1) 
        csend(MSG_TYPE, msg, size, ALL_NODES,PROCESS_PID);
 }
 
@@ -267,7 +270,7 @@ int size;
 char * msg;
 {
     char *temp;
-    if (CpvAccess(Cmi_numpes) > 1) 
+    if (Cmi_numpes > 1) 
        csend(MSG_TYPE, msg, size, ALL_NODES,PROCESS_PID);
     temp = (char *)CmiAlloc(size) ;
     memcpy(temp, msg, size) ;
@@ -294,7 +297,7 @@ void CmiFreeBroadcastAllFn(size, msg)
 int size;
 char * msg;
 {
-    if (CpvAccess(Cmi_numpes) > 1)
+    if (Cmi_numpes > 1)
        csend(MSG_TYPE, msg, size, ALL_NODES,PROCESS_PID);
     FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
 }
@@ -315,12 +318,10 @@ char *argv[];
 CmiStartFn fn;
 int usched, initret;
 {
-  CpvInitialize(int, Cmi_mype);
-  CpvInitialize(int, Cmi_numpes);
   CpvInitialize(void*, CmiLocalQueue);
-  CpvAccess(Cmi_mype)  = mynode();
-  CpvAccess(Cmi_numpes) = numnodes();
-  neighbour_init(CpvAccess(Cmi_mype));
+  Cmi_mype = mynode();
+  Cmi_numpes = numnodes();
+  neighbour_init(Cmi_mype);
   CpvAccess(CmiLocalQueue)= (void *) FIFO_Create();
   CmiSpanTreeInit();
   CmiTimerInit();
@@ -340,7 +341,7 @@ int usched, initret;
 long CmiNumNeighbours(node)
 int node;
 {
-    if (node == CpvAccess(Cmi_mype) )
+    if (node == Cmi_mype)
      return  _MC_numofneighbour;
     else
      return 0;
@@ -352,7 +353,7 @@ int node, *neighbours;
 {
     int i;
 
-    if (node == CpvAccess(Cmi_mype) )
+    if (node == Cmi_mype)
        for(i=0; i<_MC_numofneighbour; i++) neighbours[i] = _MC_neighbour[i];
 
 }
@@ -379,8 +380,8 @@ int p;
 {
     int a,b,n;
 
-    a = (int) floor(sqrt((double) CpvAccess(Cmi_numpes)));
-    b = (int) ceil( ((double)CpvAccess(Cmi_numpes) / (double)a) );
+    a = (int) floor(sqrt((double) Cmi_numpes));
+    b = (int) ceil( ((double)Cmi_numpes / (double)a) );
 
    
     _MC_numofneighbour = 0;
@@ -390,14 +391,14 @@ int p;
            n = p-b+1;
     else {
            n = p+1;
-           if (n>=CpvAccess(Cmi_numpes)) n = (a-1)*b; /* west-south corner */
+           if (n>=Cmi_numpes) n = (a-1)*b; /* west-south corner */
     }
     if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
 
     /* west neigbour */
     if ( (p%b) == 0) {
           n = p+b-1;
-          if (n >= CpvAccess(Cmi_numpes)) n = CpvAccess(Cmi_numpes)-1;
+          if (n >= Cmi_numpes) n = Cmi_numpes-1;
        }
     else
           n = p-1;
@@ -406,7 +407,7 @@ int p;
     /* north neighbour */
     if ( (p/b) == 0) {
           n = (a-1)*b+p;
-          if (n >= CpvAccess(Cmi_numpes)) n = n-b;
+          if (n >= Cmi_numpes) n = n-b;
        }
     else
           n = p-b;
@@ -417,7 +418,7 @@ int p;
            n = p%b;
     else {
            n = p+b;
-           if (n >= CpvAccess(Cmi_numpes)) n = n%b;
+           if (n >= Cmi_numpes) n = n%b;
     } 
     if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
 
