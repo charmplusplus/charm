@@ -597,8 +597,10 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
   int i;
   CkPrintf("TMRC2D: updateNodeCoords...\n");
   // do some error checking
-  CkAssert(nEl == numElements);
-  CkAssert(nNode == numNodes);
+  //CkAssert(nEl == numElements);
+  CkAssert(nEl == elementSlots);
+  //CkAssert(nNode == numNodes);
+  CkAssert(nNode == nodeSlots);
   // update node coordinates from coord
   for (i=0; i<nodeSlots; i++)
     if (theNodes[i].isPresent()) {
@@ -647,7 +649,7 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
 
   for (i=0; i<elementSlots; i++) { // set desired areas for elements
     area = theElements[i].getArea();
-    precThrshld = area * 1e-15;
+    precThrshld = area * 1e-10;
     //CkPrintf("TMRC2D: desiredArea[%d]=%f present? %d area=%f\n", i, desiredArea[i], theElements[i].isPresent(), area);
     if ((theElements[i].isPresent()) &&
 	(desiredArea[i] > area+precThrshld)) {

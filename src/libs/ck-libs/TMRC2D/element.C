@@ -215,7 +215,7 @@ void element::collapse(int shortEdge)
   CkPrintf("TMRC2D: LOCKing opnode=%d\n", nodes[opnode]);
   int aResult = nodeLockup(C->theNodes[nodes[opnode]], edges[keepEdge], edges[keepEdge], keepNbr, length);
   if (aResult == 0) return;
-  if ((aResult == -1) && (delNbr.cid != -1)) {
+  if ((aResult == -1) && (keepNbr.cid != -1)) {
     intMsg *im = mesh[keepNbr.cid].nodeLockup(keepNbr.idx, C->theNodes[nodes[opnode]], edges[keepEdge], edges[keepEdge], delNbr, length);
     if (im->anInt == 0) {
       int junkResult = nodeUpdate(C->theNodes[nodes[opnode]],edges[keepEdge],keepNbr,C->theNodes[nodes[opnode]]);

@@ -487,7 +487,7 @@ driver(void)
     CkPrintf("Entering timeloop\n");
   }	
   //  int tSteps=0x70FF00FF;
-  int tSteps=2;
+  int tSteps=100;
   int z=13;
   calcMasses(g);
   double startTime=CkWallTimer();
@@ -528,23 +528,17 @@ driver(void)
       areas[i]=calcArea(g,i);
     }
     
-    //coarsen all steps but 0
-    if (t > 0 ) {
-      areas[z] *= 2.0;
-      z += 7;
-      CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements to %.3g\n", myChunk,g.nnodes,g.nelems,curArea);
-      FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)g.coord,FEM_ELEM,areas);
-      repeat_after_split((void *)&g);
-      g.nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
-      g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
-      CkPrintf("[%d] Done with coarsening step: %d nodes, %d elements\n",
-	       myChunk,g.nnodes,g.nelems);
-    }		    
+    //coarsen all steps
+    areas[z] *= 2.0;
+    z += 3;
+    CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements to %.3g\n", myChunk,g.nnodes,g.nelems,curArea);
+    FEM_REFINE2D_Coarsen(FEM_Mesh_default_read(),FEM_NODE,(double *)g.coord,FEM_ELEM,areas);
+    repeat_after_split((void *)&g);
+    g.nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
+    g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
+    CkPrintf("[%d] Done with coarsening step: %d nodes, %d elements\n",
+	     myChunk,g.nnodes,g.nelems);
     if (1) { //Publish data to the net
-      if (t==0) {
-	g.nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
-	g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
-      }
       NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_POINTAT);
       int count=0;
       double *vcoord = new double[2*g.nnodes];
@@ -576,8 +570,6 @@ driver(void)
       NetFEM_End(n);
       delete [] vcoord;
       delete [] vconn;
-      CkPrintf("Reported data to NetFEM!\n");
-      if (t==0) sleep(5);
     }
   }
   

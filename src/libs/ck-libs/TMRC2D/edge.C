@@ -118,10 +118,14 @@ int edge::collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
 	     dNode.X(), dNode.Y(), kNode.X(), kNode.Y(), incidentNode.X(), 
 	     incidentNode.Y());
     // unlock opnode and oNode
-    im = mesh[keepNbr.cid].nodeUpdate(keepNbr.idx,opnode,keepEdge,delNbr,opnode);
+    if (keepNbr.cid != -1)
+      im = mesh[keepNbr.cid].nodeUpdate(keepNbr.idx,opnode,keepEdge,delNbr,opnode);
+    else { im = new intMsg; im->anInt = -1; }
     if ((im->anInt == -1) && (delNbr.cid != -1))
-      im = mesh[delNbr.cid].nodeUpdate(delNbr.idx,opnode,delEdge,keepNbr,opnode);
-    im = mesh[kNbr.cid].nodeUpdate(kNbr.idx,oNode,kEdge,dNbr,oNode);
+      im = mesh[delNbr.cid].nodeUpdate(delNbr.idx,opnode,keepEdge,keepNbr,opnode);
+    if (kNbr.cid != -1)
+      im = mesh[kNbr.cid].nodeUpdate(kNbr.idx,oNode,kEdge,dNbr,oNode);
+    else { im = new intMsg; im->anInt = -1; }
     if ((im->anInt == -1) && (dNbr.cid != -1))
       im = mesh[dNbr.cid].nodeUpdate(dNbr.idx,oNode,dEdge,kNbr,oNode);
 
