@@ -661,6 +661,7 @@ void CsdEndIdle()
 #if CMK_WEB_MODE
   usageStart();  
 #endif
+  CcdRaiseCondition(CcdPROCESSORBUSY) ;
 }
 
 void CsdBeginIdle()
@@ -1614,12 +1615,32 @@ extern void CrnInit(void);
 extern void CcsInit(void);
 #endif
 
+static unsigned int idle_timeout = 0;
+CpvStaticDeclare(int, call_cancel);
+
+static void on_timeout(void *tmp)
+{
+  if(CpvAccess(call_cancel)==0) {
+    CmiError("Idle time on PE %d exceeded specified timeout.\n", CmiMyPe());
+    CmiAbort("Exiting.\n");
+  }
+}
+
+static void on_idle(void *tmp)
+{
+  CcdCallFnAfter(on_timeout, 0, idle_timeout);
+  CpvAccess(call_cancel) = 0;
+}
+
+static void on_busy(void *tmp)
+{
+  CpvAccess(call_cancel) = 1;
+}
+
 void ConverseCommonInit(char **argv)
 {
-#if NODE_0_IS_CONVHOST
   int i,j;
   char *ptr;
-#endif
   CmiTimerInit();
   CstatsInit(argv);
   CcdModuleInit(argv);
@@ -1650,7 +1671,7 @@ void ConverseCommonInit(char **argv)
  
   /*  if(CmiMyPe() == 0){ */
   i = 0;
-  for(ptr = argv[i]; ptr != 0; i++, ptr = argv[i])
+  for(ptr = argv[i]; ptr != 0; i++, ptr = argv[i]) {
     if(strcmp(ptr, "++server") == 0) {
       if (CmiMyPe() == 0)
 	serverFlag = 1;
@@ -1658,10 +1679,26 @@ void ConverseCommonInit(char **argv)
 	argv[j] = argv[j+1];
       break;
     }
+  }
   /*   } */
 #endif
   CldModuleInit();
   CrnInit();
+  i = 0;
+  for(ptr = argv[i]; ptr != 0; i++, ptr = argv[i]) {
+    if(strcmp(ptr, "+idle-timeout") == 0) {
+      sscanf(argv[i+1], "%u", &idle_timeout);
+      for(j = i; argv[j] != 0; j++)
+	argv[j] = argv[j+2];
+      break;
+    }
+  }
+  if(idle_timeout != 0) {
+    CcdCallOnCondition(CcdPROCESSORIDLE, on_idle, 0);
+    CcdCallOnCondition(CcdPROCESSORBUSY, on_busy, 0);
+    CpvInitialize(int, call_cancel);
+    CpvAccess(call_cancel) = 1;
+  }
 }
 
 void ConverseCommonExit(void)

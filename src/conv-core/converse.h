@@ -1074,6 +1074,7 @@ void CPathMsgFree(void *msg);
 
 typedef void (*CcdVoidFn)();
 
+#define CcdPROCESSORBUSY 0
 #define CcdPROCESSORIDLE 1
 #define CcdSIGUSR1 2
 #define CcdSIGUSR2 3
