@@ -3,9 +3,7 @@ Note This version of cygwin is still under testing.
 
 To compile charm on cygwin:
 1. install cygwin from: http://sourceware.cygnus.com/cygwin
-   with inetutils and w32api packages. TCSH need to be installed separately
-   in order to run charm programs.  (tcsh doesn't come with the cygwin package,
-   but can be found on the same web site) 
+   with inetutils and w32api packages. 
 
 2. compile charm++:    ./SUPER_INSTALL charm++ net-cygwin
 
