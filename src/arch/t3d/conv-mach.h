@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.6  1996-07-16 17:23:37  jyelon
+ * Revision 1.7  1996-07-16 21:08:30  gursoy
+ * selected the correct thread option
+ *
+ * Revision 1.6  1996/07/16  17:23:37  jyelon
  * Renamed a flag.
  *
  * Revision 1.5  1996/07/16 05:20:41  milind
@@ -100,10 +103,10 @@
 #define CMK_STRINGS_USE_STRING_H                           1
 
 #define CMK_THREADS_UNAVAILABLE                            0
-#define CMK_THREADS_USE_ALLOCA                             1
+#define CMK_THREADS_USE_ALLOCA                             0
 #define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE            0
 #define CMK_THREADS_USE_ALLOCA_WITH_PRAGMA                 0
-#define CMK_THREADS_USE_JB_TWEAKING                        0
+#define CMK_THREADS_USE_JB_TWEAKING                        1
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              1
