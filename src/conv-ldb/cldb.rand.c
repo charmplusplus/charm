@@ -4,6 +4,10 @@ CpvDeclare(int, CldRelocatedMessages);
 CpvDeclare(int, CldLoadBalanceMessages);
 CpvDeclare(int, CldMessageChunks);
 
+void CldNotify(int load)
+{
+}
+
 void CldHandler(char *msg)
 {
   int len, queueing, priobits;
