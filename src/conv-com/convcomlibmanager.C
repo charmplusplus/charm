@@ -28,6 +28,10 @@ void ConvComlibManager::insertStrategy(Strategy *s) {
     st.strategy = s;
 
     s->setInstance(nstrats);
+    // if the strategy is pure converse or pure charm the following line is a
+    // duplication, but if a charm strategy embed a converse strategy it is
+    // necessary to set the instanceID in both
+    s->getConverseStrategy()->setInstance(nstrats);
     nstrats ++;
 }
 

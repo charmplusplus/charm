@@ -3,7 +3,7 @@
 void propagate_handler(void *message) {
   int instid = CmiGetXHandler(message);
   PipeBroadcastConverse *myStrategy = (PipeBroadcastConverse *)ConvComlibGetStrategy(instid);
-  ComlibPrintf("[%d] propagate_handler: calling on %x\n",CmiMyPe(),myStrategy);
+  ComlibPrintf("[%d] propagate_handler: calling on instid %d (%x)\n",CmiMyPe(),instid,myStrategy);
   envelope *env = (envelope*)message;
   myStrategy->propagate((char*)message, false, env->getSrcPe(), env->getTotalsize(), &envelope::setSrcPe);
 }
@@ -61,12 +61,13 @@ void PipeBroadcastStrategy::insertMessage(CharmMessageHolder *cmsg){
 void PipeBroadcastStrategy::conversePipeBcast(envelope *env, int totalSize) {
   // set the instance ID to be used by the receiver using the XHandler variable
   CmiSetXHandler(env, myInstanceID);
+  ComlibPrintf("[%d] PipeBroadcast charm, setting instid to %d\n",CkMyPe(),myInstanceID);
 
   if (totalSize > ((PipeBroadcastConverse*)converseStrategy)->getPipeSize()) {
     ((PipeBroadcastConverse*)converseStrategy)->conversePipeBcast((char*)env, totalSize);
   } else {
     // the message fit into the pipe, so send it in a single chunk
-    ComlibPrintf("[%d] Propagating message in one single chunk\n",CkMyPe());
+    ComlibPrintf("[%d] Propagating message in one single chunk (%d)\n",CkMyPe(),propagateHandle);
     CmiSetHandler(env, propagateHandle);
     env->setSrcPe(CkMyPe());
     ((PipeBroadcastConverse*)converseStrategy)->propagate((char*)env, false, CkMyPe(), totalSize, &envelope::setSrcPe);

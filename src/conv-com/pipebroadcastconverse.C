@@ -27,7 +27,7 @@ extern void propagate_handler(void *);
 void propagate_handler_frag(void *message) {
   int instid = CmiGetXHandler(message);
   PipeBroadcastConverse *myStrategy = (PipeBroadcastConverse*)ConvComlibGetStrategy(instid);
-  ComlibPrintf("[%d] propagate_handler_frag: calling on %x\n",CmiMyPe(),myStrategy);
+  ComlibPrintf("[%d] propagate_handler_frag: calling on instid %d %x\n",CmiMyPe(),instid,myStrategy);
   //CProxy_ComlibManager(CkpvAccess(cmgrID)).ckLocalBranch()->getStrategy(instid);
   PipeBcastInfo *info = (PipeBcastInfo*)(((char*)message)+CmiReservedHeaderSize);
   myStrategy->propagate((char*)message, true, info->srcPe, info->chunkSize+CmiReservedHeaderSize+sizeof(PipeBcastInfo), NULL);
@@ -35,7 +35,7 @@ void propagate_handler_frag(void *message) {
 
 void PipeBroadcastConverse::propagate(char *env, int isFragmented, int srcPeNumber, int totalSendingSize, setFunction setPeNumber){
   // find destination processors and send
-  int destination, tmp, k;
+  int destination, tmp, k, sizeToSend;
   int num_pes, *dest_pes;
   PipeBcastInfo *info = (PipeBcastInfo*)(env+CmiReservedHeaderSize);
   //int srcPeNumber = isFragmented ? info->srcPe : env->getSrcPe();
@@ -79,7 +79,8 @@ void PipeBroadcastConverse::propagate(char *env, int isFragmented, int srcPeNumb
 
     //CmiSyncListSend(num_pes, dest_pes, env->getTotalsize(), (char *)env);
     // !!!!!!!!for (k=0; k<num_pes; ++k) CmiSyncSend(dest_pes[k], totalSendingSize, env);
-    for (k=0; k<num_pes; ++k) CmiSyncSend(dest_pes[k], pipeSize, env);
+    sizeToSend = pipeSize<totalSendingSize ? pipeSize : totalSendingSize;
+    for (k=0; k<num_pes; ++k) CmiSyncSend(dest_pes[k], sizeToSend, env);
     free(dest_pes);
     break;
 
