@@ -1,14 +1,11 @@
 /**************************************************************************
 ** Greg Koenig (koenig@uiuc.edu)
 **
-** PERSISTENT HANDLES
-**    * charm/tmp/persistent.h
-**    * charm/tmp/persistent.c
-**    * Elan machine.c
-**
 ** EFFICIENT DATA STRUCTURES
-**    * pre-allocate arrays of send/receive/persistent handles at startup
-**    * use same structure (with unions) for send/receive/persistent handles
+**    + pre-allocate array of handles at startup
+**    + use same structure (with unions) for send/receive/persistent handles
+**    + need to update AsyncMsgCount in more cases now
+**
 **    * pass index as context instead of pointers
 **
 **    * fix persistent handles so they send data in chunks
@@ -72,8 +69,13 @@ volatile int CMI_VMI_AsyncMsgCount;
 
 
 
+CMI_VMI_Handle_T CMI_VMI_Handle_Array[CMI_VMI_MAX_HANDLES];
+
+
+
 
 int CMI_VMI_RDMA_Rendezvous_Handler_ID;
+
 #if CMK_PERSISTENT_COMM
 int CMI_VMI_Persistent_Request_Handler_ID;
 int CMI_VMI_Persistent_Grant_Handler_ID;
@@ -123,21 +125,13 @@ PVMI_BUFFER_POOL CMI_VMI_Bucket5_Pool;
 */
 PVMI_BUFFER_POOL CMI_VMI_MessageBuffer_Pool;
 PVMI_BUFFER_POOL CMI_VMI_CmiCommHandle_Pool;
-PVMI_BUFFER_POOL CMI_VMI_Handle_Pool;
 PVMI_BUFFER_POOL CMI_VMI_RDMABytesSent_Pool;
-PVMI_BUFFER_POOL CMI_VMI_RDMAPutContext_Pool;
 PVMI_BUFFER_POOL CMI_VMI_RDMACacheEntry_Pool;
-
+PVMI_BUFFER_POOL CMI_VMI_RDMAPutContext_Pool;
 
 /* This is the global list of all processes in the computation. */
 CMI_VMI_Process_Info_T *CMI_VMI_Procs;
 
-
-/*
-  The following global variable is used for RDMA receive contexts.
-*/
-CMI_VMI_RDMA_Receive_Context_T
-     CMI_VMI_RDMA_Receive_Context[CMI_VMI_MAX_RECEIVE_HANDLES];
 
 
 /*
@@ -425,21 +419,14 @@ void CMI_VMI_Stream_Completion_Handler (PVOID ctxt, VMI_STATUS sstatus)
   /* Cast the context to a send handle. */
   handle = (CMI_VMI_Handle_T *) ctxt;
 
-  /*
-    If the handle is for some type of asynchronous operation, decrement the
-    global count of outstanding asynchronous operations.
-  */
-  if ((handle->type == CMI_VMI_HANDLE_TYPE_ASYNC_SEND_STREAM) ||
-      (handle->type == CMI_VMI_HANDLE_TYPE_ASYNC_BROADCAST_STREAM)) {
-    CMI_VMI_AsyncMsgCount--;
-  }
+  CMI_VMI_AsyncMsgCount--;
 
   /*
     If there is a CmiCommHandle associated with the handle (which would
     have been handed back to the caller), decrement its count.
   */
-  if (handle->commhandle) {
-    handle->commhandle->count--;
+  if (handle->data.send.commhandle) {
+    handle->data.send.commhandle->count--;
   }
 
   /*
@@ -448,17 +435,11 @@ void CMI_VMI_Stream_Completion_Handler (PVOID ctxt, VMI_STATUS sstatus)
   */
   handle->refcount--;
   if (handle->refcount < 1) {
-    /*
-    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_MessageBuffer_Pool,
-					 handle->data.stream.vmimsg);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
-    */
-
-    status = VMI_Cache_Deregister (handle->data.stream.cacheentry);
+    status = VMI_Cache_Deregister (handle->data.send.data.stream.cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
 
-    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Handle_Pool, handle);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+    handle->allocated = FALSE;
+    // GAK - more needed to deallocate handle?
   }
 }
 
@@ -538,22 +519,14 @@ void CMI_VMI_RDMA_Completion_Handler (PVMI_RDMA_OP op, PVOID ctxt,
   status = VMI_Cache_Deregister (cacheentry);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
 
-  /*
-    If the handle is for some type of asynchronous operation, decrement the
-    global count of outstanding asynchronous operations.
-  */
-  // TODO: We don't correctly deal with persistent asynchronous.
-  if ((handle->type == CMI_VMI_HANDLE_TYPE_ASYNC_SEND_RDMA) ||
-      (handle->type == CMI_VMI_HANDLE_TYPE_ASYNC_BROADCAST_RDMA)) {
-    CMI_VMI_AsyncMsgCount--;
-  }
+  CMI_VMI_AsyncMsgCount--;
 
   /*
     If there is a CmiCommHandle associated with the handle (which would
     have been handed back to the caller), decrement its count.
   */
-  if (handle->commhandle) {
-    handle->commhandle->count--;
+  if (handle->data.send.commhandle) {
+    handle->data.send.commhandle->count--;
   }
 
   /*
@@ -562,8 +535,8 @@ void CMI_VMI_RDMA_Completion_Handler (PVMI_RDMA_OP op, PVOID ctxt,
   */
   handle->refcount--;
   if (handle->refcount < 1) {
-    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Handle_Pool, handle);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+    handle->allocated = FALSE;
+    // GAK - deallocate any more state associated with handle here
   }
 }
 
@@ -596,12 +569,11 @@ void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT conn, PVMI_REMOTE_BUFFER rbuf)
   /* Cast the remote buffer's local context to a send handle. */
   handle = (CMI_VMI_Handle_T *) (VMI_ADDR_CAST) rbuf->lctxt;
 
-  /* Check to see if the handle is for an RDMA send or an RDMA broadcast. */
-  if ((handle->type == CMI_VMI_HANDLE_TYPE_SYNC_SEND_RDMA) ||
-      (handle->type == CMI_VMI_HANDLE_TYPE_ASYNC_SEND_RDMA)) {
-
-    putaddr = handle->msg + handle->data.rdma.bytes_sent;
-    putlen = handle->msgsize - handle->data.rdma.bytes_sent;
+  if (handle->data.send.send_handle_type == CMI_VMI_SEND_HANDLE_TYPE_RDMA) {
+    //putaddr = handle->msg + handle->data.rdma.bytes_sent;
+    //putlen = handle->msgsize - handle->data.rdma.bytes_sent;
+    putaddr = handle->msg + handle->data.send.data.rdma.bytes_sent;
+    putlen = handle->msgsize - handle->data.send.data.rdma.bytes_sent;
 
     if (putlen > CMI_VMI_RDMA_Max_Chunk) {
       putlen = CMI_VMI_RDMA_Max_Chunk;
@@ -623,7 +595,8 @@ void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT conn, PVMI_REMOTE_BUFFER rbuf)
     rdmaop->rbuffer = rbuf;
     rdmaop->roffset = 0;
 
-    handle->data.rdma.bytes_sent += putlen;
+    //handle->data.rdma.bytes_sent += putlen;
+    handle->data.send.data.rdma.bytes_sent += putlen;
 
     if (complete_flag) {
       status = VMI_Pool_Allocate_Buffer (CMI_VMI_RDMAPutContext_Pool,
@@ -642,16 +615,19 @@ void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT conn, PVMI_REMOTE_BUFFER rbuf)
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
     }
 #if CMK_PERSISTENT_COMM
-  } else if ((handle->type == CMI_VMI_HANDLE_TYPE_SYNC_BROADCAST_RDMA) ||
-             (handle->type == CMI_VMI_HANDLE_TYPE_ASYNC_BROADCAST_RDMA)) {
+  } else if (handle->data.send.send_handle_type ==
+	     CMI_VMI_SEND_HANDLE_TYPE_RDMABROAD) {
+
 #else   /* CMK_PERSISTENT_COMM */
   } else {
 #endif
     proc = (CMI_VMI_Process_Info_T *) VMI_CONNECT_GET_RECEIVE_CONTEXT (conn);
     rank = proc->rank;
 
-    putaddr = handle->msg + handle->data.rdmabroad.bytes_sent[rank];
-    putlen = handle->msgsize - handle->data.rdmabroad.bytes_sent[rank];
+    //putaddr = handle->msg + handle->data.rdmabroad.bytes_sent[rank];
+    //putlen = handle->msgsize - handle->data.rdmabroad.bytes_sent[rank];
+    putaddr = handle->msg + handle->data.send.data.rdmabroad.bytes_sent[rank];
+    putlen = handle->msgsize - handle->data.send.data.rdmabroad.bytes_sent[rank];
 
     if (putlen > CMI_VMI_RDMA_Max_Chunk) {
       putlen = CMI_VMI_RDMA_Max_Chunk;
@@ -673,7 +649,8 @@ void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT conn, PVMI_REMOTE_BUFFER rbuf)
     rdmaop->rbuffer = rbuf;
     rdmaop->roffset = 0;
 
-    handle->data.rdmabroad.bytes_sent[rank] += putlen;
+    //handle->data.rdmabroad.bytes_sent[rank] += putlen;
+    handle->data.send.data.rdmabroad.bytes_sent[rank] += putlen;
 
     if (complete_flag) {
       status = VMI_Pool_Allocate_Buffer (CMI_VMI_RDMAPutContext_Pool,
@@ -694,8 +671,11 @@ void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT conn, PVMI_REMOTE_BUFFER rbuf)
   }
 #if CMK_PERSISTENT_COMM
   else {
-    handle->data.persistent.rbuf = rbuf;
-    handle->data.persistent.ready++;
+    //handle->data.persistent.rbuf = rbuf;
+    //handle->data.persistent.ready++;
+
+    handle->data.send.data.persistent.rbuf = rbuf;
+    handle->data.send.data.persistent.ready++;
   }
 #endif   /* CMK_PERSISTENT_COMM */
 }
@@ -712,7 +692,7 @@ void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT conn, UINT32 rdmasz,
 {
   VMI_STATUS status;
 
-  CMI_VMI_RDMA_Receive_Context_T *rdmarecvctxt;
+  CMI_VMI_Handle_T *handle;
 
   char *pubaddr;
   int pubsz;
@@ -725,23 +705,23 @@ void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT conn, UINT32 rdmasz,
 
   DEBUG_PRINT ("CMI_VMI_RDMA_Notification_Handler() called.\n");
 
-  rdmarecvctxt = &(CMI_VMI_RDMA_Receive_Context[context]);
+  handle = &(CMI_VMI_Handle_Array[context]);
 
-  rdmarecvctxt->bytes_rec += rdmasz;
-  rdmarecvctxt->rdmacnt--;
+  handle->data.receive.data.rdma.bytes_rec += rdmasz;
+  handle->data.receive.data.rdma.rdmacnt--;
 
-  cacheentry = rdmarecvctxt->cacheentry[rdmarecvctxt->rindx];
+  cacheentry = handle->data.receive.data.rdma.cacheentry[handle->data.receive.data.rdma.rindx];
   status = VMI_Cache_Deregister (cacheentry);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
 
-  rdmarecvctxt->rindx++;
-  if (rdmarecvctxt->rindx >= CMI_VMI_RDMA_Max_Outstanding) {
-    rdmarecvctxt->rindx = 0;
+  handle->data.receive.data.rdma.rindx++;
+  if (handle->data.receive.data.rdma.rindx >= CMI_VMI_RDMA_Max_Outstanding) {
+    handle->data.receive.data.rdma.rindx = 0;
   }
 
-  if (rdmarecvctxt->bytes_pub < rdmarecvctxt->msgsize) {
-    pubaddr = rdmarecvctxt->msg + rdmarecvctxt->bytes_pub;
-    pubsz = rdmarecvctxt->msgsize - rdmarecvctxt->bytes_pub;
+  if (handle->data.receive.data.rdma.bytes_pub < handle->msgsize) {
+    pubaddr = handle->msg + handle->data.receive.data.rdma.bytes_pub;
+    pubsz = handle->msgsize - handle->data.receive.data.rdma.bytes_pub;
     if (pubsz > CMI_VMI_RDMA_Max_Chunk) {
       pubsz = CMI_VMI_RDMA_Max_Chunk;
     }
@@ -749,65 +729,64 @@ void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT conn, UINT32 rdmasz,
     status = VMI_Cache_Register (pubaddr, pubsz, &cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
 
-    rdmarecvctxt->cacheentry[rdmarecvctxt->sindx] = cacheentry;
+    handle->data.receive.data.rdma.cacheentry[handle->data.receive.data.rdma.sindx] = cacheentry;
 
-    rdmarecvctxt->sindx++;
-    if (rdmarecvctxt->sindx >= CMI_VMI_RDMA_Max_Outstanding) {
-      rdmarecvctxt->sindx = 0;
+    handle->data.receive.data.rdma.sindx++;
+    if (handle->data.receive.data.rdma.sindx >= CMI_VMI_RDMA_Max_Outstanding) {
+      handle->data.receive.data.rdma.sindx = 0;
     }
 
-    rdmarecvctxt->rdmacnt++;
+    handle->data.receive.data.rdma.rdmacnt++;
 
     status = VMI_RDMA_Publish_Buffer (conn, cacheentry->bufferHandle,
          (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr, pubsz,
-         (VMI_virt_addr_t) rdmarecvctxt->rhandleaddr, context);
+         (VMI_virt_addr_t) handle->data.receive.data.rdma.rhandleaddr,
+	 context);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
 
-    rdmarecvctxt->bytes_pub += pubsz;
+    handle->data.receive.data.rdma.bytes_pub + pubsz;
   }
 
-  if (rdmarecvctxt->bytes_rec >= rdmarecvctxt->msgsize) {
+  if (handle->data.receive.data.rdma.bytes_rec >= handle->msgsize) {
 #if CMK_BROADCAST_SPANNING_TREE
-    if (CMI_BROADCAST_ROOT (rdmarecvctxt->msg)) {
-      CMI_VMI_Send_Spanning_Children (rdmarecvctxt->msgsize,
-				      rdmarecvctxt->msg);
+    if (CMI_BROADCAST_ROOT (handle->msg)) {
+      CMI_VMI_Send_Spanning_Children (handle->msgsize, handle->msg);
     }
 #endif
 
-    CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), rdmarecvctxt->msg);
+    CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), handle->msg);
 
-    if (rdmarecvctxt->persistent_flag) {
-      msg2 = (char *) CmiAlloc (rdmarecvctxt->msgsize);
+    if (handle->data.receive.receive_handle_type == CMI_VMI_RECEIVE_HANDLE_TYPE_PERSISTENT) {
+      msg2 = (char *) CmiAlloc (handle->msgsize);
 
-      rdmarecvctxt->msg = msg2;
-      rdmarecvctxt->bytes_rec = 0;
-      rdmarecvctxt->rdmacnt = 1;
-      rdmarecvctxt->sindx = 0;
-      rdmarecvctxt->rindx = 0;
+      handle->msg = msg2;
+      handle->data.receive.data.persistent.bytes_rec = 0;
+      handle->data.receive.data.persistent.rdmacnt = 1;
+      handle->data.receive.data.persistent.sindx = 0;
+      handle->data.receive.data.persistent.rindx = 0;
 
-      pubaddr = rdmarecvctxt->msg;
-      pubsize = rdmarecvctxt->msgsize;
+      pubaddr = handle->msg;
+      pubsize = handle->msgsize;
 
       status = VMI_Cache_Register (pubaddr, pubsize, &cacheentry);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
 
-      rdmarecvctxt->cacheentry[rdmarecvctxt->sindx] = cacheentry;
+      handle->data.receive.data.persistent.cacheentry[handle->data.receive.data.persistent.sindx] = cacheentry;
 
       status = VMI_RDMA_Publish_Buffer (conn,
 	   cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr,
-	   pubsize, rdmarecvctxt->rhandleaddr,
-	   (UINT32) rdmarecvctxt->index);
+	   pubsize, handle->data.receive.data.persistent.rhandleaddr,
+	   (UINT32) handle->index);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
     } else {
       status = VMI_Pool_Deallocate_Buffer (CMI_VMI_RDMACacheEntry_Pool,
-					   rdmarecvctxt->cacheentry);
+	   handle->data.receive.data.persistent.cacheentry);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
 
-      (&(CMI_VMI_RDMA_Receive_Context[context]))->allocated = FALSE;
+      (&(CMI_VMI_Handle_Array[context]))->allocated = FALSE;
     }
   }
 }
-
 
 
 
@@ -822,11 +801,12 @@ void CMI_VMI_RDMA_Rendezvous_Handler (char *msg)
   int msgsize;
   VMI_virt_addr_t rhandleaddr;
   int rdmarecvindx;
-  CMI_VMI_RDMA_Receive_Context_T *rdmarecvctxt;
   char *pubaddr;
   int pubsize;
   PVMI_CACHE_ENTRY cacheentry;
   char *msg2;
+
+  CMI_VMI_Handle_T *handle;
 
 
   rank = ((CMI_VMI_Rendezvous_Message_T *) msg)->rank;
@@ -835,30 +815,30 @@ void CMI_VMI_RDMA_Rendezvous_Handler (char *msg)
 
   CmiFree (msg);
 
-  rdmarecvindx = CMI_VMI_Get_RDMA_Receive_Context();
-  rdmarecvctxt = &(CMI_VMI_RDMA_Receive_Context[rdmarecvindx]);
+  handle = CMI_VMI_Allocate_Handle();
 
   msg2 = (char *) CmiAlloc (msgsize);
 
-  rdmarecvctxt->rhandleaddr = rhandleaddr;
-  rdmarecvctxt->msg = msg2;
-  rdmarecvctxt->msgsize = msgsize;
-  rdmarecvctxt->bytes_pub = 0;
-  rdmarecvctxt->bytes_rec = 0;
-  rdmarecvctxt->rdmacnt = 0;
-  rdmarecvctxt->sindx = 0;
-  rdmarecvctxt->rindx = 0;
-  rdmarecvctxt->persistent_flag = FALSE;
+  handle->msg = msg2;
+  handle->msgsize = msgsize;
+  handle->handle_type = CMI_VMI_HANDLE_TYPE_RECEIVE;
+  handle->data.receive.receive_handle_type = CMI_VMI_RECEIVE_HANDLE_TYPE_RDMA;
+  handle->data.receive.data.rdma.rhandleaddr = rhandleaddr;
+  handle->data.receive.data.rdma.bytes_pub = 0;
+  handle->data.receive.data.rdma.bytes_rec = 0;
+  handle->data.receive.data.rdma.rdmacnt = 0;
+  handle->data.receive.data.rdma.sindx = 0;
+  handle->data.receive.data.rdma.rindx = 0;
 
   status = VMI_Pool_Allocate_Buffer (CMI_VMI_RDMACacheEntry_Pool,
-       (PVOID) &(rdmarecvctxt->cacheentry), NULL);
+       (PVOID) &(handle->data.receive.data.rdma.cacheentry), NULL);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
-  while ((rdmarecvctxt->bytes_pub < rdmarecvctxt->msgsize) &&
-	 (rdmarecvctxt->rdmacnt < CMI_VMI_RDMA_Max_Outstanding)) {
+  while ((handle->data.receive.data.rdma.bytes_pub < handle->msgsize) &&
+	 (handle->data.receive.data.rdma.rdmacnt < CMI_VMI_RDMA_Max_Outstanding)) {
 
-    pubaddr = rdmarecvctxt->msg + rdmarecvctxt->bytes_pub;
-    pubsize = rdmarecvctxt->msgsize - rdmarecvctxt->bytes_pub;
+    pubaddr = handle->msg + handle->data.receive.data.rdma.bytes_pub;
+    pubsize = handle->msgsize - handle->data.receive.data.rdma.bytes_pub;
     if (pubsize > CMI_VMI_RDMA_Max_Chunk) {
       pubsize = CMI_VMI_RDMA_Max_Chunk;
     }
@@ -866,23 +846,24 @@ void CMI_VMI_RDMA_Rendezvous_Handler (char *msg)
     status = VMI_Cache_Register (pubaddr, pubsize, &cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
 
-    rdmarecvctxt->cacheentry[rdmarecvctxt->sindx] = cacheentry;
+    handle->data.receive.data.rdma.cacheentry[handle->data.receive.data.rdma.sindx] = cacheentry;
 
-    rdmarecvctxt->sindx++;
-    if (rdmarecvctxt->sindx >= CMI_VMI_RDMA_Max_Outstanding) {
-      rdmarecvctxt->sindx = 0;
+    handle->data.receive.data.rdma.sindx++;
+    if (handle->data.receive.data.rdma.sindx >= CMI_VMI_RDMA_Max_Outstanding) {
+      handle->data.receive.data.rdma.sindx = 0;
     }
 
-    rdmarecvctxt->rdmacnt++;
+    handle->data.receive.data.rdma.rdmacnt++;
 
     status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Procs[rank])->connection,
          cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr,
-         pubsize, rhandleaddr, (UINT32) rdmarecvindx);
+         pubsize, rhandleaddr, (UINT32) handle->index);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
 
-    rdmarecvctxt->bytes_pub += pubsize;
+    handle->data.receive.data.rdma.bytes_pub += pubsize;
   }
 }
+
 
 
 #if CMK_PERSISTENT_COMM
@@ -899,10 +880,11 @@ void CMI_VMI_Persistent_Request_Handler (char *msg)
   int maxsize;
   VMI_virt_addr_t rhandleaddr;
   int rdmarecvindx;
-  CMI_VMI_RDMA_Receive_Context_T *rdmarecvctxt;
   char *pubaddr;
   int pubsize;
   PVMI_CACHE_ENTRY cacheentry;
+
+  CMI_VMI_Handle_T *handle;
 
   CMI_VMI_Persistent_Grant_Message_T grant_msg;
 
@@ -916,41 +898,41 @@ void CMI_VMI_Persistent_Request_Handler (char *msg)
 
   CmiFree (msg);
 
-  rdmarecvindx = CMI_VMI_Get_RDMA_Receive_Context();
-  rdmarecvctxt = &(CMI_VMI_RDMA_Receive_Context[rdmarecvindx]);
+  handle = CMI_VMI_Allocate_Handle();
 
   msg2 = (char *) CmiAlloc (maxsize);
 
-  rdmarecvctxt->rhandleaddr = rhandleaddr;
-  rdmarecvctxt->msg = msg2;
-  rdmarecvctxt->msgsize = maxsize;
-  rdmarecvctxt->bytes_pub = maxsize;
-  rdmarecvctxt->bytes_rec = 0;
-  rdmarecvctxt->rdmacnt = 1;
-  rdmarecvctxt->sindx = 0;
-  rdmarecvctxt->rindx = 0;
-  rdmarecvctxt->persistent_flag = TRUE;
+  handle->msg = msg2;
+  handle->msgsize = maxsize;
+  handle->handle_type = CMI_VMI_HANDLE_TYPE_RECEIVE;
+  handle->data.receive.receive_handle_type = CMI_VMI_RECEIVE_HANDLE_TYPE_PERSISTENT;
+  handle->data.receive.data.persistent.rhandleaddr = rhandleaddr;
+  handle->data.receive.data.persistent.bytes_pub = maxsize;
+  handle->data.receive.data.persistent.bytes_rec = 0;
+  handle->data.receive.data.persistent.rdmacnt = 1;
+  handle->data.receive.data.persistent.sindx = 0;
+  handle->data.receive.data.persistent.rindx = 0;
 
   status = VMI_Pool_Allocate_Buffer (CMI_VMI_RDMACacheEntry_Pool,
-       (PVOID) &(rdmarecvctxt->cacheentry), NULL);
+       (PVOID) &(handle->data.receive.data.persistent.cacheentry), NULL);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
-  pubaddr = rdmarecvctxt->msg;
-  pubsize = rdmarecvctxt->msgsize;
+  pubaddr = handle->msg;
+  pubsize = handle->msgsize;
 
   status = VMI_Cache_Register (pubaddr, pubsize, &cacheentry);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
 
-  rdmarecvctxt->cacheentry[rdmarecvctxt->sindx] = cacheentry;
+  handle->data.receive.data.persistent.cacheentry[handle->data.receive.data.persistent.sindx] = cacheentry;
 
   status = VMI_RDMA_Publish_Buffer ((&CMI_VMI_Procs[rank])->connection,
        cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr,
-       pubsize, rhandleaddr, (UINT32) rdmarecvindx);
+       pubsize, rhandleaddr, (UINT32) handle->index);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
 
   CmiSetHandler (&grant_msg, CMI_VMI_Persistent_Grant_Handler_ID);
   grant_msg.context = (VMI_virt_addr_t) (VMI_ADDR_CAST) rhandleaddr;
-  grant_msg.rdmarecvindx = rdmarecvindx;
+  grant_msg.rdmarecvindx = handle->index;
 
 #if CMK_BROADCAST_SPANNING_TREE
   CMI_SET_BROADCAST_ROOT (&grant_msg, 0);
@@ -975,12 +957,12 @@ void CMI_VMI_Persistent_Grant_Handler (char *msg)
 
   handle = (CMI_VMI_Handle_T *) (VMI_ADDR_CAST)
             ((CMI_VMI_Persistent_Grant_Message_T *) msg)->context;
-  handle->data.persistent.rdmarecvindx =
+  handle->data.send.data.persistent.rdmarecvindx =
             ((CMI_VMI_Persistent_Grant_Message_T *) msg)->rdmarecvindx;
 
   CmiFree (msg);
 
-  handle->data.persistent.ready++;
+  handle->data.send.data.persistent.ready++;
 }
 
 
@@ -991,22 +973,23 @@ void CMI_VMI_Persistent_Destroy_Handler (char *msg)
 {
   VMI_STATUS status;
   int rdmarecvindx;
-  CMI_VMI_RDMA_Receive_Context_T *rdmarecvctxt;
+
+  CMI_VMI_Handle_T *handle;
 
 
   rdmarecvindx = ((CMI_VMI_Persistent_Destroy_Message_T *) msg)->rdmarecvindx;
 
   CmiFree (msg);
 
-  rdmarecvctxt = &(CMI_VMI_RDMA_Receive_Context[rdmarecvindx]);
+  handle = &(CMI_VMI_Handle_Array[rdmarecvindx]);
 
-  CmiFree (rdmarecvctxt->msg);
+  CmiFree (handle->msg);
 
   status = VMI_Pool_Deallocate_Buffer (CMI_VMI_RDMACacheEntry_Pool,
-				       rdmarecvctxt->cacheentry);
+       handle->data.receive.data.persistent.cacheentry);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
 
-  (&(CMI_VMI_RDMA_Receive_Context[rdmarecvindx]))->allocated = FALSE;
+  (&(CMI_VMI_Handle_Array[rdmarecvindx]))->allocated = FALSE;
 }
 #endif   /* CMK_PERSISTENT_COMM */
 
@@ -1154,7 +1137,7 @@ BOOLEAN CMI_VMI_Open_Connections (PUCHAR synckey)
   }
 
   /* Allocate space for the remote key. */
-  remotekey = malloc (strlen (synckey) + 32);
+  remotekey = malloc (strlen ((const char *) synckey) + 32);
   if (!remotekey) {
     DEBUG_PRINT ("Unable to allocate memory for remote key.\n");
     return FALSE;
@@ -1335,7 +1318,7 @@ BOOLEAN CMI_VMI_Open_Connections (PUCHAR synckey)
 /**************************************************************************
 **
 */
-int CMI_VMI_Get_RDMA_Receive_Context ()
+CMI_VMI_Handle_T *CMI_VMI_Allocate_Handle()
 {
   VMI_STATUS status;
 
@@ -1343,20 +1326,20 @@ int CMI_VMI_Get_RDMA_Receive_Context ()
 
 
   i = 0;
-  while ((&(CMI_VMI_RDMA_Receive_Context[i]))->allocated) {
+  while ((&(CMI_VMI_Handle_Array[i]))->allocated) {
     i++;
 
-    if (i >= CMI_VMI_MAX_RECEIVE_HANDLES) {
+    if (i >= CMI_VMI_MAX_HANDLES) {
       i = 0;
 
       status = VMI_Poll ();
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
-    }      
+    }
   }
 
-  (&(CMI_VMI_RDMA_Receive_Context[i]))->allocated = TRUE;
+  (&(CMI_VMI_Handle_Array[i]))->allocated = TRUE;
 
-  return (i);
+  return (&CMI_VMI_Handle_Array[i]);
 }
 
 
@@ -1501,11 +1484,14 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
     status = VMI_Cache_Register (msg, msgsize, &cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
 
+    handle.index = -1;
+    handle.allocated = TRUE;
     handle.msg = msg;
     handle.msgsize = msgsize;
-    handle.commhandle = NULL;
-    handle.type = CMI_VMI_HANDLE_TYPE_SYNC_BROADCAST_STREAM;
-    handle.data.stream.cacheentry = cacheentry;
+    handle.handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle.data.send.commhandle = NULL;
+    handle.data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
+    handle.data.send.data.stream.cacheentry = cacheentry;
 
     bufHandles[0] = cacheentry->bufferHandle;
     addrs[0] = (PVOID) msg;
@@ -1549,13 +1535,16 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
     status = VMI_Cache_Deregister (cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
   } else {
+    handle.index = -1;
+    handle.allocated = TRUE;
     handle.msg = msg;
     handle.msgsize = msgsize;
-    handle.commhandle = NULL;
-    handle.type = CMI_VMI_HANDLE_TYPE_SYNC_BROADCAST_RDMA;
+    handle.handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle.data.send.commhandle = NULL;
+    handle.data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMA;
 
     status = VMI_Pool_Allocate_Buffer (CMI_VMI_RDMABytesSent_Pool,
-	 (PVOID) &(handle.data.rdmabroad.bytes_sent), NULL);
+	 (PVOID) &(handle.data.send.data.rdmabroad.bytes_sent), NULL);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
     CmiSetHandler ((int *) &rendezvous_msg,
@@ -1604,7 +1593,7 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
     }
 
     status = VMI_Pool_Deallocate_Buffer (CMI_VMI_RDMABytesSent_Pool,
-					 handle.data.rdmabroad.bytes_sent);
+	 handle.data.send.data.rdmabroad.bytes_sent);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
   }
 }
@@ -1617,7 +1606,6 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
 /***** E X T E R N A L   M A C H I N E   L A Y E R   R O U T I N E S *****/
 /*************************************************************************/
 /*************************************************************************/
-
 
 
 /**************************************************************************
@@ -1637,9 +1625,11 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
   char *a;
   int i;
 
-  char *synckey;
+  //char *synckey;
+  PUCHAR synckey;
   char *vmikey;
-  char *initkey;
+  //char *initkey;
+  PUCHAR initkey;
 
   char *vmiinlinesize;
 
@@ -1682,7 +1672,7 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
   /* Set up the synchronization key for initial interaction with CRM. */
   a = getenv ("VMI_KEY");
   if (a) {
-    synckey = (char *) strdup (a);
+    synckey = (PUCHAR) strdup (a);
   }
   else {
     synckey = malloc (strlen (argv[0]) + 1);
@@ -1755,7 +1745,7 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
   }
 
   /* Set the VMI_KEY environment variable. */
-  vmikey = (char *) malloc (strlen (synckey) + 32);
+  vmikey = (char *) malloc (strlen ((const char *) synckey) + 32);
   if (!vmikey) {
     CmiAbort ("Unable to allocate memory for VMI_KEY environment variable.");
   }
@@ -1796,12 +1786,6 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
        sizeof (PVOID), CMI_VMI_CMICOMMHANDLE_POOL_PREALLOCATE,
        CMI_VMI_CMICOMMHANDLE_POOL_GROW, VMI_POOL_CLEARONCE,
        &CMI_VMI_CmiCommHandle_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
-
-  status = VMI_Pool_Create_Buffer_Pool (sizeof (CMI_VMI_Handle_T),
-       sizeof (PVOID), CMI_VMI_HANDLE_POOL_PREALLOCATE,
-       CMI_VMI_HANDLE_POOL_GROW, VMI_POOL_CLEARONCE,
-       &CMI_VMI_Handle_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
 
   status = VMI_Pool_Create_Buffer_Pool (_Cmi_numpes * sizeof (int),
@@ -1848,12 +1832,6 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
        &CMI_VMI_Bucket5_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
 
-  /* Initialize RDMA receive context table entries. */
-  for (i = 0; i < CMI_VMI_MAX_RECEIVE_HANDLES; i++) {
-    (&(CMI_VMI_RDMA_Receive_Context[i]))->allocated = FALSE;
-    (&(CMI_VMI_RDMA_Receive_Context[i]))->index = i;
-  }
-
   /* Create the FIFOs for holding local and remote messages. */
   CpvAccess (CmiLocalQueue) = CdsFifo_Create ();
   CpvAccess (CMI_VMI_RemoteQueue) = CdsFifo_Create ();
@@ -1891,7 +1869,7 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
   */
 
   /* Prepare the synchronization key to be used. */
-  initkey = (PUCHAR) malloc (strlen (synckey) + 13);
+  initkey = (PUCHAR) malloc (strlen ((const char *) synckey) + 13);
   if (!initkey) {
     CmiAbort ("Unable to allocate space for initialization key.");
   }
@@ -2018,9 +1996,6 @@ void ConverseExit ()
   status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_CmiCommHandle_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
 
-  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Handle_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
-
   status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_RDMABytesSent_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
 
@@ -2125,6 +2100,7 @@ void CmiNotifyIdle ()
 
 
 
+
 /**************************************************************************
 ** done
 */
@@ -2161,9 +2137,9 @@ void CmiSyncSendFn (int destrank, int msgsize, char *msg)
   }
 #if CMK_PERSISTENT_COMM
   else if ((CMI_VMI_Persistent_Handles != NULL) &&
-    ((&CMI_VMI_Persistent_Handles[0])->data.persistent.destrank == destrank) &&
-    ((&CMI_VMI_Persistent_Handles[0])->data.persistent.msgsize <= msgsize) &&
-    ((&CMI_VMI_Persistent_Handles[0])->data.persistent.ready >= 2)) {
+    ((&CMI_VMI_Persistent_Handles[0])->data.send.data.persistent.destrank == destrank) &&
+    ((&CMI_VMI_Persistent_Handles[0])->data.send.data.persistent.maxsize <= msgsize) &&
+    ((&CMI_VMI_Persistent_Handles[0])->data.send.data.persistent.ready >= 2)) {
     // TODO: We should probably buffer the message instead of sending direct
     //       if the connection is not ready.
     // TODO: This code should perform the RDMA operation in chunks!
@@ -2187,7 +2163,7 @@ void CmiSyncSendFn (int destrank, int msgsize, char *msg)
     rdmaop->buffers[0] = cacheentry->bufferHandle;
     rdmaop->addr[0] = putaddr;
     rdmaop->sz[0] = putlen;
-    rdmaop->rbuffer = phandle->data.persistent.rbuf;
+    rdmaop->rbuffer = phandle->data.send.data.persistent.rbuf;
     rdmaop->roffset = 0;
 
     status = VMI_Pool_Allocate_Buffer (CMI_VMI_RDMAPutContext_Pool,
@@ -2197,10 +2173,10 @@ void CmiSyncSendFn (int destrank, int msgsize, char *msg)
     rdmaputctxt->cacheentry = cacheentry;
     rdmaputctxt->handle = phandle;
 
-    phandle->data.persistent.bytes_sent = msgsize;
+    phandle->data.send.data.persistent.bytes_sent = msgsize;
 
-    status = VMI_RDMA_Put (phandle->data.persistent.connection, rdmaop,
-         (PVOID) rdmaputctxt,
+    status = VMI_RDMA_Put (phandle->data.send.data.persistent.connection,
+         rdmaop, (PVOID) rdmaputctxt,
          (VMIRDMAWriteComplete) CMI_VMI_RDMA_Completion_Handler);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
 
@@ -2219,12 +2195,15 @@ void CmiSyncSendFn (int destrank, int msgsize, char *msg)
          addrs, sz, 1, msgsize);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
   } else {
+    handle.index = -1;
+    handle.allocated = TRUE;
     handle.refcount = 2;
     handle.msg = msg;
     handle.msgsize = msgsize;
-    handle.commhandle = NULL;
-    handle.type = CMI_VMI_HANDLE_TYPE_SYNC_SEND_RDMA;
-    handle.data.rdma.bytes_sent = 0;
+    handle.handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle.data.send.commhandle = NULL;
+    handle.data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMA;
+    handle.data.send.data.rdma.bytes_sent = 0;
 
     CmiSetHandler (&rendezvous_msg, CMI_VMI_RDMA_Rendezvous_Handler_ID);
     rendezvous_msg.rank = _Cmi_mype;
@@ -2293,9 +2272,9 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
   }
 #if CMK_PERSISTENT_COMM
   else if ((CMI_VMI_Persistent_Handles != NULL) &&
-    ((&CMI_VMI_Persistent_Handles[0])->data.persistent.destrank == destrank) &&
-    ((&CMI_VMI_Persistent_Handles[0])->data.persistent.msgsize <= msgsize) &&
-    ((&CMI_VMI_Persistent_Handles[0])->data.persistent.ready >= 2)) {
+    ((&CMI_VMI_Persistent_Handles[0])->data.send.data.persistent.destrank == destrank) &&
+    ((&CMI_VMI_Persistent_Handles[0])->data.send.data.persistent.maxsize <= msgsize) &&
+    ((&CMI_VMI_Persistent_Handles[0])->data.send.data.persistent.ready >= 2)) {
     // TODO: We should probably buffer the message instead of sending direct
     //       if the connection is not ready.
     // TODO: This code should perform the RDMA operation in chunks!
@@ -2311,10 +2290,13 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
     commhandle->count = 1;
-    phandle->commhandle = commhandle;
+    phandle->data.send.commhandle = commhandle;
+
     // CANNOT DO THIS -->   CMI_VMI_AsyncMsgCount++;
     // Because CMI_VMI_RDMA_Completion_Handler() does not properly
     // decrement for the case of persistent handles.
+    //
+    // UPDATE: Most likely this is fixed with REFACTOR_HANDLES.
 
     putaddr = msg;
     putlen = msgsize;
@@ -2329,7 +2311,7 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
     rdmaop->buffers[0] = cacheentry->bufferHandle;
     rdmaop->addr[0] = putaddr;
     rdmaop->sz[0] = putlen;
-    rdmaop->rbuffer = phandle->data.persistent.rbuf;
+    rdmaop->rbuffer = phandle->data.send.data.persistent.rbuf;
     rdmaop->roffset = 0;
 
     status = VMI_Pool_Allocate_Buffer (CMI_VMI_RDMAPutContext_Pool,
@@ -2339,10 +2321,10 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
     rdmaputctxt->cacheentry = cacheentry;
     rdmaputctxt->handle = phandle;
 
-    phandle->data.persistent.bytes_sent = msgsize;
+    phandle->data.send.data.persistent.bytes_sent = msgsize;
 
-    status = VMI_RDMA_Put (handle->data.persistent.connection, rdmaop,
-         (PVOID) rdmaputctxt,
+    status = VMI_RDMA_Put (handle->data.send.data.persistent.connection,
+	 rdmaop, (PVOID) rdmaputctxt,
          (VMIRDMAWriteComplete) CMI_VMI_RDMA_Completion_Handler);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
   }
@@ -2361,9 +2343,7 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
 				       (PVOID) &commhandle, NULL);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Handle_Pool, (PVOID) &handle,
-				       NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+    handle = CMI_VMI_Allocate_Handle();
 
     status = VMI_Cache_Register (msg, msgsize, &cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
@@ -2371,9 +2351,10 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
     handle->refcount = 1;
     handle->msg = msg;
     handle->msgsize = msgsize;
-    handle->commhandle = commhandle;
-    handle->type = CMI_VMI_HANDLE_TYPE_ASYNC_SEND_STREAM;
-    handle->data.stream.cacheentry = cacheentry;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.commhandle = commhandle;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
+    handle->data.send.data.stream.cacheentry = cacheentry;
 
     bufHandles[0] = cacheentry->bufferHandle;
     addrs[0] = (PVOID) msg;
@@ -2391,16 +2372,15 @@ CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg)
 				       (PVOID) &commhandle, NULL);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Handle_Pool, (PVOID) &handle,
-				       NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+    handle = CMI_VMI_Allocate_Handle();
 
     handle->refcount = 1;
     handle->msg = msg;
     handle->msgsize = msgsize;
-    handle->commhandle = commhandle;
-    handle->type = CMI_VMI_HANDLE_TYPE_ASYNC_SEND_RDMA;
-    handle->data.rdma.bytes_sent = 0;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.commhandle = commhandle;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMA;
+    handle->data.send.data.rdma.bytes_sent = 0;
 
     CmiSetHandler ((int *) &rendezvous_msg,
 		   CMI_VMI_RDMA_Rendezvous_Handler_ID);
@@ -2476,11 +2456,14 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
     status = VMI_Cache_Register (msg, msgsize, &cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
 
+    handle.index = -1;
+    handle.allocated = TRUE;
     handle.msg = msg;
     handle.msgsize = msgsize;
-    handle.commhandle = NULL;
-    handle.type = CMI_VMI_HANDLE_TYPE_SYNC_BROADCAST_STREAM;
-    handle.data.stream.cacheentry = cacheentry;
+    handle.handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle.data.send.commhandle = NULL;
+    handle.data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
+    handle.data.send.data.stream.cacheentry = cacheentry;
 
     bufHandles[0] = cacheentry->bufferHandle;
     addrs[0] = (PVOID) msg;
@@ -2542,13 +2525,16 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
     status = VMI_Cache_Deregister (cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Deregister()");
   } else {
+    handle.index = -1;
+    handle.allocated = TRUE;
     handle.msg = msg;
     handle.msgsize = msgsize;
-    handle.commhandle = NULL;
-    handle.type = CMI_VMI_HANDLE_TYPE_SYNC_BROADCAST_RDMA;
+    handle.handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle.data.send.commhandle = NULL;
+    handle.data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMABROAD;
 
     status = VMI_Pool_Allocate_Buffer (CMI_VMI_RDMABytesSent_Pool,
-	 (PVOID) &(handle.data.rdmabroad.bytes_sent), NULL);
+	 (PVOID) &(handle.data.send.data.rdmabroad.bytes_sent), NULL);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
     CmiSetHandler ((int *) &rendezvous_msg,
@@ -2615,7 +2601,7 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
     }
 
     status = VMI_Pool_Deallocate_Buffer (CMI_VMI_RDMABytesSent_Pool,
-					 handle.data.rdmabroad.bytes_sent);
+	 handle.data.send.data.rdmabroad.bytes_sent);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
   }
 }
@@ -2700,18 +2686,17 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
 				       (PVOID) &commhandle, NULL);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Handle_Pool, (PVOID) &handle,
-				       NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+    handle = CMI_VMI_Allocate_Handle();
 
     status = VMI_Cache_Register (msg, msgsize, &cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Cache_Register()");
 
     handle->msg = msg;
     handle->msgsize = msgsize;
-    handle->commhandle = commhandle;
-    handle->type = CMI_VMI_HANDLE_TYPE_ASYNC_BROADCAST_STREAM;
-    handle->data.stream.cacheentry = cacheentry;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.commhandle = commhandle;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_STREAM;
+    handle->data.send.data.stream.cacheentry = cacheentry;
 
     bufHandles[0] = cacheentry->bufferHandle;
     addrs[0] = (PVOID) msg;
@@ -2772,17 +2757,16 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
 				       (PVOID) &commhandle, NULL);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Handle_Pool, (PVOID) &handle,
-				       NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+    handle = CMI_VMI_Allocate_Handle();
 
     handle->msg = msg;
     handle->msgsize = msgsize;
-    handle->commhandle = commhandle;
-    handle->type = CMI_VMI_HANDLE_TYPE_ASYNC_BROADCAST_RDMA;
+    handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+    handle->data.send.commhandle = commhandle;
+    handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMABROAD;
 
     status = VMI_Pool_Allocate_Buffer (CMI_VMI_RDMABytesSent_Pool,
-	 (PVOID) &(handle->data.rdmabroad.bytes_sent), NULL);
+	 (PVOID) &(handle->data.send.data.rdmabroad.bytes_sent), NULL);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
 
     CmiSetHandler ((int *) &rendezvous_msg,
@@ -2849,7 +2833,6 @@ CmiCommHandle CmiAsyncBroadcastFn (int msgsize, char *msg)
 
   return ((CmiCommHandle) commhandle);
 }
-
 
 
 /**************************************************************************
@@ -2984,7 +2967,7 @@ void CmiFreeListSendFn (int npes, int *pes, int msgsize, char *msg)
     rdmaop->buffers[0] = cacheentry->bufferHandle;
     rdmaop->addr[0] = putaddr;
     rdmaop->sz[0] = putlen;
-    rdmaop->rbuffer = phandle->data.persistent.rbuf;
+    rdmaop->rbuffer = phandle->data.send.data.persistent.rbuf;
     rdmaop->roffset = 0;
 
     status = VMI_Pool_Allocate_Buffer (CMI_VMI_RDMAPutContext_Pool,
@@ -2994,10 +2977,10 @@ void CmiFreeListSendFn (int npes, int *pes, int msgsize, char *msg)
     rdmaputctxt->cacheentry = cacheentry;
     rdmaputctxt->handle = phandle;
 
-    phandle->data.persistent.bytes_sent = msgsize;
+    phandle->data.send.data.persistent.bytes_sent = msgsize;
 
-    status = VMI_RDMA_Put (phandle->data.persistent.connection, rdmaop,
-         (PVOID) rdmaputctxt,
+    status = VMI_RDMA_Put (phandle->data.send.data.persistent.connection,
+         rdmaop, (PVOID) rdmaputctxt,
          (VMIRDMAWriteComplete) CMI_VMI_RDMA_Completion_Handler);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
 
@@ -3102,22 +3085,21 @@ PersistentHandle CmiCreatePersistent (int destrank, int maxsize)
   ULONG sz[1];
 
 
-  status = VMI_Pool_Allocate_Buffer (CMI_VMI_Handle_Pool, (PVOID) &handle,
-				     NULL);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+  handle = CMI_VMI_Allocate_Handle();
 
   handle->refcount = 1;
   handle->msg = NULL;
   handle->msgsize = -1;
-  handle->commhandle = NULL;
-  handle->type = CMI_VMI_HANDLE_TYPE_PERSISTENT;
-  handle->data.persistent.ready = 0;
-  handle->data.persistent.connection = (&CMI_VMI_Procs[destrank])->connection;
-  handle->data.persistent.destrank = destrank;
-  handle->data.persistent.maxsize = maxsize;
-  handle->data.persistent.rbuf = NULL;
-  handle->data.persistent.bytes_sent = 0;
-  handle->data.persistent.rdmarecvindx = -1;
+  handle->handle_type = CMI_VMI_HANDLE_TYPE_SEND;
+  handle->data.send.commhandle = NULL;
+  handle->data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_PERSISTENT;
+  handle->data.send.data.persistent.ready = 0;
+  handle->data.send.data.persistent.connection = (&CMI_VMI_Procs[destrank])->connection;
+  handle->data.send.data.persistent.destrank = destrank;
+  handle->data.send.data.persistent.maxsize = maxsize;
+  handle->data.send.data.persistent.rbuf = NULL;
+  handle->data.send.data.persistent.bytes_sent = 0;
+  handle->data.send.data.persistent.rdmarecvindx = -1;
 
   CmiSetHandler (&request_msg, CMI_VMI_Persistent_Request_Handler_ID);
   request_msg.rank = _Cmi_mype;
@@ -3137,7 +3119,6 @@ PersistentHandle CmiCreatePersistent (int destrank, int maxsize)
 
   return ((PersistentHandle) handle);
 }
-
 
 
 /**************************************************************************
@@ -3167,7 +3148,7 @@ void CmiDestroyPersistent (PersistentHandle h)
   handle = (CMI_VMI_Handle_T *) h;
 
   CmiSetHandler (&destroy_msg, CMI_VMI_Persistent_Destroy_Handler_ID);
-  destroy_msg.rdmarecvindx = handle->data.persistent.rdmarecvindx;
+  destroy_msg.rdmarecvindx = handle->data.send.data.persistent.rdmarecvindx;
 
 #if CMK_BROADCAST_SPANNING_TREE
   CMI_SET_BROADCAST_ROOT (&destroy_msg, 0);
@@ -3176,12 +3157,11 @@ void CmiDestroyPersistent (PersistentHandle h)
   addrs[0] = (PVOID) &destroy_msg;
   sz[0] = (ULONG) (sizeof (CMI_VMI_Persistent_Destroy_Message_T));
 
-  status = VMI_Stream_Send_Inline (handle->data.persistent.connection,
+  status = VMI_Stream_Send_Inline(handle->data.send.data.persistent.connection,
        addrs, sz, 1, sizeof (CMI_VMI_Persistent_Destroy_Message_T));
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Stream_Send_Inline()");
 
-  status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Handle_Pool, handle);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+  handle->allocated = FALSE;
 }
 
 
@@ -3432,7 +3412,7 @@ SOCKET createSocket(char *hostName, int port, int *localAddr){
 /**************************************************************************
 **
 */
-BOOLEAN CRMRegister (char *key, ULONG numPE, int shutdownPort,
+BOOLEAN CRMRegister (PUCHAR key, ULONG numPE, int shutdownPort,
 		     SOCKET *clientSock, int *clientAddr, PCRM_Msg *msg2)
 {
   PCRM_Msg msg;

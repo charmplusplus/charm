@@ -18,34 +18,17 @@
 
 #include "vmi.h"
 
+
+
+#define CMI_VMI_MAX_HANDLES 1000
+
+
 /* This is the number of seconds to wait for connection setup. */
 #define CMI_VMI_CONNECTION_TIMEOUT 300
 
-/*
-  Asynchronous messages of fewer bytes than the following boundary are
-  sent by calling VMI_Stream_Send_Inline() which does an internal memcpy()
-  and dispatches the message synchronously.  For sufficiently-short messages,
-  this is faster than paying the cost of getting some pinned memory from
-  cache.
-*/
+/* These are the message send strategy boundaries. */
 #define CMI_VMI_SMALL_MESSAGE_BOUNDARY 512
-
-/*
-  Messages of fewer bytes than the following boundary are sent by the
-  "short message protocol".  Right now, this means that they will be sent
-  via a VMI Stream Send of some type.
-
-  Messages larger than the boundary are sent by the "large message protocol".
-  This is an RDMA rendezvous protocol where a rendezvous message is first
-  sent via a stream to initiate an RDMA transfer of the message data.
-*/
 #define CMI_VMI_MEDIUM_MESSAGE_BOUNDARY 4096
-
-/*
-  Receive contexts are stored in an array of CMI_VMI_MAX_RECEIVE_HANDLES
-  elements.
-*/
-#define CMI_VMI_MAX_RECEIVE_HANDLES 1000
 
 /*
   RDMA puts for large messages are done in a pipeline.  The following two
@@ -98,17 +81,11 @@
 #define CMI_VMI_CMICOMMHANDLE_POOL_PREALLOCATE        64
 #define CMI_VMI_CMICOMMHANDLE_POOL_GROW               32
 
-#define CMI_VMI_HANDLE_POOL_PREALLOCATE               64
-#define CMI_VMI_HANDLE_POOL_GROW                      32
-
 #define CMI_VMI_RDMA_BYTES_SENT_POOL_PREALLOCATE      64
 #define CMI_VMI_RDMA_BYTES_SENT_POOL_GROW             32
 
 #define CMI_VMI_RDMA_PUT_CONTEXT_POOL_PREALLOCATE     64
 #define CMI_VMI_RDMA_PUT_CONTEXT_POOL_GROW            32
-
-#define CMI_VMI_RDMA_RECEIVE_CONTEXT_POOL_PREALLOCATE 64
-#define CMI_VMI_RDMA_RECEIVE_CONTEXT_POOL_GROW        32
 
 #define CMI_VMI_RDMA_CACHE_ENTRY_POOL_PREALLOCATE     64
 #define CMI_VMI_RDMA_CACHE_ENTRY_POOL_GROW            32
@@ -253,90 +230,78 @@ typedef struct
   int count;
 } CMI_VMI_CmiCommHandle_T;
 
+
 typedef enum
 {
-  CMI_VMI_HANDLE_TYPE_SYNC_SEND_STREAM,
-  CMI_VMI_HANDLE_TYPE_ASYNC_SEND_STREAM,
-
-  CMI_VMI_HANDLE_TYPE_SYNC_BROADCAST_STREAM,
-  CMI_VMI_HANDLE_TYPE_ASYNC_BROADCAST_STREAM,
-
-  CMI_VMI_HANDLE_TYPE_SYNC_SEND_RDMA,
-  CMI_VMI_HANDLE_TYPE_ASYNC_SEND_RDMA,
-
-  CMI_VMI_HANDLE_TYPE_SYNC_BROADCAST_RDMA,
-  CMI_VMI_HANDLE_TYPE_ASYNC_BROADCAST_RDMA,
-
-  CMI_VMI_HANDLE_TYPE_PERSISTENT
+  CMI_VMI_HANDLE_TYPE_SEND,
+  CMI_VMI_HANDLE_TYPE_RECEIVE
 } CMI_VMI_Handle_Type_T;
+
+
+typedef enum
+{
+  CMI_VMI_SEND_HANDLE_TYPE_STREAM,
+  CMI_VMI_SEND_HANDLE_TYPE_RDMA,
+  CMI_VMI_SEND_HANDLE_TYPE_RDMABROAD,
+  CMI_VMI_SEND_HANDLE_TYPE_PERSISTENT
+} CMI_VMI_Send_Handle_Type_T;
+
 
 typedef struct
 {
   PVMI_CACHE_ENTRY cacheentry;
-} CMI_VMI_Handle_Stream_T;
+} CMI_VMI_Send_Handle_Stream_T;
+
 
 typedef struct
 {
   int bytes_sent;
-} CMI_VMI_Handle_RDMA_T;
+} CMI_VMI_Send_Handle_RDMA_T;
+
 
 typedef struct
 {
   int *bytes_sent;
-} CMI_VMI_Handle_RDMABROAD_T;
+} CMI_VMI_Send_Handle_RDMABROAD_T;
+
 
 typedef struct
 {
-  int ready;
-  PVMI_CONNECT connection;
-  int destrank;
-  int maxsize;
+  int                ready;
+  PVMI_CONNECT       connection;
+  int                destrank;
+  int                maxsize;
   PVMI_REMOTE_BUFFER rbuf;
-  int bytes_sent;
-  int rdmarecvindx;
+  int                bytes_sent;
+  int                rdmarecvindx;
   // void *next;     needed for the "delete all persistent" function
-} CMI_VMI_Handle_Persistent_T;
+} CMI_VMI_Send_Handle_Persistent_T;
+
 
 typedef struct
 {
-  int                      refcount;
-  char                    *msg;
-  int                      msgsize;
-  CMI_VMI_CmiCommHandle_T *commhandle;
-  CMI_VMI_Handle_Type_T    type;
+  CMI_VMI_CmiCommHandle_T    *commhandle;
+  CMI_VMI_Send_Handle_Type_T  send_handle_type;
 
   union
   {
-    CMI_VMI_Handle_Stream_T     stream;
-    CMI_VMI_Handle_RDMA_T       rdma;
-    CMI_VMI_Handle_RDMABROAD_T  rdmabroad;
-    CMI_VMI_Handle_Persistent_T persistent;
+    CMI_VMI_Send_Handle_Stream_T     stream;
+    CMI_VMI_Send_Handle_RDMA_T       rdma;
+    CMI_VMI_Send_Handle_RDMABROAD_T  rdmabroad;
+    CMI_VMI_Send_Handle_Persistent_T persistent;
   } data;
-} CMI_VMI_Handle_T;
+} CMI_VMI_Send_Handle_T;
 
 
+typedef enum
+{
+  CMI_VMI_RECEIVE_HANDLE_TYPE_RDMA,
+  CMI_VMI_RECEIVE_HANDLE_TYPE_PERSISTENT
+} CMI_VMI_Receive_Handle_Type_T;
 
-/*
-  The following data structures hold details of RDMA "long message protocol"
-  contexts.
 
-  CMI_VMI_RDMA_Context_T
-
-  CMI_VMI_RDMA_Put_Context_T holds details of an RDMA put context.  This
-  data structure is necessary due to RDMA broadcasts since each Put requires
-  a separate cache entry (for each Put in an individual pipeline, and for
-  each pipeline to each receiver).  It is tempting to believe we could
-  allocate an array of cache entries within the RDMA send handle, except
-  this approach will not work because there is no way for the RDMA
-  completion handler to determine the rank of the process for which the Put
-  completed and hence no way to index this array.
-*/
 typedef struct
 {
-  BOOLEAN           allocated;
-  int               index;
-  char             *msg;
-  int               msgsize;
   int               bytes_pub;
   int               rdmacnt;
   int               sindx;
@@ -344,8 +309,49 @@ typedef struct
   int               bytes_rec;
   PVMI_CACHE_ENTRY *cacheentry;
   VMI_virt_addr_t   rhandleaddr;
-  BOOLEAN           persistent_flag;
-} CMI_VMI_RDMA_Receive_Context_T;
+} CMI_VMI_Receive_Handle_RDMA_T;
+
+
+typedef struct
+{
+  int               bytes_pub;
+  int               rdmacnt;
+  int               sindx;
+  int               rindx;
+  int               bytes_rec;
+  PVMI_CACHE_ENTRY *cacheentry;
+  VMI_virt_addr_t   rhandleaddr;
+} CMI_VMI_Receive_Handle_Persistent_T;
+
+
+typedef struct
+{
+  CMI_VMI_Receive_Handle_Type_T  receive_handle_type;
+
+  union
+  {
+    CMI_VMI_Receive_Handle_RDMA_T       rdma;
+    CMI_VMI_Receive_Handle_Persistent_T persistent;
+  } data;
+} CMI_VMI_Receive_Handle_T;
+
+
+typedef struct
+{
+  int                    index;
+  BOOLEAN                allocated;
+  int                    refcount;
+  char                  *msg;
+  int                    msgsize;
+  CMI_VMI_Handle_Type_T  handle_type;
+
+  union
+  {
+    CMI_VMI_Send_Handle_T    send;
+    CMI_VMI_Receive_Handle_T receive;
+  } data;
+} CMI_VMI_Handle_T;
+
 
 typedef struct
 {
@@ -440,7 +446,7 @@ void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT conn, UINT32 rdmasz,
 
 int CMI_VMI_CRM_Register (PUCHAR key, int numProcesses, BOOLEAN reg);
 BOOLEAN CMI_VMI_Open_Connections (PUCHAR synckey);
-int CMI_VMI_Get_RDMA_Receive_Context ();
+CMI_VMI_Handle_T *CMI_VMI_Allocate_Handle ();
 void *CMI_VMI_CmiAlloc (int size);
 void CMI_VMI_CmiFree (void *ptr);
 #if CMK_BROADCAST_SPANNING_TREE
@@ -471,7 +477,7 @@ void CmiReleaseCommHandle (CmiCommHandle cmicommhandle);
 
 BOOLEAN CRMInit ();
 SOCKET createSocket(char *hostName, int port, int *localAddr);
-BOOLEAN CRMRegister (char *key, ULONG numPE, int shutdownPort,
+BOOLEAN CRMRegister (PUCHAR key, ULONG numPE, int shutdownPort,
 		     SOCKET *clientSock, int *clientAddr, PCRM_Msg *msg2);
 BOOLEAN CRMParseMsg (PCRM_Msg msg, int rank, int *nodeIP,
 		     int *shutdownPort, int *nodePE);
