@@ -13,7 +13,7 @@
  * Grid (mesh) based router
  ***********************************************************/
 #include "gridrouter.h"
-#include "globals.h"
+//#include "globals.h"
 
 //#define NULL 0
 
