@@ -60,6 +60,7 @@ void Strategy::pup(PUP::er &p){
     p | aid;
     p | gid;
     p | nIndices;
+    p | nsrcpes;
     
     if(p.isUnpacking()) {
         if(nIndices > 0) 
@@ -68,10 +69,14 @@ void Strategy::pup(PUP::er &p){
             srcpelist = new int[nsrcpes];
     }
     
+    //Unable to get this going, 
+    //cannot pack a list of indices!!! Check with Orion
+    //Packing them as bytes
     if(nIndices > 0)
-        p(elements, nIndices);
-    else
-        elements = NULL;
+        p((char *)elements, nIndices * sizeof(CkArrayIndexMax));    
+
+    if(nsrcpes >0) 
+        p(srcpelist, nsrcpes);
 }
 
 CharmMessageHolder::CharmMessageHolder(char * msg, int proc) {
