@@ -34,7 +34,7 @@ void BaseLB::unregister() {
 }
 
 #else
-BaseLB::BaseLB(int seq) {}
+BaseLB::BaseLB(const CkLBOptions &) {}
 void BaseLB::unregister() {}
 #endif
 
