@@ -209,6 +209,14 @@ class CkLocRec_remote;
 /** This is the superclass of all migratable parallel objects.
  *  Currently, that's just array elements.
  */
+#if CMK_OUT_OF_CORE
+#  include "conv-ooc.h"
+extern CooPrefetchManager CkArrayElementPrefetcher;
+// If this flag is set, this creation/deletion is just 
+//   a "fake" constructor/destructor call for prefetching.
+CkpvExtern(int,CkSaveRestorePrefetch);
+#endif
+
 class CkMigratable : public Chare {
 private:
   CkLocRec_local *myRec;
@@ -271,6 +279,15 @@ public:
   void AtSync(void) { ResumeFromSync();}
 public:
   void ckFinishConstruction(void) { }
+#endif
+#if CMK_OUT_OF_CORE
+private:
+  friend class CkLocMgr;
+  friend int CkArrayPrefetch_msg2ObjId(void *msg);
+  friend void CkArrayPrefetch_writeToSwap(FILE *swapfile,void *objptr);
+  friend void CkArrayPrefetch_readFromSwap(FILE *swapfile,void *objptr);
+  int prefetchObjID; //From CooRegisterObject
+  CmiBool isInCore; //If true, the object is present in memory
 #endif
 };
 
