@@ -26,3 +26,4 @@ web:
 
 clean:
 	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) clean) || exit 1; done
+	rm -fr ps pdf html
