@@ -205,7 +205,7 @@ void ampi_waitall(int *count, int *request, int *status, int *ierr)
 
 void ampi_testall(int *count, int *request, int *flag, int *status, int *ierr)
 {
-  *ierr = AMPI_TestAll(*count, (AMPI_Request*) request, flag, 
+  *ierr = AMPI_Testall(*count, (AMPI_Request*) request, flag, 
       (AMPI_Status*) status);
 }
 
@@ -380,7 +380,7 @@ void ampi_abort(int *comm, int *errorcode, int *ierr)
 
 void ampi_get_count(int *sts, int *dtype, int *cnt, int *ierr)
 {
-  *ierr = AMPI_Get_count(sts, *dtype, cnt);
+  *ierr = AMPI_Get_count((AMPI_Status*) sts, *dtype, cnt);
 }
 
 void ampi_print(char *str, int len)

@@ -82,6 +82,7 @@ int AMPI_Iprobe(int src, int tag, AMPI_Comm comm, int *flag, AMPI_Status *sts);
 int AMPI_Waitall(int count, AMPI_Request *request, AMPI_Status *sts);
 int AMPI_Test(AMPI_Request *request, int *flag, AMPI_Status *sts);
 int AMPI_Testall(int count, AMPI_Request *request, int *flag, AMPI_Status *sts);
+int AMPI_Get_count(AMPI_Status *sts, AMPI_Datatype dtype, int *count);
 int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
                   AMPI_Comm comm, AMPI_Request *req);
 int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
