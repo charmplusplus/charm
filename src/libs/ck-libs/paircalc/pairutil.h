@@ -33,43 +33,47 @@ struct ComplexPt {
   }
 };
 
-
-class complex : public fftw_complex {
-public:
-  inline complex() {re=0; im=0;}
-  explicit complex(fftw_real r) {re=r; im=0;}
-  complex(fftw_real r,fftw_real i) {re=r; im=i;}
-  double getMagSqr(void) const { return re*re+im*im; }
-  inline complex operator+(complex a) { return complex(re+a.re,im+a.im); }
-  inline complex conj(void) { return complex(re, -im); }
-  inline void operator+=(complex a) { re+=a.re; im+=a.im; }
-
-  inline complex operator*(double a) { return complex(re*a, im*a); }  
-  inline bool notzero() const { return( (0.0 != re) ? true : (0.0 != im)); }
-  inline void operator*=(complex a) {        
-    double treal, tim;
-    treal = re * a.re - im * a.im;
-    tim = re * a.im + im * a.re;
-    re = treal;
-    im = tim;
-  }
-  inline complex operator*(complex a) {
-    return complex( re * a.re - im * a.im, re * a.im + im * a.re); }
-  void pup(PUP::er &p) {
-    p|re;
-    p|im;
-  }
-
-  void * operator new[] (size_t size){
-    void *buf = CmiAlloc(size);
-    //memset(buf, 0, size);
-    return buf;
-  }
-  
-  void operator delete[] (void *buf){
-    CmiFree(buf);    
-  }
+struct complex {
+    double re;
+    double im;
+    
+    inline complex() {re=0; im=0;}
+    explicit complex(fftw_real r) {re=r; im=0;}
+    inline complex(fftw_real r,fftw_real i) {re=r; im=i;}
+    inline double getMagSqr(void) const { return re*re+im*im; }
+    inline complex operator+(complex a) { return complex(re+a.re,im+a.im); }
+    inline complex conj(void) { return complex(re, -im); }
+    inline void operator+=(complex a) { re+=a.re; im+=a.im; }
+    
+    inline complex operator*(double a) { return complex(re*a, im*a); }  
+    inline bool notzero() const { return( (0.0 != re) ? true : (0.0 != im)); }
+    inline void operator*=(complex a) {        
+        double treal, tim;
+        treal = re * a.re - im * a.im;
+        tim = re * a.im + im * a.re;
+        re = treal;
+        im = tim;
+    }
+    inline complex operator*(complex a) {
+        return complex( re * a.re - im * a.im, re * a.im + im * a.re); }
+    
+    void pup(PUP::er &p) {
+        p|re;
+        p|im;
+    }
+    
+    void * operator new[] (size_t size){
+        void *buf = CmiAlloc(size);
+        //memset(buf, 0, size);
+        return buf;
+    }
+    
+    void operator delete[] (void *buf){
+        CmiFree(buf);    
+    }
 };
+
+
 
 #endif //__PAIRUTIL_H__
 
