@@ -1,22 +1,13 @@
 #include <stdio.h>
 #include "converse.h"
-#define PERIOD 10
-
-typedef struct requestmsg_s {
-  char header[CmiMsgHeaderSizeBytes];
-  int pe;
-} requestmsg;
+#define PERIOD 100
+#define MAXMSGBFRSIZE 100000
 
 CpvDeclare(int, CldHandlerIndex);
 CpvDeclare(int, CldBalanceHandlerIndex);
 CpvDeclare(int, CldRelocatedMessages);
 CpvDeclare(int, CldLoadBalanceMessages);
 CpvDeclare(int, CldMessageChunks);
-CpvDeclare(int, CldRequestExists);
-CpvDeclare(int, CldNoneSentHandlerIndex);
-CpvDeclare(int, CldRequestResponseHandlerIndex);
-
-void CldNoneSent(int pe);
 
 void CldMultipleSend(int pe, int numToSend)
 {
@@ -75,49 +66,19 @@ void CldMultipleSend(int pe, int numToSend)
   free(msgSizes);
 }
 
-void CldRequestTokens()
+void CldDistributeTokens()
 {
   int destPe = (CmiMyPe()+1)%CmiNumPes();
-  requestmsg msg;
-
-  msg.pe = CmiMyPe();
-  CmiSetHandler(&msg, CpvAccess(CldRequestResponseHandlerIndex));
-  CmiSyncSend(destPe, sizeof(requestmsg), &msg);
-  CpvAccess(CldLoadBalanceMessages)++;
-  CpvAccess(CldRequestExists) = 0;
-}
-
-void CldRequestResponseHandler(requestmsg *msg)
-{
   int numToSend;
 
   numToSend = CsdLength() / 2;
   if (numToSend > CldCountTokens())
-    numToSend = CldCountTokens();
+    numToSend = CldCountTokens() / 2;
 
   if (numToSend > 0)
-    CldMultipleSend(msg->pe, numToSend);
-  else 
-    CldNoneSent(msg->pe);
-  free(msg);
-}       
-  
-void CldNoneSent(int pe)
-{
-  requestmsg msg;
+    CldMultipleSend(destPe, numToSend);
 
-  msg.pe = CmiMyPe();
-  CmiSetHandler(&msg, CpvAccess(CldNoneSentHandlerIndex));
-  CmiSyncSend(pe, sizeof(requestmsg), &msg);
-}
-
-void CldNoneSentHandler(requestmsg *msg)
-{
-  free(msg);
-  if (!CpvAccess(CldRequestExists)) {
-    CpvAccess(CldRequestExists) = 1;
-    CcdCallFnAfter((CcdVoidFn)CldRequestTokens, NULL, PERIOD);
-  }
+  CcdCallFnAfter((CcdVoidFn)CldDistributeTokens, NULL, PERIOD);
 }
 
 void CldBalanceHandler(void *msg)
@@ -171,36 +132,15 @@ void CldEnqueue(int pe, void *msg, int infofn)
   }
 }
 
-void CldNotifyIdle()
-{
-  if (!CpvAccess(CldRequestExists))
-    CldRequestTokens();
-}
-
-void CldNotifyBusy()
-{
-}
-
 void CldHelpModuleInit()
 {
-  CpvInitialize(int, CldRequestExists);
   CpvInitialize(int, CldBalanceHandlerIndex);
-  CpvInitialize(int, CldNoneSentHandlerIndex);
-  CpvInitialize(int, CldRequestResponseHandlerIndex);
 
   CpvAccess(CldBalanceHandlerIndex) = 
     CmiRegisterHandler(CldBalanceHandler);
-  CpvAccess(CldNoneSentHandlerIndex) = 
-    CmiRegisterHandler(CldNoneSentHandler);
-  CpvAccess(CldRequestResponseHandlerIndex) = 
-    CmiRegisterHandler(CldRequestResponseHandler);
-  CpvAccess(CldRequestExists) = 0;
 
-  if (CmiNumPes() > 1) {
-    CldRequestTokens();
-    CsdSetNotifyIdle(CldNotifyIdle, CldNotifyBusy);
-    CsdStartNotifyIdle();
-  }
+  if (CmiNumPes() > 1)
+    CldDistributeTokens();
 }
 
 void CldModuleInit()
