@@ -1,5 +1,5 @@
 module comlib {
-  initproc void initComlibManager();
+  //  initproc void initComlibManager();
 
   message ComlibDummyMsg;
   //  message PrioMsg;

@@ -12,25 +12,30 @@ void PrioStreaming::insertMessage(CharmMessageHolder *cmsg) {
                  PERIOD, bufferMax);
 
     int pe=cmsg->dest_proc;
-    streamingMsgBuf[pe].enq(cmsg);
-    streamingMsgCount[pe]++;
-    if (streamingMsgCount[pe] > bufferMax) {
-        flushPE(pe);
-        return;
-    }
-    
     char* msg = cmsg->getCharmMessage();
     envelope *env = UsrToEnv(msg);
     int msg_prio = *(int*)env->getPrioPtr();
-    
+
+    if(streamingMsgCount[pe] == 0) 
+        minPrioVec[pe] = msg_prio;
+    else if(minPrioVec[pe] > msg_prio)
+        minPrioVec[pe] = msg_prio;
+
+    streamingMsgBuf[pe].enq(cmsg);
+    streamingMsgCount[pe]++;   
+
     if(msg_prio <= basePriority)
+        flushPE(pe);
+
+    if (streamingMsgCount[pe] > bufferMax) 
         flushPE(pe);
 }
 
 void PrioStreaming::pup(PUP::er &p){
 
     StreamingStrategy::pup(p);
-
     p | basePriority;
 
+    if(p.isUnpacking())
+        minPrioVec.resize(CkNumPes());
 }

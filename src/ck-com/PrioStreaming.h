@@ -9,6 +9,7 @@
 class PrioStreaming : public StreamingStrategy {
  protected:
     int basePriority;
+    CkVec<int> minPrioVec;
     
  public:
     /**
@@ -31,7 +32,14 @@ class PrioStreaming : public StreamingStrategy {
     
     virtual void insertMessage(CharmMessageHolder *msg);
 
+    //If new priority is greater than current priority, 
+    //then flush all queues which have relatively high priority messages
     inline void setBasePriority(int p) {
+        if(p > basePriority) {
+            for(int count =0; count < CkNumPes(); count++)
+                if(minPrioVec[count] <= p)
+                    flushPE(count);
+        }        
         basePriority = p;
     }
 

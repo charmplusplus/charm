@@ -65,6 +65,8 @@ ComlibManager::ComlibManager(){
 
 void ComlibManager::init(){
     
+    initComlibManager();
+
     PUPable_reg(CharmStrategy);
     PUPable_reg(CharmMessageHolder);
     
