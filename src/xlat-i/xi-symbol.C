@@ -248,7 +248,8 @@ Module::generate()
   botname<<name<<".def.h";
   ofstream decl(topname.get_string()), def(botname.get_string());
   if(decl==0 || def==0) {
-    cerr<<"Cannot open "<<topname<<"or "<<botname<<" for writing!!\n";
+    cerr<<"Cannot open "<<topname.get_string()<<"or "
+	<<botname.get_string()<<" for writing!!\n";
     exit(1);
   }
   decl<<declstr.get_string();
@@ -984,7 +985,7 @@ XStr Entry::voidParamDecl(void)
     return "";
 }
 
-XStr Entry::epIdx(int include__idx_=1)
+XStr Entry::epIdx(int include__idx_)
 {
   XStr str;
   if(include__idx_) str << "__idx_";

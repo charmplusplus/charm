@@ -101,6 +101,7 @@ class TypeList : public Printable {
 
 class EnType : virtual public Type {
   public:
+    virtual void print(XStr&) = 0;
     virtual void genMsgProxyName(XStr& str) { 
       cerr << "Illegal genMsgProxy call?\n"; 
       abort(); 
