@@ -39,6 +39,7 @@ int main(int argc,char **argv) {
 #else /* FEM_ALONE version: just call F90 init routine */
 			FTN_NAME(INIT,init)();
 #endif
+			serialMesh=FEM_Mesh_default_write();
 		}
 		parallelMesh=FEM_Mesh_broadcast(serialMesh,0,(FEM_Comm_t)comm);
 		if (myPart==0) FEM_Mesh_deallocate(serialMesh);
