@@ -58,7 +58,7 @@ CpvExtern(int, RecvmsgHandle);
 ** If nothing else is going on anyway, we might as well flush the buffers
 ** now instead of waiting for the flush period.
 */
-void idle_flush_handler (void *ptr)
+void idle_flush_handler (void *ptr, double curT)
 {
   ComlibPrintf ("[%d] idle_flush_handler() invoked.\n", CkMyPe());
 
@@ -75,7 +75,7 @@ void idle_flush_handler (void *ptr)
 ** calls RegisterPeriodicFlush() to do so after it finishes flushing
 ** buffers.
 */
-void periodic_flush_handler (void *ptr)
+void periodic_flush_handler (void *ptr, double curT)
 {
   ComlibPrintf ("[%d] periodic_flush_handler() invoked.\n", CkMyPe());
 
