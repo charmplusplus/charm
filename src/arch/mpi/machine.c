@@ -302,6 +302,11 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 
 void ConverseExit(void)
 {
+  while(!CmiAllAsyncMsgsSent()) {
+    PumpMsgs();
+    CmiReleaseSentMessages();
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
   ConverseCommonExit();
   MPI_Finalize();
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
