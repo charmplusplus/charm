@@ -1,8 +1,10 @@
-#DIRS=comlib commlib_stream
+# for bigsim only
+DIRS=comlib commlib_stream
 # BROKEN: pipeBroadcast
 
 .PHONY: test $(DIRS)
 
+# BROKEN: commlib_stream
 test: comlib 
 
 comlib: 
