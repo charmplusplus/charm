@@ -644,6 +644,7 @@ void CmiStateInit(int pe, int rank, CmiState state)
 {
   state->pe = pe;
   state->rank = rank;
+  if (pe==-1) return; /* Communications thread */
   state->recv = PCQueueCreate();
   state->localqueue = CdsFifo_Create();
   CmiIdleLock_init(&state->idle);
@@ -928,13 +929,6 @@ void CmiYield(void)
 
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
-static DWORD WINAPI comm_thread(LPVOID dummy)
-{  
-  if (Cmi_charmrun_fd!=-1)
-    while (1) CommunicationServer(5);
-  return 0;
-}
-
 static DWORD WINAPI call_startfn(LPVOID vindex)
 {
   int index = (int)vindex;
@@ -943,7 +937,12 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
   if(Cmi_state_key == 0xFFFFFFFF) PerrorExit("TlsAlloc");
   if(TlsSetValue(Cmi_state_key, (LPVOID)state) == 0) PerrorExit("TlsSetValue");
 
-  ConverseRunPE(0);
+  if (index<Cmi_mynodesize)
+	  ConverseRunPE(0); /*Regular worker thread*/
+  else { /*Communication thread*/
+	  if (Cmi_charmrun_fd!=-1)
+		  while (1) CommunicationServer(5);
+  } 
   return 0;
 }
 
@@ -991,12 +990,14 @@ static void CmiStartThreads(char **argv)
   if(Cmi_state_key == 0xFFFFFFFF) PerrorExit("TlsAlloc main");
   
   Cmi_state_vector =
-    (CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
+    (CmiState)calloc(Cmi_mynodesize+1, sizeof(struct CmiStateStruct));
   
   for (i=0; i<Cmi_mynodesize; i++)
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
+  /*Create a fake state structure for the comm. thread*/
+  CmiStateInit(-1,Cmi_mynodesize,CmiGetStateN(Cmi_mynodesize));
   
-  for (i=1; i<Cmi_mynodesize; i++) {
+  for (i=1; i<=Cmi_mynodesize; i++) {
     if((thr = CreateThread(NULL, 0, call_startfn, (LPVOID)i, 0, &threadID)) 
        == NULL) PerrorExit("CreateThread");
     CloseHandle(thr);
@@ -1004,10 +1005,6 @@ static void CmiStartThreads(char **argv)
   
   if(TlsSetValue(Cmi_state_key, (LPVOID)Cmi_state_vector) == 0) 
     PerrorExit("TlsSetValue");
-  
-  if((thr = CreateThread(NULL, 0, comm_thread, 0, 0, &threadID)) == NULL) 
-     PerrorExit("CreateThread");
-  CloseHandle(thr);
 }
 
 #endif
@@ -1081,17 +1078,20 @@ void CmiCommUnlock(void) {
 }
 #endif
 
-static void comm_thread(void)
-{
-  while (1) CommunicationServer(5);
-}
-
 static void *call_startfn(void *vindex)
 {
   int index = (int)vindex;
   CmiState state = Cmi_state_vector + index;
   pthread_setspecific(Cmi_state_key, state);
-  ConverseRunPE(0);
+
+  if (index<Cmi_mynodesize) 
+	  ConverseRunPE(0); /*Regular worker thread*/
+  else 
+  { /*Communication thread*/
+	  if (Cmi_charmrun_fd!=-1)
+		  while (1) CommunicationServer(5);
+  }
+  
   return 0;
 }
 
@@ -1106,10 +1106,13 @@ static void CmiStartThreads(char **argv)
 
   pthread_key_create(&Cmi_state_key, 0);
   Cmi_state_vector =
-    (CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
+    (CmiState)calloc(Cmi_mynodesize+1, sizeof(struct CmiStateStruct));
   for (i=0; i<Cmi_mynodesize; i++)
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
-  for (i=1; i<Cmi_mynodesize; i++) {
+  /*Create a fake state structure for the comm. thread*/
+  CmiStateInit(-1,Cmi_mynodesize,CmiGetStateN(Cmi_mynodesize));
+
+  for (i=1; i<=Cmi_mynodesize; i++) {
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     ok = pthread_create(&pid, &attr, call_startfn, (void *)i);
@@ -1117,8 +1120,6 @@ static void CmiStartThreads(char **argv)
     pthread_attr_destroy(&attr);
   }
   pthread_setspecific(Cmi_state_key, Cmi_state_vector);
-  ok = pthread_create(&pid, NULL, (void *(*)(void *))comm_thread, 0);
-  if (ok<0) PerrorExit("pthread_create comm"); 
 }
 
 #endif
