@@ -548,12 +548,12 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
     //multicastGrpMsg *newm = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
 //    CProxyElement_ArrayBase ap(msg->aid, entry->localElem[i]);
 //    ap.ckSend((CkArrayMessage *)newm, msg->ep);
-    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[i], CmiFalse);
+    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[i], CK_MSG_KEEP);
   }
   if (nLocal) {
 //    CProxyElement_ArrayBase ap(msg->aid, entry->localElem[nLocal-1]);
 //    ap.ckSend((CkArrayMessage *)msg, msg->ep);
-    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[nLocal-1], CmiTrue);
+    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[nLocal-1]);
   }
   else {
     CkAssert (entry->rootSid.get_pe() == CkMyPe());
