@@ -53,8 +53,9 @@ public:
                             // making projections output look funny
 
   void ReceiveStats(CkMarshalledCLBStatsMessage &msg);	// Receive stats on PE 0
-  void ResumeClients(int);                     // Resuming clients needs
+  void ResumeClients(int);                      // Resuming clients needs
 	                                        // to be resumed via message
+  void ResumeClients(CkReductionMsg *);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
 
   // manual predictor start/stop

@@ -17,9 +17,25 @@
 #include "lbdb.h"
 
 // command line options
-extern double _autoLbPeriod;		// in seconds
-extern int _lb_debug;
-extern int _lb_ignoreBgLoad;
+class CkLBArgs
+{
+private:
+  double _autoLbPeriod;		// in seconds
+  int _lb_debug;
+  int _lb_ignoreBgLoad;
+  int _lb_syncResume;
+public:
+  CkLBArgs() {
+    _autoLbPeriod = 1.0;
+    _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = 0;
+  }
+  double & lbperiod() { return _autoLbPeriod; }
+  int & debug() { return _lb_debug; }
+  int & ignoreBgLoad() { return _lb_ignoreBgLoad; }
+  int & syncResume() { return _lb_syncResume; }
+};
+extern CkLBArgs _lb_args;
+
 extern int _lb_predict;
 extern int _lb_predict_delay;
 extern int _lb_predict_window;
@@ -51,10 +67,7 @@ CkpvExtern(int, hasNullLB);
 CkpvExtern(int, lbdatabaseInited);
 
 // LB options, mostly controled by user parameter
-extern double _autoLbPeriod;
 extern "C" char * _lbtopo;
-extern int _lb_debug;
-extern int _lb_ignoreBgLoad;
 
 typedef void (*LBCreateFn)();
 typedef BaseLB * (*LBAllocFn)();

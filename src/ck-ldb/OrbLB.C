@@ -254,7 +254,7 @@ void OrbLB::mapPartitionsToNodes()
   delete [] pool;
 #endif
 
-  if (_lb_debug) {
+  if (_lb_args.debug()) {
     CmiPrintf("partitions to nodes mapping: ");
     for (i=0; i<P; i++) CmiPrintf("%d ", partitions[i].node);
     CmiPrintf("\n");
@@ -344,7 +344,7 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
   // recursively divide
   rec_divide(npartition, top_partition);
 
-  if (_lb_debug) {
+  if (_lb_args.debug()) {
     CmiPrintf("After partitioning: \n");
     for (i=0; i<P; i++) {
       CmiPrintf("[%d] (%d,%d,%d) (%d,%d,%d) load:%f count:%d\n", i, partitions[i].origin[0], partitions[i].origin[1], partitions[i].origin[2], partitions[i].corner[0], partitions[i].corner[1], partitions[i].corner[2], partitions[i].load, partitions[i].count);

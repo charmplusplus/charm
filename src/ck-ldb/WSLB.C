@@ -217,7 +217,7 @@ WSLBStatsMsg* WSLB::AssembleStats()
   msg->vacate_me = vacate;
   msg->usage = usage;
 
-  if (_lb_debug) {
+  if (_lb_args.debug()) {
     CkPrintf(
       "Proc %d speed=%d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f Obj=%f %f\n",
       CkMyPe(),msg->proc_speed,msg->total_walltime,msg->total_cputime,
@@ -529,7 +529,7 @@ LBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 
       const int me = CkMyPe();
       // Apparently we can give this object to this processor
-      if (_lb_debug)
+      if (_lb_args.debug())
       CkPrintf("[%d] Obj %d of %d migrating from %d to %d\n",
 	       CkMyPe(),obj->Id,myStats.obj_data_sz,me,p->Id);
 

@@ -30,9 +30,7 @@ CkpvDeclare(int, hasNullLB);         /**< true if NullLB is created */
 CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
 
 // command line options
-double _autoLbPeriod = 1.0;		// in seconds
-int _lb_debug=0;
-int _lb_ignoreBgLoad=0;
+CkLBArgs _lb_args;
 int _lb_predict=0;
 int _lb_predict_delay=10;
 int _lb_predict_window=20;
@@ -174,7 +172,7 @@ void _loadbalancerInit()
 
   // set up init value for LBPeriod time in seconds
   // it can also be set calling LDSetLBPeriod()
-  CmiGetArgDoubleDesc(argv,"+LBPeriod", &_autoLbPeriod,"specify the period for automatic load balancing in seconds (for non atSync mode)");
+  CmiGetArgDoubleDesc(argv,"+LBPeriod", &_lb_args.lbperiod(),"specify the period for automatic load balancing in seconds (for non atSync mode)");
 
   // now called in cldb.c: CldModuleGeneralInit()
   // registerLBTopos();
@@ -216,14 +214,15 @@ void _loadbalancerInit()
   LBSimulation::simProcs = 0;
   CmiGetArgIntDesc(argv, "+LBSimProcs", &LBSimulation::simProcs, "Number of target processors.");
 
-  _lb_debug = CmiGetArgFlagDesc(argv, "+LBDebug", "Turn on LB debugging printouts");
-  _lb_ignoreBgLoad = CmiGetArgFlagDesc(argv, "+LBObjOnly", "Load balancer only balance migratable object without considering the background load, etc");
+  _lb_args.syncResume() = CmiGetArgFlagDesc(argv, "+LBSyncResume", "LB performs a barrier after migration is finished globally");
+  _lb_args.debug() = CmiGetArgFlagDesc(argv, "+LBDebug", "Turn on LB debugging printouts");
+  _lb_args.ignoreBgLoad() = CmiGetArgFlagDesc(argv, "+LBObjOnly", "Load balancer only balance migratable object without considering the background load, etc");
   if (CkMyPe() == 0) {
-    if (_lb_debug) {
-      CmiPrintf("LB> Load balancer running with verbose mode, period time: %gs.\n", _autoLbPeriod);
+    if (_lb_args.debug()) {
+      CmiPrintf("LB> Load balancer running with verbose mode, period time: %gs.\n", _lb_args.lbperiod());
       CkPrintf("LB> Topology %s\n", _lbtopo);
     }
-    if (_lb_ignoreBgLoad)
+    if (_lb_args.ignoreBgLoad())
       CmiPrintf("LB> Load balancer only balance migratable object.\n");
     if (LBSimulation::doSimulation)
       CmiPrintf("LB> Load balancer running in simulation mode.\n");

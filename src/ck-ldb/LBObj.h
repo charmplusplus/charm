@@ -22,10 +22,10 @@ class LBObj
 friend class LBDB;
 
 public:
-  LBObj(LBDB *_parentDB, const LDObjHandle &_h, void *usr_ptr = NULL, CmiBool _migratable=CmiTrue) {
+  LBObj(LBDB *_parentDB, const LDObjHandle &_h, void *usr_ptr = NULL, CmiBool _migratable=CmiTrue, CmiBool _ignoreArrival = CmiFalse) {
     data.handle = _h;
     data.migratable = _migratable;
-    data.ignoreArrival = CmiFalse;
+    data.ignoreArrival = _ignoreArrival;
     data.cpuTime = 0.;
     data.wallTime = 0.;
     userData = usr_ptr;

@@ -335,7 +335,7 @@ int RefinerComm::refine()
     }
 
     if (bestCompute) {
-      if (_lb_debug)
+      if (_lb_args.debug())
         CkPrintf("Assign: [%d] with load: %f from %d to %d \n",
       	       bestCompute->Id, bestCompute->load, 
                donor->Id, bestP->Id);
@@ -343,7 +343,7 @@ int RefinerComm::refine()
       assign(bestCompute, bestP);
 
       // show the load
-      if (_lb_debug)  printLoad();
+      if (_lb_args.debug())  printLoad();
 
       // update commnication
       computeAverage();
@@ -360,7 +360,7 @@ int RefinerComm::refine()
           lightProcessors->insert((InfoRecord *) &(processors[i]));
         }
       }
-      if (_lb_debug) CmiPrintf("averageLoad after assignment: %f\n", averageLoad);
+      if (_lb_args.debug()) CmiPrintf("averageLoad after assignment: %f\n", averageLoad);
     } else {
       finish = 0;
       break;
@@ -411,10 +411,10 @@ void RefinerComm::Refine(int count, CentralLB::LDStats* stats,
   processorCommCost();
 
   removeComputes();
-  if (_lb_debug)  printLoad();
+  if (_lb_args.debug())  printLoad();
 
   computeAverage();
-  if (_lb_debug) CmiPrintf("averageLoad: %f\n", averageLoad);
+  if (_lb_args.debug()) CmiPrintf("averageLoad: %f\n", averageLoad);
 
   multirefine();
 

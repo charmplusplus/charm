@@ -21,7 +21,7 @@
   it does some tracking about how many lb strategies are created.
   it also defines some common functions.
 */
-class BaseLB: public IrrGroup
+class BaseLB: public CBase_BaseLB
 {
 protected:
   int  seqno;
@@ -34,7 +34,7 @@ private:
   void initLB(const CkLBOptions &);
 public:
   BaseLB(const CkLBOptions &opt)  { initLB(opt); }
-  BaseLB(CkMigrateMessage *m):IrrGroup(m) {}
+  BaseLB(CkMigrateMessage *m):CBase_BaseLB(m) {}
   virtual ~BaseLB();
 
   void unregister(); 

@@ -100,14 +100,14 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
 
     Node* from_node = find_node(newedgedata.sender);
     if (from_node == 0) {
-      if (!_lb_ignoreBgLoad) 
+      if (!_lb_args.ignoreBgLoad()) 
 	CkPrintf("ObjGraph::find_node: Didn't locate from node match!\n");
       continue;
     }
 
     Node* to_node = find_node(newedgedata.receiver.get_destObj());
     if (to_node == 0) {
-      if (!_lb_ignoreBgLoad) 
+      if (!_lb_args.ignoreBgLoad()) 
         CkPrintf("ObjGraph::find_node: Didn't locate to node match!\n");
       continue;
     }

@@ -62,7 +62,7 @@ LBDB::LBDB(): useBarrier(CmiTrue)
     obj_walltime = obj_cputime = 0;
     startLBFn_count = 0;
     predictCBFn = NULL;
-    batsync.init(this, _autoLbPeriod);		// original 1.0 second
+    batsync.init(this, _lb_args.lbperiod());		// original 1.0 second
 }
 
 LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData, 
@@ -192,7 +192,7 @@ int LBDB::ObjDataCount()
 {
   int nitems=0;
   int i;
-  if (_lb_ignoreBgLoad) {
+  if (_lb_args.ignoreBgLoad()) {
   for(i=0; i < objCount; i++)
     if (objs[i] && (objs[i])->data.migratable)
       nitems++;
@@ -207,7 +207,7 @@ int LBDB::ObjDataCount()
 
 void LBDB::GetObjData(LDObjData *dp)
 {
-  if (_lb_ignoreBgLoad) {
+  if (_lb_args.ignoreBgLoad()) {
   for(int i = 0; i < objs.length(); i++) {
     LBObj* obj = objs[i];
     if ( obj && obj->data.migratable)

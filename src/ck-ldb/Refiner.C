@@ -281,7 +281,7 @@ int Refiner::multirefine()
   double dMaxOverload = maxOverload * overloadStep + overloadStart;
   int curOverload;
   int refineDone = 0;
-  if (_lb_debug)
+  if (_lb_args.debug())
     CmiPrintf("dMinOverload: %f dMaxOverload: %f\n", dMinOverload, dMaxOverload);
                                                                                 
   overLoad = dMinOverload;
@@ -303,7 +303,7 @@ int Refiner::multirefine()
       curOverload = (maxOverload + minOverload ) / 2;
                                                                                 
       overLoad = curOverload * overloadStep + overloadStart;
-      if (_lb_debug)
+      if (_lb_args.debug())
       CmiPrintf("Testing curOverload %d = %f [min,max]= %d, %d\n", curOverload, overLoad, minOverload, maxOverload);
       if (refine())
         maxOverload = curOverload;
@@ -353,7 +353,7 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
 	             next((Iterator *)&nextCompute);
     }
   }
-  if (_lb_debug) CkPrintf("Refiner: moving %d obejcts. \n", nmoves);
+  if (_lb_args.debug()) CkPrintf("Refiner: moving %d obejcts. \n", nmoves);
   delete [] computes;
   delete [] processors;
 };

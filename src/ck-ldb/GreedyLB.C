@@ -198,7 +198,7 @@ void GreedyLB::work(CentralLB::LDStats* stats, int count)
   HeapData *cpuData = BuildCpuArray(stats, count, &heapSize);
   HeapData *objData = BuildObjectArray(stats, count, &objCount);
 
-  if (_lb_debug) CkPrintf("In GreedyLB strategy\n",CkMyPe());
+  if (_lb_args.debug()) CkPrintf("In GreedyLB strategy\n",CkMyPe());
 
   heapSize--;
   for (obj=0; obj < objCount; obj++) {

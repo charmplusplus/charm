@@ -237,7 +237,7 @@ void CentralLB::buildStats()
        statsMsgsList[pe]=0;
     }
     statsData->n_migrateobjs = nmigobj;
-    if (_lb_debug) {
+    if (_lb_args.debug()) {
       CmiPrintf("n_obj:%d migratable:%d ncom:%d\n", nobj, nmigobj, ncom);
     }
 }
@@ -264,7 +264,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
     struct ProcStats &procStat = statsData->procs[pe];
     procStat.total_walltime = m->total_walltime;
     procStat.total_cputime = m->total_cputime;
-    if (_lb_ignoreBgLoad) {
+    if (_lb_args.ignoreBgLoad()) {
       procStat.idletime = 0.0;
       procStat.bg_walltime = 0.0;
       procStat.bg_cputime = 0.0;
@@ -287,7 +287,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
   DEBUGF(("[0] ReceiveStats from %d step: %d count: %d\n", pe, step(), stats_msg_count));
   const int clients = CkNumPes();
   if (stats_msg_count == clients) {
-    if (_lb_debug) 
+    if (_lb_args.debug()) 
       CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d\n",
                  lbName(), step(),start_lb_time, cur_ld_balancer);
 //    double strat_start_time = CmiWallTimer();
@@ -317,7 +317,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 
 //  calculate predicted load
 //  very time consuming though, so only happen when debugging is on
-    if (_lb_debug) {
+    if (_lb_args.debug()) {
       double minObjLoad, maxObjLoad;
       getPredictedLoad(statsData, clients, migrateMsg, migrateMsg->expectedLoad, minObjLoad, maxObjLoad, 1);
     }
@@ -449,29 +449,43 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 void CentralLB::MigrationDone(int balancing)
 {
 #if CMK_LBDB_ON
-  if (balancing && _lb_debug && CkMyPe() == cur_ld_balancer) {
-    double end_lb_time = CmiWallTimer();
-      CkPrintf("[%s] Load balancing step %d finished at %f\n",
-  	        lbName(), step(),end_lb_time);
-      double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
-      CkPrintf("[%s] duration %fs memUsage: LBManager:%dKB CentralLB:%dKB\n", 
-  	        lbName(), end_lb_time - start_lb_time,
-	        (int)lbdbMemsize, (int)(useMem()/1000));
-  }
   migrates_completed = 0;
   migrates_expected = -1;
   // clear load stats
   if (balancing) theLbdb->ClearLoads();
   // Increment to next step
   theLbdb->incStep();
-  thisProxy [CkMyPe()].ResumeClients(balancing);
+  // if sync resume, invoke a barrier
+  if (balancing && _lb_args.syncResume()) {
+    CkCallback cb(CkIndex_CentralLB::ResumeClients((CkReductionMsg*)NULL), 
+                  thisProxy);
+    contribute(0, NULL, CkReduction::sum_int, cb);
+  }
+  else 
+    thisProxy [CkMyPe()].ResumeClients(balancing);
 #endif
+}
+
+void CentralLB::ResumeClients(CkReductionMsg *msg)
+{
+  ResumeClients(1);
+  delete msg;
 }
 
 void CentralLB::ResumeClients(int balancing)
 {
 #if CMK_LBDB_ON
   DEBUGF(("Resuming clients on PE %d\n",CkMyPe()));
+  if (balancing && _lb_args.debug() && CkMyPe() == cur_ld_balancer) {
+    double end_lb_time = CmiWallTimer();
+    CkPrintf("[%s] Load balancing step %d finished at %f\n",
+  	      lbName(), step(),end_lb_time);
+    double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
+    CkPrintf("[%s] duration %fs memUsage: LBManager:%dKB CentralLB:%dKB\n", 
+  	      lbName(), end_lb_time - start_lb_time,
+	      (int)lbdbMemsize, (int)(useMem()/1000));
+  }
+
   theLbdb->ResumeClients();
   // switch to the next load balancer in the list
   if (balancing) theLbdb->nextLoadbalancer(seqno);
@@ -571,7 +585,7 @@ LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats,int count)
     delete item;
     migrateInfo[i] = 0;
   }
-  if (_lb_debug)
+  if (_lb_args.debug())
     CkPrintf("%s: %d objects migrating.\n", lbname, migrate_count);
   return msg;
 }
