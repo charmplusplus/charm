@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-24 01:54:40  jyelon
+ * Revision 2.4  1995-09-05 22:03:34  sanjeev
+ * removed call to CPlus_GetMagicNumber
+ *
+ * Revision 2.3  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.2  1995/07/22  23:45:15  jyelon
@@ -78,11 +81,7 @@ struct chare_block * mainChareBlock;
 	/* this is where we add the information for the main chare
 	block */
 	SetEnv_chareBlockPtr(env, (int) mainChareBlock);
-	if ( CsvAccess(MainChareLanguage) == CHARMPLUSPLUS )
-		SetEnv_chare_magic_number(env, 
-			CPlus_GetMagicNumber(mainChareBlock));
-	else
-		SetEnv_chare_magic_number(env, 
+	SetEnv_chare_magic_number(env, 
 			GetID_chare_magic_number(mainChareBlock->selfID));
 
 	CkCheck_and_Broadcast(env);
