@@ -329,7 +329,7 @@ public:
 	void ckSend(CkArrayMessage *m, int ep) ;
 
 //	ArrayElement *ckLocal(void) const;
-	inline CkSectionCookie &ckGetSectionCookie() {return _sid._cookie;}
+	inline CkSectionInfo &ckGetSectionInfo() {return _sid._cookie;}
 	inline CkSectionID &ckGetSectionID() {return _sid;}
         inline CkArrayIndexMax *ckGetArrayElements() const {return _sid._elems;}
 	inline int ckGetNumElements() const { return _sid._nElems; }
@@ -340,8 +340,8 @@ PUPmarshall(CProxySection_ArrayBase);
 	CK_DISAMBIG_ARRAY(super) \
 	inline void ckSend(CkArrayMessage *m, int ep) \
 	  { super::ckSend(m,ep); } \
-        inline CkSectionCookie &ckGetSectionCookie() \
-	  { return super::ckGetSectionCookie(); } \
+        inline CkSectionInfo &ckGetSectionInfo() \
+	  { return super::ckGetSectionInfo(); } \
         inline CkSectionID &ckGetSectionID() \
 	  { return super::ckGetSectionID(); } \
         inline CkArrayIndexMax *ckGetArrayElements() const \

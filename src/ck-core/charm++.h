@@ -275,34 +275,7 @@ public:
 };
 PUPmarshall(CkArrayID)
 
-class CkSectionCookie {
-public:
-  CkArrayID aid;
-  int pe;
-  void *val;    // point to mCastCookie
-  int redNo;
-public:
-  CkSectionCookie(): pe(-1), val(NULL), redNo(0) {}
-  CkSectionCookie(void *p): val(p), redNo(0) { pe = CkMyPe();};
-  CkSectionCookie(int e, void *p, int r):  pe(e), val(p), redNo(r) {}
-};
-PUPbytes(CkSectionCookie) //FIXME: write a real pup routine
-PUPmarshall(CkSectionCookie)
-
-class CkSectionID {
-public:
-  CkSectionCookie _cookie;
-  CkArrayIndexMax *_elems;
-  int _nElems;
-public:
-  CkSectionID(): _elems(NULL), _nElems(0) {}
-  CkSectionID(const CkSectionID &sid);
-  CkSectionID(const CkArrayID &aid, const CkArrayIndexMax *elems, const int nElems);
-  void operator=(const CkSectionID &);
-  ~CkSectionID();
-  void pup(PUP::er &p);
-};
-PUPmarshall(CkSectionID)
+#include "cksection.h"
 
 #include "ckcallback.h"
 
@@ -420,7 +393,7 @@ class CkDelegateMgr : public IrrGroup {
     virtual void ArrayCreate(int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a);
     virtual void ArraySend(int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a);
     virtual void ArrayBroadcast(int ep,void *m,CkArrayID a);
-    virtual void ArraySectionSend(int ep,void *m,CkArrayID a,CkSectionCookie &s);
+    virtual void ArraySectionSend(int ep,void *m,CkArrayID a,CkSectionInfo &s);
 };
 
 

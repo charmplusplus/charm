@@ -109,7 +109,7 @@ void CkDelegateMgr::ArrayBroadcast(int ep,void *m,CkArrayID a)
 	ap.ckBroadcast((CkArrayMessage *)m,ep);
 }
 
-void CkDelegateMgr::ArraySectionSend(int ep,void *m, CkArrayID a,CkSectionCookie &s)
+void CkDelegateMgr::ArraySectionSend(int ep,void *m, CkArrayID a,CkSectionInfo &s)
 {
 	CmiAbort("ArraySectionSend is not implemented!\n");
 /*
@@ -120,7 +120,7 @@ void CkDelegateMgr::ArraySectionSend(int ep,void *m, CkArrayID a,CkSectionCookie
 
 CkSectionID::CkSectionID(const CkArrayID &aid, const CkArrayIndexMax *elems, const int nElems): _nElems(nElems) {
   _cookie.aid = aid;
-  _cookie.pe = CkMyPe();
+  _cookie.get_pe() = CkMyPe();
   _elems = new CkArrayIndexMax[nElems];
   for (int i=0; i<nElems; i++) _elems[i] = elems[i];
 }

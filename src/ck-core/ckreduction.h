@@ -261,7 +261,7 @@ private:
 	int redNo;//The serial number of this reduction
 	int gcount;//Contribution to the global contributor count
         // for section multicast/reduction library
-        CkSectionCookie sid;   // section cookie for multicast
+        CkSectionInfo sid;   // section cookie for multicast
         char rebuilt;          // indicate if the multicast tree needs rebuilt
 	double dataStorage;//Start of data array (so it's double-aligned)
 
