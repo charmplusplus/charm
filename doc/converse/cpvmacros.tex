@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.8  1997-07-19 23:51:52  wilmarth
+% Revision 1.9  1997-07-29 20:55:30  milind
+% Updated machine model chapter and merged it with Cmi chapter.
+%
+% Revision 1.8  1997/07/19 23:51:52  wilmarth
 % Several changes to correct/clarify test were made.
 %
 % Revision 1.7  1997/06/26 05:16:22  jyelon
@@ -39,13 +42,8 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Machine Model and Global Variables}
-
-Converse treats the parallel machine as a collection of nodes, where
-each node is comprised of a number of processors that share memory.  In
-some cases, the number of processors per node may be exactly one.  In
-addition, each of the processors may have multiple threads running on
-them which share code and data but have different stacks.
+\section{Global Variables and Utility functions}
+\label{globalvars}
 
 Different vendors are not consistent about how they treat global and static
 variables.  Most vendors write C compilers in which global variables are
@@ -61,7 +59,7 @@ shared.  For these reasons, we added ``pseudoglobals'' to Converse.
 These act much like C global and static variables, except that you have
 explicit control over the degree of sharing.
 
-\section{Converse PseudoGlobals}
+\subsection{Converse PseudoGlobals}
 
 Three classes of pseudoglobal variables are supported: node-private,
 process-private, and thread-private variables.
@@ -179,7 +177,7 @@ File Module1.c
 \label{fig:cpv}
 \end{figure}
 
-\section{Utility Functions}
+\subsection{Utility Functions}
 \label{utility}
 
 To further simplify programming with global variables on shared memory
@@ -188,14 +186,74 @@ macros. \note{These functions are defined on machines other than
 shared-memory machines also, and have the effect of only one processor
 per node and only one thread per processor.}
 
+\function{int CmiMyNode()}
+\index{CmiMyNode}
+\desc{Returns the node number to which the calling processor belongs.}
+
+\function{int CmiNumNodes()}
+\index{CmiNumNodes}
+\desc{Returns number of nodes in the system. Note that this is not the
+same as \param{CmiNumPes()}.}
+
 \function{int CmiMyRank()}
 \index{CmiMyRank}
 \desc{Returns the rank of the calling processor within a shared memory node.}
+
+\function{int CmiNodeFirst(int node)}
+\index{CmiNodeFirst}
+\desc{Returns the processor number of the lowest ranked processor on node
+\param{node}}
+
+\function{int CmiNodeSize(int node)}
+\index{CmiNodeSize}
+\desc{Returns the number of processors that belong to the node \param{node}.}
+
+\function{int CmiNodeOf(int pe)}
+\index{CmiNodeOf}
+\desc{Returns the node number to which processor \param{pe} belongs. Indeed,
+\param{CmiMyNode()} is a utility macro that is aliased to 
+\param{CmiNodeOf(CmiMyPe())}.}
+
+\function{int CmiRankOf(int pe)}
+\index{CmiRankOf}
+\desc{Returns the rank of processor \param{pe} in the node to which it belongs.}
+
+\subsection{Node-level Locks and other Synchronization Mechanisms}
+\label{nodelocks}
 
 \function{void CmiNodeBarrier()}
 \index{CmiNodeBarrier}
 \desc{Provide barrier synchronization at the node level, i.e. all the 
 processors belonging to the node participate in this barrier.}
+
+\function{typedef McDependentType CmiNodeLock}
+\index{CmiNodeLock}
+\desc{This is the type for all the node-level locks in Converse.}
+
+\function{CmiNodeLock CmiCreateLock(void)}
+\index{CmiCreateLock}
+\desc{Creates, initializes and returns a new lock. Initially the
+lock is unlocked.}
+
+\function{void CmiLock(CmiNodeLock lock)}
+\index{CmiLock}
+\desc{Locks \param{lock}. If the \param{lock} has been locked by other
+processor, waits for \param{lock} to be unlocked.}
+
+\function{void CmiUnlock(CmiNodeLock lock)}
+\index{CmiUnlock}
+\desc{Unlocks \param{lock}. Processors waiting for the \param{lock} can
+then compete for acquiring \param{lock}.}
+
+\function{int CmiTryLock(CmiNodeLock lock)}
+\index{CmiTryLock}
+\desc{Tries to lock \param{lock}. If it succeeds in locking, it returns
+0. If any other processor has already acquired the lock, it returns 1.}
+
+\function{voi CmiDestroyLock(CmiNodeLock lock)}
+\index{CmiDestroyLock}
+\desc{Frees any memory associated with \param{lock}. It is an error to
+perform any operations with \param{lock} after a call to this function.}
 
 \function{void *CmiSvAlloc(int size)}
 \index{CmiSvAlloc}

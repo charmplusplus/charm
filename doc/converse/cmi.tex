@@ -2,7 +2,21 @@
 
 This chapter describes two of Converse's modules: the CMI, and the
 CSD.  Together, they serve to transmit messages and schedule the
-delivery of messages.
+delivery of messages. First, we describe the machine model assumed by
+Converse.
+
+\section{Machine Model}
+\label{model}
+
+Converse treats the parallel machine as a collection of nodes, where
+each node is comprised of a number of processors that share memory 
+In some cases, the number of processors per node may be exactly one  
+(e.g. Distributed memory multicomputers such as IBM SP.)  
+In addition, each of the processors may have multiple threads running on
+them which share code and data but have different stacks.
+Functions and macros are provided for handling shared memory across
+processors and querying node information. These are discussed in section
+\ref{globalvars}
 
 \section{Defining Handler Numbers}
 \label{handler1}
@@ -529,6 +543,8 @@ parallel program is being run.}
 caller resides. A processor Id is between \param{0} and \param{CmiNumPe()-1}.}
 
 Also see the calls in Section~\ref{utility}.  % put a ref here..??
+
+\input{cpvmacros}
 
 \section{Input/Output}
 
