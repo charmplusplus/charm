@@ -1,0 +1,34 @@
+message Packet;
+message NetInterfaceMsg;
+message InputBufferMsg;
+message ChannelMsg;
+message flowStart;
+message NicMsg;
+message SwitchMsg;
+
+poser NetInterface : sim adapt2 chpt {
+  entry NetInterface(NetInterfaceMsg *);
+  entry [event] void recvMsg(NicMsg *);
+  entry [event] void recvPacket(Packet *);
+  entry [event] void storeMsgInAdvance(NicMsg *);
+};
+	
+poser InputBuffer : sim adapt2 chpt {
+  entry InputBuffer(InputBufferMsg *);
+  entry [event] void recvPacket(Packet *);
+  entry [event] void recvRequest(Packet *);
+  entry [event] void restartBufferFlow(flowStart *);
+  entry [event] void checkVC(flowStart *);
+};
+
+poser Channel : sim adapt2 chpt {
+  entry Channel(ChannelMsg *);
+  entry [event] void recvPacket(Packet *);
+};
+
+poser Switch : sim adapt2 chpt {
+  entry Switch(SwitchMsg *);
+  entry [event] void recvPacket(Packet *);
+  entry [event] void updateCredits(flowStart *);
+  entry [event] void checkNextPacketInVc(flowStart *);
+};

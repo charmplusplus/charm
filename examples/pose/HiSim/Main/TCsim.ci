@@ -1,0 +1,17 @@
+message BGnodeMsg;
+message BGprocMsg;
+message TaskMsg;
+
+poser BGnode : sim adapt2 chpt {
+  entry BGnode(BGnodeMsg *);
+  // Event methods
+  entry [event] void recvOutgoingMsg(TaskMsg *);
+  entry [event] void recvIncomingMsg(TaskMsg *);
+};
+
+poser BGproc : sim adapt2 chpt {
+  entry BGproc(BGprocMsg *);
+  // Event methods
+  entry [event] void executeTask(TaskMsg *);
+};
+
