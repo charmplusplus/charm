@@ -117,7 +117,7 @@ void ComlibSectionInfo::getPeList(int _nElems,
     }   
 
     if(npes == 0) {
-        delete pelist;
+        delete [] pelist;
         pelist = NULL;
     }
 }
@@ -155,7 +155,7 @@ void ComlibSectionInfo::getRemotePelist(int nindices,
     }
     
     if(npes == 0) {
-        delete pelist;
+        delete [] pelist;
         pelist = NULL;
     }
 }

@@ -90,7 +90,7 @@ class ComlibSectionHashObject {
     }
 
     ~ComlibSectionHashObject() {
-        delete pelist;
+        delete [] pelist;
 	//delete msg;
     }
 };
