@@ -206,10 +206,11 @@ LogPool::LogPool(char *pgm) : phaseTab(MAX_PHASES)
 void LogPool::write(void) 
 {
   int i;
+  unsigned int j;
   fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%le phases:%d\n", VER, CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize), phaseTab.numPhasesCalled());
   // write bin time
-  for(i=0; i<numEntries; i++)
-    pool[i].write(fp);
+  for(j=0; j<numEntries; j++)
+    pool[j].write(fp);
   fprintf(fp, "\n");
   // write entry execution time
   for (i=0; i<_numEntries; i++)

@@ -37,6 +37,9 @@ class LogEntry {
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
     void operator delete(void *ptr) { free(ptr); }
+#ifdef WIN32
+    void operator delete(void *, void *) { }
+#endif
     LogEntry() {}
     LogEntry(double tm, UChar t, UShort m=0, UShort e=0, int ev=0, int p=0) { 
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm;
@@ -88,7 +91,7 @@ class LogPool {
       delete[] pool;
     }
     void write(void) {
-      for(int i=0; i<numEntries; i++)
+      for(UInt i=0; i<numEntries; i++)
         pool[i].write(fp);
     }
     void writeSts(void);

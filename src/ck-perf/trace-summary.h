@@ -49,6 +49,9 @@ class LogEntry {
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
     void operator delete(void *ptr) { free(ptr); }
+#ifdef WIN32
+    void operator delete(void *, void *) { }
+#endif
     LogEntry() {}
     LogEntry(double t, int p=0) { 
       time = t; pe = p;
