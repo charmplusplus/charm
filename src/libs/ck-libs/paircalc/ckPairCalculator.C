@@ -190,6 +190,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
   // Because the vectors are not guaranteed contiguous, record each
   // offset so we can iterate through them
 
+/*
   if((kLeftCount >= kUnits 
       && ((kRightCount >= kUnits) 
 	  || (symmetric && thisIndex.x == thisIndex.y) )) 
@@ -280,8 +281,8 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 #endif
 #endif
   }
-  
-  /*
+*/ 
+ 
   if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
     //    kLeftCount=kRightCount=0;  
 #ifdef _DEBUG_
@@ -332,10 +333,9 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     }
     // FIXME: should do 'op2' here!!!
 
-   r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
+   r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), /*(CkTwoDoubles*)*/ outData);
     r.contribute(this, sparse_sum_double);
   }
-  */
 }
 
 void
@@ -482,23 +482,24 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
    */ 
 
   //original version
-  
-/*
+
   if(!symmetric){
     CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
-    thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
+//    thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
+    thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
   }
   else {
     CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
-    thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
-    if (rowNum != thisIndex.x){
+  //  thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
+   thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
+   if (rowNum != thisIndex.x){
       CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
-      thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z, cb);
+      thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z);
                                                                                 
     }
   }
-*/
 
+/*
   int segments=S/grainSize;
   if(S%grainSize!=0)
       segments+=1;
@@ -538,6 +539,8 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
       thisProxy(idx).sumPartialResult(pmsg);  
     }
   }
+*/
+
   delete [] mynewData;
   if(symmetric && thisIndex.x != thisIndex.y){
       delete [] othernewData;
