@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1995-09-06 21:48:50  jyelon
+ * Revision 2.16  1995-09-07 05:24:27  gursoy
+ * converted CharmInitLoop to a handler function
+ *
+ * Revision 2.15  1995/09/06  21:48:50  jyelon
  * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
  *
  * Revision 2.14  1995/09/06  04:08:58  sanjeev
@@ -124,7 +127,7 @@ CsvExtern(FUNCTION_PTR*,  ChareFnTable);
 
 #define BLK_LEN 512
 CpvStaticDeclare(BOCINIT_QUEUE*, BocInitQueueHead);
-
+CpvStaticDeclare(ENVELOPE*, readvarmsg);
 
 void *BocInitQueueCreate() ;
 ENVELOPE *DeQueueBocInitMsgs() ;
@@ -165,6 +168,9 @@ void initModuleInit()
     CpvInitialize(BOCINIT_QUEUE*, BocInitQueueHead);
     CpvInitialize(int, userArgc);
     CpvInitialize(char**, userArgv);
+    CpvInitialize(ENVELOPE*, readvarmsg);
+
+    CpvAccess(BocInitQueueHead) = NULL;
     if (CmiMyRank() == 0) CsvAccess(ReadBuffSize) = 0;
 }
 
@@ -221,6 +227,10 @@ char **argv;
 
 	if (CmiMyPe() == 0)
 	{
+
+                /* processor 0 does not have a initialization phase */
+                CpvAccess(CkInitPhase) = 0;
+
 		CpvAccess(MsgCount) = 0; 
                                  /* count # of messages being sent to each
 				 * node. assume an equal number gets sent to
@@ -242,9 +252,9 @@ char **argv;
 						CHAREKIND_CHARE, rand());
 
 		if (CsvAccess(MainChareLanguage) != CHARMPLUSPLUS) 
-			mainChareBlock->chareptr = mainChareBlock + 1 ;
+			CpvAccess(mainChareBlock)->chareptr = mainChareBlock + 1 ;
 		else {
-			mainChareBlock->chareptr = (void *)
+			CpvAccess(mainChareBlock)->chareptr = (void *)
 						((CsvAccess(ChareFnTable)
 					      [CsvAccess(_CK_MainChareIndex)])
 						(CpvAccess(mainChareBlock)));
@@ -294,131 +304,125 @@ char **argv;
 	}
 	else
 	{
-		CharmInitLoop();
+                /* for other nodes we are gonna create some buffering
+                   queues. No message must be received by the handlers
+                   before this point */
+               
+
+                /* create the boc init message queue */
+                CpvAccess(BocInitQueueHead) = (BOCINIT_QUEUE *) BocInitQueueCreate();
+
+                /* for other processors, create the queue for non-init
+                   messages arrived during initialization */
+                CpvAccess(CkBuffQueue) = (void *) FIFO_Create();	
 	}
+
 	SysPeriodicCheckInit();
 
 	/* Loop(); 	- Narain 11/16 */
 }
 
 
-/*
- * Receive read only variable buffer, read only messages and  BocInit
- * messages. Start Boc's by allocating and filling the NodeBocTbl. Wait until
- * (a) the  "count" message is received and (b) "count" number of initial
- * messages are received.
- */
-CharmInitLoop()
-{
-  int             i, id, type;
-  void           *usrMsg;
-  int             countInit = 0;
-  extern void    *CmiGetMsg();
-  int         countArrived = 0;
-  ENVELOPE       *envelope, *readvarmsg;
-  
-  CpvAccess(BocInitQueueHead) = (BOCINIT_QUEUE *) BocInitQueueCreate();
-  
-  while ((!countArrived) || (countInit != 0))
-    {
-      envelope = NULL;
-      while (envelope == NULL)
-	envelope = (ENVELOPE *) CmiGetMsg();
-      if ((GetEnv_msgType(envelope) == BocInitMsg) ||
-	  (GetEnv_msgType(envelope) == ReadMsgMsg))
-	UNPACK(envelope);
-      usrMsg = USER_MSG_PTR(envelope);
-      /* Have a valid message now. */
-      type = GetEnv_msgType(envelope);
-      switch (type)
-	{
-	  
-	case BocInitMsg:
-	  EnQueueBocInitMsgs(envelope);
-	  countInit++;
-	  break;
-	  
-	case InitCountMsg:
-	  countArrived = 1;
-	  countInit -= GetEnv_count(envelope);
-	  CmiFree(envelope);
-	  break;
-	  
-	case ReadMsgMsg:
-	  id = GetEnv_other_id(envelope);
-	  CsvAccess(_CK_9_ReadMsgTable)[id] = (void *) usrMsg;
-	  countInit++;
-	  break;
-	  
-	case ReadVarMsg:
-	  CpvAccess(ReadFromBuffer) = usrMsg;
-	  countInit++;
-	  
-	  /* get the information about the main chare */
-	  CpvAccess(mainChareBlock) = (struct chare_block *)
-	    GetEnv_chareBlockPtr(envelope);
-	  CpvAccess(mainChare_magic_number) =
-	    GetEnv_chare_magic_number(envelope);
-	  if (CsvAccess(MainChareLanguage) == CHARMPLUSPLUS)
-	    CPlus_SetMainChareID();
-	  readvarmsg = envelope;
-	  break;
-	  
-	case LdbMsg:
-	case BocMsg:
-	case ImmBocMsg:
-	case QdBocMsg:
-	case BroadcastBocMsg:
-	case ImmBroadcastBocMsg:
-	case QdBroadcastBocMsg:      
-          CmiPrintf("Internal error #324832498\n");
-          exit(1);
-	  break;
 
-	case NewChareNoBalanceMsg:
-	case NewChareMsg:
-	  CmiSetHandler(envelope,CsvAccess(CkProcIdx_NewChareMsg));
-	  CkEnqueue(envelope);
-	  break;
-	  
-	case ForChareMsg:
-          CmiPrintf("Internal error #30984790238\n");
-          exit(1);
 /*
-	  CmiSetHandler(envelope,CsvAccess(CkProcIdx_ForChareMsg));
-	  CkEnqueue(envelope);
-*/
-	  break;
-	  
-	case DynamicBocInitMsg:
-	  CmiSetHandler(envelope,CsvAccess(CkProcIdx_DynamicBocInitMsg));
-	  CkEnqueue(envelope);
-	  break;
-	  
-	case VidSendOverMsg:
-	  CmiSetHandler(envelope,CsvAccess(CkProcIdx_VidSendOverMsg));
-	  CkEnqueue(envelope);
-	  break;
-	  
+ * This is the handler for initialization messages 
+ * Start Boc's by allocating and filling the NodeBocTbl. 
+ * When (a) the  "count" message is received and (b) "count" number of initial
+ * messages are received, switch to the regular phase 
+ */
+
+void HANDLE_INIT_MSG(env)
+ENVELOPE *env;
+{
+    int          i;
+    int          id;
+    int          type;
+    void         *usrMsg;
+    void         *buffMsg;
+    ENVELOPE     *bocMsg;
+
+
+    if ((GetEnv_msgType(env) == BocInitMsg) ||
+          (GetEnv_msgType(env) == ReadMsgMsg))
+        UNPACK(env);
+    usrMsg = USER_MSG_PTR(env);
+    /* Have a valid message now. */
+    type = GetEnv_msgType(env);
+
+    switch (type)
+    {
+        case BocInitMsg:
+              EnQueueBocInitMsgs(env);
+              CpvAccess(CkInitCount)++;
+              break;
+ 
+        case InitCountMsg:
+              CpvAccess(CkCountArrived) = 1;
+              CpvAccess(CkInitCount) -= GetEnv_count(env);
+              CmiFree(env);
+              break;
+
+        case ReadMsgMsg:
+              id = GetEnv_other_id(env);
+              CsvAccess(_CK_9_ReadMsgTable)[id] = (void *) usrMsg;
+              CpvAccess(CkInitCount)++; 
+              break;
+
+        case ReadVarMsg:
+              CpvAccess(ReadFromBuffer) = usrMsg;
+              CpvAccess(CkInitCount)++; 
+         
+              /* get the information about the main chare */
+              CpvAccess(mainChareBlock) = (struct chare_block *)
+                                          GetEnv_chareBlockPtr(env);
+              CpvAccess(mainChare_magic_number) =
+                                          GetEnv_chare_magic_number(env);
+              if (CsvAccess(MainChareLanguage) == CHARMPLUSPLUS)
+                  CPlus_SetMainChareID();
+              CpvAccess(readvarmsg) = env;
+              break;
+
         default:
-          CmiPrintf("** ERROR ** Unknown message type %d\n",type);
-	}
+              CmiPrintf("** ERROR ** Unknown message type in initialization phase%d\n",type);
+    
+    } 
+
+    if ( CpvAccess(CkCountArrived) && CpvAccess(CkInitCount)==0 )
+    {
+         /* initialization phase is done, set the flag to 0 */
+         CpvAccess(CkInitPhase) = 0;
+
+         /* call all the CopyFromBuffer functions for ReadOnly variables.
+          * _CK_9_ReadMsgTable is passed as an arg because it is no longer
+          * global */
+
+         if (CmiMyRank() == 0) {
+            for (i = 0; i < CsvAccess(sharedReadCount); i++)
+                (CsvAccess(ROCopyFromBufferTable)[i]) (CsvAccess(_CK_9_ReadMsgTable));
+         }
+         CmiFree(CpvAccess(readvarmsg));
+
+
+         while ( (bocMsg=DeQueueBocInitMsgs()) != NULL )
+               ProcessBocInitMsg(bocMsg);
+
+
+         /* process all the non-init messages arrived during the 
+            initialization */
+         while ( !FIFO_Empty(CpvAccess(CkBuffQueue))  )
+         {
+               FIFO_DeQueue(CpvAccess(CkBuffQueue), &buffMsg); 
+               HANDLE_INCOMING_MSG(buffMsg); 
+         }
     }
 
-  /*
-   * call all the CopyFromBuffer functions for ReadOnly variables.
-   * _CK_9_ReadMsgTable is passed as an arg because it is no longer
-   * global
-   */
-  if (CmiMyRank() == 0) {
-    for (i = 0; i < CsvAccess(sharedReadCount); i++)
-      (CsvAccess(ROCopyFromBufferTable)[i]) (CsvAccess(_CK_9_ReadMsgTable));
-  }
-  CmiFree(readvarmsg);
-  
-  while ( (envelope=DeQueueBocInitMsgs()) != NULL ) 
-    ProcessBocInitMsg(envelope);
 }
+
+
+
+
+
+
 
 ProcessBocInitMsg(envelope)
 ENVELOPE       *envelope;
@@ -638,7 +642,7 @@ InitializeEPTables()
   
   /* Register all the built-in BOC's */
   AddSysBocEps();
-  NumSysBocEps = chareEpsCount;
+  NumSysBocEps = CpvAccess(chareEpsCount);
 
   /*
    * This is the top level call to all modules for initialization. It
@@ -653,6 +657,8 @@ InitializeEPTables()
   /* Register the Charm handlers with Converse */
   CsvAccess(HANDLE_INCOMING_MSG_Index)
     = CmiRegisterHandler(HANDLE_INCOMING_MSG) ;
+  CsvAccess(HANDLE_INIT_MSG_Index)
+    = CmiRegisterHandler(HANDLE_INIT_MSG);
   CsvAccess(CkProcIdx_ForChareMsg)
     = CmiRegisterHandler(CkProcess_ForChareMsg);
   CsvAccess(CkProcIdx_DynamicBocInitMsg)
@@ -700,8 +706,7 @@ BroadcastCount()
 
 	SetEnv_count(env, CpvAccess(currentBocNum) - NumSysBoc + 2 + CpvAccess(NumReadMsg));
 
-	CkCheck_and_Broadcast(env);
-	/* CkFreeMsg(dummy_msg);  commented on Jun 23 */
+        CkCheck_and_BcastInitNL(env);
 }
 
 int 
