@@ -341,6 +341,7 @@ PUPmarshall(CProxySection_ArrayBase);
 
 //Simple C-like API:
 void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx);
+void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx);
 void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID);
 
 /************************ Array Element *********************/
