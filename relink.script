@@ -1,5 +1,11 @@
 #!/bin/sh
 
+if test ! -d "$1" 
+then
+ echo "$0 <directory>"
+ exit 1
+fi
+
 rm -f bin include lib lib_so tmp
 
 ln -s $1/bin bin
