@@ -562,6 +562,11 @@ void _initCharm(int argc, char **argv)
 			     (symbolTableFunction) makeCharmSymbolTableInfo,
 			     (indirectionFunction) getEpIdx);
 #endif
+
+#if CMK_LBDB_ON
+  CreateLBDatabase();
+#endif
+
 }
 
 GroupTable::GroupTable() 
