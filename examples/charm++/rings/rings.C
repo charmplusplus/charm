@@ -31,7 +31,7 @@ main::main(CkArgMsg *m) {
   for (i=0;i<NUMBEROFRINGS;i++) {
     Token *t = new Token;
     t->value = i;
-    t->hopSize = (i+1) * (int) pow(-1,i);
+    t->hopSize = (i+1) * (int) pow(-1.0,i);
     t->loops = NUMBEROFRINGS - i + 1;
     CProxy_ring::ckNew(t);
   }
