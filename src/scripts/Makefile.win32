@@ -130,7 +130,7 @@ DIRSSOURCES :
 #
 ###############################################################################
 
-TRACELIBS=libtrace-none.a libtrace-projections.a libtrace-summary.a
+TRACELIBS=libtrace-none.a libtrace-projections.a libtrace-summary.a libtrace-counter.a
 
 CVLIBS=$(LIBS_DIR)\libconv-core.a $(LIBS_DIR)\libconv-cplus-n.a $(LIBS_DIR)\libconv-cplus-y.a $(LIBS_DIR)\libconv-util.a $(LIBS_DIR)\libldb-rand.o $(LIBS_DIR)\libldb-spray.o $(LIBS_DIR)\libldb-graph.o $(LIBS_DIR)\libldb-test.o $(TRACELIBS)
 
@@ -327,6 +327,12 @@ LIBTRACE_SUMM=trace-summary.obj
 libtrace-summary.a: $(LIBTRACE_SUMM)
 	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libtrace-summary.a" \
 	$(LIBTRACE_SUMM)
+
+LIBTRACE_COUNT=trace-counter.obj
+
+libtrace-counter.a: $(LIBTRACE_COUNT)
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libtrace-counter.a" \
+	$(LIBTRACE_COUNT)
 
 ampi.decl.h ampi.def.h : ampi.ci $(CHARMXI)
 	$(CHARMXI) -ansi ampi.ci
@@ -525,6 +531,9 @@ trace-projections.obj : trace-projections.C trace-projections.h trace.h $(CKHEAD
 
 trace-summary.obj : trace-summary.C trace-summary.h trace.h $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP trace-summary.C
+
+trace-counter.obj : trace-counter.C trace-counter.h trace.h $(CKHEADERS)
+	$(CPP) $(CPP_PROJ) /TP trace-counter.C
 
 ###############################################################################
 #

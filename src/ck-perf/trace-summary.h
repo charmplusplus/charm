@@ -15,10 +15,8 @@
 
 #include <stdio.h>
 #include <errno.h>
-
 #include "trace.h"
 #include "ck.h"
-
 #include "trace-common.h"
 
 // time in seconds

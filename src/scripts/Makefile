@@ -206,7 +206,7 @@ dirs+sources:
 #
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-graph.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
-TRACELIBS=$(L)/libtrace-projections.a $(L)/libtrace-summary.a
+TRACELIBS=$(L)/libtrace-projections.a $(L)/libtrace-summary.a $(L)/libtrace-counter.a
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
    $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o $(L)/libmemory-isomalloc.o
 
@@ -563,6 +563,10 @@ LIBTRACE_SUMM=trace-summary.o trace-common.o
 $(L)/libtrace-summary.a: $(LIBTRACE_SUMM)
 	$(CHARMC) -o $@ $(LIBTRACE_SUMM)
 
+LIBTRACE_COUNT=trace-counter.o trace-common.o
+$(L)/libtrace-counter.a: $(LIBTRACE_COUNT)
+	$(CHARMC) -o $@ $(LIBTRACE_COUNT)
+
 trace-common.o: trace-common.C $(CKHEADERS)
 	$(CHARMC) trace-common.C
 
@@ -572,6 +576,8 @@ trace-projections.o:trace-projections.C trace-projections.h trace.h trace-common
 trace-summary.o:trace-summary.C trace-summary.h trace.h trace-common.h $(CKHEADERS)
 	$(CHARMC) -o trace-summary.o trace-summary.C
 
+trace-counter.o:trace-counter.C trace-counter.h trace.h trace-common.h $(CKHEADERS)
+	$(CHARMC) -o trace-counter.o trace-counter.C
 
 ###############################################################################
 #

@@ -10,6 +10,7 @@
 
 #include "conv-common.h"
 
+#define CMK_ORIGIN2000					   1
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
 
 #define CMK_GETPAGESIZE_AVAILABLE                          1
