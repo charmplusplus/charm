@@ -228,6 +228,18 @@ static int my_sendto(s, msg, len, flags, to, tolen)
 int s; char *msg; int len; int flags; struct sockaddr *to; int tolen;
 {
   int ok;
+
+/* I tried this, but didn't seem to have impact.
+   We should make sure a poll/check like this is not needed, and then 
+   delete this comment --- Sanjay 
+
+  fd_set wfds;
+  int nwritable;
+  FD_ZERO(&wfds);
+  FD_SET(s, &wfds);
+  nwritable = select(FD_SETSIZE, NULL, &wfds, NULL, NULL);  
+*/
+
   while (1) {
     ok = sendto(s, msg, len, flags, to, tolen);
     if (ok>=0) break;
@@ -390,6 +402,11 @@ void (*handler)();
  *
  **************************************************************************/
 
+#define DGRAM_BUF_SIZE 60000
+/* This should depend on the OS. So, this may have to be made a m/c specific 
+ constant. Set to the largest value possible, unless eats into memory 
+ available significantly */ 
+
 static void skt_server(ppo, pfd)
 unsigned int *ppo;
 unsigned int *pfd;
@@ -421,6 +438,7 @@ unsigned int *pfd;
 {
   struct sockaddr_in name;
   int length, ok, skt;
+  int optval, optlen;
 
   /* Create data socket */
   retry: skt = socket(AF_INET,SOCK_DGRAM,0);
@@ -435,6 +453,12 @@ unsigned int *pfd;
   length = sizeof(name);
   if (getsockname(skt, (struct sockaddr *)&name , &length))
     { perror("getting socket name"); KillEveryoneCode(39483); }
+
+  optlen = 4;
+  /*  getsockopt(skt, SOL_SOCKET , SO_RCVBUF , (char *) &optval, &optlen); */
+  optval = DGRAM_BUF_SIZE;
+  setsockopt(skt, SOL_SOCKET , SO_RCVBUF , (char *) &optval, optlen); 
+
   *pfd = skt;
   *ppo = htons(name.sin_port);
 }
@@ -618,6 +642,7 @@ static char   self_IP_str[16];
 static int    ctrl_port, ctrl_skt;
 static int    data_port, data_skt;
 
+
 #define MAX_NODES 100
 
 typedef struct {
@@ -658,7 +683,7 @@ char **argv;
 static void ExtractArgs(argv)
 char **argv;
 {
-  resend_wait =   0.010;
+  resend_wait =   0.030; /* This could be m/c dependent -- -Sanjay */
   resend_fail = 600.000;
   Cmi_enableinterrupts = 1;
   Topology = 'H';
@@ -666,10 +691,10 @@ char **argv;
 
   while (*argv) {
     if (strcmp(*argv,"++resend-wait")==0) {
-      DeleteArg(argv); resend_wait = atoi(DeleteArg(argv)) * 1000.0;
+      DeleteArg(argv); resend_wait = atoi(DeleteArg(argv)) *.001;
     } else
     if (strcmp(*argv,"++resend-fail")==0) {
-      DeleteArg(argv); resend_fail = atoi(DeleteArg(argv)) * 1000.0;
+      DeleteArg(argv); resend_fail = atoi(DeleteArg(argv)) * .001;
     } else
     if (strcmp(*argv,"++no-interrupts")==0) {
       DeleteArg(argv); Cmi_enableinterrupts=0;
@@ -975,12 +1000,20 @@ int CmiScanf(va_alist) va_dcl
  *****************************************************************************/
 
 static int NumIntr;
+
 static int NumIntrCalls;
 static int NumOutsideMc;
 static int NumRetransmits;
 static int NumAcksSent;
 static int NumUseless;
 static int NumSends;
+
+CmiNetPrintUdpStatistics()
+{
+CmiPrintf("[%d]: NumIntr = %d\t, NumRetransmits = %d,\t NumAcksSent = %d\n",
+	  CmiMyPe(), NumIntr, NumRetransmits, NumAcksSent);
+CmiPrintf("NumSends= %d\n", NumSends);
+}
 
 /*****************************************************************************
  *                                                                           
@@ -1100,7 +1133,9 @@ typedef struct new_msg
 }
 NewMessage;
 
-#define WINDOW_SIZE 3             /* size of sliding window  */
+#define WINDOW_SIZE 14             /* size of sliding window : set to 
+				    (DGRAM_BUF_SIZE/CMK_MAX_DGRAM_SIZE) -1 */
+
 
 #define MAX_SEQ_NUM 0xFFFFFFFF     /* 2^32 - 1 */
 
