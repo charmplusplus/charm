@@ -663,7 +663,6 @@ void CkLocRec_local::staticMigrate(LDObjHandle h, int dest)
 	DEBL((AA"Load balancer wants to migrate %s to %d\n"AB,idx2str(el->idx),dest));
 	el->migrateMe(dest);
 }
-#endif
 
 void CkLocRec_local::setMigratable(int migratable)
 {
@@ -672,6 +671,7 @@ void CkLocRec_local::setMigratable(int migratable)
 	else
   	  the_lbdb->NonMigratable(ldHandle);
 }
+#endif
 
 /**
  * Represents a deleted array element (and prevents re-use).

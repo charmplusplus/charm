@@ -192,12 +192,11 @@ public:
 public:
   inline LBDatabase *getLBDB(void) const {return the_lbdb;}
   static void staticMigrate(LDObjHandle h, int dest);
+  void setMigratable(int migratable);
 private:
   LBDatabase *the_lbdb;
   LDObjHandle ldHandle;
 #endif
-public:
-  void setMigratable(int migratable);
 };
 class CkLocRec_remote;
 
