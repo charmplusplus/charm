@@ -506,6 +506,14 @@ then
     CMK_LD="$CMK_SEQ_LD"
     CMK_CXX="$CMK_SEQ_CXX" 
     CMK_LDXX="$CMK_SEQ_LDXX" 
+    if [ -n "$CMK_SEQ_AR" ]
+    then
+      CMK_AR="$CMK_SEQ_AR"
+    fi
+    if [ -n "$CMK_SEQ_RANLIB" ]
+    then
+      CMK_RANLIB="$CMK_SEQ_RANLIB"
+    fi
 fi
 
 if [ -n "$OVERRIDE_CC" ]
