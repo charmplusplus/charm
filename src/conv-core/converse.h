@@ -245,6 +245,7 @@ extern int _Cmi_numpes;
 extern void CmiMemLock();
 extern void CmiMemUnlock();
 extern void CmiNodeBarrier();
+extern void CmiNodeAllBarrier();
 #define CmiSvAlloc CmiAlloc
 
 typedef pthread_mutex_t *CmiNodeLock;
@@ -1038,17 +1039,16 @@ CpvExtern(int, CmiImmediateMsgHandlerIdx);
 void CmiProbeImmediateMsg();
 
 /*
-   to immediate-fy a Converse message, change the Converse handler x
-   to -x. Note that the Converse handler is of type CmiUInt2, thus
-   the immediate-fied Converse handler should be in range of 32768 and 65535.
+   to immediate-fy a Converse message, set the most significant bit to 1
+   in the Converse handler (x|0x8000). 
 */
 #if CMK_IMMEDIATE_MSG
 void CmiDelayImmediate();
 #  define CmiBecomeImmediate(msg) do { \
-	CmiSetHandler(msg, (CmiUInt2)(-(CmiInt2)CmiGetHandler(msg))); \
+	CmiSetHandler(msg, (CmiGetHandler(msg))|0x8000); \
      } while (0)
-#  define CmiIsImmediate(msg)      ((CmiInt2)(CmiGetHandler(msg)) < 0) 
-#  define CmiImemdiateHandler(msg) (-(CmiInt2)(CmiGetHandler(msg)))
+#  define CmiIsImmediate(msg)      ((CmiGetHandler(msg)) & 0x8000) 
+#  define CmiImemdiateHandler(msg) ((CmiGetHandler(msg)) ^ 0x8000)
 /*
 #  define CmiIsImmediate(msg)   ((CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0)))
 #  define CmiBecomeImmediate(msg) do {\
