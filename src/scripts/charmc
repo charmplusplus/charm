@@ -627,10 +627,17 @@ Debugf "----------- Module dependency search complete ------------"
 Debug "About to read machine config script"
 Debug "Read config script, setting defaults..."
 
+# loading system configuration shell scripts
 [ ! -r $CHARMINC/conv-config.sh ] && Abort "Cannot find conv-config.sh in $CHARMINC"
 . $CHARMINC/conv-config.sh $CHARMINC
 
 Debug "Setting vars..."
+
+# update charm to bgcharm
+if [ "$LANGUAGE" = "charm++" -a -n "$CMK_BLUEGENE" ] 
+then
+	LANGUAGE="bgcharm++"
+fi
 
 if [ -n "$USE_RELIABLE_CC" ]
 then
