@@ -1360,7 +1360,7 @@ void CmiNodeBarrier(void)
 {
   mutex_lock(&barrier_mutex);
   barrier++;
-  if(barrier != CmiNumPes())
+  if(barrier != CmiMyNodeSize())
     cond_wait(&barrier_cond, &barrier_mutex);
   else{
     barrier = 0;
@@ -2102,8 +2102,9 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
   dst = ogm->dst;
   switch (dst) {
   case PE_BROADCAST_ALL:
-    for (rank = 0; rank<Cmi_mynodesize; rank++)
+    for (rank = 0; rank<Cmi_mynodesize; rank++) {
       PCQueuePush(CmiGetStateN(rank)->recv,CopyMsg(ogm->data,ogm->size));
+    }
     for (i=0; i<Cmi_numnodes; i++)
       if (i!=Cmi_mynode)
 	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
@@ -2111,8 +2112,9 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
     break;
   case PE_BROADCAST_OTHERS:
     for (rank = 0; rank<Cmi_mynodesize; rank++)
-      if (rank + Cmi_nodestart != ogm->src)
+      if (rank + Cmi_nodestart != ogm->src) {
 	PCQueuePush(CmiGetStateN(rank)->recv,CopyMsg(ogm->data,ogm->size));
+      }
     for (i = 0; i<Cmi_numnodes; i++)
       if (i!=Cmi_mynode)
 	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
@@ -2462,8 +2464,7 @@ static void CommunicationServer()
 char *CmiGetNonLocal()
 {
   CmiState cs = CmiGetState();
-  void *result = PCQueuePop(cs->recv);
-  return result;
+  return (char *) PCQueuePop(cs->recv);
 }
 
 /******************************************************************************
@@ -2483,7 +2484,6 @@ void CmiNotifyIdle()
   CommunicationServer();
   CmiCommUnlock();
 #endif
-  CmiYield();
 }
 
 /******************************************************************************
