@@ -226,8 +226,9 @@ CldEnqueue function.
 
 Throughout this manual, we will occasionally refer to the source code
 of two provided load balancers, the random initial placement load balancer
-({\tt cldb.rand.c}) and the graph-based load balancer ({\tt
-cldb.graph.c}).  The functioning of these balancers is described in
+({\tt cldb.rand.c}) and the virtual topology-based load balancer ({\tt
+cldb.neighbor.c}) which applies virtual topology including dense graph to 
+construct neighbors.  The functioning of these balancers is described in
 the \charmpp{} manual load balancing section.
 
 In addition, a special utility is provided that allows us to add and
@@ -547,7 +548,7 @@ in reasonably sized parcels.  In addition, the {\bf CldBalanceHandler} and
 its associated declarations and initializations are required to use it.
 
 You may want to use the three status variables.  These can be used to
-keep track of what your LB is doing (see usage in cldb.graph.c and
+keep track of what your LB is doing (see usage in cldb.neighbor.c and
 itc++queens program).
 
 \begin{alltt}
