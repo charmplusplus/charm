@@ -7,8 +7,9 @@
     to automatically checkpoint objects of classes derived from this type. */
 template<class StateType> class chpt : public rep {
  public:
+  int sinceLast;
   /// Basic Constructor
-  chpt() { }
+  chpt() { sinceLast = STORE_RATE; }
   /// Destructor
   virtual ~chpt() { }
   void registerTimestamp(int idx, eventMsg *m, int offset);
@@ -40,14 +41,15 @@ void chpt<StateType>::registerTimestamp(int idx, eventMsg *m, int offset)
 template<class StateType>
 void chpt<StateType>::checkpoint(StateType *data)
 {
-  static int sinceLast = 0;
 #ifdef POSE_STATS_ON
   localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
   localStats->SwitchTimer(CP_TIMER);
 #endif
   CmiAssert(!(parent->myStrat->currentEvent->cpData));
-  if ((myStrat->currentEvent->timestamp > 
-       myStrat->currentEvent->prev->timestamp) || (sinceLast == STORE_RATE)) {
+  //  if ((myStrat->currentEvent->timestamp > 
+  //myStrat->currentEvent->prev->timestamp) || (sinceLast == STORE_RATE)) {
+  if ((sinceLast == STORE_RATE) || (CpvAccess(stateRecovery) == 1) ||
+      (myStrat->currentEvent->prev == parent->eq->front())) {
     myStrat->currentEvent->cpData = new StateType;
     myStrat->currentEvent->cpData->copy = 1;
     *((StateType *)myStrat->currentEvent->cpData) = *data;
@@ -55,7 +57,7 @@ void chpt<StateType>::checkpoint(StateType *data)
   }
   else sinceLast++;
 #ifdef POSE_STATS_ON
-  localStats->SwitchTimer(DO_TIMER);
+  localStats->SwitchTimer(SIM_TIMER);
 #endif
 }
 

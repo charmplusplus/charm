@@ -38,10 +38,6 @@ void adapt::Step()
     // do all events within speculative window
     currentEvent = ev;
     ev->done = 2;
-#ifdef POSE_STATS_ON
-    localStats->Do();
-    localStats->SwitchTimer(DO_TIMER);
-#endif
     parent->DOs++;
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
 #ifdef POSE_STATS_ON

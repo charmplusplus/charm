@@ -35,10 +35,6 @@ void opt2::Step()
       // do all events at the first available timestamp
       currentEvent = ev;
       ev->done = 2;
-#ifdef POSE_STATS_ON
-      localStats->Do();
-      localStats->SwitchTimer(DO_TIMER);
-#endif
       parent->DOs++;
       parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
 #ifdef POSE_STATS_ON

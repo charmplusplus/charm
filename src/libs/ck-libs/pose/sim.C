@@ -102,21 +102,28 @@ void sim::Step(prioMsg *m)
 /// Commit events based on new GVT estimate
 void sim::Commit()
 {
+  static int lastGVT = 0;
   if (active < 0)  return; // object is migrating
 #ifdef POSE_STATS_ON
-  int tstat = localStats->TimerRunning();
-  if (!tstat)  localStats->TimerStart(MISC_TIMER);
-  else localStats->SwitchTimer(MISC_TIMER);
+    int tstat = localStats->TimerRunning();
+    if (!tstat)  localStats->TimerStart(SIM_TIMER);
+    else localStats->SwitchTimer(SIM_TIMER);
 #endif
   localPVT = (PVT *)CkLocalBranch(ThePVT);
-  if (localPVT->done() && (POSE_endtime == -1)) { // simulation inactive
-    eq->CommitEvents(this, -1); // commit all events in queue
-    objID->terminus(); // call terminus on all posers
+#ifdef POSE_STATS_ON
+  localStats->SwitchTimer(MISC_TIMER);
+#endif
+  if (localPVT->getGVT() != lastGVT) {
+    if (localPVT->done() && (POSE_endtime == -1)) { // simulation inactive
+      eq->CommitEvents(this, -1); // commit all events in queue
+      objID->terminus(); // call terminus on all posers
+    }
+    else { 
+      eq->CommitEvents(this, localPVT->getGVT()); // commit events up to GVT
+      if (localPVT->done()) objID->terminus(); // if sim done, term posers
+    }
   }
-  else { 
-    eq->CommitEvents(this, localPVT->getGVT()); // commit events up to GVT
-    if (localPVT->done()) objID->terminus(); // if sim done, term posers
-  }
+  lastGVT = localPVT->getGVT();
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(SIM_TIMER);
 #endif

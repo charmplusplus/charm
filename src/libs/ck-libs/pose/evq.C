@@ -67,7 +67,7 @@ void eventQueue::InsertEvent(Event *e)
     e->next->prev = e;
     tmp->next = e;
     // if e is inserted before currPtr, move currPtr back to avoid rollback
-    if ((currentPtr->prev == e) && (currentPtr->done <= 0))
+    if ((currentPtr->prev == e) && (currentPtr->done < 1))
       currentPtr = currentPtr->prev;
   }
   //sanitize();
@@ -76,6 +76,7 @@ void eventQueue::InsertEvent(Event *e)
 /// Move currentPtr to next event in queue
 void eventQueue::ShiftEvent() { 
   Event *e;
+  //sanitize();
   CmiAssert(currentPtr->next != NULL);
   currentPtr = currentPtr->next; // set currentPtr to next event
   if ((currentPtr == backPtr) && (eqh->top)) { // currentPtr on back sentinel
@@ -94,36 +95,30 @@ void eventQueue::ShiftEvent() {
 void eventQueue::CommitEvents(sim *obj, int ts)
 {
   //sanitize();
-  Event *target, *commitPtr;
-  if (ts >= 0) { // commit up to ts
-    target = currentPtr->prev;
-    while (target->timestamp >= ts)
-      target = target->prev;
-    target = target->next;
-    while (!target->cpData && (target != frontPtr))
-      target = target->prev;
-    if (target == frontPtr) return; // nothing to commit
-    commitPtr = frontPtr->next;
-  }
-  else if (ts == -1) {
-    commitPtr = frontPtr->next;
-    if (commitPtr == currentPtr) return; // nothing to commit
-    target = currentPtr;
-  }
-  while (commitPtr != target) { // commit up to next checkpoint
-    CmiAssert(commitPtr->done == 1); // only commit executed events
-    obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg); // call commit fn
-    if (commitPtr->commitBfrLen > 0)  { // print buffered output
-      CkPrintf("%s", commitPtr->commitBfr);
-      if (commitPtr->commitErr) CmiAbort("Commit ERROR");
+  Event *target = frontPtr->next, *commitPtr = frontPtr->next;
+  if (ts == -1) ts = currentPtr->timestamp;  
+  if (ts == -1) ts = currentPtr->prev->timestamp;  
+
+  while ((target != backPtr) && (target->timestamp <= ts)) { // commit to ts
+    while (commitPtr != target) { // commit up to next checkpoint
+      CmiAssert(commitPtr->done == 1); // only commit executed events
+      obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg); // call commit fn
+      if (commitPtr->commitBfrLen > 0)  { // print buffered output
+	CkPrintf("%s", commitPtr->commitBfr);
+	if (commitPtr->commitErr) CmiAbort("Commit ERROR");
+      }
+      if (commitPtr->cpData) delete commitPtr->cpData;
+      commitPtr = commitPtr->next;
+      delete commitPtr->prev; // delete committed event
     }
-    commitPtr = commitPtr->next;
-    if (commitPtr->prev->cpData) delete commitPtr->prev->cpData; 
-    delete commitPtr->prev; // delete committed event
+    //find next target
+    target = target->next;
+    while (!target->cpData && (target->timestamp <= ts) && (target != backPtr))
+      target = target->next;
   }
+
   commitPtr->prev = frontPtr; // reattach front sentinel node
   frontPtr->next = commitPtr;
-  commitPtr = NULL;
   //sanitize();
 }
 
@@ -148,6 +143,7 @@ void eventQueue::SetCurrentPtr(Event *e) {
 /// Return first (earliest) unexecuted event before currentPtr
 Event *eventQueue::RecomputeRollbackTime() 
 {
+  //sanitize();
   Event *ev = frontPtr->next; // start at front
   while ((ev->done == 1) && (ev != currentPtr)) ev = ev->next;
   if (ev == currentPtr) return NULL; // no unexecuted events up to currentPtr
@@ -285,6 +281,31 @@ void eventQueue::sanitize()
   // check currentPtr
   CmiAssert(currentPtr != NULL);
   // should also make sure that the event this points to is in the queue!
+  // traverse forward
+  tmp = currentPtr;
+  while (tmp != backPtr) {
+    CmiAssert(tmp->next != NULL);
+    tmp = tmp->next;
+  } // tmp is now at backptr
+  // traverse backward to currentPtr
+  while (tmp != currentPtr) {
+    CmiAssert(tmp->prev != NULL);
+    tmp = tmp->prev;
+  } // tmp is now at currentPtr
+  // traverse backward to frontPtr
+  while (tmp != frontPtr) {
+    CmiAssert(tmp->prev != NULL);
+    tmp = tmp->prev;
+  } // tmp is now at frontPtr
+  // traverse forward to currentPtr
+  while (tmp != currentPtr) {
+    CmiAssert(tmp->next != NULL);
+    tmp = tmp->next;
+  } // tmp is now at currentPtr again
+
+  // first event in queue should always have a checkpoint
+  if ((frontPtr->next != backPtr) && (frontPtr->next->done))
+    CmiAssert(frontPtr->next->cpData);
 
   // check eqheap
   eqh->sanitize();

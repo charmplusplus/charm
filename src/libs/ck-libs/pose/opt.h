@@ -38,19 +38,17 @@ public:
       its current state (assuming no stragglers, cancellations or events
       are subsequently received */
   int SafeTime() {  
-    int ovt=userObj->OVT(), theTime=-1, ec=parent->cancels.getEarliest(),
+    int ovt=userObj->OVT(), theTime, ec=parent->cancels.getEarliest(),
       gvt=localPVT->getGVT(), worktime = eq->currentPtr->timestamp;
     // Object is idle; report -1
     if (!RBevent && (ec<0) && (worktime < 0) && (ovt <= gvt))  return -1;
-    if (worktime > theTime) { // check queued events
+    theTime = ovt;
+    if (worktime > theTime) // check queued events
       theTime = worktime; // worktime is minimal
-      if (ovt > theTime) theTime = ovt; // pending work can't reduce OVT
-    }
-    if (RBevent && ((RBevent->timestamp<theTime) || (theTime == -1)))
+    if (RBevent && (RBevent->timestamp < theTime))
       theTime = RBevent->timestamp; // rollback time is minimal
-    if ((ec >= 0) && ((ec < theTime) || (theTime == -1))) 
+    if ((ec > -1) && (ec < theTime)) 
       theTime = ec; // earliest cancellation is minimal
-    if ((theTime == -1) && (ovt > gvt)) theTime = ovt;
     return theTime;
   }
   /// Add spawned event to current event's spawned event list

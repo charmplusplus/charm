@@ -32,10 +32,6 @@ void opt::Step()
   if (ev->timestamp >= 0) {
     currentEvent = ev;
     ev->done = 2;
-#ifdef POSE_STATS_ON
-    localStats->Do();
-    localStats->SwitchTimer(DO_TIMER);
-#endif
     parent->DOs++;
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
 #ifdef POSE_STATS_ON
@@ -61,9 +57,14 @@ void opt::Rollback()
   // find earliest event that must be undone
   recoveryPoint = RBevent;
   // skip forward over other stragglers
-  while ((recoveryPoint != eq->back()) && (recoveryPoint->done == 0)) 
+  while ((recoveryPoint != eq->back()) && (recoveryPoint->done == 0) 
+	 && (recoveryPoint != eq->currentPtr)) 
     recoveryPoint = recoveryPoint->next;
   CmiAssert(recoveryPoint != eq->back());
+  if (recoveryPoint == eq->currentPtr) {
+    eq->SetCurrentPtr(RBevent);
+    return;
+  }
 
   // roll back over recovery point
 #ifdef POSE_STATS_ON
