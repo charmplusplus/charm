@@ -17,11 +17,13 @@ extern int eventMsgsDiscarded;
 
 // Primary versions
 #define POSE_STATS_ON 1
-//#define POSE_COMM_ON 1
+#define POSE_COMM_ON 1
 //#define LB_ON 1
 
 #ifdef POSE_COMM_ON
 #include <StreamingStrategy.h>
+#define COMM_TIMEOUT 20
+#define COMM_MAXMSG 100
 #endif 
 #include "pose.decl.h"
 
