@@ -217,7 +217,7 @@ void PipeBroadcastConverse::conversePipeBcast(char *env, int totalSize) {
   CmiSetHandler(env, propagateHandle_frag);
   ComlibPrintf("setting env handler to %d\n",propagateHandle_frag);
   for (int i=0; i<(int)ceil(((double)totalSize-CmiReservedHeaderSize)/reducedPipe); ++i) {
-    sendingMsg = (char*)CmiAlloc(pipeSize);
+    sendingMsg = (char*)CmiAlloc(reducedPipe<remaining? pipeSize : remaining+CmiReservedHeaderSize+sizeof(PipeBcastInfo));
     memcpy (sendingMsg, env, CmiReservedHeaderSize);
     PipeBcastInfo *info = (PipeBcastInfo*)(sendingMsg+CmiReservedHeaderSize);
     info->srcPe = CkMyPe();
