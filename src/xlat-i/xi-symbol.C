@@ -2412,8 +2412,16 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
   if(prependEntryName) procFull<<name<<"_";
   procFull<<procName;
   
-  str << "  CthAwaken(CthCreate((CthVoidFn)"<<procFull
-   <<", new CkThrCallArg(impl_msg,impl_obj), "<<getStackSize()<<"));\n}\n";
+  str << "  CthThread tid = CthCreate((CthVoidFn)"<<procFull
+   <<", new CkThrCallArg(impl_msg,impl_obj), "<<getStackSize()<<");\n";
+#if CMK_BLUEGENE_CHARM
+  str << "  BgAttach(tid);\n";
+#endif
+  str << "  CthAwaken(tid);\n";
+  str << "}\n";
+//  str << "  CthAwaken(CthCreate((CthVoidFn)"<<procFull
+//   <<", new CkThrCallArg(impl_msg,impl_obj), "<<getStackSize()<<"));\n}\n";
+
   str << makeDecl("void")<<"::"<<procFull<<"(CkThrCallArg *impl_arg)\n";
   str << "{\n";\
   str << "  void *impl_msg = impl_arg->msg;\n";
