@@ -9,3 +9,6 @@
        external tcharm_register
        external tcharm_migrate
        external tcharm_done
+
+       external tcharm_readonly_globals
+

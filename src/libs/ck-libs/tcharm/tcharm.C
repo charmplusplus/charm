@@ -22,8 +22,10 @@ void TCharm::nodeInit(void)
 {
   CtvInitialize(TCharm *,_curTCharm);
   CpvInitialize(inState,_stateTCharm);
+  TCharm::setState(inNodeSetup);
   TCharmUserNodeSetup();
   FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)();
+  TCharm::setState(inInit);
 }
 
 static void startTCharmThread(TCharmInitMsg *msg)
@@ -37,8 +39,7 @@ static void startTCharmThread(TCharmInitMsg *msg)
 TCharm::TCharm(TCharmInitMsg *initMsg_)
 {
   initMsg=initMsg_;
-  
-tid=CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->stackSize);
+  tid=CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->stackSize);
   CtvAccessOther(tid,_curTCharm)=this;
   TCharm::setState(inInit);
   isStopped=true;
@@ -219,6 +220,41 @@ static void TCharmBuildThreads(TCharmInitMsg *msg,TCharmSetupCookie &cook)
 	cook.setThreads(id,msg->numElements);
 }
 
+/****** Readonlys *****/
+CkVec<TCpupReadonlyGlobal> TCharmReadonlys::entries;
+void TCharmReadonlys::add(TCpupReadonlyGlobal fn)
+{
+	entries.push_back(fn);
+}
+//Pups all registered readonlys
+void TCharmReadonlys::pup(PUP::er &p) {
+	if (p.isUnpacking()) {
+		//HACK: Rather than sending this message only where its needed,
+		// we send it everywhere and just ignore it if it's not needed.
+		if (CkMyPe()==0) return; //Processor 0 is the source-- no unpacking needed
+		if (CkMyRank()!=0) return; //Some other processor will do the unpacking
+	}
+	//Pup the globals for this node:
+	int i,n=entries.length();
+	p(n);
+	if (n!=entries.length())
+		CkAbort("TCharmReadonly list length mismatch!\n");
+	for (i=0;i<n;i++)
+		(entries[i])((pup_er)&p);
+}
+
+CDECL void TCharmReadonlyGlobals(TCpupReadonlyGlobal fn)
+{
+	if (TCharm::getState()!=inNodeSetup)
+		CkAbort("Can only call TCharmReadonlyGlobals from in TCharmUserNodeSetup!\n");
+	TCharmReadonlys::add(fn);
+}
+FDECL void FTN_NAME(TCHARM_READONLY_GLOBALS,tcharm_readonly_globals)
+	(TCpupReadonlyGlobal fn)
+{
+	TCharmReadonlyGlobals(fn);
+}
+
 /************* Startup/Shutdown Coordination Support ************/
 
 enum {TC_READY=23, TC_DONE=42};
@@ -341,6 +377,10 @@ public:
     
     if (0==TCharmCoordinator::getTotal())
 	    CkAbort("You didn't create any TCharm arrays in TCharmUserSetup!\n");
+
+    //Send out the readonly globals:
+    TCharmReadonlys r;
+    CProxy_TCharmReadonlyGroup::ckNew(r);
   }
 };
 
@@ -466,11 +506,15 @@ FDECL int FTN_NAME(TCHARM_NUM_ELEMENTS,tcharm_num_elements)(void)
 
 CDECL int TCharmRegister(void *data,TCharmPupFn pfn)
 { 
+	if (!CmiIsomallocInRange(data))
+		CkAbort("The UserData you register must be allocated on the stack!\n");
 	return TCharm::get()->add(TCharm::UserData(pfn,data));
 }
 FDECL int FTN_NAME(TCHARM_REGISTER,tcharm_register)
 	(void *data,TCpupUserDataF pfn)
 { 
+	if (!CmiIsomallocInRange(data))
+		CkAbort("The UserData you register must be allocated on the stack!\n");
 	return TCharm::get()->add(TCharm::UserData(
 		pfn,data,TCharm::UserData::isFortran()));
 }

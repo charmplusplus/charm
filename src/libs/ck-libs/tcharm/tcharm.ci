@@ -10,4 +10,7 @@ module tcharm {
   mainchare TCharmMain {
     entry TCharmMain();
   };
+  group TCharmReadonlyGroup {
+    entry void TCharmReadonlyGroup(TCharmReadonlys r);
+  };
 };

@@ -17,7 +17,14 @@ void TCharmUserNodeSetup(void);
 void TCharmUserSetup(void);
 
 
-/*Routines you can call from UserSetup:*/
+/**** Routines you can call from UserNodeSetup: ****/
+
+/*Register readonly global variables-- these will be broadcast
+after init and available in driver.*/
+typedef void (*TCpupReadonlyGlobal)(pup_er p);
+void TCharmReadonlyGlobals(TCpupReadonlyGlobal fn);
+
+/**** Routines you can call from UserSetup: ****/
 
 /*Set the size of the thread stack*/
 void TCharmSetStackSize(int newStackSize);
@@ -38,11 +45,8 @@ int TCharmArgc(void);
 /*Get the number of chunks we expect based on the command line*/
 int TCharmGetNumChunks(void);
 
-/*Implementation routines*/
-void TCharmInDefaultSetup(void);
 
-
-/*Routines you can call from a thread*/
+/**** Routines you can call from the thread (driver) ****/
 int TCharmElement(void);
 int TCharmNumElements(void);
 
@@ -51,6 +55,7 @@ int TCharmRegister(void *data,TCharmPupFn pfn);
 void *TCharmGetUserdata(int id);
 void TCharmMigrate(void);
 void TCharmDone(void);
+
 
 #ifdef __cplusplus
 };

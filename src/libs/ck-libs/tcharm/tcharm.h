@@ -10,9 +10,30 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #ifndef __CHARM_TCHARM_H
 #define __CHARM_TCHARM_H
 
-#include "tcharm.decl.h"
+#include "pup.h"
 #include "pup_c.h"
 #include "charm-api.h"
+#include "tcharmc.h"
+#include "cklists.h"
+
+//User's readonly global variables, set exactly once after initialization
+class TCharmReadonlys {
+	//There's only one (shared) list per node, so no CpvAccess here
+	static CkVec<TCpupReadonlyGlobal> entries;
+ public:
+	static void add(TCpupReadonlyGlobal fn);
+	//Pups all registered readonlys
+	void pup(PUP::er &p);
+};
+PUPmarshall(TCharmReadonlys);
+
+#include "tcharm.decl.h"
+
+class TCharmReadonlyGroup : public Group {
+ public:
+	//Just unpacking the parameter is enough:
+	TCharmReadonlyGroup(const TCharmReadonlys &r) { /*nothing needed*/ }
+};
 
 class TCharm;
 
@@ -32,7 +53,7 @@ class TCharmInitMsg : public CMessage_TCharmInitMsg {
 };
 
 //Current computation location
-typedef enum {inInit,inDriver,inFramework,inPup} inState;
+typedef enum {inNodeSetup,inInit,inDriver,inFramework,inPup} inState;
 
 //Thread-local variables:
 CtvExtern(TCharm *,_curTCharm);
@@ -202,8 +223,6 @@ class TCharmSetupCookie {
 
 	static TCharmSetupCookie *get(void) {return theCookie;}
 };
-
-#include "tcharmc.h"
 
 //Node setup callbacks: called at startup on each node
 FDECL void FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)(void);
