@@ -289,16 +289,17 @@ void bgTimeLog::print(int node, int th)
 
 void bgTimeLog::write(FILE *fp)
 { 
+  int i;
   fprintf(fp,"<<==  %p ep:%d name:%s startTime:%f endTime:%f recvime:%f effRecvTime:%e srcnode:%d msgID:%d seqno:%d\n", this, ep, name,startTime, endTime, recvTime, effRecvTime, srcnode, msgID, seqno);
-  for (int i=0; i<msgs.length(); i++)
+  for (i=0; i<msgs.length(); i++)
    msgs[i]->write(fp);
   // fprintf(fp,"\nbackwardDeps [%d]:\n",backwardDeps.length());
   fprintf(fp, "backward: ");
-  for (int i=0; i<backwardDeps.length(); i++)
+  for (i=0; i<backwardDeps.length(); i++)
     fprintf(fp,"[%p] ",backwardDeps[i]);
   fprintf(fp, "\n");
   fprintf(fp, "forward: ");
-  for (int i=0; i<forwardDeps.length(); i++)
+  for (i=0; i<forwardDeps.length(); i++)
     fprintf(fp,"[%p] ",forwardDeps[i]);
   fprintf(fp, "\n");
   fprintf(fp, "==>>\n");
@@ -1034,7 +1035,7 @@ static inline int batchHandleCorrectionMsg(int mynode, BgTimeLineRec &tlinerec, 
   bgTimeLog *minLog = NULL;
   tlinerec.minCorrection = INVALIDTIME;
   BGSTATE2(2,"batchHandleCorrectionMsg (bgnode:%d len:%d) {", mynode, len);
-  for (int i=0; i<len; i++) {
+  for (i=0; i<len; i++) {
     bgCorrectionMsg *cm = cmsg.deq();
     if (cm->tAdjust >= 0.) {
       int oldIdx;
@@ -1077,7 +1078,7 @@ static inline int batchHandleCorrectionMsg(int mynode, BgTimeLineRec &tlinerec, 
   }
 
   int qlen = tmpQ.length();
-  for (int i=0; i<qlen; i++) cmsg.enq(tmpQ.deq());
+  for (i=0; i<qlen; i++) cmsg.enq(tmpQ.deq());
 /*
 if (cmsg.length()>0)
 CmiPrintf("QUEUE LEN %d: %d\n", mynode, cmsg.length());
@@ -1285,6 +1286,7 @@ static double findLeastTime()
 {
   // find the least of all buffered message timer and all correction timer
   double minT = INVALIDTIME;
+  int i;
 
   for (int nodeidx=0; nodeidx<cva(numNodes); nodeidx++) {
     BgTimeLineRec *tlinerecs = cva(nodeinfo)[nodeidx].timelines;
@@ -1295,7 +1297,7 @@ static double findLeastTime()
     CthThread *threadTable = cva(nodeinfo)[nodeidx].threadTable;
 
     //min in correction msg Q  
-    for (int i=0; i<cmsgQ.length(); i++){
+    for (i=0; i<cmsgQ.length(); i++){
       bgCorrectionMsg* cmsg = cmsgQ[i]; 
       if (cmsg->tAdjust>.0){
 	int index;
@@ -1313,7 +1315,7 @@ static double findLeastTime()
       }
     }
     //min in affinityQ
-    for(int i=0;i<cva(numWth);i++){
+    for(i=0;i<cva(numWth);i++){
 	ckMsgQueue &aQ = affinityQs[i];
 #if 0
 	if (aQ.length() && deadlock)  {
@@ -1328,7 +1330,7 @@ static double findLeastTime()
 	}
     }
     //min in nodeQ
-    for(int i=0;i<nodeQ.length();i++){
+    for(i=0;i<nodeQ.length();i++){
         if(CmiBgMsgRecvTime(nodeQ[i])< minT)
 	    minT = CmiBgMsgRecvTime(nodeQ[i]);
     }
