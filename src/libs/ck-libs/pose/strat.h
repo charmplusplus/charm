@@ -6,6 +6,14 @@
 #ifndef STRAT_H
 #define STRAT_H
 
+#define INIT_T -2
+#define CONS_T -1
+#define OPT_T 0
+#define OPT2_T 1
+#define OPT3_T 2
+#define SPEC_T 3
+#define ADAPT_T 4
+
 class strat
 {
  protected:
@@ -21,6 +29,7 @@ class strat
   virtual void Rollback() { }      // strategy specific rollback function
   virtual void CancelEvents() { }  // strategy specific event cancellation
  public:
+  int STRAT_T;      // type of strategy; see defines above
   Event *targetEvent,   // checkpoint state target event
     *currentEvent;  // current event being executed
   int voted;        // if this object's strategy has voted for a GVT run

@@ -1,10 +1,7 @@
 // File: opt.C
-// Module for optimistic simulation strategy class
-// Last Modified: 09.12.01 by Terry L. Wilmarth
-
 #include "pose.h"
 
-opt::opt() { timeLeash = SPEC_WINDOW; }
+opt::opt() { STRAT_T = OPT_T; }
 
 // Single forward execution step
 void opt::Step()
@@ -33,36 +30,24 @@ void opt::Step()
   }
   // Prepare to execute an event
   ev = eq->currentPtr;
-  if (ev->timestamp < 0) return;
-  // Shorten the leash as we near POSE_endtime
-  if ((POSE_endtime > -1) && (lastGVT + timeLeash > POSE_endtime))
-    timeLeash = POSE_endtime - lastGVT + 1;
 
-  // This code is currently operating under BEST FIRST mode
-  if ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
-    int fix_timestamp = ev->timestamp;
-    while (ev->timestamp == fix_timestamp) {
-      // do all events with fix_timestamp
-      currentEvent = ev;
-      ev->done = 2;
+  // execute an event
+  if (ev->timestamp >= 0) {
+    currentEvent = ev;
+    ev->done = 2;
 #ifdef POSE_STATS_ON
-      localStats->Do();
-      localStats->SwitchTimer(DO_TIMER);
+    localStats->Do();
+    localStats->SwitchTimer(DO_TIMER);
 #endif
-      parent->DOs++;
-      parent->ResolveFn(ev->fnIdx, ev->msg);  // execute it
+    parent->DOs++;
+    parent->ResolveFn(ev->fnIdx, ev->msg);  // execute it
 #ifdef POSE_STATS_ON
-      localStats->SwitchTimer(SIM_TIMER);
+    localStats->SwitchTimer(SIM_TIMER);
 #endif
-      ev->done = 1;                           // complete the event execution
-      eq->ShiftEvent();                       // shift to next event
-      ev = eq->currentPtr;
-    }
-  }
-  if ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
-    prioMsg *pm = new prioMsg;
-    pm->setPriority(eq->currentPtr->timestamp);
-    POSE_Objects[parent->thisIndex].Step(pm);
+    ev->done = 1;              // complete the event execution
+    eq->ShiftEvent();          // shift to next event
+    if (eq->currentPtr->timestamp >= 0)
+      parent->Step();            // execute next event if there is one
   }
 }
 

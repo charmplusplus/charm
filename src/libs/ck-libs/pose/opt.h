@@ -1,14 +1,9 @@
 // File: opt.h
-// Module for optimistic simulation strategy class
-// Last Modified: 09.12.01 by Terry L. Wilmarth
-
 #ifndef OPT_H
 #define OPT_H
 
 class opt : public strat {
 protected:
-  int timeLeash;  // time units ahead of GVT an object can progress
-  int eventLeash; // # of events w/timestamp > GVT an object can execute
   virtual void Rollback();              // rollback to predetermined RBevent
   virtual void RecoverState(Event *ev); // recover state prior to ev
   virtual void CancelEvents();          // cancel events in cancellation list

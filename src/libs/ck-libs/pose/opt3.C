@@ -1,10 +1,10 @@
-// File: adapt.C
+// File: opt3.C
 #include "pose.h"
 
-adapt::adapt() { timeLeash = MIN_LEASH; STRAT_T = ADAPT_T; }
+opt3::opt3() { timeLeash = SPEC_WINDOW; STRAT_T = OPT3_T; }
 
 // Single forward execution step
-void adapt::Step()
+void opt3::Step()
 {
   Event *ev;
   static int lastGVT = 0;
@@ -23,8 +23,6 @@ void adapt::Step()
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(RB_TIMER);      
 #endif
-    //CkPrintf("<%d:%d @ %d (%d)", RBevent->evID.id, RBevent->evID.pe, RBevent->timestamp, timeLeash);
-    timeLeash = MIN_LEASH;
     Rollback(); 
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(SIM_TIMER);      
@@ -35,24 +33,28 @@ void adapt::Step()
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > -1) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT + 1;
-
-  while ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
-    // do all events at under timeLeash
-    currentEvent = ev;
-    ev->done = 2;
+  
+  if ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
+    int fix_time = ev->timestamp;
+    while (ev->timestamp == fix_time) {
+      // do all events at the first available timestamp
+      currentEvent = ev;
+      ev->done = 2;
 #ifdef POSE_STATS_ON
-    localStats->Do();
-    localStats->SwitchTimer(DO_TIMER);
+      localStats->Do();
+      localStats->SwitchTimer(DO_TIMER);
 #endif
-    parent->DOs++;
-    parent->ResolveFn(ev->fnIdx, ev->msg);  // execute it
+      parent->DOs++;
+      parent->ResolveFn(ev->fnIdx, ev->msg);  // execute it
 #ifdef POSE_STATS_ON
-    localStats->SwitchTimer(SIM_TIMER);
+      localStats->SwitchTimer(SIM_TIMER);
 #endif
-    ev->done = 1;                           // complete the event execution
-    eq->ShiftEvent();                       // shift to next event
-    ev = eq->currentPtr;
+      ev->done = 1;                           // complete the event execution
+      eq->ShiftEvent();                       // shift to next event
+      ev = eq->currentPtr;                    // reset ev
+    }
+    if (eq->currentPtr->timestamp >= 0)
+      parent->Step();             // execute next event if there is one
   }
-  if (timeLeash < MAX_LEASH) timeLeash++;
 }
 

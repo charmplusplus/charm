@@ -1,10 +1,10 @@
-// File: adapt.C
+// File: spec.C
 #include "pose.h"
 
-adapt::adapt() { timeLeash = MIN_LEASH; STRAT_T = ADAPT_T; }
+spec::spec() { timeLeash = SPEC_WINDOW; STRAT_T = SPEC_T; }
 
 // Single forward execution step
-void adapt::Step()
+void spec::Step()
 {
   Event *ev;
   static int lastGVT = 0;
@@ -23,8 +23,6 @@ void adapt::Step()
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(RB_TIMER);      
 #endif
-    //CkPrintf("<%d:%d @ %d (%d)", RBevent->evID.id, RBevent->evID.pe, RBevent->timestamp, timeLeash);
-    timeLeash = MIN_LEASH;
     Rollback(); 
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(SIM_TIMER);      
@@ -35,9 +33,9 @@ void adapt::Step()
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > -1) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT + 1;
-
+  
   while ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
-    // do all events at under timeLeash
+    // do all events within the speculative window
     currentEvent = ev;
     ev->done = 2;
 #ifdef POSE_STATS_ON
@@ -51,8 +49,7 @@ void adapt::Step()
 #endif
     ev->done = 1;                           // complete the event execution
     eq->ShiftEvent();                       // shift to next event
-    ev = eq->currentPtr;
+    ev = eq->currentPtr;                    // reset ev
   }
-  if (timeLeash < MAX_LEASH) timeLeash++;
 }
 

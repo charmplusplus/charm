@@ -13,6 +13,7 @@ strat::strat() // basic initialization constructor
   currentEvent = targetEvent = RBevent = NULL;
   voted = 0;
   localPVT = (PVT *)CkLocalBranch(ThePVT);
+  STRAT_T = INIT_T;
 #ifdef POSE_STATS_ON
   localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif

@@ -253,8 +253,8 @@ void GVT::computeGVT(UpdateMsg *m)
       estGVT = unmatchedMsg;
     //SendsAndRecvs->dump();
     
-    CkPrintf("opt=%d con=%d lastGVT=%d lastMsg=%d\n", 
-    	     optGVT, conGVT, lastGVT, unmatchedMsg);
+    //CkPrintf("opt=%d con=%d lastGVT=%d lastMsg=%d\n", 
+    //     optGVT, conGVT, lastGVT, unmatchedMsg);
     
     // STEP 3: In times of inactivity, GVT must be set to lastGVT
     if ((estGVT < 0) && (lastGVT < 0)) { estGVT = 0; }
@@ -266,7 +266,7 @@ void GVT::computeGVT(UpdateMsg *m)
       SendsAndRecvs->dump();
     }
     
-    CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
+    //CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
 
     // STEP 5: Check for termination conditions
     int term = 0;

@@ -52,12 +52,26 @@ void sim::Step()
     localStats->TimerStart(SIM_TIMER);
   else localStats->SwitchTimer(SIM_TIMER);
 #endif
-  if (eq->currentPtr->timestamp >= 0) {
-    prioMsg *pm = new prioMsg;
-    pm->setPriority(eq->currentPtr->timestamp);
-    POSE_Objects[thisIndex].Step(pm);
+  prioMsg *pm = new prioMsg;
+  switch (myStrat->STRAT_T) {
+  case CONS_T:
+  case OPT_T:
+  case OPT2_T:
+  case OPT3_T: // prioritized step
+    if (eq->currentPtr->timestamp >= 0) {
+      pm->setPriority(eq->currentPtr->timestamp-INT_MAX);
+      POSE_Objects[thisIndex].Step(pm);
+    }
+    else myStrat->Step();
+    break;
+  case SPEC_T:
+  case ADAPT_T: // non-prioritized step
+    myStrat->Step(); // Call Step on strategy
+    break;
+  default: 
+    CkPrintf("Invalid strategy type: %d\n", myStrat->STRAT_T); 
+    break;
   }
-  //  myStrat->Step(); // Call Step on strategy
 #ifdef POSE_STATS_ON
   if (!tstat)
     localStats->TimerStop();
@@ -85,6 +99,7 @@ void sim::Step(prioMsg *m)
 
 void sim::Status()
 {
+  int st = myStrat->SafeTime();
   localPVT->objUpdate(myPVTidx, myStrat->SafeTime(), -1, -1);
 }
 
