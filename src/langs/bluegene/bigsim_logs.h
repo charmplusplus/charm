@@ -17,28 +17,28 @@ class bgMsgEntry {
 public:
   int msgID;
   int dstPe;		// dest bg node in global sequence
-  double recvTime;
+  double sendTime;	// msg sending offset in the event
+  double recvTime;	// predicted recv time with delay
 #if DELAY_SEND
   char *sendMsg;	// real msg
 #endif
   CmiInt2 tID;		// destination worker thread ID
-//  double sendtime;
   int msgsize;		// message size
 private:
   bgMsgEntry() {}
 public:
   bgMsgEntry(char *msg, int node, int tid, int local);
   inline void print() {
-    CmiPrintf("msgID:%d recvtime:%f dstPe:%d\n", msgID, recvTime, dstPe);
+    CmiPrintf("msgID:%d sent:%f recvtime:%f dstPe:%d\n", msgID, sendTime, recvTime, dstPe);
   }
   void write(FILE *fp) {
-    fprintf(fp, "msgID:%d recvtime:%f dstPe:%d\n", msgID, recvTime, dstPe);
+    fprintf(fp, "msgID:%d sent:%d recvtime:%f dstPe:%d\n", msgID, sendTime, recvTime, dstPe);
   }
 #if DELAY_SEND
   void send();
 #endif
   void pup(PUP::er &p) {
-    p|msgID; p|dstPe; p|recvTime; p|tID; p|msgsize;
+    p|msgID; p|dstPe; p|sendTime; p|recvTime; p|tID; p|msgsize;
   }
 };
 
