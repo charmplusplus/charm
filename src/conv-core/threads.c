@@ -1787,7 +1787,8 @@ CthThread t;
     CthAbortHelp(&tc->stackp, tc, 0);
     setcontext(&t->stackp);
   } else {
-    if (0 != swapcontext(&tc->stackp, &t->stackp)) CmiAbort("CthResume: swapcontext failed\n");
+    if (0 != swapcontext(&tc->stackp, &t->stackp)) 
+      CmiAbort("CthResume: swapcontext failed.\n");
   }
   if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
 }
@@ -1807,29 +1808,25 @@ CthVoidFn fn; void *arg; int size;
 {
   CthThread result; char *stack, *stackbase;
   ucontext_t *jb, *stackp;
-  int pagesize;
   size = 16384*2;
   stack = (char*)malloc(size);
   _MEMCHECK(stack);
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
-#if CMK_GETPAGESIZE_AVAILABLE
-  pagesize = getpagesize();
-#else
-  pagesize = CMK_MEMORY_PAGESIZE;
-#endif
+  stackbase = stack;
+  stackbase = STP_STKALIGN(stackbase, 16);
 #if CMK_STACK_GROWDOWN
-  stackbase = stack+size-2048;
+  stackbase = stackbase+size-2048;
 #elif CMK_STACK_GROWUP
-  stackbase = STP_STKALIGN(stack+pagesize, pagesize);
+  stackbase = stackbase+8192;
 #else
   #error "Must define stack grow up or down in conv-mach.h!"
   CmiAbort("Must define stack grow up or down in conv-mach.h!\n");
 #endif
   getcontext(&result->stackp);
   result->stackp.uc_stack.ss_sp = stackbase;
-  result->stackp.uc_stack.ss_size = pagesize;
+  result->stackp.uc_stack.ss_size = size - 8192;
   result->stackp.uc_stack.ss_flags = 0;
   result->stackp.uc_link = 0;
   makecontext(&result->stackp, (void (*) (void))CthOnly, 3, arg, result, fn);
