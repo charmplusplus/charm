@@ -1,0 +1,9 @@
+module DummyLB {
+
+extern module CentralLB;
+initcall void lbinit(void);
+group DummyLB : CentralLB {
+  entry void DummyLB(void);  
+};
+
+};
