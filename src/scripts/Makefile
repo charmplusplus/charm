@@ -180,9 +180,11 @@ dirs+sources:
 
 TRACELIBS=libtrace-none.a libtrace-projections.a libtrace-summary.a
 
-CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o libldb-spray.o libldb-graph.o libldb-test.o $(TRACELIBS)
+CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libconv-util.a libldb-rand.o libldb-spray.o libldb-graph.o libldb-test.o $(TRACELIBS)
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o generate.o edgelist.o conv-ccs.o quiescence.o 
+
+LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o ckhashtable.o
 
 converse: basics QuickThreads/libckqt.a $(CVLIBS) conv-host-if-needed conv-cpm
 
@@ -205,6 +207,9 @@ libconv-cplus-y.a: machine.c $(CVHEADERS)
 
 libconv-cplus-n.a: machine.c $(CVHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=0 machine.c
+
+libconv-util.a: $(LIBCONV_UTIL)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTIL)
 
 cpm.o: cpm.c $(CVHEADERS)
 	$(CHARMC) cpm.c
@@ -269,6 +274,18 @@ libldb-spray.o: cldb.spray.c $(CVHEADERS)
 libldb-test.o: cldb.test.c $(CVHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ cldb.test.c
 
+pup_util.o: pup_util.C $(UTILHEADERS)
+	$(CHARMC) -o pup_util.o pup_util.C
+
+pup_xlater.o: pup_xlater.C $(UTILHEADERS)
+	$(CHARMC) -o pup_xlater.o pup_xlater.C
+
+pup_c.o: pup_c.C $(UTILHEADERS)
+	$(CHARMC) -o pup_c.o pup_c.C
+
+ckhashtable.o: ckhashtable.C ckhashtable.h
+	$(CHARMC) -o ckhashtable.o ckhashtable.C
+
 ###############################################################################
 #
 # Charm Libraries
@@ -278,7 +295,7 @@ libldb-test.o: cldb.test.c $(CVHEADERS)
 CK_LIBS_CORE=libck.a
 
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
-           ckarray.o pup_util.o pup_xlater.o ckreduction.o ckhashtable.o \
+           ckarray.o ckreduction.o \
            tempo.o waitqd.o LBDatabase.o lbdb.o \
 	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
 	   ObjGraph.o \
@@ -387,20 +404,11 @@ CkReduction.decl.h CkReduction.def.h: ckreduction.ci charmxi
 ckreduction.o: ckreduction.C $(CKHEADERS)
 	$(CHARMC) -o ckreduction.o ckreduction.C
 
-ckhashtable.o: ckhashtable.C $(CKHEADERS)
-	$(CHARMC) -o ckhashtable.o ckhashtable.C
-
 CkArray.decl.h CkArray.def.h : ckarray.ci charmxi
 	$(CHARMC) ckarray.ci
 
 ckarray.o: ckarray.C $(CKHEADERS)
 	$(CHARMC) -o ckarray.o ckarray.C
-
-pup_util.o: pup_util.C $(CKHEADERS)
-	$(CHARMC) -o pup_util.o pup_util.C
-
-pup_xlater.o: pup_xlater.C $(CKHEADERS)
-	$(CHARMC) -o pup_xlater.o pup_xlater.C
 
 lbdb.o: lbdb.C $(CKHEADERS)
 	$(CHARMC) -o lbdb.o lbdb.C

@@ -884,7 +884,7 @@ case "$LANGUAGE" in
 esac
 
 LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $PRE_LIBRARIES -lck $POST_LIBRARIES"
-CORE_LIBS="-lconv-core -ltrace-$TRACEMODE"
+CORE_LIBS="-lconv-core -lconv-util -ltrace-$TRACEMODE"
 
 case "$LANGUAGE" in
 "charm"|"charm++")
