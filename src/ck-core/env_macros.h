@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-07-24 01:54:40  jyelon
+ * Revision 2.6  1995-07-25 00:29:31  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.5  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.4  1995/07/22  23:44:13  jyelon
@@ -106,8 +109,10 @@ typedef struct envelope {
   unsigned short pe;      /* unknown meaning. used only for logging. */
   unsigned char  msgType;
   unsigned char  isPACKED;
+
   unsigned char  queueing;
   unsigned char  packid;
+  unsigned char  LdbFull;
 
 } ENVELOPE;
 
@@ -156,11 +161,20 @@ typedef struct envelope {
 #define SetEnv_chareIndex(e,x)          (env(e)->s_tag2=(x))
 
 /*********************************************************/
+/** These fields share a byte.                           */
+/*********************************************************/
+
+#define GetEnv_isPACKED(e)      (env(e)->isPACKED)
+#define SetEnv_isPACKED(e,x)    (env(e)->isPACKED=(x))
+
+#define GetEnv_LdbFull(e)       (env(e)->LdbFull)
+#define SetEnv_LdbFull(e)       (env(e)->LdbFull=1) 
+#define ClrEnv_LdbFull(e)       (env(e)->LdbFull=0)
+
+/*********************************************************/
 /** These fields are alone currently, and accessed	**/
 /** separately.						**/
 /*********************************************************/
-#define GetEnv_isPACKED(e)      (env(e)->isPACKED)
-#define SetEnv_isPACKED(e,x)    (env(e)->isPACKED=(x))
 
 #define GetEnv_pe(e)		(env(e)->pe)
 #define SetEnv_pe(e,x)          (env(e)->pe=(x))

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-07-24 01:54:40  jyelon
+ * Revision 2.8  1995-07-25 00:29:31  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.7  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.6  1995/07/22  23:44:13  jyelon
@@ -303,11 +306,8 @@ ChareIDType * pChareID;
  	CreateChare(Charename, Entry, Msg, [vid [,destPE]]) 
 
    If vid is NULL_VID it is a CreateChare call ("without ID"). 
-   if DestPe is NULL_PE  then it may go to any destination node
-   if DestPe is ALL_NODES then the message is to be broadcast
-   if DestPe is ALL_NODES_EXCEPT_ME then the message is to be broadcast
-   to all nodes except myself.
-   if DestPe is >= 0 then the message is bound for a valid destination
+   if DestPe is CK_PE_ANY  then it may go to any destination node
+   if DestPe is not CK_PE_SPECIAL then the message is bound for a regular destination
 
 */
 
@@ -368,7 +368,10 @@ int destPE;
      calls were moved inside this if-then-else  */
   
   trace_creation(GetEnv_msgType(env), Entry, env);
-  if (destPE == NULL_PE) {
+  if (CK_PE_SPECIAL(destPE)) {
+    if (destPE != CK_PE_ANY) {
+      CmiPrintf("** ERROR ** Illegal destPE in CreateChare\n");
+    }
     SetEnv_msgType(env, NewChareMsg);
     CmiSetHandler(env,CsvAccess(CkProcess_NewChareMsg_Index)) ;
     CldNewSeedFromLocal(env, LDB_ELEMENT_PTR(env),

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-07-24 01:54:40  jyelon
+ * Revision 2.8  1995-07-25 00:29:31  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.7  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.6  1995/07/22  23:44:13  jyelon
@@ -50,11 +53,13 @@
 /* constants for denoting illegal values (used as flags) */
 #define NULL_VID       NULL
 #define NULL_PACK_ID    0  
-#define NULL_PE        -2   /* -1 indicates all nodes, so use -2 */
 
-/* Constant values for destPE in envelope */
-#define ALL_NODES           (-1)
-#define ALL_NODES_EXCEPT_ME (-2)
+/* Constant values for PE */
+#define CK_PE_SPECIAL(x) ((x)>=0xFFF0)
+#define CK_PE_ALL        (0xFFF0)
+#define CK_PE_ALL_BUT_ME (0xFFF1)
+#define CK_PE_ANY        (0xFFF2)
+#define CK_PE_INVALID    (0xFFF3)
 
 /* Constant values for queueing in envelope */
 #define CK_QUEUEING_FIFO  CQS_QUEUEING_FIFO

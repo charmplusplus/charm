@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-07-24 01:54:40  jyelon
+ * Revision 2.10  1995-07-25 00:29:31  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.9  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.8  1995/07/22  23:44:13  jyelon
@@ -110,22 +113,26 @@ void mainModuleInit()
 void CkProcess_ForChareMsg(envelope)
 ENVELOPE *envelope;
 {
-  int magic = GetEnv_chare_magic_number(envelope);
-  int current_ep = GetEnv_EP(envelope);
-  int current_msgType = GetEnv_msgType(envelope);
-  void *usrMsg = USER_MSG_PTR(envelope);
-  CHARE_BLOCK *current_block = GetEnv_chareBlockPtr(envelope);
+  int current_ep, current_magic, current_msgType; void *current_usr;
+  CHARE_BLOCK *current_block;
+  current_ep = GetEnv_EP(envelope);
+  if (EpLanguageTable[current_ep]==CHARMPLUSPLUS)
+    { CkProcess_Cplus_ForChareMsg(envelope); return; }
+  current_magic = GetEnv_chare_magic_number(envelope);
+  current_msgType = GetEnv_msgType(envelope);
+  current_usr = USER_MSG_PTR(envelope);
+  current_block = GetEnv_chareBlockPtr(envelope);
   CpvAccess(currentChareBlock) = (void *)current_block;
   CpvAccess(nodeforCharesProcessed)++;
 
-  if (magic != GetID_chare_magic_number(current_block->selfID)) {
+  if (current_magic != GetID_chare_magic_number(current_block->selfID)) {
     CmiPrintf("[%d] *** ERROR *** Invalid or expired chareID used at entry point %s.\n", CmiMyPe(), CsvAccess(EpNameTable)[current_ep]);
   }
 
   /* Run the entry-point */
   trace_begin_execute(envelope);
-  (*(CsvAccess(EpTable)[current_ep])) (usrMsg,current_block+1);
-  trace_end_execute(magic, current_msgType, current_ep);
+  (*(CsvAccess(EpTable)[current_ep])) (current_usr,current_block+1);
+  trace_end_execute(current_magic, current_msgType, current_ep);
   QDCountThisProcessing(current_msgType);
 }
 
@@ -145,11 +152,15 @@ ENVELOPE *envelope;
 void CkProcess_NewChareMsg(envelope)
 ENVELOPE *envelope;
 {
-  void * CreateChareBlock();
-  int current_ep = GetEnv_EP(envelope);
-  void *usrMsg = USER_MSG_PTR(envelope);
-  int current_msgType = GetEnv_msgType(envelope);
+  int current_ep, current_msgType; void *current_usr;
   CHARE_BLOCK *current_block;
+  void * CreateChareBlock();
+
+  current_ep = GetEnv_EP(envelope);
+  if (EpLanguageTable[current_ep]==CHARMPLUSPLUS)
+    { CkProcess_Cplus_NewChareMsg(envelope); return; }
+  current_usr = USER_MSG_PTR(envelope);
+  current_msgType = GetEnv_msgType(envelope);
   /* allocate data area, and strart execution. */
   current_block= (CHARE_BLOCK *)CreateChareBlock
     (magnitude_to_bytes(GetEnv_dataMag(envelope)));
@@ -168,7 +179,7 @@ ENVELOPE *envelope;
   /* run the entry point */
   trace_begin_execute(envelope);
   (*(CsvAccess(EpTable)[current_ep]))
-    (usrMsg, CpvAccess(currentChareBlock) + 1);
+    (current_usr, CpvAccess(currentChareBlock) + 1);
   trace_end_execute
     (CpvAccess(nodecharesProcessed), current_msgType, current_ep);
 
@@ -181,14 +192,17 @@ ENVELOPE *envelope;
 void CkProcess_BocMsg(env)
 ENVELOPE *env;
 {
-  int current_ep = GetEnv_EP(env);
-  void *usrMsg = USER_MSG_PTR(env);
-  int current_msgType = GetEnv_msgType(env);
-  int executing_boc_num = GetEnv_boc_num(env);
+  int current_ep, current_msgType, current_bocnum; void *current_usr;
+  current_ep = GetEnv_EP(env);
+  if (EpLanguageTable[current_ep]==CHARMPLUSPLUS)
+    { CkProcess_Cplus_BocMsg(env); return; }
+  current_usr = USER_MSG_PTR(env);
+  current_msgType = GetEnv_msgType(env);
+  current_bocnum = GetEnv_boc_num(env);
   trace_begin_execute(env);
-  (*(CsvAccess(EpTable)[current_ep]))(usrMsg, 
-			    GetBocDataPtr(executing_boc_num));
-  trace_end_execute(executing_boc_num, current_msgType, current_ep);
+  (*(CsvAccess(EpTable)[current_ep]))(current_usr, 
+			    GetBocDataPtr(current_bocnum));
+  trace_end_execute(current_bocnum, current_msgType, current_ep);
   CpvAccess(nodebocMsgsProcessed)++;
   QDCountThisProcessing(current_msgType);
 }
@@ -197,9 +211,9 @@ void CkProcess_VidEnqueueMsg(env)
 ENVELOPE *env;
 {
   int current_msgType = GetEnv_msgType(env);
-  void *usrMsg = USER_MSG_PTR(env);
+  void *current_usr = USER_MSG_PTR(env);
   trace_begin_execute(env);
-  (*(CsvAccess(EpTable)[VidQueueUpInVidBlock_EP])) (usrMsg, NULL);
+  (*(CsvAccess(EpTable)[VidQueueUpInVidBlock_EP])) (current_usr, NULL);
   trace_end_execute(VidBocNum, current_msgType, VidQueueUpInVidBlock_EP);
   QDCountThisProcessing(current_msgType);
 }
@@ -208,32 +222,24 @@ void CkProcess_VidSendOverMsg(env)
 ENVELOPE *env;
 {
   int current_msgType = GetEnv_msgType(env);
-  void *usrMsg = USER_MSG_PTR(env);
+  void *current_usr = USER_MSG_PTR(env);
   trace_begin_execute(env);
-  (*(CsvAccess(EpTable)[VidSendOverMessages_EP])) (usrMsg, NULL);
+  (*(CsvAccess(EpTable)[VidSendOverMessages_EP])) (current_usr, NULL);
   trace_end_execute(VidBocNum, current_msgType, VidSendOverMessages_EP);
   QDCountThisProcessing(current_msgType);
 }
 
 /* This is the handler function for Charm and Charm++, which is called
-   immediately when a message is received from the network */
+   immediately when a message is received (from self or network) */
 
 HANDLE_INCOMING_MSG(env)
 ENVELOPE *env;
 {
+  int ep, type = GetEnv_msgType(env);
   UNPACK(env);
-  if(CpvAccess(InsideDataInit))
-    CldStripLdb(LDB_ELEMENT_PTR(env));
-  HANDLE_LOCAL_MSG(env);
-}
-
-/* This is the handler function for Charm and Charm++, which is called
-   immediately whenever I send a message to myself */
-
-HANDLE_LOCAL_MSG(env)
-ENVELOPE *env;
-{
-  int type = GetEnv_msgType(env);
+  if (GetEnv_LdbFull(env))
+    if(CpvAccess(InsideDataInit))
+      CldStripLdb(LDB_ELEMENT_PTR(env));
   switch (type)
     {
     case NewChareMsg:

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-07-25 00:29:31  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.4  1995/05/09  20:55:53  knauff
@@ -70,7 +73,7 @@ public:
         }
         void Insert(int key, void *data, int size_data, int EPid, ChareIDType cid, int option)
         {
-            if ( GetID_onPE(cid) == -1 )
+            if ( CK_PE_SPECIAL(GetID_onPE(cid)) )
                 ::TblInsert(_CK_MyId, -1, key, data, size_data, EPid, NULL, option) ;
             else
                 ::TblInsert(_CK_MyId, -1, key, data, size_data, EPid, &cid, option) ;
@@ -78,7 +81,7 @@ public:
 
         void Delete(int key, int EPid, ChareIDType cid, int option)
         {
-            if ( GetID_onPE(cid) == -1 )
+            if ( CK_PE_SPECIAL(GetID_onPE(cid)) )
                 ::TblDelete(_CK_MyId, -1, key, EPid, NULL, option) ;
             else
                 ::TblDelete(_CK_MyId, -1, key, EPid, &cid, option) ;
@@ -86,7 +89,7 @@ public:
 
         void Find(int key, int EPid, ChareIDType cid, int option)
         {
-            if ( GetID_onPE(cid) == -1 )
+            if ( CK_PE_SPECIAL(GetID_onPE(cid)) )
                 ::TblFind(_CK_MyId, -1, key, EPid, NULL, option) ;
             else
                 ::TblFind(_CK_MyId, -1, key, EPid, &cid, option) ;

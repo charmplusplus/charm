@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-07-24 01:54:40  jyelon
+ * Revision 2.11  1995-07-25 00:29:31  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.10  1995/07/24  01:54:40  jyelon
  * *** empty log message ***
  *
  * Revision 2.9  1995/07/22  23:44:13  jyelon
@@ -138,9 +141,12 @@
 
 #define CkCheck_and_Send(PE, env)\
     {\
-        if (PE==CmiMyPe()) HANDLE_LOCAL_MSG(env);\
+        if (PE==CmiMyPe())\
+            { ClrEnv_LdbFull(env); HANDLE_INCOMING_MSG(env); }\
         else {\
-            PACK(env); CldFillLdb(PE, LDB_ELEMENT_PTR(env)); \
+            SetEnv_LdbFull(env);\
+            CldFillLdb(PE, LDB_ELEMENT_PTR(env)); \
+            PACK(env); \
             CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
             CmiSyncSend(PE,CmiSize(env),env); \
             CmiFree(env); \
@@ -148,26 +154,30 @@
     }
 
 #define CkCheck_and_Broadcast(env) { \
-        CldFillLdb(ALL_NODES_EXCEPT_ME, LDB_ELEMENT_PTR(env)); PACK(env); \
+        SetEnv_LdbFull(env);\
+        CldFillLdb(CK_PE_ALL_BUT_ME, LDB_ELEMENT_PTR(env)); PACK(env); \
         CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcast(CmiSize(env),env); \
 	CmiFree(env) ; \
         }
 
 #define CkCheck_and_BroadcastNoFree(env) { \
-        CldFillLdb(ALL_NODES_EXCEPT_ME, LDB_ELEMENT_PTR(env)); PACK(env); \
+        SetEnv_LdbFull(env);\
+        CldFillLdb(CK_PE_ALL_BUT_ME, LDB_ELEMENT_PTR(env)); PACK(env); \
         CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcast(CmiSize(env),env); UNPACK(env);  \
         }
 
 #define CkCheck_and_BroadcastNoFreeNoLdb(env) { \
+        ClrEnv_LdbFull(env);\
         PACK(env); \
         CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcast(CmiSize(env),env); UNPACK(env);  \
         }
 
 #define CkCheck_and_BroadcastAll(env) { \
-        CldFillLdb(ALL_NODES, LDB_ELEMENT_PTR(env)); PACK(env); \
+        SetEnv_LdbFull(env);\
+        CldFillLdb(CK_PE_ALL, LDB_ELEMENT_PTR(env)); PACK(env); \
         CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcastAllAndFree(CmiSize(env),env);\
         }
