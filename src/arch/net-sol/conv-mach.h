@@ -57,6 +57,7 @@
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 #define CMK_SHARED_VARS_SUN_THREADS                        0
+#define CMK_FAKE_SCHED_YIELD                               1
 
 #define CMK_THREADS_ARE_WIN32_FIBERS                       0
 #define CMK_THREADS_USE_PTHREADS                           0
