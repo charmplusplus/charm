@@ -123,21 +123,22 @@ void nodeInfo::addBgNodeMessage(char *msgPtr)
       /* this work thread is idle, schedule the msg here */
       DEBUGF(("activate a work thread %d - %p.\n", wID, threadTable[wID]));
       affinityQ[wID].enq(msgPtr);
-#if SCHEDULE_WORK
+      if (schedule_flag) {
       double nextT = CmiBgMsgRecvTime(msgPtr);
       CthThread tid = threadTable[wID];
       unsigned int prio = (unsigned int)(nextT*PRIO_FACTOR)+1;
       CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
-#else
+      }
+      else {
       CthAwaken(threadTable[wID]);
-#endif
+       }
       lastW = wID;
       return;
     }
   }
   /* all worker threads are busy */   
   DEBUGF(("all work threads are busy.\n"));
-#if SCHEDULE_WORK
+  if (schedule_flag) {
 #if 0
   DEBUGF(("[N%d] activate all work threads on N%d.\n", id));
   double nextT = CmiBgMsgRecvTime(msgPtr);
@@ -157,9 +158,9 @@ void nodeInfo::addBgNodeMessage(char *msgPtr)
   CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
 */
 #endif
-
-#else
+  }
+  else {
   nodeQ.enq(msgPtr);
-#endif
+  }
 }
 

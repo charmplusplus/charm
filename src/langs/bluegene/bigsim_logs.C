@@ -5,6 +5,7 @@
 
 int genTimeLog = 0;			// was 1 for guna 's seq correction
 int correctTimeLog = 0;
+int schedule_flag = 0;
 int bgverbose = 0;
 int bgcorroff = 0;
 
@@ -329,13 +330,11 @@ void BgTimeLog::pup(PUP::er &p){
 	p|forwardDeps[i]->seqno;
     }
 
-/*
     // a sanity check for floatable events
     if (msgId == BgMsgID(-1,-1) && backwardDeps.length() == 0 && recvTime == -1.0) {
       CmiPrintf("Potential error in log: (a floating event) \n");
       print(-1,-1);
     }
-*/
 }
 
 // create a log with msg and insert into timeline

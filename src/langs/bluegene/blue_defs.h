@@ -13,7 +13,7 @@
 #endif
 
 /* optimization parameters */
-#define SCHEDULE_WORK       1
+//#define SCHEDULE_WORK       1     now is schedule_flag
 #define USE_MULTISEND	    0		/* must be BATCH_PROCESSING */
 #define DELAY_CHECK         1
 #define LIMITED_SEND        0		/* BATCH_PROCESSING must be 1 or 2 */

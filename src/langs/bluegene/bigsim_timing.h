@@ -11,6 +11,7 @@ extern double gvt;
 extern int  genTimeLog;
 extern int  correctTimeLog;
 extern int  bgverbose;
+extern int  schedule_flag;
 
 class StateCounters{
   public:

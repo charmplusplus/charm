@@ -1000,7 +1000,12 @@ CmiStartFn bgMain(int argc, char **argv)
      genTimeLog = 1;
   if (CmiGetArgFlagDesc(argv, "+bgcorrect", "Apply timestamp correction to logs"))
     correctTimeLog = 1;
-  if (correctTimeLog) genTimeLog = 1;
+  schedule_flag = 0;
+  if (correctTimeLog) {
+    genTimeLog = 1;
+    schedule_flag = 1;
+  }
+
   if (CmiGetArgFlagDesc(argv, "+bgverbose", "Print debug info verbosely"))
     bgverbose = 1;
 

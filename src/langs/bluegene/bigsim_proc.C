@@ -60,9 +60,7 @@ void commThreadInfo::run()
     }
     /* let other communication thread do their jobs */
 //    tCURRTIME += (CmiWallTimer()-tSTARTTIME);
-#if !SCHEDULE_WORK
-    CthYield();
-#endif
+    if (!schedule_flag) CthYield();
     tSTARTTIME = CmiWallTimer();
   }
 }
@@ -193,13 +191,14 @@ void workThreadInfo::scheduler(int count)
     if (cycle != CsdStopFlag) break;
 
     /* let other work thread do their jobs */
-#if SCHEDULE_WORK
+    if (schedule_flag) {
     DEBUGF(("[N%d] work thread T%d suspend when done - %d to go.\n", BgMyNode(), tMYID, q2.length()));
     CthSuspend();
     DEBUGF(("[N%d] work thread T%d awakened here.\n", BgMyNode(), id));
-#else
+    }
+    else {
     CthYield();
-#endif
+    }
   }
 
   CsdStopFlag --;
@@ -232,17 +231,18 @@ void workThreadInfo::addAffMessage(char *msgPtr)
 {
   ckMsgQueue &que = myNode->affinityQ[id];
   que.enq(msgPtr);
-#if SCHEDULE_WORK
+  if (schedule_flag) {
   /* don't awake directly, put into a priority queue sorted by recv time */
   double nextT = CmiBgMsgRecvTime(msgPtr);
   CthThread tid = me;
   unsigned int prio = (unsigned int)(nextT*PRIO_FACTOR)+1;
   DEBUGF(("[%d] awaken worker thread with prio %d.\n", tMYNODEID, prio));
   CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
-#else
+  }
+  else {
   if (que.length() == 1) {
     CthAwaken(me);
   }
-#endif
+  }
 }
 
