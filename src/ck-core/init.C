@@ -627,15 +627,17 @@ void _initCharm(int unused_argc, char **argv)
         // enumerate initcalls registered in modules
 	_initCallTable.enumerateInitCalls();
 
+	CmiNodeAllBarrier();
+
  	if (!inCommThread) {
 	  _TRACE_BEGIN_COMPUTATION();
 	}
 	CkpvAccess(_myStats) = new Stats();
 	CkpvAccess(_msgPool) = new MsgPool();
+
 	CmiNodeAllBarrier();
 
 	if(_doRestart){
-		register int i;
 		_allStats = new Stats*[CkNumPes()];
 		flag = 0;
 		CkRestartMain(_restartDir);
