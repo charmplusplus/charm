@@ -15,18 +15,20 @@
 class DimexRouter : public Router
 {
   private:
- 	PeTable *PeHcube;
+ 	PeTable *PeHcube, *PeHcube1;
 	comID MyID;
 	int *buffer;
   	int* msgnum, InitCounter;
 	int *penum,*gpes;
 	int **next;
-  	int Dim, stage, MyPe, NumPes;
+  	int Dim, stage, MyPe, NumPes, numDirectSteps, two_pow_ndirect;
+        int procMsgCount;
 	void InitVars();
 	void CreateStageTable(int, int *);
 	void LocalProcMsg();
   public:
-	DimexRouter(int, int);
+        
+	DimexRouter(int, int, int ndirect = 0);
 	~DimexRouter();
 	void NumDeposits(comID, int);
 	void EachToAllMulticast(comID , int , void *, int);
@@ -35,7 +37,7 @@ class DimexRouter : public Router
 	void RecvManyMsg(comID, char *);
 	void ProcManyMsg(comID, char *);
 	void DummyEP(comID id, int);
-	void SetID(comID id) { MyID=id;}
+	void SetID(comID id);
 	void SetMap(int *);
 };
 #endif

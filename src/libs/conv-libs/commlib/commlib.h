@@ -8,6 +8,7 @@
 #ifndef COMLIB_H
 #define COMLIB_H
 #include <converse.h>
+#include <charm++.h>
 #include <stdlib.h>
 
 #ifndef NULL
@@ -17,6 +18,16 @@
 #define ComlibPrintf if(comm_debug) CmiPrintf
 extern int comm_debug;
 
+#if CMK_BLUEGENE_CHARM
+#ifndef CmiReservedHeaderSize 
+#define CmiReservedHeaderSize   CmiBlueGeneMsgHeaderSizeBytes
+#endif
+#else
+#ifndef CmiReservedHeaderSize
+#define CmiReservedHeaderSize   CmiMsgHeaderSizeBytes
+#endif
+#endif
+
 enum{BCAST=0,TREE, GRID, HCUBE, RSEND};  
 #define MAXNUMMSGS 1000
 #define MAXNUMSTRATEGY 10
@@ -25,14 +36,17 @@ enum{BCAST=0,TREE, GRID, HCUBE, RSEND};
 #define PERSISTENT_BUFSIZE 131072
 
 typedef struct {
-  int srcpe;
-  short ImplType;
-  short ImplIndex;
-  int callbackHandler;
-  short instanceID;  
-  int SwitchVal;
-  int NumMembers;
-  CmiGroup grp;
+    int srcpe;
+    short ImplType;
+    short ImplIndex;
+    int callbackHandler;
+    
+    short instanceID;  
+    short SwitchVal;
+    char isAllToAll;
+
+    int NumMembers;
+    CmiGroup grp;
 } comID;
 
 

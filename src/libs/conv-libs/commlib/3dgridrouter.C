@@ -19,7 +19,7 @@
         newmsg=PeGrid->ExtractAndPack(kid, u1, knpe, kpelist, &len);\
 	if (newmsg) {\
 	  CmiSetHandler(newmsg, khndl);\
-          CmiSyncSendAndFree(knextpe, len, newmsg);\
+          CmiSyncSendAndFree(knextpe, len, (char *)newmsg);\
         }\
 	else {\
 	  KSendDummyMsg(kid, knextpe, u2);\
@@ -40,7 +40,7 @@ double cubeRoot(double d) {
 inline int ColLen3D(int npes)
 {
     int len= (int)cubeRoot((double)npes);
-    //    ComlibPrintf("%d:collen len = %d\n", CmiMyPe(), len);
+    //    ComlibPrintf("%d:collen len = %d\n", CkMyPe(), len);
     if (npes > (len * len * len)) len++;
     return(len);
 }
@@ -107,7 +107,7 @@ inline int LPMsgExpect(int gpe, int gnpes)
  *****************************************************/
 D3GridRouter::D3GridRouter(int n, int me)
 {
-    ComlibPrintf("PE=%d me=%d NUMPES=%d\n", CmiMyPe(), me, n);
+    ComlibPrintf("PE=%d me=%d NUMPES=%d\n", CkMyPe(), me, n);
     
     NumPes=n;
     MyPe=me;
@@ -148,13 +148,13 @@ D3GridRouter::D3GridRouter(int n, int me)
     LPMsgExpected = LPMsgExpect(MyPe, NumPes);
     //ComlibPrintf("%d LPMsgExpected=%d\n", MyPe, LPMsgExpected);
     
-    PeGrid = new PeTable(/*CmiNumPes()*/NumPes);
+    PeGrid = new PeTable(/*CkNumPes()*/NumPes);
     
     oneplane = new int[NPLANES * ROWLEN];
     zline = new int[NPLANES];
     
     InitVars();
-    ComlibPrintf("%d:%d:COLLEN=%d, ROWLEN=%d, recvexpected=%d,%d\n", CmiMyPe(), MyPe, COLLEN, ROWLEN, recvExpected[0], recvExpected[1]);
+    ComlibPrintf("%d:%d:COLLEN=%d, ROWLEN=%d, recvexpected=%d,%d\n", CkMyPe(), MyPe, COLLEN, ROWLEN, recvExpected[0], recvExpected[1]);
 }
 
 D3GridRouter::~D3GridRouter()
@@ -196,7 +196,7 @@ void D3GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes
     if (more) return;
 
     routerStage = 0;
-    ComlibPrintf("All messages received %d %d\n", CmiMyPe(), COLLEN);
+    ComlibPrintf("All messages received %d %d\n", CkMyPe(), COLLEN);
     
     //Send the messages
     int firstproc = MyPe - (MyPe % (ROWLEN * COLLEN));
@@ -246,8 +246,8 @@ void D3GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes
         ComlibPrintf("nummappedpes = %d, NumPes = %d, nextrowrep = %d, nextpe = %d, mype = %d\n", nummappedpes, NumPes, nextrowrep,  nextpe, MyPe);
         
         gmap(nextpe);
-        ComlibPrintf("sending to column %d and dest %d in %d\n", i, nextpe, CmiMyPe());
-        GRIDSENDFN(MyID, 0, 0, idx, oneplane, CpvAccess(RecvHandle), nextpe); 
+        ComlibPrintf("sending to column %d and dest %d in %d\n", i, nextpe, CkMyPe());
+        GRIDSENDFN(MyID, 0, 0, idx, oneplane, CkpvAccess(RecvHandle), nextpe); 
     }
 }
 
@@ -303,7 +303,7 @@ void D3GridRouter::RecvManyMsg(comID id, char *msg)
             ComlibPrintf("After gmap %d\n", nextpe);
             
             ComlibPrintf("%d:sending recv message %d %d\n", MyPe, nextpe, myrep);
-            GRIDSENDFN(MyID, 1, 1, k, pelist, CpvAccess(RecvHandle), nextpe);
+            GRIDSENDFN(MyID, 1, 1, k, pelist, CkpvAccess(RecvHandle), nextpe);
         }
     }
     
@@ -325,7 +325,7 @@ void D3GridRouter::RecvManyMsg(comID id, char *msg)
             ComlibPrintf("After gmap %d\n", nextpe);
             
             ComlibPrintf("%d:sending proc message %d %d\n", MyPe, nextpe, nplanes);
-            GRIDSENDFN(MyID, 2, 2, 1, pelist, CpvAccess(ProcHandle), nextpe);
+            GRIDSENDFN(MyID, 2, 2, 1, pelist, CkpvAccess(ProcHandle), nextpe);
         }
         LocalProcMsg();
     }
@@ -362,7 +362,7 @@ void D3GridRouter:: LocalProcMsg()
 	PeGrid->Purge();
 	InitVars();
         routerStage = 0;
-        ComlibPrintf("%d:Round Done\n", CmiMyPe());
+        ComlibPrintf("%d:Round Done\n", CkMyPe());
 	KDone(MyID);
     }
 }
@@ -382,7 +382,7 @@ void D3GridRouter :: SetMap(int *pes)
 {
     gpes=pes;
     
-    //  ComlibPrintf("%d:GPES[1] = %d\n", CmiMyPe(), gpes[1]);
-    gpes[1] = 4;
+    //ComlibPrintf("%d:GPES[1] = %d\n", CkMyPe(), gpes[1]);
+    //gpes[1] = 4;
 }
 

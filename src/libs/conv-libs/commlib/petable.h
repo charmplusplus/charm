@@ -61,12 +61,15 @@ class PeTable {
 	~PeTable();
 	void InsertMsgs(int npe, int *pelist, int nmsgs, void **msglist);
 	void InsertMsgs(int npe, int *pelist, int size, void *msg);
-	//int ExtractMsgs(int npe, int *pelist, int *nmsgs, void **msglist);
+
 	void ExtractAndDeliverLocalMsgs(int pe);
+
 	int UnpackAndInsert(void *in);
-	char * ExtractAndPack(comID, int, int, int *pelist, int *length);
-	//int ExtractAsVector(comID, int, int, int *, int **, char ***) 
-        //	{ return(0);}
+        int UnpackAndInsertAll(void *in, int npes, int *pelist);
+
+	char * ExtractAndPack(comID, int, int, int *pelist, int *length); 
+        char * ExtractAndPackAll(comID id, int ufield, int *length);
+
 	void GarbageCollect();
 	void Purge();
 };

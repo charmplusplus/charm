@@ -42,9 +42,13 @@ inline int Expect(int pe, int npes)
 class GridRouter : public Router
 {
   private:
-	PeTable *PeMesh;
+	PeTable *PeMesh, *PeMesh1, *PeMesh2;
+        int *onerow, *gpes, 
+            *rowVector, *colVector, 
+            *growVector, *gcolVector;
+
+        int rvecSize, cvecSize;
 	comID MyID;
-  	int *onerow, *gpes;
 	int MyPe, NumPes, COLLEN;
  	int LPMsgCount, LPMsgExpected;
 	int recvExpected, recvCount;

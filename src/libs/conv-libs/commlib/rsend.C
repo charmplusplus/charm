@@ -64,14 +64,14 @@ void RsendRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes,
 
     if (!size) return;
     for (i=0;i<numpes-1;i++) {
-	//CmiPrintf("%d sending to %d\n", CmiMyPe(), destpes[i]);
+	//CmiPrintf("%d sending to %d\n", CkMyPe(), destpes[i]);
 #if CMK_PERSISTENT_COMM
         //if(step % 2 == 1)
         //  CmiUsePersistentHandle(&handlerArray[destpes[i]], 1);
         //else
         //  CmiUsePersistentHandle(&handlerArrayEven[destpes[i]], 1);
 #endif        
-	CmiSyncSend(destpes[i], size, msg);
+	CmiSyncSend(destpes[i], size, (char *)msg);
 #if CMK_PERSISTENT_COMM
         CmiUsePersistentHandle(NULL, 0);
 #endif        
@@ -83,7 +83,7 @@ void RsendRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes,
     //else
     //  CmiUsePersistentHandle(&handlerArrayEven[destpes[i]], 1);
 #endif        
-    CmiSyncSendAndFree(destpes[i], size, msg);
+    CmiSyncSendAndFree(destpes[i], size, (char *)msg);
 
 #if CMK_PERSISTENT_COMM
     CmiUsePersistentHandle(NULL, 0);

@@ -11,6 +11,9 @@
  * Author : Krishnan V.
  *
  * Dimensional Exchange (Hypercube) Router 
+ *  
+ * Modified to send last k stages directly by Sameer Kumar 9/07/03
+ *
  ************************************************/
 #include "de.h"
 
@@ -19,13 +22,10 @@
 /**The only communication op used. Modify this to use
  ** vector send */
 
-//if(CmiMyPe() == 0) \
-//CmiPrintf("[%d]DE sending message of size %d to %d\n", CmiMyPe(), len, knextpe); \
-
-#define HCUBESENDFN(kid, u1, u2, knpe, kpelist, khndl, knextpe)  \
+#define HCUBESENDFN(kid, u1, u2, knpe, kpelist, khndl, knextpe, pehcube)  \
   	{int len;\
 	char *newmsg;\
- 	newmsg=PeHcube->ExtractAndPack(kid, u1, knpe, kpelist, &len);\
+ 	newmsg=pehcube->ExtractAndPack(kid, u1, knpe, kpelist, &len);\
 	if (newmsg) {\
 	  CmiSetHandler(newmsg, khndl);\
   	  CmiSyncSendAndFree(knextpe, len, newmsg);\
@@ -66,7 +66,7 @@ inline int setIC(int dim, int pe, int N)
   if (mymax < N) {
 	myneighb= neighbor(pe, dim);
 	if (myneighb < N && myneighb >= mymax) {
-		initCounter=0;
+              initCounter=0;
 	}
   }
   if (pe >= mymax) initCounter = -1;
@@ -76,9 +76,16 @@ inline int setIC(int dim, int pe, int N)
 /*********************************************************************
  * Total preallocated memory=(P+Dim+Dim*P)ints + MAXNUMMSGS msgstruct
  **********************************************************************/
-DimexRouter::DimexRouter(int n, int me)
+DimexRouter::DimexRouter(int n, int me, int ndirect)
 {
   int i;
+ 
+  //last ndirect steps will be sent directly
+  numDirectSteps = ndirect;
+  //2 raised to the power of ndirect
+  two_pow_ndirect = 1;
+  for(int count = 0; count < ndirect; count ++)
+      two_pow_ndirect *= 2;
 
   //Initialize the no: of pes and my Pe number
   NumPes=n;
@@ -89,6 +96,7 @@ DimexRouter::DimexRouter(int n, int me)
   Dim=maxdim(NumPes);
 
   PeHcube=new PeTable(NumPes);
+  PeHcube1 = new PeTable(NumPes);
 
   InitVars();
 
@@ -113,13 +121,17 @@ DimexRouter::DimexRouter(int n, int me)
   CreateStageTable(NumPes, dp);
   delete(dp);
 
-  //CmiPrintf("%d DE constructor done dim=%d, mymax=%d IC=%d\n", CmiMyPe(), Dim, 1<<Dim, InitCounter);
+  //CmiPrintf("%d DE constructor done dim=%d, mymax=%d IC=%d\n", CkMyPe(), Dim, 1<<Dim, InitCounter);
+
+  if(numDirectSteps > Dim - 1)
+      numDirectSteps = Dim - 1;
 }
  
 DimexRouter :: ~DimexRouter()
 {
   int i;
   delete PeHcube;
+  delete PeHcube1;
   delete buffer;
   for (i=0;i<Dim;i++) {
 	delete next[i];
@@ -136,7 +148,9 @@ void DimexRouter :: InitVars()
 {
   stage=Dim-1;
   InitCounter=setIC(Dim, MyPe, NumPes);
+  procMsgCount = 0;
 }
+
 void DimexRouter::EachToAllMulticast(comID id, int size, void *msg, int more)
 {
   int npe=NumPes;
@@ -153,96 +167,179 @@ void DimexRouter::NumDeposits(comID, int num)
 
 void DimexRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, int *destpes, int more)
 {
- //Create the message
-  if (size) {
+
+    SetID(id);
+
+    //Create the message
+    if (msg && size) {
   	PeHcube->InsertMsgs(numpes, destpes, size, msg);
-  }
-
-  if (more >0) return;
-
-  if (InitCounter <0) {
-	//CmiPrintf("%d Sending to the lower hypercube\n", MyPe);
+    }
+    
+    if (more >0) return;
+    
+    if (InitCounter <0) {
+        ComlibPrintf("%d Sending to the lower hypercube\n", MyPe);
   	int nextpe=neighbor(MyPe, Dim);
 	int * pelist=(int *)CmiAlloc(NumPes*sizeof(int));
 	for (int i=0;i<NumPes;i++) {
-		pelist[i]=i;
+            pelist[i]=i;
 	}
+        ComlibPrintf("Before Gmap %d\n", nextpe);
 	nextpe=gmap(nextpe);
-	HCUBESENDFN(MyID, Dim, Dim, NumPes, pelist, CpvAccess(RecvHandle), nextpe);
+	HCUBESENDFN(MyID, Dim, Dim, NumPes, pelist, CkpvAccess(RecvHandle), nextpe, PeHcube);
  	CmiFree(pelist);
 	return;
-  }
-
-  //Done: no more stages.
-  if (stage <0) {
+    }
+    
+    //Done: no more stages.
+    if (stage <0) {
 	//CmiPrintf("calling lp in multicast call %d\n", stage);
 	LocalProcMsg();
 	return;
-  }
-
-  InitCounter++;
-  RecvManyMsg(id,NULL);
+    }
+    
+    InitCounter++;
+    RecvManyMsg(id,NULL);
 }
 
-
+//Send the messages for the next stage to the next dimension neighbor
+//If only numDirectStage's are left send messages directly using prefix send
 void DimexRouter::RecvManyMsg(comID id, char *msg)
 {
   //CmiPrintf("%d recv called\n", MyPe);
-  int msgstage;
-  if (msg) {
-  	msgstage=PeHcube->UnpackAndInsert(msg);
-	//CmiPrintf("%d recvd msg for stage=%d\n", MyPe, msgstage);
-	if (msgstage == Dim) InitCounter++;
-  	else buffer[msgstage]=1;
-  }
+    int msgstage;
+    if (msg) {
+        msgstage=PeHcube->UnpackAndInsert(msg);
+        //CmiPrintf("%d recvd msg for stage=%d\n", MyPe, msgstage);
+        if (msgstage == Dim) InitCounter++;
+        else buffer[msgstage]=1;
+    }
   
-
-  //Check the buffers 
-  while ((InitCounter==2) || (stage >=0 && buffer[stage+1])) {
+    
+    //Check the buffers 
+    while ((InitCounter==2) || (stage >=numDirectSteps && buffer[stage+1])) {
 	InitCounter=setIC(Dim, MyPe, NumPes);
   	if (InitCounter != 2) { 
-		buffer[stage+1]=0;
+            buffer[stage+1]=0;
  	}
+
   	//Send the data to the neighbor in this stage
   	int nextpe=neighbor(MyPe, stage);
+        
+        ComlibPrintf("Before Gmap %d\n", nextpe);
         nextpe=gmap(nextpe);
-	HCUBESENDFN(MyID, stage, stage, penum[stage], next[stage], CpvAccess(RecvHandle), nextpe);
+        ComlibPrintf("%d Sending to %d\n", MyPe, nextpe);
+	HCUBESENDFN(MyID, stage, stage, penum[stage], next[stage], CkpvAccess(RecvHandle), nextpe, PeHcube);
 
   	//Go to the next stage
   	stage--; 
-  }
-  if (stage <0 && buffer[0]) {
-	//CmiPrintf("Calling local proc msg %d\n", buffer[0]);
-	buffer[0]=0;
-	LocalProcMsg();
-  }
+    }        
+
+    if (stage < numDirectSteps && buffer[numDirectSteps]) {
+                
+        InitCounter=setIC(Dim, MyPe, NumPes);
+        
+        //I am a processor in the smaller hypercube and there are some
+        //processors to send directly
+        if(InitCounter >= 0 && numDirectSteps > 0) {
+            //Sending through prefix send to save on copying overhead   
+            //of the hypercube algorithm            
+            
+            int *pelist = (int *)CmiAlloc(two_pow_ndirect * sizeof(int));
+            for(int count = 0; count < two_pow_ndirect; count ++){
+                int nextpe = count ^ MyPe;
+                gmap(nextpe);
+                
+                ComlibPrintf("%d Sending to %d\n", MyPe, nextpe);
+                pelist[count] = nextpe;
+            }
+            
+            int len;
+            char *newmsg;
+            newmsg=PeHcube->ExtractAndPackAll(MyID, stage, &len);
+            if (newmsg) {
+                CmiSetHandler(newmsg, CkpvAccess(ProcHandle));
+                CmiSyncListSendAndFree(two_pow_ndirect, pelist, len, newmsg);
+            }
+            
+            stage -= numDirectSteps;
+
+            //if(procMsgCount == two_pow_ndirect)
+            //  LocalProcMsg();
+        }
+        else if(numDirectSteps == 0) {
+            LocalProcMsg();
+            ComlibPrintf("Calling local proc msg %d\n", 
+                         buffer[numDirectSteps]);
+        }
+        
+	buffer[numDirectSteps]=0;
+    }
 }
 
 void DimexRouter :: ProcManyMsg(comID, char *m)
 {
-  int msgstage=PeHcube->UnpackAndInsert(m);
 
-  //CmiPrintf("calling lp in procmsg call\n");
-  LocalProcMsg();
+    InitCounter=setIC(Dim, MyPe, NumPes);
+    if(MyID.isAllToAll) {
+        int pe_list[2];
+        int npes = 2;
+
+        if(InitCounter > 0)
+            npes = 1;
+        
+        pe_list[0] = MyPe;
+        pe_list[1] = neighbor(MyPe, Dim);
+        
+        PeHcube1->UnpackAndInsertAll(m, npes, pe_list);
+    }
+    else
+        PeHcube->UnpackAndInsert(m);
+    
+    procMsgCount ++;
+
+    if(InitCounter >= 0){
+        if((procMsgCount == two_pow_ndirect) && stage < 0) {
+            ComlibPrintf("%d Calling lp %d %d\n", CkMyPe(), 
+                         procMsgCount, stage);
+            LocalProcMsg();
+        }
+    }
+    else
+        //CmiPrintf("calling lp in procmsg call\n");
+        LocalProcMsg();
 }
 
 void DimexRouter:: LocalProcMsg()
 {
-  //CmiPrintf("%d local procmsg called\n", CmiMyPe());
+    //CmiPrintf("%d local procmsg called\n", CkMyPe());
 
-  int mynext=neighbor(MyPe, Dim);
-  int mymax=1<<Dim;
-
-  if (mynext >=mymax && mynext < NumPes) {
-	mynext=gmap(mynext);
-	int *pelist=&mynext;
-	HCUBESENDFN(MyID, Dim, -1, 1, pelist, CpvAccess(ProcHandle), mynext);
-  }
+    int mynext=neighbor(MyPe, Dim);
+    int mymax=1<<Dim;
+    
+    if (mynext >=mymax && mynext < NumPes) {
+        ComlibPrintf("Before Gmap %d\n", mynext);
+        mynext=gmap(mynext);
+        int *pelist=&mynext;
+        ComlibPrintf("%d Sending to %d\n", MyPe, mynext);        
+        
+        if(MyID.isAllToAll){
+            HCUBESENDFN(MyID, Dim, -1, 1, pelist, CkpvAccess(ProcHandle), mynext, PeHcube1);
+        }
+        else {
+            HCUBESENDFN(MyID, Dim, -1, 1, pelist, CkpvAccess(ProcHandle), mynext, PeHcube);
+        }
+    }
   
-  PeHcube->ExtractAndDeliverLocalMsgs(MyPe);
-  PeHcube->Purge();
-  InitVars();
-  KDone(MyID);
+    if(MyID.isAllToAll)
+        PeHcube1->ExtractAndDeliverLocalMsgs(MyPe);
+    else
+        PeHcube->ExtractAndDeliverLocalMsgs(MyPe);
+
+    PeHcube->Purge();
+    PeHcube1->Purge();
+    InitVars();
+    KDone(MyID);
 }
 
 void DimexRouter::DummyEP(comID id, int msgstage)
@@ -288,4 +385,16 @@ Router * newhcubeobject(int n, int me)
 {
     Router *obj=new DimexRouter(n, me);
     return(obj);
+}
+
+
+void DimexRouter::SetID(comID id) { 
+    MyID=id;
+
+    if(MyID.isAllToAll) {
+        numDirectSteps = 2;
+        two_pow_ndirect = 1;
+          for(int count = 0; count < numDirectSteps; count ++)
+              two_pow_ndirect *= 2;
+    }
 }

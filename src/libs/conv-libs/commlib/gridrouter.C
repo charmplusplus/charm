@@ -68,67 +68,68 @@ GridRouter::GridRouter(int n, int me)
   ComlibPrintf("%d LPMsgExpected=%d\n", MyPe, LPMsgExpected);
 
   PeMesh = new PeTable(NumPes);
+  PeMesh1 = new PeTable(NumPes);
+  PeMesh2 = new PeTable(NumPes);
 
   onerow=(int *)CmiAlloc(ROWLEN*sizeof(int));
+
+  rowVector = (int *)CmiAlloc(ROWLEN*sizeof(int));
+  colVector = (int *)CmiAlloc(COLLEN*sizeof(int));
+
+  int myrep=myrow*COLLEN;
+  int count = 0;
+  int pos = 0;
+
+  for(count = myrow; count < ROWLEN+myrow; count ++){
+      int nextpe= myrep + count%ROWLEN;
+      
+      if (nextpe >= NumPes) {
+          int new_row = mycol % (myrow+1);
+          
+          if(new_row >= myrow)
+              new_row = 0;
+          
+          nextpe = COLLEN * new_row + count;
+      }
+      
+      if(nextpe == MyPe)
+          continue;
+
+      rowVector[pos ++] = nextpe;
+  }
+  rvecSize = pos;
+
+  pos = 0;
+  for(count = mycol; count < COLLEN+mycol; count ++){
+      int nextrowrep = (count % COLLEN) *COLLEN;
+      int nextpe = nextrowrep+mycol;
+      
+      if(nextpe < NumPes && nextpe != MyPe)
+          colVector[pos ++] = nextpe;
+  }
   
+  cvecSize = pos;
+
+  growVector = new int[rvecSize];
+  gcolVector = new int[cvecSize];
+
+  for(count = 0; count < rvecSize; count ++)
+      growVector[count] = rowVector[count];
+  
+  for(count = 0; count < cvecSize; count ++)
+      gcolVector[count] = colVector[count];
+  
+
   InitVars();
   ComlibPrintf("%d:COLLEN=%d, ROWLEN=%d, recvexpected=%d\n", MyPe, COLLEN, ROWLEN, recvExpected);
-
-#if CMK_PERSISTENT_COMM
-  rowHandleArray = new PersistentHandle[COLLEN];
-  rowHandleArrayEven = new PersistentHandle[COLLEN];
-  columnHandleArray = new PersistentHandle[COLLEN];
-  columnHandleArrayEven = new PersistentHandle[COLLEN];
-
-  //handles for all the same column elements
-  int pcount = 0;
-  for (pcount = 0; pcount < COLLEN; pcount ++) {
-    int dest = pcount *COLLEN + mycol;
-
-    if(dest < NumPes) {
-        ComlibPrintf("%d:Creating Persistent Buffer of size %d at %d\n", MyPe,
-                     PERSISTENT_BUFSIZE, dest);
-        gmap(dest);
-        columnHandleArray[pcount] = CmiCreatePersistent(dest, 
-                                                        PERSISTENT_BUFSIZE);
-        ComlibPrintf("%d:Creating Even Persistent Buffer of size %d at %d\n",
-                     MyPe, PERSISTENT_BUFSIZE, dest);
-        columnHandleArrayEven[pcount] = CmiCreatePersistent
-            (dest, PERSISTENT_BUFSIZE);
-    }
-    else
-        columnHandleArray[pcount] = NULL;
-  }
-
-  //handles for all same row elements
-  for (pcount = 0; pcount < COLLEN; pcount++) {
-    int dest = myrow *COLLEN + pcount;
-
-    if(dest >= NumPes){
-        dest = COLLEN * (mycol % myrow) + pcount;
-    }
-    
-    if(dest < NumPes && dest != MyPe){
-      ComlibPrintf("[%d] Creating Persistent Buffer of size %d at %d\n", MyPe,
-		   PERSISTENT_BUFSIZE, dest);
-      gmap(dest);
-      rowHandleArray[pcount] = CmiCreatePersistent(dest, PERSISTENT_BUFSIZE);
-      ComlibPrintf("[%d] Creating Even Persistent Buffer of size %d at %d\n",
-                   MyPe, PERSISTENT_BUFSIZE, dest);
-      rowHandleArrayEven[pcount] = CmiCreatePersistent(dest, 
-                                                       PERSISTENT_BUFSIZE);
-    }
-    else 
-        rowHandleArray[pcount] = NULL;
-  }
-
-  ComlibPrintf("After Initializing Persistent Buffers\n");
-#endif
 }
 
 GridRouter::~GridRouter()
 {
   delete PeMesh;
+  delete PeMesh1;
+  delete PeMesh2;
+    
   CmiFree(onerow);
 }
 
@@ -137,6 +138,7 @@ void GridRouter :: InitVars()
   recvCount=0;
   LPMsgCount=0;
 }
+
 void GridRouter::NumDeposits(comID, int num)
 {
 }
@@ -149,117 +151,104 @@ void GridRouter::EachToAllMulticast(comID id, int size, void *msg, int more)
   EachToManyMulticast(id, size, msg, npe, destpes, more);
 }
 
+extern void CmiReference(void *blk);
+
 void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, int *destpes, int more)
 {
   int i=0;
-  static int step = 0;
-  PeMesh->InsertMsgs(numpes, destpes, size, msg);
+  
+  if(id.isAllToAll)
+      PeMesh->InsertMsgs(1, &MyPe, size, msg);
+  else
+      PeMesh->InsertMsgs(numpes, destpes, size, msg);
   
   if (more) return;
 
-  ComlibPrintf("All messages received %d %d\n", MyPe, COLLEN);
+  ComlibPrintf("All messages received %d %d %d\n", MyPe, COLLEN,id.isAllToAll);
 
-  step ++;
+  char *a2amsg = NULL;
+  int a2a_len;
+  if(id.isAllToAll) {
+      a2amsg = PeMesh->ExtractAndPackAll(id, 0, &a2a_len);
+      CmiSetHandler(a2amsg, CkpvAccess(RecvHandle));
+      CmiReference(a2amsg);
+      CmiSyncListSendAndFree(rvecSize, growVector, a2a_len, a2amsg);      
+      RecvManyMsg(id, a2amsg);
+      return;
+  }
 
   //Send the messages
   int MYROW=MyPe/COLLEN;
   int MYCOL = MyPe%COLLEN;
   int myrep=MYROW*COLLEN;
   
-  for (int colcount= MYCOL; colcount < ROWLEN + MYCOL; ++colcount) {
-      i = colcount % ROWLEN;
-      int nextpe= myrep + i;
+  for (int colcount = 0; colcount < rvecSize; ++colcount) {
+      int nextpe = rowVector[colcount];
+      i = nextpe % COLLEN;
       
-      if (nextpe >= NumPes) {
-          //Previously hole assigned to elements in the same row as nextpe
-          // Now they are spread across the grid in the same column as nextpe
-          int new_row = MYCOL % (MYROW+1);
-          
-          if(new_row >= MYROW)
-              new_row = 0;
-
-          ComlibPrintf("%d: %d %d %d\n\n", nextpe, new_row, i);
-          nextpe = COLLEN * new_row + i;
-          ComlibPrintf("%d: %d %d %d\n\n", nextpe, new_row, i);
-      }            
-
       int length = (NumPes - 1)/COLLEN + 1;
       if((length - 1)* COLLEN + i >= NumPes)
           length --;
       
-      for (int j=0;j<length;j++) {
+      for (int j = 0; j < length; j++) {
           onerow[j]=j * COLLEN + i;
       }
       
-      if (nextpe == MyPe) {
-          RecvManyMsg(id, NULL);
-          continue;
-      }
-    
-      ComlibPrintf("%d: before gmap sending to %d of column %d\n", MyPe, nextpe, i);
+      ComlibPrintf("%d: before gmap sending to %d of column %d\n",
+                   MyPe, nextpe, i);
       gmap(nextpe);
       ComlibPrintf("%d:sending to %d of column %d\n", MyPe, nextpe, i);
-
-#if CMK_PERSISTENT_COMM
-      if(step % 2 == 1)
-          CmiUsePersistentHandle(&rowHandleArray[i], 1);
-      else
-          CmiUsePersistentHandle(&rowHandleArrayEven[i], 1);
-#endif          
-
-      GRIDSENDFN(MyID, 0, 0, length, onerow, CpvAccess(RecvHandle), nextpe); 
       
-#if CMK_PERSISTENT_COMM
-      CmiUsePersistentHandle(NULL, 0);
-#endif          
+      GRIDSENDFN(MyID, 0, 0, length, onerow, CkpvAccess(RecvHandle), nextpe); 
   }
+  RecvManyMsg(id, NULL);
 }
 
 void GridRouter::RecvManyMsg(comID id, char *msg)
 {
-  static int step = 0;
-  if (msg)
-      PeMesh->UnpackAndInsert(msg);
+  if (msg) {  
+      if(id.isAllToAll)
+          PeMesh1->UnpackAndInsertAll(msg, 1, &MyPe);
+      else
+          PeMesh->UnpackAndInsert(msg);
+  }
 
   recvCount++;
   if (recvCount == recvExpected) {
-      step ++;
       ComlibPrintf("%d recvcount=%d recvexpected = %d refno=%d\n", MyPe, recvCount, recvExpected, KMyActiveRefno(MyID));
       
       int myrow=MyPe/COLLEN;
       int mycol=MyPe%COLLEN;
       
-      for (int rowcount= myrow; rowcount < COLLEN + myrow; rowcount++) {
-          int i = rowcount % COLLEN;
-          int nextrowrep=i*COLLEN;
-          int nextpe=nextrowrep+mycol;
-          
-          ComlibPrintf("sending message %d %d %d\n", nextpe, NumPes, MyPe);
-          
-          if (nextpe >= NumPes || nextpe==MyPe) continue;
-          
+      char *a2amsg;
+      int a2a_len;
+      if(id.isAllToAll) {
+          a2amsg = PeMesh1->ExtractAndPackAll(id, 1, &a2a_len);
+          CmiSetHandler(a2amsg, CkpvAccess(ProcHandle));
+          CmiReference(a2amsg);
+          CmiSyncListSendAndFree(cvecSize, gcolVector, a2a_len, a2amsg);   
+          ProcManyMsg(id, a2amsg);
+          return;
+      }
+
+      for (int rowcount=0; rowcount < cvecSize; rowcount++) {
+          int nextpe = colVector[rowcount];
+                    
           int gnextpe = nextpe;
           int *pelist=&gnextpe;
           
           ComlibPrintf("Before gmap %d\n", nextpe);
           
           gmap(nextpe);
-          
+
           ComlibPrintf("After gmap %d\n", nextpe);
           
-#if CMK_PERSISTENT_COMM
-          if(step % 2 == 1)
-              CmiUsePersistentHandle(&columnHandleArray[i], 1);
-          else
-              CmiUsePersistentHandle(&columnHandleArrayEven[i], 1);
-#endif          
+          ComlibPrintf("%d:sending message to %d of row %d\n", MyPe, nextpe, 
+                       rowcount);
           
-          GRIDSENDFN(MyID, 0, 1, 1, pelist, CpvAccess(ProcHandle), nextpe);
-          
-#if CMK_PERSISTENT_COMM
-          CmiUsePersistentHandle(NULL, 0);
-#endif          
+          GRIDSENDFN(MyID, 0, 1, 1, pelist, CkpvAccess(ProcHandle), nextpe);
       }
+      
       LocalProcMsg();
   }
 }
@@ -276,25 +265,31 @@ void GridRouter::DummyEP(comID id, int magic)
   }
 }
 
-void GridRouter:: ProcManyMsg(comID, char *m)
+void GridRouter:: ProcManyMsg(comID id, char *m)
 {
-  PeMesh->UnpackAndInsert(m);
-  //ComlibPrintf("%d proc calling lp\n");
-  LocalProcMsg();
+    if(id.isAllToAll)
+        PeMesh2->UnpackAndInsertAll(m, 1, &MyPe);
+    else
+        PeMesh->UnpackAndInsert(m);
+    //ComlibPrintf("%d proc calling lp\n");
+    
+    LocalProcMsg();
 }
 
 void GridRouter:: LocalProcMsg()
 {
-
-  LPMsgCount++;
-  PeMesh->ExtractAndDeliverLocalMsgs(MyPe);
-
-  if (LPMsgCount==LPMsgExpected) {
-    //    CkPrintf("%d local procmsg called\n", MyPe);
-      PeMesh->Purge();
-      InitVars();
-      KDone(MyID);
-  }
+    LPMsgCount++;
+    PeMesh->ExtractAndDeliverLocalMsgs(MyPe);
+    PeMesh2->ExtractAndDeliverLocalMsgs(MyPe);
+    
+    ComlibPrintf("%d local procmsg called\n", MyPe);
+    if (LPMsgCount==LPMsgExpected) {
+        PeMesh->Purge();
+        PeMesh2->Purge();
+        
+        InitVars();
+        KDone(MyID);
+    }
 }
 
 Router * newgridobject(int n, int me)
@@ -310,6 +305,18 @@ void GridRouter::SetID(comID id)
 
 void GridRouter :: SetMap(int *pes)
 {
+    
   gpes=pes;
+  
+  if(!gpes)
+      return;
+
+  int count = 0;
+
+  for(count = 0; count < rvecSize; count ++)
+      growVector[count] = gpes[rowVector[count]];
+  
+  for(count = 0; count < cvecSize; count ++)
+      gcolVector[count] = gpes[colVector[count]];
 }
 

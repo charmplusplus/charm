@@ -33,7 +33,7 @@ void CComlibEachToManyMulticast(comID id, int ep, void *msg, int bocnum, int npe
   	
   ENVELOPE *env;
   int len, queueing, priobits; unsigned int *prioptr;
-  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(CpvAccess(CkInfo_Index));
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(CkpvAccess(CkInfo_Index));
   CldPackFn pfn;
  
   env = ENVELOPE_UPTR(msg);
@@ -48,7 +48,7 @@ void CComlibEachToManyMulticast(comID id, int ep, void *msg, int bocnum, int npe
       pfn(&env);
       ifn((void *)env, &pfn, &len, &queueing, &priobits, &prioptr);
   }
-  CmiSetHandler(env,CpvAccess(HANDLE_INCOMING_MSG_Index));
+  CmiSetHandler(env,CkpvAccess(HANDLE_INCOMING_MSG_Index));
   //EachToManyMulticastWithRef(id, len, (void *)env, npe, pelist, ref);
   EachToManyMulticast(id, len, (void *)env, npe, pelist);
   if((type!=QdBocMsg)&&(type!=QdBroadcastBocMsg)&&(type!=LdbMsg))
@@ -91,7 +91,7 @@ void CComlibEachToManyMulticast(comID id, int ep, void *msg,
   double sendT;
   _TRACE_ONLY(sendT = CmiTraceTimer());
 
-  CpvAccess(_qd)->create();
+  CkpvAccess(_qd)->create();
   EachToManyMulticast(id, len, (void *)env, npe, pelist);
 
   _STATS_RECORD_SEND_BRANCH_N(npe);
