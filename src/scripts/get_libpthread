@@ -3,7 +3,7 @@
 echo "GET /distrib/libpthread.uu 1.0"
 echo
 # exit normally when the telnet session closes.
-trap "exit 0" SIGPIPE
+trap "exit 0" 13
 while : ; do
  echo
  sleep 1

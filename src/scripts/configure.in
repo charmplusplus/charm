@@ -1,7 +1,7 @@
 
 AC_INIT(./Makefile)
 
-AC_CONFIG_HEADER(./conv-autoconfig.h)
+AC_CONFIG_HEADER(conv-autoconfig.h)
 
 if test ! -r ./conv-mach.sh 
 then
@@ -169,6 +169,7 @@ then
     AC_CHECK_PROG(WGET, wget, wget )
     AC_CHECK_PROG(LYNX, lynx, lynx )
     AC_CHECK_PROG(TELNET, telnet, telnet )
+    AC_CHECK_PROG(UUDECODE, uudecode, uudecode )
     
     URL='http://charm.cs.uiuc.edu/distrib/libpthread.a'
     printf "getting libpthread.a from $URL ..."
@@ -178,9 +179,9 @@ then
     elif test -n "$LYNX"
     then
       (cd ../lib; $LYNX -source $URL > libpthread.a)
-    elif test -n "$TELNET"
+    elif test -n "$TELNET" && test -n "$UUDECODE"
     then
-      (chmod +x ./get_libpthread; ./get_libpthread | $TELNET charm.cs.uiuc.edu 80 > .uulib ; uudecode .uulib; rm -f .uulib; mv libpthread.a ../lib)
+      (chmod +x ./get_libpthread; ./get_libpthread | $TELNET charm.cs.uiuc.edu 80 > .uulib ; $UUDECODE .uulib; rm -f .uulib; mv libpthread.a ../lib)
     fi
     if test ! -f ../lib/libpthread.a
     then
