@@ -2,8 +2,8 @@
 \index{Checkpoint/Restart}
 \label{sec:checkpoint}
 
-\charmpp{} offers fault tolerance capabilities such as 
-checkpoint/restart. Usual Chare array-based \charmpp{} application 
+\charmpp{} offers basic fault tolerance capabilities through its 
+checkpoint/restart mechanism. Usual Chare array-based \charmpp{} application 
 can be checkpointed to disk files and later on restarting from the files.
 
 The basic idea behind this is straightforward: Checkpointing an 
@@ -47,7 +47,6 @@ wants to write PUP routines for the groups and declare them as
 After {\tt CkStartCheckpoint} is executed, a directory of the designated
 name is created and a collection of checkpoint files are written into it. 
 
-
 \subsubsection{Restarting}
 
 The user can choose to run the \charmpp{} application in restart mode, i.e.,
@@ -68,3 +67,22 @@ function, the function pointer might be lost and the user needs to register
 it again. A better alternative is to always use entry method of a chare
 object. Since all the entry methods are registered inside \charmpp{} system,
 in restart phase, the reduction client will be automatically restored.
+
+\subsubsection{Choosing What to Save}
+In your programs, you may use chare groups for different types of purposes. 
+For example, groups holding read-only data can avoid excessive data copying,
+while groups maintaining processor-specific information is used as a local
+manager of the processor. In the latter situation, the data is sometimes
+too complicated to save and restore but easy to re-compute. For the read-only
+data, you want to save and restore it in the PUP'er routing and leave empty
+the migration constructor, via which the new object is created during restart.
+For the easy-to-recompute type of data, we just omit the PUP'er routine and
+do the data reconstruction in the group's migration constructor.
+
+A similar example is the program mentioned above, where there aree two 
+types of chare arrays, one maintaining intermediate results while the 
+other type holding the final result for each timestep. The programmer 
+can take advantage of the flexibility by omitting PUP'er routine empty
+for intermediate objects, and do save/restore only for the important 
+objects. 
+
