@@ -1,10 +1,9 @@
 module mblock {
   message MBlockDataMsg { unsigned char data[]; };
-  message MBlockInitMsg;
-  initcall void MBlockInit(void);
+  initproc void MBlockProcInit(void);
   array [1D] MBlockChunk {
-    entry MBlockChunk(MBlockInitMsg *m);
+    entry MBlockChunk(CkArrayID threads);
     entry void recv(MBlockDataMsg *);
-    entry void reductionResult(MBlockDataMsg *);
+    entry void reductionResult(CkReductionMsg *);
   };
 };

@@ -16,6 +16,8 @@ then resume the thread when the results arrive.
 #include <limits.h>
 #include <float.h> /*for FLT_MIN on non-Suns*/
 
+/* TCHARM Semaphore ID */
+#define MBLOCK_TCHARM_SEMAID 0x003B70C6 /* __MBLOCK */
 
 #if 0
 /*Many debugging statements:*/
@@ -30,22 +32,6 @@ then resume the thread when the results arrive.
 // valid in routines called from driver().
 CtvStaticDeclare(MBlockChunk *, _mblkptr);
 
-static void 
-_allReduceHandler(void *proxy_v, int datasize, void *data)
-{
-  CProxy_MBlockChunk *proxy=(CProxy_MBlockChunk *)proxy_v;
-  // the reduction handler is called on processor 0
-  // with available reduction results
-  MBlockDataMsg *dmsg = new (&datasize, 0) MBlockDataMsg(0,datasize,0,0); CHK(dmsg);
-  memcpy(dmsg->data, data, datasize);
-
-  // broadcast the reduction results to all array elements
-  proxy->reductionResult(dmsg);
-}
-
-
-CDECL void init(void);
-FDECL void FTN_NAME(INIT,init)(void);
 CDECL void driver(void);
 FDECL void FTN_NAME(DRIVER,driver)(void);
 
@@ -58,49 +44,23 @@ static void callDrivers(void) {
 static void MBlockFallbackSetup(void)
 {
 	TCHARM_Create(TCHARM_Get_num_chunks(),callDrivers);
-        init();
-        FTN_NAME(INIT,init)();
-        MBLK_Attach();
 }
 
-static MBlockSetupCookie cookie;
-void MBlockInit(void) 
+void MBlockProcInit(void) 
 {
   CtvInitialize(MBlockChunk *, _mblkptr);
   TCHARM_Set_fallback_setup(MBlockFallbackSetup);
 }
 
-MBlockSetupCookie::MBlockSetupCookie(void)
-{
-  nblocks=-1;
-  ndims=3;	
+CDECL void MBLK_Init(int comm) {
+  if (TCHARM_Element()==0) {
+     CkArrayID threads; int nThreads;
+     CkArrayOptions opt=TCHARM_Attach_start(&threads,&nThreads);
+     CkArrayID aid=CProxy_MBlockChunk::ckNew(threads,opt);
+  }
+  MBlockChunk *c=(MBlockChunk *)TCharm::get()->semaGet(MBLOCK_TCHARM_SEMAID);
 }
-
-void MBlockSetupCookie::createArray(void)
-{
-  if (nblocks==-1)
-    CkAbort("You must call MBLCK_Set_nblocks during init!\n");
-
-  CkArrayOptions opt(nblocks);
-  TCharmSetupCookie *tc=TCharmSetupCookie::get();
-  if (!tc->hasThreads())
-	  CkAbort("You must create a threads array with TCharmCreate before calling MBLK_Attach!\n");
-  opt.bindTo(tc->getThreads());
-  CkArrayID aid=CProxy_MBlockChunk::ckNew(
-	  new MBlockInitMsg((const char *)prefix, ndims,tc->getThreads()),opt);
-  CProxy_MBlockChunk *proxy=new CProxy_MBlockChunk(aid);
-  proxy->setReductionClient(_allReduceHandler,proxy);
-  tc->addClient(aid);
-}
-
-CDECL void MBLK_Attach(void)
-{
-	MBLOCKAPI("MBLK_Attach");
-	cookie.createArray();
-}
-FDECL void FTN_NAME(MBLK_ATTACH,mblk_attach)(void)
-{ MBLK_Attach(); }
-
+FORTRAN_AS_C(MBLK_INIT,MBLK_Init,mblk_init, (int *comm), (*comm))
 
 /******************** Reduction Support **********************/
 
@@ -218,45 +178,34 @@ combine(const DType& dt, int op)
 void MBlockChunk::commonInit(void)
 {
   nfields = 0;
-  thisproxy=thisArrayID;
-
-}
-
-MBlockChunk::MBlockChunk(MBlockInitMsg *msg)
-{
-  commonInit();
-
-  threads=msg->threads;
-  migInit();
+  seqnum = 0;
+  b=NULL;
 
   for (int bc=0;bc<MBLK_MAXBC;bc++)
     bcs[bc].fn=NULL;
+}
+
+MBlockChunk::MBlockChunk(const CkArrayID &threads_)
+{
+  commonInit();
+
+  threads=threads_;
+  migInit();
   
-  seqnum = 0;
   update.nRecd = 0;
   update.wait_seqnum = -1;
-  messages = CmmNew();	
+  messages = CmmNew();
   
-  b = new block(msg->prefix, thisIndex);
-  int n = b->getPatches();
-  nRecvPatches = 0;
-  for(int i=0;i<n;i++) {
-    patch *p = b->getPatch(i);
-    if(p->type == patch::internal)
-      nRecvPatches++;
-  }
-  delete msg;
-  thread->ready();
+  thread->semaPut(MBLOCK_TCHARM_SEMAID,this);
 }
 
 MBlockChunk::MBlockChunk(CkMigrateMessage *msg)
-	:ArrayElement1D(msg)
+	:CBase_MBlockChunk(msg)
 {
-  b=NULL;
-  messages=NULL;
   commonInit();
+  
+  messages=NULL;
 }
-
 
 //Update fields after migration
 void MBlockChunk::migInit(void)
@@ -276,6 +225,21 @@ MBlockChunk::~MBlockChunk() //Destructor-- deallocate memory
 {
         CmmFree(messages);
 	delete b;
+}
+
+void 
+MBlockChunk::read(const char *prefix,int nDim) 
+{
+  if (nDim!=3) CkAbort("MBlock> Currently only 3D calculations are supported.\n");
+  delete b;
+  b = new block(prefix, thisIndex);
+  int n = b->getPatches();
+  nRecvPatches = 0;
+  for(int i=0;i<n;i++) {
+    patch *p = b->getPatch(i);
+    if(p->type == patch::internal)
+      nRecvPatches++;
+  }
 }
 
 void
@@ -345,7 +309,7 @@ MBlockChunk::send(int fid,const extrudeMethod &meth,const void *grid)
           memcpy(data, src, len);
           data = (void*) ((char*)data + len);
         }
-    thisproxy[dest].recv(msg);
+    thisProxy[dest].recv(msg);
     DBG("  sending "<<num<<" data items ("<<seqnum<<") to processor "<<dest)
   }
 }
@@ -480,19 +444,19 @@ MBlockChunk::reduce(int fid, const void *inbuf, void *outbuf, int op)
       }
       break;
   }
-  contribute(len, (void *)inbuf, rtype);
   reduce_output = outbuf;
+  contribute(len, (void *)inbuf, rtype, 
+  	CkCallback(index_t::reductionResult(0),thisProxy) );
   thread->suspend();
 }
 
 void
-MBlockChunk::reductionResult(MBlockDataMsg *msg)
+MBlockChunk::reductionResult(CkReductionMsg *m)
 {
-  //msg->from used as length
-  memcpy(reduce_output, msg->data, msg->from);
+  memcpy(reduce_output,m->getData(),m->getSize());
+  delete m;
   reduce_output=NULL;
   thread->resume();
-  delete msg;
 }
 
 /********** Thread/migration support ************/
@@ -500,7 +464,7 @@ static MBlockChunk *getCurMBlockChunk(void)
 {
   MBlockChunk *cptr=CtvAccess(_mblkptr);
   if (cptr==NULL) 
-    CkAbort("Routine can only be called from driver()!\n");
+    CkAbort("MBlock does not appear to be initialized!");
   return cptr;
 }
 
@@ -508,38 +472,8 @@ static MBlockChunk *getCurMBlockChunk(void)
 /******************************* C Bindings **********************************/
 
 CDECL int 
-MBLK_Set_prefix(const char *prefix)
-{
-  MBLOCKAPI("MBLK_Set_prefix");
-  if(TCharm::getState() != inInit) {
-    CkError("MBLK_Set_prefix called from outside init\n");
-    return MBLK_FAILURE;
-  }
-  strcpy(cookie.prefix,prefix);
-  return MBLK_SUCCESS;
-}
-
-CDECL int 
-MBLK_Set_nblocks(const int n)
-{
-  MBLOCKAPI("MBLK_Set_nblocks");
-  if(TCharm::getState() != inInit) {
-    CkError("MBLK_Set_nblocks called from outside init\n");
-    return MBLK_FAILURE;
-  }
-  cookie.nblocks = n;
-  return MBLK_SUCCESS;
-}
-
-CDECL int 
-MBLK_Set_dim(const int n)
-{
-  MBLOCKAPI("MBLK_Set_dim");
-  if(TCharm::getState() != inInit) {
-    CkError("MBLK_Set_dim called from outside init\n");
-    return MBLK_FAILURE;
-  }
-  cookie.ndims = n;
+MBLK_Read(const char *prefix,int nDim) {
+  getCurMBlockChunk() -> read(prefix,nDim);
   return MBLK_SUCCESS;
 }
 
@@ -611,8 +545,7 @@ MBLK_Print(const char *str)
 {
   MBLOCKAPI("MBLK_Print");
   if(TCharm::getState()==inDriver) {
-    MBlockChunk *cptr = getCurMBlockChunk();
-    CkPrintf("[%d] %s\n", cptr->thisIndex, str);
+    CkPrintf("[%d] %s\n", TCHARM_Element(), str);
   } else {
     CkPrintf("%s\n", str);
   }
@@ -782,28 +715,16 @@ FDECL int FTN_NAME(FOFFSETOF,foffsetof)
   return (int)((char *)second - (char*)first);
 }
 
-FDECL void FTN_NAME(MBLK_SET_PREFIX, mblk_set_prefix)
-  (const char *str, int *ret)
+FDECL void FTN_NAME(MBLK_READ, mblk_read)
+  (const char *str, int *nDim,int *ret, int len)
 {
-  int len=0; /*Find the end of the string by looking for the space*/
-  while (str[len]!=' ') len++;
+  /* skip over silly Fortran space-padded string */
+  while (str[len-1]==' ') len--;
   char *tmpstr = new char[len+1]; CHK(tmpstr);
   memcpy(tmpstr,str,len);
   tmpstr[len] = '\0';
-  *ret = MBLK_Set_prefix(tmpstr);
+  *ret = MBLK_Read(tmpstr,*nDim);
   delete[] tmpstr;
-}
-
-FDECL void FTN_NAME(MBLK_SET_NBLOCKS, mblk_set_nblocks)
-  (int *nblocks, int *ret)
-{
-  *ret = MBLK_Set_nblocks(*nblocks);
-}
-
-FDECL void FTN_NAME(MBLK_SET_DIM, mblk_set_dim)
-  (int *dim, int *ret)
-{
-  *ret = MBLK_Set_dim(*dim);
 }
 
 FDECL void FTN_NAME(MBLK_GET_NBLOCKS, mblk_get_nblocks)

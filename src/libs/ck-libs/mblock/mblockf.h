@@ -16,9 +16,8 @@
 
        integer, external :: foffsetof
 
-       external :: MBLK_Set_prefix
-       external :: MBLK_Set_nblocks
-       external :: MBLK_Set_dim
+       external :: MBLK_Init
+       external :: MBLK_Read
 
        external :: MBLK_Get_nblocks
        external :: MBLK_Get_myblock

@@ -32,6 +32,10 @@ extern "C" {
   typedef void (*MBLK_PupFn)(pup_er, void*);
   typedef void (*MBLK_BcFn)(void *p1,void *p2,int *start,int *end);
 
+  /* called from init */
+  void MBLK_Init(int comm);
+  int MBLK_Read(const char *prefix,int nDimensions);
+  
   /*Utility*/
   int MBLK_Get_nblocks(int *n);
   int MBLK_Get_myblock(int *m);
@@ -40,15 +44,7 @@ extern "C" {
   double MBLK_Timer(void);
   void MBLK_Print(const char *str);
   void MBLK_Print_block(void);
-
-  /* called from init */
-  int MBLK_Set_prefix(const char *prefix);
-  int MBLK_Set_nblocks(const int n);
-  int MBLK_Set_dim(const int n);
-
-  /* attach to an existing TCharm array */
-  void MBLK_Attach(void);
-
+  
   /* field creation */
   int MBLK_Create_field(int *dimensions,int isVoxel,
       const int base_type, const int vec_len,

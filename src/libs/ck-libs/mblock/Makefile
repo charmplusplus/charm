@@ -5,7 +5,7 @@ HEADERS=mblock.h mblockf.h
 HEADDEP=$(HEADERS) patch.h gridutil.h mblock_impl.h \
         mblock.decl.h mblock.def.h
 OBJS=mblock.o patch.o
-COMPAT=compat_init.o compat_finit.o compat_driver.o compat_fdriver.o
+COMPAT=compat_driver.o compat_fdriver.o
 LIB=libmodulemblock
 
 LIBDIR=$(CDIR)/lib

@@ -71,16 +71,6 @@ class MBlockDataMsg : public CMessage_MBlockDataMsg
     seqnum(s), from(f), fid(fid_), patchno(p) {  }
 };
 
-class MBlockInitMsg : public CMessage_MBlockInitMsg
-{
-  public:
-    char prefix[1024];
-    int ndims;
-    CkArrayID threads;
-    MBlockInitMsg(const char *_p, const int n,const CkArrayID &t) 
-	    : ndims(n),threads(t) { strcpy(prefix, _p); }
-};
-
 #define MBLK_MAXDT 20
 #define MBLK_MAXUDATA 20
 #define MBLK_MAXBC 20
@@ -104,7 +94,7 @@ class field_t {
   }
 };
 
-class MBlockChunk: public ArrayElement1D
+class MBlockChunk: public CBase_MBlockChunk
 {
 private:
   int nfields;
@@ -113,8 +103,6 @@ private:
   int nudata;
   void *userdata[MBLK_MAXUDATA];
   MBLK_PupFn pup_ud[MBLK_MAXUDATA];
-
-  CProxy_MBlockChunk thisproxy;
 
   CProxy_TCharm threads;
   TCharm *thread;
@@ -146,15 +134,17 @@ private:
  public:
   block *b;
 
-  MBlockChunk(MBlockInitMsg *m);
+  MBlockChunk(const CkArrayID &threads);
   MBlockChunk(CkMigrateMessage *msg);
   ~MBlockChunk();
-
+  
+  void read(const char *prefix,int nDim);
+  
   void ckJustMigrated(void);
   
   //entry methods
   void recv(MBlockDataMsg *);
-  void reductionResult(MBlockDataMsg *);
+  void reductionResult(CkReductionMsg *);
 
   int add_field(field_t *f) {
     if (nfields==MBLK_MAXDT) return -1;
