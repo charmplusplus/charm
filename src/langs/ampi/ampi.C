@@ -113,7 +113,10 @@ ampi::ampi(void)
 {
   ampiArray = thisArray;
   nrequests = 0;
-  ntypes = 0;
+  //UDT_MOD1 Begin
+  //ntypes = 0;
+  myDDT = new DDT ;
+  //UDT_MOD1 End 
   nirequests = 0;
   firstfree = 0;
   nReductions = 0;
@@ -148,6 +151,10 @@ void ampi::pup(PUP::er &p)
 	}
 	
 	
+	//UDT_MOD1	Begin
+	//call pup for DDT.
+	//UDT_MOD1	End
+
 	//Pack/unpack all our data
 	p(csize);p(isize);p(rsize);p(fsize);
 	p(totsize);
@@ -294,6 +301,7 @@ extern "C" void ampi_finalize_(int *ierr)
   *ierr = AMPI_Finalize();
 }
 
+/* UDT_MOD1 Begin
 static int typesize(int type, int count, ampi* ptr)
 {
   switch(type) {
@@ -317,15 +325,45 @@ static int typesize(int type, int count, ampi* ptr)
       return 0; // keep compiler happy
   }
 }
+//UDT_MOD1 end
+*/
 
 extern "C" int AMPI_Send(void *msg, int count, AMPI_Datatype type, int dest, 
                         int tag, AMPI_Comm comm)
 {
-  ampi *ptr = CtvAccess(ampiPtr);
-  int size = typesize(type, count, ptr);
+	//UDT_MOD1	Begin
+	int bytesCopied, extentType, size ;
+	char* oldBuffer = (char*) msg ;
+	char* tempOldBuffer = oldBuffer ;
+
+	ampi *ptr = CtvAccess(ampiPtr);
+	
+	DDT_DataType* dttype = ptr->myDDT->getType(type) ;
+	extentType = dttype->getExtent();
+	size = count * dttype->getSize() ;
+
+	char* newBuffer = new char[size] ;
+	char* tempNewBuffer = newBuffer ;
+
+	for(int i = 0 ; i < count ; i++)
+	{
+		bytesCopied = dttype->copyBuffer(oldBuffer, newBuffer);
+		oldBuffer = oldBuffer + extentType ;
+		newBuffer = newBuffer + bytesCopied ;
+	}
+
+	oldBuffer = tempOldBuffer ;
+	newBuffer = tempNewBuffer ;
+
+  	if(0) printf("NumBytes Copied = %d\n", bytesCopied );
+	//UDT_MOD1	end
+	
   //CkPrintf("[%d] sending %d bytes to %d tagged %d\n", ptr->getIndex(), 
            //size, dest, tag);
-  ptr->ckTempoSendElem(tag, ptr->getIndex(), msg, size, dest);
+	//UDT_MOD1 begin	
+	//ptr->ckTempoSendElem(tag, ptr->getIndex(), msg, size, dest);
+	ptr->ckTempoSendElem(tag, ptr->getIndex(), newBuffer, size, dest);
+	//UDT_MOD1 end	
   return 0;
 }
 
@@ -335,11 +373,25 @@ extern "C" void ampi_send_(void *msg, int *count, int *type, int *dest,
   *ierr = AMPI_Send(msg, *count, *type, *dest, *tag, *comm);
 }
 
-extern "C" int AMPI_Recv(void *msg, int count, int type, int src, int tag,
-                        AMPI_Comm comm, AMPI_Status *status)
+extern "C" int AMPI_Recv(void *msg, int count, AMPI_Datatype type, int src, int tag, AMPI_Comm comm, AMPI_Status *status)
 {
+	/*
   ampi *ptr = CtvAccess(ampiPtr);
   int size = typesize(type, count, ptr);
+*/
+	//UDT_MOD1	Begin
+	int bytesCopied, extentType, size ;
+	char* oldBuffer = (char*) msg ;
+	char* tempOldBuffer = oldBuffer ;
+
+	ampi *ptr = CtvAccess(ampiPtr);
+	
+	DDT_DataType* dttype = ptr->myDDT->getType(type) ;
+	extentType = dttype->getExtent();
+	size = count * dttype->getSize() ;
+	//UDT_MOD1 End
+  //Change similarly in Recv also.
+
   //CkPrintf("[%d] waits for %d bytes tagged %d\n",ptr->getIndex(),size,tag);
   ptr->ckTempoRecv(tag, src, msg, size);
   //CkPrintf("[%d] received %d bytes tagged %d\n", ptr->getIndex(), size, tag);
@@ -385,11 +437,20 @@ extern "C" void ampi_barrier_(int *comm, int *ierr)
 
 #define AMPI_BCAST_TAG 999
 
-extern "C" int AMPI_Bcast(void *buf, int count, int type, int root, 
+extern "C" int AMPI_Bcast(void *buf, int count, AMPI_Datatype type, int root, 
                          AMPI_Comm comm)
 {
+	/*
   ampi *ptr = CtvAccess(ampiPtr);
   int size = typesize(type, count, ptr);
+  */
+	//UDT_MOD1	Begin
+	ampi *ptr = CtvAccess(ampiPtr);
+	
+	DDT_DataType* dttype = ptr->myDDT->getType(type) ;
+	int size = count * dttype->getSize() ;
+	//UDT_MOD1 End
+
   ptr->nbcasts++;
   // CkPrintf("[%d] %dth Broadcast called size=%d\n", ptr->getIndex(), 
            // ptr->nbcasts, size);
@@ -494,8 +555,17 @@ extern "C" int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
       ckerr << "Op " << op << " not supported." << endl;
       CmiAbort("exiting");
   }
+  /*
   ampi *ptr = CtvAccess(ampiPtr);
   int size = typesize(type, count, ptr);
+  */
+	//UDT_MOD1	Begin
+	ampi *ptr = CtvAccess(ampiPtr);
+	
+	DDT_DataType* dttype = ptr->myDDT->getType(type) ;
+	int size = count * dttype->getSize() ;
+	//UDT_MOD1 End
+
   ptr->contribute(size, inbuf, mytype);
   //CkPrintf("[%d] Allreduce called\n", ptr->getIndex());
   ptr->nAllReductions++;
@@ -584,11 +654,20 @@ extern "C" void ampi_waitall_(int *count, int *request, int *status, int *ierr)
 extern "C" int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
                              AMPI_Comm comm, AMPI_Request *req)
 {
+
   ampi *ptr = CtvAccess(ampiPtr);
+
   if(ptr->nrequests == 100) {
     CmiAbort("Too many persistent commrequests.\n");
   }
+/*
   int size = typesize(type, count, ptr);
+ */
+	//UDT_MOD1	Begin
+	DDT_DataType* dttype = ptr->myDDT->getType(type) ;
+	int size = count * dttype->getSize() ;
+	//UDT_MOD1 End
+
   ptr->requests[ptr->nrequests].sndrcv = 2;
   ptr->requests[ptr->nrequests].buf = buf;
   ptr->requests[ptr->nrequests].size = size;
@@ -614,7 +693,14 @@ extern "C" int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
   if(ptr->nrequests == 100) {
     CmiAbort("Too many persistent commrequests.\n");
   }
+  /*
   int size = typesize(type, count, ptr);
+  */
+//UDT_MOD1	Begin
+	DDT_DataType* dttype = ptr->myDDT->getType(type) ;
+	int size = count * dttype->getSize() ;
+//UDT_MOD1 End
+
   ptr->requests[ptr->nrequests].sndrcv = 1;
   ptr->requests[ptr->nrequests].buf = buf;
   ptr->requests[ptr->nrequests].size = size;
@@ -633,15 +719,63 @@ extern "C" void ampi_send_init_(void *buf, int *count, int *type, int *destpe,
   *ierr = AMPI_Send_init(buf,*count,*type,*destpe,*tag,*comm,(AMPI_Request*)req);
 }
 
-extern "C" int AMPI_Type_contiguous(int count, AMPI_Datatype oldtype, 
+extern "C" int AMPI_Type_Contiguous(int count, AMPI_Datatype oldtype, 
                                    AMPI_Datatype *newtype)
 {
-  ampi *ptr = CtvAccess(ampiPtr);
-  *newtype = ptr->ntypes;
-  ptr->types[*newtype] =  typesize(oldtype, count, ptr);
-  ptr->ntypes ++;
-  *newtype += 100;
-  return 0;
+	ampi *ptr = CtvAccess(ampiPtr);
+	
+ 	ptr->myDDT->Type_Contiguous(count, oldtype, newtype); 
+	return 0;
+}
+
+extern "C" void ampi_type_contiguous_(int *count, int *oldtype, int *newtype, 
+                                int *ierr)
+{
+  *ierr = AMPI_Type_Contiguous(*count, *oldtype, newtype);
+}
+
+
+extern	"C"	int AMPI_Type_Vector(int count, int blocklength, int stride, AMPI_Datatype oldtype,
+								 AMPI_Datatype*	newtype)
+{
+	ampi	*ptr = CtvAccess(ampiPtr);
+
+	ptr->myDDT->Type_Vector(count, blocklength, stride, oldtype, newtype);
+	return 0 ;
+}
+
+extern	"C"	int AMPI_Type_HVector(int count, int blocklength, int stride, AMPI_Datatype oldtype,
+								 AMPI_Datatype*	newtype)
+{
+	ampi	*ptr = CtvAccess(ampiPtr);
+
+	ptr->myDDT->Type_HVector(count, blocklength, stride, oldtype, newtype);
+	return 0 ;
+}
+
+extern	"C"	int AMPI_Type_Indexed(int count, int* arrBlength, int* arrDisp, AMPI_Datatype oldtype,
+								 AMPI_Datatype*	newtype)
+{
+	ampi	*ptr = CtvAccess(ampiPtr);
+
+	ptr->myDDT->Type_Indexed(count, arrBlength, arrDisp, oldtype, newtype);
+	return 0 ;
+}
+
+extern	"C"	int AMPI_Type_HIndexed(int count, int* arrBlength, int* arrDisp, AMPI_Datatype oldtype, AMPI_Datatype*	newtype)
+{
+	ampi	*ptr = CtvAccess(ampiPtr);
+
+	ptr->myDDT->Type_HIndexed(count, arrBlength, arrDisp, oldtype, newtype);
+	return 0 ;
+}
+
+extern	"C"	int AMPI_Type_Struct(int count, int* arrBlength, int* arrDisp, AMPI_Datatype* oldtype, AMPI_Datatype*	newtype)
+{
+	ampi	*ptr = CtvAccess(ampiPtr);
+
+	ptr->myDDT->Type_Struct(count, arrBlength, arrDisp, oldtype, newtype);
+	return 0 ;
 }
 
 extern "C" int AMPI_Type_commit(AMPI_Datatype *datatype)
@@ -651,14 +785,11 @@ extern "C" int AMPI_Type_commit(AMPI_Datatype *datatype)
 
 extern "C" int AMPI_Type_free(AMPI_Datatype *datatype)
 {
-  return 0;
+	ampi	*ptr = CtvAccess(ampiPtr);
+	ptr->myDDT->freeType(datatype);
+	return 0;
 }
 
-extern "C" void ampi_type_contiguous_(int *count, int *oldtype, int *newtype, 
-                                int *ierr)
-{
-  *ierr = AMPI_Type_contiguous(*count, *oldtype, newtype);
-}
 
 extern "C" void ampi_type_commit_(int *type, int *ierr)
 {
@@ -670,11 +801,32 @@ extern "C" void ampi_type_free_(int *type, int *ierr)
   *ierr = AMPI_Type_free(type);
 }
 
+extern "C" void AMPI_Type_Extent(AMPI_Datatype datatype, AMPI_Aint extent)
+{
+	ampi *ptr = CtvAccess(ampiPtr) ;
+	*extent = ptr->myDDT->getExtent(datatype);
+}
+
+extern "C" void AMPI_Type_Size(AMPI_Datatype datatype, AMPI_Aint extent)
+{
+	ampi *ptr = CtvAccess(ampiPtr) ;
+	*extent = ptr->myDDT->getSize(datatype);
+}
+
 extern "C" int AMPI_Isend(void *buf, int count, AMPI_Datatype datatype, int dest, 
               int tag, AMPI_Comm comm, AMPI_Request *request)
 {
+	/*
     ampi *ptr = CtvAccess(ampiPtr);
     int size = typesize(datatype, count, ptr);
+*/
+	//UDT_MOD1	Begin
+	ampi *ptr = CtvAccess(ampiPtr);
+	
+	DDT_DataType* dttype = ptr->myDDT->getType(datatype) ;
+	int size = count * dttype->getSize() ;
+	//UDT_MOD1 End
+
     ptr->niSends++;
     ptr->biSend += size;
     ptr->ckTempoSendElem(tag, ptr->getIndex(), buf, size, dest);
@@ -689,7 +841,14 @@ extern "C" int AMPI_Irecv(void *buf, int count, AMPI_Datatype datatype, int src,
   if(ptr->nirequests == 100) {
     CmiAbort("Too many Irecv requests.\n");
   }
+  /*
   int size = typesize(datatype, count, ptr);
+  */
+//UDT_MOD1	Begin
+	DDT_DataType* dttype = ptr->myDDT->getType(datatype) ;
+	int size = count * dttype->getSize() ;
+//UDT_MOD1 End
+
   ptr->niRecvs++;
   ptr->biRecv += size;
   PersReq *req = &(ptr->irequests[ptr->firstfree]);
@@ -735,7 +894,11 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
   }
 
   AMPI_Status status;
-  int itemsize = typesize(recvtype, 1, ptr);
+  /* int itemsize = typesize(recvtype, 1, ptr); */
+//UDT_MOD1	Begin
+	DDT_DataType* dttype = ptr->myDDT->getType(recvtype) ;
+	int itemsize = dttype->getSize() ;
+//UDT_MOD1 End
   
   for(i=0;i<size;i++) {
     AMPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
@@ -766,7 +929,11 @@ int AMPI_Allgather(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
   }
 
   AMPI_Status status;
-  int itemsize = typesize(recvtype, 1, ptr);
+  /* int itemsize = typesize(recvtype, 1, ptr); */
+//UDT_MOD1	Begin
+	DDT_DataType* dttype = ptr->myDDT->getType(recvtype) ;
+	int itemsize = dttype->getSize() ;
+//UDT_MOD1 End
   
   for(i=0;i<size;i++) {
     AMPI_Recv(((char*)recvbuf)+(recvcount*itemsize*i), recvcount, recvtype,
@@ -797,7 +964,11 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
 
   if(ptr->getIndex() == root) {
     AMPI_Status status;
-    int itemsize = typesize(recvtype, 1, ptr);
+    /* int itemsize = typesize(recvtype, 1, ptr); */
+//UDT_MOD1	Begin
+	DDT_DataType* dttype = ptr->myDDT->getType(recvtype) ;
+	int itemsize = dttype->getSize() ;
+//UDT_MOD1 End
   
     for(i=0;i<size;i++) {
       AMPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
@@ -828,7 +999,11 @@ int AMPI_Gather(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
 
   if(ptr->getIndex()==root) {
     AMPI_Status status;
-    int itemsize = typesize(recvtype, 1, ptr);
+    /* int itemsize = typesize(recvtype, 1, ptr); */
+//UDT_MOD1	Begin
+	DDT_DataType* dttype = ptr->myDDT->getType(recvtype) ;
+	int itemsize = dttype->getSize() ;
+//UDT_MOD1 End
   
     for(i=0;i<size;i++) {
       AMPI_Recv(((char*)recvbuf)+(recvcount*itemsize*i), recvcount, recvtype,
@@ -854,7 +1029,11 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
 {
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->getSize();
-  int itemsize = typesize(sendtype, 1, ptr);
+  /* int itemsize = typesize(sendtype, 1, ptr); */
+//UDT_MOD1	Begin
+	DDT_DataType* dttype = ptr->myDDT->getType(sendtype) ;
+	int itemsize = dttype->getSize() ;
+//UDT_MOD1 End
   int i;
   for(i=0;i<size;i++) {
     AMPI_Send(((char*)sendbuf)+(itemsize*sdispls[i]), sendcounts[i], sendtype,
@@ -862,7 +1041,11 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
   }
 
   AMPI_Status status;
-  itemsize = typesize(recvtype, 1, ptr);
+  /* itemsize = typesize(recvtype, 1, ptr); */
+//UDT_MOD1	Begin
+	dttype = ptr->myDDT->getType(recvtype) ;
+	itemsize = dttype->getSize() ;
+//UDT_MOD1 End
   
   for(i=0;i<size;i++) {
     AMPI_Recv(((char*)recvbuf)+(itemsize*rdispls[i]), recvcounts[i], recvtype,
@@ -887,7 +1070,11 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
 {
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->getSize();
-  int itemsize = typesize(sendtype, 1, ptr);
+  /* int itemsize = typesize(sendtype, 1, ptr); */
+//UDT_MOD1	Begin
+	DDT_DataType* dttype = ptr->myDDT->getType(sendtype) ;
+	int itemsize = dttype->getSize() ;
+//UDT_MOD1 End
   int i;
   for(i=0;i<size;i++) {
     AMPI_Send(((char*)sendbuf)+(itemsize*sendcount*i), sendcount, sendtype,
@@ -895,7 +1082,11 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
   }
 
   AMPI_Status status;
-  itemsize = typesize(recvtype, 1, ptr);
+  /* itemsize = typesize(recvtype, 1, ptr); */
+//UDT_MOD1	Begin
+	dttype = ptr->myDDT->getType(recvtype) ;
+	itemsize = dttype->getSize() ;
+//UDT_MOD1 End
   
   for(i=0;i<size;i++) {
     AMPI_Recv(((char*)recvbuf)+(itemsize*recvcount*i), recvcount, recvtype,
