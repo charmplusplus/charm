@@ -4,7 +4,8 @@
 #include "CkSparseReducer.decl.h"
 
 template <class T>
-struct sparseRec1D{
+struct sparseRec1D
+{
 	sparseRec1D(int _i, T _data)
 	{
 		i = _i;
@@ -15,8 +16,8 @@ struct sparseRec1D{
 	{
 	}
 
-	int i;
-	T data;
+	int i; // index of element
+	T data; // actual data
 };
 
 extern CkReduction::reducerType sparse_sum_int;
@@ -34,24 +35,35 @@ extern CkReduction::reducerType sparse_min_int;
 extern CkReduction::reducerType sparse_min_float;
 extern CkReduction::reducerType sparse_min_double;
 
+/*
+** To contribute a sparse array,
+**    create an object of CkSparseReducer1D<T> r.
+**    call the function r.numOfElements(n) where n is the number of elements to contribute
+**    call r.add(index, data) n times, to add all the elements to the object r.
+**    call r.contribute(...)
+**  NOTE that sparse reduction library expects data contributed (added to r) to be sorted on index.
+*/
 
 template <class T>
 class CkSparseReducer1D
 {
 	public:
 
-		void add(int i, T data){
+		void add(int i, T data)
+		{
                         records[index].i = i;
 			records[index].data = data;
 			index++;
 		}
 
-                void contribute(ArrayElement *elem, CkReduction::reducerType type){
+                void contribute(ArrayElement *elem, CkReduction::reducerType type)
+		{
                         elem->contribute(size*sizeof(rec), records, type);
 			delete[] records;
                 }
 
-		void contribute(ArrayElement *elem, CkReduction::reducerType type, const CkCallback &cb){
+		void contribute(ArrayElement *elem, CkReduction::reducerType type, const CkCallback &cb)
+		{
                         elem->contribute(size*sizeof(rec), records, type, cb);
 			delete[] records;
 		}
