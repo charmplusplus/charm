@@ -130,9 +130,11 @@ void LogPool::init(void)
 #endif
   openLog("w+");
   if(!binary) {
+#if CMK_PROJECTIONS_USE_ZLIB
     if(compressed)
       gzprintf(zfp, "PROJECTIONS-RECORD\n");
     else
+#endif
       fprintf(fp, "PROJECTIONS-RECORD\n");
   }
   CLOSE_LOG 
