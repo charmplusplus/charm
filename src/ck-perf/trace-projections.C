@@ -224,7 +224,7 @@ void LogPool::creatFiles(char *fix)
 	gzprintf(zfp, "PROJECTIONS-RECORD\n");
       }
       if (deltaLog) {
-	gzprintf(deltazfp, "PROJECTIONS-RECORD\n");
+	gzprintf(deltazfp, "PROJECTIONS-RECORD DELTA\n");
       }
     } 
     else /* else clause is below... */
@@ -234,7 +234,7 @@ void LogPool::creatFiles(char *fix)
 	fprintf(fp, "PROJECTIONS-RECORD\n");
       }
       if (deltaLog) {
-	fprintf(deltafp, "PROJECTIONS-RECORD\n");
+	fprintf(deltafp, "PROJECTIONS-RECORD DELTA\n");
       }
     }
   }
