@@ -200,6 +200,7 @@ static void _exitHandler(envelope *env)
 #ifndef CMK_OPTIMIZE
         _printStats();
 #endif
+        _TRACE_END_COMPUTATION();
         CsdExitScheduler();
       }
       break;
@@ -214,15 +215,9 @@ static inline void _processBufferedBocInits(void)
   CmiNumberHandler(_bocHandlerIdx, (CmiHandler)_processHandler);
   while(env=(envelope *)CpvAccess(_bocInitQ)->deq()) {
     if(env->isPacked() && _msgTable[env->getMsgIdx()]->unpack) {
-#ifndef CMK_OPTIMIZE
-      if(CpvAccess(traceOn))
-        CpvAccess(_trace)->beginUnpack();
-#endif
+      _TRACE_BEGIN_UNPACK();
       env = UsrToEnv(_msgTable[env->getMsgIdx()]->unpack(EnvToUsr(env)));
-#ifndef CMK_OPTIMIZE
-      if(CpvAccess(traceOn))
-        CpvAccess(_trace)->endUnpack();
-#endif
+      _TRACE_END_UNPACK();
     }
     _processBocInitMsg(env);
   }
@@ -234,15 +229,9 @@ static inline void _processBufferedNodeBocInits(void)
   CmiNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_processHandler);
   while(env=(envelope *)CpvAccess(_nodeBocInitQ)->deq()) {
     if(env->isPacked() && _msgTable[env->getMsgIdx()]->unpack) {
-#ifndef CMK_OPTIMIZE
-      if(CpvAccess(traceOn))
-        CpvAccess(_trace)->beginUnpack();
-#endif
+      _TRACE_BEGIN_UNPACK();
       env = UsrToEnv(_msgTable[env->getMsgIdx()]->unpack(EnvToUsr(env)));
-#ifndef CMK_OPTIMIZE
-      if(CpvAccess(traceOn))
-        CpvAccess(_trace)->endUnpack();
-#endif
+      _TRACE_END_UNPACK();
     }
     _processNodeBocInitMsg(env);
   }
@@ -496,9 +485,8 @@ void _initCharm(int argc, char **argv)
     _registerwaitqd();
     CkRegisterMainModule();
   }
+  _TRACE_BEGIN_COMPUTATION();
 #ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    CpvAccess(_trace)->beginComputation();
   CpvAccess(_myStats) = new Stats();
 #endif
   CpvAccess(_msgPool) = new MsgPool();

@@ -3,6 +3,18 @@
 
 #define CINTBITS (sizeof(int)*8)
 
+#ifndef CMK_OPTIMIZE
+#define _SET_USED(env, x) (env)->setUsed((x))
+#define _CHECK_USED(env) if(env->isUsed()) { \
+                           CmiAbort("Message being re-sent. Aborting...\n"); \
+                         }
+#else
+#define _SET_USED(env, x)
+#define _CHECK_USED(env)
+#endif
+
+#ifndef CMK_OPTIMIZE
+#endif
 typedef unsigned int   UInt;
 typedef unsigned short UShort;
 typedef unsigned char  UChar;
@@ -109,9 +121,7 @@ class envelope {
       env->totalsize = tsize;
       env->priobits = prio;
       env->setPacked(0);
-#ifndef CMK_OPTIMIZE
-      env->setUsed(0);
-#endif
+      _SET_USED(env, 0);
       return env;
     }
     UShort getEpIdx(void) const {
