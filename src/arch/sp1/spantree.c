@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-10-02 19:22:34  knauff
+ * Revision 2.6  1995-10-02 19:28:29  knauff
+ * Fixed the call to CmiAsyncSendFn in CmiSendToSpanTreeLeaves, so I
+ * don't need the '#include machine.h' after all.
+ *
+ * Revision 2.5  1995/10/02  19:22:34  knauff
  * Added '#include machine.h' so PROCESS_PID doesn't barf.
  *
  * Revision 2.4  1995/09/29  09:50:07  jyelon
@@ -35,7 +39,6 @@ static char ident[] = "@(#)$Header$";
 
 /* This file contains all the spanning tree functions */
 #include "converse.h"
-#include "machine.h"
 
 #define MAXSPAN    4          /* The maximum permitted span on 
 				 each node of the spanning tree */
@@ -162,5 +165,5 @@ char * msg;
     /* node 0 cannot be a leaf of a spanning tree: it is the root */
     for (node = 1; node < numnodes; node++)
     if (SpanArray[node].noofchildren == 0)  /* it is a leaf */
-        CmiAsyncSendFn(node, size, msg, PROCESS_PID);
+        CmiAsyncSendFn(node, size, msg);
 }
