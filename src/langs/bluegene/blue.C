@@ -60,6 +60,8 @@ int programExit = 0;
 
 static int bgstats_flag = 0;		// flag print stats at end of simulation
 
+static char *bgtraceroot = NULL;          // bgTraceFile prefix
+
 // for debugging log
 FILE *bgDebugLog;			// for debugging
 
@@ -363,11 +365,14 @@ static inline double MSGTIME(int ox, int oy, int oz, int nx, int ny, int nz, int
 #if LEMIEUX_SETUP
   return bytes/BANDWIDTH;
 #else
+  int numpackets;
   int xd=ABS(ox-nx), yd=ABS(oy-ny), zd=ABS(oz-nz);
   int ncorners = 2;
   ncorners -= (xd?0:1 + yd?0:1 + zd?0:1);
   ncorners = (ncorners<0)?0:ncorners;
   double packetcost = (ncorners*CYCLES_PER_CORNER + (xd+yd+zd)*CYCLES_PER_HOP)*CYCLE_TIME_FACTOR*1E-6;
+  numpackets = bytes/PACKETSIZE;
+  if (bytes%PACKETSIZE) numpackets++;
   return  packetcost * numpackets;
 #endif
 }
@@ -725,6 +730,7 @@ double BgGetTime()
 #endif
   else 
     CmiAbort("Unknown Timing Method.");
+  return -1;
 #else
   /* sometime I am interested in real wall time */
   tCURRTIME = CmiWallTimer();
@@ -937,7 +943,7 @@ CmiStartFn bgMain(int argc, char **argv)
   CmiGetArgIntDesc(argv, "+wth", &cva(bgMach).numWth, 
 		"The number of simulated worker threads per node");
 
-  CmiGetArgIntDesc(argv, "+bg_stacksize", &bg_stacksize, 
+  CmiGetArgIntDesc(argv, "+bgstacksize", &bg_stacksize, 
 		"Blue Gene thread stack size");
 
   genTimeLog = CmiGetArgFlagDesc(argv, "+bglog", "Write events to log file");
@@ -969,6 +975,12 @@ CmiStartFn bgMain(int argc, char **argv)
   bgstats_flag=0;
   if(CmiGetArgFlagDesc(argv, "+bgstats", "Print correction statistics")) 
     bgstats_flag = 1;
+
+  char *root;
+  if (CmiGetArgStringDesc(argv, "+bgtraceroot", &root, "Directory to write bgTrace files to") && !bgtraceroot) {
+    bgtraceroot = (char*)malloc(strlen(root) + 10);
+    sprintf(bgtraceroot, "%s/", root);
+  }
 
 #if BLUEGENE_DEBUG_LOG
   {
@@ -1017,6 +1029,8 @@ CmiStartFn bgMain(int argc, char **argv)
       CmiPrintf("BG info> Generating timing log. \n");
     if (correctTimeLog)
       CmiPrintf("BG info> Perform timing log correction. \n");
+    if (bgtraceroot)
+      CmiPrintf("BG info> bgTrace root is %s. \n", bgtraceroot);
   }
 
   CtvInitialize(threadInfo *, threadinfo);
@@ -1206,13 +1220,18 @@ static void beginExitHandlerFunc(void *msg)
 // return the number of real msgs
 void computeUtilForAll(int* array, int *nReal)
 {
-  double scale = 1000.0;	// scale to ms
+  double scale = 1.0e3;		// scale to ms
 
   //We measure from 1ms to 5001 ms in steps of 100 ms
-  int min = 0, max = HISTOGRAM_SIZE, step = 1;
+  int min = 0, step = 1;
+  int max = min + HISTOGRAM_SIZE*step;
+  // [min, max: step]  HISTOGRAM_SIZE slots
 
+  if (CmiMyPe()==0)
+    CmiPrintf("computeUtilForAll: min:%d max:%d step:%d scale:%f.\n", min, max, step, scale);
   int size = (max-min)/step;
   CmiAssert(size == HISTOGRAM_SIZE);
+  int allmin = -1, allmax = -1;
   for(int i=0;i<size;i++) array[i] = 0;
 
   for (int nodeidx=0; nodeidx<cva(numNodes); nodeidx++) {
@@ -1220,10 +1239,13 @@ void computeUtilForAll(int* array, int *nReal)
     for (int tID=0; tID<cva(bgMach).numWth; tID++) {
       int util = (int)(scale*(tlinerec[tID].computeUtil(nReal)));
 
-      if (util >= max) util=max-1;
+      if (util >= max) { if (util>allmax||allmax==-1) allmax=util; util=max-1;}
+      if (util < min) { if (util<allmin||allmin==-1) allmin=util; util=min; }
       array[(util-min)/step]++;
     }
   }
+  if (allmin!=-1 || allmax!=-1)
+    CmiPrintf("[%d] Warning: computeUtilForAll out of range %f - %f.\n", CmiMyPe(), (allmin==-1)?-1:allmin/scale, (allmax==-1)?-1:allmax/scale);
 }
 
 class StatsMessage {
@@ -1298,7 +1320,10 @@ void statsCollectionHandlerFunc(void *msg)
   if (count == CmiNumPes()) {
     if (bgstats_flag) {
       CmiPrintf("Total procCount:%d corrMsgCount:%d realMsg:%d timeline:%d-%d\n", pc, cc, realMsgCount, minTimelineLen, maxTimelineLen);
-      for (i=0; i<HISTOGRAM_SIZE; i++) CmiPrintf("%d ", histArray[i]);
+      for (i=0; i<HISTOGRAM_SIZE; i++) {
+        CmiPrintf("%d ", histArray[i]);
+	if (i%20 == 19) CmiPrintf("\n");
+      }
       CmiPrintf("\n");
     }
     CsdExitScheduler();
@@ -1339,7 +1364,7 @@ void correctMsgTime(char *msg)
 static void writeToDisk()
 {
 
-  char* d = new char[10];
+  char* d = new char[1025];
   //Num of simulated procs on this real pe
   int numProcs = cva(numNodes)*cva(bgMach).numWth;
 
@@ -1348,7 +1373,8 @@ static void writeToDisk()
   // write summary file on PE0
   if(CmiMyPe()==0){
     
-    FILE *f2 = fopen("bgTrace","w");
+    sprintf(d, "%sbgTrace", bgtraceroot?bgtraceroot:""); 
+    FILE *f2 = fopen(d,"w");
     //Total real and toal BG processors
     int numPes=CmiNumPes();
     int totalProcs = BgNumNodes()*cva(bgMach).numWth;
@@ -1367,8 +1393,7 @@ static void writeToDisk()
     fclose(f2);
   }
   
-  CmiPrintf("seq correct called on %d \n",CmiMyPe());
-  sprintf(d,"bgTrace%d",CmiMyPe());
+  sprintf(d, "%sbgTrace%d", bgtraceroot?bgtraceroot:"", CmiMyPe()); 
   FILE *f = fopen(d,"w");
  
   int *procOffsets = new int[numProcs];
@@ -1403,7 +1428,7 @@ static void writeToDisk()
   p(procOffsets,numProcs);
   fclose(f);
 
-  CmiPrintf("[%d] Wrote to disk for BG node:%d work:%d \n", CmiMyPe(), cva(numNodes),cva(bgMach).numWth);
+  CmiPrintf("[%d] Wrote to disk for %d BG nodes. \n", CmiMyPe(), cva(numNodes));
 }
 
 
