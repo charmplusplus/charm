@@ -43,24 +43,26 @@ Entry::Entry(char *n, char *m, int t, char *r)
 	strcpy(name,n) ;
 
 	msgtype = thismodule->FindMsg(m) ;
-	if (msgtype == NULL) {
+	if (m != NULL && msgtype == NULL) {	// error
 		char *mesg = (char *) malloc(strlen(m) + 100);
 		strcpy(mesg, m);
 		strcat(mesg, " not declared");
 		yyerror(mesg);
 		exit(1);
 	}
-	next = NULL ;
 
 	isthreaded = t;
+
 	returnMsg = thismodule->FindMsg(r) ;
-	if (returnMsg == NULL) {
+	if (r != NULL && returnMsg == NULL) {	// error
 		char *mesg = (char *) malloc(strlen(m) + 100);
 		strcpy(mesg, m);
 		strcat(mesg, " not declared");
 		yyerror(mesg);
 		exit(1);
 	}
+
+	next = NULL ;
 }
 
 
@@ -118,6 +120,19 @@ Message *Module::FindMsg(char *msg)
 	return NULL ;
 }
 
+char *getmodulename(char *pathname)
+{
+	char c = '/';
+	int i = 0;
+
+	for(i=strlen(pathname)-1; i>=0; i--)
+		if (pathname[i] == c)
+			break;
+
+	cout << "MODULE " << &(pathname[i+1]) << endl;
+	return &(pathname[i+1]);
+}
+
 
 Module *Parse(char *interfacefile)
 {
@@ -125,7 +140,7 @@ Module *Parse(char *interfacefile)
 	strcpy(modulename, interfacefile) ;
 	modulename[strlen(interfacefile)-3] = '\0' ;
 
-	thismodule = new Module(modulename) ;
+	thismodule = new Module(getmodulename(modulename)) ;
 	delete modulename;
 
 	FILE * fp = fopen (interfacefile, "r") ;
