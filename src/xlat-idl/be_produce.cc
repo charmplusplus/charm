@@ -12,9 +12,10 @@
 #include <assert.h>
 #include <string.h>
 
+#define SZ 1024
+
 class XString {
   private:
-    const int SZ=1024;
     char *s;
     unsigned int len, blklen;
   public:
