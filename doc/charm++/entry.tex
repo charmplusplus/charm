@@ -1,0 +1,71 @@
+\subsection{Entry Methods}
+\label{entry}
+
+In \charmpp, \index{chare}chares, \index{group}groups and \index{nodegroup}
+nodegroups communicate using remote method invocation.  These ``remote entry'' methods may either take marshalled parameters, described in the next section; or special objects called messages.  Messages are lower level, more efficient, more flexible, and more difficult to use than parameter marshalling.
+
+An entry method is always a part of a chare--
+there are no global entry methods in \charmpp{}.
+Entry methods are declared in the the interface file as:
+
+\begin{alltt}
+entry void \uw{Entry1}(\uw{parameters});
+\end{alltt}
+
+\uw{Parameters} is either a list of marshalled parameters,
+(e.g., ``int i, double x''), or a message description (e.g.,
+``MyMessage *msg'').  See section~\ref{marshalling} and
+section~\ref{messages} for details on these types of
+parameters.
+
+Entry methods typically do not return data-- in \CC, they have
+return type ``void''.  An entry method with the same name
+as its enclosing class is a constructor.  Constructors in \CC
+have no return type.  Finally, sync methods, described below,
+may return a message.
+
+\subsubsection{Entry Method Attributes}
+\label{attributes}
+
+\charmpp{}  provides a handful of special attributes that \index{entry
+method}entry methods may have.  In order to give a particular \index{entry
+method}entry method an attribute, you must specify the keyword for the desired
+attribute in the attribute list of that entry method's {\tt .ci} file
+declaration.  The syntax for this is as follows:
+
+\begin{alltt}
+entry [\uw{attribute1}, ..., \uw{attributeN}] void \uw{EntryMethod}(\uw{parameters});
+\end{alltt}
+
+\charmpp{} currently offers four attributes that one may give an entry method:
+\kw{threaded}, \kw{sync}, and \kw{exclusive}.
+
+\index{threaded}Threaded \index{entry method}entry methods are simply entry
+methods which are run in their own nonpremptible threads.  To make an
+\index{entry method}entry method threaded, one simply adds the keyword
+\kw{threaded} to the attribute list of that entry method.
+
+\index{sync}Sync \index{entry method}entry methods are special in that calls to
+sync entry methods are blocking - they do not return control to the caller
+until the method is finished executing completely.  Sync methods may have
+return values; however, they may only return messages.  To make an \index{entry
+method}entry method a sync entry method, add the keyword \kw{sync} to the
+attribute list of that entry method.
+
+\index{exclusive}Exclusive entry methods, which exist only on node groups, are
+\index{entry method}entry methods that do not execute while other exclusive
+\index{entry method}entry methods of its node group are executing in the same
+node.  If one exclusive method of a node group is executing on node 0, and
+another one is scheduled to run on that same node, the second exclusive method
+will wait for the first to finish before it executes.  To make an \index{entry
+method}entry method exclusive, add the keyword \kw{exclusive} to that
+entry method's attribute list.
+
+
+
+
+
+
+
+
+
