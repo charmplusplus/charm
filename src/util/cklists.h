@@ -253,7 +253,10 @@ protected:
 public:
 	CkZeroPtr() {storage=0;}
 	CkZeroPtr(T *sto) {storage=sto;}
-	//Default copy constructor, asssignment operator
+	CkZeroPtr(const CkZeroPtr &src) { storage=src.storage; }
+	CkZeroPtr &operator=(const CkZeroPtr &src) {
+		storage=src.storage; return *this;
+	}
 	T *operator=(T *sto) {storage=sto; return sto;}
 	
 	operator T* () const {return storage;}
