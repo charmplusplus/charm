@@ -1,4 +1,5 @@
 #include "HammingDistance.h"
+// Simple algorithm based on hamming distance
 
 int HammingDistance::selectRoute(int c,int d,int numP,int *next) {
         unsigned int xorCurAndDst,portid=0,checkBit=1,nextNode;

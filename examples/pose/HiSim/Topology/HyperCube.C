@@ -21,7 +21,10 @@ void HyperCube::getNeighbours(int nodeid,int numP) {
         }
         }
 }
-                                                                                                                                                             
+        
+
+// If routing is modified, we can support incomplete hypercubes
+// The topology recognizes incomplete hypercubes for now. So the code is slightly complex                                                                                                                                                     
 int HyperCube::getNext(int portid,int nodeid,int numP) {
 unsigned int p,pow2,y;
 int r,id,c,i,nextPort,checkBit;

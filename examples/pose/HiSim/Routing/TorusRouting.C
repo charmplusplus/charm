@@ -1,5 +1,7 @@
 #include "TorusRouting.h"
 
+// Look at bluegene paper for more details
+
 int TorusRouting::selectRoute(int c,int d,int numP,Topology *top,Packet *p,map<int,int> & Bufsize) {
 	int *next; next = top->next;
 	int longestSize = -1,offset;

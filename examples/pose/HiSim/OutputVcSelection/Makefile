@@ -20,6 +20,9 @@ BlueGene: maxAvailBufferBubbleVc.o
 IB: maxAvailBufferSwitch.o
 	cp maxAvailBufferSwitch.o ../tmp
 
+OB: outputBuffer.o
+	cp outputBuffer.o ../tmp
+
 maxAvailBuffer.o: maxAvailBuffer.C maxAvailBuffer.h
 	$(CHARMC) -o maxAvailBuffer.o -seq maxAvailBuffer.C -I$(MACHINE)
 
@@ -29,6 +32,9 @@ maxAvailBufferBubbleVc.o: maxAvailBufferBubbleVc.C maxAvailBufferBubbleVc.h
 maxAvailBufferSwitch.o: maxAvailBufferSwitch.C maxAvailBufferSwitch.h
 	$(CHARMC) -o maxAvailBufferSwitch.o -seq maxAvailBufferSwitch.C -I$(MACHINE)
 	
+outputBuffer.o: outputBuffer.C outputBuffer.h
+	$(CHARMC) -o outputBuffer.o -seq outputBuffer.C -I$(MACHINE)
+
 clean:
 	rm -f charmrun conv-host *.o
 	rm -f *.def.h *.decl.h

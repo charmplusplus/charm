@@ -1,6 +1,6 @@
 #include "SLQ.h"
 int SLQ::selectInputVc(map<int,int> & Bufsize,map<int,int> &requested,map<int, vector <Header> > &inBuffer,const int globalVc) {
-	int i=0,longestQ=NO_VC_AVAILABLE,longestLen=config.switchBufsize,start;
+	int i=0,longestQ=NO_VC_AVAILABLE,shortestLen=config.switchBufsize,start;
 	vector <Header>::iterator headOfBuf; 
 	start = (globalVc/config.switchVc);
 	int occupied[6],myvc;
@@ -20,8 +20,8 @@ int SLQ::selectInputVc(map<int,int> & Bufsize,map<int,int> &requested,map<int, v
                 if((inBuffer[i].size()) && (!(requested[i])) && (occupied[i/config.switchVc] < config.inputSpeedup)) {
 			headOfBuf = inBuffer[i].begin();
 			if(headOfBuf->portId == start) {	
-                        if(longestLen >= Bufsize[i]) {
-                                longestLen = Bufsize[i];
+                        if(shortestLen >= Bufsize[i]) {
+                                shortestLen = Bufsize[i];
                                 longestQ = i;
                         }
 			}

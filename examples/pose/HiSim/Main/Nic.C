@@ -13,6 +13,8 @@ NetInterface::NetInterface(NetInterfaceMsg *niMsg) {
    numRecvd = 0; prevIntervalStart = 0; counter = 0; roundRobin = 0;
    initializeNetwork(&topology,&routingAlgorithm);
 }
+
+// Packetize message and pump it out
 void NetInterface::recvMsg(NicMsg *nic) {
         int delay=0,inputPort,msgLenRest = nic->totalLen,packetnum  = 0,curlen,initPort,initVc;
         Packet *p;
@@ -27,7 +29,7 @@ void NetInterface::recvMsg(NicMsg *nic) {
                 CkAssert(delay >= 0);
 
                 p->hdr.portId = topology->getStartPort(nicConsts->id-config.nicStart);
-                p->hdr.vcid = topology->getStartVc();
+                p->hdr.vcid = roundRobin; roundRobin = (roundRobin+1)%config.switchVc;
                 p->hdr.prevId = nicConsts->id;
                 p->hdr.prev_vcid = -1;
                 p->hdr.nextId = topology->getStartSwitch(nicConsts->id-config.nicStart);
@@ -44,12 +46,16 @@ void NetInterface::recvMsg(NicMsg *nic) {
 
 }
 
+
+// Store part of message having higher level protocol directly to destination
 void NetInterface::storeMsgInAdvance(NicMsg *m) {
         MsgStore ms; ms = *m;
         remoteMsgId rmid(m->msgId,m->src);
         storeBuf[rmid] = ms;
 //      CkPrintf("%d Stored src %d msgid %d\n",ovt,m->src,m->msgId);
 }
+
+// Receive packet by packet and finally send message to node
 
 void NetInterface::recvPacket(Packet *p) {
         int tmp,expected,extra,hops,remlen; TaskMsg *tm; TransMsg *tr;Position src; MsgStore ms;

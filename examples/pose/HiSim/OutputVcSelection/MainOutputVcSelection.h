@@ -4,6 +4,6 @@
 #include "../Main/BgSim_sim.h"
 class OutputVcSelection {
         public:
-        virtual int selectOutputVc(map<int,int> & Bufsize,const Packet *h){}
+        virtual int selectOutputVc(map<int,int> & Bufsize,const Packet *h,const int){}
 };
 #endif

@@ -1,5 +1,5 @@
 #include "maxAvailBufferBubbleVc.h"
-int maxAvailBufferBubbleVc::selectOutputVc(map<int,int> & Bufsize,const Packet *h) {
+int maxAvailBufferBubbleVc::selectOutputVc(map<int,int> & Bufsize,const Packet *h,const int junk) {
 
        int avail=0,vc=NO_VC_AVAILABLE,start;
 	start = h->hdr.portId*config.switchVc;

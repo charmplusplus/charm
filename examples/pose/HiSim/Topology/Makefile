@@ -21,6 +21,9 @@ BlueGene: Mesh3D.o
 IB: FatTree.o
 	cp FatTree.o ../tmp
 
+OB: FatTree.o
+	cp FatTree.o ../tmp
+
 HyperCube.o: HyperCube.C HyperCube.h
 	$(CHARMC) -o HyperCube.o -seq HyperCube.C -I$(MACHINE)
 

@@ -349,9 +349,9 @@ class NicConsts {
 
 class Switch {
 	public:
-	map <int,int> Bufsize;	 // Downstream buffer sizes .. Note this is not current switch buffer sizes.
+	map <int,int> availBufsize;	 // Downstream buffer sizes .. Note this is not current switch buffer sizes.
 	map <int,int> mapVc;     // map input to output
-	map <int,vector <Header> > inBuffer;  // Save the packets when path is stalled
+	map <int,vector <Header> > Buffer;  // Save the packets when path is stalled
 	map <int,int> requested;  // Used to do head of line blocking
 
 	int id,numP;
@@ -380,8 +380,8 @@ class Switch {
 
 	Switch& operator=(const Switch& obj) {
 	rep::operator=(obj);
-	Bufsize = obj.Bufsize; InputRoundRobin = obj.InputRoundRobin; RequestRoundRobin = obj.RequestRoundRobin;  
-	inBuffer = obj.inBuffer; AssignVCRoundRobin = obj.AssignVCRoundRobin; topology = obj.topology; 
+	availBufsize = obj.availBufsize; InputRoundRobin = obj.InputRoundRobin; RequestRoundRobin = obj.RequestRoundRobin;  
+	Buffer = obj.Buffer; AssignVCRoundRobin = obj.AssignVCRoundRobin; topology = obj.topology; 
 	requested = obj.requested; mapVc = obj.mapVc;
 	return *this;
 	}

@@ -27,6 +27,7 @@ public:
    int receptionSerial;
    int inputSpeedup;
    int use_transceiver;
+   int inputBuffering;
 
   int NodeStart;
   int HCAStart;

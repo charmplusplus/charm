@@ -20,6 +20,9 @@ BlueGene: SLQ.o
 IB: SLQ_Switch.o
 	cp SLQ_Switch.o ../tmp
 
+OB: SLQ_Switch.o
+	cp SLQ_Switch.o ../tmp
+
 RoundRobin.o: RoundRobin.C RoundRobin.h
 	$(CHARMC) -o RoundRobin.o -seq RoundRobin.C -I$(MACHINE)
 

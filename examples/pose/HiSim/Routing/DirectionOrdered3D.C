@@ -1,5 +1,6 @@
 #include "DirectionOrdered3D.h"
 
+// Dimension ordered should be the more accurate word. route in x, then y and then z dimension
 int DirectionOrdered3D::selectRoute(int c,int d,int numP,int *next) {
         int xdiff,ydiff,zdiff,zdiff2,nextPort,select_torus=0;
         Position dst,pos; dst.init(d); pos.init(c);

@@ -33,7 +33,7 @@ void Config::readConfig(CkArgMsg *m) {
   fscanf(fp,"RECEPTION_SERIAL %d\n",&receptionSerial);
   fscanf(fp,"INPUT_SPEEDUP %d\n",&inputSpeedup);
   fscanf(fp,"ADAPTIVE_ROUTING %d\n",&adaptiveRouting);
-
+  
 /*  fscanf(fp, "HEADER_SIZE %d\n", &headerSize);
   fscanf(fp, "DMA_DELAY_SMALL %d\n", &DMADelaySmall);
   fscanf(fp, "DMA_DELAY_LARGE %d\n", &DMADelayLarge);

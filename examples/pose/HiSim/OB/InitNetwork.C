@@ -3,7 +3,7 @@
 #include "../Topology/FatTree.h"
 #include "../Routing/UpDown.h"
 #include "../InputVcSelection/SLQ_Switch.h"
-#include "../OutputVcSelection/maxAvailBufferSwitch.h"
+#include "../OutputVcSelection/outputBuffer.h"
 
 void InitNetwork(MachineParams *mp) {
 
@@ -22,7 +22,7 @@ void InitNetwork(MachineParams *mp) {
 
 	CkPrintf("fanout %d numP %d \n",fanout,mp->config->numP);	
 
-	mp->config->inputBuffering = 1;
+	mp->config->inputBuffering = 0; mp->config->switchVc = mp->config->numP;
 	mp->config->numNodes = numNodes = nnodes ;	
        	switchP = mp->config->numP;
 	numSwitches = (numNodes/fanout)*numLevels;
@@ -66,7 +66,7 @@ void initializeNetwork(Topology **topology,RoutingAlgorithm **routing,InputVcSel
    *topology = new FatTree;
    *routing = new UpDown;
    *invc = new SLQ_Switch;
-   *outvc = new maxAvailBufferSwitch;
+   *outvc = new outputBuffer;
 }
 
 void initializeNetwork(Topology **topology,RoutingAlgorithm **routing)

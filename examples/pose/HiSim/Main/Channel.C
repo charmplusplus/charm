@@ -9,6 +9,7 @@ Channel::Channel(ChannelMsg *m) {
    prevIntervalStart = 0; counter = 0;
 }
 
+// Send packet to switch or node. Also doubles as the reception channel in direct network
 void Channel::recvPacket(Packet *copyP) {
         Packet *p; p = new Packet; *p = *copyP;
 

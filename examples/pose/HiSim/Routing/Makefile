@@ -20,6 +20,9 @@ BlueGene: TorusRouting.o
 IB: UpDown.o
 	cp UpDown.o ../tmp
 
+OB: UpDown.o
+	cp UpDown.o ../tmp
+
 DirectionOrdered3D.o: DirectionOrdered3D.C DirectionOrdered3D.h
 	$(CHARMC) -o DirectionOrdered3D.o -seq DirectionOrdered3D.C -I$(MACHINE)
 

@@ -14,7 +14,7 @@ void InitNetwork(MachineParams *mp) {
 	SwitchMsg *sbuf;
 	ChannelMsg *chan;
         switchP = 6;
-	
+	mp->config->inputBuffering = 1;	
         mp->config->switchStart= mp->config->nicStart+mp->BGnodes; 
         mp->config->ChannelStart = mp->config->switchStart + mp->BGnodes;
 	

@@ -3,13 +3,13 @@ int SLQ_Switch::selectInputVc(map<int,int> & Bufsize,map<int,int> & requested,ma
 
 	vector <Header>::iterator headBuf;
 
-	int i=0,longestQ=NO_VC_AVAILABLE,longestLen=-1;
+	int i=0,longestQ=NO_VC_AVAILABLE,shortestLen=config.switchBufsize;
 	for(i=0;i<(config.switchVc*config.numP);i++) {
 		if(inBuffer[i].size()) {
 		headBuf = inBuffer[i].begin();
                 if((!requested[i]) && (headBuf->portId == (outVcId/config.switchVc))) {
-                        if(longestLen < Bufsize[i]) {
-                                longestLen = Bufsize[i];
+                        if(shortestLen >= Bufsize[i]) {
+                                shortestLen = Bufsize[i];
                                 longestQ = i;
                         }
                 }
