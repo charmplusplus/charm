@@ -7,7 +7,7 @@ COMMLIBDIR=../../conv-libs/commlib
 
 DEPENDFILE = Make.depends
 
-LIB = libmodulecommlib.a
+LIB = $(LIBDIR)/libmodulecommlib.a
 
 STRATEGY_OBJS = EachToManyStrategy.o MPIStrategy.o StreamingStrategy.o \
 		DummyStrategy.o NodeMulticast.o EachToManyMulticastStrategy.o \
@@ -30,7 +30,7 @@ all:
 	$(MAKE) $(LIB) 
 
 $(LIB): $(OBJS) $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
-	$(CHARMC) -cp $(LIBDIR) -o libmodulecommlib.a $(OBJS)
+	$(CHARMC) -o $(LIB) $(OBJS)
 	rm -f $(CDIR)/include/ComlibManager.h
 	cp  ComlibManager.h $(CDIR)/include
 	rm -f $(CDIR)/include/EachToManyMulticastStrategy.h
