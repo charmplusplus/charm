@@ -1,5 +1,5 @@
 CMK_CPP_CHARM='/lib/cpp -P'
-CMK_CPP_C='gcc -E'
+CMK_CPP_C='gcc -E -I /usr/include/w32api'
 CMK_CC='gcc -I /usr/include/w32api'
 CMK_CC_RELIABLE='gcc '
 CMK_CC_FASTEST='gcc '
