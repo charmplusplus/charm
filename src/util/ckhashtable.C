@@ -168,6 +168,7 @@ void CkHashtable::empty(void)
 		char *dest=entry(i);
 		layout.empty(dest);
 	}
+	nObj = 0;
 }
 
 //Add the given object to this table under the given key
