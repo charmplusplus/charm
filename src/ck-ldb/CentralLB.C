@@ -113,7 +113,8 @@ void CentralLB::AtSync()
 {
   DEBUGF(("[%d] CentralLB At Sync step %d!!!!\n",CkMyPe(),mystep));
 
-  if (!QueryBalanceNow(step())) {
+  // if num of processor is only 1, nothing should happen
+  if (!QueryBalanceNow(step()) || CkNumPes() == 1) {
     MigrationDone(0);
     return;
   }

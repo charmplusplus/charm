@@ -39,12 +39,11 @@ GreedyRefLB::GreedyRefLB()
 }
 
 
-LBMigrateMsg* GreedyRefLB::Strategy(CentralLB::LDStats* stats, int count)
+void GreedyRefLB::work(CentralLB::LDStats* stats, int count)
 {
-  CkVec<MigrateInfo*> migrateInfo;
   int obj;
 
-  work(stats, count);    // call GreedyLB first
+  GreedyLB::work(stats, count);    // call GreedyLB first
 
   // Get a new buffer to refine into
   int* from_procs = Refiner::AllocProcs(count, stats);
@@ -59,40 +58,13 @@ LBMigrateMsg* GreedyRefLB::Strategy(CentralLB::LDStats* stats, int count)
 
   // Save output
   for(obj=0;obj<stats->n_objs;obj++) {
-      int frompe = stats->from_proc[obj];
-
-      if (from_procs[obj] == -1) CkPrintf("From_Proc was unassigned!\n");
       if (to_procs[obj] == -1) CkPrintf("To_Proc was unassigned!\n");
-      
-      if (to_procs[obj] != frompe) {
-  //  CkPrintf("[%d] Obj %d migrating from %d to %d\n",
-  //     CkMyPe(),obj,pe,to_procs[pe][obj]);
-        //CkPrintf("Refinement moved obj %d orig %d from %d to %d\n", obj,stats->from_proc[obj],from_procs[obj],to_procs[obj]);
-        MigrateInfo *migrateMe = new MigrateInfo;
-        migrateMe->obj = stats->objData[obj].handle;
-        migrateMe->from_pe = frompe;
-        migrateMe->to_pe = to_procs[obj];
-        migrateInfo.insertAtEnd(migrateMe);
-      }
+      stats->to_proc[obj] = to_procs[obj];
   }
 
   // Free the refine buffers
   Refiner::FreeProcs(from_procs);
   Refiner::FreeProcs(to_procs);
-  
-  int migrate_count=migrateInfo.length();
-  CkPrintf("GreedyRefLB migrating %d elements\n",migrate_count);
-  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
-  msg->n_moves = migrate_count;
-  for(int i=0; i < migrate_count; i++) {
-    MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
-    msg->moves[i] = *item;
-    delete item;
-    migrateInfo[i] = 0;
-  }
-
-  return msg;
-  
 }
 
 #endif

@@ -25,7 +25,7 @@ public:
   GreedyRefLB();
   GreedyRefLB(CkMigrateMessage *m):GreedyLB(m) {}
 private:
-  LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
+  void work(CentralLB::LDStats* stats, int count);
 };
 
 #endif /* _GREEDYREFLB_H_ */

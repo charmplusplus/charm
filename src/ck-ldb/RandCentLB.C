@@ -63,8 +63,6 @@ void RandCentLB::work(CentralLB::LDStats* stats, int count)
         }
       }
   }
-  if (lb_debug)
-    CkPrintf("%s: %d objects migrated.\n", lbname, nmigrated);
 }
 
 #endif
