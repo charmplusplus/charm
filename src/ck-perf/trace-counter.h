@@ -19,16 +19,13 @@
 #include "ck.h"
 #include "trace-common.h"
 #include "conv-mach.h"
-#ifdef CMK_ORIGIN2000
-#include <sys/hwperftypes.h>
-#endif
 
 #define MAX_ENTRIES 500
 
 //! track statistics for all entry points
 class StatTable {
   public:
-    StatTable(char** name, char** desc, int argc);
+    StatTable();
     ~StatTable();
     //! one entry is called for 'time' seconds, value is counter reading 
     void setEp(int epidx, int stat, long long value, double time);
@@ -38,7 +35,8 @@ class StatTable {
     //!   3. total time in us spent for each entry
     void write(FILE* fp);
     void clear();
-    inline int numStats() { return numStats_; }
+    int numStats() { return numStats_; }
+    void init(char** name, char** desc, int argc);
 
   private:
     //! struct to maintain statistics
@@ -60,20 +58,24 @@ class StatTable {
 // counter log pool
 class CountLogPool {
   public:
-    CountLogPool(char* pgm, char** name, char** desc, int argc);
+    CountLogPool();
     ~CountLogPool();
     void write(int phase=-1) ;
     void writeSts(int phase=-1);
-    void openFile(int phase=-1);
+    FILE* openFile(int phase=-1);
     void setEp(int epidx, long long count1, long long count2, double time);
-    void clearEps() { stats_.clear(); }
+    void clearEps() { dirty_ = false; stats_.clear(); }
     void setTrace(bool on) { traceOn_ = on; }
+    void setDirty(bool d) { dirty_ = d; }
+    void init(char** name, char** desc, int argc) { 
+      stats_.init(name, desc, argc);
+    }
 
   private:
-    char*     pgm_;
-    FILE*     fp_;
     StatTable stats_;
     bool      traceOn_;
+    int       lastPhase_;
+    bool      dirty_;
 };
 
 //! For each processor, TraceCounter calculates mean, stdev, etc of 
@@ -130,39 +132,25 @@ class TraceCounter : public Trace {
     };
 
   private:
-    int         execEP_;       // id currently executing entry point
-    double      startEP_;      // start time of currently executing ep
-    double      startPack_;    // start time of pack operation
-    double      startUnpack_;  // start time of unpack operation
-    CounterArg* firstArg_;     // pointer to start of linked list of args
-    CounterArg* lastArg_;      // pointer to end of linked list of args
-    int         argStrSize_;   // size of maximum arg string (formatted output)
-    int         phase_;        // current phase
-    bool        traceOn_;      // true if trace is turned on
+    int         execEP_;        // id currently executing entry point
+    double      startEP_;       // start time of currently executing ep
+    double      startPack_;     // start time of pack operation
+    double      startUnpack_;   // start time of unpack operation
+    CounterArg* firstArg_;      // pointer to start of linked list of args
+    CounterArg* lastArg_;       // pointer to end of linked list of args
+    int         argStrSize_;    // size of maximum arg string (formatted output)
+    int         phase_;         // current phase
+    bool        traceOn_;       // true if trace is turned on
 
-    int         counter1_;     // 1st counter to track
-    int         counter2_;     // 2nd counter to track
+    CounterArg* commandLine_;   // list of command line args
+    int         commandLineSz_; // size of commande line args array
+    CounterArg* counter1_;      // point to current counter
+    CounterArg* counter2_;      // point to current counter
 
-    #ifdef CMK_ORIGIN2000
     enum Status { IDLE, WORKING };
-    Status      status_;       // to prevent errors
-    int         genStart_;     // track value of start_counters
-    int         fileDesc_;     // file descriptor for accessing hw counters
-    hwperf_profevctrarg_t evctrArgs_;  // tells what type of counter to profile
-    hwperf_cntr_t         cnts_;       // reads the counters values
-    // starts hw profiling for these counters
-    // returns -1 if error, generation number if no error
-    int startCounter(int counter1, int counter2);
-    // gets hw profile values for these counters
-    // returns -1 if error, generation number if no error
-    int readCounters
-    (
-      int        counter1,
-      long long* value1,
-      int        counter2,
-      long long* value2
-    );
-    #endif // CMK_ORIGIN2000
+    Status      status_;        // to prevent errors
+    int         genStart_;      // track value of start_counters
+    bool        dirty_;         // true if endExecute called 
 
     //! add the argument parameters to the linked list of args choices
     void registerArg(CounterArg* arg);
