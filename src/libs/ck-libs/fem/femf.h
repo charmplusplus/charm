@@ -35,6 +35,7 @@
        external FEM_Get_Elem_Data_c
        
        external FEM_Set_Sparse
+       external FEM_Set_Sparse_Elem
        external FEM_Get_Sparse
 
        external FEM_Set_Partition
@@ -86,11 +87,6 @@
        function FEM_Get_Ghost_List_Length()
          integer :: FEM_Get_Ghost_List_Length
        end function
-
-       subroutine FEM_Set_Sparse_Elem(sID,rec2elem)
-         integer,intent (in) :: sID
-         integer, intent(in) :: rec2elem(2,:)
-       end subroutine 
 
        function FEM_Get_Sparse_Length(sID)
          integer :: FEM_Get_Sparse_Length
