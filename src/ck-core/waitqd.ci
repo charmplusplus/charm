@@ -13,11 +13,19 @@
 module waitqd {
 
   readonly CkChareID waitqd_qdhandle; 
+  readonly CkGroupID waitGC_gchandle;
+
+  message ckGroupMsg;
 
   mainchare waitqd_QDChare {
     entry waitqd_QDChare();
     entry [threaded, sync] void waitQD(void);
     entry void onQD(CkQdMsg *);
+  };
+
+  group waitGC_group {
+    entry waitGC_group(void);
+    entry void recvGroupID(ckGroupMsg *);
   };
 };
 

@@ -122,8 +122,10 @@ extern void CkCreateChare(int chareIdx, int constructorIdx, void *msg,
                           CkChareID *vid, int destPE);
 extern CkGroupID CkCreateGroup(int chareIdx, int constructorIdx, void *msg,
                          int returnEpIdx, CkChareID *returnChare);
+extern CkGroupID CkCreateGroupSync(int cIdx, int consIdx, void *msg);
 extern CkGroupID CkCreateNodeGroup(int chareIdx, int constructorIdx, void *msg,
                          int returnEpIdx, CkChareID *returnChare);
+extern CkGroupID CkCreateNodeGroupSync(int cIdx, int consIdx, void *msg);
 
 /******************************************************************************
  *

@@ -1098,6 +1098,13 @@ void Entry::genGroupStaticConstructorDecl(XStr& str)
       str << "msg";
   }
   str << ");\n";
+  str << "    static CkGroupID ckNewSync(";
+  if(param) {
+    param->print(str);
+    if(!param->isVoid())
+      str << "msg";
+  }
+  str << ");\n";
   str << "    ";
   container->genProxyName(str);
   str << "(";
@@ -1672,6 +1679,31 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
     str << "  return CkCreateNodeGroup(__idx, __idx_";
   genEpIdx(str);
   str << ", msg, 0, 0);\n";
+  str << "}\n";
+
+  if(container->isTemplated())
+    container->genSpec(str);
+  str << "CkGroupID ";
+  container->genProxyName(str);
+  if(container->isTemplated())
+    container->genVars(str);
+  str << "::ckNewSync(";
+  if(param) {
+    param->print(str);
+    if(!param->isVoid())
+      str << "msg";
+  }
+  str << ")\n";
+  str << "{\n";
+  if(param->isVoid()) {
+    str << "  void *msg = CkAllocSysMsg();\n";
+  }
+  if(container->getChareType()==SGROUP)
+    str << "  return CkCreateGroupSync(__idx, __idx_";
+  else
+    str << "  return CkCreateNodeGroupSync(__idx, __idx_";
+  genEpIdx(str);
+  str << ", msg);\n";
   str << "}\n";
 
   if(container->isTemplated())
