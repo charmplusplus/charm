@@ -8,7 +8,6 @@
 #include "ampiimpl.h"
 // for strlen
 #include <string.h>
-#include <sys/stat.h> // for mkdir
 
 int AMPI_COMM_UNIVERSE[AMPI_MAX_COMM];
 

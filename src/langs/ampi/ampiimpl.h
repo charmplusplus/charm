@@ -12,6 +12,7 @@
 #include "ampi.decl.h"
 #include "ampimain.decl.h"
 #include "ddt.h"
+#include <sys/stat.h> // for mkdir
 
 #define AMPI_MAX_COMM 8
 
@@ -169,7 +170,6 @@ class AmpiMsg : public CMessage_AmpiMsg {
 
 class ampi : public ArrayElement1D {
       char str[128];
-      char idxstr[16];
   public: // entry methods
     ampi(AmpiStartMsg *);
     ampi(CkMigrateMessage *msg) {}
@@ -198,9 +198,9 @@ class ampi : public ArrayElement1D {
     }
     void checkpoint(DirMsg *msg)
     {
-      strcpy(str, msg->dname);
-      sprintf(idxstr, "/%d.cpt", thisIndex);
-      strcat(str, idxstr);
+      sprintf(str, "%s/%d", msg->dname, commidx);
+      mkdir(str, 0777);
+      sprintf(str, "%s/%d/%d.cpt", msg->dname, commidx, thisIndex);
       delete msg;
       CProxy_ampimain pm(ampimain::handle); 
       pm.checkpoint(); 
@@ -208,9 +208,7 @@ class ampi : public ArrayElement1D {
     void restart(DirMsg *);
     void restartThread(char *dname)
     {
-      strcpy(str, dname);
-      sprintf(idxstr, "/%d.cpt", thisIndex);
-      strcat(str, idxstr);
+      sprintf(str, "%s/%d/%d.cpt", dname, commidx, thisIndex);
       FILE *fp = fopen(str, "rb");
       if(fp!=0) {
         PUP::fromDisk p(fp); p.becomeUserlevel();
