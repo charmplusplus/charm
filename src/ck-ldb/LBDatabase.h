@@ -23,6 +23,8 @@ class LBDB;
 CkpvExtern(int, numLoadBalancers);
 CkpvExtern(int, hasNullLB);
 CkpvExtern(int, lbdatabaseInited);
+CkpvExtern(int, dumpStep);
+CkpvExtern(char*, dumpFile);
 
 typedef void (*LBDefaultCreateFn)(void);
 void LBSetDefaultCreate(LBDefaultCreateFn f);
