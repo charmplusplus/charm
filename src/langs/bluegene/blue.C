@@ -328,13 +328,18 @@ void threadBCastMsgHandlerFunc(char *msg)
  *		BG Messaging Functions
  */
 
-static inline double MSGTIME(int ox, int oy, int oz, int nx, int ny, int nz)
+static inline double MSGTIME(int ox, int oy, int oz, int nx, int ny, int nz, int bytes)
 {
+#if LEMIEUX_SETUP
+  return bytes/BANDWIDTH;
+#else
   int xd=ABS(ox-nx), yd=ABS(oy-ny), zd=ABS(oz-nz);
   int ncorners = 2;
   ncorners -= (xd?0:1 + yd?0:1 + zd?0:1);
   ncorners = (ncorners<0)?0:ncorners;
-  return (ncorners*CYCLES_PER_CORNER + (xd+yd+zd)*CYCLES_PER_HOP)*CYCLE_TIME_FACTOR*1E-6;
+  double packetcost = (ncorners*CYCLES_PER_CORNER + (xd+yd+zd)*CYCLES_PER_HOP)*CYCLE_TIME_FACTOR*1E-6;
+  return  packetcost * numpackets;
+#endif
 }
 
 void CmiSendPacket(int x, int y, int z, int msgSize,char *msg)
@@ -359,7 +364,7 @@ void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type
   CmiBgMsgType(sendmsg) = type;
   CmiBgMsgLength(sendmsg) = numbytes;
   BgElapse(ALPHACOST);
-  CmiBgMsgRecvTime(sendmsg) = MSGTIME(tMYX, tMYY, tMYZ, x,y,z) + BgGetTime();
+  CmiBgMsgRecvTime(sendmsg) = MSGTIME(tMYX, tMYY, tMYZ, x,y,z, numbytes) + BgGetTime();
 
   // timing
   BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, local);
@@ -383,7 +388,7 @@ static inline void nodeBroadcastPacketExcept_(int node, CmiInt2 threadID, int ha
   CmiBgMsgType(sendmsg) = type;	
   CmiBgMsgLength(sendmsg) = numbytes;
   /* FIXME */
-  CmiBgMsgRecvTime(sendmsg) = BgGetTime();	
+  CmiBgMsgRecvTime(sendmsg) = MSGTIME(tMYX, tMYY, tMYZ, 0,0,0, numbytes) + BgGetTime();
 
   // timing
   // FIXME

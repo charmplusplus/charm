@@ -15,10 +15,17 @@
 /* define system parameters */
 #define INBUFFER_SIZE	32
 
+#define LEMIEUX_SETUP  1
+
+#if LEMIEUX_SETUP
+#define ALPHACOST          (8E-6)
+#define BANDWIDTH          (256E6)
+#else
 #define CYCLES_PER_HOP     5
 #define CYCLES_PER_CORNER  75
 #define CYCLE_TIME_FACTOR  (0.001)  /* one cycle = nanosecond = 10^(-3) us */
 #define ALPHACOST          (0.1E-6)
+#endif
 /* end of system parameters */
 
 #define MAX_HANDLERS	100
