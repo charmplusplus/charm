@@ -1700,7 +1700,7 @@ void Entry::genDefs(XStr& str)
 
 void Entry::genReg(XStr& str)
 {
-  str << "    /* REG: "<<*this << "*/\n";
+  str << "    // REG: "<<*this;
   if(isConstructor() && container->isAbstract())
     return;
   
@@ -1789,7 +1789,7 @@ void ParamList::print(XStr &str,int withDefaultValues)
 }
 void Parameter::print(XStr &str,int withDefaultValues) 
 {
-	if (arrLen!=NULL || type->isReference())
+	if (arrLen!=NULL)
 		str<<"const ";
     	type->print(str);
     	if (arrLen!=NULL)
@@ -1854,15 +1854,15 @@ void ParamList::marshall(XStr &str,int makeVoid)
 		str<<"  int impl_off=0, impl_arrstart=0;\n";
 		callEach(&Parameter::marshallArraySizes,str);
 		str<<"  { //Find the size of the PUP'd data\n";
-		str<<"    PUP::sizer p;\n";
+		str<<"    PUP::sizer implP;\n";
 		callEach(&Parameter::pup,str);
-		str<<"    impl_off+=(impl_arrstart=CK_ALIGN(p.size(),16));\n";
+		str<<"    impl_off+=(impl_arrstart=CK_ALIGN(implP.size(),16));\n";
 		str<<"  }\n";
 		//Now that we know the size, allocate the packing buffer
 		str<<"  CkMarshallMsg *impl_msg=new (impl_off,0)CkMarshallMsg();\n";
 		//Second pass: write the data
 		str<<"  { //Copy over the PUP'd data\n";
-		str<<"    PUP::toMem p((void *)impl_msg->msgBuf);\n";
+		str<<"    PUP::toMem implP((void *)impl_msg->msgBuf);\n";
 		callEach(&Parameter::pup,str);
 		str<<"  }\n";
 		str<<"  char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
@@ -1882,8 +1882,8 @@ void Parameter::marshallArraySizes(XStr &str)
 	}
 }
 void Parameter::pup(XStr &str) {
-	if (isArray())  str<<"    p|impl_off_"<<name<<";\n";
-	else  str<<"    p|"<<name<<";\n";
+	if (isArray())  str<<"    implP|impl_off_"<<name<<";\n";
+	else  str<<"    implP|"<<name<<";\n";
 }
 void Parameter::marshallArrayData(XStr &str)
 {
@@ -1899,18 +1899,18 @@ void ParamList::beginUnmarshall(XStr &str)
     	{
     		str<<"  //Unmarshall: ";print(str,0);str<<"\n";
     		str<<"  char *impl_buf=((CkMarshallMsg *)impl_msg)->msgBuf;\n";
-    		str<<"  PUP::fromMem p(impl_buf);\n";
+    		str<<"  PUP::fromMem implP(impl_buf);\n";
     		callEach(&Parameter::beginUnmarshall,str);
-    		str<<"  impl_buf+=CK_ALIGN(p.size(),16);\n";
+    		str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
     	}
 }
 void Parameter::beginUnmarshall(XStr &str) 
 {
 	Type *dt=type->deref();//Type, without &
 	if (isArray())
-		str<<"  int impl_off_"<<name<<"; p|impl_off_"<<name<<";\n";
+		str<<"  int impl_off_"<<name<<"; implP|impl_off_"<<name<<";\n";
 	else
-		str<<"  "<<dt<<" "<<name<<"; p|"<<name<<";\n";
+		str<<"  "<<dt<<" "<<name<<"; implP|"<<name<<";\n";
 }
 void ParamList::unmarshall(XStr &str) 
 {
@@ -1955,3 +1955,24 @@ void ParamList::endUnmarshall(XStr &str)
     		str<<"  delete (CkMarshallMsg *)impl_msg;\n";
     	}
 }
+
+/***************** InitCall **************/
+InitCall::InitCall(int l, const char *n)
+	    : name(n)
+{ 
+	line=l; setChare(0); 
+}
+void InitCall::print(XStr& str)
+{
+	str<<"  initcall void "<<name<<"(void);\n";
+}
+void InitCall::genDecls(XStr& str) {}
+void InitCall::genDefs(XStr& str) {}
+void InitCall::genReg(XStr& str)
+{
+	str<<"      ";
+	if (container)
+		str<<container->baseName()<<"::";
+	str<<name<<"();\n";
+}
+

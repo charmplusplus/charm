@@ -89,7 +89,6 @@ class Type : public Printable {
     virtual int isMessage(void) const {return 0;}
     virtual int isTemplated(void) const { return 0; }
     virtual int isPointer(void) const {return 0;}
-    virtual int isArray(void) const {return 0;}
     virtual int isReference(void) const {return 0;}
     virtual int isConst(void) const {return 0;}
     virtual Type *deref(void) {return this;}
@@ -143,17 +142,6 @@ class PtrType : public Type {
         type->print(str);
       }
     }
-};
-
-class ArrayType : public Type {
-  private:
-    Type *type;
-    Value *dim; // Array length (a constant)
-  public:
-    ArrayType(Type *t,Value *d) : type(t), dim(d) {}
-    int isArray(void) const {return 1;}
-    void print(XStr& str) {str<<type<<"["<<dim<<"]";}
-    const char *getBaseName(void) { return type->getBaseName(); }
 };
 
 class ReferenceType : public Type {
@@ -686,6 +674,16 @@ class Readonly : public Member {
     Readonly(int l, Type *t, char *n, ValueList* d, int m=0) 
 	    : msg(m), type(t), name(n)
             { line=l; dims=d; setChare(0); }
+    void print(XStr& str);
+    void genDecls(XStr& str);
+    void genDefs(XStr& str);
+    void genReg(XStr& str);
+};
+
+class InitCall : public Member {
+    const char *name;
+public:
+    InitCall(int l, const char *n);
     void print(XStr& str);
     void genDecls(XStr& str);
     void genDefs(XStr& str);

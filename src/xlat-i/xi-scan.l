@@ -79,6 +79,7 @@ struct rwtable rwtable[] = {
   "array",	ARRAY,
   "message",	MESSAGE,
   "extern",	EXTERN,
+  "initcall",	INITCALL,
   "readonly",	READONLY,
   "stacksize",	STACKSIZE,
   "threaded",	THREADED,
@@ -90,8 +91,6 @@ struct rwtable rwtable[] = {
   "sync",	SYNC,
   "exclusive",	EXCLUSIVE,
   "virtual",    VIRTUAL,
-  "void",	VOID,
-  "const",	CONST,
   "mainchare",	MAINCHARE,
   "packed",     PACKED,
   "varsize",    VARSIZE,
@@ -103,6 +102,8 @@ struct rwtable rwtable[] = {
   "float",      FLOAT,
   "double",     DOUBLE,
   "unsigned",   UNSIGNED,
+  "void",	VOID,
+  "const",	CONST,
   "",		0,
 };
 

@@ -46,6 +46,7 @@ ModuleList *modlist;
 %token MAINMODULE
 %token EXTERN
 %token READONLY
+%token INITCALL
 %token <intval> CHARE MAINCHARE GROUP NODEGROUP ARRAY
 %token MESSAGE
 %token CLASS
@@ -68,7 +69,7 @@ ModuleList *modlist;
 %type <strval>		Name QualName CCode OptSdagCode OptNameInit
 %type <val>		OptStackSize
 %type <intval>		OptExtern OptSemiColon MAttribs MAttribList MAttrib
-%type <intval>		EAttribs EAttribList EAttrib OptPure
+%type <intval>		EAttribs EAttribList EAttrib OptPure OptVoid
 %type <cattr>		CAttribs CAttribList CAttrib
 %type <tparam>		TParam
 %type <tparlist>	TParamList TParamEList OptTParams
@@ -86,7 +87,7 @@ ModuleList *modlist;
 %type <plist>           ParamList EParameters
 %type <typelist>	BaseList OptBaseList
 %type <mbrlist>		MemberEList MemberList
-%type <member>		Member
+%type <member>		Member NonEntryMember InitCall
 %type <tvar>		TVar
 %type <tvarlist>	TVarList TemplateSpec
 %type <val>		ArrayDim Dim DefaultParameter
@@ -155,9 +156,7 @@ Construct	: OptExtern '{' ConstructList '}' OptSemiColon
 		{ if($3) $3->setExtern($1); $$ = $3; }
 		| OptExtern Module
 		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Readonly ';'
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern ReadonlyMsg ';'
+		| OptExtern NonEntryMember 
 		{ $2->setExtern($1); $$ = $2; }
 		| OptExtern Message ';'
 		{ $2->setExtern($1); $$ = $2; }
@@ -288,6 +287,18 @@ Readonly	: READONLY Type QualName DimList
 
 ReadonlyMsg	: READONLY MESSAGE SimpleType '*'  Name
 		{ $$ = new Readonly(lineno, $3, $5, 0, 1); }
+		;
+
+OptVoid		: /*Empty*/
+		{ $$ = 0;}
+		| VOID
+		{ $$ = 0;}
+		;
+
+InitCall	: INITCALL OptVoid QualName
+		{ $$ = new InitCall(lineno, $3); }
+		| INITCALL OptVoid QualName '(' OptVoid ')'
+		{ $$ = new InitCall(lineno, $3); }
 		;
 
 MAttribs	: /* Empty */
@@ -464,11 +475,17 @@ MemberList	: /* Empty */
 		{ $$ = new MemberList($1, $2); }
 		;
 
-Member		: Entry ';'
-		{ $$ = $1; }
-		| Readonly ';'
+NonEntryMember  : Readonly ';'
 		{ $$ = $1; }
 		| ReadonlyMsg ';'
+		{ $$ = $1; }
+		| InitCall ';'
+		{ $$ = $1; }
+		;
+
+Member		: Entry ';'
+		{ $$ = $1; }
+		| NonEntryMember
 		{ $$ = $1; }
 		;
 

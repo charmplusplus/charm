@@ -266,8 +266,11 @@ static void yy_flex_free YY_PROTO(( void * ));
 typedef unsigned char YY_CHAR;
 FILE *yyin = (FILE *) 0, *yyout = (FILE *) 0;
 typedef int yy_state_type;
-extern char *yytext;
-#define yytext_ptr yytext
+#define YY_FLEX_LEX_COMPAT
+extern int yylineno;
+int yylineno = 1;
+extern char yytext[];
+
 
 static yy_state_type yy_get_previous_state YY_PROTO(( void ));
 static yy_state_type yy_try_NUL_trans YY_PROTO(( yy_state_type current_state ));
@@ -282,6 +285,12 @@ static void yy_fatal_error YY_PROTO(( yyconst char msg[] ));
 	yyleng = (int) (yy_cp - yy_bp); \
 	yy_hold_char = *yy_cp; \
 	*yy_cp = '\0'; \
+	if ( yyleng + yy_more_offset >= YYLMAX ) \
+		YY_FATAL_ERROR( "token too large, exceeds YYLMAX" ); \
+	yy_flex_strncpy( &yytext[yy_more_offset], yytext_ptr, yyleng + 1 ); \
+	yyleng += yy_more_offset; \
+	yy_prev_more_offset = yy_more_offset; \
+	yy_more_offset = 0; \
 	yy_c_buf_p = yy_cp;
 
 #define YY_NUM_RULES 13
@@ -548,10 +557,22 @@ yy_cp = yy_full_match; /* restore poss. backed-over text */ \
 ++yy_lp; \
 goto find_rule; \
 }
-#define yymore() yymore_used_but_not_detected
+static int yy_more_offset = 0;
+static int yy_prev_more_offset = 0;
+#define yymore() (yy_more_offset = yy_flex_strlen( yytext ))
+#define YY_NEED_STRLEN
 #define YY_MORE_ADJ 0
-#define YY_RESTORE_YY_MORE_OFFSET
-char *yytext;
+#define YY_RESTORE_YY_MORE_OFFSET \
+	{ \
+	yy_more_offset = yy_prev_more_offset; \
+	yyleng -= yy_more_offset; \
+	}
+#ifndef YYLMAX
+#define YYLMAX 8192
+#endif
+
+char yytext[YYLMAX];
+char *yytext_ptr;
 #line 1 "xi-scan.l"
 #define INITIAL 0
 #line 2 "xi-scan.l"
@@ -578,7 +599,7 @@ int search(char *s);
 #undef yywrap
 #endif
 
-#line 582 "lex.yy.c"
+#line 603 "lex.yy.c"
 
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
@@ -726,12 +747,12 @@ YY_MALLOC_DECL
 YY_DECL
 	{
 	register yy_state_type yy_current_state;
-	register char *yy_cp = NULL, *yy_bp = NULL;
+	register char *yy_cp, *yy_bp;
 	register int yy_act;
 
 #line 53 "xi-scan.l"
 
-#line 735 "lex.yy.c"
+#line 756 "lex.yy.c"
 
 	if ( yy_init )
 		{
@@ -809,6 +830,13 @@ find_rule: /* we branch to this label when backing up */
 
 		YY_DO_BEFORE_ACTION;
 
+		if ( yy_act != YY_END_OF_BUFFER )
+			{
+			int yyl;
+			for ( yyl = 0; yyl < yyleng; ++yyl )
+				if ( yytext[yyl] == '\n' )
+					++yylineno;
+			}
 
 do_action:	/* This label is used only to access EOF actions. */
 
@@ -880,7 +908,7 @@ YY_RULE_SETUP
 #line 66 "xi-scan.l"
 ECHO;
 	YY_BREAK
-#line 884 "lex.yy.c"
+#line 912 "lex.yy.c"
 			case YY_STATE_EOF(INITIAL):
 				yyterminate();
 
@@ -1248,6 +1276,8 @@ register char *yy_bp;
 
 	*--yy_cp = (char) c;
 
+	if ( c == '\n' )
+		--yylineno;
 
 	yytext_ptr = yy_bp;
 	yy_hold_char = *yy_cp;
@@ -1324,6 +1354,8 @@ static int input()
 	*yy_c_buf_p = '\0';	/* preserve yytext */
 	yy_hold_char = *++yy_c_buf_p;
 
+	if ( c == '\n' )
+		++yylineno;
 
 	return c;
 	}
@@ -1777,6 +1809,7 @@ struct rwtable rwtable[] = {
   "array",	ARRAY,
   "message",	MESSAGE,
   "extern",	EXTERN,
+  "initcall",	INITCALL,
   "readonly",	READONLY,
   "stacksize",	STACKSIZE,
   "threaded",	THREADED,
@@ -1788,8 +1821,6 @@ struct rwtable rwtable[] = {
   "sync",	SYNC,
   "exclusive",	EXCLUSIVE,
   "virtual",    VIRTUAL,
-  "void",	VOID,
-  "const",	CONST,
   "mainchare",	MAINCHARE,
   "packed",     PACKED,
   "varsize",    VARSIZE,
@@ -1801,6 +1832,8 @@ struct rwtable rwtable[] = {
   "float",      FLOAT,
   "double",     DOUBLE,
   "unsigned",   UNSIGNED,
+  "void",	VOID,
+  "const",	CONST,
   "",		0,
 };
 
