@@ -266,6 +266,21 @@ extern "C" void LDAtLocalBarrier(LDHandle _db, LDBarrierClient h)
   db->AtLocalBarrier(h);
 }
 
+extern "C" void LDLocalBarrierOn(LDHandle _db)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+
+  db->LocalBarrierOn();
+}
+
+extern "C" void LDLocalBarrierOff(LDHandle _db)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+
+  db->LocalBarrierOff();
+}
+
+
 extern "C" void LDResumeClients(LDHandle _db)
 {
   LBDB *const db = (LBDB*)(_db.handle);

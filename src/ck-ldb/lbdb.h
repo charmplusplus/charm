@@ -186,6 +186,8 @@ LDBarrierReceiver LDAddLocalBarrierReceiver(LDHandle lbdb,LDBarrierFn fn,
 					    void* data);
 void LDRemoveLocalBarrierReceiver(LDHandle lbdb,LDBarrierReceiver h);
 void LDAtLocalBarrier(LDHandle lbdb, LDBarrierClient h);
+void LDLocalBarrierOn(LDHandle _db);
+void LDLocalBarrierOff(LDHandle _db);
 void LDResumeClients(LDHandle lbdb);
 int LDProcessorSpeed();
 CmiBool LDOMidEqual(const LDOMid &i1, const LDOMid &i2);

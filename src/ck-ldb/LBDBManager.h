@@ -81,6 +81,9 @@ public:
   void RegisteringObjects(LDOMHandle _h);
   void DoneRegisteringObjects(LDOMHandle _h);
 
+  inline void LocalBarrierOn() { localBarrier.TurnOn();}
+  inline void LocalBarrierOff() { localBarrier.TurnOff();}
+
   inline LBOM *LbOM(LDOMHandle h) { return oms[h.handle]; };
   inline LBObj *LbObj(const LDObjHandle &h) const { return objs[h.handle]; };
   void DumpDatabase(void);

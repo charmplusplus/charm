@@ -130,6 +130,8 @@ public:
   };
 
   inline void AtLocalBarrier(LDBarrierClient h) { LDAtLocalBarrier(myLDHandle,h); }
+  inline void LocalBarrierOn(void) { LDLocalBarrierOn(myLDHandle); };
+  inline void LocalBarrierOff(void) { LDLocalBarrierOn(myLDHandle); };
   inline void ResumeClients() { LDResumeClients(myLDHandle); }
 
   inline int ProcessorSpeed() { return LDProcessorSpeed(); };
