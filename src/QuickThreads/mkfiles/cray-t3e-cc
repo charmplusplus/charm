@@ -5,16 +5,16 @@ all: qt stp testpgm
 
 qt:
 	ln -s md/t3e.h qtmd.h
-	$CC -c -o qt.o qt.c
+	$(CC) -c -o qt.o qt.c
 	cam -o qtmds.o md/t3e.s
 	ar q libqt.a qt.o qtmds.o
 
 stp:
-	$CC -c stp.c
+	$(CC) -c stp.c
 	ar q libstp.a stp.o
 
 testpgm:
-	$CC -c meas.c
+	$(CC) -c meas.c
 	cam -o qtmdb.o md/t3e_b.s
-	$CC -o run meas.o qtmdb.o libstp.a libqt.a
+	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
 
