@@ -70,7 +70,7 @@ public:
   };
   inline void ObjectStart(const LDObjHandle &_h) { LDObjectStart(_h); };
   inline void ObjectStop(const LDObjHandle &_h) { LDObjectStop(_h); };
-  inline void Send(LDOMHandle &_om, LDObjid &_id, unsigned int _b) {
+  inline void Send(const LDOMHandle &_om, const LDObjid _id, unsigned int _b) {
     LDSend(_om, _id, _b);
   };
 
