@@ -781,12 +781,29 @@ void       CthYieldPrio(int,int,unsigned int*);
 void       CthSetNext(CthThread t, CthThread next);
 CthThread  CthGetNext(CthThread t);
 
+void       CthSwitchThread(CthThread t);
+
+/* unimplemented: preemptive threads */
 void       CthAutoYield(CthThread t, int flag);
 double     CthAutoYieldFreq(CthThread t);
 void       CthAutoYieldBlock(void);
 void       CthAutoYieldUnblock(void);
 
-void       CthSwitchThread(CthThread t);
+/* Converse Thread Global (Ctg)/-swapglobals global variable manipulation */
+typedef struct CtgGlobalStruct *CtgGlobals;
+
+/** Initialize the globals support (called on each processor). */
+void CtgInit(void);
+
+/** Copy the current globals into this new set */
+CtgGlobals CtgCreate(void);
+/** Install this set of globals. If g==NULL, returns to original globals. */
+void CtgInstall(CtgGlobals g);
+/** PUP this (not currently installed) globals set */
+CtgGlobals CtgPup(pup_er, CtgGlobals g);
+/** Delete this (not currently installed) set of globals. */
+void CtgFree(CtgGlobals g);
+
 
 /****** CTH: THREAD-PRIVATE VARIABLES ******/
 
