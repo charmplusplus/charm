@@ -2087,9 +2087,6 @@ int rsh_pump(p, nodeno, rank0no, argv)
     xstr_printf(ibuf,"\n");
     if (arg_debug_no_pause) xstr_printf(ibuf,"run\n");
     xstr_printf(ibuf,"END_OF_SCRIPT\n");
-  }
-  
-  if (arg_debug || arg_debug_no_pause) {
     xstr_printf(ibuf,"$F_XTERM");
     xstr_printf(ibuf," -T 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
     xstr_printf(ibuf," -n 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
@@ -2097,11 +2094,21 @@ int rsh_pump(p, nodeno, rank0no, argv)
     xstr_printf(ibuf," < /dev/null >& /dev/null &");
     xstr_printf(ibuf,"\n");
   } else if (arg_in_xterm) {
+    xstr_printf(ibuf,"cat > /tmp/inx%08x << END_OF_SCRIPT\n", randno);
+    xstr_printf(ibuf,"#!/bin/sh\n");
+    xstr_printf(ibuf,"rm -f /tmp/inx%08x\n",randno);
+    xstr_printf(ibuf,"%s", arg_nodeprog_r);
+    while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
+    xstr_printf(ibuf,"\n");
+    xstr_printf(ibuf,"echo 'program exited with code '\\$?\n");
+    xstr_printf(ibuf,"read eoln\n");
+    xstr_printf(ibuf,"END_OF_SCRIPT\n");
+    xstr_printf(ibuf,"chmod 700 /tmp/inx%08x\n", randno);
     xstr_printf(ibuf,"$F_XTERM");
     xstr_printf(ibuf," -T 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
     xstr_printf(ibuf," -n 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-    xstr_printf(ibuf," -e %s", arg_nodeprog_r);
-    while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
+    xstr_printf(ibuf," -sl 5000");
+    xstr_printf(ibuf," -e /tmp/inx%08x", randno);
     xstr_printf(ibuf," < /dev/null >& /dev/null &");
     xstr_printf(ibuf,"\n");
   } else {
