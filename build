@@ -335,6 +335,7 @@ EOF
     fi
     $VERSION/tmp/system_ln $VERSION/$newdir $newdir
   done
+  $VERSION/tmp/system_ln $VERSION/include/VERSION VERSION
 fi
 
 $VERSION/tmp/system_ln "../../src/scripts/Make.depends" $VERSION/tmp/Make.depends
