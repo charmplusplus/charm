@@ -8,7 +8,11 @@
 #endif
 
 #if CMK_BOOL_UNDEFINED
-enum bool {false=0, true=1};
+enum Bool {False=0, True=1};
+#else
+typedef bool Bool;
+#define False false
+#define True true
 #endif
 
 #if CMK_DEBUG_MODE

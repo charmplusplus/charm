@@ -56,9 +56,9 @@ private:
 protected:
 
   // For Backward compatibility:
-  void finishConstruction(void) { finishConstruction(false); };
+  void finishConstruction(void) { finishConstruction(False); };
 
-  void finishConstruction(bool use_local_barrier);
+  void finishConstruction(Bool use_local_barrier);
   void finishMigration(void);
 
   virtual int packsize(void) { return 0; }
@@ -106,7 +106,7 @@ public:
   void broadcast(ArrayMessage *msg, EntryIndexType ei);
   void RecvMapID(ArrayMap *mapPtr,int mapHandle);
   void RecvElementID(int index, ArrayElement *elem, CkChareID handle,
-		     bool uses_barrier);
+		     Bool uses_barrier);
   void RecvForElement(ArrayMessage *msg);
   void RecvMigratedElement(ArrayMigrateMessage *msg);
   void RecvMigratedElementID(int index, ArrayElement *elem, CkChareID handle);
@@ -156,7 +156,7 @@ private:
     ArrayMigrateMessage *migrateMsg;
 #if CMK_LBDB_ON
     LDObjHandle ldHandle;
-    bool uses_barrier;
+    Bool uses_barrier;
     LDBarrierClient barrierHandle;
     BarrierClientData barrierData;
 #endif
@@ -221,7 +221,7 @@ public:
   int elementSize;
   void *elementData;
   int hopCount;
-  bool uses_barrier;
+  Bool uses_barrier;
 
   static void *alloc(int msgnum, int size, int *array, int priobits);
   static void *pack(ArrayMigrateMessage *);

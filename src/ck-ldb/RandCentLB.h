@@ -10,7 +10,7 @@ class RandCentLB : public CentralLB {
 public:
   RandCentLB();
 private:
-  bool QueryBalanceNow(int step);
+  Bool QueryBalanceNow(int step);
   CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
 };
 

@@ -176,7 +176,7 @@ void Array1D::RecvMapID(ArrayMap *mPtr, int mHandle)
 }
 
 void Array1D::RecvElementID(int index, ArrayElement *elem,
-			    CkChareID handle, bool use_local_barrier)
+			    CkChareID handle, Bool use_local_barrier)
 {
   elementIDs[index].state = here;
   elementIDs[index].element = elem;
@@ -197,7 +197,7 @@ void Array1D::RecvElementID(int index, ArrayElement *elem,
   if (use_local_barrier)
     RegisterElementForSync(index);
   else
-    elementIDs[index].uses_barrier = false;
+    elementIDs[index].uses_barrier = False;
 
   if (elementIDsReported == numLocalElements)
     the_lbdb->DoneRegisteringObjects(myHandle);
@@ -484,7 +484,7 @@ void Array1D::RegisterElementForSync(int index)
 				      static_cast<void*>(this));
   }
     
-  elementIDs[index].uses_barrier = true;  
+  elementIDs[index].uses_barrier = True;  
   elementIDs[index].barrierData.me = this;
   elementIDs[index].barrierData.index = index;
 
@@ -554,7 +554,7 @@ ArrayElement::ArrayElement(ArrayElementMigrateMessage *msg)
   thisIndex = msg->index;
 }
 
-void ArrayElement::finishConstruction(bool use_local_barrier)
+void ArrayElement::finishConstruction(Bool use_local_barrier)
 {
   thisArray->RecvElementID(thisIndex, this, thishandle, use_local_barrier);
 }

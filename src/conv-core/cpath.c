@@ -29,7 +29,7 @@ struct eltset
   CPath path;
   int eltno;
   int root;   /* who is the root of the set */
-  int inset;  /* true if I am in the set */
+  int inset;  /* True if I am in the set */
   int parent; /* my parent in the set */
   int child1; /* my first child in the set */
   int child2; /* my second child in the set */

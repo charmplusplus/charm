@@ -45,7 +45,7 @@ LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData,
 }
 
 LDObjHandle LBDB::AddObj(LDOMHandle _h, LDObjid _id,
-			 void *_userData, bool _migratable)
+			 void *_userData, Bool _migratable)
 {
   LDObjHandle newhandle;
 
@@ -67,7 +67,7 @@ LDObjHandle LBDB::AddObj(LDOMHandle _h, LDObjid _id,
 
 void LBDB::UnregisterObj(LDObjHandle _h)
 {
-  objs[_h.handle]->registered=false;
+  objs[_h.handle]->registered=False;
 }
 
 void LBDB::RegisteringObjects(LDOMHandle _h)
@@ -77,7 +77,7 @@ void LBDB::RegisteringObjects(LDOMHandle _h)
     if (oms_registering == 0)
       localBarrier.TurnOff();
     oms_registering++;
-    om->SetRegisteringObjs(true);
+    om->SetRegisteringObjs(True);
   }
 }
 
@@ -88,7 +88,7 @@ void LBDB::DoneRegisteringObjects(LDOMHandle _h)
     oms_registering--;
     if (oms_registering == 0)
       localBarrier.TurnOn();
-    om->SetRegisteringObjs(false);
+    om->SetRegisteringObjs(False);
   }
 }
 
@@ -226,11 +226,11 @@ void LocalBarrier::CheckBarrier()
   if (!on) return;
 
   if (at_count >= client_count) {
-    bool at_barrier = false;
+    Bool at_barrier = False;
 
     for(int i=0; i < max_client; i++)
       if (clients[i] != 0 && clients[i]->refcount >= cur_refcount)
-	at_barrier = true;
+	at_barrier = True;
 
     if (at_barrier) {
       at_count -= client_count;
@@ -244,12 +244,12 @@ void LocalBarrier::CallReceivers(void)
 {
   CmiPrintf("All at barrier, calling receviers for %d clients\n",
 	    client_count);
-  bool called_receiver=false;
+  Bool called_receiver=False;
 
   for(int i=0; i < max_receiver; i++)
     if (receivers[i] != 0) {
       receivers[i]->fn(receivers[i]->data);
-      called_receiver = true;
+      called_receiver = True;
     }
 
   if (!called_receiver)
