@@ -372,6 +372,8 @@ public:
   void deliverLocal(CkArrayMessage *msg,ArrayElement *el);
    //Called by CkArrayRec for a remote message
   void deliverRemote(CkArrayMessage *msg,int onPE);
+   //Called by CkArrayRec for a remote message
+  void deliverUnknown(CkArrayMessage *msg);
 
 //Migration:
   void migrateMe(ArrayElement *elem, int where);

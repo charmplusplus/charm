@@ -57,7 +57,7 @@ static const char *idx2str(const ArrayElement *el)
 #   define DEB(x) CkPrintf x  //General debug messages
 #   define DEBI(x) //CkPrintf x  //Index debug messages
 #   define DEBC(x) //CkPrintf x  //Construction debug messages
-#   define DEBS(x) //CkPrintf x  //Send/recv/broadcast debug messages
+#   define DEBS(x) CkPrintf x  //Send/recv/broadcast debug messages
 #   define DEBM(x) CkPrintf x  //Migration debug messages
 #   define DEBL(x) CkPrintf x  //Load balancing debug messages
 #   define DEBK(x) //CkPrintf x  //Spring Cleaning debug messages
@@ -144,6 +144,12 @@ elements together instead of separately.  Since there are
 (for 32-bit ints) 2^128 LBObjid's, this should be rare enough 
 not to seriously impact the load balance.
 */
+static unsigned int circularLeftShift(unsigned int x,int dist)
+{/*Return x circular-left-shifted by dist bits*/
+	const int bits=8*sizeof(int);/*Bits in an int*/
+	dist%=bits;/*Prevent wraparound*/
+	return (x<<dist)|(x>>(bits-dist)); 
+}
 static LDObjid idx2LDObjid(const CkArrayIndex &idx)
 {
   int i,len, lenInInts;
@@ -153,12 +159,8 @@ static LDObjid idx2LDObjid(const CkArrayIndex &idx)
   const unsigned char *data=idx.getKey(len);
   const int *id=(const int *)data;
   lenInInts = len/sizeof(int);
-  /* FIXME: This is Orion's version. It breaks the common 1D case.
   for (i=0;i<lenInInts;i++)
-    r.id[i%OBJ_ID_SZ]^=id[i]+(id[i]<<(24+i/4));
-  */
-  for (i=0;i<lenInInts;i++)
-    r.id[i%OBJ_ID_SZ] = id[i];
+    r.id[i%OBJ_ID_SZ]^=circularLeftShift(id[i],11*i);
   return r;
 }
 #endif
@@ -372,9 +374,11 @@ protected:
   //Return the type of this ArrayRec:
   virtual RecType type(void) {return base;}
   
-  //Send (or buffer) a message for this element.
-  // if viaSchedulerQ, deliver it via Scheduler's message Queue.
+  //Send (or buffer) a message to this element.
   virtual void send(CkArrayMessage *msg) = 0;
+
+  //Receive a message for this element (default: forward to him)
+  virtual void recv(CkArrayMessage *msg) {send(msg);}
   
   //This is called when this ArrayRec is about to be replaced.
   // It is only used to deliver buffered element messages.
@@ -411,10 +415,17 @@ public:
 
   virtual RecType type(void) {return local;}
   
-  //Deliver a message to this local element.
+  //Deliver a message to this local element, going via the
+  // message queue.
   virtual void send(CkArrayMessage *msg) {
+    CProxy_CkArray(arr->getGroupID()).RecvForElement(msg,CkMyPe());
+  }
+
+  //Deliver a message to this local element.
+  virtual void recv(CkArrayMessage *msg) {
     arr->deliverLocal(msg,el);
   }
+
   //Return if this element is now obsolete (it isn't)
   virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx) {return CmiFalse;}
   
@@ -541,7 +552,7 @@ class CkArrayRec_buffering:public CkArrayRec_aging {
     CkArrayMessage *m;
     while (NULL!=(m=buffer.deq())) {
       DEBS((AA"Sending buffered message to %s\n"AB,idx2str(m->index())));
-      arr->Send(m);
+      arr->RecvForElement(m);
     }
   }
   
@@ -982,10 +993,7 @@ void CkArray::ElementDying(CkArrayRemoveMsg *m)
   if (rtype==CkArrayRec::local) {
     //This is a local element dying a natural death
     //Detach him from his arrayRec (prevents double-delete)
-    ArrayElement *el=((CkArrayRec_local *)rec)->releaseElement();
-#if CMK_LBDB_ON
-    the_lbdb->ObjectStop(el->ldHandle);
-#endif
+    ((CkArrayRec_local *)rec)->releaseElement();
     //Forward the death notice to the home
     if (homePE(idx)!=CkMyPe())
       thisproxy.ElementDying(m,homePE(idx));
@@ -1266,7 +1274,7 @@ void CkArray::pup(PUP::er &p)
 /********************* CkArray Messaging ******************/
 
 void CkArray::deliverLocal(CkArrayMessage *msg,ArrayElement *el)
-{
+{//This is a local element-- deliver a message to him
 	DEBS((AA"Delivering local message for element %s\n"AB,idx2str(el)));
 	int hopCount=msg->type.msg.hopCount;
 	if (hopCount>1)
@@ -1284,20 +1292,35 @@ void CkArray::deliverLocal(CkArrayMessage *msg,ArrayElement *el)
 	
 	int entry=msg->type.msg.entryIndex;
 #if CMK_LBDB_ON
-	the_lbdb->ObjectStart(el->ldHandle);
+	LDObjHandle ldHandle=el->ldHandle;/*In case el suicides*/
+	the_lbdb->ObjectStart(ldHandle);
 	_entryTable[entry]->call(msg, el);
-	if (!curElementIsDead)
-		the_lbdb->ObjectStop(el->ldHandle);
+	the_lbdb->ObjectStop(ldHandle);
 #else
 	_entryTable[entry]->call(msg, el);
 #endif
 }
 
 void CkArray::deliverRemote(CkArrayMessage *msg,int onPE)
-{
+{//This element is on another PE-- forward message there
 	DEBS((AA"Forwarding message for %s to %d\n"AB,idx2str(msg->index()),onPE));
 	msg->type.msg.hopCount++;
 	thisproxy.RecvForElement(msg, onPE);
+}
+
+void CkArray::deliverUnknown(CkArrayMessage *msg)
+{//This index is not hashed-- send to its "home" processor
+	const CkArrayIndexConst &idx=msg->index();
+	int onPE=homePE(idx);
+	if (onPE!=CkMyPe())
+		deliverRemote(msg,onPE);
+	else
+	{// We *are* the home processor-- this element will be created soon
+		DEBC((AA"Adding buffer for unknown element %s\n"AB,idx2str(idx)));
+		CkArrayRec *rec=new CkArrayRec_buffering(this);
+		insertRec(rec,idx);
+		rec->send(msg);
+	}
 }
 
 void CProxy_CkArrayBase::send(CkArrayMessage *msg, int entryIndex)
@@ -1306,47 +1329,34 @@ void CProxy_CkArrayBase::send(CkArrayMessage *msg, int entryIndex)
 	msg->type.msg.entryIndex = entryIndex;
 	msg->type.msg.hopCount = 0;
 	msg=msg->insert(*_idx);//Insert array index into message
-	// CProxy_CkArray(_aid).Send(msg, CkMyPe());
 	CProxy_CkArray(_aid).ckLocalBranch()->Send(msg);
 	delete _idx;
 	_idx = NULL;
 }
-//Put given message 
+//Deliver given (pre-addressed) message 
 void CkArray::Send(CkArrayMessage *msg)
 {
 	const CkArrayIndex &idx=msg->index();
-	
 #if CMK_LBDB_ON
 	the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize());
 #endif
 	CkArrayRec *rec=elementNrec(idx);
 	if (rec!=NULL)
-	{//This index *is* in the hash table-- just call send
-		DEBS((AA"Sending to hashed element %s\n"AB,idx2str(idx)));
 		rec->send(msg);
-	}
-	else
-	{//This index is not hashed-- send to its "home" processor
-		int onPE=homePE(idx);
-		deliverRemote(msg,onPE);
-	}
-	springCheck();//Check if it's spring cleaning time
+	else deliverUnknown(msg);
 }
 
 //This receives a message from the net destined for a 
-// (probably) local element.
+// (probably) local element.  
 void CkArray::RecvForElement(CkArrayMessage *msg)
 {
+	springCheck();//Check if it's spring cleaning time
 	const CkArrayIndexConst &idx=msg->index();
 	DEBS((AA"RecvForElement %s\n"AB,idx2str(idx)));
 	CkArrayRec *rec=elementNrec(idx);
-	if (rec==NULL)
-	{ //Element not found in hash table-- add an entry for it
-		DEBC((AA"Adding buffer for unknown element %s\n"AB,idx2str(idx)));
-		rec=new CkArrayRec_buffering(this);
-		insertRec(rec,idx);
-	}
-	rec->send(msg);
+	if (rec!=NULL)
+	        rec->recv(msg);
+	else deliverUnknown(msg);
 }
 
 /*********************** CkArray Broadcast ******************/
