@@ -282,9 +282,9 @@ LBMigrateMsg* OrbLB::Strategy(CentralLB::LDStats* stats, int count)
   for (i=0; i<nObjs; i++) {
     LDObjData &odata = stats->objData[i];
     computeLoad[objIdx].id = objIdx;
-    computeLoad[objIdx].v[XDIR] = odata.id().id[0];
-    computeLoad[objIdx].v[YDIR] = odata.id().id[1];
-    computeLoad[objIdx].v[ZDIR] = odata.id().id[2];
+    computeLoad[objIdx].v[XDIR] = odata.objID().id[0];
+    computeLoad[objIdx].v[YDIR] = odata.objID().id[1];
+    computeLoad[objIdx].v[ZDIR] = odata.objID().id[2];
     computeLoad[objIdx].load = odata.wallTime;
     computeLoad[objIdx].refno = 0;
     computeLoad[objIdx].partition = NULL;

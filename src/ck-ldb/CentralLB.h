@@ -64,11 +64,6 @@ public:
 
   void set_avail_vector(char *new_vector);
 
-   struct LDOId {
-     LDObjid oid;
-     LDOMid mid;
-   };
-
   struct ProcStats {  // per processor data
     double total_walltime;
     double total_cputime;
@@ -94,16 +89,15 @@ public:
     int n_comm;
     LDCommData* commData;
 
-    LDOId *transTable;
     int *objHash; 
     int  hashSize;
 
     LDStats(): n_objs(0), n_comm(0) { objData = NULL; commData = NULL; 
-		from_proc = NULL; to_proc = NULL;
-		transTable = NULL; objHash = NULL; }
+		from_proc = NULL; to_proc = NULL; objHash = NULL; }
       // build hash table
     void makeCommHash();
     void deleteCommHash();
+    int getHash(const LDObjKey &);
     int getHash(const LDObjid &oid, const LDOMid &mid);
     void assign(int oid, int pe) { to_proc[oid] = pe; }
     void clear() {

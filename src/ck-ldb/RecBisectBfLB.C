@@ -10,6 +10,12 @@
 */
 /*@{*/
 
+/**
+  FIXME:  need to remove outlier object load. Outlier object can cause
+  failure of partitioning and often causes: "too few objects to paritition"
+  error.
+*/
+
 #include <charm++.h>
 
 #if CMK_LBDB_ON
@@ -71,14 +77,13 @@ LBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats,
   int i;
   PartitionList *partitions;
 
-  
   CkPrintf("[%d] RecBisectBfLB strategy\n",CkMyPe());
   ObjGraph og(numPartitions, stats);
 
   Graph *g =  convertGraph( &og);
   CkPrintf("[%d] RecBisectBfLB: graph converted\n",CkMyPe());
     
-  //  printGraph(g);
+  //  g_printGraph(g);
   int* nodes = (int *) malloc(sizeof(int)*g->V);
 
   for (i=0; i<g->V; i++) 
@@ -194,7 +199,13 @@ void RecBisectBfLB::partitionInTwo(Graph *g, int nodes[], int numNodes,
   IntQueue * q1, *q2;
   int * p1, *p2;
 
-  if (numNodes <2) CkPrintf("error: too few objects to paritition\n");
+  /*
+  CkPrintf("partitionInTwo:\n");
+  for (i=0; i<numNodes; i++) 
+    CkPrintf("%d: %f\n", i, graph_weightof(g, nodes[i])); 
+  */
+
+  if (numNodes <2) CkAbort("error: too few objects to paritition\n");
   r1 = nodes[0];
 /*  r2 = nodes[numNodes-1];*/
   r2 = nodes[1]; 

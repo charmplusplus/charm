@@ -30,7 +30,7 @@
 // 	 && i1.id[3] == i2.id[3]);
 // };
 
-LBCommData* LBCommTable::HashInsert(const LBCommData data)
+LBCommData* LBCommTable::HashInsert(const LBCommData &data)
 {
   if (in_use > cur_sz/2)
     Resize();
@@ -53,7 +53,7 @@ LBCommData* LBCommTable::HashInsert(const LBCommData data)
   return 0;
 }
 
-LBCommData* LBCommTable::HashSearch(const LBCommData data)
+LBCommData* LBCommTable::HashSearch(const LBCommData &data)
 {
   int i=0;
   int j;
@@ -67,7 +67,7 @@ LBCommData* LBCommTable::HashSearch(const LBCommData data)
   return 0;
 }
 
-LBCommData* LBCommTable::HashInsertUnique(const LBCommData data)
+LBCommData* LBCommTable::HashInsertUnique(const LBCommData &data)
 {
   LBCommData* item = HashSearch(data);
   if (!item) {
@@ -101,10 +101,7 @@ CmiBool LBCommData::equal(const LBCommData d2) const
 	|| !LDObjIDEqual(srcObj.objID(),d2.srcObj.objID()) )
       return CmiFalse;
   }
-  if (!LDOMidEqual(destOM,d2.destOM)
-      || !LDObjIDEqual(destObj,d2.destObj))
-    return CmiFalse;
-  else return CmiTrue;
+  return (CmiBool)(destObj == d2.destObj);
 }
 
 int LBCommData::compute_key()
@@ -122,10 +119,31 @@ int LBCommData::compute_key()
 		     srcObj.id.id[2],srcObj.id.id[3]);
     kptr += pcount;
   }
-  pcount += sprintf(kptr,"%d%d%d%d%dXXXXXXXX",destOM.id.idx,
-		    destObj.id[0],destObj.id[1],
-		    destObj.id[2],destObj.id[3]);
-  pcount -= 8;  /* The 'X's insure that the next few bytes are fixed */
+
+  CmiAssert(destObj.get_type() == LD_OBJ_MSG);
+  switch (destObj.get_type()) {
+  case LD_PROC_MSG:
+       pcount += sprintf(kptr,"%d", destObj.proc());
+       break;
+  case LD_OBJ_MSG: {
+       LDObjKey &destKey = destObj.get_destObj();
+       pcount += sprintf(kptr,"%d%d%d%d%dXXXXXXXX",destKey.omID().id.idx,
+		    destKey.objID().id[0],destKey.objID().id[1],
+		    destKey.objID().id[2],destKey.objID().id[3]);
+       pcount -= 8;  /* The 'X's insure that the next few bytes are fixed */
+       break;
+       }
+  case LD_OBJLIST_MSG: {
+       int len;
+       LDObjKey *destKeys = destObj.get_destObjs(len);
+       CmiAssert(len>0);
+       pcount += sprintf(kptr,"%d%d%d%d%dXXXXXXXX",destKeys[0].omID().id.idx,
+		    destKeys[0].objID().id[0],destKeys[0].objID().id[1],
+		    destKeys[0].objID().id[2],destKeys[0].objID().id[3]);
+       pcount -= 8;  /* The 'X's insure that the next few bytes are fixed */
+       break;
+       }
+  }
 
   int k=-1;
   for(int i=0; i < (pcount+3)/4; i++)
@@ -163,11 +181,10 @@ void LBCommTable::GetCommData(LDCommData* data)
 	out->src_proc = curtable->src_proc;
       } else {
 	out->src_proc = -1;
-	out->senderOM = curtable->srcObj.omID();
-	out->sender = curtable->srcObj.objID();
+        out->sender.omID() = curtable->srcObj.omID();
+        out->sender.objID() = curtable->srcObj.objID();
       }
-      out->dest_proc = -1;
-      out->receiverOM = curtable->destOM;
+      CmiAssert(curtable->destObj.get_type() == LD_OBJ_MSG);
       out->receiver = curtable->destObj;
       out->messages = curtable->n_messages;
       out->bytes = curtable->n_bytes;

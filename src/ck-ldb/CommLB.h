@@ -19,11 +19,6 @@
 #include "CommLBHeap.h"
 #define CUT_OFF_FACTOR 1.200
 
-struct obj_id{
-  LDObjid oid;
-  LDOMid mid;
-};
-
 struct graph{
   int id;
   int data;

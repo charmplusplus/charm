@@ -56,7 +56,7 @@ void Refiner::create(int count, CentralLB::LDStats* stats, int* procs)
   LDObjData *odata = stats->objData;
   for (i=0; i<stats->n_objs; i++)
   {
-        computes[index].id = odata[i].id();
+        computes[index].id = odata[i].objID();
         computes[index].handle = odata[i].handle;
         computes[index].load = odata[i].cpuTime;
         computes[index].originalPE = stats->from_proc[i];

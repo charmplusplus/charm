@@ -182,9 +182,10 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* _stats, int count)
 
     for(com =0; com< stats->n_comm;com++) {
 	 LDCommData &commData = stats->commData[com];
-	 if((!commData.from_proc())&&(!commData.to_proc())){
-		xcoord = stats->getHash(commData.sender, commData.senderOM);
-		ycoord = stats->getHash(commData.receiver, commData.receiverOM);
+	 if((!commData.from_proc())&&(commData.recv_type()==LD_OBJ_MSG))
+	 {
+		xcoord = stats->getHash(commData.sender);
+		ycoord = stats->getHash(commData.receiver.get_destObj());
 		if((xcoord == -1)||(ycoord == -1))
 		    if (lb_ignoreBgLoad) continue;
 		    else CkAbort("Error in search\n");

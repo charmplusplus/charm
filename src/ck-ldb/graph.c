@@ -66,7 +66,7 @@ void g_nextVertex(Graph *g, int v, float weight)
   g->vertices[current].weight = weight;
   g->vertices[current].firstEdge = g->currentEdge;
   g->vertices[current].numEdges = 0;
-/*  printf("next vertex is: %d \n", current);*/
+/*  printf("next vertex is: %d weight:%f\n", current, weight); */
 
 }
 

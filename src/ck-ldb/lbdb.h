@@ -34,8 +34,13 @@ typedef struct {
 typedef int LDHandle;
 #endif
 
-typedef struct {
+typedef struct _LDOMid {
   CkGroupID id;
+#ifdef __cplusplus
+  CmiBool operator==(const struct _LDOMid& omId) const {
+    return (CmiBool)(id == omId.id);
+  }
+#endif
 } LDOMid;
 
 typedef struct {
@@ -54,6 +59,22 @@ typedef struct _LDObjid {
   }
 #endif
 } LDObjid;
+
+/* LDObjKey uniquely identify one object */
+typedef struct _LDObjKey {
+  LDOMid omId;
+  LDObjid objId;
+public:
+#ifdef __cplusplus
+  CmiBool operator==(const _LDObjKey& obj) const {
+    return omId == obj.omId && objId == obj.objId;
+  }
+  inline LDOMid &omID() { return omId; }
+  inline LDObjid &objID() { return objId; }
+  inline const LDOMid &omID() const { return omId; }
+  inline const LDObjid &objID() const { return objId; }
+#endif
+} LDObjKey;
 
 typedef int LDObjIndex;
 typedef int LDOMIndex;
@@ -76,7 +97,7 @@ typedef struct {
 #ifdef __cplusplus
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
   inline const LDOMid &omID() const { return handle.omhandle.id; }
-  inline const LDObjid &id() const { return handle.id; }
+  inline const LDObjid &objID() const { return handle.id; }
 #endif
 } LDObjData;
 
@@ -88,18 +109,58 @@ typedef struct {
   int to_proc;
 } LDObjStats;
 
+#define LD_PROC_MSG      1
+#define LD_OBJ_MSG       2
+#define LD_OBJLIST_MSG   3
+
+typedef struct _LDCommDesc {
+  char type;
+  union {
+    int destProc;		/* 1:   processor level message */
+    LDObjKey  destObj;		/* 2:   object based message    */
+    struct {
+      LDObjKey  *objs;
+      int len;
+    } destObjs;			/* 3:   one to many message     */
+  } dest;
+#ifdef __cplusplus
+  char &get_type() { return type; }
+  char const get_type() const { return type; }
+  int proc() const { return type==1?dest.destProc:-1; }
+  LDObjKey &get_destObj() 
+	{ CmiAssert(type==LD_OBJ_MSG); return dest.destObj; }
+  LDObjKey const &get_destObj() const 
+	{ CmiAssert(type==LD_OBJ_MSG); return dest.destObj; }
+  LDObjKey * get_destObjs(int &len) 
+	{ CmiAssert(type==LD_OBJLIST_MSG); len=dest.destObjs.len; return dest.destObjs.objs; }
+  void init_objmsg(LDOMid &omid, LDObjid &objid) { 
+	type=LD_OBJ_MSG; 
+  	dest.destObj.omID()=omid;
+  	dest.destObj.objID()=objid;
+  }
+  inline CmiBool operator==(const _LDCommDesc &obj) const {
+    if (type != obj.type) return CmiFalse;
+    switch (type) {
+    case LD_PROC_MSG: return dest.destProc == obj.dest.destProc;
+    case LD_OBJ_MSG:  return dest.destObj == obj.dest.destObj;
+    case LD_OBJLIST_MSG: return 0;             // fixme
+    }
+    return 0;
+  }
+  inline void pup(PUP::er &p);
+#endif
+} LDCommDesc;
+
 typedef struct {
   int src_proc;
-  LDOMid senderOM;
-  LDObjid sender;
-  int dest_proc;
-  LDOMid receiverOM;
-  LDObjid receiver;
+  LDObjKey  sender;
+  LDCommDesc   receiver;
   int messages;
   int bytes;
 #ifdef __cplusplus
   inline int from_proc() const { return (src_proc != -1); }
-  inline int to_proc() const { return (dest_proc != -1); }
+  inline int recv_type() const { return receiver.get_type(); }
+  inline void pup(PUP::er &p);
 #endif
 } LDCommData;
 
@@ -231,9 +292,28 @@ int LDMemusage(LDHandle _db);
 
 #ifdef __cplusplus
 /* put outside of __cplusplus */
+PUPbytes(LDOMid)
+PUPbytes(LDObjid)
+PUPbytes(LDObjKey)
 PUPbytes(LDObjData)
 PUPbytes(LDObjStats)
-PUPbytes(LDCommData)
+inline void LDCommDesc::pup(PUP::er &p) {
+  p|type;
+  switch (type) {
+  case 1:  p|dest.destProc; break;
+  case 2:  p|dest.destObj; break;
+  case 3:  break;		// fixme
+  }
+}
+PUPmarshall(LDCommDesc)
+inline void LDCommData::pup(PUP::er &p) {
+    p|src_proc;
+    p|sender;
+    p|receiver;
+    p|messages;
+    p|bytes;
+}
+PUPmarshall(LDCommData)
 #endif
 
 #endif /* LBDBH_H */

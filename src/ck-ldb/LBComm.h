@@ -16,6 +16,7 @@
 #include "converse.h"
 #include "lbdb.h"
 
+// point to point communication data
 class LBCommData {
 
 friend class LBCommTable;
@@ -23,8 +24,7 @@ friend class LBCommTable;
 public:
   LBCommData(int _src_proc, LDOMid _destOM, LDObjid _destObj) {
     src_proc = _src_proc;
-    destOM = _destOM;
-    destObj = _destObj;
+    destObj.init_objmsg(_destOM, _destObj);
     n_messages = 0;
     n_bytes = 0;
     mykey = compute_key();
@@ -32,13 +32,8 @@ public:
 
   LBCommData(LDObjHandle _srcObj, LDOMid _destOM, LDObjid _destObj) {
     src_proc = -1;
-/*
-    srcObj = _srcObj.id;
-    srcOM = _srcObj.omhandle.id;
-*/
     srcObj = _srcObj;
-    destOM = _destOM;
-    destObj = _destObj;
+    destObj.init_objmsg(_destOM, _destObj);
     n_messages = 0;
     n_bytes = 0;
     mykey = compute_key();
@@ -50,7 +45,6 @@ public:
       srcObj = d.srcObj;
 //      srcOM = d.srcOM;
     }
-    destOM = d.destOM;
     destObj = d.destObj;
     n_messages = d.n_messages;
     n_bytes = d.n_messages;
@@ -65,7 +59,6 @@ public:
       srcObj = d.srcObj;
 //      srcOM = d.srcOM;
     }
-    destOM = d.destOM;
     destObj = d.destObj;
     n_messages = d.n_messages;
     n_bytes = d.n_messages;
@@ -91,10 +84,7 @@ private:
   int mykey;
   int src_proc;
   LDObjHandle srcObj;
-//  LDOMid srcOM;
-//  LDObjid srcObj;
-  LDOMid destOM;
-  LDObjid destObj;
+  LDCommDesc   destObj;
   int n_messages;
   int n_bytes;
 };
@@ -111,9 +101,9 @@ public:
     delete [] state;
   };
 
-  LBCommData* HashInsert(const LBCommData data);
-  LBCommData* HashInsertUnique(const LBCommData data);
-  LBCommData* HashSearch(const LBCommData data);
+  LBCommData* HashInsert(const LBCommData &data);
+  LBCommData* HashInsertUnique(const LBCommData &data);
+  LBCommData* HashSearch(const LBCommData &data);
   int CommCount() { return in_use; };
   void GetCommData(LDCommData* data);
 	

@@ -165,12 +165,12 @@ LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   const int csz = stats->n_comm;
   for(i=0; i<csz; i++) {
       LDCommData &cdata = stats->commData[i];
-      if(cdata.from_proc() || cdata.to_proc())
+      if(cdata.from_proc() || cdata.receiver.get_type() != LD_OBJ_MSG)
         continue;
       // FIXME!
       // senderID and recverID is not correct !!!
-      int senderID = cdata.sender.id[0];
-      int recverID = cdata.receiver.id[0];
+      int senderID = cdata.sender.objID().id[0];
+      int recverID = cdata.receiver.get_destObj().objID().id[0];
       CmiAssert(senderID < numobjs);
       CmiAssert(recverID < numobjs);
       comm[senderID][recverID] += cdata.messages;

@@ -47,21 +47,18 @@ void set_avail_vector(char * bitmap){
 void CentralLB::staticStartLB(void* data)
 {
   CentralLB *me = (CentralLB*)(data);
-
   me->StartLB();
 }
 
 void CentralLB::staticMigrated(void* data, LDObjHandle h)
 {
   CentralLB *me = (CentralLB*)(data);
-
   me->Migrated(h);
 }
 
 void CentralLB::staticAtSync(void* data)
 {
   CentralLB *me = (CentralLB*)(data);
-
   me->AtSync();
 }
 
@@ -189,7 +186,7 @@ void CentralLB::buildStats()
     statsData->commData = new LDCommData[statsData->n_comm];
     int nobj = 0;
     int ncom = 0;
-    // copy all data in individule message to this bug structure
+    // copy all data in individule message to this big structure
     for (int pe=0; pe<stats_msg_count; pe++) {
        int i;
        CLBStatsMsg *msg = statsMsgsList[pe];
@@ -228,18 +225,19 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 	     pe);
   } else {
     statsMsgsList[pe] = m;
+    // store per processor data right away
     struct ProcStats &procStat = statsData->procs[pe];
     procStat.total_walltime = m->total_walltime;
     procStat.total_cputime = m->total_cputime;
     if (lb_ignoreBgLoad) {
-    procStat.idletime = 0.0;
-    procStat.bg_walltime = 0.0;
-    procStat.bg_cputime = 0.0;
+      procStat.idletime = 0.0;
+      procStat.bg_walltime = 0.0;
+      procStat.bg_cputime = 0.0;
     }
     else {
-    procStat.idletime = m->idletime;
-    procStat.bg_walltime = m->bg_walltime;
-    procStat.bg_cputime = m->bg_cputime;
+      procStat.idletime = m->idletime;
+      procStat.bg_walltime = m->bg_walltime;
+      procStat.bg_cputime = m->bg_cputime;
     }
     procStat.pe_speed = m->pe_speed;
     procStat.utilization = 1.0;
@@ -255,7 +253,6 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
   if (stats_msg_count == clients) {
 //    double strat_start_time = CmiWallTimer();
 
-//    CkPrintf("Before setting bitmap\n");
     // build data
     buildStats();
 
@@ -266,7 +263,6 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
       statsData->procs[proc].available = (CmiBool)avail_vector[proc];
 
 //    CkPrintf("Before Calling Strategy\n");
-
     LBMigrateMsg* migrateMsg = Strategy(statsData, clients);
 
 //    CkPrintf("returned successfully\n");
@@ -277,10 +273,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
     migrateMsg->next_lb = new_ld_balancer;
 
 //  very time consuming, only needed for step load balancing
-#if 0
-    getPredictedLoad(statsDataList, clients, migrateMsg, migrateMsg->expectedLoad);
-#endif
-
+//    getPredictedLoad(statsDataList, clients, migrateMsg, migrateMsg->expectedLoad);
 
 //  CkPrintf("calling recv migration\n");
     thisProxy.ReceiveMigration(migrateMsg);
@@ -290,8 +283,8 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
     statsData->clear();
     stats_msg_count=0;
 
-    double strat_end_time = CmiWallTimer();
-    //     CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
+//    double strat_end_time = CmiWallTimer();
+//    CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
   }
 
 }
@@ -302,8 +295,9 @@ static int isMigratable(LDObjData **objData, int *len, int count, const LDCommDa
   for (int pe=0 ; pe<count; pe++)
   {
     for (int i=0; i<len[pe]; i++)
-      if (LDObjIDEqual(objData[pe][i].id(), commData.sender) ||
-          LDObjIDEqual(objData[pe][i].id(), commData.receiver)) return 0;
+      if (LDObjIDEqual(objData[pe][i].objID(), commData.sender.objID()) ||
+          LDObjIDEqual(objData[pe][i].objID(), commData.receiver.get_destObj().objID())) 
+      return 0;
   }
   return 1;
 }
@@ -452,7 +446,7 @@ void CentralLB::work(LDStats* stats,int count)
     for(i=0; i < osz; i++) {
       LDObjData &odata = stats->objData[i];
       CkPrintf("Object %d\n",i);
-      CkPrintf("     id = %d\n",odata.id().id[0]);
+      CkPrintf("     id = %d\n",odata.objID().id[0]);
       CkPrintf("  OM id = %d\n",odata.omID().id);
       CkPrintf("   Mig. = %d\n",odata.migratable);
       CkPrintf("    CPU = %f\n",odata.cpuTime);
@@ -471,13 +465,13 @@ void CentralLB::work(LDStats* stats,int count)
 	CkPrintf("    sender PE = %d\n",cdata[i].src_proc);
       else
 	CkPrintf("    sender id = %d:%d\n",
-		 cdata[i].senderOM.id,cdata[i].sender.id[0]);
+		 cdata[i].sender.omID().id,cdata[i].sender.objID().id[0]);
 
-      if (cdata[i].to_proc())
-	CkPrintf("  receiver PE = %d\n",cdata[i].dest_proc);
+      if (cdata[i].recv_type() == LD_PROC_MSG)
+	CkPrintf("  receiver PE = %d\n",cdata[i].receiver.proc());
       else	
 	CkPrintf("  receiver id = %d:%d\n",
-		 cdata[i].receiverOM.id,cdata[i].receiver.id[0]);
+		 cdata[i].receiver.get_destObj().omID().id,cdata[i].receiver.get_destObj().objID().id[0]);
       
       CkPrintf("     messages = %d\n",cdata[i].messages);
       CkPrintf("        bytes = %d\n",cdata[i].bytes);
@@ -565,19 +559,9 @@ void CentralLB::writeStatsMsgs(const char* filename) {
     CmiAbort("writeStatsMsgs failed to open the output file!\n");
 
   PUP::toDisk p(f);
-  p|stats_msg_count;
 
-#if LB_DUMP_MSG
-  for (i = 0; i < stats_msg_count; i++) {
-    CLBStatsMsg *m = statsMsgsList[i];
-    envelope *env=UsrToEnv(m);
-    CkPackMessage(&env); //Pack it
-    m = (CLBStatsMsg *)EnvToUsr(env);
-    CkPupMessage(p, (void **)&m, 2);
-  }
-#else
+  p|stats_msg_count;
   statsData->pup(p);
-#endif
 
   fclose(f);
 
@@ -629,15 +613,15 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count,
 	  if(cdata.from_proc())
 	    senderPE = cdata.src_proc;
 	  else {
-	    int idx = stats->getHash(cdata.sender, cdata.senderOM);
+	    int idx = stats->getHash(cdata.sender);
 	    CmiAssert(idx != -1);
 	    senderPE = stats->to_proc[idx];
 	    CmiAssert(senderPE != -1);
 	  }
-	  if(cdata.to_proc())
-	    receiverPE = cdata.dest_proc;
+	  if(cdata.receiver.get_type() == LD_PROC_MSG)
+	    receiverPE = cdata.receiver.proc();
 	  else {
-	    int idx = stats->getHash(cdata.receiver, cdata.receiverOM);
+	    int idx = stats->getHash(cdata.receiver.get_destObj());
 	    CmiAssert(idx != -1);
 	    receiverPE = stats->to_proc[idx];
 	    CmiAssert(receiverPE != -1);
@@ -692,15 +676,8 @@ inline static int ObjKey(const LDObjid &oid, const int hashSize) {
 }
 
 void CentralLB::LDStats::makeCommHash() {
-  if (transTable) return;
-
-  transTable = new LDOId[n_objs];
-  for (int obj=0; obj < n_objs; obj++){
-      LDObjData &oData = objData[obj];
-      transTable[obj].mid.id = oData.omID().id;
-      transTable[obj].oid = oData.id();
-  }
   int i;
+  if (objHash) return;
    
   hashSize = n_objs*2;
   objHash = new int[hashSize];
@@ -708,7 +685,7 @@ void CentralLB::LDStats::makeCommHash() {
         objHash[i] = -1;
    
   for(i=0;i<n_objs;i++){
-        LDObjid &oid = transTable[i].oid;
+        const LDObjid &oid = objData[i].objID();
         int hash = ObjKey(oid, hashSize);
         while(objHash[hash] != -1)
             hash = (hash+1)%hashSize;
@@ -719,8 +696,6 @@ void CentralLB::LDStats::makeCommHash() {
 void CentralLB::LDStats::deleteCommHash() {
   if (objHash) delete [] objHash;
   objHash = NULL;
-  if (transTable) delete [] transTable;
-  transTable = NULL;
 }
 
 int CentralLB::LDStats::getHash(const LDObjid &oid, const LDOMid &mid)
@@ -729,14 +704,20 @@ int CentralLB::LDStats::getHash(const LDObjid &oid, const LDOMid &mid)
 
     for(int id=0;id<hashSize;id++){
         int index = (id+hash)%hashSize;
-        if (LDObjIDEqual(transTable[objHash[index]].oid, oid) &&
-            LDOMidEqual(transTable[objHash[index]].mid, mid))
+        if (LDObjIDEqual(objData[objHash[index]].objID(), oid) &&
+            LDOMidEqual(objData[objHash[index]].omID(), mid))
             return objHash[index];
     }
     //  CkPrintf("not found \n");
     return -1;
 }
 
+int CentralLB::LDStats::getHash(const LDObjKey &objKey)
+{
+  const LDObjid &oid = objKey.objID();
+  const LDOMid  &mid = objKey.omID();
+  return getHash(oid, mid);
+}
 
 void CentralLB::LDStats::pup(PUP::er &p)
 {
@@ -752,7 +733,6 @@ void CentralLB::LDStats::pup(PUP::er &p)
     commData = new LDCommData[n_comm];
     from_proc = new int[n_objs];
     to_proc = new int[n_objs];
-    transTable = NULL;
     objHash = NULL;
   }
   // ignore the background load when unpacking
@@ -772,7 +752,7 @@ void CentralLB::LDStats::pup(PUP::er &p)
 
 int CentralLB::LDStats::useMem() { 
   // calculate the memory usage of this LB (superclass).
-  return sizeof(LDStats) + sizeof(ProcStats)*count + 
+  return sizeof(CentralLB) + sizeof(LDStats) + sizeof(ProcStats)*count + 
 	 (sizeof(LDObjData) + 2*sizeof(int)) * n_objs +
  	 sizeof(LDCommData) * n_comm;
 }

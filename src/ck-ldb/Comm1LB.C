@@ -51,13 +51,16 @@ CmiBool Comm1LB::QueryBalanceNow(int _step)
   return CmiTrue;
 }
 
-int Comm1LB::search(LDObjid oid, LDOMid mid){
-  int id,hash;
+int Comm1LB::search(const LDObjKey &objKey) {
+  const LDObjid &oid = objKey.objID();
+  const LDOMid &mid = objKey.omID();
+  int id, hash;
   
   hash = (oid.id[0] | oid.id[1]) % nobj;
 
   for(id=0;id<nobj;id++){
-    if((translate[htable[(id+hash)%nobj]].oid.id[0] == oid.id[0])&&(translate[htable[(id+hash)%nobj]].oid.id[1] == oid.id[1])&&(translate[htable[(id+hash)%nobj]].oid.id[2] == oid.id[2])&&(translate[htable[(id+hash)%nobj]].oid.id[3] == oid.id[3])&&(translate[htable[(id+hash)%nobj]].mid.id == mid.id))
+    if((translate[htable[(id+hash)%nobj]].objID() == oid)
+       &&(translate[htable[(id+hash)%nobj]].omID().id == mid.id))
       return htable[(id + hash)%nobj];
   }
   //  CkPrintf("not found \n");
@@ -147,7 +150,7 @@ void Comm1LB::make_hash(){
     htable[i] = -1;
   
   for(i=0;i<nobj;i++){
-    oid = translate[i].oid;
+    oid = translate[i].objID();
     hash = ((oid.id[0])|(oid.id[1])) % nobj;
     while(htable[hash] != -1)
       hash = (hash+1)%nobj;
@@ -221,16 +224,13 @@ LBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
 */
 
   npe = count;
-  translate = new obj_id[nobj];
+  translate = new LDObjKey[nobj];
   int objno=0;
 
   for(obj=0; obj < stats->n_objs; obj++){ 
       LDObjData &oData = stats->objData[obj];
-      translate[objno].mid.id = oData.omID().id;
-      translate[objno].oid.id[0] = oData.id().id[0];
-      translate[objno].oid.id[1] = oData.id().id[1];
-      translate[objno].oid.id[2] = oData.id().id[2];
-      translate[objno].oid.id[3] = oData.id().id[3];
+      translate[objno].omID() = oData.omID();
+      translate[objno].objID() = oData.objID();
       objno++;
   }
 
@@ -247,9 +247,9 @@ LBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
 
   for(com =0; com< stats->n_comm;com++) {
       LDCommData &commData = stats->commData[com];
-      if((!commData.from_proc())&&(!commData.to_proc())){
-	xcoord = search(commData.sender, commData.senderOM); 
-	ycoord = search(commData.receiver, commData.receiverOM);
+      if((!commData.from_proc())&&(commData.recv_type()==LD_OBJ_MSG)){
+	xcoord = search(commData.sender); 
+	ycoord = search(commData.receiver.get_destObj());
 	if((xcoord == -1)||(ycoord == -1))
 	  if (lb_ignoreBgLoad) continue;
 	  else CkAbort("Error in search\n");

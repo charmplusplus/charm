@@ -37,7 +37,7 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
       const LDCommData newedgedata = stats->commData[index];
 
       // If this isn't an object-to-object message, ignore it
-      if (!newedgedata.from_proc() && !newedgedata.to_proc())
+      if (!newedgedata.from_proc() && newedgedata.recv_type() == LD_OBJ_MSG)
 	n_edges++;
     }
   nodelist = new Node[n_objs];
@@ -61,7 +61,7 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
       thisnode->inEdge = 0;
       cur_node++;
       const int hashval = calc_hashval(odata.omID(),
-				       odata.id());
+				       odata.objID());
       thisnode->nxt_hash = node_table[hashval];
       node_table[hashval] = thisnode;
   }
@@ -71,7 +71,7 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
       LDCommData &newedgedata = stats->commData[index];
 
       // If this isn't an object-to-object message, ignore it
-      if (newedgedata.from_proc() || newedgedata.to_proc())
+      if (newedgedata.from_proc() || newedgedata.recv_type()!=LD_OBJ_MSG)
 	continue;
 
       if(cur_edge >= n_edges)
@@ -98,14 +98,14 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
     int index = newedge->index;
     const LDCommData newedgedata = stats->commData[index];
 
-    Node* from_node = find_node(newedgedata.senderOM,newedgedata.sender);
+    Node* from_node = find_node(newedgedata.sender);
     if (from_node == 0) {
       if (!lb_ignoreBgLoad) 
 	CkPrintf("ObjGraph::find_node: Didn't locate from node match!\n");
       continue;
     }
 
-    Node* to_node = find_node(newedgedata.receiverOM,newedgedata.receiver);
+    Node* to_node = find_node(newedgedata.receiver.get_destObj());
     if (to_node == 0) {
       if (!lb_ignoreBgLoad) 
         CkPrintf("ObjGraph::find_node: Didn't locate to node match!\n");
@@ -144,8 +144,10 @@ int ObjGraph::calc_hashval(LDOMid omid, LDObjid id)
   return hashval;
 }
 
-ObjGraph::Node* ObjGraph::find_node(LDOMid edge_omid, LDObjid edge_id)
+ObjGraph::Node* ObjGraph::find_node(const LDObjKey &edge_key)
 {
+  const LDOMid &edge_omid = edge_key.omID();
+  const LDObjid &edge_id = edge_key.objID();
   const int from_hashval = calc_hashval(edge_omid,edge_id);
   //  CkPrintf("From = %d\n",from_hashval);
   Node* from_node = node_table[from_hashval];
@@ -154,7 +156,7 @@ ObjGraph::Node* ObjGraph::find_node(LDOMid edge_omid, LDObjid edge_id)
     const LDOMid omid =
       stats->objData[from_node->index].omID();
     const LDObjid objid =
-      stats->objData[from_node->index].id();
+      stats->objData[from_node->index].objID();
     //    CkPrintf("Comparing %d to %d\n",objid.id[0],edge_id.id[0]);
     if (LDOMidEqual(omid,edge_omid) && LDObjIDEqual(objid,edge_id) )
       break;
