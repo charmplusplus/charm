@@ -9,7 +9,7 @@
 
 #if CMK_LBDB_ON
 
-#include "CkLists.h"
+#include "cklists.h"
 
 
 #include "RecBisectBfLB.h"
@@ -100,7 +100,7 @@ CLBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats,
   
   //  printPartitions(partitions);
 
-  CkVector migrateInfo;
+  CkVec<MigrateInfo*> migrateInfo;
 
   for (i=0; i<partitions->max; i++) {
     //    CmiPrintf("[%d] (%d) : \t", i, partitions->partitions[i].size);
@@ -118,7 +118,7 @@ CLBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats,
 	migrateMe->obj = stats[n.proc].objData[n.index].handle;
 	migrateMe->from_pe = n.proc;
 	migrateMe->to_pe = i;
-	migrateInfo.push_back((void*)migrateMe);
+	migrateInfo.insertAtEnd(migrateMe);
       }
     }
     free(partitions->partitions[i].nodeArray);
@@ -126,7 +126,7 @@ CLBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats,
   free(partitions->partitions);
   free(partitions);
 
-  int migrate_count=migrateInfo.size();
+  int migrate_count=migrateInfo.length();
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
   CkPrintf("Moving %d elements\n",migrate_count);

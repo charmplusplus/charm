@@ -9,7 +9,7 @@
 
 #if CMK_LBDB_ON
 
-#include "CkLists.h"
+#include "cklists.h"
 #include "Refiner.h"
 
 #include "RandRefLB.h"
@@ -38,7 +38,7 @@ CLBMigrateMsg* RandRefLB::Strategy(CentralLB::LDStats* stats, int count)
 {
   //  CkPrintf("[%d] RandRefLB strategy\n",CkMyPe());
 
-  CkVector migrateInfo;
+  CkVec<MigrateInfo*> migrateInfo;
 
   int** from_procs = Refiner::AllocProcs(count,stats);
   int pe;
@@ -62,12 +62,12 @@ CLBMigrateMsg* RandRefLB::Strategy(CentralLB::LDStats* stats, int count)
 	migrateMe->obj = stats[pe].objData[obj].handle;
 	migrateMe->from_pe = pe;
 	migrateMe->to_pe = to_procs[pe][obj];
-	migrateInfo.push_back((void*)migrateMe);
+	migrateInfo.insertAtEnd(migrateMe);
       }
     }
   }
 
-  int migrate_count=migrateInfo.size();
+  int migrate_count=migrateInfo.length();
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
   for(int i=0; i < migrate_count; i++) {

@@ -9,7 +9,7 @@
 
 #if CMK_LBDB_ON
 
-#include "CkLists.h"
+#include "cklists.h"
 
 #include "RandCentLB.h"
 #include "RandCentLB.def.h"
@@ -37,7 +37,7 @@ CLBMigrateMsg* RandCentLB::Strategy(CentralLB::LDStats* stats, int count)
 {
   //  CkPrintf("[%d] RandCentLB strategy\n",CkMyPe());
 
-  CkVector migrateInfo;
+  CkVec<MigrateInfo*> migrateInfo;
 
   for(int pe=0; pe < count; pe++) {
     //    CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
@@ -52,13 +52,13 @@ CLBMigrateMsg* RandCentLB::Strategy(CentralLB::LDStats* stats, int count)
 	  migrateMe->obj = stats[pe].objData[obj].handle;
 	  migrateMe->from_pe = pe;
 	  migrateMe->to_pe = dest;
-	  migrateInfo.push_back((void*)migrateMe);
+	  migrateInfo.insertAtEnd(migrateMe);
 	}
       }
     }
   }
 
-  int migrate_count=migrateInfo.size();
+  int migrate_count=migrateInfo.length();
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
   for(int i=0; i < migrate_count; i++) {

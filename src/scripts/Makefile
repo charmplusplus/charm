@@ -101,7 +101,7 @@ CVHEADERS=cpthreads.h converse.h conv-mach.h conv-mach.sh \
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
-UTILHEADERS=pup.h pup_c.h ckhashtable.h \
+UTILHEADERS=pup.h pup_c.h ckhashtable.h cklists.h \
 	sockRoutines.h sockRoutines.c
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
@@ -112,7 +112,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  CentralLB.h RandCentLB.h RecBisectBfLB.h \
 	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h \
 	  MetisLB.h NborBaseLB.h \
-	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h CkLists.h \
+	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h \
       ampi.h ampif.h BlueGene.h \
 	  $(CVHEADERS)
 

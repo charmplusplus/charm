@@ -9,7 +9,7 @@
 
 #if CMK_LBDB_ON
 
-#include "CkLists.h"
+#include "cklists.h"
 
 #include "heap.h"
 #include "NeighborLB.h"
@@ -46,7 +46,7 @@ NLBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
   }
   avgload /= (count+1);
 
-  CkVector migrateInfo;
+  CkVec<MigrateInfo*> migrateInfo;
 
   if (myload > avgload) {
     //    CkPrintf("[%d] OVERLOAD My load is %f, average load is %f\n",
@@ -123,7 +123,7 @@ NLBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
       migrateMe->obj = myStats.objData[obj->Id].handle;
       migrateMe->from_pe = me;
       migrateMe->to_pe = p->Id;
-      migrateInfo.push_back((void*)migrateMe);
+      migrateInfo.insertAtEnd(migrateMe);
 
       objs_here--;
       
@@ -149,7 +149,7 @@ NLBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
   }  
 
   // Now build the message to actually perform the migrations
-  int migrate_count=migrateInfo.size();
+  int migrate_count=migrateInfo.length();
   //  if (migrate_count > 0) {
   //    CkPrintf("PE %d migrating %d elements\n",CkMyPe(),migrate_count);
   //  }

@@ -9,7 +9,7 @@
 
 #if CMK_LBDB_ON
 
-#include "CkLists.h"
+#include "cklists.h"
 #include "HeapCentLB.h"
 #include "HeapCentLB.def.h"
 
@@ -157,7 +157,7 @@ HeapCentLB::BuildCpuArray(CentralLB::LDStats* stats,
 
 CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
 {
-  CkVector migrateInfo;
+  CkVec<MigrateInfo*> migrateInfo;
   int      obj, heapSize, objCount;
   HeapData *cpuData = BuildCpuArray(stats, count, &heapSize);
   HeapData *objData = BuildObjectArray(stats, count, &objCount);
@@ -189,7 +189,7 @@ CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
       migrateMe->obj = stats[pe].objData[id].handle;
       migrateMe->from_pe = pe;
       migrateMe->to_pe = dest;
-      migrateInfo.push_back((void*)migrateMe);
+      migrateInfo.insertAtEnd(migrateMe);
     }
 
     //Insert the least loaded processor with load updated back into the heap
@@ -202,7 +202,7 @@ CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
     cpuData[location] = minCpu;
   }
 
-  int migrate_count=migrateInfo.size();
+  int migrate_count=migrateInfo.length();
   CkPrintf("HeapCentLB migrating %d elements\n",migrate_count);
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;

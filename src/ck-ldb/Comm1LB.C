@@ -10,7 +10,7 @@
 
 #if CMK_LBDB_ON
 
-#include "CkLists.h"
+#include "cklists.h"
 
 #include "Comm1LB.h"
 #include "Comm1LB.def.h"
@@ -170,7 +170,7 @@ CLBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
 
   //  CkPrintf("[%d] Comm1LB strategy\n",CkMyPe());
 
-  CkVector migrateInfo;
+  CkVec<MigrateInfo*> migrateInfo;
 
   alloc_array = new alloc_struct *[count+1];
 
@@ -249,7 +249,7 @@ CLBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
     migrateMe->obj = stats[spe].objData[mpos].handle;
     migrateMe->from_pe = spe;
     migrateMe->to_pe = pe;
-    migrateInfo.push_back((void *)migrateMe);
+    migrateInfo.insertAtEnd(migrateMe);
   }
 
   int out_msg,out_byte,min_msg,min_byte;
@@ -291,11 +291,11 @@ CLBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
       migrateMe->obj = stats[spe].objData[mpos].handle;
       migrateMe->from_pe = spe;
       migrateMe->to_pe = minpe;
-      migrateInfo.push_back((void *)migrateMe);
+      migrateInfo.insertAtEnd(migrateMe);
     }
   }
 
-  int migrate_count = migrateInfo.size();
+  int migrate_count = migrateInfo.length();
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
   for(int i=0; i < migrate_count; i++) {

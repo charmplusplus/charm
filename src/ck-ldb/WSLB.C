@@ -10,7 +10,7 @@
 #endif
 #include <charm++.h>
 #include <LBDatabase.h>
-#include <CkLists.h>
+#include <cklists.h>
 #include "heap.h"
 #include "WSLB.h"
 #include "WSLB.def.h"
@@ -424,7 +424,7 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 
   avgload /= (unvacated_neighbors+1);
 
-  CkVector migrateInfo;
+  CkVec<MigrateInfo*> migrateInfo;
 
   // If we want to vacate, we always dump our load, otherwise
   // only if we are overloaded
@@ -512,7 +512,7 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
       migrateMe->obj = myStats.objData[obj->Id].handle;
       migrateMe->from_pe = me;
       migrateMe->to_pe = p->Id;
-      migrateInfo.push_back((void*)migrateMe);
+      migrateInfo.insertAtEnd(migrateMe);
 
       objs_here--;
       
@@ -537,7 +537,7 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
   }  
 
   // Now build the message to actually perform the migrations
-  int migrate_count=migrateInfo.size();
+  int migrate_count=migrateInfo.length();
   //  if (migrate_count) {
   //    CkPrintf("PE %d: Sent away %d of %d objects\n",
   //	     CkMyPe(),migrate_count,myStats.obj_data_sz);

@@ -29,8 +29,8 @@ LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData,
 
   LBOM* om = new LBOM(this,_userID,_userData,_callbacks);
   if (om != NULL) {
-    newhandle.handle = oms.size();
-    oms.push_back(om);
+    newhandle.handle = oms.length();
+    oms.insertAtEnd(om);
   } else newhandle.handle = -1;
   om->DepositHandle(newhandle);
   omCount++;
@@ -48,8 +48,8 @@ LDObjHandle LBDB::AddObj(LDOMHandle _h, LDObjid _id,
   
   LBObj *obj = new LBObj(this,_h,_id,_userData,_migratable);
   if (obj != NULL) {
-    newhandle.handle = objs.size();
-    objs.push_back(obj);
+    newhandle.handle = objs.length();
+    objs.insertAtEnd(obj);
   } else {
     newhandle.handle = -1;
   }
@@ -136,7 +136,7 @@ int LBDB::ObjDataCount()
 
 void LBDB::GetObjData(LDObjData *dp)
 {
-  for(int i = 0; i < objs.size(); i++) {
+  for(int i = 0; i < objs.length(); i++) {
     LBObj* obj = (LBObj*) objs[i];
     if ( obj->registered )
       *dp++ = obj->ObjData();
@@ -162,7 +162,7 @@ void LBDB::Migrated(LDObjHandle h)
 {
   // Object migrated, inform load balancers
 
-  for(int i=0; i < migrateCBList.size(); i++) {
+  for(int i=0; i < migrateCBList.length(); i++) {
     MigrateCB* cb = (MigrateCB*)migrateCBList[i];
     (cb->fn)(cb->data,h);
   }
@@ -176,7 +176,7 @@ void LBDB::NotifyMigrated(LDMigratedFn fn, void* data)
 
   callbk->fn = fn;
   callbk->data = data;
-  migrateCBList.push_back((void*)callbk);
+  migrateCBList.insertAtEnd((void*)callbk);
 }
 
 void LBDB::BackgroundLoad(double* walltime, double* cputime)
@@ -209,7 +209,7 @@ LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
 
   LDBarrierClient ret_val;
   ret_val.serial = max_client;
-  clients.push_back((void*)new_client);
+  clients.insertAtEnd((void*)new_client);
   max_client++;
 
   client_count++;
@@ -235,7 +235,7 @@ LDBarrierReceiver LocalBarrier::AddReceiver(LDBarrierFn fn, void* data)
 
   LDBarrierReceiver ret_val;
   ret_val.serial = max_receiver;
-  receivers.push_back(new_receiver);
+  receivers.insertAtEnd(new_receiver);
   max_receiver++;
 
   return ret_val;

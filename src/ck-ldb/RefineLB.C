@@ -9,7 +9,7 @@
 
 #if CMK_LBDB_ON
 
-#include "CkLists.h"
+#include "cklists.h"
 
 #include "RefineLB.h"
 #include "RefineLB.def.h"
@@ -216,7 +216,7 @@ CLBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
 
   refiner.Refine(count,stats,from_procs,to_procs);
 
-  CkVector migrateInfo;
+  CkVec<MigrateInfo*> migrateInfo;
 
 /*
   for (int pe=0; pe < P; pe++) {
@@ -231,7 +231,7 @@ CLBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
 	migrateMe->obj = c->handle;
 	migrateMe->from_pe = c->oldProcessor;
 	migrateMe->to_pe = c->processor;
-	migrateInfo.push_back((void*)migrateMe);
+	migrateInfo.insertAtEnd(migrateMe);
       }
       nextCompute.id++;
       c = (computeInfo *) processors[pe].computeSet->
@@ -250,12 +250,12 @@ CLBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
 	migrateMe->obj = stats[pe].objData[obj].handle;
 	migrateMe->from_pe = pe;
 	migrateMe->to_pe = to_procs[pe][obj];
-	migrateInfo.push_back((void*)migrateMe);
+	migrateInfo.insertAtEnd(migrateMe);
       }
     }
   }
 
-  int migrate_count=migrateInfo.size();
+  int migrate_count=migrateInfo.length();
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
   for(int i=0; i < migrate_count; i++) {

@@ -10,7 +10,7 @@
 
 #include "converse.h"
 #include "lbdb.h"
-#include "CkLists.h"
+#include "cklists.h"
 
 #include "LBObj.h"
 #include "LBOM.h"
@@ -47,8 +47,8 @@ private:
     LDBarrierFn fn;
   };
 
-  CkVector clients;
-  CkVector receivers;
+  CkVec<void*> clients;
+  CkVec<void*> receivers;
 
   int cur_refcount;
   int max_client;
@@ -148,9 +148,9 @@ private:
     void* data;
   };
 
-  typedef CkVector OMList;
-  typedef CkVector ObjList;
-  typedef CkVector MigrateCBList;
+  typedef CkVec<void*> OMList;
+  typedef CkVec<void*> ObjList;
+  typedef CkVec<void*> MigrateCBList;
 
   LBCommTable* commTable;
   OMList oms;

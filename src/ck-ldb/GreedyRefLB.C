@@ -9,7 +9,7 @@
 
 #if CMK_LBDB_ON
 
-#include "CkLists.h"
+#include "cklists.h"
 #include "GreedyRefLB.h"
 #include "GreedyRefLB.def.h"
 
@@ -154,7 +154,7 @@ GreedyRefLB::BuildCpuArray(CentralLB::LDStats* stats, int count, int *peCount)
 
 CLBMigrateMsg* GreedyRefLB::Strategy(CentralLB::LDStats* stats, int count)
 {
-  CkVector migrateInfo;
+  CkVec<MigrateInfo*> migrateInfo;
   int      pe, obj, heapSize, objCount;
   HeapData *cpuData = BuildCpuArray(stats, count, &heapSize);
   HeapData *objData = BuildObjectArray(stats, count, &objCount);
@@ -241,12 +241,12 @@ CLBMigrateMsg* GreedyRefLB::Strategy(CentralLB::LDStats* stats, int count)
   migrateMe->obj = stats[pe].objData[obj].handle;
   migrateMe->from_pe = pe;
   migrateMe->to_pe = to_procs[pe][obj];
-  migrateInfo.push_back((void*)migrateMe);
+  migrateInfo.insertAtEnd(migrateMe);
       }
     }
   }
 
-  int migrate_count=migrateInfo.size();
+  int migrate_count=migrateInfo.length();
   CkPrintf("GreedyRefLB migrating %d elements\n",migrate_count);
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;

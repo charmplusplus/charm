@@ -9,7 +9,7 @@
 
 #if CMK_LBDB_ON
 
-#include "CkLists.h"
+#include "cklists.h"
 
 #include "MetisLB.h"
 #include "MetisLB.def.h"
@@ -99,7 +99,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 {
   // CkPrintf("entering MetisLB::Strategy...\n");
   // CkPrintf("[%d] MetisLB strategy\n",CkMyPe());
-  CkVector migrateInfo;
+  CkVec<MigrateInfo*> migrateInfo;
 
   int i, j, m;
   int option = 0;
@@ -294,7 +294,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 	migrateMe->obj = handles[i];
 	migrateMe->from_pe = origmap[i];
 	migrateMe->to_pe = newmap[i];
-	migrateInfo.push_back(migrateMe);
+	migrateInfo.insertAtEnd(migrateMe);
       }
     }
   }
@@ -303,7 +303,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   if(newmap != origmap)
     delete[] newmap;
 
-  int migrate_count=migrateInfo.size();
+  int migrate_count=migrateInfo.length();
   //  CkPrintf("Migration Count = %d\n", migrate_count);
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
