@@ -1,6 +1,5 @@
 /*
-Test out high-level (matching faces)
-FEM symmetry interface.
+Test out iterative (matrix-based) FEM interface.
 
 Orion Sky Lawlor, olawlor@acm.org, 1/27/2003 
 */
