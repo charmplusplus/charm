@@ -76,8 +76,8 @@ public:
     return *this;
   };
 
-  void addMessage(int bytes) {
-    n_messages++;
+  void addMessage(int bytes, int nMsgs=1) {
+    n_messages += nMsgs;
     n_bytes += bytes;
   };
 
