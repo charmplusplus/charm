@@ -5,6 +5,14 @@
  * $Revision$
  *****************************************************************************/
 
+/*
+include 
+Pack
+Unpack
+into utilization time?
+*/
+
+
 #include "trace-summary.h"
 
 #define VER   "2.0"
@@ -17,6 +25,8 @@ CpvStaticDeclare(char*, pgmName);
 CpvExtern(CthThread, curThread);
 static int _numEvents = 0;
 static int _threadMsg, _threadChare, _threadEP;
+static int _packMsg, _packChare, _packEP;
+static int _unpackMsg, _unpackChare, _unpackEP;
 CpvDeclare(double, binSize);
 
 extern "C" void setEvent(CthThread t, int event);
@@ -288,18 +298,24 @@ void TraceProjections::endIdle(void)
 
 void TraceProjections::beginPack(void)
 {
+    packstart = CmiTimer();
 }
 
 void TraceProjections::endPack(void)
 {
+    double t = CmiTimer();
+    CpvAccess(_logPool)->setEp(_packEP, t-packstart);
 }
 
 void TraceProjections::beginUnpack(void)
 {
+    unpackstart = CmiTimer();
 }
 
 void TraceProjections::endUnpack(void)
 {
+    double t = CmiTimer();
+    CpvAccess(_logPool)->setEp(_unpackEP, t-unpackstart);
 }
 
 void TraceProjections::beginCharmInit(void) {}
@@ -316,6 +332,14 @@ void TraceProjections::beginComputation(void)
     _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
     _threadChare = CkRegisterChare("dummy_thread_chare", 0);
     _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare);
+
+    _packMsg = CkRegisterMsg("dummy_pack_msg", 0, 0, 0, 0);
+    _packChare = CkRegisterChare("dummy_pack_chare", 0);
+    _packEP = CkRegisterEp("dummy_pack_ep", 0, _packMsg,_packChare);
+
+    _unpackMsg = CkRegisterMsg("dummy_unpack_msg", 0, 0, 0, 0);
+    _unpackChare = CkRegisterChare("dummy_unpack_chare", 0);
+    _unpackEP = CkRegisterEp("dummy_unpack_ep", 0, _unpackMsg,_unpackChare);
   }
 }
 

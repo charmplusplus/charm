@@ -185,7 +185,7 @@ class TraceProjections : public Trace {
     int execPe;
 
     double binStart;
-    double start;
+    double start, packstart, unpackstart;
     double bin;
     int msgNum;
   public:
