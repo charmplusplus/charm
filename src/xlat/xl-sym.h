@@ -1,36 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.2  1995-06-15 20:57:00  jyelon
- * *** empty log message ***
- *
- * Revision 2.1  1995/06/15  20:27:11  jyelon
- * got rid of dontfree.
- *
- * Revision 2.0  1995/06/05  18:52:05  brunner
- * Reorganized file structure
- *
- * Revision 1.3  1994/11/11  21:15:12  brunner
- * Put back the lines containing "ident" that I accidentally removed
- *
- * Revision 1.2  1994/11/11  05:32:34  brunner
- * Removed ident added by accident with RCS header
- *
- * Revision 1.1  1994/11/07  15:41:01  brunner
- * Initial revision
- *
- ***************************************************************************/
 #include <stdio.h>
 
 #define dontfree(x) 0

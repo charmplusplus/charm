@@ -1,9 +1,3 @@
-/***************************************************************************/
-/*         (C) Copyright 1995,1996,1997 The Board of Trustees of the       */
-/*                          University of Illinois                         */
-/*                           All Rights Reserved                           */
-/***************************************************************************/
-
 #include <string.h>
 #include "Communicate.h"
 #include "MStream.h"

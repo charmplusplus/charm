@@ -1,36 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 1.3  1995-10-27 22:09:16  jyelon
- * Changed Cmi to Ck in all charm files.
- *
- * Revision 1.2  1995/10/27  21:42:06  jyelon
- * changed CmiNumPe --> CkNumPes
- *
- * Revision 1.1  1995/06/13  11:32:16  jyelon
- * Initial revision
- *
- * Revision 1.1  1995/06/13  10:06:34  jyelon
- * Initial revision
- *
- * Revision 1.2  1995/04/13  03:57:14  narain
- * Mc - Cmi
- *
- * Revision 1.1  1994/11/07  16:12:08  brunner
- * Initial revision
- *
- ***************************************************************************/
 /* pg.p
  * Charm Process Groups Library
  *

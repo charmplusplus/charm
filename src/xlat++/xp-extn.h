@@ -1,37 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.3  1996-08-01 21:07:30  jyelon
- * *** empty log message ***
- *
- * Revision 2.2  1995/09/20 14:51:25  sanjeev
- * *** empty log message ***
- *
- * Revision 2.0  1995/06/05  19:01:24  brunner
- * Reorganized directory structure
- *
- * Revision 1.3  1995/03/23  05:11:53  sanjeev
- * changes for printing call graph
- *
- * Revision 1.2  1994/11/11  05:32:43  brunner
- * Removed ident added by accident with RCS header
- *
- * Revision 1.1  1994/11/07  15:41:10  brunner
- * Initial revision
- *
- ***************************************************************************/
-
 extern StackStruct *StackTop ;
 extern StackStruct *GlobalStack ;
 

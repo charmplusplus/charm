@@ -1,27 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 1.1  1995-06-13 11:32:16  jyelon
- * Initial revision
- *
-# Revision 1.1  1995/06/13  10:06:34  jyelon
-# Initial revision
-#
-# Revision 1.1  1994/11/07  16:21:19  brunner
-# Initial revision
-#
- ***************************************************************************/
 interface module Barrier {
 
 message {ChareNumType id;} BARRIER_MSG;

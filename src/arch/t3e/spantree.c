@@ -1,26 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 1.1  1997-07-07 22:57:21  rbrunner
- * T3E port
- *
- * Revision 1.1  1996/05/16 15:59:43  gursoy
- * Initial revision
- *
- ***************************************************************************/
-static char ident[] = "@(#)$Header$";
-
 #include <converse.h>
 
 /* This file contains all the spanning tree functions */

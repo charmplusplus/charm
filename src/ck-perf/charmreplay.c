@@ -1,28 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.1  1998-02-27 11:52:49  jyelon
- * Cleaned up header files, replaced load-balancer.
- *
- * Revision 2.0  1995/06/02 17:40:29  brunner
- * Reorganized directory structure
- *
- * Revision 1.1  1994/10/14  21:00:47  brunner
- * Initial revision
- *
- ***************************************************************************/
-
 #include <sys/param.h>
 #include <stdio.h>
 #include <string.h>

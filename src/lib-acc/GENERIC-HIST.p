@@ -1,31 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 1.2  1995-06-13 11:30:13  jyelon
- * *** empty log message ***
- *
- * Revision 1.1  1995/06/13  10:45:22  jyelon
- * Initial revision
- *
- * Revision 1.1  1995/06/13  10:06:34  jyelon
- * Initial revision
- *
- * Revision 1.1  1994/10/17  15:52:37  brunner
- * Initial revision
- *
- ***************************************************************************/
-
 #include HEAD
 
 module GENERIC_MODULE_NAME {

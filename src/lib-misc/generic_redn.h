@@ -1,30 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 1.1  1995-06-13 11:32:16  jyelon
- * Initial revision
- *
- * Revision 1.1  1995/06/13  10:06:34  jyelon
- * Initial revision
- *
- * Revision 1.2  1994/11/11  05:20:00  brunner
- * Removed ident added by accident with RCS header
- *
- * Revision 1.1  1994/11/07  15:37:44  brunner
- * Initial revision
- *
- ***************************************************************************/
 #define GENERIC_DATATYPE int
 #define GENERIC_MODULE_NAME IMaxRedn
 #define GENERIC_REDOP_NAME Rmax 

@@ -1,38 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.4  1998-02-27 11:53:08  jyelon
- * Cleaned up header files, replaced load-balancer.
- *
- * Revision 2.3  1997/10/29 23:53:11  milind
- * Fixed CthInitialize bug on uth machines.
- *
- * Revision 2.2  1996/08/01 21:03:16  jyelon
- * Updated everything to bison and flex.
- *
- * Revision 2.1  1995/06/15 20:27:11  jyelon
- * got rid of myfree.
- *
- * Revision 2.0  1995/06/05  18:52:05  brunner
- * Reorganized file structure
- *
- * Revision 1.1  1994/11/03  17:41:41  brunner
- * Initial revision
- *
- ***************************************************************************/
-static char ident[] = "@(#)$Header$";
-
 #include <stdio.h>
 #include <string.h>
 #include "xl-sym.h"

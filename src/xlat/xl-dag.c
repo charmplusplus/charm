@@ -1,37 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.2  1996-04-30 04:44:31  gursoy
- * CkPrintf to CmiPrintf
- *
- * Revision 2.1  1995/06/13  07:56:43  jyelon
- * Fixed silly warnings.
- *
- * Revision 2.0  1995/06/05  18:52:05  brunner
- * Reorganized file structure
- *
- * Revision 1.2  1995/05/04  21:26:44  milind
- * *** empty log message ***
- *
- * Revision 1.1  1994/11/03  17:41:33  brunner
- * Initial revision
- *
- * Revision 1.1  1994/11/03  17:41:33  brunner
- * Initial revision
- *
- ***************************************************************************/
-static char ident[] = "@(#)$Header$";
 #include <stdio.h>
 extern int InPass1;
 extern char *CkLocalPtr;

@@ -1,34 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 2.2  1996-08-01 21:03:16  jyelon
- * Updated everything to bison and flex.
- *
- * Revision 2.1  1995/07/07 02:05:38  narain
- * Definition for the ImmSendMsgBranch command
- *
- * Revision 2.0  1995/06/05  18:52:05  brunner
- * Reorganized file structure
- *
- * Revision 1.2  1995/04/23  18:30:18  milind
- * Changed list of keywords to include Cmi functions.
- *
- * Revision 1.1  1994/11/03  17:41:53  brunner
- * Initial revision
- *
- ***************************************************************************/
-static char ident[] = "@(#)$Header$";
 #include "xl-lex.h"
 #include "xl-sym.h"
 #include "xl-yacc.tab.h"

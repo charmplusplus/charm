@@ -1,34 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 1.3  1995-10-27 21:45:35  jyelon
- * Changed CmiNumPe --> CmiNumPes
- *
- * Revision 1.2  1995/10/19  18:18:24  jyelon
- * added "converse.h"
- *
- * Revision 1.1  1995/10/13  16:08:54  gursoy
- * Initial revision
- *
- * Revision 2.0  1995/07/05  23:37:59  gursoy
- * *** empty log message ***
- *
- *
- *
- ***************************************************************************/
-static char ident[] = "@(#)$Header$";
-
 /* This file contains all the spanning tree functions */
 #include <converse.h>
 

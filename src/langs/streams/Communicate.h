@@ -1,10 +1,3 @@
-//-*-c++-*-
-/***************************************************************************/
-/*       (C) Copyright 1995,1996,1997 The Board of Trustees of the         */
-/*                          University of Illinois                         */
-/*                           All Rights Reserved                           */
-/***************************************************************************/
-
 #ifndef COMMUNICATE_H
 #define COMMUNICATE_H
 

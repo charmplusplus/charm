@@ -1,30 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- * $Log$
- * Revision 1.1  1995-06-13 11:32:16  jyelon
- * Initial revision
- *
- * Revision 1.1  1995/06/13  10:06:34  jyelon
- * Initial revision
- *
- * Revision 1.2  1994/11/11  05:20:15  brunner
- * Removed ident added by accident with RCS header
- *
- * Revision 1.1  1994/11/07  15:37:52  brunner
- * Initial revision
- *
- ***************************************************************************/
 #define MAX_SPAN_CHILDREN 2
 #define HASH_TABLE_SIZE 11     /*This should be some (smallish) prime number */
 #define MAX_HASH_TABLE_SIZE 13 /*This should be the next larrgest prime num */

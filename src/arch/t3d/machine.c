@@ -1,19 +1,3 @@
-/***************************************************************************
- * RCS INFORMATION:
- *
- *      $RCSfile$
- *      $Author$        $Locker$                $State$
- *      $Revision$      $Date$
- *
- ***************************************************************************
- * DESCRIPTION:
- *
- ***************************************************************************
- * REVISION HISTORY:
- *
- ***************************************************************************/
-static char ident[] = "@(#)$Header$";
-
 /*
  * This is a complete port, but could be made considerably more efficient
  * by handling asynchronous messages correctly, ie. without doing
