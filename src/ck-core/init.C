@@ -591,6 +591,7 @@ void _initCharm(int unused_argc, char **argv)
 	_futuresModuleInit(); // part of futures implementation is a converse module
 	_loadbalancerInit();
 	
+	initCharmProjections();
 #if CMK_TRACE_IN_CHARM
         // initialize trace module in ck
         traceCharmInit(argv);
