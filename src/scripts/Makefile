@@ -538,7 +538,7 @@ LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o 	\
 	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o WSLB.o \
-           ObjGraph.o graph.o Refiner.o RefinerApprox.o  \
+           ObjGraph.o graph.o LButil.o Refiner.o RefinerApprox.o  \
            RefinerComm.o bitvecset.o Set.o heap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) \
 	   charmProjections.o
