@@ -1475,10 +1475,13 @@ Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz) :
 void Entry::setChare(Chare *c) {
 	Member::setChare(c);
         // mainchare constructor parameter is not allowed
-	/*
+	/* ****************** REMOVED 10/8/2002 ************************
         if (isConstructor()&&container->isMainChare() && param != NULL)
           if (!param->isCkArgMsgPtr())
            die("MainChare Constructor doesn't allow parameter!", line);
+	Removed old treatment for CkArgMsg to allow argc, argv or void
+	constructors for mainchares.
+	* **************************************************************/
 	if (param==NULL) 
 	{//Fake a parameter list of the appropriate type
 		Type *t;
@@ -1488,14 +1491,6 @@ void Entry::setChare(Chare *c) {
 		else
 			t=new BuiltinType("void");
 		param=new ParamList(new Parameter(line,t));
-	}
-	Removed old treatment for CkArgMsg to allow argc, argv or void
-	constructors for mainchares.
-	*/
-	if (param==NULL) {
-	    Type *t;
-	    t=new BuiltinType("void");
-	    param=new ParamList(new Parameter(line,t));
 	}
 	entryCount=c->nextEntry();
 }
