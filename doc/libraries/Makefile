@@ -1,6 +1,7 @@
 TEXFILES=manual.tex intro.tex irecv.tex
 
 ps: $(TEXFILES)
+	make clean
 	touch index.tex
 	latex manual.tex
 	bibtex manual
@@ -10,10 +11,12 @@ ps: $(TEXFILES)
 	dvips -o manual.ps manual.dvi
 
 html: $(TEXFILES)
+	make clean
 	latex manual.tex
 	latex2html -local_icons manual.tex
 
 pdf: $(TEXFILES)
+	make clean
 	touch index.tex
 	pdflatex manual.tex
 	bibtex manual
@@ -35,7 +38,9 @@ install:
 
 all: ps pdf html install
 
-clean:	
-	rm -f *.aux *.log *.dvi *.ps *.idx *.toc *.bbl *.blg *.pdf *.ilg
-	rm -rf index.tex manual/
+clean:
+	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc index.tex *.blg *.bbl
+
+veryclean:
+	rm -rf *.ps *.pdf manual/
 

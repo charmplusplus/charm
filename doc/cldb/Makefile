@@ -1,12 +1,15 @@
 ps:
+	make clean
 	latex HowToLB.tex
 	dvips -o HowToLB.ps HowToLB.dvi
 
 html:
+	make clean
 	latex HowToLB.tex
 	latex2html -local_icons HowToLB.tex
 
 pdf:
+	make clean
 	pdflatex HowToLB.tex
 
 install:
@@ -21,8 +24,11 @@ install:
 	cp HowToLB/* /expand1/groupMosaic/html-manuals/cldb.manual/
 	chmod 664 /expand1/groupMosaic/html-manuals/cldb.manual/*
 
-all: ps html install
+all: ps pdf html install
 
-clean:	
-	rm -rf *.aux *.log *.dvi *.ps *.idx *.toc *.pdf HowToLB
+clean:
+	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc index.tex *.blg *.bbl
+
+veryclean:
+	rm -rf *.ps *.pdf HowToLB/
 

@@ -1,6 +1,7 @@
 TEXFILES= groups.tex ack.tex nodegroups.tex sdag.tex arrays.tex idl.tex seqobjs.tex inhertmplt.tex othercalls.tex intro.tex syntaxchange.tex chares.tex keywords.tex manual.tex messages.tex quiesce.tex further.tex readonly.tex modules.tex overview.tex comprundebug.tex
 
 ps: $(TEXFILES)
+	make clean
 	touch index.tex
 	latex manual.tex
 	bibtex manual
@@ -10,10 +11,12 @@ ps: $(TEXFILES)
 	dvips -o manual.ps manual.dvi
 
 html: $(TEXFILES)
+	make clean
 	latex manual.tex
 	latex2html -local_icons manual.tex
 
 pdf: $(TEXFILES)
+	make clean
 	touch index.tex
 	pdflatex manual.tex
 	bibtex manual
@@ -35,7 +38,9 @@ install:
 
 all: ps pdf html install
 
-clean:	
-	rm -f *.ilg *.aux *.log *.dvi *.ps *.idx *.toc *.pdf index.tex *.blg *.bbl
-	rm -rf manual/
+clean:
+	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc index.tex *.blg *.bbl
+
+veryclean:
+	rm -rf *.ps *.pdf manual/
 

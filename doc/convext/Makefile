@@ -14,7 +14,11 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.6  2000-06-22 14:39:33  milind
+# Revision 1.7  2000-06-22 22:21:07  milind
+# Added table of contents to the PDF file, and also cleaned up the clean
+# target.
+#
+# Revision 1.6  2000/06/22 14:39:33  milind
 # Made compatible with pdflatex as well.
 #
 # Revision 1.5  2000/02/24 07:06:29  milind
@@ -39,6 +43,7 @@ thsync.tex pthreads.tex
 
 
 ps:
+	make clean
 	touch index.tex
 	latex manual.tex
 	makeindex -o index.tex manual.idx
@@ -47,10 +52,12 @@ ps:
 	dvips -o manual.ps manual.dvi
 
 html:
+	make clean
 	latex manual.tex
 	latex2html -local_icons manual.tex
 
 pdf:
+	make clean
 	touch index.tex
 	latex manual.tex
 	makeindex -o index.tex manual.idx
@@ -70,7 +77,9 @@ install:
 
 all: ps html pdf install
 
-clean:	
-	rm -f *.ilg *.aux *.log *.dvi *.ps *.idx *.toc *~ index.tex *.pdf
-	rm -rf manual
+clean:
+	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc index.tex *.blg *.bbl
+
+veryclean:
+	rm -rf *.ps *.pdf manual/
 

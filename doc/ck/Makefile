@@ -2,16 +2,19 @@
 TEXFILES=manual.tex ack.tex
 
 ps:
+	make clean
 	latex manual.tex
 	latex manual.tex
 	latex manual.tex
 	dvips -o manual.ps manual.dvi
 
 html:
+	make clean
 	latex manual.tex
 	latex2html -local_icons manual.tex
 
 pdf:
+	make clean
 	pdflatex manual.tex
 	pdflatex manual.tex
 
@@ -29,7 +32,9 @@ install:
 
 all: ps pdf html install
 
-clean:	
-	rm -f *.aux *.log *.dvi *.ps *.idx *.toc *.pdf
-	rm -rf manual/
+clean:
+	rm -f *.ilg *.aux *.log *.dvi *.idx *.toc index.tex *.blg *.bbl
+
+veryclean:
+	rm -rf *.ps *.pdf manual/
 
