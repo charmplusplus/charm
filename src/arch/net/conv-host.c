@@ -1409,6 +1409,13 @@ int           nodetab_size;
 int          *nodetab_rank0_table;
 int           nodetab_rank0_size;
 
+void nodetab_add(nodetab_host res)
+{
+  if (res->rank == 0)
+    nodetab_rank0_table[nodetab_rank0_size++] = nodetab_size;
+  nodetab_table[nodetab_size++] = res;
+}
+
 void nodetab_makehost(char *host)
 {
   nodetab_host res;
@@ -1430,9 +1437,7 @@ void nodetab_makehost(char *host)
   res->rank = default_rank;
   res->cpus = default_cpus;
   res->ip = ip;
-  if (res->rank == 0)
-    nodetab_rank0_table[nodetab_rank0_size++] = nodetab_size;
-  nodetab_table[nodetab_size++] = res;
+  nodetab_add(res);
 }
 
 void nodetab_init()
@@ -1492,10 +1497,8 @@ void nodetab_init()
     exit(1);
   }
   while ((nodetab_size < arg_requested_pes)&&(arg_requested_pes!=MAX_NODES)) {
-    nodetab_table[nodetab_size] = nodetab_table[nodetab_size-basicsize];
-    if(nodetab_table[nodetab_size]->rank == 0)
-      nodetab_rank0_table[nodetab_rank0_size++] = nodetab_size;
-    nodetab_size++;
+    nodetab_host h = nodetab_table[nodetab_size-basicsize];
+    nodetab_add(h);
   }
   fclose(f);
 }
@@ -2074,6 +2077,8 @@ int rsh_pump(p, nodeno, argv)
   if (arg_debug || arg_debug_no_pause) {
     xstr_printf(ibuf,"cat > /tmp/gdb%08x << END_OF_SCRIPT\n",randno);
     xstr_printf(ibuf,"shell rm -f /tmp/gdb%08x\n",randno);
+    xstr_printf(ibuf,"handle SIGWINCH nostop noprint\n");
+    xstr_printf(ibuf,"handle SIGWAITING nostop noprint\n");
     xstr_printf(ibuf,"set args");
     while (*argv) { xstr_printf(ibuf," %s",*argv); argv++; }
     xstr_printf(ibuf,"\n");

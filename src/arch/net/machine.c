@@ -37,11 +37,11 @@ int  CmiScanf();
 #include <stdio.h>
 #include <ctype.h>
 #include <fcntl.h>
-#include <errno.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <rpc/rpc.h>
+#include <errno.h>
 #include <setjmp.h>
 #include <pwd.h>
 #include <stdlib.h>
@@ -93,11 +93,53 @@ extern void CmemCallWhenMemAvail();
 
 /******************************************************************************
  *
+ * Memory Mutual Exclusion
+ *
+ * This code is designed to keep malloc from being called reentrantly.
+ * Malloc is a special case, because malloc must be operational right
+ * from the start. Thus, it's mutual exclusion mechanism must be free
+ * of dependencies on anything that requires initialization.
+ *
+ * The remainder of the system uses a mutual exclusion flag ``busy'' in
+ * the cmi_state record.
+ *
+ *****************************************************************************/
+
+#if CMK_SHARED_VARS_UNAVAILABLE
+
+static int memflag;
+void CmiMemLock() { memflag = 1; }
+void CmiMemUnlock() { memflag = 0; }
+#define CmiMemBusy() memflag
+
+#endif
+
+#if CMK_SHARED_VARS_SUN_THREADS
+
+static mutex_t memmutex;
+static int     memflag;
+void CmiMemLock()
+{
+  mutex_lock(&memmutex);
+  memflag=1;
+}
+void CmiMemUnlock()
+{
+  memflag=0;
+  mutex_unlock(&memmutex);
+}
+#define CmiMemBusy() (memflag)
+
+#endif
+
+/******************************************************************************
+ *
  * Protocol State Variables
  *
  *****************************************************************************/
 
-#define MAX_NODES 100
+#define MAX_NODESIZE 64
+#define MAX_NODES 128
 
 typedef struct {
   int IP;
@@ -175,16 +217,16 @@ NewMessage;
  *
  *****************************************************************************/
 
-typedef struct cmi_state_struct
+typedef struct Cmi_state_struct
 {
   int ctrl_port;
   int ctrl_skt;
   int data_port;
   int data_skt;
-
-  node_info node_table[MAX_NODES];
-  int       node_table_fill;
-
+  
+  node_info  node_table[MAX_NODES];
+  int        node_table_fill;
+  
   int all_done;
   char *scanf_data;
   double CmiNow;
@@ -206,7 +248,7 @@ typedef struct cmi_state_struct
   int *needack;
   DATA_HDR ack;
   MsgQueueElem *recd_msg_head, *recd_msg_tail;
-
+  
   int NumAlloc;
   int NumFree;
   int NumIntr;
@@ -217,25 +259,37 @@ typedef struct cmi_state_struct
   int NumUseless;
   int NumSends;
   int NumEvents;
+
+  int mype;
+  int myrank;
+  int busy;
+} *cmi_state;
+
+
+#if CMK_SHARED_VARS_SUN_THREADS
+
+static int cmi_state_key;
+cmi_state CmiState()
+{
+  cmi_state result = 0;
+  thr_getspecific(cmi_state_key, (void **)&result);
+  return result;
 }
-*cmi_state;
+int CmiMyPe() { return CmiState()->mype; }
+int CmiMyRank() { return CmiState()->myrank; }
 
-CpvStaticDeclare(cmi_state, CmiStateVar);
+#endif
 
-#define CmiState() (CpvAccess(CmiStateVar))
+#if CMK_SHARED_VARS_UNAVAILABLE
 
-/*****************************************************************************
- *
- * Exported CPV and CSV variables
- * 
- * ONLY put CPV and CSV variables that are needed by the rest of the system
- * here.  All other state should go in the CmiState struct above.
- *
- *****************************************************************************/
+static struct Cmi_state_struct Cmi_state;
+#define CmiState() (&Cmi_state)
+int Cmi_mype;
+int Cmi_myrank;
 
-CpvDeclare(int,   Cmi_mype);
-CpvDeclare(int,   Cmi_numpes);
-CpvDeclare(void *,CmiLocalQueue);
+#endif
+
+CpvDeclare(void *, CmiLocalQueue);
 
 /*****************************************************************************
  *
@@ -652,9 +706,12 @@ unsigned int ip; int port; int seconds;
  *
  *****************************************************************************/
 
+int Cmi_numpes;
+int Cmi_nodesize;
+
+static char **conf_argv;
+static int    conf_argc;
 static int    conf_node_start; /* PE number of first processor in this node */
-static int    conf_node_size;  /* total number of PE's in this node */
-static int    conf_num_pes;    /* total size of machine (same as CmiNumPes) */
 static int    conf_host_IP;
 static int    conf_self_IP;
 static int    conf_host_port;
@@ -662,9 +719,9 @@ static char   conf_host_IP_str[16];
 static char   conf_self_IP_str[16];
 static char   conf_topology;
 static char  *conf_outfile;
-static int    conf_enableinterrupts;
 static double conf_resend_wait;
 static double conf_resend_fail;
+static int    conf_enableinterrupts;
 
 static void conf_parse_netstart()
 {
@@ -673,7 +730,7 @@ static void conf_parse_netstart()
   ns = getenv("NETSTART");
   if (ns==0) goto abort;
   nread = sscanf(ns, "%d%d%d%d%d%d%d",
-		 &conf_node_start, &conf_num_pes, &conf_node_size, &rank,
+		 &conf_node_start, &Cmi_numpes, &Cmi_nodesize, &rank,
 		 &conf_self_IP, &conf_host_IP, &conf_host_port);
   if (nread!=7) goto abort;
   if (rank!=0) goto abort;
@@ -694,9 +751,12 @@ char **argv;
 {
   conf_resend_wait =   0.030; /* This could be m/c dependent -- -Sanjay */
   conf_resend_fail = 600.000;
-  conf_enableinterrupts = 1;
   conf_topology = 'H';
   conf_outfile = NULL;
+
+#if CMK_SHARED_VARS_UNAVAILABLE
+  conf_enableinterrupts = 1;
+#endif
 
   while (*argv) {
     if (strcmp(*argv,"++resend-wait")==0) {
@@ -1595,10 +1655,10 @@ static int data_getone()
     UpdateSendWindow(recv_buf, (int) recv_buf->hd.PeNum);
     CmiFree(recv_buf);
   } else if (kind == SEND) {
-      sender = cs->node_table + recv_buf->hd.PeNum;
-      if((sender->dataport)&&(sender->dataport!=htons(src.sin_port)))
-        KillEveryoneCode(38473);
-      AddToReceiveWindow(recv_buf, (int) recv_buf->hd.PeNum);
+    sender = cs->node_table + recv_buf->hd.PeNum;
+    if((sender->dataport)&&(sender->dataport!=htons(src.sin_port)))
+      KillEveryoneCode(38473);
+    AddToReceiveWindow(recv_buf, (int) recv_buf->hd.PeNum);
   } 
   return kind;
 }
@@ -1657,11 +1717,10 @@ static void ticker_reset()
 
 static void InterruptHandler()
 {
-  cmi_state cs;
+  cmi_state cs = CmiState();
   int prevmask ;
   int dgram_scan();
-  CmiInterruptHeader(InterruptHandler);
-  cs = CmiState();
+  if (CmiMemBusy() || (cs->busy)) return;
   cs->NumIntrCalls++;
   cs->NumOutsideMc++;
   ticker_countup++;
@@ -1687,12 +1746,12 @@ static void InterruptInit()
 
 static void InterruptHandler()
 {
-  cmi_state cs;
+  cmi_state cs = CmiState();
   int prevmask;
   int dgram_scan();
-  CmiInterruptHeader(InterruptHandler);
 
-  cs = CmiState();
+  if (CmiMemBusy() || (cs->busy)) return;
+
   cs->NumIntrCalls++;
   cs->NumOutsideMc++;
   sighold(SIGIO) ;
@@ -1728,7 +1787,7 @@ static int netSend(destPE, size, msg)
   unsigned int pktnum = 0;
   unsigned int numfrag = ((size-1)/MAXDSIZE) + 1;
 
-  CmiInterruptsBlock();
+  cs->busy++;
   
   if (!cs->Communication_init) return -1;
   
@@ -1756,7 +1815,59 @@ static int netSend(destPE, size, msg)
   
   SendPackets(destPE);
   
-  CmiInterruptsRelease();
+  cs->busy--;
+}
+
+static int netBcast(size, msg) 
+     int size; 
+     char * msg; 
+{
+  cmi_state cs = CmiState();
+  DATA_HDR *hd,*hd2;
+  unsigned int pktnum = 0;
+  unsigned int numfrag = ((size-1)/MAXDSIZE) + 1;
+  unsigned int destPE1, destPE2;
+
+  my_children(CmiMyPe(), &destPE1, &destPE2);
+  if(destPE1==(-1) || destPE2==(-1)){
+	 if(destPE1!=(-1))
+		netSend(destPE1, size, msg);
+    if(destPE2!=(-1))
+		netSend(destPE2, size, msg);
+    return 1;
+  }
+
+  cs->busy++;
+  
+  if (!cs->Communication_init) return -1;
+  
+  for(;pktnum<(numfrag-1);pktnum++) {
+    hd = (DATA_HDR *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
+    hd->pktidx = pktnum;
+    hd->rem_size = size;
+    hd->PeNum = (1<<31) | (CmiMyPe()<<16) | (CmiMyPe());
+    memcpy((hd+1), msg, MAXDSIZE);
+	 hd2 = (DATA_HDR *)CmiAlloc(CMK_DGRAM_MAX_SIZE);
+	 memcpy(hd2,hd,CMK_DGRAM_MAX_SIZE);
+    InsertInTransmitQueue(hd, destPE1);
+    InsertInTransmitQueue(hd2, destPE2);
+    msg += MAXDSIZE;
+    size -= MAXDSIZE;
+  }
+  hd = (DATA_HDR *)CmiAlloc(sizeof(DATA_HDR)+size);
+  hd->pktidx = pktnum;
+  hd->rem_size = size;
+  hd->PeNum = (1<<31) | (CmiMyPe()<<16) | (CmiMyPe());
+  memcpy((hd+1), msg, size);
+  hd2 = (DATA_HDR *)CmiAlloc(sizeof(DATA_HDR)+size);
+  memcpy(hd2,hd,sizeof(DATA_HDR)+size);
+  InsertInTransmitQueue(hd, destPE1);
+  InsertInTransmitQueue(hd2, destPE2);
+  
+  SendPackets(destPE1);
+  SendPackets(destPE2);
+  
+  cs->busy--;
 }
 
 static int netSendV(destPE, n, sizes, msgs) 
@@ -1774,7 +1885,7 @@ static int netSendV(destPE, n, sizes, msgs)
   for(size=0,cur=0;cur<n;size += sizes[cur++]);
   numfrag  = ((size-1)/MAXDSIZE) + 1;
 
-  CmiInterruptsBlock();
+  cs->busy++;
   
   if (!cs->Communication_init) return -1;
   
@@ -1837,7 +1948,7 @@ static int netSendV(destPE, n, sizes, msgs)
   
   SendPackets(destPE);
   
-  CmiInterruptsRelease();
+  cs->busy--;
 }
 
 static int CmiProbe() 
@@ -1846,13 +1957,13 @@ static int CmiProbe()
   int dgram_scan();
   cmi_state cs = CmiState();
 
-  CmiInterruptsBlock();
+  cs->busy++;
 
   dgram_scan();
   RetransmitPackets();
   val = (cs->recd_msg_head != NULL);
 
-  CmiInterruptsRelease();
+  cs->busy--;
   return (val);
 }
 
@@ -1863,7 +1974,7 @@ void *CmiGetNonLocal()
   char *newmsg=NULL;
   int i;
 
-  CmiInterruptsBlock();
+  cs->busy++;
 
   dgram_scan();
   RetransmitPackets();
@@ -1878,7 +1989,7 @@ void *CmiGetNonLocal()
       cs->recd_msg_head = cs->recd_msg_head->nextptr;
     CmiFree(msgelem);
   } 
-  CmiInterruptsRelease();
+  cs->busy--;
   return newmsg;
 }
 
@@ -2037,13 +2148,13 @@ void CmiReleaseCommHandle(handle)
 CmiInitMc(argv)
 char **argv;
 {
+  void *FIFO_Create();
   cmi_state cs = CmiState();
-  static int initmc=0;
   
   cs->Communication_init = 0;
-  CmiInterruptsBlock();
-  if (initmc==1) KillEveryone("CmiInit called twice");
-  initmc=1;
+  cs->busy++;
+  CpvInitialize(void *,CmiLocalQueue);
+  CpvAccess(CmiLocalQueue) = FIFO_Create();
   skt_datagram(&cs->data_port, &cs->data_skt);
   skt_server(&cs->ctrl_port, &cs->ctrl_skt);
   KillInit();
@@ -2055,20 +2166,15 @@ char **argv;
   RecvWindowInit();
   InterruptInit();
   cs->Communication_init = 1;
-  CmiInterruptsRelease();
+  cs->busy--;
 }
 
 CmiExit()
 {
-  cmi_state cs = CmiState();
-  static int exited;
   int begin;
+  cmi_state cs = CmiState();
   
-  if (exited==1) KillEveryone("CmiExit called twice");
-  exited=1;
-  
-  CmiInterruptsBlock();
-
+  cs->busy++;
   ctrl_sendone(120,"aget %s %d done 0 %d\n",
          conf_self_IP_str,cs->ctrl_port,CmiNumPes()-1);
   ctrl_sendone(120,"aset done %d TRUE\n",CmiMyPe());
@@ -2077,16 +2183,16 @@ CmiExit()
   while(!cs->all_done && (time(0)<begin+120))
     { RetransmitPackets(); dgram_scan(); sleep(1); }
   outlog_done();
-  
-  CmiInterruptsRelease();
+  cs->busy--;
 }
 
+#if CMK_SHARED_VARS_UNAVAILABLE
 main(argc, argv)
 int argc;
 char **argv;
 {
-  void *FIFO_Create();
-  int i;
+  int i, pid;
+
 #if CMK_USE_HP_MAIN_FIX
 #if FOR_CPLUS
   _main(argc,argv);
@@ -2094,20 +2200,58 @@ char **argv;
 #endif
   conf_parse_netstart();
   conf_extract_args(argv);
-  for (i=0; i<conf_node_size; i++) {
-    if (fork()==0) {
-      CpvInitialize(int, Cmi_mype);
-      CpvInitialize(int, Cmi_numpes);
-      CpvInitialize(void *,CmiLocalQueue);
-      CpvInitialize(cmi_state, CmiStateVar);
-      CpvAccess(Cmi_mype) = conf_node_start + i;
-      CpvAccess(Cmi_numpes) = conf_num_pes;
-      CpvAccess(CmiLocalQueue) = FIFO_Create();
-      CpvAccess(CmiStateVar) =
-	(cmi_state)malloc(sizeof(struct cmi_state_struct));
+
+  for (i=Cmi_nodesize-1; i>=0; i--) {
+    if (i!=0) pid=fork();
+    if ((i==0)||(pid==0)) {
+      Cmi_mype = conf_node_start + i;
+      Cmi_myrank = 0;
+      CmiState()->mype = Cmi_mype;
+      CmiState()->myrank = 0;
+      CmiState()->busy = 0;
       user_main(argc, argv);
       exit(0);
     }
   }
-  exit(0);
 }
+#endif
+
+#if CMK_SHARED_VARS_SUN_THREADS
+
+static void *call_user_main(void *vindex)
+{
+  int index = (int)vindex;
+  cmi_state state = (cmi_state)malloc(sizeof(struct Cmi_state_struct));
+  thr_setspecific(cmi_state_key, state);
+  state->mype = conf_node_start + index;
+  state->myrank = index;
+  state->busy = 0;
+  user_main(conf_argc, conf_argv);
+  thr_exit(0);
+}
+
+main(argc, argv)
+int argc;
+char **argv;
+{
+  int i, ok; thread_t pid;
+  
+#if CMK_USE_HP_MAIN_FIX
+#if FOR_CPLUS
+  _main(argc,argv);
+#endif
+#endif
+  conf_argc = argc;
+  conf_argv = argv;
+  conf_parse_netstart();
+  conf_extract_args(argv);
+  thr_keycreate(&cmi_state_key, 0);
+  for (i=0; i<Cmi_nodesize; i++) {
+    thr_create(0, 256000, call_user_main, (void *)i,
+	       THR_DETACHED|THR_BOUND, &pid);
+    if (ok<0) { perror("thr_create"); exit(1); }
+  }
+  thr_exit(0);
+}
+#endif
+
