@@ -127,7 +127,7 @@ class ComlibManager: public CkDelegateMgr{
  public:
     ComlibManager();  //Receommended constructor
     ComlibManager(int strategyID,int eltPerPE=1);
-    ComlibManager(Strategy &strat,int eltPerPE=1);
+    ComlibManager(Strategy *strat,int eltPerPE=1);
 
     void barrier(void);
     void barrier2(void);
