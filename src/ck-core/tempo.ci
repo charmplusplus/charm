@@ -1,0 +1,21 @@
+module tempo  {
+  message [packed] TempoMessage;
+
+  chare TempoChare
+  {
+    entry [threaded] TempoChare(void);
+    entry void tempoGeneric(TempoMessage *);
+  };
+  
+  group TempoGroup
+  {
+    entry [threaded] TempoGroup(void);
+    entry void tempoGeneric(TempoMessage *);
+  };
+
+  array TempoArray
+  {
+    entry [threaded] TempoArray();
+    entry void tempoGeneric(TempoMessage *);
+  };
+}
