@@ -35,6 +35,7 @@
 #define CkDDT_LB              23
 #define CkDDT_UB              24
 #define CkDDT_LONG_LONG_INT   25
+#define CkDDT_DOUBLE_COMPLEX  26
 
 #define CkDDT_CONTIGUOUS      36
 #define CkDDT_VECTOR          37
@@ -374,7 +375,9 @@ class CkDDT {
     types[24] = CkDDT_UB;
     typeTable[25] = new CkDDT_DataType(CkDDT_LONG_LONG_INT);
     types[25] = CkDDT_LONG_LONG_INT;    
-    num_types = 26;
+    typeTable[26] = new CkDDT_DataType(CkDDT_DOUBLE_COMPLEX);
+    types[26] = CkDDT_DOUBLE_COMPLEX;
+    num_types = 27;
 
     int i;
     for(i=num_types ; i < max_types; i++)

@@ -264,6 +264,7 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
       size = 1 ;
       break;
     case CkDDT_COMPLEX:
+    case CkDDT_DOUBLE_COMPLEX:
       size =  2 * sizeof(double) ;
       break;
     case CkDDT_LOGICAL:

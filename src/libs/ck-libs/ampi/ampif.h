@@ -71,6 +71,8 @@
        integer, parameter :: MPI_2INTEGER = 18
        integer, parameter :: MPI_LB = 23
        integer, parameter :: MPI_UB = 24
+       integer, parameter :: MPI_DOUBLE_COMPLEX = 26
+       
 
        integer, parameter :: MPI_ANY_SOURCE = -1
        integer, parameter :: MPI_ANY_TAG = -1
