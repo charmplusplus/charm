@@ -65,7 +65,16 @@ static void skt_SIGPIPE_handler(int sig) {
 
 void skt_init(void)
 {
+#if 0
+	/* Install a SIGPIPE signal handler.
+	  This prevents us from dying when one of our network
+	  connections goes down; but interacts badly with a broken
+	  stdio output (since we can't tell that sigpipe from a
+	  broken network socket).  This means we infinite loop
+	  when called, e.g., by "less".
+	*/
 	signal(SIGPIPE,skt_SIGPIPE_handler);
+#endif
 }
 void skt_close(SOCKET fd)
 {
