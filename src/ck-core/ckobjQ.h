@@ -1,6 +1,8 @@
 #ifndef _CK_OBJQ_H_
 #define _CK_OBJQ_H_
 
+#include "cklists.h"
+
 class Chare;
 
 // Converse token message
@@ -24,35 +26,16 @@ public:
   void process();
 };
 
-#define MAXTokenMSGS 52
-
-class TokenPool {
-  private:
-    int num;
-    ObjectToken *msgs[MAXTokenMSGS];
-    static void *_alloc(void) {
-      register envelope *env = (envelope*)CmiAlloc(sizeof(ObjectToken));
-      return env;
+class TokenPool: public SafePool<ObjectToken*> {
+private:
+    static inline ObjectToken *_alloc(void) {
+      return (ObjectToken*)CmiAlloc(sizeof(ObjectToken));
     }
-  public:
-    TokenPool() {
-      for(int i=0;i<MAXTokenMSGS;i++) msgs[i] = (ObjectToken*)CmiAlloc(sizeof(ObjectToken));
-      num = MAXTokenMSGS;
+    static inline void _free(ObjectToken *ptr) {
+      CmiFree((void*)ptr);
     }
-    ObjectToken *get(void) {
-      /* CkAllocSysMsg() called in .def.h is not thread of sigio safe */
-      if (CmiImmIsRunning()) return (ObjectToken*)CmiAlloc(sizeof(ObjectToken));
-//if (num==0) CmiPrintf("[%d] underflow\n", CkMyPe());
-      return (num ? msgs[--num] : (ObjectToken*)CmiAlloc(sizeof(ObjectToken)));
-    }
-    void put(ObjectToken *m) {
-      if (num==MAXTokenMSGS || CmiImmIsRunning()) {
-//CmiPrintf("overflow!\n");
-        CmiFree(m);
-      }
-      else
-        msgs[num++] = m;
-    }
+public:
+    TokenPool(): SafePool<ObjectToken*>(_alloc, _free) {}
 };
 
 CkpvExtern(TokenPool*, _tokenPool);
