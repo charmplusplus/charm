@@ -890,6 +890,8 @@ typedef struct OtherNodeStruct
  
   int sent_msgs;
   int recd_msgs;
+  int sent_bytes;
+  int recd_bytes;
 }
 *OtherNode;
 
@@ -1028,6 +1030,12 @@ void printNetStatistics(void)
   strcat(statstr, tmpstr);
   sprintf(tmpstr, "Interrupts: %u \tProcessed: %u\n",
                   myNode->stat_total_intr, myNode->stat_proc_intr);
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "Total Msgs Sent: %u \tTotal Bytes Sent: %u\n",
+                  myNode->sent_msgs, myNode->sent_bytes);
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "Total Msgs Recv: %u \tTotal Bytes Recv: %u\n",
+                  myNode->recd_msgs, myNode->recd_bytes);
   strcat(statstr, tmpstr);
   sprintf(tmpstr, "***********************************\n");
   strcat(statstr, tmpstr);
@@ -1790,6 +1798,8 @@ static void node_addresses_store(addrs) char *addrs;
     OtherNode node = ntab + i;
     node->sent_msgs = 0;
     node->recd_msgs = 0;
+    node->sent_bytes = 0;
+    node->recd_bytes = 0;
     node->send_window =
       (ImplicitDgram*)calloc(Cmi_window_size, sizeof(ImplicitDgram));
     node->recv_window =
@@ -2107,6 +2117,7 @@ void EnqueueOutgoingDgram
 void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
 {
   int size, seqno; char *data;
+  OtherNode myNode = nodes+CmiMyNode();
  
   size = ogm->size - DGRAM_HEADER_SIZE;
   data = ogm->data + DGRAM_HEADER_SIZE;
@@ -2115,10 +2126,10 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
     data += Cmi_dgram_max_data;
     size -= Cmi_dgram_max_data;
   }
-
-  node->sent_msgs++;
-
   EnqueueOutgoingDgram(ogm, data, size, node, rank);
+
+  myNode->sent_msgs++;
+  myNode->sent_bytes += ogm->size;
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -2243,6 +2254,7 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
 void AssembleDatagram(OtherNode node, ExplicitDgram dg)
 {
   int i, size; char *msg;
+  OtherNode myNode = nodes+CmiMyNode();
   
   LOG(Cmi_clock, Cmi_nodestart, 'X', dg->srcpe, dg->seqno);
   msg = node->asm_msg;
@@ -2283,7 +2295,8 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
 #endif
     }
     node->asm_msg = 0;
-  node->recd_msgs++;
+    myNode->recd_msgs++;
+    myNode->recd_bytes += node->asm_total;
   }
   FreeExplicitDgram(dg);
 }
@@ -2789,12 +2802,10 @@ void ConverseInitPE()
 void ConverseExit()
 {
   if (CmiMyRank()==0) {
-    CmiCommLock();
     if(Cmi_print_stats)
       printNetStatistics();
     log_done();
     ConverseCommonExit();
-    CmiCommUnlock();
   }
   ctrl_sendone(120,"ending"); /* this causes host to go away */
   Cmi_check_delay = 2.0;
