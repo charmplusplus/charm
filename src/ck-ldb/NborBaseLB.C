@@ -51,6 +51,14 @@ NborBaseLB::NborBaseLB(const CkLBOptions &opt): BaseLB(opt)
   // I had to move neighbor initialization outside the constructor
   // in order to get the virtual functions of any derived classes
   // so I'll just set them to illegal values here.
+  LBtopoFn topofn = LBTopoLookup(_lbtopo);
+  if (topofn == NULL) {
+    if (CkMyPe()==0) CmiPrintf("LB> Fatal error: Unknown topology: %s.\n", _lbtopo);
+    CmiAbort("");
+  }
+  topo = topofn();
+
+  mig_msgs_expected = 0;
   neighbor_pes = 0;
   stats_msg_count = 0;
   statsMsgsList = 0;
@@ -85,15 +93,15 @@ void NborBaseLB::FindNeighbors()
   if (neighbor_pes == 0) { // Neighbors never initialized, so init them
                            // and other things that depend on the number
                            // of neighbors
-    statsMsgsList = new NLBStatsMsg*[max_neighbors()];
-    for(int i=0; i < max_neighbors(); i++)
+    int maxneighbors = topo->max_neighbors();
+    statsMsgsList = new NLBStatsMsg*[maxneighbors];
+    for(int i=0; i < maxneighbors; i++)
       statsMsgsList[i] = 0;
-    statsDataList = new LDStats[max_neighbors()];
+    statsDataList = new LDStats[maxneighbors];
 
-    neighbor_pes = new int[max_neighbors()];
-    neighbors(neighbor_pes);
-    mig_msgs_expected = num_neighbors();
-    mig_msgs = new LBMigrateMsg*[num_neighbors()];
+    neighbor_pes = new int[maxneighbors];
+    topo->neighbors(CkMyPe(), neighbor_pes, mig_msgs_expected);
+    mig_msgs = new LBMigrateMsg*[mig_msgs_expected];
   }
 
 }
@@ -106,7 +114,7 @@ void NborBaseLB::AtSync()
   if (neighbor_pes == 0) FindNeighbors();
   start_lb_time = 0;
 
-  if (!QueryBalanceNow(step()) || num_neighbors() == 0) {
+  if (!QueryBalanceNow(step()) || mig_msgs_expected == 0) {
     MigrationDone();
     return;
   }
@@ -121,11 +129,11 @@ void NborBaseLB::AtSync()
   NLBStatsMsg* msg = AssembleStats();
 
   int i;
-  for(i=0; i < num_neighbors()-1; i++) {
-    NLBStatsMsg* m2 = (NLBStatsMsg*) CkCopyMsg((void**)&msg);
+  for(i=0; i < mig_msgs_expected-1; i++) {
+    NLBStatsMsg* m2 = new NLBStatsMsg(msg);
     thisProxy [neighbor_pes[i]].ReceiveStats(m2);
   }
-  if (0 < num_neighbors()) {
+  if (0 < mig_msgs_expected) {
     thisProxy [neighbor_pes[i]].ReceiveStats(msg);
   } else delete msg;
 
@@ -242,7 +250,7 @@ void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &data)
     }
   }
 
-  const int clients = num_neighbors();
+  const int clients = mig_msgs_expected;
   if (stats_msg_count == clients && receive_stats_ready) {
     double strat_start_time = CmiWallTimer();
     receive_stats_ready = 0;
@@ -263,11 +271,11 @@ void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &data)
     }
     
     // Now, send migrate messages to neighbors
-    for(i=1; i < num_neighbors(); i++) {
+    for(i=1; i < clients; i++) {
       LBMigrateMsg* m2 = (LBMigrateMsg*) CkCopyMsg((void**)&migrateMsg);
       thisProxy [neighbor_pes[i]].ReceiveMigration(m2);
     }
-    if (0 < num_neighbors())
+    if (0 < clients)
       thisProxy [neighbor_pes[0]].ReceiveMigration(migrateMsg);
     else delete migrateMsg;
     
@@ -381,7 +389,7 @@ LBMigrateMsg* NborBaseLB::Strategy(LDStats* stats,int count)
 int NborBaseLB::NeighborIndex(int pe)
 {
     int peslot = -1;
-    for(int i=0; i < num_neighbors(); i++) {
+    for(int i=0; i < mig_msgs_expected; i++) {
       if (pe == neighbor_pes[i]) {
 	peslot = i;
 	break;
@@ -393,6 +401,26 @@ int NborBaseLB::NeighborIndex(int pe)
 NLBStatsMsg::NLBStatsMsg(int osz, int csz) {
   objData = new LDObjData[osz];
   commData = new LDCommData[csz];
+}
+
+NLBStatsMsg::NLBStatsMsg(NLBStatsMsg *src) 
+{
+  int size;
+  {
+    PUP::sizer  p;
+    src->pup(p);
+    size = p.size();
+  }
+  char *buf = new char[size];
+  {
+    PUP::toMem  p(buf);
+    src->pup(p);
+  }
+  {
+    PUP::fromMem  p(buf);
+    pup(p);
+  }
+  delete [] buf;
 }
 
 NLBStatsMsg::~NLBStatsMsg() {

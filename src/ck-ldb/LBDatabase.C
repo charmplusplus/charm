@@ -19,6 +19,7 @@
 #include "LBDatabase.h"
 #include "LBDatabase.def.h"
 #include "LBSimulation.h"
+#include "LBTopology.h"
 
 #include "NullLB.h"
 
@@ -30,6 +31,7 @@ CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
 
 // command line options
 double _autoLbPeriod = 1.0;		// in seconds
+char* _lbtopo = "ring";			// topology for neiborhood lbs
 int _lb_debug=0;
 int _lb_ignoreBgLoad=0;
 
@@ -171,6 +173,9 @@ void _loadbalancerInit()
   // set up init value for LBPeriod time in seconds
   // it can also be set calling LDSetLBPeriod()
   CmiGetArgDoubleDesc(argv,"+LBPeriod", &_autoLbPeriod,"specify the period for automatic load balancing in seconds (for non atSync mode)");
+
+  registerLBTopos();
+  CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
 
   /******************* SIMULATION *******************/
   // get the step number at which to dump the LB database

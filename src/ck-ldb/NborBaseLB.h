@@ -13,8 +13,10 @@
 #ifndef NBORBASELB_H
 #define NBORBASELB_H
 
-#include <BaseLB.h>
+#include "BaseLB.h"
 #include "NborBaseLB.decl.h"
+
+#include "LBTopology.h"
 
 void CreateNborBaseLB();
 
@@ -27,6 +29,7 @@ class NborBaseLB : public BaseLB
 {
 private:
   CProxy_NborBaseLB  thisProxy;
+  LBTopology         *topo;
 public:
   NborBaseLB(const CkLBOptions &);
   NborBaseLB(CkMigrateMessage *m):BaseLB(m) {}
@@ -70,21 +73,6 @@ protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
   virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
-
-  virtual int max_neighbors() {
-    if (CkNumPes() > 2) return 2;
-    else return (CkNumPes()-1);
-  }
-
-  virtual int num_neighbors() {
-    if (CkNumPes() > 2) return 2;
-    else return (CkNumPes()-1);
-  };
-
-  virtual void neighbors(int* _n) {
-    _n[0] = (CkMyPe() + CkNumPes() -1) % CkNumPes();
-    _n[1] = (CkMyPe() + 1) % CkNumPes();
-  };
 
   int NeighborIndex(int pe);   // return the neighbor array index
 
@@ -142,6 +130,7 @@ public:
   LDCommData *commData;
 public:
   NLBStatsMsg(int osz, int csz);
+  NLBStatsMsg(NLBStatsMsg *s);
   NLBStatsMsg()  {}
   ~NLBStatsMsg();
   void pup(PUP::er &p);

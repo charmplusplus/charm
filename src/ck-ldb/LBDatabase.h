@@ -37,6 +37,7 @@ CkpvExtern(int, hasNullLB);
 CkpvExtern(int, lbdatabaseInited);
 
 extern double _autoLbPeriod;
+extern char * _lbtopo;
 extern int _lb_debug;
 extern int _lb_ignoreBgLoad;
 
