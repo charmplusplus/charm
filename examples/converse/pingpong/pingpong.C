@@ -1,123 +1,131 @@
+
+/**********************************************************
+      Converse Ping-pong to test the message latency and bandwidth
+      Modified from Milind's ping-pong
+      
+      Sameer Kumar 02/07/05
+***************************************************/
+
 #include <stdlib.h>
 #include <converse.h>
+#include <unistd.h>
 
-enum {nCycles = 1 << 8 };
-enum { maxMsgSize = 1 << 18 }; 
+enum {nCycles =4096};
+enum { maxMsgSize = 1 << 16 };
 
 CpvDeclare(int,msgSize);
 CpvDeclare(int,cycleNum);
-CpvDeclare(int,sizeNum);
 CpvDeclare(int,exitHandler);
 CpvDeclare(int,node0Handler);
 CpvDeclare(int,node1Handler);
 CpvStaticDeclare(double,startTime);
 CpvStaticDeclare(double,endTime);
-CpvStaticDeclare(double,startCTime);
-CpvStaticDeclare(double,endCTime);
 
+// Start the pingpong for each message size
 void startRing()
 {
   CpvAccess(cycleNum) = 0;
-  CpvAccess(msgSize) = (1 << CpvAccess(sizeNum)) + CmiMsgHeaderSizeBytes;
-  //CmiPrintf("PE %d startRing allocating %d bytes, header=%d bytes\n",
-	    //CmiMyPe(),CpvAccess(msgSize),CmiMsgHeaderSizeBytes);
-  CmiPrintf(
-  "       cycles       bytes         Total(ms)     One-way (us/msg)\n"
-  );
+
+  //Increase message in powers of 4. Also add a converse header to that
+  CpvAccess(msgSize) = (CpvAccess(msgSize)-CmiMsgHeaderSizeBytes)*4 + 
+      CmiMsgHeaderSizeBytes;
+
   char *msg = (char *)CmiAlloc(CpvAccess(msgSize));
   *((int *)(msg+CmiMsgHeaderSizeBytes)) = CpvAccess(msgSize);
-  CmiPrintf("PE %d startRing starting clock\n",CmiMyPe());
-  CpvAccess(startTime) = CmiWallTimer();
-  CpvAccess(startCTime) = CmiTimer();
   CmiSetHandler(msg,CpvAccess(node0Handler));
   CmiSyncSendAndFree(0, CpvAccess(msgSize), msg);
+  CpvAccess(startTime) = CmiWallTimer();
 }
 
+//the pingpong has finished, record message time
 void ringFinished(char *msg)
 {
-  // CmiPrintf("PE %d ringFinished\n",CmiMyPe());
   CmiFree(msg);
-  CpvAccess(endTime) = CmiWallTimer();
-  CpvAccess(endCTime) = CmiTimer();
-  CmiPrintf("WALL: %4d \t%8d \t%8.4g \t%8.4g\n",
-	    nCycles, CpvAccess(msgSize)-CmiMsgHeaderSizeBytes,
-	    (CpvAccess(endTime)-CpvAccess(startTime))*1e3,
-	    1e6*(CpvAccess(endTime)-CpvAccess(startTime))/(2.*nCycles)
-  );
-  CmiPrintf(" CPU: %4d \t%8d \t%8.4g \t%8.4g\n",
-  	    nCycles,CpvAccess(msgSize)-CmiMsgHeaderSizeBytes,
- 	    (CpvAccess(endCTime)-CpvAccess(startCTime))*1e3, 
-  	    1e6*(CpvAccess(endCTime)-CpvAccess(startCTime))/(2.*nCycles)
-    );
-  CpvAccess(sizeNum)++;
+
+  //Print the time for that message size
+  CmiPrintf("Size=%d bytes, time=%lf microseconds one-way\n", 
+             CpvAccess(msgSize)-CmiMsgHeaderSizeBytes, 
+	     (1e6*(CpvAccess(endTime)-CpvAccess(startTime)))/(2.*nCycles));
+
+  
+  //Have we finished all message sizes?
   if (CpvAccess(msgSize) < maxMsgSize)
-    startRing();
-  else 
-  {
-    void *sendmsg = CmiAlloc(CmiMsgHeaderSizeBytes);
-    CmiSetHandler(sendmsg,CpvAccess(exitHandler));
-    CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes,sendmsg);
+      //start the ring again
+      startRing();
+  else {
+      //exit
+      void *sendmsg = CmiAlloc(CmiMsgHeaderSizeBytes);
+      CmiSetHandler(sendmsg,CpvAccess(exitHandler));
+      CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes,sendmsg);
   }
 }
 
+//We finished for all message sizes. Exit now
 CmiHandler exitHandlerFunc(char *msg)
 {
-  CmiFree(msg);
-  CsdExitScheduler();
-  return 0;
+    CmiFree(msg);
+    CsdExitScheduler();
+    return 0;
 }
 
+
+//Handler on Node 0
 CmiHandler node0HandlerFunc(char *msg)
 {
-  CpvAccess(cycleNum)++;
-
-  if (CpvAccess(cycleNum) == nCycles)
-    ringFinished(msg);
-  else
-  {
-    CmiSetHandler(msg,CpvAccess(node1Handler));
-    CmiSyncSendAndFree(1,CpvAccess(msgSize),msg);
-  }
-  return 0;
+    CpvAccess(cycleNum)++;
+    
+    if (CpvAccess(cycleNum) == nCycles) {
+        CpvAccess(endTime) = CmiWallTimer();
+        ringFinished(msg);
+    }
+    else {
+        CmiSetHandler(msg,CpvAccess(node1Handler));
+        *((int *)(msg+CmiMsgHeaderSizeBytes)) = CpvAccess(msgSize);
+        
+        CmiSyncSendAndFree(1,CpvAccess(msgSize),msg);
+    }
+    return 0;
 }
 
 CmiHandler node1HandlerFunc(char *msg)
 {
-  CpvAccess(msgSize) = *((int *)(msg+CmiMsgHeaderSizeBytes));
-  CmiSetHandler(msg,CpvAccess(node0Handler));
-  CmiSyncSendAndFree(0,CpvAccess(msgSize),msg);
-  return 0;
+    CpvAccess(msgSize) = *((int *)(msg+CmiMsgHeaderSizeBytes));
+    CmiSetHandler(msg,CpvAccess(node0Handler));
+    
+    CmiSyncSendAndFree(0,CpvAccess(msgSize),msg);
+    return 0;
 }
 
+
+//Converse main. Initialize variables and register handlers
 CmiStartFn mymain()
 {
-  CmiPrintf("PE %d of %d starting\n",CmiMyPe(),CmiNumPes());
-
-  CpvInitialize(int,msgSize);
-  CpvInitialize(int,cycleNum);
-  CpvInitialize(int,sizeNum);
-  CpvAccess(sizeNum) = 2;	// leave 4 bytes for the size field
-
-  CpvInitialize(int,exitHandler);
-  CpvAccess(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
-  CpvInitialize(int,node0Handler);
-  CpvAccess(node0Handler) = CmiRegisterHandler((CmiHandler) node0HandlerFunc);
-  CpvInitialize(int,node1Handler);
-  CpvAccess(node1Handler) = CmiRegisterHandler((CmiHandler) node1HandlerFunc);
-
-  CpvInitialize(double,startTime);
-  CpvInitialize(double,endTime);
-  CpvInitialize(double,startCTime);
-  CpvInitialize(double,endCTime);
-
-  if (CmiMyPe() == 0)
-    startRing();
-
-  return 0;
+    CpvInitialize(int,msgSize);
+    CpvInitialize(int,cycleNum);
+    
+    CpvAccess(msgSize)= 4 + CmiMsgHeaderSizeBytes;
+    
+    CpvInitialize(int,exitHandler);
+    CpvAccess(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
+    CpvInitialize(int,node0Handler);
+    CpvAccess(node0Handler) = CmiRegisterHandler((CmiHandler) node0HandlerFunc);
+    CpvInitialize(int,node1Handler);
+    CpvAccess(node1Handler) = CmiRegisterHandler((CmiHandler) node1HandlerFunc);
+    
+    CpvInitialize(double,startTime);
+    CpvInitialize(double,endTime);
+    
+    int otherPe = CmiMyPe() ^ 1;
+    
+    
+    if (CmiMyPe() == 0)
+        startRing();
+    
+    return 0;
 }
 
 int main(int argc,char *argv[])
 {
-  ConverseInit(argc,argv,(CmiStartFn)mymain,0,0);
-  return 0;
+    ConverseInit(argc,argv,(CmiStartFn)mymain,0,0);
+    return 0;
 }
