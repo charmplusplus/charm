@@ -1,8 +1,13 @@
 Things to do for Charm++/Converse Release 5.5
 ---------------------------------------------
 * Integrate projections in the distributed source.
-* Make RPMs. Both source and binary.
+* Make RPMs. Both source and binary for intel-net-linux version.
+* Make .exe for the binary version on Win NT (and cygwin?).
 * Move all the data structures headers and sources to util.
 * Check documentation for correctness (mainly see that all example
   programs in the manual work.)
+* Host a bug-tracking system on TBRes.
+* Write a README file that describes how to install from source as well as
+  binary.
+* FEM Framework manual, and AMPI manual to be integrated.
 * Test. Test. Test.
