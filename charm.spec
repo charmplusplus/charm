@@ -40,3 +40,4 @@ cd tmp; make DESTDIR=$RPM_BUILD_ROOT/usr/local/%{name}  install
 %files
 /usr/local/%{name}/*
 %doc README LICENSE CHANGES README.cygwin README.win32
+
