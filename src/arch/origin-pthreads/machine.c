@@ -213,7 +213,6 @@ static void *threadInit(void *arg)
   neighbour_init(CmiMyPe());
   CpvInitialize(void*, CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
-  CmiSpanTreeInit();
   CmiTimerInit();
   if (Cmi_initret==0) {
     Cmi_startFn(Cmi_argc, usrparam->argv);

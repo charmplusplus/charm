@@ -171,7 +171,6 @@ static void threadInit(void *arg)
   ConverseCommonInit(usrparam->argv);
   neighbour_init(Cmi_mype);
   CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
-  CmiSpanTreeInit();
   CmiTimerInit();
   usadd(arena);
   if (usrparam->initret==0) {
