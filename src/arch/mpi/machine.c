@@ -631,13 +631,15 @@ void CmiNotifyIdle(void)
 /* user call to handle immediate message, only useful in non SMP version
    using polling method to schedule message.
 */
+#if CMK_IMMEDIATE_MSG
 void CmiProbeImmediateMsg()
 {
-#if CMK_IMMEDIATE_MSG && !CMK_SMP
+#if !CMK_SMP
   PumpMsgs();
   CmiHandleImmediate();
 #endif
 }
+#endif
 
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
@@ -1165,13 +1167,14 @@ static void ConverseRunPE(int everReturn)
   }
 #endif
 
-  Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
   /* communication thread */
   if (CmiMyRank() == CmiMyNodeSize()) {
+    Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
     while (1) CommunicationServerThread(5);
   }
   else {  /* worker thread */
   if (!everReturn) {
+    Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
     if (Cmi_usrsched==0) CsdScheduler(-1);
     ConverseExit();
   }
