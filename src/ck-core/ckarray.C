@@ -284,8 +284,16 @@ void Array1D::send(ArrayMessage *msg, int index, EntryIndexType ei)
 
 void Array1D::broadcast(ArrayMessage *msg, EntryIndexType ei)
 {
-  CkPrintf("Broadcast not implemented\n");
-  delete msg;
+//Brain-dead broadcast algorithm:
+// linear loop over array elements.
+  for (int i=0;i<numElements;i++)
+  {//Send a copy of the original message
+    void *newMsg=CkCopyMsg((void **)&msg);
+    send((ArrayMessage *)newMsg,i,ei);
+  }
+  //We've only sent off copies of the message, so
+  // delete the original.
+  CkFreeMsg((void *)msg);
 }
 
 void Array1D::RecvForElement(ArrayMessage *msg)
@@ -486,8 +494,11 @@ void Array1D::AckMigratedElement(ArrayElementAckMessage *msg)
       }
       ArrayElementExitMessage *exitmsg = new ArrayElementExitMessage;
       //      CkPrintf("[%d] I want to delete the element %d\n",CkMyPe(),index);
-      CProxy_ArrayElement elem(elementIDs[index].elementHandle);
-      elem.exit(exitmsg);
+ //OSL 2/20/2000-- replaced CProxy_ArrayElement(CkChareId) constructor
+      // with this horrible hack:
+      CkSendMsg(CProxy_ArrayElement::__idx_exit_ArrayElementExitMessage,
+		exitmsg,
+		&elementIDs[index].elementHandle);
       //      CkPrintf("[%d] Element %d deleted\n",CkMyPe(),index);
     }
     elementIDs[index].pe = msg->arrivedAt;

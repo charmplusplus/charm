@@ -97,18 +97,6 @@ class CkArrayID {
 
 typedef CkArrayID CkAID;/* Depricated usage */
 
-class _CK_AID:public CkArrayID {
-  private:
-    int _chare;
-  public:
-    CkChareID _cid;
-    _CK_AID(CkGroupID aid, int elem=-1):CkArrayID(aid,elem) {}
-    _CK_AID() {}
-    void _setCid(CkChareID cid) { _cid = cid; }
-    int _isChare(void) { return _chare; }
-    void _setChare(int c) { _chare = c; }
-};
-
 class CkQdMsg {
   public:
     void *operator new(size_t s) { return CkAllocMsg(0,s,0); }
