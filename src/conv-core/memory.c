@@ -49,6 +49,13 @@ or -1 if nobody has it.  Only set when malloc might be reentered.
 */
 static int rank_holding_CmiMemLock=-1;
 
+/* By default, there are no flags */
+static int CmiMemoryIs_flag=0;
+
+int CmiMemoryIs(int flag)
+{
+	return (CmiMemoryIs_flag&flag)==flag;
+}
 
 /**
  * memory_lifeRaft is a very small heap-allocated region.

@@ -265,6 +265,7 @@ static void status(char *msg) {
 }
 static void meta_init(char **argv)
 {
+  CmiMemoryIs_flag|=CMI_MEMORY_IS_PARANOID;
   CmiArgGroup("Converse","memory-paranoid");
   status("Converse -memory mode: paranoid");
   /*Parse uninitialized-memory-fill options:*/
