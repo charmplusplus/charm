@@ -1366,7 +1366,7 @@ int req_handle_ending(ChMessage *msg,SOCKET fd)
 
 int req_handle_abort(ChMessage *msg,SOCKET fd)
 {
-	fprintf(stderr,"req_handle_abort called \n");
+  /*fprintf(stderr,"req_handle_abort called \n");*/
   if (msg->len==0) 
     fprintf(stderr,"Aborting!\n");
   else
