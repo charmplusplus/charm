@@ -127,11 +127,12 @@ CmiPrintf("start\n");
 
     // check correctness
     int result;
-    if (cnt.reductionNo%3 == 0) {
+    int redno = msg->getRedNo();
+    if (redno%3 == 0) {
       result = 0;
       for (int i=0; i<SECTIONSIZE; i++) result+=i;
     }
-    else if (cnt.reductionNo%3 == 2) {
+    else if (redno%3 == 2) {
       result = 1;
       for (int i=1; i<SECTIONSIZE+1; i++) result*=i;
     }
@@ -139,6 +140,7 @@ CmiPrintf("start\n");
       result = SECTIONSIZE+1;
     }
     if (*(int *)data != result) {
+      CmiPrintf("Expected: %d acual:%d\n", result, *(int *)data);
       CmiAbort("reduction result is wrong!");
     }
   
