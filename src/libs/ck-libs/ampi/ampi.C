@@ -81,12 +81,14 @@ ampiAllReduceHandler(void *arg, void *r_msg)
   CkReductionMsg *msg=(CkReductionMsg *)r_msg;
   
   ampi::bcastraw(msg->getData(), msg->getSize(), commspec->aid);
+  delete msg;
 }
 
 void ampi::reduceResult(CkReductionMsg *msg)
 {
   ampi::sendraw(MPI_REDUCE_TAG, 0, msg->getData(), msg->getSize(), 
              thisArrayID,thisIndex);
+  delete msg;
 }
 
 class MPI_threadstart_t {
