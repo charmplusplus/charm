@@ -717,8 +717,10 @@ void CsdEndIdle(void)
 
 void CmiHandleMessage(void *msg)
 {
-	CpvAccess(cQdState)->mProcessed++;
-	(CmiGetHandlerFunction(msg))(msg);
+/* this is wrong because it counts the Charm++ messages in sched queue
+ 	CpvAccess(cQdState)->mProcessed++;
+*/
+ 	(CmiGetHandlerFunction(msg))(msg);
 }
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
@@ -744,8 +746,11 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 
 void *CsdNextMessage(CsdSchedulerState_t *s) {
 	void *msg;
-	if (NULL!=(msg=CmiGetNonLocal())) return msg;
-	if (NULL!=(msg=CdsFifo_Dequeue(s->localQ))) return msg;
+	if (NULL!=(msg=CmiGetNonLocal()) ||
+            NULL!=(msg=CdsFifo_Dequeue(s->localQ)) ) {
+          CpvAccess(cQdState)->mProcessed++;
+          return msg;
+        }
 #if CMK_NODE_QUEUE_AVAILABLE
 	if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;
 	if (!CqsEmpty(s->nodeQ)
