@@ -136,7 +136,27 @@ be called.  If a thread {\tt Y} calls {\tt CthSuspend}, then thread
 {\tt Y}'s {\tt choosefn} will be called to pick the next thread.)  Of
 course, you may use the same functions for all threads (the common
 case), but the specification on a per-thread basis gives you maximum
-flexibility in controlling scheduling.}
+flexibility in controlling scheduling.
+
+A final caution about the {\tt choosefn}: it may only return a thread
+that wants the CPU, eg, a thread that has been awakened using the {\tt
+awakefn}.  If no such thread exists, if the {\tt choosefn} cannot
+return an awakened thread, then it must not return at all: instead, it
+must wait until, by means of some pending IO event, a thread becomes
+awakened (pending events could be asynchonous disk reads, networked
+message receptions, signal handlers, etc).  For this reason, many
+schedulers perform the task of polling the IO devices as a side
+effect.  If handling the IO event causes a thread to be awakened, then
+the choosefn may return that thread.  If no pending events exist, then
+all threads will remain permanently blocked, the program is therefore
+done, and the {\tt choosefn} should call {\tt exit}.
+
+There is one minor exception to the rule stated above ("the scheduler
+may not resume a thread unless it has been declared that the thread
+wants the CPU using the {\tt awakefn}").  If a thread is a part of the
+scheduling module, it is permitted for it to short-circuit the {\tt
+awakefn}: presumably, the scheduling module has other means of knowing
+when its threads want the CPU.}
 
 \function{void CthYield()}
 \desc{This function is part of the scheduler-interface.  It simply
