@@ -176,6 +176,7 @@ void marshall_moduleinit(void){
 
 /// Send the array element ap[i] a whole set of marshalled messages.
 static void callMarshallElt(const CProxy_marshallElt &ap,int i) {
+     // 1
      ap[i].basic((unsigned char)basicData[0],(char)basicData[1],
 				 (short)basicData[2],(unsigned short)basicData[3],
 				 (int)basicData[4],(unsigned int)basicData[5],
@@ -183,44 +184,44 @@ static void callMarshallElt(const CProxy_marshallElt &ap,int i) {
 				 (float)basicData[8],(double)basicData[9]);
 
      flatStruct f; f.init();
-     ap[i].flatRef(f);
+     ap[i].flatRef(f);			// 2
      pupStruct p; 
      p.init();
-     ap[i].pupped(p);
+     ap[i].pupped(p);			// 3
      pupStruct p2; 
      p2.init(new child);
-     ap[i].puppedSubclass(p2);
+     ap[i].puppedSubclass(p2);		// 4
      
      parent *sub=new child;
-     ap[i].PUPableReference(*sub);
-     ap[i].PUPablePointer(sub);
+     ap[i].PUPableReference(*sub);	// 5
+     ap[i].PUPablePointer(sub);		// 6
      delete sub;
 
      int n=0+13*i*i;
      int *arr=makeArr(1,n,0);
-     ap[i].simpleArray(n,arr);
+     ap[i].simpleArray(n,arr);		// 7
      delete[] arr;
 
      int m=1+i;
      int *arr2=makeArr(2,n*m,0);
-     ap[i].fancyArray(arr2,n,m);
+     ap[i].fancyArray(arr2,n,m);	// 8
      delete[] arr2;
 
      int n1=2+7*i*i,n2=4+i;
      int *a1=makeArr(3,n1,1);
      int *a2=makeArr(4,n2+n,1);
      a1[0]=n2+1; a2[0]=n1+1;
-     ap[i].crazyArray(a1,a2,n);
+     ap[i].crazyArray(a1,a2,n);		// 9
      delete[] a1;
      delete[] a2;
      
      int j;
      msgQ_t q;
-     ap[i].msgQ(0,q);
+     ap[i].msgQ(0,q);			// 10
      const int nQ=2;
      for (j=0;j<nQ;j++)
      	q.enq(makeMsg(5,13+2*j));
-     ap[i].msgQ(nQ,q);
+     ap[i].msgQ(nQ,q);			// 11
      for (j=0;j<nQ;j++)
      	delete q.deq();
 }
