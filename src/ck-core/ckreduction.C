@@ -201,6 +201,8 @@ void CkReductionMgr::contributorLeaving(contributorInfo *ci)
   //He's already contributed to several reductions here
   for (int r=redNo;r<ci->redNo;r++)
     adj(r).lcount++;//He'll be contributing to r here
+
+  finishReduction();
 }
 //Migrating in (note that global count doesn't change)
 void CkReductionMgr::contributorArriving(contributorInfo *ci)
