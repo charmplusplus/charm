@@ -69,7 +69,8 @@ do
 done
 
 Do $get $charm/include/tcharm*.h .
-Do $get $charm/tmp/libs/conv-libs/metis/Lib/*.[ch] .
+# Do $get $charm/tmp/libs/conv-libs/metis/Lib/*.[ch] .
+Do $get $charm/tmp/libs/ck-libs/parmetis/METISLib/*.[ch] .
 Do $get $charm/tmp/libs/ck-libs/idxl/*.[Ch] .
 Do $get $charm/tmp/libs/ck-libs/fem/*.[Ch] .
 
