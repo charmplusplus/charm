@@ -50,16 +50,13 @@ extern void CldModuleInit(void);
 #include <sys/timeb.h>
 #endif
 
+#include "quiescence.h"
+
 /*****************************************************************************
  *
  * Unix Stub Functions
  *
  ****************************************************************************/
-
-#if CMK_STRERROR_USE_SYS_ERRLIST
-extern char *sys_errlist[];
-char *strerror(i) int i; { return sys_errlist[i]; }
-#endif
 
 #ifdef MEMMONITOR
 typedef unsigned long mmulong;
@@ -89,7 +86,7 @@ void  *CmiGetNonLocal();
 void   CmiNotifyIdle();
 
 CpvDeclare(int, disable_sys_msgs);
-CpvExtern(int,    CcdNumChecks) ;
+CpvExtern(int,    CcdCheckNum) ;
 CpvDeclare(void*, CsdSchedQueue);
 #if CMK_NODE_QUEUE_AVAILABLE
 CsvDeclare(void*, CsdNodeQueue);
@@ -674,29 +671,6 @@ void (*handler)();
  *        invokes the message's handler.  Note that unlike CmiDeliverMsgs,
  *        This function _does_ wait.
  *
- * void CmiGrabBuffer(void **bufptrptr)
- *
- *      - When CmiDeliverMsgs or CmiDeliverSpecificMsgs calls a handler,
- *        the handler receives a pointer to a buffer containing the message.
- *        The buffer does not belong to the handler, eg, the handler may not
- *        free the buffer.  Instead, the buffer will be automatically reused
- *        or freed as soon as the handler returns.  If the handler wishes to
- *        keep a copy of the data after the handler returns, it may do so by
- *        calling CmiGrabBuffer and passing it a pointer to a variable which
- *        in turn contains a pointer to the system buffer.  The variable will
- *        be updated to contain a pointer to a handler-owned buffer containing
- *        the same data as before.  The handler then has the responsibility of
- *        making sure the buffer eventually gets freed.  Example:
- *
- * void myhandler(void *msg)
- * {
- *    CmiGrabBuffer(&msg);      // Claim ownership of the message buffer
- *    ... rest of handler ...
- *    CmiFree(msg);             // I have the right to free it or
- *                              // keep it, as I wish.
- * }
- *
- *
  * For this common implementation to work, the machine layer must provide the
  * following:
  *
@@ -711,66 +685,55 @@ void (*handler)();
  *
  *****************************************************************************/
 
+
 CpvDeclare(CmiHandler, CsdNotifyIdle);
 CpvDeclare(CmiHandler, CsdNotifyBusy);
 CpvDeclare(int, CsdStopNotifyFlag);
-CpvStaticDeclare(int, CsdIdleDetectedFlag);
 
-void CsdEndIdle()
+void CsdBeginIdle(void)
 {
-  if(CpvAccess(CsdIdleDetectedFlag)) {
-    CpvAccess(CsdIdleDetectedFlag) = 0;
-    if(!CpvAccess(CsdStopNotifyFlag)) {
-      (CpvAccess(CsdNotifyBusy))();
-    }
-#ifndef CMK_OPTIMIZE
-    if(CpvAccess(traceOn))
-      traceEndIdle();
-#endif
+  if(!CpvAccess(CsdStopNotifyFlag)) {
+    (CpvAccess(CsdNotifyIdle))();
   }
-#if CMK_WEB_MODE
-  usageStart();  
-#endif
-  CcdRaiseCondition(CcdPROCESSORBUSY) ;
-}
-
-void CsdBeginIdle()
-{
-  if (!CpvAccess(CsdIdleDetectedFlag)) {
-    CpvAccess(CsdIdleDetectedFlag) = 1;
-    if(!CpvAccess(CsdStopNotifyFlag)) {
-      (CpvAccess(CsdNotifyIdle))();
-    }
 #ifndef CMK_OPTIMIZE
-    if(CpvAccess(traceOn))
-      traceBeginIdle();
+  if(CpvAccess(traceOn))
+    traceBeginIdle();
 #endif
-  }
 #if CMK_WEB_MODE
   usageStop();  
 #endif
   CmiNotifyIdle();
   CcdRaiseCondition(CcdPROCESSORIDLE) ;
 }
-  
+
+void CsdStillIdle(void)
+{
+  CmiNotifyIdle();
+  CcdRaiseCondition(CcdPROCESSORIDLE) ;
+}
+
+void CsdEndIdle(void)
+{
+  if(!CpvAccess(CsdStopNotifyFlag)) {
+    (CpvAccess(CsdNotifyBusy))();
+  }
+#ifndef CMK_OPTIMIZE
+  if(CpvAccess(traceOn))
+    traceEndIdle();
+#endif
+#if CMK_WEB_MODE
+  usageStart();  
+#endif
+  CcdRaiseCondition(CcdPROCESSORBUSY) ;
+}
+
+
+
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
 
-CtvStaticDeclare(int, CmiBufferGrabbed);
-
-void CmiGrabBuffer(void **bufptrptr)
-{
-  CtvAccess(CmiBufferGrabbed) = 1;
-}
-
-void CmiReleaseBuffer(void *buffer)
-{
-  CmiGrabBuffer(&buffer);
-  CmiFree(buffer);
-}
-
+#if CMK_DEBUG_MODE
 void CmiHandleMessage(void *msg)
 {
-#if CMK_DEBUG_MODE
   CpvExtern(int, freezeModeFlag);
   CpvExtern(int, continueFlag);
   CpvExtern(int, stepFlag);
@@ -782,12 +745,6 @@ void CmiHandleMessage(void *msg)
 
   char *freezeReply;
   int fd;
-
-#endif
-
-  CtvAccess(CmiBufferGrabbed) = 0;
-
-#if CMK_DEBUG_MODE
 
   if(CpvAccess(continueFlag) && (isBreakPoint((char *)msg))) {
 
@@ -851,15 +808,13 @@ void CmiHandleMessage(void *msg)
     free(freezeReply);
     CpvAccess(stepFlag) = 0;
   }
-#endif  
   (CmiGetHandlerFunction(msg))(msg);
-  if (!CtvAccess(CmiBufferGrabbed)) CmiFree(msg);
 }
+#endif  
+
 
 void CmiDeliversInit()
 {
-  CtvInitialize(int, CmiBufferGrabbed);
-  CtvAccess(CmiBufferGrabbed) = 0;
 }
 
 int CmiDeliverMsgs(int maxmsgs)
@@ -877,6 +832,7 @@ int CsdScheduler(int maxmsgs)
   void *localqueue = CpvAccess(CmiLocalQueue);
   int cycle = CpvAccess(CsdStopFlag);
   int pollmode = (maxmsgs==0);
+  int isIdle=0;
   
 #if CMK_DEBUG_MODE
   /* To allow start in freeze state */
@@ -926,23 +882,24 @@ int CsdScheduler(int maxmsgs)
 	  csdMsgFlag = 1;
     }
 #endif
-    if (msg && (!csdMsgFlag)) CQdProcess(CpvAccess(cQdState), 1);
-	if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),(void **)&msg);
+    if (msg && (!csdMsgFlag)) CpvAccess(cQdState)->mProcessed++;
+    if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),(void **)&msg);
     if (msg) {
-      CsdEndIdle();
+      if (isIdle) {isIdle=0;CsdEndIdle();}
       CmiHandleMessage(msg);
       maxmsgs--; if (maxmsgs==0) return maxmsgs;
       if (CpvAccess(CsdStopFlag) != cycle) return maxmsgs;
     } else {
       if(pollmode) return maxmsgs;
-      CsdBeginIdle();
+      if (!isIdle) {isIdle=1;CsdBeginIdle();}
+      else CsdStillIdle();
       if (CpvAccess(CsdStopFlag) != cycle) {
 	CsdEndIdle();
 	return maxmsgs;
       }
     }
-    if (!CpvAccess(disable_sys_msgs))
-      if (CpvAccess(CcdNumChecks) > 0)
+    if (CpvAccess(CcdCheckNum)-- <= 0)
+      if (!CpvAccess(disable_sys_msgs))
         CcdCallBacks();
   }
 }
@@ -960,8 +917,7 @@ int handler;
     else      msg = CdsFifo_Dequeue(localqueue);
     if (msg) {
       if (CmiGetHandler(msg)==handler) {
-	CQdProcess(CpvAccess(cQdState), 1);
-	CsdEndIdle();
+	CpvAccess(cQdState)->mProcessed++;
 	CmiHandleMessage(msg);
 	return;
       } else {
@@ -1135,7 +1091,6 @@ void CsdInit(argv)
 
   CpvAccess(CsdStopFlag)  = 0;
   CpvAccess(CsdStopNotifyFlag) = 1;
-  CpvAccess(CsdIdleDetectedFlag) = 0;
 }
 
 

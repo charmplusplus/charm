@@ -1652,24 +1652,31 @@ CthThread CthPup(pup_er p, CthThread t)
   return 0;
 }
 
-#else
+#else /*Default, stack-on-heap threads*/
 
 #define STACKSIZE (32768)
 static int _stksize = 0;
 
-#if CMK_MEMORY_PROTECTABLE
-
-#include "sys/mman.h"
-#define CthMemAlign(x,n) memalign((x),(n))
-#define CthMemoryProtect(p,l) mprotect(p,l,PROT_NONE)
-#define CthMemoryUnprotect(p,l) mprotect(p,l,PROT_READ | PROT_WRITE)
-
+#ifdef CMK_OPTIMIZE
+#  define CMK_STACKPROTECT 0
 #else
+#  define CMK_STACKPROTECT 1
 
-#define CthMemAlign(x,n) malloc(n)
-#define CthMemoryProtect(p,l) 
-#define CthMemoryUnprotect(p,l)
-#define memalign(m, a) valloc(a)
+#  if CMK_MEMORY_PROTECTABLE
+
+#    include "sys/mman.h"
+#    define CthMemAlign(x,n) memalign((x),(n))
+#    define CthMemoryProtect(p,l) mprotect(p,l,PROT_NONE)
+#    define CthMemoryUnprotect(p,l) mprotect(p,l,PROT_READ | PROT_WRITE)
+
+#  else
+
+#    define CthMemAlign(x,n) malloc(n)
+#    define CthMemoryProtect(p,l) 
+#    define CthMemoryUnprotect(p,l)
+#    define memalign(m, a) valloc(a)
+
+#  endif
 
 #endif
 
@@ -1685,8 +1692,10 @@ struct CthThreadStruct
   int        suspendable;
   int        Event;
   CthThread  qnext;
+#if CMK_STACKPROTECT
   char      *protect;
   int        protlen;
+#endif
   qt_t      *stack;
   qt_t      *stackp;
 };
@@ -1744,8 +1753,10 @@ void CthInit(char **argv)
 
   t = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(t);
+#if CMK_STACKPROTECT
   t->protect = 0;
   t->protlen = 0;
+#endif
   CthThreadInit(t);
   CthCpvAccess(CthData)=0;
   CthCpvAccess(CthCurrent)=t;
@@ -1765,7 +1776,9 @@ CthThread t;
   if (t==CthCpvAccess(CthCurrent)) {
     CthCpvAccess(CthExiting) = 1;
   } else {
+#if CMK_STACKPROTECT
     CthMemoryUnprotect(t->protect, t->protlen);
+#endif
     if (t->data) free(t->data);
     free(t->stack);
     free(t);
@@ -1774,7 +1787,9 @@ CthThread t;
 
 static void *CthAbortHelp(qt_t *sp, CthThread old, void *null)
 {
+#if CMK_STACKPROTECT
   CthMemoryUnprotect(old->protect, old->protlen);
+#endif
   if (old->data) free(old->data);
   free(old->stack);
   free(old);
@@ -1818,8 +1833,12 @@ CthVoidFn fn; void *arg; int size;
 {
   CthThread result; qt_t *stack, *stackbase, *stackp;
   size = (size) ? size : ((_stksize) ? _stksize : STACKSIZE);
+#if CMK_STACKPROTECT
   size = (size+(CMK_MEMORY_PAGESIZE*2)-1) & ~(CMK_MEMORY_PAGESIZE-1);
   stack = (qt_t*)CthMemAlign(CMK_MEMORY_PAGESIZE, size);
+#else
+  stack = (qt_t*)malloc(size);
+#endif
   _MEMCHECK(stack);
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
@@ -1828,6 +1847,7 @@ CthVoidFn fn; void *arg; int size;
   stackp = QT_ARGS(stackbase, arg, result, (qt_userf_t *)fn, CthOnly);
   result->stack = stack;
   result->stackp = stackp;
+#if CMK_STACKPROTECT
   if (stack==stackbase) {
     result->protect = ((char*)stack) + size - CMK_MEMORY_PAGESIZE;
     result->protlen = CMK_MEMORY_PAGESIZE;
@@ -1836,6 +1856,7 @@ CthVoidFn fn; void *arg; int size;
     result->protlen = CMK_MEMORY_PAGESIZE;
   }
   CthMemoryProtect(result->protect, result->protlen);
+#endif
   CthSetStrategyDefault(result);
   return result;
 }

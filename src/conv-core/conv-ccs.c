@@ -570,27 +570,18 @@ void CWebInit(void)
  * Converse Client-Server Functions
  *
  *****************************************************************************/
+ 
+#include "ckhashtable.h"
 
 /*This struct describes a single CCS handler*/
-typedef struct CcsListNode {
-  char name[CCS_MAXHANDLER]; /*CCS handler name*/
-  int hdlr; /*Converse handler index*/
-  struct CcsListNode *next;
-}CcsListNode;
+typedef CkHashtable_c CcsHandlerTable;
+CpvStaticDeclare(CcsHandlerTable, ccsTab);/*Maps handler name to handler index*/
 
-CpvStaticDeclare(CcsListNode*, ccsList);/*Maps handler name to handler index*/
-CpvStaticDeclare(CcsImplHeader,ccsReq);/*CCS requestor*/
+CpvStaticDeclare(CcsImplHeader,ccsReq);/*Identifies CCS requestor (client)*/
 
 void CcsUseHandler(char *name, int hdlr)
 {
-  CcsListNode *list=(CcsListNode *)malloc(sizeof(CcsListNode));
-  CcsListNode *old=CpvAccess(ccsList);
-  if (strlen(name)+1>=CCS_MAXHANDLER)
-    CmiAbort("CCS Handler name too long to register!\n");
-  list->next = old;
-  CpvAccess(ccsList)=list;
-  strcpy(list->name, name);
-  list->hdlr = hdlr;
+  *(int *)CkHashtablePut(CpvAccess(ccsTab),(void *)&name)=hdlr;
 }
 
 int CcsRegisterHandler(char *name, CmiHandler fn)
@@ -656,22 +647,15 @@ static void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
   char *cmsg;
   int reqLen=ChMessageInt(hdr->len);
 /*Look up handler's converse ID*/
+  void *hdlrPtr=CkHashtableGet(CpvAccess(ccsTab),(void *)&(hdr->handler));
   int hdlrID;
-  CcsListNode *list = CpvAccess(ccsList);
-  /*CmiPrintf("CCS: message for handler %s\n", hdr->handler);*/
-  while(list!=0) {
-    if(strncmp(hdr->handler, list->name,CCS_MAXHANDLER)==0) {
-      hdlrID = list->hdlr;
-      break;
-    }
-    list = list->next;
-  }
-  if(list==0) {
+  if (hdlrPtr==NULL) {
     CmiPrintf("CCS: Unknown CCS handler name '%s' requested!\n",
 	      hdr->handler);
     return;
  /*   CmiAbort("CCS: Unknown CCS handler name.\n");*/
   }
+  hdlrID=*(int *)hdlrPtr;
 
 /*Pack user data into a converse message*/
   cmsg = (char *) CmiAlloc(CmiMsgHeaderSizeBytes+reqLen);
@@ -854,8 +838,8 @@ void CHostProcess(void)
 
 void CcsInit(void)
 {
-  CpvInitialize(CcsListNode*, ccsList);
-  CpvAccess(ccsList) = 0;
+  CpvInitialize(CkHashtable_c, ccsTab);
+  CpvAccess(ccsTab) = CkCreateHashtable_string(sizeof(int),5);
   CpvInitialize(CcsImplHeader, ccsReq);
   CpvAccess(ccsReq).ip = ChMessageInt_new(0);
   req_fw_handler_idx = CmiRegisterHandler(req_fw_handler);

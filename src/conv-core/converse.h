@@ -10,6 +10,7 @@
 
 #ifndef _conv_mach_h
 #include "conv-mach.h"
+#include "conv-autoconfig.h"
 #endif
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
@@ -593,8 +594,10 @@ extern void CsdExitScheduler(void);
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)++)
 #endif
 
-void     CmiGrabBuffer(void **ppbuf);
+#define CmiGrabBuffer(x) /*empty*/
+/*void     CmiGrabBuffer(void **ppbuf);
 void     CmiReleaseBuffer(void *pbuf);
+*/
 
 #if CMK_SPANTREE_USE_COMMON_CODE
 
@@ -752,7 +755,12 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 
 int    CmiDeliverMsgs(int maxmsgs);
 void   CmiDeliverSpecificMsg(int handler);
+
+#if !CMK_DEBUG_MODE
+#define CmiHandleMessage(msg) (CmiGetHandlerFunction(msg))(msg)
+#else
 void   CmiHandleMessage(void *msg);
+#endif
 
 /******** CQS: THE QUEUEING SYSTEM ********/
 

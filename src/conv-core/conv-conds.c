@@ -26,6 +26,12 @@ typedef struct {
 } CONDS;
 
 typedef struct {
+	int nSkip;/*Number of opportunities to skip*/
+	double lastCheck;/*Time of last check*/
+	FN_ARG *periodicCalls;
+} occasionalCheck;
+
+typedef struct {
     double timeVal;     /* the actual time value we sort on           */
     CcdVoidFn fn; 
     void *arg; 
@@ -39,10 +45,10 @@ typedef struct {
 
 CpvStaticDeclare(HeapIndexType*, timerHeap); 
 CpvStaticDeclare(CONDS*, CondArr);   
-CpvStaticDeclare(FN_ARG*, PeriodicCalls);
+CpvStaticDeclare(occasionalCheck, ock);
 CpvStaticDeclare(int, numHeapEntries);
 
-CpvDeclare(int, CcdNumChecks);
+CpvDeclare(int, CcdCheckNum);
 
 extern double CmiWallTimer(void);
 
@@ -52,20 +58,22 @@ void CcdModuleInit(void)
 
    CpvInitialize(HeapIndexType*, timerHeap);
    CpvInitialize(CONDS*, CondArr);
-   CpvInitialize(FN_ARG*, PeriodicCalls);
+   CpvInitialize(occasionalCheck, ock);
    CpvInitialize(int, numHeapEntries);
-   CpvInitialize(int, CcdNumChecks);
+   CpvInitialize(int, CcdCheckNum);
 
    CpvAccess(timerHeap) = 
      (HeapIndexType*) malloc(sizeof(HeapIndexType)*(MAXTIMERHEAPENTRIES + 1));
    _MEMCHECK(CpvAccess(timerHeap));
    CpvAccess(CondArr) = (CONDS*) malloc(sizeof(CONDS)*(MAXCONDCHKARRAYELTS));
    _MEMCHECK(CpvAccess(CondArr));
-   CpvAccess(CcdNumChecks) = 0;
    CpvAccess(numHeapEntries) = 0;
-   CpvAccess(PeriodicCalls) = (FN_ARG *) 0;
    for(i=0; i<MAXCONDCHKARRAYELTS; i++)
      CpvAccess(CondArr)[i].fn_arg_list = 0;
+   CpvAccess(CcdCheckNum) = 10;
+   CpvAccess(ock).nSkip = 10;
+   CpvAccess(ock).lastCheck = CmiWallTimer();
+   CpvAccess(ock).periodicCalls = (FN_ARG *) 0;
 }
 
 
@@ -92,9 +100,8 @@ void CcdPeriodicallyCall(CcdVoidFn fnp, void *arg)
   _MEMCHECK(temp);
   temp->fn = fnp;
   temp->arg = arg;
-  temp->next = CpvAccess(PeriodicCalls);
-  CpvAccess(PeriodicCalls) = temp;
-  CpvAccess(CcdNumChecks)++;
+  temp->next = CpvAccess(ock).periodicCalls;
+  CpvAccess(ock).periodicCalls = temp;
 }
 
 /*****************************************************************************
@@ -128,25 +135,34 @@ void CcdCallFnAfter(CcdVoidFn fnp, void *arg, unsigned int deltaT)
 /*****************************************************************************
   If any of the CallFnAfter functions can now be called, call them 
   ****************************************************************************/
-void CcdCallBacks()
-{
-  double currTime;
-  FN_ARG *temp, *next;
-  
-  if ( CpvAccess(numHeapEntries) > 0 ) {
-    currTime = CmiWallTimer();
-    while ((CpvAccess(numHeapEntries) > 0) && 
+static void updateTimerHeap(double currTime) {
+  while ((CpvAccess(numHeapEntries) > 0) && 
            CpvAccess(timerHeap)[1].timeVal < currTime)
-    {
+  {
       (*(CpvAccess(timerHeap)[1].fn))(CpvAccess(timerHeap)[1].arg);
       RemoveFromHeap(1);
-    }
   }
+}
 
-  temp = CpvAccess(PeriodicCalls); 
-  CpvAccess(PeriodicCalls) = 0 ;
+void CcdCallBacks()
+{
+  FN_ARG *temp, *next;
+  occasionalCheck *o=&CpvAccess(ock);
+  
+  /* Figure out how many times to skip Ccd processing */
+  double currTime = CmiWallTimer();
+  double elapsed=currTime-o->lastCheck;
+  if (elapsed>0) /* Try to wait about 5 ms between time checks */
+     o->nSkip=(int)(5.0e-3*o->nSkip/elapsed);
+  else o->nSkip*=2;
+  CpvAccess(CcdCheckNum)=o->nSkip;
+  o->lastCheck=currTime;
+  
+  updateTimerHeap(currTime);
+    
+  temp = o->periodicCalls;
+  o->periodicCalls = 0 ;
   for(; temp; temp = next) {
-    CpvAccess(CcdNumChecks)--;
     (*(temp->fn))(temp->arg);
     next = temp->next ;
     free(temp) ;
@@ -168,7 +184,6 @@ static void InsertInHeap(double theTime, CcdVoidFn fnp, void *arg)
     }
   else 
     {
-      CpvAccess(CcdNumChecks)++;
       CpvAccess(numHeapEntries)++;
       CpvAccess(timerHeap)[CpvAccess(numHeapEntries)].timeVal    = theTime;
       CpvAccess(timerHeap)[CpvAccess(numHeapEntries)].fn = fnp;
@@ -200,7 +215,6 @@ static void RemoveFromHeap(int index)
       SwapHeapEntries(index,CpvAccess(numHeapEntries)); /* put deleted value at end 
 						of heap */
       CpvAccess(numHeapEntries)--;
-      CpvAccess(CcdNumChecks)--;
       if(CpvAccess(numHeapEntries)) 
 	{             /* if any left, then bubble up values */
 	  child = 2 * parent;
