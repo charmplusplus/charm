@@ -113,7 +113,7 @@ public:
   int npes;
   
 public:
-  CkSectionID(): _elems(NULL), _nElems(0) {}
+  CkSectionID(): _elems(NULL), _nElems(0), pelist(0), npes(0) {}
   CkSectionID(const CkSectionID &sid);
   CkSectionID(const CkArrayID &aid, const CkArrayIndexMax *elems, const int nElems);
   void operator=(const CkSectionID &);
