@@ -51,6 +51,7 @@ void foo(void) {
 	printf("Hello, world!\n");
 }
 EOT
+echo "set C++ compiler as: $CMK_CXX"
 test_cxx "whether C++ compiler works" "ok" "no"
 if test $fail -eq 1
 then
