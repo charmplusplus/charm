@@ -598,8 +598,30 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
   return thread;
 }
 
+// reduction client data - preparation for checkpointing
+class ckptClientStruct {
+public:
+  char *dname;
+  ampiParent *ampiPtr;
+  ckptClientStruct(char *s, ampiParent *a): dname(s), ampiPtr(a) {}
+};
+
+static void checkpointClient(void *param,int dataSize,void *data)
+{
+  ckptClientStruct *client = (ckptClientStruct*)param;
+  char *dname = client->dname;
+  ampiParent *ampiPtr = client->ampiPtr;
+  ampiPtr->Checkpoint(strlen(dname), dname);
+  delete client;
+}
+
 void ampiParent::startCheckpoint(char* dname){
-  if(thisIndex==0) thisProxy[thisIndex].Checkpoint(strlen(dname),dname);
+  //if(thisIndex==0) thisProxy[thisIndex].Checkpoint(strlen(dname),dname);
+  if (CkMyPe()==0) {
+	ckptClientStruct *clientData = new ckptClientStruct(dname, this);
+	thisProxy.setReductionClient(checkpointClient,(void *)clientData);
+  }
+  contribute(0, NULL, CkReduction::sum_int);
   thread->stop();
 }
 void ampiParent::Checkpoint(int len, char* dname){
