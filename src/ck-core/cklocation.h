@@ -181,8 +181,10 @@ public:
   
   /** Invoke the given entry method on this element.
    *   Returns false if the element died during the receive.
+   *   If doFree is true, the message is freed after send;
+   *    if false, the message can be reused.
    */
-  CmiBool invokeEntry(CkMigratable *obj,void *msg,int idx);
+  CmiBool invokeEntry(CkMigratable *obj,void *msg,int idx,bool doFree);
 
   virtual RecType type(void);
   virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx);
@@ -262,8 +264,8 @@ public:
 
   /// Execute the given entry method.  Returns false if the element 
   /// deleted itself or migrated away during execution.
-  inline CmiBool ckInvokeEntry(int epIdx,void *msg) 
-	  {return myRec->invokeEntry(this,msg,epIdx);}
+  inline CmiBool ckInvokeEntry(int epIdx,void *msg,bool doFree) 
+	  {return myRec->invokeEntry(this,msg,epIdx,doFree);}
 
 protected:
   /// A more verbose form of abort

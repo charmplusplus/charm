@@ -438,7 +438,7 @@ void CkArrayPrefetch_readFromSwap(FILE *swapfile,void *objptr) {
   //Call the element's migration constructor in-place
   CkpvAccess(CkSaveRestorePrefetch)=1;
   int ctorIdx=_chareTable[elt->thisChareType]->migCtor;
-  elt->myRec->invokeEntry(elt,(CkMigrateMessage *)0,ctorIdx);
+  elt->myRec->invokeEntry(elt,(CkMigrateMessage *)0,ctorIdx,true);
   CkpvAccess(CkSaveRestorePrefetch)=0;
   
   //Restore the element's data from disk:
@@ -716,7 +716,9 @@ CmiBool CkLocRec_local::isObsolete(int nSprings,const CkArrayIndex &idx_)
 	return CmiFalse;
 }
 
-CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,int epIdx) {
+CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
+	int epIdx,bool doFree) 
+{
 	DEBS((AA"   Invoking entry %d on element %s\n"AB,epIdx,idx2str(idx)));
 	CmiBool isDeleted=CmiFalse; //Enables us to detect deletion during processing
 	deletedMarker=&isDeleted;
@@ -730,7 +732,11 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,int epIdx) {
 		    		 ForChareMsg,epIdx,env->array_srcPe(), env->getTotalsize());
 	}
 #endif
-	_entryTable[epIdx]->call(msg, obj);
+	if (doFree) 
+	   CkDeliverMessageFree(epIdx,msg,obj);
+	else /* !doFree */
+	   CkDeliverMessageReadonly(epIdx,msg,obj);
+	
 #ifndef CMK_OPTIMIZE
 	if (msg) { /* Tracing: */
 		if (_entryTable[epIdx]->traceEnabled)
@@ -766,7 +772,7 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type)
 			
 		if (msg->array_hops()>1)
 			myLocMgr->multiHop(msg);
-		return invokeEntry(obj,(void *)msg,msg->array_ep());
+		return invokeEntry(obj,(void *)msg,msg->array_ep(),true);
 	}
 }
 
@@ -1137,7 +1143,7 @@ CmiBool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 	CkMigratable_initInfo &i=CkpvAccess(mig_initInfo);
 	i.locRec=rec;
 	i.chareType=_entryTable[ctorIdx]->chareIdx;
-	if (!rec->invokeEntry(elt,ctorMsg,ctorIdx)) return CmiFalse;
+	if (!rec->invokeEntry(elt,ctorMsg,ctorIdx,true)) return CmiFalse;
 
 #if CMK_OUT_OF_CORE
 	/* Register new element with out-of-core */

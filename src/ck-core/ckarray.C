@@ -665,10 +665,9 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
 {
   int &elBcastNo=getData(el);
   elBcastNo++;
-  void *newMsg=CkCopyMsg((void **)&bcast);
   DEBB((AA"Delivering broadcast %d to element %s\n"AB,elBcastNo,idx2str(el)));
-  int epIdx=((CkArrayMessage *)newMsg)->array_ep();
-  return el->ckInvokeEntry(epIdx,newMsg);
+  int epIdx=bcast->array_ep();
+  return el->ckInvokeEntry(epIdx,bcast,false);
 }
 
 /// Deliver all needed broadcasts to the given local element

@@ -60,12 +60,14 @@ int CkRegisterMsg(const char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack,
 }
 
 extern "C"
-int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx)
+int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
+	int ck_ep_flags)
 {
   if(!__registerDone)
     _registerInit();
   _entryTable[_numEntries] = new EntryInfo(name, call, msgIdx, chareIdx);
   _MEMCHECK(_entryTable[_numEntries]);
+  if (ck_ep_flags & CK_EP_NOKEEP) _entryTable[_numEntries]->noKeep=true;
   return _numEntries++;
 }
 

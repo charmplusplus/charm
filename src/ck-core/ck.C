@@ -223,11 +223,37 @@ extern "C" int CkGetArgc(void) {
 }
 
 /******************** Basic support *****************/
+extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
+{
+  _entryTable[epIdx]->call(msg, obj);
+  if (_entryTable[epIdx]->noKeep)
+  { /* Method doesn't keep/delete the message, so we have to: */
+     CkFreeMsg(msg);
+  }
+}
+extern "C" void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
+{
+  void *deliverMsg;
+  if (_entryTable[epIdx]->noKeep) 
+  { /* Deliver a read-only copy of the message */
+    deliverMsg=(void *)msg;
+  } else 
+  { /* Method needs a copy of the message to keep/delete */
+    void *oldMsg=(void *)msg;
+    deliverMsg=CkCopyMsg(&oldMsg);
+#ifndef CMK_OPTIMIZE
+    if (oldMsg!=msg) 
+      CkAbort("CkDeliverMessageReadonly: message pack/unpack changed message pointer!");
+#endif
+  }
+  _entryTable[epIdx]->call(deliverMsg, obj);
+}
+
 static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
 {
   register void *msg = EnvToUsr(env);
   _SET_USED(env, 0);
-  _entryTable[epIdx]->call(msg, obj);
+  CkDeliverMessageFree(epIdx,msg,obj);
 }
 
 static inline void _invokeEntry(int epIdx,envelope *env,void *obj)

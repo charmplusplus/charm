@@ -128,8 +128,11 @@ typedef void  (*CkCallFnPtr) (void *msg, void *obj);
 
 extern int CkRegisterMsg(const char *name, CkPackFnPtr pack, 
                        CkUnpackFnPtr unpack, CkCoerceFnPtr coerce, size_t size);
+
+#define CK_EP_NOKEEP (1<<2) /* Entry method does not keep passed-in message */
 extern int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, 
-                        int chareIdx);
+                        int chareIdx,int ck_ep_flags);
+
 extern int CkRegisterChare(const char *name, int dataSz);
 extern int CkRegisterMainChare(int chareIndex, int epIndex);
 extern void CkRegisterDefaultCtor(int chareIndex, int ctorEpIndex);
@@ -183,6 +186,9 @@ extern void CkSetRefNum(void *msg, int ref);
 extern int  CkGetRefNum(void *msg);
 extern int  CkGetSrcPe(void *msg);
 extern int  CkGetSrcNode(void *msg);
+
+extern void CkDeliverMessageFree(int epIdx,void *msg,void *object);
+extern void CkDeliverMessageReadonly(int epIdx,const void *msg,void *object);
 
 /******************************************************************************
  *

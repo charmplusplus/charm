@@ -532,7 +532,7 @@ void _initCharm(int unused_argc, char **argv)
 		CkRegisterChare("null", 0);
 		CkIndex_Chare::__idx=CkRegisterChare("Chare", sizeof(Chare));
 		CkIndex_Group::__idx=CkRegisterChare("Group", sizeof(Group));
-		CkRegisterEp("null", (CkCallFnPtr)_nullFn, 0, 0);
+		CkRegisterEp("null", (CkCallFnPtr)_nullFn, 0, 0, 0);
 		_registerCkFutures();
 		_registerCkArray();
 		_registerCkCallback();

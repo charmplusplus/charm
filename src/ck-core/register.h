@@ -14,12 +14,13 @@ class EntryInfo {
     CkCallFnPtr call;
     int msgIdx;
     int chareIdx;
-    bool traceEnabled;
+    bool traceEnabled; /* Charm++ Tracing enabled for this ep (dynamic) */
+    bool noKeep; /* Method doesn't keep message passed in to it (static) */
     CkMarshallUnpackFn marshallUnpack;
 
     EntryInfo(const char *n, CkCallFnPtr c, int m, int ci) : 
       name(n), call(c), msgIdx(m), chareIdx(ci), marshallUnpack(0)
-    { traceEnabled=true; }
+    { traceEnabled=true; noKeep=false; }
 };
 
 class MsgInfo {
