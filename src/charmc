@@ -608,11 +608,8 @@ if ($status) goto failure
 
 # Decide whether or not to add defmain.
 
-if (! { (egrep '^charm_main$' MODULES.TMP.nm >& /dev/null) }) then
-	set MAINOBJ=($CHARMLIB/lib${LIBCLASS}-defmain.o $OBJECTFILES)
-else
-	set MAINOBJ=
-endif
+set MAINOBJ=$CHARMLIB/lib${LIBCLASS}-defmain.o
+if { (egrep '^charm_main$' MODULES.TMP.nm >& /dev/null) } set MAINOBJ=
 
 # Perform final linkage
 
