@@ -70,12 +70,15 @@ void PVT::startPhase()
     SendsAndRecvs->Restructure(estGVT, pvt, POSE_UnsetTS);
   }
 
+  //CkPrintf("[%d] pvt=%d gvt=%d\n", CkMyPe(), pvt, estGVT);
+  int xt;
   if (pvt == POSE_UnsetTS) { // all are idle; find max ovt
     POSE_TimeType maxOVT = POSE_UnsetTS;
     for (i=0; i<end; i++)
       if (objs.objs[i].isPresent()) {
-	if (objs.objs[i].getOVT2() > maxOVT) 
-	  maxOVT = objs.objs[i].getOVT2();
+	xt = objs.objs[i].getOVT2();
+	if (xt > maxOVT)
+	  maxOVT = xt;
       }
     if (maxOVT > estGVT)
       pvt = maxOVT;
@@ -87,8 +90,6 @@ void PVT::startPhase()
   um->optPVT = pvt;
   um->conPVT = conPVT;
   um->runGVTflag = 0;
-
-  //CkPrintf("[%d] PVT reporting pvt=%d.\n", CkMyPe(), pvt);
 
   // send data to GVT estimation
   if (simdone) // transmit final info to GVT on PE 0

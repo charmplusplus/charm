@@ -61,13 +61,28 @@ public:
     // Object is idle; report -1
     if (!(eq->RBevent) && (ec == POSE_UnsetTS) && (worktime == POSE_UnsetTS))
       return POSE_UnsetTS;
-    if (eq->RBevent)  theTime = eq->RBevent->timestamp;
-    if ((ec > POSE_UnsetTS) && ((ec < theTime) || (theTime == POSE_UnsetTS)))  
+    if (eq->RBevent)  {
+      theTime = eq->RBevent->timestamp;
+      if ((ec < theTime) && (ec > POSE_UnsetTS))
+	theTime = ec;
+    }
+    else if (ec > POSE_UnsetTS) {
       theTime = ec;
-    POSE_TimeType maxWork = worktime;
-    if (ovt > maxWork) maxWork = ovt;
-    if ((maxWork < theTime) || (theTime == POSE_UnsetTS)) theTime = maxWork;
-    //CkPrintf("1:theTime=%d ovt=%d wt=%d ec=%d gvt=%d idle=%d\n", theTime, ovt, worktime, ec, gvt, idle);
+      if ((worktime > POSE_UnsetTS) && (worktime < ec) && (ovt < worktime))
+	theTime = worktime;
+      else if ((worktime > POSE_UnsetTS) && (worktime < ec) && (ovt < ec))
+	theTime = ovt;
+      else if ((worktime > POSE_UnsetTS) && (worktime < ec))
+	theTime = ec;
+      else if ((worktime == POSE_UnsetTS) && (ovt < ec))
+	theTime = ec;
+    }
+    else if (worktime > POSE_UnsetTS) {
+      theTime = worktime;
+      if (ovt > worktime)
+	theTime = ovt;
+    }
+    //CkPrintf("theTime=%d ovt=%d wt=%d ec=%d gvt=%d\n", theTime, ovt, worktime, ec, gvt);
     CkAssert((theTime == POSE_UnsetTS) || (theTime >= gvt) ||
 	     (theTime == gvt-1));
     return theTime;
