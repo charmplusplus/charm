@@ -11,7 +11,7 @@ shamelessly stolen from java.util.Hashtable.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef  WIN32
+#ifndef _WIN32
 #include <values.h> //For INTBITS
 #endif
 #include "pup.h"
