@@ -54,7 +54,7 @@ inline void liveVizRequestUnpack(const liveVizRequestMsg *src,T &dest)
 	p|dest;
 	if (p.size()!=src->dataLen) {
 		CkError("liveVizRequestUnpack: client sent %d bytes, but you wanted %d bytes!\n",
-			p.size(), src->dataLen);
+			src->dataLen, p.size());
 		CkAbort("liveVizRequestUnpack size mismatch\n");
 	}
 }
