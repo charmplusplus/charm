@@ -82,8 +82,7 @@ depends:  $(CIFILES)
         for i in $(OBJECTS) ; do \
 	      SRCFILE=`basename $$i .o`.C ; \
               echo "checking dependencies for $$SRCFILE" ; \
-              g++ -MM -Wno-deprecated -I$(CHARMINC) $$SRCFILE | \
-              perl $(CHARMBIN)/dep.pl $(CHARMINC) /usr/include /usr/local >> $(DEPENDFILE); \
+              g++ -MM -Wno-deprecated -I$(CHARMINC) $$SRCFILE >> $(DEPENDFILE); \
               echo '	$$(CHARMC) -o '$$i $$SRCFILE >> $(DEPENDFILE) ; \
         done; 
 
