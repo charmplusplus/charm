@@ -5,9 +5,9 @@
 \title{Bluegene Emulator}
 \version{0.01}
 \credits{Charm++ BlueGene Emulator was developed by Arun Singla, Neelam Saboo
-and Joshua Unger under the guidance of Prof. L. V. Kale. The new Converse BlueGe
-ne Emulator is completely rewritten by Gengbin Zheng. Converse BlueGene 
-Emulator is the only version maintained now.}
+and Joshua Unger under the guidance of Prof. L. V. Kale. The new Converse 
+BlueGene Emulator is completely rewritten by Gengbin Zheng. Converse BlueGene 
+Emulator is the only version under maintenance now.}
 
 \begin{document}
 \maketitle
@@ -35,19 +35,6 @@ $k$ threads (e.g. 200), each with its own integer unit.  The proximity of
 the integer unit with individual memory modules within a chip is not
 currently modeled.
 
-\section{History}
- The first version of BlueGene emulator was first written on Charm++, a 
-parallel object language. The second version of Blue Gene emulator is now 
-completely rewritten on top of Converse instead of Charm++, while the API 
-supported by the original emulator is kept without major changes. The new 
-emulator is implemented on a lower layer communication library - Converse 
-in order to achieve better performance by avoiding the cross layer overhead. 
-Switching to Converse Blue Gene emulator allows further porting of Charm++ 
-parallel language on the emulator. 
-   New features are also added in the Converse Blue Gene emulator including 
-supporting thread-committed messages that can be send to a specific thread 
-in a Blue Gene node; supporting Bluegene node level broadcast. 
-
 The API supported by the emulator can be broken down into several
 components:
 
@@ -69,6 +56,21 @@ future.
 The following sections define the appropriate parts of the API, with
 example programs and instructions for executing them.
 
+\section{History}
+
+The first version of BlueGene emulator was first written on Charm++, a 
+parallel object language. The second version of Blue Gene emulator is now 
+completely rewritten on top of Converse instead of Charm++, while the API 
+supported by the original emulator is kept without major changes. The new 
+emulator is implemented on a lower layer communication library - Converse 
+in order to achieve better performance by avoiding the cross layer overhead. 
+Switching to Converse Blue Gene emulator allows further porting of Charm++ 
+parallel language on the emulator. 
+
+New features are also added in the Converse Blue Gene emulator including 
+supporting thread-committed messages that can be send to a specific thread 
+in a Blue Gene node; supporting Bluegene node level broadcast. 
+
 \section{Blue Gene Programming Environment}
 
 The basic philosophy of the Blue Gene Emulator is to hide intricate details
@@ -81,11 +83,27 @@ Time Stamping, etc are done by the emulator.
 
 \subsection{Blue Gene API: Level 0}
 
-\function{void putMessage(PacketMsg *)}
+\function{void addBgNodeInbuffer(bgMsg *msgPtr, int nodeID)}
 \desc{
-        chip-to-chip communication function, invoked by Blue Gene
-        environment when a node calls sendPacket
-        to put the message in the inBuffer of target node.
+        low-level primitive invoked by Blue Gene emulator to put the 
+        message to the inbuffer queue of a node.
+
+        msgPtr - pointer to the message to be sent to target node; 
+
+        nodeID - node ID of the target node, it is the serial number of a 
+                 bluegene node in the emulator's physical node.
+}
+
+\function{void addBgThreadMessage(bgMsg *msgPtr, int threadID)}
+\desc{
+        add a message to a thread's affinity queue, these messages can be 
+ 	only executed by a specific thread indicated by threadID.
+}
+
+\function{void addBgNodeMessage(bgMsg *msgPtr)}
+\desc{
+	add a message to a node's non-affinity queue, these messages can be 
+	executed by any thread in the node.
 }
 
 \function{boolean checkReady()}
@@ -94,104 +112,106 @@ Time Stamping, etc are done by the emulator.
         message in inBuffer.
 }
 
-\function{PacketMsg *getMessage()}
+\function{bgMsg * getFullBuffer()}
 \desc{
-        invoked by communication thread to retrieve the unattended message
-        in inBuffer.
+	invoked by communication thread to retrieve the unattended message 
+	in inBuffer.
+}
+
+\function{CmiHandler msgHandlerFunc(char *msg)}
+\desc{
+	Handler function type that user can register to handle the message.
+}
+
+\function{void sendPacket(int x, int y, int z, int msgSize,bgMsg *msg)}
+\desc{
+	chip-to-chip communication function. It send a message to Node[x][y][z].
+        
+	bgMsg is the message type with message envelop used internally.
 }
 
 \subsection{Initialization API: Level 1a}
 
-Execution starts at BgInit(Main *), where Blue Gene machine parameters are
-initialized.
+All the functions defined in API Level 0 are used internally for the 
+implementation of bluegene node communication and worker threads.
 
-\function{void CreateBlueGene(CreateBgNodeMsg *msg)}
+From this level, the functions defined are exposed to users to write bluegene
+program on emulator.
+
+Considering that the emulator machine will emulator several Bluegene nodes on
+each physical node, the emulator program define this function 
+\function{BgEmulatorInit(int argc, char **argv)} to initialize each emulator
+node. In this function, user program can define the Bluegene machine size,
+number of communication/worker threads, and check the command line arguments.
+
+The size of the Blue Gene machine being emulated and the number of thread per
+node is determined either by the command line arguments or calling following
+functions:
+
+\function{void BgSetSize(int sx, int sy, int sz)}
 \desc{
-Specifies the machines configuration in CreateBgNodeMsg.
+	set Blue Gene Machine size;
 }
 
-Data required for initialization of Node is specified in a system
-defined type CreateBgNodeMsg.
-
-\begin{alltt}
-        class CreateBgNodeMsg
-        \{
-                public:
-                  int numCTh ;
-                  int numWTh ;
-                  int numBgX ;
-                  int numBgY ;
-                  int numBgZ ;
-        \} ;
-\end{alltt}
-
-\function{int  getNumArgs()}
+\function{void BgSetNumWorkThread(int num)}
 \desc{
-Return the number of command line arguments
+	set number of worker threads per node;
 }
 
-\function{const char** getArgs()}
+\function{void BgSetNumCommThread(int num)}
 \desc{
-Return command line arguments
+	set number of communication threads per node;
 }
 
-\function{typedef void (*BgHandler)(void*)}
+\function{int BgRegisterHandler(BgHandler h)}
 \desc{
-This is type defined in BlueGene.h. It represents a handler function
-that returns nothing and takes a (void *)
+	reister user message handler functions; 
 }
 
-The Runtime system calls BgNodeInit(BgNode *) for each node, where
-application handlers are registered and
-computation is triggered by creating a task at required nodes. The Node
-Variables are encapsulated in a struct
-definition and a pointer to this (node private variable) is returned.
+For each Blue Gene node, the execution starts at 
+\function{BgNodeStart(int argc, char **argv)} called by emulator for each 
+bluegene node, where application handlers can be registered and computation 
+is triggered by creating a task at required nodes.
 
-\function{void  registerHandler(int handlerID, BgHandler h)}
-\desc{
-Register a Handler with each node
-}
+Similar to pthread's thread specifc data, each bluegene node can has its
+own node specific data associated with it. To do this, user need to define its 
+own the Node Specific Variables encapsulated in a struct definition and register
+ the pointer to the data to the emulator by following function:
 
-\function{void addMessage(PacketMsg *msgPtr, int handlerID, int threadCategory)}
-\desc{
-Create a micro-task, specifiy the handler function to be
-used for this message i.e. handlerID, and
-specify the thread category:
-\begin{description}
-\item[1:] a small piece of work that can be done by
-communication thread itself, so NO scheduling overhead.
-\item[0:] a large piece of work, so communication thread
-schedules it for a worker thread
-\end{description}
-}
+\function{void BgSetNodeData(char *data)}
 
-InterNode communication messages are to be inherited from PacketMsg
+To retrieve the node specific data, call:
 
-\begin{alltt}
-        class PacketMsg
-        \{
-            public:
-                  int srcX ;
-                  int srcY ;
-                  int srcZ ;
-                  int destX ;
-                  int destY ;
-                  int destZ ;
-                  int numBytes ;
-                  double sendTime ;
-                  double recvTime ;
-        \} ;
-\end{alltt}
+\function{char *BgGetNodeData();}
 
-After completion of execution, Blue Gene environment invokes a user defined
-function BgFinish().
+After completion of execution, user program invokes a function:
+
+\function{void BgShutdown()}
+
+to terminate the emulator.
 
 \subsection{Handler Function API: Level 1a}
 
-\function{void sendPacket(int x, int y, int z, PacketMsg *msgPtr, int handlerID, int threadCategory)}
+The following functions can be called in user's application program to retrie
+ve the BleneGene machine information, get thread execution time, and perform
+the communication.
+
+\function{void BgGetSize(int *sx, int *sy, int *sz);}
+
+\function{int BgGetNumWorkThread();}
+
+\function{int BgGetNumCommThread();}
+
+\function{int BgGetThreadID();}
+
+\function{double BgGetTime();}
+
+\function{void BgSendPacket(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* data);}
 \desc{
-Sends a PacketMsg pointer to Node[x,y,z] and also specifies the
-handler function to be used for this message ie. handlerID,
+Sends a trunk of data to Node[x,y,z] and also specifies the
+handler function to be used for this message ie. handlerID;
+threadID specifes the desired thread ID to handle the message, ANYTHREAD means
+no preference.
 specify the thread category:
 \begin{description}
 \item[1:] a small piece of work that can be done by
@@ -199,17 +219,6 @@ communication thread itself, so NO scheduling overhead.
 \item[0:] a large piece of work, so communication thread
 schedules it for a worker thread
 \end{description}
-}
-
-\function{void getXYZ(int\& x, int\& y, int\& z)}
-\desc{
-Gets which Blue Gene node do the invoking thread belongs to
-}
-
-\function{double getTime()}
-\desc{
-Returns current time of thread in microseconds (execution time since
-the application started)
 }
 
 
@@ -218,36 +227,28 @@ the application started)
 \subsection{Application Skeleton}
 
 \begin{alltt}
-Handler declarations
-Application specific messages, inherited from PacketMsg
-Struct definitions encapsulating Node (specific) variables
+Handler function prototypes;
+Node specific data type declarations;
 
-void  BgInit(Main *)  function
-  Make a Blue Gene node creation message, CreateBgNodeMsg
-  Initialize number of Communication Threads and 
-    number of Worker Threads per node
-  Initialize number of Blue Gene nodes in X, Y, and Z dimension.
-  Initialize the emulator by calling CreateBlueGene(CreateBgNodeMsg)
+void  BgEmulatorInit(int argc, char **argv)  function
+  Configure bluegene machine parameters including size, number of threads, etc.
+  You also neet to register handlers here.
 
-void *BgNodeInit(BgNode *) function
-  Register handlers, registerHandler(handlerID, handler)
-  Send initialization message packets to node, 
-    addMessage(messagePointer, handlerID)
-  Declare Node Variables (struct) and return a pointer to it.
+void *BgNodeStart(int argc, char **argv) function
+  The usual practice in this function is to send an intial message to trigger 
+  the execution.
+  You can also register node specific data in this function.
 
-void  BgFinish()  function
-  detects Quiescence
-
-Handler Function 1, void handlerName(ThreadInfo *info)
-Hanlder Function 2, void handlerName(ThreadInfo *info)
+Handler Function 1, void handlerName(char *info)
+Hanlder Function 2, void handlerName(char *info)
 ..
-Handler Function N, void handlerName(ThreadInfo *info)
+Handler Function N, void handlerName(char *info)
 
 \end{alltt}
 
 \subsection{Sample Application 1}
 
-\begin{alltt}
+\begin{verbatim}
 /* Application: 
  *   Each node starting at [0,0,0] sends a packet to next node in
  *   the ring order.
@@ -255,99 +256,77 @@ Handler Function N, void handlerName(ThreadInfo *info)
  *   in the ring, the application ends.
  */
 
-#include "BlueGene.h"
-#define  computeID 1
 
-extern "C" void compute(ThreadInfo *) ;
+#include "blue.h"
 
-class MyMsg : public PacketMsg
-\{
-public:
-  int dummy ;
-\} ;
+#define MAXITER 2
 
+int iter = 0;
+int passRingHandler;
 
-void BgInit(Main *main)
-\{
-  int num_comm = 1, num_work = 2;       // default number of communication
-                                        // and worker threads per node
-  int num_args = main->getNumArgs();
-  if (num_args < 4) \{ 
-    // Abort application: insufficient number of arguments
-    CkAbort("Usage: ring <x> <y> <z> [<numCommTh> <numWorkTh>]\verb+\n+"); 
-  \}
+void passRing(char *msg);
 
-  if (num_args > 5) \{ num_work = atoi(main->getArgs()[5]); \}
-  if (num_args > 4) \{ num_comm = atoi(main->getArgs()[4]); \}
+void nextxyz(int x, int y, int z, int *nx, int *ny, int *nz)
+{
+  int numX, numY, numZ;
 
-  CreateBgNodeMsg *bgNodeMsg = new CreateBgNodeMsg;
-  bgNodeMsg->numBgX = atoi(main->getArgs()[1]);
-  bgNodeMsg->numBgY = atoi(main->getArgs()[2]);
-  bgNodeMsg->numBgZ = atoi(main->getArgs()[3]);
-  bgNodeMsg->numCTh = num_comm;
-  bgNodeMsg->numWTh = num_work;
+  BgGetSize(&numX, &numY, &numZ);
+  *nz = z+1; *ny = y; *nx = x;
+  if (*nz == numZ) {
+    *nz = 0; (*ny) ++;
+    if (*ny == numY) {
+      *ny = 0; (*nx) ++;
+      if (*nx == numX) *nx = 0;
+    }
+  }
+}
 
-  main->CreateBlueGene(bgNodeMsg);
-  return;
-\}
+void BgEmulatorInit(int argc, char **argv)
+{
+  passRingHandler = BgRegisterHandler(passRing);
+}
 
-void* BgNodeInit(BgNode *bgNode)
-\{
-  bgNode->registerHandler(computeID, compute) ;
+/* user defined functions for bgnode start entry */
+void BgNodeStart(int argc, char **argv)
+{
+  int x,y,z;
+  int nx, ny, nz;
+  int data, id;
 
-  // trigger computation at Node[0,0,0]
-  if(bgNode->thisIndex.x==0 \&\& bgNode->thisIndex.y==0 \&\& bgNode->thisIndex.z==0)
-  \{
-   MyMsg *msg = new MyMsg ;
-   msg->dummy = 0 ;
-   bgNode->addMessage(msg, computeID, 0) ;
-  \}
-  return NULL;    // No node variables for this example
-\}
+  BgGetXYZ(&x, &y, &z);
+  nextxyz(x, y, z, &nx, &ny, &nz);
+  id = BgGetThreadID();
+  data = 888;
+  if (x == 0 && y==0 && z==0) {
+    BgSendPacket(nx, ny, nz, -1,passRingHandler, LARGE_WORK, 
+				sizeof(int), (char *)&data);
+  }
+}
 
-void BgFinish() \{\}
+/* user write code */
+void passRing(char *msg)
+{
+  int x, y, z;
+  int nx, ny, nz;
+  int id;
+  int data = *(int *)msg;
 
-void compute(ThreadInfo *info)
-\{
-  int i, j, k ;
-  int ni, nj, nk ;
+  BgGetXYZ(&x, &y, &z);
+  nextxyz(x, y, z, &nx, &ny, &nz);
+  if (x==0 && y==0 && z==0) {
+    if (++iter == MAXITER) BgShutdown();
+  }
+  id = BgGetThreadID();
+  BgSendPacket(nx, ny, nz, -1, passRingHandler, LARGE_WORK, 
+				sizeof(int), (char *)&data);
+}
 
-  info->bgNode->getXYZ(i,j,k) ;
-
-  if(i==info->bgNode->numBgX-1 \&\& j==info->bgNode->numBgY-1 \&\& 
-     k==info->bgNode->numBgZ-1)
-  \{
-           ckout << "Exiting" << endl ;
-           info->bgNode->finish() ;
-           return ;
-  \}
-
-  nk = k + 1 ;
-  nj = j ;
-  ni = i ;
-  if( nk==info->bgNode->numBgZ )
-  \{
-          nk = 0 ;
-         nj = j+1 ;
-         if ( nj==info->bgNode->numBgY )
-         \{
-                nj = 0 ;
-                ni = i+1 ;
-                if ( ni==info->bgNode->numBgX ) \{
-                    ni = 0 ;
-                \}
-         \}
-  \}
-  MyMsg *msg = new MyMsg ;
-  msg->dummy = i+j+k ;
-  info->bgNode->sendPacket(ni, nj, nk, msg, computeID, 0) ;
-\}
-\end{alltt}
+\end{verbatim}
 
 
 \subsection{Sample Application 2}
 
-\begin{alltt}
+\begin{verbatim}
 
 /* Application: 
  *   Find the maximum element.
@@ -359,202 +338,259 @@ void compute(ThreadInfo *info)
  *   Reduce max data to origin.
  */
 
-#include "BlueGene.h"
+
+#include <stdlib.h>
+#include "blue.h"
 
 #define A_SIZE 4
 
-#define reduceID                    1
-#define computeMaxID        2
-#define contributeID             3
+#define X_DIM 3
+#define Y_DIM 3
+#define Z_DIM 3
 
-//handler declarations
-void reduce(ThreadInfo *) ;
-void computeMax(ThreadInfo *) ;
-void contribute(ThreadInfo *) ;
+int REDUCE_HANDLER_ID;
+int COMPUTATION_ID;
 
-//Application specifice messages inherited from PacketMsg
-class contributeMsg: public PacketMsg
-\{
+extern "C" void reduceHandler(char *);
+extern "C" void computeMax(char *);
+
+class ReductionMsg {
 public:
-  int max ;
-\} ;
+  int max;
+};
 
-class computeMaxMsg: public PacketMsg
-\{\} ;
+class ComputeMsg {
+public:
+  int dummy;
+};
 
-class reduceMsg: public PacketMsg
-\{\} ;
+void BgEmulatorInit(int argc, char **argv)
+{
+  if (argc < 2) { 
+    CmiAbort("Usage: <program> <numCommTh> <numWorkTh>\n"); 
+  }
 
-//Node variables encapsulated in a struct definition
-typedef struct userDataStruct
-\{
-  int data[A_SIZE] ;
-  int count ;
-\} userData ;
+  /* set machine configuration */
+  BgSetSize(X_DIM, Y_DIM, Z_DIM);
+  BgSetNumCommThread(atoi(argv[1]));
+  BgSetNumWorkThread(atoi(argv[2]));
 
-void BgInit(Main *main)
-\{
-  int num_comm = 1, num_work = 2;       // default number of communication
-and worker threads
-  int num_args = main->getNumArgs();
-  if (num_args < 4) \{ 
-    CkAbort("Usage: maxReduceNV <x> <y> <z> [<numCommTh> <numWorkTh>]\verb+\n+"); 
-  \}
-  if (num_args > 5) \{ num_work = atoi(main->getArgs()[5]); \}
-  if (num_args > 4) \{ num_comm = atoi(main->getArgs()[4]); \}
+  REDUCE_HANDLER_ID = BgRegisterHandler(reduceHandler);
+  COMPUTATION_ID = BgRegisterHandler(computeMax);
 
-  CreateBgNodeMsg *bgNodeMsg = new CreateBgNodeMsg;
-  bgNodeMsg->numBgX = atoi(main->getArgs()[1]);
-  bgNodeMsg->numBgY = atoi(main->getArgs()[2]);
-  bgNodeMsg->numBgZ = atoi(main->getArgs()[3]);
-  bgNodeMsg->numCTh = num_comm;
-  bgNodeMsg->numWTh = num_work;
+}
 
-  main->CreateBlueGene(bgNodeMsg);
-  return;
-\}
+void BgNodeStart(int argc, char **argv) {
+  int x, y, z;
+  BgGetXYZ(&x, &y, &z);
 
-void* BgNodeInit(BgNode *bgNode)
-\{
-  //register handlers
-  bgNode->registerHandler(reduceID, reduce) ;
-  bgNode->registerHandler(computeMaxID, computeMax) ;
-  bgNode->registerHandler(contributeID, contribute) ;
+  ComputeMsg *msg = new ComputeMsg;
+  BgSendLocalPacket(ANYTHREAD, COMPUTATION_ID, LARGE_WORK, 
+			sizeof(ComputeMsg), (char *)msg);
+}
 
-  //triger computer at each node
-  computeMaxMsg *msg = new computeMaxMsg;
-  bgNode->addMessage(msg, computeMaxID, 0);
+void reduceHandler(char *info) {
+  // assumption: THey are initialized to zero?
+  static int max[X_DIM][Y_DIM][Z_DIM];
+  static int num_msg[X_DIM][Y_DIM][Z_DIM];
 
-  //declare node variable and return a pointer
-  userData *ud = new userData ;
-  ud->count = 0 ;
-  for(int i=0; i<A_SIZE; i++)
-   ud->data[i] = 0 ;
+  int i,j,k;
+  int external_max;
 
-  return (void*)ud ;
-\}
+  BgGetXYZ(&i,&j,&k);
+  external_max = ((ReductionMsg *)info)->max;
+  num_msg[i][j][k]++;
 
-void BgFinish()
-\{\}
+  if ((i == 0) && (j == 0) && (k == 0)) {
+    // master node expects 4 messages:
+    // 1 from itself;
+    // 1 from the i dimension;
+    // 1 from the j dimension; and
+    // 1 from the k dimension
+    if (num_msg[i][j][k] < 4) {
+      // not ready yet, so just find the max
+      if (max[i][j][k] < external_max) {
+	max[i][j][k] = external_max;
+      }
+    } else {
+      // done. Can report max data after making last comparison
+      if (max[i][j][k] < external_max) {
+	max[i][j][k] = external_max;
+      }
+      CmiPrintf("The maximal value is %d \n", max[i][j][k]);
+      BgShutdown();
+      return;
+    }
+  } else if ((i == 0) && (j == 0) && (k != Z_DIM - 1)) {
+    // nodes along the k-axis other than the last one expects 4 messages:
+    // 1 from itself;
+    // 1 from the i dimension;
+    // 1 from the j dimension; and
+    // 1 from the k dimension
+    if (num_msg[i][j][k] < 4) {
+      // not ready yet, so just find the max
+      if (max[i][j][k] < external_max) {
+	max[i][j][k] = external_max;
+      }
+    } else {
+      // done. Forwards max data to node i,j,k-1 after making last comparison
+      if (max[i][j][k] < external_max) {
+	max[i][j][k] = external_max;
+      }
+      ReductionMsg *msg = new ReductionMsg;
+      msg->max = max[i][j][k];
+      BgSendPacket(i,j,k-1,ANYTHREAD,REDUCE_HANDLER_ID,LARGE_WORK, 
+				sizeof(ReductionMsg), (char *)msg);
+    }
+  } else if ((i == 0) && (j == 0) && (k == Z_DIM - 1)) {
+    // the last node along the k-axis expects 3 messages:
+    // 1 from itself;
+    // 1 from the i dimension; and
+    // 1 from the j dimension
+    if (num_msg[i][j][k] < 3) {
+      // not ready yet, so just find the max
+      if (max[i][j][k] < external_max) {
+	max[i][j][k] = external_max;
+      }
+    } else {
+      // done. Forwards max data to node i,j,k-1 after making last comparison
+      if (max[i][j][k] < external_max) {
+	max[i][j][k] = external_max;
+      }
+      ReductionMsg *msg = new ReductionMsg;
+      msg->max = max[i][j][k];
+      BgSendPacket(i,j,k-1,ANYTHREAD,REDUCE_HANDLER_ID,LARGE_WORK, 
+				sizeof(ReductionMsg), (char *)msg);
+    }
+  } else if ((i == 0) && (j != Y_DIM - 1)) {
+    // for nodes along the j-k plane except for the last and first row of j,
+    // we expect 3 messages:
+    // 1 from itself;
+    // 1 from the i dimension; and
+    // 1 from the j dimension
+    if (num_msg[i][j][k] < 3) {
+      // not ready yet, so just find the max
+      if (max[i][j][k] < external_max) {
+	max[i][j][k] = external_max;
+      }
+    } else {
+      // done. Forwards max data to node i,j-1,k after making last comparison
+      if (max[i][j][k] < external_max) {
+	max[i][j][k] = external_max;
+      }
+      ReductionMsg *msg = new ReductionMsg;
+      msg->max = max[i][j][k];
+      BgSendPacket(i,j-1,k,ANYTHREAD,REDUCE_HANDLER_ID,LARGE_WORK, 
+				sizeof(ReductionMsg), (char *)msg);
+    }
+  } else if ((i == 0) && (j == Y_DIM - 1)) {
+    // for nodes along the last row of j on the j-k plane,
+    // we expect 2 messages:
+    // 1 from itself;
+    // 1 from the i dimension;
+    if (num_msg[i][j][k] < 2) {
+      // not ready yet, so just find the max
+      if (max[i][j][k] < external_max) {
+	max[i][j][k] = external_max;
+      }
+    } else {
+      // done. Forwards max data to node i,j-1,k after making last comparison
+      if (max[i][j][k] < external_max) {
+	max[i][j][k] = external_max;
+      }
+      ReductionMsg *msg = new ReductionMsg;
+      msg->max = max[i][j][k];
+      BgSendPacket(i,j-1,k,ANYTHREAD,REDUCE_HANDLER_ID,LARGE_WORK, 
+				sizeof(ReductionMsg), (char *)msg);
+    }
+  } else if (i != X_DIM - 1) {
+    // for nodes anywhere the last row of i,
+    // we expect 2 messages:
+    // 1 from itself;
+    // 1 from the i dimension;
+    if (num_msg[i][j][k] < 2) {
+      // not ready yet, so just find the max
+      if (max[i][j][k] < external_max) {
+	max[i][j][k] = external_max;
+      }
+    } else {
+      // done. Forwards max data to node i-1,j,k after making last comparison
+      if (max[i][j][k] < external_max) {
+	max[i][j][k] = external_max;
+      }
+      ReductionMsg *msg = new ReductionMsg;
+      msg->max = max[i][j][k];
+      BgSendPacket(i-1,j,k,ANYTHREAD,REDUCE_HANDLER_ID,LARGE_WORK, 
+				sizeof(ReductionMsg), (char *)msg);
+    }
+  } else if (i == X_DIM - 1) {
+    // last row of i, we expect 1 message:
+    // 1 from itself;
+    if (num_msg[i][j][k] < 1) {
+      // not ready yet, so just find the max
+      if (max[i][j][k] < external_max) {
+	max[i][j][k] = external_max;
+      }
+    } else {
+      // done. Forwards max data to node i-1,j,k after making last comparison
+      if (max[i][j][k] < external_max) {
+	max[i][j][k] = external_max;
+      }
+      ReductionMsg *msg = new ReductionMsg;
+      msg->max = max[i][j][k];
+      BgSendPacket(i-1,j,k,-1,REDUCE_HANDLER_ID,LARGE_WORK, 
+				sizeof(ReductionMsg), (char *)msg);
+    }
+  }
+}
 
-void computeMax(ThreadInfo *info)
-\{
+void computeMax(char *info) {
   int A[A_SIZE][A_SIZE];
   int i, j;
   int max = 0;
 
-  int x,y,z;
-  info->bgNode->getXYZ(x,y,z);
+  int x,y,z; // test variables
+  BgGetXYZ(&x,&y,&z);
 
-  // Initialize data in each node
-  for (i=0;i<A_SIZE;i++)
-    for (j=0;j<A_SIZE;j++)
-      A[i][j] = info->bgNode->numBgX * info->bgNode->numBgY * 
-                info->bgNode->numBgZ - x*y*z - i*j ;
+  // Initialize
+  for (i=0;i<A_SIZE;i++) {
+    for (j=0;j<A_SIZE;j++) {
+      A[i][j] = i*j;
+    }
+  }
+
+//  CmiPrintf("Finished Initializing %d %d %d!\n",  x , y , z);
 
   // Find Max
-  for (i=0;i<A_SIZE;i++)
-    for (j=0;j<A_SIZE;j++)
-      if (max < A[i][j])
-      \{
-             max = A[i][j];
-      \}
+  for (i=0;i<A_SIZE;i++) {
+    for (j=0;j<A_SIZE;j++) {
+      if (max < A[i][j]) {
+	max = A[i][j];
+      }
+    }
+  }
 
-  // contribute the results for reduction
-  contributeMsg *msg = new contributeMsg;
+  // prepare to reduce
+  ReductionMsg *msg = new ReductionMsg;
   msg->max = max;
-  info->bgNode->addMessage(msg,contributeID,1);
+  BgSendLocalPacket(ANYTHREAD, REDUCE_HANDLER_ID, LARGE_WORK, 
+				sizeof(ReductionMsg), (char *)msg);
 
-  ckout << "computeMax in " << x << ", " << y << ", " << z << endl;
-  ckout << "contributed max value " << max << endl;
-\}
+//  CmiPrintf("Sent reduce message to myself with max value %d\n", max);
+}
 
-void contribute(ThreadInfo *info)
-\{
-  int x,y,z;
-  info->bgNode->getXYZ(x,y,z);
 
-  // Accessing node variables : get number of data values received at this node
-  int count = ((userData*)(info->bgNode->nvData))->count++ ;
-  // Store new contribution to node variables
-  ((userData*)(info->bgNode->nvData))->data[count++] =
-((contributeMsg*)(info->msg))->max ;
-
- // Compute the required Count of data values at each node to start reduction 
- // at that node, depends on reduction sequence
-  int reqCount ;
-
-  if(z==info->bgNode->numBgZ-1)
-  \{
-         reqCount = 1 ;
-  \}
-  else if(z>0 || (z==0 \&\& x==info->bgNode->numBgX-1))
-  \{
-         reqCount = 2 ;
-  \}
-  else if(x>0 || (x==0 \&\& y==info->bgNode->numBgY-1))
-  \{
-         reqCount = 3 ;
-  \}
-  else
-         reqCount = 4 ;
-
-  if(count==reqCount)     //if data for reduction is ready
-  \{
-       reduceMsg *msg = new reduceMsg ;
-       info->bgNode->addMessage(msg, reduceID, 0) ;
-       ckout << "contribute in Node " << x << ", " << y << ", " << z << endl;
-       ckout << "Values collected " << count << ", calling reduction " << endl;
-       return ;
-  \}
-
-  ckout << "contribute in Node " << x << ", " << y << ", " << z << endl ;
-  ckout << "Values collected " << count << ", reqCount " << reqCount << endl;
-\}
-
-void reduce(ThreadInfo *info)
-\{
-  int x,y,z;
-  info->bgNode->getXYZ(x,y,z);
-  ckout << "reduce in " << x << ", " << y << ", " << z << endl;
-
-  //do reduction
-  int max = 0 ;
-  int count = ((userData*)(info->bgNode->nvData))->count ;
-  for(int i=0; i<count; i++)
-  \{
-           if(max<((userData*)(info->bgNode->nvData))->data[i])
-           max = ((userData*)(info->bgNode->nvData))->data[i] ;
-  \}
-
-  if(x==0 \&\& y==0 \&\& z==0)
-  \{
-         ckout << "Exiting: max value is " << max << endl ;
-         info->bgNode->finish() ;
-         return ;
-  \}
-
-  //send max to destination, depends on reduction sequence
-  if(z>0)
-   z-- ;
-  else if(x>0)
-   x-- ;
-  else
-   y-- ;
-
-  contributeMsg *msg = new contributeMsg;
-  msg->max = max;
-  info->bgNode->sendPacket(x,y,z,msg,contributeID,1);
-
-  ckout << "sending max value " << max << " to " << x << ", " << y << ", " << z << endl ;
-\}
-\end{alltt}
+\end{verbatim}
 
 \section{Compiling and Running}
 
+BlueGene Emulator now is integrated into Charm++ distribution as a runtime 
+library. Download Charm++ from Charm++ website and install properly before 
+using Bluegene emulator.
+
 Compile Blue Gene emulator programs using {\tt charmc} as one would
-in the case of normal \charmpp{} programs. In order to link the
-Blue Gene programs, use \texttt{-language bluegene} as an argument
+in the case of compiling normal \charmpp{} programs. In order to link the
+Blue Gene library, specify \texttt{-language bluegene} as an argument
 to the {\tt charmc} linker.
 
 \input{index}
