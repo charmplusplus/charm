@@ -70,7 +70,7 @@ Since there are normally several of these threads per processor,
 any code that runs in the parallel context has to be thread-safe.
 However, \tcharm{} 
 is non-preemptive, so it will only switch threads when you make
-a blocking call, like ``MPI\_Recv" or ``FEM\_Update\_Field".
+a blocking call, like ``MPI\_Recv" or ``FEM\_Update\_field".
 
 
 
@@ -310,19 +310,19 @@ the routine below.  An arbitrary number of blocks can be registered
 in this fashion.
 
 \vspace{0.2in}
-\function{void TCharmRegister(void *block, TCharmPupFn pup\_fn)}
-\function{SUBROUTINE tcharm\_register(block,pup\_fn)}
+\function{void TCHARM\_Register(void *block, TCharmPupFn pup\_fn)}
+\function{SUBROUTINE TCHARM\_Register(block,pup\_fn)}
     \args{TYPE(varies), POINTER :: block}
     \args{SUBROUTINE :: pup\_fn}
 
      Associate the given data block and pup function.  Can only be
      called from the parallel context.  For the declarations above, you call
-     \kw{TCharmRegister} as:
+     \kw{TCHARM\_Register} as:
 
 \begin{alltt}
           /*In C/C++ driver() function*/
           my_block m;
-          TCharmRegister(m,(TCharmPupFn)pup_my_block);
+          TCHARM_Register(m,(TCharmPupFn)pup_my_block);
  
           !- In Fortran driver subroutine
           use my_block_mod
@@ -334,21 +334,21 @@ in this fashion.
             end subroutine
           end interface
           TYPE(my_block) :: m
-          call TCharmRegister(m,pup_my_block)
+          call TCHARM_Register(m,pup_my_block)
 \end{alltt}
 
      Note that the data block must be allocated on the stack.
 
 \vspace{0.2in}
-\function{void TCharmMigrate()}
-\function{subroutine TCharmMigrate()}
+\function{void TCHARM\_Migrate()}
+\function{subroutine TCHARM\_Migrate()}
 
      Informs the load balancing system that you are ready to be
      migrated, if needed.  If the system decides to migrate you, the
-     pup function passed to \kw{TCharm\_Register} will first be called with 
+     pup function passed to \kw{TCHARM\_Register} will first be called with 
      a sizing pupper, then a packing, deleting pupper.  Your stack and pupped
      data will then be sent to the destination machine, where your pup
-     function will be called with an unpacking pupper.  \kw{TCharm\_Migrate}
+     function will be called with an unpacking pupper.  \kw{TCHARM\_Migrate}
      will then return.  Can only be called from in the parallel context.
 
 
@@ -410,8 +410,8 @@ You register your global variable pup routine using the method below.
 Multiple pup routines can be registered the same way.
 
 \vspace{0.2in}
-\function{void TCharmReadonlyGlobals(TCharmPupGlobalFn pup\_fn)}
-\function{SUBROUTINE tcharm\_readonly\_globals(pup\_fn)}
+\function{void TCHARM\_Readonly\_globals(TCharmPupGlobalFn pup\_fn)}
+\function{SUBROUTINE TCHARM\_Readonly\_globals(pup\_fn)}
     \args{SUBROUTINE :: pup\_fn}
 
 
@@ -425,8 +425,7 @@ to use AMPI communication inside a finite element method solver.
 
 You specify how you want the frameworks to be combined by writing
 a special setup routine that runs when the program starts.
-The setup routine must be named TCharmUserSetup if written in C, 
-or tcharm\_user\_setup if written in Fortran.  If you declare a 
+The setup routine must be named TCHARM\_User\_setup.  If you declare a 
 user setup routine, the standard framework setup routines (such
 as the FEM framework's \kw{init} routine) are bypassed, and you
 do all the setup in the user setup routine.
@@ -439,17 +438,16 @@ thread cannot have two attached AMPI frameworks, since the MPI\_COMM\_WORLD
 for such a thread would be indeterminate.
 
 \vspace{0.2in}
-\function{void TCharmCreateThreads(int nThreads, TCharmThreadStartFn thread\_fn)}
-\function{SUBROUTINE tcharm\_create\_threads(nThreads,thread\_fn)}
+\function{void TCHARM\_Create\_threads(int nThreads, TCharmThreadStartFn thread\_fn)}
+\function{SUBROUTINE TCHARM\_Create\_threads(nThreads,thread\_fn)}
     \args{INTEGER, INTENT(in) :: nThreads}
     \args{SUBROUTINE :: thread\_fn}
 
 Create a new set of \tcharm{} threads of the given size.  The threads will
 execute the given function, which is normally your user code.  
-You should call \kw{TCharmGetNumChunks()} (in Fortran, 
-\kw{tcharm\_get\_num\_chunks()})
+You should call \kw{TCHARM\_Get\_num\_chunks()} 
 to get the number of threads from the command line.  This routine can 
-only be called from your \kw{TCharmUserSetup} routine.
+only be called from your \kw{TCHARM\_User\_setup} routine.
 
 You then attach frameworks to the new threads.  The order in which
 frameworks are attached is irrelevant, but attach commands always apply
@@ -484,9 +482,9 @@ routine called \uw{myDriver} would be:
      #include "fem.h"
      
      /* Called to start the program */
-     void TCharmUserSetup(void)
+     void TCHARM\_User\_setup(void)
      \{
-         TCharmCreateThreads(TCharmGetNumChunks(),myDriver);
+         TCHARM\_Create\_threads(TCHARM\_Get\_num\_chunks(),myDriver);
          MPI\_Attach("myAMPIFEM");        
          ... Usual FEM_Set calls, as normally made from init() ...
          FEM\_Attach(0);
