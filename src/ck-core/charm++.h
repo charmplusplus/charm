@@ -89,6 +89,13 @@ public:
 		prioBits=0;
 		prioPtr=NULL;
 	}
+
+	~CkEntryOptions() {
+		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {
+			delete [] prioPtr;
+			prioBits = 0;
+		}
+	}
 	
 	inline void setPriority(prio_t integerPrio) {
 		queueingtype=CK_QUEUEING_IFIFO;
@@ -99,14 +106,14 @@ public:
 	inline void setPriority(int prioBits_,const prio_t *prioPtr_) {
 		queueingtype=CK_QUEUEING_BFIFO;
 		prioBits=prioBits_;
-		prioPtr=prioPtr_;
+		int dataLength = (prioBits + (sizeof(prio_t)*8 - 1)) /
+		                 (sizeof(prio_t)*8);
+		prio_t *tmp = new prio_t[dataLength];
+		memcpy(tmp, prioPtr_, dataLength);
+		prioPtr=tmp;
 	}
-	inline void setPriority(CkBitVector prioBitVector_) {
-		queueingtype=CK_QUEUEING_BFIFO;
-		prioBits = prioBitVector_.usedBits;
-		prio_t *tmp = new prio_t[prioBitVector_.dataLength];
-		memcpy(tmp, prioBitVector_.data, prioBitVector_.dataLength*sizeof(prio_t));
-		prioPtr = tmp;
+	inline void setPriority(const CkBitVector &prioBitVector_) {
+		setPriority(prioBitVector_.usedBits, prioBitVector_.data);
 	}
 	
 	inline void setQueueing(int queueingtype_) {queueingtype=queueingtype_;}
