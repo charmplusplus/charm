@@ -382,6 +382,9 @@ static ampi *ampiInit(char **argv)
   if (CtvAccess(ampiInitDone)) return NULL; /* Already called ampiInit */
   STARTUP_DEBUG("ampiInit> begin")
 
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_START(NULL, "AMPI_INIT_START");
+#endif
   // Parse command-line arguments (Commlib)
   int strat = USE_MESH;
   char *comlibStrat;
@@ -436,6 +439,9 @@ static ampi *ampiInit(char **argv)
         //strategy->setDestArray(parent.ckGetArrayID());
 #endif
   }
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_SUSPEND();
+#endif
   int *barrier = (int *)TCharm::get()->semaGet(AMPI_BARRIER_SEMAID);
   if (TCHARM_Element()==0)
   {
@@ -461,6 +467,9 @@ static ampi *ampiInit(char **argv)
   ampi *ptr=(ampi *)TCharm::get()->semaGet(AMPI_TCHARM_SEMAID);
   CtvAccess(ampiInitDone)=1;
   STARTUP_DEBUG("ampiInit> complete")
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_START(ptr->getThread(), "AMPI_AMPI_START");
+#endif
 
   return ptr;
 }
@@ -1181,6 +1190,11 @@ void
 ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 {
   _LOG_E_END_AMPI_PROCESSING(thisIndex)
+#if CMK_BLUEGENE_CHARM
+  void *curLog;		// store current log in timeline
+  _TRACE_BG_TLINE_END(&curLog);
+  TRACE_BG_AMPI_SUSPEND();
+#endif
 
   if(isInter()){
     s = myComm.getIndexForRemoteRank(s);
@@ -1219,9 +1233,13 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
     count = msg->length/(ddt->getSize(1));
   }
   ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
-  delete msg;
 
   _LOG_E_BEGIN_AMPI_PROCESSING(thisIndex,s,count)
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_RESUME(thread->getThread(), msg, "RECV_RESUME", curLog);
+#endif
+
+  delete msg;
 }
 
 void
@@ -1321,7 +1339,13 @@ static AmpiRequestList *getReqs(void) {
 CDECL void MPI_Migrate(void)
 {
   AMPIAPI("MPI_Migrate");
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_SUSPEND();
+#endif
   TCHARM_Migrate();
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_MIGRATE")
+#endif
 }
 
 CDECL int MPI_Init(int *p_argc, char*** p_argv)
@@ -1402,6 +1426,9 @@ CDECL
 int MPI_Finalize(void)
 {
   AMPIAPI("MPI_Finalize");
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_SUSPEND();
+#endif
   MPI_Exit(0);
   return 0;
 }
@@ -1905,7 +1932,11 @@ CDECL
 double MPI_Wtime(void)
 {
   AMPIAPI("MPI_Wtime");
+#if CMK_BLUEGENE_CHARM
+  return BgGetTime();
+#else
   return TCHARM_Wall_timer();
+#endif
 }
 
 CDECL
@@ -1948,12 +1979,18 @@ int PersReq::wait(MPI_Status *sts){
 	if(sndrcv == 2) {
 		getAmpiInstance(comm)->recv(tag, src, buf, count,
 				type, comm, (int*)sts);
+#if CMK_BLUEGENE_CHARM
+  		_TRACE_BG_TLINE_END(&event);
+#endif
 	}
 	return 0;
 }
 int IReq::wait(MPI_Status *sts){
 	getAmpiInstance(comm)->recv(tag, src, buf, count,
 			type, comm, (int*)sts);
+#if CMK_BLUEGENE_CHARM
+  	_TRACE_BG_TLINE_END(&event);
+#endif
 	return 0;
 }
 int ATAReq::wait(MPI_Status *sts){
@@ -1961,7 +1998,14 @@ int ATAReq::wait(MPI_Status *sts){
 	for(i=0;i<count;i++){
 		getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
 				myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int *)sts);
+#if CMK_BLUEGENE_CHARM
+  		_TRACE_BG_TLINE_END(&myreqs[i].event);
+#endif
 	}
+#if CMK_BLUEGENE_CHARM
+  	TRACE_BG_AMPI_NEWSTART(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "ATAReq", myreqs[i].event, count);
+  	_TRACE_BG_TLINE_END(&event);
+#endif
 	return 0;
 }
 
@@ -1985,6 +2029,10 @@ int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts)
   for(int i=0;i<count;i++) {
     MPI_Wait(&request[i], sts+i);
   }
+#if CMK_BLUEGENE_CHARM
+  // in Blue Gene simulator, setup forward and backward dependence
+  TRACE_BG_AMPI_WAITALL();
+#endif
   return 0;
 }
 

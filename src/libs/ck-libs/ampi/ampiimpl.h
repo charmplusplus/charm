@@ -315,6 +315,10 @@ Represents an MPI request that has been initiated
 using Isend, Irecv, Ialltoall, Send_init, etc.
 */
 class AmpiRequest {
+#if CMK_BLUEGENE_CHARM
+public:
+	void *event;	// the event point that corresponding to this message
+#endif
 protected:
 	bool isvalid;
 public:
@@ -369,6 +373,7 @@ public:
 };
 
 class IReq : public AmpiRequest {
+private:
 	void *buf;
 	int count;
 	int type;
@@ -395,6 +400,9 @@ class ATAReq : public AmpiRequest {
 		int src;
 		int tag;
 		int comm;
+#if CMK_BLUEGENE_CHARM
+		void *event;             // event buffered for the request
+#endif
 	friend class ATAReq;
 	};
 	Request *myreqs;
@@ -901,8 +909,6 @@ class ampi : public CBase_ampi {
     static void sendraw(int t, int s, void* buf, int len, CkArrayID aid,
                         int idx);
     void delesend(int t, int s, const void* buf, int count, int type,  int rank, MPI_Comm destcomm, CProxy_ampi arrproxy);
-    AmpiMsg *recvMsg(int t,int s,void* buf,int count,int type,int comm,int *sts);
-    void recvNoTrace(int t,int s,void* buf,int count,int type,int comm,int *sts=0);
     void recv(int t,int s,void* buf,int count,int type,int comm,int *sts=0);
     void probe(int t,int s,int comm,int *sts);
     int iprobe(int t,int s,int comm,int *sts);
