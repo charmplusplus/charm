@@ -26,17 +26,26 @@ $(COMPAT):
 	        $(CHARMC) -c $$file || exit 1; \
 	done
 
-.C.o:
-	$(CHARMC) -c $<
+fem.o: fem.C $(HEADDEP)
+	$(CHARMC) -c fem.C
 
-fem.o: $(HEADDEP)
-partition.o: $(HEADDEP)
-map.o: $(HEADDEP)
-symmetries.o: $(HEADDEP)
-datatype.o: $(HEADDEP)
+partition.o: partition.C $(HEADDEP)
+	$(CHARMC) -c partition.C
+
+map.o: map.C $(HEADDEP)
+	$(CHARMC) -c map.C
+
+symmetries.o: symmetries.C $(HEADDEP)
+	$(CHARMC) -c symmetries.C
+
+datatype.o: datatype.C $(HEADDEP)
+	$(CHARMC) -c datatype.C
 
 fem.decl.h fem.def.h: fem.ci
 	$(CHARMC) fem.ci
+
+call_init.o: call_init.c
+	$(CHARMC) -c call_init.c
 
 clean:
 	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) headers
