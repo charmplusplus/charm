@@ -27,7 +27,7 @@ Developed by Sameer Kumar
 #define QSNETLIBS_VERSION_CODE          QSNETLIBS_VERSION(1,3,0)
 #endif
 
-#define MAX_QLEN 100
+#define MAX_QLEN 1000
 #define MAX_BYTES 1000000
 
 #define USE_SHM 1
@@ -65,14 +65,14 @@ int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages
                                           which need pre posted receives
                                           Message sizes greater will be 
                                           probe received adding 5us overhead*/
-#define SYNC_MESSAGE_SIZE MID_MESSAGE_SIZE  
+#define SYNC_MESSAGE_SIZE MID_MESSAGE_SIZE * 10
                              /* Message sizes greater will be 
                                 sent synchronously thus avoiding copying*/
 
 #define NON_BLOCKING_MSG  16     /* Message sizes greater 
                                     than this will be sent asynchronously*/
-#define RECV_MSG_Q_SIZE 8
-#define MID_MSG_Q_SIZE  4
+#define RECV_MSG_Q_SIZE 20
+#define MID_MSG_Q_SIZE  8
 
 ELAN_EVENT *esmall[RECV_MSG_Q_SIZE], *emid[MID_MSG_Q_SIZE], *elarge;
 
@@ -779,9 +779,6 @@ void CmiPing() {
     ElanSendQueuedMessages();
 }
 
-void elan_machine_broadcast(int size, void *buffer, int src){
-    elan_bcast( elan_base->allGroup, buffer, size, src, 0); 
-}
 
 void enableBlockingReceives(){
     blockingReceiveFlag = 1;
@@ -1320,6 +1317,7 @@ static void ConverseRunPE(int everReturn)
   }
 }
 
+//fast low level global barrier
 void elan_barrier(){
     
     while(!CmiReleaseSentMessages() || cur_unsent) {
@@ -1328,6 +1326,58 @@ void elan_barrier(){
     }   
     
     elan_gsync(elan_base->allGroup);
+}
+
+//synchronous fast hardware broadcast
+//size = size of the message to be broadcast
+//buffer = address of the message
+//root = root and source of the broadcast
+void elan_machine_broadcast(int size, void *buffer, int root) {
+    
+    while(!CmiReleaseSentMessages() || cur_unsent) {
+        PumpMsgs(0);
+        ElanSendQueuedMessages();
+    }   
+    
+    elan_bcast(elan_base->allGroup, buffer, size, root, 0); 
+}
+
+typedef void (* ELAN_REDUCER)(void *in, void *inout, int *count, void *handle);
+
+//nelem = number of elements
+//size = size of data type
+//data = data to be reduced
+//fn = function pointer of the function which will do the reduction
+//dest = destination buffer where data is finally stored on all processors
+void elan_machine_allreduce(int nelem, int size, void * data, void *dest, ELAN_REDUCER fn){
+    
+    while(!CmiReleaseSentMessages() || cur_unsent) {
+        PumpMsgs(0);
+        ElanSendQueuedMessages();
+    }   
+    
+    //ELAN reduction call here
+    elan_reduce (elan_base->allGroup, data, dest, size, nelem, fn, NULL, 0, 0, ELAN_RESULT_ALL|elan_base->group_flags, 0);
+}
+
+//nelem = number of elements
+//size = size of data type
+//data = data to be reduced
+//fn = function pointer of the function which will do the reduction
+//dest = destination buffer where data is finally stored, NULL on all non root processors
+//root = root of the reduction where the data will be returned
+void elan_machine_reduce(int nelem, int size, void * data, void *dest, ELAN_REDUCER fn, int root){
+    
+    while(sent_msgs || cur_unsent) {
+        CmiReleaseSentMessages();
+        PumpMsgs(0);
+        ElanSendQueuedMessages();
+    }   
+    
+    printf("Machine Called Reduce %d\n", sent_msgs);
+
+    //ELAN reduction call here
+    elan_reduce (elan_base->allGroup, data, dest, size, nelem, fn, NULL, 0, 0, 0xfffffff8, root);
 }
 
 void *elan_CmiAlloc(int size){
@@ -1476,7 +1526,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     exit (1);
   }
   
-  nslots = 16; //elan_base->tport_nslots * 2;
+  nslots = elan_base->tport_nslots * 2;
   
   //if(nslots < elan_base->state->nvp)
   //  nslots = elan_base->state->nvp;
@@ -1491,7 +1541,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 				   //MID_MESSAGE_SIZE, 
                                    elan_base->tport_bigmsg,
 #if QSNETLIBS_VERSION_CODE > QSNETLIBS_VERSION(1,4,1)
-	 			   elan_base->tport_stripemsg,
+	 			   10000000, //elan_base->tport_stripemsg,
 #endif
 				   elan_base->waitType, elan_base->retryCount,
 				   &(elan_base->shm_key),
@@ -1588,9 +1638,9 @@ CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
 }
 
 extern void CmiReference(void *blk);
-#if 0
+#if 1
 #define ELAN_BUF_SIZE MID_MESSAGE_SIZE
-#define USE_NIC_MULTICAST 0
+#define USE_NIC_MULTICAST 1
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {  
     static int ppn = 0;
