@@ -12,6 +12,11 @@
 #include "converse.h"
 #include <mpi.h>
 
+#ifndef _WIN32
+#include <sys/time.h>
+#include <sys/resource.h>           /* for setpriority */
+#endif
+
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
 #  warning "   Try doing an 'rm charm/include/mpi.h' and building again."
@@ -152,7 +157,7 @@ char *CopyMsg(char *msg, int len)
 #if CMK_TIMER_USE_SPECIAL
 
 /* MPI calls are not threadsafe, even the timer on some machines */
-static CmiNodeLock  timerLock = NULL;
+static CmiNodeLock  timerLock = 0;
 
 void CmiTimerInit(void)
 {
@@ -460,7 +465,10 @@ static void PumpMsgsBlocking(void)
   CmiPrintf("[%d] PumpMsgsBlocking. \n", CmiMyPe());
 #endif
 
-  if (buf == NULL) buf = (char *) CmiAlloc(maxbytes);
+  if (buf == NULL) {
+    buf = (char *) CmiAlloc(maxbytes);
+    _MEMCHECK(buf);
+  }
 
   if (MPI_SUCCESS != PMPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
       CmiAbort("PumpMsgs: PMP_Recv failed!\n");
@@ -1206,6 +1214,8 @@ static void ConverseRunPE(int everReturn)
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   int n,i;
+  int nicelevel = -100;      /* nice level for process */
+
 #if MACHINE_DEBUG
   debugLog=NULL;
 #endif
@@ -1233,8 +1243,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #if CMK_NO_OUTSTANDING_SENDS
   no_outstanding_sends=1;
 #endif
-  if (CmiGetArgInt(argv,"+no_outstanding_sends",&no_outstanding_sends) && _Cmi_mynode == 0) {
-     CmiPrintf("Charm++: Will%s consume outstanding sends in scheduler loop\n",
+  if (CmiGetArgFlag(argv,"+no_outstanding_sends")) {
+    no_outstanding_sends = 1;
+    if (_Cmi_mynode == 0)
+      CmiPrintf("Charm++: Will%s consume outstanding sends in scheduler loop\n",
      	no_outstanding_sends?"":" not");
   }
   _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
@@ -1254,6 +1266,21 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     if (!CmiGetArgFlag(argv,"++debug-no-pause"))
       sleep(10);
   }
+
+  CmiGetArgIntDesc(argv,"+nice",&nicelevel,"Set the process priority level");
+#ifndef _WIN32
+  /* call setpriority once on each process to set process's priority */
+  if (nicelevel != -100)  {
+    if (0!=setpriority(PRIO_PROCESS, 0, nicelevel))  {
+      CmiPrintf("[%d] setpriority failed with value %d. \n", _Cmi_mynode, nicelevel);
+      perror("setpriority");
+      CmiAbort("setpriority failed.");
+    }
+    else
+      CmiPrintf("[%d] Charm++: setpriority %d\n", _Cmi_mynode, nicelevel);
+  }
+#endif
+
 
   CmiTimerInit();
 
