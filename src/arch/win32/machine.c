@@ -1419,320 +1419,6 @@ void CheckSocketsReady()
  *
  *****************************************************************************/
 
-#if CMK_SHARED_VARS_SUN_THREADS
-
-static mutex_t memmutex;
-void CmiMemLock() { mutex_lock(&memmutex); }
-void CmiMemUnlock() { mutex_unlock(&memmutex); }
-
-static thread_key_t Cmi_state_key;
-static CmiState     Cmi_state_vector;
-
-CmiState CmiGetState()
-{
-  CmiState result = 0;
-  thr_getspecific(Cmi_state_key, (void **)&result);
-  return result;
-}
-
-int CmiMyPe()
-{
-  CmiState result = 0;
-  thr_getspecific(Cmi_state_key, (void **)&result);
-  return result->pe;
-}
-
-int CmiMyRank()
-{
-  CmiState result = 0;
-  thr_getspecific(Cmi_state_key, (void **)&result);
-  return result->rank;
-}
-
-int CmiNodeFirst(int node) { return nodes[node].nodestart; }
-int CmiNodeSize(int node)  { return nodes[node].nodesize; }
-int CmiNodeOf(int pe)      { return (nodes_by_pe[pe] - nodes); }
-int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe]->nodestart); }
-
-CmiNodeLock CmiCreateLock()
-{
-  CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(mutex_t));
-  _MEMCHECK(lk);
-  mutex_init(lk,0,0);
-  return lk;
-}
-
-void CmiDestroyLock(CmiNodeLock lk)
-{
-  mutex_destroy(lk);
-  free(lk);
-}
-
-void CmiYield() { thr_yield(); }
-
-int barrier = 0;
-cond_t barrier_cond = DEFAULTCV;
-mutex_t barrier_mutex = DEFAULTMUTEX;
-
-void CmiNodeBarrier(void)
-{
-  mutex_lock(&barrier_mutex);
-  barrier++;
-  if(barrier != CmiMyNodeSize())
-    cond_wait(&barrier_cond, &barrier_mutex);
-  else{
-    barrier = 0;
-    cond_broadcast(&barrier_cond);
-  }
-  mutex_unlock(&barrier_mutex);
-}
-
-#define CmiGetStateN(n) (Cmi_state_vector+(n))
-
-static mutex_t comm_mutex;
-#define CmiCommLock() (mutex_lock(&comm_mutex))
-#define CmiCommUnlock() (mutex_unlock(&comm_mutex))
-
-static void comm_thread(void)
-{
-  struct timeval tmo; fd_set rfds;
-  while (1) {
-    CmiCommLock();
-    CommunicationServer();
-    CmiCommUnlock();
-    tmo.tv_sec = 0;
-    tmo.tv_usec = Cmi_tickspeed;
-    FD_ZERO(&rfds);
-    FD_SET(dataskt, &rfds);
-    FD_SET(ctrlskt, &rfds);
-    select(FD_SETSIZE, &rfds, 0, 0, &tmo);
-  }
-  /* thr_exit(0); */
-}
-
-static void *call_startfn(void *vindex)
-{
-  int index = (int)vindex;
-  CmiState state = Cmi_state_vector + index;
-  thr_setspecific(Cmi_state_key, state);
-  ConverseInitPE();
-  Cmi_startfn(CountArgs(Cmi_argv), Cmi_argv);
-  if (Cmi_usrsched == 0) CsdScheduler(-1);
-  ConverseExit();
-  thr_exit(0);
-}
-
-static void CmiStartThreads()
-{
-  int i, ok;
-  unsigned int pid;
-  
-  thr_setconcurrency(Cmi_mynodesize);
-  thr_keycreate(&Cmi_state_key, 0);
-  Cmi_state_vector =
-    (CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
-  for (i=0; i<Cmi_mynodesize; i++)
-    CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
-  for (i=1; i<Cmi_mynodesize; i++) {
-    ok = thr_create(0, 256000, call_startfn, (void *)i, THR_DETACHED|THR_BOUND, &pid);
-    if (ok<0) { perror("thr_create"); exit(1); }
-  }
-  thr_setspecific(Cmi_state_key, Cmi_state_vector);
-  ok = thr_create(0, 256000, (void *(*)(void *))comm_thread, 0, 0, &pid);
-  if (ok<0) { perror("thr_create"); exit(1); }
-}
-
-#endif
-
-
-#if CMK_SHARED_VARS_POSIX_THREADS_SMP
-
-static pthread_mutex_t memmutex;
-void CmiMemLock() { pthread_mutex_lock(&memmutex); }
-void CmiMemUnlock() { pthread_mutex_unlock(&memmutex); }
-
-static pthread_key_t Cmi_state_key;
-static CmiState      Cmi_state_vector;
-
-CmiState CmiGetState()
-{
-  CmiState result = 0;
-  result = pthread_getspecific(Cmi_state_key);
-  return result;
-}
-
-int CmiMyPe()
-{
-  CmiState result = 0;
-  result = pthread_getspecific(Cmi_state_key);
-  return result->pe;
-}
-
-int CmiMyRank()
-{
-  CmiState result = 0;
-  result = pthread_getspecific(Cmi_state_key);
-  return result->rank;
-}
-
-int CmiNodeFirst(int node) { return nodes[node].nodestart; }
-int CmiNodeSize(int node)  { return nodes[node].nodesize; }
-int CmiNodeOf(int pe)      { return (nodes_by_pe[pe] - nodes); }
-int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe]->nodestart); }
-
-CmiNodeLock CmiCreateLock()
-{
-  CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(pthread_mutex_t));
-  _MEMCHECK(lk);
-  pthread_mutex_init(lk,(pthread_mutexattr_t *)0);
-  return lk;
-}
-
-void CmiDestroyLock(CmiNodeLock lk)
-{
-  pthread_mutex_destroy(lk);
-  free(lk);
-}
-
-void CmiYield() { sched_yield(); }
-
-int barrier;
-pthread_cond_t barrier_cond;
-pthread_mutex_t barrier_mutex;
-
-void CmiNodeBarrier(void)
-{
-  pthread_mutex_lock(&barrier_mutex);
-  barrier++;
-  if(barrier != CmiMyNodeSize())
-    pthread_cond_wait(&barrier_cond, &barrier_mutex);
-  else{
-    barrier = 0;
-    pthread_cond_broadcast(&barrier_cond);
-  }
-  pthread_mutex_unlock(&barrier_mutex);
-}
-
-
-#define CmiGetStateN(n) (Cmi_state_vector+(n))
-
-static pthread_mutex_t comm_mutex;
-#define CmiCommLock() (pthread_mutex_lock(&comm_mutex))
-#define CmiCommUnlock() (pthread_mutex_unlock(&comm_mutex))
-
-static void comm_thread(void)
-{
-  struct timeval tmo; fd_set rfds;
-  while (1) {
-    CmiCommLock();
-    CommunicationServer();
-    CmiCommUnlock();
-    tmo.tv_sec = 0;
-    tmo.tv_usec = Cmi_tickspeed;
-    FD_ZERO(&rfds);
-    FD_SET(dataskt, &rfds);
-    FD_SET(ctrlskt, &rfds);
-    select(FD_SETSIZE, &rfds, 0, 0, &tmo);
-  }
-  pthread_exit(0);
-}
-
-static void *call_startfn(void *vindex)
-{
-  int index = (int)vindex;
-  CmiState state = Cmi_state_vector + index;
-  pthread_setspecific(Cmi_state_key, state);
-  ConverseInitPE();
-  Cmi_startfn(CountArgs(Cmi_argv), Cmi_argv);
-  if (Cmi_usrsched == 0) CsdScheduler(-1);
-  ConverseExit();
-  pthread_exit(0);
-}
-
-static void CmiStartThreads()
-{
-  pthread_t pid;
-  int i, ok;
-  
-  //thr_setconcurrency(Cmi_mynodesize);
-  pthread_key_create(&Cmi_state_key, 0);
-  Cmi_state_vector =
-    (CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
-  for (i=0; i<Cmi_mynodesize; i++)
-    CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
-  for (i=1; i<Cmi_mynodesize; i++) {
-    ok = pthread_create(&pid, NULL, call_startfn, (void *)i);
-    if (ok<0) { perror("pthread_create"); exit(1); }
-  }
-  pthread_setspecific(Cmi_state_key, Cmi_state_vector);
-  ok = pthread_create(&pid, NULL, (void *(*)(void *))comm_thread, 0);
-  if (ok<0) { perror("pthread_create"); exit(1); }
-}
-
-#endif
-
-#if CMK_SHARED_VARS_UNAVAILABLE
-
-static volatile int memflag;
-void CmiMemLock() { memflag=1; }
-void CmiMemUnlock() { memflag=0; }
-
-static struct CmiStateStruct Cmi_state;
-int Cmi_mype;
-int Cmi_myrank;
-#define CmiGetState() (&Cmi_state)
-#define CmiGetStateN(n) (&Cmi_state)
-
-static int comm_flag;
-#define CmiCommLock() (comm_flag=1)
-#define CmiCommUnlock() (comm_flag=0)
-
-void CmiYield() { jsleep(0,100); }
-
-int interruptFlag;
-
-static unsigned int terrupt;
-static void CommunicationInterrupt(int arg)
-{
-  
-  nodes[CmiMyNode()].stat_total_intr++;
-  if (comm_flag) return;
-  if (memflag) return;
-  nodes[CmiMyNode()].stat_proc_intr++;
-  interruptFlag = 109;
-  CommunicationServer();
-  interruptFlag = 0;
-}
-
-static void CmiStartThreads()
-{
-  struct itimerval i;
-  
-  if ((Cmi_numpes != Cmi_numnodes) || (Cmi_mynodesize != 1))
-    KillEveryone
-      ("Multiple cpus unavailable, don't use cpus directive in nodesfile.\n");
-  
-  CmiStateInit(Cmi_nodestart, 0, &Cmi_state);
-  Cmi_mype = Cmi_nodestart;
-  Cmi_myrank = 0;
-  
-#if CMK_ASYNC_NOT_NEEDED
-  CmiSignal(SIGALRM, 0, 0, CommunicationInterrupt);
-#else
-  CmiSignal(SIGALRM, SIGIO, 0, CommunicationInterrupt);
-  CmiEnableAsyncIO(dataskt);
-  CmiEnableAsyncIO(ctrlskt);
-#endif
-  
-  i.it_interval.tv_sec = 0;
-  i.it_interval.tv_usec = Cmi_tickspeed;
-  i.it_value.tv_sec = 0;
-  i.it_value.tv_usec = Cmi_tickspeed;
-  setitimer(ITIMER_REAL, &i, NULL);
-}
-
-#endif
-
 
 
 #if CMK_SHARED_VARS_NT_THREADS
@@ -1752,8 +1438,7 @@ CmiState CmiGetState()
   if(Cmi_state_key == 0xFFFFFFFF) return 0;
   
   result = (CmiState)TlsGetValue(Cmi_state_key);
-  if(result == 0)
-  {
+  if(result == 0) {
     printf("Key = %d\n", Cmi_state_key);
     perror("TlsGetValue");
     exit(1);
@@ -1768,13 +1453,9 @@ int CmiMyPe()
   if(Cmi_state_key == 0xFFFFFFFF) return -1;
   result = (CmiState)TlsGetValue(Cmi_state_key);
 
-  if(result == 0)
-  {
-    DEBUGF(("Error in CmiMyPe()\n"));
-    printf("Key = %d\n", Cmi_state_key);
+  if(result == 0) {
     perror("TlsGetValue");
     return 0;
-    //exit(1);
   }
   return result->pe;
 }
@@ -1784,16 +1465,11 @@ int CmiMyRank()
   CmiState result = 0;
 
   if(Cmi_state_key == 0xFFFFFFFF) return 0;
-  //thr_getspecific(Cmi_state_key, (void **)&result);
   result = (CmiState)TlsGetValue(Cmi_state_key);
   if(result == 0){
-  printf("Error in TlsGetValue\n");
-  printf("Key = %d\n", Cmi_state_key);
-  perror("TlsGetValue");
-  return 0;
-  //exit(1);
+    perror("TlsGetValue");
+    return 0;
   }
-
   return result->rank;
 }
 
@@ -1830,8 +1506,7 @@ static DWORD WINAPI comm_thread(LPVOID dummy)
 {  
   struct timeval tmo; fd_set rfds;
   
-  while (Cmi_shutdown_initiated == 0) 
-  {
+  while (Cmi_shutdown_initiated == 0) {
     CmiCommLock();
     CommunicationServer();
     CmiCommUnlock();
@@ -1851,14 +1526,12 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
   int index = (int)vindex;
  
   CmiState state = Cmi_state_vector + index;
-  if(Cmi_state_key == 0xFFFFFFFF)
-  {
+  if(Cmi_state_key == 0xFFFFFFFF) {
     perror("TlsAlloc");
     exit(1);
   }
   
-  if(TlsSetValue(Cmi_state_key, (LPVOID)state) == 0)
-  {
+  if(TlsSetValue(Cmi_state_key, (LPVOID)state) == 0) {
     perror("TlsSetValue");
     exit(1);
   }
@@ -1882,20 +1555,16 @@ void  CmiNodeBarrier(void)
   int flag = 0;
 
   WaitForSingleObject(barrier_mutex, INFINITE);
-  if (!which)
-  {
-    if (barrier_wait0 == Cmi_mynodesize - 1)
-    {
+  if (!which) {
+    if (barrier_wait0 == Cmi_mynodesize - 1) {
       which = 1;
       barrier_wait1 = 0;
       flag = 1;
     }
     barrier_wait0++;
   }
-  else 
-  {
-    if (barrier_wait1 == Cmi_mynodesize - 1)
-    {
+  else {
+    if (barrier_wait1 == Cmi_mynodesize - 1) {
       which = 0;
       barrier_wait0 = 0;
       flag = 1;
@@ -1904,14 +1573,12 @@ void  CmiNodeBarrier(void)
   }
   ReleaseMutex(barrier_mutex);
 
-  if (flag == 0)
-  {
+  if (flag == 0) {
     if(which == 0)
       while(barrier_wait0 != Cmi_mynodesize);
     else
       while(barrier_wait1 != Cmi_mynodesize);
   }
-
 }
 
 static void CmiStartThreads()
@@ -1926,8 +1593,7 @@ static void CmiStartThreads()
   barrier_mutex = CmiCreateLock();
 
   Cmi_state_key = TlsAlloc();
-  if(Cmi_state_key == 0xFFFFFFFF)
-  {
+  if(Cmi_state_key == 0xFFFFFFFF) {
     perror("TlsAlloc");
     exit(1);
   }
@@ -1938,37 +1604,25 @@ static void CmiStartThreads()
   for (i=0; i<Cmi_mynodesize; i++)
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
   
-  for (i=1; i<Cmi_mynodesize; i++) 
-  {
-    if((thr = CreateThread(NULL, 0, call_startfn, (LPVOID)i, 0, &threadID)) == NULL)
-    {
+  for (i=1; i<Cmi_mynodesize; i++) {
+    if((thr = CreateThread(NULL, 0, call_startfn, (LPVOID)i, 0, &threadID)) 
+       == NULL) {
       perror("CreateThread");
       exit(1);
     }
     CloseHandle(thr);
   }
   
-  if(TlsSetValue(Cmi_state_key, (LPVOID)Cmi_state_vector) == 0)
-  {
+  if(TlsSetValue(Cmi_state_key, (LPVOID)Cmi_state_vector) == 0) {
     perror("TlsSetValue");
     exit(1);  
   }  
   
-  if((thr = CreateThread(NULL, 0, comm_thread, 0, 0, &threadID)) == NULL)
-  {
+  if((thr = CreateThread(NULL, 0, comm_thread, 0, 0, &threadID)) == NULL) {
     perror("CreateThread");
     exit(1);
   }
   CloseHandle(thr);
-}
-
-
-static void CmiJoinThreads()
-{
-  //printf("In CmiJoin, my pe and rank are %d and %d\n", CmiMyPe(), CmiMyRank());
-
-  while (proc_done != (Cmi_mynodesize -1));
-
 }
 
 #endif
@@ -3018,8 +2672,8 @@ void IntegrateAckDatagram(ExplicitDgram dg)
       else 
       {
         diff = dgseqno >= idg->seqno ? 
-            ((dgseqno - idg->seqno) & DGRAM_SEQNO_MASK) :
-            ((dgseqno + (DGRAM_SEQNO_MASK - idg->seqno) + 1) & DGRAM_SEQNO_MASK);
+	  ((dgseqno - idg->seqno) & DGRAM_SEQNO_MASK) :
+	  ((dgseqno + (DGRAM_SEQNO_MASK - idg->seqno) + 1) & DGRAM_SEQNO_MASK);
     
         if ((diff <= 0) || (diff > Cmi_window_size))
         {
@@ -3086,19 +2740,9 @@ void ReceiveDatagram()
 static void CommunicationServer()
 {
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
-#if CMK_SHARED_VARS_UNAVAILABLE
-  if (terrupt)
-  {
-    return;
-  }
-  terrupt++;
-#endif
-  
-  while (1) 
-  {
+  while (1) {
     Cmi_clock = GetClock();
-    if (Cmi_clock > Cmi_check_last + Cmi_check_delay) 
-    {
+    if (Cmi_clock > Cmi_check_last + Cmi_check_delay) {
       writeall(Cmi_host_fd, "ping", 5);
       Cmi_check_last = Cmi_clock;
     }
@@ -3109,9 +2753,6 @@ static void CommunicationServer()
     if (dataskt_ready_write) { if (TransmitDatagram()) continue; }
     break;
   }
-#if CMK_SHARED_VARS_UNAVAILABLE
-  terrupt--;
-#endif
 }
 
 /******************************************************************************
@@ -3186,11 +2827,13 @@ void CmiNotifyIdle()
 
 CmiCommHandle CmiGeneralNodeSend(int pe, int size, int freemode, char *data)
 {
-  CmiState cs = CmiGetState(); OutgoingMsg ogm;
+  CmiState cs = CmiGetState(); 
+  OutgoingMsg ogm;
+  char *copy;
 
   if (freemode == 'S') {
-    char *copy = (char *)CmiAlloc(size);
-  if (!copy)
+    copy = (char *)CmiAlloc(size);
+    if (!copy)
       fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
     memcpy(copy, data, size);
     data = copy; freemode = 'F';
@@ -3227,24 +2870,23 @@ CmiCommHandle CmiGeneralNodeSend(int pe, int size, int freemode, char *data)
 
 CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 {  
-  CmiState cs = CmiGetState(); 
+  char *copy;
+  CmiState cs; 
   OutgoingMsg ogm;
 
-  if (freemode == 'S') 
-  {
-    char *copy = (char *)CmiAlloc(size);
+  cs = CmiGetState();
+  if (freemode == 'S') {
+    copy = (char *)CmiAlloc(size);
     if (!copy)
       fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
     memcpy(copy, data, size);
     data = copy; 
     freemode = 'F';
   }
-
-  if (pe == cs->pe) 
-  {
+  
+  if (pe == cs->pe) {
     FIFO_EnQueue(cs->localqueue, data);
-    if (freemode == 'A') 
-    {
+    if (freemode == 'A') {
       MallocOutgoingMsg(ogm);
       ogm->freemode = 'X';
       return ogm;
@@ -3460,15 +3102,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   WSADATA wsaData;
   int     inCrt, outCrt;
   FILE    *hIn,  *hOut;
-
-  WSAStartup(0x0002, &wsaData);
-
-#if CMK_USE_HP_MAIN_FIX
-#if FOR_CPLUS
-  _main(argc,argv);
-#endif
-#endif
   
+  WSAStartup(0x0002, &wsaData);
   atexit(exitDelay);  /*FOR TESTING*/
 
   Cmi_argv = argv;
@@ -3513,8 +3148,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   CmiStartThreads();
   DEBUGF(("ConverseInit: about to init PE\n"));
   ConverseInitPE();
-  if (ret==0) 
-  {
+  if (ret==0) {
     fn(CountArgs(CpvAccess(CmiMyArgv)), CpvAccess(CmiMyArgv));
     DEBUGF(("ConverseInit: about to start scheduler\n"));
     if (usc==0) CsdScheduler(-1);
