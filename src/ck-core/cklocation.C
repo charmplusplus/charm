@@ -905,7 +905,9 @@ CmiBool CkLocRec_local::checkBufferedMigration()
 	    // don't migrate inside the object call
 	    migrateMe(toPe);
 	    // don't do anything
+	    return CmiTrue;
 	}
+	return CmiFalse;
 }
 
 void CkLocRec_local::setMigratable(int migratable)
