@@ -259,23 +259,39 @@ public:
 //Accumulates all symmetries of the mesh before splitting:
 class FEM_Initial_Symmetries; /*Defined in symmetries.C*/
 
-//Describes all ghost elements
-class FEM_Ghost : public CkNoncopyable {
+/// Describes all the data needed for partitioning a mesh.
+class FEM_Partition : public CkNoncopyable {
+	/// Maps element number to (0-based) chunk number, allocated with new[]
+	int *elem2chunk;
+	
+	/// Describes the different layers of ghost elements:
 	CkVec<ghostLayer *> layers;
 	
+	/// Describes the problem domain's spatial symmetries.
 	FEM_Initial_Symmetries *sym;
 public:
-	FEM_Ghost() {sym=NULL;}
-	~FEM_Ghost() {for (int i=0;i<getLayers();i++) delete layers[i];}
+	FEM_Partition();
+	~FEM_Partition();
 	
-	int getLayers(void) const {return layers.size();}
+// Manipulate partitioning information
+	void setPartition(const int *elem2chunk, int nElem, int idxBase);
+	const int *getPartition(FEM_Mesh *src,int nChunks) const;
+	
+// Manipulate ghost layers
 	ghostLayer *addLayer(void) {
 		ghostLayer *l=new ghostLayer();
 		layers.push_back(l);
 		return l;
 	}
+	ghostLayer *curLayer(void) {
+		if (layers.size()==0) CkAbort("Must call FEM_Add_ghost_layer before FEM_Add_ghost_elem\n");
+		return layers[layers.size()-1];
+	}
+	
+	int getLayers(void) const {return layers.size();}
 	const ghostLayer &getLayer(int layerNo) const {return *layers[layerNo];}
 	
+// Manipulate spatial symmetries:
 	void setSymmetries(int nNodes_,int *new_can,const int *sym_src);
 	void addLinearPeriodic(int nFaces_,int nPer,
 		const int *facesA,const int *facesB,int idxBase,
@@ -284,6 +300,8 @@ public:
 	const FEM_Symmetries_t *getSymmetries(void) const;
 	const FEM_Sym_List &getSymList(void) const;
 };
+// Access the latest partition:
+FEM_Partition &FEM_curPartition(void);
 
 //Declare this at the start of every API routine:
 #define FEMAPI(routineName) TCHARM_API_TRACE(routineName,"fem")
@@ -309,13 +327,12 @@ class FEM_Mesh_Output {
 /*After partitioning, create a sub-mesh for each chunk's elements,
 including communication lists between chunks.
 */
-void FEM_Mesh_split(FEM_Mesh *mesh,int nchunks,const int *elem2chunk,
-	       const FEM_Ghost &ghosts,FEM_Mesh_Output *out);
+void FEM_Mesh_split(FEM_Mesh *mesh,int nchunks,
+	const FEM_Partition &partition,FEM_Mesh_Output *out);
 
 
 //Make a new[]'d copy of this (len-entry) array, changing the index as spec'd
 int *CkCopyArray(const int *src,int len,int indexBase);
-FEM_Ghost &FEM_Set_FEM_Ghost(void);
 
 /*\@}*/
 

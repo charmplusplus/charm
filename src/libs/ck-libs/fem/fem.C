@@ -81,23 +81,6 @@ inline void MPI_Send_pup(T &t, int to,int tag,MPI_Comm comm) {
 
 /******** Startup and initialization *******/
 
-//Maps element number to (0-based) chunk number, allocated with new[]
-static int *_elem2chunk=NULL;
-
-static FEM_Ghost ghosts;
-static ghostLayer *curGhostLayer=NULL;
-
-static void FEM_Mesh_partition(FEM_Mesh *src,int _nchunks,FEM_Mesh_Output *out) {
-    if (_elem2chunk==NULL) 
-    {//Partition the elements ourselves
-    	_elem2chunk=new int[src->nElems()];
-    	FEM_Mesh_partition(src,_nchunks,_elem2chunk);
-    }
-    src->setAscendingGlobalno();
-    //Build communication lists and split mesh data
-    FEM_Mesh_split(src,_nchunks,_elem2chunk,ghosts,out);
-}
-
 // This is our TCharm global ID:
 enum {FEM_globalID=33};
 
@@ -120,7 +103,7 @@ FEMchunk *FEMchunk::get(const char *caller) {
 
 CDECL void FEM_Init(FEM_Comm_t defaultComm)
 {
-	IDXL_Init();
+	IDXL_Init(defaultComm);
 	if (!TCHARM_Get_global(FEM_globalID)) {
 		FEMchunk *c=new FEMchunk(defaultComm);
 		TCHARM_Set_global(FEM_globalID,c,pupFEM_Chunk);
@@ -207,6 +190,42 @@ FEM_Mesh_assemble(int nParts,const int *srcMeshes) {
 }
 FORTRAN_AS_C_RETURN(int,FEM_MESH_ASSEMBLE,FEM_Mesh_assemble,fem_mesh_assemble,
 	(int *nParts,const int *src),(*nParts,src))
+
+static FEM_Partition *partition=NULL;
+FEM_Partition &FEM_curPartition(void) {
+	if (partition==NULL) partition=new FEM_Partition();
+	return *partition;
+}
+static void clearPartition(void) {delete partition; partition=NULL;}
+
+FEM_Partition::FEM_Partition() {
+	elem2chunk=NULL;
+	sym=NULL; 
+}
+FEM_Partition::~FEM_Partition() {
+	if (elem2chunk) {delete[] elem2chunk;elem2chunk=NULL;}
+	for (int i=0;i<getLayers();i++) delete layers[i];
+}
+
+void FEM_Partition::setPartition(const int *e, int nElem, int idxBase) {
+	if (elem2chunk) {delete[] elem2chunk;elem2chunk=NULL;}
+	elem2chunk=CkCopyArray(e,nElem,idxBase);
+}
+const int *FEM_Partition::getPartition(FEM_Mesh *src,int nChunks) const {
+	if (!elem2chunk) { /* Create elem2chunk based on Metis partitioning: */
+		int *e=new int[src->nElems()];
+		FEM_Mesh_partition(src,nChunks,e);
+		((FEM_Partition *)this)->elem2chunk=e;
+	}
+	return elem2chunk;
+}
+
+static void FEM_Mesh_partition(FEM_Mesh *src,int _nchunks,FEM_Mesh_Output *out) {
+    src->setAscendingGlobalno();
+    FEM_Mesh_split(src,_nchunks,FEM_curPartition(),out);
+    clearPartition();
+}
+
 
 class FEM_Mesh_Partition_List : public FEM_Mesh_Output {
 	FEMchunk *c;
@@ -390,15 +409,11 @@ FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller) {
 }
 
 /****** Custom Partitioning API *******/
-static void Set_Partition(int *elem2chunk,int indexBase) {
-	if (_elem2chunk!=NULL) delete[] _elem2chunk;
-	_elem2chunk=CkCopyArray(elem2chunk,setMesh()->nElems(),indexBase);
-}
 
 //C bindings:
 CDECL void FEM_Set_partition(int *elem2chunk) {
 	FEMAPI("FEM_Set_partition");
-	Set_Partition(elem2chunk,0);
+	FEM_curPartition().setPartition(elem2chunk,setMesh()->nElems(),0);
 }
 
 //Fortran bindings:
@@ -406,7 +421,7 @@ FDECL void FTN_NAME(FEM_SET_PARTITION,fem_set_partition)
 	(int *elem2chunk) 
 {
 	FEMAPI("FEM_Set_partition");
-	Set_Partition(elem2chunk,1);
+	FEM_curPartition().setPartition(elem2chunk,setMesh()->nElems(),1);
 }
 
 
@@ -828,46 +843,32 @@ FDECL void FTN_NAME(FEM_GET_COMM_NODES,fem_get_comm_nodes)
 }
 
 /******************** Ghost Layers *********************/
-FEM_Ghost &FEM_Set_FEM_Ghost(void) {
-	return ghosts;
-}
-
 CDECL void FEM_Add_ghost_layer(int nodesPerTuple,int doAddNodes)
 {
 	FEMAPI("FEM_Add_ghost_layer");
-	curGhostLayer=FEM_Set_FEM_Ghost().addLayer();
-	curGhostLayer->nodesPerTuple=nodesPerTuple;
-	curGhostLayer->addNodes=(doAddNodes!=0);
-	curGhostLayer->elem.makeLonger(setMesh()->elem.size());
+	ghostLayer *cur=FEM_curPartition().addLayer();
+	cur->nodesPerTuple=nodesPerTuple;
+	cur->addNodes=(doAddNodes!=0);
+	cur->elem.makeLonger(20);
 }
 FDECL void FTN_NAME(FEM_ADD_GHOST_LAYER,fem_add_ghost_layer)
 	(int *nodesPerTuple,int *doAddNodes)
 { FEM_Add_ghost_layer(*nodesPerTuple,*doAddNodes); }
 
-CDECL void FEM_Add_ghost_elem(int elType,int tuplesPerElem,const int *elem2tuple)
-{
+static void add_ghost_elem(int elType,int tuplesPerElem,const int *elem2tuple,int idxBase) {
 	FEMAPI("FEM_Add_ghost_elem");
-	if (curGhostLayer==NULL)
-		CkAbort("You must call FEM_Add_Ghost_Layer before calling FEM_Add_Ghost_elem!\n");
-	curGhostLayer->elem[elType].add=true;
-	curGhostLayer->elem[elType].tuplesPerElem=tuplesPerElem;
-	curGhostLayer->elem[elType].elem2tuple=CkCopyArray(elem2tuple,
-		          tuplesPerElem*curGhostLayer->nodesPerTuple,0);
+	ghostLayer *cur=FEM_curPartition().curLayer();
+	cur->elem[elType].add=true;
+	cur->elem[elType].tuplesPerElem=tuplesPerElem;
+	cur->elem[elType].elem2tuple=CkCopyArray(elem2tuple,
+		          tuplesPerElem*cur->nodesPerTuple,idxBase);
 }
+
+CDECL void FEM_Add_ghost_elem(int elType,int tuplesPerElem,const int *elem2tuple)
+{ add_ghost_elem(elType,tuplesPerElem,elem2tuple,0); }
 FDECL void FTN_NAME(FEM_ADD_GHOST_ELEM,fem_add_ghost_elem)
 	(int *FelType,int *FtuplesPerElem,const int *elem2tuple)
-{
-	FEMAPI("FEM_add_ghost_elem");
-	int elType=*FelType;
-	int tuplesPerElem=*FtuplesPerElem;
-	if (curGhostLayer==NULL)
-		CkAbort("You must call FEM_Add_Ghost_Layer before calling FEM_Add_Ghost_elem!\n");
-	setMesh()->chkET(elType);
-	curGhostLayer->elem[elType].add=true;
-	curGhostLayer->elem[elType].tuplesPerElem=tuplesPerElem;
-	curGhostLayer->elem[elType].elem2tuple=CkCopyArray(elem2tuple,
-		          tuplesPerElem*curGhostLayer->nodesPerTuple,1);
-}
+{ add_ghost_elem(*FelType,*FtuplesPerElem,elem2tuple,1); }
 
 CDECL void FEM_Update_ghost_field(int fid, int elType, void *v_data)
 {

@@ -102,7 +102,7 @@ static void checkArrayEntries(const int *arr,int nArr,int max,const char *what)
 }
 
 //Check all user-settable fields in this object for validity
-static void checkMesh(const FEM_Mesh *mesh) {
+static void check(const FEM_Mesh *mesh) {
 #if 0 //FIXME
 	for (int t=0;t<mesh->elem.size();t++) 
 	if (mesh->elem.has(t)) {
@@ -122,8 +122,8 @@ static void checkMesh(const FEM_Mesh *mesh) {
 	}
 #endif
 }
-static void checkGhost(const FEM_Ghost &ghosts,const FEM_Mesh *mesh) {
-	const int *canon=ghosts.getCanon();
+static void check(const FEM_Partition &partition,const FEM_Mesh *mesh) {
+	const int *canon=partition.getCanon();
 	if (canon!=NULL)
 	  checkArrayEntries(canon,mesh->node.size(),mesh->node.size(),
 		"node canonicalization array, from FEM_Set_Symmetries");
@@ -216,7 +216,7 @@ class splitter {
 	int totGhostElem,totGhostNode; //For debugging printouts
 
 	/// Add an entire layer of ghost elements
-	void addLayer(const ghostLayer &g,const FEM_Ghost &ghosts);
+	void addLayer(const ghostLayer &g,const FEM_Partition &partition);
 	
 	/// Return true if any of these global nodes are ghost nodes
 	bool hasGhostNodes(const int *conn,int nodesPer) 
@@ -262,7 +262,7 @@ class splitter {
 	}
 	void range(int value,int lo,int hi,const char *what) {
 		if (value<lo || value>=hi) {
-			CkPrintf("ERROR! %s out of range (%d,%d)!\n",value,lo,hi);
+			CkPrintf("ERROR! %s: %d is out of range (%d,%d)!\n",what,value,lo,hi);
 			bad("Internal FEM data structure corruption! (out of range)\n");
 		}
 	}
@@ -282,7 +282,7 @@ public:
 	void buildCommLists(void);
 	
 	//Add the layers of ghost elements
-	void addGhosts(const FEM_Ghost &ghost);
+	void addGhosts(const FEM_Partition &partition);
 	
 	//Divide up the sparse data lists
 	void separateSparse(bool forGhost);
@@ -442,23 +442,24 @@ FEM_Mesh *splitter::createMesh(int c)
 Create a sub-mesh for each chunk's elements,
 including communication lists between chunks.
 */
-void FEM_Mesh_split(FEM_Mesh *mesh,int nChunks,const int *elem2chunk,
-	       const FEM_Ghost &ghosts,FEM_Mesh_Output *out)
+void FEM_Mesh_split(FEM_Mesh *mesh,int nChunks,
+	       const FEM_Partition &partition,FEM_Mesh_Output *out)
 {
+	const int *elem2chunk=partition.getPartition(mesh,nChunks);
 	//Check the elem2chunk mapping:
 	checkArrayEntries(elem2chunk,mesh->nElems(),nChunks,
 		"elem2chunk, from FEM_Set_Partition or metis,");
-	checkMesh(mesh);
-	checkGhost(ghosts,mesh);
+	check(mesh);
+	check(partition,mesh);
 	
-	mesh->setSymList(ghosts.getSymList());
+	mesh->setSymList(partition.getSymList());
 	splitter s(mesh,elem2chunk,nChunks);
 
 	s.buildCommLists();
 	
 	s.separateSparse(false); //Copies real sparse elements
 	
-	s.addGhosts(ghosts);
+	s.addGhosts(partition);
 	
 	s.separateSparse(true); //Copies ghost sparse elements
 	
@@ -696,9 +697,9 @@ public:
 };
 
 //Add all the layers of ghost elements
-void splitter::addGhosts(const FEM_Ghost &ghosts)
+void splitter::addGhosts(const FEM_Partition &partition)
 {
-	int nLayers=ghosts.getLayers();
+	int nLayers=partition.getLayers();
 	if (nLayers==0) return; //No ghost layers-- nothing to do
 	
 //Build initial ghostNode table-- just the shared nodes
@@ -709,8 +710,8 @@ void splitter::addGhosts(const FEM_Ghost &ghosts)
 	}
 
 //Mark the symmetry nodes as being ghost-capable
-	canon=ghosts.getCanon();
-	sym=ghosts.getSymmetries();
+	canon=partition.getCanon();
+	sym=partition.getSymmetries();
 	if (sym!=NULL)
 	  for (n=0;n<nNode;n++)
 	    if (sym[n]!=(FEM_Symmetries_t)0)
@@ -719,7 +720,7 @@ void splitter::addGhosts(const FEM_Ghost &ghosts)
 //Add each layer
 	consistencyCheck();
 	for (int i=0;i<nLayers;i++) {
-		addLayer(ghosts.getLayer(i),ghosts);
+		addLayer(partition.getLayer(i),partition);
 		consistencyCheck();
 	}
 	
@@ -728,7 +729,7 @@ void splitter::addGhosts(const FEM_Ghost &ghosts)
 
 
 //Add one layer of ghost elements
-void splitter::addLayer(const ghostLayer &g,const FEM_Ghost &ghosts)
+void splitter::addLayer(const ghostLayer &g,const FEM_Partition &partition)
 {
 	tupleTable table(g.nodesPerTuple);
 	
@@ -980,6 +981,8 @@ void splitter::consistencyCheck(void)
 	//Make sure everything in gNode and gElem is either a ghost or in dyn
 	for (int gNo=0;gNo<mesh->node.size();gNo++) {
 		for (chunkList *l=&gNode[gNo];l!=NULL;l=l->next) {
+			if (l->chunk<0) /* l->chunk==-1 at initialization */
+				FEM_Abort("partitioning","Global node %d (0-based) is not connected to any elements!",gNo);
 			range(l->chunk,0,nChunks,"gNode chunk");
 			if (!FEM_Is_ghost_index(l->localNo))
 				equal(dyn[l->chunk].node[l->localNo],gNo,"chunk local node");

@@ -285,7 +285,7 @@ public:
 	}
 };
 
-void FEM_Ghost::setSymmetries(int nNodes_,int *new_can,const int *sym_src)
+void FEM_Partition::setSymmetries(int nNodes_,int *new_can,const int *sym_src)
 {
 	if (sym!=NULL) CkAbort("Cannot call FEM_Set_Symmetries after adding other symmetries!");
 	sym=new FEM_Initial_Symmetries;
@@ -294,7 +294,7 @@ void FEM_Ghost::setSymmetries(int nNodes_,int *new_can,const int *sym_src)
 	for (int i=0;i<nNodes_;i++) 
 		sym->nodeSymmetries[i]=(FEM_Symmetries_t)sym_src[i];
 }
-void FEM_Ghost::addLinearPeriodic(int nFaces,int nPer,
+void FEM_Partition::addLinearPeriodic(int nFaces,int nPer,
 	const int *facesA,const int *facesB,int idxBase,
 	int nNodes,const CkVector3d *nodeLocs)
 {
@@ -320,7 +320,7 @@ void FEM_Ghost::addLinearPeriodic(int nFaces,int nPer,
 	}
 }
 
-const int *FEM_Ghost::getCanon(void) const {
+const int *FEM_Partition::getCanon(void) const {
 	if (sym==NULL) return NULL;
 	if (sym->nodeCanon==NULL && sym->find!=NULL) 
 	{ //Need to transfer the canon array out of unionFind:
@@ -329,11 +329,11 @@ const int *FEM_Ghost::getCanon(void) const {
 	}
 	return sym->nodeCanon; //<- may be NULL, too
 }
-const FEM_Symmetries_t *FEM_Ghost::getSymmetries(void) const {
+const FEM_Symmetries_t *FEM_Partition::getSymmetries(void) const {
 	if (sym==NULL) return NULL;
 	return sym->nodeSymmetries; //<- may be NULL, too
 }
-const FEM_Sym_List &FEM_Ghost::getSymList(void) const {
+const FEM_Sym_List &FEM_Partition::getSymList(void) const {
 	if (sym==NULL) {
 		const static FEM_Sym_List emptyList;
 		return emptyList;
@@ -397,7 +397,7 @@ CDECL void FEM_Add_linear_periodicity(
 	)
 {
 	FEMAPI("FEM_Add_Linear_Periodicity");
-	FEM_Set_FEM_Ghost().addLinearPeriodic(nFaces,nPer,
+	FEM_curPartition().addLinearPeriodic(nFaces,nPer,
 		facesA,facesB,0,nNodes,(const CkVector3d *)nodeLocs);
 }
 FDECL void FTN_NAME(FEM_ADD_LINEAR_PERIODICITY,fem_add_linear_periodicity)(
@@ -407,7 +407,7 @@ FDECL void FTN_NAME(FEM_ADD_LINEAR_PERIODICITY,fem_add_linear_periodicity)(
 	)
 {
 	FEMAPI("fem_add_linear_periodicity");
-	FEM_Set_FEM_Ghost().addLinearPeriodic(*nFaces,*nPer,
+	FEM_curPartition().addLinearPeriodic(*nFaces,*nPer,
 		facesA,facesB,1,*nNodes,(const CkVector3d *)nodeLocs);
 }
 
@@ -440,14 +440,14 @@ CDECL void FEM_Set_sym_nodes(const int *canon,const int *sym)
 {
 	const char *caller="FEM_Set_sym_nodes"; FEMAPI(caller);
 	int n=FEMchunk::get(caller)->setMesh(caller)->node.size();
-	FEM_Set_FEM_Ghost().setSymmetries(n,CkCopyArray(canon,n,0),sym);
+	FEM_curPartition().setSymmetries(n,CkCopyArray(canon,n,0),sym);
 }
 FDECL void FTN_NAME(FEM_SET_SYM_NODES,fem_set_sym_nodes)
 	(const int *canon,const int *sym)
 {
 	const char *caller="FEM_Set_sym_nodes"; FEMAPI(caller);
 	int n=FEMchunk::get(caller)->setMesh(caller)->node.size();
-	FEM_Set_FEM_Ghost().setSymmetries(n,CkCopyArray(canon,n,1),sym);
+	FEM_curPartition().setSymmetries(n,CkCopyArray(canon,n,1),sym);
 }
 
 /*******************************************************************/

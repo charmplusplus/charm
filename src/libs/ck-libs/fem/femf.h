@@ -105,9 +105,9 @@
        subroutine FEM_Init(comm) 
            integer,intent(in) :: comm
        end subroutine
-       integer function FEM_My_Partition()
-       end function FEM_My_Partition
-       integer function FEM_Num_Partitions()
+       integer function FEM_My_partition()
+       end function
+       integer function FEM_Num_partitions()
        end function 
        double precision function FEM_Timer()
        end function
@@ -119,9 +119,9 @@
           integer, intent(in) :: mesh
        end subroutine
        
-       integer function FEM_Mesh_create()
+       integer function FEM_Mesh_allocate()
        end function
-       subroutine FEM_Mesh_destroy(mesh) 
+       subroutine FEM_Mesh_deallocate(mesh) 
           integer, intent(in) :: mesh
        end subroutine
        
@@ -153,13 +153,13 @@
           integer, intent(in) :: source,tag,comm
        end subroutine
        
-       integer function FEM_Mesh_reduce(mesh,master,tag,comm)
+       integer function FEM_Mesh_reduce(mesh,master,comm)
           integer, intent(in) :: mesh
-          integer, intent(in) :: master,tag,comm
+          integer, intent(in) :: master,comm
        end function
-       integer function FEM_Mesh_broadcast(mesh,master,tag,comm) 
+       integer function FEM_Mesh_broadcast(mesh,master,comm) 
           integer, intent(in) :: mesh
-          integer, intent(in) :: master,tag,comm
+          integer, intent(in) :: master,comm
        end function
        
        
