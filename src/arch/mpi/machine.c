@@ -589,7 +589,6 @@ char *CmiGetNonLocalNodeQ(void)
 void *CmiGetNonLocal(void)
 {
   static int count=0;
-  count++;
   CmiState cs = CmiGetState();
   void *msg;
   CmiIdleLock_checkMessage(&cs->idle);
@@ -598,11 +597,14 @@ void *CmiGetNonLocal(void)
   CmiLock(procState[cs->rank].recvLock);
   msg =  PCQueuePop(cs->recv); 
   CmiUnlock(procState[cs->rank].recvLock);
+/*
   if (msg) {
     MACHSTATE2(3,"CmiGetNonLocal done on pe %d for queue %p", CmiMyPe(), cs->recv); }
   else {
+    count++;
     if (count%1000000==0) MACHSTATE2(3,"CmiGetNonLocal empty on pe %d for queue %p", CmiMyPe(), cs->recv);
   }
+*/
 #if ! CMK_SMP
   if (no_outstanding_sends) {
     while (MsgQueueLen>0) {
