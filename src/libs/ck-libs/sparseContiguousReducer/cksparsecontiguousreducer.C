@@ -14,7 +14,7 @@
 CkReduction::reducerType sparse_sum_int;
 CkReduction::reducerType sparse_sum_float;
 CkReduction::reducerType sparse_sum_double;
-CkReduction::reducerType sparse_sum_TwoFloat;
+CkReduction::reducerType sparse_sum_TwoFloats;
 CkReduction::reducerType sparse_sum_TwoDoubles;
 
 CkReduction::reducerType sparse_product_int;
