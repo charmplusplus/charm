@@ -16,6 +16,8 @@ group [migratable] HybridBaseLB: BaseLB {
   entry void ResumeClients(CkReductionMsg *msg);
   entry void ResumeClients(int balancing);
   entry void ReceiveMigration(LBMigrateMsg*);	
+  entry void ReceiveVectorMigration(LBVectorMigrateMsg*);	
+  entry void TotalObjMigrated(int count, int level);
   entry void ObjMigrated(LDObjData data, int level);
   entry void Loadbalancing(int level);	
   entry void NotifyObjectMigrationDone(int);	

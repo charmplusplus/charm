@@ -33,6 +33,7 @@ public:
   MyHierarchyTree() {}
   virtual ~MyHierarchyTree() {}
   virtual int numLevels() = 0;
+  virtual int numGroupsAtLevels(int level) = 0;
   virtual int parent(int mype, int level) = 0;
   virtual int isroot(int mype, int level) = 0;
   virtual int numChildren(int mype, int level) = 0;
@@ -111,16 +112,19 @@ public:
   void ResumeClients(CkReductionMsg *msg);
   void ResumeClients(int balancing);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
+  void ReceiveVectorMigration(LBVectorMigrateMsg *); // Receive migration data
+  void TotalObjMigrated(int count, int level);
 
   // Migrated-element callback
   static void staticMigrated(void* me, LDObjHandle h, int waitBarrier);
   void Migrated(LDObjHandle h, int waitBarrier);
 
   void ObjMigrated(LDObjData data, int level);
+  void VectorDone(int atlevel);
   void MigrationDone(int balancing);  // Call when migration is complete
   void StatsDone(int level);  // Call when LDStats migration is complete
   void NotifyObjectMigrationDone(int level);	
-  void Loadbalancing(int level);	// start load balancing
+  virtual void Loadbalancing(int level);	// start load balancing
   void StartCollectInfo();
   void CollectInfo(Location *loc, int n, int fromlevel);
   void PropagateInfo(Location *loc, int n, int fromlevel);
@@ -145,6 +149,8 @@ protected:
   virtual void work(LDStats* stats,int count);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
 
+  virtual LBVectorMigrateMsg* VectorStrategy(LDStats* stats,int count);
+
   virtual int     useMem();
   int NeighborIndex(int pe, int atlevel);   // return the neighbor array index
 
@@ -160,8 +166,9 @@ protected:
     LDStats *statsData;
     int obj_expected, obj_completed;
     int migrates_expected, migrates_completed;
-    int mig_reported;
-    int info_recved;
+    int mig_reported;		// for NotifyObjectMigrationDone
+    int info_recved;		// for CollectInfo()
+    int vector_expected, vector_completed;
     int resumeAfterMigration;
     CkVec<MigrationRecord> outObjs;
     CkVec<Location> unmatchedObjs;
@@ -171,7 +178,9 @@ protected:
                  statsMsgsList(NULL), stats_msg_count(0),
                  statsData(NULL), obj_expected(-1), obj_completed(0),
 		 migrates_expected(-1), migrates_completed(0),
-                 mig_reported(0), info_recved(0), resumeAfterMigration(0)
+                 mig_reported(0), info_recved(0), 
+		 vector_expected(-1), vector_completed(0),
+		 resumeAfterMigration(0)
  		 {}
     ~LevelData() {
       if (children) delete [] children;
@@ -182,6 +191,9 @@ protected:
 //CkPrintf("[%d] checking migrates_expected: %d migrates_completed: %d obj_completed: %d\n", migrates_expected, migrates_completed, obj_completed);
       return migrates_expected == 0 || migrates_completed + obj_completed == migrates_expected;
     }
+    int vectorReceived() {
+      return vector_expected==0 || vector_expected == vector_completed;
+    }
     void clear() {
       obj_expected = -1;
       obj_completed = 0;
@@ -189,6 +201,8 @@ protected:
       migrates_completed = 0;
       mig_reported = 0;
       info_recved = 0;
+      vector_expected = -1;
+      vector_completed = 0;
       resumeAfterMigration = 0;
       if (statsData) statsData->clear();
       outObjs.free();
@@ -208,7 +222,8 @@ protected:
 
   int currentLevel;
 
-  CkVec<Location> newObjs;
+  enum StatsStrategy { FULL, SHRINK } ;
+  StatsStrategy statsStrategy;
 
 private:
   void FindNeighbors();
@@ -224,6 +239,10 @@ private:
   double start_lb_time;
 
   double maxLoad;
+
+  CkVec<Location> newObjs;
+
+  int vector_n_moves;
 };
 
 /*
