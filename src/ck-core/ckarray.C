@@ -67,21 +67,29 @@ Array1D::Array1D(ArrayCreateMessage *msg)
   elementConstType = msg->elementConstType;
   elementMigrateType = msg->elementMigrateType;
 
-  CProxy_ArrayMap pmap(msg->mapID);
   ArrayMapRegisterMessage *mapMsg = new ArrayMapRegisterMessage;
   mapMsg->numElements = numElements;
   mapMsg->arrayID = thishandle;
   mapMsg->groupID = thisgroup;
-  pmap.registerArray(mapMsg, CkMyPe());
 
   bufferedForElement = new PtrQ();
   bufferedMigrated = new PtrQ();
   map = 0;
 
+  ArrayMap *mapPtr = (ArrayMap *)CkLocalBranch(msg->mapID);
+
+  if(mapPtr==0) {
+    CProxy_ArrayMap pmap(msg->mapID);
+    pmap.registerArray(mapMsg, CkMyPe());
+  } else {
+    mapPtr->registerArray(mapMsg);
+  }
+
+  delete msg;
+
   /*
   CkPrintf("Array1D constructed\n");
   */
-  delete msg;
 }
 
 void Array1D::RecvMapID(ArrayMap *mPtr, int mHandle)
