@@ -934,7 +934,8 @@ for its children, which are bound to it.
 */
 class ampiParent : public CBase_ampiParent {
     CProxy_TCharm threads;
-    ComlibInstanceHandle comlib;
+    ComlibInstanceHandle mcomlib;
+    ComlibInstanceHandle bcomlib;
     TCharm *thread;
     void prepareCtv(void);
 
@@ -1001,7 +1002,7 @@ class ampiParent : public CBase_ampiParent {
     CProxy_ampi tmpRProxy;
 
 public:
-    ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,ComlibInstanceHandle comlib_);
+    ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,ComlibInstanceHandle mcomlib_,ComlibInstanceHandle bcomlib_);
     ampiParent(CkMigrateMessage *msg);
     void ckJustMigrated(void);
     ~ampiParent();
@@ -1128,8 +1129,11 @@ public:
       groupStruct vec = group2vec(group);
       return getPosOp(thisIndex,vec);
     }
-    inline ComlibInstanceHandle getComlib(void) {
-      return comlib;
+    inline ComlibInstanceHandle getMcastComlib(void) {
+      return mcomlib;
+    }
+    inline ComlibInstanceHandle getBcastComlib(void) {
+      return bcomlib;
     }
     inline int getMyPe(void){
       return CkMyPe();
@@ -1283,18 +1287,26 @@ class ampi : public CBase_ampi {
     inline const int getIndexForRank(int r) const {return myComm.getIndexForRank(r);}
     inline const int getIndexForRemoteRank(int r) const {return myComm.getIndexForRemoteRank(r);}
 
-    inline CProxy_ampi comlibBegin(void) const {
-       CProxy_ampi p=getProxy();
-       if (comlibEnabled) {
+    inline CProxy_ampi mcomlibBegin(void) const {
+      CProxy_ampi p=getProxy();
+      if (comlibEnabled) {
        	ComlibDelegateProxy(&p);
-	parent->getComlib().beginIteration();
-       }
-       return p;
+	parent->getMcastComlib().beginIteration();
+      }
+      return p;
     }
-    void comlibEnd(void) {
-       if (comlibEnabled) parent->getComlib().endIteration();
+    void mcomlibEnd(void) {
+       if (comlibEnabled) parent->getMcastComlib().endIteration();
     }
 
+    inline CProxy_ampi bcomlibBegin(CProxy_ampi p) const {
+      if (comlibEnabled) {
+	ComlibDelegateProxy(&p);
+	parent->getBcastComlib().beginIteration();
+      }
+      return p;
+    }
+    
     CkDDT *getDDT(void) {return parent->myDDT;}
     CthThread getThread() { return thread->getThread(); }
 #if CMK_LBDB_ON

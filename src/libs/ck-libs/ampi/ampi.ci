@@ -7,7 +7,7 @@ module ampi {
   initproc void ampiProcInit(void);
 
   array[1D] ampiParent {
-    entry [notrace] ampiParent(int universeNo,CProxy_TCharm threads_, ComlibInstanceHandle comlib_);
+    entry [notrace] ampiParent(int universeNo,CProxy_TCharm threads_,ComlibInstanceHandle mcomlib_,ComlibInstanceHandle bcomlib_);
     entry void ResumeThread();
     entry void Checkpoint(int len, char dname[len]);
     entry void ExchangeProxy(CProxy_ampi);
