@@ -22,7 +22,7 @@ char *filename;
 PARAMETERS *num;
 THRESHOLD  *threshold;
 {
-    #define MAXLINE 100
+#define MAXLINE 100
     char line[100];
     char key[80], gunk[80];
     FILE *fp;

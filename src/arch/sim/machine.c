@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.6  1995-11-08 00:40:20  jyelon
+ * Revision 1.7  1995-11-08 00:42:13  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.6  1995/11/08  00:40:20  jyelon
  * *** empty log message ***
  *
  * Revision 1.5  1995/11/07  23:22:56  jyelon
@@ -360,7 +363,7 @@ char *argv[];
     if (requested_npe <= 0)
     {
        printf("Error: requested number of processors is invalid %d\n",requested_npe);
-       exit();
+       exit(1);
     }
 
     Cmi_numpes = requested_npe;
