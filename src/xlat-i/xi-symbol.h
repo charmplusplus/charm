@@ -608,6 +608,7 @@ class Message : public TEntity {
 #define SMIGRATE  0x20 //<- is magic migration constructor
 #define SCREATEHERE   0x40 //<- is a create-here-if-nonexistant
 #define SCREATEHOME   0x80 //<- is a create-at-home-if-nonexistant
+#define SIMMEDIATE    0x100 //<- is a immediate
 
 /* An entry construct */
 class Entry : public Member {
