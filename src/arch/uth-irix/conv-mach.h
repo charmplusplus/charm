@@ -8,7 +8,12 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.1  1997-03-21 23:22:55  jyelon
+ * Revision 1.2  1997-03-24 23:24:43  milind
+ * MAde uth-irix version to work by tweaking conv-mach.h flags and also
+ * modified uth-irix/conv-mach.csh to make megatest and megatest++
+ * correctly by removing the nm bugs.
+ *
+ * Revision 1.1  1997/03/21 23:22:55  jyelon
  * Blabla
  *
  * Revision 1.3  1997/02/13 09:31:45  jyelon
@@ -123,7 +128,7 @@
 #define CMK_STRINGS_USE_STRINGS_H                          0
 #define CMK_STRINGS_USE_STRING_H                           1
 
-#define CMK_THREADS_REQUIRE_ALLOCA_H                       0
+#define CMK_THREADS_REQUIRE_ALLOCA_H                       1
 #define CMK_THREADS_REQUIRE_PRAGMA_ALLOCA                  0
 #define CMK_THREADS_REQUIRE_NO_CPV                         1
 
@@ -143,8 +148,8 @@
 #define CMK_WAIT_USES_SYS_WAIT_H                           0
 #define CMK_WAIT_USES_WAITFLAGS_H                          0
 
-#define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   0
-#define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1
+#define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
+#define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
 #define CMK_USE_HP_MAIN_FIX                                0
 #define CMK_DONT_USE_HP_MAIN_FIX                           1
