@@ -587,7 +587,7 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep) const
 		CkAbort("Array index length (nInts) is too long-- did you "
 			"use bytes instead of integers?\n");
 #endif
-        CmiBool immediate = msg->array_isImmediate();
+        CmiBool immediate = (CmiBool)msg->array_isImmediate();
 #if CMK_IMMEDIATE_MSG
 	if (immediate) {
 	  msg_prepareSendImmediate(msg,ep,ckGetArrayID());
@@ -710,7 +710,7 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
   elBcastNo++;
   DEBB((AA"Delivering broadcast %d to element %s\n"AB,elBcastNo,idx2str(el)));
   int epIdx=bcast->array_ep();
-  return el->ckInvokeEntry(epIdx,bcast,false);
+  return el->ckInvokeEntry(epIdx,bcast,CmiFalse);
 }
 
 /// Deliver all needed broadcasts to the given local element

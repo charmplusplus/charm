@@ -87,25 +87,25 @@ public:
 		:type(callCFn) 
 		{d.cfn.onPE=CkMyPe(); d.cfn.fn=fn; d.cfn.param=param;}
 
-	CkCallback(int ep,const CkChareID &id,bool doInline=false)
+	CkCallback(int ep,const CkChareID &id,CmiBool doInline=CmiFalse)
 		:type(doInline?isendChare:sendChare) 
 		{d.chare.ep=ep; d.chare.id=id;}
 
 	CkCallback(int ep,const CkGroupID &id)
 		:type(bcastGroup) 
 		{d.group.ep=ep; d.group.id=id;}
-	CkCallback(int ep,int onPE,const CkGroupID &id,bool doInline=false)
+	CkCallback(int ep,int onPE,const CkGroupID &id,CmiBool doInline=CmiFalse)
 		:type(doInline?isendGroup:sendGroup) 
 		{d.group.ep=ep; d.group.id=id; d.group.onPE=onPE;}
-	CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline=false);
+	CkCallback(int ep,const CProxyElement_Group &grpElt,CmiBool doInline=CmiFalse);
 	
 	CkCallback(int ep,const CkArrayID &id)
 		:type(bcastArray) 
 		{d.array.ep=ep; d.array.id=id;}
-	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id,bool doInline=false)
+	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id,CmiBool doInline=CmiFalse)
 		:type(doInline?isendArray:sendArray) 
 		{d.array.ep=ep; d.array.id=id; d.array.idx.asMax()=idx;}
-	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInline=false);
+	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline=CmiFalse);
 
 	int isInvalid(void) const {return type==invalid;}
 

@@ -74,7 +74,7 @@ public:
 	 * This message is about to be processed by Charm.
 	 * If this function returns false, the message will not be processed.
 	 */
-	virtual bool processMessage(envelope *env,CkCoreState *ck) =0;
+	virtual CmiBool processMessage(envelope *env,CkCoreState *ck) =0;
 };
 
 /// All the state that's useful to have on the receive side in the Charm Core (ck.C)

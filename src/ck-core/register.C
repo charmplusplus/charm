@@ -47,7 +47,7 @@ int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
 	int ck_ep_flags)
 {
   EntryInfo *e = new EntryInfo(name, call, msgIdx, chareIdx);
-  if (ck_ep_flags & CK_EP_NOKEEP) e->noKeep=true;
+  if (ck_ep_flags & CK_EP_NOKEEP) e->noKeep=CmiTrue;
   return _entryTable.add(e);
 }
 
@@ -115,13 +115,13 @@ CkMarshallUnpackFn CkLookupMarshallUnpackFn(int epIndex)
 extern "C" 
 int CkDisableTracing(int epIdx) {
 	int oldStatus = _entryTable[epIdx]->traceEnabled;
-	_entryTable[epIdx]->traceEnabled=false;
+	_entryTable[epIdx]->traceEnabled=CmiFalse;
 	return oldStatus;
 }
 
 extern "C" 
 void CkEnableTracing(int epIdx) {
-	_entryTable[epIdx]->traceEnabled=true;
+	_entryTable[epIdx]->traceEnabled=CmiTrue;
 }
 
 //These pup functions are used by the CpdList interface, below

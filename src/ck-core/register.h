@@ -59,9 +59,9 @@ class EntryInfo {
     /// Our chare's index into the _chareTable
     int chareIdx;
     /// Charm++ Tracing enabled for this ep (can change dynamically)
-    bool traceEnabled; 
+    CmiBool traceEnabled; 
     /// Method doesn't keep (and delete) message passed in to it.
-    bool noKeep; 
+    CmiBool noKeep; 
     
     /** 
       A "marshall unpack" function:
@@ -75,7 +75,7 @@ class EntryInfo {
 
     EntryInfo(const char *n, CkCallFnPtr c, int m, int ci) : 
       name(n), call(c), msgIdx(m), chareIdx(ci), marshallUnpack(0)
-    { traceEnabled=true; noKeep=false; }
+    { traceEnabled=CmiTrue; noKeep=CmiFalse; }
 };
 
 /**

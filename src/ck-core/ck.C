@@ -1048,9 +1048,9 @@ public:
 		fclose(f);
 	}
 	
-	virtual bool processMessage(envelope *env,CkCoreState *ck) {
+	virtual CmiBool processMessage(envelope *env,CkCoreState *ck) {
 		fprintf(f,"%d %d %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent());
-		return true;
+		return CmiTrue;
 	}
 };
 
@@ -1067,13 +1067,13 @@ class CkMessageReplay : public CkMessageWatcher {
 			nextPE=nextSize=nextEvent=-1; //No destructor->record file just ends in the middle!
 		}
 	}
-	/// If this is the next message we need, advance and return true.
-	bool isNext(envelope *env) {
-		if (nextPE!=env->getSrcPe()) return false;
-		if (nextEvent!=env->getEvent()) return false;
+	/// If this is the next message we need, advance and return CmiTrue.
+	CmiBool isNext(envelope *env) {
+		if (nextPE!=env->getSrcPe()) return CmiFalse;
+		if (nextEvent!=env->getEvent()) return CmiFalse;
 		if (nextSize!=env->getTotalsize())
 			CkAbort("CkMessageReplay> Message size changed during replay");
-		return true;
+		return CmiTrue;
 	}
 	
 	/// This is a (short) list of messages we aren't yet ready for:
@@ -1098,18 +1098,18 @@ public:
 	CkMessageReplay(FILE *f_) :f(f_) { getNext(); }
 	~CkMessageReplay() {fclose(f);}
 	
-	virtual bool processMessage(envelope *env,CkCoreState *ck) {
+	virtual CmiBool processMessage(envelope *env,CkCoreState *ck) {
 		if (isNext(env)) { /* This is the message we were expecting */
 			REPLAYDEBUG("Executing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
 			getNext(); /* Advance over this message */
 			flush(); /* try to process queued-up stuff */
-			return true;
+			return CmiTrue;
 		}
 		else /*!isNext(env) */ {
 			REPLAYDEBUG("Queueing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent()
 				<<" because we wanted "<<nextPE<<" "<<nextSize<<" "<<nextEvent)
 			delayed.enq(env);
-			return false;
+			return CmiFalse;
 		}
 	}
 };

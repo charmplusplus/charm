@@ -454,7 +454,7 @@ void CkArrayPrefetch_readFromSwap(FILE *swapfile,void *objptr) {
   //Call the element's migration constructor in-place
   CkpvAccess(CkSaveRestorePrefetch)=1;
   int ctorIdx=_chareTable[elt->thisChareType]->migCtor;
-  elt->myRec->invokeEntry(elt,(CkMigrateMessage *)0,ctorIdx,true);
+  elt->myRec->invokeEntry(elt,(CkMigrateMessage *)0,ctorIdx,CmiTrue);
   CkpvAccess(CkSaveRestorePrefetch)=0;
   
   //Restore the element's data from disk:
@@ -482,7 +482,7 @@ class CkMigratable_initInfo {
 public:
 	CkLocRec_local *locRec;
 	int chareType;
-	bool forPrefetch; /* If true, this creation is only a prefetch restore-from-disk.*/
+	CmiBool forPrefetch; /* If true, this creation is only a prefetch restore-from-disk.*/
 };
 
 CkpvStaticDeclare(CkMigratable_initInfo,mig_initInfo);
@@ -538,7 +538,7 @@ void CkMigratable::ckJustMigrated(void) { }
 CkMigratable::~CkMigratable() {
 	DEBC((AA"In CkMigratable::~CkMigratable %s\n"AB,idx2str(thisIndexMax)));
 #if CMK_OUT_OF_CORE
-	isInCore=false;
+	isInCore=CmiFalse;
 	if (CkpvAccess(CkSaveRestorePrefetch)) 
 		return; /* Just saving to disk--don't deregister anything. */
 	/* We're really leaving or dying-- unregister from the ooc system*/
@@ -734,7 +734,7 @@ CmiBool CkLocRec_local::isObsolete(int nSprings,const CkArrayIndex &idx_)
 }
 
 CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
-	int epIdx,bool doFree) 
+	int epIdx,CmiBool doFree) 
 {
 	DEBS((AA"   Invoking entry %d on element %s\n"AB,epIdx,idx2str(idx)));
 	CmiBool isDeleted=CmiFalse; //Enables us to detect deletion during processing
@@ -789,7 +789,7 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type)
 			
 		if (msg->array_hops()>1)
 			myLocMgr->multiHop(msg);
-		return invokeEntry(obj,(void *)msg,msg->array_ep(),true);
+		return invokeEntry(obj,(void *)msg,msg->array_ep(),CmiTrue);
 	}
 }
 
@@ -1193,7 +1193,7 @@ CmiBool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 	CkMigratable_initInfo &i=CkpvAccess(mig_initInfo);
 	i.locRec=rec;
 	i.chareType=_entryTable[ctorIdx]->chareIdx;
-	if (!rec->invokeEntry(elt,ctorMsg,ctorIdx,true)) return CmiFalse;
+	if (!rec->invokeEntry(elt,ctorMsg,ctorIdx,CmiTrue)) return CmiFalse;
 
 #if CMK_OUT_OF_CORE
 	/* Register new element with out-of-core */

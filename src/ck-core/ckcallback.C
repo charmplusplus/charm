@@ -71,14 +71,14 @@ void *CkCallback::impl_thread_delay(void) const
 /*These can't be defined in the .h file like the other constructors
  * because we need CkCallback before CProxyElement* are defined.
  */
-CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline) 
+CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,CmiBool doInline) 
 	:type(doInline?isendGroup:sendGroup) 
 {
 	d.group.ep=ep; 
 	d.group.id=grpElt.ckGetGroupID(); 
 	d.group.onPE=grpElt.ckGetGroupPe();
 }
-CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInline)
+CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline)
 	:type(doInline?isendArray:sendArray) 
 {
 	d.array.ep=ep; 

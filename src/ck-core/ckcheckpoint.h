@@ -43,7 +43,7 @@ private:
 public:
 	ElementRestorer(const char *dirName_,CkLocMgr *dest_);
 	~ElementRestorer();
-	bool restore(void);
+	CmiBool restore(void);
 };
 
 /**

@@ -195,7 +195,7 @@ public:
    *   If doFree is true, the message is freed after send;
    *    if false, the message can be reused.
    */
-  CmiBool invokeEntry(CkMigratable *obj,void *msg,int idx,bool doFree);
+  CmiBool invokeEntry(CkMigratable *obj,void *msg,int idx,CmiBool doFree);
 
   virtual RecType type(void);
   virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx);
@@ -275,7 +275,7 @@ public:
 
   /// Execute the given entry method.  Returns false if the element 
   /// deleted itself or migrated away during execution.
-  inline CmiBool ckInvokeEntry(int epIdx,void *msg,bool doFree) 
+  inline CmiBool ckInvokeEntry(int epIdx,void *msg,CmiBool doFree) 
 	  {return myRec->invokeEntry(this,msg,epIdx,doFree);}
 
 protected:
@@ -452,7 +452,7 @@ class CkLocMgr : public IrrGroup {
 public:
 	CkLocMgr(CkGroupID map,CkGroupID lbdb,int numInitial);
 	CkLocMgr(CkMigrateMessage *m);
-	inline bool isLocMgr(void) { return true; }
+	inline CmiBool isLocMgr(void) { return CmiTrue; }
 	CkGroupID &getGroupID(void) {return thisgroup;}
 	inline CProxy_CkLocMgr &getProxy(void)
 		{return thisProxy;}
