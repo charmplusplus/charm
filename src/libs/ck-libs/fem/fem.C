@@ -1119,12 +1119,15 @@ FDECL void FTN_NAME(FEM_GET_GHOST_LIST,fem_get_ghost_list)
 /********* Roccom utility interface *******/
 
 /** Extract an IDXL_Side_t into Roccom format. */
-static void getRoccomPconn(IDXL_Side_t is,int bias,CkVec<int> &pconn)
+static void getRoccomPconn(IDXL_Side_t is,int bias,CkVec<int> &pconn,const int *paneFmChunk)
 {
 	int p,np=IDXL_Get_partners(is);
 	pconn.push_back(np);
 	for (p=0;p<np;p++) {
-		pconn.push_back(IDXL_Get_partner(is,p)+1); /* paneID's are 1-based */
+		int chunk=IDXL_Get_partner(is,p);
+		int pane=1+chunk;
+		if(paneFmChunk) pane=paneFmChunk[chunk];
+		pconn.push_back(pane);
 		int n,nn=IDXL_Get_count(is,p);
 		pconn.push_back(nn); /* number of shared nodes */
 		for (n=0;n<nn;n++)
@@ -1133,18 +1136,18 @@ static void getRoccomPconn(IDXL_Side_t is,int bias,CkVec<int> &pconn)
 }
 
 /** Extract all FEM communication information into Roccom format. */
-static CkVec<int> getRoccomPconn(int fem_mesh,int *ghost_len)
+static CkVec<int> getRoccomPconn(int fem_mesh,int *ghost_len,const int *paneFmChunk)
 {
 	CkVec<int> pconn;
 	// Shared nodes come first:
-	getRoccomPconn(IDXL_Get_send(FEM_Comm_shared(fem_mesh,FEM_NODE)),0,pconn);
+	getRoccomPconn(IDXL_Get_send(FEM_Comm_shared(fem_mesh,FEM_NODE)),0,pconn,paneFmChunk);
 	int realLen=pconn.size();
 	
 	// Sent ghost nodes:
-	getRoccomPconn(IDXL_Get_send(FEM_Comm_ghost(fem_mesh,FEM_NODE)),0,pconn);
+	getRoccomPconn(IDXL_Get_send(FEM_Comm_ghost(fem_mesh,FEM_NODE)),0,pconn,paneFmChunk);
 	// Received ghost nodes (use bias to switch to Roccom ghost node numbering)
 	getRoccomPconn(IDXL_Get_recv(FEM_Comm_ghost(fem_mesh,FEM_NODE)),
-		FEM_Mesh_get_length(fem_mesh,FEM_NODE),pconn);
+		FEM_Mesh_get_length(fem_mesh,FEM_NODE),pconn,paneFmChunk);
 	
 // Handle elements (much tougher!)
 	// Find list of element types
@@ -1164,9 +1167,9 @@ static CkVec<int> getRoccomPconn(int fem_mesh,int *ghost_len)
 	}
 	
 	// Sent ghost elements:
-	getRoccomPconn(IDXL_Get_send(elghost),0,pconn);
+	getRoccomPconn(IDXL_Get_send(elghost),0,pconn,paneFmChunk);
 	// Received ghost elements (shift all ghosts to start after real elements)
-	getRoccomPconn(IDXL_Get_recv(elghost),out_r,pconn);
+	getRoccomPconn(IDXL_Get_recv(elghost),out_r,pconn,paneFmChunk);
 	IDXL_Destroy(elghost);
 	
 	if (ghost_len) *ghost_len=pconn.size()-realLen;
@@ -1175,44 +1178,54 @@ static CkVec<int> getRoccomPconn(int fem_mesh,int *ghost_len)
 
 CDECL void FEM_Get_roccom_pconn_size(int fem_mesh,int *total_len,int *ghost_len)
 {
-	CkVec<int> pconn=getRoccomPconn(fem_mesh,ghost_len);
+	CkVec<int> pconn=getRoccomPconn(fem_mesh,ghost_len,NULL);
 	*total_len=pconn.size();
 }
 FORTRAN_AS_C(FEM_GET_ROCCOM_PCONN_SIZE,FEM_Get_roccom_pconn_size,fem_get_roccom_pconn_size,
         (int *mesh,int *tl,int *gl), (*mesh,tl,gl)
 )
 
-CDECL void FEM_Get_roccom_pconn(int fem_mesh,int *dest)
+CDECL void FEM_Get_roccom_pconn(int fem_mesh,const int *paneFmChunk,int *dest)
 {
-	CkVec<int> pconn=getRoccomPconn(fem_mesh,NULL);
+	CkVec<int> pconn=getRoccomPconn(fem_mesh,NULL,paneFmChunk);
 	for (unsigned int i=0;i<pconn.size();i++)
 		dest[i]=pconn[i];
 }
 FORTRAN_AS_C(FEM_GET_ROCCOM_PCONN,FEM_Get_roccom_pconn,fem_get_roccom_pconn,
-        (int *mesh,int *dest), (*mesh,dest)
+        (int *mesh,int *paneFmChunk,int *dest), (*mesh,paneFmChunk,dest)
 )
 
+int findChunk(int paneID,const int *paneFmChunk)
+{
+	for (int c=0;paneFmChunk[c]>0;c++)
+		if (paneFmChunk[c]==paneID)
+			return c;
+	CkError("Can't find chunk for pconn paneID %d!\n",paneID);
+	CmiAbort("Bad pconn array");
+	return -1;
+}
 
-const int* makeIDXLside(const int *src,IDXL_Side &s) {
+const int* makeIDXLside(const int *src,const int *paneFmChunk,IDXL_Side &s) {
 	int nPartner=*src++;
 	for (int p=0;p<nPartner;p++) {
-		int partnerName=*src++ - 1; /* paneID's are 1-based */
+		int paneID=*src++;
+		int chunk=findChunk(paneID,paneFmChunk);
 		int nComm=*src++;
 		for (int i=0;i<nComm;i++)
-			s.addNode(*src++ - 1,partnerName); /* nodeID's are 1-based */
+			s.addNode(*src++ - 1,chunk); /* nodeID's are 1-based */
 	}
 	return src;
 }
 
-CDECL void FEM_Set_roccom_pconn(int fem_mesh,const int *src,int total_len,int ghost_len)
+CDECL void FEM_Set_roccom_pconn(int fem_mesh,const int *paneFmChunk,const int *src,int total_len,int ghost_len)
 {
 	const char *caller="FEM_Set_roccom_pconn"; FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
 	/// FIXME: only sets shared nodes for now (should grab ghosts too)
-	makeIDXLside(src,m->node.shared);
+	makeIDXLside(src,paneFmChunk,m->node.shared);
 }
 FORTRAN_AS_C(FEM_SET_ROCCOM_PCONN,FEM_Set_roccom_pconn,fem_set_roccom_pconn,
-        (int *mesh,const int *src,int *tl,int *gl), (*mesh,src,*tl,*gl)
+        (int *mesh,const int *paneFmChunk,const int *src,int *tl,int *gl), (*mesh,paneFmChunk,src,*tl,*gl)
 )
 
 enum {comm_unshared, comm_shared, comm_primary};
