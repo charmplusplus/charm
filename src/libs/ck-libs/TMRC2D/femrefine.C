@@ -217,14 +217,8 @@ FDECL void FTN_NAME(FEM_REFINE2D_SPLIT,fem_refine2d_split)(int *meshID,int *node
 void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas){
 	int nnodes = FEM_Mesh_get_length(meshID,nodeID);
 	int nelems = FEM_Mesh_get_length(meshID,elemID);
-
-/*	for(int k=0;k<nnodes;k++){
-		printf(" node %d ( %.6f %.6f )\n",k,coord[2*k+0],coord[2*k+1]);
-	}*/
-	printf("coarsen %d %d \n",nnodes,nelems);	
-	REFINE2D_Coarsen(nnodes,coord,nelems,desiredAreas);
-	int nCollapses = REFINE2D_Get_Collapse_Length();
-	
+	int nodeCount=0,elemCount=0;
+		
 	/*
 		The attributes of the different entities
 	*/
@@ -244,11 +238,28 @@ void FEM_REFINE2D_Coarsen(int meshID,int nodeID,double *coord,int elemID,double 
 	AllocTable2d<int> &connTable = ((FEM_IndexAttribute *)connAttr)->get();
 	AllocTable2d<unsigned char>&validNodeTable = ((FEM_DataAttribute *)validNodeAttr)->getChar();
 	AllocTable2d<unsigned char>&validElemTable = ((FEM_DataAttribute *)validElemAttr)->getChar();
-
-	
 	int *connData = connTable.getData();
 	unsigned char *validNodeData = validNodeTable.getData();
 	unsigned char *validElemData = validElemTable.getData();
+
+
+	for(int k=0;k<nnodes;k++){
+		if(validNodeData[k]){
+			nodeCount++;
+		}
+	}
+	for(int k=0;k<nelems;k++){
+		if(validElemData[k]){
+			elemCount++;
+		}
+	}
+
+	printf("coarsen %d %d \n",nodeCount,elemCount);	
+	REFINE2D_Coarsen(nodeCount,coord,elemCount,desiredAreas);
+	int nCollapses = REFINE2D_Get_Collapse_Length();
+
+
+	
 	for(int collapseNo=0;collapseNo < nCollapses;collapseNo++){
 		int tri,nodeToThrow,nodeToKeep,flag,idxbase;
 		double nx,ny;
