@@ -512,6 +512,7 @@ typedef void (*CmiStartFn)(int argc, char **argv);
 CpvExtern(int, _ccd_numchecks);
 extern void  CcdCallBacks();
 #define CsdPeriodic() do{ if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks(); } while(0)
+#define CsdResetPeriodic()    CpvAccess(_ccd_numchecks) = 0;
 
 extern void  CsdEndIdle(void);
 extern void  CsdStillIdle(void);

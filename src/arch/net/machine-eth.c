@@ -56,6 +56,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
   if (s->sleepMs>0) {
     MACHSTATE1(3,"idle lock(%d) {",CmiMyPe())
     CmiIdleLock_sleep(&s->cs->idle,s->sleepMs);
+    CsdResetPeriodic();		/* check ccd callbacks when I am awakened */
     MACHSTATE1(3,"} idle lock(%d)",CmiMyPe())
   }
 #endif
@@ -63,7 +64,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
 
 void CmiNotifyIdle(void) {
   CmiIdleState s;
-  s.sleepMs=5;
+  s.sleepMs=5; 
   CmiNotifyStillIdle(&s);
 }
 
