@@ -244,9 +244,7 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
     // Zero out data structures for next cycle
     // CkPrintf("zeroing out data\n");
     for(int i=0; i < clients; i++) {
-#if 0
       delete statsMsgsList[i];
-#endif
       statsMsgsList[i]=0;
     }
     stats_msg_count=0;
