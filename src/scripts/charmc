@@ -93,7 +93,7 @@ printUsage() {
     echo "        -cc <new cc> -c++ <new CC>  -ld <new ld> -ld++ <new LD>"
     echo "        -cpp-option <opt> -ldro-option <opt> -cc-option <opt>"
     echo "        -c++-option <opt> -ld-option <opt> -ld++-option <opt>"
-    echo "        -pg <opt>"
+    echo "        -pg <opt> -build-shared -charm-shared"
     echo
     echo "  Charmc compiles C, C++, f77, f90, Converse, Converse++, Charm, "
     echo "and Charm++ programs.  The flags generally match those of cc or f77."
@@ -938,6 +938,7 @@ MakeSO() {
 	DoNoErrCheck $RM $OBJECT
 	Do $CMK_LD -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES \
 		$PRE_LIBRARIES $POST_LIBRARIES
+	Warning "Warning: creating $OBJECT "
 	Copyobj
 }
 
