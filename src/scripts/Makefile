@@ -108,8 +108,8 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h \
       conv-ccs.h ccs-client.c ccs-client.h ccs-auth.c ccs-auth.h CcsServer.java \
       debug-conv.h debug-charm.h conv-autoconfig.h \
       conv-mach.h conv-mach-opt.h conv-mach.sh conv-mach-opt.sh\
-      CkFutures.decl.h CkArray.decl.h CkReduction.decl.h \
-      LBDatabase.decl.h CentralLB.decl.h \
+      CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkReduction.decl.h \
+      CkFutures.decl.h LBDatabase.decl.h CentralLB.decl.h \
       RandCentLB.decl.h RecBisectBfLB.decl.h \
       MetisLB.decl.h RefineLB.decl.h \
       HeapCentLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
@@ -124,7 +124,8 @@ UTILHEADERS=pup.h pup_c.h ckhashtable.h cklists.h conv-lists.h \
 	sockRoutines.h sockRoutines.c
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
-	  ckfutures.h ckarray.h ckreduction.h readonly.h $(UTILHEADERS) \
+	  ckfutures.h ckarray.h cklocation.h ckreduction.h readonly.h \
+	  $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h \
@@ -256,7 +257,7 @@ libconv-utilf.a: $(LIBCONV_UTILF)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTILF)
 
 libccs-client.a: ccs-client.o
-	$(CHARMC) -cp ../lib/ -o $@ $<
+	$(CHARMC) -cp ../lib/ -o $@ ccs-client.o
 
 cpm.o: cpm.c $(CVHEADERS)
 	$(CHARMC) cpm.c
@@ -378,7 +379,7 @@ $(L)/libmemory-cache.o: memory-cache.c $(MEM_DEPS)
 CK_LIBS_CORE=libck.a
 
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
-           debug-message.o ckarray.o ckreduction.o \
+           debug-message.o cklocation.o ckarray.o ckreduction.o \
            tempo.o waitqd.o LBDatabase.o lbdb.o \
 	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
 	   ObjGraph.o \
@@ -487,11 +488,20 @@ CkReduction.decl.h CkReduction.def.h: ckreduction.ci charmxi
 ckreduction.o: ckreduction.C $(CKHEADERS)
 	$(CHARMC) -o ckreduction.o ckreduction.C
 
+CkMarshall.decl.h CkMarshall.def.h : ckmarshall.ci charmxi
+	$(CHARMC) ckmarshall.ci
+
 CkArray.decl.h CkArray.def.h : ckarray.ci charmxi
 	$(CHARMC) ckarray.ci
 
 ckarray.o: ckarray.C $(CKHEADERS)
 	$(CHARMC) -o ckarray.o ckarray.C
+
+CkLocation.decl.h: cklocation.ci charmxi
+	$(CHARMC) cklocation.ci
+
+cklocation.o: cklocation.C $(CKHEADERS)
+	$(CHARMC) -c cklocation.C
 
 
 ## Charm++ Load balancer (Dynamic load balancer)
