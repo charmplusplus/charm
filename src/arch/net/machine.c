@@ -483,7 +483,8 @@ void CmiEnableAsyncIO(int fd)
 void CmiEnableAsyncIO(int fd) { }
 #endif
 
-#if 1 /* <- what machines won't this work for? */
+/* We should probably have a set of "CMK_NONBLOCK_USE_..." defines here:*/
+#if !defined(_WIN32) || defined(__CYGWIN__)
 void CmiEnableNonblockingIO(int fd) {
   int on=1;
   if (fcntl(fd,F_SETFL,O_NONBLOCK,&on)<0) {
@@ -1487,6 +1488,11 @@ static void CmiStdoutInit(void) {
 		CmiEnableAsyncIO(readStdout[i]);
 #endif
 	}
+#else
+/*Windows system-- just fake reads for now*/
+# ifndef read
+#  define read(x,y,z) 0
+# endif
 #endif
 }
 
