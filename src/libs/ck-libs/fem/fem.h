@@ -1,6 +1,7 @@
 #ifndef _FEM_H
 #define _FEM_H
 
+#include <stdio.h>
 #include "fem.decl.h"
 
 extern CkChareID _mainhandle;
@@ -13,6 +14,8 @@ extern unsigned int _nchunks;
 #define FEM_REAL   2
 #define FEM_DOUBLE 3
 
+// temporary Datatype representation
+// will go away once MPI user-defined datatypes are ready
 struct DType {
   int base_type;
   int vec_len;
@@ -34,10 +37,10 @@ struct DType {
 
 class DataMsg : public CMessage_DataMsg
 {
+ public:
   int from;
   int len;
   void *data;
- public:
   int tag;
   DataMsg(int t, int f, int l) : 
     tag(t), from(f), len(l) { data = (void*) (this+1); }
@@ -66,11 +69,11 @@ class chunk : public ArrayElement1D
   int *gNodeNums; // global node numbers for local nodes [numNodes]
   int numNodesPerElem; // number of Nodes per element *a constant*
   int *gElemNums; // global element numbers for local elements [numElems]
-  int *conn; // elem->node connectivity, a 2-D array stored in column-order
+  int *conn; // elem->node connectivity, a 2-D array stored in row-order
   int *peNums; // which Pes I need to communicate with [numPes]
   int *numNodesPerPe; // How many Pes I need to communicate [numPes]
-  int *peStart; // starting index into nodesPerPe [numPes]
-  int *nodesPerPe; // Pes->nodes map, stored as CSR
+  int **nodesPerPe; // Pes->nodes map
+  int *gPeToIdx; // which local index does the global PeNum map to [TotalPes]
 
   DType dtypes[MAXDT];
   int nsize; // size of the app's node type, separation between values
@@ -99,26 +102,33 @@ class chunk : public ArrayElement1D
     return ntypes-1;
   }
   void update(int fid, void *nodes);
+  void reduce(int fid, void *nodes, void *outbuf);
   void set_node_size(int n) { nsize = n; }
  private:
   void update_field(DataMsg *);
   void send(int fid, void *nodes);
+  void readNodes(FILE*);
+  void readElems(FILE*);
+  void readComm(FILE*);
+  void readChunk(void);
 };
 
 void FEM_Done(void);
 void FEM_Set_Node_Size(int nsize);
 int FEM_Create_Field(int base_type, int vec_len);
 void FEM_Update_Field(int fid, void *nodes);
+void FEM_Reduce_Field(int fid, void *nodes, void *outbuf);
 
 // Fortran Bindings
 
 extern "C" void fem_set_node_size_(int *nsize);
 extern "C" int fem_create_field_(int *bt, int *vl);
 extern "C" void fem_update_field_(int *fid, void *nodes);
+extern "C" void fem_reduce_field_(int *fid, void *nodes, void *outbuf);
 
 // Utility functions for Fortran
 
-extern "C" int sizeof_(void *, void *);
+extern "C" int offsetof_(void *, void *);
 
 // to be provided by the application
 extern "C" void init_(void);

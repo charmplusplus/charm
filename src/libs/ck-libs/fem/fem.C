@@ -79,13 +79,15 @@ void sum(int len, d* lhs, d* rhs)
 }
 
 static inline void
-combine(int type, int len, void *lhs, void *rhs)
+combine(DType& dt, void *lhs, void *rhs)
 {
-  switch(type) {
-    case FEM_BYTE : sum(len,(char*)lhs, (char*)rhs); break;
-    case FEM_INT : sum(len,(int*)lhs, (int*) rhs); break;
-    case FEM_REAL : sum(len,(float*)lhs, (float*) rhs); break;
-    case FEM_DOUBLE : sum(len,(double*)lhs, (double*) rhs); break;
+  switch(dt.base_type) {
+    case FEM_BYTE : 
+      sum(dt.vec_len,(unsigned char*)lhs, (unsigned char*)rhs); 
+      break;
+    case FEM_INT : sum(dt.vec_len,(int*)lhs, (int*) rhs); break;
+    case FEM_REAL : sum(dt.vec_len,(float*)lhs, (float*) rhs); break;
+    case FEM_DOUBLE : sum(dt.vec_len,(double*)lhs, (double*) rhs); break;
   }
 }
 
@@ -108,6 +110,7 @@ chunk::run(void)
 {
   CtvInitialize(chunk*, _femptr);
   CtvAccess(_femptr) = this;
+  readChunk();
   // call the application-specific driver
   driver_(&numNodes, gNodeNums, &numElems, gElemNums, conn);
   FEM_Done();
@@ -135,15 +138,14 @@ chunk::send(int fid, void *nodes)
   int i, j;
   for(i=0;i<numPes;i++) {
     int dest = peNums[i];
-    int start = peStart[i];
     int num = numNodesPerPe[i];
     int len = dtypes[fid].length(num);
     DataMsg *msg = new (&len, 0) DataMsg(seqnum, thisIndex, len);
     len = dtypes[fid].length();
     void *data = msg->getData();
     void *src = nodes;
-    for(j=start;j<(start+num);j++) {
-      src = (void *)((char*)nodes+(j*nsize));
+    for(j=0;j<num;j++) {
+      src = (void *)((char*)nodes+(nodesPerPe[i][j]*nsize));
       memcpy(data, src, len);
       data = (void*) ((char*)data + len);
     }
@@ -182,6 +184,81 @@ chunk::update(int fid, void *nodes)
 void
 chunk::update_field(DataMsg *msg)
 {
+  void *data = msg->data;
+  int from = gPeToIdx[msg->from];
+  int nnodes = numNodesPerPe[from];
+  int i;
+  for(i=0;i<nnodes;i++) {
+    int cnum = nodesPerPe[from][i];
+    void *cnode = (void*) ((char*)curnodes+cnum*nsize);
+    combine(dtypes[curfid], cnode, data);
+    data = (void *)((char*)data+(dtypes[curfid].length()));
+  }
+}
+
+void
+chunk::reduce(int fid, void *nodes, void *outbuf)
+{
+}
+
+void
+chunk::readNodes(FILE* fp)
+{
+  fscanf(fp, "%d", &numNodes);
+  gNodeNums = new int[numNodes];
+  for(int i=0;i<numNodes;i++) {
+    fscanf(fp, "%d", &gNodeNums[i]);
+  }
+}
+
+void
+chunk::readElems(FILE* fp)
+{
+  fscanf(fp, "%d%d", &numElems, &numNodesPerElem);
+  gElemNums = new int[numElems];
+  conn = new int[numElems*numNodesPerElem];
+  for(int i=0; i<numElems; i++) {
+    fscanf(fp, "%d", &gElemNums[i]);
+    for(int j=0;j<numNodesPerElem;j++) {
+      fscanf(fp, "%d", &conn[i*numNodesPerElem+j]);
+    }
+  }
+}
+
+void
+chunk::readComm(FILE* fp)
+{
+  gPeToIdx = new int[numElements];
+  for(int p=0;p<numElements;p++) {
+    gPeToIdx[p] = (-1);
+  }
+  fscanf(fp, "%d", &numPes);
+  peNums = new int[numPes];
+  numNodesPerPe = new int[numPes];
+  nodesPerPe = new int*[numPes];
+  for(int i=0;i<numPes;i++) {
+    fscanf(fp, "%d%d", &peNums[i], &numNodesPerPe[i]);
+    gPeToIdx[peNums[i]] = i;
+    nodesPerPe[i] = new int[numNodesPerPe[i]];
+    for(int j=0;j<numNodesPerPe[i];j++) {
+      fscanf(fp, "%d", &nodesPerPe[i][j]);
+    }
+  }
+}
+
+void
+chunk::readChunk(void)
+{
+  char fname[32];
+  sprintf(fname, "meshdata.Pe%d", thisIndex);
+  FILE *fp = fopen(fname, "r");
+  if(fp==0) {
+    CkAbort("FEM: unable to open input file.\n");
+  }
+  readNodes(fp);
+  readElems(fp);
+  readComm(fp);
+  fclose(fp);
 }
 
 void 
@@ -212,6 +289,13 @@ FEM_Update_Field(int fid, void *nodes)
   cptr->update(fid, nodes);
 }
 
+void
+FEM_Reduce_Field(int fid, void *nodes, void *outbuf)
+{
+  chunk *cptr = CtvAccess(_femptr);
+  cptr->reduce(fid, nodes, outbuf);
+}
+
 // Fortran Bindings
 
 extern "C" void
@@ -232,10 +316,16 @@ fem_update_field_(int *fid, void *nodes)
   FEM_Update_Field(*fid, nodes);
 }
 
+extern "C" void
+fem_reduce_field_(int *fid, void *nodes, void *outbuf)
+{
+  FEM_Reduce_Field(*fid, nodes, outbuf);
+}
+
 // Utility functions for Fortran
 
 extern "C" int
-sizeof_(void *first, void *second)
+offsetof_(void *first, void *second)
 {
   return (int)((char *)second - (char*)first);
 }
