@@ -114,7 +114,7 @@ void PythonObject::execute (CkCcsRequestMsg *msg) {
 
   // check if this is just a request for prints
   if (pyPrint) {
-    PythonTable::iterator iter = CsvAccess(pyWorkers)->find((CmiUInt4)*pyPrint->interpreter);
+    PythonTable::iterator iter = CsvAccess(pyWorkers)->find(pyPrint->interpreter);
     if (iter == CsvAccess(pyWorkers)->end()) {
       // Malformed request!
       CkPrintf("PythonCCS: print request on invalid interpreter\n");
@@ -129,7 +129,7 @@ void PythonObject::execute (CkCcsRequestMsg *msg) {
 	CcsSendDelayedReply(msg->reply, strlen(str)+1, str);
 	if (iter->second.clientReady == -1) {
 	  // after the client flush the printed buffer, delete the entry
-	  CsvAccess(pyWorkers)->erase((CmiUInt4)*pyPrint->interpreter);
+	  CsvAccess(pyWorkers)->erase(pyPrint->interpreter);
 	}
 	CmiUnlock(CsvAccess(pyLock));
       } else {
@@ -148,13 +148,13 @@ void PythonObject::execute (CkCcsRequestMsg *msg) {
   // re-establish the pointers in the structure
   pyMsg->unpack();
 
-  if ((CmiUInt4)*pyMsg->interpreter > 0) {
+  if (pyMsg->interpreter > 0) {
     // the user specified an interpreter, check if it is free
     PythonTable::iterator iter;
-    if ((iter=CsvAccess(pyWorkers)->find((CmiUInt4)*pyMsg->interpreter))!=CsvAccess(pyWorkers)->end() && !iter->second.inUse) {
+    if ((iter=CsvAccess(pyWorkers)->find(pyMsg->interpreter))!=CsvAccess(pyWorkers)->end() && !iter->second.inUse) {
       // the interpreter already exists and it is not in use
       //CkPrintf("interpreter present and not in use\n");
-      pyReference = (CmiUInt4)*pyMsg->interpreter;
+      pyReference = pyMsg->interpreter;
       iter->second.inUse = true;
       // send back this number to the client, which is an ack
       CcsSendDelayedReply(msg->reply, sizeof(CmiUInt4), (void *)&pyReference);
@@ -234,10 +234,10 @@ void PythonObject::executeThread(CkCcsRequestMsg *msg) {
 
   // decide whether it is iterative or not
   if (!pyMsg->isIterate()) {
-    PyRun_SimpleString(pyMsg->code);
+    PyRun_SimpleString(pyMsg->code.code);
   } else {
     // compile the program
-    char *userCode = pyMsg->code;
+    char *userCode = pyMsg->code.code;
     struct _node* programNode = PyParser_SimpleParseString(userCode, Py_file_input);
     if (programNode==NULL) {
       CkPrintf("Program error\n");
@@ -269,7 +269,7 @@ void PythonObject::executeThread(CkCcsRequestMsg *msg) {
     }
 
     // load the user defined method
-    char *userMethod = userCode + strlen(userCode) + 1;
+    char *userMethod = pyMsg->methodName.methodName;
     PyObject *item = PyDict_GetItemString(dict, userMethod);
     if (item==NULL) {
       CkPrintf("Method not found\n");
@@ -289,7 +289,7 @@ void PythonObject::executeThread(CkCcsRequestMsg *msg) {
     PyTuple_SetItem(arg, 0, part);
 
     // construct the iterator calling the user defined method in the interiting class
-    void *userIterator = (void *)(userMethod + strlen(userMethod) + 1);
+    PythonIterator *userIterator = pyMsg->info.info;
     int more = buildIterator(part, userIterator);
 
     // iterate over all the provided iterators from the user class

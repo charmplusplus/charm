@@ -33,7 +33,7 @@ class PythonIterator {
 
   // pack the message into a contiguous memory and return the pointer to this
   // memory. the memory needs to be persistent (i.e. cannot disappear) and will
-  // be freed automatically
+  // be freed automatically. It should not modify the original data.
   virtual PythonIterator *pack() {
     void *memory = malloc(size());
     memcpy (memory, this, size());
@@ -55,19 +55,34 @@ class PythonAbstract {
   CmiUInt4 magic;
 };
 
+/* the unions with the "dummy" variables are to force a 64 bit space, which will
+   allow compatibility with 64 bit machines */
+/* all the integers (CmiUInt4) are interpreted in network byte order */
 class PythonExecute : private PythonAbstract {
   friend class PythonObject;
  private:
-  int codeLength;
-  char * code;
+  CmiUInt4 codeLength;
+  union {
+    char * code;
+    char dummy[8];
+  } code;
 
   /* the following parameters are used when the iterator mode is invoked */
-  int methodNameLength;
-  char * methodName;
-  int infoSize; /* must contain the size of the info structure passed */
-  PythonIterator *info;
+  CmiUInt4 methodNameLength;
+  union {
+    char * methodName;
+    char dummy[8];
+  } methodName;
+  CmiUInt4 infoSize; /* must contain the size of the info structure passed */
+  union {
+    PythonIterator *info;
+    char dummy[8];
+  } info;
 
-  char interpreter[4]; /* request for an existing interpreter */
+  /* interpreter is not sent in network byte order, since it does not need to be
+     interpreted by the client. The only two values which need to be interpreted
+     are 0 and -1 which are the same in both big and little endian notation. */
+  CmiUInt4 interpreter; /* request for an existing interpreter */
   char flags;
   /* flags has the following parameters: (bit 1 is the MSB)
      bit 1: isPersistent
@@ -84,8 +99,8 @@ class PythonExecute : private PythonAbstract {
 
   /* constructors */
   /* by default, if the code is persistent, then the prints will be maintained */
-  PythonExecute(char *_code, bool _persistent=false, bool _highlevel=false, char _interp[4]=0);
-  PythonExecute(char *_code, char *_method, PythonIterator *_info, bool _persistent=false, bool _highlevel=false, char _interp[4]=0);
+  PythonExecute(char *_code, bool _persistent=false, bool _highlevel=false, CmiUInt4 _interp=0);
+  PythonExecute(char *_code, char *_method, PythonIterator *_info, bool _persistent=false, bool _highlevel=false, CmiUInt4 _interp=0);
   ~PythonExecute();
 
   /* routines to set all parameters in the class */
@@ -96,31 +111,36 @@ class PythonExecute : private PythonAbstract {
   void setIterate(bool _set);
   void setHighLevel(bool _set);
   void setKeepPrint(bool _set);
-  void setInterpreter(char i[4]) { memcpy(interpreter, i, 4); };
+  void setInterpreter(CmiUInt4 i) { interpreter = i; };
 
   bool isPersistent() { return flags & FLAG_PERSISTENT; };
   bool isIterate() { return flags & FLAG_ITERATE; };
   bool isHighLevel() { return flags & FLAG_HIGHLEVEL; };
   bool isKeepPrint() { return flags & FLAG_KEEPPRINT; };
-  void getInterpreter(char i[4]) { memcpy(i, interpreter, 4); };
+  CmiUInt4 getInterpreter() { return interpreter; };
 
   int size();
   char *toString();
+  inline char *pack() { return toString(); };
   void unpack();
+
+  void print(); /* for debugging */
 };
 
 class PythonPrint : private PythonAbstract {
   friend class PythonObject;
  private:
-  char interpreter[4];;
+  CmiUInt4 interpreter;
   char flags;
   /* flags has the following parameters: (bit 1 is the MSB)
      bit 1: noWait
   */
   static const char FLAG_WAIT = 0x80;
  public:
-  PythonPrint(char _interp[4], bool Wait=true);
+  PythonPrint(CmiUInt4 _interp, bool Wait=true);
 
   void setWait(bool _set);
   bool isWait() { return flags & FLAG_WAIT; };
+
+  void print(); /* for debugging */
 };

@@ -30,20 +30,25 @@ int main (int argc, char** argv) {
   wrapper.setKeepPrint(true);
 
   // if there is a third argument means kill the server
-  char buffer[10];
+  CmiUInt4 remoteValue;
+  char buffer[100];
   if (argc>3) {
     CcsSendRequest (&server, "kill", 0, 1, code.c_str());
   }
   else {
     CcsSendRequest (&server, "pyCode", 0, wrapper.size(), wrapper.toString());
-    CcsRecvResponse (&server, 10, buffer, 100);
-    printf("buffer: %d\n",*(int*)buffer);
-    PythonPrint request(buffer);
+    CcsRecvResponse (&server, 10, &remoteValue, sizeof(remoteValue));
+    printf("buffer: %d\n",remoteValue);
+    PythonPrint request(remoteValue);
     sleep(2);
+    //request.print();
     CcsSendRequest (&server, "pyCode", 0, sizeof(request), &request);
+    //request.print();
     CcsRecvResponse (&server, 100, buffer, 100);
+    //request.print();
     printf("responce: %s\n",buffer);
     sleep(2);
+    //request.print();
     CcsSendRequest (&server, "pyCode", 0, sizeof(request), &request);
     CcsRecvResponse (&server, 100, buffer, 100);
     printf("responce: %x\n",*buffer);
