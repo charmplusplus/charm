@@ -6,15 +6,8 @@
  *****************************************************************************/
 
 #include <stdio.h>
-#include <sys/time.h>
-#include <assert.h>
-#include <errno.h>
 #include "converse.h"
 #include <mpi.h>
-
-#if CMK_DONT_USE_PMPI
-#include "pmpi2mpi.h"
-#endif
 
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
@@ -57,6 +50,10 @@
 #define CMI_GET_CYCLE(msg)               ((CmiMsgHeaderBasic *)msg)->root
 
 #define CMI_DEST_RANK(msg)               ((CmiMsgHeaderBasic *)msg)->rank
+#define CMI_MAGIC(msg)			 ((CmiMsgHeaderBasic *)msg)->magic
+
+/* FIXME: need a random number that everyone agrees ! */
+#define CHARM_MAGIC_NUMBER		 126
 
 #if !CMK_OPTIMIZE
 static int checksum_flag = 0;
@@ -87,7 +84,12 @@ static int checksum_flag = 0;
 #endif
 
 
+/*
+ to avoid MPI's in order delivery, changing MPI Tag all the time
+*/
 #define TAG     1375
+static int mpi_tag = TAG;
+#define NEW_MPI_TAG	mpi_tag++; if (mpi_tag == MPI_TAG_UB) mpi_tag=TAG;
 
 int _Cmi_numpes;
 int               _Cmi_mynode;    /* Which address space am I */
@@ -168,7 +170,7 @@ static CmiNodeLock  timerLock = 0;
 
 void CmiTimerInit(void)
 {
-  starttimer = PMPI_Wtime();
+  starttimer = MPI_Wtime();
 /*  timerLock = CmiCreateLock(); */
 }
 
@@ -176,7 +178,7 @@ double CmiTimer(void)
 {
   double t;
   if (timerLock) CmiLock(timerLock);
-  t = PMPI_Wtime() - starttimer;
+  t = MPI_Wtime() - starttimer;
   if (timerLock) CmiUnlock(timerLock);
   return t;
 }
@@ -187,7 +189,7 @@ double CmiWallTimer(void)
 #if CMK_SMP
   if (timerLock) CmiLock(timerLock);
 #endif
-  t = PMPI_Wtime() - starttimer;
+  t = MPI_Wtime() - starttimer;
 #if CMK_SMP
   if (timerLock) CmiUnlock(timerLock);
 #endif
@@ -200,7 +202,7 @@ double CmiCpuTimer(void)
 #if CMK_SMP
   if (timerLock) CmiLock(timerLock);
 #endif
-  t = PMPI_Wtime() - starttimer;
+  t = MPI_Wtime() - starttimer;
 #if CMK_SMP
   if (timerLock) CmiUnlock(timerLock);
 #endif
@@ -343,8 +345,8 @@ static int CmiAllAsyncMsgsSent(void)
      
    while(msg_tmp!=0) {
     done = 0;
-    if (MPI_SUCCESS != PMPI_Test(&(msg_tmp->req), &done, &sts)) 
-      CmiAbort("CmiAllAsyncMsgsSent: PMPI_Test failed!\n");
+    if (MPI_SUCCESS != MPI_Test(&(msg_tmp->req), &done, &sts)) 
+      CmiAbort("CmiAllAsyncMsgsSent: MPI_Test failed!\n");
     if(!done)
       return 0;
     msg_tmp = msg_tmp->next;
@@ -363,8 +365,8 @@ int CmiAsyncMsgSent(CmiCommHandle c) {
     msg_tmp = msg_tmp->next;
   if(msg_tmp) {
     done = 0;
-    if (MPI_SUCCESS != PMPI_Test(&(msg_tmp->req), &done, &sts)) 
-      CmiAbort("CmiAsyncMsgSent: PMPI_Test failed!\n");
+    if (MPI_SUCCESS != MPI_Test(&(msg_tmp->req), &done, &sts)) 
+      CmiAbort("CmiAsyncMsgSent: MPI_Test failed!\n");
     return ((done)?1:0);
   } else {
     return 1;
@@ -387,8 +389,8 @@ static void CmiReleaseSentMessages(void)
   MACHSTATE1(2,"CmiReleaseSentMessages begin on %d {", CmiMyPe());
   while(msg_tmp!=0) {
     done =0;
-    if(PMPI_Test(&(msg_tmp->req), &done, &sts) != MPI_SUCCESS)
-      CmiAbort("CmiReleaseSentMessages: PMPI_Test failed!\n");
+    if(MPI_Test(&(msg_tmp->req), &done, &sts) != MPI_SUCCESS)
+      CmiAbort("CmiReleaseSentMessages: MPI_Test failed!\n");
     if(done) {
       MACHSTATE2(3,"CmiReleaseSentMessages release one %d to %d", CmiMyPe(), msg_tmp->destpe);
       MsgQueueLen--;
@@ -420,18 +422,23 @@ static int PumpMsgs(void)
   MACHSTATE(2,"PumpMsgs begin {");
   while(1) {
     flg = 0;
-    res = PMPI_Iprobe(MPI_ANY_SOURCE, TAG, MPI_COMM_WORLD, &flg, &sts);
+    res = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flg, &sts);
     if(res != MPI_SUCCESS)
-      CmiAbort("PMPI_Iprobe failed\n");
+      CmiAbort("MPI_Iprobe failed\n");
     if(!flg) break;
     recd = 1;
-    PMPI_Get_count(&sts, MPI_BYTE, &nbytes);
+    MPI_Get_count(&sts, MPI_BYTE, &nbytes);
     msg = (char *) CmiAlloc(nbytes);
-    if (MPI_SUCCESS != PMPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
-      CmiAbort("PumpMsgs: PMPI_Recv failed!\n");
+    if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,MPI_ANY_TAG, MPI_COMM_WORLD,&sts)) 
+      CmiAbort("PumpMsgs: MPI_Recv failed!\n");
 
     MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
     CMI_CHECK_CHECKSUM(msg, nbytes);
+    if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
+      CmiPrintf("Charm++ Warning: Non Charm++ Message Received. \n");
+      CmiFree(msg);
+      continue;
+    }
 #if CMK_NODE_QUEUE_AVAILABLE
     if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
       CmiPushNode(msg);
@@ -478,9 +485,9 @@ static void PumpMsgsBlocking(void)
     _MEMCHECK(buf);
   }
 
-  if (MPI_SUCCESS != PMPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
+  if (MPI_SUCCESS != MPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,MPI_ANY_TAG, MPI_COMM_WORLD,&sts)) 
       CmiAbort("PumpMsgs: PMP_Recv failed!\n");
-   PMPI_Get_count(&sts, MPI_BYTE, &nbytes);
+   MPI_Get_count(&sts, MPI_BYTE, &nbytes);
    msg = (char *) CmiAlloc(nbytes);
    memcpy(msg, buf, nbytes);
 
@@ -558,8 +565,8 @@ static void CommunicationServer(int sleepTime)
       PumpMsgs();
     }
     MACHSTATE(2, "CommunicationServer barrier begin {");
-    if (MPI_SUCCESS != PMPI_Barrier(MPI_COMM_WORLD))
-      CmiAbort("ConverseExit: PMPI_Barrier failed!\n");
+    if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
+      CmiAbort("ConverseExit: MPI_Barrier failed!\n");
     MACHSTATE(2, "} CommunicationServer barrier end");
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
     if (CmiMyNode() == 0){
@@ -567,7 +574,7 @@ static void CommunicationServer(int sleepTime)
     }
 #endif
     MACHSTATE(2, "} CommunicationServer EXIT");
-    PMPI_Finalize();
+    MPI_Finalize();
     exit(0);   
   }
 }
@@ -638,6 +645,7 @@ void *CmiGetNonLocal(void)
   return msg;
 }
 
+/* called in non-smp mode */
 void CmiNotifyIdle(void)
 {
   CmiReleaseSentMessages();
@@ -723,9 +731,11 @@ static int SendMsgBuf()
 	PumpMsgs();
       }
       MACHSTATE2(3,"MPI_send to node %d rank: %d{", node, CMI_DEST_RANK(msg));
+      CMI_SET_MAGIC(msg) = CHARM_MAGIC_NUMBER;
       CMI_SET_CHECKSUM(msg, size);
-      if (MPI_SUCCESS != PMPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
-        CmiAbort("CmiAsyncSendFn: PMPI_Isend failed!\n");
+      if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,mpi_tag,MPI_COMM_WORLD,&(msg_tmp->req))) 
+        CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
+      NEW_MPI_TAG;
       MACHSTATE(3,"}MPI_send end");
       MsgQueueLen++;
       if(sent_msgs==0)
@@ -794,9 +804,11 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 	CmiReleaseSentMessages();
 	PumpMsgs();
   }
+  CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
   CMI_SET_CHECKSUM(msg, size);
-  if (MPI_SUCCESS != PMPI_Isend((void *)msg,size,MPI_BYTE,destPE,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
-    CmiAbort("CmiAsyncSendFn: PMPI_Isend failed!\n");
+  if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,mpi_tag,MPI_COMM_WORLD,&(msg_tmp->req))) 
+    CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
+  NEW_MPI_TAG;
   MsgQueueLen++;
   if(sent_msgs==0)
     sent_msgs = msg_tmp;
@@ -840,7 +852,7 @@ void SendSpanningChildren(int size, char *msg)
   int startpe = CMI_BROADCAST_ROOT(msg)-1;
   int i;
 
-  assert(startpe>=0 && startpe<_Cmi_numpes);
+  CmiAssert(startpe>=0 && startpe<_Cmi_numpes);
 
   for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
     int p = cs->pe-startpe;
@@ -849,7 +861,7 @@ void SendSpanningChildren(int size, char *msg)
     if (p > _Cmi_numpes - 1) break;
     p += startpe;
     p = p%_Cmi_numpes;
-    assert(p>=0 && p<_Cmi_numpes && p!=cs->pe);
+    CmiAssert(p>=0 && p<_Cmi_numpes && p!=cs->pe);
     CmiSyncSendFn1(p, size, msg);
   }
 }
@@ -1096,10 +1108,10 @@ void ConverseExit(void)
     PumpMsgs();
     CmiReleaseSentMessages();
   }
-  if (MPI_SUCCESS != PMPI_Barrier(MPI_COMM_WORLD)) 
-    CmiAbort("ConverseExit: PMPI_Barrier failed!\n");
+  if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD)) 
+    CmiAbort("ConverseExit: MPI_Barrier failed!\n");
   ConverseCommonExit();
-  PMPI_Finalize();
+  MPI_Finalize();
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
   if (CmiMyPe() == 0){
     CmiPrintf("End of program\n");
@@ -1237,9 +1249,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
 #endif
   
-  PMPI_Init(&argc, &argv);
-  PMPI_Comm_size(MPI_COMM_WORLD, &_Cmi_numnodes);
-  PMPI_Comm_rank(MPI_COMM_WORLD, &_Cmi_mynode);
+  MPI_Init(&argc, &argv);
+  MPI_Comm_size(MPI_COMM_WORLD, &_Cmi_numnodes);
+  MPI_Comm_rank(MPI_COMM_WORLD, &_Cmi_mynode);
   /* processor per node */
   _Cmi_mynodesize = 1;
   CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize);
@@ -1329,7 +1341,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 void CmiAbort(const char *message)
 {
   CmiError(message);
-  PMPI_Abort(MPI_COMM_WORLD, 1);
+  MPI_Abort(MPI_COMM_WORLD, 1);
 }
 
 
@@ -1346,7 +1358,7 @@ static void ** AllocBlock(unsigned int len)
   blk=(void **)CmiAlloc(len*sizeof(void *));
   if(blk==(void **)0) {
     CmiError("Cannot Allocate Memory!\n");
-    PMPI_Abort(MPI_COMM_WORLD, 1);
+    MPI_Abort(MPI_COMM_WORLD, 1);
   }
   return blk;
 }
