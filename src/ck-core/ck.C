@@ -176,6 +176,7 @@ CProxy& CProxy::operator=(const CProxy &src) {
 	if (delegatedPtr) delegatedPtr->ref();
 	// subtle: do unref *after* ref, because it's possible oldPtr == delegatedPtr
 	if (oldPtr) oldPtr->unref();
+	return *this;
 }
 
 void CProxy::pup(PUP::er &p) {
