@@ -11,8 +11,15 @@ Asks for refinements occasionally.
 #include <math.h>
 #include "charm++.h"
 #include "fem.h"
+/*My HEADERS*/
+#include "ckvector3d.h"
+#include "charm-api.h"
+#include "fem_mesh.h"
+
+
 #include "netfem.h"
 #include "refine.h"
+#include "femrefine.h"
 #include "pgm.h"
 
 //The material constants c, as computed by fortran mat_const
@@ -33,6 +40,9 @@ static void die(const char *str) {
   CkExit();
 }
 
+/**schak*/
+void resize_nodes(void *data,int *len,int *max);
+void resize_elems(void *data,int *len,int *max);
 
 #define NANCHECK 1 /*Check for NaNs at each timestep*/
 
@@ -64,12 +74,24 @@ init(void)
     fclose(f);
   }
   CkPrintf("Passing node coords to framework\n");
-  FEM_Set_node(nPts,2);
-  FEM_Set_node_data((double *)pts);
-  delete[] pts;
+
+	//Register the node entity and its data arrays that will be used later. This
+	// needs to be done so that the width of the data segments are set correctly and
+	// can be used later
+	FEM_Register_entity(FEM_Mesh_default_write(),FEM_NODE,NULL,nPts,nPts,resize_nodes);
+	for(int k=0;k<=4;k++){
+		if(k != 0){
+			vector2d *t = new vector2d[nPts];
+			FEM_Register_array(FEM_Mesh_default_write(),FEM_NODE,FEM_DATA+k,t,FEM_DOUBLE,2);
+		}else{
+			FEM_Register_array(FEM_Mesh_default_write(),FEM_NODE,FEM_DATA+k,pts,FEM_DOUBLE,2);
+		}
+	}
+	double *td = new double[nPts];
+	FEM_Register_array(FEM_Mesh_default_write(),FEM_NODE,FEM_DATA+5,td,FEM_DOUBLE,1);
 
   int nEle=0;
-  connRec *ele=NULL;
+  int *ele=NULL;
   CkPrintf("Reading elements from %s\n",eleName);
   //Open and read the element connectivity file
   {
@@ -78,15 +100,15 @@ init(void)
     if (f==NULL) die("Can't open element file!");
     fgets(line,1024,f);
     if (1!=sscanf(line,"%d",&nEle)) die("Can't read number of elements!");
-    ele=new connRec[nEle];
+    ele=new int[3*nEle];
     for (int i=0;i<nEle;i++) {
       int elNo;
       if (NULL==fgets(line,1024,f)) die("Can't read element input line!");
-      if (4!=sscanf(line,"%d%d%d%d",&elNo,&ele[i][0],&ele[i][1],&ele[i][2])) 
+      if (4!=sscanf(line,"%d%d%d%d",&elNo,&ele[3*i+0],&ele[3*i+1],&ele[3*i+2])) 
 	die("Can't parse element input line!");
-      ele[i][0]--; //Fortran to C indexing
-      ele[i][1]--; //Fortran to C indexing
-      ele[i][2]--; //Fortran to C indexing
+      ele[3*i+0]--; //Fortran to C indexing
+      ele[3*i+1]--; //Fortran to C indexing
+      ele[3*i+2]--; //Fortran to C indexing
       
     }
     fclose(f);
@@ -94,9 +116,16 @@ init(void)
   
   CkPrintf("Passing elements to framework\n");
 
-  FEM_Set_elem(0,nEle,0,3);
-  FEM_Set_elem_conn(0,(int *)ele);
-  delete[] ele;
+	// Register the Element entity and its connectivity array. Register the
+	// data arrays to set up the widths correctly at the beginning
+	FEM_Register_entity(FEM_Mesh_default_write(),FEM_ELEM,NULL,nEle,nEle,resize_nodes);
+	FEM_Register_array(FEM_Mesh_default_write(),FEM_ELEM,FEM_CONN,ele,FEM_INDEX_0,3);
+	
+	for(int k=0;k<3;k++){
+		void *t = new double[nEle];
+		FEM_Register_array(FEM_Mesh_default_write(),FEM_ELEM,FEM_DATA+k,t,FEM_DOUBLE,1);
+	}
+	
 
 /*Build the ghost layer for refinement border*/
   FEM_Add_ghost_layer(2,0); /*2 nodes/tuple, do not add ghost nodes*/
@@ -110,7 +139,7 @@ init(void)
 struct myGlobals {
   int nnodes,maxnodes;
   int nelems,maxelems;
-  connRec *conn; //Element connectivity table
+  int *conn; //Element connectivity table
 
   vector2d *coord; //Undeformed coordinates of each node
   vector2d *R_net, *d, *v, *a; //Physical fields of each node
@@ -130,7 +159,7 @@ void pup_myGlobals(pup_er p,myGlobals *g)
   int nnodes=g->nnodes, nelems=g->nelems;
   if (pup_isUnpacking(p)) {
     g->coord=new vector2d[g->maxnodes];
-    g->conn=new connRec[g->maxelems];
+    g->conn=new int[3*g->maxelems];
     g->R_net=new vector2d[g->maxnodes]; //Net force
     g->d=new vector2d[g->maxnodes];//Node displacement
     g->v=new vector2d[g->maxnodes];//Node velocity
@@ -168,9 +197,9 @@ void pup_myGlobals(pup_er p,myGlobals *g)
 //Return the signed area of triangle i
 double calcArea(myGlobals &g, int i)
 {
-	int n1=g.conn[i][0];
-	int n2=g.conn[i][1];
-	int n3=g.conn[i][2];
+	int n1=g.conn[3*i+0];
+	int n2=g.conn[3*i+1];
+	int n3=g.conn[3*i+2];
 	vector2d a=g.coord[n1];
 	vector2d b=g.coord[n2];
 	vector2d c=g.coord[n3];
@@ -194,88 +223,8 @@ void checkTriangle(myGlobals &g, int i)
 	}
 }
 
-class myRefineClient {
-  myGlobals &g;
-  int lastA,lastB,lastD;
-  int lastSplit(int A,int B) {
-    if (A==lastA && B==lastB) return lastD;
-    if (A==lastB && B==lastA) return lastD;
-    return -1;
-  }
-
-public:
-  myRefineClient(myGlobals &g_) :g(g_) {
-    lastA=lastB=lastD=-1;
-  }
-  void split(int triNo,int A,int B,int C, double frac) {
-    CkPrintf("---- Splitting edge %d-%d (%d), of triangle %d at %.2f\n",
-    	A,B,C, triNo, frac);
-    checkTriangle(g,triNo);
-    
-    //Figure out what we're adding:
-    connRec &oldConn=g.conn[triNo];
-    int D; //New node
-    if (-1==(D=lastSplit(A,B))) 
-    { //This edge wasn't just split-- create a new node
-      D=g.nnodes++;
-      CkPrintf("---- Adding node %d\n",D);
-      if (g.nnodes>g.maxnodes) CkAbort("Added too many nodes to mesh!\n");
-      lastA=A; lastB=B; lastD=D;
-      if (A>=g.nnodes) CkAbort("Calculated A is invalid!");
-      if (B>=g.nnodes) CkAbort("Calculated B is invalid!");
-      
-      //Interpolate node's physical quantities
-      g.coord[D]=g.coord[A]*(1-frac)+g.coord[B]*frac;
-      vector2d z(0,0);
-      g.d[D]=g.d[A]*(1-frac)+g.d[B]*frac;
-      g.v[D]=g.v[A]*(1-frac)+g.v[B]*frac;
-      g.a[D]=g.a[A]*(1-frac)+g.a[B]*frac;
-      g.R_net[D]=z;
-      //m_i will be reconstructed after all insertions
-
-      //Create new node's communication list:
-      int AandB[2];
-      AandB[0]=A;
-      AandB[1]=B;
-      /* Add a new node D between A and B */
-      IDXL_Add_entity(
-      	FEM_Comm_shared(FEM_Mesh_default_read(),FEM_NODE),
-	D,2,AandB);
-    }
-
-  //Add the new triangle
-    int newTri=g.nelems++;
-    CkPrintf("---- Adding triangle %d\n",newTri);
-    if (g.nelems>g.maxelems) CkAbort("Added too many elements to mesh!\n");
-    connRec &newConn=g.conn[newTri];
-    
-  //Update the element connectivity:
-    int i;
-    //Replace A by D in the old triangle
-    for (i=0;i<3;i++)
-      if (oldConn[i]==A) oldConn[i]=D;
-    //Insert new triangle CAD
-    // OLD WAY: 
-    //newConn[0]=C; newConn[1]=A; newConn[2]=D;
-    // NEW WAY: preserves orientation and makes connectivity consistent
-    //          with what TMR framework has
-    for (i=0; i<3; i++) {
-      if (oldConn[i] == B)
-	newConn[i] = D;
-      else if (oldConn[i] == C)
-	newConn[i] = C;
-      else if (oldConn[i] == D)
-	newConn[i] = A;
-    }
-      
-    
-    checkTriangle(g,triNo);
-    checkTriangle(g,newTri);
-  }
-};
-
 //Compute forces on constant-strain triangles:
-void CST_NL(const vector2d *coor,const connRec *lm,vector2d *R_net,
+void CST_NL(const vector2d *coor,const int *lm,vector2d *R_net,
 	    const vector2d *d,const double *c,
 	    int numnp,int numel,
 	    double *S11o,double *S22o,double *S12o);
@@ -296,10 +245,11 @@ void advanceNodes(const double dt,int nnodes,const vector2d *coord,
 #if NANCHECK
     if (((R_n.x-R_n.x)!=0)) {
 	    CkPrintf("R_net[%d]=NaN at (%.4f,%.4f)   ",i,coord[i].x,coord[i].y);
+			CmiAbort("nan node");
 	    someNaNs=true;
     }
     if (fabs(d[i].x)>1.0) {
-	    CkPrintf("d[%d] large at (%.4f,%.4f)   ",i,coord[i].x,coord[i].y);
+	    CkPrintf("d[%d] %f large at (%.4f,%.4f)   ",i,d[i].x,coord[i].x,coord[i].y);
 	    someNaNs=true;
     }
 #endif
@@ -336,11 +286,11 @@ void calcMasses(myGlobals &g) {
 	for (i=0;i<g.nnodes;i++) m_i[i]=0.0;
 	//Add mass from surrounding triangles:
 	for (i=0;i<g.nelems;i++) {
-		int n1=g.conn[i][0];
-		int n2=g.conn[i][1];
-		int n3=g.conn[i][2];
+		int n1=g.conn[3*i+0];
+		int n2=g.conn[3*i+1];
+		int n3=g.conn[3*i+2];
 		double area=calcArea(g,i);
-		if (1 || i%100==0) CkPrintf("Triangle %d has area %.3g\n",i,area);
+		if (1 || i%100==0) CkPrintf("Triangle %d (%d %d %d) has area %.3g\n",i,n1,n2,n3,area);
 		double mass=0.333*density*(thickness*area);
 		m_i[n1]+=mass;
 		m_i[n2]+=mass;
@@ -356,6 +306,108 @@ void calcMasses(myGlobals &g) {
 	}
 }
 
+void init_myGlobal(myGlobals *g){
+	g->coord = g->R_net = g->d = g->v = g->a = NULL;
+	g->m_i = NULL;
+	g->conn = NULL;
+	g->S11 = g->S22 = g->S12 = NULL;
+}
+
+
+void resize_nodes(void *data,int *len,int *max){
+	printf("[%d] resize nodes called len %d max %d\n",FEM_My_partition(),*len,*max);
+	FEM_Register_entity(FEM_Mesh_default_read(),FEM_NODE,data,*len,*max,resize_nodes);
+	myGlobals *g = (myGlobals *)data;
+
+	vector2d *coord=g->coord,*R_net=g->R_net,*d=g->d,*v=g->v,*a=g->a;
+	double *m_i=g->m_i;
+	
+	
+	g->coord=new vector2d[*max];
+	g->coord[0].x = 0.9;
+	g->coord[0].y = 0.8;
+	g->maxnodes = *max;
+  g->R_net=new vector2d[g->maxnodes]; //Net force
+  g->d=new vector2d[g->maxnodes];//Node displacement
+  g->v=new vector2d[g->maxnodes];//Node velocity
+  g->a=new vector2d[g->maxnodes];//Node accelleration
+  g->m_i=new double[g->maxnodes];//Node mass
+	
+	if(coord != NULL){
+		for(int k=0;k<*len;k++){
+			printf("before resize node %d ( %.6f %.6f ) \n",k,coord[k].x,coord[k].y);
+		}
+	}	
+	
+	FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA,(void *)g->coord,FEM_DOUBLE,2);
+	FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+1,(void *)g->R_net,FEM_DOUBLE,2);
+	FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+2,(void *)g->d,FEM_DOUBLE,2);
+	FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+3,(void *)g->v,FEM_DOUBLE,2);
+	FEM_Register_array(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+4,(void *)g->a,FEM_DOUBLE,2);
+	FEM_Register_array_layout(FEM_Mesh_default_read(),FEM_NODE,FEM_DATA+5,(void *)g->m_i,g->m_i_fid);
+
+	for(int k=0;k<*len;k++){
+		printf("after resize node %d ( %.6f %.6f )\n",k,g->coord[k].x,g->coord[k].y);
+	}
+
+
+	if(coord != NULL){
+		delete [] coord;
+		delete [] R_net;
+		delete [] d;
+		delete [] v;
+		delete [] a;
+		delete [] m_i;
+		
+	}
+
+};
+
+
+void resize_elems(void *data,int *len,int *max){
+	printf("[%d] resize elems called len %d max %d\n",FEM_My_partition(),*len,*max);
+	FEM_Register_entity(FEM_Mesh_default_read(),FEM_ELEM,data,*len,*max,resize_elems);
+	myGlobals *g = (myGlobals *)data;
+	
+	int *conn=g->conn;
+	double *S11 = g->S11,*S22 = g->S22,*S12 = g->S12;
+	
+	g->conn = new int[3*(*max)];
+	g->maxelems = *max;
+ 
+ 	g->S11=new double[g->maxelems];
+  g->S22=new double[g->maxelems];
+  g->S12=new double[g->maxelems];
+	
+	FEM_Register_array(FEM_Mesh_default_read(),FEM_ELEM,FEM_CONN,(void *)g->conn,FEM_INDEX_0,3);	
+	CkPrintf("Connectivity array starts at %p \n",g->conn);
+	FEM_Register_array(FEM_Mesh_default_read(),FEM_ELEM,FEM_DATA,(void *)g->S11,FEM_DOUBLE,1);	
+	FEM_Register_array(FEM_Mesh_default_read(),FEM_ELEM,FEM_DATA+1,(void *)g->S22,FEM_DOUBLE,1);	
+	FEM_Register_array(FEM_Mesh_default_read(),FEM_ELEM,FEM_DATA+2,(void *)g->S12,FEM_DOUBLE,1);	
+	
+	if(conn != NULL){
+		delete [] conn;
+		delete [] S11;
+		delete [] S22;
+		delete [] S12;
+	}
+};
+
+
+
+
+void repeat_after_split(void *data){
+	myGlobals *g = (myGlobals *)data;
+	g->nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
+	g->nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
+	for(int k=0;k<g->nnodes;k++){
+		printf(" node %d ( %.6f %.6f )\n",k,g->coord[k].x,g->coord[k].y);
+	}
+
+	calcMasses(*g);
+};
+
+
 extern "C" void
 driver(void)
 {
@@ -365,50 +417,38 @@ driver(void)
 
 /*Add a refinement object to FEM array*/
 CkPrintf("[%d] begin init\n",myChunk);
-  REFINE2D_Init();
+  FEM_REFINE2D_Init();
 CkPrintf("[%d] end init\n",myChunk);
 
   myGlobals g;
   FEM_Register(&g,(FEM_PupFn)pup_myGlobals);
-  
-  FEM_Get_node(&g.nnodes,&ignored);
-  g.maxnodes=10000+3*g.nnodes; //Silly: large maximum instead of slow additions
-  g.coord=new vector2d[g.maxnodes];
-  FEM_Get_node_data((double *)g.coord);  
 
-  int nghost=0;    
-  FEM_Get_elem(0,&nghost,&ignored,&ignored);
-  g.nelems=FEM_Get_elem_ghost(0);
-  g.maxelems=20000+6*g.nelems;
-  g.conn=new connRec[(g.maxelems>nghost)?g.maxelems:nghost];
-  FEM_Get_elem_conn(0,(int *)g.conn);
+	init_myGlobal(&g);
   
-  /*Set up the global ID's, for refinement*/
-  int *gid=new int[2*nghost];
-  for (i=0;i<g.nelems;i++) {
-    gid[2*i+0]=myChunk; //Local element-- my chunk
-    gid[2*i+1]=i; //Local number
-  }
-  int gid_fid=FEM_Create_field(FEM_INT,2,0,2*sizeof(int));
-  FEM_Update_ghost_field(gid_fid,0,gid);
+ 	g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
+	int maxNodes = g.nnodes;
+  g.maxnodes=2*maxNodes;
+  
+	g.m_i_fid=FEM_Create_field(FEM_DOUBLE,1,0,sizeof(double));
 
-  /*Set up refinement framework*/
-  REFINE2D_NewMesh(g.nelems,nghost,(int *)g.conn,gid);
-  delete[] gid;
+	
+	resize_nodes((void *)&g,&g.nnodes,&maxNodes);
   
-  g.S11=new double[g.maxelems];
-  g.S22=new double[g.maxelems];
-  g.S12=new double[g.maxelems];
+	
+	int nghost=0;
+  
+	g.nelems=FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
+  g.maxelems=g.nelems;
+
+	resize_elems((void *)&g,&g.nelems,&g.maxelems);
+
+	FEM_REFINE2D_Newmesh(FEM_Mesh_default_read(),FEM_NODE,FEM_ELEM);
+  
   
   //Initialize associated data
-  g.R_net=new vector2d[g.maxnodes]; //Net force
-  g.d=new vector2d[g.maxnodes];//Node displacement
-  g.v=new vector2d[g.maxnodes];//Node velocity
-  g.a=new vector2d[g.maxnodes];//Node accelleration
-  g.m_i=new double[g.maxnodes];//Node mass
-  g.m_i_fid=FEM_Create_field(FEM_DOUBLE,1,0,sizeof(double));
-  for (i=0;i<g.maxnodes;i++)
+  for (i=0;i<g.maxnodes;i++){
     g.R_net[i]=g.d[i]=g.v[i]=g.a[i]=vector2d(0.0);
+	}
 
 //Apply a small initial perturbation to positions
   for (i=0;i<g.nnodes;i++) {
@@ -419,26 +459,28 @@ CkPrintf("[%d] end init\n",myChunk);
 
   int fid=FEM_Create_field(FEM_DOUBLE,2,0,sizeof(vector2d));
   
-  for (i=0;i<g.nelems;i++)
+  for (i=0;i<g.nelems;i++){
     checkTriangle(g,i);
+	}	
 
   //Timeloop
-  if (CkMyPe()==0)
+  if (CkMyPe()==0){
     CkPrintf("Entering timeloop\n");
+	}	
   int tSteps=0x70FF00FF;
   calcMasses(g);
   double startTime=CkWallTimer();
   double curArea=2.0e-5;
   for (int t=0;t<tSteps;t++) {
     if (1) { //Structural mechanics
-    //Compute forces on nodes exerted by elements
-	CST_NL(g.coord,g.conn,g.R_net,g.d,matConst,g.nnodes,g.nelems,g.S11,g.S22,g.S12);
+    	//Compute forces on nodes exerted by elements
+			CST_NL(g.coord,g.conn,g.R_net,g.d,matConst,g.nnodes,g.nelems,g.S11,g.S22,g.S12);
 	
-    //Communicate net force on shared nodes
-	FEM_Update_field(fid,g.R_net);
+	    //Communicate net force on shared nodes
+			FEM_Update_field(fid,g.R_net);
 
-    //Advance node positions
-	advanceNodes(dt,g.nnodes,g.coord,g.R_net,g.a,g.v,g.d,g.m_i,(t%4)==0);
+	    //Advance node positions
+			advanceNodes(dt,g.nnodes,g.coord,g.R_net,g.a,g.v,g.d,g.m_i,(t%4)==0);
     
     }
 
@@ -448,24 +490,24 @@ CkPrintf("[%d] end init\n",myChunk);
     startTime=curTime;
     if (CkMyPe()==0 && (t%64==0))
 	    CkPrintf("%d %.6f sec for loop %d \n",CkNumPes(),total,t);
-    if (0 && t%16==0) {
+ /*   if (0 && t%16==0) {
 	    CkPrintf("    Triangle 0:\n");
 	    for (int j=0;j<3;j++) {
 		    int n=g.conn[0][j];
 		    CkPrintf("    Node %d: coord=(%.4f,%.4f)  d=(%.4g,%.4g)\n",
 			     n,g.coord[n].x,g.coord[n].y,g.d[n].x,g.d[n].y);
 	    }
-    }
+    }*/
 //    if (t%512==0)
 //      FEM_Migrate();
 
     if (t%128==0) { //Refinement:
       vector2d *loc=new vector2d[2*g.nnodes];
       for (i=0;i<g.nnodes;i++) {
-	loc[i]=g.coord[i];//+g.d[i];
+				loc[i]=g.coord[i];//+g.d[i];
       }
       double *areas=new double[g.nelems];
-      curArea=curArea*0.99;
+      curArea=curArea*0.98;
       for (i=0;i<g.nelems;i++) {
       #if 0
         double origArea=8e-8; //Typical triangle size
@@ -478,23 +520,14 @@ CkPrintf("[%d] end init\n",myChunk);
       }
       
       CkPrintf("[%d] Starting refinement step: %d nodes, %d elements to %.3g\n",
-	       myChunk,g.nnodes,g.nelems,curArea);  
-      REFINE2D_Split(g.nnodes,(double *)loc,g.nelems,areas);
-      delete[] areas;
-      delete[] loc;
-      myRefineClient c(g);
-      int nSplits=REFINE2D_Get_Split_Length();
-      for (int splitNo=0;splitNo<nSplits;splitNo++) {
-        int tri,A,B,C;
-        double frac;
-        REFINE2D_Get_Split(splitNo,(int *)(g.conn),&tri,&A,&B,&C,&frac);      
-        c.split(tri,A,B,C,frac);
-      
-        //Since the connectivity changed, update the masses
-        calcMasses(g);
-      }
-      
-      REFINE2D_Check(g.nelems,(int *)g.conn,g.nnodes);
+	       myChunk,g.nnodes,g.nelems,curArea);
+			
+			FEM_REFINE2D_Split(FEM_Mesh_default_read(),FEM_NODE,(double *)loc,FEM_ELEM,areas);
+			repeat_after_split((void *)&g);
+
+			
+      g.nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
+			g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
              
       CkPrintf("[%d] Done with refinement step: %d nodes, %d elements\n",
 	       myChunk,g.nnodes,g.nelems);

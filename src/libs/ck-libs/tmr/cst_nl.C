@@ -1,7 +1,7 @@
 #include "pgm.h"
 
 //Compute forces on constant-strain triangles:
-void CST_NL(const vector2d *coor,const connRec *lm,vector2d *R_net,
+void CST_NL(const vector2d *coor,const int *lm,vector2d *R_net,
 	    const vector2d *d,const double *c,
 	    int numnp,int numel,
 	    double *S11o,double *S22o,double *S12o)
@@ -12,9 +12,9 @@ void CST_NL(const vector2d *coor,const connRec *lm,vector2d *R_net,
   double E11,E22,E12;
 
   for (i=0;i<numel;i++) {
-    n1=lm[i][0];
-    n2=lm[i][1];
-    n3=lm[i][2];
+    n1=lm[3*i+0];
+    n2=lm[3*i+1];
+    n3=lm[3*i+2];
           u1 = d[n1].x;
           u2 = d[n2].x;
           u3 = d[n3].x;

@@ -1,0 +1,154 @@
+#include "ckvector3d.h"
+#include "charm-api.h"
+#include "refine.h"
+#include "fem.h"
+#include "fem_mesh.h"
+#include "femrefine.h"
+
+
+void FEM_REFINE2D_Init(){
+  REFINE2D_Init();	
+}
+
+
+void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID){
+	int nelems = FEM_Mesh_get_length(meshID,elemID);
+	int	nghost = FEM_Mesh_get_length(meshID,elemID+FEM_GHOST);
+	int total = nghost + nelems;
+	int *tempMesh = new int[3*total];
+	FEM_Mesh_data(meshID,elemID,FEM_CONN,&tempMesh[0],0,nelems,FEM_INDEX_0,3);
+	FEM_Mesh_data(meshID,elemID+FEM_GHOST,FEM_CONN,&tempMesh[nelems],0,nghost,FEM_INDEX_0,3);
+
+	for(int t=nelems;t<total;t++){
+		for(int j=0;j<3;j++){
+			if(FEM_Is_ghost_index(tempMesh[3*t+j])){
+				tempMesh[3*t+j] += nelems;
+			}
+		}	
+	}
+	
+  /*Set up the global ID's, for refinement*/
+	int myID = FEM_My_partition();
+  int *gid=new int[2*total];
+  for (int i=0;i<nelems;i++) {
+    gid[2*i+0]=myID; //Local element-- my chunk
+    gid[2*i+1]=i; //Local number
+  }
+  int gid_fid=FEM_Create_field(FEM_INT,2,0,2*sizeof(int));
+  FEM_Update_ghost_field(gid_fid,0,gid);
+	
+  /*Set up refinement framework*/
+  REFINE2D_NewMesh(nelems,total,(int *)tempMesh,gid);
+	delete [] gid;
+	delete [] tempMesh;
+}
+
+
+
+
+void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *desiredAreas){
+	int nnodes = FEM_Mesh_get_length(meshID,nodeID);
+	int nelems = FEM_Mesh_get_length(meshID,elemID);
+
+	for(int k=0;k<nnodes;k++){
+		printf(" node %d ( %.6f %.6f )\n",k,coord[2*k+0],coord[2*k+1]);
+	}
+	printf("%d %d \n",nnodes,nelems);	
+	REFINE2D_Split(nnodes,coord,nelems,desiredAreas);
+	printf("called REFINE2D_Split\n");
+	
+	int lastA=-1,lastB=-1,lastD=-1;
+  
+	int nSplits=REFINE2D_Get_Split_Length();
+	
+	/*find out the attributes of the node 
+		TODO: replace FEM_NODE by paramter that specifies node type
+	*/
+	FEM_Entity *e=FEM_Entity_lookup(meshID,FEM_NODE,"REFINE2D_Mesh");
+	CkVec<FEM_Attribute *> *attrs = e->getAttrVec();
+	
+	FEM_Entity *elem = FEM_Entity_lookup(meshID,FEM_ELEM,"REFIN2D_Mesh_elem");
+	CkVec<FEM_Attribute *> *elemattrs = elem->getAttrVec();
+
+	FEM_Attribute *connAttr = elem->lookup(FEM_CONN,"REFINE2D_Mesh");
+	if(connAttr == NULL){
+		CkAbort("Grrrr element without connectivity \n");
+	}
+	AllocTable2d<int> &connTable = ((FEM_IndexAttribute *)connAttr)->get();
+	
+  for (int splitNo=0;splitNo<nSplits;splitNo++){
+    int tri,A,B,C,D;
+    double frac;
+		// current number of nodes in the mesh
+		int cur_nodes = FEM_Mesh_get_length(meshID,FEM_NODE);
+		int *connData = connTable.getData();
+
+
+		REFINE2D_Get_Split(splitNo,(int *)(connData),&tri,&A,&B,&C,&frac);
+		if((A == lastA && B == lastB ) || (A == lastB && B == lastA)){
+			//node already exists
+			D = lastD;
+		}else{
+			//new node 
+			D = cur_nodes;
+      CkPrintf("---- Adding node %d\n",D);					
+			lastA=A;
+			lastB=B;
+			lastD=D;
+      if (A>=cur_nodes) CkAbort("Calculated A is invalid!");
+      if (B>=cur_nodes) CkAbort("Calculated B is invalid!");
+			e->setLength(cur_nodes+1);
+			for(int i=0;i<attrs->size();i++){
+				FEM_Attribute *a = (FEM_Attribute *)(*attrs)[i];
+				if(a->getAttr()<FEM_ATTRIB_TAG_MAX){
+					FEM_DataAttribute *d = (FEM_DataAttribute *)a;
+					d->interpolate(A,B,D,frac);
+				}	
+			}
+			int AandB[2];
+      AandB[0]=A;
+		  AandB[1]=B;
+      /* Add a new node D between A and B */
+		  IDXL_Add_entity(FEM_Comm_shared(FEM_Mesh_default_read(),FEM_NODE),D,2,AandB);
+		}
+		//add a new triangle
+		/*TODO: replace  FEM_ELEM with parameter*/
+		int newTri = FEM_Mesh_get_length(meshID,FEM_ELEM);
+    CkPrintf("---- Adding triangle %d after splitting %d \n",newTri,tri);
+		elem->setLength(newTri+1);
+		for(int j=0;j<elemattrs->size();j++){
+			if((*elemattrs)[j]->getAttr() == FEM_CONN){
+				CkPrintf("elem attr conn code %d \n",(*elemattrs)[j]->getAttr());
+				//it is a connectivity attribute.. get the connectivity right
+				FEM_IndexAttribute *connAttr = (FEM_IndexAttribute *)(*elemattrs)[j];
+				AllocTable2d<int> &table = connAttr->get();
+				CkPrintf("Table of connectivity attribute starts at %p width %d \n",table[0],connAttr->getWidth());
+				int *oldRow = table[tri];
+				int *newRow = table[newTri];
+				for (int i=0;i<3;i++){
+		      if (oldRow[i]==A) oldRow[i]=D;	
+					CkPrintf("In triangle %d %d replaced by %d \n",tri,A,D);
+				}	
+				for (int i=0; i<3; i++) {
+		      if (oldRow[i] == B){
+						newRow[i] = D;
+					}	
+	      	else if (oldRow[i] == C){
+						newRow[i] = C;
+					}	
+		      else if (oldRow[i] == D){
+						newRow[i] = A;
+					}	
+   			}
+				CkPrintf("New Triangle %d  (%d %d %d) conn %p\n",newTri,newRow[0],newRow[1],newRow[2],newRow);
+			}else{
+				FEM_Attribute *elattr = (FEM_Attribute *)(*elemattrs)[j];
+					elattr->copyEntity(newTri,*elattr,tri);
+			}
+		}
+
+		
+	}
+
+}
+

@@ -1,17 +1,17 @@
-OPTS=-g -Wall
+OPTS=-g
 CHARMDIR=../../../..
 CHARMC=$(CHARMDIR)/bin/charmc $(OPTS) 
 
 OBJS=cst_nl.o pgm.o 
 
 DEST=$(CHARMDIR)/lib/libmodulerefine.a
-LOBJS=refine.o tri.o
+LOBJS=refine.o tri.o femrefine.o
 HEADERS=refine.h refinef.h
 
 all: $(DEST) pgm
 
 pgm: $(DEST) $(OBJS)
-	$(CHARMC) -L. -o pgm $(OBJS) -language fem -module netfem -module refine
+	$(CHARMC) -L. -o pgm $(OBJS) -language fem -module netfem -module refine -memory paranoid
 
 pgm.o: pgm.C pgm.h
 	$(CHARMC) -c pgm.C
@@ -25,6 +25,9 @@ $(DEST): $(LOBJS) $(HEADERS)
 
 refine.o: refine.C refine.h tri.h
 	$(CHARMC) -c refine.C
+
+femrefine.o: femrefine.C femrefine.h refine.h
+	$(CHARMC) -c femrefine.C
 
 tri.o: tri.C tri.h 
 	$(CHARMC) -c tri.C
