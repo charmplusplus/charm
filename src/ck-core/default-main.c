@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1997-02-13 09:30:37  jyelon
+ * Revision 2.16  1997-03-19 04:30:50  jyelon
+ * Eliminated all the nonsense pertaining to the SIM version.
+ *
+ * Revision 2.15  1997/02/13 09:30:37  jyelon
  * Modified default-main for new main structure.
  *
  * Revision 2.14  1996/11/08 22:22:46  brunner
@@ -73,79 +76,19 @@ static char ident[] = "@(#)$Header$";
 
 #include "converse.h"
 
-
-#if CMK_DEFAULT_MAIN_USES_COMMON_CODE
-
-CpvExtern(int, numHeapEntries);
-CpvExtern(int, numCondChkArryElts);
 CpvExtern(int, CsdStopFlag);
 
-charm_main(argc, argv)
+void charm_init(argc, argv)
 int argc;
 char **argv;
 {
   InitializeCharm(argv);
   StartCharm(argv, (void *)0);
-  CpvAccess(CsdStopFlag)=0;
-  CsdScheduler(-1) ;
-  EndCharm();
-  ConverseExit();
 }
 
 main(argc, argv)
 int argc;
 char *argv[];
 {
-  ConverseInit(argc, argv, charm_main);
+  ConverseInit(argc, argv, charm_init, 1, 1);
 }
-
-#endif
-
-#if CMK_DEFAULT_MAIN_USES_SIMULATOR_CODE
-
-CpvExtern(int, numHeapEntries);
-CpvExtern(int, numCondChkArryElts);
-CpvExtern(int, CsdStopFlag);
-CsvExtern(int, CsdStopCount);
-
-void defaultmainModuleInit()
-{
-}
-
-main(argc, argv)
-int argc;
-char *argv[];
-{
-  int i;
-
-  for(i=0; i<CmiNumPes(); i++) 
-  {
-        CmiUniContextSwitch(i); 
-        InitializeCharm(argv);
-  }
-
-  for(i=0; i<CmiNumPes(); i++) {CmiUniContextSwitch(i); ConverseInit(argv); }
-
-  for(i=0; i<CmiNumPes(); i++) {
-          CmiUniContextSwitch(i); 
-          StartCharm(argv, (void *)0); 
-  }
-
-  for(i=0; i<CmiNumPes(); i++)
-    {CmiUniContextSwitch(i);CpvAccess(CsdStopFlag)=0;}
-  
-  CsvAccess(CsdStopCount) = CmiNumPes();
-  CmiUniContextSwitch(0);
-  CsdUniScheduler(-1) ;
-
-  for(i=0; i<CmiNumPes(); i++) { CmiUniContextSwitch(i); CkEndCharm();}
-  for(i=0; i<CmiNumPes(); i++) {CmiUniContextSwitch(i);CpvAccess(CsdStopFlag)=0;}
-  CsvAccess(CsdStopCount) = CmiNumPes();
-  CmiUniContextSwitch(0);
-  CsdUniScheduler(-1) ;
-
-  for(i=0; i<CmiNumPes(); i++) { CmiUniContextSwitch(i); ConverseExit() ;}
-}
-
-#endif
-
