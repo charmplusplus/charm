@@ -342,8 +342,13 @@ do
 		shift
 		;;
 
-	-D*|-I*)
+	-D*)
 		OPTSC="$OPTSC $arg"
+		;;
+
+	-I*)
+		OPTSC="$OPTSC $arg"
+		OPTS_F90="$OPTS_F90 $arg"
 		;;
 
 	-LANG*)
@@ -693,11 +698,11 @@ do
 		NU_OBJ=$BASE.o
 		;;
 	*.f|*.F)
-		Do $CMK_CF90 $OPTSC $OPTS_F90 -freeform -I$CHARMINC -c $FILE -o $BASE.o
+		Do $CMK_CF90 $OPTS_F90 -freeform -I$CHARMINC -c $FILE -o $BASE.o
 		NU_OBJ=$BASE.o
 		;;
 	*.f90|*.F90)
-		Do $CMK_CF90 $OPTSC $OPTS_F90 -I$CHARMINC -c $FILE -o $BASE.o
+		Do $CMK_CF90 $OPTS_F90 -I$CHARMINC -c $FILE -o $BASE.o
 		;;
 	*.fc|*.FC)
 		Abort "I'm not yet smart enough to compile $FILE"
