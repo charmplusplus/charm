@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1998-03-07 09:07:51  jyelon
+ * Revision 2.3  1998-05-13 19:58:19  milind
+ * Added Wall Timers.
+ *
+ * Revision 2.2  1998/03/07 09:07:51  jyelon
  * Added stdio.h --- this gets us NULL and size_t the right way.
  *
  * Revision 2.1  1998/03/02 14:58:04  jyelon
@@ -41,10 +44,12 @@
 #define CK_QUEUEING_BLIFO  CQS_QUEUEING_BLIFO
 
 #define CkTimer()  	((int)(CmiTimer() * 1000.0))
+#define CkWallTimer()  	((int)(CmiWallTimer() * 1000.0))
 #define CkUTimer()	((int)(CmiWallTimer() * 1000000.0))
 #define CkHTimer()	((int)(CmiWallTimer() / 3600.0))
 
 #define CTimer()  	((int)(CmiTimer() * 1000.0))
+#define CWallTimer()  	((int)(CmiWallTimer() * 1000.0))
 #define CUTimer()	((int)(CmiWallTimer() * 1000000.0))
 #define CHTimer()	((int)(CmiWallTimer() / 3600.0))
 
