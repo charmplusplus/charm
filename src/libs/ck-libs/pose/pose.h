@@ -18,12 +18,13 @@
 #include "pose.decl.h"
 
 /// Synchronization strategy constants
-#define STORE_RATE 100      // default checkpoint rate: 1 for every n events
-#define SPEC_WINDOW 50      // speculative event window size
-#define MIN_LEASH 10        // min speculative window for adaptive strategy
-#define MAX_LEASH 100       // max  "     "     "     "        "     "
+#define MAX_ITERATIONS 5   // maximum forward executions per Step call
+#define STORE_RATE 10       // default checkpoint rate: 1 for every n events
+#define SPEC_WINDOW 1      // speculative event window size
+#define MIN_LEASH 1        // min speculative window for adaptive strategy
+#define MAX_LEASH 10       // max  "     "     "     "        "     "
 #define LEASH_FLEX 1        // leash increment
-#define GVT_WINDOW 500      // Maximum time GVT can advance
+#define GVT_WINDOW 100      // Maximum time GVT can advance
 
 /// Load balancer contants
 #define LB_SKIP 51          // LB done 1/LB_SKIP times GVT iterations

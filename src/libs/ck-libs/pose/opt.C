@@ -191,12 +191,14 @@ void opt::CancelEvents()
     }
     if (it == last) {
       parent->cancels.RemoveItem(it); // Clean up
-      RBevent = eq->RecomputeRollbackTime();
+      if (RBevent && (RBevent->timestamp > eq->currentPtr->timestamp))
+	RBevent = NULL;
       return;
     }
     else parent->cancels.RemoveItem(it); // Clean up
   } // end outer while which loops through entire cancellations list
-  RBevent = eq->RecomputeRollbackTime();
+  if (RBevent && (RBevent->timestamp > eq->currentPtr->timestamp))
+    RBevent = NULL;
 }
 
 /// Recover checkpointed state prior to ev

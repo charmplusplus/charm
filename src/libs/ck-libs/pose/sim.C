@@ -2,7 +2,7 @@
 #include "pose.h"
 #include "sim.def.h"
 
-/// The array in which all posers are stored
+/// Global readonly proxy to array containing all posers in a simulation
 CProxy_sim POSE_Objects;
 /// Coordinates all startup and shutdown behaviors for POSE simulations
 CkChareID POSE_Coordinator_ID;
@@ -53,6 +53,7 @@ void sim::Step()
   case CONS_T:
   case OPT_T:
   case OPT2_T: // pass this step call directly to strategy
+    localPVT->objUpdate(myPVTidx, myStrat->SafeTime(), -1, -1);
     myStrat->Step();
     break;
   case OPT3_T: // prioritize this step call if work exists
@@ -65,6 +66,7 @@ void sim::Step()
   case SPEC_T:
   case ADAPT_T:
   case ADAPT2_T: // pass this step call directly to strategy
+    localPVT->objUpdate(myPVTidx, myStrat->SafeTime(), -1, -1);
     myStrat->Step();
     break;
   default: 
@@ -88,6 +90,7 @@ void sim::Step(prioMsg *m)
     localStats->TimerStart(SIM_TIMER);
   else localStats->SwitchTimer(SIM_TIMER);
 #endif
+  localPVT->objUpdate(myPVTidx, myStrat->SafeTime(), -1, -1);
   myStrat->Step(); // Call Step on strategy
 #ifdef POSE_STATS_ON
   if (!tstat)

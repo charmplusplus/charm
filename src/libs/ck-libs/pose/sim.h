@@ -13,9 +13,9 @@
 #include "sim.decl.h"
 #include <stdarg.h>
 
-extern CProxy_sim POSE_Objects; // global readonly proxy to array of posers
-extern CkChareID POSE_Coordinator_ID; // handle for POSE coordinator object
-class sim;                       // needed for eventMsg definition below
+extern CProxy_sim POSE_Objects; 
+extern CkChareID POSE_Coordinator_ID; 
+class sim; // needed for eventMsg definition below
 
 /// All user event messages inherit from this
 /** Adds timestamp and event ID to message, plus other info useful for the

@@ -34,10 +34,11 @@ void adapt2::Step()
   if ((POSE_endtime > -1) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT + 1;
 
-  //int iter=0;
-  while ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
+  int iter=0;
+  while ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)
+	 && (iter < MAX_ITERATIONS)) {
     // do all events at under timeLeash
-    //iter++;
+    iter++;
     currentEvent = ev;
     ev->done = 2;
 #ifdef POSE_STATS_ON

@@ -278,7 +278,7 @@ void GVT::computeGVT(UpdateMsg *m)
     // check the estimate
     CmiAssert(estGVT >= lastGVT); 
     
-    //CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
+    CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
 
     // check for termination conditions
     int term = 0;

@@ -59,7 +59,10 @@ class strat
   /// Calculate safe time (earliest time at which object can generate events)
   virtual int SafeTime() { return userObj->OVT(); }
   /// Set rollback point to event e
-  void ResetRBevent(Event *e) { RBevent = e; }
+  void ResetRBevent(Event *e) { 
+    if (!RBevent) RBevent = e; 
+    else if (RBevent->timestamp > e->timestamp) RBevent = e;
+  }
 };
 
 #endif
