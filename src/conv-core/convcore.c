@@ -2586,8 +2586,9 @@ void ConverseCommonExit(void)
   if((CmiMyPe() == 0) && (clientIP != 0)){
     int fd;
     fd = skt_connect(clientIP, clientKillPort, 120);
-    if (fd>0) 
+    if (fd>0){ 
       write(fd, "die\n", strlen("die\n"));
+    }
   }
 #endif
   traceClose();
