@@ -368,6 +368,12 @@ FEM_Mesh_create_node_elem_adjacency(int fem_mesh){
 	m->createElemNodeAdj();
 }
 
+CDECL void 
+FEM_Mesh_create_node_node_adjacency(int fem_mesh){
+	const char *caller="FEM_Mesh_create_node_node_adjacency"; FEMAPI(caller);
+	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
+	m->createNodeNodeAdj();
+}
 
 // Internal API:
 void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr, 	
@@ -939,6 +945,18 @@ void FEM_VarIndexAttribute::print(){
 	}
 };
 
+int FEM_VarIndexAttribute::findInRow(int row,const ID &data){
+	if(row >= idx.length()){
+		return -1;
+	}
+	CkVec<ID> &rowVec = idx[row];
+	for(int i=0;i<rowVec.length();i++){
+		if(data == rowVec[i]){
+			return i;
+		}
+	}
+	return -1;
+}
 
 /********************** Entity **************************/
 
@@ -1225,7 +1243,7 @@ void FEM_Entity::copyOldGlobalno(const FEM_Entity &e) {
 
 /********************** Node *****************/
 FEM_Node::FEM_Node(FEM_Node *ghost_) 
-	:FEM_Entity(ghost_), primary(0), sharedIDXL(&shared,&shared),elemAdjacency(0) 
+	:FEM_Entity(ghost_), primary(0), sharedIDXL(&shared,&shared),elemAdjacency(0),nodeAdjacency(0) 
 {}
 
 void FEM_Node::allocatePrimary(void) {
@@ -1255,6 +1273,13 @@ void FEM_Node::allocateElemAdjacency(){
 	add(elemAdjacency);
 }
 
+void FEM_Node::allocateNodeAdjacency(){
+	if(nodeAdjacency){
+		delete nodeAdjacency;
+	}
+	nodeAdjacency = new FEM_VarIndexAttribute(this,FEM_NODE_NODE_ADJACENCY);
+	add(nodeAdjacency);
+}
 const char *FEM_Node::getName(void) const {return "FEM_NODE";}
 
 void FEM_Node::create(int attr,const char *caller) {
@@ -1263,6 +1288,8 @@ void FEM_Node::create(int attr,const char *caller) {
 	} 
 	else if(attr == FEM_NODE_ELEM_ADJACENCY) {
 		allocateElemAdjacency();
+	}else if(attr == FEM_NODE_NODE_ADJACENCY){
+		allocateNodeAdjacency();
 	}else
 		super::create(attr,caller);
 }
@@ -1273,10 +1300,8 @@ void FEM_Node::fillElemAdjacencyTable(int type,const FEM_Elem &elem){
 	CkVec<CkVec<var_id> > &ghostAdjacencyTable = ((FEM_Node *)getGhost())->elemAdjacency->get();
 	for(int i=0;i<elem.size();i++){
 		const int *conn = elem.connFor(i);
-		printf("Type %d Elem %d ",type,i);
 		for(int j=0;j<nodesPerElem;j++){
 				int node = conn[j];
-				printf("%d ",node);
 				if(node >= 0){
 					adjacencyTable[node].push_back(var_id(type,i));
 				}else{
@@ -1289,7 +1314,6 @@ void FEM_Node::fillElemAdjacencyTable(int type,const FEM_Elem &elem){
 					}
 				}
 		}
-		printf("\n");
 	}
 };
 
@@ -1299,12 +1323,61 @@ void FEM_Node::setElemAdjacency(int type, const FEM_Elem &elem){
 		FEM_Elem *ghostElem = (FEM_Elem *)elem.getGhost();
 		fillElemAdjacencyTable(-(type+1),(*ghostElem));
 	}
-	CkVec<CkVec<var_id> > &adjacencyTable = elemAdjacency->get();
-		printf("Node to elem adjacency after adding type %d --\n",type);
+	printf("Node to elem adjacency after adding type %d --\n",type);
 	elemAdjacency->print();
 	printf("----------------------------------------------\n");
 };
 
+void FEM_Node::fillNodeAdjacencyForElement(int node,int nodesPerElem,const int *conn,FEM_VarIndexAttribute *adjacencyAttr){
+	for(int k=0;k<nodesPerElem;k++){
+		if(conn[k] != node){
+			var_id nodeIDAdded = var_id::createNodeID(1,conn[k]);
+			int idx = adjacencyAttr->findInRow(node,nodeIDAdded);
+			if(idx == -1){
+				(adjacencyAttr->get())[node].push_back(nodeIDAdded);
+			}	
+		}	
+	}
+};
+
+void FEM_Node::fillNodeAdjacency(const FEM_Elem &elem){
+	int nodesPerElem = elem.getNodesPer();
+	CkVec<CkVec<var_id> > &adjacencyTable = nodeAdjacency->get();
+	FEM_VarIndexAttribute *ghostAdjacencyAttr = ((FEM_Node *)getGhost())->nodeAdjacency;
+	CkVec<CkVec<var_id> > &ghostAdjacencyTable = ghostAdjacencyAttr->get();
+	
+	for(int i=0;i<elem.size();i++){
+		const int *conn = elem.connFor(i);
+		printf("Elem %d ",i);
+		for(int j=0;j<nodesPerElem;j++){
+			int node = conn[j];
+			printf("%d ",node);
+			if(node >= 0){
+				fillNodeAdjacencyForElement(node,nodesPerElem,conn,nodeAdjacency);
+			}else{
+				if(node == -1){
+					//invalid node...
+				}else{
+					//ghost 
+					node = -(node+2);
+					fillNodeAdjacencyForElement(node,nodesPerElem,conn,ghostAdjacencyAttr);
+				}
+			}	
+		}
+		printf("\n");
+	}
+};
+
+void FEM_Node::setNodeAdjacency(const FEM_Elem &elem){
+	fillNodeAdjacency(elem);
+	if(elem.getGhost() != NULL){
+		FEM_Elem *ghostElem = (FEM_Elem *)elem.getGhost();
+		fillNodeAdjacency(*ghostElem);
+	}
+	printf("Node to Node adjacency \n");
+	nodeAdjacency->print();
+	printf("----------------------------------------------\n");
+};
 
 /********************** Elem *****************/
 /// This checker verifies that FEM_Elem::conn's entries are valid node indices.
@@ -1586,6 +1659,13 @@ void FEM_Mesh::createElemNodeAdj(){
 	node.lookup(FEM_NODE_ELEM_ADJACENCY,"FEM_Mesh::createElemNodeAdj");
 	for(int i=0;i<elem.size();i++){
 		node.setElemAdjacency(i,elem[i]);
+	}
+};
+
+void FEM_Mesh::createNodeNodeAdj(){
+	node.lookup(FEM_NODE_NODE_ADJACENCY,"FEM_Mesh::createNodeNodeAdj");
+	for(int i=0;i<elem.size();i++){
+		node.setNodeAdjacency(elem[i]);
 	}
 };
 

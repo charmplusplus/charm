@@ -113,7 +113,8 @@ extern "C" {
 to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
 #define FEM_BOUNDARY (FEM_ATTRIB_FIRST+9) /*provides the boundary flag for nodes, elements and sparse elements FEM_INT*/
 #define FEM_NODE_ELEM_ADJACENCY (FEM_ATTRIB_FIRST+10) /*node to element adjacency FEM_VAR_INDEX only */
-#define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+12) /*This is the last valid attribute code*/
+#define FEM_NODE_NODE_ADJACENCY (FEM_ATTRIB_FIRST+11) /*node to node adjacency FEM_VAR_INDEX only */
+#define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+14) /*This is the last valid attribute code*/
 
   /* Specialized routines: */
   void FEM_Mesh_set_conn(int fem_mesh,int entity,
@@ -220,6 +221,7 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
 		Create additional mesh information
 	*/
 	void FEM_Mesh_create_node_elem_adjacency(int fem_mesh);
+	void FEM_Mesh_create_node_node_adjacency(int fem_mesh);
 	
 	
 /* Backward compatability routines: */

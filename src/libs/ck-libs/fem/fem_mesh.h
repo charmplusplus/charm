@@ -521,6 +521,8 @@ PUPmarshall(FEM_IndexAttribute);
 class FEM_VarIndexAttribute : public FEM_Attribute{
 public:
  class ID{
+ 	//type is negative for ghost elements
+	//id refers to the index in the entity list
  	public:
  		int type;
 		int id;
@@ -532,10 +534,25 @@ public:
 			type = _type;
 			id = _id;
 		};
+		bool operator ==(const ID &rhs)const {
+			return (type == rhs.type) && (id == rhs.id);
+		}
 		virtual void pup(PUP::er &p){
 			p | type;
 			p | id;
 		};
+
+		static ID createNodeID(int type,int node){
+			ID temp;
+			if(node < -1){
+				temp.id = -(node+2);
+				temp.type = -type;
+			}else{
+				temp.id = node;
+				temp.type = type;
+			}
+			return temp;
+		}
  };
 private:
 	typedef FEM_Attribute super;
@@ -563,6 +580,8 @@ public:
 		const IDXL_Layout &layout, const char *caller) const;
 	
 	virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity);
+
+	int findInRow(int row,const ID &data);
 	
 	void print();
 };
@@ -784,10 +803,12 @@ class FEM_Node : public FEM_Entity {
 	void allocatePrimary(void);
 	
 	void allocateElemAdjacency();
+	void allocateNodeAdjacency();
 	/*
 		stores the node to element adjacency vector 
 	*/
 	FEM_VarIndexAttribute *elemAdjacency;
+	FEM_VarIndexAttribute *nodeAdjacency;
 	typedef FEM_VarIndexAttribute::ID var_id;
 protected:
 	virtual void create(int attr,const char *caller);
@@ -811,6 +832,9 @@ public:
 	}
 	void fillElemAdjacencyTable(int type,const FEM_Elem &elem);
 	void setElemAdjacency(int type,const FEM_Elem &elem);
+	void fillNodeAdjacency(const FEM_Elem &elem);
+	void setNodeAdjacency(const FEM_Elem &elem);
+	void fillNodeAdjacencyForElement(int node,int nodesPerElem,const int *conn,FEM_VarIndexAttribute *adjacencyAttr);
 	
 	void print(const char *type,const IDXL_Print_Map &map);
 };
@@ -1116,6 +1140,7 @@ public:
 		share a node.
 		*/
 	void createElemNodeAdj();
+	void createNodeNodeAdj();
 }; 
 PUPmarshall(FEM_Mesh);
 FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller);
