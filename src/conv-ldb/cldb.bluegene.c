@@ -239,7 +239,7 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
   }
 }
 
-void CldModuleInit()
+void CldModuleInit(char **argv)
 {
   CpvInitialize(int, CldHandlerIndex);
   CpvInitialize(int, CldBalanceHandlerIndex);
@@ -250,7 +250,7 @@ void CldModuleInit()
   CpvInitialize(int, CldMessageChunks);
   CpvAccess(CldRelocatedMessages) = CpvAccess(CldLoadBalanceMessages) = 
     CpvAccess(CldMessageChunks) = 0;
-  CldModuleGeneralInit();
+  CldModuleGeneralInit(argv);
 }
 
 

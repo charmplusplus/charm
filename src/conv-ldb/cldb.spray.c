@@ -215,7 +215,7 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
   }
 }
 
-void CldModuleInit()
+void CldModuleInit(char **argv)
 {
   peinfo *pinf;
   CpvInitialize(peinfo, peinf);
@@ -233,6 +233,6 @@ void CldModuleInit()
   pinf->spantree_parent = CmiSpanTreeParent(CmiMyPe());
   pinf->spantree_root = 0;
   pinf->rebalance = 0;
-  CldModuleGeneralInit();
+  CldModuleGeneralInit(argv);
   CldInitiateReduction();
 }
