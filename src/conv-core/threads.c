@@ -1156,8 +1156,10 @@ map_slots(int slot, int nslots)
   pa = mmap((void*) addr, sz*nslots, 
             PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED,
             CpvAccess(zerofd), 0);
-  if((pa==((void*)(-1))) || (pa != (void*)addr))
-    CmiAbort("mmap call failed to allocate requested memory.\n");
+  if((pa==((void*)(-1))) || (pa != (void*)addr)) {
+    CmiError("mmap call failed to allocate %d bytes at %p.\n", sz*nslots, addr);
+    CmiAbort("Exiting\n");
+  }
   return pa;
 }
 
