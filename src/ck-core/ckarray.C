@@ -663,7 +663,10 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) cons
 	  ckDelegatedTo()->ArraySend(ckDelegatedPtr(),ep,msg,_idx,ckGetArrayID());
 	else 
 	{ //Usual case: a direct send
-	  ckLocalBranch()->deliver(msg, CkDeliver_queue, opts);
+	  if (opts & CK_MSG_INLINE)
+	    ckLocalBranch()->deliver(msg, CkDeliver_inline, opts&!CK_MSG_INLINE);
+	  else
+	    ckLocalBranch()->deliver(msg, CkDeliver_queue, opts);
 	}
 }
 
@@ -707,8 +710,7 @@ void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArra
   m->array_index()=idx;
   msg_prepareSend(m,entryIndex,aID);
   CkArray *a=(CkArray *)_localBranch(aID);
-  // avoid nested tracing
-  int oldStatus = CkDisableTracing(entryIndex);
+  int oldStatus = CkDisableTracing(entryIndex);     // avoid nested tracing
   a->deliver(m,CkDeliver_inline,opts);
   if (oldStatus) CkEnableTracing(entryIndex);
 }

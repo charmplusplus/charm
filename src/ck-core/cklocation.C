@@ -905,7 +905,20 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
 		if (msg->array_hops()>1)
 			myLocMgr->multiHop(msg);
 		CmiBool doFree = (CmiBool)!(opts & CK_MSG_KEEP);
-		return invokeEntry(obj,(void *)msg,msg->array_ep(),doFree);
+#if CMK_LBDB_ON
+		// if there is a running obj being measured, stop it temporarily
+		LDObjHandle objHandle;
+		int objstopped = 0;
+		if (LBDatabaseObj()->RunningObject(&objHandle)) {
+			objstopped = 1;
+			LBDatabaseObj()->ObjectStop(objHandle);
+		}
+#endif
+		CmiBool status = invokeEntry(obj,(void *)msg,msg->array_ep(),doFree);
+#if CMK_LBDB_ON
+		if (objstopped) LBDatabaseObj()->ObjectStart(objHandle);
+#endif
+		return status;
 	}
 }
 
