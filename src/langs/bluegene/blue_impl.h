@@ -1,3 +1,10 @@
+#ifndef BLUE_IMPL_H
+#define BLUE_IMPL_H
+
+/* alway use handler table per node */
+#if ! defined(CMK_BLUEGENE_NODE) && ! defined(CMK_BLUEGENE_THREAD)
+#define CMK_BLUEGENE_NODE   1
+#endif
 
 /* define system parameters */
 #define INBUFFER_SIZE	32
@@ -186,3 +193,4 @@ public:
   inline static int Local2Global(int num) { return CmiMyPe()+num*CmiNumPes();}
 };
 
+#endif

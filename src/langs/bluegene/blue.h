@@ -101,11 +101,11 @@ void BgSetNumWorkThread(int num);
 int  BgGetNumCommThread();
 void BgSetNumCommThread(int num);
 
-/// return thread's local id on the Blue Gene node
+/** return thread's local id on the Blue Gene node  */
 int  BgGetThreadID();
-/// return thread's global id(including both worker and comm threads)
+/** return thread's global id(including both worker and comm threads) */
 int  BgGetGlobalThreadID();
-/// return thread's global id(including only worker threads)
+/** return thread's global id(including only worker threads) */
 int  BgGetGlobalWorkerThreadID();
 
 /**
