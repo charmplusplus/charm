@@ -144,9 +144,16 @@ main::setMesh(int nelem, int nnodes, int ctype, int *connmat)
 #else
   numflag = 0;
 #endif
-  // pass mesh to metis to be partitioned
-  METIS_PartMeshDual(&nelem, &nnodes, connmat, &ctype, &numflag, 
-                     (int*)&_nchunks, &ecut, epart, npart);
+  if(_nchunks==1) { // Metis cannot handle this case
+    int i;
+    for(i=0;i<nelem;i++) { epart[i] = 0; }
+    for(i=0;i<nnodes;i++) { npart[i] = 0; }
+    ecut = 0;
+  } else {
+    // pass mesh to metis to be partitioned
+    METIS_PartMeshDual(&nelem, &nnodes, connmat, &ctype, &numflag, 
+                       (int*)&_nchunks, &ecut, epart, npart);
+  }
   // call the map function to compute communication info needed by the framework
   ChunkMsg **msgs = new ChunkMsg*[_nchunks]; CHK(msgs);
   fem_map(nelem, nnodes, ctype, connmat, _nchunks, epart, npart, msgs);

@@ -76,6 +76,8 @@ fem_map(int nelems, int nnodes, int ctype, int *connmat,
         }
       }
     }
+    m->gNodeNums = new int[m->nnodes]; CHK(m->gNodeNums);
+    m->primaryPart = new int[m->nnodes]; CHK(m->primaryPart);
     m->nnodes = 0;
     for(j=0;j<nnodes;j++) {
       if(ninfo[j]==1) {

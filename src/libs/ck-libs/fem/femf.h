@@ -55,7 +55,8 @@
      double precision        :: first, second
   end function offsetof
 
-  function FEM_Set_Mesh(nelem, nnodes, ctype, mesh)
+  subroutine FEM_Set_Mesh(nelem, nnodes, ctype, mesh)
     integer :: nelem, nnodes, ctype
-  end function FEM_Set_Mesh
+    integer, dimension(:,:) :: mesh
+  end subroutine FEM_Set_Mesh
   end interface
