@@ -16,6 +16,8 @@
 #include "LBDBManager.h"
 #include "NborBaseLB.def.h"
 
+#define  DEBUGF(x)      // CmiPrintf x;
+
 //CreateLBFunc_Def(NborBaseLB);
 
 void NborBaseLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
@@ -352,13 +354,29 @@ void NborBaseLB::MigrationDone()
   migrates_expected = -1;
   // Increment to next step
   mystep++;
-  thisProxy [CkMyPe()].ResumeClients();
+
+  // if sync resume invoke a barrier
+  if (_lb_args.syncResume()) {
+    CkCallback cb(CkIndex_NborBaseLB::ResumeClients((CkReductionMsg*)NULL), 
+                  thisProxy);
+    contribute(0, NULL, CkReduction::sum_int, cb);
+  }
+  else 
+    thisProxy [CkMyPe()].ResumeClients();
+  //thisProxy [CkMyPe()].ResumeClients();
 #endif
+}
+
+void NborBaseLB::ResumeClients(CkReductionMsg *msg)
+{
+  ResumeClients();
+  delete msg;
 }
 
 void NborBaseLB::ResumeClients()
 {
 #if CMK_LBDB_ON
+  DEBUGF(("[%d] ResumeClients. \n", CkMyPe()));
   theLbdb->ResumeClients();
 #endif
 }
