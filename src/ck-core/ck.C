@@ -296,9 +296,9 @@ void *CkLocalBranch(CkGroupID gID) {
 
 static 
 void *_ckLocalNodeBranch(CkGroupID groupID) {
-  CmiLock(CksvAccess(_nodeLock));
+  CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
   void *retval = CksvAccess(_nodeGroupTable)->find(groupID).getObj();
-  CmiUnlock(CksvAccess(_nodeLock));
+  CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
   return retval;
 }
 
@@ -465,11 +465,11 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   CkpvAccess(_currentNodeGroupObj) = NULL;
   _STATS_RECORD_PROCESS_NODE_GROUP_1();
   
-  CmiLock(CksvAccess(_nodeLock));
+  CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
   CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
   CksvAccess(_nodeGroupTable)->find(groupID).setcIdx(gIdx);
   CksvAccess(_nodeGroupIDTable).push_back(groupID);
-  CmiUnlock(CksvAccess(_nodeLock));
+  CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
 
   PtrQ *ptrq = CksvAccess(_nodeGroupTable)->find(groupID).getPending();
   if(ptrq) {
@@ -553,12 +553,12 @@ static CkGroupID _groupCreate(envelope *env)
 static CkGroupID _nodeGroupCreate(envelope *env)
 {
   register CkGroupID groupNum;
-  CmiLock(CksvAccess(_nodeLock));                // change for proc 0 and other processors
+  CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));                // change for proc 0 and other processors
   if(CkMyNode() == 0)				// should this be CkMyPe() or CkMyNode()?
           groupNum.idx = CksvAccess(_numNodeGroups)++;
    else
           groupNum.idx = _getGroupIdx(CkNumNodes(),CkMyNode(),CksvAccess(_numNodeGroups)++);
-  CmiUnlock(CksvAccess(_nodeLock));
+  CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
   _createNodeGroup(groupNum, env);
   return groupNum;
 }
@@ -1220,9 +1220,9 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
 {
   if (node==CkMyNode()) 
   { 
-    CmiLock(CksvAccess(_nodeLock));
+    CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
     void *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();
-    CmiUnlock(CksvAccess(_nodeLock));
+    CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
     if (obj!=NULL) 
     { //Just directly call the group:
       envelope *env=UsrToEnv(msg);

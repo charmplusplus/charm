@@ -368,7 +368,7 @@ static int _charmLoadEstimator(void)
 static void _sendTriggers(void)
 {
   int i, num, first;
-  CmiLock(CksvAccess(_nodeLock));
+  CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
   if (_triggersSent == 0)
   {
     _triggersSent++;
@@ -382,7 +382,7 @@ static void _sendTriggers(void)
 	CmiSyncSend(first+i, env->getTotalsize(), (char *)env);
     CmiFree(env);
   }
-  CmiUnlock(CksvAccess(_nodeLock));
+  CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
 }
 
 void _initDone(void)
@@ -452,11 +452,11 @@ static void _initHandler(void *msg)
       CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, env);
       break;
     case NodeBocInitMsg:
-      CmiLock(CksvAccess(_nodeLock));
+      CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
       if (env->getGroupEpoch()==0)
         CksvAccess(_numInitNodeMsgs)++;
       CksvAccess(_nodeBocInitVec)->insert(env->getGroupNum().idx, env);
-      CmiUnlock(CksvAccess(_nodeLock));
+      CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
       CpvAccess(_qd)->process();
       break;
     case ROMsgMsg:
