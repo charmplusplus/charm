@@ -28,10 +28,7 @@ DEPTEX=$(TEX) $(FILE).aux index.tex
 
 all: ps pdf html
 
-$(FILE).aux: $(TEX) index.tex
-	latex $(FILE).tex
-
-
+# PostScript Target:
 ps: $(FILE).ps
 
 $(FILE).dvi: $(TEX) $(FILE).aux 
@@ -41,24 +38,31 @@ $(FILE).ps: $(FILE).dvi
 	dvips -t letter -f $(FILE).dvi > $(FILE).ps
 
 
+# PDF Target:
 pdf: $(FILE).pdf
 
 $(FILE).pdf: $(TEX) $(FILE).aux
 	pdflatex $(FILE).tex
 
 
+# HTML Target:
 html: $(FILE)
 
 $(FILE): $(TEX) $(FILE).aux
 	-@ln -s ../pplmanual.* .
 	-@rm -fr $(FILE)/*.html $(FILE)/*.aux
 	$(LATEX2HTML) $(FILE).tex
+	[ -x fig ] && ../latex2html_fixpaths.sh
+
+# LaTeX Index and link support
+$(FILE).aux: $(TEX) index.tex
+	latex $(FILE).tex
+
+index.tex: $(FILE).idx
+	makeindex -o index.tex $(FILE).idx
 
 $(FILE).idx:
-	touch index.tex
-
-index.tex: manual.idx
-	makeindex -o index.tex $(FILE).idx
+	touch $(FILE).idx
 
 # Clean out all TeX droppings:
 clean:
