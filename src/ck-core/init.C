@@ -529,6 +529,7 @@ void _initCharm(int argc, char **argv)
 		_initDone();
 	}
 
+  traceWriteSts();
 }
 
 GroupTable::GroupTable() { }
