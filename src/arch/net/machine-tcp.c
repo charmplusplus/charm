@@ -307,7 +307,7 @@ static void IntegrateMessageDatagram(char *msg, int len)
         } else {
 #if CMK_NODE_QUEUE_AVAILABLE
            if (rank==DGRAM_NODEMESSAGE) {
-             PCQueuePush(CsvAccess(NodeRecv), newmsg);
+             CmiPushNode(newmsg);
            }
            else
 #endif
