@@ -289,17 +289,17 @@ TraceSummary::TraceSummary(char **argv):curevent(0),binStart(0.0),bin(0.0),msgNu
   CkpvInitialize(double, version);
   CkpvAccess(binSize) = BIN_SIZE;
   CkpvAccess(version) = VER;
-  if (CmiGetArgString(argv,"+binsize",&tmpStr))
-  	sscanf(tmpStr,"%lf",&CkpvAccess(binSize));
-  if (CmiGetArgString(argv,"+version",&tmpStr))
-  	sscanf(tmpStr,"%lf",&CkpvAccess(version));
-
+  CmiGetArgDoubleDesc(argv,"+binsize",&CkpvAccess(binSize),
+  	"CPU usage log time resolution");
+  CmiGetArgDoubleDesc(argv,"+version",&CkpvAccess(version),
+  	"Write this .sum file version");
+  
   epThreshold = 0.001; 
-  if (CmiGetArgString(argv,"+epThreshold",&tmpStr))
-  	sscanf(tmpStr,"%lf",&epThreshold);
+  CmiGetArgDoubleDesc(argv,"+epThreshold",&epThreshold,
+  	"Execution time histogram lower bound");
   epInterval = 0.001; 
-  if (CmiGetArgString(argv,"+epInterval",&tmpStr))
-  	sscanf(tmpStr,"%lf",&epInterval);
+  CmiGetArgDoubleDesc(argv,"+epInterval",&epInterval,
+  	"Execution time histogram bin size");
 
   sumonly = CmiGetArgFlag(argv, "+sumonly");
 

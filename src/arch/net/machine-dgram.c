@@ -92,16 +92,16 @@ static void extract_args(char **argv)
 {
   int ms;
   setspeed_eth();
-  if (CmiGetArgFlag(argv,"+atm"))
+  if (CmiGetArgFlagDesc(argv,"+atm","Tune for a low-latency ATM network"))
     setspeed_atm();
-  if (CmiGetArgFlag(argv,"+eth"))
+  if (CmiGetArgFlagDesc(argv,"+eth","Tune for an ethernet network"))
     setspeed_eth();
-  CmiGetArgInt(argv,"+max_dgram_size",&Cmi_max_dgram_size);
-  CmiGetArgInt(argv,"+window_size",&Cmi_window_size);
-  CmiGetArgInt(argv,"+os_buffer_size",&Cmi_os_buffer_size);
-  if (CmiGetArgInt(argv,"+delay_retransmit",&ms))
+  CmiGetArgIntDesc(argv,"+max_dgram_size",&Cmi_max_dgram_size,"Size of each UDP packet");
+  CmiGetArgIntDesc(argv,"+window_size",&Cmi_window_size,"Number of unacknowledged packets");
+  CmiGetArgIntDesc(argv,"+os_buffer_size",&Cmi_os_buffer_size, "UDP socket's SO_RCVBUF/SO_SNDBUF");
+  if (CmiGetArgIntDesc(argv,"+delay_retransmit",&ms, "Milliseconds to wait before retransmit"))
 	  Cmi_delay_retransmit=0.001*ms;
-  if (CmiGetArgInt(argv,"+ack_delay",&ms))
+  if (CmiGetArgIntDesc(argv,"+ack_delay",&ms, "Milliseconds to wait before ack'ing"))
 	  Cmi_delay_retransmit=0.001*ms;
   extract_common_args(argv);
   Cmi_dgram_max_data = Cmi_max_dgram_size - DGRAM_HEADER_SIZE;

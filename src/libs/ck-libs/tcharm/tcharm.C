@@ -59,18 +59,19 @@ void TCharm::nodeInit(void)
   CtvInitialize(TCharm *,_curTCharm);
   CtvAccess(_curTCharm)=NULL;
   CpvInitialize(inState,_stateTCharm);
+  CmiArgGroup("Library","TCharm");
   char **argv=CkGetArgv();
-  tcharm_nomig=CmiGetArgFlag(argv,"+tcharm_nomig");
-  tcharm_nothreads=CmiGetArgFlag(argv,"+tcharm_nothread");
-  tcharm_nothreads|=CmiGetArgFlag(argv,"+tcharm_nothreads");
+  tcharm_nomig=CmiGetArgFlagDesc(argv,"+tcharm_nomig","Disable migration support (debugging)");
+  tcharm_nothreads=CmiGetArgFlagDesc(argv,"+tcharm_nothread","Disable thread support (debugging)");
+  tcharm_nothreads|=CmiGetArgFlagDesc(argv,"+tcharm_nothreads",NULL);
   char *traceLibName=NULL;
-  while (CmiGetArgString(argv,"+tcharm_trace",&traceLibName))
+  while (CmiGetArgStringDesc(argv,"+tcharm_trace",&traceLibName,"Print each call to this library"))
       tcharm_tracelibs.addTracing(traceLibName);
-  CmiGetArgInt(argv,"+tcharm_stacksize",&tcharm_stacksize);
+  CmiGetArgIntDesc(argv,"+tcharm_stacksize",&tcharm_stacksize,"Set the thread stack size (default 1MB)");
   if (CkMyPe()!=0) { //Processor 0 eats "+vp<N>" and "-vp<N>" later:
   	int ignored;
-  	while (CmiGetArgInt(argv,"-vp",&ignored)) {}
-  	while (CmiGetArgInt(argv,"+vp",&ignored)) {}
+  	while (CmiGetArgIntDesc(argv,"-vp",&ignored,NULL)) {}
+  	while (CmiGetArgIntDesc(argv,"+vp",&ignored,NULL)) {}
   }
 
   TCharm::setState(inNodeSetup);
@@ -659,8 +660,8 @@ CDECL int TCHARM_Get_num_chunks(void)
 	if (CkMyPe()!=0) CkAbort("TCHARM_Get_num_chunks should only be called on PE 0 during setup!");
 	int nChunks=CkNumPes();
 	char **argv=CkGetArgv();
-	CmiGetArgInt(argv,"-vp",&nChunks);
-	CmiGetArgInt(argv,"+vp",&nChunks);
+	CmiGetArgIntDesc(argv,"-vp",&nChunks,"Set the total number of virtual processors");
+	CmiGetArgIntDesc(argv,"+vp",&nChunks,NULL);
 	lastNumChunks=nChunks;
 	return nChunks;
 }

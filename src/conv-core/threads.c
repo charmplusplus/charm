@@ -260,7 +260,8 @@ static void CthBaseInit(char **argv)
 
   CthCpvInitialize(int,  _defaultStackSize);
   CthCpvAccess(_defaultStackSize)=32768;
-  CmiGetArgInt(argv,"+stacksize",&CthCpvAccess(_defaultStackSize));  
+  CmiGetArgIntDesc(argv,"+stacksize",&CthCpvAccess(_defaultStackSize),
+  	"Default user-level thread stack size");  
   
   CthCpvInitialize(CthThread,  CthCurrent);
   CthCpvInitialize(char *, CthData);

@@ -604,7 +604,7 @@ void TraceCounter::traceInit(char **argv)
   CounterArg* commandLine_ = NULL;
   bool badArg = false;
   int numCounters = 0;
-  if (CmiGetArgString(argv, "+counters", &counters)) {
+  if (CmiGetArgStringDesc(argv, "+counters", &counters, "Measure these performance counters")) {
     if (CmiMyPe()==0) { CmiPrintf("Counters: %s\n", counters); }
     int offset = 0;
     int limit = strlen(counters);
@@ -633,7 +633,7 @@ void TraceCounter::traceInit(char **argv)
   commandLineSz_ = numCounters;
 
   // check to see if args are valid, output if not
-  if (badArg || CmiGetArgFlag(argv, "+count-help")) {
+  if (badArg || CmiGetArgFlagDesc(argv, "+count-help", "List available performance counters")) {
     if (CmiMyPe() == 0) { printHelp(); }
     ConverseExit();  return;
   }

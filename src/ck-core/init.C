@@ -72,21 +72,21 @@ static int   _exitStarted = 0;
 
 static inline void _parseCommandLineOpts(char **argv)
 {
-  if (CmiGetArgFlag(argv,"+cs"))
+  if (CmiGetArgFlagDesc(argv,"+cs", "Print extensive statistics at shutdown"))
       _STATS_ON(_printCS);
-  if (CmiGetArgFlag(argv,"+ss"))
+  if (CmiGetArgFlagDesc(argv,"+ss", "Print summary statistics at shutdown"))
       _STATS_ON(_printSS);
-  if (CmiGetArgFlag(argv,"+fifo"))
+  if (CmiGetArgFlagDesc(argv,"+fifo", "Default to FIFO queuing"))
       _defaultQueueing = CK_QUEUEING_FIFO;
-  if (CmiGetArgFlag(argv,"+lifo"))
+  if (CmiGetArgFlagDesc(argv,"+lifo", "Default to LIFO queuing"))
       _defaultQueueing = CK_QUEUEING_LIFO; 
-  if (CmiGetArgFlag(argv,"+ififo"))
+  if (CmiGetArgFlagDesc(argv,"+ififo", "Default to integer-prioritized FIFO queuing"))
       _defaultQueueing = CK_QUEUEING_IFIFO; 
-  if (CmiGetArgFlag(argv,"+ilifo"))
+  if (CmiGetArgFlagDesc(argv,"+ilifo", "Default to integer-prioritized LIFO queuing"))
       _defaultQueueing = CK_QUEUEING_ILIFO;
-  if (CmiGetArgFlag(argv,"+bfifo"))
+  if (CmiGetArgFlagDesc(argv,"+bfifo", "Default to bitvector-prioritized FIFO queuing"))
       _defaultQueueing = CK_QUEUEING_BFIFO; 
-  if (CmiGetArgFlag(argv,"+blifo"))
+  if (CmiGetArgFlagDesc(argv,"+blifo", "Default to bitvector-prioritized LIFO queuing"))
       _defaultQueueing = CK_QUEUEING_BLIFO;
 }
 
@@ -423,9 +423,8 @@ extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
 extern void _loadbalancerInit();
 
-void _initCharm(int argc, char **argv)
-{
-
+void _initCharm(int unused_argc, char **argv)
+{ 
 	CkpvInitialize(PtrQ*,_buffQ);
 	CkpvInitialize(PtrVec*,_bocInitVec);
 	CkpvInitialize(void*, _currentChare);
@@ -495,8 +494,9 @@ void _initCharm(int argc, char **argv)
 
 	_futuresModuleInit(); // part of futures implementation is a converse module
 	_loadbalancerInit();
-	if(CkMyRank()==0) 
+	if(CkMyRank()==0)  /* Register */
 	{
+		CmiArgGroup("Charm++",NULL);
 		_parseCommandLineOpts(argv);
 		_registerInit();
 		CkRegisterMsg("System", 0, 0, 0, sizeof(int));
@@ -528,7 +528,7 @@ void _initCharm(int argc, char **argv)
 	{
 		_allStats = new Stats*[CkNumPes()];
 		register int i;
-		for(i=0;i<_numMains;i++) 
+		for(i=0;i<_numMains;i++)  /* Create all mainchares */
 		{
 			register int size = _chareTable[_mainTable[i]->chareIdx]->size;
 			register void *obj = malloc(size);
@@ -544,7 +544,7 @@ void _initCharm(int argc, char **argv)
 
 		_STATS_RECORD_CREATE_CHARE_N(_numMains);
 		_STATS_RECORD_PROCESS_CHARE_N(_numMains);
-		for(i=0;i<_numReadonlyMsgs;i++) 
+		for(i=0;i<_numReadonlyMsgs;i++) /* Send out readonly messages */
 		{
 			register void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
 			if(roMsg==0)

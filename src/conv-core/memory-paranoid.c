@@ -231,32 +231,30 @@ static int meta_getpagesize(void)
 
 /*Only display startup status messages from processor 0*/
 static void status(char *msg) {
-  if (CmiMyPe()==0) {
+  if (CmiMyPe()==0 && !CmiArgGivingUsage()) {
     CmiPrintf("%s",msg);
   }
 }
 static void meta_init(char **argv)
 {
+  CmiArgGroup("Converse","memory-paranoid");
   status("Converse -memory mode: paranoid");
   /*Parse uninitialized-memory-fill options:*/
-  if (CmiGetArgInt(argv,"+memory_fill",&memory_fill)) { 
+  if (CmiGetArgIntDesc(argv,"+memory_fill",&memory_fill, "Overwrite new and deleted memory")) { 
     status(" fill");
   }
-  if (CmiGetArgFlag(argv,"+memory_fillphase")) { 
+  if (CmiGetArgFlagDesc(argv,"+memory_fillphase", "Invert memory overwrite pattern")) { 
     status(" phaseflip");
     memory_fillphase=1;
   }
-  if (CmiGetArgFlag(argv,"+memory_verbose")) {
+  /*Parse heap-check options*/
+  if (CmiGetArgIntDesc(argv,"+memory_checkfreq",&memory_checkfreq, "Check heap this many mallocs")) {
+    status(" checkfreq");
+  }
+  if (CmiGetArgFlagDesc(argv,"+memory_verbose", "Give a printout at each heap check")) {
     status(" verbose");
     memory_verbose=1;
   }  
-  if (CmiGetArgInt(argv,"+memory_fillphase",&memory_fillphase)) { 
-    status(" phaseflip");
-  }  
-  /*Parse heap-check options*/
-  if (CmiGetArgInt(argv,"+memory_checkfreq",&memory_checkfreq)) {
-    status(" checkfreq");
-  }
   status("\n");
 }
 

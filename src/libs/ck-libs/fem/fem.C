@@ -61,9 +61,10 @@ void FEMnodeInit(void) {
 	PUPable_reg(FEM_Sym_Linear);
 	CtvInitialize(FEMchunk*, _femptr);
 	TCHARM_Set_fallback_setup(FEMfallbackSetup);
+	CmiArgGroup("Library","FEM Framework");
 	char **argv=CkGetArgv();
-	if (CmiGetArgFlag(argv,"-read")) initFlags|=FEM_INIT_READ;
-	if (CmiGetArgFlag(argv,"-write")) initFlags|=FEM_INIT_WRITE;	
+	if (CmiGetArgFlagDesc(argv,"-read","Skip init()--read mesh from files")) initFlags|=FEM_INIT_READ;
+	if (CmiGetArgFlagDesc(argv,"-write","Skip driver()--write mesh to files")) initFlags|=FEM_INIT_WRITE;	
 }
 
 static void 

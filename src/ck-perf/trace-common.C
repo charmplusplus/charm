@@ -44,6 +44,7 @@ CkpvDeclare(char*, traceRoot);
 /// decide parameters from command line
 static void traceCommonInit(char **argv)
 {
+  CmiArgGroup("Charm++","Tracing");
   DEBUGF(("[%d] in traceCommonInit.\n", CkMyPe()));
   CkpvInitialize(double, traceInitTime);
   CkpvAccess(traceInitTime) = TRACE_TIMER();
@@ -63,11 +64,11 @@ static void traceCommonInit(char **argv)
 #endif
 #endif
   CkpvAccess(CtrLogBufSize) = LogBufSize;
-  if (CmiGetArgInt(argv,"+logsize",&CkpvAccess(CtrLogBufSize)))
+  if (CmiGetArgIntDesc(argv,"+logsize",&CkpvAccess(CtrLogBufSize), "Log entries to buffer per I/O"))
     if (CkMyPe() == 0) 
       CmiPrintf("Trace: logsize: %d\n", CkpvAccess(CtrLogBufSize));
   char *root;
-  if (CmiGetArgString(argv, "+traceroot", &root)) {
+  if (CmiGetArgStringDesc(argv, "+traceroot", &root, "Directory to write trace files to")) {
     int i;
     for (i=strlen(argv[0])-1; i>=0; i--) if (argv[0][i] == '/') break;
     i++;
@@ -122,7 +123,7 @@ static inline void _traceInit(char **argv)
   // in moduleInit.C
   _createTraces(argv);
 
-  if (CkpvAccess(_traces)->length() && !CmiGetArgFlag(argv,"+traceoff"))
+  if (CkpvAccess(_traces)->length() && !CmiGetArgFlagDesc(argv,"+traceoff","Disable tracing"))
     traceBegin();
 }
 

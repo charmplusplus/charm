@@ -325,9 +325,9 @@ void CcsInit(char **argv)
    int ccs_serverPort=0;
    char *ccs_serverAuth=NULL;
    
-   if (CmiGetArgFlag(argv,"++server") | 
-      CmiGetArgInt(argv,"++server-port",&ccs_serverPort) |
-      CmiGetArgString(argv,"++server-auth",&ccs_serverAuth)) 
+   if (CmiGetArgFlagDesc(argv,"++server", "Create a CCS server port") | 
+      CmiGetArgIntDesc(argv,"++server-port",&ccs_serverPort, "Listen on this TCP/IP port number") |
+      CmiGetArgStringDesc(argv,"++server-auth",&ccs_serverAuth, "Use this CCS authentication file")) 
     if (CmiMyPe()==0)
     {/*Create and occasionally poll on a CCS server port*/
       CcsServer_new(NULL,&ccs_serverPort,ccs_serverAuth);

@@ -980,20 +980,22 @@ CmiStartFn bgMain(int argc, char **argv)
   cva(numX) = cva(numY) = cva(numZ) = 0;
   cva(numCth) = cva(numWth) = 0;
 
-  CmiGetArgInt(argv, "+x", &cva(numX));
-  CmiGetArgInt(argv, "+y", &cva(numY));
-  CmiGetArgInt(argv, "+z", &cva(numZ));
-  CmiGetArgInt(argv, "+cth", &cva(numCth));
-  CmiGetArgInt(argv, "+wth", &cva(numWth));
+  CmiArgGroup("Charm++","BlueGene Simulator");
+  CmiGetArgIntDesc(argv, "+x", &cva(numX), "The x size of the grid of nodes");
+  CmiGetArgIntDesc(argv, "+y", &cva(numY), "The y size of the grid of nodes");
+  CmiGetArgIntDesc(argv, "+z", &cva(numZ), "The z size of the grid of nodes");
+  CmiGetArgIntDesc(argv, "+cth", &cva(numCth), "The number of simulated communication threads per node");
+  CmiGetArgIntDesc(argv, "+wth", &cva(numWth), "The number of simulated worker threads per node");
 
 //  printTimeLog = CmiGetArgFlag(argv, "+bglog");
-  genTimeLog = CmiGetArgFlag(argv, "+bglog");
-  correctTimeLog = CmiGetArgFlag(argv, "+bgcorrect");
+  genTimeLog = CmiGetArgFlagDesc(argv, "+bglog", "Write events to log file");
+  correctTimeLog = CmiGetArgFlagDesc(argv, "+bgcorrect", "Apply timestamp correction to logs");
   if (correctTimeLog) genTimeLog = 1;
 
   // for timing method, default using elapse calls.
   timingMethod = BG_ELAPSE;
-  if(CmiGetArgFlag(argv, "+bgwalltime"))  timingMethod = BG_WALLTIME;
+  if(CmiGetArgFlagDesc(argv, "+bgwalltime", "Use walltime, not CPU time, for time estimate")) 
+  	 timingMethod = BG_WALLTIME;
 
   if (CmiMyPe() == 0) {
     CmiPrintf("BG info> Simulating %dx%dx%d nodes with %d comm + %d work threads each.\n", cva(numX), cva(numY), cva(numZ), cva(numCth), cva(numWth));

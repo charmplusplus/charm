@@ -34,7 +34,7 @@ CkpvStaticDeclare(CkVec<UsrEvent *>, usrEvents);
 static int warned=0;
 #define OPTIMIZED_VERSION 	\
 	if (!warned) { warned=1; 	\
-	CmiPrintf("\n\n!!!! Warning: traceUserEvent not availbale in optimized version!!!!\n\n\n"); }
+	CmiPrintf("\n\n!!!! Warning: traceUserEvent not available in optimized version!!!!\n\n\n"); }
 #else
 #define OPTIMIZED_VERSION /*empty*/
 #endif
@@ -441,9 +441,9 @@ TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0)
 
   CtvInitialize(int,curThreadEvent);
   CtvAccess(curThreadEvent)=0;
-  int binary = CmiGetArgFlag(argv,"+binary-trace");
+  int binary = CmiGetArgFlagDesc(argv,"+binary-trace","Write log files in (unreadable) binary format");
 #if CMK_PROJECTIONS_USE_ZLIB
-  int compressed = CmiGetArgFlag(argv,"+gz-trace");
+  int compressed = CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
 #endif
   _logPool = new LogPool(CkpvAccess(traceRoot));
   _logPool->setBinary(binary);

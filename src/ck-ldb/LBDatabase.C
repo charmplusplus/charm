@@ -124,16 +124,17 @@ void _loadbalancerInit()
 
   char **argv = CkGetArgv();
   char *balancer = NULL;
-  if (CmiGetArgString(argv, "+balancer", &balancer)) {
+  CmiArgGroup("Charm++","Load Balancer");
+  if (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer")) {
     lbRegistry.defaultLB() = balancer;
   }
 
   // get the step number at which to dump the LB database
-  CmiGetArgInt(argv, "+LBDump", &CkpvAccess(dumpStep));
-  CmiGetArgString(argv, "+LBDumpFile", &CkpvAccess(dumpFile));
+  CmiGetArgIntDesc(argv, "+LBDump", &CkpvAccess(dumpStep), "Dump the LB state at this step");
+  CmiGetArgStringDesc(argv, "+LBDumpFile", &CkpvAccess(dumpFile), "Set the LB state file name");
 
   // get the simulation flag
-  CkpvAccess(doSimulation) = CmiGetArgFlag(argv, "+LBSim");
+  CkpvAccess(doSimulation) = CmiGetArgFlagDesc(argv, "+LBSim", "Read LB state from LBDumpFile");
 }
 
 int LBDatabase::manualOn = 0;

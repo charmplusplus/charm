@@ -590,7 +590,7 @@ static void parse_netstart(void)
 
 static void extract_common_args(char **argv)
 {
-  if (CmiGetArgFlag(argv,"+stats"))
+  if (CmiGetArgFlagDesc(argv,"+stats","Print network statistics at shutdown"))
     Cmi_print_stats = 1;
 }
 
@@ -1281,7 +1281,7 @@ static void node_addresses_obtain(char **argv)
   	ChSingleNodeinfo *fakeTab;
 	ChMessage_new("nodeinfo",sizeof(ChSingleNodeinfo),&nodetabmsg);
 	fakeTab=(ChSingleNodeinfo *)(nodetabmsg.data);
-  	CmiGetArgInt(argv,"+p",&npes);
+  	CmiGetArgIntDesc(argv,"+p",&npes,"Set the number of processes to create");
 #if CMK_SHARED_VARS_UNAVAILABLE
 	if (npes!=1) {
 		fprintf(stderr,
@@ -1897,15 +1897,15 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   Cmi_idlepoll = 1;
 #endif
   Cmi_truecrash = 0;
-  if (CmiGetArgFlag(argv,"+truecrash") ||
-      CmiGetArgFlag(argv,"++debug")) Cmi_truecrash = 1;
+  if (CmiGetArgFlagDesc(argv,"+truecrash","Do not install signal handlers") ||
+      CmiGetArgFlagDesc(argv,"++debug",NULL /*meaning: don't show this*/)) Cmi_truecrash = 1;
     /* netpoll disable signal */
-  if (CmiGetArgFlag(argv,"+netpoll")) Cmi_netpoll = 1;
+  if (CmiGetArgFlagDesc(argv,"+netpoll","Do not use SIGIO--poll instead")) Cmi_netpoll = 1;
     /* idlepoll use poll instead if sleep when idle */
-  if (CmiGetArgFlag(argv,"+idlepoll")) Cmi_idlepoll = 1;
+  if (CmiGetArgFlagDesc(argv,"+idlepoll","Do not sleep when idle")) Cmi_idlepoll = 1;
     /* idlesleep use sleep instead if busywait when idle */
-  if (CmiGetArgFlag(argv,"+idlesleep")) Cmi_idlepoll = 0;
-  Cmi_syncprint = CmiGetArgFlag(argv,"+syncprint");
+  if (CmiGetArgFlagDesc(argv,"+idlesleep","Make sleep calls when idle")) Cmi_idlepoll = 0;
+  Cmi_syncprint = CmiGetArgFlagDesc(argv,"+syncprint", "Flush each CmiPrintf to the terminal");
 
   MACHSTATE2(5,"Init: (netpoll=%d), (idlepoll=%d)",Cmi_netpoll,Cmi_idlepoll);
 
