@@ -1364,9 +1364,10 @@ void element::unlockArc2(int prio, elemRef parentRef, elemRef destRef,
 
 void element::refineCP()
 {
-  int a, b, c, d;
+  int a, b, c, d, iResult;
   node n1, n2, n3, n4, centerpoint;
   elemRef abcn, ancd, nbcd, abnd;
+  intMsg *result;
 
   CkPrintf("Refine: %d on %d: volume=%lf target=%lf lock=%d\n",
   	   myRef.idx, myRef.cid, currentVolume, targetVolume, lock);
@@ -1388,69 +1389,64 @@ void element::refineCP()
   ancd = faceElements[2];
   nbcd = faceElements[3];
 
-  // build local locking cloud:
-  // sort face elements by idx to prevent deadlocks
-  elemRef theFirst, theSecond, theThird;
-  if ((abnd < ancd) && (abnd < nbcd)) {
-    theFirst = abnd;
-    if (ancd < nbcd) { theSecond = ancd; theThird = nbcd; }
-    else { theSecond = nbcd; theThird = ancd; }
+  // build local locking cloud
+  iResult = C->lockLocalChunk(myRef.cid, currentVolume);
+  while (iResult != 1) {
+    if (iResult == 0) return;
+    else if (iResult == -1) CthYield();
+    iResult = C->lockLocalChunk(myRef.cid, currentVolume);
   }
-  else if ((ancd < abnd) && (ancd < nbcd)) {
-    theFirst = ancd;
-    if (abnd < nbcd) { theSecond = abnd; theThird = nbcd; }
-    else { theSecond = nbcd; theThird = abnd; }
-  }
-  else {
-    theFirst = nbcd;
-    if (ancd < abnd) { theSecond = ancd; theThird = abnd; }
-    else { theSecond = abnd; theThird = ancd; }
-  }
-
-  lockResult *lr1, *lr2, *lr3, *lr4;
-  lockMsg *lm1 = new (8*sizeof(int)) lockMsg, 
-    *lm2 = new (8*sizeof(int)) lockMsg, *lm3 = new (8*sizeof(int)) lockMsg,
-    *lm4 = new (8*sizeof(int)) lockMsg;
-  *(int *)CkPriorityPtr(lm1) = *(int *)CkPriorityPtr(lm2) = 
-    *(int *)CkPriorityPtr(lm3) = *(int *)CkPriorityPtr(lm4) = 
-    ((myRef.cid*10000) + myRef.idx) - INT_MAX;
-  CkSetQueueing(lm1, CK_QUEUEING_IFIFO);
-  CkSetQueueing(lm2, CK_QUEUEING_IFIFO);
-  CkSetQueueing(lm3, CK_QUEUEING_IFIFO);
-  CkSetQueueing(lm4, CK_QUEUEING_IFIFO);
-  lm1->idx = myRef.idx;
-  lm2->idx = theFirst.idx;
-  lm3->idx = theSecond.idx;
-  lm4->idx = theThird.idx;
-  lr1 = mesh[myRef.cid].lockElement(lm1);
-  if (lr1->result) { // lock acd abd and bcd face elements
-    if (theFirst.cid != -1)  lr2 = mesh[theFirst.cid].lockElement(lm2);
-    if ((theFirst.idx == -1) || (lr2->result)) {
-      if (theSecond.cid != -1)  lr3 = mesh[theSecond.cid].lockElement(lm3);
-      if ((theSecond.idx == -1) || (lr3->result)) {
-	if (theThird.cid != -1)  lr4 = mesh[theThird.cid].lockElement(lm4);
-	if ((theThird.idx == -1) || (lr4->result)) {} // LOCKING CLOUD BUILT
-	else {
-	  if (theSecond.cid != -1)  
-	    mesh[theSecond.cid].unlockElement(theSecond.idx);
-	  if (theFirst.cid != -1)  
-	    mesh[theFirst.cid].unlockElement(theFirst.idx);
-	  unlockElement();
-	  return;
-	}
-      }
-      else {
-	if (theFirst.cid != -1) mesh[theFirst.cid].unlockElement(theFirst.idx);
-	unlockElement();
+  if (abnd.cid != -1) {
+    result = mesh[abnd.cid].lockChunk(myRef.cid, currentVolume);
+    while (result->anInt != 1) {
+      if (result->anInt == 0) {
+	C->unlockLocalChunk(myRef.cid);
+	CkFreeMsg(result);
 	return;
       }
+      else if (result->anInt == -1) {
+	CthYield();
+	CkFreeMsg(result);
+	result = mesh[abnd.cid].lockChunk(myRef.cid, currentVolume);
+      }
     }
-    else {
-      unlockElement();
-      return;
-    }
+    CkFreeMsg(result);
   }
-  else  return;
+  if (ancd.cid != -1) {
+    result = mesh[ancd.cid].lockChunk(myRef.cid, currentVolume);
+    while (result->anInt != 1) {
+      if (result->anInt == 0) {
+	C->unlockLocalChunk(myRef.cid);
+	if (abnd.cid != -1) mesh[abnd.cid].unlockChunk(myRef.cid);
+	CkFreeMsg(result);
+	return;
+      }
+      else if (result->anInt == -1) {
+	CthYield();
+	CkFreeMsg(result);
+	result = mesh[ancd.cid].lockChunk(myRef.cid, currentVolume);
+      }
+    }
+    CkFreeMsg(result);
+  }
+  if (nbcd.cid != -1) {
+    result = mesh[nbcd.cid].lockChunk(myRef.cid, currentVolume);
+    while (result->anInt != 1) {
+      if (result->anInt == 0) {
+	C->unlockLocalChunk(myRef.cid);
+	if (abnd.cid != -1) mesh[abnd.cid].unlockChunk(myRef.cid);
+	if (ancd.cid != -1) mesh[ancd.cid].unlockChunk(myRef.cid);
+	CkFreeMsg(result);
+	return;
+      }
+      else if (result->anInt == -1) {
+	CthYield();
+	CkFreeMsg(result);
+	result = mesh[nbcd.cid].lockChunk(myRef.cid, currentVolume);
+      }
+    }
+    CkFreeMsg(result);
+  }
 
   // get nodeRefs for nodes
   CkPrintf("  -> Refine: %d on %d: Local cloud built.\n",myRef.idx,myRef.cid);
@@ -1505,10 +1501,10 @@ void element::refineCP()
   fireDependents();
   CkPrintf("   <- Refine: Done %d on %d\n", myRef.idx, myRef.cid);
 
-  if (theThird.cid != -1) mesh[theThird.cid].unlockElement(theThird.idx);
-  if (theSecond.cid != -1) mesh[theSecond.cid].unlockElement(theSecond.idx);
-  if (theFirst.cid != -1) mesh[theFirst.cid].unlockElement(theFirst.idx);
-  unlockElement();
+  if (abnd.cid != -1) mesh[abnd.cid].unlockChunk(myRef.cid);
+  if (ancd.cid != -1) mesh[ancd.cid].unlockChunk(myRef.cid);
+  if (nbcd.cid != -1) mesh[nbcd.cid].unlockChunk(myRef.cid);
+  C->unlockLocalChunk(myRef.cid);
   CkPrintf("Refine: DONE %d on %d\n", myRef.idx, myRef.cid);
 }
 
