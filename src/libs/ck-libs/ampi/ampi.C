@@ -686,7 +686,8 @@ ampi::send(int t, int s, const void* buf, int count, int type,  int rank, MPI_Co
      seq = nextseq[idx]++;
   }
 
-  dest.getProxy()[idx].generic(makeAmpiMsg(t,s,buf,count,type,destcomm,seq));
+  AmpiMsg *msg = makeAmpiMsg(t,s,buf,count,type,destcomm,seq);
+  dest.getProxy()[idx].generic(msg);
 }
 
 void
@@ -739,7 +740,7 @@ ampi::probe(int t, int s, int comm, int *sts)
     ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
 }
 
-int 
+int
 ampi::iprobe(int t, int s, int comm, int *sts)
 {
   int tags[3];
@@ -756,7 +757,7 @@ ampi::iprobe(int t, int s, int comm, int *sts)
 }
 
 
-void 
+void
 ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
 {
   const ampiCommStruct &dest=comm2proxy(destcomm);
@@ -860,7 +861,7 @@ int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
   int size=0;
   MPI_Type_size(type,&size);
   _LOG_E_AMPI_MSG_SEND(tag,dest,count,size)
-#endif		  
+#endif
   return 0;
 }
 
@@ -876,7 +877,7 @@ int MPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
   int size =0;
   MPI_Type_size(type,&size);
   _LOG_E_AMPI_MSG_SEND(tag,dest,count,size)
-#endif		  
+#endif
   return 0;
 }
 
@@ -886,9 +887,9 @@ int MPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
 {
   AMPIAPI("MPI_Recv");
   ampi *ptr = getAmpiInstance(comm);
-#ifndef CMK_OPTIMIZE  
+#ifndef CMK_OPTIMIZE
   _LOG_E_END_AMPI_PROCESSING()
-#endif		  
+#endif
   ptr->recv(tag,src,msg,count,type, comm, (int*) status);
 #ifndef CMK_OPTIMIZE
   _LOG_E_BEGIN_AMPI_PROCESSING(tag,src,count)
@@ -924,6 +925,16 @@ int MPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
   int re=MPI_Recv(rbuf,rcount,rtype,src,rtag,comm,sts);
   if (se) return se;
   else return re;
+}
+
+CDECL
+int MPI_Sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
+                         int dest, int sendtag, int source, int recvtag,
+                         MPI_Comm comm, MPI_Status *status)
+{
+  AMPIAPI("MPI_Sendrecv_replace");
+  return MPI_Sendrecv(buf, count, datatype, dest, sendtag,
+                      buf, count, datatype, source, recvtag, comm, status);
 }
 
 
@@ -1046,7 +1057,7 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
 
 CDECL
 int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
-                int root, MPI_Comm comm)
+               int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Reduce");
   ampi *ptr = getAmpiInstance(comm);
@@ -1064,7 +1075,7 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
 
 CDECL
 int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
-                   MPI_Op op, MPI_Comm comm)
+                  MPI_Op op, MPI_Comm comm)
 {
   AMPIAPI("MPI_Allreduce");
   ampi *ptr = getAmpiInstance(comm);
@@ -1072,11 +1083,38 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   CkCallback allreduceCB(CkIndex_ampi::reduceResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
-  
+
   /*HACK: Use recv() to block until the reduction data comes back*/
   ptr->recv(MPI_REDUCE_TAG, 0, outbuf, count, type, MPI_COMM_WORLD);
   return 0;
 }
+
+CDECL
+int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
+                       MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
+{
+  AMPIAPI("MPI_Reduce_scatter");
+  ampi *ptr = getAmpiInstance(comm);
+  int size = ptr->getSize();
+  int count=0;
+  int *displs = new int [size];
+  int len;
+  void *tmpbuf;
+
+  //under construction
+  for(int i=0;i<size;i++){
+    displs[i] = count;
+    count+= recvcounts[i];
+  }
+  len = ptr->getDDT()->getType(datatype)->getSize(count);
+  tmpbuf = malloc(len);
+  MPI_Reduce(sendbuf, tmpbuf, count, datatype, op, 0, comm);
+  MPI_Scatterv(tmpbuf, recvcounts, displs, datatype,
+               recvbuf, recvcounts[ptr->getRank()], datatype, 0, comm);
+  free(tmpbuf);
+  return 0;
+}
+
 
 CDECL
 double MPI_Wtime(void)
@@ -1516,7 +1554,7 @@ int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   MPI_Status status;
   CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
   int itemsize = dttype->getSize() ;
-  
+
   for(i=0;i<size;i++) {
     MPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
              i, MPI_GATHER_TAG, comm, &status);

@@ -32,6 +32,7 @@ This is needed so we can call the routine as a new thread.
 /* Somebody needs to define MPI_ERRs here */
 
 /* these values have to match values in ampif.h */
+#define MPI_DATATYPE_NULL -1
 #define MPI_DOUBLE 0
 #define MPI_INT 1
 #define MPI_FLOAT 2
@@ -128,7 +129,7 @@ int MPI_Issend(void *buf, int count, MPI_Datatype datatype, int dest,
 int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int src,
               int tag, MPI_Comm comm, MPI_Request *request);
 int MPI_Wait(MPI_Request *request, MPI_Status *sts);
-int MPI_Waitany(int count, MPI_Request *request, int *index,MPI_Status *sts);
+int MPI_Waitany(int count, MPI_Request *request, int *index, MPI_Status *sts);
 int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts);
 int MPI_Test(MPI_Request *request, int *flag, MPI_Status *sts);
 int MPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts);
@@ -151,7 +152,9 @@ int MPI_Start(MPI_Request *reqnum);
 int MPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
                  int stag, void *rbuf, int rcount, int rtype,
                  int src, int rtag, MPI_Comm comm, MPI_Status *sts);
-//MPI_Sendrecv_replace
+int MPI_Sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
+                         int dest, int sendtag, int source, int recvtag,
+                         MPI_Comm comm, MPI_Status *status);
 int MPI_Type_contiguous(int count, MPI_Datatype oldtype,
                          MPI_Datatype *newtype);
 int MPI_Type_vector(int count, int blocklength, int stride,
@@ -200,8 +203,6 @@ int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                    void *recvbuf, int *recvcounts, int *displs,
                    MPI_Datatype recvtype, MPI_Comm comm) ;
-//MPI_Scatter
-//MPI_Scatterv
 int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
                  MPI_Comm comm);
@@ -212,7 +213,9 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type,
                MPI_Op op, int root, MPI_Comm comm);
 int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
                   MPI_Op op, MPI_Comm comm);
-//MPI_Reduce_scatter
+int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
+                       MPI_Datatype datatype, MPI_Op op, MPI_Comm comm);
+
 //MPI_Scan
 //MPI_Op_create
 //MPI_Op_free
