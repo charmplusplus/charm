@@ -182,8 +182,9 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  Refiner.h RefinerComm.h ObjGraph.h heap.h elements.h CommLBHeap.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h RandCentLB.h RecBisectBfLB.h \
 	  RefineLB.h RefineCommLB.h OrbLB.h GreedyLB.h GreedyCommLB.h \
-	  Comm1LB.h manager.h MetisLB.h RotateLB.h NborBaseLB.h topology.h \
-	  NeighborLB.h NeighborCommLB.h NeighborLBMsg.h WSLB.h GridCommLB.h \
+          GreedyAgentLB.h Comm1LB.h MetisLB.h RotateLB.h GridCommLB.h \
+          NborBaseLB.h topology.h manager.h \
+	  NeighborLB.h NeighborCommLB.h NeighborLBMsg.h WSLB.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h 	\
           CkReduction.decl.h CkArrayReductionMgr.decl.h\
@@ -193,6 +194,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h \
           MetisLB.decl.h DummyLB.decl.h RefineLB.decl.h RefineCommLB.decl.h  \
           OrbLB.decl.h GreedyLB.decl.h GreedyCommLB.decl.h Comm1LB.decl.h \
+          GreedyAgentLB.decl.h		\
 	  RotateLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
 	  NeighborCommLB.decl.h WSLB.decl.h GridCommLB.decl.h EveryLB.decl.h \
           charisma.decl.h TraceSummary.decl.h BlueGene.decl.h \
