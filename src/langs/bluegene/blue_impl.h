@@ -33,6 +33,7 @@ const char UNKNOWN_THREAD=0, COMM_THREAD=1, WORK_THREAD=2;
 #define tMYNODE		cta(threadinfo)->myNode
 #define tSTARTTIME	tMYNODE->startTime
 #define tCURRTIME	cta(threadinfo)->currTime
+#define tHANDLETAB	cta(threadinfo)->handlerTable
 #define tMYX		tMYNODE->x
 #define tMYY		tMYNODE->y
 #define tMYZ		tMYNODE->z

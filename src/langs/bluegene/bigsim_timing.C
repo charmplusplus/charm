@@ -28,32 +28,33 @@ void bgMsgEntry::print()
   CmiPrintf("msgID:%d sendtime:%f dstPe:%d\n", msgID, sendtime, dstPe);
 }
 
-bgTimingLog::bgTimingLog(int epc, char *msg)
+bgTimeLog::bgTimeLog(int epc, char *msg)
 {
-  if (msg == NULL) CmiAbort("bgTimingLog: msg is NULL!");
+  if (msg == NULL) CmiAbort("bgTimeLog: msg is NULL!");
   ep = epc;
-  startTime = endTime = BgGetTime();
+  startTime = BgGetTime();
+  endTime = 0.0;
   srcpe = CmiBgMsgSrcPe(msg);
   msgID = CmiBgMsgID(msg);
 }
 
-bgTimingLog::~bgTimingLog()
+bgTimeLog::~bgTimeLog()
 {
   for (int i=0; i<msgs.length(); i++)
     delete msgs[i];
 }
 
-void bgTimingLog::closeLog()
+void bgTimeLog::closeLog()
 {
   endTime = BgGetTime();
 }
 
-void bgTimingLog::addMsg(char *msg)
+void bgTimeLog::addMsg(char *msg)
 {
   msgs.push_back(new bgMsgEntry(msg));
 }
 
-void bgTimingLog::print(int node, int th)
+void bgTimeLog::print(int node, int th)
 {
   CmiPrintf("<<== [%d th:%d] ep:%d startTime:%f endTime:%f srcpe:%d msgID:%d\n", node, th, ep, startTime, endTime, srcpe, msgID);
   for (int i=0; i<msgs.length(); i++)
@@ -61,7 +62,7 @@ void bgTimingLog::print(int node, int th)
   CmiPrintf("==>>\n");
 }
 
-void bgTimingLog::adjustTimingLog(double tAdjust)
+void bgTimeLog::adjustTimeLog(double tAdjust)
 {
 	startTime += tAdjust;
 	endTime   += tAdjust;
@@ -72,7 +73,7 @@ void bgTimingLog::adjustTimingLog(double tAdjust)
 	}
 }
 
-void BgAdjustTimeLineInsert(bgTimingLog* tlog, BgTimeLine &tline)
+void BgAdjustTimeLineInsert(bgTimeLog* tlog, BgTimeLine &tline)
 {
 	//FIXME
 	/* ASSUMPTION: BgAdjustTimeLineInit is called only if necessary */
@@ -92,7 +93,7 @@ void BgAdjustTimeLineInsert(bgTimingLog* tlog, BgTimeLine &tline)
 			break; 
 		else {
 			idx++;
-			tline[idx]->adjustTimingLog(tAdjust);
+			tline[idx]->adjustTimeLog(tAdjust);
 		}
 	}
 }
@@ -106,13 +107,13 @@ void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline)
 
 	//FIXME is remove implemented ?
 	/* remove entry at 'idx' from timeline */
-//	bgTimingLog* tlog = (bgTimingLog*)(tline->remove(idx));
+//	bgTimeLog* tlog = (bgTimeLog*)(tline->remove(idx));
 
 	/* adjust timing of 'tlog' */
-//	tlog->adjustTimingLog(tAdjust);
+//	tlog->adjustTimeLog(tAdjust);
 
 	/* insert entry at proper place in timeline */
-//    BgAdjustTimeLineInit(bgTimingLog* tlog, BgTimeLine &tline);
+//    BgAdjustTimeLineInit(bgTimeLog* tlog, BgTimeLine &tline);
 }
 
 void BgPrintThreadTimeLine(int pe, int th, BgTimeLine &tline)

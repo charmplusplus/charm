@@ -5,6 +5,9 @@
 
 #define BLUEGENE_TIMING     	1
 
+/**
+  a message sent event
+*/
 class bgMsgEntry {
 public:
   int msgID;
@@ -15,35 +18,43 @@ public:
   void print();
 };
 
-class bgTimingLog {
+/**
+  one time log for an handler function;
+  it record a list of message sent events in an execution of handler
+*/
+class bgTimeLog {
 public:
   int ep;
   double startTime, endTime;
-  int srcpe;   // source bg node 
+  int srcpe;                   // source bg node 
   int msgID;
   CkVec< bgMsgEntry * > msgs;
 public:
-  bgTimingLog(int epc, char *msg);
-  ~bgTimingLog();
+  bgTimeLog(int epc, char *msg);
+  ~bgTimeLog();
   void closeLog();
   void addMsg(char *msg);
   void print(int node, int th);
 
-  void adjustTimingLog(double tAdjust);
+  void adjustTimeLog(double tAdjust);
 };
 
-typedef CkQ< bgTimingLog *> BgTimeLine;
+/**
+  an entry in a time log
+  it record a list of message sent events
+*/
+typedef CkQ< bgTimeLog *> BgTimeLine;
 
 extern void BgInitTiming();
 extern void BgMsgSetTiming(char *msg);
 extern void BgPrintThreadTimeLine(int node, int th, BgTimeLine &tline);
-extern void BgAdjustTimeLineInit(bgTimingLog* tlog, BgTimeLine &tline);
+extern void BgAdjustTimeLineInit(bgTimeLog* tlog, BgTimeLine &tline);
 extern void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline);
 
 #if BLUEGENE_TIMING
 
 #define BG_ENTRYSTART(m)  \
-	if (tTHREADTYPE == WORK_THREAD) tMYNODE->timelines[tMYID].enq(new bgTimingLog(handler, m));
+	if (tTHREADTYPE == WORK_THREAD) tMYNODE->timelines[tMYID].enq(new bgTimeLog(handler, m));
 
 #define BG_ENTRYEND()  \
 	if (tTHREADTYPE == WORK_THREAD) {	\
@@ -55,8 +66,11 @@ extern void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline
 	BgMsgSetTiming(m); 	\
 	if (tTHREADTYPE == WORK_THREAD) {	\
           BgTimeLine &log = tMYNODE->timelines[tMYID];	\
-          bgTimingLog *tline = log[log.length()-1];	\
-          tline->addMsg(m);				\
+          int n = log.length();				\
+          if (n>0) {				\
+            bgTimeLog *tline = log[n-1];	\
+            tline->addMsg(m);				\
+          }						\
 	  /* log[log.length()-1]->print(); */		\
         }
 #else

@@ -15,9 +15,15 @@
 extern "C" {
 #endif
 
+/**
+  conform to Converse message header
+*/
 typedef struct CMK_MSG_HEADER_BLUEGENE   CmiBlueGeneMsgHeader;
 #define CmiBlueGeneMsgHeaderSizeBytes (sizeof(CmiBlueGeneMsgHeader))
 
+/**
+  macros to access Blue Gene message header fields
+*/
 #define CmiBgMsgType(m)  (((CmiBlueGeneMsgHeader*)m)->t)
 #define CmiBgMsgRecvTime(m)  (((CmiBlueGeneMsgHeader*)m)->rt)
 #define CmiBgMsgLength(m)  (((CmiBlueGeneMsgHeader*)m)->n)
@@ -27,78 +33,159 @@ typedef struct CMK_MSG_HEADER_BLUEGENE   CmiBlueGeneMsgHeader;
 #define CmiBgMsgID(m)      (((CmiBlueGeneMsgHeader*)m)->msgID)
 #define CmiBgMsgSrcPe(m)   (((CmiBlueGeneMsgHeader*)m)->srcPe)
 
-	/* when send packets, this means it is a non-affinity message */
+/**
+   indicate a message is for any thread;
+   when send packets, this means it is a non-affinity message 
+*/
 #define ANYTHREAD   ((CmiUInt2)-1)
 
+/**
+   indicate a message is a broacast to all message
+*/
 #define BG_BROADCASTALL	-1
 
-/* API data structures */
-	/* define size of a work which helps communication threads schedule */
+/************************* API data structures *************************/
+/** 
+   define size of a work which helps communication threads schedule 
+*/
 typedef enum WorkType {LARGE_WORK, SMALL_WORK} WorkType;
 
-	/* user handler function prototype */
+/**
+   user handler function prototype 
+*/
 typedef void (*BgHandler) (char *);
 
-/* API functions */
-	/* get a bluegene node coordinate */
+/***********  user defined functions called by bluegene ***********/
+/** 
+   called exactly once per process, used to check argc/argv,
+   setup bluegene emulation machine size, number of communication/worker
+   threads and register user handler functions
+*/
+extern void BgEmulatorInit(int argc, char **argv);
+
+/** 
+   called on every bluegene node to trigger the computation 
+*/
+extern void BgNodeStart(int argc, char **argv);
+
+typedef void (*BgStartHandler) (int, char **);
+
+/** 
+   register function 'f' to be called first thing in each worker thread
+*/
+extern void BgSetWorkerThreadStart(BgStartHandler f);
+
+/*********************** API functions ***********************/
+/** 
+  get a bluegene node coordinate 
+*/
 void BgGetMyXYZ(int *x, int *y, int *z);
-void BgGetXYZ(int seq, int *x, int *y, int *z);
-	/* get and set blue gene cube size */
-	/* set functions can only be called in user's BgGlobalInit code */
+void BgGetXYZ(int pe, int *x, int *y, int *z);
+
+/** 
+  get and set blue gene cube size
+  set functions can only be called in user's BgGlobalInit code
+*/
 void BgGetSize(int *sx, int *sy, int *sz);
-int  BgGetTotalSize();
+int  BgGetTotalSize();	/**<  total Blue Gene nodes */
 void BgSetSize(int sx, int sy, int sz);
 int  BgNumNodes();      /* return the number of nodes on this emulator pe */
-int  BgMyRank();		/* node ID, this is local ID */
+int  BgMyRank();	/* node ID, this is local ID */
 int  BgMyNode();
 
-	/* get and set number of worker and communication thread */
+/**
+   get and set number of worker and communication thread 
+*/
 int  BgGetNumWorkThread();
 void BgSetNumWorkThread(int num);
 int  BgGetNumCommThread();
 void BgSetNumCommThread(int num);
 
+/// return thread's local id on the Blue Gene node
 int  BgGetThreadID();
+/// return thread's global id(including both worker and comm threads)
 int  BgGetGlobalThreadID();
+/// return thread's global id(including only worker threads)
+int  BgGetGlobalWorkerThreadID();
 
-	/* get and set user-defined node private data */
-char *BgGetNodeData();
-void BgSetNodeData(char *data);
-
-	/* register user defined function and get a handler, 
-	   should only be called in BgGlobalInit() */
+/**
+   register user defined function and get a handler, 
+   should only be called in BgGlobalInit() 
+*/
 int  BgRegisterHandler(BgHandler h);
 void BgNumberHandler(int, BgHandler h);
 
-double BgGetTime();
+/************************ send packet functions ************************/
+/**
+  Send a packet to a thread in same Blue Gene node
+*/
+void BgSendLocalPacket(int threadID, int handlerID, WorkType type, 
+                       int numbytes, char* data);
+/**
+  Send a packet to a thread(threadID) to Blue Gene node (x,y,z)
+*/
+void BgSendNonLocalPacket(int x, int y, int z, int threadID, int handlerID, 
+                          WorkType type, int numbytes, char* data);
+/**
+  Send a packet to a thread(threadID) to Blue Gene node (x,y,z)
+  this is a wrapper of above two.
+*/
+void BgSendPacket(int x, int y, int z, int threadID, int handlerID, 
+                  WorkType type, int numbytes, char* data);
 
-	/* send packet functions */
-void BgSendLocalPacket(int threadID, int handlerID, WorkType type, int numbytes, char* data);
-void BgSendNonLocalPacket(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* data);
-void BgSendPacket(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* data);
+/************************ broadcast functions ************************/
 
-void BgBroadcastAllPacket(int handlerID, WorkType type, int numbytes, char * data);
-void BgBroadcastPacketExcept(int node, CmiUInt2 threadID, int handlerID, WorkType type, int numbytes, char * data);
+/**
+  Broadcast a packet to all Blue Gene nodes;
+  each BG node receive one message.
+*/
+void BgBroadcastAllPacket(int handlerID, WorkType type, int numbytes, 
+                          char * data);
+/**
+  Broadcast a packet to all Blue Gene nodes except to "node" and "threadID";
+  each BG node receive one message.
+*/
+void BgBroadcastPacketExcept(int node, CmiUInt2 threadID, int handlerID, 
+                             WorkType type, int numbytes, char * data);
+/**
+  Broadcast a packet to all Blue Gene threads 
+  each BG thread receive one message.
+*/
+void BgThreadBroadcastAllPacket(int handlerID, WorkType type, int numbytes, 
+                                char * data);
+/**
+  Broadcast a packet to all Blue Gene threads except to "node" and "threadID"
+  each BG thread receive one message.
+*/
+void BgThreadBroadcastPacketExcept(int node, CmiUInt2 threadID, int handlerID, 
+                                   WorkType type, int numbytes, char * data);
 
-	/** shutdown the emulator */
+/************************ utility functions ************************/
+
+/** 
+  shutdown the emulator 
+*/
 void BgShutdown();
 
-/* user defined functions called by bluegene */
-	/* called exactly once per process, used to check argc/argv,
-	   setup bluegene emulation machine size, number of communication/worker
-	   threads and register user handler functions */
-extern void BgEmulatorInit(int argc, char **argv);
-	/* called every bluegene node to trigger the computation */
-extern void BgNodeStart(int argc, char **argv);
+/**
+  get Blue Gene timer, one for each thread
+*/
+double BgGetTime();
 
 CpvExtern(int, inEmulatorInit);
+
+/**
+   get and set user-defined node private data 
+*/
+char *BgGetNodeData();
+void BgSetNodeData(char *data);
 
 #if defined(__cplusplus)
 }
 #endif
 
 /*****************************************************************************
-      Node Private variables macros (Bnv)
+      Node Private variables(Bnv) functions and macros
 *****************************************************************************/
 
 #if 0

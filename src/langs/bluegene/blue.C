@@ -17,7 +17,7 @@
 
 #include "cklists.h"
 
-#define  DEBUGF(x)    // CmiPrintf x;
+#define  DEBUGF(x)     // CmiPrintf x;
 
 #include "blue.h"
 
@@ -40,15 +40,19 @@ CpvDeclare(nodeInfo*, nodeinfo);		/* represent a bluegene node */
 /* thread level variables */
 CtvDeclare(threadInfo *, threadinfo);	/* represent a bluegene thread */
 
+CpvStaticDeclare(CthThread, mainThread);
+
 /* emulator node level variables */
 CpvDeclare(int,msgHandler);
-CmiHandler msgHandlerFunc(char *msg);
-
+CpvDeclare(int,nBcastMsgHandler);
+CpvDeclare(int,tBcastMsgHandler);
 CpvDeclare(int,exitHandler);
 
-typedef void (*BgStartHandler) (int, char **);
-BnvStaticDeclare(int, handlerTableCount);
-BnvStaticDeclare(BgHandler *, handlerTable);
+CmiHandler msgHandlerFunc(char *msg);
+CmiHandler nodeBCastMsgHandlerFunc(char *msg);
+CmiHandler threadBCastMsgHandlerFunc(char *msg);
+
+extern "C" void defaultBgHandler(char *);
 
 CpvStaticDeclare(msgQueue *,inBuffer);	/* emulate the bluegene fix-size inbuffer */
 CpvStaticDeclare(CmmTable *,msgBuffer);	/* if inBuffer is full, put to this buffer */
@@ -63,12 +67,6 @@ CpvDeclare(int, inEmulatorInit);
   if (cva(numX)*cva(numY)*cva(numZ)<CmiNumPes()) {	\
     CmiAbort("\nToo few BlueGene nodes!\n");	\
     BgShutdown(); 	\
-  }
-
-#define HANDLERCHECK(handler)	\
-  if (BnvAccess(handlerTable)[handler] == NULL) {	\
-    CmiPrintf("Handler %d unregistered!\n", handler);	\
-    CmiAbort("Abort!\n");	\
   }
 
 
@@ -105,6 +103,52 @@ public:
   inline int isEmpty() { return count == 0; }
 };
 
+/**
+  definition of Handler Table;
+  there are two kinds of handle tables: 
+  one is node level, the other is at thread level
+*/
+class HandlerTable {
+public:
+  int          handlerTableCount; 
+  BgHandler *  handlerTable;     
+public:
+  HandlerTable()
+  {
+    handlerTableCount = 1;
+    handlerTable = (BgHandler *)malloc(MAX_HANDLERS * sizeof(BgHandler));
+    for (int i=0; i<MAX_HANDLERS; i++) handlerTable[i] = defaultBgHandler;
+  }
+  int registerHandler(BgHandler h)
+  {
+    ASSERT(!cva(inEmulatorInit));
+    /* leave 0 as blank, so it can report error luckily */
+    int cur = handlerTableCount++;
+    if (cur >= MAX_HANDLERS)
+      CmiAbort("BG> HandlerID exceed the maximum.\n");
+    handlerTable[cur] = h;
+    return cur;
+  }
+  void numberHandler(int idx, BgHandler h)
+  {
+    ASSERT(!cva(inEmulatorInit));
+    if (idx >= handlerTableCount || idx < 1)
+      CmiAbort("BG> HandlerID exceed the maximum!\n");
+    handlerTable[idx] = h;
+  }
+  BgHandler getHandle(int handler)
+  {
+#if 0
+    if (handler >= handlerTableCount) {
+      CmiPrintf("[%d] handler: %d handlerTableCount:%d. \n", tMYNODEID, handler, handlerTableCount);
+      CmiAbort("Invalid handler!");
+    }
+#endif
+    if (handler >= handlerTableCount) return NULL;
+    return handlerTable[handler];
+  }
+};
+
 /*****************************************************************************
       NodeInfo:
         including a group of functions defining the mapping, terms used here:
@@ -121,32 +165,26 @@ public:
   int x,y,z;
   threadQueue *commThQ;		/* suspended comm threads queue */
   CthThread   *threadTable;	/* thread table for both work and comm threads*/
+  threadInfo  **threadinfo;
   ckMsgQueue   nodeQ;		/* non-affinity msg queue */
   ckMsgQueue  *affinityQ;	/* affinity msg queue for each work thread */
   char        *udata;		/* node specific data pointer */
   double       startTime;	/* start time for a thread */
   char         started;		/* flag indicate if this node is started */
  
+  HandlerTable handlerTable; /* node level handler table */
+
   // for timing
   BgTimeLine *timelines;
 
 public:
-  nodeInfo(): udata(NULL), started(0) {
-    commThQ = new threadQueue;
-    commThQ->initialize(cva(numCth));
-
-    threadTable = new CthThread[cva(numWth)+cva(numCth)];
-
-    affinityQ = new ckMsgQueue[cva(numWth)];
-
-    // timing
-    timelines = new BgTimeLine[cva(numWth)];
-  }
+  nodeInfo();
 
   ~nodeInfo() {
     if (commThQ) delete commThQ;
     delete [] affinityQ;
     delete [] threadTable;
+    delete [] threadinfo;
   }
   
 };	// end of nodeInfo
@@ -168,6 +206,10 @@ public:
   nodeInfo *myNode;		/* the node belonged to */
   double  currTime;		/* thread timer */
 
+#if  CMK_BLUEGENE_THREAD
+  HandlerTable   handlerTable;      /* thread level handler table */
+#endif
+
 public:
   threadInfo(int _id, ThreadType _type, nodeInfo *_node): id(_id), type(_type), myNode(_node) {
     currTime=0.0;
@@ -177,6 +219,34 @@ public:
   inline CthThread getThread() { return me; }
 }; 
 
+
+/**
+  nodeInfo construtor
+*/
+nodeInfo::nodeInfo(): udata(NULL), started(0) 
+{
+    int i;
+    commThQ = new threadQueue;
+    commThQ->initialize(cva(numCth));
+
+    threadTable = new CthThread[cva(numWth)+cva(numCth)];
+    threadinfo = new (threadInfo*)[cva(numWth)+cva(numCth)];
+
+    affinityQ = new ckMsgQueue[cva(numWth)];
+
+    // create threadinfo
+    for (i=0; i< cva(numWth); i++)
+    {
+      threadinfo[i] = new threadInfo(i, WORK_THREAD, this);
+    }
+    for (i=0; i< cva(numCth); i++)
+    {
+      threadinfo[i+cva(numWth)] = new threadInfo(i+cva(numWth), COMM_THREAD, this);
+    }
+
+    // timing
+    timelines = new BgTimeLine[cva(numWth)];
+  }
 
 /*****************************************************************************
       low level API
@@ -190,20 +260,32 @@ extern "C" void defaultBgHandler(char *null)
 int BgRegisterHandler(BgHandler h)
 {
   ASSERT(!cva(inEmulatorInit));
-  /* leave 0 as blank, so it can report error luckily */
-  int cur = BnvAccess(handlerTableCount)++;
-  if (cur >= MAX_HANDLERS)
-    CmiAbort("BG> HandlerID exceed the maximum.\n");
-  BnvAccess(handlerTable)[cur] = h;
-  return cur;
+  int cur;
+#if CMK_BLUEGENE_NODE
+  return tMYNODE->handlerTable.registerHandler(h);
+#else
+  if (tTHREADTYPE == COMM_THREAD) {
+    return tMYNODE->handlerTable.registerHandler(h);
+  }
+  else {
+    return tHANDLETAB.registerHandler(h);
+  }
+#endif
 }
 
 void BgNumberHandler(int idx, BgHandler h)
 {
   ASSERT(!cva(inEmulatorInit));
-  if (idx >= BnvAccess(handlerTableCount) || idx < 1)
-  CmiAbort("BG> HandlerID exceed the maximum!\n");
-  BnvAccess(handlerTable)[idx] = h;
+#if CMK_BLUEGENE_NODE
+  return tMYNODE->handlerTable.numberHandler(idx,h);
+#else
+  if (tTHREADTYPE == COMM_THREAD) {
+    return tMYNODE->handlerTable.numberHandler(idx, h);
+  }
+  else {
+    return tHANDLETAB.numberHandler(idx, h);
+  }
+#endif
 }
 
 /* communication thread call getFullBuffer to test if there is data ready 
@@ -272,7 +354,7 @@ void addBgNodeMessage(char *msgPtr)
     if (tMYNODE->affinityQ[i].length() == 0)
     {
       /* this work thread is idle, schedule the msg here */
-      DEBUGF(("activate a work thread %p.\n", tTHREADTABLE[i]));
+      DEBUGF(("activate a work thread %d - %p.\n", i, tTHREADTABLE[i]));
       tMYNODE->affinityQ[i].enq(msgPtr);
       CthAwaken(tTHREADTABLE[i]);
       return;
@@ -308,34 +390,71 @@ CmiHandler msgHandlerFunc(char *msg)
     addBgNodeInbuffer(msg, nodeID);
   }
   else {
-    if (nodeID < -1) {
+    CmiAbort("Invalid message!");
+  }
+  return 0;
+}
+
+CmiHandler nodeBCastMsgHandlerFunc(char *msg)
+{
+  /* bgmsg is CmiMsgHeaderSizeBytes offset of original message pointer */
+  int nodeID = CmiBgMsgNodeID(msg);
+  if (nodeID < -1) {
       nodeID = - (nodeID+100);
       if (nodeInfo::Global2PE(nodeID) == CmiMyPe())
 	nodeID = nodeInfo::Global2Local(nodeID);
       else
 	nodeID = -1;
+  }
+  CmiUInt2 threadID = CmiBgMsgThreadID(msg);
+  // broadcast except nodeID:threadId
+  int len = CmiBgMsgLength(msg);
+  int count = 0;
+  for (int i=0; i<cva(numNodes); i++)
+  {
+    if (i==nodeID) continue;
+    char *dupmsg;
+    if (count == 0) dupmsg = msg;
+    else {
+      dupmsg = (char *)CmiAlloc(len);
+      memcpy(dupmsg, msg, len);
     }
-    CmiUInt2 threadID = CmiBgMsgThreadID(msg);
-    // broadcast except nodeID:threadId
-    int len = CmiBgMsgLength(msg);
-    int count = 0;
-    for (int i=0; i<cva(numNodes); i++)
-    {
-      if (i==nodeID) continue;
-      char *dupmsg;
-      if (count == 0) dupmsg = msg;
-      else {
-        dupmsg = (char *)CmiAlloc(len);
-        memcpy(dupmsg, msg, len);
-      }
-      DEBUGF(("[%d] addBgNodeInbuffer to %d\n", BgMyNode(), i));
-      addBgNodeInbuffer(dupmsg, i);
-      count ++;
-    }
+    DEBUGF(("[%d] addBgNodeInbuffer to %d\n", BgMyNode(), i));
+    addBgNodeInbuffer(dupmsg, i);
+    count ++;
   }
   return 0;
 }
 
+CmiHandler threadBCastMsgHandlerFunc(char *msg)
+{
+  /* bgmsg is CmiMsgHeaderSizeBytes offset of original message pointer */
+  int nodeID = CmiBgMsgNodeID(msg);
+  if (nodeID < -1) {
+      nodeID = - (nodeID+100);
+      if (nodeInfo::Global2PE(nodeID) == CmiMyPe())
+	nodeID = nodeInfo::Global2Local(nodeID);
+      else
+	nodeID = -1;
+  }
+  CmiUInt2 threadID = CmiBgMsgThreadID(msg);
+  // broadcast except nodeID:threadId
+  int len = CmiBgMsgLength(msg);
+  for (int i=0; i<cva(numNodes); i++)
+  {
+    char *dupmsg;
+    for (int j=0; j<cva(numWth); j++) {
+      if (i==nodeID && j==threadID) continue;
+      dupmsg = (char *)CmiAlloc(len);
+      memcpy(dupmsg, msg, len);
+      CmiBgMsgThreadID(dupmsg) = j;
+      DEBUGF(("[%d] addBgNodeInbuffer to %d tid:%d\n", CmiMyPe(), i, j));
+      addBgNodeInbuffer(dupmsg, i);
+    }
+  }
+  CmiFree(msg);
+  return 0;
+}
 
 #define ABS(x) (((x)<0)? -(x) : (x))
 
@@ -370,9 +489,9 @@ void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type
 }
 
 /* broadcast will copy data to msg buffer */
-void broadcastPacketExcept_(int node, CmiUInt2 threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
+void nodeBroadcastPacketExcept_(int node, CmiUInt2 threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
 {
-  CmiSetHandler(sendmsg, cva(msgHandler));	
+  CmiSetHandler(sendmsg, cva(nBcastMsgHandler));	
   if (node >= 0)
     CmiBgMsgNodeID(sendmsg) = -node-100;
   else
@@ -385,6 +504,25 @@ void broadcastPacketExcept_(int node, CmiUInt2 threadID, int handlerID, WorkType
   CmiBgMsgRecvTime(sendmsg) = BgGetTime();	
 
   DEBUGF(("[%d]CmiSyncBroadcastAllAndFree node: %d\n", BgMyNode(), node));
+  CmiSyncBroadcastAllAndFree(numbytes,sendmsg);
+}
+
+/* broadcast will copy data to msg buffer */
+void threadBroadcastPacketExcept_(int node, CmiUInt2 threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
+{
+  CmiSetHandler(sendmsg, cva(tBcastMsgHandler));	
+  if (node >= 0)
+    CmiBgMsgNodeID(sendmsg) = -node-100;
+  else
+    CmiBgMsgNodeID(sendmsg) = node;
+  CmiBgMsgThreadID(sendmsg) = threadID;	
+  CmiBgMsgHandle(sendmsg) = handlerID;	
+  CmiBgMsgType(sendmsg) = type;	
+  CmiBgMsgLength(sendmsg) = numbytes;
+  /* FIXME */
+  CmiBgMsgRecvTime(sendmsg) = BgGetTime();	
+
+  DEBUGF(("[%d]CmiSyncBroadcastAllAndFree node: %d tid:%d\n", BgMyNode(), node, threadID));
   CmiSyncBroadcastAllAndFree(numbytes,sendmsg);
 }
 
@@ -416,12 +554,22 @@ void BgSendPacket(int x, int y, int z, int threadID, int handlerID, WorkType typ
 
 void BgBroadcastPacketExcept(int node, CmiUInt2 threadID, int handlerID, WorkType type, int numbytes, char * data)
 {
-  broadcastPacketExcept_(node, threadID, handlerID, type, numbytes, data);
+  nodeBroadcastPacketExcept_(node, threadID, handlerID, type, numbytes, data);
 }
 
 void BgBroadcastAllPacket(int handlerID, WorkType type, int numbytes, char * data)
 {
-  broadcastPacketExcept_(BG_BROADCASTALL, ANYTHREAD, handlerID, type, numbytes, data);
+  nodeBroadcastPacketExcept_(BG_BROADCASTALL, ANYTHREAD, handlerID, type, numbytes, data);
+}
+
+void BgThreadBroadcastPacketExcept(int node, CmiUInt2 threadID, int handlerID, WorkType type, int numbytes, char * data)
+{
+  threadBroadcastPacketExcept_(node, threadID, handlerID, type, numbytes, data);
+}
+
+void BgThreadBroadcastAllPacket(int handlerID, WorkType type, int numbytes, char * data)
+{
+  threadBroadcastPacketExcept_(BG_BROADCASTALL, ANYTHREAD, handlerID, type, numbytes, data);
 }
 
 /*****************************************************************************
@@ -492,6 +640,13 @@ int BgGetGlobalThreadID()
 {
   ASSERT(tTHREADTYPE == WORK_THREAD || tTHREADTYPE == COMM_THREAD);
   return nodeInfo::Local2Global(tMYNODE->id)*(cva(numCth)+cva(numWth))+tMYID;
+//  return tMYGLOBALID;
+}
+
+int BgGetGlobalWorkerThreadID()
+{
+  ASSERT(tTHREADTYPE == WORK_THREAD);
+  return nodeInfo::Local2Global(tMYNODE->id)*cva(numWth)+tMYID;
 //  return tMYGLOBALID;
 }
 
@@ -587,33 +742,49 @@ void BgShutdown()
       Communication and Worker threads
 *****************************************************************************/
 
+BgStartHandler  workStartFunc = NULL;
 
+void BgSetWorkerThreadStart(BgStartHandler f)
+{
+  workStartFunc = f;
+}
+
+#if 0
 static void InitHandlerTable()
 {
   /* init handlerTable */
-  BnvInitialize(int, handlerTableCount);
-  BnvAccess(handlerTableCount) = 1;
-  BnvInitialize(BgHandler*, handlerTable);
-  BnvAccess(handlerTable) = (BgHandler *)malloc(MAX_HANDLERS * sizeof(BgHandler));
-  for (int i=0; i<MAX_HANDLERS; i++) BnvAccess(handlerTable)[i] = defaultBgHandler;
+  BGInitialize(int, handlerTableCount);
+  BGAccess(handlerTableCount) = 1;
+  BGInitialize(BgHandler*, handlerTable);
+  BGAccess(handlerTable) = (BgHandler *)malloc(MAX_HANDLERS * sizeof(BgHandler));
+  for (int i=0; i<MAX_HANDLERS; i++) BGAccess(handlerTable)[i] = defaultBgHandler;
 }
+#endif
 
 static void ProcessMessage(char *msg)
 {
   int handler = CmiBgMsgHandle(msg);
   DEBUGF(("[%d] call handler %d\n", BgMyNode(), handler));
-#ifndef CMK_OPTIMIZE
-  if (handler >= BnvAccess(handlerTableCount)) {
-    CmiPrintf("[%d] handler: %d handlerTableCount:%d. \n", tMYNODEID, handler, BnvAccess(handlerTableCount));
-    CmiAbort("Invalid handler!");
-  }
+
+  BgHandler entryFunc;
+#if  CMK_BLUEGENE_NODE
+  entryFunc = tMYNODE->handlerTable.getHandle(handler);
+#else
+  entryFunc = tHANDLETAB.getHandle(handler);
+  if (entryFunc == NULL) entryFunc = tMYNODE->handlerTable.getHandle(handler);
 #endif
+
+  if (entryFunc == NULL) {
+    CmiPrintf("[%d] invalid handler: %d. \n", tMYNODEID, handler);
+    CmiAbort("");
+  }
+
   CmiSetHandler(msg, CmiBgMsgHandle(msg));
 
   // timing
   BG_ENTRYSTART(msg);
 
-  BnvAccess(handlerTable)[handler](msg);
+  entryFunc(msg);
 
   // timing
   BG_ENTRYEND();
@@ -629,7 +800,7 @@ void comm_thread(threadInfo *tinfo)
 
   if (!tSTARTED) {
     tSTARTED = 1;
-    InitHandlerTable();
+//    InitHandlerTable();
     BgNodeStart(arg_argc, arg_argv);
     /* bnv should be initialized */
   }
@@ -656,6 +827,7 @@ void comm_thread(threadInfo *tinfo)
         addBgNodeMessage(msg);			/* non-affinity message */
       }
       else {
+        DEBUGF(("affinity msg, call addBgThreadMessage to %d\n", CmiBgMsgThreadID(msg)));
         addBgThreadMessage(msg, CmiBgMsgThreadID(msg));
       }
     }
@@ -671,6 +843,10 @@ void work_thread(threadInfo *tinfo)
   cta(threadinfo) = tinfo;
 
   tSTARTTIME = CmiWallTimer();
+
+//  InitHandlerTable();
+  if (workStartFunc) workStartFunc(arg_argc, arg_argv);
+
   for (;;) {
     char *msg=NULL;
     ckMsgQueue &q1 = tNODEQ;
@@ -695,16 +871,18 @@ void work_thread(threadInfo *tinfo)
       tCURRTIME += (CmiWallTimer()-tSTARTTIME);
       CthSuspend();
       tSTARTTIME = CmiWallTimer();
-      DEBUGF(("[%d] work thread awakened.\n", BgMyNode()));
+      DEBUGF(("[%d] work thread %d awakened.\n", BgMyNode(), tMYID));
       continue;
     }
-    DEBUGF(("[%d] work thread has a msg.\n", BgMyNode()));
+    DEBUGF(("[%d] work thread %d has a msg.\n", BgMyNode(), tMYID));
     if (CmiBgMsgRecvTime(msg) > tCURRTIME)  tCURRTIME = CmiBgMsgRecvTime(msg);
     DEBUGF(("call ProcessMessage\n"));
     // ProcessMessage may trap into scheduler
     ProcessMessage(msg);
 
     if (fromQ2 == 1) q2.deq();
+
+    DEBUGF(("[%d] work thread %d finish a msg.\n", BgMyNode(), tMYID));
 
     /* let other work thread do their jobs */
     tCURRTIME += (CmiWallTimer()-tSTARTTIME);
@@ -726,8 +904,7 @@ void BgNodeInitialize(nodeInfo *ninfo)
   /* creat work threads */
   for (i=0; i< cva(numWth); i++)
   {
-    threadInfo *tinfo = new threadInfo(i, WORK_THREAD, ninfo);
-    _MEMCHECK(tinfo);
+    threadInfo *tinfo = ninfo->threadinfo[i];
     t = CthCreate((CthVoidFn)work_thread, tinfo, 0);
     if (t == NULL) CmiAbort("BG> Failed to create worker thread. \n");
     tinfo->setThread(t);
@@ -739,8 +916,7 @@ void BgNodeInitialize(nodeInfo *ninfo)
   /* creat communication thread */
   for (i=0; i< cva(numCth); i++)
   {
-    threadInfo *tinfo = new threadInfo(i+cva(numWth), COMM_THREAD, ninfo);
-    _MEMCHECK(tinfo);
+    threadInfo *tinfo = ninfo->threadinfo[i+cva(numWth)];
     t = CthCreate((CthVoidFn)comm_thread, tinfo, 0);
     if (t == NULL) CmiAbort("BG> Failed to create communication thread. \n");
     tinfo->setThread(t);
@@ -793,6 +969,10 @@ CmiStartFn bgMain(int argc, char **argv)
   /* msg handler */
   CpvInitialize(int,msgHandler);
   cva(msgHandler) = CmiRegisterHandler((CmiHandler) msgHandlerFunc);
+  CpvInitialize(int,nBcastMsgHandler);
+  cva(nBcastMsgHandler) = CmiRegisterHandler((CmiHandler)nodeBCastMsgHandlerFunc);
+  CpvInitialize(int,tBcastMsgHandler);
+  cva(tBcastMsgHandler) = CmiRegisterHandler((CmiHandler)threadBCastMsgHandlerFunc);
 
   CpvInitialize(int,exitHandler);
   cva(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
@@ -845,6 +1025,8 @@ CmiStartFn bgMain(int argc, char **argv)
   }
   // clear main thread.
   cta(threadinfo)->myNode = NULL;
+  CpvInitialize(CthThread, mainThread);
+  cva(mainThread) = CthSelf();
 
   return 0;
 }
@@ -859,6 +1041,31 @@ int main(int argc,char *argv[])
 // if -2 untouch
 // if -1 main thread
 #undef CmiSwitchToPE
+#if CMK_BLUEGENE_THREAD
+extern "C" int CmiSwitchToPE(int pe)
+{
+  if (pe == -2) return -2;
+  int oldpe;
+  ASSERT(tTHREADTYPE != COMM_THREAD);
+  if (tMYNODE == NULL) oldpe = -1;
+  else if (tTHREADTYPE == COMM_THREAD) oldpe = -BgGetThreadID();
+  else oldpe = BgGetGlobalWorkerThreadID();
+//CmiPrintf("CmiSwitchToPE from %d to %d\n", oldpe, pe);
+  if (pe == -1) {
+    CthSwitchThread(cva(mainThread));
+  }
+  else if (pe < 0) {
+  }
+  else {
+    int t = pe%cva(numWth);
+    int newpe = nodeInfo::Global2Local(pe/cva(numWth));
+    nodeInfo *ninfo = cva(nodeinfo) + newpe;;
+    threadInfo *tinfo = ninfo->threadinfo[t];
+    CthSwitchThread(tinfo->me);
+  }
+  return oldpe;
+}
+#else
 extern "C" int CmiSwitchToPE(int pe)
 {
   if (pe == -2) return -2;
@@ -874,5 +1081,6 @@ extern "C" int CmiSwitchToPE(int pe)
   }
   return oldpe;
 }
+#endif
 
 
