@@ -349,7 +349,7 @@ bound together-- A[i] and B[i] will always be on the same processor.
 //Create the second array bound to the first
   CkCreateOptions opts(nElements);
   opts.bindTo(aProxy);
-  bProxy=CProxy_B::ckNew(\uw{parameters},nElements);
+  bProxy=CProxy_B::ckNew(\uw{parameters},opts);
 \end{alltt}
 
 Bound arrays are often useful if A[i] and B[i] perform different 
