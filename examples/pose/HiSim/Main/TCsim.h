@@ -223,6 +223,7 @@ class BGproc {
   int numLogs;
   FILE *proj;
   int binary;
+  FILE *lf;
 
   CkHashtableT<TaskID, int> msgTable;
   void buildHash();

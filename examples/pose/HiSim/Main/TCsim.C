@@ -224,6 +224,18 @@ BGproc::BGproc(BGprocMsg *m)
   // read trace projections logs if there is any
   loadProjections();
 
+  if (config.tproj_on) {
+    char str[1024];
+    char app[128];
+//    for (int j=0; j<128; j++) app[j] = appname[j];
+    sprintf(str, "%s.%d.log", "foo", procNum);
+    lf = fopen(str, "w");
+    toProjectionsFile p(lf);
+    LogEntry *foo = new LogEntry(0.0, 6);
+    foo->pup(p);
+  }
+
+
   // only pe 0 should start the sim
   if (procNum == 0) {
     TaskMsg *tm = new TaskMsg(-1,-1,startEvt);
@@ -286,7 +298,12 @@ void BGproc::executeTask(TaskMsg *m)
 */
 //  CmiAssert(done[locateTask(m->taskID)] == 0);
   int taskLoc = locateTask(m->taskID);
-  if (taskLoc == -1) return; // user was warned in locateTask
+  if (taskLoc == -1) {
+    // This may be ok if the message is at the end of execution
+    // user is warned here though
+    parent->CommitPrintf("WARNING: executeTask TASK NOT FOUND src:%d msg:%d on:%d\n", m->taskID.srcNode, m->taskID.msgID, parent->thisIndex);
+    return;
+  }
   if (done[taskLoc] == 1) {
     char str[1024];
     sprintf(str, "[%d] Event #%d '%s' already done!\n", procNum, taskLoc, taskList[taskLoc].name);
@@ -517,6 +534,10 @@ void BGproc::executeTask_anti(TaskMsg *m)
   restore(this);
   if (usesAntimethods()) {
     int taskLoc = locateTask(m->taskID);
+    if (taskLoc == -1) {
+      parent->CommitPrintf("WARNING: executeTask_anti TASK NOT FOUND src:%d msg:%d on:%d\n", m->taskID.srcNode, m->taskID.msgID, parent->thisIndex);
+      return;
+    }
     CmiAssert(taskLoc >= 0);
     //CmiPrintf("[%d] executeTask_anti %d for %d %d %d\n", procNum, taskLoc, m->taskID.srcNode, m->taskID.msgID, m->taskID.index);
     done[taskLoc] = 0;
@@ -525,8 +546,18 @@ void BGproc::executeTask_anti(TaskMsg *m)
 
 void BGproc::executeTask_commit(TaskMsg *m)
 {
+  int taskLoc = locateTask(m->taskID);
+  if (taskLoc == -1) {
+    parent->CommitPrintf("WARNING: executeTask_commit TASK NOT FOUND src:%d msg:%d on:%d\n", m->taskID.srcNode, m->taskID.msgID, parent->thisIndex);
+    return;
+  }
+  Task &task = taskList[taskLoc];
+  //CkPrintf("[%d] commit %d for %d %d %d evID=", procNum, taskLoc, m->taskID.srcNode, m->taskID.msgID, m->taskID.index); m->evID.dump(); CkPrintf("\n");
+  //CmiAssert(done[taskLoc] == 1);
+  // trying to commit an unexecuted event (may happen in sequential mode)
+  if (done[taskLoc] == 0) return;
+
   if (proj) {
-    Task &task = taskList[locateTask(m->taskID)];
     // pup projections to logs
     if (!binary)  {
       toProjectionsFile p(proj);
@@ -539,6 +570,13 @@ void BGproc::executeTask_commit(TaskMsg *m)
       }
     }
   }
+  else if (config.tproj_on) {
+    toProjectionsFile p(lf);
+    LogEntry *beginLog = new LogEntry((double)task.newStartTime/factor, 2);
+    LogEntry *endLog = new LogEntry(((double)(task.newStartTime+task.execTime))/factor, 3);
+    beginLog->pup(p);
+    endLog->pup(p);
+  }
 }
 
 void BGproc::terminus()
@@ -548,13 +586,19 @@ void BGproc::terminus()
     logs[numLogs-1].time = ovt/1e9;
     logs[numLogs-1].pup(p);
   }
+  else if (config.tproj_on) {
+    toProjectionsFile p(lf);
+    LogEntry *foo = new LogEntry(((double)ovt)/factor, 7);
+    foo->pup(p);
+    fclose(lf);
+  }
   if (config.check_on) 
   {
   // error checking
   int i, count=0;
   for (i=0; i<numTasks; i++) if (done[i] == 0) count++;
   if (count) {
-    CkPrintf("[%d] Having %d/%d uncommitted events: ", procNum, count, numTasks);
+    CkPrintf("[%d] %d/%d uncommitted events: ", procNum, count, numTasks);
     i=0;
     while (i<numTasks) {
       if (done[i] == 0) {
@@ -584,11 +628,10 @@ int BGproc::locateTask(TaskID* t){
 //  if the index has been already set, use it directly
   if (t->index >= 0) return t->index;
 #if 1
-  t->index = msgTable.get(*t);
-  if(t->index == 0) t->index = -1;
-
-  if (t->index>0) {
-    return --t->index;
+  int index = msgTable.get(*t);
+  if (index>0) {
+    t->index = index-1;
+    return t->index;
   }
 #else
   for(int i=0;i<numTasks;i++){
@@ -600,8 +643,8 @@ int BGproc::locateTask(TaskID* t){
   }
 #endif
  
-  parent->CommitPrintf("WARNING: TASK NOT FOUND src:%d msg:%d on:%d\n",
-	       t->srcNode, t->msgID, parent->thisIndex);
+  //parent->CommitPrintf("WARNING: TASK NOT FOUND src:%d msg:%d on:%d\n",
+  //	       t->srcNode, t->msgID, parent->thisIndex);
   //abort();
   return -1;
 }
@@ -626,6 +669,7 @@ int BGproc::dependenciesMet(yourUniqueTaskIDtype taskID)
   // not yet been executed.  If succeed, mark this task executed.
 
   int idx = locateTask(taskID);
+  CmiAssert(idx != -1);
 
   int bidx;
   for(int i=0;i<taskList[idx].bDepsLen;i++){
@@ -649,6 +693,7 @@ void BGproc::enableDependents(TaskID* taskID)
   TaskMsg *tm;
   TaskID* ftid;
   int taskIdx = locateTask(taskID);
+  CmiAssert(taskIdx != -1);
   POSE_TimeType execT = taskList[taskIdx].execTime;
   
   int fDepsLen = taskList[taskIdx].fDepsLen;
