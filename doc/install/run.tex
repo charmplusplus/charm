@@ -12,7 +12,11 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.7  1995-11-20 20:14:22  brunner
+% Revision 1.8  1996-11-14 18:41:14  milind
+% Modified to reflect the changes made to the nodesfile format.
+% Also, changed the Makefile to install into proper directories.
+%
+% Revision 1.7  1995/11/20 20:14:22  brunner
 % Made the comments about simulator and Converse more sensible.
 %
 % Revision 1.6  1995/11/20  16:47:00  brunner
@@ -90,20 +94,30 @@ command line options is in Section~\ref{command line options}.
 		\item If the absolute path starts with the equivalent of {\bf \$HOME} 
 			or the current working directory, the beginning part of the path 
 			is replaced with the environment variable {\bf \$HOME} or the 
-			current working directory.
+			current working directory. However, if {\fparm exec\_home} is 
+            specified in the nodes file (see below), the beginning part of
+            the path is replaced with {\fparm exec\_home}.
 		\item The system tries to locate this program (with modified 
-			pathname) on all nodes.
+			pathname and appended extension if specified) on all nodes.
 	\end{enumerate}
 
 The list of nodes must be specified in a file, with one node entry per
 line, each entry being in the format:
 
-{\fexec nodename [username] [passwd] [setup\_command]}
+{\fexec nodename [username] [passwd] [exec\_home] [extension] [setup\_command]}
 
 The {\fparm nodename} must be specified completely (e.g. sparc1.cs.uiuc.edu).
 The {\fparm username} is optional; if the login id on that node is the
 same as the current login id, it need not be specified.
 The {\fparm password} argument is ignored in the current implementation.
+The {\fparm exec\_home} argument is optional; if the directory path under
+which the executable is found is the same as on the node running 
+{\fexec conv-host}, it could be ignored. This argument is used for pathname
+resolution as explained above.
+The {\fparm extension} argument is useful when the names for executables 
+on each node differ. If specified, {\fexec conv-host}
+appends the extension to the name of the executable specified on the 
+command line and executes the new program.
 The {\fparm setup\_command} is optional; if specified,
 the command is executed on the corresponding node before the program 
 begins execution. The {\bf *} character may be used as a
