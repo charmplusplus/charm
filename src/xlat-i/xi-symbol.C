@@ -116,6 +116,8 @@ TParamList::print(XStr& str)
   if(next) { 
     str << ","; 
     next->print(str); 
+  } else {
+    str << " ";
   }
 }
 
@@ -141,7 +143,9 @@ NamedType::print(XStr& str)
 {
   str << name;
   if(tparams) {
-    str << "<"<<tparams<<">";
+    str << "<"<<tparams<<" >";
+  } else {
+    str << " ";
   }
 }
 
@@ -237,6 +241,8 @@ TVarList::print(XStr& str)
   if(next) {
     str << ", ";
     next->print(str);
+  } else {
+    str << " ";
   }
 }
 
@@ -1543,6 +1549,8 @@ void TParamList::genSpec(XStr& str)
   if(next) {
     str << ", ";
     next->genSpec(str);
+  } else {
+    str << " ";
   }
 }
 
