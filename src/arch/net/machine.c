@@ -1493,7 +1493,7 @@ int CmiScanf(const char *fmt, ...)
   if (Cmi_charmrun_fd!=-1)
     i=InternalScanf(fmt, p);
   else
-    i=vscanf(fmt,p);
+    i=scanf(fmt,p);
   va_end(p);
   return i;
 }
