@@ -57,7 +57,7 @@ class LogPool {
       sprintf(pestr, "%d", CkMyPe());
       int len = strlen(pgm) + strlen(".log.") + strlen(pestr) + 1;
       char *fname = new char[len];
-      sprintf(fname, "%s.log.%s", pgm, pestr);
+      sprintf(fname, "%s.%s.log", pgm, pestr);
       fp = fopen(fname, "w");
       delete[] fname;
       if(!fp)
