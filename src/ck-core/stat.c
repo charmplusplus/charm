@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-06-14 16:31:04  brunner
+ * Initialized EpLanguageTable in StatAddSysBocEps().  This should probably
+ * call RegisterBocEp() instead.
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.5  1995/05/04  22:05:47  jyelon
@@ -274,15 +278,18 @@ PrintOutStatistics()
 	}
 }
 
-
-
 StatAddSysBocEps()
 {
 	extern BroadcastExitMessage(), ExitMessage();
 
 	CsvAccess(EpTable)[StatCollectNodes_EP] = CollectFromNodes;
+	CsvAccess(EpLanguageTable)[StatCollectNodes_EP] = CHARM;
 	CsvAccess(EpTable)[StatData_EP] = NodeCollectStatistics;
+	CsvAccess(EpLanguageTable)[StatData_EP] = CHARM;
 	CsvAccess(EpTable)[StatPerfCollectNodes_EP] = CollectPerfFromNodes;
+	CsvAccess(EpLanguageTable)[StatPerfCollectNodes_EP] = CHARM;
 	CsvAccess(EpTable)[StatBroadcastExitMessage_EP] = BroadcastExitMessage;
+	CsvAccess(EpLanguageTable)[StatBroadcastExitMessage_EP] = CHARM;
 	CsvAccess(EpTable)[StatExitMessage_EP] = ExitMessage;
+	CsvAccess(EpLanguageTable)[StatExitMessage_EP] = CHARM;
 }
