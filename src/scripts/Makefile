@@ -671,12 +671,6 @@ RandRefLB.o: RandRefLB.C RandRefLB.decl.h $(CKHEADERS)
 $(L)/libmoduleRandRefLB.a: RandRefLB.o
 	$(CHARMC) -o $(L)/libmoduleRandRefLB.a RandRefLB.o
 
-EveryLB.o: EveryLB.C EveryLB.decl.h
-	$(CHARMC) -c EveryLB.C
-
-EveryLB.decl.h: EveryLB.ci
-	$(CHARMC) EveryLB.ci
-
 LB_OBJ=EveryLB.o \
     RandCentLB.o \
     RecBisectBfLB.o \
