@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.8  1995-10-30 20:31:35  jyelon
+# Revision 2.9  1995-10-30 20:53:35  jyelon
+# *** empty log message ***
+#
+# Revision 2.8  1995/10/30  20:31:35  jyelon
 # *** empty log message ***
 #
 # Revision 2.7  1995/10/25  19:59:30  jyelon
@@ -52,6 +55,7 @@ set CMK_SUF='o'
 set CMK_AR='ar q'
 set CMK_RANLIB='true'
 set CMK_LIBS=''
+set CMK_SEQ_LIBS=''
 set CMK_SEQ_CC='gcc '
 set CMK_SEQ_LD='gcc '
 set CMK_NM='nm'

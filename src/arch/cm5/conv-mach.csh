@@ -35,11 +35,10 @@ set CMK_M4='m4'
 set CMK_SUF='o'
 set CMK_AR='ar q'
 set CMK_RANLIB='ranlib'
-set CMK_LIBS=
+set CMK_LIBS=''
+set CMK_SEQ_LIBS=''
 set CMK_SEQ_CC='gcc'
 set CMK_SEQ_LD='gcc'
-set CMK_EXTRAS=
-set CMK_CLEAN=
 set CMK_NM='nm'
 set CMK_NM_FILTER='grep "T _" | sed -e "s/.*T _//"'
 
