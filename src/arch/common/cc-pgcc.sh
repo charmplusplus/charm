@@ -5,6 +5,22 @@ CMK_CXX='pgCC '
 CMK_CXXPP='pgCC -E '
 CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
+
+# compiler for compiling sequential programs
+# pgcc can not handle QT right for generic64, so always use gcc
+CMK_SEQ_CC="gcc "
+CMK_SEQ_LD="gcc "
+CMK_SEQ_CXX="g++ "
+CMK_SEQ_LDXX="g++ "
+CMK_SEQ_LIBS=""
+
+# compiler for native programs
+CMK_NATIVE_CC="gcc "
+CMK_NATIVE_LD="gcc "
+CMK_NATIVE_CXX="g++ "
+CMK_NATIVE_LDXX="g++ "
+CMK_NATIVE_LIBS=""
+
 CMK_CF90='pgf90 '
 CMK_CF90_FIXED="$CMK_CF90 -Mfixed "
 CMK_F90LIBS='-L/usr/local/pgi/linux86/lib  -lpgf90 -lpgf90_rpm1 -lpgf902 -lpgf90rtl -lpgftnrtl '
