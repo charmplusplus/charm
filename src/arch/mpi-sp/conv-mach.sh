@@ -5,6 +5,8 @@ CMK_LDRO_WORKS=0
 CMK_CC='mpcc_r '
 CMK_CXX='mpCC_r -qstaticinline '
 CMK_CXXPP='xlC -E '
+CMK_LD="mpcc_r -brtl "
+CMK_LDXX="mpCC_r -brtl "
 CMK_CF77='mpxlf_r'
 CMK_CF90='mpxlf90_r -qsuffix=f=f90'
 CMK_CF90_FIXED='mpxlf90_r '
@@ -24,4 +26,4 @@ CMK_NM_FILTER="grep ^_CK_ | cut -f 1 -d ' '"
 CMK_QT='aix32-xlc'
 CMK_XIOPTS=''
 CMK_MOD_EXT='mod'
-CMK_F90LIBS='-lxlf90_r'
+CMK_F90LIBS='-lxlf90_r -lhC'
