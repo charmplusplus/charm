@@ -253,6 +253,9 @@ QuickThreads/libqt.a:
 	cd QuickThreads ; make qt  OPTS='$(OPTS)'
 	cp QuickThreads/libqt.a ../lib/libckqt.a
 
+METIS:   
+	cd libs/conv-libs/metis; make OPTS='$(OPTS)'
+
 CONVLIBS: converse
 	cd libs; make convlibs OPTS='$(OPTS)'
 
