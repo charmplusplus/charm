@@ -531,7 +531,7 @@ void CmiStateInit(int pe, int rank, CmiState state)
   MACHSTATE(4,"StateInit")
   state->pe = pe;
   state->rank = rank;
-  if (rank==_Cmi_mynodesize) return; /* Communications thread */
+  if (rank==CmiMyNodeSize()) return; /* Communications thread */
   state->recv = PCQueueCreate();
   state->localqueue = CdsFifo_Create();
   CmiIdleLock_init(&state->idle);
