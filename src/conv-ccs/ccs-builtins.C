@@ -448,6 +448,8 @@ static void CWeb_Collect(void)
 
 extern "C" void CWebPerformanceRegisterFunction(CWebFunction fn)
 {
+  if (CmiMyRank()!=0) return; /* Should only register from rank 0 */
+  if (CWebNoOfFns>=MAXFNS) CmiAbort("Registered too many CWebPerformance functions!");
   CWebPerformanceFunctionArray[CWebNoOfFns] = fn;
   CWebNoOfFns++;
 }
