@@ -377,10 +377,10 @@ extern void CmiNodeBarrier(void);
 
 
 typedef HANDLE CmiNodeLock;
-extern  CmiNodeLock CmiCreateLock();
+extern  CmiNodeLock CmiCreateLock(void);
 #define CmiLock(lock) (WaitForSingleObject(lock, INFINITE))
 #define CmiUnlock(lock) (ReleaseMutex(lock))
-#define CmiTryLock(lock) (WaitForSingleObject(lock 0))
+#define CmiTryLock(lock) (WaitForSingleObject(lock, 0))
 extern  void CmiDestroyLock(CmiNodeLock lock);
 
 #endif
