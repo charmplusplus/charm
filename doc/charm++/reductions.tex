@@ -72,7 +72,7 @@ unreliable) callback will be chosen for use.
     contribute(2*sizeof(double), forces,CkReduction::sum_double, cb);
 \end{alltt}
 
-If no member passes a callback to \tt{contribute}, the reduction will use
+If no member passes a callback to \kw{contribute}, the reduction will use
 the default callback. You set the default callback for an array or group
 using the \kw{ckSetReductionClient} proxy call on processor zero.
 Again, a \kw{CkReductionMsg} message will be passed to this callback,
