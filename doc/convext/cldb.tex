@@ -1,5 +1,7 @@
 \chapter{Load Balancing}
 
+\section{Using Converse Load Balancers}
+
 This module defines a function {\bf CldEnqueue} that sends a message
 to a lightly-loaded processor.  It automates the process of finding a
 lightly-loaded processor.  
@@ -206,6 +208,504 @@ void registerAndInitialize()
 }
 \end{verbatim}
 
+\section{How to Write a Load Balancer for Converse/Charm++}
+
+\subsection{Introduction}
+
+This manual details how to write your own general-purpose
+message-based load balancer for Converse.
+A Converse load balancer can be used by any Converse program, but also
+serves as a {\sl seed} load balancer for Charm++ chare creation messages.
+Specifically, to use a load balancer, you would pass messages to
+CldEnqueue rather than directly to the scheduler.  This is the default
+behavior with chare creation message in Charm++.  Thus, the primary
+provision of a new load balancer is an implementation of the
+CldEnqueue function.
+
+\subsection{Existing Load Balancers and Provided Utilities}
+
+Throughout this manual, we will occasionally refer to the source code
+of two provided load balancers, the random initial placement load balancer
+({\tt cldb.rand.c}) and the graph-based load balancer ({\tt
+cldb.graph.c}).  The functioning of these balancers is described in
+the Charm++ Extensions manual load balancing section.
+
+In addition, a special utility is provided that allows us to add and
+remove load-balanced messages from the scheduler's queue.  The source
+code for this is available in {\tt cldb.c}.  The usage of this utility
+will also be described here in detail.
+
+\section{A Sample Load Balancer}
+
+This manual steps through the design of a load balancer using an
+example which we will call {\tt test}.  The {\tt test} load balancer
+has each processor periodically send half of its load to its neighbor
+in a ring.  Specifically, for N processors, processor K will send
+approximately half of its load to (K+1)\%N, every 100 milliseconds
+(this is an example only; we leave the genius approaches up to you).
+
+\subsection{Minimal Requirements}
+
+The minimal requirements for a load balancer are illustrated by the
+following code.
+
+\begin{verbatim}
+#include <stdio.h>
+#include "converse.h"
+
+char *CldGetStrategy(void)
+{
+  return "test";
+}
+
+CpvDeclare(int, CldHandlerIndex);
+
+void CldHandler(void *msg)
+{
+  CldInfoFn ifn; CldPackFn pfn;
+  int len, queueing, priobits; unsigned int *prioptr;
+  
+  CmiGrabBuffer((void **)&msg);
+  CldRestoreHandler(msg);
+  ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
+}
+
+void CldEnqueue(int pe, void *msg, int infofn)
+{
+  int len, queueing, priobits; unsigned int *prioptr;
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  CldPackFn pfn;
+
+  if (pe == CLD_ANYWHERE) {
+    /* do what you want with the message; in this case we'll just keep
+       it local */
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    CmiSetInfo(msg,infofn);
+    CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
+  }
+  else {
+    /* pe contains a particular destination or broadcast */
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    if (pfn) {
+      pfn(&msg);
+      ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    }
+    CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+    CmiSetInfo(msg,infofn);
+    if (pe==CLD_BROADCAST) 
+      CmiSyncBroadcastAndFree(len, msg);
+    else if (pe==CLD_BROADCAST_ALL)
+      CmiSyncBroadcastAllAndFree(len, msg);
+    else CmiSyncSendAndFree(pe, len, msg);
+  }
+}
+
+void CldModuleInit()
+{
+  CpvInitialize(int, CldHandlerIndex);
+  CpvAccess(CldHandlerIndex) = CmiRegisterHandler(CldHandler);
+  CldModuleGeneralInit();
+}
+\end{verbatim}
+
+The primary function a load balancer must provide is the {\bf
+CldEnqueue} function, which has the following prototype:
+
+{\tt void {\bf CldEnqueue}(int pe, void *msg, int infofn);}
+
+This function takes three parameters: {\tt pe},
+{\tt msg} and {\tt infofn}.  {\tt pe} is the intended destination of
+the {\tt msg}. {\tt pe} may take on one of the following values:
+
+\begin{itemize}
+\item Any valid processor number - the message must be sent to
+that processor
+\item {\tt CLD\_ANYWHERE} - the message can be placed on any processor
+\item {\tt CLD\_BROADCAST} - the message must be sent to all processors
+excluding the local processor
+\item {\tt CLD\_BROADCAST\_ALL} - the message must be sent to all processors
+including the local processor
+\end{itemize}
+
+{\bf CldEnqueue} must handle all of these possibilities.  The only
+case in which the load balancer should get control of a message is when
+{\tt pe = CLD\_ANYWHERE}.  All other messages must be sent off to their
+intended destinations and passed on to the scheduler as if they never
+came in contact with the load balancer. 
+
+The integer parameter {\tt infofn} is a handler index for a
+user-provided function that allows CldEnqueue to extract information about
+(mostly components of) the message {\tt msg}.
+
+Thus, an implementation of the {\bf CldEnqueue} function might have
+the following structure:
+
+\begin{verbatim}
+void CldEnqueue(int pe, void *msg, int infofn)
+{
+  ...
+  if (pe == CLD_ANYWHERE)
+    /* These messages can be load balanced */
+  else if (pe == CmiMyPe())
+    /* Enqueue the message in the scheduler locally */
+  else if (pe==CLD_BROADCAST) 
+    /* Broadcast to all but self */
+  else if (pe==CLD_BROADCAST_ALL)
+    /* Broadcast to all plus self */
+  else /* Specific processor number was specified */
+    /* Send to specific processor */
+}
+\end{verbatim}
+
+In order to fill in the code above, we need to know more about the
+message before we can send it off to a scheduler's queue, either
+locally or remotely.  For this, we have the info function.  The
+prototype of an info function must be as follows:
+
+\noindent{\tt void ifn(void *msg, CldPackFn *pfn, int *len, int
+*queueing, int *priobits, unsigned int **prioptr);}
+
+Thus, to use the info function, we need to get the actual function via
+the handler index provided to {\bf CldEnqueue}.  Typically, {\bf
+CldEnqueue} would contain the following declarations:
+
+\begin{verbatim}
+  int len, queueing, priobits; 
+  unsigned int *prioptr;
+  CldPackFn pfn;
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+\end{verbatim}
+
+\noindent Subsequently, a call to {\tt ifn} would look like this:
+
+\begin{verbatim}
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+\end{verbatim}
+
+The info function extracts information from the message about its size,
+queuing strategy and priority, and also a pack function, which will be
+used when we need to send the message elsewhere.  For now, consider
+the case where the message is to be locally enqueued:
+
+\begin{verbatim}
+  ...
+  else if (pe == CmiMyPe())
+    {
+      ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+      CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
+    }
+  ...
+\end{verbatim}
+
+Thus, we see the info function is used to extract info from the
+message that is necessary to pass on to {\bf CsdEnqueueGeneral}.
+
+In order to send the message to a remote destination and enqueue it in
+the scheduler, we need to pack it up with a special pack function so
+that it has room for extra handler information and a reference to the
+info function.  Therefore, before we handle the last three cases of
+{\bf CldEnqueue}, we have a little extra work to do:
+
+\begin{verbatim}
+  ...
+  else
+    {
+      ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+      if (pfn) {
+        pfn(&msg);
+        ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+      }
+      CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+      CmiSetInfo(msg,infofn);
+      ...
+\end{verbatim}
+
+Calling the info function once gets the pack function we need, if
+there is one.  We then call the pack function which rearranges the
+message leaving space for the info function, which we will need to
+call on the message when it is received at its destination, and also
+room for the extra handler that will be used on the receiving side to
+do the actual enqueuing.  {\bf CldSwitchHandler} is used to set this extra
+handler, and the receiving side must restore the original handler.
+
+In the above code, we call the info function again because some of the
+values may have changed in the packing process.  
+
+Finally, we handle our last few cases:
+
+\begin{verbatim}
+  ...
+      if (pe==CLD_BROADCAST) 
+        CmiSyncBroadcastAndFree(len, msg);
+      else if (pe==CLD_BROADCAST_ALL)
+        CmiSyncBroadcastAllAndFree(len, msg);
+      else CmiSyncSendAndFree(pe, len, msg);
+    }
+}
+\end{verbatim}
+
+The above example also provides {\bf CldHandler} which is used to
+receive messages that {\bf CldEnqueue} forwards to other processors.
+
+\begin{verbatim}
+CpvDeclare(int, CldHandlerIndex);
+
+void CldHandler(void *msg)
+{
+  CldInfoFn ifn; CldPackFn pfn;
+  int len, queueing, priobits; unsigned int *prioptr;
+  
+  CmiGrabBuffer((void **)&msg);
+  CldRestoreHandler(msg);
+  ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
+}
+\end{verbatim}
+
+Note that the {\bf CldHandler} properly restores the message's original
+handler using {\bf CldRestoreHandler}, and calls the info function to obtain
+the proper parameters to pass on to the scheduler.  We talk about this
+more below. 
+
+Finally, Converse initialization functions call {\bf CldModuleInit} to
+initialize the load balancer module.
+
+\begin{verbatim}
+void CldModuleInit()
+{
+  CpvInitialize(int, CldHandlerIndex);
+  CpvAccess(CldHandlerIndex) = CmiRegisterHandler(CldHandler);
+  CldModuleGeneralInit();
+
+  /* call other init processes here */
+  CldBalance();
+}
+\end{verbatim}
 
 
+\subsection{Provided Load Balancing Facilities}
+
+Converse provides a number of structures and functions to aid in load
+balancing (see cldb.c).  Foremost amongst these is a method for
+queuing tokens of messages in a processor's scheduler in a way that
+they can be removed and relocated to a different processor at any
+time. The interface for this module is as follows:
+
+\begin{verbatim}
+void CldSwitchHandler(char *cmsg, int handler)
+void CldRestoreHandler(char *cmsg)
+int CldCountTokens()
+int CldLoad()
+void CldPutToken(char *msg)
+void CldGetToken(char **msg)
+void CldModuleGeneralInit()
+\end{verbatim}
+
+Messages normally have a handler index associated with them, but in addition
+they have extra space for an additional handler.  This is used by the
+load balancer when we use an intermediate handler (typically {\bf
+CldHandler}) to handle the message when it is received after
+relocation.  To do this, we use {\bf CldSwitchHandler} to temporarily
+swap the intended handler with the load balancer handler.  When the
+message is received, {\bf CldRestoreHandler} is used to change back to
+the intended handler. 
+
+{\bf CldPutToken} puts a message in the scheduler queue in such a way
+that it can be retrieved from the queue. Once the message gets
+handled, it can no longer be retrieved.  {\bf CldGetToken} retrieves a
+message that was placed in the scheduler queue in this way.
+{\bf CldCountTokens} tells you how many tokens are currently
+retrievable. {\bf CldLoad} gives a slightly more accurate estimate of
+message load by counting the total number of messages in the
+scheduler queue.
+
+{\bf CldModuleGeneralInit} is used to initialize this load balancer
+helper module.  It is typically called from the load balancer's {\bf
+CldModuleInit} function.
+
+The helper module also provides the following functions:
+
+\begin{verbatim}
+void CldMultipleSend(int pe, int numToSend)
+int CldRegisterInfoFn(CldInfoFn fn)
+int CldRegisterPackFn(CldPackFn fn)
+\end{verbatim}
+
+{\bf CldMultipleSend} is generally useful for any load balancer that
+sends multiple messages to one processor.  It works with the token
+queue module described above.  It attempts to retrieve up to {\tt
+numToSend} messages, and then packs them together and sends them, via
+CmiMultipleSend, to {\tt pe}.  If the number and/or size of the
+messages sent is very large, {\bf CldMultipleSend} will transmit them
+in reasonably sized parcels.  In addition, the {\bf CldBalanceHandler} and
+its associated declarations and initializations are required to use it.
+
+You may want to use the three status variables.  These can be used to
+keep track of what your LB is doing (see usage in cldb.graph.c and
+itc++queens program).
+
+\begin{verbatim}
+CpvDeclare(int, CldRelocatedMessages);
+CpvDeclare(int, CldLoadBalanceMessages);
+CpvDeclare(int, CldMessageChunks);
+\end{verbatim}
+
+The two register functions register {\sl info} and {\sl pack}
+functions, returning an index for the functions.  Info functions are
+used by the load balancer to extract the various components from a
+message.  Amongst these components is the pack function index.  If
+necessary, the pack function can be used to pack a message that is
+about to be relocated to another processor.  Information on how
+to write info and pack functions is available in the load balancing
+section of the Converse Extensions manual. 
+
+\subsection{Finishing the {\tt Test} Balancer}
+
+The {\tt test} balancer is a somewhat silly strategy in which every
+processor attempts to get rid of half of its load by periodically
+sending it to someone else, regardless of the load at the
+destination.  Hopefully, you won't actually use this for anything
+important!
+
+The {\tt test} load balancer is available in
+charm/src/Common/conv-ldb/cldb.test.c.  To try out your own load
+balancer you can use this filename and SUPER\_INSTALL will compile it
+and you can link it into your Charm++ programs with -balance test.
+(To add your own new balancers permanently and give them another name
+other than "test" you will need to change the Makefile used by
+SUPER\_INSTALL. Don't worry about this for now.)  The cldb.test.c
+provides a good starting point for new load balancers.
+
+Look at the code for the {\tt test} balancer below, starting with the
+{\bf CldEnqueue} function.  This is almost exactly as described
+earlier.  One exception is the handling of a few extra cases:
+specifically if we are running the program on only one processor, we
+don't want to do any load balancing.  The other obvious difference is
+in the first case: how do we handle messages that can be load
+balanced?  Rather than enqueuing the message directly with the
+scheduler, we make use of the token queue.  This means that messages
+can later be removed for relocation.  {\bf CldPutToken} adds the
+message to the token queue on the local processor.
+
+\begin{verbatim}
+#include <stdio.h>
+#include "converse.h"
+#define PERIOD 100
+#define MAXMSGBFRSIZE 100000
+
+char *CldGetStrategy(void)
+{
+  return "test";
+}
+
+CpvDeclare(int, CldHandlerIndex);
+CpvDeclare(int, CldBalanceHandlerIndex);
+CpvDeclare(int, CldRelocatedMessages);
+CpvDeclare(int, CldLoadBalanceMessages);
+CpvDeclare(int, CldMessageChunks);
+
+void CldDistributeTokens()
+{
+  int destPe = (CmiMyPe()+1)%CmiNumPes(), numToSend;
+
+  numToSend = CldLoad() / 2;
+  if (numToSend > CldCountTokens())
+    numToSend = CldCountTokens() / 2;
+  if (numToSend > 0)
+    CldMultipleSend(destPe, numToSend);
+  CcdCallFnAfter((CcdVoidFn)CldDistributeTokens, NULL, PERIOD);
+}
+
+void CldBalanceHandler(void *msg)
+{
+  CmiGrabBuffer((void **)&msg);
+  CldRestoreHandler(msg);
+  CldPutToken(msg);
+}
+
+void CldHandler(void *msg)
+{
+  CldInfoFn ifn; CldPackFn pfn;
+  int len, queueing, priobits; unsigned int *prioptr;
+  
+  CmiGrabBuffer((void **)&msg);
+  CldRestoreHandler(msg);
+  ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
+}
+
+void CldEnqueue(int pe, void *msg, int infofn)
+{
+  int len, queueing, priobits; unsigned int *prioptr;
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  CldPackFn pfn;
+
+  if ((pe == CLD_ANYWHERE) && (CmiNumPes() > 1)) {
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    CmiSetInfo(msg,infofn);
+    CldPutToken(msg); 
+  } 
+  else if ((pe == CmiMyPe()) || (CmiNumPes() == 1)) {
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    CmiSetInfo(msg,infofn);
+    CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
+  }
+  else {
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    if (pfn) {
+      pfn(&msg);
+      ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    }
+    CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+    CmiSetInfo(msg,infofn);
+    if (pe==CLD_BROADCAST) 
+      CmiSyncBroadcastAndFree(len, msg);
+    else if (pe==CLD_BROADCAST_ALL)
+      CmiSyncBroadcastAllAndFree(len, msg);
+    else CmiSyncSendAndFree(pe, len, msg);
+  }
+}
+
+void CldModuleInit()
+{
+  CpvInitialize(int, CldHandlerIndex);
+  CpvAccess(CldHandlerIndex) = CmiRegisterHandler(CldHandler);
+  CpvInitialize(int, CldBalanceHandlerIndex);
+  CpvAccess(CldBalanceHandlerIndex) = CmiRegisterHandler(CldBalanceHandler);
+  CpvInitialize(int, CldRelocatedMessages);
+  CpvInitialize(int, CldLoadBalanceMessages);
+  CpvInitialize(int, CldMessageChunks);
+  CpvAccess(CldRelocatedMessages) = CpvAccess(CldLoadBalanceMessages) = 
+    CpvAccess(CldMessageChunks) = 0;
+  CldModuleGeneralInit();
+  if (CmiNumPes() > 1)
+    CldDistributeTokens();
+}
+\end{verbatim}
+
+Now look two functions up from {\bf CldEnqueue}.  We have an additional
+handler besides the {\bf CldHandler}: the {\bf CldBalanceHandler}.  The
+purpose of this special handler is to receive messages that can be still be
+relocated again in the future.  Just like the first case of {\bf CldEnqueue}
+uses {\bf CldPutToken} to keep the message retrievable, {\bf
+CldBalanceHandler} does the same with relocatable messages it receives.
+{\bf CldHandler} is only used when we no
+longer want the message to have the potential for relocation.  It
+places messages irretrievably in the scheduler queue.
+
+Next we look at our initialization functions to see how the process
+gets started.  The {\bf CldModuleInit} function gets called by the
+common Converse initialization code and starts off the periodic load
+distribution process by making a call to {\bf
+CldDistributeTokens}. The entirety of the balancing is handled by the
+periodic invocation of this function.  It computes an
+approximation of half of the PE's total load ({\bf CsdLength}()), and if
+that amount exceeds the number of movable messages ({\bf
+CldCountTokens}()), we attempt to move all of the movable messages.
+To do this, we pass this number of messages to move and the number of
+the PE to move them to, to the {\bf CldMultipleSend} function.
 
