@@ -257,8 +257,8 @@ fi
 
 
 #go get libpthread.a from charm website
-if test $version = net-linux-smp  || test $version = mpi-linux-vmi || test $version = mpi-linux-vmi-pgcc
-then
+case $version in
+*linux*smp*|*linux*vmi*)
   if test ! -r ../lib/libpthread.a
   then
     AC_CHECK_PROG(WGET, wget, wget )
@@ -314,6 +314,7 @@ EOT
       echo "done"
     fi
   fi
-fi
+  ;;
+esac
 
 AC_OUTPUT()

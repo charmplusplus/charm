@@ -1228,8 +1228,8 @@ echo "${ECHO_T}$fortran_postfix" >&6
 fi
 
 #go get libpthread.a from charm website
-if test $version = net-linux-smp  || test $version = mpi-linux-vmi || test $version = mpi-linux-vmi-pgcc
-then
+case $version in
+*linux*smp*|*linux*vmi*)
   if test ! -r ../lib/libpthread.a
   then
     # Extract the first word of "wget", so it can be a program name with args.
@@ -1408,7 +1408,8 @@ EOT
       echo "done"
     fi
   fi
-fi
+  ;;
+esac
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -1489,7 +1490,7 @@ DEFS=-DHAVE_CONFIG_H
 : ${CONFIG_STATUS=./config.status}
 ac_clean_files_save=$ac_clean_files
 ac_clean_files="$ac_clean_files $CONFIG_STATUS"
-{ echo "$as_me:1492: creating $CONFIG_STATUS" >&5
+{ echo "$as_me:1493: creating $CONFIG_STATUS" >&5
 echo "$as_me: creating $CONFIG_STATUS" >&6;}
 cat >$CONFIG_STATUS <<_ACEOF
 #! $SHELL
@@ -1656,7 +1657,7 @@ cat >>$CONFIG_STATUS <<\EOF
     echo "$ac_cs_version"; exit 0 ;;
   --he | --h)
     # Conflict between --help and --header
-    { { echo "$as_me:1659: error: ambiguous option: $1
+    { { echo "$as_me:1660: error: ambiguous option: $1
 Try \`$0 --help' for more information." >&5
 echo "$as_me: error: ambiguous option: $1
 Try \`$0 --help' for more information." >&2;}
@@ -1675,7 +1676,7 @@ Try \`$0 --help' for more information." >&2;}
     ac_need_defaults=false;;
 
   # This is an error.
-  -*) { { echo "$as_me:1678: error: unrecognized option: $1
+  -*) { { echo "$as_me:1679: error: unrecognized option: $1
 Try \`$0 --help' for more information." >&5
 echo "$as_me: error: unrecognized option: $1
 Try \`$0 --help' for more information." >&2;}
@@ -1711,7 +1712,7 @@ do
   case "$ac_config_target" in
   # Handling of arguments.
   "conv-autoconfig.h" ) CONFIG_HEADERS="$CONFIG_HEADERS conv-autoconfig.h" ;;
-  *) { { echo "$as_me:1714: error: invalid argument: $ac_config_target" >&5
+  *) { { echo "$as_me:1715: error: invalid argument: $ac_config_target" >&5
 echo "$as_me: error: invalid argument: $ac_config_target" >&2;}
    { (exit 1); exit 1; }; };;
   esac
@@ -1781,7 +1782,7 @@ for ac_file in : $CONFIG_HEADERS; do test "x$ac_file" = x: && continue
   * )   ac_file_in=$ac_file.in ;;
   esac
 
-  test x"$ac_file" != x- && { echo "$as_me:1784: creating $ac_file" >&5
+  test x"$ac_file" != x- && { echo "$as_me:1785: creating $ac_file" >&5
 echo "$as_me: creating $ac_file" >&6;}
 
   # First look for the input files in the build tree, otherwise in the
@@ -1792,7 +1793,7 @@ echo "$as_me: creating $ac_file" >&6;}
       -) echo $tmp/stdin ;;
       [\\/$]*)
          # Absolute (can't be DOS-style, as IFS=:)
-         test -f "$f" || { { echo "$as_me:1795: error: cannot find input file: $f" >&5
+         test -f "$f" || { { echo "$as_me:1796: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          echo $f;;
@@ -1805,7 +1806,7 @@ echo "$as_me: error: cannot find input file: $f" >&2;}
            echo $srcdir/$f
          else
            # /dev/null tree
-           { { echo "$as_me:1808: error: cannot find input file: $f" >&5
+           { { echo "$as_me:1809: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          fi;;
@@ -1922,7 +1923,7 @@ cat >>$CONFIG_STATUS <<\EOF
   rm -f $tmp/in
   if test x"$ac_file" != x-; then
     if cmp -s $ac_file $tmp/config.h 2>/dev/null; then
-      { echo "$as_me:1925: $ac_file is unchanged" >&5
+      { echo "$as_me:1926: $ac_file is unchanged" >&5
 echo "$as_me: $ac_file is unchanged" >&6;}
     else
       ac_dir=`$as_expr X"$ac_file" : 'X\(.*[^/]\)//*[^/][^/]*/*$' \| \
