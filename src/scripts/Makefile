@@ -28,7 +28,7 @@ all: charm++ bluegene LIBS AMPI f90charm TSM SM PVM doc
 
 charm++: converse libck.a loadbalancers charmxi
 
-bluegene: charm++ libconv-bluegene.a
+bluegene: charm++ libconv-bluegene.a METIS multicast
 
 for-namd: charm++ pvm AMPIC
 
