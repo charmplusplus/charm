@@ -13,7 +13,11 @@
  * Multicast based on repeated sends
  *****************************************/
 #include "rsend.h"
+
+#ifndef NULL
 #define NULL 0
+#endif
+
 #define gmap(pe) {if (gpes) pe=gpes[pe];}
 
 RsendRouter::RsendRouter(int n, int me)

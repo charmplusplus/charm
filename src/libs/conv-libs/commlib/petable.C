@@ -134,7 +134,7 @@ void PeTable :: InsertMsgs(int npe, int *pelist, int nmsgs, void **msglist)
 
 int PeTable :: ExtractMsgs(int npe, int *pelist, int *nmsgs, void **msgs)
 {
-  int nm=0, retval=0,i, j;
+  int nm=0, i, j;
   msgstruct *m;
   magic++;
 

@@ -20,7 +20,10 @@
 #endif
 #include "bcast.h"
 
+#ifndef NULL
 #define NULL 0
+#endif
+
 #define gmap(pe) {if (gpes) pe=gpes[pe];}
 
 BcastRouter::BcastRouter(int n, int me)

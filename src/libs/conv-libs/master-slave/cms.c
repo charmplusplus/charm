@@ -31,9 +31,8 @@ CpvDeclare(cms_consumer, consumerFunction);
 CpvDeclare(int,counter);
 CpvDeclare(int, tableSize);
 
-initForCms(int argc,char *argv[])
+void initForCms(int argc,char *argv[])
 {
-
 }
 
 void cms_infoFn(void *msg, CldPackFn *pfn, int *len,
@@ -46,13 +45,13 @@ void cms_infoFn(void *msg, CldPackFn *pfn, int *len,
   *prioptr = 0;
 }
 
-CmiHandler stopHandler(char * msg)
-  {
-    CsdExitScheduler();
-    ConverseExit();
-  }
+void stopHandler(char * msg)
+{
+  CsdExitScheduler();
+  ConverseExit();
+}
 
-CmiHandler callWorker(char *msg)
+void callWorker(char *msg)
 {
  char * m, *r;
  int size, msgSize, ref;
@@ -74,10 +73,10 @@ char * msg2;
   CmiSyncSendAndFree( 0, msgSize, msg2);
 };
 
-CmiHandler response(char * msg)
+void response(char * msg)
 {
   char * r, *m;
-  int i, size, ref;
+  int size, ref;
    m = msg + CmiMsgHeaderSizeBytes;
   size = *( (int *) m);
   m += sizeof(int);
@@ -104,10 +103,8 @@ char *CmsGetResponse(int ref)
 }
 
 
-cms_registerHandlers(cms_WorkerFn f)
+void cms_registerHandlers(cms_WorkerFn f)
 {
-cms_consumer g;
-
   CpvInitialize(int,stopHandlerIndex);
   CpvInitialize(int,workHandler);
   CpvInitialize(int,responseHandler);
@@ -129,7 +126,7 @@ cms_consumer g;
 
 
 
-CmsInit(cms_WorkerFn f, int maxResponses)
+void CmsInit(cms_WorkerFn f, int maxResponses)
 {
   char* argv[100];
   int argc = 0;
@@ -147,10 +144,9 @@ CmsInit(cms_WorkerFn f, int maxResponses)
   }    
 }
 
-CmsFireTask(int ref, char * t, int size)
-{ int i;
-int k;
-   char *m;
+void CmsFireTask(int ref, char * t, int size)
+{
+  char *m;
   char * msg;
 
   msg = CmiAlloc( 2*sizeof(int) + CmiExtHeaderSizeBytes + size);
@@ -168,7 +164,7 @@ int k;
   CpvAccess(counter)++;
 }
 
-CmsAwaitResponses()
+void CmsAwaitResponses(void)
 /* allows the system to use processor 0 as a worker.*/
 {
 
@@ -176,21 +172,13 @@ CmsAwaitResponses()
   /* when back from the sceduler, return. Because all response have been recvd */
 } 
 
-CmsProcessResponses(cms_consumer f)
+void CmsProcessResponses(cms_consumer f)
 {
-  int i;
-  /* this loop is probably unnecessary: no response handlers have executed so far */
-  /*  for (i=0; i< CpvAccess(tableSize); i++) 
-    if (CpvAccess(responses)[i].response != NULL) {
-      f(CpvAccess(responses)[i].response, CpvAccess(responses)[i].ref);
-      CpvAccess(responses)[i].response = NULL;
-    }
-    */
   CpvAccess(consumerFunction) = f;
   CsdScheduler(-1); 
 }
 
-CmsExit()
+void CmsExit(void)
 {
   char * msg;
 

@@ -8,7 +8,9 @@
 #ifndef PETABLE_H
 #define PETABLE_H
 
+#ifndef NULL
 #define NULL 0
+#endif
 
 #define MSGQLEN 100
 
