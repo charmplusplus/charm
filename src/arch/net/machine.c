@@ -2623,8 +2623,10 @@ void CmiNotifyIdle()
   tv.tv_sec=0; tv.tv_usec=5000;
   if (Cmi_charmrun_fd!=-1)
     FD_SET(Cmi_charmrun_fd, &rfds);
-  if (dataskt!=-1)
+  if (dataskt!=-1) {
     FD_SET(dataskt, &rfds);
+    FD_SET(dataskt, &wfds);
+  }
   select(FD_SETSIZE,&rfds,&wfds,0,&tv);
   if (Cmi_netpoll) CommunicationServer(5);
 #else
