@@ -23,4 +23,6 @@ module CkMulticast {
     entry void recvRedMsg(CkReductionMsg *msg);
     entry void updateRedNo(mCastEntryPtr e, int no);
   };
+
+  initcall void _ckMulticastInit(void);
 };

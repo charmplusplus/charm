@@ -95,6 +95,12 @@ class multicastGrpMsg: public CkMcastBaseMsg, public CMessage_multicastGrpMsg {
 
 extern void CkPackMessage(envelope **pEnv);
 
+void _ckMulticastInit(void)
+{
+  CkDisableTracing(CkIndex_CkMulticastMgr::recvMsg(0));
+  CkDisableTracing(CkIndex_CkMulticastMgr::recvRedMsg(0));
+}
+
 mCastEntry::mCastEntry (mCastEntry *old): 
   oldc(NULL), newc(NULL), flag(COOKIE_NOTREADY)
 {
