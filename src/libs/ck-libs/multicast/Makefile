@@ -1,12 +1,12 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-LIB = libckmulticast.a
+LIB = libmoduleCkMulticast.a
 LIBOBJ = ckmulticast.o
 
 HEADERS = $(CDIR)/include/CkMulticast.decl.h \
           $(CDIR)/include/ckmulticast.h 
-LIBDEST =  $(CDIR)/lib/libckmulticast.a
+LIBDEST =  $(CDIR)/lib/$(LIB)
 
 all: $(LIBDEST) $(HEADERS)
 

@@ -1,19 +1,22 @@
 #ifndef _MULTICAST
 #define _MULTICAST
 
-class mCastCookie;
+class mCastEntry;
 
 class multicastSetupMsg;
 class multicastGrpMsg;
 class cookieMsg;
 class ReductionMsg;
 
-typedef mCastCookie * mCastCookiePtr;
+typedef mCastEntry * mCastEntryPtr;
 
 #include "CkMulticast.decl.h"
 
+#define MAXMCASTCHILDREN  2
+
 class CkMcastBaseMsg {
 public:
+  char magic;      // TODO
   unsigned int _gpe, _redNo;
   void *_cookie;
 public:
@@ -22,13 +25,10 @@ public:
   void *&cookie(void) { return _cookie; }
 };
 
-#define MAXMCASTCHILDREN  2
-
 typedef void (*redClientFn)(CkSectionCookie sid, void *param,int dataSize,void *data);
 
 class CkMulticastMgr: public CkDelegateMgr {
   private:
-    CkSectionCookie sid;  // for now
     int idNum;
   public:
     CkMulticastMgr(): idNum(0) {};
@@ -40,8 +40,6 @@ class CkMulticastMgr: public CkDelegateMgr {
     void init(CkSectionCookie sid);
     void reset(CkSectionCookie sid);
     cookieMsg * setup(multicastSetupMsg *);
-    void ArraySend(int ep, void *m, const CkArrayIndexMax &idx, CkArrayID a);
-    void ArrayBroadcast(int ep,void *m, CkArrayID a);
     void ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCookie &s);
     void recvMsg(multicastGrpMsg *m);
     // for reduction
@@ -51,14 +49,14 @@ class CkMulticastMgr: public CkDelegateMgr {
     void rebuild(CkSectionCookie &);
     // entry
     void recvRedMsg(ReductionMsg *msg);
-    void updateRedNo(mCastCookie *, int red);
+    void updateRedNo(mCastEntry *, int red);
   public:
     typedef ReductionMsg *(*reducerFn)(int nMsg,ReductionMsg **msgs);
   private:
     enum {MAXREDUCERS=256};
     static reducerFn reducerTable[MAXREDUCERS];
-    void releaseFutureReduceMsgs(mCastCookie *entry);
-    void releaseBufferedReduceMsgs(mCastCookie *entry);
+    void releaseFutureReduceMsgs(mCastEntry *entry);
+    void releaseBufferedReduceMsgs(mCastEntry *entry);
 };
 
 
