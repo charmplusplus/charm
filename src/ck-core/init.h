@@ -124,6 +124,7 @@ extern unsigned int    _printSS;
 extern int     _infoIdx;
 extern int     _charmHandlerIdx;
 extern int     _roHandlerIdx;
+extern int     _roRestartHandlerIdx;     /* for checkpoint/restart */
 extern int     _initHandlerIdx;
 extern int     _bocHandlerIdx;
 extern int     _nodeBocHandlerIdx;
