@@ -325,9 +325,9 @@ if ($?OVERRIDE_LD) then
     set CMK_LD = ( $OVERRIDE_LD $CMK_LD )
 endif
 
-if ($?OVERRIDE_LD) then
+if ($?OVERRIDE_LDXX) then
     set CMK_LDXX[1]=""
-    set CMK_LDXX = ( $OVERRIDE_LD $CMK_LDXX )
+    set CMK_LDXX = ( $OVERRIDE_LDXX $CMK_LDXX )
 endif
 
 ##############################################################################
