@@ -456,13 +456,20 @@ public:
 	CkDelegateData() :refcount(0) {}
 	virtual ~CkDelegateData();
 	
+        //Child class constructor may have to set this.
+        inline void reset() {
+            refcount = 0;
+        }
+        
 	/// Add a reference to this delegation data.  Just increments the refcount.
 	///   Only CProxy should ever have to call this routine.
+        /// Actually now the delegate manager calls it.
 	inline void ref(void) {refcount++;}
 	
 	/// Remove our reference from this data.  If the refcount
 	///  reaches 0, deletes the delegateData.
 	///   Only CProxy should ever have to call this routine.
+        /// Actually now the delegate manager calls it.
 	inline void unref(void) {
 		refcount--;
 		if (refcount==0) delete this;
@@ -493,6 +500,10 @@ class CkDelegateMgr : public IrrGroup {
     virtual void ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a);
     virtual void ArraySectionSend(CkDelegateData *pd,int ep,void *m,CkArrayID a,CkSectionID &s);
     virtual void initDelegateMgr(CProxy *proxy)  {}
+    virtual CkDelegateData* ckCopyDelegateData(CkDelegateData *data) {
+        data->ref();
+        return data;
+    } 
     
     /**
      Management of per-proxy data: pup this delegate's data.
@@ -542,10 +553,12 @@ class CProxy {
 /// Delegation constructor: used when building 
 ///   an element proxy from a collective proxy, like in "aProxy[i]".
     CProxy(CK_DELCTOR_PARAM)
-	:delegatedMgr(dTo), delegatedPtr(dPtr)
-    {
-	if (delegatedPtr) delegatedPtr->ref();
-    }
+	:delegatedMgr(dTo)
+        {
+            delegatedPtr = NULL;
+            if(delegatedMgr != NULL) 
+                delegatedPtr = dTo->ckCopyDelegateData(dPtr);            
+        }
   public:
     /// Copy constructor.  Only needed for delegated proxies.
     CProxy(const CProxy &src);
@@ -553,7 +566,7 @@ class CProxy {
     CProxy& operator=(const CProxy &src);
     /// Destructor.  Only needed for delegated proxies. 
     ~CProxy() {
-       if (delegatedPtr) delegatedPtr->unref();
+        if (delegatedPtr) delegatedPtr->unref();
     }
     
     /**

@@ -182,9 +182,11 @@ void CProxy::ckUndelegate(void) {
 
 /// Copy constructor
 CProxy::CProxy(const CProxy &src) 
-	:delegatedMgr(src.delegatedMgr), delegatedPtr(src.delegatedPtr)
+    :delegatedMgr(src.delegatedMgr) 
 {
-	if (delegatedPtr) delegatedPtr->ref();
+    delegatedPtr = NULL;
+    if(delegatedMgr != NULL) 
+        delegatedPtr = src.delegatedMgr->ckCopyDelegateData(src.delegatedPtr);
 }
 
 /// Assignment operator
@@ -192,9 +194,13 @@ CProxy& CProxy::operator=(const CProxy &src) {
 	CkDelegateData *oldPtr=delegatedPtr;
 	ckUndelegate();
 	delegatedMgr=src.delegatedMgr;
-	delegatedPtr=src.delegatedPtr;
-	if (delegatedPtr) delegatedPtr->ref();
-	// subtle: do unref *after* ref, because it's possible oldPtr == delegatedPtr
+
+        if(delegatedMgr != NULL)
+            delegatedPtr = delegatedMgr->ckCopyDelegateData(src.delegatedPtr);
+        else
+            delegatedPtr = NULL;
+        
+        // subtle: do unref *after* ref, because it's possible oldPtr == delegatedPtr
 	if (oldPtr) oldPtr->unref();
 	return *this;
 }
@@ -218,9 +224,10 @@ void CProxy::pup(PUP::er &p) {
 	  else
 		delegatedMgr=(CkDelegateMgr *)CkLocalBranch(delegatedTo);
 	}
+        
         delegatedPtr=delegatedMgr->DelegatePointerPup(p,delegatedPtr);
 	if (p.isUnpacking() && delegatedPtr)
-	  delegatedPtr->ref();
+            delegatedPtr->ref();
       }
 }
 
