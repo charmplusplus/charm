@@ -52,7 +52,7 @@ void RouterStrategy::setReverseMap(){
 
     //All processors not in the domain will point to -1
     for(pcount = 0; pcount < npes; pcount++) {
-        if (pelist[pcount] == CmiMyPe())
+        if (pelist[pcount] == CkMyPe())
             myPe = pelist[pcount];
 
         procMap[pelist[pcount]] = pcount;
@@ -90,7 +90,7 @@ RouterStrategy::RouterStrategy(int stratid, int handle, int _npes,
 
     npes = _npes;
     pelist = new int[npes];
-    procMap = new int[CmiNumPes()];
+    procMap = new int[CkNumPes()];
     
     memcpy(pelist, _pelist, sizeof(int) * npes);    
     setReverseMap();
@@ -158,7 +158,7 @@ void RouterStrategy::doneInserting(){
     
     if(doneFlag == 0) {
         ComlibPrintf("%d:Waiting for previous iteration to Finish\n", 
-                     CmiMyPe());
+                     CkMyPe());
         bufferedDoneInserting = 1;
         return;
     }
@@ -231,7 +231,7 @@ void RouterStrategy::doneInserting(){
 
 void RouterStrategy::Done(DummyMsg *m){
 
-    ComlibPrintf("%d: Finished iteration\n", CmiMyPe());
+    ComlibPrintf("%d: Finished iteration\n", CkMyPe());
 
     if(doneHandle > 0) {
         CmiSetHandler(m, doneHandle);

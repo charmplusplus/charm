@@ -27,7 +27,7 @@ extern void propagate_handler(void *);
 void propagate_handler_frag(void *message) {
   int instid = CmiGetXHandler(message);
   PipeBroadcastConverse *myStrategy = (PipeBroadcastConverse*)ConvComlibGetStrategy(instid);
-  ComlibPrintf("[%d] propagate_handler_frag: calling on instid %d %x\n",CmiMyPe(),instid,myStrategy);
+  ComlibPrintf("[%d] propagate_handler_frag: calling on instid %d %x\n",CkMyPe(),instid,myStrategy);
   //CProxy_ComlibManager(CkpvAccess(cmgrID)).ckLocalBranch()->getStrategy(instid);
   PipeBcastInfo *info = (PipeBcastInfo*)(((char*)message)+CmiReservedHeaderSize);
   myStrategy->propagate((char*)message, true, info->srcPe, info->chunkSize+CmiReservedHeaderSize+sizeof(PipeBcastInfo), NULL);
@@ -43,21 +43,21 @@ void PipeBroadcastConverse::propagate(char *env, int isFragmented, int srcPeNumb
 
   switch (topology) {
   case USE_LINEAR:
-    if (srcPeNumber == (CmiMyPe()+1)%CmiNumPes()) break;
-    destination = (CmiMyPe()+1) % CmiNumPes();
-    ComlibPrintf("[%d] Pipebroadcast sending to %d\n",CmiMyPe(), destination);
+    if (srcPeNumber == (CkMyPe()+1)%CkNumPes()) break;
+    destination = (CkMyPe()+1) % CkNumPes();
+    ComlibPrintf("[%d] Pipebroadcast sending to %d\n",CkMyPe(), destination);
     CmiSyncSend(destination, totalSendingSize, env);
     break;
   case USE_HYPERCUBE:
-    tmp = srcPeNumber ^ CmiMyPe();
-    k = log_of_2(CmiNumPes()) + 2;
+    tmp = srcPeNumber ^ CkMyPe();
+    k = log_of_2(CkNumPes()) + 2;
     if (tmp) {
       do {--k;} while (!(tmp>>k));
     }
-    ComlibPrintf("[%d] tmp=%d, k=%d\n",CmiMyPe(),tmp,k);
+    ComlibPrintf("[%d] tmp=%d, k=%d\n",CkMyPe(),tmp,k);
     // now 'k' is the last dimension in the hypercube used for exchange
-    if (isFragmented) info->srcPe = CmiMyPe();
-    else setPeNumber(env,CmiMyPe());  // where the message is coming from
+    if (isFragmented) info->srcPe = CkMyPe();
+    else setPeNumber(env,CkMyPe());  // where the message is coming from
     dest_pes = (int *)malloc(k*sizeof(int));
     --k;  // next dimension in the cube to be used
     num_pes = HypercubeGetBcastDestinations(k, dest_pes);
@@ -65,13 +65,13 @@ void PipeBroadcastConverse::propagate(char *env, int isFragmented, int srcPeNumb
     /*
     for ( ; k>=0; --k) {
       // add the processor destination at level k if it exist
-      dest_pes[num_pes] = CmiMyPe() ^ (1<<k);
-      if (dest_pes[num_pes] >= CmiNumPes()) {
+      dest_pes[num_pes] = CkMyPe() ^ (1<<k);
+      if (dest_pes[num_pes] >= CkNumPes()) {
 	dest_pes[num_pes] &= (-1)<<k;
-	if (CmiNumPes()>dest_pes[num_pes]) dest_pes[num_pes] += (CmiMyPe() - (CmiMyPe() & ((-1)<<k))) % (CmiNumPes() - dest_pes[num_pes]);
+	if (CkNumPes()>dest_pes[num_pes]) dest_pes[num_pes] += (CkMyPe() - (CkMyPe() & ((-1)<<k))) % (CkNumPes() - dest_pes[num_pes]);
       }
-      if (dest_pes[num_pes] < CmiNumPes()) {
-	ComlibPrintf("[%d] PipeBroadcast sending to %d\n",CmiMyPe(), dest_pes[num_pes]);
+      if (dest_pes[num_pes] < CkNumPes()) {
+	ComlibPrintf("[%d] PipeBroadcast sending to %d\n",CkMyPe(), dest_pes[num_pes]);
 	++num_pes;
       }
     }
@@ -118,7 +118,7 @@ void PipeBroadcastConverse::storing(char* fragment, int isFragmented) {
     char *incomingMsg;
     if (position) {
       // the message already exist, add to it
-      ComlibPrintf("[%d] adding to an existing message for id %d/%d (%d remaining)\n",CmiMyPe(),info->bcastPe,info->seqNumber,position->remaining-1);
+      ComlibPrintf("[%d] adding to an existing message for id %d/%d (%d remaining)\n",CkMyPe(),info->bcastPe,info->seqNumber,position->remaining-1);
       incomingMsg = position->message;
       memcpy (incomingMsg+CmiReservedHeaderSize+((pipeSize-CmiReservedHeaderSize-sizeof(PipeBcastInfo))*info->chunkNumber), fragment+CmiReservedHeaderSize+sizeof(PipeBcastInfo), info->chunkSize);
 
@@ -132,7 +132,7 @@ void PipeBroadcastConverse::storing(char* fragment, int isFragmented) {
 
     } else {
       // the message doesn't exist, create it
-      ComlibPrintf("[%d] creating new message of size %d for id %d/%d; chunk=%d chunkSize=%d\n",CmiMyPe(),info->messageSize,info->bcastPe,info->seqNumber,info->chunkNumber,info->chunkSize);
+      ComlibPrintf("[%d] creating new message of size %d for id %d/%d; chunk=%d chunkSize=%d\n",CkMyPe(),info->messageSize,info->bcastPe,info->seqNumber,info->chunkNumber,info->chunkSize);
       incomingMsg = (char*)CmiAlloc(info->messageSize);
       memcpy (incomingMsg, fragment, CmiReservedHeaderSize);
       memcpy (incomingMsg+CmiReservedHeaderSize+((pipeSize-CmiReservedHeaderSize-sizeof(PipeBcastInfo))*info->chunkNumber), fragment+CmiReservedHeaderSize+sizeof(PipeBcastInfo), info->chunkSize);
@@ -149,7 +149,7 @@ void PipeBroadcastConverse::storing(char* fragment, int isFragmented) {
     CmiFree(fragment);
 
   } else {  // message not fragmented
-    ComlibPrintf("[%d] deliverer: received message in single chunk\n",CmiMyPe());
+    ComlibPrintf("[%d] deliverer: received message in single chunk\n",CkMyPe());
     isFinished = 1;
     complete = fragment;
   }
@@ -160,10 +160,10 @@ void PipeBroadcastConverse::storing(char* fragment, int isFragmented) {
 }
 
 void PipeBroadcastConverse::deliverer(char *msg, int dimension) {
-  ComlibPrintf("{%d} dest = %d, %d, %x\n",CmiMyPe(),destinationHandler, dimension,CmiHandlerToInfo(destinationHandler).hdlr);
+  ComlibPrintf("{%d} dest = %d, %d, %x\n",CkMyPe(),destinationHandler, dimension,CmiHandlerToInfo(destinationHandler).hdlr);
   if (destinationHandler) {
     CmiSetHandler(msg, destinationHandler);
-    CmiSyncSendAndFree(CmiMyPe(), dimension, msg);
+    CmiSyncSendAndFree(CkMyPe(), dimension, msg);
   } else {
     CmiPrintf("[%d] Pipelined Broadcast: message not delivered since destination not set!");
   }
@@ -176,7 +176,7 @@ PipeBroadcastConverse::PipeBroadcastConverse(int _topology, int _pipeSize, Strat
   messageBuf = new CkQ<MessageHolder *>;
   if (!parent) propagateHandle_frag = CmiRegisterHandler((CmiHandler)propagate_handler_frag);
   ComlibPrintf("init: %d %d (%x)\n",topology, pipeSize,this);
-  if (!parent) ComlibPrintf("[%d] registered handler fragmented to %d\n",CmiMyPe(),propagateHandle_frag);
+  if (!parent) ComlibPrintf("[%d] registered handler fragmented to %d\n",CkMyPe(),propagateHandle_frag);
 }
 
 void PipeBroadcastConverse::insertMessage(MessageHolder *cmsg){
@@ -206,7 +206,7 @@ void PipeBroadcastConverse::conversePipeBcast(char *env, int totalSize) {
 
   ++seqNumber;
   // message doesn't fit into the pipe: split it into chunks and propagate them individually
-  ComlibPrintf("[%d] Propagating message in multiple chunks (totalsize=%d)\n",CmiMyPe(),totalSize);
+  ComlibPrintf("[%d] Propagating message in multiple chunks (totalsize=%d)\n",CkMyPe(),totalSize);
 
   char *sendingMsg;
   char *nextChunk = env+CmiReservedHeaderSize;
@@ -220,8 +220,8 @@ void PipeBroadcastConverse::conversePipeBcast(char *env, int totalSize) {
     sendingMsg = (char*)CmiAlloc(pipeSize);
     memcpy (sendingMsg, env, CmiReservedHeaderSize);
     PipeBcastInfo *info = (PipeBcastInfo*)(sendingMsg+CmiReservedHeaderSize);
-    info->srcPe = CmiMyPe();
-    info->bcastPe = CmiMyPe();
+    info->srcPe = CkMyPe();
+    info->bcastPe = CkMyPe();
     info->seqNumber = seqNumber;
     info->chunkNumber = i;
     info->chunkSize = reducedPipe<remaining ? reducedPipe : remaining;
@@ -231,26 +231,26 @@ void PipeBroadcastConverse::conversePipeBcast(char *env, int totalSize) {
     remaining -= info->chunkSize;
     nextChunk += info->chunkSize;
 
-    propagate(sendingMsg, true, CmiMyPe(), totalSize, NULL);
+    propagate(sendingMsg, true, CkMyPe(), totalSize, NULL);
   }
   CmiFree(env);
 }
 
 void PipeBroadcastConverse::pup(PUP::er &p){
   Strategy::pup(p);
-  ComlibPrintf("[%d] initial of Pipeconverse pup %s\n",CmiMyPe(),(p.isPacking()==0)?(p.isUnpacking()?"UnPacking":"sizer"):("Packing"));
+  ComlibPrintf("[%d] initial of Pipeconverse pup %s\n",CkMyPe(),(p.isPacking()==0)?(p.isUnpacking()?"UnPacking":"sizer"):("Packing"));
 
   p | pipeSize;
   p | topology;
   p | seqNumber;
 
-  ComlibPrintf("[%d] PipeBroadcast converse pupping %s, size=%d, topology=%d\n",CmiMyPe(), (p.isPacking()==0)?(p.isUnpacking()?"UnPacking":"sizer"):("Packing"),pipeSize,topology);
+  ComlibPrintf("[%d] PipeBroadcast converse pupping %s, size=%d, topology=%d\n",CkMyPe(), (p.isPacking()==0)?(p.isUnpacking()?"UnPacking":"sizer"):("Packing"),pipeSize,topology);
 
   if (p.isUnpacking()) {
     //log_of_2_inv = 1/log((double)2);
     messageBuf = new CkQ<MessageHolder *>;
     propagateHandle_frag = CmiRegisterHandler((CmiHandler)propagate_handler_frag);
-    ComlibPrintf("[%d] registered handler fragmented to %d\n",CmiMyPe(),propagateHandle_frag);
+    ComlibPrintf("[%d] registered handler fragmented to %d\n",CkMyPe(),propagateHandle_frag);
   }
   if (p.isPacking()) {
     delete messageBuf;

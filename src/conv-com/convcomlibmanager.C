@@ -46,7 +46,7 @@ void ConvComlibManager::insertStrategy(Strategy *s, int loc) {
 
 //handler for dummy messages
 void recv_dummy(void *msg){
-    ComlibPrintf("Received Dummy %d\n", CmiMyPe());    
+    ComlibPrintf("Received Dummy %d\n", CkMyPe());    
     CmiFree(msg);
 }
 

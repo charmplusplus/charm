@@ -94,7 +94,7 @@ class PeTable {
             int index = pelist[i];            
             *nm += msgnum[index];
             
-            ComlibPrintf("%d: NUM MSGS %d, %d\n", CmiMyPe(), index, 
+            ComlibPrintf("%d: NUM MSGS %d, %d\n", CkMyPe(), index, 
                          msgnum[index]);
             
             for (int j=0;j<msgnum[index];j++) {
