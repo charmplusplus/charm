@@ -607,6 +607,9 @@ do
         -h|--help)
 	        printUsage
 		;;
+	-f90main)
+		F90_MAIN=1
+		;;
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS  $arg"
@@ -863,6 +866,13 @@ OPTS_F90="$OPTS $OPTS_F90"
 OPTS_LD="$OPTS $OPTS_LD"
 # OPTS_LDXX gets OPTS from OPTS_LD
 
+if [ -n "$F90_MAIN" ] 
+then
+# for_main needs to be placed at beginning
+	CMK_LD="$CMK_LD $CMK_F90MAINLIBS"
+	CMK_LDXX="$CMK_LDXX $CMK_F90MAINLIBS"
+fi
+
 # There's really no analog for this in the Bourne shell: 
 #  -------- C Shell ------> onintr failure
 # Luckily, it's irrelevant as long as nobody sends us a ^Z.
@@ -1090,7 +1100,12 @@ MakeSO() {
 	OBJECT=$dir/$fname
 	fi
 	Warning "Warning: creating $OBJECT "
-	soCmd="$CMK_LD -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES $PRE_LIBRARIES $POST_LIBRARIES $CMK_LD_SHARED_LIBS"
+	if test "$MAKE_LDXX" = "1"
+	then
+ 	  soCmd="$CMK_LDXX -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES $PRE_LIBRARIES $POST_LIBRARIES $CMK_LD_SHARED_LIBS"
+	else
+	  soCmd="$CMK_LD -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES $PRE_LIBRARIES $POST_LIBRARIES $CMK_LD_SHARED_LIBS"
+	fi
 	DoNoErrCheck $soCmd
 	Do_res=$?
 	if [ $Do_res -ne 0 ] 
