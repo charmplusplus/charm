@@ -28,7 +28,7 @@ CkpvDeclare(int, numLoadBalancers);  /**< num of lb created */
 CkpvDeclare(int, hasNullLB);         /**< true if NullLB is created */
 CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
 
-double autoLbPeriod = 0.0;
+double autoLbPeriod = 1.0;
 int lb_debug=0;
 int lb_ignoreBgLoad=0;
 
