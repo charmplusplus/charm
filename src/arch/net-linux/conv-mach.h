@@ -31,8 +31,6 @@
 #define CMK_RSH_NOT_NEEDED                                 0
 #define CMK_RSH_USE_REMSH                                  0
 
-#define CMK_CONV_HOST_WANT_CSH                             1
-
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
@@ -73,6 +71,5 @@
 
 
 #endif
-
 
 
