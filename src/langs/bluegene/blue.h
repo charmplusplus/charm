@@ -29,6 +29,7 @@ void BgGetXYZ(int *x, int *y, int *z);
 	/* get and set blue gene cube size */
 	/* set functions can only be called in user's BgGlobalInit code */
 void BgGetSize(int *sx, int *sy, int *sz);
+int BgGetTotalSize();
 void BgSetSize(int sx, int sy, int sz);
 int  BgNumNodes();      /* return the number of nodes on this emulator pe */
 int  BgMyRank();	/* node ID, this is local ID */

@@ -488,6 +488,11 @@ void BgGetSize(int *sx, int *sy, int *sz)
   *sx = cva(numX); *sy = cva(numY); *sz = cva(numZ);
 }
 
+int BgGetTotalSize()
+{
+  return cva(numX)*cva(numY)*cva(numZ);
+}
+
 /* can only called in emulatorinit */
 void BgSetSize(int sx, int sy, int sz)
 {
