@@ -2,14 +2,6 @@
 #include "converse.h"
 #define PERIOD 10000
 
-typedef struct CldField
-{
-  CLD_STANDARD_FIELD_STUFF
-  int infofn, packfn;
-} *CldField;
-
-int Cld_fieldsize = sizeof(struct CldField);
-
 typedef struct CldNeighborData
 {
   int pe, load;
@@ -31,7 +23,6 @@ void CldReadNeighborData()
   char filename[25];
   int i;
   
-  /* CmiError("On %d: Begin CldReadNeighborData\n", CmiMyPe()); */
   sprintf(filename, "graph/graph%d", CmiMyPe());
   if ((fp = fopen(filename, "r")) == 0) 
     {
@@ -48,7 +39,6 @@ void CldReadNeighborData()
       CpvAccess(neighbors)[i].load = 0;
     }
   fclose(fp);
-  /* CmiError("On %d: End CldReadNeighborData\n", CmiMyPe()); */
 }
 
 
@@ -56,7 +46,6 @@ void CldSetNeighborLoad(int pe, int load)
 {
   int i=0, found=0;
   
-  /* CmiError("On %d: Begin CldSetNeighborLoad\n", CmiMyPe()); */
   while (i<CpvAccess(numNeighbors) && !found)
     {
       if (CpvAccess(neighbors)[i].pe == pe)
@@ -66,18 +55,15 @@ void CldSetNeighborLoad(int pe, int load)
 	}
       i++;
     }
-  /* CmiError("On %d: End CldSetNeighborLoad\n", CmiMyPe()); */
 }
 
 int CldAvgNeighborLoad()
 {
   int sum=0, i;
   
-  /* CmiError("On %d: Begin CldAvgNeighborLoad\n", CmiMyPe()); */
   for (i=0; i<CpvAccess(numNeighbors); i++)
     sum += CpvAccess(neighbors)[i].load;
   sum += CldCountTokens();
-  /* CmiError("On %d: End CldAvgNeighborLoad\n", CmiMyPe()); */
   return (int)(sum / (CpvAccess(numNeighbors)+1));
 
 }
@@ -86,20 +72,11 @@ int CldGetRandomNeighborOrSelf()
 {
   int randIndex = (((rand()+CmiMyPe())&0x7FFFFFFF)
 		   % (CpvAccess(numNeighbors)+1));
-  /* CmiError("On %d: Begin CldGetRandomNeighborOrSelf\n", CmiMyPe()); */  
-  /* CmiError("On %d: In CldGetRandomNeighborOrSelf randIndex = %d numNeighbors = %d\n", CmiMyPe(), randIndex, CpvAccess(numNeighbors));    */
+
   if (randIndex == CpvAccess(numNeighbors))
-    {
-      /* CmiError("On %d: In CldGetRandomNeighborOrSelf 3\n", CmiMyPe()); */
-      return (CmiMyPe());
-      /* CmiError("On %d: In CldGetRandomNeighborOrSelf 4\n", CmiMyPe()); */
-    }
+    return (CmiMyPe());
   else
-    {
-      /* CmiError("On %d: In CldGetRandomNeighborOrSelf 5\n", CmiMyPe()); */
-      return (CpvAccess(neighbors)[randIndex].pe);
-      /* CmiError("On %d: In CldGetRandomNeighborOrSelf 6\n", CmiMyPe()); */
-    }
+    return (CpvAccess(neighbors)[randIndex].pe);
 }
 
 void CldPeriodicBalanceInit()
@@ -109,14 +86,10 @@ void CldPeriodicBalanceInit()
   
   char *msg, *msgPos;
   
-  /* Send CldLoadRequestHandler to all neighbors: */
-  /* Construct msg with CmiMyPe() in it */
-  /* Set message handler to CldLoadRequestHandler */
   /* CmiError("On %d: Begin CldPeriodicBalanceInit\n", CmiMyPe()); */
   myPe = CmiMyPe();
-  len = CmiMsgHeaderSizeBytes + sizeof(int) + sizeof(void *);
+  len = CmiMsgHeaderSizeBytes + sizeof(int);
 
-  /* Temp solution to CmiSyncMulticastAndFree bug */
   for (i=0; i<CpvAccess(numNeighbors); i++){
     msg = (char *)CmiAlloc(len);
     msgPos = (msg + CmiMsgHeaderSizeBytes);
@@ -126,8 +99,6 @@ void CldPeriodicBalanceInit()
     CmiSyncSendAndFree(CpvAccess(neighbors)[i].pe, len, msg);
   }
 
-  /*  CmiSyncMulticastAndFree(CpvAccess(CldNeighbors), len, msg); */
-  /* CmiError("On %d: In CldPeriodicBalanceInit before CcdCallFnAfter\n", CmiMyPe()); */
   CcdCallFnAfter((CcdVoidFn)CldPeriodicBalanceInit, NULL, PERIOD);
   /* CmiError("On %d: End CldPeriodicBalanceInit\n", CmiMyPe()); */
 }
@@ -155,18 +126,14 @@ void CldBalance()
 	  numSent = 0;
 	  for (j=0; j<numToMove; j++)
 	    {
-	      CldGetToken(&msgs[j], &infofn, &packfn);
+	      CldGetToken(&msgs[j]);
 	      if (msgs[j] != 0)
 		{
 		  numSent++;
-		  ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
-		  ifn(msgs[j], &len, &ldbfield, &queueing, &priobits, 
-		      &prioptr);
+		  ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msgs[j]));
+		  ifn(msgs[j], &len, &queueing, &priobits, &prioptr);
 		  msgSizes[j] = len;
-		  CldSwitchHandler(msgs[j], ldbfield, 
-				   CpvAccess(CldBalanceHandlerIndex));
-		  ldbfield->infofn = infofn;
-		  ldbfield->packfn = packfn;
+		  CldSwitchHandler(msgs[j], CpvAccess(CldBalanceHandlerIndex));
 		}
 	      else
 		break;
@@ -229,13 +196,11 @@ void CldLoadResponseHandler(char *msg)
   
 void CldBalanceHandler(void *msg)
 {
-  CldField ldbfield;
-  
   /* CmiError("On %d: Begin CldBalanceHandler\n", CmiMyPe()); */
   CmiGrabBuffer((void **)&msg);
-  CldRestoreHandler(msg, &ldbfield);
+  CldRestoreHandler(msg);
       
-  CldPutToken(msg, ldbfield->infofn, ldbfield->packfn);
+  CldPutToken(msg);
   /* CmiError("On %d: End CldBalanceHandler\n", CmiMyPe()); */
 }
 
@@ -276,15 +241,14 @@ void CldGraphModuleInit()
 
 void CldHandler(void *msg)
 {
-  CldField ldbfield;
   CldInfoFn ifn;
   int len, queueing, priobits; unsigned int *prioptr;
   
   /* CmiError("On %d: Begin CldHandler\n", CmiMyPe()); */
   CmiGrabBuffer((void **)&msg);
-  CldRestoreHandler(msg, &ldbfield);
-  ifn = (CldInfoFn)CmiHandlerToFunction(ldbfield->infofn);
-  ifn(msg, &len, &ldbfield, &queueing, &priobits, &prioptr);
+  CldRestoreHandler(msg);
+  ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
+  ifn(msg, &len, &queueing, &priobits, &prioptr);
   CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
       
   /* CmiError("On %d: End CldHandler\n", CmiMyPe()); */
@@ -292,7 +256,7 @@ void CldHandler(void *msg)
 
 void CldEnqueue(int pe, void *msg, int infofn, int packfn)
 {
-  int len, queueing, priobits; unsigned int *prioptr; CldField ldbfield;
+  int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn = (CldPackFn)CmiHandlerToFunction(packfn);
 
@@ -301,25 +265,22 @@ void CldEnqueue(int pe, void *msg, int infofn, int packfn)
 
   if (pe == CLD_ANYWHERE)
     {
-      ifn(msg, &len, &ldbfield, &queueing, &priobits, &prioptr);
-      ldbfield->infofn = infofn;
-      ldbfield->packfn = packfn;
-      CldPutToken(msg, infofn, packfn);
+      ifn(msg, &len, &queueing, &priobits, &prioptr);
+      CmiSetInfo(infofn);
+      CldPutToken(msg);
     } 
   else if (pe == CmiMyPe())
     {
-      ifn(msg, &len, &ldbfield, &queueing, &priobits, &prioptr);
-      ldbfield->infofn = infofn;
-      ldbfield->packfn = packfn;
+      ifn(msg, &len, &queueing, &priobits, &prioptr);
+      CmiSetInfo(infofn);
       CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
     }
   else
     {
       pfn(&msg);
-      ifn(msg, &len, &ldbfield, &queueing, &priobits, &prioptr);
-      CldSwitchHandler(msg, ldbfield, CpvAccess(CldHandlerIndex));
-      ldbfield->infofn = infofn;
-      ldbfield->packfn = packfn;
+      ifn(msg, &len, &queueing, &priobits, &prioptr);
+      CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+      CmiSetInfo(infofn);
       if (pe==CLD_BROADCAST) 
 	CmiSyncBroadcastAndFree(len, msg);
       else if (pe==CLD_BROADCAST_ALL)
