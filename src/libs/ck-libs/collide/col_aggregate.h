@@ -17,7 +17,7 @@ typedef double real;
 
 //Java programmer compatability
 #define null NULL
-typedef bool boolean;
+//typedef bool boolean;
 
 /********************* Generic utilities ***************/
 //A simple extensible untyped chunk of memory.
