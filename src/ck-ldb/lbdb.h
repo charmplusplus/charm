@@ -281,6 +281,8 @@ void LDGetCommData(LDHandle _lbdb, LDCommData *data);
 void LDBackgroundLoad(LDHandle _lbdb, double *walltime, double *cputime);
 void LDIdleTime(LDHandle _lbdb, double *walltime);
 void LDTotalTime(LDHandle _lbdb, double *walltime, double *cputime);
+void LDGetTime(LDHandle _db, double *total_walltime,double *total_cputime,
+                   double *idletime, double *bg_walltime, double *bg_cputime);
 
 void LDClearLoads(LDHandle _lbdb);
 int  LDMigrate(LDObjHandle h, int dest);

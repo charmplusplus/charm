@@ -244,6 +244,11 @@ public:
     LDTotalTime(myLDHandle,walltime,cputime);
   }
 
+  inline void GetTime(double *total_walltime,double *total_cputime,
+                   double *idletime, double *bg_walltime, double *bg_cputime) {
+    LDGetTime(myLDHandle, total_walltime, total_cputime, idletime, bg_walltime, bg_cputime);
+  }
+
   inline void ClearLoads(void) { LDClearLoads(myLDHandle); };
   inline int Migrate(LDObjHandle h, int dest) { return LDMigrate(h,dest); };
 

@@ -174,9 +174,13 @@ void CentralLB::ProcessAtSync()
   // msg->serial = rand();
   msg->serial = CrnRand();
 
+/*
   theLbdb->TotalTime(&msg->total_walltime,&msg->total_cputime);
   theLbdb->IdleTime(&msg->idletime);
   theLbdb->BackgroundLoad(&msg->bg_walltime,&msg->bg_cputime);
+*/
+  theLbdb->GetTime(&msg->total_walltime,&msg->total_cputime,
+		   &msg->idletime, &msg->bg_walltime,&msg->bg_cputime);
   msg->pe_speed = myspeed;
 //  CkPrintf(
 //    "Processors %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n",

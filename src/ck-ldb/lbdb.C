@@ -237,6 +237,14 @@ extern "C" void LDTotalTime(LDHandle _db,double* walltime, double* cputime)
   return;
 }
 
+extern "C" void LDGetTime(LDHandle _db, double *total_walltime,
+                   double *total_cputime,
+                   double *idletime, double *bg_walltime, double *bg_cputime)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->GetTime(total_walltime, total_cputime, idletime, bg_walltime, bg_cputime);
+}
+
 extern "C" void LDNonMigratable(const LDObjHandle &h)
 {
   LBDB *const db = (LBDB*)(h.omhandle.ldb.handle);
