@@ -447,7 +447,7 @@ FEM_DataAttribute::~FEM_DataAttribute() {
 
 /// Copy this data out of the user's (layout-formatted) array:
 template <class T>
-void setTableData(const void *user, int firstItem, int length, 
+inline void setTableData(const void *user, int firstItem, int length, 
 	IDXL_LAYOUT_PARAM, AllocTable2d<T> *table) 
 {
 	for (int r=0;r<length;r++) {
@@ -459,7 +459,7 @@ void setTableData(const void *user, int firstItem, int length,
 
 /// Copy this data into the user's (layout-formatted) array:
 template <class T>
-void getTableData(void *user, int firstItem, int length, 
+inline void getTableData(void *user, int firstItem, int length, 
 	IDXL_LAYOUT_PARAM, const AllocTable2d<T> *table) 
 {
 	for (int r=0;r<length;r++) {
@@ -494,7 +494,7 @@ void FEM_DataAttribute::get(void *u, int f,int l,
 }
 
 template<class T>
-AllocTable2d<T> *allocTablePtr(AllocTable2d<T> *src,int len,int wid) {
+inline AllocTable2d<T> *allocTablePtr(AllocTable2d<T> *src,int len,int wid) {
 	if (src==NULL) src=new AllocTable2d<T>;
 	src->allocate(wid,len);
 	return src;

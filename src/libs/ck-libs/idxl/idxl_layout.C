@@ -78,7 +78,7 @@ void gatherName(T *dest,const byte *src,const IDXL_Layout *srcLayout) { \
 		src+=skew; \
 	} \
 } \
-/*Instantiate templates: */ \
+/*Explicitly instantiate templates: */ \
 template void gatherName(byte *dest,const byte *src,const IDXL_Layout *srcLayout); \
 template void gatherName(int *dest,const byte *src,const IDXL_Layout *srcLayout); \
 template void gatherName(float *dest,const byte *src,const IDXL_Layout *srcLayout); \
@@ -95,7 +95,7 @@ typedef void (*floatCombineFn)(float *dest,const byte *src,const IDXL_Layout *sr
 typedef void (*doubleCombineFn)(double *dest,const byte *src,const IDXL_Layout *srcLayout);
 
 template<class T>
-void assignFn(int len,T *dest,T val) {
+inline void assignFn(int len,T *dest,T val) {
   for (int i=0;i<len;i++) dest[i]=val;
 }
 
@@ -185,7 +185,7 @@ through the user's array (in) and collect it into a message (out).
 // Hopefully the compiler's common-subexpression elimination will
 //   get rid of the multiplies in the inner loop.
 template <class T>
-void gatherUserData(const void *user,int nIndices,const int *indices,
+inline void gatherUserData(const void *user,int nIndices,const int *indices,
 		IDXL_LAYOUT_PARAM,T *compressed) 
 {
 	for (int r=0;r<nIndices;r++) {
@@ -213,7 +213,7 @@ indices of the user array (out).
  */
 
 template <class T>
-void scatterUserData(void *user,int nIndices,const int *indices,
+inline void scatterUserData(void *user,int nIndices,const int *indices,
 		IDXL_LAYOUT_PARAM,const T *compressed) 
 {
 	for (int r=0;r<nIndices;r++) {
@@ -240,7 +240,7 @@ void IDXL_Layout::scatter(int nIndices,const int *indices,
 shared nodes distributed through the user's data (out).
  */
 template <class T>
-void scatterAddUserData(void *user,int nIndices,const int *indices,
+inline void scatterAddUserData(void *user,int nIndices,const int *indices,
 		IDXL_LAYOUT_PARAM,const T *compressed) 
 {
 	for (int r=0;r<nIndices;r++) {
