@@ -1075,6 +1075,8 @@ static int InternalScanf(char *fmt, va_list l)
   return i;
 }
 
+#if CMK_CMIPRINTF_IS_A_BUILTIN
+
 /*New stdarg.h declarations*/
 void CmiPrintf(const char *fmt, ...)
 {
@@ -1103,6 +1105,8 @@ int CmiScanf(const char *fmt, ...)
   va_end(p);
   return i;
 }
+
+#endif
 
 /***************************************************************************
  * Output redirection:
