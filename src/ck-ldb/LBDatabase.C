@@ -253,6 +253,12 @@ void _loadbalancerInit()
   _lb_args.traceComm() = !CmiGetArgFlagDesc(argv, "+LBCommOff",
 		"Turn load balancer instrumentation of communication off");
 
+  // set alpha and beeta
+  _lb_args.alpha() = PER_MESSAGE_SEND_OVERHEAD_DEFAULT;
+  _lb_args.beeta() = PER_BYTE_SEND_OVERHEAD_DEFAULT;
+  CmiGetArgDoubleDesc(argv,"+LBAlpha", &_lb_args.alpha(),"per message send overhead");
+  CmiGetArgDoubleDesc(argv,"+LBBeta", &_lb_args.beeta(),"per byte send overhead");
+
   if (CkMyPe() == 0) {
     if (_lb_args.debug()) {
       CmiPrintf("LB> Load balancer running with verbose mode, period time: %gs.\n", _lb_args.lbperiod());

@@ -28,6 +28,8 @@ private:
   int _lb_useCpuTime;           // use cpu instead of wallclock time
   int _lb_statson;		// stats collection
   int _lb_traceComm;		// stats collection for comm
+  double _lb_alpha;		// per message send overhead
+  double _lb_beeta;		// per byte send overhead
 public:
   CkLBArgs() {
     _autoLbPeriod = 1.0;
@@ -42,7 +44,10 @@ public:
   inline int & useCpuTime() { return _lb_useCpuTime; }
   inline int & statsOn() { return _lb_statson; }
   inline int & traceComm() { return _lb_traceComm; }
+  inline double & alpha() { return _lb_alpha; }
+  inline double & beeta() { return _lb_beeta; }
 };
+
 extern CkLBArgs _lb_args;
 
 extern int _lb_predict;

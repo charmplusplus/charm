@@ -24,27 +24,28 @@ Status:
 #include <stdio.h>
 
 #include "cklists.h"
-
 #include "GreedyCommLB.h"
-
-#define alpha PER_MESSAGE_SEND_OVERHEAD  /*Startup time per message, seconds*/
-#define beeta PER_BYTE_SEND_OVERHEAD     /*Long-message time per byte, seconds*/
+#include "manager.h"
 
 CreateLBFunc_Def(GreedyCommLB, "Greedy algorithm which takes communication graph into account");
 
-#include "manager.h"
-
-GreedyCommLB::GreedyCommLB(const CkLBOptions &opt): CentralLB(opt)
+void GreedyCommLB::init()
 {
     lbname = (char*)"GreedyCommLB";
-    if (CkMyPe() == 0)
-	CkPrintf("[%d] GreedyCommLB created\n",CkMyPe());
+    alpha = _lb_args.alpha();
+    beeta = _lb_args.beeta();
     manager_init();
 }
 
+GreedyCommLB::GreedyCommLB(const CkLBOptions &opt): CentralLB(opt)
+{
+    init();
+    if (CkMyPe() == 0)
+	CkPrintf("[%d] GreedyCommLB created\n",CkMyPe());
+}
+
 GreedyCommLB::GreedyCommLB(CkMigrateMessage *m):CentralLB(m) {
-    lbname = (char*)"GreedyCommLB";
-    manager_init();
+    init();
 }
 
 CmiBool GreedyCommLB::QueryBalanceNow(int _step)
@@ -130,7 +131,7 @@ void GreedyCommLB::add_graph(int x, int y, int data, int nmsg){
     ptr->next = temp;
 }
   
-void init(double **a, graph * object_graph, int l, int b){
+static void init_data(double **a, graph * object_graph, int l, int b){
     int i,j;
     
     for(i=0;i<l+1;i++)
@@ -167,7 +168,7 @@ void GreedyCommLB::work(CentralLB::LDStats* _stats, int count)
     for(pe=0;pe <= count;pe++)
 	alloc_array[pe] = new double[nobj +1];
 
-    init(alloc_array,object_graph,npe,nobj);
+    init_data(alloc_array,object_graph,npe,nobj);
 
     for(com =0; com< stats->n_comm;com++) {
          int xcoord=0,ycoord=0;

@@ -37,8 +37,8 @@ private:
     Messages() { clear(); }
     void clear() { byteSent=msgSent=byteRecv=msgRecv=0; }
     double cost() {
-      return msgSent * PER_MESSAGE_SEND_OVERHEAD + 
-             byteSent * PER_BYTE_SEND_OVERHEAD +
+      return msgSent * _lb_args.alpha() + 
+             byteSent * _lb_args.beeta() +
              msgRecv * PER_MESSAGE_RECV_OVERHEAD + 
              byteRecv * PER_BYTE_RECV_OVERHEAD;
     }

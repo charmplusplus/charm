@@ -477,9 +477,9 @@ void RefinerComm::CommTable::increase(bool issend, int pe, int msgs, int bytes)
 double RefinerComm::CommTable::overheadOnPe(int pe)
 {
   return msgRecvCount[pe]  * PER_MESSAGE_RECV_OVERHEAD +
-	 msgSentCount[pe]  * PER_MESSAGE_SEND_OVERHEAD +
+	 msgSentCount[pe]  * _lb_args.alpha() +
 	 byteRecvCount[pe] * PER_BYTE_RECV_OVERHEAD +
-	 byteSentCount[pe] * PER_BYTE_SEND_OVERHEAD;
+	 byteSentCount[pe] * _lb_args.beeta();
 }
 
 /*@}*/

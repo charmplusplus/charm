@@ -875,8 +875,11 @@ void getLoadInfo(CentralLB::LDStats* stats, int count,
 	double *bgLoads = info.bgLoads;
         double minObjLoad = 1.0e20;  // I suppose no object load is beyond this
 	double maxObjLoad = 0.0;
-
 	CmiAssert(peLoads);
+
+	double alpha = _lb_args.alpha();
+	double beeta = _lb_args.beeta();
+
 	stats->makeCommHash();
 
 	info.clear();
@@ -943,9 +946,9 @@ void getLoadInfo(CentralLB::LDStats* stats, int count,
 	  for(i = 0; i < count; i++)
 	  {
 		double comload = msgRecvCount[i]  * PER_MESSAGE_RECV_OVERHEAD +
-			      msgSentCount[i]  * PER_MESSAGE_SEND_OVERHEAD +
+			      msgSentCount[i]  * alpha +
 			      byteRecvCount[i] * PER_BYTE_RECV_OVERHEAD +
-			      byteSentCount[i] * PER_BYTE_SEND_OVERHEAD;
+			      byteSentCount[i] * beeta;
 		peLoads[i] += comload;
 		if (comLoads) comLoads[i] += comload;
 	  }
