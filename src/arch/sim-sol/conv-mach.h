@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.21  1997-04-01 08:10:36  jyelon
+ * Revision 1.22  1997-05-05 13:56:00  jyelon
+ * Updated for quickthreads
+ *
+ * Revision 1.21  1997/04/01 08:10:36  jyelon
  * Added CMK_GETPAGESIZE_AVAILABLE
  *
  * Revision 1.20  1997/03/25 23:09:19  milind
@@ -133,13 +136,7 @@
 #define CMK_STRINGS_USE_STRINGS_H                          0
 #define CMK_STRINGS_USE_STRING_H                           1
 
-#define CMK_THREADS_REQUIRE_ALLOCA_H                       0
-#define CMK_THREADS_REQUIRE_PRAGMA_ALLOCA                  0
-#define CMK_THREADS_REQUIRE_NO_CPV                         1
-
-#define CMK_THREADS_UNAVAILABLE                            0
-#define CMK_THREADS_USE_ALLOCA                             1
-#define CMK_THREADS_USE_JB_TWEAKING                        0
+#define CMK_THREADS_REQUIRE_NO_CPV                         0
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0

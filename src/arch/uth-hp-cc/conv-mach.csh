@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.1  1996-11-05 21:29:21  brunner
+# Revision 1.2  1997-05-05 13:56:59  jyelon
+# Updated for quickthreads
+#
+# Revision 1.1  1996/11/05 21:29:21  brunner
 # Needs _main in main for C++ compile
 #
 # Revision 1.3  1996/08/04 04:19:50  jyelon
@@ -49,7 +52,7 @@ set CMK_M4='m4'
 set CMK_SUF='o'
 set CMK_AR='ar q'
 set CMK_RANLIB='true'
-set CMK_LIBS=''
+set CMK_LIBS='-lqt'
 set CMK_SEQ_LIBS=''
 set CMK_SEQ_CC='cc -Aa -D_HPUX_SOURCE '
 set CMK_SEQ_LD='cc -Aa -D_HPUX_SOURCE '
@@ -59,3 +62,4 @@ set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | sed -e 's@ *|.*@@'"
 set CMK_CPP_SUFFIX="i"
 set CMK_XLATPP='charmxlat++ '
+set CMK_QT='setjmp-gcc-d'

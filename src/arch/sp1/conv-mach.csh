@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.21  1997-03-21 20:06:54  milind
+# Revision 2.22  1997-05-05 13:56:09  jyelon
+# Updated for quickthreads
+#
+# Revision 2.21  1997/03/21 20:06:54  milind
 # Fixed a prototype mismatch.
 #
 # Revision 2.20  1997/03/14 20:25:43  milind
@@ -102,7 +105,7 @@ set CMK_M4           = 'm4'
 set CMK_SUF          = 'o'
 set CMK_AR           = 'ar cq'
 set CMK_RANLIB       = 'true'
-set CMK_LIBS         = '-bnso -bI:/lib/syscalls.exp'
+set CMK_LIBS         = '-bnso -bI:/lib/syscalls.exp -lqt'
 set CMK_SEQ_LIBS     = ''
 set CMK_SEQ_CC       = 'gcc'
 set CMK_SEQ_LD       = 'gcc'
@@ -112,3 +115,4 @@ set CMK_NM           = '/bin/nm'
 set CMK_NM_FILTER    = "grep '|extern|' | sed -e 's/ *|.*//'"
 set CMK_CPP_SUFFIX   = "i"
 set CMK_XLATPP       = 'charmxlat++ '
+set CMK_QT='setjmp-gcc-d'

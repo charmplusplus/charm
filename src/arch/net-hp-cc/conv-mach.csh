@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.6  1997-03-19 23:17:46  milind
+# Revision 1.7  1997-05-05 13:52:39  jyelon
+# Updated for quickthreads
+#
+# Revision 1.6  1997/03/19 23:17:46  milind
 # Got net-irix to work. Had to modify jsleep to deal with restaring
 # system calls on interrupts.
 #
@@ -60,7 +63,7 @@ set CMK_M4='m4'
 set CMK_SUF='o'
 set CMK_AR='ar q'
 set CMK_RANLIB='true'
-set CMK_LIBS=''
+set CMK_LIBS='-lqt'
 set CMK_SEQ_LIBS=''
 set CMK_SEQ_CC='cc -Aa -D_HPUX_SOURCE '
 set CMK_SEQ_LD='cc -Aa -D_HPUX_SOURCE '
@@ -70,3 +73,4 @@ set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | sed -e 's@ *|.*@@'"
 set CMK_CPP_SUFFIX="i"
 set CMK_XLATPP='charmxlat++ '
+set CMK_QT='setjmp-gcc-d'

@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.19  1996-10-01 18:11:51  jyelon
+# Revision 2.20  1997-05-05 13:52:30  jyelon
+# Updated for quickthreads
+#
+# Revision 2.19  1996/10/01 18:11:51  jyelon
 # Changed all translator linking to static.
 #
 # Revision 2.18  1996/08/05 15:28:49  jyelon
@@ -86,7 +89,7 @@ set CMK_M4='m4'
 set CMK_SUF='o'
 set CMK_AR='ar q'
 set CMK_RANLIB='true'
-set CMK_LIBS=''
+set CMK_LIBS='-lqt'
 set CMK_SEQ_LIBS=''
 set CMK_SEQ_CC='gcc '
 set CMK_SEQ_LD='gcc -static '
@@ -96,3 +99,4 @@ set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | sed -e 's@ *|.*@@'"
 set CMK_CPP_SUFFIX="ii"
 set CMK_XLATPP='charmxlat++ -w'
+set CMK_QT='hpux-cc'
