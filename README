@@ -138,6 +138,13 @@ the Charm++ source code into _version_/tmp, build the entire
 Charm++ runtime system in _version_/tmp, and link sample programs 
 into _version_/pgms.
 
+Several #define's control the compilation of Charm++.  Some of these
+#define's can be found in src/_version_/conv-mach.h.  #define's can
+also be specified on the command line, using the -D option.  For
+example,
+    > ./build charm++ net-linux -O -DCMK_OPTIMIZE=1
+
+CMK_OPTIMIZE: Turn on optimizations in Charm++.
 
 
 BUILDING A PROGRAM
@@ -211,15 +218,16 @@ improvements, or bug reports is
 AUTHORS
 =======
 
-Charm++ is written and maintained by the Parallel Programming
-Lab, in the Computer Science department at the University of 
-Illinois at Urbana-Champaign.  Our managing professor is
-Dr. L.V. Kale; students have included (in rough time order)
-Wennie Shu, Kevin Nomura, Wayne Fenton, Balkrishna Ramkumar,
-Vikram Saletore, Amitabh B. Sinha, Manish Gupta, Attila Gursoy, 
-Balkrishna Ramkumar, Amitabh B. Sinha, Nimish Shah, Sanjeev 
-Krishnan, Parthasarathy Ramachandran, Jeff Wright, Michael Lang, 
-Jackie Wang, Fang Hu, Michael Denardo, Joshua Yelon, Narain Jagathesan,
-Zehra Sura, Krishnan Varadarajan, and Sameer Paranjpye.  Current developers
-include Milind Bhandarkar, Robert Brunner, Terry Wilmarth, Gengbin Zheng, 
-Jayant Desouza, Orion Lawlor, Karthik Mahesh, and Neelam Saboo.
+Charm++ is written and maintained by the Parallel Programming Lab, in
+the Computer Science department at the University of Illinois at
+Urbana-Champaign.  Our managing professor is Dr. L.V. Kale; students
+have included (in rough time order) Wennie Shu, Kevin Nomura, Wayne
+Fenton, Balkrishna Ramkumar, Vikram Saletore, Amitabh B. Sinha, Manish
+Gupta, Attila Gursoy, Balkrishna Ramkumar, Amitabh B. Sinha, Nimish
+Shah, Sanjeev Krishnan, Jayant DeSouza, Parthasarathy Ramachandran,
+Jeff Wright, Michael Lang, Jackie Wang, Fang Hu, Michael Denardo,
+Joshua Yelon, Narain Jagathesan, Zehra Sura, Krishnan Varadarajan, and
+Sameer Paranjpye.  Current developers include Milind Bhandarkar,
+Robert Brunner, Terry Wilmarth, Gengbin Zheng, Jayant Desouza, Orion
+Lawlor, Karthik Mahesh, and Neelam Saboo.
+
