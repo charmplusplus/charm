@@ -48,8 +48,10 @@ void recv_dummy(void *msg){
     CmiFree(msg);
 }
 
+extern void propagate_handler(void *);
+extern void propagate_handler_frag(void *);
 
-//An initialization routine which does prelimnary initialization of the 
+//An initialization routine which does preliminary initialization of the 
 //Converse commlib manager. Currently also initialized krishnans code
 void initComlibManager(){ 
     CkpvInitialize(ConvComlibManager *, conv_comm_ptr);
@@ -61,6 +63,12 @@ void initComlibManager(){
     
     CkpvInitialize(int, RecvdummyHandle);
     CkpvAccess(RecvdummyHandle) = CkRegisterHandler((CmiHandler)recv_dummy);
+
+    // init strategy specific variables
+    CsvInitialize(int, pipeBcastPropagateHandle);
+    CsvInitialize(int, pipeBcastPropagateHandle_frag);
+    CsvAccess(pipeBcastPropagateHandle) = CmiRegisterHandler((CmiHandler)propagate_handler);
+    CsvAccess(pipeBcastPropagateHandle_frag) = CmiRegisterHandler((CmiHandler)propagate_handler_frag);
 
     PUPable_reg(Strategy);
     PUPable_reg(RouterStrategy);

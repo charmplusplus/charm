@@ -177,9 +177,9 @@ PipeBroadcastConverse::PipeBroadcastConverse(int _topology, int _pipeSize, Strat
   else higherLevel = this;
   seqNumber = 0;
   messageBuf = new CkQ<MessageHolder *>;
-  if (!parent) propagateHandle_frag = CmiRegisterHandler((CmiHandler)propagate_handler_frag);
+  //if (!parent) propagateHandle_frag = CmiRegisterHandler((CmiHandler)propagate_handler_frag);
   ComlibPrintf("init: %d %d (%x)\n",topology, pipeSize,this);
-  if (!parent) ComlibPrintf("[%d] registered handler fragmented to %d\n",CkMyPe(),propagateHandle_frag);
+  //if (!parent) ComlibPrintf("[%d] registered handler fragmented to %d\n",CkMyPe(),propagateHandle_frag);
 }
 
 void PipeBroadcastConverse::insertMessage(MessageHolder *cmsg){
@@ -194,7 +194,7 @@ void PipeBroadcastConverse::doneInserting(){
     MessageHolder *cmsg = messageBuf->deq();
     // modify the Handler to deliver the message to the propagator
     char *env = cmsg->getMessage();
-    CmiSetHandler(env, propagateHandle_frag);
+    CmiSetHandler(env, CsvAccess(pipeBcastPropagateHandle_frag));
     conversePipeBcast(env, cmsg->getSize());
     delete cmsg;
     //conversePipeBcast(env, env->getTotalsize(), false);
@@ -217,9 +217,9 @@ void PipeBroadcastConverse::conversePipeBcast(char *env, int totalSize) {
   int reducedPipe = pipeSize-CmiReservedHeaderSize-sizeof(PipeBcastInfo);
   int sendingMsgSize;
   ComlibPrintf("reducedPipe = %d, CmiReservedHeaderSize = %d, sizeof(PipeBcastInfo) = %d\n",reducedPipe,CmiReservedHeaderSize,sizeof(PipeBcastInfo));
-  ComlibPrintf("sending %d chunks of size %d, total=%d to handle %d\n",(int)ceil(((double)totalSize-CmiReservedHeaderSize)/reducedPipe),reducedPipe,remaining,propagateHandle_frag);
-  CmiSetHandler(env, propagateHandle_frag);
-  ComlibPrintf("setting env handler to %d\n",propagateHandle_frag);
+  ComlibPrintf("sending %d chunks of size %d, total=%d to handle %d\n",(int)ceil(((double)totalSize-CmiReservedHeaderSize)/reducedPipe),reducedPipe,remaining,CsvAccess(pipeBcastPropagateHandle_frag));
+  CmiSetHandler(env, CsvAccess(pipeBcastPropagateHandle_frag));
+  ComlibPrintf("setting env handler to %d\n",CsvAccess(pipeBcastPropagateHandle_frag));
   for (int i=0; i<(int)ceil(((double)totalSize-CmiReservedHeaderSize)/reducedPipe); ++i) {
     sendingMsgSize = reducedPipe<remaining? pipeSize : remaining+CmiReservedHeaderSize+sizeof(PipeBcastInfo);
     sendingMsg = (char*)CmiAlloc(sendingMsgSize);
@@ -254,8 +254,8 @@ void PipeBroadcastConverse::pup(PUP::er &p){
   if (p.isUnpacking()) {
     //log_of_2_inv = 1/log((double)2);
     messageBuf = new CkQ<MessageHolder *>;
-    propagateHandle_frag = CmiRegisterHandler((CmiHandler)propagate_handler_frag);
-    ComlibPrintf("[%d] registered handler fragmented to %d\n",CkMyPe(),propagateHandle_frag);
+    //propagateHandle_frag = CmiRegisterHandler((CmiHandler)propagate_handler_frag);
+    ComlibPrintf("[%d] registered handler fragmented to %d\n",CkMyPe(),CsvAccess(pipeBcastPropagateHandle_frag));
   }
   if (p.isPacking()) {
     delete messageBuf;

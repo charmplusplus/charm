@@ -86,3 +86,6 @@ StrategyTableEntry::StrategyTableEntry() {
 
 PUPable_def(Strategy);
 PUPable_def(MessageHolder);
+
+CsvDeclare(int, pipeBcastPropagateHandle);
+CsvDeclare(int, pipeBcastPropagateHandle_frag);

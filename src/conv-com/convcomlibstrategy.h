@@ -180,4 +180,8 @@ struct StrategyTableEntry {
 
 typedef CkVec<StrategyTableEntry> StrategyTable;
 
+/* Global variables needed by some strategy */
+CsvExtern(int, pipeBcastPropagateHandle);
+CsvExtern(int, pipeBcastPropagateHandle_frag);
+
 #endif

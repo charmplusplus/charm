@@ -6,7 +6,7 @@
 class PipeBroadcastStrategy : public CharmStrategy {
  protected:
 
-  int propagateHandle;
+  //int propagateHandle;
   CkQ <CharmMessageHolder*> *messageBuf;
   CkVec<CkArrayIndexMax> *localDest;
 

@@ -67,8 +67,8 @@ void PipeBroadcastStrategy::conversePipeBcast(envelope *env, int totalSize) {
     ((PipeBroadcastConverse*)converseStrategy)->conversePipeBcast((char*)env, totalSize);
   } else {
     // the message fit into the pipe, so send it in a single chunk
-    ComlibPrintf("[%d] Propagating message in one single chunk (%d)\n",CkMyPe(),propagateHandle);
-    CmiSetHandler(env, propagateHandle);
+    ComlibPrintf("[%d] Propagating message in one single chunk (%d)\n",CkMyPe(),CsvAccess(pipeBcastPropagateHandle));
+    CmiSetHandler(env, CsvAccess(pipeBcastPropagateHandle));
     env->setSrcPe(CkMyPe());
     ((PipeBroadcastConverse*)converseStrategy)->propagate((char*)env, false, CkMyPe(), totalSize, &envelope::setSrcPe);
   }
@@ -96,8 +96,8 @@ void PipeBroadcastStrategy::pup(PUP::er &p){
   p | *converseStrategy;
 
   if (p.isUnpacking()) {
-    propagateHandle = CmiRegisterHandler((CmiHandler)propagate_handler);
-    ComlibPrintf("[%d] registered handler single to %d\n",CmiMyPe(),propagateHandle);
+    //propagateHandle = CmiRegisterHandler((CmiHandler)propagate_handler);
+    ComlibPrintf("[%d] registered handler single to %d\n",CmiMyPe(),CsvAccess(pipeBcastPropagateHandle));
     messageBuf = new CkQ<CharmMessageHolder *>;
     converseStrategy->setHigherLevel(this);
   }
