@@ -11,6 +11,9 @@
 ############################################################################
 # REVISION HISTORY:
 #
+# $Log$
+# Revision 2.3  1995-09-19 20:12:08  brunner
+# conv-host not compiled to bin directory, fixed, and RCS header added
 #
 ############################################################################
 
@@ -31,6 +34,6 @@ set CMK_SEQ_CC='gcc'
 set CMK_SEQ_LD='gcc'
 set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | awk '{print "'$'"1;}'"
-set CMK_EXTRAS='gcc -o conv-host conv-host.c'
+set CMK_EXTRAS='gcc -o ../bin/conv-host conv-host.c'
 set CMK_CLEAN='rm -f conv-host'
 
