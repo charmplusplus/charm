@@ -27,6 +27,8 @@ all: charm++ libs ampi IDL tsm sm pvm sdag
 
 charm++: converse charmxi charmlibs
 
+for-namd: charm++ pvm ampic
+
 IDL: charm++ charmidl libidl.a
 
 tsm: converse libtsm.a
@@ -37,7 +39,11 @@ pvm: converse libpvmc.a
 
 sdag: charm++ sdagx libsdag.a
 
-ampi: charm++ libampi.a libampif.a
+ampi: charm++ ampic ampif
+
+ampic: charm++ libampi.a
+
+ampif: charm++ libampif.a
 
 translators: sdagx charmxi conv-cpm charmidl
 
@@ -96,9 +102,7 @@ dirs+sources:
 	rm -rf libs
 	rm -rf ../bin ; mkdir ../bin
 	rm -rf ../lib ; mkdir ../lib
-	rm -rf ../src ; mkdir ../src
 	rm -rf ../pgms
-	rm -rf ../libsrc
 	../../src/Common/scripts/gatherflat ../../src/Common/scripts .
 	./gatherflat ../../src/Common/conv-core        .
 	./gatherflat ../../src/Common/conv-ldb         .
@@ -117,13 +121,7 @@ dirs+sources:
 	./gathertree ../../src/Common/libs libs
 	./gatherflat ../../src/Common.`cat .gdir`      .
 	./gatherflat ../../src/`cat .vdir`             .
-	./gathertree ../../src/Common/langs   ../src/langs
-	./gathertree ../../src/Common/xlat-i  ../src/xlat-i
-	./gathertree ../../src/Common/xlat-idl  ../src/xlat-idl
-	./gathertree ../../src/Common/xlatcpm ../src/xlatcpm
 	./gathertree ../../pgms ../pgms
-	./gathertree ../../src/Common/libs ../libsrc
-	ln -s ../../src/Common/scripts/Makefile ../src
 	rm -f .vdir .gdir
 	touch dirs+sources
 
@@ -629,7 +627,7 @@ libsm.a: converse sm.c sm.h
 
 PVMC=pvmc_buf.o pvmc_comm.o pvmc_conv.o pvmc_main.o pvmc_pack.o pvmc_groups.o
 
-libpvmc.a: converse $(PVMC)
+libpvmc.a: $(PVMC)
 	$(CHARMC) -cp ../lib -o libpvmc.a $(PVMC)
 
 pvmc_buf.o: pvmc_buf.c pvmc.h pvm3.h
