@@ -403,8 +403,6 @@ extern void _loadbalancerInit();
 
 void _initCharm(int argc, char **argv)
 {
-        // initialize trace module in ck
-        traceCharmInit(argv);
 
 	CkpvInitialize(PtrQ*,_buffQ);
 	CkpvInitialize(PtrVec*,_bocInitVec);
@@ -497,6 +495,10 @@ void _initCharm(int argc, char **argv)
 		CkRegisterMainModule();
 	}
 
+#if CMK_TRACE_IN_CHARM
+        // initialize trace module in ck
+        traceCharmInit(argv);
+#endif
 	_TRACE_BEGIN_COMPUTATION();
 	CkpvAccess(_myStats) = new Stats();
 	_MEMCHECK(CkpvAccess(_myStats));
