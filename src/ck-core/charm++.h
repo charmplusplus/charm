@@ -139,19 +139,6 @@ public:	GroupIdType groupid ;
         }
 } ;
 
-class QuiescenceMessage {// used in quiescence module
-public:	int emptyfield ;
-
-	void *operator new(CMK_SIZE_T size) {	// should never be called
-		size += 0 ;	// to prevent CC from generating "size unused"
-		return NULL ;
-	}
-
-        void operator delete(void *msg) {
-                CkFreeMsg(msg) ;
-        }
-} ;
-
 class TableMessage {	
 // used by distributed tables, must have exactly the
 // same size and format as TBL_MSG in tbl.h
@@ -202,9 +189,13 @@ public:	void operator delete(void *msg) {
 } ;
 
 
+// size of this message has to be sizeof(int), which means that
+// comm_object cannot have virtual methods.
 
-
-
+class QuiescenceMessage : public comm_object {// used in quiescence module
+  public:
+    int emptyfield ;
+} ;
 
 /******* Top level chare class at root of chare hierarchy ********/
 
