@@ -8,9 +8,14 @@
 #ifndef CONVERSE_H
 #define CONVERSE_H
 
-#include <stdlib.h>
 
 #include "conv-config.h"
+
+#if CMK_HAS_STDINT_H
+#include <stdint.h>
+#endif
+
+#include <stdlib.h>
 
 /* Paste the tokens x and y together, without any space between them.
    The ANSI C way to do this is the bizarre ## "token-pasting" 
