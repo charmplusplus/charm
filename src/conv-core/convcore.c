@@ -2433,6 +2433,7 @@ void CcsSendReply(unsigned int ip, unsigned int port, int size, void *msg)
 #endif
 }
 
+#if CMK_WEB_MODE
 void CcsSendReplyFd(unsigned int ip, unsigned int port, int size, void *msg)
 {
   char cmd[100], c;
@@ -2451,6 +2452,7 @@ void CcsSendReplyFd(unsigned int ip, unsigned int port, int size, void *msg)
   while (read(fd, &c, 1)==EINTR);
 #endif
 }
+#endif
 
 #endif
 /*****************************************************************************
