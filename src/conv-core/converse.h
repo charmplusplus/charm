@@ -333,6 +333,58 @@ extern void         CmiDestroyLock(CmiNodeLock lock);
 
 #endif
 
+#if CMK_SHARED_VARS_NT_THREADS
+
+#include <windows.h>
+
+extern int Cmi_numpes;
+extern int Cmi_mynodesize;
+extern int Cmi_mynode;
+extern int Cmi_numnodes;
+
+extern int CmiMyPe();
+extern int CmiMyRank();
+#define CmiNumPes()         Cmi_numpes
+#define CmiMyNodeSize()     Cmi_mynodesize
+#define CmiMyNode()         Cmi_mynode
+#define CmiNumNodes()       Cmi_numnodes
+extern int CmiNodeFirst(int node);
+extern int CmiNodeSize(int node);
+extern int CmiNodeOf(int pe);
+extern int CmiRankOf(int pe);
+
+#define SHARED_DECL
+
+#define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvInitialize(t,v)\
+ do { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0) Sleep(0);\
+    else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize()); }} \
+ while(0)
+#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
+
+#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
+#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
+#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
+#define CsvInitialize(t,v) do{}while(0)
+#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
+
+extern void CmiMemLock();
+extern void CmiMemUnlock();
+extern void CmiNodeBarrier(void);
+#define CmiSvAlloc CmiAlloc
+
+
+typedef HANDLE CmiNodeLock;
+extern  CmiNodeLock CmiCreateLock();
+#define CmiLock(lock) (WaitForSingleObject(lock, INFINITE))
+#define CmiUnlock(lock) (ReleaseMutex(lock))
+#define CmiTryLock(lock) (WaitForSingleObject(lock 0))
+extern  void CmiDestroyLock(CmiNodeLock lock);
+
+#endif
+
 /******** CMI: TYPE DEFINITIONS ********/
 
 typedef CMK_TYPEDEF_INT2      CmiInt2;
