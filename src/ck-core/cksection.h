@@ -52,7 +52,7 @@ class CkSectionInfo {
         cInfo;
 
     } sInfo;
-    int type;
+    char type;
     
     CkSectionInfo()  {
         type = 0; pe = -1;
@@ -78,15 +78,17 @@ class CkSectionInfo {
             CmiAssert(0);
 	}
     }
-    CkSectionInfo(void *p) {
+    CkSectionInfo(CkArrayID _aid, void *p = NULL) {
 	type = MulticastMsg;
 	pe = CkMyPe(); 
+	aid = _aid;
 	sInfo.sCookie.val=p;
 	sInfo.sCookie.redNo=0;
     }
-    CkSectionInfo(int e, void *p, int r) {
+    CkSectionInfo(int e, void *p, int r, CkArrayID _aid) {
 	type = MulticastMsg;
 	pe = e; 
+	aid = _aid;
 	sInfo.sCookie.val=p;
 	sInfo.sCookie.redNo=r;
     }
@@ -128,10 +130,10 @@ PUPmarshall(CkSectionID)
 */
 class CkMcastBaseMsg {
  public:
-  char magic;
-  CkArrayID aid; 
   CkSectionInfo _cookie;
-  int ep;
+  char magic;
+  unsigned short ep;
+//  CkArrayID aid; 
 
  public:
   CkMcastBaseMsg(): magic(_SECTION_MAGIC) {}
