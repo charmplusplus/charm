@@ -1,6 +1,10 @@
 #include "converse.h"
 #include "cldb.h"
 
+void LoadNotifyFn(int l)
+{
+}
+
 char *CldGetStrategy(void)
 {
   return "rand";

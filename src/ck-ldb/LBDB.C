@@ -92,6 +92,41 @@ void LBDB::DoneRegisteringObjects(LDOMHandle _h)
   }
 }
 
+
+void LBDB::Send(LDOMHandle destOM, LDObjid destid, unsigned int bytes)
+{
+  LBCommData* item_ptr;
+
+  if (obj_running) {
+    LBCommData item(runningObj,destOM.id,destid);
+    item_ptr = commTable->HashInsertUnique(item);
+
+//     CmiPrintf("[%d] Sending %d from object manager %d, object {%d,%d,%d,%d}\n"
+//  	      "     to object manager %d, object {%d,%d,%d,%d}\n",
+//   	      CmiMyPe(),bytes,
+//   	      runningObj.omhandle.id.id,
+//   	      runningObj.id.id[0],runningObj.id.id[1],
+//   	      runningObj.id.id[2],runningObj.id.id[3],
+//   	      destOM.id.id,
+//   	      destid.id[0],destid.id[1],
+//   	      destid.id[2],destid.id[3]
+//   	      );
+  } else {
+    LBCommData item(CmiMyPe(),destOM.id,destid);
+    item_ptr = commTable->HashInsertUnique(item);
+
+//     CmiPrintf("[%d] Sending %d from processor %d\n"
+//   	      "     to object manager %d, object {%d,%d,%d,%d}\n",
+//  	      CmiMyPe(),bytes,
+// 	      CmiMyPe(),
+//    	      destOM.id.id,
+//    	      destid.id[0],destid.id[1],
+//    	      destid.id[2],destid.id[3]
+//    	      );
+  }  
+  item_ptr->addMessage(bytes);
+}
+
 void LBDB::ClearLoads(void)
 {
   int i;
@@ -101,6 +136,8 @@ void LBDB::ClearLoads(void)
       objs[i]->data.wallTime = 
 	objs[i]->data.cpuTime = 0.;
     }
+  delete commTable;
+  commTable = new LBCommTable;
 }
 
 int LBDB::ObjDataCount()
@@ -164,7 +201,6 @@ void LBDB::DumpDatabase()
 
 LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
 {
-  CmiPrintf("[%d] LocalBarrier Adding client\n",CmiMyPe());
   client* new_client = new client;
   new_client->fn = fn;
   new_client->data = data;
@@ -182,7 +218,6 @@ LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
 
 void LocalBarrier::RemoveClient(LDBarrierClient c)
 {
-  CmiPrintf("[%d] LocalBarrier Removing client\n",CmiMyPe());
   const int cnum = c.serial;
   if (cnum < max_client && clients[cnum] != 0) {
     delete clients[cnum];
@@ -242,8 +277,6 @@ void LocalBarrier::CheckBarrier()
 
 void LocalBarrier::CallReceivers(void)
 {
-  CmiPrintf("All at barrier, calling receviers for %d clients\n",
-	    client_count);
   CmiBool called_receiver=CmiFalse;
 
   for(int i=0; i < max_receiver; i++)
@@ -259,7 +292,6 @@ void LocalBarrier::CallReceivers(void)
 
 void LocalBarrier::ResumeClients(void)
 {
-  CmiPrintf("[%d] Resuming %d clients\n",CmiMyPe(),client_count);
   for(int i=0; i < max_client; i++)
     if (clients[i] != 0) 
       clients[i]->fn(clients[i]->data);

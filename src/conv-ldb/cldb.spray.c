@@ -1,6 +1,10 @@
 #include "converse.h"
 #include <math.h>
 
+void LoadNotifyFn(int l)
+{
+}
+
 char *CldGetStrategy(void)
 {
   return "spray";

@@ -43,10 +43,10 @@ public:
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CLBMigrateMsg* Strategy(LDStats* stats,int count);
+  LBDatabase* theLbdb;
 
 private:  
   int step;
-  LBDatabase* theLbdb;
   int stats_msg_count;
   CLBStatsMsg** statsMsgsList;
   LDStats* statsDataList;

@@ -5,6 +5,9 @@
 extern "C" {
 #endif
 
+typedef void* cvoid; /* To eliminate warnings, because a C void* is not
+			the same as a C++ void* */
+
   /*  User-defined object IDs will be 4 ints long */
 #define OBJ_ID_SZ 4
 
@@ -48,10 +51,16 @@ typedef struct {
 } LDObjData;
 
 typedef struct {
+  CmiBool from_proc;
+  int src_proc;
+  LDOMid senderOM;
   LDObjid sender;
+  CmiBool to_proc;
+  int dest_proc;
+  LDOMid receiverOM;
   LDObjid receiver;
-  int nMessages;
-  int nBytes;
+  int messages;
+  int bytes;
 } LDCommData;
 
 /*
@@ -95,6 +104,7 @@ void LDUnregisterObj(LDObjHandle h);
 void LDObjTime(LDObjHandle h, double walltime, double cputime);
 void LDObjectStart(LDObjHandle _h);
 void LDObjectStop(LDObjHandle _h);
+void LDSend(LDOMHandle destOM, LDObjid destid, unsigned int bytes);
 
 void LDMessage(LDObjHandle from, 
 	       LDOMid toOM, LDObjid *toID, int bytes);

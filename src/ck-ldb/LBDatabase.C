@@ -15,7 +15,6 @@ LBDBInit::LBDBInit(CkArgMsg *m)
 {
 #if CMK_LBDB_ON
   lbdb = CProxy_LBDatabase::ckNew();
-  CkPrintf("[%d] New database created\n",CkMyPe());
 #endif
   delete m;
 }

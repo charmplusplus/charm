@@ -31,9 +31,9 @@ RandCentLB::RandCentLB()
   CkPrintf("[%d] RandCentLB created\n",CkMyPe());
 }
 
-CmiBool RandCentLB::QueryBalanceNow(int step)
+CmiBool RandCentLB::QueryBalanceNow(int _step)
 {
-  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),step);
+  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
   return CmiTrue;
 }
 
@@ -51,8 +51,7 @@ CLBMigrateMsg* RandCentLB::Strategy(CentralLB::LDStats* stats, int count)
     CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
 	     CkMyPe(),pe,stats[pe].n_objs,stats[pe].n_comm);
     for(int obj=0; obj < stats[pe].n_objs; obj++) {
-      const int dest = (int)((static_cast<double>(random()) * count) 
-			     / RAND_MAX);
+      const int dest = static_cast<int>(drand48()*(CmiNumPes()-1) + 0.5);
       if (dest != pe) {
 	CkPrintf("[%d] Obj %d migrating from %d to %d\n",
 		 CkMyPe(),obj,pe,dest);

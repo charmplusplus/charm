@@ -3,6 +3,10 @@
 #define PERIOD 100
 #define MAXMSGBFRSIZE 100000
 
+void LoadNotifyFn(int l)
+{
+}
+
 char *CldGetStrategy(void)
 {
   return "test";

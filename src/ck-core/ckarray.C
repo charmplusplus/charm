@@ -89,9 +89,10 @@ Array1D::Array1D(ArrayCreateMessage *msg)
   myId.id = (int)thisgroup;
 
   LDCallbacks myCallbacks;
-  myCallbacks.migrate = staticMigrate;
-  myCallbacks.setStats = staticSetStats;
-  myCallbacks.queryEstLoad = staticQueryLoad;
+  myCallbacks.migrate = reinterpret_cast<LDMigrateFn>(staticMigrate);
+  myCallbacks.setStats = reinterpret_cast<LDStatsFn>(staticSetStats);
+  myCallbacks.queryEstLoad =
+    reinterpret_cast<LDQueryEstLoadFn>(staticQueryLoad);
   
   myHandle = the_lbdb->RegisterOM(myId,this,myCallbacks);
 #endif
@@ -216,6 +217,13 @@ void Array1D::send(ArrayMessage *msg, int index, EntryIndexType ei)
   msg->serial_num = 1000*serial_num+CkMyPe();
   serial_num++;
 
+#if CMK_LBDB_ON
+  LDObjid dest;
+  dest.id[0] = index; dest.id[1] = dest.id[2] = dest.id[3] = 0;
+  
+  LDSend(myHandle,dest,UsrToEnv(msg)->getTotalsize());
+
+#endif
   if (elementIDs[index].state == here) {
 #if 0
     CPrintf("PE %d sending local message to index %d\n",CMyPe(),index);
@@ -492,8 +500,9 @@ void Array1D::RegisterElementForSync(int index)
   if (elementIDsReported == 1) { // This is the first element reported
     // If this is a sync array, register a sync callback so I can
     // inform the db when I start registering objects 
-    the_lbdb->AddLocalBarrierReceiver(staticRecvAtSync,
-				      static_cast<void*>(this));
+    the_lbdb->
+      AddLocalBarrierReceiver(reinterpret_cast<LDBarrierFn>(staticRecvAtSync),
+			      static_cast<void*>(this));
   }
     
   elementIDs[index].uses_barrier = CmiTrue;  
@@ -501,7 +510,7 @@ void Array1D::RegisterElementForSync(int index)
   elementIDs[index].barrierData.index = index;
 
   elementIDs[index].barrierHandle = the_lbdb->
-    AddLocalBarrierClient(staticResumeFromSync,
+    AddLocalBarrierClient(reinterpret_cast<LDResumeFn>(staticResumeFromSync),
 			  static_cast<void*>(&elementIDs[index].barrierData));
 
 }
@@ -550,6 +559,7 @@ ArrayElement::ArrayElement(ArrayElementCreateMessage *msg)
   thisArray = msg->arrayPtr;
   thisAID._setAid(thisArray->ckGetGroupId());
   thisAID._elem = (-1);
+  thisArrayID = thisAID;
   thisIndex = msg->index;
 }
 
@@ -561,6 +571,7 @@ ArrayElement::ArrayElement(ArrayElementMigrateMessage *msg)
   thisArray = msg->arrayPtr;
   thisAID._setAid(thisArray->ckGetGroupId());
   thisAID._elem = (-1);
+  thisArrayID = thisAID;
   thisIndex = msg->index;
 }
 

@@ -12,14 +12,14 @@ void CreateCentralLB()
   loadbalancer = CProxy_CentralLB::ckNew();
 }
 
-void CentralLB::staticMigrated(void* data, LDObjHandle h)
+extern "C" void CentralLB::staticMigrated(void* data, LDObjHandle h)
 {
   CentralLB *me = static_cast<CentralLB*>(data);
 
   me->Migrated(h);
 }
 
-void CentralLB::staticAtSync(void* data)
+extern "C" void CentralLB::staticAtSync(void* data)
 {
   CentralLB *me = static_cast<CentralLB*>(data);
 
@@ -30,8 +30,12 @@ CentralLB::CentralLB()
 {
   step = 0;
   theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
-  theLbdb->AddLocalBarrierReceiver(staticAtSync,static_cast<void*>(this));
-  theLbdb->NotifyMigrated(staticMigrated,static_cast<void*>(this));
+  theLbdb->
+    AddLocalBarrierReceiver(reinterpret_cast<LDBarrierFn>(staticAtSync),
+			    static_cast<void*>(this));
+  theLbdb->
+    NotifyMigrated(reinterpret_cast<LDMigratedFn>(staticMigrated),
+		   static_cast<void*>(this));
 
   stats_msg_count = 0;
   statsMsgsList = new CLBStatsMsg*[CkNumPes()];
@@ -39,6 +43,7 @@ CentralLB::CentralLB()
     statsMsgsList[i] = 0;
 
   statsDataList = new LDStats[CkNumPes()];
+  theLbdb->CollectStatsOn();
 }
 
 CentralLB::~CentralLB()
@@ -69,7 +74,8 @@ void CentralLB::AtSync()
   msg->n_comm = csz;
   theLbdb->GetCommData(msg->commData);
   theLbdb->ClearLoads();
-  CkPrintf("PE %d sending %d to ReceiveStats\n",CkMyPe(),msg->serial);
+  CkPrintf("PE %d sending %d to ReceiveStats %d objs, %d comm\n",
+	   CkMyPe(),msg->serial,msg->n_objs,msg->n_comm);
   CProxy_CentralLB(thisgroup).ReceiveStats(msg,0);
 }
 
@@ -118,7 +124,7 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
 
 void CentralLB::ReceiveMigration(CLBMigrateMsg *m)
 {
-  CkPrintf("[%d] in ReceiveMigration %d moves\n",CkMyPe(),m->n_moves);
+  //  CkPrintf("[%d] in ReceiveMigration %d moves\n",CkMyPe(),m->n_moves);
   migrates_expected = 0;
   for(int i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
@@ -157,7 +163,7 @@ CLBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
     for(i=0; i < osz; i++) {
       CkPrintf("Object %d\n",i);
       CkPrintf("     id = %d\n",odata[i].id.id[0]);
-      CkPrintf("  OM id = %d\n",odata[i].omID);
+      CkPrintf("  OM id = %d\n",odata[i].omID.id);
       CkPrintf("    CPU = %f\n",odata[i].cpuTime);
       CkPrintf("   Wall = %f\n",odata[i].wallTime);
     }
@@ -166,13 +172,24 @@ CLBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
     const int csz = stats[j].n_comm;
 
     CkPrintf("------------- Comm Data: PE %d: %d records -------------\n",
-	     i,csz);
+	     j,csz);
     for(i=0; i < csz; i++) {
-      CkPrintf("Object %d\n",i);
-      CkPrintf("    sender id = %d\n",cdata[i].sender);
-      CkPrintf("  receiver id = %d\n",cdata[i].receiver);
-      CkPrintf("     messages = %d\n",cdata[i].nMessages);
-      CkPrintf("        bytes = %d\n",cdata[i].nBytes);
+      CkPrintf("Link %d\n",i);
+      
+      if (cdata[i].from_proc)
+	CkPrintf("    sender PE = %d\n",cdata[i].src_proc);
+      else
+	CkPrintf("    sender id = %d:%d\n",
+		 cdata[i].senderOM.id,cdata[i].sender.id[0]);
+
+      if (cdata[i].to_proc)
+	CkPrintf("  receiver PE = %d\n",cdata[i].dest_proc);
+      else	
+	CkPrintf("  receiver id = %d:%d\n",
+		 cdata[i].receiverOM.id,cdata[i].receiver.id[0]);
+      
+      CkPrintf("     messages = %d\n",cdata[i].messages);
+      CkPrintf("        bytes = %d\n",cdata[i].bytes);
     }
   }
 

@@ -83,6 +83,7 @@ extern "C" void LDObjectStart(LDObjHandle _h)
 {
   LBDB *const db = static_cast<LBDB*>(_h.omhandle.ldb.handle);
   if (db->StatsOn()) {
+    db->RunningObj(_h);
     LBObj *const obj = db->LbObj(_h);
     obj->StartTimer();
   }
@@ -96,7 +97,15 @@ extern "C" void LDObjectStop(LDObjHandle _h)
     double walltime, cputime;
     obj->StopTimer(&walltime,&cputime);
     obj->IncrementTime(walltime,cputime);
+    db->NoRunningObj();
   }
+}
+
+extern "C" void LDSend(LDOMHandle destOM, LDObjid destid, unsigned int bytes)
+{
+  LBDB *const db = static_cast<LBDB*>(destOM.ldb.handle);
+  if (db->StatsOn())
+    db->Send(destOM,destid,bytes);
 }
 
 extern "C" void LDClearLoads(LDHandle _db)
@@ -122,22 +131,16 @@ extern "C" void LDGetObjData(LDHandle _db, LDObjData *data)
 
 extern "C" int LDGetCommDataSz(LDHandle _db)
 {
-  /*
   LBDB *const db = static_cast<LBDB*>(_db.handle);
 
-  return db->objDataCount();
-  */
-
-  return 0;
+  return db->CommDataCount();
 }
 
 extern "C" void LDGetCommData(LDHandle _db, LDCommData *data)
 {
-  /*
   LBDB *const db = static_cast<LBDB*>(_db.handle);
 
-  db->getObjData(data);
-  */
+  db->GetCommData(data);
   return;
 }
 

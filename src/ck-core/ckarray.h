@@ -69,7 +69,8 @@ protected:
   };
 
   int thisIndex;
-  CkArrayID thisAID;
+  CkArrayID thisAID;     // thisArrayID is preferred
+  CkArrayID thisArrayID; // A duplicate of thisAID
   int numElements;
 
 public:

@@ -12,6 +12,7 @@
 
 #include "LBObj.h"
 #include "LBOM.h"
+#include "LBComm.h"
 
 class LocalBarrier {
 friend class LBDB;
@@ -64,6 +65,8 @@ public:
   LBDB() {
     statsAreOn = CmiFalse;
     omCount = objCount = oms_registering = 0;
+    obj_running = CmiFalse;
+    commTable = new LBCommTable;
   }
 
   ~LBDB() { }
@@ -85,13 +88,26 @@ public:
   void TurnStatsOn(void) { statsAreOn = CmiTrue; };
   void TurnStatsOff(void) { statsAreOn = CmiFalse; };
   CmiBool StatsOn(void) { return statsAreOn; };
+  void Send(LDOMHandle destOM, LDObjid destid, unsigned int bytes);
   int ObjDataCount();
   void GetObjData(LDObjData *data);
-  LDObjData *FetchData(int *nitems);
+  int CommDataCount() { 
+    if (commTable)
+      return commTable->CommCount();
+    else return 0;
+  }
+  void GetCommData(LDCommData *data) { 
+    if (commTable) commTable->GetCommData(data);
+  };
+
   void Migrate(LDObjHandle h, int dest);
   void Migrated(LDObjHandle h);
   void NotifyMigrated(LDMigratedFn fn, void* data);
   void ClearLoads(void);
+  void RunningObj(LDObjHandle _h) {
+    runningObj = _h; obj_running = CmiTrue;
+  };
+  void NoRunningObj() { obj_running = CmiFalse; };
   
   LDBarrierClient AddLocalBarrierClient(LDResumeFn fn, void* data) { 
     return localBarrier.AddClient(fn,data);
@@ -128,7 +144,7 @@ private:
   typedef std::vector<LBObj*> ObjList;
   typedef std::vector<MigrateCB*> MigrateCBList;
 #endif
-
+  LBCommTable* commTable;
   OMList oms;
   int omCount;
   int oms_registering;
@@ -136,6 +152,8 @@ private:
   int objCount;
   CmiBool statsAreOn;
   MigrateCBList migrateCBList;
+  CmiBool obj_running;
+  LDObjHandle runningObj;
 
   LocalBarrier localBarrier;
 };
