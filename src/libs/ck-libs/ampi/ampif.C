@@ -459,7 +459,6 @@ ampi_print_
 #endif
   (char *str, int len)
 {
-  ampi *ptr = CtvAccess(ampiPtr);
   char *tmpstr = new char[len+1];
   memcpy(tmpstr,str,len);
   tmpstr[len] = '\0';
