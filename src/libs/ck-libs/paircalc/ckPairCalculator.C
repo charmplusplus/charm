@@ -131,11 +131,13 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     }
 
     // FIXME: should do 'op2' here!!!
-    r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
-    r.contribute(this, sparse_sum_TwoDoubles);
+    complex *ptr = new complex[S*S];
+    for(int i=0; i<grainSize; i++)
+      memcpy(ptr+thisIndex.y+thisIndex.x*S+i*S, outData, grainSize);
+    contribute(S*S*sizeof(complex), ptr,CkReduction::sum_double);
+    delete [] ptr;
   }
 }
-
 
 void
 PairCalculator::acceptEntireResult(int size, complex *matrix){
@@ -175,11 +177,6 @@ PairCalculator::acceptResult(int size, complex *matrix, int rowNum, CkCallback c
 #endif
   complex *mynewData = new complex[N*grainSize];
 
-  /*
-  int offset = grainSize;
-  if (rowNum >= thisIndex.x && rowNum < thisIndex.x + grainSize)
-    offset = 0;
-  */
 
   int offset = 0;  
   for (int i = 0; i < grainSize; i++) {
