@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1998-02-27 11:51:59  jyelon
+ * Revision 2.15  1998-04-16 16:28:43  milind
+ * Fixed a charmc bug detected by a CS497 student and a size_t bug.
+ *
+ * Revision 2.14  1998/02/27 11:51:59  jyelon
  * Cleaned up header files, replaced load-balancer.
  *
  * Revision 2.13  1997/07/18 21:39:46  milind
@@ -93,21 +96,21 @@ extern "C" void *CPlus_CallMonoInit(int id, void *msg) ;
 
 
 void *
-comm_object::operator new(size_t size) 
+comm_object::operator new(CMK_SIZE_T size) 
 {
 	CmiPrintf("[%d] ERROR: wrong new operator for message allocation\n",CmiMyPe()) ;
 	return (void *)0;
 }
 
 void *
-_CK_Object::operator new(size_t size) 
+_CK_Object::operator new(CMK_SIZE_T size) 
 {
 	CmiPrintf("[%d] ERROR: wrong new operator for chare object allocation\n",CmiMyPe()) ;
 	return (void *)0;
 }
 
 void * 
-_CK_Object::operator new(size_t size, void *buf) 
+_CK_Object::operator new(CMK_SIZE_T size, void *buf) 
 {
         return buf ;
 }

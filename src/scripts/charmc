@@ -559,8 +559,10 @@ foreach FILE ($FILES)
       echo "charmc: I'm not yet smart enough to compile $FILE"
       goto failure
     case "*.o"
-    case "*.a"
       set OBJECTFILES=( $OBJECTFILES $BASE.o )
+      breaksw
+    case "*.a"
+      set OBJECTFILES=( $OBJECTFILES $BASE.a )
       breaksw
     default:
       echo "file with unrecognized extension $FILE"
