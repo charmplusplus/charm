@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.38  1996-02-14 20:46:11  jyelon
+ * Revision 2.39  1996-04-07 19:16:52  jyelon
+ * Corrected bug in CmiInterruptsRelease (could lead to reentering sighandler)
+ *
+ * Revision 2.38  1996/02/14 20:46:11  jyelon
  * *** empty log message ***
  *
  * Revision 2.37  1996/01/17 08:04:56  jyelon
@@ -491,15 +494,14 @@ CpvExtern(CthVoidFn, CmiInterruptFuncSaved);
 #define CmiInterruptsBlock()\
     { CpvAccess(CmiInterruptsBlocked)++; }
 
-#define CmiInterruptsRelease() { \
+#define CmiInterruptsRelease() {\
     int val = CpvAccess(CmiInterruptsBlocked)-1;\
-    CpvAccess(CmiInterruptsBlocked) = val;\
-    if (val == 0) {\
-        CthVoidFn f = CpvAccess(CmiInterruptFuncSaved);\
-        if (f) { CpvAccess(CmiInterruptFuncSaved)=0; (f)(); }\
+    if (val==0) {\
+      CthVoidFn f = CpvAccess(CmiInterruptFuncSaved);\
+      if (f) { CpvAccess(CmiInterruptFuncSaved)=0; (f)(); }\
     }\
+    CpvAccess(CmiInterruptsBlocked) = val;\
 }
-
 
 /******** CONVCONDS ********/
 
