@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-09-19 18:57:17  jyelon
+ * Revision 2.12  1995-09-19 19:31:51  jyelon
+ * Fixed a bug.
+ *
+ * Revision 2.11  1995/09/19  18:57:17  jyelon
  * added CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION and other goodies.
  *
  * Revision 2.10  1995/09/07  21:14:15  jyelon
@@ -52,11 +55,11 @@
 extern "C" {
 #endif
 
-#ifdef CMK_COMPILER_SUPPORTS_PROTOTYPES
+#ifdef CMK_COMPILER_LIKES_PROTOTYPES
 #define CMK_PROTO(x) x
 #endif
 
-#ifdef CMK_COMPILER_DISLIKES_PROTOTYPES
+#ifdef CMK_COMPILER_HATES_PROTOTYPES
 #define CMK_PROTO(x) ()
 #endif
 
