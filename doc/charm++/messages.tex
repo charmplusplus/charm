@@ -25,12 +25,21 @@ In the {\tt .ci} file (the interface file), a message is declared as:
  message MessageType;
 \end{alltt}
 
-a variable sized or packed message is declared as:
+A variable sized or packed message is declared as:
 
 \begin{alltt}
  message [varsize|packed] MessageType;
 \end{alltt}
 
+A simplified varsize message type called \kw{varrays} message is declared as:
+
+\begin{alltt}
+ message [varrays] MessageType \{
+   type1 var_name1[];
+   type2 var_name2[];
+   type3 var_name3[];
+ \};
+\end{alltt}
 
 If the name of the message class is \uw{MessageType}, the class must inherit 
 publicly from a class whose name is \uw{CMessage\_MessageType}. This class
@@ -59,6 +68,10 @@ varsize messages is an array of integer elements of which denote the size (in
 appropriate units) of the memory blocks that need to be allocated and assigned
 to the pointers that the message contains. The \uw{priobits} argument denotes
 the size of a bitfield that will be used to store the message priority.   
+
+The \kw{varrays} message has a \kw{new} operator similar to the \kw{varsize}
+message, except that this \kw{new} operator takes a list of integers as 
+input parameters instead of the \uw{sizes\_array}.
 
 For example, to allocate a \index{varsize message}varsize message whose 
 class declaration is:
@@ -95,6 +108,30 @@ VarsizeMessage *msg = new (size, sizeof(int)*8) VarsizeMessage;
 Note, you must provide number of bits which is used to store the priority as
 the \uw{priobits} parameter. The section on prioritized execution describes how
 this bitfield is used.
+
+As another example, to allocate a \index{varrays message}varrays message whose 
+class declaration is:
+
+\begin{alltt}
+class VArraysMessage : public CMessage_VArraysMessage \{
+  int length;
+  int *firstArray;
+  double *secondArray;
+  // see explanation later for the following magic
+  VArraysMessage_VARRAYS_MACROS();
+\};
+\end{alltt}
+
+do the following:
+
+\begin{alltt}
+VArraysMessage *msg = new (10, 20, 0) VArraysMessage;
+\end{alltt}
+
+This allocates a \uw{VarraysMessage}, in which \uw{firstArray} points to an
+array of 10 ints and \uw{secondArray} points to an array of 20 doubles.  This
+is explained in detail in later sections. The last parameter 0 specifies
+the priority bits used for this message.
 
 In Section~\ref{message packing} we explain how messages can contain arbitrary
 pointers, and how the validity of such pointers can be maintained across
@@ -397,6 +434,69 @@ The pointers in a varsize message can exist in two states.  At creation, they
 are valid \CC\ pointers to the start of the arrays.  After packing, they become
 offsets from the address of the pointer variable to the start of the pointed-to
 data.  Unpacking restores them to pointers. 
+
+\subsection{Varrays Messages}
+
+Almost always, one finds that one does not need full control over
+allocation, packing and unpacking in varsize messages. A simple case is where a
+\kw{varsize} message contains one or more variable-length arrays of simple
+types (as in the previous example of \kw{varsize} messages). Such messages are
+treated differently by the \charmpp{} interface translator. These are called
+\kw{varrays} messages. \kw{varrays} messages are similar in concept to
+\kw{varsize} messages. However, for \kw{varrays} messages, the translator
+generates the alloc, pack and unpack static methods automatically. For this
+purpose, the translator should be informed about the variable length arrays
+present in the message. This makes the syntax of \kw{varrays} messages
+different thank \kw{varsize} messages. We write the previous example of
+\kw{varsize} messages using \kw{varrays} message to illustrate the differences.
+
+\subsubsection{An Example}
+
+As before, a \charmpp{} message contains two varsize fields, \uw{firstArray}
+and \uw{secondArray}:
+
+\begin{alltt} 
+class VarraysMessage: public CMessage_VarraysMessage \{
+  public:
+    int* firstArray;
+    double* secondArray;
+    // other fields here
+\};
+\end{alltt}
+
+Then in the \texttt{.ci} file, this can be represented as: 
+
+\begin{alltt}
+message [varrays] VarraysMessage \{
+  int firstArray[];
+  double secondArray[];
+\};
+\end{alltt}
+
+Note the change in the message attribute. Instead of \kw{varsize}, we specify
+\kw{varrays}. Also, we specify the types and actual names of the fields that
+contain variable length arrays. The dimensions of these arrays are not
+specified in the interface file, since they will be specified in the
+constructor of the message when message is created. In the {\tt .h} or {\tt .C}
+file, this class is declared as:
+
+\begin{alltt} 
+class VarraysMessage: public CMessage_VarraysMessage \{
+  public:
+    int* firstArray;
+    double* secondArray;
+    // other fields here
+    // ...
+    // And now the magic...
+    \textbf{VarraysMessage_VARRAYS_MACROS();}
+\};
+\end{alltt}
+
+Note the magical \texttt{VarraysMessage\_VARRAYS\_MACROS} line at the bottom of
+the \uw{VarraysMessage} class. This is a macro defined in the \texttt{decl.h}
+file by the interface translator. This macro expands to the static methods
+\texttt{alloc}, \texttt{pack}, and \texttt{unpack} methods of the
+\uw{VarraysMessage} class. Thus, one is spared from having to write them.
 
 \subsection{Prioritized Execution}
 \label{prioritized message passing}
