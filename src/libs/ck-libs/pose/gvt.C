@@ -45,7 +45,7 @@ PVT::PVT()
     reportEnd = 1;
     reportsExpected = 1 + (P-2)/4 + 1;
   }
-  else if ((N == P-1) && (N != 1)) {
+  else if (N == P-1) {
     reportTo = N;
     reportEnd = 1;
     reportsExpected = 1 + (P-2)/4;
