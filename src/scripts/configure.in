@@ -6,8 +6,8 @@ AC_CONFIG_HEADER(conv-autoconfig.h)
 CHARMINC="."
 test -r ./conv-config.sh && . ./conv-config.sh
 
-#turn out to be in octal number, don't use digit >= 8
-VERSION=051000
+#keep it a decimal
+VERSION=50800
 AC_DEFINE_UNQUOTED([CHARM_VERSION], $VERSION, [Charm++ version number])
 
 AC_MSG_CHECKING(machine name)
