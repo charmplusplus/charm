@@ -1033,13 +1033,9 @@ CDECL void FEM_Update_ghost_field(int fid, int elType, void *v_data)
 	int bytesPerRec=IDXL_Get_layout_distance(fid);
 	char *data=(char *)v_data;
 	IDXL_Comm_t comm=IDXL_Comm_begin(1,0);
-	CmiMemoryCheck();
 	IDXL_Comm_send(comm,src,fid,data);
-	CmiMemoryCheck();
 	IDXL_Comm_recv(comm,src,fid,&data[nReal*bytesPerRec]); //Begin recv'ing ghosts after all reals
-	CmiMemoryCheck();	
 	IDXL_Comm_wait(comm);
-	CmiMemoryCheck();	
 }
 FDECL void FTN_NAME(FEM_UPDATE_GHOST_FIELD,fem_update_ghost_field)
 	(int *fid, int *elemType, void *data)
