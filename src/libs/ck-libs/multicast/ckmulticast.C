@@ -3,9 +3,12 @@
 
 #include "ckmulticast.h"
 
-#define DEBUGF(x)    // CkPrintf x;
+#define DEBUGF(x)   // CkPrintf x;
 
 #define MAXMCASTCHILDREN  2
+
+#define SPLIT_MULTICAST			0
+#define SPLIT_NUM	  2
 
 typedef CkQ<multicastGrpMsg *> multicastGrpMsgBuf;
 typedef CkVec<CkArrayIndexMax>  arrayIndexList;
@@ -34,6 +37,21 @@ public:
 #define COOKIE_READY    1
 #define COOKIE_OLD      2
 
+class mCastPacket {
+public:
+  CkSectionInfo cookie;
+  int n;
+  char *data;
+  int seqno;
+  int count;
+  int totalsize;
+
+  mCastPacket(CkSectionInfo &_cookie, int _n, char *_d, int _s, int _c, int _t):
+		cookie(_cookie), n(_n), data(_d), seqno(_s), count(_c), totalsize(_t) {}
+};
+
+typedef CkQ<mCastPacket *> multicastGrpPacketBuf;
+
 /// cookie for an array section 
 class mCastEntry {
 public:
@@ -45,6 +63,9 @@ public:
   int pe;			/**< should always be mype */
   CkSectionInfo rootSid;      /**< section ID of the root */
   multicastGrpMsgBuf msgBuf;
+  multicastGrpPacketBuf packetBuf;   /**< pending packets */
+  char *asm_msg;		/**< for multicast packetization */
+  int   asm_fill;
   mCastEntry *oldc, *newc;
   // for reduction
   reductionInfo red;
@@ -53,7 +74,7 @@ public:
 private:
   char flag;
 public:
-  mCastEntry(): numChild(0), 
+  mCastEntry(): numChild(0), asm_msg(NULL), asm_fill(0),
                 oldc(NULL), newc(NULL), needRebuild(0),
 		flag(COOKIE_NOTREADY) {}
   mCastEntry(mCastEntry *);
@@ -67,6 +88,9 @@ public:
                 for (mCastEntry *next = newc; next; next=next->newc) 
                    next->red.redNo++;
               }
+  inline void print() {
+    CmiPrintf("[%d] mCastEntry: %p, numChild: %d pe: %d asm_msg:%p asm_fill:%d\n", CkMyPe(), this, numChild, pe, asm_msg, asm_fill);
+  }
 };
 
 class cookieMsg: public CMessage_cookieMsg {
@@ -94,6 +118,7 @@ class multicastGrpMsg: public CkMcastBaseMsg, public CMessage_multicastGrpMsg {
 };
 
 extern void CkPackMessage(envelope **pEnv);
+extern void CkUnpackMessage(envelope **pEnv);
 
 void _ckMulticastInit(void)
 {
@@ -113,6 +138,8 @@ mCastEntry::mCastEntry (mCastEntry *old):
   red.storedClientParam = old->red.storedClientParam;
   red.redNo = old->red.redNo;
   needRebuild = 0;
+  asm_msg = NULL;
+  asm_fill = 0;
 }
 
 // call setup to return a sectionid.
@@ -169,7 +196,7 @@ void CkMulticastMgr::initCookie(CkSectionInfo s)
 {
   mCastEntry *entry = (mCastEntry *)s.get_val();
   int n = entry->allElem.length();
-  DEBUGF(("init: %d elems %p\n", n, s.val));
+  DEBUGF(("init: %d elems %p\n", n, s.get_val()));
   multicastSetupMsg *msg = new (n, n, 0) multicastSetupMsg;
   msg->nIdx = n;
   msg->parent = CkSectionInfo((void *)NULL);
@@ -301,6 +328,16 @@ void CkMulticastMgr::childrenReady(mCastEntry *entry)
   if (entry->hasParent()) {
     mCastGrp[entry->parentGrp.get_pe()].recvCookie(entry->parentGrp, CkSectionInfo(entry));
   }
+#if SPLIT_MULTICAST
+  // clear packet buffer
+  while (!entry->packetBuf.isEmpty()) {
+    mCastPacket *packet = entry->packetBuf.deq();
+    packet->cookie.get_val() = entry;
+    mCastGrp[CkMyPe()].recvPacket(packet->cookie, packet->n, packet->data, packet->seqno, packet->count, packet->totalsize, 1);
+    delete [] packet->data;
+    delete packet;
+  }
+#else
   // clear msg buffer
   while (!entry->msgBuf.isEmpty()) {
     multicastGrpMsg *newmsg = entry->msgBuf.deq();
@@ -308,6 +345,7 @@ void CkMulticastMgr::childrenReady(mCastEntry *entry)
     newmsg->_cookie.get_val() = entry;
     mCastGrp[CkMyPe()].recvMsg(newmsg);
   }
+#endif
   // release reduction msgs
   releaseFutureReduceMsgs(entry);
 }
@@ -393,6 +431,29 @@ void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionID &
   msg->_cookie = s;
   msg->ep = ep;
 
+#if SPLIT_MULTICAST
+  // split multicast msg into SPLIT_NUM copies
+  register envelope *env = UsrToEnv(m);
+  CkPackMessage(&env);
+  int totalsize = env->getTotalsize();
+  int packetSize = totalsize/SPLIT_NUM;
+  if (totalsize%SPLIT_NUM) packetSize ++;
+  int totalcount = SPLIT_NUM;
+  CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+  int sizesofar = 0;
+  char *data = (char*) env;
+  for (int i=0; i<totalcount; i++) {
+    int mysize = packetSize;
+    if (mysize + sizesofar > totalsize) {
+      mysize = totalsize-sizesofar;
+    }
+    //CmiPrintf("[%d] send to %d : mysize: %d total: %d \n", CkMyPe(), s.get_pe(), mysize, totalsize);
+    mCastGrp[s.get_pe()].recvPacket(s, mysize, data, i, totalcount, totalsize, 0);
+    sizesofar += mysize;
+    data += mysize;
+  }
+  CmiFree(env);
+#else
   if (s.get_pe() == CkMyPe()) {
     recvMsg(msg);
   }
@@ -400,6 +461,52 @@ void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionID &
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
     mCastGrp[s.get_pe()].recvMsg(msg);
   }
+#endif
+}
+
+void CkMulticastMgr::recvPacket(CkSectionInfo &_cookie, int n, char *data, int seqno, int count, int totalsize, int fromBuffer)
+{
+  int i;
+  mCastEntry *entry = (mCastEntry *)_cookie.get_val();
+
+
+  if (!fromBuffer && (entry->notReady() || !entry->packetBuf.isEmpty())) {
+    char *newdata = new char[n];
+    memcpy(newdata, data, n);
+    entry->packetBuf.enq(new mCastPacket(_cookie, n, newdata, seqno, count, totalsize));
+//CmiPrintf("[%d] Buffered recvPacket: seqno: %d %d frombuf:%d empty:%d entry:%p\n", CkMyPe(), seqno, count, fromBuffer, entry->packetBuf.isEmpty(),entry);
+    return;
+  }
+
+//CmiPrintf("[%d] recvPacket ready: seqno: %d %d buffer: %d entry:%p\n", CkMyPe(), seqno, count, fromBuffer, entry);
+
+  // send to spanning tree children
+  // can not optimize using list send because the difference in cookie
+  CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+  for (i=0; i<entry->children.length(); i++) {
+    mCastGrp[entry->children[i].get_pe()].recvPacket(entry->children[i], n, data, seqno, count, totalsize, 0);
+  }
+
+  if (seqno == 0) {
+    if (entry->asm_msg != NULL || entry->asm_fill != 0) {
+      entry->print();
+      CmiAssert(entry->asm_msg == NULL && entry->asm_fill==0);
+    }
+    entry->asm_msg = (char *)CmiAlloc(totalsize);
+  }
+  memcpy(entry->asm_msg+entry->asm_fill, data, n);
+  entry->asm_fill += n;
+  if (seqno + 1 == count) {
+    CmiAssert(entry->asm_fill == totalsize);
+    CkUnpackMessage(&(envelope*)entry->asm_msg);
+    multicastGrpMsg *msg = (multicastGrpMsg *)EnvToUsr((envelope*)entry->asm_msg);
+    msg->_cookie = _cookie;
+//    mCastGrp[CkMyPe()].recvMsg(msg);
+    recvMsg(msg);
+    entry->asm_msg = NULL;
+    entry->asm_fill = 0;
+  }
+//  if (fromBuffer) delete [] data;
 }
 
 void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
@@ -407,6 +514,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   int i;
   mCastEntry *entry = (mCastEntry *)msg->_cookie.get_val();
 
+#if ! SPLIT_MULTICAST
   if (entry->notReady()) {
     DEBUGF(("entry not ready, enq buffer %p\n", msg));
     entry->msgBuf.enq(msg);
@@ -421,6 +529,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
     newmsg->_cookie = entry->children[i];
     mCastGrp[entry->children[i].get_pe()].recvMsg(newmsg);
   }
+#endif
 
   // send to local
   int nLocal = entry->localElem.length();
@@ -521,7 +630,7 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
   msg->callback = cb;
 
   id.get_redNo()++;
-  DEBUGF(("[%d] val: %d %p\n", CkMyPe(), id.pe, id.val));
+  DEBUGF(("[%d] val: %d %p\n", CkMyPe(), id.get_pe(), id.get_val()));
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   mCastGrp[id.get_pe()].recvRedMsg(msg);
 }
@@ -529,8 +638,9 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
 void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
 {
   int i;
-  CkSectionInfo id = msg->sid;
+  CkSectionInfo &id = msg->sid;
   mCastEntry *entry = (mCastEntry *)id.get_val();
+//CmiPrintf("[%d] recvRedMsg: entry: %p\n", CkMyPe(), entry);
 
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
@@ -562,7 +672,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
   DEBUGF(("[%d] msg %p red:%d, entry:%p redno:%d\n", CkMyPe(), msg, msg->redNo, entry, entry->red.redNo));
   // old message come, ignore
   if (msg->redNo < redInfo.redNo) {
-  DEBUGF(("[%d] msg redNo:%d, %p, entry:%p redno:%d\n", CkMyPe(), msg->redNo, msg, entry, redInfo.redNo));
+    CmiPrintf("[%d] msg redNo:%d, msg:%p, entry:%p redno:%d\n", CkMyPe(), msg->redNo, msg, entry, redInfo.redNo);
     CmiAbort("Could never happen! \n");
   }
   if (entry->notReady() || msg->redNo > redInfo.redNo) {
@@ -571,7 +681,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     return;
   }
 
-  DEBUGF(("[%d] recvRedMsg flag:%d red:%d\n", CkMyPe(), msg->flag, redInfo.redNo));
+  DEBUGF(("[%d] recvRedMsg flag:%d red:%d\n", CkMyPe(), msg->sourceFlag, redInfo.redNo));
   if (msg->sourceFlag == 1) redInfo.lcount ++;
   if (msg->sourceFlag == 2) redInfo.ccount ++;
   redInfo.gcount += msg->gcount;
@@ -629,7 +739,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
       newmsg->gcount = redInfo.gcount;
       newmsg->rebuilt = rebuilt;
       newmsg->callback = msg_cb;
-      DEBUGF(("send to parent %p: %d\n", entry->parentGrp.val, entry->parentGrp.pe));
+      DEBUGF(("send to parent %p: %d\n", entry->parentGrp.get_val(), entry->parentGrp.get_pe()));
       mCastGrp[entry->parentGrp.get_pe()].recvRedMsg(newmsg);
     }
     else {   // root

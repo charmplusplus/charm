@@ -75,6 +75,7 @@ class CkMulticastMgr: public CkDelegateMgr {
     void recvCookie(CkSectionInfo sid, CkSectionInfo child);
     void childrenReady(mCastEntry *entry);
     void recvMsg(multicastGrpMsg *m);
+    void recvPacket(CkSectionInfo &_cookie, int n, char *data, int seqno, int count, int totalsize, int fromBuffer);
     // for reduction
     void setReductionClient(CProxySection_ArrayElement &, redClientFn fn,void *param=NULL);
     void setReductionClient(CProxySection_ArrayElement &, CkCallback *cb);
