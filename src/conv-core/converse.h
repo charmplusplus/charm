@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.25  1995-10-12 18:14:18  jyelon
+ * Revision 2.26  1995-10-12 20:18:19  sanjeev
+ * modified prototype for CmiPrintf etc.
+ *
+ * Revision 2.25  1995/10/12  18:14:18  jyelon
  * Added parentheses in macro defs.
  *
  * Revision 2.24  1995/10/11  00:36:39  jyelon
@@ -248,9 +251,9 @@ extern int Cmi_numpe;
 #endif
 
 #ifdef CMK_CMIPRINTF_IS_A_BUILTIN
-void  CmiPrintf CMK_PROTO(());
-void  CmiError  CMK_PROTO(());
-int   CmiScanf  CMK_PROTO(());
+void  CmiPrintf CMK_PROTO((...));
+void  CmiError  CMK_PROTO((...));
+int   CmiScanf  CMK_PROTO((...));
 #endif
 
 #ifdef CMK_CMIPRINTF_IS_JUST_PRINTF
@@ -348,9 +351,9 @@ typedef struct CmmTableStruct *CmmTable;
 #define CmmWildCard (-1)
 
 CmmTable   CmmNew();
-void       CmmFree(CmmTable t);
-void       CmmPut(CmmTable t, int ntags, int *tags, void *msg);
-void      *CmmFind(CmmTable t, int ntags, int *tags, int *returntags, int del);
+void       CmmFree CMK_PROTO((CmmTable t));
+void       CmmPut CMK_PROTO((CmmTable t, int ntags, int *tags, void *msg));
+void      *CmmFind CMK_PROTO((CmmTable t, int ntags, int *tags, int *returntags, int del));
 #define    CmmGet(t,nt,tg,rt)   (CmmFind((t),(nt),(tg),(rt),1))
 #define    CmmProbe(t,nt,tg,rt) (CmmFind((t),(nt),(tg),(rt),0))
 
