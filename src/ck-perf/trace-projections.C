@@ -14,7 +14,15 @@ CpvStaticDeclare(LogPool*, _logPool);
 CpvStaticDeclare(char*, traceRoot);
 CpvExtern(CthThread, curThread);
 static int _numEvents = 0;
+#if CMK_OPTIMIZE
+static warned = 0;
+#endif
 static int _threadMsg, _threadChare, _threadEP;
+
+#define OPTIMIZED_VERSION 	\
+	if (!warned) { warned=1; 	\
+	CmiPrintf("\n\n!!!! Warning: traceUserEvent not availbale in optimized version!!!!\n\n\n"); }
+
 
 extern "C" void setEvent(CthThread t, int event);
 extern "C" int getEvent(CthThread t);
@@ -86,16 +94,25 @@ void traceAwaken(void)
 extern "C"
 void traceUserEvent(int e)
 {
+#if CMK_OPTIMIZE
+  OPTIMIZED_VERSION
+#else
   CpvAccess(_trace)->userEvent(e);
+#endif
 }
 
 extern "C"
 int traceRegisterUserEvent(const char*)
 {
+#if CMK_OPTIMIZE
+  OPTIMIZED_VERSION
+  return 0;
+#else
   if(CmiMyPe()==0)
     return _numEvents++;
   else
     return 0;
+#endif
 }
 
 extern "C"
@@ -117,8 +134,21 @@ void traceClose(void)
   free(CpvAccess(traceRoot));
 }
 
-extern "C" void traceBegin(void) {CpvAccess(traceOn) = 1;}
-extern "C" void traceEnd(void) {CpvAccess(traceOn) = 0;}
+extern "C" void traceBegin(void) {
+#if CMK_OPTIMIZE
+  OPTIMIZED_VERSION
+#else
+  CpvAccess(traceOn) = 1;
+#endif
+}
+
+extern "C" void traceEnd(void) {
+#if CMK_OPTIMIZE
+  OPTIMIZED_VERSION
+#else
+  CpvAccess(traceOn) = 0;
+#endif
+}
 
 LogPool::LogPool(char *pgm, int b) {
   binary = b;
