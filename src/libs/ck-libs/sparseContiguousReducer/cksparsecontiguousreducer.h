@@ -90,6 +90,12 @@ class CkDataSegHeader{
     else
       if((sx == r.sx)&&(ex < r.ex))
 	return true;
+      else
+	if((sx == r.sx)&&(ex == r.ex)&&(sy < r.sy))
+	  return true;
+	else
+	  if((sx == r.sx)&&(ex == r.ex)&&(sy == r.sy)&&(ey < r.ey))
+	    return true;
 
     return false;
   }

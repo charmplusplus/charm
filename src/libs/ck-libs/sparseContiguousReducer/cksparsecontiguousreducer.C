@@ -40,6 +40,11 @@ int getIndex(CkDataSegHeader *r, const unsigned char *ptr, int j);
 */
 #define SIMPLE_SPARSE_CONTIGUOUS_REDUCTION(name,dataType,typeStr,loop) \
 static CkReductionMsg *name(int nMsg, CkReductionMsg ** msg){\
+  if(nMsg==1){\
+    CkReductionMsg *ret = msg[0];\
+    msg[0] = NULL;\
+    return ret;\
+  }\
   int count = 0;\
   int numElements = 0;\
   CkDataSegHeader *headerArray;\
