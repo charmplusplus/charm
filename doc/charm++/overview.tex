@@ -206,7 +206,7 @@ array elements across the available processors.
 \subsubsection{Chare Groups}
 
 Chare Groups\footnote{ These were called Branch Office Chares (BOC) in earlier
-version of Charm.} are a special type of concurrent objects.  Each chare group
+versions of Charm.} are a special type of concurrent objects.  Each chare group
 is a collection of chares, with one representative (group member) on each
 processor. All the members of a chare group share a globally unique name
 (handle, defined by Charm kernel to be of type \kw{CkGroupID}). An entire chare
@@ -229,7 +229,7 @@ processors) number of processors per node. A network of such SMP nodes is the
 most general model of parallel computers, making pure distributed and pure
 shared memory systems mere special cases. \charmpp\ is built on top of this
 machine abstraction, and Chare nodegroups embody this abstraction in a higher
-level language construct. Sematically, methods invoked on a nodegroup member
+level language construct. Semantically, methods invoked on a nodegroup member
 could be executed on any processor within that node. This fact can be utilized
 for supporting load balance across processors within a node. However, this also
 means that different processors within a node could be executing methods of the
