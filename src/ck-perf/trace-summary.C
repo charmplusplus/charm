@@ -75,6 +75,7 @@ SumLogPool::~SumLogPool()
       delete events[i][j];
   }
   delete[] pool;
+  delete[] epInfo;
 }
 
 void SumLogPool::addEventType(int eventType, double time)
@@ -114,16 +115,8 @@ SumLogPool::SumLogPool(char *pgm) : phaseTab(MAX_PHASES)
    }
 
    epSize = MAX_ENTRIES;
-   epTime = new double[epSize];
-   _MEMCHECK(epTime);
-   epCount = new int[epSize];
-   _MEMCHECK(epCount);
-   epMaxTime = new double[epSize];
-   _MEMCHECK(epMaxTime);
-   for (i=0; i< epSize; i++) {
-     epTime[i] = epMaxTime[i] = 0.0;
-     epCount[i] = 0;
-   };
+   epInfo = new SumEntryInfo[epSize];
+   _MEMCHECK(epInfo);
 
    // event
    markcount = 0;
@@ -177,20 +170,26 @@ void SumLogPool::write(void)
 
   // write entry execution time
   for (i=0; i<_numEntries; i++)
-    fprintf(fp, "%ld ", (long)(epTime[i]*1.0e6));
+    fprintf(fp, "%ld ", (long)(epInfo[i].epTime*1.0e6));
   fprintf(fp, "\n");
   // write entry function call times
   for (i=0; i<_numEntries; i++)
-    fprintf(fp, "%d ", epCount[i]);
+    fprintf(fp, "%d ", epInfo[i].epCount);
   fprintf(fp, "\n");
   // write max entry function execute times
+  fprintf(fp, "PE%d MaxEPTime: ", CkMyPe());
   for (i=0; i<_numEntries; i++)
-    fprintf(fp, "%ld ", (long)(epMaxTime[i]*1.0e6));
+    fprintf(fp, "%ld ", (long)(epInfo[i].epMaxTime*1.0e6));
   fprintf(fp, "\n");
+  for (i=0; i<SumEntryInfo::SIZE; i++) {
+    for (j=0; j<_numEntries; j++) 
+      fprintf(fp, "%d ", epInfo[j].hist[i]);
+    fprintf(fp, "\n");
+  }
   // write marks
   if (CkpvAccess(version)>=2.0) 
   {
-  fprintf(fp, "%d ", markcount);
+  fprintf(fp, "NumMarks: %d ", markcount);
   for (i=0; i<MAX_MARKS; i++) {
     for(int j=0; j<events[i].length(); j++)
         fprintf(fp, "%d %f ", i, events[i][j]->time);
@@ -239,9 +238,7 @@ void SumLogPool::setEp(int epidx, double time)
         CmiAbort("Too many entry points!!\n");
   }
   //CmiPrintf("set EP: %d %e \n", epidx, time);
-  epTime[epidx] += time;
-  epCount[epidx] ++;
-  if (epMaxTime[epidx] < time) epMaxTime[epidx] = time;
+  epInfo[epidx].setTime(time);
   // set phase table counter
   phaseTab.setEp(epidx, time);
 }
@@ -289,6 +286,13 @@ TraceSummary::TraceSummary(char **argv):curevent(0),binStart(0.0),bin(0.0),msgNu
   	sscanf(tmpStr,"%lf",&CkpvAccess(version));
   _logPool = new SumLogPool(CkpvAccess(traceRoot));
   execEp=INVALIDEP;
+
+  SumEntryInfo::threshold = 0.001; 
+  if (CmiGetArgString(argv,"+epThreshold",&tmpStr))
+  	sscanf(tmpStr,"%lf",&SumEntryInfo::threshold);
+  SumEntryInfo::epIncrease = 0.001; 
+  if (CmiGetArgString(argv,"+epInterval",&tmpStr))
+  	sscanf(tmpStr,"%lf",&SumEntryInfo::epIncrease);
 }
 
 void TraceSummary::traceClearEps(void)

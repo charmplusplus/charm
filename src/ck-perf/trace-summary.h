@@ -132,6 +132,35 @@ class PhaseTable {
     }
 };
 
+/// info for each entry
+class SumEntryInfo {
+public:
+  double epTime;
+  double epMaxTime;
+  int epCount;
+  static const int SIZE = 10;
+  int hist[SIZE];
+  static double threshold;
+  static double epIncrease;
+public:
+  SumEntryInfo(): epTime(0.), epMaxTime(0.), epCount(0) {}
+  void clear() {
+    epTime = epMaxTime = 0.;
+    epCount = 0;
+    for (int i=0; i<SIZE; i++) hist[i]=0;
+  }
+  void setTime(double t) {
+    epTime += t;
+    epCount ++;
+    if (epMaxTime < t) epMaxTime = t;
+    for (int i=SIZE; i>=0; i--) {
+      if (t>threshold+i*epIncrease) {
+        hist[i]++; break;
+      }
+    }
+  }
+};
+
 /// summary log pool
 class SumLogPool {
   private:
@@ -140,8 +169,7 @@ class SumLogPool {
     BinEntry *pool;	/**< bins */
     FILE *fp, *stsfp ;
 
-    double  *epTime, *epMaxTime;
-    int *epCount;
+    SumEntryInfo  *epInfo;
     int epSize;
 
     /// a mark entry for trace summary
@@ -162,8 +190,7 @@ class SumLogPool {
     void setEp(int epidx, double time);
     void clearEps() {
       for(int i=0; i < epSize; i++) {
-	epTime[i]  = 0.;
-	epCount[i] = 0;
+	epInfo[i].clear();
       }
     }
     void shrink(void) ;
