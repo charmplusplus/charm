@@ -202,11 +202,14 @@ class Parameter {
     void marshallArrayData(XStr &str);
     void beginUnmarshall(XStr &str);
     void unmarshall(XStr &str);
+    void unmarshallAddress(XStr &str);
     void endUnmarshall(XStr &str);
   public:
     Parameter(int Nline,Type *Ntype,const char *Nname=0,
     	const char *NarrLen=0,Value *Nvalue=0);
     void print(XStr &str,int withDefaultValues=0);
+    void printAddress(XStr &str);
+    void printValue(XStr &str);
     int isMessage(void) const {return type->isMessage();}
     int isVoid(void) const {return type->isVoid();}
     int isArray(void) const {return arrLen!=NULL;}
@@ -222,6 +225,8 @@ class ParamList {
     ParamList(Parameter *Nparam,ParamList *Nnext=NULL)
     	:param(Nparam), next(Nnext) {}
     void print(XStr &str,int withDefaultValues=0);
+    void printAddress(XStr &str);
+    void printValue(XStr &str);
     int isMessage(void) const {
     	return (next==NULL) && param->isMessage();
     }
@@ -240,6 +245,7 @@ class ParamList {
     void marshall(XStr &str,int orMakeVoid);
     void beginUnmarshall(XStr &str);
     void unmarshall(XStr &str);
+    void unmarshallAddress(XStr &str);
     void endUnmarshall(XStr &str);
 };
 

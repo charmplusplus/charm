@@ -1610,6 +1610,38 @@ void Entry::genDefs(XStr& str)
     
     postCall << "  CmiUnlock(impl_obj->__nodelock);\n";
   }
+
+  if (!isConstructor() && fortranMode) { // Fortran90
+      const char* msg_name = param->getBaseName();
+
+      str << "/* FORTRAN SECTION */\n";
+
+      // Declare the Fortran Entry Function
+      // This is called from C++
+      str << "extern \"C\" void " << fortranify(name) << "_(char **, int*, ";
+      param->printAddress(str);
+      str << ");\n";
+
+      // Define the Fortran interface function
+      // This is called from Fortran to send the message to a chare.
+      str << "extern \"C\" void "
+        //<< container->proxyName() << "_" 
+          << fortranify("SendTo_")
+	  << fortranify(container->baseName())
+          << "_" << fortranify(name)
+          << "_(long* aindex, int *index, ";
+      param->printAddress(str);
+      str << ")\n";
+      str << "{\n";
+      str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
+      str << "\n";
+      str << "  " << container->proxyName() << " h(*aid);\n";
+      str << "  h[*index]." << name << "(";
+      param->printValue(str);
+      str << ");\n";
+      str << "}\n";
+      str << "/* FORTRAN SECTION END */\n";
+    }
   
   //Generate the call-method body
   str << makeDecl("void")<<"::_call_"<<epIdx(0)<<"(void* impl_msg, "<<containerType<<"* impl_obj)\n";
@@ -1617,9 +1649,19 @@ void Entry::genDefs(XStr& str)
   if(isThreaded()) str << callThread(epIdx(0));
   str << preCall;
   param->beginUnmarshall(str);
+  if (!isConstructor() && fortranMode) {
+    str << "/* FORTRAN */\n";
+    str << "  int index = impl_obj->getIndex();\n";
+    str << "  " << fortranify(name)
+	<< "_((char **)(impl_obj->user_data), &index, ";
+    param->unmarshallAddress(str); str<<");\n";
+    str << "/* FORTRAN END */\n";
+  }
+  else {
   if(isConstructor()) str << "  new (impl_obj) "<<containerType;
   else str << "  impl_obj->"<<name;
   str<<"("; param->unmarshall(str); str<<");\n";
+  }
   param->endUnmarshall(str);
   str << postCall;
   str << "}\n";
@@ -1723,6 +1765,40 @@ void Parameter::print(XStr &str,int withDefaultValues)
 	    	if (val!=NULL) {str<<" = ";val->print(str);}
 }
 
+void ParamList::printAddress(XStr &str)
+{
+    	param->printAddress(str);
+    	if (next) {
+    		str<<", ";
+    		next->printAddress(str);
+    	}
+}
+
+void Parameter::printAddress(XStr &str) 
+{
+    	type->print(str);
+    	str<<"*";
+    	if (name!=NULL)
+    		str<<" "<<name;
+}
+
+void ParamList::printValue(XStr &str)
+{
+    	param->printValue(str);
+    	if (next) {
+    		str<<", ";
+    		next->printValue(str);
+    	}
+}
+
+void Parameter::printValue(XStr &str) 
+{
+    	if (arrLen==NULL)
+    	  	str<<"*";
+    	if (name!=NULL)
+    		str<<name;
+}
+
 void ParamList::callEach(fn_t f,XStr &str)
 {
 	ParamList *cur=this;
@@ -1818,6 +1894,24 @@ void Parameter::unmarshall(XStr &str)
 		str<<"("<<type->deref()<<" *)(impl_buf+impl_off_"<<name<<")";
 	else
 		str<<name;
+}
+void ParamList::unmarshallAddress(XStr &str) 
+{
+    	if (isMessage()) str<<"("<<param->type<<")impl_msg";
+    	else if (isMarshalled()) {
+    		param->unmarshallAddress(str);
+    		if (next) {
+    			str<<", ";
+    			next->unmarshallAddress(str);
+    		}
+    	}
+}
+void Parameter::unmarshallAddress(XStr &str)
+{
+	if (isArray())
+		str<<"("<<type->deref()<<" *)(impl_buf+impl_off_"<<name<<")";
+	else
+		str<<"&" <<name;
 }
 void ParamList::endUnmarshall(XStr &str) 
 {
