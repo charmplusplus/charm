@@ -347,7 +347,7 @@ const FEM_Sym_List &FEM_Ghost::getSymList(void) const {
 FEM_Sym_List::FEM_Sym_List() {}
 void FEM_Sym_List::operator=(const FEM_Sym_List &src) {
 	for (int i=0;i<src.sym.size();i++)
-		sym.push_back(src.sym[i]->clone());
+		sym.push_back((FEM_Sym_Desc *)src.sym[i]->clone());
 }
 void FEM_Sym_List::pup(PUP::er &p) {
 	p|sym;

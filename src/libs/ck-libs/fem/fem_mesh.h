@@ -71,9 +71,6 @@ public:
 	/// Apply this symmetry to this relative (vel or acc) vector
 	virtual CkVector3d applyVec(const CkVector3d &vec) const =0;
 	
-	/// Make a new copy of this class:
-	virtual FEM_Sym_Desc *clone(void) const =0;
-	
 	/// Allows Desc's to be pup'd via | operator:
 	friend inline void operator|(PUP::er &p,FEM_Sym_Desc &a) {a.pup(p);}
 	friend inline void operator|(PUP::er &p,FEM_Sym_Desc* &a) {
@@ -93,10 +90,6 @@ public:
 	
 	/// Apply this symmetry to this relative (vel or acc) vector
 	virtual CkVector3d applyVec(const CkVector3d &vec) const {return vec;}
-	
-	virtual FEM_Sym_Desc *clone(void) const {
-		return new FEM_Sym_Linear(shift);
-	}
 	
 	virtual void pup(PUP::er &p);
 	PUPable_decl(FEM_Sym_Linear);
