@@ -9,7 +9,7 @@ syntax() {
   echo '<versions>: ' 
   ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | pr -3 -t )
   echo ''
-  echo '<options>: help cc cc64 cxx kcc pgcc acc icc gcc3 smp gm vmi scyld '
+  echo '<options>: help cc cc64 cxx kcc pgcc acc icc gcc3 mpcc smp gm vmi scyld '
   echo ''
   echo '<charmc-options>: e.g. -g -save -verbose'
   echo 'Note: This script:'
@@ -52,7 +52,7 @@ do
           while [ ! $# -eq 0 ]
           do
             case "$1" in
-	    "pgcc"|"icc"|"cxx"|"kcc"|"cc"|"cc64"|"acc"|"gcc3")
+	    "pgcc"|"icc"|"cxx"|"kcc"|"cc"|"cc64"|"acc"|"gcc3"|"mpcc")
                 if [ ! -f src/$VERSION/conv-mach-$1.h ]
                 then
                   echo; 
