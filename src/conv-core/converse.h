@@ -962,6 +962,8 @@ void CmiPrintStackTrace(int nSkip);
 CpvExtern(void*, CmiLocalQueue);
 #endif
 
+char *CmiCopyMsg(char *msg, int len);
+
 /******** Immediate Messages ********/
 
 CpvExtern(int, CmiImmediateMsgHandlerIdx);

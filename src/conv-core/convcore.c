@@ -2037,3 +2037,13 @@ void __cmi_assert(const char *expr, const char *file, int line)
       CmiMyPe(), expr, file, line);
   CmiAbort("");
 }
+
+char *CmiCopyMsg(char *msg, int len)
+{
+  char *copy = (char *)CmiAlloc(len);
+  if (!copy)
+      fprintf(stderr, "Out of memory\n");
+  memcpy(copy, msg, len);
+  return copy;
+}
+
