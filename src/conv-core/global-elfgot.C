@@ -1,0 +1,317 @@
+/*  Library to manage the program's global offset table.
+ *
+ *  The global offset table (GOT) is a static, linker-generated 
+ *  table used to look up the locations of dynamic stuff
+ *  like subroutines or global data.
+ *
+ *  It's only generated and used if you're on an ELF binary
+ *  format machine, and compile with "-fpic", for "position 
+ *  independent code"; otherwise the code includes direct 
+ *  references to subroutines and data.
+ *
+ *  During execution of a single routine, the GOT is pointed to
+ *  by %ebx.  Changing %ebx only affects global access within
+ *  the current subroutine, so we have to change the single, 
+ *  static copy of the GOT to switch between sets of global variables.
+ *  This is slow, but because the GOT just contains pointers,
+ *  it's not as slow as copying the data in and out of the GOT.
+ *
+ 
+The ELF GOT layout is described in excruciating detail
+by the Sun documentation, at 
+   Solaris 2.5 Software Developer AnswerBook >> 
+      Linker and Libraries Guide >> 
+        6 Object Files >> 
+	  File Format
+
+A more readable summary is at:  
+  http://www.iecc.com/linker/linker08.html
+
+ *
+ *  Developed by Sameer Kumar (sameer@ks.uiuc.edu) 8/25/03
+ *  Made functional by Orion Lawlor (olawlor@acm.org) 2003/9/16
+ *
+ *  FIXME2: Sanity check. I am assuming that if a symbol is in the
+ *  relocation table it is in the global offset table. A sanity check
+ *  would be to get the address from the symbol table and look for it
+ *  in the GOT. Pointers to remote function calls may be an exception
+ *  to this.
+ */
+#include "converse.h"
+#include "cklists.h"
+#include <string.h>
+#include <stdio.h>
+#include <elf.h>
+#include <stdlib.h>
+#include <strings.h>
+#include <errno.h>
+
+#include "converse.h"
+#include "pup.h"
+
+#if !CMK_SHARED_VARS_UNAVAILABLE
+#  error "Global-elfgot won't work properly under smp version: -swapglobals disabled"
+#endif
+
+
+#define ALIGN8(x)       (int)((~7)&((x)+7))
+
+#define DEBUG_GOT_MANAGER 1
+
+typedef Elf32_Addr ELF_TYPE_Addr;
+typedef Elf32_Dyn  ELF_TYPE_Dyn;
+typedef Elf32_Rel  ELF_TYPE_Rel;
+typedef Elf32_Sym  ELF_TYPE_Sym;
+
+extern ELF_TYPE_Dyn _DYNAMIC[];      //The Dynamic section table pointer
+
+/****************** Global Variable Understanding *********************/
+/**
+ Keeps a list of global variables.
+*/
+class CtgGlobalList
+{
+  int datalen; ///< Number of bytes in the table of global data.
+  struct CtgRec {
+    ELF_TYPE_Addr *got; ///< Points to our entry in the GOT.
+    int off; ///< Our byte offset into the table of global data.
+    CtgRec() {got=NULL;}
+    CtgRec(ELF_TYPE_Addr *got_,int off_) :got(got_), off(off_) {}
+  };
+  CkVec<CtgRec> rec;
+  int nRec;
+public:
+  /**
+   Analyze the current set of global variables, determine 
+   which are user globals and which are system globals, 
+   and store the list of user globals. 
+  */
+  CtgGlobalList();
+  
+  /// Return the number of bytes needed to store our global data.
+  inline int getSize(void) const {return datalen;}
+  
+  /// Copy the current set of global data into this set,
+  ///   which must be getSize() bytes.
+  void read(void *datav) const;
+  
+  /// Point at this set of global data (must be getSize() bytes).
+  inline void install(void *datav) const {
+    char *data=(char *)datav;
+    for (int i=0;i<nRec;i++)
+      *(rec[i].got)=(ELF_TYPE_Addr)(data+rec[i].off);
+  }
+  
+private:
+  /* Return 1 if this is the name of a user global variable;
+     0 if this is the name of some other (Charm or system)
+     global variable. */
+  int isUserSymbol(const char *name);
+};
+
+int CtgGlobalList::isUserSymbol(const char *name) {
+    // return 1;
+    if((strncmp("_", name, 1) == 0) || (strncmp("Cpv_", name, 4) == 0)
+       || (strncmp("Csv_", name, 4) == 0) || (strncmp("Ctv_", name, 4) == 0)
+       || (strncmp("ckout", name, 5) == 0) || (strncmp("stdout", name, 6) == 0)
+       || (strncmp("stderr", name, 6) == 0))
+        return 0;
+    
+    return 1;
+}
+
+void CtgGlobalList::read(void *datav) const {
+    char *data=(char *)datav;
+    for (int i=0;i<nRec;i++) {
+      int size;
+      if (i<nRec-1) 
+        size=rec[i+1].off-rec[i].off;
+      else /* i==nRec-1, last one: */ 
+        size=datalen-rec[i].off;
+      memcpy(data+rec[i].off, (void *)*rec[i].got, size);
+    }
+}
+
+/**
+   Analyze the current set of global variables, determine 
+   which are user globals and which are system globals, 
+   and store the list of user globals. 
+ */
+CtgGlobalList::CtgGlobalList() {
+    datalen=0;
+    nRec=0;
+    
+    int count;
+    int relt_size = 0;
+    int type, symindx;
+    char *sym_name;
+    ELF_TYPE_Rel *relt=NULL;       //Relocation table
+    ELF_TYPE_Sym *symt=NULL;       //symbol table
+    char *str_tab=NULL;         //String table
+
+/*Find tables and sizes of tables from the dynamic segment table*/
+    count = 0;
+    while(_DYNAMIC[count].d_tag != 0){
+
+        if(_DYNAMIC[count].d_tag == DT_REL)
+            relt = (ELF_TYPE_Rel *) _DYNAMIC[count].d_un.d_ptr;
+
+        else if(_DYNAMIC[count].d_tag == DT_RELSZ)
+            relt_size = _DYNAMIC[count].d_un.d_val/ sizeof(ELF_TYPE_Rel);
+
+        else if(_DYNAMIC[count].d_tag == DT_SYMTAB)
+            symt = (ELF_TYPE_Sym *) _DYNAMIC[count].d_un.d_ptr;
+
+        else if(_DYNAMIC[count].d_tag == DT_STRTAB)
+            str_tab = (char *)_DYNAMIC[count].d_un.d_ptr;
+
+        count ++;
+    }
+
+/*Figure out which relocation data entries refer to global data:
+*/
+    for(count = 0; count < relt_size; count ++){
+        type = ELF32_R_TYPE(relt[count].r_info);
+        symindx = ELF32_R_SYM(relt[count].r_info);
+        
+        if(type == R_386_GLOB_DAT) { /* It's global data */
+            sym_name = str_tab + symt[symindx].st_name;
+#if DEBUG_GOT_MANAGER
+            printf("relt[%d]= %s: %d bytes, %p sym, R_==%d\n", count, sym_name, 
+              symt[symindx].st_size, (void *)symt[symindx].st_value, type);
+#endif
+	
+            if(!(strcmp(sym_name, "_DYNAMIC") == 0
+	      || strcmp(sym_name, "__gmon_start__") == 0
+	      || strcmp(sym_name, "_GLOBAL_OFFSET_TABLE_") == 0
+	    )) 
+	    { /* It's not system data */
+              if(ELF32_ST_TYPE(symt[symindx].st_info) == STT_OBJECT) /* ? */
+	        if (isUserSymbol(sym_name))
+		{ /* It's got the right name-- it's a user global */
+                    int gSize = ALIGN8(symt[symindx].st_size);
+		    ELF_TYPE_Addr *gGot=(ELF_TYPE_Addr *)relt[count].r_offset;
+		    
+#if DEBUG_GOT_MANAGER
+            printf("   -> %s is a user global, of size %d, at %p\n",
+	      sym_name, symt[symindx].st_size, (void *)*gGot);
+#endif
+		    if ((void *)*gGot != (void *)symt[symindx].st_value)
+		    	CmiAbort("CtgGlobalList: symbol table and GOT address mismatch!\n");
+		    
+		    rec.push_back(CtgRec(gGot,datalen));
+		    datalen+=gSize;
+                }
+            }
+        }
+    }
+    
+    nRec=rec.size();
+    
+#if DEBUG_GOT_MANAGER   
+    printf("relt has %d entries, %d of which are user globals\n\n", 
+    	relt_size,nRec);
+#endif
+}
+
+/****************** Global Variable Storage and Swapping *********************/
+CpvStaticDeclare(CtgGlobals,_curCtg);
+
+struct CtgGlobalStruct {
+public:
+    /* This is set when our data is pointed to by the current GOT */
+    int installed;
+
+    /* Pointer to our global data segment. */
+    void *data_seg;  
+    int seg_size; /* size in bytes of data segment */
+    
+    void allocate(int size) {
+      seg_size=size;
+      data_seg=malloc(seg_size);
+    }
+    
+    CtgGlobalStruct(void) {
+      installed=0;
+      data_seg=0;
+    }
+    ~CtgGlobalStruct() {
+      if (data_seg) {
+        free(data_seg);
+      }
+    }
+    
+    void pup(PUP::er &p);
+};
+
+void CtgGlobalStruct::pup(PUP::er &p) {
+    p | seg_size;
+    if (p.isUnpacking()) allocate(seg_size);
+    p(data_seg, seg_size);
+}
+
+/// Singleton object describing our global variables:
+static CtgGlobalList *_ctgList=NULL;
+/// Singleton object describing the original values for the globals.
+static CtgGlobalStruct *_ctgListGlobals=NULL;
+
+/** Initialize the globals support (called on each processor). */
+void CtgInit(void) {
+	CpvInitialize(CtgGlobal,_curCtg);
+	
+	if (!_ctgList) 
+	{
+	/*
+	  First call on this node: parse out our globals:
+	*/
+		CtgGlobalList *l=new CtgGlobalList;
+		CtgGlobalStruct *g=new CtgGlobalStruct;
+		if (CmiMyNode()==0) {
+			CmiPrintf("CHARM> -swapglobals enabled\n");
+		}
+		
+		g->allocate(l->getSize());
+		l->read(g->data_seg);
+		l->install(g->data_seg);
+		_ctgList=l;
+		_ctgListGlobals=g;
+	}
+	
+	CpvAccess(_curCtg)=_ctgListGlobals;
+}
+
+/** Copy the current globals into this new set */
+CtgGlobals CtgCreate(void) {
+	CtgGlobalStruct *g=new CtgGlobalStruct;
+	g->allocate(_ctgList->getSize());
+	_ctgList->read(g->data_seg);
+	return g;
+}
+/** PUP this (not currently installed) globals set */
+CtgGlobals CtgPup(pup_er pv, CtgGlobals g) {
+	PUP::er *p=(PUP::er *)pv;
+	if (p->isUnpacking()) g=new CtgGlobalStruct;
+	if (g->installed) 
+		CmiAbort("CtgPup called on currently installed globals!\n");
+	g->pup(*p);
+	if (g->seg_size!=_ctgList->getSize())
+		CmiAbort("CtgPup: global variable size changed during migration!\n");
+	return g;
+}
+
+/** Install this set of globals. If g==NULL, returns to original globals. */
+void CtgInstall(CtgGlobals g) {
+	CtgGlobals *cur=&CpvAccess(_curCtg);
+	CtgGlobals oldG=*cur;
+	if (g==NULL) g=_ctgListGlobals;
+	*cur=g;
+	oldG->installed=0;
+	_ctgList->install(g->data_seg);
+	g->installed=1;
+}
+
+/** Delete this (not currently installed) set of globals. */
+void CtgFree(CtgGlobals g) {
+	if (g->installed) CmiAbort("CtgFree called on currently installed globals!\n");
+	delete g;
+}
