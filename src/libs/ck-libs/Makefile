@@ -1,4 +1,10 @@
-CHARMC=../../../bin/charmc $(OPTS)
+CHARMC=../../bin/charmc $(OPTS)
 
-all:
-	echo 'Nothing to do here right now'
+all: barrier irecv
+
+barrier:
+	cd barrier; make all OPTS='$(OPTS)'
+
+irecv:
+	cd irecv; make all OPTS='$(OPTS)'
+

@@ -8,11 +8,7 @@
 #include "Barrier.decl.h"
 
 typedef void (*voidfn)();
-extern int barrierInit();
-
-class DUMMY : public CMessage_DUMMY 
-{
-};
+extern int barrierInit(void);
 
 class FP : public CMessage_FP
 {
@@ -28,9 +24,9 @@ class barrier : public Group
 
 public:
   /* entry methods */
-  barrier(DUMMY *);
-  void notify(DUMMY *);
-  void callFP(DUMMY *);
-  void reset(DUMMY *);
+  barrier(void);
+  void notify(void);
+  void callFP(void);
+  void reset(void);
   void atBarrier(FP *);
 };

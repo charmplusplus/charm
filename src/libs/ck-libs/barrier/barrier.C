@@ -12,7 +12,7 @@
 #include "barrier.h"
 #include "Barrier.def.h"
 
-barrier::barrier(DUMMY *m)
+barrier::barrier(void)
 {
   myPe = CkMyPe();
   myLeft = (myPe*2)+1;
@@ -24,17 +24,15 @@ barrier::barrier(DUMMY *m)
     kidscount++;
   if (myLeft >= CkNumPes())
     kidscount++;
-  delete m;
 }
 
-void barrier::reset(DUMMY *m)
+void barrier::reset(void)
 {
   kidscount = 0;
   if (myRight >= CkNumPes())
     kidscount++;
   if (myLeft >= CkNumPes())
     kidscount++;
-  delete m;
 }
 
 void barrier::atBarrier(FP *m)
@@ -44,43 +42,41 @@ void barrier::atBarrier(FP *m)
   kidscount++;
   if (kidscount == 3) {
     if (myPe == 0)
-      grp.callFP(new DUMMY, CkMyPe());
+      grp.callFP(CkMyPe());
     else
-      grp.notify(new DUMMY, myParent);
+      grp.notify(myParent);
   }
   fnptr = m->fp;
   delete m;
 }
 
-void barrier::notify(DUMMY *m)
+void barrier::notify(void)
 {
   CProxy_barrier grp(myGroup);
 
   kidscount++;
   if (kidscount == 3) {
     if (myPe == 0)
-      grp.callFP(new DUMMY, CkMyPe());
+      grp.callFP(CkMyPe());
     else
-      grp.notify(new DUMMY, myParent);
+      grp.notify(myParent);
   }
-  delete m;
 }
 
-void barrier::callFP(DUMMY *m)
+void barrier::callFP(void)
 {
   CProxy_barrier grp(myGroup);
 
   if (myLeft < CkNumPes())
-    grp.callFP(new DUMMY, myLeft);
+    grp.callFP(myLeft);
   if (myRight < CkNumPes())
-    grp.callFP(new DUMMY, myRight);
+    grp.callFP(myRight);
   fnptr();
-  delete m;
 }
 
-int barrierInit()
+int barrierInit(void)
 {
-  int g = CProxy_barrier::ckNew(new DUMMY);
+  int g = CProxy_barrier::ckNew();
   return g;
 }
 
