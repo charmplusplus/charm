@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-09-19 19:31:51  jyelon
+ * Revision 2.13  1995-09-19 21:43:58  brunner
+ * Moved declaration of CmiTimer here from c++interface.h
+ *
+ * Revision 2.12  1995/09/19  19:31:51  jyelon
  * Fixed a bug.
  *
  * Revision 2.11  1995/09/19  18:57:17  jyelon
@@ -191,6 +194,8 @@ CpvExtern(int, Cmi_numpe);
 void *CmiAlloc  CMK_PROTO((int size));
 int   CmiSize   CMK_PROTO(());
 void  CmiFree   CMK_PROTO(());
+
+double CmiTimer CMK_PROTO(());
 
 #ifdef CMK_CMIPRINTF_IS_A_BUILTIN
 void  CmiPrintf CMK_PROTO(());
