@@ -1,6 +1,18 @@
 #include "ck.h"
 
 extern "C"
+void CkSetRefNum(void *msg, int ref)
+{
+  UsrToEnv(msg)->setRef(ref);
+}
+
+extern "C"
+int CkGetRefNum(void *msg)
+{
+  return UsrToEnv(msg)->getRef();
+}
+
+extern "C"
 void CkGetChareID(CkChareID *pCid) {
   pCid->onPE = CkMyPe();
   pCid->objPtr = CpvAccess(_currentChare);

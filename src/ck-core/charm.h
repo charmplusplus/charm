@@ -70,8 +70,6 @@ typedef void* (*CkPackFnPtr)(void *msg);
 typedef void* (*CkUnpackFnPtr)(void *buf);
 typedef void* (*CkCoerceFnPtr)(void *buf);
 typedef void  (*CkCallFnPtr) (void *msg, void *obj);
-typedef void  (*CkCopyFromFnPtr) (void *buf);
-typedef void  (*CkCopyToFnPtr) (void *buf);
 
 /******************************************************************************
  *
@@ -107,6 +105,9 @@ extern int CkCreateGroup(int chareIdx, int constructorIdx, void *msg,
 extern void CkSendMsg(int entryIndex, void *msg, CkChareID *chare);
 extern void CkSendMsgBranch(int entryIdx, void *msg, int destPE, int groupID);
 extern void CkBroadcastMsgBranch(int entryIdx, void *msg, int groupID);
+
+extern void CkSetRefNum(void *msg, int ref);
+extern int  CkGetRefNum(void *msg);
 
 /******************************************************************************
  *

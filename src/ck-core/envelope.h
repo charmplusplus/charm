@@ -58,32 +58,32 @@ class envelope {
     // to make envelope void* aligned
     UChar padding[D(3*sizeof(UShort)+4*sizeof(UChar))];
   public:
-    UInt   getEvent(void) { return event; }
-    void   setEvent(UInt e) { event = e; }
-    UInt   getRef(void) { return s2; }
-    void   setRef(UShort r) { s2 = r; }
-    UChar  getQueueing(void) { return queueing; }
-    void   setQueueing(UChar q) { queueing = q; }
-    UChar  getMsgtype(void) { return msgtype; }
-    void   setMsgtype(UChar m) { msgtype = m; }
-    UChar  getMsgIdx(void) { return msgIdx; }
-    void   setMsgIdx(UChar idx) { msgIdx = idx; }
-    UInt   getTotalsize(void) { return totalsize; }
-    void   setTotalsize(UInt s) { totalsize = s; }
-    UChar  isPacked(void) { return packed; }
-    void   setPacked(UChar p) { packed = p; }
-    UShort getPriobits(void) { return priobits; }
-    void   setPriobits(UShort p) { priobits = p; }
-    UShort getPrioWords(void) { return (priobits+CINTBITS-1)/CINTBITS; }
-    UShort getPrioBytes(void) { return getPrioWords()*sizeof(int); }
-    void*  getPrioPtr(void) { 
+    UInt   getEvent(void) const { return event; }
+    void   setEvent(const UInt e) { event = e; }
+    UInt   getRef(void) const { return s2; }
+    void   setRef(const UShort r) { s2 = r; }
+    UChar  getQueueing(void) const { return queueing; }
+    void   setQueueing(const UChar q) { queueing = q; }
+    UChar  getMsgtype(void) const { return msgtype; }
+    void   setMsgtype(const UChar m) { msgtype = m; }
+    UChar  getMsgIdx(void) const { return msgIdx; }
+    void   setMsgIdx(const UChar idx) { msgIdx = idx; }
+    UInt   getTotalsize(void) const { return totalsize; }
+    void   setTotalsize(const UInt s) { totalsize = s; }
+    UChar  isPacked(void) const { return packed; }
+    void   setPacked(const UChar p) { packed = p; }
+    UShort getPriobits(void) const { return priobits; }
+    void   setPriobits(const UShort p) { priobits = p; }
+    UShort getPrioWords(void) const { return (priobits+CINTBITS-1)/CINTBITS; }
+    UShort getPrioBytes(void) const { return getPrioWords()*sizeof(int); }
+    void*  getPrioPtr(void) const { 
       return (void *)((char *)this + totalsize - getPrioBytes());
     }
-    UInt   getCount(void) { assert(msgtype==RODataMsg); return i1; }
-    void   setCount(UInt c) { assert(msgtype==RODataMsg); i1 = c; }
-    UInt   getRoIdx(void) { assert(msgtype==ROMsgMsg); return i1; }
-    void   setRoIdx(UInt r) { assert(msgtype==ROMsgMsg); i1 = r; }
-    static envelope *alloc(UChar type, UInt size=0, UShort prio=0)
+    UInt   getCount(void) const { assert(msgtype==RODataMsg); return i1; }
+    void   setCount(const UInt c) { assert(msgtype==RODataMsg); i1 = c; }
+    UInt   getRoIdx(void) const { assert(msgtype==ROMsgMsg); return i1; }
+    void   setRoIdx(const UInt r) { assert(msgtype==ROMsgMsg); i1 = r; }
+    static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
     {
       assert(type>=NewChareMsg && type<=StatMsg);
       register UInt tsize = sizeof(envelope)+ALIGN(size)+sizeof(int)*PW(prio);
@@ -94,19 +94,19 @@ class envelope {
       env->packed = 0;
       return env;
     }
-    UShort getEpIdx(void) {
+    UShort getEpIdx(void) const {
       assert(msgtype==NewChareMsg || msgtype==NewVChareMsg
           || msgtype==ForChareMsg || msgtype==ForVidMsg
           || msgtype==BocInitMsg || msgtype==ForBocMsg);
       return s1;
     }
-    void   setEpIdx(UShort idx) {
+    void   setEpIdx(const UShort idx) {
       assert(msgtype==NewChareMsg || msgtype==NewVChareMsg
           || msgtype==ForChareMsg || msgtype==ForVidMsg
           || msgtype==BocInitMsg || msgtype==ForBocMsg);
       s1 = idx;
     }
-    void*  getVidPtr(void) {
+    void*  getVidPtr(void) const {
       assert(msgtype==NewVChareMsg || msgtype==ForVidMsg
           || msgtype==FillVidMsg);
       return ptr;
@@ -116,13 +116,13 @@ class envelope {
           || msgtype==FillVidMsg);
       ptr = p;
     }
-    UInt   getSrcPe(void) { return pe; }
-    void   setSrcPe(UInt s) { pe = s; }
-    void*  getObjPtr(void) { assert(msgtype==ForChareMsg); return ptr; }
+    UInt   getSrcPe(void) const { return pe; }
+    void   setSrcPe(const UInt s) { pe = s; }
+    void*  getObjPtr(void) const { assert(msgtype==ForChareMsg); return ptr; }
     void   setObjPtr(void *p) { assert(msgtype==ForChareMsg); ptr = p; }
-    UShort getRetEp(void) { assert(msgtype==DBocReqMsg); return s1; }
-    void   setRetEp(UShort e) { assert(msgtype==DBocReqMsg); s1 = e; }
-    void*  getUsrMsg(void) { 
+    UShort getRetEp(void) const { assert(msgtype==DBocReqMsg); return s1; }
+    void   setRetEp(const UShort e) { assert(msgtype==DBocReqMsg); s1 = e; }
+    void*  getUsrMsg(void) const { 
       assert(msgtype==DBocReqMsg || msgtype==DBocNumMsg); 
       return ptr; 
     }
@@ -130,31 +130,31 @@ class envelope {
       assert(msgtype==DBocReqMsg || msgtype==DBocNumMsg); 
       ptr = p; 
     }
-    UInt   getGroupNum(void) {
+    UInt   getGroupNum(void) const {
       assert(msgtype==BocInitMsg || msgtype==ForBocMsg
           || msgtype==DBocNumMsg);
       return i1;
     }
-    void   setGroupNum(UInt g) {
+    void   setGroupNum(const UInt g) {
       assert(msgtype==BocInitMsg || msgtype==ForBocMsg
           || msgtype==DBocNumMsg);
       i1 = g;
     }
 };
 
-static inline envelope *UsrToEnv(void *msg) {
+static inline envelope *UsrToEnv(const void *const msg) {
   return (((envelope *) msg)-1);
 }
 
-static inline void *EnvToUsr(envelope *env) {
+static inline void *EnvToUsr(const envelope *const env) {
   return ((void *)(env+1));
 }
 
-static inline envelope *_allocEnv(int msgtype, int size=0, int prio=0) {
+static inline envelope *_allocEnv(const int msgtype, const int size=0, const int prio=0) {
   return envelope::alloc(msgtype,size,prio);
 }
 
-static inline void *_allocMsg(int msgtype, int size, int prio=0) {
+static inline void *_allocMsg(const int msgtype, const int size, const int prio=0) {
   return EnvToUsr(envelope::alloc(msgtype,size,prio));
 }
 
@@ -166,7 +166,7 @@ class MsgPool {
   private:
     int num;
     void *msgs[MAXMSGS];
-    void *_alloc(void) {
+    static void *_alloc(void) {
       register envelope *env = _allocEnv(ForChareMsg,0,0);
       env->setQueueing(_defaultQueueing);
       env->setMsgIdx(0);

@@ -83,9 +83,10 @@ static void _discardHandler(envelope *env)
 
 static inline void _printStats(void)
 {
+  int i;
   if(_printSS || _printCS) {
     Stats *total = new Stats();
-    for(int i=0;i<CkNumPes();i++)
+    for(i=0;i<CkNumPes();i++)
       total->combine(_allStats[i]);
     CkPrintf("Charm Kernel Summary Statistics:\n");
     for(i=0;i<CkNumPes();i++) {
@@ -99,7 +100,7 @@ static inline void _printStats(void)
   if(_printCS) {
     CkPrintf("Charm Kernel Detailed Statistics:\n");
     CkPrintf("PE\tCC\tCP\tFCC\tFCP\tGC\tGP\tFGC\tFGP\n");
-    for(int i=0;i<CkNumPes();i++) {
+    for(i=0;i<CkNumPes();i++) {
       CkPrintf("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",i,
                _allStats[i]->getCharesCreated(),
                _allStats[i]->getCharesProcessed(),
@@ -251,6 +252,11 @@ void CkExit(void)
   }
 }
 
+static void _nullFn(void *, void *)
+{
+  CmiAbort("Null-Method Called. Program may have Unregistered Module!!\n");
+}
+
 void _initCharm(int argc, char **argv)
 {
   CpvInitialize(PtrQ*,_buffQ);
@@ -293,6 +299,8 @@ void _initCharm(int argc, char **argv)
     argc = _parseCommandLineOpts(argc, argv);
     _registerInit();
     CkRegisterMsg("System", 0, 0, 0, sizeof(int));
+    CkRegisterChare("null", 0);
+    CkRegisterEp("null", _nullFn, 0, 0);
     _registerCkFutures();
     CkRegisterMainModule();
   }
