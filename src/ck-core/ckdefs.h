@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-06-14 20:18:55  gursoy
+ * Revision 2.5  1995-06-14 21:51:24  gursoy
+ * *** empty log message ***
+ *
+ * Revision 2.4  1995/06/14  20:18:55  gursoy
  * *** empty log message ***
  *
  * Revision 2.3  1995/06/13  19:19:07  gursoy
@@ -65,7 +68,7 @@
 #endif
 
 #ifdef CMK_COMPILER_HATES_STATIC_PROTO
-#define PROTO_PUB_PRIV 
+#define PROTO_PUB_PRIV extern
 #endif
 
 #define _CK_Find		TblFind
