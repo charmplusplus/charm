@@ -65,6 +65,9 @@ f90charm: charm++ $(L)/libf90charm.a
 multicast: charm++
 	cd libs/ck-libs/multicast && make
 
+commlib:
+	cd libs/ck-libs/commlib && make
+
 translators: charmxi conv-cpm
 
 LIBS: CONVLIBS CHARMLIBS
