@@ -3,7 +3,7 @@ COMMLIBDIR=../../conv-libs/commlib
 CDIR=../../../..
 LIBDIR=$(CDIR)/lib
 
-LIB = $(LIBDIR)/libcomm.a
+LIB = libcomm.a
 
 STRATEGY_OBJS = EachToManyStrategy.o MPIStrategy.o StreamingStrategy.o \
 		DummyStrategy.o NodeMulticast.o EachToManyMulticastStrategy.o
@@ -38,8 +38,8 @@ all: cifiles conversecom $(LIB)
 conversecom :
 	(cd ../../conv-libs/commlib; make)
 
-$(LIBDIR)/libcomm.a: $(OBJS) $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
-	$(CHARMC) -o $@ $(OBJS)
+libcomm.a: $(OBJS) $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
+	$(CHARMC) -cp $(LIBDIR) -o libcomm.a $(OBJS)
 
 ComlibManager.o: ComlibManager.C ComlibManager.h
 	$(CHARMC) -c ComlibManager.C
