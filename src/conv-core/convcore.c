@@ -1061,7 +1061,13 @@ void CmiMulticastInit()
 
 /***************************************************************************
  *
- *  Memory Allocation routines 
+ * Memory Allocation routines 
+ *
+ * A block of memory can consist of multiple chunks.  Each chunk has
+ * a sizefield and a refcount.  The first chunk's refcount is a reference
+ * count.  That's how many CmiFrees it takes to free the message.
+ * Subsequent chunks have a refcount which is less than zero.  This is
+ * the offset back to the start of the first chunk.
  *
  ***************************************************************************/
 
@@ -1076,8 +1082,19 @@ int size;
   res =(char *)malloc(size+2*sizeof(int));
   if (res==0) CmiAbort("Memory allocation failed.");
   ((int *)res)[0]=size;
-  ((int *)res)[1]=-1;    /* Reference count value */
+  ((int *)res)[1]=1;
   return (void *)(res+2*sizeof(int));
+}
+
+void CmiReference(blk)
+void *blk;
+{
+  int refCount = REFFIELD(blk);
+  if (refCount < 0) {
+    blk = (void *)((char*)blk+refCount);
+    refCount = REFFIELD(blk);
+  }
+  REFFIELD(blk) = refCount+1;
 }
 
 int CmiSize(blk)
@@ -1093,30 +1110,20 @@ void *blk;
   int refCount;
 
   refCount = REFFIELD(blk);
-
-  /* Check if the reference count is -1 */
-  if(refCount == -1){
+  if (refCount < 0) {
+    blk = (void *)((char*)blk+refCount);
+    refCount = REFFIELD(blk);
+  }
+  if(refCount==0) {
     free(BLKSTART(blk));
     return;
   }
-  if(refCount >= 0){ /* This is the Header for the Multiple messages */
-    if(REFFIELD(blk)==0){
-      free(BLKSTART(blk));
-      return;
-    }
-    REFFIELD(blk)--;
-    if(REFFIELD(blk)==0){
-      free(BLKSTART(blk));
-      return;
-    }
-  } else {
-    offset = refCount;
-    REFFIELD((char *)blk+offset)--;
-    if(REFFIELD((char *)blk+offset)==0){
-      free(BLKSTART((char *)blk+offset));
-      return;
-    }
+  refCount--;
+  if(refCount==0) {
+    free(BLKSTART(blk));
+    return;
   }
+  REFFIELD(blk) = refCount;
 }
 
 /******************************************************************************
