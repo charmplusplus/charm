@@ -263,7 +263,6 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* _stats, int count)
 	    temp = compute_com(maxid,pe);
 	    
 	    /*  CkPrintf("check id = %d, processor = %d,com = %lf, pro = %lf, comp=%lf\n", maxid,pe,temp,alloc_array[pe][nobj],total_time); */
-	    
 	    if(total_time > (temp + alloc_array[pe][nobj])){
 		minpe = pe;
 		total_time = temp + alloc_array[pe][nobj];
@@ -287,7 +286,7 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* _stats, int count)
 	    migrateMe->to_pe = minpe;
 	    migrateInfo.insertAtEnd(migrateMe);
 	}
-	delete x;   // gzheng
+	delete x;
     }
     
     int migrate_count = migrateInfo.length();
@@ -302,9 +301,10 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* _stats, int count)
     if (lb_debug)
       CmiPrintf("%s migrating %d objects.\n", lbname, migrate_count);
     
+    // free up memory
     for(pe=0;pe <= count;pe++)
 	delete alloc_array[pe];
-    delete alloc_array;
+    delete [] alloc_array;
 
     for(int oindex= 0; oindex < nobj; oindex++){
       graph * ptr = &object_graph[oindex];
@@ -316,8 +316,7 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* _stats, int count)
 	delete cur;
       }
     }
-
-    delete object_graph;
+    delete [] object_graph;
 
     return msg;
 }
