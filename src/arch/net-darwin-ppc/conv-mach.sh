@@ -5,7 +5,7 @@ CMK_CXX="c++ -Wno-long-double -fPIC -dynamic -fno-common "
 CMK_CXXPP="c++ -x c++ -E "
 CMK_LDXX="$CMK_CXX -multiply_defined suppress "
 CMK_XIOPTS=""
-CMK_QT="generic"
+CMK_QT="generic-light"
 CMK_LIBS="-lckqt"
 CMK_RANLIB="ranlib"
 
