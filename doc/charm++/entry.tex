@@ -37,8 +37,9 @@ declaration.  The syntax for this is as follows:
 entry [\uw{attribute1}, ..., \uw{attributeN}] void \uw{EntryMethod}(\uw{parameters});
 \end{alltt}
 
-\charmpp{} currently offers five attributes that one may give an entry method:
-\kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{immediate}, \kw{skipscheduler}.
+\charmpp{} currently offers the following attributes that one may give an 
+entry method:
+\kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{nokeep}, \kw{notrace}, \kw{immediate}, \kw{expedited}.
 
 \index{threaded}Threaded \index{entry method}entry methods are simply entry
 methods which are run in their own nonpremptible threads.  To make an
@@ -61,6 +62,13 @@ will wait for the first to finish before it executes.  To make an \index{entry
 method}entry method exclusive, add the keyword \kw{exclusive} to that
 entry method's attribute list.
 
+\index{nokeep}{\bf Nokeep} entry methods tells Charm++ that messages passed to
+these user entry methods will not be kept by the calls. Charm++ runtime
+may be able to adopt optimization for reusing the message memory.
+
+\index{notrace}{\bf Notrace} entry methods simply tells Charm++ that calls to 
+these entry methods should be not traced in trace projections or summary mode.
+
 \index{immediate}{\bf Immediate} entry methods are entry functions in which 
 short messages can be executed in an ``immediate'' fashion when they are 
 received either by an interrupt (Network version) or by a communication 
@@ -74,7 +82,7 @@ one execution of immediate message will not be interrupted by another.
 Function \kw{CmiProbeImmediateMsg()} can be called in users code to 
 probe and process immediate messages periodically.
 
-\index{skipscheduler}{\bf Skipscheduler} entry methods are entry functions 
+\index{expedited}{\bf Expedited} entry methods are entry functions 
 that skip Charm++'s priority-based message queue. It is useful for messages 
 that require prompt processing however in the situation when immediate message 
 does not apply. Compared with immediate message, it provides a more general
