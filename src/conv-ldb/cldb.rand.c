@@ -102,4 +102,5 @@ void CldModuleInit()
 {
   CpvInitialize(int, CldHandlerIndex);
   CpvAccess(CldHandlerIndex) = CmiRegisterHandler(CldHandler);
+  CldModuleGeneralInit();
 }

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.86  1998-06-09 17:03:11  milind
+ * Revision 2.87  1998-06-15 19:50:41  jyelon
+ * Adding new typedef stuff.
+ *
+ * Revision 2.86  1998/06/09 17:03:11  milind
  * Added CmiAbort prototype.
  *
  * Revision 2.85  1998/05/06 20:39:47  milind
@@ -379,19 +382,17 @@ typedef void (*CmiHandler)();
 
 /******** Basic Types ********/
 
-#ifdef CMK_NUMBERS_NORMAL
 
-typedef short                   CInt2;
-typedef int                     CInt4;
-typedef long long               CInt8;
-typedef unsigned short          CUInt2;
-typedef unsigned int            CUInt4;
-typedef unsigned long long      CUInt8;
-typedef float                   CFloat4;
-typedef double                  CFloat8;
-typedef struct { char c[16]; }  CFloat16;
+typedef CMK_TYPEDEF_INT2              CmiInt2;
+typedef CMK_TYPEDEF_INT4              CmiInt4;
+typedef CMK_TYPEDEF_INT8              CmiInt8;
+typedef unsigned CMK_TYPEDEF_INT2     CmiUInt2;
+typedef unsigned CMK_TYPEDEF_INT4     CmiUInt4;
+typedef unsigned CMK_TYPEDEF_INT8     CmiUInt8;
+typedef CMK_TYPEDEF_FLOAT4            CmiFloat4;
+typedef CMK_TYPEDEF_FLOAT8            CmiFloat8;
+typedef CMK_TYPEDEF_FLOAT16           CmiFloat16;
 
-#endif
 
 /******** CMI, CSD: MANY LOW-LEVEL OPERATIONS ********/
 

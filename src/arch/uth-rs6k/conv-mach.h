@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.35  1998-05-22 22:07:34  milind
+ * Revision 1.36  1998-06-15 19:54:03  jyelon
+ * Adding new typedef stuff.
+ *
+ * Revision 1.35  1998/05/22 22:07:34  milind
  * Added Charm-IDL
  *
  * Revision 1.34  1998/04/17 17:18:35  milind
@@ -174,6 +177,13 @@
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                1
+
+#define CMK_TYPEDEF_INT2    short
+#define CMK_TYPEDEF_INT4    int
+#define CMK_TYPEDEF_INT8    long long
+#define CMK_TYPEDEF_FLOAT4  float
+#define CMK_TYPEDEF_FLOAT8  double
+#define CMK_TYPEDEF_FLOAT16 struct { char d[16]; }
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
