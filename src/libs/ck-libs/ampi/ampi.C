@@ -90,7 +90,7 @@ extern "C" void get_size_(int *, int *, int *, int *);
 extern "C" void pack_(char*,int*,int*,int*,float*,int*,int*,int*);
 extern "C" void unpack_(char*,int*,int*,int*,float*,int*,int*,int*);
 
-ampi::ampi(ArrayElementCreateMessage *msg) : TempoArray(msg)
+ampi::ampi(void)
 {
   ampiArray = thisArray;
   nrequests = 0;
@@ -105,67 +105,48 @@ ampi::ampi(ArrayElementCreateMessage *msg) : TempoArray(msg)
     irequests[i].prevfree = ((i-1)+100)%100;
   }
   nbcasts = 0;
-  // delete msg;
 }
 
-ampi::ampi(ArrayElementMigrateMessage *msg) : TempoArray(msg)
+ampi::ampi(ArrayElementMigrateMessage *msg)
 {
-  //CkPrintf("[%d] called migration constructor\n", thisIndex);
-  nrequests = 0;
   ampiArray = thisArray;
-  const void *buf = ArrayElement1D::unpack(msg->packData);
-  totsize = *(int *)buf;
-  buf = (void *) ((int *)buf + 1);
-  csize = *(int *)buf;
-  buf = (void *) ((int *)buf + 1);
-  isize = *(int *)buf;
-  buf = (void *) ((int *)buf + 1);
-  rsize = *(int *)buf;
-  buf = (void *) ((int *)buf + 1);
-  fsize = *(int *)buf;
-  buf = (void *) ((int *)buf + 1);
-  packedBlock = malloc(totsize);
-  memcpy(packedBlock, buf, totsize);
-  buf = (void *) ((char *)buf + totsize);
-  thread_id = CthUnpackThread((void *)buf);//<- should be const_cast<void *>
-  CthAwaken(thread_id);
-  delete msg;
-  //CkPrintf("[%d] finished migration constructor\n", thisIndex);
+  nrequests = 0;
 }
 
-int
-ampi::packsize(void) const
+void ampi::pup(PUP::er &p)
 {
-  return ArrayElement1D::packsize()+
-  	5*sizeof(int) + totsize + CthPackBufSize(thread_id);
-}
-
-void *
-ampi::pack(void *buf)
-{
-  TempoMessage *msg;
-  int itags[2];
-  itags[0] = TEMPO_ANY; itags[1] = TEMPO_ANY;
-  // resend pending messages in table
-  while((msg=(TempoMessage *)CmmGet(tempoMessages, 2, itags, 0))) {
-    ckTempoSendElem(msg->tag1, msg->tag2, msg->data, msg->length, thisIndex);
-  }
-  buf=ArrayElement1D::pack(buf);
-  *(int *)buf = totsize;
-  buf = (void *) ((int *)buf + 1);
-  *(int *)buf = csize;
-  buf = (void *) ((int *)buf + 1);
-  *(int *)buf = isize;
-  buf = (void *) ((int *)buf + 1);
-  *(int *)buf = rsize;
-  buf = (void *) ((int *)buf + 1);
-  *(int *)buf = fsize;
-  buf = (void *) ((int *)buf + 1);
-  memcpy(buf, packedBlock, totsize);
-  free(packedBlock);
-  buf = (void *) ((char *)buf + totsize);
-  CthPackThread(thread_id, buf);
-  return buf;
+	ArrayElement1D::pup(p);//Pack superclass
+	
+	if (p.isPacking())
+	{ // resend pending messages in table
+	  TempoMessage *msg;
+	  int itags[2];
+	  itags[0] = TEMPO_ANY; itags[1] = TEMPO_ANY;
+	  while((msg=(TempoMessage *)CmmGet(tempoMessages, 2, itags, 0))) {
+	    ckTempoSendElem(msg->tag1, msg->tag2, msg->data, msg->length, thisIndex);
+	  }
+	}
+	
+	
+	//Pack/unpack all our data
+	p(csize);p(isize);p(rsize);p(fsize);
+	p(totsize);
+	if (p.isUnpacking()) packedBlock=malloc(totsize);
+	p(packedBlock,totsize);
+	
+	//Pack our thread structure [HACK: we need a CthPup]
+	int thBytes;
+	if (!p.isUnpacking())  thBytes=CthPackBufSize(thread_id);
+	p(thBytes);
+	void *buf=malloc(thBytes);//<- temporary pack/unpack buffer
+	if (p.isPacking())  CthPackThread(thread_id, buf);
+	p(buf,thBytes);
+	if (p.isUnpacking())  thread_id=CthUnpackThread(buf);
+	free(buf);
+	
+	//Start our thread on arrival
+	if (p.isUnpacking()) 
+		CthAwaken(thread_id);
 }
 
 void

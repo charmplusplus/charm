@@ -77,12 +77,12 @@ class ampi : public TempoArray {
     int nReductions;
     int nAllReductions;
 
-    ampi(ArrayElementCreateMessage *msg);
+    ampi(void);
     ampi(ArrayElementMigrateMessage *msg); 
     
-    virtual int packsize(void) const;//Returns number of bytes I need
-    virtual void *pack(void *intoBuf);//Write me to given buffer
-
+    virtual void pup(PUP::er &p);
+    
+    
     void run(void);
 };
 
