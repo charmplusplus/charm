@@ -73,12 +73,12 @@ public:
   // and newY, while nodeToDelete is removed and all references to it
   // are replaced by references to nodeToKeep
   virtual void collapse(int elemId, int nodeToKeep, int nodeToDelete, double newX, double newY, int flag) {};
- /* // update nodeID with new coordinates newX and newY
-  virtual void nodeUpdate(int nodeID, double newX, double newY);
+  // update nodeID with new coordinates newX and newY
+  virtual void nodeUpdate(int nodeID, double newX, double newY){};
   // replace oldNodeID with newNodeID on element elementID
-  virtual void nodeReplace(int elementID, int oldNodeID, int newNodeID);
+  virtual void nodeReplace(int elementID, int oldNodeID, int newNodeID){};
   // delete node entry at nodeID index
-  virtual void nodeDelete(int nodeID);*/
+  virtual void nodeDelete(int nodeID){};
 };
 
 class refineResults; //Used by refinement API to store intermediate results
