@@ -84,6 +84,10 @@ public:
     for (int i=0; i<evts.length(); i++)
       evts[i]->update(startTime, recvTime, usrPtr);
   }
+  inline void updateStartTime(double newSt) {
+    endTime = newSt + endTime - startTime;
+    startTime = newSt;
+  }
 };
 
 /**

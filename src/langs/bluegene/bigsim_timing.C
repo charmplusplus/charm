@@ -117,7 +117,8 @@ void bgTimeLog::adjustTimeLog(double tAdjust)
 	}
 }
 
-void BgGetMsgStartTime(double recvTime, BgTimeLine &tline, double* startTime, int* index)
+
+static void BgGetMsgStartTime(double recvTime, BgTimeLine &tline, double* startTime, int* index)
 {
 	/* ASSUMPTION: BgGetMsgStartTime is called only if necessary */
 
@@ -171,13 +172,14 @@ void BgAdjustTimeLineInsert(BgTimeLine &tline)
 	int idx = 0;
 	double startTime = 0;
 	BgGetMsgStartTime(tlog->recvTime, tline, &startTime, &idx);
+	double tAdjust = startTime - tlog->startTime;
+	tlog->updateStartTime(startTime);
 	
 	/* store entry corresponding to 'msg' in timeline at 'idx' */
 	tline.insert(idx, tlog);
 
 
 	// tAdjust is relative time
-	double tAdjust = startTime - tlog->startTime;
 	tline[idx]->adjustTimeLog(tAdjust);	// tAdjust would be '0' or -ve
 
 	/* adjust all entries following 'idx' in timeline */
@@ -211,14 +213,18 @@ int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline)
   if((testCount%1000)==0)
   	CmiPrintf("BgAdjustTimeLineForward\n");
 
+  // remove the log temporarily
   int idx=0;
   double startTime=0;
   bgTimeLog* tlog = tline.remove(idxOld);
 
+  // get the new startTime and proper idx for this tlog
   tlog->recvTime = tAdjustAbs;
   BgGetMsgStartTime(tlog->recvTime, tline, &startTime, &idx);
-  tline.insert(idx, tlog);
+  // update to the new start time and insert back
   double tAdjust = startTime - tlog->startTime;
+  tlog->updateStartTime(startTime);
+  tline.insert(idx, tlog);
 
   if(tAdjust==0.) return 1;
 
