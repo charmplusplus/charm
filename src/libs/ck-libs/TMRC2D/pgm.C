@@ -466,12 +466,13 @@ CkPrintf("[%d] end init\n",myChunk);
   if (CkMyPe()==0){
     CkPrintf("Entering timeloop\n");
 	}	
-  int tSteps=0x70FF00FF;
-  calcMasses(g);
+//  int tSteps=0x70FF00FF;
+  int tSteps=10;
+	calcMasses(g);
   double startTime=CkWallTimer();
   double curArea=2.0e-5;
   for (int t=0;t<tSteps;t++) {
-    if (1) { //Structural mechanics
+/*    if (1) { //Structural mechanics
     	//Compute forces on nodes exerted by elements
 			CST_NL(g.coord,g.conn,g.R_net,g.d,matConst,g.nnodes,g.nelems,g.S11,g.S22,g.S12);
 	
@@ -481,14 +482,14 @@ CkPrintf("[%d] end init\n",myChunk);
 	    //Advance node positions
 			advanceNodes(dt,g.nnodes,g.coord,g.R_net,g.a,g.v,g.d,g.m_i,(t%4)==0);
     
-    }
+    }*/
 
     //Debugging/perf. output
     double curTime=CkWallTimer();
     double total=curTime-startTime;
     startTime=curTime;
-    if (CkMyPe()==0 && (t%64==0))
-	    CkPrintf("%d %.6f sec for loop %d \n",CkNumPes(),total,t);
+/*    if (CkMyPe()==0 && (t%64==0))
+	    CkPrintf("%d %.6f sec for loop %d \n",CkNumPes(),total,t);*/
  /*   if (0 && t%16==0) {
 	    CkPrintf("    Triangle 0:\n");
 	    for (int j=0;j<3;j++) {
@@ -500,13 +501,12 @@ CkPrintf("[%d] end init\n",myChunk);
 //    if (t%512==0)
 //      FEM_Migrate();
 
-    if (t%128==0) { //Refinement:
       vector2d *loc=new vector2d[2*g.nnodes];
       for (i=0;i<g.nnodes;i++) {
 				loc[i]=g.coord[i];//+g.d[i];
       }
       double *areas=new double[g.nelems];
-      curArea=curArea*0.98;
+      curArea=curArea*0.499;
       for (i=0;i<g.nelems;i++) {
       #if 0
         double origArea=8e-8; //Typical triangle size
@@ -531,7 +531,6 @@ CkPrintf("[%d] end init\n",myChunk);
       CkPrintf("[%d] Done with refinement step: %d nodes, %d elements\n",
 	       myChunk,g.nnodes,g.nelems);
       
-    }
     
     if (1) { //Publish data to the net
 	    NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_POINTAT);
