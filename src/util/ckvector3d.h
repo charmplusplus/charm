@@ -138,6 +138,7 @@ public:
 	}
 };
 
+#if 0 /* fast but roundoff-unfriendly halfspace: */
 //A CkHalfspace3d is the portion of a 3d plane lying on
 // one side of the plane (p1,p2,p3).
 class CkHalfspace3d {
@@ -169,16 +170,63 @@ public:
 	double side(cv &pt) const
 	{return n.dot(pt)+d;}
 	
-	//Return a value t such that pos+t*dir lies on our plane.
-	double intersect(cv &pos,cv &dir) const
+	/*Return a value t such that pos+t*dir lies on our plane.*/
+	double intersectDir(cv &pos,cv &dir) const
 		{return -(d+n.dot(pos))/n.dot(dir);}
+	double intersect(cv &start,cv &end) const
+		{return intersectDir(start,end-start);}
 	
-	/*Returns the point that lies on our plane and 
-	  the line starting at start and going in dir.*/
-	CkVector3d intersectPt(cv &start,cv &dir) const
-	{
-		return start+dir*intersect(start,dir);
-	}
+	/*Returns the Point that lies on our plane and 
+	  the line starting at start and going in dir*/
+	CkVector3d intersectDirPt(cv &start,cv &dir) const
+		{return start+dir*intersectDir(start,dir);}
+	CkVector3d intersectPt(cv &start,cv &end) const
+		{return intersectDirPt(start,end-start);}
 };
+#else /* slower but more roundoff-friendly halfspace: */
+//A CkHalfspace3d is the portion of a 3d plane lying on
+// one side of the plane (p1,p2,p3).
+class CkHalfspace3d {
+public:
+	// n dot p-o==0 for plane points p
+	CkVector3d n;//Plane normal
+	CkVector3d o;//A point on the plane
+	
+	typedef const CkVector3d cv;
+	CkHalfspace3d() {}
+	CkHalfspace3d(cv &p1,cv &p2,cv &p3) {init(p1,p2,p3);}
+	CkHalfspace3d(cv &p1,cv &p2,cv &p3,cv &in) {initCheck(p1,p2,p3,in);}
+	//Norm points into the halfspace; p0 is on the line
+	CkHalfspace3d(cv &norm,cv &p0) {n=norm;o=p0;}
+
+	//Set this halfspace to (p1,p2,p3).
+	// inside points are on the right-handed thumb side of p1,p2,p3
+	void init(cv &p1,cv &p2,cv &p3) {
+		n=(p2-p1).cross(p3-p1);
+		o=p1;
+	}
+	
+	//Set this halfspace to (p1,p2,p3) with in inside.
+	void initCheck(cv &p1,cv &p2,cv &p3,cv &in)
+	{ init(p1,p2,p3); if (side(in)<0) {n=-n;} }
+	
+	//Returns + if inside halfspace, - if outside (and 0 on line).
+	double side(cv &pt) const
+	{return n.dot(pt-o);}
+	
+	/*Return a value t such that pos+t*dir lies on our plane.*/
+	double intersectDir(cv &pos,cv &dir) const
+		{return -(n.dot(pos-o))/n.dot(dir);}
+	double intersect(cv &start,cv &end) const
+		{return intersectDir(start,end-start);}
+	
+	/*Returns the Point that lies on our plane and 
+	  the line starting at start and going in dir*/
+	CkVector3d intersectDirPt(cv &start,cv &dir) const
+		{return start+dir*intersectDir(start,dir);}
+	CkVector3d intersectPt(cv &start,cv &end) const
+		{return intersectDirPt(start,end-start);}
+};
+#endif
 
 #endif /*def(thisHeader)*/
