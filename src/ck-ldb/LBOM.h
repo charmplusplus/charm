@@ -25,6 +25,8 @@ friend class LBDB;
 public:
   LDOMid id() { return myid; };
 
+  void *getUserData() { return userData; }
+
 private:
   LBOM() { };
 

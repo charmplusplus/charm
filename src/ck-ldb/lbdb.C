@@ -35,6 +35,12 @@ extern "C" LDOMHandle LDRegisterOM(LDHandle _db, LDOMid _userID,
   return db->AddOM(_userID, _userptr, _callbacks);
 }
 
+extern "C" void * LDOMUserData(LDOMHandle &_h)
+{
+  LBDB *const db = (LBDB*)(_h.ldb.handle);
+  return db->LbOM(_h)->getUserData();
+}
+
 extern "C" void LDRegisteringObjects(LDOMHandle _h)
 {
   LBDB *const db = (LBDB*)(_h.ldb.handle);
@@ -74,6 +80,13 @@ extern "C" void LDQueryKnownObjLoad(LDObjHandle &_h, double *cpuT, double *wallT
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(_h);
   obj->lastKnownLoad(cpuT, wallT);
+}
+
+extern "C" void * LDObjUserData(LDObjHandle &_h)
+{
+  LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
+  LBObj *const obj = db->LbObj(_h);
+  return obj->getUserData();
 }
 
 extern "C" void LDDumpDatabase(LDHandle _db)

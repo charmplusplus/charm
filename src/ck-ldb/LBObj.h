@@ -22,11 +22,12 @@ class LBObj
 friend class LBDB;
 
 public:
-  LBObj(LBDB *_parentDB, const LDObjHandle &_h, CmiBool _migratable=CmiTrue) {
+  LBObj(LBDB *_parentDB, const LDObjHandle &_h, void *usr_ptr = NULL, CmiBool _migratable=CmiTrue) {
     data.handle = _h;
     data.migratable = _migratable;
     data.cpuTime = 0.;
     data.wallTime = 0.;
+    userData = usr_ptr;
     parentDB = _parentDB;
     migratable = _migratable;
     registered = CmiTrue;
@@ -69,13 +70,14 @@ public:
   inline void SetMigratable(int mig) { data.migratable = mig; }
   inline LDObjData &ObjData() { return data; };
   inline void lastKnownLoad(double *c, double *w) {*c=lastCpuTime; *w=lastWallTime; }
+  inline void *getUserData() { return  userData; }
 private:
 
   LBDB* parentDB;
 //  LDOMHandle parentOM;
 //  LDObjHandle myhandle;
   LDObjData data;
-//  void *userData;
+  void *userData;
   double startWTime;
   double startCTime;
   double lastCpuTime;

@@ -69,7 +69,7 @@ LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData,
   LDOMHandle newhandle;
 
   newhandle.ldb.handle = (void*)(this);
-  newhandle.user_ptr = _userData;
+//  newhandle.user_ptr = _userData;
   newhandle.id = _userID;
 
   LBOM* om = new LBOM(this,_userID,_userData,_callbacks);
@@ -88,12 +88,12 @@ LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
   LDObjHandle newhandle;
 
   newhandle.omhandle = _omh;
-  newhandle.user_ptr = _userData;
+//  newhandle.user_ptr = _userData;
   newhandle.id = _id;
   
 #if 1
   newhandle.handle = objs.length();
-  LBObj *obj = new LBObj(this, newhandle, _migratable);
+  LBObj *obj = new LBObj(this, newhandle, _userData, _migratable);
   objs.insertAtEnd(obj);
 #else
   LBObj *obj = new LBObj(this,_omh,_id,_userData,_migratable);

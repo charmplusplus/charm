@@ -23,7 +23,7 @@ extern "C" {
 typedef void* cvoid; /* To eliminate warnings, because a C void* is not
 			the same as a C++ void* */
 
-  /*  User-defined object IDs will be 4 ints long */
+  /*  User-defined object ID is 4 ints long */
 #define OBJ_ID_SZ 4
 
 #if CMK_LBDB_ON
@@ -40,7 +40,7 @@ typedef struct {
 
 typedef struct {
   LDHandle ldb;
-  void *user_ptr;
+//  void *user_ptr;
   LDOMid id;
   int handle;		// index to LBOM
 } LDOMHandle;
@@ -56,10 +56,11 @@ typedef struct _LDObjid {
 } LDObjid;
 
 typedef int LDObjIndex;
+typedef int LDOMIndex;
 
 typedef struct {
   LDOMHandle omhandle;
-  void *user_ptr;
+//  void *user_ptr;
   LDObjid id;
   LDObjIndex  handle;
 } LDObjHandle;
@@ -123,6 +124,7 @@ LDHandle LDCreate(void);
 
 LDOMHandle LDRegisterOM(LDHandle lbdb, LDOMid userID, 
 			void *userptr, LDCallbacks cb);
+void * LDOMUserData(LDOMHandle &_h);
 void LDRegisteringObjects(LDOMHandle _h);
 void LDDoneRegisteringObjects(LDOMHandle _h);
 
@@ -130,6 +132,7 @@ LDObjHandle LDRegisterObj(LDOMHandle h, LDObjid id, void *userptr,
 			  int migratable);
 void LDUnregisterObj(LDObjHandle h);
 
+void * LDObjUserData(LDObjHandle &_h);
 void LDObjTime(LDObjHandle &h, double walltime, double cputime);
 int LDRunningObject(LDHandle _h, LDObjHandle* _o );
 void LDObjectStart(const LDObjHandle &_h);
