@@ -68,23 +68,24 @@ class RedStormNetwork: public BigSimNetwork
 private:
   int packetsize;
   double hoplatency;
+  double neighborlatency;
 public:
   RedStormNetwork() { 
     myname = "redstorm";
     alpha = 0.1E-6; 
     packetsize = PACKETSIZE;
-    hoplatency = 2e-6;
+    neighborlatency = 2e-6;
+    hoplatency = 44.8e-9;
   }
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
-    int numpackets;
     int xd=ABS(ox-nx), yd=ABS(oy-ny), zd=ABS(oz-nz);
-    double packetcost = (xd+yd+zd)*hoplatency;
-    numpackets = bytes/packetsize;
-    if (bytes%packetsize) numpackets++;
-    return  packetcost * numpackets;
+    CmiAssert(xd>=0 && yd>=0 && zd>=0);
+    int hops = xd+yd+zd;
+    double packetcost = neighborlatency + hoplatency * hops + bytes * 1e-9;
+    return packetcost;
   }
   void print() {
-    CmiPrintf("alpha: %e	packetsize: %d	hop latency:%es.\n", alpha, packetsize, hoplatency);
+    CmiPrintf("alpha: %e	latency: %es	hop latency:%es.\n", alpha, neighborlatency, hoplatency);
   }
 };
 
