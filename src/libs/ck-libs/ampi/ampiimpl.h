@@ -524,6 +524,16 @@ public:
 
 	/// Returns the type of request: 1-PersReq, 2-IReq, 3-ATAReq
 	virtual int getType(void) =0;
+
+	virtual void pup(PUP::er &p) {
+		p((char *)&buf,sizeof(void *));  //supposed to work only with isomalloc
+		p(count);
+		p(type);
+		p(src);
+		p(tag);
+		p(comm);
+		p(isvalid);
+	}
 };
 
 class PersReq : public AmpiRequest {
@@ -535,12 +545,17 @@ public:
 		buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_; 
 		comm=comm_;  sndrcv=sndrcv_;  isvalid=true; 
 	}
+	PersReq(){};
 	~PersReq(){ }
 	int start();
 	CmiBool test(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
 	inline int getType(void){ return 1; }
+	virtual void pup(PUP::er &p){
+		AmpiRequest::pup(p);
+		p(sndrcv);
+	}
 };
 
 class IReq : public AmpiRequest {
@@ -550,11 +565,15 @@ public:
 		buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_; 
 		comm=comm_;  isvalid=true; 
 	}
+	IReq(){};
 	~IReq(){ }
 	CmiBool test(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
 	inline int getType(void){ return 2; }
+	virtual void pup(PUP::er &p){
+		AmpiRequest::pup(p);
+	}
 };
 
 class ATAReq : public AmpiRequest {
@@ -569,6 +588,12 @@ class ATAReq : public AmpiRequest {
 #if CMK_BLUEGENE_CHARM
 		void *event;             // event buffered for the request
 #endif
+		virtual void pup(PUP::er &p){
+			p((char *)&buf,sizeof(void *));  //supposed to work only with isomalloc
+			p(count);
+			p(type);
+			p(src);p(tag);p(comm);
+		}
 	friend class ATAReq;
 	};
 	Request *myreqs;
@@ -576,6 +601,7 @@ class ATAReq : public AmpiRequest {
 	int idx;
 public:
 	ATAReq(int c_):elmcount(c_),idx(0) { myreqs = new Request [c_]; isvalid=true; }
+	ATAReq(){};
 	~ATAReq(void) { if(myreqs) delete [] myreqs; }
 	int addReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_){
 		myreqs[idx].buf=buf_;	myreqs[idx].count=count_;
@@ -589,6 +615,20 @@ public:
 	inline int getCount(void){ return elmcount; }
 	inline int getType(void){ return 3; }
 // 	inline void free(void){ isvalid=false; delete [] myreqs; }
+	virtual void pup(PUP::er &p){
+		AmpiRequest::pup(p);
+		p(elmcount);
+		p(idx);
+		if(p.isUnpacking()){
+			myreqs = new Request[elmcount];
+		}
+		for(int i=0;i<idx;i++){
+			myreqs[i].pup(p);
+		}
+		if(p.isDeleting()){
+			delete []myreqs;
+		}
+	}
 };
 
 /// Special CkVec<AmpiRequest*> for AMPI. Most code copied from cklist.h
@@ -665,9 +705,7 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
         CkAbort("Invalide MPI_Request\n");
     }
 
-    /// PUPer is empty because there shouldn't be any
-    /// outstanding requests at migration.
-    void pup(PUP::er &p) { /* empty */ }
+    void pup(PUP::er &p);
 };
 
 //A simple memory buffer

@@ -1743,6 +1743,55 @@ AmpiMsg *AmpiSeqQ::getOutOfOrder(int srcIdx)
   return 0;
 }
 
+
+void AmpiRequestList::pup(PUP::er &p) { 
+	CmiMemoryCheck();
+	if(!CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
+		return;
+	}
+
+	p(blklen); //Allocated size of block
+	p(len); //Number of used elements in block
+	if(p.isUnpacking()){
+		makeBlock(blklen,len);
+	}
+	int count=0;
+	for(int i=0;i<len;i++){
+		char nonnull;
+		if(!p.isUnpacking()){
+			if(block[i] == NULL){
+				nonnull = 0;
+			}else{
+				nonnull = block[i]->getType();
+			}
+		}	
+		p(nonnull);
+		if(nonnull != 0){
+			if(p.isUnpacking()){
+				switch(nonnull){
+					case 1:
+						block[i] = new PersReq;
+						break;
+					case 2:	
+						block[i] = new IReq;
+						break;
+					case 3:	
+						block[i] = new ATAReq;
+						break;
+				}
+			}	
+			block[i]->pup(p);
+			count++;
+		}else{
+			block[i] = 0;
+		}
+	}
+	if(p.isDeleting()){
+		freeBlock();
+	}
+	CmiMemoryCheck();
+}
+
 //------------------ External Interface -----------------
 ampiParent *getAmpiParent(void) {
   ampiParent *p = CtvAccess(ampiPtr);
