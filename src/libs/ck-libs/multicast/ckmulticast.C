@@ -3,9 +3,7 @@
 
 #include "ckmulticast.h"
 
-#define COOKIE_NOTREADY 0
-#define COOKIE_READY    1
-#define COOKIE_OLD     2
+#define MAXMCASTCHILDREN  2
 
 class IndexPos;
 
@@ -45,23 +43,30 @@ class mCastEntry {
 public:
   CkSectionCookie parentGrp;	// spanning tree parent
   sectionIdList children;
-  arrayIndexList allElem;	// only on root
+  arrayIndexList allElem;	// only useful on root
   arrayIndexList localElem;
   int pe;			// should always be mype
   CkSectionCookie rootSid;
   multicastGrpMsgBuf msgBuf;
-  char flag;
   mCastEntry *oldc, *newc;
   // for reduction
   reductionInfo red;
   char needRebuild;
+
+private:
+  char flag;
+  static const char COOKIE_NOTREADY=0;
+  static const char COOKIE_READY=1;
+  static const char COOKIE_OLD=2;
 public:
   mCastEntry(): flag(COOKIE_NOTREADY), oldc(NULL), newc(NULL), needRebuild(0){}
   mCastEntry(mCastEntry *);
   inline int hasParent() { return parentGrp.val?1:0; }
   inline int isObsolete() { return (flag == COOKIE_OLD); }
+  inline void setObsolete() { flag=COOKIE_OLD; }
   inline int notReady() { return (flag == COOKIE_NOTREADY); }
-  void incReduceNo();
+  inline void setReady() { flag=COOKIE_READY; }
+  inline void incReduceNo();
 };
 
 class cookieMsg: public CMessage_cookieMsg {
@@ -84,6 +89,7 @@ public:
   int redNo;
 };
 
+// message send in spanning tree
 class multicastGrpMsg: public CMessage_multicastGrpMsg {
 public:
   CkSectionCookie cookie;
@@ -125,11 +131,10 @@ flag(COOKIE_NOTREADY), oldc(NULL), newc(NULL)
   needRebuild = 0;
 }
 
-void mCastEntry::incReduceNo()
+inline void mCastEntry::incReduceNo()
 {
   red.redNo ++;
-  mCastEntry *next = newc;
-  for (; next; next=next->newc) next->red.redNo++;
+  for (mCastEntry *next = newc; next; next=next->newc) next->red.redNo++;
 }
 
 // call setup to return a sectionid.
@@ -203,7 +208,7 @@ void CkMulticastMgr::teardown(CkSectionCookie cookie)
   int i;
   mCastEntry *sect = (mCastEntry *)cookie.val;
 
-  sect->flag = COOKIE_OLD;
+  sect->setObsolete();
 
   releaseBufferedReduceMsgs(sect);
 
@@ -253,7 +258,7 @@ cookieMsg * CkMulticastMgr::setup(multicastSetupMsg *msg)
       entry->localElem.insertAtEnd(msg->arrIdx[i]);
     }
     else {
-      lists[lastKnown].insertAtEnd(IndexPos(msg->arrIdx[i], lastKnown));
+      lists[lastKnown].push_back(IndexPos(msg->arrIdx[i], lastKnown));
     }
   }
   // divide into MAXMCASTCHILDREN slots
@@ -277,6 +282,7 @@ cookieMsg * CkMulticastMgr::setup(multicastSetupMsg *msg)
       num = (num+1) % numchild;
     }
 
+    // send messages
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
     for (i=0; i<numchild; i++) {
       int n = slots[i].length();
@@ -285,7 +291,7 @@ cookieMsg * CkMulticastMgr::setup(multicastSetupMsg *msg)
       m->nIdx = slots[i].length();
       m->rootSid = msg->rootSid;
       m->redNo = msg->redNo;
-      for (int j=0; j<slots[i].length(); j++) {
+      for (j=0; j<slots[i].length(); j++) {
         m->arrIdx[j] = slots[i][j].idx;
         m->lastKnown[j] = slots[i][j].pe;
       }
@@ -299,7 +305,7 @@ cookieMsg * CkMulticastMgr::setup(multicastSetupMsg *msg)
   }
   delete [] lists;
 
-  entry->flag = COOKIE_READY;
+  entry->setReady();
 
   cookieMsg *newmsg = new cookieMsg;
   newmsg->cookie.val = entry;
@@ -313,7 +319,7 @@ void CkMulticastMgr::rebuild(CkSectionCookie &sectId)
   mCastEntry *curCookie = (mCastEntry*)sectId.val;
   // make sure I am the newest one
   while (curCookie->newc) curCookie = curCookie->newc;
-  if (curCookie->flag == COOKIE_OLD) return;
+  if (curCookie->isObsolete()) return;
 
   mCastEntry *newCookie = new mCastEntry(curCookie);  // allocate table for this section
 
@@ -325,7 +331,7 @@ void CkMulticastMgr::rebuild(CkSectionCookie &sectId)
 
 //CmiPrintf("rebuild: redNo:%d oldc:%p newc;%p\n", newCookie->red.redNo, curCookie, newCookie);
 
-  curCookie->flag = COOKIE_OLD;
+  curCookie->setObsolete();
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   mCastGrp[CmiMyPe()].reset(sectId);
 }
@@ -357,7 +363,7 @@ void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCook
       CmiAbort("Unknown array section, Did you forget to register the array section to CkMulticastMgr using setSection()?");
     }
 
-    // make sure I am the newest one
+    // update entry pointer in case there is newer one.
     if (entry->newc) {
       do { entry=entry->newc; } while (entry->newc);
       s.val = entry;
@@ -380,28 +386,16 @@ void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCook
   CkFreeMsg(m);
 
   mCastGrp[s.pe].recvMsg(newmsg);
-
-/*
-  if (entry->flag == COOKIE_NOTREADY) {
-//CmiPrintf("enq buffer %p\n", newmsg);
-    entry->msgBuf.enq(newmsg);
-  }
-  else {
-    mCastGrp[CmiMyPe()].recvMsg(newmsg);
-  }
-*/
 }
 
+extern void setSectionCookie(void *msg, CkSectionCookie sid);
 
 void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
 {
   int i;
-  envelope *env = (envelope *)msg->msg;
-  void *m = EnvToUsr(env);
-
   mCastEntry *entry = (mCastEntry *)msg->cookie.val;
 
-  if (entry->flag == COOKIE_NOTREADY) {
+  if (entry->notReady()) {
 //CmiPrintf("enq buffer %p\n", msg);
     entry->msgBuf.enq(msg);
     return;
@@ -415,12 +409,13 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
     mCastGrp[entry->children[i].pe].recvMsg(newmsg);
   }
 
-  // send to local
+  envelope *env = (envelope *)msg->msg;
   int msgSize = env->getTotalsize();
+
+  // send to local
 //CmiPrintf("send to local %d\n", msgSize);
   for (i=0; i<entry->localElem.length(); i++) {
 //CmiPrintf("local: %d %d\n", i, msg->ep);
-//entry->localElem[i].print();
     CProxyElement_ArrayBase ap(msg->aId, entry->localElem[i]);
     envelope *newm = (envelope *)CmiAlloc(msgSize);
     memcpy(newm, env, msgSize);
@@ -512,7 +507,7 @@ void CkMulticastMgr::recvRedMsg(ReductionMsg *msg)
 	entry = newentry;
 	if (!entry || entry->isObsolete()) CmiAbort("Crazy!");
 	msg->flag = 0;	     // indicate it is not on old spanning tree
-	updateReduceNo = 1;  // reduce from old tree, new try has to be updated.
+	updateReduceNo = 1;  // reduce from old tree, new entry need update.
       }
       else {
 	msg->sid = entry->rootSid;

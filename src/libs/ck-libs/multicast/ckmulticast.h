@@ -12,20 +12,18 @@ typedef mCastEntry * mCastEntryPtr;
 
 #include "CkMulticast.decl.h"
 
-#define MAXMCASTCHILDREN  2
-
 class CkMcastBaseMsg {
 public:
-  char magic;      // TODO
+  char magic;
   unsigned int _gpe, _redNo;
   void *_cookie;
   static const char MAGIC = 88 ;
 public:
   CkMcastBaseMsg() { magic = MAGIC; }
-  static int checkMagic(CkMcastBaseMsg *m) { return m->magic == MAGIC; }
-  unsigned int &gpe(void) { return _gpe; }
-  unsigned int &redno(void) { return _redNo; }
-  void *&cookie(void) { return _cookie; }
+  static inline int checkMagic(CkMcastBaseMsg *m) { return m->magic == MAGIC; }
+  inline unsigned int &gpe(void) { return _gpe; }
+  inline unsigned int &redno(void) { return _redNo; }
+  inline void *&cookie(void) { return _cookie; }
 };
 
 typedef void (*redClientFn)(CkSectionCookie sid, void *param,int dataSize,void *data);
@@ -62,7 +60,6 @@ class CkMulticastMgr: public CkDelegateMgr {
 };
 
 
-extern void setSectionCookie(void *msg, CkSectionCookie sid);
 extern void CkGetSectionCookie(CkSectionCookie &id, void *msg);
 
 #endif
