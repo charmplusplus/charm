@@ -117,7 +117,7 @@ CmiPrintf("start\n");
   }
   
 //  void cb_client(CkSectionCookie sid, void *param, int dataSize, void *data)
-  void cb_client(CkMcastReductionMsg *msg)
+  void cb_client(CkReductionMsg *msg)
   {
     int dataSize = msg->getSize();
     void *data = msg->getData();
