@@ -276,8 +276,8 @@ protected:
   void AtSync(void);
   virtual void ResumeFromSync(void);
   CmiBool usesAtSync;//You must set this in the constructor to use AtSync().
-private: //Load balancer state:
   LDObjHandle ldHandle;//Transient (not migrated)
+private: //Load balancer state:
   LDBarrierClient ldBarrierHandle;//Transient (not migrated)  
   static void staticResumeFromSync(void* data);
   static void staticMigrate(LDObjHandle h, int dest);
@@ -390,6 +390,7 @@ public:
   void SendBroadcast(CkArrayMessage *msg);
   void RecvBroadcast(CkArrayMessage *msg);
   
+  LBDatabase *the_lbdb;
 private:
 #if CMK_LBDB_ON
   LDBarrierClient dummyBarrierHandle;
@@ -405,7 +406,6 @@ private:
   void queryLoad(LDOMHandle _h);
   
   LDOMHandle myLBHandle;
-  LBDatabase *the_lbdb;
 #endif
   //This flag lets us detect element suicide, so we can stop timing
   CmiBool curElementIsDead;

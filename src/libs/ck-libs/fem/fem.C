@@ -93,6 +93,7 @@ _allReduceHandler(void *, int datasize, void *data)
 }
 
 static main* _mainptr = 0;
+extern void CreateMetisLB(void);
 
 main::main(CkArgMsg *am)
 {
@@ -110,6 +111,7 @@ main::main(CkArgMsg *am)
       break;
     }
   }
+  CreateMetisLB();
   _femaid = CProxy_chunk::ckNew(_nchunks);
   CProxy_chunk farray(_femaid);
   farray.setReductionClient(_allReduceHandler, 0);
@@ -366,6 +368,7 @@ combine(const DType& dt, void* lhs, void* rhs, int op)
 
 chunk::chunk(void)
 {
+  usesAtSync = CmiTrue;
   ntypes = 0;
   new_DT(FEM_BYTE);
   new_DT(FEM_INT);
@@ -400,19 +403,25 @@ chunk::callDriver(void)
 void
 chunk::run(ChunkMsg *msg)
 {
+  start_running();
   CtvInitialize(chunk*, _femptr);
   CtvAccess(_femptr) = this;
   readChunk(msg);
   callDriver();
+  // Note: "this may have changed after we come back here 
+  CtvAccess(_femptr)->stop_running();
 }
 
 void
 chunk::run(void)
 {
+  start_running();
   CtvInitialize(chunk*, _femptr);
   CtvAccess(_femptr) = this;
   readChunk();
   callDriver();
+  // Note: "this may have changed after we come back here 
+  CtvAccess(_femptr)->stop_running();
 }
 
 void
@@ -474,7 +483,9 @@ chunk::update(int fid, void *nodes)
   if (nRecd != numPes) {
     wait_for = seqnum;
     tid = CthSelf();
+    stop_running();
     CthSuspend();
+    start_running();
     wait_for = 0;
     tid = 0;
   }
@@ -546,7 +557,9 @@ chunk::reduce(int fid, void *inbuf, void *outbuf, int op)
   contribute(len, inbuf, rtype);
   curbuf = outbuf;
   tid = CthSelf();
+  stop_running();
   CthSuspend();
+  start_running();
 }
 
 void
@@ -787,9 +800,8 @@ chunk::pup(PUP::er &p)
   if(p.isUnpacking())
   {
     tid = CthUnpackThread(p.getBuf());
-    CthAwaken(tid);
+    // CthAwaken(tid);
     CtvAccessOther(tid,_femptr) = this;
-    tid = 0;
   }
   p.advance(tsize);
   p(seqnum);
@@ -902,24 +914,18 @@ FEM_Get_Userdata(void)
   return cptr->get_userdata();
 }
 
-// FIXME: Place Holder
 extern "C" void
 FEM_Migrate(void)
 {
   chunk *cptr = CtvAccess(_femptr);
   cptr->tid = CthSelf();
   int idx = cptr->thisIndex;
-  int mype = CkMyPe();
-  int npes = CkNumPes();
-  int tope = (mype+1)%npes;
   CProxy_chunk cproxy(_femaid);
-  cproxy[idx].migrate(new MigrateInfo(tope));
+  cproxy[idx].migrate();
+  cptr->stop_running();
   CthSuspend();
-  if(CkMyPe()!=tope)
-  {
-    CkError("[%d] wanted to go to %d but went to %d!\n",idx,tope,CkMyPe());
-    CkAbort("");
-  }
+  cptr = CtvAccess(_femptr);
+  cptr->start_running();
 }
 
 extern "C" void 

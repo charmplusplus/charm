@@ -1,10 +1,10 @@
 mainmodule fem {
+  extern module MetisLB;
   readonly CkChareID _mainhandle;
   readonly CkArrayID _femaid;
   readonly unsigned int _nchunks;
   message [varsize] DataMsg;
   message [packed] ChunkMsg;
-  message MigrateInfo;
   mainchare main {
     entry main();
     entry void done(void);
@@ -15,6 +15,6 @@ mainmodule fem {
     entry [threaded] void run(ChunkMsg*);
     entry void recv(DataMsg *);
     entry void result(DataMsg *);
-    entry void migrate(MigrateInfo *);
+    entry void migrate(void);
   };
 };

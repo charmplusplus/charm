@@ -103,13 +103,6 @@ class ChunkMsg : public CMessage_ChunkMsg {
   static ChunkMsg *unpack(void *);
 };
 
-class MigrateInfo :public CMessage_MigrateInfo
-{
- public:
-  int where;
-  MigrateInfo(int w) : where(w) {}
-};
-
 #define MAXDT 20
 
 class chunk : public ArrayElement1D
@@ -155,7 +148,19 @@ class chunk : public ArrayElement1D
   void run(ChunkMsg*);
   void recv(DataMsg *);
   void result(DataMsg *);
-  void migrate(MigrateInfo *msg) { migrateMe(msg->where); delete msg; }
+  void migrate(void)
+  {
+    // CkPrintf("[%d] going to sync\n", thisIndex);
+    AtSync();
+  }
+  void start_running(void)
+  {
+    thisArray->the_lbdb->ObjectStart(ldHandle);
+  }
+  void stop_running(void)
+  {
+    thisArray->the_lbdb->ObjectStop(ldHandle);
+  }
   int new_DT(int base_type, int vec_len=1, int init_offset=0, int distance=0) {
     if(ntypes==MAXDT) {
       CkAbort("FEM: registered datatypes limit exceeded.");
@@ -185,6 +190,12 @@ class chunk : public ArrayElement1D
     valid_udata = 1;
   }
   void pup(PUP::er &p);
+  void ResumeFromSync(void)
+  {
+    // CkPrintf("[%d] returned from sync\n", thisIndex);
+    CthAwaken(tid);
+    tid = 0;
+  }
  private:
   FILE *fp;
   void update_field(DataMsg *);

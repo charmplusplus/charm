@@ -121,15 +121,25 @@ updateNodes(GlobalData *gd, double prop, double slope)
   }
 }
 
+extern "C" double CmiCpuTimer(void);
+static void
+_DELAY_(int microsecs)
+{
+  double upto = CmiCpuTimer() + 1.e-6 * microsecs;
+  while(upto > CmiCpuTimer());
+}
+
 extern "C" void
 driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
 {
+  int myid = FEM_My_Partition();
+  // CkPrintf("[%d] starting driver\n", myid);
   GlobalData *gd = new GlobalData;
   FEM_Register((void*)gd, (FEM_Packsize_Fn)mypksz, (FEM_Pack_Fn)mypk,
                (FEM_Unpack_Fn)myupk);
   Node *nodes = new Node[nn];
   Element *elements = new Element[ne];
-  gd->myid = FEM_My_Partition();
+  gd->myid = myid;
   gd->nn = nn;
   gd->nnums = nnums;
   gd->ne = ne;
@@ -148,9 +158,10 @@ driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
   int kk = -1;
   double prop, slope;
   double stime, etime;
-  stime = CkTimer();
+  int phase = 0;
   for(i=0;i<gd->nTime;i++)
   {
+    stime = CkWallTimer();
     // CkPrintf("[%d] iteration %d at %lf secs\n", gd->myid, i, CkTimer());
     if (gd->ts_proportion[kk+1] == i)
     {
@@ -167,18 +178,26 @@ driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
     initNodes(gd);
     lst_NL(gd);
     lst_coh2(gd);
+    if(myid==3 && i>20)
+    {
+      int biter = (i < 30 ) ? i : 30;
+      _DELAY_((biter-20)*5000);
+    }
     updateNodes(gd, prop, slope);
     FEM_Update_Field(rfield, gd->nodes);
-    // FIXME: Place holder for now.
-    FEM_Migrate();
-    gd = (GlobalData*) FEM_Get_Userdata();
-    gd->nnums = FEM_Get_Node_Nums();
-    gd->enums = FEM_Get_Elem_Nums();
-    gd->conn = FEM_Get_Conn();
+    if(i%20==19)
+    {
+      FEM_Migrate();
+      gd = (GlobalData*) FEM_Get_Userdata();
+      gd->nnums = FEM_Get_Node_Nums();
+      gd->enums = FEM_Get_Elem_Nums();
+      gd->conn = FEM_Get_Conn();
+    }
+    etime = CkWallTimer();
+    if(gd->myid == 0)
+      CkPrintf("Iter=%d\tTime=%lf seconds\n", i, (etime-stime));
   }
-  etime = CkTimer();
-  if(gd->myid == 0)
-    CkPrintf("Time per iteration = %lf seconds\n", (etime-stime)/gd->nTime);
+  // CkPrintf("[%d] exiting driver\n", myid);
 }
 
 extern "C" void

@@ -153,8 +153,12 @@ static LDObjid idx2LDObjid(const CkArrayIndex &idx)
   const unsigned char *data=idx.getKey(len);
   const int *id=(const int *)data;
   lenInInts = len/sizeof(int);
+  /* FIXME: This is Orion's version. It breaks the common 1D case.
   for (i=0;i<lenInInts;i++)
     r.id[i%OBJ_ID_SZ]^=id[i]+(id[i]<<(24+i/4));
+  */
+  for (i=0;i<lenInInts;i++)
+    r.id[i%OBJ_ID_SZ] = id[i];
   return r;
 }
 #endif
@@ -1302,7 +1306,8 @@ void CProxy_CkArrayBase::send(CkArrayMessage *msg, int entryIndex)
 	msg->type.msg.entryIndex = entryIndex;
 	msg->type.msg.hopCount = 0;
 	msg=msg->insert(*_idx);//Insert array index into message
-	CProxy_CkArray(_aid).Send(msg, CkMyPe());
+	// CProxy_CkArray(_aid).Send(msg, CkMyPe());
+	CProxy_CkArray(_aid).ckLocalBranch()->Send(msg);
 	delete _idx;
 	_idx = NULL;
 }
