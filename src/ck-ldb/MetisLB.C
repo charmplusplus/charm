@@ -90,7 +90,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count,
   // CkPrintf("[%d] MetisLB strategy\n",CkMyPe());
   CkVector migrateInfo;
 
-  int i, j;
+  int i, j, m;
   int numobjs = 0;
   for (j=0; j < count; j++) {
     numobjs += stats[j].n_objs;
@@ -218,18 +218,18 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count,
     }
     else if (WEIGHTED == option) {
       float maxtotal_walltime = stats[0].total_walltime;
-      for (int m=1; m<count; m++) {
+      for (m=1; m<count; m++) {
 	if (maxtotal_walltime < stats[m].total_walltime)
 	  maxtotal_walltime = stats[m].total_walltime;
       }
       float totaltimeAllPe = 0.0;
-      for (int m=0; m<count; m++) {
+      for (m=0; m<count; m++) {
 	totaltimeAllPe += stats[m].pe_speed * 
 	  (maxtotal_walltime-stats[m].bg_walltime);
       }
       // set up the different weights
       float *tpwgts = new float[count];
-      for (int m=0; m<count; m++) {
+      for (m=0; m<count; m++) {
 	tpwgts[m] = stats[m].pe_speed * 
 	  (maxtotal_walltime-stats[m].bg_walltime) / totaltimeAllPe;
       }
@@ -245,7 +245,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count,
     }
     else if (MULTI_CONSTRAINT == option) {
       CkPrintf("Metis load balance strategy: ");
-      Ckprintf("multiple constraints not implemented yet.\n";
+      CkPrintf("multiple constraints not implemented yet.\n";
     }
   }
   CkPrintf("Post-LDB Statistics step %d\n", step());
