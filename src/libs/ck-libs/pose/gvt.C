@@ -114,8 +114,8 @@ void PVT::setGVT(GVTMsg *m)
   CProxy_PVT p(ThePVT);
   estGVT = m->estGVT;
 #ifdef POSE_COMM_ON  
-  PrioStreaming *pstrat = (PrioStreaming *)(POSE_commlib_insthndl.getStrategy());
-  pstrat->setBasePriority(estGVT);
+  //PrioStreaming *pstrat = (PrioStreaming *)(POSE_commlib_insthndl.getStrategy());
+  //pstrat->setBasePriority(estGVT);
 #endif
   simdone = m->done;
   CkFreeMsg(m);

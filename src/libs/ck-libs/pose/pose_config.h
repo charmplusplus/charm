@@ -29,7 +29,7 @@
 #define MSG_RECYCLING 1
 
 /// Uncomment to make use of the Streaming Communication Library optimizations
-#define POSE_COMM_ON 1
+//#define POSE_COMM_ON 1
 
 /// Uncomment to turn on POSE load balancer
 //#define LB_ON 1
@@ -37,8 +37,8 @@
 #include <StreamingStrategy.h>
 #include <MeshStreamingStrategy.h>
 #include <PrioStreaming.h>
-#define COMM_TIMEOUT 3
-#define COMM_MAXMSG 50
+#define COMM_TIMEOUT 2
+#define COMM_MAXMSG 20
 
 /// Synchronization strategy constants
 #define MAX_ITERATIONS 100  // maximum forward executions per Step call
