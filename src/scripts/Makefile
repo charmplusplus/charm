@@ -11,7 +11,7 @@
 # 
 # This Makefile is common to all machines.  This works because the charmc
 # is smart enough to "conceal" the differences between machines.  charmc
-# gets its smarts by reading the conv-mach.csh configuration file.
+# gets its smarts by reading the conv-mach.sh configuration file.
 #
 # If you wish to compile with debugging, optimization, or some other charm
 # option, you can do so by setting OPTS.  For example, if you need a lot
@@ -55,7 +55,7 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 
 ###############################################################################
 #
-# The basics (bin, lib, include, headers, charmc, conv-mach.csh)
+# The basics (bin, lib, include, headers, charmc, conv-mach.sh)
 #
 ###############################################################################
 
@@ -68,14 +68,14 @@ ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
 
 ALLINTERFACES=idl.ci
 
-basics: dirs+sources $(ALLHEADERS) $(ALLINTERFACES) charmc conv-mach.csh
+basics: dirs+sources $(ALLHEADERS) $(ALLINTERFACES) charmc conv-mach.sh
 	rm -rf ../include
 	mkdir ../include
 	cp $(ALLHEADERS) ../include/
 	cp $(ALLINTERFACES) ../include/
 	rm -f ../bin/charmc ; cp charmc ../bin/
 	chmod 755 ../bin/charmc
-	cp conv-mach.csh ../include/
+	cp conv-mach.sh ../include/
 	touch basics
 
 dirs+sources:
@@ -128,7 +128,7 @@ dirs+sources:
 #
 ###############################################################################
 
-CVHEADERS=converse.h conv-mach.h conv-mach.csh \
+CVHEADERS=converse.h conv-mach.h conv-mach.sh \
           ../include/CkFutures.decl.h CkFutures.def.h \
           ../include/CkArray.decl.h CkArray.def.h \
           ../include/LBDatabase.decl.h LBDatabase.def.h \
@@ -152,7 +152,7 @@ conv-host-if-needed:
 	if [ -f conv-host.c ] ; then make conv-host OPTS='$(OPTS)' ; fi
 
 QuickThreads/libckqt.a:
-	csh -fc 'source conv-mach.csh;cd QuickThreads;./configure $$CMK_QT'
+	. conv-mach.sh;cd QuickThreads;./configure $$CMK_QT
 	cd QuickThreads ; make qt
 	cp QuickThreads/libqt.a ../lib/libckqt.a
 
