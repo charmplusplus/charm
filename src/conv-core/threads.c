@@ -1787,13 +1787,7 @@ CthThread t;
     CthAbortHelp(&tc->stackp, tc, 0);
     setcontext(&t->stackp);
   } else {
-/*
-CmiPrintf("qt_block swap stack tc:%p t:%p \n", &tc->stackp, &t->stackp);
-*/
     if (0 != swapcontext(&tc->stackp, &t->stackp)) CmiAbort("CthResume: swapcontext failed\n");
-/*
-CmiPrintf("here: stack:%p %p %p\n", &tc->stackp, tc, CthCpvAccess(CthCurrent));
-*/
   }
   if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
 }
@@ -1805,14 +1799,9 @@ void CthOnly(void *arg, void *vt, qt_userf_t fn)
   CthSuspend();
 }
 
-static int did=0;
-
 #define STP_STKALIGN(sp, alignment) \
   ((void *)((((qt_word_t)(sp)) + (alignment) - 1) & ~((alignment)-1)))
 
-/*  for Solaris, it seems it already allocate a stack for new context,
-    so, there is no need to assign a new one.
-*/
 CthThread CthCreate(fn, arg, size)
 CthVoidFn fn; void *arg; int size;
 {
@@ -1825,30 +1814,20 @@ CthVoidFn fn; void *arg; int size;
   _MEMCHECK(result);
   CthThreadInit(result);
   stackbase = stack;
-#if CMK_SOLARIS
-  if (did == 0) {
-    stack_t sigstk;
-    did = 1;
-    sigstk.ss_sp = (char *)malloc(SIGSTKSZ);
-    _MEMCHECK(sigstk.ss_sp);
-    sigstk.ss_size = SIGSTKSZ;
-    sigstk.ss_flags = 0;
-    if (sigaltstack(&sigstk, (stack_t *)0) < 0) CmiAbort("sigaltstack");
-  }
-#endif
-  stackbase = stack;
   stackbase = STP_STKALIGN(stackbase, 16);
   getcontext(&result->stackp);
-#if ! CMK_SOLARIS
+#if CMK_STACK_GROWDOWN
+  result->stackp.uc_stack.ss_sp = stackbase+size-2048;
+#elif CMK_STACK_GROWUP
   result->stackp.uc_stack.ss_sp = stackbase+8192;
-  result->stackp.uc_stack.ss_size = 8192*2;
-  result->stackp.uc_stack.ss_flags = 0;
+#else
+  #error "Must define stack grow up or down in conv-mach.h!"
+  CmiAbort("Must define stack grow up or down in conv-mach.h!\n");
 #endif
+  result->stackp.uc_stack.ss_size = size - 8192;
+  result->stackp.uc_stack.ss_flags = 0;
   result->stackp.uc_link = 0;
   makecontext(&result->stackp, (void (*) (void))CthOnly, 3, arg, result, fn);
-/*
-CmiPrintf("created: %p stack:%p\n", result, &result->stackp);
-*/
   result->stack = stack;
   CthSetStrategyDefault(result);
   return result;
