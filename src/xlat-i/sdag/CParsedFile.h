@@ -24,6 +24,7 @@ class CParsedFile {
     void generateCode(XStr& output);
     void generateEntries(XStr& output);
     void generateInitFunction(XStr& output);
+    void generatePupFunction(XStr& output);
   public:
     TList<CEntry*> entryList;
     TList<CParseNode*> nodeList;
@@ -39,6 +40,7 @@ class CParsedFile {
       generateCode(output);
       generateEntries(output);
       generateInitFunction(output);
+      generatePupFunction(output);
       output.line_append('\\');
       output << "\n";
     }

@@ -79,3 +79,11 @@ void CParsedFile::generateInitFunction(XStr& op)
   }
   op << "  }\n";
 }
+
+void CParsedFile::generatePupFunction(XStr& op)
+{
+  op << "public:\n";
+  op << "  void __sdag_pup(PUP::er& p) {\n";
+  op << "    if (__cDep) { __cDep->pup(p); }\n";
+  op << "  }\n";
+}
