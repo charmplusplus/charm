@@ -101,15 +101,14 @@ void Switch::sendPacket(Packet *p,const int & outVcId,const int & outPort,const 
 void Switch::checkNextPacketInVc(flowStart *f) {
         int outVc; Packet p,*p2;
         vector<Header>::iterator headOfBuf;
-        p.hdr.routeInfo.datalen = f->datalen; p.hdr.portId = f->vcid/config.switchVc;
         requested[f->vcid] = 0;
 
         if(Buffer[f->vcid].size()) {
         headOfBuf = Buffer[f->vcid].begin();
                 // Be careful so that neccessary data in packet "p" is populated
-		
+		p.hdr = *headOfBuf;	
                 outVc = outputVcSelect->selectOutputVc(availBufsize,&p,f->vcid%config.switchVc);
-                if((outVc != NO_VC_AVAILABLE) && !requested[outVc+config.switchVc*(headOfBuf->portId)]) {
+                if(outVc != NO_VC_AVAILABLE) {
                         p2 = new Packet; p2->hdr = *headOfBuf;
                         Buffer[f->vcid].erase(headOfBuf);
                         sendPacket(p2,outVc+p2->hdr.portId*config.switchVc,p2->hdr.portId,f->vcid);
