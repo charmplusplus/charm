@@ -1,5 +1,25 @@
 #include "armci_impl.h"
 
+void *stridedCopy(void *base, void *buffer_ptr,
+		  int *stride, int *count, 
+		  int dim_id, bool flatten) {
+  if (dim_id == 0) {
+    if (flatten) {
+      memcpy(buffer_ptr, base, count[dim_id]);
+    } else {
+      memcpy(base, buffer_ptr, count[dim_id]);
+    }
+    return (void *)((char *)buffer_ptr + count[dim_id]);
+  } else {
+    for (int i=0; i<count[dim_id]; i++) {
+      buffer_ptr = stridedCopy(base, buffer_ptr, stride, 
+			       count, dim_id-1, flatten);
+      base = (void *)((char *)base + stride[dim_id-1]);
+    }
+    return buffer_ptr;
+  }
+}
+
 // malloc reduction client
 void mallocClient(void *param, int datasize, void *data) {
   // get the array proxy from the supplied aid value (at setup)
