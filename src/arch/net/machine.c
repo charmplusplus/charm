@@ -1648,9 +1648,10 @@ static void host_abort(const char *s)
 static void node_addresses_store();
 
 #if CMK_CCS_AVAILABLE
-CpvExtern(int, strHandlerID);
-CpvDeclare(void *, CcsRequestQueue);
-CpvDeclare(int, stateAvailable);
+static CmiNodeLock ccs_mutex;
+extern int strHandlerID;
+static void *ccs_request_q;
+static int stateAvailable;
 typedef struct CcsRequestNode {
   char *ptr;
   int pe;
@@ -1696,20 +1697,21 @@ static void ctrl_getone()
       msg = (char *) CmiAlloc(len+size+CmiMsgHeaderSizeBytes+1);
       if (!msg)
         CmiPrintf("%d: Out of mem\n", Cmi_mynode);
-      CmiSetHandler(msg, CpvAccess(strHandlerID));
+      CmiSetHandler(msg, strHandlerID);
       strcpy(msg+CmiMsgHeaderSizeBytes, line);
       fread(msg+CmiMsgHeaderSizeBytes+len, 1, size, f);
       msg[CmiMsgHeaderSizeBytes+len+size] = '\0';
-      if(CpvAccess(stateAvailable) == 0){
+      CmiLock(ccs_mutex);
+      if(stateAvailable < Cmi_mynodesize){
 	CcsRequest qmsg = (CcsRequest)malloc(sizeof(struct CcsRequestNode));
         _MEMCHECK(qmsg);
 	qmsg->ptr = msg;
 	qmsg->pe = pe;
-	FIFO_EnQueue(CpvAccess(CcsRequestQueue), qmsg);
-      }
-      else{
+	FIFO_EnQueue(ccs_request_q, qmsg);
+      } else {
 	PCQueuePush(CmiGetStateN(pe)->recv, msg);
       }
+      CmiUnlock(ccs_mutex);
 
 #if CMK_USE_PERSISTENT_CCS
       if(dont_close == 1) break;
@@ -2850,22 +2852,21 @@ void ConverseInitPE()
   _MEMCHECK(CpvAccess(internal_printf_buffer));
   CthInit(Cmi_argv);
 #if CMK_CCS_AVAILABLE
-  CpvInitialize(void *, CcsRequestQueue);
-  CpvAccess(CcsRequestQueue) = FIFO_Create();
-  CpvInitialize(int, stateAvailable);
-  CpvAccess(stateAvailable) = 0;
+  stateAvailable = 0;
 #endif
   ConverseCommonInit(Cmi_argv);
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
 #if CMK_CCS_AVAILABLE
-  CpvAccess(stateAvailable) = 1;
-  while(!FIFO_Empty(CpvAccess(CcsRequestQueue))){
+  CmiLock(ccs_mutex); 
+  stateAvailable++; 
+  while(stateAvailable==Cmi_mynodesize && !FIFO_Empty(ccs_request_q)) {
     CcsRequest queuedMsg;
-    FIFO_DeQueue(CpvAccess(CcsRequestQueue), (void **)&queuedMsg);
-    CmiSetHandler(queuedMsg->ptr, CpvAccess(strHandlerID));
+    FIFO_DeQueue(ccs_request_q, (void **)&queuedMsg);
+    CmiSetHandler(queuedMsg->ptr, strHandlerID);
     PCQueuePush(CmiGetStateN(queuedMsg->pe)->recv, queuedMsg->ptr);
   }
+  CmiUnlock(ccs_mutex);
 #endif
 }
 
@@ -2896,6 +2897,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   parse_netstart();
   extract_args(argv);
   log_init();
+  Cmi_check_delay = Cmi_numnodes * 0.5;
+  Cmi_scanf_mutex = CmiCreateLock();
+#if CMK_CCS_AVAILABLE
+  ccs_mutex = CmiCreateLock();
+  ccs_request_q = FIFO_Create();
+#endif
   signal(SIGPIPE, KillOnSIGPIPE);
   signal(SIGSEGV, KillOnAllSigs);
   signal(SIGBUS, KillOnAllSigs);
@@ -2913,8 +2920,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   skt_server(&ctrlport, &ctrlskt);
   Cmi_host_fd = skt_connect(Cmi_host_IP, Cmi_host_port, 60);
   node_addresses_obtain();
-  Cmi_check_delay = Cmi_numnodes * 0.5;
-  Cmi_scanf_mutex = CmiCreateLock();
   CmiStartThreads();
   ConverseInitPE();
   if (ret==0) {

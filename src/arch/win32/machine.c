@@ -258,31 +258,31 @@ static int Cmi_shutdown_initiated;
 
 static void KillEveryone(const char *msg)
 {
-	host_abort(msg);
-	exit(1);
+  host_abort(msg);
+  exit(1);
 }
 
 static void KillEveryoneCode(int n)
 {
-	char _s[100];
-	sprintf(_s, "[%d] Fatal error #%d\n", CmiMyPe(), n);
-	Cmi_shutdown_initiated = 1;
-	host_abort(_s);
-	exit(1);
+  char _s[100];
+  sprintf(_s, "[%d] Fatal error #%d\n", CmiMyPe(), n);
+  Cmi_shutdown_initiated = 1;
+  host_abort(_s);
+  exit(1);
 }
 
 static void KillOnAllSigs(int dummy)
 {
-	char _s[100];
-	sprintf(_s, "[%d] Node program recived signal\n", CmiMyPe());
-	host_abort(_s);
-	exit(1);
+  char _s[100];
+  sprintf(_s, "[%d] Node program recived signal\n", CmiMyPe());
+  host_abort(_s);
+  exit(1);
 }
 
 static void KillOnSIGPIPE(int dummy)
 {
-	fprintf(stderr,"host exited, terminating.\n");
-	exit(0);
+  fprintf(stderr,"host exited, terminating.\n");
+  exit(0);
 }
 
 
@@ -311,152 +311,152 @@ static void KillOnSIGPIPE(int dummy)
 
 static void zap_newline(char *s) 
 {
-	char *p;
-	p = s + strlen(s)-1;
-	if (*p == '\n') *p = '\0';
+  char *p;
+  p = s + strlen(s)-1;
+  if (*p == '\n') *p = '\0';
 }
 
 static char *skipblanks(char *p) 
 {
-	while ((*p==' ')||(*p=='\t')||(*p=='\n')) p++;
-	return p;
+  while ((*p==' ')||(*p=='\t')||(*p=='\n')) p++;
+  return p;
 }
 
 static char *skipstuff(char *p) 
 {
-	while ((*p)&&(*p!=' ')&&(*p!='\t')) p++;
-	return p;
+  while ((*p)&&(*p!=' ')&&(*p!='\t')) p++;
+  return p;
 }
 
 static char *strdupl(char *s)
 {
-	int len = strlen(s);
-	char *res = (char *)malloc(len+1);
-	_MEMCHECK(res);
-	strcpy(res, s);
-	return res;
+  int len = strlen(s);
+  char *res = (char *)malloc(len+1);
+  _MEMCHECK(res);
+  strcpy(res, s);
+  return res;
 }
 
 double GetClock()
 {
-	struct _timeb tv; 
-	_ftime(&tv);
-	return (tv.time * 1.0 + tv.millitm * 1.0E-3);
+  struct _timeb tv; 
+  _ftime(&tv);
+  return (tv.time * 1.0 + tv.millitm * 1.0E-3);
 }
 
 void jmemcpy(char *dst, char *src, int len)
 {
-	char *sdend = (char *)(((CMK_SIZE_T)(src + len)) & ~(sizeof(double)-1));
-	while (src != sdend) 
-	{
-		*((double*)dst) = *((double*)src);
-		dst+=sizeof(double); src+=sizeof(double);
-	}
-	len &= (sizeof(double)-1);
-	while (len) { *dst++ = *src++; len--; }
+  char *sdend = (char *)(((CMK_SIZE_T)(src + len)) & ~(sizeof(double)-1));
+  while (src != sdend) 
+  {
+    *((double*)dst) = *((double*)src);
+    dst+=sizeof(double); src+=sizeof(double);
+  }
+  len &= (sizeof(double)-1);
+  while (len) { *dst++ = *src++; len--; }
 }
 
 char *CopyMsg(char *msg, int len)
 {
-	char *copy = (char *)CmiAlloc(len);
-	if (!copy)
+  char *copy = (char *)CmiAlloc(len);
+  if (!copy)
       fprintf(stderr, "Out of memory\n");
-	jmemcpy(copy, msg, len);
-	return copy;
+  jmemcpy(copy, msg, len);
+  return copy;
 }
 
 static char *parseint(char *p, int *value) 
 {
-	int val = 0;
-	while (((*p)==' ')||((*p)=='.')) p++;
-	if (((*p)<'0')||((*p)>'9')) KillEveryone("badly-formed number");
-	while ((*p>='0')&&(*p<='9')) { val*=10; val+=(*p)-'0'; p++; }
-	*value = val;
-	return p;
+  int val = 0;
+  while (((*p)==' ')||((*p)=='.')) p++;
+  if (((*p)<'0')||((*p)>'9')) KillEveryone("badly-formed number");
+  while ((*p>='0')&&(*p<='9')) { val*=10; val+=(*p)-'0'; p++; }
+  *value = val;
+  return p;
 }
 
 
 static char *DeleteArg(char **argv)
 {
-	char *res = argv[0];
-	if (res==0) KillEveryone("Illegal Arglist");
-	while (*argv) { argv[0]=argv[1]; argv++; }
-	return res;
+  char *res = argv[0];
+  if (res==0) KillEveryone("Illegal Arglist");
+  while (*argv) { argv[0]=argv[1]; argv++; }
+  return res;
 }
 
 static int CountArgs(char **argv)
 {
-	int count=0;
-	while (argv[0]) { count++; argv++; }
-	return count;
+  int count=0;
+  while (argv[0]) { count++; argv++; }
+  return count;
 }
 
 
 static void jsleep(int sec, int usec)
 {
-	int ntimes,i;
-	struct timeval tm;
-	int err;
+  int ntimes,i;
+  struct timeval tm;
+  int err;
 
-	ntimes = sec*200 + usec/5000;
-	for(i=0;i<ntimes;i++) 
-	{
-		tm.tv_sec = 0;
-		tm.tv_usec = 5000;
-		while(1) 
-		{
-			if (select(0,NULL,NULL,NULL,&tm)==0) break;
-			err = WSAGetLastError();
-			if ((err!=WSAEBADF)&&(err!=WSAEINTR)) return;
-		}
-	}
+  ntimes = sec*200 + usec/5000;
+  for(i=0;i<ntimes;i++) 
+  {
+    tm.tv_sec = 0;
+    tm.tv_usec = 5000;
+    while(1) 
+    {
+      if (select(0,NULL,NULL,NULL,&tm)==0) break;
+      err = WSAGetLastError();
+      if ((err!=WSAEBADF)&&(err!=WSAEINTR)) return;
+    }
+  }
 }
 
 
 void writeall(SOCKET fd, char *buf, int size)
 {
-	int ok;
+  int ok;
 
-	while (size) 
-	{
+  while (size) 
+  {
 retry:
-		CmiYield();
-		ok = SendSocketN(fd, buf, size);
-		if ((ok<0)&&(WSAGetLastError()==WSAEINTR)) goto retry;
-		if (ok<=0) 
-		{
-			fprintf(stderr,"Error in writeall-- socket %d, message '%s'\n",fd,buf);
-			KillOnSIGPIPE(0);
-		}
-		size-=ok; buf+=ok;
-	}
+    CmiYield();
+    ok = SendSocketN(fd, buf, size);
+    if ((ok<0)&&(WSAGetLastError()==WSAEINTR)) goto retry;
+    if (ok<=0) 
+    {
+      fprintf(stderr,"Error in writeall-- socket %d, message '%s'\n",fd,buf);
+      KillOnSIGPIPE(0);
+    }
+    size-=ok; buf+=ok;
+  }
 }
 
 
 static int wait_readable(SOCKET fd, int sec)
 {
-	struct fd_set  rfds;
-	struct timeval tmo;
-	int            begin, nreadable;
-	int            err;
+  struct fd_set  rfds;
+  struct timeval tmo;
+  int            begin, nreadable;
+  int            err;
   
-	begin = time(0);
-	FD_ZERO(&rfds);
-	FD_SET(fd, &rfds);
-	while(1) 
-	{
-		tmo.tv_sec = (time(0) - begin) + sec;
-		tmo.tv_usec = 0;
-		nreadable = select(FD_SETSIZE, &rfds, NULL, NULL, &tmo);
+  begin = time(0);
+  FD_ZERO(&rfds);
+  FD_SET(fd, &rfds);
+  while(1) 
+  {
+    tmo.tv_sec = (time(0) - begin) + sec;
+    tmo.tv_usec = 0;
+    nreadable = select(FD_SETSIZE, &rfds, NULL, NULL, &tmo);
     
-		if (nreadable == SOCKET_ERROR) 
-		{
-			err = WSAGetLastError();
-			if ( err==WSAEINTR || err==WSAEBADF ) continue;
-		}	
-		if (nreadable == 0) { err=WSAETIMEDOUT; return -1; }
-		return 0;
-	}
+    if (nreadable == SOCKET_ERROR) 
+    {
+      err = WSAGetLastError();
+      if ( err==WSAEINTR || err==WSAEBADF ) continue;
+    }  
+    if (nreadable == 0) { err=WSAETIMEDOUT; return -1; }
+    return 0;
+  }
 }
 
 /**************************************************************************
@@ -494,205 +494,205 @@ static int wait_readable(SOCKET fd, int sec)
 static void skt_server(unsigned int *ppo, SOCKET *pfd)
 {
   
-	SOCKET             fd = INVALID_SOCKET;
-	int                ok, len, err;
-	struct sockaddr_in addr;
+  SOCKET             fd = INVALID_SOCKET;
+  int                ok, len, err;
+  struct sockaddr_in addr;
   
 retry:
   
-	CmiYield();
-	fd = socket(PF_INET, SOCK_STREAM, 0);
-	
-	if (fd == INVALID_SOCKET) 
-	{
-		err = WSAGetLastError();
-		if (err == WSAEINTR || err == WSAEBADF) goto retry;
-	}
-  	
-	if (fd == INVALID_SOCKET) { fprintf(stderr, "socket 1: %d\n", err); KillEveryoneCode(93483); }
-	memset(&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	ok = bind(fd, (struct sockaddr *)&addr, sizeof(addr));
-	if (ok == SOCKET_ERROR) 
-	{ fprintf(stderr, "bind: %d\n", WSAGetLastError()); KillEveryoneCode(22933); }
-	ok = listen(fd,5);
-	if (ok == SOCKET_ERROR) 
-	{ fprintf(stderr, "listen: %d\n", WSAGetLastError()); KillEveryoneCode(3948); }
-	len = sizeof(addr);
-	ok = getsockname(fd, (struct sockaddr *)&addr, &len);
-	if (ok == SOCKET_ERROR) 
-	{ fprintf(stderr, "getsockname: %d\n", WSAGetLastError()); KillEveryoneCode(93583); }
+  CmiYield();
+  fd = socket(PF_INET, SOCK_STREAM, 0);
+  
+  if (fd == INVALID_SOCKET) 
+  {
+    err = WSAGetLastError();
+    if (err == WSAEINTR || err == WSAEBADF) goto retry;
+  }
+    
+  if (fd == INVALID_SOCKET) { fprintf(stderr, "socket 1: %d\n", err); KillEveryoneCode(93483); }
+  memset(&addr, 0, sizeof(addr));
+  addr.sin_family = AF_INET;
+  ok = bind(fd, (struct sockaddr *)&addr, sizeof(addr));
+  if (ok == SOCKET_ERROR) 
+  { fprintf(stderr, "bind: %d\n", WSAGetLastError()); KillEveryoneCode(22933); }
+  ok = listen(fd,5);
+  if (ok == SOCKET_ERROR) 
+  { fprintf(stderr, "listen: %d\n", WSAGetLastError()); KillEveryoneCode(3948); }
+  len = sizeof(addr);
+  ok = getsockname(fd, (struct sockaddr *)&addr, &len);
+  if (ok == SOCKET_ERROR) 
+  { fprintf(stderr, "getsockname: %d\n", WSAGetLastError()); KillEveryoneCode(93583); }
 
-	*pfd = fd;
-	*ppo = ntohs(addr.sin_port);
+  *pfd = fd;
+  *ppo = ntohs(addr.sin_port);
 }
 
 static void skt_datagram(unsigned int *ppo, SOCKET *pfd, unsigned int bufsize)
 {  
-	struct sockaddr_in name;
-	int                length, ok, err;
-	SOCKET             skt;
+  struct sockaddr_in name;
+  int                length, ok, err;
+  SOCKET             skt;
   
   /* Create data socket */
 retry:
-	CmiYield();
-	skt = socket(AF_INET,SOCK_DGRAM,0);
-	
-	if (skt == INVALID_SOCKET) 
-	{
-		err = WSAGetLastError();
-		if (err == WSAEINTR|| err == WSAEBADF) goto retry;
-	}
+  CmiYield();
+  skt = socket(AF_INET,SOCK_DGRAM,0);
   
-	if (skt == INVALID_SOCKET)
+  if (skt == INVALID_SOCKET) 
+  {
+    err = WSAGetLastError();
+    if (err == WSAEINTR|| err == WSAEBADF) goto retry;
+  }
+  
+  if (skt == INVALID_SOCKET)
     { 
-		fprintf(stderr, "socket 2: %d\n", err); 
-		KillEveryoneCode(8934); 
-	}
+    fprintf(stderr, "socket 2: %d\n", err); 
+    KillEveryoneCode(8934); 
+  }
   
-	name.sin_family = AF_INET;
-	name.sin_port = 0;
-	name.sin_addr.s_addr = htonl(INADDR_ANY);   /* Could potentially get rid of this htonl */
-	if (bind(skt, (struct sockaddr *)&name, sizeof(name)) == SOCKET_ERROR)
-	{ 
-		fprintf(stderr, "binding data socket: %d\n", WSAGetLastError()); 
-		KillEveryoneCode(2983); 
-	}
+  name.sin_family = AF_INET;
+  name.sin_port = 0;
+  name.sin_addr.s_addr = htonl(INADDR_ANY);   /* Could potentially get rid of this htonl */
+  if (bind(skt, (struct sockaddr *)&name, sizeof(name)) == SOCKET_ERROR)
+  { 
+    fprintf(stderr, "binding data socket: %d\n", WSAGetLastError()); 
+    KillEveryoneCode(2983); 
+  }
   
-	length = sizeof(name);
-	if (getsockname(skt, (struct sockaddr *)&name , &length))
-	{ 
-		fprintf(stderr, "getting socket name %d\n", WSAGetLastError()); 
-		KillEveryoneCode(39483); 
-	}
+  length = sizeof(name);
+  if (getsockname(skt, (struct sockaddr *)&name , &length))
+  { 
+    fprintf(stderr, "getting socket name %d\n", WSAGetLastError()); 
+    KillEveryoneCode(39483); 
+  }
 
-	if (bufsize) 
-	{
-		int len = sizeof(int);
-		ok = setsockopt(skt, SOL_SOCKET , SO_RCVBUF , (char *)&bufsize, len);
-		if (ok == SOCKET_ERROR) KillEveryoneCode(35782);
-		ok = setsockopt(skt, SOL_SOCKET , SO_SNDBUF , (char *)&bufsize, len);
-		if (ok == SOCKET_ERROR) KillEveryoneCode(35783);
-	}     
+  if (bufsize) 
+  {
+    int len = sizeof(int);
+    ok = setsockopt(skt, SOL_SOCKET , SO_RCVBUF , (char *)&bufsize, len);
+    if (ok == SOCKET_ERROR) KillEveryoneCode(35782);
+    ok = setsockopt(skt, SOL_SOCKET , SO_SNDBUF , (char *)&bufsize, len);
+    if (ok == SOCKET_ERROR) KillEveryoneCode(35783);
+  }     
 
-	*pfd = skt;
-	*ppo = htons(name.sin_port);              
+  *pfd = skt;
+  *ppo = htons(name.sin_port);              
 }
 
 static void skt_accept(int src, unsigned int *pip, unsigned int *ppo, SOCKET *pfd)
 {
   
-	int i, err;
-	struct sockaddr_in remote;
-	SOCKET fd;
-	i = sizeof(remote);
+  int i, err;
+  struct sockaddr_in remote;
+  SOCKET fd;
+  i = sizeof(remote);
  
  acc:
-	CmiYield();
-	fd = accept(src, (struct sockaddr *)&remote, &i);
-	if (fd == INVALID_SOCKET) 
-	{
-		err = WSAGetLastError();
-		if (err == WSAEINTR|| err == WSAEBADF ) goto acc;
-	}
-	
-	if (fd == INVALID_SOCKET){ fprintf(stderr, "accept: %d\n", err); KillEveryoneCode(39489); }
-	*pip=htonl(remote.sin_addr.s_addr);
-	*ppo=htons(remote.sin_port);
-	*pfd=fd;
+  CmiYield();
+  fd = accept(src, (struct sockaddr *)&remote, &i);
+  if (fd == INVALID_SOCKET) 
+  {
+    err = WSAGetLastError();
+    if (err == WSAEINTR|| err == WSAEBADF ) goto acc;
+  }
+  
+  if (fd == INVALID_SOCKET){ fprintf(stderr, "accept: %d\n", err); KillEveryoneCode(39489); }
+  *pip=htonl(remote.sin_addr.s_addr);
+  *ppo=htons(remote.sin_port);
+  *pfd=fd;
 }
 
 
 int skt_connect(unsigned int ip, int port, int seconds)
 {
-	struct sockaddr_in remote; 
-	short              sport=port;
-	int                ok, begin, err;
-	SOCKET             fd;
+  struct sockaddr_in remote; 
+  short              sport=port;
+  int                ok, begin, err;
+  SOCKET             fd;
     
-	/* create an address structure for the server */
-	memset(&remote, 0, sizeof(remote));
-	remote.sin_family = AF_INET;
-	remote.sin_port = htons(sport);
-	remote.sin_addr.s_addr = htonl(ip);
+  /* create an address structure for the server */
+  memset(&remote, 0, sizeof(remote));
+  remote.sin_family = AF_INET;
+  remote.sin_port = htons(sport);
+  remote.sin_addr.s_addr = htonl(ip);
     
-	begin = time(0); 
-	ok= -1;
-	while (time(0)-begin < seconds) 
-	{
+  begin = time(0); 
+  ok= -1;
+  while (time(0)-begin < seconds) 
+  {
   sock:
-		fd = socket(AF_INET, SOCK_STREAM, 0);
-		if (fd==SOCKET_ERROR) 
-		{
-			err = WSAGetLastError();
-			if (err == WSAEINTR|| err == WSAEBADF) goto sock;
-		}
-		if (fd == SOCKET_ERROR) KillEveryone("skt_connect failure");
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd==SOCKET_ERROR) 
+    {
+      err = WSAGetLastError();
+      if (err == WSAEINTR|| err == WSAEBADF) goto sock;
+    }
+    if (fd == SOCKET_ERROR) KillEveryone("skt_connect failure");
     
-		ok = connect(fd, (struct sockaddr *)&(remote), sizeof(remote));
-		if (ok != SOCKET_ERROR) break;
-		closesocket(fd);
-		err = WSAGetLastError();
-		switch (err) 
-		{
-		
-			case WSAEINTR: case WSAEBADF: case WSAEALREADY: case WSAEISCONN: break;
-			case WSAECONNREFUSED: jsleep(1,0); break;
-			case WSAEADDRINUSE: jsleep(1,0); break;
-			case WSAEADDRNOTAVAIL: jsleep(1,0); break;
-			default: return INVALID_SOCKET;
-		}
-	}
-	if (ok == SOCKET_ERROR) return INVALID_SOCKET;
-	return fd;
+    ok = connect(fd, (struct sockaddr *)&(remote), sizeof(remote));
+    if (ok != SOCKET_ERROR) break;
+    closesocket(fd);
+    err = WSAGetLastError();
+    switch (err) 
+    {
+    
+      case WSAEINTR: case WSAEBADF: case WSAEALREADY: case WSAEISCONN: break;
+      case WSAECONNREFUSED: jsleep(1,0); break;
+      case WSAEADDRINUSE: jsleep(1,0); break;
+      case WSAEADDRNOTAVAIL: jsleep(1,0); break;
+      default: return INVALID_SOCKET;
+    }
+  }
+  if (ok == SOCKET_ERROR) return INVALID_SOCKET;
+  return fd;
 }
 
 int RecvSocketN(SOCKET hSocket,BYTE *pBuff,int nBytes)
 {
-	int nLeft;
-	int nRead;
-	int nTotal = 0;
+  int nLeft;
+  int nRead;
+  int nTotal = 0;
 
-	nLeft = nBytes;
-	while (0 < nLeft)
-	{
-		nRead = recv(hSocket,pBuff,nLeft,0);
-		if (SOCKET_ERROR == nRead)
-		{
-			return nRead;
-		}
-		else
-		{
-			nLeft -= nRead;
-			pBuff += nRead;
-			nTotal += nRead;
-		}
-	}
+  nLeft = nBytes;
+  while (0 < nLeft)
+  {
+    nRead = recv(hSocket,pBuff,nLeft,0);
+    if (SOCKET_ERROR == nRead)
+    {
+      return nRead;
+    }
+    else
+    {
+      nLeft -= nRead;
+      pBuff += nRead;
+      nTotal += nRead;
+    }
+  }
 
-	return nTotal;
+  return nTotal;
 }
 
 int SendSocketN(SOCKET hSocket, BYTE *pBuff,int nBytes)
 {
-	int nLeft,nWritten;
-	int nTotal = 0;
+  int nLeft,nWritten;
+  int nTotal = 0;
 
-	nLeft = nBytes;
-	while (0 < nLeft)
-	{
-		nWritten = send(hSocket,pBuff,nLeft,0);
-		if (SOCKET_ERROR == nWritten)
-		{
-			return nWritten;
-		}
-		else
-		{
-			nLeft -= nWritten;
-			pBuff += nWritten;
-			nTotal += nWritten;
-		}
-	}
-	return nTotal;
+  nLeft = nBytes;
+  while (0 < nLeft)
+  {
+    nWritten = send(hSocket,pBuff,nLeft,0);
+    if (SOCKET_ERROR == nWritten)
+    {
+      return nWritten;
+    }
+    else
+    {
+      nLeft -= nWritten;
+      pBuff += nWritten;
+      nTotal += nWritten;
+    }
+  }
+  return nTotal;
 }
 
 
@@ -713,68 +713,68 @@ int SendSocketN(SOCKET hSocket, BYTE *pBuff,int nBytes)
 
 typedef struct CircQueueStruct
 {
-	struct CircQueueStruct *next;
-	int push;
-	int pull;
-	char *data[PCQueueSize];
+  struct CircQueueStruct *next;
+  int push;
+  int pull;
+  char *data[PCQueueSize];
 } *CircQueue;
 
 typedef struct PCQueueStruct
 {
-	CircQueue head;
-	CircQueue tail;
+  CircQueue head;
+  CircQueue tail;
 } *PCQueue;
 
 
 PCQueue PCQueueCreate()
 {  
-	CircQueue circ;
-	PCQueue Q;
+  CircQueue circ;
+  PCQueue Q;
 
-	circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));
+  circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));
 
-	Q = (PCQueue)malloc(sizeof(struct PCQueueStruct));
-	_MEMCHECK(Q);
-	Q->head = circ;
-	Q->tail = circ;
-	return Q;
+  Q = (PCQueue)malloc(sizeof(struct PCQueueStruct));
+  _MEMCHECK(Q);
+  Q->head = circ;
+  Q->tail = circ;
+  return Q;
 }
 
 int PCQueueEmpty(PCQueue Q)
 {
-	CircQueue circ = Q->head;
-	char *data = circ->data[circ->pull];
-	return (data == 0);
+  CircQueue circ = Q->head;
+  char *data = circ->data[circ->pull];
+  return (data == 0);
 }
 
 char *PCQueuePop(PCQueue Q)
 {
-	CircQueue circ; 
-	int pull; 
-	char *data;
+  CircQueue circ; 
+  int pull; 
+  char *data;
 
     circ = Q->head;
     pull = circ->pull;
     data = circ->data[pull];
     if (data) 
-	{
-		circ->pull = (pull + 1);
-		circ->data[pull] = 0;
-		if (pull == PCQueueSize - 1) 
-		{ 
-			/* just pulled the data from the last slot of this buffer */
-			/* next buffer must exist, because "Push"  */
-			/* links in the next buffer *before* filling */
+  {
+    circ->pull = (pull + 1);
+    circ->data[pull] = 0;
+    if (pull == PCQueueSize - 1) 
+    { 
+      /* just pulled the data from the last slot of this buffer */
+      /* next buffer must exist, because "Push"  */
+      /* links in the next buffer *before* filling */
             /* in the last slot. See below. */
-	
-			Q->head = circ->next; 
-			free(circ);
-	
-		}
-		return data;
+  
+      Q->head = circ->next; 
+      free(circ);
+  
+    }
+    return data;
     }
     else 
-	{ /* queue seems to be empty. The producer may be adding something */
+  { /* queue seems to be empty. The producer may be adding something */
       /* to it, but its ok to report queue is empty. */
       return 0;
     }
@@ -782,23 +782,23 @@ char *PCQueuePop(PCQueue Q)
 
 void PCQueuePush(PCQueue Q, char *data)
 {
-	CircQueue circ, circ1; 
-	int       push;
+  CircQueue circ, circ1; 
+  int       push;
   
-	circ1 = Q->tail;
-	push = circ1->push;
-	if (push == (PCQueueSize -1)) 
-	{ 
-		/* last slot is about to be filled */
-		/* this way, the next buffer is linked in before data is filled in 
-		in the last slot of this buffer */
+  circ1 = Q->tail;
+  push = circ1->push;
+  if (push == (PCQueueSize -1)) 
+  { 
+    /* last slot is about to be filled */
+    /* this way, the next buffer is linked in before data is filled in 
+    in the last slot of this buffer */
 
-		circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));		
-		Q->tail->next = circ;
-		Q->tail = circ;
-	}
-	circ1->data[push] = data;
-	circ1->push = (push + 1);
+    circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));    
+    Q->tail->next = circ;
+    Q->tail = circ;
+  }
+  circ1->data[push] = data;
+  circ1->push = (push + 1);
 }
 
 /***********************************************************************
@@ -809,7 +809,7 @@ void PCQueuePush(PCQueue Q, char *data)
 
 void CmiAbort(const char *message)
 {
-	host_abort(message);
+  host_abort(message);
 }
 
 
@@ -868,75 +868,75 @@ typedef struct { DgramHeader head; char window[1024]; } DgramAck;
 
 typedef struct OutgoingMsgStruct
 {
-	struct OutgoingMsgStruct *next;
-	int    src, dst;
-	int    size;
-	char   *data;
-	int    refcount;
-	int    freemode;
+  struct OutgoingMsgStruct *next;
+  int    src, dst;
+  int    size;
+  char   *data;
+  int    refcount;
+  int    freemode;
 }
 *OutgoingMsg;
 
 typedef struct ExplicitDgramStruct
 {
-	struct ExplicitDgramStruct *next;
-	int  srcpe, rank, seqno;
-	unsigned int len, dummy; /* dummy to fix bug in rs6k alignment */
-	double data[1];
+  struct ExplicitDgramStruct *next;
+  int  srcpe, rank, seqno;
+  unsigned int len, dummy; /* dummy to fix bug in rs6k alignment */
+  double data[1];
 }
 *ExplicitDgram;
 
 typedef struct ImplicitDgramStruct
 {
-	struct ImplicitDgramStruct *next;
-	struct OtherNodeStruct *dest;
-	int srcpe, rank, seqno;
-	char  *dataptr;
-	int    datalen;
-	OutgoingMsg ogm;
+  struct ImplicitDgramStruct *next;
+  struct OtherNodeStruct *dest;
+  int srcpe, rank, seqno;
+  char  *dataptr;
+  int    datalen;
+  OutgoingMsg ogm;
 }
 *ImplicitDgram;
 
 typedef struct OtherNodeStruct
 {
-	int nodestart, nodesize;
-	unsigned int IP, dataport, ctrlport;
-	struct sockaddr_in addr;
+  int nodestart, nodesize;
+  unsigned int IP, dataport, ctrlport;
+  struct sockaddr_in addr;
 
-	double                   send_primer;  /* time to send primer packet */
-	unsigned int             send_last;    /* seqno of last dgram sent */
-	ImplicitDgram           *send_window;  /* datagrams sent, not acked */
-	ImplicitDgram            send_queue_h; /* head of send queue */
-	ImplicitDgram            send_queue_t; /* tail of send queue */
-	unsigned int             send_next;    /* next seqno to go into queue */
-	unsigned int             send_ack_seqno; /* next ack seqno to send */
+  double                   send_primer;  /* time to send primer packet */
+  unsigned int             send_last;    /* seqno of last dgram sent */
+  ImplicitDgram           *send_window;  /* datagrams sent, not acked */
+  ImplicitDgram            send_queue_h; /* head of send queue */
+  ImplicitDgram            send_queue_t; /* tail of send queue */
+  unsigned int             send_next;    /* next seqno to go into queue */
+  unsigned int             send_ack_seqno; /* next ack seqno to send */
 
-	int                      asm_rank;
-	int                      asm_total;
-	int                      asm_fill;
-	char                    *asm_msg;
+  int                      asm_rank;
+  int                      asm_total;
+  int                      asm_fill;
+  char                    *asm_msg;
   
-	int                      recv_ack_cnt; /* number of unacked dgrams */
-	double                   recv_ack_time;/* time when ack should be sent */
-	unsigned int             recv_expect;  /* next dgram to expect */
-	ExplicitDgram           *recv_window;  /* Packets received, not integrated */
-	int                      recv_winsz;   /* Number of packets in recv window */
-	unsigned int             recv_next;    /* Seqno of first missing packet */
-	unsigned int             recv_ack_seqno; /* last ack seqno received */
+  int                      recv_ack_cnt; /* number of unacked dgrams */
+  double                   recv_ack_time;/* time when ack should be sent */
+  unsigned int             recv_expect;  /* next dgram to expect */
+  ExplicitDgram           *recv_window;  /* Packets received, not integrated */
+  int                      recv_winsz;   /* Number of packets in recv window */
+  unsigned int             recv_next;    /* Seqno of first missing packet */
+  unsigned int             recv_ack_seqno; /* last ack seqno received */
 
-	unsigned int             stat_total_intr; /* Total Number of Interrupts */
-	unsigned int             stat_proc_intr;  /* Processed Interrupts */
-	unsigned int             stat_send_pkt;   /* number of packets sent */
-	unsigned int             stat_resend_pkt; /* number of packets resent */
-	unsigned int             stat_send_ack;   /* number of acks sent */
-	unsigned int             stat_recv_pkt;   /* number of packets received */
-	unsigned int             stat_recv_ack;   /* number of acks received */
-	unsigned int             stat_ack_pkts;   /* packets acked */
+  unsigned int             stat_total_intr; /* Total Number of Interrupts */
+  unsigned int             stat_proc_intr;  /* Processed Interrupts */
+  unsigned int             stat_send_pkt;   /* number of packets sent */
+  unsigned int             stat_resend_pkt; /* number of packets resent */
+  unsigned int             stat_send_ack;   /* number of acks sent */
+  unsigned int             stat_recv_pkt;   /* number of packets received */
+  unsigned int             stat_recv_ack;   /* number of acks received */
+  unsigned int             stat_ack_pkts;   /* packets acked */
  
-	int sent_msgs;
-	int recd_msgs;
-	int sent_bytes;
-	int recd_bytes;
+  int sent_msgs;
+  int recd_msgs;
+  int sent_bytes;
+  int recd_bytes;
 }
 *OtherNode;
 
@@ -945,9 +945,9 @@ static OtherNode  nodes;        /* Indexed only by ``node number'' */
 
 typedef struct CmiStateStruct
 {
-	int pe, rank;
-	PCQueue recv;
-	void *localqueue;
+  int pe, rank;
+  PCQueue recv;
+  void *localqueue;
 }
 *CmiState;
 
@@ -958,18 +958,18 @@ CsvStaticDeclare(PCQueue, NodeRecv);
 
 void CmiStateInit(int pe, int rank, CmiState state)
 {  
-	state->pe = pe;
-	state->rank = rank;
-	state->recv = PCQueueCreate();
-	state->localqueue = FIFO_Create();
+  state->pe = pe;
+  state->rank = rank;
+  state->recv = PCQueueCreate();
+  state->localqueue = FIFO_Create();
 #if CMK_NODE_QUEUE_AVAILABLE
-	CsvInitialize(CmiNodeLock, CmiNodeRecvLock);
-	CsvInitialize(PCQueue, NodeRecv);
-	if (rank==0) 
-	{
-		CsvAccess(CmiNodeRecvLock) = CmiCreateLock();
-		CsvAccess(NodeRecv) = PCQueueCreate();
-	}
+  CsvInitialize(CmiNodeLock, CmiNodeRecvLock);
+  CsvInitialize(PCQueue, NodeRecv);
+  if (rank==0) 
+  {
+    CsvAccess(CmiNodeRecvLock) = CmiCreateLock();
+    CsvAccess(NodeRecv) = PCQueueCreate();
+  }
 #endif
 }
 
@@ -999,7 +999,7 @@ static OutgoingMsg   Cmi_freelist_outgoing;
 #define MallocExplicitDgram(dg) {\
   ExplicitDgram d = Cmi_freelist_explicit;\
   if (d==0) { d = ((ExplicitDgram)malloc \
-		   (sizeof(struct ExplicitDgramStruct) + Cmi_max_dgram_size));\
+       (sizeof(struct ExplicitDgramStruct) + Cmi_max_dgram_size));\
               _MEMCHECK(d);\
   } else Cmi_freelist_explicit = d->next;\
   dg = d;\
@@ -1059,126 +1059,126 @@ void printLog(void);
 
 void printNetStatistics(void)
 {
-	char tmpstr[1024];
-	OtherNode myNode;
-	int i;
-	unsigned int send_pkt=0, resend_pkt=0, recv_pkt=0, send_ack=0;
-	unsigned int recv_ack=0, ack_pkts=0;
+  char tmpstr[1024];
+  OtherNode myNode;
+  int i;
+  unsigned int send_pkt=0, resend_pkt=0, recv_pkt=0, send_ack=0;
+  unsigned int recv_ack=0, ack_pkts=0;
 
-	myNode = nodes+CmiMyNode();
-	sprintf(tmpstr, "***********************************\n");
-	strcpy(statstr, tmpstr);
-	sprintf(tmpstr, "Net Statistics For Node %u\n", CmiMyNode());
-	strcat(statstr, tmpstr);
-	sprintf(tmpstr, "Interrupts: %u \tProcessed: %u\n",
-		              myNode->stat_total_intr, myNode->stat_proc_intr);
-	strcat(statstr, tmpstr);
-	sprintf(tmpstr, "Total Msgs Sent: %u \tTotal Bytes Sent: %u\n",
-		              myNode->sent_msgs, myNode->sent_bytes);
-	strcat(statstr, tmpstr);
-	sprintf(tmpstr, "Total Msgs Recv: %u \tTotal Bytes Recv: %u\n",
-		              myNode->recd_msgs, myNode->recd_bytes);
-	strcat(statstr, tmpstr);
-	sprintf(tmpstr, "***********************************\n");
-	strcat(statstr, tmpstr);
-	sprintf(tmpstr, "[Num]\tSENDTO\tRESEND\tRECV\tACKSTO\tACKSFRM\tPKTACK\n");
-	strcat(statstr,tmpstr);
-	sprintf(tmpstr, "=====\t======\t======\t====\t======\t=======\t======\n");
-	strcat(statstr,tmpstr);
-	for(i=0;i<CmiNumNodes();i++) 
-	{
-		OtherNode node = nodes+i;
-		sprintf(tmpstr,"[%u]\t%u\t%u\t%u\t%u\t%u\t%u\n",
-						i, node->stat_send_pkt, node->stat_resend_pkt,
-						node->stat_recv_pkt, node->stat_send_ack,
-						node->stat_recv_ack, node->stat_ack_pkts);
-		strcat(statstr, tmpstr);
-		send_pkt += node->stat_send_pkt;
-		recv_pkt += node->stat_recv_pkt;
-		resend_pkt += node->stat_resend_pkt;
-		send_ack += node->stat_send_ack;
-		recv_ack += node->stat_recv_ack;
-		ack_pkts += node->stat_ack_pkts;
-	}
-	sprintf(tmpstr, "[TOTAL]\t%u\t%u\t%u\t%u\t%u\t%u\n",
-		             send_pkt, resend_pkt,
-					 recv_pkt, send_ack,
-					 recv_ack, ack_pkts);
-	strcat(statstr, tmpstr);
-	sprintf(tmpstr, "***********************************\n");
-	strcat(statstr, tmpstr);
-	CmiPrintf(statstr);
+  myNode = nodes+CmiMyNode();
+  sprintf(tmpstr, "***********************************\n");
+  strcpy(statstr, tmpstr);
+  sprintf(tmpstr, "Net Statistics For Node %u\n", CmiMyNode());
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "Interrupts: %u \tProcessed: %u\n",
+                  myNode->stat_total_intr, myNode->stat_proc_intr);
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "Total Msgs Sent: %u \tTotal Bytes Sent: %u\n",
+                  myNode->sent_msgs, myNode->sent_bytes);
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "Total Msgs Recv: %u \tTotal Bytes Recv: %u\n",
+                  myNode->recd_msgs, myNode->recd_bytes);
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "***********************************\n");
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "[Num]\tSENDTO\tRESEND\tRECV\tACKSTO\tACKSFRM\tPKTACK\n");
+  strcat(statstr,tmpstr);
+  sprintf(tmpstr, "=====\t======\t======\t====\t======\t=======\t======\n");
+  strcat(statstr,tmpstr);
+  for(i=0;i<CmiNumNodes();i++) 
+  {
+    OtherNode node = nodes+i;
+    sprintf(tmpstr,"[%u]\t%u\t%u\t%u\t%u\t%u\t%u\n",
+            i, node->stat_send_pkt, node->stat_resend_pkt,
+            node->stat_recv_pkt, node->stat_send_ack,
+            node->stat_recv_ack, node->stat_ack_pkts);
+    strcat(statstr, tmpstr);
+    send_pkt += node->stat_send_pkt;
+    recv_pkt += node->stat_recv_pkt;
+    resend_pkt += node->stat_resend_pkt;
+    send_ack += node->stat_send_ack;
+    recv_ack += node->stat_recv_ack;
+    ack_pkts += node->stat_ack_pkts;
+  }
+  sprintf(tmpstr, "[TOTAL]\t%u\t%u\t%u\t%u\t%u\t%u\n",
+                 send_pkt, resend_pkt,
+           recv_pkt, send_ack,
+           recv_ack, ack_pkts);
+  strcat(statstr, tmpstr);
+  sprintf(tmpstr, "***********************************\n");
+  strcat(statstr, tmpstr);
+  CmiPrintf(statstr);
 }
 
 static ImplicitDgram Cmi_freelist_implicit;
 
 static void setspeed_atm()
 {  
-	Cmi_max_dgram_size   = 2048;
-	Cmi_os_buffer_size   = 50000;
-	Cmi_window_size      = 20;
-	Cmi_delay_retransmit = 0.0150;
-	Cmi_ack_delay        = 0.0035;
-	Cmi_tickspeed        = 10000;
+  Cmi_max_dgram_size   = 2048;
+  Cmi_os_buffer_size   = 50000;
+  Cmi_window_size      = 20;
+  Cmi_delay_retransmit = 0.0150;
+  Cmi_ack_delay        = 0.0035;
+  Cmi_tickspeed        = 10000;
 }
 
 static void setspeed_eth()
 {
-	Cmi_max_dgram_size   = 2048;
-	Cmi_os_buffer_size   = 50000;
-	Cmi_window_size      = 20;
-	Cmi_delay_retransmit = 0.0400;
-	Cmi_ack_delay        = 0.0100;
-	Cmi_tickspeed        = 10000;
+  Cmi_max_dgram_size   = 2048;
+  Cmi_os_buffer_size   = 50000;
+  Cmi_window_size      = 20;
+  Cmi_delay_retransmit = 0.0400;
+  Cmi_ack_delay        = 0.0100;
+  Cmi_tickspeed        = 10000;
 }
 
 static void parse_netstart()
 {
-	int ip;
-	char *ns;
-	int nread;
-	
-	ns = getenv("NETSTART");
-	if (ns==0) goto abort;
-	nread = sscanf(ns, "%d%d%d%d%d%d%d%d",
-						&Cmi_numnodes, &Cmi_mynode,
-						&Cmi_nodestart, &Cmi_mynodesize, &Cmi_numpes,
-						&Cmi_self_IP, &Cmi_host_IP, &Cmi_host_port, &Cmi_host_pid);
-	if (nread!=8) goto abort;
-	ip=Cmi_self_IP;
-	sprintf(Cmi_self_IP_str,"%d.%d.%d.%d",0xff&(ip>>24),0xff&(ip>>16),0xff&(ip>>8),0xff&(ip>>0));
-	ip=Cmi_host_IP;
-	sprintf(Cmi_host_IP_str,"%d.%d.%d.%d",0xff&(ip>>24),0xff&(ip>>16),0xff&(ip>>8),0xff&(ip>>0));
-	return;
+  int ip;
+  char *ns;
+  int nread;
+  
+  ns = getenv("NETSTART");
+  if (ns==0) goto abort;
+  nread = sscanf(ns, "%d%d%d%d%d%d%d%d",
+            &Cmi_numnodes, &Cmi_mynode,
+            &Cmi_nodestart, &Cmi_mynodesize, &Cmi_numpes,
+            &Cmi_self_IP, &Cmi_host_IP, &Cmi_host_port, &Cmi_host_pid);
+  if (nread!=8) goto abort;
+  ip=Cmi_self_IP;
+  sprintf(Cmi_self_IP_str,"%d.%d.%d.%d",0xff&(ip>>24),0xff&(ip>>16),0xff&(ip>>8),0xff&(ip>>0));
+  ip=Cmi_host_IP;
+  sprintf(Cmi_host_IP_str,"%d.%d.%d.%d",0xff&(ip>>24),0xff&(ip>>16),0xff&(ip>>8),0xff&(ip>>0));
+  return;
 abort:
-	KillEveryone("program not started using 'conv-host' utility. aborting.\n");
+  KillEveryone("program not started using 'conv-host' utility. aborting.\n");
 }
 
 static void extract_args(char **argv)
 {
-	setspeed_eth();
-	while (*argv) 
-	{
-		if (strcmp(*argv,"++atm")==0) 		
-		{
-			setspeed_atm();
-			DeleteArg(argv);
-		} 
-		else if (strcmp(*argv,"++eth")==0) 
-		{
-			setspeed_eth();
-			DeleteArg(argv);
-		} 
-		else if (strcmp(*argv,"++stats")==0) 
-		{
-			Cmi_print_stats = 1;
-			DeleteArg(argv);
-		} else argv++;
-	}
-	Cmi_dgram_max_data = Cmi_max_dgram_size - DGRAM_HEADER_SIZE;
-	Cmi_half_window = Cmi_window_size >> 1;
-	if ((Cmi_window_size * Cmi_max_dgram_size) > Cmi_os_buffer_size)
-		KillEveryone("Window size too big for OS buffer.");
+  setspeed_eth();
+  while (*argv) 
+  {
+    if (strcmp(*argv,"++atm")==0)     
+    {
+      setspeed_atm();
+      DeleteArg(argv);
+    } 
+    else if (strcmp(*argv,"++eth")==0) 
+    {
+      setspeed_eth();
+      DeleteArg(argv);
+    } 
+    else if (strcmp(*argv,"++stats")==0) 
+    {
+      Cmi_print_stats = 1;
+      DeleteArg(argv);
+    } else argv++;
+  }
+  Cmi_dgram_max_data = Cmi_max_dgram_size - DGRAM_HEADER_SIZE;
+  Cmi_half_window = Cmi_window_size >> 1;
+  if ((Cmi_window_size * Cmi_max_dgram_size) > Cmi_os_buffer_size)
+    KillEveryone("Window size too big for OS buffer.");
 }
 
 /******************************************************************************
@@ -1196,11 +1196,11 @@ static void extract_args(char **argv)
 
 typedef struct logent 
 {
-	double time;
-	int seqno;
-	int srcpe;
-	int dstpe;
-	int kind;
+  double time;
+  int seqno;
+  int srcpe;
+  int dstpe;
+  int kind;
 } *logent;
 
 
@@ -1210,60 +1210,60 @@ int    log_wrap;
 
 static void log_init()
 {
-	log = (logent)malloc(50000 * sizeof(struct logent));
-	_MEMCHECK(log);
-	log_pos = 0;
-	log_wrap = 0;
+  log = (logent)malloc(50000 * sizeof(struct logent));
+  _MEMCHECK(log);
+  log_pos = 0;
+  log_wrap = 0;
 }
 
 static void log_done()
 {
-	char logname[100]; FILE *f; int i, size;
-	sprintf(logname, "log.%d", Cmi_mynode);
-	f = fopen(logname, "w");
-	if (f==0) KillEveryone("fopen problem");
-	if (log_wrap) size = 50000; else size=log_pos;
-	for (i=0; i<size; i++) 
-	{
-		logent ent = log+i;
-		fprintf(f, "%1.4f %d %c %d %d\n",
-					ent->time, ent->srcpe, ent->kind, ent->dstpe, ent->seqno);
-	}
-	fclose(f);
+  char logname[100]; FILE *f; int i, size;
+  sprintf(logname, "log.%d", Cmi_mynode);
+  f = fopen(logname, "w");
+  if (f==0) KillEveryone("fopen problem");
+  if (log_wrap) size = 50000; else size=log_pos;
+  for (i=0; i<size; i++) 
+  {
+    logent ent = log+i;
+    fprintf(f, "%1.4f %d %c %d %d\n",
+          ent->time, ent->srcpe, ent->kind, ent->dstpe, ent->seqno);
+  }
+  fclose(f);
 }
 
 
 void printLog(void)
 {
-	char logname[100]; 
-	FILE *f; 
-	int  i, j, size;
-	static int logged = 0;
-	
-	if (logged) return;
-	
-	logged = 1;
-	CmiPrintf("Logging: %d\n", Cmi_mynode);
-	sprintf(logname, "log.%d", Cmi_mynode);
-	f = fopen(logname, "w");
-	if (f==0) KillEveryone("fopen problem");
-	for (i = 5000; i; i--)
-	{
-		j = log_pos - i;
-		if (j < 0)
-		{
-			if (log_wrap) j = 5000 + j;
-			else j = 0;
-		};
-		
-		{
-			logent ent = log+j;
-			fprintf(f, "%1.4f %d %c %d %d\n",
-						ent->time, ent->srcpe, ent->kind, ent->dstpe, ent->seqno);
-		}
-	}
-	fclose(f);
-	CmiPrintf("Done Logging: %d\n", Cmi_mynode);
+  char logname[100]; 
+  FILE *f; 
+  int  i, j, size;
+  static int logged = 0;
+  
+  if (logged) return;
+  
+  logged = 1;
+  CmiPrintf("Logging: %d\n", Cmi_mynode);
+  sprintf(logname, "log.%d", Cmi_mynode);
+  f = fopen(logname, "w");
+  if (f==0) KillEveryone("fopen problem");
+  for (i = 5000; i; i--)
+  {
+    j = log_pos - i;
+    if (j < 0)
+    {
+      if (log_wrap) j = 5000 + j;
+      else j = 0;
+    };
+    
+    {
+      logent ent = log+j;
+      fprintf(f, "%1.4f %d %c %d %d\n",
+            ent->time, ent->srcpe, ent->kind, ent->dstpe, ent->seqno);
+    }
+  }
+  fclose(f);
+  CmiPrintf("Done Logging: %d\n", Cmi_mynode);
 }
 
 #define LOG(t,s,k,d,q) { if (log_pos==50000) { log_pos=0; log_wrap=1;} { logent ent=log+log_pos; ent->time=t; ent->srcpe=s; ent->kind=k; ent->dstpe=d; ent->seqno=q; log_pos++; }}
@@ -1311,32 +1311,32 @@ static int dataskt_ready_write;
 
 void CheckSocketsReady()
 {  
-	static struct fd_set rfds; 
-	static struct fd_set wfds; 
-	struct timeval tmo;
-	int nreadable;
+  static struct fd_set rfds; 
+  static struct fd_set wfds; 
+  struct timeval tmo;
+  int nreadable;
   
-	FD_SET(dataskt, &rfds);
-	FD_SET(ctrlskt, &rfds);
-	FD_SET(dataskt, &wfds);
-	FD_SET(ctrlskt, &wfds);
+  FD_SET(dataskt, &rfds);
+  FD_SET(ctrlskt, &rfds);
+  FD_SET(dataskt, &wfds);
+  FD_SET(ctrlskt, &wfds);
   
-	tmo.tv_sec = 0;
-	tmo.tv_usec = 0;
-	nreadable = select(FD_SETSIZE, &rfds, &wfds, NULL, &tmo);
-	if (nreadable <= 0) 
-	{
-		ctrlskt_ready_read = 0;
-		ctrlskt_ready_write = 0;
-		dataskt_ready_read = 0;
-		dataskt_ready_write = 0;
-		return;
-	}
+  tmo.tv_sec = 0;
+  tmo.tv_usec = 0;
+  nreadable = select(FD_SETSIZE, &rfds, &wfds, NULL, &tmo);
+  if (nreadable <= 0) 
+  {
+    ctrlskt_ready_read = 0;
+    ctrlskt_ready_write = 0;
+    dataskt_ready_read = 0;
+    dataskt_ready_write = 0;
+    return;
+  }
   
-	ctrlskt_ready_read = (FD_ISSET(ctrlskt, &rfds));
-	dataskt_ready_read = (FD_ISSET(dataskt, &rfds));
-	ctrlskt_ready_write = (FD_ISSET(ctrlskt, &wfds));
-	dataskt_ready_write = (FD_ISSET(dataskt, &wfds));
+  ctrlskt_ready_read = (FD_ISSET(ctrlskt, &rfds));
+  dataskt_ready_read = (FD_ISSET(dataskt, &rfds));
+  ctrlskt_ready_write = (FD_ISSET(ctrlskt, &wfds));
+  dataskt_ready_write = (FD_ISSET(dataskt, &wfds));
 }
 
 /******************************************************************************
@@ -1669,13 +1669,13 @@ static unsigned int terrupt;
 static void CommunicationInterrupt(int arg)
 {
   
-	nodes[CmiMyNode()].stat_total_intr++;
-	if (comm_flag) return;
-	if (memflag) return;
-	nodes[CmiMyNode()].stat_proc_intr++;
-	interruptFlag = 109;
-	CommunicationServer();
-	interruptFlag = 0;
+  nodes[CmiMyNode()].stat_total_intr++;
+  if (comm_flag) return;
+  if (memflag) return;
+  nodes[CmiMyNode()].stat_proc_intr++;
+  interruptFlag = 109;
+  CommunicationServer();
+  interruptFlag = 0;
 }
 
 static void CmiStartThreads()
@@ -1720,36 +1720,36 @@ static CmiState     Cmi_state_vector = 0;
 
 CmiState CmiGetState()
 {
-  	CmiState result = 0;
+    CmiState result = 0;
 
-	if(Cmi_state_key == 0xFFFFFFFF) return 0;
-	
-	result = (CmiState)TlsGetValue(Cmi_state_key);
-	if(result == 0)
-	{
-		printf("Key = %d\n", Cmi_state_key);
-		perror("TlsGetValue");
-		exit(1);
-	}
-	return result;
+  if(Cmi_state_key == 0xFFFFFFFF) return 0;
+  
+  result = (CmiState)TlsGetValue(Cmi_state_key);
+  if(result == 0)
+  {
+    printf("Key = %d\n", Cmi_state_key);
+    perror("TlsGetValue");
+    exit(1);
+  }
+  return result;
 }
 
 int CmiMyPe()
 {  
-	CmiState result = 0;
+  CmiState result = 0;
 
-	if(Cmi_state_key == 0xFFFFFFFF) return -1;
-	result = (CmiState)TlsGetValue(Cmi_state_key);
+  if(Cmi_state_key == 0xFFFFFFFF) return -1;
+  result = (CmiState)TlsGetValue(Cmi_state_key);
 
-	if(result == 0)
-	{
-		DEBUGF(("Error in CmiMyPe()\n"));
-		printf("Key = %d\n", Cmi_state_key);
-		perror("TlsGetValue");
-		return 0;
-		//exit(1);
-	}
-	return result->pe;
+  if(result == 0)
+  {
+    DEBUGF(("Error in CmiMyPe()\n"));
+    printf("Key = %d\n", Cmi_state_key);
+    perror("TlsGetValue");
+    return 0;
+    //exit(1);
+  }
+  return result->pe;
 }
 
 int CmiMyRank()
@@ -1760,11 +1760,11 @@ int CmiMyRank()
   //thr_getspecific(Cmi_state_key, (void **)&result);
   result = (CmiState)TlsGetValue(Cmi_state_key);
   if(result == 0){
-	printf("Error in TlsGetValue\n");
-	printf("Key = %d\n", Cmi_state_key);
-	perror("TlsGetValue");
-	return 0;
-	//exit(1);
+  printf("Error in TlsGetValue\n");
+  printf("Key = %d\n", Cmi_state_key);
+  perror("TlsGetValue");
+  return 0;
+  //exit(1);
   }
 
   return result->rank;
@@ -1801,48 +1801,48 @@ static volatile int proc_done = 0;
 
 static DWORD WINAPI comm_thread(LPVOID dummy)
 {  
-	struct timeval tmo; fd_set rfds;
-	
-	while (Cmi_shutdown_initiated == 0) 
-	{
-		CmiCommLock();
-		CommunicationServer();
-		CmiCommUnlock();
-		tmo.tv_sec = 0;
-		tmo.tv_usec = Cmi_tickspeed;
-		FD_ZERO(&rfds);
-		FD_SET(dataskt, &rfds);
-		FD_SET(ctrlskt, &rfds);
-		select(FD_SETSIZE, &rfds, 0, 0, &tmo);
-	}
-	ExitThread(0);
-	return 0;//should never get here
+  struct timeval tmo; fd_set rfds;
+  
+  while (Cmi_shutdown_initiated == 0) 
+  {
+    CmiCommLock();
+    CommunicationServer();
+    CmiCommUnlock();
+    tmo.tv_sec = 0;
+    tmo.tv_usec = Cmi_tickspeed;
+    FD_ZERO(&rfds);
+    FD_SET(dataskt, &rfds);
+    FD_SET(ctrlskt, &rfds);
+    select(FD_SETSIZE, &rfds, 0, 0, &tmo);
+  }
+  ExitThread(0);
+  return 0;//should never get here
 }
 
 static DWORD WINAPI call_startfn(LPVOID vindex)
 {
-	int index = (int)vindex;
+  int index = (int)vindex;
  
-	CmiState state = Cmi_state_vector + index;
-	if(Cmi_state_key == 0xFFFFFFFF)
-	{
-		perror("TlsAlloc");
-		exit(1);
-	}
-	
-	if(TlsSetValue(Cmi_state_key, (LPVOID)state) == 0)
-	{
-		perror("TlsSetValue");
-		exit(1);
-	}
+  CmiState state = Cmi_state_vector + index;
+  if(Cmi_state_key == 0xFFFFFFFF)
+  {
+    perror("TlsAlloc");
+    exit(1);
+  }
+  
+  if(TlsSetValue(Cmi_state_key, (LPVOID)state) == 0)
+  {
+    perror("TlsSetValue");
+    exit(1);
+  }
 
- 	ConverseInitPE();
-	Cmi_startfn(CountArgs(Cmi_argv), Cmi_argv);
-	if (Cmi_usrsched == 0) CsdScheduler(-1);
-	ConverseExit();
-	proc_done++;
-	ExitThread(0);
-	return 0;
+   ConverseInitPE();
+  Cmi_startfn(CountArgs(Cmi_argv), Cmi_argv);
+  if (Cmi_usrsched == 0) CsdScheduler(-1);
+  ConverseExit();
+  proc_done++;
+  ExitThread(0);
+  return 0;
 }
 
 static HANDLE barrier_mutex;
@@ -1852,87 +1852,87 @@ static volatile int    which = 0;
 
 void  CmiNodeBarrier(void)
 {
-	int flag = 0;
+  int flag = 0;
 
-	WaitForSingleObject(barrier_mutex, INFINITE);
-	if (!which)
-	{
-		if (barrier_wait0 == Cmi_mynodesize - 1)
-		{
-			which = 1;
-			barrier_wait1 = 0;
-			flag = 1;
-		}
-		barrier_wait0++;
-	}
-	else 
-	{
-		if (barrier_wait1 == Cmi_mynodesize - 1)
-		{
-			which = 0;
-			barrier_wait0 = 0;
-			flag = 1;
-		}
-		barrier_wait1++;
-	}
-	ReleaseMutex(barrier_mutex);
+  WaitForSingleObject(barrier_mutex, INFINITE);
+  if (!which)
+  {
+    if (barrier_wait0 == Cmi_mynodesize - 1)
+    {
+      which = 1;
+      barrier_wait1 = 0;
+      flag = 1;
+    }
+    barrier_wait0++;
+  }
+  else 
+  {
+    if (barrier_wait1 == Cmi_mynodesize - 1)
+    {
+      which = 0;
+      barrier_wait0 = 0;
+      flag = 1;
+    }
+    barrier_wait1++;
+  }
+  ReleaseMutex(barrier_mutex);
 
-	if (flag == 0)
-	{
-		if(which == 0)
-			while(barrier_wait0 != Cmi_mynodesize);
-		else
-			while(barrier_wait1 != Cmi_mynodesize);
-	}
+  if (flag == 0)
+  {
+    if(which == 0)
+      while(barrier_wait0 != Cmi_mynodesize);
+    else
+      while(barrier_wait1 != Cmi_mynodesize);
+  }
 
 }
 
 static void CmiStartThreads()
 {
-	int     i;
-	DWORD   threadID;
-	HANDLE  thr;
-	int     val = 0;
+  int     i;
+  DWORD   threadID;
+  HANDLE  thr;
+  int     val = 0;
 
-	comm_mutex = CmiCreateLock();
-	memmutex = CmiCreateLock();
-	barrier_mutex = CmiCreateLock();
+  comm_mutex = CmiCreateLock();
+  memmutex = CmiCreateLock();
+  barrier_mutex = CmiCreateLock();
 
-	Cmi_state_key = TlsAlloc();
-	if(Cmi_state_key == 0xFFFFFFFF)
-	{
-		perror("TlsAlloc");
-		exit(1);
-	}
-	
-	Cmi_state_vector =
-		(CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
-	
-	for (i=0; i<Cmi_mynodesize; i++)
-		CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
+  Cmi_state_key = TlsAlloc();
+  if(Cmi_state_key == 0xFFFFFFFF)
+  {
+    perror("TlsAlloc");
+    exit(1);
+  }
   
-	for (i=1; i<Cmi_mynodesize; i++) 
-	{
-		if((thr = CreateThread(NULL, 0, call_startfn, (LPVOID)i, 0, &threadID)) == NULL)
-		{
-			perror("CreateThread");
-			exit(1);
-		}
-		CloseHandle(thr);
-	}
-	
-	if(TlsSetValue(Cmi_state_key, (LPVOID)Cmi_state_vector) == 0)
-	{
-		perror("TlsSetValue");
-		exit(1);	
-	}	
-	
-	if((thr = CreateThread(NULL, 0, comm_thread, 0, 0, &threadID)) == NULL)
-	{
-		perror("CreateThread");
-		exit(1);
-	}
-	CloseHandle(thr);
+  Cmi_state_vector =
+    (CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
+  
+  for (i=0; i<Cmi_mynodesize; i++)
+    CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
+  
+  for (i=1; i<Cmi_mynodesize; i++) 
+  {
+    if((thr = CreateThread(NULL, 0, call_startfn, (LPVOID)i, 0, &threadID)) == NULL)
+    {
+      perror("CreateThread");
+      exit(1);
+    }
+    CloseHandle(thr);
+  }
+  
+  if(TlsSetValue(Cmi_state_key, (LPVOID)Cmi_state_vector) == 0)
+  {
+    perror("TlsSetValue");
+    exit(1);  
+  }  
+  
+  if((thr = CreateThread(NULL, 0, comm_thread, 0, 0, &threadID)) == NULL)
+  {
+    perror("CreateThread");
+    exit(1);
+  }
+  CloseHandle(thr);
 }
 
 
@@ -1963,26 +1963,26 @@ CpvStaticDeclare(char *, internal_printf_buffer);
 
 static void ctrl_sendone(int first, ...)
 {  
-	char *f; 
-	int delay; 
-	char *buffer = ctrl_sendone_buffer;
-	va_list ap;
-	
-	va_start(ap, first);
-	delay = first;
-	f = va_arg(ap, char *);
-	CmiCommLock();
-	vsprintf(buffer, f, ap);
-	writeall(Cmi_host_fd, buffer, strlen(buffer)+1);
-	CmiCommUnlock();
+  char *f; 
+  int delay; 
+  char *buffer = ctrl_sendone_buffer;
+  va_list ap;
+  
+  va_start(ap, first);
+  delay = first;
+  f = va_arg(ap, char *);
+  CmiCommLock();
+  vsprintf(buffer, f, ap);
+  writeall(Cmi_host_fd, buffer, strlen(buffer)+1);
+  CmiCommUnlock();
 }
 
 static void host_abort(const char *s)
 {
-	char *buffer = ctrl_sendone_buffer;
-	fprintf(stderr,"Converse Fatal Error: %s\n",s);
-	sprintf(buffer, "abort %s", s);
-	writeall(Cmi_host_fd, buffer, strlen(buffer)+1);
+  char *buffer = ctrl_sendone_buffer;
+  fprintf(stderr,"Converse Fatal Error: %s\n",s);
+  sprintf(buffer, "abort %s", s);
+  writeall(Cmi_host_fd, buffer, strlen(buffer)+1);
 }
 
 /****************************************************************************
@@ -1996,9 +1996,10 @@ static void host_abort(const char *s)
 static void node_addresses_store();
 
 #if CMK_CCS_AVAILABLE
-CpvExtern(int, strHandlerID);
-CpvDeclare(void *, CcsRequestQueue);
-CpvDeclare(int, stateAvailable);
+static CmiNodeLock ccs_mutex;
+extern int strHandlerID;
+static void *ccs_request_q;
+static int stateAvailable;
 typedef struct CcsRequestNode {
   char *ptr;
   int pe;
@@ -2020,98 +2021,96 @@ extern int appletFd;
  */
 static void ctrl_getone()
 { 
-	char line[10000];
-	int ip, port, nStatus, size; 
-	SOCKET fd;
+  char line[10000];
+  int ip, port, nStatus, size; 
+  SOCKET fd;
 
-	#if CMK_WEB_MODE
-	char hndlrId[100];
-	int dont_close = 0;
-	int svrip, svrport;
-	#endif
+  #if CMK_WEB_MODE
+  char hndlrId[100];
+  int dont_close = 0;
+  int svrip, svrport;
+  #endif
 
-	skt_accept(ctrlskt, &ip, &port, &fd);
+  skt_accept(ctrlskt, &ip, &port, &fd);
 
-	nStatus = RecvSocketN(fd, (BYTE *) &size, sizeof(int));
-	if (nStatus == SOCKET_ERROR) {
-		printf("Error getting size of message (1)\n");
-		exit(1);
-	}
+  nStatus = RecvSocketN(fd, (BYTE *) &size, sizeof(int));
+  if (nStatus == SOCKET_ERROR) {
+    printf("Error getting size of message (1)\n");
+    exit(1);
+  }
 
-	nStatus = RecvSocketN(fd, line, size);
-	if (nStatus == SOCKET_ERROR) {
-		printf("Error getting message of size %d\n",size);
-		exit(1);
-	}
-	DEBUGF(("Ctrl_getone: recieved '%s'\n",line));
+  nStatus = RecvSocketN(fd, line, size);
+  if (nStatus == SOCKET_ERROR) {
+    printf("Error getting message of size %d\n",size);
+    exit(1);
+  }
+  DEBUGF(("Ctrl_getone: recieved '%s'\n",line));
 
-	if (strncmp(line,"aval addr ",10)==0) 
-	{
-		node_addresses_store(line);
-	}	
-	else if (strncmp(line,"scanf-data ",11)==0) 
-	{
-		Cmi_scanf_data=strdupl(line+11);
-	#if CMK_CCS_AVAILABLE
-	} 
-	else if (strncmp(line, "req ", 4)==0) 
-	{
-		char cmd[5], *msg;
-		int pe, msgsize, len;
-	#if CMK_WEB_MODE   
-		sscanf(line, "%s%d%d%d%d%s", cmd, &pe, &msgsize, &svrip, &svrport, hndlrId);
-		if(strcmp(hndlrId, "MonitorHandler") == 0) 
-		{
-			appletFd = fd;
-			dont_close = 1;
-		}
-	#else
-		sscanf(line, "%s%d%d", cmd, &pe, &msgsize);
-	#endif
-		len = strlen(line);
-		msg = (char *) CmiAlloc(len+msgsize+CmiMsgHeaderSizeBytes+1);
-		if (!msg)
-			CmiPrintf("%d: Out of mem\n", Cmi_mynode);
-		CmiSetHandler(msg, CpvAccess(strHandlerID));
-		strcpy(msg+CmiMsgHeaderSizeBytes, line);
-		RecvSocketN(fd, (BYTE *) (msg+CmiMsgHeaderSizeBytes+len), msgsize);
-		msg[CmiMsgHeaderSizeBytes+len+msgsize] = '\0';
-		if(CpvAccess(stateAvailable) == 0){
-		CcsRequest qmsg = (CcsRequest)malloc(sizeof(struct CcsRequestNode));
-		_MEMCHECK(qmsg);
-		qmsg->ptr = msg;
-		qmsg->pe = pe;
-		FIFO_EnQueue(CpvAccess(CcsRequestQueue), qmsg);
-	}
-	else
-	{
-		PCQueuePush(CmiGetStateN(pe)->recv, msg);
-	}
+  if (strncmp(line,"aval addr ",10)==0) 
+  {
+    node_addresses_store(line);
+  }  
+  else if (strncmp(line,"scanf-data ",11)==0) 
+  {
+    Cmi_scanf_data=strdupl(line+11);
+  #if CMK_CCS_AVAILABLE
+  } 
+  else if (strncmp(line, "req ", 4)==0) 
+  {
+    char cmd[5], *msg;
+    int pe, msgsize, len;
+  #if CMK_WEB_MODE   
+    sscanf(line, "%s%d%d%d%d%s", cmd, &pe, &msgsize, &svrip, &svrport, hndlrId);
+    if(strcmp(hndlrId, "MonitorHandler") == 0) 
+    {
+      appletFd = fd;
+      dont_close = 1;
+    }
+  #else
+    sscanf(line, "%s%d%d", cmd, &pe, &msgsize);
+  #endif
+    len = strlen(line);
+    msg = (char *) CmiAlloc(len+msgsize+CmiMsgHeaderSizeBytes+1);
+    if (!msg)
+      CmiPrintf("%d: Out of mem\n", Cmi_mynode);
+    CmiSetHandler(msg, strHandlerID);
+    strcpy(msg+CmiMsgHeaderSizeBytes, line);
+    RecvSocketN(fd, (BYTE *) (msg+CmiMsgHeaderSizeBytes+len), msgsize);
+    msg[CmiMsgHeaderSizeBytes+len+msgsize] = '\0';
+    if(stateAvailable == Cmi_mynodesize) {
+      CcsRequest qmsg = (CcsRequest)malloc(sizeof(struct CcsRequestNode));
+      _MEMCHECK(qmsg);
+      qmsg->ptr = msg;
+      qmsg->pe = pe;
+      FIFO_EnQueue(ccs_request_q, qmsg);
+    } else {
+      PCQueuePush(CmiGetStateN(pe)->recv, msg);
+    }
 
-	#if CMK_USE_PERSISTENT_CCS
-	if(dont_close == 1) break;
-	#endif
+#if CMK_USE_PERSISTENT_CCS
+  if(dont_close == 1) break;
+#endif
 
-	#endif
-	} 
-	else if (strncmp(line,"die ",4)==0) 
-	{
-		fprintf(stderr,"aborting: %s\n",line+4);
-		log_done();
-		ConverseCommonExit();
-		exit(0);
-	}
-	else KillEveryoneCode(2932);
-	
-	#if CMK_WEB_MODE
-	if(dont_close==0) 
-	{
-	#endif
-		closesocket(fd);
-	#if CMK_WEB_MODE
-	}
-	#endif
-	DEBUGF(("Ctrl_getone finished\n"));
+#endif
+  } 
+  else if (strncmp(line,"die ",4)==0) 
+  {
+    fprintf(stderr,"aborting: %s\n",line+4);
+    log_done();
+    ConverseCommonExit();
+    exit(0);
+  }
+  else KillEveryoneCode(2932);
+  
+  #if CMK_WEB_MODE
+  if(dont_close==0) 
+  {
+  #endif
+    closesocket(fd);
+  #if CMK_WEB_MODE
+  }
+  #endif
+  DEBUGF(("Ctrl_getone finished\n"));
 }
 
 /*****************************************************************************
@@ -2138,77 +2137,77 @@ static void ctrl_getone()
 
 static void node_addresses_obtain()
 {
-	DEBUGF(("Sending master my address\n"));
-	ctrl_sendone(120, "aset addr %d %s.%d.%d.%d.%d",
-	       Cmi_mynode, Cmi_self_IP_str, ctrlport, dataport,
-	       Cmi_nodestart, Cmi_mynodesize);
-	ctrl_sendone(120, "aget %s %d addr 0 %d",
-	       Cmi_self_IP_str,ctrlport,Cmi_numnodes-1);
-	while (nodes == 0) 
-	{
-	  DEBUGF(("Waiting for node addresses from master conv-host\n"));
-		if (wait_readable(ctrlskt, 60)<0)
-			KillEveryoneCode(21323);
-		ctrl_getone();
-	}
-	DEBUGF(("Got everyone's addresses\n"));
+  DEBUGF(("Sending master my address\n"));
+  ctrl_sendone(120, "aset addr %d %s.%d.%d.%d.%d",
+         Cmi_mynode, Cmi_self_IP_str, ctrlport, dataport,
+         Cmi_nodestart, Cmi_mynodesize);
+  ctrl_sendone(120, "aget %s %d addr 0 %d",
+         Cmi_self_IP_str,ctrlport,Cmi_numnodes-1);
+  while (nodes == 0) 
+  {
+    DEBUGF(("Waiting for node addresses from master conv-host\n"));
+    if (wait_readable(ctrlskt, 60)<0)
+      KillEveryoneCode(21323);
+    ctrl_getone();
+  }
+  DEBUGF(("Got everyone's addresses\n"));
 }
 
 
 static void node_addresses_store(addrs) char *addrs;
 {  
-	char *p; int i, j, lo, hi;
-	OtherNode ntab, *bype;
+  char *p; int i, j, lo, hi;
+  OtherNode ntab, *bype;
   
-	if (strncmp(addrs,"aval addr ",10)!=0) KillEveryoneCode(83473);
-	ntab = (OtherNode)calloc(Cmi_numnodes, sizeof(struct OtherNodeStruct));
-	
-	p = skipblanks(addrs+10);
-	p = parseint(p,&lo);
-	p = parseint(p,&hi);
-	if ((lo!=0)||(hi!=Cmi_numnodes - 1)) KillEveryoneCode(824793);
-	for (i=0; i<Cmi_numnodes; i++) 
-	{
-		unsigned int ip0,ip1,ip2,ip3,cport,dport,nodestart,nodesize,ip;
-		p = parseint(p,&ip0);
-		p = parseint(p,&ip1);
-		p = parseint(p,&ip2);
-		p = parseint(p,&ip3);
-		p = parseint(p,&cport);
-		p = parseint(p,&dport);
-		p = parseint(p,&nodestart);
-		p = parseint(p,&nodesize);
-		ip = (ip0<<24)+(ip1<<16)+(ip2<<8)+ip3;
-		ntab[i].nodestart = nodestart;
-		ntab[i].nodesize  = nodesize;
-		ntab[i].IP = ip;
-		ntab[i].ctrlport = cport;
-		ntab[i].dataport = dport;
-		ntab[i].addr.sin_family      = AF_INET;
-		ntab[i].addr.sin_port        = htons((short)dport);
-		ntab[i].addr.sin_addr.s_addr = htonl(ip);
-	}
+  if (strncmp(addrs,"aval addr ",10)!=0) KillEveryoneCode(83473);
+  ntab = (OtherNode)calloc(Cmi_numnodes, sizeof(struct OtherNodeStruct));
   
-	p = skipblanks(p);
-	if (*p!=0) KillEveryoneCode(82283);
-	bype = (OtherNode*)malloc(Cmi_numpes * sizeof(OtherNode));
-	_MEMCHECK(bype);
-	for (i=0; i<Cmi_numnodes; i++) 
-	{
-		OtherNode node = ntab + i;
-		node->sent_msgs = 0;
-		node->recd_msgs = 0;
-		node->sent_bytes = 0;
-		node->recd_bytes = 0;
-		node->send_window =
-			(ImplicitDgram*)calloc(Cmi_window_size, sizeof(ImplicitDgram));
-		node->recv_window =
-			(ExplicitDgram*)calloc(Cmi_window_size, sizeof(ExplicitDgram));
-		for (j=0; j<node->nodesize; j++)
-			bype[j + node->nodestart] = node;
-	}
-	nodes_by_pe = bype;
-	nodes = ntab;
+  p = skipblanks(addrs+10);
+  p = parseint(p,&lo);
+  p = parseint(p,&hi);
+  if ((lo!=0)||(hi!=Cmi_numnodes - 1)) KillEveryoneCode(824793);
+  for (i=0; i<Cmi_numnodes; i++) 
+  {
+    unsigned int ip0,ip1,ip2,ip3,cport,dport,nodestart,nodesize,ip;
+    p = parseint(p,&ip0);
+    p = parseint(p,&ip1);
+    p = parseint(p,&ip2);
+    p = parseint(p,&ip3);
+    p = parseint(p,&cport);
+    p = parseint(p,&dport);
+    p = parseint(p,&nodestart);
+    p = parseint(p,&nodesize);
+    ip = (ip0<<24)+(ip1<<16)+(ip2<<8)+ip3;
+    ntab[i].nodestart = nodestart;
+    ntab[i].nodesize  = nodesize;
+    ntab[i].IP = ip;
+    ntab[i].ctrlport = cport;
+    ntab[i].dataport = dport;
+    ntab[i].addr.sin_family      = AF_INET;
+    ntab[i].addr.sin_port        = htons((short)dport);
+    ntab[i].addr.sin_addr.s_addr = htonl(ip);
+  }
+  
+  p = skipblanks(p);
+  if (*p!=0) KillEveryoneCode(82283);
+  bype = (OtherNode*)malloc(Cmi_numpes * sizeof(OtherNode));
+  _MEMCHECK(bype);
+  for (i=0; i<Cmi_numnodes; i++) 
+  {
+    OtherNode node = ntab + i;
+    node->sent_msgs = 0;
+    node->recd_msgs = 0;
+    node->sent_bytes = 0;
+    node->recd_bytes = 0;
+    node->send_window =
+      (ImplicitDgram*)calloc(Cmi_window_size, sizeof(ImplicitDgram));
+    node->recv_window =
+      (ExplicitDgram*)calloc(Cmi_window_size, sizeof(ExplicitDgram));
+    for (j=0; j<node->nodesize; j++)
+      bype[j + node->nodestart] = node;
+  }
+  nodes_by_pe = bype;
+  nodes = ntab;
 }
 
 /*****************************************************************************
@@ -2220,17 +2219,17 @@ static void node_addresses_store(addrs) char *addrs;
 
 static void InternalPrintf(f, l) char *f; va_list l;
 {
-	char *buffer = CpvAccess(internal_printf_buffer);
-	vsprintf(buffer, f, l);
-	ctrl_sendone(120, "print %s", buffer);
+  char *buffer = CpvAccess(internal_printf_buffer);
+  vsprintf(buffer, f, l);
+  ctrl_sendone(120, "print %s", buffer);
 }
 
 
 static void InternalError(f, l) char *f; va_list l;
 {
-	char *buffer = CpvAccess(internal_printf_buffer);
-	vsprintf(buffer, f, l);
-	ctrl_sendone(120, "printerr %s", buffer);
+  char *buffer = CpvAccess(internal_printf_buffer);
+  vsprintf(buffer, f, l);
+  ctrl_sendone(120, "printerr %s", buffer);
 }
 
 static int InternalScanf(fmt, l)
@@ -2253,9 +2252,9 @@ static int InternalScanf(fmt, l)
   ctrl_sendone(120, "scanf %s %d %s", Cmi_self_IP_str, ctrlport, fmt);
   while (Cmi_scanf_data == 0) jsleep(0, 250000);
   i = sscanf((char*)Cmi_scanf_data, fmt,
-	     ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
-	     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
-	     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
+       ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
+       ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
+       ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
   free((char*)Cmi_scanf_data);
   Cmi_scanf_data=0;
   CmiUnlock(Cmi_scanf_mutex);
@@ -2265,29 +2264,29 @@ static int InternalScanf(fmt, l)
 
 void CmiPrintf(const char *fmt, ...)
 {
-	va_list ap;
-	va_start(ap, fmt);
-	InternalPrintf(fmt, ap);
-	va_end(ap);
-	return;
+  va_list ap;
+  va_start(ap, fmt);
+  InternalPrintf(fmt, ap);
+  va_end(ap);
+  return;
 }
 
 void CmiError(const char *fmt, ...)
 {
-	va_list ap;
-	va_start (ap, fmt);
-	InternalError(fmt, ap);
-	va_end(ap);
-	return;
+  va_list ap;
+  va_start (ap, fmt);
+  InternalError(fmt, ap);
+  va_end(ap);
+  return;
 }
 
 int CmiScanf(const char *fmt, ...)
 {
-	va_list ap; int i;
-	va_start(ap, fmt);
-	i = InternalScanf(fmt, ap);
-	va_end(ap);
-	return i;
+  va_list ap; int i;
+  va_start(ap, fmt);
+  i = InternalScanf(fmt, ap);
+  va_end(ap);
+  return i;
 }
 
 
@@ -2300,28 +2299,28 @@ int CmiScanf(const char *fmt, ...)
 void GarbageCollectMsg(OutgoingMsg ogm)
 {
   
-	if (ogm->refcount == 0) 
-	{
-		if (ogm->freemode == 'A') 
-		{
-			ogm->freemode = 'X';
-		} 
-		else 
-		{
-			CmiFree(ogm->data);
-			FreeOutgoingMsg(ogm);
-		}
-	}
+  if (ogm->refcount == 0) 
+  {
+    if (ogm->freemode == 'A') 
+    {
+      ogm->freemode = 'X';
+    } 
+    else 
+    {
+      CmiFree(ogm->data);
+      FreeOutgoingMsg(ogm);
+    }
+  }
 }
 
 
 void DiscardImplicitDgram(ImplicitDgram dg)
 {
-	OutgoingMsg ogm;
-	ogm = dg->ogm;
-	ogm->refcount--;
-	GarbageCollectMsg(ogm);
-	FreeImplicitDgram(dg);
+  OutgoingMsg ogm;
+  ogm = dg->ogm;
+  ogm->refcount--;
+  GarbageCollectMsg(ogm);
+  FreeImplicitDgram(dg);
 }
 
 
@@ -2338,33 +2337,33 @@ void DiscardImplicitDgram(ImplicitDgram dg)
 int TransmitAckDatagram(OtherNode node)
 {
   
-	DgramAck ack; int i, seqno, slot; ExplicitDgram dg;
-	int retval;
+  DgramAck ack; int i, seqno, slot; ExplicitDgram dg;
+  int retval;
   
-	seqno = node->recv_next;
-	DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, Cmi_host_pid, seqno);
-	LOG(Cmi_clock, Cmi_nodestart, 'A', node->nodestart, seqno);
+  seqno = node->recv_next;
+  DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, Cmi_host_pid, seqno);
+  LOG(Cmi_clock, Cmi_nodestart, 'A', node->nodestart, seqno);
   
-	for (i=0; i<Cmi_window_size; i++) 
-	{
-		slot = seqno % Cmi_window_size;
-		dg = node->recv_window[slot];
-		ack.window[i] = (dg && (dg->seqno == seqno));
-		seqno = ((seqno+1) & DGRAM_SEQNO_MASK);
-	}
+  for (i=0; i<Cmi_window_size; i++) 
+  {
+    slot = seqno % Cmi_window_size;
+    dg = node->recv_window[slot];
+    ack.window[i] = (dg && (dg->seqno == seqno));
+    seqno = ((seqno+1) & DGRAM_SEQNO_MASK);
+  }
   
-	memcpy(&ack.window[Cmi_window_size], &(node->send_ack_seqno), 
-			sizeof(unsigned int));
-	node->send_ack_seqno = ((node->send_ack_seqno + 1) & DGRAM_SEQNO_MASK);
-	
-	retval = SOCKET_ERROR;
-	while(retval == SOCKET_ERROR)
-		retval = sendto(dataskt, (char *)&ack,
-						DGRAM_HEADER_SIZE + Cmi_window_size + sizeof(unsigned int), 0,
-						(struct sockaddr *)&(node->addr),
-						sizeof(struct sockaddr_in));
-	node->stat_send_ack++;
-	return retval;
+  memcpy(&ack.window[Cmi_window_size], &(node->send_ack_seqno), 
+      sizeof(unsigned int));
+  node->send_ack_seqno = ((node->send_ack_seqno + 1) & DGRAM_SEQNO_MASK);
+  
+  retval = SOCKET_ERROR;
+  while(retval == SOCKET_ERROR)
+    retval = sendto(dataskt, (char *)&ack,
+            DGRAM_HEADER_SIZE + Cmi_window_size + sizeof(unsigned int), 0,
+            (struct sockaddr *)&(node->addr),
+            sizeof(struct sockaddr_in));
+  node->stat_send_ack++;
+  return retval;
 }
 
 
@@ -2377,23 +2376,23 @@ int TransmitAckDatagram(OtherNode node)
 
 void TransmitImplicitDgram(ImplicitDgram dg)
 {
-	char *data; DgramHeader *head; int len; DgramHeader temp;
-	OtherNode dest;
-	int retval;
+  char *data; DgramHeader *head; int len; DgramHeader temp;
+  OtherNode dest;
+  int retval;
 
-	len = dg->datalen;
-	data = dg->dataptr;
-	head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
-	temp = *head;
-	dest = dg->dest;
-	DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_host_pid, dg->seqno);
-	LOG(Cmi_clock, Cmi_nodestart, 'T', dest->nodestart, dg->seqno);
-	retval = SOCKET_ERROR;
-	while(retval ==  SOCKET_ERROR)
-		retval = sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
-			(struct sockaddr *)&(dest->addr), sizeof(struct sockaddr_in));
-	*head = temp;
-	dest->stat_send_pkt++;
+  len = dg->datalen;
+  data = dg->dataptr;
+  head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
+  temp = *head;
+  dest = dg->dest;
+  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_host_pid, dg->seqno);
+  LOG(Cmi_clock, Cmi_nodestart, 'T', dest->nodestart, dg->seqno);
+  retval = SOCKET_ERROR;
+  while(retval ==  SOCKET_ERROR)
+    retval = sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
+      (struct sockaddr *)&(dest->addr), sizeof(struct sockaddr_in));
+  *head = temp;
+  dest->stat_send_pkt++;
 }
 
 
@@ -2401,25 +2400,25 @@ void TransmitImplicitDgram(ImplicitDgram dg)
 
 void TransmitImplicitDgram1(ImplicitDgram dg)
 {
-	char *data; DgramHeader *head; int len; DgramHeader temp;
-	OtherNode dest;
-	int retval;
+  char *data; DgramHeader *head; int len; DgramHeader temp;
+  OtherNode dest;
+  int retval;
 
-	len = dg->datalen;
-	data = dg->dataptr;
-	head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
-	temp = *head;
-	dest = dg->dest;
-	DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_host_pid, dg->seqno);
-	LOG(Cmi_clock, Cmi_nodestart, 'P', dest->nodestart, dg->seqno);
-	retval = SOCKET_ERROR;
-	
-	while (retval == SOCKET_ERROR)
-		retval = sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
-			(struct sockaddr *)&(dest->addr), sizeof(struct sockaddr_in));
-	
-	*head = temp;
-	dest->stat_resend_pkt++;
+  len = dg->datalen;
+  data = dg->dataptr;
+  head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
+  temp = *head;
+  dest = dg->dest;
+  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_host_pid, dg->seqno);
+  LOG(Cmi_clock, Cmi_nodestart, 'P', dest->nodestart, dg->seqno);
+  retval = SOCKET_ERROR;
+  
+  while (retval == SOCKET_ERROR)
+    retval = sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
+      (struct sockaddr *)&(dest->addr), sizeof(struct sockaddr_in));
+  
+  *head = temp;
+  dest->stat_resend_pkt++;
 }
 
 
@@ -2434,33 +2433,33 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
  ***********************************************************************/
 int TransmitAcknowledgement()
 {
-	int skip; static int nextnode=0; OtherNode node;
+  int skip; static int nextnode=0; OtherNode node;
   
-	for (skip=0; skip<Cmi_numnodes; skip++) 
-	{
-		node = nodes+nextnode;
-		nextnode = (nextnode + 1) % Cmi_numnodes;
-		
-		if (node->recv_ack_cnt) 
-		{
-			if ((node->recv_ack_cnt > Cmi_half_window) ||
-				(Cmi_clock >= node->recv_ack_time)) 
-			{
-				TransmitAckDatagram(node);
-				if (node->recv_winsz) 
-				{
-					node->recv_ack_cnt  = 1;
-					node->recv_ack_time = Cmi_clock + Cmi_ack_delay;
-				} 
-				else 
-				{
-					node->recv_ack_cnt  = 0;
-					node->recv_ack_time = 0.0;
-				}
-			return 1;
-			}
-		}
-	}
+  for (skip=0; skip<Cmi_numnodes; skip++) 
+  {
+    node = nodes+nextnode;
+    nextnode = (nextnode + 1) % Cmi_numnodes;
+    
+    if (node->recv_ack_cnt) 
+    {
+      if ((node->recv_ack_cnt > Cmi_half_window) ||
+        (Cmi_clock >= node->recv_ack_time)) 
+      {
+        TransmitAckDatagram(node);
+        if (node->recv_winsz) 
+        {
+          node->recv_ack_cnt  = 1;
+          node->recv_ack_time = Cmi_clock + Cmi_ack_delay;
+        } 
+        else 
+        {
+          node->recv_ack_cnt  = 0;
+          node->recv_ack_time = 0.0;
+        }
+      return 1;
+      }
+    }
+  }
   return 0;
 }
 
@@ -2475,50 +2474,50 @@ int TransmitAcknowledgement()
 int TransmitDatagram()
 {
   
-	ImplicitDgram dg; OtherNode node;
-	static int nextnode=0; 
-	unsigned int slot, seqno;
-	int skip, count;
+  ImplicitDgram dg; OtherNode node;
+  static int nextnode=0; 
+  unsigned int slot, seqno;
+  int skip, count;
   
-	for (skip=0; skip<Cmi_numnodes; skip++) 
-	{
-		node = nodes+nextnode;
-		nextnode = (nextnode + 1) % Cmi_numnodes;
-		dg = node->send_queue_h;
-		
-		if (dg) 
-		{
-			seqno = dg->seqno;
-			slot = seqno % Cmi_window_size;
-			if (node->send_window[slot] == 0) 
-			{
-				node->send_queue_h = dg->next;
-				node->send_window[slot] = dg;
-				TransmitImplicitDgram(dg);
-				if (seqno == ((node->send_last+1)&DGRAM_SEQNO_MASK))
-					node->send_last = seqno;
-				node->send_primer = Cmi_clock + Cmi_delay_retransmit;
-				return 1;
-			}
-		}
+  for (skip=0; skip<Cmi_numnodes; skip++) 
+  {
+    node = nodes+nextnode;
+    nextnode = (nextnode + 1) % Cmi_numnodes;
+    dg = node->send_queue_h;
     
-		if (Cmi_clock > node->send_primer) 
-		{
-			slot = (node->send_last % Cmi_window_size);
-			for (count=0; count<Cmi_window_size; count++) 
-			{
-				dg = node->send_window[slot];
-				if (dg) break;
-				slot = ((slot+Cmi_window_size-1) % Cmi_window_size);
-			}
-			if (dg) 
-			{
-				TransmitImplicitDgram1(node->send_window[slot]);
-				node->send_primer = Cmi_clock + Cmi_delay_retransmit;
-				return 1;
-			}
-		}
-	}
+    if (dg) 
+    {
+      seqno = dg->seqno;
+      slot = seqno % Cmi_window_size;
+      if (node->send_window[slot] == 0) 
+      {
+        node->send_queue_h = dg->next;
+        node->send_window[slot] = dg;
+        TransmitImplicitDgram(dg);
+        if (seqno == ((node->send_last+1)&DGRAM_SEQNO_MASK))
+          node->send_last = seqno;
+        node->send_primer = Cmi_clock + Cmi_delay_retransmit;
+        return 1;
+      }
+    }
+    
+    if (Cmi_clock > node->send_primer) 
+    {
+      slot = (node->send_last % Cmi_window_size);
+      for (count=0; count<Cmi_window_size; count++) 
+      {
+        dg = node->send_window[slot];
+        if (dg) break;
+        slot = ((slot+Cmi_window_size-1) % Cmi_window_size);
+      }
+      if (dg) 
+      {
+        TransmitImplicitDgram1(node->send_window[slot]);
+        node->send_primer = Cmi_clock + Cmi_delay_retransmit;
+        return 1;
+      }
+    }
+  }
   return 0;
 }
 
@@ -2531,35 +2530,35 @@ int TransmitDatagram()
  ***********************************************************************/
 void EnqueueOutgoingDgram(OutgoingMsg ogm, char *ptr, int len, OtherNode node, int rank)
 {  
-	unsigned int seqno; 
-	int dst, src; 
-	ImplicitDgram dg;
+  unsigned int seqno; 
+  int dst, src; 
+  ImplicitDgram dg;
   
-	src = ogm->src;
-	dst = ogm->dst;
-	seqno = node->send_next;
-	node->send_next = ((seqno+1)&DGRAM_SEQNO_MASK);
-	MallocImplicitDgram(dg);
-	dg->dest = node;
-	dg->srcpe = src;
-	dg->rank = rank;
-	dg->seqno = seqno;
-	dg->dataptr = ptr;
-	dg->datalen = len;
-	dg->ogm = ogm;
-	ogm->refcount++;
-	dg->next = 0;
+  src = ogm->src;
+  dst = ogm->dst;
+  seqno = node->send_next;
+  node->send_next = ((seqno+1)&DGRAM_SEQNO_MASK);
+  MallocImplicitDgram(dg);
+  dg->dest = node;
+  dg->srcpe = src;
+  dg->rank = rank;
+  dg->seqno = seqno;
+  dg->dataptr = ptr;
+  dg->datalen = len;
+  dg->ogm = ogm;
+  ogm->refcount++;
+  dg->next = 0;
   
-	if (node->send_queue_h == 0) 
-	{
-		node->send_queue_h = dg;
-		node->send_queue_t = dg;
-	} 
-	else 
-	{
-		node->send_queue_t->next = dg;
-		node->send_queue_t = dg;
-	}
+  if (node->send_queue_h == 0) 
+  {
+    node->send_queue_h = dg;
+    node->send_queue_t = dg;
+  } 
+  else 
+  {
+    node->send_queue_t->next = dg;
+    node->send_queue_t = dg;
+  }
 }
 
 
@@ -2572,22 +2571,22 @@ void EnqueueOutgoingDgram(OutgoingMsg ogm, char *ptr, int len, OtherNode node, i
  ***********************************************************************/
 void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
 {  
-	int  size; 
-	char *data;
-	OtherNode myNode = nodes+CmiMyNode();
+  int  size; 
+  char *data;
+  OtherNode myNode = nodes+CmiMyNode();
  
-	size = ogm->size - DGRAM_HEADER_SIZE;
-	data = ogm->data + DGRAM_HEADER_SIZE;
-	while (size > Cmi_dgram_max_data) 
-	{
-	    EnqueueOutgoingDgram(ogm, data, Cmi_dgram_max_data, node, rank);
-		data += Cmi_dgram_max_data;
-		size -= Cmi_dgram_max_data;
-	}
-	EnqueueOutgoingDgram(ogm, data, size, node, rank);
+  size = ogm->size - DGRAM_HEADER_SIZE;
+  data = ogm->data + DGRAM_HEADER_SIZE;
+  while (size > Cmi_dgram_max_data) 
+  {
+      EnqueueOutgoingDgram(ogm, data, Cmi_dgram_max_data, node, rank);
+    data += Cmi_dgram_max_data;
+    size -= Cmi_dgram_max_data;
+  }
+  EnqueueOutgoingDgram(ogm, data, size, node, rank);
 
-	myNode->sent_msgs++;
-	myNode->sent_bytes += ogm->size;
+  myNode->sent_msgs++;
+  myNode->sent_bytes += ogm->size;
 }
 
 
@@ -2606,48 +2605,48 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
 void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
 {
   
-	int i, rank, dst; OtherNode node;
+  int i, rank, dst; OtherNode node;
 
-	dst = ogm->dst;
-	switch (dst) 
-	{
-		case NODE_BROADCAST_OTHERS:
-			for (i = 0; i<Cmi_numnodes; i++)
-				if (i!=Cmi_mynode)
-					DeliverViaNetwork(ogm, nodes + i, DGRAM_NODEMESSAGE);
-			GarbageCollectMsg(ogm);
-			break;
-	
-		case NODE_BROADCAST_ALL:
-			PCQueuePush(CsvAccess(NodeRecv),CopyMsg(ogm->data,ogm->size));
-			for (i=0; i<Cmi_numnodes; i++)
-				if (i!=Cmi_mynode)
-					DeliverViaNetwork(ogm, nodes + i, DGRAM_NODEMESSAGE);
-			GarbageCollectMsg(ogm);
-			break;
-	
-		default:
-			node = nodes+dst;
-			rank=DGRAM_NODEMESSAGE;
-			if (dst != Cmi_mynode) 
-			{
-				DeliverViaNetwork(ogm, node, rank);
-				GarbageCollectMsg(ogm);
-			} 
-			else 
-			{
-				if (ogm->freemode == 'A') 
-				{
-					PCQueuePush(CsvAccess(NodeRecv),CopyMsg(ogm->data,ogm->size));
-					ogm->freemode = 'X';
-				} 
-				else 
-				{
-					PCQueuePush(CsvAccess(NodeRecv), ogm->data);
-					FreeOutgoingMsg(ogm);
-				}
-			}
-	}
+  dst = ogm->dst;
+  switch (dst) 
+  {
+    case NODE_BROADCAST_OTHERS:
+      for (i = 0; i<Cmi_numnodes; i++)
+        if (i!=Cmi_mynode)
+          DeliverViaNetwork(ogm, nodes + i, DGRAM_NODEMESSAGE);
+      GarbageCollectMsg(ogm);
+      break;
+  
+    case NODE_BROADCAST_ALL:
+      PCQueuePush(CsvAccess(NodeRecv),CopyMsg(ogm->data,ogm->size));
+      for (i=0; i<Cmi_numnodes; i++)
+        if (i!=Cmi_mynode)
+          DeliverViaNetwork(ogm, nodes + i, DGRAM_NODEMESSAGE);
+      GarbageCollectMsg(ogm);
+      break;
+  
+    default:
+      node = nodes+dst;
+      rank=DGRAM_NODEMESSAGE;
+      if (dst != Cmi_mynode) 
+      {
+        DeliverViaNetwork(ogm, node, rank);
+        GarbageCollectMsg(ogm);
+      } 
+      else 
+      {
+        if (ogm->freemode == 'A') 
+        {
+          PCQueuePush(CsvAccess(NodeRecv),CopyMsg(ogm->data,ogm->size));
+          ogm->freemode = 'X';
+        } 
+        else 
+        {
+          PCQueuePush(CsvAccess(NodeRecv), ogm->data);
+          FreeOutgoingMsg(ogm);
+        }
+      }
+  }
 }
 
 #else
@@ -2669,58 +2668,58 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
 void DeliverOutgoingMessage(OutgoingMsg ogm)
 {
   
-	int       i, rank, dst; 
-	OtherNode node;
+  int       i, rank, dst; 
+  OtherNode node;
   
-	dst = ogm->dst;
-	switch (dst) 
-	{
-		case PE_BROADCAST_ALL:
-			for (rank = 0; rank<Cmi_mynodesize; rank++) 
-			{
-				PCQueuePush(CmiGetStateN(rank)->recv,CopyMsg(ogm->data,ogm->size));
-			}
-			for (i=0; i<Cmi_numnodes; i++)
-				if (i!=Cmi_mynode)
-					DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
-			GarbageCollectMsg(ogm);
-			break;
+  dst = ogm->dst;
+  switch (dst) 
+  {
+    case PE_BROADCAST_ALL:
+      for (rank = 0; rank<Cmi_mynodesize; rank++) 
+      {
+        PCQueuePush(CmiGetStateN(rank)->recv,CopyMsg(ogm->data,ogm->size));
+      }
+      for (i=0; i<Cmi_numnodes; i++)
+        if (i!=Cmi_mynode)
+          DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
+      GarbageCollectMsg(ogm);
+      break;
   
-		case PE_BROADCAST_OTHERS:
-			for (rank = 0; rank<Cmi_mynodesize; rank++)
-			if (rank + Cmi_nodestart != ogm->src) 
-			{
-				PCQueuePush(CmiGetStateN(rank)->recv,CopyMsg(ogm->data,ogm->size));
-			}
-			for (i = 0; i<Cmi_numnodes; i++)
-				if (i!=Cmi_mynode)
-					DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
-			GarbageCollectMsg(ogm);
-			break;
+    case PE_BROADCAST_OTHERS:
+      for (rank = 0; rank<Cmi_mynodesize; rank++)
+      if (rank + Cmi_nodestart != ogm->src) 
+      {
+        PCQueuePush(CmiGetStateN(rank)->recv,CopyMsg(ogm->data,ogm->size));
+      }
+      for (i = 0; i<Cmi_numnodes; i++)
+        if (i!=Cmi_mynode)
+          DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
+      GarbageCollectMsg(ogm);
+      break;
   
-		default:
-			node = nodes_by_pe[dst];
-			rank = dst - node->nodestart;
-			if (node->nodestart != Cmi_nodestart) 
-			{
-				DeliverViaNetwork(ogm, node, rank);
+    default:
+      node = nodes_by_pe[dst];
+      rank = dst - node->nodestart;
+      if (node->nodestart != Cmi_nodestart) 
+      {
+        DeliverViaNetwork(ogm, node, rank);
 
-				GarbageCollectMsg(ogm);
-			} 
-			else 
-			{
-				if (ogm->freemode == 'A') 
-				{
-					PCQueuePush(CmiGetStateN(rank)->recv,CopyMsg(ogm->data,ogm->size));
-					ogm->freemode = 'X';
-				} 
-				else
-				{
-					PCQueuePush(CmiGetStateN(rank)->recv, ogm->data);
-					FreeOutgoingMsg(ogm);
-				}
-			}
-	}
+        GarbageCollectMsg(ogm);
+      } 
+      else 
+      {
+        if (ogm->freemode == 'A') 
+        {
+          PCQueuePush(CmiGetStateN(rank)->recv,CopyMsg(ogm->data,ogm->size));
+          ogm->freemode = 'X';
+        } 
+        else
+        {
+          PCQueuePush(CmiGetStateN(rank)->recv, ogm->data);
+          FreeOutgoingMsg(ogm);
+        }
+      }
+  }
 }
 
 
@@ -2737,58 +2736,58 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
 
 void AssembleDatagram(OtherNode node, ExplicitDgram dg)
 {  
-	int i; char *msg; unsigned int size;
-	OtherNode myNode = nodes+CmiMyNode();
+  int i; char *msg; unsigned int size;
+  OtherNode myNode = nodes+CmiMyNode();
   
-	LOG(Cmi_clock, Cmi_nodestart, 'X', dg->srcpe, dg->seqno);
-	msg = node->asm_msg;
-	if (msg == 0) 
-	{
-		size = CmiMsgHeaderGetLength(dg->data);
-		msg = (char *)CmiAlloc(size);
-		if (!msg)
-			fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
-		if (size < dg->len) KillEveryoneCode(4559312);
-			jmemcpy(msg, (char*)(dg->data), dg->len);
-		node->asm_rank = dg->rank;
-		node->asm_total = size;
-		node->asm_fill = dg->len;
-		node->asm_msg = msg;
-	} 
-	else 
-	{
-		size = dg->len - DGRAM_HEADER_SIZE;
-		jmemcpy(msg + node->asm_fill, ((char*)(dg->data))+DGRAM_HEADER_SIZE, size);
-		node->asm_fill += size;
-	}
-	
-	if (node->asm_fill > node->asm_total)
-		fprintf(stderr, "\n\n\t\tLength mismatch!!\n\n");
-	if (node->asm_fill == node->asm_total) 
-	{
-		if (node->asm_rank == DGRAM_BROADCAST) 
-		{
-			int len = node->asm_total;
-			for (i=1; i<Cmi_mynodesize; i++)
-			PCQueuePush(CmiGetStateN(i)->recv, CopyMsg(msg, len));
-			PCQueuePush(CmiGetStateN(0)->recv, msg);
-		} 
-		else 
-		{
+  LOG(Cmi_clock, Cmi_nodestart, 'X', dg->srcpe, dg->seqno);
+  msg = node->asm_msg;
+  if (msg == 0) 
+  {
+    size = CmiMsgHeaderGetLength(dg->data);
+    msg = (char *)CmiAlloc(size);
+    if (!msg)
+      fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
+    if (size < dg->len) KillEveryoneCode(4559312);
+      jmemcpy(msg, (char*)(dg->data), dg->len);
+    node->asm_rank = dg->rank;
+    node->asm_total = size;
+    node->asm_fill = dg->len;
+    node->asm_msg = msg;
+  } 
+  else 
+  {
+    size = dg->len - DGRAM_HEADER_SIZE;
+    jmemcpy(msg + node->asm_fill, ((char*)(dg->data))+DGRAM_HEADER_SIZE, size);
+    node->asm_fill += size;
+  }
+  
+  if (node->asm_fill > node->asm_total)
+    fprintf(stderr, "\n\n\t\tLength mismatch!!\n\n");
+  if (node->asm_fill == node->asm_total) 
+  {
+    if (node->asm_rank == DGRAM_BROADCAST) 
+    {
+      int len = node->asm_total;
+      for (i=1; i<Cmi_mynodesize; i++)
+      PCQueuePush(CmiGetStateN(i)->recv, CopyMsg(msg, len));
+      PCQueuePush(CmiGetStateN(0)->recv, msg);
+    } 
+    else 
+    {
 #if CMK_NODE_QUEUE_AVAILABLE
-			if (node->asm_rank==DGRAM_NODEMESSAGE) 
-			{
-				PCQueuePush(CsvAccess(NodeRecv), msg);
-			}
-		else
+      if (node->asm_rank==DGRAM_NODEMESSAGE) 
+      {
+        PCQueuePush(CsvAccess(NodeRecv), msg);
+      }
+    else
 #endif
-			PCQueuePush(CmiGetStateN(node->asm_rank)->recv, msg);
-		}
-		node->asm_msg = 0;
-		myNode->recd_msgs++;
-		myNode->recd_bytes += node->asm_total;
-	}
-	FreeExplicitDgram(dg);
+      PCQueuePush(CmiGetStateN(node->asm_rank)->recv, msg);
+    }
+    node->asm_msg = 0;
+    myNode->recd_msgs++;
+    myNode->recd_bytes += node->asm_total;
+  }
+  FreeExplicitDgram(dg);
 }
 
 
@@ -2804,19 +2803,19 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
 void AssembleReceivedDatagrams(OtherNode node)
 {
   
-	unsigned int next, slot; ExplicitDgram dg;
-	next = node->recv_next;
-	while (1) 
-	{
-		slot = (next % Cmi_window_size);
-		dg = node->recv_window[slot];
-		if (dg == 0) break;
-		AssembleDatagram(node, dg);
-		node->recv_window[slot] = 0;
-		node->recv_winsz--;
-		next = ((next + 1) & DGRAM_SEQNO_MASK);
-	}
-	node->recv_next = next;
+  unsigned int next, slot; ExplicitDgram dg;
+  next = node->recv_next;
+  while (1) 
+  {
+    slot = (next % Cmi_window_size);
+    dg = node->recv_window[slot];
+    if (dg == 0) break;
+    AssembleDatagram(node, dg);
+    node->recv_window[slot] = 0;
+    node->recv_winsz--;
+    next = ((next + 1) & DGRAM_SEQNO_MASK);
+  }
+  node->recv_next = next;
 }
 
 
@@ -2837,37 +2836,37 @@ void AssembleReceivedDatagrams(OtherNode node)
 
 void IntegrateMessageDatagram(ExplicitDgram dg)
 {  
-	unsigned int seqno, slot; OtherNode node;
+  unsigned int seqno, slot; OtherNode node;
 
-	LOG(Cmi_clock, Cmi_nodestart, 'M', dg->srcpe, dg->seqno);
-	
-	node = nodes_by_pe[dg->srcpe];
-	node->stat_recv_pkt++;
-	seqno = dg->seqno;
-	node->recv_ack_cnt++;
-	
-	if (node->recv_ack_time == 0.0)
-		node->recv_ack_time = Cmi_clock + Cmi_ack_delay;
-	
-	if (((seqno - node->recv_next) & DGRAM_SEQNO_MASK) < (unsigned int)Cmi_window_size) 
-	{
-		slot = (seqno % Cmi_window_size);
-		if (node->recv_window[slot] == 0) 
-		{
-			node->recv_window[slot] = dg;
-			node->recv_winsz++;
-			if (seqno == node->recv_next)
-				AssembleReceivedDatagrams(node);
-			if (seqno > node->recv_expect)
-				node->recv_ack_time = 0.0;
-			if (seqno >= node->recv_expect)
-				node->recv_expect = ((seqno+1)&DGRAM_SEQNO_MASK);
-			LOG(Cmi_clock, Cmi_nodestart, 'Y', node->recv_next, dg->seqno);
-			return;
-		}
-	}
-	LOG(Cmi_clock, Cmi_nodestart, 'y', node->recv_next, dg->seqno);
-	FreeExplicitDgram(dg);
+  LOG(Cmi_clock, Cmi_nodestart, 'M', dg->srcpe, dg->seqno);
+  
+  node = nodes_by_pe[dg->srcpe];
+  node->stat_recv_pkt++;
+  seqno = dg->seqno;
+  node->recv_ack_cnt++;
+  
+  if (node->recv_ack_time == 0.0)
+    node->recv_ack_time = Cmi_clock + Cmi_ack_delay;
+  
+  if (((seqno - node->recv_next) & DGRAM_SEQNO_MASK) < (unsigned int)Cmi_window_size) 
+  {
+    slot = (seqno % Cmi_window_size);
+    if (node->recv_window[slot] == 0) 
+    {
+      node->recv_window[slot] = dg;
+      node->recv_winsz++;
+      if (seqno == node->recv_next)
+        AssembleReceivedDatagrams(node);
+      if (seqno > node->recv_expect)
+        node->recv_ack_time = 0.0;
+      if (seqno >= node->recv_expect)
+        node->recv_expect = ((seqno+1)&DGRAM_SEQNO_MASK);
+      LOG(Cmi_clock, Cmi_nodestart, 'Y', node->recv_next, dg->seqno);
+      return;
+    }
+  }
+  LOG(Cmi_clock, Cmi_nodestart, 'y', node->recv_next, dg->seqno);
+  FreeExplicitDgram(dg);
 }
 
 
@@ -2925,121 +2924,121 @@ void IntegrateMessageDatagram(ExplicitDgram dg)
 void IntegrateAckDatagram(ExplicitDgram dg)
 {
   
-	OtherNode node; DgramAck *ack; ImplicitDgram idg;
-	int i, seqno, dgseqno, diff; 
-	unsigned int slot, rxing, ackseqno;
-	unsigned int tmp;
+  OtherNode node; DgramAck *ack; ImplicitDgram idg;
+  int i, seqno, dgseqno, diff; 
+  unsigned int slot, rxing, ackseqno;
+  unsigned int tmp;
 
 
-	node = nodes_by_pe[dg->srcpe];
-	ack = ((DgramAck*)(dg->data));
-	memcpy(&ackseqno, &(ack->window[Cmi_window_size]), sizeof(unsigned int));
-	dgseqno = dg->seqno;
-	seqno = (dgseqno + Cmi_window_size) & DGRAM_SEQNO_MASK;
-	slot = seqno % Cmi_window_size;
-	rxing = 0;
-	node->stat_recv_ack++;
+  node = nodes_by_pe[dg->srcpe];
+  ack = ((DgramAck*)(dg->data));
+  memcpy(&ackseqno, &(ack->window[Cmi_window_size]), sizeof(unsigned int));
+  dgseqno = dg->seqno;
+  seqno = (dgseqno + Cmi_window_size) & DGRAM_SEQNO_MASK;
+  slot = seqno % Cmi_window_size;
+  rxing = 0;
+  node->stat_recv_ack++;
   
-	LOG(Cmi_clock, Cmi_nodestart, 'R', node->nodestart, dg->seqno);
+  LOG(Cmi_clock, Cmi_nodestart, 'R', node->nodestart, dg->seqno);
 
-	tmp = node->recv_ack_seqno;
+  tmp = node->recv_ack_seqno;
   /* check that the ack being received is actually appropriate */
-	if ( !((node->recv_ack_seqno >= 
-	  ((DGRAM_SEQNO_MASK >> 1) + (DGRAM_SEQNO_MASK >> 2))) &&
-	 (ackseqno < (DGRAM_SEQNO_MASK >> 1))) &&
+  if ( !((node->recv_ack_seqno >= 
+    ((DGRAM_SEQNO_MASK >> 1) + (DGRAM_SEQNO_MASK >> 2))) &&
+   (ackseqno < (DGRAM_SEQNO_MASK >> 1))) &&
        (ackseqno <= node->recv_ack_seqno))
     {
-		FreeExplicitDgram(dg);
-		return;
+    FreeExplicitDgram(dg);
+    return;
     } 
   /* higher ack so adjust */
   
-	node->recv_ack_seqno = ackseqno;
+  node->recv_ack_seqno = ackseqno;
   
-	for (i=Cmi_window_size-1; i>=0; i--) 
-	{	
-		slot--; 
-		if (slot== ((unsigned int)-1)) slot+=Cmi_window_size;
-		
-		seqno = (seqno-1) & DGRAM_SEQNO_MASK;
-		idg = node->send_window[slot];
+  for (i=Cmi_window_size-1; i>=0; i--) 
+  {  
+    slot--; 
+    if (slot== ((unsigned int)-1)) slot+=Cmi_window_size;
     
-		if (idg) 
-		{
-			if (idg->seqno == seqno) 
-			{
-				if (ack->window[i]) 
-				{
-				/* remove those that have been received and are within a window
-				of the first missing packet */
-					node->stat_ack_pkts++;
-					LOG(Cmi_clock, Cmi_nodestart, 'r', node->nodestart, seqno);
-					node->send_window[slot] = 0;
-					DiscardImplicitDgram(idg);
-					rxing = 1;
-				}
-				else if (rxing) 
-				{
-					node->send_window[slot] = 0;
-					idg->next = node->send_queue_h;
-					if (node->send_queue_h == 0) 
-					{
-						node->send_queue_t = idg;
-					}
-					node->send_queue_h = idg;
-				}
-			} 
-			else 
-			{
-				diff = dgseqno >= idg->seqno ? 
-						((dgseqno - idg->seqno) & DGRAM_SEQNO_MASK) :
-						((dgseqno + (DGRAM_SEQNO_MASK - idg->seqno) + 1) & DGRAM_SEQNO_MASK);
-	  
-				if ((diff <= 0) || (diff > Cmi_window_size))
-				{
-					continue;
-				}
+    seqno = (seqno-1) & DGRAM_SEQNO_MASK;
+    idg = node->send_window[slot];
+    
+    if (idg) 
+    {
+      if (idg->seqno == seqno) 
+      {
+        if (ack->window[i]) 
+        {
+        /* remove those that have been received and are within a window
+        of the first missing packet */
+          node->stat_ack_pkts++;
+          LOG(Cmi_clock, Cmi_nodestart, 'r', node->nodestart, seqno);
+          node->send_window[slot] = 0;
+          DiscardImplicitDgram(idg);
+          rxing = 1;
+        }
+        else if (rxing) 
+        {
+          node->send_window[slot] = 0;
+          idg->next = node->send_queue_h;
+          if (node->send_queue_h == 0) 
+          {
+            node->send_queue_t = idg;
+          }
+          node->send_queue_h = idg;
+        }
+      } 
+      else 
+      {
+        diff = dgseqno >= idg->seqno ? 
+            ((dgseqno - idg->seqno) & DGRAM_SEQNO_MASK) :
+            ((dgseqno + (DGRAM_SEQNO_MASK - idg->seqno) + 1) & DGRAM_SEQNO_MASK);
+    
+        if ((diff <= 0) || (diff > Cmi_window_size))
+        {
+          continue;
+        }
 
-				if (dgseqno < idg->seqno)
-				{
-					continue;
-				}
-				if (dgseqno == idg->seqno)
-				{
-					continue;
-				}
-				node->stat_ack_pkts++;
-				LOG(Cmi_clock, Cmi_nodestart, 'o', node->nodestart, idg->seqno);
-				node->send_window[slot] = 0;
-				DiscardImplicitDgram(idg);
-			}
-		}
-	}
-	FreeExplicitDgram(dg);  
+        if (dgseqno < idg->seqno)
+        {
+          continue;
+        }
+        if (dgseqno == idg->seqno)
+        {
+          continue;
+        }
+        node->stat_ack_pkts++;
+        LOG(Cmi_clock, Cmi_nodestart, 'o', node->nodestart, idg->seqno);
+        node->send_window[slot] = 0;
+        DiscardImplicitDgram(idg);
+      }
+    }
+  }
+  FreeExplicitDgram(dg);  
 }
 
 /* Possible Socket use - confirmed, changed to WinNT*/
 
 void ReceiveDatagram()
 {  
-	ExplicitDgram dg; int ok, magic;
-	
-	MallocExplicitDgram(dg);
-	ok = recv(dataskt,(char*)(dg->data),Cmi_max_dgram_size,0);
-	if (ok == SOCKET_ERROR) KillEveryoneCode(37489437);
-	dg->len = ok;
-	if (ok >= DGRAM_HEADER_SIZE) 
-	{
-	    DgramHeaderBreak(dg->data, dg->rank, dg->srcpe, magic, dg->seqno);
-		if (magic == (Cmi_host_pid&DGRAM_MAGIC_MASK)) 
-		{
-			if (dg->rank == DGRAM_ACKNOWLEDGE)
-				IntegrateAckDatagram(dg);
-			else IntegrateMessageDatagram(dg);
-		} 
-		else FreeExplicitDgram(dg);
-	} 
-	else FreeExplicitDgram(dg);
+  ExplicitDgram dg; int ok, magic;
+  
+  MallocExplicitDgram(dg);
+  ok = recv(dataskt,(char*)(dg->data),Cmi_max_dgram_size,0);
+  if (ok == SOCKET_ERROR) KillEveryoneCode(37489437);
+  dg->len = ok;
+  if (ok >= DGRAM_HEADER_SIZE) 
+  {
+      DgramHeaderBreak(dg->data, dg->rank, dg->srcpe, magic, dg->seqno);
+    if (magic == (Cmi_host_pid&DGRAM_MAGIC_MASK)) 
+    {
+      if (dg->rank == DGRAM_ACKNOWLEDGE)
+        IntegrateAckDatagram(dg);
+      else IntegrateMessageDatagram(dg);
+    } 
+    else FreeExplicitDgram(dg);
+  } 
+  else FreeExplicitDgram(dg);
 }
 
 
@@ -3059,29 +3058,29 @@ void ReceiveDatagram()
 
 static void CommunicationServer()
 {
-	LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
+  LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
 #if CMK_SHARED_VARS_UNAVAILABLE
-	if (terrupt)
-	{
-		return;
-	}
-	terrupt++;
+  if (terrupt)
+  {
+    return;
+  }
+  terrupt++;
 #endif
-	
-	while (1) 
-	{
-		Cmi_clock = GetClock();
-		if (Cmi_clock > Cmi_check_last + Cmi_check_delay) 
-		{
-			writeall(Cmi_host_fd, "ping", 5);
-			Cmi_check_last = Cmi_clock;
-		}
-		CheckSocketsReady();
-		if (ctrlskt_ready_read) { ctrl_getone(); continue; }
-		if (dataskt_ready_write) { if (TransmitAcknowledgement()) continue; }
-		if (dataskt_ready_read) { ReceiveDatagram(); continue; }
-		if (dataskt_ready_write) { if (TransmitDatagram()) continue; }
-		break;
+  
+  while (1) 
+  {
+    Cmi_clock = GetClock();
+    if (Cmi_clock > Cmi_check_last + Cmi_check_delay) 
+    {
+      writeall(Cmi_host_fd, "ping", 5);
+      Cmi_check_last = Cmi_clock;
+    }
+    CheckSocketsReady();
+    if (ctrlskt_ready_read) { ctrl_getone(); continue; }
+    if (dataskt_ready_write) { if (TransmitAcknowledgement()) continue; }
+    if (dataskt_ready_read) { ReceiveDatagram(); continue; }
+    if (dataskt_ready_write) { if (TransmitDatagram()) continue; }
+    break;
   }
 #if CMK_SHARED_VARS_UNAVAILABLE
   terrupt--;
@@ -3104,22 +3103,22 @@ static void CommunicationServer()
 #if CMK_NODE_QUEUE_AVAILABLE
 char *CmiGetNonLocalNodeQ()
 {  
-	CmiState cs = CmiGetState();
-	char *result = 0;
-	if(!PCQueueEmpty(CsvAccess(NodeRecv))) 
-	{
-		CmiLock(CsvAccess(CmiNodeRecvLock));
-		result = (char *) PCQueuePop(CsvAccess(NodeRecv));
-		CmiUnlock(CsvAccess(CmiNodeRecvLock));
-	}
-	return result;
+  CmiState cs = CmiGetState();
+  char *result = 0;
+  if(!PCQueueEmpty(CsvAccess(NodeRecv))) 
+  {
+    CmiLock(CsvAccess(CmiNodeRecvLock));
+    result = (char *) PCQueuePop(CsvAccess(NodeRecv));
+    CmiUnlock(CsvAccess(CmiNodeRecvLock));
+  }
+  return result;
 }
 #endif
 
 char *CmiGetNonLocal()
 {
-	CmiState cs = CmiGetState();
-	return (char *) PCQueuePop(cs->recv);
+  CmiState cs = CmiGetState();
+  return (char *) PCQueuePop(cs->recv);
 }
 
 /******************************************************************************
@@ -3201,154 +3200,154 @@ CmiCommHandle CmiGeneralNodeSend(int pe, int size, int freemode, char *data)
 
 CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 {  
-	CmiState cs = CmiGetState(); 
-	OutgoingMsg ogm;
+  CmiState cs = CmiGetState(); 
+  OutgoingMsg ogm;
 
-	if (freemode == 'S') 
-	{
-		char *copy = (char *)CmiAlloc(size);
-		if (!copy)
-			fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
-		memcpy(copy, data, size);
-		data = copy; 
-		freemode = 'F';
-	}
+  if (freemode == 'S') 
+  {
+    char *copy = (char *)CmiAlloc(size);
+    if (!copy)
+      fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
+    memcpy(copy, data, size);
+    data = copy; 
+    freemode = 'F';
+  }
 
-	if (pe == cs->pe) 
-	{
-		FIFO_EnQueue(cs->localqueue, data);
-		if (freemode == 'A') 
-		{
-			MallocOutgoingMsg(ogm);
-			ogm->freemode = 'X';
-			return ogm;
-		} 
-		else return 0;
-	}
+  if (pe == cs->pe) 
+  {
+    FIFO_EnQueue(cs->localqueue, data);
+    if (freemode == 'A') 
+    {
+      MallocOutgoingMsg(ogm);
+      ogm->freemode = 'X';
+      return ogm;
+    } 
+    else return 0;
+  }
   
-	MallocOutgoingMsg(ogm);
-	CmiMsgHeaderSetLength(data, size);
-	ogm->size = size;
-	ogm->data = data;
-	ogm->src = cs->pe;
-	ogm->dst = pe;
-	ogm->freemode = freemode;
-	ogm->refcount = 0;
-	CmiCommLock();
-	DeliverOutgoingMessage(ogm);
-	CommunicationServer();
-	CmiCommUnlock();
-	return (CmiCommHandle)ogm;
+  MallocOutgoingMsg(ogm);
+  CmiMsgHeaderSetLength(data, size);
+  ogm->size = size;
+  ogm->data = data;
+  ogm->src = cs->pe;
+  ogm->dst = pe;
+  ogm->freemode = freemode;
+  ogm->refcount = 0;
+  CmiCommLock();
+  DeliverOutgoingMessage(ogm);
+  CommunicationServer();
+  CmiCommUnlock();
+  return (CmiCommHandle)ogm;
 }
 
 void CmiSyncSendFn(int p, int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), 1);
-	CmiGeneralSend(p,s,'S',m); 
+  CQdCreate(CpvAccess(cQdState), 1);
+  CmiGeneralSend(p,s,'S',m); 
 }
 
 CmiCommHandle CmiAsyncSendFn(int p, int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), 1);	
-	return CmiGeneralSend(p,s,'A',m); 
+  CQdCreate(CpvAccess(cQdState), 1);  
+  return CmiGeneralSend(p,s,'A',m); 
 }
 
 void CmiFreeSendFn(int p, int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), 1);	
-	CmiGeneralSend(p,s,'F',m); 
+  CQdCreate(CpvAccess(cQdState), 1);  
+  CmiGeneralSend(p,s,'F',m); 
 }
 
 void CmiSyncBroadcastFn(int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);	
-	CmiGeneralSend(PE_BROADCAST_OTHERS,s,'S',m); 
+  CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);  
+  CmiGeneralSend(PE_BROADCAST_OTHERS,s,'S',m); 
 }
 
 CmiCommHandle CmiAsyncBroadcastFn(int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);	
-	return CmiGeneralSend(PE_BROADCAST_OTHERS,s,'A',m); 
+  CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);  
+  return CmiGeneralSend(PE_BROADCAST_OTHERS,s,'A',m); 
 }
 
 void CmiFreeBroadcastFn(int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);	
-	CmiGeneralSend(PE_BROADCAST_OTHERS,s,'F',m); 
+  CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);  
+  CmiGeneralSend(PE_BROADCAST_OTHERS,s,'F',m); 
 }
 
 void CmiSyncBroadcastAllFn(int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), CmiNumPes());		
-	CmiGeneralSend(PE_BROADCAST_ALL,s,'S',m); 
+  CQdCreate(CpvAccess(cQdState), CmiNumPes());    
+  CmiGeneralSend(PE_BROADCAST_ALL,s,'S',m); 
 }
 
 CmiCommHandle CmiAsyncBroadcastAllFn(int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), CmiNumPes());	
-	return CmiGeneralSend(PE_BROADCAST_ALL,s,'A',m); 
+  CQdCreate(CpvAccess(cQdState), CmiNumPes());  
+  return CmiGeneralSend(PE_BROADCAST_ALL,s,'A',m); 
 }
 
 void CmiFreeBroadcastAllFn(int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), CmiNumPes());	
-	CmiGeneralSend(PE_BROADCAST_ALL,s,'F',m); 
+  CQdCreate(CpvAccess(cQdState), CmiNumPes());  
+  CmiGeneralSend(PE_BROADCAST_ALL,s,'F',m); 
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
 
 void CmiSyncNodeSendFn(int p, int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), 1);
-	CmiGeneralNodeSend(p,s,'S',m); 
+  CQdCreate(CpvAccess(cQdState), 1);
+  CmiGeneralNodeSend(p,s,'S',m); 
 }
 
 CmiCommHandle CmiAsyncNodeSendFn(int p, int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), 1);
-	return CmiGeneralNodeSend(p,s,'A',m); 
+  CQdCreate(CpvAccess(cQdState), 1);
+  return CmiGeneralNodeSend(p,s,'A',m); 
 }
 
 void CmiFreeNodeSendFn(int p, int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), 1);
-	CmiGeneralNodeSend(p,s,'F',m); 
+  CQdCreate(CpvAccess(cQdState), 1);
+  CmiGeneralNodeSend(p,s,'F',m); 
 }
 
 void CmiSyncNodeBroadcastFn(int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
-	CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'S',m); 
+  CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
+  CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'S',m); 
 }
 
 CmiCommHandle CmiAsyncNodeBroadcastFn(int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
-	return CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'A',m); 
+  CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
+  return CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'A',m); 
 }
 
 void CmiFreeNodeBroadcastFn(int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
-	CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'F',m); 
+  CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
+  CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'F',m); 
 }
 
 void CmiSyncNodeBroadcastAllFn(int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), CmiNumNodes());
-	CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'S',m); 
+  CQdCreate(CpvAccess(cQdState), CmiNumNodes());
+  CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'S',m); 
 }
 
 CmiCommHandle CmiAsyncNodeBroadcastAllFn(int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), CmiNumNodes());
-	return CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'A',m); 
+  CQdCreate(CpvAccess(cQdState), CmiNumNodes());
+  return CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'A',m); 
 }
 
 void CmiFreeNodeBroadcastAllFn(int s, char *m)
 { 
-	CQdCreate(CpvAccess(cQdState), CmiNumNodes());
-	CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'F',m); 
+  CQdCreate(CpvAccess(cQdState), CmiNumNodes());
+  CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'F',m); 
 }
 
 #endif
@@ -3361,12 +3360,12 @@ void CmiFreeNodeBroadcastAllFn(int s, char *m)
 
 int CmiAsyncMsgSent(CmiCommHandle handle)
 {
-	return (((OutgoingMsg)handle)->freemode == 'X');
+  return (((OutgoingMsg)handle)->freemode == 'X');
 }
 
 void CmiReleaseCommHandle(CmiCommHandle handle)
 {
-	FreeOutgoingMsg(((OutgoingMsg)handle));
+  FreeOutgoingMsg(((OutgoingMsg)handle));
 }
 
 /******************************************************************************
@@ -3380,107 +3379,110 @@ extern void ConverseCommonInit(char **);
 
 void ConverseInitPE()
 {  
-	CmiState cs;
-	CmiNodeBarrier();
-	cs = CmiGetState();
-	CpvInitialize(char *, internal_printf_buffer);
-	CpvAccess(internal_printf_buffer) = (char *) malloc(PRINTBUFSIZE);
-	_MEMCHECK(CpvAccess(internal_printf_buffer));
-	CthInit();
+  CmiState cs;
+  CmiNodeBarrier();
+  cs = CmiGetState();
+  CpvInitialize(char *, internal_printf_buffer);
+  CpvAccess(internal_printf_buffer) = (char *) malloc(PRINTBUFSIZE);
+  _MEMCHECK(CpvAccess(internal_printf_buffer));
+  CthInit();
+  ConverseCommonInit(Cmi_argv);
+  CpvInitialize(void *,CmiLocalQueue);
+  CpvAccess(CmiLocalQueue) = cs->localqueue;
 #if CMK_CCS_AVAILABLE
-	CpvInitialize(void *, CcsRequestQueue);
-	CpvAccess(CcsRequestQueue) = FIFO_Create();
-	CpvInitialize(int, stateAvailable);
-	CpvAccess(stateAvailable) = 0;
-#endif
-	ConverseCommonInit(Cmi_argv);
-	CpvInitialize(void *,CmiLocalQueue);
-	CpvAccess(CmiLocalQueue) = cs->localqueue;
-#if CMK_CCS_AVAILABLE
-	CpvAccess(stateAvailable) = 1;
-	while(!FIFO_Empty(CpvAccess(CcsRequestQueue)))
-	{
-		CcsRequest queuedMsg;
-		FIFO_DeQueue(CpvAccess(CcsRequestQueue), (void **)&queuedMsg);
-		CmiSetHandler(queuedMsg->ptr, CpvAccess(strHandlerID));
-		PCQueuePush(CmiGetStateN(queuedMsg->pe)->recv, queuedMsg->ptr);
-	}
+  CmiLock(ccs_mutex);
+  stateAvailable++;
+  while(stateAvailable==Cmi_mynodesize && !FIFO_Empty(ccs_request_q))
+  {
+    CcsRequest queuedMsg;
+    FIFO_DeQueue(ccs_request_q, (void **)&queuedMsg);
+    CmiSetHandler(queuedMsg->ptr, strHandlerID);
+    PCQueuePush(CmiGetStateN(queuedMsg->pe)->recv, queuedMsg->ptr);
+  }
+  CmiUnlock(ccs_mutex);
 #endif
 }
 
 
 void ConverseExit()
 {  
-	if (CmiMyRank()==0) 
-	{
-		if(Cmi_print_stats)
-			printNetStatistics();
-		log_done();
-		ConverseCommonExit();
-	}
-	ctrl_sendone(120,"ending"); /* this causes host to go away
-		(It also causes a write error-- OSL, 12/4/1999) */
-	Cmi_check_delay = 2.0;
-	while (1) CmiYield(); /* loop until host disappearance causes exit */
+  if (CmiMyRank()==0) 
+  {
+    if(Cmi_print_stats)
+      printNetStatistics();
+    log_done();
+    ConverseCommonExit();
+  }
+  ctrl_sendone(120,"ending"); /* this causes host to go away
+    (It also causes a write error-- OSL, 12/4/1999) */
+  Cmi_check_delay = 2.0;
+  while (1) CmiYield(); /* loop until host disappearance causes exit */
 }
 
 
 void exitDelay(void)
 {
-	printf("Program finished.\n");
+  printf("Program finished.\n");
 }
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
 {
 
-	WSADATA wsaData;
+  WSADATA wsaData;
 
-	WSAStartup(0x0002, &wsaData);
+  WSAStartup(0x0002, &wsaData);
 
 #if CMK_USE_HP_MAIN_FIX
 #if FOR_CPLUS
-	_main(argc,argv);
+  _main(argc,argv);
 #endif
 #endif
   
-	atexit(exitDelay);  /*FOR TESTING*/
+  atexit(exitDelay);  /*FOR TESTING*/
 
-	Cmi_argv = argv;
-	Cmi_startfn = fn;
-	Cmi_usrsched = usc;
+  Cmi_argv = argv;
+  Cmi_startfn = fn;
+  Cmi_usrsched = usc;
 
-	parse_netstart();
-	extract_args(argv);
-	log_init();
+  parse_netstart();
+  extract_args(argv);
+  log_init();
 
-	signal(SIGSEGV, KillOnAllSigs);
-	signal(SIGFPE, KillOnAllSigs);
-	signal(SIGILL, KillOnAllSigs);
-	signal(SIGINT, KillOnAllSigs);
-	signal(SIGTERM, KillOnAllSigs);
-	signal(SIGABRT, KillOnAllSigs);
+  Cmi_check_delay = Cmi_numnodes * 0.5;
+  Cmi_scanf_mutex = CmiCreateLock();
 
-	skt_datagram(&dataport, &dataskt, Cmi_os_buffer_size);
-	skt_server(&ctrlport, &ctrlskt);
-	
-	Cmi_host_fd = skt_connect(Cmi_host_IP, Cmi_host_port, 60);
-	node_addresses_obtain();
-	Cmi_check_delay = Cmi_numnodes * 0.5;
-	Cmi_scanf_mutex = CmiCreateLock();
-	DEBUGF(("ConverseInit: about to start threads\n"));
-	CmiStartThreads();
-	DEBUGF(("ConverseInit: about to init PE\n"));
-	ConverseInitPE();
-	if (ret==0) 
-	{
-		fn(CountArgs(argv), argv);
-		DEBUGF(("ConverseInit: about to start scheduler\n"));
-		if (usc==0) CsdScheduler(-1);
-		DEBUGF(("ConverseInit: scheduler finished (!?)\n"));
-		ConverseExit();
-		WSACleanup();
-	}
-	DEBUGF(("ConverseInit: I should never get here\n"));
+#if CMK_CCS_AVAILABLE
+  ccs_mutex = CmiCreateLock();
+  stateAvailable = 0;
+  ccs_request_q = FIFO_Create();
+#endif
+
+  signal(SIGSEGV, KillOnAllSigs);
+  signal(SIGFPE, KillOnAllSigs);
+  signal(SIGILL, KillOnAllSigs);
+  signal(SIGINT, KillOnAllSigs);
+  signal(SIGTERM, KillOnAllSigs);
+  signal(SIGABRT, KillOnAllSigs);
+
+  skt_datagram(&dataport, &dataskt, Cmi_os_buffer_size);
+  skt_server(&ctrlport, &ctrlskt);
+  
+  Cmi_host_fd = skt_connect(Cmi_host_IP, Cmi_host_port, 60);
+  node_addresses_obtain();
+  DEBUGF(("ConverseInit: about to start threads\n"));
+  CmiStartThreads();
+  DEBUGF(("ConverseInit: about to init PE\n"));
+  ConverseInitPE();
+  if (ret==0) 
+  {
+    fn(CountArgs(argv), argv);
+    DEBUGF(("ConverseInit: about to start scheduler\n"));
+    if (usc==0) CsdScheduler(-1);
+    DEBUGF(("ConverseInit: scheduler finished (!?)\n"));
+    ConverseExit();
+    WSACleanup();
+  }
+  DEBUGF(("ConverseInit: I should never get here\n"));
 }
 
 

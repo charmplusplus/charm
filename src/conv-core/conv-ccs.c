@@ -22,7 +22,7 @@ int appletFd = -1;
 
 int serverFlag = 0;
 extern int inside_comm;
-CpvExtern(int, strHandlerID);
+extern int strHandlerID;
 
 int hostport, hostskt;
 int hostskt_ready_read;
@@ -235,8 +235,8 @@ void CHostGetOne()
       msg = (char *) CmiAlloc(len+size+CmiMsgHeaderSizeBytes+1);
       if (!msg)
         CmiPrintf("%d: Out of mem\n", CmiMyPe());
-      CmiSetHandler(msg, CpvAccess(strHandlerID));
-      /*CmiPrintf("hdlr ID = %d\n", CpvAccess(strHandlerID));*/
+      CmiSetHandler(msg, strHandlerID);
+      /*CmiPrintf("hdlr ID = %d\n", strHandlerID);*/
       strcpy(msg+CmiMsgHeaderSizeBytes, line);
       ret = fread(msg+CmiMsgHeaderSizeBytes+len, 1, size, f);
       /*CmiPrintf("size = %d, ret =%d\n", size, ret);*/
@@ -877,7 +877,7 @@ typedef struct CcsListNode {
 CpvStaticDeclare(CcsListNode*, ccsList);
 CpvStaticDeclare(int, callerIP);
 CpvStaticDeclare(int, callerPort);
-CpvDeclare(int, strHandlerID);
+int strHandlerID;
 
 static void CcsStringHandlerFn(char *msg)
 {
@@ -922,8 +922,7 @@ void CcsInit(void)
   CpvAccess(callerIP) = 0;
   CpvInitialize(int, callerPort);
   CpvAccess(callerPort) = 0;
-  CpvInitialize(int, strHandlerID);
-  CpvAccess(strHandlerID) = CmiRegisterHandler(CcsStringHandlerFn);
+  strHandlerID = CmiRegisterHandler(CcsStringHandlerFn);
 }
 
 void CcsUseHandler(char *name, int hdlr)
