@@ -16,3 +16,8 @@ ETRANS += "-s"
 POSEMODULE=-module seqpose
 endif
 
+OSTYPE          := $(shell uname -m)
+
+ifeq "$(OSTYPE)" "alpha"
+override OPTS += -tweak
+endif
