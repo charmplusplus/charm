@@ -12,6 +12,10 @@
 #include "converse.h"
 #include <mpi.h>
 
+#if CMK_DONT_USE_PMPI
+#include "pmpi2mpi.h"
+#endif
+
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
 #  warning "   Try doing an 'rm charm/include/mpi.h' and building again."
