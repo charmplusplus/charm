@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.15  1996-04-16 22:45:34  jyelon
+# Revision 2.16  1996-07-24 22:03:49  milind
+# made changes for built in types wchar_t and ptrdiff_t
+#
+# Revision 2.15  1996/04/16 22:45:34  jyelon
 # *** empty log message ***
 #
 # Revision 2.14  1996/04/09 22:56:22  jyelon
@@ -62,14 +65,14 @@
 #
 ############################################################################
 
-set CMK_CPP_CHARM		= '/usr/lib/cpp -D_NO_PROTO '
-set CMK_CPP_C                   = '/usr/lib/cpp -D_NO_PROTO '
+set CMK_CPP_CHARM		= '/usr/lib/cpp  -D_WCHAR_T -D_PTRDIFF_T -D_NO_PROTO '
+set CMK_CPP_C                   = '/usr/lib/cpp  -D_WCHAR_T -D_PTRDIFF_T -D_NO_PROTO '
 set CMK_LDRO			= 'ld -r -o '
-set CMK_CC			= 'mpcc'
-set CMK_CC_RELIABLE		= 'mpcc'
-set CMK_CC_FASTEST		= 'mpcc'
-set CMK_CXX			= 'mpCC'
-set CMK_CXXPP			= 'xlC -E'
+set CMK_CC			= 'mpcc  -D_WCHAR_T -D_PTRDIFF_T '
+set CMK_CC_RELIABLE		= 'mpcc  -D_WCHAR_T -D_PTRDIFF_T '
+set CMK_CC_FASTEST		= 'mpcc  -D_WCHAR_T -D_PTRDIFF_T '
+set CMK_CXX			= 'mpCC  -D_WCHAR_T -D_PTRDIFF_T '
+set CMK_CXXPP			= 'xlC -E  -D_WCHAR_T -D_PTRDIFF_T '
 set CMK_CF77			= 'mpxlf'
 set CMK_C_DEBUG                 = '-g'
 set CMK_C_OPTIMIZE              = '-O'
