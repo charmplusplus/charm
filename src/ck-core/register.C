@@ -130,7 +130,9 @@ void CkEnableTracing(int epIdx) {
 static void pupEntry(PUP::er &p,int i)
 {
   EntryInfo *c=_entryTable[i];
-  PCOMS(name) PCOM(msgIdx) PCOM(chareIdx)
+  PCOMS(name) 
+  PCOM(msgIdx) 
+  PCOM(chareIdx)
 }
 static void pupMsg(PUP::er &p,int i)
 {
@@ -140,7 +142,8 @@ static void pupMsg(PUP::er &p,int i)
 static void pupChare(PUP::er &p,int i)
 {
   ChareInfo *c=_chareTable[i];
-  PCOMS(name) PCOM(size) PCOM(defCtor) PCOM(migCtor)
+  PCOMS(name) PCOM(size) 
+  PCOM(defCtor) PCOM(migCtor)
   PCOM(numbases)
   p.comment("List of base classes:");
   p(c->bases,c->numbases);
@@ -148,7 +151,7 @@ static void pupChare(PUP::er &p,int i)
 static void pupMain(PUP::er &p,int i)
 {
   MainInfo *c=_mainTable[i];
-  PCOM(chareIdx) PCOM(entryIdx)
+  PCOMS(name) PCOM(chareIdx) PCOM(entryIdx)
 }
 static void pupReadonly(PUP::er &p,int i)
 {
@@ -165,6 +168,57 @@ static void pupReadonlyMsg(PUP::er &p,int i)
   CkPupMessage(p,c->pMsg,0);
 }
 
+class GroupIterator : public CkLocIterator {
+private:
+   PUP::er &p;
+public:
+   GroupIterator(PUP::er &_p) :p(_p){}
+   ~GroupIterator() {}
+   void addLocation (CkLocation & loc)
+   {
+     p.comment("Element details");
+     const CkArrayIndex &idx = loc.getIndex();
+     const int * idxData = idx.data();
+     char buf[128];
+     char * temp = buf;
+     for(int i=0; i < idx.nInts; i++)
+     {
+        sprintf(temp, "%s%d",i==0?"":":", idxData[i]);
+        temp += strlen(temp);
+     } 
+     p(buf, strlen(buf));
+     loc.pup(p);
+     p.comment("VALUE");
+   }
+};
+
+
+static void pupArray(PUP::er &p, int i)
+{
+  IrrGroup * c;
+  c = (CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i])).getObj();
+  GroupIterator itr(p);
+  p.comment("name");
+  char buf[128];
+  if (c->isLocMgr())
+  {
+   int groupID = (((CkLocMgr *)c)->getGroupID()).idx;
+   sprintf(buf, "Array Element %d", groupID);
+   p(buf, strlen(buf));
+   ((CkLocMgr*)(c))->iterate(itr);
+    
+  }
+  else
+  {
+    sprintf(buf,"Group");
+    p(buf, strlen(buf));
+    p.comment("Not an Array Location Mgr");
+  }
+}
+
+CpvDeclare(int, groupTableSize);
+
+
 void _registerDone(void)
 {
   CpdListRegister(new CpdSimpleListAccessor("charm/entries",_entryTable.size(),pupEntry));
@@ -173,6 +227,8 @@ void _registerDone(void)
   CpdListRegister(new CpdSimpleListAccessor("charm/mains",_mainTable.size(),pupMain));
   CpdListRegister(new CpdSimpleListAccessor("charm/readonly",_readonlyTable.size(),pupReadonly));
   CpdListRegister(new CpdSimpleListAccessor("charm/readonlyMsg",_readonlyMsgs.size(),pupReadonlyMsg));
+ 
+  CpdListRegister(new CpdSimpleListAccessor("charm/arrayelements", CpvAccess(_groupIDTable)->length(), pupArray));
 }
 
 //Print a debugging version of this entry method index:
