@@ -581,7 +581,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   double * outMatrix;
   for(int i=0;i<grainSize;i++){
     localMatrix = (matrix1+index+i*S);
-    outMatrix   = (double*)(amatrix+i*grainSize);
+    outMatrix   = reinterpret_cast <double *> (amatrix+i*grainSize);
     DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
   }
 
@@ -604,7 +604,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
 
   for(int i=0;i<grainSize;i++){
     localMatrix = (matrix2+index+i*S);
-    outMatrix   = (double*)(amatrix+i*grainSize);
+    outMatrix   = reinterpret_cast <double *> (amatrix+i*grainSize);
     DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
   }
 
@@ -749,6 +749,7 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
   }
 }
 
+// EJB: Shouldn't this be inlined?
 void add_double(void *in, void *inout, int *red_size, void *handle) {
     double * matrix1 = (double *)in;
     double * matrix2 = (double *)inout;
