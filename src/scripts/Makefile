@@ -134,7 +134,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       CkFutures.decl.h CkCheckpoint.decl.h \
       LBDatabase.decl.h CentralLB.decl.h ComboCentLB.decl.h NullLB.decl.h \
       RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h \
-      MetisLB.decl.h DummyLB.decl.h RefineLB.decl.h RefineCommLB.decl.h	\
+      MetisLB.decl.h DummyLB.decl.h RefineLB.decl.h RefineCommLB.decl.h  \
       OrbLB.decl.h GreedyLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
       WSLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
       GreedyCommLB.decl.h Comm1LB.decl.h EveryLB.decl.h \
@@ -457,89 +457,89 @@ $(L)/libck.a: $(LIBCK_CORE)
 CkFutures.def.h: CkFutures.decl.h
 
 CkFutures.decl.h: ckfutures.ci charmxi
-	$(CHARMC) ckfutures.ci
+	$(CHARMC) -intrinsic ckfutures.ci
 
 tempo.def.h: tempo.decl.h
 
 tempo.decl.h: tempo.ci charmxi
-	$(CHARMC) tempo.ci
+	$(CHARMC) -intrinsic tempo.ci
 
 waitqd.def.h: waitqd.decl.h
 
 waitqd.decl.h: waitqd.ci charmxi
-	$(CHARMC) waitqd.ci
+	$(CHARMC) -intrinsic waitqd.ci
 
 LBDatabase.def.h: LBDatabase.decl.h
 
 LBDatabase.decl.h: LBDatabase.ci charmxi
-	$(CHARMC) LBDatabase.ci
+	$(CHARMC) -intrinsic LBDatabase.ci
 
 NullLB.def.h: NullLB.decl.h
 
 NullLB.decl.h: NullLB.ci charmxi
-	$(CHARMC) NullLB.ci
+	$(CHARMC) -intrinsic NullLB.ci
 
 BaseLB.def.h: BaseLB.decl.h
 
 BaseLB.decl.h: BaseLB.ci charmxi
-	$(CHARMC) BaseLB.ci
+	$(CHARMC) -intrinsic BaseLB.ci
 
 TraceSummary.def.h: TraceSummary.decl.h
 
 TraceSummary.decl.h: trace-summary.ci charmxi
-	$(CHARMC) trace-summary.ci
+	$(CHARMC) -intrinsic trace-summary.ci
 
 CkReduction.def.h: CkReduction.decl.h
 
 CkReduction.decl.h: ckreduction.ci charmxi
-	$(CHARMC) ckreduction.ci
+	$(CHARMC) -intrinsic ckreduction.ci
 
 CkCheckpoint.def.h: CkCheckpoint.decl.h
 
 CkCheckpoint.decl.h: ckcheckpoint.ci charmxi
-	$(CHARMC) ckcheckpoint.ci
+	$(CHARMC) -intrinsic ckcheckpoint.ci
 
 CkMarshall.def.h: CkMarshall.decl.h
 
 CkMarshall.decl.h: ckmarshall.ci charmxi
-	$(CHARMC) ckmarshall.ci
+	$(CHARMC) -intrinsic ckmarshall.ci
 
 CkArrayReductionMgr.def.h: CkArrayReductionMgr.decl.h
 
 CkArrayReductionMgr.decl.h: ckarrayreductionmgr.ci charmxi
-	$(CHARMC) ckarrayreductionmgr.ci
+	$(CHARMC) -intrinsic ckarrayreductionmgr.ci
 
 CkArray.def.h: CkArray.decl.h
 
 CkArray.decl.h : ckarray.ci charmxi
-	$(CHARMC) ckarray.ci
+	$(CHARMC) -intrinsic ckarray.ci
 
 CkLocation.def.h: CkLocation.decl.h
 
 CkLocation.decl.h: cklocation.ci charmxi
-	$(CHARMC) cklocation.ci
+	$(CHARMC) -intrinsic cklocation.ci
 
 CkCallback.def.h: CkCallback.decl.h
 
 CkCallback.decl.h: ckcallback.ci charmxi
-	$(CHARMC) ckcallback.ci
+	$(CHARMC) -intrinsic ckcallback.ci
 
 charisma.def.h: charisma.decl.h
 
 charisma.decl.h: charisma.ci charmxi
-	$(CHARMC) charisma.ci
+	$(CHARMC) -intrinsic charisma.ci
 
 ## Charm++ Load balancer (Dynamic load balancer)
 
 CentralLB.def.h: CentralLB.decl.h
 
 CentralLB.decl.h: CentralLB.ci charmxi
-	$(CHARMC) CentralLB.ci
+	$(CHARMC) -intrinsic CentralLB.ci
 
 NborBaseLB.def.h: NborBaseLB.decl.h
 
 NborBaseLB.decl.h: NborBaseLB.ci charmxi
-	$(CHARMC) NborBaseLB.ci
+	$(CHARMC) -intrinsic NborBaseLB.ci
 
 
 ## Tracing libraries (profiling, -tracemode)
@@ -604,7 +604,7 @@ LOADBALANCERS=\
 DummyLB.def.h: DummyLB.decl.h
 
 DummyLB.decl.h: DummyLB.ci charmxi
-	$(CHARMC) DummyLB.ci
+	$(CHARMC) -intrinsic DummyLB.ci
 
 $(L)/libmoduleDummyLB.a: DummyLB.o 
 	$(CHARMC) -o $(L)/libmoduleDummyLB.a DummyLB.o 
@@ -613,7 +613,7 @@ $(L)/libmoduleDummyLB.a: DummyLB.o
 ComboCentLB.def.h: ComboCentLB.decl.h
 
 ComboCentLB.decl.h: ComboCentLB.ci charmxi
-	$(CHARMC) ComboCentLB.ci
+	$(CHARMC) -intrinsic ComboCentLB.ci
 
 $(L)/libmoduleComboCentLB.a: ComboCentLB.o 
 	$(CHARMC) -o $(L)/libmoduleComboCentLB.a ComboCentLB.o 
@@ -622,7 +622,7 @@ $(L)/libmoduleComboCentLB.a: ComboCentLB.o
 RandCentLB.def.h: RandCentLB.decl.h
 
 RandCentLB.decl.h: RandCentLB.ci charmxi
-	$(CHARMC) RandCentLB.ci
+	$(CHARMC) -intrinsic RandCentLB.ci
 
 $(L)/libmoduleRandCentLB.a: RandCentLB.o 
 	$(CHARMC) -o $(L)/libmoduleRandCentLB.a RandCentLB.o 
@@ -631,7 +631,7 @@ $(L)/libmoduleRandCentLB.a: RandCentLB.o
 RecBisectBfLB.def.h: RecBisectBfLB.decl.h
 
 RecBisectBfLB.decl.h: RecBisectBfLB.ci charmxi
-	$(CHARMC) RecBisectBfLB.ci
+	$(CHARMC) -intrinsic RecBisectBfLB.ci
 
 $(L)/libmoduleRecBisectBfLB.a: RecBisectBfLB.o 
 	$(CHARMC) -o $(L)/libmoduleRecBisectBfLB.a RecBisectBfLB.o 
@@ -640,7 +640,7 @@ $(L)/libmoduleRecBisectBfLB.a: RecBisectBfLB.o
 MetisLB.def.h: MetisLB.decl.h
 
 MetisLB.decl.h: MetisLB.ci charmxi
-	$(CHARMC) MetisLB.ci
+	$(CHARMC) -intrinsic MetisLB.ci
 
 $(L)/libmoduleMetisLB.a: MetisLB.o 
 	$(CHARMC) -o $(L)/libmoduleMetisLB.a MetisLB.o 
@@ -649,7 +649,7 @@ $(L)/libmoduleMetisLB.a: MetisLB.o
 RefineLB.def.h: RefineLB.decl.h
 
 RefineLB.decl.h: RefineLB.ci charmxi
-	$(CHARMC) RefineLB.ci
+	$(CHARMC) -intrinsic RefineLB.ci
 
 $(L)/libmoduleRefineLB.a: RefineLB.o 
 	$(CHARMC) -o $(L)/libmoduleRefineLB.a RefineLB.o 
@@ -658,7 +658,7 @@ $(L)/libmoduleRefineLB.a: RefineLB.o
 RefineCommLB.def.h: RefineCommLB.decl.h
 
 RefineCommLB.decl.h: RefineCommLB.ci charmxi
-	$(CHARMC) RefineCommLB.ci
+	$(CHARMC) -intrinsic RefineCommLB.ci
 
 $(L)/libmoduleRefineCommLB.a: RefineCommLB.o 
 	$(CHARMC) -o $(L)/libmoduleRefineCommLB.a RefineCommLB.o 
@@ -667,7 +667,7 @@ $(L)/libmoduleRefineCommLB.a: RefineCommLB.o
 GreedyCommLB.def.h: GreedyCommLB.decl.h
 
 GreedyCommLB.decl.h: GreedyCommLB.ci charmxi
-	$(CHARMC) GreedyCommLB.ci
+	$(CHARMC) -intrinsic GreedyCommLB.ci
 
 $(L)/libmoduleGreedyCommLB.a: GreedyCommLB.o manager.o
 	$(CHARMC) -o $(L)/libmoduleGreedyCommLB.a GreedyCommLB.o manager.o
@@ -676,7 +676,7 @@ $(L)/libmoduleGreedyCommLB.a: GreedyCommLB.o manager.o
 Comm1LB.def.h: Comm1LB.decl.h
 
 Comm1LB.decl.h: Comm1LB.ci charmxi
-	$(CHARMC) Comm1LB.ci
+	$(CHARMC) -intrinsic Comm1LB.ci
 
 $(L)/libmoduleComm1LB.a: Comm1LB.o 
 	$(CHARMC) -o $(L)/libmoduleComm1LB.a Comm1LB.o 
@@ -685,7 +685,7 @@ $(L)/libmoduleComm1LB.a: Comm1LB.o
 GreedyLB.def.h: GreedyLB.decl.h
 
 GreedyLB.decl.h: GreedyLB.ci charmxi
-	$(CHARMC) GreedyLB.ci
+	$(CHARMC) -intrinsic GreedyLB.ci
 
 $(L)/libmoduleGreedyLB.a: GreedyLB.o 
 	$(CHARMC) -o $(L)/libmoduleGreedyLB.a GreedyLB.o 
@@ -694,7 +694,7 @@ $(L)/libmoduleGreedyLB.a: GreedyLB.o
 NeighborLB.def.h: NeighborLB.decl.h
 
 NeighborLB.decl.h: NeighborLB.ci charmxi
-	$(CHARMC) NeighborLB.ci
+	$(CHARMC) -intrinsic NeighborLB.ci
 
 $(L)/libmoduleNeighborLB.a: NeighborLB.o 
 	$(CHARMC) -o $(L)/libmoduleNeighborLB.a NeighborLB.o 
@@ -703,7 +703,7 @@ $(L)/libmoduleNeighborLB.a: NeighborLB.o
 GreedyRefLB.def.h: GreedyRefLB.decl.h
 
 GreedyRefLB.decl.h: GreedyRefLB.ci charmxi
-	$(CHARMC) GreedyRefLB.ci
+	$(CHARMC) -intrinsic GreedyRefLB.ci
 
 $(L)/libmoduleGreedyRefLB.a: GreedyRefLB.o 
 	$(CHARMC) -o $(L)/libmoduleGreedyRefLB.a GreedyRefLB.o 
@@ -712,7 +712,7 @@ $(L)/libmoduleGreedyRefLB.a: GreedyRefLB.o
 OrbLB.def.h: OrbLB.decl.h
 
 OrbLB.decl.h: OrbLB.ci charmxi
-	$(CHARMC) OrbLB.ci
+	$(CHARMC) -intrinsic OrbLB.ci
 
 $(L)/libmoduleOrbLB.a: OrbLB.o 
 	$(CHARMC) -o $(L)/libmoduleOrbLB.a OrbLB.o 
@@ -721,7 +721,7 @@ $(L)/libmoduleOrbLB.a: OrbLB.o
 RandRefLB.def.h: RandRefLB.decl.h
 
 RandRefLB.decl.h: RandRefLB.ci charmxi
-	$(CHARMC) RandRefLB.ci
+	$(CHARMC) -intrinsic RandRefLB.ci
 
 $(L)/libmoduleRandRefLB.a: RandRefLB.o 
 	$(CHARMC) -o $(L)/libmoduleRandRefLB.a RandRefLB.o 
@@ -730,7 +730,7 @@ $(L)/libmoduleRandRefLB.a: RandRefLB.o
 WSLB.def.h: WSLB.decl.h
 
 WSLB.decl.h: WSLB.ci charmxi
-	$(CHARMC) WSLB.ci
+	$(CHARMC) -intrinsic WSLB.ci
 
 $(L)/libmoduleWSLB.a: WSLB.o 
 	$(CHARMC) -o $(L)/libmoduleWSLB.a WSLB.o 
@@ -758,7 +758,7 @@ LB_OBJ=EveryLB.o \
 EveryLB.def.h: EveryLB.decl.h
 
 EveryLB.decl.h: EveryLB.ci charmxi
-	$(CHARMC) EveryLB.ci
+	$(CHARMC) -intrinsic EveryLB.ci
 
 $(L)/libmoduleEveryLB.a: $(LB_OBJ)
 	$(CHARMC) -o $(L)/libmoduleEveryLB.a $(LB_OBJ)
@@ -779,7 +779,7 @@ bluegene-target: charm++ $(L)/libconv-bluegene.a $(L)/libconv-bluegene-logs.a ME
 
 # old (Charm++) Blue Gene emulator
 BlueGene.decl.h BlueGene.def.h : BlueGene.ci charmxi
-	$(CHARMC) BlueGene.ci
+	$(CHARMC) -intrinsic BlueGene.ci
 
 $(L)/libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
 	$(CHARMC) -c BlueGene.C
@@ -820,7 +820,9 @@ SDAGOBJ=sdag-globals.o CSdagConstruct.o CEntry.o
 SDAGHEADERS= CToken.h EToken.h CParsedFile.h \
 	sdag-globals.h CEntry.h 
 
-charmxi: $(CHARMXI) $(SDAGOBJ)
+charmxi: ../bin/charmxi
+
+../bin/charmxi: $(CHARMXI) $(SDAGOBJ)
 	$(SEQCHARMC) -language c++ -cp ../bin/ -o charmxi $(CHARMXI) $(SDAGOBJ)
 
 xi-main.o: xi-main.C $(XIHEADERS) $(SDAGHEADERS)

@@ -354,6 +354,10 @@ do
 		VERBOSE=true
 		;;
 
+        "-intrinsic")
+		XI_INTERNAL=true
+		;;
+
 	"-debug-script")
 	        echo "Will give excessive charmc debugging output..."
 		DEBUG_SCRIPT=true
@@ -764,6 +768,11 @@ then
     OPTS_F90="$CMK_F90_OPTIMIZE $OPTS_F90"
     OPTS_LD="$CMK_C_OPTIMIZE $OPTS_LD"
     OPTS_LDXX="$CMK_CXX_OPTIMIZE $OPTS_LDXX"
+fi
+
+if [ -n "$XI_INTERNAL" ]
+then
+    CMK_XIOPTS="$CMK_XIOPTS -intrinsic"
 fi
 
 #Add generic options to the compiler- and linker-options
