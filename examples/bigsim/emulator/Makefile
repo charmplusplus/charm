@@ -4,7 +4,7 @@ all: jacobi3D maxReduce prime ping octo line ring
 	cd littleMD; make
 
 jacobi3D: jacobi3D.C
-	$(CHARMC) -language bluegene -o jacobi3D jacobi3D.C #-memory paranoid
+	$(CHARMC) -language bluegene -o jacobi3D jacobi3D.C 
 
 maxReduce: maxReduce.C
 	$(CHARMC) -language bluegene -o maxReduce maxReduce.C
