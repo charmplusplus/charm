@@ -1632,11 +1632,8 @@ int CmiScanf(va_alist) va_dcl
  *
  *****************************************************************************/
 
-void DiscardImplicitDgram(ImplicitDgram dg)
+void GarbageCollectMsg(OutgoingMsg ogm)
 {
-  OutgoingMsg ogm;
-  ogm = dg->ogm;
-  ogm->refcount--;
   if (ogm->refcount == 0) {
     if (ogm->freemode == 'A') {
       ogm->freemode = 'X';
@@ -1645,6 +1642,14 @@ void DiscardImplicitDgram(ImplicitDgram dg)
       FreeOutgoingMsg(ogm);
     }
   }
+}
+
+void DiscardImplicitDgram(ImplicitDgram dg)
+{
+  OutgoingMsg ogm;
+  ogm = dg->ogm;
+  ogm->refcount--;
+  GarbageCollectMsg(ogm);
   FreeImplicitDgram(dg);
 }
 
@@ -1822,6 +1827,7 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
     for (i=0; i<Cmi_numnodes; i++)
       if (i!=Cmi_mynode)
 	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
+    GarbageCollectMsg(ogm);
     break;
   case PE_BROADCAST_OTHERS:
     for (rank = 0; rank<Cmi_mynodesize; rank++)
@@ -1830,13 +1836,15 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
     for (i = 0; i<Cmi_numnodes; i++)
       if (i!=Cmi_mynode)
 	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
+    GarbageCollectMsg(ogm);
     break;
   default:
     node = nodes_by_pe[dst];
     rank = dst - node->nodestart;
-    if (node->nodestart != Cmi_nodestart)
+    if (node->nodestart != Cmi_nodestart) {
       DeliverViaNetwork(ogm, node, rank);
-    else {
+      GarbageCollectMsg(ogm);
+    } else {
       if (ogm->freemode == 'A') {
 	PCQueuePush(CmiGetStateN(rank)->recv,CopyMsg(ogm->data,ogm->size));
 	ogm->freemode = 'X';
