@@ -85,7 +85,7 @@ The programmer-visible entities in a \charmpp\ program are:
 \charmpp\ starts a program by creating a single \index{chare} instance of each
 {\em mainchare} on processor 0, and invokes constructor methods of these chare.
 Typically, these chares then creates a number of other \index{chare} chares,
-possibly on other processors, which can simultaniously work to solve the
+possibly on other processors, which can simultaneously work to solve the
 problem at hand.
 
 Each \index{chare}chare contains a number of \index{entry method}{\em entry
@@ -136,7 +136,7 @@ Laboratory. The message-driven runtime system code of the \charmpp\ was
 separated from the actual language implementation, resulting in an
 interoperable parallel runtime system called {\sc
 Converse}\cite{ConverseRTSPP98,InterOpIPPS96}. The \charmpp\ runtime system was
-retargetted on top on {\sc Converse}, and popular programming paradigms such as
+retargetted on top of {\sc Converse}, and popular programming paradigms such as
 MPI and PVM were also implemented on {\sc Converse}. This allowed
 interoperability between these paradigms and \charmpp. This release also
 eliminated the full-fledged \charmpp\ translator by replacing syntactic

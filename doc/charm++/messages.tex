@@ -66,11 +66,11 @@ operator:
 The optional arguments to the new operator are used when allocating 
 \kw{varsize} or \kw{prioritized} messages. The {\it sizes\_array} 
 used for varsize messages is an 
-array of integers elements of which denote the size (in appropriate
+array of integer elements of which denote the size (in appropriate
 units) of the memory blocks that need to be allocated and assigned to the
-pointers that the message contains. The optional {\it priobits} argument 
+pointers that the message contains. The {\it priobits} argument 
 denotes the size of a bitfield that will be used to store the message 
-priority.
+priority.   
 
 For example, to allocate a \index{varsize message}varsize message whose 
 class declaration is:
@@ -178,7 +178,7 @@ method:
 \begin{itemize}
 \item Allocate message using \kw{CkAllocBuffer} function. {\em Do not
 use \kw{new} to allocate message here. If the message constructor has
-to be called, it could be done using the in-place \kw{new} \index{new}
+to be called, it can be done using the in-place \kw{new} \index{new}
 operator.}
 \item De-serialize message data from input buffer into the allocated message.
 \item Free the input buffer using \kw{CkFreeMsg}\index{CkFreeMsg}.
@@ -199,7 +199,7 @@ module PackExample {
 class PackedMessage : public CMessage_PackedMessage
 {
   public:
-    BinaryTree<NodeType> *btree; // Non-linear data structure
+    BinaryTree<NodeType> *btree; // Non-linear data structure used in e.g. only 
     static void *pack(PackedMessage *);
     static PackedMessage *unpack(void *);
     ...
@@ -214,24 +214,35 @@ PackedMessage::pack(PackedMessage *inmsg)
   int numnodes = inmsg->btree->numNodes();
   int totalsize = numnodes*sizeof(NodeType) + sizeof(int);
   int *buf = (int *)CkAllocBuffer(inmsg, totalsize);
-  *buf++ = numnodes;
+  // buf is now just raw memory to store the data structure 
+  *buf = numnodes;           // copy numnodes into buffer 
+  buf++;		     // don't overwrite numnodes 
   inmsg->btree->flatten((void *)buf); // copies nodes, and 
                                       // replaces pointers by indices
+  buf--;                     // don't lose numnodes  
   delete inmsg;
-  return (void *)(--buf);
+  return (void *)(buf);
 }
 
 PackedMessage *
 PackedMessage::unpack(void *inbuf)
 {
-  int *buf = (int *)inbuf;
-  int numnodes = *buf++;
-  PackedMessage *pmsg = CkAllocBuffer(inbuf, sizeof(PackedMessage));
+  // inbuf is the raw memory allocated and assigned in pack 
+  int *buf = (int *)inbuf;  // stop the compiler from whining 
+  int numnodes = *buf;      // pull out numnodes from the buffer 
+  buf++; 
+   // allocate the message through the charm kernel      
+  PackedMessage *pmsg = (PackedMessage*)CkAllocBuffer(inbuf, sizeof(PackedMessage));
+   // call the Constructor of PackedMessage that takes a raw buffer in 
+   //   the format numnodes, flattened btree and constructs itself 
   pmsg = new ((void *)pmsg) PackedMessage(inbuf, numnodes); // constructs btree
   CkFreeMsg(inbuf);
+  return pmsg; 
 }
 ... 
-}
+PackedMessage *pm = new PackedMessage;  // just like always 
+pm->bTree = new BinaryTree<NodeType>; 
+...
 \end{verbatim}
 
 
@@ -272,14 +283,14 @@ In the \CC\ header file, it has to be declared as:
 class MyVarsizeMessage : public CMessage_MyVarsizeMessage { 
 // Other methods & data members 
   static void *alloc(int msgnum, size_t size, int *array, int priobits); 
-  static void* pack(msg* in); 
-  static msg* unpack(void* in); 
+  static void* pack(MyVarsizeMessage* in); 
+  static MyVarSizeMessage* unpack(void* in); 
 }; 
 \end{verbatim}
 
 The \kw{alloc} method will be called when the message is allocated using
 the \CC\ \kw{new} operator. The programmer never needs to explicitly
-call it.
+call it.  Note that all elements of the message are allocated when the message is created with \kw{new}.  There is no need to call \kw{new} to allocate any of the fields of the message.  This differs from a \kw{packed} message where each field requires individual allocation.     
 The \kw{alloc} method should actually allocate the message using
 \kw{CkAllocMsg}\index{CkAllocMsg}, whose signature is given below:
 
@@ -318,19 +329,30 @@ class NewVarsizeMessage : public CMessage_NewVarsizeMessage {
   static void *alloc(int msgnum, int size, int *array, int priobits) 
   { 
     int totalsize; 
+    // array is passed in when the message is allocated using new (see below).
+    // size is the amount of space needed for the part of the message  
+    //   known about at compile time.  Depending on their values, 
+    //   sometimes a segfault will occur if size/totalsize is not 
+    //   altered with ALIGN8. 
+    size = ALIGN8(size);       // 8-byte align size with this macro 
     totalsize = size + array[0]*sizeof(int) + array[1]*sizeof(double); 
     NewVarsizeMessage *newMsg = 
       (NewVarsizeMessage *) CkAllocMsg(msgnum, totalsize, priobits); 
+
+    // make firstArray point to the end of newMsg in memory  
     newMsg->firstArray = (int *) ((char *)newMsg+size); 
+    // make secondArray point to after the end of first array  
     newMsg->secondArray = (double *) ((char *)newMsg + size + 
                                       sizeof(int)*array[0]); 
     return (void *)newMsg; 
   } 
 
   static void *pack(NewVarsizeMessage *in) 
-  { 
+  {
+    // set firstArray an offset from the start of in 
     in->firstArray = (int *) ((char *) in->firstArray - 
                               (char *)&in->firstArray); 
+    // set secondArray to the appropriate offset 
     in->secondArray = (double *) ((char *) in->secondArray - 
                                   (char *) &in->secondArray); 
     return in; 
@@ -338,14 +360,27 @@ class NewVarsizeMessage : public CMessage_NewVarsizeMessage {
 
   static NewVarsizeMessage* unpack(void *in) 
   { 
-    NewVarsizeMessage *me = (NewVarsizeMessage *) in; 
+    NewVarsizeMessage *me = (NewVarsizeMessage *) in;  // stop compiler whining
+ 
+    // return firstArray to an absolute address in memory
     me->firstArray = (int *) ((char *) &(me->firstArray) + 
                               (size_t)(me->firstArray)); 
+    // likewise for secondArray
     me->secondArray = (double *) ((char *) &(me->secondArray) + 
                                   (size_t)(me->secondArray)); 
     return me;
   } 
 }; 
+
+int size[2];
+size[0] = 4;               // firstArray will have 4 elements
+size[1] = 5;               // secondArray will have 5 elements 
+NewVarsizeMessage *p = new(size, 0) NewVarsizeMessage;
+p->firstArray[2] = 13;     // the arrays have already been allocated 
+p->secondArray[4] = 6.7; 
+
+
+
 \end{verbatim}
 
 The pointers in a varsize message can exist in two states.  
@@ -418,7 +453,7 @@ specified as a placement argument to the \kw{new} operator, as
 described in Section \ref{memory allocation}.  Although the size of
 the priority field is specified in bits, it is always padded to an
 integral number of {\tt int}s.  A pointer to the priority part of the
-message buffer can be obtained with these calls:
+message buffer can be obtained with this call:
 
 \begin{tabbing}
 ~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill

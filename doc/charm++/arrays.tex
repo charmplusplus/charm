@@ -153,7 +153,7 @@ array [Foo] AF {entry AF();entry void e(MyMsg *m);}
 
 The last declaration expects an array index of type CkArrayIndexFoo,
 which must be defined before including the .decl.h file 
-(see ``Defining a new array index type'' below).
+(see ``Defining a new array index type'' below).  Also, <charm++.h> must be included before the definition of the CkArrayIndexFoo type. 
 
 \begin{verbatim}
 //In the .h file:
