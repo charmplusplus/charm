@@ -821,6 +821,12 @@ static void CmiDestoryLocks()
 
 #endif
 
+/*Network progress utility variables. Period controls the rate at
+  which the network poll is called */
+
+CpvDeclare(int , networkProgressCount);
+int networkProgressPeriod;
+
 CpvDeclare(void *, CmiLocalQueue);
 
 
@@ -1857,9 +1863,8 @@ void CmiProbeImmediateMsg()
 #endif
 */
 
-CpvDeclare(int, networkProgressCount);
-int networkProgressPeriod;
-
+/* Network progress function is used to poll the network when for
+   messages. This flushes receive buffers on some  implementations*/ 
 void CmiMachineProgressImpl()
 {
     CommunicationServerThread(0);
@@ -1900,6 +1905,12 @@ static void ConverseRunPE(int everReturn)
 #endif
 
   ConverseCommonInit(CmiMyArgv);
+
+  /* initialize the network progress counter*/
+  /* Network progress function is used to poll the network when for
+     messages. This flushes receive buffers on some  implementations*/ 
+  CpvInitialize(int , networkProgressCount);
+  CpvAccess(networkProgressCount) = 0;
 
   /* better to show the status here */
   if (Cmi_netpoll == 1 && CmiMyPe() == 0)
@@ -2117,7 +2128,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   CsvInitialize(CmiNodeState, NodeState);
   CmiNodeStateInit(&CsvAccess(NodeState));
 
-  CpvInitialize(networkProgressCount, 0);
+  /* Network progress function is used to poll the network when for
+     messages. This flushes receive buffers on some  implementations*/ 
   networkProgressPeriod = 0;  
   CmiGetArgInt(argv, "+networkProgressPeriod", &networkProgressPeriod);
 
