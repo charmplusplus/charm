@@ -1,14 +1,17 @@
 /*
- * parCollide: parallel interface part of collision detection system
+ * Parallel layer for Collision detection system
  * Orion Sky Lawlor, olawlor@acm.org, 4/8/2001
  */
-#ifndef __OSL_PARCOLLIDE_H
-#define __OSL_PARCOLLIDE_H
+#ifndef __UIUC_CHARM_COLLIDECHARM_IMPL_H
+#define __UIUC_CHARM_COLLIDECHARM_IMPL_H
 
-#include "parCollide.decl.h"
+#include "collide_serial.h"
+#include "collide_buffers.h"
+#include "collidecharm.decl.h"
+#include "collidecharm.h"
 
 /******************** objListMsg *********************
-A pile of objects sent to a collision voxel.
+A pile of objects sent to a Collision voxel.
 Declared as a "packed" message
 type, which converts the message to a flat byte array
 only when needed (for sending across processors).
@@ -18,8 +21,8 @@ class objListMsg : public CMessage_objListMsg
 public:
 	class returnReceipt {
 		CkGroupID gid;
-		int onPE;
 	public:
+		int onPE;
 		returnReceipt() {}
 		returnReceipt(CkGroupID gid_,int onPE_) :gid(gid_),onPE(onPE_) {}
 		void send(void);
@@ -29,7 +32,7 @@ private:
 	returnReceipt receipt;
 	
 	int n;
-	crossObjRec *obj; //Bounding boxes & IDs
+	CollideObjRec *obj; //Bounding boxes & IDs
 	
 	void freeHeapAllocated();
 public:
@@ -37,18 +40,51 @@ public:
 	
 	//Hand control of these arrays over to this message,
 	// which will delete them when appropriate.
-	objListMsg(int n_,crossObjRec *obj_,
+	objListMsg(int n_,CollideObjRec *obj_,
 		const returnReceipt &receipt_);
 	~objListMsg() {freeHeapAllocated();}
 	
+	int getSource(void) {return receipt.onPE;}
 	void sendReceipt(void) {receipt.send();}
 	
 	int getObjects(void) const {return n;}
-	const crossObjRec &getObj(int i) const {return obj[i];}
+	const CollideObjRec &getObj(int i) const {return obj[i];}
 	const bbox3d &bbox(int i) const {return obj[i].box;}
 	
 	static void *pack(objListMsg *m);
 	static objListMsg *unpack(void *m);
+};
+
+
+/****************** aggregator *************/
+#include "ckhashtable.h"
+
+class collideMgr;
+class voxelAggregator;
+
+/*This class splits each chunk's triangles into messages
+ * headed out to each voxel.  It is implemented as a group.
+ */
+class CollisionAggregator {
+	CollideGrid3d gridMap;
+	CkHashtableT<CollideLoc3d,voxelAggregator *> voxels;
+	collideMgr *mgr;
+	
+	//Add a new accumulator to the hashtable
+	voxelAggregator *addAccum(const CollideLoc3d &dest);
+public:
+	CollisionAggregator(const CollideGrid3d &gridMap_,collideMgr *mgr_);
+	~CollisionAggregator();
+	
+	//Add this chunk's triangles
+	void aggregate(int pe,int chunk,
+		int n,const bbox3d *boxes,const int *prio);
+	
+	//Send off all accumulated voxel messages
+	void send(void);
+	
+	//Delete all cached aggregators
+	void compact(void);
 };
 
 /********************* syncReductionMgr *****************
@@ -97,50 +133,45 @@ public:
 };
 
 /*********************** collideMgr **********************
-A group that synchronizes the collision detection process.
-A single collision operation consists of:
-	-collect contributions from clients
+A group that synchronizes the Collision detection process.
+A single Collision operation consists of:
+	-collect contributions from clients (contribute)
 	-aggregate the contributions
 	-send off triangle lists to voxels
 	-wait for replies from the voxels indicating sucessful delivery
 	-collideMgr reduction to make sure everybody's messages are delivered
 	-root broadcasts startCollision to collideVoxel array
-	-collideVoxel array reduces over collisionLists
-	-resulting summed collisionList is delivered on processor 0
+	-client group accepts the CollisionLists
 */
 
 class collideMgr : public syncReductionMgr
 {
 	CProxy_collideMgr thisproxy;
-public:
-	//Set the client function to call with collision data
-	typedef void (*collisionClientFn)(void *param,int nColl,collision *colls);
 private:
 	void status(const char *msg) {
 		CkPrintf("CMgr pe %d> %s\n",CkMyPe(),msg);
 	}
-	collisionClientFn clientFn;void *clientParam;
+	int steps; //Number of separate Collision operations
+	CProxy_collideVoxel voxelProxy;
+	CollideGrid3d gridMap; //Shape of 3D voxel grid
+	CProxy_collideClient client; //Collision client group
 	
 	int nContrib;//Number of registered contributors
 	int contribCount;//Number of contribute calls given this step
-
-	collisionAggregator aggregator;
-	CProxy_collideVoxel voxelProxy;
+	
+	CollisionAggregator aggregator;
 	int msgsSent;//Messages sent out to voxels
 	int msgsRecvd;//Return-receipt messages received from voxels
 	void tryAdvance(void);
-	static void reductionClient(void *param,int dataSize,void *data);
 protected:
 	//Check if we're barren-- if so, advance now
 	virtual void pleaseAdvance(void);
 	//This is called on PE 0 once the voxel send reduction is finished
 	virtual void reductionFinished(void);
 public:
-	collideMgr(CkArrayID voxels);
-
-	//Use this routine on node 0 to report collisions
-	void setClient(collisionClientFn clientFn_,void *clientParam_)
-	  {clientFn=clientFn_; clientParam=clientParam_; }
+	collideMgr(const CollideGrid3d &gridMap,
+		const CProxy_collideClient &client,
+		const CProxy_collideVoxel &voxels);
 	
 	//Maintain contributor registration count
 	void registerContributor(int chunkNo);
@@ -148,11 +179,11 @@ public:
 	
 	//Clients call this to contribute their objects
 	void contribute(int chunkNo,
-		int n,const bbox3d *boxes);
+		int n,const bbox3d *boxes,const int *prio);
 	
 	//voxelAggregators deliver messages to voxels via this bottleneck
-	void sendVoxelMessage(const gridLoc3d &dest,
-		int n,crossObjRec *obj);
+	void sendVoxelMessage(const CollideLoc3d &dest,
+		int n,CollideObjRec *obj);
 	
 	//collideVoxels send a return receipt here
 	void voxelMessageRecvd(void);
@@ -160,35 +191,48 @@ public:
 
 /********************** collideVoxel ********************
 A sparse 3D array that represents a region of space where
-collisions may occur.  Each step it accumulates triangle
+Collisions may occur.  Each step it accumulates triangle
 lists and then computes their intersection
 */
 
 class collideVoxel : public ArrayElement3D
 {
 	growableBufferT<objListMsg *> msgs;
-	bbox3d territory;
 	void status(const char *msg);
 	void emptyMessages();
-	void collide(collisionList &dest);
+	void collide(const bbox3d &territory,CollisionList &dest);
 public:
-	collideVoxel();
+	collideVoxel(void);
 	collideVoxel(CkMigrateMessage *m);
 	~collideVoxel();
 	void pup(PUP::er &p);
 	
 	void add(objListMsg *msg);
-	void startCollision(void);
+	void startCollision(int step,
+		const CollideGrid3d &gridMap,
+		const CProxy_collideClient &client);
 };
 
 
-/*  External Interface:   */
-//Create a collider group to contribute triangles to.  
-// Should be called at init. time on node 0
-CkGroupID createCollider(const vector3d &gridStart,const vector3d &gridSize,
-	collideMgr::collisionClientFn client,void *clientParam);
+/********************** serialCollideClient *****************
+Reduces the Collision list down to processor 0.
+*/
+class serialCollideClient : public collideClient {
+	CollisionClientFn clientFn;
+	void *clientParam;
+public:
+	serialCollideClient(void);
+	
+	/// Call this client function on processor 0:
+	void setClient(CollisionClientFn clientFn,void *clientParam);
+	
+	/// Called by voxel array on each processor:
+	virtual void collisions(ArrayElement *src,
+		int step,CollisionList &colls);
+	
+	/// Called after the reduction is complete:
+	virtual void reductionDone(CkReductionMsg *m);
+};
 
-//Create collider voxel array
-CkArrayID createColliderVoxels(const vector3d &gridStart,const vector3d &gridSize);
 
 #endif //def(thisHeader)

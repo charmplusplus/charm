@@ -1,0 +1,31 @@
+module collidecharm {
+  message objListMsg;
+  
+  group collideClient {
+  };  
+  group serialCollideClient : collideClient {
+    entry serialCollideClient();
+    entry void reductionDone(CkReductionMsg *m);
+  };
+  
+  group syncReductionMgr {
+    entry syncReductionMgr();
+    entry void childProd(int stepCount);
+    entry void childDone(int stepCount);
+  };
+  group collideMgr : syncReductionMgr {
+    entry collideMgr(CollideGrid3d gridMap,
+    	CProxy_collideClient client,
+	CkArrayID cells);
+    entry void voxelMessageRecvd(void);
+  };
+
+  array [3D] collideVoxel {
+    entry collideVoxel(void);
+    entry [createhere] void add(objListMsg *);
+//    entry [createhome] void add(objListMsg *);
+    entry void startCollision(int step,
+		CollideGrid3d gridMap,
+		CProxy_collideClient client);
+  };
+};

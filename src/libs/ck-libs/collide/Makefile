@@ -1,49 +1,58 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
+LIBDIR=$(CDIR)/lib
 
-HEADERS=collision.h collidef.h \
-	col_aggregate.h parCollide.decl.h collide.decl.h
-OBJS = collision.o parCollide.o threadCollide.o \
-	aggregate.o 
+HEADERS=collide_util.h bbox.h collide_cfg.h collide_buffers.h \
+	collidecharm.h collidec.h collidef.h 
+HEADDEP=$(HEADERS) collidecharm_impl.h \
+	collide_serial.h collide_buffers.h collide_cfg.h \
+	collide.decl.h collidecharm.decl.h headers
 
-DEST=$(CDIR)/lib/libmodulecollide.a
+COBJS=collide_util.o collide_serial.o collidecharm.o collide_buffers.o 
+CLIB=libmodulecollidecharm
+CDEST=$(LIBDIR)/$(CLIB).a
 
-all: $(DEST)
+OBJS=$(COBJS) threadCollide.o
+LIB=libmodulecollide
+DEST=$(LIBDIR)/$(LIB).a
 
-$(DEST): $(OBJS) $(CDIR)/include/collision.h
-	$(CHARMC) $(OBJS) -o $@
+all: $(DEST) $(CDEST)
 
-$(CDIR)/include/collision.h: $(HEADERS)
+$(DEST): $(OBJS) $(COMPAT) headers
+	$(CHARMC) $(OBJS) $(COMPAT) -o $@
+	cp $(LIB).dep $(LIBDIR)/$(LIB).dep
+
+$(CDEST): $(COBJS) $(COMPAT) headers
+	$(CHARMC) $(COBJS) $(COMPAT) -o $@
+#	cp $(CLIB).dep $(LIBDIR)/$(CLIB).dep
+
+headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
+	touch headers
 
-model_corr.o: model_corr.C $(HEADERS)
-	$(CHARMC) $(CFLAGS) -c model_corr.C
+collide_util.o: collide_util.C $(HEADDEP)
+	$(CHARMC) -c collide_util.C
 
-collision.o: collision.C $(HEADERS)
-	$(CHARMC) $(CFLAGS) -c collision.C
+collide_serial.o: collide_serial.C $(HEADDEP)
+	$(CHARMC) -c collide_serial.C
 
-aggregate.o: aggregate.C $(HEADERS)
-	$(CHARMC) $(CFLAGS) -c aggregate.C
+collidecharm.o: collidecharm.C $(HEADDEP)
+	$(CHARMC) -c collidecharm.C
 
-parCollide.o: parCollide.C $(HEADERS)
-	$(CHARMC) $(CFLAGS) -c parCollide.C
+collide_buffers.o: collide_buffers.C $(HEADDEP)
+	$(CHARMC) -c collide_buffers.C
 
-threadCollide.o: threadCollide.C $(HEADERS)
-	$(CHARMC) $(CFLAGS) -c threadCollide.C
-
-parCollide.decl.h: parCollide.ci
-	$(CHARMC) parCollide.ci
+threadCollide.o: threadCollide.C $(HEADDEP)
+	$(CHARMC) -c threadCollide.C
 
 collide.decl.h: threadCollide.ci
 	$(CHARMC) threadCollide.ci
 
+collidecharm.decl.h: collidecharm.ci
+	$(CHARMC) collidecharm.ci
 
-test_par.o: test_par.C $(HEADERS)
-	$(CHARMC) $(CFLAGS) -c test_par.C
+call_init.o: call_init.c
+	$(CHARMC) -c call_init.c
 
-test_par.decl.h: test_par.ci
-	$(CHARMC) test_par.ci
-
-clean: 
-	-rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) conv-host charmrun
-
+clean:
+	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) headers
