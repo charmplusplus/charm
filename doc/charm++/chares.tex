@@ -67,7 +67,7 @@ mechanism allows chares to send their handles to other chares.
 \label{chare creation}
 
 First, a \index{chare}chare needs to be declared, both in {\tt .ci} file and in
-{\tt .h} file, as stated in Section 2.3.3. The following is an example of
+{\tt .h} file, as stated earlier. The following is an example of
 declaration for a \index{chare}chare of user-defined type \uw{C}, where \uw{M1}
 and \uw{M2} are user-defined \index{message}message types, and \uw{someEntry}
 is an entry method.
@@ -208,7 +208,7 @@ chareID}.  Alternatively, we can create a proxy pointer:
 
 \begin{tabbing} ~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~
 \=~~~~ \kill \> \kw{CProxy}\_\uw{chareType} *{\it chareProxyPointer} = \kw{new
-CProxy}\_\uw{chareType}({\it chareHandle}); \end{tabbing}
+CProxy}\_\uw{chareType}({\it chareID}); \end{tabbing}
 
 This creates a pointer named {\it chareProxyPointer} which points to the proxy. 
 
