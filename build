@@ -90,6 +90,10 @@ syntax() {
   echo '6. compile on IBM SP with MPI using parallel gmake, 4 jobs simultaneously:'
   echo '  MAKE=gmake  ./build charm++ mpi-sp -j4 -O            # sh'
   echo '  setenv MAKE gmake;  ./build charm++ mpi-sp -j4 -O    # csh'
+  echo '7. compile Charm++ with MPI that is installed at /usr/local/mpich:'
+  echo '  ./build charm++ mpi-linux --incdir /usr/local/mpich/include --libdir /usr/local/mpich/lib -O'
+  echo '   or in short,'
+  echo '  ./build charm++ mpi-linux --basedir /usr/local/mpich -O'
   echo ''
   echo 'Note: This script:'
   echo ' 1. Creates directories <version> and <version>/tmp';
