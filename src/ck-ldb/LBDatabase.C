@@ -29,7 +29,7 @@ CkpvDeclare(int, hasNullLB);         /**< true if NullLB is created */
 CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
 
 // command line options
-double autoLbPeriod = 0.0;		// in seconds
+double autoLbPeriod = 1.0;		// in seconds
 int lb_debug=0;
 int lb_ignoreBgLoad=0;
 

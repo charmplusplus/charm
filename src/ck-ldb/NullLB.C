@@ -69,7 +69,7 @@ void NullLB::AtSync()
 //  theLbdb->ClearLoads();
   
   // disable the batsyncer if no balancer exists
-  theLbdb->SetLBPeriod(1e10);
+  // theLbdb->SetLBPeriod(1e10);
 
   //We don't *do* any migrations, so they're already done!
   CpvAccess(_qd)->create(-1);
