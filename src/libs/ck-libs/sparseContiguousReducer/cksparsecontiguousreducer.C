@@ -45,110 +45,155 @@ static CkReductionMsg *name(int nMsg, CkReductionMsg ** msg){\
     msg[0] = NULL;\
     return ret;\
   }\
-  int count = 0;\
-  int numElements = 0;\
-  CkDataSegHeader *headerArray;\
-  int *size;\
-  unsigned char *flag;\
-  int i;	\
+ \
+  int               count          = 0;\
+  CkDataSegHeader*  finalHeaderArr = NULL; /* size [count] */\
+  CkDataSegHeader** msgHeaderArr   = NULL; /* size [nMsg] */\
+  int*              size           = NULL; /* size [nMsg] */\
+  int*              pos            = NULL; /* size [nMsg] */\
+  int*              off            = NULL; /* size [nMsg] */\
+  int*              arrPos         = NULL; /* size [count] */\
+  int*              dataPos        = NULL; /* size [count] */\
+  int*              flag           = NULL; /* size [count] */\
+  int               i              = 0;\
 \
   /* find the total data segments in n input msgs */\
-  for(i=0; i<nMsg; i++)\
+  for(i=0; i<nMsg; i++) {\
     count += numDataSegs((unsigned char*)(msg[i]->getData()));\
+  }\
 \
-  headerArray = new CkDataSegHeader[count];\
-  size = new int[count];\
-  flag = new unsigned char[count];\
+  int nm  = ((nMsg*sizeof(int)) + \
+            sizeof(CkDataSegHeader))/sizeof(CkDataSegHeader);\
+  int nmp = ((nMsg*sizeof(CkDataSegHeader*)) + \
+            sizeof(CkDataSegHeader))/sizeof(CkDataSegHeader);\
+  int nc  = ((count*sizeof(int)) + \
+            sizeof(CkDataSegHeader))/sizeof(CkDataSegHeader);\
+  int numHeaderToAllocate = count + nmp + 3*nm + 3*nc;\
 \
-  count = 0;\
+  finalHeaderArr = new CkDataSegHeader[numHeaderToAllocate];\
+\
+  msgHeaderArr   = (CkDataSegHeader**)(finalHeaderArr + count);\
+  size           = (int*)(((CkDataSegHeader*)msgHeaderArr) + nmp);\
+  pos            = (int*)(((CkDataSegHeader*)size) + nm);\
+  off            = (int*)(((CkDataSegHeader*)pos) + nm);\
+  arrPos         = (int*)(((CkDataSegHeader*)off) + nm);\
+  dataPos        = (int*)(((CkDataSegHeader*)arrPos) + nc);\
+  flag           = (int*)(((CkDataSegHeader*)dataPos) + nc);\
 \
   /* put all the unique data headers from input messages to the header-array */\
-  for(i=0; i<nMsg; i++){\
 \
+  /* initialize temporary variables */\
+  pos [0]          = 0;\
+  size [0]         = numDataSegs((unsigned char*)(msg[0]->getData()));\
+  off [0]          = 0;\
+  msgHeaderArr [0] = getDataSegHeaderPtr((unsigned char*)(msg[0]->getData()));\
+\
+  for(i=1; i<nMsg; i++){\
     unsigned char * data = (unsigned char*)(msg[i]->getData());\
-    int numSegs = numDataSegs(data);\
+    pos  [i]             = 0;\
+    size [i]             = numDataSegs(data);\
+    off [i]              = off [i-1] + size [i-1];\
+    msgHeaderArr [i]     = getDataSegHeaderPtr(data);\
+  }\
 \
-    for(int j=0; j<numSegs; j++){\
+  for(i=0; i<count; i++){\
+    arrPos  [i]  = -1;\
+    dataPos [i]  = -1;\
+  }\
 \
-      int index = count;\
-      CkDataSegHeader node = getDataSegHeader(j, data);\
+  /* n-way merge */\
+  int nScanned    = 0;\
+  int currMsg     = 0;\
+  /* number of unique merged headers */\
+  int totalHeader = 0;\
 \
-      /* to maintain x-sorted header array */\
-      int k;	\
-      for(k=count-1; k >= 0; k--)\
-	if(node < headerArray[k])\
-          index = k;\
-	else\
-	  break;\
+  /* find the first header */\
+  int index = 0;\
+  int currDataOff = 0;\
+  CkDataSegHeader minHdr = msgHeaderArr [currMsg][pos[currMsg]];\
 \
-      if((index != 0) && (node == headerArray[index-1]))\
-	continue; /* overlap */\
-\
-      for(k=count-1; k>=index; k--){\
-	headerArray[k+1] = headerArray[k];\
-	size[k+1] = size[k];\
-      }\
-\
-      headerArray[index] = node;\
-      size[index] = node.getNumElements();\
-      count++;\
-      numElements += size[index];\
+  for (index=1; index < nMsg; index++) {\
+    if (msgHeaderArr [index][pos[index]] < minHdr)  {\
+      currMsg = index;\
+      minHdr = msgHeaderArr [index][pos[index]];\
     }\
   }\
 \
- /* number of non-null data blocks and total number of elements in them is
-    known. Now pack the input data into one buffer resolving the overlap.*/\
+  arrPos [off [currMsg] + pos [currMsg]] = totalHeader;\
+  dataPos [off [currMsg] + pos [currMsg]] = currDataOff;\
+  finalHeaderArr [totalHeader++] = msgHeaderArr [currMsg][pos[currMsg]++];\
+  nScanned ++;\
 \
-  int dataSize = sizeof(int) + sizeof(CkDataSegHeader)*count + \
-                 sizeof(dataType)*numElements;\
-  CkReductionMsg* m = CkReductionMsg::buildNew(dataSize, NULL); \
-  unsigned char *data = (unsigned char*)(m->getData ());\
+  while (nScanned != count) {\
+    if (pos [currMsg] != size [currMsg]) {\
+      minHdr = msgHeaderArr [currMsg][pos[currMsg]];\
+    } else {\
+      currMsg = (currMsg+1)%nMsg;\
+      continue;\
+    }\
+    for (index=0; index < nMsg; index++) {\
+      if ((pos [index] != size [index])&&\
+          (msgHeaderArr [index][pos[index]] < minHdr))  {\
+        currMsg = index;\
+        minHdr = msgHeaderArr [index][pos[index]];\
+      }\
+    }\
 \
-  memset(flag, 0,count*sizeof(unsigned char));\
-  memcpy(data, &count, sizeof(int));\
-\
-  unsigned char *ptr = data + sizeof(int);\
-  /* copy the data segment headers to packing buffer */\
-  for(i=0; i<count; i++){\
-    memcpy(ptr, &(headerArray[i]), sizeof(CkDataSegHeader));\
-    ptr += sizeof(CkDataSegHeader);\
-    if(i != 0)\
-      size[i] += size[i-1];\
+    if (!(finalHeaderArr [totalHeader-1] == msgHeaderArr [currMsg][pos[currMsg]])) {\
+      currDataOff += sizeof(dataType)*finalHeaderArr [totalHeader-1].getNumElements();\
+      arrPos [off [currMsg] + pos [currMsg]] = totalHeader;\
+      dataPos [off [currMsg] + pos [currMsg]] = currDataOff;\
+      finalHeaderArr [totalHeader++] = msgHeaderArr [currMsg][pos[currMsg]++];\
+    }\
+    else {\
+      arrPos [off [currMsg] + pos [currMsg]] = totalHeader-1;\
+      dataPos [off [currMsg] + pos [currMsg]] = currDataOff;\
+      pos[currMsg]++;\
+    }\
+    nScanned ++;\
   }\
 \
- /* copy data from n-input messages to packing buffer */\
-  for(i=0; i<nMsg; i++){\
-    unsigned char *msgptr = (unsigned char*)(msg[i]->getData());\
-    dataType *msgDataptr = (dataType *)getDataPtr(msgptr);\
-    dataType *dataptr = (dataType *)ptr;\
-    int numSegs = numDataSegs(msgptr);\
-    int index = 0;\
-    int startInd = 0;\
+ /* number of non-null data blocks and total number of elements in them is\
+    known. Now pack the input data into one buffer resolving the overlap.*/\
 \
-    for(int j=0; j<numSegs; j++){\
-      index = getIndex(headerArray, msgptr, j);\
-      if(index != 0)\
-        startInd = size[index-1];\
-      else\
-        startInd = 0;\
+  int dataSize = sizeof(int) + sizeof(CkDataSegHeader)*totalHeader + \
+                 currDataOff + \
+                 sizeof(dataType)*finalHeaderArr [totalHeader-1].getNumElements();\
 \
-      if(flag[index] != 0){\
-        for(int k=startInd; k<size[index]; k++){\
-          loop /* operation to be performed on overlapping data */\
+  CkReductionMsg* m = CkReductionMsg::buildNew(dataSize, NULL); \
+  unsigned char *data = (unsigned char*)(m->getData ());\
+  memset (flag, 0, totalHeader*sizeof(int));\
+\
+  memcpy(data, &totalHeader, sizeof(int));\
+\
+  data += sizeof(int);\
+\
+  int dataOffset = sizeof (CkDataSegHeader)*totalHeader;\
+  int numElems;\
+  CkDataSegHeader* hdrPtr = (CkDataSegHeader*)data;\
+  dataType*        dataptr = (dataType*)(data + dataOffset);\
+\
+  for (i=0; i<nMsg; i++) {\
+    dataType* msgDataptr = (dataType*)getDataPtr((unsigned char*)(msg[i]->getData()));\
+    for (index=0; index<size[i]; index++) {\
+      numElems = msgHeaderArr [i][index].getNumElements();\
+\
+      hdrPtr [arrPos [off [i] + index]] = msgHeaderArr [i][index];\
+      dataptr = (dataType*)(data + dataOffset + dataPos [off [i] + index]);\
+      if (!flag [arrPos [off [i] + index]]) {\
+        flag [arrPos [off [i] + index]] = 1;\
+        memcpy(dataptr, msgDataptr, sizeof(dataType)*numElems);\
+        msgDataptr += numElems;\
+      } else {\
+        for (int k=0; k<numElems; k++) {\
+          loop\
           msgDataptr++;\
         }\
       }\
-      else{\
-        for(int k=startInd; k<size[index]; k++)\
-          *(dataptr + k) = *msgDataptr++;\
-      }\
-      flag[index] = 1;\
     }\
   }\
 \
-  delete[] headerArray;\
-  delete[] size;\
-  delete[] flag;\
+  delete[] finalHeaderArr;\
 \
   return m;\
 }
@@ -214,9 +259,7 @@ void registerReducers(void)
 }
 
 int numDataSegs(const unsigned char *data){
-  int size=0;
-  memcpy(&size, data, sizeof(int));
-  return size;
+  return *(int*)data;
 }
 
 CkDataSegHeader getDataSegHeader(int index, const unsigned char *data){
@@ -241,6 +284,10 @@ unsigned char * getDataPtr(const unsigned char *ptr){
   int size;
   size = numDataSegs(ptr);
   return (unsigned char*)(ptr + sizeof(int) + size*sizeof(CkDataSegHeader));
+}
+
+CkDataSegHeader* getDataSegHeaderPtr(const unsigned char *ptr) {
+  return (CkDataSegHeader*)(ptr + sizeof(int));
 }
 
 CkDataSegHeader getDecompressedDataHdr(const unsigned char *msg){

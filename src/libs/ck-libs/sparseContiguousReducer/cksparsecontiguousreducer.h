@@ -100,7 +100,7 @@ class CkDataSegHeader{
     return false;
   }
 
-  inline bool operator>(const CkDataSegHeader &r){
+  /*inline bool operator>(const CkDataSegHeader &r){
     if(sx > r.sx)
       return true;
     else
@@ -108,7 +108,7 @@ class CkDataSegHeader{
 	return true;
 
     return false;
-  }
+  }*/
 
   /* 
      returns the number of elements in this data segment 
@@ -186,6 +186,12 @@ int numDataSegs(const unsigned char *data);
    segment 
 */
 CkDataSegHeader getDataSegHeader(int index, const unsigned char *data);
+
+/* 
+   returns an instance of CkDataSegHeader having indices for index(th) data 
+   segment 
+*/
+CkDataSegHeader* getDataSegHeaderPtr(const unsigned char *data);
 
 /* 
    returns pointer to data portion in the message. All the data segments are 
