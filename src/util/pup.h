@@ -540,6 +540,7 @@ public:\
 //  Abstract PUP::ables do not need def or reg.
 #define PUPable_abstract(className) \
 public:\
+    virtual const PUP::able::PUP_ID &get_PUP_ID(void) const =0; \
     friend inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
     friend inline void operator|(PUP::er &p,className* &a) {\
 	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
@@ -560,7 +561,65 @@ public:\
 #define PUPable_reg(className) \
     className::register_PUP_ID();
 
+
 };//<- End "namespace" PUP
+
+
+//Holds a pointer to a (possibly dynamically allocated) PUP::able.
+//  This is used by parameter marshalling, which doesn't work well 
+//  with pointers.
+template <class T>
+class PUPable_marshall {
+	T *allocated; //Pointer that PUP dynamically allocated for us (recv only)
+	T *ptr; //Read-only pointer
+
+	//Don't use the copy constructor!
+	PUPable_marshall(const PUPable_marshall<T> &src);
+public:
+	/// Marshall this object.
+	/// Used on the send side, and does *not* delete the object.
+	PUPable_marshall(T *src) { 
+		allocated=0; //Don't ever delete src
+		ptr=src;
+	}
+	
+	/// Marshall this object.
+	/// Used on the send side, and does *not* delete the object.
+	PUPable_marshall(T &src) { 
+		allocated=0; //Don't ever delete &src
+		ptr=&src;
+	}
+	
+	/// Begin completely empty: used on marshalling recv side.
+	PUPable_marshall(void) { 
+		ptr=allocated=0;
+	}
+	
+	~PUPable_marshall() {
+		if (allocated) delete allocated;
+	}
+	
+	/// Access the object held by this class:
+	operator T* () { return ptr; }
+	
+	/// Remove the held object from this class.
+	/// You are then responsible for deallocating the pointer.
+	T *release(void) { 
+		allocated=0;
+		return ptr;
+	}
+	
+	inline void pup(PUP::er &p) {
+		bool ptrWasNull=(ptr==0);
+		p|ptr;
+		if (ptrWasNull) 
+		{ //PUP just allocated a new object for us-- 
+		  // make sure it gets deleted eventually.
+			allocated=ptr;
+		}
+	}
+	friend inline void operator|(PUP::er &p,PUPable_marshall<T> &v) {v.pup(p);}
+};
 
 /******** PUP via pipe: another way to access PUP::ers *****
 The parameter marshalling system pups each variable v using just:
