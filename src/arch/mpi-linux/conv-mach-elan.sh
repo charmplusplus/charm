@@ -1,0 +1,15 @@
+CMK_CPP_C="icc -E"
+CMK_CC="icc "
+CMK_CXX="icc "
+CMK_CXXPP="icc -E "
+CMK_CF77="ifc "
+CMK_CF90="ifc "
+OPTS_CPP="$OPTS_CPP -I/usr/lib/mpi/include"
+CMK_LD="icc "
+CMK_LDXX="icc "
+CMK_LIBS="-lckqt -L/usr/lib/mpi/lib -L/scratch/release/head/quadrics/lib/Linux_i686 -lmpi -lelan "
+CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
+CMK_F90LIBS=' -lmpifarg -lifport -lifcore '
+CMK_MOD_EXT="mod"
+CMK_F90_USE_MODDIR=
+CMK_F90_MODINC=""
