@@ -16,7 +16,7 @@
 #endif
 
 /* TCharm Semaphore ID for collision startup */
-#define COLLIDE_TCHARM_SEMAID 0xC0771DE
+#define COLLIDE_TCHARM_SEMAID 0x0C0771DE /* _COLLIDE */
 
 class threadCollide;
 
