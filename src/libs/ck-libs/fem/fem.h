@@ -82,7 +82,7 @@ class main : public Chare
  public:
   main(CkArgMsg *);
   void done(void);
-  void setMesh(int,int,int,int*);
+  void setMesh(int,int,int,int*,int*);
 };
 
 class ChunkMsg : public CMessage_ChunkMsg {
@@ -128,6 +128,8 @@ class chunk : public ArrayElement1D
   void *curbuf; // data addr for current update operation
 
  public:
+
+  int doneCalled;
   chunk(void);
   chunk(CkMigrateMessage *) {}
   void run(void);
@@ -169,6 +171,8 @@ int FEM_Num_Partitions(void);
 void FEM_Read_Field(int fid, void *nodes, char *fname);
 void FEM_Print(char *str);
 void FEM_Set_Mesh(int nelem, int nnodes, int ctype, int* connmat);
+void FEM_Set_Mesh_Transform(int nelem, int nnodes, int ctype, int* connmat, 
+                            int *permute);
 void FEM_Print_Partition(void);
 
 // Fortran Bindings
@@ -183,6 +187,8 @@ extern "C" int FEM_NUM_PARTITIONS(void);
 extern "C" void FEM_READ_FIELD(int *fid, void *nodes, char *fname, int len);
 extern "C" void FEM_PRINT(char *str, int len);
 extern "C" void FEM_SET_MESH(int *nelem,int *nnodes,int *ctype,int *connmat);
+extern "C" void FEM_SET_MESH_TRANSFORM(int *nelem,int *nnodes,int *ctype,
+                                       int *connmat, int *permute);
 extern "C" void FEM_PRINT_PARTITION(void);
 extern "C" int OFFSETOF(void *, void *);
 // to be provided by the application
@@ -200,6 +206,8 @@ extern "C" int fem_num_partitions_(void);
 extern "C" void fem_read_field_(int *fid, void *nodes, char *fname, int len);
 extern "C" void fem_print_(char *str, int len);
 extern "C" void fem_set_mesh_(int *nelem,int *nnodes,int *ctype,int *connmat);
+extern "C" void fem_set_mesh_transform_(int *nelem,int *nnodes,int *ctype,
+                                        int *connmat, int *permute);
 extern "C" void fem_print_partition_(void);
 extern "C" int offsetof_(void *, void *);
 // to be provided by the application

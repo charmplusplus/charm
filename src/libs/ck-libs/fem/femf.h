@@ -60,6 +60,12 @@
     integer, dimension(:,:) :: mesh
   end subroutine FEM_Set_Mesh
 
+  subroutine FEM_Set_Mesh_Transform(nelem, nnodes, ctype, mesh, permute)
+    integer :: nelem, nnodes, ctype
+    integer, dimension(:,:) :: mesh
+    integer, dimension(:) :: permute
+  end subroutine FEM_Set_Mesh_Transform
+
   subroutine FEM_Print_Partition()
   end subroutine FEM_Print_Partition
 

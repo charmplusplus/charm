@@ -134,7 +134,7 @@ METIS_PartMeshNodal(int*,int*,int*,int*,int*,int*,int*,int*,int*);
 extern void fem_map(int nelem, int nnodes, int ctype, int *connmat,
                     int nparts, int *epart, int *npart, ChunkMsg *msgs[]);
 void
-main::setMesh(int nelem, int nnodes, int ctype, int *connmat)
+main::setMesh(int nelem, int nnodes, int ctype, int *connmat, int *xconn)
 {
   int *epart = new int[nelem]; CHK(epart);
   int *npart = new int[nnodes]; CHK(npart);
@@ -151,7 +151,7 @@ main::setMesh(int nelem, int nnodes, int ctype, int *connmat)
     ecut = 0;
   } else {
     // pass mesh to metis to be partitioned
-    METIS_PartMeshNodal(&nelem, &nnodes, connmat, &ctype, &numflag, 
+    METIS_PartMeshNodal(&nelem, &nnodes, xconn, &ctype, &numflag, 
                        (int*)&_nchunks, &ecut, epart, npart);
   }
   // call the map function to compute communication info needed by the framework
@@ -161,7 +161,6 @@ main::setMesh(int nelem, int nnodes, int ctype, int *connmat)
   delete[] npart;
   // send messages to individual chunks with these partitions
   isMeshSet = 1;
-  _femaid = CProxy_chunk::ckNew(_nchunks);
   CProxy_chunk farray(_femaid);
   // each chunk is sent a message containing its meshdata
   for(int i=0;i<_nchunks;i++) {
@@ -175,14 +174,80 @@ void FEM_Set_Mesh(int nelem, int nnodes, int ctype, int *connmat)
   if(_mainptr == 0) {
     CkAbort("FEM_Set_Mesh can be called from within _init only.\n");
   }
-  _mainptr->setMesh(nelem, nnodes, ctype, connmat);
+  _mainptr->setMesh(nelem, nnodes, ctype, connmat, connmat);
+}
+
+void FEM_Set_Mesh_Transform(int nelem, int nnodes, int ctype, int *connmat,
+                            int *permute)
+{
+  if(_mainptr == 0) {
+    CkAbort("FEM_Set_Mesh_Transform can be called from within _init only.\n");
+  }
+  int esize = (ctype==FEM_TRIANGULAR) ? 3:
+              (ctype==FEM_HEXAHEDRAL) ? 8:
+	      4;
+  // check if permute array is indeed a permutation
+  // it is a permutation if the mapped indices are in the range 0..esize-1
+  // and if every index occurs just once.
+  int i, j;
+  int *freq = new int[esize]; CHK(freq);
+  for(i=0;i<esize;i++) { freq[i] = 0; }
+#if FEM_FORTRAN
+  for(i=0;i<esize;i++) {
+    if(permute[i] < 1 || permute[i] > esize) {
+      CkAbort("FEM> transform vector not a permutation.\n");
+    }
+  }
+  for(i=0;i<esize;i++) { freq[permute[i]-1]++; }
+#else
+  for(i=0;i<esize;i++) {
+    if(permute[i] < 0 || permute[i] >= esize) {
+      CkAbort("FEM> transform vector not a permutation.\n");
+    }
+  }
+  for(i=0;i<esize;i++) { freq[permute[i]]++; }
+#endif
+  for(i=0;i<esize;i++) {
+    if(freq[i]!=1) {
+      CkAbort("FEM> transform vector not a permutation.\n");
+    }
+  }
+  delete[] freq;
+  // allocate conn, and transform
+  int *conn = new int[nelem*esize]; CHK(conn);
+  for(i=0;i<nelem;i++) {
+    for(j=0;j<esize;j++) {
+#if FEM_FORTRAN
+      conn[i*esize+j] = permute[connmat[i*esize+j]-1];
+#else
+      conn[i*esize+j] = permute[connmat[i*esize+j]];
+#endif
+    }
+  }
+  _mainptr->setMesh(nelem, nnodes, ctype, connmat, conn);
+  delete[] conn;
 }
 
 extern "C" void
+#if CMK_FORTRAN_USES_ALLCAPS
+FEM_SET_MESH
+#else
 fem_set_mesh_
+#endif
 (int *nelem, int *nnodes, int *ctype, int *connmat)
 {
   FEM_Set_Mesh(*nelem, *nnodes, *ctype, connmat);
+}
+
+extern "C" void
+#if CMK_FORTRAN_USES_ALLCAPS
+FEM_SET_MESH_TRANSFORM
+#else
+fem_set_mesh_transform_
+#endif
+(int *nelem, int *nnodes, int *ctype, int *connmat, int *permute)
+{
+  FEM_Set_Mesh_Transform(*nelem, *nnodes, *ctype, connmat, permute);
 }
 
 void
@@ -283,6 +348,7 @@ chunk::run(ChunkMsg *msg)
   CtvAccess(_femptr) = this;
   readChunk(msg);
   // call the application-specific driver
+  doneCalled = 0;
   driver_(&numNodes, gNodeNums, &numElems, gElemNums, &numNodesPerElem, conn);
   FEM_Done();
 }
@@ -294,6 +360,7 @@ chunk::run(void)
   CtvAccess(_femptr) = this;
   readChunk();
   // call the application-specific driver
+  doneCalled = 0;
   driver_(&numNodes, gNodeNums, &numElems, gElemNums, &numNodesPerElem, conn);
   FEM_Done();
 }
@@ -653,8 +720,12 @@ chunk::print(void)
 void 
 FEM_Done(void)
 {
-  CProxy_main mainproxy(_mainhandle);
-  mainproxy.done();
+  chunk *cptr = CtvAccess(_femptr);
+  if(!cptr->doneCalled) {
+    CProxy_main mainproxy(_mainhandle);
+    mainproxy.done();
+    cptr->doneCalled = 1;
+  }
 }
 
 int 
