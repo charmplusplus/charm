@@ -24,7 +24,7 @@ public:
   LBDatabase(void) {
     myLDHandle = LDCreate();  
   };
-  LBDatabase(CkMigrateMessage *m) {}
+  LBDatabase(CkMigrateMessage *m) { myLDHandle = LDCreate(); }
 
   /*
    * Calls from object managers to load database
