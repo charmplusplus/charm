@@ -9,7 +9,7 @@
 //#define SEQUENTIAL_POSE 1
 
 /// Uncomment to gather and print POSE statistics set
-//#define POSE_STATS_ON 1
+#define POSE_STATS_ON 1
 /// Insane level of analysis
 //#define POSE_DOP_ON 1
 /// Projections analysis
@@ -19,11 +19,11 @@
 //#define USE_LONG_TIMESTAMPS 1
 
 /// Uncomment to force determinism in event ordering
-#define DETERMINISTIC_EVENTS 1
+//#define DETERMINISTIC_EVENTS 1
 
 /// Uncomment this to turn on coarse memory management
 #define MEM_COARSE
-#define MAX_USAGE 10000   // maximum uncommits per object for coarse mem. man.
+#define MAX_USAGE 5   // maximum checkpoints per object for coarse mem. man.
 
 /// Uncomment to save time on memory allocation and freeing
 #define MSG_RECYCLING 1
