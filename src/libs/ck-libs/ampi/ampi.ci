@@ -1,21 +1,11 @@
 module ampi {
-  group BlockMap : CkArrayMap {
-    entry BlockMap(void);
-  };
-
-  message MigrateInfo;
   message [packed] ArgsInfo;
   message [varsize] AmpiMsg;
-
-  group migrator {
-    entry migrator(void);
-    entry void migrateElement(MigrateInfo *);
-  };
-
   array[1D] ampi {
     entry ampi(void);
     entry void generic(AmpiMsg *);
     entry [threaded] void run(ArgsInfo *);
     entry [threaded] void run(void);
+    entry void migrate(void);
   };
 }

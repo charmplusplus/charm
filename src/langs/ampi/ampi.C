@@ -13,20 +13,9 @@
 #include "ampimain.decl.h"
 #if CMK_FORTRAN_USES_ALLCAPS
 extern "C" void AMPIMAIN(int, char **);
-extern "C" void GET_SIZE(int *, int *, int *, int *);
-extern "C" void PACK(char*,int*,int*,int*,float*,int*,int*,int*);
-extern "C" void UNPACK(char*,int*,int*,int*,float*,int*,int*,int*);
 #else
 extern "C" void ampimain_(int, char **);
-extern "C" void get_size_(int *, int *, int *, int *);
-extern "C" void pack_(char*,int*,int*,int*,float*,int*,int*,int*);
-extern "C" void unpack_(char*,int*,int*,int*,float*,int*,int*,int*);
 #endif // CMK_FORTRAN_USES_ALLCAPS
-#else // not AMPI_FORTRAN
-// FIXME: find good names for these user-provided functions
-extern "C" void get_size_(int *, int *, int *, int *);
-extern "C" void pack_(char*,int*,int*,int*,float*,int*,int*,int*);
-extern "C" void unpack_(char*,int*,int*,int*,float*,int*,int*,int*);
 #endif // AMPI_FORTRAN
 
 int _redntype;
@@ -41,7 +30,7 @@ ArgsInfo::pack(ArgsInfo* msg)
   }
   void *p = CkAllocBuffer(msg, sizeof(ArgsInfo) +
                                (msg->argc*sizeof(char*)) + 
-			        argsize);
+                                argsize);
   memcpy(p,msg,sizeof(ArgsInfo));
   char *args = (char *)((char*)p+sizeof(ArgsInfo)+(msg->argc+sizeof(char*)));
   for(i=0;i<msg->argc;i++) {
@@ -68,36 +57,26 @@ ArgsInfo::unpack(void *in)
   return msg;
 }
 
-int migHandle;
-CtvDeclare(ampi *, ampiPtr);
-CtvDeclare(int, numMigrateCalls);
+CtvDeclare(ampi*, ampiPtr);
 static CkArray *ampiArray;
 
 
 ampi::ampi(void)
 {
+  ampiArray = thisArray;
+  usesAtSync = CmiTrue;
   msgs = CmmNew();
   thread_id = 0;
   nbcasts = 0;
-  ampiArray = thisArray;
   nrequests = 0;
   myDDT = new DDT ;
   nirequests = 0;
   firstfree = 0;
-  nReductions = 0;
-  nAllReductions = 0;
-  niRecvs = niSends = biRecv = biSend = 0;
   int i;
   for(i=0;i<100;i++) {
     irequests[i].nextfree = (i+1)%100;
     irequests[i].prevfree = ((i-1)+100)%100;
   }
-}
-
-ampi::ampi(CkMigrateMessage *msg)
-{
-  ampiArray = thisArray;
-  nrequests = 0;
 }
 
 void
@@ -144,7 +123,9 @@ ampi::recv(int t1, int t2, void* buf, int count, int type)
     msg = (AmpiMsg *) CmmGet(msgs, 2, tags, 0);
     if (msg) break;
     thread_id = CthSelf();
+    stop_running();
     CthSuspend();
+    start_running();
   }
   if (msg->length < len) {
     CkError("AMPI: Expecting message of length %d, received %d\n",
@@ -189,52 +170,63 @@ ampi::bcastraw(void* buf, int len, CkArrayID aid)
   pa.generic(msg);
 }
 
-void 
-ampi::reduce(int root, int op, void* inb, void *outb, int count, int type)
-{
-}
-
 void ampi::pup(PUP::er &p)
 {
   ArrayElement1D::pup(p);//Pack superclass
-  CkAbort("Pupper for AMPI is not implemented yet.\n");
+  msgs = CmmPup((pup_er)&p, msgs);
+  thread_id = CthPup((pup_er) &p, thread_id);
+  p(nbcasts);
+  // persistent comm requests will have to be re-registered after
+  // migration anyway, so no need to pup them
+  // migrate is called only when all irequests are complete, so no need
+  // to pup them as well.
+  if(p.isUnpacking())
+  {
+    CtvAccessOther(thread_id, ampiPtr) = this;
+    myDDT = new DDT;
+    nrequests = 0;
+    ampiArray = thisArray;
+    nirequests = 0;
+    firstfree = 0;
+    int i;
+    for(i=0;i<100;i++) {
+      irequests[i].nextfree = (i+1)%100;
+      irequests[i].prevfree = ((i-1)+100)%100;
+    }
+  }
+  myDDT->pup(p);
 }
 
+// This is invoked in the Fortran (and C ?) version of AMPI
 void
 ampi::run(ArgsInfo *msg)
 {
-#if AMPI_FORTRAN
+  int argc = msg->argc;
+  char **argv = msg->argv;
+  delete msg;
   CtvInitialize(ampi *, ampiPtr);
   CtvAccess(ampiPtr) = this;
-  CtvInitialize(int, numMigrateCalls);
-  CtvAccess(numMigrateCalls) = 0;
-
+#if AMPI_FORTRAN
 #if CMK_FORTRAN_USES_ALLCAPS
-  AMPIMAIN
+  AMPIMAIN(argc, argv);
 #else
-  ampimain_
+  ampimain_(argc, argv);
 #endif
-    (msg->argc, msg->argv);
 
-  CProxy_ampimain mp(mainhandle);
+  CProxy_ampimain mp(ampimain::handle);
   mp.done();
-  CthSuspend();
 #else
   CkPrintf("You should link ampi using -language ampif\n");
 #endif
 }
 
+// This is invoked in the C++ version of AMPI
 void
 ampi::run(void)
 {
   CtvInitialize(ampi *, ampiPtr);
   CtvAccess(ampiPtr) = this;
-  CtvInitialize(int, numMigrateCalls);
-  CtvAccess(numMigrateCalls) = 0;
-
   start();
-
-  CthSuspend();
 }
 
 void
@@ -243,81 +235,20 @@ ampi::start(void)
   CkPrintf("You should write your own start(). \n");
 }
 
-// migrate to next processor every 2 iterations
-// needs to be changed in a major way
-// to provide some sort of user control over migration
-extern "C" void 
-#if AMPI_FORTRAN
-#if CMK_FORTRAN_USES_ALLCAPS
-MIGRATE
-#else // ! CMK_FORTRAN_USES_ALLCAPS
-migrate_
-#endif // CMK_FORTRAN_USES_ALLCAPS
-#else // ! AMPI_FORTRAN
-migrate_
-#endif // AMPI_FORTRAN
-  (void *gptr)
+extern "C" void
+AMPI_Migrate(void)
 {
-  ampi *ptr = CtvAccess(ampiPtr);;
-  CtvAccess(numMigrateCalls)++;
-  if(CtvAccess(numMigrateCalls)%2 == 0) {
-    int index = ptr->getIndex();
-    int where = (CkMyPe()+1) % CkNumPes();
-    if(where == CkMyPe())
-      return;
-    CProxy_migrator pmg(migHandle);
-    pmg.migrateElement(new MigrateInfo(ptr, where), CkMyPe());
-    int csize, isize, rsize, fsize;
-#if AMPI_FORTRAN
-#if CMK_FORTRAN_USES_ALLCAPS
-    GET_SIZE
-#else // ! CMK_FORTRAN_USES_ALLCAPS
-    get_size_
-#endif // CMK_FORTRAN_USES_ALLCAPS
-#else // ! AMPI_FORTRAN
-    get_size_
-#endif // AMPI_FORTRAN
-      (&csize, &isize, &rsize, &fsize);
-    int totsize = MyAlign8(csize)+isize+rsize+fsize;
-    void *pb = malloc(totsize);
-    char *cb = (char *)pb;
-    int *ib = (int *) (cb+MyAlign8(csize));
-    float *rb = (float *)(ib+isize/sizeof(int));
-    int *fb = (int *)(rb+rsize/sizeof(float));
-#if AMPI_FORTRAN
-#if CMK_FORTRAN_USES_ALLCAPS
-    PACK
-#else // ! CMK_FORTRAN_USES_ALLCAPS
-    pack_
-#endif // CMK_FORTRAN_USES_ALLCAPS
-#else // ! AMPI_FORTRAN
-    pack_
-#endif // AMPI_FORTRAN
-      (cb, &csize, ib, &isize, rb, &rsize, fb, &fsize);
-    ptr->csize = csize; ptr->isize = isize; ptr->rsize = rsize; 
-    ptr->fsize = fsize; ptr->totsize = totsize; ptr->packedBlock = pb;
-    CthSuspend();
-    CtvAccess(ampiPtr) = ptr = 
-      (ampi*) ampiArray->getElement(CkArrayIndex1D(index));
-    pb = ptr->packedBlock; csize = ptr->csize; isize = ptr->isize;
-    rsize = ptr->rsize; fsize = ptr->fsize;
-    cb = (char *)pb;
-    ib = (int *) (cb+MyAlign8(csize));
-    rb = (float *)(ib+isize/sizeof(int));
-    fb = (int *)(rb+rsize/sizeof(float));
-#if AMPI_FORTRAN
-#if CMK_FORTRAN_USES_ALLCAPS
-    UNPACK
-#else // ! CMK_FORTRAN_USES_ALLCAPS
-    unpack_
-#endif // CMK_FORTRAN_USES_ALLCAPS
-#else // ! AMPI_FORTRAN
-    unpack_
-#endif // AMPI_FORTRAN
-      (cb, &csize, ib, &isize, rb, &rsize, fb, &fsize);
-    free(pb);
-  }
+  ampi *ptr = CtvAccess(ampiPtr);
+  ptr->thread_id = CthSelf();
+  int idx = ptr->thisIndex;
+  CProxy_ampi aproxy(ampimain::ampiAid);
+  aproxy[idx].migrate();
+  ptr->stop_running();
+  CthSuspend();
+  ptr = CtvAccess(ampiPtr);
+  ptr->start_running();
 }
+
 extern "C" 
 int AMPI_Init(int *argc, char*** argv)
 {
@@ -334,7 +265,7 @@ int AMPI_Comm_rank(AMPI_Comm comm, int *rank)
 extern "C" 
 int AMPI_Comm_size(AMPI_Comm comm, int *size)
 {
-  *size = CtvAccess(ampiPtr)->getSize();
+  *size = CtvAccess(ampiPtr)->getArraySize();
   return 0;
 }
 
@@ -463,7 +394,6 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   ampi *ptr = CtvAccess(ampiPtr);
   int size = ptr->myDDT->getType(type)->getSize(count) ;
   ptr->contribute(size, inbuf, mytype);
-  ptr->nAllReductions++;
   ptr->recv(0, AMPI_BCAST_TAG, outbuf, count, type);
   return 0;
 }
@@ -650,7 +580,6 @@ int AMPI_Isend(void *buf, int count, AMPI_Datatype type, int dest,
 {
   ampi *ptr = CtvAccess(ampiPtr);
   
-  ptr->niSends++;
   ptr->send(tag, ptr->getIndex(), buf, count, type, dest);
   *request = (-1);
   return 0;
@@ -665,7 +594,6 @@ int AMPI_Irecv(void *buf, int count, AMPI_Datatype type, int src,
     CmiAbort("Too many Irecv requests.\n");
   }
 
-  ptr->niRecvs++;
   PersReq *req = &(ptr->irequests[ptr->firstfree]);
   req->sndrcv = 2;
   req->buf = buf;
@@ -689,7 +617,7 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
                    AMPI_Datatype recvtype, AMPI_Comm comm) 
 {
   ampi *ptr = CtvAccess(ampiPtr);
-  int size = ptr->getSize();
+  int size = ptr->getArraySize();
   int i;
   for(i=0;i<size;i++) {
     AMPI_Send(sendbuf, sendcount, sendtype, i, AMPI_GATHER_TAG, comm);
@@ -712,7 +640,7 @@ int AMPI_Allgather(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
                   AMPI_Comm comm)
 {
   ampi *ptr = CtvAccess(ampiPtr);
-  int size = ptr->getSize();
+  int size = ptr->getArraySize();
   int i;
   for(i=0;i<size;i++) {
     AMPI_Send(sendbuf, sendcount, sendtype, i, AMPI_GATHER_TAG, comm);
@@ -735,7 +663,7 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
                 AMPI_Datatype recvtype, int root, AMPI_Comm comm)
 {
   ampi *ptr = CtvAccess(ampiPtr);
-  int size = ptr->getSize();
+  int size = ptr->getArraySize();
   int i;
 
   AMPI_Send(sendbuf, sendcount, sendtype, root, AMPI_GATHER_TAG, comm);
@@ -759,7 +687,7 @@ int AMPI_Gather(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
                int root, AMPI_Comm comm)
 {
   ampi *ptr = CtvAccess(ampiPtr);
-  int size = ptr->getSize();
+  int size = ptr->getArraySize();
   int i;
   AMPI_Send(sendbuf, sendcount, sendtype, root, AMPI_GATHER_TAG, comm);
 
@@ -782,7 +710,7 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
                   int *rdispls, AMPI_Datatype recvtype, AMPI_Comm comm)
 {
   ampi *ptr = CtvAccess(ampiPtr);
-  int size = ptr->getSize();
+  int size = ptr->getArraySize();
   DDT_DataType* dttype = ptr->myDDT->getType(sendtype) ;
   int itemsize = dttype->getSize() ;
   int i;
@@ -808,7 +736,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
                  AMPI_Comm comm)
 {
   ampi *ptr = CtvAccess(ampiPtr);
-  int size = ptr->getSize();
+  int size = ptr->getArraySize();
   DDT_DataType* dttype = ptr->myDDT->getType(sendtype) ;
   int itemsize = dttype->getSize(sendcount) ;
   int i;

@@ -10,17 +10,38 @@
 
 #include "ampi.h"
 #include "ampi.decl.h"
+#include "ampimain.decl.h"
 #include "ddt.h"
+
+class ampimain : public Chare
+{
+  int nblocks;
+  int numDone;
+  public:
+    static CkChareID handle;
+    static CkArrayID ampiAid;
+    ampimain(CkArgMsg *);
+    ampimain(CkMigrateMessage *m) {}
+    void done(void);
+};
+
+static inline void 
+itersDone(void) 
+{ 
+  CProxy_ampimain pm(ampimain::handle); 
+  pm.done(); 
+}
 
 #define AMPI_BCAST_TAG  1025
 #define AMPI_BARR_TAG   1026
 #define AMPI_REDUCE_TAG 1027
 #define AMPI_GATHER_TAG 1028
 
-extern CkChareID mainhandle;
 extern int _redntype;
 extern int _rednroot;
 
+#if 0
+// This is currently not used.
 class BlockMap : public CkArrayMap {
  public:
   BlockMap(void) {}
@@ -36,15 +57,9 @@ class BlockMap : public CkArrayMap {
     return penum;
   }
 };
+#endif
 
 #define MyAlign8(x) (((x)+7)&(~7))
-
-class MigrateInfo : public CMessage_MigrateInfo {
-  public:
-    ArrayElement1D *elem;
-    int where;
-    MigrateInfo(ArrayElement1D *e, int w) : elem(e), where(w) {}
-};
 
 class PersReq {
   public:
@@ -57,7 +72,6 @@ class PersReq {
     int nextfree, prevfree;
 };
 
-// FIXME: Make this a packed message.
 class ArgsInfo : public CMessage_ArgsInfo {
   public:
     int argc;
@@ -85,16 +99,25 @@ class AmpiMsg : public CMessage_AmpiMsg {
 };
 
 class ampi : public ArrayElement1D {
-  private:
-    CmmTable msgs;
-    CthThread thread_id;
-    int nbcasts;
   public: // entry methods
     ampi(void);
-    ampi(CkMigrateMessage *msg); 
+    ampi(CkMigrateMessage *msg) {}
     void run(ArgsInfo *);
     void run(void);
     void generic(AmpiMsg *);
+    void migrate(void)
+    {
+      AtSync();
+    }
+    void start_running(void)
+    {
+      thisArray->the_lbdb->ObjectStart(ldHandle);
+    }
+    void stop_running(void)
+    {
+      thisArray->the_lbdb->ObjectStop(ldHandle);
+    }
+
   public: // to be used by AMPI_* functions
     void send(int t1, int t2, void* buf, int count, int type, int idx);
     static void sendraw(int t1, int t2, void* buf, int len, CkArrayID aid, 
@@ -103,36 +126,25 @@ class ampi : public ArrayElement1D {
     void barrier(void);
     void bcast(int root, void* buf, int count, int type);
     static void bcastraw(void* buf, int len, CkArrayID aid);
-    void reduce(int root, int op, void* inb, void *outb, int count, int type);
   public:
-    int csize, isize, rsize, fsize;
-    int totsize;
+    CmmTable msgs;
+    int msize;
+    CthThread thread_id;
+    int tsize;
+    int nbcasts;
     PersReq requests[100];
     int nrequests;
-    int types[100]; // currently just gives the size
-    int ntypes;
     PersReq irequests[100];
     int nirequests;
     int firstfree;
-    void *packedBlock;
-    int nReductions;
-    int nAllReductions;
-    int niRecvs, niSends, biRecv, biSend;
     DDT *myDDT ;
 
     virtual void pup(PUP::er &p);
     virtual void start(void); // should be overloaded in derived class
-};
-
-extern int migHandle;
-
-class migrator : public Group {
-  public:
-    migrator(void) { migHandle = thisgroup; }
-    migrator(CkMigrateMessage *m) {}
-    void migrateElement(MigrateInfo *msg) {
-      msg->elem->migrateMe(msg->where);
-      delete msg;
+    void ResumeFromSync(void)
+    {
+      CthAwaken(thread_id);
+      thread_id = 0;
     }
 };
 
