@@ -115,7 +115,8 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 
 CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       queueing.h conv-cpath.h conv-cpm.h persistent.h\
-      trace.h charm-api.h conv-ccs.h ccs-client.c ccs-client.h CcsServer.java\
+      trace.h trace-bluegene.h charm-api.h \
+      conv-ccs.h ccs-client.c ccs-client.h CcsServer.java\
       ccs-server.h ccs-auth.c ccs-auth.h \
       memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh \
