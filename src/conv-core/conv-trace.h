@@ -31,9 +31,9 @@ int  traceRegisterUserEvent(const char*, int e
 #endif
 );
 
-int registerFunction(char*);
-void beginFuncIndexProj(int, char*, int);
-void endFuncIndexProj(int);
+int traceRegisterFunction(const char*);
+void traceBeginFuncIndexProj(int, char* file, int);
+void traceEndFuncIndexProj(int);
 
 void traceClose(void);
 void traceCharmClose(void);          /* close trace in ck */
