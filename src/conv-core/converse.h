@@ -16,6 +16,8 @@
 
 #define CMK_CONCAT(x,y) x##y
 
+#include "pup_c.h"
+
 /* the following flags denote properties of the C compiler,  */
 /* not the C++ compiler.  If this is C++, ignore them.       */
 #ifdef __cplusplus
@@ -772,6 +774,8 @@ typedef CthThread   (*CthThFn)();
 
 int        CthImplemented(void);
 
+CthThread  CthPup(pup_er, CthThread);
+
 CthThread  CthSelf(void);
 CthThread  CthCreate(CthVoidFn, void *, int);
 void       CthResume(CthThread);
@@ -815,10 +819,6 @@ void       CthAutoYieldUnblock(void);
 #define CthCpvAccess(x)       CpvAccess(x)
 
 #endif
-
-extern int CthPackBufSize(CthThread);
-extern void CthPackThread(CthThread, void *);
-extern CthThread CthUnpackThread(void *);
 
 CthCpvExtern(char *,CthData);
 extern int CthRegister(int);
@@ -1003,6 +1003,8 @@ typedef struct CmmTableStruct *CmmTable;
 
 #define CmmWildCard (-1)
 
+CmmTable CmmPup(pup_er, CmmTable);
+
 CmmTable   CmmNew();
 void       CmmFree(CmmTable t);
 void       CmmPut(CmmTable t, int ntags, int *tags, void *msg);
@@ -1010,10 +1012,6 @@ void      *CmmFind(CmmTable t, int ntags, int *tags, int *returntags, int del);
 int        CmmEntries(CmmTable t);
 #define    CmmGet(t,nt,tg,rt)   (CmmFind((t),(nt),(tg),(rt),1))
 #define    CmmProbe(t,nt,tg,rt) (CmmFind((t),(nt),(tg),(rt),0))
-
-int CmmPackBufSize(CmmTable t);
-void CmmPackTable(CmmTable t, void *buf);
-CmmTable CmmUnpackTable(void *buf);
 
 /******** ConverseInit and ConverseExit ********/
 
