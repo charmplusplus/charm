@@ -276,7 +276,7 @@ libconv-util.a: $(LIBCONV_UTIL) libconv-utilf.a
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTIL)
 
 libconv-utilf.a: $(LIBCONV_UTILF)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTILF)
+	-@$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTILF)
 
 libccs-client.a: ccs-client.o
 	$(CHARMC) -cp ../lib/ -o $@ ccs-client.o
