@@ -14,7 +14,7 @@ syntax:
   echo 'Note: This script is trivial.  It'
   echo ''
   echo ' 1. Creates directories <version> and <version>/tmp'
-  echo ' 2. Copies src/Common/Makefile into <version>/tmp'
+  echo ' 2. Copies src/Common/scripts/Makefile into <version>/tmp'
   echo ' 3. Does a "make <target> <version> OPTS=<charmc-options>" in <version>/tmp.'
   echo ''
   echo "That's all SUPER_INSTALL does.  The rest is handled by the Makefile."
@@ -34,9 +34,9 @@ begin:
   echo "Creating directories: $VERSION and $VERSION/tmp"
   if (! -d $VERSION     ) mkdir $VERSION
   if (! -d $VERSION/tmp ) mkdir $VERSION/tmp
-  echo "Copying src/Common/Makefile to $VERSION/tmp"
+  echo "Copying src/Common/scripts/Makefile to $VERSION/tmp"
   rm -f $VERSION/tmp/Makefile
-  ln -s ../../src/Common/Makefile $VERSION/tmp/Makefile
+  ln -s ../../src/Common/scripts/Makefile $VERSION/tmp/Makefile
   echo "Performing 'make $PROGRAM OPTS="$*"' in $VERSION/tmp"
   cd $VERSION/tmp ; make $PROGRAM OPTS="$*"
 
