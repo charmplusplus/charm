@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.27  1995-10-13 18:14:10  jyelon
+ * Revision 2.28  1995-10-13 22:34:07  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.27  1995/10/13  18:14:10  jyelon
  * K&R changes, etc.
  *
  * Revision 2.26  1995/10/12  20:18:19  sanjeev
@@ -253,9 +256,9 @@ extern int Cmi_numpe;
 #endif
 
 #ifdef CMK_CMIPRINTF_IS_A_BUILTIN
-void  CmiPrintf CMK_PROTO((...));
-void  CmiError  CMK_PROTO((...));
-int   CmiScanf  CMK_PROTO((...));
+void  CmiPrintf CMK_PROTO((char *, ...));
+void  CmiError  CMK_PROTO((char *, ...));
+int   CmiScanf  CMK_PROTO((char *, ...));
 #endif
 
 #ifdef CMK_CMIPRINTF_IS_JUST_PRINTF

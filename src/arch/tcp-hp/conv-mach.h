@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-10-13 18:17:44  jyelon
+ * Revision 2.12  1995-10-13 22:35:38  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.11  1995/10/13  18:17:44  jyelon
  * I can't even remember.
  *
  * Revision 2.10  1995/10/11  00:35:06  jyelon
@@ -90,8 +93,9 @@
 /* #define CMK_CMIPRINTF_IS_JUST_PRINTF */
 #define CMK_CMIPRINTF_IS_A_BUILTIN
 
-#define CMK_THREADS_UNAVAILABLE
-/* #define CMK_THREADS_USE_ALLOCA */
+/* #define CMK_THREADS_UNAVAILABLE */
+/* #define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE */
+#define CMK_THREADS_USE_ALLOCA
 
 
 
