@@ -135,7 +135,7 @@ void Entry::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhe
    int notfound=1;
    
    for(entry=CEntrylist.begin(); !CEntrylist.end(); entry=CEntrylist.next()) {
-     if(*(entry->entry) == name) 
+     if(*(entry->entry) == (const char *)name) 
      {
         ParamList *epl;
 	epl = entry->paramlist;
