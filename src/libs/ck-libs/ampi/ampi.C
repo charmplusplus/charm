@@ -498,8 +498,8 @@ public:
         ampiWorldsGroup=thisgroup;
         add(nextWorld);
     }
-    ampiWorlds(){ /* this group is not meant to be PUP'ed(?) */ }
-    int useDefCtor(void){ return 1; }
+    ampiWorlds(CkMigrateMessage *m): CBase_ampiWorlds(m) {}
+    void pup(PUP::er &p)  { CBase_ampiWorlds::pup(p); }
     void add(const ampiCommStruct &nextWorld) {
         int new_idx=nextWorld.getComm()-(MPI_COMM_WORLD+1);
         mpi_worlds[new_idx].comm=nextWorld;

@@ -36,8 +36,7 @@ module ampi {
     entry void winRemoteUnlock(int winIndex, CkFutureID ftHandle, int pe_src, int requestRank);
   };
 
-  group ampiWorlds {
-    entry ampiWorlds();
+  group [migratable] ampiWorlds {
     entry ampiWorlds(ampiCommStruct nextWorld);
     entry void add(ampiCommStruct nextWorld);
   };
