@@ -34,7 +34,7 @@ OUTPUT_VCSELECTIONDIR = ../OutputVcSelection
 INPUT_VCSELECTIONDIR = ../InputVcSelection
 MAINDIR = ../Main
 SUBDIRS = $(MAINDIR) $(ROUTINGDIR) $(TOPOLOGYDIR) $(OUTPUT_VCSELECTIONDIR) $(INPUT_VCSELECTIONDIR)
-PGM = pgm
+PGM = HypCubeSim
 OTHER = -lconv-bluegene-logs
 LIBS = -Lstdc++ -lm
 MACHINE = HypCubeArch
@@ -49,7 +49,7 @@ all:
 	$(CHARMC) -o util.o -seq util.C
 	test -d ../tmp || mkdir ../tmp; cp *.o ../tmp
 
-	cd ../tmp; /bin/rm -f moduleinit.o; $(CHARMC) *.o $(OTHER) $(LIBS) -o $(PGM) -lpose -ltrace-projections -language charm++ -module commlib
+	cd ../tmp; /bin/rm -f moduleinit.o; $(CHARMC) *.o $(OTHER) $(LIBS) -o $(PGM) -module pose -ltrace-projections -language charm++ -module commlib
 
 clean:
 	@echo
