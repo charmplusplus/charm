@@ -15,14 +15,15 @@ class CentralLB;
 class CLBSimResults
 {
 public:
-	CLBSimResults(int numPes_);
-	~CLBSimResults();
-	void SetProcessorLoad(int pe, double load);
-	void PrintSimulationResults();
+  CLBSimResults(int numPes_);
+  ~CLBSimResults();
+  void SetProcessorLoad(int pe, double load, double bgload);
+  void PrintSimulationResults();
 private:
-	double* peLoads;
-	int numPes;
-	friend class CentralLB;		// so that we don't have to provide little get/put functions
+  double* peLoads;
+  double* bgLoads;
+  int numPes;
+  friend class CentralLB;		// so that we don't have to provide little get/put functions
 };
 
 #endif /* SIMRESULTS_H */
