@@ -3,6 +3,7 @@
 
 #include "LBDatabase.h"
 
+/// Base class for all LB strategies.
 class BaseLB: public Group
 {
 protected:

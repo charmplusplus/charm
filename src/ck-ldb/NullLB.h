@@ -13,6 +13,11 @@
 
 void CreateNullLB(void);
 
+/**
+ NullLB is inherited from BaseLB. It has all the strategy's API, 
+ but doing nothing but resume from sync
+ NullLB only is functioning when there is no other strategy created.
+*/
 class NullLB : public CBase_NullLB
 {
   void init(void);

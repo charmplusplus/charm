@@ -39,7 +39,7 @@ NullLB::~NullLB()
 
 void NullLB::staticAtSync(void* data)
 {
-  // if there is other LBs, just return
+  /// if there is other LBs, just ignore return
   // CmiPrintf("numLoadBalancers = %d\n", CkpvAccess(numLoadBalancers));
   if (CkpvAccess(numLoadBalancers) > 1) return;
 
@@ -55,6 +55,7 @@ void NullLB::AtSync()
   //We don't *do* any migrations, so they're already done!
   thisProxy[CkMyPe()].migrationsDone();
 }
+
 void NullLB::migrationsDone(void)
 {
   theLbdb->ResumeClients();
