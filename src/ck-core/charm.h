@@ -219,6 +219,8 @@ extern void  CkGetChareID(CkChareID *pcid);
 extern CkGroupID   CkGetGroupID(void);
 extern CkGroupID   CkGetNodeGroupID(void);
 extern void  CkExit(void);
+extern void CkPrintEntryMethod(int epIdx);
+extern void CkPrintChareName(int chareIdx);
 
 extern void CkSummary_MarkEvent(int);
 extern void CkSummary_StartPhase(int);

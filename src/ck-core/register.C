@@ -200,3 +200,27 @@ void _REGISTER_DONE(void)
   CpdListRegister(new CpdSimpleListAccessor("charm/readonlyMsg",_numReadonlyMsgs,pupReadonlyMsg));
 }
 
+//Print a debugging version of this entry method index:
+void CkPrintEntryMethod(int epIdx) {
+	if (epIdx<=0 || epIdx>=_numEntries) 
+		CkPrintf("INVALID ENTRY METHOD %d!",epIdx);
+	else {
+		EntryInfo *e=_entryTable[epIdx];
+		CkPrintChareName(e->chareIdx);
+		CkPrintf("::%s",e->name);
+	}
+}
+
+//Print a debugging version of this chare index:
+void CkPrintChareName(int chareIdx) {
+	if (chareIdx<=0 || chareIdx>=_numChares)
+		CkPrintf("INVALID CHARE INDEX %d!",chareIdx);
+	else {
+		ChareInfo *c=_chareTable[chareIdx];
+		CkPrintf("%s",c->name);
+	}
+}
+
+
+
+
