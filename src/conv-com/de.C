@@ -181,7 +181,27 @@ void DimexRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes,
     }
     
     if (more) return;
+    start_hcube(id);
+}
+
+void DimexRouter::EachToManyMulticastQ(comID id, CkQ<MessageHolder *> &msgq) {
+    SetID(id);
+
+    int count = 0;
+    int length = msgq.length();
+
+    for(count = 0; count < length; count ++) {
+        MessageHolder *mhdl = msgq.deq();
+        PeHcube->InsertMsgs(mhdl->npes, mhdl->pelist, mhdl->size, 
+                            mhdl->getMessage());
+        delete mhdl;
+    }
     
+    start_hcube(id);
+}
+
+void DimexRouter::start_hcube(comID id) {
+
     if (InitCounter <0) {
         ComlibPrintf("%d Sending to the lower hypercube\n", MyPe);
   	int nextpe=neighbor(MyPe, Dim);

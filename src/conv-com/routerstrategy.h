@@ -63,4 +63,53 @@ class RouterStrategy : public Strategy {
     virtual void pup(PUP::er &p);
     PUPable_decl(RouterStrategy);
 };
+
+
+//Call the router functions
+inline void RouterStrategy::RecvManyMsg(char *msg) {
+
+    //comID new_id;
+    int new_refno =0;
+
+    //FOO BAR when structure of comid changes this will break !!!!!
+    ComlibPrintf("In RecvManyMsg at %d\n", CkMyPe());
+    //memcpy(&new_id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
+    //ComlibPrintf("REFNO = %d, %d\n", new_id.refno, id.refno);
+    
+    //First int in comid is refno
+    memcpy(&new_refno, (char*) msg + CmiReservedHeaderSize + sizeof(int), 
+           sizeof(int)); 
+
+    if(new_refno != id.refno)
+        recvQ.push(msg);
+    else
+        router->RecvManyMsg(id, msg);
+}
+
+inline void RouterStrategy::ProcManyMsg(char *msg) {    
+
+    //comID new_id;
+    int new_refno =0;
+    ComlibPrintf("In ProcManyMsg at %d\n", CkMyPe());
+    //memcpy(&new_id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
+    //First int in comid is refno
+    memcpy(&new_refno, (char*) msg + CmiReservedHeaderSize + sizeof(int), 
+           sizeof(int)); 
+    
+    if(new_refno != id.refno)
+        procQ.push(msg);
+    else
+        router->ProcManyMsg(id, msg);
+}
+
+inline void RouterStrategy::DummyEP(DummyMsg *m) {
+
+    if(id.refno != m->id.refno)
+        dummyQ.push(m);
+    else {
+        router->DummyEP(m->id, m->magic);
+        CmiFree(m);
+    }
+}
+
 #endif

@@ -158,8 +158,6 @@ extern void CmiReference(void *blk);
 
 void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, int *destpes, int more)
 {
-  int i=0;
-  
   if(id.isAllToAll)
       PeMesh->InsertMsgs(1, &MyPe, size, msg);
   else
@@ -168,47 +166,78 @@ void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, 
   if (more) return;
 
   ComlibPrintf("All messages received %d %d %d\n", MyPe, COLLEN,id.isAllToAll);
+  sendRow(id);
+}
 
-  char *a2amsg = NULL;
-  int a2a_len;
-  if(id.isAllToAll) {
-      ComlibPrintf("ALL to ALL flag set\n");
+void GridRouter::EachToManyMulticastQ(comID id, CkQ<MessageHolder *> &msgq) {
+   
+    ComlibPrintf("Grid Router :: EachToManyQ\n");
+ 
+    int count = 0;
+    int length = msgq.length();
+    if(id.isAllToAll) {
+        for(count = 0; count < length; count ++) {
+            MessageHolder *mhdl = msgq.deq();
+            PeMesh->InsertMsgs(1, &MyPe, mhdl->size, mhdl->getMessage());
+            delete mhdl;
+        }
+    }
+    else {
+        for(count = 0; count < length; count ++) {
+            MessageHolder *mhdl = msgq.deq();
+            PeMesh->InsertMsgs(mhdl->npes, mhdl->pelist, mhdl->size, 
+                               mhdl->getMessage());
+            delete mhdl;
+        }
+    }
+    
+    sendRow(id);
+}
 
-      a2amsg = PeMesh->ExtractAndPackAll(id, 0, &a2a_len);
-      CmiSetHandler(a2amsg, CkpvAccess(RecvHandle));
-      CmiReference(a2amsg);
-      CmiSyncListSendAndFree(rvecSize, growVector, a2a_len, a2amsg);      
-      RecvManyMsg(id, a2amsg);
-      return;
-  }
 
-  //Send the messages
-  //int MYROW  =MyPe/COLLEN;
-  //int MYCOL = MyPe%COLLEN;
-  int myrep= myrow*COLLEN; 
-  int maxlength = (NumPes - 1)/COLLEN + 1;
+void GridRouter::sendRow(comID id) {
 
-  for (int colcount = 0; colcount < rvecSize; ++colcount) {
-      int nextpe = rowVector[colcount];
-      i = nextpe % COLLEN;
-
-      int length = maxlength;
-      if((length - 1)* COLLEN + i >= NumPes)
-          length --;
-      
-      for (int j = 0; j < length; j++) {
-          onerow[j]=j * COLLEN + i;
-      }
-      
-      ComlibPrintf("%d: before gmap sending to %d of column %d for %d procs,  %d,%d,%d,%d\n",
-                   MyPe, nextpe, i, length, onerow[0], onerow[1], onerow[2], onerow[3]);
-
-      gmap(nextpe);
-
-      GRIDSENDFN(id, 0, 0,length, onerow, CkpvAccess(RecvHandle), nextpe); 
-      ComlibPrintf("%d:sending to %d of column %d\n", MyPe, nextpe, i);
-  }
-  RecvManyMsg(id, NULL);
+    int i=0;
+    char *a2amsg = NULL;
+    int a2a_len;
+    if(id.isAllToAll) {
+        ComlibPrintf("ALL to ALL flag set\n");
+        
+        a2amsg = PeMesh->ExtractAndPackAll(id, 0, &a2a_len);
+        CmiSetHandler(a2amsg, CkpvAccess(RecvHandle));
+        CmiReference(a2amsg);
+        CmiSyncListSendAndFree(rvecSize, growVector, a2a_len, a2amsg);      
+        RecvManyMsg(id, a2amsg);
+        return;
+    }
+    
+    //Send the messages
+    //int MYROW  =MyPe/COLLEN;
+    //int MYCOL = MyPe%COLLEN;
+    int myrep= myrow*COLLEN; 
+    int maxlength = (NumPes - 1)/COLLEN + 1;
+    
+    for (int colcount = 0; colcount < rvecSize; ++colcount) {
+        int nextpe = rowVector[colcount];
+        i = nextpe % COLLEN;
+        
+        int length = maxlength;
+        if((length - 1)* COLLEN + i >= NumPes)
+            length --;
+        
+        for (int j = 0; j < length; j++) {
+            onerow[j]=j * COLLEN + i;
+        }
+        
+        ComlibPrintf("%d: before gmap sending to %d of column %d for %d procs,  %d,%d,%d,%d\n",
+                     MyPe, nextpe, i, length, onerow[0], onerow[1], onerow[2], onerow[3]);
+        
+        gmap(nextpe);
+        
+        GRIDSENDFN(id, 0, 0,length, onerow, CkpvAccess(RecvHandle), nextpe); 
+        ComlibPrintf("%d:sending to %d of column %d\n", MyPe, nextpe, i);
+    }
+    RecvManyMsg(id, NULL);
 }
 
 void GridRouter::RecvManyMsg(comID id, char *msg)

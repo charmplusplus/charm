@@ -41,35 +41,35 @@ inline int Expect(int pe, int npes)
 //Grid based router
 class GridRouter : public Router
 {
-  private:
-	PeTable *PeMesh, *PeMesh1, *PeMesh2;
-        int *onerow, *gpes, 
-            *rowVector, *colVector, 
-            *growVector, *gcolVector;
+ private:
+    PeTable *PeMesh, *PeMesh1, *PeMesh2;
+    int *onerow, *gpes, 
+        *rowVector, *colVector, 
+        *growVector, *gcolVector;
 
-        int myrow, mycol;
-        int rvecSize, cvecSize;
-	int MyPe, NumPes, COLLEN;
- 	int LPMsgCount, LPMsgExpected;
-	int recvExpected, recvCount;
-	void InitVars();
-	void LocalProcMsg(comID id);
-#if CMK_PERSISTENT_COMM
-	PersistentHandle *rowHandleArray, *columnHandleArray;
-        PersistentHandle *rowHandleArrayEven, *columnHandleArrayEven;
-#endif          
-
-  public:
-	GridRouter(int, int);
-	~GridRouter();
-	void NumDeposits(comID, int);
-	void EachToAllMulticast(comID , int , void *, int);
-	void EachToManyMulticast(comID , int , void *, int, int *, int);
-	void RecvManyMsg(comID, char *);
-	void ProcManyMsg(comID, char *);
-	void DummyEP(comID id, int);
-	void ProcMsg(int, msgstruct **) {;}
-	void SetMap(int *);
+    int myrow, mycol;
+    int rvecSize, cvecSize;
+    int MyPe, NumPes, COLLEN;
+    int LPMsgCount, LPMsgExpected;
+    int recvExpected, recvCount;
+    void InitVars();
+    void LocalProcMsg(comID id); 
+    void sendRow(comID id);
+    
+ public:
+    GridRouter(int, int);
+    ~GridRouter();
+    void NumDeposits(comID, int);
+    
+    void EachToAllMulticast(comID , int , void *, int);
+    void EachToManyMulticast(comID , int , void *, int, int *, int);
+    void EachToManyMulticastQ(comID id, CkQ<MessageHolder *> &msgq);
+	
+    void RecvManyMsg(comID, char *);
+    void ProcManyMsg(comID, char *);
+    void DummyEP(comID id, int);
+    void ProcMsg(int, msgstruct **) {;}
+    void SetMap(int *);
 };
 
 #endif

@@ -148,9 +148,10 @@ RouterStrategy::RouterStrategy(int stratid, int handle, int _npes,
 
 void RouterStrategy::insertMessage(MessageHolder *cmsg){
 
+    int count = 0;
     if(routerID == USE_DIRECT) {
         if(cmsg->dest_proc == IS_MULTICAST) {
-            for(int count = 0; count < cmsg->npes-1; count ++)
+            for(count = 0; count < cmsg->npes-1; count ++)
                 CmiSyncSend(cmsg->pelist[count], cmsg->size, 
                             cmsg->getMessage());
             if(cmsg->npes > 0)
@@ -162,8 +163,19 @@ void RouterStrategy::insertMessage(MessageHolder *cmsg){
                                cmsg->getMessage());
         delete cmsg;
     }
-    else
+    else {
+        if(cmsg->dest_proc != IS_MULTICAST) {
+            cmsg->pelist = &procMap[cmsg->dest_proc];
+            cmsg->npes = 1;
+        }
+        else {
+            for(count = 0; count < cmsg->npes; count ++) {
+                cmsg->pelist[count] = procMap[cmsg->pelist[count]];
+            }
+        }
+        
         msgQ.push(cmsg);
+    }
 }
 
 void RouterStrategy::doneInserting(){
@@ -201,40 +213,46 @@ void RouterStrategy::doneInserting(){
                                                      myPe, 
                                                      sizeof(DummyMsg));
         cmsg->isDummy = 1;
+        cmsg->pelist = &myPe;
+        cmsg->npes = 1;
         msgQ.push(cmsg);
     }
 
-    int numToDeposit = msgQ.length();
+    /*
+      int numToDeposit = msgQ.length();
+      
+      while(!msgQ.isEmpty()) {
+      MessageHolder *cmsg = msgQ.deq();
+      char *msg = cmsg->getMessage();
+      
+      if(!cmsg->isDummy)  {            
+      //Assuming list of processors to multicast to is in the
+      //order of relative processors numbering and NOT absolute
+      //processor numbering
+      
+      if(cmsg->dest_proc == IS_MULTICAST) {  
+      router->EachToManyMulticast(id, cmsg->size, msg, cmsg->npes, 
+      cmsg->pelist, 
+      numToDeposit > 1);
+      }            
+      else {                                
+      
+      ComlibPrintf("%d: Insert Pers. Message to %d\n", CkMyPe(), procMap[cmsg->dest_proc]);
+      router->EachToManyMulticast(id, cmsg->size, msg, 1,
+      &procMap[cmsg->dest_proc],
+      numToDeposit > 1);
+      }            
+      }   
+      else
+      router->EachToManyMulticast(id, cmsg->size, msg, 1, &myPe, 
+      numToDeposit > 1);
+      
+      numToDeposit --;
+      delete cmsg;        
+      }
+    */
     
-    while(!msgQ.isEmpty()) {
-        MessageHolder *cmsg = msgQ.deq();
-        char *msg = cmsg->getMessage();
-        
-        if(!cmsg->isDummy)  {            
-            //Assuming list of processors to multicast to is in the
-            //order of relative processors numbering and NOT absolute
-            //processor numbering
-
-            if(cmsg->dest_proc == IS_MULTICAST) {  
-                router->EachToManyMulticast(id, cmsg->size, msg, cmsg->npes, 
-                                            cmsg->pelist, 
-                                            numToDeposit > 1);
-            }            
-            else {                                
-                
-                ComlibPrintf("%d: Insert Pers. Message to %d\n", CkMyPe(), procMap[cmsg->dest_proc]);
-                             router->EachToManyMulticast(id, cmsg->size, msg, 1,
-                                            &procMap[cmsg->dest_proc],
-                                            numToDeposit > 1);
-            }            
-        }   
-        else
-            router->EachToManyMulticast(id, cmsg->size, msg, 1, &myPe, 
-                                        numToDeposit > 1);
-        
-        numToDeposit --;
-        delete cmsg;        
-    }
+    router->EachToManyMulticastQ(id, msgQ);
 
     while(!recvQ.isEmpty()) {
         char *msg = recvQ.deq();
@@ -273,52 +291,5 @@ void RouterStrategy::Done(DummyMsg *m){
 
 //Implement it later while implementing checkpointing of Comlib
 void RouterStrategy::pup(PUP::er &p){}
-
-//Call the router functions
-void RouterStrategy::RecvManyMsg(char *msg) {
-
-    //comID new_id;
-    int new_refno =0;
-
-    //FOO BAR when structure of comid changes this will break !!!!!
-    ComlibPrintf("In RecvManyMsg at %d\n", CkMyPe());
-    //memcpy(&new_id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
-    //ComlibPrintf("REFNO = %d, %d\n", new_id.refno, id.refno);
-    
-    //First int in comid is refno
-    memcpy(&new_refno, (char*) msg + CmiReservedHeaderSize + sizeof(int), 
-           sizeof(int)); 
-
-    if(new_refno != id.refno)
-        recvQ.push(msg);
-    else
-        router->RecvManyMsg(id, msg);
-}
-
-void RouterStrategy::ProcManyMsg(char *msg) {    
-
-    //comID new_id;
-    int new_refno =0;
-    ComlibPrintf("In ProcManyMsg at %d\n", CkMyPe());
-    //memcpy(&new_id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
-    //First int in comid is refno
-    memcpy(&new_refno, (char*) msg + CmiReservedHeaderSize + sizeof(int), 
-           sizeof(int)); 
-    
-    if(new_refno != id.refno)
-        procQ.push(msg);
-    else
-        router->ProcManyMsg(id, msg);
-}
-
-void RouterStrategy::DummyEP(DummyMsg *m) {
-
-    if(id.refno != m->id.refno)
-        dummyQ.push(m);
-    else {
-        router->DummyEP(m->id, m->magic);
-        CmiFree(m);
-    }
-}
 
 PUPable_def(RouterStrategy);

@@ -1,6 +1,9 @@
 #ifndef ROUTER_H
 #define ROUTER_H
 
+#include "cklists.h"
+#include "convcomlibstrategy.h"
+
 //Base class for routers
 //Imported from Krishnan's Each To Many Communication Framework
 //Modified to suit the new communication library
@@ -34,6 +37,21 @@ class Router
                                      int more) 
         {CmiPrintf("Not impl\n");}
     
+    virtual void EachToManyMulticastQ(comID id, CkQ<MessageHolder *> &msgq){
+        MessageHolder *mhdl;
+        int len = msgq.length();
+        for(int count = 0; count < len - 1; count++) {
+            mhdl = msgq.deq();
+            EachToManyMulticast(id, mhdl->size, mhdl->getMessage(), 
+                                mhdl->npes, mhdl->pelist, 1);
+            delete mhdl;
+        }
+        mhdl = msgq.deq();
+        EachToManyMulticast(id, mhdl->size, mhdl->getMessage(), 
+                            mhdl->npes, mhdl->pelist, 0);
+        delete mhdl;
+    }
+
     //The first iteration of message combining should call this
     //entry function
     virtual void RecvManyMsg(comID, char *) {CmiPrintf("Not Impl\n");}
