@@ -1,0 +1,71 @@
+3D FFT Library
+--------------
+The 3D fft library is intended for performing multiple ffts, though it can 
+also be used for performing a single parallel 3dfft. 
+
+The parallelization is achieved by splitting the 3d space (over which the
+fft is to be performed) into a set of equal sized slabs. This is the "source"
+array of slabs. Each slab is essentially a collection of planes (say, x-y 
+planes). First, FFT is done over each of the planes in the slab. This step 
+provides as much parallelism as the number of slabs. After this, an fft in the
+ third direction is requrired. For this, another array of slabs is required, 
+a "destination" array. After the partial fft, data from the source array is
+sent to the destination array so that fft in the third direction can be 
+performed. Once the fft is performed in the destination array, the parallel 
+fft is done. 
+
+The source and destination arrays are essentially one-dimensional chare arrays,
+ but to support multiple 3dffts going on in parallel, two-dimesional chare 
+arrays are used. The first index.x is an fft id, and index.y is the index of
+ the slab within that fft.
+
+To use the library, the user has to support the basic abstraction of an
+array of slabs. The user will have to create source and destination arrays and
+the library will use them. These arrays should derive from a predefined 
+array, "SlabArray" (fftlib.h). The SlabArray class has three virtual methods, 
+that need to be implemented by the user. 
+
+1. complex *data() const
+
+	this returns a pointer to the data held in a slab. 
+IMPORTANT: if the slab contains more than one plane, the library expects the 
+data from the second plane to follow that of the first, and so on. 
+
+2. const CkIndex2D *myIdx() 
+	to returnt the index of the slab in the two dimesional chare array.
+IMPORTANT: if the slabs have more than one slab, index.y should be the position
+of the first plane in the slab. In other words, if the number of planes per
+slab is 2, index.y should vary as 0,2,4...
+
+3. const FFTinfo *getFFTinfo()
+	The FFTinfo class is used to tell the library about the configuration 
+of the source and destination arrays. It contains:
+	1. The proxies for the source and destination arrays.
+	2. Plane sizes for the source and destination slabs.
+		srcSize[0] is the number of rows in each source plane and srcSize[1]
+		is the size of each row. 
+		destSize is defined similarly.
+		For consistency, srcSize[1] should be equal to destSize[1]
+	3. an integer telling if the slab is a source slab or destination slab.
+	4. the number of planes per slab on the source and destination sides.
+
+	The FFTinfo should be available on all the slabs and should typically be
+sent through the array constructor.
+
+Runtime:
+-------
+when each source slab is ready for doing an fft, it just needs to call the
+method doFFT(). Once the fft is finished on the destination side, the
+doneFFT() method is called there. The user can override this method to add 
+code. Similarly, if the destination side is ready to do an inverse fft, the
+slabs need to call doIFFT() and the method doneIFFT() will be called on the
+source side to return control to the user.
+
+
+Example code:
+-------------
+the files under pgms/charm++/fftdemo/app.* demonstrate a sample use of the library.
+
+Acknowledgements:
+-----------------
+Orion Lawlor: The files util.h and util.C are almost entirely his work.
