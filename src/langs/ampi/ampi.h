@@ -20,7 +20,7 @@ extern "C" {
 #define AMPI_FLOAT 2
 #define AMPI_COMPLEX 3
 #define AMPI_LOGICAL 4
-#define AMPI_CHARACTER 5
+#define AMPI_CHAR 5
 #define AMPI_BYTE 6
 #define AMPI_PACKED 7
 

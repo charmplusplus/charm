@@ -269,7 +269,7 @@ static int typesize(int type, int count, ampi* ptr)
     case AMPI_FLOAT : return count*sizeof(float);
     case AMPI_COMPLEX: return 2*count*sizeof(double);
     case AMPI_LOGICAL: return count*sizeof(int);
-    case AMPI_CHARACTER: return count*sizeof(char);
+    case AMPI_CHAR: return count*sizeof(char);
     case AMPI_BYTE: return count;
     case AMPI_PACKED: return count;
     default:
