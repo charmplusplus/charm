@@ -126,10 +126,10 @@ void StatTable::setEp(int epidx, int stat, long long value, double time)
   CkAssert(epidx<MAX_ENTRIES);
   CkAssert(stat<numStats_);
   
-  // int numCalled = stats_[stat].numCalled[epidx];
-  // double avg = stats_[stat].totCount[epidx]/numCalled;
+  int numCalled = stats_[stat].numCalled[epidx];
+  double avg = stats_[stat].avgCount[epidx];
   stats_[stat].numCalled[epidx]++;
-  stats_[stat].totCount[epidx] += value;
+  stats_[stat].avgCount[epidx] = (avg * numCalled + value) / (numCalled + 1);
   stats_[stat].totTime[epidx] += time;
 }
 
@@ -151,15 +151,15 @@ void StatTable::write(FILE* fp)
     }
     fprintf(fp, "\n");
     // write average count for each 
-    fprintf(fp, "[%s total_count] ", stats_[i].name);
+    fprintf(fp, "[%s avg_count] ", stats_[i].name);
     for (j=0; j<_numEntries; j++) { 
-      fprintf(fp, "%ld ", stats_[i].totCount[j]); 
+      fprintf(fp, "%f ", stats_[i].avgCount[j]); 
     }
     fprintf(fp, "\n");
     // write total time in us spent for each entry
-    fprintf(fp, "[%s total_time(s)] ", stats_[i].name);
+    fprintf(fp, "[%s total_time(us)] ", stats_[i].name);
     for (j=0; j<_numEntries; j++) {
-      fprintf(fp, "%f ", (long)(stats_[i].totTime[j]));
+      fprintf(fp, "%f ", stats_[i].totTime[j]*1e6);
     }
     fprintf(fp, "\n");
   }
@@ -171,23 +171,34 @@ void StatTable::clear()
   for (int i=0; i<numStats_; i++) {
     for (int j=0; j<MAX_ENTRIES; j++) {
       stats_[i].numCalled[j] = 0;
-      stats_[i].totCount[j] = 0.0;
+      stats_[i].avgCount[j] = 0.0;
       stats_[i].totTime[j] = 0.0;
     }
   }
 }
 
 CountLogPool::CountLogPool(char* pgm, char** name, char** desc, int argc): 
-  stats_(name, desc, argc)
+  pgm_(pgm), fp_(NULL), stats_(name, desc, argc), traceOn_(false)
 {
   DEBUGF(("%d/%d DEBUG: CountLogPool::CountLogPool() %08x\n", 
           CkMyPe(), CkNumPes(), this));
+}
 
-  char pestr[10];
-  sprintf(pestr, "%d", CkMyPe());
-  int len = strlen(pgm) + strlen(".count.") + strlen(pestr) + 1;
+// open file, if phase is -1, don't add the phase string
+void CountLogPool::openFile(int phase) {
+  const static int strSize = 10;
+  char pestr[strSize+1];
+  char phasestr[strSize+1];
+  snprintf(pestr, strSize, "%d", CkMyPe());
+  pestr[strSize] = '\0';
+  int len = strlen(pgm_) + strlen("phase.count.") + 2*strSize + 1;
   char* fname = new char[len+1];  _MEMCHECK(fname);
-  sprintf(fname, "%s.%s.count", pgm, pestr);
+  if (phase >= 0) { 
+    snprintf(phasestr, strSize, "%d", phase);
+    phasestr[strSize] = '\0';
+    sprintf(fname, "%s.phase%s.%s.count", pgm_, phasestr, pestr); 
+  }
+  else { sprintf(fname, "%s.%s.count", pgm_, pestr); }
   fp_ = NULL;
   DEBUGF(("%d/%d DEBUG: TRACE: %s:%d\n", CkMyPe(), CkNumPes(), fname, errno));
   do {
@@ -201,22 +212,26 @@ CountLogPool::CountLogPool(char* pgm, char** name, char** desc, int argc):
 
 CountLogPool::~CountLogPool() 
 {
-  write();
-  fclose(fp_);
+  if (CmiMyPe()==0) { writeSts(); }
+  write(); 
 }
 
-void CountLogPool::write(void) 
+void CountLogPool::write(int phase) 
 {
+  if (phase==-1) { openFile(); }
+  else { openFile(phase); }
   fprintf(fp_, "ver:%3.1f %d/%d ep:%d counters:%d\n", 
 	  CpvAccess(version), CmiMyPe(), CmiNumPes(), _numEntries, 
 	  stats_.numStats());
   stats_.write(fp_);
+  fclose(fp_);
 }
 
-void CountLogPool::writeSts(void)
+void CountLogPool::writeSts(int phase)
 {
   // CmiPrintf("CountLogPool::writeSts\n");
-  char *fname = new char[strlen(CpvAccess(pgmName))+strlen(".count.sts")+1];
+  // add ten for phase number
+  char *fname = new char[strlen(CpvAccess(pgmName))+strlen(".count.sts")+10];
   _MEMCHECK(fname);
   sprintf(fname, "%s.count.sts", CpvAccess(pgmName));
   FILE *sts = fopen(fname, "w+");
@@ -265,6 +280,8 @@ TraceCounter::TraceCounter() :
   firstArg_    (NULL),
   lastArg_     (NULL),
   argStrSize_  (0),
+  phase_       (0),
+  traceOn_     (false),
   #ifdef CMK_ORIGIN2000
   status_      (IDLE),
   #endif
@@ -285,6 +302,34 @@ TraceCounter::~TraceCounter()
     }
   }
   #endif
+}
+
+void TraceCounter::traceBegin() {
+  CmiPrintf("%d/%d traceBegin called\n", CkMyPe(), CkNumPes());
+  if (traceOn_) {
+    CmiPrintf("%d/%d WARN: traceBegin called but trace already on!\n",
+	      CkMyPe(), CkNumPes());
+  }
+  else {
+    traceOn_ = true;
+    CpvAccess(_logPool)->setTrace(true); 
+  }
+}
+
+void TraceCounter::traceEnd() {
+  CmiPrintf("%d/%d traceEnd called\n", CkMyPe(), CkNumPes());
+  if (!traceOn_) {
+    CmiPrintf("%d/%d WARN: traceEnd called but trace not on!\n",
+	      CkMyPe(), CkNumPes());
+  }
+  else {
+    traceOn_ = false;
+    if (CmiMyPe()==0) { CpvAccess(_logPool)->writeSts(phase_); }
+    CpvAccess(_logPool)->write(phase_); 
+    CpvAccess(_logPool)->clearEps(); 
+    CpvAccess(_logPool)->setTrace(false);  
+    // setTrace must go after the writes otherwise the writes won't go through
+  }
 }
   
 void TraceCounter::traceInit(char **argv)
@@ -353,7 +398,6 @@ void TraceCounter::traceInit(char **argv)
   _MEMCHECK(CpvAccess(_logPool));
   DEBUGF(("%d/%d DEBUG: Created _logPool at %08x\n", 
           CkMyPe(), CkNumPes(), CpvAccess(_logPool)));
-
 }
 
 void TraceCounter::traceClearEps(void)
@@ -363,7 +407,9 @@ void TraceCounter::traceClearEps(void)
 
 void TraceCounter::traceWriteSts(void)
 {
-  if (CmiMyPe()==0) { CpvAccess(_logPool)->writeSts(); }
+  if (traceOn_) {
+    if (CmiMyPe()==0) { CpvAccess(_logPool)->writeSts(); }
+  }
 }
 
 void TraceCounter::traceClose(void)
