@@ -123,29 +123,33 @@ typedef struct CthThreadStruct
   int        Event;
 /** End Addition */
   CthThread  qnext;      /* for cthsetnext and cthgetnext */
-  qt_t      *savedstack; /* pointer to saved stack (null when running) */
+  qt_t      *savedstack; /* pointer to saved stack */
   int        savedsize;  /* length of saved stack (zero when running) */
-  qt_t      *savedptr;   /* stack pointer (null when running) */
+  int        stacklen;   /* length of the allocated savedstack >= savedsize */
+  qt_t      *savedptr;   /* stack pointer */
 } CthThreadStruct;
 
 int CthPackBufSize(CthThread t)
 {
-  if (t->savedstack == 0)
+  if (t->savedsize == 0)
     CmiAbort("Trying to pack a running thread!!\n");
   return sizeof(CthThreadStruct) + t->datasize + t->savedsize;
 }
 
 void CthPackThread(CthThread t, void *buffer)
 {
-  if (t->savedstack == 0)
+  if (t->savedsize == 0)
     CmiAbort("Trying to pack a running thread!!\n");
   if (t->insched)
     CmiAbort("Trying to pack a thread in scheduler queue!!\n");
   memcpy(buffer, (void *)t, sizeof(CthThreadStruct));
   memcpy(((char*)buffer)+sizeof(CthThreadStruct), 
          (void *)t->data, t->datasize);
+  free((void *)t->data);
   memcpy(((char*)buffer)+sizeof(CthThreadStruct)+t->datasize, 
          (void *)t->savedstack, t->savedsize);
+  free((void *)t->savedstack);
+  free(t);
 }
 
 CthThread CthUnpackThread(void *buffer)
@@ -156,6 +160,7 @@ CthThread CthUnpackThread(void *buffer)
   memcpy((void*)t->data, ((char*)buffer)+sizeof(CthThreadStruct),
          t->datasize);
   t->savedstack = (qt_t*) malloc(t->savedsize);
+  t->stacklen = t->savedsize;
   memcpy((void*)t->savedstack, 
          ((char*)buffer)+sizeof(CthThreadStruct)+t->datasize, t->savedsize);
   return t;
@@ -201,6 +206,7 @@ static void CthThreadInit(CthThread t, CthVoidFn fn, void *arg)
   t->qnext = 0;
   t->savedstack = 0;
   t->savedsize = 0;
+  t->stacklen = 0;
   t->savedptr = 0;
   CthSetStrategyDefault(t);
 }
@@ -253,8 +259,9 @@ void CthInit()
   CthThreadInit(t,0,0);
   CthCpvAccess(CthData)=0;
   CthCpvAccess(CthProc)=p;
-  sp = (qt_t*)(((size_t)&t) & ~((size_t)0xFFFFF));
-  p->stackbase = QT_SP(sp, 0x100000);
+  /* leave some space for current stack frame < 256 bytes */
+  sp = (qt_t*)(((size_t)&t) & ~((size_t)0xFF));
+  p->stackbase = QT_SP(sp, 0x100);
   p->current = t;
   p->datasize = 0;
   switchbuf = (qt_t*)malloc(QT_STKALIGN + SWITCHBUF_SIZE);
@@ -293,7 +300,11 @@ static void CthResume1(qt_t *sp, CthProcInfo proc, CthThread t)
     hi = sp; lo = proc->stackbase;
 #endif
     bytes = ((size_t)hi)-((size_t)lo);
-    old->savedstack = (qt_t*)malloc(bytes);
+    if(bytes > old->stacklen) {
+      if(old->savedstack) free((void *)old->savedstack);
+      old->savedstack = (qt_t*)malloc(bytes);
+      old->stacklen = bytes;
+    }
     old->savedsize = bytes;
     old->savedptr = sp;
     memcpy(old->savedstack, lo, bytes);
@@ -307,8 +318,6 @@ static void CthResume1(qt_t *sp, CthProcInfo proc, CthThread t)
     lo = proc->stackbase;
 #endif
     memcpy(lo, t->savedstack, t->savedsize);
-    free(t->savedstack);
-    t->savedstack=0;
     t->savedsize=0;
     sp = t->savedptr;
   } else {
