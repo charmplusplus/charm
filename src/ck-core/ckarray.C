@@ -839,7 +839,7 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 	else 
 	{ //Broadcast message via serializer node
 	  _TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
- 	  int skipsched = opts & CK_MSG_SKIPSCHEDULER;
+ 	  int skipsched = opts & CK_MSG_EXPEDITED;
 	  int serializer=0;//1623802937%CkNumPes();
 	  if (CkMyPe()==serializer)
 	  {
