@@ -569,14 +569,14 @@ a simple way to add ghosts from two kinds of tuples at once.
 The above two routines are always used together. For example, if your elements are 3-node triangles and you only require one shared node for inclusion in a single ghost layer, you would use:
 \begin{alltt}
    FEM\_Add\_ghost\_layer(1,0); /* 1 node per tuple */
-   const static int tri2node[]={0,1,2};
+   const static int tri2node[]=\{0,1,2\};
    FEM\_Add\_ghost\_elem(0,3,tri2node); /* triangles are surrounded by 3 nodes */
 \end{alltt}
 
 If you require two shared nodes (a shared edge), the code will look like:
 \begin{alltt}    
    FEM\_Add\_ghost\_layer(2,0); /* 2 nodes per tuple */
-   const static int tri2edge[]={0,1,  1,2,  2,0};
+   const static int tri2edge[]=\{0,1,  1,2,  2,0\};
    FEM\_Add\_ghost\_elem(0,3,tri2edge); /*triangles are surrounded by 3 edges */
 \end{alltt}
 
