@@ -127,6 +127,7 @@ class TCharm: public CBase_TCharm
 	friend class TCharmAPIRoutine; //So he can get to heapBlocks:
 	CmiIsomallocBlockList *heapBlocks; //Migratable heap data
 	CtgGlobals threadGlobals; //Global data
+	void pupThread(PUP::er &p);
 
 	bool isStopped, resumeAfterMigration, exitWhenDone;
 	ThreadInfo threadInfo;

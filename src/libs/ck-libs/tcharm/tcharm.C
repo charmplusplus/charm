@@ -166,7 +166,7 @@ void TCharm::pup(PUP::er &p) {
 //Pup superclass
   ArrayElement1D::pup(p);
 
-  checkPupMismatch(p,5136,"before TCHARM");
+  checkPupMismatch(p,5134,"before TCHARM");
   p(isStopped); p(resumeAfterMigration); p(exitWhenDone);
   p(threadInfo.thisElement);
   p(threadInfo.numElements);
@@ -186,51 +186,55 @@ void TCharm::pup(PUP::er &p) {
   // and heap data both at pack and unpack time.
   PUP::seekBlock s(p,2);
   
-// Set up TCHARM context for use during user's pup routines:
-  CtvAccess(_curTCharm)=this;
-  activateThread();
-  
-//Pup thread (EVIL & UGLY):
   if (p.isUnpacking())
   {//In this case, unpack the thread & heap before the user data
     s.seek(1);
-    tid = CthPup((pup_er) &p, tid);
-    CtvAccessOther(tid,_curTCharm)=this;
-    CmiIsomallocBlockListPup((pup_er) &p,&heapBlocks);
-    threadGlobals=CtgPup((pup_er) &p,threadGlobals);
+    pupThread(p);
     //Restart our clock: set it up so packTime==CkWallTimer+timeOffset
     double packTime;
     p(packTime);
     timeOffset=packTime-CkWallTimer();
-    checkPupMismatch(p,5138,"after TCHARM thread");
   }
-
-  //Pack all user data
-  s.seek(0);
-  p(nUd);
   
+//Pack all user data
+  // Set up TCHARM context for use during user's pup routines:
+  CtvAccess(_curTCharm)=this;
+  activateThread();
+
+  s.seek(0);
+  checkPupMismatch(p,5135,"before TCHARM user data");
+  p(nUd);
   for(int i=0;i<nUd;i++) ud[i].pup(p);
   checkPupMismatch(p,5137,"after TCHARM_Register user data");
   p|sud;
   checkPupMismatch(p,5138,"after TCHARM_Global user data");
   
+  // Tear down TCHARM context after calling user pup routines
+  deactivateThread();
+  CtvAccess(_curTCharm)=NULL;
+  
   if (!p.isUnpacking())
   {//In this case, pack the thread & heap after the user data
     s.seek(1);
-    tid = CthPup((pup_er) &p, tid);
-    CmiIsomallocBlockListPup((pup_er) &p,&heapBlocks);
-    threadGlobals=CtgPup((pup_er) &p,threadGlobals);
+    pupThread(p);
     //Stop our clock:
     double packTime=CkWallTimer()+timeOffset;
     p(packTime);
-    checkPupMismatch(p,5138,"after TCHARM thread");
   }
-  
-  CtvAccess(_curTCharm)=NULL;
-  deactivateThread();
   
   s.endBlock(); //End of seeking block
   checkPupMismatch(p,5140,"after TCHARM");
+}
+// Pup our thread and related data
+void TCharm::pupThread(PUP::er &pc) {
+    pup_er p=(pup_er)&pc;
+    checkPupMismatch(pc,5138,"before TCHARM thread");
+    tid = CthPup(p, tid);
+    if (pc.isUnpacking())
+      CtvAccessOther(tid,_curTCharm)=this;
+    CmiIsomallocBlockListPup(p,&heapBlocks);
+    threadGlobals=CtgPup(p,threadGlobals);
+    checkPupMismatch(pc,5139,"after TCHARM thread");
 }
 
 //Pup one group of user data
@@ -260,6 +264,7 @@ TCharm::~TCharm()
 {
   CmiIsomallocBlockListDelete(heapBlocks);
   CthFree(tid);
+  CtgFree(threadGlobals);
   delete initMsg;
 }
 
