@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-09-01 02:13:17  jyelon
+ * Revision 2.6  1995-09-05 22:02:09  sanjeev
+ * modified _CK_Object, _CK_BOC for new ChareBlock format.
+ *
+ * Revision 2.5  1995/09/01  02:13:17  jyelon
  * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
  *
  * Revision 2.4  1995/07/27  20:29:34  jyelon
@@ -50,60 +53,41 @@
 #ifndef C_PLUS_INTERFACE_H
 #define C_PLUS_INTERFACE_H
 
-/*  #define BASE_EP_NUM 0x00008001	*/
-
 #define NULL_EP -1
-
-typedef unsigned short MAGIC_NUMBER_TYPE ;
 
 extern "C" void CollectValue(int, int, ChareIDType *) ;
 extern "C" void * MonoValue(int) ;
 
-class _CK_Object ;
 
-/* EPTYPE is no longer used  : SANJEEV, Jan 5
- * EPTYPE is a pointer to a member function of a chare 
- * typedef void (_CK_Object::*EPTYPE)(void *) ;  
- */
-
-class _CK_Object {  /* Top level chare object at root of chare hierarchy */
+class _CK_Object {  /* Top level chare class at root of chare hierarchy */
 public:
 	ChareIDType thishandle ;   
-	/* This is put in by the translator for use by Charm */
 
 	_CK_Object() {}
 
-	_CK_Object(int magic) {
+	_CK_Object(CHARE_BLOCK *chareblock) {
         	SetID_onPE(thishandle, CmiMyPe());
-        	SetID_chare_magic_number(thishandle,(int)magic) ;
-        	SetID_chareBlockPtr(thishandle, ((CHARE_BLOCK *)this));
+        	SetID_chare_magic_number(thishandle,GetID_chare_magic_number(chareblock->selfID)) ;
+        	SetID_chareBlockPtr(thishandle, chareblock);
 	}
-
-/*	virtual void CallEP(EPTYPE EpPtr, void *msg)
- *      {
- *              (this->*EpPtr)(msg) ;
- *      }
- *
- *	virtual void SwitchEP(int EpIndex, void * msg) = 0 ; 
- */
 } ;
 
 
 
-class _CK_BOC : public _CK_Object {  /* top level BOC object */
-
+class _CK_BOC {  /* top level BOC object */
 public:
 	int _CK_MyBocNum ;  /* BocNum of this instance of the BOC */
-	int thishandle ;  /* also stores BocNum */
+	int thishandle ;  /* stores BocNum */
+	ChareIDType thisbranchhandle ;
 
 	_CK_BOC() {}
-	_CK_BOC(int magic) : _CK_Object(magic) {}
+	_CK_BOC(CHARE_BLOCK *bocblock) {
+        	SetID_onPE(thisbranchhandle, CmiMyPe());
+        	SetID_chare_magic_number(thisbranchhandle,GetID_chare_magic_number(bocblock->selfID)) ;
+        	SetID_chareBlockPtr(thisbranchhandle, bocblock);
 
-	void setBocNum(int num) {
-		thishandle = _CK_MyBocNum = num ;
+		thishandle = _CK_MyBocNum = bocblock->x.boc_num ;
 	}
-
-/*	virtual void SwitchEP(int EpIndex, void * msg) = 0 ;   */
 } ;
 
 
