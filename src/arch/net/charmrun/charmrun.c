@@ -4,7 +4,7 @@
  * $Date$
  * $Revision$
  *****************************************************************************/
-#include "conv-mach.h"
+
 #include "converse.h"
 
 #include "../sockRoutines.h"
