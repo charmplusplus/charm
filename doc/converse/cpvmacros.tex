@@ -12,18 +12,23 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.1  1995-10-26 21:08:23  gursoy
+% Revision 1.2  1995-10-27 21:02:54  milind
+% Integrated into Manual.
+%
+% Revision 1.1  1995/10/26  21:08:23  gursoy
 % Initial revision
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-Global Variable Usage:
+\chapter{Global Variable Usage}
+
 
 Global variables are allowed in Converse via specific macros.  These macros 
 ensure that the program runs portably on various parallel machines. 
 Three classes of global variables are supported: node-private,
-process-private, and thread-private variables. These classes are
-strongly related to the machine model described in Section x.
+process-private, and thread-private variables. 
+%These classes are
+%strongly related to the machine model described in Section x.
 
 \begin{description}
 \item[Node-private global variables] are specific to a node. They are
@@ -57,7 +62,7 @@ CsvAccess(variable)
 
 
 Macros for process-private variables:
-\begin{verbatim
+\begin{verbatim}
 CpvDeclare(type,variable)
 CpvStaticDeclare(type,variable)
 CpvExtern(type,variable)
@@ -75,7 +80,7 @@ CthAccess(variable)
 \end{verbatim}
 
 
-Example of Usage:
+\section{Example of Usage}
 
     A sample code to illustrate the usage of the macros is provided
     in Figure~\ref{fig:cpv}.
