@@ -154,7 +154,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  Refiner.h RefinerComm.h ObjGraph.h heap.h elements.h CommLBHeap.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h RandCentLB.h RecBisectBfLB.h \
 	  RefineLB.h RefineCommLB.h OrbLB.h GreedyLB.h GreedyCommLB.h \
-	  Comm1LB.h manager.h MetisLB.h NborBaseLB.h LBTopology.h \
+	  Comm1LB.h manager.h MetisLB.h NborBaseLB.h topology.h \
 	  NeighborLB.h NeighborLBMsg.h WSLB.h GreedyRefLB.h RandRefLB.h \
           ComlibStrategy.h ComlibArrayListener.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
@@ -260,7 +260,7 @@ CVLIBS=$(L)/libconv-core.a \
 	$(L)/libccs-client.a
 
 LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
-	cpm.o cpthreads.o futures.o cldb.o LBTopology.o random.o \
+	cpm.o cpthreads.o futures.o cldb.o topology.o random.o \
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
 	traceCore.o traceCoreCommon.o \
 	converseProjections.o machineProjections.o \
