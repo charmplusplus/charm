@@ -84,7 +84,6 @@ static int checksum_flag = 0;
 #  define CMI_SET_CYCLE(msg, cycle)
 #endif
 
-
 /*
  to avoid MPI's in order delivery, changing MPI Tag all the time
 */
@@ -101,6 +100,11 @@ int               _Cmi_numnodes;  /* Total number of address spaces */
 int               _Cmi_numpes;    /* Total number of processors */
 static int        Cmi_nodestart; /* First processor in this address space */ 
 CpvDeclare(void*, CmiLocalQueue);
+
+/*Network progress utility variables. Period controls the rate at
+  which the network poll is called */
+CpvDeclare(int , networkProgressCount);
+int networkProgressPeriod;
 
 int 		  idleblock = 0;
 
@@ -426,6 +430,10 @@ void CmiReleaseCommHandle(CmiCommHandle c)
   return;
 }
 
+#if CMK_VERSION_BLUEGENE
+extern void MPID_Progress_test();
+#endif
+
 static void CmiReleaseSentMessages(void)
 {
   SMSG_LIST *msg_tmp=sent_msgs;
@@ -433,6 +441,10 @@ static void CmiReleaseSentMessages(void)
   SMSG_LIST *temp;
   int done;
   MPI_Status sts;
+
+#if CMK_VERSION_BLUEGENE
+  extern void MPID_Progress_test();
+#endif
      
   MACHSTATE1(2,"CmiReleaseSentMessages begin on %d {", CmiMyPe());
   while(msg_tmp!=0) {
@@ -466,6 +478,10 @@ static int PumpMsgs(void)
   char *msg;
   MPI_Status sts;
   int recd=0;
+
+#if CMK_VERSION_BLUEGENE
+  extern void MPID_Progress_test();
+#endif
 
   MACHSTATE(2,"PumpMsgs begin {");
   while(1) {
@@ -700,9 +716,15 @@ void CmiNotifyIdle(void)
   if (!PumpMsgs() && idleblock) PumpMsgsBlocking();
 }
  
+
+/********************************************************
+    The call to probe immediate messages has been renamed to
+    CmiMachineProgressImpl
+******************************************************/
 /* user call to handle immediate message, only useful in non SMP version
    using polling method to schedule message.
 */
+/*
 #if CMK_IMMEDIATE_MSG
 void CmiProbeImmediateMsg()
 {
@@ -712,6 +734,23 @@ void CmiProbeImmediateMsg()
 #endif
 }
 #endif
+*/
+
+/* Network progress function is used to poll the network when for
+   messages. This flushes receive buffers on some  implementations*/
+void CmiMachineProgressImpl()
+{
+#if !CMK_SMP
+    PumpMsgs();
+#if CMK_IMMEDIATE_MSG
+    CmiHandleImmediate();
+#endif
+#else
+    /*Not implemented yet. Communication server does not seem to be
+      thread safe */
+    /* CommunicationServerThread(0); */
+#endif
+}
 
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
@@ -1249,6 +1288,12 @@ static void ConverseRunPE(int everReturn)
 
   ConverseCommonInit(CmiMyArgv);
 
+  /* initialize the network progress counter*/
+  /* Network progress function is used to poll the network when for
+     messages. This flushes receive buffers on some  implementations*/
+  CpvInitialize(int , networkProgressCount);
+  CpvAccess(networkProgressCount) = 0;
+
 #if CMK_SMP
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)s);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)s);
@@ -1373,6 +1418,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   sendMsgBuf = PCQueueCreate();
   sendMsgBufLock = CmiCreateLock();
 #endif
+
+  /* Network progress function is used to poll the network when for
+     messages. This flushes receive buffers on some  implementations*/
+  networkProgressPeriod = 0;
+  CmiGetArgInt(argv, "+networkProgressPeriod", &networkProgressPeriod);
 
   CmiStartThreads(argv);
   ConverseRunPE(initret);
