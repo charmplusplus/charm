@@ -1,4 +1,4 @@
-CC=xlc -I. -ma
+CC=../../bin/charmc -I. -DALLOCA_H=1
 
 all: qt stp testpgm
 
@@ -7,7 +7,7 @@ qt: md/setjmp_d.h qt.c md/setjmp.c
 	ln -s md/setjmp_d.h qtmd.h
 	$(CC) -c -o qt.o qt.c
 	$(CC) -c -o qtmds.o md/setjmp.c
-	ar q libqt.a qt.o qtmds.o
+	$(CC) -o libqt.a qt.o qtmds.o
 
 stp:
 	$(CC) -c stp.c
