@@ -829,6 +829,8 @@ void CmiGmConvertMachineID(unsigned int *mach_id)
 #if CMK_USE_GM2 
     gm_status_t status;
     int newid;
+    /* skip if running without charmrun */
+    if (Cmi_charmrun_pid == 0 && gmport == NULL) return;
     status = gm_global_id_to_node_id(gmport, *mach_id, &newid);
     if (status == GM_SUCCESS) *mach_id = newid;
 #endif
