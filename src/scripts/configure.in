@@ -485,13 +485,16 @@ case $version in
 EOT
     else
       L="libpthread-$GLIBCVERSION.a"
+      LSO="libpthread-$GLIBCVERSION.so"
       URL="http://${CHARMIP}/distrib/$L"
+      URLSO="http://${CHARMIP}/distrib/$LSO"
       finish=0
       printf "getting $L from $URL ..."
       if test -n "$WGET"
       then
         printf "(wget) ..."
         $WGET $URL > /dev/null 2>&1  && mv $L ../lib && finish=1
+        $WGET $URLSO > /dev/null 2>&1  && mv $LSO ../lib_so
       fi
       if test $finish = 0 && test -n "$LYNX"
       then
@@ -501,6 +504,7 @@ EOT
         then
           mv $L ../lib && finish=1
         fi
+        $LYNX -source $URLSO > $L 2>/dev/null 
       fi
       if test $finish = 0 && test -n "$TELNET" && test -n "$UUDECODE"
       then
@@ -519,6 +523,7 @@ EOT
         /bin/sh ./get_libpthread | ($TELNET $CHARMIP 80 > .uulib 2>/dev/null); $UUDECODE .uulib 2>/dev/null && rm -f .uulib && mv $L ../lib && finish=1
       fi
       ln -s $L ../lib/libpthread.a
+      ln -s $LSO ../lib_so/libpthread.so
       if test $finish = 0 || test ! -r ../lib/libpthread.a
       then
         /bin/rm -f ../lib/libpthread.a
