@@ -658,8 +658,10 @@ Group::Group(int ln, attrib_t Nattr,
 	if (b==NULL) {//Add Group as a base class
 		if (isNodeGroup())
 			bases = new TypeList(new NamedType("NodeGroup"), NULL);
-		else
-			bases = new TypeList(new NamedType("Group"), NULL);
+		else {
+			bases = new TypeList(new NamedType("IrrGroup"), NULL);
+			bases_CBase = new TypeList(new NamedType("Group"), NULL);
+		}
 	}
 }
 
@@ -680,7 +682,7 @@ Group::genSubDecls(XStr& str)
   genProxyNames(str, "public ",NULL, "", ", ");
   str << CIClassStart;
   str << "    "<<ptype<<"(void) {}\n";
-  str << "    "<<ptype<<"(const Group *g) : ";
+  str << "    "<<ptype<<"(const IrrGroup *g) : ";
   genProxyNames(str, "", NULL,"(g)", ", ");
   str << "{  }\n";
 
