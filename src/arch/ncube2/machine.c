@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1996-07-15 20:59:22  jyelon
+ * Revision 2.14  1997-02-13 09:31:43  jyelon
+ * Updated for new main/ConverseInit structure.
+ *
+ * Revision 2.13  1996/07/15 20:59:22  jyelon
  * Moved much timer, signal, etc code into common.
  *
  * Revision 2.12  1995/11/13 22:51:32  gursoy
@@ -329,36 +332,36 @@ int node, neighbour;
 
 /************************** SETUP ***********************************/
 
-void CmiInitMc(argv)
-char *argv[];
-{
-    CpvInitialize(int, Cmi_mype);
-    CpvInitialize(int, Cmi_numpes);
-    CpvInitialize(void*, CmiLocalQueue);
-
-    whoami(&CpvAccess(Cmi_mype), &process, &host, &Cmi_dim);
-    CpvAccess(Cmi_numpes) = (1 << Cmi_dim) ;
-
-
-    CpvAccess(CmiLocalQueue)= (void *) FIFO_Create();
-    CmiSpanTreeInit();
-    CmiTimerInit();
-}
-
-
-
-void CmiExit()
+void ConverseExit()
 {}
 
+void ConverseStart(argc, argv, fn)
+int argc;
+char *argv[];
+CmiStartFn fn;
+{
+  CpvInitialize(int, Cmi_mype);
+  CpvInitialize(int, Cmi_numpes);
+  CpvInitialize(void*, CmiLocalQueue);
+  whoami(&CpvAccess(Cmi_mype), &process, &host, &Cmi_dim);
+  CpvAccess(Cmi_numpes) = (1 << Cmi_dim) ;
+  CpvAccess(CmiLocalQueue)= (void *) FIFO_Create();
+  CmiSpanTreeInit();
+  CmiTimerInit();
+  ConverseCommonInit(argv);
+  CthInit(argv);
+}
+
+void ConverseInit(argc, argv, fn)
+int argc;
+char *argv[];
+CmiStartFn fn;
+{
+  ConverseStart(argc, argv, fn);
+  fn(argc, argv);
+}
 
 void CmiDeclareArgs()
 {}
 
-
-main(argc,argv)
-int argc;
-char *argv[];
-{
-    user_main(argc,argv);
-}
 

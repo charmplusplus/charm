@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1996-07-15 20:59:22  jyelon
+ * Revision 2.13  1997-02-13 09:31:40  jyelon
+ * Updated for new main/ConverseInit structure.
+ *
+ * Revision 2.12  1996/07/15 20:59:22  jyelon
  * Moved much timer, signal, etc code into common.
  *
  * Revision 2.11  1996/04/18 22:40:35  sanjeev
@@ -452,68 +455,70 @@ int node, neighbour;
 
 /************************** MAIN ***********************************/
 
-main(argc, argv)
+void ConverseExit()
+{}
+
+void ConverseStart(argc, argv, fn)
 int argc;
 char **argv;
+CmiStartFn fn;
 {
-	int n, i, j ;
-
-        CMMD_fset_io_mode(stdin, CMMD_independent) ;
-	CMMD_fset_io_mode(stdout, CMMD_independent) ;
-	CMMD_fset_io_mode(stderr, CMMD_independent) ;
-
-        fcntl(fileno(stdout), F_SETFL, O_APPEND) ;
-        fcntl(fileno(stderr), F_SETFL, O_APPEND) ;
-
-	CpvAccess(Cmi_mype) = CMMD_self_address() ;
-
-        CpvAccess(Cmi_numpes) = numpes = CMMD_partition_size() ;
-
-	if ( argc >= 2 ) { /* Check if theres a +p #procs */
-		for ( i=1; i<argc; i++ ) {
-			if ( strncmp(argv[i], "+p", 2) != 0) 
-				continue ;
-			if ( strlen(argv[i]) > 2 ) {
-				CpvAccess(Cmi_numpes) = numpes = atoi(&(argv[i][2])) ;
-				for ( j=i; j<argc-1; j++ )
-					argv[j] = argv[j+1] ;
-				argc-- ;
-			}
-			else {
-				CpvAccess(Cmi_numpes) = numpes = atoi(argv[i+1]) ;
-				for ( j=i; j<argc-2; j++ )
-					argv[j] = argv[j+2] ;
-				argc -= 2 ;
-			}
-			break ;
-		}
-	}
-
-	if ( CpvAccess(Cmi_mype) >= CpvAccess(Cmi_numpes) )
-		exit(0) ;
-
-	/* find dim = log2(numpes), to pretend we are a hypercube */
-	for ( Cmi_dim=0,n=numpes-1; n>=1; n/=2 )
-		Cmi_dim++ ;
-
-	/* Initialize timers */
-	CmiTimerInit();
-	user_main(argc, argv);
+  int n, i, j ;
+  
+  CMMD_fset_io_mode(stdin, CMMD_independent) ;
+  CMMD_fset_io_mode(stdout, CMMD_independent) ;
+  CMMD_fset_io_mode(stderr, CMMD_independent) ;
+  
+  fcntl(fileno(stdout), F_SETFL, O_APPEND) ;
+  fcntl(fileno(stderr), F_SETFL, O_APPEND) ;
+  
+  CpvAccess(Cmi_mype) = CMMD_self_address() ;
+  
+  CpvAccess(Cmi_numpes) = numpes = CMMD_partition_size() ;
+  
+  if ( argc >= 2 ) { /* Check if theres a +p #procs */
+    for ( i=1; i<argc; i++ ) {
+      if ( strncmp(argv[i], "+p", 2) != 0) 
+	continue ;
+      if ( strlen(argv[i]) > 2 ) {
+	CpvAccess(Cmi_numpes) = numpes = atoi(&(argv[i][2])) ;
+	for ( j=i; j<argc-1; j++ )
+	  argv[j] = argv[j+1] ;
+	argc-- ;
+      }
+      else {
+	CpvAccess(Cmi_numpes) = numpes = atoi(argv[i+1]) ;
+	for ( j=i; j<argc-2; j++ )
+	  argv[j] = argv[j+2] ;
+	argc -= 2 ;
+      }
+      break ;
+    }
+  }
+  
+  if (CpvAccess(Cmi_mype) >= CpvAccess(Cmi_numpes))
+    exit(0) ;
+  CmiSpanTreeInit(); 
+  CpvAccess(CmiLocalQueue) = FIFO_Create() ;
+  
+  /* find dim = log2(numpes), to pretend we are a hypercube */
+  for ( Cmi_dim=0,n=numpes-1; n>=1; n/=2 )
+    Cmi_dim++ ;
+  
+  /* Initialize timers */
+  CmiTimerInit();
+  ConverseCommonInit(argv);
+  CthInit(argv);
 }
 
-
-
-void CmiInitMc(argv)
-char *argv[];
+void ConverseInit(argc, argv, fn)
+int argc;
+char **argv;
+CmiStartFn fn;
 {
-	CmiSpanTreeInit(); 
- 
-	CpvAccess(CmiLocalQueue) = FIFO_Create() ;
+  ConverseStart(argc, argv, fn);
+  fn(argc, argv);
 }
-
-
-void CmiExit()
-{}
 
 
 /*****************************************************************************

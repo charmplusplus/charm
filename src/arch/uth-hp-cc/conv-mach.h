@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.6  1997-02-08 14:10:31  jyelon
+ * Revision 1.7  1997-02-13 09:32:00  jyelon
+ * Updated for new main/ConverseInit structure.
+ *
+ * Revision 1.6  1997/02/08 14:10:31  jyelon
  * Correcting bugs in network version.
  *
  * Revision 1.5  1997/02/06 20:21:13  jyelon
@@ -67,9 +70,6 @@
 #define CMK_CSDEXITSCHEDULER_IS_A_FUNCTION                 0
 #define CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG               1
 
-#define CMK_CTHINIT_IS_IN_CONVERSEINIT                     0
-#define CMK_CTHINIT_IS_IN_MAIN                             1
-
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
 #define CMK_DEFAULT_MAIN_USES_SIMULATOR_CODE               0
 
@@ -102,7 +102,6 @@
 #define CMK_SIGHOLD_NOT_NEEDED                             0
 #define CMK_SIGHOLD_USE_SIGMASK                            1
 
-#define CMK_SIGNAL_IS_A_BUILTIN                            0
 #define CMK_SIGNAL_NOT_NEEDED                              0
 #define CMK_SIGNAL_USE_SIGACTION                           1
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0

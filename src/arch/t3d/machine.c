@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.4  1996-07-16 21:08:30  gursoy
+ * Revision 1.5  1997-02-13 09:31:57  jyelon
+ * Updated for new main/ConverseInit structure.
+ *
+ * Revision 1.4  1996/07/16 21:08:30  gursoy
  * added empty CmiDeliverSpecificMsg
  *
  * Revision 1.3  1996/07/15  20:59:22  jyelon
@@ -351,44 +354,40 @@ char * msg;
 
 /************************** SETUP ***********************************/
 
-void CmiInitMc(argv)
+void ConverseExit()
+{
+}
+
+void ConverseStart(argc, argv, fn)
+int argc;
 char *argv[];
+CmiStartFn fn;
 {
-    CpvInitialize(int, Cmi_mype);
-    CpvInitialize(int, Cmi_numpes);
-    CpvInitialize(void*, CmiLocalQueue);
-
-
-    CpvAccess(Cmi_mype)  = _my_pe();
-    CpvAccess(Cmi_numpes) = _num_pes();
-    neighbour_init(CpvAccess(Cmi_mype));
-    CpvAccess(CmiLocalQueue)= (void *) FIFO_Create();
-    CmiSpanTreeInit();
-
-    FM_set_parameter(MAX_MSG_SIZE_FINC, MAX_PACKET_SIZE) ;
-
-    /* 512 is the default value used by FM */
-    FM_set_parameter(MSG_BUFFER_SIZE_FINC, 512);
-
-    FM_initialize() ;
-
-    CmiTimerInit();
+  CpvInitialize(int, Cmi_mype);
+  CpvInitialize(int, Cmi_numpes);
+  CpvInitialize(void*, CmiLocalQueue);
+  CpvAccess(Cmi_mype)  = _my_pe();
+  CpvAccess(Cmi_numpes) = _num_pes();
+  CpvAccess(CmiLocalQueue)= (void *) FIFO_Create();
+  ConverseCommonSetup(argv);
+  CthInit(argv);
+  neighbour_init(CpvAccess(Cmi_mype));
+  CmiSpanTreeInit();
+  FM_set_parameter(MAX_MSG_SIZE_FINC, MAX_PACKET_SIZE) ;
+  /* 512 is the default value used by FM */
+  FM_set_parameter(MSG_BUFFER_SIZE_FINC, 512);
+  FM_initialize() ;
+  CmiTimerInit();
 }
 
-
-
-void CmiExit()
-{}
-
-
-main(argc,argv)
-int   argc;
-char  *argv[];
+void ConverseInit(argc, argv, fn)
+int argc;
+char *argv[];
+CmiStartFn fn;
 {
-user_main(argc,argv);    
+  ConverseStart(argc, argv, fn);
+  fn(argc, argv);
 }
-
-
 
 /**********************  LOAD BALANCER NEEDS **********************/
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1997-02-02 07:33:56  milind
+ * Revision 2.11  1997-02-13 09:31:56  jyelon
+ * Updated for new main/ConverseInit structure.
+ *
+ * Revision 2.10  1997/02/02 07:33:56  milind
  * Fixed Bugs in SP1 machine dependent code that made megacon to hang.
  * Consisted of almost 60 percent rewrite.
  *
@@ -417,50 +420,50 @@ int CmiFlushPrintfs()
 
 /************************** MAIN ***********************************/
 
-void CmiInitMc(argv)
-char *argv[];
-{
-     CpvAccess(CmiLocalQueue) = FIFO_Create();
+void CmiDeclareArgs()
+{}
 
-     CmiSpanTreeInit();
-     CmiTimerInit();
-     
-}
-
-void CmiExit()
+void ConverseExit()
 {
   int msgid = allmsg, nbytes;
   mpc_wait(&msgid, &nbytes);
 }
 
-
-void CmiDeclareArgs()
-{}
-
-
-main(argc, argv)
+ConverseStart(argc, argv, fn)
 int argc;
 char *argv[];
+CmiStartFn fn;
 {
-	int n ;
-   int nbuf[4];
+  int n ;
+  int nbuf[4];
+  
+  Cmi_myrank = 0;
+  mpc_environ(&Cmi_numpes, &Cmi_mype);
+  numpes = Cmi_numpes;
+  mpc_task_query(nbuf, 4, 3);
+  dontcare = nbuf[0];
+  allmsg = nbuf[1];
+  mpc_task_query(nbuf, 2, 2);
+  msgtype = nbuf[0];
+  
+  /* find dim = log2(numpes), to pretend we are a hypercube */
+  for ( Cmi_dim=0,n=numpes; n>1; n/=2 )
+    Cmi_dim++ ;
+  CmiSpanTreeInit();
+  CmiTimerInit();
+  CpvInitialize(void *, CmiLocalQueue);
+  CpvAccess(CmiLocalQueue) = FIFO_Create();
+  ConverseCommonInit(argv);
+  CthInit(argv);
+}
 
-
-	Cmi_myrank = 0;
-	mpc_environ(&Cmi_numpes, &Cmi_mype);
-	numpes = Cmi_numpes;
-   mpc_task_query(nbuf, 4, 3);
-   dontcare = nbuf[0];
-   allmsg = nbuf[1];
-   mpc_task_query(nbuf, 2, 2);
-   msgtype = nbuf[0];
-
-	/* find dim = log2(numpes), to pretend we are a hypercube */
-	for ( Cmi_dim=0,n=numpes; n>1; n/=2 )
-		Cmi_dim++ ;
-
-	user_main(argc, argv);
-/*	exit(0); */
+void ConverseInit(argc, argv, fn)
+int argc;
+char *argv[];
+CmiStartFn fn;
+{
+  ConverseStart(argc, argv, fn);
+  fn(argc, argv);
 }
 
 /*****************************************************************************

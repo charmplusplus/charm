@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.19  1997-01-17 15:49:57  jyelon
+ * Revision 1.20  1997-02-13 09:31:39  jyelon
+ * Updated for new main/ConverseInit structure.
+ *
+ * Revision 1.19  1997/01/17 15:49:57  jyelon
  * Minor adjustments to deal with recent changes to Common code.
  *
  * Revision 1.18  1996/11/20 06:46:54  jyelon
@@ -167,6 +170,7 @@ int        Cmi_numpes;
 int        Cmi_nodesize;
 int        Cmi_stacksize = 64000;
 char     **CmiArgv;
+CmiStartFn CmiStart;
 CthThread *CmiThreads;
 Fifo      *CmiQueues;
 int       *CmiBarred;
@@ -494,25 +498,6 @@ char * msg;
 
 /************************** SETUP ***********************************/
 
-void CmiInitMc(argv)
-char *argv[];
-{
-  CpvAccess(CmiLocalQueue) = CmiQueues[CmiMyPe()];
-  CmiSpanTreeInit();
-  CmiTimerInit();
-}
-
-void CmiCallMain()
-{
-  int argc; char **argv;
-  for (argc=0; CmiArgv[argc]; argc++);
-  argv = (char **)CmiAlloc((argc+1)*sizeof(char *));
-  memcpy(argv, CmiArgv, (argc+1)*sizeof(char *));
-  user_main(argc, argv);
-  CmiThreads[CmiMyPe()] = 0;
-  CmiNext();
-}
-
 static void CmiParseArgs(argv)
 char **argv;
 {
@@ -537,22 +522,49 @@ char **argv;
   }
 }
 
-main(argc,argv)
+void CmiInitPE()
+{
+  CpvAccess(CmiLocalQueue) = CmiQueues[CmiMyPe()];
+  CmiSpanTreeInit();
+  CmiTimerInit();
+  ConverseCommonInit(CmiArgv);
+}
+
+void CmiCallMain()
+{
+  int argc; char **argv;
+  for (argc=0; CmiArgv[argc]; argc++);
+  argv = (char **)CmiAlloc((argc+1)*sizeof(char *));
+  memcpy(argv, CmiArgv, (argc+1)*sizeof(char *));
+  CmiInitPE();
+  CmiStart(argc, argv);
+  CmiThreads[CmiMyPe()] = 0;
+  CmiNext();
+}
+
+void ConverseExit()
+{
+  CmiThreads[CmiMyPe()] = 0;
+  CmiNext();
+}
+
+void ConverseStart(argc,argv,fn)
 int argc;
 char *argv[];
+CmiStartFn fn;
 {
-  CthThread t; Fifo q; int stacksize, i;
-
+  CthThread t; int stacksize, i;
+  
 #if CMK_USE_HP_MAIN_FIX
 #if FOR_CPLUS
   _main(argc,argv);
 #endif
 #endif
+  
   CmiArgv = argv;
+  CmiStart = fn;
   CmiParseArgs(argv);
-  
   CthInit(argv);
-  
   CpvInitialize(void*, CmiLocalQueue);
   CmiThreads = (CthThread *)CmiAlloc(CmiNumPes()*sizeof(CthThread));
   CmiBarred  = (int       *)CmiAlloc(CmiNumPes()*sizeof(int));
@@ -566,6 +578,14 @@ char *argv[];
     CmiQueues[i] = FIFO_Create();
   }
   Cmi_mype = 0;
-  CmiCallMain();
+  CmiInitPE();
 }
 
+void ConverseInit(argc,argv,fn)
+int argc;
+char *argv[];
+CmiStartFn fn;
+{
+  ConverseStart(argc, argv, fn);
+  fn(argc, argv);
+}
