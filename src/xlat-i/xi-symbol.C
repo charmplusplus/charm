@@ -771,6 +771,7 @@ Message::genAllocDecl(XStr &str)
   if(compilemode==ansi)
     str << CIMsgClassAnsi;
   else str << CIMsgClass;
+  str << "    CMessage_" << mtype << "() {};\n";
   str << "    static void *pack(" << mtype << " *p);\n";
   str << "    static " << mtype << "* unpack(void* p);\n";
   num = numVars();
