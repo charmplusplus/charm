@@ -27,6 +27,7 @@ Load-balancing test program:
 #include "NeighborLB.h"
 #include "WSLB.h"
 #include "OrbLB.h"
+#include "HybridLB.h"
 
 #include "lb_test.decl.h"
 
@@ -110,6 +111,9 @@ static const struct {
   {"recbf",
    "recbf - Recursive partitioning with Breadth first enumeration, with 2 nuclei",
    CreateRecBisectBfLB},
+  {"hybrid",
+   "hybrid - Hybrid strategy",
+   CreateHybridLB},
 
   {NULL,NULL,NULL}
 };
