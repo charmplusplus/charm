@@ -2,6 +2,8 @@
 
 #if CMK_LBDB_ON
 
+#include <math.h>
+
 #include "lbdb.h"
 #include "LBObj.h"
 #include "LBOM.h"

@@ -178,8 +178,10 @@ void NeighborLB::ReceiveStats(NLBStatsMsg *m)
     receive_stats_ready = 0;
     NLBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
 
+    int i;
+
     // Migrate messages from me to elsewhere
-    for(int i=0; i < migrateMsg->n_moves; i++) {
+    for(i=0; i < migrateMsg->n_moves; i++) {
       MigrateInfo& move = migrateMsg->moves[i];
       const int me = CkMyPe();
       if (move.from_pe == me && move.to_pe != me) {
@@ -192,7 +194,6 @@ void NeighborLB::ReceiveStats(NLBStatsMsg *m)
     }
     
     // Now, send migrate messages to neighbors
-    int i;
     for(i=1; i < num_neighbors(); i++) {
       NLBMigrateMsg* m2 = (NLBMigrateMsg*) CkCopyMsg((void**)&migrateMsg);
       CProxy_NeighborLB(thisgroup).ReceiveMigration(m2,neighbor_pes[i]);
@@ -203,7 +204,7 @@ void NeighborLB::ReceiveStats(NLBStatsMsg *m)
     else delete migrateMsg;
     
     // Zero out data structures for next cycle
-    for(int i=0; i < clients; i++) {
+    for(i=0; i < clients; i++) {
       delete statsMsgsList[i];
       statsMsgsList[i]=0;
     }
