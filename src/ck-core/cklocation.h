@@ -250,6 +250,8 @@ public:
   virtual ~CkMigratable();
   virtual void pup(PUP::er &p);
 
+  virtual void pupCpdData(PUP::er &p);
+  
   inline int ckGetChareType(void) const {return thisChareType;}
   const CkArrayIndex &ckGetArrayIndex(void) const {return myRec->getIndex();}
 
@@ -389,6 +391,8 @@ class CkMagicNumber : public CkMagicNumber_impl {
  * This is a transient class-- do not attempt to store it or send 
  * it across processors.
  */
+
+        
 class CkLocation {
 	CkLocMgr *mgr;
 	CkLocRec_local *rec;
@@ -403,6 +407,13 @@ public:
 	
 	/// Pup all the array elements at this location.
 	void pup(PUP::er &p);
+        
+        //data for each array element, used by cpd; should be
+        //implemented by user
+        //buf holds the string array to be displayed while
+        //bufLen holds its length
+        void pupCpdData(PUP::er &p);
+             
 };
 
 /**
@@ -564,7 +575,7 @@ private:
 
 	friend class CkLocation; //so it can call pupElementsFor
 	void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
-		CkElementCreation_t type);
+		CkElementCreation_t type, int forCpd = 0);
 
 	/// Call this member function on each element of this location:
 	typedef void (CkMigratable::* CkMigratable_voidfn_t)(void);
