@@ -29,6 +29,9 @@ public:
   static const char *Index;
 };
 
+typedef enum {
+	forAll=0,forIndividual=1,forSection=2,forIndex=-1
+} forWhom;
 
 class Chare;//Forward declaration
 class Message;
@@ -95,15 +98,14 @@ class Type : public Printable {
     virtual int isMessage(void) const {return 0;}
     virtual int isTemplated(void) const { return 0; }
     virtual int isPointer(void) const {return 0;}
-    virtual int isReference(void) const {return 0;}
-    virtual int isConst(void) const {return 0;}
+    virtual int isNamed(void) const { return 0; }
     virtual Type *deref(void) {return this;}
     virtual const char *getBaseName(void) = 0;
-    virtual void genProxyName(XStr &str,int forElement);
+    virtual void genProxyName(XStr &str,forWhom forElement);
     virtual void genIndexName(XStr &str);
     virtual void genMsgProxyName(XStr& str);
-    XStr proxyName(int forEl) 
-    	{XStr ret; genProxyName(ret,forEl); return ret;}
+    XStr proxyName(forWhom w)
+    	{XStr ret; genProxyName(ret,w); return ret;}
     XStr indexName(void) 
     	{XStr ret; genIndexName(ret); return ret;}
     XStr msgProxyName(void) 
@@ -131,8 +133,9 @@ class NamedType : public Type {
        : name(n), tparams(t) {}
     int isTemplated(void) const { return (tparams!=0); }
     void print(XStr& str);
+    int isNamed(void) const {return 1;}
     const char *getBaseName(void) { return name; }
-    virtual void genProxyName(XStr& str,int forElement);
+    virtual void genProxyName(XStr& str,forWhom forElement);
     virtual void genIndexName(XStr& str) 
     { 
       str << Prefix::Index; 
@@ -165,6 +168,7 @@ class PtrType : public Type {
     }
 };
 
+/* I don't think these are useful any longer (OSL 11/30/2001)
 class ReferenceType : public Type {
   private:
     Type *referant;
@@ -185,6 +189,7 @@ class ConstType : public Type {
     void print(XStr& str) {str<<"const "<<type;}
     const char *getBaseName(void) { return type->getBaseName(); }
 };
+*/
 
 //This is used as a list of base classes
 class TypeList : public Printable {
@@ -196,7 +201,7 @@ class TypeList : public Printable {
     Type *getFirst(void) {return type;}
     void print(XStr& str);
     void genProxyNames(XStr& str, const char *prefix, const char *middle, 
-                        const char *suffix, const char *sep, int forElement);
+                        const char *suffix, const char *sep, forWhom forElement);
 };
 
 /**************** Parameter types & lists (for marshalling) ************/
@@ -208,6 +213,7 @@ class Parameter {
     			 NULL if not an array*/
     Value *val; /*Initial value, if any*/
     int line;
+    int byReference; //Fake a pass-by-reference (for efficiency)
     friend class ParamList;
     void pup(XStr &str);
     void marshallArraySizes(XStr &str);
@@ -264,7 +270,7 @@ class ParamList {
     void printMsg(XStr& str) {
         param->printMsg(str);
     }
-    void marshall(XStr &str,int orMakeVoid);
+    void marshall(XStr &str);
     void beginUnmarshall(XStr &str);
     void unmarshall(XStr &str);
     void unmarshallAddress(XStr &str);
@@ -451,7 +457,7 @@ class Chare : public TEntity {
   protected:
     attrib_t attrib;
     int hasElement;//0-- no element type; 1-- has element type
-    int forElement;//0-- applies to entire array/group; 1-- applies only to element
+    forWhom forElement;
     int hasSection; //1-- applies only to array section
 
     NamedType *type;
@@ -484,7 +490,8 @@ class Chare : public TEntity {
     int  isArray(void) {return attrib&CARRAY;}
     int  isGroup(void) {return attrib&CGROUP;}
     int  isNodeGroup(void) {return attrib&CNODEGROUP;}
-    int  isForElement(void) const {return forElement;}
+    int  isForElement(void) const {return forElement==forIndividual;}
+    forWhom getForWhom(void) const {return forElement;}
     void print(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
@@ -629,7 +636,7 @@ class Entry : public Member {
     XStr paramType(int withDefaultVals);
     XStr paramComma(int withDefaultVals);
     XStr syncReturn(void);
-    XStr marshallMsg(int orMakeVoid=1);
+    XStr marshallMsg(void);
     XStr callThread(const XStr &procName,int prependEntryName=0);
   public:
     Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz=0);
