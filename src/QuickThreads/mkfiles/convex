@@ -1,5 +1,5 @@
 
-CC=/bin/cc -I. -O
+CC=/bin/cc -I. -L. -O
 
 all: qt stp testpgm
 
@@ -14,7 +14,7 @@ stp:
 	$(CC) -c stp.c
 	ar q libstp.a stp.o
 
-testpgm:
+testpgm: qt stp
 	$(CC) -c meas.c
 	cc -c -o qtmdb.o md/hppa_b.s
 	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a

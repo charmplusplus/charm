@@ -391,11 +391,15 @@ endif
 if ($?DEBUG_MODE) then
     set OPTS_CC  = ( $CMK_C_DEBUG $OPTS_CC )
     set OPTS_CXX = ( $CMK_CXX_DEBUG $OPTS_CXX )
+    set OPTS_LD  = ( $CMK_C_DEBUG $OPTS_LD )
+    set OPTS_LDXX = ( $CMK_CXX_DEBUG $OPTS_LDXX )
 endif
 
 if ($?OPTIMIZE_MODE) then
     set OPTS_CC  = ( $CMK_C_OPTIMIZE $OPTS_CC )
     set OPTS_CXX = ( $CMK_CXX_OPTIMIZE $OPTS_CXX )
+    set OPTS_LD  = ( $CMK_C_OPTIMIZE $OPTS_LD )
+    set OPTS_LDXX = ( $CMK_CXX_OPTIMIZE $OPTS_LDXX )
 endif
 
 onintr failure

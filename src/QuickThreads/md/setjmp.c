@@ -1,6 +1,9 @@
 
 #include "qt.h"
 #include <setjmp.h>
+#ifdef ALLOCA_H
+#include <alloca.h>
+#endif
 
 struct helpdesc { qt_helper_t *hfn; qt_t *jb; void *old; void *new; };
 

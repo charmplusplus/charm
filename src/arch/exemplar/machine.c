@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.22  1997-07-22 18:16:05  milind
+ * Revision 2.23  1997-07-23 16:55:02  milind
+ * Made Converse run on Exemplar.
+ *
+ * Revision 2.22  1997/07/22 18:16:05  milind
  * fixed some exemplar-related bugs.
  *
  * Revision 2.21  1996/11/23 02:25:36  milind
@@ -115,13 +118,13 @@ CpvDeclare(void*, CmiLocalQueue);
 CpvDeclare(int, Cmi_mype);
 CpvDeclare(int, Cmi_numpes);
 CpvDeclare(int, Cmi_myrank);
+CpvDeclare(int, Cmi_nodesize);
 
 static node_private barrier_t barrier;
 static node_private barrier_t *barr;
 static node_private int *nthreads;
 static node_private int requested_npe;
 
-static void mycpy();
 static void threadInit();
 
 void *CmiAlloc(size)
@@ -185,6 +188,7 @@ typedef struct {
    void *argv;
    int  npe;
    CmiStartFn fn;
+   int usched;
 } USER_PARAMETERS;
 
 
@@ -220,10 +224,12 @@ void ConverseInit(int argc, char** argv, CmiStartFn fn, int usched, int initret)
     }
 
 
+    printf("Requested NP = %d\n", requested_npe);
     usrparam.argc = argc;
     usrparam.argv = (void *) argv;
     usrparam.npe  = requested_npe;
     usrparam.fn = fn;
+    usrparam.usched = usched;
     request.node = CPS_ANY_NODE;
     request.min  = requested_npe;
     request.max  = requested_npe;
@@ -242,12 +248,19 @@ void ConverseInit(int argc, char** argv, CmiStartFn fn, int usched, int initret)
     }
     for(i=0; i<requested_npe; i++) MsgQueue[i] = McQueueCreate();
 
-    if (cps_ppcall(&request, threadInit ,arg) != requested_npe) {
+    if (cps_ppcall(&request, threadInit ,arg) < 0) {
 	CmiError("Cannot created threads...\n");
 	exit(1);
     } 
     cps_barrier_free(barr);
 
+}
+
+void CmiInitMc(char **);
+
+void ConverseExit(void)
+{
+   cps_barrier(barr,nthreads);
 }
 
 static void threadInit(arg)
@@ -258,12 +271,21 @@ void *arg;
 
     CpvInitialize(int, Cmi_mype);
     CpvInitialize(int, Cmi_numpes);
+    CpvInitialize(int, Cmi_myrank);
+    CpvInitialize(int, Cmi_nodesize);
     CpvInitialize(void*, CmiLocalQueue);
 
     CpvAccess(Cmi_mype)  = my_thread();
     CpvAccess(Cmi_numpes) =  usrparam->npe;
+    CpvAccess(Cmi_myrank)  = CpvAccess(Cmi_mype);
+    CpvAccess(Cmi_nodesize)  = CpvAccess(Cmi_numpes);
 
+    ConverseCommonInit(usrparam->argv);
+    CthInit(usrparam->argv);
+    CmiInitMc(usrparam->argv);
     usrparam->fn(usrparam->argc,usrparam->argv);
+    if (usrparam->usched==0) CsdScheduler(-1);
+    ConverseExit();
 }
 
 
@@ -314,7 +336,7 @@ char *msg;
         buf += 8;
 
 
-        mycpy((double *)buf,(double *)msg,size);
+        memcpy((double *)buf,(double *)msg,size);
         McQueueAddToBack(MsgQueue[destPE],buf); 
 }
 
@@ -400,24 +422,6 @@ void CmiNodeBarrier()
 
 
 
-
-static void mycpy(double *dst, double *src, int bytes)
-{
-        unsigned char *cdst, *csrc;
-
-        while(bytes>8)
-        {
-                *dst++ = *src++;
-                bytes -= 8;
-        }
-        cdst = (unsigned char *) dst;
-        csrc = (unsigned char *) src;
-        while(bytes)
-        {
-                *cdst++ = *csrc++;
-                bytes--;
-        }
-}
 
 /* ********************************************************************** */
 /* The following functions are required by the load balance modules       */
