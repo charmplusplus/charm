@@ -107,7 +107,7 @@ TRACELIBS=libtrace-none.lib libtrace-projections.lib libtrace-summary.lib
 
 CVLIBS=libconv-core.lib libconv-cplus-n.lib libconv-cplus-y.lib libldb-rand.obj libldb-spray.obj libldb-graph.obj libldb-test.obj $(TRACELIBS)
 	
-LIBCONV_CORE=threads.obj convcore.obj conv-conds.obj spantree.obj queueing.obj fifo.obj msgmgr.obj memory.obj cpm.obj cpthreads.obj futures.obj cldb.obj random.obj debug-message.obj debug-object.obj info.obj generate.obj edgelist.obj conv-ccs.obj winrand48.obj
+LIBCONV_CORE=threads.obj convcore.obj conv-conds.obj spantree.obj queueing.obj fifo.obj msgmgr.obj memory.obj cpm.obj cpthreads.obj futures.obj cldb.obj random.obj debug-message.obj debug-object.obj info.obj generate.obj edgelist.obj conv-ccs.obj winrand48.obj quiescence.obj
 
 CONVERSE : BASICS $(CVLIBS) CONV-HOST CONVLIBS DAEMON CONVCPM
 
@@ -224,6 +224,9 @@ generate.obj : generate.c typedefs.h $(CVHEADERS)
 
 cldb.obj : cldb.c cldb.h $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) cldb.c
+
+quiescence.obj: quiescence.c $(CVHEADERS) 
+	$(CPP) $(CPP_PROJ) quiescence.c
 
 libldb-rand.obj : cldb.rand.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) cldb.rand.c
