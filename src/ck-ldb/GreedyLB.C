@@ -197,7 +197,7 @@ void GreedyLB::work(BaseLB::LDStats* stats, int count)
   heapSize--;
   for (obj=0; obj < objCount; obj++) {
     HeapData minCpu;  
-    // Operation of extracting the the least loaded processor
+    // Operation of extracting the least loaded processor
     // from the heap
     minCpu = cpuData[0];
     cpuData[0] = cpuData[heapSize];
@@ -215,7 +215,7 @@ void GreedyLB::work(BaseLB::LDStats* stats, int count)
     if (dest != pe) {
       stats->to_proc[id] = dest;
       if (_lb_args.debug()>2) 
-        CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),obj,pe,dest);
+        CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),objData[obj].id,pe,dest);
     }
 
     //Insert the least loaded processor with load updated back into the heap
