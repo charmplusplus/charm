@@ -78,16 +78,22 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 
 	for (c=thismodule->chares; c!=NULL; c=c->next ) {
 
-		if (c->isExtern())
+		if (c->isExtern()){
+			sprintf(str,"int _CK_chare_%s = 0 ;",c->name) ;
+			bot << str << endl ;
+
 			sprintf(str,"extern int _CK_chare_%s ;",c->name) ;
-		else
+		} else
 			sprintf(str,"int _CK_chare_%s = 0 ;",c->name) ;
 		top << str << endl ;
 
 		for (e=c->entries; e!=NULL; e=e->next ) {
-			if (c->isExtern())
+			if (c->isExtern()) {
+				sprintf(str,"int _CK_ep_%s_%s = 0 ;",c->name,e->name) ;
+				bot << str << endl ;
+
 				sprintf(str,"extern int _CK_ep_%s_%s ;",c->name,e->name) ;
-			else
+			} else
 				sprintf(str,"int _CK_ep_%s_%s = 0 ;",c->name,e->name) ;
 			top << str << endl ;
 		}
