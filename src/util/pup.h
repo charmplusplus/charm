@@ -259,10 +259,14 @@ class er {
   /// Insert a synchronization marker and comment into the stream.
   ///  Only applies if this PUP::er wants comments.
   inline void syncComment(unsigned int sync,const char *message=0) {
+#ifndef CMK_OPTIMIZE
   	if (hasComments()) {
 		synchronize(sync);
 		if (message) comment(message);
 	}
+#else
+	/* empty, to avoid expensive virtual function calls */
+#endif
   }
 
   //Generic bottleneck: pack/unpack n items of size itemSize
@@ -743,7 +747,7 @@ public:
 	friend inline void operator|(PUP::er &p,CkReference<T> &v) {v.pup(p);}
 };
 
-// For people that forget ::'s:
+// For people that forget the "::"
 typedef PUP::er PUPer;
 typedef PUP::able PUPable;
 
@@ -751,70 +755,111 @@ typedef PUP::able PUPable;
 The parameter marshalling system pups each variable v using just:
      p|v;
 Thus we need a "void operator|(PUP::er &p,T &v)" for all types
-that work with parameter marshalling.  This operator| is often
-defined by the PUPmarshall macro, below.
+that work with parameter marshalling. 
 */
 
-//These versions map p|t to p(t) for all built-in types
-inline void operator|(PUP::er &p,signed char &t) {p(t);}
-#if CMK_SIGNEDCHAR_DIFF_CHAR
-inline void operator|(PUP::er &p,char &t) {p(t);}
+namespace PUP {
+	/** 
+	  Traits class: decide if the type T can be safely
+	  pupped as raw bytes.  This is true of classes that
+	  do not contain pointers and do not need pup routines.
+	  Use this like:
+	     if (PUP::as_bytes<someClass>::value) { ... }
+	*/
+	template<class T> class as_bytes {
+#ifdef CK_DEFAULT_BITWISE_PUP   /* OLD */
+		public: enum {value=1};
+#else /* normal case: don't pack as bytes by default */
+		public: enum {value=0};
 #endif
-inline void operator|(PUP::er &p,unsigned char &t) {p(t);}
-inline void operator|(PUP::er &p,short &t) {p(t);}
-inline void operator|(PUP::er &p,int &t) {p(t);}
-inline void operator|(PUP::er &p,long &t) {p(t);}
-inline void operator|(PUP::er &p,unsigned short &t) {p(t);}
-inline void operator|(PUP::er &p,unsigned int &t) {p(t);}
-inline void operator|(PUP::er &p,unsigned long &t) {p(t);}
-inline void operator|(PUP::er &p,float &t) {p(t);}
-inline void operator|(PUP::er &p,double &t) {p(t);}
-inline void operator|(PUP::er &p,CmiBool &t) {p(t);}
-#if CMK_LONG_DOUBLE_DEFINED
-inline void operator|(PUP::er &p,long double &t) {p(t);}
-#endif
-#ifdef CMK_PUP_LONG_LONG
-inline void operator|(PUP::er &p,CMK_PUP_LONG_LONG &t) {p(t);}
-inline void operator|(PUP::er &p,unsigned CMK_PUP_LONG_LONG &t) {p(t);}
-#endif
+	};
+};
 
-#ifdef CK_DEFAULT_BITWISE_PUP
-/// This defines "p|t" as a byte-by-byte copy, for any
-///  user-defined type T that does not have a normal operator| defined.
-/// It is the old, "convenient but error-prone" definition.
+#ifdef CK_DEFAULT_BITWISE_PUP   /* OLD compatability mode*/
+/// Default operator| and PUParray: copy as bytes.
 template <class T>
-inline void operator|(PUP::er &p,T &t)
-{
-         p((void *)&t,sizeof(T));
+inline void operator|(PUP::er &p,T &t) {p((void *)&t,sizeof(T));}
+template <class T>
+inline void PUParray(PUP::er &p,T *ta,int n) { p((void *)ta,n*sizeof(T)); }
+
+/* enable normal pup mode from CK_DEFAULT_BITWISE_PUP */
+#  define PUPmarshall(type) \
+template<class T> inline void operator|(PUP::er &p,T &t) { t.pup(p); } \
+template<class T> inline void PUParray(PUP::er &p,T *t,int n) { \
+	for (int i=0;i<n;i++) p|t[i]; \
 }
 
-//Map operator| to this classes' ordinary pup routine.
-#define PUPmarshall(type) \
-  inline void operator|(PUP::er &p,type &t) {t.pup(p);}
-
-#else /* The usual case: !CK_DEFAULT_BITWISE_PUP */
-
-/// This defines "p|t" to call t's pup routine, if no
-///  existing operator| is found.
-template <class T>
-inline void operator|(PUP::er &p,T &t) {
+#else /* !CK_DEFAULT_BITWISE_PUP */
+/// Normal case: Call pup routines by default
+/**
+  Default operator|: call pup routine.
+*/
+template<class T>
+inline void operator|(PUP::er &p,T &t) { 
 	p.syncComment(PUP::sync_begin_object);
 	t.pup(p);
-	p.syncComment(PUP::sync_end_object);
+	p.syncComment(PUP::sync_end_object); 
 }
 
-#define PUPmarshall(type) /* empty, for backward compatability */
+/**
+  Default PUParray: pup each element.
+*/
+template<class T>
+inline void PUParray(PUP::er &p,T *t,int n) {
+	p.syncComment(PUP::sync_begin_array);
+	for (int i=0;i<n;i++) {
+		p.syncComment(PUP::sync_item);
+		p|t[i];
+	}
+	p.syncComment(PUP::sync_end_array);
+}
 
+/* PUPmarshall macro: now a deprecated no-op */
+#  define PUPmarshall(type) /* empty, pup routines now the default */
 #endif
-
 #define PUPmarshal(type) PUPmarshall(type) /*Support this common misspelling*/
 
-
-/// Copy these classes as raw memory
+/// Copy this type as raw memory (like memcpy).
 #define PUPbytes(type) \
-  inline void operator|(PUP::er &p,type &t) { p((void *)&t,sizeof(type)); }
-
+  inline void operator|(PUP::er &p,type &t) {p((void *)&t,sizeof(type));} \
+  inline void PUParray(PUP::er &p,type *ta,int n) { p((void *)ta,n*sizeof(type)); } \
+  namespace PUP { template<> class as_bytes<type> { \
+  	public: enum {value=1};  \
+  }; };
 #define PUPmarshallBytes(type) PUPbytes(type)
+
+
+/**
+  For all builtin types, like "int",
+  operator| and PUParray use p(t) and p(ta,n).
+*/
+#define PUP_BUILTIN_SUPPORT(type) \
+  inline void operator|(PUP::er &p,type &t) {p(t);} \
+  inline void PUParray(PUP::er &p,type *ta,int n) { p(ta,n); } \
+  namespace PUP { template<> class as_bytes<type> { \
+  	public: enum {value=1};  \
+  }; };
+PUP_BUILTIN_SUPPORT(signed char)
+#if CMK_SIGNEDCHAR_DIFF_CHAR
+PUP_BUILTIN_SUPPORT(char)
+#endif
+PUP_BUILTIN_SUPPORT(unsigned char)
+PUP_BUILTIN_SUPPORT(short)
+PUP_BUILTIN_SUPPORT(int)
+PUP_BUILTIN_SUPPORT(long)
+PUP_BUILTIN_SUPPORT(unsigned short)
+PUP_BUILTIN_SUPPORT(unsigned int)
+PUP_BUILTIN_SUPPORT(unsigned long)
+PUP_BUILTIN_SUPPORT(float)
+PUP_BUILTIN_SUPPORT(double)
+PUP_BUILTIN_SUPPORT(CmiBool)
+#if CMK_LONG_DOUBLE_DEFINED
+PUP_BUILTIN_SUPPORT(long double)
+#endif
+#ifdef CMK_PUP_LONG_LONG
+PUP_BUILTIN_SUPPORT(CMK_PUP_LONG_LONG)
+PUP_BUILTIN_SUPPORT(unsigned CMK_PUP_LONG_LONG)
+#endif
 
 
 //This macro is useful in simple pup routines:
@@ -823,9 +868,9 @@ inline void operator|(PUP::er &p,T &t) {
 #define PUPn(field) \
   do{  if (p.hasComments()) p.comment(#field); p|field; } while(0)
 
-//Like PUPn(x), above, but for arrays of built-in types.
+//Like PUPn(x), above, but for arrays.
 #define PUPv(field,len) \
-  do{  if (p.hasComments()) p.comment(#field); p(field,len); } while(0)
+  do{  if (p.hasComments()) p.comment(#field); PUParray(p,field,len); } while(0)
 
 
 #endif //def __CK_PUP_H
