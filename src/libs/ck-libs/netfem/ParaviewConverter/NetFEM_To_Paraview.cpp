@@ -15,6 +15,9 @@
 #include "netfem_data.h"
 #include "netfem_update_vtk.h"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+
 using namespace std;
 
 void convert(char* from, char* to){

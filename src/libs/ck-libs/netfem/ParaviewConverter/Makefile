@@ -10,7 +10,7 @@ CHARMDIR = ../../../../..
 DEST = NetFEM_To_Paraview
 
 CC   = g++
-FLAGS = -O
+FLAGS = -O -Wno-long-double
 
 # Shouldn't need to modify anything else below
 CHARMINC=-I$(CHARMDIR)/include
