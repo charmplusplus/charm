@@ -74,9 +74,9 @@
 #define CMK_STRERROR_IS_A_BUILTIN                          0
 #define CMK_STRERROR_USE_SYS_ERRLIST                       1
 
-#define CMK_STRINGS_USE_OWN_DECLARATIONS                   1
+#define CMK_STRINGS_USE_OWN_DECLARATIONS                   0
 #define CMK_STRINGS_USE_STRINGS_H                          0
-#define CMK_STRINGS_USE_STRING_H                           0
+#define CMK_STRINGS_USE_STRING_H                           1
 
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
