@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-09-19 18:56:26  jyelon
+ * Revision 2.5  1995-09-20 13:22:57  jyelon
+ * Added 'CMK_THREAD_' flags.
+ *
+ * Revision 2.4  1995/09/19  18:56:26  jyelon
  * added CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION and other goodies.
  *
  * Revision 2.3  1995/07/05  21:33:36  brunner
@@ -41,6 +44,8 @@
 #define CMK_CMIPRINTF_IS_A_BUILTIN
 /* #define CMK_CMIPRINTF_IS_JUST_PRINTF */
 
+/* #define CMK_THREADS_UNAVAILABLE */
+#define CMK_THREADS_USE_ALLOCA
 
 
 
