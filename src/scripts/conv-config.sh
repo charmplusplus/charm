@@ -45,13 +45,15 @@ CMK_LD_SHARED="-shared"
 [ -z "$CMK_CC_RELIABLE" ] && CMK_CC_RELIABLE="$CMK_CC"
 [ -z "$CMK_CC_FASTEST" ] && CMK_CC_FASTEST="$CMK_CC"
 [ -z "$CMK_CC_RELIABLE" ] && CMK_CC_RELIABLE="$CMK_CC"
-[ -z "$CMK_SEQ_CC" ] && CMK_SEQ_CC="$CMK_CC"
-[ -z "$CMK_SEQ_CXX" ] && CMK_SEQ_CXX="$CMK_CXX"
-[ -z "$CMK_SEQ_LD" ] && CMK_SEQ_LD="$CMK_LD"
-[ -z "$CMK_SEQ_LDXX" ] && CMK_SEQ_LDXX="$CMK_LDXX"
-[ -z "$CMK_SEQ_F90" ] && CMK_SEQ_F90="$CMK_CF90"
-[ -z "$CMK_SEQ_AR" ] && CMK_SEQ_AR="$CMK_AR"
-[ -z "$CMK_SEQ_RANLIB" ] && CMK_SEQ_RANLIB="$CMK_RANLIB"
+
+# set default earlier because option configs may need these value
+[ -z "$CMK_NATIVE_CC" ] && CMK_NATIVE_CC="$CMK_CC"
+[ -z "$CMK_NATIVE_CXX" ] && CMK_NATIVE_CXX="$CMK_CXX"
+[ -z "$CMK_NATIVE_LD" ] && CMK_NATIVE_LD="$CMK_LD"
+[ -z "$CMK_NATIVE_LDXX" ] && CMK_NATIVE_LDXX="$CMK_LDXX"
+[ -z "$CMK_NATIVE_F90" ] && CMK_NATIVE_F90="$CMK_CF90"
+[ -z "$CMK_NATIVE_AR" ] && CMK_NATIVE_AR="$CMK_AR"
+[ -z "$CMK_NATIVE_LIBS" ] && CMK_NATIVE_LIBS="$CMK_LIBS"
 
 if [ -r $CHARMINC/conv-mach-opt.sh ]
 then
@@ -60,9 +62,11 @@ fi
 
 [ -n "$CMK_CC64" ] && CMK_QT="${CMK_QT}64"
 
-[ -z "$CMK_NATIVE_CC" ] && CMK_NATIVE_CC="$CMK_SEQ_CC"
-[ -z "$CMK_NATIVE_LD" ] && CMK_NATIVE_LD="$CMK_SEQ_LD"
-[ -z "$CMK_NATIVE_CXX" ] && CMK_NATIVE_CXX="$CMK_SEQ_CXX"
-[ -z "$CMK_NATIVE_LDXX" ] && CMK_NATIVE_LDXX="$CMK_SEQ_LDXX"
-[ -z "$CMK_NATIVE_LIBS" ] && CMK_NATIVE_LIBS="$CMK_SEQ_LIBS"
+[ -z "$CMK_SEQ_CC" ] && CMK_SEQ_CC="$CMK_CC"
+[ -z "$CMK_SEQ_CXX" ] && CMK_SEQ_CXX="$CMK_CXX"
+[ -z "$CMK_SEQ_LD" ] && CMK_SEQ_LD="$CMK_LD"
+[ -z "$CMK_SEQ_LDXX" ] && CMK_SEQ_LDXX="$CMK_LDXX"
+[ -z "$CMK_SEQ_F90" ] && CMK_SEQ_F90="$CMK_CF90"
+[ -z "$CMK_SEQ_AR" ] && CMK_SEQ_AR="$CMK_AR"
+[ -z "$CMK_SEQ_RANLIB" ] && CMK_SEQ_RANLIB="$CMK_RANLIB"
 
