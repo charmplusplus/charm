@@ -39,18 +39,6 @@ void LBObj::IncrementTime(double walltime, double cputime)
   data.cpuTime += cputime;
 }
 
-void LBObj::StartTimer(void)
-{
-  startWTime = CkWallTimer();
-  startCTime = CkCpuTimer();
-}
-
-void LBObj::StopTimer(double* walltime, double* cputime)
-{
-  *walltime = CkWallTimer() - startWTime;
-  *cputime = CkCpuTimer() - startCTime;
-}
-
 #endif
 
 /*@}*/

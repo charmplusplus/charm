@@ -63,8 +63,14 @@ public:
   void Clear(void);
 
   void IncrementTime(double walltime, double cputime);
-  void StartTimer(void);
-  void StopTimer(double* walltime, double* cputime);
+  inline void StartTimer(void) {
+	startWTime = CkWallTimer();
+	startCTime = CkCpuTimer();
+  }
+  inline void StopTimer(double* walltime, double* cputime) {
+	*walltime = CkWallTimer() - startWTime;
+	*cputime = CkCpuTimer() - startCTime;
+  }
 
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
   inline const LDObjHandle &GetLDObjHandle() const { return data.handle; }
