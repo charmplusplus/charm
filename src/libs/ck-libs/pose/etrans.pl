@@ -550,12 +550,13 @@ while (@line=split(' ',($thisline=getcodeline($inChandle)))) {
       $outChandle->print("  myStrat = new ".$strat{$class}."();\n");
       $outChandle->print("  $messagename->parent = this;\n");
       $outChandle->print("  $messagename->str = myStrat;\n");
+      $outChandle->print("  int _ts = $messagename->timestamp;\n");
       $outChandle->print("#ifdef POSE_STATS_ON\n  localStats->SwitchTimer(DO_TIMER);\n#endif\n");
       $outChandle->print("  objID = new state_$method($messagename);\n");
       $outChandle->print("#ifdef POSE_STATS_ON\n  localStats->SwitchTimer(SIM_TIMER);\n#endif\n");
       $outChandle->print("  myStrat->init(eq, objID, this, thisIndex);\n");
       $outChandle->print("#ifdef POSE_STATS_ON\n  localStats->TimerStop();\n#endif\n");
-      $outChandle->print("  myPVTidx = pvt->objRegister(thisIndex, $messagename->timestamp, sync, this);\n");
+      $outChandle->print("  myPVTidx = pvt->objRegister(thisIndex, _ts, sync, this);\n");
       $outChandle->print("#ifdef LB_ON  \n");
       $outChandle->print("  myLBidx = localLBG->objRegister(thisIndex, sync, this);\n");
       $outChandle->print("#endif  \n");
