@@ -118,6 +118,8 @@ public:
     void deleteCommHash();
     int getHash(const LDObjKey &);
     int getHash(const LDObjid &oid, const LDOMid &mid);
+    int getSendHash(LDCommData &cData);
+    int getRecvHash(LDCommData &cData);
     void clear() {
       n_objs = n_comm = 0;
       delete [] objData;

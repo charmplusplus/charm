@@ -177,6 +177,7 @@ typedef struct {
   int src_proc;
   LDObjKey  sender;
   LDCommDesc   receiver;
+  int  sendHash, recvHash;
   int messages;
   int bytes;
 #ifdef __cplusplus
@@ -390,6 +391,9 @@ inline void LDCommData::pup(PUP::er &p) {
     p|receiver;
     p|messages;
     p|bytes;
+    if (p.isUnpacking()) {
+      sendHash = recvHash = -1;
+    }
 }
 PUPmarshall(LDCommData)
 #endif

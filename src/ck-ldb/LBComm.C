@@ -177,6 +177,7 @@ void LBCommTable::GetCommData(LDCommData* data)
 
   for(i=0; i < cur_sz; i++, curtable++, curstate++) {
     if (*curstate == InUse) {
+      out->sendHash = out->recvHash = -1;
       if (curtable->from_proc()) {
 	out->src_proc = curtable->src_proc;
       } else {

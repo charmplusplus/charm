@@ -49,7 +49,8 @@ private:
     int 	shown;		// if 0, donot show in help page
     LBDBEntry(): name(0), cfn(0), afn(0), help(0), shown(1) {}
     LBDBEntry(int) {}
-    LBDBEntry(const char *n, LBCreateFn cf, LBAllocFn af, const char *h, int show=1):
+    LBDBEntry(const char *n, LBCreateFn cf, LBAllocFn af, 
+              const char *h, int show=1):
       name(n), cfn(cf), afn(af), help(h), shown(show) {};
   };
   CkVec<LBDBEntry> lbtables;	 	// a list of available LBs linked

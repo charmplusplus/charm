@@ -29,7 +29,7 @@ void RefinerComm::create(int count, CentralLB::LDStats* _stats, int* procs)
      	LDCommData &comm = cdata[i];
 	if (!comm.from_proc()) {
           // out going message
-	  int computeIdx = stats->getHash(comm.sender);
+	  int computeIdx = stats->getSendHash(comm);
           CmiAssert(computeIdx >= 0 && computeIdx < numComputes);
           computes[computeIdx].sendmessages.push_back(i);
         }
@@ -37,7 +37,7 @@ void RefinerComm::create(int count, CentralLB::LDStats* _stats, int* procs)
 	// FIXME: only obj msg here
         // incoming messages
 	if (comm.receiver.get_type() == LD_OBJ_MSG)  {
-          int computeIdx = stats->getHash(comm.receiver.get_destObj());
+          int computeIdx = stats->getRecvHash(comm);
           CmiAssert(computeIdx >= 0 && computeIdx < numComputes);
           computes[computeIdx].recvmessages.push_back(i);
         }
@@ -71,7 +71,7 @@ void RefinerComm::processorCommCost()
     if (cdata.from_proc())
       senderPE = cdata.src_proc;
     else {
-      int idx = stats->getHash(cdata.sender);
+      int idx = stats->getSendHash(cdata);
       CmiAssert(idx != -1);
       senderPE = computes[idx].oldProcessor;	// object's original processor
     }
@@ -80,7 +80,7 @@ void RefinerComm::processorCommCost()
       receiverPE = cdata.receiver.proc();
       break;
     case LD_OBJ_MSG:  {
-      int idx = stats->getHash(cdata.receiver.get_destObj());
+      int idx = stats->getRecvHash(cdata);
       CmiAssert(idx != -1);
       receiverPE = computes[idx].oldProcessor;
       break;
@@ -165,7 +165,7 @@ void RefinerComm::commAffinity(int c, int pe, Messages &m)
     LDCommData &cdata = stats->commData[obj.sendmessages[i]];
     bool sendtope = false;
     if (cdata.receiver.get_type() == LD_OBJ_MSG) {
-      int recvCompute = stats->getHash(cdata.receiver.get_destObj());
+      int recvCompute = stats->getRecvHash(cdata);
       int recvProc = computes[recvCompute].processor;
       if (recvProc != -1 && recvProc == pe) sendtope = true;
     }
@@ -192,7 +192,7 @@ void RefinerComm::commAffinity(int c, int pe, Messages &m)
       sendProc = cdata.src_proc;
     }
     else {
-      int sendCompute = stats->getHash(cdata.sender);
+      int sendCompute = stats->getSendHash(cdata);
       sendProc = computes[sendCompute].processor;
     }
     if (sendProc != -1 && sendProc == pe) {
@@ -219,7 +219,7 @@ void RefinerComm::objCommCost(int c, int pe, Messages &m)
       CmiAssert(0);
     }
     if (cdata.receiver.get_type() == LD_OBJ_MSG) {
-      int recvCompute = stats->getHash(cdata.receiver.get_destObj());
+      int recvCompute = stats->getRecvHash(cdata);
       int recvProc = computes[recvCompute].processor;
       if (recvProc!= -1 && recvProc != pe) diffPe = true;
     }
@@ -248,7 +248,7 @@ void RefinerComm::objCommCost(int c, int pe, Messages &m)
       if (cdata.src_proc != pe) diffPe = true;
     }
     else {
-      int sendCompute = stats->getHash(cdata.sender);
+      int sendCompute = stats->getSendHash(cdata);
       int sendProc = computes[sendCompute].processor;
       if (sendProc != -1 && sendProc != pe) diffPe = true;
     }

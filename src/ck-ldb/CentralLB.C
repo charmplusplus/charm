@@ -782,6 +782,7 @@ void CentralLB::readStatsMsgs(const char* filename)
   statsData->pup(p);
 
   CmiPrintf("Simulation for %d pes \n", LBSimulation::simProcs);
+  CmiPrintf("n_obj: %d n_migratble: %d \n", statsData->n_objs, statsData->n_migrateobjs);
 
   // file f is closed in the destructor of PUP::fromDisk
   CmiPrintf("ReadStatsMsg from %s completed\n", filename);
@@ -943,12 +944,85 @@ CentralLB::LDStats::LDStats():
         objHash(NULL) { 
   procs = new ProcStats[CkNumPes()]; 
 }
+
+const static unsigned int doublingPrimes[] = {
+3,
+7,
+17,
+37,
+73,
+157,
+307,
+617,
+1217,
+2417,
+4817,
+9677,
+20117,
+40177,
+80177,
+160117,
+320107,
+640007,
+1280107,
+2560171,
+5120117,
+10000079,
+20000077,
+40000217,
+80000111,
+160000177,
+320000171,
+640000171,
+1280000017,
+2560000217u,
+4200000071u
+/* extra primes larger than an unsigned 32-bit integer:
+51200000077,
+100000000171,
+200000000171,
+400000000171,
+800000000117,
+1600000000021,
+3200000000051,
+6400000000081,
+12800000000003,
+25600000000021,
+51200000000077,
+100000000000067,
+200000000000027,
+400000000000063,
+800000000000017,
+1600000000000007,
+3200000000000059,
+6400000000000007,
+12800000000000009,
+25600000000000003,
+51200000000000023,
+100000000000000003,
+200000000000000003,
+400000000000000013,
+800000000000000119,
+1600000000000000031,
+3200000000000000059 //This is a 62-bit number
+*/
+};
+
+//This routine returns an arbitrary prime larger than x
+static unsigned int primeLargerThan(unsigned int x)
+{
+	int i=0;
+	while (doublingPrimes[i]<=x) i++;
+	return doublingPrimes[i];
+}
+
 void CentralLB::LDStats::makeCommHash() {
   // hash table is already build
   if (objHash) return;
    
   int i;
   hashSize = n_objs*2;
+  hashSize = primeLargerThan(hashSize);
   objHash = new int[hashSize];
   for(i=0;i<hashSize;i++)
         objHash[i] = -1;
@@ -991,6 +1065,22 @@ int CentralLB::LDStats::getHash(const LDObjKey &objKey)
   const LDObjid &oid = objKey.objID();
   const LDOMid  &mid = objKey.omID();
   return getHash(oid, mid);
+}
+
+int CentralLB::LDStats::getSendHash(LDCommData &cData)
+{
+  if (cData.sendHash == -1) {
+    cData.sendHash = getHash(cData.sender);
+  }
+  return cData.sendHash;
+}
+
+int CentralLB::LDStats::getRecvHash(LDCommData &cData)
+{
+  if (cData.recvHash == -1) {
+    cData.recvHash =  getHash(cData.receiver.get_destObj());
+  }
+  return cData.recvHash;
 }
 
 double CentralLB::LDStats::computeAverageLoad()
