@@ -6,7 +6,7 @@ void edge::reset()
   newNodeIdx = -1;
   if (!(newEdgeRef == nullRef))
     C->theEdges[newEdgeRef.idx].reset();
-  pending = 0; waitingFor.reset(); newEdgeRef.reset(); 
+  unsetPending(); waitingFor.reset(); newEdgeRef.reset(); 
   newNode.reset(); incidentNode.reset(); fixNode.reset(); 
 }
 
@@ -26,7 +26,7 @@ void edge::checkPending(elemRef e, elemRef ne)
   }
 }
 
-int edge::split(int *m, edgeRef *e_prime, node iNode, node fNode, 
+int edge::split(int *m, edgeRef *e_prime, node iNode, node fNode,
 		elemRef requester, int *local, int *first, int *nullNbr)
 {
   // element requester has asked this edge to split and give back a new node
@@ -34,19 +34,23 @@ int edge::split(int *m, edgeRef *e_prime, node iNode, node fNode,
   // e_prime is NOT incident on iNode, -1 if another split is pending
   // on this edge; local is set if this edge is not a boundary between chunks
   // and first is set if this was the first split request on this edge
-  elemRef nbr = getNot(requester);
+  intMsg *im;
+  elemRef nbr = getNot(requester), nullRef;
+  nullRef.reset();
   if (pending && (waitingFor == requester)) { 
     // already split; waiting for requester
-  CkPrintf("TMRC2D: edge::split: ** PART 2! ** On edge=%d on chunk=%d, requester=%d on chunk=%d\n", myRef.idx, myRef.cid, requester.idx, requester.cid);
+  CkPrintf("TMRC2D: edge::split: ** PART 2! ** On edge=%d on chunk=%d, requester=(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);
     *m = newNodeIdx;
     *e_prime = newEdgeRef;
     *first = 0;
     *local = 1;
-    if (nbr.cid != requester.cid) {
+    if (nbr.cid != requester.cid) { 
       *local = 0;
-      *m = C->addNode(newNode);
-      CkPrintf("TMRC2D: New node (%f,%f) added at index %d on chunk %d\n", newNode.X(),
-	       newNode.Y(), *m, myRef.cid);
+      im = mesh[requester.cid].addNode(newNode);
+      *m = im->anInt;
+      CkFreeMsg(im);
+      CkPrintf("TMRC2D: New node (%f,%f) added at index %d on chunk %d\n",
+	       newNode.X(), newNode.Y(), *m, myRef.cid);
     }
     if (iNode == incidentNode) return 1; // incidence as planned
     else return 0; // incidence is on fNode
@@ -56,13 +60,14 @@ int edge::split(int *m, edgeRef *e_prime, node iNode, node fNode,
     return -1;
   }
   else { // Need to do the split
-  CkPrintf("TMRC2D: edge::split: ** PART 1! ** On edge=%d on chunk=%d, requester=%d on chunk=%d\n", myRef.idx, myRef.cid, requester.idx, requester.cid);
+  CkPrintf("TMRC2D: edge::split: ** PART 1! ** On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);
+    setPending();
     iNode.midpoint(fNode, newNode);
-    newNodeIdx = C->addNode(newNode);
-      CkPrintf("TMRC2D: New node (%f,%f) added at index %d on chunk %d\n", newNode.X(),
-	       newNode.Y(), newNodeIdx, myRef.cid);
-    if ((elements[0] == nullRef) || (elements[1] == nullRef))
-      C->theNodes[newNodeIdx].setBorder();
+    im = mesh[requester.cid].addNode(newNode);
+    newNodeIdx = im->anInt;
+    CkFreeMsg(im);
+    CkPrintf("TMRC2D: New node (%f,%f) added at index %d on chunk %d\n", 
+	     newNode.X(), newNode.Y(), newNodeIdx, myRef.cid);
     newEdgeRef = C->addEdge();
     CkPrintf("TMRC2D: New edge (%d,%d) added between nodes (%f,%f) and newNode\n", 
 	     newEdgeRef.cid, newEdgeRef.idx, iNode.X(), iNode.Y());
@@ -73,9 +78,10 @@ int edge::split(int *m, edgeRef *e_prime, node iNode, node fNode,
     *first = 1;
     if ((nbr.cid == requester.cid) || (nbr.cid == -1)) *local = 1;
     else *local = 0;
-    pending = 1;
-    newEdgeRef.setPending();
+    C->theEdges[newEdgeRef.idx].setPending();
+    *nullNbr = 0;
     if (nbr == nullRef) *nullNbr = 1;
+    if (*nullNbr) CkPrintf("TMRC2D: on edge, nbr is null\n");
     if (nbr.cid != -1) {
       waitingFor = nbr;
       double nbrArea = nbr.getArea();

@@ -242,35 +242,11 @@ doubleMsg *chunk::getArea(int n)
   return dm;
 }
 
-intMsg *chunk::setPending(int n)
-{
-  intMsg *rm = new intMsg;
-  accessLock();
-  if (theEdges[n].isPending())
-    rm->anInt = 0;
-  else {
-    theEdges[n].setPending();
-    rm->anInt = 1;
-  }
-  releaseLock();
-  return rm;
-}
-
-void chunk::unsetPending(int n)
+void chunk::resetEdge(int n)
 {
   accessLock();
-  theEdges[n].unsetPending();
+  theEdges[n].reset();
   releaseLock();
-}
-
-
-intMsg *chunk::isPending(int n)
-{
-  intMsg *rm = new intMsg;
-  accessLock();
-  rm->anInt = theEdges[n].isPending();
-  releaseLock();
-  return rm;
 }
 
 intMsg *chunk::lockNode(int n)
@@ -427,13 +403,23 @@ void chunk::adjustMesh()
   }
 }
 
+intMsg *chunk::addNode(node n)
+{
+  intMsg *im = new intMsg;
+  im->anInt = numNodes;
+  theNodes[numNodes] = n;
+  numNodes++;
+  return im;
+}
+
+/*
 int chunk::addNode(node n)
 {
   theNodes[numNodes] = n;
   numNodes++;
-  return (numNodes - 1);
+  return (numNodes-1);
 }
-
+*/
 
 edgeRef chunk::addEdge()
 {
@@ -463,7 +449,8 @@ elemRef chunk::addElement(int n1, int n2, int n3)
 elemRef chunk::addElement(int n1, int n2, int n3,
 			  edgeRef er1, edgeRef er2, edgeRef er3)
 {
-  CkPrintf("TMRC2D: New element added with nodes %d, %d and %d\n", n1, n2, n3);
+  CkPrintf("TMRC2D: New element %d added with nodes %d, %d and %d\n", 
+	   numElements, n1, n2, n3);
   elemRef eRef(cid, numElements);
   theElements[numElements].set(cid, numElements, this);
   theElements[numElements].set(n1, n2, n3, er1, er2, er3);
@@ -589,6 +576,8 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
   CkPrintf("TMRC2D: multipleRefine....\n");
   theClient = client; // initialize refine client associated with this chunk
   sanityCheck();
+
+  dump();
 
   // set desired areas for elements
   for (i=0; i<numElements; i++)
@@ -827,6 +816,19 @@ void chunk::sanityCheck(void)
   for (i=0; i<numNodes; i++)
     theNodes[i].sanityCheck(cid, i);
   CkPrintf("TMRC2D: sanity check PASSED.\n");
+}
+
+void chunk::dump()
+{
+  int i;
+  CkPrintf("TMRC2D: Chunk %d, with %d elements, %d nodes and %d edges:\n", cid, 
+	   numElements, numNodes, numEdges);
+  for (i=0; i<numElements; i++)
+    CkPrintf("TMRC2D: Element %d has nodes %d, %d, %d and edges [%d,%d], [%d,%d], [%d,%d]\n", i, theElements[i].nodes[0], theElements[i].nodes[1], theElements[i].nodes[2], theElements[i].edges[0].cid, theElements[i].edges[0].idx, theElements[i].edges[1].cid, theElements[i].edges[1].idx, theElements[i].edges[2].cid, theElements[i].edges[2].idx);
+  for (i=0; i<numNodes; i++)
+    CkPrintf("TMRC2D: Node %d has coordinates (%f,%f)\n", i, theNodes[i].X(), theNodes[i].Y());
+  for (i=0; i<numEdges; i++)
+    CkPrintf("TMRC2D: Edge %d has elements [%d,%d] and [%d,%d]\n", i, theEdges[i].elements[0].cid, theEdges[i].elements[0].idx, theEdges[i].elements[1].cid, theEdges[i].elements[1].idx);
 }
 
 #include "refine.def.h"

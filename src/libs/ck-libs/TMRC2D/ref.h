@@ -31,9 +31,9 @@ class edgeRef : public objRef {
   elemRef get(elemRef& m);
   elemRef getNot(elemRef er);
   void remove();
-  int split(int *m, edgeRef *e_prime, node iNode, node fNode, 
+  int split(int *m, edgeRef *e_prime, node iNode, node fNode,
 	    elemRef requester, int *local, int *first, int *nullNbr);
-  void setPending();
+  void resetEdge();
   void checkPending(elemRef e);
   void checkPending(elemRef e, elemRef ne);
 };

@@ -38,8 +38,9 @@ void element::split(int longEdge)
                       longEdge                         */
   int opnode, othernode, fixnode, modEdge, otherEdge, result, local, first;
   edgeRef e_prime, newEdge;
-  int m, nullNbr;
+  int m = -2, nullNbr=0;
   elemRef newElem, nullRef;
+  node newNode;
 
   // initializations of shortcuts to affected parts of element
   opnode = (longEdge + 2) % 3;
@@ -49,11 +50,11 @@ void element::split(int longEdge)
   fixnode = otherEdge;
 
   if ((result=edges[longEdge].split(&m, &e_prime,C->theNodes[nodes[othernode]],
-				    C->theNodes[nodes[fixnode]], myRef, &local,
-				    &first, &nullNbr)) == 1) {
+				    C->theNodes[nodes[fixnode]],
+				    myRef, &local, &first, &nullNbr)) == 1) {
     // e_prime successfully created incident on othernode
-  CkPrintf("TMRC2D: Refining element %d, opnode=%d ^othernode=%d fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.idx, nodes[opnode], nodes[othernode], nodes[fixnode], edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);
-      CkPrintf("TMRC2D: to FEM: element=%d local=%d first=%d between nodes %d and %d\n", myRef.idx, local, first, nodes[othernode], nodes[fixnode]);
+    CkPrintf("TMRC2D: Refining element %d, opnode=%d ^othernode=%d fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.idx, nodes[opnode], nodes[othernode], nodes[fixnode], edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);
+    CkPrintf("TMRC2D: to FEM: element=%d local=%d first=%d between nodes %d and %d\n", myRef.idx, local, first, nodes[othernode], nodes[fixnode]);
     newEdge = C->addEdge();
     CkPrintf("TMRC2D: New edge (%d,%d) added between nodes %d and %d\n", 
 	     newEdge.cid, newEdge.idx, m, nodes[opnode]);
@@ -100,8 +101,14 @@ void element::split(int longEdge)
     if (!local && first) flag = BOUND_FIRST;
     if (!local && !first) flag = BOUND_SECOND;
     if(C->theClient)C->theClient->split(myRef.idx,longEdge,othernode,0.5,flag);
-    if (!first || nullNbr) 
-      mesh[edges[longEdge].cid].unsetPending(edges[longEdge].idx);
+    if (nullNbr) CkPrintf("TMRC2D: nbr is null\n");
+    if (!first || nullNbr) {
+      if (!first)
+	CkPrintf("TMRC2D: Resetting pending edges, second split complete.\n");
+      else if (nullNbr)
+	CkPrintf("TMRC2D: Resetting pending edges, neighbor NULL.\n");
+      edges[longEdge].resetEdge();
+    }
   }
   else if (result == 0) { 
     // e_prime already incident on fixnode
@@ -152,7 +159,8 @@ void element::split(int longEdge)
     if (local) flag = LOCAL_SECOND;
     else  flag = BOUND_SECOND;
     if (C->theClient) C->theClient->split(myRef.idx,longEdge,fixnode,0.5,flag);
-    mesh[edges[longEdge].cid].unsetPending(edges[longEdge].idx);
+    CkPrintf("TMRC2D: Resetting pending edges, second split complete.\n");
+    edges[longEdge].resetEdge();
   }
   else { // longEdge still trying to complete previous split; try later
     // do nothing for now

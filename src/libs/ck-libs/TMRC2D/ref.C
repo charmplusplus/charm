@@ -34,8 +34,9 @@ void edgeRef::remove()
   mesh[cid].removeEdge(idx);
 }
 
-int edgeRef::split(int *m, edgeRef *e_prime, node iNode, node fNode,
-		   elemRef requester, int *local, int *first, int *nullNbr)
+int edgeRef::split(int *m, edgeRef *e_prime, node iNode, node fNode, 
+		   elemRef requester, int *local, int *first, 
+		   int *nullNbr)
 {
   splitOutMsg *som;
   int result;
@@ -44,14 +45,15 @@ int edgeRef::split(int *m, edgeRef *e_prime, node iNode, node fNode,
   *e_prime = som->e;
   *local = som->local;
   *first = som->first;
+  *nullNbr = som->nullNbr;
   result = som->result;
   CkFreeMsg(som);
   return result;
 }
 
-void edgeRef::setPending()
+void edgeRef::resetEdge()
 {
-  mesh[cid].setPending(idx);
+  mesh[cid].resetEdge(idx);
 }
 
 void edgeRef::checkPending(elemRef e)

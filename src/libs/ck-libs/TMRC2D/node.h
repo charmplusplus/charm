@@ -59,6 +59,8 @@ class node {  // a 2D double coordinate
   }
   void midpoint(const node& n, node& result) { // get midpoint between this & n
     result.x = (x + n.x) / 2.0;  result.y = (y + n.y) / 2.0;
+    CkAssert(result.x >= 0.0);
+    CkAssert(result.y >= 0.0);
   }
   node midpoint(const node& n) { // get midpoint between this & n
     double a=(x + n.x) / 2.0, b=(y + n.y) / 2.0;

@@ -162,9 +162,7 @@ class chunk : public TCharmClient1D {
   void updateElementEdge(int idx, objRef oldval, objRef newval);
   void updateReferences(int idx, objRef oldval, objRef newval);
   doubleMsg *getArea(int n);
-  intMsg *setPending(int n);
-  void unsetPending(int n);
-  intMsg *isPending(int n);
+  void resetEdge(int n);
   intMsg *lockNode(int n);
   void unlockNode(int n);
   refMsg *getNeighbor(int idx, objRef aRef);
@@ -209,7 +207,8 @@ class chunk : public TCharmClient1D {
   // these methods allow for run-time additions/modifications to the chunk
   void allocMesh(int nEl);
   void adjustMesh();
-  int addNode(node n);
+  intMsg *addNode(node n);
+  //int addNode(node n);
   edgeRef addEdge();
   elemRef addElement(int n1, int n2, int n3);
   elemRef addElement(int n1, int n2, int n3,
@@ -220,6 +219,7 @@ class chunk : public TCharmClient1D {
   // prints a snapshot of the chunk to file
   void debug_print(int c);
   void out_print();
+  void dump();
 };
 
 #endif

@@ -34,9 +34,7 @@ module refine {
     entry [sync] void updateElementEdge(int, objRef, objRef);
     entry void updateReferences(int, objRef, objRef);
     entry [sync, threaded] doubleMsg *getArea(int);
-    entry [sync] intMsg *setPending(int);
-    entry [sync] void unsetPending(int);
-    entry [sync] intMsg *isPending(int);
+    entry [sync] void resetEdge(int);
     entry [sync] intMsg *lockNode(int);
     entry [sync] void unlockNode(int);
     entry [sync, threaded] intMsg *isLongestEdge(int, objRef);
@@ -56,6 +54,7 @@ module refine {
     entry [sync, threaded] void improve();
  
     entry void addNode(int, double, double);
+    entry [sync] intMsg *addNode(node n);
     entry [sync] void removeNode(int);
     entry [sync] void removeEdge(int);
     entry [sync] void removeElement(int);

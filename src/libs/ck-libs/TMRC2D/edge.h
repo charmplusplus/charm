@@ -15,15 +15,15 @@ class edge {
   chunk *C;
   edgeRef myRef;
   elemRef elements[2];  // the elements on either side of the edge
-  edge() { pending = 0; }
+  edge() { unsetPending(); }
   edge(int idx, int cid, chunk *myChk) { 
-    pending = 0; myRef.set(cid, idx); C = myChk; 
+    unsetPending(); myRef.set(cid, idx); C = myChk; 
   }
   edge(elemRef e1, elemRef e2, int p) {
     elements[0] = e1;  elements[1] = e2;  pending = p; 
   }
   edge(elemRef e1, elemRef e2) {
-    elements[0] = e1;  elements[1] = e2;  pending = 0; 
+    elements[0] = e1;  elements[1] = e2;  unsetPending();
   }
   edge(const edge& e) {
     for (int i=0; i<2; i++)  elements[i] = e.elements[i];
@@ -38,7 +38,7 @@ class edge {
     myRef = e.myRef;
   }
   void set(int idx, int cid, chunk *myChk)  { 
-    pending = 0; myRef.set(cid, idx); C = myChk; 
+    unsetPending(); myRef.set(cid, idx); C = myChk; 
   }
   void set(elemRef e1, elemRef e2) { elements[0] = e1;  elements[1] = e2; }
   void set(elemRef *e) { elements[0] = e[0]; elements[1] = e[1]; }
@@ -57,12 +57,9 @@ class edge {
     return *this; 
   }
   void update(elemRef oldval, elemRef newval) {
-    CkAssert((elements[0] == oldval) || (elements[1] == oldval) || 
-	     (elements[0] == newval) || (elements[1] == newval));
-    if ((elements[0] == oldval) && !(elements[1] == newval))  
-      elements[0] = newval;
-    else if ((elements[1] == oldval) && !(elements[0] == newval))
-      elements[1] = newval;
+    CkAssert((elements[0] == oldval) || (elements[1] == oldval));
+    if (elements[0] == oldval)  elements[0] = newval;
+    else /* (elements[1] == oldval) */ elements[1] = newval;
   }
   elemRef& getElement(int idx) {
     CkAssert((idx==0) || (idx==1));
@@ -74,11 +71,10 @@ class edge {
     else return elements[0];
   }
   void setPending() { pending = 1; }
-  void unsetPending() { reset(); }
-  int isPending() { return pending; }
+  void unsetPending() { pending = 0; }
   void checkPending(elemRef e);
   void checkPending(elemRef e, elemRef ne);
-  int split(int *m, edgeRef *e_prime, node iNode, node fNode, 
+  int split(int *m, edgeRef *e_prime, node iNode, node fNode,
 	    elemRef requester, int *local, int *first, int *nullNbr);
   void sanityCheck(chunk *c, edgeRef shouldRef);
 };
