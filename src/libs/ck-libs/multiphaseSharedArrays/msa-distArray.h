@@ -36,6 +36,9 @@ protected:
     }
 
 public:
+    // @@ Needed for Jade
+    inline MSA1D(){}
+
     inline MSA1D(unsigned int nEntries_, unsigned int num_wrkrs, unsigned int maxBytes=DEFAULT_MAX_BYTES) : nEntries(nEntries_)
     {
         // first create an array and the cache for the pages
@@ -190,6 +193,9 @@ protected:
     }
 
 public:
+    // @@ Needed for Jade
+    inline MSA2D() : MSA1D<ENTRY, ENTRIES_PER_PAGE>() {}
+
     inline MSA2D(unsigned int rows_, unsigned int cols_, unsigned int numwrkrs, unsigned int maxBytes=DEFAULT_MAX_BYTES) : MSA1D<ENTRY, ENTRIES_PER_PAGE>(rows_*cols_, numwrkrs, maxBytes)
     {
         rows = rows_; cols = cols_;
