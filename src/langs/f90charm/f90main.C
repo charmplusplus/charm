@@ -1,14 +1,7 @@
 #include "f90main.h"
+#include "charm-api.h"
 
-#if AMPI_FORTRAN
-#if CMK_FORTRAN_USES_ALLCAPS
-extern "C" void F90CHARMMAIN(int, char **);
-#else
-extern "C" void f90charmmain_(int, char **);
-#endif // CMK_FORTRAN_USES_ALLCAPS
-#else
-extern "C" void f90charmmain(int, char **);
-#endif
+extern "C" void FTN_NAME(F90CHARMMAIN,f90charmmain)(int, char **);
 
 extern void _initCharm(int argc, char **argv);
 
@@ -42,15 +35,7 @@ f90main::f90main(CkArgMsg *msg)
   count = 0;
   mainhandle = thishandle;
 
-#if AMPI_FORTRAN
-#if CMK_FORTRAN_USES_ALLCAPS
-  F90CHARMMAIN(argc, argv);
-#else
-  f90charmmain_(argc, argv);
-#endif // CMK_FORTRAN_USES_ALLCAPS
-#else
-  f90charmmain(argc, argv);
-#endif
+  FTN_NAME(F90CHARMMAIN,f90charmmain)(argc, argv);
 
   /*
   int executor_grp = CProxy_executor::ckNew(); 
