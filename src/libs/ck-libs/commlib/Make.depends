@@ -2,8 +2,73 @@
 ComlibManager.o: \
 	ComlibManager.C \
 	ComlibManager.h \
+	../../../charm++.h \
+	../../../charm.h \
+	../../../converse.h \
+	../../../conv-config.h \
+	../../../conv-common.h \
+	../../../conv-mach.h \
+	../../../conv-autoconfig.h \
+	../../../conv-mach-opt.h \
+	../../../cc-cxx.h \
+	../../../pup_c.h \
+	../../../conv-cpm.h \
+	../../../conv-cpath.h \
+	../../../conv-qd.h \
+	../../../conv-random.h \
+	../../../conv-lists.h \
+	../../../conv-trace.h \
+	../../../persistent.h \
+	../../../debug-conv.h \
+	../../../pup.h \
+	../../../middle.h \
+	../../../middle-conv.h \
+	../../../cklists.h \
+	../../../ckbitvector.h \
+	../../../ckstream.h \
+	../../../init.h \
+	../../../ckhashtable.h \
+	../../../debug-charm.h \
+	../../../CkMarshall.decl.h \
+	../../../cksection.h \
+	../../../ckcallback.h \
+	../../../conv-ccs.h \
+	../../../sockRoutines.h \
+	../../../ccs-server.h \
+	../../../ckobjQ.h \
+	../../../ckreduction.h \
+	../../../CkReduction.decl.h \
+	../../../cknodegroupreduction.h \
+	../../../CkArrayReductionMgr.decl.h \
+	../../../ckmemcheckpoint.h \
+	../../../CkMemCheckpoint.decl.h \
+	../../../readonly.h \
+	../../../ckarray.h \
+	../../../cklocation.h \
+	../../../LBDatabase.h \
+	../../../lbdb.h \
+	../../../LBDatabase.decl.h \
+	../../../NullLB.decl.h \
+	../../../BaseLB.decl.h \
+	../../../CkLocation.decl.h \
+	../../../CkArray.decl.h \
+	../../../ComlibArrayListener.h \
+	../../../ComlibStrategy.h \
+	../../../CkFutures.decl.h \
+	../../../charisma.h \
+	../../../charisma.decl.h \
+	../../../tempo.h \
+	../../../tempo.decl.h \
+	../../../waitqd.h \
+	../../../waitqd.decl.h \
+	../../../sdag.h \
+	../../../ckcheckpoint.h \
+	../../../CkCheckpoint.decl.h \
+	../../../ckarrayreductionmgr.h \
+	../../../trace.h \
+	../../../trace-bluegene.h \
+	../../../envelope.h \
 	commlib.decl.h \
-	EachToManyStrategy.h \
 	EachToManyMulticastStrategy.h \
 	DirectMulticastStrategy.h \
 	StreamingStrategy.h \
@@ -13,22 +78,83 @@ ComlibManager.o: \
 	MsgPacker.h \
 	RingMulticastStrategy.h \
 	PipeBroadcastStrategy.h \
+	BroadcastStrategy.h \
 	MeshStreamingStrategy.h \
 	PrioStreaming.h \
+	../../../qd.h \
 	commlib.def.h
 	$(CHARMC) -c -o ComlibManager.o ComlibManager.C
-
-EachToManyStrategy.o: \
-	EachToManyStrategy.C \
-	EachToManyStrategy.h \
-	ComlibManager.h \
-	commlib.decl.h
-	$(CHARMC) -c -o EachToManyStrategy.o EachToManyStrategy.C
 
 MPIStrategy.o: \
 	MPIStrategy.C \
 	MPIStrategy.h \
 	ComlibManager.h \
+	../../../charm++.h \
+	../../../charm.h \
+	../../../converse.h \
+	../../../conv-config.h \
+	../../../conv-common.h \
+	../../../conv-mach.h \
+	../../../conv-autoconfig.h \
+	../../../conv-mach-opt.h \
+	../../../cc-cxx.h \
+	../../../pup_c.h \
+	../../../conv-cpm.h \
+	../../../conv-cpath.h \
+	../../../conv-qd.h \
+	../../../conv-random.h \
+	../../../conv-lists.h \
+	../../../conv-trace.h \
+	../../../persistent.h \
+	../../../debug-conv.h \
+	../../../pup.h \
+	../../../middle.h \
+	../../../middle-conv.h \
+	../../../cklists.h \
+	../../../ckbitvector.h \
+	../../../ckstream.h \
+	../../../init.h \
+	../../../ckhashtable.h \
+	../../../debug-charm.h \
+	../../../CkMarshall.decl.h \
+	../../../cksection.h \
+	../../../ckcallback.h \
+	../../../conv-ccs.h \
+	../../../sockRoutines.h \
+	../../../ccs-server.h \
+	../../../ckobjQ.h \
+	../../../ckreduction.h \
+	../../../CkReduction.decl.h \
+	../../../cknodegroupreduction.h \
+	../../../CkArrayReductionMgr.decl.h \
+	../../../ckmemcheckpoint.h \
+	../../../CkMemCheckpoint.decl.h \
+	../../../readonly.h \
+	../../../ckarray.h \
+	../../../cklocation.h \
+	../../../LBDatabase.h \
+	../../../lbdb.h \
+	../../../LBDatabase.decl.h \
+	../../../NullLB.decl.h \
+	../../../BaseLB.decl.h \
+	../../../CkLocation.decl.h \
+	../../../CkArray.decl.h \
+	../../../ComlibArrayListener.h \
+	../../../ComlibStrategy.h \
+	../../../CkFutures.decl.h \
+	../../../charisma.h \
+	../../../charisma.decl.h \
+	../../../tempo.h \
+	../../../tempo.decl.h \
+	../../../waitqd.h \
+	../../../waitqd.decl.h \
+	../../../sdag.h \
+	../../../ckcheckpoint.h \
+	../../../CkCheckpoint.decl.h \
+	../../../ckarrayreductionmgr.h \
+	../../../trace.h \
+	../../../trace-bluegene.h \
+	../../../envelope.h \
 	commlib.decl.h
 	$(CHARMC) -c -o MPIStrategy.o MPIStrategy.C
 
@@ -36,6 +162,72 @@ StreamingStrategy.o: \
 	StreamingStrategy.C \
 	StreamingStrategy.h \
 	ComlibManager.h \
+	../../../charm++.h \
+	../../../charm.h \
+	../../../converse.h \
+	../../../conv-config.h \
+	../../../conv-common.h \
+	../../../conv-mach.h \
+	../../../conv-autoconfig.h \
+	../../../conv-mach-opt.h \
+	../../../cc-cxx.h \
+	../../../pup_c.h \
+	../../../conv-cpm.h \
+	../../../conv-cpath.h \
+	../../../conv-qd.h \
+	../../../conv-random.h \
+	../../../conv-lists.h \
+	../../../conv-trace.h \
+	../../../persistent.h \
+	../../../debug-conv.h \
+	../../../pup.h \
+	../../../middle.h \
+	../../../middle-conv.h \
+	../../../cklists.h \
+	../../../ckbitvector.h \
+	../../../ckstream.h \
+	../../../init.h \
+	../../../ckhashtable.h \
+	../../../debug-charm.h \
+	../../../CkMarshall.decl.h \
+	../../../cksection.h \
+	../../../ckcallback.h \
+	../../../conv-ccs.h \
+	../../../sockRoutines.h \
+	../../../ccs-server.h \
+	../../../ckobjQ.h \
+	../../../ckreduction.h \
+	../../../CkReduction.decl.h \
+	../../../cknodegroupreduction.h \
+	../../../CkArrayReductionMgr.decl.h \
+	../../../ckmemcheckpoint.h \
+	../../../CkMemCheckpoint.decl.h \
+	../../../readonly.h \
+	../../../ckarray.h \
+	../../../cklocation.h \
+	../../../LBDatabase.h \
+	../../../lbdb.h \
+	../../../LBDatabase.decl.h \
+	../../../NullLB.decl.h \
+	../../../BaseLB.decl.h \
+	../../../CkLocation.decl.h \
+	../../../CkArray.decl.h \
+	../../../ComlibArrayListener.h \
+	../../../ComlibStrategy.h \
+	../../../CkFutures.decl.h \
+	../../../charisma.h \
+	../../../charisma.decl.h \
+	../../../tempo.h \
+	../../../tempo.decl.h \
+	../../../waitqd.h \
+	../../../waitqd.decl.h \
+	../../../sdag.h \
+	../../../ckcheckpoint.h \
+	../../../CkCheckpoint.decl.h \
+	../../../ckarrayreductionmgr.h \
+	../../../trace.h \
+	../../../trace-bluegene.h \
+	../../../envelope.h \
 	commlib.decl.h \
 	MsgPacker.h
 	$(CHARMC) -c -o StreamingStrategy.o StreamingStrategy.C
@@ -44,6 +236,72 @@ DummyStrategy.o: \
 	DummyStrategy.C \
 	DummyStrategy.h \
 	ComlibManager.h \
+	../../../charm++.h \
+	../../../charm.h \
+	../../../converse.h \
+	../../../conv-config.h \
+	../../../conv-common.h \
+	../../../conv-mach.h \
+	../../../conv-autoconfig.h \
+	../../../conv-mach-opt.h \
+	../../../cc-cxx.h \
+	../../../pup_c.h \
+	../../../conv-cpm.h \
+	../../../conv-cpath.h \
+	../../../conv-qd.h \
+	../../../conv-random.h \
+	../../../conv-lists.h \
+	../../../conv-trace.h \
+	../../../persistent.h \
+	../../../debug-conv.h \
+	../../../pup.h \
+	../../../middle.h \
+	../../../middle-conv.h \
+	../../../cklists.h \
+	../../../ckbitvector.h \
+	../../../ckstream.h \
+	../../../init.h \
+	../../../ckhashtable.h \
+	../../../debug-charm.h \
+	../../../CkMarshall.decl.h \
+	../../../cksection.h \
+	../../../ckcallback.h \
+	../../../conv-ccs.h \
+	../../../sockRoutines.h \
+	../../../ccs-server.h \
+	../../../ckobjQ.h \
+	../../../ckreduction.h \
+	../../../CkReduction.decl.h \
+	../../../cknodegroupreduction.h \
+	../../../CkArrayReductionMgr.decl.h \
+	../../../ckmemcheckpoint.h \
+	../../../CkMemCheckpoint.decl.h \
+	../../../readonly.h \
+	../../../ckarray.h \
+	../../../cklocation.h \
+	../../../LBDatabase.h \
+	../../../lbdb.h \
+	../../../LBDatabase.decl.h \
+	../../../NullLB.decl.h \
+	../../../BaseLB.decl.h \
+	../../../CkLocation.decl.h \
+	../../../CkArray.decl.h \
+	../../../ComlibArrayListener.h \
+	../../../ComlibStrategy.h \
+	../../../CkFutures.decl.h \
+	../../../charisma.h \
+	../../../charisma.decl.h \
+	../../../tempo.h \
+	../../../tempo.decl.h \
+	../../../waitqd.h \
+	../../../waitqd.decl.h \
+	../../../sdag.h \
+	../../../ckcheckpoint.h \
+	../../../CkCheckpoint.decl.h \
+	../../../ckarrayreductionmgr.h \
+	../../../trace.h \
+	../../../trace-bluegene.h \
+	../../../envelope.h \
 	commlib.decl.h
 	$(CHARMC) -c -o DummyStrategy.o DummyStrategy.C
 
@@ -51,6 +309,72 @@ NodeMulticast.o: \
 	NodeMulticast.C \
 	NodeMulticast.h \
 	ComlibManager.h \
+	../../../charm++.h \
+	../../../charm.h \
+	../../../converse.h \
+	../../../conv-config.h \
+	../../../conv-common.h \
+	../../../conv-mach.h \
+	../../../conv-autoconfig.h \
+	../../../conv-mach-opt.h \
+	../../../cc-cxx.h \
+	../../../pup_c.h \
+	../../../conv-cpm.h \
+	../../../conv-cpath.h \
+	../../../conv-qd.h \
+	../../../conv-random.h \
+	../../../conv-lists.h \
+	../../../conv-trace.h \
+	../../../persistent.h \
+	../../../debug-conv.h \
+	../../../pup.h \
+	../../../middle.h \
+	../../../middle-conv.h \
+	../../../cklists.h \
+	../../../ckbitvector.h \
+	../../../ckstream.h \
+	../../../init.h \
+	../../../ckhashtable.h \
+	../../../debug-charm.h \
+	../../../CkMarshall.decl.h \
+	../../../cksection.h \
+	../../../ckcallback.h \
+	../../../conv-ccs.h \
+	../../../sockRoutines.h \
+	../../../ccs-server.h \
+	../../../ckobjQ.h \
+	../../../ckreduction.h \
+	../../../CkReduction.decl.h \
+	../../../cknodegroupreduction.h \
+	../../../CkArrayReductionMgr.decl.h \
+	../../../ckmemcheckpoint.h \
+	../../../CkMemCheckpoint.decl.h \
+	../../../readonly.h \
+	../../../ckarray.h \
+	../../../cklocation.h \
+	../../../LBDatabase.h \
+	../../../lbdb.h \
+	../../../LBDatabase.decl.h \
+	../../../NullLB.decl.h \
+	../../../BaseLB.decl.h \
+	../../../CkLocation.decl.h \
+	../../../CkArray.decl.h \
+	../../../ComlibArrayListener.h \
+	../../../ComlibStrategy.h \
+	../../../CkFutures.decl.h \
+	../../../charisma.h \
+	../../../charisma.decl.h \
+	../../../tempo.h \
+	../../../tempo.decl.h \
+	../../../waitqd.h \
+	../../../waitqd.decl.h \
+	../../../sdag.h \
+	../../../ckcheckpoint.h \
+	../../../CkCheckpoint.decl.h \
+	../../../ckarrayreductionmgr.h \
+	../../../trace.h \
+	../../../trace-bluegene.h \
+	../../../envelope.h \
 	commlib.decl.h
 	$(CHARMC) -c -o NodeMulticast.o NodeMulticast.C
 
@@ -58,6 +382,72 @@ EachToManyMulticastStrategy.o: \
 	EachToManyMulticastStrategy.C \
 	EachToManyMulticastStrategy.h \
 	ComlibManager.h \
+	../../../charm++.h \
+	../../../charm.h \
+	../../../converse.h \
+	../../../conv-config.h \
+	../../../conv-common.h \
+	../../../conv-mach.h \
+	../../../conv-autoconfig.h \
+	../../../conv-mach-opt.h \
+	../../../cc-cxx.h \
+	../../../pup_c.h \
+	../../../conv-cpm.h \
+	../../../conv-cpath.h \
+	../../../conv-qd.h \
+	../../../conv-random.h \
+	../../../conv-lists.h \
+	../../../conv-trace.h \
+	../../../persistent.h \
+	../../../debug-conv.h \
+	../../../pup.h \
+	../../../middle.h \
+	../../../middle-conv.h \
+	../../../cklists.h \
+	../../../ckbitvector.h \
+	../../../ckstream.h \
+	../../../init.h \
+	../../../ckhashtable.h \
+	../../../debug-charm.h \
+	../../../CkMarshall.decl.h \
+	../../../cksection.h \
+	../../../ckcallback.h \
+	../../../conv-ccs.h \
+	../../../sockRoutines.h \
+	../../../ccs-server.h \
+	../../../ckobjQ.h \
+	../../../ckreduction.h \
+	../../../CkReduction.decl.h \
+	../../../cknodegroupreduction.h \
+	../../../CkArrayReductionMgr.decl.h \
+	../../../ckmemcheckpoint.h \
+	../../../CkMemCheckpoint.decl.h \
+	../../../readonly.h \
+	../../../ckarray.h \
+	../../../cklocation.h \
+	../../../LBDatabase.h \
+	../../../lbdb.h \
+	../../../LBDatabase.decl.h \
+	../../../NullLB.decl.h \
+	../../../BaseLB.decl.h \
+	../../../CkLocation.decl.h \
+	../../../CkArray.decl.h \
+	../../../ComlibArrayListener.h \
+	../../../ComlibStrategy.h \
+	../../../CkFutures.decl.h \
+	../../../charisma.h \
+	../../../charisma.decl.h \
+	../../../tempo.h \
+	../../../tempo.decl.h \
+	../../../waitqd.h \
+	../../../waitqd.decl.h \
+	../../../sdag.h \
+	../../../ckcheckpoint.h \
+	../../../CkCheckpoint.decl.h \
+	../../../ckarrayreductionmgr.h \
+	../../../trace.h \
+	../../../trace-bluegene.h \
+	../../../envelope.h \
 	commlib.decl.h \
 	DirectMulticastStrategy.h
 	$(CHARMC) -c -o EachToManyMulticastStrategy.o EachToManyMulticastStrategy.C
@@ -65,15 +455,149 @@ EachToManyMulticastStrategy.o: \
 MsgPacker.o: \
 	MsgPacker.C \
 	ComlibManager.h \
+	../../../charm++.h \
+	../../../charm.h \
+	../../../converse.h \
+	../../../conv-config.h \
+	../../../conv-common.h \
+	../../../conv-mach.h \
+	../../../conv-autoconfig.h \
+	../../../conv-mach-opt.h \
+	../../../cc-cxx.h \
+	../../../pup_c.h \
+	../../../conv-cpm.h \
+	../../../conv-cpath.h \
+	../../../conv-qd.h \
+	../../../conv-random.h \
+	../../../conv-lists.h \
+	../../../conv-trace.h \
+	../../../persistent.h \
+	../../../debug-conv.h \
+	../../../pup.h \
+	../../../middle.h \
+	../../../middle-conv.h \
+	../../../cklists.h \
+	../../../ckbitvector.h \
+	../../../ckstream.h \
+	../../../init.h \
+	../../../ckhashtable.h \
+	../../../debug-charm.h \
+	../../../CkMarshall.decl.h \
+	../../../cksection.h \
+	../../../ckcallback.h \
+	../../../conv-ccs.h \
+	../../../sockRoutines.h \
+	../../../ccs-server.h \
+	../../../ckobjQ.h \
+	../../../ckreduction.h \
+	../../../CkReduction.decl.h \
+	../../../cknodegroupreduction.h \
+	../../../CkArrayReductionMgr.decl.h \
+	../../../ckmemcheckpoint.h \
+	../../../CkMemCheckpoint.decl.h \
+	../../../readonly.h \
+	../../../ckarray.h \
+	../../../cklocation.h \
+	../../../LBDatabase.h \
+	../../../lbdb.h \
+	../../../LBDatabase.decl.h \
+	../../../NullLB.decl.h \
+	../../../BaseLB.decl.h \
+	../../../CkLocation.decl.h \
+	../../../CkArray.decl.h \
+	../../../ComlibArrayListener.h \
+	../../../ComlibStrategy.h \
+	../../../CkFutures.decl.h \
+	../../../charisma.h \
+	../../../charisma.decl.h \
+	../../../tempo.h \
+	../../../tempo.decl.h \
+	../../../waitqd.h \
+	../../../waitqd.decl.h \
+	../../../sdag.h \
+	../../../ckcheckpoint.h \
+	../../../CkCheckpoint.decl.h \
+	../../../ckarrayreductionmgr.h \
+	../../../trace.h \
+	../../../trace-bluegene.h \
+	../../../envelope.h \
 	commlib.decl.h \
-	MsgPacker.h
+	MsgPacker.h \
+	../../../register.h
 	$(CHARMC) -c -o MsgPacker.o MsgPacker.C
 
 DirectMulticastStrategy.o: \
 	DirectMulticastStrategy.C \
 	DirectMulticastStrategy.h \
 	ComlibManager.h \
-	commlib.decl.h
+	../../../charm++.h \
+	../../../charm.h \
+	../../../converse.h \
+	../../../conv-config.h \
+	../../../conv-common.h \
+	../../../conv-mach.h \
+	../../../conv-autoconfig.h \
+	../../../conv-mach-opt.h \
+	../../../cc-cxx.h \
+	../../../pup_c.h \
+	../../../conv-cpm.h \
+	../../../conv-cpath.h \
+	../../../conv-qd.h \
+	../../../conv-random.h \
+	../../../conv-lists.h \
+	../../../conv-trace.h \
+	../../../persistent.h \
+	../../../debug-conv.h \
+	../../../pup.h \
+	../../../middle.h \
+	../../../middle-conv.h \
+	../../../cklists.h \
+	../../../ckbitvector.h \
+	../../../ckstream.h \
+	../../../init.h \
+	../../../ckhashtable.h \
+	../../../debug-charm.h \
+	../../../CkMarshall.decl.h \
+	../../../cksection.h \
+	../../../ckcallback.h \
+	../../../conv-ccs.h \
+	../../../sockRoutines.h \
+	../../../ccs-server.h \
+	../../../ckobjQ.h \
+	../../../ckreduction.h \
+	../../../CkReduction.decl.h \
+	../../../cknodegroupreduction.h \
+	../../../CkArrayReductionMgr.decl.h \
+	../../../ckmemcheckpoint.h \
+	../../../CkMemCheckpoint.decl.h \
+	../../../readonly.h \
+	../../../ckarray.h \
+	../../../cklocation.h \
+	../../../LBDatabase.h \
+	../../../lbdb.h \
+	../../../LBDatabase.decl.h \
+	../../../NullLB.decl.h \
+	../../../BaseLB.decl.h \
+	../../../CkLocation.decl.h \
+	../../../CkArray.decl.h \
+	../../../ComlibArrayListener.h \
+	../../../ComlibStrategy.h \
+	../../../CkFutures.decl.h \
+	../../../charisma.h \
+	../../../charisma.decl.h \
+	../../../tempo.h \
+	../../../tempo.decl.h \
+	../../../waitqd.h \
+	../../../waitqd.decl.h \
+	../../../sdag.h \
+	../../../ckcheckpoint.h \
+	../../../CkCheckpoint.decl.h \
+	../../../ckarrayreductionmgr.h \
+	../../../trace.h \
+	../../../trace-bluegene.h \
+	../../../envelope.h \
+	commlib.decl.h \
+	../../../register.h
 	$(CHARMC) -c -o DirectMulticastStrategy.o DirectMulticastStrategy.C
 
 RingMulticastStrategy.o: \
@@ -81,6 +605,72 @@ RingMulticastStrategy.o: \
 	RingMulticastStrategy.h \
 	DirectMulticastStrategy.h \
 	ComlibManager.h \
+	../../../charm++.h \
+	../../../charm.h \
+	../../../converse.h \
+	../../../conv-config.h \
+	../../../conv-common.h \
+	../../../conv-mach.h \
+	../../../conv-autoconfig.h \
+	../../../conv-mach-opt.h \
+	../../../cc-cxx.h \
+	../../../pup_c.h \
+	../../../conv-cpm.h \
+	../../../conv-cpath.h \
+	../../../conv-qd.h \
+	../../../conv-random.h \
+	../../../conv-lists.h \
+	../../../conv-trace.h \
+	../../../persistent.h \
+	../../../debug-conv.h \
+	../../../pup.h \
+	../../../middle.h \
+	../../../middle-conv.h \
+	../../../cklists.h \
+	../../../ckbitvector.h \
+	../../../ckstream.h \
+	../../../init.h \
+	../../../ckhashtable.h \
+	../../../debug-charm.h \
+	../../../CkMarshall.decl.h \
+	../../../cksection.h \
+	../../../ckcallback.h \
+	../../../conv-ccs.h \
+	../../../sockRoutines.h \
+	../../../ccs-server.h \
+	../../../ckobjQ.h \
+	../../../ckreduction.h \
+	../../../CkReduction.decl.h \
+	../../../cknodegroupreduction.h \
+	../../../CkArrayReductionMgr.decl.h \
+	../../../ckmemcheckpoint.h \
+	../../../CkMemCheckpoint.decl.h \
+	../../../readonly.h \
+	../../../ckarray.h \
+	../../../cklocation.h \
+	../../../LBDatabase.h \
+	../../../lbdb.h \
+	../../../LBDatabase.decl.h \
+	../../../NullLB.decl.h \
+	../../../BaseLB.decl.h \
+	../../../CkLocation.decl.h \
+	../../../CkArray.decl.h \
+	../../../ComlibArrayListener.h \
+	../../../ComlibStrategy.h \
+	../../../CkFutures.decl.h \
+	../../../charisma.h \
+	../../../charisma.decl.h \
+	../../../tempo.h \
+	../../../tempo.decl.h \
+	../../../waitqd.h \
+	../../../waitqd.decl.h \
+	../../../sdag.h \
+	../../../ckcheckpoint.h \
+	../../../CkCheckpoint.decl.h \
+	../../../ckarrayreductionmgr.h \
+	../../../trace.h \
+	../../../trace-bluegene.h \
+	../../../envelope.h \
 	commlib.decl.h
 	$(CHARMC) -c -o RingMulticastStrategy.o RingMulticastStrategy.C
 
@@ -88,21 +678,145 @@ PipeBroadcastStrategy.o: \
 	PipeBroadcastStrategy.C \
 	PipeBroadcastStrategy.h \
 	ComlibManager.h \
+	../../../charm++.h \
+	../../../charm.h \
+	../../../converse.h \
+	../../../conv-config.h \
+	../../../conv-common.h \
+	../../../conv-mach.h \
+	../../../conv-autoconfig.h \
+	../../../conv-mach-opt.h \
+	../../../cc-cxx.h \
+	../../../pup_c.h \
+	../../../conv-cpm.h \
+	../../../conv-cpath.h \
+	../../../conv-qd.h \
+	../../../conv-random.h \
+	../../../conv-lists.h \
+	../../../conv-trace.h \
+	../../../persistent.h \
+	../../../debug-conv.h \
+	../../../pup.h \
+	../../../middle.h \
+	../../../middle-conv.h \
+	../../../cklists.h \
+	../../../ckbitvector.h \
+	../../../ckstream.h \
+	../../../init.h \
+	../../../ckhashtable.h \
+	../../../debug-charm.h \
+	../../../CkMarshall.decl.h \
+	../../../cksection.h \
+	../../../ckcallback.h \
+	../../../conv-ccs.h \
+	../../../sockRoutines.h \
+	../../../ccs-server.h \
+	../../../ckobjQ.h \
+	../../../ckreduction.h \
+	../../../CkReduction.decl.h \
+	../../../cknodegroupreduction.h \
+	../../../CkArrayReductionMgr.decl.h \
+	../../../ckmemcheckpoint.h \
+	../../../CkMemCheckpoint.decl.h \
+	../../../readonly.h \
+	../../../ckarray.h \
+	../../../cklocation.h \
+	../../../LBDatabase.h \
+	../../../lbdb.h \
+	../../../LBDatabase.decl.h \
+	../../../NullLB.decl.h \
+	../../../BaseLB.decl.h \
+	../../../CkLocation.decl.h \
+	../../../CkArray.decl.h \
+	../../../ComlibArrayListener.h \
+	../../../ComlibStrategy.h \
+	../../../CkFutures.decl.h \
+	../../../charisma.h \
+	../../../charisma.decl.h \
+	../../../tempo.h \
+	../../../tempo.decl.h \
+	../../../waitqd.h \
+	../../../waitqd.decl.h \
+	../../../sdag.h \
+	../../../ckcheckpoint.h \
+	../../../CkCheckpoint.decl.h \
+	../../../ckarrayreductionmgr.h \
+	../../../trace.h \
+	../../../trace-bluegene.h \
+	../../../envelope.h \
 	commlib.decl.h
 	$(CHARMC) -c -o PipeBroadcastStrategy.o PipeBroadcastStrategy.C
-
-BroadcastStrategy.o: \
-	BroadcastStrategy.C \
-	BroadcastStrategy.h \
-	ComlibManager.h \
-	commlib.decl.h
-	$(CHARMC) -c -o BroadcastStrategy.o BroadcastStrategy.C
-
 
 MeshStreamingStrategy.o: \
 	MeshStreamingStrategy.C \
 	MeshStreamingStrategy.h \
 	ComlibManager.h \
+	../../../charm++.h \
+	../../../charm.h \
+	../../../converse.h \
+	../../../conv-config.h \
+	../../../conv-common.h \
+	../../../conv-mach.h \
+	../../../conv-autoconfig.h \
+	../../../conv-mach-opt.h \
+	../../../cc-cxx.h \
+	../../../pup_c.h \
+	../../../conv-cpm.h \
+	../../../conv-cpath.h \
+	../../../conv-qd.h \
+	../../../conv-random.h \
+	../../../conv-lists.h \
+	../../../conv-trace.h \
+	../../../persistent.h \
+	../../../debug-conv.h \
+	../../../pup.h \
+	../../../middle.h \
+	../../../middle-conv.h \
+	../../../cklists.h \
+	../../../ckbitvector.h \
+	../../../ckstream.h \
+	../../../init.h \
+	../../../ckhashtable.h \
+	../../../debug-charm.h \
+	../../../CkMarshall.decl.h \
+	../../../cksection.h \
+	../../../ckcallback.h \
+	../../../conv-ccs.h \
+	../../../sockRoutines.h \
+	../../../ccs-server.h \
+	../../../ckobjQ.h \
+	../../../ckreduction.h \
+	../../../CkReduction.decl.h \
+	../../../cknodegroupreduction.h \
+	../../../CkArrayReductionMgr.decl.h \
+	../../../ckmemcheckpoint.h \
+	../../../CkMemCheckpoint.decl.h \
+	../../../readonly.h \
+	../../../ckarray.h \
+	../../../cklocation.h \
+	../../../LBDatabase.h \
+	../../../lbdb.h \
+	../../../LBDatabase.decl.h \
+	../../../NullLB.decl.h \
+	../../../BaseLB.decl.h \
+	../../../CkLocation.decl.h \
+	../../../CkArray.decl.h \
+	../../../ComlibArrayListener.h \
+	../../../ComlibStrategy.h \
+	../../../CkFutures.decl.h \
+	../../../charisma.h \
+	../../../charisma.decl.h \
+	../../../tempo.h \
+	../../../tempo.decl.h \
+	../../../waitqd.h \
+	../../../waitqd.decl.h \
+	../../../sdag.h \
+	../../../ckcheckpoint.h \
+	../../../CkCheckpoint.decl.h \
+	../../../ckarrayreductionmgr.h \
+	../../../trace.h \
+	../../../trace-bluegene.h \
+	../../../envelope.h \
 	commlib.decl.h
 	$(CHARMC) -c -o MeshStreamingStrategy.o MeshStreamingStrategy.C
 
@@ -110,8 +824,147 @@ PrioStreaming.o: \
 	PrioStreaming.C \
 	PrioStreaming.h \
 	ComlibManager.h \
+	../../../charm++.h \
+	../../../charm.h \
+	../../../converse.h \
+	../../../conv-config.h \
+	../../../conv-common.h \
+	../../../conv-mach.h \
+	../../../conv-autoconfig.h \
+	../../../conv-mach-opt.h \
+	../../../cc-cxx.h \
+	../../../pup_c.h \
+	../../../conv-cpm.h \
+	../../../conv-cpath.h \
+	../../../conv-qd.h \
+	../../../conv-random.h \
+	../../../conv-lists.h \
+	../../../conv-trace.h \
+	../../../persistent.h \
+	../../../debug-conv.h \
+	../../../pup.h \
+	../../../middle.h \
+	../../../middle-conv.h \
+	../../../cklists.h \
+	../../../ckbitvector.h \
+	../../../ckstream.h \
+	../../../init.h \
+	../../../ckhashtable.h \
+	../../../debug-charm.h \
+	../../../CkMarshall.decl.h \
+	../../../cksection.h \
+	../../../ckcallback.h \
+	../../../conv-ccs.h \
+	../../../sockRoutines.h \
+	../../../ccs-server.h \
+	../../../ckobjQ.h \
+	../../../ckreduction.h \
+	../../../CkReduction.decl.h \
+	../../../cknodegroupreduction.h \
+	../../../CkArrayReductionMgr.decl.h \
+	../../../ckmemcheckpoint.h \
+	../../../CkMemCheckpoint.decl.h \
+	../../../readonly.h \
+	../../../ckarray.h \
+	../../../cklocation.h \
+	../../../LBDatabase.h \
+	../../../lbdb.h \
+	../../../LBDatabase.decl.h \
+	../../../NullLB.decl.h \
+	../../../BaseLB.decl.h \
+	../../../CkLocation.decl.h \
+	../../../CkArray.decl.h \
+	../../../ComlibArrayListener.h \
+	../../../ComlibStrategy.h \
+	../../../CkFutures.decl.h \
+	../../../charisma.h \
+	../../../charisma.decl.h \
+	../../../tempo.h \
+	../../../tempo.decl.h \
+	../../../waitqd.h \
+	../../../waitqd.decl.h \
+	../../../sdag.h \
+	../../../ckcheckpoint.h \
+	../../../CkCheckpoint.decl.h \
+	../../../ckarrayreductionmgr.h \
+	../../../trace.h \
+	../../../trace-bluegene.h \
+	../../../envelope.h \
 	commlib.decl.h \
 	StreamingStrategy.h \
 	MsgPacker.h
 	$(CHARMC) -c -o PrioStreaming.o PrioStreaming.C
+
+BroadcastStrategy.o: \
+	BroadcastStrategy.C \
+	BroadcastStrategy.h \
+	ComlibManager.h \
+	../../../charm++.h \
+	../../../charm.h \
+	../../../converse.h \
+	../../../conv-config.h \
+	../../../conv-common.h \
+	../../../conv-mach.h \
+	../../../conv-autoconfig.h \
+	../../../conv-mach-opt.h \
+	../../../cc-cxx.h \
+	../../../pup_c.h \
+	../../../conv-cpm.h \
+	../../../conv-cpath.h \
+	../../../conv-qd.h \
+	../../../conv-random.h \
+	../../../conv-lists.h \
+	../../../conv-trace.h \
+	../../../persistent.h \
+	../../../debug-conv.h \
+	../../../pup.h \
+	../../../middle.h \
+	../../../middle-conv.h \
+	../../../cklists.h \
+	../../../ckbitvector.h \
+	../../../ckstream.h \
+	../../../init.h \
+	../../../ckhashtable.h \
+	../../../debug-charm.h \
+	../../../CkMarshall.decl.h \
+	../../../cksection.h \
+	../../../ckcallback.h \
+	../../../conv-ccs.h \
+	../../../sockRoutines.h \
+	../../../ccs-server.h \
+	../../../ckobjQ.h \
+	../../../ckreduction.h \
+	../../../CkReduction.decl.h \
+	../../../cknodegroupreduction.h \
+	../../../CkArrayReductionMgr.decl.h \
+	../../../ckmemcheckpoint.h \
+	../../../CkMemCheckpoint.decl.h \
+	../../../readonly.h \
+	../../../ckarray.h \
+	../../../cklocation.h \
+	../../../LBDatabase.h \
+	../../../lbdb.h \
+	../../../LBDatabase.decl.h \
+	../../../NullLB.decl.h \
+	../../../BaseLB.decl.h \
+	../../../CkLocation.decl.h \
+	../../../CkArray.decl.h \
+	../../../ComlibArrayListener.h \
+	../../../ComlibStrategy.h \
+	../../../CkFutures.decl.h \
+	../../../charisma.h \
+	../../../charisma.decl.h \
+	../../../tempo.h \
+	../../../tempo.decl.h \
+	../../../waitqd.h \
+	../../../waitqd.decl.h \
+	../../../sdag.h \
+	../../../ckcheckpoint.h \
+	../../../CkCheckpoint.decl.h \
+	../../../ckarrayreductionmgr.h \
+	../../../trace.h \
+	../../../trace-bluegene.h \
+	../../../envelope.h \
+	commlib.decl.h
+	$(CHARMC) -c -o BroadcastStrategy.o BroadcastStrategy.C
 

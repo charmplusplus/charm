@@ -94,7 +94,7 @@ depends:  $(CIFILES)
 	      SRCFILE=`basename $$i .o`.C ; \
               echo "checking dependencies for $$SRCFILE" ; \
               g++ -MM  -I../../.. -I$(CHARMINC) $$SRCFILE | \
-              perl $(CHARMBIN)/dep.pl $(CHARMINC)  ../../.. /usr/include /usr/local >> $(DEPENDFILE); \
+              perl $(CHARMBIN)/dep.pl $(CHARMINC)  /usr/include /usr/local >> $(DEPENDFILE); \
               echo '	$$(CHARMC) -c -o '$$i $$SRCFILE >> $(DEPENDFILE) ; \
 	      echo '' >> $(DEPENDFILE) ; \
         done; 
