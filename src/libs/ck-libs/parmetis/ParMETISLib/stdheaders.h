@@ -14,7 +14,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+
+/* OSX does not use malloc.h, but provides malloc functionality in stdlib.h */
+#ifndef __MACH__ && __APPLE_CC__
 #include <malloc.h>
+#endif
+
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
