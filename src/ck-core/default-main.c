@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1997-03-19 04:30:50  jyelon
+ * Revision 2.17  1997-03-19 04:32:53  jyelon
+ * Fixed new ConverseInit
+ *
+ * Revision 2.16  1997/03/19 04:30:50  jyelon
  * Eliminated all the nonsense pertaining to the SIM version.
  *
  * Revision 2.15  1997/02/13 09:30:37  jyelon
@@ -90,5 +93,5 @@ main(argc, argv)
 int argc;
 char *argv[];
 {
-  ConverseInit(argc, argv, charm_init, 1, 1);
+  ConverseInit(argc, argv, charm_init,0,0);
 }
