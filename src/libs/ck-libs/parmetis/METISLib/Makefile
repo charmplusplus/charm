@@ -2,7 +2,8 @@ include ../Makefile.in
 
 
 CFLAGS = $(OPTFLAGS) -I. 
-
+#certain compilers (e.g. icc) may need to special option for FP precision
+#CFLAGS = $(CFLAGS) -mp1
 
 OBJS = coarsen.o fm.o initpart.o match.o ccgraph.o \
        pmetis.o pqueue.o refine.o util.o timing.o debug.o \
