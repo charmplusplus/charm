@@ -59,9 +59,9 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 		int index2=0, index=0;\
 		while((size!=0)&&(size2!=0))\
 		{\
-			if(arr2[index2].i < temp[index].i)\
+			if(arr2[index2].index < temp[index].index)\
 			{\
-				mergedData[mergedDataSize].i = arr2[index2].i;\
+				mergedData[mergedDataSize].index = arr2[index2].index;\
 				mergedData[mergedDataSize].data = arr2[index2].data;\
 \
 				mergedDataSize++;\
@@ -69,9 +69,9 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 				index2++;\
 			}\
 			else\
-			if(arr2[index2].i > temp[index].i)\
+			if(arr2[index2].index > temp[index].index)\
 			{\
-				mergedData[mergedDataSize].i = temp[index].i;\
+				mergedData[mergedDataSize].index = temp[index].index;\
 				mergedData[mergedDataSize].data = temp[index].data;\
 \
 				mergedDataSize++;\
@@ -80,7 +80,7 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 			}\
 			else\
 			{\
-				mergedData[mergedDataSize].i = arr2[index2].i;\
+				mergedData[mergedDataSize].index = arr2[index2].index;\
 				mergedData[mergedDataSize].data = arr2[index2].data;\
 				loop\
 \
@@ -94,7 +94,7 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 \
 		while(size!=0)\
 		{\
-			mergedData[mergedDataSize].i = temp[index].i;\
+			mergedData[mergedDataSize].index = temp[index].index;\
 			mergedData[mergedDataSize].data = temp[index].data;\
 \
 			mergedDataSize++;\
@@ -104,7 +104,7 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 \
 		while(size2!=0)\
 		{\
-			mergedData[mergedDataSize].i = arr2[index2].i;\
+			mergedData[mergedDataSize].index = arr2[index2].index;\
 			mergedData[mergedDataSize].data = arr2[index2].data;\
 \
 			mergedDataSize++;\

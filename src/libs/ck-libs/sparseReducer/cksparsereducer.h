@@ -6,9 +6,9 @@
 template <class T>
 struct sparseRec1D
 {
-	sparseRec1D(int _i, T _data)
+	sparseRec1D(int _index, T _data)
 	{
-		i = _i;
+		index = _index;
 		data = _data;
 	}
 
@@ -16,7 +16,7 @@ struct sparseRec1D
 	{
 	}
 
-	int i; // index of element
+	int index; // index of element
 	T data; // actual data
 };
 
@@ -37,9 +37,8 @@ extern CkReduction::reducerType sparse_min_double;
 
 /*
 ** To contribute a sparse array,
-**    create an object of CkSparseReducer1D<T> r.
-**    call the function r.numOfElements(n) where n is the number of elements to contribute
-**    call r.add(index, data) n times, to add all the elements to the object r.
+**    create an object of CkSparseReducer1D<T> r(numOfElements). Here 'numOfElements' is the # elements to contribute.
+**    call r.add(index, data) 'numOfElements' times, to add all the elements to the object r.
 **    call r.contribute(...)
 **  NOTE that sparse reduction library expects data contributed (added to r) to be sorted on index.
 */
@@ -49,38 +48,48 @@ class CkSparseReducer1D
 {
 	public:
 
+		CkSparseReducer1D(int numOfElements)
+		{
+			size = numOfElements;
+			index = 0;
+			if(size != 0)
+				records = new rec[size];
+			else
+				records = NULL;
+		}
+
+		~CkSparseReducer1D()
+		{
+			if(records != NULL)
+				delete[] records;
+		}
+
 		void add(int i, T data)
 		{
-                        records[index].i = i;
+			records[index].index = i;
 			records[index].data = data;
 			index++;
 		}
 
                 void contribute(ArrayElement *elem, CkReduction::reducerType type)
 		{
-                        elem->contribute(size*sizeof(rec), records, type);
-			delete[] records;
+			elem->contribute(size*sizeof(rec), records, type);
                 }
 
 		void contribute(ArrayElement *elem, CkReduction::reducerType type, const CkCallback &cb)
 		{
-                        elem->contribute(size*sizeof(rec), records, type, cb);
-			delete[] records;
-		}
-
-		void numOfElements(int n)
-		{
-			size = n;
-			index = 0;
-			records = new rec[size];
+			elem->contribute(size*sizeof(rec), records, type, cb);
 		}
 
 	protected:
 
-                typedef sparseRec1D<T> rec;
-                rec *records;
+		typedef sparseRec1D<T> rec;
+		rec *records;
 		int size;
 		int index;
+
+	private:
+		CkSparseReducer1D(){} // should not use the default constructor
 };
 
 #endif
