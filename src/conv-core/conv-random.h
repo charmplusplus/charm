@@ -1,4 +1,4 @@
-#ifdef _CONV_RANDOM_H
+#ifndef _CONV_RANDOM_H
 #define _CONV_RANDOM_H
 
 #ifdef __cplusplus
