@@ -171,7 +171,7 @@ class PtrType : public Type {
     int isCkArgMsgPtr(void) const {return numstars==1 && type->isCkArgMsg();}
     int isMessage(void) const {return numstars==1 && !type->isBuiltin();}
     void indirect(void) { numstars++; }
-    int getNumStars(void) {return numstars; }
+    int getNumStars(void) const {return numstars; }
     void print(XStr& str);
     char *getBaseName(void) { return type->getBaseName(); }
     virtual void genMsgProxyName(XStr& str) { 
