@@ -237,12 +237,6 @@ do
 		LINK="$LINK $base.o"
 		DOCOMPILE="yes"
 		;;
-	-shared)
-#skip building a DLL
-		End 0;
-		CL="$CL $CL_DLL"
-		DOCOMPILE="yes"
-		;;
 # Default
 	*)
 #		printUsage  "Error: Unrecognized argument $arg"
