@@ -19,11 +19,11 @@ CMK_LDXX="CC -library=Cstd $CMK_CXXFLAGS -instances=global "
 CMK_AR='CC -xar -o'
 CMK_LD_SHARED="-G"
 CMK_LIBS=" -lnsl -lsocket $CHARMLIB/libckqt.a"
-CMK_SEQ_LIBS='-lnsl -lsocket'
-CMK_SEQ_CC="cc $CMK_CFLAGS "
-CMK_SEQ_LD="cc $CMK_CFLAGS "
-CMK_SEQ_CXX="CC -library=Cstd $CMK_CXXFLAGS "
-CMK_SEQ_LDXX="CC -library=Cstd $CMK_CXXFLAGS "
+CMK_NATIVE_LIBS='-lnsl -lsocket'
+CMK_NATIVE_CC="cc $CMK_CFLAGS "
+CMK_NATIVE_LD="cc $CMK_CFLAGS "
+CMK_NATIVE_CXX="CC -library=Cstd $CMK_CXXFLAGS "
+CMK_NATIVE_LDXX="CC -library=Cstd $CMK_CXXFLAGS "
 CMK_CPP_SUFFIX="cc"
 CMK_XLATPP='charmxlat++ -w -p '
 CMK_QT='solaris-cc64'
