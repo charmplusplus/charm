@@ -18,6 +18,63 @@ CmiIdleLock_checkMessage
 
 void CmiStateInit(int pe, int rank, CmiState state);
 
+/******************************************************************************
+ *
+ * OS Threads
+ *
+ * This version of converse is for multiple-processor workstations,
+ * and we assume that the OS provides threads to gain access to those
+ * multiple processors.  This section contains an interface layer for
+ * the OS specific threads package.  It contains routines to start
+ * the threads, routines to access their thread-specific state, and
+ * routines to control mutual exclusion between them.
+ *
+ * In addition, we wish to support nonthreaded operation.  To do this,
+ * we provide a version of these functions that uses the main/only thread
+ * as a single PE, and simulates a communication thread using interrupts.
+ *
+ *
+ * CmiStartThreads()
+ *
+ *    Allocates one CmiState structure per PE.  Initializes all of
+ *    the CmiState structures using the function CmiStateInit.
+ *    Starts processor threads 1..N (not 0, that's the one
+ *    that calls CmiStartThreads), as well as the communication
+ *    thread.  Each processor thread (other than 0) must call ConverseInitPE
+ *    followed by Cmi_startfn.  The communication thread must be an infinite
+ *    loop that calls the function CommunicationServer over and over.
+ *
+ * CmiGetState()
+ *
+ *    When called by a PE-thread, returns the processor-specific state
+ *    structure for that PE.
+ *
+ * CmiGetStateN(int n)
+ *
+ *    returns processor-specific state structure for the PE of rank n.
+ *
+ * CmiMemLock() and CmiMemUnlock()
+ *
+ *    The memory module calls these functions to obtain mutual exclusion
+ *    in the memory routines, and to keep interrupts from reentering malloc.
+ *
+ * CmiCommLock() and CmiCommUnlock()
+ *
+ *    These functions lock a mutex that insures mutual exclusion in the
+ *    communication routines.
+ *
+ * CmiMyPe() and CmiMyRank()
+ *
+ *    The usual.  Implemented here, since a highly-optimized version
+ *    is possible in the nonthreaded case.
+ *
+
+  
+  FIXME: There is horrible duplication of code (e.g. locking code)
+   both here and in converse.h.  It could be much shorter.  OSL 9/9/2000
+
+ *****************************************************************************/
+
 /************************ Win32 kernel SMP threads **************/
 #if CMK_SHARED_VARS_NT_THREADS
 
@@ -60,6 +117,7 @@ void CmiYield(void)
 
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
+/*
 static DWORD WINAPI comm_thread(LPVOID dummy)
 {  
   if (Cmi_charmrun_fd!=-1)
@@ -76,6 +134,23 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
   if(TlsSetValue(Cmi_state_key, (LPVOID)state) == 0) PerrorExit("TlsSetValue");
 
   ConverseRunPE(0);
+  return 0;
+}
+*/
+static DWORD WINAPI call_startfn(LPVOID vindex)
+{
+  int index = (int)vindex;
+ 
+  CmiState state = Cmi_state_vector + index;
+  if(Cmi_state_key == 0xFFFFFFFF) PerrorExit("TlsAlloc");
+  if(TlsSetValue(Cmi_state_key, (LPVOID)state) == 0) PerrorExit("TlsSetValue");
+
+  if (index<Cmi_mynodesize)
+	  ConverseRunPE(0); /*Regular worker thread*/
+  else { /*Communication thread*/
+	  if (Cmi_charmrun_fd!=-1)
+		  while (1) CommunicationServer(5);
+  } 
   return 0;
 }
 
@@ -123,12 +198,14 @@ static void CmiStartThreads(char **argv)
   if(Cmi_state_key == 0xFFFFFFFF) PerrorExit("TlsAlloc main");
   
   Cmi_state_vector =
-    (CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
+    (CmiState)calloc(Cmi_mynodesize+1, sizeof(struct CmiStateStruct));
   
   for (i=0; i<Cmi_mynodesize; i++)
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
+  /*Create a fake state structure for the comm. thread*/
+  CmiStateInit(-1,Cmi_mynodesize,CmiGetStateN(Cmi_mynodesize));
   
-  for (i=1; i<Cmi_mynodesize; i++) {
+  for (i=1; i<=Cmi_mynodesize; i++) {
     if((thr = CreateThread(NULL, 0, call_startfn, (LPVOID)i, 0, &threadID)) 
        == NULL) PerrorExit("CreateThread");
     CloseHandle(thr);
@@ -136,10 +213,6 @@ static void CmiStartThreads(char **argv)
   
   if(TlsSetValue(Cmi_state_key, (LPVOID)Cmi_state_vector) == 0) 
     PerrorExit("TlsSetValue");
-  
-  if((thr = CreateThread(NULL, 0, comm_thread, 0, 0, &threadID)) == NULL) 
-     PerrorExit("CreateThread");
-  CloseHandle(thr);
 }
 
 /***************** Pthreads kernel SMP threads ******************/
@@ -212,6 +285,7 @@ void CmiCommUnlock(void) {
 }
 #endif
 
+/*
 static void comm_thread(void)
 {
   while (1) CommunicationServer(5);
@@ -225,6 +299,25 @@ static void *call_startfn(void *vindex)
   ConverseRunPE(0);
   return 0;
 }
+*/
+
+static void *call_startfn(void *vindex)
+{
+  int index = (int)vindex;
+  CmiState state = Cmi_state_vector + index;
+  pthread_setspecific(Cmi_state_key, state);
+
+  if (index<Cmi_mynodesize) 
+	  ConverseRunPE(0); /*Regular worker thread*/
+  else 
+  { /*Communication thread*/
+	  if (Cmi_charmrun_fd!=-1)
+		  while (1) CommunicationServer(5);
+  }
+  
+  return 0;
+}
+
 
 static void CmiStartThreads(char **argv)
 {
@@ -237,10 +330,13 @@ static void CmiStartThreads(char **argv)
 
   pthread_key_create(&Cmi_state_key, 0);
   Cmi_state_vector =
-    (CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
+    (CmiState)calloc(Cmi_mynodesize+1, sizeof(struct CmiStateStruct));
   for (i=0; i<Cmi_mynodesize; i++)
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
-  for (i=1; i<Cmi_mynodesize; i++) {
+  /*Create a fake state structure for the comm. thread*/
+  CmiStateInit(-1,Cmi_mynodesize,CmiGetStateN(Cmi_mynodesize));
+
+  for (i=1; i<=Cmi_mynodesize; i++) {
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     ok = pthread_create(&pid, &attr, call_startfn, (void *)i);
@@ -248,8 +344,6 @@ static void CmiStartThreads(char **argv)
     pthread_attr_destroy(&attr);
   }
   pthread_setspecific(Cmi_state_key, Cmi_state_vector);
-  ok = pthread_create(&pid, NULL, (void *(*)(void *))comm_thread, 0);
-  if (ok<0) PerrorExit("pthread_create comm"); 
 }
 
 #endif
@@ -367,6 +461,7 @@ void CmiStateInit(int pe, int rank, CmiState state)
 {
   state->pe = pe;
   state->rank = rank;
+  if (pe==-1) return; /* Communications thread */
   state->recv = PCQueueCreate();
   state->localqueue = CdsFifo_Create();
   CmiIdleLock_init(&state->idle);

@@ -7,6 +7,13 @@ CmiIdleLock
 CmiState
 */
 
+/***********************************************************
+ * SMP Idle Locking
+ *   In an SMP system, idle processors need to sleep on a
+ * lock so that if a message for them arrives, they can be
+ * woken up.
+ **********************************************************/
+
 #if CMK_SHARED_VARS_NT_THREADS
 
 typedef struct {
@@ -31,6 +38,12 @@ typedef struct {
 } CmiIdleLock;
 
 #endif
+
+/************************************************************
+ *
+ * Processor state structure
+ *
+ ************************************************************/
 
 typedef struct CmiStateStruct
 {
