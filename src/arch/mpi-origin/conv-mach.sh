@@ -32,3 +32,4 @@ CMK_CPP_SUFFIX="i"
 CMK_XLATPP='charmxlat++ -w '
 CMK_QT='origin'
 CMK_XIOPTS=''
+CMK_F90LIBS='fmain.o -L/usr/lib64 -lfortran -lftn'
