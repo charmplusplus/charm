@@ -261,6 +261,9 @@ static void CommunicationServer(int withDelayMs)
   MACHSTATE1(2,"CommunicationServer(%d)",withDelayMs)
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
 
+  /* standalone mode */
+  if (Cmi_charmrun_pid == 0 && gmport == NULL) return;
+
   CmiCommLock();
 
   CommunicationServer_nolock(withDelayMs);
@@ -630,12 +633,17 @@ void CmiMachineInit(char **argv)
 
   gmport = NULL;
   if (dataport == -1) 
-  { /* Can't do standalone mode without mucking with broadcast, etc. */
+  {
+#if 0
+    /* Can't do standalone mode without mucking with broadcast, etc. */
     fprintf(stderr,
     "ERROR: Standalone mode not supported under net-linux gm.\n"
     "You must either run using charmrun or rebuild using just net-linux.\n");
     machine_initiated_shutdown=1;
     exit(1);
+#else
+    return;
+#endif
   }
 
   status = gm_init();
@@ -727,6 +735,7 @@ void CmiCheckGmStatus()
 {
   int i;
   int doabort = 0;
+  if (Cmi_charmrun_pid == 0 && gmport == NULL) return;
   if (gmport == NULL) machine_exit(1);
   for (i=0; i<_Cmi_numnodes; i++) {
     gm_status_t status;
