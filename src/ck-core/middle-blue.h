@@ -16,8 +16,9 @@
 #undef CmiSyncBroadcastAll
 #undef CmiSyncBroadcastAllAndFree
 
-#define CkRegisterHandler(x)     BgRegisterHandler((BgHandler)(x))
-#define CkNumberHandler(n, x)    BgNumberHandler(n, (BgHandler)(x))
+#define CkRegisterHandler(x)        BgRegisterHandler((BgHandler)(x))
+#define CkNumberHandler(n, x)       BgNumberHandler(n, (BgHandler)(x))
+#define CkNumberHandlerEx(n, x, p)  BgNumberHandlerEx(n, (BgHandlerEx)(x), p)
 
 #define ConverseExit             BgCharmExit
 

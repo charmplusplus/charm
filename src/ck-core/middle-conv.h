@@ -13,8 +13,9 @@
 #undef CkMyPe
 #undef CkNumPes
 
-#define CkRegisterHandler(x)     CmiRegisterHandler(x)
-#define CkNumberHandler(n, x)    CmiNumberHandler(n, x)
+#define CkRegisterHandler(x)          CmiRegisterHandler(x)
+#define CkNumberHandler(n, x)         CmiNumberHandler(n, x)
+#define CkNumberHandlerEx(n, x, p)    CmiNumberHandlerEx(n, x, p)
 
 #undef CmiSyncSend
 #undef CmiSyncSendAndFree
