@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1995-10-10 06:10:58  jyelon
+ * Revision 2.14  1995-10-13 20:05:13  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.13  1995/10/10  06:10:58  jyelon
  * removed program_name
  *
  * Revision 2.12  1995/09/29  09:50:07  jyelon
@@ -286,7 +289,7 @@ void         *msg;
                 exit(1);
         }
 
-        mycpy((unsigned long long *)buf,(unsigned long long *)msg,size);
+        mycpy((double *)buf,(double *)msg,size);
         McQueueAddToBack(MsgQueue[destPE],buf); 
 }
 
@@ -354,7 +357,7 @@ void         *msg;
                 exit(1);
         }
 
-    mycpy((unsigned long long *)buf,(unsigned long long *)msg,size);
+    mycpy((double *)buf,(double *)msg,size);
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),buf);
 }
 
@@ -396,7 +399,7 @@ CmiNodeBarrier()
 
 
 
-static void mycpy(unsigned long long *dst, unsigned long long *src, int bytes)
+static void mycpy(double *dst, double *src, int bytes)
 {
         unsigned char *cdst, *csrc;
 

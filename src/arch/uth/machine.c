@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.3  1995-10-10 06:10:58  jyelon
+ * Revision 1.4  1995-10-13 20:05:13  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.3  1995/10/10  06:10:58  jyelon
  * removed program_name
  *
  * Revision 1.2  1995/09/30  15:44:59  jyelon
@@ -47,7 +50,6 @@ static char ident[] = "@(#)$Header$";
 #include <stdio.h>
 #include <math.h>
 #include "converse.h"
-#include "conv-conds.h"
 
 #ifdef CMK_TIMER_USE_TIMES
 #include <sys/times.h>
@@ -68,7 +70,8 @@ static char *DeleteArg(argv)
   return res;
 }
 
-static void mycpy(unsigned long long *dst, unsigned long long *src, int bytes)
+static void mycpy(dst, src, bytes)
+    double *dst; double *src; int bytes;
 {
         unsigned char *cdst, *csrc;
 
@@ -367,7 +370,7 @@ int size;
 char * msg;
 {
   char *buf = (char *)CmiAlloc(size);
-  mycpy((unsigned long long *)buf,(unsigned long long *)msg,size);
+  mycpy((double *)buf,(double *)msg,size);
   FIFO_EnQueue(CmiQueues[destPE],buf);
 }
 
@@ -377,7 +380,7 @@ int size;
 char * msg;
 {
   char *buf = (char *)CmiAlloc(size);
-  mycpy((unsigned long long *)buf,(unsigned long long *)msg,size);
+  mycpy((double *)buf,(double *)msg,size);
   FIFO_EnQueue(CmiQueues[destPE],buf);
 }
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.2  1995-10-13 18:17:44  jyelon
+ * Revision 1.3  1995-10-13 20:05:13  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.2  1995/10/13  18:17:44  jyelon
  * I can't even remember.
  *
  * Revision 1.1  1995/10/12  23:11:36  jyelon
@@ -74,10 +77,11 @@
 #define CMK_COMPILER_LIKES_STATIC_PROTO
 
 /* #define CMK_CMIMYPE_IS_A_BUILTIN */
-#define CMK_CMIMYPE_IS_A_VARIABLE
+/* #define CMK_CMIMYPE_IS_A_VARIABLE */
+#define CMK_CMIMYPE_UNIPROCESSOR
 
-/* #define CMK_CMIPRINTF_IS_JUST_PRINTF */
-#define CMK_CMIPRINTF_IS_A_BUILTIN
+/* #define CMK_CMIPRINTF_IS_A_BUILTIN */
+#define CMK_CMIPRINTF_IS_JUST_PRINTF
 
 /* #define CMK_THREADS_UNAVAILABLE */
 #define CMK_THREADS_USE_ALLOCA

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1995-10-13 16:08:54  gursoy
+ * Revision 1.2  1995-10-13 20:05:13  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.1  1995/10/13  16:08:54  gursoy
  * Initial revision
  *
  ***************************************************************************/
@@ -22,7 +25,7 @@ static char ident[] = "@(#)$Header$";
 #include <math.h>
 #include "machine.h"
 #include "converse.h"
-#include "conv-conds.h"
+
 #ifdef CMK_TIMER_USE_TIMES
 #include <sys/times.h>
 #include <sys/unistd.h>
@@ -130,7 +133,7 @@ char * msg;
     buf              =  (char *)malloc(size+8);
     ((int *)buf)[0]  =  size;
     buf += 8;
-    mycpy((unsigned long long *)buf,(unsigned long long *)msg,size);
+    mycpy((double *)buf,(double *)msg,size);
 
     sim_send_message(Cmi_mype,buf,size,FALSE,destPE);
 }
@@ -224,7 +227,7 @@ char * msg;
      buf              =  (char *)malloc(size+8);
      ((int *)buf)[0]  =  size; 
      buf += 8;
-     mycpy((unsigned long long *)buf,(unsigned long long *)msg,size);
+     mycpy((double *)buf,(double *)msg,size);
      FIFO_EnQueue(CpvAccess(CmiLocalQueue),buf);
 }
 
@@ -420,7 +423,7 @@ char *argv[];
     user_main(argc,argv);
 }
 
-static void mycpy(unsigned long long *dst, unsigned long long *src, int bytes)
+static void mycpy(double *dst, double *src, int bytes)
 {
         unsigned char *cdst, *csrc;
 

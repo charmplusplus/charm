@@ -31,5 +31,5 @@ set CMK_SEQ_CC='gcc'
 set CMK_SEQ_LD='gcc'
 set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | sed -e 's@ *|.*@@'"
-set CMK_EXTRAS='gcc -o ../bin/conv-host conv-host.c '
-set CMK_CLEAN='rm -f ../bin/conv-host'
+set CMK_EXTRAS=''
+set CMK_CLEAN=''
