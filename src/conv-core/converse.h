@@ -12,7 +12,13 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.76  1997-12-10 21:01:06  jyelon
+ * Revision 2.77  1998-01-16 18:03:02  milind
+ * Fixed Ctv bug on shared memory machines.
+ * Made latencyBWtest conformant with Converse.
+ * Added high resolution timers to Origin2000.
+ * Removed starvation from Origin Pthreads version.
+ *
+ * Revision 2.76  1997/12/10 21:01:06  jyelon
  * *** empty log message ***
  *
  * Revision 2.75  1997/11/26 19:17:24  milind
@@ -578,7 +584,7 @@ extern int CthRegister CMK_PROTO((int));
 #define CtvStaticDeclare(t,v)   typedef t CtvType##v; CsvStaticDeclare(int,CtvOffs##v);
 #define CtvExtern(t,v)          typedef t CtvType##v; CsvExtern(int,CtvOffs##v);
 #define CtvAccess(v)            (*((CtvType##v *)(CthCpvAccess(CthData)+CsvAccess(CtvOffs##v))))
-#define CtvInitialize(t,v)      if (CmiMyRank()==0) (CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)));
+#define CtvInitialize(t,v)      (CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)));
 
 /************************************************************************
  *

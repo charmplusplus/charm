@@ -8,7 +8,13 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.7  1998-01-13 17:03:37  milind
+ * Revision 1.8  1998-01-16 18:03:12  milind
+ * Fixed Ctv bug on shared memory machines.
+ * Made latencyBWtest conformant with Converse.
+ * Added high resolution timers to Origin2000.
+ * Removed starvation from Origin Pthreads version.
+ *
+ * Revision 1.7  1998/01/13 17:03:37  milind
  * Made charm++ to compile and run with Solaris 2.6.
  * In particular, changed INTBITS to CINTBITS, and handled EALREADY.
  *
@@ -166,7 +172,7 @@
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
-#define CMK_TIMER_USE_TIMES                                1
+#define CMK_TIMER_USE_TIMES                                0
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0

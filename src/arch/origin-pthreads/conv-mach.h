@@ -8,7 +8,13 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.2  1997-12-22 21:58:04  jyelon
+ * Revision 1.3  1998-01-16 18:03:07  milind
+ * Fixed Ctv bug on shared memory machines.
+ * Made latencyBWtest conformant with Converse.
+ * Added high resolution timers to Origin2000.
+ * Removed starvation from Origin Pthreads version.
+ *
+ * Revision 1.2  1997/12/22 21:58:04  jyelon
  * Changed LDB initialization scheme.
  *
  * Revision 1.1  1997/11/26 19:13:59  milind
@@ -109,8 +115,8 @@
 
 #define CMK_MACHINE_NAME                                   "origin-pthreads"
 
-#define CMK_MALLOC_USE_GNU_MALLOC                          0
-#define CMK_MALLOC_USE_OS_BUILTIN                          1
+#define CMK_MALLOC_USE_GNU_MALLOC                          1
+#define CMK_MALLOC_USE_OS_BUILTIN                          0
 
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             0
@@ -166,7 +172,7 @@
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
-#define CMK_TIMER_USE_TIMES                                1
+#define CMK_TIMER_USE_TIMES                                0
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0

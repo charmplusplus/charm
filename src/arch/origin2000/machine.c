@@ -6,6 +6,7 @@
 #include <ulocks.h>
 #include <math.h>
 #include "converse.h"
+#include <time.h>
 
 usptr_t *arena;
 static barrier_t *barr;
@@ -151,6 +152,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 }
 
 static void neighbour_init(int);
+
+void CmiTimerInit(void);
 
 static void threadInit(void *arg)
 {
@@ -479,3 +482,48 @@ void * McQueueRemoveFromFront(McQueue *queue)
   }
   return localmsg;
 }
+
+/* Timer Routines */
+
+
+CpvStaticDeclare(double,inittime_wallclock);
+CpvStaticDeclare(double,inittime_virtual);
+
+void CmiTimerInit(void)
+{
+  struct timespec temp;
+  CpvInitialize(double, inittime_wallclock);
+  CpvInitialize(double, inittime_virtual);
+  clock_gettime(CLOCK_SGI_CYCLE, &temp);
+  CpvAccess(inittime_wallclock) = (double) temp.tv_sec +
+				  1e-9 * temp.tv_nsec;
+  CpvAccess(inittime_virtual) = CpvAccess(inittime_wallclock);
+}
+
+double CmiWallTimer(void)
+{
+  struct timespec temp;
+  double currenttime;
+
+  clock_gettime(CLOCK_SGI_CYCLE, &temp);
+  currenttime = (double) temp.tv_sec +
+                1e-9 * temp.tv_nsec;
+  return (currenttime - CpvAccess(inittime_wallclock));
+}
+
+double CmiCpuTimer(void)
+{
+  struct timespec temp;
+  double currenttime;
+
+  clock_gettime(CLOCK_SGI_CYCLE, &temp);
+  currenttime = (double) temp.tv_sec +
+                1e-9 * temp.tv_nsec;
+  return (currenttime - CpvAccess(inittime_virtual));
+}
+
+double CmiTimer(void)
+{
+  return CmiCpuTimer();
+}
+

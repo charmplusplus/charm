@@ -249,16 +249,19 @@ static void CmiHandlerInit()
 
 #if CMK_TIMER_USE_TIMES
 
-static double  clocktick;
-static int     inittime_wallclock;
-static int     inittime_virtual;
+CpvStaticDeclare(double, clocktick);
+CpvStaticDeclare(int,inittime_wallclock);
+CpvStaticDeclare(int,inittime_virtual);
 
 void CmiTimerInit()
 {
   struct tms temp;
-  inittime_wallclock = times(&temp);
-  inittime_virtual = temp.tms_utime + temp.tms_stime;
-  clocktick = 1.0 / (sysconf(_SC_CLK_TCK));
+  CpvInitialize(double, clocktick);
+  CpvInitialize(int, inittime_wallclock);
+  CpvInitialize(int, inittime_virtual);
+  CpvAccess(inittime_wallclock) = times(&temp);
+  CpvAccess(inittime_virtual) = temp.tms_utime + temp.tms_stime;
+  CpvAccess(clocktick) = 1.0 / (sysconf(_SC_CLK_TCK));
 }
 
 double CmiWallTimer()
@@ -268,7 +271,7 @@ double CmiWallTimer()
   int now;
 
   now = times(&temp);
-  currenttime = (now - inittime_wallclock) * clocktick;
+  currenttime = (now - CpvAccess(inittime_wallclock)) * CpvAccess(clocktick);
   return (currenttime);
 }
 
@@ -280,7 +283,7 @@ double CmiCpuTimer()
 
   times(&temp);
   now = temp.tms_stime + temp.tms_utime;
-  currenttime = (now - inittime_virtual) * clocktick;
+  currenttime = (now - CpvAccess(inittime_virtual)) * CpvAccess(clocktick);
   return (currenttime);
 }
 
@@ -293,17 +296,19 @@ double CmiTimer()
 
 #if CMK_TIMER_USE_GETRUSAGE
 
-static double inittime_wallclock;
-static double inittime_virtual;
+CpvStaticDeclare(double, inittime_wallclock);
+CpvStaticDeclare(double, inittime_virtual);
 
 void CmiTimerInit()
 {
   struct timeval tv;
   struct rusage ru;
+  CpvInitialize(double, inittime_wallclock);
+  CpvInitialize(double, inittime_virtual);
   gettimeofday(&tv,0);
-  inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
+  CpvAccess(inittime_wallclock) = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
   getrusage(0, &ru); 
-  inittime_virtual =
+  CpvAccess(inittime_virtual) =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
 }
@@ -317,7 +322,7 @@ double CmiCpuTimer()
   currenttime =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
-  return currenttime - inittime_virtual;
+  return currenttime - CpvAccess(inittime_virtual);
 }
 
 double CmiWallTimer()
@@ -327,7 +332,7 @@ double CmiWallTimer()
 
   gettimeofday(&tv,0);
   currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
-  return currenttime - inittime_wallclock;
+  return currenttime - CpvAccess(inittime_wallclock);
 }
 
 double CmiTimer()

@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <pthread.h>
 #include <sched.h>
+#include <time.h>
 
 #define _POSIX1C
 #define _NO_ANSIMODE
@@ -19,6 +20,8 @@ extern void FIFO_EnQueue(void *, void *);
 
 typedef struct {
   pthread_mutex_t mutex;
+  pthread_cond_t cond;
+  int waiting;
   void     **blk;
   unsigned int blk_len;
   unsigned int first;
@@ -201,6 +204,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
 static void neighbour_init(int);
 
+void CmiTimerInit(void);
+
 static void *threadInit(void *arg)
 {
   USER_PARAMETERS *usrparam;
@@ -209,8 +214,8 @@ static void *threadInit(void *arg)
 
   pthread_setspecific(perThreadKey, (void *) usrparam->mype);
 
-  ConverseCommonInit(usrparam->argv);
   CthInit(usrparam->argv);
+  ConverseCommonInit(usrparam->argv);
   neighbour_init(CmiMyPe());
   CpvInitialize(void*, CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
@@ -237,6 +242,15 @@ void CmiDeclareArgs(void)
 
 void CmiNotifyIdle()
 {
+  McQueue *queue = MsgQueue[CmiMyPe()];
+  pthread_mutex_lock(&(queue->mutex));
+  if(!queue->len){
+    queue->waiting++;
+    pthread_cond_wait(&(queue->cond), &(queue->mutex));
+    queue->waiting--;
+  }
+  pthread_mutex_unlock(&(queue->mutex));
+  return;
 }
 
 void *CmiGetNonLocal()
@@ -442,6 +456,8 @@ McQueue * McQueueCreate(void)
 
   queue = (McQueue *) CmiAlloc(sizeof(McQueue));
   pthread_mutex_init(&(queue->mutex), (pthread_mutexattr_t *) 0);
+  pthread_cond_init(&(queue->cond), (pthread_condattr_t *) 0);
+  queue->waiting = 0;
   queue->blk = AllocBlock(BLK_LEN);
   queue->blk_len = BLK_LEN;
   queue->first = 0;
@@ -466,6 +482,9 @@ void McQueueAddToBack(McQueue *queue, void *element)
   queue->blk[(queue->first+queue->len++)%queue->blk_len] = element;
   if(queue->len>queue->maxlen)
     queue->maxlen = queue->len;
+  if(queue->waiting) {
+    pthread_cond_broadcast(&(queue->cond));
+  }
   pthread_mutex_unlock(&(queue->mutex));
 }
 
@@ -482,3 +501,48 @@ void * McQueueRemoveFromFront(McQueue *queue)
   pthread_mutex_unlock(&(queue->mutex));
   return element;
 }
+
+/* Timer Routines */
+
+
+CpvStaticDeclare(double,inittime_wallclock);
+CpvStaticDeclare(double,inittime_virtual);
+
+void CmiTimerInit(void)
+{
+  struct timespec temp;
+  CpvInitialize(double, inittime_wallclock);
+  CpvInitialize(double, inittime_virtual);
+  clock_gettime(CLOCK_SGI_CYCLE, &temp);
+  CpvAccess(inittime_wallclock) = (double) temp.tv_sec +
+				  1e-9 * temp.tv_nsec;
+  CpvAccess(inittime_virtual) = CpvAccess(inittime_wallclock);
+}
+
+double CmiWallTimer(void)
+{
+  struct timespec temp;
+  double currenttime;
+
+  clock_gettime(CLOCK_SGI_CYCLE, &temp);
+  currenttime = (double) temp.tv_sec +
+                1e-9 * temp.tv_nsec;
+  return (currenttime - CpvAccess(inittime_wallclock));
+}
+
+double CmiCpuTimer(void)
+{
+  struct timespec temp;
+  double currenttime;
+
+  clock_gettime(CLOCK_SGI_CYCLE, &temp);
+  currenttime = (double) temp.tv_sec +
+                1e-9 * temp.tv_nsec;
+  return (currenttime - CpvAccess(inittime_virtual));
+}
+
+double CmiTimer(void)
+{
+  return CmiCpuTimer();
+}
+
