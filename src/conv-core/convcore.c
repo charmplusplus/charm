@@ -2240,6 +2240,31 @@ void CommunicationServerInit()
 #endif
 }
 
+/**
+  Main Converse initialization routine.  This routine is 
+  called by the machine file (machine.c) to set up Converse.
+  It's "Common" because it's shared by all the machine.c files. 
+  
+  The main task of this routine is to set up all the Cpv's
+  (message queues, handler tables, etc.) used during main execution.
+  
+  On SMP versions, this initialization routine is called by 
+  *all* processors of a node simultaniously.  It's *also* called
+  by the communication thread, which is rather strange but needed
+  for immediate messages.  Each call to this routine expects a 
+  different copy of the argv arguments, so use CmiCopyArgs(argv).
+  
+  Requires:
+    - A working network layer.
+    - Working Cpv's and CmiNodeBarrier.
+    - CthInit to already have been called.  CthInit is called
+      from the machine layer directly, because some machine layers
+      (like uth) use Converse threads internally.
+
+  Initialization is somewhat subtle, in that various modules
+  won't work properly until they're initialized.  For example,
+  nobody can register handlers before calling CmiHandlerInit.
+*/
 void ConverseCommonInit(char **argv)
 {
   CmiArgInit(argv);
