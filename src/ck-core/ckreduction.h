@@ -164,7 +164,7 @@ private:
 
 
 //State:
-	void startReduction(int number);
+	void startReduction(int number,int srcPE);
 	void addContribution(CkReductionMsg *m);
 	void finishReduction(void);
 

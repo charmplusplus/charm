@@ -232,7 +232,7 @@ void CkReductionMgr::doneCreatingContributors(void)
 {
   DEBR((AA"Done creating contributors...\n"AB));
   creating=CmiFalse;
-  if (startRequested) startReduction(redNo);
+  if (startRequested) startReduction(redNo,CkMyPe());
   finishReduction();
 }
 
@@ -351,10 +351,11 @@ void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 	//delete m;
 	//return;
  }
+ int srcPE = (UsrToEnv(m))->getSrcPe();
   if (isPresent(m->num) && !inProgress)
   {
     DEBR((AA"Starting reduction #%d at parent's request\n"AB,m->num));
-    startReduction(m->num);
+    startReduction(m->num,srcPE);
     finishReduction();
   } else if (isFuture(m->num)){
 //   CkPrintf("[%d] arrays Mesg No %d redNo %d \n",CkMyPe(),m->num,redNo);
@@ -392,7 +393,7 @@ void CkReductionMgr::MigrantDied(CkReductionNumberMsg *m)
 }
 
 //////////// Reduction Manager State /////////////
-void CkReductionMgr::startReduction(int number)
+void CkReductionMgr::startReduction(int number,int srcPE)
 {
   if (isFuture(number)){ /*CkAbort("Can't start reductions out of order!\n");*/ return;}
   if (isPast(number)) {/*CkAbort("Can't restart reduction that's already finished!\n");*/return;}
@@ -411,25 +412,33 @@ void CkReductionMgr::startReduction(int number)
   DEBR((AA"Starting reduction #%d  %d %d \n"AB,redNo,completedRedNo,number));
   inProgress=CmiTrue;
   //Sent start requests to our kids (in case they don't already know)
- 
-
-  //making it a broadcast done only by PE 0
-
-  if(CkMyPe()==0){
-	int temp = completedRedNo+1;
-	if(temp < 0)
-		temp = 0;  
+	
+	int temp;
+  if(!hasParent()){
+		temp = completedRedNo+1;
+	/*	if(temp < 0)
+			temp = 0;  */
+	}	else{
+		temp = number;
+	}
 	for(int i=temp;i<=number;i++){
-		DEBR((AA"Asking all child PEs to start #%d \n"AB,i));
-		//thisProxy.ReductionStarting(new CkReductionNumberMsg(i));
+	//	DEBR((AA"Asking all child PEs to start #%d \n"AB,i));
+		if(hasParent()){
+	  // kick-start your parent too ...
+			if(treeParent() != srcPE){
+		  	thisProxy[treeParent()].ReductionStarting(new CkReductionNumberMsg(i));
+			}	
+		}
 	  for (int k=0;k<treeKids();k++)
 	  {
-	    DEBR((AA"Asking child PE %d to start #%d\n"AB,firstKid()+k,redNo));
-	    thisProxy[firstKid()+k].ReductionStarting(new CkReductionNumberMsg(i));
-  	 }
+			if(firstKid()+k != srcPE){
+		    DEBR((AA"Asking child PE %d to start #%d\n"AB,firstKid()+k,redNo));
+		    thisProxy[firstKid()+k].ReductionStarting(new CkReductionNumberMsg(i));
+			}	
+  	}
 	}
-  }
-  else{
+}	
+ /* else{
 	  // kick-start your parent too ...
 	  thisProxy[treeParent()].ReductionStarting(new CkReductionNumberMsg(number));
 	  for (int k=0;k<treeKids();k++)
@@ -437,8 +446,7 @@ void CkReductionMgr::startReduction(int number)
 	    DEBR((AA"Asking child PE %d to start #%d\n"AB,firstKid()+k,redNo));
 	    thisProxy[firstKid()+k].ReductionStarting(new CkReductionNumberMsg(number));
   	  }
-  }
-}
+  }*/
 /*Handle a message from one element for the reduction*/
 void CkReductionMgr::addContribution(CkReductionMsg *m)
 {
@@ -455,7 +463,7 @@ void CkReductionMgr::addContribution(CkReductionMsg *m)
   } else {// An ordinary contribution
     DEBR((AA"Recv'd local contribution %d for #%d at %d\n"AB,nContrib,m->redNo,this));
    // CkPrintf("[%d] Local Contribution for %d in Mesg %d at %.6f\n",CkMyPe(),redNo,m->redNo,CmiWallTimer());
-    startReduction(m->redNo);
+    startReduction(m->redNo,CkMyPe());
     msgs.enq(m);
     nContrib++;
     finishReduction();
@@ -520,7 +528,7 @@ void CkReductionMgr::finishReduction(void)
       addContribution(m);//<- if *still* early, puts it back in the queue
   }
   if(maxStartRequest >= redNo){
-	  startReduction(redNo);
+	  startReduction(redNo,CkMyPe());
 	  finishReduction();
   }
 }
@@ -1240,10 +1248,11 @@ void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMs
 void CkNodeReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 {
   CmiLock(lockEverything);
+	int srcNode = CmiNodeOf((UsrToEnv(m))->getSrcPe());
   if (isPresent(m->num) && !inProgress)
   {
     DEBR((AA"Starting Node reduction #%d at parent's request\n"AB,m->num));
-    startReduction(m->num);
+    startReduction(m->num,srcNode);
     finishReduction();
   } else if (isFuture(m->num)){
   	//CkPrintf("[%d][%d] Message num %d Present redNo %d \n",CkMyNode(),CkMyPe(),m->num,redNo);
@@ -1263,7 +1272,7 @@ void CkNodeReductionMgr::doRecvMsg(CkReductionMsg *m){
 #endif
 	if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
 	    //DEBR((AA"Recv'd remote contribution %d for #%d at %d\n"AB,nRemote,m->redNo,this));
-	    startReduction(m->redNo);
+	    startReduction(m->redNo,CkMyNode());
 	    msgs.enq(m);
 	    nRemote++;
 	    finishReduction();
@@ -1309,7 +1318,7 @@ void CkNodeReductionMgr::RecvMsg(CkReductionMsg *m)
 #endif 
 }
 
-void CkNodeReductionMgr::startReduction(int number)
+void CkNodeReductionMgr::startReduction(int number,int srcPE)
 {
 	if (isFuture(number)) CkAbort("Can't start reductions out of order!\n");
 	if (isPast(number)) CkAbort("Can't restart reduction that's already finished!\n");
@@ -1323,7 +1332,7 @@ void CkNodeReductionMgr::startReduction(int number)
 		startRequested=CmiTrue;
 		return;
 	}
-
+	
 	//If none of these cases, we need to start the reduction--
 	DEBR((AA"Starting Node reduction #%d\n"AB,redNo));
 	inProgress=CmiTrue;
@@ -1335,8 +1344,10 @@ void CkNodeReductionMgr::startReduction(int number)
 		DEBR((AA"Asking child Node %d to start #%d\n"AB,kids[k],redNo));
 		thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
 #else
-		DEBR((AA"Asking child Node %d to start #%d\n"AB,firstKid()+k,redNo));
-		thisProxy[firstKid()+k].ReductionStarting(new CkReductionNumberMsg(redNo));
+		if(firstKid()+k != srcPE){
+			DEBR((AA"Asking child Node %d to start #%d\n"AB,firstKid()+k,redNo));
+			thisProxy[firstKid()+k].ReductionStarting(new CkReductionNumberMsg(redNo));
+		}	
 #endif
 	}
 }
@@ -1348,7 +1359,7 @@ void CkNodeReductionMgr::doAddContribution(CkReductionMsg *m){
 	} else {// An ordinary contribution
 		DEBR((AA"Recv'd local node contribution %d for #%d at %d\n"AB,nContrib,m->redNo,this));
 		//    CmiPrintf("[%d,%d] Redcv'd Local Contribution for redNo %d number %d at %0.6f \n",CkMyNode(),CkMyPe(),m->redNo,nContrib+1,CkWallTimer());
-		startReduction(m->redNo);
+		startReduction(m->redNo,CkMyNode());
 		msgs.enq(m);
 		nContrib++;
 		finishReduction();

@@ -176,7 +176,7 @@ private:
 	int interrupt; /* flag for use in non-smp 0 means interrupt can occur 1 means not (also acts as a lock)*/
 
 //State:
-	void startReduction(int number);
+	void startReduction(int number,int srcPE);
 	void doAddContribution(CkReductionMsg *m);
 	void addContribution(CkReductionMsg *m);
 	void finishReduction(void);
