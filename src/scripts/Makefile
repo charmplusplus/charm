@@ -87,7 +87,7 @@ test: test-charm test-AMPI test-fem
 test-converse: converse
 	cd ../pgms ; $(MAKE) test-converse  OPTS='$(OPTS)'
 
-test-charm: charm++
+test-charm: charm++ METIS
 	cd ../pgms ; $(MAKE) test-charm  OPTS='$(OPTS)'
 
 test-AMPI: AMPI
