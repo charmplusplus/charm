@@ -208,8 +208,8 @@ aF[new CkArrayIndexFoo(...)].e(new MyMsg(7);
 
 \end{verbatim}
 With user-defined index types, you must pass a fresh index 
-(allocated with new) to each [] or () call-- the system will delete
-the index.
+(allocated with new) to a [] or () call in order to create an element proxy.
+System will delete the index in the destructor for the element proxy.
 
 To broadcast a message to all the current elements of an array, 
 simply omit the index, as:
