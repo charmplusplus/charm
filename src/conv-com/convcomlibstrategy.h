@@ -55,6 +55,14 @@ class MessageHolder : public PUP::able {
       return size;
     }
 
+    inline void * operator new(size_t size) {
+        return CmiAlloc(size);
+    }
+
+    inline void operator delete (void *buf) {
+        CmiFree(buf);
+    }
+
     virtual void pup(PUP::er &p);
     PUPable_decl(MessageHolder);
 };
@@ -90,8 +98,8 @@ class Strategy : public PUP::able{
 	higherLevel = this;
     }
 
-    void setBracketed(){isStrategyBracketed = 1;}
-    int isBracketed(){return isStrategyBracketed;}
+    inline void setBracketed(){isStrategyBracketed = 1;}
+    inline int isBracketed(){return isStrategyBracketed;}
 
     //Called for each message
     virtual void insertMessage(MessageHolder *msg) {}
@@ -100,24 +108,24 @@ class Strategy : public PUP::able{
     //messages on that processor.
     virtual void doneInserting() {}
 
-    void setInstance(int instid){myInstanceID = instid;}
-    int getInstance(){return myInstanceID;}
-    int getType() {return type;}
-    void setType(int t) {type = t;}
+    inline void setInstance(int instid){myInstanceID = instid;}
+    inline int getInstance(){return myInstanceID;}
+    inline int getType() {return type;}
+    inline void setType(int t) {type = t;}
 
-    void setDestination(int handler) {destinationHandler = handler;}
-    int getDestination() {return destinationHandler;}
+    inline void setDestination(int handler) {destinationHandler = handler;}
+    inline int getDestination() {return destinationHandler;}
 
-    void setConverseStrategy(Strategy *s){
+    inline void setConverseStrategy(Strategy *s){
         converseStrategy = s;
     }
 
-    Strategy * getConverseStrategy() {
+    inline Strategy * getConverseStrategy() {
         return converseStrategy;
     }
 
-    void setHigherLevel(Strategy *s) {
-      higherLevel = s;
+    inline void setHigherLevel(Strategy *s) {
+        higherLevel = s;
     }
 
     Strategy * getHigherLevel() {

@@ -47,6 +47,7 @@ class GridRouter : public Router
             *rowVector, *colVector, 
             *growVector, *gcolVector;
 
+        int myrow, mycol;
         int rvecSize, cvecSize;
 	int MyPe, NumPes, COLLEN;
  	int LPMsgCount, LPMsgExpected;

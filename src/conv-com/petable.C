@@ -231,8 +231,7 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
                                 int *pelist, int *length)
 {
     char *junk;
-    int mask=~7;
-    int nummsgs, offset, actual_msgsize=0, num_distinctmsgs;
+    int nummsgs, offset, num_distinctmsgs;
     
     ComlibPrintf("In ExtractAndPack %d\n", npe); 
     
@@ -241,27 +240,19 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
 	*length=0;
         
         ComlibPrintf("Returning NULL\n");
-
 	return(NULL);
     }
-    
-    //int ave_msgsize=(tot_msgsize>MSGSIZETHRESHOLD) ? 
-    //  tot_msgsize/(num_distinctmsgs):tot_msgsize;
     
     int msg_offset = CmiReservedHeaderSize + sizeof(comID) 
         + (npe + 4 + nummsgs) * sizeof(int);  
 
     msg_offset = ALIGN8(msg_offset);
     
-    int headersize=msg_offset;
-    
     *length = tot_msgsize;
     *length += msg_offset;
     char *p;
     p=(char *)CmiAlloc(*length);
-    
-    int l1 = *length;
-    
+
     char *t = p + CmiReservedHeaderSize;
     int i, j;
     if (!p) CmiAbort("Big time problem\n");
@@ -288,48 +279,29 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
         register int newval=-1*pelist[i];
         PACKINT(newval); 
         for (j=0;j<msgnum[index];j++) {
-            if (PeList[index][j]->magic != magic) {
-		int tmpms=actual_msgsize+PeList[index][j]->msgsize;
-		if (tmpms >= MSGSIZETHRESHOLD 
-                    /*|| (PeList[index][j]->msgsize>=ave_msgsize)*/ ) {
-                    
-                    CmiPrintf("%d sending directly\n", CkMyPe());
-                    if (--(PeList[index][j]->refCount) <=0) {
-                        CmiSyncSendAndFree(index, PeList[index][j]->msgsize, 
-                                           (char*)PeList[index][j]->msg);
-			//ComlibPrintf("%d Freeing msg\n", CkMyPe());
-                        PTFREE(PeList[index][j]);
-			}
-                    else
-                        CmiSyncSend(index, PeList[index][j]->msgsize, 
-                                    (char*)PeList[index][j]->msg);
-                    PeList[index][j]=NULL;
-                    continue;
-		}
-		
+            if (PeList[index][j]->magic == magic) {
+                offset=(PeList[index][j]->offset);
+            }
+            else {
 		npacked ++;
                 
      		offset=msg_offset;
 		PeList[index][j]->magic=magic;
 		PeList[index][j]->offset=msg_offset;
 		PTinfo *tempmsg=PeList[index][j];
- 		PACKMSG((&(tempmsg->msgsize)), sizeof(int));
-		actual_msgsize += tempmsg->msgsize;
-		int nullptr=-1;
- 		PACKMSG(&nullptr, sizeof(int));
-
+ 		
+                CmiChunkHeader hdr;
+                hdr.size = tempmsg->msgsize;
+                hdr.ref = -1;
+                PACKMSG(&hdr, sizeof(CmiChunkHeader));
      		PACKMSG(tempmsg->msg, tempmsg->msgsize);
 
                 msg_offset = ALIGN8(msg_offset);
-                actual_msgsize = ALIGN8(actual_msgsize);                
-		actual_msgsize += 2*sizeof(int);
-            }
-            else {
-		offset=(PeList[index][j]->offset);
             }
             
             //ComlibPrintf("%d Packing msg_offset=%d\n", CkMyPe(), offset);
             PACKINT(offset); 
+
             if (--(PeList[index][j]->refCount) <=0) {
                 CmiFree(PeList[index][j]->msg);
                 
@@ -347,14 +319,7 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
 	npe=npe-lesspe;
 	PACK(int, npe);
     }
-    if (!actual_msgsize) {
-        if (l1 >= MAXBUFSIZE) 
-            CmiFree(p);
-        *length=0;
-        return(NULL);
-    }
-    
-    *length=actual_msgsize+headersize;
+
     return(p);
 } 
 
@@ -402,6 +367,7 @@ int PeTable :: UnpackAndInsert(void *in)
                 UNPACK(int, offset);
                 continue;
             }
+            
             PTinfo *temp;
             PTALLOC(temp);
             temp->msgsize=tempmsgsize;
@@ -510,80 +476,5 @@ int PeTable :: UnpackAndInsertAll(void *in, int npes, int *pelist){
 
 void PeTable :: GarbageCollect()
 {
-}
-
-GList :: GList()
-{
-  InList=(InNode *)CmiAlloc(10*sizeof(InNode));
-  InListIndex=0;
-}
-
-GList :: ~GList()
-{
-  CmiFree(InList);
-}
-
-int GList :: AddWholeMsg(void *ptr)
-{
-  InList[InListIndex].flag=0;
-  InList[InListIndex++].ptr=ptr;
-  return(InListIndex-1);
-}
-
-void GList :: setRefcount(int indx, int ref)
-{
-  //ComlibPrintf("setting InList[%d]=%d\n", indx, ref);
-  InList[indx].refCount=ref;
-}
-
-void GList :: DeleteWholeMsg(int indx)
-{
-  //ComlibPrintf("DeleteWholeMsg indx=%d\n", indx);
-  InList[indx].refCount--;
-  if ((InList[indx].refCount <=0) && (InList[indx].flag==0)) {
-	//ComlibPrintf("Deleting msgwhole\n");
-	CmiFree(InList[indx].ptr);
-  }
-}
-void GList :: DeleteWholeMsg(int indx, int flag)
-{
-  InList[indx].refCount--;
-  InList[indx].flag=flag;
-} 
-/*
-void GList :: DeleteWholeMsg(int indx, void *p)
-{
-  int *rc=(int *)((char *)p-sizeof(int));
-  *rc=(int)((char *)p-(char *)(InList[indx].ptr)+2*sizeof(int));
-}
-*/
-
-void GList :: GarbageCollect()
-{
-  for (int i=0;i<InListIndex;i++) {
-	if ((InList[i].refCount <= 0) && (InList[i].flag >0))
-		CmiFree(InList[i].ptr);
-  }
-}
-
-void GList :: Add(void *ptr )
-{
-  InList[InListIndex].ptr=ptr;
-  InList[InListIndex++].refCount=0;
-}
-
-void GList :: Delete()
-{
-  InListIndex=0;
-  /******
-  int counter=0;
-  for (int i=0;i< InListIndex;i++) {
-  	if (InList[i].refCount <=0)  {
-		counter++;
-		CmiFree(InList[i].ptr);
-	}
-  }
-  if (counter == InListIndex) InListIndex=0;
-****/
 }
 

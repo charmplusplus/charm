@@ -12,6 +12,7 @@
  *
  * Grid (mesh) based router
  ***********************************************************/
+
 #include "gridrouter.h"
 
 #define gmap(pe) {if (gpes) pe=gpes[pe];}
@@ -45,8 +46,8 @@ GridRouter::GridRouter(int n, int me)
   LPMsgExpected = Expect(MyPe, NumPes);
   recvExpected = 0;
 
-  int myrow=MyPe/COLLEN;
-  int mycol=MyPe%COLLEN;  
+  myrow=MyPe/COLLEN;
+  mycol=MyPe%COLLEN;  
   int lastrow = (NumPes - 1)/COLLEN;
   
   if(myrow < lastrow) 
@@ -180,15 +181,15 @@ void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, 
   }
 
   //Send the messages
-  int MYROW=MyPe/COLLEN;
-  int MYCOL = MyPe%COLLEN;
-  int myrep=MYROW*COLLEN;
-  
+  //int MYROW  =MyPe/COLLEN;
+  //int MYCOL = MyPe%COLLEN;
+  int myrep= myrow*COLLEN; 
+  int length = (NumPes - 1)/COLLEN + 1;
+ 
   for (int colcount = 0; colcount < rvecSize; ++colcount) {
       int nextpe = rowVector[colcount];
       i = nextpe % COLLEN;
       
-      int length = (NumPes - 1)/COLLEN + 1;
       if((length - 1)* COLLEN + i >= NumPes)
           length --;
       
@@ -220,9 +221,6 @@ void GridRouter::RecvManyMsg(comID id, char *msg)
   recvCount++;
   if (recvCount == recvExpected) {
       ComlibPrintf("%d recvcount=%d recvexpected = %d\n", MyPe, recvCount, recvExpected);
-      
-      int myrow=MyPe/COLLEN;
-      int mycol=MyPe%COLLEN;
       
       char *a2amsg;
       int a2a_len;

@@ -11,11 +11,17 @@ CkpvDeclare(int, DummyHandle);
 //Correspods to Router::ProcManyMsg
 void procManyCombinedMsg(char *msg)
 {
-    comID id;
+    //comID id;
+    int instance_id;
+
     ComlibPrintf("In Recv combined message at %d\n", CkMyPe());
-    memcpy(&id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
-    
-    Strategy *s = ConvComlibGetStrategy(id.instanceID);
+    //memcpy(&id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
+
+    //Comid specific
+    memcpy(&instance_id, (char*) msg + CmiReservedHeaderSize + 2*sizeof(int)
+           , sizeof(int));
+
+    Strategy *s = ConvComlibGetStrategy(instance_id);
     ((RouterStrategy *)s)->ProcManyMsg(msg);
 }
 
@@ -30,11 +36,16 @@ void dummyEP(DummyMsg *m)
 //Correspods to Router::RecvManyMsg
 void recvManyCombinedMsg(char *msg)
 {
-    comID id;
+    //comID id;
+    int instance_id;
     ComlibPrintf("In Recv combined message at %d\n", CkMyPe());
-    memcpy(&id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
+    //memcpy(&id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
     
-    Strategy *s = ConvComlibGetStrategy(id.instanceID);
+    //Comid specific
+    memcpy(&instance_id, (char*) msg + CmiReservedHeaderSize + 2*sizeof(int)
+           , sizeof(int));
+
+    Strategy *s = ConvComlibGetStrategy(instance_id);
     ((RouterStrategy *)s)->RecvManyMsg(msg);
 }
 
@@ -142,7 +153,7 @@ void RouterStrategy::insertMessage(MessageHolder *cmsg){
         delete cmsg;
     }
     else
-        msgQ.enq(cmsg);
+        msgQ.push(cmsg);
 }
 
 void RouterStrategy::doneInserting(){
@@ -180,7 +191,7 @@ void RouterStrategy::doneInserting(){
                                                      CkMyPe(), 
                                                      sizeof(DummyMsg));
         cmsg->isDummy = 1;
-        msgQ.enq(cmsg);
+        msgQ.push(cmsg);
     }
 
     int numToDeposit = msgQ.length();
@@ -209,7 +220,8 @@ void RouterStrategy::doneInserting(){
             router->EachToManyMulticast(id, cmsg->size, msg, 1, &myPe, 
                                         numToDeposit > 1);
         
-        numToDeposit --;        
+        numToDeposit --;
+        delete cmsg;        
     }
 
     while(!recvQ.isEmpty()) {
@@ -253,26 +265,36 @@ void RouterStrategy::pup(PUP::er &p){}
 //Call the router functions
 void RouterStrategy::RecvManyMsg(char *msg) {
 
-    comID new_id;
+    //comID new_id;
+    int new_refno =0;
+
+    //FOO BAR when structure of comid changes this will break !!!!!
     ComlibPrintf("In RecvManyMsg at %d\n", CkMyPe());
-    memcpy(&new_id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
+    //memcpy(&new_id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
+    //ComlibPrintf("REFNO = %d, %d\n", new_id.refno, id.refno);
+    
+    //First int in comid is refno
+    memcpy(&new_refno, (char*) msg + CmiReservedHeaderSize + sizeof(int), 
+           sizeof(int)); 
 
-    ComlibPrintf("REFNO = %d, %d\n", new_id.refno, id.refno);
-
-    if(new_id.refno != id.refno)
-        recvQ.enq(msg);
+    if(new_refno != id.refno)
+        recvQ.push(msg);
     else
         router->RecvManyMsg(id, msg);
 }
 
 void RouterStrategy::ProcManyMsg(char *msg) {    
 
-    comID new_id;
+    //comID new_id;
+    int new_refno =0;
     ComlibPrintf("In ProcManyMsg at %d\n", CkMyPe());
-    memcpy(&new_id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
-
-    if(new_id.refno != id.refno)
-        procQ.enq(msg);
+    //memcpy(&new_id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
+    //First int in comid is refno
+    memcpy(&new_refno, (char*) msg + CmiReservedHeaderSize + sizeof(int), 
+           sizeof(int)); 
+    
+    if(new_refno != id.refno)
+        procQ.push(msg);
     else
         router->ProcManyMsg(id, msg);
 }
@@ -280,7 +302,7 @@ void RouterStrategy::ProcManyMsg(char *msg) {
 void RouterStrategy::DummyEP(DummyMsg *m) {
 
     if(id.refno != m->id.refno)
-        dummyQ.enq(m);
+        dummyQ.push(m);
     else {
         router->DummyEP(m->id, m->magic);
         CmiFree(m);
