@@ -206,6 +206,10 @@ typedef void (*bgEventCallBackFn)(void *data, double adjust, double recvT, void 
 void BgElapse(double t);
 void BgStartCorrection();
 
+/* BG event types */
+#define BG_EVENT_PROJ		1
+#define BG_EVENT_PRINT		2
+
 void *BgCreateEvent(int eidx);
 void BgEntrySplit();
 void bgAddProjEvent(void *data, int idx, double t, 

@@ -2,6 +2,8 @@
 #ifndef BLUE_LOGS_H
 #define BLUE_LOGS_H
 
+#include <string.h>
+
 #include "blue_defs.h"
 #include "cklists.h"
 
@@ -46,10 +48,10 @@ public:
 */
 class bgEvents {
 private:
-  void*   data;         // e.g. can be pointer to trace projection log entry
   bgEventCallBackFn  callbackFn;
   void* usrPtr;
 public:
+  void*   data;         // e.g. can be pointer to trace projection log entry
   int     index;		// index of the event to its original log pool.
   double  rTime;	// relative time from the start entry
   char   eType;
@@ -59,7 +61,22 @@ public:
   inline void update(double startT, double recvT, int e) {
 	if (eType==e) callbackFn(data, startT+rTime, recvT, usrPtr);
   }
-  void pup(PUP::er &p) {  p|eType; p|index; p|rTime; }
+  void pup(PUP::er &p) { 
+	p|eType; p|rTime;
+	switch (eType) {
+	case BG_EVENT_PROJ:
+	   p|index;  break;
+	case BG_EVENT_PRINT: {
+	     int slen = 0;
+	     if (p.isPacking()) slen = strlen((char *)data)+1;
+	     p|slen;
+	     if (p.isUnpacking()) data=malloc(sizeof(char)*slen);
+	     p((char *)data,slen); 
+	     break;
+	   }
+	default: CmiAbort("bgEvents::pup(): unknown BG event type!");
+   	}
+  }
 };
 
 class BgTimeLineRec;
