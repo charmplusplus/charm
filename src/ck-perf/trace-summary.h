@@ -153,7 +153,7 @@ public:
     epTime += t;
     epCount ++;
     if (epMaxTime < t) epMaxTime = t;
-    for (int i=SIZE; i>=0; i--) {
+    for (int i=SIZE-1; i>=0; i--) {
       if (t>threshold+i*epIncrease) {
         hist[i]++; break;
       }
