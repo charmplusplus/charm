@@ -25,7 +25,7 @@ OBJS = comm.o util.o debug.o setup.o grsetup.o timer.o \
 DEST=$(LIBDIR)/libparmetis.a
 
 $(DEST): $(OBJS)
-	$(CC) -o $@ $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
 clean:
 	rm -f *.o 
