@@ -1,0 +1,105 @@
+
+#include "elements.h"
+#include "heap.h"
+
+#include "BaseLB.h"
+
+LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats, int count)
+{
+   int i;
+   processorInfo *processors = new processorInfo[count];
+
+   for(i=0; i < count; i++) {
+    processors[i].Id = i;
+    processors[i].backgroundLoad = stats->procs[i].bg_cputime;
+    processors[i].computeLoad = stats->procs[i].total_walltime;
+    processors[i].load = stats->procs[i].total_walltime;
+    processors[i].pe_speed = stats->procs[i].pe_speed;
+    processors[i].available = stats->procs[i].available;
+  }
+
+  // compute average
+  double total = 0.0;
+  for (i=0; i<count; i++)
+    total += processors[i].load;
+                                                                                
+  double averageLoad = total/count;
+
+  if (_lb_args.debug()>1) CkPrintf("Average load: %f\n", averageLoad);
+
+  maxHeap *heavyProcessors = new maxHeap(count);
+  Set *lightProcessors = new Set();
+
+  double overload_factor = 1.01;
+  for (i=0; i<count; i++) {
+    if (processors[i].load > averageLoad*overload_factor) {
+      //      CkPrintf("Processor %d is HEAVY: load:%f averageLoad:%f!\n",
+      //               i, processors[i].load, averageLoad);
+      heavyProcessors->insert((InfoRecord *) &(processors[i]));
+    } else if (processors[i].load < averageLoad) {
+      //      CkPrintf("Processor %d is LIGHT: load:%f averageLoad:%f!\n",
+      //               i, processors[i].load, averageLoad);
+      lightProcessors->insert((InfoRecord *) &(processors[i]));
+    }
+  }
+
+  int done = 0;
+  CkVec<VectorMigrateInfo *> miginfo;
+  while (!done) {
+    processorInfo *donor = (processorInfo *) heavyProcessors->deleteMax();
+    if (!donor) break;
+    Iterator nextProcessor;
+    processorInfo *p = (processorInfo *)
+      lightProcessors->iterator((Iterator *) &nextProcessor);
+    double load = donor->load - averageLoad;
+    while (load > 0.0 && p) {
+      double needed = averageLoad - p->load;
+      double give;
+      if (load > needed) give = needed;
+      else give = load;
+      donor->load -= give;
+      p->load += give;
+      VectorMigrateInfo *move = new VectorMigrateInfo;
+      move->from_pe = donor->Id;
+      move->to_pe = p->Id;
+      move->load = give;
+      miginfo.push_back(move);
+      if (give < needed) 
+        break;
+      else
+        lightProcessors->remove(p);
+      p = (processorInfo *)lightProcessors->next((Iterator *) &nextProcessor);
+      load -= give;
+    }
+  }
+
+  int migrate_count = miginfo.length();
+  LBVectorMigrateMsg* msg = new(migrate_count,0) LBVectorMigrateMsg;
+  msg->n_moves = migrate_count;
+  for(i=0; i < migrate_count; i++) {
+    VectorMigrateInfo* item = (VectorMigrateInfo*) miginfo[i];
+    msg->moves[i] = *item;
+    if (_lb_args.debug()>1)
+      CkPrintf("Processor %d => %d load: %f.\n", item->from_pe, item->to_pe, item->load);
+    delete item;
+    miginfo[i] = 0;
+  }
+
+  if (_lb_args.debug()>1) {
+    CkPrintf("After migration: ");
+    for (i=0; i<count; i++) CkPrintf("%f ", processors[i].load);
+    CkPrintf("\n");
+  }
+
+  if (_lb_args.debug())
+    CkPrintf("VectorStrategy: %d processor vector migrating.\n", migrate_count);
+
+  delete heavyProcessors;
+  delete lightProcessors;
+
+  delete [] processors;
+
+  return msg;
+}
+
+
