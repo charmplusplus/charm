@@ -45,6 +45,12 @@ int CldRegisterPackFn(CldPackFn fn)
 }
 
 /*
+ * CldSwitchHandler takes a message, a pointer to its CLD field, and
+ * a new handler number.  It changes the handler number and records the
+ * location of the CLD field.  When the message gets handled, the handler
+ * should call CldRestoreHandler to put the old handler back, and get
+ * a pointer to the CLD field which was recorded.
+ *
  * These next subroutines are balanced on a thin wire.  They're
  * correct, but the slightest disturbance in the offsets could break them.
  *
@@ -69,3 +75,113 @@ void CldRestoreHandler(char *cmsg, void *hfield)
   *(int**)hfield = field;
 }
 
+/* CldPutToken puts a message in the scheduler queue in such a way
+ * that it can be retreived from the queue.  Once the message gets
+ * handled, it can no longer be retreived.  CldGetToken removes a
+ * message that was placed in the scheduler queue in this way.
+ * CldCountTokens tells you how many tokens are currently retreivable.
+ *
+ * Caution: these functions are using the function "CmiReference"
+ * which I just added to the Cmi memory allocator (it increases the
+ * reference count field, making it possible to free the memory
+ * twice.)  I'm not sure how well this is going to work.  I need this
+ * because the message should not be freed until it's out of the
+ * scheduler queue AND out of the user's hands.  It needs to stay
+ * around while it's in the scheduler queue because it may contain
+ * a priority.
+ *
+ */
+
+void Cldhandler(void *);
+ 
+typedef struct CldToken_s {
+  char msg_header[CmiMsgHeaderSizeBytes];
+  void *msg;  /* if null, message already removed */
+  int infofn;
+  int packfn;
+  struct CldToken_s *pred;
+  struct CldToken_s *succ;
+} *CldToken;
+
+typedef struct CldProcInfo_s {
+  int tokenhandleridx;
+  int load; /* number of items in doubly-linked circle besides sentinel */
+  CldToken sentinel;
+} *CldProcInfo;
+
+CpvDeclare(CldProcInfo, CldProc);
+
+static void CldTokenHandler(CldToken tok)
+{
+  CldProcInfo proc = CpvAccess(CldProc);
+  CldToken pred, succ;
+  if (tok->pred) {
+    tok->pred->succ = tok->succ;
+    tok->succ->pred = tok->pred;
+    proc->load --;
+    CmiHandleMessage(tok->msg);
+  } else {
+    CmiFree(tok->msg);
+  }
+}
+
+int CldCountTokens()
+{
+  CldProcInfo proc = CpvAccess(CldProc);
+  return proc->load;
+}
+
+void CldPutToken(void *msg, int infofn, int packfn)
+{
+  CldProcInfo proc = CpvAccess(CldProc);
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  CldToken tok = (CldToken)CmiAlloc(sizeof(struct CldToken_s));
+  int len, queueing, priobits; unsigned int *prioptr; void *ldbfield;
+  
+  tok->msg = msg;
+  tok->infofn = infofn;
+  tok->packfn = packfn;
+
+  /* add token to the doubly-linked circle */
+  tok->pred = proc->sentinel->pred;
+  tok->succ = proc->sentinel;
+  tok->pred->succ = tok;
+  tok->succ->pred = tok;
+  proc->load ++;
+  
+  /* add token to the scheduler */
+  CmiSetHandler(tok, proc->tokenhandleridx);
+  ifn(msg, &len, &ldbfield, &queueing, &priobits, &prioptr);
+  CsdEnqueueGeneral(tok, queueing, priobits, prioptr);
+}
+
+void CldGetToken(void **msg, int *infofn, int *packfn)
+{
+  CldProcInfo proc = CpvAccess(CldProc);
+  CldToken tok;
+  tok = proc->sentinel->succ;
+  if (tok == proc->sentinel) {
+    *infofn = 0; *packfn = 0;
+    *msg = 0; return;
+  }
+  tok->pred->succ = tok->succ;
+  tok->succ->pred = tok->pred;
+  tok->succ = 0;
+  tok->pred = 0;
+  proc->load --;
+  CmiReference(msg);
+  *msg = tok->msg;
+  *infofn = tok->infofn;
+  *packfn = tok->packfn;
+}
+
+void CldModuleGeneralInit()
+{
+  CldToken sentinel = (CldToken)CmiAlloc(sizeof(struct CldToken_s));
+  CldProcInfo proc = (CldProcInfo)malloc(sizeof(struct CldProcInfo_s));
+  proc->load = 0;
+  proc->tokenhandleridx = CmiRegisterHandler((CmiHandler)CldTokenHandler);
+  proc->sentinel = sentinel;
+  sentinel->succ = sentinel;
+  sentinel->pred = sentinel;
+}
