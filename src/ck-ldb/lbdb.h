@@ -40,6 +40,9 @@ typedef struct _LDOMid {
   CmiBool operator==(const struct _LDOMid& omId) const {
     return id == omId.id?CmiTrue:CmiFalse;
   }
+  CmiBool operator!=(const struct _LDOMid& omId) const {
+    return id == omId.id?CmiFalse:CmiTrue;
+  }
   inline void pup(PUP::er &p);
 #endif
 } LDOMid;
