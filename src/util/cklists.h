@@ -1,7 +1,7 @@
 #ifndef _CKLISTS_H
 #define _CKLISTS_H
 
-#include <converse.h> // for size_t
+//#include <converse.h> // for size_t
 #include <stdlib.h> // for size_t
 #include <string.h> // for memcpy
 
@@ -28,7 +28,7 @@ class CkQ {
     }
     ~CkQ() { delete[] block; }
     int length(void) { return len; }
-    CmiBool isEmpty(void) { return (CmiBool)(len==0); }
+    int isEmpty(void) { return (len==0); }
     T deq(void) {
       if(len>0) {
         T &ret = block[first];
@@ -79,7 +79,14 @@ class CkVec {
     T *getVec(void) { return block; }
     T& operator[](size_t n) { return block[n]; }
     const T& operator[](size_t n) const { return block[n]; }
-    void setSize(int newSize);
+    void setSize(int newlen) {
+      T *newblk = new T[newlen];
+      if (block!=NULL)
+         memcpy(newblk, block, sizeof(T)*blklen);
+      for(int i=blklen; i<newlen; i++) newblk[i] = T(0);
+      delete[] block; block = newblk;
+      blklen = newlen;
+    }
     void insert(int pos, const T &elt) {
       if (pos>=len) { 
         if(pos>=blklen) 
@@ -91,15 +98,5 @@ class CkVec {
     void insertAtEnd(const T &elt) {insert(length(),elt);}
     void push_back(const T &elt) {insert(length(),elt);}
 };
-
-template <class T> void CkVec<T>::setSize(int newlen)
-{
-   T *newblk = new T[newlen];
-   if (block!=NULL)
-      memcpy(newblk, block, sizeof(T)*blklen);
-   for(int i=blklen; i<newlen; i++) newblk[i] = T(0);
-   delete[] block; block = newblk;
-   blklen = newlen;
-}
 
 #endif
