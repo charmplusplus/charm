@@ -127,40 +127,23 @@ int skt_select1(SOCKET fd,int msec)
   return 0;/*Timed out*/
 }
 
-
 unsigned long skt_my_ip(void)
 {  
   static unsigned long ip = 0;/*Cached IP address*/
   unsigned long self_ip=0x7F000001u;/*Host byte order 127.0.0.1*/
   char hostname[1000];
   
-#if CMK_SCYLD
-  /* on Scyld, the hostname is just the node number */
-  sprintf(hostname, "%d", bproc_currnode());
-  ip=skt_lookup_ip(hostname);
-#else
   if (ip==0) 
   {
     if (gethostname(hostname, 999)==0) 
 		ip=skt_lookup_ip(hostname);
   }
   if (ip==0) ip=self_ip;
-#endif
   return ip;
 }
 
 unsigned long skt_lookup_ip(const char *name)
 {
-#if CMK_SCYLD
-  struct sockaddr_in addr;
-  int len = sizeof(struct sockaddr_in);
-  if (-1 == bproc_nodeaddr(atoi(name), &addr, &len)) {
-    return 0;
-  }
-  else {
-    return ntohl(addr.sin_addr.s_addr);
-  }
-#else
   const unsigned int inval=0xffFFffFFu;
   unsigned long ret;
   ret=inet_addr(name);/*Try dotted decimal*/
@@ -173,8 +156,43 @@ unsigned long skt_lookup_ip(const char *name)
     ip=ntohl(*((unsigned int *)(h->h_addr_list[0])));
     return ip;
   }
+}
+
+/* these 2 functions will return the inner node IP, special for
+   Linux Scyld.  G. Zheng 
+*/
+unsigned long skt_innode_my_ip(void)
+{  
+  static unsigned long ip = 0;/*Cached IP address*/
+  unsigned long self_ip=0x7F000001u;/*Host byte order 127.0.0.1*/
+  char hostname[1000];
+  
+#if CMK_SCYLD
+  /* on Scyld, the hostname is just the node number */
+  sprintf(hostname, "%d", bproc_currnode());
+  ip=skt_innode_lookup_ip(hostname);
+#else
+  ip = skt_my_ip();
+#endif
+  return ip;
+}
+
+unsigned long skt_innode_lookup_ip(const char *name)
+{
+#if CMK_SCYLD
+  struct sockaddr_in addr;
+  int len = sizeof(struct sockaddr_in);
+  if (-1 == bproc_nodeaddr(atoi(name), &addr, &len)) {
+    return 0;
+  }
+  else {
+    return ntohl(addr.sin_addr.s_addr);
+  }
+#else
+  return skt_lookup_ip(name);
 #endif
 }
+
 
 struct sockaddr_in skt_build_addr(unsigned int IP,unsigned int port)
 {

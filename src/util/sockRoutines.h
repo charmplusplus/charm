@@ -121,6 +121,8 @@ skt_abortFn skt_set_abort(skt_abortFn f);
 /*DNS*/
 unsigned long skt_my_ip(void);
 unsigned long skt_lookup_ip(const char *name);
+unsigned long skt_innode_my_ip(void);		/* inner node version */
+unsigned long skt_innode_lookup_ip(const char *name);
 struct sockaddr_in skt_build_addr(unsigned int IP,unsigned int port);
 
 /*UDP*/
