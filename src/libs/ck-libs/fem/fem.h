@@ -14,6 +14,11 @@ extern unsigned int _nchunks;
 #define FEM_REAL   2
 #define FEM_DOUBLE 3
 
+// reduction operations: keep in synch with femf.h
+#define FEM_SUM 0
+#define FEM_MAX 1
+#define FEM_MIN 2
+
 // temporary Datatype representation
 // will go away once MPI user-defined datatypes are ready
 struct DType {
@@ -113,8 +118,8 @@ class chunk : public ArrayElement1D
     return ntypes-1;
   }
   void update(int fid, void *nodes);
-  void reduce_field(int fid, void *nodes, void *outbuf);
-  void reduce(int fid, void *inbuf, void *outbuf);
+  void reduce_field(int fid, void *nodes, void *outbuf, int op);
+  void reduce(int fid, void *inbuf, void *outbuf, int op);
   void readField(int fid, void *nodes, char *fname);
   int id(void) { return thisIndex; }
  private:
@@ -129,8 +134,8 @@ class chunk : public ArrayElement1D
 void FEM_Done(void);
 int FEM_Create_Field(int base_type, int vec_len, int init_offset, int distance);
 void FEM_Update_Field(int fid, void *nodes);
-void FEM_Reduce_Field(int fid, void *nodes, void *outbuf);
-void FEM_Reduce(int fid, void *inbuf, void *outbuf);
+void FEM_Reduce_Field(int fid, void *nodes, void *outbuf, int op);
+void FEM_Reduce(int fid, void *inbuf, void *outbuf, int op);
 int FEM_Id(void);
 void FEM_Read_Field(int fid, void *nodes, char *fname);
 
@@ -138,8 +143,8 @@ void FEM_Read_Field(int fid, void *nodes, char *fname);
 
 extern "C" int fem_create_field_(int *bt, int *vl, int *io, int *d);
 extern "C" void fem_update_field_(int *fid, void *nodes);
-extern "C" void fem_reduce_field_(int *fid, void *nodes, void *outbuf);
-extern "C" void fem_reduce_(int *fid, void *inbuf, void *outbuf);
+extern "C" void fem_reduce_field_(int *fid, void *nodes, void *outbuf, int *op);
+extern "C" void fem_reduce_(int *fid, void *inbuf, void *outbuf, int *op);
 extern "C" int fem_id_(void);
 // FIXME: correct fortran-c interoperability issue for passing character arrays
 extern "C" void fem_read_field_(int *fid, void *nodes, char *fname);

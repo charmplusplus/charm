@@ -85,16 +85,60 @@ void sum(const int len, d* lhs, d* rhs)
   }
 }
 
-static inline void
-combine(const DType& dt, void* lhs, void* rhs)
+template<class d>
+void max(const int len, d* lhs, d* rhs)
 {
-  switch(dt.base_type) {
-    case FEM_BYTE : 
-      sum(dt.vec_len,(unsigned char*)lhs, (unsigned char*)rhs); 
+  int i;
+  for(i=0;i<len;i++) {
+    *lhs = (*lhs > *rhs) ? *lhs : *rhs;
+    lhs++; rhs++;
+  }
+}
+
+template<class d>
+void min(const int len, d* lhs, d* rhs)
+{
+  int i;
+  for(i=0;i<len;i++) {
+    *lhs = (*lhs < *rhs) ? *lhs : *rhs;
+    lhs++; rhs++;
+  }
+}
+
+static inline void
+combine(const DType& dt, void* lhs, void* rhs, int op)
+{
+  switch(op) {
+    case FEM_SUM:
+      switch(dt.base_type) {
+        case FEM_BYTE : 
+          sum(dt.vec_len,(unsigned char*)lhs, (unsigned char*)rhs); 
+          break;
+        case FEM_INT : sum(dt.vec_len,(int*)lhs, (int*) rhs); break;
+        case FEM_REAL : sum(dt.vec_len,(float*)lhs, (float*) rhs); break;
+        case FEM_DOUBLE : sum(dt.vec_len,(double*)lhs, (double*) rhs); break;
+      }
       break;
-    case FEM_INT : sum(dt.vec_len,(int*)lhs, (int*) rhs); break;
-    case FEM_REAL : sum(dt.vec_len,(float*)lhs, (float*) rhs); break;
-    case FEM_DOUBLE : sum(dt.vec_len,(double*)lhs, (double*) rhs); break;
+    case FEM_MAX:
+      switch(dt.base_type) {
+        case FEM_BYTE : 
+          max(dt.vec_len,(unsigned char*)lhs, (unsigned char*)rhs); 
+          break;
+        case FEM_INT : max(dt.vec_len,(int*)lhs, (int*) rhs); break;
+        case FEM_REAL : max(dt.vec_len,(float*)lhs, (float*) rhs); break;
+        case FEM_DOUBLE : max(dt.vec_len,(double*)lhs, (double*) rhs); break;
+      }
+      break;
+    case FEM_MIN:
+      switch(dt.base_type) {
+        case FEM_BYTE : 
+          min(dt.vec_len,(unsigned char*)lhs, (unsigned char*)rhs); 
+          break;
+        case FEM_INT : min(dt.vec_len,(int*)lhs, (int*) rhs); break;
+        case FEM_REAL : min(dt.vec_len,(float*)lhs, (float*) rhs); break;
+        case FEM_DOUBLE : min(dt.vec_len,(double*)lhs, (double*) rhs); break;
+      }
+      break;
   }
 }
 
@@ -198,36 +242,54 @@ chunk::update_field(DataMsg *msg)
   for(i=0;i<nnodes;i++) {
     int cnum = nodesPerPe[from][i];
     void *cnode = (void*) ((char*)curbuf+cnum*dtypes[msg->dtype].distance);
-    combine(dtypes[msg->dtype], cnode, data);
+    combine(dtypes[msg->dtype], cnode, data, FEM_SUM);
     data = (void *)((char*)data+(dtypes[msg->dtype].length()));
   }
 }
 
 void
-chunk::reduce_field(int fid, void *nodes, void *outbuf)
+chunk::reduce_field(int fid, void *nodes, void *outbuf, int op)
 {
   // first reduce over local nodes
   DType *dt = &dtypes[fid];
   void *src = (void *) ((char *) nodes + dt->init_offset);
   for(int i=0; i<numNodes; i++) {
     if(isPrimary[i]) {
-      combine(*dt, outbuf, src);
+      combine(*dt, outbuf, src, op);
     }
     src = (void *)((char *)src + dt->distance);
   }
   // and now reduce over partitions
-  reduce(fid, outbuf, outbuf);
+  reduce(fid, outbuf, outbuf, op);
 }
 
 void
-chunk::reduce(int fid, void *inbuf, void *outbuf)
+chunk::reduce(int fid, void *inbuf, void *outbuf, int op)
 {
   int len = dtypes[fid].length();
   CkReduction::reducerType rtype;
-  switch(dtypes[fid].base_type) {
-    case FEM_INT: rtype = CkReduction::sum_int; break;
-    case FEM_REAL: rtype = CkReduction::sum_float; break;
-    case FEM_DOUBLE: rtype = CkReduction::sum_double; break;
+  switch(op) {
+    case FEM_SUM:
+      switch(dtypes[fid].base_type) {
+        case FEM_INT: rtype = CkReduction::sum_int; break;
+        case FEM_REAL: rtype = CkReduction::sum_float; break;
+        case FEM_DOUBLE: rtype = CkReduction::sum_double; break;
+      }
+      break;
+    case FEM_MAX:
+      switch(dtypes[fid].base_type) {
+        case FEM_INT: rtype = CkReduction::max_int; break;
+        case FEM_REAL: rtype = CkReduction::max_float; break;
+        case FEM_DOUBLE: rtype = CkReduction::max_double; break;
+      }
+      break;
+    case FEM_MIN:
+      switch(dtypes[fid].base_type) {
+        case FEM_INT: rtype = CkReduction::min_int; break;
+        case FEM_REAL: rtype = CkReduction::min_float; break;
+        case FEM_DOUBLE: rtype = CkReduction::min_double; break;
+      }
+      break;
   }
   contribute(len, inbuf, rtype);
   curbuf = outbuf;
@@ -373,17 +435,17 @@ FEM_Update_Field(int fid, void *nodes)
 }
 
 void
-FEM_Reduce_Field(int fid, void *nodes, void *outbuf)
+FEM_Reduce_Field(int fid, void *nodes, void *outbuf, int op)
 {
   chunk *cptr = CtvAccess(_femptr);
-  cptr->reduce_field(fid, nodes, outbuf);
+  cptr->reduce_field(fid, nodes, outbuf, op);
 }
 
 void
-FEM_Reduce(int fid, void *inbuf, void *outbuf)
+FEM_Reduce(int fid, void *inbuf, void *outbuf, int op)
 {
   chunk *cptr = CtvAccess(_femptr);
-  cptr->reduce(fid, inbuf, outbuf);
+  cptr->reduce(fid, inbuf, outbuf, op);
 }
 
 void
@@ -415,15 +477,15 @@ fem_update_field_(int *fid, void *nodes)
 }
 
 extern "C" void
-fem_reduce_field_(int *fid, void *nodes, void *outbuf)
+fem_reduce_field_(int *fid, void *nodes, void *outbuf, int *op)
 {
-  FEM_Reduce_Field(*fid, nodes, outbuf);
+  FEM_Reduce_Field(*fid, nodes, outbuf, *op);
 }
 
 extern "C" void
-fem_reduce_(int *fid, void *inbuf, void *outbuf)
+fem_reduce_(int *fid, void *inbuf, void *outbuf, int *op)
 {
-  FEM_Reduce(*fid, inbuf, outbuf);
+  FEM_Reduce(*fid, inbuf, outbuf, *op);
 }
 
 extern "C" void
