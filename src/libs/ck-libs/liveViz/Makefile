@@ -1,9 +1,9 @@
 CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc  $(OPTS)
+CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=liveViz.h liveViz.decl.h liveVizPoll.decl.h liveViz0.h colorScale.h
+HEADERS=liveViz.h liveViz.decl.h liveVizPoll.decl.h liveViz0.h colorScale.h point.h image.h imagelist.h imagenode.h xSortedImageList.h
 HEADDEP=$(HEADERS) liveViz.def.h networkVar.h
-OBJS=liveViz0.o liveViz.o liveVizPoll.o networkVar.o colorScale.o
+OBJS=liveViz0.o liveViz.o liveVizPoll.o networkVar.o colorScale.o point.o image.o imagenode.o imagelist.o xSortedImageList.o
 DEST=$(CDIR)/lib/libmoduleliveViz.a
 
 all: $(DEST)
@@ -30,6 +30,21 @@ networkVar.o: networkVar.C $(HEADDEP)
 colorScale.o: colorScale.C $(HEADDEP)
 	$(CHARMC) -c colorScale.C
 
+point.o : point.C $(HEADDEP)
+	charmc -c -g point.C
+
+image.o : image.C $(HEADDEP)
+	charmc -c -g image.C
+
+imagenode.o : imagenode.C $(HEADDEP)
+	charmc -c -g imagenode.C
+
+imagelist.o : imagelist.C $(HEADDEP)
+	charmc -c -g imagelist.C
+
+xSortedImageList.o : xSortedImageList.C $(HEADDEP)
+	charmc -c -g xSortedImageList.C
+	
 liveViz.decl.h liveViz.def.h: liveViz.ci
 	$(CHARMC) liveViz.ci
 

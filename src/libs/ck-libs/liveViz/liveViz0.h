@@ -1,5 +1,5 @@
 /*
-Prototypes for CCS/visualization interaction routines, 
+Prototypes  for CCS/visualization interaction routines, 
 the lowest level of liveViz. (liveViz level 0)
 
 Orion Sky Lawlor, olawlor@acm.org, 6/11/2002

@@ -3,6 +3,9 @@
 
 Orion Sky Lawlor, olawlor@acm.org, 6/11/2002
 */
+#include "point.h"
+#include "xSortedImageList.h"
+#include "image.h"
 #include "liveViz.h"
 #include "liveViz_impl.h"
 
@@ -49,13 +52,138 @@ static void liveVizNodeInit(void) {
 }
 
 #if 1
+/****************** Fast but complex image combining *****************
+
+Here I create a list of non-overlapping images and contribute the list of images rather than the combined images.
+
+The contributed data looks like:
+	a list of Images packed into a run of bytes
+*/
+
+// This function is not needed in this implementation of image combine!!
+CkReductionMsg *allocateImageMsg(const liveVizRequest &req,const CkRect &r,
+	byte **imgDest)
+{
+  imageHeader hdr(req,r);
+  CkReductionMsg *msg=CkReductionMsg::buildNew(
+  	sizeof(imageHeader)+r.area()*lv_config.getBytesPerPixel(),
+	NULL,imageCombineReducer);
+  byte *dest=(byte *)msg->getData();
+  *(imageHeader *)dest=hdr;
+  *imgDest=dest+sizeof(hdr);
+  return msg;
+}
+
+//Called by clients to deposit a piece of the final image
+void liveVizDeposit(const liveVizRequest &req,
+		    int startx, int starty,
+		    int sizex, int sizey, const byte * src,
+		    ArrayElement* client)
+{
+
+  if (lv_config.getVerbose(2))
+    CkPrintf("liveVizDeposit> Deposited image at (%d,%d), (%d x %d) pixels, on pe %d\n",startx,starty,sizex,sizey,CkMyPe());
+  // Implement image clipping -- to do
+
+  Point ulc, lrc;
+
+  ulc.x = startx;
+  ulc.y = starty;
+  lrc.x = startx + sizex-1;
+  lrc.y = starty + sizey-1;
+
+  // copy the image data, so that liveViz lib does not delete the actual pointer passed by the user.
+  byte *imageData = new byte[sizex*sizey*lv_config.getBytesPerPixel()];
+  memcpy(imageData,src,sizex*sizey*lv_config.getBytesPerPixel());
+
+  Image *img = new Image(ulc,lrc,(byte *)imageData);
+  XSortedImageList list(lv_config.getBytesPerPixel());
+  list.add(img, req);
+  byte* packedData = (byte*)list.pack(&req);
+  CkReductionMsg* msg = CkReductionMsg::buildNew(list.packedDataSize(),packedData, imageCombineReducer);
+
+  //Contribute this image to the reduction
+  msg->setCallback(CkCallback(vizReductionHandler));
+  client->contribute(msg);
+}
+
+/*
+Called by the reduction manager to combine all the source images
+received on one processor. This function adds all the image on one
+processor to one list of non-overlapping images.
+*/
+CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
+{
+  if (nMsg==1) { //Don't bother copying if there's only one source
+        if (lv_config.getVerbose(2))
+	    CkPrintf("imageCombine> Skipping combine on pe %d\n",CkMyPe());
+  	CkReductionMsg *ret=msgs[0];
+	msgs[0]=NULL; //Prevent reduction manager from double-delete
+	return ret;
+  }
+
+  if (lv_config.getVerbose(2))
+    CkPrintf("imageCombine> image combine on pe %d\n",CkMyPe());
+
+  XSortedImageList list(lv_config.getBytesPerPixel());
+  liveVizRequest *req = list.unPack((void *)msgs[0]->getData());
+
+  for(int i=1; i<nMsg; i++)
+     delete list.unPack(msgs[i]->getData()); // delete the liveVizRequest* ptr returned by unpack()
+
+  byte* packedData = (byte*)list.pack(req);
+
+  CkReductionMsg *msg = CkReductionMsg::buildNew(list.packedDataSize(),packedData, imageCombineReducer);
+
+  delete req;
+
+  return msg;
+}
+
+/* Called once Unpacks images, combines them to form one image and passes it on to layer 0. */
+void vizReductionHandler(void *r_msg)
+{
+  CkReductionMsg *msg = (CkReductionMsg*)r_msg;
+  XSortedImageList list(lv_config.getBytesPerPixel());
+  liveVizRequest * req = list.unPack(msg->getData());
+  Image *image = list.combineImage();
+
+  if (lv_config.getVerbose(2))
+    CkPrintf("vizReductionHandler> pe %d image is (%d,%d, %d,%d)\n", CkMyPe(), image->m_ulc.x, image->m_ulc.y, image->m_lrc.x, image->m_lrc.y);
+
+  int bpp=lv_config.getBytesPerPixel();
+  CkRect destRect(0,0,req->wid-1,req->ht-1);
+  CkRect srcRect(0,0,image->getImageWidth()-1, image->getImageHeight()-1);
+  if (destRect==srcRect)
+  {
+  //Client contributed entire image-- pass along unmodified
+    liveViz0Deposit(*req,image->m_imgData);
+    image->m_imgData = NULL; // don't delete the image buffer.
+    delete image;
+  }
+  else
+  { //Client didn't quite cover whole image-- have to pad
+    CkImage src(image->getImageWidth(), image->getImageHeight(), bpp,image->m_imgData);
+    CkAllocImage dest(req->wid,req->ht,bpp);
+    dest.clear();
+    dest.put(image->m_ulc.x,image->m_ulc.y,src);
+    liveViz0Deposit(*req,dest.getData());
+    delete image;
+  }
+
+  delete req;
+  delete msg;
+}
+
+#else
+
 /****************** Fairly Slow, but straightforward image combining *****************
 The contributed data looks like:
 	liveVizRequest
 	Rectangle of image, in final image coordinates (fully clipped)
 	image data
 
-This turned out to be incredibly hideous, because the simple data 
+This turned out to be incredibly hideous, because the simple data
 structure above has to be compressed into a flat run of bytes.
 I'm considering changing the reduction interface to use messages,
 or some sort of pup'd object.
@@ -77,7 +205,7 @@ CkReductionMsg *allocateImageMsg(const liveVizRequest &req,const CkRect &r,
 
 //Called by clients to deposit a piece of the final image
 void liveVizDeposit(const liveVizRequest &req,
-		    int startx, int starty, 
+		    int startx, int starty,
 		    int sizex, int sizey, const byte * src,
 		    ArrayElement* client)
 {
@@ -92,7 +220,7 @@ void liveVizDeposit(const liveVizRequest &req,
   int bpp=lv_config.getBytesPerPixel();
   byte *dest;
   CkReductionMsg *msg=allocateImageMsg(req,r,&dest);
-  
+
 //Copy our image into the reductionMessage:
   if (!r.isEmpty()) {
     //We can't just copy image with memcpy, because we may be clipping user data here:
@@ -107,7 +235,7 @@ void liveVizDeposit(const liveVizRequest &req,
   client->contribute(msg);
 }
 
-/*Called by the reduction manager to combine all the source images 
+/*Called by the reduction manager to combine all the source images
 received on one processor.
 */
 CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
@@ -115,7 +243,7 @@ CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
   if (nMsg==1) { //Don't bother copying if there's only one source
         if (lv_config.getVerbose(2))
 	    CkPrintf("imageCombine> Skipping combine on pe %d\n",CkMyPe());
-  	CkReductionMsg *ret=msgs[0]; 
+  	CkReductionMsg *ret=msgs[0];
 	msgs[0]=NULL; //Prevent reduction manager from double-delete
 	return ret;
   }
@@ -126,11 +254,11 @@ CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
 //Determine the size of the output image
   CkRect destRect; destRect.makeEmpty();
   for (m=0;m<nMsg;m++) destRect=destRect.getUnion(((imageHeader *)msgs[m]->getData())->r);
-  
+
 //Allocate output message of that size
   byte *dest;
   CkReductionMsg *msg=allocateImageMsg(firstHdr->req,destRect,&dest);
-  
+
 //Add each source image to the destination
 // Everything should be pre-clippped, so no further geometric clipping is needed.
 // Brightness clipping, of course, is still necessary.
@@ -139,7 +267,7 @@ CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
   for (m=0;m<nMsg;m++) {
   	byte *src=(byte *)msgs[m]->getData();
   	imageHeader *mHdr=(imageHeader *)src;
-	src+=sizeof(imageHeader); 
+	src+=sizeof(imageHeader);
 	if (lv_config.getVerbose(2))
 	    CkPrintf("imageCombine>    pe %d  image %d is (%d,%d, %d,%d)\n",
     	          CkMyPe(),m,mHdr->r.l,mHdr->r.t,mHdr->r.r,mHdr->r.b);
@@ -164,7 +292,7 @@ void vizReductionHandler(void *r_msg)
   if (destRect==hdr->r) { //Client contributed entire image-- pass along unmodified
     liveViz0Deposit(hdr->req,srcData);
   }
-  else 
+  else
   { //Client didn't quite cover whole image-- have to pad
     CkImage src(hdr->r.wid(),hdr->r.ht(),bpp,srcData);
     CkAllocImage dest(hdr->req.wid,hdr->req.ht,bpp);
@@ -174,15 +302,6 @@ void vizReductionHandler(void *r_msg)
   }
   delete msg;
 }
-
-#else
-/****************** Fast but complex image combining *****************
-
-Aught to do some sort of run-length encoding, or list-of-rectangles here.
-
-INCOMPLETE
-*/
-
 #endif
 
 
