@@ -66,16 +66,26 @@ class VidBlock {
 
 // All the state that's useful to have on the receive side in the Charm Core (ck.C)
 class CkCoreState {
-	GroupTable &groupTable;
+	GroupTable *groupTable;
 	QdState *qd;
 public:
 	CkCoreState() 
-		:groupTable(CkpvAccess(_groupTable)), 
+		:groupTable(&CkpvAccess(_groupTable)), 
 		 qd(CpvAccess(_qd)) {}
 	
-	inline GroupTable &getGroupTable() {return groupTable;}
+	inline GroupTable *getGroupTable() {
+#ifdef __BLUEGENE__ 
+		return &CkpvAccess(_groupTable);
+#else
+ 		return groupTable;
+#endif
+	}
 	inline IrrGroup *localBranch(CkGroupID gID) {
-		return groupTable.find(gID).getObj();
+#ifdef __BLUEGENE__
+		return CkpvAccess(_groupTable).find(gID).getObj();
+#else
+		return groupTable->find(gID).getObj();
+#endif
 	}
 	
 	inline QdState *getQD() {return qd;}

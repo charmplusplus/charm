@@ -216,7 +216,7 @@ static void _exitHandler(envelope *env)
 
 static inline void _processBufferedBocInits(void)
 {
-  CmiNumberHandlerEx(_bocHandlerIdx,(CmiHandlerEx)_processHandler,
+  CkNumberHandlerEx(_bocHandlerIdx,(CmiHandlerEx)_processHandler,
   	CkpvAccess(_coreState));
   register int i = 0;
   PtrVec &inits=*CkpvAccess(_bocInitVec);
@@ -233,7 +233,7 @@ static inline void _processBufferedBocInits(void)
 
 static inline void _processBufferedNodeBocInits(void)
 {
-  CmiNumberHandlerEx(_nodeBocHandlerIdx,(CmiHandlerEx)_processHandler,
+  CkNumberHandlerEx(_nodeBocHandlerIdx,(CmiHandlerEx)_processHandler,
   	CkpvAccess(_coreState));
   register int i = 0;
   PtrVec &inits=*_nodeBocInitVec;
@@ -250,7 +250,7 @@ static inline void _processBufferedNodeBocInits(void)
 
 static inline void _processBufferedMsgs(void)
 {
-  CmiNumberHandlerEx(_charmHandlerIdx,(CmiHandlerEx)_processHandler,
+  CkNumberHandlerEx(_charmHandlerIdx,(CmiHandlerEx)_processHandler,
   	CkpvAccess(_coreState));
   envelope *env;
   while(NULL!=(env=(envelope*)CkpvAccess(_buffQ)->deq())) {

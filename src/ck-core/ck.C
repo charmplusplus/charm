@@ -496,7 +496,7 @@ static inline void _processForBocMsg(CkCoreState *ck,envelope *env)
   register CkGroupID groupID =  env->getGroupNum();
   register IrrGroup *obj = ck->localBranch(groupID);
   if(!obj) { // groupmember not yet created
-    ck->getGroupTable().find(groupID).enqMsg(env);
+    ck->getGroupTable()->find(groupID).enqMsg(env);
     return;
   }
   ck->process();
