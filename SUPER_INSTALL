@@ -8,7 +8,7 @@ syntax() {
   echo 'targets: doc ps-doc pdf-doc html-doc'
   echo ''
   echo 'versions: ' 
-  echo `( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' )`
+  ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | sort | pr -4t )
   echo ''
   echo 'example charmc-options: -g -save -verbose'
   echo ''
