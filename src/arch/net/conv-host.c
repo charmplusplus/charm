@@ -2400,7 +2400,7 @@ void req_poll()
 #if CMK_CCS_AVAILABLE
   if (arg_server ==1) {
     if(FD_ISSET(myFd, &rfds)){
-      /* printf("Activity detected on client socket\n"); */
+      /*      printf("Activity detected on client socket %d\n",myFd); */
       skt_accept(myFd, &clientIP, &clientPortNo, &CcsClientFd);
       /* printf("Accept over\n"); */
       fflush(stdout);
@@ -2939,14 +2939,6 @@ main(argc, argv)
     fprintf(stderr, "INFO> conv-host started...\n");
   /* Initialize the node-table by reading nodesfile */
   nodetab_init();
-  /* Start the worker processes */
-  req_start_workers();
-  /* Wait until the workers have registered */
-  while (req_workers_registered < req_numworkers) req_poll();
-  /* Initialize the IO module */
-  input_init();
-  /* start the node processes */
-  start_nodes();
 
 #if CMK_CCS_AVAILABLE
   if(arg_server == 1){
@@ -2956,6 +2948,16 @@ main(argc, argv)
     fflush(stdout);
   }
 #endif
+
+  /* Start the worker processes */
+  req_start_workers();
+  /* Wait until the workers have registered */
+  while (req_workers_registered < req_numworkers) req_poll();
+  /* Initialize the IO module */
+  input_init();
+  /* start the node processes */
+  start_nodes();
+
 
 #if CMK_DEBUG_MODE
   if(arg_initial_bp == 0){
