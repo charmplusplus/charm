@@ -16,6 +16,7 @@
 #include "queueing.h"
 #include "conv-ccs.h"
 #include "ccs-server.h"
+#include "memory-isomalloc.h"
 
 extern void CcdModuleInit(char **);
 extern void CmiMemoryInit(char **);
@@ -1214,7 +1215,7 @@ void CmiMulticastInit()
 #if SIMPLE_CMIALLOC
 void *CmiAlloc(int size)
 {
-	return malloc(size);
+	return malloc_nomigrate(size);
 }
 
 void CmiReference(void *blk)
@@ -1230,7 +1231,7 @@ int CmiSize(void *blk)
 
 void CmiFree(void *blk)
 {
-	free(blk);
+	free_nomigrate(blk);
 }
 
 #else /*!SIMPLE_CMIALLOC*/
@@ -1243,7 +1244,7 @@ void *CmiAlloc(size)
 int size;
 {
   char *res;
-  res =(char *)malloc(size+2*sizeof(int));
+  res =(char *)malloc_nomigrate(size+2*sizeof(int));
   _MEMCHECK(res);
 
 #ifdef MEMMONITOR
@@ -1306,7 +1307,7 @@ void *blk;
     CpvAccess(BlocksAllocated)--;
     CmiPrintf("Refcount 0 case called\n");
 #endif
-    free(BLKSTART(blk));
+    free_nomigrate(BLKSTART(blk));
     return;
   }
   refCount--;
@@ -1317,7 +1318,7 @@ void *blk;
     CpvAccess(MemoryUsage) -= (SIZEFIELD(blk) + 2*sizeof(int));
     CpvAccess(BlocksAllocated)--;
 #endif
-    free(BLKSTART(blk));
+    free_nomigrate(BLKSTART(blk));
     return;
   }
   REFFIELD(blk) = refCount;
