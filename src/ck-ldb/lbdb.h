@@ -162,6 +162,7 @@ LDBarrierReceiver LDAddLocalBarrierReceiver(LDHandle lbdb,LDBarrierFn fn,
 void LDRemoveLocalBarrierReceiver(LDHandle lbdb,LDBarrierReceiver h);
 void LDAtLocalBarrier(LDHandle lbdb, LDBarrierClient h);
 void LDResumeClients(LDHandle lbdb);
+int LDProcessorSpeed();
 
 #ifdef __cplusplus
 }

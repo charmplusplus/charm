@@ -106,6 +106,7 @@ public:
   void AtLocalBarrier(LDBarrierClient h) { LDAtLocalBarrier(myLDHandle,h); };
   void ResumeClients() { LDResumeClients(myLDHandle); }
 
+  int ProcessorSpeed() { return LDProcessorSpeed(); };
 private:
   LDHandle myLDHandle;
 

@@ -117,6 +117,8 @@ public:
     runningObj = _h; obj_running = CmiTrue;
   };
   void NoRunningObj() { obj_running = CmiFalse; };
+  CmiBool ObjIsRunning() { return obj_running; };
+  LDObjHandle RunningObj() { return runningObj; };
   
   LDBarrierClient AddLocalBarrierClient(LDResumeFn fn, void* data) { 
     return localBarrier.AddClient(fn,data);

@@ -82,6 +82,9 @@ extern "C" void LDCollectStatsOff(LDHandle _db)
 extern "C" void LDObjectStart(LDObjHandle _h)
 {
   LBDB *const db = static_cast<LBDB*>(_h.omhandle.ldb.handle);
+
+  if (db->ObjIsRunning()) LDObjectStop(db->RunningObj());
+
   if (db->StatsOn()) {
     db->RunningObj(_h);
     LBObj *const obj = db->LbObj(_h);
@@ -226,6 +229,51 @@ extern "C" void LDResumeClients(LDHandle _db)
   LBDB *const db = static_cast<LBDB*>(_db.handle);
 
   db->ResumeClients();
+}
+
+static int work(int iter_block) {
+  int result=0;
+  int i;
+  for(i=0; i < iter_block; i++) {
+    double b=0.1+0.1*result;
+    result=(int)(sqrt(log(atan(b))));
+  }
+  return result;
+}
+
+extern "C" int LDProcessorSpeed()
+{
+  double wps = 0;
+  // First, count how many iterations for 1 second.
+  // Since we are doing lots of function calls, this will be rough
+  const double end_time = CmiCpuTimer()+1;
+  wps = 0;
+  while(CmiCpuTimer() < end_time) {
+    work(100);
+    wps+=100;
+  }
+
+  // Now we have a rough idea of how many iterations there are per
+  // second, so just perform a few cycles of correction by
+  // running for what we think is 1 second.  Then correct
+  // the number of iterations per second to make it closer
+  // to the correct value
+  
+  for(int i=0; i < 2; i++) {
+    const double start_time = CmiCpuTimer();
+    work(wps);
+    const double end_time = CmiCpuTimer();
+    const double correction = 1. / (end_time-start_time);
+    wps *= correction;
+  }
+  
+  // If necessary, do a check now
+  //    const double start_time3 = CmiWallTimer();
+  //    work(msec * 1e-3 * wps);
+  //    const double end_time3 = CmiWallTimer();
+  //    CkPrintf("[%d] Work block size is %d %d %f\n",
+  //	     thisIndex,wps,msec,1.e3*(end_time3-start_time3));
+  return wps;
 }
 
 #endif // CMK_LBDB_ON
