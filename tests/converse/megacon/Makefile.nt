@@ -1,0 +1,128 @@
+CHARMBIN=..\..\..\bin
+CPP = cl.exe
+
+INCLUDE = /I"C:\Program Files\Microsoft Visual Studio\Vc98\Include"\
+		/I"..\..\..\include"
+
+CPP_PROJ=/nologo /MT /w /GX /Z7 /Od $(INCLUDE)\
+ /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX\
+ /Fo /FD /c
+
+LINK=link.exe
+LINK_FLAGS = /nologo /LIBPATH:"C:\Program Files\Microsoft Visual Studio\VC98\Lib" /LIBPATH:"..\..\..\lib"
+LINK_OTHER = libldb-rand.obj libconv-core.lib libtrace-none.lib libconv-cplus-y.lib libckqt.lib ws2_32.lib kernel32.lib
+
+OBJS=blkinhand.obj megacon.obj ringsimple.obj ring.obj fibobj.obj fibthr.obj broadc.obj priotest.obj deadlock.obj vars.obj nodenum.obj specmsg.obj bigmsg.obj vecsend.obj posixth.obj future.obj multicast.obj multisend.obj
+
+.SILENT:
+
+pgm: $(OBJS) link
+
+link: 
+	$(LINK) $(LINK_FLAGS) $(LINK_OTHER) /out:"pgm.exe" $(OBJS)
+	copy $(CHARMBIN)\conv-host.exe .
+
+megacon.obj: megacon.c
+	touch megacon.cpm.h
+	$(CPP) /nologo /E $(INCLUDE) megacon.c > megacon.TMP.i
+	$(CHARMBIN)\conv-cpm megacon.TMP.i megacon.cpm.h
+	$(CPP) $(CPP_PROJ) megacon.c
+
+blkinhand.obj: blkinhand.c
+	touch blkinhand.cpm.h
+	$(CPP) /nologo /E $(INCLUDE) blkinhand.c > blkinhand.TMP.i
+	$(CHARMBIN)\conv-cpm blkinhand.TMP.i blkinhand.cpm.h
+	$(CPP) $(CPP_PROJ) blkinhand.c
+
+ring.obj: ring.c
+	touch ring.cpm.h
+	$(CPP) /nologo /E $(INCLUDE) ring.c > ring.TMP.i
+	$(CHARMBIN)\conv-cpm ring.TMP.i ring.cpm.h
+	$(CPP) $(CPP_PROJ) ring.c
+
+ringsimple.obj: ringsimple.c
+	$(CPP) $(CPP_PROJ) ringsimple.c
+
+vecsend.obj: vecsend.c
+	touch vecsend.cpm.h
+	$(CPP) /nologo /E $(INCLUDE) vecsend.c > vecsend.TMP.i
+	$(CHARMBIN)\conv-cpm vecsend.TMP.i vecsend.cpm.h
+	$(CPP) $(CPP_PROJ) vecsend.c
+
+multicast.obj: multicast.c
+	$(CPP) $(CPP_PROJ) multicast.c
+
+fibobj.obj: fibobj.c
+	touch fibobj.cpm.h
+	$(CPP) /nologo /E $(INCLUDE) fibobj.c > fibobj.TMP.i
+	$(CHARMBIN)\conv-cpm fibobj.TMP.i fibobj.cpm.h
+	$(CPP) $(CPP_PROJ) fibobj.c
+
+
+fibthr.obj: fibthr.c
+	touch fibthr.cpm.h
+	$(CPP) /nologo /E $(INCLUDE) fibthr.c > fibthr.TMP.i
+	$(CHARMBIN)\conv-cpm fibthr.TMP.i fibthr.cpm.h
+	$(CPP) $(CPP_PROJ) fibthr.c
+
+
+broadc.obj: broadc.c
+	$(CPP) $(CPP_PROJ) broadc.c
+
+priotest.obj: priotest.c
+	touch priotest.cpm.h
+	$(CPP) /nologo /E $(INCLUDE) priotest.c > priotest.TMP.i
+	$(CHARMBIN)\conv-cpm priotest.TMP.i priotest.cpm.h
+	$(CPP) $(CPP_PROJ) priotest.c
+
+
+deadlock.obj: deadlock.c
+	$(CPP) $(CPP_PROJ) deadlock.c
+
+vars.obj: vars.c
+	touch vars.cpm.h
+	$(CPP) /nologo /E $(INCLUDE) vars.c > vars.TMP.i
+	$(CHARMBIN)\conv-cpm vars.TMP.i vars.cpm.h
+	$(CPP) $(CPP_PROJ) vars.c
+
+
+nodenum.obj: nodenum.c
+	touch nodenum.cpm.h
+	$(CPP) /nologo /E $(INCLUDE) nodenum.c > nodenum.TMP.i
+	$(CHARMBIN)\conv-cpm nodenum.TMP.i nodenum.cpm.h
+	$(CPP) $(CPP_PROJ) nodenum.c
+
+future.obj: future.c
+	touch future.cpm.h
+	$(CPP) /nologo /E $(INCLUDE) future.c > future.TMP.i
+	$(CHARMBIN)\conv-cpm future.TMP.i future.cpm.h
+	$(CPP) $(CPP_PROJ) future.c
+
+specmsg.obj: specmsg.c
+	touch specmsg.cpm.h
+	$(CPP) /nologo /E $(INCLUDE) specmsg.c > specmsg.TMP.i
+	$(CHARMBIN)\conv-cpm specmsg.TMP.i specmsg.cpm.h
+	$(CPP) $(CPP_PROJ) specmsg.c
+
+bigmsg.obj: bigmsg.c
+	touch bigmsg.cpm.h
+	$(CPP) /nologo /E $(INCLUDE) bigmsg.c > bigmsg.TMP.i
+	$(CHARMBIN)\conv-cpm bigmsg.TMP.i bigmsg.cpm.h
+	$(CPP) $(CPP_PROJ) bigmsg.c
+
+posixth.obj: posixth.c
+	touch posixth.cpm.h
+	$(CPP) /nologo /E $(INCLUDE) posixth.c > posixth.TMP.i
+	$(CHARMBIN)\conv-cpm posixth.TMP.i posixth.cpm.h
+	$(CPP) $(CPP_PROJ) posixth.c
+
+multisend.obj: multisend.c
+	$(CPP) $(CPP_PROJ) multisend.c
+
+.IGNORE:
+
+clean:
+	del /q *.cpm.h
+	del /q *.obj *.TMP.i
+	del /q *.exe vc60.*
+
