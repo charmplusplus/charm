@@ -517,8 +517,31 @@ void element::splitBorderLocal(int longEdge, int opnode, int othernode,
   int mIdx = C->addNode(m);
   edgeRef newEdgeRef = C->addEdge(nodes[opnode], mIdx);
   edgeRef newLongRef = C->addEdge(mIdx, nodes[othernode]);
-  elemRef newElemRef = C->addElement(nodes[opnode], nodes[othernode], mIdx,
-			     edges[modEdge], newLongRef, newEdgeRef);
+  elemRef newElemRef;
+  if (opnode == 0) {
+    if (othernode == 1)
+      newElemRef = C->addElement(nodes[0], nodes[1], mIdx, edges[modEdge],
+				 newLongRef, newEdgeRef);
+    else // othernode == 2
+      newElemRef = C->addElement(nodes[0], mIdx, nodes[2], newEdgeRef, 
+				 newLongRef, edges[modEdge]);
+  }
+  else if (opnode == 1) {
+    if (othernode == 0)
+      newElemRef = C->addElement(nodes[0], nodes[1], mIdx, edges[modEdge], 
+				 newEdgeRef, newLongRef);
+    else // othernode == 2
+      newElemRef = C->addElement(mIdx, nodes[1], nodes[2], newEdgeRef, 
+				 edges[modEdge], newLongRef);
+  }
+  else { // opnode is 2
+    if (othernode == 0)
+      newElemRef = C->addElement(nodes[0], mIdx, nodes[2], newLongRef, 
+				 newEdgeRef, edges[modEdge]);
+    else // othernode == 1
+      newElemRef = C->addElement(mIdx, nodes[1], nodes[2], newLongRef, 
+				 edges[modEdge], newEdgeRef);
+  }
 
   C->theEdges[edges[longEdge].idx].updateNode(nodes[othernode], mIdx);
   edges[modEdge].updateElement(C, myRef, newElemRef);
@@ -611,13 +634,70 @@ void element::splitNeighborsLocal(int longEdge, int opnode, int othernode,
   edgeRef newLongRef = C->addEdge(mIdx, nodes[othernode]);
   edgeRef newNbrEdgeRef = C->addEdge(mIdx, 
 			     C->theElements[nbr.idx].nodes[nbrOpnode]);
-  elemRef newElemRef = C->addElement(nodes[opnode], nodes[othernode], mIdx,
-			     edges[modEdge], newLongRef, newEdgeRef);
-  elemRef newNbrRef = C->addElement(C->theElements[nbr.idx].nodes[nbrOpnode],
-				    nodes[othernode], mIdx, 
-				    C->theElements[nbr.idx].edges[nbrModEdge],
-				    newLongRef, newNbrEdgeRef);
-  
+  elemRef newElemRef;
+  if (opnode == 0) {
+    if (othernode == 1)
+      newElemRef = C->addElement(nodes[0], nodes[1], mIdx, edges[modEdge],
+				 newLongRef, newEdgeRef);
+    else // othernode == 2
+      newElemRef = C->addElement(nodes[0], mIdx, nodes[2], newEdgeRef, 
+				 newLongRef, edges[modEdge]);
+  }
+  else if (opnode == 1) {
+    if (othernode == 0)
+      newElemRef = C->addElement(nodes[0], nodes[1], mIdx, edges[modEdge], 
+				 newEdgeRef, newLongRef);
+    else // othernode == 2
+      newElemRef = C->addElement(mIdx, nodes[1], nodes[2], newEdgeRef, 
+				 edges[modEdge], newLongRef);
+  }
+  else { // opnode is 2
+    if (othernode == 0)
+      newElemRef = C->addElement(nodes[0], mIdx, nodes[2], newLongRef, 
+				 newEdgeRef, edges[modEdge]);
+    else // othernode == 1
+      newElemRef = C->addElement(mIdx, nodes[1], nodes[2], newLongRef, 
+				 edges[modEdge], newEdgeRef);
+  }
+  elemRef newNbrRef;
+  if (nbrOpnode == 0) {
+    if (nbrOthernode == 1)
+      newElemRef = C->addElement(C->theElements[nbr.idx].nodes[0], 
+				 C->theElements[nbr.idx].nodes[1], mIdx, 
+				 C->theElements[nbr.idx].edges[nbrModEdge], 
+				 newLongRef, newNbrEdgeRef);
+    else // nbrOthernode == 2
+      newElemRef = C->addElement(C->theElements[nbr.idx].nodes[0], mIdx, 
+				 C->theElements[nbr.idx].nodes[2], 
+				 newNbrEdgeRef, newLongRef, 
+				 C->theElements[nbr.idx].edges[nbrModEdge]);
+  }
+  else if (nbrOpnode == 1) {
+    if (nbrOthernode == 0)
+      newElemRef = C->addElement(C->theElements[nbr.idx].nodes[0], 
+				 C->theElements[nbr.idx].nodes[1], mIdx, 
+				 C->theElements[nbr.idx].edges[nbrModEdge], 
+				 newNbrEdgeRef, newLongRef);
+    else // nbrOthernode == 2
+      newElemRef = C->addElement(mIdx, C->theElements[nbr.idx].nodes[1], 
+				 C->theElements[nbr.idx].nodes[2], 
+				 newNbrEdgeRef, 
+				 C->theElements[nbr.idx].edges[nbrModEdge], 
+				 newLongRef);
+  }
+  else { // nbrOpnode is 2
+    if (nbrOthernode == 0)
+      newElemRef = C->addElement(C->theElements[nbr.idx].nodes[0], mIdx, 
+				 C->theElements[nbr.idx].nodes[2], newLongRef, 
+				 newNbrEdgeRef, 
+				 C->theElements[nbr.idx].edges[nbrModEdge]);
+    else // nbrOthernode == 1
+      newElemRef = C->addElement(mIdx, C->theElements[nbr.idx].nodes[1], 
+				 C->theElements[nbr.idx].nodes[2], newLongRef, 
+				 C->theElements[nbr.idx].edges[nbrModEdge], 
+				 newNbrEdgeRef);
+  }
+
   // link everything together properly
   edges[modEdge].updateElement(C, myRef, newElemRef);
   C->theEdges[edges[longEdge].idx].updateNode(nodes[othernode], mIdx);
@@ -683,9 +763,32 @@ void element::splitHelp(int longEdge)
   // add new components and make proper connections
   newNodeIdx = C->addNode(newNode);
   edgeRef newEdgeRef = C->addEdge(newNodeIdx, nodes[opnode]);
-  elemRef newElemRef = C->addElement(nodes[opnode], nodes[othernode], 
-				     newNodeIdx, edges[modEdge], 
-				     newLongEdgeRef, newEdgeRef);
+  elemRef newElemRef;
+  if (opnode == 0) {
+    if (othernode == 1)
+      newElemRef = C->addElement(nodes[0], nodes[1], newNodeIdx, 
+				 edges[modEdge], newLongEdgeRef, newEdgeRef);
+    else // othernode == 2
+      newElemRef = C->addElement(nodes[0], newNodeIdx, nodes[2], newEdgeRef, 
+				 newLongEdgeRef, edges[modEdge]);
+  }
+  else if (opnode == 1) {
+    if (othernode == 0)
+      newElemRef = C->addElement(nodes[0], nodes[1], newNodeIdx, 
+				 edges[modEdge], newEdgeRef, newLongEdgeRef);
+    else // othernode == 2
+      newElemRef = C->addElement(newNodeIdx, nodes[1], nodes[2], newEdgeRef, 
+				 edges[modEdge], newLongEdgeRef);
+  }
+  else { // opnode is 2
+    if (othernode == 0)
+      newElemRef = C->addElement(nodes[0], newNodeIdx, nodes[2], 
+				 newLongEdgeRef, newEdgeRef, edges[modEdge]);
+    else // othernode == 1
+      newElemRef = C->addElement(newNodeIdx, nodes[1], nodes[2], 
+				 newLongEdgeRef, edges[modEdge], newEdgeRef);
+  }
+
   if (edges[longEdge].cid == C->cid)
     C->theEdges[edges[longEdge].idx].updateNode(nodes[othernode], newNodeIdx);
   C->theEdges[newEdgeRef.idx].updateElement(nullRef, myRef);
@@ -746,8 +849,31 @@ void element::splitResponse(int longEdge)
   int mIdx = C->addNode(m);
   edgeRef newEdgeRef = C->addEdge(nodes[opnode], mIdx);
   edgeRef newLongRef = C->addEdge(mIdx, nodes[othernode]);
-  elemRef newElemRef = C->addElement(nodes[opnode], nodes[othernode], mIdx,
-			     edges[modEdge], newLongRef, newEdgeRef);
+  elemRef newElemRef;
+  if (opnode == 0) {
+    if (othernode == 1)
+      newElemRef = C->addElement(nodes[0], nodes[1], mIdx, edges[modEdge],
+				 newLongRef, newEdgeRef);
+    else // othernode == 2
+      newElemRef = C->addElement(nodes[0], mIdx, nodes[2], newEdgeRef, 
+				 newLongRef, edges[modEdge]);
+  }
+  else if (opnode == 1) {
+    if (othernode == 0)
+      newElemRef = C->addElement(nodes[0], nodes[1], mIdx, edges[modEdge], 
+				 newEdgeRef, newLongRef);
+    else // othernode == 2
+      newElemRef = C->addElement(mIdx, nodes[1], nodes[2], newEdgeRef, 
+				 edges[modEdge], newLongRef);
+  }
+  else { // opnode is 2
+    if (othernode == 0)
+      newElemRef = C->addElement(nodes[0], mIdx, nodes[2], newLongRef, 
+				 newEdgeRef, edges[modEdge]);
+    else // othernode == 1
+      newElemRef = C->addElement(mIdx, nodes[1], nodes[2], newLongRef, 
+				 edges[modEdge], newEdgeRef);
+  }
 
   if (edges[longEdge].cid == C->cid)
     C->theEdges[edges[longEdge].idx].updateNode(nodes[othernode], mIdx);
