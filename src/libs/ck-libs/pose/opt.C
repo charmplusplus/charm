@@ -101,6 +101,7 @@ void opt::UndoEvent(Event *e)
     parent->ResolveFn(((e->fnIdx) * -1), e->msg); // execute the anti-method
     if (e->commitBfrLen > 0) free(e->commitBfr); // clean up buffered output
     e->commitBfr = NULL;
+    e->commitErr = 0;
     e->done = e->commitBfrLen = 0;
     delete e->cpData;
     e->cpData = NULL;
