@@ -8,8 +8,6 @@
 #ifndef _TRACE_H
 #define _TRACE_H
 
-#include "charm++.h"
-
 class envelope;
 
 /**
@@ -76,7 +74,7 @@ class Trace {
     virtual void traceClose() {}
 };
 
-#define ALLDO(x) for (int i=0; i<traces.length(); i++) traces[i]->x
+#define ALLDO(x) for (int i=0; i<length(); i++) traces[i]->x
 
 /// Array of Traces modules,  every event raised will go through every Trace module.
 class TraceArray {
@@ -86,7 +84,7 @@ private:
 public:
     TraceArray(): n(0) {}
     inline void addTrace(Trace *tr) { traces.push_back(tr); n++;}
-    inline int length() const { return n; }
+    inline const int length() const { return n; }
 
     inline void userEvent(int e) { ALLDO(userEvent(e));}
     inline void userBracketEvent(int e,double bt, double et) {ALLDO(userBracketEvent(e,bt,et));}
@@ -107,7 +105,7 @@ public:
     inline void endComputation(void) {ALLDO(endComputation());}
     inline int traceRegisterUserEvent(const char*x, int evt) {
 	  int eno = 0;
-	  for (int i=0; i<traces.length(); i++) {
+	  for (int i=0; i<length(); i++) {
 	    int e = traces[i]->traceRegisterUserEvent(x, evt);
 	    if (e) eno = e;
           }

@@ -11,9 +11,14 @@
 /*@{*/
 
 #include <stdlib.h>
+
+// cannot include charm++.h because trace-common.o is part of libconv-core.a
+#include "charm.h"
+#include "middle.h"
+#include "cklists.h"
+
 #include "trace.h"
 #include "trace-common.h"
-#include "stdlib.h"
 
 #define DEBUGF(x)          // CmiPrintf x
 

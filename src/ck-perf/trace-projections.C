@@ -11,6 +11,7 @@
 */
 /*@{*/
 
+#include "charm++.h"
 #include "trace-projections.h"
 
 #define DEBUGF(x)           // CmiPrintf x

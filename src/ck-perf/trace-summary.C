@@ -10,6 +10,7 @@
 */
 /*@{*/
 
+#include "charm++.h"
 #include "trace-summary.h"
 #include "trace-summaryBOC.h"
 
