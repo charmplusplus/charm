@@ -115,12 +115,12 @@ static void CldTokenHandler(CldToken tok)
     LoadNotifyFn(CpvAccess(CldProc)->load);
 }
 
-int CldCountTokens()
+int CldCountTokens(void)
 {
   return (CpvAccess(CldProc)->load);
 }
 
-int CldLoad()
+int CldLoad(void)
 {
   return (CsdLength() - CpvAccess(CldLoadOffset));
 }
@@ -203,7 +203,7 @@ void CldSetPEBitVector(const char *newBV)
 
 /* End Bit Vector Stuff */
 
-void CldModuleGeneralInit()
+void CldModuleGeneralInit(void)
 {
   CldToken sentinel = (CldToken)CmiAlloc(sizeof(struct CldToken_s));
   CldProcInfo proc;

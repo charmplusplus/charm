@@ -104,7 +104,7 @@ void CldAverageHandler(struct loadmsg *msg)
   double average = (msg->load_total / CmiNumPes());
   int rebalance;
   if (load < (average+10) * 1.2) rebalance=0;
-  else rebalance = (load - average);
+  else rebalance = (int)(load - average);
   if (DEBUGGING_OUTPUT)
     CmiPrintf("PE %d load=%6d average=%6d rebalance=%d\n", 
 	      CmiMyPe(), CldEstimate(), (int)average, rebalance);
