@@ -96,20 +96,20 @@ extern int     _initHandlerIdx;
 extern int     _bocHandlerIdx;
 extern int     _nodeBocHandlerIdx;
 extern int     _qdHandlerIdx;
-extern CmiNodeLock _nodeLock;
+
+CsvExtern(GroupTable*,  _nodeGroupTable);
+CsvExtern(CmiNodeLock, _nodeLock);
+CsvExtern(unsigned int, _numNodeGroups);
 
 CkpvExtern(CkGroupID,_currentGroup);
 CkpvExtern(GroupTable*, _groupTable);
 CkpvExtern(unsigned int, _numGroups);
-extern unsigned int _numNodeGroups;
 CpvExtern(char **,Ck_argv);
 
 static inline IrrGroup *_localBranch(CkGroupID gID)
 {
   return CkpvAccess(_groupTable)->find(gID).getObj();
 }
-
-extern GroupTable*  _nodeGroupTable;
 
 extern void _initCharm(int argc, char **argv);
 

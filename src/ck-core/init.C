@@ -28,7 +28,7 @@ int   _triggerHandlerIdx;
 int   _triggersSent = 0;
 int   _mainDone = 0;
 
-CmiNodeLock _nodeLock;
+CsvDeclare(CmiNodeLock, _nodeLock);
 
 CkOutStream ckout;
 CkErrStream ckerr;
@@ -40,8 +40,8 @@ CkpvDeclare(CkGroupID,   _currentGroup);
 CkpvDeclare(CkGroupID,   _currentNodeGroup);
 CkpvDeclare(GroupTable*, _groupTable);
 CkpvDeclare(UInt, _numGroups);
-UInt _numNodeGroups;
-GroupTable* _nodeGroupTable = 0;
+CsvDeclare(UInt,_numNodeGroups);
+CsvDeclare(GroupTable*, _nodeGroupTable) = 0;
 CkpvDeclare(CkCoreState *, _coreState);
 
 CkpvDeclare(Stats*, _myStats);
@@ -273,7 +273,7 @@ static int _charmLoadEstimator(void)
 static void _sendTriggers(void)
 {
   int i, num, first;
-  CmiLock(_nodeLock);
+  CmiLock(CsvAccess(_nodeLock));
   if (_triggersSent == 0) 
   {
     _triggersSent++;
@@ -287,7 +287,7 @@ static void _sendTriggers(void)
 	CmiSyncSend(first+i, env->getTotalsize(), (char *)env);
     CmiFree(env);
   }
-  CmiUnlock(_nodeLock);
+  CmiUnlock(CsvAccess(_nodeLock));
 }
 
 static inline void _initDone(void)
@@ -340,10 +340,10 @@ static void _initHandler(void *msg)
       CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, env);
       break;
     case NodeBocInitMsg:
-      CmiLock(_nodeLock);
+      CmiLock(CsvAccess(_nodeLock));
       _numInitNodeMsgs++;
       _nodeBocInitVec->insert(env->getGroupNum().idx, env);
-      CmiUnlock(_nodeLock);
+      CmiUnlock(CsvAccess(_nodeLock));
       CpvAccess(_qd)->process();
       break;
     case ROMsgMsg:
@@ -433,12 +433,15 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(CkGroupID, _currentNodeGroup);
 	CkpvInitialize(GroupTable*, _groupTable);
 	CkpvInitialize(UInt, _numGroups);
-//	CkpvInitialize(UInt, _numNodeGroups);
 	CkpvInitialize(int, _numInitsRecd);
 	CpvInitialize(QdState*, _qd);
 	CpvInitialize(char**, Ck_argv); CpvAccess(Ck_argv)=argv;
 	CkpvInitialize(MsgPool*, _msgPool);
 	CkpvInitialize(CkCoreState *, _coreState);
+
+	CsvInitialize(UInt, _numNodeGroups);
+	CsvInitialize(GroupTable*,  _nodeGroupTable);
+	CsvInitialize(CmiNodeLock, _nodeLock);
 
 	CkpvInitialize(_CkOutStream*, _ckout);
 	CkpvInitialize(_CkErrStream*, _ckerr);
@@ -448,15 +451,15 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvAccess(_groupTable) = new GroupTable;
 	CkpvAccess(_groupTable)->init();
 	CkpvAccess(_numGroups) = 1; // make 0 an invalid group number
-	_numNodeGroups = 1;
+	CsvAccess(_numNodeGroups) = 1;
 	CkpvAccess(_buffQ) = new PtrQ();
 	CkpvAccess(_bocInitVec) = new PtrVec();
 	
 	if(CkMyRank()==0) 
 	{
-		_nodeLock = CmiCreateLock();
-		_nodeGroupTable = new GroupTable();
-		_nodeGroupTable->init();
+		CsvAccess(_nodeLock) = CmiCreateLock();
+		CsvAccess(_nodeGroupTable) = new GroupTable();
+		CsvAccess(_nodeGroupTable)->init();
 		_nodeBocInitVec = new PtrVec();
 	}
   
