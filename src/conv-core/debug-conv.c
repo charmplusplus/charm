@@ -125,7 +125,7 @@ void CpdInit(void)
   CpvInitialize(void *, debugQueue);
   CpvAccess(debugQueue) = CdsFifo_Create();
 
-  CcsRegisterHandler("DebugHandler", CpdDebugHandler);
+  CcsRegisterHandler("ccs_debug", CpdDebugHandler);
   
 #if 0
   CpdInitializeObjectTable();
