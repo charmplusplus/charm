@@ -4,9 +4,10 @@
 #include <stdio.h>
 #include "CToken.h"
 #include "sdag-globals.h"
+#include "string.h"
 
 extern "C" EToken yylex();
-extern char *yytext;
+extern "C" char yytext[];
 extern "C" void Unput(char);
 
 class CLexer {
