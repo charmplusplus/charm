@@ -1,6 +1,7 @@
 module MPIINCL
    include 'ampif.h'
-   
+
+   external MPI_Init
    external MPI_Init_universe
    external MPI_Comm_rank
    external MPI_Comm_size
@@ -61,13 +62,5 @@ module MPIINCL
    external MPI_Migrate
    external MPI_Register_main
    external MPI_Attach
-
-contains
-
-  subroutine MPI_Init(ierr)
-    integer :: ierr
-    call MPI_Init_universe(MPI_COMM_UNIVERSE)
-    ierr = 0
-  end subroutine
 
 end module MPIINCL

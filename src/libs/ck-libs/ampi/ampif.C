@@ -2,7 +2,7 @@
 #include "ampiimpl.h"
 
 FDECL {
-
+#define mpi_init FTN_NAME( MPI_INIT , mpi_init )
 #define mpi_init_universe FTN_NAME( MPI_INIT_UNIVERSE , mpi_init_universe )
 #define mpi_comm_rank FTN_NAME( MPI_COMM_RANK , mpi_comm_rank )
 #define mpi_comm_size FTN_NAME( MPI_COMM_SIZE , mpi_comm_size )
@@ -79,6 +79,11 @@ void mpi_init_universe(int *unicomm)
   {
     unicomm[i] = MPI_COMM_UNIVERSE[i];
   }
+}
+
+void mpi_init(int *ierr){
+  //mpi_init_universe(MPI_COMM_UNIVERSE);
+  *ierr = MPI_Init(NULL,NULL);
 }
 
 void mpi_comm_rank(int *comm, int *rank, int *ierr)

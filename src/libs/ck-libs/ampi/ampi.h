@@ -70,6 +70,7 @@ This is needed so we can call the routine as a new thread.
 #define MPI_SIMILAR	1
 #define MPI_UNEQUAL	2
 
+#define MPI_OP_NULL 0
 #define MPI_MAX 1
 #define MPI_MIN 2
 #define MPI_SUM 3
