@@ -26,6 +26,7 @@ public:
     data.id = myid;
     data.omHandle = _h.omhandle;
     data.omID = _h.omhandle.id;
+    data.migratable = migratable;
     data.cpuTime = 0.;
     data.wallTime = 0.;
     registered = CmiTrue;

@@ -43,6 +43,9 @@ public:
     double bg_walltime;
     double bg_cputime;
     int pe_speed;
+    double utilization;
+    CmiBool available;
+    
     int n_objs;
     LDObjData* objData;
     int n_comm;

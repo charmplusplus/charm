@@ -50,6 +50,7 @@ typedef struct {
   LDOMid omID;
   double cpuTime;
   double wallTime;
+  CmiBool migratable;
 } LDObjData;
 
 typedef struct {

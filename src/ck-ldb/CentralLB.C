@@ -122,7 +122,9 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
     statsDataList[pe].bg_walltime = m->bg_walltime;
     statsDataList[pe].bg_cputime = m->bg_cputime;
     statsDataList[pe].pe_speed = m->pe_speed;
-    statsDataList[pe].n_objs = m->n_objs;
+    statsDataList[pe].utilization = 1.0;
+    statsDataList[pe].available = CmiTrue;
+
     statsDataList[pe].n_objs = m->n_objs;
     statsDataList[pe].objData = m->objData;
     statsDataList[pe].n_comm = m->n_comm;
