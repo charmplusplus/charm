@@ -220,8 +220,8 @@ void GreedyLB::work(CentralLB::LDStats* stats, int count)
     const int id   = objData[obj].id;
     if (dest != pe) {
       stats->to_proc[id] = dest;
-      //  CkPrintf("[%d] Obj %d migrating from %d to %d\n",
-      //           CkMyPe(),obj,pe,dest);
+      if (_lb_args.debug()>1) 
+        CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),obj,pe,dest);
     }
 
     //Insert the least loaded processor with load updated back into the heap

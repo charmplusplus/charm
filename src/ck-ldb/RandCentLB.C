@@ -49,6 +49,8 @@ inline int chooseProc(int count)
 
 void RandCentLB::work(CentralLB::LDStats* stats, int count)
 {
+  if (_lb_args.debug()) CkPrintf("Calling RandCentLB strategy\n",CkMyPe());
+
   int proc;
   for (proc=0; proc<count; proc++) {
     if (stats->procs[proc].available) break;
@@ -62,7 +64,8 @@ void RandCentLB::work(CentralLB::LDStats* stats, int count)
 	int dest = chooseProc(count);
 	while (!stats->procs[dest].available) dest = chooseProc(count);
 	if (dest != stats->from_proc[obj]) {
-          //CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),obj,stats->from_proc[obj],dest);
+          if (_lb_args.debug() >= 2)
+            CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),obj,stats->from_proc[obj],dest);
           nmigrated ++;
 	  stats->to_proc[obj] = dest;
         }

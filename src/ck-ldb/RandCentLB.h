@@ -21,7 +21,7 @@ void CreateRandCentLB();
 class RandCentLB : public CentralLB {
 public:
   RandCentLB(const CkLBOptions &opt);
-  RandCentLB(CkMigrateMessage *m):CentralLB(m) {}
+  RandCentLB(CkMigrateMessage *m):CentralLB(m) { lbname = "RandCentLB"; }
   void pup(PUP::er &p){ CentralLB::pup(p); }
 
   void work(CentralLB::LDStats* stats, int count);

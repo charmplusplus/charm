@@ -28,7 +28,7 @@ public:
   };
 
   GreedyLB(const CkLBOptions &);
-  GreedyLB(CkMigrateMessage *m):CentralLB(m) {}
+  GreedyLB(CkMigrateMessage *m):CentralLB(m) { lbname = "GreedyLB"; }
   void work(LDStats* stats,int count);
 private:
 	enum           HeapCmp {GT = '>', LT = '<'};
