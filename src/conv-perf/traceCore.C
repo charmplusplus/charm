@@ -6,6 +6,8 @@
 #include <assert.h>
 
 #include "converse.h"
+#include "charm++.h"
+#include "trace-common.h"
 #include "traceCore.h"
 #include "traceCoreCommon.h"
 
@@ -18,7 +20,7 @@ CpvExtern(double, _traceCoreInitTime);
 CpvExtern(char*, _traceCoreRoot);
 CpvExtern(int, _traceCoreBufferSize);
 CpvExtern(TraceCore*, _traceCore);
-CpvStaticDeclare(int ,staticNumEntries);
+//CpvStaticDeclare(int ,staticNumEntries);
 
 /* Trace Timer */
 #define  TRACE_CORE_TIMER   CmiWallTimer
@@ -30,8 +32,7 @@ TraceCore::TraceCore(char** argv)
 {
 	int binary = CmiGetArgFlag(argv,"+binary-trace");
 	traceLogger = new TraceLogger(CpvAccess(_traceCoreRoot), binary);
-	CpvInitialize(int ,staticNumEntries);
-	CpvAccess(staticNumEntries)=0;
+
 	if(CpvAccess(_traceCoreOn) == 0){
 		traceCoreOn=0;
 		return;
@@ -269,11 +270,13 @@ TraceLogger::TraceLogger(char* program, int b):
 	numLangs(1), numEntries(0), lastWriteFlag(0), prevLID(0), prevSeek(0)
 {
   binary = b;
-//  CmiPrintf("Size of the pool %d \n",CpvAccess(_traceCoreBufferSize));
-  pool = new TraceEntry[5*CpvAccess(_traceCoreBufferSize)];
- // pool = new TraceEntry[500];
-  poolSize = CpvAccess(_traceCoreBufferSize);
+
   
+
+  poolSize = CkpvAccess(CtrLogBufSize);
+  pool = new TraceEntry[poolSize+5];
+//  CmiPrintf("CtrLogBufSize %d \n",CkpvAccess(CtrLogBufSize));
+  CmiPrintf("PoolSize = %d \n",poolSize);
   for (int lID=0;lID<MAX_NUM_LANGUAGES;lID++) {
     lName[lID]=NULL;
     fName[lID]=NULL;
@@ -360,7 +363,7 @@ void TraceLogger::write(void)
 	int pLID=0, nLID=0;
 	int currSeek=0, nextSeek=0;
 	int i;
-  	for(i=0; i<CpvAccess(staticNumEntries)-1; i++) {
+  	for(i=0; i<numEntries-1; i++) {
 		currLID  = pool[i].languageID;
 		FILE* fp = fptrs[currLID];
 		if(fp ==  NULL)
@@ -404,23 +407,24 @@ void TraceLogger::add(int lID, int eID, double timestamp, int iLen, int* iData, 
 	//  CmiPrintf("Printing in buffer \n");
 	  buffer = new TraceEntry(lID, eID, timestamp, iLen, iData, sLen, sData);
   }else{
-  new (&pool[CpvAccess(staticNumEntries)]) TraceEntry(lID, eID, timestamp, iLen, iData, sLen, sData);
-  CpvAccess(staticNumEntries) = CpvAccess(staticNumEntries)+1;
-if(CpvAccess(staticNumEntries)>= poolSize) {
+  new (&pool[numEntries]) TraceEntry(lID, eID, timestamp, iLen, iData, sLen, sData);
+  numEntries = numEntries+1;
+if(numEntries>= poolSize) {
     double writeTime = TraceCoreTimer();
     isWriting = 1;
     if(binary) writeBinary();
 	else 	   write();
-    isWriting = 0;
 
-    new (&pool[0]) TraceEntry(pool[CpvAccess(staticNumEntries)-1]);
+
+    new (&pool[0]) TraceEntry(pool[numEntries-1]);
     //numEntries = 1;
-    CpvAccess(staticNumEntries)=1;
+    numEntries=1;
     if(buffer != NULL){
 	    new (&pool[1]) TraceEntry(*buffer);
-	    CpvAccess(staticNumEntries)=2;
+	    numEntries=2;
 	    buffer = NULL;
     }
+        isWriting = 0;
 	//TODO
     //new (&pool[numEntries++]) TraceEntry(0, BEGIN_INTERRUPT, writeTime);
     //new (&pool[numEntries++]) TraceEntry(0, END_INTERRUPT, TraceCoreTimer());
