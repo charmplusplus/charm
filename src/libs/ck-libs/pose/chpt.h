@@ -54,7 +54,7 @@ void chpt<StateType>::checkpoint(StateType *data)
     //  if ((myStrat->currentEvent->timestamp > 
     //myStrat->currentEvent->prev->timestamp) || (sinceLast == STORE_RATE)) {
     if ((sinceLast == ((opt *)myStrat)->cpRate) || 
-	(CpvAccess(stateRecovery) == 1) || 
+	//(CpvAccess(stateRecovery) == 1) || 
 	(myStrat->currentEvent->prev == parent->eq->front())) {
       myStrat->currentEvent->cpData = new StateType;
       myStrat->currentEvent->cpData->copy = 1;

@@ -131,7 +131,7 @@ void PVT::setGVT(GVTMsg *m)
   */
 #ifdef POSE_COMM_ON  
   //PrioStreaming *pstrat = (PrioStreaming *)(POSE_commlib_insthndl.getStrategy());
-  //pstrat->setBasePriority(estGVT);
+  //pstrat->setBasePriority((estGVT+10) - POSE_TimeMax);
 #endif
   simdone = m->done;
   CkFreeMsg(m);
@@ -360,8 +360,8 @@ void GVT::computeGVT(UpdateMsg *m)
     gmsg->estGVT = estGVT;
     gmsg->done = term;
     if (term) {
-      if (POSE_endtime > POSE_UnsetTS) gmsg->estGVT = POSE_endtime + 1;
-      else gmsg->estGVT++;
+      //if (POSE_endtime > POSE_UnsetTS) gmsg->estGVT = POSE_endtime + 1;
+      // else gmsg->estGVT++;
 #if USE_LONG_TIMESTAMPS      
       CkPrintf("Final GVT = %lld\n", gmsg->estGVT);
 #else
