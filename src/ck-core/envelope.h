@@ -102,7 +102,7 @@ class envelope {
     void   setRoIdx(const UInt r) { assert(getMsgtype()==ROMsgMsg); i1 = r; }
     static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
     {
-      assert(type>=NewChareMsg && type<=StatMsg);
+      assert(type>=NewChareMsg && type<=DNodeBocNumMsg);
       register UInt tsize = sizeof(envelope)+ALIGN(size)+sizeof(int)*PW(prio);
       register envelope *env = (envelope *)CmiAlloc(tsize);
       env->setMsgtype(type);
@@ -127,6 +127,14 @@ class envelope {
           || getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg
           || getMsgtype()==ForBocMsg || getMsgtype()==ForNodeBocMsg);
       s1 = idx;
+    }
+    UInt isForAnyPE(void) { 
+      assert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
+      return i1; 
+    }
+    void setForAnyPE(UInt f) { 
+      assert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
+      i1 = f; 
     }
     void*  getVidPtr(void) const {
       assert(getMsgtype()==NewVChareMsg || getMsgtype()==ForVidMsg

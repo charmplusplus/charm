@@ -419,6 +419,10 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   CpvAccess(_myStats)->recordCreateChare();
   env->setUsed(1);
 #endif
+  if(destPE == CK_PE_ANY)
+    env->setForAnyPE(1);
+  else
+    env->setForAnyPE(0);
   CldEnqueue(destPE, env, _infoIdx);
 }
 

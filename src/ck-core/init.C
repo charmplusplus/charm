@@ -253,7 +253,14 @@ static inline void _processBufferedMsgs(void)
   CmiNumberHandler(_charmHandlerIdx,(CmiHandler)_processHandler);
   envelope *env;
   while(env=(envelope*)CpvAccess(_buffQ)->deq()) {
-    CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), env);
+    if(env->getMsgtype()==NewChareMsg || env->getMsgtype()==NewVChareMsg) {
+      if(env->isForAnyPE())
+        CldEnqueue(CLD_ANYWHERE, env, _infoIdx);
+      else
+        CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), env);
+    } else {
+      CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), env);
+    }
   }
 }
 
