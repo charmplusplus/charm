@@ -38,7 +38,13 @@ CpvExtern(int,pseudoCount);
 CpvExtern(int,msgCount);
 CpvExtern(int, chareEpsCount);
 
-
+/* Addition for threads tracing */
+CpvDeclare(int, threadChare);
+CpvDeclare(int, threadMsg);
+CpvDeclare(int, threadEp);
+CpvDeclare(int, threadPe);
+CpvDeclare(int, threadEvent);
+/* end addition */
 
 traceModuleInit(pargc, argv)
 int *pargc;
@@ -60,6 +66,18 @@ char **argv;
   CpvInitialize(un_int,begin_processing_time);
   CpvInitialize(FILE*,state_file_fd);
 
+/* Addition for threads tracing */
+  CpvInitialize(int, threadChare);
+  CpvInitialize(int, threadMsg);
+  CpvInitialize(int, threadEp);
+  CpvInitialize(int, threadPe);
+  CpvInitialize(int, threadEvent);
+  CpvAccess(threadMsg) = registerMsg("dummy_thread_msg", 0, 0, 0, 0);
+  CpvAccess(threadChare) = registerChare("dummy_thread_chare", 0, 0);
+  CpvAccess(threadEp) = registerEp("dummy_thread_ep", 0, 0,
+                                   CpvAccess(threadMsg),
+                                   CpvAccess(threadChare));
+/* end addition */
   program_name(argv[0]);
 }
 
@@ -76,6 +94,17 @@ int msg_type, entry;
 ENVELOPE *envelope;
 {
 	int i;
+/* Addition for threads tracing */
+  if(envelope == 0) {
+    CpvAccess(threadEvent) = CpvAccess(current_event);
+    CpvAccess(threadPe) = CmiMyPe();
+    add_to_buffer(CREATION, CpvAccess(threadMsg), CpvAccess(threadEp),
+                            CkUTimer(), CpvAccess(threadEvent),
+                            CpvAccess(threadPe));
+    CpvAccess(current_event) += 1;
+    return;
+  }
+/* end addition */
 	CpvAccess(iteration) = 1;
 	if (msg_type == BocInitMsg ||
 		msg_type == BroadcastBocMsg || 
@@ -94,7 +123,18 @@ ENVELOPE *envelope;
 trace_begin_execute(envelope)
 ENVELOPE *envelope;
 {
-	int msg_type = GetEnv_msgType(envelope);
+	int msg_type;
+/* Addition for threads tracing */
+  if(envelope == 0) {
+    msg_type = CpvAccess(threadMsg);
+    CpvAccess(begin_event) = CpvAccess(threadEvent);
+    CpvAccess(begin_pe) = CpvAccess(threadPe);
+    add_to_buffer(BEGIN_PROCESSING, msg_type, CpvAccess(threadEp), CkUTimer(),
+                                    CpvAccess(begin_event), CpvAccess(begin_pe));
+    return;
+  }
+/* end addition */
+        msg_type = GetEnv_msgType(envelope);
 	CpvAccess(begin_event) = GetEnv_event(envelope);
 	if (msg_type ==  BocInitMsg ||
 		msg_type == BroadcastBocMsg || 
@@ -109,6 +149,13 @@ ENVELOPE *envelope;
 trace_end_execute(id, msg_type, entry)
 int id, msg_type, entry;
 {
+/* Addition for threads tracing */
+  if(msg_type == (-1)) {
+    add_to_buffer(END_PROCESSING, 0, CpvAccess(threadEp), CkUTimer(),
+			CpvAccess(begin_event), CpvAccess(begin_pe));
+    return;
+  }
+/* end addition */
 	/* Overload the msg_type field : put the id (magic number) into it */
 	add_to_buffer(END_PROCESSING, id, entry, CkUTimer(),
 						CpvAccess(begin_event), CpvAccess(begin_pe));
