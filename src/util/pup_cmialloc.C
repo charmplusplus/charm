@@ -1,25 +1,24 @@
-#include "pup.h"
 #include "pup_cmialloc.h"
-#include "converse.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-
-/********  CMIALLOC buffer management functions ******/
-
-/* Given a user chunk m, extract the enclosing chunk header fields: */
-#define SIZEFIELD(m) (((CmiChunkHeader *)(m))[-1].size)
-#define REFFIELD(m) (((CmiChunkHeader *)(m))[-1].ref)
-#define BLKSTART(m) (((CmiChunkHeader *)(m))-1)
-
-//Align data sizes to 8 bytes
-#define ALIGN8(x)       (int)((~7)&((x)+7))
-
-//Assuming Size of CmiChunkHeader is a multiple of 8 bytes!!
 
 void PUP_cmiAllocSizer::bytes(void *,int n,size_t itemSize,PUP::dataType) {
     nBytes += n * itemSize;
+}
+
+void PUP_toCmiAllocMem::bytes(void *p, int n, size_t itemSize, 
+                              PUP::dataType t) {
+
+    n *= itemSize;
+    memcpy((void *)buf, p, n);    
+    buf += n;
+}
+
+void PUP_fromCmiAllocMem::bytes(void *p, int n, size_t itemSize, 
+                                PUP::dataType t)
+{
+    n*=itemSize;
+    memcpy(p,(const void *)buf,n);
+    
+    buf+= n;
 }
 
 void PUP_cmiAllocSizer::pupCmiAllocBuf(void **msg) {
@@ -40,14 +39,6 @@ void PUP_cmiAllocSizer::pupCmiAllocBuf(void **msg, int msg_size) {
 }
 
 
-void PUP_toCmiAllocMem::bytes(void *p, int n, size_t itemSize, 
-                              PUP::dataType t) {
-
-    n *= itemSize;
-    memcpy((void *)buf, p, n);    
-    buf += n;
-}
-
 void PUP_toCmiAllocMem::pupCmiAllocBuf(void **msg) {
     pupCmiAllocBuf(msg, SIZEFIELD(msg));
 }
@@ -56,7 +47,7 @@ void PUP_toCmiAllocMem::pupCmiAllocBuf(void **msg, int msg_size) {
 
     CmiChunkHeader chnk_hdr;
 
-    buf = origBuf + ALIGN8(size());
+    buf = origBuf + ALIGN8_LONG(size());
 
     chnk_hdr.size = msg_size;
     chnk_hdr.ref = origBuf - (buf + sizeof(CmiChunkHeader));
@@ -72,20 +63,9 @@ void PUP_toCmiAllocMem::pupCmiAllocBuf(void **msg, int msg_size) {
     buf += msg_size;
 }
 
-
-void PUP_fromCmiAllocMem::bytes(void *p, int n, size_t itemSize, 
-                                PUP::dataType t)
-{
-    n*=itemSize;
-    memcpy(p,(const void *)buf,n);
-    
-    buf+= n;
-}
-
-
 void PUP_fromCmiAllocMem::pupCmiAllocBuf(void **msg) {
     //First align buf
-    buf = (PUP::myByte *)ALIGN8((long)buf);
+    buf = (PUP::myByte *)ALIGN8_LONG((long)buf);
 
     //Now get the chunk header
     CmiChunkHeader chnk_hdr;    
@@ -102,5 +82,7 @@ void PUP_fromCmiAllocMem::pupCmiAllocBuf(void **msg) {
     //update the reference count of the original buf
     REFFIELD(origBuf) ++;
 }
+
+
 
 /***** END CmiAlloc'ed buffer management functions ***********/

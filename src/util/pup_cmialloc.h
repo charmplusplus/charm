@@ -1,5 +1,26 @@
 
 #include "pup.h"
+#include "converse.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+/********  CMIALLOC buffer management functions ******/
+
+/* Given a user chunk m, extract the enclosing chunk header fields: */
+#define SIZEFIELD(m) (((CmiChunkHeader *)(m))[-1].size)
+#define REFFIELD(m) (((CmiChunkHeader *)(m))[-1].ref)
+#define BLKSTART(m) (((CmiChunkHeader *)(m))-1)
+
+//Align data sizes to 8 bytes
+#define ALIGN8(x)            (int)((~7)&((x)+7))
+#define ALIGN8_LONG(x)       (long)((~7)&((x)+7))
+
+//Assuming Size of CmiChunkHeader is a multiple of 8 bytes!!
+
+
 
 /*For CMI alloc'ed memory
   CmiAlloc currently has the following memory footprint
@@ -70,11 +91,11 @@ class PUP_cmiAllocSizer : public PUP::sizer {
     PUP_cmiAllocSizer(void): PUP::sizer() {}
     
     //Must be a CmiAlloced buf while packing
-    virtual void pupCmiAllocBuf(void **msg);
+    void pupCmiAllocBuf(void **msg);
     
     //In case source is not CmiAlloced the size can be passed and any
     //user buf can be converted into a cmialloc'ed buf
-    virtual void pupCmiAllocBuf(void **msg, int msg_size);
+    void pupCmiAllocBuf(void **msg, int msg_size);
 };
  
 
