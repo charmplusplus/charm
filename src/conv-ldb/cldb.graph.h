@@ -1,7 +1,4 @@
-#include <stdio.h>
-#include "converse.h"
-
-#define MAXMSGBFRSIZE 100000
+#include "cldb.h"
 
 typedef struct CldNeighborData
 {
@@ -21,9 +18,3 @@ typedef struct requestmsg_s {
 CpvDeclare(CldNeighborData, neighbors);
 CpvDeclare(CmiGroup, neighborGroup);
 CpvDeclare(int, numNeighbors);
-CpvDeclare(int, CldHandlerIndex);
-CpvDeclare(int, CldBalanceHandlerIndex);
-CpvDeclare(int, CldRelocatedMessages);
-CpvDeclare(int, CldLoadBalanceMessages);
-CpvDeclare(int, CldMessageChunks);
-
