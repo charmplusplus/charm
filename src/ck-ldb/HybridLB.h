@@ -53,7 +53,7 @@ private:
 public:
   ThreeLevelTree() {
     nLevels = 3;
-    span[0] = CkNumPes()/4;
+    span[0] = CkNumPes()/8;
     CmiAssert(span[0]>0);
     span[1] = (CkNumPes()+span[0]-1)/span[0];
     toproot = 1;
