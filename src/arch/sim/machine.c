@@ -47,7 +47,7 @@ int CsdScheduler(maxmsgs)
 int maxmsgs;
 {
   CmiError("Cannot call scheduling functions in SIM versions.\n");
-  exit(1);
+  exit(0);
 }
 
 int CmiDeliverMsgs(maxmsgs)
@@ -91,7 +91,10 @@ void CmiAbort(const char *message)
   exit(1);
 }
 
-
+void ConverseExit(void)
+{
+  exit(0);
+}
 
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
