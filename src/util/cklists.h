@@ -174,8 +174,7 @@ class CkVec : private CkSTLHelper<T> {
     void push_back(const T &elt) {insert(length(),elt);}
     int size(void) const {return len;}
  
-//PUP routine:
-  protected:
+//PUP routine help:
     //Only pup the length of this vector, which is returned:
     int pupbase(PUP::er &p) {
        int l=len;
@@ -183,13 +182,14 @@ class CkVec : private CkSTLHelper<T> {
        if (p.isUnpacking()) { setSize(l); len=l;}
        return l;
     }
-  public:
-    void pup(PUP::er &p) {
-       int l=pupbase(p);
-       for (int i=0;i<l;i++) p|block[i];
-    }
-    friend void operator|(PUP::er &p,this_type &v) {v.pup(p);}
 };
+
+/// Default pup routine for CkVec: pup each of the elements
+template <class T>
+void operator|(PUP::er &p,CkVec<T> &vec) {
+    int l=vec.pupbase(p);
+    for (int i=0;i<l;i++) p|vec[i];
+}
 
 
 ///A vector of basic types, which can be pupped as an array
@@ -295,6 +295,10 @@ class CkPupPtrVec : public CkVec< CkZeroPtr<T, PUP_PTR> >,
 		for (int i=0;i<length();i++)
 			operator[] (i).destroy();
 	}
+	void pup(PUP::er &p) {
+		int l=pupbase(p);
+		for (int i=0;i<length();i++) p|operator[] (i);
+	}
 	friend void operator|(PUP::er &p,this_type &v) {v.pup(p);}
 };
 
@@ -310,6 +314,10 @@ class CkPupAblePtrVec : public CkVec< CkZeroPtr<T, CkPupAblePtr<T> > >,
 	~CkPupAblePtrVec() {
 		for (int i=0;i<length();i++)
 			operator[] (i).destroy();
+	}
+	void pup(PUP::er &p) {
+		int l=pupbase(p);
+		for (int i=0;i<length();i++) p|operator[] (i);
 	}
 	friend void operator|(PUP::er &p,this_type &v) {v.pup(p);}
 };
