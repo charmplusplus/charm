@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-10-13 18:15:22  jyelon
+ * Revision 2.5  1995-11-06 17:55:09  milind
+ * Changed CldAdd Token to take priority info as parameters.
+ *
+ * Revision 2.4  1995/10/13  18:15:22  jyelon
  * K&R changes, etc.
  *
  * Revision 2.3  1995/07/19  22:15:21  jyelon
@@ -83,8 +86,9 @@ CldTOK_HOLDER *new_CldTOK_HOLDER(sendfn, msgptr)
 /******************************************************************
  * This function adds a token to the end of the token list 
  ******************************************************************/
-int CldAddToken(msg, sendfn)
+int CldAddToken(msg, sendfn, queuing, priolen, prioptr)
     void *msg; void (*sendfn)();
+    unsigned int queuing, priolen, *prioptr;
 {
   void *enqmsg;
   CldTOK_HOLDER *newtok = new_CldTOK_HOLDER(sendfn, msg), *temp;
