@@ -27,7 +27,7 @@ class eventID
   /// get source obj
   int getObj() { return obj; }
   /// set source obj
-  int setObj(int objIdx) { obj = objIdx; }
+  void setObj(int objIdx) { obj = objIdx; }
   /// Equality comparison operator
   int operator==(const eventID& obj);           
   /// Less than/equality comparison operator
