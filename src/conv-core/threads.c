@@ -999,11 +999,16 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
-  size += MINSIGSTKSZ;
+  size += SIGSTKSZ;
   CthAllocateStack(&result->base,&size,migratable);
+  stack = result->base.stack;
+#if CMK_STACK_GROWDOWN
+  stack = stack +  size - MINSIGSTKSZ;
+  size = stack - (char *)result->base.stack;
+#endif
   if (0 != getcontext(&result->context))
     CmiAbort("CthCreateInner: getcontext failed.\n");
-  result->context.uc_stack.ss_sp = result->base.stack;
+  result->context.uc_stack.ss_sp = stack;
   result->context.uc_stack.ss_size = size;
   result->context.uc_stack.ss_flags = 0;
   result->context.uc_link = 0;
