@@ -26,9 +26,10 @@ LINK_COMMON='/nologo '
 LINK_O=$LINK_COMMON
 LINK_DEF=$LINK_COMMON
 LINK_G="$LINK_COMMON /DEBUG"
-LINK_POST='ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib 
- advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib 
- odbccp32.lib /SUBSYSTEM:CONSOLE /INCREMENTAL:NO /MACHINE:IX86 '
+LINK_POST='ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib 
+  comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib 
+  odbc32.lib odbccp32.lib /SUBSYSTEM:CONSOLE /INCREMENTAL:NO /MACHINE:IX86 
+  /NODEFAULTLIB:libcmt.lib'
 
 if [ "x$LIB" = "x" ]
 then
