@@ -1764,6 +1764,9 @@ void req_client_start_and_connect(void)
 	    for (client=c; client<c+count; client++) {
 		req_one_client_connect(client);
             }
+	    for (client=c; client<c+count; client++) {
+		finish_one_node(client);
+            }
 	}
         if (portOk == 0) exit(1);
 	if (arg_verbose) printf("Charmrun> All clients connected.\n");
@@ -1867,7 +1870,7 @@ int main(int argc, char **argv, char **envp)
 
   /* Wait for all clients to connect */
 #if !CMK_RSH_KILL
-  finish_nodes();
+  if (!arg_batch_spawn) finish_nodes();
 #endif
 #if ! CONVERSE_VERSION_VMI
   /* vmi version clients don't connect back */
@@ -2580,6 +2583,24 @@ void start_nodes_rsh()
   }
 }
 
+void finish_one_node(int rank0no)
+{
+  if (!rsh_pids) return; /*nothing to do*/
+  const char *host=nodetab_name(nodetab_rank0_table[rank0no]);
+  int status=0;
+  if (arg_verbose) printf("Charmrun> waiting for rsh (%s:%d), pid %d\n",
+		host,rank0no,rsh_pids[rank0no]);
+  do {
+     	waitpid(rsh_pids[rank0no],&status,0);
+  } while (!WIFEXITED(status));
+  if (WEXITSTATUS(status)!=0)
+  {
+     fprintf(stderr,"Charmrun> Error %d returned from rsh (%s:%d)\n",
+     		WEXITSTATUS(status),host,rank0no);
+     exit(1);
+  }     
+}
+
 void finish_nodes()
 {
   int rank0no;
@@ -2587,19 +2608,7 @@ void finish_nodes()
   /*Now wait for all the rsh'es to finish*/
   for (rank0no=0;rank0no<nodetab_rank0_size;rank0no++)
   {
-     const char *host=nodetab_name(nodetab_rank0_table[rank0no]);
-     int status=0;
-     if (arg_verbose) printf("Charmrun> waiting for rsh (%s:%d), pid %d\n",
-		host,rank0no,rsh_pids[rank0no]);
-     do {
-     	waitpid(rsh_pids[rank0no],&status,0);
-     } while (!WIFEXITED(status));
-     if (WEXITSTATUS(status)!=0)
-     {
-     	fprintf(stderr,"Charmrun> Error %d returned from rsh (%s:%d)\n",
-     		WEXITSTATUS(status),host,rank0no);
-     	exit(1);
-     }     
+    finish_one_node(rank0no);
   }
   free(rsh_pids);
 }
