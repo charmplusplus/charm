@@ -160,7 +160,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
-UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h\
+UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h\
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h \
 	ckstatistics.h ckvector3d.h conv-lists.h RTH.h ckcomplex.h \
 	sockRoutines.h sockRoutines.c
@@ -286,7 +286,8 @@ MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
 	  $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o 	\
 	  $(L)/libthreads-context.o $(L)/libthreads-uJcontext.o \
-	  $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o
+	  $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o \
+	  $(L)/libthreads-stackcopy.o $(L)/libthreads-memoryalias.o 
 
 CVLIBS=$(L)/libconv-core.a \
 	$(L)/libconv-cplus-y.a $(L)/libconv-cplus-n.a \
@@ -495,6 +496,12 @@ $(L)/libthreads-pthreads.o: threads.c $(CVHEADERS)
 
 $(L)/libthreads-fibers.o: threads.c $(CVHEADERS)
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_FIBERS=1 -IQuickThreads threads.c 2> /dev/null || touch $@
+
+$(L)/libthreads-stackcopy.o: threads.c $(CVHEADERS)
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_STACKCOPY=1 -IQuickThreads threads.c || touch $@
+
+$(L)/libthreads-memoryalias.o: threads.c $(CVHEADERS)
+	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_QT=1 -IQuickThreads threads.c || touch $@
 
 ## Global swapping (-swapglobal)
 swapglobal-target: $(L)/libglobal-swap.o
