@@ -1348,7 +1348,7 @@ int      __posix_memalign(void **, size_t, size_t);
 #define M_TRIM_THRESHOLD       -1
 
 #ifndef DEFAULT_TRIM_THRESHOLD
-#define DEFAULT_TRIM_THRESHOLD (128 * 1024)
+#define DEFAULT_TRIM_THRESHOLD (512 * 1024)
 #endif
 
 /*
@@ -1428,7 +1428,7 @@ int      __posix_memalign(void **, size_t, size_t);
 #define M_MMAP_THRESHOLD      -3
 
 #ifndef DEFAULT_MMAP_THRESHOLD
-#define DEFAULT_MMAP_THRESHOLD (128 * 1024)
+#define DEFAULT_MMAP_THRESHOLD (512 * 1024)
 #endif
 
 /*
@@ -1448,7 +1448,7 @@ int      __posix_memalign(void **, size_t, size_t);
 
 #ifndef DEFAULT_MMAP_MAX
 #if HAVE_MMAP
-#define DEFAULT_MMAP_MAX       (65536)
+#define DEFAULT_MMAP_MAX       (262144)
 #else
 #define DEFAULT_MMAP_MAX       (0)
 #endif
@@ -2111,7 +2111,7 @@ typedef struct malloc_chunk* mfastbinptr;
   if trimming is not used.
 */
 
-#define FASTBIN_CONSOLIDATION_THRESHOLD  (65536UL)
+#define FASTBIN_CONSOLIDATION_THRESHOLD  (262144UL)
 
 /*
   Since the lowest 2 bits in max_fast don't matter in size comparisons,
