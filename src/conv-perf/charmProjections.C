@@ -31,6 +31,7 @@ extern "C" void initCharmProjections()
 
 extern "C" void charm_creation(envelope *e, int num)
 {
+	
   if(e==0) {
     CtvAccess(curThreadEvent)=curEvent;
 	int* iData = (int*)malloc(sizeof(int)*4); 

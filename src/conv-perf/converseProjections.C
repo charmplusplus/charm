@@ -22,7 +22,7 @@ extern "C" void converse_msgRecvMC();
 extern "C" void converse_msgRecvSC();
 
 extern "C" void converse_handlerBegin(int handlerIdx)
-{	
+{		
 	int* iData = (int*)malloc(sizeof(int)*2); 
 	iData[0] = handlerIdx;
 	iData[1] = CmiMyPe();

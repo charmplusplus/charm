@@ -174,7 +174,10 @@ void TraceCore::LogEvent(int lID, int eID)
 
 void TraceCore::LogEvent(int lID, int eID, int iLen, int* iData)
 { 
-	if(traceCoreOn == 0){		
+	if(traceCoreOn == 0){
+		if(iData){
+			free(iData);			
+		}		
 		return;
 	}
 	LogEvent(lID, eID, iLen, iData, 0, NULL); 
@@ -182,8 +185,12 @@ void TraceCore::LogEvent(int lID, int eID, int iLen, int* iData)
 
 void TraceCore::LogEvent(int lID, int eID, int iLen, int* iData,double t){
 	if(traceCoreOn == 0){
+		if(iData){
+			free(iData);
+		}		
 		return;
 	}
+	CmiPrintf("TraceCore LogEvent called \n");
 #ifndef CMK_OPTIMIZE	
 	traceLogger->add(lID,eID,TraceCoreTimer(t),iLen,iData,0,NULL);
 #endif
@@ -193,6 +200,9 @@ void TraceCore::LogEvent(int lID, int eID, int iLen, int* iData,double t){
 void TraceCore::LogEvent(int lID, int eID, int sLen, char* sData)
 { 
 	if(traceCoreOn == 0){
+		if(sData){
+			free(sData);
+		}		
 		return;
 	}
 	LogEvent(lID, eID, 0, NULL, sLen, sData); 
@@ -202,9 +212,15 @@ void TraceCore::LogEvent(int lID, int eID, int iLen, int* iData, int sLen, char*
 {
 	//CmiPrintf("lID: %d, eID: %d", lID, eID);
 	if(traceCoreOn == 0){
+		if(iData){
+			free(iData);
+		}	
+		if(sData){
+			free(sData);
+		}			
 		return;
 	}
-	
+		
 
 #ifndef CMK_OPTIMIZE
 	traceLogger->add(lID, eID, TraceCoreTimer(), iLen, iData, sLen, sData);
@@ -227,9 +243,9 @@ TraceEntry::TraceEntry(TraceEntry& te)
 
 TraceEntry::~TraceEntry()
 {
-	if(entity) delete [] entity;
-	if(iData)  delete [] iData;
-	if(sData)  delete [] sData;
+	if(entity) free(entity);
+	if(iData)  free(iData);
+	if(sData)  free(sData);
 }
 
 void TraceEntry::write(FILE* fp, int prevLID, int prevSeek, int nextLID, int nextSeek)
@@ -258,19 +274,25 @@ void TraceEntry::write(FILE* fp, int prevLID, int prevSeek, int nextLID, int nex
 	else fprintf(fp, "\n");
 
 	// free memory
-	if(entity) delete [] entity;
-	//entity = NULL;
-	if(iData)  delete [] iData;
-	//iData = NULL;
-	if(sData)  delete [] sData;
-	//sData=NULL;
+	if(entity){
+		free(entity);
+	}
+	entity = NULL;
+	if(iData){
+		free(iData);
+	}
+	iData = NULL;
+	if(sData){
+		free(sData);
+	}
+	sData=NULL;
 }
 
 /***************** Class TraceLogger Definition *****************/
 TraceLogger::TraceLogger(char* program, int b):
 	numLangs(1), numEntries(0), lastWriteFlag(0), prevLID(0), prevSeek(0)
 {
-//  CkPrintf("TraceLogger created\n");
+  CmiPrintf("TraceLogger created\n");
   binary = b;
 
   
@@ -405,6 +427,7 @@ void TraceLogger::writeSts(void) {};
 
 void TraceLogger::add(int lID, int eID, double timestamp, int iLen, int* iData, int sLen, char* sData)
 {
+	
   if(isWriting){
 	//  CmiPrintf("Printing in buffer \n");
 	  buffer = new TraceEntry(lID, eID, timestamp, iLen, iData, sLen, sData);
@@ -424,6 +447,7 @@ if(numEntries>= poolSize) {
     if(buffer != NULL){
 	    new (&pool[1]) TraceEntry(*buffer);
 	    numEntries=2;
+	    delete buffer;
 	    buffer = NULL;
     }
         isWriting = 0;
