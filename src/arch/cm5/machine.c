@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-10-09 19:25:55  sanjeev
+ * Revision 2.6  1995-10-10 06:10:58  jyelon
+ * removed program_name
+ *
+ * Revision 2.5  1995/10/09  19:25:55  sanjeev
  * fixed bugs
  *
  * Revision 2.4  1995/09/29  09:50:07  jyelon
@@ -438,8 +441,6 @@ int argc;
 char **argv;
 {
 	int n, i, j ;
-
-	/* program_name(argv[0], "CM5");  cant be called from converse */
 
         CMMD_fset_io_mode(stdin, CMMD_independent) ;
 	CMMD_fset_io_mode(stdout, CMMD_independent) ;

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.2  1995-09-30 15:44:59  jyelon
+ * Revision 1.3  1995-10-10 06:10:58  jyelon
+ * removed program_name
+ *
+ * Revision 1.2  1995/09/30  15:44:59  jyelon
  * fixed a bug.
  *
  * Revision 1.1  1995/09/30  15:00:00  jyelon
@@ -445,7 +448,6 @@ char * msg;
 void CmiInitMc(argv)
 char *argv[];
 {
-  program_name(argv[0], "UTH");
   neighbour_init(Cmi_mype);
   CpvAccess(CmiLocalQueue) = CmiQueues[Cmi_mype];
   CmiSpanTreeInit();

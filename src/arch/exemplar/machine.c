@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-09-29 09:50:07  jyelon
+ * Revision 2.13  1995-10-10 06:10:58  jyelon
+ * removed program_name
+ *
+ * Revision 2.12  1995/09/29  09:50:07  jyelon
  * CmiGet-->CmiDeliver, added protos, etc.
  *
  * Revision 2.11  1995/09/20  16:01:33  gursoy
@@ -239,8 +242,6 @@ void *arg;
 void CmiInitMc(argv)
 char *argv[];
 {
-    program_name(argv[0],"Convex/Exemplar");
-
     neighbour_init(CpvAccess(Cmi_mype));
     CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
     CmiSpanTreeInit();

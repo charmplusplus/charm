@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-09-29 09:50:07  jyelon
+ * Revision 2.5  1995-10-10 06:10:58  jyelon
+ * removed program_name
+ *
+ * Revision 2.4  1995/09/29  09:50:07  jyelon
  * CmiGet-->CmiDeliver, added protos, etc.
  *
  * Revision 2.3  1995/09/20  16:02:35  gursoy
@@ -421,8 +424,6 @@ int CmiFlushPrintfs()
 void CmiInitMc(argv)
 char *argv[];
 {
-     program_name(argv[0], "SP1");   
-
      CpvAccess(CmiLocalQueue) = FIFO_Create();
 
      CmiSpanTreeInit();

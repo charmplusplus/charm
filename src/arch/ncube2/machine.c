@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-09-29 09:50:07  jyelon
+ * Revision 2.8  1995-10-10 06:10:58  jyelon
+ * removed program_name
+ *
+ * Revision 2.7  1995/09/29  09:50:07  jyelon
  * CmiGet-->CmiDeliver, added protos, etc.
  *
  * Revision 2.6  1995/09/20  16:00:16  gursoy
@@ -293,8 +296,6 @@ int node, neighbour;
 void CmiInitMc(argv)
 char *argv[];
 {
-    program_name(argv[0], "NCUBE2");
-
     CpvInitialize(int, Cmi_mype);
     CpvInitialize(int, Cmi_numpe);
     CpvInitialize(void*, CmiLocalQueue);
