@@ -52,7 +52,7 @@ static CkReductionMsg *name(int nMsg, CkReductionMsg ** msg){\
 \
   headerArray = new CkDataSegHeader[count];\
   size = new int[count];\
-  flag = new (unsigned char)[count];\
+  flag = new unsigned char[count];\
 \
   count = 0;\
 \
@@ -267,7 +267,7 @@ dataType *decompressMsg(CkReductionMsg *m, CkDataSegHeader &h, dataType nullVal)
   int sizeY = h.ey - h.sy + 1;\
   int numSegs = numDataSegs(msg);\
 \
-  data = new (dataType)[sizeX*sizeY];\
+  data = new dataType[sizeX*sizeY];\
 \
   for(int i=0; i<sizeX*sizeY; i++)\
       data[i] = nullVal;\
