@@ -226,10 +226,10 @@ void PipeBroadcastConverse::conversePipeBcast(char *env, int totalSize) {
     info->chunkNumber = i;
     info->chunkSize = reducedPipe<remaining ? reducedPipe : remaining;
     info->messageSize = totalSize;
-    memcpy (sendingMsg+CmiReservedHeaderSize+sizeof(PipeBcastInfo), nextChunk, reducedPipe);
+    memcpy (sendingMsg+CmiReservedHeaderSize+sizeof(PipeBcastInfo), nextChunk, info->chunkSize);
 
-    remaining -= reducedPipe;
-    nextChunk += reducedPipe;
+    remaining -= info->chunkSize;
+    nextChunk += info->chunkSize;
 
     propagate(sendingMsg, true, CmiMyPe(), totalSize, NULL);
   }
