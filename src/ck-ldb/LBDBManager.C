@@ -61,6 +61,7 @@ LBDB::LBDB(): useBarrier(CmiTrue)
     commTable = new LBCommTable;
     obj_walltime = obj_cputime = 0;
     startLBFn_count = 0;
+    predictCBFn = NULL;
     batsync.init(this, _autoLbPeriod);		// original 1.0 second
 }
 
@@ -302,6 +303,16 @@ void LBDB::StartLB()
     StartLBCB *startLBFn = startLBFnList[i];
     if (startLBFn && startLBFn->on) startLBFn->fn(startLBFn->data);
   }
+}
+
+void LBDB::SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin, LDPredictFn off, LDPredictModelFn change, void* data)
+{
+  if (predictCBFn==NULL) predictCBFn = new PredictCB;
+  predictCBFn->on = on;
+  predictCBFn->onWin = onWin;
+  predictCBFn->off = off;
+  predictCBFn->change = change;
+  predictCBFn->data = data;
 }
 
 void LBDB::BackgroundLoad(double* walltime, double* cputime)

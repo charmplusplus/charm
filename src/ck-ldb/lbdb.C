@@ -131,6 +131,31 @@ void LDTurnManualLBOff(LDHandle _db)
   db->TurnManualLBOff();
 }
 
+extern "C" void LDTurnPredictorOn(LDHandle _db, void *model)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->TurnPredictorOn(model);
+}
+
+extern "C" void LDTurnPredictorOnWin(LDHandle _db, void *model, int wind)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->TurnPredictorOn(model, wind);
+}
+
+extern "C" void LDTurnPredictorOff(LDHandle _db)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->TurnPredictorOff();
+}
+
+/* the parameter model is really of class LBPredictorFunction in file LBDatabase.h */
+extern "C" void LDChangePredictor(LDHandle _db, void *model)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->ChangePredictor(model);
+}
+
 extern "C" void LDCollectStatsOn(LDHandle _db)
 {
   LBDB *const db = (LBDB*)(_db.handle);

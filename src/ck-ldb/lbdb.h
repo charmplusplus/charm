@@ -252,6 +252,13 @@ void LDStartLB(LDHandle _db);
 void LDTurnManualLBOn(LDHandle _lbdb);
 void LDTurnManualLBOff(LDHandle _lbdb);
 
+typedef void (*LDPredictFn)(void* user_ptr);
+typedef void (*LDPredictModelFn)(void* user_ptr, void* model);
+typedef void (*LDPredictWindowFn)(void* user_ptr, void* model, int wind);
+void LDTurnPredictorOn(LDHandle _lbdb, void *model);
+void LDTurnPredictorOnWin(LDHandle _lbdb, void *model, int wind);
+void LDTurnPredictorOff(LDHandle _lbdb);
+void LDChangePredictor(LDHandle _lbdb, void *model);
 void LDCollectStatsOn(LDHandle _lbdb);
 void LDCollectStatsOff(LDHandle _lbdb);
 void LDQueryEstLoad(LDHandle bdb);

@@ -102,6 +102,25 @@ public:
   inline CmiBool StatsOn(void) const 
        { return statsAreOn; };
 
+  void SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin, LDPredictFn off, LDPredictModelFn change, void* data);
+  inline void TurnPredictorOn(void *model) {
+    if (predictCBFn!=NULL) predictCBFn->on(predictCBFn->data, model);
+    else CmiPrintf("Predictor not supported in this load balancer\n");
+  }
+  inline void TurnPredictorOn(void *model, int wind) {
+    if (predictCBFn!=NULL) predictCBFn->onWin(predictCBFn->data, model, wind);
+    else CmiPrintf("Predictor not supported in this load balancer\n");
+  }
+  inline void TurnPredictorOff(void) {
+    if (predictCBFn!=NULL) predictCBFn->off(predictCBFn->data);
+    else CmiPrintf("Predictor not supported in this load balancer\n");
+  }
+  /* the parameter model is really of class LBPredictorFunction in file LBDatabase.h */
+  inline void ChangePredictor(void *model) {
+    if (predictCBFn!=NULL) predictCBFn->change(predictCBFn->data, model);
+    else CmiPrintf("Predictor not supported in this load balancer");
+  }
+
   void Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc);
   int ObjDataCount();
   void GetObjData(LDObjData *data);
@@ -203,6 +222,14 @@ private:
     int on;
   };
 
+  struct PredictCB {
+    LDPredictModelFn on;
+    LDPredictWindowFn onWin;
+    LDPredictFn off;
+    LDPredictModelFn change;
+    void* data;
+  };
+
   typedef CkVec<LBOM*> OMList;
   typedef CkVec<LBObj*> ObjList;
   typedef CkVec<MigrateCB*> MigrateCBList;
@@ -218,6 +245,8 @@ private:
 
   CmiBool statsAreOn;
   MigrateCBList migrateCBList;
+
+  PredictCB* predictCBFn;
 
   CmiBool obj_running;
   int runningObj;		// index of the runningObj in ObjList

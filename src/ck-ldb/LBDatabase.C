@@ -33,6 +33,9 @@ CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
 double _autoLbPeriod = 1.0;		// in seconds
 int _lb_debug=0;
 int _lb_ignoreBgLoad=0;
+int _lb_predict=0;
+int _lb_predict_delay=10;
+int _lb_predict_window=20;
 
 // registry class stores all load balancers linked and created at runtime
 class LBDBRegistry {
@@ -176,6 +179,15 @@ void _loadbalancerInit()
   // now called in cldb.c: CldModuleGeneralInit()
   // registerLBTopos();
   CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
+
+  /**************** FUTURE PREDICTOR ****************/
+  _lb_predict = CmiGetArgFlagDesc(argv, "+LBPredictor", "Turn on LB future predictor");
+  CmiGetArgIntDesc(argv, "+LBPredictorDelay", &_lb_predict_delay, "Number of balance steps before learning a model");
+  CmiGetArgIntDesc(argv, "+LBPredictorWindow", &_lb_predict_window, "Number of steps to use to learn a model");
+  if (_lb_predict_window < _lb_predict_delay) {
+    CmiPrintf("LB> Argument LBPredictorWindow less than LBPredictorDelay, fixing\n");
+    _lb_predict_delay = _lb_predict_window;
+  }
 
   /******************* SIMULATION *******************/
   // get the step number at which to dump the LB database
@@ -373,6 +385,30 @@ void LBTurnInstrumentOn() {
 void LBTurnInstrumentOff() { 
 #if CMK_LBDB_ON
   LBDatabase::Object()->CollectStatsOff(); 
+#endif
+}
+
+void LBTurnPredictorOn(LBPredictorFunction *model) {
+#if CMK_LBDB_ON
+  LBDatabase::Object()->PredictorOn(model);
+#endif
+}
+
+void LBTurnPredictorOn(LBPredictorFunction *model, int wind) {
+#if CMK_LBDB_ON
+  LBDatabase::Object()->PredictorOn(model, wind);
+#endif
+}
+
+void LBTurnPredictorOff() {
+#if CMK_LBDB_ON
+  LBDatabase::Object()->PredictorOff();
+#endif
+}
+
+void LBChangePredictor(LBPredictorFunction *model) {
+#if CMK_LBDB_ON
+  LBDatabase::Object()->ChangePredictor(model);
 #endif
 }
 

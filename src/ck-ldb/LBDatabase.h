@@ -13,7 +13,20 @@
 #ifndef LBDATABASE_H
 #define LBDATABASE_H
 
+#include <math.h>
 #include "lbdb.h"
+
+// command line options
+extern double _autoLbPeriod;		// in seconds
+extern int _lb_debug;
+extern int _lb_ignoreBgLoad;
+extern int _lb_predict;
+extern int _lb_predict_delay;
+extern int _lb_predict_window;
+#ifndef PREDICT_DEBUG
+#define PREDICT_DEBUG  0   // 0 = No debug, 1 = Debug info on
+#endif
+#define PredictorPrintf  if (PREDICT_DEBUG) CmiPrintf
 
 // used in constructor of all load balancers
 class CkLBOptions
@@ -56,6 +69,48 @@ class LBDBInit : public Chare {
   public:
     LBDBInit(CkArgMsg*);
     LBDBInit(CkMigrateMessage *m):Chare(m) {}
+};
+
+// class which implement a virtual function for the FuturePredictor
+class LBPredictorFunction {
+public:
+  int num_params;
+
+  void initialize_params(double *x) {double normall=1.0/pow(2,31); x[0]=rand()*normall; x[1]=rand()*normall; x[2]=rand()*normall; x[3]=rand()*normall; x[4]=rand()*normall; x[5]=rand()*normall;}
+
+  virtual double predict(double x, double *params) =0;
+  virtual void print(double *params) {PredictorPrintf("LB: unknown model\n");};
+  virtual void function(double x, double *param, double &y, double *dyda) =0;
+  virtual LBPredictorFunction* constructor() =0;
+};
+
+// a default implementation for a FuturePredictor function
+class DefaultFunction : public LBPredictorFunction {
+ public:
+  // constructor
+  DefaultFunction() {num_params=6;};
+
+  DefaultFunction* constructor() {return new DefaultFunction();}
+
+  // compute the prediction function for the variable x with parameters param
+  double predict(double x, double *param) {return (param[0] + param[1]*x + param[2]*x*x + param[3]*sin(param[4]*(x+param[5])));}
+
+  void print(double *param) {PredictorPrintf("LB: %f + %fx + %fx^2 + %fsin%f(x+%f)\n",param[0],param[1],param[2],param[3],param[4],param[5]);}
+
+  // compute the prediction function and its derivatives respect to the parameters
+  void function(double x, double *param, double &y, double *dyda) {
+    double tmp;
+
+    y = predict(x, param);
+
+    dyda[0] = 1;
+    dyda[1] = x;
+    dyda[2] = x*x;
+    tmp = param[4] * (x+param[5]);
+    dyda[3] = sin(tmp);
+    dyda[4] = param[3] * (x+param[5]) * cos(tmp);
+    dyda[5] = param[3] * param[4] *cos(tmp);
+  }
 };
 
 
@@ -138,6 +193,11 @@ public:
   inline void TurnManualLBOn() { LDTurnManualLBOn(myLDHandle); }
   inline void TurnManualLBOff() { LDTurnManualLBOff(myLDHandle); }
  
+  inline void PredictorOn(LBPredictorFunction *model) { LDTurnPredictorOn(myLDHandle,model); }
+  inline void PredictorOn(LBPredictorFunction *model,int wind) { LDTurnPredictorOnWin(myLDHandle,model,wind); }
+  inline void PredictorOff() { LDTurnPredictorOff(myLDHandle); }
+  inline void ChangePredictor(LBPredictorFunction *model) { LDTurnPredictorOn(myLDHandle,model); }
+
   inline void CollectStatsOn(void) { LDCollectStatsOn(myLDHandle); };
   inline void CollectStatsOff(void) { LDCollectStatsOff(myLDHandle); };
   inline void QueryEstLoad(void) { LDQueryEstLoad(myLDHandle); };
@@ -227,6 +287,11 @@ public:
 
 void TurnManualLBOn();
 void TurnManualLBOff();
+
+void LBTurnPredictorOn(LBPredictorFunction *model);
+void LBTurnPredictorOn(LBPredictorFunction *model, int wind);
+void LBTurnPredictorOff();
+void LBChangePredictor(LBPredictorFunction *model);
 
 void LBTurnInstrumentOn();
 void LBTurnInstrumentOff();
