@@ -18,7 +18,6 @@
 
 #include "vmi.h"
 
-
 /* This is the number of seconds to wait for connection setup. */
 #define CMI_VMI_CONNECTION_TIMEOUT 300
 
