@@ -3,8 +3,6 @@
 #include "trace.h"
 #include <errno.h>
 
-#define MEMMONITOR
-
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
 #include <sys/types.h>
 #include <sys/time.h>
