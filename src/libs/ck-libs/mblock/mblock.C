@@ -588,10 +588,10 @@ MBLK_Get_nodelocs(const int *nodedim,double *nodeloc) {
       return MBLK_FAILURE;
     }
   
-  blockLoc i;
-  BLOCKSPAN_FOR(i,blockSpan(blockLoc(0,0,0),d)) {
-     int idx=d[i];
-     vector3d v=b->getLoc(i);
+  blockLoc j;
+  BLOCKSPAN_FOR(j,blockSpan(blockLoc(0,0,0),d)) {
+     int idx=d[j];
+     vector3d v=b->getLoc(j);
      nodeloc[3*idx+0]=v.x;
      nodeloc[3*idx+1]=v.y;
      nodeloc[3*idx+2]=v.z;
