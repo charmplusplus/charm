@@ -42,13 +42,13 @@ template <class T>
 class implCkVecPup : public CkVec<T> {
  protected:
 	int pupbase(PUP::er &p) {
-		int len=length();
-		p(len);
+		int l=length();
+		p(l);
 		if (p.isUnpacking()) {
-			setSize(len);
-			length()=len;
+			setSize(l);
+			length()=l;
 		}
-		return len;
+		return l;
 	}
 };
 
@@ -57,14 +57,12 @@ template <class T>
 class CkPupVec : public implCkVecPup<T> {
  public:
 	void pup(PUP::er &p) {
-		int len=pupbase(p);
-		for (int i=0;i<len;i++)
+		int l=pupbase(p);
+		for (int i=0;i<l;i++)
 			p|(*this)[i];
 	}
+	friend void operator|(PUP::er &p,CkPupVec<T> &v) {v.pup(p);}
 };
-template <class T>
-inline void operator|(PUP::er &p,CkPupVec<T> &v) {v.pup(p);}
-
 
 ///A vector of basic types, which can be pupped as an array
 /// (more restricted, but more efficient version of above)
@@ -72,12 +70,11 @@ template <class T>
 class CkPupBasicVec : public implCkVecPup<T> {
  public:
 	void pup(PUP::er &p) {
-		int len=pupbase(p);
-		p(getVec(),len);
+		int l=pupbase(p);
+		p(getVec(),l);
 	}
+	friend void operator|(PUP::er &p,CkPupBasicVec<T> &v) {v.pup(p);}
 };
-template <class T>
-inline void operator|(PUP::er &p,CkPupBasicVec<T> &v) {v.pup(p);}
 
 ///A vector of heap-allocated objects of type T
 template <class T>
@@ -88,16 +85,14 @@ class CkPupPtrVec : public implCkVecPup<T *> {
 			delete (*this)[i];
 	}
 	void pup(PUP::er &p) {
-		int len=pupbase(p);
-		for (int i=0;i<len;i++) {
+		int l=pupbase(p);
+		for (int i=0;i<l;i++) {
 			if (p.isUnpacking()) (*this)[i]=new T;
 			(*this)[i]->pup(p);
 		}
 	}
+	friend void operator|(PUP::er &p,CkPupPtrVec<T> &v) {v.pup(p);}
 };
-template <class T>
-inline void operator|(PUP::er &p,CkPupPtrVec<T> &v) {v.pup(p);}
-
 
 #include "debug-charm.h"
 
