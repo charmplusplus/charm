@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-09-08 02:38:26  gursoy
+ * Revision 2.3  1995-09-20 16:02:35  gursoy
+ * made the arg of CmiFree and CmiSize void*
+ *
+ * Revision 2.2  1995/09/08  02:38:26  gursoy
  * Cmi_mype Cmi_numpe CmiLocalQueue accessed thru macros now
  *
  * Revision 2.1  1995/07/17  17:46:05  knauff
@@ -447,13 +450,13 @@ int size;
 }
 
 int CmiSize(blk)
-char *blk;
+void *blk;
 {
-	return ((int *)(blk-8))[0];
+	return ((int *)( ((char *)blk)-8))[0];
 }
  
 void CmiFree(blk)
-char *blk;
+void *blk;
 {
-	free(blk-8);
+	free( ((char*)blk)-8);
 }

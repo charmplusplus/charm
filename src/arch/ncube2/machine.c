@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-09-07 22:59:57  gursoy
+ * Revision 2.6  1995-09-20 16:00:16  gursoy
+ * made the arg of CmiFree and CmiSize void*
+ *
+ * Revision 2.5  1995/09/07  22:59:57  gursoy
  * added CpvInitialize calls for Cmi_mype etc for the sake of compleeteness
  *
  * Revision 2.4  1995/09/07  22:51:52  gursoy
@@ -73,15 +76,15 @@ return (void *)(res+8);
 }
 
 int CmiSize(blk)
-char *blk;
+void *blk;
 {
-return ((int *)(blk-8))[0];
+return ((int *)( (char *)blk)  -8))[0];
 }
 
 void CmiFree(blk)
-char *blk;
+void *blk;
 {
-free(blk-8);
+free( ((char *)blk) - 8);
 }
 
 
