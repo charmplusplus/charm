@@ -183,7 +183,7 @@ void traceUserBracketEvent(int e, double beginT)
 }
 
 extern "C"
-int traceRegisterUserEvent(const char*x, int e=-1)
+int traceRegisterUserEvent(const char*x, int e)
 {
 #ifndef CMK_OPTIMIZE
   return CkpvAccess(_traces)->traceRegisterUserEvent(x, e);
