@@ -37,4 +37,8 @@
     integer  :: FEM_Num_Partitions
   end function FEM_Num_Partitions
 
+  function FEM_Timer()
+    double precision  :: FEM_Timer
+  end function FEM_Timer
+
   end interface

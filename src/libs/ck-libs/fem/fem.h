@@ -208,6 +208,7 @@ class chunk : public ArrayElement1D
 };
 
 extern "C" {
+  double FEM_Timer(void);
   void FEM_Done(void);
   int FEM_Create_Field(int base_type, int vec_len, int init_offset, 
                        int distance);
@@ -233,6 +234,7 @@ extern "C" {
 
 #if FEM_FORTRAN
 #if CMK_FORTRAN_USES_ALLCAPS
+  double FEM_TIMER_(void);
   int FEM_CREATE_FIELD(int *bt, int *vl, int *io, int *d);
   void FEM_UPDATE_FIELD(int *fid, void *nodes);
   void FEM_REDUCE_FIELD(int *fid, void *nodes, void *outbuf, int *op);
@@ -252,6 +254,7 @@ extern "C" {
   void DRIVER(int *, int *, int *, int *, int *, int *);
   void FINALIZE(void);
 #else // fortran uses trailing underscore
+  double fem_timer_(void);
   int fem_create_field_(int *bt, int *vl, int *io, int *d);
   void fem_update_field_(int *fid, void *nodes);
   void fem_reduce_field_(int *fid, void *nodes, void *outbuf, int *op);

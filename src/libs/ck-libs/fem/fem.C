@@ -1035,6 +1035,12 @@ FEM_Num_Partitions(void)
   return _nchunks;
 }
 
+extern "C" double
+FEM_Timer(void)
+{
+  return CkTimer();
+}
+
 extern "C" void 
 FEM_Print(char *str)
 {
@@ -1134,6 +1140,17 @@ fem_num_partitions_
   (void)
 {
   return FEM_Num_Partitions();
+}
+
+extern "C" double
+#if CMK_FORTRAN_USES_ALLCAPS
+FEM_TIMER
+#else
+fem_timer_
+#endif
+  (void)
+{
+  return CkTimer();
 }
 
 // Utility functions for Fortran
