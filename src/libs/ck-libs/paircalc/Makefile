@@ -15,7 +15,7 @@ LIB=libmoduleckPairCalculator.a
 LIBOBJ=ckPairCalculator.o pairCalculator.o 
 
 HEADERS= $(CDIR)/include/pairCalculator.h\
-	 $(CDIR)/include/util.h \
+	 $(CDIR)/include/pairutil.h \
          $(CDIR)/include/ckPairCalculator.h\
          $(CDIR)/include/ckPairCalculator.decl.h\
          $(CDIR)/include/ckPairCalculator.def.h\
@@ -25,7 +25,7 @@ all: $(LIB)  $(HEADERS)
 $(HEADERS): pairCalculator.h ckPairCalculator.h ckPairCalculator.decl.h 
 	/bin/cp pairCalculator.h $(CDIR)/include
 	/bin/cp ckPairCalculator.h $(CDIR)/include
-	/bin/cp util.h $(CDIR)/include
+	/bin/cp pairutil.h $(CDIR)/include
 	/bin/cp ckPairCalculator.decl.h $(CDIR)/include
 	/bin/cp ckPairCalculator.def.h $(CDIR)/include
 

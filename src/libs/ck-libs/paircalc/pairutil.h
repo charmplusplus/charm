@@ -1,5 +1,5 @@
-#ifndef __PFFTUTIL_H__
-#define __PFFTUTIL_H__
+#ifndef __PAIRUTIL_H__
+#define __PAIRUTIL_H__
 
 // some codes are borrowed from Orion's serial version.
 
@@ -42,8 +42,8 @@ public:
   double getMagSqr(void) const { return re*re+im*im; }
   complex operator+(complex a) { return complex(re+a.re,im+a.im); }
   complex conj(void) { return complex(re, -im); }
-  void operator+=(complex a) { re+=a.re; im+=a.im; }
-  void operator*=(complex a);
+  inline void operator+=(complex a) { re+=a.re; im+=a.im; }
+  inline void operator*=(complex a);
   complex operator*(complex a) {
     return complex( re * a.re - im * a.im, re * a.im + im * a.re); }
   void pup(PUP::er &p) {
@@ -52,6 +52,6 @@ public:
   }
 };
 
-#endif //__PFFTUTIL_H__
+#endif //__PAIRUTIL_H__
 
 
