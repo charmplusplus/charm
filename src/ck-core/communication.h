@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-07-06 13:59:12  gursoy
+ * Revision 2.6  1995-07-06 22:42:11  narain
+ * Changes for LDB interface revision
+ *
+ * Revision 2.5  1995/07/06  13:59:12  gursoy
  * well still modifying CsvAccess(... MsgStructTable)
  *
  * Revision 2.4  1995/07/06  13:45:34  gursoy
@@ -78,9 +81,7 @@
 #endif
 
 
-CsvExtern(struct msg_struct*, MsgToStructTable);
-
-#define LdbFillBlock(env) LdbFillLDB(LDB_ELEMENT_PTR(env))
+/* CsvExtern(struct msg_struct*, MsgToStructTable); */
 
 #define UNPACK(envelope) if (GetEnv_isPACKED(envelope) == PACKED) \
 { \
@@ -137,7 +138,7 @@ CsvExtern(struct msg_struct*, MsgToStructTable);
 
 #define CkSend(pe,env) \
 { \
-	LdbFillBlock(env); \
+	LdbFillLDB(GetEnv_destPE(env), LDB_ELEMENT_PTR(env)); \
 	PACK(env); \
 	CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncSend(pe,CmiSize(env),env); \
@@ -146,14 +147,14 @@ CsvExtern(struct msg_struct*, MsgToStructTable);
 
 
 #define CkCheck_and_Broadcast(env,Entry) { \
-        LdbFillBlock(env); PACK(env); \
+        LdbFillLDB(GetEnv_destPE(env), LDB_ELEMENT_PTR(env)); PACK(env); \
         CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcast(CmiSize(env),env); \
 	CmiFree(env) ; \
         }
 
 #define CkCheck_and_BroadcastNoFree(env,Entry) { \
-        LdbFillBlock(env); PACK(env); \
+        LdbFillLDB(GetEnv_destPE(env), LDB_ELEMENT_PTR(env)); PACK(env); \
         CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcast(CmiSize(env),env); UNPACK(env);  \
         }
@@ -165,7 +166,7 @@ CsvExtern(struct msg_struct*, MsgToStructTable);
         }
 
 #define CkCheck_and_BroadcastAll(env,Entry) { \
-        LdbFillBlock(env); PACK(env); \
+        LdbFillLDB(GetEnv_destPE(env), LDB_ELEMENT_PTR(env)); PACK(env); \
         CmiSetHandler(env,CsvAccess(HANDLE_INCOMING_MSG_Index)); \
 	CmiSyncBroadcastAllAndFree(CmiSize(env),env);\
         }

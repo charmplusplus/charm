@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-29 21:38:00  narain
+ * Revision 2.3  1995-07-06 22:42:11  narain
+ * Changes for LDB interface revision
+ *
+ * Revision 2.2  1995/06/29  21:38:00  narain
  * Added #define Ldb_NewChare_FromLocal, and code for CkMakeFreeCharesMessage,
  * CkQueueFreeCharesMessage, and SetNewChareMsg
  *
@@ -67,10 +70,10 @@ static char ident[] = "@(#)$Header$";
 #include "performance.h"
 #include "converse.h"
 
-#define Ldb_NewChare_FromLocal(env) Ldb_NewMsg_FromLocal(USER_MSG_PTR(env))
 #include <varargs.h>
 
 extern void *FIFO_Create();
+void CkLdbSend();
 
 CpvStaticDeclare(int, num_exits);
 CpvStaticDeclare(int, done);
@@ -387,13 +390,12 @@ int DestPe;
 		/* Currently set to local PE, */
 		SetEnv_destPE(env, CmiMyPe());
 		SetEnv_destPeFixed(env, 0);
-		if (CmiNumPe() > 1)
-			Ldb_NewChare_FromLocal(env);
-		else {
-		        CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
-			CsdEnqueue(env);
-		}
-	}
+		CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
+		if (CmiNumPe() > 1) 
+		  Ldb_NewSeed_FromLocal(env, LDB_ELEMENT_PTR(env), CkLdbSend);
+		else 
+		  CsdEnqueue(env);
+	      }
 	else
 	{
 		SetEnv_destPE(env, DestPe);
@@ -523,93 +525,18 @@ void *usrptr;
 }
 
 
+/*****************************************************************************
+ * CkLdbSend is a function that is passed to the Ldb strategy to send out a
+ * message to another processor
+ *****************************************************************************/
 
-/****************************************************************************
- *  Additions on July 13th for LDB changes by narain
- *  Uses the definition of CharesMsg in ldb.h
- ****************************************************************************/
-typedef ENVELOPE *ENVELOPE_PTR ;
-
-struct CharesMsgstruct {
-  int number_chares;
-  void **msgPtrs;
-};
-
-int CkMakeFreeCharesMessage(NofChares, message)
-int NofChares;
-struct CharesMsgstruct *message;
-{	
-  ENVELOPE *env;
-  ENVELOPE *multEnv;	
-  ENVELOPE_PTR *env_ptr;
-  int   j,  num_done, i;	
-  int TotalMessageSize;	
-  int *sizes;
-  num_done    = 0;	
-
-  env_ptr = (ENVELOPE_PTR *) CmiAlloc(sizeof(ENVELOPE_PTR)*NofChares); 
-  sizes = (int *) CmiAlloc(sizeof(int)*NofChares); 
-                        
-  TotalMessageSize = 0;	
-  
-  for (j = 0 ; j < NofChares ; j++) { 
-    QsPickFreeChare(&env);     
-    if (env)   /* Pick as many of the needed chares as possible from queue */
-      {
-	TotalMessageSize += (sizes[num_done] = CmiSize(env));
-	num_done++;		
-	env_ptr[j] = env;	
-      }
-    else break;		
-  }
-  
-  if (num_done != 0) 
-    {
-      message->number_chares = num_done;
-      message->msgPtrs = (void **) CmiAlloc(num_done * sizeof(void *));
-      for(i = 0; i< num_done; i++)
-	message->msgPtrs[i] = USER_MSG_PTR(env_ptr[i]);
-    }
-  if (env_ptr) 
-    CmiFree(env_ptr);  
-  if(sizes)
-    CmiFree(sizes);
-  return num_done;
-}
-
-#define QsEnqUsrMsg(msg) CsdEnqueue(ENVELOPE_UPTR(msg))
-
-int CkQueueFreeCharesMessage(message)
-struct CharesMsgstruct *message;
+void CkLdbSend(msgst, destPe)
+     void *msgst;
+     int destPe;
 {
-  int i;
-  
-  for (i = 0; i < message->number_chares; i++) 
-    QsEnqUsrMsg(message->msgPtrs[i]);		    
-  return 1;
+  ENVELOPE *env = (ENVELOPE *)msgst;
+  CmiSetHandler(env, CsvAccess(HANDLE_INCOMING_MSG_Index));
+  trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env); 
+  SetEnv_destPE(env,destPe); 
+  CkSend(destPe, env); 
 }
-
-
-struct NewCharestr
-{
-  int size;
-  void *ptr;
-};
-
-SetNewChareMsg(msg, size, chareptr)
-     void *msg, **chareptr;
-     int *size;
-{
-  struct NewCharestr * temp;
-  ENVELOPE *env;
-  
-  temp = (struct NewCharestr *)CmiAlloc(sizeof(struct NewCharestr));
-  env = ENVELOPE_UPTR(msg);
-  
-  *size = CmiSize(env);
-  *chareptr = (void *)env;
-}
-
-
-
-

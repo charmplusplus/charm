@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-07-05 21:04:11  narain
+ * Revision 2.5  1995-07-06 22:42:11  narain
+ * Changes for LDB interface revision
+ *
+ * Revision 2.4  1995/07/05  21:04:11  narain
  * *** empty log message ***
  *
  * Revision 2.3  1995/07/05  19:38:31  narain
@@ -72,9 +75,6 @@ static char ident[] = "@(#)$Header$";
 #include "globals.h"
 #include "performance.h"
 
-#define LdbStripMsg(env) LdbStripLDB(LDB_ELEMENT_PTR(env))
-#define Ldb_NewChare_FromNet(env) Ldb_NewMsg_FromNet(USER_MSG_PTR(env))
-
 /* This is the "processMsg()" for Charm and Charm++ */
 int CallProcessMsg() ;
 CsvDeclare(int, CallProcessMsg_Index);
@@ -82,7 +82,7 @@ CsvDeclare(int, CallProcessMsg_Index);
 int HANDLE_INCOMING_MSG() ;
 CsvDeclare(int, HANDLE_INCOMING_MSG_Index);
 
-
+extern void CkLdbSend();
 
 void mainModuleInit()
 {
@@ -112,7 +112,7 @@ ENVELOPE *env;
 {
 	/* send to ldb strategy to extract load information if user message */
         if(CpvAccess(InsideDataInit))
-	   LdbStripMsg(env);
+	   LdbStripLDB(LDB_ELEMENT_PTR(env));
 
 	switch (GetEnv_category(env)) {
 	case IMMEDIATEcat :
@@ -125,7 +125,8 @@ ENVELOPE *env;
 
         	if (!GetEnv_destPeFixed(env)) { 
 			/* if destPeFixed==0, msg is always USERcat */
-                	Ldb_NewChare_FromNet(env);
+                	Ldb_NewSeed_FromNet(env, LDB_ELEMENT_PTR(env),
+					    CkLdbSend);
 		}
 		else 
 			CsdEnqueue(env);

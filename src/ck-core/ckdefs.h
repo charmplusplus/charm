@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-07-05 21:17:02  narain
+ * Revision 2.7  1995-07-06 22:42:11  narain
+ * Changes for LDB interface revision
+ *
+ * Revision 2.6  1995/07/05  21:17:02  narain
  * Added #defines for timers
  *
  * Revision 2.5  1995/06/14  21:51:24  gursoy
@@ -106,8 +109,6 @@
 #define CharmExit               CkExit
 #define CkAlloc                 CmiAlloc
 #define CkFree                  CmiFree
-#define CkTimer()               ((int)(CmiTimer()*1000))
-#define CkUTimer()              ((int)(CmiTimer()*1000000))
 
 #define CMaxPeNum               CmiNumPe
 #define CNumSpanTreeChildren    CmiNumSpanTreeChildren

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-29 21:32:35  narain
+ * Revision 2.3  1995-07-06 22:42:11  narain
+ * Changes for LDB interface revision
+ *
+ * Revision 2.2  1995/06/29  21:32:35  narain
  * Added Extern declarations for LdbBocNum, numPe and LDB_ELEM_SIZE
  *
  * Revision 2.1  1995/06/08  17:07:12  gursoy
@@ -104,6 +107,4 @@ CsvExtern(int, MainChareLanguage);
 CsvExtern(int, CallProcessMsg_Index);
 CsvExtern(int, HANDLE_INCOMING_MSG_Index);
 
-CpvExtern(int, LdbBocNum);
-CpvExtern(int, numPe);
 CpvExtern(int, LDB_ELEM_SIZE);
