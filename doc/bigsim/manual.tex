@@ -4,8 +4,10 @@
 
 \title{Bluegene Emulator}
 \version{0.01}
-\credits{BlueGene Emulator was developed by Arun Singla, Neelam Saboo
-and Joshua Unger under the guidance of Prof. L. V. Kale.}
+\credits{Charm++ BlueGene Emulator was developed by Arun Singla, Neelam Saboo
+and Joshua Unger under the guidance of Prof. L. V. Kale. The new Converse BlueGe
+ne Emulator is completely rewritten by Gengbin Zheng. Converse BlueGene 
+Emulator is the only version maintained now.}
 
 \begin{document}
 \maketitle
@@ -32,6 +34,19 @@ of the machine along each dimension (e.g. 34x34x36).  The chip supports
 $k$ threads (e.g. 200), each with its own integer unit.  The proximity of
 the integer unit with individual memory modules within a chip is not
 currently modeled.
+
+\section{History}
+ The first version of BlueGene emulator was first written on Charm++, a 
+parallel object language. The second version of Blue Gene emulator is now 
+completely rewritten on top of Converse instead of Charm++, while the API 
+supported by the original emulator is kept without major changes. The new 
+emulator is implemented on a lower layer communication library - Converse 
+in order to achieve better performance by avoiding the cross layer overhead. 
+Switching to Converse Blue Gene emulator allows further porting of Charm++ 
+parallel language on the emulator. 
+   New features are also added in the Converse Blue Gene emulator including 
+supporting thread-committed messages that can be send to a specific thread 
+in a Blue Gene node; supporting Bluegene node level broadcast. 
 
 The API supported by the emulator can be broken down into several
 components:
