@@ -144,7 +144,7 @@ void CldBalance()
   double startT = CmiWallTimer();
 #endif
 
-//CmiPrintf("[%d] CldBalance %f\n", CmiMyPe(), startT);
+/*CmiPrintf("[%d] CldBalance %f\n", CmiMyPe(), startT);*/
   avgLoad = CldMinAvg();
   overload = CldLoad() - avgLoad;
   if (overload > CldCountTokens())
@@ -176,7 +176,7 @@ void CldBalance()
   traceUserBracketEvent(CpvAccess(CldData)->balanceEvt, startT, CmiWallTimer());
 #endif
   CcdCallFnAfterOnPE((CcdVoidFn)CldBalance, NULL, PERIOD, CmiMyPe());
-//  CcdCallBacksReset(0);
+/*  CcdCallBacksReset(0); */
 }
 
 void CldLoadResponseHandler(loadmsg *msg)
