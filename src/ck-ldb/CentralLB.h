@@ -41,7 +41,7 @@ public:
   };
 
 protected:
-  virtual Bool QueryBalanceNow(int) { return True; };  
+  virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CLBMigrateMsg* Strategy(LDStats* stats,int count);
 
 private:  

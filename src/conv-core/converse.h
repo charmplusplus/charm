@@ -12,6 +12,18 @@
 /* the following flags denote properties of the C compiler,  */
 /* not the C++ compiler.  If this is C++, ignore them.       */
 #ifdef __cplusplus
+
+/* Only C++ needs this backup bool defined.  We'll assume that C doesn't
+   use it */
+
+#if CMK_BOOL_UNDEFINED
+enum CmiBool {CmiFalse=0, CmiTrue=1};
+#else
+typedef bool CmiBool;
+#define CmiFalse false
+#define CmiTrue true
+#endif
+
 extern "C" {
 #endif
 

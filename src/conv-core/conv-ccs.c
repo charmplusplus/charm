@@ -1,6 +1,7 @@
 #include <stdlib.h>
 /* #include <sys/timer.h> */
-#include <sys/unistd.h>
+/* #include <sys/unistd.h>  (net-axp chokes on this, so if somebody needs */
+/*                             it, we need to use a typedef -RKB 8.24.99) */
 #include <errno.h>
 #include <sys/time.h>
 #include <string.h>

@@ -7,6 +7,7 @@
 #include <vector>
 #endif
 
+#include "converse.h"
 #include "lbdb.h"
 
 #include "LBObj.h"
@@ -16,7 +17,7 @@ class LocalBarrier {
 friend class LBDB;
 public:
   LocalBarrier() { cur_refcount = 1; client_count = 0; max_client = 0;
-                   max_receiver= 0; at_count = 0; on = False; };
+                   max_receiver= 0; at_count = 0; on = CmiFalse; };
   ~LocalBarrier() { };
 
   LDBarrierClient AddClient(LDResumeFn fn, void* data);
@@ -24,8 +25,8 @@ public:
   LDBarrierReceiver AddReceiver(LDBarrierFn fn, void* data);
   void RemoveReceiver(LDBarrierReceiver h);
   void AtBarrier(LDBarrierClient h);
-  void TurnOn() { on = True; CheckBarrier(); };
-  void TurnOff() { on = False; };
+  void TurnOn() { on = CmiTrue; CheckBarrier(); };
+  void TurnOff() { on = CmiFalse; };
 
 private:
   void CallReceivers(void);
@@ -55,13 +56,13 @@ private:
   int client_count;
   int max_receiver;
   int at_count;
-  Bool on;
+  CmiBool on;
 };
 
 class LBDB {
 public:
   LBDB() {
-    statsAreOn = False;
+    statsAreOn = CmiFalse;
     omCount = objCount = oms_registering = 0;
   }
 
@@ -72,7 +73,7 @@ public:
   LDOMHandle AddOM(LDOMid _userID, void* _userData, 
 		   LDCallbacks _callbacks);
   LDObjHandle AddObj(LDOMHandle _h, LDObjid _id, void *_userData,
-		     Bool _migratable);
+		     CmiBool _migratable);
   void UnregisterObj(LDObjHandle _h);
 
   void RegisteringObjects(LDOMHandle _h);
@@ -81,9 +82,9 @@ public:
   LBOM *LbOM(LDOMHandle h) { return oms[h.handle]; };
   LBObj *LbObj(LDObjHandle h) { return objs[h.handle]; };
   void DumpDatabase(void);
-  void TurnStatsOn(void) { statsAreOn = True; };
-  void TurnStatsOff(void) { statsAreOn = False; };
-  Bool StatsOn(void) { return statsAreOn; };
+  void TurnStatsOn(void) { statsAreOn = CmiTrue; };
+  void TurnStatsOff(void) { statsAreOn = CmiFalse; };
+  CmiBool StatsOn(void) { return statsAreOn; };
   int ObjDataCount();
   void GetObjData(LDObjData *data);
   LDObjData *FetchData(int *nitems);
@@ -133,7 +134,7 @@ private:
   int oms_registering;
   ObjList objs;
   int objCount;
-  Bool statsAreOn;
+  CmiBool statsAreOn;
   MigrateCBList migrateCBList;
 
   LocalBarrier localBarrier;
