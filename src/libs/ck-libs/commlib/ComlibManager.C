@@ -52,7 +52,7 @@ void recv_dummy(void *msg){
 
 //An initialization routine which does prelimnary initialization of the 
 void initComlibManager(void){
-    //    comm_debug = 1;
+    //comm_debug = 1;
     ComlibInit();
     ComlibPrintf("Init Call\n");
 
@@ -555,7 +555,7 @@ void ComlibManager::multicast(CharmMessageHolder *cmsg) {
     else {
         flushTable = 1;
 	cmsg->next = NULL;
-	ComlibPrintf("Enqueuing message in tmplist\n");
+	ComlibPrintf("Enqueuing message in tmplist at %d\n", curStratID);
         strategyTable[curStratID].tmplist.enq(cmsg);
     }
 
@@ -705,9 +705,14 @@ void ComlibDoneCreating(){
     (cgproxy.ckLocalBranch())->doneCreating();
 }
 
+char *router;
 class ComlibManagerMain {
 public:
     ComlibManagerMain(CkArgMsg *msg) {
+        
+        if(CkMyPe() == 0 && msg !=  NULL)
+            CmiGetArgString(msg->argv, "+strategy", &router);         
+        
         CProxy_ComlibManager::ckNew();
     }
 };

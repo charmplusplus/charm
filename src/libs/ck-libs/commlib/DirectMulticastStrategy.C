@@ -92,8 +92,8 @@ void DirectMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
     }
     
     messageBuf->enq(cmsg);
-    if(!isBracketed())
-        doneInserting();
+    //if(!isBracketed())
+    doneInserting();
 }
 
 void DirectMulticastStrategy::doneInserting(){
@@ -244,7 +244,7 @@ void DirectMulticastStrategy::localMulticast(CkVec<CkArrayIndexMax>*vec,
         CkArrayIndexMax idx = (*vec)[count];
         
         ComlibPrintf("[%d] Sending multicast message to ", CkMyPe());
-        //idx.print();     
+        if(comm_debug) idx.print();     
         
         if(count < nelements - 1) {
             newmsg = CkCopyMsg(&msg); 

@@ -1,5 +1,6 @@
 #include "EachToManyMulticastStrategy.h"
 #include "commlib.h"
+#include "string.h"
 
 //EachToManyMulticastStrategy CODE
 CpvExtern(int, RecvdummyHandle);
@@ -210,8 +211,22 @@ EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy,
     commonInit();
 }
 
+extern char *router;
 //Common initialization for both group and array constructors
 void EachToManyMulticastStrategy::commonInit() {
+
+    if(CkMyPe() == 0 && router != NULL){
+        if(strcmp(router, "USE_MESH") == 0)
+            routerID = USE_MESH;
+        else if(strcmp(router, "USE_GRID") == 0)
+            routerID = USE_GRID;
+        else  if(strcmp(router, "USE_HYPERCUBE") == 0)
+            routerID = USE_HYPERCUBE;
+        else  if(strcmp(router, "USE_DIRECT") == 0)
+            routerID = USE_DIRECT;        
+    }
+    
+    CkPrintf("Creating Strategy %d\n", routerID);
 
     messageBuf = 0;
 
@@ -242,12 +257,20 @@ void EachToManyMulticastStrategy::commonInit() {
 void EachToManyMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
     
     if(messageBuf == NULL) {
-	CkPrintf("ERROR MESSAGE BUF IS NULL\n");
+	CkAbort("ERROR MESSAGE BUF IS NULL\n");
 	return;
     }
 
     ComlibPrintf("[%d] EachToManyMulticast: insertMessage \n", 
                  CkMyPe());   
+
+    if(routerID == USE_DIRECT && cmsg->dest_proc >= 0){
+        char *msg = cmsg->getCharmMessage();
+        CmiSyncSendAndFree(cmsg->dest_proc, UsrToEnv(msg)->getTotalsize(), 
+                           (char *)UsrToEnv(msg));
+        delete cmsg;
+        return;
+    }
    
     if(cmsg->dest_proc == IS_MULTICAST && cmsg->sec_id != NULL) {        
         int cur_sec_id = cmsg->sec_id->_cookie.sInfo.cInfo.id;
@@ -279,7 +302,7 @@ void EachToManyMulticastStrategy::doneInserting(){
     
     if(messageBuf->length() == 0) {
         if(routerID == USE_DIRECT)
-		return; 
+            return; 
 
         ComlibDummyMsg * dummymsg = new ComlibDummyMsg;
         ComlibPrintf("[%d] Creating a dummy message\n", CkMyPe());
