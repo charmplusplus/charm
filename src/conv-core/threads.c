@@ -1579,8 +1579,8 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   result->fn = fn;
   result->arg = arg;
   result->creator = &(self->cond);
-  pthread_create(&(result->self), (pthread_attr_t *) 0, CthOnly, 
-                 (void*) result);
+  if (0 != pthread_create(&(result->self), (pthread_attr_t *) 0, CthOnly, (void*) result)) 
+    CmiAbort("CthCreate failed to created a new pthread\n");
   do {
   pthread_cond_wait(&(self->cond), &CthCpvAccess(sched_mutex));
   } while (result->inited==0);
