@@ -1,3 +1,8 @@
+/*****************************************************************************
+     Blue Gene Converse Layer
+     Converse function should be implemented based on the functions here
+*****************************************************************************/
+
 #ifndef  _BLUE_CONV_H_
 #define  _BLUE_CONV_H_
 
@@ -137,6 +142,15 @@ static inline void BgSyncNodeBroadcastAll(int nb, char *m)
   char *dupm = (char *)CmiAlloc(nb);
   memcpy(dupm, m, nb);
   BgSyncNodeBroadcastAllAndFree(nb, dupm);
+}
+
+static inline void BgSyncListSendAndFree(int npes, int *pes, int len, char *msg)
+{
+  int i;
+  for(i=0;i<npes;i++) {
+    CmiSyncSend(pes[i], len, msg);
+  }
+  CmiFree(msg);
 }
 
 #endif
