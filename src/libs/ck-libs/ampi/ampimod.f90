@@ -73,6 +73,9 @@ module AMPI
   external AMPI_Abort
   external AMPI_Print
   external AMPI_Migrate
+
+  external AMPI_Register_main
+  external AMPI_Attach
   
 contains
 

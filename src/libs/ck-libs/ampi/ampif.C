@@ -1,117 +1,62 @@
 #include "ampi.h"
 #include "ampiimpl.h"
 
-extern "C" {
+FDECL {
 
-#if CMK_FORTRAN_USES_ALLCAPS
-
-#define ampi_init_universe           AMPI_INIT_UNIVERSE
-#define ampi_comm_rank               AMPI_COMM_RANK
-#define ampi_comm_size               AMPI_COMM_SIZE
-#define ampi_finalize                AMPI_FINALIZE
-#define ampi_send                    AMPI_SEND
-#define ampi_recv                    AMPI_RECV
-#define ampi_probe                   AMPI_PROBE
-#define ampi_iprobe                  AMPI_IPROBE
-#define ampi_isend                   AMPI_ISEND
-#define ampi_irecv                   AMPI_IRECV
-#define ampi_sendrecv                AMPI_SENDRECV
-#define ampi_barrier                 AMPI_BARRIER
-#define ampi_bcast                   AMPI_BCAST
-#define ampi_reduce                  AMPI_REDUCE
-#define ampi_allreduce               AMPI_ALLREDUCE
-#define ampi_wtime                   AMPI_WTIME
-#define ampi_start                   AMPI_START
-#define ampi_waitall                 AMPI_WAITALL
-#define ampi_testall                 AMPI_TESTALL
-#define ampi_test                    AMPI_TEST
-#define ampi_send_init               AMPI_SEND_INIT
-#define ampi_recv_init               AMPI_RECV_INIT
-#define ampi_type_contiguous         AMPI_TYPE_CONTIGUOUS
-#define ampi_type_vector             AMPI_TYPE_VECTOR
-#define ampi_type_hvector            AMPI_TYPE_HVECTOR
-#define ampi_type_indexed            AMPI_TYPE_INDEXED
-#define ampi_type_hindexed           AMPI_TYPE_HINDEXED
-#define ampi_type_struct             AMPI_TYPE_STRUCT
-#define ampi_type_commit             AMPI_TYPE_COMMIT
-#define ampi_type_free               AMPI_TYPE_FREE
-#define ampi_type_extent             AMPI_TYPE_EXTENT
-#define ampi_type_size               AMPI_TYPE_SIZE
-#define ampi_pack                    AMPI_PACK
-#define ampi_unpack                  AMPI_UNPACK
-#define ampi_pack_size               AMPI_PACK_SIZE
-#define ampi_allgatherv              AMPI_ALLGATHERV
-#define ampi_allgather               AMPI_ALLGATHER
-#define ampi_gatherv                 AMPI_GATHERV
-#define ampi_gather                  AMPI_GATHER
-#define ampi_alltoallv               AMPI_ALLTOALLV
-#define ampi_alltoall                AMPI_ALLTOALL
-#define ampi_comm_dup                AMPI_COMM_DUP
-#define ampi_comm_free               AMPI_COMM_FREE
-#define ampi_abort                   AMPI_ABORT
-#define ampi_print                   AMPI_PRINT
-#define ampi_migrate                 AMPI_MIGRATE
-#define ampi_register                AMPI_REGISTER
-#define ampi_get_count               AMPI_GET_COUNT
-
-#else
-
-#define ampi_init_universe           FNAME(ampi_init_universe)
-#define ampi_comm_rank               FNAME(ampi_comm_rank)
-#define ampi_comm_size               FNAME(ampi_comm_size)
-#define ampi_finalize                FNAME(ampi_finalize)
-#define ampi_send                    FNAME(ampi_send)
-#define ampi_recv                    FNAME(ampi_recv)
-#define ampi_probe                   FNAME(ampi_probe)
-#define ampi_iprobe                  FNAME(ampi_iprobe)
-#define ampi_isend                   FNAME(ampi_isend)
-#define ampi_irecv                   FNAME(ampi_irecv)
-#define ampi_sendrecv                FNAME(ampi_sendrecv)
-#define ampi_barrier                 FNAME(ampi_barrier)
-#define ampi_bcast                   FNAME(ampi_bcast)
-#define ampi_reduce                  FNAME(ampi_reduce)
-#define ampi_allreduce               FNAME(ampi_allreduce)
-#define ampi_wtime                   FNAME(ampi_wtime)
-#define ampi_start                   FNAME(ampi_start)
-#define ampi_waitall                 FNAME(ampi_waitall)
-#define ampi_testall                 FNAME(ampi_testall)
-#define ampi_test                    FNAME(ampi_test)
-#define ampi_send_init               FNAME(ampi_send_init)
-#define ampi_recv_init               FNAME(ampi_recv_init)
-#define ampi_type_contiguous         FNAME(ampi_type_contiguous)
-#define ampi_type_vector             FNAME(ampi_type_vector)
-#define ampi_type_hvector            FNAME(ampi_type_hvector)
-#define ampi_type_indexed            FNAME(ampi_type_indexed)
-#define ampi_type_hindexed           FNAME(ampi_type_hindexed)
-#define ampi_type_struct             FNAME(ampi_type_struct)
-#define ampi_type_commit             FNAME(ampi_type_commit)
-#define ampi_type_free               FNAME(ampi_type_free)
-#define ampi_type_extent             FNAME(ampi_type_extent)
-#define ampi_type_size               FNAME(ampi_type_size)
-#define ampi_pack                    FNAME(ampi_pack)
-#define ampi_unpack                  FNAME(ampi_unpack)
-#define ampi_pack_size               FNAME(ampi_pack_size)
-#define ampi_allgatherv              FNAME(ampi_allgatherv)
-#define ampi_allgather               FNAME(ampi_allgather)
-#define ampi_gatherv                 FNAME(ampi_gatherv)
-#define ampi_gather                  FNAME(ampi_gather)
-#define ampi_alltoallv               FNAME(ampi_alltoallv)
-#define ampi_alltoall                FNAME(ampi_alltoall)
-#define ampi_comm_dup                FNAME(ampi_comm_dup)
-#define ampi_comm_free               FNAME(ampi_comm_free)
-#define ampi_abort                   FNAME(ampi_abort)
-#define ampi_print                   FNAME(ampi_print)
-#define ampi_migrate                 FNAME(ampi_migrate)
-#define ampi_register                FNAME(ampi_register)
-#define ampi_get_count               FNAME(ampi_get_count)
-
-#endif
+#define ampi_init_universe FTN_NAME( AMPI_INIT_UNIVERSE , ampi_init_universe )
+#define ampi_comm_rank FTN_NAME( AMPI_COMM_RANK , ampi_comm_rank )
+#define ampi_comm_size FTN_NAME( AMPI_COMM_SIZE , ampi_comm_size )
+#define ampi_finalize FTN_NAME( AMPI_FINALIZE , ampi_finalize )
+#define ampi_send FTN_NAME( AMPI_SEND , ampi_send )
+#define ampi_recv FTN_NAME( AMPI_RECV , ampi_recv )
+#define ampi_probe FTN_NAME( AMPI_PROBE , ampi_probe )
+#define ampi_iprobe FTN_NAME( AMPI_IPROBE , ampi_iprobe )
+#define ampi_isend FTN_NAME( AMPI_ISEND , ampi_isend )
+#define ampi_irecv FTN_NAME( AMPI_IRECV , ampi_irecv )
+#define ampi_sendrecv FTN_NAME( AMPI_SENDRECV , ampi_sendrecv )
+#define ampi_barrier FTN_NAME( AMPI_BARRIER , ampi_barrier )
+#define ampi_bcast FTN_NAME( AMPI_BCAST , ampi_bcast )
+#define ampi_reduce FTN_NAME( AMPI_REDUCE , ampi_reduce )
+#define ampi_allreduce FTN_NAME( AMPI_ALLREDUCE , ampi_allreduce )
+#define ampi_wtime FTN_NAME( AMPI_WTIME , ampi_wtime )
+#define ampi_start FTN_NAME( AMPI_START , ampi_start )
+#define ampi_waitall FTN_NAME( AMPI_WAITALL , ampi_waitall )
+#define ampi_testall FTN_NAME( AMPI_TESTALL , ampi_testall )
+#define ampi_test FTN_NAME( AMPI_TEST , ampi_test )
+#define ampi_send_init FTN_NAME( AMPI_SEND_INIT , ampi_send_init )
+#define ampi_recv_init FTN_NAME( AMPI_RECV_INIT , ampi_recv_init )
+#define ampi_type_contiguous FTN_NAME( AMPI_TYPE_CONTIGUOUS , ampi_type_contiguous )
+#define ampi_type_vector FTN_NAME( AMPI_TYPE_VECTOR , ampi_type_vector )
+#define ampi_type_hvector FTN_NAME( AMPI_TYPE_HVECTOR , ampi_type_hvector )
+#define ampi_type_indexed FTN_NAME( AMPI_TYPE_INDEXED , ampi_type_indexed )
+#define ampi_type_hindexed FTN_NAME( AMPI_TYPE_HINDEXED , ampi_type_hindexed )
+#define ampi_type_struct FTN_NAME( AMPI_TYPE_STRUCT , ampi_type_struct )
+#define ampi_type_commit FTN_NAME( AMPI_TYPE_COMMIT , ampi_type_commit )
+#define ampi_type_free FTN_NAME( AMPI_TYPE_FREE , ampi_type_free )
+#define ampi_type_extent FTN_NAME( AMPI_TYPE_EXTENT , ampi_type_extent )
+#define ampi_type_size FTN_NAME( AMPI_TYPE_SIZE , ampi_type_size )
+#define ampi_pack FTN_NAME( AMPI_PACK , ampi_pack )
+#define ampi_unpack FTN_NAME( AMPI_UNPACK , ampi_unpack )
+#define ampi_pack_size FTN_NAME( AMPI_PACK_SIZE , ampi_pack_size )
+#define ampi_allgatherv FTN_NAME( AMPI_ALLGATHERV , ampi_allgatherv )
+#define ampi_allgather FTN_NAME( AMPI_ALLGATHER , ampi_allgather )
+#define ampi_gatherv FTN_NAME( AMPI_GATHERV , ampi_gatherv )
+#define ampi_gather FTN_NAME( AMPI_GATHER , ampi_gather )
+#define ampi_alltoallv FTN_NAME( AMPI_ALLTOALLV , ampi_alltoallv )
+#define ampi_alltoall FTN_NAME( AMPI_ALLTOALL , ampi_alltoall )
+#define ampi_comm_dup FTN_NAME( AMPI_COMM_DUP , ampi_comm_dup )
+#define ampi_comm_free FTN_NAME( AMPI_COMM_FREE , ampi_comm_free )
+#define ampi_abort FTN_NAME( AMPI_ABORT , ampi_abort )
+#define ampi_print FTN_NAME( AMPI_PRINT , ampi_print )
+#define ampi_migrate FTN_NAME( AMPI_MIGRATE , ampi_migrate )
+#define ampi_register FTN_NAME( AMPI_REGISTER , ampi_register )
+#define ampi_get_count FTN_NAME( AMPI_GET_COUNT , ampi_get_count )
 
 extern int AMPI_COMM_UNIVERSE[AMPI_MAX_COMM];
 
-void  ampi_init_universe(int *unicomm)
+void ampi_init_universe(int *unicomm)
 {
-  for(int i=0;i<ampimain::ncomms; i++)
+  for(int i=0;i<ampi_ncomms; i++)
   {
     unicomm[i] = AMPI_COMM_UNIVERSE[i];
   }

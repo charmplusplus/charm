@@ -9,108 +9,212 @@
 // for strlen
 #include <string.h>
 
+argvPupable::~argvPupable()
+{
+	if (!isSeparate) return;
+	int argc=getArgc();
+	for (int i=0;i<argc;i++)
+		delete[] argv[i];
+	delete[] argv;
+}
+
+argvPupable::argvPupable(const argvPupable &p)
+{
+	isSeparate=true;
+	int argc=p.getArgc();
+	char **nu_argv=new char*[argc+1];
+	for (int i=0;i<argc;i++)
+	{
+		int len;
+		len=strlen(p.argv[i])+1;
+		nu_argv[i]=new char[len];
+		strcpy(nu_argv[i],p.argv[i]);
+	}
+	nu_argv[argc]=NULL;
+	argv=nu_argv;
+}
+
+void argvPupable::pup(PUP::er &p)
+{
+	int argc=0;
+	if (!p.isUnpacking()) argc=getArgc();
+	p(argc);
+	if (p.isUnpacking()) {
+		argv=new char*[argc+1];
+		isSeparate=true;
+	}
+	for (int i=0;i<argc;i++) {
+		int len;
+		if (!p.isUnpacking()) len=strlen(argv[i])+1;
+		p(len);
+		if (p.isUnpacking()) argv[i]=new char[len];
+		p(argv[i],len);
+	}
+	if (p.isUnpacking()) argv[argc]=NULL;
+}
+
+//------------- startup -------------
+static ampi_comm_structs ampi_comms;
+int ampi_ncomms;
 int AMPI_COMM_UNIVERSE[AMPI_MAX_COMM];
 
-// Default ampi_setup
-#if AMPI_FORTRAN
-#include "ampimain.decl.h"
-#if CMK_FORTRAN_USES_ALLCAPS
-extern "C" void AMPI_SETUP(void);
-#else
-extern "C" void ampi_setup_(void);
-#endif
-#else
-extern "C" void AMPI_Setup(void);
-#endif
-
-void*
-ArgsInfo::pack(ArgsInfo* msg)
-{
-  int argsize=0, i;
-  for(i=0;msg->argv[i]!=0;i++) {
-    argsize += (strlen(msg->argv[i])+1); // +1 for '\0'
-  }
-  msg->argc = i;
-  void *p = CkAllocBuffer(msg, sizeof(ArgsInfo) +
-                               (msg->argc*sizeof(char*)) + 
-                                argsize);
-  memcpy(p,msg,sizeof(ArgsInfo));
-  char *args = (char *)((char*)p+sizeof(ArgsInfo)+(msg->argc*sizeof(char*)));
-  for(i=0;i<msg->argc;i++) {
-    char *tmp = msg->argv[i];
-    while(*tmp) { *args++ = *tmp++; }
-    *args++ = '\0';
-  }
-  delete msg;
-  return p;
-}
-
-ArgsInfo*
-ArgsInfo::unpack(void *in)
-{
-  ArgsInfo* msg = new (in) ArgsInfo();
-  char **argv = (char**)((char*)in+sizeof(ArgsInfo));
-  msg->setargs(msg->argc, argv);
-  char *tmp = ((char*)in+sizeof(ArgsInfo)+(msg->argc*sizeof(char*)));
-  for(int i=0;i<msg->argc;i++) {
-    argv[i] = tmp;
-    while(*tmp) { tmp++; }
-    tmp++;
-  }
-  return msg;
-}
+extern "C" void AMPI_Setup_Switch(void);
 
 CtvDeclare(ampi*, ampiPtr);
-
-#if !CMK_LBDB_ON
-/*Fake definitions here, to prevent linking errors*/
-void CreateMetisLB(void) { }
-void _registerMetisLB(void) { }
-#endif
-ampi::ampi(AmpiStartMsg *msg)
+static void ampiNodeInit(void)
 {
-#if CMK_LBDB_ON
-  usesAtSync = CmiTrue;
-#endif
-  commidx = msg->commidx;
-  delete msg;
+  CtvInitialize(ampi *, ampiPtr);
+  ampi_ncomms=0;
+  for(int i=0;i<ampi_ncomms; i++)
+  {
+    AMPI_COMM_UNIVERSE[i] = i+1;
+  }
+  TCharmSetFallbackSetup(AMPI_Setup_Switch);
+}
+
+static void 
+ampiAllReduceHandler(void *arg, int dataSize, void *data)
+{
+  ampi_comm_struct *commspec = (ampi_comm_struct *) arg;
+  int type = commspec->rspec.type;
+  if (type==-1)
+	  CkAbort("ERROR! Never set the AMPI reduction type-- is there an element on processor 0?\n");
+
+  if(type==0) 
+  { // allreduce
+    ampi::bcastraw(data, dataSize, commspec->aid);
+  } else 
+  { // reduce
+    ampi::sendraw(0, AMPI_REDUCE_TAG, data, dataSize, commspec->aid, 
+                  commspec->rspec.root);
+  }
+  commspec->rspec.type=-1;
+}
+
+class AMPI_threadstart_t {
+public:
+	argvPupable args;
+	AMPI_MainFn fn;
+	AMPI_threadstart_t() {}
+	AMPI_threadstart_t(const argvPupable &args_,AMPI_MainFn fn_)
+		:args(args_), fn(fn_) {}
+	void start(void) {
+		char **argv=args.getArgv();
+		int argc=args.getArgc();
+		(fn)(argc,argv);
+	}
+	void pup(PUP::er &p) {
+		p|args;
+		p|fn;
+	}
+};
+PUPmarshall(AMPI_threadstart_t);
+
+extern "C" void AMPI_threadstart(void *data)
+{
+	AMPI_threadstart_t t;
+	pupFromBuf(data,t);
+	t.start();
+}
+
+static void ampiAttach(void);
+
+void ampiCreateMain(AMPI_MainFn mainFn)
+{
+	int _nchunks=TCharmGetNumChunks();
+	
+	//Make a new threads array
+	argvPupable args(TCharmArgv());
+	AMPI_threadstart_t s(args,mainFn);
+	memBuf b; pupIntoBuf(b,s);
+	TCharmCreateData( _nchunks,AMPI_threadstart,
+			  b.getData(), b.getSize());
+}
+
+static void ampiAttach(const char *name,int namelen)
+{
+        TCharmSetupCookie *tc=TCharmSetupCookie::get();
+	if (!tc->hasThreads())
+		CkAbort("You must create a thread array with TCharmCreate before calling AMPI_Attach!\n");
+	int _nchunks=tc->getNumElements();
+	CkArrayID threads=tc->getThreads();
+
+	//Allocate the next communicator  
+	if(ampi_ncomms == AMPI_MAX_COMM)
+	{
+		CkAbort("AMPI> Number of registered comm_worlds exceeded limit.\n");
+	}
+	int commidx=ampi_ncomms++;	
+	ampi_comms[commidx].mainfunc = NULL; //mainFn;
+	ampi_comms[commidx].name = new char[namelen+1];
+	memcpy(ampi_comms[commidx].name, name, namelen);
+	ampi_comms[commidx].name[namelen] = '\0';
+	ampi_comms[commidx].nobj=_nchunks;
+	ampi_comms[commidx].rspec.type=-1;
+	ampi_comms[commidx].rspec.root=-1;
+        
+        //Create and attach the new ampi array
+        CkArrayOptions opts(_nchunks);
+        opts.bindTo(threads);
+        CProxy_ampi arr= CProxy_ampi::ckNew(commidx,threads,opts);
+	ampi_comms[commidx].aid=arr;
+        arr.setReductionClient(ampiAllReduceHandler, &ampi_comms[commidx]);
+
+        tc->addClient(arr);        
+}
+
+
+ampi::ampi(int commidx_,CProxy_TCharm threads_)
+{
+  commidx = commidx_;
   msgs = CmmNew();
-  thread_id = 0;
-  cthread_id = 0;
-  mthread_id = 0;
   nbcasts = 0;
   nrequests = 0;
   myDDT = new DDT() ;
   nirequests = 0;
   firstfree = 0;
+  ampiBlockedThread=0;
+  threads=threads_;
+  prepareCtv();
+
   int i;
   for(i=0;i<100;i++) {
     irequests[i].nextfree = (i+1)%100;
     irequests[i].prevfree = ((i-1)+100)%100;
   }
-  for(i=0;i<ampimain::ncomms; i++)
-  {
-    AMPI_COMM_UNIVERSE[i] = i+1;
-  }
+  thread->ready();
+}
+ampi::ampi(CkMigrateMessage *msg)
+{
+	msgs=NULL;
+	ampiBlockedThread=0;
+}
+void ampi::ckJustMigrated(void)
+{
+	ArrayElement1D::ckJustMigrated();
+	prepareCtv();
+}
+void ampi::prepareCtv(void)
+{
+	thread=threads[thisIndex].ckLocal();
+	if (thread==NULL) CkAbort("Ampi cannot find its TCharm!\n");
+	CtvAccessOther(thread->getThread(),ampiPtr) = this;   
 }
 
 ampi::~ampi()
 {
-  if (thread_id!=0)
-    CthFree(thread_id);
-  CmmFree(msgs);
+	CmmFree(msgs);
 }
 
+//------------------------ communication -----------------------
 void
 ampi::generic(AmpiMsg* msg)
 {
   int tags[3];
   tags[0] = msg->tag1; tags[1] = msg->tag2; tags[2] = msg->comm;
   CmmPut(msgs, 3, tags, msg);
-  if(thread_id) {
-    CthAwaken(thread_id);
-    thread_id = 0;
-  }
+  if(ampiBlockedThread)
+	  thread->resume();
 }
 
 void 
@@ -121,7 +225,7 @@ ampi::send(int t1, int t2, void* buf, int count, int type,  int idx, int comm)
   if(comm != AMPI_COMM_WORLD)
   {
     mycomm = AMPI_COMM_UNIVERSE[commidx];
-    aid = ampimain::ampi_comms[comm-1].aid;
+    aid = ampi_comms[comm-1].aid;
   }
   DDT_DataType *ddt = myDDT->getType(type);
   int len = ddt->getSize(count);
@@ -147,17 +251,14 @@ ampi::recv(int t1, int t2, void* buf, int count, int type, int comm, int *sts)
   AmpiMsg *msg = 0;
   DDT_DataType *ddt = myDDT->getType(type);
   int len = ddt->getSize(count);
+  ampiBlockedThread=1;
   while(1) {
     tags[0] = t1; tags[1] = t2; tags[2] = comm;
     msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
     if (msg) break;
-    thread_id = CthSelf();
-    stop_running();
-    CthSuspend();
-    if(thread_id != 0)
-      CkAbort("thread_id not 0 upon return !!\n");
-    start_running();
+    thread->suspend();
   }
+  ampiBlockedThread=0;
   if(sts)
     ((AMPI_Status*)sts)->AMPI_LENGTH = msg->length;
   if (msg->length < len) {
@@ -178,12 +279,7 @@ ampi::probe(int t1, int t2, int comm, int *sts)
     tags[0] = t1; tags[1] = t2; tags[2] = comm;
     msg = (AmpiMsg *) CmmProbe(msgs, 3, tags, sts);
     if (msg) break;
-    thread_id = CthSelf();
-    stop_running();
-    CthSuspend();
-    if(thread_id != 0)
-      CkAbort("thread_id not 0 upon return !!\n");
-    start_running();
+    thread->schedule();
   }
   if(sts)
     ((AMPI_Status*)sts)->AMPI_LENGTH = msg->length;
@@ -201,9 +297,7 @@ ampi::iprobe(int t1, int t2, int comm, int *sts)
       ((AMPI_Status*)sts)->AMPI_LENGTH = msg->length;
     return 1;
   }
-  stop_running();
-  CthYield();
-  start_running();
+  thread->schedule();
   return 0;
 }
 
@@ -243,105 +337,44 @@ ampi::bcastraw(void* buf, int len, CkArrayID aid)
   pa.generic(msg);
 }
 
+//------------------- maintainance -----------------
+#if 0
+//Need to figure out how to support checkpoint/restart properly
 void ampi::checkpoint(DirMsg *msg)
 {
-#if AMPI_STANDALONE
-  CkAbort("Checkpointing not available in standalone AMPI lib!\n");
-#else
   sprintf(str, "%s/%d", msg->dname, commidx);
   mkdir(str, 0777);
   sprintf(str, "%s/%d/%d.cpt", msg->dname, commidx, thisIndex);
   delete msg;
   CProxy_ampimain pm(ampimain::handle); 
   pm.checkpoint(); 
-#endif
 }
+extern "C" void
+AMPI_Checkpoint(char *dirname)
+{
+  mkdir(dirname, 0777);
+  ampi *ptr = CtvAccess(ampiPtr);
+  ptr->cthread_id = CthSelf();
+  int idx = ptr->thisIndex;
+  CProxy_ampi aproxy(ampimain::ampi_comms[ptr->commidx].aid);
+  aproxy[idx].checkpoint(new DirMsg(dirname));
+  ptr->stop_running();
+  CthSuspend();
+  ptr = CtvAccess(ampiPtr);
+  if(ptr->cthread_id != 0)
+    CkAbort("cthread_id not 0 upon return !!\n");
+  ptr->start_running();
+}
+#endif
 
 void ampi::pup(PUP::er &p)
 {
   if(!p.isUserlevel())
     ArrayElement1D::pup(p);//Pack superclass
   p(commidx);
-  if(p.isPacking()||p.isSizing())
-  {
-    int moremsgs;
-    CmmTable newmsgs;
-    if(!p.isDeleting())
-      newmsgs = CmmNew();
-    AmpiMsg *msg;
-    int snum[3];
-    snum[0] = CmmWildCard;
-    snum[1] = CmmWildCard;
-    snum[2] = CmmWildCard;
-    while(msg = (AmpiMsg*)CmmGet(msgs,3,snum,0))
-    {
-      moremsgs = 1;
-      p(moremsgs);
-      msg = AmpiMsg::pup(p, msg);
-      if(!p.isDeleting())
-      {
-        int tags[3];
-        tags[0] = msg->tag1; tags[1] = msg->tag2; tags[2] = msg->comm;
-        CmmPut(newmsgs, 3, tags, msg);
-      }
-    }
-    moremsgs = 0;
-    p(moremsgs);
-    if(!p.isDeleting())
-      msgs = newmsgs;
-  }
-  if(p.isUnpacking())
-  {
-    msgs = CmmNew();
-    int moremsgs;
-    p(moremsgs);
-    while(moremsgs)
-    {
-      AmpiMsg *msg;
-      msg = AmpiMsg::pup(p, 0);
-      int tags[3];
-      tags[0] = msg->tag1; tags[1] = msg->tag2; tags[2] = msg->comm;
-      CmmPut(msgs, 3, tags, msg);
-      p(moremsgs);
-    }
-  }
-  //This seekBlock allows us to reorder the packing/unpacking--
-  // This is needed because the userData depends on the thread's stack
-  // both at pack and unpack time.
-  PUP::seekBlock s(p,2);
-  bool haveThread=(cthread_id||mthread_id);
-  p(haveThread);
-  if (p.isUnpacking()) 
-  {//In this case, unpack the thread before the user data
-    thread_id = 0;
-    cthread_id = 0;
-    mthread_id = 0;
-    if (haveThread) {
-      s.seek(1);
-      if(p.isUserlevel())
-	cthread_id = CthPup((pup_er) &p, cthread_id);
-      else
-	mthread_id = CthPup((pup_er) &p, mthread_id);
-    }
-  }
-  //Pack all user data
-  s.seek(0);
-  p(nudata);
-  int i;
-  for(i=0;i<nudata;i++) {
-    p((void*)&(userdata[i]), sizeof(void*));
-    p((void*)&(pup_ud[i]), sizeof(AMPI_PupFn));
-    pup_ud[i]((pup_er) &p, userdata[i]);
-  }
-  if (haveThread && !p.isUnpacking())
-  {//In this case, pack the thread after the user data
-    s.seek(1);
-    if(p.isUserlevel())
-      cthread_id = CthPup((pup_er) &p, cthread_id);
-    else
-      mthread_id = CthPup((pup_er) &p, mthread_id);
-  }
-  s.endBlock(); //End of seeking block
+  msgs=CmmPup((pup_er)&p,msgs);
+
+  p|threads;
 
   p(nbcasts);
   // persistent comm requests will have to be re-registered after
@@ -350,10 +383,6 @@ void ampi::pup(PUP::er &p)
   // to pup them as well.
   if(p.isUnpacking())
   {
-    if(p.isUserlevel())
-      {if (cthread_id) CtvAccessOther(cthread_id, ampiPtr) = this;}
-    else
-      {if (mthread_id) CtvAccessOther(mthread_id, ampiPtr) = this;}
     myDDT = new DDT((void*)0);
     nrequests = 0;
     nirequests = 0;
@@ -367,69 +396,7 @@ void ampi::pup(PUP::er &p)
   myDDT->pup(p);
 }
 
-int
-ampi::register_userdata(void *d, AMPI_PupFn f)
-{
-  if(nudata==AMPI_MAXUDATA)
-    CkAbort("AMPI> UserData registration limit exceeded.!\n");
-  userdata[nudata] = d;
-  pup_ud[nudata] = f;
-  nudata++;
-  return (nudata-1);
-}
-
-void *
-ampi::get_userdata(int idx)
-{
-  return userdata[idx];
-}
-
-void ampi::prepareCtv(void)
-{
-  CtvInitialize(ampi *, ampiPtr);
-  CtvAccess(ampiPtr) = this;   
-}
-
-void
-ampi::restart(DirMsg *m)
-{
-  CkPrintf("[%d] restarting...\n", thisIndex);
-  prepareCtv();
-  restartThread(m->dname);
-  delete m;
-}
-
-// This is invoked in the Fortran (and C ?) version of AMPI
-void
-ampi::run(ArgsInfo *msg)
-{
-#if AMPI_STANDALONE
-  CkAbort("ampi::run not supported by standalone AMPI lib!\n");
-#else
-  int argc = msg->argc;
-  char **argv = msg->argv;
-  char *dname;
-  delete msg;
-  prepareCtv();
-  ampimain::ampi_comms[commidx].mainfunc(argc, argv);
-  CProxy_ampimain mp(ampimain::handle);
-  mp.done();
-#endif
-}
-
-// This is invoked in the C++ version of AMPI
-void
-ampi::run(void)
-{
-  prepareCtv();
-  start();
-}
-
-void
-ampi::start(void)
-{
-  CkPrintf("You should write your own start(). \n");
-}
+//------------------ External Interface -----------------
 
 static ampi *getAmpiInstance(void) {
   ampi *ret = CtvAccess(ampiPtr);
@@ -439,38 +406,7 @@ static ampi *getAmpiInstance(void) {
 extern "C" void
 AMPI_Migrate(void)
 {
-  ampi *ptr = CtvAccess(ampiPtr);
-  ptr->mthread_id = CthSelf();
-  int idx = ptr->thisIndex;
-  CProxy_ampi aproxy(ampimain::ampi_comms[ptr->commidx].aid);
-  aproxy[idx].migrate();
-  ptr->stop_running();
-  CthSuspend();
-  ptr = CtvAccess(ampiPtr);
-  if(ptr->mthread_id != 0)
-    CkAbort("mthread_id not 0 upon return !!\n");
-  ptr->start_running();
-}
-
-extern "C" void
-AMPI_Checkpoint(char *dirname)
-{
-#if AMPI_STANDALONE
-  CkAbort("Checkpointing not supported by AMPI library version!\n");
-#else
-  mkdir(dirname, 0777);
-  ampi *ptr = CtvAccess(ampiPtr);
-  ptr->cthread_id = CthSelf();
-  int idx = ptr->thisIndex;
-  CProxy_ampi aproxy(ampimain::ampi_comms[ptr->commidx].aid);
-  aproxy[idx].checkpoint(new DirMsg(dirname));
-  ptr->stop_running();
-  CthSuspend();
-  ptr = CtvAccess(ampiPtr);
-  if(ptr->cthread_id != 0)
-    CkAbort("cthread_id not 0 upon return !!\n");
-  ptr->start_running();
-#endif
+  TCharmMigrate();
 }
 
 extern "C" 
@@ -482,14 +418,14 @@ int AMPI_Init(int *argc, char*** argv)
 extern "C" 
 int AMPI_Comm_rank(AMPI_Comm comm, int *rank)
 {
-  *rank = CtvAccess(ampiPtr)->getIndex();
+  *rank = TCharmElement();
   return 0;
 }
 
 extern "C" 
 int AMPI_Comm_size(AMPI_Comm comm, int *size)
 {
-  *size = CtvAccess(ampiPtr)->getArraySize();
+  *size = TCharmNumElements();
   return 0;
 }
 
@@ -630,8 +566,8 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, AMPI_Op op,
   ampi *ptr = CtvAccess(ampiPtr);
   if(CkMyPe()==0)
   {
-    ampimain::ampi_comms[ptr->commidx].rspec.type = 1;
-    ampimain::ampi_comms[ptr->commidx].rspec.root = root;
+    ampi_comms[ptr->commidx].rspec.type = 1;
+    ampi_comms[ptr->commidx].rspec.root = root;
   }
   CkReduction::reducerType mytype = getReductionType(type,op);
   int size = ptr->myDDT->getType(type)->getSize(count) ;
@@ -652,7 +588,7 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   ampi *ptr = CtvAccess(ampiPtr);
   if(CkMyPe()==0)
   {
-    ampimain::ampi_comms[ptr->commidx].rspec.type = 0;
+    ampi_comms[ptr->commidx].rspec.type = 0;
   }
   CkReduction::reducerType mytype = getReductionType(type,op);
   int size = ptr->myDDT->getType(type)->getSize(count) ;
@@ -1156,15 +1092,35 @@ void AMPI_Print(char *str)
 extern "C"
 int AMPI_Register(void *d, AMPI_PupFn f)
 {
-  ampi *ptr = CtvAccess(ampiPtr);
-  return ptr->register_userdata(d, f);
+	return TCharmRegister(d,f);
 }
 
 extern "C"
 void *AMPI_Get_userdata(int idx)
 {
-  ampi *ptr = CtvAccess(ampiPtr);
-  return ptr->get_userdata(idx);
+	return TCharmGetUserdata(idx);
 }
+
+CDECL void AMPI_Register_main(AMPI_MainFn mainFn,const char *name)
+{
+	ampiCreateMain(mainFn);
+	ampiAttach(name,strlen(name));
+}
+FDECL void FTN_NAME(AMPI_REGISTER_MAIN,ampi_register_main)
+	(AMPI_MainFn mainFn,const char *name,int nameLen)
+{
+	ampiCreateMain(mainFn);	
+	ampiAttach(name,nameLen);
+}
+
+CDECL void AMPI_Attach(const char *name)
+{
+	ampiAttach(name,strlen(name));	
+}
+FDECL void FTN_NAME(AMPI_ATTACH,ampi_attach)(const char *name,int nameLen)
+{
+	ampiAttach(name,nameLen);
+}
+
 
 #include "ampi.def.h"

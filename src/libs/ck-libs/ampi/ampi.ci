@@ -1,17 +1,12 @@
 module ampi {
-  extern module MetisLB;
-  message ArgsInfo;
   message AmpiMsg;
-  message AmpiStartMsg;
-  message DirMsg;
+ 
+  initcall void ampiNodeInit(void);
+  readonly ampi_comm_structs ampi_comms;
+  readonly int ampi_ncomms;
+
   array[1D] ampi {
-    entry ampi(AmpiStartMsg *);
+    entry ampi(int commidx,CProxy_TCharm threads_);
     entry void generic(AmpiMsg *);
-    entry [threaded] void run(ArgsInfo *);
-    entry [threaded] void run(void);
-    entry void migrate(void);
-    entry void checkpoint(DirMsg *);
-    entry void saveState(void);
-    entry void restart(DirMsg *);
   };
 }

@@ -136,12 +136,20 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
 int AMPI_Comm_dup(AMPI_Comm comm, AMPI_Comm *newcomm);
 int AMPI_Comm_free(AMPI_Comm *comm);
 int AMPI_Abort(AMPI_Comm comm, int errorcode);
+
 void AMPI_Print(char *str);
 int AMPI_Register(void *, AMPI_PupFn);
 void AMPI_Migrate(void);
 void AMPI_Checkpoint(char *dirname);
 void *AMPI_Get_userdata(int);
-void AMPI_Register_main(void (*mainfunc) (int,char**), char *, int);
+
+/*Create a new threads array and attach to it*/
+typedef void (*AMPI_MainFn) (int,char**);
+void AMPI_Register_main(AMPI_MainFn mainFn, const char *name);
+
+/*Attach a new AMPI to each existing threads array element*/
+void AMPI_Attach(const char *name);
+
 #ifdef __cplusplus
 }
 #endif

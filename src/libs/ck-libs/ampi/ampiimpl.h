@@ -9,43 +9,9 @@
 #define _AMPIIMPL_H
 
 #include "ampi.h"
-#include "ampi.decl.h"
-#include "ampimain.decl.h"
-#include "ddt.h"
-#include <sys/stat.h> // for mkdir
+#include "charm++.h"
 
 #define AMPI_MAX_COMM 8
-
-#ifdef FNAME
-#undef FNAME
-#endif
-
-#if CMK_FORTRAN_USES_TWOSCORE
-#  define FNAME(x) x##__
-#elif CMK_FORTRAN_USES_ONESCORE
-#  define FNAME(x) x##_
-#else
-#  define FNAME(x) x
-#endif
-
-#if AMPI_FORTRAN
-#  if CMK_FORTRAN_USES_ALLCAPS
-#    define ampi_setup         AMPI_SETUP
-#    define ampi_register_main AMPI_REGISTER_MAIN
-#    define ampi_main          AMPI_MAIN
-#  else
-#    define ampi_setup         FNAME(ampi_setup)
-#    define ampi_register_main FNAME(ampi_register_main)
-#    define ampi_main          FNAME(ampi_main)
-#  endif
-#else
-#  define ampi_setup         AMPI_Setup
-#  define ampi_register_main AMPI_Register_main
-#  define ampi_main          AMPI_Main
-#endif
-
-extern "C" void ampi_setup(void);
-extern "C" void ampi_register_main(void (*)(int, char **), char *, int);
 
 struct ampi_redn_spec
 {
@@ -67,37 +33,14 @@ public:
 	ampi_comm_struct &operator[](int i) {return s[i];}
 };
 
-class AmpiStartMsg : public CMessage_AmpiStartMsg
-{
-  public:
-    int commidx;
-    AmpiStartMsg(int _idx) : commidx(_idx) {}
-};
+#include "tcharm.h"
+#include "tcharmc.h"
+#include "ampi.decl.h"
+#include "ddt.h"
+#include "charm-api.h"
+#include <sys/stat.h> // for mkdir
 
-class ampimain : public Chare
-{
-  int nobjs;
-  int numDone;
-  int qwait;
-  public:
-    static CkChareID handle;
-    static ampi_comm_structs ampi_comms;
-
-    static int ncomms;
-    static void register_main(void (*)(int, char **), char *, int);
-    ampimain(CkArgMsg *);
-    ampimain(CkMigrateMessage *m) {}
-    void done(void);
-    void checkpoint(void);
-    void checkpointOnQd(void);
-};
-
-static inline void 
-itersDone(void) 
-{ 
-  CProxy_ampimain pm(ampimain::handle); 
-  pm.done(); 
-}
+extern int ampi_ncomms;
 
 #define AMPI_BCAST_TAG  1025
 #define AMPI_BARR_TAG   1026
@@ -137,37 +80,61 @@ class PersReq {
     int nextfree, prevfree;
 };
 
-class ArgsInfo : public CMessage_ArgsInfo {
-  public:
-    int argc;
-    char **argv;
-    ArgsInfo(void) { argc = 0; argv=0; }
-    ArgsInfo(int c, char **v) { argc = c; argv = v; }
-    void setargs(int c, char**v) { argc = c; argv = v; }
-    static void* pack(ArgsInfo*);
-    static ArgsInfo* unpack(void*);
+class argvPupable {
+	bool isSeparate;//Separately allocated strings
+	char **argv;
+ public:
+	char **getArgv(void) {return argv;}
+	int getArgc(void) const {return CmiGetArgc(argv);}
+	argvPupable() {argv=NULL;isSeparate=false;}
+	argvPupable(char **argv_) {argv=argv_; isSeparate=false;}
+	argvPupable(const argvPupable &p);
+	~argvPupable();
+	void pup(PUP::er &p);
+};
+PUPmarshall(argvPupable);
+
+//A simple destructive-copy memory buffer
+class memBuf {
+	int bufSize;
+	char *buf;
+	void make(int size=0) {
+		clear();
+		bufSize=size;
+		if (bufSize>0) buf=new char[bufSize];
+		else buf=NULL;
+	}
+	void steal(memBuf &b) {
+		bufSize=b.bufSize;
+		buf=b.buf;
+		b.bufSize=-1;
+		b.buf=NULL;
+	}
+	void clear(void) { if (buf!=NULL) {delete[] buf; buf=NULL;} }
+	//No copy semantics:
+	memBuf(memBuf &b);
+	memBuf &operator=(memBuf &b);
+ public:
+	memBuf() {buf=NULL; bufSize=0;}
+	memBuf(int size) {buf=NULL; make(size);}
+	~memBuf() {clear();}
+	void setSize(int s) {make(s);}
+	int getSize(void) const {return bufSize;}
+	const void *getData(void) const {return (const void *)buf;}
+	void *getData(void) {return (void *)buf;}
 };
 
-class DirMsg : public CMessage_DirMsg {
-  public:
-    char *dname;
-    DirMsg(char* d) { dname = new char[strlen(d)+1]; strcpy(dname, d); }
-    ~DirMsg() { delete[] dname; }
-    static void *pack(DirMsg *m)
-    {
-      void *buf = CkAllocBuffer(m, strlen(m->dname)+1);
-      strcpy((char*)buf, m->dname);
-      delete m;
-      return buf;
-    }
-    static DirMsg* unpack(void *buf)
-    {
-      DirMsg *m = (DirMsg*) CkAllocBuffer(buf, sizeof(DirMsg));
-      m = new ((void*)m) DirMsg((char*)buf);
-      CkFreeMsg(buf);
-      return m;
-    }
-};
+template <class T>
+void pupIntoBuf(memBuf &b,T &t) {
+	PUP::sizer ps;ps|t;
+	b.setSize(ps.size());
+	PUP::toMem pm(b.getData()); pm|t;	
+}
+
+template <class T>
+void pupFromBuf(const void *data,T &t) {
+	PUP::fromMem p(data); p|t;
+}
 
 class AmpiMsg : public CMessage_AmpiMsg {
  public:
@@ -205,72 +172,21 @@ class AmpiMsg : public CMessage_AmpiMsg {
   }
 };
 
-#define AMPI_MAXUDATA 20
-
 class ampi : public ArrayElement1D {
-    char str[128];
-  protected:
+	//char str[128];    
+    CProxy_TCharm threads;
+    TCharm *thread;
+    int ampiBlockedThread;
     void prepareCtv(void);
   public: // entry methods
-    ampi(AmpiStartMsg *);
-    ampi(CkMigrateMessage *msg) {}
+    ampi(int commidx_,CProxy_TCharm threads_);
+    ampi(CkMigrateMessage *msg);
+    void ckJustMigrated(void);
     ~ampi();
-
-    int getIndex(void) const {return thisIndex;}
-    int getArraySize(void) const {return numElements;}
-
-
-    void run(ArgsInfo *);
-    void run(void);
+    
+    virtual void pup(PUP::er &p);
     void generic(AmpiMsg *);
-    void migrate(void)
-    {
-#if CMK_LBDB_ON
-      AtSync();
-#endif
-    }
-    void saveState(void)
-    {
-      FILE *fp = fopen(str, "wb");
-      if(fp!=0) {
-        PUP::toDisk p(fp); p.becomeUserlevel();
-        pup(p);
-      } else {
-        CkError("Cannot checkpoint to file %s! Continuing...\n");
-      }
-      if(cthread_id) {
-        CthAwaken(cthread_id);
-        cthread_id = 0;
-      }
-      return;
-    }
-    void checkpoint(DirMsg *msg);
-    void restart(DirMsg *);
-    void restartThread(char *dname)
-    {
-      sprintf(str, "%s/%d/%d.cpt", dname, commidx, thisIndex);
-      FILE *fp = fopen(str, "rb");
-      if(fp!=0) {
-        PUP::fromDisk p(fp); p.becomeUserlevel();
-        pup(p);
-        if(cthread_id) {
-          CthAwaken(cthread_id);
-          cthread_id = 0;
-        }
-      } else {
-        CkAbort("Canot open restart file for reading!\n");
-      }
-      return;
-    }
-    void start_running(void)
-    {
-      ckStartTiming();
-    }
-    void stop_running(void)
-    {
-      ckStopTiming();
-    }
-
+    
   public: // to be used by AMPI_* functions
     void send(int t1, int t2, void* buf, int count, int type, int idx, int comm);
     static void sendraw(int t1, int t2, void* buf, int len, CkArrayID aid, 
@@ -281,14 +197,13 @@ class ampi : public ArrayElement1D {
     void barrier(void);
     void bcast(int root, void* buf, int count, int type);
     static void bcastraw(void* buf, int len, CkArrayID aid);
-    int register_userdata(void *, AMPI_PupFn);
-    void *get_userdata(int);
+
+    inline int getIndex(void) const {return thisIndex;}
+    inline int getArraySize(void) const {return numElements;}
   public:
+    //These are directly used by , which is hideous
     int commidx;
     CmmTable msgs;
-    CthThread thread_id;
-    CthThread mthread_id;
-    CthThread cthread_id;
     int nbcasts;
     PersReq requests[100];
     int nrequests;
@@ -296,20 +211,6 @@ class ampi : public ArrayElement1D {
     int nirequests;
     int firstfree;
     DDT *myDDT ;
-    int nudata;
-    void *userdata[AMPI_MAXUDATA];
-    AMPI_PupFn pup_ud[AMPI_MAXUDATA];
-
-    virtual void pup(PUP::er &p);
-    virtual void start(void); // should be overloaded in derived class
-    void ResumeFromSync(void)
-    {
-      if (mthread_id)
-      {
-        CthAwaken(mthread_id);
-        mthread_id = 0;
-      }
-    }
 };
 
 #endif
