@@ -76,17 +76,17 @@ extern int     _nodeBocHandlerIdx;
 extern int     _qdHandlerIdx;
 extern CmiNodeLock _nodeLock;
 
-CpvExtern(void*,       _currentChare);
-CpvExtern(int,       _currentChareType);
-CpvExtern(CkGroupID,         _currentGroup);
-CpvExtern(CkGroupID,         _currentNodeGroup);
-CpvExtern(GroupTable, _groupTable);
-CpvExtern(unsigned int, _numGroups);
+CkpvExtern(void*,       _currentChare);
+CkpvExtern(int,       _currentChareType);
+CkpvExtern(CkGroupID,         _currentGroup);
+CkpvExtern(CkGroupID,         _currentNodeGroup);
+CkpvExtern(GroupTable, _groupTable);
+CkpvExtern(unsigned int, _numGroups);
 extern unsigned int _numNodeGroups;
 
 static inline Group *_localBranch(CkGroupID gID)
 {
-  return CpvAccess(_groupTable).find(gID).getObj();
+  return CkpvAccess(_groupTable).find(gID).getObj();
 }
 
 extern GroupTable*    _nodeGroupTable;

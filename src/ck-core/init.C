@@ -8,7 +8,7 @@
 #include "ck.h"
 #include "trace.h"
 
-#define  DEBUGF(x)   /* printf x */ 
+#define  DEBUGF(x)   // CmiPrintf x;
 
 UChar _defaultQueueing = CK_QUEUEING_FIFO;
 
@@ -33,24 +33,24 @@ CkOutStream ckout;
 CkErrStream ckerr;
 CkInStream  ckin;
 
-CpvDeclare(void*,       _currentChare);
-CpvDeclare(int,         _currentChareType);
-CpvDeclare(CkGroupID,   _currentGroup);
-CpvDeclare(CkGroupID,   _currentNodeGroup);
-CpvDeclare(GroupTable, _groupTable);
-CpvDeclare(UInt, _numGroups);
+CkpvDeclare(void*,       _currentChare);
+CkpvDeclare(int,         _currentChareType);
+CkpvDeclare(CkGroupID,   _currentGroup);
+CkpvDeclare(CkGroupID,   _currentNodeGroup);
+CkpvDeclare(GroupTable, _groupTable);
+CkpvDeclare(UInt, _numGroups);
 UInt _numNodeGroups;
 GroupTable* _nodeGroupTable = 0;
 
-CpvDeclare(Stats*, _myStats);
-CpvDeclare(MsgPool*, _msgPool);
+CkpvDeclare(Stats*, _myStats);
+CkpvDeclare(MsgPool*, _msgPool);
 
-CpvDeclare(_CkOutStream*, _ckout);
-CpvDeclare(_CkErrStream*, _ckerr);
+CkpvDeclare(_CkOutStream*, _ckout);
+CkpvDeclare(_CkErrStream*, _ckerr);
 
-CpvStaticDeclare(int,  _numInitsRecd); /* UInt changed to int */
-CpvStaticDeclare(PtrQ*, _buffQ);
-CpvStaticDeclare(PtrVec*, _bocInitVec);
+CkpvStaticDeclare(int,  _numInitsRecd); /* UInt changed to int */
+CkpvStaticDeclare(PtrQ*, _buffQ);
+CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
 static PtrVec* _nodeBocInitVec;
 
@@ -90,17 +90,20 @@ static inline void _parseCommandLineOpts(char **argv)
 
 static void _bufferHandler(void *msg)
 {
-  CpvAccess(_buffQ)->enq(msg);
+  DEBUGF(("[%d] _bufferHandler called.\n", CkMyPe()));
+  CkpvAccess(_buffQ)->enq(msg);
 }
 
 static void _discardHandler(envelope *env)
 {
+  DEBUGF(("[%d] _discardHandler called.\n", CkMyPe()));
   CmiFree(env);
 }
 
 #ifndef CMK_OPTIMIZE
 static inline void _printStats(void)
 {
+  DEBUGF(("[%d] _printStats\n", CkMyPe()));
   int i;
   if(_printSS || _printCS) {
     Stats *total = new Stats();
@@ -142,18 +145,20 @@ static inline void _printStats(void) {}
 
 static inline void _sendStats(void)
 {
+  DEBUGF(("[%d] _sendStats\n", CkMyPe()));
 #ifndef CMK_OPTIMIZE
-  envelope *env = UsrToEnv(CpvAccess(_myStats));
+  envelope *env = UsrToEnv(CkpvAccess(_myStats));
 #else
   envelope *env = _allocEnv(StatMsg);
 #endif
   env->setSrcPe(CkMyPe());
   CmiSetHandler(env, _exitHandlerIdx);
-  CmiSyncSendAndFree(0, env->getTotalsize(), env);
+  CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 }
 
 static void _exitHandler(envelope *env)
 {
+  DEBUGF(("exitHandler called on %d msgtype: %d\n", CkMyPe(), env->getMsgtype()));
   switch(env->getMsgtype()) {
     case ExitMsg:
       CkAssert(CkMyPe()==0);
@@ -162,17 +167,18 @@ static void _exitHandler(envelope *env)
         return;
       }
       _exitStarted = 1; 
-      CmiNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
-      CmiNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
-      CmiNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
+      CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
+      CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
+      CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
-      CmiSyncBroadcastAllAndFree(env->getTotalsize(), env);
+      CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
       break;
     case ReqStatMsg:
-      CmiNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
-      CmiNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
-      CmiNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
+      DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
+      CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
+      CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
+      CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
       CmiFree(env);
       _sendStats();
       _mainDone = 1; // This is needed because the destructors for
@@ -181,8 +187,10 @@ static void _exitHandler(envelope *env)
 		     // is 0, it will assume that the readonly variable was
 		     // declared locally. On all processors other than 0, 
 		     // _mainDone is never set to 1 before the program exits.
+#ifndef __BLUEGENE__
       if(CkMyPe())
         ConverseExit();
+#endif
       break;
     case StatMsg:
       CkAssert(CkMyPe()==0);
@@ -190,24 +198,29 @@ static void _exitHandler(envelope *env)
       _allStats[env->getSrcPe()] = (Stats*) EnvToUsr(env);
 #endif
       _numStatsRecd++;
+      DEBUGF(("StatMsg on %d with %d\n", CkMyPe(), _numStatsRecd));
       if(_numStatsRecd==CkNumPes()) {
         _printStats();
         _TRACE_END_COMPUTATION();
+#ifdef __BLUEGENE__
+        BgShutdown();
+#else
         ConverseExit();
+#endif
       }
       break;
     default:
-      CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
+      CmiAbort("Internal Error(_exitHandler): Unknown-msg-type. Contact Developers.\n");
   }
 }
 
 static inline void _processBufferedBocInits(void)
 {
   register envelope *env;
-  CmiNumberHandler(_bocHandlerIdx, (CmiHandler)_processHandler);
+  CkNumberHandler(_bocHandlerIdx, (CmiHandler)_processHandler);
   register int i = 0;
-  register int len = CpvAccess(_bocInitVec)->length();
-  register void **vec = CpvAccess(_bocInitVec)->getVec();
+  register int len = CkpvAccess(_bocInitVec)->length();
+  register void **vec = CkpvAccess(_bocInitVec)->getVec();
   for(i=0; i<len; i++) {
     env = (envelope *) vec[i];
     if(env==0) continue;
@@ -215,13 +228,13 @@ static inline void _processBufferedBocInits(void)
       CkUnpackMessage(&env);
     _processBocInitMsg(env);
   }
-  delete CpvAccess(_bocInitVec);
+  delete CkpvAccess(_bocInitVec);
 }
 
 static inline void _processBufferedNodeBocInits(void)
 {
   register envelope *env;
-  CmiNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_processHandler);
+  CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_processHandler);
   register int i = 0;
   register int len = _nodeBocInitVec->length();
   register void **vec = _nodeBocInitVec->getVec();
@@ -237,23 +250,23 @@ static inline void _processBufferedNodeBocInits(void)
 
 static inline void _processBufferedMsgs(void)
 {
-  CmiNumberHandler(_charmHandlerIdx,(CmiHandler)_processHandler);
+  CkNumberHandler(_charmHandlerIdx,(CmiHandler)_processHandler);
   envelope *env;
-  while(NULL!=(env=(envelope*)CpvAccess(_buffQ)->deq())) {
+  while(NULL!=(env=(envelope*)CkpvAccess(_buffQ)->deq())) {
     if(env->getMsgtype()==NewChareMsg || env->getMsgtype()==NewVChareMsg) {
       if(env->isForAnyPE())
         CldEnqueue(CLD_ANYWHERE, env, _infoIdx);
       else
-        CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), env);
+        CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), (char *)env);
     } else {
-      CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), env);
+      CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), (char *)env);
     }
   }
 }
 
 static int _charmLoadEstimator(void)
 {
-  return CpvAccess(_buffQ)->length();
+  return CkpvAccess(_buffQ)->length();
 }
 
 static void _sendTriggers(void)
@@ -270,7 +283,7 @@ static void _sendTriggers(void)
     first = CmiNodeFirst(CmiMyNode());
     for (i=0; i < num; i++)
       if(first+i != CkMyPe())
-	CmiSyncSend(first+i, env->getTotalsize(), env);
+	CmiSyncSend(first+i, env->getTotalsize(), (char *)env);
     CmiFree(env);
   }
   CmiUnlock(_nodeLock);
@@ -278,22 +291,23 @@ static void _sendTriggers(void)
 
 static inline void _initDone(void)
 {
+  DEBUGF(("[%d] _initDone.\n", CkMyPe()));
   if (!_triggersSent) _sendTriggers(); 
-  CmiNumberHandler(_triggerHandlerIdx, (CmiHandler)_discardHandler); 
-  CmiNumberHandler(_exitHandlerIdx, (CmiHandler)_exitHandler);
+  CkNumberHandler(_triggerHandlerIdx, (CmiHandler)_discardHandler); 
+  CkNumberHandler(_exitHandlerIdx, (CmiHandler)_exitHandler);
   _processBufferedBocInits();
-  if(CmiMyRank() == 0) {
+  if(CkMyRank() == 0) {
     _processBufferedNodeBocInits();
   }
-  DEBUGF(("Reached CmiNodeBarrier(), pe = %d, rank = %d\n", CmiMyPe(), CmiMyRank()));
+  DEBUGF(("Reached CmiNodeBarrier(), pe = %d, rank = %d\n", CkMyPe(), CkMyRank()));
   CmiNodeBarrier();
-  DEBUGF(("Crossed CmiNodeBarrier(), pe = %d, rank = %d\n", CmiMyPe(), CmiMyRank()));
+  DEBUGF(("Crossed CmiNodeBarrier(), pe = %d, rank = %d\n", CkMyPe(), CkMyRank()));
   _processBufferedMsgs();
 }
 
 static void _triggerHandler(envelope *env)
 {
-  if (_numInitMsgs && CpvAccess(_numInitsRecd) + _numInitNodeMsgs == _numInitMsgs)
+  if (_numInitMsgs && CkpvAccess(_numInitsRecd) + _numInitNodeMsgs == _numInitMsgs)
   {
     DEBUGF(("Calling Init Done from _triggerHandler\n"));
     _initDone();
@@ -323,9 +337,9 @@ static void _initHandler(void *msg)
   register envelope *env = (envelope *) msg;
   switch (env->getMsgtype()) {
     case BocInitMsg:
-      CpvAccess(_numInitsRecd)++;
+      CkpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
-      CpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, msg);
+      CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, msg);
       break;
     case NodeBocInitMsg:
       CmiLock(_nodeLock);
@@ -335,13 +349,13 @@ static void _initHandler(void *msg)
       CpvAccess(_qd)->process();
       break;
     case ROMsgMsg:
-      CpvAccess(_numInitsRecd)++;
+      CkpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
       if(env->isPacked()) CkUnpackMessage(&env);
       _processROMsgMsg(env);
       break;
     case RODataMsg:
-      CpvAccess(_numInitsRecd)+=2;  /*++;*/
+      CkpvAccess(_numInitsRecd)+=2;  /*++;*/
       CpvAccess(_qd)->process();
       _numInitMsgs = env->getCount();
       _processRODataMsg(env);
@@ -349,7 +363,7 @@ static void _initHandler(void *msg)
     default:
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
-  if(_numInitMsgs&&(CpvAccess(_numInitsRecd)+_numInitNodeMsgs==_numInitMsgs)) {
+  if(_numInitMsgs&&(CkpvAccess(_numInitsRecd)+_numInitNodeMsgs==_numInitMsgs)) {
     _initDone();
   }
 }
@@ -360,21 +374,22 @@ static void _initHandler(void *msg)
 extern "C"
 void CkExit(void) 
 {
-  CmiNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
-  CmiNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
-  CmiNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
+  CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
+  CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
+  CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
+  DEBUGF(("[%d] CkExit - _exitStarted:%d %d\n", CkMyPe(), _exitStarted, _exitHandlerIdx));
   if(CkMyPe()==0) {
     if(_exitStarted)
       CsdScheduler(-1);
     envelope *env = _allocEnv(ReqStatMsg);
     env->setSrcPe(CkMyPe());
     CmiSetHandler(env, _exitHandlerIdx);
-    CmiSyncBroadcastAllAndFree(env->getTotalsize(), env);
+    CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
   } else {
     envelope *env = _allocEnv(ExitMsg);
     env->setSrcPe(CkMyPe());
     CmiSetHandler(env, _exitHandlerIdx);
-    CmiSyncSendAndFree(0, env->getTotalsize(), env);
+    CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
   }
   // if CkExit is called inside main(), it will hang here.
   if (_mainDone == 1) CsdScheduler(-1);
@@ -391,33 +406,33 @@ extern void _ckModuleInit(void);
 
 void _initCharm(int argc, char **argv)
 {
-	CpvInitialize(PtrQ*,_buffQ);
-	CpvInitialize(PtrVec*,_bocInitVec);
-	CpvInitialize(void*, _currentChare);
-	CpvInitialize(int,   _currentChareType);
-	CpvInitialize(CkGroupID, _currentGroup);
-	CpvInitialize(CkGroupID, _currentNodeGroup);
-	CpvInitialize(GroupTable, _groupTable);
-	CpvInitialize(UInt, _numGroups);
-//	CpvInitialize(UInt, _numNodeGroups);
-	CpvInitialize(int, _numInitsRecd);
+	CkpvInitialize(PtrQ*,_buffQ);
+	CkpvInitialize(PtrVec*,_bocInitVec);
+	CkpvInitialize(void*, _currentChare);
+	CkpvInitialize(int,   _currentChareType);
+	CkpvInitialize(CkGroupID, _currentGroup);
+	CkpvInitialize(CkGroupID, _currentNodeGroup);
+	CkpvInitialize(GroupTable, _groupTable);
+	CkpvInitialize(UInt, _numGroups);
+//	CkpvInitialize(UInt, _numNodeGroups);
+	CkpvInitialize(int, _numInitsRecd);
 	CpvInitialize(QdState*, _qd);
-	CpvInitialize(MsgPool*, _msgPool);
+	CkpvInitialize(MsgPool*, _msgPool);
 
-	CpvInitialize(_CkOutStream*, _ckout);
-	CpvInitialize(_CkErrStream*, _ckerr);
+	CkpvInitialize(_CkOutStream*, _ckout);
+	CkpvInitialize(_CkErrStream*, _ckerr);
 
-	CpvInitialize(Stats*, _myStats);
-	
-	CpvAccess(_groupTable).init();
-	CpvAccess(_numGroups) = 1; // make 0 an invalid group number
+	CkpvInitialize(Stats*, _myStats);
+
+	CkpvAccess(_groupTable).init();
+	CkpvAccess(_numGroups) = 1; // make 0 an invalid group number
 	_numNodeGroups = 1;
-	CpvAccess(_buffQ) = new PtrQ();
-	_MEMCHECK(CpvAccess(_buffQ));
-	CpvAccess(_bocInitVec) = new PtrVec();
-	_MEMCHECK(CpvAccess(_bocInitVec));
+	CkpvAccess(_buffQ) = new PtrQ();
+	_MEMCHECK(CkpvAccess(_buffQ));
+	CkpvAccess(_bocInitVec) = new PtrVec();
+	_MEMCHECK(CkpvAccess(_bocInitVec));
 	
-	if(CmiMyRank()==0) 
+	if(CkMyRank()==0) 
 	{
 		_nodeLock = CmiCreateLock();
 		_nodeGroupTable = new GroupTable();
@@ -428,23 +443,33 @@ void _initCharm(int argc, char **argv)
 	}
   
 	CmiNodeBarrier();
+#ifdef __BLUEGENE__
+	if(CkMyRank()==0) 
+#endif
+	{
 	CpvAccess(_qd) = new QdState();
 	_MEMCHECK(CpvAccess(_qd));
-	CpvAccess(_numInitsRecd) = -1;  /*0;*/
+        }
+	CkpvAccess(_numInitsRecd) = -1;  /*0;*/
 
-	CpvAccess(_ckout) = new _CkOutStream();
-	_MEMCHECK(CpvAccess(_ckout));
-	CpvAccess(_ckerr) = new _CkErrStream();
-	_MEMCHECK(CpvAccess(_ckerr));
+	CkpvAccess(_ckout) = new _CkOutStream();
+	_MEMCHECK(CkpvAccess(_ckout));
+	CkpvAccess(_ckerr) = new _CkErrStream();
+	_MEMCHECK(CkpvAccess(_ckerr));
 
-	_charmHandlerIdx = CmiRegisterHandler((CmiHandler)_bufferHandler);
-	_initHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
-	_exitHandlerIdx = CmiRegisterHandler((CmiHandler)_bufferHandler);
-	_bocHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
-	_nodeBocHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
+	_charmHandlerIdx = CkRegisterHandler((CmiHandler)_bufferHandler);
+	_initHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
+	_exitHandlerIdx = CkRegisterHandler((CmiHandler)_bufferHandler);
+	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
+	_nodeBocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
+#ifdef __BLUEGENE__
+	if(CkMyRank()==0) 
+#endif
+	{
 	_qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
+        }
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
-	_triggerHandlerIdx = CmiRegisterHandler((CmiHandler)_triggerHandler);
+	_triggerHandlerIdx = CkRegisterHandler((CmiHandler)_triggerHandler);
 	_ckModuleInit();
 
 	CthSetSuspendable(CthSelf(), 0);
@@ -452,7 +477,7 @@ void _initCharm(int argc, char **argv)
 	CldRegisterEstimator((CldEstimator)_charmLoadEstimator);
 
 	_futuresModuleInit(); // part of futures implementation is a converse module
-	if(CmiMyRank()==0) 
+	if(CkMyRank()==0) 
 	{
 		_parseCommandLineOpts(argv);
 		_registerInit();
@@ -471,13 +496,13 @@ void _initCharm(int argc, char **argv)
 	}
 
 	_TRACE_BEGIN_COMPUTATION();
-	CpvAccess(_myStats) = new Stats();
-	_MEMCHECK(CpvAccess(_myStats));
-	CpvAccess(_msgPool) = new MsgPool();
-	_MEMCHECK(CpvAccess(_msgPool));
+	CkpvAccess(_myStats) = new Stats();
+	_MEMCHECK(CkpvAccess(_myStats));
+	CkpvAccess(_msgPool) = new MsgPool();
+	_MEMCHECK(CkpvAccess(_msgPool));
 	CmiNodeBarrier();
 
-	if(CmiMyPe()==0) 
+	if(CkMyPe()==0) 
 	{
 		_allStats = new Stats*[CkNumPes()];
 		_MEMCHECK(_allStats);
@@ -487,8 +512,8 @@ void _initCharm(int argc, char **argv)
 			register int size = _chareTable[_mainTable[i]->chareIdx]->size;
 			register void *obj = malloc(size);
 			_MEMCHECK(obj);
-			CpvAccess(_currentChare) = obj;
-			CpvAccess(_currentChareType) = _mainTable[i]->chareIdx;
+			CkpvAccess(_currentChare) = obj;
+			CkpvAccess(_currentChareType) = _mainTable[i]->chareIdx;
 			register CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
 			msg->argc = CmiGetArgc(argv);
 			msg->argv = argv;
@@ -511,7 +536,7 @@ void _initCharm(int argc, char **argv)
 			CmiSetHandler(env, _initHandlerIdx);
 			if (!env->isPacked() &&  _msgTable[msgIdx]->pack)
 				CkPackMessage(&env);
-			CmiSyncBroadcast(env->getTotalsize(), env);
+			CmiSyncBroadcast(env->getTotalsize(), (char *)env);
 			if (env->isPacked() && _msgTable[msgIdx]->unpack)
 				CkUnpackMessage(&env);
 			CpvAccess(_qd)->create(CkNumPes()-1);
@@ -531,12 +556,23 @@ void _initCharm(int argc, char **argv)
 		env->setCount(++_numInitMsgs);
 		env->setSrcPe(CkMyPe());
 		CmiSetHandler(env, _initHandlerIdx);
-		CmiSyncBroadcastAndFree(env->getTotalsize(), env);
+		CmiSyncBroadcastAndFree(env->getTotalsize(), (char *)env);
 		CpvAccess(_qd)->create(CkNumPes()-1);
 		_initDone();
 	}
 
 }
+
+#ifdef __BLUEGENE__
+void BgEmulatorInit(int argc, char **argv)
+{
+}
+
+void BgNodeStart(int argc, char **argv)
+{
+  _initCharm(argc, argv);
+}
+#endif
 
 // this is needed because on o2k, f90 programs have to have main in
 // fortran90.
