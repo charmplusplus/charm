@@ -1848,12 +1848,22 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 
 #endif
 
+/*
 #if CMK_IMMEDIATE_MSG
 void CmiProbeImmediateMsg()
 {
   CommunicationServerThread(0);
 }
 #endif
+*/
+
+CpvDeclare(int, networkProgressCount);
+int networkProgressPeriod;
+
+void CmiMachineProgressImpl()
+{
+    CommunicationServerThread(0);
+}
 
 /******************************************************************************
  *
@@ -2106,6 +2116,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 
   CsvInitialize(CmiNodeState, NodeState);
   CmiNodeStateInit(&CsvAccess(NodeState));
+
+  CpvInitialize(networkProgressCount, 0);
+  networkProgressPeriod = 0;  
+  CmiGetArgInt(argv, "+networkProgressPeriod", &networkProgressPeriod);
 
   CmiStartThreads(argv);
   ConverseRunPE(everReturn);
