@@ -598,6 +598,7 @@ void arg_init(int argc, char **argv)
   pparam_int(&arg_maxrsh,        16, "maxrsh",        "Maximum number of rsh's to run at a time");
   pparam_str(&arg_shell,          0, "remote-shell",  "which remote shell to use");
   pparam_str(&arg_debugger,       0, "debugger",      "which debugger to use");
+  pparam_str(&arg_display,        0, "display",       "X Display for xterm");
   pparam_flag(&arg_in_xterm,      0, "in-xterm",      "Run each node in an xterm window");
   pparam_str(&arg_xterm,          0, "xterm",         "which xterm to use");
 #endif
@@ -1718,6 +1719,8 @@ char *xstr_gets(buff, size, s)
  *
  ****************************************************************************/
 
+#include <sys/wait.h>
+
 typedef struct prog
 {
   int ifd; xstr ibuf;
@@ -1756,7 +1759,10 @@ void prog_iclose(c)
 void prog_close(c)
     prog c;
 {
+  int status=0;
   prog_flush(c);
+  kill(c->pid,SIGKILL);
+  waitpid(c->pid,&status,0);
   if (c->ibuf) { xstr_free(c->ibuf); close(c->ifd); }
   if (c->obuf) { xstr_free(c->obuf); close(c->ofd); }
   if (c->ebuf) { xstr_free(c->ebuf); close(c->efd); }
@@ -1798,7 +1804,7 @@ prog prog_start(p, argv, useerr)
       dup2(p_stdin[0],0);
       dup2(p_stdout[1],1);
       dup2(useerr?p_stderr[1]:p_stdout[1],2);
-      for(i=3; i<128; i++) close(i);
+      for(i=3; i<1024; i++) close(i);
       execvp(p, argv);
       exit(1);
     }
@@ -1854,6 +1860,7 @@ void rsh_pump(p, nodeno, rank0no, argv)
     prog p; int nodeno, rank0no; char **argv;
 {
   char *arg_nodeprog_r,*arg_currdir_r;
+  char *dbg=nodetab_debugger(nodeno);
   xstr ibuf = p->ibuf;
   int randno = rand();
   /* int randno = CrnRand(); */
@@ -1880,50 +1887,35 @@ void rsh_pump(p, nodeno, rank0no, argv)
     xstr_printf(ibuf,"end\n");
     xstr_printf(ibuf,"if ($?F_XTERM == 0) then\n");
     xstr_printf(ibuf,"   echo '%s not in path --- set your path in your cshrc.'\n", nodetab_xterm(nodeno));
-    xstr_printf(ibuf,"   sleep 1; kill -9 $$\n");
+    xstr_printf(ibuf,"   exit 1\n");
     xstr_printf(ibuf,"endif\n");
     xstr_printf(ibuf,"if ($?F_XRDB == 0) then\n");
     xstr_printf(ibuf,"   echo 'xrdb not in path - set your path in your cshrc.'\n");
-    xstr_printf(ibuf,"   sleep 1; kill -9 $$\n");
+    xstr_printf(ibuf,"   exit 1\n");
     xstr_printf(ibuf,"endif\n");
-    if(arg_verbose) xstr_printf(ibuf,"echo 'using xterm ' $F_XTERM\n");
+    if(arg_verbose) xstr_printf(ibuf,"echo 'using xterm' $F_XTERM\n");
     prog_flush(p);
   }
 
   if (arg_debug || arg_debug_no_pause)
   	{
-	  if ( strcmp(nodetab_debugger(nodeno), "gdb") == 0 ) {
-            xstr_printf(ibuf,"foreach dir ($path)\n");
-            xstr_printf(ibuf,"  if (-e $dir/gdb) setenv F_GDB $dir/gdb\n");
-            xstr_printf(ibuf,"end\n");
-            xstr_printf(ibuf,"if ($?F_GDB == 0) then\n");
-            xstr_printf(ibuf,"   echo 'gdb not in path - set your path in your cshrc.'\n");
-            xstr_printf(ibuf,"   sleep 1; kill -9 $$\n");
-            xstr_printf(ibuf,"endif\n");
-            prog_flush(p);
-	  } else if ( strcmp(nodetab_debugger(nodeno), "dbx") == 0 ) {
-            xstr_printf(ibuf,"foreach dir ($path)\n");
-            xstr_printf(ibuf,"  if (-e $dir/dbx) setenv F_DBX $dir/dbx\n");
-            xstr_printf(ibuf,"end\n");
-            xstr_printf(ibuf,"if ($?F_DBX == 0) then\n");
-            xstr_printf(ibuf,"   echo 'dbx not in path - set your path in your cshrc.'\n");
-            xstr_printf(ibuf,"   sleep 1; kill -9 $$\n");
-            xstr_printf(ibuf,"endif\n");
-            prog_flush(p);
-	  } else {
-	    fprintf(stderr, "Unknown Debugger: %s.\n exiting.\n", 
-	      nodetab_debugger(nodeno));
-	    exit(1);
-	  }
+	  xstr_printf(ibuf,"foreach dir ($path)\n");
+          xstr_printf(ibuf,"  if (-e $dir/%s) setenv F_DBG $dir/%s\n",dbg,dbg);
+          xstr_printf(ibuf,"end\n");
+          xstr_printf(ibuf,"if ($?F_DBG == 0) then\n");
+          xstr_printf(ibuf,"   echo '%s not in path - set your path in your cshrc.'\n",dbg);
+          xstr_printf(ibuf,"   exit 1\n");
+          xstr_printf(ibuf,"endif\n");
+          prog_flush(p);
        }
 
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
     xstr_printf(ibuf,"xrdb -query > /dev/null\n");
     xstr_printf(ibuf,"if ($status != 0) then\n");
-    xstr_printf(ibuf,"  echo 'Cannot contact X Server.  You probably'\n");
+    xstr_printf(ibuf,"  echo 'Cannot contact X Server '$DISPLAY'.  You probably'\n");
     xstr_printf(ibuf,"  echo 'need to run xhost to authorize connections.'\n");
     xstr_printf(ibuf,"  echo '(See manual for xhost for security issues)'\n");
-    xstr_printf(ibuf,"  sleep 1; kill -9 $$\n");
+    xstr_printf(ibuf,"  exit 1\n");
     xstr_printf(ibuf,"endif\n");
     prog_flush(p);
   }
@@ -1931,14 +1923,14 @@ void rsh_pump(p, nodeno, rank0no, argv)
   xstr_printf(ibuf,"if (! -x %s) then\n",arg_nodeprog_r);
   xstr_printf(ibuf,"  echo 'Cannot locate this node-program:'\n");
   xstr_printf(ibuf,"  echo '%s'\n",arg_nodeprog_r);
-  xstr_printf(ibuf,"  sleep 1; kill -9 $$\n");
+  xstr_printf(ibuf,"  exit 1\n");
   xstr_printf(ibuf,"endif\n");
   
   xstr_printf(ibuf,"cd %s\n",arg_currdir_r);
   xstr_printf(ibuf,"if ($status == 1) then\n");
   xstr_printf(ibuf,"  echo 'Cannot propagate this current directory:'\n"); 
   xstr_printf(ibuf,"  echo '%s'\n",arg_currdir_r);
-  xstr_printf(ibuf,"  sleep 1; kill -9 $$\n");
+  xstr_printf(ibuf,"  exit 1\n");
   xstr_printf(ibuf,"endif\n");
   
   if (strcmp(nodetab_setup(nodeno),"*")) {
@@ -1948,12 +1940,13 @@ void rsh_pump(p, nodeno, rank0no, argv)
     xstr_printf(ibuf,"  echo 'this initialization command failed:'\n");
     xstr_printf(ibuf,"  echo '\"%s\"'\n",nodetab_setup(nodeno));
     xstr_printf(ibuf,"  echo 'edit your nodes file to fix it.'\n");
-    xstr_printf(ibuf,"  sleep 1; kill -9 $$\n");
+    xstr_printf(ibuf,"  exit 1\n");
     xstr_printf(ibuf,"endif\n");
   }
-  
+
+  if(arg_verbose) xstr_printf(ibuf,"echo 'starting node-program...'\n");  
   if (arg_debug || arg_debug_no_pause ) {
-	 if ( strcmp(nodetab_debugger(nodeno), "gdb") == 0 ) {
+	 if ( strcmp(dbg, "gdb") == 0 ) {
            xstr_printf(ibuf,"cat > /tmp/gdb%08x << END_OF_SCRIPT\n",randno);
            xstr_printf(ibuf,"shell rm -f /tmp/gdb%08x\n",randno);
            xstr_printf(ibuf,"handle SIGPIPE nostop noprint\n");
@@ -1967,11 +1960,11 @@ void rsh_pump(p, nodeno, rank0no, argv)
            if( arg_debug || arg_debug_no_pause){
              xstr_printf(ibuf,"$F_XTERM");
              xstr_printf(ibuf," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-             xstr_printf(ibuf," -e $F_GDB %s -x /tmp/gdb%08x",arg_nodeprog_r,randno);
+             xstr_printf(ibuf," -e $F_DBG %s -x /tmp/gdb%08x",arg_nodeprog_r,randno);
              xstr_printf(ibuf," < /dev/null >& /dev/null &");
              xstr_printf(ibuf,"\n");
            }
-        } else if ( strcmp(nodetab_debugger(nodeno), "dbx") == 0 ) {
+        } else if ( strcmp(dbg, "dbx") == 0 ) {
           xstr_printf(ibuf,"cat > /tmp/dbx%08x << END_OF_SCRIPT\n",randno);
           xstr_printf(ibuf,"sh rm -f /tmp/dbx%08x\n",randno);
           xstr_printf(ibuf,"dbxenv suppress_startup_message 5.0\n");
@@ -1983,7 +1976,7 @@ void rsh_pump(p, nodeno, rank0no, argv)
           if( arg_debug || arg_debug_no_pause){
             xstr_printf(ibuf,"$F_XTERM");
             xstr_printf(ibuf," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-            xstr_printf(ibuf," -e $F_DBX %s ",arg_debug_no_pause?"-r":"");
+            xstr_printf(ibuf," -e $F_DBG %s ",arg_debug_no_pause?"-r":"");
 	    if(arg_debug) {
               xstr_printf(ibuf,"-c \'runargs ");
               while (*argv) { xstr_printf(ibuf,"%s ",*argv); argv++; }
@@ -2030,7 +2023,7 @@ void rsh_pump(p, nodeno, rank0no, argv)
   }
   
     xstr_printf(ibuf,"echo 'rsh phase successful.'\n");
-    /*    xstr_printf(ibuf,"kill -9 $$\n");*/
+    xstr_printf(ibuf,"exit 0\n");
   prog_flush(p);
   
 }
@@ -2110,6 +2103,7 @@ void start_nodes_rsh(void)
       if (!done) continue;
       rsh_nfinished++;
 
+      prog_close(rsh_prog[i]);
       rsh_prog[i] = 0;
       if (rsh_nstarted==nodetab_rank0_size) break;
       pe = nodetab_rank0_table[rsh_nstarted];
