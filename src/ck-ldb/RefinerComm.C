@@ -135,11 +135,12 @@ void  RefinerComm::deAssign(computeInfo *c, processorInfo *p)
 // how much communication from compute c  to pe
 double RefinerComm::commAffinity(int c, int pe)
 {
+  int i;
   int byteSent=0, msgSent=0, byteRecv=0, msgRecv=0;
   computeInfo &obj = computes[c];
 
   int nSendMsgs = obj.sendmessages.length();
-  for (int i=0; i<nSendMsgs; i++) {
+  for (i=0; i<nSendMsgs; i++) {
     LDCommData &cdata = stats->commData[obj.sendmessages[i]];
     bool sendtope = false;
     if (cdata.receiver.get_type() == LD_OBJ_MSG) {
@@ -163,7 +164,7 @@ double RefinerComm::commAffinity(int c, int pe)
   }  // end of for
 
   int nRecvMsgs = obj.recvmessages.length();
-  for (int i=0; i<nRecvMsgs; i++) {
+  for (i=0; i<nRecvMsgs; i++) {
     LDCommData &cdata = stats->commData[obj.recvmessages[i]];
     int sendProc;
     if (cdata.from_proc()) {
@@ -187,13 +188,14 @@ double RefinerComm::commAffinity(int c, int pe)
 // assume c is on pe, how much comm overhead it will be?
 void RefinerComm::commCost(int c, int pe, int &byteSent, int &msgSent, int &byteRecv, int &msgRecv)
 {
+  int i;
   byteSent=msgSent=byteRecv=msgRecv=0;
   computeInfo &obj = computes[c];
 
   // find out send overhead for every outgoing message that has receiver
   // not same as pe
   int nSendMsgs = obj.sendmessages.length();
-  for (int i=0; i<nSendMsgs; i++) {
+  for (i=0; i<nSendMsgs; i++) {
     LDCommData &cdata = stats->commData[obj.sendmessages[i]];
     bool diffPe = false;
     if (cdata.receiver.get_type() == LD_PROC_MSG) {
@@ -222,7 +224,7 @@ void RefinerComm::commCost(int c, int pe, int &byteSent, int &msgSent, int &byte
   // find out recv overhead for every incoming message that has sender
   // not same as pe
   int nRecvMsgs = obj.recvmessages.length();
-  for (int i=0; i<nRecvMsgs; i++) {
+  for (i=0; i<nRecvMsgs; i++) {
     LDCommData &cdata = stats->commData[obj.recvmessages[i]];
     bool diffPe = false;
     if (cdata.from_proc()) {
