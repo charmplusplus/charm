@@ -237,8 +237,6 @@ static inline void _sendStats(void)
   CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 }
 
-extern void CkDeleteChares();
-
 static void _exitHandler(envelope *env)
 {
   DEBUGF(("exitHandler called on %d msgtype: %d\n", CkMyPe(), env->getMsgtype()));
@@ -270,10 +268,8 @@ static void _exitHandler(envelope *env)
 		     // is 0, it will assume that the readonly variable was
 		     // declared locally. On all processors other than 0, 
 		     // _mainDone is never set to 1 before the program exits.
-      if(CkMyPe()) {
-	CkDeleteChares();
+      if(CkMyPe())
         ConverseExit();
-      }
       break;
     case StatMsg:
       CkAssert(CkMyPe()==0);
@@ -284,7 +280,6 @@ static void _exitHandler(envelope *env)
       DEBUGF(("StatMsg on %d with %d\n", CkMyPe(), _numStatsRecd));
       if(_numStatsRecd==CkNumPes()) {
         _printStats();
-	CkDeleteChares();
         ConverseExit();
       }
       break;
@@ -638,7 +633,7 @@ void _initCharm(int unused_argc, char **argv)
 #endif
  
 
-	CkMessageWatcherInit(argv,CkpvAccess(_coreState));
+CkMessageWatcherInit(argv,CkpvAccess(_coreState));
 
 
 #ifdef __BLUEGENE__

@@ -162,9 +162,9 @@ public:
 class CkLocRec_local : public CkLocRec {
   CkArrayIndexMax idx;/// Element's array index
   int localIdx; /// Local index (into array manager's element lists)
+  CmiBool running; /// True when inside a startTiming/stopTiming pair
   CmiBool *deletedMarker; /// Set this if we're deleted during processing
   CkQ<CkArrayMessage *> halfCreated; /// Stores messages for nonexistent siblings of existing elements
-  CmiBool running; /// True when inside a startTiming/stopTiming pair
 public:
   //Creation and Destruction:
   CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,CmiBool ignoreArrival,
@@ -284,7 +284,6 @@ protected:
   virtual void CkAbort(const char *str) const;
 
   CmiBool usesAtSync;//You must set this in the constructor to use AtSync().
-  CmiBool usesSyncTiming;//You must set this in the constructor to use SyncTiming().
   virtual void ResumeFromSync(void);
   CmiBool barrierRegistered;//True iff barrier handle below is set
 
@@ -296,7 +295,6 @@ private: //Load balancer state:
   LDBarrierClient ldBarrierHandle;//Transient (not migrated)  
   LDBarrierReceiver ldBarrierRecvHandle;//Transient (not migrated)  
   static void staticResumeFromSync(void* data);
-  LDBarrierClient ldStatBarrierHandle;//Transient (not migrated)  
 public:
   void ckFinishConstruction(void);
   void setMigratable(int migratable);

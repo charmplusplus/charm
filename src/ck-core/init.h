@@ -39,7 +39,6 @@ class TableEntry {
 
 template <class dtype>
 class GroupIdxArray {
-  friend class GroupTableIterator;
   // The initial size of the table for groups created on PE 0:
   enum {INIT_BINS_PE0=32};
   
@@ -97,68 +96,10 @@ class GroupIdxArray {
       else
         return nonInlineFind(n);
     }
-
-    inline void nullify(CkGroupID n) {
-      dtype &ent = find(n);
-      ent = dtype(0);     // FIXME free obj
-    }
 };
 
 typedef GroupIdxArray<TableEntry> GroupTable;
 typedef CkVec<CkGroupID> GroupIDTable;
-
-#if 0
-class GroupTableIterator {
-protected:
-	GroupTable * table;
-	CkGroupID curNo;
-	CkHashtableIterator *it;
-public:
-	GroupTableIterator(GroupTable *table_) :table(table_)
-		{curNo.idx=1; it = table->hashTab.iterator()}
-/*
-CkHashtableIterator *it=hash.iterator();
-  while (NULL!=(objp=it->next())) {
-    CkLocRec *rec=*(CkLocRec **)objp;
-    if (rec->type()==CkLocRec::local) {
-      CkLocation loc(this,(CkLocRec_local *)rec);
-      dest.addLocation(loc);
-    }
-  }
-*/
-
-	
-	//Seek to start of hash table
-	void seekStart(void) {curNo.idx=1;}
-	
-	//Seek forward (or back) n hash slots (*not* n objects!)
-	void seek(int n) {
-	  curNo.idx += n;
-          if (curNo.idx < 1) curNo.idx = 1;
-        }
-	
-	//Return 1 if next will be non-NULL
-	int hasNext(void);
-	//Return the next object, or NULL if none.
-	// The corresponding object key will be returned in retKey.
-	TableEntry * next() {
-	  curNo.idx ++;
-          while (curNo.idx > 1 && curNo.idx < table->max) {
-		TableEntry &ent = table->find(curNo);
-		if (ent.getObj()) return &ent;
-          }
-          if (table->hashTab == NULL) return NULL;
-          TableEntry *ret = (TableEntry *)CkHashtableGet(table->hashTab,&(curNo.idx));
-	  while (ret == NULL) 
-
-        if(ret == NULL)  // insert new entry into the table
-        {
-          ret = (dtype *)CkHashtablePut(hashTab,&(n.idx));
-          new (ret) dtype(0); //Call dtype's constructor (ICK!)
-        }
-	}
-};
-#endif
 
 typedef void (*CkInitCallFn)(void);
 class InitCallTable 
