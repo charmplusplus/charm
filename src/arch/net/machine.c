@@ -1791,14 +1791,6 @@ static void ConverseRunPE(int everReturn)
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
 
-#if MACHINE_DEBUG_LOG
-  {
-    char ln[200];
-    sprintf(ln,"debugLog.%d",CmiMyNode());
-    debugLog=fopen(ln,"w");
-  }
-#endif
-
   /* all non 0 rank use the copied one while rank 0 will modify the actual argv */
   if (CmiMyRank())
     CmiMyArgv = CmiCopyArgs(Cmi_argvcopy);
@@ -1976,6 +1968,14 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   log_init();
   Cmi_scanf_mutex = CmiCreateLock();
 
+#if MACHINE_DEBUG_LOG
+  {
+    char ln[200];
+    sprintf(ln,"debugLog.%d",_Cmi_mynode);
+    debugLog=fopen(ln,"w");
+  }
+#endif
+
   skt_set_idle(obtain_idleFn);
   if (!skt_ip_match(Cmi_charmrun_IP,_skt_invalid_ip)) {
   	set_signals();
@@ -1986,6 +1986,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #else
         dataskt=-1;
 #endif
+	MACHSTATE2(5,"skt_connect at dataskt:%d Cmi_charmrun_port:%d",dataskt, Cmi_charmrun_port);
   	Cmi_charmrun_fd = skt_connect(Cmi_charmrun_IP, Cmi_charmrun_port, 1800);
 	MACHSTATE1(5,"Opened data socket at port %d",dataport);
 	CmiStdoutInit();
