@@ -572,35 +572,14 @@ Debugf "----------- Module dependency search complete ------------"
 #
 ##############################################################################
 
-# Load machine-specific defaults:
-CMK_C_OPTIMIZE="-O"
-CMK_CXX_OPTIMIZE="-O"
-CMK_F90_OPTIMIZE="-O"
-CMK_C_DEBUG="-g"
-CMK_CXX_DEBUG="-g"
-CMK_F90_DEBUG="-g"
-
-CMK_CF90_FIXED="none"
-
-if [ -r $CHARMINC/conv-mach-pre.sh ]
-then
-. $CHARMINC/conv-mach-pre.sh
-fi
-
-if [ ! -r $CHARMINC/conv-mach.sh ]
-then
-	Abort "Can't find conv-mach.sh in $CHARMINC directory."
-fi
 
 Debug "About to read machine config script"
-. $CHARMINC/conv-mach.sh
+Debug "Read config script, setting defaults..."
 
-if [ -r $CHARMINC/conv-mach-opt.sh ]
-then
-. $CHARMINC/conv-mach-opt.sh
-fi
+[ ! -r $CHARMINC/conv-config.sh ] && Abort "Cannot find conv-config.sh in $CHARMINC"
+. $CHARMINC/conv-config.sh $CHARMINC
 
-Debug "Read config script, setting vars..."
+Debug "Setting vars..."
 
 if [ -n "$USE_RELIABLE_CC" ]
 then
@@ -610,11 +589,6 @@ fi
 if [ -n "$USE_FASTEST_CC" ]
 then
     CMK_CC="$CMK_CC_FASTEST"
-fi
-
-if [ "$CMK_CF90_FIXED" = "none" ]
-then
-   CMK_CF90_FIXED="$CMK_CF90"
 fi
 
 if [ -n "$CMK_F90_MODINC" ]
@@ -634,16 +608,10 @@ then
     CMK_CC="$CMK_SEQ_CC -DCMK_SEQUENTIAL=1 "
     CMK_LD="$CMK_SEQ_LD"
     CMK_CXX="$CMK_SEQ_CXX -DCMK_SEQUENTIAL=1 " 
-    CMK_CF90="$CMK_SEQ_F90 -DCMK_SEQUENTIAL=1 " 
+    CMK_CF90="$CMK_SEQ_F90 " 
     CMK_LDXX="$CMK_SEQ_LDXX" 
-    if [ -n "$CMK_SEQ_AR" ]
-    then
-      CMK_AR="$CMK_SEQ_AR"
-    fi
-    if [ -n "$CMK_SEQ_RANLIB" ]
-    then
-      CMK_RANLIB="$CMK_SEQ_RANLIB"
-    fi
+    CMK_AR="$CMK_SEQ_AR"
+    CMK_RANLIB="$CMK_SEQ_RANLIB"
 fi
 
 if [ -n "$OVERRIDE_CC" ]
@@ -917,16 +885,62 @@ case "$OBJECT" in
 	Copyobj
 	;;
 esac
-# If the above case returns, we're not creating a .o or .a file--
-# check if we're linking a sequential object
+# If the above case returns, we're not creating a .o or .a file,
+# so linking is needed.
 
+############ Determine the language and libraries ##########
+
+# Parse out the real languages
+case "$LANGUAGE" in
+"charm++f")
+	LANGUAGE="charm++"
+	USE_F90_LIBRARIES="1"
+	;;
+"f90charm")
+        PRE_LIBRARIES="$PRE_LIBRARIES -lf90charm "
+        POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
+	;;
+"bluegene")
+        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene"
+	;;
+"ckbluegene")
+        POST_LIBRARIES="$POST_LIBRARIES -lbluegene"
+	;;
+"bgcharm++")
+        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene"
+	;;
+esac
+[ -r $CHARMLIB/libconv-utilf.a ] || USE_F90_LIBRARIES="0"
+
+if [ $USE_F90_LIBRARIES = "1" ]
+then
+	POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf $CMK_F90LIBS"
+        if [ -z "$SEQUENTIAL" -a ! -z "$CMK_F90OBJS" ] 
+        then
+          for f90obj in $CMK_F90OBJS
+          do
+            OBJECTFILES="$OBJECTFILES $CHARMLIB/$f90obj"
+          done
+        fi
+fi
+
+# Add the modules to the link list
+LINK_MODULES=""
+for module in $MODULES; do
+    LINK_MODULES="$LINK_MODULES -lmodule$module"
+done
+PRE_LIBRARIES="$LINK_MODULES $PRE_LIBRARIES"
+
+# check if we're linking a sequential object
 case "$LANGUAGE" in
 "c"|"C"|"f90"|"f77")
-	Do $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
+	Do $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES \
+		-L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
 	Copyobj
 	;;
 "c++"|"C++")
-	Do $CMK_SEQ_LDXX $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
+	Do $CMK_SEQ_LDXX $OPTS_LD -o $OBJECT $OBJECTFILES \
+		-L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
 	Copyobj
 	;;
 esac
@@ -996,49 +1010,6 @@ fi
 MEM_OBJ="$CHARMLIB/libmemory-$MEMORY.o"
 
 [ ! -r $MEM_OBJ ] && Abort "charmc : No such memory mode $MEMORY"
-
-############ Determine the language and libraries ##########
-
-# Parse out the real languages
-case "$LANGUAGE" in
-"charm++f")
-	LANGUAGE="charm++"
-	USE_F90_LIBRARIES="1"
-	;;
-"f90charm")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lf90charm "
-        POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
-	;;
-"bluegene")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene"
-	;;
-"ckbluegene")
-        POST_LIBRARIES="$POST_LIBRARIES -lbluegene"
-	;;
-"bgcharm++")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene"
-	;;
-esac
-[ -r $CHARMLIB/libconv-utilf.a ] || USE_F90_LIBRARIES="0"
-
-if [ $USE_F90_LIBRARIES = "1" ]
-then
-	POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf $CMK_F90LIBS"
-        if [ ! -z "$CMK_F90OBJS" ] 
-        then
-          for f90obj in $CMK_F90OBJS
-          do
-            OBJECTFILES="$OBJECTFILES $CHARMLIB/$f90obj"
-          done
-        fi
-fi
-
-# Add the modules to the link list
-LINK_MODULES=""
-for module in $MODULES; do
-    LINK_MODULES="$LINK_MODULES -lmodule$module"
-done
-PRE_LIBRARIES="$LINK_MODULES $PRE_LIBRARIES"
 
 ################# Build the module initialization function ##################
 modInitName="moduleinit"

@@ -114,7 +114,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h queueing.h
       trace.h charm-api.h conv-ccs.h ccs-client.c ccs-client.h CcsServer.java\
       ccs-server.h ccs-auth.c ccs-auth.h \
       memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
-      conv-common.h conv-mach.h conv-mach.sh \
+      conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh \
       CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkReduction.decl.h CkArrayReductionMgr.decl.h\
       CkFutures.decl.h LBDatabase.decl.h CentralLB.decl.h NullLB.decl.h CkCheckpoint.decl.h\
       RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h \
@@ -208,7 +208,7 @@ dirs+sources:
 	chmod +x ../bin/charmc
 	rm -f .gdir
 	rm -rf ../include ; mkdir ../include
-	-./system_ln  ../tmp/conv-mach*.*h ../include
+	-./system_ln  ../tmp/conv-*.*h ../include
 	-./system_ln  ../tmp/cc-*.*h ../include
 	if [ ! -f conv-common.h ] ; then ( touch conv-common.h ) ; fi
 	touch dirs+sources
@@ -261,7 +261,7 @@ fmain-ok: fmain.f90
 	-@touch fmain-ok
 
 QuickThreads/libqt.a:
-	. ./conv-mach.sh;. ./conv-mach-opt.sh; cd QuickThreads;./configure $$CMK_QT
+	cd QuickThreads;./configure
 	rm -f QuickThreads/libqt.a
 	cd QuickThreads ; make qt  OPTS='$(OPTS)'
 	cp QuickThreads/libqt.a ../lib/libckqt.a
