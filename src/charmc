@@ -472,7 +472,7 @@ endsw
 # Check for valid choice of QUEUE
 # Check for valid choice of BALANCE
 # Check for compatibility among BALANCE, QUEUE, and EXECMODE
-# Create module-init.TMP.o
+# Create MODULES.TMP.o
 # Do the linkage.
 #
 ##############################################################################
