@@ -402,19 +402,22 @@ static ampi *ampiInit(char **argv)
 	int new_idx=mpi_nworlds;
 	MPI_Comm new_world=MPI_COMM_WORLD+1+new_idx;
 
-        //CProxy_ComlibManager comlib = CProxy_ComlibManager::ckNew(strat, 1);
-	//comlib.ckLocalBranch()->createId();
-	EachToManyMulticastStrategy *strategy = new EachToManyMulticastStrategy(strat);
-        ComlibInstanceHandle cinst = ComlibRegisterStrategy(strategy); 
-
-	//Create and attach the ampiParent array
+        ComlibInstanceHandle cinst; 
+        cinst.init();
+        
+        //Create and attach the ampiParent array
 	CkArrayID threads; int _nchunks;
         CkArrayOptions opts=TCHARM_Attach_start(&threads,&_nchunks);
 	CProxy_ampiParent parent;
-	parent=CProxy_ampiParent::ckNew(new_world,threads,cinst,opts);
+	parent=CProxy_ampiParent::ckNew(new_world,threads,cinst, opts);
+
+        //CProxy_ComlibManager comlib = CProxy_ComlibManager::ckNew(strat, 1);
+	//comlib.ckLocalBranch()->createId();
+	EachToManyMulticastStrategy *strategy = new EachToManyMulticastStrategy(strat, parent.ckGetArrayID());
+        cinst.setStrategy(strategy);
         
-        strategy->setSourceArray(parent.ckGetArrayID());
-        strategy->setDestArray(parent.ckGetArrayID());
+        //strategy->setSourceArray(parent.ckGetArrayID());
+        //strategy->setDestArray(parent.ckGetArrayID());
 
 	//Make a new ampi array
 	CkArrayID empty;
@@ -460,8 +463,8 @@ public:
 };
 
 //-------------------- ampiParent -------------------------
-ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_, ComlibInstanceHandle cinst_)
-	:threads(threads_), comlib(cinst_), worldNo(worldNo_)
+ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_, ComlibInstanceHandle comlib_)
+    :threads(threads_), worldNo(worldNo_), comlib(comlib_)
 {
   STARTUP_DEBUG("ampiParent> starting up")
   thread=NULL;
