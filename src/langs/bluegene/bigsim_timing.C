@@ -7,6 +7,9 @@
 
 #define max(a,b) ((a)>=(b)?(a):(b))
 
+//temporary
+static int testCount = 0;
+
 CpvStaticDeclare(int, msgCounter);
 
 /**
@@ -82,6 +85,7 @@ void bgTimeLog::write(FILE *fp)
 
 void bgTimeLog::adjustTimeLog(double tAdjust)
 {
+	//arg tAdjust is a relative time
 	if(tAdjust == 0) return;
 
 	startTime += tAdjust;
@@ -92,7 +96,8 @@ void bgTimeLog::adjustTimeLog(double tAdjust)
 		bgCorrectionMsg *msg = (bgCorrectionMsg *)CmiAlloc(sizeof(bgCorrectionMsg));
 		msg->msgID = msgs[i]->msgID;
 		msg->tID = msgs[i]->tID;
-		msg->tAdjust = tAdjust;
+		//msg->tAdjust is absolute recvTime at destination node
+		msg->tAdjust = msgs[i]->recvTime + tAdjust;
 		msg->destNode = msgs[i]->dstPe;
 		
 		CmiSetHandler(msg, CpvAccess(bgCorrectionHandler));
@@ -104,11 +109,24 @@ void BgGetMsgStartTime(double recvTime, BgTimeLine &tline, double* startTime, in
 {
 	/* ASSUMPTION: BgGetMsgStartTime is called only if necessary */
 
-	//FIXME
-	//replace linear search by binary search algorithm
+	// binary search: index of FIRST entry in tline whose recvTime is 
+	// greater then arg 'recvTime'
+	int low = 0, high = tline.length();
 	int idx = 0;
-	while((idx < tline.length()) && (recvTime >= tline[idx]->recvTime))
-		idx++;
+	while(1) {
+		idx = (low + high)/2;
+		if(recvTime < tline[idx]->recvTime) {
+			if(idx == low || recvTime >= tline[idx-1]->recvTime) { break; }
+			else { high = idx; }
+		}
+		else {
+			low = idx+1;
+			if(low == tline.length()) {
+				idx = low;
+				break;
+			}
+		}
+	}
 
 	if(idx==0 || tline[idx-1]->endTime <= recvTime) {
 		*startTime = recvTime;
@@ -123,6 +141,7 @@ void BgGetMsgStartTime(double recvTime, BgTimeLine &tline, double* startTime, in
 	*index = idx;
 }
 
+// move the last entry in BgTimeLine to it's proper position
 void BgAdjustTimeLineInsert(BgTimeLine &tline)
 {
 	/* ASSUMPTION: no error testing needed */
@@ -144,6 +163,8 @@ void BgAdjustTimeLineInsert(BgTimeLine &tline)
 	/* store entry corresponding to 'msg' in timeline at 'idx' */
 	tline.insert(idx, tlog);
 
+
+	// tAdjust is relative time
 	double tAdjust = startTime - tlog->startTime;
 	tline[idx]->adjustTimeLog(tAdjust);	// tAdjust would be '0' or -ve
 
@@ -159,26 +180,32 @@ void BgAdjustTimeLineInsert(BgTimeLine &tline)
 	}
 }
 
-void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline)
+void BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline)
 {
 	/* ASSUMPTION: BgAdjustTimeLineForward is called only if necessary */
 	/* ASSUMPTION: no error testing needed */
 
-//	CmiPrintf("BgAdjustTimeLineForward\n"); 
-	if(tAdjust == 0) return;
 
-	//FIXME can this search be made faster than linear search ?
-	int idxOld = 0;
-	while((idxOld < tline.length()) && (tline[idxOld]->msgID != msgID))
-		idxOld++;
+	// CmiPrintf("BgAdjustTimeLineForward\n"); 
+	testCount++;
+	if((testCount%1000)==0)
+			CmiPrintf("BgAdjustTimeLineForward\n");
+
+
+	// FIXME can this search be made faster than linear search ?
+	// It cannot be made binary search, since there is no ordering for msgIDs
+	int idxOld = tline.length()-1;
+	while((idxOld >= 0) && (tline[idxOld]->msgID != msgID))
+		idxOld--;
 
 	int idx=0;
 	double startTime=0;
 	bgTimeLog* tlog = tline.remove(idxOld);
-	tlog->recvTime += tAdjust;
+
+	tlog->recvTime = tAdjustAbs;
 	BgGetMsgStartTime(tlog->recvTime, tline, &startTime, &idx);
 	tline.insert(idx, tlog);
-	tAdjust = startTime - tlog->startTime;
+	double tAdjust = startTime - tlog->startTime;
 	tline[idx]->adjustTimeLog(tAdjust);
 
 	if(tAdjust==0) return;

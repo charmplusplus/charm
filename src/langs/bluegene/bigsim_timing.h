@@ -11,11 +11,11 @@
 class bgCorrectionMsg
 {
 public:
-  char   core[CmiBlueGeneMsgHeaderSizeBytes];
-  int    msgID;	
-  CmiUInt2    tID;		// destination worker thread ID
-  double tAdjust;	// correction in recvTime at destPe
-  int 	 destNode;
+  char     core[CmiBlueGeneMsgHeaderSizeBytes];
+  int      msgID;	
+  CmiUInt2 tID;		// destination worker thread ID
+  double   tAdjust;	// new absolute value of recvTime at destPe
+  int 	   destNode;
 };
 
 /**
@@ -71,7 +71,7 @@ extern void BgPrintThreadTimeLine(int node, int th, BgTimeLine &tline);
 extern void BgWriteThreadTimeLine(char **argv, int x, int y, int z, int th, BgTimeLine &tline);
 extern void BgGetMsgStartTime(double recvTime, BgTimeLine &tline, double* startTime, int index);
 extern void BgAdjustTimeLineInsert(BgTimeLine &tline);
-extern void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline);
+extern void BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline);
 
 #if BLUEGENE_TIMING
 
