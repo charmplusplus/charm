@@ -82,243 +82,6 @@ void CcsImpl_kill(void)
   }
 }
 
-
-/* move */
-
-#if CMK_DEBUG_MODE
-CpvDeclare(int, freezeModeFlag);
-CpvDeclare(int, continueFlag);
-CpvDeclare(int, stepFlag);
-CpvDeclare(void *, debugQueue);
-unsigned int freezeIP;
-int freezePort;
-char* breakPointHeader;
-char* breakPointContents;
-
-void dummyF()
-{
-}
-
-static void CpdDebugHandler(char *msg)
-{
-  char *reply, *temp;
-  int index;
-  unsigned int ip,ignored_port;
-  CcsCallerId(&ip,&ignored_port);
-  if(CcsIsRemoteRequest()) {
-    char name[128];
-    sscanf(msg+CmiMsgHeaderSizeBytes, "%s", name);
-    reply = NULL;
-
-    if (strcmp(name, "freeze") == 0) {
-      CpdFreeze();
-      msgListCleanup();
-      msgListCache();
-      CmiPrintf("freeze received\n");
-    }
-    else if (strcmp(name, "unfreeze") == 0) {
-      CpdUnFreeze();
-      msgListCleanup();
-      CmiPrintf("unfreeze received\n");
-    }
-    else if (strcmp(name, "getObjectList") == 0){
-      CmiPrintf("getObjectList received\n");
-      reply = getObjectList();
-      CmiPrintf("list obtained");
-      if(reply == NULL){
-	CmiPrintf("list empty");
-	CcsSendReply(strlen("$") + 1, "$");
-      }
-      else{
-	CmiPrintf("list : %s\n", reply);
-	CcsSendReply(strlen(reply) + 1, reply);
-	free(reply);
-      }
-    }
-    else if(strncmp(name,"getObjectContents",strlen("getObjectContents"))==0){
-      CmiPrintf("getObjectContents received\n");
-      temp = strstr(name, "#");
-      temp++;
-      sscanf(temp, "%d", &index);
-      reply = getObjectContents(index);
-      CmiPrintf("Object Contents : %s\n", reply);
-      CcsSendReply(strlen(reply) + 1, reply);
-      free(reply);
-    }
-    else if (strcmp(name, "getMsgListSched") == 0){
-      CmiPrintf("getMsgListSched received\n");
-      reply = getMsgListSched();
-      if(reply == NULL)
-	CcsSendReply(strlen("$") + 1, "$");
-      else{
-	CcsSendReply(strlen(reply) + 1, reply);
-	free(reply);
-      }
-    }
-    else if (strcmp(name, "getMsgListFIFO") == 0){
-      CmiPrintf("getMsgListFIFO received\n");
-      reply = getMsgListFIFO();
-      if(reply == NULL)
-	CcsSendReply(strlen("$") + 1, "$");
-      else{
-	CcsSendReply(strlen(reply) + 1, reply);
-	free(reply);
-      }
-    }
-    else if (strcmp(name, "getMsgListPCQueue") == 0){
-      CmiPrintf("getMsgListPCQueue received\n");
-      reply = getMsgListPCQueue();
-      if(reply == NULL)
-	CcsSendReply(strlen("$") + 1, "$");
-      else{
-	CcsSendReply(strlen(reply) + 1, reply);
-	free(reply);
-      }
-    }
-    else if (strcmp(name, "getMsgListDebug") == 0){
-      CmiPrintf("getMsgListDebug received\n");
-      reply = getMsgListDebug();
-      if(reply == NULL)
-	CcsSendReply(strlen("$") + 1, "$");
-      else{
-	CcsSendReply(strlen(reply) + 1, reply);
-	free(reply);
-      }
-    }
-    else if(strncmp(name,"getMsgContentsSched",strlen("getMsgContentsSched"))==0){
-      CmiPrintf("getMsgContentsSched received\n");
-      temp = strstr(name, "#");
-      temp++;
-      sscanf(temp, "%d", &index);
-      reply = getMsgContentsSched(index);
-      CmiPrintf("Message Contents : %s\n", reply);
-      CcsSendReply(strlen(reply) + 1, reply);
-      free(reply);
-    }
-    else if(strncmp(name,"getMsgContentsFIFO",strlen("getMsgContentsFIFO"))==0){
-      CmiPrintf("getMsgContentsFIFO received\n");
-      temp = strstr(name, "#");
-      temp++;
-      sscanf(temp, "%d", &index);
-      reply = getMsgContentsFIFO(index);
-      CmiPrintf("Message Contents : %s\n", reply);
-      CcsSendReply(strlen(reply) + 1, reply);
-      free(reply);
-    }
-    else if (strncmp(name, "getMsgContentsPCQueue", strlen("getMsgContentsPCQueue")) == 0){
-      CmiPrintf("getMsgContentsPCQueue received\n");
-      temp = strstr(name, "#");
-      temp++;
-      sscanf(temp, "%d", &index);
-      reply = getMsgContentsPCQueue(index);
-      CmiPrintf("Message Contents : %s\n", reply);
-      CcsSendReply(strlen(reply) + 1, reply);
-      free(reply);
-    }
-    else if (strncmp(name, "getMsgContentsDebug", strlen("getMsgContentsDebug")) == 0){
-      CmiPrintf("getMsgContentsDebug received\n");
-      temp = strstr(name, "#");
-      temp++;
-      sscanf(temp, "%d", &index);
-      reply = getMsgContentsDebug(index);
-      CmiPrintf("Message Contents : %s\n", reply);
-      CcsSendReply(strlen(reply) + 1, reply);
-      free(reply);
-    } 
-    else if (strncmp(name, "step", strlen("step")) == 0){
-      CmiPrintf("step received\n");
-      CpvAccess(stepFlag) = 1;
-      temp = strstr(name, "#");
-      temp++;
-      sscanf(temp, "%d", &freezePort);
-      freezeIP = ip;
-      CpdUnFreeze();
-    }
-    else if (strncmp(name, "continue", strlen("continue")) == 0){
-      CmiPrintf("continue received\n");
-      CpvAccess(continueFlag) = 1;
-      temp = strstr(name, "#");
-      temp++;
-      sscanf(temp, "%d", &freezePort);
-      freezeIP = ip;
-      CpdUnFreeze();
-    }
-    else if (strcmp(name, "getBreakStepContents") == 0){
-      CmiPrintf("getBreakStepContents received\n");
-      if(breakPointHeader == 0){
-	CcsSendReply(strlen("$") + 1, "$");
-      }
-      else{
-	reply = (char *)malloc(strlen(breakPointHeader) + strlen(breakPointContents) + 1);
-	strcpy(reply, breakPointHeader);
-	strcat(reply, "@");
-	strcat(reply, breakPointContents);
-	CcsSendReply(strlen(reply) + 1, reply);
-	free(reply);
-      }
-    }
-    else if (strcmp(name, "getSymbolTableInfo") == 0){
-      CmiPrintf("getSymbolTableInfo received");
-      reply = getSymbolTableInfo();
-      CcsSendReply(strlen(reply) + 1, reply);
-      reply = getBreakPoints();
-      CcsSendReply(strlen(reply) + 1, reply);
-      free(reply);
-    }
-    else if (strncmp(name, "setBreakPoint", strlen("setBreakPoint")) == 0){
-      CmiPrintf("setBreakPoint received\n");
-      temp = strstr(name, "#");
-      temp++;
-      setBreakPoints(temp);
-    }
-    else if (strncmp(name, "gdbRequest", strlen("gdbRequest")) == 0){
-      CmiPrintf("gdbRequest received\n");
-      dummyF();
-    }
-
-    else if (strcmp(name, "quit") == 0){
-      CpdUnFreeze();
-      CsdExitScheduler();
-    }
-    else{
-      CmiPrintf("incorrect command:%s received,len=%ld\n",name,strlen(name));
-    }
-  }
-}
-
-void CpdInit(void)
-{
-  CpvInitialize(int, freezeModeFlag);
-  CpvAccess(freezeModeFlag) = 0;
-
-  CpvInitialize(int, continueFlag);
-  CpvInitialize(int, stepFlag);
-  CpvAccess(continueFlag) = 0;
-  CpvAccess(stepFlag) = 0;
-
-  CpvInitialize(void *, debugQueue);
-  CpvAccess(debugQueue) = CdsFifo_Create();
-    
-  CpdInitializeObjectTable();
-  CpdInitializeHandlerArray();
-  CpdInitializeBreakPoints();
-
-  CcsRegisterHandler("DebugHandler", CpdDebugHandler);
-}  
-
-void CpdFreeze(void)
-{
-  CpvAccess(freezeModeFlag) = 1;
-}  
-
-void CpdUnFreeze(void)
-{
-  CpvAccess(freezeModeFlag) = 0;
-}  
-
-#endif
-
-
 #if CMK_WEB_MODE
 /******************************************************
 Web performance monitoring interface:
@@ -674,14 +437,13 @@ static void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 }
 
 /*Unpacks request message to call above routine*/
-static int req_fw_handler_idx;
+int _ccsHandlerIdx;/*Converse handler index of below routine*/
 static void req_fw_handler(char *msg)
 {
   CcsHandleRequest((CcsImplHeader *)(msg+CmiMsgHeaderSizeBytes),
 		   msg+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader));
   CmiFree(msg);  
 }
-
 
 /*Convert CCS header & message data into a converse message 
  addressed to handler*/
@@ -692,7 +454,7 @@ char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_le
   char *msg=(char *)CmiAlloc(len);
   memcpy(msg+CmiMsgHeaderSizeBytes,hdr,sizeof(CcsImplHeader));
   memcpy(msg+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader),data,reqLen);
-  CmiSetHandler(msg, req_fw_handler_idx);
+  CmiSetHandler(msg, _ccsHandlerIdx);
   if (ret_len!=NULL) *ret_len=len;
   return msg;
 }
@@ -843,7 +605,7 @@ void CcsInit(void)
   CpvAccess(ccsTab) = CkCreateHashtable_string(sizeof(int),5);
   CpvInitialize(CcsImplHeader, ccsReq);
   CpvAccess(ccsReq).ip = ChMessageInt_new(0);
-  req_fw_handler_idx = CmiRegisterHandler(req_fw_handler);
+  _ccsHandlerIdx = CmiRegisterHandler(req_fw_handler);
 #if NODE_0_IS_CONVHOST
   rep_fw_handler_idx = CmiRegisterHandler(rep_fw_handler);
 #endif

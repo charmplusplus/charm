@@ -23,6 +23,7 @@ extern "C" {
 
 #define CMK_CCS_VERSION "2"
 
+extern int _ccsHandlerIdx;
 typedef struct {unsigned char hidden[4];} CcsDelayedReply;
 
 #if CMK_CCS_AVAILABLE
