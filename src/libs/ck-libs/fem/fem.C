@@ -460,8 +460,7 @@ int *CkCopyArray(const int *src,int len,int indexBase)
 void FEMchunk::check(const char *where) {
 	magic.check(where,0,this);
 	if (thisIndex<0 || thisIndex> thread->getNumElements()
-		|| thisIndex!=thread->getElement()
-		|| doneCalled!=0 ) 
+		|| thisIndex!=thread->getElement() ) 
 	{
 		CkError("FEM Chunk corrupted at %s (thisIndex==%d)\n",
 			where,thisIndex);
@@ -1381,8 +1380,6 @@ FEMchunk::pup(PUP::er &p)
 
 //Pup all other fields
   init.pup(p);
-
-  p(doneCalled);
 }
 
 #include "fem.def.h"

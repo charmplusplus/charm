@@ -219,7 +219,6 @@ private:
  public:
 
   int tsize;
-  int doneCalled;
 
   FEMchunk(const FEMinit &init);
   FEMchunk(CkMigrateMessage *msg);
