@@ -13,6 +13,10 @@
 
 #include <stdio.h> /* for FILE */
 
+#ifdef __cplusplus
+ extern "C" {
+#endif
+
 /**
  * This struct is our representation for 
  * out-of-core "managers", which actually talk to
@@ -81,5 +85,9 @@ extern void CooSetSize(int objid,int newsize);
  */
 extern void CooBringIn(int objid); 
 
+
+#ifdef __cplusplus
+ };
+#endif
 
 #endif
