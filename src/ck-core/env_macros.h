@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1997-02-06 19:52:44  jyelon
+ * Revision 2.13  1997-03-24 23:10:13  milind
+ * Made envelope 64-bit safe by replacing an int with a void *.
+ *
+ * Revision 2.12  1997/02/06 19:52:44  jyelon
  * Corrected the core field to take CmiMsgHeaderSizeBytes into account.
  *
  * Revision 2.11  1995/10/27 09:09:31  jyelon
@@ -105,7 +108,7 @@ typedef struct envelope {
   
   unsigned int   event;   /* unknown meaning. Used only for logging.*/
 
-  unsigned int   i_tag2;  /* Count OR vidBlockPtr OR chareBlockPtr OR boc_num*/
+  void *     i_tag2;  /* Count OR vidBlockPtr OR chareBlockPtr OR boc_num*/
 
   unsigned int   TotalSize; /* total size of message, in bytes */
 
@@ -130,17 +133,17 @@ typedef struct envelope {
 /*********************************************************/
 /** Arrangement for i_tag2                              **/
 /*********************************************************/
-#define GetEnv_count(e)		        (((ENVELOPE *)(e))->i_tag2)
-#define SetEnv_count(e,x)		(((ENVELOPE *)(e))->i_tag2=(x))
+#define GetEnv_count(e)		        ((int)(((ENVELOPE *)(e))->i_tag2))
+#define SetEnv_count(e,x)		(((ENVELOPE *)(e))->i_tag2=((void *)(x)))
 
 #define GetEnv_chareBlockPtr(e)	        ((CHARE_BLOCK *)(((ENVELOPE *)(e))->i_tag2))
-#define SetEnv_chareBlockPtr(e,x)	(((ENVELOPE *)(e))->i_tag2=((int)(x)))
+#define SetEnv_chareBlockPtr(e,x)	(((ENVELOPE *)(e))->i_tag2=((void *)(x)))
 
-#define SetEnv_vidBlockPtr(e,x)	        (((ENVELOPE *)(e))->i_tag2=((int)(x)))
+#define SetEnv_vidBlockPtr(e,x)	        (((ENVELOPE *)(e))->i_tag2=(x))
 #define GetEnv_vidBlockPtr(e)		((CHARE_BLOCK *)(((ENVELOPE *)(e))->i_tag2))
 
-#define GetEnv_boc_num(e) 		(((ENVELOPE *)(e))->i_tag2)
-#define SetEnv_boc_num(e,x) 		(((ENVELOPE *)(e))->i_tag2=(x))
+#define GetEnv_boc_num(e) 		((int)(((ENVELOPE *)(e))->i_tag2))
+#define SetEnv_boc_num(e,x) 		(((ENVELOPE *)(e))->i_tag2=((void *)(x)))
 
 /*********************************************************/
 /* Arrangement for s_tag1                                */
