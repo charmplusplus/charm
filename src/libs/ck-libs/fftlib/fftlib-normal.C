@@ -102,21 +102,38 @@ NormalSlabArray::doIFFT(int src_id, int dst_id)
     
     CmiAssert(bwd2DPlan!=NULL);
     int p;
+#ifdef IFFT_DUMP
+    char ofile[80];
+    snprintf(ofile,80,"prebwdfft.%d_%d_%d.out",thisIndex,src_id,dst_id);
+    FILE *ifd=fopen(ofile,"w");
+    // output each plane so we can compare them
+    for(int i=0; i<fftinfo.destPlanesPerSlab;i++)
+	for(int point=0;point<planeSize;point++)
+	fprintf(ifd,"plane %d src %d dest %d point %d %.10g %.10g\n",i+thisIndex*fftinfo.destPlanesPerSlab,src_id,dst_id,point+i*planeSize+thisIndex*fftinfo.destPlanesPerSlab*planeSize,((complex *) dataPtr + point + i * planeSize )->re,((complex *) dataPtr + point + i * planeSize )->im);
+    fclose(ifd);
+#endif    
     for(p = 0; p < fftinfo.destPlanesPerSlab; p++)
       fftwnd_one(bwd2DPlan, 
 	       (fftw_complex*)dataPtr + p * planeSize,
 	       NULL);
+
+#ifdef IFFT_DUMP
+    ofile[80];
+    snprintf(ofile,80,"fftlibSending.%d_%d_%d.out",thisIndex,src_id,dst_id);
+    ifd=fopen(ofile,"w");
+    // output each plane so we can compare them
+    for(int i=0; i<fftinfo.destPlanesPerSlab;i++)
+	for(int point=0;point<planeSize;point++)
+	fprintf(ifd,"plane %d src %d dest %d point %d %.10g %.10g\n",i+thisIndex*fftinfo.destPlanesPerSlab,src_id,dst_id,point+i*planeSize,((complex *) dataPtr + point + i * planeSize )->re,((complex *) dataPtr + point + i * planeSize )->im);
+    fclose(ifd);
+#endif    
     
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
     complex *temp;
     int i, pe;
     for (i = 0, pe = 0; i < fftinfo.destSize[0]; i += fftinfo.srcPlanesPerSlab, pe++) {
 	int ti;
-#ifdef IFFT_DUMP
-    char ofile[80];
-    snprintf(ofile,80,"fftlibSending%d_%d_%d.out",src_id,thisIndex,pe);
-    FILE *ifd=fopen(ofile,"w");
-#endif    
+
 
 	temp = sendData;
 	for (ti = i; ti < i + fftinfo.srcPlanesPerSlab; ti++)
@@ -124,20 +141,14 @@ NormalSlabArray::doIFFT(int src_id, int dst_id)
 		memcpy(temp,
 		       dataPtr + p * planeSize + ti * lineSize,
 		       sizeof(complex) * lineSize);
-#ifdef IFFT_DUMP
-		for(int point=0;point<lineSize;point++)
-		  fprintf(ifd,"%d r %.10g i %.10g\n",point+(temp-sendData),((complex *) dataPtr + point + p * planeSize + ti * lineSize)->re,((complex *) dataPtr + point + p * planeSize + ti * lineSize)->im);
-#endif
 		temp += lineSize;
 	    }
 	((CProxy_NormalSlabArray)fftinfo.srcProxy)(pe).acceptDataForIFFT(lineSize * fftinfo.destPlanesPerSlab * fftinfo.srcPlanesPerSlab, sendData, thisIndex, dst_id);
-#ifdef IFFT_DUMP
-	fclose(ifd);
-#endif
     }
     delete [] sendData;
 }
 
+    //back on source side
 void
 NormalSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn, int info_id)
 {
@@ -165,7 +176,7 @@ NormalSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn, int
 	       sizeof(complex) * lineSize * fftinfo.destPlanesPerSlab);
 	points += lineSize * fftinfo.destPlanesPerSlab;
 	for(int apoint=0;apoint<lineSize*fftinfo.destPlanesPerSlab;apoint++)
-	  fprintf(ifd,"r %.10g i %.10g\n", ((complex *) dataPtr +p *planeSize +posn*lineSize*fftinfo.destPlanesPerSlab+apoint)->re,((complex *) dataPtr +p *planeSize +posn*lineSize*fftinfo.destPlanesPerSlab+apoint)->im);
+	  fprintf(ifd,"p %d r %.10g i %.10g\n", p,((complex *) dataPtr +p *planeSize +posn*lineSize*fftinfo.destPlanesPerSlab+apoint)->re,((complex *) dataPtr +p *planeSize +posn*lineSize*fftinfo.destPlanesPerSlab+apoint)->im);
     }
 #ifdef IFFT_DUMP
     fclose(ifd);
