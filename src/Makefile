@@ -29,7 +29,7 @@ all: charm++
 
 charm: converse charmxlat charmlibs libcharm
 
-charm++: converse charmxlat charmlibs charmxlat++ libcharm libck-cplus-y.o 
+charm++: converse charmxlat charmlibs charmxlat++ libcharm libck-cplus-y.a
 
 CHARMC=../bin/charmc $(OPTS)
 
@@ -75,13 +75,13 @@ dirs+sources:
 
 CVHEADERS=converse.h conv-conds.h conv-mach.h 
 
-CVLIBS=libconv-core.o $(CVLIBS_QS)
+CVLIBS=libconv-core.a $(CVLIBS_QS)
 
 LIBCONV_CORE=convcore.o conv-conds.o machine.o spantree.o queueing.o fifo.o threads.o msgmgr.o
 
 converse: basics $(CVLIBS) cmk_extras
 
-libconv-core.o: $(LIBCONV_CORE)
+libconv-core.a: $(LIBCONV_CORE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_CORE)
 
 fifo.o: fifo.c $(CVHEADERS)
@@ -120,26 +120,18 @@ cmk_clean:
 #
 # Charm Libraries
 #
-# Each source file is compiled twice, once with debugging enabled,
-# yielding a file with the extension .o, and once with debugging
-# disabled, yielding a file with the extension .o.
-#
-# The object files so produced are collected into libraries, which
-# are named libck-* if they contain debugging objects, or libck-*
-# if they contain normal objects.
-#
 ###############################################################################
 
 CKHEADERS=chare.h const.h msg_macros.h prio_macros.h env_macros.h globals.h\
 	  sys_macros.h communication.h performance.h $(CVHEADERS)
 
-CK_LIBS_CORE=libck-core-notrace.o libck-core-summary.o libck-core-projections.o
+CK_LIBS_CORE=libck-core-notrace.a libck-core-summary.a libck-core-projections.a
 
 CK_LIBS_LDB=libck-ldb-rand.o libck-ldb-acwn.o libck-ldb-mngr.o # libck-ldb-priomngr.o libck-ldb-recv.o libck-ldb-tok.o libck-ldb-btok.o
 
-CK_LIBS_CPLUS=libck-cplus-n.o
+CK_LIBS_CPLUS=libck-cplus-n.a
 
-CK_LIBS_MAIN=libck-defmain.o libck-unimain.o
+CK_LIBS_MAIN=libck-defmain.a libck-unimain.a
 
 CK_LIBS=$(CK_LIBS_CORE) $(CK_LIBS_LDB) $(CK_LIBS_CPLUS) $(CK_LIBS_MAIN)
 
@@ -148,15 +140,15 @@ LIBCK_CORE=common.o globals.o init.o register.o boc.o condsend.o qd.o vid.o rdon
 charmlibs: converse $(CK_LIBS)
 
 LIBCK_CORE_NOTRACE=$(LIBCK_CORE) perf-none.o
-libck-core-notrace.o: $(LIBCK_CORE_NOTRACE)
+libck-core-notrace.a: $(LIBCK_CORE_NOTRACE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_NOTRACE)
 
 LIBCK_CORE_SUMMARY=$(LIBCK_CORE) perf-sum.o
-libck-core-summary.o: $(LIBCK_CORE_SUMMARY)
+libck-core-summary.a: $(LIBCK_CORE_SUMMARY)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_SUMMARY)
 
 LIBCK_CORE_PROJ=$(LIBCK_CORE) perf-proj.o perfio.o
-libck-core-projections.o: $(LIBCK_CORE_PROJ)
+libck-core-projections.a: $(LIBCK_CORE_PROJ)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_PROJ)
 
 libck-ldb-acwn.o: ldb.acwn.p ldb.h $(CKHEADERS)
@@ -183,13 +175,13 @@ libck-ldb-repl.o: ldb.repl.p ldb.h $(CKHEADERS)
 libck-ldb-recv.o: ldb.recv.p ldb.h $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ ldb.recv.p
 
-libck-cplus-n.o: dummy.cplus.c $(CKHEADERS)
+libck-cplus-n.a: dummy.cplus.c $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ dummy.cplus.c
 
-libck-defmain.o: default-main.c $(CKHEADERS)
+libck-defmain.a: default-main.c $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ default-main.c
 
-libck-unimain.o: uni_user_main.c $(CKHEADERS)
+libck-unimain.a: uni_user_main.c $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ uni_user_main.c
 
 ldbcfns.o: ldbcfns.c $(CKHEADERS)
@@ -270,7 +262,7 @@ perf-proj.o : perf-proj.c performance.h $(CKHEADERS)
 #
 ###############################################################################
 
-libck-cplus-y.o: cplus.C c++interface.h $(CKHEADERS)
+libck-cplus-y.a: cplus.C c++interface.h $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ cplus.C
 
 ###############################################################################

@@ -528,7 +528,7 @@ endif
 
 if ($?EXECMODE == 0) set EXECMODE=notrace
 
-if (! -e $CHARMLIB/libck-core-$EXECMODE.o) then
+if (! -e $CHARMLIB/libck-core-$EXECMODE.a) then
    echo "charmc : No such execmode $EXECMODE"
    (cd $CHARMLIB ; ls -al libck-core-*)
    goto failure
@@ -578,9 +578,9 @@ switch ($LANGUAGE)
                       $OBJECTFILES $LIBRARIES $BAL_OBJ)
         set LOADER =($CMK_LDXX $OPTS_LDXX -o $OBJECT \
 		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
-                      $CHARMLIB/libck-core-$EXECMODE.o \
-        	      $CHARMLIB/libck-cplus-y.o \
-        	      $CHARMLIB/libconv-core.o \
+                      $CHARMLIB/libck-core-$EXECMODE.a \
+        	      $CHARMLIB/libck-cplus-y.a \
+        	      $CHARMLIB/libconv-core.a \
 		      $CMK_LIBS -lm )
         breaksw
     case "charm"
@@ -588,9 +588,9 @@ switch ($LANGUAGE)
                       $OBJECTFILES $LIBRARIES $BAL_OBJ)
 	set LOADER=($CMK_LD $OPTS_LD -o $OBJECT \
 		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
-        	      $CHARMLIB/libck-core-$EXECMODE.o \
-        	      $CHARMLIB/libck-cplus-n.o \
-        	      $CHARMLIB/libconv-core.o \
+        	      $CHARMLIB/libck-core-$EXECMODE.a \
+        	      $CHARMLIB/libck-cplus-n.a \
+        	      $CHARMLIB/libconv-core.a \
 		      $CMK_LIBS -lm )
         breaksw
     case "converse"
@@ -598,7 +598,7 @@ switch ($LANGUAGE)
                       $OBJECTFILES $LIBRARIES)
         set LOADER = ($CMK_LD $OPTS_LD -o $OBJECT \
 		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
-        	      $CHARMLIB/libconv-core.o \
+        	      $CHARMLIB/libconv-core.a \
 		      $CMK_LIBS -lm )
         breaksw
 endsw
@@ -650,7 +650,7 @@ if ($status) goto failure
 ########################################################################
 
 if (! { (egrep '^user_main$' < CHARMC-USR.TMP.nm >& /dev/null) }) then
-    set LOADER=($LOADER $CHARMLIB/libck-defmain.o)
+    set LOADER=($LOADER $CHARMLIB/libck-defmain.a)
 endif
 
 ########################################################################
