@@ -146,8 +146,24 @@ public:
 
 class coarsenResults {
 	int nResults;
+	class resRec{
+		public:
+			int elemID,collapseEdge,nodeToKeep;
+			double nx,ny;
+			int flag;
+			resRec(int id,int edge,int n,double nx_,double ny_):elemID(id),collapseEdge(edge),nodeToKeep(n),nx(nx_),ny(ny_){
+				flag=0;
+			}
+			resRec(int id,int edge,int n,double nx_,double ny_,int flag_):elemID(id),collapseEdge(edge),nodeToKeep(n),nx(nx_),ny(ny_),flag(flag_){}
+	};
+	std::vector<resRec> res;
+	
 public:
 	coarsenResults(){nResults=0;}
+  void add(int elementID,int collapseEdge,int nodeToKeep,double nX,double nY,int flag){
+		nResults++;
+		res.push_back(resRec(elementID,collapseEdge,nodeToKeep,nX,nY,flag));
+	};
 };
 
 
@@ -156,6 +172,7 @@ class resultsCoarsenClient : public refineClient {
 public:
   resultsCoarsenClient(coarsenResults *res_) : res(res_){};
   void collapse(int elementID,int collapseEdge,int nodeToKeep,double nX,double nY,int flag){
+		res->add(elementID,collapseEdge,nodeToKeep,nX,nY,flag);
   }
 };
 
