@@ -119,7 +119,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h queueing.h
       CkFutures.decl.h LBDatabase.decl.h CentralLB.decl.h NullLB.decl.h CkCheckpoint.decl.h\
       RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h \
       MetisLB.decl.h DummyLB.decl.h RefineLB.decl.h OrbLB.decl.h \
-      HeapCentLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
+      GreedyLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
       WSLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
       tempo.decl.h waitqd.decl.h \
       CommLB.decl.h Comm1LB.decl.h  \
@@ -144,7 +144,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h \
 	  BaseLB.h CentralLB.h RandCentLB.h RecBisectBfLB.h \
-	  RefineLB.h OrbLB.h HeapCentLB.h CommLB.h Comm1LB.h manager.h \
+	  RefineLB.h OrbLB.h GreedyLB.h CommLB.h Comm1LB.h manager.h \
 	  MetisLB.h NborBaseLB.h \
 	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
@@ -686,7 +686,7 @@ LOADBALANCERS=\
    $(L)/libmoduleRefineLB.a \
    $(L)/libmoduleCommLB.a \
    $(L)/libmoduleComm1LB.a \
-   $(L)/libmoduleHeapCentLB.a \
+   $(L)/libmoduleGreedyLB.a \
    $(L)/libmoduleNeighborLB.a \
    $(L)/libmoduleGreedyRefLB.a \
    $(L)/libmoduleOrbLB.a \
@@ -766,14 +766,14 @@ $(L)/libmoduleComm1LB.a: Comm1LB.o
 	$(CHARMC) -o $(L)/libmoduleComm1LB.a Comm1LB.o 
 	
 
-HeapCentLB.decl.h: HeapCentLB.ci charmxi
-	$(CHARMC) HeapCentLB.ci
+GreedyLB.decl.h: GreedyLB.ci charmxi
+	$(CHARMC) GreedyLB.ci
 
-HeapCentLB.o: HeapCentLB.C HeapCentLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c HeapCentLB.C
+GreedyLB.o: GreedyLB.C GreedyLB.decl.h $(CKHEADERS)
+	$(CHARMC) -c GreedyLB.C
 
-$(L)/libmoduleHeapCentLB.a: HeapCentLB.o 
-	$(CHARMC) -o $(L)/libmoduleHeapCentLB.a HeapCentLB.o 
+$(L)/libmoduleGreedyLB.a: GreedyLB.o 
+	$(CHARMC) -o $(L)/libmoduleGreedyLB.a GreedyLB.o 
 	
 
 NeighborLB.decl.h: NeighborLB.ci charmxi
@@ -834,7 +834,7 @@ LB_OBJ=EveryLB.o \
     RefineLB.o \
     CommLB.o \
     Comm1LB.o \
-    HeapCentLB.o \
+    GreedyLB.o \
     NeighborLB.o \
     GreedyRefLB.o \
     OrbLB.o \
