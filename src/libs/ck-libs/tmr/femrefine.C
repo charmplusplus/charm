@@ -24,7 +24,7 @@ void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID){
 	int total = nghost + nelems;
 	int *tempMesh = new int[3*total];
 	FEM_Mesh_data(meshID,elemID,FEM_CONN,&tempMesh[0],0,nelems,FEM_INDEX_0,3);
-	FEM_Mesh_data(meshID,elemID+FEM_GHOST,FEM_CONN,&tempMesh[nelems],0,nghost,FEM_INDEX_0,3);
+	FEM_Mesh_data(meshID,elemID+FEM_GHOST,FEM_CONN,&tempMesh[3*nelems],0,nghost,FEM_INDEX_0,3);
 
 	for(int t=nelems;t<total;t++){
 		for(int j=0;j<3;j++){
