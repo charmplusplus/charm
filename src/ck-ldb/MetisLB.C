@@ -217,11 +217,11 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
   else {
     sameMapFlag = 0;
     newmap = new int[numobjs];
-    for(i=0;i<(numobjs+1);i++)
-      xadj[i] = 0;
-    delete[] edgewt;
-    edgewt = 0;
-    wgtflag = 2;
+    //for(i=0;i<(numobjs+1);i++)
+      //xadj[i] = 0;
+    //delete[] edgewt;
+    //edgewt = 0;
+    //wgtflag = 2;
     // CkPrintf("before calling Metis functions. option is %d.\n", option);
     if (0 == option) {
 
@@ -245,10 +245,11 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
       METIS_PartGraphRecursive(&numobjs, xadj, adjncy, objwt, edgewt,
                                  &wgtflag, &numflag, &count, options,
                                  &edgecut, newmap);
-      // CkPrintf("after calling Metis functions.\n");
+      CkPrintf("after calling Metis functions.\n");
     }
     else if (WEIGHTED == option) {
-      float maxtotal_walltime = stats->procs[0].total_walltime;
+      CkPrintf("unepected\n");
+			float maxtotal_walltime = stats->procs[0].total_walltime;
       for (m=1; m<count; m++) {
 	if (maxtotal_walltime < stats->procs[m].total_walltime)
 	  maxtotal_walltime = stats->procs[m].total_walltime;
@@ -292,7 +293,11 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
   delete[] adjncy;
   if(objwt) delete[] objwt;
   if(edgewt) delete[] edgewt;
-
+	
+	/*CkPrintf("obj-proc mapping\n");
+	for(i=0;i<numobjs;i++)
+		CkPrintf(" %d,%d ",i,newmap[i]);
+  */
   if(!sameMapFlag) {
     for(i=0; i<numobjs; i++) {
       if(origmap[i] != newmap[i]) {
@@ -303,7 +308,24 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
       }
     }
   }
+	
+	//CkPrintf("chking wts on each partition...\n");
 
+	/*int avg=0;
+	int *chkwt = new int[count];
+	for(i=0;i<count;i++)
+		chkwt[i]=0;
+	//totalwt=0;
+	for(i=0;i<numobjs;i++){
+		chkwt[newmap[i]] += objwt[i];
+		avg += objwt[i];
+		
+	}
+	
+	
+	for(i=0;i<count;i++)
+		CkPrintf("%d -- %d\n",i,chkwt[i]);
+*/
   delete[] origmap;
   if(newmap != origmap)
     delete[] newmap;
