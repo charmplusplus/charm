@@ -33,7 +33,13 @@ void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID){
 			}
 		}	
 	}
-	
+	int maxnode=0,maxid=0;
+	for(int i=0;i<3*total;i++){
+		if(tempMesh[i] > maxnode){
+			maxnode = tempMesh[i];
+			maxid=i;
+		}
+	}
   /*Set up the global ID's, for refinement*/
 	int myID = FEM_My_partition();
   int *gid=new int[2*total];
@@ -45,6 +51,7 @@ void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID){
   FEM_Update_ghost_field(gid_fid,0,gid);
 	
   /*Set up refinement framework*/
+  printf("NewMesh %d %d %d maxid %d \n",nelems,total,maxnode,maxid);
   REFINE2D_NewMesh(nelems,total,(int *)tempMesh,gid);
 	delete [] gid;
 	delete [] tempMesh;
@@ -60,15 +67,15 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 	int nnodes = FEM_Mesh_get_length(meshID,nodeID);
 	int nelems = FEM_Mesh_get_length(meshID,elemID);
 
-/*	for(int k=0;k<nnodes;k++){
-		printf(" node %d ( %.6f %.6f )\n",k,coord[2*k+0],coord[2*k+1]);
-	}*/
 	printf("%d %d \n",nnodes,nelems);	
+	for(int k=0;k<nnodes;k++){
+		printf(" node %d ( %.6f %.6f )\n",k,coord[2*k+0],coord[2*k+1]);
+	}
 	REFINE2D_Split(nnodes,coord,nelems,desiredAreas);
-	printf("called REFINE2D_Split\n");
+	int nSplits=REFINE2D_Get_Split_Length();
+	printf("called REFINE2D_Split nSplits %d\n",nSplits);
 	
   
-	int nSplits=REFINE2D_Get_Split_Length();
 	if(nSplits == 0){
 		return;
 	}
@@ -116,6 +123,7 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 			lastD=D;*/
       if (A>=cur_nodes) CkAbort("Calculated A is invalid!");
       if (B>=cur_nodes) CkAbort("Calculated B is invalid!");
+      			CmiMemoryCheck();
 			e->setLength(cur_nodes+1);
 			for(int i=0;i<attrs->size();i++){
 				FEM_Attribute *a = (FEM_Attribute *)(*attrs)[i];
@@ -138,8 +146,10 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 		/*TODO: replace  FEM_ELEM with parameter*/
 		int newTri =  FEM_Mesh_get_length(meshID,elemID);
     CkPrintf("---- Adding triangle %d after splitting %d \n",newTri,tri);
+      		CmiMemoryCheck();
 		elem->setLength(newTri+1);
 		for(int j=0;j<elemattrs->size();j++){
+    	CmiMemoryCheck();
 			if((*elemattrs)[j]->getAttr() == FEM_CONN){
 				CkPrintf("elem attr conn code %d \n",(*elemattrs)[j]->getAttr());
 				//it is a connectivity attribute.. get the connectivity right
@@ -149,8 +159,10 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 				int *oldRow = table[tri];
 				int *newRow = table[newTri];
 				for (int i=0;i<3;i++){
-		      if (oldRow[i]==A) oldRow[i]=D;	
-					CkPrintf("In triangle %d %d replaced by %d \n",tri,A,D);
+		      if (oldRow[i]==A){
+						oldRow[i]=D;	
+						CkPrintf("In triangle %d %d replaced by %d \n",tri,A,D);
+					}	
 				}	
 				for (int i=0; i<3; i++) {
 		      if (oldRow[i] == B){
@@ -165,10 +177,16 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
    			}
 				CkPrintf("New Triangle %d  (%d %d %d) conn %p\n",newTri,newRow[0],newRow[1],newRow[2],newRow);
 			}else{
+    		CmiMemoryCheck();
 				FEM_Attribute *elattr = (FEM_Attribute *)(*elemattrs)[j];
+				if(elattr->getAttr() < FEM_ATTRIB_FIRST){ 
 					elattr->copyEntity(newTri,*elattr,tri);
+				}	
+    		CmiMemoryCheck();
 			}
+    	CmiMemoryCheck();
 		}
+    CmiMemoryCheck();
 
 		
 	}

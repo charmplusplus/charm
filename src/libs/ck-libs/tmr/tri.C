@@ -1232,13 +1232,16 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
 #endif  
   
   // update node coordinates from coord
-  for (i=0; i<numNodes; i++)
+  for (i=0; i<numNodes; i++){
     theNodes[i].init(coord[2*i], coord[2*i + 1]);
+    CkPrintf("[tmr] Chunk %d Node %d %.8lf %.8lf \n",cid,i,theNodes[i].X(),theNodes[i].Y());
+  }  
     
   // recalculate and cache new areas for each element
-  for (i=0; i<numElements; i++)
+  for (i=0; i<numElements; i++){
     theElements[i].calculateArea();
-
+    CkPrintf("[tmr] Chunk %d Element %d area = %.8lf \n",cid,i, theElements[i].getArea());
+  }	
   sanityCheck();
 }
 
@@ -1252,7 +1255,7 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
   for (i=0; i<numElements; i++)
     if (desiredArea[i] < theElements[i].getArea()) {
       theElements[i].setTargetArea(desiredArea[i]);
-      CkPrintf("[tmr] Chunk %d: Element %d to be refined from %f to below %f\n",
+      CkPrintf("[tmr] Chunk %d: Element %d to be refined from %.8lf to below %.8lf \n",
 	       cid, i, theElements[i].getArea(), desiredArea[i]);
     }
   
