@@ -1,0 +1,484 @@
+#include <errno.h>
+#include <pthread.h>
+#include <sched.h>
+
+#define _POSIX1C
+#define _NO_ANSIMODE
+
+#include <stdio.h>
+#include <sys/types.h>
+#include <limits.h>
+#include <unistd.h>
+
+#include "converse.h"
+
+extern void *FIFO_Create(void);
+extern void FIFO_EnQueue(void *, void *);
+
+#define BLK_LEN  512
+
+typedef struct {
+  pthread_mutex_t mutex;
+  void     **blk;
+  unsigned int blk_len;
+  unsigned int first;
+  unsigned int len;
+  unsigned int maxlen;
+} McQueue;
+
+static McQueue *McQueueCreate(void);
+static void McQueueAddToBack(McQueue *queue, void *element);
+static void *McQueueRemoveFromFront(McQueue *queue);
+static McQueue **MsgQueue;
+
+CpvDeclare(void*, CmiLocalQueue);
+
+int Cmi_argc;
+int Cmi_numpes;
+int Cmi_usched;
+int Cmi_initret;
+CmiStartFn Cmi_startFn;
+
+pthread_key_t perThreadKey;
+
+static void *threadInit(void *arg);
+
+pthread_mutex_t memory_mutex;
+
+void CmiMemLock() {pthread_mutex_lock(&memory_mutex);}
+void CmiMemUnlock() {pthread_mutex_unlock(&memory_mutex);}
+
+int barrier;
+pthread_cond_t barrier_cond;
+pthread_mutex_t barrier_mutex;
+
+void CmiNodeBarrier(void)
+{
+  pthread_mutex_lock(&barrier_mutex);
+  barrier++;
+  if(barrier!=CmiNumPes())
+    pthread_cond_wait(&barrier_cond, &barrier_mutex);
+  else {
+    barrier = 0;
+    pthread_cond_broadcast(&barrier_cond);
+  }
+  pthread_mutex_unlock(&barrier_mutex);
+}
+
+CmiNodeLock CmiCreateLock(void)
+{
+  pthread_mutex_t *lock;
+  lock = (pthread_mutex_t *) CmiAlloc(sizeof(pthread_mutex_t));
+  pthread_mutex_init(lock, (pthread_mutexattr_t *) 0);
+  return lock;
+}
+
+void CmiLock(CmiNodeLock lock)
+{
+  pthread_mutex_lock(lock);
+}
+
+void CmiUnlock(CmiNodeLock lock)
+{
+  pthread_mutex_unlock(lock);
+}
+
+int CmiTryLock(CmiNodeLock lock)
+{
+  return pthread_mutex_trylock(lock);
+}
+
+void CmiDestroyLock(CmiNodeLock lock)
+{
+  pthread_mutex_destroy(lock);
+}
+
+int CmiMyPe()
+{
+  int mype = (int) pthread_getspecific(perThreadKey);
+  return mype;
+}
+
+void *CmiAlloc(int size)
+{
+  char *res;
+  res =(char *) malloc(size+8);
+  if (res==(char *)0) { 
+    CmiError("%d:Memory allocation failed.",CmiMyPe()); 
+    abort();
+  }
+  ((int *)res)[0]=size;
+  return (void *)(res+8);
+}
+
+int CmiSize(void *blk)
+{
+  return ((int *)( ((char *) blk) - 8))[0];
+}
+
+void CmiFree(void *blk)
+{
+  free( ((char *)blk) - 8);
+}
+
+
+int CmiAsyncMsgSent(CmiCommHandle msgid)
+{
+  return 0;
+}
+
+
+typedef struct {
+  char       **argv;
+  int        mype;
+} USER_PARAMETERS;
+
+void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
+{
+  int i;
+  USER_PARAMETERS *usrparam;
+  pthread_t *aThread;
+ 
+  Cmi_numpes = 0; 
+  Cmi_usched = usched;
+  Cmi_initret = initret;
+  Cmi_startFn = fn;
+  Cmi_argc = argc;
+
+  for(i=0;i<Cmi_argc;i++) {
+    if (strcmp(argv[i], "+p") == 0) {
+      sscanf(argv[i+1], "%d", &Cmi_numpes);
+      break;
+    } else {
+      if (sscanf(argv[i], "+p%d", &Cmi_numpes) == 1) 
+	break;
+    }
+  }
+
+  if (Cmi_numpes <= 0)
+  {
+    CmiError("Error: requested number of processors is invalid %d\n",
+              Cmi_numpes);
+    abort();
+  }
+
+
+  pthread_mutex_init(&memory_mutex, (pthread_mutexattr_t *) 0);
+
+  MsgQueue=(McQueue **)CmiAlloc(Cmi_numpes*sizeof(McQueue *));
+  if (MsgQueue == (McQueue **)0) {
+    CmiError("Cannot Allocate Memory...\n");
+    abort();
+  }
+  for(i=0; i<Cmi_numpes; i++) 
+    MsgQueue[i] = McQueueCreate();
+
+  pthread_key_create(&perThreadKey, (void *) 0);
+  barrier = 0;
+  pthread_cond_init(&barrier_cond, (pthread_condattr_t *) 0);
+  pthread_mutex_init(&barrier_mutex, (pthread_mutexattr_t *) 0);
+
+  aThread = (pthread_t *) CmiAlloc(sizeof(pthread_t) * Cmi_numpes);
+  for(i=0; i<Cmi_numpes; i++) {
+    int j;
+    char **uargv = (char **) CmiAlloc(sizeof(char *) * (Cmi_argc+1));
+
+    for (j=0;j<Cmi_argc;j++)
+      uargv[j] = argv[j];
+    uargv[j] = 0;
+
+    usrparam = (USER_PARAMETERS *) CmiAlloc(sizeof(USER_PARAMETERS));
+    usrparam->argv = uargv;
+    usrparam->mype = i;
+
+    pthread_create(&aThread[i],(pthread_attr_t *)0,threadInit,(void *)usrparam);
+  }
+  for(i=0;i<Cmi_numpes;i++) {
+    void *retVal;
+    pthread_join(aThread[i], &retVal);
+  }
+}
+
+static void neighbour_init(int);
+
+static void *threadInit(void *arg)
+{
+  USER_PARAMETERS *usrparam;
+  usrparam = (USER_PARAMETERS *) arg;
+
+
+  pthread_setspecific(perThreadKey, (void *) usrparam->mype);
+
+  ConverseCommonInit(usrparam->argv);
+  CthInit(usrparam->argv);
+  neighbour_init(CmiMyPe());
+  CpvInitialize(void*, CmiLocalQueue);
+  CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
+  CmiSpanTreeInit();
+  CmiTimerInit();
+  if (Cmi_initret==0) {
+    Cmi_startFn(Cmi_argc, usrparam->argv);
+    if (Cmi_usched==0) CsdScheduler(-1);
+    ConverseExit();
+  }
+}
+
+
+void ConverseExit(void)
+{
+  ConverseCommonExit();
+}
+
+
+void CmiDeclareArgs(void)
+{
+}
+
+
+void CmiNotifyIdle()
+{
+}
+
+void *CmiGetNonLocal()
+{
+  return McQueueRemoveFromFront(MsgQueue[CmiMyPe()]);
+}
+
+
+void CmiSyncSendFn(int destPE, int size, char *msg)
+{
+  char *buf;
+
+  buf=(void *)CmiAlloc(size);
+  memcpy(buf,msg,size);
+  McQueueAddToBack(MsgQueue[destPE],buf); 
+}
+
+
+CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
+{
+  CmiSyncSendFn(destPE, size, msg); 
+  return 0;
+}
+
+
+void CmiFreeSendFn(int destPE, int size, char *msg)
+{
+  if (CmiMyPe()==destPE) {
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+  } else {
+    McQueueAddToBack(MsgQueue[destPE],msg); 
+  }
+}
+
+void CmiSyncBroadcastFn(int size, char *msg)
+{
+  int i;
+  for(i=0; i<Cmi_numpes; i++)
+    if (CmiMyPe() != i) CmiSyncSendFn(i,size,msg);
+}
+
+CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)
+{
+  CmiSyncBroadcastFn(size, msg);
+  return 0;
+}
+
+void CmiFreeBroadcastFn(int size, char *msg)
+{
+  CmiSyncBroadcastFn(size,msg);
+  CmiFree(msg);
+}
+
+void CmiSyncBroadcastAllFn(int size, char *msg)
+{
+  int i;
+  for(i=0; i<CmiNumPes(); i++) 
+    CmiSyncSendFn(i,size,msg);
+}
+
+
+CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)
+{
+  CmiSyncBroadcastAllFn(size, msg);
+  return 0; 
+}
+
+
+void CmiFreeBroadcastAllFn(int size, char *msg)
+{
+  int i;
+  for(i=0; i<CmiNumPes(); i++) {
+    if(CmiMyPe() != i) {
+      CmiSyncSendFn(i,size,msg);
+    }
+  }
+  FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+}
+
+/* ********************************************************************** */
+/* The following functions are required by the load balance modules       */
+/* ********************************************************************** */
+
+static int _MC_neighbour[4]; 
+static int _MC_numofneighbour;
+
+long CmiNumNeighbours(int node)
+{
+  if (node == CmiMyPe() ) 
+   return  _MC_numofneighbour;
+  else 
+   return 0;
+}
+
+
+void CmiGetNodeNeighbours(int node, int *neighbours)
+{
+  int i;
+
+  if (node == CmiMyPe() )
+    for(i=0; i<_MC_numofneighbour; i++) 
+      neighbours[i] = _MC_neighbour[i];
+}
+
+
+int CmiNeighboursIndex(int node, int neighbour)
+{
+  int i;
+
+  for(i=0; i<_MC_numofneighbour; i++)
+    if (_MC_neighbour[i] == neighbour) return i;
+  return(-1);
+}
+
+
+static void neighbour_init(int p)
+{
+  int a,b,n;
+
+  n = CmiNumPes();
+  a = (int)sqrt((double)n);
+  b = (int) ceil( ((double)n / (double)a) );
+
+   
+  _MC_numofneighbour = 0;
+   
+  /* east neighbour */
+  if( (p+1)%b == 0 )
+    n = p-b+1;
+  else {
+    n = p+1;
+    if(n>=CmiNumPes()) 
+      n = (a-1)*b; /* west-south corner */
+  }
+  if(neighbour_check(p,n) ) 
+    _MC_neighbour[_MC_numofneighbour++] = n;
+
+  /* west neigbour */
+  if( (p%b) == 0) {
+    n = p+b-1;
+  if(n >= CmiNumPes()) 
+    n = CmiNumPes()-1;
+  } else
+    n = p-1;
+  if(neighbour_check(p,n) ) 
+    _MC_neighbour[_MC_numofneighbour++] = n;
+
+  /* north neighbour */
+  if( (p/b) == 0) {
+    n = (a-1)*b+p;
+    if(n >= CmiNumPes()) 
+      n = n-b;
+  } else
+    n = p-b;
+  if(neighbour_check(p,n) ) 
+    _MC_neighbour[_MC_numofneighbour++] = n;
+    
+  /* south neighbour */
+  if( (p/b) == (a-1) )
+    n = p%b;
+  else {
+    n = p+b;
+    if(n >= CmiNumPes()) 
+      n = n%b;
+  } 
+  if(neighbour_check(p,n) ) 
+    _MC_neighbour[_MC_numofneighbour++] = n;
+}
+
+static neighbour_check(int p, int n)
+{
+    int i; 
+    if(n==p) 
+      return 0;
+    for(i=0; i<_MC_numofneighbour; i++) 
+      if (_MC_neighbour[i] == n) return 0;
+    return 1; 
+}
+
+/* ****************************************************************** */
+/*    The following internal functions implements FIFO queues for     */
+/*    messages. These queues are shared among threads                 */
+/* ****************************************************************** */
+
+static void ** AllocBlock(unsigned int len)
+{
+  void **blk;
+
+  blk=(void **)CmiAlloc(len*sizeof(void *));
+  return blk;
+}
+
+static void 
+SpillBlock(void **srcblk, void **destblk, unsigned int first, unsigned int len)
+{
+  memcpy(destblk, &(srcblk[first]), (len-first)*sizeof(void *));
+  memcpy(&(destblk[len-first]),srcblk,first*sizeof(void *));
+}
+
+McQueue * McQueueCreate(void)
+{
+  McQueue *queue;
+
+  queue = (McQueue *) CmiAlloc(sizeof(McQueue));
+  pthread_mutex_init(&(queue->mutex), (pthread_mutexattr_t *) 0);
+  queue->blk = AllocBlock(BLK_LEN);
+  queue->blk_len = BLK_LEN;
+  queue->first = 0;
+  queue->len = 0;
+  queue->maxlen = 0;
+  return queue;
+}
+
+void McQueueAddToBack(McQueue *queue, void *element)
+{
+  pthread_mutex_lock(&(queue->mutex));
+  if(queue->len==queue->blk_len) {
+    void **blk;
+
+    queue->blk_len *= 3;
+    blk = AllocBlock(queue->blk_len);
+    SpillBlock(queue->blk, blk, queue->first, queue->len);
+    CmiFree(queue->blk);
+    queue->blk = blk;
+    queue->first = 0;
+  }
+  queue->blk[(queue->first+queue->len++)%queue->blk_len] = element;
+  if(queue->len>queue->maxlen)
+    queue->maxlen = queue->len;
+  pthread_mutex_unlock(&(queue->mutex));
+}
+
+
+void * McQueueRemoveFromFront(McQueue *queue)
+{
+  void *element = 0;
+  pthread_mutex_lock(&(queue->mutex));
+  if(queue->len) {
+    element = queue->blk[queue->first++];
+    queue->first = (queue->first+queue->blk_len)%queue->blk_len;
+    queue->len--;
+  }
+  pthread_mutex_unlock(&(queue->mutex));
+  return element;
+}
