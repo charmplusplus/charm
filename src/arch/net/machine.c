@@ -2727,7 +2727,6 @@ static void ConverseRunPE(int everReturn)
   cs = CmiGetState();
   CpvInitialize(char *, internal_printf_buffer);
   
-  CpvInitialize(char **,);
   CpvAccess(internal_printf_buffer) = (char *) malloc(PRINTBUFSIZE);
   _MEMCHECK(CpvAccess(internal_printf_buffer));
   CmiMyArgv=CmiCopyArgs(Cmi_argv);
