@@ -654,7 +654,8 @@ void CentralLB::simulationRead() {
     double startT = CmiWallTimer();
     CmiPrintf("%s> Strategy starts ... \n", lbname);
     LBMigrateMsg* migrateMsg = Strategy(statsData, LBSimulation::simProcs);
-    CmiPrintf("%s> Strategy took %fs. \n", lbname, CmiWallTimer()-startT);
+    CmiPrintf("%s> Strategy took %fs memory usage: CentralLB:%dKB. \n", 
+               lbname, CmiWallTimer()-startT, (int)(useMem()/1000));
 
     // now calculate the results of the load balancing simulation
     findSimResults(statsData, LBSimulation::simProcs, migrateMsg, simResults);
@@ -849,8 +850,8 @@ void CentralLB::pup(PUP::er &p) {
 }
 
 int CentralLB::useMem() { 
-  return CkNumPes() * (sizeof(CentralLB::LDStats)+sizeof(CLBStatsMsg *)) +
-                        sizeof(CentralLB);
+  return sizeof(CentralLB) + statsData->useMem() + 
+         CkNumPes() * sizeof(CLBStatsMsg *);
 }
 
 static inline int i_abs(int c) { return c>0?c:-c; }
@@ -973,7 +974,7 @@ void CentralLB::LDStats::pup(PUP::er &p)
 
 int CentralLB::LDStats::useMem() { 
   // calculate the memory usage of this LB (superclass).
-  return sizeof(CentralLB) + sizeof(LDStats) + sizeof(ProcStats)*count + 
+  return sizeof(LDStats) + sizeof(ProcStats)*count + 
 	 (sizeof(LDObjData) + 2*sizeof(int)) * n_objs +
  	 sizeof(LDCommData) * n_comm;
 }
