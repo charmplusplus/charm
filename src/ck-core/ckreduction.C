@@ -262,7 +262,7 @@ void CkReductionMgr::RecvMsg(CkReductionMsg *m)
   if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
     DEBR((AA"Recv'd remote contribution %d for #%d\n"AB,nRemote,m->redNo));
     startReduction(m->redNo);
-    msgs.insertAtEnd(m);
+    msgs.push_back(m);
     nRemote++;
     finishReduction();
   }
@@ -311,7 +311,7 @@ void CkReductionMgr::addContribution(CkReductionMsg *m)
   } else {// An ordinary contribution  
     DEBR((AA"Recv'd local contribution %d for #%d\n"AB,nContrib,m->redNo));
     startReduction(m->redNo);
-    msgs.insertAtEnd(m);
+    msgs.push_back(m);
     nContrib++;
     finishReduction();
   }
@@ -340,7 +340,7 @@ void CkReductionMgr::finishReduction(void)
     if (totalElements>result->nSources()) 
     {
       DEBR((AA"Only got %d of %d contributions (c'mon, migrators!)\n"AB,result->nSources(),totalElements));
-      msgs.insertAtEnd(result);
+      msgs.push_back(result);
       return; // Wait for migrants to contribute
     } else if (totalElements<result->nSources()) {
       DEBR((AA"Got %d of %d contributions\n"AB,result->nSources(),totalElements));
@@ -412,7 +412,7 @@ CkReductionMgr::countAdjustment &CkReductionMgr::adj(int number)
   if (number<0) CkAbort("Requested adjustment to prior reduction!\n");
   //Pad the adjustment vector with zeros until it's at least number long
   while (adjVec.length()<=number)
-    adjVec.insertAtEnd(countAdjustment());
+    adjVec.push_back(countAdjustment());
   return adjVec[number];
 }
 
@@ -527,7 +527,7 @@ void CkReductionMgr::pupAdjVec(CkVec<CkReductionMgr::countAdjustment> &vec, PUP:
   p(nAdjs);
 
   for(int i = 0; i < nAdjs; i++) {
-  if (p.isUnpacking()) vec.insertAtEnd(countAdjustment());
+  if (p.isUnpacking()) vec.push_back(countAdjustment());
   p(vec[i].gcount);
   p(vec[i].lcount);
   }

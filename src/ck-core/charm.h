@@ -191,7 +191,7 @@ extern void CkWaitQD(void);
  *
  *****************************************************************************/
 
-extern void *CkLocalBranch(int gID);
+/*extern void *CkLocalBranch(int gID);*/
 extern void *CkLocalNodeBranch(int gID);
 extern void  CkGetChareID(CkChareID *pcid);
 extern CkGroupID   CkGetGroupID(void);

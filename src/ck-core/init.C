@@ -38,7 +38,7 @@ CpvDeclare(void*,       _currentChare);
 CpvDeclare(int,         _currentChareType);
 CpvDeclare(CkGroupID,   _currentGroup);
 CpvDeclare(CkGroupID,   _currentNodeGroup);
-CpvDeclare(GroupTable*, _groupTable);
+CpvDeclare(GroupTable, _groupTable);
 GroupTable* _nodeGroupTable = 0;
 
 CpvDeclare(Stats*, _myStats);
@@ -463,6 +463,7 @@ static char* fContent(char *msg)
 #endif
 
 extern void _registerLBDatabase(void);
+extern void _ckModuleInit(void);
 
 void _initCharm(int argc, char **argv)
 {
@@ -472,7 +473,7 @@ void _initCharm(int argc, char **argv)
 	CpvInitialize(int,   _currentChareType);
 	CpvInitialize(CkGroupID, _currentGroup);
 	CpvInitialize(CkGroupID, _currentNodeGroup);
-	CpvInitialize(GroupTable*, _groupTable);
+	CpvInitialize(GroupTable, _groupTable);
 	CpvInitialize(int, _numInitsRecd);
 	CpvInitialize(QdState*, _qd);
 	CpvInitialize(MsgPool*, _msgPool);
@@ -486,8 +487,6 @@ void _initCharm(int argc, char **argv)
 	_MEMCHECK(CpvAccess(_buffQ));
 	CpvAccess(_bocInitVec) = new PtrVec();
 	_MEMCHECK(CpvAccess(_bocInitVec));
-	CpvAccess(_groupTable) = new GroupTable();
-	_MEMCHECK(CpvAccess(_groupTable));
 	
 	if(CmiMyRank()==0) 
 	{
@@ -516,6 +515,7 @@ void _initCharm(int argc, char **argv)
 	_qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
 	_triggerHandlerIdx = CmiRegisterHandler((CmiHandler)_triggerHandler);
+	_ckModuleInit();
 
 	CthSetSuspendable(CthSelf(), 0);
 
@@ -617,11 +617,23 @@ void _initCharm(int argc, char **argv)
 
 }
 
-GroupTable::GroupTable() 
-{ 
-  for(int i=0;i<MAXBINS;i++) 
-    bins[i] = 0;
+GroupTable::GroupTable() { }
+
+void GroupTable::enqmsg(CkGroupID n, void *msg)
+{
+	if (tab[n].pending==NULL)
+		tab[n].pending=new PtrQ();
+	tab[n].pending->enq(msg);
 }
+
+void GroupTable::add(CkGroupID n, void *obj)
+{
+	tab[n].obj=obj;
+	if (tab[n].pending==NULL)
+		tab[n].pending=new PtrQ();
+}
+
+
 
 // this is needed because on o2k, f90 programs have to have main in
 // fortran90.

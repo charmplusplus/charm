@@ -12,17 +12,16 @@
 #include <memory.h>
 #include "charm.h"
 
-#include "pup.h"
-
 #if CMK_DEBUG_MODE
 #include <string.h>
-#endif
-
-#if CMK_DEBUG_MODE
 class Chare;
 extern void putObject(Chare *);
 extern void removeObject(Chare *);
 #endif
+
+#include "cklists.h"
+#include "init.h"
+#include "pup.h"
 
 //We need CkMigrateMessage only to distinguish the migration
 // constructor from all other constructors-- the type
@@ -92,17 +91,18 @@ class CkArray;
 class CkArrayID {
   public:
     CkGroupID _aid;
-    CkArray *_array;
+    CkArrayID() {}
     CkArrayID(CkGroupID aid) {
-      _array = (CkArray *) CkLocalBranch(aid);
       _aid=aid;
     }
-    CkArray *getArrayManager(void) { return _array; }
-    CkArrayID() {}
-    virtual void pup(PUP::er &p) { 
+    CkArray *ckLocalBranch(void) const
+	{ return (CkArray *)CkLocalBranch(_aid); }
+    CkArray *getArrayManager(void) const {return ckLocalBranch();}
+    static CkArray *CkLocalBranch(CkGroupID id) 
+	{ return (CkArray *)::CkLocalBranch(id); }
+
+    void pup(PUP::er &p) { 
       p(_aid); 
-      if (p.isUnpacking()) 
-	_array = (CkArray *) CkLocalBranch(_aid); 
     }
 };
 
@@ -134,8 +134,6 @@ static inline void _CHECK_CID(CkChareID cid, int idx)
 #else
 static inline void _CHECK_CID(CkChareID, int){}
 #endif
-
-#include "cklists.h"
 
 #include "ckarray.h"
 #include "ckstream.h"

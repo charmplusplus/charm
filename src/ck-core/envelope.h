@@ -85,6 +85,7 @@ class envelope {
     // to make envelope void* aligned
     UChar padding[D(3*sizeof(UShort)+3*sizeof(UChar))];
   public:
+  
     UInt   getEvent(void) const { return event; }
     void   setEvent(const UInt e) { event = e; }
     UInt   getRef(void) const { return s2; }
@@ -199,19 +200,19 @@ class envelope {
     }
 };
 
-static inline envelope *UsrToEnv(const void *const msg) {
+inline envelope *UsrToEnv(const void *const msg) {
   return (((envelope *) msg)-1);
 }
 
-static inline void *EnvToUsr(const envelope *const env) {
+inline void *EnvToUsr(const envelope *const env) {
   return ((void *)(env+1));
 }
 
-static inline envelope *_allocEnv(const int msgtype, const int size=0, const int prio=0) {
+inline envelope *_allocEnv(const int msgtype, const int size=0, const int prio=0) {
   return envelope::alloc(msgtype,size,prio);
 }
 
-static inline void *_allocMsg(const int msgtype, const int size, const int prio=0) {
+inline void *_allocMsg(const int msgtype, const int size, const int prio=0) {
   return EnvToUsr(envelope::alloc(msgtype,size,prio));
 }
 
@@ -243,5 +244,7 @@ class MsgPool {
 };
 
 CpvExtern(MsgPool*, _msgPool);
+extern void _processBocInitMsg(envelope *);
+extern void _processNodeBocInitMsg(envelope *);
 
 #endif

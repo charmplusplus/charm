@@ -12,15 +12,14 @@
 #include <stdlib.h>
 
 #ifdef CMK_OPTIMIZE
-#define NDEBUG
-#endif
-
+#define assert(x) ((void *)0)
+#else
 #include <assert.h>
+#endif
 
 #include "charm++.h"
 
 #include "envelope.h"
-#include "init.h"
 #include "qd.h"
 #include "register.h"
 #include "stats.h"
