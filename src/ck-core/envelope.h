@@ -8,7 +8,9 @@
 #ifndef _ENVELOPE_H
 #define _ENVELOPE_H
 
+#ifndef CINTBITS
 #define CINTBITS (sizeof(int)*8)
+#endif
 
 #ifndef CMK_OPTIMIZE
 #define _SET_USED(env, x) (env)->setUsed((x))
@@ -248,31 +250,16 @@ extern UChar   _defaultQueueing;
 extern void CkPackMessage(envelope **pEnv);
 extern void CkUnpackMessage(envelope **pEnv);
 
-#define MAXMSGS 32
-
-class MsgPool {
-  private:
-    int num;
-    void *msgs[MAXMSGS];
+class MsgPool: public SafePool<void *> {
+private:
     static void *_alloc(void) {
       register envelope *env = _allocEnv(ForChareMsg,0,0);
       env->setQueueing(_defaultQueueing);
       env->setMsgIdx(0);
       return EnvToUsr(env);
     }
-  public:
-    MsgPool();
-    void *get(void) {
-      /* CkAllocSysMsg() called in .def.h is not thread of sigio safe */
-      if (CmiImmIsRunning()) return _alloc();
-      return (num ? msgs[--num] : _alloc());
-    }
-    void put(void *m) {
-      if (num==MAXMSGS || CmiImmIsRunning())
-        CkFreeMsg(m);
-      else
-        msgs[num++] = m;
-    }
+public:
+    MsgPool():SafePool<void*>(_alloc, CkFreeMsg) {}
 };
 
 CkpvExtern(MsgPool*, _msgPool);
