@@ -1,0 +1,143 @@
+#include <stdio.h>
+#include "charm++.h"
+#include "ckmulticast.h"
+
+#include "hello.decl.h"
+
+CkChareID mid;
+CProxy_Hello arr;
+CkGroupID mCastGrpId;
+CProxySection_Hello *mcast;
+
+#define SECTIONSIZE  5
+
+class HiMsg : public CkMcastBaseMsg, public CMessage_HiMsg
+{
+public:
+  int *data;
+//	HiMsg(int n) {data=n;}
+};
+
+
+typedef struct {
+  int reductionNo;
+  int reductionsRemaining;
+} myReductionCounter;
+
+class main : public Chare
+{
+public:
+  main(CkMigrateMessage *m) {}
+  main(CkArgMsg* m)
+  {
+    if(m->argc < 2) {
+      CkAbort("Usage: hello <nElements>\n");
+    }
+    int nElements = atoi(m->argv[1]);
+    delete m;
+    CkPrintf("Running Hello on %d processors for %d elements\n",
+	     CkNumPes(),nElements);
+    mid = thishandle;
+
+    arr = CProxy_Hello::ckNew(nElements);
+
+    mCastGrpId = CProxy_CkMulticastMgr::ckNew();
+
+    arr[0].start();
+
+  };
+
+  void maindone(void)
+  {
+    static int count = 0;
+    count ++;
+//    if (count < SECTIONSIZE*3) return;
+    CkPrintf("All done\n");
+    CkExit();
+  };
+};
+
+void client(CkSectionID sid, void *param, int dataSize, void *data)
+{
+  myReductionCounter *c=(myReductionCounter *)param;
+  CmiPrintf("RESULT: %d %d\n", *(int *)data, c->reductionNo); 
+
+  c->reductionsRemaining--;
+  if (c->reductionsRemaining<=0) {
+    CProxy_main mproxy(mid);
+    mproxy.maindone();
+  }
+  else {
+    CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+    mg->rebuild(mcast->ckGetSectionID());
+
+    c->reductionNo++;
+    HiMsg *hiMsg = new (1, 0) HiMsg;
+    hiMsg->data[0] = 18+c->reductionNo;
+    mcast->SayHi(hiMsg);
+  }
+}
+
+class Hello : public ArrayElement1D
+{
+private:
+  CkSectionID sid;
+  int init;
+
+public:
+  Hello()
+  {
+    CkPrintf("Hello %d created\n",thisIndex);
+    init = 0;
+  }
+
+  Hello(CkMigrateMessage *m) {}
+
+  void start()
+  {
+    CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+
+    CkArrayIndexMax al[SECTIONSIZE];
+    for (int i=0; i<SECTIONSIZE; i++) {
+      al[i] = CkArrayIndex1D(i);
+    }
+    mcast = new CProxySection_Hello(thisArrayID, al, SECTIONSIZE, mCastGrpId);
+    mg->setSection(mcast);
+
+#if 0
+    mg->setSection(sid, thisArrayID, al, SECTIONSIZE);
+    sid.create(thisArrayID);
+    for (int i=0; i<SECTIONSIZE; i++) 
+      sid.addMember(CkArrayIndex1D(i));
+    mg->setSection(sid);
+#endif
+
+    myReductionCounter *c=new myReductionCounter;
+    c->reductionsRemaining=18;
+    c->reductionNo=0;
+    mg->setReductionClient(mcast, client, c);
+
+    HiMsg *hiMsg = new (1, 0) HiMsg;
+    hiMsg->data[0] = 17;
+    mcast->SayHi(hiMsg);
+  }
+  
+  void SayHi(HiMsg *m)
+  {
+    CkPrintf("[%d] Hi[%d] from element %d\n",CmiMyPe(), m->data[0],thisIndex);
+
+    CkGetSectionID(sid, m);
+
+    CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+
+    int data = thisIndex;
+    mg->contribute(sizeof(int), &data,CkReduction::sum_int, sid);
+    data = thisIndex+1;
+    mg->contribute(sizeof(int), &data,CkReduction::product_int, sid);
+    data = thisIndex+2;
+    mg->contribute(sizeof(int), &data,CkReduction::max_int, sid);
+    delete m;
+  }
+};
+
+#include "hello.def.h"
