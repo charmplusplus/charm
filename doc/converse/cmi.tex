@@ -113,6 +113,16 @@ CmiGrabBuffer(\&msg)}.  Afterward, {\tt msg} contains a pointer to the
 message, or a copy of it.  From that point forward, it is the user's
 responsibility to free the message using \param{CmiFree.}}
 
+\function{void CmiReleaseBuffer(void *buf)}
+\index{CmireleaseBuffer}
+\desc{A handler function receives a pointer to a message buffer
+as an argument.  Normally, it is supposed to copy the data out of the
+message buffer before it returns, at which time Converse automatically
+frees the message buffer or may reuse it for further communication.  
+However, a handler function may use
+CmiReleaseBuffer to give up ownership of the message buffer in the
+middle of handler execution (and therefore allowing Converse to reuse it).}
+
 \section{Building Messages}
 
 To send a message, one first creates a buffer to hold the message.
@@ -213,7 +223,8 @@ using {\tt CmiFree}}
 \desc{Sends \param{msg} of size \param{size} bytes to processor
 \param{destPE}.  It returns a communication handle which can be
 tested using CmiAsyncMsgSent: when this returns true, you may reuse
-the message buffer.}
+the message buffer. If the returned communication handle is 0, message buffer
+can be reused immediately, thus saving a call to CmiAsyncMsgSent.}
 
 \function{void CmiSyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])}
 \desc{Concatenates several pieces of data and sends them to processor
@@ -245,7 +256,9 @@ The individual pieces of data as well as the arrays \param{sizes} and
 \param{msgComps} should not be overwritten or freed before the
 communication is complete.  This function returns a communication
 handle which can be tested using CmiAsyncMsgSent: when this returns
-true, the input parameters can be reused.}
+true, the input parameters can be reused. If the returned communication 
+handle is 0, message buffer
+can be reused immediately, thus saving a call to CmiAsyncMsgSent.}
 
 \function{int CmiAsyncMsgSent(CmiCommHandle handle)}
 \index{CmiAsyncMsgSent}
@@ -321,7 +334,9 @@ frees the message buffer for \param{msg} before returning, so
 length \param{size} bytes to all processors excluding the processor on
 which the caller resides. It returns a communication handle which
 could be used to check the status of this send using
-\param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
+\param{CmiAsyncMsgSent()}. If the returned communication handle is 0, 
+message buffer can be reused immediately, thus saving a call to 
+CmiAsyncMsgSent. \param{msg} should not be overwritten or
 freed before the communication is complete.}
 
 \function{CmiCommHandle CmiAsyncBroadcastAll(unsigned int size, void *msg)}
@@ -330,7 +345,9 @@ freed before the communication is complete.}
 length \param{size} bytes to all processors including the processor on
 which the caller resides. It returns a communication handle which
 could be used to check the status of this send using
-\param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
+\param{CmiAsyncMsgSent()}. If the returned communication handle is 0, 
+message buffer can be reused immediately, thus saving a call to 
+CmiAsyncMsgSent. \param{msg} should not be overwritten or
 freed before the communication is complete.}
 
 \section{Multicasting Messages}
@@ -368,7 +385,9 @@ Group IDs are created using \param{CmiEstablishGroup}.}
 message \param{msg} of length \param{size} bytes to all members of
 the specified group.  It returns a communication handle which could
 be used to check the status of this send using
-\param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
+\param{CmiAsyncMsgSent()}. If the returned communication handle is 0, 
+message buffer can be reused immediately, thus saving a call to 
+CmiAsyncMsgSent. \param{msg} should not be overwritten or
 freed before the communication is complete.
 Group IDs are created using \param{CmiEstablishGroup}.}
 
@@ -392,7 +411,9 @@ Group IDs are created using \param{CmiEstablishGroup}.}
 message \param{msg} of length \param{size} bytes to all processors
 in the list.  It returns a communication handle which could
 be used to check the status of this send using
-\param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
+\param{CmiAsyncMsgSent()}. If the returned communication handle is 0,
+message buffer can be reused immediately, thus saving a call to 
+CmiAsyncMsgSent. \param{msg} should not be overwritten or
 freed before the communication is complete.
 Group IDs are created using \param{CmiEstablishGroup}.}
 
@@ -707,7 +728,9 @@ could be called only by the root processor of processor-group \param{group}.}
 length \param{size} bytes to all processors belonging to \param{group}
 excluding the processor on which the caller resides. It returns a
 communication handle which could be used to check the status of this
-send using \param{CmiAsyncMsgSent()}. \param{msg} should not be
+send using \param{CmiAsyncMsgSent()}. If the returned communication handle 
+is 0, message buffer can be reused immediately, thus saving a call to 
+CmiAsyncMsgSent. \param{msg} should not be
 overwritten or freed before the communication is complete. \note{Caller
 need not belong to \param{group}.}} 
 
