@@ -343,17 +343,21 @@ data or connectivity data (respectively) is associated with the element.
   \args{REAL*8, intent(in),  dimention(doublePerNode,nNode)  :: data}
 \function{subroutine FEM\_Get\_Node\_Data\_r(data)}
   \args{REAL*8, intent(out), dimention(doublePerNode,nNode)  :: data}
-\function{subroutine FEM\_Set\_Elem\_Data\_r(data)}
-  \args{REAL*8, intent(in),  dimention(doublePerElem,nElem)  :: data}
-\function{subroutine FEM\_Get\_Elem\_Data\_r(data)}
+\function{subroutine FEM\_Set\_Elem\_Data\_r(elType,data)}
+  \args{integer, intent(in) :: elType}
+  \args{REAL*8, intent(in), dimention(doublePerElem,nElem)  :: data}
+\function{subroutine FEM\_Get\_Elem\_Data\_r(elType,data)}
+  \args{integer, intent(in) :: elType}
   \args{REAL*8, intent(out), dimention(doublePerElem,nElem)  :: data}
 \function{subroutine FEM\_Set\_Node\_Data\_c(data)}
   \args{REAL*8, intent(in),  dimention(nNode,doublePerNode)  :: data}
 \function{subroutine FEM\_Get\_Node\_Data\_c(data)}
   \args{REAL*8, intent(out), dimention(nNode,doublePerNode)  :: data}
-\function{subroutine FEM\_Set\_Elem\_Data\_c(data)}
+\function{subroutine FEM\_Set\_Elem\_Data\_c(elType,data)}
+  \args{integer, intent(in) :: elType}
   \args{REAL*8, intent(in),  dimention(nElem,doublePerElem)  :: data}
-\function{subroutine FEM\_Get\_Elem\_Data\_c(data)}
+\function{subroutine FEM\_Get\_Elem\_Data\_c(elType,data)}
+  \args{integer, intent(in) :: elType}
   \args{REAL*8, intent(out), dimention(nElem,doublePerElem)  :: data}
 
      Describe/retrieve the optional, uninterpreted user data associated with
