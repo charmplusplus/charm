@@ -128,7 +128,7 @@ class NodeGroup : public Chare { //Superclass of all NodeGroups
 template <class Parent,class CProxy_Derived>
 class CBaseT : public Parent {
 public:
-	CBase_ProxyDecls(Derived);
+	CProxy_Derived thisProxy;
 	CBaseT(void) :Parent(), CBase_ProxyInits(this) {}
 	CBaseT(CkMigrateMessage *m) :Parent(m), CBase_ProxyInits(this) {}
 };
@@ -137,7 +137,7 @@ public:
 template <class Parent1,class Parent2,class CProxy_Derived>
 class CBaseT2 : public Parent1, public Parent2 {
 public:
-	CBase_ProxyDecls(Derived);
+	CProxy_Derived thisProxy;
 	CBaseT2(void) :Parent1(), Parent2(), 
 		CBase_ProxyInits((Parent1 *)this) {}
 	CBaseT2(CkMigrateMessage *m) :Parent1(m), Parent2(m),
