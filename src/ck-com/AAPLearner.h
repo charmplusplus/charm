@@ -6,8 +6,16 @@
 #include "ComlibManager.h"
 #include "ComlibLearner.h"
 
-#define ALPHA 1e-5
-#define BETA  7.8e-9
+#define ALPHA       1e-5    //Total alpha overhead
+#define ALPHA_NIC1  9e-6  //NIC alpha for short messages
+#define ALPHA_NIC2  6e-6  //NIC alpha
+
+#define ALPHA_CHARM 2e-6  //Charm++ processing after message has been received
+                             //Includes malloc and scheduling overheads
+
+#define GAMMA_NIC   2.6e-9   //DMA bandwidth to copy data into NIC memory
+#define BETA        4e-9   //Network bandwidth
+#define GAMMA       9e-10     //Memory bandwidth (copied twice)
 
 #define min(x,y) ((x < y) ? x : y)
 

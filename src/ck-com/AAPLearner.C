@@ -2,8 +2,10 @@
 #include "ComlibManager.h"
 #include "EachToManyMulticastStrategy.h"
 
+#define max(a,b) ((a > b) ? a : b)
+
 AAPLearner::AAPLearner() {
-   init();
+    init();
 }
 
 void AAPLearner::init() {
@@ -60,7 +62,7 @@ Strategy *AAPLearner::optimizePattern(Strategy *strat,
         in_strat->ainfo.getDestinationArray(daid, didxlist, ndest);
                 
         ostrat = new EachToManyMulticastStrategy
-            (minstrat, said, daid,
+	     (minstrat, said, daid,
              nsrc, sidxlist, ndest,
              didxlist);
 
@@ -84,25 +86,43 @@ Strategy *AAPLearner::optimizePattern(Strategy *strat,
 
 //P = number of processors, m = msgsize, d = degree
 double AAPLearner::computeDirect(double P, double m, double d) {
-    double cost = 0.0;
-    cost = d * alpha;
-    cost += d * m * beta;
+    double cost1, cost2;
+
+    /*  //Old equations do not model bursts 
+      cost = d * alpha;
+      cost += d * m * beta;
+    */
+
+    cost1 = (d-1) * ALPHA_NIC1 + alpha + m * beta + d * m * GAMMA_NIC; 
+    cost2 = alpha + d * ALPHA_NIC2 +  d * m * beta + m * GAMMA_NIC;
     
-    return cost;
+    return max(cost1, cost2); 
 }
 
 //P = number of processors, m = msgsize, d = degree
 double AAPLearner::computeMesh(double P, double m, double d) {
 
-    double cost = 0.0;
+    double cost1, cost2;
+
+    /* old equation 
     cost = 2 * sqrt((double) P) * alpha;
     cost += 2 * d * m * beta;
+    */
+
+    double sqrt_p = ceil(sqrt((double) P));
+
+    cost1 = 2 * (sqrt_p - 2) * ALPHA_NIC1 + 2 * alpha + 2 * m * beta
+      + 2 * d * m * GAMMA_NIC; 
+    cost2 = 2 * alpha + 2 * (sqrt_p - 2) * ALPHA_NIC2 + 2 * d * m * beta + 2 * m *GAMMA_NIC;
     
-    return cost;
+    return max(cost1, cost2) + d * ALPHA_CHARM; 
 }
 
 //P = number of processors, m = msgsize, d = degree
 double AAPLearner::computeHypercube(double P, double m, double d) {
+
+    //Temporarily disabling hypercube
+    return 100;
 
     if(P == 0)
         return 0;
@@ -111,23 +131,31 @@ double AAPLearner::computeHypercube(double P, double m, double d) {
     double log_2_P = log(P)/log(2.0);
     
     if(d >= P/2) {
-        cost = log_2_P * alpha;
-        cost += P/2 * log_2_P * m * beta;
+      cost = log_2_P * alpha;
+      cost += (P/2) * log_2_P * m * (beta + GAMMA_NIC + GAMMA);
     }
     else {
-        cost = log_2_P * alpha;
-        cost += log_2_P * d * m * beta;
+      cost = log_2_P * alpha;
+      cost += log_2_P * d * m * (beta + GAMMA_NIC + GAMMA);
     }
-
-    return cost;
+    
+    return cost + d * ALPHA_CHARM;
 }
 
 //P = number of processors, m = msgsize, d = degree
 double AAPLearner::computeGrid(double P, double m, double d) {
-    double cost = 0.0;
-    cost = 3 * cubeRoot((double) P) * alpha;
-    cost += 3 * d * m * beta;
+    double cost1, cost2 = 0.0;
+    /*
+      cost = 3 * cubeRoot((double) P) * alpha;
+      cost += 3 * d * m * beta;
+    */
+
+    double cbrt_p = ceil(cubeRoot((double) P));
+
+    cost1 = 3 * (cbrt_p - 2) * ALPHA_NIC1 + 3 * alpha + 3 * m * beta +
+      3 * d *m * GAMMA_NIC;  
+    cost2 = 3 * alpha + 3 * (cbrt_p - 2) * ALPHA_NIC2 + 3 * d * m * beta + 3 * m *GAMMA_NIC; 
     
-    return cost;
+    return max(cost1, cost2) + d * ALPHA_CHARM;
 }
 
