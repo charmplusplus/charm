@@ -8,6 +8,8 @@ class multicastGrpMsg;
 class cookieMsg;
 class ReductionMsg;
 
+typedef mCastCookie * mCastCookiePtr;
+
 #include "CkMulticast.decl.h"
 
 class CkMcastBaseMsg {
@@ -46,8 +48,10 @@ class CkMulticastMgr: public CkDelegateMgr {
     void setReductionClient(CkSectionID sid, redClientFn fn,void *param=NULL);
     void setReductionClient(CProxySection_ArrayElement *, redClientFn fn,void *param=NULL);
     void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionID &sid);
-    void recvRedMsg(ReductionMsg *msg);
     void rebuild(CkSectionID &);
+    // entry
+    void recvRedMsg(ReductionMsg *msg);
+    void updateRedNo(mCastCookie *, int red);
   public:
     typedef ReductionMsg *(*reducerFn)(int nMsg,ReductionMsg **msgs);
   private:

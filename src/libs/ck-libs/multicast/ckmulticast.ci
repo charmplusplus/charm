@@ -22,5 +22,6 @@ module CkMulticast {
     entry [sync, threaded] cookieMsg * setup(multicastSetupMsg *);
     // reduction
     entry void recvRedMsg(ReductionMsg *msg);
+    entry void updateRedNo(mCastCookiePtr e, int no);
   };
 };
