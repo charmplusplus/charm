@@ -37,6 +37,7 @@ typedef char ThreadType;
 const char UNKNOWN_THREAD=0, COMM_THREAD=1, WORK_THREAD=2;
 
 /* converse message send to other bgnodes */
+#if 0
 class bgMsg {
 public:
   char core[CmiMsgHeaderSizeBytes];
@@ -50,11 +51,12 @@ public:
 public:
   bgMsg() {};
 };
+#endif
 
 typedef bgQueue<int>  	    threadIDQueue;
 typedef bgQueue<CthThread>  threadQueue;
-typedef bgQueue<bgMsg *>    msgQueue;
-typedef CkQ<bgMsg *> 	    ckMsgQueue;
+typedef bgQueue<char *>    msgQueue;
+typedef CkQ<char *> 	    ckMsgQueue;
 
 class nodeInfo;
 class threadInfo;
@@ -299,10 +301,10 @@ void BgNumberHandler(int idx, BgHandler h)
 
 /* communication thread call getFullBuffer to test if there is data ready 
    in INBUFFER for its own queue */
-bgMsg * getFullBuffer()
+char * getFullBuffer()
 {
   int tags[1], ret_tags[1];
-  bgMsg *data, *mb;
+  char *data, *mb;
 
   /* I must be a communication thread */
   if (tTHREADTYPE != COMM_THREAD) 
@@ -313,21 +315,24 @@ bgMsg * getFullBuffer()
   data = tINBUFFER.deq(); 
   /* since we have just delete one from inbuffer, fill one from msgbuffer */
   tags[0] = CmmWildCard;
-  mb = (bgMsg *)CmmGet(tMSGBUFFER, 1, tags, ret_tags);
+  mb = (char *)CmmGet(tMSGBUFFER, 1, tags, ret_tags);
   if (mb) tINBUFFER.enq(mb);
 
   return data;
 }
 
 /* add message msgPtr to a bluegene node's inbuffer queue */
-void addBgNodeInbuffer(bgMsg *msgPtr, int nodeID)
+void addBgNodeInbuffer(char *msgPtr, int nodeID)
 {
   int tags[1];
 
+#ifndef CMK_OPTIMIZE
+  if (nodeID >= cva(numNodes)) CmiAbort("NodeID is out of range!");
+#endif
   /* if inbuffer is full, store in the msgbuffer */
   if (cva(inBuffer)[nodeID].isFull()) {
     tags[0] = nodeID;
-    CmmPut(cva(msgBuffer)[nodeID], 1, tags, (char *)msgPtr);
+    CmmPut(cva(msgBuffer)[nodeID], 1, tags, msgPtr);
   }
   else {
     cva(inBuffer)[nodeID].enq(msgPtr);
@@ -338,8 +343,11 @@ void addBgNodeInbuffer(bgMsg *msgPtr, int nodeID)
 }
 
 /* add a message to a thread's affinity queue */
-void addBgThreadMessage(bgMsg *msgPtr, int threadID)
+void addBgThreadMessage(char *msgPtr, int threadID)
 {
+#ifndef CMK_OPTIMIZE
+  if (threadID >= cva(numWth)) CmiAbort("ThreadID is out of range!");
+#endif
   ckMsgQueue &que = tMYNODE->affinityQ[threadID];
   que.enq(msgPtr);
   if (que.length() == 1)
@@ -347,7 +355,7 @@ void addBgThreadMessage(bgMsg *msgPtr, int threadID)
 }
 
 /* add a message to a node's non-affinity queue */
-void addBgNodeMessage(bgMsg *msgPtr)
+void addBgNodeMessage(char *msgPtr)
 {
   /* find a idle worker thread */
   /* FIXME:  flat search is bad if there is many work threads */
@@ -370,7 +378,7 @@ int checkReady()
   return !tINBUFFER.isEmpty();
 }
 
-void sendPacket(int x, int y, int z, int msgSize,bgMsg *msg)
+void sendPacket(int x, int y, int z, int msgSize,char *msg)
 {
   CmiSyncSendAndFree(nodeInfo::XYZ2PE(x,y,z),msgSize,(char *)msg);
 }
@@ -379,20 +387,19 @@ void sendPacket(int x, int y, int z, int msgSize,bgMsg *msg)
 CmiHandler msgHandlerFunc(char *msg)
 {
   /* bgmsg is CmiMsgHeaderSizeBytes offset of original message pointer */
-  bgMsg *bgmsg = (bgMsg *)msg;
-  int nodeID = bgmsg->node;
+  int nodeID = CmiBgGetNodeID(msg);
   if (nodeID >= 0) {
     nodeID = nodeInfo::Global2Local(nodeID);
-    addBgNodeInbuffer(bgmsg, nodeID);
+    addBgNodeInbuffer(msg, nodeID);
   }
   else {
-    int len = bgmsg->len;
-    addBgNodeInbuffer(bgmsg, 0);
+    int len = CmiBgGetLength(msg);
+    addBgNodeInbuffer(msg, 0);
     for (int i=1; i<cva(numNodes); i++)
     {
-      char *dupmsg = (char *)malloc(len);
+      char *dupmsg = (char *)CmiAlloc(len);
       memcpy(dupmsg, msg, len);
-      addBgNodeInbuffer((bgMsg*)dupmsg, i);
+      addBgNodeInbuffer(dupmsg, i);
     }
   }
   return 0;
@@ -412,44 +419,36 @@ static double MSGTIME(int ox, int oy, int oz, int nx, int ny, int nz)
 
 /* send will copy data to msg buffer */
 /* user data is not freeed in this routine, user can reuse the data ! */
-void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* data, int local)
+void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* sendmsg, int local)
 {
-  int msgSize = sizeof(bgMsg)-1+numbytes;
-  void *sendmsg = CmiAlloc(msgSize);
   CmiSetHandler(sendmsg, cva(msgHandler));
-  bgMsg *bgmsg = (bgMsg *)sendmsg;
-  bgmsg->node = nodeInfo::XYZ2Global(x,y,z);
-  bgmsg->threadID = threadID;
-  bgmsg->handlerID = handlerID;
-  bgmsg->type = type;
-  bgmsg->len = msgSize;
-  bgmsg->recvTime = MSGTIME(tMYX, tMYY, tMYZ, x,y,z) + BgGetTime();
-  if (numbytes) memcpy(bgmsg->first, data, numbytes);
+  CmiBgGetNodeID(sendmsg) = nodeInfo::XYZ2Global(x,y,z);
+  CmiBgGetThreadID(sendmsg) = threadID;
+  CmiBgGetHandle(sendmsg) = handlerID;
+  CmiBgGetType(sendmsg) = type;
+  CmiBgGetLength(sendmsg) = numbytes;
+  CmiBgGetRecvTime(sendmsg) = MSGTIME(tMYX, tMYY, tMYZ, x,y,z) + BgGetTime();
 
   if (local)
-    addBgNodeInbuffer(bgmsg, tMYNODEID);
+    addBgNodeInbuffer(sendmsg, tMYNODEID);
   else
-    CmiSyncSendAndFree(nodeInfo::XYZ2PE(x,y,z),msgSize,sendmsg);
+    CmiSyncSendAndFree(nodeInfo::XYZ2PE(x,y,z),numbytes,sendmsg);
 }
 
 /* broadcast will copy data to msg buffer */
 /* user data is not freeed in this routine, user can reuse the data ! */
-void broadcastPacket_(int bcasttype, int threadID, int handlerID, WorkType type, int numbytes, char* data)
+void broadcastPacket_(int bcasttype, int threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
 {
-  int msgSize = sizeof(bgMsg)-1+numbytes;	
-  void *sendmsg = CmiAlloc(msgSize);	
   CmiSetHandler(sendmsg, cva(msgHandler));	
-  bgMsg *bgmsg = (bgMsg *)sendmsg;
-  bgmsg->node = bcasttype;
-  bgmsg->threadID = threadID;	
-  bgmsg->handlerID = handlerID;	
-  bgmsg->type = type;	
-  bgmsg->len = msgSize;
+  CmiBgGetNodeID(sendmsg) = bcasttype;
+  CmiBgGetThreadID(sendmsg) = threadID;	
+  CmiBgGetHandle(sendmsg) = handlerID;	
+  CmiBgGetType(sendmsg) = type;	
+  CmiBgGetLength(sendmsg) = numbytes;
   /* FIXME */
-  bgmsg->recvTime = BgGetTime();	
-  if (numbytes) memcpy(bgmsg->first, data, numbytes);
+  CmiBgGetRecvTime(sendmsg) = BgGetTime();	
 
-  CmiSyncBroadcastAndFree(msgSize,sendmsg);
+  CmiSyncBroadcastAndFree(numbytes,sendmsg);
 }
 
 /* sendPacket to route */
@@ -583,7 +582,7 @@ double BgGetTime()
 
 void BgShutdown()
 {
-  int msgSize = CmiMsgHeaderSizeBytes;
+  int msgSize = CmiBlueGeneMsgHeaderSizeBytes;
   void *sendmsg = CmiAlloc(msgSize);
   CmiSetHandler(sendmsg, cva(exitHandler));
   
@@ -629,7 +628,7 @@ void comm_thread(threadInfo *tinfo)
   }
 
   for (;;) {
-    bgMsg *msg = (bgMsg *)getFullBuffer();
+    char *msg = getFullBuffer();
     if (!msg) { 
       tCURRTIME += (CmiWallTimer()-tSTARTTIME);
       tCOMMTHQ->enq(CthSelf());
@@ -638,20 +637,18 @@ void comm_thread(threadInfo *tinfo)
       continue;
     }
     /* schedule a worker thread, if small work do it itself */
-    if (msg->type == SMALL_WORK) {
-      if (msg->recvTime > tCURRTIME)  tCURRTIME = msg->recvTime;
+    if (CmiBgGetType(msg) == SMALL_WORK) {
+      if (CmiBgGetRecvTime(msg) > tCURRTIME)  tCURRTIME = CmiBgGetRecvTime(msg);
       /* call user registered handler function */
-      int handler = msg->handlerID;
-      cva(handlerTable)[handler](msg->first);
-      /* free the message */
-      CmiFree((char *)msg); 
+      int handler = CmiBgGetHandle(msg);
+      cva(handlerTable)[handler](msg);
     }
     else {
-      if (msg->threadID == ANYTHREAD) {
+      if (CmiBgGetThreadID(msg) == ANYTHREAD) {
         addBgNodeMessage(msg);			/* non-affinity message */
       }
       else {
-        addBgThreadMessage(msg, msg->threadID);
+        addBgThreadMessage(msg, CmiBgGetThreadID(msg));
       }
     }
     /* let other communication thread do their jobs */
@@ -669,7 +666,7 @@ void work_thread(threadInfo *tinfo)
 
   tSTARTTIME = CmiWallTimer();
   for (;;) {
-    bgMsg *msg=NULL;
+    char *msg=NULL;
     ckMsgQueue &q1 = tNODEQ;
     ckMsgQueue &q2 = tAFFINITYQ;
     int e1 = q1.isEmpty();
@@ -678,7 +675,7 @@ void work_thread(threadInfo *tinfo)
     if (e1 && !e2) { msg = q2.deq(); }
     else if (e2 && !e1) { msg = q1.deq(); }
     else if (!e1 && !e2) {
-      if (q1[0]->recvTime < q2[0]->recvTime) {
+      if (CmiBgGetRecvTime(q1[0]) < CmiBgGetRecvTime(q2[0])) {
         msg = q1.deq();
       }
       else {
@@ -692,13 +689,11 @@ void work_thread(threadInfo *tinfo)
       tSTARTTIME = CmiWallTimer();
       continue;
     }
-    if (msg->recvTime > tCURRTIME)  tCURRTIME = msg->recvTime;
-    handler = msg->handlerID;
+    if (CmiBgGetRecvTime(msg) > tCURRTIME)  tCURRTIME = CmiBgGetRecvTime(msg);
+    handler = CmiBgGetHandle(msg);
     
     /* call user registered handler function */
-    cva(handlerTable)[handler](msg->first);
-      /* free the msg and clear the buffer */
-    CmiFree((char *)msg); 
+    cva(handlerTable)[handler](msg);
     /* let other work thread do their jobs */
     tCURRTIME += (CmiWallTimer()-tSTARTTIME);
     CthYield();
@@ -760,7 +755,7 @@ CmiHandler exitHandlerFunc(char *msg)
   return 0;
 }
 
-CmiStartFn mymain(int argc, char **argv)
+CmiStartFn bgMain(int argc, char **argv)
 {
   int i;
 
@@ -850,7 +845,7 @@ CmiStartFn mymain(int argc, char **argv)
 
 int main(int argc,char *argv[])
 {
-  ConverseInit(argc,argv,(CmiStartFn)mymain,0,0);
+  ConverseInit(argc,argv,(CmiStartFn)bgMain,0,0);
   return 0;
 }
 

@@ -7,14 +7,26 @@
 #ifndef BLUEGENE_H
 #define BLUEGENE_H
 
+#define __BLUEGENE__
+
 #include "converse.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+typedef struct CMK_MSG_HEADER_BLUEGENE   CmiBlueGeneMsgHeader;
+#define CmiBlueGeneMsgHeaderSizeBytes (sizeof(CmiBlueGeneMsgHeader))
+
+#define CmiBgGetType(m)  (((CmiBlueGeneMsgHeader*)m)->t)
+#define CmiBgGetRecvTime(m)  (((CmiBlueGeneMsgHeader*)m)->rt)
+#define CmiBgGetLength(m)  (((CmiBlueGeneMsgHeader*)m)->n)
+#define CmiBgGetNodeID(m)  (((CmiBlueGeneMsgHeader*)m)->nd)
+#define CmiBgGetThreadID(m)  (((CmiBlueGeneMsgHeader*)m)->tID)
+#define CmiBgGetHandle(m)  (((CmiBlueGeneMsgHeader*)m)->hID)
+
 	/* when send packets, this means it is a non-affinity message */
-#define ANYTHREAD   -1
+#define ANYTHREAD   ((CmiUInt2)-1)
 
 /* API data structures */
 	/* define size of a work which helps communication threads schedule */
