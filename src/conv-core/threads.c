@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.3  1995-09-20 15:07:44  jyelon
+ * Revision 1.4  1995-09-20 15:39:54  jyelon
+ * Still ironing out initial bugs.
+ *
+ * Revision 1.3  1995/09/20  15:07:44  jyelon
  * *** empty log message ***
  *
  * Revision 1.2  1995/09/20  14:58:12  jyelon
@@ -156,6 +159,7 @@
  *
  *****************************************************************************/
  
+#include "converse.h"
 
 /*****************************************************************************
  *
@@ -172,7 +176,6 @@
 #include <stdio.h>
 #include <setjmp.h>
 #include <sys/types.h>
-#include "converse.h"
 
 #define STACKSIZE (32768)
 #define SLACK     256
@@ -275,7 +278,8 @@ CthThread CthCreate(fn, arg, size)
   if (setjmp(result->jb)) {
     if (thread_exiting) { free(thread_exiting); thread_exiting=0; }
     (thread_current->fn)(thread_current->arg);
-    CthExit();
+    thread_exiting = thread_current;
+    CthSuspend();
   }
   else return result;
 }
@@ -295,8 +299,9 @@ static void CthNoStrategy()
 
 void CthSuspend()
 {
-  if (th->choosefn == 0) CthNoStrategy();
-  CthThread next = thread_current->choosefn();
+  CthThread next;
+  if (thread_current->choosefn == 0) CthNoStrategy();
+  next = thread_current->choosefn();
   CthResume(next);
 }
 
@@ -307,7 +312,8 @@ void CthAwaken(th)
   th->awakenfn(th);
 }
 
-void CthSetStrategy(CthThread t, awkfn, chsfn)
+void CthSetStrategy(t, awkfn, chsfn)
+  CthThread t;
   CthVoidFn awkfn;
   CthThFn chsfn;
 {
