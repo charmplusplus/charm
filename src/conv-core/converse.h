@@ -1115,7 +1115,6 @@ int HypercubeGetBcastDestinations(int k, int *dest_pes);
 
 CpvExtern(int, CmiImmediateMsgHandlerIdx);
 
-#define CmiProbeImmediateMsg CmiMachineProgressImpl
 
 CpvExtern(int, networkProgressCount);
 extern int networkProgressPeriod;
@@ -1123,8 +1122,13 @@ extern int networkProgressPeriod;
 #if !CMK_MACHINE_PROGRESS_DEFINED
 #define CmiNetworkProgress() 
 #define CmiNetworkProgressAfter(p) 
+
+void CmiProbeImmediateMsg();
+
 #else
 void CmiMachineProgressImpl();
+
+#define CmiProbeImmediateMsg CmiMachineProgressImpl
 
 #define CmiNetworkProgress() {CpvAccess(networkProgressCount) ++; \
       if(CpvAccess(networkProgressCount) ==  networkProgressPeriod) { \
