@@ -9,6 +9,7 @@
 #include "ampiimpl.h"
 // for strlen
 #include <string.h>
+#include "../../../ampiEvents.h" /*** for trace generation for projector *****/
 
 //------------- startup -------------
 static mpi_comm_worlds mpi_worlds;
@@ -725,6 +726,7 @@ int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
   AMPIAPI("MPI_Send");
   ampi *ptr = getAmpiInstance(comm);
   ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm);
+  _LOG_E_AMPI_MSG_SEND(tag,dest,count,sizeof(msg))
   return 0;
 }
 
@@ -736,6 +738,7 @@ int MPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
   AMPIAPI("MPI_Ssend");
   ampi *ptr = getAmpiInstance(comm);
   ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm);
+  _LOG_E_AMPI_MSG_SEND(tag,dest,count,sizeof(msg))
   return 0;
 }
 
@@ -745,7 +748,9 @@ int MPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
 {
   AMPIAPI("MPI_Recv");
   ampi *ptr = getAmpiInstance(comm);
+  _LOG_E_END_AMPI_PROCESSING()
   ptr->recv(tag,src,msg,count,type, comm, (int*) status);
+  _LOG_E_BEGIN_AMPI_PROCESSING(tag,src,count)
   return 0;
 }
 
@@ -1240,6 +1245,7 @@ int MPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
   ampi *ptr = getAmpiInstance(comm);
 
   ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm);
+
   *request = (-1);
   return 0;
 }
@@ -1252,6 +1258,7 @@ int MPI_Issend(void *buf, int count, MPI_Datatype type, int dest,
   ampi *ptr = getAmpiInstance(comm);
 
   ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm);
+
   *request = (-1);
   return 0;
 }
