@@ -230,7 +230,7 @@ void Array1D::send(ArrayMessage *msg, int index, EntryIndexType ei)
   LDObjid dest;
   dest.id[0] = index; dest.id[1] = dest.id[2] = dest.id[3] = 0;
   
-  LDSend(myHandle,dest,UsrToEnv(msg)->getTotalsize());
+  the_lbdb->Send(myHandle,dest,UsrToEnv(msg)->getTotalsize());
 
 #endif
   if (elementIDs[index].state == here) {
