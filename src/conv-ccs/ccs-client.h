@@ -15,6 +15,10 @@
 #include "sockRoutines.h"
 #include "ccs-auth.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct CcsServer {
   /*CCS Server description:*/
   char hostAddr[128];
@@ -39,15 +43,16 @@ typedef struct CcsServer {
 } CcsServer;
 
 /*All routines return -1 on failure*/
-int CcsConnect(CcsServer *svr, char *host, int port,CcsSec_secretKey *key);
-int CcsConnectWithTimeout(CcsServer *svr, char *host, int port,CcsSec_secretKey *key, int timeout);
+int CcsConnect(CcsServer *svr, const char *host, int port,const CcsSec_secretKey *key);
+int CcsConnectWithTimeout(CcsServer *svr, const char *host, int port,
+	const CcsSec_secretKey *key, int timeout);
 
-int CcsConnectIp(CcsServer *svr,skt_ip_t ip, int port,CcsSec_secretKey *key);
-int CcsConnectIpWithTimeout(CcsServer *svr,skt_ip_t ip, int port,CcsSec_secretKey *key, int timeout);
+int CcsConnectIp(CcsServer *svr,skt_ip_t ip, int port,const CcsSec_secretKey *key);
+int CcsConnectIpWithTimeout(CcsServer *svr,skt_ip_t ip, int port,const CcsSec_secretKey *key, int timeout);
 
-int CcsSendRequest(CcsServer *svr, char *hdlrID, int pe, 
+int CcsSendRequest(CcsServer *svr, const char *hdlrID, int pe, 
 		    unsigned int size, const char *msg);
-int CcsSendRequestWithTimeout(CcsServer *svr, char *hdlrID, int pe, 
+int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, 
 		    unsigned int size, const char *msg, int timeout);
 
 int CcsRecvResponse(CcsServer *svr, 
@@ -60,5 +65,9 @@ int CcsNodeFirst(CcsServer *svr, int node);
 int CcsNodeSize(CcsServer *svr,int node);
 int CcsProbe(CcsServer *svr);
 void CcsFinalize(CcsServer *svr);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif

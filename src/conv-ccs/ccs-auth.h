@@ -6,6 +6,10 @@ Orion Sky Lawlor, olawlor@acm.org, 7/23/2001
 #ifndef __CCS_AUTH_H
 #define __CCS_AUTH_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*A secret key, used to authenticate a client or server.
 This could be human-readable text, a random one-time pad,
 some shared common knowledge, or any combination.
@@ -34,6 +38,10 @@ typedef struct {
 
 void CCS_RAND_new(CCS_RAND_state *s);
 unsigned int CCS_RAND_next(CCS_RAND_state *s);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /* def(thisHeader) */
 
