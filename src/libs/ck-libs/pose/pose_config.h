@@ -13,7 +13,7 @@
 /// Insane level of analysis
 //#define POSE_DOP_ON 1
 /// Projections analysis
-#define TRACE_DETAIL 1
+//#define TRACE_DETAIL 1
 
 /// Set this to use 64 bit timestamps
 //#define USE_LONG_TIMESTAMPS 1
