@@ -399,8 +399,8 @@ foreach FILE ($FILES)
 # For heavens sake, dont change CMK_CXX to CMK_CPP below ! The preprocessor
 # for Charm++ is "g++ -E", not "cpp". Ive fixed it before, but someone keeps
 # screwing it up again.  -- Sanjeev 8/30/95
-      if ($?VERBOSE) echo "$CMK_CXX -E $OPTS_CPP -I$CHARMINC $TMP.P.c > $TMP.cpp"
-      $CMK_CXX -E $OPTS_CPP -I$CHARMINC $TMP.P.c > $TMP.cpp
+      if ($?VERBOSE) echo "$CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.c > $TMP.cpp"
+      $CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.c > $TMP.cpp
       if ($?VERBOSE) echo "$CHARMBIN/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space"
       $CHARMBIN/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space
       if ($?VERBOSE) echo "$CHARMBIN/charmxlat++ $TMP.space $TMP.C"
