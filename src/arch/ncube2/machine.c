@@ -22,7 +22,7 @@ extern double amicclk();
  *
  ************************************************************************/
 
-void CmiAbort(char *message)
+void CmiAbort(const char *message)
 {
   CmiError(message);
   exit(1);

@@ -25,7 +25,7 @@ int CountArgs(argv)
  *
  ************************************************************************/
 
-void CmiAbort(char *message)
+void CmiAbort(const char *message)
 {
   CmiError(message);
   exit(1);

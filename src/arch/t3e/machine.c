@@ -420,7 +420,7 @@ void CmiFreeMulticastFn(CmiGroup grp, int size, char *msg)
  *
  ************************************************************************/
 
-void CmiAbort(char *message)
+void CmiAbort(const char *message)
 {
   CmiError(message);
   globalexit(1);

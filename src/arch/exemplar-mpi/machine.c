@@ -34,7 +34,7 @@ static SMSG_LIST *end_sent=0;
 
 double starttimer;
 
-void CmiAbort(char *message);
+void CmiAbort(const char *message);
 
 /**************************  TIMER FUNCTIONS **************************/
 
@@ -341,7 +341,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
  *
  ************************************************************************/
 
-void CmiAbort(char *message)
+void CmiAbort(const char *message)
 {
   CmiError(message);
   MPI_Abort(MPI_COMM_WORLD, 1);

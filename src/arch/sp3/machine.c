@@ -331,7 +331,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
  *
  ************************************************************************/
 
-void CmiAbort(char *message)
+void CmiAbort(const char *message)
 {
   CmiError(message);
   exit(1);
