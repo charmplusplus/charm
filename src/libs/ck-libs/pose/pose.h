@@ -5,16 +5,16 @@
 #ifndef POSE_H
 #define POSE_H
 /// Uncomment to gather and print POSE statistics set
-#define POSE_STATS_ON 1
+//#define POSE_STATS_ON 1
 /// Uncomment to make use of the Streaming Communication Library optimizations
-//#define POSE_COMM_ON 1
+#define POSE_COMM_ON 1
 /// Uncomment to turn on POSE load balancer
 //#define LB_ON 1
 #ifdef POSE_COMM_ON
 #include <StreamingStrategy.h>
 #include <DummyStrategy.h>
-#define COMM_TIMEOUT 100
-#define COMM_MAXMSG 100
+#define COMM_TIMEOUT 5
+#define COMM_MAXMSG 5
 #endif 
 #include "pose.decl.h"
 

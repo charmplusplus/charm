@@ -23,7 +23,7 @@ void POSE_init()
   strategy->enableShortArrayMessagePacking();
   //Register the strategy
   cinst.setStrategy(strategy);
-  comm_debug=1;
+  //comm_debug=1;
   CkPrintf("Simulation run with StreamingStrategy(%d,%d) for communication optimization...\n", COMM_TIMEOUT, COMM_MAXMSG);
 #endif
   // Create an EventMsgPool with global handle for message recycling 
