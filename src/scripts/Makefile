@@ -104,16 +104,16 @@ test: test-charm test-AMPI test-fem
 	@echo "--- All tests passed ---"
 
 test-converse: converse
-	cd ../pgms ; $(MAKE) test-converse  OPTS='$(OPTS)'
+	cd ../tests ; $(MAKE) test-converse  OPTS='$(OPTS)'
 
 test-charm: charm++ METIS
-	cd ../pgms ; $(MAKE) test-charm  OPTS='$(OPTS)'
+	cd ../tests ; $(MAKE) test-charm  OPTS='$(OPTS)'
 
 test-AMPI: AMPI
-	cd ../pgms ; $(MAKE) test-AMPI  OPTS='$(OPTS)'
+	cd ../tests ; $(MAKE) test-AMPI  OPTS='$(OPTS)'
 
 test-fem: FEM
-	cd ../pgms ; $(MAKE) test-fem  OPTS='$(OPTS)'
+	cd ../tests ; $(MAKE) test-fem  OPTS='$(OPTS)'
 
 ps-doc: basics
 	cd ../doc ; make ps
@@ -230,8 +230,8 @@ dirs+sources:
 	rm -rf ../bin ; mkdir ../bin
 	rm -rf ../lib ; mkdir ../lib
 	rm -rf ../lib_so ; mkdir ../lib_so; touch ../lib_so/.charmso
-	rm -rf ../pgms
 	rm -rf ../examples
+	rm -rf ../tests
 	rm -rf ../doc ; ln -s ../doc ../doc
 	../../src/scripts/gatherflat ../../src/scripts .
 	./gatherflat ../../src/conv-core        .
@@ -258,8 +258,8 @@ dirs+sources:
 	./gathertree ../../src/arch/common           .
 	./gathertree ../../src/arch/`cat .gdir`      .
 	./gatherflat ../../src/arch/`cat .vdir`      .
-	./gathertree ../../pgms ../pgms
 	./gathertree ../../examples ../examples
+	./gathertree ../../tests ../tests
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
 	chmod +x charmc
 	-./system_ln  ../tmp/charmc ../bin/
@@ -890,15 +890,15 @@ clean:
 	if [ -d charmrun ] ; then ( cd charmrun; make clean ) ; fi
 	-( cd doc && make clean )
 	( cd libs; make clean )
-	( cd ../pgms && make clean )
 	( cd ../examples && make clean )
+	( cd ../tests && make clean )
 
 veryclean:
 	rm -rf ../bin
 	rm -rf ../lib
 	rm -rf ../src
-	rm -rf ../pgms
 	rm -rf ../examples
+	rm -rf ../tests
 	rm -rf ../include
 	rm -rf ../doc
 	mv Makefile .Makefile
