@@ -1,10 +1,6 @@
 CHARMC=../../bin/charmc $(OPTS)
 
-all: barrier irecv
-
-barrier:
+all:
 	cd barrier; make all OPTS='$(OPTS)'
-
-irecv:
 	cd irecv; make all OPTS='$(OPTS)'
 

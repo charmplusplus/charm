@@ -7,7 +7,6 @@ convlibs:
 
 charmlibs:
 	cd ck-libs; make all OPTS='$(OPTS)'
-	cd irecv; make all OPTS='$(OPTS)'
 
 otherlibs:
 	cd other; make all OPTS='$(OPTS)'
