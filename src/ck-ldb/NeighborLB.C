@@ -244,8 +244,10 @@ void NeighborLB::ReceiveStats(NLBStatsMsg *m)
     stats_msg_count=0;
 
     theLbdb->ClearLoads();
-    double strat_end_time = CmiWallTimer();
-    CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
+    if (CkMyPe() == 0) {
+      double strat_end_time = CmiWallTimer();
+      CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
+    }
   }
   
 }
