@@ -87,6 +87,11 @@ CkGroupID CkGetNodeGroupID(void) {
 }
 
 extern "C"
+void *CkLocalBranch(int gID) {
+  return CpvAccess(_groupTable).find(gID);
+}
+
+extern "C"
 void *CkLocalNodeBranch(CkGroupID groupID)
 {
   CmiLock(_nodeLock);
