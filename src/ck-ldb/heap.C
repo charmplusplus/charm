@@ -20,7 +20,6 @@ class manheap;
 class maxHeap;
 #include "heap.h"
 
-#include "iostream.h"
 // Heap of pointers. The field to be compared is:
 
 minHeap::minHeap(int nsize)
