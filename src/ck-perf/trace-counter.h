@@ -16,7 +16,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include "trace.h"
-#include "ck.h"
 #include "trace-common.h"
 #include "conv-mach.h"
 
@@ -43,7 +42,7 @@ class StatTable {
     struct Statistics {
       char*  name;                    // name of stat being tracked
       char*  desc;                    // description of stat being tracked
-      UInt   numCalled[MAX_ENTRIES];  // total number times called
+      unsigned int numCalled[MAX_ENTRIES];  // total number times called
       double avgCount[MAX_ENTRIES];   // track average of value
       double totTime[MAX_ENTRIES];    // total time associated with counter
 

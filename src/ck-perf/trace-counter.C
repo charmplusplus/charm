@@ -16,6 +16,7 @@
 #include "conv-mach.h"
 #ifdef CMK_ORIGIN2000
 #include "trace-counter.h"
+#include "ck.h"
 #include <inttypes.h>
 
 #define DEBUGF(x) // CmiPrintf x
@@ -95,7 +96,7 @@ StatTable::StatTable():
   stats_(NULL), numStats_(0)
 {
   DEBUGF(("%d/%d DEBUG: StatTable::StatTable %08x size %d\n", 
-          CkMyPe(), CkNumPes(), this, argc));
+          CkMyPe(), CkNumPes(), this));
 }
 
 // destructor
@@ -349,6 +350,7 @@ void TraceCounter::traceInit(char **argv)
   switchByPhase_ = CmiGetArgFlag(argv, "+count-switchbyphase");
 
   if (!switchByPhase_) {
+    if (CkMyPe()==0) { usage(); }
     CmiAbort("PHASE ONLY SWITCH IMPLEMENTED ONLY (use +count-switchbyphase)\n");
   }
 
@@ -725,8 +727,8 @@ void TraceCounter::traceClose(void)
 //! just print to screen
 void TraceCounter::beginOverview()
 {
-  DEBUGF(("%d/%d DEBUG:   beginOverview EP %d\n", 
-          CkMyPe(), CkNumPes(), ep, genStart_));
+  DEBUGF(("%d/%d DEBUG:   beginOverview\n", 
+          CkMyPe(), CkNumPes()));
   startEP_=TraceTimer();
   if ((genStart_=start_counters(counter1_->code, counter2_->code))<0)
   {
@@ -734,15 +736,13 @@ void TraceCounter::beginOverview()
               genStart_, counter1_->code, counter2_->code);
     CmiAbort("ERROR: start_counters() in beginOverview\n");
   }
-  DEBUGF(("%d/%d DEBUG:   beginOverview EP %d genStart %d\n", 
-          CkMyPe(), CkNumPes(), ep, genStart_));
+  DEBUGF(("%d/%d DEBUG:   beginOverview\n", CkMyPe(), CkNumPes()));
   dirty_ = true;
 }
 
 void TraceCounter::endOverview()
 {
-  DEBUGF(("%d/%d DEBUG:   endOverview genStart %d \n", 
-	  CkMyPe(), CkNumPes(), genStart));
+  DEBUGF(("%d/%d DEBUG:   endOverview\n", CkMyPe(), CkNumPes()));
  
   double t = TraceTimer();
 
