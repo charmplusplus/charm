@@ -228,7 +228,7 @@ static inline void _traceInit(char **argv)
   // check if trace is turned on/off for this pe
   CkpvAccess(traceOnPe) = checkTraceOnPe(argv);
 
-  // in moduleInit.C
+  // defined in moduleInit.C
   _createTraces(argv);
 
   // set trace on/off
@@ -417,31 +417,33 @@ void registerFunction(char *name){
 */
 
 extern "C"
-int registerFunction(char* name) {
+int traceRegisterFunction(const char* name) {
 #ifndef CMK_OPTIMIZE
-  return CkpvAccess(_traces)->regFunc(name);
+  int idx;
+  CkpvAccess(_traces)->regFunc(name, idx);
+  return idx;
 #else
   return 0;
 #endif
 }
 
 extern "C" 
-void beginFuncProj(char *name,char *file,int line){
+void traceBeginFuncProj(char *name,char *file,int line){
 	 _TRACE_ONLY(CkpvAccess(_traces)->beginFunc(name,file,line));
 }
 
 extern "C"
-void beginFuncIndexProj(int idx,char *file,int line){
+void traceBeginFuncIndexProj(int idx,char *file,int line){
 	 _TRACE_ONLY(CkpvAccess(_traces)->beginFunc(idx,file,line));
 }
 
 extern "C" 
-void endFuncProj(char *name){
+void traceEndFuncProj(char *name){
 	 _TRACE_ONLY(CkpvAccess(_traces)->endFunc(name));
 }
 
 extern "C" 
-void endFuncIndexProj(int idx){
+void traceEndFuncIndexProj(int idx){
 	 _TRACE_ONLY(CkpvAccess(_traces)->endFunc(idx));
 }
 

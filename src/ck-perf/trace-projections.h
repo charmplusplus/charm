@@ -272,7 +272,7 @@ class TraceProjections : public Trace {
     //functions that perform function tracing
     CkHashtableIterator *getfuncIterator(){return funcHashtable.iterator();};
     int getFuncNumber(){return funcHashtable.numObjects();};
-    int regFunc(char *name);
+    void regFunc(const char *name, int &idx);
     void beginFunc(char *name,char *file,int line);
 		void beginFunc(int idx,char *file,int line);
     void endFunc(char *name);

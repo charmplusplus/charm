@@ -1048,8 +1048,8 @@ void TraceProjections::endComputation(void)
   _logPool->add(END_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
 }
 
-int TraceProjections::regFunc(char *name){
-	StrKey k(name,strlen(name));
+void TraceProjections::regFunc(const char *name, int &idx){
+	StrKey k((char*)name,strlen(name));
 	int num = funcHashtable.get(k);
 	if(num == 0){
 		char *st = new char[strlen(name)+1];
@@ -1060,7 +1060,7 @@ int TraceProjections::regFunc(char *name){
 		num = funcCount;
 		funcCount++;
 	}
-	return num;	
+	idx = num;	
 }
 
 void TraceProjections::beginFunc(char *name,char *file,int line){

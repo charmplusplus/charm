@@ -49,7 +49,7 @@ void ftracebegin()
                 { CpvAccess(a)++;}
 }
 
-void FTN_NAME(FTRACEEND, ftraceend)()
+void ftraceend()
 {
           checkInit();
           if ( CpvAccess(a) == 1)
@@ -89,16 +89,16 @@ void ftraceFlushLog()
 
 void ftraceRegisterFunc(char *name,int *outIdx,int lenName){
 	char *newstr = FortrantoCString(name,lenName);
-	*outIdx = registerFunction(newstr);
+	*outIdx = traceRegisterFunction(newstr);
 	delete [] newstr;
 }
 
 void ftraceBeginFunc(int idx){
-	beginFuncIndexProj(idx,"FORTRAN",0);
+	traceBeginFuncIndexProj(idx,"FORTRAN",0);
 }
 
 void ftraceEndFunc(int idx){
-	endFuncIndexProj(idx);
+	traceEndFuncIndexProj(idx);
 }
 
 
