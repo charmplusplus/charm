@@ -87,7 +87,7 @@ public:
   {
     CkPrintf("Hi[%d] from element %d\n",hiNo,thisIndex);
     CProxy_Hello delArr=arr;
-    delArr.ckDelegate(delMgr.ckGetGroupID());
+    delArr.ckDelegate(delMgr.ckLocalBranch());
     if (thisIndex < nElements-1)
       //Pass the hello on:
       delArr[thisIndex+1].SayHi(hiNo+1);
