@@ -1079,6 +1079,9 @@ void FEM_Entity::create(int attr,const char *caller) {
 		FEM_IndexAttribute *chunkNo= new FEM_IndexAttribute(this,FEM_CHUNK,NULL);
 		add(chunkNo);
 		chunkNo->setWidth(1);
+	} else if(attr == FEM_BOUNDARY){
+		//the boundary attribute for this entity
+		allocateBoundary();
 	} else {
 	//It's an unrecognized tag: abort
 		char attrNameStorage[256], msg[1024];
@@ -1118,6 +1121,13 @@ void FEM_Entity::allocateGlobalno(void) {
 	globalno=new FEM_IndexAttribute(this,FEM_GLOBALNO,NULL);
 	add(globalno); // globalno will be deleted via attributes list now
 	globalno->setWidth(1);
+}
+
+void FEM_Entity::allocateBoundary(){
+	FEM_DataAttribute *bound = new FEM_DataAttribute(this,FEM_BOUNDARY);
+	add(bound);
+	bound->setWidth(1);
+	bound->setDatatype(FEM_INT);
 }
 
 void FEM_Entity::setGlobalno(int r,int g) {

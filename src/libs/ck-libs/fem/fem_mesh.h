@@ -443,6 +443,9 @@ public:
 	AllocTable2d<unsigned char> &getChar(void) {return *char_data;}
 	const AllocTable2d<unsigned char> &getChar(void) const {return *char_data;}
 	
+	AllocTable2d<int> &getInt(void) {return *int_data;}
+	const AllocTable2d<int> &getInt(void) const {return *int_data;}
+	
 	virtual void set(const void *src, int firstItem,int length, 
 		const IDXL_Layout &layout, const char *caller);
 	
@@ -557,6 +560,12 @@ class FEM_Entity {
 	 */
 	FEM_IndexAttribute *globalno;
 	void allocateGlobalno(void);
+	
+	/*
+		used to allocate the integer array for storing the boundary
+		values associated with an entity. 
+	*/
+	void allocateBoundary();
 	
 	FEM_Comm ghostSend; //Non-ghosts we send out (only set for real entities)
 	FEM_Comm ghostRecv; //Ghosts we recv into (only set for ghost entities)
