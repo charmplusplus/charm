@@ -1621,17 +1621,22 @@ void Entry::genArrayDefs(XStr& str)
 
 void Entry::genArrayStaticConstructorDecl(XStr& str)
 {
+  static int sectionConstructorDecl = 0;
   if (container->getForWhom()==forIndividual)
       str<< //Element insertion routine
       "    void insert("<<paramComma(1)<<"int onPE=-1);";
   else if (container->getForWhom()==forAll)
       str<< //With options
       "    static CkArrayID ckNew("<<paramComma(1)<<"const CkArrayOptions &opts);\n";
-  else if (container->getForWhom()==forSection) 
+  else if (container->getForWhom()==forSection) {
+      if (sectionConstructorDecl == 0) {
       str << 
       "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) {\n"
       "      return CkSectionID(aid, elems, nElems);\n"
       "    } \n";
+      }
+      sectionConstructorDecl = 1;
+  }
 }
 
 void Entry::genArrayStaticConstructorDefs(XStr& str)
