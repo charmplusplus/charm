@@ -13,10 +13,6 @@
  *
  * ************************************************************************ */
 
-#ifdef log2
-#undef log2
-#endif
-
 typedef CmiUInt4 prio_t;
 
 class CkBitVector {
@@ -36,7 +32,7 @@ class CkBitVector {
   }
 
  public:
-  static prio_t log2(prio_t val) {
+  static prio_t ilog2(prio_t val) {
     prio_t log = 0u;
     if ( val != 0u ) {
       while ( val > (1u<<log) ) { log++; }
