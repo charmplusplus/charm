@@ -1,0 +1,18 @@
+CDIR=../../../..
+LIBDIR=$(CDIR)/lib
+
+default:
+	(cd METISLib ; make ) 
+	(cd ParMETISLib ; make ) 
+	(cd Programs ; make ) 
+
+clean:
+	(cd METISLib ; make realclean )
+	(cd ParMETISLib ; make realclean )
+	(cd Programs ; make realclean )
+
+all:
+	(cd METISLib ; make ) 
+	(cd ParMETISLib ; make ) 
+	cp libparmetis.a $(LIBDIR)/
+	cp libmetis.a $(LIBDIR)/
