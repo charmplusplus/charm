@@ -6,7 +6,7 @@ CMK_CC='cc  -64 '
 CMK_CXX='CC -64 -LANG:std '
 CMK_CXXPP="$CMK_CXX -E"
 CMK_CF77='f77'
-CMK_CF90='f90'
+CMK_CF90='f90 -64 '
 CMK_C_OPTIMIZE='-O3 -r10000 -INLINE:all -TARG:platform=ip27 -OPT:Olimit=0:roundoff=3:div_split=ON:alias=typed '
 CMK_CXX_OPTIMIZE='-O3 -r10000 -INLINE:all -TARG:platform=ip27 -OPT:Olimit=0:roundoff=3:div_split=ON:alias=typed '
 CMK_LD="$CMK_CC -w"
