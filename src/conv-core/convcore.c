@@ -1417,7 +1417,6 @@ void CsdInit(argv)
       CsdLocalMax= CSD_LOCAL_MAX_DEFAULT;
     }
   CpvAccess(CsdLocalCounter) = CsdLocalMax;
-  CmiPrintf("csdLocalMax set to %d\n",CsdLocalMax);
   CpvAccess(CsdSchedQueue) = (void *)CqsCreate();
 
 #if CMK_OBJECT_QUEUE_AVAILABLE
