@@ -5,6 +5,41 @@ Orion Sky Lawlor, olawlor@acm.org, 11/2/2001
 #ifndef __OSL_NETFEM_DATA_H
 #define __OSL_NETFEM_DATA_H
 
+	class CkShortStr {
+		enum {maxLen=32};
+		char store[maxLen];
+		void terminate(void) {
+			store[maxLen-1]=0;//Bit of paranoia
+		}
+	public:
+		CkShortStr() {} //store[0]=0;}
+		CkShortStr(const char *s) {copyFrom(s);}
+		CkShortStr(const char *s,int l) {copyFrom(s,l);}
+		
+		void operator=(const char *s) { copyFrom(s);}
+		void copyFrom(const char *s) {copyFrom(s,strlen(s));}
+		void copyFrom(const char *s,int len) {
+			if (len>=maxLen) {
+				CkPrintf("[%d] NetFEM passed bad %d-character name '%s'!\n",
+					 CkMyPe(),strlen(s),s);
+				CkAbort("Name passed to NetFEM is too long!");
+			}
+			strncpy(store,s,maxLen); //,min(len,maxLen));
+			store[len]=0;
+			terminate();
+		}
+		operator const char *() const {return store;}
+		
+		void pup(PUP::er &p) {
+			int len=strlen(store)+1;
+			p(len);
+			p(store,len);
+			terminate();
+		}
+	};
+
+
+
 //Any list of items we can associate user data with.
 class NetFEM_item {
 public:
@@ -35,34 +70,6 @@ public:
 		int nDoubles(void) const {return vec_len;}
 	};
 
- public: /* <- should be protected, but Sun CC 5.0 complains*/
-	class shortStr {
-		enum {maxLen=32};
-		char store[maxLen];
-		void terminate(void) {
-			store[maxLen-1]=0;//Bit of paranoia
-		}
-	public:
-		shortStr() {} //store[0]=0;}
-		void operator=(const char *s) {
-			if (strlen(s)>=maxLen) {
-				CkPrintf("[%d] NetFEM passed bad %d-character name '%s'!\n",
-					 CkMyPe(),strlen(s),s);
-				CkAbort("Name passed to NetFEM is too long!");
-			}
-			strncpy(store,s,maxLen);
-			terminate();
-		}
-		operator const char *() const {return store;}
-		
-		void pup(PUP::er &p) {
-			int len=strlen(store)+1;
-			p(len);
-			p(store,len);
-			terminate();
-		}
-	};
-
 public:
 	class doubleField {
 		friend class NetFEM_item; //<- friend so he can set our fields directly
@@ -70,7 +77,7 @@ public:
 		double *start;//Beginning of data
 		format fmt; //Layout of data
 		bool isSpatial;//Should be interpreted as x,y,z
-		shortStr name;
+		CkShortStr name;
 		bool isHeapAllocated;//Is data a heap copy (true) or user data (false)
 		
 		void allocate(void) {
@@ -153,7 +160,7 @@ public:
 	const doubleField &getField(int fieldNo) const {return fields[fieldNo];}
 
 	void add(double *start,const format &fmt,
-		const char *name, bool isSpatialVector)
+		const CkShortStr &name, bool isSpatialVector)
 	{
 		doubleField &f=fields[nFields++];
 		if (nFields>maxFields) 
@@ -181,7 +188,7 @@ class NetFEM_nodes : public NetFEM_item {
 public:
 	NetFEM_nodes() {}
 
-	NetFEM_nodes(int nNode,int dim,double *coord,const char *name) 
+	NetFEM_nodes(int nNode,int dim,double *coord,const CkShortStr &name) 
 		:NetFEM_item(nNode)
 	{
 		//HACK: The first field of the nodes are the node coordinates
@@ -193,7 +200,7 @@ public:
 class NetFEM_elems : public NetFEM_item {
 	typedef NetFEM_item super;
 
-	shortStr name; //Name of element type (e.g. "Volumetric Tets"; "Surface Triangles")
+	CkShortStr name; //Name of element type (e.g. "Volumetric Tets"; "Surface Triangles")
 	int nodesPer,idxBase;
 	int *conn;
 	bool isHeapAllocated; //Conn array on heap(true) or in user area(false)
@@ -221,7 +228,7 @@ public:
 	}
 
 	NetFEM_elems(int nEl,int nodesPerEl,int *conn_,int idxBase_,
-		     const char *name_) 
+		     const CkShortStr &name_) 
 		:super(nEl),nodesPer(nodesPerEl),idxBase(idxBase_),
 		 conn(conn_),isHeapAllocated(false)
 	{

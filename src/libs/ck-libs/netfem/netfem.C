@@ -103,6 +103,17 @@ void NetFEM_Init(void)
 	CcsRegisterHandler("NetFEM_current",(CmiHandler)NetFEM_getCurrent);
 }
 
+#define FTN_STR_DECL const char *strData,int strLen
+#define FTN_STR makeCString(strData,strLen)
+static CkShortStr makeCString(const char *data,int len)
+{
+	if (len>32 || len<0)
+		CkAbort("F90 string has suspicious length-- is NetFEM ignorant of how your f90 compiler passes strings?");
+	return CkShortStr(data,len);
+}
+typedef int *NetFEMF;
+#define N ((NetFEM_updatePackage *)n)
+#define NF ((NetFEM_updatePackage *)*nf)
 
 /*----------------------------------------------
 All NetFEM calls must be between a Begin and End pair:*/
@@ -112,13 +123,20 @@ CDECL NetFEM NetFEM_Begin(
 	int flavor /*What to do with data (point at, write, or copy)*/
 ) 
 {
+	//On one processor, this is our only chance to network!
+	if (CkNumPes()==1) CthYield();
 	return (NetFEM)(new NetFEM_updatePackage(dim,timestep,flavor));
 }
-
-#define N ((NetFEM_updatePackage *)n)
+FDECL NetFEMF FTN_NAME(NETFEM_BEGIN,netfem_begin)(int *d,int *t,int *f)
+{
+	return (NetFEMF)NetFEM_Begin(*d,*t,*f);
+}
 
 CDECL void NetFEM_End(NetFEM n) { /*Publish these updates*/
 	getState()->add(N);
+}
+FDECL void FTN_NAME(NETFEM_END,netfem_end)(NetFEMF nf) {
+	NetFEM_End((NetFEM)NF);
 }
 
 /*---- Register the locations of the nodes.  (Exactly once, required)
@@ -129,6 +147,12 @@ CDECL void NetFEM_Nodes(NetFEM n,int nNodes,double *loc,const char *name) {
 	N->addNodes(new NetFEM_nodes(nNodes,N->getDim(),loc,name));
 }
 
+FDECL void FTN_NAME(NETFEM_NODES,netfem_nodes)
+	(NetFEMF nf,int *nNodes,double *loc,FTN_STR_DECL)
+{
+	NF->addNodes(new NetFEM_nodes(*nNodes,NF->getDim(),loc,FTN_STR));
+}
+
 /*----- Register the connectivity of the elements. 
    Element i is adjacent to nodes conn[nodePerEl*i+{0,1,...,nodePerEl-1}]
 */
@@ -137,6 +161,11 @@ CDECL void NetFEM_Elements(NetFEM n,int nEl,int nodePerEl,int *conn,const char *
 	N->addElems(new NetFEM_elems(nEl,nodePerEl,conn,0,name));
 }
 
+FDECL void FTN_NAME(NETFEM_ELEMENTS,netfem_elements)
+	(NetFEMF nf,int *nEl,int *nodePerEl,int *conn,FTN_STR_DECL)
+{
+	NF->addElems(new NetFEM_elems(*nEl,*nodePerEl,conn,1,FTN_STR));
+}
 /*--------------------------------------------------
 Associate a spatial vector (e.g., displacement, velocity, accelleration)
 with each of the previous objects (nodes or elements).
@@ -148,6 +177,12 @@ CDECL void NetFEM_Vector_Field(NetFEM n,double *start,
 	NetFEM_item::format fmt(N->getDim(),init_offset,distance);
 	N->getItem()->add(start,fmt,name,true);
 }
+FDECL void FTN_NAME(NETFEM_VECTOR_FIELD,netfem_vector_field)
+	(NetFEMF nf,double *start,int *init_offset,int *distance,FTN_STR_DECL)
+{
+	CkShortStr s=FTN_STR;
+	NetFEM_Vector_Field((NetFEM)NF,start,*init_offset,*distance,s);
+}
 
 /*Simpler version of the above if your data is packed as
 data[item*3+{0,1,2}].
@@ -155,6 +190,12 @@ data[item*3+{0,1,2}].
 CDECL void NetFEM_Vector(NetFEM n,double *data,const char *name)
 {
 	NetFEM_Vector_Field(n,data,0,sizeof(double)*N->getDim(),name);
+}
+FDECL void FTN_NAME(NETFEM_VECTOR,netfem_vector)
+	(NetFEMF nf,double *data,FTN_STR_DECL)
+{
+	CkShortStr s=FTN_STR;
+	NetFEM_Vector((NetFEM)NF,data,s);
 }
 
 /*--------------------------------------------------
@@ -169,11 +210,26 @@ CDECL void NetFEM_Scalar_Field(NetFEM n,double *start,
 	N->getItem()->add(start,fmt,name,false);
 }
 
+FDECL void FTN_NAME(NETFEM_SCALAR_FIELD,netfem_scalar_field)
+	(NetFEMF nf,double *start,int *veclen,int *init_offset,
+	 int *distance,FTN_STR_DECL)
+{
+	CkShortStr s=FTN_STR;
+	NetFEM_Scalar_Field((NetFEM)NF,start,*veclen,*init_offset,*distance,s);
+}
+
+
 /*Simpler version of above for contiguous double-precision data*/
 CDECL void NetFEM_Scalar(NetFEM n,double *start,int doublePer,
 	const char *name)
 {
 	NetFEM_Scalar_Field(n,start,doublePer,0,sizeof(double)*doublePer,name);
+}
+FDECL void FTN_NAME(NETFEM_SCALAR,netfem_scalar)
+	(NetFEMF nf,double *start,int *veclen,FTN_STR_DECL)
+{
+	CkShortStr s=FTN_STR;
+	NetFEM_Scalar((NetFEM)NF,start,*veclen,s);
 }
 
 
