@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-09 21:23:01  gursoy
+ * Revision 2.2  1995-09-07 22:52:18  gursoy
+ * Cmi_dim is replaced qith a fucntion call to machine.c
+ *
+ * Revision 2.1  1995/06/09  21:23:01  gursoy
  * Cpv macros moved to converse
  *
  * Revision 2.0  1995/06/08  16:39:47  gursoy
@@ -43,11 +46,10 @@ typedef struct spantreearray {
     int *children;
 } SpanTreeArray;
 
-SpanTreeArray *SpanArray;
-int *NodeStore;   /* used to store the nodes in the spanning 
+static SpanTreeArray *SpanArray;
+static int *NodeStore;   /* used to store the nodes in the spanning 
 		       tree in breadth first order */
-extern int Cmi_dim;
-int numnodes;
+static int numnodes;
 
 CmiSpanTreeInit()
 {
@@ -55,8 +57,10 @@ CmiSpanTreeInit()
     BOOLEAN visited[MAXNODES];
     int next, currentnode;
     int neighbours[MAXCUBEDIM];
-
-    numnodes = (1 << Cmi_dim);
+    int dim;
+    
+    dim      =  CmiNumNeighbours(0);
+    numnodes = CmiNumPe();
     SpanArray = (SpanTreeArray *)CmiAlloc(sizeof(SpanTreeArray) * numnodes);
     NodeStore = (int *) CmiAlloc(sizeof(int) * numnodes);
     visited[0] = TRUE;
@@ -71,7 +75,7 @@ CmiSpanTreeInit()
 	currentnode = NodeStore[i];
 	CmiGetNodeNeighbours(currentnode, neighbours);
 	SpanArray[currentnode].noofchildren = 0;
-	for (j = 0; j < Cmi_dim && 
+	for (j = 0; j < dim && 
 	            SpanArray[currentnode].noofchildren < MAXSPAN; j++)
 	{
 	    if (!visited[neighbours[j]])
