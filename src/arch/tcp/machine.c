@@ -573,7 +573,7 @@ static void ParseNetstart()
   if (nread!=5) goto abort;
   return;
  abort:
-  fprintf(stderr,"program not started using NETSTART utility. aborting.\n");
+  fprintf(stderr,"program not started using 'conv-host' utility. aborting.\n");
   exit(1);
 }
 
