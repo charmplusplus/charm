@@ -31,6 +31,7 @@ charm: converse charmxlat charmlibs libcharm
 
 charm++: converse charmxlat charmlibs charmxlat++ libcharm libck-cplus-y.a
 
+OPTS=-g
 CHARMC=../bin/charmc $(OPTS)
 
 
@@ -40,7 +41,7 @@ CHARMC=../bin/charmc $(OPTS)
 #
 ###############################################################################
 
-ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h qd.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h conv-mach.h internal.h quiescence.h performance.h dag.h generic_redn.h pglib.h
+ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h qd.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h conv-mach.h internal.h quiescence.h performance.h dag.h generic_redn.h # pglib.h
 
 ALLINTERFACES=GENERIC-ACC.int GENERIC-HIST.int GENERIC-REDN.int barrier_redn.int cache.int dacc_count.int dacc_hist.int dcountredn.int dmaxredn.int dminredn.int dprodredn.int dsumredn.int facc_count.int facc_hist.int fcountredn.int fmaxredn.int fminredn.int fprodredn.int fsumredn.int iacc_count.int iacc_hist.int icountredn.int imaxredn.int iminredn.int iprodredn.int isumredn.int pg.int
 
@@ -58,6 +59,9 @@ dirs+sources:
 	@rm -f .vdir .gdir
 	@(cd .. ; basename `pwd` > tmp/.vdir)
 	@cat .vdir | sed -e 's@-.*@@' > .gdir
+	@echo
+	@echo 'Gathering source code in '`cat .vdir`'/tmp'
+	@echo
 	if [ ! -d ../bin ] ; then mkdir ../bin ; fi
 	if [ ! -d ../lib ] ; then mkdir ../lib ; fi
 	rm -f ../../bin ; ln -s `cat .vdir`/bin ../../bin
@@ -65,8 +69,16 @@ dirs+sources:
 	find ../../src/Common -type f \! -name "*,v" -exec ln -s {} . \;
 	find ../../src/`cat .vdir` -type f \! -name "*,v" -exec ln -s {} . \;
 	if [ -d ../../src/Common.`cat .gdir` ] ; then find ../../src/Common.`cat .gdir` -type f \! -name "*,v" -exec ln -s {} . \; ; fi
+	@echo
+	@echo 'Gathering test-programs in '`cat .vdir`/pgms
+	@echo
+	rm -rf ../pgms
+	(cd ../.. ; find pgms -type d -print) | sed -e 's@^@mkdir ../@' | sh
+	rt=`(cd ../.. ; pwd)` ; (cd ../.. ; find pgms -type f -print) | awk '{ print "ln -s '$$rt'/"$$1" ../"$$1; }' | sh
 	@rm -f .vdir .gdir
 	touch dirs+sources
+
+
 
 ###############################################################################
 #
@@ -279,7 +291,7 @@ GENERIC_ACC_H=GENERIC-ACC.int GENERIC-ACC.p $(CKHEADERS)
 GENERIC_HIST_H=GENERIC-HIST.int GENERIC-HIST.p $(CKHEADERS)
 GENERIC_REDN_H=GENERIC-REDN.int GENERIC-REDN.p $(CKHEADERS)
 
-LIBCHARM=pglib.o cache.o dag.o barrier_redn.o \
+LIBCHARM=cache.o dag.o barrier_redn.o pglib.o \
 	 iacc_count.o facc_count.o dacc_count.o \
          iacc_hist.o facc_hist.o dacc_hist.o \
          iminredn.o imaxredn.o isumredn.o iprodredn.o icountredn.o \
