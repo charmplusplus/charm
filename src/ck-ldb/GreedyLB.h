@@ -29,16 +29,17 @@ public:
 
   GreedyLB();
   GreedyLB(CkMigrateMessage *m):CentralLB(m) {}
+  void work(LDStats* stats,int count);
+  LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
 private:
 	enum           HeapCmp {GT = '>', LT = '<'};
-    void           Heapify(HeapData*, int, int, HeapCmp);
+    	void           Heapify(HeapData*, int, int, HeapCmp);
 	void           HeapSort(HeapData*, int, HeapCmp);
 	void           BuildHeap(HeapData*, int, HeapCmp);
 	CmiBool        Compare(double, double, HeapCmp);
 	HeapData*      BuildCpuArray(CentralLB::LDStats*, int, int *);      
 	HeapData*      BuildObjectArray(CentralLB::LDStats*, int, int *);      
 	CmiBool        QueryBalanceNow(int step);
-	LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
 };
 
 #endif /* _HEAPCENTLB_H_ */

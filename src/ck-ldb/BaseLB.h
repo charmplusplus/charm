@@ -36,6 +36,7 @@ public:
 
 /// migration decision for an obj.
 struct MigrateInfo {  
+    int index;   // object index in objData array
     LDObjHandle obj;
     int from_pe;
     int to_pe;

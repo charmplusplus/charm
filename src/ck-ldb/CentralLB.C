@@ -22,12 +22,12 @@ char ** avail_vector_address;
 int * lb_ptr;
 int load_balancer_created;
 
+#define LB_DUMP_MSG       0
+
 #if CMK_LBDB_ON
 
 static void getPredictedLoad(CentralLB::LDStats* stats, int count, 
-                      LBMigrateMsg* msg, double *peLoads, double &, double &);
-static int FindPEAfterMigration(LDObjid& id, CentralLB::LDStats* stats, int count,
-							 LBMigrateMsg* msg, int bCheckStats);
+                          LBMigrateMsg *, double *peLoads, double &, double &);
 
 void CreateCentralLB()
 {
@@ -85,7 +85,9 @@ CentralLB::CentralLB()
   for(int i=0; i < CkNumPes(); i++)
     statsMsgsList[i] = 0;
 
-  statsDataList = new LDStats[CkNumPes()];
+  statsData = new LDStats;
+  statsData->procs = new ProcStats[CkNumPes()];
+
   myspeed = theLbdb->ProcessorSpeed();
   theLbdb->CollectStatsOn();
   migrates_completed = 0;
@@ -179,6 +181,33 @@ void CentralLB::Migrated(LDObjHandle h)
   }
 }
 
+// build data from buffered msg
+void CentralLB::buildStats()
+{
+    statsData->count = stats_msg_count;
+    statsData->objData = new LDObjData[statsData->n_objs];
+    statsData->from_proc = new int[statsData->n_objs];
+    statsData->to_proc = new int[statsData->n_objs];
+    statsData->commData = new LDCommData[statsData->n_comm];
+    int nobj = 0;
+    int ncom = 0;
+    for (int pe=0; pe<stats_msg_count; pe++) {
+       int i;
+       CLBStatsMsg *msg = statsMsgsList[pe];
+       for (i=0; i<msg->n_objs; i++) {
+         statsData->from_proc[nobj] = statsData->to_proc[nobj] = pe;
+	 statsData->objData[nobj] = msg->objData[i];
+	 nobj++;
+       }
+       for (i=0; i<msg->n_comm; i++) {
+	 statsData->commData[ncom] = msg->commData[i];
+	 ncom++;
+       }
+       delete msg;
+       statsMsgsList[pe]=0;
+    }
+}
+
 void CentralLB::ReceiveStats(CLBStatsMsg *m)
 {
   int proc;
@@ -199,26 +228,26 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
 	     pe);
   } else {
     statsMsgsList[pe] = m;
-    statsDataList[pe].total_walltime = m->total_walltime;
-    statsDataList[pe].total_cputime = m->total_cputime;
+    struct ProcStats &procStat = statsData->procs[pe];
+    procStat.total_walltime = m->total_walltime;
+    procStat.total_cputime = m->total_cputime;
     if (lb_ignoreBgLoad) {
-    statsDataList[pe].idletime = 0.0;
-    statsDataList[pe].bg_walltime = 0.0;
-    statsDataList[pe].bg_cputime = 0.0;
+    procStat.idletime = 0.0;
+    procStat.bg_walltime = 0.0;
+    procStat.bg_cputime = 0.0;
     }
     else {
-    statsDataList[pe].idletime = m->idletime;
-    statsDataList[pe].bg_walltime = m->bg_walltime;
-    statsDataList[pe].bg_cputime = m->bg_cputime;
+    procStat.idletime = m->idletime;
+    procStat.bg_walltime = m->bg_walltime;
+    procStat.bg_cputime = m->bg_cputime;
     }
-    statsDataList[pe].pe_speed = m->pe_speed;
-    statsDataList[pe].utilization = 1.0;
-    statsDataList[pe].available = CmiTrue;
+    procStat.pe_speed = m->pe_speed;
+    procStat.utilization = 1.0;
+    procStat.available = CmiTrue;
+    procStat.n_objs = m->n_objs;
 
-    statsDataList[pe].n_objs = m->n_objs;
-    statsDataList[pe].objData = m->objData;
-    statsDataList[pe].n_comm = m->n_comm;
-    statsDataList[pe].commData = m->commData;
+    statsData->n_objs += m->n_objs;
+    statsData->n_comm += m->n_comm;
     stats_msg_count++;
   }
 
@@ -227,15 +256,18 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
 //    double strat_start_time = CmiWallTimer();
 
 //    CkPrintf("Before setting bitmap\n");
-    for(proc = 0; proc < clients; proc++)
-      statsDataList[proc].available = (CmiBool)avail_vector[proc];
+    // build data
+    buildStats();
 
     // if this is the step at which we need to dump the database
     simulation();
 
+    for(proc = 0; proc < clients; proc++)
+      statsData->procs[proc].available = (CmiBool)avail_vector[proc];
+
 //    CkPrintf("Before Calling Strategy\n");
 
-    LBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
+    LBMigrateMsg* migrateMsg = Strategy(statsData, clients);
 
 //    CkPrintf("returned successfully\n");
     int num_proc = CkNumPes();
@@ -253,25 +285,11 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
 //  CkPrintf("calling recv migration\n");
     thisProxy.ReceiveMigration(migrateMsg);
 
-#if 0
-    {
-      char fname[1024];
-      static int phase = 0;
-      if (QueryDumpData()) {
-        sprintf(fname, "load%d", phase);
-	writeStatsMsgs(fname);
-      }
-      phase ++;
-    }
-#endif
-
     // Zero out data structures for next cycle
     // CkPrintf("zeroing out data\n");
-    for(int i=0; i < clients; i++) {
-      delete statsMsgsList[i];
-      statsMsgsList[i]=0;
-    }
+    statsData->clear();
     stats_msg_count=0;
+
     double strat_end_time = CmiWallTimer();
     //     CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
   }
@@ -290,29 +308,26 @@ static int isMigratable(LDObjData **objData, int *len, int count, const LDCommDa
   return 1;
 }
 
+#if 0
 // remove in the LDStats those objects that are non migratable
 void CentralLB::RemoveNonMigratable(LDStats* stats, int count)
 {
   int pe;
   LDObjData **nonmig = new LDObjData*[count];
   int   *lens = new int[count];
-  for (pe=0; pe<count; pe++) {
-    int n_objs = stats[pe].n_objs;
-    if (n_objs == 0) continue;
-    LDObjData *objData = stats[pe].objData; 
+  int n_objs = stats->n_objs;
+    LDObjStats *objStat = stats.objData[n]; 
     int l=-1, h=n_objs;
     while (l<h) {
-      while (objData[l+1].migratable && l<h) l++;
-      while (h>0 && !objData[h-1].migratable && l<h) h--;
+      while (objStat[l+1].data.migratable && l<h) l++;
+      while (h>0 && !objStat[h-1].data.migratable && l<h) h--;
       if (h-l>2) {
-        LDObjData tmp = objData[l+1];
-        objData[l+1] = objData[h-1];
-        objData[h-1] = tmp;
+        LDObjStats tmp = objStat[l+1];
+        objStat[l+1] = objStat[h-1];
+        objStat[h-1] = tmp;
       }
-      else 
-        break;
     }
-    stats[pe].n_objs = h;
+    stats->n_objs = h;
     if (n_objs != h) CmiPrintf("Removed %d nonmigratable on pe:%d n_objs:%d migratable:%d\n", n_objs-h, pe, n_objs, h);
     nonmig[pe] = objData+stats[pe].n_objs;
     lens[pe] = n_objs-stats[pe].n_objs;
@@ -322,7 +337,6 @@ void CentralLB::RemoveNonMigratable(LDStats* stats, int count)
       stats[pe].bg_walltime += objData[j].wallTime;
       stats[pe].bg_cputime += objData[j].cpuTime;
     }
-  }
 
   // modify comm data
   for (pe=0; pe<count; pe++) {
@@ -348,6 +362,7 @@ void CentralLB::RemoveNonMigratable(LDStats* stats, int count)
   delete [] nonmig;
   delete [] lens;
 }
+#endif
 
 void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 {
@@ -412,33 +427,43 @@ void CentralLB::ResumeClients()
   theLbdb->ResumeClients();
 }
 
+// default load balancing strategy
 LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
 {
-  for(int j=0; j < count; j++) {
-    int i;
-    LDObjData *odata = stats[j].objData;
-    const int osz = stats[j].n_objs;
+  work(stats, count);
+  return createMigrateMsg(stats, count);
+}
+
+void CentralLB::work(LDStats* stats,int count)
+{
+  int i;
+  for(int pe=0; pe < count; pe++) {
+    struct ProcStats &proc = stats->procs[pe];
 
     CkPrintf(
       "Proc %d Sp %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n",
-      j,stats[j].pe_speed,stats[j].total_walltime,stats[j].total_cputime,
-      stats[j].idletime,stats[j].bg_walltime,stats[j].bg_cputime);
-    CkPrintf("------------- Object Data: PE %d: %d objects -------------\n",
-	     j,osz);
+      pe,proc.pe_speed,proc.total_walltime,proc.total_cputime,
+      proc.idletime,proc.bg_walltime,proc.bg_cputime);
+  }
+
+  int osz = stats->n_objs;
+    CkPrintf("------------- Object Data: %d objects -------------\n",
+	     stats->n_objs);
     for(i=0; i < osz; i++) {
+      LDObjData &odata = stats->objData[i];
       CkPrintf("Object %d\n",i);
-      CkPrintf("     id = %d\n",odata[i].id().id[0]);
-      CkPrintf("  OM id = %d\n",odata[i].omID().id);
-      CkPrintf("   Mig. = %d\n",odata[i].migratable);
-      CkPrintf("    CPU = %f\n",odata[i].cpuTime);
-      CkPrintf("   Wall = %f\n",odata[i].wallTime);
+      CkPrintf("     id = %d\n",odata.id().id[0]);
+      CkPrintf("  OM id = %d\n",odata.omID().id);
+      CkPrintf("   Mig. = %d\n",odata.migratable);
+      CkPrintf("    CPU = %f\n",odata.cpuTime);
+      CkPrintf("   Wall = %f\n",odata.wallTime);
     }
 
-    LDCommData *cdata = stats[j].commData;
-    const int csz = stats[j].n_comm;
+    const int csz = stats->n_comm;
 
-    CkPrintf("------------- Comm Data: PE %d: %d records -------------\n",
-	     j,csz);
+    CkPrintf("------------- Comm Data: %d records -------------\n",
+	     csz);
+    LDCommData *cdata = stats->commData;
     for(i=0; i < csz; i++) {
       CkPrintf("Link %d\n",i);
 
@@ -457,8 +482,10 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
       CkPrintf("     messages = %d\n",cdata[i].messages);
       CkPrintf("        bytes = %d\n",cdata[i].bytes);
     }
-  }
+}
 
+LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats,int count)
+{
   int sizes=0;
   LBMigrateMsg* msg = new(&sizes,1) LBMigrateMsg;
   msg->n_moves = 0;
@@ -484,10 +511,10 @@ void CentralLB::simulation() {
     LBSimulation simResults(LBSimulation::simProcs);
 
     // now pass it to the strategy routine
-    LBMigrateMsg* migrateMsg = Strategy(statsDataList, LBSimulation::simProcs);
+    LBMigrateMsg* migrateMsg = Strategy(statsData, LBSimulation::simProcs);
 
     // now calculate the results of the load balancing simulation
-    FindSimResults(statsDataList, LBSimulation::simProcs, migrateMsg, &simResults);
+    FindSimResults(statsData, LBSimulation::simProcs, migrateMsg, &simResults);
 
     // now we have the simulation data, so print it and exit
     CmiPrintf("Charm++> LBSim: Simulation of one load balancing step done.\n");
@@ -518,11 +545,15 @@ void CentralLB::readStatsMsgs(const char* filename) {
   CmiPrintf("readStatsMsgs for %d pes starts ... \n", stats_msg_count);
   if (LBSimulation::simProcs == 0) LBSimulation::simProcs = stats_msg_count;
 
+#if LB_DUMP_MSG
   // now rebuild new structures
   int tableSize = stats_msg_count;
   if (tableSize < LBSimulation::simProcs) tableSize = LBSimulation::simProcs;
   statsMsgsList = new CLBStatsMsg*[stats_msg_count];
-  statsDataList = new LDStats[tableSize];
+  statsData->clear();
+
+  statsData->procs = new ProcStats[stats_msg_count];
+  statsData->count = stats_msg_count;
 
   for (i = 0; i < stats_msg_count; i++) {
     CLBStatsMsg* m = new CLBStatsMsg;
@@ -537,52 +568,48 @@ void CentralLB::readStatsMsgs(const char* filename) {
     m = (CLBStatsMsg *)EnvToUsr(env);
 
     statsMsgsList[i] = m;
-    statsDataList[i].total_walltime = m->total_walltime;
-    statsDataList[i].total_cputime = m->total_cputime;
-    statsDataList[i].idletime = m->idletime;
-#if 0
-    statsDataList[i].bg_walltime = m->bg_walltime;
-    statsDataList[i].bg_cputime = m->bg_cputime;
-#else
-    statsDataList[i].bg_walltime = 0.;
-    statsDataList[i].bg_cputime = 0.;
-#endif
-    statsDataList[i].pe_speed = m->pe_speed;
-    statsDataList[i].utilization = 1.0;
-    statsDataList[i].available = CmiTrue;
+    struct ProcStats &proc = statsData->procs[i];
 
-    statsDataList[i].n_objs = m->n_objs;
-    statsDataList[i].objData = m->objData;
-    statsDataList[i].n_comm = m->n_comm;
-    statsDataList[i].commData = m->commData;
-#if OLD_FORMAT_COMPATIBLE
-    statsDataList[i].objData = (LDObjData*)((char*)m+(size_t)m->objData);
-    statsDataList[i].commData = (LDCommData*)((char *)m+(size_t)m->commData);
+    proc.total_walltime = m->total_walltime;
+    proc.total_cputime = m->total_cputime;
+    proc.idletime = m->idletime;
+#if 0
+    proc.bg_walltime = m->bg_walltime;
+    proc.bg_cputime = m->bg_cputime;
+#else
+    proc.bg_walltime = 0.;
+    proc.bg_cputime = 0.;
 #endif
-//CmiPrintf("i:%d bg_walltime: %f total_walltime: %f objData: %d %p comm: %d %p\n", i, m->bg_walltime, m->total_walltime, m->n_objs, m->objData, m->n_comm, m->commData);
+    proc.pe_speed = m->pe_speed;
+    proc.utilization = 1.0;
+    proc.available = CmiTrue;
+    statsData->n_objs += m->n_objs;
+    statsData->n_comm += m->n_comm;
   }
 
-  CmiPrintf("Simulation for %d pes \n", LBSimulation::simProcs);
+  buildStats();
+
+//CmiPrintf("i:%d bg_walltime: %f total_walltime: %f objData: %d %p comm: %d %p\n", i, m->bg_walltime, m->total_walltime, m->n_objs, m->objData, m->n_comm, m->commData);
 
   if (stats_msg_count < LBSimulation::simProcs) {
     for (int i=stats_msg_count; i<LBSimulation::simProcs; i++) {
-      statsMsgsList[i] = NULL;
-      statsDataList[i].total_walltime = 0.0;
-      statsDataList[i].total_cputime = 0.0;
-      statsDataList[i].idletime = 0.0;
-      statsDataList[i].bg_walltime = 0.;
-      statsDataList[i].bg_cputime = 0.;
-      statsDataList[i].pe_speed = 1;
-      statsDataList[i].utilization = 1.0;
-      statsDataList[i].available = CmiTrue;
-
-      statsDataList[i].n_objs = 0;
-      statsDataList[i].objData = NULL;
-      statsDataList[i].n_comm = 0;
-      statsDataList[i].commData = NULL;
-      
+      struct ProcStats &proc = statsData->procs[i];
+      proc.total_walltime = 0.0;
+      proc.total_cputime = 0.0;
+      proc.idletime = 0.0;
+      proc.bg_walltime = 0.;
+      proc.bg_cputime = 0.;
+      proc.pe_speed = 1;
+      proc.utilization = 1.0;
+      proc.available = CmiTrue;
     }
   }
+#else
+    // LBSimulation::simProcs must be set
+  statsData->pup(p);
+#endif
+
+  CmiPrintf("Simulation for %d pes \n", LBSimulation::simProcs);
 
   // file f is closed in the destructor of PUP::fromDisk
   CmiPrintf("ReadStatsMsg from %s completed\n", filename);
@@ -598,6 +625,7 @@ void CentralLB::writeStatsMsgs(const char* filename) {
   PUP::toDisk p(f);
   p|stats_msg_count;
 
+#if LB_DUMP_MSG
   for (i = 0; i < stats_msg_count; i++) {
     CLBStatsMsg *m = statsMsgsList[i];
     envelope *env=UsrToEnv(m);
@@ -605,13 +633,18 @@ void CentralLB::writeStatsMsgs(const char* filename) {
     m = (CLBStatsMsg *)EnvToUsr(env);
     CkPupMessage(p, (void **)&m, 2);
   }
+#else
+  statsData->pup(p);
+#endif
 
   fclose(f);
 
   CmiPrintf("WriteStatsMsgs to %s succeed!\n", filename);
 }
 
-static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg* msg, double *peLoads, double &minObjLoad, double &maxObjLoad)
+static void getPredictedLoad(CentralLB::LDStats* stats, int count, 
+                             LBMigrateMsg *msg, double *peLoads, 
+                             double &minObjLoad, double &maxObjLoad)
 {
 	int* msgSentCount = new int[count]; // # of messages sent by each PE
 	int* msgRecvCount = new int[count]; // # of messages received by each PE
@@ -621,79 +654,58 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg*
 
 	for(i = 0; i < count; i++)
 	  msgSentCount[i] = msgRecvCount[i] = byteSentCount[i] = byteRecvCount[i] = 0;
-        minObjLoad = 1.0e20;	// I suppose no object load beyond this
+        minObjLoad = 1.0e20;	// I suppose no object load is beyond this
 	maxObjLoad = 0.0;
+
+	stats->makeCommHash();
+ 	// update to_proc according to migration msgs
+	for(int i = 0; i < msg->n_moves; i++) {
+	  MigrateInfo &mInfo = msg->moves[i];
+	  int idx = stats->getHash(mInfo.obj.objID(), mInfo.obj.omID());
+	  CmiAssert(idx != -1);
+          stats->to_proc[idx] = mInfo.to_pe;
+	}
 
 	for(pe = 0; pe < count; pe++)
   	{
-    	  peLoads[pe] = stats[pe].bg_walltime;
+    	  peLoads[pe] = stats->procs[pe].bg_walltime;
+        }
 
-    	  for(int obj = 0; obj < stats[pe].n_objs; obj++)
-    	  {
-		double &oload = stats[pe].objData[obj].wallTime;
+    	for(int obj = 0; obj < stats->n_objs; obj++)
+    	{
+		int pe = stats->to_proc[obj];
+		double &oload = stats->objData[obj].wallTime;
 		if (oload < minObjLoad) minObjLoad = oload;
 		if (oload > maxObjLoad) maxObjLoad = oload;
 		peLoads[pe] += oload;
-    	  }
 	}
 
-	// now for each migration, substract the load of the migrating 
-        // object from the source pe and add it to the destination pe
-	for(int mig = 0; mig < msg->n_moves; mig++)
-	{
-		int from = msg->moves[mig].from_pe;
-		int to = msg->moves[mig].to_pe;
-		double wallTime;
-		int oidx, cidx;
-		
-		// find the cpu time for the object that is migrating
-		for(oidx = 0; oidx < stats[from].n_objs; oidx++)
-			if(stats[from].objData[oidx].handle.id == msg->moves[mig].obj.id)
-			{
-				wallTime = stats[from].objData[oidx].wallTime;
-				break;
-			}
-		CkAssert(oidx != stats[from].n_objs);
-		peLoads[from] -= wallTime;
-		peLoads[to] += wallTime;
-	}
-	// handling of the communication overheads. Here, for each "link" in the communication statistics,
-	// find the sender and receiver PE and if they are not the same, add the costs, else don't add
-	for(pe = 0; pe < count; pe++)
-	{
-		// add the communication loads
-		LDCommData* cdata = stats[pe].commData;
-		const int csz = stats[pe].n_comm;
+	// handling of the communication overheads. 
+        for (int cidx=0; cidx < stats->n_comm; cidx++) {
+	  LDCommData& cdata = stats->commData[cidx];
+	  int senderPE, receiverPE;
+	  if(cdata.from_proc())
+	    senderPE = cdata.src_proc;
+	  else {
+	    int idx = stats->getHash(cdata.sender, cdata.senderOM);
+	    senderPE = stats->to_proc[idx];
+	    CmiAssert(senderPE != -1);
+	  }
+	  if(cdata.to_proc())
+	    receiverPE = cdata.dest_proc;
+	  else {
+	    int idx = stats->getHash(cdata.receiver, cdata.receiverOM);
+	    receiverPE = stats->to_proc[idx];
+	    CmiAssert(receiverPE != -1);
+	  }
+	  if(senderPE != receiverPE)
+	  {
+		msgSentCount[senderPE] += cdata.messages;
+		byteSentCount[senderPE] += cdata.bytes;
 
-		for(int cidx = 0; cidx < csz; cidx++)
-		{
-			// find the sender and receiver PE for this "link"
-			int senderPE, receiverPE;
-
-			if(cdata[cidx].from_proc())
-				senderPE = cdata[cidx].src_proc;
-			else
-			{
-				// for sender, check just the migration messages
-				senderPE = FindPEAfterMigration(cdata[cidx].sender, stats, count, msg, 0);
-				if(senderPE == -1)
-					senderPE = pe;
-			}
-
-			if(cdata[cidx].to_proc())
-				receiverPE = cdata[cidx].dest_proc;
-			else
-				receiverPE = FindPEAfterMigration(cdata[cidx].receiver, stats, count, msg, 1);
-
-			if(senderPE != receiverPE)
-			{
-				msgSentCount[senderPE] += cdata[cidx].messages;
-				byteSentCount[senderPE] += cdata[cidx].bytes;
-
-				msgRecvCount[receiverPE] += cdata[cidx].messages;
-				byteRecvCount[receiverPE] += cdata[cidx].bytes;
-			}
-		}
+		msgRecvCount[receiverPE] += cdata.messages;
+		byteRecvCount[receiverPE] += cdata.bytes;
+	  }
 	}
 
 	// now for each processor, add to its load the send and receive overheads
@@ -718,40 +730,95 @@ void CentralLB::FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, LBS
     // estimate the new loads of the processors. As a first approximation, this is the
     // get background load
     for(int pe = 0; pe < count; pe++)
-    	  simResults->bgLoads[pe] = stats[pe].bg_walltime;
+    	  simResults->bgLoads[pe] = stats->procs[pe].bg_walltime;
     // sum of the cpu times of the objects on that processor
-    getPredictedLoad(stats, count, msg, simResults->peLoads, simResults->minObjLoad, simResults->maxObjLoad);
-}
-
-// find the PE of an object after migration. The bCheckStats flag indicates whether the stats is to
-// be checked or not.
-static int FindPEAfterMigration(LDObjid& id, CentralLB::LDStats* stats, int count, LBMigrateMsg* msg, int bCheckStats)
-{
-	// first check in the migration messages
-	for(int i = 0; i < msg->n_moves; i++)
-		if(msg->moves[i].obj.id == id)
-			return msg->moves[i].to_pe;
-
-	if(!bCheckStats)
-		return -1;
-
-	// not a migrating object, so find in the stats if requires
-	for(int pe = 0; pe < count; pe++)
-	{
-		CmiBool found = CmiFalse;
-		for(int obj = 0; obj < stats[pe].n_objs; obj++)
-			if(stats[pe].objData[obj].handle.id == id)
-				{ found = CmiTrue; break;}
-		if(found)
-			return pe;
-	}
-	CkAssert(0);
-	return -1;
+    getPredictedLoad(stats, count, msg, simResults->peLoads, 
+		     simResults->minObjLoad, simResults->maxObjLoad);
 }
 
 int CentralLB::useMem() { 
   return CkNumPes() * (sizeof(CentralLB::LDStats)+sizeof(CLBStatsMsg *)) +
                         sizeof(CentralLB);
+}
+
+void CentralLB::LDStats::makeCommHash() {
+  if (transTable) return;
+
+  transTable = new LDOId[n_objs];
+  for (int obj=0; obj < n_objs; obj++){
+      LDObjData &oData = objData[obj];
+      transTable[obj].mid.id = oData.omID().id;
+      transTable[obj].oid = oData.id();
+  }
+  int i;
+   
+  objHash = new int[n_objs];
+  for(i=0;i<n_objs;i++)
+        objHash[i] = -1;
+   
+  for(i=0;i<n_objs;i++){
+        LDObjid &oid = transTable[i].oid;
+        int hash = ((oid.id[0])|(oid.id[1])) % n_objs;
+        while(objHash[hash] != -1)
+            hash = (hash+1)%n_objs;
+        objHash[hash] = i;
+  }
+}
+
+void CentralLB::LDStats::deleteCommHash() {
+  if (objHash) delete [] objHash;
+  if (transTable) delete [] transTable;
+}
+
+int CentralLB::LDStats::getHash(LDObjid oid, LDOMid mid)
+{
+    int hash = (oid.id[0] | oid.id[1]) % n_objs;
+
+    for(int id=0;id<n_objs;id++){
+        int index = (id+hash)%n_objs;
+        if (LDObjIDEqual(transTable[objHash[index]].oid, oid) &&
+            LDOMidEqual(transTable[objHash[index]].mid, mid))
+            return objHash[index];
+    }
+    //  CkPrintf("not found \n");
+    return -1;
+}
+
+
+void CentralLB::LDStats::pup(PUP::er &p)
+{
+  int i;
+  p(count);  
+  p(n_objs);
+  p(n_comm);
+  if (p.isUnpacking()) {
+    int maxpe = count>LBSimulation::simProcs?count:LBSimulation::simProcs;
+    procs = new ProcStats[maxpe];
+    objData = new LDObjData[n_objs];
+    commData = new LDCommData[n_comm];
+    from_proc = new int[n_objs];
+    to_proc = new int[n_objs];
+    transTable = NULL;
+    objHash = NULL;
+  }
+#if 1
+  ProcStats dummy;		// ignore the background load
+  for (i=0; i<count; i++) p((char*)&dummy, sizeof(ProcStats));
+#else
+  for (i=0; i<count; i++) p((char*)&procs[i], sizeof(ProcStats));
+#endif
+  for (i=0; i<n_objs; i++) p((char*)&objData[i], sizeof(LDObjStats));
+  p(from_proc, n_objs);
+  p(to_proc, n_objs);
+  for (i=0; i<n_comm; i++) p((char*)&commData[i], sizeof(LDCommData));
+  if (p.isUnpacking())
+    count = LBSimulation::simProcs;
+}
+
+int CentralLB::LDStats::useMem() { 
+  return sizeof(LDStats) + sizeof(ProcStats)*count + 
+	 (sizeof(LDObjData) + 2*sizeof(int)) * n_objs;
+ 	 sizeof(LDCommData) * n_comm;
 }
 
 #endif

@@ -186,43 +186,53 @@ LBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
 
   alloc_array = new alloc_struct *[count+1];
 
-  nobj =0;
-  for(pe=0; pe < count; pe++) 
-    for(obj=0; obj < stats[pe].n_objs; obj++) 
-      nobj++;
+  nobj = stats->n_objs;
   //  CkPrintf("OBJ: Before \n");
 
   ObjectHeap maxh(nobj+1);
-  nobj =0;
+  for(obj=0; obj < nobj; obj++) {
+      x = new ObjectRecord;
+      x->id = obj;
+      x->pos = obj;
+      x->load = stats->objData[obj].wallTime;
+      x->pe = stats->from_proc[obj];
+      maxh.insert(x);
+  }
+  for(pe=0; pe < count; pe++) {
+     mean_load += stats->procs[pe].total_walltime;
+  }
+  mean_load /= count;
+/*
   for(pe=0; pe < count; pe++) {
     load_pe = 0.0;
     for(obj=0; obj < stats[pe].n_objs; obj++) {
-      load_pe += stats[pe].objData[obj].wallTime;
+      load_pe += stats->objData[obj].data.wallTime;
       nobj++;
       x = new ObjectRecord;
       x->id = nobj -1;
       x->pos = obj;
-      x->load = stats[pe].objData[obj].wallTime;
+      x->load = stats->objData[obj].data.wallTime;
       x->pe = pe;
       maxh.insert(x);
     }
     mean_load += load_pe/count;
 //    CkPrintf("LOAD on %d = %5.3lf\n",pe,load_pe);
   }
+*/
 
   npe = count;
   translate = new obj_id[nobj];
   int objno=0;
 
-  for(pe=0; pe < count; pe++) 
-    for(obj=0; obj < stats[pe].n_objs; obj++){ 
-      translate[objno].mid.id = stats[pe].objData[obj].omID().id;
-      translate[objno].oid.id[0] = stats[pe].objData[obj].id().id[0];
-      translate[objno].oid.id[1] = stats[pe].objData[obj].id().id[1];
-      translate[objno].oid.id[2] = stats[pe].objData[obj].id().id[2];
-      translate[objno].oid.id[3] = stats[pe].objData[obj].id().id[3];
+  for(obj=0; obj < stats->n_objs; obj++){ 
+      LDObjData &oData = stats->objData[obj];
+      translate[objno].mid.id = oData.omID().id;
+      translate[objno].oid.id[0] = oData.id().id[0];
+      translate[objno].oid.id[1] = oData.id().id[1];
+      translate[objno].oid.id[2] = oData.id().id[2];
+      translate[objno].oid.id[3] = oData.id().id[3];
       objno++;
-    }
+  }
 
   make_hash();
 
@@ -235,16 +245,17 @@ LBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
 
   int xcoord=0,ycoord=0;
 
-  for(pe=0; pe < count; pe++) 
-    for(com =0; com< stats[pe].n_comm;com++)
-      if((!stats[pe].commData[com].from_proc())&&(!stats[pe].commData[com].to_proc())){
-	xcoord = search(stats[pe].commData[com].sender,stats[pe].commData[com].senderOM); 
-	ycoord = search(stats[pe].commData[com].receiver,stats[pe].commData[com].receiverOM);
+  for(com =0; com< stats->n_comm;com++) {
+      LDCommData &commData = stats->commData[com];
+      if((!commData.from_proc())&&(!commData.to_proc())){
+	xcoord = search(commData.sender, commData.senderOM); 
+	ycoord = search(commData.receiver, commData.receiverOM);
 	if((xcoord == -1)||(ycoord == -1))
 	  if (lb_ignoreBgLoad) continue;
 	  else CkAbort("Error in search\n");
-	add_graph(xcoord,ycoord,stats[pe].commData[com].bytes, stats[pe].commData[com].messages);	
+	add_graph(xcoord,ycoord,commData.bytes, commData.messages);	
       }
+  }
   
   int id,maxid,spe=0,minpe=0,mpos;
   double temp_cost,min_cost;
@@ -255,11 +266,11 @@ LBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
   spe = x->pe;
   mpos = x->pos;
   
-  alloc(pe,maxid,stats[spe].objData[mpos].wallTime,0,0);
+  alloc(pe,maxid,stats->objData[mpos].wallTime,0,0);
   if(pe != spe){
     //      CkPrintf("**Moving from %d to %d\n",spe,pe);
     MigrateInfo* migrateMe = new MigrateInfo;
-    migrateMe->obj = stats[spe].objData[mpos].handle;
+    migrateMe->obj = stats->objData[mpos].handle;
     migrateMe->from_pe = spe;
     migrateMe->to_pe = pe;
     migrateInfo.insertAtEnd(migrateMe);
@@ -301,7 +312,7 @@ LBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
     if(minpe != spe){
       //      CkPrintf("**Moving from %d to %d\n",spe,minpe);
       MigrateInfo *migrateMe = new MigrateInfo;
-      migrateMe->obj = stats[spe].objData[mpos].handle;
+      migrateMe->obj = stats->objData[mpos].handle;
       migrateMe->from_pe = spe;
       migrateMe->to_pe = minpe;
       migrateInfo.insertAtEnd(migrateMe);

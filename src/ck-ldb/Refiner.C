@@ -16,68 +16,53 @@
 
 #include "Refiner.h"
 
-int** Refiner::AllocProcs(int count, CentralLB::LDStats* stats)
+int* Refiner::AllocProcs(int count, CentralLB::LDStats* stats)
 {
-  int** bufs = new int*[count];
-
-  int total_objs=0;
-  int i;
-  for(i=0; i<count; i++) 
-    total_objs += stats[i].n_objs;
-
-  bufs[0] = new int[total_objs];
-
-  int cur_obj = 0;
-  for(i=1; i<count;i++) {
-    cur_obj += stats[i-1].n_objs;
-    bufs[i] = bufs[0] + cur_obj;
-  }
-  return bufs;
+  return new int[stats->n_objs];
 }
 
-void Refiner::FreeProcs(int** bufs)
+void Refiner::FreeProcs(int* bufs)
 {
-  delete [] bufs[0];
   delete [] bufs;
 }
 
-void Refiner::create(int count, CentralLB::LDStats* stats, int** procs)
+void Refiner::create(int count, CentralLB::LDStats* stats, int* procs)
 {
-  int i,j;
+  int i;
 
   P = count;
 
   // now numComputes is all the computes: migratable and not.
   // afterwards, nonmigratable computes will be taken off
-  numComputes = 0;
-  for(j=0; j < P; j++) numComputes+= stats[j].n_objs;
+  numComputes = stats->n_objs;
   computes = new computeInfo[numComputes];
 
   processors = new processorInfo[count];
 
   int index = 0;
   numAvail = 0;
-  for(j=0; j < count; j++) {
-    processors[j].Id = j;
-    processors[j].backgroundLoad = stats[j].bg_cputime;
-    processors[j].load = processors[j].backgroundLoad;
-    processors[j].computeLoad = 0;
-    processors[j].computeSet = new Set();
-    processors[j].pe_speed = stats[j].pe_speed;
-    processors[j].utilization = stats[j].utilization;
-    processors[j].available = stats[j].available;
-    if (processors[j].available == CmiTrue) numAvail++;
+  for(i=0; i < count; i++) {
+    processors[i].Id = i;
+    processors[i].backgroundLoad = stats->procs[i].bg_cputime;
+    processors[i].load = processors[i].backgroundLoad;
+    processors[i].computeLoad = 0;
+    processors[i].computeSet = new Set();
+    processors[i].pe_speed = stats->procs[i].pe_speed;
+    processors[i].utilization = stats->procs[i].utilization;
+    processors[i].available = stats->procs[i].available;
+    if (processors[i].available == CmiTrue) numAvail++;
+  }
 
-    LDObjData *odata = stats[j].objData;
-    const int osz = stats[j].n_objs;  
-    for(i=0; i < osz; i++) {
+  LDObjData *odata = stats->objData;
+  for (i=0; i<stats->n_objs; i++)
+  {
         computes[index].id = odata[i].id();
         computes[index].handle = odata[i].handle;
         computes[index].load = odata[i].cpuTime;
-        computes[index].originalPE = j;
+        computes[index].originalPE = stats->from_proc[i];
         computes[index].originalIdx = i;
         computes[index].processor = -1;
-        computes[index].oldProcessor = procs[j][i];
+        computes[index].oldProcessor = procs[i];
         computes[index].migratable = odata[i].migratable;
         index ++;
 /*
@@ -98,7 +83,6 @@ void Refiner::create(int count, CentralLB::LDStats* stats, int** procs)
         numComputes --;
       }
 */
-    }
   }
 //  for (i=0; i < numComputes; i++)
 //      processors[computes[i].oldProcessor].computeLoad += computes[i].load;
@@ -289,7 +273,7 @@ int Refiner::refine()
 }
 
 void Refiner::Refine(int count, CentralLB::LDStats* stats, 
-		     int** cur_p, int** new_p)
+		     int* cur_p, int* new_p)
 {
   //  CkPrintf("[%d] Refiner strategy\n",CkMyPe());
 
@@ -312,7 +296,7 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
     computeInfo *c = (computeInfo *)
       processors[pe].computeSet->iterator((Iterator *)&nextCompute);
     while(c) {
-      new_p[c->originalPE][c->originalIdx] = c->processor;
+      new_p[c->originalIdx] = c->processor;
 //       if (c->oldProcessor != c->processor)
 //      	CkPrintf("Refiner::Refine: from %d to %d\n",
 //      		 c->oldProcessor, c->processor);

@@ -22,7 +22,6 @@ public:
     friend class ObjGraph;
   public:
     int edge_index;
-    int proc;
     int index;
     int from_node;
     int to_node;
@@ -62,7 +61,7 @@ public:
     const Node n = GraphNode(i);
     const int pe = n.proc;
     const int index = n.index;
-    return stats[pe].objData[index].wallTime;
+    return stats->objData[index].wallTime;
   };
 
   double EdgeWeight(Edge* e);

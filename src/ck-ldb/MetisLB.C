@@ -116,9 +116,7 @@ LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   int i, j, m;
   int option = 0;
   int numobjs = 0;
-  for (j=0; j < count; j++) {
-    numobjs += stats[j].n_objs;
-  }
+  numobjs = stats->n_objs;
 
   // allocate space for the computing data
   double *objtime = new double[numobjs];
@@ -132,19 +130,18 @@ LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   }
 
   int k=0;
-  for (j=0; j<count; j++) {
-    for (i=0; i<stats[j].n_objs; i++) {
-      LDObjData *odata = stats[j].objData;
+  for (i=0; i<stats->n_objs; i++) {
+      LDObjData &odata = stats->objData[i];
       /*
       origmap[odata[i].id.id[0]] = j;
       cputime[odata[i].id.id[0]] = odata[i].cpuTime;
       handles[odata[i].id.id[0]] = odata[i].handle;
       */
-      origmap[k] = j;
-      objtime[k] = odata[i].wallTime*stats[j].pe_speed;
-      handles[k] = odata[i].handle;
+      int frompe = stats->from_proc[i];
+      origmap[k] = frompe;
+      objtime[k] = odata.wallTime*stats->procs[frompe].pe_speed;
+      handles[k] = odata.handle;
       k++;
-    }
   }
 
   // to convert the weights on vertices to integers
@@ -165,22 +162,21 @@ LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
     }
   }
 
-  for(j=0; j<count; j++) {
-    LDCommData *cdata = stats[j].commData;
-    const int csz = stats[j].n_comm;
-    for(i=0; i<csz; i++) {
-      if(cdata[i].from_proc() || cdata[i].to_proc())
+  const int csz = stats->n_comm;
+  for(i=0; i<csz; i++) {
+      LDCommData &cdata = stats->commData[i];
+      if(cdata.from_proc() || cdata.to_proc())
         continue;
       // FIXME!
       // senderID and recverID is not correct !!!
-      int senderID = cdata[i].sender.id[0];
-      int recverID = cdata[i].receiver.id[0];
+      int senderID = cdata.sender.id[0];
+      int recverID = cdata.receiver.id[0];
       CmiAssert(senderID < numobjs);
       CmiAssert(recverID < numobjs);
-      comm[senderID][recverID] += cdata[i].messages;
-      comm[recverID][senderID] += cdata[i].messages;
+      comm[senderID][recverID] += cdata.messages;
+      comm[recverID][senderID] += cdata.messages;
     }
-}
+
 // ignore messages sent from an object to itself
   for (i=0; i<numobjs; i++)
     comm[i][i] = 0;
@@ -260,21 +256,21 @@ LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
       // CkPrintf("after calling Metis functions.\n");
     }
     else if (WEIGHTED == option) {
-      float maxtotal_walltime = stats[0].total_walltime;
+      float maxtotal_walltime = stats->procs[0].total_walltime;
       for (m=1; m<count; m++) {
-	if (maxtotal_walltime < stats[m].total_walltime)
-	  maxtotal_walltime = stats[m].total_walltime;
+	if (maxtotal_walltime < stats->procs[m].total_walltime)
+	  maxtotal_walltime = stats->procs[m].total_walltime;
       }
       float totaltimeAllPe = 0.0;
       for (m=0; m<count; m++) {
-	totaltimeAllPe += stats[m].pe_speed * 
-	  (maxtotal_walltime-stats[m].bg_walltime);
+	totaltimeAllPe += stats->procs[m].pe_speed * 
+	  (maxtotal_walltime-stats->procs[m].bg_walltime);
       }
       // set up the different weights
       float *tpwgts = new float[count];
       for (m=0; m<count; m++) {
-	tpwgts[m] = stats[m].pe_speed * 
-	  (maxtotal_walltime-stats[m].bg_walltime) / totaltimeAllPe;
+	tpwgts[m] = stats->procs[m].pe_speed * 
+	  (maxtotal_walltime-stats->procs[m].bg_walltime) / totaltimeAllPe;
       }
       if (count > 8)
 	METIS_WPartGraphKway(&numobjs, xadj, adjncy, objwt, edgewt, 

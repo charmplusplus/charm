@@ -80,6 +80,14 @@ typedef struct {
 #endif
 } LDObjData;
 
+/* used for load balancer */
+typedef struct {
+  int index;
+  LDObjData data;
+  int from_proc;
+  int to_proc;
+} LDObjStats;
+
 typedef struct {
   int src_proc;
   LDOMid senderOM;

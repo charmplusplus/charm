@@ -106,23 +106,22 @@ GreedyLB::BuildObjectArray(CentralLB::LDStats* stats,
 
   *objCount = 0;
   int pe, obj;
-  for (pe = 0; pe < count; pe++)
-    *objCount += stats[pe].n_objs;
+  *objCount += stats->n_objs;
 
 //for (obj = 0; obj < stats[pe].n_objs; obj++)
 //if (stats[pe].objData[obj].migratable == CmiTrue) (*objCount)++; 
 
   objData  = new HeapData[*objCount];
   *objCount = 0; 
-  for(pe=0; pe < count; pe++)
-	for(obj=0; obj < stats[pe].n_objs; obj++) {
+  for(obj=0; obj < stats->n_objs; obj++) {
 //      if (stats[pe].objData[obj].migratable == CmiTrue) {
+	int pe = stats->from_proc[obj];
         objData[*objCount].load = 
-          stats[pe].objData[obj].wallTime * stats[pe].pe_speed;
+          stats->objData[obj].wallTime * stats->procs[pe].pe_speed;
         objData[*objCount].pe = pe;
         objData[*objCount].id = obj;
         (*objCount)++;
-    }
+  }
   
   HeapSort(objData, *objCount-1, GT);
   return objData;
@@ -133,19 +132,19 @@ GreedyLB::BuildCpuArray(CentralLB::LDStats* stats,
                           int count, int *peCount)
 {
   HeapData           *data;
-  CentralLB::LDStats *peData;
+  CentralLB::ProcStats *peData;
   
   *peCount = 0;
   int pe;
   for (pe = 0; pe < count; pe++)
-    if (stats[pe].available == CmiTrue) (*peCount)++;
+    if (stats->procs[pe].available == CmiTrue) (*peCount)++;
 
   data = new HeapData[*peCount];
   
   *peCount = 0;
   for (pe=0; pe < count; pe++) {
     data[*peCount].load = 0.0;
-    peData = &(stats[pe]);
+    peData = &(stats->procs[pe]);
  
     if (peData->available == CmiTrue) 
 	{
@@ -167,9 +166,8 @@ GreedyLB::BuildCpuArray(CentralLB::LDStats* stats,
   return data;
 }
 
-LBMigrateMsg* GreedyLB::Strategy(CentralLB::LDStats* stats, int count)
+void GreedyLB::work(CentralLB::LDStats* stats, int count)
 {
-  CkVec<MigrateInfo*> migrateInfo;
   int      obj, heapSize, objCount;
   HeapData *cpuData = BuildCpuArray(stats, count, &heapSize);
   HeapData *objData = BuildObjectArray(stats, count, &objCount);
@@ -195,13 +193,16 @@ LBMigrateMsg* GreedyLB::Strategy(CentralLB::LDStats* stats, int count)
     const int pe   = objData[obj].pe;
     const int id   = objData[obj].id;
     if (dest != pe) {
+      stats->to_proc[id] = dest;
       //      CkPrintf("[%d] Obj %d migrating from %d to %d\n",
       //         CkMyPe(),obj,pe,dest);
+/*
       MigrateInfo *migrateMe = new MigrateInfo;
-      migrateMe->obj = stats[pe].objData[id].handle;
+      migrateMe->obj = stats->objData[id].data.handle;
       migrateMe->from_pe = pe;
       migrateMe->to_pe = dest;
       migrateInfo.insertAtEnd(migrateMe);
+*/
     }
 
     //Insert the least loaded processor with load updated back into the heap
@@ -216,6 +217,25 @@ LBMigrateMsg* GreedyLB::Strategy(CentralLB::LDStats* stats, int count)
 
   delete [] cpuData;
   delete [] objData;
+}
+
+LBMigrateMsg * GreedyLB::createMigrateMsg(LDStats* stats,int count)
+{
+  CkVec<MigrateInfo*> migrateInfo;
+  for (int i=0; i<stats->n_objs; i++) {
+    LDObjData &objData = stats->objData[i];
+    int frompe = stats->from_proc[i];
+    int tope = stats->to_proc[i];
+    if (frompe != tope) {
+      //      CkPrintf("[%d] Obj %d migrating from %d to %d\n",
+      //         CkMyPe(),obj,pe,dest);
+      MigrateInfo *migrateMe = new MigrateInfo;
+      migrateMe->obj = objData.handle;
+      migrateMe->from_pe = frompe;
+      migrateMe->to_pe = tope;
+      migrateInfo.insertAtEnd(migrateMe);
+    }
+  }
 
   int migrate_count=migrateInfo.length();
   CkPrintf("GreedyLB migrating %d elements\n",migrate_count);

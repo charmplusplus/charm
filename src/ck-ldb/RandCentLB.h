@@ -22,9 +22,9 @@ class RandCentLB : public CentralLB {
 public:
   RandCentLB();
   RandCentLB(CkMigrateMessage *m):CentralLB(m) {}
+  void work(CentralLB::LDStats* stats, int count);
 private:
   CmiBool QueryBalanceNow(int step);
-  LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
 };
 
 #endif /* _RANDCENTLB_H_ */

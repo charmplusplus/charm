@@ -161,7 +161,6 @@ void init(double **a, graph * object_graph, int l, int b){
 LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 {
     int pe,obj,com;
-    double load_pe=0.0;
     ObjectRecord *x;
     
     //  CkPrintf("[%d] CommLB strategy\n",CkMyPe());
@@ -170,45 +169,29 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
     
     alloc_array = new double *[count+1];
     
-    nobj =0;
-    for(pe=0; pe < count; pe++) 
-	for(obj=0; obj < stats[pe].n_objs; obj++) 
-	    nobj++;
+    nobj = stats->n_objs;
     
     ObjectHeap maxh(nobj+1);
-    nobj =0;
-    for(pe=0; pe < count; pe++) {
-	load_pe = 0.0;
-	for(obj=0; obj < stats[pe].n_objs; obj++) {
-	    load_pe += stats[pe].objData[obj].wallTime;
-	    nobj++;
+    for(obj=0; obj < stats->n_objs; obj++) {
+//	    load_pe += stats[pe].objData[obj].wallTime;
 	    x = new ObjectRecord;
-	    x->id = nobj -1;
+	    x->id = obj;
 	    x->pos = obj;
-	    x->load = stats[pe].objData[obj].wallTime;
-	    x->pe = pe;
+	    x->load = stats->objData[obj].wallTime;
+	    x->pe = stats->from_proc[obj];
 	    maxh.insert(x);
-	}
-	//    CkPrintf("LOAD on %d = %5.3lf\n",pe,load_pe);
     }
 
     npe = count;
     translate = new obj_id[nobj];
     int objno=0;
 
-    for(pe=0; pe < count; pe++)
-	for(obj=0; obj < stats[pe].n_objs; obj++){
-	    LDObjData &objData = stats[pe].objData[obj];
-	    translate[objno].mid.id = objData.omID().id;
-	    translate[objno].oid = objData.id();
-	    #if 0
-	    translate[objno].oid.id[0] = objData.id().id[0];
-	    translate[objno].oid.id[1] = objData.id().id[1];
-	    translate[objno].oid.id[2] = objData.id().id[2];
-	    translate[objno].oid.id[3] = objData.id().id[3];
-	    #endif
-	    objno++;
-	}
+    for(obj=0; obj < stats->n_objs; obj++){
+      LDObjData &objData = stats->objData[obj];
+      translate[objno].mid.id = objData.omID().id;
+      translate[objno].oid = objData.id();
+      objno++;
+    }
 
     make_hash();
 
@@ -221,18 +204,17 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 
     int xcoord=0,ycoord=0;
 
-    for(pe=0; pe < count; pe++)
-	for(com =0; com< stats[pe].n_comm;com++) {
-	    LDCommData &commData = stats[pe].commData[com];
-	    if((!commData.from_proc())&&(!commData.to_proc())){
+    for(com =0; com< stats->n_comm;com++) {
+	 LDCommData &commData = stats->commData[com];
+	 if((!commData.from_proc())&&(!commData.to_proc())){
 		xcoord = search(commData.sender, commData.senderOM);
 		ycoord = search(commData.receiver, commData.receiverOM);
 		if((xcoord == -1)||(ycoord == -1))
 		    if (lb_ignoreBgLoad) continue;
 		    else CkAbort("Error in search\n");
 		add_graph(xcoord,ycoord,commData.bytes, commData.messages);
-	    }
-        }
+	 }
+    }
 
     int id,maxid,spe=0,minpe=0,mpos;
     double temp,total_time,min_temp;
@@ -241,7 +223,7 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 	CkPrintf("avail for %d = %d\n",pe,stats[pe].available);
     */
     for(pe=0;pe < count;pe++)
-	if(stats[pe].available == 1)
+	if(stats->procs[pe].available == 1)
 	    break;
 
     int first_avail_pe = pe;
@@ -252,11 +234,11 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
     mpos = x->pos;
     delete x;
     //  CkPrintf("before alloc firstpe = %d\n",pe);
-    alloc(pe,maxid,stats[spe].objData[mpos].wallTime);
+    alloc(pe,maxid,stats->objData[mpos].wallTime);
     if(pe != spe){
 	//    CkPrintf("**Moving from %d to %d\n",spe,pe);
 	MigrateInfo* migrateMe = new MigrateInfo;
-	migrateMe->obj = stats[spe].objData[mpos].handle;
+	migrateMe->obj = stats->objData[mpos].handle;
 	migrateMe->from_pe = spe;
 	migrateMe->to_pe = pe;
 	migrateInfo.insertAtEnd(migrateMe);
@@ -275,7 +257,7 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 	minpe = first_avail_pe;
 	
 	for(pe = first_avail_pe +1; pe < count; pe++){
-	    if(stats[pe].available == 0)
+	    if(stats->procs[pe].available == 0)
 		continue;
 	    
 	    temp = compute_com(maxid,pe);
@@ -296,7 +278,7 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 	if(minpe != spe){
 	    //      CkPrintf("**Moving from %d to %d\n",spe,minpe);
 	    MigrateInfo *migrateMe = new MigrateInfo;
-	    migrateMe->obj = stats[spe].objData[mpos].handle;
+	    migrateMe->obj = stats->objData[mpos].handle;
 	    migrateMe->from_pe = spe;
 	    migrateMe->to_pe = minpe;
 	    migrateInfo.insertAtEnd(migrateMe);

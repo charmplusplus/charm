@@ -14,17 +14,16 @@
 #define _RANDREFLB_H_
 
 #include "CentralLB.h"
+#include "RandCentLB.h"
 #include "RandRefLB.decl.h"
 
 void CreateRandRefLB();
 
-class RandRefLB : public CentralLB {
+class RandRefLB : public RandCentLB {
 public:
   RandRefLB();
-  RandRefLB(CkMigrateMessage *m):CentralLB(m) {}
-private:
-  CmiBool QueryBalanceNow(int step);
-  LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
+  RandRefLB(CkMigrateMessage *m):RandCentLB(m) {}
+  void work(CentralLB::LDStats* stats, int count);
 };
 
 #endif /* _RANDCENTLB_H_ */

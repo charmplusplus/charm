@@ -64,7 +64,12 @@ public:
 
   void set_avail_vector(char *new_vector);
 
-  struct LDStats {  // Passed to Strategy
+   struct LDOId {
+     LDObjid oid;
+     LDOMid mid;
+   };
+
+  struct ProcStats {  // per processor data
     double total_walltime;
     double total_cputime;
     double idletime;
@@ -73,11 +78,42 @@ public:
     int pe_speed;
     double utilization;
     CmiBool available;
+    int   n_objs;
+    ProcStats(): total_walltime(0.0), total_cputime(0.0), idletime(0.0),
+	   	 bg_walltime(0.0), bg_cputime(0.0), pe_speed(1),
+		 utilization(1.0), available(1), n_objs(0) {}
+  };
+
+  struct LDStats {  // Passed to Strategy
+    struct ProcStats  *procs;
+    int count;
     
     int n_objs;
     LDObjData* objData;
+    int  *from_proc, *to_proc;
     int n_comm;
     LDCommData* commData;
+
+    LDOId *transTable;
+    int *objHash;
+
+    LDStats(): n_objs(0), n_comm(0) { objData = NULL; commData = NULL; 
+		from_proc = NULL; to_proc = NULL;
+		transTable = NULL; objHash = NULL; }
+      // build hash table
+    void makeCommHash();
+    void deleteCommHash();
+    int getHash(LDObjid oid, LDOMid mid);
+    void clear() {
+      n_objs = n_comm = 0;
+      delete [] objData;
+      delete [] commData;
+      delete [] from_proc;
+      delete [] to_proc;
+      deleteCommHash();
+    }
+    void pup(PUP::er &p);
+    int useMem();
   };
 
    LBMigrateMsg* callStrategy(LDStats* stats,int count){
@@ -96,18 +132,23 @@ protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryDumpData() { return CmiFalse; };  
   virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
+  virtual void work(LDStats* stats,int count);
+  virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
 
   void simulation();
   void FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, LBSimulation* simResults);
+#if 0
   void RemoveNonMigratable(LDStats* statsDataList, int count);
+#endif
+  void buildStats();
 
 private:  
 
   int mystep;
   int myspeed;
   int stats_msg_count;
-  CLBStatsMsg** statsMsgsList;
-  LDStats* statsDataList;
+  CLBStatsMsg **statsMsgsList;
+  LDStats *statsData;
   int migrates_completed;
   int migrates_expected;
   double start_lb_time;

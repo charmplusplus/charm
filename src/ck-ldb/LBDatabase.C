@@ -177,6 +177,8 @@ void _loadbalancerInit()
       CmiPrintf("LB> Load balancer running in verbose mode.\n");
     if (lb_ignoreBgLoad)
       CmiPrintf("LB> Load balancer only balance migratable object.\n");
+    if (LBSimulation::doSimulation)
+      CmiPrintf("LB> Load balancer running in simulation mode.\n");
   }
 }
 

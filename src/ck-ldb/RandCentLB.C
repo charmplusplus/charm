@@ -44,46 +44,19 @@ CmiBool RandCentLB::QueryBalanceNow(int _step)
   return CmiTrue;
 }
 
-LBMigrateMsg* RandCentLB::Strategy(CentralLB::LDStats* stats, int count)
+void RandCentLB::work(CentralLB::LDStats* stats, int count)
 {
-  //  CkPrintf("[%d] RandCentLB strategy\n",CkMyPe());
-
-  // remove non-migratable objects
-  RemoveNonMigratable(stats, count);
-
-  CkVec<MigrateInfo*> migrateInfo;
-
-  for(int pe=0; pe < count; pe++) {
-    //    CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
-    //	     CkMyPe(),pe,stats[pe].n_objs,stats[pe].n_comm);
-    for(int obj=0; obj < stats[pe].n_objs; obj++) {
-      if (stats[pe].objData[obj].migratable) {
+  for(int obj=0; obj < stats->n_objs; obj++) {
+      LDObjData &odata = stats->objData[obj];
+      if (odata.migratable) {
 	const int dest = (int)(CrnDrand()*(CkNumPes()-1) + 0.5);
-	if (dest != pe) {
-	  //	CkPrintf("[%d] Obj %d migrating from %d to %d\n",
-	  //		 CkMyPe(),obj,pe,dest);
-	  MigrateInfo* migrateMe = new MigrateInfo;
-	  migrateMe->obj = stats[pe].objData[obj].handle;
-	  migrateMe->from_pe = pe;
-	  migrateMe->to_pe = dest;
-	  migrateInfo.insertAtEnd(migrateMe);
-	}
+	if (dest != stats->from_proc[obj]) {
+	  // CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),obj,odata.from_proc,dest);
+	  stats->to_proc[obj] = dest;
+        }
       }
-    }
   }
-
-  int migrate_count=migrateInfo.length();
-  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
-  msg->n_moves = migrate_count;
-  for(int i=0; i < migrate_count; i++) {
-    MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
-    msg->moves[i] = *item;
-    delete item;
-    migrateInfo[i] = 0;
-  }
-
-  return msg;
-};
+}
 
 #endif
 

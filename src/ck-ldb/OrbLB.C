@@ -267,8 +267,7 @@ LBMigrateMsg* OrbLB::Strategy(CentralLB::LDStats* stats, int count)
 
   P = count;
   // calculate total number of objects
-  nObjs = 0;
-  for (i=0; i<count; i++) nObjs += stats[i].n_objs;
+  nObjs = stats->n_objs;
 #ifdef DEBUG
   CmiPrintf("ORB: num objects:%d\n", nObjs);
 #endif
@@ -280,23 +279,20 @@ LBMigrateMsg* OrbLB::Strategy(CentralLB::LDStats* stats, int count)
   // v[0] = XDIR  v[1] = YDIR v[2] = ZDIR
   // vArray[XDIR] is an array holding the x vector for all computes
   int objIdx = 0;
-  for (i=0; i<count; i++) {
-    int osz = stats[i].n_objs;
-    LDObjData *odata = stats[i].objData;
-    for (j=0; j<osz; j++) {
-      computeLoad[objIdx].id = objIdx;
-      computeLoad[objIdx].v[XDIR] = odata[j].id().id[0];
-      computeLoad[objIdx].v[YDIR] = odata[j].id().id[1];
-      computeLoad[objIdx].v[ZDIR] = odata[j].id().id[2];
-      computeLoad[objIdx].load = odata[j].wallTime;
-      computeLoad[objIdx].refno = 0;
-      computeLoad[objIdx].partition = NULL;
-      for (int k=XDIR; k<=ZDIR; k++) {
+  for (i=0; i<nObjs; i++) {
+    LDObjData &odata = stats->objData[i];
+    computeLoad[objIdx].id = objIdx;
+    computeLoad[objIdx].v[XDIR] = odata.id().id[0];
+    computeLoad[objIdx].v[YDIR] = odata.id().id[1];
+    computeLoad[objIdx].v[ZDIR] = odata.id().id[2];
+    computeLoad[objIdx].load = odata.wallTime;
+    computeLoad[objIdx].refno = 0;
+    computeLoad[objIdx].partition = NULL;
+    for (int k=XDIR; k<=ZDIR; k++) {
         vArray[k][objIdx].id = objIdx;
         vArray[k][objIdx].v = computeLoad[objIdx].v[k];
-      }
-      objIdx ++;
     }
+    objIdx ++;
   }
 
   double t = CmiWallTimer();
@@ -376,19 +372,18 @@ LBMigrateMsg* OrbLB::Strategy(CentralLB::LDStats* stats, int count)
 
   // Save output
   objIdx = 0;
-  for(int pe=0;pe < count; pe++) {
-    for(int obj=0;obj<stats[pe].n_objs;obj++) {
-      if (pe != computeLoad[objIdx].partition->node) {
+  for(int obj=0;obj<stats->n_objs;obj++) {
+      int frompe = stats->from_proc[obj];
+      if (frompe != computeLoad[objIdx].partition->node) {
         //      CkPrintf("[%d] Obj %d migrating from %d to %d\n",
         //               CkMyPe(),obj,pe,to_procs[pe][obj]);
         MigrateInfo *migrateMe = new MigrateInfo;
-        migrateMe->obj = stats[pe].objData[obj].handle;
-        migrateMe->from_pe = pe;
+        migrateMe->obj = stats->objData[obj].handle;
+        migrateMe->from_pe = frompe;
         migrateMe->to_pe = computeLoad[objIdx].partition->node;
         migrateInfo.insertAtEnd(migrateMe);
       }
       objIdx ++;
-    }
   }
 
   int migrate_count=migrateInfo.length();

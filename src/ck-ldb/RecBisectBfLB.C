@@ -116,7 +116,7 @@ LBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats,
    
       if (n.proc != i) {
 	MigrateInfo *migrateMe = new MigrateInfo;
-	migrateMe->obj = stats[n.proc].objData[n.index].handle;
+	migrateMe->obj = stats->objData[n.index].handle;
 	migrateMe->from_pe = n.proc;
 	migrateMe->to_pe = i;
 	migrateInfo.insertAtEnd(migrateMe);

@@ -28,12 +28,12 @@ public:
   };
   ~Refiner() { delete [] computes; delete [] processors; };
 
-  static int** AllocProcs(int count, CentralLB::LDStats* stats);
-  static void FreeProcs(int** bufs);
-  void Refine(int count, CentralLB::LDStats* stats, int** cur_p, int** new_p);
+  static int* AllocProcs(int count, CentralLB::LDStats* stats);
+  static void FreeProcs(int* bufs);
+  void Refine(int count, CentralLB::LDStats* stats, int* cur_p, int* new_p);
 
 private:
-  void create(int count, CentralLB::LDStats* stats, int** cur_p);
+  void create(int count, CentralLB::LDStats* stats, int* cur_p);
   int refine();
   void assign(computeInfo *c, int p);
   void assign(computeInfo *c, processorInfo *p);
