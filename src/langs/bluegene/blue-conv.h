@@ -149,6 +149,19 @@ static inline void BgSyncListSendAndFree(int npes, int *pes, int nb, char *m)
   BgSyncListSend(npes, pes, CmiGetHandler(m), LARGE_WORK, nb, m);
 }
 
+static inline void BgMultipleSend(unsigned int pe, int len, int sizes[], char *msgComps[])
+{
+  int x,y,z,t,i;
+  t = pe%BgGetNumWorkThread();
+  pe = pe/BgGetNumWorkThread();
+  BgGetXYZ(pe, &x, &y, &z);
+  for (i=0; i<len; i++) {
+    int nb = sizes[i];
+    char *dupm = (char *)CmiAlloc(nb);
+    memcpy(dupm, msgComps[i], nb);
+    BgSendPacket(x,y,z, t, CmiGetHandler(dupm), LARGE_WORK, nb, dupm);
+  }
+}
 #endif
 
 #endif
