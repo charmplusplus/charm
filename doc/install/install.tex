@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.12  1999-07-09 18:18:39  milind
+% Revision 1.13  2000-01-31 21:10:49  milind
+% fixed bugs pointed out by quantum TA
+%
+% Revision 1.12  1999/07/09 18:18:39  milind
 % Updated for new release 5.0.
 %
 % Revision 1.11  1998/03/16 20:17:29  milind
@@ -97,7 +100,7 @@ untar it, and move the directory thereby created to {\tt /usr/local/charm}:
 \begin{verbatim}
     % gunzip net-sol.tar.gz
     % tar xf net-sol.tar
-    % mv net-sol /usr/local/charm
+    % mv net-sol/* /usr/local/charm
 \end{verbatim}
 
 You are almost ready to go.  The last thing you need to do is put the
@@ -209,15 +212,8 @@ binaries are operational:
     % rm -r /usr/local/charm/src
 \end{verbatim}
 
-If you are not using charm++, you may delete the charm++ compiler:
-
-\begin{verbatim}
-    % rm /usr/local/charm/bin/charmxlat++
-    % rm /usr/local/charm/bin/charmfilter++
-\end{verbatim}
-
-You may delete the programs {\tt conv-host.notify} and {\tt
-conv-host.silent}, although please read the section on security first.
+You may delete the programs {\tt conv-host-notify} and {\tt
+conv-host-silent}, although please read the section on security first.
 
 Finally, you may {\tt strip} all the binaries in {\tt
 /usr/local/charm/bin}, if we have not already done so.
