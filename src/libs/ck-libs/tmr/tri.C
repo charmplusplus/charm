@@ -1472,7 +1472,8 @@ void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_, int 
 {
   int i, j;
 
-  numElements=nEl;
+  CkPrintf("[tmr] newMesh on chunk %d...\n", cid);
+  numElements = nEl;
   numGhosts = nGhost;
   allocMesh(nEl);
   int *conn = new int[3*numGhosts];
@@ -1548,6 +1549,7 @@ void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_, int 
   }
   delete[] conn;
   delete[] gid;
+  CkPrintf("[tmr] Finished newMesh on chunk %d...\n", cid);
 }
 
 void chunk::deriveNodes()
@@ -1559,9 +1561,12 @@ void chunk::deriveNodes()
   for (i=0; i<numElements; i++) {
     for (j=0; j<3; j++) {
       aNode = theElements[i].nodes[j];
-      theNodes[aNode].init(this);
-      if ((aNode + 1) > numNodes)
-	numNodes = aNode + 1;
+      if (aNode >= 0) {
+	theNodes[aNode].init(this);
+	if ((aNode + 1) > numNodes)
+	  numNodes = aNode + 1;
+      }
+      else CkPrintf("WARNING: negative node id found in conn...\n");
     }
   }
 }
