@@ -86,7 +86,7 @@ ModuleList *modlist;
 %type <module>		Module
 %type <conslist>	ConstructEList ConstructList
 %type <construct>	Construct
-%type <strval>		Name QualName CCode OptNameInit
+%type <strval>		Name QualName CCode CPROGRAM_List OptNameInit
 %type <val>		OptStackSize
 %type <intval>		OptExtern OptSemiColon MAttribs MAttribList MAttrib
 %type <intval>		EAttribs EAttribList EAttrib OptVoid
@@ -632,6 +632,18 @@ DefaultParameter: LITERAL
 		{ $$ = new Value($1); }
 		;
 
+CPROGRAM_List   :  /* Empty */
+		{ $$ = ""; }
+		| CPROGRAM
+		{ $$ = $1; }
+		| CPROGRAM ',' CPROGRAM_List
+		{  /*Returned only when in_bracket*/
+			char *tmp = new char[strlen($1)+strlen($3)+3];
+			sprintf(tmp,"%s, %s", $1, $3);
+			$$ = tmp;
+		}
+		;
+
 CCode		: /* Empty */
 		{ $$ = ""; }
 		| CPROGRAM
@@ -648,7 +660,7 @@ CCode		: /* Empty */
 			sprintf(tmp,"%s{%s}%s", $1, $3, $5);
 			$$ = tmp;
 		}
-		| CPROGRAM '(' CCode ')' CCode
+		| CPROGRAM '(' CPROGRAM_List ')' CCode
 		{ /*Returned only when in_braces*/
 			char *tmp = new char[strlen($1)+strlen($3)+strlen($5)+3];
 			sprintf(tmp,"%s(%s)%s", $1, $3, $5);
