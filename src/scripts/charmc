@@ -127,6 +127,11 @@ End() {
             $RM $TMP.i $TMP.$CMK_CPP_SUFFIX
         done
         $RM core $DELETE
+	if test -n "$modInitObj"
+	then
+	    [ -n "$VERBOSE" ] && echo $RM $modInitSrc $modInitObj
+	    DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
+	fi
     fi
     exit $1
 }
@@ -154,6 +159,7 @@ DoNoErrCheck() {
 	[ -n "$VERBOSE" ] && echo "charmc: Executing $@" 1>&2
 	"$@"
 }
+
 Do() {
 	DoNoErrCheck "$@"
 	Do_res=$?
@@ -255,7 +261,6 @@ AppendList() {
 	done
 	echo $ret $search
 }
-
 
 
 # TEMP_BASE is appended with this script's process ID (PID),
@@ -620,6 +625,7 @@ do
 done
 }
 
+trap 'End 1' 2
 
 # Process original command-line arguments
 processArgs "$@"
