@@ -1,6 +1,7 @@
 #ifndef _MULTICAST
 #define _MULTICAST
 
+#include "pup.h"
 class mCastEntry;
 
 class multicastSetupMsg;
