@@ -106,7 +106,7 @@ void CqsPrioqRehash(pq)
   int oldHsize = pq->hash_key_size;
   int newHsize = oldHsize * 2;
   unsigned int hashval;
-  prioqelt pe, pe1;
+  prioqelt pe, pe1, pe2;
   int i,j;
 
   prioqelt *ohashtab = pq->hashtab;
@@ -118,7 +118,8 @@ void CqsPrioqRehash(pq)
     nhashtab[i] = 0;
 
   for(i=0; i<oldHsize; i++) {
-    for(pe=ohashtab[i]; pe; pe=pe->ht_next) {
+    for(pe=ohashtab[i]; pe; ) {
+      pe2 = pe->ht_next;
       hashval = pe->pri.bits;
       for (j=0; j<pe->pri.ints; j++) hashval ^= pe->pri.data[j];
       hashval = (hashval&0x7FFFFFFF)%newHsize;
@@ -128,6 +129,7 @@ void CqsPrioqRehash(pq)
       pe->ht_handle = (nhashtab+hashval);
       if (pe1) pe1->ht_handle = &(pe->ht_next);
       nhashtab[hashval]=pe;
+      pe = pe2;
     }
   }
   pq->hashtab = nhashtab;
