@@ -130,6 +130,7 @@ extern void CkBroadcastMsgBranch(int entryIdx, void *msg, int groupID);
 
 extern void CkSetRefNum(void *msg, int ref);
 extern int  CkGetRefNum(void *msg);
+extern int  CkGetSrcPe(void *msg);
 
 /******************************************************************************
  *

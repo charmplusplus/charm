@@ -13,6 +13,12 @@ int CkGetRefNum(void *msg)
 }
 
 extern "C"
+int CkGetSrcPe(void *msg)
+{
+  return UsrToEnv(msg)->getSrcPe();
+}
+
+extern "C"
 void CkGetChareID(CkChareID *pCid) {
   pCid->onPE = CkMyPe();
   pCid->objPtr = CpvAccess(_currentChare);

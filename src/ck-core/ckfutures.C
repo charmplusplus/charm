@@ -126,7 +126,7 @@ class  FutureMain : public Chare {
 };
 
 extern "C" 
-void *CkRemoteCallBranch(int ep, void *m, int group, int PE)
+void *CkRemoteBranchCall(int ep, void *m, int group, int PE)
 { 
   void * result;
   envelope *env = UsrToEnv(m);
