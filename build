@@ -135,7 +135,7 @@ done
 
 [ "x$VERSION" = "x" ] && syntax
 	
-[ -d $src/$BASEVERSION ] || syntax
+[ -f $src/$BASEVERSION/conv-mach.h ] || syntax
 
 #generate VERSION name combining all options.
 if test -n "$MORE"
