@@ -153,12 +153,21 @@ static void call_cblist_keep(ccd_cblist *l)
 static void call_cblist_remove(ccd_cblist *l)
 {
   int i, len = l->len, idx;
+#if 0
   for(i=0, idx=l->first;i<len;i++) {
     int old = CmiSwitchToPE(l->elems[idx].cb.pe);
     (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg);
     CmiSwitchToPE(old);
     idx = l->elems[idx].next;
   }
+#else
+  for(i=0, idx=l->last;i<len;i++) {
+    int old = CmiSwitchToPE(l->elems[idx].cb.pe);
+    (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg);
+    CmiSwitchToPE(old);
+    idx = l->elems[idx].prev;
+  }
+#endif
   remove_n_elems(l,len);
 }
 
