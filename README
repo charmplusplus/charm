@@ -55,8 +55,7 @@ build <target> <version> [options ...] [charmc-options ...]
 
 Here is a table for choosing correct version, for the detailed explanation
 of the options see the comments following the table.
-(Note: this table doesn't necessarily include all the current supported version,
-run ./build in charm top directory to check the latest versions.)
+(Note: this isn't a complete list.  Run ./build for a complete listing)
 
 Charm version          OS        Communication     Compiler  
 -------------       ---------    --------------   --------------------
