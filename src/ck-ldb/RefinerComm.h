@@ -29,6 +29,20 @@ public:
   void Refine(int count, CentralLB::LDStats* stats, int* cur_p, int* new_p);
 
 private:
+  struct Messages {
+    int byteSent;
+    int msgSent;
+    int byteRecv; 
+    int msgRecv;
+    Messages() { clear(); }
+    void clear() { byteSent=msgSent=byteRecv=msgRecv=0; }
+    double cost() {
+      return msgSent * PER_MESSAGE_SEND_OVERHEAD + 
+             byteSent * PER_BYTE_SEND_OVERHEAD +
+             msgRecv * PER_MESSAGE_RECV_OVERHEAD + 
+             byteRecv * PER_BYTE_RECV_OVERHEAD;
+    }
+  };
   struct CommTable {
     int* msgSentCount; // # of messages sent by each PE
     int* msgRecvCount; // # of messages received by each PE
@@ -49,10 +63,14 @@ private:
   void assign(computeInfo *c, int p);
   void assign(computeInfo *c, processorInfo *p);
   void deAssign(computeInfo *c, processorInfo *pRec);
-  void commCost(int c, int pe, int &byteSent, int &msgSent, int &byteRecv, int &msgRecv);
   int refine();
   void computeAverageWithComm();
-  double commAffinity(int c, int pe);
+  void objCommCost(int c, int pe, Messages &m);
+  void commAffinity(int c, int pe, Messages &m);
+  inline void printLoad() {
+      for (int i=0; i<P; i++) CmiPrintf("%f ", processors[i].load);
+      CmiPrintf("\n");
+  }
 };
 
 #endif /* _REFINERCOMM_H_ */

@@ -28,17 +28,17 @@ void RefinerComm::create(int count, CentralLB::LDStats* _stats, int* procs)
   {
      	LDCommData &comm = cdata[i];
 	if (!comm.from_proc()) {
-	  // FIXME: only obj msg here
           // out going message
 	  int computeIdx = stats->getHash(comm.sender);
           CmiAssert(computeIdx >= 0 && computeIdx < numComputes);
           computes[computeIdx].sendmessages.push_back(i);
         }
 
+	// FIXME: only obj msg here
         // incoming messages
 	if (comm.receiver.get_type() == LD_OBJ_MSG)  {
           int computeIdx = stats->getHash(comm.receiver.get_destObj());
-          CmiAssert(computeIdx != -1);
+          CmiAssert(computeIdx >= 0 && computeIdx < numComputes);
           computes[computeIdx].recvmessages.push_back(i);
         }
   }
@@ -67,25 +67,25 @@ void RefinerComm::processorCommCost()
 
   for (int cidx=0; cidx < stats->n_comm; cidx++) {
     LDCommData& cdata = stats->commData[cidx];
-    int senderPE, receiverPE = -1;
+    int senderPE = -1, receiverPE = -1;
     if (cdata.from_proc())
       senderPE = cdata.src_proc;
     else {
       int idx = stats->getHash(cdata.sender);
       CmiAssert(idx != -1);
-      senderPE = stats->from_proc[idx];  //computes[idx].processor;	// object's original processor
+      senderPE = computes[idx].oldProcessor;	// object's original processor
     }
     switch (cdata.receiver.get_type()) {
     case LD_PROC_MSG:
       receiverPE = cdata.receiver.proc();
       break;
-    case LD_OBJ_MSG:  {  // object message FIXME add multicast
+    case LD_OBJ_MSG:  {
       int idx = stats->getHash(cdata.receiver.get_destObj());
       CmiAssert(idx != -1);
-      receiverPE = stats->from_proc[idx]; //computes[idx].processor;
+      receiverPE = computes[idx].oldProcessor;
       break;
       }
-    case LD_OBJLIST_MSG:
+    case LD_OBJLIST_MSG:    // object message FIXME add multicast
       break;
     }
     CmiAssert(senderPE != -1);
@@ -94,7 +94,13 @@ void RefinerComm::processorCommCost()
     {
        commTable->increase(true, senderPE, cdata.messages, cdata.bytes);
        commTable->increase(false, receiverPE, cdata.messages, cdata.bytes);
-     }
+    }
+  }
+  // recalcualte the cpu load
+  for (i=0; i<P; i++) 
+  {
+    processorInfo *p = &processors[i];
+    p->load = p->computeLoad + p->backgroundLoad + commTable->overheadOnPe(i);
   }
 }
 
@@ -105,38 +111,53 @@ void RefinerComm::assign(computeInfo *c, int processor)
 
 void RefinerComm::assign(computeInfo *c, processorInfo *p)
 {
+   int oldProc = c->processor;
    c->processor = p->Id;
    p->computeSet->insert((InfoRecord *) c);
    p->computeLoad += c->load;
 //   p->load = p->computeLoad + p->backgroundLoad;
    // add communication cost
-   int byteSent, msgSent, byteRecv, msgRecv;
-   commCost(c->Id, p->Id, byteSent, msgSent, byteRecv, msgRecv);
-   commTable->increase(true, p->Id, msgSent, byteSent);
-   commTable->increase(false, p->Id, msgRecv, byteRecv);
-   
+   Messages m;
+   objCommCost(c->Id, p->Id, m);
+   commTable->increase(true, p->Id, m.msgSent, m.byteSent);
+   commTable->increase(false, p->Id, m.msgRecv, m.byteRecv);
+
+//   CmiPrintf("Assign %d to %d commCost: %d %d %d %d \n", c->Id, p->Id, byteSent,msgSent,byteRecv,msgRecv);
+
+   commAffinity(c->Id, p->Id, m);
+   commTable->increase(false, p->Id, -m.msgSent, -m.byteSent);
+   commTable->increase(true, p->Id, -m.msgRecv, -m.byteRecv);   // reverse
+
+//   CmiPrintf("Assign %d to %d commAffinity: %d %d %d %d \n", c->Id, p->Id, -byteSent,-msgSent,-byteRecv,-msgRecv);
+
    p->load = p->computeLoad + p->backgroundLoad + commTable->overheadOnPe(p->Id);
 }
 
 void  RefinerComm::deAssign(computeInfo *c, processorInfo *p)
 {
-   c->processor = -1;
+//   c->processor = -1;
    p->computeSet->remove(c);
    p->computeLoad -= c->load;
 //   p->load = p->computeLoad + p->backgroundLoad;
-   int byteSent, msgSent, byteRecv, msgRecv;
-   commCost(c->Id, p->Id, byteSent, msgSent, byteRecv, msgRecv);
-   commTable->increase(true, p->Id, -msgSent, -byteSent);
-   commTable->increase(false, p->Id, -msgRecv, -byteRecv);
+   Messages m;
+   objCommCost(c->Id, p->Id, m);
+   commTable->increase(true, p->Id, -m.msgSent, -m.byteSent);
+   commTable->increase(false, p->Id, -m.msgRecv, -m.byteRecv);
    
+   commAffinity(c->Id, p->Id, m);
+   commTable->increase(true, p->Id, m.msgSent, m.byteSent);
+   commTable->increase(false, p->Id, m.msgRecv, m.byteRecv);
+
    p->load = p->computeLoad + p->backgroundLoad + commTable->overheadOnPe(p->Id);
 }
 
 // how much communication from compute c  to pe
-double RefinerComm::commAffinity(int c, int pe)
+// byteSent, msgSent are messages from object c to pe p
+// byteRecv, msgRecv are messages from pe p to obejct c
+void RefinerComm::commAffinity(int c, int pe, Messages &m)
 {
   int i;
-  int byteSent=0, msgSent=0, byteRecv=0, msgRecv=0;
+  m.clear();
   computeInfo &obj = computes[c];
 
   int nSendMsgs = obj.sendmessages.length();
@@ -158,8 +179,8 @@ double RefinerComm::commAffinity(int c, int pe)
       }  
     }
     if (sendtope) {
-      byteSent += cdata.bytes;
-      msgSent += cdata.messages;
+      m.byteSent += cdata.bytes;
+      m.msgSent += cdata.messages;
     }
   }  // end of for
 
@@ -175,21 +196,17 @@ double RefinerComm::commAffinity(int c, int pe)
       sendProc = computes[sendCompute].processor;
     }
     if (sendProc != -1 && sendProc == pe) {
-      byteRecv += cdata.bytes;
-      msgRecv += cdata.messages;
+      m.byteRecv += cdata.bytes;
+      m.msgRecv += cdata.messages;
     }
   }  // end of for
-  return msgSent  * PER_MESSAGE_SEND_OVERHEAD + 
-	 byteSent * PER_BYTE_SEND_OVERHEAD +
-	 msgRecv * PER_MESSAGE_RECV_OVERHEAD +
-	 byteRecv * PER_BYTE_RECV_OVERHEAD;
 }
 
 // assume c is on pe, how much comm overhead it will be?
-void RefinerComm::commCost(int c, int pe, int &byteSent, int &msgSent, int &byteRecv, int &msgRecv)
+void RefinerComm::objCommCost(int c, int pe, Messages &m)
 {
   int i;
-  byteSent=msgSent=byteRecv=msgRecv=0;
+  m.clear();
   computeInfo &obj = computes[c];
 
   // find out send overhead for every outgoing message that has receiver
@@ -216,8 +233,8 @@ void RefinerComm::commCost(int c, int pe, int &byteSent, int &msgSent, int &byte
       }  
     }
     if (diffPe) {
-      byteSent += cdata.bytes;
-      msgSent += cdata.messages;
+      m.byteSent += cdata.bytes;
+      m.msgSent += cdata.messages;
     }
   }  // end of for
 
@@ -236,8 +253,8 @@ void RefinerComm::commCost(int c, int pe, int &byteSent, int &msgSent, int &byte
       if (sendProc != -1 && sendProc != pe) diffPe = true;
     }
     if (diffPe) {	// sender is not pe
-      byteRecv += cdata.bytes;
-      msgRecv += cdata.messages;
+      m.byteRecv += cdata.bytes;
+      m.msgRecv += cdata.messages;
     }
   }  // end of for
 }
@@ -295,15 +312,21 @@ int RefinerComm::refine()
         }
 	//CkPrintf("c->load: %f p->load:%f overLoad*averageLoad:%f \n",
 	//c->load, p->load, overLoad*averageLoad);
-	double commgain = commAffinity(c->Id, p->Id) -
-			  commAffinity(c->Id, c->processor);
-	if ( c->load + p->load < overLoad*averageLoad) {
+        Messages m;
+        double commgain;
+        commAffinity(c->Id, p->Id, m);
+        commgain = m.cost();
+        commAffinity(c->Id, p->Id, m);
+        commgain -= m.cost();
+        objCommCost(c->Id, p->Id, m);
+        double commcost = m.cost();
+	if ( c->load + p->load + commcost < overLoad*averageLoad) {
 	  // iout << iINFO << "Considering Compute : " 
 	  //      << c->Id << " with load " 
 	  //      << c->load << "\n" << endi;
-	  if(c->load + commgain > bestSize) {
+	  if(c->load + commgain + commcost > bestSize) {
             //CmiPrintf("[%d] comm gain %f bestSize:%f\n", c->Id, commgain, bestSize);
-	    bestSize = c->load + commgain;
+	    bestSize = c->load + commgain + commcost ;
 	    bestCompute = c;
 	    bestP = p;
 	  }
@@ -325,14 +348,11 @@ int RefinerComm::refine()
       assign(bestCompute, bestP);
 
       // show the load
-      if (_lb_debug) {
-        for (i=0; i<P; i++) CmiPrintf("%f ", processors[i].load);
-        CmiPrintf("\n");
-      }
+      if (_lb_debug)  printLoad();
 
       // update commnication
       computeAverageWithComm();
-      if (_lb_debug) CmiPrintf("averageLoad: %f\n", averageLoad);
+      if (_lb_debug) CmiPrintf("averageLoad after assignment: %f\n", averageLoad);
     } else {
       finish = 0;
       break;
@@ -370,16 +390,18 @@ void RefinerComm::Refine(int count, CentralLB::LDStats* stats,
 
   create(count, stats, cur_p);
 
-  commTable->clear();
-
-  processorCommCost();
-
   int i;
   for (i=0; i<numComputes; i++)
     assign((computeInfo *) &(computes[i]),
            (processorInfo *) &(processors[computes[i].oldProcessor]));
 
+  commTable->clear();
+
+  // recalcualte the cpu load
+  processorCommCost();
+
   removeComputes();
+  if (_lb_debug)  printLoad();
 
   computeAverageWithComm();
   if (_lb_debug) CmiPrintf("averageLoad: %f\n", averageLoad);
