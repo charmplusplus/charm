@@ -17,12 +17,12 @@ PVT::PVT()
   localStats = (localStat *)CkLocalBranch(theLocalStats);
   localStats->TimerStart(GVT_TIMER);
 #endif
-  optPVT = conPVT = estGVT = -1;
+  optPVT = conPVT = estGVT = POSE_UnsetTS;
   simdone = 0;
   SendsAndRecvs = new SRtable();
   SendsAndRecvs->Initialize();
   waitForFirst = 0;
-  iterMin = -1;
+  iterMin = POSE_UnsetTS;
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif
@@ -41,34 +41,34 @@ void PVT::startPhase()
   objs.Wake(); // wake objects to make sure all have reported
 
   // compute PVT
-  optPVT = conPVT = -1;
+  optPVT = conPVT = POSE_UnsetTS;
   for (i=0; i<objs.getNumSpaces(); i++)
     if (objs.objs[i].isPresent()) {
       if (objs.objs[i].isOptimistic()) { // check optPVT 
 	if ((optPVT < 0) || ((objs.objs[i].getOVT() < optPVT) && 
-			     (objs.objs[i].getOVT() > -1))) {
+			     (objs.objs[i].getOVT() > POSE_UnsetTS))) {
 	  optPVT = objs.objs[i].getOVT();
 	  CkAssert((objs.objs[i].getOVT() >= estGVT) ||
-		   (objs.objs[i].getOVT() == -1));
+		   (objs.objs[i].getOVT() == POSE_UnsetTS));
 	}
       }
       else if (objs.objs[i].isConservative()) { // check conPVT
 	if ((conPVT < 0) || ((objs.objs[i].getOVT() < conPVT) && 
-			     (objs.objs[i].getOVT() > -1)))
+			     (objs.objs[i].getOVT() > POSE_UnsetTS)))
 	  conPVT = objs.objs[i].getOVT();
       }
-      CkAssert(simdone || (optPVT >= estGVT)||(optPVT == -1)||(estGVT == -1));
-      CkAssert(simdone || (conPVT >= estGVT)||(conPVT == -1)||(estGVT == -1));
+      CkAssert(simdone || (optPVT >= estGVT)||(optPVT == POSE_UnsetTS)||(estGVT == POSE_UnsetTS));
+      CkAssert(simdone || (conPVT >= estGVT)||(conPVT == POSE_UnsetTS)||(estGVT == POSE_UnsetTS));
     }
 
   // pack PVT data
   // (1) Find out the local PVT from optPVT and conPVT
   int pvt = optPVT;
-  if ((conPVT < pvt) && (conPVT > -1)) pvt = conPVT;
-  if ((iterMin < pvt) && (iterMin > -1)) pvt = iterMin;
+  if ((conPVT < pvt) && (conPVT > POSE_UnsetTS)) pvt = conPVT;
+  if ((iterMin < pvt) && (iterMin > POSE_UnsetTS)) pvt = iterMin;
   if (waitForFirst) {
     waitForFirst = 0;
-    SendsAndRecvs->Restructure(estGVT, pvt, -1);
+    SendsAndRecvs->Restructure(estGVT, pvt, POSE_UnsetTS);
   }
   // (2) Pack the SRtable data into the message
   UpdateMsg *um = SendsAndRecvs->PackTable(pvt);
@@ -85,7 +85,7 @@ void PVT::startPhase()
     gvtTurn = (gvtTurn + 1) % CkNumPes();  // calculate next GVT location
   }
   objs.SetIdle(); // Set objects to idle
-  iterMin = -1;
+  iterMin = POSE_UnsetTS;
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif
@@ -124,7 +124,7 @@ void PVT::objRemove(int pvtIdx)
 }
 
 /// Update send/recv table at timestamp
-void PVT::objUpdate(int timestamp, int sr)
+void PVT::objUpdate(POSE_TimeType timestamp, int sr)
 {
 #ifdef POSE_STATS_ON
   int tstat = localStats->TimerRunning();
@@ -133,9 +133,9 @@ void PVT::objUpdate(int timestamp, int sr)
   else
     localStats->TimerStart(GVT_TIMER);
 #endif
-  CmiAssert(simdone || (timestamp >= estGVT) || (estGVT == -1));
+  CmiAssert(simdone || (timestamp >= estGVT) || (estGVT == POSE_UnsetTS));
   CmiAssert((sr == SEND) || (sr == RECV));
-  if ((timestamp < iterMin) || (iterMin == -1)) iterMin = timestamp;
+  if ((timestamp < iterMin) || (iterMin == POSE_UnsetTS)) iterMin = timestamp;
   if (waitForFirst) {
     waitForFirst = 0;
     SendsAndRecvs->Restructure(estGVT, timestamp, sr);
@@ -152,18 +152,19 @@ void PVT::objUpdate(int timestamp, int sr)
 }
 
 /// Update PVT with safeTime and send/recv table at timestamp
-void PVT::objUpdate(int pvtIdx, int safeTime, int timestamp, int sr)
+void PVT::objUpdate(int pvtIdx, POSE_TimeType safeTime, POSE_TimeType timestamp, int sr)
 {
   int index = (pvtIdx-CkMyPe())/1000;
-  //CmiAssert((timestamp >= estGVT) || (timestamp == -1) || (estGVT == -1));
-  CmiAssert(simdone || (safeTime >= estGVT) || (safeTime == -1));
+
+  //CmiAssert((timestamp >= estGVT) || (timestamp == POSE_UnsetTS) || (estGVT == POSE_UnsetTS));
+  CmiAssert(simdone || (safeTime >= estGVT) || (safeTime == POSE_UnsetTS));
   // minimize the non-idle OVT
-  if ((safeTime > -1) && 
+  if ((safeTime > POSE_UnsetTS) && 
       ((objs.objs[index].getOVT() > safeTime) || 
        (objs.objs[index].getOVT() < 0)))
     objs.objs[index].setOVT(safeTime);
   //if ((sr == SEND) || (sr == RECV)) SendsAndRecvs->Insert(timestamp, sr);
-  // sr could be -1 in which case we just ignore it here
+  // sr could be POSE_UnsetTS in which case we just ignore it here
 }
 
 /// Basic Constructor
@@ -175,7 +176,7 @@ GVT::GVT()
 #ifdef LB_ON
   nextLBstart = LB_SKIP - 1;
 #endif
-  estGVT = lastEarliest = inactiveTime = -1;
+  estGVT = lastEarliest = inactiveTime = POSE_UnsetTS;
   lastSends = lastRecvs = inactive = 0;
   if (CkMyPe() == 0) { // start the PVT phase of the GVT algorithm
     CProxy_PVT p(ThePVT);
@@ -218,8 +219,8 @@ void GVT::computeGVT(UpdateMsg *m)
   CProxy_GVT g(TheGVT);
   GVTMsg *gmsg = new GVTMsg;
   int lastGVT = 0, i;
-  static int optGVT = -1, conGVT = -1, done=0;
-  static int earliestMsg=-1;
+  static int optGVT = POSE_UnsetTS, conGVT = POSE_UnsetTS, done=0;
+  static int earliestMsg=POSE_UnsetTS;
   static SRentry *SRs = NULL;
   static int startOffset = 0;
 
@@ -227,13 +228,13 @@ void GVT::computeGVT(UpdateMsg *m)
   if (m->runGVTflag == 1) done++;
   else {
     // see if message provides new min optGVT or conGVT
-    if ((optGVT < 0) || ((m->optPVT > -1) && (m->optPVT < optGVT)))
+    if ((optGVT < 0) || ((m->optPVT > POSE_UnsetTS) && (m->optPVT < optGVT)))
       optGVT = m->optPVT;
-    if ((conGVT < 0) || ((m->conPVT > -1) && (m->conPVT < conGVT)))
+    if ((conGVT < 0) || ((m->conPVT > POSE_UnsetTS) && (m->conPVT < conGVT)))
       conGVT = m->conPVT;
     // add send/recv info to SRs
     for (i=0; i<m->numEntries; i++) {
-      if ((m->SRs[i].timestamp < optGVT) || (optGVT == -1))
+      if ((m->SRs[i].timestamp < optGVT) || (optGVT == POSE_UnsetTS))
 	addSR(&SRs, m->SRs[i]);
       else i = m->numEntries;
     }
@@ -249,16 +250,16 @@ void GVT::computeGVT(UpdateMsg *m)
     startOffset = 1;
     lastGVT = estGVT; // store previous estimate
     if (lastGVT < 0) lastGVT = 0;
-    estGVT = -1;
+    estGVT = POSE_UnsetTS;
     
     // derive GVT estimate from min optimistic & conservative GVTs
     estGVT = optGVT;
-    if ((conGVT > -1) && (estGVT > -1) && (conGVT < estGVT))  estGVT = conGVT;
+    if ((conGVT > POSE_UnsetTS) && (estGVT > POSE_UnsetTS) && (conGVT < estGVT))  estGVT = conGVT;
 
     // Check if send/recv activity provides lower possible estimate
     SRentry *tmp = SRs;
-    int lastSR = -1;
-    while (tmp && ((tmp->timestamp < estGVT) || (estGVT == -1))) {
+    int lastSR = POSE_UnsetTS;
+    while (tmp && ((tmp->timestamp < estGVT) || (estGVT == POSE_UnsetTS))) {
       lastSR = tmp->timestamp;
       if (tmp->sends != tmp->recvs) {
 	earliestMsg = tmp->timestamp;
@@ -266,13 +267,13 @@ void GVT::computeGVT(UpdateMsg *m)
       }
       tmp = tmp->next;
     }
-    if ((earliestMsg < estGVT) && (earliestMsg != -1)) estGVT = earliestMsg;
-    if ((lastSR != -1) && (estGVT == -1) && (lastSR > lastGVT)) 
+    if ((earliestMsg < estGVT) && (earliestMsg != POSE_UnsetTS)) estGVT = earliestMsg;
+    if ((lastSR != POSE_UnsetTS) && (estGVT == POSE_UnsetTS) && (lastSR > lastGVT)) 
       estGVT = lastSR;
     
 
     // check for inactivity
-    if (((estGVT == lastGVT) || (estGVT < 0)) && (earliestMsg == -1)) {
+    if (((estGVT == lastGVT) || (estGVT < 0)) && (earliestMsg == POSE_UnsetTS)) {
       inactive++; 
       estGVT = lastGVT;
       if (inactive == 1) inactiveTime = lastGVT;
@@ -292,7 +293,7 @@ void GVT::computeGVT(UpdateMsg *m)
 
     // check for termination conditions
     int term = 0;
-    if ((estGVT >= POSE_endtime) && (POSE_endtime > -1)) {
+    if ((estGVT >= POSE_endtime) && (POSE_endtime > POSE_UnsetTS)) {
       CkPrintf("At endtime: %d\n", POSE_endtime);
       term = 1;
     }
@@ -305,7 +306,7 @@ void GVT::computeGVT(UpdateMsg *m)
     gmsg->estGVT = estGVT;
     gmsg->done = term;
     if (term) {
-      if (POSE_endtime > -1) gmsg->estGVT = POSE_endtime + 1;
+      if (POSE_endtime > POSE_UnsetTS) gmsg->estGVT = POSE_endtime + 1;
       else gmsg->estGVT++;
       CkPrintf("Final GVT = %d\n", gmsg->estGVT);
       p.setGVT(gmsg);
@@ -343,7 +344,7 @@ void GVT::computeGVT(UpdateMsg *m)
     }
 
     // reset static data
-    optGVT = conGVT = earliestMsg = -1;
+    optGVT = conGVT = earliestMsg = POSE_UnsetTS;
     SRentry *cur = SRs;
     SRs = NULL;
     while (cur) {

@@ -31,7 +31,7 @@ class HeapNode
       possible at expense of creating unbalanced tree */
   HeapNode *conjoin(HeapNode *h);           
   /// Remove heap node matching evID
-  int remove(eventID evID, int timestamp);  
+  int remove(eventID evID, POSE_TimeType timestamp);  
   /// Dump all data fields
   void dump();                 
   /// Pack/unpack/sizing operator
@@ -60,7 +60,7 @@ class EqHeap {
   /** Delete the node with event corresponding to evID and timestamp; 
       returns 1 if an event was successfully deleted, 0 if the event was not
       found in the heap */
-  int DeleteEvent(eventID evID, int timestamp);  
+  int DeleteEvent(eventID evID, POSE_TimeType timestamp);  
   /// Dump entire heap
   void dump();                      
   /// Pack/unpack/sizing operator

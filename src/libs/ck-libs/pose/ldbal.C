@@ -13,7 +13,7 @@ LBgroup::LBgroup(void)
 }
 
 // local methods
-int LBgroup::computeObjectLoad(int ovt, int eet, double rbOh, int sync, int gvt)
+int LBgroup::computeObjectLoad(POSE_TimeType ovt, POSE_TimeType eet, double rbOh, int sync, POSE_TimeType gvt)
 {
   // an object can score a max of 100 if it is the heaviest an object can be
   int offset = eet - gvt; 
@@ -27,7 +27,7 @@ int LBgroup::computeObjectLoad(int ovt, int eet, double rbOh, int sync, int gvt)
 int LBgroup::computePeLoad()
 {
   PVT *localPVT = (PVT *)CkLocalBranch(ThePVT);
-  int gvt = localPVT->getGVT();
+  POSE_TimeType gvt = localPVT->getGVT();
   peLoad = 0;
   for (int i=0; i<objs.numSpaces; i++)
     if (objs.objs[i].present) {
@@ -79,7 +79,7 @@ void LBgroup::objRemove(int arrayIdx)
   objs.Delete(idx);                   // delete the object
 }
 
-void LBgroup::objUpdate(int ldIdx, int ovt, int eet, int ne, double rbOh, 
+void LBgroup::objUpdate(int ldIdx, POSE_TimeType ovt, POSE_TimeType eet, int ne, double rbOh, 
 			int *srVec)
 {
   int idx = (ldIdx-CkMyPe())/1000; // calculate local idx from unique idx

@@ -3,7 +3,7 @@
 #include "pose.h"
 
 /// Insert an event at beginning of cancellations list
-void CancelList::Insert(int ts, eventID e) 
+void CancelList::Insert(POSE_TimeType ts, eventID e) 
 {
   CancelNode *newnode = new CancelNode(ts, e);
   count++;
@@ -29,7 +29,7 @@ CancelNode *CancelList::GetItem()
 /// Remove a specific cancellation from the list
 void CancelList::RemoveItem(CancelNode *item)
 {
-  int isEarliest = (item->timestamp == earliest);
+  POSE_TimeType isEarliest = (item->timestamp == earliest);
   CancelNode *tmp = cancellations;
   if (item == tmp) { // item is at front
     cancellations = cancellations->next;
@@ -69,9 +69,17 @@ int CancelList::IsEmpty()
 void CancelList::dump()
 {
   CancelNode *tmp = cancellations;
+#if USE_LONG_TIMESTAMPS
+  if (!tmp) CkPrintf("[[Earliest=%lld of %d CANCELS: NULL]\n", earliest, count);
+#else
   if (!tmp) CkPrintf("[[Earliest=%d of %d CANCELS: NULL]\n", earliest, count);
+#endif
   else {
+#if USE_LONG_TIMESTAMPS
+    CkPrintf("[Earliest=%lld of %d CANCELS: ", earliest, count);
+#else
     CkPrintf("[Earliest=%d of %d CANCELS: ", earliest, count);
+#endif
     while (tmp) {
       tmp->dump();
       tmp = tmp->next;

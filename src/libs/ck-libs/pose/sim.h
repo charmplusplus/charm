@@ -25,7 +25,8 @@ class sim; // needed for eventMsg definition below
 class eventMsg : public CMessage_eventMsg {
 public:
   /// The event's timestamp
-  int timestamp;  
+
+  POSE_TimeType timestamp;  
   /// The event's globally unique ID
   eventID evID;   
   /// The message size, used for message recycling (currently not used)
@@ -45,12 +46,11 @@ public:
   /// Timestamps this message and generates a unique event ID
   /** Timestamps this message and generates a unique event ID for the event
       to be invoked on the receiving side.  Sets the priority of this
-      message to timestamp - INT_MAX. */
-  void Timestamp(int t) { 
+      message to timestamp - POSE_TimeMax. */
+
+  void Timestamp(POSE_TimeType t) { 
     timestamp = t;  evID = GetEventID();  
-#ifdef PRIO_MSGS
-    setPriority(t-INT_MAX); 
-#endif
+    setPriority(t-POSE_TimeMax); 
     rst = 0.0;
   }
   /// Assignment operator: copies priority too
@@ -61,9 +61,7 @@ public:
     str = obj.str;
     msgSize = obj.msgSize;
     rst = obj.rst;
-#ifdef PRIO_MSGS    
-    setPriority(timestamp-INT_MAX);
-#endif
+    setPriority(timestamp-POSE_TimeMax); 
     return *this;
   }
   /// Allocates event message with space for priority
@@ -75,11 +73,7 @@ public:
       return localPool->GetBlock(size);
     else {
 #endif
-#ifdef PRIO_MSGS
-      void *msg = CkAllocMsg(CMessage_eventMsg::__idx, size, 8*sizeof(int));
-#else
-      void *msg = CkAllocMsg(CMessage_eventMsg::__idx, size, 0);
-#endif
+      void *msg = CkAllocMsg(CMessage_eventMsg::__idx, size, 8*sizeof(POSE_TimeType));
       ((eventMsg *)msg)->msgSize = size;
       return msg;
 #ifdef MSG_RECYCLING
@@ -101,9 +95,14 @@ public:
       CkFreeMsg(p);
   }
   /// Set priority field and queuing strategy
-  void setPriority(int prio) {  
+  void setPriority(POSE_TimeType prio) {
+#if USE_LONG_TIMESTAMPS
+    memcpy(((POSE_TimeType *)CkPriorityPtr(this)),&prio,sizeof(POSE_TimeType));
+    CkSetQueueing(this, CK_QUEUEING_LFIFO);
+#else
     *((int*)CkPriorityPtr(this)) = prio;
     CkSetQueueing(this, CK_QUEUEING_IFIFO);
+#endif
   }
 };
 
@@ -115,18 +114,24 @@ public:
   eventID evID;
   /// Timestamp of event to be cancelled
   /** Providing this makes finding the event faster */
-  int timestamp;          
+  POSE_TimeType timestamp;          
   /// Allocate cancellation message with priority field
   void *operator new (size_t size) {  
-    return CkAllocMsg(CMessage_cancelMsg::__idx, size, 8*sizeof(int));
+    return CkAllocMsg(CMessage_cancelMsg::__idx, size, 8*sizeof(POSE_TimeType));
   } 
   /// Delete cancellation message
   void operator delete(void *p) {  CkFreeMsg(p);  }
   /// Set priority field and queuing strategy
-  void setPriority(int prio) {
+  void setPriority(POSE_TimeType prio) {
+#if USE_LONG_TIMESTAMPS
+    memcpy(((POSE_TimeType *)CkPriorityPtr(this)),&prio,sizeof(POSE_TimeType));
+    CkSetQueueing(this, CK_QUEUEING_LFIFO);
+#else
     *((int*)CkPriorityPtr(this)) = prio;
     CkSetQueueing(this, CK_QUEUEING_IFIFO);
+#endif
   }
+
 };
 
 /// Prioritized null msg; used to sort Step calls
@@ -134,14 +139,20 @@ class prioMsg : public CMessage_prioMsg {
 public:
   /// Allocate prioritized message with priority field
   void *operator new (size_t size) {
-    return CkAllocMsg(CMessage_eventMsg::__idx, size, 8*sizeof(int));
+    return CkAllocMsg(CMessage_eventMsg::__idx, size, 8*sizeof(POSE_TimeType));
   }
   /// Delete prioritized message
   void operator delete(void *p) {  CkFreeMsg(p);  }
   /// Set priority field and queuing strategy
-  void setPriority(int prio) {
+  void setPriority(POSE_TimeType prio) {
+#if USE_LONG_TIMESTAMPS
+    memcpy(((POSE_TimeType *)CkPriorityPtr(this)),&prio,sizeof(POSE_TimeType));
+    CkSetQueueing(this, CK_QUEUEING_LFIFO);
+#else
     *((int*)CkPriorityPtr(this)) = prio;
     CkSetQueueing(this, CK_QUEUEING_IFIFO);
+
+#endif
   }
 };
 
@@ -189,7 +200,7 @@ class sim : public ArrayElement1D {
   /// Number of sends/recvs per PE
   int *srVector;    
   /// Most recent GVT estimate
-  int lastGVT;
+  POSE_TimeType lastGVT;
   /// Relative start time, start time, end time and current time
   /** Used to calculate degree of parallelism */
   double st, et, ct;
@@ -271,7 +282,7 @@ class sim : public ArrayElement1D {
       whatever the user wishes. */
   virtual void ResolveCommitFn(int fnIdx, void *msg) { }
   /// Notify the PVT of a message send
-  void registerSent(int timestamp) {
+  void registerSent(POSE_TimeType timestamp) {
     localPVT->objUpdate(timestamp, SEND);
   }
   /// Used for buffered output

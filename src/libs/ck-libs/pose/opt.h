@@ -40,8 +40,8 @@ public:
   /** Safe time is the earliest timestamp that this object can generate given
       its current state (assuming no stragglers, cancellations or events
       are subsequently received */
-  int SafeTime() {  
-    int ovt=userObj->OVT(), theTime=-1, ec=parent->cancels.getEarliest(),
+  POSE_TimeType SafeTime() {  
+    POSE_TimeType ovt=userObj->OVT(), theTime=-1, ec=parent->cancels.getEarliest(),
       gvt=localPVT->getGVT(), worktime = eq->currentPtr->timestamp;
     // Object is idle; report -1
     if (!RBevent && (ec < 0) && (worktime < 0) && (ovt <= gvt))  return -1;
@@ -52,7 +52,7 @@ public:
     return theTime;
   }
   /// Add spawned event to current event's spawned event list
-  void AddSpawnedEvent(int AnObjIdx, eventID evID, int ts) { 
+  void AddSpawnedEvent(int AnObjIdx, eventID evID, POSE_TimeType ts) { 
     eq->AddSpawnToCurrent(AnObjIdx, evID, ts);
   }
   /// Send cancellation messages to all of event e's spawned events
@@ -65,7 +65,7 @@ public:
       m = new cancelMsg(); // build a cancel message
       m->evID = ev->evID;
       m->timestamp = ev->timestamp;
-      m->setPriority(m->timestamp - INT_MAX);
+      m->setPriority(m->timestamp - POSE_TimeMax);
       localPVT->objUpdate(ev->timestamp, SEND);
       //CkPrintf("Cancelling spawned event "); ev->evID.dump(); CkPrintf("\n");
       POSE_Objects[ev->objIdx].Cancel(m); // send the cancellation

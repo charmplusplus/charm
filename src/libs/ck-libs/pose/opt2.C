@@ -4,7 +4,7 @@
 void opt2::Step()
 {
   Event *ev;
-  static int lastGVT = -1;
+  static POSE_TimeType lastGVT = POSE_UnsetTS;
 
   lastGVT = localPVT->getGVT();
   if (!parent->cancels.IsEmpty()) { // Cancel as much as possible
@@ -29,8 +29,8 @@ void opt2::Step()
   // Prepare to execute an event
   ev = eq->currentPtr;
   if ((ev->timestamp >= 0) && 
-      ((POSE_endtime == -1) || (ev->timestamp <= POSE_endtime))){
-    int fix_time = ev->timestamp;
+      ((POSE_endtime == POSE_UnsetTS) || (ev->timestamp <= POSE_endtime))){
+    POSE_TimeType fix_time = ev->timestamp;
     while (ev->timestamp == fix_time) {
       // do all events at the first available timestamp
       currentEvent = ev;
@@ -42,7 +42,7 @@ void opt2::Step()
     }
     if (eq->currentPtr->timestamp >= 0) { // if more events, schedule the next
       prioMsg *pm = new prioMsg;
-      pm->setPriority(eq->currentPtr->timestamp-INT_MAX);
+      pm->setPriority(eq->currentPtr->timestamp-POSE_TimeMax);
       POSE_Objects[parent->thisIndex].Step(pm);
     }
   }

@@ -41,7 +41,8 @@ void con::Step()
 void con::CancelEvents() 
 {
   Event *ev;
-  int found, eGVT = localPVT->getGVT();
+  int found;
+  POSE_TimeType eGVT = localPVT->getGVT();
   CancelNode *it, *last;
 
   last = parent->cancels.GetItem();     // make note of last item to be examined

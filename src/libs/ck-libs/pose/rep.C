@@ -12,7 +12,7 @@ void rep::init(eventMsg *m)
   anti_methods = 0;
 }
 
-void rep::update(int t, double rt) 
+void rep::update(POSE_TimeType t, double rt) 
 { 
   ovt = (ovt < t) ? t : ovt;
   parent->eq->currentPtr->svt = ovt;
@@ -23,7 +23,7 @@ void rep::update(int t, double rt)
 }
 
 /// Timestamps event message, sets priority, and records in spawned list
-void rep::registerTimestamp(int idx, eventMsg *m, unsigned int offset)
+void rep::registerTimestamp(int idx, eventMsg *m, POSE_TimeType offset)
 {
   PVT *localPVT = (PVT *)CkLocalBranch(ThePVT);
   CmiAssert(ovt+offset >= localPVT->getGVT());

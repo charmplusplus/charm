@@ -14,7 +14,7 @@ class SpawnedEvent {
   /// Handle of the object the spawned event was sent to
   int objIdx;
   /// Timestamp of the spawned event
-  int timestamp;
+  POSE_TimeType timestamp;
   /// Event ID of the spawned event
   eventID evID;           
   /// Next spawned event in list
@@ -22,7 +22,7 @@ class SpawnedEvent {
   /// Basic Constructor
   SpawnedEvent() { objIdx = timestamp = -1; next = NULL; }
   /// Initializing constructor
-  SpawnedEvent(int idx, eventID e, int ts, SpawnedEvent *n) {
+  SpawnedEvent(int idx, eventID e, POSE_TimeType ts, SpawnedEvent *n) {
     objIdx = idx;  evID = e;  timestamp = ts;  next = n;
   }
   /// Pack/unpack/sizing operator
@@ -37,11 +37,11 @@ class Event {
   /// The event method index associated with this event
   int fnIdx;      
   /// The timestamp of this event
-  int timestamp;    
+  POSE_TimeType timestamp;    
   /// Execution status: 0=not done, 1=done, 2=executing
   int done;         
   /// Virtual start and end time
-  int svt, evt;
+  POSE_TimeType svt, evt;
   /// Real start and end time
   double srt, ert;
   /// Length of commitBfr

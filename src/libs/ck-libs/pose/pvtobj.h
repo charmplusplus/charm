@@ -10,7 +10,7 @@
     processor. */
 class pvtObjectNode {
   /// Last reported safe time of poser
-  int ovt;
+  POSE_TimeType ovt;
   /// Index of poser in POSE_Objects array
   int index;  
   /// Flag to indicate if object data is stored at this index

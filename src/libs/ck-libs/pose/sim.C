@@ -56,9 +56,9 @@ void sim::Step()
     myStrat->Step();
     break;
   case OPT3_T: // prioritize this step call if work exists
-    if (eq->currentPtr->timestamp > -1) {
+    if (eq->currentPtr->timestamp > POSE_UnsetTS) {
       pm = new prioMsg;
-      pm->setPriority(eq->currentPtr->timestamp-INT_MAX);
+      pm->setPriority(eq->currentPtr->timestamp-POSE_TimeMax);
       POSE_Objects[thisIndex].Step(pm);
     }
     break;
@@ -111,7 +111,7 @@ void sim::Commit()
 #endif
   if (localPVT->getGVT() > lastGVT) {
     lastGVT = localPVT->getGVT();
-    if (localPVT->done() && (POSE_endtime == -1)) { // simulation inactive
+    if (localPVT->done() && (POSE_endtime == POSE_UnsetTS)) { // simulation inactive
       eq->CommitEvents(this, -1); // commit all events in queue
       objID->terminus(); // call terminus on all posers
     }
@@ -140,7 +140,7 @@ void sim::ReportLBdata()
 
   if (DOs-UNDOs == 0) rbOh = 1.0;
   else rbOh = ((double)DOs)/((double)(DOs-UNDOs));
-  while (tmp->timestamp > -1) {
+  while (tmp->timestamp > POSE_UnsetTS) {
     numEvents++;
     tmp = tmp->next;
   }

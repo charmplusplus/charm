@@ -15,7 +15,7 @@ class rep
   strat *myStrat;          
  public:
   /// The object's virtual time (OVT)
-  int ovt;
+  POSE_TimeType ovt;
   /// The object's real time (ORT)
   double ort;
   /// the object's unique handle
@@ -31,15 +31,15 @@ class rep
     anti_methods = 0;
   }
   /// Initializing Constructor
-  rep(int init_ovt) { ovt = init_ovt; ort = 0.0; copy = 0; anti_methods = 0; }
+  rep(POSE_TimeType init_ovt) { ovt = init_ovt; ort = 0.0; copy = 0; anti_methods = 0; }
   /// Destructor
   virtual ~rep() { }
   /// Initializer called from poser wrapper constructor
   void init(eventMsg *m);  
   /// Return the OVT
-  int OVT() { return ovt; }
+  POSE_TimeType OVT() { return ovt; }
   /// Set the OVT to t
-  void SetOVT(int t) { ovt = t; }
+  void SetOVT(POSE_TimeType t) { ovt = t; }
   /// Make object use anti-methods rather than checkpointing
   void useAntimethods() { anti_methods = 1; }
   /// Make object use checkpointing rather than anti-methods
@@ -47,17 +47,17 @@ class rep
   /// Check if this object uses anti-methods rather than checkpointing
   int usesAntimethods() { return anti_methods; }
   /// Elapse time by incrementing the OVT by dt
-  void elapse(int dt) { ovt += dt; }
+  void elapse(POSE_TimeType dt) { ovt += dt; }
   /// Update the OVT and ORT at event start to auto-elapse to event timestamp
   /** If event has timestamp > OVT, OVT elapses to timestamp, otherwise
       there is no change to OVT. ORT updates similarly. */
-  void update(int t, double rt);
+  void update(POSE_TimeType t, double rt);
   /// Called on every object at end of simulation
   virtual void terminus() { 
     //CkPrintf("Object %d terminus at time %d\n", myHandle, ovt);
   }
   /// Timestamps event message, sets priority, and records in spawned list
-  virtual void registerTimestamp(int idx, eventMsg *m, unsigned int offset);
+  virtual void registerTimestamp(int idx, eventMsg *m, POSE_TimeType offset);
   /// Assignment operator
   /** Derived classes must provide assignment */
   virtual rep& operator=(const rep& obj) { 
@@ -68,7 +68,11 @@ class rep
     return *this;
   }
   /// Dump all data fields
+#if USE_LONG_TIMESTAMPS
+  virtual void dump() { CkPrintf("[REP: ovt=%lld]\n", ovt); }
+#else
   virtual void dump() { CkPrintf("[REP: ovt=%d]\n", ovt); }
+#endif
   /// Pack/unpack/sizing operator
   /** Derived classes must provide pup */
   virtual void pup(PUP::er &p) { 

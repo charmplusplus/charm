@@ -57,7 +57,7 @@ class strat
   /// Strategy-specific event cancellation
   virtual void CancelEvents() { }  
   /// Calculate safe time (earliest time at which object can generate events)
-  virtual int SafeTime() { return userObj->OVT(); }
+  virtual POSE_TimeType SafeTime() { return userObj->OVT(); }
   /// Set rollback point to event e
   void ResetRBevent(Event *e) { 
     if (!RBevent) RBevent = e; 

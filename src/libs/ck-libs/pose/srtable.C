@@ -26,7 +26,7 @@ void SRtable::Initialize()
 
 /// Insert send/recv record sr at timestamp ts
 /* NOTE: buckets roughly ordered with decreasing timestamps */
-void SRtable::Insert(int ts, int sr)
+void SRtable::Insert(POSE_TimeType ts, int sr)
 {
   //sanitize();
   CmiAssert(ts >= offset);
@@ -65,7 +65,7 @@ void SRtable::Insert(SRentry *e)
 /// Restructure the table according to new GVT estimate and first send/recv
 /** Number of buckets and bucket size are determined from firstTS, and
     entries below newGVTest are discarded. */
-void SRtable::Restructure(int newGVTest, int firstTS, int firstSR)
+void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS, int firstSR)
 {
   //sanitize();
   //CkPrintf("SRtable::Restructure(%d, %d, %d)\n", newGVTest, firstTS, firstSR);
@@ -104,7 +104,7 @@ void SRtable::Restructure(int newGVTest, int firstTS, int firstSR)
 }
 
 /// Compress and pack table into an UpdateMsg and return it
-UpdateMsg *SRtable::PackTable(int pvt)
+UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
 {
   //sanitize();
   int packSize = 0, nEntries = 0, entryIdx = 0, nBkts = 0;
@@ -144,7 +144,7 @@ UpdateMsg *SRtable::PackTable(int pvt)
 }
 
 /// CompressAndSort all buckets with timestamps <= pvt
-void SRtable::PartialSortTable(int pvt)
+void SRtable::PartialSortTable(POSE_TimeType pvt)
 {
   //sanitize();
   int sortall = 0, sortTo,

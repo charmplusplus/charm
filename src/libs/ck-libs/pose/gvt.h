@@ -26,9 +26,9 @@ class UpdateMsg : public CMessage_UpdateMsg {
 public:
   /// PVT of local optimistic objects
   /** Used to send estimated GVT from one GVT invocation to next */
-  int optPVT;
+  POSE_TimeType optPVT;
   /// PVT of local conservative objects
-  int conPVT;
+  POSE_TimeType conPVT;
   /// # sends/recvs at particular timestamps <= PVT
   SRentry *SRs;
   /// Count of entries in SRs
@@ -36,7 +36,7 @@ public:
   /// Inactive status (GVT only)
   int inactive;
   /// Inactive time (GVT only)
-  int inactiveTime;
+  POSE_TimeType inactiveTime;
   /// Iterations of GVT since last LB (GVT only)
   int nextLB;
   /// Flag used by runGVT to call computeGVT indicating readiness
@@ -47,7 +47,7 @@ public:
 class GVTMsg : public CMessage_GVTMsg {
 public:
   /// GVT estimate
-  int estGVT;
+  POSE_TimeType estGVT;
   /// Termination flag
   int done;
 };
@@ -62,15 +62,15 @@ class PVT : public Group {
   localStat *localStats;
 #endif
   /// PVT of local optimistic posers
-  int optPVT;
+  POSE_TimeType optPVT;
   /// PVT of local conservative posers
-  int conPVT;
+  POSE_TimeType conPVT;
   /// Last GVT estimate
-  int estGVT;       
+  POSE_TimeType estGVT;       
   /// Simulation termination flag
   int simdone;
   /// Minimum send/recv timestamp in this iteration
-  int iterMin;
+  POSE_TimeType iterMin;
   /// Flag to indicate waiting for first send/recv of next iteration
   /** Used to indicate when to restructure the SendsAndRecvs table */
   int waitForFirst;
@@ -89,7 +89,7 @@ class PVT : public Group {
       for fossil collection and forward execution with new GVT estimate. */
   void setGVT(GVTMsg *m);            
   /// Returns GVT estimate
-  int getGVT() { return estGVT; }    
+  POSE_TimeType getGVT() { return estGVT; }    
   /// Returns termination flag
   int done() { return simdone; }
   /// Register poser with PVT
@@ -97,9 +97,9 @@ class PVT : public Group {
   /// Unregister poser from PVT
   void objRemove(int pvtIdx);
   /// Update send/recv table at timestamp
-  void objUpdate(int timestamp, int sr); 
+  void objUpdate(POSE_TimeType timestamp, int sr); 
   /// Update PVT with safeTime and send/recv table at timestamp
-  void objUpdate(int pvtIdx, int safeTime, int timestamp, int sr);
+  void objUpdate(int pvtIdx, POSE_TimeType safeTime, POSE_TimeType timestamp, int sr);
 };
 
 /// GVT chare group for estimating GVT
@@ -111,15 +111,15 @@ private:
   localStat *localStats;
 #endif
   /// Latest GVT estimate
-  int estGVT; 
+  POSE_TimeType estGVT; 
   /// Inactivity status: number of iterations since GVT has changed
   int inactive;
   /// Time at which GVT last went inactive
-  int inactiveTime;
+  POSE_TimeType inactiveTime;
   /// Number of GVT iterations since last LB run
   int nextLBstart; 
   /// Earliest send/recv timestamp in previous GVT invocation
-  int lastEarliest;
+  POSE_TimeType lastEarliest;
   /// Number of sends at lastEarliest
   int lastSends;
   /// Number of receives at lastEarliest

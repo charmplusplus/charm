@@ -5,7 +5,7 @@
 void opt::Step()
 {
   Event *ev;
-  static int lastGVT = -1;
+  static POSE_TimeType lastGVT = POSE_UnsetTS;
 
   lastGVT = localPVT->getGVT();
   if (!parent->cancels.IsEmpty()) { // Cancel as much as possible
@@ -29,15 +29,15 @@ void opt::Step()
 
   // Execute an event
   ev = eq->currentPtr;
-  if (ev->timestamp > -1) {
+  if (ev->timestamp > POSE_UnsetTS) {
     currentEvent = ev;
     ev->done = 2;
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it
     ev->done = 1; // complete the event execution
     eq->ShiftEvent(); // shift to next event
-    if (eq->currentPtr->timestamp > -1) { // if more events, schedule the next
+    if (eq->currentPtr->timestamp > POSE_UnsetTS) { // if more events, schedule the next
       prioMsg *pm = new prioMsg;
-      pm->setPriority(eq->currentPtr->timestamp-INT_MAX);
+      pm->setPriority(eq->currentPtr->timestamp-POSE_TimeMax);
       POSE_Objects[parent->thisIndex].Step(pm);
     }
   }
@@ -128,7 +128,7 @@ void opt::CancelEvents()
       if (ev == eq->back()) ev = ev->prev;
       if (ev->timestamp <= it->timestamp) {
 	// search forward for 'it' from currentPtr to backPtr
-	while (!found && (ev->timestamp > -1) && 
+	while (!found && (ev->timestamp > POSE_UnsetTS) && 
 	       (ev->timestamp <= it->timestamp)) {
 	  if (ev->evID == it->evID) found = 1; // found it
 	  else ev = ev->next;
@@ -145,7 +145,7 @@ void opt::CancelEvents()
 	ev = eq->currentPtr; // set search start point
 	if (ev == eq->back()) ev = ev->prev;
 	if (ev->timestamp >= it->timestamp) { // search backward
-	  while (!found && (ev->timestamp > -1) && 
+	  while (!found && (ev->timestamp > POSE_UnsetTS) && 
 		 (ev->timestamp >= it->timestamp)) {
 	    if (ev->evID == it->evID)  found = 1; // found it
 	    else ev = ev->prev;
@@ -196,7 +196,7 @@ void opt::CancelEvents()
       eq->DeleteEvent(recoveryPoint); // delete the targetEvent
       targetEvent = NULL;
       // currentPtr may have unexecuted events in front of it
-      while ((eq->currentPtr->prev->timestamp > -1) 
+      while ((eq->currentPtr->prev->timestamp > POSE_UnsetTS) 
 	     && (eq->currentPtr->prev->done == 0))
 	eq->currentPtr = eq->currentPtr->prev;
 #ifdef POSE_STATS_ON

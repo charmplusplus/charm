@@ -59,7 +59,7 @@ HeapNode *HeapNode::conjoin(HeapNode *h)
 }
 
 /// Remove heap node matching evID
-int HeapNode::remove(eventID evID, int timestamp)
+int HeapNode::remove(eventID evID, POSE_TimeType timestamp)
 {
   CmiAssert(this != NULL);
   CmiAssert(!(this->e->evID == evID));
@@ -187,7 +187,7 @@ Event *EqHeap::GetAndRemoveTopEvent()
 }
 
 /// Delete event from heap
-int EqHeap::DeleteEvent(eventID evID, int timestamp)
+int EqHeap::DeleteEvent(eventID evID, POSE_TimeType timestamp)
 {
   int result;
   if (!top || (timestamp < top->e->timestamp))

@@ -8,7 +8,7 @@ CpvDeclare(int, stateRecovery);
 extern int comm_debug;
 #endif
 double busyWait;
-int POSE_endtime;
+POSE_TimeType POSE_endtime;
 
 // Main initialization for all of POSE
 void POSE_init()
@@ -60,11 +60,11 @@ void POSE_useID()
 {
   CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
   POSE_Coordinator.IDon();
-  POSE_endtime = -1;
+  POSE_endtime = POSE_UnsetTS;
 }
 
 /// Use a user-specified end time to terminate program
-void POSE_useET(int et) 
+void POSE_useET(POSE_TimeType et) 
 {
   CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
   POSE_Coordinator.ETon();

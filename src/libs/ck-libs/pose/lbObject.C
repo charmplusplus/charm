@@ -87,7 +87,7 @@ void lbObjects::Delete(int idx)
     firstEmpty = idx;
 }
 
-void lbObjects::UpdateEntry(int idx, int ovt, int eet, int ne, double rbOh, 
+void lbObjects::UpdateEntry(int idx, POSE_TimeType ovt, POSE_TimeType eet, int ne, double rbOh, 
 			    int *srVec)
 {
   if (objs[idx].present) {

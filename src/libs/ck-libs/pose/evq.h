@@ -18,7 +18,7 @@ class eventQueue {
   /// Output file pointer for stats for DOP calculation
   FILE *fp;
   /// Keep track of last logged VT for this object so no duplicates are logged
-  int lastLoggedVT;
+  POSE_TimeType lastLoggedVT;
   /// Basic Constructor
   /** Creates front and back sentinel nodes, connects them, and inits pointers
       and heap. */
@@ -37,7 +37,7 @@ class eventQueue {
   /** If no more events, take one from heap */
   void ShiftEvent();               
   /// Commit (delete) events before target timestamp ts
-  void CommitEvents(sim *obj, int ts); 
+  void CommitEvents(sim *obj, POSE_TimeType ts); 
   /// Change currentPtr to point to event e
   /** Be very very careful with this -- avoid using if possible */
   void SetCurrentPtr(Event *e);
@@ -49,7 +49,7 @@ class eventQueue {
   const eventID& CurrentEventID() { return currentPtr->evID; }
   /// Add id, e and ts as an entry in currentPtr's spawned list
   /** The poser e was sent to is id */
-  void AddSpawnToCurrent(int id, eventID e, int ts);
+  void AddSpawnToCurrent(int id, eventID e, POSE_TimeType ts);
   /// Return the first entry in currentPtr's spawned list and remove it
   SpawnedEvent *GetNextCurrentSpawn();
   /// Dump the event queue

@@ -12,7 +12,7 @@ class UpdateMsg; // from gvt.h
 class SRentry {
  public:
   /// Timestamp of the message
-  int timestamp;  
+  POSE_TimeType timestamp;  
   /// The number of messages sent with theTimestamp
   int sends;
   /// The number of messages sent with theTimestamp
@@ -22,24 +22,24 @@ class SRentry {
   /// Basic constructor
   /** Initializes all data members */
   SRentry() { 
-    timestamp = -1; sends = recvs = 0; next = NULL; 
+    timestamp = POSE_UnsetTS; sends = recvs = 0; next = NULL; 
   }
   /// Initializing constructor 1
   /** Initializes timestamp & next w/parameters, sends & recvs to 0 */
-  SRentry(int ts, SRentry *p) { 
+  SRentry(POSE_TimeType ts, SRentry *p) { 
     timestamp = ts; sends = recvs = 0; next = p; 
   }
   /// Initializing constructor 2
   /** Initializes timestamp, send/recv count and next
       w/parameters */
-  SRentry(int ts, int sr, SRentry *p) {
+  SRentry(POSE_TimeType ts, int sr, SRentry *p) {
     timestamp = ts;  next = p; 
     if (sr == SEND) { sends = 1; recvs = 0; }
     else { sends = 0; recvs = 1; }
   }
   /// Initializing constructor
   /** Initializes timestamp and send/recv count w/parameters */
-  SRentry(int ts, int sr) {
+  SRentry(POSE_TimeType ts, int sr) {
     timestamp = ts;  next = NULL; 
     if (sr == SEND) { sends = 1; recvs = 0; }
     else { sends = 0; recvs = 1; }
@@ -59,12 +59,12 @@ class SRentry {
   }
   /// Check validity of data fields
   void sanitize() {
-    CmiAssert(timestamp >= -1); // should be -1 or > if initialized
+    CmiAssert(timestamp >= POSE_UnsetTS); // should be POSE_UnsetTS or > if initialized
     CmiAssert(sends >= 0);  // cannot be less than zero
     CmiAssert(recvs >= 0);  // cannot be less than zero
     if (next == NULL) return;   // next can be NULL
     // if next != NULL, check if pointer looks valid
-    int test_ts = next->timestamp;
+    POSE_TimeType test_ts = next->timestamp;
     int test_sendCount = next->sends;
     int test_recvCount = next->recvs;
     SRentry *test_next = next->next;
@@ -81,7 +81,7 @@ class SRtable {
  public:
   /// Base timestamp to index tables
   /** offset is the current GVT */
-  int offset;
+  POSE_TimeType offset;
   /// Number of buckets to sort sends/recvs into
   /** Recomputed with each new offset */
   int b;
@@ -109,17 +109,17 @@ class SRtable {
   /// Initialize table to a minimum size
   void Initialize();
   /// Insert send/recv record sr at timestamp ts
-  void Insert(int ts, int sr); 
+  void Insert(POSE_TimeType ts, int sr); 
   /// Insert an existing SRentry e
   void Insert(SRentry *e); 
   /// Restructure the table according to new GVT estimate and first send/recv
   /** Number of buckets and bucket size are determined from firstTS, and
       entries below newGVTest are discarded. */
-  void Restructure(int newGVTest, int firstTS, int firstSR);
+  void Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS, int firstSR);
   /// Compress and pack table into an UpdateMsg and return it
-  UpdateMsg *PackTable(int pvt);
+  UpdateMsg *PackTable(POSE_TimeType pvt);
   /// CompressAndSort all buckets with timestamps <= pvt
-  void PartialSortTable(int pvt);
+  void PartialSortTable(POSE_TimeType pvt);
   /// Compress a bucket so all SRentries have unique timestamps and are sorted
   void CompressAndSortBucket(int i, int is_overflow);
   /// Free all buckets and overflows, reset all counts

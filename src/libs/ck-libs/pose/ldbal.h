@@ -36,13 +36,13 @@ class LBgroup : public Group {  // Gathers load info locally on a single PE
   LBgroup(void);
   LBgroup(CkMigrateMessage *) { };
   // local methods
-  int computeObjectLoad(int ovt, int eet, double rbOh, int sync, int gvt);
+  int computeObjectLoad(POSE_TimeType ovt, POSE_TimeType eet, double rbOh, int sync, POSE_TimeType gvt);
   int computePeLoad();
   int findHeaviestUnder(int loadDiff, int prioLoad, int **mvObjs,
 			int pe, int *contrib);
   int objRegister(int arrayIdx, int sync, sim *myPtr);
   void objRemove(int arrayIdx);
-  void objUpdate(int ldIdx, int ovt, int eet, int ne, double rbOh, int *srVec);
+  void objUpdate(int ldIdx, POSE_TimeType ovt, POSE_TimeType eet, int ne, double rbOh, int *srVec);
   // entry methods
   void calculateLocalLoad(void);
   void balance(BalanceSpecs *);

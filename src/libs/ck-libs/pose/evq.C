@@ -13,7 +13,8 @@ eventQueue::eventQueue()
   eqh = new EqHeap();  // create the heap for incoming events
   // create the front sentinel node
   e = new Event();
-  e->timestamp = e->done = -1;
+  e->timestamp = POSE_UnsetTS;
+  e->done = -1;
   e->fnIdx = -99;
   e->msg = NULL;
   e->commitBfr = NULL;
@@ -23,7 +24,8 @@ eventQueue::eventQueue()
   frontPtr = e;
   // create the back sentinel node
   e = new Event();
-  e->timestamp = e->done = -1;
+  e->timestamp=POSE_UnsetTS;
+  e->done = -1;
   e->fnIdx = -100;
   e->msg = NULL;
   e->commitBfr = NULL;
@@ -98,7 +100,7 @@ void eventQueue::ShiftEvent() {
 }
 
 /// Commit (delete) events before target timestamp ts
-void eventQueue::CommitEvents(sim *obj, int ts)
+void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
 {
   //sanitize();
 #ifdef POSE_DOP_ON
@@ -117,7 +119,11 @@ void eventQueue::CommitEvents(sim *obj, int ts)
       if (lastLoggedVT >= commitPtr->svt)
 	commitPtr->svt = commitPtr->evt = -1;
       else lastLoggedVT = commitPtr->evt;
+#if USE_LONG_TIMESTAMPS
+      while (!fprintf(fp, "%f %f %lld %lld\n", commitPtr->srt, commitPtr->ert,
+#else
       while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert,
+#endif
 		      commitPtr->svt, commitPtr->evt)) {
 	fsetpos(fp, &fptr);
       }
@@ -145,15 +151,20 @@ void eventQueue::CommitEvents(sim *obj, int ts)
 	if (lastLoggedVT >= commitPtr->svt)
 	  commitPtr->svt = commitPtr->evt = -1;
 	else lastLoggedVT = commitPtr->evt;
+#if USE_LONG_TIMESTAMPS
+	while (!fprintf(fp, "%f %f %lld %lld\n", commitPtr->srt, commitPtr->ert,
+#else	
 	while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert,
+#endif
 			commitPtr->svt, commitPtr->evt)) {
+
 	  fsetpos(fp, &fptr);
 	}
 	fgetpos(fp, &fptr);
 	localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
 #endif
 	if (commitPtr->commitBfrLen > 0)  { // print buffered output
-	  CkPrintf("%s", commitPtr->commitBfr, ts, commitPtr->timestamp);
+	  CkPrintf("%s", commitPtr->commitBfr);
 	  if (commitPtr->commitErr) CmiAbort("Commit ERROR");
 	}
 	if (commitPtr->cpData) delete commitPtr->cpData;
@@ -217,7 +228,7 @@ void eventQueue::DeleteEvent(Event *ev)
 }
 
 /// Add id, e and ts as an entry in currentPtr's spawned list
-void eventQueue::AddSpawnToCurrent(int id, eventID e, int ts) 
+void eventQueue::AddSpawnToCurrent(int id, eventID e, POSE_TimeType ts) 
 {
   SpawnedEvent *newnode = new SpawnedEvent(id, e, ts, currentPtr->spawnedList);
   CmiAssert(currentPtr->done == 2);
@@ -238,7 +249,11 @@ void eventQueue::dump()
   Event *e = frontPtr;
   CkPrintf("[EVENTQUEUE: \n");
   while (e) {
+#if USE_LONG_TIMESTAMPS
+    CkPrintf("%lld[", e->timestamp); e->evID.dump(); CkPrintf("]");
+#else
     CkPrintf("%d[", e->timestamp); e->evID.dump(); CkPrintf("]");
+#endif
     if (e == frontPtr) CkPrintf("(FP)");
     if (e == currentPtr) CkPrintf("(CP)");
     if (e == backPtr) CkPrintf("(BP)");
@@ -295,7 +310,7 @@ void eventQueue::sanitize()
 {
   // check sentinel nodes
   CmiAssert(frontPtr != NULL);
-  CmiAssert(frontPtr->timestamp == -1);
+  CmiAssert(frontPtr->timestamp == POSE_UnsetTS);
   CmiAssert(frontPtr->done == -1);
   CmiAssert(frontPtr->fnIdx == -99);
   CmiAssert(frontPtr->msg == NULL);
@@ -305,7 +320,7 @@ void eventQueue::sanitize()
   CmiAssert(frontPtr->prev == NULL);
   CmiAssert(frontPtr->commitBfrLen == 0);
   CmiAssert(backPtr != NULL);
-  CmiAssert(backPtr->timestamp == -1);
+  CmiAssert(backPtr->timestamp == POSE_UnsetTS);
   CmiAssert(backPtr->done == -1);
   CmiAssert(backPtr->fnIdx == -100);
   CmiAssert(backPtr->msg == NULL);

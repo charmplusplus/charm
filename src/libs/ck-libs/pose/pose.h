@@ -5,8 +5,9 @@
 #ifndef POSE_H
 #define POSE_H
 
-#include "pose_config.h"
+
 #include "pose.decl.h"
+#include "pose_config.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -51,10 +52,12 @@ void POSE_start();
 /// Use Inactivity Detection to terminate program
 void POSE_useID();
 /// Simulation end time
-extern int POSE_endtime;
+
+extern POSE_TimeType POSE_endtime;
+
 /// Use a user-specified end time to terminate program
 /** Also uses inactivity detection in conjunction with end time */
-void POSE_useET(int et); 
+void POSE_useET(POSE_TimeType et); 
 /// Specify an optional callback to be called when simulation terminates
 void POSE_registerCallBack(CkCallback cb);
 /// Stop POSE simulation

@@ -11,15 +11,15 @@ class con : public strat {
  public:
   void initSync() { parent->sync = CONSERVATIVE; }
   virtual void Step();
-  int SafeTime() {  // computes the safe time for this object: the object in
+  POSE_TimeType SafeTime() {  // computes the safe time for this object: the object in
     // its current state cannot generate an event or cancellation earlier than
     // its safe time
-    int hightime = userObj->OVT(), lowtime;
+    POSE_TimeType hightime = userObj->OVT(), lowtime;
     
     if ((parent->cancels.getEarliest() < 0) 
 	&& (eq->currentPtr->timestamp < 0)
 	&& (userObj->OVT() <= localPVT->getGVT()))
-      return -1;  // this corresponds to an idle object; ignore its safe time
+      return POSE_UnsetTS;  // this corresponds to an idle object; ignore its safe time
     
     if (eq->currentPtr->timestamp > hightime)  // check next queued event
       hightime = eq->currentPtr->timestamp;

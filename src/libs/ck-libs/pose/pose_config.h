@@ -1,8 +1,10 @@
+
 /// POSE confgiuration parameters
 /** This code provides all the switches for control over adaptivity,
     communication, statistics gathering, load balancing, etc. */
 #ifndef POSE_CONFIG_H
 #define POSE_CONFIG_H
+#include <limits.h>
 /// Uncomment to gather and print POSE statistics set
 #define POSE_STATS_ON 1
 //#define POSE_DOP_ON 1
@@ -14,7 +16,7 @@
 //#define LB_ON 1
 #ifdef POSE_COMM_ON
 #include <StreamingStrategy.h>
-#include <DummyStrategy.h>
+#include <DummyStrategy.h> 
 #define COMM_TIMEOUT 5
 #define COMM_MAXMSG 5
 #endif 
@@ -39,5 +41,18 @@
 #define RECV 1
 #define OPTIMISTIC 0
 #define CONSERVATIVE 1
+#define USE_LONG_TIMESTAMPS 0
+
+#if USE_LONG_TIMESTAMPS 
+typedef CmiInt8 POSE_TimeType;
+const POSE_TimeType POSE_UnsetTS=-1LL;
+const POSE_TimeType POSE_TimeMax=9223372036854775807LL;
+#else
+typedef int POSE_TimeType;
+const POSE_TimeType POSE_UnsetTS=-1;
+const POSE_TimeType POSE_TimeMax=INT_MAX;
+#endif
+
+
 
 #endif
