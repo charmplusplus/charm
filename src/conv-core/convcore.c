@@ -1386,6 +1386,7 @@ static void CcsStringHandlerFn(char *msg)
       hdlrID = list->hdlr;
       break;
     }
+    list = list->next;
   }
   if(list==0) CmiAbort("Invalid Service Request\n");
   while(*msg != '\n') msg++;
