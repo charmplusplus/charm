@@ -523,6 +523,12 @@ int      CmiNumSpanTreeChildren  CMK_PROTO((int)) ;
 int      CmiSpanTreeParent       CMK_PROTO((int)) ;
 void     CmiSpanTreeChildren     CMK_PROTO((int node, int *children)) ;
 
+/******** Node level Trees *********************/
+int      CmiNodeSpanTreeRoot         CMK_PROTO(()) ;
+int      CmiNumNodeSpanTreeChildren  CMK_PROTO((int)) ;
+int      CmiNodeSpanTreeParent       CMK_PROTO((int)) ;
+void     CmiNodeSpanTreeChildren     CMK_PROTO((int node, int *children)) ;
+
 /****** MULTICAST GROUPS ******/
 
 typedef CMK_MULTICAST_GROUP_TYPE CmiGroup;
