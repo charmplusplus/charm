@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1995-11-07 22:58:56  jyelon
+ * Revision 1.2  1995-11-08 00:28:52  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.1  1995/11/07  22:58:56  jyelon
  * Initial revision
  *
  * Revision 1.7  1995/10/31  20:38:39  jyelon
@@ -65,14 +68,14 @@
 /* #define CMK_CTHINIT_IS_IN_CONVERSEINIT */
 #define CMK_CTHINIT_IS_IN_MAIN
 
-/* #define CMK_CSDEXITSCHEDULER_IS_A_FUNCTION */
-#define CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG
+/* #define CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG */
+#define CMK_CSDEXITSCHEDULER_IS_A_FUNCTION
 
 /* #define CMK_COMMHANDLE_IS_AN_INTEGER */
 #define CMK_COMMHANDLE_IS_A_POINTER
  
-/* #define CMK_USES_SPECIAL_CMIDELIVERS */ 
-#define CMK_USES_COMMON_CMIDELIVERS
+/* #define CMK_USES_COMMON_CMIDELIVERS */
+#define CMK_USES_SPECIAL_CMIDELIVERS
 
 /* #define CMK_NO_SHARED_VARS_AT_ALL */
 /* #define CMK_SHARED_VARS_EXEMPLAR */
