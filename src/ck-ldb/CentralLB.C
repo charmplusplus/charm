@@ -719,11 +719,12 @@ int CentralLB::useMem() {
 
 static inline int i_abs(int c) { return c>0?c:-c; }
 
+// assume integer is 32 bits
 inline static int ObjKey(const LDObjid &oid, const int hashSize) {
   // make sure all positive
-  return ((i_abs(oid.id[0])<<16)
-	 |(i_abs(oid.id[1])<<8)
-	 |i_abs(oid.id[2])) % hashSize;
+  return (((i_abs(oid.id[2]) & 0x7F)<<24)
+	 |((i_abs(oid.id[1]) & 0xFF)<<16)
+	 |i_abs(oid.id[0])) % hashSize;
 }
 
 void CentralLB::LDStats::makeCommHash() {
