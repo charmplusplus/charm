@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.27  1995-11-15 16:48:16  sanjeev
+ * Revision 2.28  1996-03-22 15:58:56  sanjeev
+ * added "class chare : public _CK_Object" for non-translator version
+ *
+ * Revision 2.27  1995/11/15 16:48:16  sanjeev
  * same as previous msg
  *
  * Revision 2.26  1995/11/15  16:45:28  sanjeev
@@ -328,6 +331,9 @@ public:
 	}
 } ;
 
+
+/* for use in the non-translator version */
+class chare : public _CK_Object {} ;
 
 
 class groupmember : public _CK_Object {  /* top level BOC object */
