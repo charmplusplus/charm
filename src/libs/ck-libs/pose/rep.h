@@ -31,25 +31,28 @@ class rep
   int copy;                
   /// Checkpointed seed for POSE_rand
   unsigned int prand_seed;
+  /// Checkpointed 48-bit seed to support uniform and linear rand
+  unsigned short int prand48_seed[3];
   /// Flag indicating this object uses anti-methods rather than checkpoints
   int anti_methods;
   /// Basic Constructor
   rep() { 
     ovt = 0; ort = 0.0; copy = 0; parent = NULL; myStrat = NULL; 
     anti_methods = 0;
-#ifndef SEQUENTIAL_POSE
-#ifdef POSE_COMM_ON    
+  #ifndef SEQUENTIAL_POSE
+  #ifdef POSE_COMM_ON    
     POSE_Objects = POSE_Objects_RO;
     ComlibDelegateProxy(&POSE_Objects);
-#endif
-#endif
+  #endif
+  #endif
   }
   /// Initializing Constructor
   rep(POSE_TimeType init_ovt) { 
     ovt = init_ovt; ort = 0.0; copy = 0; anti_methods = 0;
-  }
+      }
   /// Destructor
-  virtual ~rep() { }
+  virtual ~rep() {
+     }
   /// Initializer called from poser wrapper constructor
   void init(eventMsg *m);
   /// Return the OVT
@@ -82,6 +85,9 @@ class rep
     myHandle = obj.myHandle;
     anti_methods = obj.anti_methods;
     prand_seed = obj.prand_seed;
+    prand48_seed[0]=obj.prand48_seed[0];
+    prand48_seed[1]=obj.prand48_seed[1];
+    prand48_seed[2]=obj.prand48_seed[2];
     return *this;
   }
   /// Dump all data fields
@@ -93,7 +99,7 @@ class rep
   /// Pack/unpack/sizing operator
   /** Derived classes must provide pup */
   virtual void pup(PUP::er &p) { 
-    p(ovt); p(ort); p(myHandle); p(copy); p(anti_methods); p(prand_seed);
+    p(ovt); p(ort); p(myHandle); p(copy); p(anti_methods); p(prand48_seed,3);
   }
 #ifdef SEQUENTIAL_POSE
   void checkpoint(rep *) { }
@@ -102,6 +108,10 @@ class rep
   void POSE_srand(unsigned int pseed) { prand_seed = pseed; }
   int POSE_rand() { int rnum; srand(prand_seed); rnum = rand(); prand_seed = rnum+INT_MAX; return rnum; }
   unsigned int POSE_urand() { int rnum; srand(prand_seed); rnum = rand(); prand_seed = rnum+INT_MAX; return prand_seed; }
+
+ inline long int POSE_Linear_rand() { return nrand48(prand48_seed); }
+ inline double POSE_Uniform_rand() { return erand48(prand48_seed); }
+
 };
 
 #endif
