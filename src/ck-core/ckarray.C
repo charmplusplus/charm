@@ -550,9 +550,21 @@ void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep)
 
 void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx)
 {
-	CProxyElement_ArrayBase bp(aID,idx);
-	bp.ckSend((CkArrayMessage *)msg,entryIndex);
+  CkArrayMessage *m=(CkArrayMessage *)msg;
+  m->array_index()=idx;
+  msg_prepareSend(m,entryIndex,aID);
+  CkArray *a=(CkArray *)_localBranch(aID);
+  a->deliverViaQueue(m);
 }
+void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx)
+{
+  CkArrayMessage *m=(CkArrayMessage *)msg;
+  m->array_index()=idx;
+  msg_prepareSend(m,entryIndex,aID);
+  CkArray *a=(CkArray *)_localBranch(aID);
+  a->deliver(m);
+}
+
 
 /*********************** CkArray Reduction *******************/
 CkArrayReducer::CkArrayReducer(CkReductionMgr *mgr_) 
