@@ -133,8 +133,10 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
     return;
   }
 
+/*
   gm_set_alarm (gmport, &gmalarm, (gm_u64_t) pollMs*1000, alarmcallback,
                     (void *)NULL );
+*/
   e = gm_blocking_receive_no_spin(gmport);
   /* have to handle this event now */
   CmiCommLock();
