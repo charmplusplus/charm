@@ -978,7 +978,18 @@ void CmiDelayImmediate();
 	CmiSetXHandler(msg,CmiGetHandler(msg)); \
 	CmiSetHandler(msg,CpvAccessOther(CmiImmediateMsgHandlerIdx,0)); \
      } while (0)
-int CmiImmIsRunning();
+/* 
+  for non smp and non intr based version, it returns immRunning
+  for smp, this doesnot matter - CkMyPe() comparasion normaly fails and
+           non threadsafe CqsEnqueueGeneral is avoided.
+*/
+#if CMK_NET_VERSION && ! CMK_SMP
+extern int immRunning;
+#  define CmiImmIsRunning()        (immRunning)
+#else
+#  define CmiImmIsRunning()        (0)
+#endif
+
 #else
 #  define CmiBecomeImmediate(msg) /* empty */
 #  define CmiImmIsRunning()       (0)
