@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-09-06 21:48:50  jyelon
+ * Revision 2.9  1995-09-07 05:24:58  gursoy
+ * necessary changes done related to CharmInitLoop--> handler fuction
+ *
+ * Revision 2.8  1995/09/06  21:48:50  jyelon
  * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
  *
  * Revision 2.7  1995/09/01  02:13:17  jyelon
@@ -315,7 +318,7 @@ ChareIDType *ReturnID;
       SetEnv_EP(env, Entry);
       SetEnv_msgType(env, BocInitMsg);
       trace_creation(GetEnv_msgType(env), Entry, env);
-      CkCheck_and_BroadcastNoFreeNoLdb(env);
+      CkCheck_and_BcastInitNFNL(env);
       /* env becomes the usrMsg, hence should not be freed by us */
       executing_boc_num = ProcessBocInitMsg(env);
       if (ReturnEP >= 0)
