@@ -45,7 +45,7 @@ FDECL void FTN_NAME(REFINE2D_INIT,refine2d_init)(void)
 }
 
 /******************** NewMesh *******************/
-CDECL void REFINE2D_NewMesh(int nEl,int nGhost,const int *conn,const int *gid,const int *boundaries)
+CDECL void REFINE2D_NewMesh(int nEl,int nGhost,int nnodes,const int *conn,const int *gid,const int *boundaries)
 {
   TCHARM_API_TRACE("REFINE2D_NewMesh", "refine");
   if (!CtvAccess(_refineChunk))

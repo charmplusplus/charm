@@ -40,9 +40,10 @@ void REFINE2D_Init(void);
  * (local number).
  * 
  * boundaries is the boundary flags for nodes. boundaries may be null,
- * if the user doesnt specify boundary flags
+ * if the user doesnt specify boundary flags.
+ * nnodes specifies the number of nodes 
  */
-void REFINE2D_NewMesh(int nEl,int nGhost,const int *conn,const int *gid,const int *boundaries);
+void REFINE2D_NewMesh(int nEl,int nGhost,int nnodes,const int *conn,const int *gid,const int *boundaries);
 
 /**
  * Refine the mesh so each element has, at most, the given desired area.
