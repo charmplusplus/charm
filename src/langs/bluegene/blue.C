@@ -638,7 +638,9 @@ void startVTimer()
   CmiAssert(tTIMERON == 0);
   tTIMERON = 1;
   if (cva(bgMach).timingMethod == BG_WALLTIME) {
-    tSTARTTIME = CmiWallTimer();
+    double ct = CmiWallTimer();
+    CmiAssert(ct >= tSTARTTIME);
+    tSTARTTIME = ct;
   }
   else if (cva(bgMach).timingMethod == BG_ELAPSE)
     tSTARTTIME = tCURRTIME;
@@ -667,6 +669,7 @@ void stopVTimer()
   if (cva(bgMach).timingMethod == BG_WALLTIME) {
     const double tp = CmiWallTimer();
     double inc = tp-tSTARTTIME;
+    CmiAssert(inc>=0.0);
     inc *= cva(bgMach).cpufactor;
     tCURRTIME += inc;
     tSTARTTIME = tp;
@@ -694,6 +697,7 @@ double BgGetTime()
     if (tTIMERON) {
       const double tp2= CmiWallTimer();
       double inc = tp2 - tSTARTTIME;
+      CmiAssert(inc>=0.0);
       inc *= cva(bgMach).cpufactor;
       tCURRTIME += inc;
       tSTARTTIME = tp2;
@@ -730,6 +734,7 @@ double BgGetTime()
 // moved to blue_logs.C
 double BgGetCurTime()
 {
+  ASSERT(tTHREADTYPE == WORK_THREAD);
   return tCURRTIME;
 }
 
@@ -948,6 +953,8 @@ CmiStartFn bgMain(int argc, char **argv)
   if (CmiGetArgFlagDesc(argv, "+bgcorrect", "Apply timestamp correction to logs"))
     correctTimeLog = 1;
   if (correctTimeLog) genTimeLog = 1;
+  if (CmiGetArgFlagDesc(argv, "+bgverbose", "Print debug info verbosely"))
+    bgverbose = 1;
 
   // for timing method, default using elapse calls.
   if(CmiGetArgFlagDesc(argv, "+bgwalltime", 
@@ -1018,6 +1025,7 @@ CmiStartFn bgMain(int argc, char **argv)
     CmiPrintf("BG info> Simulating %dx%dx%d nodes with %d comm + %d work threads each.\n", cva(bgMach).x, cva(bgMach).y, cva(bgMach).z, cva(bgMach).numCth, cva(bgMach).numWth);
     CmiPrintf("BG info> Network type: %s.\n", cva(bgMach).network->name());
     cva(bgMach).network->print();
+    CmiPrintf("BG info> cpufactor is %f.\n", cva(bgMach).cpufactor);
     if (cva(bgMach).stacksize)
       CmiPrintf("BG info> BG stack size: %d bytes. \n", cva(bgMach).stacksize);
     if (cva(bgMach).timingMethod == BG_ELAPSE) 
