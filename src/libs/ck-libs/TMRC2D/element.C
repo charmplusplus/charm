@@ -213,20 +213,17 @@ void element::collapse(int shortEdge)
   double length = 
     C->theNodes[nodes[keepNode]].distance(C->theNodes[nodes[delNode]]);
   CkPrintf("TMRC2D: LOCKing opnode=%d\n", nodes[opnode]);
-  int aResult = nodeLockup(C->theNodes[nodes[opnode]], edges[delEdge], edges[keepEdge], delNbr, length);
+  int aResult = nodeLockup(C->theNodes[nodes[opnode]], edges[keepEdge], edges[keepEdge], keepNbr, length);
   if (aResult == 0) return;
   if ((aResult == -1) && (delNbr.cid != -1)) {
-    aResult = nodeLockup(C->theNodes[nodes[opnode]], edges[keepEdge], edges[delEdge], keepNbr, length);
-    if (aResult == 0) {
-      // unlock requester side of kNode
-      int junkResult = nodeUpdate(C->theNodes[nodes[opnode]],edges[keepEdge],delNbr,C->theNodes[nodes[opnode]]);
+    intMsg *im = mesh[keepNbr.cid].nodeLockup(keepNbr.idx, C->theNodes[nodes[opnode]], edges[keepEdge], edges[keepEdge], delNbr, length);
+    if (im->anInt == 0) {
+      int junkResult = nodeUpdate(C->theNodes[nodes[opnode]],edges[keepEdge],keepNbr,C->theNodes[nodes[opnode]]);
       return;
     }
   }
 
-  node newNode = 
-    C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
-
+  node newNode;
   result = edges[shortEdge].collapse(myRef, C->theNodes[nodes[keepNode]],
 				     C->theNodes[nodes[delNode]], keepNbr,
 				     delNbr, edges[keepEdge], edges[delEdge], 
@@ -235,6 +232,8 @@ void element::collapse(int shortEdge)
   if (result == 1) {
     // collapse successful; keepNode is node to keep
     // tell delNbr to replace delEdge with keepEdge
+    newNode = 
+      C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
     CkPrintf("In collapse[%d](a) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], nodes[delNode], nodes[keepNode], delNbr.idx, keepNbr.idx);
     if (delNbr.cid != -1)
       mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
@@ -264,6 +263,8 @@ void element::collapse(int shortEdge)
     // tell delNbr to replace delEdge with keepEdge
     keepNbr = edges[keepEdge].getNbr(myRef);
     delNbr = edges[delEdge].getNbr(myRef);
+    newNode = 
+      C->theNodes[nodes[keepNode]].midpoint(C->theNodes[nodes[delNode]]);
     CkPrintf("In collapse[%d](b) shortEdge=%d delEdge=%d keepEdge=%d opnode=%d delNode=%d keepNode=%d delNbr=%d keepNbr=%d\n", myRef.idx, edges[shortEdge].idx, edges[delEdge].idx, edges[keepEdge].idx, nodes[opnode], nodes[delNode], nodes[keepNode], delNbr.idx, keepNbr.idx);
     if (delNbr.cid != -1)
       mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 

@@ -58,40 +58,32 @@ class node {  // a 2D double coordinate
   double X() { return x; }
   double Y() { return y; }
   int lock(double l, edgeRef e) { 
-    CkPrintf("TMRC2D: Try lock %d on %d with l=%f of node %f,%f\n", e.idx, 
-	     e.cid, l, x, y);
     if (theLock == 0) {
       theLock = 1;
       lockLength = l;
       lockHolder = e;
-      CkPrintf("TMRC2D: Got lock %d on %d with l=%f node %f,%f\n", e.idx, 
-	     e.cid, l, x, y);
+      CkPrintf("TMRC2D: LOCK w/l=%f edge=%d node %f,%f\n", l, e.idx, x, y);
       return 1;
     }
     else if (e == lockHolder) {
-      CkPrintf("TMRC2D: Held lock %d on %d with l=%f node %f,%f\n", e.idx, 
-	     e.cid, l, x, y);
+      CkPrintf("TMRC2D: HOLD w/l=%f edge=%d node %f,%f\n", l, e.idx, x, y);
       return 1;
     }
     else if (e.cid == lockHolder.cid) {
-      CkPrintf("TMRC2D: Fail lock %d on %d with l=%f node %f,%f\n", e.idx, 
-	       e.cid, l, x, y);
+      CkPrintf("TMRC2D: FAIL w/l=%f edge=%d node %f,%f\n", l, e.idx, x, y);
       return 0;
     }
     else if (l >= lockLength) {
-      CkPrintf("TMRC2D: Fail lock %d on %d with l=%f node %f,%f\n", e.idx, 
-	       e.cid, l, x, y);
+      CkPrintf("TMRC2D: FAIL w/l=%f edge=%d node %f,%f\n", l, e.idx, x, y);
       return 0;
     }
     else if (l < lockLength) {
-      CkPrintf("TMRC2D: Spin for lock %d on %d with l=%f node %f,%f\n", e.idx, 
-		 e.cid, l, x, y);
+      CkPrintf("TMRC2D: SPIN w/l=%f edge=%d node %f,%f\n", l, e.idx, x, y);
       while (theLock) CthYield();
       theLock = 1;
       lockLength = l;
       lockHolder = e;
-      CkPrintf("TMRC2D: Got lock %d on %d with l=%f node %f,%f\n", e.idx, 
-	       e.cid, l, x, y);
+      CkPrintf("TMRC2D: LOCK w/l=%f edge=%d node %f,%f\n", l, e.idx, x, y);
       return 1;
     }
     CkPrintf("WARNING: node::lock: unhandled case.\n");

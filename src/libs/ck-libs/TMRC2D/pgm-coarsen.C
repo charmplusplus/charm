@@ -485,7 +485,7 @@ driver(void)
     CkPrintf("Entering timeloop\n");
   }	
   //  int tSteps=0x70FF00FF;
-  int tSteps=3;
+  int tSteps=2;
   int z=13;
   calcMasses(g);
   double startTime=CkWallTimer();
@@ -539,6 +539,10 @@ driver(void)
 	       myChunk,g.nnodes,g.nelems);
     }		    
     if (1) { //Publish data to the net
+      if (t==0) {
+	g.nelems = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_ELEM);
+	g.nnodes = FEM_Mesh_get_length(FEM_Mesh_default_read(),FEM_NODE);
+      }
       NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_POINTAT);
       int count=0;
       double *vcoord = new double[2*g.nnodes];
@@ -571,7 +575,7 @@ driver(void)
       delete [] vcoord;
       delete [] vconn;
       CkPrintf("Reported data to NetFEM!\n");
-      if (t==0) sleep(5);
+      if (t==0) sleep(50);
     }
   }
   

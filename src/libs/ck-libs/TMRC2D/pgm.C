@@ -461,19 +461,19 @@ CkPrintf("[%d] end init\n",myChunk);
   
   for (i=0;i<g.nelems;i++){
     checkTriangle(g,i);
-	}	
-	sleep(5);
+  }	
+  sleep(5);
   //Timeloop
   if (CkMyPe()==0){
     CkPrintf("Entering timeloop\n");
-	}	
-//  int tSteps=0x70FF00FF;
-  int tSteps=9;
-	calcMasses(g);
+  }	
+  //  int tSteps=0x70FF00FF;
+  int tSteps=100;
+  calcMasses(g);
   double startTime=CkWallTimer();
   double curArea=2.0e-5;
   for (int t=0;t<tSteps;t++) {
-/*    if (1) { //Structural mechanics
+    /*    if (1) { //Structural mechanics
     	//Compute forces on nodes exerted by elements
 			CST_NL(g.coord,g.conn,g.R_net,g.d,matConst,g.nnodes,g.nelems,g.S11,g.S22,g.S12);
 	
