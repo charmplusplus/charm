@@ -30,15 +30,18 @@ protected:
   LDBarrierReceiver receiver;
   int  notifier;
   int  startLbFnHdl;
+private:
+  void initLB(const CkLBOptions &);
 public:
-  BaseLB(const CkLBOptions &) ;
-  BaseLB(CkMigrateMessage *m):IrrGroup(m) { theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch(); }
+  BaseLB(const CkLBOptions &opt)  { initLB(opt); }
+  BaseLB(CkMigrateMessage *m):IrrGroup(m) {}
   virtual ~BaseLB();
+
   void unregister(); 
   inline char *lbName() { return lbname; }
   virtual void turnOff() { CmiAbort("turnOff not implemented"); }
   virtual void turnOn()  { CmiAbort("turnOn not implemented"); }
-  void pup(PUP::er &p){ IrrGroup::pup(p); }
+  void pup(PUP::er &p);
 };
 
 /// migration decision for an obj.

@@ -15,7 +15,7 @@
 
 #if CMK_LBDB_ON
 
-BaseLB::BaseLB(const CkLBOptions &opt) {
+void BaseLB::initLB(const CkLBOptions &opt) {
   seqno = opt.getSeqNo();
   CkpvAccess(numLoadBalancers) ++;
 /*
@@ -37,11 +37,27 @@ void BaseLB::unregister() {
   CkpvAccess(numLoadBalancers) --;
 }
 
+void BaseLB::pup(PUP::er &p) { 
+  IrrGroup::pup(p); 
+  p|seqno;
+  if (p.isUnpacking())
+  {
+    if (CkMyPe()==0) {
+      if (seqno!=-1) {
+        int newseq = LBDatabaseObj()->getLoadbalancerTicket();
+        CmiAssert(newseq == seqno);
+      }
+    }
+    initLB(seqno);
+  }
+}
+
 #else
 BaseLB::BaseLB(const CkLBOptions &) {}
 BaseLB::~BaseLB() {} 
 
 void BaseLB::unregister() {}
+void BaseLB::pup(PUP::er &p) {}
 #endif
 
 #include "BaseLB.def.h"
