@@ -392,7 +392,9 @@ public:
   void SendBroadcast(CkArrayMessage *msg);
   void RecvBroadcast(CkArrayMessage *msg);
   
+#if CMK_LBDB_ON
   LBDatabase *the_lbdb;
+#endif
 private:
 #if CMK_LBDB_ON
   LDBarrierClient dummyBarrierHandle;
