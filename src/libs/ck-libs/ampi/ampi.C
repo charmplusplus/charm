@@ -1261,7 +1261,6 @@ int MPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
               int tag, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("MPI_Irecv");
-
   ampiPersRequests *ptr = getPers();
   if(ptr->nirequests == 100) {
     CmiAbort("Too many Irecv requests.\n");

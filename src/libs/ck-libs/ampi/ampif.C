@@ -64,8 +64,6 @@ FDECL {
 #define mpi_group_range_excl FTN_NAME(MPI_GROUP_RANGE_EXCL, mpi_group_range_excl)
 #define mpi_group_free FTN_NAME(MPI_GROUP_FREE, mpi_group_free)
 #define mpi_comm_create FTN_NAME(MPI_COMM_CREATE, mpi_comm_create)
-#define mpi_checkpoint FTN_NAME(MPI_CHECKPOINT, mpi_checkpoint)
-#define mpi_restart FTN_NAME(MPI_RESTART, mpi_restart)
 #define mpi_abort FTN_NAME( MPI_ABORT , mpi_abort )
 #define mpi_print FTN_NAME( MPI_PRINT , mpi_print )
 #define mpi_migrate FTN_NAME( MPI_MIGRATE , mpi_migrate )
@@ -108,7 +106,7 @@ void mpi_ssend(void *msg, int *count, int *type, int *dest,
   *ierr = MPI_Ssend(msg, *count, *type, *dest, *tag, *comm);
 }
 
-void mpi_recv(void *msg, int *count, int *type, int *src, 
+void mpi_recv(void *msg, int *count, int *type, int *src,
   int *tag, int *comm, int *status, int *ierr)
 {
   *ierr = MPI_Recv(msg, *count, *type, *src, *tag, *comm, 
@@ -213,31 +211,31 @@ void mpi_type_contiguous(int *count, int *oldtype, int *newtype, int *ierr)
   *ierr = MPI_Type_contiguous(*count, *oldtype, newtype);
 }
 
-void mpi_type_vector(int *count, int *blocklength, int *stride, 
+void mpi_type_vector(int *count, int *blocklength, int *stride,
    int *oldtype, int*  newtype, int *ierr)
 {
   *ierr = MPI_Type_vector(*count, *blocklength, *stride, *oldtype, newtype);
 }
 
-void mpi_type_hvector(int *count, int *blocklength, int *stride, 
+void mpi_type_hvector(int *count, int *blocklength, int *stride,
    int* oldtype, int* newtype, int* ierr)
 {
   *ierr = MPI_Type_hvector(*count, *blocklength, *stride, *oldtype, newtype);
 }
 
-void mpi_type_indexed(int *count, int* arrBlength, int* arrDisp, 
+void mpi_type_indexed(int *count, int* arrBlength, int* arrDisp,
    int* oldtype, int*  newtype, int* ierr)
 {
   *ierr = MPI_Type_indexed(*count, arrBlength, arrDisp, *oldtype, newtype);
 }
 
-void mpi_type_hindexed(int* count, int* arrBlength, int* arrDisp, 
+void mpi_type_hindexed(int* count, int* arrBlength, int* arrDisp,
    int* oldtype, int* newtype, int* ierr)
 {
   *ierr = MPI_Type_hindexed(*count, arrBlength, arrDisp, *oldtype, newtype);
 }
 
-void mpi_type_struct(int* count, int* arrBlength, int* arrDisp, 
+void mpi_type_struct(int* count, int* arrBlength, int* arrDisp,
    int* oldtype, int* newtype, int* ierr)
 {
   *ierr = MPI_Type_struct(*count, arrBlength, arrDisp, oldtype, newtype);
@@ -264,17 +262,17 @@ void  mpi_type_size(int* type, int* size, int* ierr)
   *ierr = MPI_Type_size(*type, size);
 }
 
-void mpi_pack(void *inbuf, int *incount, int *datatype, void *outbuf, 
+void mpi_pack(void *inbuf, int *incount, int *datatype, void *outbuf,
     int *outsize, int *position, int *comm, int *ierr)
 {
-  *ierr = MPI_Pack(inbuf, *incount, (MPI_Datatype)*datatype, outbuf, 
+  *ierr = MPI_Pack(inbuf, *incount, (MPI_Datatype)*datatype, outbuf,
       *outsize, position, *comm);
 }
 
-void mpi_unpack(void *inbuf, int *insize, int *position, void *outbuf, 
+void mpi_unpack(void *inbuf, int *insize, int *position, void *outbuf,
     int *outcount, int *datatype, int *comm, int *ierr)
 {
-  *ierr = MPI_Unpack(inbuf, *insize, position, outbuf, *outcount, 
+  *ierr = MPI_Unpack(inbuf, *insize, position, outbuf, *outcount,
       (MPI_Datatype) *datatype, (MPI_Comm) *comm);
 }
 
@@ -329,7 +327,7 @@ void mpi_gather(void *sendbuf, int *sendcount, int *sendtype,
    void *recvbuf, int *recvcount, int *recvtype,
    int *root, int *comm, int *ierr)
 {
-  *ierr = MPI_Gather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount, 
+  *ierr = MPI_Gather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                       *recvtype, *root, *comm);
 }
 
@@ -360,6 +358,49 @@ void mpi_comm_free(int *comm, int *ierr)
 {
   AMPIAPI("ampi_comm_free");
   *ierr = 0;
+}
+
+void mpi_group_size(int* group, int* size, int* ierror){
+  *ierror = MPI_Group_size(*group, size);
+}
+void mpi_group_rank(int* group, int* rank, int* ierror){
+  *ierror = MPI_Group_rank(*group, rank);
+}
+void mpi_group_translate_ranks(int* group1, int* n, int* ranks1, int* group2, int* ranks2, int* ierror){
+  *ierror = MPI_Group_translate_ranks(*group1, *n, ranks1, *group2, ranks2);
+}
+void mpi_group_compare(int* group1, int* group2, int* result, int* ierror){
+  *ierror = MPI_Group_compare(*group1, *group2, result);
+}
+void mpi_comm_group(int* comm, int* group, int* ierror){
+  *ierror = MPI_Comm_group(*comm, group);
+}
+void mpi_group_union(int* group1, int* group2, int* newgroup, int* ierror){
+  *ierror = MPI_Group_union(*group1, *group2, newgroup);
+}
+void mpi_group_intersection(int* group1, int* group2, int* newgroup, int* ierror){
+  *ierror = MPI_Group_intersection(*group1, *group2, newgroup);
+}
+void mpi_group_difference(int* group1, int* group2, int* newgroup, int* ierror){
+  *ierror = MPI_Group_difference(*group1, *group2, newgroup);
+}
+void mpi_group_incl(int* group, int* n, int* ranks, int* newgroup, int* ierror){
+  *ierror = MPI_Group_incl(*group, *n, ranks, newgroup);
+}
+void mpi_group_excl(int* group, int* n, int* ranks, int* newgroup, int* ierror){
+  *ierror = MPI_Group_excl(*group, *n, ranks, newgroup);
+}
+void mpi_group_range_incl(int* group, int* n, int ranges[][3], int* newgroup, int* ierror){
+  *ierror = MPI_Group_range_incl(*group, *n, ranges, newgroup);
+}
+void mpi_group_range_excl(int* group,int*  n, int ranges[][3], int* newgroup, int* ierror){
+  *ierror = MPI_Group_range_excl(*group, *n, ranges, newgroup);
+}
+void mpi_group_free(int*  group, int*  ierror){
+  *ierror = 0;
+}
+void mpi_comm_create(int*  comm, int*  group, int*  newcomm, int*  ierror){
+  *ierror = MPI_Comm_create(*comm, *group, newcomm);
 }
 
 void mpi_abort(int *comm, int *errorcode, int *ierr)

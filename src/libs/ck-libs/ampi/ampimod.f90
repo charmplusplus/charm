@@ -54,8 +54,6 @@ module MPIINCL
    external MPI_Group_range_excl
    external MPI_Group_free
    external MPI_Comm_create
-   external MPI_Checkpoint
-   external MPI_Restart
    external MPI_Abort
    external MPI_Print
    external MPI_Migrate
