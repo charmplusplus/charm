@@ -748,6 +748,31 @@ then
 	esac
 fi
 
+if [ -n "$OVERRIDE_CC" ]
+then
+    CMK_CC="$OVERRIDE_CC"
+fi
+Debug "set 2"
+if [ -n "$OVERRIDE_CXX" ]
+then
+    CMK_CXX="$OVERRIDE_CXX"
+fi
+
+if [ -n "$OVERRIDE_F90" ]
+then
+    CMK_CF90="$OVERRIDE_F90"
+fi
+
+if [ -n "$OVERRIDE_LD" ]
+then
+    CMK_LD="$OVERRIDE_LD"
+fi
+
+if [ -n "$OVERRIDE_LDXX" ]
+then
+    CMK_LDXX="$OVERRIDE_LDXX"
+fi
+
 if [ -n "$USE_RELIABLE_CC" ]
 then
 	CMK_CC="$CMK_CC_RELIABLE"
@@ -804,35 +829,10 @@ then
     CMK_LDXX="$CMK_NATIVE_LDXX" 
 fi
 
-if [ -n "$OVERRIDE_CC" ]
-then
-    CMK_CC="$OVERRIDE_CC $CMK_CC "
-fi
-Debug "set 2"
-if [ -n "$OVERRIDE_CXX" ]
-then
-    CMK_CXX="$OVERRIDE_CXX $CMK_CXX "
-fi
-
-if [ -n "$OVERRIDE_F90" ]
-then
-    CMK_CF90="$OVERRIDE_F90 $CMK_CF90 "
-fi
-
-if [ -n "$OVERRIDE_LD" ]
-then
-    CMK_LD="$OVERRIDE_LD $CMK_LD"
-fi
-
 if [ -n "$PURIFY" ]
 then
     CMK_LD="purify $CMK_LD"
     CMK_LDXX="purify $CMK_LDXX"
-fi
-
-if [ -n "$OVERRIDE_LDXX" ]
-then
-    CMK_LDXX="$OVERRIDE_LDXX $CMK_LDXX"
 fi
 
 Debug "set 4"
