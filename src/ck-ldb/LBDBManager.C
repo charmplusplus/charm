@@ -273,7 +273,10 @@ void LBDB::Migrated(LDObjHandle h, int waitBarrier)
 {
   // Object migrated, inform load balancers
 
-  for(int i=0; i < migrateCBList.length(); i++) {
+  // subtle: callback may change (on) when switching LBs
+  // call in reverse order
+  //for(int i=0; i < migrateCBList.length(); i++) {
+  for(int i=migrateCBList.length()-1; i>=0; i--) {
     MigrateCB* cb = (MigrateCB*)migrateCBList[i];
     if (cb && cb->on) (cb->fn)(cb->data,h,waitBarrier);
   }
