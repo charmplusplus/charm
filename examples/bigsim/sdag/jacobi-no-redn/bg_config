@@ -1,0 +1,14 @@
+x 2
+y 2
+z 1
+cth 1
+wth 1
+#stacksize  4000
+#timing  walltime
+timing  bgelapse
+cpufactor   1.0
+traceroot     .
+log      yes
+correct  no
+network   bluegene
+

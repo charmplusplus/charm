@@ -4,7 +4,7 @@ CHARMC=../../../bin/charmc $(OPTS)
 all: jacobi
 
 jacobi: parallelJacobi.o
-	$(CHARMC) -language bgcharm++ -o jacobi parallelJacobi.o -tracemode bluegene #-tracemode projections  #-memory paranoid
+	$(CHARMC) -language bgcharm++ -o jacobi parallelJacobi.o #-tracemode projections  #-memory paranoid
 
 parallelJacobi.o: parallelJacobi.decl.h parallelJacobi.def.h parallelJacobi.h parallelJacobi.C
 	$(CHARMC) -c parallelJacobi.C 
@@ -40,7 +40,7 @@ large: jacobi
 	prun ./jacobi 128000 4 128000 +x40 +y40 +z20 +cth1 +wth1 +bgcorrect +stacksize 10000 +logsize 800000
 
 bglog: jacobi
-	./charmrun +p4 ./jacobi 16 10 4 +x2 +y2 +z1 +cth1 +wth1 +bglog
+	./charmrun +p4 ./jacobi 16 10 4 +bgconfig ./bg_config
 #	./charmrun +p4 ./jacobi 16 10 4 +x2 +y2 +z2 +cth1 +wth1 +bglog
 
 clean:
