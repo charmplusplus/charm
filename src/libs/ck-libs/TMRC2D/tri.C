@@ -871,11 +871,11 @@ void chunk::deriveEdges(int *conn, int *gid)
     for (j=0; j<3; j++) {
       n1localIdx = j;
       n2localIdx = (j+1) % 3;
-      CkPrintf("TMRC2D: [%d] Deriving edges for element %d between %d,%d (real nodes %d,%d)...\n", cid, i, n1localIdx, n2localIdx, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx]);
+      DEBUGREF(CkPrintf("TMRC2D: [%d] Deriving edges for element %d between %d,%d (real nodes %d,%d)...\n", cid, i, n1localIdx, n2localIdx, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx]);)
       // look for edge
       if (theElements[i].edges[j] == nullRef) { // the edge doesn't exist yet
 	// get nbr ref
-	CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d doesn't exist yet...\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx]);
+	DEBUGREF(CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d doesn't exist yet...\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx]);)
 	elemRef nbrRef;
 	int edgeIdx = getNbrRefOnEdge(theElements[i].nodes[n1localIdx], 
 				      theElements[i].nodes[n2localIdx], 
@@ -898,12 +898,13 @@ void chunk::deriveEdges(int *conn, int *gid)
 	}
 	// else edge will be made on a different chunk
         else { 
-	  CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d to be created elsewhere...\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx]);
+	  DEBUGREF(CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d to be created elsewhere...\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx]);)
 	  // mark the edge as non-boundary; will be filled later
 	  theElements[i].edges[j].idx = theElements[i].edges[j].cid = -2;
 	}
       }
-      else CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d exists at %d\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx], theElements[i].edges[j].idx);
+      else{ DEBUGREF(CkPrintf("TMRC2D: [%d] Edge between nodes %d,%d exists at %d\n", cid, theElements[i].nodes[n1localIdx], theElements[i].nodes[n2localIdx], theElements[i].edges[j].idx);)
+			}
     }
   }
   nodeSlots = numNodes;

@@ -7,6 +7,9 @@
 #include "ref.h"
 #define DIM 2
 
+//#define DBG(x) x
+#define DBG(x)
+
 class elemRef;
 class edgeRef;
 
@@ -181,8 +184,9 @@ class node {  // a 2D double coordinate
 	       ((mi.Y() >= m.Y()) && (mi.Y() <= y))));
   }
   void sanityCheck(int cid, int idx) {
-    if ((x == -1.0) && (y == -1.0))
-      CkPrintf("TMRC2D: [%d] node::sanityCheck WARNING: node %d has default coordinate values.\n", cid, idx);
+    if ((x == -1.0) && (y == -1.0)){
+      DBG(CkPrintf("TMRC2D: [%d] node::sanityCheck WARNING: node %d has default coordinate values.\n", cid, idx);)
+		}	
     if (theLock)
       CkAbort("TMRC2D: node::sanityCheck WARNING: node is locked.\n");
   }
