@@ -117,7 +117,7 @@ int CtgGlobalList::isUserSymbol(const char *name) {
     if((strncmp("_", name, 1) == 0) || (strncmp("Cpv_", name, 4) == 0)
        || (strncmp("Csv_", name, 4) == 0) || (strncmp("Ctv_", name, 4) == 0)
        || (strncmp("ckout", name, 5) == 0) || (strncmp("stdout", name, 6) == 0)
-       || (strncmp("stderr", name, 6) == 0))
+       || (strncmp("stderr", name, 6) == 0) || (strncmp("stdin", name, 5) == 0))
         return 0;
     
     return 1;
