@@ -60,7 +60,7 @@ int programExit = 0;
 
 static int bgstats_flag = 0;		// flag print stats at end of simulation
 
-static char *bgtraceroot = NULL;          // bgTraceFile prefix
+char *bgtraceroot = NULL;          // bgTraceFile prefix
 
 // for debugging log
 FILE *bgDebugLog;			// for debugging
