@@ -130,6 +130,7 @@ public:
   int array_size(void) { return numElements; };
   int num_local(void) { return numLocalElements; };
   int ckGetGroupId(void) { return thisgroup; }
+  ArrayElement *getElement(int idx) { return elementIDs[idx].element; }
 
   typedef enum {creating, here, moving_to, arriving, at} ElementState;
 

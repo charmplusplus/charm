@@ -30,10 +30,11 @@ class TempoMessage : public ArrayMessage, public CMessage_TempoMessage
 
 class Tempo 
 {
-  CmmTable tempoMessages;
-  int sleeping;
-  CthThread thread_id;
-  
+  protected:
+    CmmTable tempoMessages;
+    int sleeping;
+    CthThread thread_id;
+    
   public :
     Tempo();
     void ckTempoRecv(int tag, void *buffer, int buflen);
