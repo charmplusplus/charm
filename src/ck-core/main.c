@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.17  1995-09-20 14:24:27  jyelon
+ * Revision 2.18  1995-09-20 15:41:38  gursoy
+ * removed the if form handle incoming message
+ *
+ * Revision 2.17  1995/09/20  14:24:27  jyelon
  * *** empty log message ***
  *
  * Revision 2.16  1995/09/07  05:27:11  gursoy
@@ -113,7 +116,7 @@ static char ident[] = "@(#)$Header$";
 #include "performance.h"
 
 CHARE_BLOCK *GetBocBlockPtr();
-int HANDLE_INCOMING_MSG() ;
+
 extern void CkLdbSend();
 
 void mainModuleInit()
@@ -231,22 +234,32 @@ void CheckMagicNumber(CHARE_BLOCK *chare, ENVELOPE *env)
   }
 }
 
+
+
+
+/* This is the message handler for non-init messages during the
+   initialization phase. It simply buffers the messafe */
+void BUFFER_INCOMING_MSG(env)
+ENVELOPE *ENV;
+{
+
+   if (CpvAccess(CkInitPhase))
+      FIFO_EnQueue(CpvAccess(CkBuffQueue),(void *)env);
+   else
+      CmiPrintf("Error: BUFFER_INCOMING_MSG received an unexpected message\n");
+}
+
+
+
+
 /* This is the handler function for Charm and Charm++, which is called
    immediately when a message is received (from self or network) */
 
-HANDLE_INCOMING_MSG(env)
+void HANDLE_INCOMING_MSG(env)
 ENVELOPE *env;
 {
   CHARE_BLOCK *chare;
   int ep, type = GetEnv_msgType(env);  
-
-
-  /* temporary fix for messages arrived during initialization */
-  if (CpvAccess(CkInitPhase))
-  {
-      FIFO_EnQueue(CpvAccess(CkBuffQueue),(void *)env);
-      return;
-  }
 
   UNPACK(env);
   if (GetEnv_LdbFull(env))
