@@ -8,8 +8,14 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.1  1997-01-17 16:14:54  jyelon
- * The new network of solaris SMPs version.
+ * Revision 1.2  1997-02-06 20:00:03  jyelon
+ * Corrected.
+ *
+ * Revision 2.29  1997/02/06 19:55:19  jyelon
+ * Added new DGRAM parameters.
+ *
+ * Revision 2.28  1997/01/17 15:50:26  jyelon
+ * Minor adjustments to deal with recent changes to Common code.
  *
  * Revision 2.27  1996/11/23 02:25:39  milind
  * Fixed several subtle bugs in the converse runtime for convex
@@ -65,20 +71,24 @@
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
 #define CMK_DEFAULT_MAIN_USES_SIMULATOR_CODE               0
 
-#define CMK_DGRAM_BUF_SIZE                                 50000
 #define CMK_DGRAM_MAX_SIZE                                 2048
-#define CMK_DGRAM_WINDOW_SIZE                              24
+#define CMK_DGRAM_BUF_SIZE                                 50000
+#define CMK_DGRAM_WINDOW_SIZE                              50
+#define CMK_DGRAM_DELAY_RETRANSMIT                         (0.050)
+#define CMK_DGRAM_ACK_DELAY                                (0.025)
+#define CMK_DGRAM_ACK_MAXGROUP                             999
 
 #define CMK_FIX_HP_CONNECT_BUG                             0
 
-#define CMK_IS_HETERO                                      1
-
-#define CMK_MACHINE_NAME                                   "net-sol-smp"
+#define CMK_MACHINE_NAME                                   "net-sol"
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          1
 #define CMK_MALLOC_USE_OS_BUILTIN                          0
 
-#define CMK_MSG_HEADER_SIZE_BYTES                          4
+#define CMK_MSG_HEADER_SIZE_BYTES                         16
+#define CMK_MSG_HEADER_BLANK_SPACE                        12
+
+#define CMK_IS_HETERO                                      0
 
 #define CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION           0
 #define CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION  1
@@ -129,8 +139,8 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                1
 
-#define CMK_VECTOR_SEND_USES_COMMON_CODE                   0
-#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  1
+#define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
+#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
 
 #define CMK_WAIT_NOT_NEEDED                                0
 #define CMK_WAIT_USES_SYS_WAIT_H                           1
