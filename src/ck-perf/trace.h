@@ -76,7 +76,7 @@ public:
     void beginComputation(void) {ALLDO(beginComputation());}
     void endComputation(void) {ALLDO(endComputation());}
     void traceInit(char **argv) {ALLDO(traceInit(argv));}
-    int traceRegisterUserEvent(const char*x) {ALLDO(traceRegisterUserEvent(x));}
+    int traceRegisterUserEvent(const char*x) {ALLDO(traceRegisterUserEvent(x)); return 1;}
     void traceClearEps() {ALLDO(traceClearEps());}
     void traceWriteSts() {ALLDO(traceWriteSts());}
     void traceClose() {ALLDO(traceClose());}
