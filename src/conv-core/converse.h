@@ -389,9 +389,18 @@ extern void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr);
 #define CmiGetHandlerInfo(env) (CmiHandlerToInfo(CmiGetHandler(env)))
 #define CmiGetHandlerFunction(env) (CmiHandlerToFunction(CmiGetHandler(env)))
 
+/** This header goes before each chunk of memory allocated with CmiAlloc. 
+    See the comment in convcore.c for details on the fields.
+*/
+typedef struct {
+  int size;
+  int ref;
+} CmiChunkHeader;
+
 void    *CmiAlloc(int size);
-int      CmiSize(void *);
-void     CmiFree(void *);
+void     CmiReference(void *blk);
+int      CmiSize(void *blk);
+void     CmiFree(void *blk);
 
 #ifndef CMI_TMP_SKIP
 void *CmiTmpAlloc(int size);

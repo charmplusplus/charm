@@ -1504,11 +1504,22 @@ void CmiMulticastInit()
  * Subsequent chunks have a refcount which is less than zero.  This is
  * the offset back to the start of the first chunk.
  *
+ * Each chunk has a CmiChunkHeader before the user data, with the fields:
+ *
+ *  size: The user-allocated size of the chunk, in bytes.
+ *
+ *  ref: A magic reference count object. Ordinary blocks start with
+ *     reference count 1.  When the reference count reaches zero,
+ *     the block is deleted.  To support nested buffers, the 
+ *     reference count can also be negative, which means it is 
+ *     a byte offset to the enclosing buffer's reference count.
+ *
  ***************************************************************************/
 
 #define SIMPLE_CMIALLOC 0
 
 #if SIMPLE_CMIALLOC
+/* For debugging only: Avoids all madness of nested buffers. */
 void *CmiAlloc(int size)
 {
 	return malloc_nomigrate(size);
@@ -1522,7 +1533,7 @@ void CmiReference(void *blk)
 int CmiSize(void *blk)
 {
 	CmiAbort("CmiSize not supported!\n");
-	return 0;
+	return (int)0;
 }
 
 void CmiFree(void *blk)
@@ -1532,25 +1543,25 @@ void CmiFree(void *blk)
 
 #else /*!SIMPLE_CMIALLOC*/
 
-#define SIZEFIELD(m) ((int *)((char *)(m)-2*sizeof(int)))[0]
-#define REFFIELD(m) ((int *)((char *)(m)-sizeof(int)))[0]
-#define BLKSTART(m) ((char *)m-2*sizeof(int))
+/* Given a user chunk m, extract the enclosing chunk header fields: */
+#define SIZEFIELD(m) (((CmiChunkHeader *)(m))[-1].size)
+#define REFFIELD(m) (((CmiChunkHeader *)(m))[-1].ref)
+#define BLKSTART(m) (((CmiChunkHeader *)(m))-1)
 
-void *CmiAlloc(size)
-int size;
+void *CmiAlloc(int size)
 {
   char *res;
 
 #if CONVERSE_VERSION_ELAN
-  res = (char *) elan_CmiAlloc(size+2*sizeof(int));
+  res = (char *) elan_CmiAlloc(size+sizeof(CmiChunkHeader));
 #else
-  res =(char *) malloc_nomigrate(size+2*sizeof(int));
+  res =(char *) malloc_nomigrate(size+sizeof(CmiChunkHeader));
 #endif
 
   _MEMCHECK(res);
 
 #ifdef MEMMONITOR
-  CpvAccess(MemoryUsage) += size+2*sizeof(int);
+  CpvAccess(MemoryUsage) += size+sizeof(CmiChunkHeader);
   CpvAccess(AllocCount)++;
   CpvAccess(BlocksAllocated)++;
   if (CpvAccess(MemoryUsage) > CpvAccess(HiWaterMark)) {
@@ -1569,73 +1580,61 @@ int size;
   }
 #endif
 
-  ((int *)res)[0]=size;
-  ((int *)res)[1]=1;
-  return (void *)(res+2*sizeof(int));
+  res+=sizeof(CmiChunkHeader);
+  SIZEFIELD(res)=size;
+  REFFIELD(res)=1;
+  return (void *)res;
 }
 
-void CmiReference(blk)
-void *blk;
-{
+/** Follow the header links out to the most enclosing block */
+static void *CmiAllocFindEnclosing(void *blk) {
   int refCount = REFFIELD(blk);
-  if (refCount < 0) {
-    blk = (void *)((char*)blk+refCount);
+  while (refCount < 0) {
+    blk = (void *)((char*)blk+refCount); /* Jump to enclosing block */
     refCount = REFFIELD(blk);
   }
-  REFFIELD(blk) = refCount+1;
+  return blk;
 }
 
-int CmiSize(blk)
-void *blk;
+/** Increment the reference count for this block's owner.
+    This call must be matched by an equivalent CmiFree. */
+void CmiReference(void *blk)
+{
+  REFFIELD(CmiAllocFindEnclosing(blk))++;
+}
+
+/** Return the size of the user portion of this block. */
+int CmiSize(void *blk)
 {
   return SIZEFIELD(blk);
 }
 
-void CmiFree(blk)
-void *blk;
+/** Decrement the reference count for this block. */
+void CmiFree(void *blk)
 {
-  int refCount;
-
-  refCount = REFFIELD(blk);
-  if (refCount < 0) {
-    blk = (void *)((char*)blk+refCount);
-    refCount = REFFIELD(blk);
-  }
-  if(refCount==0) {
-#ifdef MEMMONITOR
-    if (SIZEFIELD(blk) > 100000)
-      CmiPrintf("MEMSTAT Uh-oh -- SIZEFIELD=%d\n",SIZEFIELD(blk));
-    CpvAccess(MemoryUsage) -= (SIZEFIELD(blk) + 2*sizeof(int));
-    CpvAccess(BlocksAllocated)--;
-    CmiPrintf("Refcount 0 case called\n");
+  void *parentBlk=CmiAllocFindEnclosing(blk);
+  int refCount=REFFIELD(parentBlk);
+#ifndef CMK_OPTIMIZE
+  if(refCount==0) /* Logic error: reference count shouldn't already have been zero */
+    CmiAbort("CmiFree reference count was zero-- is this a duplicate free?");
 #endif
-
-#if CONVERSE_VERSION_ELAN
-    elan_CmiFree(BLKSTART(blk));
-#else
-    free_nomigrate(BLKSTART(blk));
-#endif
-
-    return;
-  }
   refCount--;
-  if(refCount==0) {
+  REFFIELD(parentBlk) = refCount;
+  if(refCount==0) { /* This was the last reference to the block-- free it */
 #ifdef MEMMONITOR
-    if (SIZEFIELD(blk) > 100000)
-      CmiPrintf("MEMSTAT Uh-oh -- SIZEFIELD=%d\n",SIZEFIELD(blk));
-    CpvAccess(MemoryUsage) -= (SIZEFIELD(blk) + 2*sizeof(int));
+    int size=SIZEFIELD(parentBlk);
+    if (size > 1000000000) /* Absurdly large size field-- warning */
+      CmiPrintf("MEMSTAT Uh-oh -- SIZEFIELD=%d\n",size);
+    CpvAccess(MemoryUsage) -= (size + sizeof(CmiChunkHeader);
     CpvAccess(BlocksAllocated)--;
 #endif
 
 #if CONVERSE_VERSION_ELAN
-    elan_CmiFree(BLKSTART(blk));
+    elan_CmiFree(BLKSTART(parentBlk));
 #else
-    free_nomigrate(BLKSTART(blk));
+    free_nomigrate(BLKSTART(parentBlk));
 #endif
-
-    return;
   }
-  REFFIELD(blk) = refCount;
 }
 #endif /*!SIMPLE_CMIALLOC*/
 
@@ -1746,70 +1745,87 @@ CpvDeclare(int, CmiMainHandlerIDP); /* Main handler that is run on every node */
 *
 *	        Parameters :
 *
-*	        destPE, len, int sizes[], char *messages[]
-*
-* ASSUMPTION  : The sizes[] and the messages[] array begin their indexing FROM 1.
-*               (i.e They should have memory allocated for n + 1)
-*               This is important to ensure that the call works correctly
+*	        destPE, len, int sizes[0..len-1], char *messages[0..len-1]
 *
 ****************************************************************************/
+/* Round up message size to the message granularity. 
+   Does this by adding, then truncating.
+*/
+static int roundUpSize(unsigned int s) {
+  return (int)((s+sizeof(double)-1)&~(sizeof(double)-1));
+}
+/* Return the amount of message padding required for a message
+   with this many user bytes. 
+ */
+static int paddingSize(unsigned int s) {
+  return roundUpSize(s)-s;
+}
+
+/* Message header for a bundle of multiple-sent messages */
+typedef struct {
+  char convHeader[CmiMsgHeaderSizeBytes];
+  int nMessages; /* Number of distinct messages bundled below. */
+  double pad; /* To align the first message, which follows this header */
+} CmiMultipleSendHeader;
 
 void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[])
 {
-  char *header;
-  int i;
-  int *newSizes;
-  char **newMsgComps;
-  int mask = ~7; /* to mask off the last 3 bits */
-  char *pad = "                 "; /* padding required - 16 bytes long w.case */
+  CmiMultipleSendHeader header;
+  int m; /* Outgoing message */
+  CmiChunkHeader *msgHdr; /* Chunk headers for each message */
+  double pad = 0; /* padding required */
+  int vecLen; /* Number of pieces in outgoing message vector */
+  int *vecSizes; /* Sizes of each piece we're sending out. */
+  char **vecPtrs; /* Pointers to each piece we're sending out. */
+  int vec; /* Entry we're currently filling out in above array */
 
-  /* Allocate memory for the newSizes array and the newMsgComps array*/
-  newSizes = (int *)CmiAlloc(2 * (len + 1) * sizeof(int));
-  newMsgComps = (char **)CmiAlloc(2 * (len + 1) * sizeof(char *));
+  msgHdr = (CmiChunkHeader *)CmiTmpAlloc(len * sizeof(CmiChunkHeader));
+  /* Allocate memory for the outgoing vector*/
+  vecLen=1+3*len; /* Header and 3 parts per message */
+  vecSizes = (int *)CmiTmpAlloc(vecLen * sizeof(int));
+  vecPtrs = (char **)CmiTmpAlloc(vecLen * sizeof(char *));
+  vec=0;
+  
+  /* Build the header */
+  header.nMessages=len;
+  CmiSetHandler(&header, CpvAccess(CmiMainHandlerIDP));
+  vecSizes[vec]=sizeof(header); vecPtrs[vec]=(char *)&header;
+  vec++;
 
-  /* Construct the newSizes array from the old sizes array */
-  newSizes[0] = (CmiMsgHeaderSizeBytes + (len + 1)*sizeof(int));
-  newSizes[1] = ((CmiMsgHeaderSizeBytes + (len + 1)*sizeof(int) + 7)&mask) - newSizes[0] + 2*sizeof(int);
-                     /* To allow the extra 8 bytes for the CmiSize & the Ref Count */
-
-  for(i = 1; i < len + 1; i++){
-    newSizes[2*i] = (sizes[i - 1]);
-    newSizes[2*i + 1] = ((sizes[i -1] + 7)&mask) - newSizes[2*i] + 2*sizeof(int); 
-             /* To allow the extra 8 bytes for the CmiSize & the Ref Count */
-  }
+  /* Build an entry for each message: 
+         | CmiChunkHeader | Message data | Message padding | ...next message entry ...
+  */
+  for (m=0;m<len;m++) {
+    msgHdr[m].size=roundUpSize(sizes[m]); /* Size of message and padding */
+    msgHdr[m].ref=0; /* Reference count will be filled out on receive side */
     
-  header = (char *)CmiAlloc(newSizes[0]*sizeof(char));
-
-  /* Set the len field in the buffer */
-  *(int *)(header + CmiMsgHeaderSizeBytes) = len;
-
-  /* and the induvidual lengths */
-  for(i = 1; i < len + 1; i++){
-    *((int *)(header + CmiMsgHeaderSizeBytes) + i) = newSizes[2*i] + newSizes[2*i + 1];
+    /* First send the message's CmiChunkHeader (for use on receive side) */
+    vecSizes[vec]=sizeof(CmiChunkHeader); vecPtrs[vec]=(char *)&msgHdr[m];
+    vec++;
+    
+    /* Now send the actual message data */
+    vecSizes[vec]=sizes[m]; vecPtrs[vec]=msgComps[m];
+    vec++;
+    
+    /* Now send padding to align the next message on a double-boundary */
+    vecSizes[vec]=paddingSize(sizes[m]); vecPtrs[vec]=(char *)&pad;
+    vec++;
   }
-
-  /* This message shd be recd by the main handler */
-  CmiSetHandler(header, CpvAccess(CmiMainHandlerIDP));
-  newMsgComps[0] = header;
-  newMsgComps[1] = pad;
-
-  for(i = 1; i < (len + 1); i++){
-    newMsgComps[2*i] =  msgComps[i - 1];
-    newMsgComps[2*i + 1] = pad;
-  }
-
-  CmiSyncVectorSend(destPE, 2*(len + 1), newSizes, newMsgComps);
-  CmiFree(newSizes);
-  CmiFree(newMsgComps);
-  CmiFree(header);
+  CmiAssert(vec==vecLen);
+  
+  CmiSyncVectorSend(destPE, vecLen, vecSizes, vecPtrs);
+  
+  CmiTmpFree(vecPtrs); /* CmiTmp: Be sure to throw away in opposite order of allocation */
+  CmiTmpFree(vecSizes);
+  CmiTmpFree(msgHdr);
 }
 
 /****************************************************************************
 * DESCRIPTION : This function initializes the main handler required for the
-*               CmiMultipleSendP() function to work. 
+*               CmiMultipleSend() function to work. 
 *	        
 *               This function should be called once in any Converse program
-*	        that uses CmiMultipleSendP()
+*	        that uses CmiMultipleSend()
 *
 ****************************************************************************/
 
@@ -1821,6 +1837,33 @@ void CmiInitMultipleSend(void)
   CpvAccess(CmiMainHandlerIDP) =
     CmiRegisterHandler((CmiHandler)CmiMultiMsgHandler);
 }
+
+/****************************************************************************
+* DESCRIPTION : This function is the main handler that splits up the messages
+*               CmiMultipleSend() pastes together. 
+*
+****************************************************************************/
+
+static void CmiMultiMsgHandler(char *msgWhole)
+{
+  int len=((CmiMultipleSendHeader *)msgWhole)->nMessages;
+  int offset=sizeof(CmiMultipleSendHeader);
+  int m;
+  for (m=0;m<len;m++) {
+    CmiChunkHeader *ch=(CmiChunkHeader *)(msgWhole+offset);
+    char *msg=(msgWhole+offset+sizeof(CmiChunkHeader));
+    int msgSize=ch->size; /* Size of user portion of message (plus padding at end) */
+    /* Link new message to owner via a negative ref pointer */
+    ch->ref=msgWhole-msg; 
+    CmiReference(msg); /* Follows link & increases reference count of *msgWhole* */
+    CmiSyncSendAndFree(CmiMyPe(), msgSize, msg);
+    offset+= sizeof(CmiChunkHeader) + msgSize;
+  }
+  /* Release our reference to the whole message.  The message will
+     only actually be deleted once all its sub-messages are free'd as well. */
+  CmiFree(msgWhole);
+}
+
 
 /****************************************************************************
 * DESCRIPTION : This function initializes the main handler required for the
@@ -1851,90 +1894,6 @@ void CmiProbeImmediateMsg()
 {
 }
 #endif 
-
-/****************************************************************************
-* DESCRIPTION : This function is the main handler required for the
-*               CmiMultipleSendP() function to work. 
-*
-****************************************************************************/
-
-static void memChop(char *msgWhole);
-
-static void CmiMultiMsgHandler(char *msgWhole)
-{
-  int len;
-  int *sizes;
-  int i;
-  int offset;
-  int mask = ~7; /* to mask off the last 3 bits */
-  
-  /* Number of messages */
-  offset = CmiMsgHeaderSizeBytes;
-  len = *(int *)(msgWhole + offset);
-  offset += sizeof(int);
-
-  /* Allocate array to store sizes */
-  sizes = (int *)(msgWhole + offset);
-  offset += sizeof(int)*len;
-
-  /* This is needed since the header may or may not be aligned on an 8 bit boundary */
-  offset = (offset + 7)&mask;
-
-  /* To cross the 8 bytes inserted in between */
-  offset += 2*sizeof(int);
-
-  /* Call memChop() */
-  memChop(msgWhole);
-
-  /* Send the messages to their respective handlers (on the same machine) */
-  /* Currently uses CmiSyncSend(), later modify to use Scheduler enqueuing */
-  for(i = 0; i < len; i++){
-    CmiSyncSendAndFree(CmiMyPe(), sizes[i], ((char *)(msgWhole + offset))); 
-    offset += sizes[i];
-  }
-  CmiFree(msgWhole);
-}
-
-static void memChop(char *msgWhole)
-{
-  int len;
-  int *sizes;
-  int i;
-  int offset;
-  int mask = ~7; /* to mask off the last 3 bits */
-  
-  /* Number of messages */
-  offset = CmiMsgHeaderSizeBytes;
-  len = *(int *)(msgWhole + offset);
-  offset += sizeof(int);
-
-  /* Set Reference count in the CmiAlloc header*/
-  /* Reference Count includes the header also, hence (len + 1) */
-  ((int *)(msgWhole - sizeof(int)))[0] = len + 1;
-
-  /* Allocate array to store sizes */
-  sizes = (int *)(msgWhole + offset);
-  offset += sizeof(int)*len;
-
-  /* This is needed since the header may or may not be aligned on an 8 bit boundary */
-  offset = (offset + 7)&mask;
-
-  /* To cross the 8 bytes inserted in between */
-  offset += 2*sizeof(int);
-
-  /* update the sizes and offsets for all the chunks */
-  for(i = 0; i < len; i++){
-    /* put in the size value for that part */
-    ((int *)(msgWhole + offset - 2*sizeof(int)))[0] = sizes[i] - 2*sizeof(int);
-    
-    /* now put in the offset (a negative value) to get right back to the begining */
-    ((int *)(msgWhole + offset - sizeof(int)))[0] = (-1)*offset;
-    
-    offset += sizes[i];
-  }
-}
-
-
 
 /******** Idle timeout module (+idletimeout=30) *********/
 
