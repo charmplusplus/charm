@@ -41,14 +41,16 @@ public:
       its current state (assuming no stragglers, cancellations or events
       are subsequently received */
   POSE_TimeType SafeTime() {  
-    POSE_TimeType ovt=userObj->OVT(), theTime=-1, ec=parent->cancels.getEarliest(),
-      gvt=localPVT->getGVT(), worktime = eq->currentPtr->timestamp;
+    POSE_TimeType ovt=userObj->OVT(), theTime=POSE_UnsetTS,
+      ec=parent->cancels.getEarliest(), gvt=localPVT->getGVT(), 
+      worktime = eq->currentPtr->timestamp;
     // Object is idle; report -1
     if (!RBevent && (ec < 0) && (worktime < 0) && (ovt <= gvt))  return -1;
     if (RBevent)  theTime = RBevent->timestamp;
     if ((ec > -1) && ((ec < theTime) || (theTime == -1)))  theTime = ec;
     if ((worktime < theTime) || (theTime == -1))  theTime = worktime;
     if ((ovt > theTime) && (ovt > gvt)) theTime = ovt;
+    CkAssert((theTime == -1) || (theTime >= gvt));
     return theTime;
   }
   /// Add spawned event to current event's spawned event list
