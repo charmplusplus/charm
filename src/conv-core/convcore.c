@@ -118,6 +118,7 @@ CsvDeclare(void*, CsdNodeQueue);
 CsvDeclare(CmiNodeLock, CsdNodeQueueLock);
 #endif
 CpvDeclare(int,   CsdStopFlag);
+CpvDeclare(int,   CsdLocalCounter);
 
 #if CONVERSE_VERSION_VMI
 void *CMI_VMI_CmiAlloc (int size);
@@ -1122,11 +1123,18 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 
 void *CsdNextMessage(CsdSchedulerState_t *s) {
 	void *msg;
-        CqsDequeue(s->schedQ,(void **)&msg);
-	if (msg!=NULL) return msg;
-
+	if((CpvAccess(CsdLocalCounter)--) >0)
+	  {
+	    CqsDequeue(s->schedQ,(void **)&msg);
+	    if (msg!=NULL) return msg;
+	    // This avoids a race condition with migration detected by megatest
+	    msg=CdsFifo_Dequeue(s->localQ);
+	    if (msg!=NULL) return msg;	    
+	  }
+	
+	CpvAccess(CsdLocalCounter)=CsdLocalMax;
 	if ( NULL!=(msg=CmiGetNonLocal()) || 
-             NULL!=(msg=CdsFifo_Dequeue(s->localQ)) ) {
+	     NULL!=(msg=CdsFifo_Dequeue(s->localQ)) ) {
             CpvAccess(cQdState)->mProcessed++;
             return msg;
         }
@@ -1147,6 +1155,7 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
         }
 #endif
 	return NULL;
+
 }
 
 int CsdScheduler(int maxmsgs)
@@ -1390,12 +1399,20 @@ void CthSchedInit()
 		 CthSuspendSchedulingThread);
 }
 
+static int CsdLocalMax=CSD_LOCAL_MAX_DEFAULT;
+
 void CsdInit(argv)
   char **argv;
 {
   CpvInitialize(void *, CsdSchedQueue);
   CpvInitialize(int,   CsdStopFlag);
-  
+  CpvInitialize(int,   CsdLocalCounter);
+  if(!CmiGetArgIntDesc(argv,"+csdLocalMax",&CsdLocalMax,"Set the max number of local messages to process before forcing a check for remote messages."))
+    {
+      CsdLocalMax= CSD_LOCAL_MAX_DEFAULT;
+    }
+  CpvAccess(CsdLocalCounter) = CsdLocalMax;
+  CmiPrintf("csdLocalMax set to %d\n",CsdLocalMax);
   CpvAccess(CsdSchedQueue) = (void *)CqsCreate();
 
 #if CMK_OBJECT_QUEUE_AVAILABLE
