@@ -14,10 +14,14 @@
 #define NULL 0
 #endif
 
+#define ComlibPrintf if(comm_debug) CmiPrintf
+extern int comm_debug;
+
 enum{BCAST=0,TREE, GRID, HCUBE, RSEND};  
 #define MAXNUMMSGS 1000
-#define MAXNUMSTRATEGY 100
-#define MSGSIZETHRESHOLD 50000
+#define MAXNUMSTRATEGY 10
+#define MSGSIZETHRESHOLD 5000000
+#define MAXBUFSIZE 5000
 
 typedef struct {
   int srcpe;
@@ -38,6 +42,9 @@ class Router;
 
 /*************** Interface to the User **********************/
 void ComlibInit();
+
+void RegisterCallbackHandler(int handler);
+
 comID ComlibInstance(int ImplType, int numParticipants);
 void NumDeposits(comID  id, int num);
 comID ComlibEstablishGroup(comID id, int npes, int *pes); 

@@ -12,7 +12,7 @@
 #define NULL 0
 #endif
 
-#define MSGQLEN 100
+#define MSGQLEN 500
 
 typedef struct ptinfo {
   int refCount;
@@ -50,7 +50,7 @@ class PeTable {
   private:
 	PTinfo ***PeList, **ptrlist;
 	PTinfo *PTFreeList;
-	char * CombBuffer;
+	//	char * CombBuffer;
 	int *msgnum, *MaxSize;
 	int NumPes;
 	int magic;

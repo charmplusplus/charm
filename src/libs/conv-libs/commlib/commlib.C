@@ -13,6 +13,9 @@
  * All the entry points and the user interface functions 
  *******************************************************/
 #include <stdlib.h>
+
+int comm_debug = 0;
+
 #include "commlib.h"
 #include "commlib_pvt.h"
 #include "globals.h"
@@ -23,10 +26,13 @@ extern "C" void CqsEnqueueLifo(void *, void *);
 #define MAXINSTANCE 100
 
 Router * newgridobject(int, int);
+Router * newd3gridobject(int, int);
 Router * newtreeobject(int, int);
 Router * newhcubeobject(int, int);
 Router * newrsendobject(int, int);
 Router * newbcastobject(int, int);
+
+int callBackHandler;
 
 /********************************************
  * Internal utility functions
@@ -46,10 +52,11 @@ void UpdateImplTable(comID id)
 	return;
   }
 
-  CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]=new Overlapper(id);
+  if(CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]== NULL)
+      CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]=new Overlapper(id);
 
   if (id.SwitchVal >0) { 
-  	CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->SetID(id);
+      CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->SetID(id);
   }
 }
 
@@ -98,8 +105,8 @@ void ComlibInit()
   ComlibRegisterStrategy(newgridobject);
   ComlibRegisterStrategy(newhcubeobject);
   ComlibRegisterStrategy(newrsendobject);
+  ComlibRegisterStrategy(newd3gridobject);
 }
-
 
 Router * GetStrategyObject(int n, int me, int indx)
 {
@@ -126,6 +133,11 @@ comID ComlibEstablishGroup(comID id, int npes, int *pes)
   id.NumMembers=-1;
   id.grp=CmiEstablishGroup(npes, pes);
   UpdateImplTable(id);
+  
+  //int gnpe, *gpes = NULL;
+  //CmiLookupGroup(id.grp, &gnpe, &gpes); // Permanent memory locations
+  
+  CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->GroupMap(npes, pes);
   CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->SetID(id);
   return(id);
 }
@@ -166,6 +178,8 @@ void NumDeposits(comID id, int num)
  ****************************************************/
 void KRecvManyCombinedMsg(char *msg)
 {
+    //  ComlibPrintf("In Recv combined message at %d\n", CmiMyPe());
+
   comID id;
   memcpy(&id,(msg+CmiMsgHeaderSizeBytes+sizeof(int)), sizeof(comID));
 
@@ -176,6 +190,7 @@ void KRecvManyCombinedMsg(char *msg)
 void KProcManyCombinedMsg(char *msg)
 {
   comID id;
+  //  ComlibPrintf("In Recv combined message at %d\n", CmiMyPe());
   memcpy(&id,(msg+CmiMsgHeaderSizeBytes+sizeof(int)), sizeof(comID));
 
   UpdateImplTable(id);
@@ -184,9 +199,12 @@ void KProcManyCombinedMsg(char *msg)
 
 void KDummyEP(DummyMsg *m)
 {
+
+    //  ComlibPrintf("In Recv dummy message at %d\n", CmiMyPe());
   comID id=m->id;
   UpdateImplTable(id);
   CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->DummyEP(m->id, m->magic, m->refno);
+  CmiFree(m);
 }
 
 /****************************************************
@@ -202,9 +220,11 @@ void KBcastSwitchMsg(comID id)
 
 void KSwitchEP(SwitchMsg *m)
 {
-  //CmiPrintf("%d switchep called\n", CmiMyPe());
+  //ComlibPrintf("%d switchep called\n", CmiMyPe());
   comID id=m->id;
   UpdateImplTable(id);
+
+  CmiFree(m);
 } 
 
 void KSendDummyMsg(comID id, int pe, int magic)
@@ -224,14 +244,22 @@ void KCsdEnqueue(void *m)
 
 int KMyActiveRefno(comID id)
 {
-  //CmiPrintf("KMyActive calling update\n");
+  //ComlibPrintf("KMyActive calling update\n");
   return(CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->MyActiveIndex());
+}
+
+void RegisterCallbackHandler(int handle){
+    callBackHandler = handle;
 }
 
 void KDoneEP(DummyMsg *m)
 {
   comID id=m->id;
   CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->Done();
+  
+  //  CmiSetHandler(m, callBackHandler);
+  //CmiSyncSendAndFree(CmiMyPe(), sizeof(DummyMsg), m);
+  CmiFree(m);
 }
 
 void KDone(comID id)
@@ -251,16 +279,16 @@ void KsendGmsg(comID id)
   gmsg->id=id;
   CmiSetHandler(gmsg, CpvAccess(KGMsgHandle));
   //CmiSyncSendAndFree(CmiMyPe(),sizeof(GMsg), gmsg);
-	KCsdEnqueue(gmsg);
+  KCsdEnqueue(gmsg);
 }
 
 void KGMsgHandler(GMsg *msg)
 {
-  //CmiPrintf("KGhandler called\n");
+  //ComlibPrintf("KGhandler called\n");
   comID id=msg->id;
   int npes, *pes;
   //CmiGroup grp=id.grp;
-  //CmiPrintf("grppe=%d, grpindex=%d\n", grp.pe, grp.id);
+  //ComlibPrintf("grppe=%d, grpindex=%d\n", grp.pe, grp.id);
   CmiLookupGroup((msg->id).grp, &npes, &pes);
   if (pes==0) {
   	//CmiSyncSendAndFree(CmiMyPe(),sizeof(GMsg), msg);
