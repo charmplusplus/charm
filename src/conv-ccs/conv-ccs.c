@@ -286,7 +286,7 @@ void CcsInit(char **argv)
     if (CmiMyPe()==0)
     {/*Create and occasionally poll on a CCS server port*/
       CcsServer_new(NULL,&ccs_serverPort,ccs_serverAuth);
-      CcdPeriodicCallKeep(CcsServerCheck,NULL);
+      CcdCallOnConditionKeep(CcdPERIODIC,CcsServerCheck,NULL);
     }
 #endif
 }
