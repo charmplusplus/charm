@@ -130,10 +130,10 @@ DAEMON : daemon.c sockRoutines.c
 	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\daemon.c
 	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\sockRoutines.c
 	$(LINK) $(LINK_FLAGS) ws2_32.lib advapi32.lib $(LINK_OTHER) \
-	/out:"$(HOST_DIR)\daemon.exe" daemon.obj sockRoutines.obj
+	/out:"$(HOST_DIR)\charmd.exe" daemon.obj sockRoutines.obj
 	$(CPP) $(CPP_PROJ) /D "FACELESS" $(COMMON_SRC)\daemon.c
 	$(LINK) $(LINK_FLAGS) ws2_32.lib advapi32.lib $(LINK_OTHER) \
-	/out:"$(HOST_DIR)\daemon_background.exe" daemon.obj sockRoutines.obj
+	/out:"$(HOST_DIR)\charmd_faceless.exe" daemon.obj sockRoutines.obj
 
 CHARMRUN-IF-NEEDED : charmrun\charmrun.c sockRoutines.c
 	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\charmrun\charmrun.c
