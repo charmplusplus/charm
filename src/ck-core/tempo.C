@@ -93,7 +93,7 @@ TempoGroup::ckTempoSendBranch(int tag1, int tag2, void *buffer, int buflen,
 {
   TempoMessage *msg = new (&buflen, 0) TempoMessage(tag1, tag2, buflen, buffer);
   CProxy_TempoGroup ptg(bocid);
-  ptg.tempoGeneric(msg, processor);
+  ptg[processor].tempoGeneric(msg);
 }
 
 // static
@@ -186,7 +186,7 @@ TempoArray::ckTempoBcast(int sender, int tag, void *buffer, int buflen)
 void
 TempoArray::ckTempoBcast(int tag, void *buffer, int buflen, CkArrayID aid)
 {
-  int i, n=aid.getArrayManager()->array_size();
+  int i, n=aid.ckLocalBranch()->array_size();
   for(i=0;i<n;i++)
     ckTempoSendElem(tag, BCAST_TAG, buffer, buflen, aid, i);
 }

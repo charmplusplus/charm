@@ -79,7 +79,7 @@ void CkGroupInitCallback::callMeBack(CkGroupInitCallbackMsg *m)
 
 
 ///////////////// Reduction Manager //////////////////
-#define thisproxy CProxy_CkReductionMgr(thisgroup)
+#define thisproxy (CProxy_CkReductionMgr(thisgroup))
 
 class CkReductionNumberMsg:public CMessage_CkReductionNumberMsg {
 public:
@@ -175,7 +175,7 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
   // contribution, which will never come.
     DEBR((AA"Dying guy %p must have been migrating-- he's at #%d!\n"AB,ci,ci->redNo));
     for (int r=ci->redNo;r<redNo;r++)
-      thisproxy.MigrantDied(new CkReductionNumberMsg(r),treeRoot());
+      thisproxy[treeRoot()].MigrantDied(new CkReductionNumberMsg(r));
   }
   
   //Add to the global count for all his future messages (wherever they are)
@@ -294,7 +294,7 @@ void CkReductionMgr::startReduction(int number)
   for (int k=0;k<treeKids();k++)
   {
     DEBR((AA"Asking child PE %d to start #%d\n"AB,firstKid()+k,redNo));
-    thisproxy.ReductionStarting(new CkReductionNumberMsg(redNo),firstKid()+k);
+    thisproxy[firstKid()+k].ReductionStarting(new CkReductionNumberMsg(redNo));
   }
 }
 //Handle a message from one element for the reduction
@@ -305,7 +305,7 @@ void CkReductionMgr::addContribution(CkReductionMsg *m)
     DEBR((AA"Migrant %p gives late contribution for #%d!\n"AB,m->ci,m->redNo));
     if (!hasParent()) //Root moved on too soon-- should never happen
       CkAbort("Late reduction contribution received at root!\n");
-    thisproxy.LateMigrantMsg(m,treeRoot());
+    thisproxy[treeRoot()].LateMigrantMsg(m);
   } 
   else if (isFuture(m->redNo)) {//An early contribution-- add to future Q
     DEBR((AA"Contributor %p gives early contribution-- for #%d\n"AB,m->ci,m->redNo));
@@ -333,7 +333,7 @@ void CkReductionMgr::finishReduction(void)
     DEBR((AA"Passing reduced data up to parent node %d.\n"AB,treeParent()));
     DEBR((AA"Message gcount is %d+%d+%d.\n"AB,result->gcount,gcount,adj(redNo).gcount));
     result->gcount+=gcount+adj(redNo).gcount;
-    thisproxy.RecvMsg(result,treeParent());
+    thisproxy[treeParent()].RecvMsg(result);
   }
   else 
   {//We are root-- pass data to client
