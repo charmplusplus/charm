@@ -628,11 +628,11 @@ void CsdEndIdle()
     CpvAccess(CsdIdleDetectedFlag) = 0;
     if(!CpvAccess(CsdStopNotifyFlag)) {
       (CpvAccess(CsdNotifyBusy))();
-#ifndef CMK_OPTIMIZE
-      if(CpvAccess(traceOn))
-        traceEndIdle();
-#endif
     }
+#ifndef CMK_OPTIMIZE
+    if(CpvAccess(traceOn))
+      traceEndIdle();
+#endif
   }
 #if CMK_WEB_MODE
   usageStart();  
@@ -646,11 +646,11 @@ void CsdBeginIdle()
     CpvAccess(CsdIdleDetectedFlag) = 1;
     if(!CpvAccess(CsdStopNotifyFlag)) {
       (CpvAccess(CsdNotifyIdle))();
-#ifndef CMK_OPTIMIZE
-      if(CpvAccess(traceOn))
-        traceBeginIdle();
-#endif
     }
+#ifndef CMK_OPTIMIZE
+    if(CpvAccess(traceOn))
+      traceBeginIdle();
+#endif
   }
 #if CMK_WEB_MODE
   usageStop();  
