@@ -275,6 +275,11 @@ int n;
   exit(1);
 }
 
+static void KillOnAllSigs(int dummy)
+{
+  KillEveryone("Node program received signal\n");
+}
+
 static void KillOnSIGPIPE(int dummy)
 {
   fprintf(stderr,"host exited, terminating.\n");
@@ -2862,6 +2867,14 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   extract_args(argv);
   log_init();
   signal(SIGPIPE, KillOnSIGPIPE);
+  signal(SIGSEGV, KillOnAllSigs);
+  signal(SIGBUS, KillOnAllSigs);
+  signal(SIGFPE, KillOnAllSigs);
+  signal(SIGILL, KillOnAllSigs);
+  signal(SIGINT, KillOnAllSigs);
+  signal(SIGTERM, KillOnAllSigs);
+  signal(SIGQUIT, KillOnAllSigs);
+  signal(SIGABRT, KillOnAllSigs);
   skt_datagram(&dataport, &dataskt, Cmi_os_buffer_size);
   skt_server(&ctrlport, &ctrlskt);
   Cmi_host_fd = skt_connect(Cmi_host_IP, Cmi_host_port, 60);
