@@ -173,6 +173,8 @@ static void simulate()
 
 /***********************************************************************/
 
+CpvExtern(int,    CcdCheckNum) ;
+
 static cpu_event(pno)
 int pno;
 {
@@ -253,7 +255,7 @@ int pno;
     temp_time = CsiTimer(); 
 
     if (!CpvAccess(disable_sys_msgs)) {
-             if (CpvAccess(CcdNumChecks) > 0) {
+             if (CpvAccess(CcdCheckNum)-- <=0) {
                       CcdCallBacks();
              }
     }
