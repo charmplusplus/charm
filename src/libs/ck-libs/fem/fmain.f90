@@ -10,6 +10,6 @@ PROGRAM main1
      call pxfgetarg(i,argv(i),length(i),ierr)
      if (ierr .ne. 0) print*,'Arg ',i,' error'
   end do
-  call femmain(argc,argv,length)
+  call fmain(argc,argv,length)
 
 END

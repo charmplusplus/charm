@@ -4,7 +4,7 @@ extern void _initCharm(int argc, char **argv);
 
 // this is needed because on o2k, f90 programs have to have main in
 // fortran90.
-extern "C" void femmain_(int *argc,char _argv[][80],int length[])
+extern "C" void fmain_(int *argc,char _argv[][80],int length[])
 {
   int i;
   char **argv = new char*[*argc+2];
