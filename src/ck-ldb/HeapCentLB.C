@@ -8,19 +8,20 @@
 
 void CreateHeapCentLB()
 {
-  CkPrintf("[%d] creating HeapCentLB %d\n",CkMyPe(),loadbalancer);
+  //  CkPrintf("[%d] creating HeapCentLB %d\n",CkMyPe(),loadbalancer);
   loadbalancer = CProxy_HeapCentLB::ckNew();
-  CkPrintf("[%d] created HeapCentLB %d\n",CkMyPe(),loadbalancer);
+  //  CkPrintf("[%d] created HeapCentLB %d\n",CkMyPe(),loadbalancer);
 }
 
 HeapCentLB::HeapCentLB()
 {
-  CkPrintf("[%d] HeapCentLB created\n",CkMyPe());
+  if (CkMyPe()==0)
+    CkPrintf("[%d] HeapCentLB created\n",CkMyPe());
 }
 
 CmiBool HeapCentLB::QueryBalanceNow(int _step)
 {
-  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
+  //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
   return CmiTrue;
 }
 
@@ -51,7 +52,7 @@ void HeapCentLB::Heapify(HeapData *heap, int node, int heapSize)
 CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
 {
   int pe,obj;
-  CkPrintf("[%d] HeapCentLB strategy\n",CkMyPe());
+  //  CkPrintf("[%d] HeapCentLB strategy\n",CkMyPe());
 
   CkVector migrateInfo;
 
@@ -68,8 +69,8 @@ CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
   objData = new HeapData[totalObjs];
   int objCount = 0;
   for(pe=0; pe < count; pe++) {
-    CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
-	     CkMyPe(),pe,stats[pe].n_objs,stats[pe].n_comm);
+    //    CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
+    //	     CkMyPe(),pe,stats[pe].n_objs,stats[pe].n_comm);
 
     for(obj=0; obj < stats[pe].n_objs; obj++, objCount++) {
       objData[objCount].cpuTime = stats[pe].objData[obj].cpuTime;
@@ -107,8 +108,8 @@ CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
     const int pe   = objData[obj].pe;
     const int id   = objData[obj].id;
     if (dest != pe) {
-      CkPrintf("[%d] Obj %d migrating from %d to %d\n",
-	       CkMyPe(),obj,pe,dest);
+      //      CkPrintf("[%d] Obj %d migrating from %d to %d\n",
+      //	       CkMyPe(),obj,pe,dest);
       MigrateInfo *migrateMe = new MigrateInfo;
       migrateMe->obj = stats[pe].objData[id].handle;
       migrateMe->from_pe = pe;
@@ -125,6 +126,7 @@ CLBMigrateMsg* HeapCentLB::Strategy(CentralLB::LDStats* stats, int count)
     cpuData[location] = minCpu;
   }
   int migrate_count=migrateInfo.size();
+  CkPrintf("HeapCentLB migrating %d elements\n",migrate_count);
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
   for(int i=0; i < migrate_count; i++) {

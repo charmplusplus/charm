@@ -154,7 +154,7 @@ void CentralLB::ReceiveMigration(CLBMigrateMsg *m)
     MigrateInfo& move = m->moves[i];
     const int me = CkMyPe();
     if (move.from_pe == me && move.to_pe != me) {
-      CkPrintf("[%d] migrating object to %d\n",move.from_pe,move.to_pe);
+      //      CkPrintf("[%d] migrating object to %d\n",move.from_pe,move.to_pe);
       theLbdb->Migrate(move.obj,move.to_pe);
     } else if (move.from_pe != me && move.to_pe == me) {
       //      CkPrintf("[%d] expecting object from %d\n",move.to_pe,move.from_pe);

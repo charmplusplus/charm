@@ -10,12 +10,13 @@
 void CreateRefineLB()
 {
   loadbalancer = CProxy_RefineLB::ckNew();
-  CkPrintf("[%d] created RefineLB %d\n",CkMyPe(),loadbalancer);
+  //  CkPrintf("[%d] created RefineLB %d\n",CkMyPe(),loadbalancer);
 }
 
 RefineLB::RefineLB()
 {
-  CkPrintf("[%d] RefineLB created\n",CkMyPe());
+  if (CkMyPe() == 0)
+    CkPrintf("[%d] RefineLB created\n",CkMyPe());
 }
 
 CmiBool RefineLB::QueryBalanceNow(int _step)
@@ -198,7 +199,7 @@ int RefineLB::refine()
 
 CLBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
 {
-  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());
+  //  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());
 
   create(stats, count);
 

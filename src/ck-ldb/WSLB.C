@@ -41,10 +41,7 @@ NLBMigrateMsg* WSLB::Strategy(NeighborLB::LDStats* stats, int count)
 
   CkVector migrateInfo;
 
-  if (myload < avgload)
-    CkPrintf("[%d] Underload My load is %f, average load is %f\n",
-	     CkMyPe(),myload,avgload);
-  else {
+  if (myload > avgload) {
     CkPrintf("[%d] OVERLOAD My load is %f, average load is %f\n",
 	     CkMyPe(),myload,avgload);
 
