@@ -418,8 +418,9 @@ public:
     else if (next != 0)
       return next->find(n);
     else {
-      cerr << "Unable to find message: " << n;
+      cerr << "Unable to find message: " << n << endl;
       exit(1);
+      return(0);
     }
   }
 };
