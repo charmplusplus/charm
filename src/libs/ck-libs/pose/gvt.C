@@ -48,9 +48,8 @@ void PVT::startPhase()
 	if ((optPVT < 0) || ((objs.objs[i].getOVT() < optPVT) && 
 			     (objs.objs[i].getOVT() > -1))) {
 	  optPVT = objs.objs[i].getOVT();
-	  if ((objs.objs[i].getOVT() < estGVT) && (objs.objs[i].getOVT() > -1))
-	    CkPrintf("Object %d has strange value %d < estGVT %d", i, 
-		     objs.objs[i].getOVT(), estGVT);
+	  CkAssert((objs.objs[i].getOVT() >= estGVT) ||
+		   (objs.objs[i].getOVT() == -1));
 	}
       }
       else if (objs.objs[i].isConservative()) { // check conPVT
@@ -58,10 +57,8 @@ void PVT::startPhase()
 			     (objs.objs[i].getOVT() > -1)))
 	  conPVT = objs.objs[i].getOVT();
       }
-      if ((optPVT < estGVT) && (optPVT != -1) && (estGVT != -1))
-	CkPrintf("optPVT=%d estGVT=%d\n", optPVT, estGVT);
-      CmiAssert(simdone || (optPVT >= estGVT) || (optPVT == -1) || (estGVT == -1));
-      CmiAssert(simdone || (conPVT >= estGVT) || (conPVT == -1) || (estGVT == -1));
+      CkAssert(simdone || (optPVT >= estGVT)||(optPVT == -1)||(estGVT == -1));
+      CkAssert(simdone || (conPVT >= estGVT)||(conPVT == -1)||(estGVT == -1));
     }
 
   // pack PVT data
@@ -69,11 +66,14 @@ void PVT::startPhase()
   int pvt = optPVT;
   if ((conPVT < pvt) && (conPVT > -1)) pvt = conPVT;
   if ((iterMin < pvt) && (iterMin > -1)) pvt = iterMin;
-  if (iterMin == -1) SendsAndRecvs->Restructure(estGVT, pvt, -1);
+  if (waitForFirst) {
+    waitForFirst = 0;
+    SendsAndRecvs->Restructure(estGVT, pvt, -1);
+  }
   // (2) Pack the SRtable data into the message
   UpdateMsg *um = SendsAndRecvs->PackTable(pvt);
   // (3) Add the PVT info to the message
-  um->optPVT = optPVT;
+  um->optPVT = pvt;
   um->conPVT = conPVT;
   um->runGVTflag = 0;
 
@@ -141,6 +141,7 @@ void PVT::objUpdate(int timestamp, int sr)
     SendsAndRecvs->Restructure(estGVT, timestamp, sr);
   }
   else SendsAndRecvs->Insert(timestamp, sr);
+  //CkPrintf("[%d] %s at %d\n", CkMyPe(), (sr == SEND)?"SEND":"RECV", timestamp);
 #ifdef POSE_STATS_ON
   if (tstat)
     localStats->SwitchTimer(tstat);
@@ -266,9 +267,9 @@ void GVT::computeGVT(UpdateMsg *m)
       tmp = tmp->next;
     }
     if ((earliestMsg < estGVT) && (earliestMsg != -1)) estGVT = earliestMsg;
-    else if ((earliestMsg == -1) && (lastSR != -1) && (estGVT == -1)
-	     && (lastSR > lastGVT)) 
+    if ((lastSR != -1) && (estGVT == -1) && (lastSR > lastGVT)) 
       estGVT = lastSR;
+    
 
     // check for inactivity
     if (((estGVT == lastGVT) || (estGVT < 0)) && (earliestMsg == -1)) {

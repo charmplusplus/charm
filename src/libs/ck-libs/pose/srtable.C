@@ -68,6 +68,7 @@ void SRtable::Insert(SRentry *e)
 void SRtable::Restructure(int newGVTest, int firstTS, int firstSR)
 {
   //sanitize();
+  //CkPrintf("SRtable::Restructure(%d, %d, %d)\n", newGVTest, firstTS, firstSR);
   // Backup the table to make new one in its place
   int b_old = b, size_b_old = size_b, offset_old = offset;
   SRentry *buckets_old[MAX_B], *overflow_old = overflow, *tmp;
@@ -138,8 +139,8 @@ UpdateMsg *SRtable::PackTable(int pvt)
   }
   CkAssert(entryIdx <= nEntries);
   um->numEntries = entryIdx;
-  return um;
   //sanitize();
+  return um;
 }
 
 /// CompressAndSort all buckets with timestamps <= pvt
