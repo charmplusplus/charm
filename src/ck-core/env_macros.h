@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-09-29 09:51:12  jyelon
+ * Revision 2.10  1995-10-13 18:15:53  jyelon
+ * K&R changes.
+ *
+ * Revision 2.9  1995/09/29  09:51:12  jyelon
  * Many small corrections.
  *
  * Revision 2.8  1995/09/01  02:13:17  jyelon
@@ -116,23 +119,22 @@ typedef struct envelope {
 } ENVELOPE;
 
 
-#define env(x) ((ENVELOPE *)(x))
 #define INTBITS (sizeof(int)*8)
 
 /*********************************************************/
 /** Arrangement for i_tag2                              **/
 /*********************************************************/
-#define GetEnv_count(e)		        (env(e)->i_tag2)
-#define SetEnv_count(e,x)		(env(e)->i_tag2=(x))
+#define GetEnv_count(e)		        (((ENVELOPE *)(e))->i_tag2)
+#define SetEnv_count(e,x)		(((ENVELOPE *)(e))->i_tag2=(x))
 
-#define GetEnv_chareBlockPtr(e)	        ((CHARE_BLOCK *)(env(e)->i_tag2))
-#define SetEnv_chareBlockPtr(e,x)	(env(e)->i_tag2=((int)(x)))
+#define GetEnv_chareBlockPtr(e)	        ((CHARE_BLOCK *)(((ENVELOPE *)(e))->i_tag2))
+#define SetEnv_chareBlockPtr(e,x)	(((ENVELOPE *)(e))->i_tag2=((int)(x)))
 
-#define SetEnv_vidBlockPtr(e,x)	        (env(e)->i_tag2=((int)(x)))
-#define GetEnv_vidBlockPtr(e)		((CHARE_BLOCK *)(env(e)->i_tag2))
+#define SetEnv_vidBlockPtr(e,x)	        (((ENVELOPE *)(e))->i_tag2=((int)(x)))
+#define GetEnv_vidBlockPtr(e)		((CHARE_BLOCK *)(((ENVELOPE *)(e))->i_tag2))
 
-#define GetEnv_boc_num(e) 		(env(e)->i_tag2)
-#define SetEnv_boc_num(e,x) 		(env(e)->i_tag2=(x))
+#define GetEnv_boc_num(e) 		(((ENVELOPE *)(e))->i_tag2)
+#define SetEnv_boc_num(e,x) 		(((ENVELOPE *)(e))->i_tag2=(x))
 
 /*********************************************************/
 /* Arrangement for s_tag1                                */
@@ -141,53 +143,53 @@ typedef struct envelope {
 /* ref is for user messages only.                        */
 /*********************************************************/
 
-#define GetEnv_other_id(e)   (env(e)->s_tag1)
-#define SetEnv_other_id(e,x) (env(e)->s_tag1=(x))
+#define GetEnv_other_id(e)   (((ENVELOPE *)(e))->s_tag1)
+#define SetEnv_other_id(e,x) (((ENVELOPE *)(e))->s_tag1=(x))
 
-#define GetEnv_vidPE(e)      (env(e)->s_tag1)
-#define SetEnv_vidPE(e,x)    (env(e)->s_tag1=(x))
+#define GetEnv_vidPE(e)      (((ENVELOPE *)(e))->s_tag1)
+#define SetEnv_vidPE(e,x)    (((ENVELOPE *)(e))->s_tag1=(x))
 
-#define GetEnv_ref(e)        (env(e)->s_tag1)
-#define SetEnv_ref(e,x)      (env(e)->s_tag1=(x))
+#define GetEnv_ref(e)        (((ENVELOPE *)(e))->s_tag1)
+#define SetEnv_ref(e,x)      (((ENVELOPE *)(e))->s_tag1=(x))
 
-#define GetEnv_chare_magic_number(e)	(env(e)->s_tag2)
-#define SetEnv_chare_magic_number(e,x)  (env(e)->s_tag2=(x))
+#define GetEnv_chare_magic_number(e)	(((ENVELOPE *)(e))->s_tag2)
+#define SetEnv_chare_magic_number(e,x)  (((ENVELOPE *)(e))->s_tag2=(x))
 
 /*********************************************************/
 /** These fields share a byte.                           */
 /*********************************************************/
 
-#define GetEnv_isPACKED(e)      (env(e)->isPACKED)
-#define SetEnv_isPACKED(e,x)    (env(e)->isPACKED=(x))
+#define GetEnv_isPACKED(e)      (((ENVELOPE *)(e))->isPACKED)
+#define SetEnv_isPACKED(e,x)    (((ENVELOPE *)(e))->isPACKED=(x))
 
 /*********************************************************/
 /** These fields are alone currently, and accessed	**/
 /** separately.						**/
 /*********************************************************/
 
-#define GetEnv_pe(e)		(env(e)->pe)
-#define SetEnv_pe(e,x)          (env(e)->pe=(x))
+#define GetEnv_pe(e)		(((ENVELOPE *)(e))->pe)
+#define SetEnv_pe(e,x)          (((ENVELOPE *)(e))->pe=(x))
 
-#define GetEnv_event(e)	        (env(e)->event)
-#define SetEnv_event(e,x)	(env(e)->event=(x))
+#define GetEnv_event(e)	        (((ENVELOPE *)(e))->event)
+#define SetEnv_event(e,x)	(((ENVELOPE *)(e))->event=(x))
 
-#define GetEnv_EP(e) 		(env(e)->EP)
-#define SetEnv_EP(e,x) 		(env(e)->EP=(x))
+#define GetEnv_EP(e) 		(((ENVELOPE *)(e))->EP)
+#define SetEnv_EP(e,x) 		(((ENVELOPE *)(e))->EP=(x))
 
-#define GetEnv_queueing(e)      (env(e)->queueing)
-#define SetEnv_queueing(e,x)    (env(e)->queueing=(x))
+#define GetEnv_queueing(e)      (((ENVELOPE *)(e))->queueing)
+#define SetEnv_queueing(e,x)    (((ENVELOPE *)(e))->queueing=(x))
 
-#define GetEnv_priosize(e)      (env(e)->priosize)
-#define SetEnv_priosize(e,x)    (env(e)->priosize=(x))
+#define GetEnv_priosize(e)      (((ENVELOPE *)(e))->priosize)
+#define SetEnv_priosize(e,x)    (((ENVELOPE *)(e))->priosize=(x))
 
-#define GetEnv_TotalSize(e)     (env(e)->TotalSize)
-#define SetEnv_TotalSize(e,x)   (env(e)->TotalSize=(x))
+#define GetEnv_TotalSize(e)     (((ENVELOPE *)(e))->TotalSize)
+#define SetEnv_TotalSize(e,x)   (((ENVELOPE *)(e))->TotalSize=(x))
 
-#define GetEnv_packid(e)        (env(e)->packid)
-#define SetEnv_packid(e,x)      (env(e)->packid=(x))
+#define GetEnv_packid(e)        (((ENVELOPE *)(e))->packid)
+#define SetEnv_packid(e,x)      (((ENVELOPE *)(e))->packid=(x))
 
-#define GetEnv_msgType(e)       (env(e)->msgType)
-#define SetEnv_msgType(e,x)     (env(e)->msgType=(x))
+#define GetEnv_msgType(e)       (((ENVELOPE *)(e))->msgType)
+#define SetEnv_msgType(e,x)     (((ENVELOPE *)(e))->msgType=(x))
 
 /*********************************/
 /* Navigating the priority field */
@@ -199,3 +201,5 @@ typedef struct envelope {
 #define GetEnv_priobgn(e) (GetEnv_prioend(e)-GetEnv_priobytes(e))
 
 #endif
+
+

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-09-01 02:13:17  jyelon
+ * Revision 2.5  1995-10-13 18:15:53  jyelon
+ * K&R changes.
+ *
+ * Revision 2.4  1995/09/01  02:13:17  jyelon
  * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
  *
  * Revision 2.3  1995/07/27  20:29:34  jyelon
@@ -99,7 +102,7 @@ ChareIDType *CID;
 }
 
 
-ACC_CollectFromNode_Fn(msg, mydata)
+static ACC_CollectFromNode_Fn(msg, mydata)
 ACC_COLLECT_MSG *msg;
 ACC_DATA *mydata;
 {
@@ -123,7 +126,7 @@ ACC_DATA *mydata;
 
 
 
-ACC_LeafNodeCollect_Fn(msg, mydata)
+static ACC_LeafNodeCollect_Fn(msg, mydata)
 DummyMsg *msg;
 ACC_DATA *mydata;
 {
@@ -148,7 +151,7 @@ TRACE(CmiPrintf("[%d] ACC_NodeCollect : Sent message to parent\n",
 
 
 
-ACC_InteriorNodeCollect_Fn(msg, mydata)
+static ACC_InteriorNodeCollect_Fn(msg, mydata)
 char *msg;
 ACC_DATA *mydata;
 {
@@ -195,7 +198,7 @@ TRACE(CmiPrintf("[%d] CreateAcc: boc = %d\n", CmiMyPe(), (AccIDType ) boc));
 }
 
 
-ACC_BranchInit_Fn(msg, mydata)
+static ACC_BranchInit_Fn(msg, mydata)
 void *msg;
 ACC_DATA *mydata; 
 {

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-09-01 02:13:17  jyelon
+ * Revision 2.8  1995-10-13 18:15:53  jyelon
+ * K&R changes.
+ *
+ * Revision 2.7  1995/09/01  02:13:17  jyelon
  * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
  *
  * Revision 2.6  1995/07/27  20:29:34  jyelon
@@ -96,13 +99,20 @@ VidSendOverMessages(msgPtr, data_area)
 CHARE_ID_MSG *msgPtr;
 void *data_area;
 {
-    ChareIDType         ID=msgPtr->ID;
-    ENVELOPE 		*env = ENVELOPE_UPTR(msgPtr);
-    CHARE_BLOCK		*vidblock = GetEnv_vidBlockPtr(env);
+    ChareIDType         ID;
+    ENVELOPE 		*env;
+    CHARE_BLOCK		*vidblock;
     void 		*vidqueue;
-    int 		chare_magic = GetID_chare_magic_number(ID);
-    int                 chare_pe    = GetID_onPE(ID);
-    CHARE_BLOCK        *chare_block = GetID_chareBlockPtr(ID);
+    int 		chare_magic;
+    int                 chare_pe;
+    CHARE_BLOCK        *chare_block;
+
+    ID = msgPtr->ID;
+    env = ENVELOPE_UPTR(msgPtr);
+    vidblock = GetEnv_vidBlockPtr(env);
+    chare_magic = GetID_chare_magic_number(ID);
+    chare_pe = GetID_onPE(ID);
+    chare_block  = GetID_chareBlockPtr(ID);
 
     if (vidblock->charekind != CHAREKIND_UVID) {
       CmiPrintf("system error #12983781\n");

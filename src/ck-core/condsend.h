@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-06-29 22:34:30  narain
+ * Revision 2.4  1995-10-13 18:15:53  jyelon
+ * K&R changes.
+ *
+ * Revision 2.3  1995/06/29  22:34:30  narain
  * Changed prototype of  SendMsgIfConditionArises to static
  *
  * Revision 2.2  1995/06/18  21:30:15  sanjeev
@@ -38,14 +41,12 @@ typedef struct {
 } CallBocStuff;
 
 /* Function implemented but not to be used .. */
-static void SendMsgIfConditionArises(int condnum, int entry, void *msg, int size,
-			      ChareIDType *cid);
-void CallBocIfConditionArises(int condnum, FUNCTION_PTR fnp, int bocNum);      
-void SendMsgAfter(unsigned int deltaT, int entry, void *msg, int size, 
-		  ChareIDType *cid);
-void CallBocAfter(FUNCTION_PTR fnp, int bocNum, unsigned int deltaT);      
-void CallBocOnCondition(FUNCTION_PTR fnp, int bocNum);
+static void SendMsgIfConditionArises  CMK_PROTO((int condnum, int entry, void *msg, int size, ChareIDType *cid));
+void CallBocIfConditionArises CMK_PROTO((int condnum, FUNCTION_PTR fnp, int bocNum));
+void SendMsgAfter CMK_PROTO((unsigned int deltaT, int entry, void *msg, int size, ChareIDType *cid));
+void CallBocAfter CMK_PROTO((FUNCTION_PTR fnp, int bocNum, unsigned int deltaT));
+void CallBocOnCondition CMK_PROTO((FUNCTION_PTR fnp, int bocNum));
 
-int NoDelayedMsgs();
+int NoDelayedMsgs CMK_PROTO((void));
 
 #endif

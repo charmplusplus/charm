@@ -1762,7 +1762,7 @@ void *CmiGetNonLocal()
   PacketQueueElem *packetelem, *nextpacket;
   MsgQueueElem *msgelem;
   DATA_HDR *packet;
-  void *newmsg;
+  char *newmsg;
   int msglength;
 
   CmiInterruptsBlock();
@@ -1782,7 +1782,7 @@ void *CmiGetNonLocal()
   
   /* now construct message */
   msglength = packetelem->packet->full_size;
-  newmsg = (void *)CmiAlloc(msglength);
+  newmsg = (char *)CmiAlloc(msglength);
   nextptr = newmsg + msglength;
   while (packetelem != NULL) {
     nextpacket = packetelem->nextptr;

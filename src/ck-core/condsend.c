@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-06-19 17:45:27  sanjeev
+ * Revision 2.5  1995-10-13 18:15:53  jyelon
+ * K&R changes.
+ *
+ * Revision 2.4  1995/06/19  17:45:27  sanjeev
  * bug in CallBocFn
  *
  * Revision 2.3  1995/06/18  22:10:45  sanjeev
@@ -26,8 +29,7 @@
 static char ident[] = "@(#)$Header$";
 
 
-#include "conv-conds.h"
-
+#include "converse.h"
 #include "const.h"
 #include "chare.h"
 #include "globals.h"
@@ -50,7 +52,8 @@ void condsendModuleInit()
   This function sends out a message using fields that it extracts from its one
   argument
  *****************************************************************************/
-static int SendMsgFn(void *arg)
+static int SendMsgFn(arg)
+    void *arg;
 {
   SendMsgStuff *sendstruct;
 
@@ -64,7 +67,8 @@ static int SendMsgFn(void *arg)
   This function makes a BOC call using fields that it extracts from its one
   argument
  *****************************************************************************/
-static int CallBocFn(void *arg)
+static int CallBocFn(arg)
+    void *arg;
 {
   CallBocStuff *cbocstruct;
   
@@ -79,8 +83,9 @@ static int CallBocFn(void *arg)
   is raised
  *****************************************************************************/
 /* Function not to be used ..  */
-static void SendMsgIfConditionArises(int condnum, int entry, void *msgToSend, 
-				     int size, ChareIDType *pChareID)
+static void SendMsgIfConditionArises(condnum, entry, msgToSend, size, pChareID)
+int condnum; int entry; void *msgToSend; 
+int size; ChareIDType *pChareID;
 {
   SendMsgStuff *newEntry;
   if((newEntry = (SendMsgStuff *) CmiAlloc(sizeof(SendMsgStuff))) == NULL) {
@@ -103,7 +108,8 @@ static void SendMsgIfConditionArises(int condnum, int entry, void *msgToSend,
   This function adds a call that will make a BOC call if a particular condition
   is raised
  *****************************************************************************/
-void CallBocIfConditionArises(int condnum, FUNCTION_PTR fn_ptr, int bocNum)
+void CallBocIfConditionArises(condnum, fn_ptr, bocNum)
+    int condnum; FUNCTION_PTR fn_ptr; int bocNum;
 {
   CallBocStuff *newEntry;
   
@@ -123,8 +129,9 @@ void CallBocIfConditionArises(int condnum, FUNCTION_PTR fn_ptr, int bocNum)
   This function adds a call that will send a message during a TimerChecks() 
   call after a minimum delay of deltaT
  *****************************************************************************/
-void SendMsgAfter(unsigned int deltaT, int entry, void *msgToSend, int size,
-		  ChareIDType *pChareID)
+void SendMsgAfter(deltaT, entry, msgToSend, size, pChareID)
+    unsigned int deltaT; int entry; void *msgToSend;
+    int size; ChareIDType *pChareID;
 {
   SendMsgStuff *newEntry;
 
@@ -149,7 +156,8 @@ void SendMsgAfter(unsigned int deltaT, int entry, void *msgToSend, int size,
   This function adds a BOC call that will be made during a TimerChecks() call 
   after a minimum delay of deltaT
  *****************************************************************************/
-void CallBocAfter(FUNCTION_PTR fn_ptr, int bocNum, unsigned int deltaT)
+void CallBocAfter(fn_ptr, bocNum, deltaT)
+    FUNCTION_PTR fn_ptr; int bocNum; unsigned int deltaT;
 {
   CallBocStuff *newEntry;
 
@@ -170,7 +178,8 @@ void CallBocAfter(FUNCTION_PTR fn_ptr, int bocNum, unsigned int deltaT)
   In reality, this function adds a BOC call that will be made during each 
   PeriodicChecks() call
  *****************************************************************************/
-void CallBocOnCondition(FUNCTION_PTR fn_ptr, int bocNum)
+void CallBocOnCondition(fn_ptr, bocNum)
+    FUNCTION_PTR fn_ptr; int bocNum;
 {
   CallBocStuff *newEntry;
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-10-11 22:20:23  sanjeev
+ * Revision 2.12  1995-10-13 18:17:13  jyelon
+ * K&R changes.
+ *
+ * Revision 2.11  1995/10/11  22:20:23  sanjeev
  * fixed bugs due to new syntax
  *
  * Revision 2.10  1995/10/11  17:55:49  sanjeev
@@ -1262,7 +1265,8 @@ char *b, *s ;
 
 
 
-OutputNewChareMsg(char *name, char *arg, char *placement)
+OutputNewChareMsg(name, arg, placement)
+    char *name; char *arg; char *placement;
 {
 	char *sptr ;
 	int type ;

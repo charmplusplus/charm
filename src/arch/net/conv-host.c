@@ -67,7 +67,8 @@ int *notify_port;
 int  notify_count;
 int  notify_max;
 
-void notify_die(int ip, int port)
+void notify_die(ip, port)
+    int ip; int port;
 {
   if (notify_count==notify_max) {
     notify_max  = (notify_max*2)+100;
@@ -81,7 +82,8 @@ void notify_die(int ip, int port)
   notify_count++;
 }
 
-void notify_die_doit(char *msg)
+void notify_die_doit(msg)
+    char *msg;
 {
   int skt_connect();
   char buffer[1024];
@@ -178,7 +180,10 @@ unsigned int skt_ip()
   return ip;
 }
 
-void skt_server(unsigned int *pip, unsigned int *ppo, unsigned int *pfd)
+void skt_server(pip,ppo,pfd)
+    unsigned int *pip;
+    unsigned int *ppo;
+    unsigned int *pfd;
 {
   int fd= -1;
   int ok, len;
@@ -201,8 +206,11 @@ void skt_server(unsigned int *pip, unsigned int *ppo, unsigned int *pfd)
   *ppo = ntohs(addr.sin_port);
 }
 
-void skt_accept(int src,
-		unsigned int *pip, unsigned int *ppo, unsigned int *pfd)
+void skt_accept(src,pip,ppo,pfd)
+    int src;
+    unsigned int *pip;
+    unsigned int *ppo;
+    unsigned int *pfd;
 {
   int i, fd, ok;
   struct sockaddr_in remote;
@@ -217,7 +225,8 @@ void skt_accept(int src,
   *pfd=fd;
 }
 
-int skt_connect(unsigned int ip, int port)
+int skt_connect(ip, port)
+    unsigned int ip; int port;
 {
   struct sockaddr_in remote; short sport=port;
   int fd, ok, len;
@@ -250,14 +259,16 @@ int skt_connect(unsigned int ip, int port)
  *
  ****************************************************************************/
 
-zap_newline(char *s)
+zap_newline(s)
+    char *s;
 {
   char *p;
   p = s + strlen(s)-1;
   if (*p == '\n') *p = '\0';
 }
 
-char *substr(char *lo, char *hi)
+char *substr(lo, hi)
+    char *lo; char *hi;
 {
   int len = hi-lo;
   char *res = (char *)malloc(1+len);
@@ -267,20 +278,23 @@ char *substr(char *lo, char *hi)
 }
 
 /* advance pointer over blank characters */
-char *skipblanks(char *p)
+char *skipblanks(p)
+    char *p;
 {
   while ((*p==' ')||(*p=='\t')) p++;
   return p;
 }
 
 /* advance pointer over nonblank characters */
-char *skipstuff(char *p)
+char *skipstuff(p)
+    char *p;
 {
   while ((*p)&&(*p!=' ')&&(*p!='\t')) p++;
   return p;
 }
 
-char *text_ip(unsigned int ip)
+char *text_ip(ip)
+    unsigned int ip;
 {
   static char buffer[100];
   sprintf(buffer,"%d.%d.%d.%d",
@@ -291,7 +305,8 @@ char *text_ip(unsigned int ip)
   return buffer;
 }
 
-int readhex(FILE *f, int len)
+int readhex(f, len)
+    FILE *f; int len;
 {
   char buffer[100];
   char *p;
@@ -327,7 +342,8 @@ char *mylogin()
   return self->pw_name;
 } 
 
-unsigned int lookup_ip(char *name)
+unsigned int lookup_ip(name)
+    char *name;
 {
   struct hostent *h;
   unsigned int ip1,ip2,ip3,ip4; int nread;
@@ -367,7 +383,8 @@ static char  **pparam_argv;
 static char    pparam_optc='-';
 char           pparam_error[100];
 
-static ppdef pparam_find(char *lname)
+static ppdef pparam_find(lname)
+    char *lname;
 {
   ppdef def;
   for (def=ppdefs; def; def=def->next)
@@ -376,7 +393,8 @@ static ppdef pparam_find(char *lname)
   return 0;
 }
 
-static ppdef pparam_cell(char *lname)
+static ppdef pparam_cell(lname)
+    char *lname;
 {
   ppdef def = pparam_find(lname);
   if (def) return def;
@@ -389,41 +407,47 @@ static ppdef pparam_cell(char *lname)
   return def;
 }
 
-void pparam_doc(char *lname, char *doc)
+void pparam_doc(lname, doc)
+    char *lname; char *doc;
 {
   ppdef def = pparam_cell(lname);
   def->doc = doc;
 }
 
-void pparam_defint(char *lname, int value)
+void pparam_defint(lname, value)
+    char *lname; int value;
 {
   ppdef def = pparam_cell(lname);
   def->type  = 'i';
   def->value.i = value;
 }
 
-void pparam_defreal(char *lname, double value)
+void pparam_defreal(lname, value)
+    char *lname; double value;
 {
   ppdef def = pparam_cell(lname);
   def->type  = 'r';
   def->value.r = value;
 }
 
-void pparam_defstr(char *lname, char *value)
+void pparam_defstr(lname, value)
+    char *lname; char *value;
 {
   ppdef def = pparam_cell(lname);
   def->type  = 's';
   def->value.s = value;
 }
 
-void pparam_defflag(char *lname)
+void pparam_defflag(lname)
+    char *lname;
 {
   ppdef def = pparam_cell(lname);
   def->type  = 'f';
   def->value.f = 0;
 }
 
-static ppdef pparam_hfind(char *lname)
+static ppdef pparam_hfind(lname)
+    char *lname;
 {
   ppdef def = pparam_find(lname);
   if (def) return def;
@@ -431,35 +455,40 @@ static ppdef pparam_hfind(char *lname)
   exit(1);
 }
 
-int pparam_getint(char *lname)
+int pparam_getint(lname)
+    char *lname;
 {
   ppdef def = pparam_hfind(lname);
   if (def->type != 'i') return 0;
   return def->value.i;
 }
 
-double pparam_getreal(char *lname)
+double pparam_getreal(lname)
+    char *lname;
 {
   ppdef def = pparam_hfind(lname);
   if (def->type != 'r') return 0.0;
   return def->value.r;
 }
 
-char *pparam_getstr(char *lname)
+char *pparam_getstr(lname)
+    char *lname;
 {
   ppdef def = pparam_hfind(lname);
   if (def->type != 's') return 0;
   return def->value.s;
 }
 
-int pparam_getflag(char *lname)
+int pparam_getflag(lname)
+    char *lname;
 {
   ppdef def = pparam_hfind(lname);
   if (def->type != 'f') return 0;
   return def->value.f;
 }
 
-static int pparam_setdef(ppdef def, char *value)
+static int pparam_setdef(def, value)
+    ppdef def; char *value;
 {
   char *p;
   switch(def->type)
@@ -482,13 +511,15 @@ static int pparam_setdef(ppdef def, char *value)
     }
 }
 
-int pparam_set(char *lname, char *value)
+int pparam_set(lname, value)
+    char *lname; char *value;
 {
   ppdef def = pparam_cell(lname);
   return pparam_setdef(def, value);
 }
 
-char *pparam_getdef(ppdef def)
+char *pparam_getdef(def)
+    ppdef def;
 {
   static char result[100];
   switch(def->type)
@@ -528,14 +559,16 @@ void pparam_printdocs()
   printf("\n");
 }
 
-void pparam_delarg(int i)
+void pparam_delarg(i)
+    int i;
 {
   int j;
   for (j=i; pparam_argv[j]; j++)
     pparam_argv[j]=pparam_argv[j+1];
 }
 
-int pparam_countargs(char **argv)
+int pparam_countargs(argv)
+    char **argv;
 {
   int argc;
   for (argc=0; argv[argc]; argc++);
@@ -611,7 +644,8 @@ int pparam_parseopt()
   return 0;
 }
 
-int pparam_parsecmd(char optchr, char **argv)
+int pparam_parsecmd(optchr, argv)
+    char optchr; char **argv;
 {
   pparam_error[0]=0;
   pparam_argv = argv;
@@ -671,7 +705,8 @@ static void path_segs_free()
   while (path_nsegs) free(path_segs[--path_nsegs]);
 }
 
-static void path_dissect(char *path)
+static void path_dissect(path)
+    char *path;
 {
   char buf[1000];
   int len=0;
@@ -706,7 +741,8 @@ static void path_reduce()
   path_nsegs = dst;
 }
 
-static void path_reconstitute(char *buff)
+static void path_reconstitute(buff)
+    char *buff;
 {
   int i;
   for (i=0; i<path_nsegs; i++)
@@ -718,7 +754,8 @@ static void path_reconstitute(char *buff)
   *(--buff)=0;
 }
 
-void path_simplify(char *path)
+void path_simplify(path)
+    char *path;
 {
   path_nsegs = 0;
   path_dissect(path);
@@ -727,7 +764,8 @@ void path_simplify(char *path)
   path_segs_free();
 }
 
-void path_concat(char *base, char *rel)
+void path_concat(base, rel)
+    char *base; char *rel;
 {
   path_nsegs = 0;
   if (rel[0]!='/') path_dissect(base);
@@ -737,7 +775,8 @@ void path_concat(char *base, char *rel)
   path_segs_free();
 }
 
-void path_absolute(char *path)
+void path_absolute(path)
+    char *path;
 {
   char buff[1024];
   if (path[0]=='/') return;
@@ -746,7 +785,8 @@ void path_absolute(char *path)
   strcpy(path, buff);
 }
 
-int path_exists(char *path)
+int path_exists(path)
+    char *path;
 {
   struct stat s;
   int ok = stat(path, &s);
@@ -754,7 +794,8 @@ int path_exists(char *path)
   return 0;
 }
 
-int path_executable(char *path)
+int path_executable(path)
+    char *path;
 {
   struct stat s;
   int ok = stat(path, &s);
@@ -766,7 +807,8 @@ int path_executable(char *path)
   return 0;
 }
 
-int path_nonzero(char *path)
+int path_nonzero(path)
+    char *path;
 {
   struct stat s;
   int ok = stat(path, &s);
@@ -776,7 +818,8 @@ int path_nonzero(char *path)
   return 1;
 }
 
-int path_search(char *prog, char *path)
+int path_search(prog, path)
+    char *prog; char *path;
 {
   char *end;
   if (strchr(prog,'/'))
@@ -803,7 +846,8 @@ int path_search(char *prog, char *path)
   prog[0]=0; errno=ENOENT; return -1;
 }
 
-int path_isprefix(char *ipre, char *ipath)
+int path_isprefix(ipre, ipath)
+    char *ipre; char *ipath;
 {
   char pre[MAXPATHLEN];
   char path[MAXPATHLEN];
@@ -904,7 +948,8 @@ typedef struct xstr
 char *xstr_lptr(l) xstr l; { return l->lptr; }
 char *xstr_rptr(l) xstr l; { return l->rptr; }
 
-int xstr_len(xstr l)
+int xstr_len(l)
+    xstr l;
 {
   return l->rptr - l->lptr;
 }
@@ -919,13 +964,15 @@ xstr xstr_alloc()
   return res;
 }
 
-void xstr_free(xstr s)
+void xstr_free(s)
+    xstr s;
 {
   free(s->lend);
   free(s);
 }
 
-void xstr_rexpand(xstr l, int nbytes)
+void xstr_rexpand(l, nbytes)
+    xstr l; int nbytes;
 {
   int lspace, rspace, uspace, needed; char *nbuf;
   if (l->rend - l->rptr>=nbytes) { l->rptr += nbytes; return; }
@@ -941,7 +988,8 @@ void xstr_rexpand(xstr l, int nbytes)
   l->rend = nbuf + needed + needed + needed;
 }
 
-void xstr_lexpand(xstr l, int nbytes)
+void xstr_lexpand(l, nbytes)
+    xstr l; int nbytes;
 {
   int lspace, rspace, uspace, needed; char *nbuf;
   if (l->rend - l->rptr>=nbytes) { l->rptr += nbytes; return; }
@@ -957,19 +1005,22 @@ void xstr_lexpand(xstr l, int nbytes)
   l->rend = nbuf + needed + needed + needed;
 }
 
-void xstr_rshrink(xstr l, int nbytes)
+void xstr_rshrink(l, nbytes)
+    xstr l; int nbytes;
 {
   if (l->rptr - l->lptr < nbytes) { l->rptr=l->lptr; return; }
   l->rptr -= nbytes;
 }
 
-void xstr_lshrink(xstr l, int nbytes)
+void xstr_lshrink(l, nbytes)
+    xstr l; int nbytes;
 {
   if (l->rptr - l->lptr < nbytes) { l->lptr=l->rptr; return; }
   l->lptr += nbytes;
 }
 
-void xstr_write(xstr l, char *bytes, int nbytes)
+void xstr_write(l, bytes, nbytes)
+    xstr l; char *bytes; int nbytes;
 {
   xstr_rexpand(l, nbytes);
   memcpy(xstr_lptr(l)+xstr_len(l)-nbytes, bytes, nbytes);
@@ -987,7 +1038,8 @@ void xstr_printf(va_alist) va_dcl
   xstr_write(l, buffer, strlen(buffer));
 }
 
-char *xstr_gets(char *buff, int size, xstr s)
+char *xstr_gets(buff, size, s)
+    char *buff; int size; xstr s;
 {
   char *p; int len;
   xstr_rptr(s)[0]=0;
@@ -1051,7 +1103,8 @@ typedef struct prog
 }
 *prog;
 
-int prog_flush(prog c)
+int prog_flush(c)
+    prog c;
 {
   xstr ibuf = c->ibuf;
   int ifd = c->ifd;
@@ -1068,14 +1121,16 @@ int prog_flush(prog c)
   return 0;
 }
 
-void prog_iclose(prog c)
+void prog_iclose(c)
+    prog c;
 {
   prog_flush(c);
   if (c->ibuf) { xstr_free(c->ibuf); close(c->ifd); }
   c->ibuf = 0;
 }
 
-void prog_close(prog c)
+void prog_close(c)
+    prog c;
 {
   prog_flush(c);
   if (c->ibuf) { xstr_free(c->ibuf); close(c->ifd); }
@@ -1084,7 +1139,8 @@ void prog_close(prog c)
   free(c);
 }
 
-prog prog_make(int ifd, int ofd, int efd, int pid)
+prog prog_make(ifd, ofd, efd, pid)
+    int ifd, ofd, efd, pid;
 {
   prog res = (prog)malloc(sizeof(struct prog));
   res->ifd = ifd;
@@ -1097,7 +1153,8 @@ prog prog_make(int ifd, int ofd, int efd, int pid)
   return res;
 }
 
-prog prog_start(char *p, char **argv, int useerr)
+prog prog_start(p, argv, useerr)
+    char *p; char **argv; int useerr;
 {
   int p_stdin[2];
   int p_stdout[2];
@@ -1166,7 +1223,8 @@ char *arg_currdir_a;
 char *arg_currdir_r;
 char *arg_mylogin;
 
-arg_init(int argc, char **argv)
+arg_init(argc, argv)
+    int argc; char **argv;
 {
   static char buf[1024]; int len, i;
   
@@ -1400,7 +1458,9 @@ void nodetab_init()
   fclose(f);
 }
 
-nodetab_info nodetab_getinfo(int i) {
+nodetab_info nodetab_getinfo(i)
+    int i;
+{
   if (nodetab_table==0) {
     fprintf(stderr,"Node table not initialized.\n");
     exit(1);
@@ -1412,11 +1472,11 @@ nodetab_info nodetab_getinfo(int i) {
   return nodetab_table+i;
 }
 
-char        *nodetab_name(int i)   { return nodetab_getinfo(i)->name; }
-char        *nodetab_login(int i)  { return nodetab_getinfo(i)->login; }
-char        *nodetab_passwd(int i) { return nodetab_getinfo(i)->passwd; }
-char        *nodetab_setup(int i)  { return nodetab_getinfo(i)->setup; }
-unsigned int nodetab_ip(int i)     { return nodetab_getinfo(i)->ip; }
+char        *nodetab_name(i) int i;    { return nodetab_getinfo(i)->name; }
+char        *nodetab_login(i) int i;   { return nodetab_getinfo(i)->login; }
+char        *nodetab_passwd(i) int i;  { return nodetab_getinfo(i)->passwd; }
+char        *nodetab_setup(i) int i;   { return nodetab_getinfo(i)->setup; }
+unsigned int nodetab_ip(i) int i;      { return nodetab_getinfo(i)->ip; }
  
 /****************************************************************************
  *
@@ -1451,14 +1511,16 @@ typedef struct arvar
 
 arvar arvar_list;
 
-arvar arvar_find(char *var)
+arvar arvar_find(var)
+    char *var;
 {
   arvar v = arvar_list;
   while (v && (strcmp(v->name, var))) v=v->next;
   return v;
 }
 
-arvar arvar_obtain(char *var)
+arvar arvar_obtain(var)
+    char *var;
 {
   arvar v = arvar_find(var);
   if (v==0) { 
@@ -1473,7 +1535,8 @@ arvar arvar_obtain(char *var)
   return v;
 }
 
-void arvar_set(char *var, int index, char *val)
+void arvar_set(var, index, val)
+    char *var; int index; char *val;
 {
   char *old;
   int i, lo, hi;
@@ -1497,7 +1560,8 @@ void arvar_set(char *var, int index, char *val)
   v->data[index-(v->lo)] = strdup(val);
 }
 
-char *arvar_get(char *var, int lo, int hi)
+char *arvar_get(var, lo, hi)
+    char *var; int lo; int hi;
 {
   int len=0; int i;
   arvar v = arvar_find(var);
@@ -1539,7 +1603,7 @@ char *arvar_get(char *var, int lo, int hi)
 
 char *input_buffer;
 
-void input_extend(void)
+void input_extend()
 {
   char line[1024];
   int len = input_buffer?strlen(input_buffer):0;
@@ -1549,12 +1613,13 @@ void input_extend(void)
   strcpy(input_buffer+len, line);
 }
 
-void input_init(void)
+void input_init()
 {
   input_buffer = strdup("");
 }
 
-char *input_extract(int nchars)
+char *input_extract(nchars)
+    int nchars;
 {
   char *res = substr(input_buffer, input_buffer+nchars);
   char *tmp = substr(input_buffer+nchars, input_buffer+strlen(input_buffer));
@@ -1563,7 +1628,7 @@ char *input_extract(int nchars)
   return res;
 }
 
-char *input_gets(void)
+char *input_gets()
 {
   char *p, *res; int len;
   while(1) {
@@ -1577,7 +1642,8 @@ char *input_gets(void)
   return res;
 }
 
-char *input_scanf_chars(char *fmt)
+char *input_scanf_chars(fmt)
+    char *fmt;
 {
   char buf[8192]; int len, pos;
   static int fd; static FILE *file;
@@ -1630,7 +1696,8 @@ req_node     req_saved;
 #define REQ_POSTPONE -1
 #define REQ_FAILED -2
 
-int req_handle_aset(char *line)
+int req_handle_aset(line)
+    char *line;
 {
   char cmd[100], var[100], val[1000]; int index, ok;
   ok = sscanf(line,"%s %s %d %s",cmd,var,&index,val);
@@ -1639,7 +1706,8 @@ int req_handle_aset(char *line)
   return REQ_OK;
 }
 
-int req_reply(int ip, int port, char *pre, char *ans)
+int req_reply(ip, port, pre, ans)
+    int ip; int port; char *pre; char *ans;
 {
   int fd = skt_connect(ip, port);
   if (fd<=0) return REQ_FAILED;
@@ -1651,7 +1719,8 @@ int req_reply(int ip, int port, char *pre, char *ans)
   return REQ_OK;
 }
 
-int req_handle_aget(char *line)
+int req_handle_aget(line)
+    char *line;
 {
   char cmd[100], host[1000], pre[1000], var[100]; int ip, port, lo, hi, ok;
   char *res;
@@ -1667,31 +1736,36 @@ int req_handle_aget(char *line)
   return ok;
 }
 
-int req_handle_print(char *line)
+int req_handle_print(line)
+    char *line;
 {
   printf("%s\n",line+6);
   return REQ_OK;
 }
 
-int req_handle_princ(char *line)
+int req_handle_princ(line)
+    char *line;
 {
   printf("%s",line+6);
   return REQ_OK;
 }
 
-int req_handle_printerr(char *line)
+int req_handle_printerr(line)
+    char *line;
 {
   fprintf(stderr,"%s\n",line+9);
   return REQ_OK;
 }
 
-int req_handle_princerr(char *line)
+int req_handle_princerr(line)
+    char *line;
 {
   fprintf(stderr,"%s",line+9);
   return REQ_OK;
 }
 
-int req_handle_notify_die(char *line)
+int req_handle_notify_die(line)
+    char *line;
 {
   char cmd[100], host[100]; int ip, port, nread;
   nread = sscanf(line,"%s%s%d",cmd,host,&port);
@@ -1702,21 +1776,24 @@ int req_handle_notify_die(char *line)
   return REQ_OK;
 }
 
-int req_handle_die(char *line)
+int req_handle_die(line)
+    char *line;
 {
   notify_die_doit(line+4);
 }
 
 int ending_count=0;
 
-int req_handle_ending(char *line)
+int req_handle_ending(line)
+    char *line;
 {
   ending_count++;
   if (ending_count == nodetab_size) exit(0);
   return REQ_OK;
 }
 
-int req_handle_scanf(char *line)
+int req_handle_scanf(line)
+    char *line;
 {
   char cmd[100], host[100]; int ip, port, ok;
   char *fmt, *res, *p;
@@ -1736,7 +1813,8 @@ int req_handle_scanf(char *line)
   return REQ_OK;
 }
 
-int req_handle(char *line)
+int req_handle(line)
+    char *line;
 {
   char cmd[100];
   sscanf(line,"%s",cmd);
@@ -1772,7 +1850,8 @@ void req_run_saved()
   }
 }
 
-req_serve_client(FILE *f)
+req_serve_client(f)
+    FILE *f;
 {
   char line[1000]; int status;
   while (1) {
@@ -1823,7 +1902,8 @@ req_init()
 /*                                                                          */
 /****************************************************************************/
 
-prog rsh_start(int nodeno)
+prog rsh_start(nodeno)
+    int nodeno;
 {
   char *rshargv[6];
   prog rsh;
@@ -1846,7 +1926,8 @@ prog rsh_start(int nodeno)
   return rsh;
 }
 
-int rsh_pump(prog p, int nodeno, char **argv)
+int rsh_pump(p, nodeno, argv)
+    prog p; int nodeno; char **argv;
 {
   xstr ibuf = p->ibuf;
   int randno = rand();
@@ -2052,7 +2133,9 @@ int start_nodes()
  *
  ****************************************************************************/
 
-main(int argc, char **argv) {
+main(argc, argv)
+    int argc; char **argv;
+{
   srand(time(0));
   /* Compute the values of all constants */
   arg_init(argc, argv);

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.21  1995-10-11 17:54:40  sanjeev
+ * Revision 2.22  1995-10-13 18:15:53  jyelon
+ * K&R changes.
+ *
+ * Revision 2.21  1995/10/11  17:54:40  sanjeev
  * fixed Charm++ chare creation
  *
  * Revision 2.20  1995/09/29  09:51:12  jyelon
@@ -235,7 +238,8 @@ ENVELOPE *env;
 }
 
 
-void CheckMagicNumber(CHARE_BLOCK *chare, ENVELOPE *env)
+void CheckMagicNumber(chare, env)
+    CHARE_BLOCK *chare; ENVELOPE *env;
 {
   if (GetID_chare_magic_number(chare->selfID) !=
       GetEnv_chare_magic_number(env)) {
