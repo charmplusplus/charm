@@ -23,6 +23,10 @@ all:
 	@echo '  make charm'
 	@echo '  make charm++'
 
+charm: converse charmlibs charmxlat libcharm.a charmreplay
+
+charm++: charm charmxlat++ charm++libs
+
 ###############################################################################
 #
 # Converse Libraries
@@ -71,16 +75,16 @@ libconv-qs-replay.a: qs.replay.c
 	charmc -cwd -o libconv-qs-replay.a qs.replay.c
 
 fifo.o: fifo.c $(CVHEADERS)
-	charmc -cwd -c fifo.c
+	charmc -cwd fifo.c
 
 spantree.o: spantree.c $(CVHEADERS)
-	charmc -cwd -c spantree.c
+	charmc -cwd spantree.c
 
 machine.o: machine.c $(CVHEADERS)
-	charmc -cwd -c machine.c
+	charmc -cwd machine.c
 
 convcore.o: convcore.c $(CVHEADERS)
-	charmc -cwd -c convcore.c
+	charmc -cwd convcore.c
 
 cmk_extras:
 	csh -fc 'source conv-mach.csh ; set echo ; $$CMK_EXTRAS'
@@ -127,7 +131,7 @@ CK_LIBS_N=$(CK_LDB_N) $(CK_CPLUS_N) $(CK_CORE_N) libckn-defmain.a
 
 CK_LIBS_D=$(CK_LDB_D) $(CK_CPLUS_D) $(CK_CORE_D) libckd-defmain.a
 
-charm: charmxlat charmfilter libcharm.a converse $(CK_LIBS_N) $(CK_LIBS_D)
+charmlibs: $(CK_LIBS_N) $(CK_LIBS_D)
 
 libckn-core-notrace.a: $(LIBCK_CORE_N) perf-none.n.o main.n.o ck.n.o
 	charmc -cwd -o $@ $(LIBCK_CORE_N) perf-none.n.o main.n.o ck.n.o
@@ -279,10 +283,11 @@ perf-proj.d.o : perf-proj.c performance.h $(CKHEADERS)
 #
 ###############################################################################
 
-charm++: charm libckn-cplus-y.a libckd-cplus-n.a charmxlat++ charmfilter++
 
 LIBCP_N=init.cplus.n.o main.cplus.n.o ck.cplus.n.o acc.cplus.n.o mono.cplus.n.o
 LIBCP_D=init.cplus.d.o main.cplus.d.o ck.cplus.d.o acc.cplus.d.o mono.cplus.d.o
+
+charm++libs: libckn-cplus-y.a libckd-cplus-n.a 
 
 libckn-cplus-y.a: $(LIBCP_N)
 	charmc -cwd -o $@ $(LIBCP_N)
@@ -316,12 +321,11 @@ mono.cplus.n.o mono.cplus.d.o : mono.cplus.cxx $(CKHEADERS) c++interface.h mono.
 #
 ###############################################################################
 
-charmreplay: charmreplay.o perfio.o
-	charmc -seq -cwd -o charmreplay charmreplay.o perfio.o
+charmreplay: charmreplay.o perfio.n.o
+	charmc -seq -cwd -o charmreplay charmreplay.o perfio.n.o
 
 charmreplay.o: charmreplay.c
-	charmc -seq -cwd -c charmreplay.c
-
+	charmc -seq -cwd charmreplay.c
 
 ###############################################################################
 #
@@ -340,83 +344,83 @@ GENERIC_ACC_H=GENERIC-ACC.int GENERIC-ACC.p $(CKHEADERS)
 GENERIC_HIST_H=GENERIC-HIST.int GENERIC-HIST.p $(CKHEADERS)
 GENERIC_REDN_H=GENERIC-REDN.int GENERIC-REDN.p $(CKHEADERS)
 
-libcharm.a: $(LIBCHARM)
+libcharm.a: charmxlat $(LIBCHARM)
 	charmc -cwd -o libcharm.a $(LIBCHARM)
 
 pglib.o: pglib.p pglib.h pg.int $(CKHEADERS)
-	charmc -cwd -c pglib.p
+	charmc -cwd pglib.p
 
 cache.o: cache.p cache.int $(CKHEADERS)
-	charmc -cwd -c cache.p
+	charmc -cwd cache.p
 
 dag.o: dag.c dag.h $(CKHEADERS)
-	charmc -cwd -c dag.c
+	charmc -cwd dag.c
 
 barrier_redn.o: barrier_redn.p barrier_redn.int $(CKHEADERS)
-	charmc -cwd -c barrier_redn.p
+	charmc -cwd barrier_redn.p
 
-iacc_count.o: iacc_count.p iacc_count.int $(GENERIC_ACC_H)
-	charmc -cwd -c iacc_count.p
+iacc_count.o: iacc_count.int $(GENERIC_ACC_H)
+	charmc -cwd -o iacc_count.o GENERIC-ACC.p -DHEAD='"iacc_count.int"'
 
-facc_count.o: facc_count.p facc_count.int $(GENERIC_ACC_H)
-	charmc -cwd -c facc_count.p
+facc_count.o: facc_count.int $(GENERIC_ACC_H)
+	charmc -cwd -o facc_count.o GENERIC-ACC.p -DHEAD='"facc_count.int"'
 
-dacc_count.o: dacc_count.p dacc_count.int $(GENERIC_ACC_H)
-	charmc -cwd -c dacc_count.p
+dacc_count.o: dacc_count.int $(GENERIC_ACC_H)
+	charmc -cwd -o dacc_count.o GENERIC-ACC.p -DHEAD='"dacc_count.int"'
 
-iacc_hist.o: iacc_hist.p iacc_hist.int $(GENERIC_HIST_H)
-	charmc -cwd -c iacc_hist.p
+iacc_hist.o: iacc_hist.int $(GENERIC_HIST_H)
+	charmc -cwd -o iacc_hist.o GENERIC-HIST.p -DHEAD='"iacc_hist.int"'
 
-facc_hist.o: facc_hist.p facc_hist.int $(GENERIC_HIST_H)
-	charmc -cwd -c facc_hist.p
+facc_hist.o: facc_hist.int $(GENERIC_HIST_H)
+	charmc -cwd -o facc_hist.o GENERIC-HIST.p -DHEAD='"facc_hist.int"'
 
-dacc_hist.o: dacc_hist.p dacc_hist.int $(GENERIC_HIST_H)
-	charmc -cwd -c dacc_hist.p
+dacc_hist.o: dacc_hist.int $(GENERIC_HIST_H)
+	charmc -cwd -o dacc_hist.o GENERIC-HIST.p -DHEAD='"dacc_hist.int"'
 
-imaxredn.o: imaxredn.p imaxredn.int $(GENERIC_REDN_H)
-	charmc -cwd -c imaxredn.p
+imaxredn.o: imaxredn.int $(GENERIC_REDN_H)
+	charmc -cwd -o imaxredn.o GENERIC-REDN.p -DHEAD='"imaxredn.int"'
 
-iminredn.o: iminredn.p iminredn.int $(GENERIC_REDN_H)
-	charmc -cwd -c iminredn.p
+iminredn.o: iminredn.int $(GENERIC_REDN_H)
+	charmc -cwd -o iminredn.o GENERIC-REDN.p -DHEAD='"iminredn.int"'
 
-isumredn.o: isumredn.p isumredn.int $(GENERIC_REDN_H)
-	charmc -cwd -c isumredn.p
+isumredn.o: isumredn.int $(GENERIC_REDN_H)
+	charmc -cwd -o isumredn.o GENERIC-REDN.p -DHEAD='"isumredn.int"'
 
-iprodredn.o: iprodredn.p iprodredn.int $(GENERIC_REDN_H)
-	charmc -cwd -c iprodredn.p
+iprodredn.o: iprodredn.int $(GENERIC_REDN_H)
+	charmc -cwd -o iprodredn.o GENERIC-REDN.p -DHEAD='"iprodredn.int"'
 
-icountredn.o: icountredn.p icountredn.int $(GENERIC_REDN_H)
-	charmc -cwd -c icountredn.p
+icountredn.o: icountredn.int $(GENERIC_REDN_H)
+	charmc -cwd -o icountredn.o GENERIC-REDN.p -DHEAD='"icountredn.int"'
 
-fmaxredn.o: fmaxredn.p fmaxredn.int $(GENERIC_REDN_H)
-	charmc -cwd -c fmaxredn.p
+fmaxredn.o: fmaxredn.int $(GENERIC_REDN_H)
+	charmc -cwd -o fmaxredn.o GENERIC-REDN.p -DHEAD='"fmaxredn.int"'
 
-fminredn.o: fminredn.p fminredn.int $(GENERIC_REDN_H)
-	charmc -cwd -c fminredn.p
+fminredn.o: fminredn.int $(GENERIC_REDN_H)
+	charmc -cwd -o fminredn.o GENERIC-REDN.p -DHEAD='"fminredn.int"'
 
-fsumredn.o: fsumredn.p fsumredn.int $(GENERIC_REDN_H)
-	charmc -cwd -c fsumredn.p
+fsumredn.o: fsumredn.int $(GENERIC_REDN_H)
+	charmc -cwd -o fsumredn.o GENERIC-REDN.p -DHEAD='"fsumredn.int"'
 
-fprodredn.o: fprodredn.p fprodredn.int $(GENERIC_REDN_H)
-	charmc -cwd -c fprodredn.p
+fprodredn.o: fprodredn.int $(GENERIC_REDN_H)
+	charmc -cwd -o fprodredn.o GENERIC-REDN.p -DHEAD='"fprodredn.int"'
 
-fcountredn.o: fcountredn.p fcountredn.int $(GENERIC_REDN_H)
-	charmc -cwd -c fcountredn.p
+fcountredn.o: fcountredn.int $(GENERIC_REDN_H)
+	charmc -cwd -o fcountredn.o GENERIC-REDN.p -DHEAD='"fcountredn.int"'
 
-dmaxredn.o: dmaxredn.p dmaxredn.int $(GENERIC_REDN_H)
-	charmc -cwd -c dmaxredn.p
+dmaxredn.o: dmaxredn.int $(GENERIC_REDN_H)
+	charmc -cwd -o dmaxredn.o GENERIC-REDN.p -DHEAD='"dmaxredn.int"'
 
-dminredn.o: dminredn.p dminredn.int $(GENERIC_REDN_H)
-	charmc -cwd -c dminredn.p
+dminredn.o: dminredn.int $(GENERIC_REDN_H)
+	charmc -cwd -o dminredn.o GENERIC-REDN.p -DHEAD='"dminredn.int"'
 
-dsumredn.o: dsumredn.p dsumredn.int $(GENERIC_REDN_H)
-	charmc -cwd -c dsumredn.p
+dsumredn.o: dsumredn.int $(GENERIC_REDN_H)
+	charmc -cwd -o dsumredn.o GENERIC-REDN.p -DHEAD='"dsumredn.int"'
 
-dprodredn.o: dprodredn.p dprodredn.int $(GENERIC_REDN_H)
-	charmc -cwd -c dprodredn.p
+dprodredn.o: dprodredn.int $(GENERIC_REDN_H)
+	charmc -cwd -o dprodredn.o GENERIC-REDN.p -DHEAD='"dprodredn.int"'
 
-dcountredn.o: dcountredn.p dcountredn.int $(GENERIC_REDN_H)
-	charmc -cwd -c dcountredn.p
+dcountredn.o: dcountredn.int $(GENERIC_REDN_H)
+	charmc -cwd -o dcountredn.o GENERIC-REDN.p -DHEAD='"dcountredn.int"'
 
 ###############################################################################
 #
@@ -425,44 +429,42 @@ dcountredn.o: dcountredn.p dcountredn.int $(GENERIC_REDN_H)
 ###############################################################################
 
 CHARMXLAT=xl-main.o xl-ytab.o xl-sym.o xl-str.o xl-lex.o xl-lexyy.o xl-rdtok.o xl-parse.o xl-outh.o xl-srch.o xl-dag.o
-charmxlat: $(CHARMXLAT)
+charmxlat: $(CHARMXLAT) xl-space.c
 	charmc -seq -cwd -o charmxlat $(CHARMXLAT)
+	charmc -seq -cwd -o charmfilter xl-space.c
 
 xl-main.o: main.c
-	charmc -seq -cwd -c xl-main.c
+	charmc -seq -cwd xl-main.c
 
 xl-ytab.o: xl-ytab.c xl-lex.h xl-sym.h
-	charmc -seq -cwd -c xl-ytab.c
+	charmc -seq -cwd xl-ytab.c
 
 xl-sym.o: xl-sym.c xl-sym.h
-	charmc -seq -cwd -c xl-sym.c
+	charmc -seq -cwd xl-sym.c
 
 xl-str.o: xl-str.c
-	charmc -seq -cwd -c xl-str.c
+	charmc -seq -cwd xl-str.c
 
 xl-lex.o: xl-lex.c xl-lex.h xl-sym.h
-	charmc -seq -cwd -c xl-lex.c
+	charmc -seq -cwd xl-lex.c
 
 xl-lexyy.o: xl-lexyy.c	
-	charmc -seq -cwd -c xl-lexyy.c
+	charmc -seq -cwd xl-lexyy.c
 
 xl-rdtok.o: xl-rdtok.c xl-lex.h xl-sym.h
-	charmc -seq -cwd -c xl-rdtok.c
+	charmc -seq -cwd xl-rdtok.c
 
 xl-parse.o: xl-parse.c xl-lex.h xl-sym.h
-	charmc -seq -cwd -c xl-parse.c
+	charmc -seq -cwd xl-parse.c
 
 xl-outh.o: xl-outh.c xl-lex.h xl-sym.h
-	charmc -seq -cwd -c xl-outh.c
+	charmc -seq -cwd xl-outh.c
 
 xl-srch.o: xl-srch.c xl-lex.h xl-sym.h
-	charmc -seq -cwd -c xl-srch.c
+	charmc -seq -cwd xl-srch.c
 
 xl-dag.o: xl-dag.c
-	charmc -seq -cwd -c xl-dag.c
-
-charmfilter: xl-space.c
-	charmc -seq -cwd -o charmfilter xl-space.c
+	charmc -seq -cwd xl-dag.c
 
 ###############################################################################
 #
@@ -473,26 +475,24 @@ charmfilter: xl-space.c
 XPHEADERS=xp-extn.h xp-t.h xp-ytab.h
 
 CHARMXLATXX=xp-lexyy.o xp-process.o xp-table.o xp-ytab.o
-charmxlat++: $(CHARMXLATXX)
+charmxlat++: $(CHARMXLATXX) xp-space.o
 	charmc -seq -cwd -o charmxlat++ $(CHARMXLATXX)
-
-charmfilter++: xp-space.o
 	charmc -seq -cwd -o charmfilter++ xp-space.o
 
 xp-lexyy.o: xp-lexyy.c $(XPHEADERS)
-	charmc -seq -cwd -c xp-lexyy.c
+	charmc -seq -cwd xp-lexyy.c
 
 xp-process.o: xp-process.c $(XPHEADERS)
-	charmc -seq -cwd -c xp-process.c
+	charmc -seq -cwd xp-process.c
 
 xp-table.o: xp-table.c $(XPHEADERS)
-	charmc -seq -cwd -c xp-table.c
+	charmc -seq -cwd xp-table.c
 
 xp-ytab.o: xp-ytab.c $(XPHEADERS)
-	charmc -seq -cwd -c xp-ytab.c
+	charmc -seq -cwd xp-ytab.c
 
 xp-space.o: xp-space.c $(XPHEADERS)
-	charmc -seq -cwd -c xp-space.c
+	charmc -seq -cwd xp-space.c
 
 
 ###############################################################################

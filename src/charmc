@@ -128,7 +128,7 @@ while ($argindex <= $#argv)
             breaksw
 
         case "-c":
-            set NOLINK=1
+            # This is ignored.
             breaksw
 
 	case "-o":
@@ -335,7 +335,6 @@ cd $ORIGDIR
 foreach FILE ($FILES)
   set BASE=$FILE:r
   set TMP=$BASE:t.TMP
-  if ($?OBJECT == 0) set OBJECT=$BASE:t
   if (${BASE}.o != $FILE) then
       if ($?VERBOSE) echo "compiling $FILE."
       /bin/rm -f $BASE.o $BASE.f.o
@@ -352,7 +351,7 @@ foreach FILE ($FILES)
       if ($?VERBOSE) echo "$CMK_CC $OPTS_CC -I$CHARMINC -c $TMP.c"
       $CMK_CC $OPTS_CC -I$CHARMINC -c $TMP.c
       if ($status) goto failure
-      if ($?NOLINK) then
+      if ($?OBJECT == 0) then
           if ($?VERBOSE) echo "/bin/mv $TMP.o $BASE.o"
           /bin/mv $TMP.o $BASE.o
       else
@@ -375,7 +374,7 @@ foreach FILE ($FILES)
       if ($?VERBOSE) echo "$CMK_CXX $OPTS_CPLUS -I$CHARMINC $TMP.C"
       $CMK_CXX $OPTS_CPLUS -I$CHARMINC $TMP.C
       if ($status) goto failure
-      if ($?NOLINK) then
+      if ($?OBJECT == 0) then
         if ($?VERBOSE) echo "/bin/mv $TMP.o $BASE.o"
         /bin/mv $TMP.o $BASE.o
       else
@@ -386,8 +385,8 @@ foreach FILE ($FILES)
       if ($?VERBOSE) echo "$CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.c"
       $CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.c
       if ($status) goto failure
-      if ($?NOLINK == 0) then
-	set DELETE=( $DELETE $BASE.o )
+      if ($?OBJECT) then
+	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
         set OBJECTFILES=( $OBJECTFILES $BASE.o )
       endif
       breaksw
@@ -395,8 +394,8 @@ foreach FILE ($FILES)
       if ($?VERBOSE) echo "$CMK_CXX $OPTS_CPLUS -I$CHARMINC $BASE.C"
       $CMK_CXX $OPTS_CPLUS -I$CHARMINC $BASE.C
       if ($status) goto failure
-      if ($?NOLINK == 0) then
-        set DELETE=( $DELETE $BASE.o )
+      if ($?OBJECT) then
+	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
         set OBJECTFILES=( $OBJECTFILES $BASE.o )
       endif
       breaksw
@@ -415,7 +414,6 @@ foreach FILE ($FILES)
   endsw
 end
 
-
 ##############################################################################
 #
 # Link-Step: there are three kinds of link-phases.
@@ -426,7 +424,7 @@ end
 #
 ##############################################################################
 
-if ($?NOLINK) goto success
+if ($?OBJECT == 0) goto success
 
 switch ($OBJECT)
   case "*.o":
@@ -476,6 +474,13 @@ endsw
 ##############################################################################
 
 exelink:
+
+if ($?SEQUENTIAL) then
+    if ($?VERBOSE) $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES
+    $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES
+    if ($status) goto failure
+    goto success
+endif
 
 # Check for valid choice of EXECMODE
 
