@@ -119,7 +119,7 @@ class CkMigratable;//Migratable object
 class CkLocRec {
 protected:
   CkLocMgr *myLocMgr;
-  int lastAccess;//Age when last accessed
+  //int lastAccess;//Age when last accessed. Removed since unused and colliding with a inheriting class, Filippo
   //Called when we discover we are obsolete before we delete ourselves
   virtual void weAreObsolete(const CkArrayIndex &idx);
 public:
