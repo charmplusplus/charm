@@ -131,6 +131,44 @@ class CMessage_CkMessage {
 
 class CkArray;
 
+void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty=1);
+
+//This is for passing a single Charm++ message via parameter marshalling
+class CkMarshalledMessage {
+	void *msg;
+	//Don't use these: only pass by reference
+	void operator=(const CkMarshalledMessage &);
+ public:
+	CkMarshalledMessage(void) {msg=NULL;}
+	CkMarshalledMessage(CkMessage *m) {msg=m;} //Takes ownership of message
+	CkMarshalledMessage(const CkMarshalledMessage &);
+	~CkMarshalledMessage() {if (msg) CkFreeMsg(msg);}
+	CkMessage *getMessage(void) {void *ret=msg; msg=NULL; return (CkMessage *)ret;}
+	void pup(PUP::er &p) {CkPupMessage(p,&msg,1);}
+};
+PUPmarshall(CkMarshalledMessage);
+
+//A queue-of-messages, like CkMsgQ<CkReductionMsg>
+template <class MSG>
+class CkMsgQ : public CkQ<MSG *> {
+public:
+	~CkMsgQ() { //Delete the messages in the queue:
+		MSG *m;
+		while (NULL!=(m=deq())) delete m;
+	}
+	void pup(PUP::er &p) {
+		int l=length();
+		p(l);
+		for (int i=0;i<l;i++) {
+			MSG *m=NULL;
+			if (!p.isUnpacking()) m=deq();
+			CkPupMessage(p,(void **)&m);
+			enq(m);
+		}
+	}
+	friend void operator|(PUP::er &p,CkMsgQ<MSG> &v) {v.pup(p);}
+};
+
 /*******************************************************
 Array Index class.  An array index is just a hash key-- 
 a run of integers used to look up an object in a hash table.
@@ -248,22 +286,6 @@ public:
 	char *msgBuf;
 };
 
-void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty=1);
-
-//This is for passing a Charm++ message via parameter marshalling
-class CkMarshalledMessage {
-	void *msg;
-	//Don't use these: only pass by reference
-	void operator=(const CkMarshalledMessage &);
- public:
-	CkMarshalledMessage(void) {msg=NULL;}
-	CkMarshalledMessage(CkMessage *m) {msg=m;} //Takes ownership of message
-	CkMarshalledMessage(const CkMarshalledMessage &);
-	~CkMarshalledMessage() {if (msg) CkFreeMsg(msg);}
-	CkMessage *getMessage(void) {void *ret=msg; msg=NULL; return (CkMessage *)ret;}
-	void pup(PUP::er &p) {CkPupMessage(p,&msg,1);}
-};
-PUPmarshall(CkMarshalledMessage);
 
 /********************* Superclass of all Chares ******************/
 #if CMK_MULTIPLE_DELETE
