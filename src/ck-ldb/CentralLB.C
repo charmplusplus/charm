@@ -14,6 +14,7 @@
 #include "envelope.h"
 #include "CentralLB.h"
 #include "CentralLB.def.h"
+#include "LBDBManager.h"
 
 #define  DEBUGF(x)    // CmiPrintf x;
 
@@ -57,7 +58,15 @@ CentralLB::CentralLB()
   //  CkPrintf("Construct in %d\n",CkMyPe());
   theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
 
-  setActive();
+  // create and turn on by default
+  receiver = theLbdb->
+    AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),(void*)(this));
+  notifier = theLbdb->getLBDB()->
+    NotifyMigrated((LDMigratedFn)(staticMigrated),(void*)(this));
+  startLbFnHdl = theLbdb->getLBDB()->
+    AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
+
+//  turnOff();
 
   stats_msg_count = 0;
   statsMsgsList = new CLBStatsMsg*[CkNumPes()];
@@ -67,12 +76,13 @@ CentralLB::CentralLB()
   statsData = new LDStats;
 
   myspeed = theLbdb->ProcessorSpeed();
-  theLbdb->CollectStatsOn();
+
   migrates_completed = 0;
   migrates_expected = -1;
-
   cur_ld_balancer = 0;
   int num_proc = CkNumPes();
+
+  theLbdb->CollectStatsOn();
 
   load_balancer_created = 1;
 }
@@ -81,18 +91,30 @@ CentralLB::~CentralLB()
 {
   CkPrintf("Going away\n");
   delete [] statsMsgsList;
+  theLbdb->getLBDB()->
+    RemoveNotifyMigrated(notifier);
   theLbdb->
     RemoveStartLBFn((LDStartLBFn)(staticStartLB));
 }
 
-void CentralLB::setActive() 
+void CentralLB::turnOn() 
 {
-  theLbdb->
-    AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),(void*)(this));
-  theLbdb->
-    NotifyMigrated((LDMigratedFn)(staticMigrated),(void*)(this));
-  theLbdb->
-    AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
+  theLbdb->getLBDB()->
+    TurnOnBarrierReceiver(receiver);
+  theLbdb->getLBDB()->
+    TurnOnNotifyMigrated(notifier);
+  theLbdb->getLBDB()->
+    TurnOnStartLBFn(startLbFnHdl);
+}
+
+void CentralLB::turnOff() 
+{
+  theLbdb->getLBDB()->
+    TurnOffBarrierReceiver(receiver);
+  theLbdb->getLBDB()->
+    TurnOffNotifyMigrated(notifier);
+  theLbdb->getLBDB()->
+    TurnOffStartLBFn(startLbFnHdl);
 }
 
 void CentralLB::AtSync()
@@ -111,9 +133,6 @@ void CentralLB::ProcessAtSync()
 {
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CmiWallTimer();
-    if (lb_debug) 
-      CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d\n",
-                 lbName(), step(),start_lb_time, cur_ld_balancer);
   }
   // build and send stats
   const int osz = theLbdb->GetObjDataSz();
@@ -241,6 +260,9 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 
   const int clients = CkNumPes();
   if (stats_msg_count == clients) {
+    if (lb_debug) 
+      CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d\n",
+                 lbName(), step(),start_lb_time, cur_ld_balancer);
 //    double strat_start_time = CmiWallTimer();
 
     // build data

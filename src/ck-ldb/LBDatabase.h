@@ -24,6 +24,7 @@ CkpvExtern(int, numLoadBalancers);
 CkpvExtern(int, hasNullLB);
 CkpvExtern(int, lbdatabaseInited);
 
+extern double autoLbPeriod;
 extern int lb_debug;
 extern int lb_ignoreBgLoad;
 

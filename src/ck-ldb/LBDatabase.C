@@ -28,6 +28,7 @@ CkpvDeclare(int, numLoadBalancers);  /**< num of lb created */
 CkpvDeclare(int, hasNullLB);         /**< true if NullLB is created */
 CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
 
+double autoLbPeriod = 0.0;
 int lb_debug=0;
 int lb_ignoreBgLoad=0;
 
@@ -129,6 +130,10 @@ void _loadbalancerInit()
     lbRegistry.defaultLB() = balancer;
   }
 
+  // set up init value for LBPeriod time in milliseconds
+  // it can also be set calling LDSetLBPeriod()
+  CmiGetArgDoubleDesc(argv,"+LBPeriod", &autoLbPeriod,"specify the period for automatic load balancing (non atSync mode)");
+
   /******************* SIMULATION *******************/
   // get the step number at which to dump the LB database
   CmiGetArgIntDesc(argv, "+LBDump", &LBSimulation::dumpStep, "Dump the LB state at this step");
@@ -141,8 +146,9 @@ void _loadbalancerInit()
   lb_debug = CmiGetArgFlagDesc(argv, "+LBDebug", "Turn on LB debugging printouts");
   lb_ignoreBgLoad = CmiGetArgFlagDesc(argv, "+LBObjOnly", "Load balancer only balance migratable object without considering the background load, etc");
   if (CkMyPe() == 0) {
-    if (lb_debug)
-      CmiPrintf("LB> Load balancer running in verbose mode.\n");
+    if (lb_debug) {
+      CmiPrintf("LB> Load balancer running with verbose mode, period time: %gms.\n", autoLbPeriod);
+    }
     if (lb_ignoreBgLoad)
       CmiPrintf("LB> Load balancer only balance migratable object.\n");
     if (LBSimulation::doSimulation)

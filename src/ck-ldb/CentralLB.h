@@ -39,7 +39,8 @@ public:
   virtual ~CentralLB();
   CentralLB(CkMigrateMessage *m):CBase_CentralLB(m) {}
 
-  void setActive();
+  void turnOn();
+  void turnOff();
   int useDefCtor(void){ return 1; }
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
@@ -61,8 +62,6 @@ public:
 
   void MigrationDone(int balancing);  // Call when migration is complete
   int step() { return mystep; };
-
-  void set_avail_vector(char *new_vector);
 
   struct ProcStats {  // per processor data
     double total_walltime;

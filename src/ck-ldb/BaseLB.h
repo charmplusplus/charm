@@ -27,6 +27,8 @@ protected:
   char *lbname;
   LBDatabase *theLbdb;
   LDBarrierReceiver receiver;
+  int  notifier;
+  int  startLbFnHdl;
 public:
   BaseLB() ;
   BaseLB(CkMigrateMessage *m):IrrGroup(m) { /* empty */ }

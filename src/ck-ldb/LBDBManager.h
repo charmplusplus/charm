@@ -33,6 +33,8 @@ public:
   void RemoveClient(LDBarrierClient h);
   LDBarrierReceiver AddReceiver(LDBarrierFn fn, void* data);
   void RemoveReceiver(LDBarrierReceiver h);
+  void TurnOnReceiver(LDBarrierReceiver h);
+  void TurnOffReceiver(LDBarrierReceiver h);
   void AtBarrier(LDBarrierClient h);
   void TurnOn() { on = CmiTrue; CheckBarrier(); };
   void TurnOff() { on = CmiFalse; };
@@ -50,6 +52,7 @@ private:
    struct receiver {
     void* data;
     LDBarrierFn fn;
+    int on;
   };
 
   CkVec<client*> clients;
@@ -73,8 +76,7 @@ public:
 
   void insert(LBOM *om);
 
-  LDOMHandle AddOM(LDOMid _userID, void* _userData, 
-		   LDCallbacks _callbacks);
+  LDOMHandle AddOM(LDOMid _userID, void* _userData, LDCallbacks _callbacks);
   LDObjHandle AddObj(LDOMHandle _h, LDObjid _id, void *_userData,
 		     CmiBool _migratable);
   void UnregisterObj(LDObjHandle _h);
@@ -88,8 +90,10 @@ public:
   inline LBOM *LbOM(LDOMHandle h) { return oms[h.handle]; };
   inline LBObj *LbObj(const LDObjHandle &h) const { return objs[h.handle]; };
   void DumpDatabase(void);
-  inline void TurnStatsOn(void) {statsAreOn = CmiTrue; machineUtil.StatsOn();}
-  inline void TurnStatsOff(void) {statsAreOn = CmiFalse;machineUtil.StatsOff();}
+  inline void TurnStatsOn(void) 
+       {statsAreOn = CmiTrue; machineUtil.StatsOn();}
+  inline void TurnStatsOff(void) 
+       {statsAreOn = CmiFalse;machineUtil.StatsOff();}
   inline CmiBool StatsOn(void) const { return statsAreOn; };
   void Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes);
   int ObjDataCount();
@@ -99,26 +103,32 @@ public:
       return commTable->CommCount();
     else return 0;
   }
-  inline void GetCommData(LDCommData *data) { 
-    if (commTable) commTable->GetCommData(data);
-  };
+  inline void GetCommData(LDCommData *data) 
+       { if (commTable) commTable->GetCommData(data); };
 
   void Migrate(LDObjHandle h, int dest);
   void Migrated(LDObjHandle h);
-  void NotifyMigrated(LDMigratedFn fn, void* data);
+  int  NotifyMigrated(LDMigratedFn fn, void* data);
+  void TurnOnNotifyMigrated(int handle)
+       { migrateCBList[handle]->on = 1; }
+  void TurnOffNotifyMigrated(int handle)
+       { migrateCBList[handle]->on = 0; }
+  void RemoveNotifyMigrated(int handle);
 
   inline void TurnManualLBOn() { useBarrier = CmiFalse; }
   inline void TurnManualLBOff() { useBarrier = CmiTrue; }
-  void AddStartLBFn(LDStartLBFn fn, void* data);
+  int AddStartLBFn(LDStartLBFn fn, void* data);
+  void TurnOnStartLBFn(int handle)
+       { startLBFnList[handle]->on = 1; }
+  void TurnOffStartLBFn(int handle)
+       { startLBFnList[handle]->on = 0; }
   void RemoveStartLBFn(LDStartLBFn fn);
   void StartLB();
 
-  inline void IdleTime(double* walltime) { 
-    machineUtil.IdleTime(walltime); 
-  };
-  inline void TotalTime(double* walltime, double* cputime) {
-    machineUtil.TotalTime(walltime,cputime);
-  };
+  inline void IdleTime(double* walltime) 
+       { machineUtil.IdleTime(walltime); };
+  inline void TotalTime(double* walltime, double* cputime) 
+       { machineUtil.TotalTime(walltime,cputime); };
   void BackgroundLoad(double* walltime, double* cputime);
   void ClearLoads(void);
 
@@ -128,37 +138,33 @@ public:
     An index is enough here because LDObjHandle can be retrieved from 
     objs array. Copyinh LDObjHandle is expensive.
   */
-  inline void SetRunningObj(const LDObjHandle &_h) {
-    runningObj = _h.handle; obj_running = CmiTrue;
-  };
-  inline const LDObjHandle &RunningObj() const { return objs[runningObj]->GetLDObjHandle(); };
-  inline void NoRunningObj() { obj_running = CmiFalse; };
-  inline CmiBool ObjIsRunning() const { return obj_running; };
+  inline void SetRunningObj(const LDObjHandle &_h) 
+       { runningObj = _h.handle; obj_running = CmiTrue; };
+  inline const LDObjHandle &RunningObj() const 
+       { return objs[runningObj]->GetLDObjHandle(); };
+  inline void NoRunningObj() 
+       { obj_running = CmiFalse; };
+  inline CmiBool ObjIsRunning() const 
+       { return obj_running; };
   
-  inline LDBarrierClient AddLocalBarrierClient(LDResumeFn fn, void* data) { 
-    return localBarrier.AddClient(fn,data);
-  };
-  inline void RemoveLocalBarrierClient(LDBarrierClient h) {
-    localBarrier.RemoveClient(h);
-  };
-  inline LDBarrierReceiver AddLocalBarrierReceiver(LDBarrierFn fn, void* data) {
-    return localBarrier.AddReceiver(fn,data);
-  };
-  inline void RemoveLocalBarrierReceiver(LDBarrierReceiver h) {
-    localBarrier.RemoveReceiver(h);
-  };
-  inline void AtLocalBarrier(LDBarrierClient h) {
-    if (useBarrier) localBarrier.AtBarrier(h);
-  };
-  inline void ResumeClients() {
-    localBarrier.ResumeClients();
-  };
-  inline void MeasuredObjTime(double wtime, double ctime) {
-    if (statsAreOn) {
-      obj_walltime += wtime;
-      obj_cputime += ctime;
-    }
-  };
+  inline LDBarrierClient AddLocalBarrierClient(LDResumeFn fn, void* data) 
+       { return localBarrier.AddClient(fn,data); };
+  inline void RemoveLocalBarrierClient(LDBarrierClient h) 
+       { localBarrier.RemoveClient(h); };
+  inline LDBarrierReceiver AddLocalBarrierReceiver(LDBarrierFn fn, void* data) 
+       { return localBarrier.AddReceiver(fn,data); };
+  inline void RemoveLocalBarrierReceiver(LDBarrierReceiver h) 
+       { localBarrier.RemoveReceiver(h); };
+  inline void TurnOnBarrierReceiver(LDBarrierReceiver h) 
+       { localBarrier.TurnOnReceiver(h); };
+  inline void TurnOffBarrierReceiver(LDBarrierReceiver h) 
+       { localBarrier.TurnOffReceiver(h); };
+  inline void AtLocalBarrier(LDBarrierClient h) 
+       { if (useBarrier) localBarrier.AtBarrier(h); };
+  inline void ResumeClients() 
+       { localBarrier.ResumeClients(); };
+  inline void MeasuredObjTime(double wtime, double ctime) 
+       { if (statsAreOn) { obj_walltime += wtime; obj_cputime += ctime; } };
 
   //This class controls the builtin-atsync frequency
   class batsyncer {
@@ -178,11 +184,13 @@ private:
   struct MigrateCB {
     LDMigratedFn fn;
     void* data;
+    int on;
   };
 
   struct StartLBCB {
     LDStartLBFn fn;
     void* data;
+    int on;
   };
 
   typedef CkVec<LBOM*> OMList;

@@ -34,6 +34,7 @@ void LBDB::batsyncer::gotoSync(void *bs)
 void LBDB::batsyncer::resumeFromSync(void *bs)
 {
   LBDB::batsyncer *s=(LBDB::batsyncer *)bs;
+  // CmiPrintf("[%d] with PERIOD: %f\n", CkMyPe(), s->period);
   CcdCallFnAfterOnPE((CcdVoidFn)gotoSync,(void *)s,(int)(1000*s->period), CkMyPe());
 }
 
@@ -58,7 +59,7 @@ LBDB::LBDB(): useBarrier(CmiTrue)
     obj_running = CmiFalse;
     commTable = new LBCommTable;
     obj_walltime = obj_cputime = 0;
-    batsync.init(this,1.0);
+    batsync.init(this, autoLbPeriod);		// original 1.0
     startLBFn_count = 0;
 }
 
@@ -241,36 +242,49 @@ void LBDB::Migrated(LDObjHandle h)
 
   for(int i=0; i < migrateCBList.length(); i++) {
     MigrateCB* cb = (MigrateCB*)migrateCBList[i];
-    (cb->fn)(cb->data,h);
+    if (cb) (cb->fn)(cb->data,h);
   }
   
 }
 
-void LBDB::NotifyMigrated(LDMigratedFn fn, void* data)
+int LBDB::NotifyMigrated(LDMigratedFn fn, void* data)
 {
   // Save migration function
   MigrateCB* callbk = new MigrateCB;
 
   callbk->fn = fn;
   callbk->data = data;
+  callbk->on = 1;
   migrateCBList.insertAtEnd(callbk);
+  return migrateCBList.size()-1;
 }
 
-void LBDB::AddStartLBFn(LDStartLBFn fn, void* data)
+void LBDB::RemoveNotifyMigrated(int handle)
+{
+  MigrateCB* callbk = migrateCBList[handle];
+  migrateCBList[handle] = NULL;
+  delete callbk;
+}
+
+int LBDB::AddStartLBFn(LDStartLBFn fn, void* data)
 {
   // Save startLB function
   StartLBCB* callbk = new StartLBCB;
 
   callbk->fn = fn;
   callbk->data = data;
+  callbk->on = 1;
   startLBFnList.push_back(callbk);
   startLBFn_count++;
+  return startLBFnList.size()-1;
 }
 
 void LBDB::RemoveStartLBFn(LDStartLBFn fn)
 {
   for (int i=0; i<startLBFnList.length(); i++) {
-    if (startLBFnList[i]->fn == fn) {
+    StartLBCB* callbk = startLBFnList[i];
+    if (callbk && callbk->fn == fn) {
+      delete callbk;
       startLBFnList[i] = 0; 
       startLBFn_count --;
       break;
@@ -352,6 +366,7 @@ LDBarrierReceiver LocalBarrier::AddReceiver(LDBarrierFn fn, void* data)
   receiver* new_receiver = new receiver;
   new_receiver->fn = fn;
   new_receiver->data = data;
+  new_receiver->on = 1;
 
   LDBarrierReceiver ret_val;
   ret_val.serial = max_receiver;
@@ -367,6 +382,22 @@ void LocalBarrier::RemoveReceiver(LDBarrierReceiver c)
   if (cnum < max_receiver && receivers[cnum] != 0) {
     delete (receivers[cnum]);
     receivers[cnum] = 0;
+  }
+}
+
+void LocalBarrier::TurnOnReceiver(LDBarrierReceiver c)
+{
+  const int cnum = c.serial;
+  if (cnum < max_receiver && receivers[cnum] != 0) {
+    receivers[cnum]->on = 1;
+  }
+}
+
+void LocalBarrier::TurnOffReceiver(LDBarrierReceiver c)
+{
+  const int cnum = c.serial;
+  if (cnum < max_receiver && receivers[cnum] != 0) {
+    receivers[cnum]->on = 0;
   }
 }
 
