@@ -16,8 +16,8 @@ void NodeMulticast::setDestinationArray(CkArrayID a, int nelem,
   
     messageBuf = NULL;
     pes_per_node = 4;
-    //if(getenv("RMS_NODES") != NULL)
-    //pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
+    if(getenv("RMS_NODES") != NULL)
+	pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
 
     mAid = a;
     nelements = nelem;
@@ -60,8 +60,8 @@ void NodeMulticast::recvHandler(void *msg) {
     ComlibPrintf("In receive Handler\n");
     
     for(int count = 0; count < pes_per_node; count ++){
-        int dest_pe = (CkMyPe()/pes_per_node) * pes_per_node + count;
-        int size = indexVec[dest_pe].size();
+	int dest_pe = (CkMyPe()/pes_per_node) * pes_per_node + count;
+	int size = indexVec[dest_pe].size();
         
         ComlibPrintf("[%d], %d elements to send to %d of size %d\n", CkMyPe(), size, dest_pe, env->getTotalsize());
         
@@ -102,6 +102,7 @@ void NodeMulticast::doneInserting(){
     ComlibPrintf("NodeMulticast :: doneInserting\n");
     
     if(messageBuf->length() > 1) {
+        //CkPrintf("NodeMulticast :: doneInserting length > 1\n");
         /*
         char **msgComps;
         int *sizes, msg_count;
@@ -135,18 +136,20 @@ void NodeMulticast::doneInserting(){
         msg = cmsg->getCharmMessage();
         env = UsrToEnv(msg);
         env->array_srcPe()=CkMyPe();
+	CkPackMessage(&env);
 
         CmiSetHandler(env, NodeMulticastHandlerId);
         ComlibPrintf("After set handler\n");
         
         for(int count = 0; count < numNodes; count++) 
-            if(nodeMap[count]) {
-                char *newmsg = (char *)CmiAlloc(env->getTotalsize());
-                memcpy(newmsg, (char *)env, env->getTotalsize());
-
-                ComlibPrintf("In cmisyncsend to %d\n", count * pes_per_node + myRank);
-                CmiSyncSendAndFree(count * pes_per_node + myRank, env->getTotalsize(), newmsg);
-            }
+	  if(nodeMap[count]) {
+	      void *newcharmmsg = CkCopyMsg((void **)&msg); 
+	      envelope *newenv = UsrToEnv(newcharmmsg);
+		
+	      ComlibPrintf("In cmisyncsend to %d\n", count * pes_per_node + myRank);
+	      CmiSyncSendAndFree(count * pes_per_node + myRank, env->getTotalsize(), 
+				 (char *)newenv);
+	  }
         
         ComlibPrintf("[%d] CmiFree (Code) (%x)\n", CkMyPe(), (char *)env - 2*sizeof(int));
         CmiFree(env);

@@ -72,4 +72,4 @@ void StreamingStrategy::pup(PUP::er &p){
   }
 }
 
-PUPable_def(StreamingStrategy);
+//PUPable_def(StreamingStrategy);

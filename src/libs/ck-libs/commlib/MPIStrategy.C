@@ -111,4 +111,4 @@ void MPIStrategy::pup(PUP::er &p) {
     }
 }
 
-PUPable_def(MPIStrategy);
+//PUPable_def(MPIStrategy);

@@ -69,7 +69,7 @@ EachToManyStrategy::EachToManyStrategy(int substrategy, int npes, int *pelist){
 
     this->npes = npes;
     this->pelist = pelist;
-    checkPeList();
+    //checkPeList();
 
     routerID = substrategy;
     messageBuf = NULL;
