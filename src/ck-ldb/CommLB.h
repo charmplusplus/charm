@@ -1,6 +1,5 @@
 #ifndef _COMMLB_H_
 #define _COMMLB_H_
-#endif
 
 #include <CentralLB.h>
 #include "CommLB.decl.h"
@@ -39,3 +38,5 @@ private:
   void add_graph(int x, int y, int data, int nmsg);
   void make_hash();
 };
+
+#endif

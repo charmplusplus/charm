@@ -3,25 +3,13 @@
 
 #if CMK_LBDB_ON
 
-#if CMK_STL_USE_DOT_H
-#include <deque.h>
-#include <queue.h>
-#else
-#include <deque>
-#include <queue>
-#endif
+#include "CkLists.h"
 
 #include "CommLB.h"
 #include "CommLB.def.h"
 
-#if CMK_STL_USE_DOT_H
-template class deque<CentralLB::MigrateInfo>;
-#else
-template class std::deque<CentralLB::MigrateInfo>;
-#endif
-
-#define alpha 0
-#define beeta 0
+#define alpha 30e-6
+#define beeta 3e-6
 
 void CreateCommLB()
 {
@@ -150,11 +138,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 
   CkPrintf("[%d] CommLB strategy\n",CkMyPe());
 
-#if CMK_STL_USE_DOT_H
-  queue<MigrateInfo> migrateInfo;
-#else
-  std::queue<MigrateInfo> migrateInfo;
-#endif
+  CkVector migrateInfo;
 
   alloc_array = new (double *)[count+1];
 
@@ -229,11 +213,11 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
   alloc(pe,maxid,stats[spe].objData[mpos].wallTime);
   if(pe != spe){
     //      CkPrintf("**Moving from %d to %d\n",spe,pe);
-    MigrateInfo migrateMe;
-    migrateMe.obj = stats[spe].objData[mpos].handle;
-    migrateMe.from_pe = spe;
-    migrateMe.to_pe = pe;
-    migrateInfo.push(migrateMe);
+    MigrateInfo* migrateMe;
+    migrateMe->obj = stats[spe].objData[mpos].handle;
+    migrateMe->from_pe = spe;
+    migrateMe->to_pe = pe;
+    migrateInfo.push_back((void *)migrateMe);
   }
 
 
@@ -259,11 +243,11 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 
     if(minpe != spe){
       //      CkPrintf("**Moving from %d to %d\n",spe,minpe);
-      MigrateInfo migrateMe;
-      migrateMe.obj = stats[spe].objData[mpos].handle;
-      migrateMe.from_pe = spe;
-      migrateMe.to_pe = minpe;
-      migrateInfo.push(migrateMe);
+      MigrateInfo *migrateMe;
+      migrateMe->obj = stats[spe].objData[mpos].handle;
+      migrateMe->from_pe = spe;
+      migrateMe->to_pe = minpe;
+      migrateInfo.push_back((void *)migrateMe);
     }
   }
   CkPrintf("OBJ: After\n"); 
@@ -277,9 +261,12 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
   for(int i=0; i < migrate_count; i++) {
-    msg->moves[i] = migrateInfo.front();
-    migrateInfo.pop();
+    MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
+    msg->moves[i] = *item;
+    delete item;
+    migrateInfo[i] = 0;
   }
+
   return msg;
 }
 

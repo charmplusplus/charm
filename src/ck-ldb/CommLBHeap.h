@@ -4,6 +4,8 @@
 ***  All rights reserved.
 **/
 
+#ifndef __COMM_LB_HEAP
+#define __COMM_LB_HEAP
 
 class ObjectRecord{
  public:
@@ -47,3 +49,4 @@ public:
   ObjectRecord *next(hIterator *);
 };
 
+#endif

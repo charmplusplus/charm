@@ -21,7 +21,7 @@ int ObjectHeap::numElements()
   return count;
 }
 
-int ObjectHeap::insert(InfoRecord *x)
+int ObjectHeap::insert(ObjectRecord *x)
 {
   h[count].info = x;
   h[count].deleted  = 0;
