@@ -11,7 +11,8 @@ typedef struct rngen_
   double state[3], multiplier[3];/* simulate 64 bit arithmetic */
 } CrnStream;
 
-void   CrnInitStream(CrnStream *, int, int);
+/*Type must be 0, 1, or 2.*/
+void   CrnInitStream(CrnStream *dest, int seed, int type);
 int    CrnInt(CrnStream *);
 double CrnDouble(CrnStream *);
 float  CrnFloat(CrnStream *);
