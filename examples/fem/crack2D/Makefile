@@ -44,6 +44,9 @@ serial: $(SERIAL_OBJS)
 test: pgm
 	./charmrun ./pgm +p2 +vp4
 
+bgtest: pgm
+	./charmrun ./pgm +p2 +vp4 +x2 +y2 +z1
+
 clean:
 	rm -rf *.o pgm *.sts *.log *.bak *~ SunWS_cache ii_files ti_files
 	rm -f conv-host getmesh charmrun
