@@ -102,11 +102,22 @@ class LV3D0_ClientManager {
 	CkHashtableT<CkViewableID,CkViewPrioHolder> id2view;
 
 	// This indexes unsent views by priority:
+	//   The "key" is all that's needed here-- the "obj" field is useless.
 	typedef std::map<CkViewPrioHolder,char> prio2view_t;
 	prio2view_t prio2view;
 	
 	bool hasDelayed;
 	CcsDelayedReply delayedReply;
+	
+	/// Emptiness detection (used for QD, below)
+	CkVec<CkCallback> emptyCallbacks;
+	void checkEmpty(void) {
+		if (prio2view.size()==0) { /* no views left-- send all empty callbacks */
+			for (unsigned int i=0;i<emptyCallbacks.size();i++)
+				emptyCallbacks[i].send();
+			emptyCallbacks.resize(0);
+		}
+	}
 	
 	/// Pack up and send off up to 100KB of stored views:
 	void sendReply(CcsDelayedReply repl) {
@@ -148,6 +159,7 @@ class LV3D0_ClientManager {
 		delete[] retMsg;
 		
 		// CmiPrintf("[OUT] Done sending off %d views\n",n);
+		checkEmpty();
 	}
 
 public:
@@ -162,6 +174,9 @@ public:
 		  ++it)
 			delete (*it).first.v;
 	}
+	
+	/// Return true if we have no stored, unsent views.
+	bool isEmpty(void) const {return prio2view.size()==0;}
 	
 	/// A local object has a new view.
 	///  We are passed in our reference to this object.
@@ -200,6 +215,12 @@ public:
 			sendReply(CcsDelayReply());
 		}	
 	}
+	
+	/// Call this callback as soon as we have nothing further to send.
+	void whenEmptyCallback(const CkCallback &cb) {
+		emptyCallbacks.push_back(cb);
+		checkEmpty();
+	}
 };
 
 /** 
@@ -207,22 +228,33 @@ public:
  * they're sent off to clients.
  */ 
 class LV3D0_Manager : public CBase_LV3D0_Manager {
-	// FIXME: should have a vector of clients
-	LV3D0_ClientManager *client;
+	/// Given a clientID, look up the corresponding LV3D0_ClientManager
+	CkHashtableT<CkHashtableAdaptorT<int>,LV3D0_ClientManager *> clientTable;
+	
+	/// Next unassigned clientID.
+	int nextClientID;
 public:
 	LV3D0_Manager(void);
+	
+	/// Create a new client.  Called only on masterProcessor.
+	///   Returns new client's clientID.
+	int newClient(void);
+	
+	/// Get this client manager
+	LV3D0_ClientManager *getClient(int clientID);
 	
 	/// This client is requesting the latest views.
 	///  This routine must be called from a CCS handler.
 	void getViews(int clientID) {
-		client->getViews();
+		getClient(clientID)->getViews();
 	}
 	
-	/// A viewable is adding this view for this client.
+	/// A local or remote viewable is adding this view for this client.
+	///  FIXME: use streaming commlib to forward messages to master.
 	inline void addView(LV3D0_ViewMsg *m) {
 		if (CkMyPe()==masterProcessor) {
 			// FIXME: look up based on clientID
-			client->add(m);
+			getClient(m->clientID)->add(m);
 		} else /* forward to master processor */
 			thisProxy[masterProcessor].addView(m);
 	}
@@ -232,13 +264,25 @@ public:
 LV3D0_Manager::LV3D0_Manager(void)
 {
 	mgrProxy=thisgroup;
-	
-	if (CkMyPe()==masterProcessor)
-		client=new LV3D0_ClientManager();
-	else
-		client=NULL;
+	nextClientID=1;
 }
 
+int LV3D0_Manager::newClient(void)
+{
+	clientTable.put(nextClientID)=new LV3D0_ClientManager();
+	return nextClientID++;
+}
+
+/// Get this client manager
+LV3D0_ClientManager *LV3D0_Manager::getClient(int clientID)
+{
+	LV3D0_ClientManager *m=clientTable.get(clientID);
+	if (m==NULL) {
+		CkPrintf("LV3D0: Unrecognized clientID %d (0x%08x)\n",clientID);
+		CkAbort("LV3D0: Unrecognized clientID");
+	}
+	return m;
+}
 
 /**
   Send this view back to this client.
@@ -265,7 +309,7 @@ Response is a 1-int clientID followed by a PUP::able universe.
 */
 extern "C" void LV3D0_setup(char *msg) {
 	CmiFree(msg);
-	int clientID=0; // FIXME: actually care about client
+	int clientID=mgrProxy.ckLocalBranch()->newClient();
 	PUP_toNetwork4_sizer sp;
 	sp|clientID;
 	sp|theUniverse;
@@ -300,7 +344,7 @@ extern "C" void LV3D0_newViewpoint(char *msg) {
 /**
 "lv3d_getViews" CCS handler:
 	Sent by the client to request the actual images
-of any updated object views.  These come via LV3D0_Deposit.
+of any updated object views.  These come in via LV3D0_Deposit.
 
 Outgoing request is a single integer, the client ID
 Incoming response is a set of updated CkViews:
@@ -318,19 +362,39 @@ extern "C" void LV3D0_getViews(char *msg) {
 	Sent by the client to wait until all views have been
 updated and sent back.  No input or output data: control flow only.
 */
-static void qdDoneFn(void *param,void *msg) 
+struct lv3d_qdState {
+	/// ID of requesting client
+	int clientID;
+	
+	/// CCS reply to send back to.
+	CcsDelayedReply reply;
+};
+
+static void qdDoneFn(void *param,void *msg);
+static void emptyDoneFn(void *param,void *msg);
+
+extern "C" void LV3D0_qd(char *msg) /* stage 1 */
 {
-	CcsDelayedReply *repl=(CcsDelayedReply *)param;
-	CcsSendDelayedReply(*repl,0,0);
-}
-extern "C" void LV3D0_qd(char *msg) 
-{
+	lv3d_qdState *s=new lv3d_qdState;
+	PUP_toNetwork4_unpack p(&msg[CmiMsgHeaderSizeBytes]);
+	p|s->clientID;
+	s->reply=CcsDelayReply();
 	CmiFree(msg);
-	CcsDelayedReply *repl=new CcsDelayedReply(CcsDelayReply());
-	CkCallback cb(qdDoneFn,repl);
+	CkCallback cb(qdDoneFn,s);
 	CkStartQD(cb); /* finish CCS reply after quiescence */
 }
-
+static void qdDoneFn(void *param,void *msg)  /* stage 2 */
+{
+	lv3d_qdState *s=(lv3d_qdState *)param;
+	mgrProxy.ckLocalBranch()->getClient(s->clientID)->whenEmptyCallback(
+		CkCallback(emptyDoneFn,s));
+}
+static void emptyDoneFn(void *param,void *msg) /* stage 3 */
+{
+	lv3d_qdState *s=(lv3d_qdState *)param;
+	CcsSendDelayedReply(s->reply,0,0);
+	delete s;
+}
 
 /**
 Register for libsixty redraw requests.  This routine

@@ -1,9 +1,9 @@
 CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc $(OPTS)
+# The "-msse" is for my stupid SSE code in ckviewpoint.
+CHARMC=$(CDIR)/bin/charmc $(OPTS) -msse
 DEST=$(CDIR)/lib/libmoduleliveViz3d.a
 
-# The "-msse" is for my stupid SSE code in ckviewpoint.
-OPTS=-O -msse
+OPTS=-O
 
 all: $(DEST) 
 

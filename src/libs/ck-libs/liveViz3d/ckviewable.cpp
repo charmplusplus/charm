@@ -14,6 +14,7 @@ Orion Sky Lawlor, olawlor@acm.org, 8/28/2002
 #ifdef CMK_LIVEVIZ3D_CLIENT
 #  include "ogl/main.h"
 #  include "ogl/util.h"
+#  include "lv3dclient/stats.h"
 #endif
 
 CkReferenceCounted::~CkReferenceCounted() {}
@@ -96,20 +97,6 @@ CkQuadView::CkQuadView(CkMigrateMessage *m)
 #endif
 }
 
-void CkQuadView::pup(PUP::er &p) {
-	CkView::pup(p);
-	p.comment("Texture corners");
-	for (int i=0;i<4;i++) p|corners[i];
-	
-// Pup the image:
-	x_tex.pup(p);
-}
-CkQuadView::~CkQuadView() {
-#ifdef CMK_LIVEVIZ3D_CLIENT
-	if (c_tex) delete c_tex;
-#endif
-}
-
 #ifdef CMK_LIVEVIZ3D_CLIENT
 int oglImageFormat(const CkImage &img)
 {
@@ -132,25 +119,43 @@ int oglImageFormat(const CkImage &img)
 	CkAbort("Unrecognized CkImage image format");
 	return -1;
 }
+
+static stats::op_t op_upload_pixels=stats::count_op("net.in","Uploaded texture pixels","pixels");
 #endif
 
 
-void CkQuadView::render(double alpha) {
-#ifndef CMK_LIVEVIZ3D_CLIENT
-	CkAbort("CkQuadView::render should never be called on server!\n");
-#else
-	if (c_tex==NULL) 
-	{ // Upload server texture to OpenGL:
+void CkQuadView::pup(PUP::er &p) {
+	CkView::pup(p);
+	p.comment("Texture corners");
+	for (int i=0;i<4;i++) p|corners[i];
+	
+// Pup the image:
+	x_tex.pup(p);
+
+#ifdef CMK_LIVEVIZ3D_CLIENT
+	if (p.isUnpacking()) { /* immediately upload image to OpenGL */
+		int w=s_tex.getWidth(), h=s_tex.getHeight();
 		int format=oglImageFormat(s_tex);
-		c_tex=new oglTexture(s_tex.getData(),
-			s_tex.getWidth(),s_tex.getHeight(),
-			oglTexture_linear, format);
+		c_tex=new oglTexture(s_tex.getData(),w,h,oglTexture_linear, format);
+		stats::get()->add(w*h,op_upload_pixels);
 		
 		//Now that we've copied the view into GL, 
 		// flush the old in-memory copy:
 		s_tex.deallocate();
 	}
-	
+#endif
+
+}
+CkQuadView::~CkQuadView() {
+#ifdef CMK_LIVEVIZ3D_CLIENT
+	if (c_tex) delete c_tex;
+#endif
+}
+
+void CkQuadView::render(double alpha) {
+#ifndef CMK_LIVEVIZ3D_CLIENT
+	CkAbort("CkQuadView::render should never be called on server!\n");
+#else
 	glColor4f(1.0,1.0,1.0,alpha);
 	CkVector3d &bl=corners[0];
 	CkVector3d &br=corners[1];
