@@ -41,15 +41,8 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   kRightDoneCount = 0;
 #endif
 
-  inDataLeft = new complex*[numExpected];
-  for (int i = 0; i < numExpected; i++)
-    inDataLeft[i] = NULL;
+  inDataLeft = NULL;
   inDataRight = NULL;
-  if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y)) {
-    inDataRight = new complex*[numExpected];
-    for (int i = 0; i < numExpected; i++)
-      inDataRight[i] = NULL;
-  }
 
 #ifdef _SPARSECONT_ 
   outData = new double[grainSize * grainSize];
@@ -112,16 +105,13 @@ PairCalculator::pup(PUP::er &p)
 #else
     outData = new double[S*S];
 #endif
-    inDataLeft = new complex*[numExpected];
+
     if(N>0)
-      for (int i = 0; i < numExpected; i++)
-	inDataLeft[i] = new complex[N * blkSize];
-    if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y)){
-      inDataRight = new complex*[numExpected];
+      inDataLeft = new complex[numExpected*N];
+    if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y))
       if(N>0)
-	for (int i = 0; i < numExpected; i++)
-	  inDataRight[i] = new complex[N * blkSize];
-    }
+	inDataRight = new complex[numExpected*N];
+
 #ifdef NOGEMM
     kRightOffset= new int[numExpected];
     kLeftOffset= new int[numExpected];
@@ -133,11 +123,10 @@ PairCalculator::pup(PUP::er &p)
   }
   if(N>0)
     for (int i = 0; i < numExpected; i++)
-      p(inDataLeft[i], N * blkSize);
+      p(inDataLeft,numExpected*N);
   if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y)){
     if(N>0)  
-      for (int i = 0; i < numExpected; i++)
-	p(inDataRight[i], N * blkSize);
+      p(inDataRight, numExpected* N);
   }
 #ifdef NOGEMM  
   p(kRightOffset, numExpected);
@@ -158,14 +147,11 @@ PairCalculator::~PairCalculator()
 
   // Since allocation is done in contiguous chunk, 
   //   deletion is done in corresponding way.
-  if(inDataLeft[0]!=NULL)
-      delete [] inDataLeft[0];
-  delete [] inDataLeft;
-  if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y)){
-    if(inDataRight[0]!=NULL)
-      delete [] inDataRight[0];
-    delete [] inDataRight;
-  }
+  if(inDataLeft!=NULL)
+    delete [] inDataLeft;
+  if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y))
+    if(inDataRight!=NULL)
+      delete [] inDataRight;
 
   if(newData!=NULL)
     delete [] newData;
@@ -184,26 +170,30 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("     pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, symm=%d, from=%d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, sender, size, symmetric, fromRow);
 #endif
-
+  
   numRecd++;   // increment the number of received counts
-  complex **inData;
+  complex *inData;
   int offset = -1;
+  
   if (fromRow) {   // This could be the symmetric diagonal case
     offset = sender - thisIndex.x;
+    if (inDataLeft==NULL) 
+      { // now that we know N we can allocate contiguous space
+	N = size; // N is init here with the size of the data chunk. 
+	inDataLeft = new complex[numExpected*N];
+      }
     inData = inDataLeft;
   }
   else {
     offset = sender - thisIndex.y;
-    inData = inDataRight;
+    if (inDataRight==NULL) 
+      { // now that we know N we can allocate contiguous space
+	N = size; // N is init here with the size of the data chunk. 
+	inDataRight = new complex[numExpected*N];
+      }
+    inData= inDataRight;
   }
-  
-  if (inData[0]==NULL) 
-    { // now that we know N we can allocate contiguous space
-      N = size; // N is init here with the size of the data chunk. 
-      inData[0] = new complex[numExpected*N];
-      for(int i=1;i<numExpected;i++)
-	inData[i] = inData[i-1] + N;
-    }
+
   CkAssert(N==size);
   /* 
    *  NOTE: For this to work the data chunks of the same plane across
@@ -211,7 +201,7 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
    */
 
   // copy the input into our matrix
-  memcpy(inData[offset], points, size * sizeof(complex));
+  memcpy(&(inData[offset*N]), points, size * sizeof(complex));
 
   /*
    * Once we have accumulated all rows  we gemm it.
@@ -245,11 +235,11 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
     double alpha=double(1.0);//multiplicative identity 
     double beta=double(0.0); // C is unset
 
-    double *ldata= reinterpret_cast <double *> (inDataLeft[0]);
+    double *ldata= reinterpret_cast <double *> (inDataLeft);
 
     if( numRecd == numExpected * 2) 
       {
-	double *rdata= reinterpret_cast <double *> (inDataRight[0]); 
+	double *rdata= reinterpret_cast <double *> (inDataRight); 
 	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, ldata, &lda, rdata, &ldb, &beta, outData, &ldc);
       }
     else if (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)
@@ -289,6 +279,8 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
 
 }
 
+
+/* note this is broken now, offset calculations need to be rejiggered to work with the one dimensional allocation scheme*/
 void
 PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromRow, bool flag_dp)
 {
@@ -321,13 +313,11 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
   N = size; // N is init here with the size of the data chunk. 
             // Assuming that data chunk of the same plane across all states are of the same size
 
-  if (inData[0]==NULL) 
+  if (inData==NULL) 
   { // now that we know N we can allocate contiguous space
-    inData[0] = new complex[numExpected*N];
-    for(int i=0;i<numExpected;i++)
-      inData[i] = inData[0] + i*N;
+    inData = new complex[numExpected*N];
   }
-  memcpy(inData[offset], points, size * sizeof(complex));
+  memcpy(inData[offset*N], points, size * sizeof(complex));
 
 
   // once have K left and K right (or just K left if we're diagonal
@@ -380,10 +370,10 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 		  // if(leftoffset1 <= leftoffset2) {
 #ifdef _SPARSECONT_
 		  outData[leftoffset1 * grainSize + leftoffset2] = 
-		    compute_entry(size, inDataLeft[leftoffset1], inDataLeft[leftoffset2],op1);   
+		    compute_entry(size, &(inDataLeft[leftoffset1*N]), &(inDataLeft[leftoffset2*N]),op1);   
 #else
 		  outData[(leftoffset1+thisIndex.y)*S + leftoffset2 + thisIndex.x] = 
-		    compute_entry(size, inDataLeft[leftoffset1], inDataLeft[leftoffset2],op1);   
+		    compute_entry(size, &(inDataLeft[leftoffset1*N]), &(inDataLeft[leftoffset2*N]),op1);   
 #endif	 
 		  //}
 	      }
@@ -402,11 +392,11 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	       rightoffset = kRightOffset[kRight];
 #ifdef _SPARSECONT_
 		outData[leftoffset * grainSize + rightoffset] = 
-		    compute_entry(size, inDataLeft[leftoffset], inDataRight[rightoffset],op1);     
+		    compute_entry(size, &(inDataLeft[leftoffset*N]), &(inDataRight[rightoffset*N]),op1);     
 
 #else
 		outData[(leftoffset+thisIndex.y)*S + rightoffset + thisIndex.x] = 
-		    compute_entry(size, inDataLeft[leftoffset], inDataRight[rightoffset],op1);    
+		    compute_entry(size, &(inDataLeft[leftoffset*N]), &(inDataRight[rightoffset*N]),op1);    
 #endif	    
 	      }
 	  }
@@ -420,11 +410,11 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	       rightoffset = kRightOffset[kRight];
 #ifdef _SPARSECONT_
 		outData[leftoffset * grainSize + rightoffset] = 
-		    compute_entry(size, inDataLeft[leftoffset], inDataRight[rightoffset],op1);       
+		    compute_entry(size, &(inDataLeft[leftoffset*N]), &(inDataRight[rightoffset*N]),op1);       
 
 #else
 		outData[(leftoffset+thisIndex.y)*S + rightoffset + thisIndex.x] = 
-		    compute_entry(size, inDataLeft[leftoffset], inDataRight[rightoffset],op1);        
+		    compute_entry(size, &(inDataLeft[leftoffset*N]), &(inDataRight[rightoffset*N]),op1);        
 #endif	    
 	      }
 	  }
@@ -477,7 +467,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 
 #else 
 
-// Below is the old version which works
+// Below is the old version, very dusty
 #ifdef _SPARSECONT_ 
   if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
     //    kLeftCount=kRightCount=0;  
@@ -493,14 +483,14 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	    int start_offset = size-size1;
             for (i = 0; i < grainSize; i++)
                 for (j = 0; j < grainSize; j++) 
-                    outData[i * grainSize + j] = compute_entry(size1, inDataLeft[i]+start_offset,
-                                                               inDataLeft[j]+start_offset, op1);        
+                    outData[i * grainSize + j] = compute_entry(size1, &(inDataLeft[i*N])+start_offset,
+                                                               &(inDataLeft[j*N])+start_offset, op1);        
         }
         for(size1 = 0; size1 + PARTITION_SIZE < size; size1 += PARTITION_SIZE) {
             for (i = 0; i < grainSize; i++)
                 for (j = 0; j < grainSize; j++) 
-                    outData[i * grainSize + j] += compute_entry(PARTITION_SIZE, inDataLeft[i]+size1,
-                                                                inDataLeft[j]+size1, op1);
+                    outData[i * grainSize + j] += compute_entry(PARTITION_SIZE, &(inDataLeft[i*N])+size1,
+                                                                &(inDataLeft[j*N])+size1, op1);
         }        
     }     
     else {                                                        
@@ -511,14 +501,14 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	    int start_offset = size-size1;
             for (i = 0; i < grainSize; i++)
                 for (j = 0; j < grainSize; j++) 
-                    outData[i * grainSize + j] = compute_entry(size1, inDataLeft[i]+start_offset,
-                                                               inDataRight[j]+start_offset, op1);        
+                    outData[i * grainSize + j] = compute_entry(size1, &(inDataLeft[i*N])+start_offset,
+                                                               &(inDataRight[j*N])+start_offset, op1);        
         }
         for(size1 = 0; size1 + PARTITION_SIZE < size; size1 += PARTITION_SIZE) {
             for (i = 0; i < grainSize; i++)
                 for (j = 0; j < grainSize; j++) 
-                    outData[i * grainSize + j] += compute_entry(PARTITION_SIZE, inDataLeft[i]+size1,
-                                                               inDataRight[j]+size1, op1);      
+                    outData[i * grainSize + j] += compute_entry(PARTITION_SIZE, &(inDataLeft[i*N])+size1,
+                                                               &(inDataRight[j*N])+size1, op1);      
         }
     }
     if (flag_dp) {
@@ -583,10 +573,14 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   memset(amatrix, 0, matrixSize*sizeof(complex));
   double *localMatrix;
   double * outMatrix;
+  
   for(int i=0;i<grainSize;i++){
     localMatrix = (matrix1+index+i*S);
     outMatrix   = reinterpret_cast <double *> (amatrix+i*grainSize);
-    DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
+    //    DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
+    // copy in real leaving imaginary as zeros
+    for(incx=0,incy=0;incx<grainSize;incx++,incy+=2)
+      outMatrix[incy]=localMatrix[incx];
   }
 
   for (int i = 0; i < grainSize; i++) {
@@ -599,7 +593,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
     }
   }
 
-  ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, &(inDataLeft[0][0]), &n_in, 
+  ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, inDataLeft, &n_in, 
         &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
 
   if(!unitcoef){
@@ -609,20 +603,21 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   for(int i=0;i<grainSize;i++){
     localMatrix = (matrix2+index+i*S);
     outMatrix   = reinterpret_cast <double *> (amatrix+i*grainSize);
-    DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
+    // DCOPY(&grainSize,localMatrix,&incx, outMatrix,&incy);
+    for(incx=0,incy=0;incx<grainSize;incx++,incy+=2)
+      outMatrix[incy]=localMatrix[incx];
   }
-
+#ifdef _PAIRCALC_DEBUG_
   for (int i = 0; i < grainSize; i++) {
     for (int j = 0; j < grainSize; j++){ 
       m = matrix2[index + j + i*S];
-#ifdef _PAIRCALC_DEBUG_
+
       if(m!=amatrix[i*grainSize+j].re){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n",
 						m, amatrix[i*grainSize+j]);}
-#endif
     }
   }
-
-  ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, &(inDataRight[0][0]), &n_in, 
+#endif
+  ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, inDataRight, &n_in, 
         &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
   }
 
@@ -718,13 +713,11 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   {
       // clear the right and left they'll get reallocated on the next pass
 
-      delete [] inDataLeft[0];
-      for (int i = 0; i < numExpected; i++)
-	inDataLeft[i] = NULL;
+      delete [] inDataLeft;
+      inDataLeft=NULL;
       if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y)) {
-	delete [] inDataRight[0];
-	for (int i = 0; i < numExpected; i++)
-	  inDataRight[i] = NULL;
+	delete [] inDataRight;
+	inDataRight = NULL;
       }
     }
 }

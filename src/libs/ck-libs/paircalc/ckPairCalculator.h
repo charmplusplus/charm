@@ -148,7 +148,7 @@ class PairCalculator: public CBase_PairCalculator {
 #endif
   int op1, op2;
   FuncType fn1, fn2;
-  complex **inDataLeft, **inDataRight;
+  complex *inDataLeft, *inDataRight;
   double *outData;
   complex *newData;
   int sumPartialCount;
