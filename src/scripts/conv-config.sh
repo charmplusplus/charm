@@ -45,6 +45,8 @@ CMK_LD_SHARED="-shared"
 [ -z "$CMK_CC_RELIABLE" ] && CMK_CC_RELIABLE="$CMK_CC"
 [ -z "$CMK_CC_FASTEST" ] && CMK_CC_FASTEST="$CMK_CC"
 [ -z "$CMK_CC_RELIABLE" ] && CMK_CC_RELIABLE="$CMK_CC"
+[ -z "$CMK_CF77" ] && CMK_CF77_FIXED="$CMK_CF90"
+[ -z "$CMK_CF77_FIXED" ] && CMK_CF77_FIXED="$CMK_CF77"
 
 # set default earlier because option configs may need these value
 [ -z "$CMK_NATIVE_CC" ] && CMK_NATIVE_CC="$CMK_CC"
