@@ -175,7 +175,8 @@ int BGMach::read(char *file)
       continue;
     }
     if (!strcmp(parameterName, "traceroot")) {
-      traceroot = parameterValue;
+      traceroot = (char *)malloc(strlen(parameterValue)+4);
+      sprintf(traceroot, "%s/", parameterValue);
       continue;
     }
     if (!strcmp(parameterName, "network")) {

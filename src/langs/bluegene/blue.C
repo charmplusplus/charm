@@ -1380,8 +1380,10 @@ static void writeToDisk()
     int numPes=CmiNumPes();
     int totalProcs = BgNumNodes()*cva(bgMach).numWth;
 
-    if(f2==NULL)
-      CmiPrintf("Creating bgTrace failed\n");
+    if(f2==NULL) {
+      CmiPrintf("[%d] Creating trace file %s  failed\n", CmiMyPe(), d);
+      CmiAbort("BG> Abort");
+    }
 //    PUP::toDisk p(f2);
     PUP::toDisk p(f2);
     p((char *)&machInfo, sizeof(machInfo));
