@@ -12,6 +12,8 @@ ImageData::ImageData (int bytesPerPixel)
     m_starty                = 0;
     m_sizex                 = 0;
     m_sizey                 = 0;
+   	m_header                = NULL;
+	   m_headerSize            = 0;
 }
 
 ImageData::~ImageData ()
@@ -20,6 +22,11 @@ ImageData::~ImageData ()
     {
         delete [] m_clippedImage;
     }
+
+    if (NULL != m_header)
+   	{
+	      delete [] m_header;
+   	}
 }
 
 int ImageData::GetBuffSize (const int& startx,
@@ -391,12 +398,11 @@ int ImageData::AddImage (const liveVizRequest* req,
 }
 #endif
 
-int ImageData::CombineImageData (int nMsg, CkReductionMsg **msgs)
+int ImageData::CombineImageDataSize (int nMsg, CkReductionMsg **msgs)
 {
     int     returnVal       = 0;    // size of combined data or '-1'
     int     buffSize        = 0;    // 'buff' size
     int     headPos         = 0;    // in 'buff'
-    int     dataPos         = 0;    // in 'buff' 
     int     numNonNullLists = 0;    // number of data lists with 
                                     // lines of data to be combined
     int     numDataLines    = 0;    // number of data lines in
@@ -427,9 +433,11 @@ int ImageData::CombineImageData (int nMsg, CkReductionMsg **msgs)
     // find optimistic buffer size
     for (int i=0; i<nMsg; i++)
     {
-        buffSize += (msgs [i])->getSize ();
+        buffSize += (*((int*)((msgs [i])->getData ())))*sizeof (Header);
     }
 
+    buffSize += sizeof (int) + sizeof (liveVizRequest);
+	
     // include memory needed for 'pos' and 'size' data
     buffSize += sizeof (int) * nMsg * 2;
 
@@ -448,7 +456,7 @@ int ImageData::CombineImageData (int nMsg, CkReductionMsg **msgs)
     size = pos + nMsg;
 
     // initialize member
-    m_imageData = buff;
+    m_header = buff;
 
     // calculate 'headPos', position in 'buff' where Headers are
     // placed
@@ -541,56 +549,45 @@ int ImageData::CombineImageData (int nMsg, CkReductionMsg **msgs)
 
     if (0 < numNonNullLists)
     {
-    // find the only list with more data lines
-    minIndex = GetNonNullListIndex (pos, nMsg);
+        // find the only list with more data lines
+        minIndex = GetNonNullListIndex (pos, nMsg);
 
-    // find the data line to add
-    minHead = (Header*)((byte*)((msgs [minIndex])->getData ()) +
-                        sizeof (int) +
-                        sizeof (liveVizRequest) +
-                        (sizeof (Header)*pos [minIndex]));
+        // find the data line to add
+        minHead = (Header*)((byte*)((msgs [minIndex])->getData ()) +
+                           sizeof (int) +
+                           sizeof (liveVizRequest) +
+                           (sizeof (Header)*pos [minIndex]));
 
-    if (-1 != minIndex)
-    {
-        for (int i=pos [minIndex]; i<size [minIndex]; i++)
+        if (-1 != minIndex)
         {
-            minPos = minHead->m_pos;
-            minSize = minHead->m_size;
-
-            if ((NULL != prevHead) && 
-                ((prevHead->m_pos + prevHead->m_size) >= minPos))
+            for (int i=pos [minIndex]; i<size [minIndex]; i++)
             {
-                if ((minPos + minSize) > (prevHead->m_pos + prevHead->m_size))
+                minPos = minHead->m_pos;
+                minSize = minHead->m_size;
+
+                if ((NULL != prevHead) && 
+                    ((prevHead->m_pos + prevHead->m_size) >= minPos))
                 {
-                    numPixels -= prevHead->m_size;
-                    prevHead->m_size = minPos - prevHead->m_pos + minSize;
-                    numPixels += prevHead->m_size;
-                }
+                    if ((minPos + minSize) > (prevHead->m_pos + prevHead->m_size))
+                    {
+                        numPixels -= prevHead->m_size;
+                        prevHead->m_size = minPos - prevHead->m_pos + minSize;
+                        numPixels += prevHead->m_size;
+                    }
 
-                minHead ++;  // += sizeof (Header);
-            }
-            else
-            {
-                prevHead = (Header*)(buff + headPos);
-                memcpy (prevHead, minHead, sizeof (Header));
-                numPixels += ((Header*)(buff+headPos))->m_size;
-                headPos += sizeof (Header);
-                minHead ++; //+= sizeof (Header);
-                numDataLines ++;
+                    minHead ++;  // += sizeof (Header);
+                }
+                else
+                {
+                    prevHead = (Header*)(buff + headPos);
+                    memcpy (prevHead, minHead, sizeof (Header));
+                    numPixels += ((Header*)(buff+headPos))->m_size;
+                    headPos += sizeof (Header);
+                    minHead ++; //+= sizeof (Header);
+                    numDataLines ++;
+                }
             }
         }
-    }
-
-    dataPos = headPos;
-
-    // initialize image data buff
-    memset (buff + dataPos, 0, m_bytesPerPixel * numPixels);
-
-    // copy image data to buff
-    for (int i=0; i<nMsg; i++)
-    {
-        CopyImageData (buff, numDataLines, msgs[i]);
-    }
     }
 
     // copy fixed header to buff
@@ -598,16 +595,45 @@ int ImageData::CombineImageData (int nMsg, CkReductionMsg **msgs)
     memcpy (buff + sizeof (int), 
             (byte*)((msgs[0])->getData ()) + sizeof (int), 
             sizeof (liveVizRequest));
-
+	
     // initialize member variables
+    m_headerSize = sizeof (int) +
+                   sizeof (liveVizRequest) +
+                   sizeof (Header) * numDataLines;
+
     m_numDataLines = numDataLines;
     m_size = sizeof (int) +
              sizeof (liveVizRequest) +
              (sizeof (Header) * numDataLines) +
              (m_bytesPerPixel * numPixels);
+    returnVal = m_size;
 
 EXITPOINT:
     return returnVal;
+}
+
+void ImageData::CombineImageData (int nMsg, CkReductionMsg **msgs, byte* dest)
+{
+    int     headPos         = 0;    // in 'buff'
+    int     dataPos         = 0;    // in 'buff' 
+    int     numPixels       = 0;    // data pixels to be copied
+
+    numPixels = (m_size - m_headerSize)/m_bytesPerPixel;
+
+    // copy header to dest
+    memcpy (dest, m_header, m_headerSize);
+
+    // calulate data position in dest buffer
+    dataPos = m_headerSize + 1;
+
+    // initialize image data buff
+    memset (dest + dataPos, 0, m_bytesPerPixel * numPixels);
+
+    // copy image data to buff
+    for (int i=0; i<nMsg; i++)
+    {
+        CopyImageData (dest, m_numDataLines, msgs[i]);
+    }
 }
 
 int ImageData::CopyImageData (byte* dest,

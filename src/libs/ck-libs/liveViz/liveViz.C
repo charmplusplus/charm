@@ -65,9 +65,8 @@ void liveVizDeposit(const liveVizRequest &req,
 		    int sizex, int sizey, const byte * src,
 		    ArrayElement* client)
 {
-
   if (lv_config.getVerbose(2))
-    CkPrintf("liveVizDeposit> Deposited image at (%d,%d), (%d x %d) pixels, on pe %d at time %.6f\n",startx,starty,sizex,sizey,CkMyPe(), CmiWallTimer ());
+    CkPrintf("liveVizDeposit> Deposited image at (%d,%d), (%d x %d) pixels, on pe %d \n",startx,starty,sizex,sizey,CkMyPe());
 
   ImageData imageData (lv_config.getBytesPerPixel ());
 
@@ -84,6 +83,7 @@ void liveVizDeposit(const liveVizRequest &req,
 
   //Contribute this image to the reduction
   msg->setCallback(CkCallback(vizReductionHandler));
+  
   client->contribute(msg);
 }
 
@@ -106,12 +106,14 @@ CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
     CkPrintf("imageCombine> image combine on pe %d\n",CkMyPe());
 
   ImageData imageData (lv_config.getBytesPerPixel ());
-  imageData.CombineImageData (nMsg, msgs);
 
-  CkReductionMsg* msg = CkReductionMsg::buildNew(imageData.GetImageDataSize(),
-				                                 imageData.GetImageData (),
+  CkReductionMsg* msg = CkReductionMsg::buildNew(imageData.CombineImageDataSize (nMsg,
+						                                                         msgs),
+
+				                                 NULL,
 												 imageCombineReducer);
-  //CkPrintf("Combining %d messages on PE %d took %.6fs\n", nMsg, CkMyPe(), CmiWallTimer()-startTime);
+
+  imageData.CombineImageData (nMsg, msgs, (byte*)(msg->getData()));
 
   return msg;
 }
@@ -126,8 +128,9 @@ void vizReductionHandler(void *r_msg)
   
   if (lv_config.getVerbose(2))
       CkPrintf("vizReductionHandler> pe %d \n", CkMyPe());
-  
+
   liveViz0Deposit(req,image);
+
   delete msg;
 }
 

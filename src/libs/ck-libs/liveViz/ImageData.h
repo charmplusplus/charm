@@ -68,11 +68,16 @@ class ImageData
                       byte* dest        = NULL);
 				  
         /*
-           This function merges data in n-reduction messages into one buffer, 
-           which can be obtained using GetImageData () and size of buffer can
-           be obtained using GetImageDataSize ()
+           This function calculates the size of buffer required to fit the
+           merged data from nMsg input msgs. It also sets some member 
+           variables, it must be called before CombineImageData () is called.           
         */
-        int CombineImageData (int nMsg, CkReductionMsg **msgs);
+        int CombineImageDataSize (int nMsg, CkReductionMsg **msgs);
+
+        /*
+           This function copies image data from n-input msgs to 'dest' buffer. 
+        */
+        void CombineImageData (int nMsg, CkReductionMsg **msgs, byte* dest);
 
 
         /*
@@ -179,22 +184,34 @@ class ImageData
         /*
            number of bytes per pixel
         */
-        int		m_bytesPerPixel;
+        int		   m_bytesPerPixel;
  
         /*
            points to image data buffer holding image data in lines format.
         */
-        byte*	m_imageData;
+        byte*	  m_imageData;
        
         /*
            size of image data buffer (m_imageData)
         */
-        int		m_size;
+        int		   m_size;
 
         /*
            number of lines of image data
         */
-        int		m_numDataLines;
+        int		   m_numDataLines;
+
+        // members used while image combine operation
+
+        /*
+           points to buffer holding merged header
+        */
+        byte*   m_header;
+
+        /*
+           holds size of m_header buff in bytes
+        */
+        int     m_headerSize;
 
 
         // initialized by GetClippedImage ()
