@@ -47,8 +47,14 @@ void ComlibManager::init(int s, int n, int nmFlush, int bFlush){
     ComlibInit();
     
     strategy = s;
-    messagesBeforeFlush = 0;
-    bytesBeforeFlush = 0;
+    
+    if(nmFlush == 0)
+        nmFlush = 1000;
+    if(bFlush == 0)
+        bFlush = 50000;
+    
+    messagesBeforeFlush = nmFlush;
+    bytesBeforeFlush = bFlush;
 
     nelements = n;  //number of elements on that processor, 
     //currently pased by the user. Should discover it.
@@ -234,8 +240,8 @@ void ComlibManager::ArraySend(int ep, void *msg,
     cmsg->next = messageBuf[dest_proc];
     messageBuf[dest_proc] = cmsg;    
 
-    if ((strategy == USE_DIRECT) && ((messageCount[dest_proc] >= messagesBeforeFlush)
-                                     || (messageSize[dest_proc] >= bytesBeforeFlush)))
+    if ((messageCount[dest_proc] >= messagesBeforeFlush)
+        || (messageSize[dest_proc] >= bytesBeforeFlush))
         sendMessage(dest_proc);
 }
 
