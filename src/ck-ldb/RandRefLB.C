@@ -8,10 +8,6 @@
 #include "RandRefLB.h"
 #include "RandRefLB.def.h"
 
-#ifdef WIN32
-double drand48(void);
-#endif
-
 void CreateRandRefLB()
 {
   //  CkPrintf("[%d] creating RandRefLB %d\n",CkMyPe(),loadbalancer);
@@ -44,7 +40,7 @@ CLBMigrateMsg* RandRefLB::Strategy(CentralLB::LDStats* stats, int count)
     //    CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
     //	     CkMyPe(),pe,stats[pe].n_objs,stats[pe].n_comm);
     for(obj=0; obj < stats[pe].n_objs; obj++)
-      from_procs[pe][obj] = static_cast<int>(drand48()*(CmiNumPes()-1) 
+      from_procs[pe][obj] = static_cast<int>(CrnDrand()*(CmiNumPes()-1) 
 					     + 0.5 );
   }
   int** to_procs = Refiner::AllocProcs(count,stats);
