@@ -17,6 +17,45 @@ extern int yyerror(char *);
 
 extern ModuleList *modlist;
 
+/******************* Macro defines ****************/
+class MacroDefinition {
+public:
+  char *key;
+  char *val;
+  MacroDefinition(): key(NULL), val(NULL) {}
+  MacroDefinition(char *k, char *v): key(k), val(v) {}
+  MacroDefinition(char *str) {
+    // split by '='
+    char *equal = strchr(str, '=');
+    if (equal) {
+      *equal = 0;
+      key = str;
+      val = equal+1;
+    }
+    else {
+      key = str;
+      val = "";
+    }
+  }
+  char *match(char *k) { if (!strcmp(k, key)) return val; }
+};
+
+static TList<MacroDefinition *> macros;
+
+int macroDefined(char *str, int istrue) 
+{
+  MacroDefinition *def;
+  for (def = macros.begin(); !macros.end(); def=macros.next()) {
+    char *val = def->match(str);
+    if (val) {
+      if (!istrue) return 1;
+      else return atoi(val);
+    }
+  }
+  return 0;
+}
+
+
 ModuleList *Parse(char *interfacefile)
 {
   cur_file=interfacefile;
@@ -49,6 +88,7 @@ main(int argc, char *argv[])
       if (strcmp(argv[i],"-ansi")==0);
       else if (strcmp(argv[i],"-f90")==0)  fortranMode = 1;
       else if (strcmp(argv[i],"-intrinsic")==0)  internalMode = 1;
+      else if (strncmp(argv[i],"-D", 2)==0)  macros.append(new MacroDefinition(argv[i]+2));
       else abortxi(argv[0]);
     }
     else

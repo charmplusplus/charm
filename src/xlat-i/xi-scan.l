@@ -12,7 +12,7 @@ int in_braces=0; /*Horrific hack to get SDAG entry code snippets (between {}'s)*
 int in_int_expr=0;
 TList<Entry *> *connectEntries = new TList<Entry *>();
 /* Local to file */
-static unsigned char in_comment=0;
+unsigned char in_comment=0;
 int search(char *s);
 
 /* We return Tokens only when not in a comment. */
@@ -61,6 +61,9 @@ nonIntExpr [^();,:]*
 "\r"		{ /* ignore ^M characters for dos-unix compat */ }
 "/*"		{ in_comment = 1; /* Single line C-style comments */ }
 "*/"		{ in_comment = 0; }
+"#if" 		{ Return Token(HASHIF); }
+"#ifdef" 	{ Return Token(HASHIFDEF); }
+"#endif" 	{ in_comment = 0; /* comments */ }
 {ws}		{ /* ignore white space */ }
 {nl}		{ lineno++;}
 {number}	{ Yval; Return Token(NUMBER); }

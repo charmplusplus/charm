@@ -3,11 +3,13 @@
 #include "xi-symbol.h"
 #include "EToken.h"
 extern int yylex (void) ;
+extern unsigned char in_comment;
 void yyerror(const char *);
 extern unsigned int lineno;
 extern int in_bracket,in_braces,in_int_expr;
 extern TList<Entry *> *connectEntries;
 ModuleList *modlist;
+extern int macroDefined(char *str, int istrue);
 
 %}
 
@@ -79,7 +81,7 @@ ModuleList *modlist;
 %token ELSE
 %token CONNECT
 %token PUBLISHES 
-%token <strval> IDENT NUMBER LITERAL CPROGRAM
+%token <strval> IDENT NUMBER LITERAL CPROGRAM HASHIF HASHIFDEF
 %token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED
 
 %type <modlist>		ModuleEList File
@@ -203,6 +205,10 @@ Construct	: OptExtern '{' ConstructList '}' OptSemiColon
 		{ $2->setExtern($1); $$ = $2; }
 		| OptExtern Template
 		{ $2->setExtern($1); $$ = $2; }
+		| HashIFComment
+		{ $$ = NULL; }
+		| HashIFDefComment
+		{ $$ = NULL; }
 		;
 
 TParam		: Type
@@ -867,6 +873,13 @@ SParamBracketEnd   : ']'
 		   { in_bracket=0; } 
 		   ;
 
+HashIFComment	: HASHIF Name
+		{ if (!macroDefined($2, 1)) in_comment = 1; }
+		;
+
+HashIFDefComment: HASHIFDEF Name
+		{ if (!macroDefined($2, 0)) in_comment = 1; }
+		;
 
 %%
 void yyerror(const char *mesg)
