@@ -175,14 +175,14 @@ static void _exitHandler(envelope *env)
       CmiNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
       CmiFree(env);
       _sendStats();
-      if(CkMyPe())
-        CsdExitScheduler();
       _mainDone = 1; // This is needed because the destructors for
                      // readonly variables will be called when the program
 		     // exits. If the destructor is called while _mainDone
 		     // is 0, it will assume that the readonly variable was
 		     // declared locally. On all processors other than 0, 
 		     // _mainDone is never set to 1 before the program exits.
+      if(CkMyPe())
+        ConverseExit();
       break;
     case StatMsg:
       CkAssert(CkMyPe()==0);
@@ -193,7 +193,7 @@ static void _exitHandler(envelope *env)
       if(_numStatsRecd==CkNumPes()) {
         _printStats();
         _TRACE_END_COMPUTATION();
-        CsdExitScheduler();
+        ConverseExit();
       }
       break;
     default:
