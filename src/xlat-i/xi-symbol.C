@@ -1178,6 +1178,13 @@ Message::genReg(XStr& str)
   }
 }
 
+void 
+Template::setExtern(int e) 
+{ 
+  Construct::setExtern(e); 
+  entity->setExtern(e); 
+}
+
 void
 Template::genVars(XStr& str)
 {

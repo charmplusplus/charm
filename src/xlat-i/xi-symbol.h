@@ -70,6 +70,7 @@ class Construct : public Printable {
     int external;
   public:
     int line;
+    Construct() {external=0;line=-1;}
     void setExtern(int e) { external = e; }
     virtual void genDecls(XStr& str) = 0;
     virtual void genDefs(XStr& str) = 0;
@@ -346,6 +347,7 @@ class Template : public Construct {
     TEntity *entity;
   public:
     Template(TVarList *t, TEntity *e) : tspec(t), entity(e) {}
+    virtual void setExtern(int e);
     void print(XStr& str);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
