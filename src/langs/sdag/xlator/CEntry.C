@@ -8,63 +8,59 @@
 #include "CEntry.h"
 #include "CParseNode.h"
 
-void CEntry::generateDeps(void)
+void CEntry::generateDeps(XStr& op)
 {
   CParseNode *cn;
   for(cn=(CParseNode *)whenList->begin(); !whenList->end(); cn=(CParseNode *)whenList->next()) {
-    pH(2, "__cDep->addDepends(%d, %d);\n", cn->nodeNum, entryNum);
+    op << "    __cDep->addDepends("<<cn->nodeNum<<","<<entryNum<<");\n";
   }
 }
 
-void CEntry::generateCode(XStr *className)
+void CEntry::generateCode(XStr& op)
 {
   CParseNode *cn;
-  // C++ file
-  pH(1, "void %s(%s *msg) {\n",
-              entry->charstar(),
-              msgType->charstar());
-  // actual code begins
-  pH(2,"CWhenTrigger *tr;\n");
+  op << "  void "<< *entry << "(" << *msgType << " *msg) {\n";
+  op << "    CWhenTrigger *tr;\n";
   if(refNumNeeded) {
-    pH(2,"int refnum = CkGetRefNum(msg);\n");
-    pH(2,"__cDep->bufferMessage(%d, (void *) msg, refnum);\n", entryNum);
-    pH(2,"tr = __cDep->getTrigger(%d, refnum);\n", entryNum);
+    op << "    int refnum = CkGetRefNum(msg);\n";
+    op << "    __cDep->bufferMessage("<<entryNum<<",(void *) msg,refnum);\n";
+    op << "    tr = __cDep->getTrigger("<<entryNum<<", refnum);\n";
   } else {
-    pH(2,"__cDep->bufferMessage(%d, (void *) msg, 0);\n", entryNum);
-    pH(2,"tr = __cDep->getTrigger(%d, 0);\n", entryNum);
+    op << "    __cDep->bufferMessage("<<entryNum<<", (void *) msg, 0);\n";
+    op << "    tr = __cDep->getTrigger("<<entryNum<<", 0);\n";
   }
-  pH(2,"if (tr == 0)\n");
-  pH(3,"return;\n");
+  op << "    if (tr == 0)\n";
+  op << "      return;\n";
   if(whenList->length() == 1) {
     cn = (CParseNode *)whenList->begin();
-    pH(2,"%s(", cn->label->charstar());
+    op << "    " << cn->label->charstar() << "(";
     CStateVar *sv = (CStateVar *)cn->stateVars->begin();
     int i = 0;
     for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
       if(i!=0)
-        pH(1,", ");
-      pH(1,"(%s) tr->args[%d]", sv->type->charstar(), i);
+        op << ", ";
+      op << "(" << sv->type->charstar() << ") tr->args[" << i << "]";
     }
-    pH(1,");\n");
-    pH(2,"return;\n");
+    op << ");\n";
+    op << "    return;\n";
   } else {
-    pH(2,"switch(tr->whenID) {\n");
+    op << "    switch(tr->whenID) {\n";
     for(cn=(CParseNode *)whenList->begin(); !whenList->end(); cn=(CParseNode *)whenList->next()) {
-      pH(3,"case %d:\n", cn->nodeNum);
-      pH(4,"%s(", cn->label->charstar());
+      op << "      case " << cn->nodeNum << ":\n";
+      op << cn->label->charstar() << "(";
       CStateVar *sv = (CStateVar *)cn->stateVars->begin();
       int i = 0;
       for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
         if(i!=0)
-          pH(1,", ");
-        pH(1,"(%s) tr->args[%d]", sv->type->charstar(), i);
+          op << ", ";
+        op << "(" << sv->type->charstar() << ") tr->args[" << i << "]";
       }
-      pH(1,");\n");
-      pH(4,"return;\n");
+      op << ");\n";
+      op << "      return;\n";
     }
-    pH(2,"}\n");
+    op << "    }\n";
   }
   // actual code ends
-  pH(1,"}\n\n");
+  op << "  }\n\n";
 }
 

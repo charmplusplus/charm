@@ -30,8 +30,8 @@ class CEntry{
       Indent(indent);
       printf("entry %s (%s *)", entry->charstar(), msgType->charstar());
     }
-    void generateCode(XStr *);
-    void generateDeps(void);
+    void generateCode(XStr& op);
+    void generateDeps(XStr& op);
     
 };
 #endif

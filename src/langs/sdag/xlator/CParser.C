@@ -72,7 +72,7 @@ CToken *CParser::lookForStatement(void)
 
 CParsedFile *CParser::doParse(void)
 {
-  CParsedFile *cParsedFile = new CParsedFile(sourceFile);
+  CParsedFile *cParsedFile = new CParsedFile();
   CToken *tok;
 
   tok = lookForToken(CLASS); delete tok;

@@ -8,25 +8,18 @@
 #include "CLexer.h"
 #include <stdlib.h>
 
-CLexer::CLexer(void)
+extern "C" void sl_scan_string(char *);
+
+CLexer::CLexer(char *str)
 {
   lineNum = 1;
   charNum = 1;
   wsSignificant = 0;
+  sl_scan_string(str);
 }
 
 CLexer::~CLexer(void)
 {
-}
-
-int CLexer::sourceFile(char *filename)
-{
-  FILE *fp;
-  if((fp=fopen(filename, "r"))==(FILE *)0)
-    return 0;
-  fclose(fp);
-  freopen(filename, "r", stdin);
-  return 1;
 }
 
 CToken *CLexer::lookAhead(void)

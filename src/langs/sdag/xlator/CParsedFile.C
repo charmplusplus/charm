@@ -10,8 +10,7 @@
 
 void CParsedFile::print(int indent)
 {
-  sourceFile->print(indent);
-  printf(":\nclass ");
+  printf("class ");
   className->print(indent);
   printf("\n");
   for(CEntry *ce=(CEntry *)(entryList->begin()); !entryList->end(); ce=(CEntry *)(entryList->next()))
@@ -54,32 +53,32 @@ void CParsedFile::generateEntryList(void)
   }
 }
 
-void CParsedFile::generateCode(void)
+void CParsedFile::generateCode(XStr& op)
 {
   for(CParseNode *cn=(CParseNode *)(nodeList->begin()); !nodeList->end(); cn=(CParseNode *)(nodeList->next())) {
     cn->setNext(0,0);
-    cn->generateCode();
+    cn->generateCode(op);
   }
 }
 
-void CParsedFile::generateEntries(void)
+void CParsedFile::generateEntries(XStr& op)
 {
   CEntry *en;
-  pH(0,"public:\n");
+  op << "public:\n";
   for(en=(CEntry *)(entryList->begin()); !entryList->end(); en=(CEntry *)(entryList->next())) {
-    en->generateCode(className);
+    en->generateCode(op);
   }
 }
 
-void CParsedFile::generateInitFunction(void)
+void CParsedFile::generateInitFunction(XStr& op)
 {
-  pH(0,"private:\n");
-  pH(1,"CDep *__cDep;\n");
-  pH(1,"void __sdag_init(void) {\n");
-  pH(2,"__cDep = new CDep(%d, %d);\n", numEntries, numWhens);
+  op << "private:\n";
+  op << "  CDep *__cDep;\n";
+  op << "  void __sdag_init(void) {\n";
+  op << "    __cDep = new CDep("<<numEntries<<","<<numWhens<<");\n";
   CEntry *en;
   for(en=(CEntry *)(entryList->begin()); !entryList->end(); en=(CEntry *)(entryList->next())) {
-    en->generateDeps();
+    en->generateDeps(op);
   }
-  pH(1,"}\n");
+  op << "  }\n";
 }

@@ -14,20 +14,15 @@
 #include "CParsedFile.h"
 #include "CToken.h"
 #include "sdag-globals.h"
+#include "xi-util.h"
 
 class CParser {
   private:
     CLexer *cLexer;
-    char *sourceFile;
 
   public:
-    CParser(char *filename) {
-      sourceFile = filename;
-      cLexer = new CLexer();
-      if(cLexer->sourceFile(filename) == 0) {
-        fprintf(stderr, "sdagx: Cannot open file %s for reading !\n", filename);
-        exit(1);
-      }
+    CParser(XStr& input) {
+      cLexer = new CLexer(input.charstar());
     }
 
     ~CParser(void) {;}

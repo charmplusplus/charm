@@ -41,21 +41,21 @@ class CParseNode {
     void labelNodes(XStr *);
     void generateEntryList(TList *, CParseNode *);
     void propogateState(TList *);
-    void generateCode(void);
+    void generateCode(XStr& output);
     void setNext(CParseNode *, int);
   private:
-    void generateWhen(void);
-    void generateOverlap(void);
-    void generateWhile(void);
-    void generateFor(void);
-    void generateIf(void);
-    void generateElse(void);
-    void generateForall(void);
-    void generateOlist(void);
-    void generateSdagEntry(void);
-    void generateSlist(void);
-    void generateAtomic(void);
-    void generatePrototype(FILE *, TList *);
-    void generateCall(FILE *f, TList *);
+    void generateWhen(XStr& op);
+    void generateOverlap(XStr& op);
+    void generateWhile(XStr& op);
+    void generateFor(XStr& op);
+    void generateIf(XStr& op);
+    void generateElse(XStr& op);
+    void generateForall(XStr& op);
+    void generateOlist(XStr& op);
+    void generateSdagEntry(XStr& op);
+    void generateSlist(XStr& op);
+    void generateAtomic(XStr& op);
+    void generatePrototype(XStr& op, TList *);
+    void generateCall(XStr& op, TList *);
 };
 #endif

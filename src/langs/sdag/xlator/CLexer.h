@@ -23,9 +23,8 @@ class CLexer {
   public:
     unsigned int lineNum;
     unsigned int charNum;
-    CLexer(void);
+    CLexer(char *);
     ~CLexer(void);
-    int sourceFile(char *filename);
     CToken *lookAhead(void);
     CToken *getNextToken(void);
     CToken *getMatchedCode(const char *, EToken, EToken);

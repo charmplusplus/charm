@@ -21,33 +21,27 @@ class CParsedFile {
     void labelNodes(void);
     void propogateState(void);
     void generateEntryList(void);
-    void generateCode(void);
-    void generateEntries(void);
-    void generateInitFunction(void);
+    void generateCode(XStr& output);
+    void generateEntries(XStr& output);
+    void generateInitFunction(XStr& output);
   public:
     XStr *className;
-    XStr *sourceFile;
     TList *entryList;
     TList *nodeList;
-    CParsedFile(char *sFile): className(0) {
-      sourceFile = new XStr(sFile);
+    CParsedFile(void): className(0) {
       entryList = new TList();
       nodeList = new TList();
     }
     ~CParsedFile(void){}
     void print(int indent);
-    void doProcess(void) {
+    void doProcess(XStr& output) {
       numberNodes();
       labelNodes();
       propogateState();
       generateEntryList();
-      XStr *fhname = new XStr(sourceFile->charstar());
-      fhname->append(".h");
-      fh = fopen(fhname->charstar(), "w");
-      generateCode();
-      generateEntries();
-      generateInitFunction();
-      fclose(fh);
+      generateCode(output);
+      generateEntries(output);
+      generateInitFunction(output);
     }
 };
 

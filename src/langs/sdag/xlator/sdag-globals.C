@@ -28,19 +28,6 @@ int numWhiles=0;
 int numAtomics=0;
 int numForalls=0;
 
-FILE *fh;
-
-void pH(int indent, const char *format, ...)
-{
-  va_list args;
-
-  va_start(args, format);
-  for(int i=0;i<indent;i++)
-    fprintf(fh, "  ");
-  vfprintf(fh, format, args);
-  va_end(args);
-}
-
 void resetNumbers(void)
 {
   numSdagEntries=0;
