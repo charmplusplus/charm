@@ -229,6 +229,10 @@ int LDMemusage(LDHandle _db);
 }
 #endif /* _cplusplus */
 
+/* put outside of __cplusplus */
+PUPbytes(LDObjData)
+PUPbytes(LDCommData)
+
 #endif /* LBDBH_H */
 
 /*@}*/
