@@ -1070,6 +1070,23 @@ CpvExtern(void*, CmiLocalQueue);
 
 char *CmiCopyMsg(char *msg, int len);
 
+/******** Hypercube broadcast propagation (Binomial tree) ********/
+
+/*
+  This routing will receive a number k containing the dimension in the hypercube
+  to be used for the broadcast, i.e. k=0 means sending only to MyPe^1, k=1 means
+  sending to MyPe^2 and MyPe^1, etc.
+  The array dest_pes will be filled with the id of the processors to which send,
+  it has to be already allocated, the size should be at least k+1 to allow
+  enough space.
+  It return the number of processors to which send, i.e. the size of dest_pes.
+  This may be less than k+1 due to not complete hypercubes.
+  For example with pow(2,n)+2 procs and 0 broadcasting, proc pow(2,n) will
+  receive from 0 in the first step but then it has only proc pow(2,n)+1 as
+  destination, so most of the other dimentions will be skipped.
+*/
+int HypercubeGetBcastDestinations(int k, int *dest_pes);
+
 /******** Immediate Messages ********/
 
 CpvExtern(int, CmiImmediateMsgHandlerIdx);

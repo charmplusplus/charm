@@ -2025,6 +2025,31 @@ static void CmiMultiMsgHandler(char *msgWhole)
   CmiFree(msgWhole);
 }
 
+/****************************************************************************
+* Hypercube broadcast message passing.
+****************************************************************************/
+
+int HypercubeGetBcastDestinations(int k, int *dest_pes) {
+  int num_pes = 0;
+  for ( ; k>=0; --k) {
+    // add the processor destination at level k if it exist
+    dest_pes[num_pes] = CmiMyPe() ^ (1<<k);
+    if (dest_pes[num_pes] >= CmiNumPes()) {
+      // find the first proc in the other part of the current dimention
+      dest_pes[num_pes] &= (-1)<<k;
+      // if the first proc there is over CmiNumPes() then there is no other
+      // dimension, otherwise if it is valid compute my correspondent in such
+      // a way to minimize the load for every processor
+      if (CmiNumPes()>dest_pes[num_pes]) dest_pes[num_pes] += (CmiMyPe() - (CmiMyPe() & ((-1)<<k))) % (CmiNumPes() - dest_pes[num_pes]);
+      }
+    if (dest_pes[num_pes] < CmiNumPes()) {
+      // if the destination is in the acceptable range increment num_pes
+      ++num_pes;
+    }
+  }
+  return num_pes;
+}
+
 
 /****************************************************************************
 * DESCRIPTION : This function initializes the main handler required for the
