@@ -4,6 +4,7 @@ The FEM framework's communication layer is called IDXL. This small library handl
 
 
 \subsection{Index Lists}
+\label{sec:IDXL}
 An Index List is the fundamental data structure of the IDXL library---for example, the list of shared nodes is an Index List.  IDXL includes routines for building, combining, and sending and receiving Index Lists.
 
 An Index List, as you might expect, is a list of indices that need to be sent and received.  An Index List includes both the indices that need to be sent, as well as the indices to be received, from each chunk.
@@ -116,6 +117,7 @@ This routine only affects the current chunk-- no other chunks are affected.  To 
 
 %%%%%%%%%%%%%%%%%%% Layout %%%%%%%%%%%%%%%%%%%%
 \subsection{Data Layout}
+\label{sec:IDXL_Layout}
 IDXL is designed to send and receive data directly out of your arrays, with no intermediate copying.  This means IDXL needs a completely general method for specifying how you store your data in your arrays.  Since you probably don't change your storage layout at runtime, you can create a ``data layout'' once at the beginning of your program, then use it repeatedly for communication.
 
 Like Index Lists, Layouts are referred to via an opaque handle---in a C program via the integer typedef IDXL\_Layout\_t, and in Fortran via a bare integer.
@@ -161,7 +163,7 @@ For example, if you keep a dense array with 3 doubles of net force per node, you
 
 
 \subsubsection{Advanced Layout Routines}
-
+\label{sec:IDXL_Layout_offset}
 \prototype{IDXL\_Layout\_offset}
 \function{IDXL\_Layout\_t IDXL\_Layout\_offset(int type, int width, int offsetBytes, int distanceBytes,int skewBytes);}
 \function{integer function IDXL\_Layout\_offset(type,width,offsetBytes,distanceBytes,skewBytes)}
@@ -267,6 +269,7 @@ used \kw{skewBytes} set to zero.
 
 %%%%%%%%%%%%%%%%%%% Communication %%%%%%%%%%%%%%%%%%%%
 \subsection{IDXL Communication}
+\label{sec:IDXL_Comm}
 This section brings together all the pieces of IDXL: Index Lists are used to determine what to send and what to receive and Layouts are used to determine where to get and put the communicated data.
 
 

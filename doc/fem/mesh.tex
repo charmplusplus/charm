@@ -1,29 +1,558 @@
 \section{Mesh}
 
 These routines describe and retreive the finite element mesh for this
-computation.  A mesh, from the framework's perspective, is a list of
-elements and nodes, together with uninterpreted data associated with each.
-Elements map to nodes via the connectivity table for that element type.
-Elements and nodes have both a global number (number in
-the serial mesh) as well as a chunk-local number (number in the partitioned
-mesh chunk).  The FEM framework currently uses the package Metis to do 
-partitioning.
+computation.  A \term{mesh}, from the framework's perspective, is a list of
+elements, nodes, and other data that describes the computational domain.
+The FEM framework provides extensive support for creating, manipulating,
+and partitioning meshes. 
 
-A simple program would set the serial mesh in init, get the partitioned
-chunk in driver, and work on that chunk.  A more complex program would set
-the initial mesh in init; then get, work on, update and repartition the mesh
-several times in driver via \kw{FEM\_Update\_mesh}.
+A \term{serial mesh} consists of a single large piece.  It's usually
+easiest to read and write serial meshes to existing, non-parallel file formats,
+and it can be easier to manipulate serial meshes.  By contrast, a 
+\term{parallel mesh} consists
+of several pieces, called \term{chunks} or partitions.  Different processors
+can work on different pieces of a parallel mesh, so most of the computation
+is done using parallel meshes.  A simple program might create or read in a
+single serial mesh in init, get a local chunk of the 
+partitioned\footnote{The framework uses the excellent graph partitioning
+package Metis.}
+mesh in driver, and work on that chunk for the rest of the program.  
+A more complex program might set an initial mesh in init; then get, 
+work on, reassemble and repartition the mesh several times in driver 
+via \kw{FEM\_Update\_mesh}.
 
-From \kw{init()}, the \kw{FEM\_Set\_} routines describe the serial mesh, which
-will be partitioned into chunks.
+\subsection{Entities}
+A mesh consists of \term{entities}, such as nodes and elements.
+Entities always have a \term{local number}, which is just the entities'
+current index in its array.  Entites may also have a \term{global number}, 
+which is the entity's index in the unpartitioned serial mesh.
+Entities have data values called \term{attributes}.
+For example, the location of each node might be called the 
+``location'' attribute of the ``node'' entity type.  Attributes are
+always stored in regular arrays indexed by the entity's local number.
+This table lists the different attributes that can be read or
+written for each type of entity.
 
-From \kw{driver()}, the \kw{FEM\_Get\_} routines ask for the current mesh
-chunk; the \kw{FEM\_Set\_} routines describe a new partitioned mesh chunk.  The
-new chunk need not have the same number of elements or nodes as the old chunk;
-but any new added nodes are assumed private (not shared).
-\kw{FEM\_Update\_mesh} will reassemble a serial version of the mesh from the
-new pieces and optionally repartition the serial mesh.
+A \term{shared entity} is a boundary entitity that two or more chunks 
+can both update---currently, only nodes can be shared.  Shared nodes
+are mixed in with regular nodes, and the framework currently provides
+no way to identify which nodes are shared.
 
+\subsubsection{Nodes}
+\kw{FEM\_NODE} is the entity code for nodes, the simplest kind of entity.  
+A node is a single point in the domain, and elements are defined by their nodes.
+Nodes can have the following attributes:
+
+\begin{itemize}
+\item \kw{FEM\_DATA}+$tag$  Uninterpreted user data, which might
+    include material properties, boundary conditions, flags, etc.
+    User data can have any data type and width.
+    $tag$ can be any number from 0 to one billion---it allows you
+    to register several data fields with a single entity.
+
+\item \kw{FEM\_GLOBALNO}  Global node numbers. Always a 1-wide index type.
+
+\item \kw{FEM\_SYMMETRIES} Symmetries that apply to this node.  
+    Always a 1-wide \kw{FEM\_BYTE}.
+
+\item \kw{FEM\_NODE\_PRIMARY}  Marker indicating that this chunk is responsible 
+    for this node.  Every node is primary in exactly one chunk.
+    This attribute is always a 1-wide \kw{FEM\_BYTE} containing 0 or 1.
+
+% \item \kw{FEM\_COORD}  Optional coordinates for this node.
+\end{itemize}
+
+
+\subsubsection{Elements}
+\kw{FEM\_ELEM}+$elType$ is the entity code for one kind of element.
+$elType$ is a small, user-defined value that uniquely identifies 
+this element type.  Like nodes, elements can have the attributes
+\kw{FEM\_DATA}+$tag$, \kw{FEM\_GLOBALNO}, or \kw{FEM\_SYMMETRIES};
+but every element type must have this attribute:
+
+\begin{itemize}
+\item \kw{FEM\_CONN} Lists the numbers of the nodes around this element. 
+    See the description in the ghost section for special ghost connectivity.
+    Always an index type--\kw{FEM\_INDEX\_0} for C-style 0-based node indexing,
+    or \kw{FEM\_INDEX\_1} for Fortran-style 1-based node indexing.
+\end{itemize}
+
+
+\subsubsection{Sparse Elements}
+\kw{FEM\_SPARSE}+$sparseType$ is the entity code for one kind of sparse element.
+Again, $sparseType$ is a small, user-defined unique value.
+The only difference between ordinary elements and sparse elements 
+regards partitioning.  Ignoring ghosts, ordinary elements are never duplicated---each
+element is sent to its own chunk.  Sparse elements may be duplicated,
+and are always dependent on some other entity for their partitioning.
+Sparse elements have all the attributes of ordinary elements:
+\kw{FEM\_DATA}+$tag$, \kw{FEM\_GLOBALNO}, \kw{FEM\_SYMMETRIES},
+and \kw{FEM\_CONN}, as well as the special attribute \kw{FEM\_SPARSE\_ELEM}.
+
+Without the \kw{FEM\_SPARSE\_ELEM} attribute, a sparse element will 
+be copied to every chunk that contains all the sparse element's nodes.  
+This is useful for things like node-associated boundary conditions, 
+where the sparse element connectivity might list the nodes with boundary
+conditions, and the sparse element data might list the boundary condition values.
+
+The \kw{FEM\_SPARSE\_ELEM} attribute lists the ordinary element each 
+sparse element should be partitioned with.  This attribute consists of 
+pairs ($elType$,$elNum$), indicating that this sparse element
+should be sent to wherever the $elNum$'th \kw{FEM\_ELEM}+$elType$ 
+is partitioned.
+
+
+\begin{itemize}
+\item \kw{FEM\_SPARSE\_ELEM} Lists the element we should be partitioned with.
+    The width of this attribute is always 2, and the data type must
+    be an index type--\kw{FEM\_INDEX\_0} or \kw{FEM\_INDEX\_1}.
+% & \kw{FEM\_COORD} & Optional coordinates for this node.
+\end{itemize}
+
+
+
+\subsection{Mesh Manipulation Routines}
+
+
+\prototype{FEM\_Mesh\_default\_read}
+\function{int FEM\_Mesh\_default\_read(void);}
+\function{integer function :: FEM\_Mesh\_default\_read()}
+
+Return the default reading mesh.  This routine is valid:
+
+\begin{itemize}
+\item From \kw{driver()}, to return the partitioned mesh.
+\item From the \kw{FEM\_Update\_mesh} routine, to return the assembled mesh.
+\end{itemize}
+
+\prototype{FEM\_Mesh\_default\_write}
+\function{int FEM\_Mesh\_default\_write(void);}
+\function{integer function :: FEM\_Mesh\_default\_write()}
+
+Return the default writing mesh.  This routine is valid:
+
+\begin{itemize}
+\item From \kw{init()}, to change the new serial mesh.
+\item From \kw{driver()}, to change the new partitioned mesh.
+\item From the \kw{FEM\_Update\_mesh} routine, to change the new serial mesh.
+\end{itemize}
+
+
+
+\prototype{FEM\_Mesh\_data}  
+\function{void FEM\_Mesh\_data(int mesh,int entity,int attr,
+        void *data, int first, int length, int datatype,int width);}
+\function{subroutine FEM\_Mesh\_data(mesh,entity,attr,data,first,length,datatype,width)}
+  \args{integer, intent(in) :: mesh,entity,attr,data,first,length,datatype,width}
+  \args{datatype, intent(inout) :: data(width,length) }
+
+This is the one routine for getting or setting entity's attributes 
+on the mesh.  
+
+\begin{itemize}
+\item \uw{mesh} A FEM mesh object.  Depending on whether this is
+   a reading or writing mesh, this routine reads from or writes to
+   the data array you pass in.
+
+\item \uw{entity} A FEM entity code, for example \kw{FEM\_NODE} or
+   \kw{FEM\_GHOST}+\kw{FEM\_ELEM}+1.
+
+\item \uw{attr} A FEM attribute code, for example \kw{FEM\_DATA}+$tag$
+   or \kw{FEM\_CONN}.  
+ 
+\item \uw{data} The user data to get or set.  Each row of this array consists
+  of \uw{width} values, and contains the data values of the attribute for the
+  corresponding entity.  This data must be formatted as one of:
+  \begin{alltt}
+      datatype :: data(width,length)
+      datatype :: data(width*length)
+  \end{alltt}
+
+\item \uw{first} The first entity to affect.  In C, this is normally 0;
+  in Fortran, this is normally 1.
+
+\item \uw{length} The number of entities to affect.  The entities
+  affected are thus those numbered from \uw{first} to \uw{first}+\uw{length}-1.
+  For now, \uw{length} must be either 1, to touch a single entity; or
+  else the total number of entities--that is, FEM\_Mesh\_get\_length(mesh,entity).
+
+\item \uw{datatype} The data type stored in this attribute.  This
+  is one of the standard IDXL data types \kw{IDXL\_BYTE}, \kw{IDXL\_INT}, 
+  \kw{IDXL\_FLOAT}, or \kw{IDXL\_DOUBLE}; or else the C-style 0-based
+  index type \kw{IDXL\_INDEX\_0} or the Fortran-style 1-based index type
+  \kw{IDXL\_INDEX\_1}.
+
+\item \uw{width} The number of data items per entity. 
+
+\end{itemize}
+
+For example, to set the element connectivity, which is stored as 
+3 integer node indices in \uw{nodes}, you would:
+
+  \begin{alltt}
+/* C version */
+   int *nodes=new int[3*nElems];
+   ... fill out nodes ...
+   FEM\_Mesh\_data(mesh,FEM\_ELEM+1,FEM\_CONN, nodes, 0,nElems, FEM\_INDEX\_0, 3);
+   ... continue to use or delete nodes ...
+   
+! F90 version
+   ALLOCATE(nodes(3,nElems))
+   ... fill out nodes ...
+   CALL FEM\_Mesh\_data(mesh,FEM\_ELEM+1,FEM\_CONN, nodes, 1,nElems, FEM\_INDEX\_1, 3)
+   ... continue to use or delete nodes ...
+  \end{alltt}
+
+To add a new node property with 2 double-precision numbers 
+from an array \uw{mat} (containing, for example,
+material properties), you would first pick an unused
+user data "tag", for example 13, and:
+
+  \begin{alltt}
+/* C version */
+   double *mat=new double[2*nNodes];
+   ...
+   FEM\_Mesh\_data(mesh,FEM\_NODE, FEM\_DATA+13, mat, 0,nNodes, FEM\_DOUBLE, 2);
+   
+! F90 version
+   ALLOCATE(mat(2,nNodes))
+   CALL FEM\_Mesh\_data(mesh,FEM\_NODE,FEM\_DATA+13, mat, 1,nNodes, FEM\_DOUBLE, 2)
+  \end{alltt}
+
+\prototype{FEM\_Mesh\_get\_length}  
+\function{int FEM\_Mesh\_get\_length(int mesh,int entity);}
+\function{integer function :: FEM\_Mesh\_get\_length(mesh,entity)}
+  \args{integer, intent(in) :: mesh,entity) }
+
+Return the number of \uw{entity}s that exist in this \uw{mesh}.
+For example, to get the number of ghost nodes, 
+  \begin{alltt}
+  	nGhostNodes=FEM\_Mesh\_get\_length(\uw{mesh},\kw{FEM\_GHOST}+\kw{FEM\_NODE})
+  \end{alltt}
+To get the number of real elements of type 2,
+  \begin{alltt}
+  	nElem=FEM\_Mesh\_get\_length(\uw{mesh},\kw{FEM\_ELEM}+2)
+  \end{alltt}
+
+
+\subsection{Advanced Mesh Manipulation Routines}
+
+\prototype{FEM\_Mesh\_offset}  
+\function{void FEM\_Mesh\_offset(int mesh,int entity,int attr,
+        void *data, int first, int length, int datatype,int width,
+	int offsetBytes,int distanceBytes,int skewBytes);}
+\function{subroutine FEM\_Mesh\_data(mesh,entity,attr,data,first,length,datatype,width,
+	offsetBytes,distanceBytes,skewBytes)}
+  \args{integer, intent(in) :: mesh,entity,attr,data,first,length,datatype,width}
+  \args{integer, intent(in) :: offsetBytes,distanceBytes,skewBytes }
+  \args{datatype, intent(inout) :: data(width,length) }
+
+This routine allows you to get or set a mesh field directly
+from a user-defined structure.  See the documentation of
+IDXL\_Layout\_offset in Section~\ref{sec:IDXL_Layout_offset}
+for details on how to set offsetBytes, distanceBytes, and skewBytes.
+
+
+\section{Mesh Ghosts}
+\label{sec:ghost}
+
+A \term{ghost entity} is a local, read-only copy of a real entity
+on another chunk. Ghosts are typically added to the boundary of a chunk to allow the real (non-ghost) elements at the boundary to access values across the processor boundary.  This makes a chunk ``feel'' as if it was part of a complete unpartitioned mesh; and can be useful with cell-centered methods, and in mesh modification.
+
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=2in]{fig/ghost_pre}
+\end{center}
+\caption{A small mesh partitioned into two pieces.}
+\label{fig:ghostpre}
+\end{figure}
+
+In Figure~\ref{fig:ghostpre}, we begin with a small mesh partitioned
+into pieces on the left and right.  In Figure~\ref{fig:ghostedge},
+we have added ghost elements (dark hashing) that share an edge with
+adjacent real elements (light hatching).  In Figure~\ref{fig:ghostnode},
+we add ghost elements that share at least one node with adjacent 
+real elements.
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=2in]{fig/ghost_edge}
+\end{center}
+\caption{The same mesh with one layer of edge-adjacent ghosts.}
+\label{fig:ghostedge}
+\end{figure}
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=2in]{fig/ghost_node}
+\end{center}
+\caption{The same mesh with one layer of node-adjacent ghosts.}
+\label{fig:ghostnode}
+\end{figure}
+
+
+\subsection{Ghost Numbering}
+\label{sec:ghost_num}
+Ghosts and real entities are stored by the framework
+in separate lists---to access the ghost entity type, add \kw{FEM\_GHOST}
+to the real entity's type.  For example, \kw{FEM\_GHOST}+\kw{FEM\_ELEM}+1 
+lists the ghost elements for \uw{elType} 1.  To get the number 
+of ghost nodes, you would call 
+\kw{FEM\_Mesh\_get\_length}(\uw{mesh},\kw{FEM\_GHOST}+\kw{FEM\_NODE}).
+
+The connectivity table for ghost elements may include the invalid 
+value -1 (in C) or 0 (in Fortran) to indicate that the corresponding 
+node is not present.  Ghost element connectivities may also include values
+less than this, which indicate the corresponding node is a ghost.
+That is, in C, ghost node $i$ is indicated by the value $-1-i$, while
+in fortran, ghost node $i$ is indicated by the value $-i$.  Since the 
+C versions are more complex (because 0 is a valid index in C), the
+C version includes the macros \kw{FEM\_Is\_ghost\_index}(i), which
+returns true if $i$ represents a ghost node; and \kw{FEM\_From\_ghost\_index}(i),
+which returns the ghost node's index given its connectivity entry.
+In Fortran, these macros are equivalent to the test $i$ .lt. $0$ and 
+the expression $-i$.
+
+For example, a quadrilateral ghost element adjacent to two real 
+nodes 23 and 17, one ghost node 10, and one not-present node might have a 
+connectivity entry of {23,17,-11,-1} (in C) or {23,17,-10,0} (in Fortran).
+
+
+\subsection{Setting up the ghost layer}
+The framework's ghost handling is element-centric. You specify which kinds of elements should be ghosts and how they connect by listing their faces before partitioning.  
+
+\begin{itemize}
+\item
+
+\prototype{FEM\_Add\_ghost\_layer}
+\function{void FEM\_Add\_ghost\_layer(int nodesPerFace,int doAddNodes);}
+\function{subroutine FEM\_Add\_ghost\_layer(nodesPerFace,doAddNodes)}
+  \args{integer, intent(in) :: nodesPerFace,doAddNodes}
+This routine creates a new layer of ghosts around each FEM chunk. \kw{nodesPerFace} is the number of shared nodes that together form a ``face''. \kw{doAddNodes} specifies that you want ghost nodes as well as elements.
+
+A face is an unordered ``tuple'' of nodes, and is an abstract way to describe which ghosts
+your application needs---an element will be added to your chunk if it connects to at 
+least one of your elements' faces.  For example, if you have a 3D, tetrahedral element that require ghosts 
+on all 4 of its sides, this is equivalent to requiring ghosts of every element that shares all 3
+nodes of one of your triangular faces, so for you a face is a 3-node triangle.  If you have a 2D shape
+and want edge-adjacency, for you a face is a 2-node edge.  If you want node-adjacent ghosts,
+a face is a single node.
+
+Calling this routine several times creates several layers of ghost elements, and the different layers need not have the same parameters.
+
+\item
+\prototype{FEM\_Add\_ghost\_elem}
+\function{void FEM\_Add\_ghost\_elem(int elType,int facesPerElem,const int *elem2face);}
+\function{subroutine FEM\_Add\_ghost\_elem(elType,facesPerElem,elem2face)}
+  \args{integer, intent(in) :: elType,facesPerElem}
+  \args{integer, intent(in) :: elem2face(nodesPerFace,facesPerElem)}
+
+This call is used to specify which type of element is to be added to the current ghost layer. \kw{facesPerElem} and \kw{elem2face} specify a mapping between each element and the surrounding faces.  The \kw{elem2face} table lists, for each face, the nodes of this element which form the face, specified as element-local numbers---indices into this element's connectivity entry. The \kw{elem2face} table should have nodesPerFace*facesPerElem entries, and no entry should be greater than nodePerEl for that element type.
+
+Because all faces must take up the same space in the array,
+\kw{elem2face} can include special indices--- -1 for C, 0 for Fortran---that indicate the
+corresponding face is actually shorter than usual.  For example, if \kw{nodesPerFace} for this layer
+is 4, for 4-node quadrilateral faces, you could set one entry in \kw{elem2face} to -1 to specify
+this is a 3-node triangular face.  Faces of different lengths will never match, so this is just
+a simple way to add ghosts from two kinds of faces at once.
+
+\end{itemize}
+
+The above two routines are always used together. For example, if your elements are 3-node triangles and you only require one shared node for inclusion in a single ghost layer, you would use:
+\begin{alltt}
+   FEM\_Add\_ghost\_layer(1,0); /* 1 node per face: node adjacency */
+   const static int tri2node[]=\{0,1,2\};
+   FEM\_Add\_ghost\_elem(0,3,tri2node); /* triangles are surrounded by 3 nodes */
+\end{alltt}
+
+If you require two shared nodes (a shared edge), the code will look like:
+\begin{alltt}    
+   FEM\_Add\_ghost\_layer(2,0); /* 2 nodes per face: edge adjacency */
+   const static int tri2edge[]=\{0,1,  1,2,  2,0\};
+   FEM\_Add\_ghost\_elem(0,3,tri2edge); /*triangles are surrounded by 3 edges */
+\end{alltt}
+
+
+\subsection{Symmetries and Ghosts--Geometric Layer}
+
+The FEM framework can create ghosts not only of things that are on other 
+processors, but also for various problem symmetries, like mirror reflection,
+and various types of periodicities.  The interface for these ghosts is 
+simple---you ask for the symmetries to be created, then you will get 
+extra ghosts along each symmetry boundary.  The symmetry ghosts are
+updated properly during any communication, even if the symmetry ghosts
+are ghosts of real local elements from the same chunk.
+
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=3in]{fig/sym_ghost}
+\end{center}
+\caption{Illustrating symmetry ghost elements.}
+\label{fig:symghost}
+\end{figure}
+
+Figure~\ref{fig:symghost} shows a chunk of a mesh for a 
+rectangular domain with horizontal linear translational periodicity---that 
+is, the domain repeats horizontally.
+Symmetry ghosts lie along the left and right sides; ordinary cross-processor
+parallel ghosts lie along the top edge where this chunk joins up with the
+rest of the domain; and the external boundary along the bottom of the chunk
+has no ghosts.
+
+
+
+\prototype{FEM\_Add\_linear\_periodicity}
+\function{void FEM\_Add\_linear\_periodicity(
+        int nFaces,int nPer,
+        const int *facesA,const int *facesB,
+        int nNodes,const double *nodeLocs
+        );}
+\function{
+SUBROUTINE FEM\_Add\_linear\_periodicity(nFaces,nPer,facesA,facesB,
+                                nNodes,nodeLocs)}
+  \args{integer, intent(in) :: nFaces, nPer, nNodes}
+  \args{integer, intent(in) :: facesA(nPer,nFaces), facesB(nPer,nFaces)}
+  \args{double precision, intent(in) :: nodeLocs(3,nNodes)}
+
+Make facesA and facesB match up under linear translation.
+Each face of facesA must match up with exactly one face of
+facesB, but both the faces and the nodes within a face can be
+permuted in any order---the order is recovered by matching 3d locations
+in the nodeLocs array.
+
+This call can be repeated, for example if the domain is periodic along several
+directions.  This call can only be issued from \kw{init()}.
+
+
+
+\prototype{FEM\_Sym\_coordinates}
+\function{void FEM\_Sym\_coordinates(int elTypeOrMinusOne,double *locs);}
+\function{SUBROUTINE FEM\_Sym\_coordinates(elTypeOrZero,locs)}
+  \args{integer, intent(in) :: elTypeOrZero}
+  \args{double precision, intent(inout) :: locs(3,<number of items>)}
+
+This call adjusts the 3d locations listed in \kw{locs} so they respect the symmetries
+of their corresponding item.  If elTypeOrZero is an element type,
+the locations are adjusted to match with the corresponding element;
+if elTypeOrZero is zero, the locations are adjusted to match up with
+the corresponding node.
+
+This call is needed because symmetry ghost nodes and elements
+initially have their original locations, which must be adjusted
+to respect the symmetry boundaries.  Thus this call is needed
+both for initial location data (e.g., from \kw{FEM\_Get\_node\_data})
+as well as any communicated location data (e.g., from
+\kw{FEM\_Update\_ghost\_field}).
+
+This call can only be issued from \kw{driver()}.
+
+
+
+\subsection{Advanced Symmetries and Ghosts--Lower Layer}
+
+The geometric symmetry layer in the preceeding section is actually
+a thin wrapper around this lower, more difficult to use layer.
+
+\prototype{FEM\_Set\_sym\_nodes}
+\function{void FEM\_Set\_sym\_nodes(const int *canon,const int *sym);}
+\function{SUBROUTINE FEM\_Set\_sym\_nodes(canon,sym)}
+  \args{integer, intent(in) :: canon(nNodes)}
+  \args{integer, intent(in) :: sym(nNodes)}
+
+This call describes all possible symmetries in an extremely terse format.
+It can only be called from \kw{init()}.
+The ``canonicalization array'' canon maps nodes to their canonical 
+representative---if canon($i$)=canon($j$), nodes $i$ and $j$ are 
+images of each other under some symmetry.  The sym array has bits set
+for each symmetry boundary passing through a node.
+
+For example, a 2d domain with 6 elements A, B, C, D, E, and F and 12 
+nodes numbered 1-12 that is 
+mirror-symmetric on the horizontal boundaries but periodic in the 
+vertical boundaries would look like:
+
+\begin{alltt}
+   D^'|  D^ |  E^ |  F^ |  F^`
+   -  1  -  2  -  3  -  4  -
+   A' |  A  |  B  |  C  |  C`
+   -  5  -  6  -  7  -  8  -
+   D' |  D  |  E  |  F  |  F`
+   -  9  - 10  -  11 -  12 -
+   Av'|  Av |  Bv |  Cv |  Cv`
+
+  v indicates the value has been shifted down (bottom boundary),
+  ^ indicates the value has been shifted up (top boundary),
+  ' indicates the value has been copied from the left (right boundary),
+  ` indicates the value has been copied from the right (left boundary).
+\end{alltt}
+
+If we mark the left border with 1, the top with 2, the right with 4,
+and the bottom with 8, this situation is indicated by topologically pasting the 
+top row to the bottom row by setting their \kw{canon} entries equal, and 
+marking each node with its symmetries.
+
+\begin{center}
+\begin{tabular}{|l|l|l|}\hline
+  Node & \kw{canon} &  \kw{sym}              \\\hline
+    1  &    1  &      3 (left + top)   \\
+    2  &    2  &      2 (top)   \\
+    3  &    3  &      2 (top)   \\
+    4  &    4  &      6 (top + right)   \\
+    5  &    5  &      1 (left)   \\
+    6  &    6  &      0 (none)   \\
+    7  &    7  &      0 (none)   \\
+    8  &    8  &      4 (right)   \\
+    9  &    1  &      9 (left+bottom)    \\
+    10 &    2  &      8 (bottom)   \\
+    11 &    3  &      8 (bottom)   \\
+    12 &    4  &      12 (bottom+right)   \\
+\hline
+\end{tabular}
+\end{center}
+
+
+\prototype{FEM\_Get\_sym}
+\function{void FEM\_Get\_sym(int elTypeOrMinusOne,int *destSym);}
+\function{void FEM\_Get\_sym(elTypeOrZero,destSym);}
+  \args{integer, intent(in) :: elTypeOrMinusOne }
+  \args{integer, intent(out) :: destSym(nItems)}
+
+This call extracts the list of symmetry conditions that apply to 
+an item type.  If elType is an element type, it returns the
+symmetry conditions that apply to that element type; if elType is
+-1 (zero for Fortran), it returns the symmetry conditions that apply
+to the nodes.  Symmetry conditions are normally only nonzero
+for ghost nodes and elements.
+
+
+Mirror symmetry conditions are not yet supported, nor are
+multiple layers of symmetry ghosts, but both should be easy to add
+without changing this interface.
+
+% FIXME: document these
+% void FEM_Set_partition(int *elem2chunk)
+% int FTN_NAME(FEM_GET_COMM_PARTNERS,fem_get_comm_partners)(void)
+% int FTN_NAME(FEM_GET_COMM_PARTNER,fem_get_comm_partner)(int *partnerNo)
+% int FTN_NAME(FEM_GET_COMM_COUNT,fem_get_comm_count)(int *partnerNo)
+% void FTN_NAME(FEM_GET_COMM_NODES,fem_get_comm_nodes)(int *pNo,int *nodeNos)
+% void FTN_NAME(FEM_GET_ELEM_NUMBERS,fem_get_elem_numbers)(int *gNo)
+% void fem_get_node_numbers(int *gNo)
+
+
+
+
+
+
+
+\section{Older Mesh Routines}
+These routines have a simpler, but less flexible interface
+than the general routines described above.  Because they are 
+easy to implement in terms of the new routines, they will remain
+part of the framework indefinitely.
+These routines always use the default mesh, as returned by 
+\kw{FEM\_Mesh\_default\_read} and \kw{FEM\_Mesh\_default\_write}.
 
 
 \prototype{FEM\_Get/Set\_elem}
@@ -35,11 +564,10 @@ new pieces and optionally repartition the serial mesh.
   \args{integer, intent(in)  :: elType}
   \args{integer, intent(out) :: nEl,doublePerEl,nodePerEl}
 
-     Describe/retreive the number and type of elements.  \kw{ElType} is the
-number of element types registered so far (the first element type is 1, then 2,
-etc.).  \kw{nEl} is the number of elements being registered.  \kw{doublesPerEl}
-and \kw{nodePerEl} are the number of doubles of user data, and nodes (respectively) associated with each element.
-		
+     Describe/retreive the number and type of elements.  \kw{ElType} is a
+user-defined small, unique element type tag.  \kw{nEl} is the number of elements 
+being registered.  \kw{doublesPerEl} and \kw{nodePerEl} are the number of doubles of user data, and nodes (respectively) associated with each element.
+
      \kw{doublePerEl} or \kw{nodePerEl} may be zero, indicating that no user
 data or connectivity data (respectively) is associated with the element.
 
@@ -77,6 +605,7 @@ to make them in linearly increasing order.  However, for a given type of element
      because it results in better cache utilization (because the nodes
      around an element are stored contiguously).
      
+     In this older interface, ghost nodes are indicated by invalid, 
 
 \prototype{FEM\_Get/Set\_node}
 \function{void FEM\_Set\_node(int  nNode,int  doublePerNode);}
@@ -94,7 +623,7 @@ to make them in linearly increasing order.  However, for a given type of element
      associated with each node.
      
 
-\subsection{Mesh Data}
+\subsection{Old Mesh Data}
 \prototype{FEM\_Get/Set\_data}
 \function{void FEM\_Set\_node\_data(const double *data);}
 \function{void FEM\_Get\_node\_data(double *data);}
@@ -130,7 +659,46 @@ arrays can be row- or column- major (see \kw{FEM\_Set\_elem\_conn} for
 details).  The row-major form is preferred.
 
 
-\subsection{Backward Compatability}
+
+\subsection{Old Ghost Numbering}
+
+In this older version of the framework, FEM\_Get\_node and FEM\_Get\_elem return the 
+\textbf{total} number of nodes and elements, including ghosts. The routines below
+return the index of the first ghost node or element, where ghosts are numbered
+after all the real elements.  This old ghost numbering scheme does not work
+well when adding elements, which is why the new ghost numbering scheme
+describes in Section~\ref{sec:ghost_num} is used in the new API.
+
+
+\prototype{FEM\_Get\_ghost}
+\function{int FEM\_Get\_node\_ghost(void);}
+\function{int FEM\_Get\_elem\_ghost(int elemType);}
+
+The examples below iterate over the real and ghost elements using the old numbering:
+\begin{alltt}
+C version:
+        int firstGhost,max;
+        FEM\_Get\_node(\&max, \&ignored);
+        firstGhost=FEM\_Get\_node\_ghost();
+        for (i=0;i<firstGhost;i++)
+                ... i is a real node...
+        for (i=firstGhost;i<max;i++)
+                ... i is a ghost node ...
+
+Fortran version:
+        call FEM\_Get\_node(max,ignored);
+        firstGhost=FEM\_Get\_node\_ghost();
+        do i=1,firstGhost-1
+                ... i is a real node...
+        end do
+        do i=firstGhost,max
+                ... i is a ghost node...
+        end do
+\end{alltt}
+
+
+
+\subsection{Old Backward Compatability}
 \prototype{FEM\_Set\_mesh}
 \function{void FEM\_Set\_mesh(int nElem, int nNodes, int nodePerEl,const int* conn);}
 
@@ -153,7 +721,7 @@ details).  The row-major form is preferred.
 \end{alltt}
 
 
-\subsection{Sparse Data}
+\subsection{Old Sparse Data}
 
 Sparse data is typically used to represent boundary conditions.  For
 example, in a structural dynamics program typically some nodes have 
@@ -244,6 +812,7 @@ are available.  \kw{FEM\_Get\_sparse} returns you the actual nodes
 (translated to local node numbers) and unchanged user data for
 these sparse records.
 
+In this old interface, there is no way to access sparse ghosts.
 
 
 
@@ -316,291 +885,3 @@ the drivers, since the entire serial mesh is available to \uw{my\_update\_routin
      or only in an update routine, rather than some in both.
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section {Mesh Ghosts}
-An option to add ``ghosts'' to a mesh is provided by the framework. A ghost is a local read-only copy of a node or element that actually lives on another chunk.  Ghosts are typically added to the boundary of a chunk to allow the real (non-ghost) elements at the boundary to access values across the processor boundary.  This makes a chunk ``feel'' as if it was part of a complete unpartitioned mesh.
-
-
-\begin{figure}[h]
-\begin{center}
-\includegraphics[width=2in]{fig/ghost_pre}
-\end{center}
-\caption{A small mesh partitioned into two pieces.}
-\label{fig:ghostpre}
-\end{figure}
-
-In Figure~\ref{fig:ghostpre}, we begin with a small mesh partitioned
-into pieces on the left and right.  In Figure~\ref{fig:ghostedge},
-we have added ghost elements (dark hashing) that share an edge with
-adjacent real elements (light hatching).  In Figure~\ref{fig:ghostnode},
-we add ghost elements that share at least one node with adjacent 
-real elements.
-
-\begin{figure}[h]
-\begin{center}
-\includegraphics[width=2in]{fig/ghost_edge}
-\end{center}
-\caption{The same mesh with one layer of edge-adjacent ghosts.}
-\label{fig:ghostedge}
-\end{figure}
-
-\begin{figure}[h]
-\begin{center}
-\includegraphics[width=2in]{fig/ghost_node}
-\end{center}
-\caption{The same mesh with one layer of node-adjacent ghosts.}
-\label{fig:ghostnode}
-\end{figure}
-
-
-
-\subsection{Setting up the ghost layer}
-The framework's ghost handling is element-centric. You specify which kinds of elements should be ghosts and how they connect by listing their ``tuples'' via calls in the \kw{init()} routine.  
-
-\begin{itemize}
-\item
-
-\prototype{FEM\_Add\_ghost\_layer}
-\function{void FEM\_Add\_ghost\_layer(int nodesPerTuple,int doAddNodes);}
-\function{subroutine FEM\_Add\_ghost\_layer(nodesPerTuple,doAddNodes)}
-  \args{integer, intent(in) :: nodesPerTuple,doAddNodes}
-This routine creates a new layer of ghosts around each FEM chunk. \kw{nodesPerTuple} is the number of shared nodes that together form a ``tuple''. \kw{doAddNodes} specifies that you want ghost nodes as well as elements.
-
-A tuple is an unordered set of nodes, and is an abstract way to describe which ghosts
-your application needs---an element will be added to your chunk if it connects to at 
-least one of your tuples.  For example, if you have a 3D, tetrahedral element that require ghosts 
-on all 4 of its sides, this is equivalent to requiring ghosts of every element that shares all 3
-nodes of one of your triangular faces, so for you a tuple is a 3-node face.  If you have a 2D shape
-and want edge-adjacency, for you a tuple is a 2-node edge.  If you want node-adjacent ghosts,
-a tuple is a single node.
-
-Calling this routine several times creates several layers of ghost elements, and the different layers need not have the same parameters.
-
-\item
-\prototype{FEM\_Add\_ghost\_elem}
-\function{void FEM\_Add\_ghost\_elem(int elType,int tuplesPerElem,const int *elem2tuple);}
-\function{subroutine FEM\_Add\_ghost\_elem(elType,tuplesPerElem,elem2tuple)}
-  \args{integer, intent(in) :: elType,tuplesPerElem}
-  \args{integer, intent(in) :: elem2tuple(nodesPerTuple,tuplesPerElem)}
-
-This call is used to specify which type of element is to be added to the current ghost layer. \kw{tuplesPerElem} and \kw{elem2tuple} specify a mapping between each element and the surrounding tuples.  The \kw{elem2tuple} table lists, for each tuple, the nodes of this element which form the tuple, specified as element-local numbers---indices into this element's connectivity entry. The \kw{elem2tuple} table should have nodesPerTuple*tuplesPerElem entries, and no entry should be greater than nodePerEl for that element type.
-
-\kw{elem2tuple} can include special indices--- -1 for C, 0 for Fortran---that indicate the
-corresponding tuple is shorter than usual.  For example, if \kw{nodesPerTuple} for this layer
-is 4, for 4-node quadrilateral faces, you could set one entry in \kw{elem2tuple} to -1 to specify
-a 3-node triangular face.  Tuples of different lengths will never match, so this is just
-a simple way to add ghosts from two kinds of tuples at once.
-
-\end{itemize}
-
-The above two routines are always used together. For example, if your elements are 3-node triangles and you only require one shared node for inclusion in a single ghost layer, you would use:
-\begin{alltt}
-   FEM\_Add\_ghost\_layer(1,0); /* 1 node per tuple */
-   const static int tri2node[]=\{0,1,2\};
-   FEM\_Add\_ghost\_elem(0,3,tri2node); /* triangles are surrounded by 3 nodes */
-\end{alltt}
-
-If you require two shared nodes (a shared edge), the code will look like:
-\begin{alltt}    
-   FEM\_Add\_ghost\_layer(2,0); /* 2 nodes per tuple */
-   const static int tri2edge[]=\{0,1,  1,2,  2,0\};
-   FEM\_Add\_ghost\_elem(0,3,tri2edge); /*triangles are surrounded by 3 edges */
-\end{alltt}
-
-
-
-\subsection{Extracting the ghost layer}
-After the ghost layer is created, we need a way to distinquish real nodes and elements 
-from ghost nodes and elements. FEM\_Get\_node and FEM\_Get\_elem return the 
-\textbf{total} number of nodes and elements, including ghosts. The routines below 
-return the index of the first ghost node or element.
-
-\prototype{FEM\_Get\_ghost}
-\function{int FEM\_Get\_node\_ghost(void);}
-\function{int FEM\_Get\_elem\_ghost(int elemType);}
-The examples below iterate over the real and ghost elements.
-\begin{alltt}
-C version:
-        int firstGhost,max;
-        FEM\_Get\_node(\&max, \&ignored);
-        firstGhost=FEM\_Get\_node\_ghost();
-        for (i=0;i<firstGhost;i++)
-                ... i is a real node...
-        for (i=firstGhost;i<max;i++)
-                ... i is a ghost node ...
-
-Fortran version:
-        call FEM\_Get\_node(max,ignored);
-        firstGhost=FEM\_Get\_node\_ghost();
-        do i=1,firstGhost-1
-                ... i is a real node...
-        end do
-        do i=firstGhost,max
-                ... i is a ghost node...
-        end do
-\end{alltt}
-
-\subsection{Symmetries and Ghosts--Geometric Layer}
-
-The FEM framework can create ghosts not only of things that are on other 
-processors, but also for various problem symmetries, like mirror reflection,
-and various types of periodicities.  The interface for these ghosts is 
-simple---you ask for the symmetries to be created, then you will get 
-extra ghosts along each symmetry boundary.  The symmetry ghosts are
-updated properly during any communication, even if the symmetry ghosts
-are ghosts of real local elements from the same chunk.
-
-
-\begin{figure}[h]
-\begin{center}
-\includegraphics[width=3in]{fig/sym_ghost}
-\end{center}
-\caption{Illustrating symmetry ghost elements.}
-\label{fig:symghost}
-\end{figure}
-
-Figure~\ref{fig:symghost} shows a chunk of a mesh for a 
-rectangular domain with horizontal linear translational periodicity---that 
-is, the domain repeats horizontally.
-Symmetry ghosts lie along the left and right sides; ordinary cross-processor
-parallel ghosts lie along the top edge where this chunk joins up with the
-rest of the domain; and the external boundary along the bottom of the chunk
-has no ghosts.
-
-
-
-\prototype{FEM\_Add\_linear\_periodicity}
-\function{void FEM\_Add\_linear\_periodicity(
-        int nFaces,int nPer,
-        const int *facesA,const int *facesB,
-        int nNodes,const double *nodeLocs
-        );}
-\function{
-SUBROUTINE FEM\_Add\_linear\_periodicity(nFaces,nPer,facesA,facesB,
-                                nNodes,nodeLocs)}
-  \args{integer, intent(in) :: nFaces, nPer, nNodes}
-  \args{integer, intent(in) :: facesA(nPer,nFaces), facesB(nPer,nFaces)}
-  \args{double precision, intent(in) :: nodeLocs(3,nNodes)}
-
-Make facesA and facesB match up under linear translation.
-Each face of facesA must match up with exactly one face of
-facesB, but both the faces and the nodes within a face can be
-permuted in any order---the order is recovered by matching 3d locations
-in the nodeLocs array.
-
-This call can be repeated, for example if the domain is periodic along several
-directions.  This call can only be issued from \kw{init()}.
-
-
-
-\prototype{FEM\_Sym\_coordinates}
-\function{void FEM\_Sym\_coordinates(int elTypeOrMinusOne,double *locs);}
-\function{SUBROUTINE FEM\_Sym\_coordinates(elTypeOrZero,locs)}
-  \args{integer, intent(in) :: elTypeOrZero}
-  \args{double precision, intent(inout) :: locs(3,<number of items>)}
-
-This call adjusts the 3d locations listed in \kw{locs} so they respect the symmetries
-of their corresponding item.  If elTypeOrZero is an element type,
-the locations are adjusted to match with the corresponding element;
-if elTypeOrZero is zero, the locations are adjusted to match up with
-the corresponding node.
-
-This call is needed because symmetry ghost nodes and elements
-initially have their original locations, which must be adjusted
-to respect the symmetry boundaries.  Thus this call is needed
-both for initial location data (e.g., from \kw{FEM\_Get\_node\_data})
-as well as any communicated location data (e.g., from
-\kw{FEM\_Update\_ghost\_field}).
-
-This call can only be issued from \kw{driver()}.
-
-
-
-\subsection{Symmetries and Ghosts--Lower Layer}
-
-The geometric symmetry layer in the preceeding section is actually
-a thin wrapper around this lower, more difficult to use layer.
-
-\prototype{FEM\_Set\_sym\_nodes}
-\function{void FEM\_Set\_sym\_nodes(const int *canon,const int *sym);}
-\function{SUBROUTINE FEM\_Set\_sym\_nodes(canon,sym)}
-  \args{integer, intent(in) :: canon(nNodes)}
-  \args{integer, intent(in) :: sym(nNodes)}
-
-This call describes all possible symmetries in an extremely terse format.
-It can only be called from \kw{init()}.
-The ``canonicalization array'' canon maps nodes to their canonical 
-representative---if canon($i$)=canon($j$), nodes $i$ and $j$ are 
-images of each other under some symmetry.  The sym array has bits set
-for each symmetry boundary passing through a node.
-
-For example, a 2d domain with 6 elements A, B, C, D, E, and F and 12 
-nodes numbered 1-12 that is 
-mirror-symmetric on the horizontal boundaries but periodic in the 
-vertical boundaries would look like:
-
-\begin{alltt}
-   D^'|  D^ |  E^ |  F^ |  F^`
-   -  1  -  2  -  3  -  4  -
-   A' |  A  |  B  |  C  |  C`
-   -  5  -  6  -  7  -  8  -
-   D' |  D  |  E  |  F  |  F`
-   -  9  - 10  -  11 -  12 -
-   Av'|  Av |  Bv |  Cv |  Cv`
-
-  v indicates the value has been shifted down (bottom boundary),
-  ^ indicates the value has been shifted up (top boundary),
-  ' indicates the value has been copied from the left (right boundary),
-  ` indicates the value has been copied from the right (left boundary).
-\end{alltt}
-
-If we mark the left border with 1, the top with 2, the right with 4,
-and the bottom with 8, this situation is indicated by topologically pasting the 
-top row to the bottom row by setting their \kw{canon} entries equal, and 
-marking each node with its symmetries.
-
-\begin{center}
-\begin{tabular}{|l|l|l|}\hline
-  Node & \kw{canon} &  \kw{sym}              \\\hline
-    1  &    1  &      3 (left + top)   \\
-    2  &    2  &      2 (top)   \\
-    3  &    3  &      2 (top)   \\
-    4  &    4  &      6 (top + right)   \\
-    5  &    5  &      1 (left)   \\
-    6  &    6  &      0 (none)   \\
-    7  &    7  &      0 (none)   \\
-    8  &    8  &      4 (right)   \\
-    9  &    1  &      9 (left+bottom)    \\
-    10 &    2  &      8 (bottom)   \\
-    11 &    3  &      8 (bottom)   \\
-    12 &    4  &      12 (bottom+right)   \\
-\hline
-\end{tabular}
-\end{center}
-
-
-\prototype{FEM\_Get\_sym}
-\function{void FEM\_Get\_sym(int elTypeOrMinusOne,int *destSym);}
-\function{void FEM\_Get\_sym(elTypeOrZero,destSym);}
-  \args{integer, intent(in) :: elTypeOrMinusOne }
-  \args{integer, intent(out) :: destSym(nItems)}
-
-This call extracts the list of symmetry conditions that apply to 
-an item type.  If elType is an element type, it returns the
-symmetry conditions that apply to that element type; if elType is
--1 (zero for Fortran), it returns the symmetry conditions that apply
-to the nodes.  Symmetry conditions are normally only nonzero
-for ghost nodes and elements.
-
-
-Mirror symmetry conditions are not yet supported, nor are
-multiple layers of symmetry ghosts.  
-
-% FIXME: document these
-% void FEM_Set_partition(int *elem2chunk)
-% int FTN_NAME(FEM_GET_COMM_PARTNERS,fem_get_comm_partners)(void)
-% int FTN_NAME(FEM_GET_COMM_PARTNER,fem_get_comm_partner)(int *partnerNo)
-% int FTN_NAME(FEM_GET_COMM_COUNT,fem_get_comm_count)(int *partnerNo)
-% void FTN_NAME(FEM_GET_COMM_NODES,fem_get_comm_nodes)(int *pNo,int *nodeNos)
-% void FTN_NAME(FEM_GET_ELEM_NUMBERS,fem_get_elem_numbers)(int *gNo)
-% void fem_get_node_numbers(int *gNo)

@@ -52,14 +52,15 @@ of spatial dimensions.
 
 \subsection{Terminology}
 
-A FEM program manipulates elements and nodes. An {\bf element} is a portion of
-the problem domain, typically in the shape of a triangle, square, or hexagon
-in 2D; or tetrahedron or rectangular solid in 3D.  A {\bf node} is a point in the
-domain.  Together, the elements and nodes form a {\bf mesh}, which is the 
+A FEM program manipulates elements and nodes. An \term{element} is a portion of
+the problem domain, also known as a cell, and is typically some simple shape 
+like a triangle, square, or hexagon in 2D; or tetrahedron or rectangular solid in 3D.  
+A \term{node} is a point in the domain, and is often the vertex of several elements.  
+Together, the elements and nodes form a \term{mesh}, which is the 
 central data structure in the FEM framework.
 
 An element knows which nodes surround it via the element's
-{\bf connectivity table}, which lists the nodes adjacent to each element.
+\term{connectivity table}, which lists the nodes adjacent to each element.
 
 \begin{figure}[h]
 \begin{center}
@@ -97,9 +98,9 @@ example, a material dynamics program has the structure:
 \end{alltt}
 
 We can parallelize such FEM programs by partitioning the serial mesh
-elements into several smaller meshes, or {\bf chunks}.  There is normally
+elements into several smaller meshes, or \term{chunks}.  There is normally
 at least one chunk per processor; and often even more.  During partitioning, 
-we give nodes and elements new, {\bf local} numbers within that chunk.
+we give nodes and elements new, \term{local} numbers within that chunk.
 In the figure below, we have partitioned the mesh above into two chunks, A and B.
 
 \begin{figure}[h]
@@ -270,11 +271,11 @@ Some of the routines in the FEM framework have different requirements or meaning
 depending on where they are called from.  When a routine is described
 as being ``called from driver'', this means it is called in the parallel
 context---from \kw{driver()} itself, any subroutine called by \kw{driver()},
-or from whatever routine is runs the FEM-attached TCHARM threads.
+or from whatever routine is run by the FEM-attached TCHARM threads.
 When a routine is described as being ``called from init'', this means it is 
 called in the serial context---from \kw{init()} itself, from any subroutine
-called from \kw{init()}, or from whatever TCHARM code executes before the
-\kw{FEM\_Attach}.
+called from \kw{init()}, from a routine called by \kw{FEM\_Update\_mesh},
+or from whatever TCHARM code executes before the \kw{FEM\_Attach}.
 
 
 \subsection{Utility}
@@ -322,7 +323,7 @@ called from \kw{init()}, or from whatever TCHARM code executes before the
 \input{idxl}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Communication Fields}
+\section{Old Communication Routines}
 
 (This section is for backward compatability only.  The IDXL routines
 are the new, more flexible way to perform communication.)
