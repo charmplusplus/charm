@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.6  1997-03-19 23:17:47  milind
+ * Revision 1.7  1997-03-21 19:23:58  milind
+ * removed the alignment bug in Common.uth/machine.c
+ *
+ * Revision 1.6  1997/03/19 23:17:47  milind
  * Got net-irix to work. Had to modify jsleep to deal with restaring
  * system calls on interrupts.
  *
@@ -60,10 +63,10 @@
 #define _CONV_MACH_H
 
 #define CMK_ASYNC_NOT_NEEDED                               0
-#define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               1
+#define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
 #define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
-#define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 0
+#define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 1
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 #define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0

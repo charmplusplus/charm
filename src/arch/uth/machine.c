@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.21  1997-03-19 04:31:36  jyelon
+ * Revision 1.22  1997-03-21 19:23:57  milind
+ * removed the alignment bug in Common.uth/machine.c
+ *
+ * Revision 1.21  1997/03/19 04:31:36  jyelon
  * Redesigned ConverseInit
  *
  * Revision 1.20  1997/02/13 09:31:39  jyelon
@@ -110,25 +113,6 @@ static char *DeleteArg(argv)
   if (res==0) { CmiError("Bad arglist."); exit(1); }
   while (*argv) { argv[0]=argv[1]; argv++; }
   return res;
-}
-
-static void mycpy(dst, src, bytes)
-    double *dst; double *src; int bytes;
-{
-        unsigned char *cdst, *csrc;
-
-        while(bytes>8)
-        {
-                *dst++ = *src++;
-                bytes -= 8;
-        }
-        cdst = (unsigned char *) dst;
-        csrc = (unsigned char *) src;
-        while(bytes)
-        {
-                *cdst++ = *csrc++;
-                bytes--;
-        }
 }
 
 /*****************************************************************************
@@ -424,7 +408,7 @@ int size;
 char * msg;
 {
   char *buf = (char *)CmiAlloc(size);
-  mycpy((double *)buf,(double *)msg,size);
+  memcpy(buf,msg,size);
   FIFO_EnQueue(CmiQueues[destPE],buf);
 }
 
@@ -434,7 +418,7 @@ int size;
 char * msg;
 {
   char *buf = (char *)CmiAlloc(size);
-  mycpy((double *)buf,(double *)msg,size);
+  memcpy(buf,msg,size);
   FIFO_EnQueue(CmiQueues[destPE],buf);
 }
 

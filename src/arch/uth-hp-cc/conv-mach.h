@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.8  1997-03-19 04:58:23  jyelon
+ * Revision 1.9  1997-03-21 19:23:59  milind
+ * removed the alignment bug in Common.uth/machine.c
+ *
+ * Revision 1.8  1997/03/19 04:58:23  jyelon
  * Removed the CMK_DEFAULT_MAIN_USES_SIMULATOR_CODE flag.
  *
  * Revision 1.7  1997/02/13 09:32:00  jyelon
@@ -77,8 +80,8 @@
 
 #define CMK_MACHINE_NAME                                   "uth-hp-cc"
 
-#define CMK_MALLOC_USE_GNU_MALLOC                          0
-#define CMK_MALLOC_USE_OS_BUILTIN                          1
+#define CMK_MALLOC_USE_GNU_MALLOC                          1
+#define CMK_MALLOC_USE_OS_BUILTIN                          0
 
 #define CMK_MSG_HEADER_SIZE_BYTES                          4
 #define CMK_MSG_HEADER_BLANK_SPACE                         0
