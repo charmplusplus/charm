@@ -89,6 +89,7 @@ void print(const CkVector3d &p);
 /// Read a TetMesh (ghs3d) ".noboite" mesh description file.
 /// Aborts on errors.
 void readNoboite(FILE *f,TetMesh &t);
+void writeNoboite(FILE *f,TetMesh &t);
 
 /// Read this mesh from the FEM framework's mesh m
 void readFEM(int m,TetMesh &t);

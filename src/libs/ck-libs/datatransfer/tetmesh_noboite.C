@@ -55,3 +55,23 @@ void readNoboite(FILE *f,TetMesh &t) {
 		CkAbort("Error reading TetMesh file's points");
 }
 
+/// Write a TetMesh (ghs3d) ".noboite" mesh description.
+void writeNoboite(FILE *f,TetMesh &t) {
+	if (f==NULL)
+		CkAbort("Error opening TetMesh file for write");
+	int i, e=t.getTets(), n=t.getPoints();
+	fprintf(f,"%d %d ", e,n);
+	for (i=0;i<15;i++) fprintf(f,"-1 ");
+	fprintf(f,"\n");
+	for (i=0;i<e;i++) {
+		for (int j=0;j<TetMesh::nodePer;j++)
+			fprintf(f,"%d ",t.getTet(i)[j]+1);
+		fprintf(f,"\n");
+	}
+	for (i=0;i<n;i++) {
+		CkVector3d v=t.getPoint(i);
+		fprintf(f,"%f %f %f \n",v.x,v.y,v.z);
+	}
+}
+
+
