@@ -7,6 +7,8 @@
 
 #define TEMPO_ANY  CmmWildCard
 #define BCAST_TAG  1025
+#define BARR_TAG   1026
+#define REDUCE_TAG 1027
 
 class TempoMessage : public ArrayMessage, public CMessage_TempoMessage
 {
@@ -65,6 +67,15 @@ class TempoGroup : public Group, public Tempo
     void ckTempoSendBranch(int tag, void *buffer, int buflen, int processor);
 };
 
+#define TEMPO_MAX  1
+#define TEMPO_MIN  2
+#define TEMPO_SUM  3
+#define TEMPO_PROD 4
+
+#define TEMPO_FLOAT  1
+#define TEMPO_INT    2
+#define TEMPO_DOUBLE 3
+
 class TempoArray : public ArrayElement, public Tempo
 {
   public:
@@ -78,6 +89,11 @@ class TempoArray : public ArrayElement, public Tempo
                                 CkAID aid, int idx);
     void ckTempoSendElem(int tag1, int tag2, void *buffer, int buflen, int idx);
     void ckTempoSendElem(int tag, void *buffer, int buflen, int idx);
+    void ckTempoBarrier(void);
+    void ckTempoBcast(int sender, int tag, void *buffer, int buflen);
+    void ckTempoReduce(int root, int op, void *inbuf, void *outbuf, int count,
+                       int type);
+    void ckTempoAllReduce(int op,void *inbuf,void *outbuf,int count,int type);
 };
 
 extern void _registertempo(void);

@@ -179,4 +179,118 @@ TempoArray::ckTempoSendElem(int tag, void *buffer, int buflen, int idx)
   ckTempoSendElem(tag, TEMPO_ANY, buffer, buflen, idx);
 }
 
+void
+TempoArray::ckTempoBarrier(void)
+{
+  if(thisIndex) {
+    ckTempoSendElem(BARR_TAG, thisIndex, (void*) 0, 0, 0);
+    ckTempoRecv(BARR_TAG, 0, (void*) 0, 0);
+  } else {
+     int i;
+     for(i=1;i<numElements;i++)
+       ckTempoRecv(BARR_TAG, (void *) 0, 0);
+     for(i=1;i<numElements;i++)
+       ckTempoSendElem(BARR_TAG, 0, (void *) 0, 0, i);
+  }
+}
+
+void
+TempoArray::ckTempoBcast(int sender, int tag, void *buffer, int buflen)
+{
+  if(sender) {
+    int i;
+    for(i=1;i<numElements;i++)
+      ckTempoSendElem(tag, BCAST_TAG, buffer, buflen, i);
+  } else
+    ckTempoRecv(tag, BCAST_TAG, buffer, buflen);
+}
+
+static void doOp(int op, int type, int count, void *inbuf, void *outbuf)
+{
+  switch(type) {
+    case TEMPO_FLOAT :
+    {
+      float *a, *b;
+      a = (float *) inbuf;
+      b = (float *) outbuf;
+      for(int i=0; i<count; i++) {
+        switch(op) {
+          case TEMPO_MIN : if(b[i]>a[i]) b[i]=a[i]; break;
+          case TEMPO_MAX : if(b[i]<a[i]) b[i]=a[i]; break;
+          case TEMPO_SUM : b[i] += a[i]; break;
+          case TEMPO_PROD :b[i] *= a[i]; break;
+        }
+      }
+    }
+    break;
+    case TEMPO_INT   :
+    {
+      int *a, *b;
+      a = (int *) inbuf;
+      b = (int *) outbuf;
+      for(int i=0; i<count; i++) {
+        switch(op) {
+          case TEMPO_MIN : if(b[i]>a[i]) b[i]=a[i]; break;
+          case TEMPO_MAX : if(b[i]<a[i]) b[i]=a[i]; break;
+          case TEMPO_SUM : b[i] += a[i]; break;
+          case TEMPO_PROD :b[i] *= a[i]; break;
+        }
+      }
+    }
+    break;
+    case TEMPO_DOUBLE:
+    {
+      double *a, *b;
+      a = (double *) inbuf;
+      b = (double *) outbuf;
+      for(int i=0; i<count; i++) {
+        switch(op) {
+          case TEMPO_MIN : if(b[i]>a[i]) b[i]=a[i]; break;
+          case TEMPO_MAX : if(b[i]<a[i]) b[i]=a[i]; break;
+          case TEMPO_SUM : b[i] += a[i]; break;
+          case TEMPO_PROD :b[i] *= a[i]; break;
+        }
+      }
+    }
+    break;
+  }
+}
+
+void 
+TempoArray::ckTempoReduce(int root, int op, void *inbuf, void *outbuf, 
+                          int count, int type)
+{
+  int size = count;
+  switch(type) {
+    case TEMPO_FLOAT : size *= sizeof(float); break;
+    case TEMPO_INT : size *= sizeof(int); break;
+    case TEMPO_DOUBLE : size *= sizeof(double); break;
+  }
+  if(thisIndex==root) {
+    memcpy(outbuf, inbuf, size);
+    void *tbuf = malloc(size);
+    for(int i=0; i<numElements-1; i++) {
+      ckTempoRecv(REDUCE_TAG, tbuf, size);
+      doOp(op, type, count, tbuf, outbuf);
+    }
+    free(tbuf);
+  } else {
+    ckTempoSendElem(REDUCE_TAG, inbuf, size, root);
+  }
+}
+
+void 
+TempoArray::ckTempoAllReduce(int op, void *inbuf, void *outbuf, 
+                             int count, int type)
+{
+  ckTempoReduce(0, op, inbuf, outbuf, count, type);
+  int size = count;
+  switch(type) {
+    case TEMPO_FLOAT : size *= sizeof(float); break;
+    case TEMPO_INT : size *= sizeof(int); break;
+    case TEMPO_DOUBLE : size *= sizeof(double); break;
+  }
+  ckTempoBcast(thisIndex==0, REDUCE_TAG, outbuf, size);
+}
+
 #include "tempo.def.h"
