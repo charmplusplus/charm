@@ -59,6 +59,10 @@ class LogPool {
   public:
     LogPool(char *pgm) {
       pool = new LogEntry[CpvAccess(CtrLogBufSize)];
+      if (pool == NULL) {
+         CkPrintf("memory overflow!\n");
+	 exit(1);
+      }
       numEntries = 0;
       poolSize = CpvAccess(CtrLogBufSize);
       char pestr[10];
@@ -100,6 +104,10 @@ class LogPool {
     void add(int index, double time, int pe) {
       new (&pool[numEntries++])
         LogEntry(index, time, pe);
+      if(poolSize==numEntries) {
+        write();
+        numEntries = 0;
+      }
     }
 };
 

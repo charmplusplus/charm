@@ -162,9 +162,9 @@ void TraceProjections::beginExecute(envelope *e)
   // fill gaps
   for (int i=oldIdx; i<index; i++) {
      CpvAccess(_logPool)->add(i, bin, CmiMyPe());
-     bin=0;
+     bin=0.0;
   }
-//CmiPrintf("start: %f index: %d\n", start, index);
+CmiPrintf("start: %f index: %d\n", start, index);
 }
 
 void TraceProjections::endExecute(void)
