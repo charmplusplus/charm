@@ -45,6 +45,7 @@ char *strerror(i) int i; { return sys_errlist[i]; }
 #endif
 
 #if CMK_SIGHOLD_USE_SIGMASK
+#include <signal.h>
 int sighold(sig) int sig;
 { if (sigblock(sigmask(sig)) < 0) return -1;
   else return 0; }
@@ -690,5 +691,44 @@ char **argv;
 ConverseExit()
 {
   CmiExit();
+}
+
+void CmiGenericSyncVectorSend(destPE, n, sizes, msgs)
+int destPE, n;
+int *sizes;
+char **msgs;
+{
+  int i, total;
+  char *mesg, *tmp;
+  
+  for(i=0,total=0;i<n;i++) total += sizes[i];
+  mesg = (char *) CmiAlloc(total);
+  for(i=0,tmp=mesg;i<n;i++) {
+    memcpy(tmp, msgs[i],sizes[i]);
+    tmp += sizes[i];
+  }
+  CmiSyncSendAndFree(destPE, total, mesg);
+}
+
+CmiCommHandle CmiGenericAsyncVectorSend(destPE, n, sizes, msgs)
+int destPE, n;
+int *sizes;
+char **msgs;
+{
+  CmiGenericSyncVectorSend(destPE,n,sizes,msgs);
+  return NULL;
+}
+
+void CmiGenericSyncVectorSendAndFree(destPE, n, sizes, msgs)
+int destPE, n;
+int *sizes;
+char **msgs;
+{
+  int i;
+
+  CmiGenericSyncVectorSend(destPE,n,sizes,msgs);
+  for(i=0;i<n;i++) CmiFree(msgs[i]);
+  CmiFree(sizes);
+  CmiFree(msgs);
 }
 
