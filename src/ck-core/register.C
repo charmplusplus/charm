@@ -44,10 +44,15 @@ int CkRegisterMsg(const char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack,
 }
 
 extern "C"
+void ckInvalidCallFn(void *msg,void *obj) {
+  CkAbort("Charm++: Invalid entry method executed.  Perhaps there is an unregistered module?");
+}
+
+extern "C"
 int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
 	int ck_ep_flags)
 {
-  EntryInfo *e = new EntryInfo(name, call, msgIdx, chareIdx);
+  EntryInfo *e = new EntryInfo(name, call?call:ckInvalidCallFn, msgIdx, chareIdx);
   if (ck_ep_flags & CK_EP_NOKEEP) e->noKeep=CmiTrue;
   if (ck_ep_flags & CK_EP_INTRINSIC) e->inCharm=CmiTrue;
   if (ck_ep_flags & CK_EP_TRACEDIABLE) e->traceEnabled=CmiFalse;
