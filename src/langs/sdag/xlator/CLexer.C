@@ -77,9 +77,9 @@ CToken *CLexer::getNextToken(void)
   }
 }
 
-CToken *CLexer::getBracedCode(void)
+CToken *CLexer::getMatchedCode(const char *start_str, EToken stok, EToken etok)
 {
-  CToken *code = new CToken(MATCHED_CPP_CODE, "{ ");
+  CToken *code = new CToken(MATCHED_CPP_CODE, start_str);
   int currentScope = 1;
   wsSignificant = 1;
   // Code to eat C++ code
@@ -87,33 +87,10 @@ CToken *CLexer::getBracedCode(void)
     CToken *cToken = getNextToken();
     if(cToken==0)
       return cToken;
-    if(cToken->type == LBRACE) {
+    if(cToken->type == stok) {
       currentScope++;
     }
-    if(cToken->type == RBRACE) {
-      currentScope--;
-    }
-    code->text->append(cToken->text);
-    delete cToken;
-  }
-  wsSignificant = 0;
-  return code;
-}
-
-CToken *CLexer::getParenCode(void)
-{
-  CToken *code = new CToken(MATCHED_CPP_CODE, "( ");
-  int currentScope = 1;
-  wsSignificant = 1;
-  // Code to eat C++ code
-  while(currentScope != 0) {
-    CToken *cToken = getNextToken();
-    if(cToken==0)
-      return cToken;
-    if(cToken->type == LP) {
-      currentScope++;
-    }
-    if(cToken->type == RP) {
+    if(cToken->type == etok) {
       currentScope--;
     }
     code->text->append(cToken->text);

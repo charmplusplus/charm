@@ -28,8 +28,7 @@ class CLexer {
     int sourceFile(char *filename);
     CToken *lookAhead(void);
     CToken *getNextToken(void);
-    CToken *getBracedCode(void);
-    CToken *getParenCode(void);
+    CToken *getMatchedCode(const char *, EToken, EToken);
     CToken *getIntExpr(EToken term);
 };
 

@@ -150,7 +150,7 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser)
       break;
     case IF:
       tok = cParser->lookForToken(LP); delete tok;
-      tok = cLexer->getParenCode();
+      tok = cLexer->getMatchedCode("( ", LP, RP);
       con1 = new CParseNode(INT_EXPR, tok->text);
       tok = cLexer->getNextToken();
       if(tok->type == LBRACE) {
@@ -197,7 +197,7 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser)
       break;
     case WHILE:
       tok = cParser->lookForToken(LP); delete tok;
-      tok = cLexer->getParenCode();
+      tok = cLexer->getMatchedCode("( ", LP, RP);
       con1 = new CParseNode(INT_EXPR, tok->text);
       tok = cLexer->getNextToken();
       if(tok->type == LBRACE) {
@@ -209,7 +209,7 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser)
       break;
     case ATOMIC:
       tok = cParser->lookForToken(LBRACE); delete tok;
-      tok = cLexer->getBracedCode();
+      tok = cLexer->getMatchedCode("{ ", LBRACE, RBRACE);
       text = tok->text;
       break;
     case OLIST:
