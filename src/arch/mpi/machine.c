@@ -1463,7 +1463,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
 void CmiAbort(const char *message)
 {
-  CmiError(message);
+  CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
+        "Reason: %s\n",CmiMyPe(),message);
+ /*  CmiError(message); */
+  CmiPrintStackTrace(0);
   MPI_Abort(MPI_COMM_WORLD, 1);
 }
 
