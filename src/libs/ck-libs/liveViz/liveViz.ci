@@ -1,6 +1,6 @@
 module liveViz {
 message liveVizRequestMsg;
-
+readonly liveVizConfig lv_config;
 initcall void liveVizNodeInit(void);
 
 /*group liveViz {
