@@ -110,11 +110,11 @@ void _REGISTER_DONE(void)
   int i, j;
   for(i=0; i<_numChares; i++)
     _chareTable[i]->classIdx = _primesTable[i];
-  for(i=_numChares-1; i>=0; i--) {
+  for(i=0; i<_numChares; i++) {
     ChareInfo *ci = _chareTable[i];
     for(j=0; j<(ci->numbases);j++) {
       ChareInfo *cj = _chareTable[ci->bases[j]];
-      cj->classIdx *= ci->classIdx;
+      ci->classIdx *= cj->classIdx;
     }
   }
 }

@@ -155,7 +155,7 @@ extern void _REGISTER_DONE(void);
 #ifndef CMK_OPTIMIZE
 static inline void _CHECK_CID(CkChareID cid, int idx)
 {
-  if(_GETIDX(idx)% cid.magic)
+  if(cid.magic%_GETIDX(idx))
     CkAbort("Illegal ChareID assignment to proxy.\n");
 }
 #else
