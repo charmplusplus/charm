@@ -15,10 +15,11 @@
 
 #include "lbdb.h"
 
+// used in constructor of all load balancers
 class CkLBOptions
 {
 private:
-  int seqno;
+  int seqno;		// for centralized lb, the seqno
 public:
   CkLBOptions(): seqno(-1) {}
   CkLBOptions(int s): seqno(s) {}
@@ -36,8 +37,9 @@ CkpvExtern(int, numLoadBalancers);
 CkpvExtern(int, hasNullLB);
 CkpvExtern(int, lbdatabaseInited);
 
+// LB options, mostly controled by user parameter
 extern double _autoLbPeriod;
-extern char * _lbtopo;
+extern "C" char * _lbtopo;
 extern int _lb_debug;
 extern int _lb_ignoreBgLoad;
 
@@ -49,6 +51,7 @@ void LBRegisterBalancer(const char *, LBCreateFn, LBAllocFn, const char *, int s
 
 void _LBDBInit();
 
+// main chare
 class LBDBInit : public Chare {
   public:
     LBDBInit(CkArgMsg*);

@@ -31,7 +31,6 @@ CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
 
 // command line options
 double _autoLbPeriod = 1.0;		// in seconds
-char* _lbtopo = "ring";			// topology for neiborhood lbs
 int _lb_debug=0;
 int _lb_ignoreBgLoad=0;
 
@@ -174,8 +173,9 @@ void _loadbalancerInit()
   // it can also be set calling LDSetLBPeriod()
   CmiGetArgDoubleDesc(argv,"+LBPeriod", &_autoLbPeriod,"specify the period for automatic load balancing in seconds (for non atSync mode)");
 
-  registerLBTopos();
-  CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
+  // now called in cldb.c: CldModuleGeneralInit()
+  // registerLBTopos();
+  //CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
 
   /******************* SIMULATION *******************/
   // get the step number at which to dump the LB database
@@ -209,6 +209,7 @@ void _loadbalancerInit()
   if (CkMyPe() == 0) {
     if (_lb_debug) {
       CmiPrintf("LB> Load balancer running with verbose mode, period time: %gs.\n", _autoLbPeriod);
+      CkPrintf("LB> Topology %s\n", _lbtopo);
     }
     if (_lb_ignoreBgLoad)
       CmiPrintf("LB> Load balancer only balance migratable object.\n");
