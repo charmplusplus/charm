@@ -870,6 +870,7 @@ void nodetab_makehost(char *name,nodetab_host *h)
 
 char *nodetab_args(char *args,nodetab_host *h)
 {
+  if (arg_ppn>0) h->cpus = arg_ppn;
   while(*args != 0) {
     char *b1 = skipblanks(args), *e1 = skipstuff(b1);
     char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
@@ -885,8 +886,7 @@ char *nodetab_args(char *args,nodetab_host *h)
 #endif
     if (subeqs(b1,e1,"speed")) h->speed = atof(b2);
     else if (subeqs(b1,e1,"cpus")) {
-      if (arg_ppn>0) h->cpus = arg_ppn;
-      else h->cpus = atol(b2);			/* ignore if there is ++ppn */
+      if (arg_ppn==0) h->cpus = atol(b2);	/* ignore if there is ++ppn */
     }
     else if (subeqs(b1,e1,"pathfix")) {
       char *b3 = skipblanks(e2), *e3 = skipstuff(b3);
