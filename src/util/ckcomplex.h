@@ -8,7 +8,11 @@
   #endif
 */
 
-#include <malloc.h>
+#include "conv-mach.h"
+
+#if CMK_MALLOC_USE_GNU_MALLOC 
+extern "C" void *memalign(size_t boundary, size_t size);
+#endif
 
 struct complex {
     double re;
@@ -152,7 +156,11 @@ struct complex {
     }
         
     inline void * operator new[] (size_t size){
+#if CMK_MALLOC_USE_GNU_MALLOC 
         void *buf = memalign(16, size);
+#else 
+        void *buf = malloc(size);
+#endif
         return buf;
     }
     
