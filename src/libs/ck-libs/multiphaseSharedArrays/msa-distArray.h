@@ -247,7 +247,7 @@ public:
 
 // define a 2d distributed array based on the 1D array, support row major and column
 // major arrangement of data
-template<class ENTRY, class ENTRY_OPS_CLASS, unsigned int ENTRIES_PER_PAGE=MSA_DEFAULT_ENTRIES_PER_PAGE, MSA_Array_Layout_t ROW_MAJOR=MSA_ROW_MAJOR>
+template<class ENTRY, class ENTRY_OPS_CLASS, unsigned int ENTRIES_PER_PAGE=MSA_DEFAULT_ENTRIES_PER_PAGE, MSA_Array_Layout_t ARRAY_LAYOUT=MSA_ROW_MAJOR>
 class MSA2D : public MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>
 {
 public:
@@ -256,19 +256,6 @@ public:
 
 protected:
     unsigned int rows, cols;
-
-    // get the index of the given entry as per the row major/column major format
-    inline unsigned int getIndex(unsigned int row, unsigned int col)
-    {
-        unsigned int index;
-
-        if(ROW_MAJOR)
-            index = row*cols + col;
-        else
-            index = col*rows + row;
-
-        return index;
-    }
 
 public:
     // @@ Needed for Jade
@@ -289,6 +276,19 @@ public:
         : rows(rows_), cols(cols_), super(cg_)
     {}
 
+    // get the index of the given entry as per the row major/column major format
+    inline unsigned int getIndex(unsigned int row, unsigned int col)
+    {
+        unsigned int index;
+
+        if(ARRAY_LAYOUT==MSA_ROW_MAJOR)
+            index = row*cols + col;
+        else
+            index = col*rows + row;
+
+        return index;
+    }
+
     inline unsigned int getPageIndex(unsigned int row, unsigned int col)
     {
         return getIndex(row, col)/ENTRIES_PER_PAGE;
@@ -302,6 +302,7 @@ public:
     inline unsigned int getRows(void) const {return rows;}
     inline unsigned int getCols(void) const {return cols;}
     inline unsigned int getColumns(void) const {return cols;}
+    inline MSA_Array_Layout_t getArrayLayout() const {return ARRAY_LAYOUT;}
 
     inline const ENTRY& get(unsigned int row, unsigned int col)
     {
@@ -330,8 +331,8 @@ public:
             end = temp;
         }
 
-        unsigned int index1 = (ROW_MAJOR) ? getIndex(start, 0) : getIndex(0, start);
-        unsigned int index2 = (ROW_MAJOR) ? getIndex(end, cols-1) : getIndex(rows-1, end);
+        unsigned int index1 = (ARRAY_LAYOUT==MSA_ROW_MAJOR) ? getIndex(start, 0) : getIndex(0, start);
+        unsigned int index2 = (ARRAY_LAYOUT==MSA_ROW_MAJOR) ? getIndex(end, cols-1) : getIndex(rows-1, end);
 
         MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::Prefetch(index1, index2);
     }
@@ -346,8 +347,8 @@ public:
             end = temp;
         }
 
-        unsigned int index1 = (ROW_MAJOR) ? getIndex(start, 0) : getIndex(0, start);
-        unsigned int index2 = (ROW_MAJOR) ? getIndex(end, cols-1) : getIndex(rows-1, end);
+        unsigned int index1 = (ARRAY_LAYOUT==MSA_ROW_MAJOR) ? getIndex(start, 0) : getIndex(0, start);
+        unsigned int index2 = (ARRAY_LAYOUT==MSA_ROW_MAJOR) ? getIndex(end, cols-1) : getIndex(rows-1, end);
 
         MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::Unlock(index1, index2);
     }
