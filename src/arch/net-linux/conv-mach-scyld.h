@@ -1,4 +1,4 @@
-#define CMK_SCYLD                                          1
+#define CMK_BPROC                                          1
 
 #undef CMK_ASYNC_NOT_NEEDED
 #undef CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN
