@@ -11,6 +11,7 @@ shamelessly stolen from java.util.Hashtable.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "conv-autoconfig.h"
 #include "ckhashtable.h"
 
 #define DEBUGF(x) /*printf x;*/
