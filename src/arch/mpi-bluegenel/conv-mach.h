@@ -40,7 +40,6 @@
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
 #define CMK_THREADS_USE_CONTEXT                            0
-#define CMK_STACK_GROWUP                                   1
 #define CMK_THREADS_USE_PTHREADS                           0
 #define CMK_THREADS_ARE_WIN32_FIBERS                       0
 

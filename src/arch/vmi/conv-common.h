@@ -75,7 +75,6 @@
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
 #define CMK_THREADS_USE_CONTEXT                            1
-#define CMK_STACK_GROWUP                                   1
 #define CMK_THREADS_USE_PTHREADS                           0
 #define CMK_THREADS_ARE_WIN32_FIBERS                       0
 
