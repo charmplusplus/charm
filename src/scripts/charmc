@@ -1195,6 +1195,8 @@ esac
 
 if [ -n "$CHARM_SHARED" ] 
 then
+  # build linking with charm .so
+  OPTS_LD="$OPTS_LD $CMK_LD_LIBRARY_PATH"
   if [ -n "$BUILD_SHARE" ]
   then
     LANG_LIBS="-L$CHARMLIBSO -I$CHARMINC $OBJECTFILES $PRE_LIBRARIES"
@@ -1202,12 +1204,13 @@ then
     LANG_LIBS="-L$CHARMLIBSO -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
   fi
 else
-LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
+  LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
 fi
 ALL_LIBS="$LANG_LIBS $MIDDLE_LIBS $CMK_LIBS $POST_LIBRARIES"
 
 if [ -n "$BUILD_SHARE" -a -n "$CHARM_SHARED" ]
 then
+  # build an applicaiton .so linking wit charm .so
   OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO -L$CHARMLIBSO"
   Debugf "Running ldro..."
   DoNoErrCheck $RM $OBJECT
