@@ -12,7 +12,7 @@ int nElements;			// readonly
 int sectionSize;		// readonly
 
 #define SECTIONSIZE  5
-#define REDUCE_TIME  1000
+#define REDUCE_TIME  100
 
 void client(CkSectionInfo sid, void *param, int dataSize, void *data);
 
