@@ -181,9 +181,9 @@ private:
       s.end=s.end+blockLoc(1,1,1);
     }
     s.getInt3(start,end);
-    thread->activateHeap();
+    TCharm::activateThread();
     (bcs[bcNo].fn)(p1,p2,start,end);
-    thread->deactivateHeap();
+    TCharm::deactivateThread();
   }
 
   int apply_bc(const int bcnum, void *p1,void *p2)
