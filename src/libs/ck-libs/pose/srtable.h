@@ -94,6 +94,8 @@ class SRtable {
   /// Pointers to the last entry of each bucket
   /** Only entries [0..b-1] are used */
   SRentry *end_bucket[MAX_B];
+  /// Error checking on bucket counts
+  int sends[MAX_B], recvs[MAX_B], ofSends, ofRecvs;
   /// The overflow bucket
   /** What doesn't fit in buckets goes here */
   SRentry *overflow;

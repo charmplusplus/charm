@@ -11,7 +11,7 @@ void opt::Step()
   CmiAssert(eq == parent->eq);
   CmiAssert(userObj == parent->objID);
 
-  //if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
+  if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
   if (eq->RBevent) Rollback(); 
   if (!parent->cancels.IsEmpty()) CancelEvents();
 
@@ -276,19 +276,7 @@ void opt::CancelUnexecutedEvents()
     // something was found!
     if (ev && (ev->done == 0)) { // found it to be unexecuted; get rid of it
       if (ev == eq->currentPtr) eq->ShiftEvent(); // adjust currentPtr
-      int rbf = 0;
-      if (ev == eq->RBevent) { 
-	rbf = 1; 
-	eq->RBevent = eq->RBevent->next; 
-      }
       eq->DeleteEvent(ev); // delete the event
-      if (rbf) {
-	while ((eq->RBevent != eq->currentPtr) && (eq->RBevent != eq->backPtr) 
-	       && (eq->RBevent->done == 1)) 
-	  eq->RBevent = eq->RBevent->next;
-	if ((eq->RBevent == eq->currentPtr) || (eq->RBevent == eq->backPtr))
-	  eq->RBevent == NULL;
-      }
     }
     if (it == last) {
       parent->cancels.RemoveItem(it); // Clean up

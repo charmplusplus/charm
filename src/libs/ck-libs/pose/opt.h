@@ -89,7 +89,11 @@ public:
       m->timestamp = ev->timestamp;
       m->setPriority(m->timestamp - POSE_TimeMax);
       localPVT->objUpdate(ev->timestamp, SEND);
-      //CkPrintf("Cancelling spawned event "); ev->evID.dump(); CkPrintf("\n");
+      char str[20];
+      if (parent->fp)
+	fprintf(parent->fp, "[%d] SEND(Cancel) @ %d: Event=%s\n", 
+		parent->thisIndex, ev->timestamp, ev->evID.sdump(str));
+      //CkPrintf("Sent cancellation %s at %d...\n", ev->evID.sdump(str), ev->timestamp);      
       POSE_Objects[ev->objIdx].Cancel(m); // send the cancellation
       delete ev; // delete the spawn
       ev = e->spawnedList; // move on to next in list

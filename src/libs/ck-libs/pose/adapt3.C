@@ -44,7 +44,7 @@ void adapt3::Step()
     localStats->Loop();
 #endif
   }
-  avgEventsPerStep = specEventCount/stepCount;
+  if (stepCount > 0)  avgEventsPerStep = specEventCount/stepCount;
   /*
   if (parent->thisIndex == RANDOM_OBJECT) {
     CkPrintf("%d STATS: leash:%d work:%d max:%d gvt:%d\n",

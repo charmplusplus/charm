@@ -43,6 +43,8 @@ class HeapNode
   /// Pack/unpack/sizing operator
   /** Packs/sizes the entire heap, DOES NOT UNPACK HEAP!!! */
   void pup(PUP::er &p);                     
+  /// Check validity of data fields
+  void sanitize();
 };
 
 /// Heap structure to store events in unexecuted portion of event queue
@@ -59,7 +61,7 @@ class EqHeap {
   /// Insert event e in heap with low timestamps at top of heap
   void InsertEvent(Event *e);              
   /// Insert event e in heap deterministically with low timestamps at top
-  void InsertEventDeterministic(Event *e);              
+  void InsertDeterministic(Event *e);              
   /// Return event on top of heap, deleting it from the heap
   /** Returns event at top of heap if one exists, null otherwise; deletes top
       node in heap, conjoining left and right subheaps */

@@ -13,10 +13,11 @@ SRtable::SRtable()
 { 
   offset = b = size_b = numOverflow = 0;
   for (int i=0; i<MAX_B; i++) {
-    buckets[i] = NULL;
-    numEntries[i] = 0;
+    buckets[i] = end_bucket[i] = NULL;
+    numEntries[i] = sends[i] = recvs[i] = 0;
   }
-  overflow = NULL;
+  overflow = end_overflow = NULL;
+  ofSends = ofRecvs = 0;
 }
 
 /// Initialize table to a minimum size
@@ -35,31 +36,42 @@ void SRtable::Insert(POSE_TimeType ts, int sr)
 #ifdef SR_SANITIZE
   sanitize();
 #endif
-  //if (ts == 0) dump();
   CmiAssert(ts >= offset);
   CmiAssert((sr == 0) || (sr == 1));
   int destBkt = (ts-offset)/size_b;  // which bucket?
   SRentry *e = new SRentry(ts, sr, NULL);
   if (destBkt >= b) { // put in overflow bucket
     if (overflow) {
-      end_overflow->next = e;
-      end_overflow = e;
+      if (end_overflow->timestamp == ts) { // an entry at that timestamp exists
+	if (sr == SEND) end_overflow->sends++;
+	else end_overflow->recvs++;
+	delete e;
+      }
+      else { // no entry with that timestamp is handy
+	end_overflow->next = e;
+	end_overflow = e;
+      }
     }
     else overflow = end_overflow = e;
+    if (sr == SEND) ofSends++;
+    else ofRecvs++;
   }
   else { // put in buckets[destBkt]
     if (buckets[destBkt]) {
-      if (end_bucket[destBkt]->timestamp == ts) {
+      if (end_bucket[destBkt]->timestamp == ts) { 
+	// an entry at that timestamp exists
 	if (sr == SEND) end_bucket[destBkt]->sends++;
 	else end_bucket[destBkt]->recvs++;
 	delete e;
       }
-      else {
+      else { // no entry with that timestamp is handy
 	end_bucket[destBkt]->next = e;
 	end_bucket[destBkt] = e;
       }
     }
     else buckets[destBkt] = end_bucket[destBkt] = e;
+    if (sr == SEND) sends[destBkt]++;
+    else recvs[destBkt]++;
   }
 #ifdef SR_SANITIZE
   sanitize();
@@ -82,6 +94,8 @@ void SRtable::Insert(SRentry *e)
       end_overflow = e;
     }
     else overflow = end_overflow = e;
+    ofSends += e->sends;
+    ofRecvs += e->recvs;
   }
   else { // put in buckets[destBkt]
     if (buckets[destBkt]) {
@@ -89,6 +103,8 @@ void SRtable::Insert(SRentry *e)
       end_bucket[destBkt] = e;
     }
     else buckets[destBkt] = end_bucket[destBkt] = e;
+    sends[destBkt] += e->sends;
+    recvs[destBkt] += e->recvs;
   }
 #ifdef SR_SANITIZE
   sanitize();
@@ -108,11 +124,17 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
   int keepBkt = (newGVTest-offset)/size_b;
   int b_old = b, size_b_old = size_b, offset_old = offset;
   SRentry *buckets_old[MAX_B], *overflow_old = overflow, *tmp;
+  int sends_old[MAX_B], recvs_old[MAX_B];
+  int ofSends_old = ofSends, ofRecvs_old = ofRecvs;
   for (int i=0; i<b_old; i++) {
     buckets_old[i] = buckets[i];
-    buckets[i] = NULL;
+    buckets[i] = end_bucket[i] = NULL;
+    sends_old[i] = sends[i];
+    recvs_old[i] = recvs[i];
+    sends[i] = recvs[i] = 0;
   }
-  overflow = NULL;
+  overflow = end_overflow = NULL;
+  ofSends = ofRecvs = 0;
   // Build new table
   offset = newGVTest;
   b = firstTS - offset;
@@ -328,12 +350,16 @@ void SRtable::CompressAndSortBucket(int i, int is_overflow)
       }
     }
   }
+  SRentry *lastEntry = newBucket;
+  if (lastEntry) while (lastEntry->next) lastEntry = lastEntry->next;
   if (is_overflow) { 
     overflow = newBucket;
+    end_overflow = lastEntry;
     numOverflow = nEntries;
   }
   else { 
     buckets[i] = newBucket;
+    end_bucket[i] = lastEntry;
     numEntries[i] = nEntries;
   }
 #ifdef SR_SANITIZE
@@ -355,6 +381,7 @@ void SRtable::FreeTable()
       delete(tmp);
       tmp = buckets[i];
     }
+    numEntries[i] = sends[i] = recvs[i] = 0;
   }
   tmp = overflow;
   while (tmp) { 
@@ -363,6 +390,7 @@ void SRtable::FreeTable()
     tmp = overflow;
   }
   offset = b = size_b = 0;
+  ofSends = ofRecvs = 0;
 }
 
 /// Dump data fields
@@ -394,25 +422,39 @@ void SRtable::dump()
 /// Check validity of data field
 void SRtable::sanitize()
 {
-  int bktMin, bktMax;
+  int bktMin, bktMax, sCount, rCount;
   SRentry *tmp;
   CmiAssert(offset > -1);
   CmiAssert((b>-1) && (b <= MAX_B));
   CmiAssert(size_b > -1);
   for (int i=0; i<b; i++) {
+    sCount = rCount = 0;
     tmp = buckets[i];
     bktMin = i*size_b + offset;
     bktMax = i*size_b + (size_b-1) + offset;
+    if (!tmp) CkAssert(!end_bucket[i]);
     while (tmp) {
       CkAssert((tmp->timestamp >= bktMin) && (tmp->timestamp <= bktMax));
+      if (!tmp->next) CkAssert(end_bucket[i] == tmp);
       tmp->sanitize();
+      sCount += tmp->sends;
+      rCount += tmp->recvs;
       tmp = tmp->next;
     }
+    CkAssert(sCount == sends[i]);
+    CkAssert(rCount == recvs[i]);
   }
   tmp = overflow;
+  sCount = rCount = 0;
+  if (!tmp) CkAssert(!end_overflow);
   while (tmp) {
     CkAssert(tmp->timestamp >= b*size_b + offset);
+    if (!tmp->next) CkAssert(end_overflow == tmp);
     tmp->sanitize();
+    sCount += tmp->sends;
+    rCount += tmp->recvs;
     tmp = tmp->next;
   }
+  CkAssert(sCount == ofSends);
+  CkAssert(rCount == ofRecvs);
 }

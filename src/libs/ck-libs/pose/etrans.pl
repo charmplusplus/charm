@@ -522,6 +522,8 @@ foreach my $incfile ($inC,@otherfiles)
       if ($iseventmethod &&  ($messagename ne '')) {
 
 	$outChandle->print("$declaration\n");
+    
+	#$outChandle->print("$messagename->sanitize();\n");
 	$outChandle->print("#ifdef POSE_STATS_ON\n");
 	$outChandle->print("  int tstat = localStats->TimerRunning();\n");
 	$outChandle->print("  if (tstat)\n");
@@ -531,6 +533,8 @@ foreach my $incfile ($inC,@otherfiles)
 	$outChandle->print("#endif\n");
 	$outChandle->print("#ifndef SEQUENTIAL_POSE\n");
 	$outChandle->print("  PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n");
+	$outChandle->print("  pvt->objUpdate($messagename->timestamp, RECV);\n");
+	$outChandle->print("  srVector[$messagename->evID.getPE()]++;\n");
 	$outChandle->print("#endif\n");
 	$outChandle->print("  Event *e = new Event();\n");
 	$outChandle->print("  if ((POSE_endtime < 0) || ($messagename->timestamp <= POSE_endtime)) {\n");
@@ -561,13 +565,11 @@ foreach my $incfile ($inC,@otherfiles)
 	$outChandle->print("    e->next = e->prev = NULL;\n");
 	$outChandle->print("    e->spawnedList = NULL;\n");
 	#$outChandle->print("    CkPrintf(\"POSE_RECV\\n\");\n");
+	$outChandle->print("char str[30];\n");
+	#$outChandle->print("if (fp) fprintf(fp, \"[%d] RECV(Event) @ %d: Event=%s\\n\", thisIndex, $messagename->timestamp, $messagename->evID.sdump(str));\n");
 	$outChandle->print("    eq->InsertEvent(e);\n");
 	$outChandle->print("    Step();\n");
 	$outChandle->print("  }\n");
-	$outChandle->print("#ifndef SEQUENTIAL_POSE\n");
-	$outChandle->print("  pvt->objUpdate($messagename->timestamp, RECV);\n");
-	$outChandle->print("  srVector[$messagename->evID.getPE()]++;\n");
-	$outChandle->print("#endif\n");
 	$outChandle->print("#ifdef POSE_STATS_ON\n");
 	$outChandle->print("  if (tstat)\n");
 	$outChandle->print("    localStats->SwitchTimer(tstat);\n");
@@ -1132,7 +1134,6 @@ sub posefuncmap
 	    $output.="int _POSE_handle = ".$segments[3].";\n";
 	    $output.="POSE_TimeType _POSE_atTime = ".$segments[4].";\n" if ($#segments>=4);
 	    $output.=$msg."->Timestamp(_POSE_handle);\n";
-	    $output.="$msg->rst = 0.0;\n";
 	    $output.="(*(CProxy_".$sim." *)&POSE_Objects)[".$segments[2]."].insert(".$msg;
 	    if ($#segments>=4) {
 	      $output.=",_POSE_atTime";
@@ -1162,9 +1163,10 @@ sub posefuncmap
 		  $output.="PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n";
 		  $output.="pvt->objUpdate(ovt+(_POSE_timeOffset), SEND);\n";
 		  $output.="#endif\n";
-		  $output.="$msg->rst = 0.0;\n";
 		  #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
-
+		  $output.="char str[30];\n";
+		  #$output.="if (parent->fp) fprintf(parent->fp, \"[%d] SEND(Event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, _POSE_handle, $msg->timestamp, $msg->evID.sdump(str));\n";
+		  #$output.="$msg->sanitize();\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		  $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 
@@ -1181,7 +1183,9 @@ sub posefuncmap
 		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
 		  $output.="#endif\n";
 		  #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
-
+		  $output.="char str[30];\n";
+		  #$output.="if (parent->fp) fprintf(parent->fp, \"[%d] SEND(Event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, _POSE_handle, $msg->timestamp, $msg->evID.sdump(str));\n";
+		  #$output.="$msg->sanitize();\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		  $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		  $output.="parent->srVector[_destPE]++;\n";
@@ -1207,9 +1211,10 @@ sub posefuncmap
 		    $output.="PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n";
 		    $output.="pvt->objUpdate(_POSE_atTime, SEND);\n";
 		    $output.="#endif\n";
-		    $output.="$msg->rst = 0.0;\n";
 		    #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
-
+		  $output.="char str[30];\n";
+		    #$output.="if (parent->fp) fprintf(parent->fp, \"[%d] SEND(Event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, _POSE_handle, $msg->timestamp, $msg->evID.sdump(str));\n";
+		    #$output.="$msg->sanitize();\n";
 		    $output.="(*(CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		    $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    $output.="parent->srVector[_destPE]++;\n";
@@ -1228,7 +1233,9 @@ sub posefuncmap
 		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
 		  $output.="#endif\n";
 		    #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
-
+		  $output.="char str[30];\n";
+		    #$output.="if (parent->fp) fprintf(parent->fp, \"[%d] SEND(Event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, _POSE_handle, $msg->timestamp, $msg->evID.sdump(str));\n";
+		    #$output.="$msg->sanitize();\n";
 		    $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		    $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    $output.="parent->srVector[_destPE]++;\n";
@@ -1252,8 +1259,10 @@ sub posefuncmap
 		      $output.="PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n";
 		      $output.="pvt->objUpdate(ovt+(_POSE_timeOffset), SEND);\n";
 		      $output.="#endif\n";
-		      $output.="$msg->rst = 0.0;\n";
-
+		      #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
+		  $output.="char str[30];\n";
+		      #$output.="if (parent->fp) fprintf(parent->fp, \"[%d] SEND(Event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, parent->thisIndex, $msg->timestamp, $msg->evID.sdump(str));\n";
+		      #$output.="$msg->sanitize();\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
 
 		      $output.="parent->srVector[CkMyPe()]++;\n";
@@ -1268,7 +1277,9 @@ sub posefuncmap
 		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
 		  $output.="#endif\n";
 		      #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
-
+		  $output.="char str[30];\n";
+		      #$output.="if (parent->fp) fprintf(parent->fp, \"[%d] SEND(Event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, parent->thisIndex, $msg->timestamp, $msg->evID.sdump(str));\n";
+		      #$output.="$msg->sanitize();\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
 		      $output.="parent->srVector[CkMyPe()]++;\n";
 		      $output.="}\n";

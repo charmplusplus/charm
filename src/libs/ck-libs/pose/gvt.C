@@ -76,7 +76,7 @@ void PVT::startPhase()
   um->conPVT = conPVT;
   um->runGVTflag = 0;
 
-  CkPrintf("PVT %d reporting pvt=%d.\n", CkMyPe(), pvt);
+  //CkPrintf("PVT %d reporting pvt=%d.\n", CkMyPe(), pvt);
 
   // send data to GVT estimation
   if (simdone) // transmit final info to GVT on PE 0
@@ -144,7 +144,6 @@ void PVT::objUpdate(POSE_TimeType timestamp, int sr)
   else { 
     SendsAndRecvs->Insert(timestamp, sr);
   }
-  //CkPrintf("[%d] %s at %d\n", CkMyPe(), (sr == SEND)?"SEND":"RECV", timestamp);
 #ifdef POSE_STATS_ON
   if (tstat)
     localStats->SwitchTimer(tstat);
@@ -267,8 +266,8 @@ void GVT::computeGVT(UpdateMsg *m)
       lastSR = tmp->timestamp;
       if (tmp->sends != tmp->recvs) {
 	earliestMsg = tmp->timestamp;
-	//	CkPrintf("GVT: @ %d, sends=%d recvs=%d estGVT was %d.\n", earliestMsg,
-	//		 tmp->sends, tmp->recvs, estGVT);
+	CkPrintf("GVT: @ %d, sends=%d recvs=%d estGVT was %d.\n", earliestMsg,
+		 tmp->sends, tmp->recvs, estGVT);
 	break;
       }
       tmp = tmp->next;

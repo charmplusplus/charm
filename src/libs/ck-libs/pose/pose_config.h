@@ -20,7 +20,7 @@
 #define DETERMINISTIC_EVENTS 1
 
 /// Uncomment to save time on memory allocation and freeing
-//#define MSG_RECYCLING 1
+#define MSG_RECYCLING 1
 
 /// Uncomment to make use of the Streaming Communication Library optimizations
 //#define POSE_COMM_ON 1
@@ -39,7 +39,7 @@
 #define STORE_RATE 10       // default checkpoint rate: 1 for every n events
 #define SPEC_WINDOW 20      // speculative event window size
 #define MIN_LEASH 10        // min speculative window for adaptive strategy
-#define MAX_LEASH 50        // max  "     "     "     "        "     "
+#define MAX_LEASH 100        // max  "     "     "     "        "     "
 #define LEASH_FLEX 10        // leash increment
 
 /// Load balancer constants

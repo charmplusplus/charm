@@ -45,6 +45,7 @@ class eventID
   char *sndump(char *s,size_t n) { snprintf(s,n,"%d.%d", id, pe); return s;}
   /// Pack/unpack/sizing operator
   void pup(class PUP::er &p) { p(id); p(pe); }  
+  void sanitize() { CkAssert((pe > -1) && (pe < CkNumPes())); }
 };
 
 /// Generates and returns unique event IDs

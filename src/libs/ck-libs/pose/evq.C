@@ -62,12 +62,12 @@ eventQueue::~eventQueue()
 /// Insert e in the queue in timestamp order
 void eventQueue::InsertEvent(Event *e)
 {
-#ifdef EQ_SANITIZE
-  sanitize();
-#endif
 #ifdef DETERMINISTIC_EVENTS
   InsertEventDeterministic(e);
 #else
+#ifdef EQ_SANITIZE
+  sanitize();
+#endif
   Event *tmp = backPtr->prev; // start at back of queue
 
   if (e->timestamp > largest) largest = e->timestamp;
@@ -325,11 +325,21 @@ void eventQueue::DeleteEvent(Event *ev)
 #ifdef EQ_SANITIZE
   sanitize();
 #endif
+  Event *tmp;
   CmiAssert(ev != currentPtr);
   CmiAssert(ev->spawnedList == NULL);
   CmiAssert(ev != frontPtr);
   CmiAssert(ev != backPtr);
-  // first connect surrounding events
+  // if ev is earliest straggler, see if there is another
+  if (RBevent == ev) {
+    RBevent = NULL;
+    tmp = ev->next;
+    while ((tmp != currentPtr) && (tmp != backPtr) && (tmp->done == 1))
+      tmp = tmp->next;
+    if ((tmp != currentPtr) && (tmp != backPtr) && (tmp->done == 0))
+      RBevent = tmp;
+  }
+  // connect surrounding events
   ev->prev->next = ev->next;
   ev->next->prev = ev->prev;
   POSE_TimeType ts = ev->timestamp;
@@ -506,7 +516,6 @@ void eventQueue::sanitize()
     tmp = tmp->next;
   if (tmp == currentPtr) CmiAssert(RBevent == NULL);
   else CmiAssert((RBevent == NULL) || (tmp == RBevent));
-
 
   // check eqheap
   eqh->sanitize();

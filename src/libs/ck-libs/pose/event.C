@@ -21,7 +21,7 @@ Event::~Event()
   //double elapsed=CmiWallTimer()-start;
   //if (elapsed>50e-6)
   //CkPrintf("delete msg(%p) took %.6f\n", (void *)msg,elapsed);
-  free(commitBfr);
+  if (commitBfr) free(commitBfr);
   while (spawnedList) {  // purge list of spawned events
     tmp = spawnedList;
     spawnedList = spawnedList->next;
@@ -107,19 +107,22 @@ void Event::pup(PUP::er &p)
 /// Check validity of data fields
 void Event::sanitize()
 {
-  // check that evID is kosher
-  // evID->sanitize();   
-  // check fnIdx... not clear how
-  // check timestamp... not clear how
-  /// Execution status: 0=not done, 1=done, 2=executing
-  CmiAssert((done == 0) || (done == 1) || (done == 2));
-  CmiAssert(commitBfrLen >= 0);
-  CmiAssert((commitErr == 0) || (commitErr == 1));
-  /// check commitBfr... not sure how
-  /// check msg... not sure how
-  /// check spawnedList... later
-  /// check cpData... not sure how
-  /// check links
-  CmiAssert(next->prev == this);
-  CmiAssert(prev->next == this);
+  if ((fnIdx != -99) && (fnIdx != -100)) {
+    evID.sanitize();   
+    msg->sanitize();
+    // check fnIdx... not clear how
+    // check timestamp... not clear how
+    /// Execution status: 0=not done, 1=done, 2=executing
+    CmiAssert((done == 0) || (done == 1) || (done == 2));
+    CmiAssert((commitErr == 0) || (commitErr == 1));
+    CmiAssert(((commitBfrLen == 0) && (commitBfr == NULL)) ||
+	      ((commitBfrLen > 0) && (commitBfr != NULL)));
+    /// check commitBfr... not sure how
+    /// check msg... not sure how
+    /// check spawnedList... later
+    /// check cpData... not sure how
+    /// check links
+    //CmiAssert(next->prev == this);
+    //CmiAssert(prev->next == this);
+  }
 }
