@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-20 14:50:24  gursoy
+ * Revision 2.3  1995-06-29 21:31:10  narain
+ * Took out the LdbBocNum macro and made it a Extern in globals.h
+ *
+ * Revision 2.2  1995/06/20  14:50:24  gursoy
  * removed SHARED_DECL
  *
  * Revision 2.1  1995/06/08  17:07:12  gursoy
@@ -44,7 +47,9 @@
 /* define the System BocNum's corresponding to system BOCs
    e.g LoadBalancing, Quiescence, Also Increment the NumSysBoc
    defined below */
-#define LdbBocNum 0    /* load-balancing         */
+
+/* load-balancing    - this is now an integer    */
+
 #define QDBocNum  1    /* Quiescecence Detection */
 #define VidBocNum 2    /* virtual id's           */
 #define WOVBocNum 3    /* write once variables   */
