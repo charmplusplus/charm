@@ -4,8 +4,7 @@ DIRS=comlib commlib_stream
 
 .PHONY: test $(DIRS)
 
-# BROKEN: commlib_stream
-test: comlib 
+test: comlib commlib_stream
 
 comlib: 
 	$(MAKE) -C $@ test OPTS='$(OPTS)'
