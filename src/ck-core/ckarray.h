@@ -66,6 +66,7 @@ protected:
   CkChareID arrayChareID;
   CkGroupID arrayGroupID;
   Array1D *thisArray;
+  CkAID thisAID;
   int numElements;
   int thisIndex;
 };
@@ -125,6 +126,7 @@ public:
   void migrateMe(int index, int where);
   int array_size(void) { return numElements; };
   int num_local(void) { return numLocalElements; };
+  int ckGetGroupId(void) { return thisgroup; }
 
   typedef enum {creating, here, moving_to, arriving, at} ElementState;
 

@@ -52,6 +52,30 @@ class _CK_GID : public _CK_CID {
     int _ck_gid;
 };
 
+class Array1D;
+
+class _CK_AID {
+  public:
+    int _ck_aid;
+    Array1D *_array;
+    int _elem;
+    void setAid(int aid) {
+      _ck_aid = aid;
+      _array = (Array1D*) CkLocalBranch(aid);
+    }
+    _CK_AID(int aid) {
+      setAid(aid);
+      _elem = -1;
+    }
+    _CK_AID(int aid, int elem) {
+      setAid(aid);
+      _elem = elem;
+    }
+    _CK_AID() {}
+};
+
+typedef _CK_AID CkAID;
+
 class CkQdMsg {
   public:
     void *operator new(size_t s) { return CkAllocMsg(0,s,0); }

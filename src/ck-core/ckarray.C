@@ -286,6 +286,8 @@ ArrayElement::ArrayElement(ArrayElementCreateMessage *msg)
   arrayChareID = msg->arrayID;
   arrayGroupID = msg->groupID;
   thisArray = msg->arrayPtr;
+  thisAID.setAid(thisArray->ckGetGroupId());
+  thisAID._elem = (-1);
   thisIndex = msg->index;
   delete msg;
 }
@@ -296,6 +298,8 @@ ArrayElement::ArrayElement(ArrayElementMigrateMessage *msg)
   arrayChareID = msg->arrayID;
   arrayGroupID = msg->groupID;
   thisArray = msg->arrayPtr;
+  thisAID.setAid(thisArray->ckGetGroupId());
+  thisAID._elem = (-1);
   thisIndex = msg->index;
   // CkPrintf("ArrayElement:%d Receiving migrated element %d\n",
     // CkMyPe(),thisIndex,numElements,
