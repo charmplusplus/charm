@@ -56,6 +56,7 @@ extern "C" void charm_creation(envelope *e, int num)
 
 extern "C" void charm_beginExecute(envelope *e)
 {
+  
   if(e==0) {
     execEvent = CtvAccess(curThreadEvent);
     execEp = (-1);
@@ -72,6 +73,7 @@ extern "C" void charm_beginExecute(envelope *e)
 
 extern "C" void charm_beginExecuteDetailed(int event,int msgType,int ep,int srcPe,int ml)
 {
+  
   execEvent=event;
   execEp=ep;
   execPe=srcPe;
@@ -87,6 +89,7 @@ extern "C" void charm_beginExecuteDetailed(int event,int msgType,int ep,int srcP
 
 extern "C" void charm_endExecute(void)
 {
+   
   if(execEp == (-1)) {
 	int* iData = (int*)malloc(sizeof(int)*4); 
 	iData[0] = 0;
