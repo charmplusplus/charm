@@ -1,4 +1,7 @@
-\section{Thread Calls}
+\chapter{Threads}
+
+The calls in this chapter can be used to put together runtime systems
+for languages that support threads.
 
 To use the threads package, you must include {\tt converse.h} and link
 with the converse library.  Note: threads are not implemented on all
@@ -103,10 +106,11 @@ CthThread}.}
 
 \function{void CthFree(CthThread t)}
 \index{CthFree}
-\desc{Frees thread {\tt t}.  You may even free the currently-executing
-thread, although the free will actually be postponed until the thread
-suspends.  This is how a thread terminates itself: it calls {\tt
-CthFree(CthSelf())}, then gives up control to another thread.}
+\desc{Frees thread {\tt t}.  You may ONLY free the
+currently-executing thread (yes, this sounds strange, it's
+historical).  Naturally, the free will actually be postponed until the
+thread suspends.  This is how a thread terminates itself: it calls
+{\tt CthFree(CthSelf())}, then gives up control to another thread.}
 
 \function{void CthSuspend()}
 \index{CthSuspend}

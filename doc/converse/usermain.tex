@@ -22,40 +22,42 @@ When you run your program, some of the processors automatically invoke
 invoked {\tt main} must must call ConverseInit.  This initializes the
 entire Converse system.  Converse then initiates, on {\em all}
 processors, the execution of the user-supplied start-function {\tt
-fn(argc, argv)} followed by the Converse scheduler.  Once the
-scheduler exits on all processors, the Converse system shuts down, and
-your program terminates.  Note that in this case, ConverseInit never
-returns.  The user is not allowed to call the Converse scheduler
-manually.
+fn(argc, argv)}.  When this function returns, Converse automatically
+calls {\tt CsdScheduler}, a function that polls for messages and
+executes their handlers (see chapter 2).  Once {\tt CsdScheduler}
+exits on all processors, the Converse system shuts down, and your
+program terminates.  Note that in this case, ConverseInit never
+returns.  The user is not allowed to poll for messages manually.
 
-ConverseInit-returns Mode: {\tt initret=1}
+User-calls-scheduler Mode: {\tt usched=1, initret=0}
+
+This is how the user initializes Converse if he wants to poll for
+messages and other events manually.  In normal mode, it is assumed
+that the user-supplied start-function {\tt fn(argc, argv)} is just for
+initialization, and that the remainder of the lifespan of the program
+is spent in the (automatically-invoked) function {\tt CsdScheduler},
+polling for messages.  In user-calls-scheduler mode, however, it is
+assumed that the user-supplied start-function will perform the {\em
+entire computation}, including polling for messages.  Thus,
+ConverseInit will not automatically call {\tt CsdScheduler} for you.
+When the user-supplied start-function ends, Converse shuts down.  This
+mode is not supported on the sim version.  This mode can be combined
+with ConverseInit returns mode below.}
+
+ConverseInit-returns Mode: {\tt usched=1, initret=1}
 
 This option is used when you want ConverseInit to return.  All
 processors which automatically invoked {\tt main} must call
 ConverseInit.  This initializes the entire Converse System.  On all
-processors which {\em did not} automatically invoke {\tt main}, Converse
-initiates the user-supplied initialization function {\tt fn(argc,
-argv)} followed by the Converse scheduler.  Meanwhile, on those
-processors which {\em did} automatically invoke {\tt main}, ConverseInit
-returns.  Shutdown is initiated when the processors that {\em did}
-automatically invoke {\tt main} call ConverseExit, and when the other
-processors exit the scheduler.  This option is not supported
-by the sim version.
-
-User-calls-scheduler Mode: {\tt usched=1}
-
-This is how the user initializes Converse if he wants to perform all
-the scheduling manually.  In normal mode, it is assumed that the
-user-supplied start-function {\tt fn(argc, argv)} is just for
-initialization, and that the remainder of the lifespan of the program
-is spent in the (automatically-invoked) Converse scheduler.  In
-user-calls-scheduler mode, however, it is assumed that the
-user-supplied start-function will perform the {\em entire
-computation}, including scheduling.  Thus, ConverseInit will not
-automatically execute the scheduler for you.  When the user-supplied
-start-function ends, Converse shuts down.  This mode is not supported
-on the sim version.  This mode can be combined with ConverseInit
-returns mode.}
+processors which {\em did not} automatically invoke {\tt main},
+Converse initiates the user-supplied initialization function {\tt
+fn(argc, argv)}.  Meanwhile, on those processors which {\em did}
+automatically invoke {\tt main}, ConverseInit returns.  Shutdown is
+initiated when the processors that {\em did} automatically invoke {\tt
+main} call ConverseExit, and when the other processors return from
+{\tt fn}.  In this mode, all polling for messages must be done
+manually (probably using CsdScheduler explicitly).  This option is not
+supported by the sim version.
 
 \function{void ConverseExit(void)}
 \index{ConverseExit}

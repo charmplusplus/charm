@@ -18,7 +18,7 @@
 \parskip 0.05in
  
 \newcommand{\internal}[1]{}
-\newcommand{\function}[1]{{\noindent{\sf {#1}}\\}}
+\newcommand{\function}[1]{{\noindent{\bf {#1}}\\}}
 \newcommand{\param}[1]{{\tt {#1}}}
 \newcommand{\note}[1]{\noindent{(Note: {\em {#1}})}}
 \newcommand{\desc}[1]{{#1}}
@@ -67,17 +67,9 @@ Brunner and Laxmikant Kale.
 
 \input{usermain}
 \input{cmi}
-\input{scheduler}
 \input{queue}
-
-\chapter{Message storage/retrieval and Threads}
-
-The calls in this chapter can be used to put together runtime systems
-for languages that support threads and tag-based message retrieval.
-
 \input{msgmgr}
 \input{threads}
-%\input{thsync}
 \input{cpvmacros}
 \input{cpm}
 \input{ldb}

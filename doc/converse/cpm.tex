@@ -1,12 +1,12 @@
-\chapter{Converse Parameter Marshalling}
+\chapter{Automatic Parameter Marshalling}
 
-The Converse Parameter Marshalling module's provides a concise means
-of invoking functions on remote processors.  The CPM module handles
-all the details of packing, transmitting, translating, and
-unpacking the arguments.  It also takes care of converting function
-pointers into function handles.  With all these details out of the
-way, it is possible to perform remote function invocation in a single
-line of code.
+Automatic Parameter Marshalling is a concise means of invoking
+functions on remote processors.  The CPM module handles all the
+details of packing, transmitting, translating, and unpacking the
+arguments.  It also takes care of converting function pointers into
+handler numbers.  With all these details out of the way, it is
+possible to perform remote function invocation in a single line of
+code.
 
 \section{CPM Basics}
 
@@ -83,15 +83,17 @@ short program {\tt myprog.c}:
  8:    user_main(int argc, char **argv)
  9:    {
 10:      int i;
-11:      ConverseInit(argv);
-12:      CpmModuleInit();
-13:      CpmInitializeThisModule();
-14:      if (CmiMyPe()==0)
-15:        for (i=1; i<CmiNumPes(); i++)
-16:          Cpm_print_integer(CpmSend(i), rand());
-17:      CsdScheduler(-1);
-18:      ConverseExit(0);
-19:    }
+11:      CpmModuleInit();
+12:      CpmInitializeThisModule();
+13:      if (CmiMyPe()==0)
+14:        for (i=1; i<CmiNumPes(); i++)
+15:          Cpm_print_integer(CpmSend(i), rand());
+16:    }
+17:    
+18:    main(int argc, char **argv)
+19:    {
+20:      ConverseInit(argc, argv, user_main, 0, 0);
+21:    }
 \end{verbatim}
 
 Lines 3-6 of this program contain a simple C function that prints an
@@ -99,19 +101,17 @@ integer.  The function is marked with the word {\tt CpmInvokable}.
 When the CPM scanner sees this word, it adds the function {\tt
 Cpm\_print\_integer} to the file {\tt myprog.cpm.h}.  The program
 includes {\tt myprog.cpm.h} on line 1, and initializes the code in
-there on line 13.  Each call to {\tt Cpm\_print\_integer} on line 16
+there on line 12.  Each call to {\tt Cpm\_print\_integer} on line 15
 builds a message that invokes {\tt print\_integer}.  The
 destination-argument {\tt CpmSend(i)} causes the message to be sent to
-the {\it i}'th processor.  Note the presence of {\tt CsdScheduler} on
-line 17: messages that are sent by the CPM mechanism are received and
-handled by the scheduler, like any other Converse message.
+the {\it i}'th processor.
 
 The effect of this program is that the first processor orders each of
 the other processors to print a random number.  Note that the example
 is somewhat minimalist, for example, it doesn't contain any code for
 terminating itself.  Also note that it would have been more efficient
 to use an explicit broadcast.  Broadcasts are described later.
-\pagebreak
+
 All launchers accept a {\it CpmDestination} as their first argument.  A
 {\it CpmDestination} is actually a pointer to a small C structure
 containing routing and handling information.  The CPM module has many
@@ -216,14 +216,16 @@ Here is a second program, {\tt example2.c}, which uses array arguments:
 10:
 11:    user_main(int argc, char **argv)
 12:    {
-13:      ConverseInit(argv);
-14:      CpmModuleInit();
-15:      CpmInitializeThisModule();
-16:      if (CmiMyPe()==0)
-17:        Cpm_print_program_arguments(CpmSend(1), argc, argv);
-19:      CsdScheduler(-1);
-20:      ConverseExit(0);
-21:    }
+13:      CpmModuleInit();
+14:      CpmInitializeThisModule();
+15:      if (CmiMyPe()==0)
+16:        Cpm_print_program_arguments(CpmSend(1), argc, argv);
+17:    }
+18:
+19:    main(int argc, char **argv)
+20:    {
+21:      ConverseInit(argc, argv, user_main, 0, 0);
+22:    }
 \end{verbatim}
 
 The word {\tt CpmStr} is a CPM built-in type, it represents a
@@ -361,7 +363,6 @@ Cpm message is sent.  This knowledge is only necessary to those
 wishing to invent new kinds of destinations.  Others can skip this
 section.
 
-\pagebreak
 The basic steps taken when sending a CPM message are:
 
 \begin{itemize}

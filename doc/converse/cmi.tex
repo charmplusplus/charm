@@ -1,58 +1,36 @@
-\chapter{Converse Machine Interface}
+\chapter{Machine Interface and Scheduler}
 
-\internal{
-\section{Initialization and Wrap-Up}
+This chapter describes two of Converse's modules: the CMI, and the
+CSD.  Together, they serve to transmit messages and schedule the
+delivery of messages.
 
-\function{void ConverseInit(char *argv[])}
-\index{ConverseInit}
-\desc{This function initializes the machine interface. It should be
-called prior to any other Converse functions. 
-Multiple calls to this function in a process should
-be avoided. \param{argv} is in similar format as passed to
-\param{main(argc, argv)}. 
-They would be utilized by \param{ConverseInit()} to initialize
-machine specific parameters such as number of processors.}
+\section{Defining Handler Numbers}
 
-\function{void ConverseExit(void)}
-\index{ConverseExit}
-\desc{This function frees the resources acquired by Converse and wraps up. 
-Any other Converse function should not be called after a call to this function.
-\note{It does not terminate the calling
-process. A separate call to \param{exit()} is needed after 
-\param{ConverseExit()} to achieve this.}}
-}
+When a message arrives at a processor, it triggers the execution of a
+{\em handler function}, not unlike a UNIX signal handler.  The handler
+function receives, as an argument, a pointer to a copy of the message.
+The message itself specifies which handler function is to be
+called when the message arrives.  Messages are contiguous sequences of
+bytes.  The message has two parts: the header, and the data.  The data
+may contain anything you like.  The header contains a {\em handler
+number}, which specifies which handler function is to be executed when
+the message arrives.  Before you can send a message, you have to
+define the handler numbers.
 
+Converse maintains a table mapping handler numbers to function
+pointers.  Each processor has its own copy of the mapping.  There is a
+caution associated with this approach: it is the user's responsibility
+to ensure that all processors have identical mappings.  This is easy
+to do, nonetheless, the user must be aware that this is (usually)
+required.
 
-\section{Converse Handlers and Handler Numbers}
-
-Prior to sending a message, the Converse user writes a {\em handler}
-function that should be called by the receiving processor.  The
-Converse user puts a reference to the {\em handler} function in the
-message, and sends it to the destination processor.  The destination
-processor automatically calls the user's {\em handler} function,
-passing it the contents of the message.
-
-Ideally, this would be achieved by putting a pointer to the
-handler-function in the message.  However, in parallel programs
-running on heterogeneous machines, sending a function pointer in a
-message doesn't work.  As a substitute, we use {\em handler numbers}.
-To this end, Converse maintains a table mapping handler numbers to
-function pointers.  Each processor has its own copy of the mapping.
-There is a caution associated with this approach: it is the user's
-responsibility to ensure that all processors have identical mappings.
-This is easy to do, nonetheless, the user must be aware that this is
-(usually) required.
-
-Note that while they may be called {\em handler numbers}, they are
-essentially function numbers, and can be used as a general substitute
-for function pointers regardless of whether those functions are handler
-functions.
+The following functions are provided to define the handler numbers:
 
 \function{typedef void (*CmiHandler)(void *)}
 \index{CmiHandler}
 \desc{Functions that handle Converse messages must be of this type.}
 
-\function {int CmiRegisterHandler(CmiHandler h)}
+\function{int CmiRegisterHandler(CmiHandler h)}
 \index{CmiRegisterHandler}
 \desc{This represents the standard technique for associating numbers
 with functions.  To use this technique, the Converse user registers
@@ -63,7 +41,7 @@ the functions, the same numbers on all processors.  This insures
 global consistency.  CmiRegisterHandler returns the number which was
 chosen for the function being registered.}
 
-\function {void CmiRegisterHandlerGlobal(int n, CmiHandler h)}
+\function {int CmiRegisterHandlerGlobal(CmiHandler h)}
 \index{CmiRegisterHandlerLocal}
 \desc{This represents a second registration technique.   The Converse
 user registers his functions on processor zero, using
@@ -72,7 +50,7 @@ broadcasting those handler numbers to other processors, and installing
 them using CmiNumberHandler below.  The user should take care not to
 invoke those handlers until they are fully installed.}
 
-\function {void CmiRegisterHandlerLocal(int n, CmiHandler h)}
+\function {int CmiRegisterHandlerLocal(CmiHandler h)}
 \index{CmiRegisterHandlerLocal}
 \desc{This function is used when one wishes to register functions
 in a manner that is not consistent across processors.  This function
@@ -98,74 +76,105 @@ registration techniques.  One may use all three registration methods
 in a program.  The system guarantees that no numbering conflicts will
 occur as a result of this combination.
 
+\section{Building Messages}
+
+To send a message, one first creates a buffer to hold the message.
+The buffer must be large enough to hold the header and the data.
+The buffer can be in any kind of memory: it could be a local variable,
+it could be a global, it could be allocated with {\tt malloc}, and
+finally, it could be allocated with {\tt CmiAlloc}.  The Converse user
+fills the buffer with the message data.  One puts a handler number
+in the message, thereby specifying which handler function the message
+should trigger when it arrives.  Finally, one uses a message-transmission
+function to send the message.
+
+The following functions are provided to help build message buffers:
+
+\function{void *CmiAlloc(int size)}
+\index{CmiAlloc}
+\desc{Allocates memory of size \param{size} in heap and returns pointer to 
+the usable space.  There are some message-sending functions that
+accept only message buffers that were allocated with CmiAlloc.  Thus,
+this is the preferred way to allocate message buffers.}
+
+\function{void CmiFree(void *ptr)}
+\index{CmiFree}
+\desc{This function frees the memory pointed to by \param{ptr}. \param{ptr}
+should be a pointer that was previously returned by \param{CmiAlloc}.}
+
 \function {\#define CmiMsgHeaderSizeBytes}
 \index{CmiMsgHeaderSizeBytes}
-\desc{Messages are continguous sequences of bytes.  The first few
-bytes bytes of the message is the {\em CMI header}.  The size of the
-header is defined by the preprocessor constant CmiMsgHeaderSizeBytes,
-which is found in in {\tt converse.h}.  When the user allocates a message,
-this number of bytes must be set aside at the front of the message for
-the {\em CMI header.}}
+\desc{This constant contains the size of the message header.  When one
+allocates a message buffer, one must set aside enough space for the header
+and the data.  This macro helps you to do so.}
 
 \function {void CmiSetHandler(int *MessageBuffer, int HandlerId)}
 \index{CmiSetHandler}
 \desc{This macro sets the handler number of a message to \param{HandlerId}.}
- 
+
 \function {int CmiGetHandler(int *MessageBuffer)}
 \index{CmiGetHandler}
-\desc{This call returns the handler of a message in the form of a handler number.}
+\desc{This call returns the handler of a message in the form of a
+handler number.}
  
 \function {CmiHandler CmiGetHandlerFunction(int *MessageBuffer)}
 \index{CmiGetHandlerFunction}
-\desc{This call returns the handler of a message in the form of a function pointer.}
+\desc{This call returns the handler of a message in the form of a
+function pointer.}
 
-\section{Point-To-Point Communication}
+\function{void CmiGrabBuffer(void **pbuf)}
+\index{CmiGrabBuffer}
+\desc{A handler function receives a pointer to a message buffer
+as an argument.  Normally, it is supposed to copy the data out of the
+message buffer, and then return, at which time Converse automatically
+frees the message buffer.  However, a handler function may use
+CmiGrabBuffer to claim ownership of the message buffer (and therefore
+prevent Converse from freeing it).  Assuming, for example, that the
+handler function called its argument {\tt msg}, it would call {\tt
+CmiGrabBuffer(\&msg)}.  Afterward, {\tt msg} contains a pointer to the
+message, or a copy of it.  From that point forward, it is the user's
+responsibility to free the message using \param{CmiFree.}}
+
+\section{Sending Messages}
+
+The following functions allow you to send messages:
 
 \function{void CmiSyncSend(unsigned int destPE, unsigned int size, void *msg)}
 \index{CmiSyncSend}
+
 \desc{Sends \param{msg} of size \param{size} bytes to processor
-\param{destPE}. Message buffer for \param{msg} could be reused after
-the call returns.
-The first CmiMsgHeaderSizeBytes bytes of \param{msg} must be set aside
-for use by the system.  (This applies to all the calls below that send
-or broadcast a message.)}
+\param{destPE}.  The call does not return until the data has been
+copied from the user-provided message buffer into system buffers.
+Therefore, once this call returns, you are free to reuse the
+message buffer immediately.}
 
 \function{void CmiSyncSendAndFree(unsigned int destPE, unsigned int size, void *msg)}
 \index{CmiSyncSendAndFree}
 \desc{Sends \param{msg} of size \param{size} bytes to processor
-\param{destPE} and frees the message buffer for \param{msg}.}
+\param{destPE} and then {\tt CmiFree}s the message buffer \param{msg}.
+Caution: the message buffer {\em must} have been allocated using {\tt
+CmiAlloc}.}
 
 \function{CmiCommHandle CmiAsyncSend(unsigned int destPE, unsigned int size, void *msg)}
 \index{CmiAsyncSend}
-\desc{Initiates an asynchronous send of \param{msg} of length
-\param{size} bytes to processor \param{destPE} and returns a
-communication handle which could be used to enquire the status of this
-communication. Message buffer for \param{mesg} should not be reused or freed
-until communication is complete.}
+\desc{Sends a message of size \param{size} bytes to processor
+\param{destPE}.  This function returns before the data has even been
+copied out of the user's message buffer.  Therefore, the Converse
+user must leave the message buffer alone for a time after calling
+this function.  This function returns a communication handle which
+can be tested to determine whether or not the buffer can be reused
+yet.}
 
 \function{int CmiAsyncMsgSent(CmiCommHandle handle)}
 \index{CmiAsyncMsgSent}
-\desc{Returns the status of asynchronous send specified by
-communication handle \param{handle}.}
+\desc{Returns true if the communication specified by the given
+CmiCommHandle has proceeded to the point where the message buffer can
+be reused.}
 
 \function{void CmiReleaseCommHandle(CmiCommHandle handle)}
 \index{CmiReleaseCommHandle}
 \desc{Releases the communication handle \param{handle} and
-associated resources. It does not free the message buffer.
-\param{handle} could be reused by CMI for another communication after
-this call succeeds.}
-
-\function{CmiCommHandle CmiAsyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])}
-\desc{Initiates an asynchronous send of data to processor
-\param{destPE}.  The data consists of \param{len} pieces residing in
-different areas of memory, which are logically concatenated.  The
-\param{msgComps} array contains pointers to the pieces; the size of
-\param{msgComps[i]} is taken from \param{sizes[i]}. 
-This function returns a communication handle which could be used to enquire
-about the status of communication using \param{CmiAsyncMsgSent()}.
-Individual pieces of data as well as the arrays \param{sizes} and
-\param{msgComps} should not be overwritten or freed before the
-communication is complete.}
+associated resources. It does not free the message buffer.}
 
 \function{void CmiSyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])}
 \desc{Synchronous send of data to processor
@@ -183,22 +192,157 @@ different areas of memory, which are logically concatenated.  The
 different areas of memory, which are logically concatenated.  The
 \param{msgComps} array contains pointers to the pieces; the size of
 \param{msgComps[i]} is taken from \param{sizes[i]}. 
-The message components specified in \param{msgComps} are freed by this function
-therefore, they should be dynamically allocated using \param{CmiAlloc()}.
-However, the \param{sizes} and \param{msgComps} array themselves are not
-freed. 
-}
+The message components specified in \param{msgComps} are {\tt
+CmiFree}d by this function therefore, they should be dynamically
+allocated using \param{CmiAlloc()}.  However, the \param{sizes} and
+\param{msgComps} array themselves are not freed.}
 
-\function{void CmiGrabBuffer(void **pbuf)}
-\index{CmiGrabBuffer}
-\desc{Transfers the ownership of the buffer pointed to by
-\param{*pbuf} to the calling procedure. On machines where 
-\param{*pbuf} points to a
-system buffer which cannot be allocated to the user, 
-CMI copies the buffer contents to newly allocated user
-space and updates \param{*pbuf} to point to the new buffer.
-In either case, the user should eventually free the buffer by calling
-\param{CmiFree}.}
+\function{CmiCommHandle CmiAsyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])}
+\desc{Initiates an asynchronous send of data to processor
+\param{destPE}.  The data consists of \param{len} pieces residing in
+different areas of memory, which are logically concatenated.  The
+\param{msgComps} array contains pointers to the pieces; the size of
+\param{msgComps[i]} is taken from \param{sizes[i]}. 
+This function returns a communication handle which could be used to enquire
+about the status of communication using \param{CmiAsyncMsgSent()}.
+Individual pieces of data as well as the arrays \param{sizes} and
+\param{msgComps} should not be overwritten or freed before the
+communication is complete.}
+
+\section{Broadcasting Messages}
+
+\function{void CmiSyncBroadcast(unsigned int size, void *msg)}
+\index{CmiSyncBroadcast}
+\desc{Sends \param{msg} of length \param{size} bytes to all processors
+excluding the processor on which the caller resides. }
+
+\function{void CmiSyncBroadcastAndFree(unsigned int size, void *msg)}
+\index{CmiSyncBroadcastAndFree}
+\desc{Sends \param{msg} of length \param{size} bytes to all processors
+excluding the processor on which the caller resides.  Uses {\tt
+CmiFree} to deallocate the message buffer for \param{msg} when the
+broadcast completes. Therefore \param{msg} must point to a buffer
+allocated with {\tt CmiAlloc}.}
+
+\function{void CmiSyncBroadcastAll(unsigned int size, void *msg)}
+\index{CmiSyncBroadcastAll}
+\desc{Sends \param{msg} of length \param{size} bytes to all processors
+including the processor on which the caller resides. This function
+does not free the message buffer for \param{msg}.}
+
+\function{void CmiSyncBroadcastAllAndFree(unsigned int size, void *msg)}
+\index{CmiSyncBroadcastAllAndFree}
+\desc{Sends \param{msg} of length \param{size} bytes to all processors
+including the processor on which the caller resides. This function
+frees the message buffer for \param{msg} before returning, so
+\param{msg} must point to a dynamically allocated buffer.}
+
+\function{CmiCommHandle CmiAsyncBroadcast(unsigned int size, void *msg)}
+\index{CmiAsyncBroadcast}
+\desc{Initiates asynchronous broadcast of message \param{msg} of
+length \param{size} bytes to all processors excluding the processor on
+which the caller resides. It returns a communication handle which
+could be used to check the status of this send using
+\param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
+freed before the communication is complete.}
+
+\function{CmiCommHandle CmiAsyncBroadcastAll(unsigned int size, void *msg)}
+\index{CmiAsyncBroadcastAll}
+\desc{Initiates asynchronous broadcast of message \param{msg} of
+length \param{size} bytes to all processors including the processor on
+which the caller resides. It returns a communication handle which
+could be used to check the status of this send using
+\param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
+freed before the communication is complete.}
+
+\section{Scheduling Messages}
+
+The scheduler queue is a powerful priority queue.  The following
+functions can be used to place messages into the scheduler queue.
+These messages are treated very much like newly-arrived messages: when
+they reach the front of the queue, they trigger handler functions,
+just like messages transmitted with Cmi functions.  Note that unlike
+the Cmi send functions, these cannot move messages across processors.
+
+\function{void CsdEnqueueGeneral(void *Message, int strategy, int priobits, int *prioptr)}
+\index{CsdEnqueueGeneral}
+\desc{This call enqueues a message to the scheduler's queue, to be processed in 
+accordance with the queueing \param{strategy}. \param{priobits} and
+\param{prioptr} specify information about priority associated with the message
+if prioritized queueing strategies are used. \param{strategy} can take values 
+defined in {\tt converse.h} depending upon the queueing strategy (FIFO or LIFO)
+and the nature of priority information used (none, integer or bit-vector).
+These predefined constants are: 
+{\tt CQS\_QUEUEING\_FIFO}, {\tt CQS\_QUEUEING\_LIFO},
+{\tt CQS\_QUEUEING\_IFIFO}, {\tt CQS\_QUEUEING\_ILIFO},
+{\tt CQS\_QUEUEING\_BFIFO}, and\\  {\tt CQS\_QUEUEING\_BLIFO}.
+This call is usually made from
+a message handler when the message is not to be processed immediately,
+but may be processed later (e.g. depending on the message's priority).
+Also, it is used to enqueue local ready entities, such as threads.
+\note{It is necessary to grab the ownership of the message buffer before queuing
+because on returning from the handler, the system can reuse the buffer.}}
+
+\function {void CsdEnqueue(void *Message)}
+\index{CsdEnqueue}
+\desc{This macro is a shorthand for 
+{\tt CsdEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL)} 
+provided here for backward compatibility.}
+
+\function{void CsdEnqueueFifo(void *Message)}
+\index{CsdEnqueueFifo}
+\desc{This macro is a shorthand for 
+{\tt CsdEnqueueGeneral(Message, CQS\_QUEUEING\_FIFO,0, NULL)} 
+provided here for backward compatibility.}
+
+
+\function{void CsdEnqueueLifo(void *Message)}
+\index{CsdEnqueueLifo}
+\desc{This macro is a shorthand for
+{\tt CsdEnqueueGeneral(Message, CQS\_QUEUEING\_LIFO,0, NULL)} 
+provided here for backward compatibility.}
+
+\function{int CsdEmpty()}
+\index{CsdEmpty}
+\desc{This function returns non-zero integer when the scheduler's queue
+is empty, zero otherwise.}
+
+\section{Polling for Messages}
+
+As we stated earlier, Converse messages trigger handler functions when
+they arrive.  In fact, for this to work, the processor must
+occasionally poll for messages.  When the user starts Converse, he can
+put it into one of several modes.  In the normal mode, the message
+polling happens automatically.  However {\em user-calls-scheduler}
+mode is designed to let the user poll manually.  To do this, the user
+must use one of two polling functions: CmiDeliverMsgs, or
+CsdScheduler.  CsdScheduler is more general, it will notice any
+Converse event.  CmiDeliverMsgs is a lower-level function that ignores
+all events except for recently-arrived messages.  (In particular, it
+ignores messages in the scheduler queue).  You can save a tiny amount
+of overhead by using the lower-level function.  We recommend the use
+of CsdScheduler for all applications except those that are using only
+the lowest level of Converse, the Cmi.  A third polling function,
+CmiDeliverSpecificMsg, is used when you know the exact event you want
+to wait for: it does not allow any other event to occur.
+
+\function {void CsdScheduler(int NumberOfMessages)}
+\index{CsdScheduler}
+\desc{This call invokes the Converse scheduler, which repeatedly
+delivers messages to their handlers (i.e. invokes the handler for each
+message it selects).  Each message header encodes a pointer to its
+handler as described in the next chapter. 
+In each iteration, the scheduler first looks for any
+message that  has arrived from another processor, and delivers it.
+If there isn't any, it selects a message from the locally enqueued
+messages (see below), and delivers it.
+The {\tt NumberOfMessages}
+parameter specifies how many messages should be processed (i.e. delivered
+to their handlers). If set to -1, the scheduler continues delivering
+messages until CsdExitScheduler() is called from a message handler.
+if {\tt NumberOfMessages} is 0, the scheduler continues delivering messages
+until it exhausts its supply of messages (i.e. becomes idle) or some 
+handler calls CsdExitScheduler().}
 
 \function{int CmiDeliverMsgs(int MaxMsgs)}
 \index{CmiDeliverMsgs}
@@ -221,6 +365,12 @@ acquire the  ownership of the message buffer.}
 with its handler field equal to \param{HandlerId}. This functions queues
 the remaining messages retrieved from the network. It returns after the 
 invoked handler function returns.}
+
+\function {void CsdExitScheduler(void)}
+\index{CsdExitScheduler}
+\desc{This call causes the scheduler
+to stop processing messages when control has returned back to it.
+The scheduler then returns to its calling routine.}
 
 \internal{
 \section{Global Pointer}
@@ -259,52 +409,7 @@ pointer \param{gptr}.  This function returns a  communication handle
 which could be used to  enquire about the status of this operation.}
 }
 
-\section{Broadcast}
-
-\function{void CmiSyncBroadcast(unsigned int size, void *msg)}
-\index{CmiSyncBroadcast}
-\desc{Sends \param{msg} of length \param{size} bytes to all processors
-excluding the processor on which the caller resides. }
-
-\function{void CmiSyncBroadcastAndFree(unsigned int size, void *msg)}
-\index{CmiSyncBroadcastAndFree}
-\desc{Sends \param{msg} of length \param{size} bytes to all processors
-excluding the processor on which the caller resides. Frees the message buffer
-for \param{msg} when the broadcast completes. Therefore \param{msg} must
-point to a dynamically allocated buffer.}
-
-\function{void CmiSyncBroadcastAll(unsigned int size, void *msg)}
-\index{CmiSyncBroadcastAll}
-\desc{Sends \param{msg} of length \param{size} bytes to all processors
-including the processor on which the caller resides. This function
-does not free the message buffer for \param{msg}.}
-
-\function{void CmiSyncBroadcastAllAndFree(unsigned int size, void *msg)}
-\index{CmiSyncBroadcastAllAndFree}
-\desc{Sends \param{msg} of length \param{size} bytes to all processors
-including the processor on which the caller resides. This function
-frees the message buffer for \param{msg} before returning, so
-\param{msg} must point to a dynamically allocated buffer.}
-
-\function{CmiCommHandle CmiAsyncBroadcast(unsigned int size, void *msg)}
-\index{CmiAsyncBroadcast}
-\desc{Initiates asynchronous broadcast of message \param{msg} of
-length \param{size} bytes to all processors excluding the processor on
-which the caller resides. It returns a communication handle which
-could be used to check the status of this send using
-\param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
-freed before the communication is complete.}
-
-\function{CmiCommHandle CmiAsyncBroadcastAll(unsigned int size, void *msg)}
-\index{CmiAsyncBroadcastAll}
-\desc{Initiates asynchronous broadcast of message \param{msg} of
-length \param{size} bytes to all processors including the processor on
-which the caller resides. It returns a communication handle which
-could be used to check the status of this send using
-\param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
-freed before the communication is complete.}
-
-\section{Timer}
+\section{The Timer}
 
 \function{double CmiTimer(void)}
 \index{CmiTimer}
@@ -326,30 +431,6 @@ parallel program is being run.}
 caller resides. A processor Id is between \param{0} and \param{CmiNumPe()-1}.}
 
 Also see the calls in Section~\ref{utility}.  % put a ref here..??
-
-\section{Memory Management}
-
-\function{void *CmiAlloc(int size)}
-\index{CmiAlloc}
-\desc{Allocates memory of size \param{size} in heap and returns pointer to 
-the usable space. All the converse entities (e.g. messages) should be 
-allocated with \param{CmiAlloc} and not with standard C library 
-functions such as \param{malloc} because converse uses \param{CmiFree} to free 
-these entities internally. \note{Currently this function is a simple wrapper
-around \param{malloc}. However, in future, sophisticated memory allocation
-strategies will be incorporated into converse.}}
-
-\function{int CmiSize(void *ptr)}
-\index{CmiSize}
-\desc{This function returns the allocated size of memory pointed to by 
-\param{ptr}. \param{ptr} should be returned by an earlier call to 
-\param{CmiAlloc}.}
-
-\function{void CmiFree(void *ptr)}
-\index{CmiFree}
-\desc{This function frees the memory pointed to by \param{ptr}. \param{ptr}
-should be returned by an earlier call to \param{CmiAlloc}.}
-
 
 \section{Input/Output}
 
