@@ -20,7 +20,7 @@ struct MSA_WriteSpan_t {
     }
 };
 
-template<class T> class DefaultEntry;
+template<class T, bool PUP_EVERY_ELEMENT> class DefaultEntry;
 template <class ENTRY, class MERGER,
           unsigned int ENTRIES_PER_PAGE>
          class MSA_PageT;
@@ -366,26 +366,30 @@ public:
     class.  It must support the default constructor, assignment, +=
     operator if yiu use accumulate, typecast from int 0, 1, and pup.
 */
-template <class T>
+
+template <class T, bool PUP_EVERY_ELEMENT=true >
 class DefaultEntry {
 public:
     inline void accumulate(T& a, const T& b) { a += b; }
     // identity for initializing at start of accumulate
     inline T getIdentity() { return (T)0; }
+    inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
 };
 
-template <class T>
+template <class T, bool PUP_EVERY_ELEMENT=true >
 class ProductEntry {
 public:
     inline void accumulate(T& a, const T& b) { a *= b; }
     inline T getIdentity() { return (T)1; }
+    inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
 };
 
-template <class T, T minVal>
+template <class T, T minVal, bool PUP_EVERY_ELEMENT=true >
 class MaxEntry {
 public:
     inline void accumulate(T& a, const T& b) { a = (a<b)?b:a; }
     inline T getIdentity() { return minVal; }
+    inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
 };
 
 //================================================================
@@ -745,9 +749,15 @@ protected:
         if (nSpans==1) 
         { /* common case: can make very fast */
             int nEntries=writeSpans[0].end-writeSpans[0].start;
-            pageArray[page].PAReceiveRLEPageWithPup(writeSpans,nSpans,
-                page_t(&writePage[writeSpans[0].start],nEntries),nEntries,
-                CkMyPe(),stateN(page)->state);
+            if (entryOpsObject->pupEveryElement()) {
+                pageArray[page].PAReceiveRLEPageWithPup(writeSpans,nSpans,
+                    page_t(&writePage[writeSpans[0].start],nEntries),nEntries,
+                    CkMyPe(),stateN(page)->state);
+            } else {
+                pageArray[page].PAReceiveRLEPage(writeSpans,nSpans,
+                    &writePage[writeSpans[0].start], nEntries,
+                    CkMyPe(),stateN(page)->state);
+            }
         } 
         else /* nSpans>1 */ 
         { /* must copy separate spans into a single output buffer (luckily rare) */
@@ -756,9 +766,15 @@ protected:
                 for (int i=writeSpans[s].start;i<writeSpans[s].end;i++)
                     writeEntries[nEntries++]=writePage[i]; // calls assign
             }
-            pageArray[page].PAReceiveRLEPageWithPup(writeSpans,nSpans,
-                                           page_t(writeEntries,nEntries),nEntries,
-                                           CkMyPe(),stateN(page)->state);
+            if (entryOpsObject->pupEveryElement()) {
+                pageArray[page].PAReceiveRLEPageWithPup(writeSpans,nSpans,
+                                                        page_t(writeEntries,nEntries),nEntries,
+                                                        CkMyPe(),stateN(page)->state);
+            } else {
+                pageArray[page].PAReceiveRLEPage(writeSpans,nSpans,
+                                               writeEntries,nEntries,
+                                               CkMyPe(),stateN(page)->state);
+            }
         }
     }
 
@@ -810,7 +826,7 @@ public:
         delete[] pageStateStorage; pageStateStorage = 0;
     }
 
-    /* To change the accumulate function */
+    /* To change the accumulate function TBD @@ race conditions */
     inline void changeEntryOpsObject(ENTRY_OPS_CLASS *e) {
         entryOpsObject = e;
         pageArray.changeEntryOpsObject(e);
@@ -1278,10 +1294,19 @@ public:
     ///   pe = to which to send page
     inline void GetPage(int pe)
     {
-        if(epage == NULL)
-            cache[pe].ReceivePageWithPUP(pageNo(), page_t((ENTRY_TYPE*)NULL), 0); // send empty page
-        else
-            cache[pe].ReceivePageWithPUP(pageNo(), page_t(epage), ENTRIES_PER_PAGE);  // send page with data
+        if(epage == NULL) {
+            // send empty page
+            if (entryOpsObject.pupEveryElement())
+                cache[pe].ReceivePageWithPUP(pageNo(), page_t((ENTRY_TYPE*)NULL), 0);
+            else
+                cache[pe].ReceivePage(pageNo(), (ENTRY_TYPE*)NULL, 0);
+        } else {
+            // send page with data
+            if (entryOpsObject.pupEveryElement())
+                cache[pe].ReceivePageWithPUP(pageNo(), page_t(epage), ENTRIES_PER_PAGE);
+            else
+                cache[pe].ReceivePage(pageNo(), epage, ENTRIES_PER_PAGE);  // send page with data                
+        }
     }
 
     /// Receive a non-runlength encoded page from the network:
