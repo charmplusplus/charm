@@ -222,6 +222,12 @@ echo "Generating $ConvHeader, conv-mach-opt.sh"
 /bin/rm -f $ConvHeader  $ConvSh
 touch $ConvHeader
 echo '[ -z "$CHARMINC" ] && CHARMINC="."' > $ConvSh
+if test -n "$COMPILER"
+then
+      i="$COMPILER"
+      echo '#include "'cc-$i.h'"' >> $ConvHeader
+      echo '. $CHARMINC/'"cc-$i.sh" >> $ConvSh
+fi
 if test -n "$BOPTS"
 then
     for i in $BOPTS
@@ -229,12 +235,6 @@ then
       echo '#include "'conv-mach-$i.h'"' >> $ConvHeader
       echo '. $CHARMINC/'"conv-mach-$i.sh" >> $ConvSh
     done
-fi
-if test -n "$COMPILER"
-then
-      i="$COMPILER"
-      echo '#include "'cc-$i.h'"' >> $ConvHeader
-      echo '. $CHARMINC/'"cc-$i.sh" >> $ConvSh
 fi
 
 
