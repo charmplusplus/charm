@@ -267,7 +267,7 @@ during driver.
 
 \function{subroutine FEM\_Set\_Mesh(nElem,nNodes,nodePerEl,conn)}
     \args{integer, intent(in) :: nElem, nNodes, nodePerEl}
-    \args{integer, intent(in), dimention(nElem,nodePerEl) :: conn;}
+    \args{integer, intent(in), dimension(nElem,nodePerEl) :: conn;}
 
      This is a convenience routine equivalent to:
 \begin{alltt}
@@ -296,16 +296,16 @@ data or connectivity data (respectively) is associated with the element.
 \function{void FEM\_Get\_Elem\_Conn(int elType,int *conn);}
 \function{subroutine FEM\_Set\_Elem\_Conn\_r(elType,conn)}
   \args{integer, intent(in)  :: elType}
-  \args{integer, intent(in),  dimention(nodePerEl,nEl) :: conn}
+  \args{integer, intent(in),  dimension(nodePerEl,nEl) :: conn}
 \function{subroutine FEM\_Get\_Elem\_Conn\_r(elType,conn)}
   \args{integer, intent(in)  :: elType}
-  \args{integer, intent(out), dimention(nodePerEl,nEl) :: conn}
+  \args{integer, intent(out), dimension(nodePerEl,nEl) :: conn}
 \function{subroutine FEM\_Set\_Elem\_Conn\_c(elType,conn)}
   \args{integer, intent(in)  :: elType}
-  \args{integer, intent(in),  dimention(nEl,nodePerEl) :: conn}
+  \args{integer, intent(in),  dimension(nEl,nodePerEl) :: conn}
 \function{subroutine FEM\_Get\_Elem\_Conn\_c(elType,conn)}
   \args{integer, intent(in)  :: elType}
-  \args{integer, intent(out), dimention(nEl,nodePerEl) :: conn}
+  \args{integer, intent(out), dimension(nEl,nodePerEl) :: conn}
 
      Describe/retreive the element connectivity array for this element
      type.  The connectivity array is indexed by the element number,
@@ -339,35 +339,94 @@ data or connectivity data (respectively) is associated with the element.
 \function{void FEM\_Set\_Elem\_Data(int elType,const double *data);}
 \function{void FEM\_Get\_Elem\_Data(int elType,double *data);}
 \function{subroutine FEM\_Set\_Node\_Data\_r(data)}
-  \args{REAL*8, intent(in),  dimention(doublePerNode,nNode)  :: data}
+  \args{REAL*8, intent(in),  dimension(doublePerNode,nNode)  :: data}
 \function{subroutine FEM\_Get\_Node\_Data\_r(data)}
-  \args{REAL*8, intent(out), dimention(doublePerNode,nNode)  :: data}
+  \args{REAL*8, intent(out), dimension(doublePerNode,nNode)  :: data}
 \function{subroutine FEM\_Set\_Elem\_Data\_r(data)}
-  \args{REAL*8, intent(in),  dimention(doublePerElem,nElem)  :: data}
+  \args{REAL*8, intent(in),  dimension(doublePerElem,nElem)  :: data}
 \function{subroutine FEM\_Get\_Elem\_Data\_r(data)}
-  \args{REAL*8, intent(out), dimention(doublePerElem,nElem)  :: data}
+  \args{REAL*8, intent(out), dimension(doublePerElem,nElem)  :: data}
 \function{subroutine FEM\_Set\_Node\_Data\_c(data)}
-  \args{REAL*8, intent(in),  dimention(nNode,doublePerNode)  :: data}
+  \args{REAL*8, intent(in),  dimension(nNode,doublePerNode)  :: data}
 \function{subroutine FEM\_Get\_Node\_Data\_c(data)}
-  \args{REAL*8, intent(out), dimention(nNode,doublePerNode)  :: data}
+  \args{REAL*8, intent(out), dimension(nNode,doublePerNode)  :: data}
 \function{subroutine FEM\_Set\_Elem\_Data\_c(data)}
-  \args{REAL*8, intent(in),  dimention(nElem,doublePerElem)  :: data}
+  \args{REAL*8, intent(in),  dimension(nElem,doublePerElem)  :: data}
 \function{subroutine FEM\_Get\_Elem\_Data\_c(data)}
-  \args{REAL*8, intent(out), dimention(nElem,doublePerElem)  :: data}
+  \args{REAL*8, intent(out), dimension(nElem,doublePerElem)  :: data}
 
      Describe/retrieve the optional, uninterpreted user data associated with
 each node and element.  This user data is partitioned and reassembled along
 with the connectivity matrix, and may include initial conditions, boundary
 values, or any other data needed or produced by the program.   The Fortran
 arrays can be row- or column- major (see \kw{FEM\_Set\_Elem\_Conn} for
-details).  The row-major form is preferred.\\
+details).  The row-major form is preferred.
 
-It is possible to add nodes to the current FEM mesh using:
-\begin{alltt}	
-void FEM\_Add\_Node(int localIdx,int nBetween,int *betweenNodes);
-\end{alltt}
-This  calls adds the node at localIdx to the current mesh. (This just changes the communication list; nothing like FEM\_Set\_...). The new node will be shared with all the chunks common to betweenNodes-- thus if betweenNodes contains a non-shared node,
-the new node will be non-shared.\\
+
+
+\function{void FEM\_Set\_Sparse(int sID,int nRec,
+         const int *nodes,int nodesPerRec,
+         const void *data,int dataPerRec,int dataType);}
+\function{subroutine FEM\_Set\_Sparse(sID,nRec,nodes,nodesPerRec,data,dataPerRec,dataType)}
+  \args{integer, intent(in) :: sID,nRec,nodesPerRec,dataPerRec,dataType}
+  \args{integer, intent(in) :: nodes(nodesPerRec,nRec)}
+  \args{varies,  intent(in) :: data(dataPerRec,nRec)}
+
+Register \kw{nRec} sparse data records with the framework under the number \kw{sID}. 
+The first call to \kw{FEM\_Set\_Sparse} must give a \kw{sID} of zero in C (1 in fortran);
+and subsequent calls to \kw{FEM\_Set\_Sparse} must give increasing consecutive \kw{sID}s.
+
+One sparse data record consists of some number of nodes, listed in the
+\kw{nodes} array, and some amount of user data, listed in the data array.
+Sparse data records are copied into the chunks that contains all that record's listed 
+nodes.  Sparse data records are normally used to describe mesh boundary conditions--
+for node-associated boundary conditions, \kw{nodesPerRec} is 1; for triangle-associated
+boundary conditions, \kw{nodesPerRec} is 3.
+
+As usual, you may change or delete the \kw{nodes} and \kw{data} arrays after this
+call returns.
+
+
+\function{int  FEM\_Get\_Sparse\_Length(int sID);}
+\function{void FEM\_Get\_Sparse(int sID,int *nodes,void *data);}
+\function{function FEM\_Get\_Sparse\_Length(sID);}
+  \args{integer, intent(in) :: sID}
+  \args{integer, intent(out) :: FEM\_Get\_Sparse\_Length}
+\function{subroutine FEM\_Get\_Sparse(sID,nodes,data);}
+  \args{integer, intent(in) :: sID}
+  \args{integer, intent(out) :: nodes(nodesPerRec,FEM\_Get\_Sparse\_Length(sID))}
+  \args{varies,  intent(out) :: data(dataPerRec,FEM\_Get\_Sparse\_Length(sID))}
+
+Retrieve the previously registered sparse data from the framework.
+\kw{FEM\_Get\_Sparse\_Length} returns the number of records of sparse
+data registered under the given \kw{sID}; zero indicates no records
+are available.  \kw{FEM\_Get\_Sparse} returns you the actual nodes
+(translated to local node numbers) and unchanged user data for
+these sparse records.
+
+
+
+\subsection{Mesh Modification}
+
+\function{void FEM\_Add\_Node(int localIdx,int nBetween,int *betweenNodes);}
+\function{subroutine FEM\_Add\_Node(localIdx,nBetween,betweenNodes)}
+    \args{integer, intent(in) :: localIdx,nBetween}
+    \args{integer, intent(in) :: betweenNodes(nBetween)}
+
+This call adds a new node, with local index \kw{localIdx}, to the current mesh chunk. 
+BetweenNodes lists the local node numbers of the all the nodes the new node is 
+"between"-- for example, when adding a new node along an edge, nBetween is 2
+and betweenNodes lists the endpoints of the edge.
+\kw{FEM\_Add\_Node} only affects the current chunk-- no other chunks are affected.
+
+To create shared nodes, \kw{FEM\_Add\_Node} must be called on all the chunks that 
+share the node, to create the local copies of the node.
+When adding multiple nodes, \kw{FEM\_Add\_Node} must be called in the same order 
+on all the processors that share the new node--that is, if two new
+nodes $x$ and $y$ are added between chunks $a$ and $b$, if $a$ calls
+\kw{FEM\_Add\_Node} with its local number for $x$ before it calls \kw{FEM\_Add\_Node}
+with its local number for $y$, $b$ must also add its copy of node $x$ before $y$.
+
 
 \function{void FEM\_Update\_Mesh(int callMeshUpdated,int doRepartition);}
 \function{subroutine FEM\_Update\_Mesh(callMeshUpdated,doRepartition)}
@@ -409,6 +468,7 @@ this routine from \kw{driver()}.
 
      It may be easier to perform major mesh modifications from
      \kw{mesh\_updated}, since the entire serial mesh is available there.
+
 
 \subsection{Node Fields}
 
@@ -475,7 +535,7 @@ indexed by 3*\kw{n}, \kw{vec\_len} is 3, \kw{offset} is 0, and \kw{dist} is
           int fid=FEM_Create_Field(FEM_DOUBLE,3,0,24);
  
           ! - Fortran90
-          REAL*8 ALLOCATABLE, DIMENTION(:) :: nodeForce
+          REAL*8 ALLOCATABLE, dimension(:) :: nodeForce
           INTEGER :: fid
           ... allocate nodeForce as 3*n_nodes...
           fid=FEM_Create_Field(FEM_DOUBLE,3,0,24)
@@ -494,7 +554,7 @@ register this node force for update with:
               (int)((char *)\&nodes[1]-(char *)\&nodes[0]) );
  
           ! - Fortran90
-          TYPE(node_type), ALLOCATABLE, DIMENTION(:) :: nodes
+          TYPE(node_type), ALLOCATABLE, dimension(:) :: nodes
           INTEGER :: fid
           ...allocate nodes array as n_nodes...
           fid=FEM_Create_Field(FEM_DOUBLE,3,
