@@ -38,7 +38,7 @@ Message::Message(char *n, int p, int e)
 	next = NULL ;
 }
 
-Entry::Entry(char *n, char *m, int t, char *r)
+Entry::Entry(char *n, char *m, int t, char *r, int s)
 {
 	name = new char [strlen(n)+1] ;
 	strcpy(name,n) ;
@@ -63,6 +63,8 @@ Entry::Entry(char *n, char *m, int t, char *r)
 		exit(1);
 	}
 
+	stackSize = s;
+
 	next = NULL ;
 }
 
@@ -76,9 +78,9 @@ Chare::Chare(char *n, int cb, int e)
 	isextern = e ;
 	next = NULL ;
 }
-void Chare::AddEntry(char *e, char *m, int t, char *r)
+void Chare::AddEntry(char *e, char *m, int t, char *r, int s)
 {
-	Entry *newe = new Entry(e, m, t, r) ;
+	Entry *newe = new Entry(e, m, t, r, s) ;
 	newe->next = entries ;
 	entries = newe ;
 }

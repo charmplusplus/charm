@@ -155,8 +155,8 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
             << endl;
 
         sprintf(str,
-          "\tt = CthCreate( (void (*)(...)) _CK_call_threaded_%s_%s, (void *) element,0);",
-          c->name,e->name) ;
+          "\tt = CthCreate( (void (*)(...)) _CK_call_threaded_%s_%s, (void *) element,%d);",
+          c->name,e->name,e->get_stackSize()) ;
         bot << str << endl;
         bot << "\tCthSetStrategyDefault(t);" << endl;
         bot << "\tCthAwaken(t);" << endl;

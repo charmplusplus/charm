@@ -35,7 +35,7 @@ public: char *name;
 
 	ReadOnly(char *n, char *t, int i);
 } ;
- 
+
 class Message {
 public: char *name;
         int packable;   // 1 is this msg type has pack/unpack functions
@@ -51,11 +51,13 @@ public: char *name;
 	int isthreaded;
 	Message *returnMsg;
         Message *msgtype;
+	int stackSize;
         Entry *next;
 
-	Entry(char *n, char *m, int t = FALSE, char *r = NULL) ;
+	Entry(char *n, char *m, int t = FALSE, char *r = NULL, int s = 0) ;
 	int isThreaded() { return isthreaded ; }
 	int isReturnMsg() { return returnMsg != NULL; }
+	int get_stackSize() { return stackSize; }
 } ;
 
 class Chare {
@@ -66,7 +68,7 @@ public: char *name;
 	int isextern;
 
 	Chare(char *n, int cb, int e) ;
-	void AddEntry(char *e, char *m, int t = FALSE, char *r = NULL) ;
+	void AddEntry(char *e, char *m, int t = FALSE, char *r = NULL, int s = 0) ;
 	int isExtern() { return isextern ; }
 } ;
 

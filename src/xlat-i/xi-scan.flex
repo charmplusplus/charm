@@ -50,6 +50,7 @@ bool	TRUE|FALSE
 "*/"		{ in_comment = FALSE; }
 {ws}		{ /* ignore white space */ }
 {nl}		{ lineno++; /* Return Token(NL); */ }
+{int}		{ yylval.intval = (atoi(yytext)); Return Token(NUMBER); }
 {name}		{ Return Token(check_name(yytext)); }
 .		{ Return Token(yytext[0]); }
 %%
@@ -61,7 +62,7 @@ struct rwtable {
 
 /* Reserved word table */
 struct rwtable rwtable[] = {
-	"",		10,
+	"",		11,
 /* MUST BE IN SORTED ORDER */
 	"boc",		BOC,
 	"chare",	CHARE,
@@ -71,6 +72,7 @@ struct rwtable rwtable[] = {
 	"message",	MESSAGE,
 	"packmessage",	PACKMESSAGE,
 	"readonly",	READONLY,
+	"stacksize",	STACKSIZE,
 	"table",	TABLE,
 	"threaded",	THREADED,
 /* MAKE SURE TO UPDATE THE NUMBER OF ENTRIES ABOVE */

@@ -27,14 +27,16 @@ int yyerror(char *);
 %token MESSAGE
 %token PACKMESSAGE
 %token READONLY
+%token STACKSIZE
 %token TABLE
 %token THREADED
 %token EXTERN
 %token <strval>	IDENTIFIER
+%token <intval> NUMBER
 
 %type <strval> Id ChareName EntryName MessageName ReadOnlyName TableName
 %type <strval> SimpleType PtrType OptionalMessagePtr
-%type <intval> OptionalThreaded OptionalExtern
+%type <intval> OptionalThreaded OptionalExtern OptionalStackSize
 
 %%
 
@@ -103,9 +105,16 @@ OptionalThreaded
 		{ $$ = TRUE; }
 	;
 
-Entry	:	OptionalThreaded OptionalMessagePtr ENTRY EntryName '(' OptionalMessagePtr ')' ';'
+OptionalStackSize
+	:	/* empty */
+		{ $$ = 0; }
+	|	STACKSIZE NUMBER
+		{ $$ = $2; }
+	;
+
+Entry	:	OptionalThreaded OptionalMessagePtr ENTRY EntryName '(' OptionalMessagePtr ')' OptionalStackSize ';'
 		{
-			thismodule->chares->AddEntry($4, $6, $1, $2) ;
+			thismodule->chares->AddEntry($4, $6, $1, $2, $8) ;
 			delete $4; delete $6;
 		}
 	;

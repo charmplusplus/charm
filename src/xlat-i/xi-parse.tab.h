@@ -4,10 +4,12 @@
 #define MESSAGE 260
 #define PACKMESSAGE 261
 #define READONLY 262
-#define TABLE 263
-#define THREADED 264
-#define EXTERN 265
-#define IDENTIFIER 266
+#define STACKSIZE 263
+#define TABLE 264
+#define THREADED 265
+#define EXTERN 266
+#define IDENTIFIER 267
+#define NUMBER 268
 typedef union {
 	char *strval;
 	int intval;
