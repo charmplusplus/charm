@@ -17,7 +17,7 @@
 
 #include "cklists.h"
 
-#define  DEBUGF(x)     // CmiPrintf x;
+#define  DEBUGF(x)      //CmiPrintf x;
 
 #include "blue.h"
 
@@ -109,7 +109,7 @@ public:
 HandlerTable::HandlerTable()
 {
     handlerTableCount = 1;
-    handlerTable = (BgHandlerInfo *)malloc(MAX_HANDLERS * sizeof(BgHandlerInfo));
+    handlerTable = new BgHandlerInfo [MAX_HANDLERS];
     for (int i=0; i<MAX_HANDLERS; i++) {
       handlerTable[i].fnPtr = defaultBgHandler;
       handlerTable[i].userPtr = NULL;
@@ -385,7 +385,7 @@ void nodeBCastMsgHandlerFunc(char *msg)
       dupmsg = (char *)CmiAlloc(len);
       memcpy(dupmsg, msg, len);
     }
-    DEBUGF(("[%d] addBgNodeInbuffer to %d\n", BgMyNode(), i));
+    DEBUGF(("addBgNodeInbuffer to %d\n", i));
     addBgNodeInbuffer(dupmsg, i);
     count ++;
   }
@@ -564,7 +564,7 @@ void BgGetSize(int *sx, int *sy, int *sz)
 }
 
 /* return the total number of Blue gene nodes */
-int BgGetTotalSize()
+int BgNumNodes()
 {
   return bgSize;
 }
@@ -577,7 +577,7 @@ void BgSetSize(int sx, int sy, int sz)
 }
 
 /* return number of bg nodes on this emulator node */
-int BgNumNodes()
+int BgNodeSize()
 {
   ASSERT(!cva(inEmulatorInit));
   return cva(numNodes);
@@ -774,7 +774,7 @@ static void InitHandlerTable()
 static inline void ProcessMessage(char *msg)
 {
   int handler = CmiBgMsgHandle(msg);
-  DEBUGF(("[%d] call handler %d\n", BgMyNode(), handler));
+  DEBUGF(("[%d] ProcessMessage call handler %d\n", BgMyNode(), handler));
 
   BgHandlerInfo *handInfo;
   BgHandlerEx entryFunc;
@@ -1212,7 +1212,7 @@ void bgCorrectionFunc(char *msg)
 CmiPrintf("destNode: %d ignored\n", m->destNode);
       CmiFree(m);
       return;
-      for (i=0; i<BgNumNodes(); i++) {
+      for (i=0; i<BgNodeSize(); i++) {
         bgCorrectionQ &cmsg = cva(nodeinfo)[i].cmsg;
         BgTimeLine *logs = cva(nodeinfo)[i].timelines;
 

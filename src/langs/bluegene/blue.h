@@ -1,3 +1,10 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
 /*
   File: Blue.h -- header file defines the user API for Converse Bluegene 
         Emulator application. 
@@ -94,9 +101,9 @@ void BgGetXYZ(int pe, int *x, int *y, int *z);
   set functions can only be called in user's BgGlobalInit code
 */
 void BgGetSize(int *sx, int *sy, int *sz);
-int  BgGetTotalSize();	/**<  total Blue Gene nodes */
+int  BgNumNodes();      /* total number of Blue Gene nodes */
 void BgSetSize(int sx, int sy, int sz);
-int  BgNumNodes();      /* return the number of nodes on this emulator pe */
+int  BgNodeSize();      /* return the number of nodes on this emulator pe */
 int  BgMyRank();	/* node ID, this is local ID */
 int  BgMyNode();
 
@@ -221,7 +228,7 @@ double BgGetRecvTime();
     if (CpvAccess(inEmulatorInit)) CmiAbort("BnvInitialize cannot be in BgEmulator\n");	\
     if (BgMyRank() == 0) { /* rank 0 must execute NodeStart() first */ 	\
       CpvInitialize(T*, v); 	 \
-      CpvAccess(v) = (T*)malloc(BgNumNodes()*sizeof(T)); 	\
+      CpvAccess(v) = (T*)malloc(BgNodeSize()*sizeof(T)); 	\
     }\
   } while(0)
 #define BnvAccess(v)       CpvAccess(v)[BgMyRank()]
@@ -240,7 +247,7 @@ public:
     if (data == NULL) {
       data = new d*[CmiMyNodeSize()];
       for (int i=0; i<CmiMyNodeSize(); i++)
-        data[i] = new d[BgNumNodes()];
+        data[i] = new d[BgNodeSize()];
     }
   }
 };
