@@ -85,13 +85,20 @@ CkSectionID::CkSectionID(const CkSectionID &sid) {
   for (int i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
 }
 
+void CkSectionID::operator=(const CkSectionID &sid) {
+  _cookie = sid._cookie;
+  _nElems = sid._nElems;
+  _elems = new CkArrayIndexMax[_nElems];
+  for (int i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
+}
+
 CkSectionID::~CkSectionID() { delete [] _elems; }
 
 void CkSectionID::pup(PUP::er &p) {
     p | _cookie;
     p(_nElems);
     if (p.isUnpacking()) _elems = new CkArrayIndexMax[_nElems];
-    for (int i=0; i< _nElems; i++) p(_elems[i].data(),_elems[i].nInts);
+    for (int i=0; i< _nElems; i++) p | _elems[i];
 }
 
 extern "C"

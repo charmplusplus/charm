@@ -416,7 +416,6 @@ void *CProxyElement_ArrayBase::ckSendSync(CkArrayMessage *msg, int ep) const
 
 void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep)
 {
-	msg_prepareSend(msg,ep,ckGetArrayID());
 	if (ckIsDelegated()) //Just call our delegateMgr
 	  ckDelegatedTo()->ArraySectionSend(ep,msg,ckGetArrayID(),ckGetSectionCookie());
 	else {

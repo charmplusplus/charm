@@ -175,6 +175,9 @@ public:
 		:CProxy_ArrayBase(sid._cookie.aid), _sid(sid){}
 	CProxySection_ArrayBase(const CkSectionID &sid, CkGroupID dTo)
 		:CProxy_ArrayBase(sid._cookie.aid, dTo), _sid(sid){}
+        CProxySection_ArrayBase(const CProxySection_ArrayBase &cs)
+		:CProxy_ArrayBase(cs.ckGetArrayID()), 
+		 _sid(cs.ckGetArrayID(), cs.ckGetArrayElements(), cs.ckGetNumElements()) {}
 	
 //	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep) ;

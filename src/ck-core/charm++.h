@@ -283,6 +283,7 @@ public:
   CkSectionID(): _elems(NULL), _nElems(0) {}
   CkSectionID(const CkSectionID &sid);
   CkSectionID(const CkArrayID &aid, const CkArrayIndexMax *elems, const int nElems);
+  void operator=(const CkSectionID &);
   ~CkSectionID();
   void pup(PUP::er &p);
 };
