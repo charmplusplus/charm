@@ -27,7 +27,6 @@ void CsmHandler(m)
 CsmMessage m;
 {
   CthThread t;
-  CmiGrabBuffer((void **)&m);
   CmmPut(CpvAccess(CsmMessages), m->ntags, m->tags, m);
   t = (CthThread)CmmGet(CpvAccess(CsmSleepers), m->ntags, m->tags, (int *)0);
   if (t) CthAwaken(t);

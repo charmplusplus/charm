@@ -23,7 +23,6 @@ void ringsimple_hop(ringmsg *msg)
   int thispe = CmiMyPe();
   int nextpe = (thispe+1) % CmiNumPes();
   int i;
-  CmiGrabBuffer((void **)&msg);
   for (i=0; i<10; i++)
     if (msg->data[i] != i) ringsimple_fail();
   if (msg->hops) {

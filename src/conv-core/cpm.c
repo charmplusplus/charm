@@ -72,7 +72,6 @@ CpvDeclare(int, CpmEnqueue2_Index);
 void CpmEnqueue2(void *msg)
 {
   int *env;
-  CmiGrabBuffer(&msg);
   env = (int *)CpmEnv(msg);
   CmiSetHandler(msg, env[0]);
   CsdEnqueueGeneral(msg, env[1], env[2], (unsigned int *)(env+3));
@@ -141,7 +140,6 @@ CpvDeclare(int, CpmEnqueueFIFO2_Index);
 void CpmEnqueueFIFO2(void *msg)
 {
   int *env;
-  CmiGrabBuffer(&msg);
   env = (int *)CpmEnv(msg);
   CmiSetHandler(msg, env[0]);
   CsdEnqueueFifo(msg);
@@ -177,7 +175,6 @@ CpvDeclare(int, CpmEnqueueLIFO2_Index);
 void CpmEnqueueLIFO2(void *msg)
 {
   int *env;
-  CmiGrabBuffer(&msg);
   env = (int *)CpmEnv(msg);
   CmiSetHandler(msg, env[0]);
   CsdEnqueueLifo(msg);
@@ -221,7 +218,6 @@ void CpmThread3(void *msg)
 void CpmThread2(void *msg)
 {
   CthThread t;
-  CmiGrabBuffer(&msg);
   t = CthCreate(CpmThread3, msg, 0);
   CthSetStrategyDefault(t); CthAwaken(t);
 }
@@ -267,7 +263,6 @@ void CpmThreadSize2(void *msg)
 {
   int *env = (int *)CpmEnv(msg);
   CthThread t;
-  CmiGrabBuffer(&msg);
   t = CthCreate(CpmThread3, msg, env[1]);
   CthSetStrategyDefault(t); CthAwaken(t);
 }

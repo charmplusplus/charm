@@ -112,7 +112,6 @@ void CldLoadResponseHandler(loadmsg *msg)
 
 void CldBalanceHandler(void *msg)
 {
-  CmiGrabBuffer((void **)&msg);
   CldRestoreHandler(msg);
   CldPutToken(msg);
 }
@@ -122,7 +121,6 @@ void CldHandler(void *msg)
   CldInfoFn ifn; CldPackFn pfn;
   int len, queueing, priobits; unsigned int *prioptr;
   
-  CmiGrabBuffer((void **)&msg);
   CldRestoreHandler(msg);
   ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);

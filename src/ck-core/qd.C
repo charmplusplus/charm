@@ -126,7 +126,6 @@ static void _callWhenIdle(QdMsg *msg)
 
 void _qdHandler(envelope *env)
 {
-  CmiGrabBuffer((void **)&env);
   register QdMsg *msg = (QdMsg*) EnvToUsr(env);
   CcdCallOnCondition(CcdPROCESSORIDLE, (CcdVoidFn)_callWhenIdle, (void*) msg);
 }

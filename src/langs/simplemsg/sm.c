@@ -25,7 +25,6 @@ CpvStaticDeclare(CmmTable, SMMessages);
 void SMHandler(m)
 SMMessage m;
 {
-  CmiGrabBuffer(&m);
   CmmPut(CpvAccess(SMMessages), m->ntags, m->tags, m);
 }
 

@@ -89,13 +89,11 @@ static inline void _parseCommandLineOpts(char **argv)
 
 static void _bufferHandler(void *msg)
 {
-  CmiGrabBuffer(&msg);
   CpvAccess(_buffQ)->enq(msg);
 }
 
 static void _discardHandler(envelope *env)
 {
-  CmiGrabBuffer((void **)&env);
   CmiFree(env);
 }
 
@@ -155,7 +153,6 @@ static inline void _sendStats(void)
 
 static void _exitHandler(envelope *env)
 {
-  CmiGrabBuffer((void **)&env);
   switch(env->getMsgtype()) {
     case ExitMsg:
       assert(CkMyPe()==0);
@@ -295,7 +292,6 @@ static inline void _initDone(void)
 
 static void _triggerHandler(envelope *env)
 {
-  CmiGrabBuffer((void **) &env);
   if (_numInitMsgs && CpvAccess(_numInitsRecd) + _numInitNodeMsgs == _numInitMsgs)
   {
     DEBUGF(("Calling Init Done from _triggerHandler\n"));
@@ -323,7 +319,6 @@ static inline void _processRODataMsg(envelope *env)
 static void _initHandler(void *msg)
 {
   assert(CkMyPe()!=0);
-  CmiGrabBuffer(&msg);
   register envelope *env = (envelope *) msg;
   switch (env->getMsgtype()) {
     case BocInitMsg:

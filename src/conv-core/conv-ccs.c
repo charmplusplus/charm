@@ -43,7 +43,7 @@ static void ccs_getinfo(char *msg)
     table[1+n]=ChMessageInt_new(CmiNodeSize(n));
   CcsSendReply(len,(const char *)table);
   free(table);
-  CmiGrabBuffer((void **)&msg);CmiFree(msg);
+  CmiFree(msg);
 }
 
 typedef struct killPortStruct{
@@ -63,7 +63,7 @@ static void ccs_killport(char *msg)
   killList->ip=ip;
   killList->port=port;
   killList->next=oldList;
-  CmiGrabBuffer((void **)&msg);CmiFree(msg);
+  CmiFree(msg);
 }
 /*Send any registered clients kill messages before we exit*/
 static int noMoreErrors(int c,const char *m) {return -1;}
@@ -400,7 +400,6 @@ static void CWeb_Reduce(void *msg){
   if(CmiMyPe() != 0){
     CmiAbort("CWeb performance data sent to wrong processor...\n");
   }
-  CmiGrabBuffer((void **)&msg);
   cur=(CWeb_CollectedData *)msg;
   src=cur->fromPE;
   prev = collectedValues[src]; /* Previous value, ideally 0 */
@@ -678,7 +677,7 @@ static void req_fw_handler(char *msg)
 {
   CcsHandleRequest((CcsImplHeader *)(msg+CmiMsgHeaderSizeBytes),
 		   msg+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader));
-  CmiGrabBuffer((void **)&msg); CmiFree(msg);  
+  CmiFree(msg);  
 }
 
 
@@ -776,7 +775,7 @@ static void rep_fw_handler(char *msg)
   SOCKET fd=*(SOCKET *)r; r+=sizeof(SOCKET);
   len=*(int *)r; r+=sizeof(int);
   CcsImpl_reply(fd,len,r);
-  CmiGrabBuffer((void **)&msg); CmiFree(msg);
+  CmiFree(msg);
 }
 
 #endif /*NODE_0_IS_CONVHOST*/

@@ -23,7 +23,6 @@ void CldHandler(char *msg)
 {
   int len, queueing, priobits;
   unsigned int *prioptr; CldInfoFn ifn; CldPackFn pfn;
-  CmiGrabBuffer((void **)&msg);
   CldRestoreHandler(msg);
   ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);

@@ -10,7 +10,6 @@
 
 extern "C" {
 #include "converse.h"
-extern void CmiGrabBuffer(char **msg);
 }
 
 class MIStream;

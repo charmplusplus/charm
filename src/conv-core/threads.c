@@ -989,7 +989,6 @@ static void
 reqslots(slotmsg *msg)
 {
   int slot, pe;
-  CmiGrabBuffer((void**)&msg);
   if(msg->pe == CmiMyPe())
     CmiAbort("All stack slots have been exhausted!\n");
   slot = get_slots(CpvAccess(myss),msg->nslots);

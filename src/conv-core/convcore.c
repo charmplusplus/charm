@@ -994,7 +994,6 @@ CthThread CthSuspendSchedulingThread()
 
 void CthResumeNormalThread(CthThread t)
 {
-  CmiGrabBuffer((void**)&t);
   /** addition for tracing */
   CpvAccess(curThread) = t;
 #ifndef CMK_OPTIMIZE
@@ -1011,7 +1010,6 @@ void CthResumeNormalThread(CthThread t)
 void CthResumeSchedulingThread(CthThread t)
 {
   CthThread me = CthSelf();
-  CmiGrabBuffer((void**)&t);
   if (me == CpvAccess(CthMainThread)) {
     CthEnqueueSchedulingThread(me,CQS_QUEUEING_FIFO, 0, 0);
   } else {
@@ -1173,7 +1171,6 @@ void CmiGroupHandler(GroupDef def)
   /* receive group definition, insert into group table */
   GroupDef *table = CpvAccess(CmiGroupTable);
   unsigned int hashval, bucket;
-  CmiGrabBuffer((void*)&def);
   hashval = (def->group.id ^ def->group.pe);
   bucket = hashval % GROUPTAB_SIZE;
   def->core.next = table[bucket];
@@ -1307,7 +1304,6 @@ void CmiMulticastDeliver(MultiMsg msg)
 
 void CmiMulticastHandler(MultiMsg msg)
 {
-  CmiGrabBuffer((void*)&msg);
   CmiMulticastDeliver(msg);
 }
 

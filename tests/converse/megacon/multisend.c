@@ -33,7 +33,6 @@ void multisend_first_handler(multisendmsg *msg)
     if(msg->data[i] != (double) (i+1))
       multisend_fail();
   }
-  CmiGrabBuffer((void **) &msg);
   CmiSetHandler(msg, CpvAccess(multisend_recv_index));
   CmiSyncSendAndFree(0, sizeof(multisendmsg), msg);
 }
@@ -48,7 +47,6 @@ void multisend_second_handler(multisendmsg *msg)
     if(msg->data[i] != (double) (i+2))
       multisend_fail();
   }
-  CmiGrabBuffer((void **) &msg);
   CmiSetHandler(msg, CpvAccess(multisend_recv_index));
   CmiSyncSendAndFree(0, sizeof(multisendmsg), msg);
 }

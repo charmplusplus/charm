@@ -167,7 +167,6 @@ void NumDeposits(comID id, int num)
 void KRecvManyCombinedMsg(char *msg)
 {
   comID id;
-  CmiGrabBuffer((void **)&msg);
   memcpy(&id,(msg+CmiMsgHeaderSizeBytes+sizeof(int)), sizeof(comID));
 
   UpdateImplTable(id);
@@ -177,7 +176,6 @@ void KRecvManyCombinedMsg(char *msg)
 void KProcManyCombinedMsg(char *msg)
 {
   comID id;
-  CmiGrabBuffer((void **)&msg);
   memcpy(&id,(msg+CmiMsgHeaderSizeBytes+sizeof(int)), sizeof(comID));
 
   UpdateImplTable(id);
@@ -265,7 +263,6 @@ void KGMsgHandler(GMsg *msg)
   //CmiPrintf("grppe=%d, grpindex=%d\n", grp.pe, grp.id);
   CmiLookupGroup((msg->id).grp, &npes, &pes);
   if (pes==0) {
-  	CmiGrabBuffer((void **)&msg);
   	//CmiSyncSendAndFree(CmiMyPe(),sizeof(GMsg), msg);
 	KCsdEnqueue(msg);
   }

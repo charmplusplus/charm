@@ -106,7 +106,6 @@ void CldEnqueueHandler(char *msg)
 {
   int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn; CldPackFn pfn;
-  CmiGrabBuffer((void **)&msg);
   ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
   CmiSetHandler(msg, CmiGetXHandler(msg));
@@ -119,7 +118,6 @@ void CldHopHandler(char *msg)
   int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn; CldPackFn pfn; int pe;
 
-  CmiGrabBuffer((void **)&msg);
   if (pinf->rebalance) {
     ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);

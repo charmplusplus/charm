@@ -111,8 +111,6 @@ static void pvmc_msg_handler_func(void *msg)
   int tags[2];
   int rtags[2];
 
-  CmiGrabBuffer(&msg);
-
   sender=((msg_hdr *)msg)->sender;
   seq_num=((msg_hdr *)msg)->seq_num;
   

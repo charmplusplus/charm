@@ -594,11 +594,6 @@ extern void CsdExitScheduler(void);
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)++)
 #endif
 
-#define CmiGrabBuffer(x) /*empty*/
-/*void     CmiGrabBuffer(void **ppbuf);
-void     CmiReleaseBuffer(void *pbuf);
-*/
-
 #if CMK_SPANTREE_USE_COMMON_CODE
 
 #define SPANTREE_W  (CMK_SPANTREE_MAXSPAN)

@@ -28,7 +28,6 @@ void vecsend_handler(int *msg)
     sizes[0] = 3600*sizeof(int);
     msgs[0] = (char *)msg;
     CmiSyncVectorSend(next, 1, sizes, msgs);
-    CmiGrabBuffer((void **)&msg);
     CmiFree(msg);
   }
 }

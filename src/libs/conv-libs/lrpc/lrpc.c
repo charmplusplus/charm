@@ -48,8 +48,6 @@ void internal_handler(void *msg)
   struct threadArgs args;
   CthThread th;
 
-  CmiGrabBuffer(&msg);
-
   switch(hdr->lrpc_type) {
     case NORMAL:
       args.funcnum = hdr->funcnum;

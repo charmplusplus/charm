@@ -258,7 +258,6 @@ static void CQdCallWhenIdle(CQdMsg msg)
 
 void CQdHandler(CQdMsg msg)
 {
-  CmiGrabBuffer((void **)&msg);
   CQdProcess(CpvAccess(cQdState), -1);
   CcdCallOnCondition(CcdPROCESSORIDLE, 
 		     (CcdVoidFn)CQdCallWhenIdle, (void*) msg);  

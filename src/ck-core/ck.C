@@ -519,7 +519,6 @@ void _processNodeBocInitMsg(envelope *env)
 
 void _processHandler(void *msg)
 {
-  CmiGrabBuffer(&msg);
   register envelope *env = (envelope *) msg;
   switch(env->getMsgtype()) {
     case NewChareMsg :
@@ -645,7 +644,6 @@ void _unpackFn(void **pEnv)
 static int index_skipCldHandler;
 static void _skipCldHandler(void *msg)
 {
-  CmiGrabBuffer(&msg);
   register envelope *env = (envelope *)(msg);
   CmiSetHandler(msg, CmiGetXHandler(msg));
   CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),

@@ -55,7 +55,6 @@ static void CfutureAwaken(futdata data, CfutureValue val)
 
 static void CfutureStore(CfutureValue m)
 {
-  CmiGrabBuffer((void **)&m);
   CfutureAwaken(m->data, m);
 }
 
