@@ -3,17 +3,9 @@
 */
 
 
-static int immRunning=0; /* if set, somebody's inside an immediate message */
+int immRunning=0; /* if set, somebody's inside an immediate message */
 
 #if CMK_IMMEDIATE_MSG
-
-int CmiImmIsRunning()
-{
-#if CMK_NET_VERSION && ! CMK_SMP
-  if (!Cmi_netpoll) return immRunning;
-#endif
-  return 0;
-}
 
 /* SMP: These variables are protected by immRecvLock. */
 static void *currentImmediateMsg=NULL; /* immediate message currently being executed */
