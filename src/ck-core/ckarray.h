@@ -65,11 +65,92 @@ public:
 
 #define ALIGN8(x)       (int)((~7)&((x)+7))
 
+/********************* CkArrayListener ****************/
+///An arrayListener is a component that gets informed whenever
+/// an array element is created, migrated, or destroyed.
+///This abstract superclass just ignores everything sent to it.
+class ArrayElement;
+class CkArrayListener : public CkComponent {
+  int nInts; //Number of ints of data to store per element
+  int dataOffset; //Int offset of our data within the element
+ public:
+  CkArrayListener(int nInts_=0);
+
+  ///Register this array type.  Our data is stored in the element at dataOffset
+  virtual void ckRegister(CkArray *arrMgr,int dataOffset_);
+	
+  ///Return the number of ints of data to store per element
+  inline int ckGetLen(void) const {return nInts;}
+  ///Return the offset of our data into the element
+  inline int ckGetOffset(void) const {return dataOffset;}
+  ///Return our data associated with this array element
+  inline int *ckGetData(ArrayElement *el) const;
+  
+  ///Elements may be being created
+  virtual void ckBeginInserting(void) {}
+  ///No more elements will be created (for now)
+  virtual void ckEndInserting(void) {}
+
+//The stamp/creating/created/died sequence happens, in order, exactly
+// once per array element.  Migrations don't show up here.
+  ///Element creation message is about to be sent
+  virtual void ckElementStamp(int *eltInfo) {}
+  ///Element is about to be created on this processor
+  virtual void ckElementCreating(ArrayElement *elt) {}
+  ///Element was just created on this processor
+  /// Return false if the element migrated away or deleted itself.
+  virtual CmiBool ckElementCreated(ArrayElement *elt) 
+    { return CmiTrue; }
+	
+  ///Element is about to be destroyed
+  virtual void ckElementDied(ArrayElement *elt) {}
+
+//The leaving/arriving seqeunce happens once per migration.
+  ///Element is about to leave this processor (so about to call pup)
+  virtual void ckElementLeaving(ArrayElement *elt) {}
+  
+  ///Element just arrived on this processor (so just called pup)
+  /// Return false if the element migrated away or deleted itself.
+  virtual CmiBool ckElementArriving(ArrayElement *elt) 
+    { return CmiTrue; }
+};
+
+
+//This simple arrayListener just prints each event to stdout:
+class CkVerboseListener : public CkArrayListener {
+ public:
+  CkVerboseListener(int nInts_=0);
+  
+  virtual void ckRegister(CkArray *arrMgr,int dataOffset_);
+  virtual void ckBeginInserting(void);
+  virtual void ckEndInserting(void);
+
+  virtual void ckElementStamp(int *eltInfo);
+  virtual void ckElementCreating(ArrayElement *elt);
+  virtual CmiBool ckElementCreated(ArrayElement *elt);
+  virtual void ckElementDied(ArrayElement *elt);
+
+  virtual void ckElementLeaving(ArrayElement *elt);
+  virtual CmiBool ckElementArriving(ArrayElement *elt);
+};
+
+//Source of CkVerboseListeners:
+class CkVerboseListenerCreator : public IrrGroup {
+  int createCount;
+ public:
+  CkVerboseListenerCreator(void);
+  virtual CkComponent *ckLookupComponent(int useIndex);
+  CkComponentID createListener(void);
+};
+
+
+/*********************** CkArrayOptions *******************************/
 /// Arguments for array creation:
 class CkArrayOptions {
 	int numInitial;/// Number of elements to create
 	CkGroupID map;/// Array location map object
 	CkGroupID locMgr;/// Location manager to bind to
+	CkPupVec<CkComponentID> arrayListeners; //CkArrayListeners for this array
  public:
  //Used by external world:
 	CkArrayOptions(void); /// Default: empty array
@@ -94,20 +175,25 @@ class CkArrayOptions {
 	/// Use this location manager
 	CkArrayOptions &setLocationManager(const CkGroupID &l)
 		{locMgr=l; return *this;}
+
+	/// Add an array listener component to this array
+	CkArrayOptions &addListener(const CkComponentID &id);
 	
   //Used by the array manager:
 	int getNumInitial(void) const {return numInitial;}
 	const CkGroupID &getMap(void) const {return map;}
 	const CkGroupID &getLocationManager(void) const {return locMgr;}
-
-	void pup(PUP::er &p) {
-		p|numInitial;
-		p|locMgr;
-		p|map;
+	int getListeners(void) const {return arrayListeners.size();}
+	CkArrayListener *getListener(int listenerNum) const {
+		return (CkArrayListener *)(arrayListeners[listenerNum].ckLookup());
 	}
+
+	void pup(PUP::er &p);
 };
 PUPmarshall(CkArrayOptions);
 
+
+/*********************** Proxy Support ************************/
 //Needed by CBase_ArrayElement
 class ArrayBase { /*empty*/ };
 /*forward*/ class ArrayElement;
@@ -142,7 +228,7 @@ public:
 #endif
 
 	static CkArrayID ckCreateEmptyArray(void);
-	static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,CkArrayOptions opts);
+	static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts);
 
 	void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx);	
 	void ckBroadcast(CkArrayMessage *m, int ep) const;
@@ -267,6 +353,7 @@ void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID);
 class ArrayElement : public CkMigratable
 {
   friend class CkArray;
+  friend class CkArrayListener;
   void initBasics(void);
 public:
   ArrayElement(void);
@@ -299,10 +386,14 @@ protected:
   virtual void CkAbort(const char *str) const;
   
 private:
-//Array implementation methods:   
-  int bcastNo;//Number of broadcasts received (also serial number)
-  CkReductionMgr::contributorInfo reductionInfo;//My reduction information
+//Array implementation methods:
+#ifndef CK_ARRAYLISTENER_MAXLEN 
+# define CK_ARRAYLISTENER_MAXLEN 3
+#endif
+  int listenerData[CK_ARRAYLISTENER_MAXLEN];
 };
+inline int *CkArrayListener::ckGetData(ArrayElement *el) const 
+  {return &el->listenerData[dataOffset];}
 
 /**An ArrayElementT is a utility class where you are 
  * constrained to a "thisIndex" of some fixed-sized type T.
@@ -335,6 +426,67 @@ typedef ArrayElementT<CkIndex3D> ArrayElement3D;
 #include "CkArray.decl.h"
 
 void _ckArrayInit(void);
+
+///This arrayListener is in charge of delivering broadcasts to the array.
+class CkArrayBroadcaster : public CkArrayListener {
+  inline int &getData(ArrayElement *el) {return *ckGetData(el);}
+public:
+  CkArrayBroadcaster();
+  virtual ~CkArrayBroadcaster();
+  
+  virtual void ckElementStamp(int *eltInfo) {*eltInfo=bcastNo;}
+  
+  ///Element was just created on this processor
+  /// Return false if the element migrated away or deleted itself.
+  virtual CmiBool ckElementCreated(ArrayElement *elt) 
+    { return bringUpToDate(elt); }
+	
+  ///Element just arrived on this processor (so just called pup)
+  /// Return false if the element migrated away or deleted itself.
+  virtual CmiBool ckElementArriving(ArrayElement *elt) 
+    { return bringUpToDate(elt); }
+  
+  void incoming(CkArrayMessage *msg);
+  
+  CmiBool deliver(CkArrayMessage *bcast,ArrayElement *el);
+  
+  void springCleaning(void);
+
+private:
+  int bcastNo;//Number of broadcasts received (also serial number)
+  int oldBcastNo;//Above value last spring cleaning
+  //This queue stores old broadcasts (in case a migrant arrives
+  // and needs to be brought up to date)
+  CkQ<CkArrayMessage *> oldBcasts;
+  
+  CmiBool bringUpToDate(ArrayElement *el);
+};
+
+///This arrayListener is in charge of performing reductions on the array.
+class CkArrayReducer : public CkArrayListener {
+  CkReductionMgr *mgr;
+  typedef CkReductionMgr::contributorInfo *I;
+  inline CkReductionMgr::contributorInfo *getData(ArrayElement *el) 
+    {return (I)ckGetData(el);}
+ public:
+  CkArrayReducer(CkReductionMgr *mgr_);
+  virtual ~CkArrayReducer();
+
+  void ckBeginInserting(void) {mgr->creatingContributors();}
+  void ckEndInserting(void) {mgr->doneCreatingContributors();}
+
+  void ckElementStamp(int *eltInfo) {mgr->contributorStamped((I)eltInfo);}
+
+  void ckElementCreating(ArrayElement *elt) 
+    {mgr->contributorCreated(getData(elt));}
+  void ckElementDied(ArrayElement *elt) 
+    {mgr->contributorDied(getData(elt));}
+
+  void ckElementLeaving(ArrayElement *elt) 
+    {mgr->contributorLeaving(getData(elt));}
+  CmiBool ckElementArriving(ArrayElement *elt) 
+    {mgr->contributorArriving(getData(elt)); return CmiTrue; }
+};
 
 class CkArray : public CkReductionMgr, public CkArrMgr {
   friend class ArrayElement;
@@ -391,7 +543,7 @@ public:
 /// Broadcast communication:
   void sendBroadcast(CkMessage *msg);
   void recvBroadcast(CkMessage *msg);
-  
+
 private:
   int numInitial;/// Number of 1D initial array elements
   CmiBool isInserting;/// Are we currently inserting elements?
@@ -400,19 +552,31 @@ private:
   ArrayElement *allocate(int elChareType,const CkArrayIndex &idx,
 	CkMessage *msg,CmiBool fromMigration);
   
-//Broadcast support
-  int bcastNo;//Number of broadcasts received (also serial number)
-  int oldBcastNo;//Above value last spring cleaning
-  //This queue stores old broadcasts (in case a migrant arrives
-  // and needs to be brought up to date)
-  CkQ<CkArrayMessage *> oldBcasts;
-  CmiBool bringBroadcastUpToDate(ArrayElement *el);
-  void deliverBroadcast(CkArrayMessage *bcast);
-  CmiBool deliverBroadcast(CkArrayMessage *bcast,ArrayElement *el);
-
 //Spring cleaning
   void springCleaning(void);
   static void staticSpringCleaning(void *forWhom);
+
+//ArrayListeners:
+//Iterate over the CkArrayListeners in this vector, calling "inside" each time.
+#define CK_ARRAYLISTENER_LOOP(listVec,inside) \
+  do { \
+	int lIdx,lMax=listVec.size();\
+	for (lIdx=0;lIdx<lMax;lIdx++) { \
+		CkArrayListener *l=listVec[lIdx];\
+		inside;\
+	}\
+  } while(0)
+ 
+  CkVec<CkArrayListener *> listeners;
+  void addListener(CkArrayListener *l,int &dataOffset) {
+    l->ckRegister(this,dataOffset);
+    dataOffset+=l->ckGetLen();
+    listeners.push_back(l);
+  }
+  
+  CkArrayBroadcaster broadcaster;
+  CkArrayReducer reducer;
+
 };
 
 #endif
