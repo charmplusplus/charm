@@ -78,9 +78,9 @@ void PipeBroadcastConverse::propagate(char *env, int isFragmented, int srcPeNumb
     */
 
     //CmiSyncListSend(num_pes, dest_pes, env->getTotalsize(), (char *)env);
-    // !!!!!!!!for (k=0; k<num_pes; ++k) CmiSyncSend(dest_pes[k], totalSendingSize, env);
-    sizeToSend = pipeSize<totalSendingSize ? pipeSize : totalSendingSize;
-    for (k=0; k<num_pes; ++k) CmiSyncSend(dest_pes[k], sizeToSend, env);
+    CmiSyncSend(dest_pes[k], totalSendingSize, env);
+    //sizeToSend = pipeSize<totalSendingSize ? pipeSize : totalSendingSize;
+    //for (k=0; k<num_pes; ++k) CmiSyncSend(dest_pes[k], sizeToSend, env);
     free(dest_pes);
     break;
 
@@ -212,12 +212,14 @@ void PipeBroadcastConverse::conversePipeBcast(char *env, int totalSize) {
   char *nextChunk = env+CmiReservedHeaderSize;
   int remaining = totalSize-CmiReservedHeaderSize;
   int reducedPipe = pipeSize-CmiReservedHeaderSize-sizeof(PipeBcastInfo);
+  int sendingMsgSize;
   ComlibPrintf("reducedPipe = %d, CmiReservedHeaderSize = %d, sizeof(PipeBcastInfo) = %d\n",reducedPipe,CmiReservedHeaderSize,sizeof(PipeBcastInfo));
   ComlibPrintf("sending %d chunks of size %d, total=%d to handle %d\n",(int)ceil(((double)totalSize-CmiReservedHeaderSize)/reducedPipe),reducedPipe,remaining,propagateHandle_frag);
   CmiSetHandler(env, propagateHandle_frag);
   ComlibPrintf("setting env handler to %d\n",propagateHandle_frag);
   for (int i=0; i<(int)ceil(((double)totalSize-CmiReservedHeaderSize)/reducedPipe); ++i) {
-    sendingMsg = (char*)CmiAlloc(reducedPipe<remaining? pipeSize : remaining+CmiReservedHeaderSize+sizeof(PipeBcastInfo));
+    sendingMsgSize = reducedPipe<remaining? pipeSize : remaining+CmiReservedHeaderSize+sizeof(PipeBcastInfo);
+    sendingMsg = (char*)CmiAlloc(sendingMsgSize);
     memcpy (sendingMsg, env, CmiReservedHeaderSize);
     PipeBcastInfo *info = (PipeBcastInfo*)(sendingMsg+CmiReservedHeaderSize);
     info->srcPe = CkMyPe();
@@ -231,7 +233,7 @@ void PipeBroadcastConverse::conversePipeBcast(char *env, int totalSize) {
     remaining -= info->chunkSize;
     nextChunk += info->chunkSize;
 
-    propagate(sendingMsg, true, CkMyPe(), totalSize, NULL);
+    propagate(sendingMsg, true, CkMyPe(), sendingMsgSize, NULL);
   }
   CmiFree(env);
 }
