@@ -197,9 +197,10 @@ template <class T>
 class AllocTable2d : public BasicTable2d<T> {
 	int max; //Maximum number of rows that can be used without reallocation
 	T fill; //Value to fill uninitialized regions with
+	T *allocTable; // the table that I allocated
 public:
 	AllocTable2d(int cols_=0,int rows_=0,T fill_=0) 
-		:BasicTable2d<T>(NULL,cols_,rows_), max(0), fill(fill_)
+		:BasicTable2d<T>(NULL,cols_,rows_), max(0), fill(fill_),allocTable(NULL)
 	{
 		if (rows>0) allocate(rows);
 	}
@@ -215,26 +216,29 @@ public:
 			rows=rows_;
 			return;
 		}
-		if (max_==0) { //They gave no suggested size-- pick one:
+/*		if (max_==0) { //They gave no suggested size-- pick one:
 			if (rows_==rows+1) //Growing slowly: grab a little extra
 				max_=10+rows_+(rows_>>2); 
-			else /* for a big change, just go with the minimum needed: */
+			else  for a big change, just go with the minimum needed: 
 				max_=rows_;
+		}*/
+		if(max_ == 0){
+			max_ = rows_;
 		}
 		int oldRows=rows;
-		T *oldTable=table;
 		cols=cols_;
 		rows=rows_;
 		max=max_;
 		table=new T[max*cols];
 		//Preserve old table entries (FIXME: assumes old cols is unchanged)
 		int copyRows=0;
-		if (oldTable!=NULL) { 
+		if (allocTable!=NULL) { 
 			copyRows=oldRows;
 			if (copyRows>max) copyRows=max;
-			memcpy(table,oldTable,sizeof(T)*cols*copyRows);
-			delete[] oldTable;
+			memcpy(table,allocTable,sizeof(T)*cols*copyRows);
+			delete[] allocTable;
 		}
+		allocTable = table;
 		//Zero out new table entries:
 		for (int r=copyRows;r<max;r++)
 			setRow(r,fill);
@@ -257,6 +261,20 @@ public:
 		}
 		rows++;
 		return getRow(rows-1);
+	}
+
+	/** to support replacement of attribute data by user 
+			supplied data
+			error checks have been performed at FEM_ATTRIB
+	*/
+	void register_data(T *user,int len,int max){
+		if(allocTable != NULL){
+			delete [] allocTable;
+			allocTable = NULL;
+		}	
+		table = user;
+		rows = len;
+		max = max;
 	}
 };
 
@@ -319,6 +337,8 @@ public:
 	/// Return the number of rows in our table of data (-1 if unknown).
 	/// This value is obtained directly from our owning Entity.
 	int getLength(void) const;
+
+	int getMax();
 	
 	/// Return the number of columns in our table of data (-1 if unknown)
 	inline int getWidth(void) const { return width; }
@@ -387,6 +407,14 @@ public:
 	
 	/// Copy everything associated with src[srcEntity] into our dstEntity.
 	virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity) =0;
+
+	/** Register this user data for this attributre 
+			Length, layout etc are checked by the default implementaion
+	*/
+
+	virtual void register_data(void *dest, int length,int max,
+		const IDXL_Layout &layout, const char *caller);
+	
 };
 PUPmarshall(FEM_Attribute);
 
@@ -416,6 +444,10 @@ public:
 	
 	virtual void get(void *dest, int firstItem,int length, 
 		const IDXL_Layout &layout, const char *caller) const;
+	
+	virtual void register_data(void *dest, int length,int max,
+		const IDXL_Layout &layout, const char *caller);
+
 	
 	/// Copy src[srcEntity] into our dstEntity.
 	virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity);
@@ -459,6 +491,9 @@ public:
 	
 	virtual void get(void *dest, int firstItem,int length,
 		const IDXL_Layout &layout, const char *caller) const;
+
+	virtual void register_data(void *dest, int length, int max,
+		const IDXL_Layout &layout, const char *caller);
 	
 	/// Copy src[srcEntity] into our dstEntity.
 	virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity);
@@ -473,7 +508,11 @@ class l2g_t;
  */
 class FEM_Entity {
 	typedef CkPupBasicVec<FEM_Symmetries_t> sym_t;
-	int length; // Number of entities of our type in the mesh
+	int length; // Number of entities of our type currently in the mesh
+	int max;    // Maximum number of entities of our type in the mesh that will be allowed
+	FEM_Mesh_alloc_fn resize; // should be a function pointer to the actual resize function later
+	void *args; // arguments to the resize function
+	
 	FEM_Entity *ghost; // Our ghost entity type, or NULL if we're the ghost
 	
 	/**
@@ -542,6 +581,9 @@ public:
 	
 	/// Return the number of entities of this type
 	inline int size(void) const {return length;}
+
+	// return the maximum size 
+	inline int getMax() { if(max > 0) return max; else return length;}
 	
 	/// Return the human-readable name of this entity type, like "node"
 	virtual const char *getName(void) const =0;
@@ -554,6 +596,14 @@ public:
 	 * all existing attributes to make room for the new entities.
 	 */
 	void setLength(int newlen);
+
+	/** Support for registration API 
+	 *  Set the current length and maximum length for this entity. 
+	 *  If the current length exceeds the maximum length a resize
+	 *  method is called .
+	 *  TODO: add the resize method to the api
+	*/
+	void setMaxLength(int newLen,int newMaxLen,void *args,FEM_Mesh_alloc_fn fn);
 	
 	/// Copy everything associated with src[srcEntity] into our dstEntity.
 	/// dstEntity must have already been allocated, e.g., with setLength.
@@ -617,6 +667,7 @@ PUPmarshall(FEM_Entity);
 
 // Now that we have FEM_Entity, we can define attribute lenth, as entity length
 inline int FEM_Attribute::getLength(void) const { return e->size(); }
+inline int FEM_Attribute::getMax(){ return e->getMax();}
 
 /**
  * Describes a set of FEM Nodes--the FEM_NODE entity type. 
@@ -952,6 +1003,9 @@ FEM_Attribute *FEM_Attribute_lookup(int fem_mesh,int entity,int attr,const char 
 void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr, 	
   	void *data, int firstItem,int length, const IDXL_Layout &layout);
 
+//registration internal api
+void FEM_Register_array_layout(int fem_mesh,int entity,int attr,void *data,const IDXL_Layout &layout);
+void FEM_Register_entity_impl(int fem_mesh,int entity,void *args,int len,int max,FEM_Mesh_alloc_fn fn);
 /// Reassemble split chunks into a single mesh
 FEM_Mesh *FEM_Mesh_assemble(int nchunks,FEM_Mesh **chunks);
 

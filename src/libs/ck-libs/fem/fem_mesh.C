@@ -113,6 +113,7 @@ FORTRAN_AS_C(FEM_MESH_DATA,FEM_Mesh_data,fem_mesh_data,
 	(*fem_mesh,*entity,*attr,data,*firstItem-1,*length,*datatype,*width)
 )
 
+
 CDECL void
 FEM_Mesh_set_data(int fem_mesh,int entity,int attr, 	
   	const void *data, int firstItem,int length, int datatype,int width)
@@ -167,6 +168,45 @@ FORTRAN_AS_C(FEM_MESH_DATA_OFFSET,FEM_Mesh_data_offset,fem_mesh_data_offset,
 	 data,*firstItem-1,*length,
 	 *type,*width,*offset,*distance,*skew)
 )
+
+
+/*registration api */
+CDECL void 
+FEM_Register_array(int fem_mesh,int entity,int attr,
+	void *data, int datatype,int width)
+{	
+	IDXL_Layout lo(datatype,width);
+	FEM_Register_array_layout(fem_mesh,entity,attr,data,lo);
+}
+
+CDECL void
+FEM_Register_array_layout(int fem_mesh,int entity,int attr, 	
+  	void *data, IDXL_Layout_t layout){
+	const char *caller="FEM_Register_array_layout";
+	FEM_Register_array_layout(fem_mesh,entity,attr,data, 
+		IDXL_Layout_List::get().get(layout,caller));
+
+}
+
+
+CDECL void 
+FEM_Register_entity(int fem_mesh,int entity,void *data,
+		int len,int max,FEM_Mesh_alloc_fn fn) {
+		FEM_Register_entity_impl(fem_mesh,entity,data,len,max,fn);
+}
+
+/**TODO: add the fortran api for registration*/
+
+FORTRAN_AS_C(FEM_REGISTER_ARRAY,FEM_Register_array,fem_register_array,
+	(int *fem_mesh,int *entity,int *attr,void *data,int *datatype,int *width),(*fem_mesh,*entity,*attr,data,*datatype,*width))
+
+
+FORTRAN_AS_C(FEM_REGISTER_ARRAY_LAYOUT,FEM_Register_array_layout,fem_register_array_layout,
+	(int *fem_mesh,int *entity,int *attr,void *data,int *layout),(*fem_mesh,*entity,*attr,data,*layout))
+
+FORTRAN_AS_C(FEM_REGISTER_ENTITY,FEM_Register_entity,fem_register_entity,
+	(int *fem_mesh,int *entity,void *data,int *len,int *max,FEM_Mesh_alloc_fn fn),(*fem_mesh,*entity,data,*len,*max,fn))
+
 
 // User data API:
 CDECL void 
@@ -319,6 +359,35 @@ void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr,
 		a->get(data,firstItem,length,layout,caller);
 }
 
+/** the internal registration function */
+void FEM_Register_array_layout(int fem_mesh,int entity,int attr,void *data,const IDXL_Layout &layout){
+	int firstItem=0;
+	const char *caller="FEM_Register_array";
+	FEMAPI(caller);
+	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
+	FEM_Entity *e = m->lookup(entity,caller);
+	int length = e->size();
+	//should actually be a call on the entity
+	int max = e->getMax();
+	FEM_Attribute *a = e->lookup(attr,caller);
+	
+	if(m->isSetting()){
+	}else{
+		a->get(data,firstItem,length,layout,caller);
+	}
+	//replace the attribute's data array with the user's data
+	a->register_data(data,length,max,layout,caller);
+}
+void FEM_Register_entity_impl(int fem_mesh,int entity,void *args,int len,int max,FEM_Mesh_alloc_fn fn){
+	char *caller = "FEM_Register_entity";
+	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
+	if(!m->isSetting()){
+		CmiAbort("Register entity called on mesh that can't be written into");
+	}
+
+	FEM_Entity *e = m->lookup(entity,caller);
+	e->setMaxLength(len,max,args,fn);
+}
 
 FEM_Entity *FEM_Entity_lookup(int fem_mesh,int entity,const char *caller) {
 	return FEM_Mesh_lookup(fem_mesh,caller)->lookup(entity,caller);
@@ -500,12 +569,37 @@ void FEM_Attribute::get(void *dest, int firstItem,int length,
 	/* our subclass will actually copy into user data */
 }
 
+/*check if the layout is the same as earlier */
+
+void FEM_Attribute::register_data(void *user, int length,int max,
+	const IDXL_Layout &layout, const char *caller){
+	
+		int width=layout.width;
+		if (getWidth()==-1){
+			setWidth(width);
+		}else{
+			if (width!=getWidth()){
+				bad("width",false,getWidth(),width, caller);
+			}
+		}	
+	
+		int datatype=layout.type;
+		if (getDatatype()==-1){
+			setDatatype(datatype);
+		}else{
+			if (datatype!=getDatatype()){ 
+				bad("datatype",false,getDatatype(),datatype, caller);
+			}
+		}	
+		
+}
+
 //Check if all three of length, width, and datatype are set.
 // If so, call allocate.
 void FEM_Attribute::tryAllocate(void) {
 	if ((!allocated) && getLength()!=-1 && getWidth()!=-1 && getDatatype()!=-1) {
 		allocated=true;
-		allocate(getLength(),getWidth(),getDatatype());
+		allocate(getMax(),getWidth(),getDatatype());
 	}
 }
 
@@ -556,6 +650,7 @@ inline void getTableData(void *user, int firstItem, int length,
 		for (int c=0;c<width;c++)
 			IDXL_LAYOUT_DEREF(T,user,r,c)=tableRow[c];
 	}
+
 }
 
 void FEM_DataAttribute::set(const void *u, int f,int l, 
@@ -579,6 +674,18 @@ void FEM_DataAttribute::get(void *u, int f,int l,
 	case FEM_INT: getTableData(u,f,l,IDXL_LAYOUT_CALL(layout),int_data); break;
 	case FEM_FLOAT: getTableData(u,f,l,IDXL_LAYOUT_CALL(layout),float_data); break;
 	case FEM_DOUBLE: getTableData(u,f,l,IDXL_LAYOUT_CALL(layout),double_data); break;
+	}
+}
+
+void FEM_DataAttribute::register_data(void *u,int l,int max,
+	    const IDXL_Layout &layout, const char *caller)
+{
+	super::register_data(u,l,max,layout,caller);
+	switch(getDatatype()){
+		case FEM_BYTE: char_data->register_data((unsigned char *)u,l,max); break;
+		case FEM_INT:	 int_data->register_data((int *)u,l,max); break;
+		case FEM_FLOAT: float_data->register_data((float *)u,l,max);break;
+		case FEM_DOUBLE: double_data->register_data((double *)u,l,max);break;
 	}
 }
 
@@ -689,6 +796,14 @@ void FEM_IndexAttribute::get(void *dest, int firstItem,int length,
 	getIndexTableData(dest,firstItem,length,IDXL_LAYOUT_CALL(layout),&idx,indexBase);
 }
 
+void FEM_IndexAttribute::register_data(void *user, int length,int max,
+		const IDXL_Layout &layout, const char *caller){
+	IDXL_Layout lo=layout; lo.type=FEM_INT; //Pretend it's always int data, not INDEX
+	super::register_data(user,length,max,lo,caller);
+
+	idx.register_data((int *)user,length,max);
+}
+
 void FEM_IndexAttribute::copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity)
 {
 	const FEM_IndexAttribute *csrc=(const FEM_IndexAttribute *)&src;
@@ -721,8 +836,8 @@ CDECL const char *FEM_Get_entity_name(int entity,char *storage)
 }
 
 FEM_Entity::FEM_Entity(FEM_Entity *ghost_) //Default constructor
-	:length(-1), ghost(ghost_), sym(0), globalno(0), 
-	 ghostIDXL(ghost?&ghostSend:NULL, ghost?&ghost->ghostRecv:NULL)
+	:length(-1), max(-1),ghost(ghost_), sym(0), globalno(0), 
+	 ghostIDXL(ghost?&ghostSend:NULL, ghost?&ghost->ghostRecv:NULL),resize(NULL)
 {
 	//No attributes initially
 } 
@@ -790,13 +905,33 @@ void FEM_Entity::copyShape(const FEM_Entity &src) {
 }
 
 void FEM_Entity::setLength(int newlen) {
-	if (size()!=newlen) {
-		length=newlen;
-		// Each of our attributes need to be expanded for our new length:
-		for (int a=0;a<attributes.size();a++)
-			attributes[a]->reallocate();
+	if(!resize){
+		if (size()!=newlen) {
+			length=newlen;
+			// Each of our attributes need to be expanded for our new length:
+			for (int a=0;a<attributes.size();a++)
+				attributes[a]->reallocate();
+		}
+	}else{
+		length = newlen;
+		if(length > max){
+			printf("Resize to be called %d %d\n",length,max);
+			max = max + max >> 2;
+			for (int a=0;a<attributes.size();a++){
+				attributes[a]->reallocate();
+			}	
+			//		call resize with args max n;
+			resize(args,&length,&max);
+		}
 	}
 }
+
+void FEM_Entity::setMaxLength(int newLen,int newMaxLen,void *args,FEM_Mesh_alloc_fn fn){
+	max = newMaxLen;
+	resize = fn;
+	setLength(newLen);
+};
+
 
 /// Copy src[srcEntity] into our dstEntity.
 void FEM_Entity::copyEntity(int dstEntity,const FEM_Entity &src,int srcEntity) {

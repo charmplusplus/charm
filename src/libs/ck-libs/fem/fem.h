@@ -42,6 +42,8 @@ extern "C" {
   typedef void (*FEM_Update_mesh_fortran_fn)(int *userTag);
 
   typedef void (*FEM_PupFn)(pup_er, void*);
+
+	typedef void (*FEM_Mesh_alloc_fn)(void *param,int *size,int *maxSize);
   
   /* This should be MPI_Comm, but I want it for Fortran too */
   typedef int FEM_Comm_t; 
@@ -131,6 +133,15 @@ extern "C" {
   void FEM_Mesh_data_offset(int fem_mesh,int entity,int attr,
   	void *data, int firstItem, int length, 
 	int type,int width, int offsetBytes,int distanceBytes,int skewBytes);
+	
+  void FEM_Register_array(int fem_mesh,int entity,int attr,
+  	void *data, int datatype,int width);
+
+	 void FEM_Register_array_layout(int fem_mesh,int entity,int attr, 	
+  	void *data, IDXL_Layout_t layout);	
+	
+	//TODO:add the most important parameter.. the function pointer to the resize function
+	void FEM_Register_entity(int fem_mesh,int entity,void *data,int len,int max,FEM_Mesh_alloc_fn fn);	
   
   void FEM_Mesh_set_length(int fem_mesh,int entity,int newLength);
   int FEM_Mesh_get_width(int fem_mesh,int entity,int attr);
