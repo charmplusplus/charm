@@ -153,9 +153,6 @@ int n; CmiHandler h;
   CmiHandler *tab = CpvAccess(CmiHandlerTable);
   int         max = CpvAccess(CmiHandlerMax);
 
-  if (n > 100000) {
-    *((char *)0)=0;
-  }
   if (n >= max) {
     int newmax = ((n<<1)+10);
     int bytes = max*sizeof(CmiHandler);
@@ -175,7 +172,7 @@ CmiHandler h;
 {
   int Count = CpvAccess(CmiHandlerCount);
   CmiNumberHandler(Count, h);
-  CpvAccess(CmiHandlerCount) = Count+2;
+  CpvAccess(CmiHandlerCount) = Count+3;
   return Count;
 }
 
@@ -184,7 +181,7 @@ CmiHandler h;
 {
   int Local = CpvAccess(CmiHandlerLocal);
   CmiNumberHandler(Local, h);
-  CpvAccess(CmiHandlerLocal) = Local+2;
+  CpvAccess(CmiHandlerLocal) = Local+3;
   return Local;
 }
 
@@ -195,7 +192,7 @@ CmiHandler h;
   if (CmiMyPe()!=0) 
     CmiError("CmiRegisterHandlerGlobal must only be called on PE 0.\n");
   CmiNumberHandler(Global, h);
-  CpvAccess(CmiHandlerGlobal) = Global+2;
+  CpvAccess(CmiHandlerGlobal) = Global+3;
   return Global;
 }
 
@@ -408,6 +405,8 @@ void (*handler)();
   struct sigaction in, out ;
   in.sa_handler = handler;
   sigemptyset(&in.sa_mask);
+  sigaddset(&in.sa_mask, SIGALRM);
+  sigaddset(&in.sa_mask, SIGIO);
   in.sa_flags = 0;
   sigaction(sig, &in, &out);
 }
@@ -422,9 +421,10 @@ void (*handler)();
   struct sigaction in, out ;
   in.sa_handler = handler ;
   sigemptyset(&in.sa_mask);
+  sigaddset(&in.sa_mask, SIGALRM);
+  sigaddset(&in.sa_mask, SIGIO);
   in.sa_flags = SA_RESTART; 
-  if(sigaction(sig, &in, &out) == -1)
-      exit(1);
+  if(sigaction(sig, &in, &out)<0) exit(1);
 }
 #endif
 
@@ -434,7 +434,7 @@ void CmiSignal(sig, handler)
 int sig;
 void (*handler)();
 {
-  signal(sig, handler) ;
+  signal(sig, handler);
 }
 #endif
 
@@ -519,22 +519,24 @@ void CmiGrabBuffer()
 int CmiDeliverMsgs(maxmsgs)
 int maxmsgs;
 {
+  int *buffergrabbed = &CpvAccess(CmiBufferGrabbed);
+  void *localqueue = CpvAccess(CmiLocalQueue);
   void *msg1, *msg2;
   int counter;
   
   while (1) {
     msg1 = CmiGetNonLocal();
     if (msg1) {
-      CpvAccess(CmiBufferGrabbed)=0;
+      *buffergrabbed = 0;
       (CmiGetHandlerFunction(msg1))(msg1);
-      if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg1);
+      if (!*buffergrabbed) CmiFree(msg1);
       maxmsgs--; if (maxmsgs==0) break;
     }
-    FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg2);
+    FIFO_DeQueue(localqueue, &msg2);
     if (msg2) {
-      CpvAccess(CmiBufferGrabbed)=0;
+      *buffergrabbed = 0;
       (CmiGetHandlerFunction(msg2))(msg2);
-      if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg2);
+      if (!*buffergrabbed) CmiFree(msg2);
       maxmsgs--; if (maxmsgs==0) break;
     }
     if ((msg1==0)&&(msg2==0)) break;

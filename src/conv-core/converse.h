@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.52  1997-01-17 15:49:06  jyelon
+ * Revision 2.53  1997-02-06 19:53:37  jyelon
+ * Fifo: added peek and pop.  Convcore: added support for new network version.
+ *
+ * Revision 2.52  1997/01/17 15:49:06  jyelon
  * Made many changes for SMP version.  In particular, memory module now uses
  * CmiMemLock and CmiMemUnlock instead of CmiInterruptsBlock, which no longer
  * exists.  Threads package uses CthCpv to declare all its global vars.
@@ -253,6 +256,9 @@ extern void CmiMemLock();
 extern void CmiMemUnlock();
 #define CmiNodeBarrier() 0
 #define CmiSvAlloc CmiAlloc
+typedef int CmiMutex;
+#define CmiMutexLock(x) 0
+#define CmiMutexUnlock(x) 0
 
 #endif
 
@@ -323,6 +329,9 @@ extern void CmiMemLock();
 extern void CmiMemUnlock();
 #define CmiNodeBarrier() 0
 #define CmiSvAlloc CmiAlloc
+typedef mutex_t CmiMutex;
+#define CmiMutexLock(m) mutex_lock(m)
+#define CmiMutexUnlock(m) mutex_unlock(m)
 
 #endif
 
@@ -356,6 +365,9 @@ extern int Cmi_numpes;
 #define CmiMemUnlock() 0
 extern void CmiNodeBarrier();
 #define CmiSvAlloc CmiAlloc
+typedef int CmiMutex;
+#define CmiMutexLock(x) 0
+#define CmiMutexUnlock(x) 0
 
 #endif
 
@@ -385,16 +397,19 @@ extern int CmiRegisterHandlerLocal CMK_PROTO((CmiHandler));
 extern int CmiRegisterHandlerGlobal CMK_PROTO((CmiHandler));
 extern void CmiNumberHandler CMK_PROTO((int, CmiHandler));
 
+#define CmiHandlerAccess(m)\
+  (*((int*)(((char *)(m))+CMK_MSG_HEADER_BLANK_SPACE)))
+
 #if CMK_IS_HETERO
 
 #include <netinet/in.h>
-#define CmiGetHandler(env)  (ntohl((*((int *)(env)))))
-#define CmiSetHandler(env,x)  (*((int *)(env)) = (htonl(x)))
+#define CmiGetHandler(env)  (ntohl(CmiHandlerAccess(env)))
+#define CmiSetHandler(env,x)  (CmiHandlerAccess(env) = (htonl(x)))
 
 #else
 
-#define CmiGetHandler(env)  (*((int *)(env)))
-#define CmiSetHandler(env,x)  (*((int *)(env)) = x)
+#define CmiGetHandler(env)  (CmiHandlerAccess(env))
+#define CmiSetHandler(env,x)  (CmiHandlerAccess(env) = (x))
 
 #endif
 

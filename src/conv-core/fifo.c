@@ -3,94 +3,103 @@
 #include "converse.h"
 
 typedef struct fifo_queue {
-        void **block;
-        int block_len;
-        int first;
-        int avail;
-        int length;
+  void **block;
+  unsigned int size;
+  unsigned int pull;
+  unsigned int push;
+  unsigned int fill;
 } FIFO_QUEUE;
 
 
 #define BLK_LEN 512
 
-void           *
-FIFO_Create()
+void *FIFO_Create()
 {
-	FIFO_QUEUE     *queue;
-	queue = (FIFO_QUEUE *)malloc(sizeof(FIFO_QUEUE));
-	queue->block = (void **) malloc(BLK_LEN * sizeof(void *));
-	queue->block_len = BLK_LEN;
-	queue->first = queue->avail = 0;
-	queue->length = 0;
-
-	return (void *) queue;
+  FIFO_QUEUE *queue;
+  queue = (FIFO_QUEUE *)malloc(sizeof(FIFO_QUEUE));
+  queue->block = (void **) malloc(BLK_LEN * sizeof(void *));
+  queue->size = BLK_LEN;
+  queue->push = queue->pull = 0;
+  queue->fill = 0;
+  return (void *)queue;
 }
 
 
-FIFO_Empty(queue)
-FIFO_QUEUE     *queue;
+int FIFO_Empty(queue)
+     FIFO_QUEUE *queue;
 {
-	return (queue->length == 0) ? 1 : 0;
+  return (queue->fill == 0) ? 1 : 0;
 }
 
-
-FIFO_EnQueue(queue, element)
-FIFO_QUEUE     *queue;
-void           *element;
+void FIFO_Expand(queue)
+     FIFO_QUEUE *queue;
 {
-
-	if (!queue->length)	/* Queue is empty */
-	{
-		queue->block[queue->avail] = element;
-		queue->first = queue->avail;
-		queue->avail = (queue->avail + 1) % queue->block_len;
-		queue->length++;
-	}
-	else
-	{
-		if (queue->avail == queue->first)	/* Queue is full */
-		{
-			void          **blk = queue->block;
-			int             i, j;
-			queue->block = (void **) malloc(sizeof(void *) * (queue->
-							     block_len) *3);
-			for (i = queue->first, j = 0; i < queue->block_len; i++, j++)
-				queue->block[j] = blk[i];
-			for (i = 0; i < queue->avail; i++, j++)
-				queue->block[j] = blk[i];
-			queue->block[j++] = element;
-			queue->block_len *= 3;
-			queue->first = 0;
-			queue->avail = j;
-			queue->length++;
-			free(blk);
-		}
-		else
-		{
-			queue->block[queue->avail] = element;
-			queue->avail = (queue->avail + 1) % queue->block_len;
-			queue->length++;
-		}
-	}
-
+  int newsize; void **newblock; int rest;
+  int    pull  = queue->pull;
+  int    size  = queue->size;
+  void **block = queue->block;
+  newsize = size * 3;
+  newblock = (void**)malloc(newsize * sizeof(void *));
+  rest = size - pull;
+  memcpy(newblock, block + pull, rest * sizeof(void *));
+  memcpy(newblock + rest, block, pull * sizeof(void *));
+  free(block);
+  queue->block = newblock;
+  queue->size = newsize;
+  queue->pull = 0;
+  queue->push = size;
+  queue->fill = size;
 }
 
-
-FIFO_DeQueue(queue, element)
-FIFO_QUEUE     *queue;
-void      **element;
+void FIFO_EnQueue(queue, elt)
+     FIFO_QUEUE *queue;
+     void       *elt;
 {
-	*element = NULL;
-	if (queue->length)
-	{
-		*element = queue->block[queue->first++];
-		queue->first %= queue->block_len;
-		queue->length--;
-	}
+  if (queue->fill == queue->size) FIFO_Expand(queue);
+  queue->block[queue->push] = elt;
+  queue->push = ((queue->push + 1) % queue->size);
+  queue->fill++;
+}
+
+void FIFO_EnQueue_Front(queue, elt)
+     FIFO_QUEUE *queue;
+     void *elt;
+{
+  if (queue->fill == queue->size) FIFO_Expand(queue);
+  queue->pull = ((queue->pull - 1) % queue->size);
+  queue->block[queue->pull] = elt;
+  queue->fill++;
+}
+
+void *FIFO_Peek(queue)
+     FIFO_QUEUE *queue;
+{
+  if (queue->fill == 0) return 0;
+  return queue->block[queue->pull];
+}
+
+void FIFO_Pop(queue)
+     FIFO_QUEUE *queue;
+{
+  if (queue->fill) {
+    queue->pull = (queue->pull+1) % queue->size;
+    queue->fill--;
+  }
+}
+
+void FIFO_DeQueue(queue, element)
+     FIFO_QUEUE     *queue;
+     void      **element;
+{
+  if (queue->fill) {
+    *element = queue->block[queue->pull];
+    queue->pull = (queue->pull + 1) % queue->size;
+    queue->fill--;
+  } else *element = 0;
 }
 
 FIFO_Destroy(queue)
-FIFO_QUEUE *queue;
+     FIFO_QUEUE *queue;
 {
   if (!FIFO_Empty(queue)) {
     CmiError("Tried to FIFO_Destroy a non-empty queue.\n");
