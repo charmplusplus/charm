@@ -1035,7 +1035,7 @@ public:
 	CkLocRec_buffering(CkLocMgr *Narr):CkLocRec_aging(Narr) {}
 	virtual ~CkLocRec_buffering() {
 		if (0!=buffer.length())
-			CkPrintf("Warning: Messages abandoned in array manager buffer!\n");
+			CkPrintf("[%d] Warning: Messages abandoned in array manager buffer!\n", CkMyPe());
 	}
   
 	virtual RecType type(void) {return buffering;}
@@ -1199,7 +1199,10 @@ void CkLocMgr::pup(PUP::er &p){
 		mapHandle=map->registerArray(0,thisgroup);
 		// _lbdb is the fixed global groupID
 		initLB(lbdbID);
-		doneInserting();
+		// delay doneInserting when it is unpacking during restart.
+		// to prevent load balancing kicking in
+		if (!CkInRestarting()) 
+			doneInserting();
 	}
 }
 
@@ -1422,7 +1425,13 @@ CmiBool CkLocMgr::deliverUnknown(CkArrayMessage *msg,CkDeliver_t type)
 	//Check if the element's array manager has been registered yet:
 	  CkArrMgr *mgr=managers.find(UsrToEnv((void *)msg)->getsetArrayMgr())->mgr;
 	  if (!mgr) { //No manager yet-- postpone the message (stupidly)
-	    CkArrayManagerDeliver(CkMyPe(),msg); 
+	    if (CkInRestarting()) {
+	      // during restarting, this message should be ignored
+	      delete msg;
+	    }
+	    else {
+	      CkArrayManagerDeliver(CkMyPe(),msg); 
+            }
 	  }
 	  else { // Has a manager-- must buffer the message
 	    DEBC((AA"Adding buffer for unknown element %s\n"AB,idx2str(idx)));
@@ -1736,8 +1745,10 @@ void CkLocMgr::insertRec(CkLocRec *rec,const CkArrayIndex &idx) {
 		DEBC((AA"  replaces old rec(%s) for %s\n"AB,rec2str[old->type()],idx2str(idx)));
 		//There was an old element at this location
 		if (old->type()==CkLocRec::local && rec->type()==CkLocRec::local) {
+		    if (!CkInRestarting()) {    // ok if it is restarting
 			CkPrintf("ERROR! Duplicate array index: %s\n",idx2str(idx));
 			CkAbort("Duplicate array index used");
+		    }
 		}
 		old->beenReplaced();
 		delete old;
