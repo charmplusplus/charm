@@ -16,7 +16,7 @@
 #define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
 #define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 1
 
-#define CMK_GETPAGESIZE_AVAILABLE                          0
+#define CMK_GETPAGESIZE_AVAILABLE                          1
 
 #define CMK_IS_HETERO                                      1
 
@@ -35,7 +35,7 @@
 
 #define CMK_SHARED_VARS_EXEMPLAR                           0
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
-#define CMK_SHARED_VARS_SUN_THREADS                            0
+#define CMK_SHARED_VARS_SUN_THREADS                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
 #define CMK_SIGNAL_NOT_NEEDED                              0
@@ -47,9 +47,9 @@
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 #define CMK_THREADS_COPY_STACK                             0
 
-#define CMK_TIMER_USE_GETRUSAGE                            0
+#define CMK_TIMER_USE_GETRUSAGE                            1
 #define CMK_TIMER_USE_SPECIAL                              0
-#define CMK_TIMER_USE_TIMES                                1
+#define CMK_TIMER_USE_TIMES                                0
 
 #define CMK_TYPEDEF_INT2 short
 #define CMK_TYPEDEF_INT4 int
@@ -71,7 +71,7 @@
 #define CMK_LBDB_OFF					   0
 
 #define CMK_DEBUG_MODE                                     0
-#define CMK_WEB_MODE                                       1  
+#define CMK_WEB_MODE                                       0  
 
 #include "conv-mach-opt.h"
 
