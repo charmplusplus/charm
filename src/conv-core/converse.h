@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-07-19 22:18:54  jyelon
+ * Revision 2.10  1995-09-07 21:14:15  jyelon
+ * Added prefix to Cpv and Csv macros, then fixed bugs thereby revealed.
+ *
+ * Revision 2.9  1995/07/19  22:18:54  jyelon
  * *** empty log message ***
  *
  * Revision 2.8  1995/07/11  18:10:26  jyelon
@@ -48,26 +51,30 @@ extern "C" {
 
 #if defined(__cplusplus)||defined(__STDC__)
 #define CMK_PROTO(x) x
+#define CMK_CONCAT(x,y) x##y
 #else
 #define CMK_PROTO(x) ()
+#define CMK_QUOTE(x) x
+#define CMK_CONCAT(x,y) CMK_QUOTE(x)y
 #endif
+
 
 /******** MACROS AND PROTOTYPES FOR CPV AND CSV *******/
 
 #ifdef CMK_NO_SHARED_VARS_AT_ALL
 
 #define SHARED_DECL
-#define CpvDeclare(t,v) t v
-#define CpvExtern(t,v)  extern t v
-#define CpvStaticDeclare(t,v) static t v
+#define CpvDeclare(t,v) t CMK_CONCAT(Cpv_Var_,v)
+#define CpvExtern(t,v)  extern t CMK_CONCAT(Cpv_Var_,v)
+#define CpvStaticDeclare(t,v) static t CMK_CONCAT(Cpv_Var_,v)
 #define CpvInitialize(t,v) 
-#define CpvAccess(v) v
+#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)
 
-#define CsvDeclare(t,v) t v
-#define CsvStaticDeclare(t,v) static t v
+#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
+#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
 #define CsvInitialize(t,v) 
-#define CsvExtern(t,v) extern t v
-#define CsvAccess(v) v
+#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
+#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
 #define CmiMyRank() 0
 #define CmiNodeBarrier()
@@ -81,17 +88,17 @@ extern "C" {
 #include <memory.h>
 
 #define SHARED_DECL node_private
-#define CpvDeclare(t,v) thread_private t v
-#define CpvExtern(t,v)  extern thread_private t v
-#define CpvStaticDeclare(t,v) static thread_private t v
+#define CpvDeclare(t,v) thread_private t CMK_CONCAT(Cpv_Var_,v)
+#define CpvExtern(t,v)  extern thread_private t CMK_CONCAT(Cpv_Var_,v)
+#define CpvStaticDeclare(t,v) static thread_private t CMK_CONCAT(Cpv_Var_,v)
 #define CpvInitialize(t,v)
-#define CpvAccess(v) v
+#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)
 
-#define CsvDeclare(t,v) node_private t v
-#define CsvStaticDeclare(t,v) static node_private t v
-#define CsvExtern(t,v) extern node_private t v
+#define CsvDeclare(t,v) node_private t CMK_CONCAT(Csv_Var_,v)
+#define CsvStaticDeclare(t,v) static node_private t CMK_CONCAT(Csv_Var_,v)
+#define CsvExtern(t,v) extern node_private t CMK_CONCAT(Csv_Var_,v)
 #define CsvInitialize(t,v)
-#define CsvAccess(v) v
+#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
 #endif
 
@@ -105,17 +112,17 @@ extern int Cmi_numpe;
 #define CmiNumPe() Cmi_numpe
 
 #define SHARED_DECL
-#define CpvDeclare(t,v) t* v
-#define CpvExtern(t,v)  extern t* v
-#define CpvStaticDeclare(t,v) static t* v
-#define CpvInitialize(t,v) if (Cmi_mype == 0) v = (t *) CmiAlloc(Cmi_numpe*sizeof(t)); else;
-#define CpvAccess(v) v[Cmi_mype]
+#define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvInitialize(t,v) if (Cmi_mype == 0) CMK_CONCAT(Cpv_Var_,v) = (t *) CmiAlloc(Cmi_numpe*sizeof(t)); else;
+#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[Cmi_mype]
 
-#define CsvDeclare(t,v) t v
-#define CsvStaticDeclare(t,v) static t v
-#define CsvExtern(t,v) extern t v
+#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
+#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
+#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
 #define CsvInitialize(t,v)
-#define CsvAccess(v) v
+#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
 #define CmiMyRank() Cmi_mype
 #define CmiNodeBarrier()
@@ -163,7 +170,7 @@ int CmiNumPe CMK_PROTO((void));
 
 #ifdef CMK_CMIMYPE_IS_A_VARIABLE
 CpvExtern(int, Cmi_mype);
-CpvExtern(int ,Cmi_numpe);
+CpvExtern(int, Cmi_numpe);
 #define CmiMyPe() CpvAccess(Cmi_mype)
 #define CmiNumPe() CpvAccess(Cmi_numpe)
 #endif
