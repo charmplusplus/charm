@@ -1339,7 +1339,7 @@ static ampiParent *getAmpiParent(void) {
 }
 
 ampi *getAmpiInstance(MPI_Comm comm) {
-  ampi *ptr=getAmpiInstance(comm);
+  ampi *ptr=getAmpiParent()->comm2ampi(comm);
 #ifndef CMK_OPTIMIZE
   if (ptr==NULL) CkAbort("AMPI's getAmpiInstance> null pointer\n");
 #endif
