@@ -1,4 +1,1 @@
 #S.no.	#date		#by	#description
-1 fixed	02/20/00	olawlor	Array Broadcast not implemented
-2	02/20/00	olawlor	Array reductions require an element per PE
-
