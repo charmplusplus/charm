@@ -1,0 +1,16 @@
+mainmodule hello {
+  readonly CProxy_Main mainProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void done(void);
+  };
+  chare Other {
+    entry Other(void);
+  };
+
+  group Hello {
+    entry Hello(void);
+    entry void SayHi(int hiNo);
+  };        	
+};
