@@ -17,8 +17,10 @@ Developed by Sameer Kumar
 #include "machine.h"
 #include "pcqueue.h"
 
-#define MAX_QLEN 2000
+#define MAX_QLEN 1000
 #define MAX_BYTES 10000000
+
+#define USE_SHM 1
 
 /*
   To reduce the buffer used in broadcast and distribute the load from 
@@ -43,7 +45,7 @@ ELAN_BASE     *elan_base;
 ELAN_TPORT    *elan_port;
 ELAN_QUEUE    *elan_q;
 
-const int SMALL_MESSAGE_SIZE=8192;  /* Smallest message size queue 
+const int SMALL_MESSAGE_SIZE=16384;  /* Smallest message size queue 
                                        used for receiving short messages */
                                      
 const int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages 
@@ -58,21 +60,28 @@ const int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages
 #define NON_BLOCKING_MSG  16     /* Message sizes greater 
                                     than this will be sent asynchronously*/
 #define RECV_MSG_Q_SIZE 8
-#define MID_MSG_Q_SIZE  8
+#define MID_MSG_Q_SIZE  4
 
 ELAN_EVENT *esmall[RECV_MSG_Q_SIZE], *emid[MID_MSG_Q_SIZE], *elarge;
 
 #define TAG_SMALL 0x1
-#define TAG_LARGE_HEADER 0x3     /* Header that a large message is coming
-                                    Not implemented yet */
+#define TAG_LARGE_HEADER 0x3     /* Header that a large message is coming*/
+#define TAG_GET_BASED_SEND 0x5     /* Header that a large message is coming
+                                    as a get request*/
 #define TAG_MID   0x10
 #define TAG_LARGE 0x100
 
-int _Cmi_numpes;
+/*Release sent messages status to check for*/
+#define BASIC_SEND 0
+#define GET_BASED_SEND 1
+#define RECEIVE_GET   2
+#define GET_FINISHED_RECEIVE 3
+
 int               _Cmi_mynode;    /* Which address space am I */
 int               _Cmi_mynodesize;/* Number of processors in my address space */
 int               _Cmi_numnodes;  /* Total number of address spaces */
 int               _Cmi_numpes;    /* Total number of processors */
+
 static int        Cmi_nodestart; /* First processor in this address space */ 
 CpvDeclare(void*, CmiLocalQueue);
 
@@ -94,13 +103,29 @@ int blockingReceiveFlag = 0;
 
 static void ConverseRunPE(int everReturn);
 
+typedef struct {
+    char header[CmiMsgHeaderSizeBytes];
+    int size;
+    char* src_addr;
+    char* flag_addr;
+} GetHeader;
+
 typedef struct msg_list {
-  ELAN_EVENT *e;
-  char *msg;
-  struct msg_list *next;
-  int size, destpe;
-  int sent;
+    ELAN_EVENT *e;
+    char *msg;
+    struct msg_list *next;
+    int size, destpe;
+    int sent;
+    
+    //Fields for get based send
+    int status;
+    long done;
+    long *flag_addr;
+    char *gmsg;
+    char *newmsg;       
+    int is_broadcast;
 } SMSG_LIST;
+
 
 static int Cmi_dim;
 
@@ -117,7 +142,11 @@ void CmiSyncSendPersistent(int destPE, int size, char *msg,
                            PersistentHandle h);
 
 void ElanSendQueuedMessages();
-static void CmiReleaseSentMessages();
+static int CmiReleaseSentMessages();
+
+void ElanGetBasedSend(SMSG_LIST *ptr);
+void handleGetHeader(char *msg, int src);
+void processGetEnv(SMSG_LIST *ptr);
 
 #if NODE_0_IS_CONVHOST
 int inside_comm = 0;
@@ -141,7 +170,6 @@ void SendSpanningChildren(int size, char *msg);
 #define DYNAMIC_MESSAGE 0
 #define STATIC_MESSAGE 1
 #define ELAN_MESSAGE 3
-
 
 static void PerrorExit(const char *msg)
 {
@@ -280,24 +308,29 @@ int CmiRankOf(int pe)      { return pe%_Cmi_mynodesize; }
 
 int CmiAllAsyncMsgsSent(void)
 {
-   SMSG_LIST *msg_tmp = sent_msgs;
+   SMSG_LIST *msg_tmp = NULL; 
 
    int done;
    
    CmiReleaseSentMessages();
 
-   while((msg_tmp!=0) && (msg_tmp->e != NULL)){
-    done = 0;
+   msg_tmp = sent_msgs;
+   while((msg_tmp != cur_unsent) && (msg_tmp->e != NULL)){
+       done = 0;
     
-    if(elan_tportTxDone(msg_tmp->e))
-        done = 1;
-    else 
-        elan_deviceCheck(elan_base->state);
+       if(elan_tportTxDone(msg_tmp->e))
+           done = 1;
+       else
+#if USE_SHM 
+           elan_deviceCheck(elan_base->state);
+#else 
+       ;
+#endif
 
-    if(!done)
-      return 0;
-    msg_tmp = msg_tmp->next;
-    //    MsgQueueLen--;
+       if(!done)
+           return 0;
+       msg_tmp = msg_tmp->next;
+       //    MsgQueueLen--;
    }
    return 1;
 }
@@ -317,7 +350,11 @@ int CmiAsyncMsgSent(CmiCommHandle c) {
     if(elan_tportTxDone(msg_tmp->e))
         done = 1;
     else 
-        elan_deviceCheck(elan_base->state);
+#if USE_SHM 
+           elan_deviceCheck(elan_base->state);
+#else 
+       ;
+#endif
     
     return ((done)?1:0);
   } else {
@@ -332,7 +369,7 @@ void CmiReleaseCommHandle(CmiCommHandle c)
 
 void release_pmsg_list();
 
-static void CmiReleaseSentMessages(void)
+static int CmiReleaseSentMessages(void)
 {
     SMSG_LIST *msg_tmp=sent_msgs;
     SMSG_LIST *prev=0;
@@ -348,12 +385,22 @@ static void CmiReleaseSentMessages(void)
       if(msg_tmp->sent) {
           done =0;
           
-          if(elan_tportTxDone(msg_tmp->e)) {
-              elan_tportTxWait(msg_tmp->e);
-              done = 1;
+          if(msg_tmp->status == BASIC_SEND) {
+              if(elan_tportTxDone(msg_tmp->e)) {
+                  elan_tportTxWait(msg_tmp->e);
+                  done = 1;
+              }          
+              else 
+#if USE_SHM 
+           elan_deviceCheck(elan_base->state);
+#else 
+       ;
+#endif
           }
-          else 
-              elan_deviceCheck(elan_base->state);
+          else {
+              processGetEnv(msg_tmp);
+              done = msg_tmp->done;
+          }              
           
           if(done) {
               MsgQueueLen--;
@@ -382,6 +429,9 @@ static void CmiReleaseSentMessages(void)
       }
   }
   
+  //if(msg_tmp)
+  //  elan_deviceCheck(elan_base->state);
+
   end_sent = prev;
 
 #if CMK_PERSISTENT_COMM
@@ -397,6 +447,13 @@ static void CmiReleaseSentMessages(void)
   }
 #endif
 #endif
+
+  //So messages not finished sending
+  if(msg_tmp != cur_unsent)
+      return 0;
+  else
+      //All messages sent
+      return 1;
 }
 
 /* retflag = 0, receive as many messages as can be 
@@ -454,6 +511,7 @@ int PumpMsgs(int retflag)
     int recd=0;
     int size= 0;
     int tag=0;
+    int src=-1;
     
 #ifndef CMK_OPTIMIZE 
     double pmp_start_time = CmiWallTimer();
@@ -506,6 +564,7 @@ int PumpMsgs(int retflag)
         }
     
         if(!step1 && elan_tportRxDone(elarge)) {
+            //elan_deviceCheck(elan_base->state);                            
             elan_tportRxWait(elarge, NULL, NULL, &size );
       
             lbuf = (char *) CmiAlloc(size);
@@ -515,6 +574,7 @@ int PumpMsgs(int retflag)
         }
         
         if(step1 && elan_tportRxDone(elarge)) {
+            //elan_deviceCheck(elan_base->state);
             elan_tportRxWait(elarge, NULL, NULL, &size);
             
             msg = lbuf;
@@ -536,6 +596,7 @@ int PumpMsgs(int retflag)
         for(mcount = 0; mcount < MID_MSG_Q_SIZE; mcount ++){
             emcount = (mcount + event_m_idx) % MID_MSG_Q_SIZE;
             if(elan_tportRxDone(emid[emcount])) {
+                //elan_deviceCheck(elan_base->state);
                 elan_tportRxWait(emid[emcount], NULL, NULL, &size);
                 
                 msg = mbuf[emcount];
@@ -554,7 +615,11 @@ int PumpMsgs(int retflag)
                     nlarge_torecv --;
             }
             else {
+#if USE_SHM 
                 elan_deviceCheck(elan_base->state);
+#else 
+                ;
+#endif
                 emcount = (emcount + MID_MSG_Q_SIZE - 1) % MID_MSG_Q_SIZE;
                 break;
             }
@@ -566,7 +631,8 @@ int PumpMsgs(int retflag)
             ecount = (rcount + event_idx) % RECV_MSG_Q_SIZE;
             if(elan_tportRxDone(esmall[ecount]) || 
                (retflag == 3 && nlarge_torecv == 0 && !flg)) {
-                elan_tportRxWait(esmall[ecount], NULL, &tag, &size );
+                //elan_deviceCheck(elan_base->state);
+                elan_tportRxWait(esmall[ecount], &src, &tag, &size );
                 
                 msg = sbuf[ecount];
                 sbuf[ecount] = NULL;
@@ -586,12 +652,19 @@ int PumpMsgs(int retflag)
                     nlarge_torecv ++;
                     CmiFree(msg);
                 }
+                else if(tag == TAG_GET_BASED_SEND) {
+                    handleGetHeader(msg, src);
+                }                    
 
                 if(retflag == 3)
                     retflag = 1;
             }
             else {
+#if USE_SHM 
                 elan_deviceCheck(elan_base->state);
+#else 
+                ;
+#endif
                 ecount = (ecount + RECV_MSG_Q_SIZE - 1) % RECV_MSG_Q_SIZE;
                 break;
             }
@@ -606,6 +679,7 @@ int PumpMsgs(int retflag)
         if(!flg) {
 #ifndef CMK_OPTIMIZE 
 #if ! CMK_TRACE_IN_CHARM
+
             double pmp_end_time = CmiWallTimer();
             if(pmp_end_time > pmp_start_time + 50/1e6)
                 traceUserBracketEvent(10, pmp_start_time, pmp_end_time);
@@ -655,25 +729,29 @@ void remote_put_wait_all(){
 /********************* MESSAGE RECEIVE FUNCTIONS ******************/
 void *CmiGetNonLocal(void)
 {
-    CmiState cs = CmiGetState();
-    void *msg = NULL;
+    register CmiState cs = CmiGetState();
+    register void *msg = NULL;
     CmiIdleLock_checkMessage(&cs->idle);
+    
     msg =  PCQueuePop(cs->recv); 
     
-    if(!msg) {
-        CmiReleaseSentMessages();
-        ElanSendQueuedMessages();
-        if (PumpMsgs(1))  // PumpMsgs(0)
-            return  PCQueuePop(cs->recv);
-        else
-            return 0;
+    if(msg) {
+        return msg;
     }
+
+    //get new messages and flush receive buffers
+    PumpMsgs(1);           // PumpMsgs(0)
+    //we are idle do more work
+    CmiReleaseSentMessages();
+    ElanSendQueuedMessages();
+
+    msg =  PCQueuePop(cs->recv); 
     return msg;
 }
 
 void CmiPing() {
     CmiReleaseSentMessages();
-    //PumpMsgs(0);
+    PumpMsgs(0);
     ElanSendQueuedMessages();
 }
 
@@ -731,17 +809,24 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
         CmiAsyncSendFn(destPE, size, dupmsg);
 }
 
-
 void ElanBasicSendFn(SMSG_LIST * ptr){
     int tag = 0, sync_mode = 0;
     int tiny_msg = 0;
+    
+    ptr->status = BASIC_SEND;
     
     if (ptr->size <= SMALL_MESSAGE_SIZE)
         tag = TAG_SMALL;
     else if (ptr->size < MID_MESSAGE_SIZE)
         tag = TAG_MID;
-    else
+    else {        
+        if(!ptr->is_broadcast) {
+            ElanGetBasedSend(ptr);
+            return;
+        }
+        
         tag = TAG_LARGE;
+    }
 
     if(ptr->size > SYNC_MESSAGE_SIZE)
         sync_mode = ELAN_TPORT_TXSYNC;
@@ -794,7 +879,8 @@ CmiCommHandle ElanSendFn(int destPE, int size, char *msg, int flag)
     msg_tmp->sent = 0;
     msg_tmp->e = NULL;
     msg_tmp->destpe = destPE;
-    
+    msg_tmp->is_broadcast = flag;
+
     if ((MsgQueueLen > request_max || MsgQueueBytes > request_bytes) 
         && (!flag)) {
         CmiReleaseSentMessages();
@@ -816,8 +902,9 @@ CmiCommHandle ElanSendFn(int destPE, int size, char *msg, int flag)
             cur_unsent = msg_tmp;
         
     }
-    else{
+    else{        
         ElanBasicSendFn(msg_tmp);
+
         if(sent_msgs==0)
             sent_msgs = msg_tmp;
         else
@@ -846,6 +933,110 @@ void ElanSendQueuedMessages() {
         cur_unsent = new_unsent;
     else
         cur_unsent = ptr;
+}
+
+void ElanGetBasedSend(SMSG_LIST *msg_tmp){
+    //CmiPrintf("using get based send\n");
+    GetHeader *gmsg = (GetHeader *) CmiAlloc(sizeof(GetHeader));
+
+    gmsg->src_addr = msg_tmp->msg;
+    gmsg->size = msg_tmp->size;
+    CMI_SET_BROADCAST_ROOT(gmsg, 0);
+    
+    msg_tmp->sent = 1;
+    msg_tmp->e = NULL;
+    msg_tmp->status = GET_BASED_SEND;
+    msg_tmp->done = 0;
+    
+    msg_tmp->gmsg = (char *)gmsg;
+    gmsg->flag_addr = (char *)&(msg_tmp->done);
+    
+    msg_tmp->e = elan_tportTxStart(elan_port, 0, msg_tmp->destpe, CmiMyPe(), 
+                                   TAG_GET_BASED_SEND, gmsg, sizeof(GetHeader));
+    
+    MsgQueueLen++;
+    MsgQueueBytes += msg_tmp->size;
+    
+    outstandingMsgs[msg_tmp->destpe] = 1;
+}
+
+void handleGetHeader(char *msg, int src){
+    GetHeader *gmsg = (GetHeader *) msg;
+
+    char *newmsg = CmiAlloc(gmsg->size);
+    
+    SMSG_LIST *msg_tmp = (SMSG_LIST *)CmiAlloc(sizeof(SMSG_LIST));
+    msg_tmp->msg = msg;
+    msg_tmp->next = 0;
+    msg_tmp->size = gmsg->size;
+    msg_tmp->sent = 1;
+    msg_tmp->destpe = src;
+    msg_tmp->status = RECEIVE_GET;
+    msg_tmp->done = 0;
+    msg_tmp->flag_addr = (long *)gmsg->flag_addr;
+    msg_tmp->newmsg = newmsg;
+    
+    msg_tmp->e = elan_get(elan_base->state, gmsg->src_addr, msg_tmp->newmsg, gmsg->size, src);
+    
+    if(sent_msgs==0) {
+        sent_msgs = msg_tmp;
+        end_sent = msg_tmp;
+    }
+    else {
+        msg_tmp->next = sent_msgs;
+        sent_msgs = msg_tmp;
+    }
+}
+
+long trueFlag = 1;
+void processGetEnv(SMSG_LIST *ptr){
+
+    if(ptr->status == BASIC_SEND)
+        return;
+
+    if(ptr->status == GET_BASED_SEND) {
+        if(ptr->gmsg != NULL) {
+            if(!elan_tportTxDone(ptr->e)) {
+#if USE_SHM 
+                elan_deviceCheck(elan_base->state);
+#else 
+                ;
+#endif
+                return;                    
+            } 
+            
+            elan_tportTxWait(ptr->e);
+            CmiFree(ptr->gmsg);
+            ptr->gmsg =  NULL;
+        }
+        
+        return;
+    }        
+
+    //RECEIVE_GET or FINISHED_RECEIVE, a get or a put poll in either case
+    int flag = elan_poll(ptr->e, ELAN_POLL_EVENT);
+
+    if(!flag)
+        return;
+    
+    if(ptr->status == RECEIVE_GET){
+        ptr->e = elan_put(elan_base->state, &trueFlag, ptr->flag_addr,
+                          sizeof(long), ptr->destpe);
+        ptr->status = GET_FINISHED_RECEIVE;
+        CmiPushPE(0, ptr->newmsg);
+        
+        /*
+          #if CMK_BROADCAST_SPANNING_TREE
+          if (CMI_BROADCAST_ROOT(ptr->newmsg))
+          SendSpanningChildren(ptr->size, ptr->newmsg);
+          #endif
+        */
+        
+        return;
+    }
+    
+    if (ptr->status == GET_FINISHED_RECEIVE)
+        ptr->done = 1;
 }
 
 CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg){
@@ -938,7 +1129,7 @@ void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
 {
   CmiState cs = CmiGetState();
 #if CMK_BROADCAST_SPANNING_TREE
-  CMI_SET_BROADCAST_ROOT(msg, _Cmi_mype+1);
+  CMI_SET_BROADCAST_ROOT(msg, CmiMyPe() + 1);
   SendSpanningChildren(size, msg);
 #else
   int i ;
@@ -1010,26 +1201,26 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 }
 
 void ConverseExit(void)
-{
-  while(!CmiAllAsyncMsgsSent() || cur_unsent ) {
-    PumpMsgs(0);
-    ElanSendQueuedMessages();
-    CmiReleaseSentMessages();
-  }
-
-  elan_gsync(elan_base->allGroup); 
-
-  // register elan events before trace module destoried
-  registerElanEvents();
-
-  ConverseCommonExit();
-
+{  
+    while(!CmiAllAsyncMsgsSent() || cur_unsent) {
+        PumpMsgs(0);
+        ElanSendQueuedMessages();
+        CmiReleaseSentMessages();
+    }   
+    
+    elan_gsync(elan_base->allGroup); 
+    
+    // register elan events before trace module destoried
+    registerElanEvents();
+    
+    ConverseCommonExit();
+    
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
-  if (CmiMyPe() == 0){
-    CmiPrintf("End of program\n");
-  }
+    if (CmiMyPe() == 0){
+        CmiPrintf("End of program\n");
+    }
 #endif
-  exit(0);
+    exit(0);
 }
 
 static char     **Cmi_argv;
@@ -1089,7 +1280,13 @@ static void ConverseRunPE(int everReturn)
 }
 
 void elan_barrier(){
-  elan_gsync(elan_base->allGroup);
+    
+    while(!CmiReleaseSentMessages() || cur_unsent) {
+        PumpMsgs(0);
+        ElanSendQueuedMessages();
+    }   
+    
+    elan_gsync(elan_base->allGroup);
 }
 
 void *elan_CmiAlloc(int size){
@@ -1171,6 +1368,29 @@ void elan_CmiStaticFree(void *res){
     free_nomigrate(buf);
 }
 
+/*
+//Called from the application for messages allocated in the NIC
+void *elan_CmiAllocElan(int size){
+    char *res = NULL;
+    char *buf = NULL;
+
+    void *elan_addr = elan_allocElan(elan_base->state, 8, len+ 4*sizeof(int));
+    if(elan_addr == 0)
+        CmiPrintf("ELAN ALLOC FAILED\n");
+    
+    elan_buf = (char*)elan_elan2main(elan_base->state, elan_sdram2elan
+                                     (elan_base->state, elan_addr));            
+
+    TYPE_FIELD(buf) = ELAN_MESSAGE;
+    SIZE_FIELD(buf) = size + 4 * sizeof(int);
+    CONV_SIZE_FIELD(buf) = size;
+    REF_FIELD(buf) = 0;    
+
+    res = buf + 4 *sizeof(int);
+    return res;
+}
+*/
+
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   int n,i ;
@@ -1182,14 +1402,18 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
 #endif
 
+#if USE_SHM 
   putenv("LIBELAN_SHM_ENABLE=1");
+#else
+  putenv("LIBELAN_SHM_ENABLE=0");
+#endif
 
   localSmallBufferQueue = PCQueueCreate();
   localMidBufferQueue = PCQueueCreate();
 
   if (!(elan_base = elan_baseInit())) {
-    perror("Failed elan_baseInit()");
-    exit(1);
+      perror("Failed elan_baseInit()");
+      exit(1);
   }
 
   elan_gsync(elan_base->allGroup);
@@ -1297,9 +1521,9 @@ CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
 }
 
 extern void CmiReference(void *blk);
-
-#define ELAN_BUF_SIZE 4096
-#define USE_NIC_MULTICAST 0
+#if 1
+#define ELAN_BUF_SIZE MID_MESSAGE_SIZE
+#define USE_NIC_MULTICAST 1
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {  
     static int ppn = 0;
@@ -1308,7 +1532,7 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
     int rflag;
     int i;
 
-    if(ppn == 0) {
+    if(ppn == 0) {        
         int rms_nodes = 1;
         int rms_procs = 1;
         if(getenv("RMS_NODES"))
@@ -1320,42 +1544,49 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
         ppn = rms_procs/rms_nodes;
         if(ppn == 0)
             ppn = 4;
+
+	//ppn = 1;
         //CmiPrintf("CmiListSyncSendAndFree PPN=%d\n", ppn);
     }    
 
+    for(i=0;i<npes;i++) 
+        if(pes[i] == CmiMyPe()) {
+            CmiSyncSend(pes[i], len, msg); 
+        }
+
+    int nremote = 0;
     msg_start = USER_BUF_START(msg);
     rflag = REF_FIELD(msg_start); 
 
-    if(rflag != 1) {   
-        //Is being referenced by the application dont mess around
-        for(i=0;i<npes;i++)
-            CmiSyncSend(pes[i], len, msg);                        
-        return;
-    }
-
     for(i=0;i<npes;i++) {
         if(pes[i] != CmiMyPe()) {
-            CmiReference(msg);   
-            if(pes[i]/ppn == CmiMyPe()/ppn) 
+            if(pes[i]/ppn == CmiMyPe()/ppn) {
+                CmiReference(msg);               
                 //dest in my node, send right away
-                CmiSyncSendAndFree(pes[i], len, msg);            
-        }              
-        else  //Local message copy and send
-            CmiSyncSend(pes[i], len, msg);        
+                CmiSyncSendAndFree(pes[i], len, msg);  
+            }
+            else
+                nremote++;
+        } 
     }
-
-    CmiFree(msg);
+    
+    if(nremote == 0) {
+        CmiFree(msg);
+        return;
+    }
+    
+    REF_FIELD(msg_start) += nremote - 1;
 
 #if USE_NIC_MULTICAST   
     //ULTIMATE HACK FOR PERFORMANCE, CLEAN UP LATER   
-    if(len < ELAN_BUF_SIZE) {
+    if(len > 2048) {
         //Attempt to speedup Namd multicast, copy the message to local
         //elan memory and then send it several times from there. Should
         //improve performance as bandwidth is increased due to lower DMA
         //contention.
         
-        void *elan_addr = elan_allocElan(elan_base->state, 8, ELAN_BUF_SIZE 
-                                         + 4*sizeof(int));
+        void *elan_addr = elan_allocElan(elan_base->state, 8, len+4*sizeof(int));
+
         if(elan_addr == 0)
             CmiPrintf("ELAN ALLOC FAILED\n");
         
@@ -1364,43 +1595,64 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
                                          (elan_base->state, 
                                           elan_addr));            
         
+        int old_size_field = SIZE_FIELD(msg_start);
+        int old_conv_size_field = CONV_SIZE_FIELD(msg_start);
+        int old_ref_field = REF_FIELD(msg_start);
+
         TYPE_FIELD(msg_start) = ELAN_MESSAGE;
-        SIZE_FIELD(msg_start) = ELAN_BUF_SIZE + 4*sizeof(int);
-        CONV_SIZE_FIELD(msg_start) = ELAN_BUF_SIZE;
+        SIZE_FIELD(msg_start) = len + 4*sizeof(int);
+        CONV_SIZE_FIELD(msg_start) = len;
+        REF_FIELD(msg_start) = nremote; 
         
-        elan_wait(elan_put(elan_base->state, msg_start, elan_buf,
+        elan_wait(elan_get(elan_base->state, msg_start, elan_buf,
                            len + 4*sizeof(int), CmiMyPe()), ELAN_WAIT_EVENT);
         //memcpy(elan_buf, msg_start, len+ 4*sizeof(int));
         
+        REF_FIELD(msg_start) = old_ref_field; 
         TYPE_FIELD(msg_start) = DYNAMIC_MESSAGE;
-        SIZE_FIELD(msg_start) = len + 4 *sizeof(int);
-        CONV_SIZE_FIELD(msg_start) = len;
-        REF_FIELD(msg_start) = 1;
-        
-        //Actually free the message
-        CmiFree(msg);
+        SIZE_FIELD(msg_start) = old_size_field ;
+        CONV_SIZE_FIELD(msg_start) = old_conv_size_field;
+                
+        //Actually free the message        
+        for(i=0;i<npes;i++)
+            if(pes[i] != CmiMyPe() && pes[i]/ppn != CmiMyPe()/ppn)
+                CmiFree(msg);                
 
         msg = elan_buf + 4*sizeof(int);
     }
 #endif  
-
     /*
-      #if CMK_PERSISTENT_COMM
-      if (phs) {
-      CmiAssert(phsSize == npes);
-      for(i=0;i<npes;i++) 
-      CmiSyncSendPersistent(pes[i], len, msg, phs[i]);
-      }
-      else 
-      #endif
+#if CMK_PERSISTENT_COMM
+    if (phs) {
+        CmiAssert(phsSize == npes);
+        for(i=0;i<npes;i++) 
+            CmiSyncSendPersistent(pes[i], len, msg, phs[i]);
+        return;
+    }
+#endif
     */
-        
-    for(i=0;i<npes;i++)
-        if(pes[i] != CmiMyPe() && pes[i]/ppn != CmiMyPe()/ppn)
+
+    for(i=0;i<npes;i++) {
+        if(pes[i] != CmiMyPe() && pes[i]/ppn != CmiMyPe()/ppn) {
             //dest not in my node
             CmiSyncSendAndFree(pes[i], len, msg);        
+            //if(len > SMALL_MESSAGE_SIZE)
+            //  elan_barrier();                
+        }        
+    }
 }
+#endif
 
+#if 0
+void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
+{
+    int i;
+    for(i=0;i<npes;i++) {
+        CmiSyncSend(pes[i], len, msg);
+    }
+    CmiFree(msg);
+}
+#endif 
 
 #if CMK_PERSISTENT_COMM
 #include "persistent.c"

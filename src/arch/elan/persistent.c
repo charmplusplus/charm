@@ -178,7 +178,10 @@ void persistentRequestHandler(void *env)
 
   PersistentHandle h = getFreeRecvSlot();
   PersistentReceivesTable *slot = (PersistentReceivesTable *)h;
-  slot->messagePtr = elan_CmiStaticAlloc(msg->maxBytes);
+  //slot->messagePtr = elan_CmiStaticAlloc(msg->maxBytes);
+
+  slot->messagePtr = CmiAlloc(msg->maxBytes);
+
   _MEMCHECK(slot->messagePtr);
   slot->sizeMax = msg->maxBytes;
 
@@ -328,6 +331,8 @@ void release_pmsg_list()
   end_pending_persistent_msgs = prev;
 }
 
+extern void CmiReference(void *blk);
+
 /* called in PumpMsgs */
 void PumpPersistent()
 {
@@ -346,8 +351,11 @@ void PumpPersistent()
       _MEMCHECK(dupmsg);
       memcpy(dupmsg, msg, size);
       msg = dupmsg;
-#endif
+#else
       //CmiPrintf("[%d] %p size:%d rank:%d root:%d\n", CmiMyPe(), msg, size, CMI_DEST_RANK(msg), CMI_BROADCAST_ROOT(msg));
+
+      CmiReference(msg);
+#endif
 
       CmiPushPE(CMI_DEST_RANK(msg), msg);
 #if CMK_BROADCAST_SPANNING_TREE
@@ -385,7 +393,9 @@ void persistentDestoryHandler(void *env)
   else
     persistentReceivesTableTail = slot->prev;
 
-  if (slot->messagePtr) elan_CmiStaticFree(slot->messagePtr);
+  if (slot->messagePtr) //elan_CmiStaticFree(slot->messagePtr);
+      CmiFree(slot->messagePtr);
+
   CmiFree(slot);
 }
 
