@@ -147,7 +147,7 @@ void LV3D_Array::pup(PUP::er &p) {
 }
 	
 LV3D_Array::~LV3D_Array() {
-	delete[] impl;
+	delete impl;
 	impl=NULL;
 }
 	
