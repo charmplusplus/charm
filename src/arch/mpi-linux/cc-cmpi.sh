@@ -7,7 +7,6 @@ CMK_CF90="cmpifc -ifc "
 CMK_LD="cmpicc -icc "
 CMK_LDXX="cmpicc -icc "
 CMK_LIBS="-lckqt -lcmpi "
-CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_F90LIBS='-lifcore  '
 CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=
