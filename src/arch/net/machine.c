@@ -1843,14 +1843,16 @@ static void ConverseRunPE(int everReturn)
     CmiPrintf("Charm++: scheduler running in netpoll mode.\n");
   
 #ifndef _WIN32
-  if (nicelevel != -100)  {
+  /* call setpriority once on each process to set process's priority */
+  /* put it here instead of earlier because only now one can do CmiPrintf */
+  if (CmiMyRank() == 0 && nicelevel != -100)  {
     if (0!=setpriority(PRIO_PROCESS, 0, nicelevel))  {
       CmiPrintf("[%d] setpriority failed with value %d. \n", CmiMyPe(), nicelevel);
       perror("setpriority");
       CmiAbort("setpriority failed.");
     }
     else
-      CmiPrintf("[%d] setpriority %d\n", CmiMyPe(), nicelevel);
+      CmiPrintf("[%d] Charm++: setpriority %d\n", CmiMyPe(), nicelevel);
   }
 #endif
 
