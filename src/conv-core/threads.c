@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.27  1997-01-17 19:20:48  milind
+ * Revision 1.28  1997-03-19 05:36:50  jyelon
+ * Made some corrections to the ALLOCA version --- trying to get IRIX working.
+ *
+ * Revision 1.27  1997/01/17 19:20:48  milind
  * Fixed static variable declarations bugs in JB_TWEAKING part.
  *
  * Revision 1.26  1997/01/17 15:49:08  jyelon
@@ -339,29 +342,6 @@ CthThread CthSelf()
   return CthCpvAccess(thread_current);
 }
 
-static void CthTransfer(t)
-CthThread t;
-{    
-  char *oldsp, *newsp;
-  /* Put the stack pointer in such a position such that   */
-  /* the longjmp moves the stack pointer down (this way,  */
-  /* the rs6000 doesn't complain about "longjmp to an     */
-  /* inactive stack frame"                                */
-  oldsp = (char *)alloca(0);
-  newsp = t->top;
-  CthCpvAccess(thread_current)->top = oldsp;
-  if (CthCpvAccess(thread_growsdown)) {
-    newsp -= SLACK;
-    alloca(oldsp - newsp);
-  } else {
-    newsp += SLACK;
-    alloca(newsp - oldsp);
-  }
-  CthCpvAccess(thread_current) = t;
-  CthCpvAccess(CthData) = t->data;
-  longjmp(t->jb, 1);
-}
-
 void CthFixData(t)
 CthThread t;
 {
@@ -385,6 +365,31 @@ CthThread t;
   CmiFree(t);
 }
 
+static void CthTransfer(f, t)
+CthThread f, t;
+{    
+  char *oldsp, *newsp;
+  /* Put the stack pointer in such a position such that   */
+  /* the longjmp moves the stack pointer down (this way,  */
+  /* the rs6000 doesn't complain about "longjmp to an     */
+  /* inactive stack frame"                                */
+  if (setjmp(f->jb)==0) {
+    oldsp = (char *)alloca(0);
+    newsp = t->top;
+    CthCpvAccess(thread_current)->top = oldsp;
+    if (CthCpvAccess(thread_growsdown)) {
+      newsp -= SLACK;
+      alloca(oldsp - newsp);
+    } else {
+      newsp += SLACK;
+      alloca(newsp - oldsp);
+    }
+    CthCpvAccess(thread_current) = t;
+    CthCpvAccess(CthData) = t->data;
+    longjmp(t->jb, 1);
+  }
+}
+
 void CthResume(t)
 CthThread t;
 {
@@ -392,10 +397,25 @@ CthThread t;
   CthThread tc = CthCpvAccess(thread_current);
   if (t == tc) return;
   CthFixData(t);
-  if (setjmp(tc->jb)==0)
-    CthTransfer(t);
-  if (CthCpvAccess(thread_exiting))
-    { CthFreeNow(CthCpvAccess(thread_exiting)); CthCpvAccess(thread_exiting)=0; }
+  CthTransfer(tc, t);
+  if (CthCpvAccess(thread_exiting)) {
+    CthFreeNow(CthCpvAccess(thread_exiting));
+    CthCpvAccess(thread_exiting)=0;
+  }
+}
+
+static void CthInitHold(CthThread f, CthThread t)
+{
+  if (setjmp(t->jb)==0)
+    longjmp(thread_current->jb, 1);
+}
+
+static void CthBeginThread(CthThread f, CthThread t)
+{
+  CthInitHold(f, t);
+  (CthCpvAccess(thread_current)->fn)(CthCpvAccess(thread_current)->arg);
+  CthCpvAccess(thread_exiting) = CthCpvAccess(thread_current);
+  CthSuspend();
 }
 
 CthThread CthCreate(fn, arg, size)
@@ -419,15 +439,11 @@ CthVoidFn fn; void *arg; int size;
   result->choosefn = 0;
   result->data = 0;
   result->datasize = 0;
-  alloca(offs);
-  if (setjmp(result->jb)) {
-    if (CthCpvAccess(thread_exiting))
-      { CthFreeNow(CthCpvAccess(thread_exiting)); CthCpvAccess(thread_exiting)=0; }
-    (CthCpvAccess(thread_current)->fn)(CthCpvAccess(thread_current)->arg);
-    CthCpvAccess(thread_exiting) = CthCpvAccess(thread_current);
-    CthSuspend();
+  if (setjmp(CthCpvAccess(thread_current)->jb)==0) {
+    alloca(offs);
+    CthBeginThread(CthCpvAccess(thread_current), result);
   }
-  else return result;
+  return result;
 }
 
 void CthFree(t)
