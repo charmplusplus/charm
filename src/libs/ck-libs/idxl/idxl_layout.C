@@ -65,23 +65,31 @@ inline void minOne(T* lhs, const T* rhs) { *lhs = (*lhs < *rhs) ? *lhs : *rhs; }
 // FIXME: figure out how to define this using templates, not macros.
 #define oneToFn(oneFn,gatherName) \
 template<class T> \
-void gatherName(byte *b_dest,const byte *src,const IDXL_Layout *srcLayout) { \
+void gatherName(T *dest,const byte *src,const IDXL_Layout *srcLayout) { \
 	src+=srcLayout->offset; \
 	int skew=srcLayout->skew; \
-	T *dest=(T *)b_dest; \
 	int i=0, width=srcLayout->width; \
 	for (i=0;i<width;i++) { \
 		oneFn(dest,(const T *)src); \
 		dest++; \
 		src+=skew; \
 	} \
-}
+} \
+/*Instantiate templates: */ \
+template void gatherName(byte *dest,const byte *src,const IDXL_Layout *srcLayout); \
+template void gatherName(int *dest,const byte *src,const IDXL_Layout *srcLayout); \
+template void gatherName(float *dest,const byte *src,const IDXL_Layout *srcLayout); \
+template void gatherName(double *dest,const byte *src,const IDXL_Layout *srcLayout);
 
 oneToFn(sumOne,sumFn)
 oneToFn(prodOne,prodFn)
 oneToFn(maxOne,maxFn)
 oneToFn(minOne,minFn)
 
+typedef void (*byteCombineFn)(byte *dest,const byte *src,const IDXL_Layout *srcLayout);
+typedef void (*intCombineFn)(int *dest,const byte *src,const IDXL_Layout *srcLayout);
+typedef void (*floatCombineFn)(float *dest,const byte *src,const IDXL_Layout *srcLayout);
+typedef void (*doubleCombineFn)(double *dest,const byte *src,const IDXL_Layout *srcLayout);
 
 template<class T>
 void assignFn(int len,T *dest,T val) {
@@ -133,18 +141,10 @@ void reduction_initialize(const IDXL_Layout& dt, void *lhs, int op,const char *c
 // returns it as a function pointer.
 #define idxl_type_return(type,fn) \
       switch(type) {\
-        case IDXL_BYTE : return fn<byte>;\
-        case IDXL_INT : return fn<int>;\
-        case IDXL_REAL : return fn<float>;\
-        case IDXL_DOUBLE : return fn<double>;\
-      }
-
-#define idxl_type_call(type,fn,args) \
-      switch(type) {\
-        case IDXL_BYTE : fn<byte> args;\
-        case IDXL_INT : fn<int> args;\
-        case IDXL_REAL : fn<float> args;\
-        case IDXL_DOUBLE : fn<double> args;\
+        case IDXL_BYTE : return (reduction_combine_fn)(byteCombineFn)fn;\
+        case IDXL_INT : return (reduction_combine_fn)(intCombineFn)fn;\
+        case IDXL_REAL : return (reduction_combine_fn)(floatCombineFn)fn;\
+        case IDXL_DOUBLE : return (reduction_combine_fn)(doubleCombineFn)fn;\
       }
 
 reduction_combine_fn reduction_combine(const IDXL_Layout& dt, int op,const char *callingRoutine)
@@ -161,6 +161,19 @@ reduction_combine_fn reduction_combine(const IDXL_Layout& dt, int op,const char 
 }
 
 
+// Bizarre macro: call the appropriate version of fn for this IDXL type:
+#define idxl_type_call(type,fn,args) \
+      switch(type) {\
+        case IDXL_BYTE : fn args(byte);\
+        case IDXL_INT : fn args(int);\
+        case IDXL_REAL : fn args(float);\
+        case IDXL_DOUBLE : fn args(double);\
+      }
+
+// Even more bizarre macro: pass typecast arguments for typical scatter/gather 
+#define scatterGatherArgs(type) \
+	(v_user, nIndices,indices, IDXL_LAYOUT_CALL(*this), (type *)v_compressed)
+
 /************************* Gather ***********************
 "Gather" routines extract data distributed (nodeIdx)
 through the user's array (in) and collect it into a message (out).
@@ -170,9 +183,8 @@ through the user's array (in) and collect it into a message (out).
 //   get rid of the multiplies in the inner loop.
 template <class T>
 void gatherUserData(const void *user,int nIndices,const int *indices,
-		IDXL_LAYOUT_PARAM,void *v_compressed) 
+		IDXL_LAYOUT_PARAM,T *compressed) 
 {
-	T *compressed=(T *)v_compressed;
 	for (int r=0;r<nIndices;r++) {
 		int sr=indices[r];
 		for (int c=0;c<width;c++)
@@ -186,11 +198,9 @@ void gatherUserData(const void *user,int nIndices,const int *indices,
    * user data in v_in into the compressed data in v_out.
    */
 void IDXL_Layout::gather(int nIndices,const int *indices,
-		   const void *v_in,void *v_out) const
+		   const void *v_user,void *v_compressed) const
 {
-  idxl_type_call(this->type, gatherUserData, 
-  	(v_in, nIndices,indices, IDXL_LAYOUT_CALL(*this), v_out)
-  );
+  idxl_type_call(this->type, gatherUserData, scatterGatherArgs);
 }
 
 /************************ Scatter ************************
@@ -201,9 +211,8 @@ indices of the user array (out).
 
 template <class T>
 void scatterUserData(void *user,int nIndices,const int *indices,
-		IDXL_LAYOUT_PARAM,const void *v_compressed) 
+		IDXL_LAYOUT_PARAM,const T *compressed) 
 {
-	const T *compressed=(const T *)v_compressed;
 	for (int r=0;r<nIndices;r++) {
 		int sr=indices[r];
 		for (int c=0;c<width;c++)
@@ -217,11 +226,9 @@ void scatterUserData(void *user,int nIndices,const int *indices,
    * compressed data from v_in into the user data in v_out.
    */
 void IDXL_Layout::scatter(int nIndices,const int *indices,
-		   const void *v_in,void *v_out) const
+		   const void *v_compressed,void *v_user) const
 {
-  idxl_type_call(this->type, scatterUserData, 
-  	(v_out, nIndices,indices, IDXL_LAYOUT_CALL(*this), v_in)
-  );
+  idxl_type_call(this->type, scatterUserData, scatterGatherArgs);
 }
 
 
@@ -231,9 +238,8 @@ shared nodes distributed through the user's data (out).
  */
 template <class T>
 void scatterAddUserData(void *user,int nIndices,const int *indices,
-		IDXL_LAYOUT_PARAM,const void *v_compressed) 
+		IDXL_LAYOUT_PARAM,const T *compressed) 
 {
-	const T *compressed=(const T *)v_compressed;
 	for (int r=0;r<nIndices;r++) {
 		int sr=indices[r];
 		for (int c=0;c<width;c++)
@@ -247,11 +253,9 @@ void scatterAddUserData(void *user,int nIndices,const int *indices,
    * compressed data from v_in into the user data in v_out.
    */
 void IDXL_Layout::scatteradd(int nIndices,const int *indices,
-		   const void *v_in,void *v_out) const
+		   const void *v_compressed,void *v_user) const
 {
-  idxl_type_call(this->type, scatterAddUserData, 
-  	(v_out, nIndices,indices, IDXL_LAYOUT_CALL(*this), v_in)
-  );
+  idxl_type_call(this->type, scatterAddUserData, scatterGatherArgs);
 }
 
 
