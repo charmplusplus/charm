@@ -389,8 +389,15 @@ CDECL void FEM_Serial_read(int chunkNo,int nChunks) {
 	if (splitMesh==NULL) {
 		splitChunks=nChunks;
 		splitMesh=new int[splitChunks];
+		FEM_Mesh_deallocate(FEM_Mesh_default_write());
 	}
-	splitMesh[chunkNo]=FEM_Mesh_read("fem_mesh",chunkNo,splitChunks);
+	int readMesh=FEM_Mesh_read("fem_mesh",chunkNo,splitChunks);
+	int writeMesh=FEM_Mesh_copy(readMesh);
+	FEM_Mesh_become_set(writeMesh);
+	splitMesh[chunkNo]=writeMesh;
+	FEM_Mesh_deallocate(FEM_Mesh_default_read());
+	FEM_Mesh_set_default_read(readMesh);
+	FEM_Mesh_set_default_write(writeMesh);
 }
 FORTRAN_AS_C(FEM_SERIAL_READ,FEM_Serial_read,fem_serial_read, (int *c,int *n),(*c-1,*n))
 
@@ -399,6 +406,7 @@ CDECL void FEM_Serial_assemble(void) {
 	for (int i=0;i<splitChunks;i++)
 		FEM_Mesh_deallocate(splitMesh[i]);
 	FEM_Mesh_set_default_read(serialMesh);
+	FEM_Mesh_set_default_write(FEM_Mesh_allocate());
 }
 FORTRAN_AS_C(FEM_SERIAL_ASSEMBLE,FEM_Serial_assemble,fem_serial_assemble,(void),())
 
