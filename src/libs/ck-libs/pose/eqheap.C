@@ -4,6 +4,9 @@
 /// Insert event in heap
 void HeapNode::insert(Event *e)
 {
+#ifdef DETERMINISTIC_EVENTS
+  insertDeterministic(e);
+#else
   CmiAssert(this != NULL);
   CmiAssert(e->timestamp > this->e->timestamp);
   HeapNode *eh;
@@ -17,12 +20,12 @@ void HeapNode::insert(Event *e)
     right = eh;
     subheapsize += 1;
   }
-  else if (left->e->timestamp >= e->timestamp) { // make root of left subtree
+  else if (e->timestamp <= left->e->timestamp) { // make root of left subtree
     eh = new HeapNode(e, left->subheapsize+1, left, NULL);
     left = eh;
     subheapsize += 1;
   }
-  else if (right->e->timestamp >= e->timestamp) { // make root of right subtree
+  else if (e->timestamp <= right->e->timestamp) { // make root of right subtree
     eh = new HeapNode(e, right->subheapsize+1, right, NULL);
     right = eh;
     subheapsize += 1;
@@ -34,6 +37,47 @@ void HeapNode::insert(Event *e)
   else { // insert in right subtree
     subheapsize += 1;
     right->insert(e);
+  }
+#endif
+}
+
+/// Insert event in heap deterministically
+void HeapNode::insertDeterministic(Event *e)
+{
+  CmiAssert(this != NULL);
+  CmiAssert(e->timestamp >= this->e->timestamp);
+  HeapNode *eh;
+  if (left == NULL) {  // make it the left subheap
+    eh = new HeapNode(e, 1, NULL, NULL);
+    left = eh;
+    subheapsize += 1;
+  }
+  else if (right == NULL) {  // make it the right subheap
+    eh = new HeapNode(e, 1, NULL, NULL);
+    right = eh;
+    subheapsize += 1;
+  }
+  else if ((e->timestamp < left->e->timestamp) ||
+	   ((e->timestamp == left->e->timestamp) &&
+	    (e->evID <= left->e->evID))) { // make root of left subtree
+    eh = new HeapNode(e, left->subheapsize+1, left, NULL);
+    left = eh;
+    subheapsize += 1;
+  }
+  else if ((e->timestamp < right->e->timestamp) ||
+	   ((e->timestamp == right->e->timestamp) &&
+	    (e->evID <= right->e->evID))) { // make root of right subtree
+    eh = new HeapNode(e, right->subheapsize+1, right, NULL);
+    right = eh;
+    subheapsize += 1;
+  }
+  else if (left->subheapsize < right->subheapsize) { // insert in left subtree
+    subheapsize += 1;
+    left->insertDeterministic(e);
+  }
+  else { // insert in right subtree
+    subheapsize += 1;
+    right->insertDeterministic(e);
   }
 }
 
@@ -145,7 +189,9 @@ void EqHeap::InsertEvent(Event *e)
   CmiAssert((top == NULL) || (top->subheapsize > 0));
   if (top == NULL) // make the top of the heap
     top = new HeapNode(e, 1, NULL, NULL);
-  else if (e->timestamp <= top->e->timestamp) { // insert at top of heap
+  else if ((e->timestamp < top->e->timestamp) || 
+           ((e->timestamp == top->e->timestamp) && 
+	    (e->evID <= top->e->evID))) { // insert at top of heap
     if (top->subheapsize == 1) // only one node in heap
       top = new HeapNode(e, 2, top, NULL); // make old top into left subheap
     else if (top->left && top->right) { // full(ish) heap

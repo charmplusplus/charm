@@ -299,7 +299,7 @@ void GVT::computeGVT(UpdateMsg *m)
 
     // check for termination conditions
     int term = 0;
-    if ((estGVT > POSE_endtime) && (POSE_endtime > POSE_UnsetTS)) {
+    if ((estGVT >= POSE_endtime) && (POSE_endtime > POSE_UnsetTS)) {
       CkPrintf("At endtime: %d\n", POSE_endtime);
       term = 1;
     }

@@ -16,17 +16,26 @@ class eventID
   int obj;
  public:
   /// Basic Constructor
-  eventID() { id = 0; pe = CkMyPe(); }          
+  eventID() { id = 0; pe = CkMyPe(); obj = 0; }          
   /// Get next value for eventID
   /** increments id field for this eventID */
   void incEventID();                            
   /// Assignment operator
   eventID& operator=(const eventID& e);         
+  /// get source PE
+  int getPE() { return pe; }
+  /// get source obj
+  int getObj() { return obj; }
+  /// set source obj
+  int setObj(int objIdx) { obj = objIdx; }
   /// Equality comparison operator
   int operator==(const eventID& obj);           
   /// Less than/equality comparison operator
   /** Provides a way to sort events by event ID */
   int operator<=(const eventID& obj);           
+  /// Less than comparison operator
+  /** Provides a way to sort events by event ID */
+  int operator<(const eventID& obj);           
   /// Dump all data fields
   void dump() { 
     CmiAssert((pe >= 0) && (pe < CkNumPes())); 

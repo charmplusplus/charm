@@ -29,6 +29,6 @@ void rep::registerTimestamp(int idx, eventMsg *m, POSE_TimeType offset)
   CmiAssert(ovt+offset >= localPVT->getGVT());
   m->Timestamp(ovt+offset);
   m->setPriority(ovt+offset-INT_MAX);
-  m->fromPE = CkMyPe(); // for comm-based LB
+  m->evID.setObj(myHandle);
   parent->registerSent(ovt+offset);
 }

@@ -57,6 +57,9 @@ eventQueue::~eventQueue()
 void eventQueue::InsertEvent(Event *e)
 {
   //sanitize();
+#ifdef DETERMINISTIC_EVENTS
+  InsertEventDeterministic(e);
+#else
   Event *tmp = backPtr->prev; // start at back of queue
 
   if (e->timestamp > largest) largest = e->timestamp;
@@ -71,6 +74,43 @@ void eventQueue::InsertEvent(Event *e)
       tmp = currentPtr; // may be closer to insertion point
     while (tmp->timestamp > e->timestamp) // search for position
       tmp = tmp->prev;
+    // insert e
+    e->prev = tmp;
+    e->next = tmp->next;
+    e->next->prev = e;
+    tmp->next = e;
+    // if e is inserted before currPtr, move currPtr back to avoid rollback
+    if ((currentPtr->prev == e) && (currentPtr->done < 1))
+      currentPtr = currentPtr->prev;
+  }
+  //sanitize();
+#endif
+}
+
+/// Insert e in the queue in timestamp order
+/** If executed events with same timestamp exist, sort e into them based on
+    eventID */
+void eventQueue::InsertEventDeterministic(Event *e)
+{
+  Event *tmp = backPtr->prev; // start at back of queue
+  if (e->timestamp > largest) largest = e->timestamp;
+  // check if new event should go on heap: 
+  // greater than last timestamp in queue, 
+  // or currentPtr is at back (presumably because heap is empty)
+  //CkPrintf("Received event "); e->evID.dump(); CkPrintf(" at %d...\n", e->timestamp);
+  if (((tmp->timestamp < e->timestamp) ||
+       (tmp->timestamp == e->timestamp) && (tmp->evID < e->evID))
+      && (currentPtr != backPtr))
+    eqh->InsertEvent(e); // insert in heap
+  else { // tmp->timestamp > e->timestamp; insert in linked list
+    if ((currentPtr != backPtr) && (currentPtr->timestamp > e->timestamp))
+      tmp = currentPtr; // may be closer to insertion point
+    while (tmp->timestamp > e->timestamp) // search for position
+      tmp = tmp->prev;
+    // tmp now points to last event with timestamp <= e's
+    if (tmp->timestamp == e->timestamp) // deterministic bit
+      while ((tmp->timestamp == e->timestamp) && (e->evID < tmp->evID))
+	tmp = tmp->prev;
     // insert e
     e->prev = tmp;
     e->next = tmp->next;
@@ -99,146 +139,119 @@ void eventQueue::ShiftEvent() {
     currentPtr = e;
   }
   if (currentPtr == backPtr) largest = POSE_UnsetTS;
-  FindLargest();
+  else FindLargest();
   //sanitize();
+}
+
+void eventQueue::CommitStatsHelper(Event *commitPtr)
+{
+#ifdef POSE_STATS_ON      
+  fpos_t fptr;
+  localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
+  localStats->Commit();
+#endif
+#ifdef POSE_DOP_ON
+  if (lastLoggedVT >= commitPtr->svt)
+    commitPtr->svt = commitPtr->evt = -1;
+  else lastLoggedVT = commitPtr->evt;
+#if USE_LONG_TIMESTAMPS
+  while (!fprintf(fp, "%f %f %lld %lld\n", commitPtr->srt, commitPtr->ert, 
+		  commitPtr->svt, commitPtr->evt))
+    fsetpos(fp, &fptr);
+#else
+  while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert, 
+		  commitPtr->svt, commitPtr->evt))
+    fsetpos(fp, &fptr);
+#endif
+  fgetpos(fp, &fptr);
+  localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
+#endif
 }
 
 /// Commit (delete) events before target timestamp ts
 void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
 {
   //sanitize();
-#ifdef POSE_STATS_ON
-  fpos_t fptr;
-  localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
-#endif
   Event *target = frontPtr->next, *commitPtr = frontPtr->next;
   if (ts == POSE_UnsetTS) {
     CommitAll(obj);
     return;
   }
   ts++;
-  
+
+  // first commit the events
   if (obj->objID->usesAntimethods()) {
     while ((commitPtr->timestamp < ts) && (commitPtr != backPtr) 
 	   && (commitPtr != currentPtr)) {
       obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg); // call commit fn
-#ifdef POSE_STATS_ON      
-      localStats->Commit();
-#endif
-#ifdef POSE_DOP_ON
-      if (lastLoggedVT >= commitPtr->svt)
-	commitPtr->svt = commitPtr->evt = -1;
-      else lastLoggedVT = commitPtr->evt;
-#if USE_LONG_TIMESTAMPS
-      while (!fprintf(fp, "%f %f %lld %lld\n", commitPtr->srt, commitPtr->ert, commitPtr->svt, commitPtr->evt)) {
-	fsetpos(fp, &fptr);
-      }
-#else
-      while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert, commitPtr->svt, commitPtr->evt)) {
-	fsetpos(fp, &fptr);
-      }
-#endif
-      fgetpos(fp, &fptr);
-      localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
-#endif
+      CommitStatsHelper(commitPtr);
       if (commitPtr->commitBfrLen > 0)  { // print buffered output
 	CkPrintf("%s", commitPtr->commitBfr);
 	if (commitPtr->commitErr) CmiAbort("Commit ERROR");
       }
-      if (commitPtr->cpData) delete commitPtr->cpData;
       commitPtr = commitPtr->next;
-      delete commitPtr->prev; // delete committed event
     }
-    commitPtr->prev = frontPtr; // reattach front sentinel node
-    frontPtr->next = commitPtr;
   }
   else {
     while ((target != backPtr) && (target->timestamp < ts) && 
 	   (target != currentPtr)) { // commit upto ts
       while (commitPtr != target) { // commit upto next checkpoint
 	CmiAssert(commitPtr->done == 1); // only commit executed events
-#ifdef POSE_STATS_ON      
-	localStats->Commit();
-#endif
-	obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg); // call commit fn
-#ifdef POSE_DOP_ON
-	if (lastLoggedVT >= commitPtr->svt)
-	  commitPtr->svt = commitPtr->evt = -1;
-	else lastLoggedVT = commitPtr->evt;
-#if USE_LONG_TIMESTAMPS
-	while (!fprintf(fp, "%f %f %lld %lld\n", commitPtr->srt,commitPtr->ert,
-			commitPtr->svt, commitPtr->evt)) {
-	  fsetpos(fp, &fptr);
-	}
-#else	
-	while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert,
-			commitPtr->svt, commitPtr->evt)) {
-	  fsetpos(fp, &fptr);
-	}
-#endif
-	fgetpos(fp, &fptr);
-	localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
-#endif
+	obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg);
+	CommitStatsHelper(commitPtr);
 	if (commitPtr->commitBfrLen > 0)  { // print buffered output
 	  CkPrintf("%s", commitPtr->commitBfr);
 	  if (commitPtr->commitErr) CmiAbort("Commit ERROR");
 	}
-	if (commitPtr->cpData) delete commitPtr->cpData;
 	commitPtr = commitPtr->next;
-	delete commitPtr->prev; // delete committed event
       }
       //find next target
       target = target->next;
       while (!target->cpData && (target->timestamp <ts) && (target != backPtr))
 	target = target->next;
     }
-    commitPtr->prev = frontPtr; // reattach front sentinel node
-    frontPtr->next = commitPtr;
   }
-  //  sanitize();
+  // now free up the memory
+  Event *link = commitPtr;
+  commitPtr = commitPtr->prev;
+  while (commitPtr != frontPtr) {
+    if (commitPtr->cpData) delete commitPtr->cpData;
+    commitPtr = commitPtr->prev;
+    delete commitPtr->next;
+  }
+  frontPtr->next = link;
+  link->prev = frontPtr;
+  //sanitize();
 }
 
 /// Commit (delete) all events
 void eventQueue::CommitAll(sim *obj)
 {
   //sanitize();
-#ifdef POSE_STATS_ON
-  fpos_t fptr;
-  localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
-#endif
   Event *commitPtr = frontPtr->next;
   
   while (commitPtr != backPtr) {
     if (commitPtr->done) {
       obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg);
-#ifdef POSE_STATS_ON      
-      localStats->Commit();
-#endif
-#ifdef POSE_DOP_ON
-      if (lastLoggedVT >= commitPtr->svt) commitPtr->svt=commitPtr->evt = -1;
-      else lastLoggedVT = commitPtr->evt;
-#if USE_LONG_TIMESTAMPS
-      while (!fprintf(fp, "%f %f %lld %lld\n", commitPtr->srt, commitPtr->ert, commitPtr->svt, commitPtr->evt)) 
-	fsetpos(fp, &fptr);
-#else
-      while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert, commitPtr->svt, commitPtr->evt))
-	fsetpos(fp, &fptr);
-#endif
-      fgetpos(fp, &fptr);
-      localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
-#endif
+      CommitStatsHelper(commitPtr);
       if (commitPtr->commitBfrLen > 0)  { // print buffered output
 	CkPrintf("%s", commitPtr->commitBfr);
 	if (commitPtr->commitErr) CmiAbort("Commit ERROR");
       }
-      if (commitPtr->cpData) delete commitPtr->cpData;
     }
     commitPtr = commitPtr->next;
-    delete commitPtr->prev; // delete committed event
   }
-  commitPtr->prev = frontPtr; // reattach front sentinel node
-  frontPtr->next = commitPtr;
-  //  sanitize();
+  // now free up the memory
+  Event *link = commitPtr;
+  commitPtr = commitPtr->prev;
+  while (commitPtr != frontPtr) {
+    if (commitPtr->cpData) delete commitPtr->cpData;
+    commitPtr = commitPtr->prev;
+    delete commitPtr->next;
+  }
+  frontPtr->next = link;
+  link->prev = frontPtr;
+  //sanitize();
 }
 
 /// Change currentPtr to point to event e
@@ -262,7 +275,7 @@ void eventQueue::SetCurrentPtr(Event *e) {
 /// Return first (earliest) unexecuted event before currentPtr
 Event *eventQueue::RecomputeRollbackTime() 
 {
-  //  sanitize();
+  //  //sanitize();
   Event *ev = frontPtr->next; // start at front
   //  while ((ev->done == 1) && (ev != currentPtr)) ev = ev->next;
   while (ev->done == 1) ev = ev->next;
@@ -291,7 +304,8 @@ void eventQueue::DeleteEvent(Event *ev)
 void eventQueue::FindLargest()
 {
   POSE_TimeType hs = eqh->FindMax();
-  largest = backPtr->prev->timestamp;
+  if (backPtr->prev->done == 0) largest = backPtr->prev->timestamp;
+  else largest = POSE_UnsetTS;
   if (largest < hs) largest = hs;
 }
 

@@ -531,7 +531,7 @@ foreach my $incfile ($inC,@otherfiles)
 	#      $outChandle->print("    else POSE_Objects[thisIndex].Step(); \n");
 	$outChandle->print("  }\n");
 	$outChandle->print("  pvt->objUpdate($messagename->timestamp, RECV);\n");
-	$outChandle->print("  srVector[$messagename->fromPE]++;\n");
+	$outChandle->print("  srVector[$messagename->evID.getPE()]++;\n");
 	$outChandle->print("#ifdef POSE_STATS_ON\n");
 	$outChandle->print("  if (tstat)\n");
 	$outChandle->print("    localStats->SwitchTimer(tstat);\n");
@@ -1100,7 +1100,6 @@ sub posefuncmap
 		  $output.="PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n";
 		  $output.=$msg."->Timestamp(ovt+(_POSE_timeOffset));\n";
 		  $output.="pvt->objUpdate(ovt+(_POSE_timeOffset), SEND);\n";
-		  $output.="$msg->fromPE = CkMyPe();\n";
 		  $output.="$msg->rst = 0.0;\n";
 		  #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
@@ -1113,7 +1112,6 @@ sub posefuncmap
 		  $output.="int _POSE_handle = ".$segments[3].";\n";
 		  $output.="POSE_TimeType _POSE_timeOffset = ".$segments[4].";\n";
 		  $output.="registerTimestamp(_POSE_handle, ".$msg.",_POSE_timeOffset);\n";
-		  $output.="$msg->fromPE = CkMyPe();\n";
 		  $output.="#ifdef POSE_DOP_ON\n";
 		  $output.="parent->ct = CmiWallTimer();\n";
 		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
@@ -1142,7 +1140,6 @@ sub posefuncmap
 		    $output.="PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n";
 		    $output.=$msg."->Timestamp(_POSE_atTime);\n";
 		    $output.="pvt->objUpdate(_POSE_atTime, SEND);\n";
-		    $output.="$msg->fromPE = CkMyPe();\n";
 		    $output.="$msg->rst = 0.0;\n";
 		    #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
 		    $output.="(*(CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
@@ -1158,7 +1155,6 @@ sub posefuncmap
 		    $output.="int _POSE_atTime = ".$segments[4].";\n";
 		    $output.="if (!CpvAccess(stateRecovery)) {\n";
 		    $output.="registerTimestamp(_POSE_handle, ".$msg.", _POSE_atTime);\n";
-		    $output.="$msg->fromPE = CkMyPe();\n";
 		  $output.="#ifdef POSE_DOP_ON\n";
 		  $output.="parent->ct = CmiWallTimer();\n";
 		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
@@ -1185,7 +1181,6 @@ sub posefuncmap
 		      $output.="PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n";
 		      $output.=$msg."->Timestamp(ovt+(_POSE_timeOffset));\n";
 		      $output.="pvt->objUpdate(ovt+(_POSE_timeOffset), SEND);\n";
-		      $output.="$msg->fromPE = CkMyPe();\n";
 		  $output.="$msg->rst = 0.0;\n";
 		      #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
@@ -1196,7 +1191,6 @@ sub posefuncmap
 		      $output.="POSE_TimeType _POSE_timeOffset = ".$segments[2].";\n";
 		      $output.="if (!CpvAccess(stateRecovery)) {\n";
 		      $output.="registerTimestamp(parent->thisIndex, ".$msg.", _POSE_timeOffset);\n";
-		      $output.="$msg->fromPE = CkMyPe();\n";
 		  $output.="#ifdef POSE_DOP_ON\n";
 		  $output.="parent->ct = CmiWallTimer();\n";
 		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";

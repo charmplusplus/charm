@@ -26,6 +26,10 @@ class HeapNode
   /** Insert event e in this subheap; designed to find insertion position
       quickly, at the cost of creating unbalanced or high & narrow heaps */
   void insert(Event *e);                    
+  /// Insert event in heap deterministically
+  /** Insert event e in this subheap; designed to find insertion position
+      quickly, at the cost of creating unbalanced or high & narrow heaps */
+  void insertDeterministic(Event *e);                    
   /// Join this heap with h
   /** Join this heap with h and return the new heap; uses quickest join method 
       possible at expense of creating unbalanced tree */
@@ -54,6 +58,8 @@ class EqHeap {
   ~EqHeap() { if (top) delete top; } 
   /// Insert event e in heap with low timestamps at top of heap
   void InsertEvent(Event *e);              
+  /// Insert event e in heap deterministically with low timestamps at top
+  void InsertEventDeterministic(Event *e);              
   /// Return event on top of heap, deleting it from the heap
   /** Returns event at top of heap if one exists, null otherwise; deletes top
       node in heap, conjoining left and right subheaps */

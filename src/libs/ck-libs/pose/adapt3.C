@@ -20,9 +20,10 @@ void adapt3::Step()
     POSE_TimeType ct = eq->currentPtr->timestamp;  // store time of next event
     CancelEvents();
     // if cancellations of executed events occurred, adjust timeLeash
-    if ((ct > -1) && (eq->currentPtr->timestamp < ct))
-      timeLeash = eq->currentPtr->timestamp - lastGVT + 1;
-    if (timeLeash < 0) timeLeash = 10;
+    if ((ct > -1) && (eq->currentPtr->timestamp < ct)) {
+      timeLeash = eq->currentPtr->timestamp - lastGVT;
+      advances = 1;
+    }
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(SIM_TIMER);      
 #endif
@@ -33,34 +34,18 @@ void adapt3::Step()
 #endif
     timeLeash = RBevent->timestamp - lastGVT;
     Rollback(); 
+    advances = 1;
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(SIM_TIMER);      
 #endif
   }
 
-  // Shorten the leash as we near POSE_endtime
-  if ((POSE_endtime > -1) && (lastGVT + timeLeash > POSE_endtime))
-    timeLeash = POSE_endtime - lastGVT + 1;
-
   // Prepare to execute an event
   ev = eq->currentPtr;
-  // Avoid wasting this iteration by expanding speculative window to
-  // include the earlier "half" of available work if there is any
-  /*
-  if ((advances == 0) && (eq->largest > POSE_UnsetTS) && 
-      (ev->timestamp > POSE_UnsetTS) && 
-      (ev->timestamp > lastGVT + timeLeash) && (eq->largest >= ev->timestamp)) {
-    timeLeash = (eq->largest - ev->timestamp + 4)/4 + (ev->timestamp-lastGVT);
-    advances = 1;
-  }
-  */
-  if ((advances == 0) && (ev->timestamp > POSE_UnsetTS) && 
-      (ev->timestamp > lastGVT + timeLeash)) {
-    timeLeash = ev->timestamp = lastGVT + 1;
-    advances = 1;
-  }
-  else if (ev->timestamp <= lastGVT + timeLeash) advances = 0;
-  // CkPrintf("largo=%d cur=%d leash=%d gvt=%d ad=%d\n", eq->largest, ev->timestamp, timeLeash, lastGVT, advances);
+  // Shorten the leash as we near POSE_endtime
+  if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
+    timeLeash = POSE_endtime - lastGVT;
+
   while ((ev->timestamp > POSE_UnsetTS) && 
 	 (ev->timestamp <= lastGVT + timeLeash) && 
 	 (iter < MAX_ITERATIONS)) { // do all events at & under timeLeash
@@ -75,12 +60,34 @@ void adapt3::Step()
     iter++;
 #endif
   }
+  if (ev->timestamp > POSE_UnsetTS) // work left undone
+    timeLeash = (eq->largest - ev->timestamp)/2 + ev->timestamp - lastGVT;
+  //if (parent->thisIndex == 42)
+    CkPrintf("On %d: Time leash:%d  Next work:%d  Latest work:%d\n", 
+	     parent->thisIndex, timeLeash, ev->timestamp, eq->largest);
+  //if (ev->timestamp > -1) timeLeash = ev->timestamp - lastGVT + 1;
+  // Avoid wasting this iteration by expanding speculative window to
+  // include the earlier "half" of available work if there is any
+  /*
+  if ((advances == 0) && (eq->largest > POSE_UnsetTS) && 
+      (ev->timestamp > lastGVT + timeLeash)) {
+    timeLeash = (eq->largest - ev->timestamp + 4)/4 + (ev->timestamp-lastGVT);
+    advances = 1;
+  }
+  if ((advances == 0) && (ev->timestamp > lastGVT + timeLeash)) {
+    timeLeash = ev->timestamp - lastGVT + 1;
+    advances = 1;
+  }
+  else if (ev->timestamp <= lastGVT + timeLeash) advances = 0;
+  */
+  // CkPrintf("largo=%d cur=%d leash=%d gvt=%d ad=%d\n", eq->largest, ev->timestamp, timeLeash, lastGVT, advances);
+
+
 #ifdef POSE_STATS_ON
   if (iter > 0) { 
     localStats->Loop();
     if (iter == MAX_ITERATIONS) CkPrintf("Touched MAX_ITERATIONS!\n");
   }
 #endif  
-  //if (ev->timestamp > -1) timeLeash = ev->timestamp - lastGVT + 1;
 }
 

@@ -35,7 +35,7 @@ void adapt2::Step()
   ev = eq->currentPtr;
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
-    timeLeash = POSE_endtime - lastGVT + 1;
+    timeLeash = POSE_endtime - lastGVT;
 
   //cpRate = (MAX_LEASH - timeLeash + MIN_LEASH)/5;
   int iter=0;

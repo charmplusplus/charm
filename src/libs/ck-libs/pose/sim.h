@@ -25,14 +25,11 @@ class sim; // needed for eventMsg definition below
 class eventMsg : public CMessage_eventMsg {
 public:
   /// The event's timestamp
-
   POSE_TimeType timestamp;  
   /// The event's globally unique ID
   eventID evID;   
   /// The message size, used for message recycling (currently not used)
-  int msgSize;    
-  /// The sending PE, used for comm-based LB
-  int fromPE;     
+  size_t msgSize;    
   /// Pointer to a poser wrapper; used to send the pointer to rep object
   sim *parent;    
   /// Pointer to synchronization strategy; used when creating rep object
@@ -84,7 +81,7 @@ public:
 #ifdef MSG_RECYCLING
     MemoryPool *localPool = (MemoryPool *)CkLocalBranch(MemPoolID);
     int ps = localPool->CheckPool(((eventMsg *)p)->msgSize);
-    if (0) { // ((ps < MAX_POOL_SIZE) && (ps > -1)) {
+    if ((ps < MAX_POOL_SIZE) && (ps > -1)) {
       size_t msgSize = ((eventMsg *)p)->msgSize;
       memset(p, 0, msgSize);
       ((eventMsg *)p)->msgSize = msgSize;

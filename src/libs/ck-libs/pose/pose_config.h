@@ -5,16 +5,24 @@
 #ifndef POSE_CONFIG_H
 #define POSE_CONFIG_H
 #include <limits.h>
+
 /// Uncomment to gather and print POSE statistics set
 #define POSE_STATS_ON 1
 /// Insane level of analysis
 //#define POSE_DOP_ON 1
-// Set to 1 to use 64 bit timestamps
+
+/// Set this to use 64 bit timestamps
 #define USE_LONG_TIMESTAMPS 0
-// Uncomment to save time on memory allocation and freeing
+
+/// Uncomment to force determinism in event ordering
+#define DETERMINISTIC_EVENTS 1
+
+/// Uncomment to save time on memory allocation and freeing
 #define MSG_RECYCLING 1
+
 /// Uncomment to make use of the Streaming Communication Library optimizations
 //#define POSE_COMM_ON 1
+
 /// Uncomment to turn on POSE load balancer
 //#define LB_ON 1
 #ifdef POSE_COMM_ON
@@ -54,7 +62,5 @@ typedef int POSE_TimeType;
 const POSE_TimeType POSE_UnsetTS=-1;
 const POSE_TimeType POSE_TimeMax=INT_MAX;
 #endif
-
-
 
 #endif

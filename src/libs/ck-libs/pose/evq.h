@@ -6,6 +6,8 @@
 /** Doubly-linked list with front and back sentinels and a heap of unexecuted
     events */
 class eventQueue {
+  /// This helper method cleans up all the commit code by removing the stats
+  void CommitStatsHelper(Event *commitPtr);
  public:
   /// Sentinel nodes
   Event *frontPtr, *backPtr;
@@ -31,6 +33,10 @@ class eventQueue {
   /** If executed events with same timestamp exist, insert e at the back of 
       these, returns 0 if rollback necessary, 1 otherwise. */
   void InsertEvent(Event *e);      
+  /// Insert e in the queue in timestamp order
+  /** If executed events with same timestamp exist, sort e into them based on
+      eventID, returns 0 if rollback necessary, 1 otherwise. */
+  void InsertEventDeterministic(Event *e);      
   /// Return front pointer
   Event *front() { return frontPtr; }
   /// Return back pointer

@@ -112,14 +112,11 @@ void sim::Commit()
 #endif
   if (localPVT->getGVT() > lastGVT) {
     lastGVT = localPVT->getGVT();
-    if (localPVT->done() && (POSE_endtime == POSE_UnsetTS)) { // simulation inactive
+    if (localPVT->done()) { // simulation inactive
       eq->CommitEvents(this, -1); // commit all events in queue
       objID->terminus(); // call terminus on all posers
     }
-    else { 
-      eq->CommitEvents(this, lastGVT); // commit events up to GVT
-      if (localPVT->done()) objID->terminus(); // if sim done, term posers
-    }
+    else eq->CommitEvents(this, lastGVT); // commit events up to GVT
   }
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(SIM_TIMER);
