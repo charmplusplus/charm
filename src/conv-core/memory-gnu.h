@@ -1,5 +1,6 @@
 #ifndef _MALLOC_H
 #include "memory-gnu-internal.h"
+#endif
 
 
 /* In the GNU libc we rename the global variable
@@ -25,4 +26,3 @@ extern __malloc_ptr_t _int_memalign (mstate __m, size_t __alignment,
 extern __malloc_ptr_t _int_valloc (mstate __m, size_t __size)
      attribute_hidden;
 
-#endif
