@@ -1011,7 +1011,7 @@ ComlibInstanceHandle::ComlibInstanceHandle(const ComlibInstanceHandle &h)
     ref();
 }
 
-ComlibInstanceHandle& ComlibInstanceHandle::operator=(ComlibInstanceHandle &h) {
+ComlibInstanceHandle& ComlibInstanceHandle::operator=(const ComlibInstanceHandle &h) {
     _instid = h._instid;
     _dmid = h._dmid;
     toForward = h.toForward;

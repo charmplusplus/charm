@@ -68,7 +68,7 @@ class ComlibInstanceHandle : public CkDelegateData {
     ComlibInstanceHandle(const ComlibInstanceHandle &h);
     ComlibInstanceHandle(int instid, CkGroupID dmid);    
    
-    ComlibInstanceHandle &operator=(ComlibInstanceHandle &h);
+    ComlibInstanceHandle &operator=(const ComlibInstanceHandle &h);
 
     void setForwardingOnMigration(){toForward = 1;} 
     void beginIteration();
