@@ -1176,7 +1176,7 @@ void CmiMemUnlock() { memflag--; }
 static volatile int comm_flag=0;
 #define CmiCommLockOrElse(dothis) if (comm_flag!=0) dothis
 #if 1
-#  define CmiCommLock(void) (comm_flag=1)
+#  define CmiCommLock() (comm_flag=1)
 #else
 void CmiCommLock(void) {
   if (comm_flag!=0) CmiAbort("Comm lock *not* reentrant!\n");
