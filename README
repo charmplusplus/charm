@@ -22,7 +22,7 @@ What you need to do is as following:
 
       cvs -d :pserver:checkout@thrift.cs.uiuc.edu:/expand6/cvsroot login
 
-      when CVS passwd is prompted, just type <Enter>.
+      when CVS password is prompted, just type <Enter>.
 2. checkout charm:
 
       cvs co -P charm
@@ -41,13 +41,14 @@ compile Charm++. The command line syntax is:
 
 build <target> <version> [options ...] [charmc-options ...]
 
-<taget> specify the parts of Charm++ to compile, the most oftenly used 
-<target> is charm++, it will compile most the key Charm++ executables and 
-runtime libraries.
-<versions> defines the CPU, OS and Communication of the machines, see 
-"How to choose a <version>" below;
-<options> defines more detailed information of the compilations including 
-compilers and features to support, etc. see "How to choose <option>" below.
+<target> specifies the parts of Charm++ to compile.  The most often used 
+  <target> is charm++, which will compile the key Charm++ executables and 
+  runtime libraries.
+<versions> defines the CPU, OS and Communication of the machines.  See 
+  "How to choose a <version>" below.
+<options> defines more detailed information of the compilations, including 
+  compilers, features to support, etc.  See "How to choose <option>"
+  below.
 
 **** How to choose a <version> ****
 
@@ -157,7 +158,7 @@ need to choose <options> from the following list:
 * gm - support MyriCom's Myrinet GM library;
 * vmi - support NCSA's VMI library;
 
-For s specific version, for example: net-linux, you can use following command 
+For a specific version, for example: net-linux, you can use following command 
 to display the supported <options> on this platform:
 > ./build charm++ net-linux help
 supported options: gm icc pgcc scyld
@@ -209,12 +210,12 @@ also be specified on the command line, using the -D option.  For
 example,
     > ./build charm++ net-linux -O -DCMK_OPTIMIZE=1
 
-CMK_OPTIMIZE: Turn on optimizations in Charm++/Converse. This disbles most of
+CMK_OPTIMIZE: Turn on optimizations in Charm++/Converse. This disables most of
 the run-time checking performed by Converse and Charm++ runtime. This option
 should be used only after the program has been debugged. Also, this option
 disables Converse/Charm++ tracing mechanisms such as projections and summary.
 
-CMK_THREADS_USE_ISOMALLOC: Ths option specifies that the user-level threads in
+CMK_THREADS_USE_ISOMALLOC: This option specifies that the user-level threads in
 Converse/Charm++ be migratable using a method called isomalloc. The
 isomalloc-based threads make sure that the thread's stack spans a unique range
 of virtual addresses across all the processors. Thus, references to stack
@@ -224,8 +225,8 @@ CMK_THREADS_USE_COPY_STACK: This option specifies that the user-level threads
 in Converse/Charm++ be migratable by using a method where the used portion of a
 thread's stack is copied in and out of a main stack on context-switch. Since
 the main (process) stack spans the same range of virtual addresses in all
-processes in a homogeneous cluster, references to stack remain valid across al
-te processors even after a thread migrates.
+processes in a homogeneous cluster, references to stack remain valid across all
+the processors even after a thread migrates.
 
 CMK_THREADS_USE_PTHREADS: This is an alternate implementation of
 Converse/Charm++ user-level threads that use Posix threads. They have higher
@@ -233,7 +234,7 @@ Converse/Charm++ user-level threads that use Posix threads. They have higher
 threads in Converse. However, they are more portable. In particular, they avoid
 some of the known problems in the way current linuxthreads implementation
 interacts with the default user-level threads in Converse. Also, memory
-debugging tols such as purify are incompatible with Converse's default
+debugging tools such as purify are incompatible with Converse's default
 user-level threads. The implementation based on posix threads can be used for
 memory debugging with purify.
 
@@ -273,9 +274,9 @@ typical .nodelist file:
 group main ++shell /bin/ssh
 host machinename
 
-The default remote shell program is rsh, but you can define differnt remote 
+The default remote shell program is rsh, but you can define different remote 
 shell you like to start remote processes in the ++shell option. You should 
-also make sure that you can rsh or ssh to these machines without passwd 
+also make sure that you can rsh or ssh to these machines without password 
 authentication. Just type following command to verify:
      > rsh(ssh) machinename date
 If this gives you current date immediately, your running environment with this 
@@ -292,7 +293,7 @@ To use this option, just type:
 
 However, for best performance, you should launch one node program per processor.
 
-Commandline Options:
+Command-line Options:
 
 +truecrash: The net-* version of Converse trap a number of signals such as
 SIGSEGV and SIGBUS to gracefully handle premature termination of Converse
