@@ -500,6 +500,20 @@ static inline void _processForBocMsg(envelope *env)
   _deliverForBocMsg(epIdx,env,obj);
 }
 
+static inline void _deliverForNodeBocMsg(envelope *env,void *obj)
+{
+  env->setMsgtype(ForChareMsg);
+  env->setObjPtr(obj);
+  _processForChareMsg(env);
+  _STATS_RECORD_PROCESS_NODE_BRANCH_1();
+}
+
+static inline void _deliverForNodeBocMsg(int epIdx, envelope *env,void *obj)
+{
+  env->setEpIdx(epIdx);
+  _deliverForNodeBocMsg(env, obj);
+}
+
 static inline void _processForNodeBocMsg(envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
@@ -701,6 +715,19 @@ static void _noCldEnqueue(int pe, envelope *env)
   }
 }
 
+static void _noCldNodeEnqueue(int node, envelope *env)
+{
+  if (node == CkMyNode()) {
+    CmiHandleMessage(env);
+  } else {
+    CkPackMessage(&env);
+    int len=env->getTotalsize();
+    if (node==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, (char *)env); }
+    else if (node==CLD_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, (char *)env); }
+    else CmiSyncNodeSendAndFree(node, len, (char *)env);
+  }
+}
+
 
 static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
 {
@@ -851,6 +878,12 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID)
       _deliverForBocMsg(eIdx,env,obj);
       return;
     }
+#if CMK_IMMEDIATE_MSG
+    else {
+      envelope *env=UsrToEnv(msg);
+      env->setImmediate(CmiFalse);
+    }
+#endif
   }
   //Can't inline-- send the usual way
 #if CMK_IMMEDIATE_MSG
@@ -906,6 +939,47 @@ void CkSendMsgNodeBranch(int eIdx, void *msg, int node, CkGroupID gID)
   _sendMsgNodeBranch(eIdx, msg, gID, node);
   _STATS_RECORD_SEND_NODE_BRANCH_1();
   CpvAccess(_qd)->create();
+}
+
+extern "C"
+void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID)
+{
+  if (node==CkMyNode()) 
+  { 
+    CmiLock(_nodeLock);
+    void *obj = _nodeGroupTable->find(gID).getObj();
+    CmiUnlock(_nodeLock);
+    if (obj!=NULL) 
+    { //Just directly call the group:
+      envelope *env=UsrToEnv(msg);
+      _deliverForNodeBocMsg(eIdx,env,obj);
+      return;
+    }
+#if CMK_IMMEDIATE_MSG
+    else {
+      envelope *env=UsrToEnv(msg);
+      env->setImmediate(CmiFalse);
+    }
+#endif
+  }
+  //Can't inline-- send the usual way
+#if CMK_IMMEDIATE_MSG
+  register envelope *env = UsrToEnv(msg);
+  if (env->isImmediate()) {
+    env->setImmediate(CmiFalse);
+    env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
+    if(node==CLD_BROADCAST_ALL) {
+      _TRACE_CREATION_N(env, CkNumNodes());
+    } else {
+      _TRACE_CREATION_1(env);
+    }
+    _noCldNodeEnqueue(node, env);
+    _STATS_RECORD_SEND_BRANCH_1();
+    CpvAccess(_qd)->create();
+  }
+  else
+#endif
+  CkSendMsgNodeBranch(eIdx,msg,node,gID);
 }
 
 extern "C"
