@@ -4,16 +4,7 @@ AC_INIT(./Makefile)
 AC_CONFIG_HEADER(conv-autoconfig.h)
 
 CHARMINC="."
-test -r ./conv-mach-pre.sh && . ./conv-mach-pre.sh
-
-if test ! -r ./conv-mach.sh 
-then
-        echo "Cannot find ./conv-mach.sh"
-        exit 1
-fi
-. ./conv-mach.sh
-
-test -r ./conv-mach-opt.sh && . ./conv-mach-opt.sh
+test -r ./conv-config.sh && . ./conv-config.sh
 
 #turn out to be in octal number, don't use digit >= 8
 VERSION=050610
