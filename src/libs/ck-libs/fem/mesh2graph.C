@@ -199,23 +199,24 @@ void Graph::save(char *file, Mesh *m)
     
   fprintf(fp, "%d %d %d\n", m->nelems(), m->nnodes(), m->esize());
 
-  for(int i=0; i<m->nelems(); i++) {
-    for(int j = 0; j < m->esize(); j++)
+  int i, j;
+  for(i=0; i<m->nelems(); i++) {
+    for(j = 0; j < m->esize(); j++)
       fprintf(fp, "%d ", m->node(i, j));
     fprintf(fp, "\n");
   }
 
   int *xadj = new int[nelems+1];
   xadj[0] = 0;
-  for(int i=1; i<nelems+1; i++)
+  for(i=1; i<nelems+1; i++)
     xadj[i] = xadj[i-1] + elems(i-1);
 
-  for(int i = 0; i < nelems+1; i++)
+  for(i = 0; i < nelems+1; i++)
     fprintf(fp, "%d\n", xadj[i]);
 
-  for(int i = 0; i < nelems; i++) {
+  for(i = 0; i < nelems; i++) {
     nbrs[i].sort();
-    for(int j = 0; j < nbrs[i].getnn(); j++)
+    for(j = 0; j < nbrs[i].getnn(); j++)
       fprintf(fp, "%d ", nbrs[i].getelt(j));
     fprintf(fp, "\n");
   }
@@ -231,16 +232,17 @@ void mesh2graph(Mesh *m, Graph *g)
 
   Nodes nl(nnodes);
 
-  for(int i = 0; i < nelems; i++)
-    for(int j = 0; j < esize; j++) {
+  int i, j;
+  for(i = 0; i < nelems; i++)
+    for(j = 0; j < esize; j++) {
       nl.add(m->node(i, j), i);
     }
 
   // nl to graph
     
-  for(int i = 0; i < nnodes; i++) {
+  for(i = 0; i < nnodes; i++) {
     int nn = nl.nelems(i);
-    for(int j = 0; j < nn; j++) {
+    for(j = 0; j < nn; j++) {
       int e1 = nl.getelt(i, j);
       for(int k = j + 1; k < nn; k++) {
         int e2 = nl.getelt(i, k);
