@@ -1,4 +1,4 @@
-FFTW_HOME=/home/net/yanshi/work/cpaimd/fftw
+FFTW_HOME=/home/net/yanshi/fftw
 CHARMC=$(CDIR)/bin/charmc $(OPTS) $(FLAGS)
 
 CDIR=../../../..
@@ -12,7 +12,7 @@ COMPILER=$(CHARMC) $(INCLUDE)
 
 LIB=libfftlib.a
 LIBDEST=$(CDIR)/lib/$(LIB)
-LIBOBJ=fftlib-normal.o fftlib-sparse.o
+LIBOBJ=fftlib-normal.o fftlib-sparse.o translines.o
 INCDIR=$(CDIR)/include/fftlib
 HEADERS= $(INCDIR)/fftlib.h\
 	 $(INCDIR)/fftlib.decl.h\
@@ -37,6 +37,9 @@ fftlib-normal.o: fftlib-normal.C fftlib.h fftlib.decl.h
 
 fftlib-sparse.o: fftlib-sparse.C fftlib.h fftlib.decl.h
 	$(COMPILER) fftlib-sparse.C
+
+translines.o: translines.C fftlib.decl.h
+	$(COMPILER) translines.C
 
 fftlib.def.h: fftlib.decl.h
 

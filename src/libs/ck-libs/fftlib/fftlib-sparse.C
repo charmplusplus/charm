@@ -226,5 +226,4 @@ SlabArray::SlabArray(FFTinfo &info)
     }
 }
 
-#include "fftlib.def.h"
 #endif

@@ -1,4 +1,5 @@
 module fftlib {
+
 	// The following arrays do not have entry methods corresponding to
 	// constructors. The user array that inherit from these should provide
 	// contructor entry methods
@@ -7,16 +8,23 @@ module fftlib {
 
 	};
 
+
 	// the application should make an array derived from this
 	array [1D] NormalSlabArray: SlabArray { 
 		entry void acceptDataForFFT(int numPoints, complex points[numPoints], int posn, int info_id);
 		entry void acceptDataForIFFT(int numPoints, complex points[numPoints], int posn, int info_id);
 	};
-
-/*	// the application should make an array derived from this
+/*
+	// the application should make an array derived from this
 	array [2D] SparseSlabArray: SlabArray { 
 		entry void acceptDataForFFT(int n, int flags[n], int numPoints, complex points[numPoints], int posn);
 		entry void acceptDataForIFFT(int num, int flags[n], int numPoints, complex points[numPoints], int posn);
 	};
 */
+
+	array [2D] NormalLineArray {
+		entry void doFirstFFT(int id, int direction);
+		entry void doSecondFFT(int ypos,  complex val[size], int size, int id, int direction);
+		entry void doThirdFFT(int zpos, int ypos, complex val[size], int size, int id, int direction);
+	};
 };

@@ -1,22 +1,24 @@
-#include <charm++.h>
-#include "util.h"
-
 #ifndef _fftlib_h_
 #define _fftlib_h_
 
+#include <charm++.h>
+#include "util.h"
+
+
 #include "fftlib.decl.h"
 
-template <class T>
-class FFTinfo {
+
+class NormalFFTinfo {
  public:
 	// Constructors
-	FFTinfo(T &sProxy, T &dProxy, int sDim[2], int dDim[2], int isSrc, complex *dptr, int sPlanesPerSlab=1, int dPlanesPerSlab=1) {
+	NormalFFTinfo(CProxy_NormalSlabArray &sProxy, CProxy_NormalSlabArray &dProxy, int sDim[2], int dDim[2], int isSrc, complex *dptr, int sPlanesPerSlab=1, int dPlanesPerSlab=1) {
 		init(sProxy, dProxy, sDim, dDim, isSrc, dptr, sPlanesPerSlab, dPlanesPerSlab);
 	}
-	FFTinfo(FFTinfo<T> &info) {
+
+	NormalFFTinfo(NormalFFTinfo &info) {
 		init(info.srcProxy, info.destProxy, info.srcSize, info.destSize, info.isSrcSlab, (complex *) NULL, info.srcPlanesPerSlab, info.destPlanesPerSlab);
 	}
-	FFTinfo(void) {}
+	NormalFFTinfo(void) {}
 
 	// charm pup function
 	void pup(PUP::er &p) {
@@ -31,13 +33,13 @@ class FFTinfo {
 			dataPtr = (complex *) NULL;
 	}
 
-	T srcProxy, destProxy;
+	CProxy_NormalSlabArray srcProxy, destProxy;
 	int srcSize[2], destSize[2];
 	bool isSrcSlab;
 	int srcPlanesPerSlab, destPlanesPerSlab;
 	complex *dataPtr;
  private:
-	void init(T &sProxy, T &dProxy, int sDim[2], int dDim[2], int isSrc, complex *dptr, int sPlanesPerSlab, int dPlanesPerSlab) {
+	void init(CProxy_NormalSlabArray &sProxy, CProxy_NormalSlabArray &dProxy, int sDim[2], int dDim[2], int isSrc, complex *dptr, int sPlanesPerSlab, int dPlanesPerSlab) {
 		if (sDim[1] != dDim[1])
 			ckerr << "WARNING"
 				  << "This configuration of the source and destination "
@@ -53,13 +55,61 @@ class FFTinfo {
 		memcpy(srcSize, sDim, 2 * sizeof(int));
 		memcpy(destSize, dDim, 2 * sizeof(int));
 	}
-
-
 };
 
-typedef FFTinfo<CProxy_NormalSlabArray> NormalFFTinfo;
+class LineFFTinfo {
+ public:
+	// Constructors
+	LineFFTinfo(CProxy_NormalLineArray &xProxy, CProxy_NormalLineArray &yProxy, CProxy_NormalLineArray &zProxy, int size[3], int isSrc, complex *dptr, int sPencilsPerSlab=1, int dPencilsPerSlab=1) {
+		init(xProxy, yProxy, zProxy, size[0], size[1], size[2], isSrc, dptr, sPencilsPerSlab, dPencilsPerSlab);
+	}
+	LineFFTinfo(LineFFTinfo &info) {
+		init(info.xlinesProxy, info.ylinesProxy, info.zlinesProxy, info.sizeX, info.sizeY, info.sizeZ, info.isSrcSlab, (complex *) NULL, info.sPencilsPerSlab, info.dPencilsPerSlab);
+	}
+	LineFFTinfo(void) {}
+
+	// charm pup function
+	void pup(PUP::er &p) {
+		p|xlinesProxy;
+		p|ylinesProxy;
+		p|zlinesProxy;
+		p|sizeX;
+		p|sizeY;
+		p|sizeZ;
+		p(isSrcSlab);
+		p(sPencilsPerSlab);
+		p(dPencilsPerSlab);
+		if (p.isUnpacking()) 
+			dataPtr = (complex *) NULL;
+	}
+	CProxy_NormalLineArray xlinesProxy, ylinesProxy, zlinesProxy;
+	int sizeX, sizeY, sizeZ;
+	bool isSrcSlab;
+	int sPencilsPerSlab, dPencilsPerSlab;
+	complex *dataPtr;
+ private:
+	void init(CProxy_NormalLineArray &xProxy, CProxy_NormalLineArray &yProxy, CProxy_NormalLineArray &zProxy, int sizex, int sizey, int sizez, int isSrc, complex *dptr, int _sPencilsPerSlab, int _dPencilsPerSlab) {
+		if (sizex != sizey || sizey != sizez)
+			ckerr << "WARNING"
+				  << "This configuration of the source and destination "
+				  << "is not consistent, check the dimensions. The program is "
+				  << "likely to misbehave" 
+				  << endl;
+		xlinesProxy = xProxy; 
+		ylinesProxy = yProxy;
+		zlinesProxy = zProxy;
+		isSrcSlab = isSrc;
+		sPencilsPerSlab = _sPencilsPerSlab; 
+		dPencilsPerSlab = _dPencilsPerSlab;
+		dataPtr = dptr;
+		sizeX = sizex;
+		sizeY = sizey;
+		sizeZ = sizez;
+	}
+};
 
 PUPmarshall(NormalFFTinfo);
+PUPmarshall(LineFFTinfo);
 
 /*
  * Abstract super class for the two dimensional array of slabs,
@@ -102,9 +152,8 @@ class NormalSlabArray: public SlabArray {
 		fwd2DPlan = bwd2DPlan = (fftwnd_plan) NULL;
 		fwd1DPlan = bwd1DPlan = (fftw_plan) NULL;
 	}
-#if 0
+
 	NormalSlabArray(NormalFFTinfo &info); 
-#endif
 	~NormalSlabArray();
 
 	void acceptDataForFFT(int, complex *, int, int);
@@ -174,6 +223,48 @@ class SparseSlabArray: public SlabArray {
 	int *nonZero;
 };
 #endif
+
+class NormalLineArray : public CBase_NormalLineArray {
+ public:
+    static const short MAX_FFTS = 4;
+    NormalLineArray (CkMigrateMessage *m) {}
+    NormalLineArray () {
+	id = -1;
+	for(int i=0; i<MAX_FFTS; i++)
+	    count[i] = 0;
+	line = NULL;
+    }
+    NormalLineArray (LineFFTinfo &info, int _flag) {
+	int sizeX = info.sizeX;
+	int sizeY = info.sizeY;
+	fftinfos[0] = new LineFFTinfo(info);
+	line = NULL;
+	fwdplan = fftw_create_plan(sizeX, FFTW_FORWARD, FFTW_USE_WISDOM|FFTW_IN_PLACE|FFTW_MEASURE);
+	bwdplan = fftw_create_plan(sizeY, FFTW_BACKWARD, FFTW_USE_WISDOM|FFTW_IN_PLACE|FFTW_MEASURE);
+	id = -1;
+	for(int i=0; i<MAX_FFTS; i++)
+	    count[i] = 0;
+	flag = _flag;
+    }
+    ~NormalLineArray () {}
+    void doFirstFFT(int id, int direction);
+    void doSecondFFT(int ypos, complex *val, int size, int id, int direction);
+    void doThirdFFT(int zpos, int ypos, complex *val, int size, int id, int direction);
+    virtual void doneFFT(int id, int direction);
+    void setInstance(int id_) { id = id_; 
+    //mgrProxy.ckLocalBranch()->registerElement(id); 
+    contribute(sizeof(int), &id_, CkReduction::sum_int);
+    }
+ protected:
+    int flag;
+    complex *line;
+    fftw_plan fwdplan, bwdplan;
+    int id;
+    LineFFTinfo *fftinfos[MAX_FFTS];
+    int count[MAX_FFTS];
+};
+
+
 #define CAREFUL 1
 
 #endif //_fftlib_h_

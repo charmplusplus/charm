@@ -23,7 +23,10 @@ public:
   void operator*=(complex a);
   complex operator*(complex a) {
     return complex( re * a.re - im * a.im, re * a.im + im * a.re); }
-  void pup(PUP::er &p) {p|re; p|im; }
+  void pup(PUP::er &p) {
+    p|re;
+    p|im;
+  }
 };
 
 #endif //__PFFTUTIL_H__
