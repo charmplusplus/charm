@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-11-08 23:36:13  gursoy
+ * Revision 2.12  1995-11-13 22:51:32  gursoy
+ * fixed a syntax error
+ *
+ * Revision 2.11  1995/11/08  23:36:13  gursoy
  * fixed varSize problem
  *
  * Revision 2.10  1995/10/27  21:45:35  jyelon
@@ -203,7 +206,7 @@ void CmiFreeSendFn(destPE, size, msg)
      char *msg;
 {
     if (CpvAccess(Cmi_mype) == destPE)
-        FIFO_EnQueue(CpvAccess(CmiLocalQueue), temp);
+        FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
     else
       {
         nwrite(msg, size, destPE, MSG_TYPE, &cflag);
