@@ -161,6 +161,12 @@ class ampiCommStruct {
 	CkPupBasicVec<int> index;
 	CkPupBasicVec<int> edges;
 
+	// Lazily fill world communicator indices
+	void makeWorldIndices(void) const {
+		// cast away constness of "index" list
+		CkPupBasicVec<int> *ind=(CkPupBasicVec<int> *)&index;
+		for (int i=0;i<size;i++) ind->push_back(i);
+	}
 public:
 	ampiCommStruct(int ignored=0) {size=-1;isWorld=-1;}
 	ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_)
@@ -178,7 +184,10 @@ public:
 	void setArrayID(const CkArrayID &nID) {ampiID=nID;}
 
 	MPI_Comm getComm(void) const {return comm;}
-	const CkPupBasicVec<int> &getIndices(void) const {return indices;}
+	const CkPupBasicVec<int> &getIndices(void) const {
+		if (isWorld && indices.size()!=size) makeWorldIndices();
+		return indices;
+	}
 	const CkPupBasicVec<int> &getRemoteIndices(void) const {return remoteIndices;}
 
 	//Get the proxy for the entire array
@@ -212,7 +221,10 @@ public:
 	int getSize(void) const {return size;}
 
 	inline const int isinter(void) const { return isInter; }
-	inline const CkPupBasicVec<int> &getindices() const {return indices;}
+	inline const CkPupBasicVec<int> &getindices() const {
+		if (isWorld && indices.size()!=size) makeWorldIndices();
+		return indices;
+	}
 	inline const CkPupBasicVec<int> &getdims() const {return dims;}
 	inline const CkPupBasicVec<int> &getperiods() const {return periods;}
 
@@ -693,120 +705,159 @@ class AmpiMsg : public CMessage_AmpiMsg {
 };
 
 
-#define INITIAL_Q_SIZE 8
-
-class AmpiNode {
+/**
+  An array that is broken up into "pages"
+  which are separately allocated.  Useful for saving memory
+  when storing a long array with few used entries.
+  Should be almost as fast as a regular vector.
+  
+  When nothing is used, this reduces storage space by a factor
+  of pageSize*sizeof(T)/sizeof(T*).  For example, an 
+  array of 64-bit ints of length 1M takes 8MB; with paging
+  it takes just 32KB, plus 2KB for each used block.
+  
+  The class T must have a pup routine, a default constructor,
+  and a copy constructor.
+*/
+template <class T>
+class CkPagedVector : private CkNoncopyable {
+	/// This is the number of array entries per page.
+	///  For any kind of efficiency, it must be a power of 2,
+	///  which lets the compiler turn divides and mods into
+	///  bitwise operations.
+	enum {pageSize=256u};
+	T **pages;
+	int nPages;
+	void allocatePages(int nEntries) {
+		nPages=(nEntries+pageSize-1)/pageSize; // round up
+		pages=new (T*)[nPages];
+		for (int pg=0;pg<nPages;pg++) pages[pg]=0;
+	}
+	void allocatePage(int pg) {
+		T *np=new T[pageSize];
+		// Initialize the new elements of the page to 0:
+		for (int of=0;of<pageSize;of++) np[of]=T();
+		pages[pg]=np;
+	}
 public:
-  AmpiMsg*   m_data;
-  int        m_next;
+	CkPagedVector() :pages(0), nPages(0) {}
+	CkPagedVector(int nEntries) {init(nEntries);}
+	~CkPagedVector() {
+		for (int pg=0;pg<nPages;pg++) 
+			if (pages[pg]) 
+				delete[] pages[pg];
+		delete[] pages;
+	}
+	void CkPagedVector::init(int nEntries) {
+		allocatePages(nEntries);
+	}
+	
+	inline T &operator[] (unsigned int i) {
+		// This divide and mod should be fast, 
+		//  as long as pageSize is a power of 2:
+		int pg=i/pageSize; 
+		int of=i%pageSize;
+		if (pages[pg]==NULL) allocatePage(pg);
+		return pages[pg][of];
+	}
+	
+	void pupPage(PUP::er &p,int pg) {
+		if (p.isUnpacking()) allocatePage(pg);
+		for (int of=0;of<pageSize;of++) 
+			p|pages[pg][of];
+	}
+	void pup(PUP::er &p) {
+		int pg, o;
+		unsigned int i;
+		p|nPages;
+		if (!p.isUnpacking()) 
+		{ // Packing phase: save each used page
+			for (pg=0;pg<nPages;pg++) 
+			if (pages[pg]) {
+				p|pg;
+				pupPage(p,pg);
+			}
+			pg=-1;
+			p|pg;
+		} else 
+		{ // Unpacking phase: allocate and restore
+			allocatePages(nPages*pageSize);
+			p|pg;
+			while (pg!=-1) {
+				pupPage(p,pg);
+				p|pg;
+			}
+		}
+	}
+};
 
-  AmpiNode () {
-    m_next  = -1;
+
+/**
+  Our local representation of another AMPI
+ array element.  Used to keep track of incoming
+ and outgoing message sequence numbers, and 
+ the out-of-order message list.
+*/
+class AmpiOtherElement {
+public:
+/// Next incoming and outgoing message sequence number
+  int seqIncoming, seqOutgoing;
+  
+/// Number of elements in out-of-order queue. (normally 0)
+  int nOut;
+
+  AmpiOtherElement(void) {
+    seqIncoming=0; seqOutgoing=0;
+    nOut=0;
   }
   
   void pup(PUP::er &p) {
-    if (p.isUnpacking ())
-      m_data = AmpiMsg::pup(p,0);
-    else
-      AmpiMsg::pup(p, m_data);
-      
-    p|m_next;
+    p|seqIncoming; p|seqOutgoing;
+    p|nOut;
   }
-};
-
-class Que {
-public:
-  int m_head;
-  int m_tail;
-  int m_size;
-
-  Que () {
-    m_head = -1;
-    m_tail = -1;
-    m_size = 0;
-  }
-  
-  void pup(PUP::er &p) {
-    p|m_head;
-    p|m_tail;
-    p|m_size;
-  }
-};
-
-class AmpiOOQ {
-  AmpiNode*     m_list;        // list holding virtual queues data
-  Que*          m_q;           // pointer to list of virtual queues
-  int           m_numP;        // num of virtual queues
-  int           m_totalNodes;  // total nodes in the list
-  int           m_freeNode;    // index of head of free node list
-  int           m_availNodes;  // free nodes
-
-  /**
-   * This function should be called when m_availNodes == 0.
-   * It adds 'INITIAL_Q_SIZE' more nodes to existing queue.
-   */
-  void _expand (void);
-
-public:
-  AmpiOOQ () {}
-  void init (int numP);
-  ~AmpiOOQ ();
-  void pup(PUP::er &p);
-  int length () { return (m_totalNodes - m_availNodes); }
-  int length (int p) { return m_q[p].m_size; }
-  int isEmpty (int p) { return (0 == m_q[p].m_size); }
-  bool isEmpty () { return (m_totalNodes == m_availNodes); }
-  AmpiMsg* deq (int p);
-  void insert (int p, int pos, AmpiMsg*& elt);
-  void enq (int p, AmpiMsg*& elt);
-  AmpiMsg* peek (int p, int pos);
 };
 
 class AmpiSeqQ : private CkNoncopyable {
-  int *next;
-  AmpiOOQ q;
-  int seqEntries;
+  CkMsgQ<AmpiMsg> out;        // all out of order messages
+  CkPagedVector<AmpiOtherElement>  elements;   // element info
 
+  void putOutOfOrder(int srcIdx, AmpiMsg *msg);
+  
 public:
-  AmpiSeqQ () {}
-  AmpiSeqQ(int p) { init(p); }
-  ~AmpiSeqQ () { delete [] next; }
-  void init(int p) {
-    seqEntries = p;
-    q.init (p);
-    next = new int [seqEntries]; 
-    for (int i=0; i<p; i++)
-      next [i] = 0;
+  AmpiSeqQ() {}
+  void init(int numP);
+  ~AmpiSeqQ ();
+  void pup(PUP::er &p);
+  
+  /// Insert this message in the table.  Returns the number 
+  ///  of messages now available for the element.
+  ///   If 0, the message was out-of-order and is buffered.
+  ///   If 1, this message can be immediately processed.
+  ///   If >1, this message can be immediately processed,
+  ///    and you should call "getOutOfOrder" repeatedly.
+  inline int put(int srcIdx, AmpiMsg *msg) {
+     AmpiOtherElement &el=elements[srcIdx];
+     if (msg->seq==el.seqIncoming) { // In order:
+       el.seqIncoming++;
+       return 1+el.nOut;
+     }
+     else { // Out of order: stash message
+       putOutOfOrder(srcIdx, msg);
+       return 0;
+     }
   }
-  AmpiMsg *get(int p)
-  {
-    if(q.isEmpty(p) || ((q.peek(p,0))->seq != next [p])) {
-      return 0;
-    }
-    next [p]++;
-    return q.deq(p);
-  }
-  void put(int p, int seq, AmpiMsg *elt)
-  {
-    int i, len;
-    len = q.length(p);
-    for(i=0;i<len;i++) {
-      if((q.peek(p,i))->seq > seq)
-        break;
-    }
-    if (i>1000) CkAbort("Logic error in AmpiSeqQ::put");
-    q.insert(p, i, elt);
-  }
-  void pup(PUP::er &p) {
-    p|seqEntries;
-    if (p.isUnpacking ()) {
-      next = new int [seqEntries]; 
-    }
-    p(next,seqEntries);
-    p|q;
+  
+  /// Get an out-of-order message from the table.
+  ///  (in-order messages never go into the table)
+  AmpiMsg *getOutOfOrder(int p);
+  
+  /// Return the next outgoing sequence number, and increment it.
+  int nextOutgoing(int p) {
+     return elements[p].seqOutgoing++;
   }
 };
 PUPmarshall(AmpiSeqQ);
+
 
 inline CProxy_ampi ampiCommStruct::getProxy(void) const {return ampiID;}
 const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo);
@@ -1096,7 +1147,6 @@ class ampi : public CBase_ampi {
     CProxy_ampi remoteProxy; // valid only for intercommunicator
 
     int seqEntries; //Number of elements in below arrays
-    int *nextseq;
     AmpiSeqQ oorder;
     void inorder(AmpiMsg *msg);
 
