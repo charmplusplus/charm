@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.59  1997-04-03 19:42:08  jyelon
+ * Revision 2.60  1997-04-03 20:32:11  milind
+ * Fixed compilation problem due to differing prototype declaration of
+ * CthAutoYield.
+ *
+ * Revision 2.59  1997/04/03 19:42:08  jyelon
  * Working on threads stuff.
  *
  * Revision 2.58  1997/03/25 23:09:00  milind
@@ -608,7 +612,7 @@ void       CthAwaken              CMK_PROTO((CthThread));
 void       CthSetStrategy         CMK_PROTO((CthThread, CthVoidFn, CthThFn));
 void       CthSetStrategyDefault  CMK_PROTO((CthThread));
 void       CthYield               CMK_PROTO((void));
-void       CthAutoYield           CMK_PROTO((CthThread t, double sec));
+void       CthAutoYield           CMK_PROTO((CthThread t, int flag));
 double     CthAutoYieldFreq       CMK_PROTO((CthThread t));
 void       CthAutoYieldBlock      CMK_PROTO((void));
 void       CthAutoYieldUnblock    CMK_PROTO((void));
