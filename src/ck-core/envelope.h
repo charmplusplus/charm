@@ -62,9 +62,9 @@ class envelope {
     UShort s1;
     UShort s2;
     UShort priobits;
-    UChar  msgtype;
+    UChar  attribs1; // stores message type as well as the Used bit
+    UChar  attribs2; // stores queueing strategy as well as packed/unpacked
     UChar  msgIdx;
-    UChar  attribs;
     // to make envelope void* aligned
     UChar padding[D(3*sizeof(UShort)+3*sizeof(UChar))];
   public:
@@ -72,16 +72,18 @@ class envelope {
     void   setEvent(const UInt e) { event = e; }
     UInt   getRef(void) const { return s2; }
     void   setRef(const UShort r) { s2 = r; }
-    UChar  getQueueing(void) const { return (attribs & QMASK); }
-    void   setQueueing(const UChar q) { attribs = (attribs & PMASK) | q; }
-    UChar  getMsgtype(void) const { return msgtype; }
-    void   setMsgtype(const UChar m) { msgtype = m; }
+    UChar  getQueueing(void) const { return (attribs2 & QMASK); }
+    void   setQueueing(const UChar q) { attribs2 = (attribs2 & PMASK) | q; }
+    UChar  getMsgtype(void) const { return (attribs1&0x7F); }
+    void   setMsgtype(const UChar m) { attribs1 = (attribs1&0x80) | m; }
+    UChar  isUsed(void) { return (attribs1&0x80); }
+    void   setUsed(const UChar u) { attribs1 = (attribs1 & 0x7F) | (u<<7); }
     UChar  getMsgIdx(void) const { return msgIdx; }
     void   setMsgIdx(const UChar idx) { msgIdx = idx; }
     UInt   getTotalsize(void) const { return totalsize; }
     void   setTotalsize(const UInt s) { totalsize = s; }
-    UChar  isPacked(void) const { return ((attribs & PMASK)>>4); }
-    void   setPacked(const UChar p) { attribs = (attribs & QMASK) | (p<<4); }
+    UChar  isPacked(void) const { return ((attribs2 & PMASK)>>4); }
+    void   setPacked(const UChar p) { attribs2 = (attribs2 & QMASK) | (p<<4); }
     UShort getPriobits(void) const { return priobits; }
     void   setPriobits(const UShort p) { priobits = p; }
     UShort getPrioWords(void) const { return (priobits+CINTBITS-1)/CINTBITS; }
@@ -89,77 +91,78 @@ class envelope {
     void*  getPrioPtr(void) const { 
       return (void *)((char *)this + totalsize - getPrioBytes());
     }
-    UInt   getCount(void) const { assert(msgtype==RODataMsg); return i1; }
-    void   setCount(const UInt c) { assert(msgtype==RODataMsg); i1 = c; }
-    UInt   getRoIdx(void) const { assert(msgtype==ROMsgMsg); return i1; }
-    void   setRoIdx(const UInt r) { assert(msgtype==ROMsgMsg); i1 = r; }
+    UInt   getCount(void) const { assert(getMsgtype()==RODataMsg); return i1; }
+    void   setCount(const UInt c) { assert(getMsgtype()==RODataMsg); i1 = c; }
+    UInt   getRoIdx(void) const { assert(getMsgtype()==ROMsgMsg); return i1; }
+    void   setRoIdx(const UInt r) { assert(getMsgtype()==ROMsgMsg); i1 = r; }
     static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
     {
       assert(type>=NewChareMsg && type<=StatMsg);
       register UInt tsize = sizeof(envelope)+ALIGN(size)+sizeof(int)*PW(prio);
       register envelope *env = (envelope *)CmiAlloc(tsize);
-      env->msgtype = type;
+      env->setMsgtype(type);
       env->totalsize = tsize;
       env->priobits = prio;
       env->setPacked(0);
+      env->setUsed(0);
       return env;
     }
     UShort getEpIdx(void) const {
-      assert(msgtype==NewChareMsg || msgtype==NewVChareMsg
-          || msgtype==ForChareMsg || msgtype==ForVidMsg
-          || msgtype==BocInitMsg || msgtype==NodeBocInitMsg
-          || msgtype==ForBocMsg || msgtype==ForNodeBocMsg);
+      assert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg
+          || getMsgtype()==ForChareMsg || getMsgtype()==ForVidMsg
+          || getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg
+          || getMsgtype()==ForBocMsg || getMsgtype()==ForNodeBocMsg);
       return s1;
     }
     void   setEpIdx(const UShort idx) {
-      assert(msgtype==NewChareMsg || msgtype==NewVChareMsg
-          || msgtype==ForChareMsg || msgtype==ForVidMsg
-          || msgtype==BocInitMsg || msgtype==NodeBocInitMsg
-          || msgtype==ForBocMsg || msgtype==ForNodeBocMsg);
+      assert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg
+          || getMsgtype()==ForChareMsg || getMsgtype()==ForVidMsg
+          || getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg
+          || getMsgtype()==ForBocMsg || getMsgtype()==ForNodeBocMsg);
       s1 = idx;
     }
     void*  getVidPtr(void) const {
-      assert(msgtype==NewVChareMsg || msgtype==ForVidMsg
-          || msgtype==FillVidMsg);
+      assert(getMsgtype()==NewVChareMsg || getMsgtype()==ForVidMsg
+          || getMsgtype()==FillVidMsg);
       return ptr;
     }
     void   setVidPtr(void *p) {
-      assert(msgtype==NewVChareMsg || msgtype==ForVidMsg
-          || msgtype==FillVidMsg);
+      assert(getMsgtype()==NewVChareMsg || getMsgtype()==ForVidMsg
+          || getMsgtype()==FillVidMsg);
       ptr = p;
     }
     UInt   getSrcPe(void) const { return pe; }
     void   setSrcPe(const UInt s) { pe = s; }
-    void*  getObjPtr(void) const { assert(msgtype==ForChareMsg); return ptr; }
-    void   setObjPtr(void *p) { assert(msgtype==ForChareMsg); ptr = p; }
+    void*  getObjPtr(void) const { assert(getMsgtype()==ForChareMsg); return ptr; }
+    void   setObjPtr(void *p) { assert(getMsgtype()==ForChareMsg); ptr = p; }
     UShort getRetEp(void) const {
-      assert(msgtype==DBocReqMsg || msgtype==DNodeBocReqMsg); 
+      assert(getMsgtype()==DBocReqMsg || getMsgtype()==DNodeBocReqMsg); 
       return s1; 
     }
     void   setRetEp(const UShort e) {
-      assert(msgtype==DBocReqMsg || msgtype==DNodeBocReqMsg); 
+      assert(getMsgtype()==DBocReqMsg || getMsgtype()==DNodeBocReqMsg); 
       s1 = e; 
     }
     void*  getUsrMsg(void) const { 
-      assert(msgtype==DBocReqMsg || msgtype==DBocNumMsg
-          || msgtype==DNodeBocReqMsg || msgtype==DNodeBocNumMsg); 
+      assert(getMsgtype()==DBocReqMsg || getMsgtype()==DBocNumMsg
+          || getMsgtype()==DNodeBocReqMsg || getMsgtype()==DNodeBocNumMsg); 
       return ptr; 
     }
     void   setUsrMsg(void *p) { 
-      assert(msgtype==DBocReqMsg || msgtype==DBocNumMsg
-          || msgtype==DNodeBocReqMsg || msgtype==DNodeBocNumMsg); 
+      assert(getMsgtype()==DBocReqMsg || getMsgtype()==DBocNumMsg
+          || getMsgtype()==DNodeBocReqMsg || getMsgtype()==DNodeBocNumMsg); 
       ptr = p; 
     }
     UInt   getGroupNum(void) const {
-      assert(msgtype==BocInitMsg || msgtype==ForBocMsg
-          || msgtype==DBocNumMsg || msgtype==NodeBocInitMsg
-          || msgtype==ForNodeBocMsg || msgtype==DNodeBocNumMsg);
+      assert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
+          || getMsgtype()==DBocNumMsg || getMsgtype()==NodeBocInitMsg
+          || getMsgtype()==ForNodeBocMsg || getMsgtype()==DNodeBocNumMsg);
       return i1;
     }
     void   setGroupNum(const UInt g) {
-      assert(msgtype==BocInitMsg || msgtype==ForBocMsg
-          || msgtype==DBocNumMsg || msgtype==NodeBocInitMsg
-          || msgtype==ForNodeBocMsg || msgtype==DNodeBocNumMsg);
+      assert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
+          || getMsgtype()==DBocNumMsg || getMsgtype()==NodeBocInitMsg
+          || getMsgtype()==ForNodeBocMsg || getMsgtype()==DNodeBocNumMsg);
       i1 = g;
     }
 };

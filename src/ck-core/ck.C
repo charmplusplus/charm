@@ -53,6 +53,7 @@ static void _processNewChareMsg(envelope *env)
   CpvAccess(_currentChare) = obj;
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->beginExecute(env);
+  env->setUsed(0);
   _entryTable[env->getEpIdx()]->call(msg, obj);
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->endExecute();
@@ -76,6 +77,7 @@ static void _processNewVChareMsg(envelope *env)
   register void *msg = EnvToUsr(env);
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->beginExecute(env);
+  env->setUsed(0);
   _entryTable[env->getEpIdx()]->call(msg, obj);
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->endExecute();
@@ -89,6 +91,7 @@ static inline void _processForChareMsg(envelope *env)
   CpvAccess(_currentChare) = obj;
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->beginExecute(env);
+  env->setUsed(0);
   _entryTable[epIdx]->call(msg, obj);
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->endExecute();
@@ -128,6 +131,7 @@ static inline void _processFillVidMsg(envelope *env)
 static inline void _processForVidMsg(envelope *env)
 {
   VidBlock *vptr = (VidBlock *) env->getVidPtr();
+  env->setUsed(1);
   vptr->send(env);
 }
 
@@ -311,9 +315,13 @@ extern "C"
 void CkSendMsg(int entryIdx, void *msg, CkChareID *pCid)
 {
   register envelope *env = UsrToEnv(msg);
+  if(env->isUsed()) {
+    CmiAbort("Message being re-sent. Aborting...\n");
+  }
   env->setMsgtype(ForChareMsg);
   env->setEpIdx(entryIdx);
   CmiSetHandler(env, _charmHandlerIdx);
+  env->setUsed(1);
   if(pCid->onPE < 0) {
     register int pe = -(pCid->onPE+1);
     if(pe==CkMyPe()) {
@@ -344,6 +352,9 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
 {
   assert(cIdx == _entryTable[eIdx]->chareIdx);
   envelope *env = UsrToEnv(msg);
+  if(env->isUsed()) {
+    CmiAbort("Message being re-sent. Aborting...\n");
+  }
   if(pCid == 0) {
     env->setMsgtype(NewChareMsg);
   } else {
@@ -359,6 +370,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
     CpvAccess(_trace)->creation(env);
   CpvAccess(_qd)->create();
   CpvAccess(_myStats)->recordCreateChare();
+  env->setUsed(1);
   CldEnqueue(destPE, env, _infoIdx);
 }
 
@@ -371,6 +383,7 @@ void _createGroupMember(int groupID, int eIdx, void *msg)
   CpvAccess(_currentChare) = obj;
   register int prevGrp = CpvAccess(_currentGroup);
   CpvAccess(_currentGroup) = groupID;
+  UsrToEnv(msg)->setUsed(0);
   _entryTable[eIdx]->call(msg, obj);
   CpvAccess(_currentChare) = prev;
   CpvAccess(_currentGroup) = prevGrp;
@@ -388,6 +401,7 @@ void _createNodeGroupMember(int groupID, int eIdx, void *msg)
   CpvAccess(_currentChare) = obj;
   register int prevGrp = CpvAccess(_currentNodeGroup);
   CpvAccess(_currentNodeGroup) = groupID;
+  UsrToEnv(msg)->setUsed(0);
   _entryTable[eIdx]->call(msg, obj);
   CpvAccess(_currentChare) = prev;
   CpvAccess(_currentNodeGroup) = prevGrp;
@@ -396,6 +410,10 @@ void _createNodeGroupMember(int groupID, int eIdx, void *msg)
 
 void _createGroup(int groupID, envelope *env, int retEp, CkChareID *retChare)
 {
+  if(env->isUsed()) {
+    CmiAbort("Message being re-sent. Aborting...\n");
+  }
+  env->setUsed(1);
   register int epIdx = env->getEpIdx();
   register int msgIdx = env->getMsgIdx();
   env->setGroupNum(groupID);
@@ -431,6 +449,10 @@ void _createGroup(int groupID, envelope *env, int retEp, CkChareID *retChare)
 
 void _createNodeGroup(int groupID, envelope *env, int retEp, CkChareID *retChare)
 {
+  if(env->isUsed()) {
+    CmiAbort("Message being re-sent. Aborting...\n");
+  }
+  env->setUsed(1);
   register int epIdx = env->getEpIdx();
   register int msgIdx = env->getMsgIdx();
   env->setGroupNum(groupID);
@@ -474,6 +496,10 @@ static int _staticGroupCreate(envelope *env, int retEp, CkChareID *retChare)
 
 static void _dynamicGroupCreate(envelope *env, int retEp, CkChareID * retChare)
 {
+  if(env->isUsed()) {
+    CmiAbort("Message being re-sent. Aborting...\n");
+  }
+  env->setUsed(1);
   register CkChareID *msg = 
     (CkChareID*) _allocMsg(DBocReqMsg, sizeof(CkChareID));
   *msg = *retChare;
@@ -497,6 +523,10 @@ static int _staticNodeGroupCreate(envelope *env, int retEp, CkChareID *retChare)
 
 static void _dynamicNodeGroupCreate(envelope *env, int retEp, CkChareID * retChare)
 {
+  if(env->isUsed()) {
+    CmiAbort("Message being re-sent. Aborting...\n");
+  }
+  env->setUsed(1);
   register CkChareID *msg = 
     (CkChareID*) _allocMsg(DNodeBocReqMsg, sizeof(CkChareID));
   *msg = *retChare;
@@ -564,6 +594,10 @@ static inline void _sendMsgBranch(int eIdx, void *msg, int gID,
                            int pe=CLD_BROADCAST_ALL)
 {
   register envelope *env = UsrToEnv(msg);
+  if(env->isUsed()) {
+    CmiAbort("Message being re-sent. Aborting...\n");
+  }
+  env->setUsed(1);
   env->setMsgtype(ForBocMsg);
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
@@ -596,6 +630,10 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, int gID,
                            int node=CLD_BROADCAST_ALL)
 {
   register envelope *env = UsrToEnv(msg);
+  if(env->isUsed()) {
+    CmiAbort("Message being re-sent. Aborting...\n");
+  }
+  env->setUsed(1);
   env->setMsgtype(ForNodeBocMsg);
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
