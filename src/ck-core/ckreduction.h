@@ -83,6 +83,7 @@ public:
 
 private:
 	friend class CkReductionMgr;
+	friend class CkMulticastMgr;
 //System-level interface
 	//This is the maximum number of possible reducers, 
 	// including both builtin and user-defined types
@@ -271,6 +272,7 @@ class CkReductionMsg : public CMessage_CkReductionMsg
 {
 	friend class CkReduction;
 	friend class CkReductionMgr;
+	friend class CkMulticastMgr;
 public:
 
 //Publically-accessible fields:	
@@ -310,12 +312,14 @@ private:
   		>0 indicates this is a reduced contribution.
   	*/
   	int nSources(void) {return sourceFlag<0?-sourceFlag:sourceFlag;}
-
 private:
 	CkReduction::reducerType reducer;
 	CkReductionMgr::contributorInfo *ci;//Source contributor, or NULL if none
 	int redNo;//The serial number of this reduction
 	int gcount;//Contribution to the global contributor count
+        // for section multicast/reduction library
+        CkSectionCookie sid;   // section cookie for multicast
+        char rebuilt;          // indicate if the multicast tree needs rebuilt
 	double dataStorage;//Start of data array (so it's double-aligned)
 	
 	//Default constructor is private so you must use "buildNew", above
