@@ -1447,8 +1447,7 @@ FEM_Num_Partitions(void)
 CDECL double
 FEM_Timer(void)
 {
-  FEMAPI("FEM_Timer");
-  return CkTimer();
+  return TCharmWallTimer();
 }
 
 CDECL void 

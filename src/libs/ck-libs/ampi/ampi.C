@@ -654,8 +654,7 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
 CDECL
 double MPI_Wtime(void)
 {
-  AMPIAPI("MPI_Wtime");
-  return CmiWallTimer();
+  return TCharmWallTimer();
 }
 
 CDECL

@@ -575,8 +575,7 @@ MBLK_Get_blocksize(int *dim)
 CDECL double 
 MBLK_Timer(void)
 {
-  MBLOCKAPI("MBLK_Timer");
-  return CkTimer();
+  return TCharmWallTimer();
 }
 
 CDECL void 
