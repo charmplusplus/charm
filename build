@@ -9,14 +9,14 @@ syntax() {
   echo ''
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
   echo ''
-  echo '<targets>: converse charm++ libs AMPI bluegene pose'
+  echo '<targets>: converse charm++ LIBS AMPI bluegene pose'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
   if test $more = 1
   then
   echo ''
   echo '  charm++         compile Charm++ core only'
   echo '  AMPI            compile Adaptive MPI'
-  echo '  libs            compile additional parallel libraries with Charm++ core'
+  echo '  LIBS            compile additional parallel libraries with Charm++ core'
   echo '  bluegene        build additional BigSim libraries'
   echo '  pose            build POSE parallel discrete event simulator'
   echo ''
@@ -53,7 +53,7 @@ syntax() {
   echo ''
   echo 'Advanced options:'
   echo '  bluegene	  compile for BigSim (Blue Gene) simulator'
-  echo '  occ		  compile with out of core support'
+  echo '  ooc		  compile with out of core support'
   echo ''
   echo "Charm++ dynamic libraries:"
   echo "  --build-shared  build Charm++ dynamic libraries (.so), this is on by default"
