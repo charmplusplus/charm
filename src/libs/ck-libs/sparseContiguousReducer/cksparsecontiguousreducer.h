@@ -208,4 +208,8 @@ float *decompressMsg(CkReductionMsg *m, CkDataSegHeader &h, float nullVal);
 
 double *decompressMsg(CkReductionMsg *m, CkDataSegHeader &h, double nullVal);
 
+CkTwoDoubles *decompressMsg(CkReductionMsg *m, CkDataSegHeader &h, CkTwoDoubles nullVal);
+
+CkTwoFloats *decompressMsg(CkReductionMsg *m, CkDataSegHeader &h, CkTwoFloats nullVal);
+
 #endif
