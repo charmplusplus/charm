@@ -5,6 +5,7 @@
  *
  * Grid (3d grid) based router
  ***********************************************************/
+#include <math.h>
 #include "3dgridrouter.h"
 //#define NULL 0
 
@@ -31,9 +32,14 @@
 #define RowLen(pe) ColLen3D(pe)
 #define PELISTSIZE ((ROWLEN-1)/sizeof(int)+1)
 
+double cubeRoot(double d) {
+  return pow(d,1.0/3.0);
+}
+
+
 inline int ColLen3D(int npes)
 {
-    int len= (int)cbrt((double)npes);
+    int len= (int)cubeRoot((double)npes);
     //    ComlibPrintf("%d:collen len = %d\n", CmiMyPe(), len);
     if (npes > (len * len * len)) len++;
     return(len);
