@@ -179,7 +179,7 @@ EOF
 	for newdir in `echo bin lib include tmp`
 	do
 		echo "Soft-linking over $newdir"
-    if [ -e $newdir ]
+    if [ -r $newdir ]
     then
       rm -f $newdir
     fi
