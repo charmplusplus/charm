@@ -661,7 +661,7 @@ if [ "$BUILD_SHARE" = "1" ]
 then
 	# ignore BUILD_SHARE if the target is not .a or .so
 	case "$OBJECT" in
-	*.a|*.so)
+	*.a|*.so|*.sl)
  		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO -L$CHARMLIBSO"
 		;;
 	*)	
@@ -898,7 +898,7 @@ do
 	*.fc|*.FC)
 		Abort "I'm not yet smart enough to compile $FILE"
 		;;
-	*.o|*.so|*.a)
+	*.o|*.so|*.sl|*.a)
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;
 	*.M|*.mod)
@@ -964,7 +964,7 @@ case "$OBJECT" in
 	fi
 	Copyobj
 	;;
-*.so)
+*.so|*.sl)
 # Make shared library
 	if [ "$MAKELIBCHARM" = 0 -a "$CHARM_SHARED" = "0" ]
 	then
@@ -985,7 +985,7 @@ case "$OBJECT" in
 	  else
 	    COPYTO=`echo $COPYTO | sed -e 's@lib[/]*$@lib_so@'`
 	  fi
-	  OBJECT=`echo $OBJECT | sed -e 's/\.a$/.so/'`
+	  OBJECT=`echo $OBJECT | sed -e 's/\.a$/.'"$CMK_SHARED_SUF"'/'`
 	  MakeSO
 	  COPYTO=$COPYTO_SAVE
 	  OBJECT=$OBJECT_SAVE
