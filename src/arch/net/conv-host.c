@@ -1249,7 +1249,9 @@ void nodetab_add(nodetab_host res)
 {
   if (res->rank == 0)
     nodetab_rank0_table[nodetab_rank0_size++] = nodetab_size;
-  nodetab_table[nodetab_size++] = res;
+  nodetab_table[nodetab_size] = 
+    (struct nodetab_host *) malloc(sizeof(struct nodetab_host));
+  memcpy(nodetab_table[nodetab_size++], res, sizeof(struct nodetab_host));
 }
 
 void nodetab_makehost(char *host)
