@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1995-10-27 23:56:49  jyelon
+ * Revision 2.17  1995-11-05 18:26:26  sanjeev
+ * removed trace_creation in CkLdbSend
+ *
+ * Revision 2.16  1995/10/27  23:56:49  jyelon
  * removed more ansi
  *
  * Revision 2.15  1995/10/27  21:31:25  jyelon
@@ -455,7 +458,11 @@ void CkLdbSend(msgst, destPE)
      int destPE;
 {
   ENVELOPE *env = (ENVELOPE *)msgst;
-  trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env); 
+
+/* trace_creation is NOT needed here because it has already been done in
+   the CreateChare
+  trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);  */
+
   CkCheck_and_Send(destPE, env);
 }
 
