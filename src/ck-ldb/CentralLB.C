@@ -561,9 +561,7 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg*
 		int to = msg->moves[mig].to_pe;
 		double wallTime;
 		int oidx, cidx;
-
-		ckout << "Object " << msg->moves[mig].obj.id.id[0] << " migrating from " << from  << " to " << to << endl;
-
+		
 		// find the cpu time for the object that is migrating
 		for(oidx = 0; oidx < stats[from].n_objs; oidx++)
 			if(stats[from].objData[oidx].handle.id == msg->moves[mig].obj.id)
