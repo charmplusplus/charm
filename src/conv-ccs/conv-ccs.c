@@ -5,374 +5,82 @@
  * $Revision$
  *****************************************************************************/
 
+#include <stdio.h>
 #include <stdlib.h>
-/* #include <sys/timer.h> */
-/* #include <sys/unistd.h>  (net-axp chokes on this, so if somebody needs */
-/*                             it, we need to use a typedef -RKB 8.24.99) */
 #include <errno.h>
 #ifndef  WIN32
 #include <sys/time.h>
 #endif
 #include <string.h>
 
+#include "converse.h"
 #include "conv-ccs.h"
+#include "ccs-server.h"
+#include "sockRoutines.h"
 
-#if CMK_WEB_MODE
-int appletFd = -1;
-#endif
+#if CMK_CCS_AVAILABLE
 
-#if NODE_0_IS_CONVHOST
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
+/**********************************************
+Builtin CCS request handlers:
+  "ccs_getinfo"-- no data
+    Return the number of parallel nodes, and
+      the number of processors per node as an array
+      of 4-byte big-endian ints.
 
-int serverFlag = 0;
-extern int inside_comm;
-extern int strHandlerID;
+  "ccs_killport"-- one 4-byte big-endian port number
+    Register a "client kill port".  When this program exits,
+    it will connect to this TCP port and write "die\n\0" it.
+*/
 
-int hostport, hostskt;
-int hostskt_ready_read;
-
-CpvStaticDeclare(int, CHostHandlerIndex);
-static unsigned int *nodeIPs;
-static unsigned int *nodePorts;
-static int numRegistered;
-
-static void KillEveryoneCode(int n)
+static void ccs_getinfo(char *msg)
 {
-  char str[128];
-  sprintf(str, "Fatal Error: code %d\n", n);
-  CmiAbort(str);
+  int nNode=CmiNumNodes();
+  int len=(1+nNode)*sizeof(ChMessageInt_t);
+  ChMessageInt_t *table=(ChMessageInt_t *)malloc(len);
+  int n;
+  table[0]=ChMessageInt_new(nNode);
+  for (n=0;n<nNode;n++)
+    table[1+n]=ChMessageInt_new(CmiNodeSize(n));
+  CcsSendReply(len,(const char *)table);
+  free(table);
+  CmiGrabBuffer((void **)&msg);CmiFree(msg);
 }
 
-static void jsleep(int sec, int usec)
-{
-  int ntimes,i;
-  struct timeval tm;
+typedef struct killPortStruct{
+  int ip,port;
+  struct killPortStruct *next;
+} killPortStruct;
+/*Only 1 kill list per node-- no Cpv needed*/
+static killPortStruct *killList=NULL;
 
-  ntimes = sec*200 + usec/5000;
-  for(i=0;i<ntimes;i++) {
-    tm.tv_sec = 0;
-    tm.tv_usec = 5000;
-    while(1) {
-      if (select(0,NULL,NULL,NULL,&tm)==0) break;
-      if ((errno!=EBADF)&&(errno!=EINTR)) return;
+static void ccs_killport(char *msg)
+{
+  killPortStruct *oldList=killList;
+  int port=ChMessageInt(*(ChMessageInt_t *)(msg+CmiMsgHeaderSizeBytes));
+  unsigned int ip,connPort;
+  CcsCallerId(&ip,&connPort);
+  killList=(killPortStruct *)malloc(sizeof(killPortStruct));
+  killList->ip=ip;
+  killList->port=port;
+  killList->next=oldList;
+  CmiGrabBuffer((void **)&msg);CmiFree(msg);
+}
+/*Send any registered clients kill messages before we exit*/
+static void noMoreErrors(int c,const char *m) {exit(1);}
+void CcsImpl_kill(void)
+{
+  skt_set_abort(noMoreErrors);
+  while (killList!=NULL)
+  {
+    SOCKET fd=skt_connect(killList->ip,killList->port,20);
+    if (fd!=INVALID_SOCKET) {
+      skt_sendN(fd,"die\n",strlen("die\n")+1);
+      skt_close(fd);
     }
+    killList=killList->next;
   }
 }
 
-void writeall(int fd, char *buf, int size)
-{
-  int ok;
-  while (size) {
-    retry:
-    ok = write(fd, buf, size);
-    if ((ok<0)&&((errno==EBADF)||(errno==EINTR))) goto retry;
-    if (ok<=0) {
-      CmiAbort("Write failed ..\n");
-    }
-    size-=ok; buf+=ok;
-  }
-}
-
-void skt_server(ppo, pfd)
-unsigned int *ppo;
-unsigned int *pfd;
-{
-  int fd= -1;
-  int ok, len;
-  struct sockaddr_in addr;
-
-retry:
-  fd = socket(PF_INET, SOCK_STREAM, 0);
-  if ((fd<0)&&((errno==EINTR)||(errno==EBADF))) goto retry;
-  if (fd < 0) { perror("socket 1"); KillEveryoneCode(93483); }
-  memset(&addr, 0, sizeof(addr));
-  addr.sin_family = AF_INET;
-  ok = bind(fd, (struct sockaddr *)&addr, sizeof(addr));
-  if (ok < 0) { perror("bind"); KillEveryoneCode(22933); }
-  ok = listen(fd,5);
-  if (ok < 0) { perror("listen"); KillEveryoneCode(3948); }
-  len = sizeof(addr);
-  ok = getsockname(fd, (struct sockaddr *)&addr, &len);
-  if (ok < 0) { perror("getsockname"); KillEveryoneCode(93583); }
-
-  *pfd = fd;
-  *ppo = ntohs(addr.sin_port);
-}
-
-int skt_connect(ip, port, seconds)
-unsigned int ip; int port; int seconds;
-{
-  struct sockaddr_in remote; short sport=port;
-  int fd, ok, begin;
-
-  /* create an address structure for the server */
-  memset(&remote, 0, sizeof(remote));
-  remote.sin_family = AF_INET;
-  remote.sin_port = htons(sport);
-  remote.sin_addr.s_addr = htonl(ip);
-
-  begin = time(0); ok= -1;
-  while (time(0)-begin < seconds) {
-  sock:
-    fd = socket(AF_INET, SOCK_STREAM, 0);
-    if ((fd<0)&&((errno==EINTR)||(errno==EBADF))) goto sock;
-    if (fd < 0) KillEveryoneCode(234234);
-
-  conn:
-    ok = connect(fd, (struct sockaddr *)&(remote), sizeof(remote));
-    if (ok>=0) break;
-    close(fd);
-    switch (errno) {
-    case EINTR: case EBADF: case EALREADY: case EISCONN: break;
-    case ECONNREFUSED: jsleep(1,0); break;
-    case EADDRINUSE: jsleep(1,0); break;
-    case EADDRNOTAVAIL: jsleep(1,0); break;
-    default: return -1;
-    }
-  }
-  if (ok<0) return -1;
-  return fd;
-}
-
-static void skt_accept(src, pip, ppo, pfd)
-int src;
-unsigned int *pip;
-unsigned int *ppo;
-unsigned int *pfd;
-{
-  int i, fd;
-  struct sockaddr_in remote;
-  i = sizeof(remote);
- acc:
-  fd = accept(src, (struct sockaddr *)&remote, &i);
-  if ((fd<0)&&((errno==EINTR)||(errno==EBADF))) goto acc;
-  if (fd<0) { perror("accept"); KillEveryoneCode(39489); }
-  *pip=htonl(remote.sin_addr.s_addr);
-  *ppo=htons(remote.sin_port);
-  *pfd=fd;
-}
-
-static void CheckSocketsReady(void)
-{
-  static fd_set rfds;
-  static fd_set wfds;
-  struct timeval tmo;
-  int nreadable;
-
-  FD_ZERO(&rfds);
-  FD_ZERO(&wfds);
-  FD_SET(hostskt, &rfds);
-  FD_SET(hostskt, &wfds);
-  tmo.tv_sec = 0;
-  tmo.tv_usec = 0;
-  nreadable = select(FD_SETSIZE, &rfds, &wfds, NULL, &tmo);
-  if (nreadable <= 0) {
-    hostskt_ready_read = 0;
-    return;
-  }
-  hostskt_ready_read = (FD_ISSET(hostskt, &rfds));
-}
-
-void CHostRegister(void)
-{
-  struct hostent *hostent;
-  char hostname[100];
-  int ip;
-  char *msg;
-  int *ptr;
-  int msgSize = CmiMsgHeaderSizeBytes + 3 * sizeof(unsigned int);
-
-  if(gethostname(hostname, 99) < 0) {
-    hostent = gethostent();
-  }
-  else{
-    hostent = gethostbyname(hostname);
-  }
-  if (hostent == 0)
-    ip = 0x7f000001;
-  else
-    ip = htonl(*((CmiInt4 *)(hostent->h_addr_list[0])));
-
-  msg = (char *)CmiAlloc(msgSize * sizeof(char));
-  ptr = (int *)(msg + CmiMsgHeaderSizeBytes);
-  ptr[0] = CmiMyPe();
-  ptr[1] = ip;
-  ptr[2] = hostport;
-  CmiSetHandler(msg, CpvAccess(CHostHandlerIndex));
-  CmiSyncSendAndFree(0, msgSize, msg);
-}
-
-unsigned int clientIP, clientPort, clientKillPort;
-
-void CHostGetOne()
-{
-  char line[10000];
-  char rest[1000];
-  int ip, port, fd;  FILE *f;
-#if CMK_WEB_MODE
-  char hndlrId[100];
-  int dont_close = 0;
-  int svrip, svrport;
-#endif
-
-  skt_accept(hostskt, &ip, &port, &fd);
-  f = fdopen(fd,"r");
-  while (fgets(line, 9999, f)) {
-    if (strncmp(line, "req ", 4)==0) {
-      char cmd[5], *msg;
-      int pe, size, len;
-      int ret;
-#if CMK_WEB_MODE   
-      sscanf(line, "%s%d%d%d%d%s", cmd, &pe, &size, &svrip, &svrport, hndlrId);
-      if(strcmp(hndlrId, "MonitorHandler") == 0) {
-	appletFd = fd;
-	dont_close = 1;
-      }
-#else
-      sscanf(line, "%s%d%d", cmd, &pe, &size);
-#endif
-      /* DEBUGGING */
-      /*CmiPrintf("Line = %s\n", line);*/
-
-      sscanf(line, "%s%d%d", cmd, &pe, &size);
-      len = strlen(line);
-      msg = (char *) CmiAlloc(len+size+CmiMsgHeaderSizeBytes+1);
-      if (!msg)
-        CmiPrintf("%d: Out of mem\n", CmiMyPe());
-      CmiSetHandler(msg, strHandlerID);
-      /*CmiPrintf("hdlr ID = %d\n", strHandlerID);*/
-      strcpy(msg+CmiMsgHeaderSizeBytes, line);
-      ret = fread(msg+CmiMsgHeaderSizeBytes+len, 1, size, f);
-      /*CmiPrintf("size = %d, ret =%d\n", size, ret);*/
-      msg[CmiMsgHeaderSizeBytes+len+size] = '\0';
-      CmiSyncSendAndFree(CmiMyPe(), CmiMsgHeaderSizeBytes+len+size+1, msg);
-
-#if CMK_USE_PERSISTENT_CCS
-      if(dont_close == 1) break;
-#endif
-
-    }
-    else if (strncmp(line, "getinfo ", 8)==0) {
-      char pre[1024], reply[1024], ans[1024];
-      char cmd[20];
-      int fd;
-      int i;
-      int nscanfread;
-      int nodetab_rank0_size = CmiNumNodes();
-
-      /* DEBUGGING */
-      /*CmiPrintf("Line = %s\n", line);*/
-      nscanfread = sscanf(line, "%s%u%u", cmd, &clientIP, &clientPort);
-      if(nscanfread != 3){
-
-	/* DEBUGGING */
-	CmiPrintf("Entering further read...\n");
-
-        fgets(rest, 999, f);
-
-	/* DEBUGGING */
-	CmiPrintf("Rest = %s\n", rest);
-
-        sscanf(rest, "%u%u", &clientIP, &clientPort);
-      }
-      clientIP = (CmiInt4) clientIP;
-      strcpy(pre, "info");
-      reply[0] = 0;
-      sprintf(ans, "%d ", nodetab_rank0_size);
-      strcat(reply, ans);
-      for(i=0;i<nodetab_rank0_size;i++) {
-        strcat(reply, "1 ");
-      }
-      for(i=0;i<nodetab_rank0_size;i++) {
-        sprintf(ans, "%d ", (CmiInt4) nodeIPs[i]);
-        strcat(reply, ans);
-      }
-      for(i=0;i<nodetab_rank0_size;i++) {
-        sprintf(ans, "%d ", nodePorts[i]);
-        strcat(reply, ans);
-      }
-      fd = skt_connect(clientIP, clientPort, 60);
-
-      /** Debugging **/
-      CmiPrintf("After Connect for getinfo reply\n");
-
-
-      if (fd<=0) KillEveryoneCode(2932);
-      write(fd, pre, strlen(pre));
-      write(fd, " ", 1);
-      write(fd, reply, strlen(reply));
-      close(fd);
-    }
-    else if (strncmp(line, "clientdata", strlen("clientdata"))==0){
-      int nread;
-      char cmd[20];
-      
-      nread = sscanf(line, "%s%d", cmd, &clientKillPort);
-      if(nread != 2){
-	fgets(rest, 999, f);
-	
-	/* DEBUGGING */
-	CmiPrintf("Rest = %s\n", rest);
-	
-        sscanf(rest, "%d", &clientKillPort);
-
-	/* Debugging */
-
-	CmiPrintf("After sscanf\n");
-      }
-    }
-    else {
-      /*CmiPrintf("Request: %s\n", line);*/
-      KillEveryoneCode(2933);
-    }
-  }
-  /*CmiPrintf("Out of fgets loop\n");*/
-#if CMK_WEB_MODE
-  if(dont_close==0) {
-#endif
-  fclose(f);
-  close(fd);
-#if CMK_WEB_MODE
-  }
-#endif
-}
-
-void CommunicationServer()
-{
-  if(inside_comm)
-    return;
-    CheckSocketsReady();
-     /*if (hostskt_ready_read) { CHostGetOne(); continue; }*/
-}
-
-void CHostHandler(char *msg)
-{
-  int pe;
-  int *ptr = (int *)(msg + CmiMsgHeaderSizeBytes);
-  pe = ptr[0];
-  nodeIPs[pe] = (unsigned int)(ptr[1]);
-  nodePorts[pe] = (unsigned int)(ptr[2]);
-  numRegistered++;
- 
-  if(numRegistered == CmiNumPes()){
-    if (serverFlag == 1)  {
-      CmiPrintf("ccs: %s\nccs: Server IP = %u, Server port = %u $\n", CMK_CCS_VERSION, (CmiInt4) nodeIPs[0], nodePorts[0]);
-    }
-  }
-}
-
-void CHostInit()
-{
-  nodeIPs = (unsigned int *)malloc(CmiNumPes() * sizeof(unsigned int));
-  nodePorts = (unsigned int *)malloc(CmiNumPes() * sizeof(unsigned int));
-  CpvInitialize(int, CHostHandlerIndex);
-  CpvAccess(CHostHandlerIndex) = CmiRegisterHandler(CHostHandler);
-}
-
-#endif
 
 /* move */
 
@@ -395,11 +103,10 @@ static void CpdDebugHandler(char *msg)
 {
   char *reply, *temp;
   int index;
-  
+  int ip,ignored_port;
+  CcsCallerId(&ip,&ignored_port);
   if(CcsIsRemoteRequest()) {
     char name[128];
-    unsigned int ip, port;
-    CcsCallerId(&ip, &port);
     sscanf(msg+CmiMsgHeaderSizeBytes, "%s", name);
     reply = NULL;
 
@@ -420,11 +127,11 @@ static void CpdDebugHandler(char *msg)
       CmiPrintf("list obtained");
       if(reply == NULL){
 	CmiPrintf("list empty");
-	CcsSendReply(ip, port, strlen("$") + 1, "$");
+	CcsSendReply(strlen("$") + 1, "$");
       }
       else{
 	CmiPrintf("list : %s\n", reply);
-	CcsSendReply(ip, port, strlen(reply) + 1, reply);
+	CcsSendReply(strlen(reply) + 1, reply);
 	free(reply);
       }
     }
@@ -435,16 +142,16 @@ static void CpdDebugHandler(char *msg)
       sscanf(temp, "%d", &index);
       reply = getObjectContents(index);
       CmiPrintf("Object Contents : %s\n", reply);
-      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      CcsSendReply(strlen(reply) + 1, reply);
       free(reply);
     }
     else if (strcmp(name, "getMsgListSched") == 0){
       CmiPrintf("getMsgListSched received\n");
       reply = getMsgListSched();
       if(reply == NULL)
-	CcsSendReply(ip, port, strlen("$") + 1, "$");
+	CcsSendReply(strlen("$") + 1, "$");
       else{
-	CcsSendReply(ip, port, strlen(reply) + 1, reply);
+	CcsSendReply(strlen(reply) + 1, reply);
 	free(reply);
       }
     }
@@ -452,9 +159,9 @@ static void CpdDebugHandler(char *msg)
       CmiPrintf("getMsgListFIFO received\n");
       reply = getMsgListFIFO();
       if(reply == NULL)
-	CcsSendReply(ip, port, strlen("$") + 1, "$");
+	CcsSendReply(strlen("$") + 1, "$");
       else{
-	CcsSendReply(ip, port, strlen(reply) + 1, reply);
+	CcsSendReply(strlen(reply) + 1, reply);
 	free(reply);
       }
     }
@@ -462,9 +169,9 @@ static void CpdDebugHandler(char *msg)
       CmiPrintf("getMsgListPCQueue received\n");
       reply = getMsgListPCQueue();
       if(reply == NULL)
-	CcsSendReply(ip, port, strlen("$") + 1, "$");
+	CcsSendReply(strlen("$") + 1, "$");
       else{
-	CcsSendReply(ip, port, strlen(reply) + 1, reply);
+	CcsSendReply(strlen(reply) + 1, reply);
 	free(reply);
       }
     }
@@ -472,9 +179,9 @@ static void CpdDebugHandler(char *msg)
       CmiPrintf("getMsgListDebug received\n");
       reply = getMsgListDebug();
       if(reply == NULL)
-	CcsSendReply(ip, port, strlen("$") + 1, "$");
+	CcsSendReply(strlen("$") + 1, "$");
       else{
-	CcsSendReply(ip, port, strlen(reply) + 1, reply);
+	CcsSendReply(strlen(reply) + 1, reply);
 	free(reply);
       }
     }
@@ -485,7 +192,7 @@ static void CpdDebugHandler(char *msg)
       sscanf(temp, "%d", &index);
       reply = getMsgContentsSched(index);
       CmiPrintf("Message Contents : %s\n", reply);
-      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      CcsSendReply(strlen(reply) + 1, reply);
       free(reply);
     }
     else if(strncmp(name,"getMsgContentsFIFO",strlen("getMsgContentsFIFO"))==0){
@@ -495,7 +202,7 @@ static void CpdDebugHandler(char *msg)
       sscanf(temp, "%d", &index);
       reply = getMsgContentsFIFO(index);
       CmiPrintf("Message Contents : %s\n", reply);
-      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      CcsSendReply(strlen(reply) + 1, reply);
       free(reply);
     }
     else if (strncmp(name, "getMsgContentsPCQueue", strlen("getMsgContentsPCQueue")) == 0){
@@ -505,7 +212,7 @@ static void CpdDebugHandler(char *msg)
       sscanf(temp, "%d", &index);
       reply = getMsgContentsPCQueue(index);
       CmiPrintf("Message Contents : %s\n", reply);
-      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      CcsSendReply(strlen(reply) + 1, reply);
       free(reply);
     }
     else if (strncmp(name, "getMsgContentsDebug", strlen("getMsgContentsDebug")) == 0){
@@ -515,7 +222,7 @@ static void CpdDebugHandler(char *msg)
       sscanf(temp, "%d", &index);
       reply = getMsgContentsDebug(index);
       CmiPrintf("Message Contents : %s\n", reply);
-      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      CcsSendReply(strlen(reply) + 1, reply);
       free(reply);
     } 
     else if (strncmp(name, "step", strlen("step")) == 0){
@@ -539,23 +246,23 @@ static void CpdDebugHandler(char *msg)
     else if (strcmp(name, "getBreakStepContents") == 0){
       CmiPrintf("getBreakStepContents received\n");
       if(breakPointHeader == 0){
-	CcsSendReply(ip, port, strlen("$") + 1, "$");
+	CcsSendReply(strlen("$") + 1, "$");
       }
       else{
 	reply = (char *)malloc(strlen(breakPointHeader) + strlen(breakPointContents) + 1);
 	strcpy(reply, breakPointHeader);
 	strcat(reply, "@");
 	strcat(reply, breakPointContents);
-	CcsSendReply(ip, port, strlen(reply) + 1, reply);
+	CcsSendReply(strlen(reply) + 1, reply);
 	free(reply);
       }
     }
     else if (strcmp(name, "getSymbolTableInfo") == 0){
       CmiPrintf("getSymbolTableInfo received");
       reply = getSymbolTableInfo();
-      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      CcsSendReply(strlen(reply) + 1, reply);
       reply = getBreakPoints();
-      CcsSendReply(ip, port, strlen(reply) + 1, reply);
+      CcsSendReply(strlen(reply) + 1, reply);
       free(reply);
     }
     else if (strncmp(name, "setBreakPoint", strlen("setBreakPoint")) == 0){
@@ -649,11 +356,8 @@ static void sendDataFunction(void)
   }
 
   /* Do the CcsSendReply */
-#if CMK_USE_PERSISTENT_CCS
-  CcsSendReplyFd(appletIP, appletPort, strlen(reply) + 1, reply);
-#else
-  CcsSendReply(appletIP, appletPort, strlen(reply) + 1, reply);
-#endif
+  CcsSendReply(strlen(reply) + 1, reply);
+
   /*
   CmiPrintf("Reply = %s\n", reply);
   */
@@ -692,10 +396,6 @@ void CWebPerformanceGetData(void *dummy)
   char *msg, data[100];
   int msgSize;
   int i;
-
-  if(appletIP == 0) {
-    return;  /* No use if client is not yet connected */
-  }
 
   strcpy(data, "");
   /* Evaluate each of the functions and get the values */
@@ -753,21 +453,14 @@ static void CWebHandler(char *msg){
       CmiPrintf("incorrect command:%s received, len=%ld\n",name,strlen(name));
     }
   }
-  else{
-    /* Ordinary converse message */
-    appletIP = ((int *)(msg + CmiMsgHeaderSizeBytes))[0];
-    appletPort = ((int *)(msg + CmiMsgHeaderSizeBytes))[1];
-
-    CcdCallFnAfter(CWebPerformanceGetData, 0, WEB_INTERVAL);
-  }
 }
 
-int f2()
+static int f2()
 {
   return(CqsLength(CpvAccess(CsdSchedQueue)));
 }
 
-int f3()
+static int f3()
 {
   struct timeval tmo;
 
@@ -779,10 +472,10 @@ int f3()
 
 /* #define CkUTimer()      ((int)(CmiWallTimer() * 1000000.0)) */
 
-CpvDeclare(double, startTime);
-CpvDeclare(double, beginTime);
-CpvDeclare(double, usedTime);
-CpvDeclare(int, PROCESSING);
+CpvStaticDeclare(double, startTime);
+CpvStaticDeclare(double, beginTime);
+CpvStaticDeclare(double, usedTime);
+CpvStaticDeclare(int, PROCESSING);
 
 /* Call this when the program is started
  -> Whenever traceModuleInit would be called
@@ -873,80 +566,26 @@ void CWebInit(void)
  *
  *****************************************************************************/
 
-#if CMK_CCS_AVAILABLE
-
+/*This struct describes a single CCS handler*/
 typedef struct CcsListNode {
-  char name[32];
-  int hdlr;
+  char name[CCS_MAXHANDLER]; /*CCS handler name*/
+  int hdlr; /*Converse handler index*/
   struct CcsListNode *next;
 }CcsListNode;
 
-CpvStaticDeclare(CcsListNode*, ccsList);
-CpvStaticDeclare(int, callerIP);
-CpvStaticDeclare(int, callerPort);
-int strHandlerID;
-
-static void CcsStringHandlerFn(char *msg)
-{
-  char cmd[10], hdlrName[32], *cmsg, *omsg=msg;
-  int ip, port, pe, size, nread, hdlrID;
-  CcsListNode *list = CpvAccess(ccsList);
-
-  msg += CmiMsgHeaderSizeBytes;
-  nread = sscanf(msg, "%s%d%d%d%d%s", 
-                 cmd, &pe, &size, &ip, &port, hdlrName);
-  if(nread!=6) CmiAbort("Garbled message from client");
-  CmiPrintf("message for %s\n", hdlrName);
-  while(list!=0) {
-    if(strcmp(hdlrName, list->name)==0) {
-      hdlrID = list->hdlr;
-      break;
-    }
-    list = list->next;
-  }
-  if(list==0) CmiAbort("Invalid Service Request\n");
-  while(*msg != '\n') msg++;
-  msg++;
-  cmsg = (char *) CmiAlloc(size+CmiMsgHeaderSizeBytes+1);
-  memcpy(cmsg+CmiMsgHeaderSizeBytes, msg, size);
-  cmsg[CmiMsgHeaderSizeBytes+size] = '\0';
-
-  CmiSetHandler(cmsg, hdlrID);
-  CpvAccess(callerIP) = ip;
-  CpvAccess(callerPort) = port;
-  CmiHandleMessage(cmsg);
-  CmiGrabBuffer((void **)&omsg);
-  CmiFree(omsg);
-  CpvAccess(callerIP) = 0;
-}
-
-/* note: was static void -jeff */
-void CcsInit(void)
-{
-  CpvInitialize(CcsListNode*, ccsList);
-  CpvAccess(ccsList) = 0;
-  CpvInitialize(int, callerIP);
-  CpvAccess(callerIP) = 0;
-  CpvInitialize(int, callerPort);
-  CpvAccess(callerPort) = 0;
-  strHandlerID = CmiRegisterHandler(CcsStringHandlerFn);
-}
+CpvStaticDeclare(CcsListNode*, ccsList);/*Maps handler name to handler index*/
+CpvStaticDeclare(CcsImplHeader,ccsReq);/*CCS requestor*/
 
 void CcsUseHandler(char *name, int hdlr)
 {
-  CcsListNode *list=CpvAccess(ccsList);
-  if(list==0) {
-    list = (CcsListNode *)malloc(sizeof(CcsListNode));
-    CpvAccess(ccsList) = list;
-  } else {
-    while(list->next != 0) 
-      list = list->next;
-    list->next = (CcsListNode *)malloc(sizeof(CcsListNode));
-    list = list->next;
-  }
+  CcsListNode *list=(CcsListNode *)malloc(sizeof(CcsListNode));
+  CcsListNode *old=CpvAccess(ccsList);
+  if (strlen(name)+1>=CCS_MAXHANDLER)
+    CmiAbort("CCS Handler name too long to register!\n");
+  list->next = old;
+  CpvAccess(ccsList)=list;
   strcpy(list->name, name);
   list->hdlr = hdlr;
-  list->next = 0;
 }
 
 int CcsRegisterHandler(char *name, CmiHandler fn)
@@ -963,63 +602,262 @@ int CcsEnabled(void)
 
 int CcsIsRemoteRequest(void)
 {
-  return (CpvAccess(callerIP) != 0);
+  return (ChMessageInt(CpvAccess(ccsReq).ip) != 0);
 }
 
 void CcsCallerId(unsigned int *pip, unsigned int *pport)
 {
-  *pip = CpvAccess(callerIP);
-  *pport = CpvAccess(callerPort);
+  *pip = ChMessageInt(CpvAccess(ccsReq).ip);
+  *pport = ChMessageInt(CpvAccess(ccsReq).port);
 }
 
-extern int skt_connect(unsigned int, int, int);
-extern void writeall(int, char *, int);
-
-void CcsSendReply(unsigned int ip, unsigned int port, int size, void *msg)
+void CcsSendReply(int size, const char *msg)
 {
-  char cmd[100];
-  int fd;
+  int fd=ChMessageInt(CpvAccess(ccsReq).replyFd);
+  if (fd<=0)
+      CmiAbort("CCS: Cannot reply to same request twice.\n");
+  CcsImpl_reply(fd,size,msg);
+  CpvAccess(ccsReq).replyFd=ChMessageInt_new(0);
+}
 
-  fd = skt_connect(ip, port, 120);
+
+
+/**********************************
+CCS Implementation Routines:
+  These do the request forwarding and
+delivery.
+***********************************/
+
+/*CCS Bottleneck:
+  Deliver the given message data to the given
+CCS handler.
+*/
+static void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
+{
+  char *cmsg;
+  int reqLen=ChMessageInt(hdr->len);
+/*Look up handler's converse ID*/
+  int hdlrID;
+  CcsListNode *list = CpvAccess(ccsList);
+  /*CmiPrintf("CCS: message for handler %s\n", hdr->handler);*/
+  while(list!=0) {
+    if(strncmp(hdr->handler, list->name,CCS_MAXHANDLER)==0) {
+      hdlrID = list->hdlr;
+      break;
+    }
+    list = list->next;
+  }
+  if(list==0) {
+    CmiPrintf("CCS: Unknown CCS handler name '%s' requested!\n",
+	      hdr->handler);
+    CmiAbort("CCS: Unknown CCS handler name.\n");
+  }
+
+/*Pack user data into a converse message*/
+  cmsg = (char *) CmiAlloc(CmiMsgHeaderSizeBytes+reqLen);
+  memcpy(cmsg+CmiMsgHeaderSizeBytes, reqData, reqLen);
+
+/* Call the handler */
+  CmiSetHandler(cmsg, hdlrID);
+  CpvAccess(ccsReq)=*hdr;
+  CmiHandleMessage(cmsg);
   
-  if (fd<0) {
-      CmiPrintf("client Exited\n");
-      return; /* maybe the requester exited */
-  }
-  sprintf(cmd, "reply %10d\n", size);
-  writeall(fd, cmd, strlen(cmd));
-  writeall(fd, msg, size);
-
-#if CMK_SYNCHRONIZE_ON_TCP_CLOSE
-  shutdown(fd, 1);
-  { char c; while (read(fd, &c, 1)==EINTR); }
-  close(fd);
-#else
-  close(fd);
-#endif
+/*Check if a reply was sent*/
+  if (ChMessageInt(CpvAccess(ccsReq).replyFd)!=0)
+    CcsSendReply(0,NULL);/*Send an empty reply if not*/
+  CpvAccess(ccsReq).ip = ChMessageInt_new(0);
 }
 
-#if CMK_USE_PERSISTENT_CCS
-void CcsSendReplyFd(unsigned int ip, unsigned int port, int size, void *msg)
+/*Unpacks request message to call above routine*/
+static int req_fw_handler_idx;
+static void req_fw_handler(char *msg)
 {
-  char cmd[100];
-  int fd;
-
-  fd = appletFd;
-  if (fd<0) {
-    CmiPrintf("client Exited\n");
-    return; /* maybe the requester exited */
-  }
-  sprintf(cmd, "reply %10d\n", size);
-  writeall(fd, cmd, strlen(cmd));
-  writeall(fd, msg, size);
-#if CMK_SYNCHRONIZE_ON_TCP_CLOSE
-  shutdown(fd, 1);
-  while (read(fd, &c, 1)==EINTR);
-#endif
+  CcsHandleRequest((CcsImplHeader *)(msg+CmiMsgHeaderSizeBytes),
+		   msg+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader));
+  CmiGrabBuffer((void **)&msg); CmiFree(msg);  
 }
-#endif
 
-#endif
 
-/* \move */
+/*Convert CCS header & message data into a converse message 
+ addressed to handler*/
+char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const char *data,int *ret_len)
+{
+  int reqLen=ChMessageInt(hdr->len);
+  int len=CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader)+reqLen;
+  char *msg=(char *)CmiAlloc(len);
+  memcpy(msg+CmiMsgHeaderSizeBytes,hdr,sizeof(CcsImplHeader));
+  memcpy(msg+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader),data,reqLen);
+  CmiSetHandler(msg, req_fw_handler_idx);
+  if (ret_len!=NULL) *ret_len=len;
+  return msg;
+}
+
+/*Forward this request to the appropriate PE*/
+void CcsImpl_netRequest(CcsImplHeader *hdr,const char *reqData)
+{
+  int len,repPE=ChMessageInt(hdr->pe);
+  char *msg=CcsImpl_ccs2converse(hdr,reqData,&len);
+  CmiSyncSendAndFree(repPE,len,msg);
+}
+
+
+#if NODE_0_IS_CONVHOST
+/************** NODE_0_IS_CONVHOST ***********
+Non net- versions of charm++ are run without a 
+(real) conv-host program.  This is fine, except 
+CCS clients connect via conv-host; so for CCS
+on non-net- versions of charm++, node 0 carries
+out the CCS forwarding normally done in conv-host.
+
+CCS works by listening to a TCP connection on a 
+port-- the Ccs server socket.  A typical communcation
+pattern is:
+
+1.) Random program (CCS client) from the net
+connects to the CCS server socket and sends
+a CCS request.
+
+2.) Node 0 forwards the request to the proper
+PE as a regular converse message (built in CcsImpl_netReq)
+for CcsHandleRequest.
+
+3.) CcsHandleRequest looks up the user's pre-registered
+CCS handler, and passes the user's handler the request data.
+
+4.) The user's handler calls CcsSendReply with some
+reply data; OR finishes without calling CcsSendReply,
+in which case CcsHandleRequest does it.
+
+5.) CcsSendReply forwards the reply back to node 0,
+which sends the reply back to the original requestor,
+on the (still-open) request socket.
+ */
+
+/*
+Send a Ccs reply back to the requestor, down the given socket.
+Since there is no conv-host, node 0 does all the CCS 
+communication-- this means all requests come to node 0
+and are forwarded out; all replies are forwarded back to node 0.
+
+Note: on Net- versions, CcsImpl_reply is implemented in machine.c
+*/
+static int rep_fw_handler_idx;
+
+void CcsImpl_reply(SOCKET repFd,int repLen,const char *repData)
+{
+  const int repPE=0;
+
+  if (CmiMyPe()==repPE) {
+    /*Actually deliver reply data*/
+    CcsServer_sendReply(repFd,repLen,repData);
+  } else {
+    /*Forward data & socket # to the replyPE*/
+    int len=CmiMsgHeaderSizeBytes+
+	       sizeof(SOCKET)+sizeof(int)+repLen;
+    char *msg=CmiAlloc(len);
+    char *r=msg;
+    *(SOCKET *)r=repFd; r+=sizeof(SOCKET);
+    *(int *)r=repLen; r+=sizeof(int);
+    memcpy(r,repData,repLen);
+    CmiSetHandler(msg,rep_fw_handler_idx);
+    CmiSyncSendAndFree(repPE,len,msg);
+  }
+}
+/*Receives reply messages passed up from
+converse to node 0.*/
+static void rep_fw_handler(char *msg)
+{
+  int len;
+  char *r=msg;
+  SOCKET fd=*(SOCKET *)r; r+=sizeof(SOCKET);
+  len=*(int *)r; r+=sizeof(int);
+  CcsImpl_reply(fd,len,r);
+  CmiGrabBuffer((void **)&msg); CmiFree(msg);
+}
+
+#endif /*NODE_0_IS_CONVHOST*/
+
+#if NODE_0_IS_CONVHOST
+/*
+We have to run a CCS server socket here on
+node 0.  To keep the speed impact minimal,
+we only probe for new connections (in CommunicationInterrupt)
+occasionally.  Convcore's main scheduler loop
+will check our ccs_socket_ready flag, and call
+CHostProcess if needed.
+ */
+#include <signal.h>
+#include "ccs-server.c" /*Include implementation here in this case*/
+
+static int inside_comm=0;
+int ccs_socket_ready=0;/*Data pending on CCS server socket?*/
+
+static void CommunicationInterrupt(void)
+{
+  if(inside_comm)
+    return;
+  if (1==skt_select1(CcsServer_fd(),0))
+    ccs_socket_ready=1;
+}
+
+void CHostInit(int CCS_server_port)
+{
+  struct itimerval i;
+  CcsServer_new(NULL,&CCS_server_port);
+  CmiSignal(SIGALRM, SIGIO, 0, CommunicationInterrupt);
+#if !CMI_ASYNC_NOT_NEEDED
+  CmiEnableAsyncIO(CcsServer_fd());
+#endif
+  /*We will receive alarm signals at 10Hz*/
+  i.it_interval.tv_sec = 0;
+  i.it_interval.tv_usec = 100000;
+  i.it_value.tv_sec = 0;
+  i.it_value.tv_usec = 100000;
+  setitimer(ITIMER_REAL, &i, NULL); 
+}
+
+void CHostProcess(void)
+{
+  CcsImplHeader hdr;
+  char *data;
+  if (ccs_socket_ready==0) return;
+  inside_comm=1;
+  printf("Got CCS connect...\n");
+  if (CcsServer_recvRequest(&hdr,&data))
+  {/*We got a network request*/
+    printf("Got CCS request...\n");
+    CcsImpl_netRequest(&hdr,data);
+    free(data);
+  }
+  inside_comm=0;
+}
+
+#endif /*NODE_0_IS_CONVHOST*/
+
+
+void CcsInit(void)
+{
+  CpvInitialize(CcsListNode*, ccsList);
+  CpvAccess(ccsList) = 0;
+  CpvInitialize(CcsImplHeader, ccsReq);
+  CpvAccess(ccsReq).ip = ChMessageInt_new(0);
+  req_fw_handler_idx = CmiRegisterHandler(req_fw_handler);
+#if NODE_0_IS_CONVHOST
+  rep_fw_handler_idx = CmiRegisterHandler(rep_fw_handler);
+#endif
+  CcsRegisterHandler("ccs_getinfo",ccs_getinfo);
+  CcsRegisterHandler("ccs_killport",ccs_killport);
+}
+
+#endif /*CMK_CCS_AVAILABLE*/
+
+
+
+
+
+
+
+
+
+
+
