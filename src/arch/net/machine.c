@@ -1591,7 +1591,7 @@ static void node_addresses_obtain()
   
   /*We get the other node addresses from a message sent
     back via the conv-host control port.*/
-  if (!skt_select1(Cmi_host_fd,60000)) CmiAbort("Timeout waiting for nodetab!\n");
+  if (!skt_select1(Cmi_host_fd,600*1000)) CmiAbort("Timeout waiting for nodetab!\n");
   ChMessage_recv(Cmi_host_fd,&nodetabmsg);
   node_addresses_store(&nodetabmsg);
   ChMessage_free(&nodetabmsg);
@@ -2802,7 +2802,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 
   skt_set_idle(obtain_idleFn);
   dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
-  Cmi_host_fd = skt_connect(Cmi_host_IP, Cmi_host_port, 600);
+  Cmi_host_fd = skt_connect(Cmi_host_IP, Cmi_host_port, 1800);
   node_addresses_obtain();
   skt_set_idle(CmiYield);
   Cmi_check_delay = 2.0+0.5*Cmi_numnodes;
