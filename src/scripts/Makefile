@@ -295,7 +295,7 @@ $(L)/libconv-util.a: $(LIBCONV_UTIL)
 	$(CHARMC) -o $@ $(LIBCONV_UTIL)
 
 $(L)/libconv-utilf.a: $(LIBCONV_UTILF)
-	-@$(CHARMC) -o $@ $(LIBCONV_UTILF)
+	-$(CHARMC) -o $@ $(LIBCONV_UTILF)
 
 $(L)/libccs-client.a: ccs-client.o
 	$(CHARMC) -o $@ ccs-client.o
@@ -367,8 +367,8 @@ pup_c.o: pup_c.C $(UTILHEADERS)
 	$(CHARMC) -o pup_c.o pup_c.C
 
 pup_f.o: pup_f.f90
-	-@$(CHARMC) -c pup_f.f90
-	-@$(CHARMC) -cpmod ../include pupmod.M
+	-$(CHARMC) -c pup_f.f90
+	-$(CHARMC) -cpmod ../include pupmod.M
 
 ckhashtable.o: ckhashtable.C ckhashtable.h
 	$(CHARMC) -o ckhashtable.o ckhashtable.C
