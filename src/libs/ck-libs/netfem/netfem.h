@@ -32,8 +32,9 @@ available.
 /*----------------------------------------------
 All NetFEM calls must be between a Begin and End pair:*/
 NetFEM NetFEM_Begin(
-	int dim,/*Number of spatial dimensions (2 or 3)*/
+	int source,/*Integer ID for the source of this data (need not be sequential)*/
 	int timestep,/*Integer ID for this instant (need not be sequential)*/
+	int dim,/*Number of spatial dimensions (2 or 3)*/
 	int flavor /*What to do with data (point at, write, or copy)*/
 );
 void NetFEM_End(NetFEM n); /*Publish these updates*/
@@ -53,7 +54,7 @@ void NetFEM_Elements(NetFEM n,int nEl,int nodePerEl,int *conn,const char *name);
 Associate a spatial vector (e.g., displacement, velocity, accelleration)
 with each of the previous objects (nodes or elements).
 */
-void NetFEM_Vector_Field(NetFEM n,double *start,
+void NetFEM_Vector_field(NetFEM n,double *start,
 	int init_offset,int distance,
 	const char *name);
 
@@ -66,7 +67,7 @@ void NetFEM_Vector(NetFEM n,double *data,const char *name);
 Associate a scalar (e.g., stress, temperature, pressure, damage)
 with each of the previous objects (nodes or elements).
 */
-void NetFEM_Scalar_Field(NetFEM n,double *start,
+void NetFEM_Scalar_field(NetFEM n,double *start,
 	int vec_len,int init_offset,int distance,
 	const char *name);
 

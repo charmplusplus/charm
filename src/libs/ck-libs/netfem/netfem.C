@@ -45,7 +45,7 @@ public:
 class NetFEM_state {
 	/*STUPID HACK:  Only keep one update around, ever.
 	  Need to:
-	     -Index updates by source FEM element
+	     -Index updates by source ID
 	     -Make copies of updates if asked
 	     -Write updates to disk if asked
 	*/
@@ -121,19 +121,21 @@ typedef int *NetFEMF;
 /*----------------------------------------------
 All NetFEM calls must be between a Begin and End pair:*/
 CDECL NetFEM NetFEM_Begin(
-	int dim,/*Number of spatial dimensions (2 or 3)*/
+	int source,/*Integer ID for the source of this data (need not be sequential)*/
 	int timestep,/*Integer ID for this instant (need not be sequential)*/
+	int dim,/*Number of spatial dimensions (2 or 3)*/
 	int flavor /*What to do with data (point at, write, or copy)*/
 ) 
 {
 	NETFEMAPI("NetFEM_Begin");
 	//On one processor, this is our only chance to network!
 	if (CkNumPes()==1) CthYield();
+	//FIXME: actually use source
 	return (NetFEM)(new NetFEM_updatePackage(dim,timestep,flavor));
 }
-FDECL NetFEMF FTN_NAME(NETFEM_BEGIN,netfem_begin)(int *d,int *t,int *f)
+FDECL NetFEMF FTN_NAME(NETFEM_BEGIN,netfem_begin)(int *s,int *t,int *d,int *f)
 {
-	return (NetFEMF)NetFEM_Begin(*d,*t,*f);
+	return (NetFEMF)NetFEM_Begin(*s,*t,*d,*f);
 }
 
 CDECL void NetFEM_End(NetFEM n) { /*Publish these updates*/
@@ -179,11 +181,11 @@ FDECL void FTN_NAME(NETFEM_ELEMENTS,netfem_elements)
 Associate a spatial vector (e.g., displacement, velocity, accelleration)
 with each of the previous objects (nodes or elements).
 */
-CDECL void NetFEM_Vector_Field(NetFEM n,double *start,
+CDECL void NetFEM_Vector_field(NetFEM n,double *start,
 	int init_offset,int distance,
 	const char *name)
 {
-	NETFEMAPI("NetFEM_Vector_Field");
+	NETFEMAPI("NetFEM_Vector_field");
 	NetFEM_item::format fmt(N->getDim(),init_offset,distance);
 	N->getItem()->add(start,fmt,name,true);
 }
@@ -192,7 +194,7 @@ FDECL void FTN_NAME(NETFEM_VECTOR_FIELD,netfem_vector_field)
 {
 	NETFEMAPI("NetFEM_vector_field");
 	CkShortStr s=FTN_STR;
-	NetFEM_Vector_Field((NetFEM)NF,start,*init_offset,*distance,s);
+	NetFEM_Vector_field((NetFEM)NF,start,*init_offset,*distance,s);
 }
 
 /*Simpler version of the above if your data is packed as
@@ -200,7 +202,7 @@ data[item*3+{0,1,2}].
 */
 CDECL void NetFEM_Vector(NetFEM n,double *data,const char *name)
 {
-	NetFEM_Vector_Field(n,data,0,sizeof(double)*N->getDim(),name);
+	NetFEM_Vector_field(n,data,0,sizeof(double)*N->getDim(),name);
 }
 FDECL void FTN_NAME(NETFEM_VECTOR,netfem_vector)
 	(NetFEMF nf,double *data,FTN_STR_DECL)
@@ -213,11 +215,11 @@ FDECL void FTN_NAME(NETFEM_VECTOR,netfem_vector)
 Associate a scalar (e.g., stress, temperature, pressure, damage)
 with each of the previous objects (nodes or elements).
 */
-CDECL void NetFEM_Scalar_Field(NetFEM n,double *start,
+CDECL void NetFEM_Scalar_field(NetFEM n,double *start,
 	int vec_len,int init_offset,int distance,
 	const char *name)
 {
-	NETFEMAPI("NetFEM_Scalar_Field");
+	NETFEMAPI("NetFEM_Scalar_field");
 	NetFEM_item::format fmt(vec_len,init_offset,distance);
 	N->getItem()->add(start,fmt,name,false);
 }
@@ -228,7 +230,7 @@ FDECL void FTN_NAME(NETFEM_SCALAR_FIELD,netfem_scalar_field)
 {
 	NETFEMAPI("NetFEM_scalar_field");
 	CkShortStr s=FTN_STR;
-	NetFEM_Scalar_Field((NetFEM)NF,start,*veclen,*init_offset,*distance,s);
+	NetFEM_Scalar_field((NetFEM)NF,start,*veclen,*init_offset,*distance,s);
 }
 
 
@@ -236,7 +238,7 @@ FDECL void FTN_NAME(NETFEM_SCALAR_FIELD,netfem_scalar_field)
 CDECL void NetFEM_Scalar(NetFEM n,double *start,int doublePer,
 	const char *name)
 {
-	NetFEM_Scalar_Field(n,start,doublePer,0,sizeof(double)*doublePer,name);
+	NetFEM_Scalar_field(n,start,doublePer,0,sizeof(double)*doublePer,name);
 }
 FDECL void FTN_NAME(NETFEM_SCALAR,netfem_scalar)
 	(NetFEMF nf,double *start,int *veclen,FTN_STR_DECL)
