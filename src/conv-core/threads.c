@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.26  1997-01-17 15:49:08  jyelon
+ * Revision 1.27  1997-01-17 19:20:48  milind
+ * Fixed static variable declarations bugs in JB_TWEAKING part.
+ *
+ * Revision 1.26  1997/01/17 15:49:08  jyelon
  * Made many changes for SMP version.  In particular, memory module now uses
  * CmiMemLock and CmiMemUnlock instead of CmiInterruptsBlock, which no longer
  * exists.  Threads package uses CthCpv to declare all its global vars.
@@ -527,13 +530,13 @@ struct CthThreadStruct
 };
 
 
-static jmp_buf    thread_launching;
-static CthThread  thread_current;
-static CthThread  thread_exiting;
-static int        thread_growsdown;
-static int        thread_datasize;
-static int        thread_jb_offsets[10];
-static int        thread_jb_count;
+static jmp_buf thread_launching;
+CthCpvStatic(CthThread, thread_current);
+CthCpvStatic(CthThread, thread_exiting);
+CthCpvStatic(int, thread_growsdown);
+CthCpvStatic(int, thread_datasize);
+static int thread_jb_offsets[10];
+static int thread_jb_count;
 
 #define ABS(a) (((a) > 0)? (a) : -(a) )
 
