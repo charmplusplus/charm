@@ -10,9 +10,9 @@
 */
 /*@{*/
 
-#ifdef CMK_ORIGIN2000
 
 #include "conv-mach.h"
+#ifdef CMK_ORIGIN2000
 #include "trace-counter.h"
 
 #ifdef CMK_ORIGIN2000
@@ -25,7 +25,7 @@
 //#include "limits.h"  // for LONGLONG_MAX
 #endif // CMK_ORIGIN2000
 
-#define DEBUGF(x) CmiPrintf x
+#define DEBUGF(x) // CmiPrintf x
 #define VER 1.0
 
 // for performance monitoring
@@ -208,7 +208,8 @@ void CountLogPool::write(void)
 
 void CountLogPool::writeSts(void)
 {
-  char *fname = new char[strlen(CpvAccess(pgmName))+strlen(".sts")+1];
+  // CmiPrintf("CountLogPool::writeSts\n");
+  char *fname = new char[strlen(CpvAccess(pgmName))+strlen(".count.sts")+1];
   _MEMCHECK(fname);
   sprintf(fname, "%s.count.sts", CpvAccess(pgmName));
   FILE *sts = fopen(fname, "w+");
@@ -436,6 +437,7 @@ void TraceCounter::beginPack(void)
 { 
   DEBUGF(("%d/%d DEBUG: beginPack\n", CkMyPe(), CkNumPes()));
 
+  /*
   if (status_!= IDLE) { 
     CmiPrintf("WARN: %d beginPack called when status not IDLE!\n", CkMyPe());
     return;
@@ -450,12 +452,14 @@ void TraceCounter::beginPack(void)
   }
   DEBUGF(("%d/%d DEBUG:   beginPack genStart %d\n", 
           CkMyPe(), CkNumPes(), genStart_));
+  */
 }
 
 void TraceCounter::endPack(void) 
 {
   DEBUGF(("%d/%d DEBUG: endPack\n", CkMyPe(), CkNumPes()));
 
+  /*
   if (status_!=WORKING) {
     CmiPrintf("WARN: %d endPack called when status not WORKING!\n", CkMyPe());
     return;
@@ -477,12 +481,14 @@ void TraceCounter::endPack(void)
   DEBUGF(("%d/%d DEBUG:   endPack genRead %d EP %d Time %f counter1 %d counter2 %ld\n", 
 	  CkMyPe(), CkNumPes(), genRead, _packEP, t-startPack_, value1, value2));
   CpvAccess(_logPool)->setEp(_packEP, value1, value2, t - startPack_);
+  */
 }
 
 void TraceCounter::beginUnpack(void) 
 { 
   DEBUGF(("%d/%d DEBUG: beginUnpack\n", CkMyPe(), CkNumPes()));
 
+  /*
   if (status_!= IDLE) { 
     CmiPrintf("WARN: %d beginUnpack called when status not IDLE!\n", CkMyPe());
     return;
@@ -497,12 +503,14 @@ void TraceCounter::beginUnpack(void)
   }
   DEBUGF(("%d/%d DEBUG:   beginUnpack genStart %d\n", 
           CkMyPe(), CkNumPes(), genStart_));
+  */
 }
 
 void TraceCounter::endUnpack(void) 
 {
   DEBUGF(("%d/%d DEBUG: endUnpack\n", CkMyPe(), CkNumPes()));
      
+  /*
   if (status_!=WORKING) {
     CmiPrintf("WARN: %d endUnack called when status not WORKING!\n", CkMyPe());
     return;
@@ -524,6 +532,7 @@ void TraceCounter::endUnpack(void)
   DEBUGF(("%d/%d DEBUG:   endUnpack genRead %d EP %d Time %f counter1 %d counter2 %ld\n", 
 	  CkMyPe(), CkNumPes(), genRead, _unpackEP, t-startUnpack_, value1, value2));
   CpvAccess(_logPool)->setEp(_unpackEP, value1, value2, t-startUnpack_);
+  */
 }
 
 void TraceCounter::beginComputation(void)
