@@ -395,6 +395,12 @@ extern void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr);
 #define CmiGetHandlerInfo(env) (CmiHandlerToInfo(CmiGetHandler(env)))
 #define CmiGetHandlerFunction(env) (CmiHandlerToFunction(CmiGetHandler(env)))
 
+#if CMK_MEM_CHECKPOINT
+extern int cur_restart_phase;      /* number of restarts */
+#undef CmiSetHandler
+#define CmiSetHandler(m,v)  do {(((CmiMsgHeaderExt*)m)->hdl)=(v); (((CmiMsgHeaderExt*)m)->pn)=cur_restart_phase;} while(0)
+#endif
+
 /** This header goes before each chunk of memory allocated with CmiAlloc. 
     See the comment in convcore.c for details on the fields.
 */

@@ -74,6 +74,8 @@ extern void CldModuleInit(char **);
 
 #include "quiescence.h"
 
+int cur_restart_phase = 0;
+
 /*****************************************************************************
  *
  * Unix Stub Functions
@@ -943,16 +945,33 @@ void CsdEndIdle(void)
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
 
+#if CMK_MEM_CHECKPOINT
+#define MESSAGE_PHASE_CHECK	\
+	{	\
+          int phase = CmiGetRestartPhase(msg);	\
+	  if (phase < cur_restart_phase) {	\
+            CmiPrintf("[%d] discard message of phase %d cur_restart_phase:%d\n", CmiMyPe(), phase, cur_restart_phase);	\
+            CmiFree(msg);	\
+	    return;	\
+          }	\
+	}
+#else
+#define MESSAGE_PHASE_CHECK
+#endif
+
 void CmiHandleMessage(void *msg)
 {
 /* this is wrong because it counts the Charm++ messages in sched queue
  	CpvAccess(cQdState)->mProcessed++;
 */
-	 CmiHandlerInfo *h;
+	CmiHandlerInfo *h;
 #ifndef CMK_OPTIMIZE
-	int handler=CmiGetHandler(msg); /* Save handler for use after msg is gone */
+	CmiUInt2 handler=CmiGetHandler(msg); /* Save handler for use after msg is gone */
 	_LOG_E_HANDLER_BEGIN(handler); /* projector */
 #endif
+
+        MESSAGE_PHASE_CHECK
+
 	h=&CmiGetHandlerInfo(msg);
 	(h->hdlr)(msg,h->userPtr);
 #ifndef CMK_OPTIMIZE
