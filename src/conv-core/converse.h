@@ -1103,7 +1103,7 @@ void CmiDelayImmediate();
 	CmiSetHandler(msg, (CmiGetHandler(msg))|0x8000); \
      } while (0)
 #  define CmiIsImmediate(msg)      ((CmiGetHandler(msg)) & 0x8000) 
-#  define CmiImemdiateHandler(msg) ((CmiGetHandler(msg)) ^ 0x8000)
+#  define CmiImmediateHandler(msg) ((CmiGetHandler(msg)) ^ 0x8000)
 /*
 #  define CmiIsImmediate(msg)   ((CmiGetHandler(msg) == CpvAccessOther(CmiImmediateMsgHandlerIdx,0)))
 #  define CmiBecomeImmediate(msg) do {\
