@@ -598,6 +598,12 @@ Chare::genDecls(XStr& str)
   str << "/* DECLS: "; print(str); str << " */\n";
  //Forward declaration of the user-defined implementation class*/
   str << tspec()<<" class "<<type<<";\n";
+  str << tspec()<<" class "<<Prefix::Index<<type<<";\n";
+  str << tspec()<<" class "<<Prefix::Proxy<<type<<";\n";
+  if (hasElement)
+    str << tspec()<<" class "<<Prefix::ProxyElement<<type<<";\n";
+  if (hasSection)
+    str << tspec()<<" class "<<Prefix::ProxySection<<type<<";\n";
   
  //Generate index class
   str << "/* --------------- index object ------------------ */\n";
@@ -609,6 +615,7 @@ Chare::genDecls(XStr& str)
   else 
   { //Actual implementation
     str << CIClassStart;
+    genTypedefs(str);
     str << "    static int __idx;\n";
     str << "    static void __register(const char *s, size_t size);\n";
     if(list)
@@ -618,16 +625,12 @@ Chare::genDecls(XStr& str)
   str << "/* --------------- element proxy ------------------ */\n";
   genSubDecls(str);
   if (hasElement) {
-  	str << "/* ---------------- collective proxy -------------- */\n";
-  	forElement=forAll;
-  	genSubDecls(str);
-
-        if (hasSection) {
-  	  str << "/* ---------------- section proxy -------------- */\n";
-  	  forElement=forSection;
-  	  genSubDecls(str);
-	}
-  	forElement=forIndividual;
+    str << "/* ---------------- collective proxy -------------- */\n";
+    forElement=forAll; genSubDecls(str); forElement=forIndividual;
+  }
+  if (hasSection) {
+    str << "/* ---------------- section proxy -------------- */\n";
+    forElement=forSection; genSubDecls(str); forElement=forIndividual;
   }
   
   if(list) {
@@ -672,6 +675,7 @@ Chare::genSubDecls(XStr& str)
   XStr ptype;
   ptype<<proxyPrefix()<<type;
   
+  // Class declaration
   str << tspec()<< "class "<<ptype;
   if(external || type->isTemplated()) {
     str << ";";
@@ -680,13 +684,20 @@ Chare::genSubDecls(XStr& str)
   str << ":";
   genProxyNames(str, "public ",NULL, "", ", ");
   str << CIClassStart;
+  
+  genTypedefs(str);
+  
+  // Various constructors:
   str << "    "<<ptype<<"(void) {};\n";
+  
   str << "    "<<ptype<<"(CkChareID __cid) : ";
   genProxyNames(str, "",NULL, "(__cid)", ", ");
   str << "{  }\n";
+  
   str << "    "<<ptype<<"(const Chare *c) : ";
   genProxyNames(str, "",NULL, "(c)", ", ");
   str << "{  }\n";
+  
   //Multiple inheritance-- resolve inheritance ambiguity
     XStr super;
     bases->getFirst()->genProxyName(super,forElement);
@@ -739,6 +750,7 @@ Group::genSubDecls(XStr& str)
   XStr super;
   bases->getFirst()->genProxyName(super,forElement);
   
+  // Class declaration:
   str << tspec()<< "class "<<ptype;
   if(external || type->isTemplated()) {
     str << ";";
@@ -747,6 +759,10 @@ Group::genSubDecls(XStr& str)
   str << ": ";
   genProxyNames(str, "public ",NULL, "", ", ");
   str << CIClassStart;
+  
+  genTypedefs(str);
+  
+  // Basic constructors:
   str << "    "<<ptype<<"(void) {}\n";
   str << "    "<<ptype<<"(const IrrGroup *g) : ";
   genProxyNames(str, "", NULL,"(g)", ", ");
@@ -846,6 +862,7 @@ Array::genSubDecls(XStr& str)
 {
   XStr ptype; ptype<<proxyPrefix()<<type;
   
+  // Class declaration:
   str << tspec()<< " class "<<ptype;
   if(external || type->isTemplated()) {
     str << ";";
@@ -853,8 +870,9 @@ Array::genSubDecls(XStr& str)
   }
   str << " : ";
   genProxyNames(str, "public ",NULL, "", ", ");
-  
   str << CIClassStart;
+  
+  genTypedefs(str);
   
   str << "    "<<ptype<<"(void) {}\n";//An empty constructor
   if (forElement!=forSection) 
@@ -972,6 +990,24 @@ Array::genSubDecls(XStr& str)
   str << CIClassEnd;
   if (!isTemplated()) str << "PUPmarshall("<<ptype<<");\n";
 }
+
+void 
+Chare::genTypedefs(XStr &str) {
+   str << "    typedef "<<baseName(1)<<" local_t;\n";
+   str << "    typedef "<<Prefix::Index<<baseName(1)<<" index_t;\n";
+   str << "    typedef "<<Prefix::Proxy<<baseName(1)<<" proxy_t;\n";
+   
+   if (hasElement) 
+     str << "    typedef "<<Prefix::ProxyElement<<baseName(1)<<" element_t;\n";
+   else /* !hasElement, so generic proxy is element type */
+     str << "    typedef "<<Prefix::Proxy<<baseName(1)<<" element_t;\n";
+   
+   if (hasSection) 
+     str << "    typedef "<<Prefix::ProxySection<<baseName(1)<<" section_t;\n";
+   str << "\n";
+}
+
+
 
 void
 Chare::genDefs(XStr& str)

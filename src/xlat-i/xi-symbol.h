@@ -524,6 +524,7 @@ class Chare : public TEntity {
     
     int entryCount;
 
+    void genTypedefs(XStr& str);
     void genRegisterMethodDef(XStr& str);
     void sharedDisambiguation(XStr &str,const XStr &superclass);
   public:
