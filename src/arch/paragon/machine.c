@@ -123,7 +123,7 @@ void *CmiGetNonLocal()
 int CmiAsyncMsgSent(c)
 CmiCommHandle c ;
 {
-    return (int) msgdone(c);
+    return (int) msgdone((long) c);
 }
 
 
@@ -168,7 +168,7 @@ char * msg;
     long msgid;
     msgid = isend(MSG_TYPE, msg, size, destPE, PROCESS_PID);
     CQdCreate(CpvAccess(cQdState), 1);
-    return msgid;
+    return (CmiCommHandle) msgid;
 }
 
 
@@ -210,7 +210,7 @@ char * msg;
         long msgid;
         msgid = isend(MSG_TYPE, msg, size, ALL_NODES, PROCESS_PID);
         CQdCreate(CpvAccess(cQdState), Cmi_numpes-1);
-        return msgid;
+        return (CmiCommHandle) msgid;
 }
 
 void CmiFreeBroadcastFn(size, msg)
@@ -246,7 +246,7 @@ char * msg;
         memcpy(temp, msg, size) ;
         CdsFifo_Enqueue(CpvAccess(CmiLocalQueue), temp);
         CQdCreate(CpvAccess(cQdState), Cmi_numpes);
-        return msgid;
+        return (CmiCommHandle) msgid;
 }
 
 

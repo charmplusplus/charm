@@ -406,14 +406,7 @@ typedef CMK_TYPEDEF_UINT8     CmiUInt8;
 typedef CMK_TYPEDEF_FLOAT4    CmiFloat4;
 typedef CMK_TYPEDEF_FLOAT8    CmiFloat8;
 
-#if CMK_COMMHANDLE_IS_A_POINTER
 typedef void  *CmiCommHandle;
-#endif
-
-#if CMK_COMMHANDLE_IS_AN_INTEGER
-typedef int    CmiCommHandle;
-#endif
-
 typedef void (*CmiHandler)();
 
 typedef struct CMK_MSG_HEADER_BASIC CmiMsgHeaderBasic;
