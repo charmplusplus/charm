@@ -1,6 +1,6 @@
 CHARMC=../../bin/charmc $(OPTS)
 DIRS=commlib sparseContiguousReducer tcharm ampi idxl fem ifem \
-        armci collide mblock barrier \
+        armci collide mblock barrier multiphaseSharedArrays \
 	multicast irecv netfem liveViz liveViz3d taskGraph search datatransfer
 
 all:  
@@ -8,7 +8,7 @@ all:
 
 idxl:
 	(cd idxl; $(MAKE) all OPTS='$(OPTS)')
-	
+
 tcharm:
 	(cd tcharm; $(MAKE) all OPTS='$(OPTS)')
 
