@@ -185,7 +185,7 @@ static void CthFixData(CthThread t)
   }
 }
 
-/*
+/**
 Allocate another size bytes of thread-local storage,
 and return the offset into the thread storage buffer.
  */
@@ -202,6 +202,19 @@ int CthRegister(int size)
   CthFixData(S(th)); /*Make the current thread have this much storage*/
   CthCpvAccess(CthData) = th->data;
   return result;
+}
+
+/**
+Make sure we have room to store up to at least maxOffset
+bytes of thread-local storage.
+*/
+void CthRegistered(int maxOffset) {
+  if (CthCpvAccess(CthDatasize)<maxOffset) {
+    CthThreadBase *th=(CthThreadBase *)CthCpvAccess(CthCurrent);
+    CthCpvAccess(CthDatasize) = maxOffset;
+    CthFixData(S(th)); /*Make the current thread have this much storage*/
+    CthCpvAccess(CthData) = th->data;
+  }
 }
 
 /*********** Creation and Deletion **********/

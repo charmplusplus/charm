@@ -803,7 +803,8 @@ void       CthSwitchThread(CthThread t);
 #endif
 
 CthCpvExtern(char *,CthData);
-extern int CthRegister(int);
+extern int CthRegister(int dataSize);
+extern void CthRegistered(int dataOffMax);
 extern char *CthGetData(CthThread t);
 
 #define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v)=(-1)
@@ -814,7 +815,7 @@ extern char *CthGetData(CthThread t);
 #define CtvInitialize(t,v)      do { \
 	if(CsvAccess(CtvOffs##v)==(-1)) \
 		CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v));\
-	else CthRegister(sizeof(CtvType##v));\
+	else CthRegistered(CsvAccess(CtvOffs##v)+sizeof(CtvType##v));\
 } while(0)
 
 /****** CFUTURE: CONVERSE FUTURES ******/
