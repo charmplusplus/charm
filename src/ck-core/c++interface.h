@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.19  1995-10-18 22:19:54  jyelon
+ * Revision 2.20  1995-10-20 17:25:42  sanjeev
+ * added typedef CMK_SIZE_T size_t ;
+ *
+ * Revision 2.19  1995/10/18  22:19:54  jyelon
  * Still having problems with <stddef> and size_t
  *
  * Revision 2.18  1995/10/12  20:13:59  sanjeev
@@ -92,8 +95,9 @@
 #ifndef C_PLUS_INTERFACE_H
 #define C_PLUS_INTERFACE_H
 
-/* This is to get size_t */
-#include <stddef.h>
+/* This is because size_t is of different type on different machines, and
+   for different compilers */
+typedef CMK_SIZE_T size_t ;
 
 #define NULL_EP -1
 
