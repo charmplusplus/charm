@@ -342,7 +342,7 @@ public:
 //    if (id != -1) globalId = nodeInfo::Local2Global(_node->id)*(cva(numCth)+cva(numWth))+_id;
   }
   inline void setThread(CthThread t) { me = t; }
-  inline const CthThread getThread() const { return me; }
+  inline CthThread getThread() const { return me; }
   void addAffMessage(char *msgPtr);        ///  add msg to affinity queue
   void run_work_thread();
   void run_comm_thread();
