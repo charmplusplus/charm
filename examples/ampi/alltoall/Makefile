@@ -1,0 +1,21 @@
+OPTS = -O3
+CHARMC = ../../../bin/charmc -language ampi
+MPICC = mpicc
+
+all: alltoall
+
+alltoall: alltoall.c
+	$(CHARMC) -c alltoall.c $(OPTS)
+	$(CHARMC) -o alltoall alltoall.o $(OPTS) $(LIBS)
+
+alltoall.mpi: alltoall.c
+	$(MPICC) -c alltoall.c $(OPTS)
+	$(MPICC) -o alltoall.mpi alltoall.o $(OPTS) $(LIBS)
+
+mpibench: mpibench.c
+	$(CHARMC) -c mpibench.c $(OPTS)
+	$(CHARMC) -o mpibench mpibench.o $(OPTS) $(LIBS)
+
+
+clean:
+	rm -rf *~ *.o alltoall mpibench charmrun conv-host
