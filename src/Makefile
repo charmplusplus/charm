@@ -45,7 +45,6 @@ test-charm: charm
 test-charm++: charm++
 	(cd ../pgms ; make test-charm++)
 
-OPTS=-g
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
 
