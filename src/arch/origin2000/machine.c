@@ -32,6 +32,9 @@ static McQueue **MsgQueue;
 #define g_malloc(s)  usmalloc(s,arena)
 #define g_free(p)    usfree(p,arena)
 
+#if NODE_0_IS_CONVHOST
+int inside_comm = 0;
+#endif
 
 CpvDeclare(void*, CmiLocalQueue);
 int Cmi_mype;
@@ -169,11 +172,11 @@ static void threadInit(void *arg)
   prctl(PR_SETEXITSIG, SIGHUP,0);
 
   CthInit(usrparam->argv);
-  ConverseCommonInit(usrparam->argv);
-  neighbour_init(Cmi_mype);
   CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
   CmiTimerInit();
+  neighbour_init(Cmi_mype);
   usadd(arena);
+  ConverseCommonInit(usrparam->argv);
   if (usrparam->initret==0) {
     usrparam->fn(usrparam->argc, usrparam->argv);
     if (usrparam->usched==0) CsdScheduler(-1);
@@ -437,6 +440,7 @@ McQueue * McQueueCreate(void)
 
 void McQueueAddToBack(McQueue *queue, void *element)
 {
+  inside_comm = 1;
 #ifdef DEBUG
   printf("[%d] Waiting for lock\n",CmiMyPe());
 #endif
@@ -461,6 +465,7 @@ void McQueueAddToBack(McQueue *queue, void *element)
 #ifdef DEBUG
   printf("[%d] released lock\n",CmiMyPe());
 #endif
+  inside_comm = 0;
 }
 
 
