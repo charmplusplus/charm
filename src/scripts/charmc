@@ -12,7 +12,7 @@
 #Prepare aliases for the external commands we use--
 # Note that adding /bin/ to everything breaks Cygwin32.
 RM="rm -f"
-CP="cp"
+CP="cp -p"
 MV="mv"
 LN="ln"
 WC="wc"
@@ -467,11 +467,6 @@ Debug "About to read machine config script"
 . $CHARMINC/conv-mach.sh
 
 Debug "Read config script, setting vars..."
-
-if [ -n "$CMK_CP" ]
-then
-	CP="$CMK_CP"
-fi
 
 if [ -n "$USE_RELIABLE_CC" ]
 then
