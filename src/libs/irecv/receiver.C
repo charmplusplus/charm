@@ -268,6 +268,16 @@ void receiver::pupCmmTable(CmmTable &t, PUP::er &p)
     }
 }
 
+extern "C" double IMPI_Wtime(void)
+{
+  return CmiWallTimer();
+}
+
+extern "C" double impi_wtime_(void)
+{
+  return IMPI_Wtime();
+}
+
 #include "receiver.def.h"
 
 
