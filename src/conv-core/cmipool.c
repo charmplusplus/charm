@@ -5,8 +5,10 @@
  * $Revision$
  *****************************************************************************/
 
+/* adapted from Sanjay Kale's pplKalloc by Eric Bohm */
 
-/* An extremley simple implementation of memory allocation
+
+/* An extremely simple implementation of memory allocation
    that maintains bins for power-of-two sizes.
    May waste about 33%  memory
    Does not do recombining or buddies. 
@@ -16,13 +18,6 @@
 
 #define CMI_POOL_HEADER_SIZE 8
 
-/* TODO make these cpvs */
-
-/*char** bins;
-int * binLengths;
-int maxBin;
-int numKallocs, numMallocs, numFrees;
-*/
 #include "converse.h"
 CpvDeclare(char **, bins);
 CpvDeclare(int *, binLengths);
@@ -87,26 +82,15 @@ inline void * CmiPoolAlloc(unsigned int numBytes)
       n = n >> 1;
       bin++;
     }
-  if(bin<CpvAccess(maxBin)) /* message not too big */
+  /* even 0 size messages go in bin 1 leaving 0 bin for too bigs */
+  if(bin<CpvAccess(maxBin) && CpvAccess(bins)[bin] != NULL) /* message not too big */
     {
       CpvAccess(numKallocs)++;
-      if (CpvAccess(bins)[bin] != NULL) 
-	{
-	  /* store some info in the header*/
-	  p = CpvAccess(bins)[bin];
-	  next = (char *) *((char **)(p -CMI_POOL_HEADER_SIZE)); /*next pointer from the header*/
-	  CpvAccess(bins)[bin] = next;
-	  CpvAccess(binLengths)[bin]--;
-	}
-      else /* this should be redundant now */
-	{
-	  int power2=1 <<bin;
-	  char * header = malloc_nomigrate(power2);
-	  CpvAccess(numMallocs)++;
-	  /*      if (numBytes > power2) 
-		  printf("bug! bump it by one more power of 2"); */
-	  p = header + CMI_POOL_HEADER_SIZE;
-	}
+      /* store some info in the header*/
+      p = CpvAccess(bins)[bin];
+      next = (char *) *((char **)(p -CMI_POOL_HEADER_SIZE)); /*next pointer from the header*/
+      CpvAccess(bins)[bin] = next;
+      CpvAccess(binLengths)[bin]--;
     }
   else
     {
