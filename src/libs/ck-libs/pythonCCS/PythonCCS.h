@@ -15,63 +15,14 @@ class PythonMain : public Chare {
   PythonMain(CkArgMsg *msg);
 };
 
-//#define PY_INT     0
-//#define PY_LONG    1
-//#define PY_FLOAT   2
-//#define PY_DOUBLE  3
-
-/*
-enum Py_types {PY_INT, PY_LONG, PY_FLOAT, PY_DOUBLE};
-enum Py_objects {PY_CHARE, PY_GROUP, PY_NODEGROUP, PY_ARRAY1D, PY_ARRAY2D};
-
-typedef struct TypedValue_ {
-  Py_types type;
-  union {
-    int i;
-    long l;
-    float f;
-    double d;
-  } value;
-
-  TypedValue_(Py_types t, int i0) {
-    type = t;
-    value.i = i0;
-  };
-
-  TypedValue_(Py_types t, PyObject *o) {
-    int i0;
-    long l0;
-    float f0;
-    double d0;
-    type = t;
-    switch (t) {
-    case PY_INT:
-      i0 = (int)PyInt_AsLong(o);
-      value.i = i0;
-      break;
-    case PY_LONG:
-      l0 = PyLong_AsLong(o);
-      value.l = l0;
-      break;
-    case PY_FLOAT:
-      f0 = (float)PyFloat_AsDouble(o);
-      value.f = f0;
-      break;
-    case PY_DOUBLE:
-      d0 = PyFloat_AsDouble(o);
-      value.d = d0;
-      break;
-    }
-  }
-} TypedValue;
-*/
-
 class PythonObject {
  public:
   void execute(CkCcsRequestMsg *msg);
   void iterate(CkCcsRequestMsg *msg);
 
   // utility functions to manipulate python objects
+  // in order to use Dictionaries, Lists, Tuples, refer to
+  // "Python/C API Reference Manual" (http://docs.python.org/)
   void pythonSetString(PyObject*, char*, char*);
   void pythonSetString(PyObject*, char*, char*, int);
   void pythonSetInt(PyObject*, char*, long);
@@ -92,10 +43,14 @@ class PythonObject {
   // the following methods should be overwritten by the user if used
 
   // methods for accessing charm varibles from inside python
-  virtual PyObject* read(PyObject*) {CkAbort("PythonCCS: Method read should be reimplemented");};
-  virtual void write(PyObject*, PyObject*) {CkAbort("PythonCCS: Method write should be reimplemented");};
+  // read: input an object which describes where the data should be read from, return a PyObject with the given data
+  // write: input two object describing where the data should be written, and the actual data
+  virtual PyObject* read(PyObject* where) {CkAbort("PythonCCS: Method read should be reimplemented");};
+  virtual void write(PyObject* where, PyObject* what) {CkAbort("PythonCCS: Method write should be reimplemented");};
 
   // methods to create iterators for iterative python invocations
+  // buildIterator: input a PyObject, which is an empty class to be filled with data, and a void pointer describing over what to iterate (user defined format). Should return 1, if it returns 0 no computation is done
+  // nextIteratorUpdate: input a PyObject to be filled with the next iterator, this contains the previous iterator, so if the python code modified the object, here the new information can be found. A Python object with the result returned by the python code, and the description of the iterator (as in buildIterator). Return 1 if there is a new object, 0 if there are no more objects in the iterator.
   virtual int buildIterator(PyObject*, void*) {CkAbort("PythonCCS: Method buildIterator should be reimplemented");};
   virtual int nextIteratorUpdate(PyObject*, PyObject*, void*) {CkAbort("PythonCCS: Method nextIteratorUpdate should be reimplemented");};
 
