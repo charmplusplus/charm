@@ -19,6 +19,10 @@ public:
   public:
     int proc;
     int index;
+    int from_proc;
+    int from_index;
+    int to_proc;
+    int to_index;
     Edge* next_from() { return nxt_out; };
     Edge* next_to() { return nxt_in; };
   private:

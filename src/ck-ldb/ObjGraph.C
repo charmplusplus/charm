@@ -57,6 +57,10 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
       Edge* newedge = new Edge;
       newedge->proc = pe;
       newedge->index = index;
+      newedge->from_proc = from_node->proc;
+      newedge->from_index = from_node->index;
+      newedge->to_proc = to_node->proc;
+      newedge->to_index = to_node->index;
       newedge->nxt_out = from_node->outEdge;
       from_node->outEdge = newedge;
       from_node->n_out++;
