@@ -6,44 +6,15 @@ void adapt4::Step()
 {
   Event *ev;
   POSE_TimeType lastGVT = localPVT->getGVT();
-  int iter=0, offset;
+  int itersAllowed, iter=0, offset=-1;
   double critStart;
-  int g_specEventCount = localPVT->getSpecEventCount(),
-    g_eventCount = localPVT->getEventCount();
 
-  rbFlag = 0;
-  if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
-  if (eq->RBevent) Rollback();
-  if (!parent->cancels.IsEmpty()) CancelEvents();
-  parent->Status();
-
-  if (rbFlag) { 
-    if (timeLeash > avgRBoffset)
-      timeLeash = avgRBoffset;
-    else timeLeash = avgRBoffset/2;
-  }
-  if ((g_specEventCount > (specTol*g_eventCount + g_eventCount)) ||
-      (specEventCount > (specTol*eventCount + eventCount))) {
-    timeLeash = 1;
-  }
-  else if (((g_specEventCount <= (specTol*g_eventCount + g_eventCount)) &&
-	    (specEventCount <= (specTol*eventCount + eventCount))) &&
-	   (timeLeash < (POSE_TimeMax/2 -10))) {
-    timeLeash += avgRBoffset;
-  }
-  /*
-  if (rbFlag) timeLeash = 1;
-  else if (eq->currentPtr->timestamp > POSE_UnsetTS)
-    timeLeash = (timeLeash + (eq->largest - lastGVT))/2;
-  else timeLeash = avgRBoffset;
-    else if (specEventCount > (specTol*eventCount)) 
-    timeLeash = 1;
-    else if (specEventCount > (specTol*eventCount)-0.1)
-    timeLeash = (timeLeash + avgRBoffset)/2;
-  */
+  itersAllowed = specEventCount * specTol;
+  itersAllowed -= specEventCount - eventCount;
+  if (itersAllowed < 1) itersAllowed = 1;
   
   // Prepare to execute an event
-  offset = lastGVT + timeLeash;
+  //offset = lastGVT + timeLeash;
   if (offset < 0) offset = POSE_TimeMax;
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && ((lastGVT+offset > POSE_endtime) ||
@@ -52,15 +23,18 @@ void adapt4::Step()
 
   ev = eq->currentPtr;
   //  CkPrintf("offset=%d timeLeash=%d avgRBoffset=%d specEventCount=%d eventCount=%d\n", offset, timeLeash, avgRBoffset, specEventCount, eventCount);
-  while ((ev->timestamp > POSE_UnsetTS) && (ev->timestamp <= offset)) { 
+  while ((ev->timestamp > POSE_UnsetTS) && (ev->timestamp <= offset) &&
+	 (itersAllowed > 0))) { 
 #ifdef MEM_COARSE
     // note: first part of check below ensures we don't deadlock:
     //       can't advance gvt if we don't execute events with timestamp > gvt
     if (((eq->frontPtr->timestamp > lastGVT) ||
          (eq->frontPtr->timestamp < ev->prev->timestamp)) &&
-        (eq->mem_usage > MAX_USAGE)) break;
+        (eq->mem_usage > MAX_USAGE))
+      break;
 #endif
     iter++;
+    itersAllowed--;
     currentEvent = ev;
     ev->done = 2;
     localPVT->incSpecEventCount();

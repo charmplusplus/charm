@@ -419,7 +419,12 @@ void GVT::computeGVT(UpdateMsg *m)
 
     // check for inactivity
     if ((optGVT == POSE_UnsetTS) && (earliestMsg == POSE_UnsetTS)) {
-      inactive++; 
+      inactive++;
+      if (inactive == 1) {
+	CkPrintf("[%d] Inactive... calling CkWaitQD...\n", CkMyPe());
+	CkWaitQD();
+	CkPrintf("[%d] Back from CkWaitQD...\n", CkMyPe());
+      }
       estGVT = lastGVT;
       if (inactive == 1) inactiveTime = lastGVT;
     }
@@ -449,7 +454,7 @@ void GVT::computeGVT(UpdateMsg *m)
 #endif
       term = 1;
     }
-    else if (inactive > 5) {
+    else if (inactive > 2) {
 #if USE_LONG_TIMESTAMPS      
       CkPrintf("Simulation inactive at time: %lld\n", inactiveTime);
 #else
