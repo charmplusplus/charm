@@ -93,13 +93,15 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
         int ep = senv.epIdx;
         CkArrayIndexMax idx = senv.idx;
         int size = senv.size;
-        ArrayElement *a_elem = CProxyElement_ArrayBase(aid, idx).ckLocal();
+
+        CProxyElement_ArrayBase ap(aid, idx);
+        ArrayElement *a_elem = ap.ckLocal();
 
         int msgIdx = _entryTable[ep]->msgIdx;
         //Unpack the message
         senv.data = (char *)_msgTable[msgIdx]->unpack(senv.data); 
         
-        if(_entryTable[ep]->noKeep) {
+        if(_entryTable[ep]->noKeep && a_elem != NULL) {
             CkDeliverMessageReadonly(ep, senv.data, a_elem);
             delete [] senv.data;
         }
@@ -114,7 +116,10 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
             memcpy(data, senv.data, size);
             delete[] senv.data;
             
-            CkDeliverMessageFree(ep, data, a_elem);           
+            if(a_elem)
+                CkDeliverMessageFree(ep, data, a_elem);           
+            else
+                ap.ckSend((CkArrayMessage *)data, ep);
         }        
     }      
         
