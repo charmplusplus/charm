@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.4  1995-10-13 20:05:13  jyelon
+ * Revision 1.5  1995-10-13 22:34:42  jyelon
+ * added CmiNext to CmiCallMain.
+ *
+ * Revision 1.4  1995/10/13  20:05:13  jyelon
  * *** empty log message ***
  *
  * Revision 1.3  1995/10/10  06:10:58  jyelon
@@ -465,6 +468,7 @@ void CmiCallMain()
   memcpy(argv, CmiArgv, (argc+1)*sizeof(char *));
   user_main(argc, argv);
   CmiThreads[Cmi_mype] = 0;
+  CmiNext();
 }
 
 static void CmiParseArgs(argv)
