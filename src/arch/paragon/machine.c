@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.5  1997-04-24 22:37:00  jyelon
+ * Revision 1.6  1997-04-25 20:48:11  jyelon
+ * Corrected CmiNotifyIdle
+ *
+ * Revision 1.5  1997/04/24 22:37:00  jyelon
  * Added CmiNotifyIdle
  *
  * Revision 1.4  1997/03/19 04:31:19  jyelon
@@ -174,7 +177,7 @@ CmiCommHandle c ;
 
 void CmiNotifyIdle()
 {
-#ifdef CMK_WHEN_PROCESSOR_IDLE_USLEEP
+#if CMK_WHEN_PROCESSOR_IDLE_USLEEP
   tv.tv_sec=0; tv.tv_usec=5000;
   select(0,0,0,0,&tv);
 #endif

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1997-04-24 22:37:06  jyelon
+ * Revision 2.17  1997-04-25 20:48:16  jyelon
+ * Corrected CmiNotifyIdle
+ *
+ * Revision 2.16  1997/04/24 22:37:06  jyelon
  * Added CmiNotifyIdle
  *
  * Revision 2.15  1997/03/19 04:31:45  jyelon
@@ -183,7 +186,7 @@ void *CmiGetNonLocal()
 
 void CmiNotifyIdle()
 {
-#ifdef CMK_WHEN_PROCESSOR_IDLE_USLEEP
+#if CMK_WHEN_PROCESSOR_IDLE_USLEEP
   tv.tv_sec=0; tv.tv_usec=5000;
   select(0,0,0,0,&tv);
 #endif

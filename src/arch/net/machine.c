@@ -1966,13 +1966,14 @@ char *CmiGetNonLocal()
 
 void CmiNotifyIdle()
 {
+#if CMK_WHEN_PROCESSOR_IDLE_USLEEP
   struct timeval tv;
+  tv.tv_sec=0; tv.tv_usec=5000;
+  select(0,0,0,0,&tv);
+#else
   CmiCommLock();
   CommunicationServer();
   CmiCommUnlock();
-#ifdef CMK_WHEN_PROCESSOR_IDLE_USLEEP
-  tv.tv_sec=0; tv.tv_usec=5000;
-  select(0,0,0,0,&tv);
 #endif
 }
 
