@@ -113,7 +113,7 @@ CmiPrintf("\n\n\nBroadcast begin EXIT\n");
 
 int BGMach::read(char *file)
 {
-  ifstream configFile(file, ios::in);
+  ifstream configFile(file);
   if (configFile.fail()) {
     cout << "Bad config file, trouble opening\n";
     exit(1);
@@ -166,6 +166,7 @@ int BGMach::read(char *file)
     }
     if (!strcmp(parameterName, "cpufactor")) {
       cpufactor = atof(parameterValue);
+      continue;
     }
     if (!strcmp(parameterName, "log")) {
       if (!strcmp(parameterValue, "yes"))
