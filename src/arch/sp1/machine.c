@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1996-07-15 20:59:22  jyelon
+ * Revision 2.10  1997-02-02 07:33:56  milind
+ * Fixed Bugs in SP1 machine dependent code that made megacon to hang.
+ * Consisted of almost 60 percent rewrite.
+ *
+ * Revision 2.9  1996/07/15 20:59:22  jyelon
  * Moved much timer, signal, etc code into common.
  *
  * Revision 2.8  1996/01/29 16:34:02  milind
@@ -71,8 +75,9 @@ static char ident[] = "@(#)$Header$";
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 
-CpvDeclare(int, Cmi_mype);
-CpvDeclare(int, Cmi_numpes);
+int Cmi_mype;
+int Cmi_numpes;
+int Cmi_myrank;
 CpvDeclare(void*, CmiLocalQueue);
 
 
@@ -83,13 +88,13 @@ typedef struct msg_list {
 } MSG_LIST;
 
 static int Cmi_dim;
-static int msglength=0 ;
 static int numpes ;
 static double itime;
 
 static MSG_LIST *sent_msgs=0;
 static MSG_LIST *end_sent=0;
 
+static int allmsg, dontcare, msgtype;
 
 /**************************  TIMER FUNCTIONS **************************/
 
@@ -133,7 +138,7 @@ double CmiCpuTimer()
   return tmsec / 1000.0;
 }
 
-CmiAllAsyncMsgsSent()
+static int CmiAllAsyncMsgsSent()
 {
      MSG_LIST *msg_tmp = sent_msgs;
      
@@ -157,22 +162,20 @@ int CmiAsyncMsgSent(CmiCommHandle c) {
 	  return 0;
      else
 	  return 1;
-
 }
 
 void CmiReleaseCommHandle(CmiCommHandle c)
 {
+  return;
 }
 
 
-CmiReleaseSentMessages()
+static void CmiReleaseSentMessages()
 {
      MSG_LIST *msg_tmp=sent_msgs;
      MSG_LIST *prev=0;
      MSG_LIST *temp;
      
-     if(sent_msgs==0)
-	  return;
      while(msg_tmp!=0)
      {
 	  if(mpc_status(msg_tmp->msgid)>=0)
@@ -196,59 +199,60 @@ CmiReleaseSentMessages()
      end_sent = prev;
 }
 
+typedef struct rmsg_list {
+  char *msg;
+  struct rmsg_list *next;
+} RMSG_LIST;
+
+static RMSG_LIST *recd_msgs=0;
+static RMSG_LIST *end_recd=0;
+
+static void PumpMsgs(void)
+{
+  int src, type, mstat;
+  size_t nbytes;
+  char *msg;
+  RMSG_LIST *msg_tmp;
+
+  CmiReleaseSentMessages();
+  while(1) {
+    src = dontcare; type = msgtype;
+	 mpc_probe(&src, &type, &mstat);
+	 if(mstat<0)
+		return;
+	 nbytes = mstat;
+	 msg = (char *) CmiAlloc(nbytes);
+	 mpc_brecv(msg, nbytes, &src, &type, &nbytes);
+	 msg_tmp = (RMSG_LIST *) CmiAlloc(sizeof(RMSG_LIST));
+	 msg_tmp->msg = msg;
+	 msg_tmp->next = 0;
+	 if(recd_msgs==0)
+		recd_msgs = msg_tmp;
+	 else
+      end_recd->next = msg_tmp;
+	 end_recd = msg_tmp;
+  }
+}
+
 /********************* MESSAGE RECEIVE FUNCTIONS ******************/
 
 void *CmiGetNonLocal()
 {
-     void *env;
-     int msglength;
-     
-     if (!CmiProbe())
-	  return 0;
-     msglength = CmiArrivedMsgLength();
-     env = (void *)  CmiAlloc(msglength);
-     if (env == 0)
-     {
-	  CmiPrintf("*** ERROR *** Memory Allocation Failed.\n");
-	  fflush(stdout);
-     }
-     CmiSyncReceive(msglength, env);
-     return env;
-}
+     void *msg;
+	  RMSG_LIST *msg_tmp;
 
-/*
- * mp_probe(src, type, nbytes)
- */
-extern mp_probe();	/* Fortran interface. In EUI-H, not in EUI */
-
-/* Internal functions */
-CmiProbe()
-{
-     int src, type, nbytes;
-     
-     src = DONTCARE;
-     type = 0;
-     mp_probe(&src, &type, &nbytes);
-     if (nbytes < 0)
-	  return 0;
-     msglength = nbytes;
-     return(1) ;
-}
-
-CmiArrivedMsgLength()
-{
-     return msglength;
-}
-
-CmiSyncReceive(size, buffer)
-     int size ;
-     char *buffer ;
-{
-     int src, type, nbytes;
-     
-     src = DONTCARE;
-     type = 0;
-     mpc_brecv(buffer, size, &src, &type, &nbytes);
+	  PumpMsgs();
+	  msg_tmp = recd_msgs;
+	  if(msg_tmp == 0)
+		 return 0;
+	  if(msg_tmp == end_recd) {
+		 recd_msgs = end_recd = 0;
+	  } else {
+		 recd_msgs = msg_tmp->next;
+	  }
+	  msg = msg_tmp->msg;
+	  CmiFree(msg_tmp);
+	  return msg;
 }
 
 /********************* MESSAGE SEND FUNCTIONS ******************/
@@ -258,7 +262,13 @@ void CmiSyncSendFn(destPE, size, msg)
      int size;
      char * msg;
 {
-     mpc_bsend(msg, size, destPE, 0);
+     char *dupmsg = (char *) CmiAlloc(size);
+	  memcpy(dupmsg, msg, size);
+	  PumpMsgs();
+	  if (Cmi_mype==destPE)
+		 FIFO_EnQueue(CpvAccess(CmiLocalQueue),dupmsg);
+	  else
+	    CmiAsyncSendFn(destPE, size, dupmsg);
 }
 
 
@@ -270,16 +280,16 @@ CmiCommHandle CmiAsyncSendFn(destPE, size, msg)
      MSG_LIST *msg_tmp;
      int msgid;
      
-     /* Send Async message and add msgid to sent msg list */
-     mpc_send(msg, size, destPE, 0, &msgid);
+	  PumpMsgs();
+     mpc_send(msg, size, destPE, msgtype, &msgid);
      msg_tmp = (MSG_LIST *) CmiAlloc(sizeof(MSG_LIST));
      msg_tmp->msgid = msgid;
      msg_tmp->msg = msg;
      msg_tmp->next = 0;
      if(sent_msgs==0)
-	  sent_msgs = msg_tmp;
+	    sent_msgs = msg_tmp;
      else
-	  end_sent->next = msg_tmp;
+	    end_sent->next = msg_tmp;
      end_sent = msg_tmp;
 }
 
@@ -287,11 +297,10 @@ void CmiFreeSendFn(destPE, size, msg)
 int destPE, size;
 char *msg;
 {
-	if (CpvAccess(Cmi_mype)==destPE) {
+	if (Cmi_mype==destPE) {
 		FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
 	} else {
-		CmiSyncSendFn(destPE, size, msg);
-		CmiFree(msg);
+		CmiAsyncSendFn(destPE, size, msg);
 	}
 }
 
@@ -304,10 +313,10 @@ void CmiSyncBroadcastFn(size, msg)     /* ALL_EXCEPT_ME  */
 {
      int i ;
      
-     for ( i=CpvAccess(Cmi_mype)+1; i<numpes; i++ ) 
-	  CmiSyncSendFn(i, size,msg) ;
-     for ( i=0; i<CpvAccess(Cmi_mype); i++ ) 
-	  CmiSyncSendFn(i, size,msg) ;
+     for ( i=Cmi_mype+1; i<numpes; i++ ) 
+	    CmiSyncSendFn(i, size,msg) ;
+     for ( i=0; i<Cmi_mype; i++ ) 
+	    CmiSyncSendFn(i, size,msg) ;
 }
 
 
@@ -317,9 +326,9 @@ char * msg;
 {
 	int i ;
 
-	for ( i=CpvAccess(Cmi_mype)+1; i<numpes; i++ ) 
+	for ( i=Cmi_mype+1; i<numpes; i++ ) 
 		CmiAsyncSendFn(i,size,msg) ;
-	for ( i=0; i<CpvAccess(Cmi_mype); i++ ) 
+	for ( i=0; i<Cmi_mype; i++ ) 
 		CmiAsyncSendFn(i,size,msg) ;
 	return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
@@ -329,7 +338,7 @@ void CmiFreeBroadcastFn(size, msg)
     char *msg;
 {
     CmiSyncBroadcastFn(size,msg);
-    CmiFree(msg);
+	 CmiFree(msg);
 }
  
 void CmiSyncBroadcastAllFn(size, msg)        /* All including me */
@@ -362,21 +371,6 @@ void CmiFreeBroadcastAllFn(size, msg)  /* All including me */
      for ( i=0; i<numpes; i++ ) 
 	  CmiSyncSendFn(i,size,msg,0) ;
      CmiFree(msg) ;
-}
-
-
-
-/**********************  PE NUMBER FUNCTIONS **********************/
-
-int CmiMainPeNum()
-{
-     return(0);
-}
-
-
-int CmiHostPeNum()
-{
-     return numpes;
 }
 
 
@@ -434,7 +428,10 @@ char *argv[];
 }
 
 void CmiExit()
-{}
+{
+  int msgid = allmsg, nbytes;
+  mpc_wait(&msgid, &nbytes);
+}
 
 
 void CmiDeclareArgs()
@@ -446,12 +443,17 @@ int argc;
 char *argv[];
 {
 	int n ;
+   int nbuf[4];
 
-        CpvInitialize(int, Cmi_mype);
-        CpvInitialize(int, Cmi_numpes);
 
-	mpc_environ(&CpvAccess(Cmi_numpes), &CpvAccess(Cmi_mype));
-	numpes = CpvAccess(Cmi_numpes);
+	Cmi_myrank = 0;
+	mpc_environ(&Cmi_numpes, &Cmi_mype);
+	numpes = Cmi_numpes;
+   mpc_task_query(nbuf, 4, 3);
+   dontcare = nbuf[0];
+   allmsg = nbuf[1];
+   mpc_task_query(nbuf, 2, 2);
+   msgtype = nbuf[0];
 
 	/* find dim = log2(numpes), to pretend we are a hypercube */
 	for ( Cmi_dim=0,n=numpes; n>1; n/=2 )
@@ -472,7 +474,10 @@ int size;
 {
      char *res;
      res =(char *)malloc(size+8);
-     if (res==0) printf("Memory allocation failed.");
+     if (res==0) {
+	    fprintf(stderr, "Memory allocation failed.");
+		 mpc_stopall(1);
+	  }
      ((int *)res)[0]=size;
      return (void *)(res+8);
 }

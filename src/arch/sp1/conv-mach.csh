@@ -12,7 +12,11 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.18  1996-08-04 04:19:50  jyelon
+# Revision 2.19  1997-02-02 07:33:55  milind
+# Fixed Bugs in SP1 machine dependent code that made megacon to hang.
+# Consisted of almost 60 percent rewrite.
+#
+# Revision 2.18  1996/08/04 04:19:50  jyelon
 # Added CMK_LDRO_WORKS
 #
 # Revision 2.17  1996/08/01 21:11:12  jyelon
@@ -82,15 +86,15 @@ set CMK_CXX			= 'mpCC '
 set CMK_CXXPP			= 'xlC -E '
 set CMK_CF77			= 'mpxlf'
 set CMK_C_DEBUG                 = '-g'
-set CMK_C_OPTIMIZE              = '-O'
+set CMK_C_OPTIMIZE              = '-O3 -qstrict '
 set CMK_CXX_DEBUG               = '-g'
-set CMK_CXX_OPTIMIZE            = '-O'
+set CMK_CXX_OPTIMIZE            = '-O3 -qstrict '
 set CMK_LD			= 'mpcc -us'
 set CMK_LDXX			= 'mpCC -us'
 set CMK_LD77			= ''
 set CMK_M4			= 'm4'
 set CMK_SUF			= 'o'
-set CMK_AR                      = 'ar q'
+set CMK_AR                      = 'ar cq'
 set CMK_RANLIB			= 'true'
 set CMK_LIBS			= '-bnso -bI:/lib/syscalls.exp'
 set CMK_SEQ_LIBS                = ''
