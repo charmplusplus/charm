@@ -180,28 +180,16 @@ class myRefineClient {
     if (A==lastB && B==lastA) return lastD;
     return -1;
   }
-  //Return anything on [0,2] than a or b
-  int otherThan(int a,int b) {
-    if (a==b) CkAbort("Opposite node is moving!");
-    for (int i=0;i<3;i++)
-    	if (i!=a && i!=b) return i;
-    CkAbort("Logic error.  Not supposed to get here.");
-    return -1;
-  }
 
 public:
   myRefineClient(myGlobals &g_) :g(g_) {
     lastA=lastB=lastD=-1;
   }
-  void split(int triNo,int edgeOfTri,int movingNode, double frac) {
-    CkPrintf("---- Splitting edge %d of triangle %d at %.2f\n",
-    	edgeOfTri,triNo,frac);
+  void split(int triNo,int A,int B,int C, double frac) {
+    CkPrintf("---- Splitting edge %d-%d (%d), of triangle %d at %.2f\n",
+    	A,B,C, triNo, frac);
     //Figure out what we're adding:
     connRec &oldConn=g.conn[triNo];
-    int c=(edgeOfTri+2)%3; //==opnode
-    int A=oldConn[movingNode]; //==othernode
-    int B=oldConn[otherThan(c,movingNode)];
-    int C=oldConn[c];
     int D; //New node
     if (-1==(D=lastSplit(A,B))) 
     { //This edge wasn't just split-- create a new node
@@ -454,21 +442,13 @@ CkPrintf("[%d] end init\n",myChunk);
       REFINE2D_Split(g.nnodes,(double *)loc,g.nelems,areas);
       delete[] areas;
       delete[] loc;
+      myRefineClient c(g);
       int nSplits=REFINE2D_Get_Split_Length();
-      if (nSplits>0) {
-        int *tris=new int[nSplits];
-        int *sides=new int[nSplits];
-        int *nodes=new int[nSplits];
-        double *fracs=new double[nSplits];
-        myRefineClient c(g);
-        REFINE2D_Get_Splits(nSplits,tris,sides,nodes,fracs);      
-        for (int i=0;i<nSplits;i++)
-           c.split(tris[i],sides[i],nodes[i],fracs[i]);
-      
-        delete[] tris;
-        delete[] sides;
-        delete[] nodes;
-        delete[] fracs;
+      for (int splitNo=0;splitNo<nSplits;splitNo++) {
+        int tri,A,B,C;
+        double frac;
+        REFINE2D_Get_Split(splitNo,(int *)(g.conn),&tri,&A,&B,&C,&frac);      
+        c.split(tri,A,B,C,frac);
       
         //Since the connectivity changed, update the masses
         calcMasses(g);

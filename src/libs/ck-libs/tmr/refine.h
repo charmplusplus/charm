@@ -60,19 +60,15 @@ void REFINE2D_Split(int nNode,double *coord,int nEl,double *desiredArea);
 int REFINE2D_Get_Split_Length(void);
 
   /**
-   * Return the indices (tri) and edge number (edge) of each split triangle.
-   *
-   * For our purposes, edges are numbered 0 (connecting nodes 0 and 1), 
-   * 1 (connecting 1 and 2), and 2 (connecting 2 and 0).
-   * 
-   * Taking as A and B the (triangle-order) nodes of the splitting edge:
+   * Return one split triangle.
+   * A and B are the nodes along the splitting edge:
    *
    *                     C                      C                 
    *                    / \                    /|\                  
    *                   /   \                  / | \                 
    *                  /     \      =>        /  |  \                
-   *                 /       \              /   |   \               
-   *                /         \            /old | new\            
+   *                 /  tri  \              /   |   \               
+   *                /         \            /tri | new\            
    *               B --------- A          B --- D --- A         
    *
    *   The original triangle's node A should be replaced by D;
@@ -87,16 +83,27 @@ int REFINE2D_Get_Split_Length(void);
    * triangle, that triangle will immediately receive a "split" call
    * for the same edge.  
    *
+   * Parameters:
+   *   -splitNo is the number of this split.  Pass splitNo
+   *      in increasing order from 0 to REFINE2D_Get_Split_Length()-1.
+   *   -conn is the triangle connectivity array, used to look up
+   *      the node numbers A, B, and C.  This array is *not* modified.
+   *   -tri returns the number of the old triangle being split;
+   *      as labelled above.
+   *   -A,B,C returns the numbers of the nodes in the above diagram.
+   *   -frac returns the weighting for D between A and B;
+   *     for now, this is always 0.5.
+   *
    * Client's responsibilities:
    *   -Add the new node D.  Since both sides of a shared local edge
    *      will receive a "split" call, you must ensure the node is
-   *      not added twice.
+   *      not added twice; you can do this by checking this split's
+   *      nodes A and B against the previous split.
    *   -Update connectivity for source triangle
    *   -Add new triangle. 
    */
-
-void REFINE2D_Get_Splits(int nSplits,int *tri,int *edge,int *movingNode,
-	double *frac);
+void REFINE2D_Get_Split(int splitNo,const int *conn,
+	int *tri,int *A,int *B,int *C,double *frac);
 
 /**
  * Check to make sure our connectivity and the refine connectivity agree.

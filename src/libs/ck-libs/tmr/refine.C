@@ -78,6 +78,15 @@ class refineResults {
 			:t(t_), s(s_), n(n_), f(f_) {}
 	};
 	std::vector<resRec> res;
+	
+  //Return anything on [0,2] than a or b
+  int otherThan(int a,int b) {
+    if (a==b) CkAbort("Opposite node is moving!");
+    for (int i=0;i<3;i++)
+    	if (i!=a && i!=b) return i;
+    CkAbort("Logic error in refine.C::otherThan");
+    return -1;
+  }
 public:
 	refineResults(void) {nResults=0;}
 	void add(int tri_,int side_,int n_,double frac_) {
@@ -85,14 +94,24 @@ public:
 		res.push_back(resRec(tri_,side_,n_,frac_));
 	}
 	int countResults(void) const {return nResults;}
-	void extract(int nDest,int *triDest,int *sideDest,int *nodeDest,double *fracDest,int idxBase) {
-		if (nDest!=nResults)
-			CkAbort("Didn't call REFINE2D_Get_Splits with value returned by REFINE2D_Get_Split_Length");
-		for (int i=0;i<nResults;i++) {
-			triDest[i]=res[i].t+idxBase;
-			sideDest[i]=res[i].s+idxBase;
-			nodeDest[i]=res[i].n+idxBase;
-			fracDest[i]=res[i].f;
+	void extract(int i,const int *conn,int *triDest,int *A,int *B,int *C,double *fracDest,int idxBase) {
+		if ((i<0) || (i>=(int)res.size()))
+			CkAbort("Invalid index in REFINE2D_Get_Splits");
+		
+		int tri=res[i].t;
+		*triDest=tri+idxBase;
+		int edgeOfTri=res[i].s;
+		int movingNode=res[i].n;
+		
+		int c=(edgeOfTri+2)%3; //==opnode
+		*A=conn[3*tri+movingNode]; //==othernode
+		*B=conn[3*tri+otherThan(c,movingNode)];
+		*C=conn[3*tri+c];
+		*fracDest=res[i].f;
+		if (i==(int)res.size()-1) {
+		  delete this;
+		  chunk *C = CtvAccess(_refineChunk);
+		  C->refineResultsStorage=NULL;
 		}
 	}
 };
@@ -131,43 +150,39 @@ FDECL void FTN_NAME(REFINE2D_SPLIT,refine2d_split)
   REFINE2D_Split(*nNode,coord,*nEl,desiredArea);
 }
 
-static refineResults *getResults(int andDetach) {
+static refineResults *getResults(void) {
   chunk *C = CtvAccess(_refineChunk);
   if (!C)
-    CkAbort("Did you forget to call REFINE2D_Attach?");
+    CkAbort("Did you forget to call REFINE2D_Init?");
   refineResults *ret=C->refineResultsStorage;
   if (ret==NULL)
     CkAbort("Did you forget to call REFINE2D_Begin?");
-  if (andDetach) C->refineResultsStorage=NULL;
   return ret;
 }
 
 CDECL int REFINE2D_Get_Split_Length(void)
 {
   TCHARM_API_TRACE("REFINE2D_Get_Split_Length", "refine");
-  return getResults(0)->countResults();
+  return getResults()->countResults();
 }
 FDECL int FTN_NAME(REFINE2D_GET_SPLIT_LENGTH,refine2d_get_split_length)(void)
 {
   return REFINE2D_Get_Split_Length();
 }
 
-CDECL void REFINE2D_Get_Splits(int destLen,int *triDest,int *sideDest,
-	int *nodeDest,double *fracDest)
+CDECL void REFINE2D_Get_Split
+    (int splitNo,const int *conn,int *triDest,int *A,int *B,int *C,double *fracDest)
 {
-  TCHARM_API_TRACE("REFINE2D_Get_Splits", "refine");
-  refineResults *r=getResults(1);
-  r->extract(destLen,triDest,sideDest,nodeDest,fracDest,0);
-  delete r;
+  TCHARM_API_TRACE("REFINE2D_Get_Split", "refine");
+  refineResults *r=getResults();
+  r->extract(splitNo,conn,triDest,A,B,C,fracDest,0);
 }
-FDECL void FTN_NAME(REFINE2D_GET_SPLITS,refine2d_get_splits)
-    (int *destLen,int *triDest,int *sideDest,
-     int *nodeDest,double *fracDest)
+FDECL void FTN_NAME(REFINE2D_GET_SPLIT,refine2d_get_split)
+    (int *splitNo,const int *conn,int *triDest,int *A,int *B,int *C,double *fracDest)
 {
-  TCHARM_API_TRACE("REFINE2D_Get_Splits", "refine");
-  refineResults *r=getResults(1);
-  r->extract(*destLen,triDest,sideDest,nodeDest,fracDest,1);
-  delete r;
+  TCHARM_API_TRACE("REFINE2D_Get_Split", "refine");
+  refineResults *r=getResults();
+  r->extract(*splitNo-1,conn,triDest,A,B,C,fracDest,1);
 }
 
 /********************* Check *****************/

@@ -2,13 +2,15 @@ OPTS=-g -Wall
 CHARMDIR=../../../..
 CHARMC=$(CHARMDIR)/bin/charmc $(OPTS) 
 
-OBJS=libmodulerefine.a cst_nl.o pgm.o 
+OBJS=cst_nl.o pgm.o 
 
+DEST=$(CHARMDIR)/lib/libmodulerefine.a
 LOBJS=refine.o tri.o
+HEADERS=refine.h refinef.h
 
-all: pgm
+all: $(DEST) pgm
 
-pgm: $(OBJS)
+pgm: $(DEST) $(OBJS)
 	$(CHARMC) -L. -o pgm $(OBJS) -language fem -module netfem -module refine
 
 pgm.o: pgm.C pgm.h
@@ -17,8 +19,9 @@ pgm.o: pgm.C pgm.h
 cst_nl.o: cst_nl.C pgm.h
 	$(CHARMC) -c cst_nl.C
 
-libmodulerefine.a: $(LOBJS)
+$(DEST): $(LOBJS) $(HEADERS)
 	$(AR) cr $@ $(LOBJS)
+	cp $(HEADERS) $(CHARMDIR)/include/
 
 refine.o: refine.C refine.h tri.h
 	$(CHARMC) -c refine.C

@@ -14,12 +14,14 @@
        function REFINE2D_Get_Split_Length()
           integer  :: REFINE2D_Get_Split_Length
        end function REFINE2D_Get_Split_Length
-       subroutine REFINE2D_Get_Splits(nSplit,tri,edge,movingNode,frac)
-          integer, intent(in) :: nSplit
-          integer, intent(out) :: tri(nSplit)
-          integer, intent(out) :: edge(nSplit)
-          integer, intent(out) :: movingNode(nSplit)
-          double precision, intent(out) :: frac(nSplit)
+       subroutine REFINE2D_Get_Split(splitNo,conn,tri,edge,movingNode,frac)
+          integer, intent(in) :: splitNo
+          integer, intent(in) :: conn(:,:)
+          integer, intent(out) :: tri
+          integer, intent(out) :: A
+          integer, intent(out) :: B
+          integer, intent(out) :: C
+          double precision, intent(out) :: frac
        end subroutine 
        subroutine REFINE2D_Check(nEl,conn,nNode)
           integer, intent(in) :: nEl,nNode

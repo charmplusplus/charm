@@ -1,39 +1,30 @@
 This is a triangle mesh refinement library,
 and pgm.C is a (poor) example code.
 
-You'll have to run the program with at least
-+vp2, because it depends on having at least two
-virtual processors. (I think this should work with 1 vp now -- Terry).
-
-
 1. Get charm from CVS or wherever.  Build FEM for your system.  For example,
    for me, I type:
    build FEM net-linux -g
 
 The -g is for debugging.
 
-2. Get fem_tmr8.tar and untar it.  
-   tar xvf fem_tmr8.tar
+2. cd net-linux/tmp/libs/ck-libs/tmr
 
-3. Change directory to fem_tmr8 and edit the Makefile so that CHARMC (the 
-   second line) has the proper path to your charm installation.
+3. Build the program and library with 'make'.
 
-4. Build the program with 'make'.
+4. Run it with 'charmrun pgm +vp1'.  If everything is working,
+it will run forever, refining the mesh.
 
-5. Run it with 'charmrun pgm +vp1'.  Right now it doesn't appear to
-exit gracefully...  Try it also with +vp2.  I think it gets weird with
-+vp higher than 2.
-
-6. Now try using NetFEM to visualize it.  Download
+5. You could also try using NetFEM to visualize it.  Download
 netfem_client_linux_3.tgz from
 http://charm.cs.uiuc.edu/research/fem/netfem/.  Unzip and untar this.
 In the resulting directory, there will be a bin dir with 'netfem'
 binary in it.  First run the sample program in one window: 
 charmrun pgm +vp1 ++server ++server-port 1234 
 
-7. Then run 'netfem' in another window.  A dialog box will pop up asking
+5b. Then run 'netfem' in another window.  A dialog box will pop up asking
 for where your running your FEM program.  If you are on the same
 machine, the default value should work: localhost:1234.
 
-8. A view window and a controller window will pop up.  Play around
+5c. A view window and a controller window will pop up.  Play around
 with it.  Hit update repeatedly to see how the mesh is changing.
+
