@@ -2,7 +2,7 @@
 FILE=manual
 TEX=$(FILE).tex install.tex emulator.tex
 
-DEST=bluegene
+DEST=bigsim
 LATEX2HTML=$(L2H) -split 5
 
 include ../Makefile.common
