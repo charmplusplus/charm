@@ -51,7 +51,9 @@ public:
   };
   LBDatabase(CkMigrateMessage *m) { myLDHandle = LDCreate(); }
   inline static LBDatabase * Object() { return CkpvAccess(lbdatabaseInited)?(LBDatabase *)CkLocalBranch(lbdb):NULL; }
+#if CMK_LBDB_ON
   inline LBDB *getLBDB() {return (LBDB*)(myLDHandle.handle);}
+#endif
 
   /*
    * Calls from object managers to load database
