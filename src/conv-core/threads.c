@@ -967,8 +967,15 @@ CthThread CthCreateMigratable(CthVoidFn fn,void *arg,int size)
 /***************************************************************
 Use SysV r3 setcontext/getcontext calls instead of
 quickthreads.  This works on lots of architectures (such as
-SUN, IBM SP, O2K, DEC Alpha, IA64, even Linux with new glibc such as RH9) 
+SUN, IBM SP, O2K, DEC Alpha, IA64, Cray X1, Linux with newer version of 
+ glibc such as the one with RH9) 
 where quickthreads' setjmp/alloca/longjmp doesnot work.
+One some machine such as IA64 and Cray X1, the context version is the 
+only thread package that is working. 
+Note: on some machine like Sun and IBM SP, one needs to link with memory gnuold
+ to have this context thread working.
+To port context threads, one need to set the direction of the thread stack 
+properly in conv-mach.h.
 
 Written by Gengbin Zheng around April 2001
 */
