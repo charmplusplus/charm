@@ -20,9 +20,18 @@
 #endif
 
 /************ Charm++ Message PUP *****************/
+/* 
+ fast_and_dirty = 0:  pup directly according to the size;
+                  1:  pup each field separately, allows for debugging;
+                  2:  try to handle the cross platform compatibility where
+		      Converse header sizes are different. Works same as 0, 
+		      but ignore the converse header. Cannot handle the case 
+		      in heterogeneous platforms where data type length is 
+		      different.
+*/
 void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty) {
 	UChar type;
-	int size,prioBits;
+	int size,prioBits,convHeaderSize;
 	envelope *env=UsrToEnv(*atMsg);
 	unsigned char wasPacked=0;
 	p.comment("Begin Charm++ Message {");
@@ -33,18 +42,32 @@ void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty) {
 		type=env->getMsgtype();
 		size=env->getTotalsize();
 		prioBits=env->getPriobits();
+		convHeaderSize=CmiReservedHeaderSize;
 	}
 	p(type);
 	p(wasPacked);
 	p(size);
 	p(prioBits);
+	p(convHeaderSize);	// converse header, different on platforms
 	int userSize=size-sizeof(envelope)-sizeof(int)*PW(prioBits);
 	if (p.isUnpacking())
 		env=_allocEnv(type,userSize,prioBits);
-	if (fast_and_dirty) {
+	if (fast_and_dirty == 1) {
 	  /*Pup entire header and message as raw bytes.*/
 	  p((void *)env,size);
 	} 
+ 	else if (fast_and_dirty == 2) {
+	  if (p.isUnpacking()) {   // ignore converse header when unpacking
+	    char *buf = new char[size];
+	    p((void *)buf,size);
+	    memcpy((char*)env+CmiReservedHeaderSize, buf+convHeaderSize, 
+			size-convHeaderSize);
+	    delete [] buf;
+	  }
+	  else {
+	    p((void *)env,size);
+	  }
+ 	}
 	else 
 	{ /*Pup each field separately, which allows debugging*/
 	  p.comment("Message Envelope:");
