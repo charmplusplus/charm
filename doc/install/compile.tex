@@ -125,12 +125,17 @@ is just a way to help charmc include the right libraries.  Pick the
 \item{{\bf f90charm} if your program includes f90 Charm interface.}
 \end{itemize}
 
-\item[{\tt -balance} {\em load-balance-strategy}:]
+\item[{\tt -balance} {\em seed load-balance-strategy}:]
 
 When linking any \converse{} program (including any \charmpp{} or sdag program),
 one must include a seed load-balancing
 library.  There are currently three to choose from: {\tt rand}, {\tt
-test}, and {\tt graph} are supported.  Default is {\tt -balance rand}.
+test}, and {\tt neighbor} are supported.  Default is {\tt -balance rand}.
+
+When linking with {\tt neighbor} seed load balancer, one can also specify
+a virtual tolpogy for constructing neighbors during run-time using 
+{\tt +LBTopo topo}, where {\em topo} can be one of (a) ring, (b) mesh2d,
+(c) mesh3d and (d) graph. The default is mesh2d.
 
 \item[{\tt -tracemode} {\em tracing-mode}:]
 
