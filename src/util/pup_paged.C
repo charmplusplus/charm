@@ -1,55 +1,47 @@
 #include "charm.h"
 #include "pup_paged.h"
 
-CpvDeclare(pup_pagetable *,_pagetable);
-CpvDeclare(int,_openPagetableFile); /*checks if the data file has been openned. 
-																			if not it is openned during a constructor call to pagedDisk.
-																			this prevents the data file from being created if no
-																			pagedDisk pupper is created.*/
 
 
-void _pupModuleInit(){
-	CpvInitialize(pup_pagetable *,_pagetable);
-	CpvInitialize(int,_openPagetableFile);
-	CpvAccess(_pagetable) = new pup_pagetable;
-	CpvAccess(_pagetable)->freelist = NULL;
-	CpvAccess(_pagetable)->table = NULL;
-	CpvAccess(_pagetable)->maxblk=0;
-	sprintf(CpvAccess(_pagetable)->fName,"_data%d.dat",CkMyPe());
-	CpvAccess(_openPagetableFile)=0;
+pup_pagetable *getNewPagetable(char *fName){
+	pup_pagetable *_pagetable = new pup_pagetable;
+	_pagetable->freelist = NULL;
+	_pagetable->table = NULL;
+	_pagetable->tailtable = NULL;
+	_pagetable->maxblk=0;
+	_pagetable->fName = new char[strlen(fName)+20];
+	sprintf(_pagetable->fName,"%s_%d.dat",fName,CkMyPe());
+	_pagetable->fp = fopen(_pagetable->fName,"wb");
+	fclose(_pagetable->fp);
+	_pagetable->fp = fopen(_pagetable->fName,"r+b");
 	
+	return _pagetable;
 }
 
 void PUP_toPagedDisk::addpageentry(){
-	pup_pageentry *p, *q;
-	p = CpvAccess(_pagetable)->table;
-	q = NULL;
-	while(p != NULL){
-		q = p;
-		p = p->next;
-	}
 	entry = new pup_pageentry;
 	entry->next = NULL;
 	entry->ptr = handle;
 	entry->blklist = NULL;
 	tailblklist = NULL;
-	if(q == NULL){
-		CpvAccess(_pagetable)->table = entry;
+	if(_pagetable->tailtable == NULL){
+		_pagetable->table = entry;
 	}else{
-		q->next = entry;
+		_pagetable->tailtable->next = entry;
 	}
+	_pagetable->tailtable = entry;
 }
 
 void PUP_toPagedDisk::nextblock(){
 	pup_list *f;
-	f = CpvAccess(_pagetable)->freelist;
+	f = _pagetable->freelist;
 	if(f != NULL){
 		current_block =  f->n;
-		CpvAccess(_pagetable)->freelist=f->next;
+		_pagetable->freelist=f->next;
 		delete f;
 	}else{
-		current_block = CpvAccess(_pagetable)->maxblk;
-		CpvAccess(_pagetable)->maxblk = current_block+1;
+		current_block = _pagetable->maxblk;
+		_pagetable->maxblk = current_block+1;
 	}
 	pup_list *newblk = new pup_list;
 	newblk->n = current_block;
@@ -86,9 +78,20 @@ void PUP_toPagedDisk::bytes(void *p,int n,size_t itemSize,PUP::dataType) {
 
 
 void PUP_fromPagedDisk::findpageentry(){
-	entry = CpvAccess(_pagetable)->table;
+	pup_pageentry *p;
+	p = NULL;
+	entry = _pagetable->table;
 	while(entry != NULL && entry->ptr != handle){
+		p = entry;
 		entry = entry->next;
+	}
+	if( p == NULL){
+		_pagetable->table = entry->next;
+	}else{
+		p->next = entry->next;
+	}
+	if(_pagetable->tailtable == entry){
+		_pagetable->tailtable = p;
 	}
 }
 
@@ -98,12 +101,12 @@ void PUP_fromPagedDisk::nextblock(){
 		pup_list *freenode = new pup_list;
 		freenode->n = current_block;
 		freenode->next = NULL;
-		if(CpvAccess(_pagetable)->freelist == NULL){
-			CpvAccess(_pagetable)->freelist = freenode;
-			CpvAccess(_pagetable)->tailfreelist = freenode;
+		if(_pagetable->freelist == NULL){
+			_pagetable->freelist = freenode;
+			_pagetable->tailfreelist = freenode;
 		}else{
-			CpvAccess(_pagetable)->tailfreelist->next = freenode;
-			CpvAccess(_pagetable)->tailfreelist = freenode;
+			_pagetable->tailfreelist->next = freenode;
+			_pagetable->tailfreelist = freenode;
 		}
 	}
 	if(entry->blklist != NULL){
