@@ -11,11 +11,18 @@ extern void initializeNetwork(Topology **,RoutingAlgorithm **);
 
 Switch::Switch(SwitchMsg *s) {
         id = s->id; numP = s->numP;
+	
+	if(config.inputBuffering)
         for(int i=0;i<numP*config.switchVc;i++) {
                 mapVc[i]=IDLE;
                 requested[i] = 0;
                 availBufsize[i] = config.switchBufsize;
         }
+	else
+	for(int i=0;i<=numP;i++) {
+		requested[i] = 0;
+		availBufsize[i] = config.switchBufsize; 
+	}
 
         initializeNetwork(&topology,&routingAlgorithm,&inputVcSelect,&outputVcSelect);
         topology->getNeighbours(id-config.switchStart,numP);
@@ -33,25 +40,55 @@ Switch::Switch(SwitchMsg *s) {
 
 void Switch::recvPacket(Packet *copyP) {
         Packet *p; p = new Packet; *p = *copyP;
-        int outPort,outVc,inPort,inVc,outVcId,nextChannel,inVcId,bufferid;
+        int outPort,outVc,inPort,inVc,outVcId,nextChannel,inVcId,bufferid,setRequest;
 
-//	CkPrintf("At switch %d \n",id-config.switchStart);
         inPort = routingAlgorithm->convertOutputToInputPort(id-config.switchStart,p,numP); inVc = p->hdr.vcid;
         p->hdr.portId = inPort;
-        outPort = routingAlgorithm->selectRoute(id-config.switchStart,p->hdr.routeInfo.dst,numP,topology,p,availBufsize);
-
+	if(config.sourceRouting) {
+		outPort = p->hdr.nextPort[p->hdr.hop++];
+	} else
+        	outPort = routingAlgorithm->selectRoute(id-config.switchStart,p->hdr.routeInfo.dst,numP,topology,p,availBufsize);
+			
+	
         CkAssert(inPort <= numP);
         p->hdr.portId = outPort;
+	if((outPort == numP) && (!config.inputBuffering)) {
+		// Direct ticket to node w/o buffering in case of output buffering
+		sendPacket(p,outPort*config.switchVc,outPort,outPort*config.switchVc);
+		return;
+	}
+
+	if(config.inputBuffering) 
         outVc = outputVcSelect->selectOutputVc(availBufsize,p,inVc);
+	else 
+	outVc = outputVcSelect->selectOutputVc(availBufsize,p,inPort); // Never use availBufsize for decision making.
+
         outVcId = outPort*config.switchVc+outVc;
-	if(!config.inputBuffering)  inVcId = outVcId;  else  inVcId = inPort*config.switchVc+inVc;
+	if(config.inputBuffering)
+	inVcId = inPort*config.switchVc+inVc;
+	else {
+	inVcId = outVcId;
+	// outputBuffering has a special problem in that we already have the output
+	// vc and so buffering is to be done only in case not enough downstream tokens
+	// if selectOutputVc returned NO_VC_AVAILABLE then outVcId is set to invalid.
+	// To prevent that, outVc is valid till outVcId is computed
+	if(availBufsize[outPort] < p->hdr.routeInfo.datalen)
+        	outVc = NO_VC_AVAILABLE; 
+	}
 
-//      parent->CommitPrintf("recvPacket: ovt %d portid %d supposed portid %d nextid is %d nicEnd is %d src %d dst %d msgid %d\n",
-//      ovt,outPort,p->hdr.portId,p->hdr.nextId,config.nicStart+config.numNodes,p->hdr.src,p->hdr.routeInfo.dst,p->hdr.msgId);
-
-	// mapVc and requested do not hold any significance for output buffering. 
-        if((outVc != NO_VC_AVAILABLE) && !requested[inVcId]) { sendPacket(p,outVcId,outPort,inVcId); }
-        else { Buffer[inVcId].push_back(p->hdr); delete p;}
+	// outputBuffering, don't sent packet if port is sending another packet
+	// Basically this is a replication of channel functionality. The only 
+	// advantage is we can do QOS in selectInputVc by this. Note that 
+	// simulation timing is not affected
+	setRequest = (config.inputBuffering)?(requested[inVcId]):requested[outPort];
+		
+        if((outVc != NO_VC_AVAILABLE) && !setRequest) { 
+		sendPacket(p,outVcId,outPort,inVcId); 
+	}
+        else { 
+		Buffer[inVcId].push_back(p->hdr); 
+		delete p;
+	}
 }
 
 /******************************************************************************
@@ -63,17 +100,30 @@ void Switch::sendPacket(Packet *p,const int & outVcId,const int & outPort,const 
         int goingToNic=0,fromNic=0;
         int nextChannel;
         mapVc[outVcId] =  inVcId;
-	if(config.inputBuffering)  // Uncomment this !!!!!!!!!!!!!!!!!!
-        requested[inVcId] = 1;
+	int setRequest = (config.inputBuffering)?(inVcId):(outPort);
 
-        CkAssert(outPort == p->hdr.portId);
+        requested[setRequest] = 1;
+
+        CkAssert(outPort == p->hdr.portId); 
 
         p->hdr.nextId = topology->getNext(outPort,id,numP) ;  // Use this in channel
 
         if((p->hdr.nextId >= config.nicStart) && (p->hdr.nextId < (config.nicStart+config.numNodes))) goingToNic = 1;
         if((p->hdr.prevId >= config.nicStart) && (p->hdr.prevId < (config.nicStart+config.numNodes))) fromNic = 1;
 
-        if(!goingToNic) availBufsize[outVcId] -= p->hdr.routeInfo.datalen;
+
+	// availbufsize for output buffering is a very inefficient scheme which 
+	// leads to lot of fragmentation. There is a variable for each port indicating
+	// the avail buffer space ( actually the worst case avail bufspace)
+	// better scheme will take next hop routing into account and have k variables
+	// for each port
+
+        if(!goingToNic)  {
+		if(config.inputBuffering) 
+			availBufsize[outVcId] -= p->hdr.routeInfo.datalen;
+		else	  
+			availBufsize[outPort] -= p->hdr.routeInfo.datalen;
+	}
 
         nextChannel = topology->getNextChannel(outPort,id,numP);
 
@@ -90,9 +140,6 @@ void Switch::sendPacket(Packet *p,const int & outVcId,const int & outPort,const 
         p->hdr.prev_vcid = outVcId;
         p->hdr.prevId = id; 
 	p->hdr.prev_src = id-config.switchStart;  // For direct networks
-//      p->hdr.dump();
-//      parent->CommitPrintf("sendPacket: ovt %d portid %d supposed portid %d nextid is %d nicEnd is %d src %d dst %d\n",
-//                      ovt,outPort,p->hdr.portId,p->hdr.nextId,config.nicStart+config.numNodes,p->hdr.src,p->hdr.routeInfo.dst);
 
         POSE_invoke(recvPacket(p),Channel,nextChannel,0);
 }
@@ -101,11 +148,14 @@ void Switch::sendPacket(Packet *p,const int & outVcId,const int & outPort,const 
 void Switch::checkNextPacketInVc(flowStart *f) {
         int outVc; Packet p,*p2;
         vector<Header>::iterator headOfBuf;
-        requested[f->vcid] = 0;
+	if(config.inputBuffering)
+        	requested[f->vcid] = 0;
+	else
+		requested[f->vcid/config.switchVc] = 0;
 
         if(Buffer[f->vcid].size()) {
-        headOfBuf = Buffer[f->vcid].begin(); p.hdr = *headOfBuf;
-                // Be careful so that neccessary data in packet "p" is populated
+
+        headOfBuf = Buffer[f->vcid].begin(); 
 		p.hdr = *headOfBuf;	
                 outVc = outputVcSelect->selectOutputVc(availBufsize,&p,f->vcid%config.switchVc);
                 if(outVc != NO_VC_AVAILABLE) {
@@ -117,14 +167,19 @@ void Switch::checkNextPacketInVc(flowStart *f) {
 }
 
 // Update byte credits in the current switch after ack is received 
+// Then select a vc which gets to send a packet
 void Switch::updateCredits(flowStart *f) {
         int outPort,outVc,inPort,inVc,nextChannel,vc;
         Packet *p; vector<Header>::iterator it;
-        availBufsize[f->vcid] += f->datalen;
-        requested[mapVc[f->vcid]] = 0;
+	if(config.inputBuffering) {
+        	requested[mapVc[f->vcid]/config.switchVc] = 0;
+        	availBufsize[f->vcid] += f->datalen;
+	}
+	else {
+		requested[f->vcid/config.switchVc] = 0;
+        	availBufsize[f->vcid/config.switchVc] += f->datalen;
+	}
 
-        // For SLQ, one level is fine, for others two levels of input vc selection should be put in later.
-        // First, selection is done on an input port by input port basis for eligible vc. Then on inter-port results are combined
         vc = inputVcSelect->selectInputVc(availBufsize,requested,Buffer,f->vcid);  // Make sure vc is port*numVc+myvc
         mapVc[f->vcid] = IDLE;
         if(vc != NO_VC_AVAILABLE) {
@@ -133,6 +188,9 @@ void Switch::updateCredits(flowStart *f) {
 
         p = new Packet; it = Buffer[vc].begin(); p->hdr = *it;
         Buffer[vc].erase(it);
+	if(config.inputBuffering)
         sendPacket(p,f->vcid,outPort,vc);
+	else
+	sendPacket(p,vc,outPort,vc);
         }
 }

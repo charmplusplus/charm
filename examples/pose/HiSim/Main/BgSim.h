@@ -134,10 +134,13 @@ class NicMsg {
 	}
 };
 
+#define MAX_ROUTE_HEADER 16
 // Part of the packet. Contains all neccessary details required for protocol and routing
 class Header {
         public:
 	RoutingInformation routeInfo;  // routing informating
+	unsigned char nextPort[MAX_ROUTE_HEADER]; // next port to take 
+	unsigned char hop;
         int src,prev_src;              // original source and previous node id
         int pktId;		       // packet id , not used in inorder arrival
         int msgId;		       // message id, set by node
@@ -153,7 +156,8 @@ class Header {
                 totalLen = obj.totalLen; prevId = obj.prevId;
                 portId = obj.portId; nextId = obj.nextId;
                 vcid = obj.vcid; prev_vcid = obj.prev_vcid;
-		prev_src = obj.prev_src;
+		prev_src = obj.prev_src; hop = obj.hop;
+		memcpy(nextPort, obj.nextPort, MAX_ROUTE_HEADER * sizeof(char));
                 return *this;
         }
 

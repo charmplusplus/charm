@@ -40,6 +40,7 @@ SIM_OBJECTS=$(OBJDIR)/BgSim_sim.o $(OBJDIR)/TCsim_sim.o
 
 RedStorm: $(OBJDIR)/$(PGM).o
 HypCubeArch: $(OBJDIR)/$(PGM).o
+HypCubeArchOB: $(OBJDIR)/$(PGM).o
 BlueGene: $(OBJDIR)/$(PGM).o
 IB: $(OBJDIR)/$(PGM).o
 OB: $(OBJDIR)/$(PGM).o

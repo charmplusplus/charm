@@ -22,6 +22,7 @@ main::main(CkArgMsg *m)
     config.check_on = 1;
   }
 
+  config.sourceRouting = 0;
   config.readConfig(m);
 
   if(!config.use_transceiver) {

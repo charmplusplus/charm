@@ -19,6 +19,8 @@ void NetInterface::recvMsg(NicMsg *nic) {
         POSE_TimeType delay=0,inputPort,msgLenRest = nic->totalLen,packetnum  = 0,curlen,initPort,initVc;
         Packet *p;
         NicMsg *newNic = new NicMsg; *newNic = *nic;
+
+
         POSE_invoke(storeMsgInAdvance(newNic),NetInterface,nic->routeInfo.dst+config.nicStart,0);
 
 //	parent->CommitPrintf("-%d %d %d %d\n",nic->src,nic->msgId,nic->routeInfo.dst,nic->totalLen);
@@ -31,9 +33,10 @@ void NetInterface::recvMsg(NicMsg *nic) {
 		p->hdr.pktId = packetnum ++;
                 p->hdr.portId = topology->getStartPort(nicConsts->id-config.nicStart,nicConsts->numP);
                 p->hdr.vcid = roundRobin; roundRobin = (roundRobin+1)%config.switchVc;
-                p->hdr.prevId = nicConsts->id;
+                p->hdr.prevId = nicConsts->id; p->hdr.hop = 0;
                 p->hdr.prev_vcid = -1; p->hdr.prev_src = p->hdr.src;
                 p->hdr.nextId = topology->getStartSwitch(nicConsts->id-config.nicStart);
+		routingAlgorithm->populateRoutes(p,nicConsts->numP); // Should do it just once later per message
 
                 POSE_invoke(recvPacket(p),Switch,nicConsts->startId,delay);
                 delay += ((POSE_TimeType)(curlen/config.switchC_BW));  msgLenRest -= curlen; 
@@ -63,7 +66,7 @@ void NetInterface::recvPacket(Packet *p) {
 
 //      CkPrintf("NIC id is %d dst is %d \n",nicConsts->id,p->hdr.routeInfo.dst);
         if(p->hdr.routeInfo.dst != (nicConsts->id-config.nicStart)) {
-                parent->CommitPrintf("%d actual dst was %d src %d dst %d\n",
+                parent->CommitPrintf("%d I am %d But src %d dst %d\n",
                 ovt,nicConsts->id-config.nicStart,p->hdr.src,p->hdr.routeInfo.dst);
                 parent->CommitError("Packet misrouted to destination\n");
                 return;
