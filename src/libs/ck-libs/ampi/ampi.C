@@ -2958,7 +2958,7 @@ int AMPI_Comm_remote_group(MPI_Comm comm, MPI_Group *group){
 }
 
 CDECL
-int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm pcomm, int rleader, int tag, MPI_Comm *newintercomm){
+int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm rcomm, int rleader, int tag, MPI_Comm *newintercomm){
   AMPIAPI("AMPI_Intercomm_create");
   ampi *ptr = getAmpiInstance(lcomm);
   int root = ptr->getIndexForRank(lleader);
@@ -2978,12 +2978,12 @@ int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm pcomm, int rlead
     int i;
     for(i=0;i<lsize;i++)
       larr[i] = lvec[i];
-    AMPI_Send(&lsize,1,MPI_INT,rleader,tag,pcomm);
-    AMPI_Recv(&rsize,1,MPI_INT,rleader,tag,pcomm,&sts);
+    AMPI_Send(&lsize,1,MPI_INT,rleader,tag,rcomm);
+    AMPI_Recv(&rsize,1,MPI_INT,rleader,tag,rcomm,&sts);
 
     rarr = new int [rsize];
-    AMPI_Send(larr,lsize,MPI_INT,rleader,tag+1,pcomm);
-    AMPI_Recv(rarr,rsize,MPI_INT,rleader,tag+1,pcomm,&sts);
+    AMPI_Send(larr,lsize,MPI_INT,rleader,tag+1,rcomm);
+    AMPI_Recv(rarr,rsize,MPI_INT,rleader,tag+1,rcomm,&sts);
     for(i=0;i<rsize;i++)
       rvec.push_back(rarr[i]);
 
@@ -2993,7 +2993,9 @@ int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm pcomm, int rlead
     if(rsize==0) CkAbort("MPI_Intercomm_create: remote size = 0!\n");
   }
   
-  if(rvec.size()==0) CkAbort("AMPI> Abort: Does it really make sense to create an empty communicator?");
+  // a strange line(bug??) has been commented out. 
+  // All the processes that are not a local leader who call this should not abort! --Isaac
+  // if(rvec.size()==0) CkAbort("AMPI> Abort: Does it really make sense to create an empty communicator?");
 
   ptr->intercommCreate(rvec,root,newintercomm);
   return 0;
