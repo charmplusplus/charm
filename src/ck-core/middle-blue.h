@@ -26,6 +26,10 @@
 #undef CmiSyncNodeBroadcastAll
 #undef CmiSyncNodeBroadcastAllAndFree
 
+
+#define CkVTimer   BgGetTime
+#define CkElapse   BgElapse
+
 #define CkRegisterHandler(x)        BgRegisterHandler((BgHandler)(x))
 #define CkNumberHandler(n, x)       BgNumberHandler(n, (BgHandler)(x))
 #define CkNumberHandlerEx(n, x, p)  BgNumberHandlerEx(n, (BgHandlerEx)(x), p)
@@ -249,7 +253,6 @@ static inline void BgCharmExit()
 }
 
 }
-
 
 
 #endif

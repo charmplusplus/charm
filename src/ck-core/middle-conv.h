@@ -30,6 +30,8 @@
 #undef CmiSyncBroadcastAll
 #undef CmiSyncBroadcastAllAndFree
 
+#define CkVTimer(x)	      0
+#define CkElapse(x)   
 
 #if ! CMK_NAMESPACES_BROKEN
 namespace Converse {
