@@ -2,7 +2,7 @@
 #define _fftlib_h_
 
 #include <charm++.h>
-#include "pairutil.h"
+#include "ckcomplex.h"
 
 
 #include "fftlib.decl.h"
