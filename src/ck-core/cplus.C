@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-09-07 21:26:02  jyelon
+ * Revision 2.2  1995-09-14 18:41:43  gursoy
+ * fixed a cpv wrong usage
+ *
+ * Revision 2.1  1995/09/07  21:26:02  jyelon
  * Added prefixes to Cpv and Csv macros, fixed bugs thereby revealed.
  *
  * Revision 2.0  1995/09/06  17:41:24  sanjeev
@@ -60,7 +63,7 @@ extern "C" void *CPlus_CallMonoInit(int id, void *msg) ;
 
 void CPlus_ChareExit()
 {
-	_CK_Object *temp = (_CK_Object *)CpvAccess(currentChareBlock->chareptr) ;
+	_CK_Object *temp = (_CK_Object *)CpvAccess(currentChareBlock)->chareptr) ;
 	delete temp ;
 
         SetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID,0) ;
