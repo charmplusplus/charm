@@ -57,6 +57,7 @@ static int tcharm_stacksize=1*1024*1024; /*Default stack size is 1MB*/
 static int tcharm_initted=0;
 CkpvDeclare(int, mapCreated);
 static CkGroupID mapID;
+static char* mapping = NULL;
 
 void TCharm::nodeInit(void)
 {
@@ -89,6 +90,11 @@ void TCharm::procInit(void)
   if (CkMyPe()==0) { // Echo various debugging options:
     if (tcharm_nomig) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
     if (tcharm_nothreads) CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
+  }
+  if (CkpvAccess(mapCreated)==0) {
+    if (0!=CmiGetArgString(argv, "+mapping", &mapping)){
+    }
+    CkpvAccess(mapCreated)=1;
   }
 }
 
@@ -575,23 +581,16 @@ CkGroupID CkCreatePropMap(void);
 
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
 {
-  char** argv = CkGetArgv();
   CkArrayOptions opts(msg->numElements);
-  if (CkpvAccess(mapCreated)==0) {
-    char* mapping;
-    if (0!=CmiGetArgString(argv, "+mapping", &mapping)){
-      if(0==strcmp(mapping,"BLOCK_MAP")){
-        mapID=CProxy_BlockMap::ckNew();
-      }else
-      if(0==strcmp(mapping,"RR_MAP")){
-        mapID=CProxy_RRMap::ckNew();
-      }else{  // "PROP_MAP" or anything else
-        mapID=CkCreatePropMap();
-      }
-    } else {
-      mapID=CkCreatePropMap();
-    }
-    CkpvAccess(mapCreated)=1;
+  CkAssert(CkpvAccess(mapCreated)==1);
+  if(mapping==NULL){
+    mapID=CkCreatePropMap();
+  }else if(0==strcmp(mapping,"BLOCK_MAP")){
+    mapID=CProxy_BlockMap::ckNew();
+  }else if(0==strcmp(mapping,"RR_MAP")){
+    mapID=CProxy_RRMap::ckNew();
+  }else{  // "PROP_MAP" or anything else
+    mapID=CkCreatePropMap();
   }
   opts.setMap(mapID);
   int nElem=msg->numElements; //<- save it because msg will be deleted.
