@@ -17,51 +17,64 @@
 #ifndef _CKMULTICAST_H
 #define _CKMULTICAST_H
 
-#define  MulticastMsg    1
+#define  MulticastMsg          1
+#define  COMMLIB_MULTICAST_MESSAGE    2
 
 class CkSectionInfo {
-public:
-  CkArrayID aid;
-  int pe;
-  union section_type {
-    struct sec_mcast {	// used for section multicast
-      int redNo;
-      void *val;    		// point to mCastCookie
-    }  sCookie;
-    int  sectionId;	// used for commlib
-  } sInfo;
-  char  type;
-public:
-  CkSectionInfo()  {
-	type = 0; pe = -1;
-	sInfo.sCookie.val=NULL; sInfo.sCookie.redNo=0;
-  }
-  CkSectionInfo(int t) {
+ public:
+    CkArrayID aid;
+    int pe;
+    union section_type {
+        struct sec_mcast {	// used for section multicast
+            int redNo;
+            void *val;        // point to mCastCookie
+        } 
+        sCookie;
+        struct commlibInfo{  // used for commlib
+            int  instId;	//the instance of the comm.lib.
+            int  nIndices;      //number of local array indices to be sent to, 0 for all
+        } 
+        cInfo;
+    } sInfo;
+    char  type;
+    
+    CkSectionInfo()  {
+        type = 0; pe = -1;
+        sInfo.sCookie.val=NULL; sInfo.sCookie.redNo=0;
+    }
+    CkSectionInfo(int t) {
 	type = t; pe = -1;
 	switch (type) {
 	case MulticastMsg:
-	  sInfo.sCookie.val=NULL; sInfo.sCookie.redNo=0;
-	  break;
+            sInfo.sCookie.val=NULL; sInfo.sCookie.redNo=0;
+            break;
+        case COMMLIB_MULTICAST_MESSAGE:
+            sInfo.cInfo.instId=0;
+            sInfo.cInfo.nIndices=0;
+            break;
 	default:
-	  CmiAssert(0);
+            CmiAssert(0);
 	}
-  }
-  CkSectionInfo(void *p) {
+    }
+    CkSectionInfo(void *p) {
 	type = MulticastMsg;
 	pe = CkMyPe(); 
 	sInfo.sCookie.val=p;
 	sInfo.sCookie.redNo=0;
-  }
-  CkSectionInfo(int e, void *p, int r) {
+    }
+    CkSectionInfo(int e, void *p, int r) {
 	type = MulticastMsg;
 	pe = e; 
 	sInfo.sCookie.val=p;
 	sInfo.sCookie.redNo=r;
-  }
-  inline int &get_pe() { return pe; }
-  inline int &get_redNo() {CmiAssert(type==MulticastMsg); return sInfo.sCookie.redNo; }
-  inline void * &get_val() { CmiAssert(type==MulticastMsg); return sInfo.sCookie.val; }
+    }
+    inline int &get_pe() { return pe; }
+    inline int &get_redNo() {CmiAssert(type==MulticastMsg); 
+    return sInfo.sCookie.redNo; }
+    inline void * &get_val() { CmiAssert(type==MulticastMsg); 
+    return sInfo.sCookie.val; }
 };
+
 PUPbytes(CkSectionInfo) //FIXME: write a real pup routine
 PUPmarshall(CkSectionInfo)
 
@@ -85,14 +98,16 @@ PUPmarshall(CkSectionID)
  CkMcastBaseMsg is the base class for all multicast message.
 */
 class CkMcastBaseMsg {
-public:
+ public:
   char magic;
-  CkArrayID aid;
+  CkArrayID aid; 
   CkSectionInfo _cookie;
   int ep;
-public:
+
+ public:
   CkMcastBaseMsg(): magic(_SECTION_MAGIC) {}
-  static inline int checkMagic(CkMcastBaseMsg *m) { return m->magic == _SECTION_MAGIC; }
+  static inline int checkMagic(CkMcastBaseMsg *m) 
+      { return m->magic == _SECTION_MAGIC; }
   inline int &gpe(void) { return _cookie.get_pe(); }
   inline int &redno(void) { return _cookie.get_redNo(); }
   inline void *&cookie(void) { return _cookie.get_val(); }
