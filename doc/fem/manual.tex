@@ -248,15 +248,30 @@ top of MPI.
 
 There is even a special shell script for collecting
 up the FEM framework source code to build a non-Charm, 
-MPI-only version of the FEM framework; but this version
-is unsupported:
+MPI-only version of the FEM framework.
+To build FEM in this manner, you first build Charm++ normally,
+then run a script to collect up the neccessary source files
+(the FEM framework, a small number of Charm configuration 
+and utility files, and the METIS library),
+and finally build the library using the usual MPI compiler 
+commands:
 \begin{alltt}
-  > cd charm
-  > src/libs/ck-libs/fem/make_fem_alone.sh
-  > cd fem_alone
-  > mpicc -c *.C -I. -DFEM_ALONE=1
-  > ar cr libfemalone.a *.o
+ > cd charm/
+ > ./src/libs/ck-libs/fem/make_fem_alone.sh
+ > cd fem_alone/
+ > mpicc -I. -DFEM_ALONE=1 -c *.c *.C 
+ > ar cr libfem_alone.a *.o
 \end{alltt}
+You will then have to build your application with the MPI
+compilers, and manually point to this ``fem\_alone'' 
+directory to find include files and the new FEM library.
+A typical compiler invocation would be:
+\begin{alltt}
+ > mpif90 -I$HOME/charm/fem_alone -L$HOME/charm/fem_alone foo.f90 -lfem_alone -o foo
+\end{alltt}
+This ``standalone'', non-Charm++ method of building the 
+FEM framework prevents the use of load balancing or the other
+features of Charm++, so we do not recommend it for normal use.
 
 
 \subsection{Compilation and Execution}
@@ -268,11 +283,13 @@ downloading the latest source version of \charmpp\ from
 {\tt version/tmp}, and type {\tt make FEM}.
 To compile a FEM program, pass the {\tt -language fem} (for C) or 
 {\tt -language femf} (for Fortran) option to {\tt charmc}.
+You can also build using the ``fem\_alone'' mode described
+at the end of the section above.
 
 In a charm installation, see charm/version/pgms/charm++/fem/
 for several example and test programs.
 
-At runtime, an FEM framework program accepts the following
+At runtime, a Charm++/FEM framework program accepts the following
 options, in addition to all the usual Charm++ options described in 
 the Charm++ ``Installation and Usage Manual''.
 
