@@ -39,20 +39,20 @@ class CkSectionInfo {
         sCookie;
 
         struct commlibInfo{     // used for commlib
-            int  instId;	//the instance of the comm. lib.
+            short  instId;	//the instance of the comm. lib.
             
             // This field indicates local array indices to multicast to:
             // COMLIB_MULTICAST_ALL for all local elements, 
             // COMLIB_MULTICAST_NEW_SECTION, elements are attached 
             // to this message
             // COMLIB_MULTICAST_OLD_SECTION use previously created section
-            char status;      
+            short status;      
             int id;      //Used to compare section ID's
         } 
         cInfo;
 
     } sInfo;
-    char type;
+    int type;
     
     CkSectionInfo()  {
         type = 0; pe = -1;
