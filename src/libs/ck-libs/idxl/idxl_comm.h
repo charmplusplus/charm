@@ -80,7 +80,7 @@ public:
  */
 class IDXL_List {
 	int chunk; //Global number of other chunk	
-	CkPupBasicVec<int> shared; //Local indices of shared entities
+	CkVec<int> shared; //Local indices of shared entities
 public:
 	IDXL_List();
 	IDXL_List(int otherchunk);

@@ -72,8 +72,8 @@ IDXL_List::IDXL_List(int otherchunk)
 IDXL_List::~IDXL_List() {}
 void IDXL_List::pup(PUP::er &p)
 {
-	p(chunk);
-	shared.pup(p);
+	p|chunk;
+	p|shared;
 }
 
 void IDXL_List::sort2d(double *coord){
