@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.24  1997-07-28 20:13:26  milind
+ * Revision 1.25  1997-08-06 20:35:44  jyelon
+ * Fixed bugs.
+ *
+ * Revision 1.24  1997/07/28 20:13:26  milind
  * Fixed bugs due to ckfutures declarations in c++interface.h
  * Also, wrote macros for node numbering in exemplar.
  *
@@ -150,6 +153,8 @@
 #define CMK_STRINGS_USE_OWN_DECLARATIONS                   0
 #define CMK_STRINGS_USE_STRINGS_H                          0
 #define CMK_STRINGS_USE_STRING_H                           1
+
+#define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 

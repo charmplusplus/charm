@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.1  1997-08-01 21:33:08  milind
+ * Revision 1.2  1997-08-06 20:36:28  jyelon
+ * Fixed bugs.
+ *
+ * Revision 1.1  1997/08/01 21:33:08  milind
  * Fixed posixthreads bug.
  *
  * Revision 1.30  1997/07/28 19:01:45  jyelon
@@ -144,6 +147,8 @@
 #define CMK_STRINGS_USE_OWN_DECLARATIONS                   1
 #define CMK_STRINGS_USE_STRINGS_H                          0
 #define CMK_STRINGS_USE_STRING_H                           0
+
+#define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         1
 

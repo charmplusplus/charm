@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.14  1997-08-06 14:57:32  milind
+ * Revision 1.15  1997-08-06 20:35:36  jyelon
+ * Fixed bugs.
+ *
+ * Revision 1.14  1997/08/06 14:57:32  milind
  * Added net-linux and sim-linux versions.
  * Fixed some bugs in Makefile.
  * Fixed a bug in machine.c in common.sim.
@@ -117,6 +120,8 @@ int maxmsgs;
 void CmiDeliverSpecificMsg(handler)
 int handler;
 {
+  CmiError("CmiDeliverSpecificMsg not implemented in SIM versions.\n");
+  exit(1);
 }
 
 CmiUniContextSwitch(i)

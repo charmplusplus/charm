@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.24  1997-07-28 19:01:18  jyelon
+ * Revision 1.25  1997-08-06 20:36:08  jyelon
+ * Fixed bugs.
+ *
+ * Revision 1.24  1997/07/28 19:01:18  jyelon
  * *** empty log message ***
  *
  * Revision 1.23  1997/07/26 16:42:12  jyelon
@@ -142,13 +145,15 @@
 #define CMK_STRINGS_USE_STRINGS_H                          0
 #define CMK_STRINGS_USE_STRING_H                           0
 
-#define CMK_THREADS_REQUIRE_NO_CPV                         0
+#define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
+
+#define CMK_THREADS_REQUIRE_NO_CPV                         1
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
-#define CMK_TIMER_USE_SIM_TIMES                            1
-#define CMK_TIMER_USE_SIM_GETRUSAGE                        0
+#define CMK_TIMER_SIM_USE_TIMES                            1
+#define CMK_TIMER_SIM_USE_GETRUSAGE                        0
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0

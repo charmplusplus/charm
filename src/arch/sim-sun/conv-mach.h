@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.24  1997-08-04 09:50:46  jyelon
+ * Revision 1.25  1997-08-06 20:36:11  jyelon
+ * Fixed bugs.
+ *
+ * Revision 1.24  1997/08/04 09:50:46  jyelon
  * *** empty log message ***
  *
  * Revision 1.23  1997/07/28 19:01:21  jyelon
@@ -119,7 +122,7 @@
 
 #define CMK_SHARED_VARS_EXEMPLAR                           0
 #define CMK_SHARED_VARS_UNAVAILABLE                        0
-#define CMK_SHARED_VARS_SUN_THREADS                            0
+#define CMK_SHARED_VARS_SUN_THREADS                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       1
 
 #define CMK_SIGHOLD_IS_A_BUILTIN                           0
@@ -142,7 +145,9 @@
 #define CMK_STRINGS_USE_STRINGS_H                          0
 #define CMK_STRINGS_USE_STRING_H                           0
 
-#define CMK_THREADS_REQUIRE_NO_CPV                         0
+#define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       1
+
+#define CMK_THREADS_REQUIRE_NO_CPV                         1
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
@@ -150,8 +155,8 @@
 #define CMK_TIMER_SIM_USE_GETRUSAGE                        1
 #define CMK_TIMER_SIM_USE_TIMES                            0
 
-#define CMK_VECTOR_SEND_USES_COMMON_CODE                        1
-#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                        0
+#define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
+#define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
 
 #define CMK_WAIT_NOT_NEEDED                                0
 #define CMK_WAIT_USES_SYS_WAIT_H                           1

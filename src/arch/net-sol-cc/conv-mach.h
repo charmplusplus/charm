@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.14  1997-07-28 19:01:04  jyelon
+ * Revision 1.15  1997-08-06 20:35:52  jyelon
+ * Fixed bugs.
+ *
+ * Revision 1.14  1997/07/28 19:01:04  jyelon
  * *** empty log message ***
  *
  * Revision 1.13  1997/07/26 16:41:59  jyelon
@@ -138,6 +141,8 @@
 #define CMK_STRINGS_USE_OWN_DECLARATIONS                   0
 #define CMK_STRINGS_USE_STRINGS_H                          0
 #define CMK_STRINGS_USE_STRING_H                           1
+
+#define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 

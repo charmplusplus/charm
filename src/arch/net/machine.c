@@ -1400,7 +1400,7 @@ static void KillInit()
 static void ctrl_sendone(va_alist) va_dcl
 {
   char buffer[1024];
-  char *f; int fd, delay;
+  char *f; int fd, delay; char c;
   va_list p;
   va_start(p);
   delay = va_arg(p, int);
@@ -1409,7 +1409,13 @@ static void ctrl_sendone(va_alist) va_dcl
   fd = skt_connect(Cmi_host_IP, Cmi_host_port, delay);
   if (fd<0) KillEveryone("cannot contact host");
   writeall(fd, buffer, strlen(buffer));
+#if CMK_SYNCHRONIZE_ON_TCP_CLOSE
+  shutdown(fd, 1);
+  while (read(fd, &c, 1)==EINTR);
   close(fd);
+#else
+  close(fd);
+#endif
 }
 
 /****************************************************************************

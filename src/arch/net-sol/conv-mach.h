@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.40  1997-08-01 02:43:36  jyelon
+ * Revision 2.41  1997-08-06 20:35:50  jyelon
+ * Fixed bugs.
+ *
+ * Revision 2.40  1997/08/01 02:43:36  jyelon
  * Changed speed-setting CMK_WHEN_PROCESSOR_IDLE_USLEEP.
  *
  * Revision 2.39  1997/07/28 19:01:02  jyelon
@@ -144,6 +147,8 @@
 #define CMK_STRINGS_USE_OWN_DECLARATIONS                   0
 #define CMK_STRINGS_USE_STRINGS_H                          0
 #define CMK_STRINGS_USE_STRING_H                           1
+
+#define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 
