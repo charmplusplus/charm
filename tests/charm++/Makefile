@@ -5,8 +5,9 @@ test:
 		(cd $$d; $(MAKE) test OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
+# skip megatest
 bgtest:
-	for d in pingpong simplearrayhello lb_test chkpt commtest; do \
+	for d in pingpong simplearrayhello lb_test chkpt commtest delegation; do \
 		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
