@@ -598,7 +598,7 @@ xi-grammar.tab.o: xi-grammar.tab.C $(XIHEADERS)
 	$(SEQCHARMC) xi-grammar.tab.C
 
 xi-scan.o: xi-scan.C $(XIHEADERS)
-	$(SEQCHARMC) -DYY_NEVER_INTERACTIVE xi-scan.C
+	$(SEQCHARMC) -I. -DYY_NEVER_INTERACTIVE xi-scan.C
 
 ###############################################################################
 #
