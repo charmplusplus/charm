@@ -6,7 +6,7 @@
 #include <iostream.h>
 #include <fstream.h>
 #include "xi-symbol.h"
-#include "xi-parse.h"
+#include "xi-parse.tab.h"
 
 extern Module *thismodule ;
 
