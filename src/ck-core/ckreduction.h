@@ -340,6 +340,7 @@ private:
 	void *data;//Reduction data
 	int userFlag; //Some sort of identifying flag, for client use
 	CkCallback callback; //What to do when done
+	CkCallback secondaryCallback; // the group callback is piggybacked on the nodegrp reduction
 
 	int sourceFlag;/*Flag:
 		0 indicates this is a placeholder message (meaning: nothing to report)

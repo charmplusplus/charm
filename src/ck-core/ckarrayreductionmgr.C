@@ -66,6 +66,7 @@ CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
   	int msgs_nSources=0;//Reduced nSources
   	int msgs_userFlag=-1;
   	CkCallback msgs_callback;
+	CkCallback msgs_secondaryCallback;
   	int i;
   	for (i=0;i<nMsgs;i++)
   	{
@@ -77,6 +78,9 @@ CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
       			r=m->reducer;
       			if (!m->callback.isInvalid())
         			msgs_callback=m->callback;
+			if(!m->secondaryCallback.isInvalid()){
+				msgs_secondaryCallback = m->secondaryCallback;
+			}
       			if (m->userFlag!=-1)
         			msgs_userFlag=m->userFlag;
     		}
@@ -106,6 +110,7 @@ CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
   	ret->gcount=msgs_gcount;
   	ret->userFlag=msgs_userFlag;
   	ret->callback=msgs_callback;
+	ret->secondaryCallback = msgs_secondaryCallback;
   	ret->sourceFlag=msgs_nSources;
 
 

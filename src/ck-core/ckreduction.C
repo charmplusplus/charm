@@ -176,7 +176,7 @@ CkReductionMgr::CkReductionMgr()//Constructor
 //Add the given client function.  Overwrites any previous client.
 void CkReductionMgr::ckSetReductionClient(CkCallback *cb)
 {
-  DEBR((AA"Setting reductionClient in ReductionMgr"AB));
+  DEBR((AA"Setting reductionClient in ReductionMgr groupid %d\n"AB,thisgroup.idx));
 
   if (CkMyPe()!=0)
 	  CkError("WARNING: ckSetReductionClient should only be called from processor zero!\n");
@@ -468,9 +468,13 @@ void CkReductionMgr::finishReduction(void)
   ret->sourceFlag = result->sourceFlag;
   ret->gcount=result->gcount+gcount+adj(redNo).gcount;
   ret->callback = CkCallback(CkIndex_CkReductionMgr::ArrayReductionHandler(NULL),0,thisProxy);
-  secondaryStoredCallback = new CkCallback();
-  *secondaryStoredCallback = result->callback;
-  callbackQ.enq(secondaryStoredCallback);
+  ret->secondaryCallback = result->callback;
+  /*secondaryStoredCallback = new CkCallback();
+  *secondaryStoredCallback = result->callback;*/
+#if DEBUGRED 
+  CkPrintf("[%d,%d]Callback for redNo %d in group %d id %p Invalid=%d\n",CkMyNode(),CkMyPe(),redNo,thisgroup.idx,ret->secondaryCallback,ret->secondaryCallback.isInvalid());
+#endif
+  //callbackQ.enq(secondaryStoredCallback);
   
   //CkPrintf("[%d]Passing things up the NodeGroup reduction tree for redNo %d at %0.6f\n",CkMyPe(),redNo,CmiWallTimer());
   (*nodeProxyPtr)[CkMyNode()].ckLocalBranch()->contributeArrayReduction(ret);
@@ -717,6 +721,7 @@ void CkReductionMgr :: endArrayReduction(){
   	int msgs_nSources=0;//Reduced nSources
   	int msgs_userFlag=-1;
   	CkCallback msgs_callback;
+	CkCallback msgs_secondaryCallback;
 	CkVec<CkReductionMsg *> tempMsgs;
   	int i;
 	int numMsgs = 0;
@@ -731,6 +736,8 @@ void CkReductionMgr :: endArrayReduction(){
       				r=m->reducer;
       				if (!m->callback.isInvalid())
         			msgs_callback=m->callback;
+				if(!m->secondaryCallback.isInvalid())
+					msgs_secondaryCallback = m->secondaryCallback;
       				if (m->userFlag!=-1)
         				msgs_userFlag=m->userFlag;
 				tempMsgs.push_back(m);
@@ -785,22 +792,27 @@ void CkReductionMgr :: endArrayReduction(){
   	ret->gcount=msgs_gcount;
   	ret->userFlag=msgs_userFlag;
   	ret->callback=msgs_callback;
+	ret->secondaryCallback = msgs_secondaryCallback;
   	ret->sourceFlag=msgs_nSources;
 	
-	secondaryStoredCallback = callbackQ.deq();
+	
 #if DEBUGRED	
 	CkPrintf("~~~~~~~~~~~~~~~~~ About to call callback from end of GROUP REDUCTION %d at %.6f\n",completedRedNo,CmiWallTimer());
 #endif	
-	if (!secondaryStoredCallback->isInvalid())
-	    secondaryStoredCallback->send(ret);
+	if (!ret->secondaryCallback.isInvalid())
+	    ret->secondaryCallback.send(ret);
     else if (storedCallback!=NULL)
 	    storedCallback->send(ret);
-    else
+    else{
+#if DEBUGRED
+	    CkPrintf("No reduction client for group %d \n",thisgroup.idx);
+#endif
 	    CkAbort("No reduction client!\n"
 		    "You must register a client with either SetReductionClient or during contribute.\n");
+    }
 	completedRedNo++;
 #if DEBUGRED	
-       CkPrintf("[%d,%d]------------END OF GROUP REDUCTION %d at %.6f\n",CkMyNode(),CkMyPe(),completedRedNo,CkWallTimer());
+       CkPrintf("[%d,%d]------------END OF GROUP REDUCTION %d for group %d at %.6f\n",CkMyNode(),CkMyPe(),completedRedNo,thisgroup.idx,CkWallTimer());
 #endif       
 	for (i=1;i<adjVec.length();i++)
     		adjVec[i-1]=adjVec[i];
@@ -1589,6 +1601,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   int msgs_nSources=0;//Reduced nSources
   int msgs_userFlag=-1;
   CkCallback msgs_callback;
+  CkCallback msgs_secondaryCallback;
   int i;
   for (i=0;i<nMsgs;i++)
   {
@@ -1600,6 +1613,9 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
       r=m->reducer;
       if (!m->callback.isInvalid())
         msgs_callback=m->callback;
+      if(!m->secondaryCallback.isInvalid()){
+	      msgs_secondaryCallback = m->secondaryCallback;
+      }
       if (m->userFlag!=-1)
         msgs_userFlag=m->userFlag;
     }
@@ -1629,6 +1645,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   ret->gcount=msgs_gcount;
   ret->userFlag=msgs_userFlag;
   ret->callback=msgs_callback;
+  ret->secondaryCallback = msgs_secondaryCallback;
   ret->sourceFlag=msgs_nSources;
   DEBR((AA"Reduced gcount=%d; sourceFlag=%d\n"AB,ret->gcount,ret->sourceFlag));
 
