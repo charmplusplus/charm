@@ -7,7 +7,7 @@ test:
 
 bgtest:
 	for d in charm++ ampi fem; do \
-		(cd $$d; $(MAKE) test OPTS='$(OPTS)' || exit 1) || exit 1; \
+		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
 test-converse:
