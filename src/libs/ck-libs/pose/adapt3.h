@@ -17,8 +17,12 @@
 #define ADAPT3_H
 
 class adapt3 : public opt3 {
+  double specTol;
  public:
-  adapt3() { timeLeash = 2; STRAT_T = ADAPT3_T; }
+  adapt3() { 
+    timeLeash = 2; STRAT_T = ADAPT3_T; 
+    specTol = 1.0 + 1.0/((double)(CkNumPes() * CkNumPes() * CkNumPes()));  
+  }
   virtual void Step();
 };
 

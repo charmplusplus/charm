@@ -39,8 +39,8 @@
 #define STORE_RATE 10       // default checkpoint rate: 1 for every n events
 #define SPEC_WINDOW 50      // speculative event window size
 #define MIN_LEASH 10        // min speculative window for adaptive strategy
-#define MAX_LEASH 50        // max  "     "     "     "        "     "
-#define LEASH_FLEX 1        // leash increment
+#define MAX_LEASH 100        // max  "     "     "     "        "     "
+#define LEASH_FLEX 10        // leash increment
 
 /// Load balancer constants
 #define LB_SKIP 51          // LB done 1/LB_SKIP times GVT iterations

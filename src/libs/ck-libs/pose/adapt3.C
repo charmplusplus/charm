@@ -1,6 +1,7 @@
 /// Adaptive Synchronization Strategy No. 2
 #include "pose.h"
 
+//#define RANDOM_OBJECT -1
 /// Single forward execution step
 void adapt3::Step()
 {
@@ -10,7 +11,6 @@ void adapt3::Step()
   int iter=0;
 
   lastGVT = localPVT->getGVT();
-  if (lastGVT == POSE_UnsetTS) lastGVT = 0;
   rbFlag = 0;
   if (!parent->cancels.IsEmpty()) { // Cancel as much as possible
 #ifdef POSE_STATS_ON
@@ -47,7 +47,7 @@ void adapt3::Step()
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT;
-
+  if (rbFlag) timeLeash = avgRBoffset;
   while ((ev->timestamp > POSE_UnsetTS) && 
 	 (ev->timestamp <= lastGVT + timeLeash) && 
 	 (iter < MAX_ITERATIONS)) { // do all events at & under timeLeash
@@ -62,8 +62,6 @@ void adapt3::Step()
     ev = eq->currentPtr;
     iter++;
   }
-  //if (ev->timestamp > POSE_UnsetTS) // work left undone
-  //timeLeash = (eq->largest - ev->timestamp)/2 + ev->timestamp - lastGVT;
   // Calculate statistics for this run
   if (iter > 0) {
     avgTimeLeash = ((avgTimeLeash * stepCount) + timeLeash)/(stepCount+1);
@@ -74,43 +72,25 @@ void adapt3::Step()
   }
   avgEventsPerStep = specEventCount/stepCount;
   /*
-  if (ev->timestamp > -1) {
-    CkPrintf("%d BEFORE:timeLeash:%d nextWork:%d latestWork:%d iter:%d gvt:%d\n",
-	     parent->thisIndex, timeLeash, ev->timestamp, eq->largest, iter,
-	     lastGVT);
-    CkPrintf(" avgTimeLeash:%d avgEventsPerStep:%d avgRBoffset:%d\n", 
-	     avgTimeLeash, avgEventsPerStep, avgRBoffset);
+  if (parent->thisIndex == RANDOM_OBJECT) {
+    CkPrintf("%d STATS: leash:%d work:%d max:%d gvt:%d\n",
+	     parent->thisIndex, timeLeash, ev->timestamp, eq->largest,lastGVT);
+    CkPrintf(" avgLeash:%d RB:%d:%d specEvents=%d events=%d\n", 
+	     avgTimeLeash, avgRBoffset, rbFlag, specEventCount, eventCount);
   }
   */
   // Revise behavior for next run
-  // immediate reaction
-  if (rbFlag && (timeLeash > avgRBoffset))  // punish
-    timeLeash -= (timeLeash-avgRBoffset)/2;
-  if (!rbFlag && (iter < avgEventsPerStep) && (ev->timestamp > -1)
-      && (timeLeash < (eq->largest-lastGVT))) //speculate
-    timeLeash += (eq->largest - (timeLeash+lastGVT))/2;
-  // reaction to past
-  if ((avgRBoffset > POSE_UnsetTS) && (timeLeash > avgRBoffset)) // play safe
-    timeLeash -= (timeLeash-avgRBoffset)/2;
-  if (timeLeash < avgTimeLeash) // average out
-    timeLeash += (avgTimeLeash-timeLeash)/2;
-  else timeLeash -= (timeLeash-avgTimeLeash)/2;
-  if (specEventCount > 1.5 * eventCount)
-    timeLeash /= 2;
-  // reaction to future
-  if (timeLeash < (eq->largest - lastGVT)) // speculate
-    timeLeash += (eq->largest - (timeLeash+lastGVT))/2;
-
-  rbFlag = 0;
+  if (!rbFlag && (ev->timestamp > -1)) timeLeash = eq->largest - lastGVT;
+  else if (!rbFlag) timeLeash += 10;
+  if (timeLeash > lastGVT) timeLeash = lastGVT;
   /*
-  if (ev->timestamp > -1) {
-    CkPrintf("%d AFTER: timeLeash:%d nextWork:%d latestWork:%d iter:%d gvt:%d\n",
-	     parent->thisIndex, timeLeash, ev->timestamp, eq->largest, iter,
-	     lastGVT);
-    CkPrintf(" avgTimeLeash:%d avgEventsPerStep:%d avgRBoffset:%d\n", 
-	     avgTimeLeash, avgEventsPerStep, avgRBoffset);
-  }
+  if (parent->thisIndex == RANDOM_OBJECT)
+    CkPrintf("New leash=%d\n", timeLeash);
   */
+  // Uh oh!  Too much speculation going on!  Pull in the leash...
+  //if (specEventCount > (1.25*eventCount)) timeLeash = avgTimeLeash/2;
+  
+  rbFlag = 0;
 }
 
 

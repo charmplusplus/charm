@@ -189,6 +189,7 @@ void opt::CancelEvents()
 	UndoEvent(tmp); // undo the event
 	tmp = tmp->prev;
       }
+      rbFlag = 1;
       if (userObj->usesAntimethods()) {
 	targetEvent = recoveryPoint;
 	UndoEvent(recoveryPoint); // undo the recovery point
