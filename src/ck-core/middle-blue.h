@@ -161,6 +161,12 @@ static inline int CkMyNodeSize() { return BgGetNumWorkThread(); }
 #define CmiSyncNodeBroadcastAll		BgSyncNodeBroadcastAll
 #define CmiSyncNodeBroadcastAllAndFree	BgSyncNodeBroadcastAllAndFree
 
+#undef CmiSyncListSendAndFree
+#define CmiSyncListSendAndFree		BgSyncListSendAndFree
+
+#undef CsdEnqueueLifo
+#define CsdEnqueueLifo(m)  CmiSyncSendAndFree(CmiMyPe(),sizeof(m), (char*)(m));
+
 
 /** common functions for two versions */
 namespace BGConverse {
