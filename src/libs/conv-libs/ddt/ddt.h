@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include "charm++.h"
 
+#define DDTDEBUG /* CkPrintf */
+
 #define CkDDT_DOUBLE          0
 #define CkDDT_INT             1
 #define CkDDT_FLOAT           2
@@ -28,6 +30,8 @@
 #define CkDDT_LONG_DOUBLE_INT 20
 #define CkDDT_2FLOAT          21
 #define CkDDT_2DOUBLE         22
+#define CkDDT_LB              23
+#define CkDDT_UB              24
 
 #define CkDDT_TYPE_NULL  -1
 #define CkDDT_PRIMITIVE  14
@@ -51,7 +55,7 @@ class CkDDT ;
   refCount - to keep track of how many references are present to this type.
 
   size - size of one unit of datatype
-  extent - extent is different from size in that it also counts 
+  extent - extent is different from size in that it also counts
            displacements between blocks.
   count -  count of base datatype present in this datatype
   baseSize - size of Base Datatype
@@ -66,7 +70,7 @@ class CkDDT ;
   getRefCount - returns the RefCount
 
   serialize - This is the function which actually copies the contents from
-    user's space to buffer if dir=1 or reverse if dir=0 
+    user's space to buffer if dir=1 or reverse if dir=0
     according to the datatype.
 */
 
@@ -80,7 +84,8 @@ class CkDDT_DataType {
     int size;
     int extent;
     int count;
-
+    int lb;
+    int ub;
     int baseSize;
     int baseExtent;
     CkDDT_DataType *baseType;
@@ -95,6 +100,10 @@ class CkDDT_DataType {
 
     virtual int getSize(int count=1);
     virtual int getExtent();
+    virtual int getBaseSize(void);
+    virtual int getLB(void);
+    virtual int getUB(void);
+    virtual int getType(void);
     virtual void inrRefCount() ;
     virtual int getRefCount() ;
     virtual void pupType(PUP::er &p, CkDDT* ddt) ;
@@ -102,14 +111,14 @@ class CkDDT_DataType {
     virtual int serialize(char* userdata, char* buffer, int num, int dir);
 };
 
-/*   
-  This class maintains the type Contiguous. 
+/*
+  This class maintains the type Contiguous.
   It constructs a typemap consisting of the
-  replication of a datatype into contiguous locations. 
+  replication of a datatype into contiguous locations.
 */
 
 class CkDDT_Contiguous : public CkDDT_DataType {
-  
+
   public:
   CkDDT_Contiguous() { };
   CkDDT_Contiguous(int count, int index, CkDDT_DataType* oldType);
@@ -120,11 +129,11 @@ class CkDDT_Contiguous : public CkDDT_DataType {
 };
 
 /*
-   This class maintains the Vector Datatype. 
+   This class maintains the Vector Datatype.
    Vector type allows replication of a datatype into
-   locations that consist of equally spaced blocks. 
+   locations that consist of equally spaced blocks.
    Each block is obtained by concatenating the
-   same number of copies of the old datatype. 
+   same number of copies of the old datatype.
    The spacing between blocks is a multiple of the
    extent of the old datatype.
 */
@@ -153,7 +162,7 @@ class CkDDT_Vector : public CkDDT_DataType {
   copies of the old datatype.
   The Vector type assumes that the stride between successive blocks 
   is a multiple of the oldtype
-  extent. HVector type allows a stride which consists of an 
+  extent. HVector type allows a stride which consists of an
   arbitrary number of bytes.
 */
 
@@ -243,11 +252,11 @@ class CkDDT_Struct : public CkDDT_DataType {
     int* arrayBlockLength ;
     int* arrayDisplacements ;
     int* index;
-    CkDDT_DataType** arrayDataType; 
+    CkDDT_DataType** arrayDataType;
 
   public:
     CkDDT_Struct() { } ;
-    CkDDT_Struct(int count, int* arrBlock, int* arrDisp, int *index, 
+    CkDDT_Struct(int count, int* arrBlock, int* arrDisp, int *index,
                CkDDT_DataType **type);
     CkDDT_Struct(const CkDDT_Struct& obj);
     CkDDT_Struct& operator=(const CkDDT_Struct& obj) ;
@@ -310,7 +319,9 @@ class CkDDT {
     typeTable[20] = new CkDDT_DataType(CkDDT_LONG_DOUBLE_INT);
     typeTable[21] = new CkDDT_DataType(CkDDT_2FLOAT);
     typeTable[22] = new CkDDT_DataType(CkDDT_2DOUBLE);
-    num_types = 23;
+    typeTable[23] = new CkDDT_DataType(CkDDT_LB);
+    typeTable[24] = new CkDDT_DataType(CkDDT_UB);
+    num_types = 25;
 
     int i;
     for(i=0 ; i < num_types; i++)
@@ -323,15 +334,15 @@ class CkDDT {
   }
 
   void newContiguous(int count, CkDDT_Type  oldType, CkDDT_Type* newType);
-  void newVector(int count, int blocklength, int stride, CkDDT_Type oldtype, 
+  void newVector(int count, int blocklength, int stride, CkDDT_Type oldtype,
                 CkDDT_Type* newtype);
-  void newHVector(int count, int blocklength, int stride, CkDDT_Type oldtype, 
+  void newHVector(int count, int blocklength, int stride, CkDDT_Type oldtype,
                  CkDDT_Type* newtype);
-  void newIndexed(int count, int* arrbLength, int* arrDisp , CkDDT_Type oldtype, 
+  void newIndexed(int count, int* arrbLength, int* arrDisp , CkDDT_Type oldtype,
                  CkDDT_Type* newtype);
-  void newHIndexed(int count, int* arrbLength, int* arrDisp , CkDDT_Type oldtype, 
+  void newHIndexed(int count, int* arrbLength, int* arrDisp , CkDDT_Type oldtype,
                   CkDDT_Type* newtype);
-  void newStruct(int count, int* arrbLength, int* arrDisp , CkDDT_Type *oldtype, 
+  void newStruct(int count, int* arrbLength, int* arrDisp , CkDDT_Type *oldtype,
                 CkDDT_Type* newtype);
   void  freeType(int* index);
   int   getNextFreeIndex(void) ;
@@ -339,6 +350,8 @@ class CkDDT {
   CkDDT_DataType*  getType(int nIndex);
   int  getSize(int nIndex, int count=1);
   int  getExtent(int nIndex);
+  int  getLB(int nIndex);
+  int  getUB(int nIndex);
   ~CkDDT() ;
 };
 
