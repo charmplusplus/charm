@@ -79,9 +79,9 @@ dirs+sources:
 	if [ ! -d ../lib ] ; then mkdir ../lib ; fi
 	rm -f ../../bin ; ln -s `cat .vdir`/bin ../../bin
 	find . -type l -exec rm {} \;
-	find ../../src/Common -type f \! -name "*,v" -exec ln -s {} . \;
-	find ../../src/`cat .vdir` -type f \! -name "*,v" -exec ln -s {} . \;
-	if [ -d ../../src/Common.`cat .gdir` ] ; then find ../../src/Common.`cat .gdir` -type f \! -name "*,v" -exec ln -s {} . \; ; fi
+	find ../../src/Common -type f \! -name Entries \! -name Root \! -name Repository -exec ln -s {} . \;
+	find ../../src/`cat .vdir` -type f \! -name Entries \! -name Root \! -name Repository -exec ln -s {} . \;
+	if [ -d ../../src/Common.`cat .gdir` ] ; then find ../../src/Common.`cat .gdir` -type f \! -name Entries \! -name Root \! -name Repository -exec ln -s {} . \; ; fi
 	@echo
 	@echo 'Gathering test-programs in '`cat .vdir`/pgms
 	@echo
