@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-09-20 13:22:49  jyelon
+ * Revision 2.5  1995-09-20 17:20:49  gursoy
+ * threads dont use alloca
+ *
+ * Revision 2.4  1995/09/20  13:22:49  jyelon
  * Added 'CMK_THREAD_' flags.
  *
  * Revision 2.3  1995/09/19  18:56:15  jyelon
@@ -85,7 +88,7 @@
 /* #define CMK_HAVE_STRINGS_H */
 /* #define CMK_JUST_DECLARE_STRING_FNS */
 
-#define CMK_HAVE_SYS_WAIT_H
-/* #define CMK_HAVE_WAITFLAGS_H */
+/* #define CMK_HAVE_SYS_WAIT_H */
+#define CMK_HAVE_WAITFLAGS_H
 
 #endif
