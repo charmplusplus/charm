@@ -14,7 +14,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.3  1997-08-18 18:25:55  jyelon
+# Revision 1.4  2000-02-20 17:36:52  milind
+# Added -local_icons option to latex2html.
+#
+# Revision 1.3  1997/08/18 18:25:55  jyelon
 # *** empty log message ***
 #
 # Revision 1.2  1997/07/26 16:04:45  jyelon
@@ -36,7 +39,7 @@ ps:
 
 html:
 	latex manual.tex
-	latex2html manual.tex
+	latex2html -local_icons manual.tex
 
 install:
 	rm -f /expand1/groupMosaic/distrib/convext.manual.ps.gz
