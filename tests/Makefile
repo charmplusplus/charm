@@ -23,7 +23,7 @@ test-fem:
 	cd fem; $(MAKE) test OPTS='$(OPTS)'
 
 clean:
-	for d in $(DIRS); do (cd $$d; make clean OPTS='$(OPTS)'); done
+	for d in $(DIRS); do (cd $$d; $(MAKE) clean OPTS='$(OPTS)'); done
 	rm -f TAGS #*#
 	rm -f core *~
 
