@@ -270,8 +270,6 @@ QuickThreads/libqt.a:
 	-(CHARMINC=.; . ./conv-config.sh; \
 	  cp QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so && \
 	  cp QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so/libckqt.$$CMK_SHARED_SUF)
-#	-@ test -d ../lib/libckqt.a.dir && /bin/rm -rf ../lib/libckqt.a.dir
-#	-@ cp -r QuickThreads/libqt.a.dir ../lib/libckqt.a.dir
 
 METIS:  charm++
 	cd libs/conv-libs/metis; make OPTS='$(OPTS)'
@@ -437,13 +435,13 @@ $(L)/libthreads-qt.o: threads.c $(CVHEADERS)
 	$(CHARMC) -o $@ -IQuickThreads -DCMK_THREADS_BUILD_QT=1 threads.c
 
 $(L)/libthreads-context.o: threads.c $(CVHEADERS)
-	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -IQuickThreads threads.c
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -IQuickThreads threads.c
 
 $(L)/libthreads-pthreads.o: threads.c $(CVHEADERS)
-	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_PTHREADS=1 -IQuickThreads threads.c
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_PTHREADS=1 -IQuickThreads threads.c
 
 $(L)/libthreads-fibers.o: threads.c $(CVHEADERS)
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_FIBERS=1 -IQuickThreads threads.c
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_FIBERS=1 -IQuickThreads threads.c 2> /dev/null
 
 
 ###############################################################################
