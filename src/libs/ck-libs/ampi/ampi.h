@@ -138,7 +138,7 @@ typedef int MPI_Aint;/* should be "long", but must be "int" for f90... */
 #define MPI_CONGRUENT   2
 #define MPI_UNEQUAL	3
 
-#define MPI_OP_NULL  (void *)NULL
+#define MPI_OP_NULL  (MPI_Op)NULL
 void MPI_MAX      ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
 void MPI_MIN      ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
 void MPI_SUM      ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);

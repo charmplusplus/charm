@@ -305,6 +305,7 @@ void MPI_MINLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 }
 
 // every msg contains a AmpiOpHeader structure before user data
+// FIXME: non-commutative operations require messages be ordered by rank
 CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs){
   AmpiOpHeader *hdr = (AmpiOpHeader *)msgs[0]->getData();
   MPI_Datatype dtype;
@@ -1861,6 +1862,7 @@ int AMPI_Op_create(MPI_User_function *function, int commute, MPI_Op *op){
 CDECL
 int AMPI_Op_free(MPI_Op *op){
   AMPIAPI("AMPI_Op_free");
+  *op = MPI_OP_NULL;
   return 0;
 }
 
