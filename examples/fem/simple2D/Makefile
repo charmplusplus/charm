@@ -15,5 +15,8 @@ cst_nl.o: cst_nl.C
 test: pgm
 	./charmrun ./pgm +vp4 +p2
 
+bgtest: pgm
+	./charmrun ./pgm +vp4 +p2 +x2 +y2 +z1
+
 clean:
 	rm -f pgm fpgm *.o conv-host charmrun
