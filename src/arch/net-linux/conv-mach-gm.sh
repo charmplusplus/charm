@@ -1,6 +1,6 @@
 #default gm dir
 #guess where the gm.h is installed
-if test -z $CMK_INCDIR 
+if test -z "$CMK_INCDIR"
 then
   # gm ver 1.0
   if test -f /usr/gm/include/gm.h
