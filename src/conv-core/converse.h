@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-07-06 23:22:58  narain
+ * Revision 2.6  1995-07-07 14:04:35  gursoy
+ * redone uniprocessors changes again, somehow an old version
+ * is checked in
+ *
+ * Revision 2.5  1995/07/06  23:22:58  narain
  * Put back the different components of converse.h in this file.
  *
  * Revision 2.4  1995/06/29  21:25:29  narain
@@ -84,6 +88,31 @@ extern "C" {
 
 
 
+#ifdef CMK_SHARED_VARS_UNIPROCESSOR
+
+extern int Cmi_mype;
+extern int Cmi_numpe;
+#define CmiMyPe() Cmi_mype
+#define CmiNumPe() Cmi_numpe
+
+#define SHARED_DECL
+#define CpvDeclare(t,v) t* v
+#define CpvExtern(t,v)  extern t* v
+#define CpvStaticDeclare(t,v) static t* v
+#define CpvInitialize(t,v) if (Cmi_mype == 0) v = (t *) CmiAlloc(Cmi_numpe*sizeof(t)); else;
+#define CpvAccess(v) v[Cmi_mype]
+
+#define CsvDeclare(t,v) t v
+#define CsvStaticDeclare(t,v) static t v
+#define CsvExtern(t,v) extern t v
+#define CsvInitialize(t,v)
+#define CsvAccess(v) v
+
+#define CmiMyRank() Cmi_mype
+#define CmiNodeBarrier()
+#define CmiSvAlloc CmiAlloc
+
+#endif
 
 
 
