@@ -111,6 +111,7 @@ OUTPUT=""
 CL_OPTS=$CL_DEF
 LINK_OPTS=$LINK_DEF
 LIBDIR=""
+LIBDIRS=""
 
 #NT CL and LINK command-line arguments:
 LINK=""
@@ -155,12 +156,14 @@ do
 		;;
 	-L)
 		LIBDIR="`cygpath -w $1`"
+		LIBDIRS="$LIBDIRS `cygpath -u $LIBDIR`"
 		LINK=$LINK"	/LIBPATH:$LIBDIR"
 		shift
 		;;
 	-L*)
 		LIBDIR=`echo $arg | awk -F@ '{print substr($1,3)}'`
 		LIBDIR="`cygpath -w $LIBDIR`"
+		LIBDIRS="$LIBDIRS `cygpath -u $LIBDIR`"
 		LINK=$LINK"	/LIBPATH:$LIBDIR"
 		shift
 		;;
@@ -172,11 +175,17 @@ do
 			D="no"
 			[ -r "$L" ] && D="$L"
 			[ -r "$L.a" ] && D="$L.a"
+			[ -r "$L.lib" ] && D="$L.lib"
 			[ -r "lib$L.a" ] && D="lib$L.a"
-			[ -r "$LIBDIR/lib$L" ] && D="$LIBDIR/lib$L"
-			[ -r "$LIBDIR/lib$L.a" ] && D="$LIBDIR/lib$L.a"
-			[ $D = no ] && Abort "Couldn't find library $L in . or $LIBDIR"
-			LINK="$LINK $D"
+			test -n "$LIBDIRS" &&	\
+			for dir in $LIBDIRS
+			do
+			  [ -r "$dir/lib$L" ] && D="$dir/lib$L"
+			  [ -r "$dir/lib$L.a" ] && D="$dir/lib$L.a"
+			  [ -r "$dir/$L.lib" ] && D="$dir/$L.lib"
+			done
+			[ $D = no ] && Abort "Couldn't find library $L in . or $LIBDIRS"
+			LINK="$LINK `cygpath -w $D`"
 		fi
 		;;
 	-o)
