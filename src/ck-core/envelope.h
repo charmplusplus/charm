@@ -273,7 +273,7 @@ class MsgPool {
       return (num ? msgs[--num] : _alloc());
     }
     void put(void *m) {
-      if (num==MAXMSGS && CmiImmIsRunning())
+      if (num==MAXMSGS || CmiImmIsRunning())
         CkFreeMsg(m);
       else
         msgs[num++] = m;
