@@ -14,7 +14,7 @@ CpvStaticDeclare(char*, traceRoot);
 CtvStaticDeclare(int,curThreadEvent);
 
 static int _numEvents = 0;
-#if CMK_OPTIMIZE
+#ifdef CMK_OPTIMIZE
 static int warned = 0;
 #endif
 static int _threadMsg, _threadChare, _threadEP;
@@ -104,7 +104,7 @@ void traceAwaken(CthThread t)
 extern "C"
 void traceUserEvent(int e)
 {
-#if CMK_OPTIMIZE
+#ifdef CMK_OPTIMIZE
   OPTIMIZED_VERSION
 #else
   CpvAccess(_trace)->userEvent(e);
@@ -114,7 +114,7 @@ void traceUserEvent(int e)
 extern "C"
 int traceRegisterUserEvent(const char*)
 {
-#if CMK_OPTIMIZE
+#ifdef CMK_OPTIMIZE
   OPTIMIZED_VERSION
   return 0;
 #else

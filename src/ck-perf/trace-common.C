@@ -9,7 +9,7 @@
 #include "trace.h"
 #include "stdlib.h"
 
-#if CMK_OPTIMIZE
+#ifdef CMK_OPTIMIZE
 static int warned = 0;
 #define OPTIMIZE_WARNING if (!warned) { warned=1;  CmiPrintf("\n\n!!!! Warning: tracing not available with CMK_OPTIMIZE!\n");  return;  }
 #else
