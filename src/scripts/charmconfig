@@ -536,7 +536,7 @@ then
         . ./conv-mach-opt.sh
 fi
 
-VERSION=5.5
+VERSION=050403
 cat >> confdefs.h <<EOF
 #define CHARM_VERSION $VERSION
 EOF
