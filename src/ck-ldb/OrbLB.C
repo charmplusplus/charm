@@ -53,7 +53,7 @@ void OrbLB::rec_divide(int n, Partition &p)
   Partition p1, p2;
 
   if (_lb_args.debug()>=2) {
-    CmiPrintf("rec_divide: partition n:%d count:%d load:%f (%d %d %d, %d %d %d)\n", n, p.count, p.load, p.origin[0], p.origin[1], p.origin[2], p.corner[0], p.corner[1], p.corner[2]);
+    CmiPrintf("rec_divide starts: partition n:%d count:%d load:%f (%d %d %d, %d %d %d)\n", n, p.count, p.load, p.origin[0], p.origin[1], p.origin[2], p.corner[0], p.corner[1], p.corner[2]);
   }
 
   if (n==1) {		// we are done in this branch
@@ -62,8 +62,11 @@ void OrbLB::rec_divide(int n, Partition &p)
   }
 /*
   if (p.origin.x==p.corner.x && p.origin.y==p.corner.y && p.origin.z==p.corner.z) 
-     NAMD_die("AlgRecBisection failed in recursion.\n"); 
+     CmiAbort("AlgRecBisection failed in recursion.\n"); 
 */
+  if (_lb_args.debug()>=2) {
+    CmiPrintf("{\n");
+  }
 
   // divide into n1 and n2 two subpartitions
   n2 = n/2;
@@ -72,7 +75,7 @@ void OrbLB::rec_divide(int n, Partition &p)
   // subpartition n1 should have this load
   load1 = (1.0*n1/n) * p.load;
   if (_lb_args.debug()>=2)
-    CmiPrintf("divide goal: n1: %d load1: %f, n2: %d, load2: %f\n", n1, load1, n2, p.load-load1);
+    CmiPrintf("goal: n1: %d with load1: %f; n2: %d load2: %f\n", n1, load1, n2, p.load-load1);
 
   p1 = p;
   p1.refno = ++refno;
@@ -151,10 +154,12 @@ void OrbLB::rec_divide(int n, Partition &p)
       else p2.bkpes.push_back(p.bkpes[i]);
   }
 
-#ifdef DEBUG
-  CmiPrintf("p1: n:%d count:%d load:%f\n", n1, p1.count, p1.load);
-  CmiPrintf("p2: n:%d count:%d load:%f\n", n2, p2.count, p2.load);
-#endif
+  if (_lb_args.debug()>=2) {
+    CmiPrintf("p1: n:%d count:%d load:%f\n", n1, p1.count, p1.load);
+    CmiPrintf("p2: n:%d count:%d load:%f\n", n2, p2.count, p2.load);
+    CmiPrintf("}\n");
+  }
+
   rec_divide(n1, p1);
   rec_divide(n2, p2);
 }
@@ -231,7 +236,7 @@ void OrbLB::mapPartitionsToNodes()
 #if 1
   if (!_lb_args.ignoreBgLoad()) {
       // processor mapping has already been determined by the background load pe
-    for (i=0; i<P; i++) partitions[i].node = partitions[i].bkpes[0];
+    for (i=0; i<npartition; i++) partitions[i].node = partitions[i].bkpes[0];
   }
   else {
     for (i=0; i<P; i++) partitions[i].node = i;
@@ -264,7 +269,7 @@ void OrbLB::mapPartitionsToNodes()
   while (1)
   {
     int index=-1, node=0, eager=-1;
-    for (j=0; j<P; j++) {
+    for (j=0; j<npartition; j++) {
       if (partitions[j].node != -1) continue;
       int wantmost=-1, maxnodes=-1;
       for (k=0; k<P; k++) if (pool[j][k] > maxnodes && !partitions[k].mapped) {wantmost=k; maxnodes = pool[j][k];}
@@ -281,14 +286,24 @@ void OrbLB::mapPartitionsToNodes()
   delete [] pool;
 #endif
 
+/*
   if (_lb_args.debug()) {
     CmiPrintf("partition load: ");
-    for (i=0; i<P; i++) CmiPrintf("%f ", partitions[i].load);
+    for (i=0; i<npartition; i++) CmiPrintf("%f ", partitions[i].load);
     CmiPrintf("\n");
     CmiPrintf("partitions to nodes mapping: ");
-    for (i=0; i<P; i++) CmiPrintf("%d ", partitions[i].node);
+    for (i=0; i<npartition; i++) CmiPrintf("%d ", partitions[i].node);
     CmiPrintf("\n");
   }
+*/
+  if (_lb_args.debug()) {
+    CmiPrintf("After partitioning: \n");
+    for (i=0; i<npartition; i++) {
+      CmiPrintf("[%d=>%d] (%d,%d,%d) (%d,%d,%d) load:%f count:%d\n", i, partitions[i].node, partitions[i].origin[0], partitions[i].origin[1], partitions[i].origin[2], partitions[i].corner[0], partitions[i].corner[1], partitions[i].corner[2], partitions[i].load, partitions[i].count);
+    }
+    for (i=npartition; i<P; i++) CmiPrintf("[%d] --------- \n", i);
+  }
+
 }
 
 void OrbLB::work(CentralLB::LDStats* stats, int count)
@@ -373,14 +388,27 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
   // if we take background load into account
   if (!_lb_args.ignoreBgLoad()) {
     top_partition.bkpes.resize(0);
+    double total = totalLoad;
     for (i=0; i<P; i++) {
       double bkload = stats->procs[i].bg_walltime;
-      totalLoad += bkload;
-      top_partition.bkpes.push_back(i);
+      total += bkload;
     }
+    double averageLoad = total / P;
+    for (i=0; i<P; i++) {
+      double bkload = stats->procs[i].bg_walltime;
+      if (bkload < averageLoad) top_partition.bkpes.push_back(i);
+      else CkPrintf("OrbLB Info> PE %d with %f background load will have 0 object.\n", i, bkload);
+    }
+    npartition = top_partition.bkpes.size();
+    // formally add these bg load to total load
+    for (i=0; i<npartition; i++) 
+      totalLoad += stats->procs[top_partition.bkpes[i]].bg_walltime; 
     if (_lb_args.debug()>=2) {
       CkPrintf("BG load: ");
       for (i=0; i<P; i++)  CkPrintf(" %f", stats->procs[i].bg_walltime);
+      CkPrintf("\n");
+      CkPrintf("Partition BG load: ");
+      for (i=0; i<npartition; i++)  CkPrintf(" %f", stats->procs[top_partition.bkpes[i]].bg_walltime);
       CkPrintf("\n");
     }
   }
@@ -393,13 +421,6 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
   // recursively divide
   rec_divide(npartition, top_partition);
 
-  if (_lb_args.debug()) {
-    CmiPrintf("After partitioning: \n");
-    for (i=0; i<P; i++) {
-      CmiPrintf("[%d] (%d,%d,%d) (%d,%d,%d) load:%f count:%d\n", i, partitions[i].origin[0], partitions[i].origin[1], partitions[i].origin[2], partitions[i].corner[0], partitions[i].corner[1], partitions[i].corner[2], partitions[i].load, partitions[i].count);
-  }
-  }
-
   // mapping partitions to nodes
   mapPartitionsToNodes();
 
@@ -409,7 +430,7 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
 
   for (i=0; i<nObjs; i++)
   {
-    for (j=0; j<count; j++)
+    for (j=0; j<npartition; j++)
       if (computeLoad[i].refno == partitions[j].refno)   {
         computeLoad[i].partition = partitions+j;
         num[j] ++;
@@ -417,7 +438,7 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
     CmiAssert(computeLoad[i].partition != NULL);
   }
 
-  for (i=0; i<P; i++)
+  for (i=0; i<npartition; i++)
     if (num[i] != partitions[i].count) 
       CmiAbort("OrbLB: Compute counts don't agree!\n");
 
