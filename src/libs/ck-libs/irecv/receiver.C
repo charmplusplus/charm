@@ -95,7 +95,7 @@ extern "C" int typesize(int type, int count)
     case CMPI_BYTE:
     case CMPI_PACKED:
     default:
-      return 2*count;
+      return count;
   }
 }
 
