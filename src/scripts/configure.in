@@ -469,16 +469,6 @@ EOT
 test_cxx "whether has values.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_VALUES_H, $pass, [whether has values.h])
 
-#### test if has alloca.h ####
-cat > $t <<EOT
-#include <alloca.h>
-int main() { 
-//  char *osp=(char *)alloca(0);
-}
-EOT
-test_cxx "whether has alloca.h " "yes" "no" ""
-AC_DEFINE_UNQUOTED([CMK_HAS_ALLOCA], $pass, [whether has alloca.h])
-
 #### test if has elf.h ####
 cat > $t <<EOT
 #include <elf.h>
@@ -488,6 +478,16 @@ int main() {
 EOT
 test_cxx "whether has elf.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK_HAS_ELF_H], $pass, [wether has elf.h])
+
+#### test if has stdint.h ####
+cat > $t <<EOT
+#include <stdint.h>
+int main() { 
+  return 0;
+}
+EOT
+test_cxx "whether has stdint.h " "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_STDINT_H, $pass, [whether has stdint.h])
 
 #### test if it can build shared library ####
 cat > $t <<EOT
