@@ -12,7 +12,7 @@ CkpvDeclare(int, DummyHandle);
 void procManyCombinedMsg(char *msg)
 {
     comID id;
-    //  ComlibPrintf("In Recv combined message at %d\n", CkMyPe());
+    ComlibPrintf("In Recv combined message at %d\n", CkMyPe());
     memcpy(&id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
     
     Strategy *s = ConvComlibGetStrategy(id.instanceID);
@@ -31,7 +31,7 @@ void dummyEP(DummyMsg *m)
 void recvManyCombinedMsg(char *msg)
 {
     comID id;
-    //  ComlibPrintf("In Recv combined message at %d\n", CkMyPe());
+    ComlibPrintf("In Recv combined message at %d\n", CkMyPe());
     memcpy(&id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
     
     Strategy *s = ConvComlibGetStrategy(id.instanceID);
@@ -69,7 +69,8 @@ RouterStrategy::RouterStrategy(int stratid, int handle, int _npes,
     CkpvInitialize(int, ProcHandle);
     CkpvInitialize(int, DummyHandle);
 
-    id.instanceID = 0; //getInstance();
+    id.instanceID = 0; //Set later in doneInserting
+    
     id.isAllToAll = 0;
     id.refno = 0;
 
@@ -146,6 +147,10 @@ void RouterStrategy::insertMessage(MessageHolder *cmsg){
 
 void RouterStrategy::doneInserting(){
     
+    id.instanceID = getInstance();
+
+    ComlibPrintf("Instance ID = %d\n", getInstance());
+
     if(routerID == USE_DIRECT)
         return;
 
@@ -249,7 +254,7 @@ void RouterStrategy::pup(PUP::er &p){}
 void RouterStrategy::RecvManyMsg(char *msg) {
 
     comID new_id;
-    //  ComlibPrintf("In Recv combined message at %d\n", CkMyPe());
+    ComlibPrintf("In RecvManyMsg at %d\n", CkMyPe());
     memcpy(&new_id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
 
     ComlibPrintf("REFNO = %d, %d\n", new_id.refno, id.refno);
@@ -263,7 +268,7 @@ void RouterStrategy::RecvManyMsg(char *msg) {
 void RouterStrategy::ProcManyMsg(char *msg) {    
 
     comID new_id;
-    //  ComlibPrintf("In Recv combined message at %d\n", CkMyPe());
+    ComlibPrintf("In ProcManyMsg at %d\n", CkMyPe());
     memcpy(&new_id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
 
     if(new_id.refno != id.refno)

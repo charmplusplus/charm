@@ -76,5 +76,5 @@ Strategy *ConvComlibGetStrategy(int loc) {
 }
 
 void ConvComlibRegisterStrategy(Strategy *s) {
-    (CkpvAccess(conv_comm_ptr))->insertStrategy(s);
+    (CkpvAccess(conv_comm_ptr))->insertStrategy(s);    
 }
