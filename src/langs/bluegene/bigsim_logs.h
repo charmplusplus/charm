@@ -90,7 +90,7 @@ public:
   friend class BgTimeLineRec;
 public:
   bgTimeLog(bgTimeLog *);
-  bgTimeLog(char *msg);
+  bgTimeLog(char *msg, char *str=NULL);
   bgTimeLog(): ep(-1), recvTime(.0), startTime(.0), endTime(.0), msgID(-1), effRecvTime(INVALIDTIME), seqno(0), doCorrect(1) {strcpy(name,"dummyname");}
   bgTimeLog(int epc, char* name, double sTime, double eTime);
   bgTimeLog(int epc, char* name, double sTime);
@@ -102,6 +102,8 @@ public:
   void print(int node, int th);
   void write(FILE *fp);
 
+  // add backward dep of the log corresponent to msg
+  void addMsgBackwardDep(BgTimeLineRec &tlinerec, void* msg);
   void addBackwardDep(bgTimeLog* log);
   //takes a list of Logs on which this log is dependent (backwardDeps) 
   void addBackwardDeps(CkVec<bgTimeLog*> logs);
@@ -211,6 +213,7 @@ public:
   void logEntryStart(bgTimeLog* log);
   void logEntryClose();
   void logEntrySplit();
+  bgTimeLog *getTimeLogOnThread(int srcnode, int msgID, int *index);
 
   void pup(PUP::er &p){
     int l=length();

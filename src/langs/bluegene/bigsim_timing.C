@@ -262,7 +262,6 @@ void BgGetMsgStartTime(bgTimeLog* tLog, BgTimeLineRec &tline, int* index)
 }
 
 
-
 void updateEffRecvTime(minHeap<bgTimeLog*>* inpQPtr, bgTimeLog *log){
   int i,j;
   if (log) {
@@ -539,25 +538,6 @@ CmiPrintf("BgAdjustTimeLineByIndex END %d %d %f\n", idx, len, CmiWallTimer()-t);
 }
 
 
-
-#if 0
-
-void BgBeginCorrection(BgTimeLineRec &tlinerec, int mynode, int tid)
-{
-#if LIMITED_SEND
-  return;
-#endif
-
-  BgTimeLine &tline = tlinerec.timeline;
-  for(int i=0;i<tline.length();i++) {
-    bgTimeLog *log = tline[i];
-    log->oldStartTime = log->startTime;
-    //  log->oldEndTime = log->endTime;
-  }
-}
-
-#endif
-
 //Send correction msgs
 void BgFinishCorrection(BgTimeLineRec &tlinerec, int mynode, int tid, int idx, int sendImmediately)
 {
@@ -668,30 +648,17 @@ int BgAdjustTimeLineInsert(BgTimeLineRec &tlinerec)
   return minIdx;
 }
 
-static bgTimeLog *BgGetTimeLogOnThread(BgTimeLineRec &tline, int srcnode, int msgID, int *index)
-{
-  int idxOld = tline.length()-1;
-  while (idxOld >= 0)  {
-    if (tline[idxOld]->msgID == msgID && tline[idxOld]->srcnode == srcnode) break;
-    idxOld--;
-  }
-
-  *index = idxOld;
-  if (idxOld == -1) return NULL;
-  return tline[idxOld];
-}
-
 bgTimeLog *BgGetTimeLog(BgTimeLineRec *tline, CmiInt2 tID, int srcnode, int msgID, int *index)
 {
   if (tID == ANYTHREAD) {
     for (int i=0; i<cva(bgMach).numWth; i++) {
-      bgTimeLog *tlog = BgGetTimeLogOnThread(tline[i], srcnode, msgID, index);
+      bgTimeLog *tlog = tline[i].getTimeLogOnThread(srcnode, msgID, index);
       if (tlog) return tlog;
     }
     return NULL;
   }
   else {
-    return BgGetTimeLogOnThread(tline[tID], srcnode, msgID, index);
+    return tline[tID].getTimeLogOnThread(srcnode, msgID, index);
   }
 }
 
@@ -713,12 +680,6 @@ int BgAdjustTimeLineForward(int srcnode, int msgID, double tAdjustAbs, BgTimeLin
 
   BGSTATE(2,"} BgAdjustTimeLineForward");
   return status;
-}
-
-void BgPrintThreadTimeLine(int pe, int th, BgTimeLine &tline)
-{
-  for (int i=0; i<tline.length(); i++)
-    tline[i]->print(pe, th);
 }
 
 /*****************************************************************************
@@ -830,7 +791,7 @@ static inline int batchHandleCorrectionMsg(int mynode, BgTimeLineRec *tlinerecs,
     bgCorrectionMsg *cm = cmsg.deq();
     if (cm->tAdjust >= 0.) {
       int oldIdx;
-      bgTimeLog *tlog = BgGetTimeLogOnThread(tlinerec, cm->srcNode, cm->msgID, &oldIdx);
+      bgTimeLog *tlog = tlinerec.getTimeLogOnThread(cm->srcNode, cm->msgID, &oldIdx);
       if (tlog==NULL) {
 //	if (!programExit) {             // HACK ?
 	if (1) {

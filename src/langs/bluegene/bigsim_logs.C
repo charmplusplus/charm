@@ -99,9 +99,12 @@ bgTimeLog::bgTimeLog(int epc, char* namestr, double sTime, double eTime)
   doCorrect = 1;
 }
 
-bgTimeLog::bgTimeLog(char *msg)
+bgTimeLog::bgTimeLog(char *msg, char *str)
 {
-  strcpy(name,"msgep");
+  if (str)
+    strcpy(name,str);
+  else
+    strcpy(name,"msgep");
   ep = msg?CmiBgMsgHandle(msg):-1;
   startTime = timerFunc();
   recvTime = msg?CmiBgMsgRecvTime(msg):0;//startTime;
@@ -171,6 +174,14 @@ void bgTimeLog::write(FILE *fp)
   fprintf(fp, "==>>\n");
 }
 
+void bgTimeLog::addMsgBackwardDep(BgTimeLineRec &tlinerec, void* msg){
+  
+  CmiAssert(recvTime < 0.);
+  int idx;
+  bgTimeLog *msglog = tlinerec.getTimeLogOnThread(CmiBgMsgSrcPe(msg), CmiBgMsgID(msg), &idx);
+  CmiAssert(msglog != NULL);
+  addBackwardDep(msglog);
+}
 
 void bgTimeLog::addBackwardDep(bgTimeLog* log){
   
@@ -198,6 +209,7 @@ void bgTimeLog::addBackwardDeps(CkVec<void*> logs){
     addBackwardDep((bgTimeLog*)(logs[i]));
 }
 
+// create a log with msg and insert into timeline
 void BgTimeLineRec::logEntryStart(char *msg) {
 //CmiPrintf("[%d] BgTimeLineRec::logEntryStart\n", BgGetGlobalWorkerThreadID());
   if (!genTimeLog) return;
@@ -206,8 +218,10 @@ void BgTimeLineRec::logEntryStart(char *msg) {
   enq(bgCurLog, 1);
 }
 
+// insert an log into timeline
 void BgTimeLineRec::logEntryInsert(bgTimeLog* log)
 {
+  if (!genTimeLog) return;
 //CmiPrintf("[%d] BgTimeLineRec::logEntryInsert\n", BgGetGlobalWorkerThreadID());
   CmiAssert(bgCurLog == NULL);
   if(timeline[timeline.length()-1]->endTime == 0.0)
@@ -243,6 +257,20 @@ void BgTimeLineRec::logEntrySplit()
   newLog->addBackwardDep(rootLog);
   logEntryInsert(newLog);
   bgCurLog = newLog;
+}
+
+bgTimeLog *
+BgTimeLineRec::getTimeLogOnThread(int srcnode, int msgID, int *index)
+{
+  int idxOld = timeline.length()-1;
+  while (idxOld >= 0)  {
+    if (timeline[idxOld]->msgID == msgID && timeline[idxOld]->srcnode == srcnode) break;
+    idxOld--;
+  }
+                                                                                
+  *index = idxOld;
+  if (idxOld == -1) return NULL;
+  return timeline[idxOld];
 }
 
 int bgTimeLog::bDepExists(bgTimeLog* log){
