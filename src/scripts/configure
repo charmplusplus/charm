@@ -604,6 +604,34 @@ echo "configure:602: checking "$1"" >&5
 	/bin/rm -f out
 }
 
+# test_linkso $1 $2 $3 $4, where
+# $1: debug msg
+# $2: yes msg
+# $3: no msg
+# $4: extra link option
+test_linkso() {
+        echo $ac_n "checking "$1"""... $ac_c" 1>&6
+echo "configure:615: checking "$1"" >&5
+	$CMK_CXX -I../include -I. $CMK_LD_SHARED $t -o testlink.$CMK_SHARED_SUF $4 > out 2>&1
+	test_result $? "$1" "$2" "$3"
+	/bin/rm -f out testlink.$CMK_SHARED_SUF
+}
+
+# add into conv-mach-opt.sh
+# add_flag $1 $2
+# $2 is description
+add_flag() {
+	if ! grep "$1" conv-mach-opt.sh  > /dev/null 2>&1
+	then
+	cat >> ./conv-mach-opt.sh << EOT
+
+# Option added by configure script's $2 section
+$1
+
+EOT
+	fi
+}
+
 test_finish() {
 	rm -f $t testlink test.o	> /dev/null 2>&1
 	/bin/rm -f out
@@ -871,12 +899,7 @@ test_link "whether dlopen links with -ldl" "yes" "no" "-ldl"
 if test $pass -eq 1
 then 
 #dlopen requires -ldl: add it to our link line
-	cat >> ./conv-mach-opt.sh << EOT
-
-# Option added by configure script's dlopen section
-CMK_LIBS="\$CMK_LIBS -ldl"
-
-EOT
+	add_flag 'CMK_LIBS="$CMK_LIBS -ldl"' "dlopen"
 fi
 
 if test $pass -eq 1 -o $noldl -eq 1
@@ -951,13 +974,8 @@ EOF
 
 if test $pass -eq 1
 then 
-cat >> ./conv-mach-opt.sh << EOT
-
-# Option added by configure script's backtrace section
-CMK_LD="\$CMK_LD $TRACE_LINK_FLAG"
-CMK_LDXX="\$CMK_LDXX $TRACE_LINK_FLAG"
-
-EOT
+	add_flag 'CMK_LD="$CMK_LD '$TRACE_LINK_FLAG'"' "backtrace"
+	add_flag 'CMK_LDXX="$CMK_LDXX '$TRACE_LINK_FLAG'"' "backtrace"
 fi
 
 
@@ -978,12 +996,7 @@ EOF
 
 if test $pass -eq 1
 then 
-cat >> ./conv-mach-opt.sh << EOT
-
-# Option added by configure script's zlib section
-CMK_LIBS="\$CMK_LIBS -lz"
-
-EOT
+	add_flag 'CMK_LIBS="$CMK_LIBS -lz"' "zlib"
 fi
 
 #### test if has values.h ####
@@ -1013,6 +1026,20 @@ cat >> confdefs.h <<EOF
 EOF
 
 
+#### test if it can build shared library ####
+cat > $t <<EOT
+extern int foo();
+int foo1() { 
+  foo();
+  return 0;
+}
+EOT
+test_linkso "whether it can build shared library" "yes" "no" ""
+if test $pass -eq 0
+then 
+	add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
+fi
+
 ################## Fortran #########################
 
 ### test fortran subroutine name ###
@@ -1022,7 +1049,7 @@ cat > conftest.f90 <<EOF
 EOF
 
 echo $ac_n "checking subroutine name used by Fortran compiler""... $ac_c" 1>&6
-echo "configure:1026: checking subroutine name used by Fortran compiler" >&5
+echo "configure:1053: checking subroutine name used by Fortran compiler" >&5
 $CMK_CF90 -c conftest.f90 > /dev/null 2> /dev/null
 
 if test -r conftest.o
@@ -1093,7 +1120,7 @@ case $version in
     # Extract the first word of "wget", so it can be a program name with args.
 set dummy wget; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1097: checking for $ac_word" >&5
+echo "configure:1124: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_WGET'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1122,7 +1149,7 @@ fi
     # Extract the first word of "lynx", so it can be a program name with args.
 set dummy lynx; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1126: checking for $ac_word" >&5
+echo "configure:1153: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_LYNX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1151,7 +1178,7 @@ fi
     # Extract the first word of "telnet", so it can be a program name with args.
 set dummy telnet; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1155: checking for $ac_word" >&5
+echo "configure:1182: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_TELNET'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1180,7 +1207,7 @@ fi
     # Extract the first word of "uudecode", so it can be a program name with args.
 set dummy uudecode; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1184: checking for $ac_word" >&5
+echo "configure:1211: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_UUDECODE'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1211,7 +1238,7 @@ fi
 #    CHARMIP='charm.cs.uiuc.edu'
 #    VERSION=`nm /lib/libc.so.6 | grep "A GLIBC_" | tail -1 | sed -e "s/00000000 A GLIBC_//g"`
     echo $ac_n "checking glibc version""... $ac_c" 1>&6
-echo "configure:1215: checking glibc version" >&5
+echo "configure:1242: checking glibc version" >&5
     get_glibc_version
     echo "$ac_t""$GLIBCVERSION" 1>&6
     if test 1 = `expr $GLIBCVERSION \> 2.2.92` 

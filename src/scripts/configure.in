@@ -74,6 +74,33 @@ test_link() {
 	/bin/rm -f out
 }
 
+# test_linkso $1 $2 $3 $4, where
+# $1: debug msg
+# $2: yes msg
+# $3: no msg
+# $4: extra link option
+test_linkso() {
+        AC_MSG_CHECKING("$1")
+	$CMK_CXX -I../include -I. $CMK_LD_SHARED $t -o testlink.$CMK_SHARED_SUF $4 > out 2>&1
+	test_result $? "$1" "$2" "$3"
+	/bin/rm -f out testlink.$CMK_SHARED_SUF
+}
+
+# add into conv-mach-opt.sh
+# add_flag $1 $2
+# $2 is description
+add_flag() {
+	if ! grep "$1" conv-mach-opt.sh  > /dev/null 2>&1
+	then
+	cat >> ./conv-mach-opt.sh << EOT
+
+# Option added by configure script's $2 section
+$1
+
+EOT
+	fi
+}
+
 test_finish() {
 	rm -f $t testlink test.o	> /dev/null 2>&1
 	/bin/rm -f out
@@ -290,12 +317,7 @@ test_link "whether dlopen links with -ldl" "yes" "no" "-ldl"
 if test $pass -eq 1
 then 
 #dlopen requires -ldl: add it to our link line
-	cat >> ./conv-mach-opt.sh << EOT
-
-# Option added by configure script's dlopen section
-CMK_LIBS="\$CMK_LIBS -ldl"
-
-EOT
+	add_flag 'CMK_LIBS="$CMK_LIBS -ldl"' "dlopen"
 fi
 
 if test $pass -eq 1 -o $noldl -eq 1
@@ -355,13 +377,8 @@ AC_DEFINE_UNQUOTED(CMK_USE_BACKTRACE, $pass)
 
 if test $pass -eq 1
 then 
-cat >> ./conv-mach-opt.sh << EOT
-
-# Option added by configure script's backtrace section
-CMK_LD="\$CMK_LD $TRACE_LINK_FLAG"
-CMK_LDXX="\$CMK_LDXX $TRACE_LINK_FLAG"
-
-EOT
+	add_flag 'CMK_LD="$CMK_LD '$TRACE_LINK_FLAG'"' "backtrace"
+	add_flag 'CMK_LDXX="$CMK_LDXX '$TRACE_LINK_FLAG'"' "backtrace"
 fi
 
 
@@ -379,12 +396,7 @@ test_link "whether it has zlib" "yes" "no" "-lz"
 AC_DEFINE_UNQUOTED(CMK_PROJECTIONS_USE_ZLIB, $pass)
 if test $pass -eq 1
 then 
-cat >> ./conv-mach-opt.sh << EOT
-
-# Option added by configure script's zlib section
-CMK_LIBS="\$CMK_LIBS -lz"
-
-EOT
+	add_flag 'CMK_LIBS="$CMK_LIBS -lz"' "zlib"
 fi
 
 #### test if has values.h ####
@@ -407,6 +419,20 @@ int main() {
 EOT
 test_cxx "whether has alloca.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_ALLOCA, $pass)
+
+#### test if it can build shared library ####
+cat > $t <<EOT
+extern int foo();
+int foo1() { 
+  foo();
+  return 0;
+}
+EOT
+test_linkso "whether it can build shared library" "yes" "no" ""
+if test $pass -eq 0
+then 
+	add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
+fi
 
 ################## Fortran #########################
 
