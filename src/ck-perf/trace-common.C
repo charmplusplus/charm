@@ -236,8 +236,7 @@ void traceClose(void)
 #if ! CMK_BLUEGENE_CHARM
   OPTIMIZE_WARNING
   CkpvAccess(_traces)->traceClose();
-#endif
-   closeTraceCore();
+#endif   
 }
 
 extern "C"

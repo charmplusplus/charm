@@ -122,7 +122,8 @@ void TraceProjector::traceClose(void)
     if(CkMyPe()==0){
 	    writeSts();
     }
-    CkpvAccess(_traceproj)->endComputation();
+    CkpvAccess(_traceproj)->endComputation();   
+    closeTraceCore(); 
 }
 
 void TraceProjector::traceBegin(void)
