@@ -178,7 +178,7 @@ dirs+sources:
 	rm -f .vdir .gdir
 	rm -rf ../include ; mkdir ../include
 	./system_ln  ../tmp/conv-mach.sh ../include
-	./system_ln  ../tmp/onv-mach-opt.sh ../include
+	./system_ln  ../tmp/conv-mach-opt.sh ../include
 	touch dirs+sources
 
 
