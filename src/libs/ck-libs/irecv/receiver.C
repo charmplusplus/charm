@@ -41,7 +41,7 @@ receiver::~receiver()
   CmmFree(reqTbl);
 }
 
-#define MIN(a,b) (a)<(b)?(a):(b)
+#define MYMIN(a,b) (a)<(b)?(a):(b)
 
 // other receiver send message here (active send)
 void receiver::sendTo(receiverMsg *msg, int tag, char *pointer, int size, int from, int refno)
@@ -54,7 +54,7 @@ void receiver::sendTo(receiverMsg *msg, int tag, char *pointer, int size, int fr
 
   if (req) {
     //  irecv called before; copy buffer
-    memcpy(req->buf, pointer, MIN(size, req->size)); 
+    memcpy(req->buf, pointer, MYMIN(size, req->size)); 
     delete msg;
     delete req;
 
@@ -120,7 +120,7 @@ void receiver::irecv(void *buf, int count, int datatype, int source, int tag, in
 
   if (req) {
     // send called before; copy buffer into
-    memcpy(buf, req->msg->buf, MIN(size, req->size));
+    memcpy(buf, req->msg->buf, MYMIN(size, req->size));
     delete req->msg;
     delete req;
   }
