@@ -38,6 +38,10 @@
 
 #endif
 
+/*Rank of the processor that's currently holding the CmiMemLock,
+or -1 if nobody has it.  Only set when malloc might be reentered.
+*/
+static int rank_holding_CmiMemLock=-1;
 
 #if CMK_MEMORY_BUILD_OS
 /* Just use the OS's built-in malloc.  All we provide is CmiMemoryInit.
@@ -46,6 +50,8 @@ void CmiMemoryInit(argv)
   char **argv;
 {
 }
+void *malloc_reentrant(size_t size) { return malloc(size); }
+void free_reentrant(void *mem) { free(mem); }
 
 #else 
 /*************************************************************
@@ -53,12 +59,6 @@ void CmiMemoryInit(argv)
 */
 
 #if CMK_MEMORY_BUILD_GNU
-/*
- * The GNU memory allocator is a good all-round memory allocator for
- * distributed memory machines.  It has the advantage that you can define
- * CmiMemLock and CmiMemUnlock to provide locking around its operations.
- */
-
 static void meta_init(char **argv) {}
 #define meta_malloc   mm_malloc
 #define meta_free     mm_free
@@ -81,6 +81,10 @@ static void meta_init(char **argv) {}
 
 #if CMK_MEMORY_BUILD_CACHE
 #include "memory-cache.c"
+#endif 
+
+#if CMK_MEMORY_BUILD_ISOMALLOC
+#include "memory-isomalloc.c"
 #endif 
 
 /*A trivial sample implementation of the meta_* calls:*/
@@ -189,5 +193,47 @@ void *valloc(size_t size)
   return result;
 }
 
+/*These are special "reentrant" versions of malloc,
+for use from code that may be called from within malloc.
+The only difference is that these versions check a global
+flag to see if they already hold the memory lock before
+actually trying the lock, which prevents a deadlock where
+you try to aquire one of your own locks.
+*/
+
+void *malloc_reentrant(size_t size) {
+  void *result;
+  if (CmiMyRank()!=rank_holding_CmiMemLock) CmiMemLock();
+  result = meta_malloc(size);
+  if (CmiMyRank()!=rank_holding_CmiMemLock) CmiMemUnlock();
+  return result;
+}
+
+void free_reentrant(void *mem)
+{
+  if (CmiMyRank()!=rank_holding_CmiMemLock) CmiMemLock();
+  meta_free(mem);
+  if (CmiMyRank()!=rank_holding_CmiMemLock) CmiMemUnlock();
+}
+
 #endif /* ! CMK_MEMORY_BUILD_BUILTIN*/
+
+#ifndef CMK_MEMORY_HAS_NOMIGRATE
+/*Default implementations of the nomigrate routines:*/
+void *malloc_nomigrate(size_t size) { return malloc(size); }
+void free_nomigrate(void *mem) { free(mem); }
+#endif
+
+#ifndef CMK_MEMORY_HAS_ISOMALLOC
+#include "memory-isomalloc.h"
+/*Empty implementations of the CmiIsomallocBlockList API*/
+CmiIsomallocBlockList *CmiIsomallocBlockListNew(void) 
+   {return NULL;}
+CmiIsomallocBlockList *CmiIsomallocBlockListActivate(CmiIsomallocBlockList *l)
+   {return l;}
+void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **l)
+   {}
+void CmiIsomallocBlockListFree(CmiIsomallocBlockList *l)
+   {}
+#endif
 
