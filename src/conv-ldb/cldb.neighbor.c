@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "cldb.graph.h"
 #define PERIOD 20                /* default: 30 */
 #define MAXOVERLOAD 1
@@ -5,9 +6,10 @@
 #include "converse.h"
 #include "queueing.h"
 #include "cldb.h"
-#include <stdlib.h>
+#include "LBTopology.h"
 
-extern void gengraph(int, int, int);
+extern char *_lbtopo;
+void gengraph(int, int, int, int *, int *);
 
 CpvDeclare(int, CldLoadResponseHandlerIndex);
 CpvDeclare(int, MinLoad);
@@ -279,7 +281,47 @@ void CldReadNeighborData()
   CpvAccess(neighborGroup) = CmiEstablishGroup(CpvAccess(numNeighbors), pes);
 }
 
-void CldGraphModuleInit()
+static void CldComputeNeighborData()
+{
+  int i, npe;
+  int *pes;
+  LBtopoFn topofn;
+  void *topo;
+
+  topofn = LBTopoLookup(_lbtopo);
+  if (topofn == NULL) {
+    char str[1024];
+    CmiPrintf("SeedLB> Fatal error: Unknown topology: %s. Choose from:\n", _lbtopo);
+    printoutTopo();
+    sprintf(str, "SeedLB> Fatal error: Unknown topology: %s", _lbtopo);
+    CmiAbort(str);
+  }
+  topo = topofn();
+  npe = getTopoMaxNeighbors(topo);
+  pes = (int *)malloc(npe*sizeof(int));
+  getTopoNeighbors(topo, CmiMyPe(), pes, &npe);
+#if 0
+  CmiPrintf("Neighors (%d) for: %d\n", npe, CmiMyPe());
+  for (i=0; i<npe; i++) {
+    CmiAssert(pes[i] < CmiNumPes());
+    CmiPrintf(" %d ", pes[i]);
+  }
+  CmiPrintf("\n");
+#endif
+
+  CpvAccess(numNeighbors) = npe;
+  CpvAccess(neighbors) = 
+    (struct CldNeighborData *)calloc(CpvAccess(numNeighbors), 
+				     sizeof(struct CldNeighborData));
+  for (i=0; i<CpvAccess(numNeighbors); i++) {
+    CpvAccess(neighbors)[i].pe = pes[i];
+    CpvAccess(neighbors)[i].load = 0;
+  }
+  CpvAccess(neighborGroup) = CmiEstablishGroup(CpvAccess(numNeighbors), pes);
+  free(pes);
+}
+
+void CldGraphModuleInit(char **argv)
 {
   FILE *fp;
   char filename[20];
@@ -301,7 +343,11 @@ void CldGraphModuleInit()
   CpvAccess(CldLoadResponseHandlerIndex) = 
     CmiRegisterHandler((CmiHandler)CldLoadResponseHandler);
 
+  CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
+  if (CmiMyPe() == 0) CmiPrintf("Seed LB> Topology %s\n", _lbtopo);
+
   if (CmiNumPes() > 1) {
+#if 0
     sprintf(filename, "graph%d/graph%d", CmiNumPes(), CmiMyPe());
     if ((fp = fopen(filename, "r")) == 0)
       {
@@ -317,11 +363,13 @@ void CldGraphModuleInit()
       }
     else fclose(fp);
     CldReadNeighborData();
+#endif
+    CldComputeNeighborData();
     CldBalance();
   }
 }
 
-void CldModuleInit()
+void CldModuleInit(char **argv)
 {
   CpvInitialize(int, CldHandlerIndex);
   CpvInitialize(int, CldRelocatedMessages);
@@ -330,6 +378,6 @@ void CldModuleInit()
   CpvAccess(CldHandlerIndex) = CmiRegisterHandler(CldHandler);
   CpvAccess(CldRelocatedMessages) = CpvAccess(CldLoadBalanceMessages) = 
     CpvAccess(CldMessageChunks) = 0;
-  CldModuleGeneralInit();
-  CldGraphModuleInit();
+  CldModuleGeneralInit(argv);
+  CldGraphModuleInit(argv);
 }
