@@ -24,19 +24,6 @@
 #include "blue_impl.h"    	// implementation header file
 #include "blue_timing.h" 	// timing module
 
-template<class T> class bgQueue;
-
-typedef bgQueue<int>  	    threadIDQueue;
-typedef bgQueue<CthThread>  threadQueue;
-typedef bgQueue<char *>     msgQueue;
-//typedef CkQ<char *> 	    ckMsgQueue;
-// use a queue sorted by recv time
-typedef minMsgHeap 	    ckMsgQueue;
-typedef CkQ<bgCorrectionMsg *> 	    bgCorrectionQ;
-
-class nodeInfo;
-class threadInfo;
-
 /* node level variables */
 CpvDeclare(nodeInfo*, nodeinfo);		/* represent a bluegene node */
 
@@ -119,24 +106,15 @@ public:
   inline int isEmpty() { return count == 0; }
 };
 
-/**
-  definition of Handler Table;
-  there are two kinds of handle tables: 
-  one is node level, the other is at thread level
-*/
-class HandlerTable {
-public:
-  int          handlerTableCount; 
-  BgHandler *  handlerTable;     
-public:
-  HandlerTable()
-  {
+HandlerTable::HandlerTable()
+{
     handlerTableCount = 1;
     handlerTable = (BgHandler *)malloc(MAX_HANDLERS * sizeof(BgHandler));
     for (int i=0; i<MAX_HANDLERS; i++) handlerTable[i] = defaultBgHandler;
-  }
-  inline int registerHandler(BgHandler h)
-  {
+}
+
+inline int HandlerTable::registerHandler(BgHandler h)
+{
     ASSERT(!cva(inEmulatorInit));
     /* leave 0 as blank, so it can report error luckily */
     int cur = handlerTableCount++;
@@ -144,16 +122,18 @@ public:
       CmiAbort("BG> HandlerID exceed the maximum.\n");
     handlerTable[cur] = h;
     return cur;
-  }
-  inline void numberHandler(int idx, BgHandler h)
-  {
+}
+
+inline void HandlerTable::numberHandler(int idx, BgHandler h)
+{
     ASSERT(!cva(inEmulatorInit));
     if (idx >= handlerTableCount || idx < 1)
       CmiAbort("BG> HandlerID exceed the maximum!\n");
     handlerTable[idx] = h;
-  }
-  inline BgHandler getHandle(int handler)
-  {
+}
+
+inline BgHandler HandlerTable::getHandle(int handler)
+{
 #if 0
     if (handler >= handlerTableCount) {
       CmiPrintf("[%d] handler: %d handlerTableCount:%d. \n", tMYNODEID, handler, handlerTableCount);
@@ -162,83 +142,7 @@ public:
 #endif
     if (handler >= handlerTableCount) return NULL;
     return handlerTable[handler];
-  }
-};
-
-/*****************************************************************************
-      NodeInfo:
-        including a group of functions defining the mapping, terms used here:
-        XYZ: (x,y,z)
-        Global:  map (x,y,z) to a global serial number
-        Local:   local index of this nodeinfo in the emulator's node 
-*****************************************************************************/
-class BlockMapInfo;
-class CyclicMapInfo;
-
-class nodeInfo: public CyclicMapInfo  {
-public:
-  int id;
-  int x,y,z;
-  threadQueue *commThQ;		/* suspended comm threads queue */
-  CthThread   *threadTable;	/* thread table for both work and comm threads*/
-  threadInfo  **threadinfo;
-  ckMsgQueue   nodeQ;		/* non-affinity msg queue */
-  ckMsgQueue  *affinityQ;	/* affinity msg queue for each work thread */
-  double       startTime;	/* start time for a thread */
-  double       nodeTime;	/* node time to coordinate thread times */
-  short        lastW;           /* last worker thread assigned msg */
-  char         started;		/* flag indicate if this node is started */
-  char        *udata;		/* node specific data pointer */
- 
-  HandlerTable handlerTable; /* node level handler table */
-#if BLUEGENE_TIMING
-  // for timing
-  BgTimeLine *timelines;
-  bgCorrectionQ cmsg;
-#endif
-public:
-  nodeInfo();
-
-  ~nodeInfo() {
-    if (commThQ) delete commThQ;
-    delete [] affinityQ;
-    delete [] threadTable;
-    delete [] threadinfo;
-  }
-  
-};	// end of nodeInfo
-
-/*****************************************************************************
-      ThreadInfo:  each thread has a thread private threadInfo structure.
-      It has a local id, a global serial id. 
-      myNode: point to the nodeInfo it belongs to.
-      currTime: is the elapse time for this thread;
-      me:   point to the CthThread converse thread handler.
-*****************************************************************************/
-
-class threadInfo {
-public:
-  short id;
-//  int globalId;
-  ThreadType  type;		/* worker or communication thread */
-  CthThread me;			/* Converse thread handler */
-  nodeInfo *myNode;		/* the node belonged to */
-  double  currTime;		/* thread timer */
-
-#if  CMK_BLUEGENE_THREAD
-  HandlerTable   handlerTable;      /* thread level handler table */
-#endif
-
-public:
-  threadInfo(int _id, ThreadType _type, nodeInfo *_node): 
-  	id(_id), type(_type), myNode(_node), currTime(0.0) 
-  {
-//    if (id != -1) globalId = nodeInfo::Local2Global(_node->id)*(cva(numCth)+cva(numWth))+_id;
-  }
-  inline void setThread(CthThread t) { me = t; }
-  inline const CthThread getThread() const { return me; }
-}; 
-
+}
 
 /**
   nodeInfo construtor
@@ -267,6 +171,14 @@ nodeInfo::nodeInfo(): lastW(0), udata(NULL), started(0)
     timelines = new BgTimeLine[cva(numWth)];
 #endif
   }
+
+nodeInfo::~nodeInfo() 
+{
+    if (commThQ) delete commThQ;
+    delete [] affinityQ;
+    delete [] threadTable;
+    delete [] threadinfo;
+}
 
 /*****************************************************************************
       low level API

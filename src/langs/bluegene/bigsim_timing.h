@@ -64,14 +64,15 @@ public:
   int ep;
   double recvTime;	//Time at which the message was received in 'inbuffer'
   double startTime, endTime;
-  int srcpe;        // source bg node 
+  int srcnode;        // source bg node 
   int msgID;
   CkVec< bgMsgEntry * > msgs;
   CkVec< bgEvents * > evts;
 public:
+  bgTimeLog(): ep(-1), recvTime(.0), startTime(.0), endTime(.0), msgID(-1)  {}
   bgTimeLog(int epc, char *msg);
   ~bgTimeLog();
-  inline void closeLog() { endTime = BgGetCurTime(); }
+  void closeLog();
   inline void addMsg(char *msg) { msgs.push_back(new bgMsgEntry(msg)); }
   inline void addEvent(void *data, double absT) { evts.push_back(new bgEvents(data, absT-startTime)); }
   void print(int node, int th);

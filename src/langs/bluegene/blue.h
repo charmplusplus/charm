@@ -189,6 +189,8 @@ void BgSetNodeData(char *data);
 
 void BgElapse(double t);
 
+void *BgCreateEvent(int eidx);
+
 #if defined(__cplusplus)
 }
 #endif

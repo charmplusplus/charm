@@ -1,7 +1,11 @@
 #ifndef BLUE_IMPL_H
 #define BLUE_IMPL_H
 
+#include "conv-mach.h"
 #include <stdlib.h>
+
+#include "blue_types.h"
+#include "blue_timing.h"
 
 /* alway use handler table per node */
 #if ! defined(CMK_BLUEGENE_NODE) && ! defined(CMK_BLUEGENE_THREAD)
@@ -28,8 +32,72 @@ CpvStaticDeclare(int, numNodes);	/* number of bg nodes on this PE */
 typedef char ThreadType;
 const char UNKNOWN_THREAD=0, COMM_THREAD=1, WORK_THREAD=2;
 
+typedef bgQueue<int>  	    threadIDQueue;
+typedef bgQueue<CthThread>  threadQueue;
+typedef bgQueue<char *>     msgQueue;
+//typedef CkQ<char *> 	    ckMsgQueue;
+// use a queue sorted by recv time
+typedef minMsgHeap 	    ckMsgQueue;
+typedef CkQ<bgCorrectionMsg *> 	    bgCorrectionQ;
+
+/**
+  definition of Handler Table;
+  there are two kinds of handle tables: 
+  one is node level, the other is at thread level
+*/
+class HandlerTable {
+public:
+  int          handlerTableCount; 
+  BgHandler *  handlerTable;     
+public:
+  HandlerTable();
+  inline int registerHandler(BgHandler h);
+  inline void numberHandler(int idx, BgHandler h);
+  inline BgHandler getHandle(int handler);
+#if 0
+  HandlerTable()
+  {
+    handlerTableCount = 1;
+    handlerTable = (BgHandler *)malloc(MAX_HANDLERS * sizeof(BgHandler));
+    for (int i=0; i<MAX_HANDLERS; i++) handlerTable[i] = defaultBgHandler;
+  }
+  inline int registerHandler(BgHandler h)
+  {
+    ASSERT(!cva(inEmulatorInit));
+    /* leave 0 as blank, so it can report error luckily */
+    int cur = handlerTableCount++;
+    if (cur >= MAX_HANDLERS)
+      CmiAbort("BG> HandlerID exceed the maximum.\n");
+    handlerTable[cur] = h;
+    return cur;
+  }
+  inline void numberHandler(int idx, BgHandler h)
+  {
+    ASSERT(!cva(inEmulatorInit));
+    if (idx >= handlerTableCount || idx < 1)
+      CmiAbort("BG> HandlerID exceed the maximum!\n");
+    handlerTable[idx] = h;
+  }
+  inline BgHandler getHandle(int handler)
+  {
+#if 0
+    if (handler >= handlerTableCount) {
+      CmiPrintf("[%d] handler: %d handlerTableCount:%d. \n", tMYNODEID, handler, handlerTableCount);
+      CmiAbort("Invalid handler!");
+    }
+#endif
+    if (handler >= handlerTableCount) return NULL;
+    return handlerTable[handler];
+  }
+#endif
+};
+
+
 #define cva CpvAccess
 #define cta CtvAccess
+
+class threadInfo;
+CtvExtern(threadInfo *, threadinfo); 
 
 #define tMYID		cta(threadinfo)->id
 #define tMYGLOBALID	cta(threadinfo)->globalId
@@ -193,112 +261,79 @@ public:
   inline static int Local2Global(int num) { return CmiMyPe()+num*CmiNumPes();}
 };
 
+
 /*****************************************************************************
-   used internally, define minHeap of messages
-   it use the msg time as key and dequeue the msg with the smallest time.
+      NodeInfo:
+        including a group of functions defining the mapping, terms used here:
+        XYZ: (x,y,z)
+        Global:  map (x,y,z) to a global serial number
+        Local:   local index of this nodeinfo in the emulator's node 
+*****************************************************************************/
+class nodeInfo: public CyclicMapInfo  {
+public:
+  int id;
+  int x,y,z;
+  threadQueue *commThQ;		/* suspended comm threads queue */
+  CthThread   *threadTable;	/* thread table for both work and comm threads*/
+  threadInfo  **threadinfo;
+  ckMsgQueue   nodeQ;		/* non-affinity msg queue */
+  ckMsgQueue  *affinityQ;	/* affinity msg queue for each work thread */
+  double       startTime;	/* start time for a thread */
+  double       nodeTime;	/* node time to coordinate thread times */
+  short        lastW;           /* last worker thread assigned msg */
+  char         started;		/* flag indicate if this node is started */
+  char        *udata;		/* node specific data pointer */
+ 
+  HandlerTable handlerTable; /* node level handler table */
+#if BLUEGENE_TIMING
+  // for timing
+  BgTimeLine *timelines;
+  bgCorrectionQ cmsg;
+#endif
+public:
+  nodeInfo();
+  ~nodeInfo();
+#if 0
+  ~nodeInfo() {
+    if (commThQ) delete commThQ;
+    delete [] affinityQ;
+    delete [] threadTable;
+    delete [] threadinfo;
+  }
+#endif
+  
+};	// end of nodeInfo
+
+/*****************************************************************************
+      ThreadInfo:  each thread has a thread private threadInfo structure.
+      It has a local id, a global serial id. 
+      myNode: point to the nodeInfo it belongs to.
+      currTime: is the elapse time for this thread;
+      me:   point to the CthThread converse thread handler.
 *****************************************************************************/
 
-class minMsgHeap
-{
-private:
-  char **h;
-  int count;
-  int size;
-  void swap(int i, int j) {
-    char * temp = h[i];
-    h[i] = h[j];
-    h[j] = temp;
-  }
-  
+class threadInfo {
 public:
-  minMsgHeap() {
-     size = 16;
-     h = new char *[size];
-     count = 0;
-  }
-  ~minMsgHeap() {
-     delete [] h;
-  }
-  inline int length() const { return count; }
-  inline int isEmpty() { return (count == 0); }
-  void expand() {
-    char **oldh = h;
-    int oldcount = count;
-    size *=2;
-    h = new char *[size];
-    count = 0;
-    for (int i=0; i<oldcount; i++) enq(oldh[i]);
-    delete [] oldh;
-  }
-  void enq(char *m) {
-//CmiPrintf("enq %p\n", m);
-      int current;
+  short id;
+//  int globalId;
+  ThreadType  type;		/* worker or communication thread */
+  CthThread me;			/* Converse thread handler */
+  nodeInfo *myNode;		/* the node belonged to */
+  double  currTime;		/* thread timer */
 
-      if (count < size) {
-        h[count] = m;
-        current = count;
-        count++;
-      } else {
-        expand();
-        enq(m);
-        return;
-      }
+#if  CMK_BLUEGENE_THREAD
+  HandlerTable   handlerTable;      /* thread level handler table */
+#endif
 
-      int parent = (current - 1)/2;
-      while (current != 0)
-        {
-          if (CmiBgMsgRecvTime(h[current]) < CmiBgMsgRecvTime(h[parent]))
-            {
-              swap(current, parent);
-              current = parent;
-              parent = (current-1)/2;
-            }
-          else
-            break;
-        }
-  }
-
-  char *deq() {
-//CmiPrintf("deq \n");
-    if (count == 0) return 0;
-
-    char *tmp = h[0];
-    int best;
-
-    h[0] = h[count-1];
-    count--;
-
-    int current = 0;
-    int c1 = 1; int c2 = 2;
-    while (c1 < count)
-    {
-      if (c2 >= count)
-	best = c1;
-      else
-	{
-	  if (CmiBgMsgRecvTime(h[c1]) < CmiBgMsgRecvTime(h[c2]))
-	    best = c1;
-	  else
-	    best = c2;
-	}
-      if (CmiBgMsgRecvTime(h[best]) < CmiBgMsgRecvTime(h[current]))
-	{
-	  swap(best, current);
-	  current = best;
-	  c1 = 2*current + 1;
-	  c2 = c1 + 1;
-	}
-      else
-	break;
-    }
-    return tmp;
-  }
-  char * operator[](size_t n)
+public:
+  threadInfo(int _id, ThreadType _type, nodeInfo *_node): 
+  	id(_id), type(_type), myNode(_node), currTime(0.0) 
   {
-//CmiPrintf("[] %d\n", n);
-    return h[n];
+//    if (id != -1) globalId = nodeInfo::Local2Global(_node->id)*(cva(numCth)+cva(numWth))+_id;
   }
-};
+  inline void setThread(CthThread t) { me = t; }
+  inline const CthThread getThread() const { return me; }
+}; 
 
 extern double BgGetCurTime();
 

@@ -12,6 +12,23 @@ static int testCount = 0;
 
 CpvStaticDeclare(int, msgCounter);
 
+
+void *BgCreateEvent(int eidx)
+{
+  bgTimeLog *entry = new bgTimeLog();
+  entry->ep = eidx;
+  entry->srcnode = BgMyNode();
+  entry->startTime = BgGetCurTime();
+  return (void *)entry;
+}
+
+void *BgInsertEvent(int eidx)
+{
+  bgTimeLog *entry = (bgTimeLog *)BgCreateEvent(eidx);
+  tTIMELINE.enq(entry);
+  return (void *)entry;
+}
+
 /**
   init Cpvs of timing module
 */
@@ -42,7 +59,7 @@ bgTimeLog::bgTimeLog(int epc, char *msg)
   startTime = BgGetCurTime();
   recvTime = msg?CmiBgMsgRecvTime(msg):startTime;
   endTime = 0.0;
-  srcpe = msg?CmiBgMsgSrcPe(msg):-1;
+  srcnode = msg?CmiBgMsgSrcPe(msg):-1;
   msgID = msg?CmiBgMsgID(msg):-1;
 }
 
@@ -52,9 +69,13 @@ bgTimeLog::~bgTimeLog()
     delete msgs[i];
 }
 
+void bgTimeLog::closeLog() 
+{ 
+  endTime = BgGetCurTime(); 
+}
 void bgTimeLog::print(int node, int th)
 {
-  CmiPrintf("<<== [%d th:%d] ep:%d startTime:%f endTime:%f srcnode:%d msgID:%d\n", node, th, ep, startTime, endTime, srcpe, msgID);
+  CmiPrintf("<<== [%d th:%d] ep:%d startTime:%f endTime:%f srcnode:%d msgID:%d\n", node, th, ep, startTime, endTime, srcnode, msgID);
   for (int i=0; i<msgs.length(); i++)
     msgs[i]->print();
   CmiPrintf("==>>\n");
@@ -62,7 +83,7 @@ void bgTimeLog::print(int node, int th)
 
 void bgTimeLog::write(FILE *fp)
 {
-  fprintf(fp, "<<== ep:%d startTime:%f endTime:%f srcnode:%d msgID:%d\n", ep, startTime, endTime, srcpe, msgID);
+  fprintf(fp, "<<== ep:%d startTime:%f endTime:%f srcnode:%d msgID:%d\n", ep, startTime, endTime, srcnode, msgID);
   for (int i=0; i<msgs.length(); i++)
     msgs[i]->write(fp);
   fprintf(fp, "==>>\n");
