@@ -35,7 +35,7 @@ class M1:public CMessage_M1 {
 class A : public ArrayElement1D {
   public:
     A(void);
-    A(ArrayElementMigrateMessage *);
+    A(CkMigrateMessage *);
 
     void someEntry(M1 *);
 };
@@ -49,11 +49,11 @@ A::A(void)
 {
   //...your constructor code...
 }
-A::A(ArrayElementMigrateMessage *m) { }
+A::A(CkMigrateMessage *m) { }
 \end{verbatim}
 
 Read the section ``Migratable Array Elements'' for more
-information on the \kw{ArrayElementMigrateMessage}
+information on the \kw{CkMigrateMessage}
 constructor. 
 
 
@@ -153,7 +153,7 @@ array [Foo] AF {entry AF();entry void e(MyMsg *m);}
 
 The last declaration expects an array index of type CkArrayIndexFoo,
 which must be defined before including the .decl.h file 
-(see ``Defining a new array index type'' below).  Also, <charm++.h> must be included before the definition of the CkArrayIndexFoo type. 
+(see ``Defining a new array index type'' below).  Also, charm++.h must be included before the definition of the CkArrayIndexFoo type. 
 
 \begin{verbatim}
 //In the .h file:
@@ -172,6 +172,14 @@ class AF:public ArrayElement {public: AF(){} ...};
 You can insert elements or invoke methods on the elements of these
 arrays by specifying the array index in parentheses.  For 1D 
 arrays or user-defined arrays, you can also use brackets.
+
+You may invoke methods on array elements that have not yet
+been created-- the system will buffer the message until the
+element is created.  However, the element must eventually be 
+created (currently, there is a 3-minute buffering period).
+Messages sent to migrating elements will be delivered after
+the migrating element arrives.  It is an error to send 
+a message to a deleted array element.
 
 \begin{verbatim}
 //In the .C file:
@@ -203,8 +211,8 @@ With user-defined index types, you must pass a fresh index
 (allocated with new) to each [] or () call-- the system will delete
 the index.
 
-To broadcast a message to all the elements of an array, simply omit the
-index, as:
+To broadcast a message to all the current elements of an array, 
+simply omit the index, as:
 
 \begin{verbatim}
 a3.e(new MyMsg(7)); //<- invokes e(7) on each array element
@@ -257,6 +265,11 @@ unpacking by passing different types of \kw{PUP::er}s to it.
 You can determine what type of \kw{PUP::er} has been passed to you 
 with the \kw{isPacking()}, \kw{isUnpacking()}, and \kw{isSizing()} calls.
 
+An array element can migrate by calling the ``migrateMe(destination
+processor)'' member function-- this call must be the last action
+in an element entry point.  The system can also migrate array elements
+for load balancing (see the ``Load Balancing Chare Arrays'' chapter).
+
 To migrate your array element to another processor, the \charmpp 
 runtime will:
 
@@ -273,7 +286,9 @@ the element.
 \end{itemize}
 
 Migration constructors, then, are normally empty-- all the
-unpacking of the data items is done in the element's \kw{pup} routine.
+unpacking and allocation of the data items is done in the 
+element's \kw{pup} routine.  Deallocation is done in the
+element destructor as usual.
 
 The \kw{PUP::er} overhead is very small-- one 
 virtual function call for each item to be packed/unpacked.
@@ -483,9 +498,9 @@ class AF:public ArrayElement {public: AF() {} ... }
 
 Inside an \kw{ArrayElement}, you can get the bytes of your index
 from the ``thisindex'' variable, which has type \kw{CkArrayIndexGeneric*}.  
-It may be more convenient, however, to inherit from \kw{ArrayElementT<foo>}, 
-which has a ``thisIndex'' (note the capitalization
-difference) variable of type foo.  In this case, you can do:
+It may be more convenient, however, to inherit from \kw{ArrayElementT} a 
+class templated in the index type foo (stored as ``thisIndex'').
+For example:
 
 \begin{verbatim}
 //.ci file unchanged
@@ -495,8 +510,8 @@ class AF:public ArrayElementT<foo> {public: AF() {} ... }
 //in the .C file:
 AF::AF()
 {
-    foo &myF=thisIndex;
-    functionTakingAfoo(myF);
+    foo myF=thisIndex;
+    functionTakingFoo(myF);
 }
 \end{verbatim}
 
@@ -524,7 +539,10 @@ won't have a thisIndex.
 
 \item The ``ArrayElementCreateMessage'' constructor is obsolete;
 as are the finishConstruction and finishMigration calls. No constructor
-need explicitly call its superclass.
+need explicitly call its superclass.  
+
+\item ``ArrayElementMigrateMessage'' is now depricated-- use 
+``CkMigrateMessage''
 
 \item For migration, the old packsize, pack, and unpacking portion of
 the migration constructor have been replaced by a unified pack/unpack 
