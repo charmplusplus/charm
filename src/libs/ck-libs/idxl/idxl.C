@@ -61,7 +61,7 @@ IDXL_Chunk::IDXL_Chunk(CkMigrateMessage *m) :currentComm(0)
 	init();
 }
 void IDXL_Chunk::init(void) {
-	for (int lat=0;lat<LAST_IDXL;lat++) idxls[lat]=NULL;
+	
 }
 
 void IDXL_Chunk::pup(PUP::er &p) {
@@ -71,29 +71,31 @@ void IDXL_Chunk::pup(PUP::er &p) {
 	if (currentComm && !currentComm->isComplete()) CkAbort("Cannot migrate with ongoing IDXL communication");
 	
 	//Pack the dynamic IDXLs (static IDXLs must re-add themselves)
-	int lat, nDynamic=0;
+	int i, nDynamic=0;
 	if (!p.isUnpacking()) //Count the number of non-NULL idxls:
-		for (lat=STATIC_IDXL;lat<LAST_IDXL;lat++) if (idxls[lat]) nDynamic++;
+		for (i=0;i<dynamic_idxls.size();i++) 
+			if (dynamic_idxls[i]) nDynamic++;
 	p|nDynamic;
 	if (p.isUnpacking()) {
 		for (int d=0;d<nDynamic;d++) //Loop over non-NULL IDXLs
 		{
-			p|lat;
-			idxls[lat]=new IDXL;
-			p|*idxls[lat];
+			p|i;
+			dynamic_idxls[i]=new IDXL;
+			p|*dynamic_idxls[i];
 		}
 	} else /* packing */ {
-		for (lat=STATIC_IDXL;lat<LAST_IDXL;lat++) //Loop over non-NULL IDXLs
-		if (idxls[lat]) {
-			p|lat;
-			p|*idxls[lat];
+		for (i=0;i<dynamic_idxls.size();i++) //Loop over non-NULL IDXLs
+		if (dynamic_idxls[i]) {
+			p|i;
+			p|*dynamic_idxls[i];
 		}
 	}
 }
 
 IDXL_Chunk::~IDXL_Chunk() {
-	for (int i=STATIC_IDXL;i<LAST_IDXL;i++) //Loop over non-NULL IDXLs
-		if (idxls[i]) delete idxls[i];
+	// we do not delete static_idxls
+	for (int i=0;i<dynamic_idxls.size();i++) 
+		if (dynamic_idxls[i]) delete dynamic_idxls[i];
 	delete currentComm;
 }
 
@@ -101,62 +103,64 @@ IDXL_Chunk::~IDXL_Chunk() {
 /// Dynamically create a new empty IDXL:
 IDXL_t IDXL_Chunk::addDynamic(void) 
 { //Pick the next free dynamic index:
-	for (int ret=STATIC_IDXL;ret<LAST_IDXL;ret++)
-		if (idxls[ret]==NULL) {
-			idxls[ret]=new IDXL;
-			idxls[ret]->allocateDual(); //FIXME: add way to allocate single, too
-			return FIRST_IDXL+ret;
-		}
-	CkAbort("Ran out of room in (silly fixed-size) IDXL table");
-	return -1; //<- for whining compilers
+	IDXL *ret=new IDXL;
+	ret->allocateDual(); //FIXME: add way to allocate single, too
+	return IDXL_DYNAMIC_IDXL_T+storeToFreeIndex(dynamic_idxls,ret);
 }
 /// Register this statically-allocated IDXL at this existing index
 IDXL_t IDXL_Chunk::addStatic(IDXL *idx,IDXL_t at) {
 	if (at!=-1) 
 	{ //User provided a (previously returned) index-- try that first
-		if (at<FIRST_IDXL || at>=FIRST_IDXL+STATIC_IDXL)
+		if (at<IDXL_STATIC_IDXL_T || at>=IDXL_LAST_IDXL_T)
 			CkAbort("Provided bad fixed address to IDXL_Chunk::add!");
-		int lat=at-FIRST_IDXL;
-		if (idxls[lat]==NULL)
+		int lat=at-IDXL_STATIC_IDXL_T;
+		while (static_idxls.size()<=lat) static_idxls.push_back(NULL);
+		if (static_idxls[lat]==NULL)
 		{ /* that slot is free-- re-use the fixed address */
-			idxls[lat]=idx;
+			static_idxls[lat]=idx;
 			return at;
 		}
 		else /* idxls[lat]!=NULL, somebody's already there-- fall through */
 			at=-1;
 	}
 	if (at==-1) { //Pick the next free static index
-		for (int ret=0;ret<STATIC_IDXL;ret++)
-			if (idxls[ret]==NULL) {
-				idxls[ret]=idx;
-				return FIRST_IDXL+ret;
-			}
-		CkAbort("Ran out of room in (silly fixed-size static) IDXL table");
+		return IDXL_STATIC_IDXL_T+storeToFreeIndex(static_idxls,idx);
 	}
 	return -1; //<- for whining compilers
 }
 
 /// Check this IDXL for validity
 void IDXL_Chunk::check(IDXL_t at,const char *callingRoutine) const {
-	if (at<FIRST_IDXL || at>=FIRST_IDXL+LAST_IDXL)
+	if (at<IDXL_DYNAMIC_IDXL_T || at>=IDXL_LAST_IDXL_T)
 			IDXL_Abort(callingRoutine,"Invalid IDXL_t %d",at);
 }
 IDXL &IDXL_Chunk::lookup(IDXL_t at,const char *callingRoutine) {
-	check(at,callingRoutine);
-	int lat=at-FIRST_IDXL;
-	return *idxls[lat];
+	IDXL *ret=0;
+	if (at>=IDXL_DYNAMIC_IDXL_T && at<IDXL_DYNAMIC_IDXL_T+dynamic_idxls.size())
+		ret=dynamic_idxls[at-IDXL_DYNAMIC_IDXL_T];
+	else if (at>=IDXL_STATIC_IDXL_T && at<IDXL_STATIC_IDXL_T+static_idxls.size())
+		ret=static_idxls[at-IDXL_STATIC_IDXL_T];
+	if (ret==NULL) 
+		IDXL_Abort(callingRoutine,"Trying to look up invalid IDXL_t %d",at);
+	return *ret;
 }
 const IDXL &IDXL_Chunk::lookup(IDXL_t at,const char *callingRoutine) const {
-	check(at,callingRoutine);
-	int lat=at-FIRST_IDXL;
-	return *idxls[lat];
+	IDXL_Chunk *dthis=(IDXL_Chunk *)this; // Call non-const version
+	return dthis->lookup(at,callingRoutine);
 }
 void IDXL_Chunk::destroy(IDXL_t at,const char *callingRoutine) {
-	check(at,callingRoutine);
-	int lat=at-FIRST_IDXL;
-	if (lat>=STATIC_IDXL) /*dynamically allocated: destroy */
-		delete idxls[lat]; 
-	idxls[lat]=NULL;
+	IDXL **ret=NULL;
+	if (at>=IDXL_DYNAMIC_IDXL_T && at<IDXL_DYNAMIC_IDXL_T+dynamic_idxls.size())
+		ret=&dynamic_idxls[at-IDXL_DYNAMIC_IDXL_T];
+	else if (at>=IDXL_STATIC_IDXL_T && at<IDXL_STATIC_IDXL_T+static_idxls.size())
+		ret=&static_idxls[at-IDXL_STATIC_IDXL_T];
+	if (ret==NULL)
+		IDXL_Abort(callingRoutine,"Trying to destroy invalid IDXL_t %d",at);
+	if (*ret==NULL)
+		IDXL_Abort(callingRoutine,"Trying to destroy already deleted IDXL_t %d",at);
+	if (at<IDXL_STATIC_IDXL_T)
+		delete *ret; /* only destroy dynamically allocated IDXLs */
+	*ret=NULL;
 }
 
 /****** User Datatype list ******/

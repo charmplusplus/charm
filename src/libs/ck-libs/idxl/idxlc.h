@@ -14,7 +14,9 @@ void IDXL_Init(int comm);
 
 /** An index list, the fundamental datatype of this library. */
 typedef int IDXL_t;
-#define IDXL_FIRST_IDXL_T 1550000000
+#define IDXL_DYNAMIC_IDXL_T 1540000000
+#define IDXL_STATIC_IDXL_T 1550000000
+#define IDXL_LAST_IDXL_T 1560000000
 
 /** Create a new, empty index list. Must eventually call IDXL_Destroy on this list. */
 IDXL_t IDXL_Create(void);
@@ -52,8 +54,8 @@ void IDXL_Destroy(IDXL_t l);
 /** Extract the indices out of this index list:
  */
 typedef int IDXL_Side_t;
-#define IDXL_SHIFT_SIDE_T_SEND 1000000 /* 1551000000 */
-#define IDXL_SHIFT_SIDE_T_RECV 2000000 /* 1552000000 */
+#define IDXL_SHIFT_SIDE_T_SEND 100000000 /* 16x0000000 */
+#define IDXL_SHIFT_SIDE_T_RECV 200000000 /* 17x0000000 */
 IDXL_Side_t IDXL_Get_send(IDXL_t l);
 IDXL_Side_t IDXL_Get_recv(IDXL_t l);
 int IDXL_Get_partners(IDXL_Side_t s);

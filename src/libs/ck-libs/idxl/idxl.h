@@ -111,12 +111,31 @@ class IDXL_Chunk {
   // MPI Communicator to use by default
   int mpi_comm;
   
-  // List of index lists: 
-  // first has a static part for stuff we can't throw away (indices 0..STATIC_IDXL-1)
-  // then a dynamic part for user-allocated stuff (indices STATIC_IDXL...LAST_IDXL-1)
-  enum {FIRST_IDXL=IDXL_FIRST_IDXL_T, STATIC_IDXL=32, LAST_IDXL=64};
-  IDXL *idxls[LAST_IDXL];
-
+  // Lists of index lists: 
+  
+  /// "Static" index list is for system entities like the FEM
+  ///  framework that want to allocate and delete the lists themselves.
+  /// Stores IDXL_t's from IDXL_STATIC_IDXL_T to IDXL_LAST_IDXL_T
+  CkVec<IDXL *> static_idxls;
+  
+  /// "Dynamic" index list is for ordinary user-created lists,
+  ///   where this class manages their allocation and deallocation.
+  /// Stores IDXL_t's from IDXL_DYNAMIC_IDXL_T to IDXL_STATIC_IDXL_T
+  CkVec<IDXL *> dynamic_idxls;
+  
+  // Return the next free index in this table, or -1 if none:
+  int storeToFreeIndex(CkVec<IDXL *> &inList,IDXL *store) {
+  	int i;
+	for (i=0;i<inList.size();i++)
+		if (inList[i]==NULL) {
+			inList[i]=store;
+			return i;
+		}
+	i=inList.size();
+	inList.push_back(store);
+	return i;
+  }
+  
   // Lists ongoing communications (FIXME: add list here)
   IDXL_Comm *currentComm; //The ongoing communicator
   

@@ -196,11 +196,11 @@ plus 1 or 2 million.
 */
 const IDXL_Side &lookupSide(IDXL_Side_t s,const char *caller) {
 	IDXL_Chunk *c=IDXL_Chunk::get(caller);
-	if (s>=IDXL_FIRST_IDXL_T+IDXL_SHIFT_SIDE_T_RECV) {
+	if (s-IDXL_SHIFT_SIDE_T_RECV>=IDXL_DYNAMIC_IDXL_T) {
 		IDXL_t l=s-IDXL_SHIFT_SIDE_T_RECV;
 		return c->lookup(l,caller).getRecv();
 	}
-	else if (s>=IDXL_FIRST_IDXL_T+IDXL_SHIFT_SIDE_T_SEND) {
+	else if (s-IDXL_SHIFT_SIDE_T_SEND>=IDXL_DYNAMIC_IDXL_T) {
 		IDXL_t l=s-IDXL_SHIFT_SIDE_T_SEND;
 		return c->lookup(l,caller).getSend();
 	}
