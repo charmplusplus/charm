@@ -150,6 +150,7 @@ public:
 
   FutureBOC(FutureInitMsg *m) 
   {
+    delete m;
   }
   void SetFuture(FutureInitMsg * m)
   {
