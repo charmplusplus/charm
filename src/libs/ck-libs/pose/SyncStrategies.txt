@@ -1,0 +1,23 @@
+Synchronization Strategies for POSE
+===================================
+
+cons (Basic Conservative): relies on GVT for advancement; no lookahead, no
+bells, no whistles [NOT MAINTAINED]
+
+opt (Basic Optimistic): Performs events in best-first order on the processor,
+one at a time
+
+opt2 (Optimized Optimistic): Same as opt, but when an object gets control, it
+will execute all events that have the same lowest timestamp
+
+opt3 (Constrained Opt2): Same as opt2, but will not execute events beyond a
+fixed speculative window
+
+spec (Speculative Window): No attempt made at best-first ordering; when an
+object gets control, it will execute all events within the fixed speculative
+window 
+
+adapt (Basic Adaptive): same as spec, only the size of the speculative window
+changes based on rollback behavior: it starts at a min size, and expands by
+one for every successful set of forward executions (up to a max size); when a
+rollback occurs, speculative window size is reset to the minimum
