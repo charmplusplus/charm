@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-07-17 17:46:05  knauff
+ * Revision 2.2  1995-09-08 02:38:26  gursoy
+ * Cmi_mype Cmi_numpe CmiLocalQueue accessed thru macros now
+ *
+ * Revision 2.1  1995/07/17  17:46:05  knauff
  * Fixed problem with machine.c
  *
  * Revision 2.0  1995/07/10  22:12:39  knauff
@@ -31,13 +34,10 @@ static char ident[] = "@(#)$Header$";
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 
-int Cmi_mype;
-int Cmi_numpe;
-int Cmi_dim;
+CpvDeclare(int, Cmi_mype);
+CpvDeclare(int, Cmi_numpe);
+CpvDeclare(void*, CmiLocalQueue);
 
-int Cmi_maxpenum ;   
-
-void *CmiLocalQueue;
 
 typedef struct msg_list {
      int msgid;
@@ -45,6 +45,7 @@ typedef struct msg_list {
      struct msg_list *next;
 } MSG_LIST;
 
+static int Cmi_dim;
 static int msglength=0 ;
 static int numpes ;
 static double itime;
@@ -274,9 +275,9 @@ void CmiSyncBroadcast(size, msg)     /* ALL_EXCEPT_ME  */
 {
      int i ;
      
-     for ( i=Cmi_mype+1; i<numpes; i++ ) 
+     for ( i=CpvAccess(Cmi_mype)+1; i<numpes; i++ ) 
 	  CmiSyncSend(i, size,msg) ;
-     for ( i=0; i<Cmi_mype; i++ ) 
+     for ( i=0; i<CpvAccess(Cmi_mype); i++ ) 
 	  CmiSyncSend(i, size,msg) ;
 }
 
@@ -311,9 +312,9 @@ char * msg;
 {
 	int i ;
 
-	for ( i=Cmi_mype+1; i<numpes; i++ ) 
+	for ( i=CpvAccess(Cmi_mype)+1; i<numpes; i++ ) 
 		CmiAsyncSend(i,size,msg) ;
-	for ( i=0; i<Cmi_mype; i++ ) 
+	for ( i=0; i<CpvAccess(Cmi_mype); i++ ) 
 		CmiAsyncSend(i,size,msg) ;
 	return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
@@ -393,8 +394,8 @@ void CmiInitMc(argv)
 char *argv[];
 {
      program_name(argv[0], "SP1");   
-     
-     CmiLocalQueue = FIFO_Create();
+
+     CpvAccess(CmiLocalQueue) = FIFO_Create();
 
      CmiSpanTreeInit();
      CmiTimerInit();
@@ -415,9 +416,11 @@ char *argv[];
 {
 	int n ;
 
+        CpvInitialize(int, Cmi_mype);
+        CpvInitialize(int, Cmi_numpe);
 
-	mpc_environ(&Cmi_numpe, &Cmi_mype);
-	numpes = Cmi_numpe;
+	mpc_environ(&CpvAccess(Cmi_numpe), &CpvAccess(Cmi_mype));
+	numpes = CpvAccess(Cmi_numpe);
 
 	/* find dim = log2(numpes), to pretend we are a hypercube */
 	for ( Cmi_dim=0,n=numpes; n>1; n/=2 )
