@@ -1,5 +1,5 @@
 #include "converse.h"
-/*
+/* ITEMS 1-3 below are no longer true.
  * How to write a load-balancer:
  *
  * 1. Every load-balancer must contain a definition of struct CldField.
@@ -44,35 +44,25 @@ int CldRegisterPackFn(CldPackFn fn)
   return CmiRegisterHandler((CmiHandler)fn);
 }
 
-/*
- * CldSwitchHandler takes a message, a pointer to its CLD field, and
- * a new handler number.  It changes the handler number and records the
- * location of the CLD field.  When the message gets handled, the handler
- * should call CldRestoreHandler to put the old handler back, and get
- * a pointer to the CLD field which was recorded.
+/* CldSwitchHandler takes a message and a new handler number.  It
+ * changes the handler number to the new handler number and move the
+ * old to the Xhandler part of the header.  When the message gets
+ * handled, the handler should call CldRestoreHandler to put the old
+ * handler back.
  *
  * These next subroutines are balanced on a thin wire.  They're
  * correct, but the slightest disturbance in the offsets could break them.
- *
- */
+ * */
 
-void CldSwitchHandler(char *cmsg, int *field, int handler)
+void CldSwitchHandler(char *cmsg, int handler)
 {
-  int *data = (int*)(cmsg+CmiMsgHeaderSizeBytes);
-  field[1] = CmiGetHandler(cmsg);
-  field[0] = data[0];
-  data[0] = ((char*)field)-cmsg;
+  CmiSetXHandler(cmsg, CmiGetHandler(cmsg));
   CmiSetHandler(cmsg, handler);
 }
 
-void CldRestoreHandler(char *cmsg, void *hfield)
+void CldRestoreHandler(char *cmsg)
 {
-  int *data = (int*)(cmsg+CmiMsgHeaderSizeBytes);
-  int offs = data[0];
-  int *field = (int*)(cmsg+offs);
-  data[0] = field[0];
-  CmiSetHandler(cmsg, field[1]);
-  *(int**)hfield = field;
+  CmiSetHandler(cmsg, CmiGetXHandler(cmsg));
 }
 
 /* CldPutToken puts a message in the scheduler queue in such a way
@@ -97,8 +87,6 @@ void Cldhandler(void *);
 typedef struct CldToken_s {
   char msg_header[CmiMsgHeaderSizeBytes];
   void *msg;  /* if null, message already removed */
-  int infofn;
-  int packfn;
   struct CldToken_s *pred;
   struct CldToken_s *succ;
 } *CldToken;
@@ -131,16 +119,14 @@ int CldCountTokens()
   return proc->load;
 }
 
-void CldPutToken(void *msg, int infofn, int packfn)
+void CldPutToken(void *msg)
 {
   CldProcInfo proc = CpvAccess(CldProc);
-  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
   CldToken tok = (CldToken)CmiAlloc(sizeof(struct CldToken_s));
-  int len, queueing, priobits; unsigned int *prioptr; void *ldbfield;
+  int len, queueing, priobits; unsigned int *prioptr;
   
   tok->msg = msg;
-  tok->infofn = infofn;
-  tok->packfn = packfn;
 
   /* add token to the doubly-linked circle */
   tok->pred = proc->sentinel->pred;
@@ -151,17 +137,16 @@ void CldPutToken(void *msg, int infofn, int packfn)
   
   /* add token to the scheduler */
   CmiSetHandler(tok, proc->tokenhandleridx);
-  ifn(msg, &len, &ldbfield, &queueing, &priobits, &prioptr);
+  ifn(msg, &len, &queueing, &priobits, &prioptr);
   CsdEnqueueGeneral(tok, queueing, priobits, prioptr);
 }
 
-void CldGetToken(void **msg, int *infofn, int *packfn)
+void CldGetToken(void **msg)
 {
   CldProcInfo proc = CpvAccess(CldProc);
   CldToken tok;
   tok = proc->sentinel->succ;
   if (tok == proc->sentinel) {
-    *infofn = 0; *packfn = 0;
     *msg = 0; return;
   }
   tok->pred->succ = tok->succ;
@@ -171,8 +156,6 @@ void CldGetToken(void **msg, int *infofn, int *packfn)
   proc->load --;
   *msg = tok->msg;
   CmiReference(*msg);
-  *infofn = tok->infofn;
-  *packfn = tok->packfn;
 }
 
 void CldModuleGeneralInit()
