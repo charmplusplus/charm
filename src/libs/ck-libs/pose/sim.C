@@ -54,6 +54,7 @@ void sim::Step()
   case OPT_T:
   case OPT2_T: // pass this step call directly to strategy
     myStrat->Step();
+    active = 0;
     break;
   case OPT3_T: // prioritize this step call if work exists
     if (eq->currentPtr->timestamp > -1) {
@@ -66,6 +67,7 @@ void sim::Step()
   case ADAPT_T:
   case ADAPT2_T: // pass this step call directly to strategy
     myStrat->Step();
+    active = 0;
     break;
   default: 
     CkPrintf("Invalid strategy type: %d\n", myStrat->STRAT_T); 
@@ -89,6 +91,7 @@ void sim::Step(prioMsg *m)
   else localStats->SwitchTimer(SIM_TIMER);
 #endif
   myStrat->Step(); // Call Step on strategy
+  active = 0;
 #ifdef POSE_STATS_ON
   if (!tstat)
     localStats->TimerStop();

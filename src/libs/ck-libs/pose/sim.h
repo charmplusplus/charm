@@ -47,7 +47,10 @@ public:
       to be invoked on the receiving side.  Sets the priority of this
       message to timestamp - INT_MAX. */
   void Timestamp(int t) { 
-    timestamp = t;  evID = GetEventID();  setPriority(t-INT_MAX); 
+    timestamp = t;  evID = GetEventID();  
+#ifdef PRIO_MSGS
+    setPriority(t-INT_MAX); 
+#endif
     rst = 0.0;
   }
   /// Assignment operator: copies priority too
@@ -58,7 +61,9 @@ public:
     str = obj.str;
     msgSize = obj.msgSize;
     rst = obj.rst;
+#ifdef PRIO_MSGS    
     setPriority(timestamp-INT_MAX);
+#endif
     return *this;
   }
   /// Allocates event message with space for priority
@@ -68,7 +73,11 @@ public:
     if (localPool->CheckPool(size) > 0)
       return localPool->GetBlock(size);
     else {
+#ifdef PRIO_MSGS
       void *msg = CkAllocMsg(CMessage_eventMsg::__idx, size, 8*sizeof(int));
+#else
+      void *msg = CkAllocMsg(CMessage_eventMsg::__idx, size, 0);
+#endif
       ((eventMsg *)msg)->msgSize = size;
       return msg;
     }
