@@ -209,7 +209,6 @@ void BgElapse(double t);
 void BgStartCorrection();
 
 void *BgCreateEvent(int eidx);
-void BgInsertLog(void* log);
 void BgEntrySplit();
 void bgAddProjEvent(void *data, double t, bgEventCallBackFn fn, void *uptr, int eType);
 void bgUpdateProj(int eType);

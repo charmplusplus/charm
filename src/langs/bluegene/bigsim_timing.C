@@ -21,8 +21,6 @@ int traceBluegeneLinked=0;
 extern int programExit;
 static int deadlock = 0;
 
-bgTimeLog *bgCurLog;
-
 #if USE_MULTISEND
 CkVec<char *>   *corrMsgBucket;
 #endif
@@ -88,36 +86,13 @@ void *BgCreateEvent(int eidx)
   return (void *)entry;
 }
 
-void BgInsertLog(void* log){
-
-  BgTimeLineRec &tlinerec = tTIMELINEREC;
-  if(tlinerec[tlinerec.length()-1]->endTime == 0.0)
-    CmiPrintf("\nERROR tried to insert %s after %s\n",((bgTimeLog*)log)->name,tlinerec[tlinerec.length()-1]->name);
-
-  tlinerec.enq((bgTimeLog*)log, 1);
-}
-
 // end current one and start a new one same ep
 // This is used for broadcast where several entry functions coexist
 // in one starting bglog
 // the parent log is bgCurLog
 void BgEntrySplit()
 {
-  if (!genTimeLog) return;
-  CmiAssert(tTHREADTYPE == WORK_THREAD);
-  BgTimeLineRec &tlinerec = tTIMELINEREC;
-  BgTimeLine &tline = tlinerec.timeline;
-  if (bgSkipEndFlag == 0) {
-    bgTimeLog *log = tline[tline.length()-1];
-    log->closeLog();
-  }
-  else
-    bgSkipEndFlag = 0;
-
-  // make up a new bglog to start, setting up dependencies.
-  bgTimeLog *newLog = new bgTimeLog(-1, "broadcast", BgGetTime());
-  newLog->addBackwardDep(bgCurLog);
-  tlinerec.enq(newLog, 1);
+  tTIMELINEREC.logEntrySplit();
 }
 
 // must be called inside a timelog
@@ -395,6 +370,78 @@ inline int bgTimeLog::adjustTimeLog(double tAdjust, BgTimeLine& tline, int mynod
 	return 1;
 }
 
+void BgTimeLineRec::logEntryStart(int handler, char *m) {
+  if (!genTimeLog) return;
+  if (tTHREADTYPE == WORK_THREAD) {
+      CmiAssert(bgCurLog == NULL);
+      bgCurLog = new bgTimeLog(handler, m);
+      enq(bgCurLog, 1);
+  }
+}
+
+void BgTimeLineRec::logEntryCommit() {
+  if (!genTimeLog) return;
+  if (tTHREADTYPE == WORK_THREAD) 
+  {
+      if(bgSkipEndFlag == 0)
+	timeline[timeline.length()-1]->closeLog();
+      else
+        bgSkipEndFlag=0;
+      if (correctTimeLog) {
+	BgAdjustTimeLineInsert(*this);
+	if (timeline.length()) 
+          tCURRTIME = timeline[timeline.length()-1]->endTime;
+	clearSendingLogs();
+      }
+      bgCurLog = NULL;
+  }
+}
+
+void BgTimeLineRec::logEntryInsert(bgTimeLog* log)
+{
+  CmiAssert(bgCurLog == NULL);
+  if(timeline[timeline.length()-1]->endTime == 0.0)
+    CmiPrintf("\nERROR tried to insert %s after %s\n",log->name,timeline[timeline.length()-1]->name);
+  enq(log, 1);
+}
+
+void BgTimeLineRec::logEntryStart(bgTimeLog* log)
+{
+  logEntryInsert(log);
+  bgCurLog = log;
+}
+
+void BgTimeLineRec::logEntryClose() {
+  if (!genTimeLog) return;
+  if (tTHREADTYPE == WORK_THREAD) 
+  {
+    bgTimeLog *lastlog = timeline[timeline.length()-1];
+    CmiAssert(bgCurLog == lastlog);
+    lastlog->closeLog();
+    bgCurLog = NULL;
+  }
+}
+
+void BgTimeLineRec::logEntrySplit()
+{
+  if (!genTimeLog) return;
+  CmiAssert(tTHREADTYPE == WORK_THREAD);
+  CmiAssert(bgCurLog != NULL);
+  bgTimeLog *rootLog = bgCurLog;
+  if (bgSkipEndFlag == 0) {
+    logEntryClose();
+  }
+  else {
+    bgCurLog=NULL;
+    bgSkipEndFlag = 0;
+  }
+
+  // make up a new bglog to start, setting up dependencies.
+  bgTimeLog *newLog = new bgTimeLog(-1, "broadcast", BgGetTime());
+  newLog->addBackwardDep(rootLog);
+  logEntryInsert(newLog);
+  bgCurLog = newLog;
+}
 
 int BgGetIndexFromTime(double effT, int seqno, BgTimeLineRec &tlinerec)
 {

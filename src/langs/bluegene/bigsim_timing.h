@@ -45,7 +45,9 @@ extern int bgcorroff;
 extern int programExit;
 extern double gvt;
 //extern int realMsgProcCount,corrMsgProcCount;
- 
+extern int  genTimeLog;
+extern int  correctTimeLog;
+extern int bgSkipEndFlag;
 
 inline int isZero(double input){
   return (input < EPSILON && input > -EPSILON);
@@ -236,11 +238,12 @@ public:
   int         correctSendIdx;
   int 	      counter;
   double      minCorrection;
+  bgTimeLog  *bgCurLog;
 #if DELAY_SEND
   CkQ<bgTimeLog *>   sendingLogs;	// send buffered
 #endif
 public:
-  BgTimeLineRec(): timeline(1024), commit(0), counter(1), correctSendIdx(0), startIdx(0) {
+  BgTimeLineRec(): timeline(1024), commit(0), counter(1), correctSendIdx(0), startIdx(0), bgCurLog(NULL) {
     if (bgcorroff) startCorrFlag=0; else startCorrFlag=1;
     minCorrection = INVALIDTIME;
   }
@@ -280,10 +283,13 @@ public:
     }
 #endif
   }
+  void logEntryStart(int handler, char *m);
+  void logEntryCommit();
+  void logEntryInsert(bgTimeLog* log);
+  void logEntryStart(bgTimeLog* log);
+  void logEntryClose();
+  void logEntrySplit();
 };
-
-extern int bgSkipEndFlag;
-extern bgTimeLog *bgCurLog;
 
 extern void BgInitTiming();
 extern void BgMsgSetTiming(char *msg);
@@ -303,29 +309,10 @@ extern void BgSendPendingCorrections(BgTimeLineRec &tlinerec, int mynode);
 #if BLUEGENE_TIMING
 
 #define BG_ENTRYSTART(handler, m)  \
-        if (genTimeLog)	\
-	  if (tTHREADTYPE == WORK_THREAD) {	\
-	    bgCurLog = new bgTimeLog(handler, m);	\
-	    tTIMELINEREC.enq(bgCurLog, 1);	\
-	  }
+	tTIMELINEREC.logEntryStart(handler, m);
 
 #define BG_ENTRYEND()  \
-        if (genTimeLog)	{ \
-	  if (tTHREADTYPE == WORK_THREAD) {	\
-            BgTimeLineRec &tlinerec = tTIMELINEREC;	\
-            BgTimeLine &tline = tlinerec.timeline;	\
-             if(bgSkipEndFlag == 0) { \
-		tline[tline.length()-1]->closeLog();	\
-	     } \
-	     else\
-                bgSkipEndFlag=0;\
-	     if (correctTimeLog) { 	\
-		BgAdjustTimeLineInsert(tTIMELINEREC); \
-		if (tline.length()) tCURRTIME = tline[tline.length()-1]->endTime;	\
-		tlinerec.clearSendingLogs();	\
-	     } \
-          }	\
-	}
+	tTIMELINEREC.logEntryCommit();
 
 #define BG_ADDMSG(m, node, tid, local)  	\
         if (genTimeLog)	{ \
@@ -343,7 +330,7 @@ extern void BgSendPendingCorrections(BgTimeLineRec &tlinerec, int mynode);
 		  bgTimeLog *newLog = new bgTimeLog(-1, "addMsg", curT, curT); \
 		  newLog->recvTime = newLog->effRecvTime = curT;	\
                   newLog->addMsg(m, node, tid, local);		\
-		  tlinerec.enq(newLog, 1);			\
+		  tlinerec.logEntryInsert(newLog);			\
 		  tlinerec.clearSendingLogs();		\
 		}					\
             }						\
@@ -359,11 +346,5 @@ extern void BgSendPendingCorrections(BgTimeLineRec &tlinerec, int mynode);
 #define BG_ENTRYEND()
 #define BG_ADDMSG(m, node, tid)
 #endif
-
-extern int  genTimeLog;
-extern int  correctTimeLog;
-
-// HACK for load balancer
-extern int CkMsgDoCorrect(void *msg);
 
 #endif
