@@ -95,7 +95,8 @@ public:
     LDCommData* commData;
 
     LDOId *transTable;
-    int *objHash;
+    int *objHash; 
+    int  hashSize;
 
     LDStats(): n_objs(0), n_comm(0) { objData = NULL; commData = NULL; 
 		from_proc = NULL; to_proc = NULL;
@@ -103,7 +104,7 @@ public:
       // build hash table
     void makeCommHash();
     void deleteCommHash();
-    int getHash(LDObjid oid, LDOMid mid);
+    int getHash(const LDObjid &oid, const LDOMid &mid);
     void assign(int oid, int pe) { to_proc[oid] = pe; }
     void clear() {
       n_objs = n_comm = 0;

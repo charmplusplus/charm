@@ -511,7 +511,10 @@ void CentralLB::simulation() {
     LBSimulation simResults(LBSimulation::simProcs);
 
     // now pass it to the strategy routine
+    double startT = CmiWallTimer();
+    CmiPrintf("%s> Strategy starts ... \n", lbname);
     LBMigrateMsg* migrateMsg = Strategy(statsData, LBSimulation::simProcs);
+    CmiPrintf("%s> Strategy took %fs. \n", lbname, CmiWallTimer()-startT);
 
     // now calculate the results of the load balancing simulation
     FindSimResults(statsData, LBSimulation::simProcs, migrateMsg, &simResults);
@@ -688,6 +691,7 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count,
 	    senderPE = cdata.src_proc;
 	  else {
 	    int idx = stats->getHash(cdata.sender, cdata.senderOM);
+	    CmiAssert(idx != -1);
 	    senderPE = stats->to_proc[idx];
 	    CmiAssert(senderPE != -1);
 	  }
@@ -695,6 +699,7 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count,
 	    receiverPE = cdata.dest_proc;
 	  else {
 	    int idx = stats->getHash(cdata.receiver, cdata.receiverOM);
+	    CmiAssert(idx != -1);
 	    receiverPE = stats->to_proc[idx];
 	    CmiAssert(receiverPE != -1);
 	  }
@@ -732,13 +737,19 @@ void CentralLB::FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, LBS
     for(int pe = 0; pe < count; pe++)
     	  simResults->bgLoads[pe] = stats->procs[pe].bg_walltime;
     // sum of the cpu times of the objects on that processor
+    double startT = CmiWallTimer();
     getPredictedLoad(stats, count, msg, simResults->peLoads, 
 		     simResults->minObjLoad, simResults->maxObjLoad);
+    CmiPrintf("getPredictedLoad finished in %fs\n", CmiWallTimer()-startT);
 }
 
 int CentralLB::useMem() { 
   return CkNumPes() * (sizeof(CentralLB::LDStats)+sizeof(CLBStatsMsg *)) +
                         sizeof(CentralLB);
+}
+
+inline static int ObjKey(const LDObjid &oid, const int hashSize) {
+  return ((oid.id[0]<<16)|(oid.id[1]<<8)|oid.id[2]) % hashSize;
 }
 
 void CentralLB::LDStats::makeCommHash() {
@@ -752,30 +763,33 @@ void CentralLB::LDStats::makeCommHash() {
   }
   int i;
    
-  objHash = new int[n_objs];
-  for(i=0;i<n_objs;i++)
+  hashSize = n_objs*2;
+  objHash = new int[hashSize];
+  for(i=0;i<hashSize;i++)
         objHash[i] = -1;
    
   for(i=0;i<n_objs;i++){
         LDObjid &oid = transTable[i].oid;
-        int hash = ((oid.id[0])|(oid.id[1])) % n_objs;
+        int hash = ObjKey(oid, hashSize);
         while(objHash[hash] != -1)
-            hash = (hash+1)%n_objs;
+            hash = (hash+1)%hashSize;
         objHash[hash] = i;
   }
 }
 
 void CentralLB::LDStats::deleteCommHash() {
   if (objHash) delete [] objHash;
+  objHash = NULL;
   if (transTable) delete [] transTable;
+  transTable = NULL;
 }
 
-int CentralLB::LDStats::getHash(LDObjid oid, LDOMid mid)
+int CentralLB::LDStats::getHash(const LDObjid &oid, const LDOMid &mid)
 {
-    int hash = (oid.id[0] | oid.id[1]) % n_objs;
+    int hash = ObjKey(oid, hashSize);
 
-    for(int id=0;id<n_objs;id++){
-        int index = (id+hash)%n_objs;
+    for(int id=0;id<hashSize;id++){
+        int index = (id+hash)%hashSize;
         if (LDObjIDEqual(transTable[objHash[index]].oid, oid) &&
             LDOMidEqual(transTable[objHash[index]].mid, mid))
             return objHash[index];
