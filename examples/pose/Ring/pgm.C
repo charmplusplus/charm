@@ -56,6 +56,26 @@ main::main(CkArgMsg *m)
 
   POSE_init();
 
+  /*
+  WorkerData *wd;
+  wd = new WorkerData;
+  wd->numObjs = numObjs;
+  wd->numMsgs = numMsgs;
+  wd->msgSize = msgSize;
+  wd->grainSize = grainSize;
+  wd->granularity = granularity;
+  wd->density = density;
+  wd->Timestamp(0);
+  //Create the map group
+  CProxy_BlockMap myMap=CProxy_BlockMap::ckNew();
+  //Make a new array using that map
+  CkArrayOptions opts(totalObjs);
+  opts.setMap(myMap);
+  (*(CProxy_worker *) &POSE_Objects) = CProxy_worker::ckNew(wd, opts);
+  //(*(CProxy_worker *) &POSE_Objects) = CProxy_worker::ckNew(wd, totalObjs);
+  */
+
+
   // create all the workers
   WorkerData *wd;
   int dest, j;
@@ -75,6 +95,13 @@ main::main(CkArgMsg *m)
     //wd->dump();
     (*(CProxy_worker *) &POSE_Objects)[i].insert(wd, dest);
   }
+  /*
+  SmallWorkMsg *sm = new SmallWorkMsg;
+  memset(sm->data, 0, SM_MSG_SZ*sizeof(int));
+  sm->fromPE = -1;
+  sm->Timestamp(0);
+  (*(CProxy_worker *) &POSE_Objects).workSmall(sm);
+  */
 }
 
 void main::buildMap(int numObjs, int dist)

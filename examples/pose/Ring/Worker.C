@@ -24,15 +24,17 @@ worker::worker(WorkerData *m)
   totalObjs = numObjs * CkNumPes();
   localDensity = ((double)density)/((double)totalObjs);
   delete m;
+  CkPrintf("Worker %d created on PE %d.\n", myHandle, CkMyPe());
+
   SmallWorkMsg *sm = new SmallWorkMsg;
   memset(sm->data, 0, SM_MSG_SZ*sizeof(int));
   sm->fromPE = -1;
-  //CkPrintf("Worker %d created on PE %d.\n", myHandle, CkMyPe());
+  CkPrintf("Worker %d created on PE %d.\n", myHandle, CkMyPe());
   //if (myHandle%numObjs == 0) { //local ring; multiple global rings
   //if (myHandle%(numObjs/2) == 0) { //multiple offset global rings
   //if (myHandle == 0) { 
-    //CkPrintf("Worker %d starting ring, sending to self.\n", myHandle, CkMyPe());
-    POSE_invoke(workSmall(sm), worker, parent->thisIndex, 0);
+  CkPrintf("Worker %d starting ring, sending to self.\n", myHandle);
+  POSE_invoke(workSmall(sm), worker, parent->thisIndex, 0);
   //}
 }
 
@@ -64,7 +66,7 @@ void worker::terminus()
 
 void worker::workSmall(SmallWorkMsg *m)
 {
-  //CkPrintf("%d receiving small work at %d\n", parent->thisIndex, ovt);
+  CkPrintf("%d receiving small work at %d from obj %d\n", parent->thisIndex, ovt, m->fromPE);
   doWork();
 }
 
@@ -125,9 +127,9 @@ void worker::doWork()
     memset(sm->data, 0, SM_MSG_SZ*sizeof(int));
     sm->fromPE = myHandle;
     // local ring
-    //POSE_invoke(workSmall(sm), worker, ((myHandle%numObjs)+1)%numObjs + (numObjs*CkMyPe()), 0);
-    POSE_invoke(workSmall(sm), worker, (myHandle+1)%totalObjs, 0);
-    //CkPrintf("%d sending small work to %d at %d. Sent=%d\n",myHandle,((myHandle%numObjs)+1)%numObjs + (numObjs*CkMyPe()),ovt,sent);
+    POSE_invoke(workSmall(sm), worker, ((myHandle%numObjs)+1)%numObjs + (numObjs*CkMyPe()), 0);
+    //POSE_invoke(workSmall(sm), worker, (myHandle+1)%totalObjs, 0);
+    CkPrintf("%d sending small work to %d at %d. Sent=%d\n",myHandle,((myHandle%numObjs)+1)%numObjs + (numObjs*CkMyPe()),ovt,sent);
   }
   else if (actualMsgSize == MEDIUM) {
     mm = new MediumWorkMsg;
@@ -143,9 +145,6 @@ void worker::doWork()
   }
   int elapseCheck = sent * (1.0/localDensity);
   if (OVT() < elapseCheck) elapse(elapseCheck-OVT());
-  /*
-  if (sent == numMsgs)
-    CkPrintf("%d done! sent %d & received %d messages!\n", myHandle, sent, received);
-  */
+  CkPrintf("%d sent %d messages out of %d!\n", myHandle, sent, numMsgs);
 }
 
