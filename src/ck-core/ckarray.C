@@ -166,6 +166,13 @@ void CkArray::staticSpringCleaning(void *forArray) {
 
 /********************* Little CkArray Utilities ******************/
 
+CProxy_ArrayBase::CProxy_ArrayBase(const ArrayElement *e)
+	:CProxy(), _aid(e->ckGetArrayID())
+	{}
+CProxyElement_ArrayBase::CProxyElement_ArrayBase(const ArrayElement *e)
+	:CProxy_ArrayBase(e), _idx(e->ckGetArrayIndex())
+	{}
+
 void CProxy_ArrayBase::setReductionClient(CkReductionMgr::clientFn fn,void *param)
 { ckLocalBranch()->setClient(fn,param); }
 
@@ -276,7 +283,7 @@ void _ckArrayInit(void)
 CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg)
         : CkReductionMgr(), 
 	locMgr(CProxy_CkLocMgr::ckLocalBranch(c.getLocationManager())),
-	thisproxy(thisgroup)
+	thisProxy(thisgroup)
 {
   //Registration
   elements=(ArrayElementList *)locMgr->addManager(thisgroup,this);
@@ -339,7 +346,7 @@ void CProxy_ArrayBase::doneInserting(void)
 
 void CkArray::doneInserting(void)
 {
-  thisproxy[CkMyPe()].remoteDoneInserting();
+  thisProxy[CkMyPe()].remoteDoneInserting();
 }
 
 //This is called after the last array insertion.
@@ -363,7 +370,7 @@ bool CkArray::demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor)
 	if (onPe==CkMyPe()) //Call local constructor directly
 		return insertElement(m);
 	else
-		thisproxy[onPe].insertElement(m);
+		thisProxy[onPe].insertElement(m);
 	return true;
 }
 
@@ -458,7 +465,7 @@ void CkArray::sendBroadcast(CkMessage *msg)
 {
 	magic.check();
 	//Broadcast the message to all processors
-	thisproxy.recvBroadcast(msg);
+	thisProxy.recvBroadcast(msg);
 }
 
 //Increment broadcast count; deliver to all local elements

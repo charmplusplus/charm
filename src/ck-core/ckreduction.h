@@ -143,10 +143,10 @@ the reduced message up the reduction tree to node zero, where
 they're passed to the user's client function.
 */
 class CkReductionMgr : public CkGroupInitCallback {
-        CProxy_CkReductionMgr thisproxy;
+        CProxy_CkReductionMgr thisProxy;
 public:
 	CkReductionMgr(void);
-	CkReductionMgr(CkMigrateMessage *m):thisproxy(thisgroup) {}
+	CkReductionMgr(CkMigrateMessage *m):thisProxy(this) {}
 	
 	//A clientFn is called on PE 0 when all contributions
 	// have been received and reduced.

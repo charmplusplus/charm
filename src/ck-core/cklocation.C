@@ -839,7 +839,7 @@ void CkLocMgr::staticSpringCleaning(void *forWhom) {
 
 /*************************** LocMgr: CREATION *****************************/
 CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial) 
-	:thisproxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),
+	:thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),
 	 hash(17,0.3)
 {
 	DEBC((AA"Creating new location manager %d\n"AB,thisgroup));
@@ -928,7 +928,7 @@ void CkLocMgr::informHome(const CkArrayIndex &idx,int nowOnPe)
 	if (home!=CkMyPe() && home!=nowOnPe) {
 		//Let this element's home Pe know it lives here now
 		DEBC((AA"  Telling %s's home %d that it lives on %d.\n"AB,idx2str(idx),home,nowOnPe));
-		thisproxy[home].updateLocation(idx,nowOnPe);
+		thisProxy[home].updateLocation(idx,nowOnPe);
 	}
 }
 
@@ -996,7 +996,7 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 	{ //This is a local element dying a natural death
 		int home=homePe(idx);
 		if (home!=CkMyPe())
-			thisproxy[home].reclaimRemote(idx,CkMyPe());
+			thisProxy[home].reclaimRemote(idx,CkMyPe());
 	/*	//Install a zombie to keep the living from re-using this index.
 		insertRecN(new CkLocRec_dead(this),idx); */
 	}
@@ -1045,7 +1045,7 @@ bool CkLocMgr::deliverUnknown(CkArrayMessage *msg)
 	if (onPe!=CkMyPe()) {
 		DEBM((AA"Forwarding message for unknown %s\n"AB,idx2str(idx)));
 		msg->array_hops()++;
-		thisproxy[onPe].deliver(msg);
+		thisProxy[onPe].deliver(msg);
 		return true;
 	}
 	else
@@ -1101,7 +1101,7 @@ void CkLocMgr::multiHop(CkArrayMessage *msg)
 	else
 	{//Send a routing message letting original sender know new element location
 		DEBS((AA"Sending update back to %d for element\n"AB,srcPe,idx2str(msg)));
-		thisproxy[srcPe].updateLocation(msg->array_index(),CkMyPe());
+		thisProxy[srcPe].updateLocation(msg->array_index(),CkMyPe());
 	}
 }
 
@@ -1189,7 +1189,7 @@ void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 	DEBM((AA"Migrated index size %s\n"AB,idx2str(amsg->array_index())));	
 
 //Send off message and delete old copy
-	thisproxy[toPe].migrateIncoming(msg);
+	thisProxy[toPe].migrateIncoming(msg);
 	duringMigration=true;
 	delete rec; //Removes elements, hashtable entries, local index
 	duringMigration=false;
@@ -1211,7 +1211,7 @@ void CkLocMgr::migrateIncoming(CkArrayElementMigrateMessage *msg)
 	if (nMsgMan>nManagers) {
 		//Some array managers haven't registered yet-- throw it back
 		DEBM((AA"Busy-waiting for array registration on migrating %s\n"AB,idx2str(idx)));
-		thisproxy[CkMyPe()].migrateIncoming(msg);
+		thisProxy[CkMyPe()].migrateIncoming(msg);
 		return;
 	}
 

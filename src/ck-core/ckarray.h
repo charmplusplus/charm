@@ -79,6 +79,9 @@ class CkArrayOptions {
 };
 PUPmarshall(CkArrayOptions);
 
+//Needed by CBase_ArrayElement
+class ArrayBase { /*empty*/ };
+/*forward*/ class ArrayElement;
 
 //This class is a wrapper around a CkArrayIndex and ArrayID,
 // used by array element proxies.  This makes the translator's
@@ -92,6 +95,7 @@ public:
 		:CProxy(dTo), _aid(aid) { }
 	CProxy_ArrayBase(const CkArrayID &aid) 
 		:CProxy(), _aid(aid) { }
+	CProxy_ArrayBase(const ArrayElement *e);
 
 	static CkArrayID ckCreateEmptyArray(void);
 	static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,CkArrayOptions opts);
@@ -138,6 +142,7 @@ public:
 		:CProxy_ArrayBase(aid,dTo), _idx(idx) { }
 	CProxyElement_ArrayBase(const CkArrayID &aid, const CkArrayIndex &idx)
 		:CProxy_ArrayBase(aid), _idx(idx) { }
+	CProxyElement_ArrayBase(const ArrayElement *e);
 	
 	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep) const;
@@ -231,6 +236,8 @@ public:
 
   CK_REDUCTION_CONTRIBUTE_METHODS_DECL
 
+  const CkArrayID &ckGetArrayID(void) const {return thisArrayID;}
+
 protected:
   CkArray *thisArray;//My source array
   CkArrayID thisArrayID;//My source array's ID
@@ -255,14 +262,14 @@ public:
   T thisIndex;//Object array index
 };
 
-typedef ArrayElementT<int> ArrayElement1D;
-
+typedef int CkIndex1D;
 typedef struct {int x,y;} CkIndex2D;
 inline void operator|(PUP::er &p,CkIndex2D &i) {p(i.x); p(i.y);}
-typedef ArrayElementT<CkIndex2D> ArrayElement2D;
-
 typedef struct {int x,y,z;} CkIndex3D;
 inline void operator|(PUP::er &p,CkIndex3D &i) {p(i.x); p(i.y); p(i.z);}
+
+typedef ArrayElementT<CkIndex1D> ArrayElement1D;
+typedef ArrayElementT<CkIndex2D> ArrayElement2D;
 typedef ArrayElementT<CkIndex3D> ArrayElement3D;
 
 
@@ -279,7 +286,7 @@ class CkArray : public CkReductionMgr, public CkArrMgr {
 
   CkMagicNumber<ArrayElement> magic; //To detect heap corruption
   CkLocMgr *locMgr;
-  CProxy_CkArray thisproxy;
+  CProxy_CkArray thisProxy;
   typedef CkMigratableListT<ArrayElement> ArrayElementList;
   ArrayElementList *elements;  
 

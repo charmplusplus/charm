@@ -130,7 +130,7 @@ they're passed to the user's client function.
 */
 
 CkReductionMgr::CkReductionMgr()//Constructor
-  : thisproxy(thisgroup)
+  : thisProxy(thisgroup)
 {
   storedClient=NULL;
   storedClientParam=NULL;
@@ -211,7 +211,7 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
   // contribution, which will never come.
     DEBR((AA"Dying guy %p must have been migrating-- he's at #%d!\n"AB,ci,ci->redNo));
     for (int r=ci->redNo;r<redNo;r++)
-      thisproxy[treeRoot()].MigrantDied(new CkReductionNumberMsg(r));
+      thisProxy[treeRoot()].MigrantDied(new CkReductionNumberMsg(r));
   }
   
   //Add to the global count for all his future messages (wherever they are)
@@ -330,7 +330,7 @@ void CkReductionMgr::startReduction(int number)
   for (int k=0;k<treeKids();k++)
   {
     DEBR((AA"Asking child PE %d to start #%d\n"AB,firstKid()+k,redNo));
-    thisproxy[firstKid()+k].ReductionStarting(new CkReductionNumberMsg(redNo));
+    thisProxy[firstKid()+k].ReductionStarting(new CkReductionNumberMsg(redNo));
   }
 }
 //Handle a message from one element for the reduction
@@ -341,7 +341,7 @@ void CkReductionMgr::addContribution(CkReductionMsg *m)
     DEBR((AA"Migrant %p gives late contribution for #%d!\n"AB,m->ci,m->redNo));
     if (!hasParent()) //Root moved on too soon-- should never happen
       CkAbort("Late reduction contribution received at root!\n");
-    thisproxy[treeRoot()].LateMigrantMsg(m);
+    thisProxy[treeRoot()].LateMigrantMsg(m);
   } 
   else if (isFuture(m->redNo)) {//An early contribution-- add to future Q
     DEBR((AA"Contributor %p gives early contribution-- for #%d\n"AB,m->ci,m->redNo));
@@ -369,7 +369,7 @@ void CkReductionMgr::finishReduction(void)
     DEBR((AA"Passing reduced data up to parent node %d.\n"AB,treeParent()));
     DEBR((AA"Message gcount is %d+%d+%d.\n"AB,result->gcount,gcount,adj(redNo).gcount));
     result->gcount+=gcount+adj(redNo).gcount;
-    thisproxy[treeParent()].RecvMsg(result);
+    thisProxy[treeParent()].RecvMsg(result);
   }
   else 
   {//We are root-- pass data to client

@@ -283,6 +283,7 @@ public:
   virtual void pup(PUP::er &p);
 
   inline int ckGetChareType(void) const {return thisChareType;}
+  const CkArrayIndex &ckGetArrayIndex(void) const {return myRec->getIndex();}
 
 #if CMK_LBDB_ON  //For load balancing:
   //Suspend load balancer measurements (e.g., before CthSuspend)
@@ -419,7 +420,7 @@ public:
 
 	CkGroupID &getGroupID(void) {return thisgroup;}
 	inline CProxy_CkLocMgr &getProxy(void) 
-		{return thisproxy;}
+		{return thisProxy;}
 	inline CProxyElement_CkLocMgr &getLocalProxy(void) 
 		{return thislocalproxy;}
 
@@ -544,7 +545,7 @@ private:
 	int localLen;//Last allocated local index plus one
 	int nextFree(void);
 	
-	CProxy_CkLocMgr thisproxy;
+	CProxy_CkLocMgr thisProxy;
 	CProxyElement_CkLocMgr thislocalproxy;
 	CkHashtableT<CkArrayIndexMax,CkLocRec *> hash;
 	
