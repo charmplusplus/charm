@@ -221,10 +221,10 @@ CONVLIBS: converse
 libconv-core.a: $(LIBCONV_CORE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_CORE)
 
-libconv-cplus-y.a: machine.c $(CVHEADERS)	
+libconv-cplus-y.a: machine.c machine-gm.c machine-eth.c $(CVHEADERS)	
 	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=1 machine.c
 
-libconv-cplus-n.a: machine.c $(CVHEADERS)
+libconv-cplus-n.a: machine.c machine-gm.c machine-eth.c $(CVHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=0 machine.c
 
 libconv-util.a: $(LIBCONV_UTIL)
