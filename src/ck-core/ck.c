@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.17  1995-11-05 18:26:26  sanjeev
+ * Revision 2.18  1995-11-07 17:53:45  sanjeev
+ * fixed bugs in statistics collection
+ *
+ * Revision 2.17  1995/11/05  18:26:26  sanjeev
  * removed trace_creation in CkLdbSend
  *
  * Revision 2.16  1995/10/27  23:56:49  jyelon
@@ -119,20 +122,36 @@ extern void *FIFO_Create();
 void CkLdbSend();
 extern CHARE_BLOCK *CreateChareBlock();
 
+
 CpvStaticDeclare(int, num_exits);
-CpvStaticDeclare(int, done);
+CpvStaticDeclare(int, num_endcharms);
 
-/* 
-  How does this work?
 
-  CkExits send on a message with an iteration number whose value is num_exits
-  CkEndCharm send -1 in the message ..
 
-  To prevent the sending of two messages for a particular CkExit or CkEndCharm,
-    *  the static variable done makes sure that only one CkEndCharm is done
+void ckModuleInit()
+{
+   CpvInitialize(int, num_exits);
+   CpvInitialize(int, num_endcharms);
+
+   CpvAccess(num_exits)=0;
+   CpvAccess(num_endcharms)=0;
+}
+
+
+/*************************************************************************
+  EXIT PROTOCOL FOR CHARM
+
+  How do the CkExit and CkEndCharm protocols work?
+
+  CkExits send a message with an iteration number whose value is num_exits
+  CkEndCharms send -1 in the message ..
+
+  To prevent the sending of two messages for a particular CkExit,
     *  the seq number in the message should equal the value of num_exits for
        a CkExit to be processed (thus no two CkExits with the same seq number
-       are processed
+       are processed).
+  Also, CkEndCharm has a synchronization : the broadcast for statistics
+  collection is done only after all processors have reported a CkEndCharm.
 
   The scheme is necessitated by the possibility of use of more than one 
   "DoCharm()" (now Scheduler()) and CkExits in each of them.
@@ -143,20 +162,7 @@ CpvStaticDeclare(int, done);
 
   ExitMessage handles CkExit and CkEndCharm requests differently.
 
-*/
-
-
-
-void ckModuleInit()
-{
-   CpvInitialize(int, num_exits);
-   CpvInitialize(int, done);
-
-   CpvAccess(num_exits)=0;
-   CpvAccess(done)     =0;
-}
-
-
+**************************************************************************/
 
 
 CkExit()
@@ -194,28 +200,20 @@ CkEndCharm()
 BroadcastExitMessage(usr, data)
 void *usr, *data;
 {
-/*
-   This function is executed only on node 0 - corresponds to 
-                 CsvAccess(CkEp_Stat_BroadcastExitMessage)
-*/
+/* This function is executed only on node 0 - corresponds to 
+                 CsvAccess(CkEp_Stat_BroadcastExitMessage) */
+
 	int *msg;
 	
-TRACE(CmiPrintf("[%d] BroadcastExitMessage: sending out message to everybody.\n",
-CmiMyPe()))
-;
-
-	if (*((int *)usr) == -1) /* For CkEndCharm */
-        {
-              if(CpvAccess(done)) 
-	            return;
-	      else
-	            CpvAccess(done) = 1;
+	if (*((int *)usr) == -1) { /* For CkEndCharm */
+		CpvAccess(num_endcharms)++ ;
+        	if( CpvAccess(num_endcharms) < CmiNumPes() ) 
+	        	return;
 	}
-	else                     /* For CkExit */
-        {
-	      if(*((int *)usr) < CpvAccess(num_exits))
-                     return;
-	      CpvAccess(num_exits)++;
+	else {  /* For CkExit */
+		if(*((int *)usr) < CpvAccess(num_exits))
+                	 return;
+		CpvAccess(num_exits)++;
 	}
 	
 	msg = (int *) CkAllocMsg(sizeof(int));
@@ -231,30 +229,33 @@ void *usr, *data;
 {
         if(*((int *)usr) == -1) /* If the user called CkEndCharm */
 	{
-	    /*
-	      if (CmiMyPe() != 0) CmiFlushPrintfs();
-	    */
-	    SendNodeStatistics();
-	    send_log();
-	    if (CmiMyPe() != 0 &&  (CpvAccess(RecdPerfMsg) && CpvAccess(RecdStatMsg))) ExitNode();
+		SendNodeStatistics();
+		send_log();
+		if ( CmiMyPe() != 0 && CpvAccess(RecdPerfMsg) 
+		 		    && CpvAccess(RecdStatMsg) ) 
+			ExitNode();
 	}
 	else /* If the user called CkExit */
 	{
-	      CsdExitScheduler();
-	      if(CmiMyPe())
-		   CpvAccess(num_exits)++;
+		CsdExitScheduler();
+		if(CmiMyPe())
+			CpvAccess(num_exits)++;
 	}
 }
 
 
-/* This is what you do before you exit the main node */
+SendNodeStatistics()
+{
+	(*(CsvAccess(EpInfoTable)[CsvAccess(CkEp_Stat_Data)].function)) 
+								(NULL,NULL);
+}
+
+
 ExitNode()
 {
 	char *msg;
 	ENVELOPE *env;
 
-TRACE(CmiPrintf("[%d] ExitNode: RecdPerfMsg=%d, RecdStatMsg=%d\n", CmiMyPe(),
-CpvAccess(RecdPerfMsg), CpvAccess(RecdStatMsg)));
 	close_log();
 	if (CmiMyPe() == 0)
 	{
@@ -266,15 +267,19 @@ CpvAccess(RecdPerfMsg), CpvAccess(RecdStatMsg)));
         CsdExitScheduler();
 }
 
+
+
+
+
+
+/**********************************************************************
+ * These are utility routines for chares 
+***********************************************************************/
+
 ChareExit()
 {
 	SetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID,-1);
 	CmiFree(CpvAccess(currentChareBlock));
-}
-
-SendNodeStatistics()
-{
-	(*(CsvAccess(EpInfoTable)[CsvAccess(CkEp_Stat_Data)].function)) (NULL,NULL);
 }
 
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-11-02 20:10:44  sanjeev
+ * Revision 2.12  1995-11-07 17:53:45  sanjeev
+ * fixed bugs in statistics collection
+ *
+ * Revision 2.11  1995/11/02  20:10:44  sanjeev
  * GeneralSendMsgBranch sets type to BocMsg if it is -1, used by Charm++
  *
  * Revision 2.10  1995/10/27  21:31:25  jyelon
@@ -414,8 +417,8 @@ ChareNumType bocnum;
 TRACE(CmiPrintf("[%d] GeneralSend: type=%d, msgType=%d\n",
 		CmiMyPe(), type, GetEnv_msgType(env)));
 
-	if (bocnum >= NumSysBoc)
-        	CpvAccess(nodebocMsgsCreated)++;
+	/* if (bocnum >= NumSysBoc) */
+        CpvAccess(nodebocMsgsCreated)++;
 
 	trace_creation(GetEnv_msgType(env), ep, env);
 	CkCheck_and_Send(destPE, env);
@@ -446,8 +449,8 @@ ChareNumType bocnum;
 TRACE(CmiPrintf("[%d] GeneralBroadcast: type=%d, msgType=%d\n",
 		CmiMyPe(), type, GetEnv_msgType(env)));
 
-	if (bocnum >= NumSysBoc)
-        	CpvAccess(nodebocMsgsCreated)+=CmiNumPes();
+	/* if (bocnum >= NumSysBoc) */
+        CpvAccess(nodebocMsgsCreated)+=CmiNumPes();
 
 	trace_creation(GetEnv_msgType(env), ep, env);
 	CkCheck_and_BroadcastAll(env); /* Asynchronous broadcast */

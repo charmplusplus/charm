@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.33  1995-11-06 22:59:01  sanjeev
+ * Revision 2.34  1995-11-07 17:53:45  sanjeev
+ * fixed bugs in statistics collection
+ *
+ * Revision 2.33  1995/11/06  22:59:01  sanjeev
  * fixes for statistics collection
  *
  * Revision 2.32  1995/11/06  21:36:29  milind
@@ -400,7 +403,8 @@ FUNCTION_PTR donehandler;
 		CpvAccess(mainChareBlock) =
                     CpvAccess(currentChareBlock) = 
 			CreateChareBlock(CpvAccess(MainDataSize),
-						CHAREKIND_CHARE, 0);
+					 CHAREKIND_CHARE, 
+					 CpvAccess(nodecharesProcessed)++);
 
 		if (CsvAccess(MainChareLanguage) == CHARMPLUSPLUS) 
 			CPlus_SetMainChareID() ;  /* set mainhandle */
@@ -450,9 +454,9 @@ FUNCTION_PTR donehandler;
 	}
 	else
 	{
-        	/* This is so that all PEs have consistent magic numbers for 
-		   BOCs. 0 is the magic # of main chare on proc 0, 
-		   all other procs have magic numbers from 1 */
+       		/* This is so that all PEs have consistent magic numbers for 
+	   	   BOCs. 0 is the magic # of main chare on proc 0, 
+	   	   all other procs have magic numbers from 1 */
 		CpvAccess(nodecharesProcessed) = 1 ;
 
                 /* create the boc init message queue */

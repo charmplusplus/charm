@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-11-06 22:59:01  sanjeev
+ * Revision 2.12  1995-11-07 17:56:51  sanjeev
+ * fixed bugs in statistics collection
+ *
+ * Revision 2.11  1995/11/06  22:59:01  sanjeev
  * fixes for statistics collection
  *
  * Revision 2.10  1995/10/27  21:31:25  jyelon
@@ -278,18 +281,22 @@ PrintOutStatistics()
 
 	if (CpvAccess(PrintChareStat))
 	{
-		CmiPrintf("\nPrinting Chare Statistics:\n");
-		CmiPrintf("Individual Chare Info: (NODE)[Created, Processed]\n");
-		for (k=0; k < CmiNumPes(); k++)
-			CmiPrintf("(%d)[%d, %d], ", k, 
-                          CpvAccess(HostStat)[k][3], CpvAccess(HostStat)[k][4]);
+		CmiPrintf("----------------------------------------------\n");
+		CmiPrintf("Printing Chare Statistics:\n");
+		CmiPrintf("PE  Chares-Created Chares-Processed Messages-Created Messages-Processed\n");
+		for (k=0; k < CmiNumPes(); k++) {
+			CmiPrintf("%-3d",k) ; 
+
+			CmiPrintf(" %14d %16d", CpvAccess(HostStat)[k][3], 
+					    CpvAccess(HostStat)[k][4]);
+			CmiPrintf(" %16d %18d", CpvAccess(HostStat)[k][5],
+					    CpvAccess(HostStat)[k][6]);
+			CmiPrintf("\n") ;
+		}
+
 		CmiPrintf("\nNumber of Branch-Office Chares : %d\n",
 					CpvAccess(nodebocInitProcessed));
 
-		CmiPrintf("\nMessages: ");
-		for (k=0; k < CmiNumPes(); k++)
-			CmiPrintf("(%d)[%d, %d], ", k, 
-                          CpvAccess(HostStat)[k][5],CpvAccess(HostStat)[k][6]);
 
 		/* Boc msgs not counted separately for now 
 		CmiPrintf("For Boc Messages: ");
