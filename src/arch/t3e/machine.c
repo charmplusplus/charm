@@ -293,6 +293,11 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
   CmiFree(msg);
 }
 
+void CmiMulticastInit(void)
+{
+  // Nothing to do.
+}
+
 void CmiSyncListSendFn(int npes, int *pes, int size, char *msg)
 {
   int i;
