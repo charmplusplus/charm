@@ -543,6 +543,8 @@ void CHostRegister(void)
   CmiSyncSendAndFree(0, msgSize, msg);
 }
 
+unsigned int clientIP, clientPort;
+
 void CHostGetOne()
 {
   char line[10000];
@@ -592,7 +594,6 @@ void CHostGetOne()
 
     }
     else if (strncmp(line, "getinfo ", 8)==0) {
-      unsigned int clientIP, clientPort;
       char pre[1024], reply[1024], ans[1024];
       char cmd[20];
       int fd;
@@ -1027,7 +1028,16 @@ static void CpdDebugHandler(char *msg)
     }
 
     else if (strcmp(name, "quit") == 0){
+      CpdUnfreeze();
       CsdExitScheduler();
+#if NODE_0_IS_CONVHOST
+      if((CmiMyPe() == 0) && (clientIP != 0)){
+	int fd;
+	fd = skt_connect(clientIP, clientKillPort);
+	if (fd>0) 
+	  write(fd, "die\n", strlen("die\n"));
+      }
+#endif
     }
     else{
       CmiPrintf("incorrect command:%s received,len=%d\n",name,strlen(name));
