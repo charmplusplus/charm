@@ -1,6 +1,0 @@
-extern message ArrayMapCreateMessage;
-
-group RRMap
-{
-  entry RRMap(ArrayMapCreateMessage *);
-};

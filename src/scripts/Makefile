@@ -56,7 +56,7 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h conv-trace.h conv-mach.h simplemsg.h sm.h trace.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h
+ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h conv-trace.h conv-mach.h simplemsg.h sm.h trace.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h ckarray.h
 
 ALLINTERFACES=idl.ci
 

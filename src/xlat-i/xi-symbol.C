@@ -848,6 +848,15 @@ void Entry::genChareStaticConstructorDecl(XStr& str)
     }
   }
   str << "int onPE=CK_PE_ANY);\n";
+  // entry ptr declaration
+  str << "    static int ckIdx_" << name << "(";
+  if(param!=0)
+    param->print(str);
+  else
+    str << "void";
+  str<< ") { return __idx_"; 
+  genEpIdx(str); 
+  str << "; }\n";
 }
 
 void Entry::genGroupStaticConstructorDecl(XStr& str)
@@ -879,6 +888,15 @@ void Entry::genGroupStaticConstructorDecl(XStr& str)
     }
   }
   str << ");\n";
+  // entry ptr declaration
+  str << "    static int ckIdx_" << name << "(";
+  if(param!=0)
+    param->print(str);
+  else
+    str << "void";
+  str<< ") { return __idx_"; 
+  genEpIdx(str); 
+  str << "; }\n";
 }
 
 void Entry::genChareDecl(XStr& str)

@@ -10,6 +10,11 @@ typedef enum {false, true} boolean;
 
 #define ALIGN8(x)       (int)(8*(((x)+7)/8))
 
+#define MessageIndex(mt)        CMessage_##mt##::__idx
+#define ChareIndex(ct)          CProxy_##ct##::__idx
+#define EntryIndex(ct,ep,mt)    CProxy_##ct##::ckIdx_##ep##((##mt##*)0)
+#define ConstructorIndex(ct,mt) EntryIndex(ct,ct,mt)
+
 typedef int CkGroupID;
 typedef int MessageIndexType;
 typedef int ChareIndexType;
