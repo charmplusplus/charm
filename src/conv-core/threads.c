@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.16  1995-10-18 22:20:17  jyelon
+ * Revision 1.17  1995-10-19 04:19:47  jyelon
+ * A correction to eatstack.
+ *
+ * Revision 1.16  1995/10/18  22:20:17  jyelon
  * Added 'eatstack' threads implementation.
  *
  * Revision 1.15  1995/10/18  01:58:43  jyelon
@@ -522,7 +525,8 @@ CthThread t;
   else CthFreeNow(t);
 }
 
-static void CthSaveLoad(jmp_buf save, jmp_buf load, int index)
+static void CthSaveLoad(save, load, index)
+jmp_buf save; jmp_buf load; int index;
 {
   if (setjmp(save)==0) longjmp(load, index);
 }
@@ -608,50 +612,67 @@ CthThread t; CthVoidFn fn; void *arg;
   t->datasize = 0;
 }
 
+static void CthExtendStack()
+{
+  CthThread t;
+  /* I am top thread, and I have been asked by the current           */
+  /* thread to extend the freelist.  I must recurse deeply using     */
+  /* CthClipTop, which will truncate me and make me just another     */
+  /* unused thread.  I must push my truncated self onto to freelist, */
+  /* then go back to current thread (which invoked me).              */
+  t = CpvAccess(CthTop);
+  t->next = CpvAccess(CthFreeList);
+  CpvAccess(CthFreeList) = t;
+  CthClipTop(STACKSIZE_STD);
+  longjmp(CpvAccess(CthCurr)->jb,1);
+}
+
+static void CthCallUserFn()
+{
+  CthThread t;
+  /* I am a thread which has recently been removed from the     */
+  /* freelist and returned by CthCreate.  I have just been      */
+  /* awakened via CthResume, therefore, I am the current        */
+  /* thread.  I must start executing my func.                   */
+  t = CpvAccess(CthCurr);
+  CthFreeExiting();
+  (t->fn)(t->arg);
+  CthFree(CthSelf());
+  CthSuspend();
+  printf("thread ran off end!\n");
+  exit(1);
+}
+
 static void CthController()
 {
-  char base;
-  CthThread t;
   /* I am the top thread, and I have recursed deeply to lower my     */
   /* stack pointer. I break off what remains of the stack segment    */
   /* and store it in CthTop, thereby making myself the second-from-  */
   /* the-top thread, and then I return.  My callee will then take    */
   /* me and push me on the freelist.                                 */
-  t = (CthThread)malloc(sizeof(struct CthThreadStruct));
-  CpvAccess(CthTop) = t;
-  switch(setjmp(t->ctrl)) {
+  CpvAccess(CthTop) = (CthThread)malloc(sizeof(struct CthThreadStruct));
+  switch(setjmp(CpvAccess(CthTop)->ctrl)) {
   case 0: return;
-  case 1:
-    /* I am top thread, and I have been asked by the current           */
-    /* thread to extend the freelist.  I must recurse deeply using     */
-    /* CthClipTop, which will truncate me and make me just another     */
-    /* unused thread.  I must push my truncated self onto to freelist, */
-    /* then go back to current thread (which invoked me).              */
-    t = CpvAccess(CthTop);
-    t->next = CpvAccess(CthFreeList);
-    CpvAccess(CthFreeList) = t;
-    CthClipTop(STACKSIZE_STD);
-    longjmp(CpvAccess(CthCurr)->jb,1);
-    break;
-  case 2:
-    /* I am a thread which has recently been removed from the     */
-    /* freelist and returned by CthCreate.  I have just been      */
-    /* awakened via CthResume, therefore, I am the current        */
-    /* thread.  I must start executing my func.                   */
-    t = CpvAccess(CthCurr);
-    CthFreeExiting();
-    (t->fn)(t->arg);
-    CthFree(CthSelf());
-    CthSuspend();
-    printf("thread ran off end!\n");
-    exit(1);
+  case 1: CthExtendStack();
+  case 2: CthCallUserFn();
   }
 }
 
-static void CthClip_1(int size)  { char gap[1024];  CthClipTop(size - 1024);  }
-static void CthClip_4(int size)  { char gap[4096];  CthClipTop(size - 4096);  }
-static void CthClip_16(int size) { char gap[16384]; CthClipTop(size - 16384); }
-static void CthClip_64(int size) { char gap[65536]; CthClipTop(size - 65536); }
+static void CthClip_1(size) 
+int size;
+{ char gap[1024];  CthClipTop(size-1024);  }
+
+static void CthClip_4(size) 
+int size;
+{ char gap[4096];  CthClipTop(size-4096);  }
+
+static void CthClip_16(size)
+int size;
+{ char gap[16384]; CthClipTop(size-16384); }
+
+static void CthClip_64(size)
+int size;
+{ char gap[65536]; CthClipTop(size-65536); }
 
 static void CthClipTop(size)
 int size;
