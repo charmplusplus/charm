@@ -324,7 +324,11 @@ chunk::readField(int fid, void *nodes, char *fname)
   char* pos;
   const char* fmt;
   int i, j, curline;
+#if FEM_FORTRAN
+  curline = 1;
+#else
   curline = 0;
+#endif
   switch(btype) {
     case FEM_INT: fmt = "%d%n"; break;
     case FEM_REAL: fmt = "%f%n"; break;
@@ -375,6 +379,8 @@ for(int i=0; i<numElems; i++) {
     for(int j=0;j<numNodesPerElem;j++) {
 #if FEM_FORTRAN
       fscanf(fp, "%d", &conn[j*numElems+i]);
+      // FIXME: This will go away once map is part of the library
+      // map will generate 1-based node numbers
       conn[j*numElems+i]++;
 #else
       fscanf(fp, "%d", &conn[i*numNodesPerElem+j]);
