@@ -1,8 +1,6 @@
 #include <stdlib.h>
 #include <converse.h>
 
-/* extern "C" int CmiGrabBuffer();*/
-
 enum {nCycles = 1 << 8 };
 enum { maxMsgSize = 1 << 13 };
 
@@ -19,11 +17,10 @@ CpvStaticDeclare(double,endCTime);
 
 void startRing()
 {
-  CmiPrintf("PE %d startRing\n",CmiMyPe());
   CpvAccess(cycleNum) = 0;
   CpvAccess(msgSize) = 100 * CpvAccess(sizeNum) + CmiMsgHeaderSizeBytes;
-  CmiPrintf("PE %d startRing allocating %d bytes, header=%d bytes\n",
-	    CmiMyPe(),CpvAccess(msgSize),CmiMsgHeaderSizeBytes);
+  //CmiPrintf("PE %d startRing allocating %d bytes, header=%d bytes\n",
+	    //CmiMyPe(),CpvAccess(msgSize),CmiMsgHeaderSizeBytes);
   CmiPrintf(
   "       cycles       bytes         Total(ms)     One-way (us/msg)\n"
   );
@@ -38,7 +35,7 @@ void startRing()
 
 void ringFinished(char *msg)
 {
-  CmiPrintf("PE %d ringFinished\n",CmiMyPe());
+  // CmiPrintf("PE %d ringFinished\n",CmiMyPe());
   CmiFree(msg);
   CpvAccess(endTime) = CmiWallTimer();
   CpvAccess(endCTime) = CmiTimer();
@@ -72,8 +69,6 @@ CmiHandler exitHandlerFunc(char *msg)
 
 CmiHandler node0HandlerFunc(char *msg)
 {
-  CmiGrabBuffer((void **)&msg);
-  //  CmiPrintf("PE %d node0Handler\n",CmiMyPe());
   CpvAccess(cycleNum)++;
 
   if (CpvAccess(cycleNum) == nCycles)
@@ -88,8 +83,6 @@ CmiHandler node0HandlerFunc(char *msg)
 
 CmiHandler node1HandlerFunc(char *msg)
 {
-  CmiGrabBuffer((void **)&msg);
-  // CmiPrintf("PE %d node1Handler\n",CmiMyPe());
   CpvAccess(msgSize) = *((int *)(msg+CmiMsgHeaderSizeBytes));
   CmiSetHandler(msg,CpvAccess(node0Handler));
   CmiSyncSendAndFree(0,CpvAccess(msgSize),msg);
