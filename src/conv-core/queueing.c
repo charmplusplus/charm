@@ -302,7 +302,7 @@ void CqsEnqueueGeneral(Queue q, void *data, int strategy,
     break;
 
   case CQS_QUEUEING_LFIFO:     
-    // allow signed priority queueing on 64 bit integers
+    /* allow signed priority queueing on 64 bit integers */
     lprio =(CmiInt8 *)prioptr;
     if (*lprio<0)
       {
