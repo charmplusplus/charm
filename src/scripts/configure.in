@@ -94,7 +94,7 @@ add_flag() {
 	then
 	  true
 	else
-	  cat >> ./conv-mach-opt.sh << EOT
+	  cat >> ../include/conv-mach-opt.sh << EOT
 
 # Option added by configure script's $2 section
 $1
