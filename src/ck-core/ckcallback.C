@@ -91,7 +91,10 @@ void CkCallback::send(void *msg) const
 		else //Forward message to processor where the thread actually lives
 			ckcallbackgroup[d.thread.onPE].call(*this,(CkMessage *)msg);
 		break;
-	case callCFn: //Call a C function pointer
+	case call1Fn: //Call a C function pointer on the current processor
+		(d.c1fn.fn)(msg);
+		break;
+	case callCFn: //Call a C function pointer on the appropriate processor
 		if (d.cfn.onPE==CkMyPe())
 			(d.cfn.fn)(d.cfn.param,msg);
 		else

@@ -13,6 +13,7 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 #define _CKCALLBACK_H_
 
 typedef void (*CkCallbackFn)(void *param,void *message);
+typedef void (*Ck1CallbackFn)(void *message);
 
 class CkCallback {
 public:
@@ -21,7 +22,8 @@ public:
 	ignore, //Do nothing
 	ckExit, //Call ckExit
 	resumeThread, //Resume a waiting thread (d.thread)
-	callCFn, //Call a C function pointer (d.cfn)
+	callCFn, //Call a C function pointer with a parameter (d.cfn)
+	call1Fn, //Call a C function pointer on any processor (d.c1fn)
 	sendChare, //Send to a chare (d.chare)
 	sendGroup, //Send to a group (d.group)
 	sendArray, //Send to an array (d.array)
@@ -44,6 +46,9 @@ private:
 		CkCallbackFn fn; //Function to call
 		void *param; //User parameter
 	} cfn;
+	struct s_c1fn { //call1Fn
+		Ck1CallbackFn fn; //Function to call on whatever processor
+	} c1fn;
 	struct s_chare { //sendChare
 		int ep; //Entry point to call
 		CkChareID id; //Chare to call it on
@@ -71,9 +76,9 @@ public:
 	CkCallback(callbackType t) 
 		:type(t) { if (t==resumeThread) impl_thread_init(); }
 
-	CkCallback(CkCallbackFn fn)
-		:type(callCFn) 
-		{d.cfn.onPE=0; d.cfn.fn=fn; d.cfn.param=NULL;}
+	CkCallback(Ck1CallbackFn fn)
+		:type(call1Fn)
+		{d.c1fn.fn=fn;}
 
 	CkCallback(CkCallbackFn fn,void *param)
 		:type(callCFn) 
