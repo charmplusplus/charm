@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1995-11-02 23:22:52  sanjeev
+ * Revision 2.16  1995-11-07 23:29:54  sanjeev
+ * fixed bug for handle variable
+ *
+ * Revision 2.15  1995/11/02  23:22:52  sanjeev
  * preprocessor problems fixes
  *
  * Revision 2.14  1995/11/01  23:05:43  sanjeev
@@ -265,8 +268,13 @@ int CheckCharmName()
 		type = CurrentDeclType ;
 		printtype = 0 ;
 	} ***/ 
-	else
-		fprintf(stderr,"TRANSLATOR ERROR in handle decl: %s, line %d: \n",CurrentFileName,CurrentLine) ;
+	else {
+		/*	fprintf(stderr,"TRANSLATOR ERROR in handle decl: %s, line %d: \n",CurrentFileName,CurrentLine) ;   */
+		return 0 ;
+	}
+
+
+
 	FLUSHBUF() ;
 
 	if ( Strstr(type,"::") != NULL ) {
