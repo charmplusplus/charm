@@ -12,7 +12,13 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:40:29  brunner
+ * Revision 2.1  1995-06-19 16:47:38  brunner
+ * Added Cpv macros and modified to use chareCount instead of TotalChares,
+ * pseudoCount instead of TotalPseudos, etc.
+ * Doesn't work yet, but I need to get a new copy of the files, so I'm
+ * checking it in.
+ *
+ * Revision 2.0  1995/06/02  17:40:29  brunner
  * Reorganized directory structure
  *
  * Revision 1.3  1995/04/13  20:55:09  sanjeev
@@ -22,6 +28,7 @@
  * interop stuff
  *
  * Revision 1.1  1994/11/03  17:40:02  brunner
+
  * Initial revision
  *
  ***************************************************************************/
@@ -36,31 +43,41 @@ static char ident[] = "@(#)$Header$";
 #include "performance.h"
 #undef MAIN_PERF
 
-char *pgm, *machine;
-int RecdPerfMsg = 1;
-char *log_file_name;		/* log file name      	*/
-int current_event = 0;
-LOGSTR logbuf[MAXLOGBUFSIZE];
+CpvDeclare(char*,pgm);
+CpvDeclare(char*,machine);
 
-int  logcnt;        		/* no. of log entries 	*/
-int iteration;
+CpvExtern(int,RecdPerfMsg);
 
-int store_event, store_pe;
-unsigned int store_time;
+CpvDeclare(char*,log_file_name);		/* log file name      	*/
+CpvDeclare(int,current_event);
 
-int begin_pe = -1, begin_event = -1;
-unsigned int begin_processing_time = -1;
+typedef LOGSTR LOGARR[MAXLOGBUFSIZE];
+CpvDeclare(LOGARR,logbuf);
 
+CpvDeclare(int,logcnt);        		/* no. of log entries 	*/
+CpvDeclare(int,iteration);
 
-FILE *state_file_fd;
+CpvDeclare(int,store_event);
+CpvDeclare(int,store_pe);
 
-extern int TotalChares;
+typedef unsigned int uint;
+CpvDeclare(uint, store_time);  /* not used currently? */
+
+CpvDeclare(int,begin_pe);
+CpvDeclare(int,begin_event);
+CpvDeclare(uint,begin_processing_time);
+
+CpvDeclare(FILE*,state_file_fd);
+
+CpvExtern(int,chareCount);
+CpvExtern(int,pseudoCount);
+CpvExtern(int,msgCount);
 
 
 void PrintStsFile(str)
 char *str ;
 {
-	fprintf(state_file_fd,"%s",str) ;
+	fprintf(CpvAccess(state_file_fd),"%s",str) ;
 }
 
 
@@ -70,41 +87,41 @@ int msg_type, entry;
 ENVELOPE *envelope;
 {
 	int i;
-	iteration = 1;
+	CpvAccess(iteration) = 1;
 	if (msg_type == BocInitMsg ||
 		msg_type == BroadcastBocMsg || 
 		msg_type == QdBroadcastBocMsg ||
 		msg_type==DynamicBocInitMsg)
-                	iteration = CmiNumPe();
+                	CpvAccess(iteration) = CmiNumPe();
 
-	SetEnv_event(envelope, current_event);
+	SetEnv_event(envelope, CpvAccess(current_event));
 	SetEnv_pe(envelope, CmiMyPe());
-	for (i=0; i<iteration; i++)
+	for (i=0; i<CpvAccess(iteration); i++)
 		add_to_buffer(CREATION, msg_type, entry, CkUTimer(), 
 					GetEnv_event(envelope)+i, GetEnv_pe(envelope));
-	current_event += iteration;	
+	CpvAccess(current_event) += CpvAccess(iteration);	
 }
 
 trace_begin_execute(envelope)
 ENVELOPE *envelope;
 {
 	int msg_type = GetEnv_msgType(envelope);
-	begin_event = GetEnv_event(envelope);
+	CpvAccess(begin_event) = GetEnv_event(envelope);
 	if (msg_type ==  BocInitMsg ||
 		msg_type == BroadcastBocMsg || 
 		msg_type == QdBroadcastBocMsg ||
 		msg_type==DynamicBocInitMsg)
-			begin_event += CmiMyPe();
-	begin_pe = GetEnv_pe(envelope);
+			CpvAccess(begin_event) += CmiMyPe();
+	CpvAccess(begin_pe) = GetEnv_pe(envelope);
 	add_to_buffer(BEGIN_PROCESSING, msg_type, GetEnv_EP(envelope), CkUTimer(),
-				 begin_event, begin_pe);
+				 CpvAccess(begin_event), CpvAccess(begin_pe));
 }
 
 trace_end_execute(id, msg_type, entry)
 int id, msg_type, entry;
 {
 	add_to_buffer(END_PROCESSING, msg_type, entry, CkUTimer(),
-						begin_event, begin_pe);
+						CpvAccess(begin_event), CpvAccess(begin_pe));
 }
 
 trace_begin_charminit() 
@@ -114,17 +131,17 @@ trace_begin_charminit()
     msg = (int *) CkAllocMsg(sizeof(int));
     envelope = (ENVELOPE *) ENVELOPE_UPTR(msg);
     trace_creation(NewChareMsg, -1, envelope);
-    store_pe = GetEnv_pe(envelope);
-    store_event = GetEnv_event(envelope);
+    CpvAccess(store_pe) = GetEnv_pe(envelope);
+    CpvAccess(store_event) = GetEnv_event(envelope);
 	add_to_buffer(BEGIN_PROCESSING, NewChareMsg, -1, CkUTimer(),
-					store_event, store_pe);
+					CpvAccess(store_event), CpvAccess(store_pe));
 
 }
 
 trace_end_charminit() 
 {
     add_to_buffer(END_PROCESSING, NewChareMsg, -1, CkUTimer(),
-					store_event, store_pe);
+		  CpvAccess(store_event), CpvAccess(store_pe));
 }
 
 
@@ -187,8 +204,8 @@ int event, pe;
 	LOGSTR *buf;
 
 TRACE(CmiPrintf("[%d] add: cnt=%d, type=%d, msg=%d, ep=%d, t1=%d, t2=%d, event=%d\n",
-CmiMyPe(), logcnt, type, msg_type, entry, t1, t2, event));
-	buf  = & (logbuf[logcnt]);
+CmiMyPe(), CpvAccess(logcnt), type, msg_type, entry, t1, t2, event));
+	buf  = & (CpvAccess(logbuf)[CpvAccess(logcnt)]);
 	buf->type 	=  type;
 	buf->msg_type 	=  msg_type;
 	buf->entry 	=  entry;
@@ -197,30 +214,30 @@ CmiMyPe(), logcnt, type, msg_type, entry, t1, t2, event));
 	buf->pe = pe;
 
 	/* write the log into the buffer */
-	logcnt++;
+	CpvAccess(logcnt)++;
 
 	/* if log buffer is full then write out */
 	/* the log into log file 		*/
-	if (logcnt == MAXLOGBUFSIZE)
+	if (CpvAccess(logcnt) == MAXLOGBUFSIZE)
 	{
 		int begin_interrupt;
 
 		begin_interrupt = CkUTimer();
-		wrtlog(CmiMyPe(), logbuf, MAXLOGBUFSIZE);
+		wrtlog(CmiMyPe(), CpvAccess(logbuf), MAXLOGBUFSIZE);
 
-		buf = &(logbuf[logcnt]);
+		buf = &(CpvAccess(logbuf)[CpvAccess(logcnt)]);
 		buf->type = BEGIN_INTERRUPT;
 		buf->time1 = begin_interrupt;
-		buf->event = current_event;
+		buf->event = CpvAccess(current_event);
 		buf->pe = CmiMyPe();
-		logcnt++;
+		CpvAccess(logcnt)++;
 		buf++;
 
 		buf->type = END_INTERRUPT;
 		buf->time1 = CkUTimer();
-		buf->event = current_event++;
+		buf->event = CpvAccess(current_event)++;
 		buf->pe = CmiMyPe();
-		logcnt++;
+		CpvAccess(logcnt)++;
 	}
 }
 
@@ -236,21 +253,41 @@ log_init()
 	int length;
 	FILE *log_file_desc;
 
+	CpvInitialize(char*,pgm);
+	CpvInitialize(char*,machine);
+	CpvInitialize(char*,log_file_name);
+	CpvInitialize(int,current_event);
+	CpvInitialize(LOGARR,logbuf);
+	CpvInitialize(int,logcnt);        /* no. of log entries 	*/
+	CpvInitialize(int,iteration);
+	CpvInitialize(int,store_event);
+	CpvInitialize(int,store_pe);
+	CpvInitialize(uint, store_time);  /* not used currently? */
+	CpvInitialize(int,begin_pe);
+	CpvInitialize(int,begin_event);
+	CpvInitialize(uint,begin_processing_time);
+	CpvInitialize(FILE*,state_file_fd);
+
+	CpvAccess(RecdPerfMsg)=1;
+	CpvAccess(current_event)=1;
+	CpvAccess(begin_pe)=-1;
+	CpvAccess(begin_event)=-1;
+	CpvAccess(begin_processing_time)=-1;
+
 	pe = CmiMyPe();
- 	begin_processing_time = -1;
 
 	/* build log file name from pgm name and pe number */
 
-	length = strlen(pgm) + strlen(".") + CmiNumPe() +
+	length = strlen(CpvAccess(pgm)) + strlen(".") + CmiNumPe() +
 		 strlen(".log") + 1;
-	log_file_name = (char *) CkAlloc(length);
-	sprintf(log_file_name, "%s.%d.log", pgm, pe);
+	CpvAccess(log_file_name) = (char *) CmiAlloc(length);
+	sprintf(CpvAccess(log_file_name), "%s.%d.log", CpvAccess(pgm), pe);
 
-	if((log_file_desc = fopen(log_file_name, "w+")) == NULL)
-		printf("*** ERROR *** Cannot Create %s",log_file_name);
+	if((log_file_desc = fopen(CpvAccess(log_file_name), "w+")) == NULL)
+		printf("*** ERROR *** Cannot Create %s",CpvAccess(log_file_name));
 	fprintf(log_file_desc, "PROJECTIONS-RECORD\n");
 	fclose(log_file_desc);
-	logcnt = 0; 
+	CpvAccess(logcnt) = 0; 
 }
 
 
@@ -269,60 +306,60 @@ close_log()
 	pe = CmiMyPe();
 
 	/* flush out the log buffer before closing the log file */
-	buf = logbuf;
+	buf = CpvAccess(logbuf);
     	trace_end_computation();
-	if (logcnt)
-		wrtlog(pe, buf, logcnt);
+	if (CpvAccess(logcnt))
+		wrtlog(pe, buf, CpvAccess(logcnt));
 	if (pe == 0)
 	{
 		char *state_file;
 
-		state_file = (char *) malloc(strlen(pgm) + strlen(".sts") + 1);
-		strcpy(state_file, pgm);
+		state_file = (char *) malloc(strlen(CpvAccess(pgm)) + strlen(".sts") + 1);
+		strcpy(state_file, CpvAccess(pgm));
 		strcat(state_file, ".sts");
-		state_file_fd = (FILE *) fopen(state_file, "w");
+		CpvAccess(state_file_fd) = (FILE *) fopen(state_file, "w");
 		
 
-		fprintf(state_file_fd, "MACHINE %s\n", machine);
-		fprintf(state_file_fd, "PROCESSORS %d\n", CmiNumPe());
-		fprintf(state_file_fd, "TOTAL_CHARES %d\n", TotalChares);
-		fprintf(state_file_fd, "TOTAL_EPS %d\n", 
+		fprintf(CpvAccess(state_file_fd), "MACHINE %s\n", CpvAccess(machine));
+		fprintf(CpvAccess(state_file_fd), "PROCESSORS %d\n", CmiNumPe());
+		fprintf(CpvAccess(state_file_fd), "TOTAL_CHARES %d\n", CpvAccess(chareCount));
+		fprintf(CpvAccess(state_file_fd), "TOTAL_EPS %d\n", 
 		   /*	  TotalEps+TotalBocEps+1);   */
 		   	  TotalEps+1);   
 
-		fprintf(state_file_fd, "TOTAL_MSGS %d\n", TotalMsgs);
-		fprintf(state_file_fd, "TOTAL_PSEUDOS %d\n", TotalPseudos-1);
+		fprintf(CpvAccess(state_file_fd), "TOTAL_MSGS %d\n", CpvAccess(msgCount));
+		fprintf(CpvAccess(state_file_fd), "TOTAL_PSEUDOS %d\n", CpvAccess(pseudoCount)-1);
 
-        	for (i=0; i<TotalChares-1; i++)
-           		fprintf(state_file_fd, "CHARE %d %s\n",
+        	for (i=0; i<CpvAccess(chareCount)-1; i++)
+           		fprintf(CpvAccess(state_file_fd), "CHARE %d %s\n",
 			 	i, ChareNamesTable[i]);
 
        		for (i=NumSysBocEps; i<TotalEps; i++) {
 		    if ( EpChareTypeTable[i] == CHARE ) {
-           			fprintf(state_file_fd, "ENTRY CHARE %d %s %d %d\n",
+           			fprintf(CpvAccess(state_file_fd), "ENTRY CHARE %d %s %d %d\n",
                			i, EpNameTable[i], EpChareTable[i],
 						EpToMsgTable[i]);
 		    }
 		    else {
-           			fprintf(state_file_fd, "ENTRY BOC %d %s %d %d\n",
+           			fprintf(CpvAccess(state_file_fd), "ENTRY BOC %d %s %d %d\n",
                		i, EpNameTable[i], EpChareTable[i],
 					EpToMsgTable[i]);
 		    }
 		}
 
-       		for (i=0; i<TotalMsgs; i++)
-           			fprintf(state_file_fd, "MESSAGE %d %d\n",
+       		for (i=0; i<CpvAccess(msgCount); i++)
+           			fprintf(CpvAccess(state_file_fd), "MESSAGE %d %d\n",
                		i, MsgToStructTable[i].size);
 
-       		for (i=0; i<TotalPseudos-1; i++)
-           			fprintf(state_file_fd, "PSEUDO %d %d %s\n",
+       		for (i=0; i<CpvAccess(pseudoCount)-1; i++)
+           			fprintf(CpvAccess(state_file_fd), "PSEUDO %d %d %s\n",
                			i, PseudoTable[i].type,
 						PseudoTable[i].name);
 
 
-         	fprintf(state_file_fd, "END\n");
-		fflush(state_file_fd);
-		fclose(state_file_fd);
+         	fprintf(CpvAccess(state_file_fd), "END\n");
+		fflush(CpvAccess(state_file_fd));
+		fclose(CpvAccess(state_file_fd));
 	}
 }
 
@@ -334,10 +371,10 @@ close_log()
 program_name(s, m)
 char *s, *m;
 {
-	pgm = (char *) malloc(strlen(s) + 1);
-	strcpy(pgm, s);
-	machine = (char *) malloc(strlen(m) + 1);
-	strcpy(machine, m);
+	CpvAccess(pgm) = (char *) malloc(strlen(s) + 1);
+	strcpy(CpvAccess(pgm), s);
+	CpvAccess(machine) = (char *) malloc(strlen(m) + 1);
+	strcpy(CpvAccess(machine), m);
 }
 
 
@@ -359,8 +396,9 @@ int count;
 
 	/* open the logfile in append mode, write the log buffer and close it */
 
-	if((log_file_desc = fopen(log_file_name, "a")) == NULL)
-		CmiPrintf("*** ERROR *** Cannot Create %s",log_file_name);
+	if((log_file_desc = fopen(CpvAccess(log_file_name), "a")) == NULL)
+		CmiPrintf("*** ERROR *** Cannot Create %s",
+			  CpvAccess(log_file_name));
 	for (i=0; i<count; i++, buf++)
 	{
 		write_out_projections_line(log_file_desc, 
@@ -369,7 +407,7 @@ int count;
 								buf->event, buf->pe);
 		fprintf(log_file_desc, "\n");
 	}
-	logcnt = 0;
+	CpvAccess(logcnt) = 0;
 	fflush(log_file_desc);
 	fclose(log_file_desc);
 }
