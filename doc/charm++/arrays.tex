@@ -184,7 +184,7 @@ which must be defined before including the \texttt{.decl.h} file
 class A1:public ArrayElement1D \{ public: A1()\{\} ...\};
 class A2:public ArrayElement2D \{ public: A2()\{\} ...\};
 class A3:public ArrayElement3D \{ public: A3()\{\} ...\};
-class AF:public ArrayElementT<foo> \{ public: AF()\{\} ...\};
+class AF:public ArrayElementT<Foo> \{ public: AF()\{\} ...\};
 \end{alltt}
 
 A 1D array element can access its index via its inherited ``thisIndex''
@@ -466,28 +466,28 @@ To define a new array index, you create an ordinary C++ class
 which inherits from \kw{CkArrayIndex} and sets the ``nInts'' member
 to the length, in integers, of the array index.
 
-For example, if you have a structure or class named ``foo'', you 
-can use a \uw{foo} object as an array index by defining the class:
+For example, if you have a structure or class named ``Foo'', you 
+can use a \uw{Foo} object as an array index by defining the class:
 
 \begin{alltt}
 #include <charm++.h>
 class CkArrayIndexFoo:public CkArrayIndex \{
-    foo f;
+    Foo f;
 public:
-    CkArrayIndexFoo(const foo \&in) 
+    CkArrayIndexFoo(const Foo \&in) 
     \{
         f=in;
         nInts=sizeof(f)/sizeof(int);
     \}
     //Not required, but convenient: cast-to-foo operators
-    operator foo &() \{return f;\}
-    operator const foo &() const \{return f;\}
+    operator Foo &() \{return f;\}
+    operator const Foo &() const \{return f;\}
 \};
 \end{alltt}
 
-Note that \uw{foo}'s size must be an integral number of integers--
+Note that \uw{Foo}'s size must be an integral number of integers--
 you must pad it with zero bytes if this is not the case.
-Also, \uw{foo} must be a simple class-- it cannot contain 
+Also, \uw{Foo} must be a simple class-- it cannot contain 
 pointers, have virtual functions, or require a destructor.
 Finally, there is a \charmpp\ configuration-time option called
 CK\_ARRAYINDEX\_MAXLEN \index{CK\_ARRAYINDEX\_MAXLEN} 
@@ -497,18 +497,18 @@ override this to any value by passing ``-DCK\_ARRAYINDEX\_MAXLEN=n''
 to the \charmpp\ build script as well as all user code. Larger 
 values will increase the size of each message.
 
-You can then declare an array indexed by \uw{foo} objects with
+You can then declare an array indexed by \uw{Foo} objects with
 
 \begin{alltt}
 //in the .ci file:
 array [Foo] AF \{ entry AF(); ... \}
 
 //in the .h file:
-class AF:public ArrayElementT<foo>
+class AF:public ArrayElementT<Foo>
 \{ public: AF() \{\} ... \}
 
 //in the .C file:
-    foo f;
+    Foo f;
     CProxy_AF a=CProxy_AF::ckNew();
     a[CkArrayIndexFoo(f)].insert();
     ...
@@ -523,16 +523,16 @@ with the explicit keyword, we can equivalently write the last line as:
 
 When you implement your array element class, as shown above you 
 can inherit from
-\kw{ArrayElementT}, a class templated by the index type \uw{foo}.
-The array index (an object of type \uw{foo}) is then accessible as ``thisIndex'':
-For example:
+\kw{ArrayElementT}, a class templated by the index type \uw{Foo}.
+The array index (an object of type \uw{Foo}) is then accessible as 
+``thisIndex''. For example:
 
 \begin{alltt}
 
 //in the .C file:
 AF::AF()
 \{
-    foo myF=thisIndex;
+    Foo myF=thisIndex;
     functionTakingFoo(myF);
 \}
 \end{alltt}
