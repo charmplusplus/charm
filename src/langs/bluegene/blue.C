@@ -1,5 +1,5 @@
 // File: blue.C
-// BlueGene Emulator Code based on Converse
+// Converse BlueGene Emulator Code
 
 #include <stdio.h>
 #include <string.h>
@@ -95,7 +95,7 @@ static int inEmulatorInit=0;
 #define ASSERT(x)	if (!(x)) { CmiPrintf("Assert failure at %s:%d\n", __FILE__,__LINE__); CmiAbort("Abort!"); }
 
 #define BGARGSCHECK   	\
-  if (numX==0 || numY==0 || numZ==0)  CmiAbort("\nMissing parameters for BlueGene node size!\n<tip> use command line options: +x, +y, or +z.\n");  \
+  if (numX==0 || numY==0 || numZ==0)  CmiAbort("\nMissing parameters for BlueGene machine size!\n<tip> use command line options: +x, +y, or +z.\n");  \
   if (numCth==0 || numWth==0) CmiAbort("\nMissing parameters for number of communication/worker threads!\n<tip> use command line options: +cth or +wth.\n");
 
 #define HANDLERCHECK(handler)	\
@@ -512,7 +512,11 @@ void BgShutdown()
   void *sendmsg = CmiAlloc(msgSize);
   CmiSetHandler(sendmsg, CpvAccess(exitHandler));
   /* broadcast to shutdown */
-  CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
+  //CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
+  CmiAbort("\nBG> BlueGene simulator shutdown gracefully!\n");
+  /* don't return */
+  ConverseExit();
+  //while (1) CmiDeliverMsgs(0);
   
 /*
   int i;

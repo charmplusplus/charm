@@ -1,6 +1,7 @@
 /*
-  Blue.h -- header file to include for bluegene emulator program
-  First written by Gengbin Zheng, gzheng@uiuc.edu on 2/20/2001
+  File: Blue.h -- header file defines the user API for Converse Bluegene 
+        Emulator application. 
+  Emulator first written by Gengbin Zheng, gzheng@uiuc.edu on 2/20/2001
 */ 
 
 #ifndef BLUEGENE_H
@@ -54,15 +55,15 @@ void BgSendLocalPacket(int threadID, int handlerID, WorkType type, int numbytes,
 void BgSendNonLocalPacket(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* data);
 void BgSendPacket(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* data);
 
-	/** shutdown the simulator */
+	/** shutdown the emulator */
 void BgShutdown();
 
 /* user defined functions called by bluegene */
-	/*  called exactly once per process, used to check argc/argv,
-	    setup bluegene simulation size, number of communication/worker 
-	    threads and register user handler functions */
+	/* called exactly once per process, used to check argc/argv,
+	   setup bluegene emulation machine size, number of communication/worker
+	   threads and register user handler functions */
 extern void BgEmulatorInit(int argc, char **argv);
-	/* called every bluegene node to start the first job */
+	/* called every bluegene node to trigger the computation */
 extern void BgNodeStart(int argc, char **argv);
 
 #if defined(__cplusplus)
