@@ -95,9 +95,11 @@ CmiPrintf("start\n");
     mcast = new CProxySection_Hello(thisArrayID, al, SECTIONSIZE, mCastGrpId);
 #endif
     mcp = CProxySection_Hello::ckNew(thisArrayID, al, SECTIONSIZE);
+    mcp.ckSectionDelegate(mg);
+/*
     mcp.ckDelegate(mg);
-
     mg->setSection(mcp);
+*/
 
 #if 0
     mg->setSection(sid, thisArrayID, al, SECTIONSIZE);
@@ -171,7 +173,7 @@ CmiPrintf("start\n");
   {
 //    CkPrintf("[%d] Hi[%d] from element %d\n",CmiMyPe(), m->data[0],thisIndex);
 
-    CkGetSectionCookie(sid, m);
+    CkGetSectionInfo(sid, m);
 //CmiPrintf("[%d] SayHi: sid on %d %p\n", CmiMyPe(), sid.pe, sid.val);
 
     CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
