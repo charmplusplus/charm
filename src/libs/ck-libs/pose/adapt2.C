@@ -3,7 +3,6 @@
 
 adapt2::adapt2() { 
   timeLeash = SPEC_WINDOW; 
-  eventLeash = MAX_EVENTS; 
   STRAT_T = ADAPT2_T; 
 }
 
@@ -11,16 +10,10 @@ adapt2::adapt2() {
 void adapt2::Step()
 {
   Event *ev;
-  static int lastGVT = 0;
-  static int evCount = 0;
+  static int lastGVT = -1;
 
-  if (localPVT->getGVT() > lastGVT) {
-    lastGVT = localPVT->getGVT();
-    evCount = 0;
-  } 
-  else if (eq->currentPtr->timestamp == lastGVT) {
-    evCount = 0;
-  }
+  CmiAssert(lastGVT <= localPVT->getGVT());
+  lastGVT = localPVT->getGVT();
   if (!parent->cancels.IsEmpty()) {             // Cancel as much as possible
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(CAN_TIMER);      
@@ -34,9 +27,8 @@ void adapt2::Step()
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(RB_TIMER);      
 #endif
-    //    CkPrintf("<ROLLBACK of %d:%d @ time %d (L_t:%d, L_e:%d) OVT=%d GVT=%d\n", RBevent->evID.id, RBevent->evID.pe, RBevent->timestamp, timeLeash, eventLeash, userObj->OVT(), lastGVT);
+    //CkPrintf("<ROLLBACK of %d:%d @ time %d (L_t:%d) OVT=%d GVT=%d\n", RBevent->evID.id, RBevent->evID.pe, RBevent->timestamp, timeLeash, userObj->OVT(), lastGVT);
     timeLeash = MIN_LEASH;
-    eventLeash = MIN_EVENTS;
     Rollback(); 
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(SIM_TIMER);      
@@ -49,8 +41,7 @@ void adapt2::Step()
   if ((POSE_endtime > -1) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT + 1;
 
-  while ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)
-	 && (evCount < eventLeash)) {
+  while ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
     // do all events at under timeLeash
     currentEvent = ev;
     ev->done = 2;
@@ -66,9 +57,7 @@ void adapt2::Step()
     ev->done = 1;                           // complete the event execution
     eq->ShiftEvent();                       // shift to next event
     ev = eq->currentPtr;
-    evCount++;
   }
-  if (eventLeash < MAX_EVENTS) eventLeash++;
-  else if (timeLeash < MAX_LEASH) timeLeash += LEASH_FLEX;
+  if (timeLeash < MAX_LEASH) timeLeash += LEASH_FLEX;
 }
 

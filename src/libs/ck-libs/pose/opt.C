@@ -292,6 +292,5 @@ void opt::RecoverState(Event *recoveryPoint)
     }
     ev = ev->next;
   }
-  userObj->ResetCheckpointRate();
   CpvAccess(stateRecovery) = 0;  // return forward execution behavior to normal
 }

@@ -13,8 +13,8 @@
 // Basic constructor
 SRtable::SRtable() 
 { 
-  gvtWindow = 512;
-  availableBuckets = numBuckets = 64;
+  gvtWindow = GVT_WINDOW;
+  availableBuckets = numBuckets = gvtWindow/GVT_BUCKET_SZ;
   residuals = residualsTail = recyc = recycTail = NULL;
   recycCount = 0;
   inBuckets = 0;
@@ -206,15 +206,14 @@ UpdateMsg *SRtable::packTable()
 }
 
 void SRtable::shrink()
-{ // Assumes bucket size is 8; currently not flexible
-  // This code shrinks by a single bucket
+{ // This code shrinks by a single bucket
   int oldNumBuckets = numBuckets, i;
   SRentry *tmp;
 
   //sanitize();
-  if (gvtWindow > 16) gvtWindow = gvtWindow-8;
+  if (gvtWindow > 2*bktSz) gvtWindow = gvtWindow-bktSz;
   else return;
-  numBuckets = gvtWindow/8;
+  numBuckets = gvtWindow/bktSz;
   // move elements from last bucket to residuals
   inBuckets = inBuckets - sends[oldNumBuckets-1].count - recvs[oldNumBuckets-1].count;
   sends[oldNumBuckets-1].emptyOutBucket(residuals, residualsTail, NULL);
@@ -223,15 +222,14 @@ void SRtable::shrink()
 }
 
 void SRtable::expand()
-{ // Assumes bucket size is 8; currently not flexible
-  // This code expands by a single bucket
+{   // This code expands by a single bucket
   int oldNumBuckets = numBuckets, i;
   SRentry *tmp;
 
   //sanitize();
   if (gvtWindow > MAX_GVT_WINDOW) return;
   gvtWindow = gvtWindow*2;
-  numBuckets = gvtWindow/8;
+  numBuckets = gvtWindow/bktSz;
   if (numBuckets > availableBuckets) { // need to actually expand table
     // move all elements to residuals
     for (i=0; i<oldNumBuckets; i++) {

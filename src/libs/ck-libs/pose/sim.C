@@ -128,7 +128,6 @@ void sim::Commit()
     if (localPVT->done())
       objID->terminus();
   }
-  objID->ResetCheckpointRate();
   #ifdef POSE_STATS_ON
     localStats->SwitchTimer(SIM_TIMER);
   #endif

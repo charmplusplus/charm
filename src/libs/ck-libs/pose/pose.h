@@ -15,24 +15,21 @@
 #endif 
 #include "pose.decl.h"
 
+// Strategy variables
+#define STORE_RATE 50           // default store rate: 1 for every n events
+#define SPEC_WINDOW 100         // speculative event window
+#define MIN_LEASH 10            // min spec window for adaptive strategy
+#define MAX_LEASH 1000          // max  "     "     "     "        " 
+#define LEASH_FLEX 10           // leash increment
+#define GVT_WINDOW 512          // Maximum time GVT can advance
+#define GVT_BUCKET_SZ 8         // Must divide GVT_WINDOW evenly
+#define TBL_THRESHOLD 1000      // max # entries in table before it shrinks
+#define MAX_GVT_WINDOW 10000    // don't expand GVT SRtable beyond this
+
 // Load balancer variables
 #define LB_SKIP 51           // LB done 1/LB_SKIP times GVT iterations
 #define LB_THRESHOLD 2000    // 20 heavy objects
 #define LB_DIFF 10000        // min diff between min and max load PEs
-
-// Strategy variables
-#define MAX_FUTURE_OFFSET 10000 // CancelList gets cancels w/ts < gvt+this
-#define STORE_RATE 1         // default store rate: 1 for every n events
-#define SPEC_WINDOW 10     // speculative event window
-#define MIN_LEASH 10        // min spec window for adaptive strategy
-#define MAX_LEASH 100      // max  "     "     "     "        " 
-#define LEASH_FLEX 10       // leash increment
-#define GVT_WINDOW 8         // GVT improvement limit; sets s/r table size
-#define GVT_bucket 1         // number of buckets to sort sends/recvs into
-#define TBL_THRESHOLD 100    // max # entries in table before it shrinks
-#define MAX_GVT_WINDOW 100  // don't expand GVT SRtable beyond this
-#define MAX_EVENTS 10       // eventLeash controls quantity of events that
-#define MIN_EVENTS 10        // are executed by a Step call on a strategy
 
 // MISC
 #define MAX_POOL_SIZE 20     // maximum size of an eventMsg pool

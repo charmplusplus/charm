@@ -35,12 +35,6 @@ Event *rep::getCommitEvent(Event *e)
   return NULL;
 }
 
-// sets checkpoint rate to 1/1 for chpt
-void rep::CheckpointAll() { }
-
-// sets checkpoint rate to default for chpt
-void rep::ResetCheckpointRate() { }
-
 // dump the entire rep object: called by objects inheriting from rep
 void rep::dump(int pdb_level) 
 { 

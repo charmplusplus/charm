@@ -31,8 +31,6 @@ class rep
 
   // timestamps event message, sets priority, and makes a record of the send
   virtual void registerTimestamp(int idx, eventMsg *m, unsigned int offset);
-  virtual void CheckpointAll();        // set checkpoint rate to 1/1
-  virtual void ResetCheckpointRate();  // reset checkpoint rate to default
 
   // required for checkpointing: must provide assignment in all derived classes
   virtual rep& operator=(const rep& obj) { 
