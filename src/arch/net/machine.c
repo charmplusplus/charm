@@ -1604,6 +1604,7 @@ extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)());
 static void CmiStartThreads()
 {
   struct itimerval i;
+  int useAlarm = 1;
   
   if ((Cmi_numpes != Cmi_numnodes) || (Cmi_mynodesize != 1))
     KillEveryone
@@ -1624,8 +1625,12 @@ static void CmiStartThreads()
 #endif
   }
   else {
-    /* even in netpoll mode, we still need to ping charmrun periodically */
+#if !CMK_ASYNC_NOT_NEEDED
+    /* in netpoll mode, we still need to ping charmrun periodically */
     CmiSignal(SIGALRM, 0, 0, alarmInterrupt);
+#else
+    useAlarm = 0;
+#endif
   }
   
   /* if running on only one node, the only thing an interrupt
@@ -1637,11 +1642,13 @@ static void CmiStartThreads()
 
   /*This will send us a SIGALRM every Cmi_tickspeed microseconds,
     which will call the CommunicationInterrupt routine above.*/
-  i.it_interval.tv_sec = 0;
-  i.it_interval.tv_usec = Cmi_tickspeed;
-  i.it_value.tv_sec = 0;
-  i.it_value.tv_usec = Cmi_tickspeed;
-  setitimer(ITIMER_REAL, &i, NULL);
+  if (useAlarm) {
+    i.it_interval.tv_sec = 0;
+    i.it_interval.tv_usec = Cmi_tickspeed;
+    i.it_value.tv_sec = 0;
+    i.it_value.tv_usec = Cmi_tickspeed;
+    setitimer(ITIMER_REAL, &i, NULL);
+  }
 }
 
 #endif
