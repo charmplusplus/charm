@@ -789,15 +789,19 @@ static const char *CIMsgClassAnsi =
 "  public:\n"
 "    static int __idx;\n"
 "    void* operator new(size_t,void*p) { return p; }\n"
-"    void operator delete(void*p,void*){CkFreeMsg(p);}\n"
 "    void* operator new(size_t,const int);\n"
-"    void operator delete(void*p,const int){CkFreeMsg(p);}\n"
 "    void* operator new(size_t);\n"
-"    void operator delete(void*p){ CkFreeMsg(p);}\n"
 "    void* operator new(size_t, int*, const int);\n"
-"    void operator delete(void*p,int*,const int){CkFreeMsg(p);}\n"
 "    void* operator new(size_t, int*);\n"
+"#if CMK_MULTIPLE_DELETE\n"
+"    void operator delete(void*p,void*){CkFreeMsg(p);}\n"
+"    void operator delete(void*p,const int){CkFreeMsg(p);}\n"
+"    void operator delete(void*p){ CkFreeMsg(p);}\n"
+"    void operator delete(void*p,int*,const int){CkFreeMsg(p);}\n"
 "    void operator delete(void*p,int*){CkFreeMsg(p);}\n"
+"#else\n"
+"    void operator delete(void*p,size_t){CkFreeMsg(p);}\n"
+"#endif\n"
 "    static void* alloc(int,size_t,int*,int);\n"
 ;
 
@@ -818,10 +822,12 @@ Message::genAllocDecl(XStr &str)
     for(i=0;i<num;i++)
       str << "int, ";
     str << "const int);\n";
+    str << "#if CMK_MULTIPLE_DELETE\n";
     str << "    void operator delete(void *p,";
     for(i=0;i<num;i++)
         str << "int, ";
     str << "const int){CkFreeMsg(p);}\n";
+    str << "#endif\n";
   }
 }
 
