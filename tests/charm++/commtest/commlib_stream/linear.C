@@ -1,4 +1,13 @@
 
+/************************
+     Benchmark to demostrate the performance of streaming communication by
+     having several simulteneous rings of messages among the array elements.
+
+     - Sameer Kumar (01/20/05)
+
+*******************************/
+
+
 #include <stdio.h>
 #include "hello.decl.h"
 #include "StreamingStrategy.h"
