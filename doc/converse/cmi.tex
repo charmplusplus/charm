@@ -576,6 +576,35 @@ function returns.}
 control has returned back to it. The scheduler then returns to its
 calling routine.}
 
+\section{Scheduler Callbacks}
+\label{schedcallbacks}
+
+Scheduler callbacks are provided for programmers who want to utilize in
+some way the event of scheduler becoming idle, or the scheduler becoming
+busy again.  Typically, these callbacks are useful for determining idle
+time in complex multilingual programs.  The callback function should not
+contain calls to scheduler related functions.  Also, the callback
+functions should not block indefinitely.  Doing so will cause the
+conditional callbacks to fail.  Following functions are provided for
+controlling the scheduler callbacks.
+
+\function{void CsdStartNotifyIdle(void)}
+\index{CsdStartNotifyIdle}
+\desc{This call causes CsdScheduler to invoke callback functions for
+idle and busy notifications. Initially, the scheduler does not call
+any callback functions.}
+
+\function{void CsdStopNotifyIdle(void)}
+\index{CsdStopNotifyIdle}
+\desc{This call causes CsdScheduler to stop invoking callback functions
+for idle and busy norifications.}
+
+\function{void CsdSetNotifyIdle((void fIdle)(void), (void fBusy)(void))}
+\index{CsdSetNotifyIdle}
+\desc{This call registers the functions to be called when CsdScheduler becomes
+idle (\param{fIdle}) or busy (\param{fBusy}). These functions can be
+overridden with another call to CsdSetNotifyIdle.}
+
 \internal{
 \section{Global Pointer}
 
