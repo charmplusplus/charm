@@ -114,34 +114,15 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
       handles[odata[i].id.id[0]] = odata[i].handle;
     }
   }
-#if 0
-  double min_cputime = cputime[0];
   double max_cputime = cputime[0];
   for(i=0; i<numobjs; i++) {
-    if(min_cputime > cputime[i])
-      min_cputime = cputime[i];
     if(max_cputime < cputime[i])
       max_cputime = cputime[i];
   }
-  double ratio = 100.0/(max_cputime - min_cputime);
+  double ratio = 1000.0/max_cputime;
   for(i=0; i<numobjs; i++) {
-    objwt[i] = (int)((cputime[i]-min_cputime)*ratio)+1;
+    objwt[i] = (int)(cputime[i]*ratio);
   }
-  int hist[102];
-  for(i=0;i<102;i++)
-    hist[i] = 0;
-  for(i=0;i<numobjs;i++)
-    hist[objwt[i]]++;
-  for(i=0;i<102;i++) {
-    if(hist[i]!=0)
-      CkPrintf("h[%d]=%d ", i, hist[i]);
-  }
-  CkPrintf("\n");
-#endif
-  for(i=0; i<numobjs; i++) {
-    objwt[i] = (int)(cputime[i]*10000.0);
-  }
-
   int **comm = new int*[numobjs];
   for (i=0; i<numobjs; i++) {
     comm[i] = new int[numobjs];
@@ -201,21 +182,14 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 
   if(count > 1) {
     newmap = new int[numobjs];
-    if(step() >= 0) {
-      for(i=0;i<(numobjs+1);i++)
-        xadj[i] = 0;
-      delete[] edgewt;
-      edgewt = 0;
-      wgtflag = 2;
-    } else {
-      delete[] objwt;
-      objwt = 0;
-      wgtflag = 1;
-    }
+    for(i=0;i<(numobjs+1);i++)
+      xadj[i] = 0;
+    delete[] edgewt;
+    edgewt = 0;
+    wgtflag = 2;
     METIS_PartGraphRecursive(&numobjs, xadj, adjncy, objwt, edgewt, 
                          &wgtflag, &numflag, &count, options, 
                          &edgecut, newmap);
-    CkPrintf("Edgecut = %d\n", edgecut);
   } else {
     newmap = origmap;
   }
