@@ -204,7 +204,7 @@ skt_ip_t skt_innode_lookup_ip(const char *name)
   struct sockaddr_in addr;
   int len = sizeof(struct sockaddr_in);
   if (-1 == bproc_nodeaddr(atoi(name), &addr, &len)) {
-    return (skt_ip_t)0;
+    return skt_invalid_ip;
   }
   else {
     skt_ip_t ret;
