@@ -81,7 +81,7 @@ class CkEntryOptions : public CkNoncopyable {
 	int queueingtype; //CK_QUEUEING type
 	int prioBits; //Number of bits of priority to use
 	typedef unsigned int prio_t; //Datatype used to represent priorities
-	const prio_t *prioPtr; //Points to message priority values
+	prio_t *prioPtr; //Points to message priority values
 	prio_t prioStore; //For short priorities, stores the priority value
 public:
 	CkEntryOptions(void) {
