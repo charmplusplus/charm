@@ -43,7 +43,7 @@
 #endif
 #define max(a,b) ((a)>=(b)?(a):(b))
 #define min(a,b) ((a)<=(b)?(a):(b))
-#define ABS(x)   ((x)>=0?(x):(-x))
+#define ABS(x)   ((x)>=0?(x):(-(x)))
 
 
 inline int isZero(double input){

@@ -399,7 +399,10 @@ void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type
   CmiBgMsgType(sendmsg) = type;
   CmiBgMsgLength(sendmsg) = numbytes;
   BgElapse(ALPHACOST);
-  CmiBgMsgRecvTime(sendmsg) = MSGTIME(tMYX, tMYY, tMYZ, x,y,z, numbytes) + BgGetTime();
+  double latency = MSGTIME(tMYX, tMYY, tMYZ, x,y,z, numbytes);
+  CmiAssert(latency >= 0);
+  CmiBgMsgRecvTime(sendmsg) = latency + BgGetTime();
+  
 
   // timing
   BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, local);
