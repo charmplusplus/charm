@@ -12,7 +12,9 @@
 #include "ck.h"
 #include "stdio.h"
 
-// second
+#define LogBufSize      10000
+
+// in second
 #define  BIN_SIZE	0.001
 
 #define  MARKSIZE       256
@@ -125,7 +127,6 @@ class LogPool {
       markcount = 0;
     }
     ~LogPool() {
-//      add(index, bin, CmiMyPe());
       write();
       fprintf(fp, "\n");
       fclose(fp);
