@@ -150,6 +150,15 @@ void TraceBluegene::getForwardDepForAll(void** logs1, void** logs2, int logsize,
       cLog->addBackwardDep((bgTimeLog*)(logs1[j]));
 }
 
+void TraceBluegene::addBackwardDep(void *log)
+{
+  if(!genTimeLog || log==NULL) return;
+  CmiAssert(tTIMELINE.length() > 0);
+  bgTimeLog  *parentLogPtr = (bgTimeLog*)tTIMELINE[tTIMELINE.length()-1];
+  CmiAssert(parentLogPtr);
+  parentLogPtr->addBackwardDep((bgTimeLog*)log);
+}
+
 void TraceBluegene::userBracketEvent(char* name, double bt, double et, void** parentLogPtr){
 
   if (!genTimeLog) return;

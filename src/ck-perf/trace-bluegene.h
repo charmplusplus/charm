@@ -34,6 +34,7 @@ class TraceBluegene : public Trace {
     void bgDummyBeginExec(char* name,void** parentLogPtr);
     void bgBeginExec(char* msg);
     void bgEndExec(int);
+    void addBackwardDep(void *log);
     void userBracketEvent(int eventID, double bt, double et) {}	// from trace.h
     void userBracketEvent(char* name, double bt, double et, void** parentLogPtr);
     void userBracketEvent(char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList);
@@ -61,6 +62,7 @@ extern int traceBluegeneLinked;
 #define _TRACE_BG_END_EXECUTE(commit)   _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgEndExec(commit))
 #define _TRACE_BG_TLINE_END(pLogPtr) _TRACE_BG_ONLY(CkpvAccess(_tracebg)->tlineEnd(pLogPtr))
 #define _TRACE_BG_FORWARD_DEPS(logs1,logs2,size,fDep)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->getForwardDepForAll(logs1,logs2, size,fDep))
+#define _TRACE_BG_ADD_BACKWARD_DEP(log)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->addBackwardDep(log))
 #define _TRACE_BG_USER_EVENT_BRACKET(x,bt,et,pLogPtr) _TRACE_BG_ONLY(CkpvAccess(_tracebg)->userBracketEvent(x,bt,et,pLogPtr))
 #define _TRACE_BGLIST_USER_EVENT_BRACKET(x,bt,et,pLogPtr,bgLogList) _TRACE_BG_ONLY(CkpvAccess(_tracebg)->userBracketEvent(x,bt,et,pLogPtr,bgLogList))
 
@@ -76,10 +78,19 @@ extern int traceBluegeneLinked;
         void* _bgParentLog = NULL;      \
         _TRACE_BG_BEGIN_EXECUTE_NOMSG(str, &_bgParentLog);      \
         if(CpvAccess(traceOn)) CthTraceResume(t);
+# define TRACE_BG_NEWSTART(t, str, event, count)	\
+	TRACE_BG_SUSPEND();	\
+	TRACE_BG_START(t, str);	\
+    	{	\
+	for(int i=0;i<count;i++) {	\
+                _TRACE_BG_ADD_BACKWARD_DEP(event);	\
+        }	\
+	}
 #else
 # define TRACE_BG_SUSPEND()
 # define TRACE_BG_RESUME(t, msg)
 # define TRACE_BG_START(t, str)
+# define TRACE_BG_NEWSTART(t, str, events, count)
 #endif   /* CMK_TRACE_IN_CHARM */
 
 #endif
