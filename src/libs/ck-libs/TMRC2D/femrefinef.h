@@ -9,4 +9,5 @@
 				 double precision, intent(in) :: coord(:)
 				 double precision, intent(in) :: areas(:)
 			 end subroutine
+			 integer, parameter :: FEM_BOUNDARY=(FEM_ATTRIB_TAG_MAX-1)
        end interface
