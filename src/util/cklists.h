@@ -75,23 +75,31 @@ class CkVec {
     CkVec() {block=NULL;blklen=len=0;}
     ~CkVec() { delete[] block; }
     int &length(void) { return len; }
+    int length(void) const {return len;}
     T *getVec(void) { return block; }
     T& operator[](size_t n) { return block[n]; }
     const T& operator[](size_t n) const { return block[n]; }
+    void setSize(int newSize);
     void insert(int pos, const T &elt) {
-      if(pos>=blklen) {
-      	int newlen=pos*2+16;//Double length at each step
-        T *newblk = new T[newlen];
-        if (block!=NULL)
-        	memcpy(newblk, block, sizeof(T)*blklen);
-        for(int i=blklen; i<newlen; i++) newblk[i] = T(0);
-        delete[] block; block = newblk;
-        blklen = newlen;
+      if (pos>=len) { 
+        if(pos>=blklen) 
+          setSize(pos*2+16);
+        len=pos+1;
       }
-      if (pos>=len) len=pos+1;
       block[pos] = elt;
     }
     void insertAtEnd(const T &elt) {insert(length(),elt);}
     void push_back(const T &elt) {insert(length(),elt);}
 };
+
+template <class T> void CkVec<T>::setSize(int newlen)
+{
+   T *newblk = new T[newlen];
+   if (block!=NULL)
+      memcpy(newblk, block, sizeof(T)*blklen);
+   for(int i=blklen; i<newlen; i++) newblk[i] = T(0);
+   delete[] block; block = newblk;
+   blklen = newlen;
+}
+
 #endif
