@@ -30,7 +30,7 @@ void CreateCommLB();
 
 class CommLB : public CentralLB {
 public:
-  int nobj,npe;
+  int nobj,npe, nmigobj;
   double ** alloc_array;
   graph * object_graph;
   CommLB();

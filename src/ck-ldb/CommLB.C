@@ -11,9 +11,9 @@
 /*@{*/
 
 /*
-Summary:
-  support processor avail bitvector
-  support nonmigratable attrib
+Status:
+  * support processor avail bitvector
+  * support nonmigratable attrib
 
   rewritten by Gengbin Zheng to use the new load balancer database and hash table;
   modified to recognize the nonmigratable attrib of an object 
@@ -161,8 +161,12 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* _stats, int count)
     
     //  CkPrintf("[%d] CommLB strategy\n",CkMyPe());
     stats = _stats; 
-    nobj = stats->n_objs;
     npe = count;
+    nobj = stats->n_objs;
+
+    // nmigobj is calculated as the number of migratable objects
+    // ObjectHeap maxh is of size nmigobj
+    nmigobj = stats->n_migrateobjs;
 
     stats->makeCommHash();
     
@@ -175,10 +179,9 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* _stats, int count)
 
     init(alloc_array,object_graph,npe,nobj);
 
-    // handle non migratable object, assign them to same processor now
-
-    // only build heap with migratable objects, mapping nonmigratable objects to the same processors
-    ObjectHeap maxh(nobj+1);
+    // only build heap with migratable objects, 
+    // mapping nonmigratable objects to the same processors
+    ObjectHeap maxh(nmigobj+1);
     for(obj=0; obj < stats->n_objs; obj++) {
       LDObjData &objData = stats->objData[obj];
       int onpe = stats->from_proc[obj];
@@ -243,7 +246,7 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* _stats, int count)
     }
 
 
-    for(id = 1;id<nobj;id++){
+    for(id = 1;id<nmigobj;id++){
 	x  = maxh.deleteMax();
 
 	maxid = x->id;
@@ -296,6 +299,8 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* _stats, int count)
 	delete item;
 	migrateInfo[i] = 0;
     }
+    if (lb_debug)
+      CmiPrintf("%s migrating %d objects.\n", lbname, migrate_count);
     
     for(pe=0;pe <= count;pe++)
 	delete alloc_array[pe];
