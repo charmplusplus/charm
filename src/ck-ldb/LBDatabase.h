@@ -38,6 +38,7 @@ public:
     myLDHandle = LDCreate();  
   };
   LBDatabase(CkMigrateMessage *m) { myLDHandle = LDCreate(); }
+  inline static LBDatabase * Object() { return (LBDatabase *)CkLocalBranch(lbdb); }
 
   /*
    * Calls from object managers to load database
@@ -91,6 +92,8 @@ public:
   {
     LDAddStartLBFn(myLDHandle,fn,data);
   };
+
+  inline void StartLB() { LDStartLB(myLDHandle); }
  
   inline void CollectStatsOn(void) { LDCollectStatsOn(myLDHandle); };
   inline void CollectStatsOff(void) { LDCollectStatsOff(myLDHandle); };
