@@ -559,6 +559,7 @@ int   arg_timeout;
 int   arg_verbose;
 char *arg_nodelist;
 char *arg_nodegroup;
+char *arg_runscript; /* script to run the node-program with */
 
 int   arg_debug;
 int   arg_debug_no_pause;
@@ -638,6 +639,7 @@ void arg_init(int argc, char **argv)
     arg_singlemaster = 0;
   }
 #endif
+  pparam_str(&arg_runscript,    0, "runscript", "script to run node-program with");
   pparam_flag(&arg_help,	0, "help", "print help messages");
   pparam_int(&arg_ppn,          0, "ppn",             "number of pes per node");
 
@@ -1006,6 +1008,7 @@ fin:
   }
 }
 
+/* Given a processor number, look up the nodetab info: */
 nodetab_host *nodetab_getinfo(int i)
 {
   if (nodetab_table==0) {
@@ -1013,6 +1016,12 @@ nodetab_host *nodetab_getinfo(int i)
     exit(1);
   }
   return nodetab_table[i];
+}
+
+/* Given a node number, look up the nodetab info: */
+nodetab_host *nodetab_getnodeinfo(int i)
+{
+  return nodetab_getinfo(nodetab_rank0_table[i]);
 }
 
 /*These routines all take *PE* numbers (NOT node numbers!)*/
@@ -2030,6 +2039,9 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
     fprintf(f,"DISPLAY='%s';export DISPLAY\n",arg_display);
   netstart = create_netstart(rank0no);
   fprintf(f,"NETSTART='%s';export NETSTART\n",netstart);
+  fprintf(f,"CmiMyNode='%d'; export CmiMyNode\n",nodeno);
+  fprintf(f,"CmiMyNodeSize='%d'; export CmiMyNodeSize\n",nodetab_getnodeinfo(nodeno)->cpus);
+  fprintf(f,"CmiNumNodes='%d'; export CmiNumNodes\n",nodetab_rank0_size);
   
   if (arg_verbose) {
     printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, rank0no);
@@ -2089,6 +2101,9 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
 
   fprintf(f,"rm -f /tmp/charmrun_err.$$\n");
   if(arg_verbose) fprintf(f,"Echo 'starting node-program...'\n");  
+  /* This is the start of the the run-nodeprogram script */
+  fprintf(f,"(");
+  
   if (arg_debug || arg_debug_no_pause ) {
 	 if ( strcmp(dbg, "gdb") == 0 ) {
            fprintf(f,"cat > /tmp/charmrun_gdb.$$ << END_OF_SCRIPT\n");
@@ -2101,9 +2116,11 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
            fprintf(f,"\n");
            if (arg_debug_no_pause) fprintf(f,"run\n");
            fprintf(f,"END_OF_SCRIPT\n");
+	   if (arg_runscript)
+	     fprintf(f,"\"%s\" ",arg_runscript);
            fprintf(f,"$F_XTERM");
            fprintf(f," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-           fprintf(f," -e $F_DBG %s -x /tmp/charmrun_gdb.$$"CLOSE_ALL"\n",
+           fprintf(f," -e $F_DBG %s -x /tmp/charmrun_gdb.$$ \n",
            	arg_nodeprog_r);
          } else if ( strcmp(dbg, "dbx") == 0 ) {
            fprintf(f,"cat > /tmp/charmrun_dbx.$$ << END_OF_SCRIPT\n");
@@ -2114,6 +2131,8 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
            fprintf(f,"ignore SIGWINCH\n");
            fprintf(f,"ignore SIGWAITING\n");
            fprintf(f,"END_OF_SCRIPT\n");
+	   if (arg_runscript)
+	     fprintf(f,"\"%s\" ",arg_runscript);
            fprintf(f,"$F_XTERM");
            fprintf(f," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
            fprintf(f," -e $F_DBG %s ",arg_debug_no_pause?"-r":"");
@@ -2125,7 +2144,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
 	   fprintf(f, "-s/tmp/charmrun_dbx.$$ %s",arg_nodeprog_r);
 	   if(arg_debug_no_pause) 
               fprint_arg(f,argv);
-           fprintf(f,CLOSE_ALL "\n");
+           fprintf(f,"\n");
 	 } else { 
 	  fprintf(stderr, "Unknown debugger: %s.\n Exiting.\n", 
 	    nodetab_debugger(nodeno));
@@ -2144,29 +2163,38 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
     fprintf(f,"read eoln\n");
     fprintf(f,"END_OF_SCRIPT\n");
     fprintf(f,"chmod 700 /tmp/charmrun_inx.$$\n");
+    if (arg_runscript)
+       fprintf(f,"\"%s\" ",arg_runscript);
     fprintf(f,"$F_XTERM -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
     fprintf(f," -sl 5000");
-    fprintf(f," -e /tmp/charmrun_inx.$$");
-    fprintf(f,CLOSE_ALL "\n");
+    fprintf(f," -e /tmp/charmrun_inx.$$\n");
   } else {
-    fprintf(f,"( \"%s\"",arg_nodeprog_r);
+    if (arg_runscript)
+       fprintf(f,"\"%s\" ",arg_runscript);
+    fprintf(f,"\"%s\" ",arg_nodeprog_r);
     fprint_arg(f,argv);
-    fprintf(f,"\n");
+    fprintf(f,"\nres=$?\n");
     /* If shared libraries fail to load, the program dies without
        calling charmrun back.  Since we *have* to close down stdin/out/err,
-       we have to smuggle this failure information out via a file, /tmp/charmrun_err. */
+       we have to smuggle this failure information out via a file,
+       /tmp/charmrun_err.<pid> */
     fprintf(f,
-    	"if [ $? -eq 127 ]\n"
+    	"if [ $res -eq 127 ]\n"
 	"then\n"
-	"  ( \n" /* Run error generator in a subshell: */
+	"  ( \n" /* Re-run, spitting out errors from a subshell: */
 	"    \"%s\" \n"
 	"    ldd \"%s\"\n"
 	"  ) > /tmp/charmrun_err.$$ 2>&1 \n"
 	"fi\n",arg_nodeprog_r,arg_nodeprog_r);
-    fprintf(f,")");
-    fprintf(f,CLOSE_ALL "\n");
-    
   }
+  
+  /* End the node-program subshell. To minimize the number 
+     of open ports on the front-end, we must close down rsh;
+     to do this, we have to close stdin, stdout, stderr, and 
+     run the subshell in the background. */
+  fprintf(f,")");
+  fprintf(f,CLOSE_ALL "\n");
+  
   if (arg_verbose) fprintf(f,"Echo 'rsh phase successful.'\n");
   fprintf(f, /* Check for startup errors: */
      "sleep 1\n"
