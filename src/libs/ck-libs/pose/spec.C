@@ -21,6 +21,7 @@ void spec::Step()
   int iter = 0;
   while ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
     // do all events within the speculative window
+    idle = 0;
     iter++;
     currentEvent = ev;
     ev->done = 2;

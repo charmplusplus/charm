@@ -13,7 +13,7 @@
 /// Insane level of analysis
 //#define POSE_DOP_ON 1
 /// Projections analysis
-//#define TRACE_DETAIL 1
+#define TRACE_DETAIL 1
 
 /// Set this to use 64 bit timestamps
 //#define USE_LONG_TIMESTAMPS 1
@@ -23,7 +23,7 @@
 
 /// Uncomment this to turn on coarse memory management
 //#define MEM_COARSE
-#define MAX_USAGE 5   // maximum uncommits per object for coarse mem. man.
+#define MAX_USAGE 10   // maximum uncommits per object for coarse mem. man.
 
 /// Uncomment to save time on memory allocation and freeing
 #define MSG_RECYCLING 1

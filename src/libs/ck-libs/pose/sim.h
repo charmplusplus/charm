@@ -271,7 +271,9 @@ class sim : public ArrayElement1D {
   /// Start a prioritized forward execution step on myStrat
   void Step(prioMsg *m);       
   /// Report safe time to PVT branch
-  void Status() { localPVT->objUpdateOVT(myPVTidx, myStrat->SafeTime()); }
+  void Status() { 
+    localPVT->objUpdateOVT(myPVTidx, myStrat->SafeTime(), objID->OVT()); 
+  }
   /// Commit events based on new GVT estimate
   void Commit();               
   /// Add m to cancellation list

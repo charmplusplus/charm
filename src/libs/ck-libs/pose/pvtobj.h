@@ -10,7 +10,7 @@
     processor. */
 class pvtObjectNode {
   /// Last reported safe time of poser
-  POSE_TimeType ovt;
+  POSE_TimeType ovt, ovt2;
   /// Index of poser in POSE_Objects array
   int index;  
   /// Flag to indicate if object data is stored at this index
@@ -29,9 +29,10 @@ class pvtObjectNode {
   /// Sets all data fields
   void set(int ts, int idx, short int on, short int s, sim *p) {
     ovt = ts; index = idx; present = on; sync = s; localObjPtr = p; qdo = 0.0;
+    ovt2 = -1;
   }
   /// Sets ovt to -1 to indicate idle
-  void setIdle() { ovt = -1; }
+  void setIdle() { ovt = ovt2 = -1; }
   /// Test present flag
   int isPresent() { return present; }
   /// Test if synchronization strategy is optimistic
@@ -40,8 +41,12 @@ class pvtObjectNode {
   int isConservative() { return (sync == CONSERVATIVE); }
   /// Return ovt
   int getOVT() { return ovt; }
+  /// Return ovt2
+  int getOVT2() { return ovt2; }
   /// Set ovt to st
   void setOVT(int st) { ovt = st; }
+  /// Set ovt2 to st
+  void setOVT2(int st) { ovt2 = st; }
   /// Add time to qdo
   void addQdoTime(double t) { qdo += t; }
   /// Return qdo

@@ -61,7 +61,6 @@ void PVT::startPhase()
       CkAssert(simdone || (conPVT >= estGVT)||(conPVT == POSE_UnsetTS)||(estGVT == POSE_UnsetTS));
     }
 
-  // pack PVT data
   // (1) Find out the local PVT from optPVT and conPVT
   int pvt = optPVT;
   if ((conPVT < pvt) && (conPVT > POSE_UnsetTS)) pvt = conPVT;
@@ -70,6 +69,18 @@ void PVT::startPhase()
     waitForFirst = 0;
     SendsAndRecvs->Restructure(estGVT, pvt, POSE_UnsetTS);
   }
+
+  if (pvt == POSE_UnsetTS) { // all are idle; find max ovt
+    POSE_TimeType maxOVT = POSE_UnsetTS;
+    for (i=0; i<end; i++)
+      if (objs.objs[i].isPresent()) {
+	if (objs.objs[i].getOVT2() > maxOVT) 
+	  maxOVT = objs.objs[i].getOVT2();
+      }
+    if (maxOVT > estGVT)
+      pvt = maxOVT;
+  }
+  
   // (2) Pack the SRtable data into the message
   UpdateMsg *um = SendsAndRecvs->PackTable(pvt);
   // (3) Add the PVT info to the message
@@ -100,12 +111,12 @@ void PVT::setGVT(GVTMsg *m)
   localStats->TimerStart(GVT_TIMER);
 #endif
   CProxy_PVT p(ThePVT);
-  p[CkMyPe()].startPhase();
   estGVT = m->estGVT;
   simdone = m->done;
   CkFreeMsg(m);
   waitForFirst = 1;
   objs.Commit();
+  p[CkMyPe()].startPhase();
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif
@@ -153,14 +164,16 @@ void PVT::objUpdate(POSE_TimeType timestamp, int sr)
 }
 
 /// Update PVT with safeTime
-void PVT::objUpdateOVT(int pvtIdx, POSE_TimeType safeTime)
+void PVT::objUpdateOVT(int pvtIdx, POSE_TimeType safeTime, POSE_TimeType ovt)
 {
   CmiAssert(simdone || (safeTime >= estGVT) || (safeTime == POSE_UnsetTS));
   int index = (pvtIdx-CkMyPe())/1000;
   // minimize the non-idle OVT
+  if ((safeTime == POSE_UnsetTS) && (objs.objs[index].getOVT2() < ovt))
+    objs.objs[index].setOVT2(ovt);
   if ((safeTime > POSE_UnsetTS) && 
       ((objs.objs[index].getOVT() > safeTime) || 
-       (objs.objs[index].getOVT() < 0)))
+       (objs.objs[index].getOVT() == POSE_UnsetTS)))
     objs.objs[index].setOVT(safeTime);
 }
 

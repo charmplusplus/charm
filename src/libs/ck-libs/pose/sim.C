@@ -130,7 +130,8 @@ void sim::Commit()
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(SIM_TIMER);
 #endif
-  if (!localPVT->done()) Step(); // not done; try stepping again
+  if (!localPVT->done() && (eq->currentPtr->timestamp > -1)) 
+    Step(); // not done; try stepping again
 #ifdef POSE_STATS_ON
   if (!tstat)  localStats->TimerStop();
   else localStats->SwitchTimer(tstat);

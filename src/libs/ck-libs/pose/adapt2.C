@@ -25,6 +25,7 @@ void adapt2::Step()
   while ((ev->timestamp > POSE_UnsetTS) && (ev->timestamp <= lastGVT + timeLeash)
 	 && (iter < MAX_ITERATIONS)) {
     // do all events at under timeLeash
+    idle = 0;
     iter++;
     currentEvent = ev;
     ev->done = 2;

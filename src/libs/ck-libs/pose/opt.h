@@ -5,6 +5,8 @@
 
 class opt : public strat {
 protected:
+  /// Idle measure
+  int idle;
   /// Rollback to predetermined RBevent
   virtual void Rollback();              
   /// Recover checkpointed state prior to ev
@@ -40,7 +42,7 @@ public:
     cpRate = STORE_RATE; 
     specEventCount = eventCount = stepCount = avgEventsPerStep = rbCount = jumpCount = rbFlag = 0;
     avgRBoffset = POSE_UnsetTS;
-    avgTimeLeash = avgJump = 0;
+    idle = avgTimeLeash = avgJump = 0;
   }
   /// Initialize the synchronization strategy type of the poser
   void initSync() { parent->sync = OPTIMISTIC; }
@@ -57,18 +59,15 @@ public:
       ec=parent->cancels.getEarliest(), gvt=localPVT->getGVT(), 
       worktime = eq->currentPtr->timestamp;
     // Object is idle; report -1
-    if (!(eq->RBevent) && (ec == POSE_UnsetTS) && (worktime == POSE_UnsetTS) 
-	&& (ovt <= gvt))
+    if (!(eq->RBevent) && (ec == POSE_UnsetTS) && (worktime == POSE_UnsetTS))
       return POSE_UnsetTS;
     if (eq->RBevent)  theTime = eq->RBevent->timestamp;
     if ((ec > POSE_UnsetTS) && ((ec < theTime) || (theTime == POSE_UnsetTS)))  
       theTime = ec;
     POSE_TimeType maxWork = worktime;
     if (ovt > maxWork) maxWork = ovt;
-    if ((worktime == POSE_UnsetTS) && (ovt <= gvt)) maxWork = POSE_UnsetTS;
-    if (((maxWork != POSE_UnsetTS) && (maxWork < theTime)) || 
-	(theTime == POSE_UnsetTS))
-      theTime = maxWork;
+    if ((maxWork < theTime) || (theTime == POSE_UnsetTS)) theTime = maxWork;
+    //CkPrintf("1:theTime=%d ovt=%d wt=%d ec=%d gvt=%d idle=%d\n", theTime, ovt, worktime, ec, gvt, idle);
     CkAssert((theTime == POSE_UnsetTS) || (theTime >= gvt) ||
 	     (theTime == gvt-1));
     return theTime;

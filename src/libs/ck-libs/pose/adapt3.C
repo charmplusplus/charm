@@ -59,6 +59,7 @@ void adapt3::Step()
 	 (eq->frontPtr->timestamp < ev->prev->timestamp)) &&
 	(eq->mem_usage > MAX_USAGE)) break;
 #endif
+    idle = 0;
     currentEvent = ev;
     ev->done = 2;
     specEventCount++;

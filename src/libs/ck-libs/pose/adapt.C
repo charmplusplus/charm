@@ -24,6 +24,7 @@ void adapt::Step()
   int iter=0;
   while ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
     // do all events within speculative window
+    idle = 0;
     currentEvent = ev;
     ev->done = 2;
     parent->ResolveFn(ev->fnIdx, ev->msg); // execute it

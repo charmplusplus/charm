@@ -18,6 +18,7 @@ void opt::Step()
   // Execute an event
   ev = eq->currentPtr;
   if (ev->timestamp > POSE_UnsetTS) {
+    idle = 0;
     currentEvent = ev;
     ev->done = 2;
     specEventCount++;
@@ -32,10 +33,10 @@ void opt::Step()
       pm->setPriority(eq->currentPtr->timestamp-POSE_TimeMax);
       POSE_Objects[parent->thisIndex].Step(pm);
     }
-  }
 #ifdef POSE_STATS_ON
-  localStats->Loop();
+    localStats->Loop();
 #endif  
+  }
 }
 
 /// Rollback to predetermined RBevent
