@@ -136,6 +136,12 @@ isomalloc.o: isomalloc.c converse.h conv-config.h conv-common.h \
   persistent.h debug-conv.h memory-isomalloc.h
 	$(CHARMC) -c -I. isomalloc.c
 
+conv-counter.o: conv-counter.c converse.h conv-config.h conv-common.h \
+  conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h \
+  conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
+  persistent.h debug-conv.h
+	$(CHARMC) -c -I. conv-counter.c
+
 global-nop.o: global-nop.c converse.h conv-config.h conv-common.h \
   conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
@@ -1342,12 +1348,12 @@ ComlibManager.o: ComlibManager.C ComlibManager.h charm++.h charm.h \
   tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
   envelope.h comlib.h router.h convcomlibmanager.h comlib.decl.h \
-  EachToManyMulticastStrategy.h DirectMulticastStrategy.h \
-  ComlibSectionInfo.h routerstrategy.h gridrouter.h petable.h \
-  graphrouter.h de.h treerouter.h 3dgridrouter.h StreamingStrategy.h \
-  DummyStrategy.h MPIStrategy.h NodeMulticast.h MsgPacker.h \
-  RingMulticastStrategy.h PipeBroadcastStrategy.h BroadcastStrategy.h \
-  MeshStreamingStrategy.h PrioStreaming.h qd.h comlib.def.h
+  EachToManyMulticastStrategy.h ComlibSectionInfo.h routerstrategy.h \
+  gridrouter.h petable.h graphrouter.h de.h treerouter.h 3dgridrouter.h \
+  DirectMulticastStrategy.h StreamingStrategy.h DummyStrategy.h \
+  MPIStrategy.h NodeMulticast.h MsgPacker.h RingMulticastStrategy.h \
+  PipeBroadcastStrategy.h BroadcastStrategy.h MeshStreamingStrategy.h \
+  PrioStreaming.h qd.h comlib.def.h
 	$(CHARMC) -c -I. ComlibManager.C
 
 MPIStrategy.o: MPIStrategy.C MPIStrategy.h ComlibManager.h charm++.h \
@@ -1439,8 +1445,8 @@ EachToManyMulticastStrategy.o: EachToManyMulticastStrategy.C \
   tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
   envelope.h comlib.h router.h convcomlibmanager.h comlib.decl.h \
-  DirectMulticastStrategy.h ComlibSectionInfo.h routerstrategy.h \
-  gridrouter.h petable.h graphrouter.h de.h treerouter.h 3dgridrouter.h
+  ComlibSectionInfo.h routerstrategy.h gridrouter.h petable.h \
+  graphrouter.h de.h treerouter.h 3dgridrouter.h
 	$(CHARMC) -c -I. EachToManyMulticastStrategy.C
 
 ComlibSectionInfo.o: ComlibSectionInfo.C ComlibManager.h charm++.h \

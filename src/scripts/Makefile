@@ -298,7 +298,7 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
 	traceCore.o traceCoreCommon.o \
 	converseProjections.o machineProjections.o \
-	quiescence.o isomalloc.o \
+	quiescence.o isomalloc.o conv-counter.o \
 	global-nop.o
 
 #############################################
