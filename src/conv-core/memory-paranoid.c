@@ -214,7 +214,7 @@ static Slot *Slot_fmUser(void *user) {
 /********** meta_ routines ***********/
 
 /* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
-#include "memory-gnu.c"
+#include "memory-gnuold.c"
 
 
 /*Return the system page size*/

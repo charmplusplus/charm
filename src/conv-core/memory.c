@@ -85,8 +85,7 @@ void free_reentrant(void *mem) { free(mem); }
 *Not* using the system malloc-- first pick the implementation:
 */
 
-#if CMK_MEMORY_BUILD_GNU
-static void meta_init(char **argv) {}
+#if CMK_MEMORY_BUILD_GNU || CMK_MEMORY_BUILD_GNUOLD
 #define meta_malloc   mm_malloc
 #define meta_free     mm_free
 #define meta_calloc   mm_calloc
@@ -95,8 +94,14 @@ static void meta_init(char **argv) {}
 #define meta_memalign mm_memalign
 #define meta_valloc   mm_valloc
 
-#include "memory-gnu.c"
-#endif /* CMK_MEMORY_BUILD_GNU */
+#if CMK_MEMORY_BUILD_GNU
+#  include "memory-gnu.c"
+#else
+#  include "memory-gnuold.c"
+#endif
+static void meta_init(char **argv) {}
+
+#endif /* CMK_MEMORY_BUILD_GNU or old*/
 
 #if CMK_MEMORY_BUILD_VERBOSE
 #include "memory-verbose.c"
@@ -163,55 +168,63 @@ void CmiMemoryInit(char **argv)
   CmiOutOfMemoryInit();
 }
 
+/* Wrap a CmiMemLock around this code */
+#define MEM_LOCK_AROUND(code) \
+  CmiMemLock(); \
+  code; \
+  CmiMemUnlock();
+
+/* Wrap a reentrant CmiMemLock around this code */
+#define REENTRANT_MEM_LOCK_AROUND(code) \
+  int myRank=CmiMyRank(); \
+  if (myRank!=rank_holding_CmiMemLock) { \
+  	CmiMemLock(); \
+	rank_holding_CmiMemLock=myRank; \
+	code; \
+	rank_holding_CmiMemLock=-1; \
+	CmiMemUnlock(); \
+  } \
+  else /* I'm already holding the memLock (reentrancy) */ { \
+  	code; \
+  }
+
 void *malloc(size_t size)
 {
   void *result;
-  CmiMemLock();
-  result = meta_malloc(size);
-  CmiMemUnlock();
+  MEM_LOCK_AROUND( result = meta_malloc(size); )
   if (result==NULL) CmiOutOfMemory(size);
   return result;
 }
 
 void free(void *mem)
 {
-  CmiMemLock();
-  meta_free(mem);
-  CmiMemUnlock();
+  MEM_LOCK_AROUND( meta_free(mem); )
 }
 
 void *calloc(size_t nelem, size_t size)
 {
   void *result;
-  CmiMemLock();
-  result = meta_calloc(nelem, size);
-  CmiMemUnlock();
+  MEM_LOCK_AROUND( result = meta_calloc(nelem, size); )
   if (result==NULL) CmiOutOfMemory(size);
   return result;
 }
 
 void cfree(void *mem)
 {
-  CmiMemLock();
-  meta_cfree(mem);
-  CmiMemUnlock();
+  MEM_LOCK_AROUND( meta_cfree(mem); )
 }
 
 void *realloc(void *mem, size_t size)
 {
   void *result;
-  CmiMemLock();
-  result = meta_realloc(mem, size);
-  CmiMemUnlock();
+  MEM_LOCK_AROUND( result = meta_realloc(mem, size); )
   return result;
 }
 
 void *memalign(size_t align, size_t size)
 {
   void *result;
-  CmiMemLock();
-  result = meta_memalign(align, size);
-  CmiMemUnlock();
+  MEM_LOCK_AROUND( result = meta_memalign(align, size); )
   if (result==NULL) CmiOutOfMemory(align*size);
   return result;    
 }
@@ -219,9 +232,7 @@ void *memalign(size_t align, size_t size)
 void *valloc(size_t size)
 {
   void *result;
-  CmiMemLock();
-  result = meta_valloc(size);
-  CmiMemUnlock();
+  MEM_LOCK_AROUND( result = meta_valloc(size); )
   if (result==NULL) CmiOutOfMemory(size);
   return result;
 }
@@ -236,17 +247,13 @@ you try to aquire one of your own locks.
 
 void *malloc_reentrant(size_t size) {
   void *result;
-  if (CmiMyRank()!=rank_holding_CmiMemLock) CmiMemLock();
-  result = meta_malloc(size);
-  if (CmiMyRank()!=rank_holding_CmiMemLock) CmiMemUnlock();
+  REENTRANT_MEM_LOCK_AROUND( result = meta_malloc(size); )
   return result;
 }
 
 void free_reentrant(void *mem)
 {
-  if (CmiMyRank()!=rank_holding_CmiMemLock) CmiMemLock();
-  meta_free(mem);
-  if (CmiMyRank()!=rank_holding_CmiMemLock) CmiMemUnlock();
+  REENTRANT_MEM_LOCK_AROUND( meta_free(mem); )
 }
 
 #endif /* ! CMK_MEMORY_BUILD_BUILTIN*/
