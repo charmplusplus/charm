@@ -366,8 +366,9 @@ void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen)
 			  b.getData(), b.getSize());
 }
 
-/* TCharm Semaphore ID for AMPI startup */
+/* TCharm Semaphore ID's for AMPI startup */
 #define AMPI_TCHARM_SEMAID 0x00A34100 /* __AMPI__ */
+#define AMPI_BARRIER_SEMAID 0x00A34200 /* __AMPI__ */
 
 static CProxy_ampiWorlds ampiWorldsGroup;
 
@@ -397,6 +398,10 @@ static ampi *ampiInit(char **argv)
 		}
   }
 
+  MPI_Comm new_world;
+  int _nchunks;
+  CkArrayOptions opts;
+  CProxy_ampiParent parent;
   if (TCHARM_Element()==0)
   { /* I'm responsible for building the arrays: */
 	STARTUP_DEBUG("ampiInit> creating arrays")
@@ -408,7 +413,7 @@ static ampi *ampiInit(char **argv)
 		CkAbort("AMPI> Number of registered comm_worlds exceeded limit.\n");
 	}
 	int new_idx=mpi_nworlds;
-	MPI_Comm new_world=MPI_COMM_WORLD+1+new_idx;
+	new_world=MPI_COMM_WORLD+1+new_idx;
 
         ComlibInstanceHandle cinst;
 
@@ -417,9 +422,8 @@ static ampi *ampiInit(char **argv)
 #endif
         
         //Create and attach the ampiParent array
-	CkArrayID threads; int _nchunks;
-        CkArrayOptions opts=TCHARM_Attach_start(&threads,&_nchunks);
-	CProxy_ampiParent parent;
+	CkArrayID threads;
+        opts=TCHARM_Attach_start(&threads,&_nchunks);
 	parent=CProxy_ampiParent::ckNew(new_world,threads,cinst, opts);
 
 #if AMPI_COMLIB
@@ -431,7 +435,10 @@ static ampi *ampiInit(char **argv)
         //strategy->setSourceArray(parent.ckGetArrayID());
         //strategy->setDestArray(parent.ckGetArrayID());
 #endif
-        
+  }
+  int *barrier = (int *)TCharm::get()->semaGet(AMPI_BARRIER_SEMAID);
+  if (TCHARM_Element()==0)
+  {
 	//Make a new ampi array
 	CkArrayID empty;
 	CkPupBasicVec<int> _indices;
@@ -479,11 +486,13 @@ public:
 ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_, ComlibInstanceHandle comlib_)
     :threads(threads_), worldNo(worldNo_), comlib(comlib_), RProxyCnt(0)
 {
+  int barrier = 0x1234;
   STARTUP_DEBUG("ampiParent> starting up")
   thread=NULL;
   worldPtr=NULL;
   myDDT=&myDDTsto;
   prepareCtv();
+  thread->semaPut(AMPI_BARRIER_SEMAID,&barrier);
 }
 ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
   thread=NULL;
