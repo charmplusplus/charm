@@ -98,10 +98,10 @@ install:
     endif
 
     if (( $OPERATION == install ) || ( $OPERATION == all )) then
-      echo "Copying libconv-*.a from $VERSION/tmp to $VERSION/lib"
-      find $VERSION/tmp -type f -name "libconv-*.a" -exec cp {} $VERSION/lib \;
-      echo "Copying libck?-*.a  from $VERSION/tmp to $VERSION/lib"
-      find $VERSION/tmp -type f -name "libck?-*.a"  -exec cp {} $VERSION/lib \;
+      echo "Copying libconv-*   from $VERSION/tmp to $VERSION/lib"
+      find $VERSION/tmp -type f -name "libconv-*"   -exec cp {} $VERSION/lib \;
+      echo "Copying libck?-*    from $VERSION/tmp to $VERSION/lib"
+      find $VERSION/tmp -type f -name "libck?-*"    -exec cp {} $VERSION/lib \;
       echo "Copying libcharm.a  from $VERSION/tmp to $VERSION/lib"
       find $VERSION/tmp -type f -name "libcharm.a"  -exec cp {} $VERSION/lib \;
       echo "Copying *.h         from $VERSION/tmp to $VERSION/include"

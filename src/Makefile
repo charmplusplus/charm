@@ -35,44 +35,44 @@ charm++: charm charmxlat++ charm++libs
 
 CVHEADERS=converse.h conv-mach.h
 
-CVLIBS_QS=libconv-qs-fifo.a libconv-qs-lifo.a # libconv-qs-bfifo.o libconv-qs-ififo.o libconv-qs-bstack.o libconv-qs-istack.o libconv-qs-newfifo.o libconv-qs-replay.o libconv-qs-rand.o libconv-qs-fifolifo.o
+CVLIBS_QS=libconv-qs-fifo.o libconv-qs-lifo.o # libconv-qs-bfifo.o libconv-qs-ififo.o libconv-qs-bstack.o libconv-qs-istack.o libconv-qs-newfifo.o libconv-qs-replay.o libconv-qs-rand.o libconv-qs-fifolifo.o
 
-CVLIBS=libconv-core.a $(CVLIBS_QS)
+CVLIBS=libconv-core.o $(CVLIBS_QS)
 
 converse: $(CVLIBS) cmk_extras
 
-libconv-core.a: convcore.o machine.o spantree.o fifo.o
-	charmc -cwd -o libconv-core.a convcore.o machine.o spantree.o fifo.o
+libconv-core.o: convcore.o machine.o spantree.o fifo.o
+	charmc -cwd -o libconv-core.o convcore.o machine.o spantree.o fifo.o
 
-libconv-qs-fifo.a: qs.fifo.c
-	charmc -cwd -o libconv-qs-fifo.a qs.fifo.c
+libconv-qs-fifo.o: qs.fifo.c
+	charmc -cwd -o libconv-qs-fifo.o qs.fifo.c
 
-libconv-qs-lifo.a: qs.lifo.c
-	charmc -cwd -o libconv-qs-lifo.a qs.lifo.c
+libconv-qs-lifo.o: qs.lifo.c
+	charmc -cwd -o libconv-qs-lifo.o qs.lifo.c
 
-libconv-qs-fifolifo.a: qs.fifolifo.c
-	charmc -cwd -o libconv-qs-fifolifo.a qs.fifolifo.c
+libconv-qs-fifolifo.o: qs.fifolifo.c
+	charmc -cwd -o libconv-qs-fifolifo.o qs.fifolifo.c
 
-libconv-qs-newfifo.a: qs.newfifo.c
-	charmc -cwd -o libconv-qs-newfifo.a qs.newfifo.c
+libconv-qs-newfifo.o: qs.newfifo.c
+	charmc -cwd -o libconv-qs-newfifo.o qs.newfifo.c
 
-libconv-qs-ififo.a: qs.ififo.c
-	charmc -cwd -o libconv-qs-ififo.a qs.ififo.c
+libconv-qs-ififo.o: qs.ififo.c
+	charmc -cwd -o libconv-qs-ififo.o qs.ififo.c
 
-libconv-qs-istack.a: qs.istack.c
-	charmc -cwd -o libconv-qs-istack.a qs.istack.c
+libconv-qs-istack.o: qs.istack.c
+	charmc -cwd -o libconv-qs-istack.o qs.istack.c
 
-libconv-qs-bfifo.a: qs.bfifo.c
-	charmc -cwd -o libconv-qs-bfifo.a qs.bfifo.c
+libconv-qs-bfifo.o: qs.bfifo.c
+	charmc -cwd -o libconv-qs-bfifo.o qs.bfifo.c
 
-libconv-qs-bstack.a: qs.bstack.c
-	charmc -cwd -o libconv-qs-bstack.a qs.bstack.c
+libconv-qs-bstack.o: qs.bstack.c
+	charmc -cwd -o libconv-qs-bstack.o qs.bstack.c
 
-libconv-qs-rand.a: qs.rand.c
-	charmc -cwd -o libconv-qs-rand.a qs.rand.c
+libconv-qs-rand.o: qs.rand.c
+	charmc -cwd -o libconv-qs-rand.o qs.rand.c
 
-libconv-qs-replay.a: qs.replay.c
-	charmc -cwd -o libconv-qs-replay.a qs.replay.c
+libconv-qs-replay.o: qs.replay.c
+	charmc -cwd -o libconv-qs-replay.o qs.replay.c
 
 fifo.o: fifo.c $(CVHEADERS)
 	charmc -cwd fifo.c
@@ -115,78 +115,78 @@ LIBCK_CORE_N=common.n.o globals.n.o init.n.o register.n.o boc.n.o condsend.n.o q
 
 LIBCK_CORE_D=common.d.o globals.d.o init.d.o register.d.o boc.d.o condsend.d.o quies.d.o vid.d.o rdonly.d.o stat.d.o wrtone.d.o acc.d.o mono.d.o tbl.d.o memstuff.d.o
 
-CK_LDB_N=libckn-ldb-acwn.a libckn-ldb-rand.a # libckn-ldb-mngr.a libckn-ldb-priomngr.a libckn-ldb-recv.a libckn-ldb-tok.a libckn-ldb-btok.a
+CK_LDB_N=libckn-ldb-acwn.o libckn-ldb-rand.o # libckn-ldb-mngr.o libckn-ldb-priomngr.o libckn-ldb-recv.o libckn-ldb-tok.o libckn-ldb-btok.o
 
-CK_LDB_D=libckd-ldb-acwn.a libckd-ldb-rand.a # libckd-ldb-mngr.a libckd-ldb-priomngr.a libckd-ldb-recv.a libckd-ldb-tok.a libckd-ldb-btok.a
+CK_LDB_D=libckd-ldb-acwn.o libckd-ldb-rand.o # libckd-ldb-mngr.o libckd-ldb-priomngr.o libckd-ldb-recv.o libckd-ldb-tok.o libckd-ldb-btok.o
 
-CK_CPLUS_N=libckn-cplus-n.a
+CK_CPLUS_N=libckn-cplus-n.o
 
-CK_CPLUS_D=libckd-cplus-n.a
+CK_CPLUS_D=libckd-cplus-n.o
 
-CK_CORE_N=libckn-core-notrace.a libckn-core-summary.a
+CK_CORE_N=libckn-core-notrace.o libckn-core-summary.o
 
-CK_CORE_D=libckd-core-proj.a libckd-core-replay.a libckd-core-record.a
+CK_CORE_D=libckd-core-proj.o libckd-core-replay.o libckd-core-record.o
 
-CK_LIBS_N=$(CK_LDB_N) $(CK_CPLUS_N) $(CK_CORE_N) libckn-defmain.a
+CK_LIBS_N=$(CK_LDB_N) $(CK_CPLUS_N) $(CK_CORE_N) libckn-defmain.o
 
-CK_LIBS_D=$(CK_LDB_D) $(CK_CPLUS_D) $(CK_CORE_D) libckd-defmain.a
+CK_LIBS_D=$(CK_LDB_D) $(CK_CPLUS_D) $(CK_CORE_D) libckd-defmain.o
 
 charmlibs: $(CK_LIBS_N) $(CK_LIBS_D)
 
-libckn-core-notrace.a: $(LIBCK_CORE_N) perf-none.n.o main.n.o ck.n.o
+libckn-core-notrace.o: $(LIBCK_CORE_N) perf-none.n.o main.n.o ck.n.o
 	charmc -cwd -o $@ $(LIBCK_CORE_N) perf-none.n.o main.n.o ck.n.o
 
-libckn-core-summary.a:$(LIBCK_CORE_N) perf-sum.n.o main.n.o ck.n.o
+libckn-core-summary.o:$(LIBCK_CORE_N) perf-sum.n.o main.n.o ck.n.o
 	charmc -cwd -o $@ $(LIBCK_CORE_N) perf-sum.n.o main.n.o ck.n.o
 
-libckd-core-proj.a:$(LIBCK_CORE_D) perf-proj.d.o perfio.d.o main.d.o ck.d.o
+libckd-core-proj.o:$(LIBCK_CORE_D) perf-proj.d.o perfio.d.o main.d.o ck.d.o
 	charmc -cwd -o $@ $(LIBCK_CORE_D) perf-proj.d.o perfio.d.o main.d.o ck.d.o
 
-libckd-core-record.a:$(LIBCK_CORE_D) perf-recd.d.o perfio.d.o main.d.o ck.d.o
+libckd-core-record.o:$(LIBCK_CORE_D) perf-recd.d.o perfio.d.o main.d.o ck.d.o
 	charmc -cwd -o $@ $(LIBCK_CORE_D) perf-recd.d.o perfio.d.o main.d.o ck.d.o
 
-libckd-core-replay.a:$(CK_CORE_D_OBJS) perf-repl.d.o perfio.d.o main.r.o ck.r.o
+libckd-core-replay.o:$(CK_CORE_D_OBJS) perf-repl.d.o perfio.d.o main.r.o ck.r.o
 	charmc -cwd -o $@ $(LIBCK_CORE_D) perf-repl.d.o perfio.d.o main.r.o ck.r.o
 
-libckn-ldb-acwn.a libckd-ldb-acwn.a: ldb.acwn.c
-	charmc -cwd -o libckn-ldb-acwn.a ldb.acwn.c
-	charmc -cwd -o libckd-ldb-acwn.a ldb.acwn.c -DDEBUGGING_MODE
+libckn-ldb-acwn.o libckd-ldb-acwn.o: ldb.acwn.c
+	charmc -cwd -o libckn-ldb-acwn.o ldb.acwn.c
+	charmc -cwd -o libckd-ldb-acwn.o ldb.acwn.c -DDEBUGGING_MODE
 
-libckn-ldb-rand.a libckd-ldb-rand.a: ldb.rand.c
-	charmc -cwd -o libckn-ldb-rand.a ldb.rand.c
-	charmc -cwd -o libckd-ldb-rand.a ldb.rand.c -DDEBUGGING_MODE
+libckn-ldb-rand.o libckd-ldb-rand.o: ldb.rand.c
+	charmc -cwd -o libckn-ldb-rand.o ldb.rand.c
+	charmc -cwd -o libckd-ldb-rand.o ldb.rand.c -DDEBUGGING_MODE
 
-libckn-ldb-mngr.a libckd-ldb-mngr.a: ldb.mngr.c
-	charmc -cwd -o libckn-ldb-mngr.a ldb.mngr.c
-	charmc -cwd -o libckd-ldb-mngr.a ldb.mngr.c -DDEBUGGING_MODE
+libckn-ldb-mngr.o libckd-ldb-mngr.o: ldb.mngr.c
+	charmc -cwd -o libckn-ldb-mngr.o ldb.mngr.c
+	charmc -cwd -o libckd-ldb-mngr.o ldb.mngr.c -DDEBUGGING_MODE
 
-libckn-ldb-priomngr.a libckd-ldb-priomngr.a: ldb.priomngr.c
-	charmc -cwd -o libckn-ldb-priomngr.a ldb.priomngr.c
-	charmc -cwd -o libckd-ldb-priomngr.a ldb.priomngr.c -DDEBUGGING_MODE
+libckn-ldb-priomngr.o libckd-ldb-priomngr.o: ldb.priomngr.c
+	charmc -cwd -o libckn-ldb-priomngr.o ldb.priomngr.c
+	charmc -cwd -o libckd-ldb-priomngr.o ldb.priomngr.c -DDEBUGGING_MODE
 
-libckn-ldb-tok.a libckd-ldb-tok.a: ldb.tok.c
-	charmc -cwd -o libckn-ldb-tok.a ldb.tok.c
-	charmc -cwd -o libckd-ldb-tok.a ldb.tok.c -DDEBUGGING_MODE
+libckn-ldb-tok.o libckd-ldb-tok.o: ldb.tok.c
+	charmc -cwd -o libckn-ldb-tok.o ldb.tok.c
+	charmc -cwd -o libckd-ldb-tok.o ldb.tok.c -DDEBUGGING_MODE
 
-libckn-ldb-btok.a libckd-ldb-btok.a: ldb.btok.c
-	charmc -cwd -o libckn-ldb-btok.a ldb.btok.c
-	charmc -cwd -o libckd-ldb-btok.a ldb.btok.c -DDEBUGGING_MODE
+libckn-ldb-btok.o libckd-ldb-btok.o: ldb.btok.c
+	charmc -cwd -o libckn-ldb-btok.o ldb.btok.c
+	charmc -cwd -o libckd-ldb-btok.o ldb.btok.c -DDEBUGGING_MODE
 
-libckn-ldb-replay.a libckd-ldb-replay.a: ldb.replay.c
-	charmc -cwd -o libckn-ldb-replay.a ldb.replay.c
-	charmc -cwd -o libckd-ldb-replay.a ldb.replay.c -DDEBUGGING_MODE
+libckn-ldb-replay.o libckd-ldb-replay.o: ldb.replay.c
+	charmc -cwd -o libckn-ldb-replay.o ldb.replay.c
+	charmc -cwd -o libckd-ldb-replay.o ldb.replay.c -DDEBUGGING_MODE
 
-libckn-ldb-recv.a libckd-ldb-recv.a: ldb.recv.c
-	charmc -cwd -o libckn-ldb-recv.a ldb.recv.c
-	charmc -cwd -o libckd-ldb-recv.a ldb.recv.c -DDEBUGGING_MODE
+libckn-ldb-recv.o libckd-ldb-recv.o: ldb.recv.c
+	charmc -cwd -o libckn-ldb-recv.o ldb.recv.c
+	charmc -cwd -o libckd-ldb-recv.o ldb.recv.c -DDEBUGGING_MODE
 
-libckn-cplus-n.a libckd-cplus-n.a: dummy.cplus.c
-	charmc -cwd -o libckn-cplus-n.a dummy.cplus.c
-	charmc -cwd -o libckd-cplus-n.a dummy.cplus.c -DDEBUGGING_MODE
+libckn-cplus-n.o libckd-cplus-n.o: dummy.cplus.c
+	charmc -cwd -o libckn-cplus-n.o dummy.cplus.c
+	charmc -cwd -o libckd-cplus-n.o dummy.cplus.c -DDEBUGGING_MODE
 
-libckn-defmain.a libckd-defmain.a: default-main.c
-	charmc -cwd -o libckn-defmain.a default-main.c
-	charmc -cwd -o libckd-defmain.a default-main.c -DDEBUGGING_MODE
+libckn-defmain.o libckd-defmain.o: default-main.c
+	charmc -cwd -o libckn-defmain.o default-main.c
+	charmc -cwd -o libckd-defmain.o default-main.c -DDEBUGGING_MODE
 
 common.n.o common.d.o: common.c $(CKHEADERS)
 	charmc -cwd -o common.n.o common.c
@@ -287,12 +287,12 @@ perf-proj.d.o : perf-proj.c performance.h $(CKHEADERS)
 LIBCP_N=init.cplus.n.o main.cplus.n.o ck.cplus.n.o acc.cplus.n.o mono.cplus.n.o
 LIBCP_D=init.cplus.d.o main.cplus.d.o ck.cplus.d.o acc.cplus.d.o mono.cplus.d.o
 
-charm++libs: libckn-cplus-y.a libckd-cplus-n.a 
+charm++libs: libckn-cplus-y.o libckd-cplus-n.o 
 
-libckn-cplus-y.a: $(LIBCP_N)
+libckn-cplus-y.o: $(LIBCP_N)
 	charmc -cwd -o $@ $(LIBCP_N)
 
-libckd-cplus-y.a: $(LIBCP_D)
+libckd-cplus-y.o: $(LIBCP_D)
 	charmc -cwd -o $@ $(LIBCP_D)
 
 init.cplus.n.o init.cplus.d.o : init.cplus.cxx $(CKHEADERS) c++interface.h

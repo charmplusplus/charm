@@ -495,10 +495,10 @@ endif
 
 if ($?EXECMODE == 0) set EXECMODE=notrace
 
-if (-e $CHARMLIB/libckn-core-$EXECMODE.a) then
+if (-e $CHARMLIB/libckn-core-$EXECMODE.o) then
    set LIBCLASS=ckn
 else
-   if (-e $CHARMLIB/libckd-core-$EXECMODE.a) then
+   if (-e $CHARMLIB/libckd-core-$EXECMODE.o) then
       set LIBCLASS=ckd
    else
       echo "charmc : No such execmode $EXECMODE"
@@ -511,7 +511,7 @@ endif
 
 if ($?QUEUE == 0) set QUEUE=fifo
 
-if (! -e $CHARMLIB/libconv-qs-$QUEUE.a) then
+if (! -e $CHARMLIB/libconv-qs-$QUEUE.o) then
    echo "charmc: Unknown queueing strategy $QUEUE"
    (cd $CHARMLIB ; ls -al libconv-qs-*)
    goto failure
@@ -521,7 +521,7 @@ endif
 
 if ($?BALANCE == 0) set BALANCE=rand
 
-if (! -e $CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.a) then
+if (! -e $CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o) then
    echo "charmc : Unknown load balancer $BALANCE"
    (cd $CHARMLIB ; ls -al lib${LIBCLASS}-ldb-*)
    goto failure
@@ -588,19 +588,18 @@ endif
 
 # Identify the libraries to use
 
-set LIBRARIES = ($LIBRARIES \
-	-l${LIBCLASS}-core-$EXECMODE \
-	-l${LIBCLASS}-ldb-$BALANCE \
-	-l${LIBCLASS}-$LIBCPLUS \
-	-lconv-core \
-	-lconv-qs-$QUEUE \
-	$CMK_LIBS -lm)
+set OBJECTFILES = ($OBJECTFILES \
+	$CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
+	$CHARMLIB/lib${LIBCLASS}-ldb-$BALANCE.o \
+	$CHARMLIB/lib${LIBCLASS}-$LIBCPLUS.o \
+	$CHARMLIB/libconv-core.o \
+	$CHARMLIB/libconv-qs-$QUEUE.o )
 
-if ($?MAINOBJ) then
-   set OBJECTFILES=($MAINOBJ $OBJECTFILES)
-else
-   set LIBRARIES=(-l${LIBCLASS}-defmain $LIBRARIES)
-endif
+set LIBRARIES = ($LIBRARIES $CMK_LIBS -lm)
+
+if ($?MAINOBJ == 0) set MAINOBJ=$CHARMLIB/lib${LIBCLASS}-defmain
+
+set OBJECTFILES=($MAINOBJ $OBJECTFILES)
 
 # Perform the Linkage
 
