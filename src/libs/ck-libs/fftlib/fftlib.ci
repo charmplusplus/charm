@@ -14,6 +14,10 @@ module fftlib {
 		entry void acceptDataForFFT(int numPoints, complex points[numPoints], int posn, int info_id);
 		entry void acceptDataForIFFT(int numPoints, complex points[numPoints], int posn, int info_id);
 	};
+	array [1D] NormalRealSlabArray: SlabArray { 
+		entry void acceptDataForFFT(int numPoints, complex points[numPoints], int posn, int info_id);
+		entry void acceptDataForIFFT(int numPoints, complex points[numPoints], int posn, int info_id);
+	};
 /*
 	// the application should make an array derived from this
 	array [2D] SparseSlabArray: SlabArray { 

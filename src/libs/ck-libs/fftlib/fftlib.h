@@ -3,22 +3,34 @@
 
 #include <charm++.h>
 #include "ckcomplex.h"
-
+#include "rfftw.h"
 
 #include "fftlib.decl.h"
+
+#define COMPLEX_TO_REAL 11
+#define REAL_TO_COMPLEX 12
+#define COMPLEX_TO_COMPLEX 13
+#define NULL_TO_NULL 14
 
 #define MAX_FFTS 5
 
 class NormalFFTinfo {
  public:
-	// Constructors
-	NormalFFTinfo(CProxy_NormalSlabArray &sProxy, CProxy_NormalSlabArray &dProxy, int sDim[2], int dDim[2], int isSrc, complex *dptr, int sPlanesPerSlab=1, int dPlanesPerSlab=1) {
-		init(sProxy, dProxy, sDim, dDim, isSrc, dptr, sPlanesPerSlab, dPlanesPerSlab);
+    // Constructors
+        NormalFFTinfo(CProxy_SlabArray &sProxy,
+                      CProxy_SlabArray &dProxy,
+                      int sDim[2], int dDim[2], int isSrc,
+                      void *dptr, int transType,
+                      int sPlanesPerSlab=1, int dPlanesPerSlab=1) {
+	    init(sProxy, dProxy, sDim, dDim, isSrc, dptr, transType, sPlanesPerSlab, dPlanesPerSlab);
 	}
-
 	NormalFFTinfo(NormalFFTinfo &info) {
-		init(info.srcProxy, info.destProxy, info.srcSize, info.destSize, info.isSrcSlab, (complex *) NULL, info.srcPlanesPerSlab, info.destPlanesPerSlab);
-	}
+                init(info.srcProxy, info.destProxy,
+                     info.srcSize, info.destSize, info.isSrcSlab,
+                     info.dataPtr, info.transformType,
+                     info.srcPlanesPerSlab, info.destPlanesPerSlab);
+        }
+
 	NormalFFTinfo(void) {}
 
 	// charm pup function
@@ -30,32 +42,39 @@ class NormalFFTinfo {
 		p(isSrcSlab);
 		p(srcPlanesPerSlab);
 		p(destPlanesPerSlab);
+		p|transformType;
 		if (p.isUnpacking()) 
-			dataPtr = (complex *) NULL;
+			dataPtr = NULL;
 	}
 
-	CProxy_NormalSlabArray srcProxy, destProxy;
+	CProxy_SlabArray srcProxy, destProxy;
 	int srcSize[2], destSize[2];
 	bool isSrcSlab;
 	int srcPlanesPerSlab, destPlanesPerSlab;
-	complex *dataPtr;
- private:
-	void init(CProxy_NormalSlabArray &sProxy, CProxy_NormalSlabArray &dProxy, int sDim[2], int dDim[2], int isSrc, complex *dptr, int sPlanesPerSlab, int dPlanesPerSlab) {
-		if (sDim[1] != dDim[1])
-			ckerr << "WARNING"
-				  << "This configuration of the source and destination "
-				  << "is not consistent, check the dimensions. The program is "
-				  << "likely to misbehave" 
-				  << endl;
-		srcProxy = sProxy; 
-		destProxy = dProxy;
-		isSrcSlab = isSrc;
-		srcPlanesPerSlab = sPlanesPerSlab; 
-		destPlanesPerSlab = dPlanesPerSlab;
-		dataPtr = dptr;
-		memcpy(srcSize, sDim, 2 * sizeof(int));
-		memcpy(destSize, dDim, 2 * sizeof(int));
-	}
+        void *dataPtr;
+        int transformType;
+ 
+       void init(CProxy_SlabArray &sProxy,
+		 CProxy_SlabArray &dProxy,
+		 int sDim[2], int dDim[2], int isSrc,
+		 void *dptr, int transT,
+		 int sPlanesPerSlab, int dPlanesPerSlab) {
+                if (sDim[1] != dDim[1])
+                        ckerr << "WARNING"
+                                  << "This configuration of the source and destination "
+                                  << "is not consistent, check the dimensions. The program is "
+                                  << "likely to misbehave"
+                                  << endl;
+                srcProxy = sProxy;
+                destProxy = dProxy;
+                isSrcSlab = isSrc;
+                srcPlanesPerSlab = sPlanesPerSlab;
+                destPlanesPerSlab = dPlanesPerSlab;
+                dataPtr = dptr;
+                transformType=transT;
+                memcpy(srcSize, sDim, 2 * sizeof(int));
+                memcpy(destSize, dDim, 2 * sizeof(int));
+        }
 };
 
 class LineFFTinfo {
@@ -170,6 +189,42 @@ class NormalSlabArray: public SlabArray {
  protected:
 	fftwnd_plan fwd2DPlan, bwd2DPlan;
 	fftw_plan fwd1DPlan, bwd1DPlan;
+	NormalFFTinfo *fftinfos[MAX_FFTS];
+ private:
+	int counts[MAX_FFTS];
+};
+
+class NormalRealSlabArray: public SlabArray {
+ public:
+	NormalRealSlabArray(CkMigrateMessage *m): SlabArray(m) {}
+	NormalRealSlabArray() {
+		int i;
+		for (i = 0; i < MAX_FFTS; i++) {
+			fftinfos[i] = NULL;
+			counts[i] = 0;
+		}
+		rfwd1DXPlan = rbwd1DXPlan = (rfftw_plan) NULL;
+		fwd1DYPlan = bwd1DYPlan = (fftw_plan) NULL;
+		fwd1DZPlan = bwd1DZPlan = (fftw_plan) NULL;
+	}
+	void setup(NormalFFTinfo &info);
+
+	NormalRealSlabArray(NormalFFTinfo &info) { setup(info); }
+	~NormalRealSlabArray();
+
+
+	void acceptDataForFFT(int, complex *, int, int);
+	void acceptDataForIFFT(int, complex *, int, int);
+
+	void doFFT(int src_id = 0, int dst_id = 0);
+	void doIFFT(int src_id = 0, int dst_id = 0);
+
+	void pup(PUP::er &p);
+
+ protected:
+	rfftw_plan rfwd1DXPlan, rbwd1DXPlan;
+	fftw_plan fwd1DYPlan, bwd1DYPlan; 
+	fftw_plan fwd1DZPlan, bwd1DZPlan;
 	NormalFFTinfo *fftinfos[MAX_FFTS];
  private:
 	int counts[MAX_FFTS];

@@ -8,7 +8,7 @@ void
 NormalSlabArray::doFFT(int src_id, int dst_id)
 {
     NormalFFTinfo &fftinfo = *(fftinfos[src_id]);
-    complex *dataPtr = fftinfo.dataPtr;
+    complex *dataPtr = (complex*)fftinfo.dataPtr;
 
     int planeSize = fftinfo.srcSize[0] * fftinfo.srcSize[1];
     int lineSize = fftinfo.srcSize[1];
@@ -35,7 +35,7 @@ NormalSlabArray::doFFT(int src_id, int dst_id)
 		temp += lineSize;
 	    }
 	
-	fftinfo.destProxy(pe).acceptDataForFFT(lineSize * fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab, sendData, thisIndex, dst_id);
+	((CProxy_NormalSlabArray)fftinfo.destProxy)(pe).acceptDataForFFT(lineSize * fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab, sendData, thisIndex, dst_id);
     }
     delete [] sendData;
 }
@@ -47,7 +47,7 @@ void
 NormalSlabArray::acceptDataForFFT(int numPoints, complex *points, int posn, int info_id)
 {
     NormalFFTinfo &fftinfo = *(fftinfos[info_id]);
-    complex *dataPtr = fftinfo.dataPtr;
+    complex *dataPtr = (complex*)fftinfo.dataPtr;
     int lineSize = fftinfo.destSize[1];
     
 #if CAREFUL
@@ -84,7 +84,7 @@ void
 NormalSlabArray::doIFFT(int src_id, int dst_id)
 {
     NormalFFTinfo &fftinfo = *(fftinfos[src_id]);
-    complex *dataPtr = fftinfo.dataPtr;
+    complex *dataPtr = (complex*)fftinfo.dataPtr;
     int planeSize = fftinfo.destSize[0] * fftinfo.destSize[1];
     int lineSize = fftinfo.destSize[1];
     
@@ -108,7 +108,7 @@ NormalSlabArray::doIFFT(int src_id, int dst_id)
 		       sizeof(complex) * lineSize);
 		temp += lineSize;
 	    }
-	fftinfo.srcProxy(pe).acceptDataForIFFT(lineSize * fftinfo.destPlanesPerSlab * fftinfo.srcPlanesPerSlab, sendData, thisIndex, dst_id);
+	((CProxy_NormalSlabArray)fftinfo.srcProxy)(pe).acceptDataForIFFT(lineSize * fftinfo.destPlanesPerSlab * fftinfo.srcPlanesPerSlab, sendData, thisIndex, dst_id);
     }
     delete [] sendData;
 }
@@ -117,7 +117,7 @@ void
 NormalSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn, int info_id)
 {
     NormalFFTinfo &fftinfo = *(fftinfos[info_id]);
-    complex *dataPtr = fftinfo.dataPtr;
+    complex *dataPtr = (complex*)fftinfo.dataPtr;
     int planeSize = fftinfo.destSize[0] * fftinfo.destSize[1];
     int lineSize = fftinfo.destSize[1];
 #if CAREFUL

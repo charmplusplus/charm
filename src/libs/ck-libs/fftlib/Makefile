@@ -12,7 +12,7 @@ COMPILER=$(CHARMC) $(INCLUDE)
 
 LIB=libmodulefftlib.a
 LIBDEST=$(CDIR)/lib/$(LIB)
-LIBOBJ=fftlib-normal.o fftlib-sparse.o translines.o
+LIBOBJ=fftlib-normal.o rfftlib-normal.o fftlib-sparse.o translines.o
 INCDIR=$(CDIR)/include/fftlib
 HEADERS= $(INCDIR)/fftlib.h\
 	 $(INCDIR)/fftlib.decl.h\
@@ -33,6 +33,9 @@ $(LIBDEST): $(LIBOBJ)
 
 fftlib-normal.o: fftlib-normal.C fftlib.h fftlib.decl.h
 	$(COMPILER) fftlib-normal.C
+
+rfftlib-normal.o: rfftlib-normal.C fftlib.h fftlib.decl.h
+	$(COMPILER) rfftlib-normal.C
 
 fftlib-sparse.o: fftlib-sparse.C fftlib.h fftlib.decl.h
 	$(COMPILER) fftlib-sparse.C
