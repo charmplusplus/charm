@@ -86,6 +86,13 @@ class SRentry {
 /** This class is used in GVT to keep track of messages sent/received */
 class SRtable {
  private:
+  /// Stores send/recv records ith timestamp >= offset+GVT_WINDOW
+  /** One entry per timestamp, all sends/recvs stored in same entry */
+  SRentry *residuals;
+  /// Helper function to Insert
+  /** Stores new send/recv record in residuals */
+  void listInsert(int timestamp, int srSt);
+ public:
   /// sends[i] is number of sends at timestamp offset+i
   /** Size of table GVT_WINDOW specified in pose.h */
   int sends[GVT_WINDOW];
@@ -95,13 +102,6 @@ class SRtable {
   /// Base timestamp to index tables
   /** offset is the current GVT */
   int offset;
-  /// Stores send/recv records ith timestamp >= offset+GVT_WINDOW
-  /** One entry per timestamp, all sends/recvs stored in same entry */
-  SRentry *residuals;
-  /// Helper function to Insert
-  /** Stores new send/recv record in residuals */
-  void listInsert(int timestamp, int srSt);
- public:
   /// Basic constructor
   /** Initializes all data fields, including entire sends and recvs arrays */
   SRtable();
@@ -116,6 +116,11 @@ class SRtable {
   /// Find earliest timestamp in table and associated send/recv counts
   /** Returns results by reference */
   void FindEarliest(int *eTS, int *eS, int *eR);
+  /// Find earliest timestamp difference between this and a previous table
+  /** Returns results by reference */
+  void FindEarliestDiff(SRtable *cp, int *eTS);
+  /// Copy table to cp
+  void CopyTable(SRtable *cp);
   /// Free residual entries, reset counters and pointers
   void FreeTable();
   /// Dump data fields

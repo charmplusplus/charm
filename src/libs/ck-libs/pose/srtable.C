@@ -117,6 +117,29 @@ void SRtable::FindEarliest(int *eTS, int *eS, int *eR)
   }
 }
 
+/// Find earliest timestamp difference between this and a previous table
+void SRtable::FindEarliestDiff(SRtable *cp, int *eTS)
+{
+  //sanitize();
+  for (int i=0; i<GVT_WINDOW; i++)
+    if ((sends[i] != cp->sends[i]) || (recvs[i] != cp->recvs[i])) {
+      *eTS = offset+i;
+      return;
+    }
+  if (residuals) *eTS = residuals->timestamp();
+}
+
+/// Copy table to cp
+void SRtable::CopyTable(SRtable *cp)
+{
+  //  sanitize();
+  cp->offset = offset;
+  for (int i=0; i<GVT_WINDOW; i++) {
+    cp->sends[i] = sends[i];
+    cp->recvs[i] = recvs[i];
+  }
+}
+
 /// Free residual entries, reset counters and pointers
 void SRtable::FreeTable() {
   //  sanitize();

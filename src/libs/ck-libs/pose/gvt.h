@@ -73,6 +73,8 @@ class PVT : public Group {
   int waitingForGVT;                 
   /// Table to store send/recv timestamps
   SRtable *SendsAndRecvs;            
+  /// Copy of SendsAndRecvs table for difference comparisons
+  SRtable *LastSendsAndRecvs;            
   /// List of objects registered with this PVT branch
   pvtObjects objs;                   
  public:
