@@ -63,6 +63,24 @@ The \kw{PUP::er} overhead is very small-- one virtual function call
 for each item or array to be packed/unpacked.  The actual packing/unpacking is
 normally a simple memory-to-memory binary copy. 
 
+Please note that if your object contains Structured Dagger code (see section ``Structured Dagger'') you must use the following syntax to correctly pup the object:
+
+\begin{alltt}
+class bar \{
+ private:
+    int a,b;
+ public:
+    bar_SDAG_CODE 
+    ...other methods...
+
+    virtual void pup(PUP::er& p) \{
+      __sdag_pup(p);
+      ...pup other data here...
+    \}
+\};
+\end{alltt}
+
+
 \subsubsection{C and Fortran bindings}
 C and Fortran programmers can use a limited subset of the
 \kw{PUP::er} capability.  The routines all take a 

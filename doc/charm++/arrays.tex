@@ -573,6 +573,23 @@ void A2::pup(PUP::er \&p)
 \}
 \end{alltt}
 
+Please note that if your object contains Structured Dagger code (see section ``Structured Dagger'') you must use the following syntax to correctly pup the object:
+
+\begin{alltt}
+class bar: public ArrayElement3D \{
+ private:
+    int a,b;
+ public:
+    bar_SDAG_CODE 
+    ...other methods...
+
+    virtual void pup(PUP::er& p) \{
+      __sdag_pup(p);
+      ...pup other data here...
+    \}
+\};
+\end{alltt}
+
 See the \index{PUP} section ``PUP'' for more details on pup routines
 and the \kw{PUP::er} type.
 
