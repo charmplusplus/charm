@@ -17,7 +17,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.6  1998-01-13 17:03:25  milind
+ * Revision 1.7  1998-03-05 17:17:26  milind
+ * made slightly more efficient in dequeue op.
+ *
+ * Revision 1.6  1998/01/13 17:03:25  milind
  * Made charm++ to compile and run with Solaris 2.6.
  * In particular, changed INTBITS to CINTBITS, and handled EALREADY.
  *
@@ -417,6 +420,8 @@ void CqsDequeue(q, resp)
 Queue q;
 void **resp;
 {
+  if (q->length==0) 
+    { *resp = 0; return; }
   if (q->negprioq.heapnext>1)
     { *resp = CqsPrioqDequeue(&(q->negprioq)); q->length--; return; }
   if (q->zeroprio.head != q->zeroprio.tail)
