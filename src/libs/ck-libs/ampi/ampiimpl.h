@@ -466,6 +466,15 @@ Represents an MPI request that has been initiated
 using Isend, Irecv, Ialltoall, Send_init, etc.
 */
 class AmpiRequest {
+protected:
+	void *buf;
+	int count;
+	int type;
+public:
+	int src;
+	int tag;
+	int comm;
+
 #if CMK_BLUEGENE_CHARM
 public:
 	void *event;	// the event point that corresponding to this message
@@ -501,20 +510,14 @@ public:
 };
 
 class PersReq : public AmpiRequest {
-	void *buf;
-	int count;
-	int type;
-	int src;
-	int tag;
-	int comm;
-
 	int sndrcv; // 1 if send , 2 if recv
 public:
-	PersReq(void *buf_, int count_, int type_, int src_, int tag_,
-		MPI_Comm comm_, int sndrcv_) :
-		buf(buf_), count(count_), type(type_), src(src_), tag(tag_),
-		comm(comm_), sndrcv(sndrcv_)
-		{ isvalid=true; }
+	PersReq(void *buf_, int count_, int type_, int src_, int tag_, 
+		MPI_Comm comm_, int sndrcv_) 
+	{
+		buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_; 
+		comm=comm_;  sndrcv=sndrcv_;  isvalid=true; 
+	}
 	~PersReq(){ }
 	int start();
 	CmiBool test(MPI_Status *sts);
@@ -524,17 +527,12 @@ public:
 };
 
 class IReq : public AmpiRequest {
-private:
-	void *buf;
-	int count;
-	int type;
-	int src;
-	int tag;
-	int comm;
 public:
-	IReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_):
-	     buf(buf_), count(count_), type(type_), src(src_), tag(tag_), comm(comm_)
-	     { isvalid=true; }
+	IReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_)
+	{
+		buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_; 
+		comm=comm_;  isvalid=true; 
+	}
 	~IReq(){ }
 	CmiBool test(MPI_Status *sts);
 	void complete(MPI_Status *sts);
@@ -557,10 +555,10 @@ class ATAReq : public AmpiRequest {
 	friend class ATAReq;
 	};
 	Request *myreqs;
-	int count;
+	int elmcount;
 	int idx;
 public:
-	ATAReq(int c_):count(c_),idx(0) { myreqs = new Request [c_]; isvalid=true; }
+	ATAReq(int c_):elmcount(c_),idx(0) { myreqs = new Request [c_]; isvalid=true; }
 	~ATAReq(void) { if(myreqs) delete [] myreqs; }
 	int addReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_){
 		myreqs[idx].buf=buf_;	myreqs[idx].count=count_;
@@ -571,7 +569,7 @@ public:
 	CmiBool test(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
-	inline int getCount(void){ return count; }
+	inline int getCount(void){ return elmcount; }
 	inline int getType(void){ return 3; }
 	inline void free(void){ isvalid=false; delete [] myreqs; }
 };

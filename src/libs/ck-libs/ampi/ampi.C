@@ -2006,19 +2006,73 @@ int AMPI_Startall(int count, MPI_Request *requests){
   return 0;
 }
 
-// this function sets idx[count] such that reqs[idx[i]] is in asending order
-inline void swap(int& a,int& b){
+/* organize the indices of requests into a vector of a vector: 
+ * level 1 is different msg envelope matches
+ * level 2 is (posting) ordered requests of with envelope
+ * each time multiple completion call loop over first elem of level 1
+ * and move the matched to the NULL request slot.   
+ * warning: this does not work with I-Alltoall requests */
+inline int matchReq(MPI_Request ia, MPI_Request ib){
+  AmpiRequestList* reqs = getReqs();
+  AmpiRequest *a, *b;
+  if(ia==MPI_REQUEST_NULL && ib==MPI_REQUEST_NULL) return 1;
+  if(ia==MPI_REQUEST_NULL || ib==MPI_REQUEST_NULL) return 0;
+  a=(*reqs)[ia];  b=(*reqs)[ib];
+  if(a->tag != b->tag) return 0;
+  if(a->src != b->src) return 0;
+  if(a->comm != b->comm) return 0;
+  return 1;
+}
+inline void swapInt(int& a,int& b){
   int tmp;
   tmp=a; a=b; b=tmp;
 }
-void sortedIndex(int n, int* arr, int* idx){
+inline void sortedIndex(int n, int* arr, int* idx){
   int i,j;
   for(i=0;i<n;i++) 
     idx[i]=i;
   for (i=0; i<n-1; i++) 
     for (j=0; j<n-1-i; j++)
       if (arr[idx[j+1]] < arr[idx[j]]) 
-	swap(idx[j+1],idx[j]);
+	swapInt(idx[j+1],idx[j]);
+}
+CkVec<CkVec<int> > vecIndex(int count, int* arr){
+  int *newidx = new int [count];
+  int flag;
+  sortedIndex(count,arr,newidx);
+  CkVec<CkVec<int> > vec;
+  CkVec<int> slot;
+  slot.push_back(newidx[0]);
+  vec.push_back(slot);
+  for(int i=1;i<count;i++){
+    flag=0;
+    for(int j=0;j<vec.size();j++){
+      if(matchReq(arr[newidx[i]],arr[(vec[j])[0]])){
+        (vec[j]).push_back(newidx[i]);
+	flag++;
+      }
+    }
+    if(!flag){
+      CkVec<int> newslot;
+      newslot.push_back(newidx[i]);
+      vec.push_back(newslot);
+    }else{
+      CkAssert(flag==1);
+    }
+  }
+  delete [] newidx;
+  return vec;
+}
+void vecPrint(CkVec<CkVec<int> > vec, int* arr){
+  printf("vec content: ");
+  for(int i=0;i<vec.size();i++){
+    printf("{");
+    for(int j=0;j<(vec[i]).size();j++){
+      printf(" %d ",arr[(vec[i])[j]]);
+    }
+    printf("} ");
+  }
+  printf("\n");
 }
 
 int PersReq::wait(MPI_Status *sts){
@@ -2078,27 +2132,28 @@ CDECL
 int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 {
   AMPIAPI("AMPI_Waitall");
-  int i;
+  int i,j;
   AmpiRequestList* reqs = getReqs();
-  int *newidx = new int [count];
-  sortedIndex(count,request,newidx);
-  for(i=0;i<count;i++) {
-    if(request[newidx[i]] == MPI_REQUEST_NULL){
-      stsempty(sts[newidx[i]]);
-      continue;
+  CkVec<CkVec<int> > reqvec = vecIndex(count,request);
+  for(i=0;i<reqvec.size();i++){
+    for(j=0;j<(reqvec[i]).size();j++){
+      if(request[(reqvec[i])[j]] == MPI_REQUEST_NULL){
+        stsempty(sts[(reqvec[i])[j]]);
+        continue;
+      }
+      (*reqs)[request[(reqvec[i])[j]]]->wait(&sts[(reqvec[i])[j]]);
     }
-    (*reqs)[request[newidx[i]]]->wait(&sts[newidx[i]]);
   }
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_WAITALL(reqs);   // setup forward and backward dependence
 #endif
   // free memory of requests
   for(i=0;i<count;i++){ 
-    if(request[newidx[i]] == MPI_REQUEST_NULL)
+    if(request[i] == MPI_REQUEST_NULL)
       continue;
-    if((*reqs)[request[newidx[i]]]->getType() != 1) { // only free non-blocking request
-      reqs->free(request[newidx[i]]);
-      request[newidx[i]] = MPI_REQUEST_NULL;
+    if((*reqs)[request[i]]->getType() != 1) { // only free non-blocking request
+      reqs->free(request[i]);
+      request[i] = MPI_REQUEST_NULL;
     }
   }
   return 0;
@@ -2109,13 +2164,12 @@ int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Waitany");
   int flag=0;
-  int *newidx = new int [count];
-  sortedIndex(count,request,newidx);
+  CkVec<CkVec<int> > reqvec = vecIndex(count,request);
   while(count>0){
-    for(int i=0;i<count;i++) {
-      AMPI_Test(&request[newidx[i]], &flag, sts);
+    for(int i=0;i<reqvec.size();i++){
+      AMPI_Test(&request[(reqvec[i])[0]], &flag, sts);
       if(flag == 1 && sts->MPI_COMM != 0){ // to skip MPI_REQUEST_NULL
-        *idx = newidx[i];
+        *idx = (reqvec[i])[0];
         return 0;
       }
     }
@@ -2130,19 +2184,21 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
 {
   AMPIAPI("AMPI_Waitsome");
   MPI_Status sts;
-  int flag;
-  int *newidx = new int [incount];
-  sortedIndex(incount,array_of_requests,newidx);
+  int i;
+  int flag=0, realflag=0;
+  CkVec<CkVec<int> > reqvec = vecIndex(incount,array_of_requests);
   *outcount = 0;
   while(1){
-    for(int i=0;i<incount;i++) {
-      AMPI_Test(&array_of_requests[newidx[i]], &flag, &sts);
-      if(flag == 1){	// here we pass MPI_REQUEST_NULL along
-        array_of_indices[(*outcount)]=newidx[i];
+    for(i=0;i<reqvec.size();i++){
+      AMPI_Test(&array_of_requests[(reqvec[i])[0]], &flag, &sts);
+      if(flag == 1){ 
+        array_of_indices[(*outcount)]=(reqvec[i])[0];
 	array_of_statuses[(*outcount)++]=sts;
+        if(sts.MPI_COMM != 0)
+	  realflag=1; // there is real(non null) request
       }
     }
-    if(outcount > 0) break; // alternative: turn around and test [0 ~ AOI[0]-1]
+    if(realflag && outcount>0) break;
   }
   return 0;
 }
@@ -2207,14 +2263,12 @@ int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
 CDECL
 int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Status *sts){
   AMPIAPI("AMPI_Testany");
-  int *newidx = new int [count];
-  sortedIndex(count,request,newidx);
+  CkVec<CkVec<int> > reqvec = vecIndex(count,request);
   *flag=0;
-  for(int i=0;i<count;i++)
-  {
-    AMPI_Test(&request[newidx[i]], flag, sts);
+  for(int i=0;i<reqvec.size();i++){
+    AMPI_Test(&request[(reqvec[i])[0]], flag, sts);
     if(*flag==1 && sts->MPI_COMM!=0){ // skip MPI_REQUEST_NULL
-      *index = newidx[i];
+      *index = (reqvec[i])[0];
       return 0;
     }
   }
@@ -2227,14 +2281,17 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Testall");
   int tmpflag;
+  int i,j;
   AmpiRequestList* reqs = getReqs();
-  int *newidx = new int [count];
-  sortedIndex(count,request,newidx);
-  *flag = 1;
-  for(int i=0;i<count;i++)
-  {
-    tmpflag = (*reqs)[request[newidx[i]]]->test(&sts[newidx[i]]);
-    *flag *= tmpflag;
+  CkVec<CkVec<int> > reqvec = vecIndex(count,request);
+  *flag = 1;  
+  for(i=0;i<reqvec.size();i++){
+    for(j=0;j<(reqvec[i]).size();j++){
+      if(request[(reqvec[i])[j]] == MPI_REQUEST_NULL)
+        continue;
+      tmpflag = (*reqs)[request[(reqvec[i])[j]]]->test(&sts[(reqvec[i])[j]]);
+      *flag *= tmpflag;
+    }
   }
   if(flag) 
     MPI_Waitall(count,request,sts);
@@ -2248,13 +2305,13 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
   AMPIAPI("AMPI_Testsome");
   MPI_Status sts;
   int flag;
-  int *newidx = new int [incount];
-  sortedIndex(incount,array_of_requests,newidx);
+  int i;
+  CkVec<CkVec<int> > reqvec = vecIndex(incount,array_of_requests);
   *outcount = 0;
-  for(int i=0;i<incount;i++) {
-    AMPI_Test(&array_of_requests[newidx[i]], &flag, &sts);
+  for(i=0;i<reqvec.size();i++){
+    AMPI_Test(&array_of_requests[(reqvec[i])[0]], &flag, &sts);
     if(flag == 1){
-      array_of_indices[(*outcount)]=newidx[i];
+      array_of_indices[(*outcount)]=(reqvec[i])[0];
       array_of_statuses[(*outcount)++]=sts;
     }
   }
