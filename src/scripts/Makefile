@@ -1,4 +1,4 @@
-#############################################################################
+#############################################################################"
 #
 # This one Makefile serves all of converse and charm.  It includes
 # rules for building:
@@ -59,7 +59,7 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h conv-trace.h conv-mach.h simplemsg.h sm.h trace.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h ckarray.h tempo.h waitqd.h LBDatabase.h lbdb.h LBDB.h LBOM.h LBObj.h CentralLB.h RandCentLB.h
+ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h conv-trace.h conv-mach.h simplemsg.h sm.h trace.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h ckarray.h tempo.h waitqd.h LBDatabase.h lbdb.h LBDB.h LBOM.h LBObj.h CentralLB.h RandCentLB.h conv-ccs.h
 
 ALLINTERFACES=idl.ci
 
@@ -136,7 +136,7 @@ TRACELIBS=libtrace-none.a libtrace-projections.a
 
 CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o libldb-spray.o libldb-graph.o libldb-test.o $(TRACELIBS)
 
-LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o generate.o edgelist.o
+LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o random.o debug-message.o debug-object.o info.o generate.o edgelist.o conv-ccs.o
 
 converse: basics QuickThreads/libckqt.a $(CVLIBS) conv-host-if-needed conv-cpm convlibs
 
@@ -182,6 +182,9 @@ spantree.o: spantree.c $(CVHEADERS)
 
 convcore.o: convcore.c $(CVHEADERS)
 	$(CHARMC) convcore.c
+
+conv-ccs.o: conv-ccs.c $(CVHEADERS)
+	$(CHARMC) conv-ccs.c
 
 random.o: random.c $(CVHEADERS)
 	$(CHARMC) random.c
