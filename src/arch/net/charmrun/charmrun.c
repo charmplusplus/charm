@@ -812,7 +812,7 @@ char *nodetab_args(char *args,nodetab_host *h)
   while(*args != 0) {
     char *b1 = skipblanks(args), *e1 = skipstuff(b1);
     char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
-	while (*b1=='+') b1++;/*Skip over "++" on parameters*/
+    while (*b1=='+') b1++;/*Skip over "++" on parameters*/
 #if CMK_USE_RSH
     if (subeqs(b1,e1,"login")) h->login = substr(b2,e2);
     else if (subeqs(b1,e1,"passwd")) h->passwd = substr(b2,e2);
@@ -822,7 +822,7 @@ char *nodetab_args(char *args,nodetab_host *h)
     else if (subeqs(b1,e1,"xterm")) h->xterm = substr(b2,e2);
     else 
 #endif
-		if (subeqs(b1,e1,"speed")) h->speed = atof(b2);
+    if (subeqs(b1,e1,"speed")) h->speed = atof(b2);
     else if (subeqs(b1,e1,"cpus")) h->cpus = atol(b2);
     else if (subeqs(b1,e1,"pathfix")) {
       char *b3 = skipblanks(e2), *e3 = skipstuff(b3);
@@ -901,6 +901,9 @@ void nodetab_init()
 			if (rightgroup) {
 				host=group;
 				nodetab_args(b3,&host);
+#if CMK_USE_GM
+                                if (host.dataport == 0) { fprintf(stderr, "Missing port number!\n"); exit(1); }
+#endif
 				for (host.rank=0; host.rank<host.cpus; host.rank++)
 					nodetab_makehost(substr(b2,e2),&host);
 			}
@@ -1531,12 +1534,12 @@ string return idiom.
 char *create_netstart(int node)
 {
   static char dest[80];
+  int port = 0;
 #if CMK_USE_GM
-  /* send dataport to node program */
-  sprintf(dest,"%d %d %d %d %d",node,server_ip,server_port,getpid()&0x7FFF, nodetab_dataport(node));
-#else
-  sprintf(dest,"%d %d %d %d",node,server_ip,server_port,getpid()&0x7FFF);
+  /* send myrinet port to node program */
+  port = nodetab_dataport(node);
 #endif
+  sprintf(dest,"%d %d %d %d %d",node,server_ip,server_port,getpid()&0x7FFF, port);
   return dest;
 }
 
