@@ -118,13 +118,15 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
             env->setPacked(0); //We have already unpakced it.
             env->getsetArraySrcPe()=CkMyPe();  //FOO Bar change later
             env->getsetArrayHops()=0;  //FOO BAR change later
-            env->setQueueing(CQS_QUEUEING_FIFO);            
+            env->setQueueing(CK_QUEUEING_FIFO);            
 
             delete[] senv.data;
             
             //if(a_elem)
-            //  CkDeliverMessageFree(ep, data, a_elem);           
+            //  CkDeliverMessageFree(ep, data, a_elem);                     
             //else
+            //CkAbort("Array Element not FOUND \n");
+
             ap.ckSend((CkArrayMessage *)data, ep);
         }        
     }      

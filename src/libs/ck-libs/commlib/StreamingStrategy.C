@@ -60,6 +60,9 @@ void StreamingStrategy::flushPE(int pe) {
         if (msg_count!=msg_pe) 
             CkAbort("streamingMsgCount doesn't match streamingMsgBuf!\n");
     
+        ComlibPrintf("Sending %d Messagaes for PE %d\n", msg_count, pe);
+
+
         CmiMultipleSend(pe, msg_count, sizes, msgComps);
         delete [] msgComps;
         delete [] sizes;
