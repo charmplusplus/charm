@@ -1879,7 +1879,7 @@ char *input_scanf_chars(fmt)
  *
  ****************************************************************************/
 
-#define REQ_MAXFD 50 /* max file descriptors per process */
+#define REQ_MAXFD 10 /* max file descriptors per process */
 
 typedef struct req_node
 {
