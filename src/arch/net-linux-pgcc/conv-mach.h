@@ -22,12 +22,6 @@
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         1
 #define CMK_CMIPRINTF_IS_JUST_PRINTF                       0
 
-#define CMK_COMMHANDLE_IS_AN_INTEGER                       0
-#define CMK_COMMHANDLE_IS_A_POINTER                        1
-
-#define CMK_CSDEXITSCHEDULER_IS_A_FUNCTION                 0
-#define CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG               1
-
 #define CMK_FIX_HP_CONNECT_BUG                             0
 
 #define CMK_GETPAGESIZE_AVAILABLE                          0
@@ -64,15 +58,9 @@
 #define CMK_SHARED_VARS_SUN_THREADS                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
-#define CMK_SIGHOLD_IS_A_BUILTIN                           0
-#define CMK_SIGHOLD_NOT_NEEDED                             0
-#define CMK_SIGHOLD_USE_SIGMASK                            1
-
 #define CMK_SIGNAL_NOT_NEEDED                              0
 #define CMK_SIGNAL_USE_SIGACTION                           1
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
-
-#define CMK_SIZE_T                                         unsigned int
 
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1

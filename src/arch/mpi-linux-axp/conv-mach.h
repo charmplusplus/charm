@@ -8,12 +8,6 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_ASYNC_NOT_NEEDED                               1
-#define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
-#define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
-#define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
-#define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 0
-
 #define CMK_CCS_AVAILABLE                                  0
 #define CMK_WEB_MODE                                       0
 #define CMK_DEBUG_MODE                                     0
@@ -24,13 +18,6 @@
 
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 #define CMK_CMIPRINTF_IS_JUST_PRINTF                       1
-
-#define CMK_COMMHANDLE_IS_AN_INTEGER                       0
-#define CMK_COMMHANDLE_IS_A_POINTER                        1
-
-#define CMK_CSDEXITSCHEDULER_IS_A_FUNCTION                 0
-#define CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG               1
-
 
 #define CMK_GETPAGESIZE_AVAILABLE                          0
 
@@ -65,15 +52,9 @@
 #define CMK_SHARED_VARS_SUN_THREADS                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
-#define CMK_SIGHOLD_IS_A_BUILTIN                           0
-#define CMK_SIGHOLD_NOT_NEEDED                             1
-#define CMK_SIGHOLD_USE_SIGMASK                            0
-
 #define CMK_SIGNAL_NOT_NEEDED                              1
 #define CMK_SIGNAL_USE_SIGACTION                           0
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
-
-#define CMK_SIZE_T                                         unsigned long
 
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
