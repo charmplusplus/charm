@@ -1,4 +1,5 @@
 #include "NodeMulticast.h"
+#include "converse.h"
 
 NodeMulticast *nm_mgr;
 
@@ -46,12 +47,15 @@ void NodeMulticast::setDestinationArray(CkArrayID a, int nelem,
 
 void NodeMulticast::recvHandler(void *msg) {
     register envelope* env = (envelope *)msg;
+    void *charm_msg = (void *)EnvToUsr(env);
 
     env->setUsed(0);
     env->array_mgr()=mAid;
     //  env->array_srcPe()=CkMyPe();
     env->array_ep()=entryPoint;
     env->array_hops()=0;
+
+    //CkUnpackMessage(&env);
     
     ComlibPrintf("In receive Handler\n");
     
@@ -63,20 +67,21 @@ void NodeMulticast::recvHandler(void *msg) {
         
         CkArrayIndexMax * idx_arr = indexVec[dest_pe].getVec();
         for(int itr = 0; itr < size; itr ++) {
-            char *newmsg = (char *)CmiAlloc(env->getTotalsize());
-            memcpy(newmsg, msg, env->getTotalsize());
-            envelope* newenv = (envelope *)newmsg;
+            void *newcharmmsg = CkCopyMsg(&charm_msg); //(char *)CmiAlloc(env->getTotalsize());
+            //memcpy(newmsg, msg, env->getTotalsize());
+            envelope* newenv = UsrToEnv(newcharmmsg);
             
             //CkArrayIndex1D idx(dest_pe);
             //idx_arr[itr].print();
             CProxyElement_ArrayBase ap(mAid, idx_arr[itr]);
-            ComlibPrintf("%d:Array Base created\n", CkMyPe());
+            ComlibPrintf("%d:Array Base created %x\n", CkMyPe(), (char *)newenv -  2*sizeof(int));
             
             newenv->array_index()=idx_arr[itr];
-            ap.ckSend((CkArrayMessage *)EnvToUsr(newenv), entryPoint);
+            //CmiSetHandler(env, 0);
+            ap.ckSend((CkArrayMessage *)newcharmmsg, entryPoint);
         }
     }
-    
+    ComlibPrintf("[%d] CmiFree (Code) (%x)\n", CkMyPe(), (long) msg - 2*sizeof(int));
     CmiFree(msg);
 }
 
@@ -84,6 +89,7 @@ void NodeMulticast::insertMessage(CharmMessageHolder *cmsg){
 
     ComlibPrintf("In insertMessage \n");
     envelope *env = UsrToEnv(cmsg->getCharmMessage());
+
     CmiSetHandler(env, NodeMulticastHandlerId);
     messageBuf->enq(cmsg);
 }
@@ -96,6 +102,7 @@ void NodeMulticast::doneInserting(){
     ComlibPrintf("NodeMulticast :: doneInserting\n");
     
     if(messageBuf->length() > 1) {
+        /*
         char **msgComps;
         int *sizes, msg_count;
     
@@ -120,6 +127,7 @@ void NodeMulticast::doneInserting(){
         
         delete [] msgComps;
         delete [] sizes;
+        */
     }
     else if (messageBuf->length() == 1){
         ComlibPrintf("Sending Node Multicast\n");
@@ -134,14 +142,14 @@ void NodeMulticast::doneInserting(){
         for(int count = 0; count < numNodes; count++) 
             if(nodeMap[count]) {
                 char *newmsg = (char *)CmiAlloc(env->getTotalsize());
-                memcpy(newmsg, env, env->getTotalsize());
-                envelope* newenv = (envelope *)newmsg;
+                memcpy(newmsg, (char *)env, env->getTotalsize());
 
                 ComlibPrintf("In cmisyncsend to %d\n", count * pes_per_node + myRank);
-                CmiSyncSendAndFree(count * pes_per_node + myRank, env->getTotalsize(), (char *)newenv);
+                CmiSyncSendAndFree(count * pes_per_node + myRank, env->getTotalsize(), newmsg);
             }
         
-        //CmiFree(env);
+        ComlibPrintf("[%d] CmiFree (Code) (%x)\n", CkMyPe(), (char *)env - 2*sizeof(int));
+        CmiFree(env);
         delete cmsg;
     }
 }
