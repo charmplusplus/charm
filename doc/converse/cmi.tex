@@ -1,0 +1,259 @@
+\section{Converse Machine Interface}
+
+\internal{
+\subsection{Initialization and Wrap-Up}
+
+\function{void CmiInit(int argc, char *argv[])}
+\desc{ This function initializes the machine interface. It should be
+called prior to any other CMI functions. 
+Multiple calls to this function in a process should
+be avoided. \param{argc} and \param{argv} are in similar format as passed to
+\param{main()}. They would be utilized by \param{CmiInit()} to initialize
+machine specific parameters such as number of processors.}
+
+\function{void CmiExit(void)}
+\desc{This function frees the resources acquired by CMI and wraps up CMI. 
+Any other CMI function should not be called after a call to this function.
+\note{It does not terminate the calling
+process. A separate call to \param{exit()} is needed after \param{CmiExit()} to
+achieve this.}}
+}
+
+
+\subsection{Message Handler Calls}
+
+
+\function {int CmiMsgHeaderSizeBytes(void)}
+\desc{This call returns the size of the message header in bytes.}
+ 
+\function {void CmiSetHandler(int *MessageBuffer, int HandlerId)}
+\desc{This call sets the handler field of a message to {\tt HandlerId}.}
+ 
+\function {HANDLER CmiGetHandlerFunction(int *MessageBuffer)}
+\desc{This call returns the handler function pointer for a message. This
+usually involves looking up a table using the handler-id stored in
+the message header at the sending processor. HANDLER is defined as 
+{\tt typedef void (*HANDLER)(void *)} .}
+
+ 
+\function {int CmiRegisterHandler(HANDLER HandlerFunction)}
+\desc{This call registers a message handler with the CMI and returns a
+handler index which can be subsequently used to specify the handler
+for a message.}
+
+
+\subsection{Timer Calls}
+
+\function{double CmiTimer(void)}
+\desc{Returns current value of the timer in seconds. This is
+typically the time spent since the \param{CmiInit()} call.
+The precision of this timer is the best available on the particular machine,
+and usually has at least microsecond accuracy.}
+
+\subsection{Point-To-Point Communication}
+
+\function{void *CmiGetSpecificMsg(int HandlerId)}
+\desc{This call waits until a message for the specified handler is
+available, and returns a pointer to the message buffer. Ownership of
+the message buffer is maintained with the CMI (e.g. another call to
+\param{CmiGetMsg()} or \param{CmiSpecificMsg()} can overwrite the
+contents of this buffer.).  The message handler should explicitly call
+\param{CmiGrabBuffer()} to acquire ownership of the message buffer.}
+
+\internal{
+\function{void *CmiGetMsg(void)}
+\desc{Retrieves a message from the network's message queue and
+returns a pointer to the message buffer. If network's message queue is
+empty, this function returns \param{(void *) 0}. Ownership of the
+message buffer is maintained with CMI. Another call to \param{CmiGetMsg()}
+or \param{CmiSpecificMsg()} could overwrite the contents of buffer.
+The calling function should
+explicitly call \param{CmiGrabBuffer()} to acquire ownership 
+the message buffer.} 
+}
+
+\internal{
+\function{void CmiDeliverMsgs(void)}
+\desc{ Retrieves messages from the network message queue and invokes 
+corresponding handler functions for arrived messages. This function 
+returns after the network message queue becomes empty. Even after
+calling the handler functions, ownership of the message is kept with
+CMI and the handler function should call \param{CmiGrabBuffer()} to
+acquire the message buffer.}
+}
+
+\function{CommHandle CmiAsyncSend(unsigned int destPE, unsigned int size, void *msg)}
+\desc{ Initiates an asynchronous send of \param{msg} of length
+\param{size} bytes to processor \param{destPE} and returns a
+communication handle which could be used to enquire the status of this
+communication. Message buffer for \param{mesg} should not be reused or freed
+until communication is complete.}
+
+\function{void CmiSyncSend(unsigned int destPE, unsigned int size, void *msg)}
+\desc{ Sends \param{msg} of size \param{size} bytes to processor
+\param{destPE}. Message buffer for \param{msg} could be reused after
+the call returns.}
+
+\function{int CmiAsyncMsgSent(CommHandle handle)}
+\desc{Returns the status of asynchronous send specified by
+communication handle \param{handle}.}
+
+\function{void CmiReleaseCommHandle(CommHandle handle)}
+\desc{ Releases the communication handle \param{handle} and
+associated resources. It does not free the message buffer.
+\param{handle} could be reused by CMI for another communication after
+this call succeeds.}
+
+\function{CommHandle CmiVectorSend(int destPE, int HandlerId, int len, int sizes[], void *DataArray[])}
+\desc{Initiates an asynchronous send of data to processor
+\param{destPE}.  The data consists of \param{len} pieces residing in
+different areas of memory, which are logically concatenated.  The
+\param{DataArray} array contains pointers to the pieces; the size of
+\param{DataArray[i]} is taken from \param{sizes[i]}. \param{HandlerId}
+is inserted at the appropriate place in the combined message and the
+corresponding handler will be invoked on the receiving side. This
+function returns a communication handle which could be used to enquire
+about the status of communication using \param{CmiAsyncMsgSent()}.
+Individual pieces of data as well as the arrays \param{sizes} and
+\param{DataArray} should not be overwritten or freed before the
+communication is complete.}
+
+\function{void CmiGrabBuffer(void **pbuf)}
+\desc{ Transfers the ownership of the buffer pointed to by
+\param{*pbuf} to the calling procedure. If \param{*pbuf} points to a
+system buffer, CMI copies the buffer contents to newly allocated user
+space and updates \param{*pbuf} to point to the new buffer.}
+
+\subsection{Global Pointer}
+
+\function{int CmiGptrCreate(GlobalPtr *gptr, void *lptr, unsigned int size)}
+\desc{This function creates a global pointer by initializing contents of
+\param{*gptr} to point to memory on the local processor pointed to by
+\param{lptr} of \param{size} bytes. \param{*gptr} could then be sent to other 
+processors, and could be used by \param{CmiGet()} and \param{CmiPut()}
+to read and write this memory by remote processors. This functions returns
+a positive integer on success.}
+
+\function{void *CmiGptrDref(GlobalPtr *gptr)}
+\desc{This function returns the address of local memory associated
+with global pointer \param{gptr}.}
+
+\function{int CmiSyncGet(GlobalPtr *gptr, void *lptr, unsigned int size)}
+\desc{Copies \param{size} bytes from 
+memory pointed to by global pointer \param{gptr}
+to local memory pointed to by \param{lptr}. 
+This is a synchronous operation and the calling processor blocks until
+the data is transferred to local memory. This function returns
+a positive integer on success.}
+
+\function{CommHandle CmiGet(GlobalPtr *gptr, void *lptr, unsigned int size)}
+\desc{Initiates copying of \param{size} bytes from 
+memory pointed to by global pointer \param{gptr}
+to local memory pointed to by \param{lptr}. 
+This function returns a  communication handle which could be used
+to  enquire about the status of this operation.}
+
+\function{CommHandle CmiPut(GlobalPtr *gptr, void *lptr, unsigned int size)}
+\desc{Initiates copying of \param{size} bytes from a processor's local
+memory pointed to by \param{lptr} to the memory pointed to by global
+pointer \param{gptr}.  This function returns a  communication handle
+which could be used to  enquire about the status of this operation.}
+
+\subsection{Group Communication}
+
+\function{void CmiSyncBroadcast(unsigned int size, void *msg)}
+\desc{Sends \param{msg} of length \param{size} bytes to all processors
+excluding the processor on which the caller resides. }
+
+\function{void CmiSyncBroadcastAllAndFree(unsigned int size, void *msg)}
+\desc{Sends \param{msg} of length \param{size} bytes to all processors
+including the processor on which the caller resides. This function
+frees the message buffer for \param{msg} before returning, so
+\param{msg} must point to a dynamically allocated buffer.}
+
+\function{void CmiSyncBroadcastAll(unsigned int size, void *msg)}
+\desc{Sends \param{msg} of length \param{size} bytes to all processors
+including the processor on which the caller resides. This function
+does not free the message buffer for \param{msg}.}
+
+\function{CommHandle CmiAsyncBroadcast(unsigned int size, void *msg)}
+\desc{ Initiates asynchronous broadcast of message \param{msg} of
+length \param{size} bytes to all processors excluding the processor on
+which the caller resides. It returns a communication handle which
+could be used to check the status of this send using
+\param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
+freed before the communication is complete.}
+
+\function{CommHandle CmiAsyncBroadcastAll(unsigned int size, void *msg)}
+\desc{ Initiates asynchronous broadcast of message \param{msg} of
+length \param{size} bytes to all processors including the processor on
+which the caller resides. It returns a communication handle which
+could be used to check the status of this send using
+\param{CmiAsyncMsgSent()}. \param{msg} should not be overwritten or
+freed before the communication is complete.}
+
+\subsection{Processor Ids}
+
+\function{int CmiNumPe(void)}
+\desc{ Returns total number of processors in the machine on which the 
+parallel program is being run.}
+
+\function{int CmiMyPe(void)}
+\desc{ Returns the logical processor identifier of processor on which the 
+caller resides. A processor Id is between \param{0} and \param{CmiNumPe()-1}.}
+
+\subsection{Input/Output}
+
+\function{void CmiPrintf(char *format, arg1, arg2, ...)}
+\desc{This function does an atomic \param{printf()} on \param{stdout}. 
+On machine with host, this is implemented on top of the messaging 
+layer using asynchronous sends.}
+
+\function{void CmiScanf(char *format, void *arg1, void *arg2, ...)}
+\desc{This function performs an atomic \param{scanf} from \param{stdin}.
+The processor, on which the caller resides, blocks for input. On machines with
+host, this is implemented on top of the messaging layer using asynchronous
+send and blocking receive.}
+
+\function{void CmiError(char *format, arg1, arg2, ...)}
+\desc{This function does an atomic \param{printf()} on \param{stderr}. 
+On machine with host, this is implemented on top of the messaging 
+layer using asynchronous sends.}
+
+\subsection{Processor Groups}
+
+\function{void CmiPgrpCreate(Pgrp *group)}
+\desc{Creates a processor-group with calling processsor as the root processor.}
+
+\function{void CmiPgrpDestroy(Pgrp *group)}
+\desc{Frees resources associated with a processor group \param{group}.}
+
+\function{void CmiAddChildren(Pgrp *group, int penum, int size, int procs[])}
+\desc{Adds \param{size} processors from array \param{procs[]} to the
+processor-group \param{group} as children of processor penum. This function
+could be called only by the root processor of processor-group \param{group}.}
+
+\function{CommHandle CmiAsyncMulticast(Pgrp *group, unsigned int size, void *msg)}
+\desc{ Initiates asynchronous broadcast of message \param{msg} of
+length \param{size} bytes to all processors belonging to \param{group}
+excluding the processor on which the caller resides. It returns a
+communication handle which could be used to check the status of this
+send using \param{CmiAsyncMsgSent()}. \param{msg} should not be
+overwritten or freed before the communication is complete. \note{Caller
+need not belong to \param{group}.}} 
+
+\function{int CmiPgrpRoot(Pgrp *group)}
+\desc{Returns the processor id of root of processor-group \param{group}. }
+
+\function{int CmiNumChildren(Pgrp *group, int penum)}
+\desc{ Returns  number of children of processor \param{penum} 
+in the processor-group \param{group}.}
+
+\function{int CmiParent(Pgrp *group, int penum)}
+\desc{ Returns  processor id of parent of processor \param{penum} 
+in the processor-group \param{group}.}
+
+\function{void CmiChildren(Pgrp *group, int node, int *children)}
+\desc{Fills in array \param{children} with processor ids of all the
+children processor \param{node} in processor-group \param{group}. This
+array should atleast be of size \param{CmiNumChildren()}.}

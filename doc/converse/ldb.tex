@@ -1,0 +1,39 @@
+
+\section{Load Balancer Calls}
+
+\internal{
+\function {void ClbInit(void)}
+Routine called at scheduler startup to allow the load balancer to
+register its own message handlers.
+}
+
+\function {void ClbEnqueue(Message *msg, FunctionPtr send\_func)}
+Function called by a handler to let the load balancer know about a
+``seed'' message. If the seed is to be processed locally, the
+load balancer will
+enqueue it in the scheduler's queue to be eventually executed.
+{\sf send\_func} specifies the function
+which should be used to send the seed to another processor
+if it is not to be processed locally.
+
+\function {void ClbEnqueuePrio(Message *msg, FunctionPtr send\_func,
+void *prio, int len)} 
+Same as {\sf ClbEnqueue()}, except that a priority {\sf prio} of length
+{\sf len} bytes is associated with the message.
+
+
+%The most general load balancing scheme will have three opportunities
+%to migrate load.  The first will be when {\sf ClbEnQueue()} is called.
+%This routine will either immediately send the message elsewhere for
+%processing, or enqueue it in a local data structure.  A token message
+%will then be enqueued with the scheduler to reactivate the load
+%balancing in order to execute the seed message at the appropriate
+%time.  The second opportunity for load balancing occurs when the load
+%balancing module receives a request from the load balancing module on
+%another processor for some work.  When this occurs, a message will be
+%delivered to the requesting node from the load balance queue, and the
+%token message in the scheduler queue will be marked as invalid.  The
+%third opportunity occurs when a token message is removed from the
+%scheduler queue.  Control will return to the load balancing module,
+%which could then choose to send seed messages to another host.
+

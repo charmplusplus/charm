@@ -1,0 +1,45 @@
+
+\section{Initialization and Completion}
+
+
+\function {void ConverseInit(void)}
+This call initializes all Converse components, such as the scheduler,
+machine interface, and other libraries. This must be the first Converse
+call in the entire program.
+
+
+\function {void ConverseExit(void)}
+This call wraps up all Converse components. No Converse call may be made
+after this call.
+
+
+
+
+\section{Scheduler Calls}
+
+%These are the calls/macros provided by the Converse scheduler.
+%All declarations are in converse.h.
+
+\internal{
+\function {void CsdInit(void)}
+This call initializes the Converse scheduler, it is called from
+ConverseInit().
+}
+
+\function {void CsdScheduler(int NumberOfMessages)}
+This call invokes the Converse scheduler. The {\tt NumberOfMessages}
+parameter specifies how many messages should be processed (i.e. delivered
+to their handlers). If set to -1, the scheduler continues processing
+messages until CsdExitScheduler() is called from a message handler.
+
+\function {void CsdExitScheduler(void)}
+This call causes the scheduler
+to stop processing messages when control has returned back to it.
+The scheduler then returns to its calling routine.
+
+\function {void CsdEnqueue(void *Message)}
+This call enqueues a message in the scheduler's queue, to be processed
+in accordance with the queueing strategy. This call is usually made from
+a message handler when the message is not to be processed immediately,
+but may be processed later (e.g. depending on the message's priority).
+Also, it is used to enqueue local ready entities, such as threads.

@@ -1,0 +1,238 @@
+\section{Message Manager Calls}
+
+To use the following calls, include the file ``SM.h''.
+
+\function{MSG\_MNGR *CmmNew(void)}
+\desc{This call returns a new initialized message manager that can store and 
+retrieve messages.}
+
+\function{CmmPut(MSG\_MNGR *mm, void *msg, int tag, int size)}
+\hspace{2in} (AND)\\
+\function{CmmPut2(MSG\_MNGR *mm, void *msg, int tag1, int tag2, int size)}
+\desc{This call puts the message \param{msg} into the message manager 
+\param{mm}'s data structure along with its \param{tag} and \param{size} 
+fields.}
+
+\note{In the following calls, \param{tag} parameters may be wildcarded by 
+placing a value of {\bf CmmWildCard} in them. The actual values of the tag(s) of 
+the message, if any, are returned in the \param{rettag} parameters if they are
+non-NULL.}
+
+\function{int CmmProbe(MSG\_MNGR *mm, int tag, int *rettag)}
+\hspace{2in} (AND)\\
+\function{int CmmProbe(MSG\_MNGR *mm, int tag1, int tag2, int *rettag1, int *rettag2)}
+\desc{This call returns the size of the message with tag \param{tag} that is 
+stored in the message manager \param{mm}, and returns -1 if such a message 
+is not found.}
+
+\function{int CmmGet(MSG\_MNGR *mm, void *addr, int tag, int size, int *rettag)}
+\hspace{2in} (AND)\\
+\function{int CmmGet2(MSG\_MNGR *mm, void *addr, int tag1, int tag2, int size, int *rettag1, int *rettag2)}
+\desc{This call copies at most \param{size} bytes of a message stored in the 
+message manager \param{mm} with the tag(s) into the address pointed to by 
+\param{addr}. The return value is the length of the message.}
+
+\function{int CmmGetPtr(MSG\_MNGR *mm, void *addr, int tag, int *rettag)}
+\hspace{2in} (AND)\\
+\function{int CmmGetPtr2(MSG\_MNGR *mm, void **addr, int tag1, int tag2, int *rettag1, int *rettag2)}
+\desc{This call allocates memory for the message in the message manager 
+\param{mm} with the tag(s) and returns this address in \param{*addr}. 
+The return value is the length of the message.}
+
+\section{Thread Manipulation}
+
+To use the following calls, include the file ``thr\_defns.h''.
+
+\subsection{Thread Object Calls}
+
+\function{int CthInit(void)}
+\desc{This call initializes some variables that are used by the thread calls 
+library, and should be called before any other thread calls are made.}
+
+\function{THREAD *CthCreate(THRFN fn, void *arg)}
+\hspace{2in}
+  (AND)\\
+\function{THREAD *CthCreateOfSize(THRFN fn, void *arg, int stacksize)}
+\desc{These are calls to create a thread. This function takes a
+function pointer \param{fn} and its void pointer argument \param{arg}.
+The second call can be used if a stack of size other than the standard
+STACKSIZE is to be allocated for the thread.}
+
+\function{int CthResume(THREAD *thr)}
+\desc{This call causes an immediate context switch to the specified
+thread {\tt thr}. The thread {\tt thr} continues to run until it, in
+turn, gives up control using CthResume or some variant of CthResume.}
+
+\function{int CthSuspend(void)}
+\desc{This function is a variant of CthResume --- it immediately causes
+a context-switch to some other thread.  This function differs from
+CthResume in only one way: it makes its own decision about which thread
+to transfer control to.  It always chooses a thread from a "ready pool"
+which is maintained by the user.
+
+By default, CthSuspend always selects the thread which has been in
+its ready-pool the longest.  This selection strategy may be altered
+by the user on a per-thread basis by calling CthSetStrategy below.}
+
+\function{int CthAwaken(THREAD thr)}
+\desc{The thread is added to
+CthSuspend's ready-pool.  This essentially constitutes permission for
+CthSuspend to transfer control to thread {\tt thr}.  CthAwaken must only
+be called on a thread when it can be shown that it is indeed acceptable
+for the thread to continue execution.}
+
+\function{THREAD *CthSetStrategy(THREAD thr, THRFN suspfn, void *susparg, THRFN awakefn, void *awakearg)}
+\desc{CthAwaken and CthSuspend work together.  By default, CthAwaken
+``adds a thread to the ready pool'' by pushing it on a FIFO queue.  By
+default, CthSuspend ``finds a thread in the ready-pool'' by popping
+this same FIFO queue.  Together, this behavior guarantees that
+CthSuspend always can find a thread which is in the ready-pool.
+
+Using CthSetStrategy, you may alter the way CthAwaken and CthSuspend
+work together.  The purpose of such modification is to give you
+control over the order in which CthSuspend selects threads for
+execution.  Note that you should not otherwise change the semantics
+of CthAwaken and CthSuspend: only the order of selection should be
+altered.
+
+Each time a CthAwaken is performed on a thread t, thread t's
+{\tt awakefn} is called.  The {\tt awakefn} must perform the task of
+CthAwaken: it must store the thread t in a location such that it can
+later be found by CthSuspend.
+
+Each time a thread t calls CthSuspend, thread t's {\tt suspfn} is
+called.  The {\tt suspfn} must look for a ready thread to transfer
+control to.  It does this by looking in a location where CthAwaken
+stores threads.  Once found, the {\tt suspfn} must resume the thread
+using CthResume.
+
+Note that CthSetStrategy overrides the behavior of CthAwaken and
+CthSuspend only on a per-thread basis.  In a modular program, it is
+therefore possible for each module to control the order in which
+its own threads are scheduled.}
+
+\mycomment{
+% Sanjay wanted this out.
+\function{QUEUE *CthGetFifo()}
+\desc{Returns the FIFO queue on which CthAwaken stores threads by
+default.  Naturally, this is the same queue that CthSuspend looks on
+for ready threads by default.  The queue can be managed using the
+queue routines below.}
+}
+
+\function{int CthExit(void)}
+\desc{This call is used by a thread that has finished execution.  The
+thread ceases to exist, and transfer is controlled to some other
+thread using CthSuspend.  If the thread that exited had a special
+scheduling strategy, that strategy is used to choose the next thread.}
+
+\function{int CthYield(void)}
+\desc{This call simply calls CthAwaken on the current thread (thereby
+adding the current thread to CthSuspend's ready-pool), after which it
+calls CthSuspend.  This may cause a transfer of control to another
+thread.  Control will probably come back to the thread that yielded,
+given that it is now in CthSuspend's ready-pool.}
+
+\function{THREAD *CthSelf(void)}
+\desc{This call returns a pointer to the currently executing thread.}
+
+\mycomment{
+% Sanjay wanted this out
+\subsection{Elementary Queues}
+This subsection describes an elementary queue of threads that can be used
+to manage lists of threads.
+
+\function{QUEUE *CthNewQueue()}
+\desc{This call returns a new empty queue of threads.}
+
+\function{int CthQueueInit(QUEUE *queue)}
+\desc{This call initializes a queue that has been allocated earlier.}
+
+\function{int CthQueueEmpty(QUEUE *queue)}
+\desc{This call returns 1 if the queue \param{queue} is empty and 0 if not.}
+
+\function{int CthQAddThread(QUEUE *queue, THREAD *thr)}
+\desc{This call adds the thread \param{thr} to the queue \param{queue}.}
+
+\function{THREAD *CthQPop(QUEUE *queue)}
+\desc{This call pops a thread from the front of the queue and returns NULL if 
+the queue is empty.}
+}
+\section{Synchronization Mechanisms}
+To use the following calls, include the file ``sync.h''
+
+\subsection{Locks}
+
+Locks (or mutexes) are synchronization mechanisms that can be used by user 
+programs to provide mutual exclusion to critical sections. Threads that attempt
+to ``lock'' such a variable are suspended if the lock is already taken and are
+awakened when the lock becomes available to them.
+
+\function{LOCK *CtsNewLock(void)}
+\desc{This call can be used to create a new lock variable.}
+
+\function{CtsLockInit(LOCK *lock)}
+\desc{This call can be used to initialize a lock \param{lock} that was 
+earlier allocated.}
+
+\function{int CtsTryLock(LOCK *lock)}
+\desc{This call is a nonblocking attempt to lock \param{lock}. It returns 
+1 immediately if \param{lock} is available after making the current thread 
+\param{lock}'s owner and returns 0 if \param{lock} is already locked.}
+
+\function{int CtsLock(LOCK *lock)}
+\desc{This call is used by a thread to wait until it obtains the ownership of 
+\param{lock}. Several threads making this call may be queued up at the lock,
+which is then ``given'' to each in turn.}
+
+\function{int CtsUnLock(LOCK *lock)}
+\desc{This call is used by a thread to relinquish the control of \param{lock}.
+An error value is returned if the thread attempts the unlock is not 
+\param{lock}'s owner.}
+
+\subsection{Condition Variables}
+
+Condition variables are synchronization mechanisms that are used to implement 
+trigger like functionality. Threads can wait on a condition variable. Other
+threads can either signal or broadcast this condition variable causing the 
+awakening of either one or all of the threads waiting on this variable.
+
+\function{CONDN *CtsNewCondn(void)}
+\desc{This call returns a new initialized condition variable.}
+
+\function{int CtsCondnInit(CONDN *condn)}
+\desc{This call can be used to initialize a condition variable that was earlier
+allocated. This call causes all the waiting threads on this condition variable 
+to be awakened.}
+
+\function{int CtsCondnWait(CONDN *condn)}
+\desc{This call is used by thread that want to wait on the condition 
+variable \param{condn}.}
+
+\function{int CtsCondnSignal(CONDN *condn)}
+\desc{This call releases one of the threads waiting on the condition 
+variable \param{condn}.}
+
+\function{int CtsCondnBroadcast(CONDN *condn)}
+\desc{This call releases all the threads waiting on the condition variable
+\param{condn}.}
+
+\subsection{Barriers}
+Barriers are a specialization of condition variables. A barrier is 
+a condition variable whose {\em k}th wait is a broadcast for some initial k.
+That is, the barrier waits for k threads to reach a particular point before it
+lets them all go.
+
+\function{BARRIER *CtsNewBarrier(void)}
+\desc{can be used to create a new barrier.}
+
+\function{int CtsBarrierReinit(BARRIER *bar, int num)}
+\desc{This call (re)initializes the barrier \param{bar} to free any 
+threads waiting on it and then to await the arrival of {\tt num} threads.}
+
+\function{int CtsAtBarrier(BARRIER *bar)}
+\desc{Following the initialization of the barrier, the {\tt num} participating 
+threads need to make this call before they can proceed beyond this point in 
+the program. This call hence blocks all but the last thread to make this call, 
+and awakens them all upon the arrival of this thread at the barrier.}
+
