@@ -56,14 +56,14 @@ done
 
 # grab all the real headers:
 for header in ckhashtable.h cklists.h ckvector3d.h \
-	pup_c.h pupf.h pup.h pup_toNetwork4.h
+	pup_c.h pupf.h pup.h pup_toNetwork4.h pup_toNetwork.h
 do
 	Do $get $charm/include/$header .
 done
 
 # grab all the source files
 for source in ckhashtable.C ckstandalone.C \
-	pup_util.C pup_c.C
+	pup_util.C pup_c.C pup_toNetwork4.C pup_toNetwork.C
 do
 	Do $get $charm/tmp/$source .
 done
