@@ -9,31 +9,37 @@ module PythonCCS {
 	chare PythonChare {
 		entry PythonChare(void);
 		entry void execute (CkCcsRequestMsg *msg);
+		entry void iterate (CkCcsRequestMsg *msg);
 	}
 
 	group PythonGroup {
 		entry PythonGroup(void);
 		entry void execute (CkCcsRequestMsg *msg);
+		entry void iterate (CkCcsRequestMsg *msg);
 	}
 
 	nodegroup PythonNodeGroup {
 		entry PythonNodeGroup(void);
 		entry void execute (CkCcsRequestMsg *msg);
+		entry void iterate (CkCcsRequestMsg *msg);
 	}
 
 	array [1D] PythonArray1D {
 		entry PythonArray1D(void);
 		entry void execute (CkCcsRequestMsg *msg);
+		entry void iterate (CkCcsRequestMsg *msg);
 	}
 
 	array [2D] PythonArray2D {
 		entry PythonArray2D(void);
 		entry void execute (CkCcsRequestMsg *msg);
+		entry void iterate (CkCcsRequestMsg *msg);
 	}
 
 	array [3D] PythonArray3D {
 		entry PythonArray3D(void);
 		entry void execute (CkCcsRequestMsg *msg);
+		entry void iterate (CkCcsRequestMsg *msg);
 	}
 
 	initnode void initializePythonDefault(void);

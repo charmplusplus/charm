@@ -3,6 +3,8 @@
 
 #include "ckcallback-ccs.h"
 #include "python/Python.h"
+#include "python/compile.h"
+#include "python/eval.h"
 #include "PythonCCS.decl.h"
 #include "string"
 #include "map"
@@ -65,12 +67,19 @@ typedef struct TypedValue_ {
 
 class PythonObject {
  public:
-  Py_objects type;
   void execute(CkCcsRequestMsg *msg);
+  void iterate(CkCcsRequestMsg *msg);
 
-  // the following three methods should be overwritten by the user
+  // the following methods should be overwritten by the user if used
+
+  // methods for accessing charm varibles from inside python
   virtual PyObject* read(PyObject*) {CkAbort("PythonCCS: Method read should be reimplemented");};
   virtual void write(PyObject*, PyObject*) {CkAbort("PythonCCS: Method write should be reimplemented");};
+
+  // methods to create iterators for iterative python invocations
+  virtual int buildIterator(PyObject*, void*) {CkAbort("PythonCCS: Method buildIterator should be reimplemented");};
+  virtual int nextIteratorUpdate(PyObject*, PyObject*, void*) {CkAbort("PythonCCS: Method nextIteratorUpdate should be reimplemented");};
+
   //virtual void registerPython();
 };
 
