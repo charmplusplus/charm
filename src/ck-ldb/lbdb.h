@@ -163,15 +163,17 @@ typedef struct _LDCommDesc {
   	dest.destObj.destObj.objID() =objid;
   	dest.destObj.destObjProc = destObjProc;
   }
-  inline CmiBool operator==(const _LDCommDesc &obj) const {
-    if (type != obj.type) return CmiFalse;
-    switch (type) {
-    case LD_PROC_MSG: return (CmiBool)(dest.destProc == obj.dest.destProc);
-    case LD_OBJ_MSG:  return (CmiBool)(dest.destObj.destObj == obj.dest.destObj.destObj);
-    case LD_OBJLIST_MSG: return CmiFalse;             // fixme
-    }
-    return CmiFalse;
+  void init_mcastmsg(LDOMid &omid, LDObjid *objid, int len) { 
+	type=LD_OBJLIST_MSG; 
+	dest.destObjs.len = len;
+	dest.destObjs.objs = new LDObjKey[len];
+        for (int i=0; i<len; i++) {
+  	  dest.destObjs.objs[i].omID()=omid;
+  	  dest.destObjs.objs[i].objID() =objid[i];
+	}
   }
+  inline CmiBool operator==(const _LDCommDesc &obj) const;
+  inline _LDCommDesc &operator=(const _LDCommDesc &c);
   inline void pup(PUP::er &p);
 #endif
 } LDCommDesc;
@@ -329,23 +331,27 @@ int LDMemusage(LDHandle _db);
 #endif /* _cplusplus */
 
 #ifdef __cplusplus
+
 #if CMK_LBDB_ON
 PUPbytes(LDHandle)
 #endif
-/* put outside of __cplusplus */
+
 inline void LDOMid::pup(PUP::er &p) {
   id.pup(p);
 }
 PUPmarshall(LDOMid);
+
 inline void LDObjid::pup(PUP::er &p) {
   for (int i=0; i<OBJ_ID_SZ; i++) p|id[i];
 }
 PUPmarshall(LDObjid);
+
 inline void LDObjKey::pup(PUP::er &p) {
   p|omId;
   p|objId;
 }
 PUPmarshall(LDObjKey);
+
 inline void LDObjStats::pup(PUP::er &p) {
   p|index;
   p|data;
@@ -369,12 +375,14 @@ inline void LDOMHandle::pup(PUP::er &p) {
   p|handle;
 }
 PUPmarshall(LDOMHandle);
+
 inline void LDObjHandle::pup(PUP::er &p) {
   p|omhandle;
   p|id;
   p|handle;
 }
 PUPmarshall(LDObjHandle);
+
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;
   p|cpuTime;
@@ -383,15 +391,47 @@ inline void LDObjData::pup(PUP::er &p) {
   p|asyncArrival;
 }
 PUPmarshall(LDObjData);
+
+inline CmiBool LDCommDesc::operator==(const LDCommDesc &obj) const {
+    if (type != obj.type) return CmiFalse;
+    switch (type) {
+    case LD_PROC_MSG: return (CmiBool)(dest.destProc == obj.dest.destProc);
+    case LD_OBJ_MSG:  return (CmiBool)(dest.destObj.destObj == obj.dest.destObj.destObj);
+    case LD_OBJLIST_MSG: { if (dest.destObjs.len != obj.dest.destObjs.len) 
+                               return CmiFalse;
+                           for (int i=0; i<dest.destObjs.len; i++)
+                             if (!(dest.destObjs.objs[i] == obj.dest.destObjs.objs[i])) return CmiFalse;
+                           return CmiTrue; }
+    }
+    return CmiFalse;
+}
+inline LDCommDesc & LDCommDesc::operator=(const LDCommDesc &c) {
+    type = c.type;
+    switch (type) {
+    case LD_PROC_MSG: dest.destProc = c.dest.destProc; break;
+    case LD_OBJ_MSG:  dest.destObj.destObj = c.dest.destObj.destObj; break;
+    case LD_OBJLIST_MSG: { dest.destObjs.len = c.dest.destObjs.len;
+                           dest.destObjs.objs = new LDObjKey[dest.destObjs.len];
+                           for (int i=0; i<dest.destObjs.len; i++)
+                             dest.destObjs.objs[i] = c.dest.destObjs.objs[i]; 
+                           break; }
+    }
+    return *this;
+}
 inline void LDCommDesc::pup(PUP::er &p) {
   p|type;
   switch (type) {
-  case 1:  p|dest.destProc; break;
-  case 2:  p|dest.destObj.destObj; p|dest.destObj.destObjProc; break;
-  case 3:  break;		// fixme
-  }
+  case LD_PROC_MSG:  p|dest.destProc; break;
+  case LD_OBJ_MSG:  p|dest.destObj.destObj; p|dest.destObj.destObjProc; break;
+  case LD_OBJLIST_MSG:  {  p|dest.destObjs.len; 
+                           if (p.isUnpacking()) 
+                               dest.destObjs.objs = new LDObjKey[dest.destObjs.len];
+                           for (int i=0; i<dest.destObjs.len; i++) p|dest.destObjs.objs[i];
+                           break; }
+  }   // end of switch
 }
 PUPmarshall(LDCommDesc)
+
 inline void LDCommData::pup(PUP::er &p) {
     p|src_proc;
     p|sender;
