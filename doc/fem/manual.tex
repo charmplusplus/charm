@@ -287,9 +287,8 @@ during driver.
      Describe/retreive the number and type of elements.  \kw{ElType} is the
 number of element types registered so far (the first element type is 1, then 2,
 etc.).  \kw{nEl} is the number of elements being registered.  \kw{doublesPerEl}
-and \kw{nodePerEl} are the number of doubles of user data, and nodes
-(respectively) associated with each element.
-
+and \kw{nodePerEl} are the number of doubles of user data, and nodes (respectively) associated with each element.
+		
      \kw{doublePerEl} or \kw{nodePerEl} may be zero, indicating that no user
 data or connectivity data (respectively) is associated with the element.
 
@@ -343,21 +342,17 @@ data or connectivity data (respectively) is associated with the element.
   \args{REAL*8, intent(in),  dimention(doublePerNode,nNode)  :: data}
 \function{subroutine FEM\_Get\_Node\_Data\_r(data)}
   \args{REAL*8, intent(out), dimention(doublePerNode,nNode)  :: data}
-\function{subroutine FEM\_Set\_Elem\_Data\_r(elType,data)}
-  \args{integer, intent(in) :: elType}
-  \args{REAL*8, intent(in), dimention(doublePerElem,nElem)  :: data}
-\function{subroutine FEM\_Get\_Elem\_Data\_r(elType,data)}
-  \args{integer, intent(in) :: elType}
+\function{subroutine FEM\_Set\_Elem\_Data\_r(data)}
+  \args{REAL*8, intent(in),  dimention(doublePerElem,nElem)  :: data}
+\function{subroutine FEM\_Get\_Elem\_Data\_r(data)}
   \args{REAL*8, intent(out), dimention(doublePerElem,nElem)  :: data}
 \function{subroutine FEM\_Set\_Node\_Data\_c(data)}
   \args{REAL*8, intent(in),  dimention(nNode,doublePerNode)  :: data}
 \function{subroutine FEM\_Get\_Node\_Data\_c(data)}
   \args{REAL*8, intent(out), dimention(nNode,doublePerNode)  :: data}
-\function{subroutine FEM\_Set\_Elem\_Data\_c(elType,data)}
-  \args{integer, intent(in) :: elType}
+\function{subroutine FEM\_Set\_Elem\_Data\_c(data)}
   \args{REAL*8, intent(in),  dimention(nElem,doublePerElem)  :: data}
-\function{subroutine FEM\_Get\_Elem\_Data\_c(elType,data)}
-  \args{integer, intent(in) :: elType}
+\function{subroutine FEM\_Get\_Elem\_Data\_c(data)}
   \args{REAL*8, intent(out), dimention(nElem,doublePerElem)  :: data}
 
      Describe/retrieve the optional, uninterpreted user data associated with
@@ -365,7 +360,14 @@ each node and element.  This user data is partitioned and reassembled along
 with the connectivity matrix, and may include initial conditions, boundary
 values, or any other data needed or produced by the program.   The Fortran
 arrays can be row- or column- major (see \kw{FEM\_Set\_Elem\_Conn} for
-details).  The row-major form is preferred.
+details).  The row-major form is preferred.\\
+
+It is possible to add nodes to the current FEM mesh using:
+\begin{alltt}	
+void FEM\_Add\_Node(int localIdx,int nBetween,int *betweenNodes);
+\end{alltt}
+This  calls adds the node at localIdx to the current mesh. (This just changes the communication list; nothing like FEM\_Set\_...). The new node will be shared with all the chunks common to betweenNodes-- thus if betweenNodes contains a non-shared node,
+the new node will be non-shared.\\
 
 \function{void FEM\_Update\_Mesh(int callMeshUpdated,int doRepartition);}
 \function{subroutine FEM\_Update\_Mesh(callMeshUpdated,doRepartition)}
@@ -749,5 +751,94 @@ A Fortran block TYPE and corresponding PUP routine is as follows:
      Since Fortran blocks are always allocated on the stack, the system
      migrates them to the same location on the new processor, so no
      \kw{Get\_Userdata} call is needed from Fortran.
+
+\subsection {Ghost elements}
+	An option to add ghost elements is provided by the framework. The \kw{ghost elements} are the additional elements at the boundary of the chunk, which are added to make the real (inner) elements at the boundary ``feel'' exactly as if they were in a complete unparitioned mesh. The real version of a ghost element will reside on some other processor. 
+\subsubsection{Setting up the ghost layer}
+       The framework now allows you to add ghost elements. You specify which kinds of elements and how they connect right in Init routine.  The calls are:
+\begin{itemize}
+\item
+\begin{alltt}
+	void FEM\_Add\_Ghost\_Layer(int nodesPerTuple,int doAddNodes);
+\end{alltt}
+This routine creates a new layer of ghosts around each FEM chunk. NodesPerTuple is the number of shared nodes that together form a "tuple". An element will be added to your chunk if it connects to at least one of your tuples. DoAddNodes specifies that you want ghost nodes as well as elements. Calling this routine several times creates several layers of ghost elements; the different layers need not have the same parameters.
+
+\item
+\begin{alltt}
+void FEM\_Add\_Ghost\_Elem(int elType,int tuplesPerElem,const int *elem2tuple)
+\end{alltt}
+
+This call is used to specify which type of element is to be added to the current ghost layer. TuplesPerElem and elem2tuple specify a mapping between each element and the surrounding sets of shared nodes.  The elem2tuple table lists, for each tuple, the nodes of this element which form the tuple. The elem2tuple table should be nodesPerTuple*tuplesPerElem long.
+\end{itemize}
+
+The above two routines are always used together. For example, if your elements are 3-node triangles and you only require one shared node for inclusion in a single ghost layer, you would use:
+\begin{alltt}
+   FEM\_Add\_Ghost\_Layer(1,0);
+   const static int tri2node[]={0,1,2};
+   FEM\_Add\_Ghost\_Elem(0,3,tri2node);
+\end{alltt}
+
+If you require two shared nodes (a shared edge), the code will look like:
+\begin{alltt}    
+   FEM\_Add\_Ghost\_Layer(2,0);
+   const static int tri2edge[]={0,1,  1,2,  2,0};
+   FEM\_Add\_Ghost\_Elem(0,3,tri2edge);
+\end{alltt}
+
+\subsubsection{Extracting the ghost layer}
+After the ghost layer is created, we need a way to distinquish real nodes and elements from ghost nodes and elements. FEM\_Get\_Node and FEM\_Get\_Elem return the \textbf{total} number of nodes and elements, including ghosts. The routines below return the index of the first ghost node or element.
+\begin{alltt}
+int FEM\_Get\_Node\_Ghost(void);
+int FEM\_Get\_Elem\_Ghost(int elemType);
+\end{alltt}
+The examples below iterate over the real and ghost elements.
+\begin{alltt}
+C version:
+        int firstGhost,max;
+        FEM\_Get\_Node(\&max, \&ignored);
+        firstGhost=FEM\_Get\_Node\_Ghost();
+        for (i=0;i<firstGhost;i++)
+                ... i is a real node...
+        for (i=firstGhost;i<max;i++)
+                ... i is a ghost node ...
+
+Fortran version:
+        call FEM\_Get\_Node(max,ignored);
+        firstGhost=FEM\_Get\_Node\_Ghost();
+        do i=1,firstGhost-1
+                ... i is a real node...
+        end do
+        do i=firstGhost,max
+                ... i is a ghost node...
+        end do
+\end{alltt}
+
+\subsubsection{Exchanging stress values with neighboring triangles}
+
+It is possible to get values for the chunk's ghost nodes and elements from the neighbors. To do this, use:
+
+\begin{alltt}
+void FEM\_Update\_Ghost\_Field(int fid, int elTypeOrMinusOne, void *data);
+subroutine FEM\_Update\_Ghost\_Field(fid,elTypeOrZero,data);
+\end{alltt}
+
+This has the same requirements and call sequence as FEM\_Update\_Field, except it applies to ghosts. You specify which type of element to exchange using the elType parameter. Specify -1 (C version) or 0 (fortran version) to exchange node values.  
+
+\subsubsection{ Exchanging "split this edge" lists }
+
+It is possible to exchange sparse lists of ghost elements between FEM chunks.
+
+\begin{alltt}
+void FEM\_Exchange\_Ghost\_Lists(int elemType,int nIdx,const int *localIdx);
+\end{alltt}
+This routine sends the local element indices in localIdx to only those neighboring chunks that connect to its ghost elements on the other side.  
+
+\begin{alltt}
+int FEM\_Get\_Ghost\_List\_Length(void);
+void FEM\_Get\_Ghost\_List(int *retLocalIdx);
+\end{alltt}
+
+These routines access the list of local elements sent by other chunks.  The returned indices will all refer to ghost elements in my chunk.
+
 \input{index}
 \end{document}
