@@ -629,7 +629,7 @@ void arg_init(int argc, char **argv)
   pparam_flag(&arg_in_xterm,      0, "in-xterm",      "Run each node in an xterm window");
   pparam_str(&arg_xterm,          0, "xterm",         "which xterm to use");
 #endif
-#ifdef CMK_BPRO
+#ifdef CMK_BPROC
   /* options for Scyld */
   pparam_int(&arg_startpe,   0, "startpe",   "first pe to start job(SCYLD)");
   pparam_int(&arg_endpe,  1000000, "endpe",   "last pe to start job(SCYLD)");
