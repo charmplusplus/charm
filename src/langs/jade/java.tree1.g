@@ -1,5 +1,8 @@
 header {
 //header
+//Pass1:
+// build global syntax table
+// mark if class is a mainchare
 }
 
 {
@@ -12,7 +15,6 @@ import JJ.*;
  * Author: (see java.g preamble)
  * Author: J. DeSouza
  *
- * This grammar is in the PUBLIC DOMAIN
  */
 class JavaTreeParser1 extends TreeParser;
 
