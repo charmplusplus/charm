@@ -118,7 +118,7 @@ typedef struct {
     int   broadcast_flag;
     int   latency_flag;
     double latency_argv1;
-    double latency_argv2;
+    long   latency_argv2;
     double processor_scale ;   
     double periodic_interval; 
   
