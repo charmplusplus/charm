@@ -1,0 +1,9 @@
+module packtest {
+  message packtest_Msg;
+
+  group packtest_Btest {
+    entry packtest_Btest(void);
+    entry void recv_msg(packtest_Msg *);
+  };
+}
+

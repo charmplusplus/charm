@@ -1,0 +1,14 @@
+module groupcast {
+  message groupcast_SimpleMsg;
+  message groupcast_BCMsg;
+
+  chare groupcast_main {
+    entry groupcast_main(void);
+    entry void groupReady(void);
+  };
+
+  group groupcast_group {
+    entry groupcast_group(groupcast_SimpleMsg *);
+    entry void doBroadcast(groupcast_BCMsg *);
+  };
+};

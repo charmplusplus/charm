@@ -1,0 +1,5 @@
+Example of checkpointable Charm++ program, especially this example
+shows how to checkpoint your mainchare: mark it [migratable], write
+a migrate constructor and pup'er for it. 
+
+Try it out with "make test".

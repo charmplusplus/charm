@@ -1,0 +1,110 @@
+CHARMBIN=..\..\..\bin
+CPP = cl.exe
+
+INC = /I"..\..\..\include"
+
+CPP_PROJ=/nologo /MT /w /Gm /GX /ZI /Od $(INC)\
+ /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX\
+ /Fo /c /TP /GZ
+
+LINK=link.exe
+LINK_FLAGS = /nologo /LIBPATH:"..\..\..\lib" /nodefaultlib:"libc"
+LINK_OTHER = libldb-rand.o libck.a libconv-core.a \
+	libtrace-none.a libconv-cplus-y.a ws2_32.lib kernel32.lib 
+
+
+OBJS = megatest.obj groupring.obj nodering.obj varsizetest.obj  groupcast.obj nodecast.obj synctest.obj fib.obj arrayring.obj tempotest.obj packtest.obj queens.obj migration.obj priomsg.obj priotest.obj templates.obj varraystest.obj
+
+MODULES = megatest groupring nodering varsizetest groupcast nodecast synctest fib arrayring tempotest packtest queens migration priomsg priotest templates varraystest
+
+DECLS = megatest.decl.h groupring.decl.h nodering.decl.h varsizetest.decl.h  groupcast.decl.h nodecast.decl.h synctest.decl.h fib.decl.h arrayring.decl.h tempotest.decl.h packtest.decl.h queens.decl.h migration.decl.h priomsg.decl.h priotest.decl.h templates.decl.h varraystest.decl.h
+
+DEFS  = megatest.def.h groupring.def.h nodering.def.h varsizetest.def.h  groupcast.def.h nodecast.def.h synctest.def.h fib.def.h arrayring.def.h tempotest.def.h packtest.def.h queens.def.h migration.def.h priomsg.def.h priotest.def.h templates.def.h varraystest.def.h
+
+#.SILENT:
+
+pgm: $(OBJS)
+	$(LINK) $(LINK_FLAGS) $(LINK_OTHER) /out:"pgm.exe" $(OBJS)
+	copy $(CHARMBIN)\charmrun.exe .
+
+.c.obj: 
+	$(CPP) $(CPP_PROJ) $<
+
+megatest.h: megatest.decl.h
+
+megatest.C: megatest.h megatest.def.h groupring.h nodering.h varsizetest.h groupcast.h nodecast.h synctest.h fib.h arrayring.h tempotest.h packtest.h queens.h migration.h priomsg.h priotest.h templates.h varraystest.h
+
+groupring.h: groupring.decl.h
+
+groupring.C: groupring.h groupring.def.h megatest.h
+
+nodering.h: nodering.decl.h
+
+nodering.C: nodering.h nodering.def.h megatest.h
+
+varsizetest.h: varsizetest.decl.h
+
+varsizetest.C: varsizetest.h varsizetest.def.h megatest.h
+
+groupcast.h: groupcast.decl.h
+
+groupcast.C: groupcast.h groupcast.def.h megatest.h
+
+nodecast.h: nodecast.decl.h
+
+nodecast.C: nodecast.h nodecast.def.h megatest.h
+
+synctest.h: synctest.decl.h
+
+synctest.C: synctest.h synctest.def.h megatest.h
+
+fib.h: fib.decl.h
+
+fib.C: fib.h fib.def.h megatest.h
+
+arrayring.h: arrayring.decl.h
+
+arrayring.C: arrayring.h arrayring.def.h megatest.h
+
+tempotest.h: tempotest.decl.h
+
+tempotest.C: tempotest.h tempotest.def.h megatest.h
+
+packtest.h: packtest.decl.h
+
+packtest.C: packtest.h packtest.def.h megatest.h
+
+queens.h: queens.decl.h
+
+queens.C: queens.h queens.def.h megatest.h
+
+migration.h: migration.decl.h
+
+migration.C: migration.h migration.def.h megatest.h
+
+priomsg.h: priomsg.decl.h
+
+priomsg.C: priomsg.h priomsg.def.h megatest.h
+
+priotest.h: priotest.decl.h
+
+priotest.C: priotest.h priotest.def.h megatest.h
+
+templates.h: templates.decl.h
+
+templates.C: templates.h templates.def.h megatest.h
+
+varraystest.C: varraystest.h varraystest.def.h megatest.h
+
+$(DECLS) $(DEFS) : $(MODULES)
+
+$(MODULES) : $*.ci
+	$(CHARMBIN)\charmxi $*.ci
+
+clean:
+	del *.decl.h
+	del *.def.h
+	del charmrun.exe
+	del *.obj
+	del pgm.exe
+	del vc60.*

@@ -1,0 +1,15 @@
+module immediatering {
+  message immMessage;
+   
+  initproc void immediatering_initcall(void);
+
+  nodegroup immRing_nodegroup {
+    entry immRing_nodegroup();
+    entry [immediate] void start(immMessage *);
+  };
+
+  group immRing_group {
+    entry immRing_group();
+    entry [expedited] void start(immMessage *);
+  };
+};

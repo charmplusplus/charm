@@ -1,0 +1,10 @@
+mainmodule megatest {
+  readonly CkChareID  mainhandle;
+  mainchare main {
+    entry main();
+    entry void start();
+    entry void finish(void);
+  };
+  initnode void megatest_initnode(void);
+};
+

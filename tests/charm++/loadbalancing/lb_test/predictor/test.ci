@@ -1,0 +1,14 @@
+mainmodule test {
+
+  readonly CProxy_Main mainhandle;
+
+  mainchare Main {
+    entry Main(CkArgMsg *);
+    entry void allDone();
+  };
+
+  array [1D] MyArray {
+    entry MyArray();
+    entry void compute();
+  };
+}

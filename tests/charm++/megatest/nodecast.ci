@@ -1,0 +1,14 @@
+module nodecast {
+  message nodecast_SimpleMsg;
+  message nodecast_BCMsg;
+
+  chare nodecast_main {
+    entry nodecast_main(void);
+    entry void reply(nodecast_SimpleMsg *);
+  };
+
+  nodegroup nodecast_group {
+    entry nodecast_group(nodecast_SimpleMsg *);
+    entry void doBroadcast(nodecast_BCMsg *);
+  };
+};

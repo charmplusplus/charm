@@ -1,0 +1,25 @@
+module marshall {
+ PUPable parent, child;
+ initnode void marshallInit(void);
+ array [1D] marshallElt {
+    entry marshallElt();
+    entry void basic(unsigned char b,char c,
+		short i,unsigned short j,
+		int k,unsigned int l,
+		long m,unsigned long n,
+		float f,double d);
+    entry void flatRef(flatStruct &s);
+    entry void pupped(pupStruct &s);
+    entry void puppedSubclass(pupStruct &s);
+    entry void PUPableReference(CkReference<parent> p);
+    entry void PUPablePointer(CkPointer<parent> p);
+    entry void simpleArray(int n,int arr[n]);
+    entry void fancyArray(int arr2[n*m],int n,int m);
+    entry void crazyArray(int arr1[arr2[0]],int arr2[arr1[0]+n],int n);
+    entry void msgQ(int nMsgs,msgQ_t q);
+
+    entry void reflectMarshall(int forElt);
+    entry void done(void);
+    initnode void eltInit(void);
+  };
+};

@@ -1,0 +1,15 @@
+module fib {
+  message fib_DataMsg;
+  message fib_Range;
+
+  chare fib_main {
+    entry fib_main(void);
+    entry void results(fib_DataMsg *);
+  };
+
+  chare fib_fibFunction {
+    entry fib_fibFunction(fib_Range *);
+    entry void sendParent(fib_DataMsg *);
+  };
+
+};

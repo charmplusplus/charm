@@ -1,0 +1,20 @@
+module tempotest {
+
+  message IdMsg;
+
+  chare tempotest_main {
+    entry tempotest_main(void);
+    entry void getid(IdMsg *);
+    entry void Finish(void);
+  };
+  
+  chare tempotest_UserClass : TempoChare {
+    entry tempotest_UserClass(IdMsg *);
+    entry [threaded] void doSendRecv(void);
+  };
+  
+  group tempotest_UserGroup : TempoGroup {
+    entry tempotest_UserGroup(IdMsg *);
+    entry [threaded] void doSendRecv(void);
+  };
+};

@@ -1,0 +1,15 @@
+module varraystest {
+  message varraystest_Msg {
+    int iarray[];
+    float farray[];
+  };
+
+  chare varraystest_main {
+    entry varraystest_main(void);
+    entry void exit(varraystest_Msg *);
+  };
+
+  chare varraystest_test {
+    entry varraystest_test(varraystest_Msg *);
+  };
+};

@@ -1,0 +1,9 @@
+module rotest {
+  message rotest_msg;
+  group rotest_group {
+    entry rotest_group(void);
+    entry void start(void);
+    entry void done(void);
+  };
+};
+

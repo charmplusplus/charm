@@ -1,0 +1,10 @@
+module reduction {
+  array [1D] reductionArray {
+    entry reductionArray();
+    entry void start(void);
+  };
+  group reductionGroup {
+    entry reductionGroup();
+    entry void start(void);
+  };
+};

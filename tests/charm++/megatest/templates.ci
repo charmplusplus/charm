@@ -1,0 +1,29 @@
+module templates {
+  readonly int BINSIZE;
+
+  message templates_ClientMsg;
+  template<class dtype> message templates_Single;
+  message templates_Single<int>;
+
+  template<class dtype> array[1D] templates_Array {
+    entry templates_Array(void);
+    entry void remoteRecv(templates_Single<dtype> *);
+    entry void marshalled(int len,dtype arr[len]);
+  };
+  
+  template<class dtype> group templates_Reduction {
+    entry templates_Reduction(void);
+    entry void submit(templates_Single<dtype> *);
+    entry void Register(templates_ClientMsg *);
+    entry void remoteRecv(templates_Single<dtype> *);
+  };
+
+  template<class dtype> chare templates_Collector {
+    entry void templates_Collector(void);
+    entry void collect(templates_Single<dtype> *);
+  };
+
+  group templates_Reduction<int>;
+  chare templates_Collector<int>;
+  array [1D] templates_Array<int>;
+};

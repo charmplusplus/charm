@@ -1,0 +1,7 @@
+module priomsg {
+  message priomsg_Msg;
+  chare priomsg_test {
+    entry priomsg_test(void);
+    entry void donow(priomsg_Msg *);
+  };
+}

@@ -1,0 +1,23 @@
+module synctest {
+  
+  message synctest_InitMsg;
+  message synctest_ReplyMsg;
+  message synctest_SyncSendMsg;
+  message synctest_SyncRecvMsg;
+ 
+  chare synctest_main {
+    entry synctest_main(void);
+    entry void reply(synctest_ReplyMsg *);
+    entry [threaded] void doTest(void) stacksize=65536;
+  };
+
+  chare synctest_chare {
+    entry synctest_chare(synctest_InitMsg *);
+    entry [sync] synctest_SyncRecvMsg *test(synctest_SyncSendMsg *);
+  };
+
+  array[1D] synctest_arr {
+    entry synctest_arr(synctest_InitMsg *);
+    entry [sync] synctest_SyncRecvMsg *test(synctest_SyncSendMsg *);
+  };
+};

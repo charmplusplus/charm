@@ -1,0 +1,22 @@
+module callback {
+  message callbackMsg;
+  chare callbackCoord {
+    entry callbackCoord(void);
+    entry void done(int objectType,int paramVal); 
+    entry [threaded] void threadedTest(void);
+  };
+
+  chare callbackChare {
+    entry callbackChare(CProxy_callbackCoord coord);
+    entry void accept(callbackMsg *m);
+  };
+  array[1D] callbackArray {
+    entry callbackArray(CProxy_callbackCoord coord);
+    entry void accept(callbackMsg *m);
+  };
+  group callbackGroup {
+    entry callbackGroup(CProxy_callbackCoord coord);
+    entry void accept(callbackMsg *m);
+    entry void reflect(CkCallback cb,int paramVal);
+  };
+};

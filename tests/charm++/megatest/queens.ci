@@ -1,0 +1,22 @@
+module queens {
+ 
+  message queens_PartialBoard;
+  message queens_DMSG;
+  message queens_countMsg;
+  
+  chare queens_main {
+    entry queens_main(queens_DMSG *);
+    entry [threaded] void Quiescence1(CkQdMsg *);
+  };
+  
+  chare queens_queens {
+    entry queens_queens(queens_PartialBoard *);
+  };
+
+  
+  group queens_counter {
+    entry queens_counter(void);
+    entry void sendCounts(void);
+    entry void childCount(queens_countMsg *);
+  };
+};

@@ -1,0 +1,43 @@
+mainmodule pingpong {
+  readonly CProxy_main mainProxy;
+  mainchare main {
+    entry main();
+    entry void maindone(void);
+  };
+  message PingMsg;
+  message IdMsg;
+  array [1D] Ping1 {
+    entry Ping1();
+    entry void start(void);
+    entry void recv(PingMsg *);
+  };        	
+  array [2D] Ping2 {
+    entry Ping2();
+    entry void start(void);
+    entry void recv(PingMsg *);
+  };        	
+  array [3D] Ping3 {
+    entry Ping3();
+    entry void start(void);
+    entry void recv(PingMsg *);
+  };        	
+  chare PingC {
+    entry PingC(void);
+    entry PingC(IdMsg *);
+    entry void start(void);
+    entry void exchange(IdMsg *);
+    entry void recv(void);
+    entry void recv(PingMsg *);
+    entry [threaded] void trecv(void);
+  };
+  group PingG {
+    entry PingG(void);
+    entry void start(void);
+    entry void recv(void);
+  }
+  array [Fancy] PingF {
+    entry PingF();
+    entry void start(void);
+    entry void recv(void);
+  };        	
+};

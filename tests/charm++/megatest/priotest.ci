@@ -1,0 +1,7 @@
+module priotest {
+  message priotest_msg;
+  chare priotest_chare {
+    entry priotest_chare(void);
+    entry void recv(priotest_msg *);
+  };
+}

@@ -1,0 +1,8 @@
+module arrayring {
+  message arrayMessage;
+   
+  array [1D] arrayRing_array {
+    entry arrayRing_array();
+    entry void start(arrayMessage *);
+  };
+};

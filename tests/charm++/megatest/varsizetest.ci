@@ -1,0 +1,12 @@
+module varsizetest {
+  message varsizetest_Msg;
+
+  chare varsizetest_main {
+    entry varsizetest_main(void);
+    entry void exit(varsizetest_Msg *);
+  };
+
+  chare varsizetest_test {
+    entry varsizetest_test(varsizetest_Msg *);
+  };
+};

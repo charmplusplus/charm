@@ -1,0 +1,90 @@
+module inherit {
+  chare inhCoord {
+    entry inhCoord(void);
+    entry void startTest(void);
+    entry void done(void);
+  };
+
+  chare cp {
+    entry cp();
+    entry void parent(int);
+    entry void inhLexical(int);
+    entry void inhVirtual(int);
+  };
+  chare c1 : cp {
+    entry c1();
+    entry void inhLexical(int);
+    entry void inhVirtual(int);
+  };
+  chare c2 : c1 {
+    entry c2();
+    entry void inhLexical(int);
+    entry void inhVirtual(int);
+  };
+  chare c3 : cp {
+    entry c3();
+    entry void inhLexical(int);
+    entry void inhVirtual(int);
+  };
+  chare c13 : c1, c3 {
+    entry c13();
+    entry void inhLexical(int);
+    entry void inhVirtual(int);
+  };
+
+  group gp {
+    entry gp();
+    entry void parent(int);
+    entry void inhLexical(int);
+    entry void inhVirtual(int);
+  };
+  group g1 : gp {
+    entry g1();
+    entry void inhLexical(int);
+    entry void inhVirtual(int);
+  };
+  group g2 : g1 {
+    entry g2();
+    entry void inhLexical(int);
+    entry void inhVirtual(int);
+  };
+  group g3 : gp {
+    entry g3();
+    entry void inhLexical(int);
+    entry void inhVirtual(int);
+  };
+  group g13 : g1, g3 {
+    entry g13();
+    entry void inhLexical(int);
+    entry void inhVirtual(int);
+  };
+
+  array [1D]  ap {
+    entry ap();
+    entry void parent(int);
+    entry void inhLexical(int);
+    entry void inhVirtual(int);
+  };
+  array [1D]  a1 : ap {
+    entry a1();
+    entry void inhLexical(int);
+    entry void inhVirtual(int);
+  };
+  array [1D]  a2 : a1 {
+    entry a2();
+    entry void inhLexical(int);
+    entry void inhVirtual(int);
+  };
+  array [1D]  a3 : ap {
+    entry a3();
+    entry void inhLexical(int);
+    entry void inhVirtual(int);
+  };
+  array [1D]  a13 : a1, a3 {
+    entry a13();
+    entry void inhLexical(int);
+    entry void inhVirtual(int);
+  };
+
+
+};

@@ -1,0 +1,381 @@
+#include <string.h> // for strlen, and strcmp
+#include <charm++.h>
+
+#define NITER 10000
+
+class Fancy
+{
+  char _str[12];
+  public:
+    Fancy() { _str[0] = '\0'; }
+    Fancy(char *str) {
+      strncpy(_str, str, 12);
+    }
+    int equals(char *str) { return !strcmp(str, _str); }
+};
+
+class CkArrayIndexFancy : public CkArrayIndex {
+  Fancy f;
+  public:
+    CkArrayIndexFancy(char *str) : f(str) {nInts=3;}
+};
+
+#include "pingpong.decl.h"
+
+class PingMsg : public CMessage_PingMsg
+{
+  public:
+    char x[100];
+};
+
+class IdMsg : public CMessage_IdMsg
+{
+  public:
+    CkChareID cid;
+    IdMsg(CkChareID _cid) : cid(_cid) {}
+};
+
+CProxy_main mainProxy;
+
+#define P1 0
+#define P2 1%CkNumPes()
+
+class main : public Chare
+{
+  int phase;
+  CProxy_Ping1 arr1;
+  CProxy_Ping2 arr2;
+  CProxy_Ping3 arr3;
+  CProxy_PingF arrF;
+  CProxy_PingC cid;
+  CProxy_PingG gid;
+public:
+  main(CkMigrateMessage *m) {}
+  main(CkArgMsg* m)
+  {
+    delete m;
+    if(CkNumPes()>2) {
+      CkAbort("Run this program on 1 or 2 processors only.\n");
+    }
+    mainProxy = thishandle;
+    phase = 0;
+    gid = CProxy_PingG::ckNew();
+    cid=CProxy_PingC::ckNew(1%CkNumPes());
+    cid=CProxy_PingC::ckNew(new IdMsg(cid.ckGetChareID()),0);
+    arr1 = CProxy_Ping1::ckNew(2);
+    arr2 = CProxy_Ping2::ckNew();
+    arr3 = CProxy_Ping3::ckNew();
+    arrF = CProxy_PingF::ckNew();
+    arr2(0,0).insert(P1);
+    arr2(0,1).insert(P2);
+    arr2.doneInserting();
+    arr3(0,0,0).insert(P1);
+    arr3(0,0,1).insert(P2);
+    arr3.doneInserting();
+    arrF[CkArrayIndexFancy("first")].insert(P1);
+    arrF[CkArrayIndexFancy("second")].insert(P2);
+    arrF.doneInserting();
+    phase=0;
+    mainProxy.maindone();
+  };
+
+  void maindone(void)
+  {
+    switch(phase++) {
+      case 0:
+	arr1[0].start();
+	break;
+      case 1:
+        arr2(0,0).start();
+        break;
+      case 2:
+        arr3(0,0,0).start();
+        break;
+      case 3:
+        arrF[CkArrayIndexFancy("first")].start();
+        break;
+      case 4:
+        cid.start();
+        break;
+      case 5:
+        gid[0].start();
+        break;
+      default:
+        CkExit();
+    }
+  };
+};
+
+class PingG : public Group
+{
+  CProxyElement_PingG *pp;
+  int niter;
+  int me, nbr;
+  double start_time, end_time;
+public:
+  PingG()
+  {
+    me = CkMyPe();    
+    nbr = (me+1)%CkNumPes();
+    pp = new CProxyElement_PingG(thisgroup,nbr);
+    niter = 0;
+  }
+  PingG(CkMigrateMessage *m) {}
+  void start(void)
+  {
+    (*pp).recv();
+    start_time = CkWallTimer();
+  }
+  void recv(void)
+  {
+    if(me==0) {
+      niter++;
+      if(niter==NITER) {
+        end_time = CkWallTimer();
+        int titer = (CkNumPes()==1)?(NITER/2) : NITER;
+        CkPrintf("Roundtrip time for Groups is %lf us\n",
+                 1.0e6*(end_time-start_time)/titer);
+        mainProxy.maindone();
+      } else {
+        (*pp).recv();
+      }
+    } else {
+      (*pp).recv();
+    }
+  }
+};
+
+class Ping1 : public ArrayElement1D
+{
+  CProxy_Ping1 *pp;
+  int niter;
+  double start_time, end_time;
+public:
+  Ping1()
+  {
+    pp = new CProxy_Ping1(thisArrayID);
+    niter = 0;
+  }
+  Ping1(CkMigrateMessage *m) {}
+  void start(void)
+  {
+    (*pp)[1].recv(new PingMsg);
+    start_time = CkWallTimer();
+  }
+  void recv(PingMsg *msg)
+  {
+    if(thisIndex==0) {
+      niter++;
+      if(niter==NITER) {
+        end_time = CkWallTimer();
+        CkPrintf("Roundtrip time for 1D Arrays is %lf us\n",
+                 1.0e6*(end_time-start_time)/NITER);
+        mainProxy.maindone();
+      } else {
+        (*pp)[1].recv(msg);
+      }
+    } else {
+      (*pp)[0].recv(msg);
+    }
+  }
+};
+
+class Ping2 : public ArrayElement2D
+{
+  CProxy_Ping2 *pp;
+  int niter;
+  double start_time, end_time;
+public:
+  Ping2()
+  {
+    pp = new CProxy_Ping2(thisArrayID);
+    niter = 0;
+  }
+  Ping2(CkMigrateMessage *m) {}
+  void start(void)
+  {
+    (*pp)(0,1).recv(new PingMsg);
+    start_time = CkWallTimer();
+  }
+  void recv(PingMsg *msg)
+  {
+    if(thisIndex.y==0) {
+      niter++;
+      if(niter==NITER) {
+        end_time = CkWallTimer();
+        CkPrintf("Roundtrip time for 2D Arrays is %lf us\n",
+                 1.0e6*(end_time-start_time)/NITER);
+        mainProxy.maindone();
+      } else {
+        (*pp)(0,1).recv(msg);
+      }
+    } else {
+      (*pp)(0,0).recv(msg);
+    }
+  }
+};
+
+class Ping3 : public ArrayElement3D
+{
+  CProxy_Ping3 *pp;
+  int niter;
+  double start_time, end_time;
+public:
+  Ping3()
+  {
+    pp = new CProxy_Ping3(thisArrayID);
+    niter = 0;
+  }
+  Ping3(CkMigrateMessage *m) {}
+  void start(void)
+  {
+    (*pp)(0,0,1).recv(new PingMsg);
+    start_time = CkWallTimer();
+  }
+  void recv(PingMsg *msg)
+  {
+    if(thisIndex.z==0) {
+      niter++;
+      if(niter==NITER) {
+        end_time = CkWallTimer();
+        CkPrintf("Roundtrip time for 3D Arrays is %lf us\n",
+                 1.0e6*(end_time-start_time)/NITER);
+        mainProxy.maindone();
+      } else {
+        (*pp)(0,0,1).recv(msg);
+      }
+    } else {
+      (*pp)(0,0,0).recv(msg);
+    }
+  }
+};
+
+class PingF : public CBase_PingF
+{
+  CProxy_PingF *pp;
+  int niter;
+  double start_time, end_time;
+  int first;
+public:
+  PingF()
+  {
+    pp = new CProxy_PingF(thisArrayID);
+    niter = 0;
+    first = thisIndex.equals("first") ? 1 : 0;
+  }
+  PingF(CkMigrateMessage *m) {}
+  void start(void)
+  {
+    (*pp)[CkArrayIndexFancy("second")].recv();
+    start_time = CkWallTimer();
+  }
+  void recv(void)
+  {
+    CkArrayIndexFancy partner((char *)(first?"second" : "first"));
+    if(first) {
+      niter++;
+      if(niter==NITER) {
+        end_time = CkWallTimer();
+        CkPrintf("Roundtrip time for Fancy Arrays is %lf us\n",
+                 1.0e6*(end_time-start_time)/NITER);
+        mainProxy.maindone();
+      } else {
+        (*pp)[partner].recv();
+      }
+    } else {
+      (*pp)[partner].recv();
+    }
+  }
+};
+
+class PingC : public Chare
+{
+  CProxy_PingC *pp;
+  int niter;
+  double start_time, end_time;
+  int first;
+ public:
+  PingC(void)
+  {
+    first = 0;
+  }
+  PingC(IdMsg *msg)
+  {
+    first = 1;
+    CProxy_PingC pc(msg->cid);
+    msg->cid = thishandle;
+    pc.exchange(msg);
+  }
+  PingC(CkMigrateMessage *m) {}
+  void start(void)
+  {
+    niter = 0;
+    pp->recv();
+    start_time = CkWallTimer();
+  }
+  void exchange(IdMsg *msg)
+  {
+    if(first) {
+      pp = new CProxy_PingC(msg->cid);
+      delete msg;
+    } else {
+      pp = new CProxy_PingC(msg->cid);
+      msg->cid = thishandle;
+      pp->exchange(msg);
+    }
+  }
+  void recv(void)
+  {
+    if(first) {
+      niter++;
+      if(niter==NITER) {
+        end_time = CkWallTimer();
+        CkPrintf("Roundtrip time for Chares (reuse msgs) is %lf us\n",
+                 1.0e6*(end_time-start_time)/NITER);
+        niter = 0;
+        pp->recv(new PingMsg);
+        start_time = CkWallTimer();
+      } else {
+        pp->recv();
+      }
+    } else {
+      pp->recv();
+    }
+  }
+  void recv(PingMsg *msg)
+  {
+    delete msg;
+    if(first) {
+      niter++;
+      if(niter==NITER) {
+        end_time = CkWallTimer();
+        CkPrintf("Roundtrip time for Chares (new/del msgs) is %lf us\n",
+                 1.0e6*(end_time-start_time)/NITER);
+        niter = 0;
+        pp->trecv();
+        start_time = CkWallTimer();
+      } else {
+        pp->recv(new PingMsg);
+      }
+    } else {
+      pp->recv(new PingMsg);
+    }
+  }
+  void trecv(void)
+  {
+    if(first) {
+      niter++;
+      if(niter==NITER) {
+        end_time = CkWallTimer();
+        CkPrintf("Roundtrip time for threaded Chares is %lf us\n",
+                 1.0e6*(end_time-start_time)/NITER);
+        mainProxy.maindone();
+      } else {
+        pp->trecv();
+      }
+    } else {
+      pp->trecv();
+    }
+  }
+};
+#include "pingpong.def.h"

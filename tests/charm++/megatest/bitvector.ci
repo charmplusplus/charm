@@ -1,0 +1,3 @@
+module bitvector {
+  message bitvectorMessage;
+};

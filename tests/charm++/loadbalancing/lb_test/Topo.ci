@@ -1,0 +1,9 @@
+module Topo {
+
+message TopoInitMsg;
+
+group Topo {
+  entry Topo(TopoInitMsg*);  
+};
+
+};
