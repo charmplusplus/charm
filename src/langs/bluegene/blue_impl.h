@@ -110,6 +110,7 @@ extern double (*timerFunc) (void);
 #define tTHREADTYPE	cta(threadinfo)->type
 #define tMYNODE		cta(threadinfo)->myNode
 #define tSTARTTIME	tMYNODE->startTime
+#define tTIMERON	tMYNODE->timeron_flag
 #define tCURRTIME	cta(threadinfo)->currTime
 #define tHANDLETAB	cta(threadinfo)->handlerTable
 #define tHANDLETABFNPTR	cta(threadinfo)->handlerTable.fnPtr
@@ -290,6 +291,7 @@ public:
   short        lastW;           /* last worker thread assigned msg */
   char         started;		/* flag indicate if this node is started */
   char        *udata;		/* node specific data pointer */
+  char 	       timeron_flag;	/* true if timer started */
  
   HandlerTable handlerTable; /* node level handler table */
 #if BLUEGENE_TIMING
@@ -343,12 +345,36 @@ public:
   }
   inline void setThread(CthThread t) { me = t; }
   inline CthThread getThread() const { return me; }
-  void addAffMessage(char *msgPtr);        ///  add msg to affinity queue
-  void run_work_thread();
-  void run_comm_thread();
+  virtual void run() { CmiAbort("run not imlplemented"); }
 }; 
 
-extern double BgGetCurTime();
+class workThreadInfo : public threadInfo {
+public:
+  workThreadInfo(int _id, ThreadType _type, nodeInfo *_node): 
+        threadInfo(_id, _type, _node) {}
+  void run();
+};
+
+class commThreadInfo : public threadInfo {
+public:
+  commThreadInfo(int _id, ThreadType _type, nodeInfo *_node): 
+        threadInfo(_id, _type, _node) {}
+  void addAffMessage(char *msgPtr);        ///  add msg to affinity queue
+  void run();
+};
+
+// functions
+
+double BgGetCurTime();
+char ** BgGetArgv();
+int     BgGetArgc();
+void    startVTimer();
+void    stopVTimer();
+
+char * getFullBuffer();
+void   addBgNodeMessage(char *msgPtr);
+void   addBgThreadMessage(char *msgPtr, int threadID);
+void   BgProcessMessage(char *msg);
 
 
 /* blue gene debug */
