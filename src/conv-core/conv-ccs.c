@@ -670,7 +670,8 @@ static void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
   if(list==0) {
     CmiPrintf("CCS: Unknown CCS handler name '%s' requested!\n",
 	      hdr->handler);
-    CmiAbort("CCS: Unknown CCS handler name.\n");
+    return;
+ /*   CmiAbort("CCS: Unknown CCS handler name.\n");*/
   }
 
 /*Pack user data into a converse message*/
