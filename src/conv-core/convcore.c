@@ -813,12 +813,11 @@ double CmiTimer()
 
 #if CMK_TIMER_USE_RTC
 
-double clocktick;
+static double clocktick;
 CpvStaticDeclare(long long, inittime_wallclock);
 
 void CmiTimerInit()
 {
-  CpvInitialize(double, clocktick);
   CpvInitialize(long long, inittime_wallclock);
   CpvAccess(inittime_wallclock) = _rtc();
   clocktick = 1.0 / (double)(sysconf(_SC_SV2_USER_TIME_RATE));
