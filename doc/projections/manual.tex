@@ -201,11 +201,15 @@ Eg.
 
 \subsection{Running \projections{}}
 From any location, type
-\begin{alltt}
-> PROJECTIONS_LOCATION/bin/projections
-\end{alltt}
+
+{\tt > PROJECTIONS\_LOCATION/bin/projections [NAME.sts]}
+
 where {\tt PROJECTIONS\_LOCATION} is the path to the main projections
 directory.
+
+Also, if you attach a .sts file after the command line, \projections{} will
+open the file and initialize immediately. This trick saves time selecting file
+from the GUI filechooser.
 
 \section{Using \projections{}}
 When \projections{} starts, you will see the main window with a title and
@@ -242,10 +246,13 @@ will be active.
 
    Clicking on the Open File button brings up a dialog box to let you select
    the location of the data you want to look at.  Navigate to the directory
-   containing your data and select the *.sts file.  Click on 'OK'.  If you
+   containing your data and select the .sts file.  Click on 'OK'.  If you
    have selected a valid file, \projections{} will load in some preliminary data
    from the files and then activate the rest of the buttons in the main window.
    If your file is invalid, you will be shown an error dialog.
+
+   As mentioned in last section, a .sts file can be directly opened through command
+   line, and thus time is saved.
 
 \subsection{Graphs}
 
