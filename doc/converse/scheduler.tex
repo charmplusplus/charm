@@ -33,10 +33,21 @@ ConverseInit().
 
 \function {void CsdScheduler(int NumberOfMessages)}
 \index{CsdScheduler}
-\desc{This call invokes the Converse scheduler. The {\tt NumberOfMessages}
+\desc{This call invokes the Converse scheduler, which repeatedly
+delivers messages to their handlers (i.e. invokes the handler for each
+message it selects).  Each message header encodes a pointer to its
+handler as described in the next chapter. 
+In each iteration, the scheduler first looks for any
+message that  has arrived from another processor, and delivers it.
+If there isn't any, it selects a message from the locally enqueued
+messages (see below), and delivers it.
+The {\tt NumberOfMessages}
 parameter specifies how many messages should be processed (i.e. delivered
-to their handlers). If set to -1, the scheduler continues processing
+to their handlers). If set to -1, the scheduler continues delivering
 messages until CsdExitScheduler() is called from a message handler.}
+% a function or option (-2?)  Is needed to specify that the scheduler
+% continue delivering messages until it exhausts its supply of
+% messages (i.e. becomes idle)
 
 \function {void CsdExitScheduler(void)}
 \index{CsdExitScheduler}
