@@ -17,6 +17,7 @@ CMK_LD="cc $CMK_CFLAGS "
 CMK_LDXX="CC -library=Cstd $CMK_CXXFLAGS"
 CMK_AR='CC -xar -o'
 CMK_LIBS='-lnsl -lsocket -lckqt'
+CMK_LD_SHARED="-G"
 CMK_SEQ_LIBS='-lnsl -lsocket'
 CMK_SEQ_CC="cc $CMK_CFLAGS "
 CMK_SEQ_LD="cc $CMK_CFLAGS "
@@ -24,7 +25,7 @@ CMK_SEQ_CXX="CC -library=Cstd $CMK_CXXFLAGS "
 CMK_SEQ_LDXX="CC -library=Cstd $CMK_CXXFLAGS "
 CMK_CPP_SUFFIX="cc"
 CMK_XLATPP='charmxlat++ -w -p '
-CMK_QT='solaris-cc'
+CMK_QT='solaris-cc64'
 CMK_F90LIBS='-lfsu -lsunmath -lfsumai -lfminvai -lfmaxvai -lfui -lfai'
 CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=1

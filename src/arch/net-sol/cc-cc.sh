@@ -15,6 +15,7 @@ CMK_LD='cc '
 CMK_LDXX='CC -library=Cstd'
 CMK_AR='CC -xar -o'
 CMK_LIBS='-lnsl -lsocket -lckqt'
+CMK_LD_SHARED="-G"
 CMK_SEQ_LIBS='-lnsl -lsocket'
 CMK_SEQ_CC='cc'
 CMK_SEQ_LD='cc'
