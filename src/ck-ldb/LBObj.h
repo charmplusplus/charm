@@ -52,7 +52,7 @@ public:
   void StopTimer(double* walltime, double* cputime);
 
   inline const LDObjHandle &GetLDObjHandle() const { return myhandle; }
-  inline void SetMigratable(int mig) { migratable = mig; }
+  inline void SetMigratable(int mig) { data.migratable = mig; }
 private:
   inline LDObjData ObjData() { return data; };
 
@@ -63,7 +63,7 @@ private:
   void *userData;
   double startWTime;
   double startCTime;
-  CmiBool migratable;
+  CmiBool migratable;   // temp
   CmiBool registered;
 };
 
