@@ -87,9 +87,11 @@ destroyFuture(int key)
 
 Allows  the key to be used for other futures.
 
-{\large \bf Bugs:} Currently, there is no way to destroy a future, so that its key
-is available for another future. In particular, the number of futures
-a program can ever use is limited to 100! This is a sever limitation,
-but is easy to fix, in the next version.
+{\large \bf Bugs:} Currently, the number of futures is limited to 100.
+Although you can reuse a key with destroyFuture, this limits the
+number of futures alive at a time to 100. With a hash table
+implementation this could be completely eliminated in a future
+release, or at least an ability to change the number of available keys
+at the initialization time will be added.
 
 \end{document}
