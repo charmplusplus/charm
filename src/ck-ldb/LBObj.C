@@ -10,7 +10,7 @@
 */
 /*@{*/
 
-#include <converse.h>
+#include <charm++.h>
 
 #if CMK_LBDB_ON
 
