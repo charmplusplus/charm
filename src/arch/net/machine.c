@@ -512,7 +512,7 @@ static skt_ip_t   Cmi_self_IP;
 static skt_ip_t   Cmi_charmrun_IP; /*Address of charmrun machine*/
 static int        Cmi_charmrun_port;
 static int        Cmi_charmrun_pid;
-static int        Cmi_charmrun_fd;
+static int        Cmi_charmrun_fd=-1;
 
 static int    Cmi_netpoll;
 static int    Cmi_idlepoll;
