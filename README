@@ -1,4 +1,4 @@
-                              Charm++ 5.4 (Release 2)
+                              Charm++ 5.6
 
        Copyright (C) 1989-2000 Regents of the University of Illinois
 
@@ -14,15 +14,15 @@ Source code is provided, and non-commercial use is free.
 GETTING THE LATEST CHARM SOURCE
 ===============================
 
-You can use our anonymous cvs server to checkout the charm++ latest source code.
+You can use our anonymous cvs server to checkout the latest charm++ source code.
 (It may not be the latest stable version though) 
 What you need to do is as following:
 
 1. login the cvs server:
 
-      cvs -d :pserver:checkout@thrift.cs.uiuc.edu:/expand6/cvsroot login
+      cvs -d :pserver:checkout@charm.cs.uiuc.edu:/cvsroot login
 
-      when CVS password is prompted, just type <Enter>.
+      when CVS password is prompted, just press enter.
 2. checkout charm:
 
       cvs co -P charm
@@ -31,6 +31,7 @@ What you need to do is as following:
 3. logout the cvs server:
 
       cvs logout
+
 
 PICKING A VERSION
 =================
@@ -61,14 +62,12 @@ Charm version          OS        Communication     Compiler
 -------------       ---------    --------------   --------------------
 net-linux            PC Linux       UDP/Myrinet   GNU compiler
 net-linux-ia64       IA64 Linux     UDP/Myrinet   GNU compiler
-net-linux-smp        PC Linux SMP workstations    GNU compiler
 mpi-linux            PC Linux       MPI           GNU compiler
 mpi-axp-cc           Alpha          MPI           DIGITAL C++ compiler  
 mpi-linux-axp        Alpha Linux    MPI           GNU compiler
 net-axp-cc           Alpha          UDP           DIGITAL C++ compiler
 net-cygwin           Win32/cygwin   UDP           GNU compiler
 net-win32            Win32          UDP           MS Visual C++
-net-win32-smp        Win32 SMP      UDP           MS Visual C++
 net-sol-cc           Solaris        UDP           Sun WorkShop C++ Compiler
 net-sol              Solaris        UDP           GNU compiler
 net-irix             IRIX	    UDP           SGI C++ compiler
@@ -83,7 +82,7 @@ t3e                  Cray T3E    shared-mem       Cray C++ compiler
 net-ppc-darwin       Mac            UDP           GNU C++ compiler
 
 
-To choose <versions>, your choice is determined by three options:
+To choose <version>, your choice is determined by three options:
 
 1.)  The way a parallel program written in Charm++ will communicate:
 
@@ -106,8 +105,8 @@ threads; "sim-" switches between processors and counts communications.
 2.)  Your operating system:
 
 	"linux"   Linux 
-	"win32"   MS Windows NT/98/2k (and MS Visual C++ compiler)
-	"cygwin"  MS Windows 98/NT/2k with Cygnus' Cygwin Unix layer
+	"win32"   MS Windows with MS Visual C++ compiler
+	"cygwin"  MS Windows with Cygnus' Cygwin Unix layer
 	"irix"    SGI IRIX
 	"origin"  SGI Origin 2000 IRIX
 	"sol"     Solaris
@@ -123,20 +122,10 @@ threads; "sim-" switches between processors and counts communications.
 	"-axp"     For Linux, use Alpha hardware (instead of PC).
 	"-64"      For IRIX, use -64 instead of -32. 
 
-You may also choose to enable direct SMP support with a "-smp"
-version, which may result in more efficient communication in
-a cluster-of-SMPs.  A "-smp" version will communicate using
-shared memory within a machine; but message passing across machines.
-"-smp" is currently only available with "net-" versions.
-Because of locking, "-smp" may slightly impact non-SMP performance.
-
-
-Your Charm++ version is made by concatenating all three options, e.g.:
+Your Charm++ version is made by concatenating the options, e.g.:
 
 "net-linux"     Charm++ for a network of Linux workstations, compiled
                 using g++.
-"net-linux-smp" Charm++ for a network of Linux SMP workstations,
-                compiled using g++.
 "mpi-origin"    Charm++ for SGI Origin 2000, compiled using SGI CC.
 
 
@@ -158,19 +147,15 @@ need to choose <options> from the following list:
 * gm - support MyriCom's Myrinet GM library;
 * vmi - support NCSA's VMI library;
 
+* smp - Enable direct SMP support.  An "smp" version communicates using
+shared memory within a machine; but normal message passing across machines.
+Because of locking, "smp" may slightly impact non-SMP performance.  Try
+your application to decide if enabling smp mode improves performance.
+
 For a specific version, for example: net-linux, you can use following command 
 to display the supported <options> on this platform:
 > ./build charm++ net-linux help
-supported options: gm icc pgcc scyld
-
-
-After you find all the options you need, you can use build to compile Charm++.
-For example, to compile net-linux with Myrinet support, type:
-./build charm++ net-linux gm
-
-Or, to compile mpi-linux with pgcc compiler and vmi support, type:
-./build charm++ mpi-linux vmi pgcc
-(the sequence of options is not important)
+supported options: gm icc pgcc scyld smp
 
 
 BUILDING THE SOURCE
@@ -184,28 +169,30 @@ see README.net.
 Once you have decided on a version, unpack Charm++, cd into charm,
 and run
 
-     > ./build _target_ _version_ _opts_
+     > ./build <target> <version> <opts>
 
-Where _target_ is one of
+<target> is one of
 	"charm++"  The basic Charm++ language.
 	"AMPI"     An implementation of MPI on top of Charm++
 	"FEM"      A Finite-Element framework on top of Charm++
 
-And _opts_ are command line options passed to the charmc compile script.
+<version> is described above
+
+<opts> are build-time options (such as the compiler or "smp"), 
+or command line options passed to the charmc compile script.
 Common compile time options such as -g, -O, -Ipath, -Lpath, -llib are 
 accepted.
 
 For example, on a Linux machine, you would run
      > ./build charm++ net-linux -O
 
-
-This will construct a _version_ directory, link over all
-the Charm++ source code into _version_/tmp, build the entire
-Charm++ runtime system in _version_/tmp, and link sample programs 
-into _version_/pgms.
+This will construct a net-linux directory, link over all
+the Charm++ source code into net-linux/tmp, build the entire
+Charm++ runtime system in net-linux/tmp, and link sample programs 
+into net-linux/pgms.
 
 Several #define's control the compilation of Charm++.  Some of these
-#define's can be found in src/_version_/conv-mach.h.  #define's can
+#define's can be found in src/<version>/conv-mach.h.  #define's can
 also be specified on the command line, using the -D option.  For
 example,
     > ./build charm++ net-linux -O -DCMK_OPTIMIZE=1
@@ -215,37 +202,14 @@ the run-time checking performed by Converse and Charm++ runtime. This option
 should be used only after the program has been debugged. Also, this option
 disables Converse/Charm++ tracing mechanisms such as projections and summary.
 
-CMK_THREADS_USE_ISOMALLOC: This option specifies that the user-level threads in
-Converse/Charm++ be migratable using a method called isomalloc. The
-isomalloc-based threads make sure that the thread's stack spans a unique range
-of virtual addresses across all the processors. Thus, references to stack
-remain valid even when a thread migrates to different processor.
-
-CMK_THREADS_USE_COPY_STACK: This option specifies that the user-level threads
-in Converse/Charm++ be migratable by using a method where the used portion of a
-thread's stack is copied in and out of a main stack on context-switch. Since
-the main (process) stack spans the same range of virtual addresses in all
-processes in a homogeneous cluster, references to stack remain valid across all
-the processors even after a thread migrates.
-
-CMK_THREADS_USE_PTHREADS: This is an alternate implementation of
-Converse/Charm++ user-level threads that use Posix threads. They have higher
-(about 10 times) context-switching costs over the default implementation of
-threads in Converse. However, they are more portable. In particular, they avoid
-some of the known problems in the way current linuxthreads implementation
-interacts with the default user-level threads in Converse. Also, memory
-debugging tools such as purify are incompatible with Converse's default
-user-level threads. The implementation based on posix threads can be used for
-memory debugging with purify.
-
 
 BUILDING A PROGRAM
 ==================
 
-To make a sample program, cd into _version_/pgms/charm++/queens/.
+To make a sample program, cd into pgms/charm++/queens/.
 This program solves the N-queens problem-- find how many ways there 
 are to arrange N queens on an NxN chess board such that none may 
-attack another.  
+attack another.
 
 To build the program, type make.  You should get an
 executable named "pgm".
@@ -261,30 +225,30 @@ Following the previous example, to run the program on two processors, type
 This should run for a few seconds, and print out:
 There are 14200 Solutions to 12 queens. Finish time=4.030000
 
-Charmrun is now available on all platforms. Depending on what platform you are 
-running charm program, charmrun could be just a shell script which is a wrapper
- for mpirun, for example, in mpi- version. The idea of charmrun is trying to 
-provide a uniform parameters across all platforms.
+Charmrun is used to provide a uniform interface to run charm programs.
+On some platforms, charmrun is just a shell script which calls the 
+platform-specific start program, such as mpirun on mpi versions.
 
 For net- version, charmrun is an executable which invokes rsh or ssh to start 
-node programs on remote machines. Remember that you should set up a ~/.nodelist that enumerates all the machines you want to run jobs on, otherwise it will
+node programs on remote machines. You should set up a ~/.nodelist that 
+enumerates all the machines you want to run jobs on, otherwise it will
 create a default ~/.nodelist for you that contains only localhost. Here is a 
 typical .nodelist file:
 
 group main ++shell /bin/ssh
-host machinename
+host <machinename>
 
 The default remote shell program is rsh, but you can define different remote 
 shell you like to start remote processes in the ++shell option. You should 
 also make sure that you can rsh or ssh to these machines without password 
 authentication. Just type following command to verify:
-     > rsh(ssh) machinename date
+     > rsh <machinename> date
 If this gives you current date immediately, your running environment with this 
 node has been setup correctly.
 
 Now, for test running purpose, net- version charmrun comes with an easy-to-use 
 "++local" options. No remote shell invocation is needed in this case. It starts
- node programs right on your local machine. This could be useful if you just 
+node programs right on your local machine. This could be useful if you just 
 want to run program on only one machine, for example, your laptop. This
 can save you all the hassle of setting up rsh/ssh or charmd daemons.
 To use this option, just type:
@@ -293,16 +257,9 @@ To use this option, just type:
 
 However, for best performance, you should launch one node program per processor.
 
-Command-line Options:
+For more detailed information, please check the "INSTALLATION MANUAL" and "RUN MANUAL" 
+under doc/install.
 
-+truecrash: The net-* version of Converse trap a number of signals such as
-SIGSEGV and SIGBUS to gracefully handle premature termination of Converse
-programs. The downside to this is that these signals do not produce core dumps
-for post-mortem debugging. Specifying +truecrash while running
-Converse/Charm++ programs on these machines allows core dumps to be produced 
-on abnormal terminations.
-
-For more detailed information, please check the "INSTALLATION MANUAL" and "RUN MANUAL" under doc/install.
 
 FOR MORE INFORMATION
 ====================
@@ -319,8 +276,8 @@ improvements, or bug reports is
 AUTHORS
 =======
 
-Charm++ is written and maintained by the Parallel Programming Lab, in
-the Computer Science department at the University of Illinois at
+Charm++ was created and is maintained by the Parallel Programming Lab, 
+in the Computer Science department at the University of Illinois at
 Urbana-Champaign.  Our managing professor is Dr. L.V. Kale; students
 have included (in rough time order) Wennie Shu, Kevin Nomura, Wayne
 Fenton, Balkrishna Ramkumar, Vikram Saletore, Amitabh B. Sinha, Manish
@@ -331,4 +288,7 @@ Joshua Yelon, Narain Jagathesan, Zehra Sura, Krishnan Varadarajan, and
 Sameer Paranjpye.  Current developers include Milind Bhandarkar,
 Robert Brunner, Terry Wilmarth, Gengbin Zheng, Jayant Desouza, Orion
 Lawlor, Karthik Mahesh, and Neelam Saboo.
+
+
+
 
