@@ -10,6 +10,7 @@ use English;
 use strict; 
 
 my $infile = shift @ARGV;
+my @otherfiles = @ARGV;
 my $inci = "$infile.ci";
 my $inh = "$infile.h";
 my $inC = "$infile.C";
@@ -364,414 +365,422 @@ $inhhandle->close;
 # END WRITE .H FILES
 
 # BEGIN WRITE .C FILES
-print "Generating source...\n";
-my $outChandle=new FileHandle();
-if ( $wantindent && ( $indent =~ /GNU/) && ( $indent !~ /2.2.5/) ) {
-  $outChandle->open("|indent -npcs -npsl -bap -bad -br -nce>$outC") or die "cannot open $outC";
-} else {
-  $outChandle->open(">$outC") or die "cannot open $outC";
-}
+foreach my $incfile (@otherfiles, $inC)
+{
 
-# write outC
-$outChandle->print( "#include \"$infile\_sim.h\"\n");
-$outChandle->print( "#include \"$infile.def.h\"\n\n");
-my $inChandle=new FileHandle();
-$inChandle->open("$inC") or die "cannot open $inC";
-inithandle($inChandle);
-my ($thefnidx);
-my($iseventmethod,$isweird,$isnoneventmethod);
-my ($returntype,,$messagename,$found);
-while (@line=split(' ',($thisline=getcodeline($inChandle)))) {
-  if (($line[0] eq "#define") || ($line[0] eq "#include")) {
-    $outChandle->print("$thisline\n");
-  } elsif ($inbody) {
-    if (posefunctest($thisline)>0) {
-      push(@body,posefuncmap($thisline,$issim,$isconstructor,$class));
-    } else {
-      push(@body,$lastline{$inChandle});
-    }
+  print "Generating source for $incfile...\n";
+
+  my ($inbase,$inext)=split('\.',$incfile);
+  my $outC=$inbase.'_sim'.'.'.$inext;
+  my $outChandle=new FileHandle();
+  if ( $wantindent && ( $indent =~ /GNU/) && ( $indent !~ /2.2.5/) ) {
+    $outChandle->open("|indent -npcs -npsl -bap -bad -br -nce>$outC") or die "cannot open $outC";
+  } else {
+    $outChandle->open(">$outC") or die "cannot open $outC";
   }
 
-  if (($blocklevel{$inChandle}<=1) && ($openblock{$inChandle}==1) &&(!$inbody)) { # decl line
-    # handle wrapper class (constructor and resolve) construction for
-    # sim classes and event methods
-    # get class name and method name
-#    	print "open on $thisline :level".$blocklevel{$inChandle}." open:".$openblock{$inChandle}." close:".$closeblock{$inChandle}."\n";
-    $iseventmethod=$isnoneventmethod=$isconstructor=$isweird=$issim=0;
-    $class=$message=$messagename=$returntype=$method='';
-    $declaration=$lastline{$inChandle};
-    $inbody=1;
-    # regexp if block to extract the fields
-    # expecting  class::method(parameters)
-    if ($thisline =~ /^\s*([^:\s\(]+)\s*\:\:\s*([^\s\(]+)\s*\(\s*([^\s]+)\s?[\*]*\s*([^\s\,\{\)]+)/) {
-      $returntype='';
-      $class=$1;
-      $method=$2;
-      $message=$3;
-      $messagename=$4;
-    }
-    # expecting retval *class::method(parameters)
-    elsif ($thisline =~ /^\s*([^:\s\(]+ \*)([^\s:\(]+)\s*\:\:\s*([^\s\(]+)\s*\(\s*([^\s]+)\s?\**\s*([^\s,\)\{]+)/) {
-
-      $returntype=$1;
-      $class=$2;
-      $method=$3;
-      $message=$4;
-      $messagename=$5;
-    }
-    # expecting retval class::method(parameters)
-    elsif ($thisline =~ /^\s*([^:\s\(]+)\s?([^\s:\(]+)\s*\:\:\s*([^\s\(]+)\s*\(\s*([^\s]+)\s?\**\s*([^\s,\)\{]+)/) {
-      $returntype=$1;
-      $class=$2;
-      $method=$3;
-      $message=$4;
-      $messagename=$5;
+  # write outC
+#  if ($incfile eq $inC) {
+    $outChandle->print( "#include \"$inbase\_sim.h\"\n");
+    $outChandle->print( "#include \"$inbase.def.h\"\n\n");
+#  }
+  my $inChandle=new FileHandle();
+  $inChandle->open("$incfile") or die "cannot open $incfile";
+  inithandle($inChandle);
+  my ($thefnidx);
+  my($iseventmethod,$isweird,$isnoneventmethod);
+  my ($returntype,,$messagename,$found);
+  while (@line=split(' ',($thisline=getcodeline($inChandle)))) {
+    if (($line[0] eq "#define") || ($line[0] eq "#include")) {
+      $outChandle->print("$thisline\n");
+    } elsif ($inbody) {
+      if (posefunctest($thisline)>0) {
+	push(@body,posefuncmap($thisline,$issim,$isconstructor,$class));
+      } else {
+	push(@body,$lastline{$inChandle});
+      }
     }
 
-    # expecting  class::method()
-    elsif ($thisline =~ /^\s*\**\s*([^\s:\(]+)\s*::\s*([^\s\(]+)\s*\(\s*\)/) {
-      $returntype='';
-      $class=$1;
-      $method=$2;
-      $message=$messagename='';
-    }
-    # expecting  retval *class::method()
-    elsif ($thisline =~  /^\s*([^\s\(:]+\s*\*)([^\s:]+)\s*::\s*([^\s\(]+)\s*\(\s*\)/) {
-      $returntype=$1;
-      $class=$2;
-      $method=$3;
-      $message=$messagename='';
-    }
-    # expecting  retval class::method()
-    elsif ($thisline =~  /^\s*([^\s\(:]+)\s?([^\s:]+)\s*::\s*([^\s\(]+)\s*\(\s*\)/) {
-      $returntype=$1;
-      $class=$2;
-      $method=$3;
-      $message=$messagename='';
-    } else {
-      #funkulation: non class subroutine perhaps just pass
-      #these for now since we have no handling instructions.
-      print STDERR "$thisline at $inC ".$inChandle->input_line_number." is weird \n";
-      $isweird=1;
+    if (($blocklevel{$inChandle}<=1) && ($openblock{$inChandle}==1) &&(!$inbody)) { # decl line
+      # handle wrapper class (constructor and resolve) construction for
+      # sim classes and event methods
+      # get class name and method name
+      #    	print "open on $thisline :level".$blocklevel{$inChandle}." open:".$openblock{$inChandle}." close:".$closeblock{$inChandle}."\n";
+      $iseventmethod=$isnoneventmethod=$isconstructor=$isweird=$issim=0;
+      $class=$message=$messagename=$returntype=$method='';
+      $declaration=$lastline{$inChandle};
       $inbody=1;
-      $outChandle->print($lastline{$inChandle}."\n");
-      $declaration='';
-      next;
-    }
-    $issim=1 if exists($base{$class});
-    $isconstructor =1 if($class eq $method);
-    my $j;
-    foreach $j (@{$events{$class}}) {
-      if ($method eq $j->[0]) {
-	$iseventmethod = 1;
+      # regexp if block to extract the fields
+      # expecting  class::method(parameters)
+      if ($thisline =~ /^\s*([^:\s\(]+)\s*\:\:\s*([^\s\(]+)\s*\(\s*([^\s]+)\s?[\*]*\s*([^\s\,\{\)]+)/) {
+	$returntype='';
+	$class=$1;
+	$method=$2;
+	$message=$3;
+	$messagename=$4;
       }
-    }
-    foreach $j (@{$nonevents{$class}}) {
-      if ($method eq $j) {
-	$isnoneventmethod = 1;
+      # expecting retval *class::method(parameters)
+      elsif ($thisline =~ /^\s*([^:\s\(]+ \*)([^\s:\(]+)\s*\:\:\s*([^\s\(]+)\s*\(\s*([^\s]+)\s?\**\s*([^\s,\)\{]+)/) {
+
+	$returntype=$1;
+	$class=$2;
+	$method=$3;
+	$message=$4;
+	$messagename=$5;
       }
-    }
-    #      print "class is $class, method is $method close=".$closeblock{$inChandle}." issim = $issim iseventmethod = $iseventmethod isnoneventmethod $isnoneventmethod \n";
+      # expecting retval class::method(parameters)
+      elsif ($thisline =~ /^\s*([^:\s\(]+)\s?([^\s:\(]+)\s*\:\:\s*([^\s\(]+)\s*\(\s*([^\s]+)\s?\**\s*([^\s,\)\{]+)/) {
+	$returntype=$1;
+	$class=$2;
+	$method=$3;
+	$message=$4;
+	$messagename=$5;
+      }
 
-    if ($iseventmethod &&  ($messagename ne '')) {
+      # expecting  class::method()
+      elsif ($thisline =~ /^\s*\**\s*([^\s:\(]+)\s*::\s*([^\s\(]+)\s*\(\s*\)/) {
+	$returntype='';
+	$class=$1;
+	$method=$2;
+	$message=$messagename='';
+      }
+      # expecting  retval *class::method()
+      elsif ($thisline =~  /^\s*([^\s\(:]+\s*\*)([^\s:]+)\s*::\s*([^\s\(]+)\s*\(\s*\)/) {
+	$returntype=$1;
+	$class=$2;
+	$method=$3;
+	$message=$messagename='';
+      }
+      # expecting  retval class::method()
+      elsif ($thisline =~  /^\s*([^\s\(:]+)\s?([^\s:]+)\s*::\s*([^\s\(]+)\s*\(\s*\)/) {
+	$returntype=$1;
+	$class=$2;
+	$method=$3;
+	$message=$messagename='';
+      } else {
+	#funkulation: non class subroutine perhaps just pass
+	#these for now since we have no handling instructions.
+	print STDERR "$thisline at $incfile ".$inChandle->input_line_number." is weird \n";
+	$isweird=1;
+	$inbody=1;
+	$outChandle->print($lastline{$inChandle}."\n");
+	$declaration='';
+	next;
+      }
+      $issim=1 if exists($base{$class});
+      $isconstructor =1 if($class eq $method);
+      my $j;
+      foreach $j (@{$events{$class}}) {
+	if ($method eq $j->[0]) {
+	  $iseventmethod = 1;
+	}
+      }
+      foreach $j (@{$nonevents{$class}}) {
+	if ($method eq $j) {
+	  $isnoneventmethod = 1;
+	}
+      }
+      #      print "class is $class, method is $method close=".$closeblock{$inChandle}." issim = $issim iseventmethod = $iseventmethod isnoneventmethod $isnoneventmethod \n";
 
-      $outChandle->print("$declaration\n");
-      $outChandle->print("#ifdef POSE_STATS_ON\n");
-      $outChandle->print("  int tstat = localStats->TimerRunning();\n");
-      $outChandle->print("  if (tstat)\n");
-      $outChandle->print("    localStats->SwitchTimer(SIM_TIMER);\n");
-      $outChandle->print("  else\n");
-      $outChandle->print("    localStats->TimerStart(SIM_TIMER);\n");
-      $outChandle->print("#endif\n");
-      $outChandle->print("  PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n");
-      $outChandle->print("  Event *e = new Event();\n");
-      $outChandle->print("  if ((POSE_endtime < 0) || ($messagename->timestamp <= POSE_endtime)) {\n");
-      $outChandle->print("    e->evID = $messagename->evID;\n");
-      $outChandle->print("    e->timestamp = $messagename->timestamp;\n");
-      $outChandle->print("    e->done = e->commitBfrLen = 0;\n");
-      $outChandle->print("    e->commitBfr = NULL;\n");
-      $outChandle->print("    e->msg = $messagename;\n");
-      $thefnidx = 0;
-      #setup index for non constructor methods
-      foreach my $i (@{$methods{$class}}) {
-	if ($i->[0] ne $class) {
-	  foreach my $j (@{$events{$class}}) {
+      if ($iseventmethod &&  ($messagename ne '')) {
 
-	    if (($i->[0] eq $j->[0])&& ($i->[1] eq $j->[1])) {
-	      $thefnidx++;
-	    }
-	    else
-	      {
+	$outChandle->print("$declaration\n");
+	$outChandle->print("#ifdef POSE_STATS_ON\n");
+	$outChandle->print("  int tstat = localStats->TimerRunning();\n");
+	$outChandle->print("  if (tstat)\n");
+	$outChandle->print("    localStats->SwitchTimer(SIM_TIMER);\n");
+	$outChandle->print("  else\n");
+	$outChandle->print("    localStats->TimerStart(SIM_TIMER);\n");
+	$outChandle->print("#endif\n");
+	$outChandle->print("  PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n");
+	$outChandle->print("  Event *e = new Event();\n");
+	$outChandle->print("  if ((POSE_endtime < 0) || ($messagename->timestamp <= POSE_endtime)) {\n");
+	$outChandle->print("    e->evID = $messagename->evID;\n");
+	$outChandle->print("    e->timestamp = $messagename->timestamp;\n");
+	$outChandle->print("    e->done = e->commitBfrLen = 0;\n");
+	$outChandle->print("    e->commitBfr = NULL;\n");
+	$outChandle->print("    e->msg = $messagename;\n");
+	$thefnidx = 0;
+	#setup index for non constructor methods
+	foreach my $i (@{$methods{$class}}) {
+	  if ($i->[0] ne $class) {
+	    foreach my $j (@{$events{$class}}) {
+
+	      if (($i->[0] eq $j->[0])&& ($i->[1] eq $j->[1])) {
+		$thefnidx++;
+	      } else {
 
 	      }
+	    }
+	  }
+	  if (($i->[0] eq $method) && ($i->[1] eq $message)) {
+	    print "$class $method $message has index $thefnidx\n";
+	    last;
 	  }
 	}
-	if (($i->[0] eq $method) && ($i->[1] eq $message)) {
-	  print "$class $method $message has index $thefnidx\n";
-	  last;
-	}
-      }
-      $outChandle->print("    e->fnIdx = $thefnidx;\n");
-      $outChandle->print("    e->next = e->prev = NULL;\n");
-      $outChandle->print("    e->spawnedList = NULL;\n");
-      #$outChandle->print("    CkPrintf(\"POSE_RECV\\n\");\n");
-      $outChandle->print("    eq->InsertEvent(e);\n");
-      $outChandle->print("    if ((e->timestamp < eq->currentPtr->timestamp)\n");
-      $outChandle->print("        || (eq->currentPtr == eq->backPtr)) {\n");
-      $outChandle->print("      myStrat->ResetRBevent(e);\n");
-      $outChandle->print("    }\n");
-      $outChandle->print("      Step();\n");
-#      $outChandle->print("    else POSE_Objects[thisIndex].Step(); \n");
-      $outChandle->print("  }\n");
-      $outChandle->print("  pvt->objUpdate($messagename->timestamp, RECV);\n");
-      $outChandle->print("  srVector[$messagename->fromPE]++;\n");
-      $outChandle->print("#ifdef POSE_STATS_ON\n");
-      $outChandle->print("  if (tstat)\n");
-      $outChandle->print("    localStats->SwitchTimer(tstat);\n");
-      $outChandle->print("  else\n");
-      $outChandle->print("    localStats->TimerStop();\n");
-      $outChandle->print("#endif\n");
-      $outChandle->print("}\n");
-    } elsif ($isnoneventmethod) {
-      my $retval =$returntype;
-      $retval =undef if $retval =~ /void/;
-      $outChandle->print("$declaration\n");
-      $outChandle->print("  ".$retval." result;\n ") if($retval);
-      $outChandle->print("  result= ") if($retval);
-      $outChandle->print("  ((state_".$class." *)objID)->".$method."(".$messagename.");\n");
-      $outChandle->print("  return result\n;") if($retval);
-      $outChandle->print("}\n");
-    } elsif ($issim && $isconstructor &&($messagename ne '')) { 
-      #create the wrapper parent class constructor
-      $outChandle->print($returntype." ") if($returntype);
-      $outChandle->print(join('',$class,"::",$method,'(',$message,' *',$messagename,"){\n"));
-      $outChandle->print("#ifdef POSE_STATS_ON\n  localStats->TimerStart(SIM_TIMER);\n#endif\n");
-      $outChandle->print("  PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n");
-      $outChandle->print("#ifdef LB_ON  \n");
-      $outChandle->print("  LBgroup *localLBG = TheLBG.ckLocalBranch();\n\n");
-      $outChandle->print("#endif  \n");
-      $outChandle->print("  myStrat = new ".$strat{$class}."();\n");
-      $outChandle->print("  $messagename->parent = this;\n");
-      $outChandle->print("  $messagename->str = myStrat;\n");
-      $outChandle->print("  POSE_TimeType _ts = $messagename->timestamp;\n");
-      $outChandle->print("#ifdef POSE_STATS_ON\n  localStats->SwitchTimer(DO_TIMER);\n#endif\n");
-      $outChandle->print("  objID = new state_$method($messagename);\n");
-      $outChandle->print("#ifdef POSE_STATS_ON\n  localStats->SwitchTimer(SIM_TIMER);\n#endif\n");
-      $outChandle->print("  myStrat->init(eq, objID, this, thisIndex);\n");
-      $outChandle->print("#ifdef POSE_STATS_ON\n  localStats->TimerStop();\n#endif\n");
-      $outChandle->print("  myPVTidx = pvt->objRegister(thisIndex, _ts, sync, this);\n");
-      $outChandle->print("#ifdef LB_ON  \n");
-      $outChandle->print("  myLBidx = localLBG->objRegister(thisIndex, sync, this);\n");
-      $outChandle->print("#endif  \n");
-      $outChandle->print("}\n");
-      #create the pup constructor
-      if (exists($puppy{$class})) {
-	$outChandle->print(join('','void ',$class,"::pup(PUP::er &p)\n"));
-	$outChandle->print("  {\n");
-	$outChandle->print("    sim::pup(p);\n");
-	$outChandle->print("    if (p.isUnpacking()) {\n");
-	$outChandle->print("      myStrat = new ".$strat{$class}.";\n");
-	$outChandle->print("      objID = new state_$class(this, myStrat);\n");
-	$outChandle->print("      myStrat->init(eq, objID, this, thisIndex);\n");
+	$outChandle->print("    e->fnIdx = $thefnidx;\n");
+	$outChandle->print("    e->next = e->prev = NULL;\n");
+	$outChandle->print("    e->spawnedList = NULL;\n");
+	#$outChandle->print("    CkPrintf(\"POSE_RECV\\n\");\n");
+	$outChandle->print("    eq->InsertEvent(e);\n");
+	$outChandle->print("    if ((e->timestamp < eq->currentPtr->timestamp)\n");
+	$outChandle->print("        || (eq->currentPtr == eq->backPtr)) {\n");
+	$outChandle->print("      myStrat->ResetRBevent(e);\n");
 	$outChandle->print("    }\n");
-	$outChandle->print("    ((state_$class *)objID)->pup(p);\n");
-	if ($rep{$class} eq "chpt") {
-	  $outChandle->print("    Event *ev = eq->front()->next;\n");
-	  $outChandle->print("    int checkpointed;\n\n");
-	  $outChandle->print("    while (ev != eq->back()) {\n");
-	  $outChandle->print("      if (p.isUnpacking()) {\n");
-	  $outChandle->print("        p(checkpointed);\n");
-	  $outChandle->print("        if (checkpointed) {\n");
-	  $outChandle->print("          ev->cpData = new state_$class(this, myStrat);\n");
-	  $outChandle->print("          ((state_$class *)ev->cpData)->cpPup(p);\n");
-	  $outChandle->print("        }\n");
-	  $outChandle->print("        else ev->cpData = NULL;\n");
-	  $outChandle->print("      }\n");
-	  $outChandle->print("      else {\n");
-	  $outChandle->print("        if (ev->cpData) {\n");
-	  $outChandle->print("          checkpointed = 1;\n");
-	  $outChandle->print("          p(checkpointed);\n");
-	  $outChandle->print("          ((state_$class *)ev->cpData)->cpPup(p);\n");
-	  $outChandle->print("        }\n");
-	  $outChandle->print("        else {\n");
-	  $outChandle->print("          checkpointed = 0;\n");
-	  $outChandle->print("          p(checkpointed);\n");
-	  $outChandle->print("        }\n");
-	  $outChandle->print("      } \n");
-	  $outChandle->print("     ev=ev->next; \n");
-	  $outChandle->print("    }\n");
-
-	}
+	$outChandle->print("      Step();\n");
+	#      $outChandle->print("    else POSE_Objects[thisIndex].Step(); \n");
 	$outChandle->print("  }\n");
+	$outChandle->print("  pvt->objUpdate($messagename->timestamp, RECV);\n");
+	$outChandle->print("  srVector[$messagename->fromPE]++;\n");
+	$outChandle->print("#ifdef POSE_STATS_ON\n");
+	$outChandle->print("  if (tstat)\n");
+	$outChandle->print("    localStats->SwitchTimer(tstat);\n");
+	$outChandle->print("  else\n");
+	$outChandle->print("    localStats->TimerStop();\n");
+	$outChandle->print("#endif\n");
+	$outChandle->print("}\n");
+      } elsif ($isnoneventmethod) {
+	my $retval =$returntype;
+	$retval =undef if $retval =~ /void/;
+	$outChandle->print("$declaration\n");
+	$outChandle->print("  ".$retval." result;\n ") if($retval);
+	$outChandle->print("  result= ") if($retval);
+	$outChandle->print("  ((state_".$class." *)objID)->".$method."(".$messagename.");\n");
+	$outChandle->print("  return result\n;") if($retval);
+	$outChandle->print("}\n");
+      } elsif ($issim && $isconstructor &&($messagename ne '')) { 
+	#create the wrapper parent class constructor
+	$outChandle->print($returntype." ") if($returntype);
+	$outChandle->print(join('',$class,"::",$method,'(',$message,' *',$messagename,"){\n"));
+	$outChandle->print("#ifdef POSE_STATS_ON\n  localStats->TimerStart(SIM_TIMER);\n#endif\n");
+	$outChandle->print("  PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n");
+	$outChandle->print("#ifdef LB_ON  \n");
+	$outChandle->print("  LBgroup *localLBG = TheLBG.ckLocalBranch();\n\n");
+	$outChandle->print("#endif  \n");
+	$outChandle->print("  myStrat = new ".$strat{$class}."();\n");
+	$outChandle->print("  $messagename->parent = this;\n");
+	$outChandle->print("  $messagename->str = myStrat;\n");
+	$outChandle->print("  POSE_TimeType _ts = $messagename->timestamp;\n");
+	$outChandle->print("#ifdef POSE_STATS_ON\n  localStats->SwitchTimer(DO_TIMER);\n#endif\n");
+	$outChandle->print("  objID = new state_$method($messagename);\n");
+	$outChandle->print("#ifdef POSE_STATS_ON\n  localStats->SwitchTimer(SIM_TIMER);\n#endif\n");
+	$outChandle->print("  myStrat->init(eq, objID, this, thisIndex);\n");
+	$outChandle->print("#ifdef POSE_STATS_ON\n  localStats->TimerStop();\n#endif\n");
+	$outChandle->print("  myPVTidx = pvt->objRegister(thisIndex, _ts, sync, this);\n");
+	$outChandle->print("#ifdef LB_ON  \n");
+	$outChandle->print("  myLBidx = localLBG->objRegister(thisIndex, sync, this);\n");
+	$outChandle->print("#endif  \n");
+	$outChandle->print("}\n");
+	#create the pup constructor
+	if (exists($puppy{$class})) {
+	  $outChandle->print(join('','void ',$class,"::pup(PUP::er &p)\n"));
+	  $outChandle->print("  {\n");
+	  $outChandle->print("    sim::pup(p);\n");
+	  $outChandle->print("    if (p.isUnpacking()) {\n");
+	  $outChandle->print("      myStrat = new ".$strat{$class}.";\n");
+	  $outChandle->print("      objID = new state_$class(this, myStrat);\n");
+	  $outChandle->print("      myStrat->init(eq, objID, this, thisIndex);\n");
+	  $outChandle->print("    }\n");
+	  $outChandle->print("    ((state_$class *)objID)->pup(p);\n");
+	  if ($rep{$class} eq "chpt") {
+	    $outChandle->print("    Event *ev = eq->front()->next;\n");
+	    $outChandle->print("    int checkpointed;\n\n");
+	    $outChandle->print("    while (ev != eq->back()) {\n");
+	    $outChandle->print("      if (p.isUnpacking()) {\n");
+	    $outChandle->print("        p(checkpointed);\n");
+	    $outChandle->print("        if (checkpointed) {\n");
+	    $outChandle->print("          ev->cpData = new state_$class(this, myStrat);\n");
+	    $outChandle->print("          ((state_$class *)ev->cpData)->cpPup(p);\n");
+	    $outChandle->print("        }\n");
+	    $outChandle->print("        else ev->cpData = NULL;\n");
+	    $outChandle->print("      }\n");
+	    $outChandle->print("      else {\n");
+	    $outChandle->print("        if (ev->cpData) {\n");
+	    $outChandle->print("          checkpointed = 1;\n");
+	    $outChandle->print("          p(checkpointed);\n");
+	    $outChandle->print("          ((state_$class *)ev->cpData)->cpPup(p);\n");
+	    $outChandle->print("        }\n");
+	    $outChandle->print("        else {\n");
+	    $outChandle->print("          checkpointed = 0;\n");
+	    $outChandle->print("          p(checkpointed);\n");
+	    $outChandle->print("        }\n");
+	    $outChandle->print("      } \n");
+	    $outChandle->print("     ev=ev->next; \n");
+	    $outChandle->print("    }\n");
+
+	  }
+	  $outChandle->print("  }\n");
+	}
+      } else {			#non constructor
       }
-    } else {			#non constructor
-    }
-    if ($closeblock{$inChandle}==1) { #its a one liner
-      print "oneliner for  $class $method sim $issim\n";
+      if ($closeblock{$inChandle}==1) { #its a one liner
+	print "oneliner for  $class $method sim $issim\n";
+	$declaration =~ s/(\b$class\b)/state_$1/gm      if($issim);
+	if (($method eq 'pup') &&(exists($puppy{$class})) && !exists($cppuppy{$class}) && ($rep{$class} eq "chpt")) {
+	  my $cpdec=$declaration;
+	  $cpdec =~ s/:pup/:cpPup/gm;
+	  $outChandle->print($cpdec."\n");
+	}
+	$outChandle->print($declaration."\n");
+	$inbody=0;
+      }
+      #	print "done open on $thisline :level".$blocklevel{$inChandle}." open:".$openblock{$inChandle}." close:".$closeblock{$inChandle}."\n";
+    } elsif (($blocklevel{$inChandle}==0) && ($closeblock{$inChandle}==1)) { #got the whole thing
+      #handle verbatim and translation copying of block
+      #if rep is chpt and the $puppy{$class} hash has no elements make the cpPup copy
+      #      print "on close class is $class, method is $method issim = $issim iseventmethod = $iseventmethod \n";
+      #	print "close  for $class $method \n";
       $declaration =~ s/(\b$class\b)/state_$1/gm      if($issim);
-      if (($method eq 'pup') &&(exists($puppy{$class})) && !exists($cppuppy{$class}) && ($rep{$class} eq "chpt")) {
+
+      if (($method eq 'pup') &&(exists($puppy{$class}))  && !exists($cppuppy{$class}) && ($rep{$class} eq "chpt")) {
 	my $cpdec=$declaration;
 	$cpdec =~ s/:pup/:cpPup/gm;
 	$outChandle->print($cpdec."\n");
+	foreach (@body) {
+	  if ($_ =~ /(chpt<state[^>]+>)/) { #translate to rep
+	    $outChandle->print($`."rep".$'."\n");
+	  } else {
+	    $outChandle->print($_."\n");
+	  }
+	}
       }
       $outChandle->print($declaration."\n");
+      $outChandle->print("init($messagename);\n") if(length($messagename) && ($issim && $isconstructor));
+      while ($_ =shift @body) {
+	s/\bthishandle\b/thisIndex/gm;
+	$outChandle->print($_."\n");
+      }
       $inbody=0;
-    }
-    #	print "done open on $thisline :level".$blocklevel{$inChandle}." open:".$openblock{$inChandle}." close:".$closeblock{$inChandle}."\n";
-  } elsif (($blocklevel{$inChandle}==0) && ($closeblock{$inChandle}==1)) { #got the whole thing
-    #handle verbatim and translation copying of block
-    #if rep is chpt and the $puppy{$class} hash has no elements make the cpPup copy
-    #      print "on close class is $class, method is $method issim = $issim iseventmethod = $iseventmethod \n";
-    #	print "close  for $class $method \n";
-    $declaration =~ s/(\b$class\b)/state_$1/gm      if($issim);
-
-    if (($method eq 'pup') &&(exists($puppy{$class}))  && !exists($cppuppy{$class}) && ($rep{$class} eq "chpt")) {
-      my $cpdec=$declaration;
-      $cpdec =~ s/:pup/:cpPup/gm;
-      $outChandle->print($cpdec."\n");
-      foreach (@body) {
-	if ($_ =~ /(chpt<state[^>]+>)/) { #translate to rep
-	  $outChandle->print($`."rep".$'."\n");
-	} else {
-	  $outChandle->print($_."\n");
-	}
-      }
-    }
-    $outChandle->print($declaration."\n");
-    $outChandle->print("init($messagename);\n") if(length($messagename) && ($issim && $isconstructor));
-    while ($_ =shift @body) {
-      s/\bthishandle\b/thisIndex/gm;
-      $outChandle->print($_."\n");
-    }
-    $inbody=0;
-  } elsif (!$inbody) {		#regular line
-#    print "regular line $thisline at $inC isweird \n";
-    $outChandle->print($lastline{$inChandle}."\n");
-  } else {
-  }
-}
-$outChandle->print("\n");
-$inChandle->close;
-
-#generate ResolveFns 
-my ($key,$count,$first,@array);
-foreach $key (keys %methods) {
-  print "key is $key\n";
-  if ($strat{$key} ne "none") {
-    my $count = 1;
-    my $first = 1;
-    my $ifopen=0;
-    @array = @{$methods{$key}};
-    foreach my $i (@array) {
-      $found = 0;
-      foreach my $j (@{$events{$key}}) {
-	if (($j->[0] eq $i->[0])&& ($i->[1]==$j->[1])){
-	  $found = 1;
-	}
-      }
-      if ($found && ($i->[0] ne $key)) {
-	if ($ifopen ==0) {
-	  $outChandle->print("void $key\:\:ResolveFn(int fnIdx, void *msg)\n{\n");
-	  $outChandle->print("  if (fnIdx >0){\n");
-	  $outChandle->print("    if (sync == OPTIMISTIC)\n");
-	  $outChandle->print("      ((state_$key *) objID)->checkpoint((state_$key *) objID);\n");
-	  $outChandle->print("    ((state_$key *) objID)->update(((eventMsg *)msg)->timestamp, ((eventMsg *)msg)->rst);\n");
-	  $outChandle->print("  }\n");
-
-
-	  $outChandle->print("  if (fnIdx == ");
-	  $ifopen=1;
-	} elsif ($first == 0) {
-	  $outChandle->print("  else if (fnIdx == ");
-	}
-	$outChandle->print("$count) {\n");
-	$first = 0;
-$outChandle->print("#ifdef POSE_STATS_ON\n");
-$outChandle->print("    if (!CpvAccess(stateRecovery)) {localStats->Do();\n");
-$outChandle->print("#ifdef POSE_DOP_ON\n");
-$outChandle->print("    st = CmiWallTimer();\n");
-$outChandle->print("#endif\n");
-$outChandle->print("    localStats->SwitchTimer(DO_TIMER);}\n");
-$outChandle->print("#endif\n");
-
-	$outChandle->print("    ((state_$key *) objID)->$i->[0](($i->[1] *)msg);\n");
-$outChandle->print("#ifdef POSE_STATS_ON\n");
-$outChandle->print("    if (!CpvAccess(stateRecovery)) {\n");
-$outChandle->print("#ifdef POSE_DOP_ON\n");
-$outChandle->print("    et = CmiWallTimer();\n");
-$outChandle->print("    eq->currentPtr->ert = eq->currentPtr->srt + (et-st);\n");
-$outChandle->print("    ((state_$key *) objID)->ort = eq->currentPtr->ert+0.000001;\n");
-$outChandle->print("    eq->currentPtr->evt = ((state_$key *) objID)->OVT();\n");
-$outChandle->print("#endif\n");
-$outChandle->print("    localStats->SwitchTimer(SIM_TIMER);}\n");
-$outChandle->print("#endif\n");
-
-	$outChandle->print("  }\n");
-	$outChandle->print("  else if (fnIdx == -$count) {\n");
-	$outChandle->print("    ((state_$key *) objID)->$i->[0]_anti(($i->[1] *)msg);\n");
-	$outChandle->print("  }\n");
-	$count++;
-      }
-    }
-    if ($ifopen) {
-      $outChandle->print("}\n\n");
+    } elsif (!$inbody) {	#regular line
+      #    print "regular line $thisline at $incfile isweird \n";
+      $outChandle->print($lastline{$inChandle}."\n");
+    } else {
     }
   }
-}
+  $outChandle->print("\n");
+  $inChandle->close;
+  if ($incfile eq $inC) {
+    #generate ResolveFns 
+    my ($key,$count,$first,@array);
+    foreach $key (keys %methods) {
+      print "key is $key\n";
+      if ($strat{$key} ne "none") {
+	my $count = 1;
+	my $first = 1;
+	my $ifopen=0;
+	@array = @{$methods{$key}};
+	foreach my $i (@array) {
+	  $found = 0;
+	  foreach my $j (@{$events{$key}}) {
+	    if (($j->[0] eq $i->[0])&& ($i->[1]==$j->[1])) {
+	      $found = 1;
+	    }
+	  }
+	  if ($found && ($i->[0] ne $key)) {
+	    if ($ifopen ==0) {
+	      $outChandle->print("void $key\:\:ResolveFn(int fnIdx, void *msg)\n{\n");
+	      $outChandle->print("  if (fnIdx >0){\n");
+	      $outChandle->print("    if (sync == OPTIMISTIC)\n");
+	      $outChandle->print("      ((state_$key *) objID)->checkpoint((state_$key *) objID);\n");
+	      $outChandle->print("    ((state_$key *) objID)->update(((eventMsg *)msg)->timestamp, ((eventMsg *)msg)->rst);\n");
+	      $outChandle->print("  }\n");
 
-foreach $key (keys %methods) {
-  if ($strat{$key} ne "none") {
-    my $count = 1;
-    my $first = 1;
-    my $ifopen =0;
-    @array = @{$methods{$key}};
-    foreach my $i (@array) {
-      $found = 0;
-      foreach my $j (@{$events{$key}}) {
-	if (($j->[0] eq $i->[0]) &&($i->[1]==$j->[1])) {
-	  $found = 1;
-	}
-      }
-      if ($found && ($i->[0] ne $key)) {
-	if ($ifopen == 0) {
-	  $outChandle->print("void $key\:\:ResolveCommitFn(int fnIdx, void *msg)\n{\n");
 
-	  $outChandle->print("  if (fnIdx == ");
-	  $ifopen=1;
-	} elsif ($first == 0) {
-	  $outChandle->print("  else if (fnIdx == ");
+	      $outChandle->print("  if (fnIdx == ");
+	      $ifopen=1;
+	    } elsif ($first == 0) {
+	      $outChandle->print("  else if (fnIdx == ");
+	    }
+	    $outChandle->print("$count) {\n");
+	    $first = 0;
+	    $outChandle->print("#ifdef POSE_STATS_ON\n");
+	    $outChandle->print("    if (!CpvAccess(stateRecovery)) {localStats->Do();\n");
+	    $outChandle->print("#ifdef POSE_DOP_ON\n");
+	    $outChandle->print("    st = CmiWallTimer();\n");
+	    $outChandle->print("#endif\n");
+	    $outChandle->print("    localStats->SwitchTimer(DO_TIMER);}\n");
+	    $outChandle->print("#endif\n");
+
+	    $outChandle->print("    ((state_$key *) objID)->$i->[0](($i->[1] *)msg);\n");
+	    $outChandle->print("#ifdef POSE_STATS_ON\n");
+	    $outChandle->print("    if (!CpvAccess(stateRecovery)) {\n");
+	    $outChandle->print("#ifdef POSE_DOP_ON\n");
+	    $outChandle->print("    et = CmiWallTimer();\n");
+	    $outChandle->print("    eq->currentPtr->ert = eq->currentPtr->srt + (et-st);\n");
+	    $outChandle->print("    ((state_$key *) objID)->ort = eq->currentPtr->ert+0.000001;\n");
+	    $outChandle->print("    eq->currentPtr->evt = ((state_$key *) objID)->OVT();\n");
+	    $outChandle->print("#endif\n");
+	    $outChandle->print("    localStats->SwitchTimer(SIM_TIMER);}\n");
+	    $outChandle->print("#endif\n");
+
+	    $outChandle->print("  }\n");
+	    $outChandle->print("  else if (fnIdx == -$count) {\n");
+	    $outChandle->print("    ((state_$key *) objID)->$i->[0]_anti(($i->[1] *)msg);\n");
+	    $outChandle->print("  }\n");
+	    $count++;
+	  }
 	}
-	$outChandle->print("$count) {\n");
-	$first = 0;
-	$outChandle->print("    ((state_$key *) objID)->$i->[0]_commit(($i->[1] *)msg);\n");
-	$outChandle->print("  }\n");
-	$count++;
+	if ($ifopen) {
+	  $outChandle->print("}\n\n");
+	}
       }
     }
-    if ($ifopen) {
-      $outChandle->print("}\n\n");
+
+    foreach $key (keys %methods) {
+      if ($strat{$key} ne "none") {
+	my $count = 1;
+	my $first = 1;
+	my $ifopen =0;
+	@array = @{$methods{$key}};
+	foreach my $i (@array) {
+	  $found = 0;
+	  foreach my $j (@{$events{$key}}) {
+	    if (($j->[0] eq $i->[0]) &&($i->[1]==$j->[1])) {
+	      $found = 1;
+	    }
+	  }
+	  if ($found && ($i->[0] ne $key)) {
+	    if ($ifopen == 0) {
+	      $outChandle->print("void $key\:\:ResolveCommitFn(int fnIdx, void *msg)\n{\n");
+
+	      $outChandle->print("  if (fnIdx == ");
+	      $ifopen=1;
+	    } elsif ($first == 0) {
+	      $outChandle->print("  else if (fnIdx == ");
+	    }
+	    $outChandle->print("$count) {\n");
+	    $first = 0;
+	    $outChandle->print("    ((state_$key *) objID)->$i->[0]_commit(($i->[1] *)msg);\n");
+	    $outChandle->print("  }\n");
+	    $count++;
+	  }
+	}
+	if ($ifopen) {
+	  $outChandle->print("}\n\n");
+	}
+      }
+
     }
   }
+
+  #create the inline mapsize function
+  #$outChandle->print("int MapSizeToIdx(int size)\n{\n");
+  #my $sizeline=0;
+  #$outChandle->print("    static int eventMsgSz = sizeof(eventMsg);\n"); 
+  #foreach my $i (keys %emessages) {
+  #  $outChandle->print("    static int ".$i."Sz = sizeof(".$i.");\n"); 
+  #}
+  #$outChandle->print("\n");
+  #$outChandle->print("    if (size == eventMsgSz) return ".$sizeline++.";\n");
+  #foreach my $i (keys %emessages) {
+  #  $outChandle->print("    else if (size == ".$i."Sz) return ".$sizeline++.";\n");
+  #}
+  #$outChandle->print("    return $sizeline;\n");
+  #$outChandle->print("}\n");
+  #$outChandle->close;
+
+  # END WRITE .C FILES
 }
-
-#create the inline mapsize function
-#$outChandle->print("int MapSizeToIdx(int size)\n{\n");
-#my $sizeline=0;
-#$outChandle->print("    static int eventMsgSz = sizeof(eventMsg);\n"); 
-#foreach my $i (keys %emessages) {
-#  $outChandle->print("    static int ".$i."Sz = sizeof(".$i.");\n"); 
-#}
-#$outChandle->print("\n");
-#$outChandle->print("    if (size == eventMsgSz) return ".$sizeline++.";\n");
-#foreach my $i (keys %emessages) {
-#  $outChandle->print("    else if (size == ".$i."Sz) return ".$sizeline++.";\n");
-#}
-#$outChandle->print("    return $sizeline;\n");
-#$outChandle->print("}\n");
-#$outChandle->close;
-
-# END WRITE .C FILES
-
 
 #codelines have  ; or { or */
 #we keep reading till our line meets those criteria.
