@@ -683,6 +683,7 @@ void CkReductionMgr::ArrayReductionHandler(CkReductionMsg *m){
 	finalMsgs.enq(m);
 	//CkPrintf("ArrayReduction Handler Invoked for %d \n",m->redNo);
 	adj(m->redNo).mainRecvd = 1;
+	//CkPrintf("~~~~~~~~~~~~~ ArrayReductionHandler Callback called for %d at %.6f %d\n",completedRedNo,CmiWallTimer());
 	endArrayReduction();
 }
 
@@ -776,7 +777,7 @@ void CkReductionMgr :: endArrayReduction(){
 	    CkAbort("No reduction client!\n"
 		    "You must register a client with either SetReductionClient or during contribute.\n");
 	completedRedNo++;
-//        CkPrintf("[%d,%d]------------END OF ARRAY REDUCTION %d at %.6f\n",CkMyNode(),CkMyPe(),completedRedNo,CkWallTimer());
+        //CkPrintf("[%d,%d]------------END OF GROUP REDUCTION %d at %.6f\n",CkMyNode(),CkMyPe(),completedRedNo,CkWallTimer());
 	for (i=1;i<adjVec.length();i++)
     		adjVec[i-1]=adjVec[i];
 	adjVec.length()--;
@@ -1232,15 +1233,17 @@ void CkNodeReductionMgr::RecvMsg(CkReductionMsg *m)
 #ifndef CMK_CPV_IS_SMP
 #if CMK_IMMEDIATE_MSG
 	if(interrupt == 1){
+		 //CkPrintf("$$$$$$$$$How did i wake up in the middle of someone else's entry method ?\n");
+		/*CpvAccess(_qd)->process(-1);
 		CmiDelayImmediate();
-		return;
+		return;*/
 	}
 #endif	
 #endif
 	 
   if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
     DEBR((AA"Recv'd remote contribution %d for #%d at %d\n"AB,nRemote,m->redNo,this));
- //  CkPrintf("[%d,%d] Recv'd REMOTE contribution for %d at %.6f\n",CkMyNode(),CkMyPe(),m->redNo,CkWallTimer());
+   //CkPrintf("[%d,%d] Recv'd REMOTE contribution for %d at %.6f\n",CkMyNode(),CkMyPe(),m->redNo,CkWallTimer());
 
     
     
@@ -1271,7 +1274,7 @@ void CkNodeReductionMgr::RecvMsg(CkReductionMsg *m)
     interrupt = 0;
   }
   else{
-    //CkPrintf("BIG Problem Present %d Mesg RedNo %d \n",redNo,m->redNo);
+    CkPrintf("BIG Problem Present %d Mesg RedNo %d \n",redNo,m->redNo);
    CkAbort("Recv'd late remote contribution!\n");
    }
 
@@ -1384,7 +1387,7 @@ void CkNodeReductionMgr::finishReduction(void)
   if (hasParent())
   {//Pass data up tree to parent
     DEBR((AA"Passing reduced data up to parent node %d. \n"AB,treeParent()));
-    //CkPrintf("[%d,%d] Passing data up to parentNode %d at %.6f \n",CkMyNode(),CkMyPe(),treeParent(),CkWallTimer());
+    	//CkPrintf("[%d,%d] Passing data up to parentNode %d at %.6f for redNo %d\n",CkMyNode(),CkMyPe(),treeParent(),CkWallTimer(),redNo);
     thisProxy[treeParent()].RecvMsg(result);
 
   }
@@ -1393,7 +1396,7 @@ void CkNodeReductionMgr::finishReduction(void)
 	  /** if the reduction is finished and I am the root of the reduction tree 
 	  then call the reductionhandler and other stuff ***/
     DEBR((AA"Passing result to client function\n"AB));
- //   CkPrintf("[%d,%d]------------------- END OF REDUCTION %d with %d remote contributions passed to client function at %.6f\n",CkMyNode(),CkMyPe(),redNo,nRemote,CkWallTimer());
+    //CkPrintf("[%d,%d]------------------- END OF REDUCTION %d with %d remote contributions passed to client function at %.6f\n",CkMyNode(),CkMyPe(),redNo,nRemote,CkWallTimer());
     if (!result->callback.isInvalid())
 	    result->callback.send(result);
     else if (storedCallback!=NULL)
@@ -1502,11 +1505,11 @@ int CkNodeReductionMgr::treeRoot(void)
 {
   return 0;
 }
-CmiBool CkNodeReductionMgr::hasParent(void) //Root PE
+CmiBool CkNodeReductionMgr::hasParent(void) //Root Node
 {
   return (CmiBool)(CkMyNode()!=treeRoot());
 }
-int CkNodeReductionMgr::treeParent(void) //My parent PE
+int CkNodeReductionMgr::treeParent(void) //My parent Node
 {
 #ifdef BINOMIAL_TREE
 	return parent;
@@ -1515,7 +1518,7 @@ int CkNodeReductionMgr::treeParent(void) //My parent PE
 #endif
 }
 
-int CkNodeReductionMgr::firstKid(void) //My first child PE
+int CkNodeReductionMgr::firstKid(void) //My first child Node
 {
   return CkMyNode()*TREE_WID+1;
 }

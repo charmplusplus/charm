@@ -38,8 +38,9 @@ module CkReduction {
 	//entry  void ReductionStarting(CkReductionNumberMsg *);
 
 	//Sent up the reduction tree with reduced data
-	entry [immediate] void RecvMsg(CkReductionMsg *);
-	//entry  void RecvMsg(CkReductionMsg *);
+	//entry [immediate] void RecvMsg(CkReductionMsg *);
+	 entry void RecvMsg(CkReductionMsg *);
+	
   };
 
 };
