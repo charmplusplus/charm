@@ -37,6 +37,8 @@ sm: converse libsm.a
 
 pvm: converse libpvmc.a
 
+AMR: charm++ LIBS
+
 FEM: FEMC FEMF
 
 FEMC: charm++ LIBS
