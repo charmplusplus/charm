@@ -66,14 +66,11 @@ $ppn
 # This determines the wall-clock time limit (here 5 minutes):
 #PBS -l walltime=5:00
 
-# Set memory limit to 500 Mbytes
-#PBS -l mem=500mb
-
 # Queue name (see info about other queues in web documentation)
 #PBS -q $PBS_QUEUE
 #
 # Export all my environment variables to the job
-#PBS -V
+##PBS -V
 #
 # Charge job to project abc (recommended for users with multiple projects)
 # [If project is invalid, a valid project will be automatically selected]
@@ -92,6 +89,7 @@ cd $indir
 # This is the actual command to run the job:
 cat \$PBS_NODEFILE
 $mpirun -np $pes $extra $args
+echo STATUS: $?
 EOF
         chmod 755 $script
 	while [ -z "$jobid" ]
@@ -109,10 +107,11 @@ EOF
                         rm tmp.$$
                         if `grep 'End of program' $output > /dev/null 2>/dev/null`
 			then
+				rm $script
                         	exec cat $output
 			else
 				cat $output
-				rm $output 
+				rm -f $output 
 				exit 1
 			fi
                 fi
