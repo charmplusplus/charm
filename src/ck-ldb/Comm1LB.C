@@ -10,6 +10,17 @@
 */
 /*@{*/
 
+/*
+  status:
+  * knows nonmigratable attribe
+  * doesnot support processor avail bitvector
+
+  rewritten by Gengbin Zheng to use the new load balancer database and comm hash table;
+  modified to recognize the nonmigratable attrib of an object 
+  by Gengbin Zheng, 7/28/2003
+
+*/
+
 #include <charm++.h>
 #include <stdio.h>
 
@@ -49,22 +60,6 @@ CmiBool Comm1LB::QueryBalanceNow(int _step)
 {
   //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
   return CmiTrue;
-}
-
-int Comm1LB::search(const LDObjKey &objKey) {
-  const LDObjid &oid = objKey.objID();
-  const LDOMid &mid = objKey.omID();
-  int id, hash;
-  
-  hash = (oid.id[0] | oid.id[1]) % nobj;
-
-  for(id=0;id<nobj;id++){
-    if((translate[htable[(id+hash)%nobj]].objID() == oid)
-       &&(translate[htable[(id+hash)%nobj]].omID().id == mid.id))
-      return htable[(id + hash)%nobj];
-  }
-  //  CkPrintf("not found \n");
-  return -1;
 }
 
 void Comm1LB::alloc(int pe , int id, double load, int nmsg, int nbyte){
@@ -141,25 +136,7 @@ void Comm1LB::add_graph(int x, int y, int data, int nmsg){
   ptr->next = temp;
 }
   
-void Comm1LB::make_hash(){
-  int i, hash;
-  LDObjid oid;
-  
-  htable = new int[nobj];
-  for(i=0;i<nobj;i++)
-    htable[i] = -1;
-  
-  for(i=0;i<nobj;i++){
-    oid = translate[i].objID();
-    hash = ((oid.id[0])|(oid.id[1])) % nobj;
-    while(htable[hash] != -1)
-      hash = (hash+1)%nobj;
-    
-    htable[hash] = i;
-  }
-
-}
-    
+ 
 void init(alloc_struct **a, graph * object_graph, int l, int b){
   int i,j;
 
@@ -182,59 +159,16 @@ LBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
   int pe,obj,com;
   double mean_load =0.0;
   ObjectRecord *x;
+  CkVec<MigrateInfo*> migrateInfo;
 
   //  CkPrintf("[%d] Comm1LB strategy\n",CkMyPe());
 
-  CkVec<MigrateInfo*> migrateInfo;
+  nobj = stats->n_objs;
+  npe = count;
+
+  stats->makeCommHash();
 
   alloc_array = new alloc_struct *[count+1];
-
-  nobj = stats->n_objs;
-  //  CkPrintf("OBJ: Before \n");
-
-  ObjectHeap maxh(nobj+1);
-  for(obj=0; obj < nobj; obj++) {
-      x = new ObjectRecord;
-      x->id = obj;
-      x->pos = obj;
-      x->load = stats->objData[obj].wallTime;
-      x->pe = stats->from_proc[obj];
-      maxh.insert(x);
-  }
-  for(pe=0; pe < count; pe++) {
-     mean_load += stats->procs[pe].total_walltime;
-  }
-  mean_load /= count;
-/*
-  for(pe=0; pe < count; pe++) {
-    load_pe = 0.0;
-    for(obj=0; obj < stats[pe].n_objs; obj++) {
-      load_pe += stats->objData[obj].data.wallTime;
-      nobj++;
-      x = new ObjectRecord;
-      x->id = nobj -1;
-      x->pos = obj;
-      x->load = stats->objData[obj].data.wallTime;
-      x->pe = pe;
-      maxh.insert(x);
-    }
-    mean_load += load_pe/count;
-//    CkPrintf("LOAD on %d = %5.3lf\n",pe,load_pe);
-  }
-*/
-
-  npe = count;
-  translate = new LDObjKey[nobj];
-  int objno=0;
-
-  for(obj=0; obj < stats->n_objs; obj++){ 
-      LDObjData &oData = stats->objData[obj];
-      translate[objno].omID() = oData.omID();
-      translate[objno].objID() = oData.objID();
-      objno++;
-  }
-
-  make_hash();
 
   object_graph = new graph[nobj];
   
@@ -243,13 +177,29 @@ LBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
 
   init(alloc_array,object_graph,npe,nobj);
 
+  ObjectHeap maxh(nobj+1);
+  for(obj=0; obj < nobj; obj++) {
+      LDObjData &objData = stats->objData[obj];
+      int onpe = stats->from_proc[obj];
+      x = new ObjectRecord;
+      x->id = obj;
+      x->pos = obj;
+      x->load = objData.wallTime;
+      x->pe = onpe;
+      maxh.insert(x);
+  }
+  for(pe=0; pe < count; pe++) {
+     mean_load += stats->procs[pe].total_walltime;
+  }
+  mean_load /= count;
+
   int xcoord=0,ycoord=0;
 
   for(com =0; com< stats->n_comm;com++) {
       LDCommData &commData = stats->commData[com];
       if((!commData.from_proc())&&(commData.recv_type()==LD_OBJ_MSG)){
-	xcoord = search(commData.sender); 
-	ycoord = search(commData.receiver.get_destObj());
+	xcoord = stats->getHash(commData.sender); 
+	ycoord = stats->getHash(commData.receiver.get_destObj());
 	if((xcoord == -1)||(ycoord == -1))
 	  if (lb_ignoreBgLoad) continue;
 	  else CkAbort("Error in search\n");
@@ -284,6 +234,16 @@ LBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
     maxid = x->id;
     spe = x->pe;
     mpos = x->pos;
+    LDObjData &objData = stats->objData[mpos];
+
+    if (!objData.migratable) {
+      if (!stats->procs[spe].available) {
+	  CmiAbort("Load balancer is not be able to move a nonmigratable object out of an unavailable processor.\n");
+      }
+      temp_cost = compute_cost(maxid,spe,id,out_msg,out_byte);
+      alloc(spe,maxid,x->load,out_msg,out_byte);
+      continue;
+    }
 
     for(pe =0; pe < count; pe++)
       if((alloc_array[pe][nobj].load <= mean_load)||(id >= UPPER_FACTOR*nobj))

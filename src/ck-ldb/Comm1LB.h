@@ -34,8 +34,6 @@ public:
   int nobj,npe;
   alloc_struct ** alloc_array;
   graph * object_graph;
-  LDObjKey * translate;
-  int * htable;
   Comm1LB();
   Comm1LB(CkMigrateMessage *m):CentralLB(m) {}
 private:
@@ -43,9 +41,7 @@ private:
   LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
   void alloc(int pe, int id, double load, int nmsg, int nbyte);
   double compute_cost(int id, int pe, int n_alloc, int &out_msg, int &out_byte); 
-  int search(const LDObjKey &key);
   void add_graph(int x, int y, int data, int nmsg);
-  void make_hash();
 };
 
 #endif
