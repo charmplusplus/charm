@@ -86,12 +86,21 @@ void printIndex(const CkArrayIndex &idx,char *dest) {
 }
 
 static double chkptStartTimer;
+static void checkpointOne(const char* dirname, CkCallback& cb);
 
+// broadcast
 void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
+	chkptStartTimer = CmiWallTimer();
+	// every body make dir in case it is local directory
+	CmiMkdir(dirname);
+
+	if (CkMyPe() == 0) {
+          checkpointOne(dirname, cb);
+ 	}
+
 	char fileName[1024];
 	// save groups into Groups.dat
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
-	CmiMkdir(dirname);
 	sprintf(fileName,"%s/Groups_%d.dat",dirname,CkMyPe());
 	FILE* fGroups = fopen(fileName,"wb");
 	if(!fGroups) CkAbort("Failed to create checkpoint file for group table!");
@@ -118,6 +127,8 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	PUP::toDisk  p(datFile);
 	CkPupArrayElementsData(p);
 	fclose(datFile);
+
+	system("sync");
 
 	restartCB = cb;
 	DEBCHK("[%d]restartCB installed\n",CkMyPe());
@@ -357,12 +368,11 @@ void CkPupProcessorData(PUP::er &p)
     CkPupArrayElementsData(p);
 }
 
-void CkStartCheckpoint(char* dirname,const CkCallback& cb){
+// called only on pe 0
+static void checkpointOne(const char* dirname, CkCallback& cb){
+	CmiAssert(CkMyPe()==0);
 	int i;
 	char filename[1024];
-	chkptStartTimer = CmiWallTimer();
-	CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
-	CmiMkdir(dirname);
 	
 	// save readonlys, and callback BTW
 	sprintf(filename,"%s/RO.dat",dirname);
@@ -376,7 +386,7 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	fclose(fRO);
 
 	// save mainchares into MainChares.dat
-	if(CkMyPe()==0){
+	{
 		sprintf(filename,"%s/MainChares.dat",dirname);
 		FILE* fMain = fopen(filename,"wb");
 		if(!fMain) CkAbort("Failed to open checkpoint file for mainchare data!");
@@ -384,7 +394,12 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 		CkPupMainChareData(pMain);
 		fclose(fMain);
 	}
+}
 
+void CkStartCheckpoint(char* dirname,const CkCallback& cb)
+{
+	CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
+	
 	// hand over to checkpoint managers for per-processor checkpointing
 	CProxy_CkCheckpointMgr(_sysChkptMgr).Checkpoint((char *)dirname, cb);
 }
