@@ -94,12 +94,12 @@ public:
 
     LDStats(): n_objs(0), n_comm(0) { objData = NULL; commData = NULL; 
 		from_proc = NULL; to_proc = NULL; objHash = NULL; }
+    void assign(int oid, int pe) { CmiAssert(procs[pe].available); to_proc[oid] = pe; }
       // build hash table
     void makeCommHash();
     void deleteCommHash();
     int getHash(const LDObjKey &);
     int getHash(const LDObjid &oid, const LDOMid &mid);
-    void assign(int oid, int pe) { to_proc[oid] = pe; }
     void clear() {
       n_objs = n_comm = 0;
       delete [] objData;
@@ -132,11 +132,9 @@ protected:
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
 
   void simulation();
-  void FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, LBSimulation* simResults);
-#if 0
-  void RemoveNonMigratable(LDStats* statsDataList, int count);
-#endif
-  void buildStats();
+  void findSimResults(LDStats* stats, int count, 
+                      LBMigrateMsg* msg, LBSimulation* simResults);
+//  void removeNonMigratable(LDStats* statsDataList, int count);
 
 private:  
 
@@ -148,6 +146,8 @@ private:
   int migrates_completed;
   int migrates_expected;
   double start_lb_time;
+
+  void buildStats();
 
 public:
   int useMem();

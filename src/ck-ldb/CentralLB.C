@@ -25,7 +25,8 @@ int load_balancer_created;
 #if CMK_LBDB_ON
 
 static void getPredictedLoad(CentralLB::LDStats* stats, int count, 
-                          LBMigrateMsg *, double *peLoads, double &, double &);
+		             LBMigrateMsg *, double *peLoads, 
+			     double &, double &, int considerComm);
 
 void CreateCentralLB()
 {
@@ -199,6 +200,7 @@ void CentralLB::buildStats()
 	 statsData->commData[ncom] = msg->commData[i];
 	 ncom++;
        }
+       // free the memory
        delete msg;
        statsMsgsList[pe]=0;
     }
@@ -272,8 +274,12 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 	migrateMsg->avail_vector[proc] = avail_vector[proc];
     migrateMsg->next_lb = new_ld_balancer;
 
-//  very time consuming, only needed for step load balancing
-//    getPredictedLoad(statsDataList, clients, migrateMsg, migrateMsg->expectedLoad);
+//  calculate predicted load
+//  very time consuming though, so only happen when debugging is on
+    if (lb_debug) {
+      double minObjLoad, maxObjLoad;
+      getPredictedLoad(statsData, clients, migrateMsg, migrateMsg->expectedLoad, minObjLoad, maxObjLoad, 1);
+    }
 
 //  CkPrintf("calling recv migration\n");
     thisProxy.ReceiveMigration(migrateMsg);
@@ -304,7 +310,7 @@ static int isMigratable(LDObjData **objData, int *len, int count, const LDCommDa
 
 #if 0
 // remove in the LDStats those objects that are non migratable
-void CentralLB::RemoveNonMigratable(LDStats* stats, int count)
+void CentralLB::removeNonMigratable(LDStats* stats, int count)
 {
   int pe;
   LDObjData **nonmig = new LDObjData*[count];
@@ -402,7 +408,7 @@ void CentralLB::MigrationDone(int balancing)
       CkPrintf("[%s] Load balancing step %d finished at %f\n",
   	        lbName(), step(),end_lb_time);
       double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
-      CkPrintf("[%s] duration %f memUsage: LBManager:%dKB CentralLB:%dKB\n", 
+      CkPrintf("[%s] duration %fs memUsage: LBManager:%dKB CentralLB:%dKB\n", 
   	        lbName(), end_lb_time - start_lb_time,
 	        (int)lbdbMemsize, (int)(useMem()/1000));
   }
@@ -511,7 +517,7 @@ void CentralLB::simulation() {
     CmiPrintf("%s> Strategy took %fs. \n", lbname, CmiWallTimer()-startT);
 
     // now calculate the results of the load balancing simulation
-    FindSimResults(statsData, LBSimulation::simProcs, migrateMsg, &simResults);
+    findSimResults(statsData, LBSimulation::simProcs, migrateMsg, &simResults);
 
     // now we have the simulation data, so print it and exit
     CmiPrintf("Charm++> LBSim: Simulation of one load balancing step done.\n");
@@ -567,22 +573,20 @@ void CentralLB::writeStatsMsgs(const char* filename) {
   CmiPrintf("WriteStatsMsgs to %s succeed!\n", filename);
 }
 
+// calculate the predicted wallclock/cpu load for every processors
+// considering communication overhead if considerComm is true
 static void getPredictedLoad(CentralLB::LDStats* stats, int count, 
                              LBMigrateMsg *msg, double *peLoads, 
-                             double &minObjLoad, double &maxObjLoad)
+                             double &minObjLoad, double &maxObjLoad,
+			     int considerComm)
 {
-	int* msgSentCount = new int[count]; // # of messages sent by each PE
-	int* msgRecvCount = new int[count]; // # of messages received by each PE
-	int* byteSentCount = new int[count];// # of bytes sent by each PE
-	int* byteRecvCount = new int[count];// # of bytes reeived by each PE
         int i, pe;
 
-	for(i = 0; i < count; i++)
-	  msgSentCount[i] = msgRecvCount[i] = byteSentCount[i] = byteRecvCount[i] = 0;
         minObjLoad = 1.0e20;	// I suppose no object load is beyond this
 	maxObjLoad = 0.0;
 
 	stats->makeCommHash();
+
  	// update to_proc according to migration msgs
 	for(i = 0; i < msg->n_moves; i++) {
 	  MigrateInfo &mInfo = msg->moves[i];
@@ -592,9 +596,7 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count,
 	}
 
 	for(pe = 0; pe < count; pe++)
-  	{
     	  peLoads[pe] = stats->procs[pe].bg_walltime;
-        }
 
     	for(int obj = 0; obj < stats->n_objs; obj++)
     	{
@@ -606,52 +608,59 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count,
 	}
 
 	// handling of the communication overheads. 
-        for (int cidx=0; cidx < stats->n_comm; cidx++) {
-	  LDCommData& cdata = stats->commData[cidx];
-	  int senderPE, receiverPE;
-	  if(cdata.from_proc())
-	    senderPE = cdata.src_proc;
-	  else {
-	    int idx = stats->getHash(cdata.sender);
-	    CmiAssert(idx != -1);
-	    senderPE = stats->to_proc[idx];
-	    CmiAssert(senderPE != -1);
-	  }
-	  if(cdata.receiver.get_type() == LD_PROC_MSG)
-	    receiverPE = cdata.receiver.proc();
-	  else {
-	    int idx = stats->getHash(cdata.receiver.get_destObj());
-	    CmiAssert(idx != -1);
-	    receiverPE = stats->to_proc[idx];
-	    CmiAssert(receiverPE != -1);
-	  }
-	  if(senderPE != receiverPE)
-	  {
-		msgSentCount[senderPE] += cdata.messages;
+	if (considerComm) {
+	  int* msgSentCount = new int[count]; // # of messages sent by each PE
+	  int* msgRecvCount = new int[count]; // # of messages received by each PE
+	  int* byteSentCount = new int[count];// # of bytes sent by each PE
+	  int* byteRecvCount = new int[count];// # of bytes reeived by each PE
+	  for(i = 0; i < count; i++)
+	    msgSentCount[i] = msgRecvCount[i] = byteSentCount[i] = byteRecvCount[i] = 0;
+
+          for (int cidx=0; cidx < stats->n_comm; cidx++) {
+	    LDCommData& cdata = stats->commData[cidx];
+	    int senderPE, receiverPE;
+	    if (cdata.from_proc())
+	      senderPE = cdata.src_proc;
+  	    else {
+	      int idx = stats->getHash(cdata.sender);
+	      CmiAssert(idx != -1);
+	      senderPE = stats->to_proc[idx];
+	      CmiAssert(senderPE != -1);
+	    }
+	    if (cdata.receiver.get_type() == LD_PROC_MSG)
+	      receiverPE = cdata.receiver.proc();
+	    else {
+	      int idx = stats->getHash(cdata.receiver.get_destObj());
+	      CmiAssert(idx != -1);
+	      receiverPE = stats->to_proc[idx];
+	      CmiAssert(receiverPE != -1);
+	    }
+	    if(senderPE != receiverPE)
+	    {
+	  	msgSentCount[senderPE] += cdata.messages;
 		byteSentCount[senderPE] += cdata.bytes;
 
 		msgRecvCount[receiverPE] += cdata.messages;
 		byteRecvCount[receiverPE] += cdata.bytes;
+	    }
 	  }
-	}
 
-	// now for each processor, add to its load the send and receive overheads
-#if 1
-	for(i = 0; i < count; i++)
-	{
+	  // now for each processor, add to its load the send and receive overheads
+	  for(i = 0; i < count; i++)
+	  {
 		peLoads[i] += msgRecvCount[i]  * PER_MESSAGE_RECV_OVERHEAD +
-				  msgSentCount[i]  * PER_MESSAGE_SEND_OVERHEAD +
-				  byteRecvCount[i] * PER_BYTE_RECV_OVERHEAD +
-				  byteSentCount[i] * PER_BYTE_SEND_OVERHEAD;
+			      msgSentCount[i]  * PER_MESSAGE_SEND_OVERHEAD +
+			      byteRecvCount[i] * PER_BYTE_RECV_OVERHEAD +
+			      byteSentCount[i] * PER_BYTE_SEND_OVERHEAD;
+	  }
+	  delete msgRecvCount;
+	  delete msgSentCount;
+	  delete byteRecvCount;
+	  delete byteSentCount;
 	}
-#endif
-	delete msgRecvCount;
-	delete msgSentCount;
-	delete byteRecvCount;
-	delete byteSentCount;
 }
 
-void CentralLB::FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, LBSimulation* simResults)
+void CentralLB::findSimResults(LDStats* stats, int count, LBMigrateMsg* msg, LBSimulation* simResults)
 {
     CkAssert(simResults != NULL && count == simResults->numPes);
     // estimate the new loads of the processors. As a first approximation, this is the
@@ -661,7 +670,7 @@ void CentralLB::FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, LBS
     // sum of the cpu times of the objects on that processor
     double startT = CmiWallTimer();
     getPredictedLoad(stats, count, msg, simResults->peLoads, 
-		     simResults->minObjLoad, simResults->maxObjLoad);
+		     simResults->minObjLoad, simResults->maxObjLoad,1);
     CmiPrintf("getPredictedLoad finished in %fs\n", CmiWallTimer()-startT);
 }
 
@@ -675,9 +684,10 @@ inline static int ObjKey(const LDObjid &oid, const int hashSize) {
 }
 
 void CentralLB::LDStats::makeCommHash() {
-  int i;
+  // hash table is already build
   if (objHash) return;
    
+  int i;
   hashSize = n_objs*2;
   objHash = new int[hashSize];
   for(i=0;i<hashSize;i++)
@@ -699,6 +709,7 @@ void CentralLB::LDStats::deleteCommHash() {
 
 int CentralLB::LDStats::getHash(const LDObjid &oid, const LDOMid &mid)
 {
+    CmiAssert(hashSize > 0);
     int hash = ObjKey(oid, hashSize);
 
     for(int id=0;id<hashSize;id++){
