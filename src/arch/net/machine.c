@@ -128,32 +128,7 @@
  *
  * CONCURRENCY CONTROL
  *
- * Almost all the transmission work is done by an interrupt routine.
- * The interrupt routine acts like a server process which does 99% of
- * the communication work.  The send-windows and other structures are
- * only accessed from within the interrupt routine.  Having a server
- * to handle the communication eliminates contention over the
- * send-windows and other communication structures.  Thus, no locking
- * of these structures is needed.
- *
- * For every PE-thread, there is one circular queue for that thread to
- * feed messages to the communication-interrupt.  And, for every
- * PE-thread, there is one circular queue for that thread to retrieve
- * messages from the communication-interrupt.  Thus, each circular
- * queue has one thread (or interrupt routine) as a producer, and one
- * thread as a consumer.  Locking is easily avoided in this case.
- * Since the circular queues are of finite size, this appears to be a
- * case of finite buffering. However, the interrupt routine does
- * infinite buffering, this turns out not to be a problem.
- *
- * The communication routine must watch for several events that can
- * happen spontaneously (from the point of view of the communication
- * thread).  Here is a complete list of the spontaneously-occurring
- * events that must be watched for: 1. A sender pushes a message into
- * its send-circular.  2. A recv-circular which was full becomes
- * not-full, making room for more received messages.  3. A datagram
- * appears on the datagram socket.  4. A timeout occurs, indicating
- * that a datagram needs to be retransmitted.
+ * This has changed recently.
  *
  * EFFICIENCY NOTES
  *
@@ -287,8 +262,8 @@ static void KillEveryoneCode();
 static void CommunicationServer();
 extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
-
-void *FIFO_Create();
+void ConverseInitPE(void);
+void *FIFO_Create(void);
 int   FIFO_Fill(void *);
 void *FIFO_Peek(void *);
 void  FIFO_Pop(void *);
@@ -431,9 +406,6 @@ static int wait_readable(fd, sec) int fd; int sec;
  * host) and from the command-line arguments.  Once read in, it is never
  * modified.
  *
- * There should be an option, such as "++tune atm" or something like
- * that, which controls all the tuning parameters at once.
- *
  *****************************************************************************/
 
 typedef void (*startfn)(int argc, char **argv);
@@ -456,7 +428,7 @@ static int    Cmi_max_dgram_size   = 2048;
 static int    Cmi_os_buffer_size   = 50000;
 static int    Cmi_window_size      = 50;
 static double Cmi_delay_retransmit = 0.050;
-static double Cmi_ack_delay        = 0.025;
+static double Cmi_ack_delay        = 0.015;
 static int    Cmi_dgram_max_data   = 2040;
 static int    Cmi_tickspeed        = 10000;
 
@@ -486,6 +458,27 @@ static void parse_netstart()
 static void extract_args(argv)
 char **argv;
 {
+  while (*argv) {
+    if (strcmp(*argv,"++atm")==0) {
+      Cmi_max_dgram_size   = 2048;
+      Cmi_os_buffer_size   = 50000;
+      Cmi_window_size      = 50;
+      Cmi_delay_retransmit = 0.050;
+      Cmi_ack_delay        = 0.015;
+      Cmi_dgram_max_data   = 2040;
+      Cmi_tickspeed        = 10000;
+      DeleteArg(argv);
+    } else if (strcmp(*argv,"++eth")==0) {
+      Cmi_max_dgram_size   = 2048;
+      Cmi_os_buffer_size   = 50000;
+      Cmi_window_size      = 50;
+      Cmi_delay_retransmit = 0.050;
+      Cmi_ack_delay        = 0.015;
+      Cmi_dgram_max_data   = 2040;
+      Cmi_tickspeed        = 10000;
+      DeleteArg(argv);
+    } else argv++;
+  }
 }
 
 /**************************************************************************
@@ -895,7 +888,6 @@ typedef struct OtherNodeStruct
 typedef struct CmiStateStruct
 {
   int pe, rank;
-  PCQueue send;
   PCQueue recv;
   void *localqueue;
 }
@@ -905,7 +897,6 @@ void CmiStateInit(int pe, int rank, CmiState state)
 {
   state->pe = pe;
   state->rank = rank;
-  state->send = PCQueueCreate();
   state->recv = PCQueueCreate();
   state->localqueue = FIFO_Create();
 }
@@ -1092,19 +1083,11 @@ void CheckSocketsReady()
  *    the CmiState structures using the function CmiStateInit.
  *    Starts processor threads 1..N (not 0, that's the one
  *    that calls CmiStartThreads), as well as the communication
- *    thread.  Each processor thread (other than 0) must call CmiInitPE
+ *    thread.  Each processor thread (other than 0) must call ConverseInitPE
  *    followed by Cmi_startfn.  The communication thread must be an infinite
  *    loop that calls the function CommunicationServer over and over,
  *    with a short delay between each call (ideally, the delay should end
  *    when a datagram arrives or when somebody notifies: see below).
- *
- * NotifyCommunicationThread
- *
- *    Used by the PE's to notify the communication thread that a message
- *    has just been inserted into a send-queue.  This may cause the
- *    communication thread to pick up the message and packetize it more
- *    quickly than if the message is simply deposited in the send-queue
- *    without notification.
  *
  * CmiGetState()
  *
@@ -1123,6 +1106,11 @@ void CheckSocketsReady()
  *
  *    The memory module calls these functions to obtain mutual exclusion
  *    in the memory routines, and to keep interrupts from reentering malloc.
+ *
+ * CmiCommLock() and CmiCommUnlock()
+ *
+ *    These functions lock a mutex that insures mutual exclusion in the
+ *    communication routines.
  *
  * CmiMyPe() and CmiMyRank()
  *
@@ -1164,31 +1152,17 @@ int CmiMyRank()
 
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
-static void NotifyCommunicationThread()
-{
-  struct sockaddr_in addr; double now;
-  if (dataskt_ready_write == 0) return;
-  addr.sin_family = AF_INET;
-  addr.sin_port = htons(dataport);
-  addr.sin_addr.s_addr = htonl(0x7F000001);
-  sendto(dataskt, "x", 1, 0, (struct sockaddr *)&addr, sizeof(addr));
-}
+static mutex_t comm_mutex;
+#define CmiCommLock() (mutex_lock(&comm_mutex))
+#define CmiCommUnlock() (mutex_unlock(&comm_mutex))
 
-static void *call_startfn(void *vindex)
-{
-  int index = (int)vindex;
-  CmiState state = Cmi_state_vector + index;
-  thr_setspecific(Cmi_state_key, state);
-  CmiInitPE();
-  Cmi_startfn(CountArgs(Cmi_argv), Cmi_argv);
-  thr_exit(0);
-}
-
-static void comm_thread()
+static void comm_thread(void)
 {
   struct timeval tmo; fd_set rfds;
   while (Cmi_shutdown_done == 0) {
+    CmiCommLock();
     CommunicationServer();
+    CmiCommUnlock();
     tmo.tv_sec = 0;
     tmo.tv_usec = Cmi_tickspeed;
     FD_ZERO(&rfds);
@@ -1196,6 +1170,16 @@ static void comm_thread()
     FD_SET(ctrlskt, &rfds);
     select(FD_SETSIZE, &rfds, 0, 0, &tmo);
   }
+  thr_exit(0);
+}
+
+static void *call_startfn(void *vindex)
+{
+  int index = (int)vindex;
+  CmiState state = Cmi_state_vector + index;
+  thr_setspecific(Cmi_state_key, state);
+  ConverseInitPE();
+  Cmi_startfn(CountArgs(Cmi_argv), Cmi_argv);
   thr_exit(0);
 }
 
@@ -1208,13 +1192,14 @@ static void CmiStartThreads()
     (CmiState)calloc(Cmi_nodesize, sizeof(struct CmiStateStruct));
   for (i=0; i<Cmi_nodesize; i++)
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
-  for (i=0; i<Cmi_nodesize; i++) {
+  for (i=1; i<Cmi_nodesize; i++) {
     ok = thr_create(0, 256000, call_startfn, (void *)i,
 		    THR_DETACHED|THR_BOUND, &pid);
     if (ok<0) { perror("thr_create"); exit(1); }
   }
   thr_setspecific(Cmi_state_key, Cmi_state_vector);
-  ok = thr_create(0, 256000, comm_thread, 0, THR_DETACHED, &pid);
+  ok = thr_create(0, 256000, (void *(*)(void *))comm_thread,
+		  0, THR_DETACHED, &pid);
   if (ok<0) { perror("thr_create"); exit(1); }
 }
 
@@ -1233,6 +1218,16 @@ int Cmi_myrank;
 #define CmiGetState() (&Cmi_state)
 #define CmiGetStateN(n) (&Cmi_state)
 
+static int comm_flag;
+#define CmiCommLock() (comm_flag=1)
+#define CmiCommUnlock() (comm_flag=0)
+
+static void CommunicationInterrupt()
+{
+  if (comm_flag) return;
+  CommunicationServer();
+}
+
 static void CmiStartThreads()
 {
   struct itimerval i;
@@ -1246,29 +1241,18 @@ static void CmiStartThreads()
   Cmi_myrank = 0;
   
 #if CMK_ASYNC_NOT_NEEDED
-  CmiSignal(SIGALRM, 0, 0, CommunicationServer);
+  CmiSignal(SIGALRM, 0, 0, CommunicationInterrupt);
 #else
-  CmiSignal(SIGALRM, SIGIO, 0, CommunicationServer);
+  CmiSignal(SIGALRM, SIGIO, 0, CommunicationInterrupt);
   CmiEnableAsyncIO(dataskt);
   CmiEnableAsyncIO(ctrlskt);
 #endif
+
   i.it_interval.tv_sec = 0;
   i.it_interval.tv_usec = Cmi_tickspeed;
   i.it_value.tv_sec = 0;
   i.it_value.tv_usec = Cmi_tickspeed;
   setitimer(ITIMER_REAL, &i, NULL);
-}
-
-static void NotifyCommunicationThread()
-{
-  struct itimerval value;
-  if (dataskt_ready_write == 0) return;
-  value.it_value.tv_sec = 0;
-  value.it_value.tv_usec = Cmi_tickspeed;
-  value.it_interval.tv_sec = 0;
-  value.it_interval.tv_usec = Cmi_tickspeed;
-  setitimer(ITIMER_REAL, &value, 0);
-  kill(0, SIGALRM);
 }
 
 #endif
@@ -1799,23 +1783,6 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
   }
 }
 
-int CollectOutgoingMessages()
-{
-  CmiState cs; int rank, pull, action=0;
-  OutgoingMsg ogm;
-  
-  for (rank=0; rank<Cmi_nodesize; rank++) {
-    cs = CmiGetStateN(rank);
-    ogm = (OutgoingMsg)PCQueuePop(cs->send);
-    if (ogm) {
-      LOG(Cmi_clock, Cmi_nodestart, 'O', ogm->dst, 0);
-      action = 1;
-      DeliverOutgoingMessage(ogm);
-    }
-  }
-  return action;
-}
-
 void AssembleDatagram(OtherNode node, ExplicitDgram dg)
 {
   int i, size; char *msg;
@@ -1945,10 +1912,7 @@ static void CommunicationServer()
     if (ctrlskt_ready_read) { ctrl_getone(); continue; }
     if (dataskt_ready_write) { if (TransmitAcknowledgement()) continue; }
     if (dataskt_ready_read) { ReceiveDatagram(); continue; }
-    if (dataskt_ready_write) {
-      CollectOutgoingMessages();
-      if (TransmitDatagram()) continue;
-    }
+    if (dataskt_ready_write) { if (TransmitDatagram()) continue; }
     break;
   }
   busy = 0;
@@ -1978,18 +1942,11 @@ char *CmiGetNonLocal()
  *
  * CmiGeneralSend
  *
- * The design of this system is that the CommunicationThread does all the
- * work, to eliminate as many locking issues as possible.  This is the
- * only part of the code that happens in the sender-thread
- *
- * Be careful, the FIFO_Fill here is on the brink of being wrong,
- * because of concurrency control, but it's ok, just barely.
- *
  *****************************************************************************/
 
 CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 {
-  CmiState cs = CmiGetState(); OutgoingMsg ogm; int fill;
+  CmiState cs = CmiGetState(); OutgoingMsg ogm;
 
   if (pe > Cmi_numpes) *((int*)0)=0;
   if (freemode == 'S') {
@@ -2015,10 +1972,10 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   ogm->dst = pe;
   ogm->freemode = freemode;
   ogm->refcount = 0;
-  PCQueuePush(cs->send, (char *)ogm);
-  fill = FIFO_Fill(retransmit_queue);
-  if (fill < (Cmi_window_size / 2))
-    NotifyCommunicationThread();
+  CmiCommLock();
+  DeliverOutgoingMessage(ogm);
+  CommunicationServer();
+  CmiCommUnlock();
   return (CmiCommHandle)ogm;
 }
 
