@@ -29,7 +29,6 @@ unsetenv MACHTYPE
 unsetenv SEQUENTIAL
 unsetenv LANGUAGE
 unsetenv BALANCE
-unsetenv QUEUE
 unsetenv MEMORY
 unsetenv EXECMODE
 unsetenv VERBOSE
@@ -87,12 +86,12 @@ while ($argindex <= $#argv)
             breaksw
 
         case "-queue"
-            set QUEUE=$argv[$argindex]
+            echo "Warning: -queue currently being ignored."
             @ argindex = $argindex + 1
             breaksw
 
         case "-memory"
-            echo "Warning: -memory currently not being dealt with."
+            echo "Warning: -memory currently being ignored."
             @ argindex = $argindex + 1
             breaksw
 
@@ -504,9 +503,8 @@ endsw
 # Executable-Linking section.
 #
 # Check for valid choice of EXECMODE
-# Check for valid choice of QUEUE
 # Check for valid choice of BALANCE
-# Check for compatibility among BALANCE, QUEUE, and EXECMODE
+# Check for compatibility among BALANCE and EXECMODE
 # Create CHARMC-MOD.TMP.o
 # Do the linkage.
 #
@@ -537,41 +535,18 @@ else
    endif
 endif
 
-# Check for valid choice of QUEUE
-
-if ($?QUEUE == 0) set QUEUE=super
-
-if (! -e $CHARMLIB/libconv-qs-$QUEUE.o) then
-   echo "charmc: Unknown queueing strategy $QUEUE"
-   (cd $CHARMLIB ; ls -al libconv-qs-*)
-   goto failure
-endif
-
 # Check for valid choice of BALANCE
 
 if ($?BALANCE == 0) set BALANCE=rand
 
-# Check that EXECMODE is compatible with QUEUE and BALANCE
+# Check that EXECMODE is compatible with BALANCE
 
 if ($EXECMODE == replay) then
-    if ($?QUEUE == 0) set QUEUE=replay
     if ($?BALANCE == 0) set BALANCE=replay
-    if ($QUEUE != replay) then
-        echo "Ignoring -queue $QUEUE, incompatible with -execmode replay"
-    endif
     if ($BALANCE != replay) then
         echo "Ignoring -balance $BALANCE, incompatible with -execmode replay"
     endif
-    set QUEUE=replay
     set BALANCE=replay
-endif
-
-# Check that BALANCE is compatible with QUEUE
-
-if ( $BALANCE == btok ) then
-    if ( ($QUEUE != bfifo) && ($QUEUE != bstack) ) then
-        echo "WARNING : btok strategy needs bfifo or bstack queueing strategy"
-    endif
 endif
 
 # Check that the BAL_OBJ exists
@@ -603,7 +578,6 @@ switch ($LANGUAGE)
         	      $CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
         	      $CHARMLIB/lib${LIBCLASS}-cplus-n.o \
         	      $CHARMLIB/libconv-core.o \
-        	      $CHARMLIB/libconv-qs-$QUEUE.o \
 		      $CMK_LIBS -lm )
         breaksw
     case "charm++"
@@ -614,7 +588,6 @@ switch ($LANGUAGE)
                       $CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
         	      $CHARMLIB/lib${LIBCLASS}-cplus-y.o \
         	      $CHARMLIB/libconv-core.o \
-        	      $CHARMLIB/libconv-qs-$QUEUE.o \
 		      $CMK_LIBS -lm )
         breaksw
     case "converse"
@@ -623,7 +596,6 @@ switch ($LANGUAGE)
         set LOADER = ($CMK_LD $OPTS_LD -o $OBJECT \
 		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
         	      $CHARMLIB/libconv-core.o \
-        	      $CHARMLIB/libconv-qs-$QUEUE.o \
 		      $CMK_LIBS -lm )
         breaksw
 endsw
