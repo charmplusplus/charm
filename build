@@ -49,7 +49,7 @@ do
           test "$1" = "help" && printOption
           while [ ! $# -eq 0 ]
           do
-            if test "$1" = "pgcc" || test "$1" = "icc" || test "$1" = "cxx" || test "$1" = "kcc" || test "$1" = "cc" || test "$1" = "cc64" || test "$1" = "acc"
+            if test "$1" = "pgcc" || test "$1" = "icc" || test "$1" = "cxx" || test "$1" = "kcc" || test "$1" = "cc" || test "$1" = "cc64" || test "$1" = "acc" || test "$1" = "gcc3"
             then
               if [ ! -f src/$VERSION/conv-mach-$1.h ]
               then
