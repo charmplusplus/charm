@@ -510,7 +510,7 @@ public:
 	}
 
 	//Migrate us to another processor
-	void migrate(CkLocRec_local *rec,int toPe);
+	void emigrate(CkLocRec_local *rec,int toPe);
 
 #if CMK_LBDB_ON
 	LBDatabase *getLBDB(void) const { return the_lbdb; }
@@ -549,7 +549,7 @@ public:
 	void resume(const CkArrayIndex &idx, PUP::er &p);
 
 //Communication:
-	void migrateIncoming(CkArrayElementMigrateMessage *msg);
+	void immigrate(CkArrayElementMigrateMessage *msg);
 	void updateLocation(const CkArrayIndexMax &idx,int nowOnPe);
 	void reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe);
 	void dummyAtSync(void);

@@ -738,7 +738,7 @@ CkLocRec_local::~CkLocRec_local()
 void CkLocRec_local::migrateMe(int toPe) //Leaving this processor
 {
 	//This will pack us up, send us off, and delete us
-	myLocMgr->migrate(this,toPe);
+	myLocMgr->emigrate(this,toPe);
 }
 
 #if CMK_LBDB_ON
@@ -1582,8 +1582,8 @@ void CkLocMgr::migratableList(CkLocRec_local *rec, CkVec<CkMigratable *> &list)
         }
 }
 
-/// Migrate this element to another processor.
-void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
+/// Migrate this local element away to another processor.
+void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 {
 	CK_MAGICNUMBER_CHECK
 	if (toPe==CkMyPe()) return; //You're already there!
@@ -1635,7 +1635,7 @@ void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 	DEBM((AA"Migrated index size %s\n"AB,idx2str(idx)));	
 
 //Send off message and delete old copy
-	thisProxy[toPe].migrateIncoming(msg);
+	thisProxy[toPe].immigrate(msg);
 	duringMigration=CmiTrue;
 	delete rec; //Removes elements, hashtable entries, local index
 	duringMigration=CmiFalse;
@@ -1644,7 +1644,10 @@ void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 	informHome(idx,toPe);
 }
 
-void CkLocMgr::migrateIncoming(CkArrayElementMigrateMessage *msg)
+/**
+  Migrating array element is arriving on this processor.
+*/
+void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 {
 	CkArrayMessage *amsg=(CkArrayMessage *)msg;
 	const CkArrayIndex &idx=msg->idx;
@@ -1657,7 +1660,7 @@ void CkLocMgr::migrateIncoming(CkArrayElementMigrateMessage *msg)
 	if (nMsgMan>nManagers) {
 		//Some array managers haven't registered yet-- throw it back
 		DEBM((AA"Busy-waiting for array registration on migrating %s\n"AB,idx2str(idx)));
-		thisProxy[CkMyPe()].migrateIncoming(msg);
+		thisProxy[CkMyPe()].immigrate(msg);
 		return;
 	}
 
