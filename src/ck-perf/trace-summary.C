@@ -31,17 +31,27 @@ void traceInit(int* argc, char **argv)
   CpvAccess(binSize) = BIN_SIZE;
   int i;
   for(i=1;i<*argc;i++) {
-//CkPrintf("arg [%d] %s %s\n", i, argv[i], argv[i+1]);
     if(strcmp(argv[i], "+logsize")==0) {
       CpvAccess(CtrLogBufSize) = atoi(argv[i+1]);
-    } else if(strcmp(argv[i], "+binsize")==0) {
+      break;
+    } 
+  }
+  if(i!=*argc) { // +logsize parameter was found, delete it and its arg
+    while((i+2)<= *argc) {
+      argv[i] = argv[i+2];
+      i++;
+    }
+    *argc -= 2;
+  }
+  for(i=1;i<*argc;i++) {
+    if(strcmp(argv[i], "+binsize")==0) {
       double d;
       sscanf(argv[i+1], "%le", &d);
       CpvAccess(binSize) = d;
+      break;
     }
   }
-//CkPrintf("logsize: %d\n", CpvAccess(CtrLogBufSize));
-  if(i!=*argc) { // +logsize parameter was found, delete it and its arg
+  if(i!=*argc) { // +binsize parameter was found, delete it and its arg
     while((i+2)<= *argc) {
       argv[i] = argv[i+2];
       i++;
