@@ -927,6 +927,13 @@ static void ConverseRunPE(int everReturn)
 
   if (!everReturn) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+#ifndef CMK_OPTIMIZE 
+#if ! CMK_TRACE_IN_CHARM
+    traceRegisterUserEvent("Pump Messages", 10);
+    traceRegisterUserEvent("Release Sent Messages", 20);
+    traceRegisterUserEvent("ELAN Send", 30);
+#endif
+#endif
     if (Cmi_usrsched==0) CsdScheduler(-1);
     ConverseExit();
   }
@@ -1109,13 +1116,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CmiStartThreads(argv);
   ConverseRunPE(initret);
 
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-  traceRegisterUserEvent("Pump Messages", 10);
-  traceRegisterUserEvent("Release Sent Messages", 20);
-  traceRegisterUserEvent("ELAN Send", 30);
-#endif
-#endif
 }
 
 /***********************************************************************
