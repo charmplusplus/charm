@@ -168,7 +168,7 @@ extern unsigned char computeCheckSum(unsigned char *data, int len);
 
 /* MPI calls are not threadsafe, even the timer on some machines */
 static CmiNodeLock  timerLock = 0;
-static double starttimer;
+static double starttimer = 0;
 static int _is_global = 0;
 
 int CmiTimerIsSynchronized(void)
@@ -189,6 +189,8 @@ int CmiTimerIsSynchronized(void)
 
 void CmiTimerInit(void)
 {
+  _is_global = CmiTimerIsSynchronized();
+
   if (CmiMyRank() == 0) {
     if (_is_global) { 
       double minTimer;
@@ -199,6 +201,9 @@ void CmiTimerInit(void)
     }
     else {
       /* we don't have a synchronous timer, set our own start time */
+      CmiBarrier();
+      CmiBarrier();
+      CmiBarrier();
       starttimer = MPI_Wtime();
     }
   }
@@ -247,20 +252,11 @@ double CmiCpuTimer(void)
 
 #endif
 
-void MPITimerInit(void)
+void CmiBarrier()
 {
-  if (!CmiTimerIsSynchronized()) {
-    if (CmiMyRank() == 0) {
-      /* we don't have a synchronous timer, set our own start time */
-      if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
+  if (CmiMyRank() == 0)
+    if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
         CmiAbort("Timernit: MPI_Barrier failed!\n");
-      if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
-        CmiAbort("Timernit: MPI_Barrier failed!\n");
-      if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
-        CmiAbort("Timernit: MPI_Barrier failed!\n");
-    }
-  }
-  CmiTimerInit();
 }
 
 typedef struct ProcState {
