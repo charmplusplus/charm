@@ -23,13 +23,13 @@
 
 SHELL=/bin/sh
 
-all: charm++ idl smsg pvm sdag
+all: charm++ IDL smsg pvm sdag
 
 charm: converse charmxlat charmlibs libcharm
 
 charm++: charm charmxlat++ charmfilter++ charmxi libck-cplus-y.a libck-defmain-cpp.a
 
-idl: charm++ charmidl
+IDL: charm++ charmidl libidl.a
 
 smsg: converse libsimplemsg.a
 
@@ -62,9 +62,9 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-ALLHEADERS=charm++.h charm.h charm++-inc.h charm-inc.h dagger.h cpthreads.h converse.h conv-mach.h simplemsg.h trace.h generic_redn.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h # pglib.h
+ALLHEADERS=charm++.h charm.h charm++-inc.h charm-inc.h dagger.h cpthreads.h converse.h conv-mach.h simplemsg.h trace.h generic_redn.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h # pglib.h
 
-ALLINTERFACES=GENERIC-ACC.int GENERIC-HIST.int GENERIC-REDN.int barrier_redn.int cache.int dacc_count.int dacc_hist.int dcountredn.int dmaxredn.int dminredn.int dprodredn.int dsumredn.int facc_count.int facc_hist.int fcountredn.int fmaxredn.int fminredn.int fprodredn.int fsumredn.int iacc_count.int iacc_hist.int icountredn.int imaxredn.int iminredn.int iprodredn.int isumredn.int pg.int
+ALLINTERFACES=GENERIC-ACC.int GENERIC-HIST.int GENERIC-REDN.int barrier_redn.int cache.int dacc_count.int dacc_hist.int dcountredn.int dmaxredn.int dminredn.int dprodredn.int dsumredn.int facc_count.int facc_hist.int fcountredn.int fmaxredn.int fminredn.int fprodredn.int fsumredn.int iacc_count.int iacc_hist.int icountredn.int imaxredn.int iminredn.int iprodredn.int isumredn.int pg.int idl.ci
 
 basics: dirs+sources $(ALLHEADERS) $(ALLINTERFACES) charmc conv-mach.csh
 	rm -rf ../include
@@ -339,7 +339,7 @@ cplus.o: cplus.C charm++.h $(CKHEADERS)
 	$(CHARMC) -o cplus.o cplus.C
 
 libck-cplus-y.a: cplus.o ckfutures.o 
-	$(CHARMC) -cp ../lib/ -o $@ cplus.C ckfutures.o
+	$(CHARMC) -cp ../lib/ -o $@ cplus.o ckfutures.o
 
 libck-defmain-cpp.a: defmain-cpp.C $(CKHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ defmain-cpp.C
@@ -642,8 +642,8 @@ CEntry.o: CEntry.C CEntry.h
 
 IDL_CFE_VERSION =       \"1.3.0\"
 CPPFLAGS = -I. -DIDL_CFE_VERSION=$(IDL_CFE_VERSION)
-IDLCHARMC = $(SEQCHARMC) $(CPPFLAGS)
 CCFLAGS  = -g
+IDLCHARMC = $(SEQCHARMC) $(CPPFLAGS) $(CCFLAGS)
 RANLIB          = /bin/true
 AR              = ar
 ARFLAGS         = crv
@@ -896,6 +896,16 @@ charmidl: libdrv.a libbe.a libfe.a libast.a libutil.a libnarrow.a
 	$(IDLCHARMC) -o charmidl -language c++ -cp ../bin libdrv.a libbe.a \
 		libfe.a libast.a libutil.a libnarrow.a
 
+libidl.a: idl.o
+	$(CHARMC) -cp ../lib/ -o libidl.a idl.o
+	/bin/cp idl.top.h ../include/
+
+idl.o: basics idl.C idl.h idl.top.h idl.bot.h
+	$(CHARMC) -c idl.C
+
+idl.top.h idl.bot.h: charmxi idl.ci
+	$(CHARMC) idl.ci
+	/bin/cp idl.top.h ../include/
 
 ###############################################################################
 #
