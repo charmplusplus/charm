@@ -130,7 +130,7 @@ class er {
         IS_UNPACKING=0x0400,
         TYPE_MASK   =0xFF00};
   unsigned int PUP_er_state;
-  er(unsigned int inType) //You don't want to create raw PUP::er's.
+  explicit er(unsigned int inType) //You don't want to create raw PUP::er's.
     {PUP_er_state=inType;}
  public:
   virtual ~er();//<- does nothing, but might be needed by some child
