@@ -217,15 +217,16 @@ public:
 			rows=rows_;
 			return;
 		}
-/*		if (max_==0) { //They gave no suggested size-- pick one:
+		if (max_==0) { //They gave no suggested size-- pick one:
 			if (rows_==rows+1) //Growing slowly: grab a little extra
 				max_=10+rows_+(rows_>>2); 
-			else  for a big change, just go with the minimum needed: 
+			else // for a big change, just go with the minimum needed: 
 				max_=rows_;
-		}*/
+		}
+/*
 		if(max_ == 0){
 			max_ = rows_;
-		}
+		} */
 		int oldRows=rows;
 		cols=cols_;
 		rows=rows_;
