@@ -285,7 +285,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   /* find dim = log2(numpes), to pretend we are a hypercube */
   for ( Cmi_dim=0,n=Cmi_numpes; n>1; n/=2 )
     Cmi_dim++ ;
-  CmiSpanTreeInit();
+  /* CmiSpanTreeInit(); */
   CmiTimerInit();
   CpvInitialize(void *, CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = (void *)FIFO_Create();
