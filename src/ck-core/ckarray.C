@@ -139,7 +139,7 @@ public:
   CkArray *thisArray;
   CkArrayID thisArrayID;
   int numInitial;
-  int *listenerData;
+  int listenerData[CK_ARRAYLISTENER_MAXLEN];
   CmiBool fromMigration;
 };
 
@@ -423,10 +423,9 @@ ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,
 	init.numInitial=numInitial;
 	init.thisArray=this;
 	init.thisArrayID=thisgroup;
-	if (msg)
-		init.listenerData=UsrToEnv(msg)->array_listenerData();
-	else
-		init.listenerData=NULL;
+	if (msg) /*Have to *copy* data because msg will be deleted*/
+	  memcpy(init.listenerData,UsrToEnv(msg)->array_listenerData(),
+		 sizeof(init.listenerData));
 	init.fromMigration=fromMigration;
 	
 	//Build the element
