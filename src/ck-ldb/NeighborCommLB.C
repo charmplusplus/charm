@@ -44,7 +44,9 @@ NeighborCommLB::NeighborCommLB(const CkLBOptions &opt):NborBaseLB(opt)
 
 LBMigrateMsg* NeighborCommLB::Strategy(NborBaseLB::LDStats* stats, int count)
 {
-bool _lb_debug=1;
+bool _lb_debug=0;
+bool _lb_debug1=0;
+bool _lb_debug2=0;
 #if CMK_LBDB_ON
   //  CkPrintf("[%d] Strategy starting\n",CkMyPe());
   // Compute the average load to see if we are overloaded relative
@@ -69,9 +71,11 @@ bool _lb_debug=1;
 
   CkVec<MigrateInfo*> migrateInfo;
 
+  if (_lb_debug) 
+    CkPrintf("[%d] My load is %lf\n", CkMyPe(),myload);
   if (myload > avgload) {
-    if (_lb_debug) 
-      CkPrintf("[%d] OVERLOAD My load is %f, average load is %f\n", CkMyPe(),myload,avgload);
+    if (_lb_debug1) 
+      CkPrintf("[%d] OVERLOAD My load is %lf average load is %lf\n", CkMyPe(), myload, avgload);
 
     // First of all, explore the topology and get dimension
     LBTopology* topo;
@@ -88,7 +92,7 @@ bool _lb_debug=1;
       topo = topofn();
     }
     int dimension = topo->get_dimension();
-    if (_lb_debug) 
+    if (_lb_debug2) 
       CkPrintf("[%d] Topology dimension = %d\n", CkMyPe(), dimension);
     if (dimension == -1) {
       char str[1024];
@@ -101,7 +105,7 @@ bool _lb_debug=1;
     // Position of this processor
     int *myProc = new int[dimension];
     topo->get_processor_coordinates(myStats.from_pe, myProc);
-    if (_lb_debug) {
+    if (_lb_debug2) {
       char temp[1000];
       char* now=temp;
       sprintf(now, "[%d] Coordinates = [", CkMyPe());
@@ -119,7 +123,7 @@ bool _lb_debug=1;
     // The communication center is relative to myProc
     double **commcenter = new double*[myStats.n_objs];
     double *commamount = new double[myStats.n_objs];
-    if(_lb_debug) {
+    if(_lb_debug1) {
       CkPrintf("[%d] Number of Objs = %d \n", CkMyPe(), myStats.n_objs);
     }
     {
@@ -144,9 +148,11 @@ bool _lb_debug=1;
               PER_MESSAGE_SEND_OVERHEAD * myStats.commData[i].messages 
               + PER_BYTE_SEND_OVERHEAD * myStats.commData[i].bytes;
             commamount[j] += comm;
-            int dest_pe = myStats.commData[i].receiver.proc();
+            int dest_pe = myStats.commData[i].receiver.lastKnown();
+            
             if(dest_pe==-1) continue;
-            topo->get_processor_coordinates(dest_pe, destProc);
+            
+              topo->get_processor_coordinates(dest_pe, destProc);
             topo->coordinate_difference(myProc, destProc, diff);
             int k;
             for(k=0;k<dimension;k++) {
@@ -162,25 +168,26 @@ bool _lb_debug=1;
       } else { //if no communication, set commcenter to myself
         int k;
         for(k=0;k<dimension;k++)
-          commcenter[i][k] = myProc[k];
+          commcenter[i][k] = 0;
       }
       
       delete [] destProc;
       delete [] diff;
     }
     
-    if(_lb_debug) {
+    if(_lb_debug2) {
       for(i=0;i<myStats.n_objs;i++) {
         char temp[1000];
         char* now=temp;
-        sprintf(now, "[%d] Objs [%d] Comm Amount = %lf  ", CkMyPe(), i, commamount[i]);
+        sprintf(now, "[%d] Objs [%d] Load = %lf /%lf Comm Amount = %lf  ", 
+          CkMyPe(), i, myStats.objData[i].cpuTime, myStats.objData[i].wallTime, commamount[i] );
         now += strlen(now);
         sprintf(now, "Comm Center = [");
         now += strlen(now);
         int j;
         for(j=0;j<dimension;j++) {
-          sprintf(now, "%.2lf ", commcenter[j]); 
-          now +=strlen(now);
+          sprintf(now, "%lf ", commcenter[i][j]); 
+          now += strlen(now);
         }
         sprintf(now, "]\n");
         now += strlen(now);
@@ -203,7 +210,7 @@ bool _lb_debug=1;
       int* difference;
     } procInfo;
 
-    if(_lb_debug) {
+    if(_lb_debug2) {
       CkPrintf("[%d] Querying neighborhood topology...\n", CkMyPe() );
     }
 
@@ -220,19 +227,21 @@ bool _lb_debug=1;
       delete[] destProc;
     }
     
-    if(_lb_debug) {
+    if(_lb_debug2) {
       CkPrintf("[%d] Building obj heap...\n", CkMyPe() );
     }
     // My objects: build heaps
     maxHeap objs(myStats.n_objs);
+    double totalObjLoad=0.0;
     for(i=0; i < myStats.n_objs; i++) {
       InfoRecord* item = new InfoRecord;
       item->load = myStats.objData[i].wallTime;
+      totalObjLoad += item->load;
       item->Id = i;
       objs.insert(item);
     }
 
-    if(_lb_debug) {
+    if(_lb_debug2) {
       CkPrintf("[%d] Beginning distributing objects...\n", CkMyPe() );
     }
 
@@ -241,17 +250,17 @@ bool _lb_debug=1;
       InfoRecord* obj;
       obj = objs.deleteMax();
       int bestDest = -1;
-      for(i=0; i<count;i++) if(neighbors[i].load < myload && (bestDest==-1 || neighbors[i].load < neighbors[bestDest].load)) {
+      for(i=0; i<count;i++) if(neighbors[i].load +obj->load < myload - obj->load && (bestDest==-1 || neighbors[i].load < neighbors[bestDest].load)) {
         double dotsum=0;
         int j;
         for(j=0; j<dimension; j++) dotsum += (commcenter[obj->Id][j] * neighbors[i].difference[j]);
-        if(dotsum>0 || commamount[obj->Id]==0) {
+        if(myload - avgload < totalObjLoad || dotsum>0.5 || (dotsum>0 && objs.numElements()==0) || commamount[obj->Id]==0) {
           bestDest = i;
         }
       }
       // Best place for the object
       if(bestDest != -1) {
-        if(_lb_debug) {
+        if(_lb_debug1) {
           CkPrintf("[%d] Obj[%d] will move to Proc[%d]\n", CkMyPe(), obj->Id, neighbors[bestDest].id);
         }
         //Migrate it
@@ -264,10 +273,11 @@ bool _lb_debug=1;
         myload -= obj->load;
         neighbors[bestDest].load += obj->load;
       }
+      totalObjLoad -= obj->load;
       delete obj;
     }
 
-    if(_lb_debug) {
+    if(_lb_debug2) {
       CkPrintf("[%d] Clearing Up...\n", CkMyPe());
     }
 
@@ -285,7 +295,7 @@ bool _lb_debug=1;
     delete[] commamount;        
   }  
 
-  if(_lb_debug) {
+  if(_lb_debug2) {
     CkPrintf("[%d] Generating result...\n", CkMyPe());
   }
 

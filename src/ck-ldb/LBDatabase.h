@@ -106,8 +106,8 @@ public:
   };
   inline void ObjectStart(const LDObjHandle &_h) { LDObjectStart(_h); };
   inline void ObjectStop(const LDObjHandle &_h) { LDObjectStop(_h); };
-  inline void Send(const LDOMHandle &_om, const LDObjid _id, unsigned int _b) {
-    LDSend(_om, _id, _b);
+  inline void Send(const LDOMHandle &_om, const LDObjid _id, unsigned int _b, int _p) {
+    LDSend(_om, _id, _b, _p);
   };
 
   inline void EstObjLoad(LDObjHandle h, double load) { LDEstObjLoad(h,load); };

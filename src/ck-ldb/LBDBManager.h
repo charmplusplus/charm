@@ -102,7 +102,7 @@ public:
   inline CmiBool StatsOn(void) const 
        { return statsAreOn; };
 
-  void Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes);
+  void Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc);
   int ObjDataCount();
   void GetObjData(LDObjData *data);
   inline int CommDataCount() { 

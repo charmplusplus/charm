@@ -22,18 +22,18 @@ class LBCommData {
 friend class LBCommTable;
 
 public:
-  LBCommData(int _src_proc, LDOMid _destOM, LDObjid _destObj) {
+  LBCommData(int _src_proc, LDOMid _destOM, LDObjid _destObj, int _destObjProc) {
     src_proc = _src_proc;
-    destObj.init_objmsg(_destOM, _destObj);
+    destObj.init_objmsg(_destOM, _destObj, _destObjProc);
     n_messages = 0;
     n_bytes = 0;
     mykey = compute_key();
   };
 
-  LBCommData(LDObjHandle _srcObj, LDOMid _destOM, LDObjid _destObj) {
+  LBCommData(LDObjHandle _srcObj, LDOMid _destOM, LDObjid _destObj, int _destObjProc) {
     src_proc = -1;
     srcObj = _srcObj;
-    destObj.init_objmsg(_destOM, _destObj);
+    destObj.init_objmsg(_destOM, _destObj, _destObjProc);
     n_messages = 0;
     n_bytes = 0;
     mykey = compute_key();

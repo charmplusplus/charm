@@ -142,7 +142,7 @@ void LBDB::DoneRegisteringObjects(LDOMHandle _h)
 }
 
 
-void LBDB::Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes)
+void LBDB::Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc)
 {
   LBCommData* item_ptr;
 
@@ -157,10 +157,10 @@ void LBDB::Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int by
     // In the future, we'll have to eliminate processor to same 
     // processor messages as well
 
-    LBCommData item(runObj,destOM.id,destid);
+    LBCommData item(runObj,destOM.id,destid, destObjProc);
     item_ptr = commTable->HashInsertUnique(item);
   } else {
-    LBCommData item(CkMyPe(),destOM.id,destid);
+    LBCommData item(CkMyPe(),destOM.id,destid, destObjProc);
     item_ptr = commTable->HashInsertUnique(item);
   }  
   item_ptr->addMessage(bytes);

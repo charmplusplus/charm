@@ -1305,13 +1305,15 @@ void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type) {
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	const CkArrayIndex &idx=msg->array_index();
 	DEBS((AA"deliver %s\n"AB,idx2str(idx)));
-#if CMK_LBDB_ON
-	if (type==CkDeliver_queue)
-		the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize());
-#endif
 	if (type==CkDeliver_queue)
 		_TRACE_CREATION_DETAILED(UsrToEnv(m),msg->array_ep());
 	CkLocRec *rec=elementNrec(idx);
+#if CMK_LBDB_ON
+	if (type==CkDeliver_queue) {
+		if(rec!=NULL) the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(), rec->lookupProcessor());
+		else /*rec==NULL*/ the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(),homePe(msg->array_index()));
+	}
+#endif
 	if (rec!=NULL) rec->deliver(msg,type);
 	else /* rec==NULL*/ deliverUnknown(msg,type);
 }

@@ -129,7 +129,10 @@ typedef struct _LDCommDesc {
   char type;
   union {
     int destProc;		/* 1:   processor level message */
-    LDObjKey  destObj;		/* 2:   object based message    */
+    struct{
+      LDObjKey  destObj;		/* 2:   object based message    */
+      int destObjProc;
+    } destObj;
     struct {
       LDObjKey  *objs;
       int len;
@@ -139,22 +142,28 @@ typedef struct _LDCommDesc {
   char &get_type() { return type; }
   char get_type() const { return type; }
   int proc() const { return type==1?dest.destProc:-1; }
+  int lastKnown() const { 
+    if (type==LD_OBJ_MSG) return dest.destObj.destObjProc;
+    if (type==LD_PROC_MSG) return dest.destProc;
+    return -1;
+  }
   LDObjKey &get_destObj() 
-	{ CmiAssert(type==LD_OBJ_MSG); return dest.destObj; }
+	{ CmiAssert(type==LD_OBJ_MSG); return dest.destObj.destObj; }
   LDObjKey const &get_destObj() const 
-	{ CmiAssert(type==LD_OBJ_MSG); return dest.destObj; }
+	{ CmiAssert(type==LD_OBJ_MSG); return dest.destObj.destObj; }
   LDObjKey * get_destObjs(int &len) 
 	{ CmiAssert(type==LD_OBJLIST_MSG); len=dest.destObjs.len; return dest.destObjs.objs; }
-  void init_objmsg(LDOMid &omid, LDObjid &objid) { 
+  void init_objmsg(LDOMid &omid, LDObjid &objid, int destObjProc) { 
 	type=LD_OBJ_MSG; 
-  	dest.destObj.omID()=omid;
-  	dest.destObj.objID()=objid;
+  	dest.destObj.destObj.omID()=omid;
+  	dest.destObj.destObj.objID() =objid;
+  	dest.destObj.destObjProc = destObjProc;
   }
   inline CmiBool operator==(const _LDCommDesc &obj) const {
     if (type != obj.type) return CmiFalse;
     switch (type) {
     case LD_PROC_MSG: return (CmiBool)(dest.destProc == obj.dest.destProc);
-    case LD_OBJ_MSG:  return (CmiBool)(dest.destObj == obj.dest.destObj);
+    case LD_OBJ_MSG:  return (CmiBool)(dest.destObj.destObj == obj.dest.destObj.destObj);
     case LD_OBJLIST_MSG: return CmiFalse;             // fixme
     }
     return CmiFalse;
@@ -220,7 +229,7 @@ void LDObjTime(LDObjHandle &h, double walltime, double cputime);
 int LDRunningObject(LDHandle _h, LDObjHandle* _o );
 void LDObjectStart(const LDObjHandle &_h);
 void LDObjectStop(const LDObjHandle &_h);
-void LDSend(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes);
+void LDSend(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc);
 
 void LDMessage(LDObjHandle from, 
 	       LDOMid toOM, LDObjid *toID, int bytes);
@@ -360,7 +369,7 @@ inline void LDCommDesc::pup(PUP::er &p) {
   p|type;
   switch (type) {
   case 1:  p|dest.destProc; break;
-  case 2:  p|dest.destObj; break;
+  case 2:  p|dest.destObj.destObj; p|dest.destObj.destObjProc; break;
   case 3:  break;		// fixme
   }
 }
