@@ -1,0 +1,219 @@
+\subsection{Reductions}
+\label{reductions}
+
+A \index{array reduction}reduction applies a single operation (e.g. add,
+max, min, ...) to data items scattered across many processors and
+collects the result in one place.  \charmpp{} supports reductions
+over the members of an array or group.
+
+The data to be reduced comes from a call to the member \kw{contribute} 
+method:
+\begin{alltt}
+void contribute(int nBytes,const void *data,CkReduction::reducerType type);
+\end{alltt}
+
+This call contributes \kw{nBytes} bytes starting at \kw{data} to the
+reduction \kw{type} (see reduction types, below).  Unlike sending a
+message, you may use \kw{data} after the call to \kw{contribute}.  All
+members must call \kw{contribute}, and all must use the same
+reduction type.  
+
+When you create a new member, it is expected
+to contribute to the next reduction not already in progress on that
+processor.  The
+reduction will complete properly even if members are migrated
+or deleted during the reduction. 
+
+If we want to sum each member's single integer myInt, we would use:
+
+\begin{alltt}
+    //Inside any member method
+    int myInt=get_myInt();
+    contribute(sizeof(int),\&myInt,CkReduction::sum_int);
+\end{alltt}
+
+The built-in reduction types (see below) can also handle arrays of
+numbers.  For example, if each element of an array has a pair of
+doubles \uw{forces}[2] which need to be summed up (separately) across
+all array elements, from each array element call:
+
+\begin{alltt}
+    //Inside any array element method
+    double forces[2]=get_my_forces();
+    contribute(2*sizeof(double),forces,CkReduction::sum_double);
+\end{alltt}
+
+Note that since C++ arrays (like \uw{forces}[2]) are already pointers, we 
+don't use \&\uw{forces}.
+
+
+After the data is reduced, it is passed to a ``client'' function on
+node zero.  This is an ordinary C or C++ function that you pass to
+the proxy \kw{setReductionClient} routine.  Reduction clients are
+typically registered from your main Chare's constructor, as in:
+
+\begin{alltt}
+//Outside any class definition:
+void myClient(void *param,int dataSize,void *data)
+\{
+  double *forceSum=(double *)data;
+  cout<<``First force sum is ``<<forceSum[0]<<endl;
+  cout<<``Second force sum is ``<<forceSum[1]<<endl;
+\}
+
+...
+    //Inside main::main
+    myProxy.setReductionClient(myClient,(void *)NULL);
+\end{alltt}
+
+This simple client prints out the double values received, and does not
+use the \uw{param} value passed in (\kw{NULL}, in this case).  The
+handler can use \uw{param}, \uw{dataSize}, and the data in any
+fashion.  The system will reclaim the passed-in ``void *data''
+after the handler returns.
+
+Within a reduction client, you may register a new reduction client 
+to handle the next reduction; the default is to call the same client.
+
+
+\subsubsection{Built-in Reduction Types}
+
+\charmpp{} includes several built-in reduction types, used to combine 
+the separate contributions.  Any of them may be passed as an
+\kw{CkReduction::reducerType} type to \kw{contribute}.
+
+The first four reductions (sum, product, max, and min) work on int,
+float, or double data as indicated by the suffix.  The logical
+reductions (and, or) only work on integer data.  All the built-in
+reductions work on either single numbers (pass a pointer) or arrays-- just
+pass the correct number of bytes to \kw{contribute}.
+
+\begin{enumerate}
+
+\item \kw{CkReduction::sum\_int}, \kw{sum\_float}, \kw{sum\_double}-- the
+result will be the sum of the given numbers.
+
+\item \kw{CkReduction::product\_int}, \kw{product\_float},
+\kw{product\_double}-- the result will be the product of the given numbers.
+
+\item \kw{CkReduction::max\_int}, \kw{max\_float}, \kw{max\_double}-- the
+result will be the largest of the given numbers.
+
+\item \kw{CkReduction::min\_int}, \kw{min\_float}, \kw{min\_double}-- the
+result will be the smallest of the given numbers.
+
+\item \kw{CkReduction::and}-- the result will be the logical AND of the given
+integers.  0 is false, nonzero is true.
+
+\item \kw{CkReduction::or}-- the result will be the logical OR of the given
+integers.
+
+\item \kw{CkReduction::set}-- the result will be a verbatim concatenation of
+all the contributed data, separated into \kw{CkReduction::setElement} records.
+The data contributed can be of any length, and can vary across array elements
+or reductions.  To extract the data from each element, see the description
+below.
+
+\item \kw{CkReduction::concat}-- the result will be a byte-by-byte
+concatentation of all the contributed data.  There is no separation
+added between different contributions.
+
+\end{enumerate}
+
+
+\kw{CkReduction::set} returns a collection of \kw{CkReduction::setElement}
+objects, one per contribution.  This class has definition:
+
+\begin{alltt}
+class CkReduction::setElement 
+\{
+public:
+  int dataSize;//The length of the data array below
+  char data[];//The (dataSize-long) array of data
+  CkReduction::setElement *next(void);
+\};
+\end{alltt}
+
+To extract the contribution of each array element from a reduction set, use the
+\uw{next} routine repeatedly:
+
+\begin{alltt}
+  //Inside a reduction handler-- 
+  //  data is our reduced data from CkReduction_set
+  CkReduction::setElement *cur=(CkReduction::setElement *)data;
+  while (cur!=NULL)
+  \{
+    ... //Use cur->dataSize and cur->data
+    //Now advance to the next element's contribution
+    cur=cur->next();
+  \}
+\end{alltt}
+
+The reduction set order is undefined.  Add a source field to your contribution
+if you need to know which array element gave a particular contribution.
+
+\subsubsection{Defining a New Reduction Type}
+
+It is possible to define a new type of reduction, performing a 
+user-defined operation on user-defined data.  A reduction function
+combines separate contributions (from this or other processors)
+into a single combined value.
+
+The input to a reduction function is a list of \kw{CkReductionMsg}s.
+A \kw{CkReductionMsg} is a thin wrapper around a buffer of untyped data.
+The output of a reduction function is a single CkReductionMsg
+containing the reduced data.  
+Thus every reduction function has the prototype:
+\begin{alltt}
+CkReductionMsg *\uw{reductionFn}(int nMsg,CkReductionMsg **msgs);
+\end{alltt}
+
+For example, a reduction function to add up contributions 
+consisting of two machine short integers would be:
+
+\begin{alltt}
+CkReductionMsg *sumTwoShorts(int nMsg,CkReductionMsg **msgs)
+\{
+  //Sum starts off at zero
+  short ret[2]={0,0};
+  for (int i=0;i<nMsg;i++) \{
+    //Sanity check:
+    CkAssert(msgs[i]->dataSize==2*sizeof(short));
+    //Extract this message's data
+    short *m=(short *)msgs[i]->data;
+    ret[0]+=m[0];
+    ret[1]+=m[1];
+  \}
+  return CkReductionMsg::buildNew(2*sizeof(short),ret);
+\}
+\end{alltt}
+
+You must register your reduction function with \charmpp{} 
+using \kw{CkReduction::addReducer} from
+an \kw{initcall} routine (see section~\ref{initcall} for details
+on the \kw{initcall} mechanism).   \kw{CkReduction::addReducer}
+returns a \kw{CkReduction::reducerType} which you can later 
+pass to \kw{contribute}.  Since \kw{initcall} routines are executed
+once on every node, you can safely store the \kw{CkReduction::reducerType}
+in a global or class-static variable.  For the example above:
+
+\begin{alltt}
+//In the .ci file:
+  initcall void registerSumTwoShorts(void);
+
+//In some .C file:
+/*global*/ CkReduction::reducerType sumTwoShortsType;
+/*initcall*/ void registerSumTwoShorts(void)
+\{
+  sumTwoShortsType=CkReduction::addReducer(sumTwoShorts);
+\}
+
+//In some member:
+  short data[2]=...;
+  contribute(2*sizeof(short),data,sumTwoShortsType);
+\end{alltt}
+
+Note that you cannot call \kw{CkReduction::addReducer}
+from anywhere but in an \kw{initcall} routine.
+
+
