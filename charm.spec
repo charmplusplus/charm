@@ -1,5 +1,5 @@
 #
-# Example spec file for cdplayer app...
+# spec file for building charm rpm for redhat.
 #
 Summary: Charm++
 
