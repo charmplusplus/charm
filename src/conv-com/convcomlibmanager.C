@@ -1,3 +1,4 @@
+
 /* Converse ComlibManager 
    Enables communication library strategies to be called from converse code.
    Also called by the Charm Comlibmanager.
@@ -17,6 +18,15 @@ CkpvDeclare(ConvComlibManager, conv_com_object);
 CkpvDeclare(ConvComlibManager *, conv_com_ptr);
 CkpvDeclare(int, RecvdummyHandle);
 
+void *strategyHandler(void *msg) {
+    CmiMsgHeaderBasic *conv_header = (CmiMsgHeaderBasic *) msg;
+    int instid = conv_header->stratid;
+    
+    Strategy *strat = ConvComlibGetStrategy(instid);
+    
+    strat->handleMessage(msg);
+    return NULL;
+}
 
 ConvComlibManager::ConvComlibManager(): strategyTable(MAX_NUM_STRATS){
     nstrats = 0;
@@ -37,9 +47,9 @@ void ConvComlibManager::insertStrategy(Strategy *s) {
 
     s->setInstance(nstrats);
     
-    // if the strategy is pure converse or pure charm the following line is a
-    // duplication, but if a charm strategy embed a converse strategy it is
-    // necessary to set the instanceID in both
+    // if the strategy is pure converse or pure charm the following
+    // line is a duplication, but if a charm strategy embed a converse
+    // strategy it is necessary to set the instanceID in both
     s->getConverseStrategy()->setInstance(nstrats);
     nstrats ++;
 }
@@ -93,8 +103,13 @@ void initComlibManager(){
     CsvInitialize(int, pipeBcastPropagateHandle);
     CsvInitialize(int, pipeBcastPropagateHandle_frag);
     //CsvAccess(pipeBcastPropagateHandle) = CmiRegisterHandler((CmiHandler)propagate_handler);
+    
     CsvAccess(pipeBcastPropagateHandle_frag) = CkRegisterHandler((CmiHandler)propagate_handler_frag);
     
+    CkpvInitialize(int, strategy_handlerid);
+
+    CkpvAccess(strategy_handlerid) = CkRegisterHandler((CmiHandler) strategyHandler);
+
     PUPable_reg(Strategy);
     PUPable_reg(RouterStrategy);
     PUPable_reg(MessageHolder);

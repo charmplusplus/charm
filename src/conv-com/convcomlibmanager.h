@@ -15,7 +15,7 @@
 #include "comlib.h"
 #include <convcomlibstrategy.h>
 
-#define MAX_NUM_STRATS 128
+#define MAX_NUM_STRATS 32
 
 class ConvComlibManager {
     
@@ -39,5 +39,16 @@ void initComlibManager();
 Strategy *ConvComlibGetStrategy(int loc);
 void ConvComlibRegisterStrategy(Strategy *s);
 void ConvComlibScheduleDoneInserting(int loc);
+
+CkpvDeclare(int, strategy_handlerid);
+
+//Send a converse message to a remote strategy instance. On being
+//received the handleMessage method will be invoked.
+inline void ConvComlibSendMessage(int instance, int dest_pe, int size, char *msg) {
+    CmiSetHandler(msg, CkpvAccess(strategy_handlerid));
+    ((CmiMsgHeaderBasic *) msg)->stratid = instance;
+    
+    CmiSyncSendAndFree(dest_pe, size, msg);
+}
 
 #endif

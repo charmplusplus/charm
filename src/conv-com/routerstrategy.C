@@ -104,6 +104,9 @@ RouterStrategy::RouterStrategy(int stratid, int handle, int _npes,
     pelist = _pelist;
     //memcpy(pelist, _pelist, sizeof(int) * npes);    
 
+    if(npes <= 1)
+        routerID = USE_DIRECT;
+
     myPe = -1;
     procMap = new int[CkNumPes()];    
     setReverseMap();

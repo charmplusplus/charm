@@ -132,10 +132,15 @@ class Strategy : public PUP::able{
       return higherLevel;
     }
 
+    //Called when a message is received in the strategy handler
+    virtual void handleMessage(void *msg) {}
+    
     //This method can be used to deliver a message through the correct class
     //when converse does not know if the message was originally sent from
     //converse itself of from a higher level language like charm
-    virtual void deliverer(char*, int) {CmiAbort("Strategy::deliverer: If used, should be first redefined\n");};
+    virtual void deliverer(char*, int) {
+        CmiAbort("Strategy::deliverer: If used, should be first redefined\n");
+    };
 
     //Each strategy must define his own Pup interface.
     virtual void pup(PUP::er &p);
