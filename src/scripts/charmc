@@ -610,6 +610,9 @@ do
 	-f90main)
 		F90_MAIN=1
 		;;
+	-nof90main)
+		F90_MAIN=
+		;;
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS  $arg"
