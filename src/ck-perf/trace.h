@@ -54,9 +54,11 @@ class Trace {
 class TraceArray {
 private:
   CkVec<Trace *>  traces;
+  int n;
 public:
-    inline void addTrace(Trace *tr) { traces.push_back(tr); }
-    inline int length() const { return traces.length(); }
+    TraceArray(): n(0) {}
+    inline void addTrace(Trace *tr) { traces.push_back(tr); n++;}
+    inline int length() const { return n; }
 
     inline void userEvent(int e) { ALLDO(userEvent(e));}
     inline void creation(envelope *env, int num=1) { ALLDO(creation(env, num));}
