@@ -35,15 +35,6 @@ void CmiNotifyIdle(void)
   select(FD_SETSIZE,&rfds,&wfds,0,&tv);
 #else
   struct pollfd fds[2]; int n = 0;
-  int nreadable;
-  int pollMs = 5;
-#if CMK_USE_GM
-  if (gm_receive_pending(gmport)) {
-    if (Cmi_netpoll) CommunicationServer(5);
-    return;
-  }
-  pollMs = 0;
-#endif
   if (Cmi_charmrun_fd!=-1) {
     fds[n].fd = Cmi_charmrun_fd;
     fds[n].events = POLLIN;
@@ -55,7 +46,7 @@ void CmiNotifyIdle(void)
     if (writeableDgrams || writeableAcks)  fds[n].events |= POLLOUT;
     n++;
   }
-  poll(fds, n, pollMs);
+  poll(fds, n, 5);
 #endif
   if (Cmi_netpoll) CommunicationServer(5);
 #else
