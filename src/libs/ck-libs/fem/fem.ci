@@ -2,7 +2,7 @@ mainmodule fem {
   extern module ampi;
   extern module threadCollide;
   extern module MetisLB;
-  readonly CkChareID _mainhandle;
+  readonly CProxy_main _mainproxy;
   readonly CkArrayID _femaid;
   readonly int _nchunks;
   message DataMsg;
@@ -14,6 +14,7 @@ mainmodule fem {
   };
   array [1D] chunk {
     entry chunk(void);
+    entry void write(ChunkMsg *);
     entry [threaded] void run(void);
     entry [threaded] void run(ChunkMsg*);
     entry void recv(DataMsg *);

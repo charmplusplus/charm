@@ -14,7 +14,7 @@ class collision{ }; //<- needed by parCollide.decl.h
 #include "ampiimpl.h"
 #include "fem.h"
 
-extern CkChareID _mainhandle;
+extern CProxy_main _main;
 extern CkArrayID _femaid;
 extern int _nchunks;
 
@@ -240,6 +240,7 @@ private:
   void serialSwitch(ChunkMsg *);
   
   void run(void);
+  void write(ChunkMsg*);
   void run(ChunkMsg*);
   void recv(DataMsg *);
   void reductionResult(DataMsg *);
@@ -311,13 +312,16 @@ private:
 #endif
   }
 
-  FILE *fp;
   void update_field(DataMsg *);
   void send(int fid,const void *nodes);
-  void readNodes();
-  void readElems();
-  void readComm();
+  void readNodes(FILE *fp);
+  void readElems(FILE *fp);
+  void readComm(FILE *fp);
   void readChunk(ChunkMsg *msg=0);
+  void writeNodes(FILE *fp) const;
+  void writeElems(FILE *fp) const;
+  void writeComm(FILE *fp) const;
+  void writeChunk(void);
   void callDriver(void);
 };
 

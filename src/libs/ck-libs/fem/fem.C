@@ -31,7 +31,7 @@ int ampimain::ncomms = 0;
 
 
 
-CkChareID _mainhandle;
+CProxy_main _mainproxy;
 CkArrayID _femaid;
 int _nchunks;
 
@@ -102,42 +102,40 @@ main::main(CkArgMsg *am)
 {
   int i;
   _nchunks = CkNumPes();
-  for(i=1;i<am->argc;i++) {
-    if(strncmp(am->argv[i], "-vp", 3) == 0) {
-      if (strlen(am->argv[i]) > 3) {
-        sscanf(am->argv[i], "-vp%d", &_nchunks);
-      } else {
-        if (am->argv[i+1]) {
-          sscanf(am->argv[i+1], "%d", &_nchunks);
-        }
-      }
-      break;
-    }
-  }
+  CmiGetArgInt(am->argv,"-vp",&_nchunks);
+  CmiGetArgInt(am->argv,"+vp",&_nchunks);
+  int readFile=CmiGetArgFlag(am->argv,"-read");
+  int writeFile=CmiGetArgFlag(am->argv,"-write");
   delete am;
   cmsgs=new ChunkMsg*[_nchunks]; CHK(cmsgs);
   CreateMetisLB();
   _femaid = CProxy_chunk::ckNew(_nchunks);
   CProxy_chunk farray(_femaid);
   farray.setReductionClient(_allReduceHandler, 0);
-  _mainhandle = thishandle;
+  _mainproxy = thishandle;
   numdone = 0;
   updateCount=1;
   _meshptr = NULL;
   CpvInitialize(fem_state_t,_fem_state);
   CpvAccess(_fem_state)=inInit;
+
+  if (!readFile) {
 #if FEM_FORTRAN
-  FTN_NAME(INIT,init_) ();
+    FTN_NAME(INIT,init_) ();
 #else // C/C++
-  init();
+    init();
 #endif // Fortran
+  } else
+    CkPrintf("FEM> Skipping init(). Mesh will come from files.\n");
+
   CpvAccess(_fem_state)=inDriver;
   if (_meshptr!=NULL) {
     //Partition the serial mesh online
     mesh2msgs(_meshptr,cmsgs);
     freeMesh();
     for (i=0;i<_nchunks;i++) {
-      farray[i].run(cmsgs[i]);
+      if (writeFile) farray[i].write(cmsgs[i]);
+      else farray[i].run(cmsgs[i]);
       cmsgs[i]=NULL;
     }
   } else /*NULL==mesh*/ {
@@ -674,6 +672,12 @@ chunk::callDriver(void)
   FEM_Done();
 }
 
+void chunk::write(ChunkMsg *msg) {
+  readChunk(msg);
+  writeChunk();
+  _mainproxy.done();
+}
+
 void
 chunk::run(ChunkMsg *msg)
 {
@@ -973,7 +977,7 @@ chunk::updateMesh(int callMeshUpdated,int doRepartition) {
     updated_mesh->elemNums[i]=-1;//New element types have no global number
 
   //Send the mesh off to main
-  CProxy_main(_mainhandle).updateMesh(updated_mesh);
+  _mainproxy.updateMesh(updated_mesh);
   updated_mesh=NULL;
   if (doRepartition)
     thread_suspend();//Sleep until repartitioned mesh arrives
@@ -995,7 +999,7 @@ chunk::readField(int fid, void *nodes, const char *fname)
   int btypelen = dtypes[fid].length()/typelen;
   char *data = (char *)nodes + dtypes[fid].init_offset;
   int distance = dtypes[fid].distance;
-  fp = fopen(fname, "r");
+  FILE *fp = fopen(fname, "r");
   if(fp==0) {
     CkError("Cannot open file %s for reading.\n", fname);
     CkAbort("Exiting");
@@ -1033,47 +1037,88 @@ chunk::readField(int fid, void *nodes, const char *fname)
     }
     data += distance;
   }
+  fclose(fp);
 }
 
-
-/*FIXME: A few things are missing from the FEM file format:
--Support for multiple element types
--Support for (arbitrary node/element) user data
-  OSL 9/29/00. I'd add these myself, but that'd break existing FEM files.
-*/
-
-void
-chunk::readNodes()
+//-------------------- chunk I/O ---------------------
+void chunk::writeNodes(FILE *fp) const
 {
-    fscanf(fp, "%d", &m.node.n);
-    nodeNums = new int[m.node.n]; CHK(nodeNums);
-    isPrimary = new int[m.node.n]; CHK(isPrimary);
+    fprintf(fp, "%d %d\n", m.node.n,m.node.dataPer);
     for(int i=0;i<m.node.n;i++) {
-      fscanf(fp, "%d%d", &nodeNums[i], &isPrimary[i]);
-      isPrimary[i] = ((isPrimary[i]==thisIndex) ? 1 : 0);
+      fprintf(fp, "%d %d ", nodeNums[i], isPrimary[i]);
+      for(int d=0;d<m.node.dataPer;d++)
+	fprintf(fp, "%lf ", m.node.udata[i*m.node.dataPer+d]);
+      fprintf(fp,"\n");
     }
 }
 
-void
-chunk::readElems()
+void chunk::readNodes(FILE *fp)
 {
-    int t=0; //<- to facilitate (later) conversion to multiple element types
-    m.nElemTypes=1;//Just one kind of element    
-    fscanf(fp, "%d%d", &m.elem[t].n, &m.elem[t].nodesPer);
-    elemNums = new int[m.elem[t].n]; CHK(elemNums);
-    m.elem[t].conn = new int[m.elem[t].connCount()]; CHK(m.elem[t].conn);
+    fscanf(fp, "%d%d", &m.node.n,&m.node.dataPer);
+    nodeNums = new int[m.node.n]; CHK(nodeNums);
+    isPrimary = new int[m.node.n]; CHK(isPrimary);
+    m.node.allocUdata();
+    for(int i=0;i<m.node.n;i++) {
+      fscanf(fp, "%d%d", &nodeNums[i], &isPrimary[i]);
+      for(int d=0;d<m.node.dataPer;d++)
+	fscanf(fp, "%lf", &m.node.udata[i*m.node.dataPer+d]);
+    }
+}
 
-    for(int i=0; i<m.elem[t].n; i++) {
+void chunk::writeElems(FILE *fp) const
+{
+    fprintf(fp,"%d\n",m.nElemTypes);
+    int t;
+    for (t=0;t<m.nElemTypes;t++) {
+      fprintf(fp, "%d %d %d\n", m.elem[t].n, m.elem[t].nodesPer,m.elem[t].dataPer);
+    }
+    for (t=0;t<m.nElemTypes;t++) {
       int start=m.nElems(t);
-      fscanf(fp, "%d", &elemNums[start+i]);
-      for(int j=0;j<m.elem[t].nodesPer;j++) {
-        fscanf(fp, "%d", &m.elem[t].conn[i*m.elem[t].nodesPer+j]);
+      for(int i=0; i<m.elem[t].n; i++) {
+        fprintf(fp, "%d ", elemNums[start+i]);
+        for(int j=0;j<m.elem[t].nodesPer;j++)
+          fprintf(fp, "%d ", m.elem[t].conn[i*m.elem[t].nodesPer+j]);
+        for(int d=0;d<m.elem[t].dataPer;d++)
+          fprintf(fp, "%lf ", m.elem[t].udata[i*m.elem[t].dataPer+d]);
+	fprintf(fp,"\n");
       }
     }
 }
 
-void
-chunk::readComm()
+void chunk::readElems(FILE *fp)
+{
+    fscanf(fp,"%d",&m.nElemTypes);
+    int t;
+    for (t=0;t<m.nElemTypes;t++) {
+      fscanf(fp, "%d%d%d", &m.elem[t].n, &m.elem[t].nodesPer,&m.elem[t].dataPer);
+    }
+    elemNums = new int[m.nElems()]; CHK(elemNums);
+    for (t=0;t<m.nElemTypes;t++) {
+      m.elem[t].allocUdata();
+      m.elem[t].allocConn();
+      int start=m.nElems(t);
+      for(int i=0; i<m.elem[t].n; i++) {
+        fscanf(fp, "%d", &elemNums[start+i]);
+        for(int j=0;j<m.elem[t].nodesPer;j++)
+          fscanf(fp, "%d", &m.elem[t].conn[i*m.elem[t].nodesPer+j]);
+        for(int d=0;d<m.elem[t].dataPer;d++)
+          fscanf(fp, "%lf", &m.elem[t].udata[i*m.elem[t].dataPer+d]);
+      }
+    }
+}
+
+void chunk::writeComm(FILE *fp) const
+{
+    fprintf(fp, "%d\n", comm.nPes);
+    for(int p=0;p<comm.nPes;p++) {
+      fprintf(fp, "%d %d\n", comm.peNums[p], comm.numNodesPerPe[p]);
+      for(int j=0;j<comm.numNodesPerPe[p];j++) {
+        fprintf(fp, "%d ", comm.nodesPerPe[p][j]);
+      }
+      fprintf(fp,"\n");
+    }
+}
+void chunk::readComm(FILE *fp)
 {
     fscanf(fp, "%d", &comm.nPes);
     comm.allocate();
@@ -1086,19 +1131,37 @@ chunk::readComm()
     }
 }
 
+static const char *meshFileNames="meshdata.pe%d";
+
+void chunk::writeChunk(void)
+{
+    char fname[256];
+    sprintf(fname, meshFileNames, thisIndex);
+    FILE *fp = fopen(fname, "w");
+    if(fp==0) {
+      CkAbort("FEM: unable to open output file.\n");
+    }
+    CkPrintf("FEM> Writing %s...\n",fname);
+    writeNodes(fp);
+    writeElems(fp);
+    writeComm(fp);
+    fclose(fp);
+}
+
 void
 chunk::readChunk(ChunkMsg *msg)
 {
   if(msg==0) {
-    char fname[32];
-    sprintf(fname, "meshdata.Pe%d", thisIndex);
-    fp = fopen(fname, "r");
+    char fname[256];
+    sprintf(fname, meshFileNames, thisIndex);
+    FILE *fp = fopen(fname, "r");
     if(fp==0) {
       CkAbort("FEM: unable to open input file.\n");
     }
-    readNodes();
-    readElems();
-    readComm();
+    CkPrintf("FEM> Reading %s...\n",fname);    
+    readNodes(fp);
+    readElems(fp);
+    readComm(fp);
     fclose(fp);
   } else {
     //Just copy pointers right out of the message--
@@ -1191,8 +1254,7 @@ FEM_Done(void)
 {
   chunk *cptr = getCurChunk();
   if(!cptr->doneCalled) {
-    CProxy_main mainproxy(_mainhandle);
-    mainproxy.done();
+    _mainproxy.done();
     cptr->doneCalled = 1;
   }
 }
