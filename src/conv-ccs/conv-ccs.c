@@ -645,8 +645,9 @@ static void sendDataFunction(void)
 #else
   CcsSendReply(appletIP, appletPort, strlen(reply) + 1, reply);
 #endif
-  /* foo */
+  /*
   CmiPrintf("Reply = %s\n", reply);
+  */
   free(reply);
 
   /* Free valueArray contents */
