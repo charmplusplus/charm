@@ -91,8 +91,8 @@ void PipeBroadcastStrategy::propagate(envelope *env, int isFragmented){
 void PipeBroadcastStrategy::deliverer(envelope *env_frag, int isFragmented) {
   envelope *env;
   int isFinished=0;
-  ComlibPrintf("isArrayDestination = %d\n",isArrayDestination);
-  if (isArrayDestination) {
+  ComlibPrintf("isArray = %d\n",isArray);
+  if (isArray) {
     // check if the message is fragmented
     if (isFragmented) {
       // store the fragment in the hash table until completed
@@ -141,7 +141,7 @@ void PipeBroadcastStrategy::deliverer(envelope *env_frag, int isFragmented) {
     }
 
     if (isFinished) {
-      CkArray *dest_array = CkArrayID::CkLocalBranch(destArrayID);
+      CkArray *dest_array = CkArrayID::CkLocalBranch(aid);
       localDest = new CkVec<CkArrayIndexMax>;
       dest_array->getComlibArrayListener()->getLocalIndices(*localDest);
       void *msg = EnvToUsr(env);
@@ -156,7 +156,7 @@ void PipeBroadcastStrategy::deliverer(envelope *env_frag, int isFragmented) {
 	ComlibPrintf("[%d] Sending message to ",CkMyPe());
 	if (comm_debug) idx.print();
 
-	CProxyElement_ArrayBase ap(destArrayID, idx);
+	CProxyElement_ArrayBase ap(aid, idx);
 	elem = ap.ckLocal();
 	CkDeliverMessageReadonly (ep, msg, elem);
       }
@@ -169,38 +169,42 @@ void PipeBroadcastStrategy::deliverer(envelope *env_frag, int isFragmented) {
 
 PipeBroadcastStrategy::PipeBroadcastStrategy()
   :topology(USE_HYPERCUBE), pipeSize(DEFAULT_PIPE), Strategy() {
-  isArrayDestination = 0;
+  isArray = 0;
   commonInit();
 }
 
 PipeBroadcastStrategy::PipeBroadcastStrategy(int _topology)
   :topology(_topology), pipeSize(DEFAULT_PIPE), Strategy() {
-  isArrayDestination = 0;
+  isArray = 0;
   commonInit();
 }
 
 PipeBroadcastStrategy::PipeBroadcastStrategy(int _topology, int _pipeSize)
   :topology(_topology), pipeSize(_pipeSize), Strategy() {
-  isArrayDestination = 0;
+  isArray = 0;
   commonInit();
 }
 
-PipeBroadcastStrategy::PipeBroadcastStrategy(int _topology, CkArrayID aid)
-  :topology(_topology), destArrayID(aid), pipeSize(DEFAULT_PIPE), Strategy() {
-  isArrayDestination = 1;
+PipeBroadcastStrategy::PipeBroadcastStrategy(int _topology, CkArrayID _aid)
+  :topology(_topology), pipeSize(DEFAULT_PIPE), Strategy() {
+  isArray = 1;
+  aid = _aid;
   CmiPrintf("init: %d %d\n",topology, pipeSize);
   commonInit();
 }
 
-PipeBroadcastStrategy::PipeBroadcastStrategy(int _topology, CkArrayID aid, int _pipeSize)
-  :topology(_topology), destArrayID(aid), pipeSize(_pipeSize), Strategy() {
-  isArrayDestination = 1;
+PipeBroadcastStrategy::PipeBroadcastStrategy(int _topology, CkArrayID _aid, int _pipeSize)
+  :topology(_topology), pipeSize(_pipeSize), Strategy() {
+  isArray = 1;
+  aid = _aid;
   commonInit();
 }
 
 void PipeBroadcastStrategy::commonInit(){
   log_of_2_inv = 1/log((double)2);
   seqNumber = 0;
+  nIndices = 0;
+  elements = NULL;
 }
 
 void PipeBroadcastStrategy::insertMessage(CharmMessageHolder *cmsg){
@@ -272,8 +276,6 @@ void PipeBroadcastStrategy::pup(PUP::er &p){
   p|pipeSize;
   p|topology;
   p|seqNumber;
-  p|isArrayDestination;
-  p|destArrayID;
 
   if (p.isUnpacking()) {
     log_of_2_inv = 1/log((double)2);
@@ -281,7 +283,7 @@ void PipeBroadcastStrategy::pup(PUP::er &p){
     propagateHandle = CkRegisterHandler((CmiHandler)propagate_handler);
     propagateHandle_frag = CkRegisterHandler((CmiHandler)propagate_handler_frag);
   }
-  //p|messageBuf;
+  //p|(*messageBuf);
   //p|fragments;
 
 }

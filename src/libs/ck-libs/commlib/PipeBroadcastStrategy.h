@@ -61,8 +61,6 @@ class PipeBroadcastStrategy : public Strategy {
   int topology;
   double log_of_2_inv;
   int seqNumber;
-  int isArrayDestination;
-  CkArrayID destArrayID;
   CkQ <CharmMessageHolder*> *messageBuf;
   CkHashtableT<PipeBcastHashKey, PipeBcastHashObj *> fragments;
   int propagateHandle;
@@ -76,8 +74,8 @@ class PipeBroadcastStrategy : public Strategy {
   PipeBroadcastStrategy();
   PipeBroadcastStrategy(int _topology);
   PipeBroadcastStrategy(int _topology, int _pipeSize);
-  PipeBroadcastStrategy(int _topology, CkArrayID aid);
-  PipeBroadcastStrategy(int _topology, CkArrayID aid, int _pipeSize);
+  PipeBroadcastStrategy(int _topology, CkArrayID _aid);
+  PipeBroadcastStrategy(int _topology, CkArrayID _aid, int _pipeSize);
   PipeBroadcastStrategy(CkMigrateMessage *){}
   void insertMessage(CharmMessageHolder *msg);
   void doneInserting();
