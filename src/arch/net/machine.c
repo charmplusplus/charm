@@ -271,7 +271,7 @@ int n;
   exit(1);
 }
 
-static void KillOnSIGPIPE()
+static void KillOnSIGPIPE(int dummy)
 {
   fprintf(stderr,"host exited, terminating.\n");
   exit(0);
@@ -409,7 +409,7 @@ void writeall(int fd, char *buf, int size)
     if ((ok<0)&&((errno==EBADF)||(errno==EINTR))) goto retry;
     if (ok<=0) {
       fprintf(stderr, "Write failed ..\n");
-      KillOnSIGPIPE();
+      KillOnSIGPIPE(0);
     }
     size-=ok; buf+=ok;
   }
@@ -1391,7 +1391,7 @@ static void comm_thread(void)
     FD_SET(ctrlskt, &rfds);
     select(FD_SETSIZE, &rfds, 0, 0, &tmo);
   }
-  thr_exit(0);
+  /* thr_exit(0); */
 }
 
 static void *call_startfn(void *vindex)
@@ -1408,7 +1408,8 @@ static void *call_startfn(void *vindex)
 
 static void CmiStartThreads()
 {
-  int i, pid, ok;
+  int i, ok;
+  unsigned int pid;
   
   thr_setconcurrency(Cmi_mynodesize);
   thr_keycreate(&Cmi_state_key, 0);
@@ -1417,7 +1418,7 @@ static void CmiStartThreads()
   for (i=0; i<Cmi_mynodesize; i++)
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
   for (i=1; i<Cmi_mynodesize; i++) {
-    ok = thr_create(0, 256000, call_startfn, (void *)i, THR_BOUND, &pid);
+    ok = thr_create(0, 256000, call_startfn, (void *)i, THR_DETACHED|THR_BOUND, &pid);
     if (ok<0) { perror("thr_create"); exit(1); }
   }
   thr_setspecific(Cmi_state_key, Cmi_state_vector);
