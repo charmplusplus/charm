@@ -69,10 +69,8 @@ static void bdcastRO(void){
 	
 	env->setCount(++_numInitMsgs);
 	env->setSrcPe(CkMyPe());
-	CmiSetHandler(env, _roHandlerIdx);
+	CmiSetHandler(env, _roRestartHandlerIdx);
 	CmiSyncBroadcastAndFree(env->getTotalsize(), (char *)env);
-	// since _roHandler calls process()
-	CpvAccess(_qd)->create(CkNumPes()-1);
 }
 
 // Print out an array index to this string as decimal fields
