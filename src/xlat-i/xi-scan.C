@@ -22,9 +22,7 @@
 #ifdef __cplusplus
 
 #include <stdlib.h>
-#ifndef WIN32 /*MANUALLY ADDED LINE*/
 #include <unistd.h>
-#endif
 
 /* Use prototypes in function declarations. */
 #define YY_USE_PROTOS
@@ -728,7 +726,7 @@ YY_MALLOC_DECL
 YY_DECL
 	{
 	register yy_state_type yy_current_state;
-	register char *yy_cp, *yy_bp;
+	register char *yy_cp = NULL, *yy_bp = NULL;
 	register int yy_act;
 
 #line 53 "xi-scan.l"

@@ -192,6 +192,7 @@ class TypeList : public Printable {
 class Parameter {
     Type *type;
     const char *name; /*The name of the variable, if any*/
+    const char *given_name; /*The name of the msg in ci file, if any*/
     const char *arrLen; /*The expression for the length of the array;
     			 NULL if not an array*/
     Value *val; /*Initial value, if any*/
@@ -215,6 +216,11 @@ class Parameter {
     int isArray(void) const {return arrLen!=NULL;}
     Type *getType(void) {return type;}
     const char *getName(void) {return name;}
+    void printMsg(XStr& str) {
+      type->print(str);
+      if(given_name!=0)
+        str << given_name;
+    }
 };
 class ParamList {
     Parameter *param;
@@ -241,6 +247,9 @@ class ParamList {
     }
     void genMsgProxyName(XStr &str) {
     	param->type->genMsgProxyName(str);
+    }
+    void printMsg(XStr& str) {
+        param->printMsg(str);
     }
     void marshall(XStr &str,int orMakeVoid);
     void beginUnmarshall(XStr &str);
@@ -387,6 +396,8 @@ class Member : public Construct {
   public:
     virtual void setChare(Chare *c) { container = c; }
     virtual int isPure(void) { return 0; }
+    virtual int isSdag(void) { return 0; }
+    virtual void collectSdagCode(XStr& str, int& sdagPresent) { return; }
     XStr makeDecl(const char *returnType);
 };
 
@@ -402,6 +413,7 @@ class MemberList : public Printable {
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
+    void collectSdagCode(XStr& str, int& sdagPresent);
 };
 
 /* Chare or group is a templated entity */
@@ -572,6 +584,8 @@ class Entry : public Member {
     char *name;
     ParamList *param;
     Value *stacksize;
+    XStr *sdagCode;
+
     XStr epIdx(int include__idx_=1);
     void genEpIdxDecl(XStr& str);
     void genEpIdxDef(XStr& str);
@@ -609,10 +623,28 @@ class Entry : public Member {
     int isCreateHere(void) { return (attribs & SCREATEHERE); }
     const char *Virtual(void) {return isVirtual()?"virtual ":"";}
     int isPure(void) { return (attribs & SPURE); }
+    int isSdag(void) { return (sdagCode!=0); }
     void print(XStr& str);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
+    void setSdagCode(char *str) {
+      if(str!=0) {
+        if(!param->isMessage()) 
+          die("Marshalling or void methods unsupported in sdag yet", line);
+        sdagCode = new XStr("sdagentry ");
+	*sdagCode << name << "(";
+        param->printMsg(*sdagCode);
+        *sdagCode << ") ";
+        *sdagCode << "{\n" << str << "\n}\n";
+      }
+    }
+    void collectSdagCode(XStr& str, int& sdagPresent) {
+       if(isSdag()) {
+         str << *sdagCode;
+         sdagPresent = 1;
+       }
+    }
 };
 
 

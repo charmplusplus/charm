@@ -1,7 +1,6 @@
 
 /*  A Bison parser, made from xi-grammar.y
- by  GNU Bison version 1.27
-  */
+    by GNU Bison version 1.28  */
 
 #define YYBISON 1  /* Identify Bison output.  */
 
@@ -96,11 +95,11 @@ typedef union {
 
 
 
-#define	YYFINAL		295
+#define	YYFINAL		301
 #define	YYFLAG		-32768
 #define	YYNTBASE	53
 
-#define YYTRANSLATE(x) ((unsigned)(x) <= 292 ? yytranslate[x] : 123)
+#define YYTRANSLATE(x) ((unsigned)(x) <= 292 ? yytranslate[x] : 125)
 
 static const char yytranslate[] = {     0,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -149,10 +148,11 @@ static const short yyprhs[] = {     0,
    261,   267,   273,   279,   284,   288,   294,   300,   306,   312,
    318,   324,   329,   330,   333,   334,   337,   340,   344,   347,
    351,   353,   357,   362,   365,   368,   371,   374,   377,   379,
-   384,   385,   388,   391,   394,   397,   405,   410,   412,   414,
-   415,   419,   421,   425,   427,   429,   431,   433,   435,   437,
-   439,   441,   443,   445,   451,   457,   461,   463,   466,   471,
-   475,   477,   481,   485,   488,   489,   493,   494
+   384,   385,   388,   391,   394,   397,   406,   412,   414,   416,
+   417,   421,   423,   427,   429,   431,   433,   435,   437,   439,
+   441,   443,   445,   446,   448,   454,   460,   464,   466,   468,
+   471,   476,   480,   482,   486,   490,   493,   494,   498,   499,
+   502,   503
 };
 
 static const short yyrhs[] = {    54,
@@ -171,7 +171,7 @@ static const short yyrhs[] = {    54,
     37,     0,    33,    37,     0,    23,     0,    57,    66,     0,
     58,    66,     0,    67,     0,    69,     0,    70,    46,     0,
     71,    46,     0,    72,    46,     0,    74,    47,    46,    57,
-    48,    47,   119,    48,     0,    70,     0,    71,     0,    72,
+    48,    47,   120,    48,     0,    70,     0,    71,     0,    72,
      0,    73,     0,    74,    49,    75,    50,     0,    74,    51,
      0,    29,     0,    58,     0,    49,    75,    50,     0,     0,
     76,    77,     0,     6,    74,    58,    77,     0,     6,    12,
@@ -196,38 +196,40 @@ static const short yyrhs[] = {    54,
    105,    99,     0,   105,   100,     0,    39,     0,    41,   108,
     42,    56,     0,     0,   109,   108,     0,   110,    39,     0,
     78,    39,     0,    79,    39,     0,    27,   112,   111,    57,
-   120,   122,   121,     0,    27,   112,    57,   120,     0,    23,
-     0,    71,     0,     0,    49,   113,    50,     0,   114,     0,
-   114,    43,   113,     0,    15,     0,    17,     0,    18,     0,
-    19,     0,    21,     0,    22,     0,    30,     0,    29,     0,
-    58,     0,    31,     0,    31,    49,    31,    50,    31,     0,
-    31,    41,    31,    42,    31,     0,    74,    57,    49,     0,
-    74,     0,    74,    57,     0,    74,    57,    52,   115,     0,
-   117,   116,    50,     0,   118,     0,   118,    43,   119,     0,
-    47,   119,    48,     0,    47,    48,     0,     0,    14,    52,
-    29,     0,     0,    52,    29,     0
+   121,   123,   122,   124,     0,    27,   112,    57,   121,   124,
+     0,    23,     0,    71,     0,     0,    49,   113,    50,     0,
+   114,     0,   114,    43,   113,     0,    15,     0,    17,     0,
+    18,     0,    19,     0,    21,     0,    22,     0,    30,     0,
+    29,     0,    58,     0,     0,    31,     0,    31,    49,    31,
+    50,    31,     0,    31,    41,   116,    42,   116,     0,    74,
+    57,    49,     0,    41,     0,    74,     0,    74,    57,     0,
+    74,    57,    52,   115,     0,   117,   116,    50,     0,   119,
+     0,   119,    43,   120,     0,    47,   120,    48,     0,    47,
+    48,     0,     0,    14,    52,    29,     0,     0,    52,    29,
+     0,     0,   118,   116,    42,     0
 };
 
 #endif
 
 #if YYDEBUG != 0
 static const short yyrline[] = { 0,
-    99,   103,   105,   109,   111,   115,   117,   121,   125,   127,
-   135,   137,   141,   143,   147,   149,   153,   155,   157,   159,
-   161,   163,   165,   167,   169,   171,   175,   177,   179,   183,
-   185,   189,   191,   195,   197,   201,   203,   205,   207,   209,
-   211,   213,   215,   217,   219,   221,   223,   225,   229,   230,
-   232,   234,   238,   242,   244,   248,   252,   254,   256,   258,
-   260,   262,   268,   270,   274,   278,   280,   284,   288,   292,
-   294,   304,   306,   310,   312,   316,   318,   322,   324,   328,
-   332,   336,   338,   342,   344,   348,   350,   354,   356,   360,
-   362,   366,   370,   374,   380,   384,   388,   390,   394,   398,
-   402,   406,   410,   412,   416,   418,   420,   424,   426,   428,
-   432,   434,   438,   442,   444,   446,   448,   450,   454,   456,
-   460,   462,   466,   468,   470,   474,   476,   480,   482,   486,
-   488,   492,   494,   498,   500,   502,   504,   506,   508,   512,
-   514,   516,   520,   522,   528,   536,   543,   545,   547,   549,
-   556,   558,   562,   564,   568,   570,   574,   576
+   100,   104,   106,   110,   112,   116,   118,   122,   126,   128,
+   136,   138,   142,   144,   148,   150,   154,   156,   158,   160,
+   162,   164,   166,   168,   170,   172,   176,   178,   180,   184,
+   186,   190,   192,   196,   198,   202,   204,   206,   208,   210,
+   212,   214,   216,   218,   220,   222,   224,   226,   230,   231,
+   233,   235,   239,   243,   245,   249,   253,   255,   257,   259,
+   261,   263,   269,   271,   275,   279,   281,   285,   289,   293,
+   295,   305,   307,   311,   313,   317,   319,   323,   325,   329,
+   333,   337,   339,   343,   345,   349,   351,   355,   357,   361,
+   363,   367,   371,   375,   381,   385,   389,   391,   395,   399,
+   403,   407,   411,   413,   417,   419,   421,   425,   427,   429,
+   433,   435,   439,   443,   445,   447,   449,   451,   455,   457,
+   461,   463,   467,   469,   471,   475,   479,   485,   487,   491,
+   493,   497,   499,   503,   505,   507,   509,   511,   513,   517,
+   519,   521,   525,   527,   529,   535,   543,   550,   557,   559,
+   561,   563,   570,   572,   576,   578,   582,   584,   588,   590,
+   596,   598
 };
 #endif
 
@@ -249,8 +251,8 @@ static const char * const yytname[] = {   "$","error","$undefined.","MODULE",
 "ArrayIndexType","Array","TChare","TGroup","TNodeGroup","TArray","TMessage",
 "OptTypeInit","OptNameInit","TVar","TVarList","TemplateSpec","Template","MemberEList",
 "MemberList","Member","Entry","EReturn","EAttribs","EAttribList","EAttrib","DefaultParameter",
-"CCode","ParamBracketStart","Parameter","ParamList","EParameters","OptStackSize",
-"OptPure", NULL
+"CCode","ParamBracketStart","ParamBraceStart","Parameter","ParamList","EParameters",
+"OptStackSize","OptPure","OptSdagCode", NULL
 };
 #endif
 
@@ -269,8 +271,9 @@ static const short yyr1[] = {     0,
    104,   104,   105,   106,   106,   106,   106,   106,   107,   107,
    108,   108,   109,   109,   109,   110,   110,   111,   111,   112,
    112,   113,   113,   114,   114,   114,   114,   114,   114,   115,
-   115,   115,   116,   116,   116,   117,   118,   118,   118,   118,
-   119,   119,   120,   120,   121,   121,   122,   122
+   115,   115,   116,   116,   116,   116,   117,   118,   119,   119,
+   119,   119,   120,   120,   121,   121,   122,   122,   123,   123,
+   124,   124
 };
 
 static const short yyr2[] = {     0,
@@ -286,10 +289,11 @@ static const short yyr2[] = {     0,
      5,     5,     5,     4,     3,     5,     5,     5,     5,     5,
      5,     4,     0,     2,     0,     2,     2,     3,     2,     3,
      1,     3,     4,     2,     2,     2,     2,     2,     1,     4,
-     0,     2,     2,     2,     2,     7,     4,     1,     1,     0,
+     0,     2,     2,     2,     2,     8,     5,     1,     1,     0,
      3,     1,     3,     1,     1,     1,     1,     1,     1,     1,
-     1,     1,     1,     5,     5,     3,     1,     2,     4,     3,
-     1,     3,     3,     2,     0,     3,     0,     2
+     1,     1,     0,     1,     5,     5,     3,     1,     1,     2,
+     4,     3,     1,     3,     3,     2,     0,     3,     0,     2,
+     0,     3
 };
 
 static const short yydefact[] = {     2,
@@ -316,70 +320,74 @@ static const short yydefact[] = {     2,
      0,     0,     0,   102,    31,     0,    65,     0,   130,     0,
      0,     0,   121,     0,     0,    83,    85,   104,    97,    98,
     99,   100,   101,     0,    89,     0,     0,   124,   125,     6,
-   122,   123,     0,   147,     0,   151,     0,   134,   135,   136,
+   122,   123,     0,   149,   143,   153,     0,   134,   135,   136,
    137,   138,   139,     0,   132,    48,     9,     0,     0,   129,
-     0,   120,     0,   148,   143,     0,     0,    56,   131,     0,
-     0,   127,     0,    81,   146,     0,     0,     0,   150,   152,
-   133,   154,     0,   157,   141,   140,   142,   149,     0,     0,
-   153,     0,   155,     0,     0,   158,     0,   126,   145,   144,
-     0,   156,     0,     0,     0
+     0,   120,     0,   150,   144,     0,     0,    56,   131,     0,
+     0,   161,     0,    81,   147,     0,   143,     0,   152,   154,
+   133,   156,     0,   148,   143,   127,   159,   141,   140,   142,
+   151,     0,     0,   155,     0,     0,   157,   143,     0,   162,
+   160,     0,   161,   146,   145,     0,   126,   158,     0,     0,
+     0
 };
 
-static const short yydefgoto[] = {   293,
+static const short yydefgoto[] = {   299,
      3,    14,    82,   103,    48,     4,    11,    15,    16,   132,
    133,   134,    92,    49,   179,    50,    51,    52,    53,    54,
    234,   139,   141,   142,   210,   211,    64,   113,   114,    57,
    101,   102,   191,   192,    29,   147,   180,    30,    31,    32,
     62,    33,    76,    77,    78,    79,    80,   194,   159,   119,
    120,    34,    35,   183,   212,   213,   214,   251,   227,   244,
-   245,   278,   256,   235,   236,   237,   262,   288,   283
+   245,   281,   256,   235,   275,   236,   237,   262,   293,   287,
+   276
 };
 
-static const short yypact[] = {   143,
-    15,    15,-32768,   143,-32768,    71,    71,-32768,-32768,    19,
+static const short yypact[] = {    61,
+    17,    17,-32768,    61,-32768,    71,    71,-32768,-32768,    19,
 -32768,-32768,-32768,     7,   -15,    19,   117,   -17,   -17,   -17,
-   -17,    -4,    28,    45,    19,-32768,    55,    66,    70,-32768,
--32768,-32768,-32768,   207,-32768,    74,-32768,   149,-32768,-32768,
--32768,    25,-32768,-32768,-32768,-32768,   141,     2,-32768,-32768,
-    73,    82,    85,-32768,     6,   118,    15,    15,    15,    15,
-   129,    15,   169,    15,    63,   102,-32768,-32768,-32768,   -17,
-   -17,   -17,   -17,    -4,    28,-32768,-32768,-32768,-32768,-32768,
--32768,-32768,    96,-32768,-32768,-32768,-32768,-32768,-32768,   120,
-   133,-32768,-32768,-32768,-32768,   150,   162,-32768,    10,-32768,
-   114,   136,   164,   170,   170,   170,   170,    15,   172,   170,
--32768,-32768,   173,   181,   171,    15,     4,    57,   182,   183,
-    74,    15,    15,    15,    15,    15,    15,    15,   199,-32768,
--32768,   186,-32768,   185,    69,    15,-32768,   192,   184,   162,
-   187,-32768,-32768,   118,-32768,    15,   100,   100,   100,   100,
-   188,-32768,   100,-32768,   169,   149,   179,   191,-32768,   189,
-    63,-32768,-32768,   170,   170,   170,   170,   170,   196,-32768,
--32768,   133,-32768,   194,-32768,   190,-32768,-32768,   200,-32768,
+   -17,    10,    28,    75,    19,-32768,    74,    89,    92,-32768,
+-32768,-32768,-32768,   207,-32768,    99,-32768,   149,-32768,-32768,
+-32768,    25,-32768,-32768,-32768,-32768,   141,    50,-32768,-32768,
+    96,    98,   114,-32768,     6,   144,    17,    17,    17,    17,
+    60,    17,   121,    17,    63,   137,-32768,-32768,-32768,   -17,
+   -17,   -17,   -17,    10,    28,-32768,-32768,-32768,-32768,-32768,
+-32768,-32768,   162,-32768,-32768,-32768,-32768,-32768,-32768,   170,
+   133,-32768,-32768,-32768,-32768,   174,   129,-32768,    43,-32768,
+   171,   169,   178,   183,   183,   183,   183,    17,   175,   183,
+-32768,-32768,   177,   181,   187,    17,     4,    57,   186,   185,
+    99,    17,    17,    17,    17,    17,    17,    17,   203,-32768,
+-32768,   189,-32768,   190,    69,    17,-32768,   194,   188,   129,
+   191,-32768,-32768,   144,-32768,    17,   100,   100,   100,   100,
+   192,-32768,   100,-32768,   121,   149,   184,   161,-32768,   193,
+    63,-32768,-32768,   183,   183,   183,   183,   183,   198,-32768,
+-32768,   133,-32768,   195,-32768,   196,-32768,-32768,   201,-32768,
 -32768,    27,-32768,-32768,-32768,-32768,-32768,-32768,-32768,    57,
-   149,   195,   149,-32768,-32768,-32768,-32768,-32768,   100,   100,
-   100,   100,   100,-32768,-32768,   197,-32768,    15,   198,   206,
-   209,   204,    27,   210,   202,-32768,-32768,    69,-32768,-32768,
--32768,-32768,-32768,   149,-32768,   115,   165,-32768,-32768,    74,
--32768,-32768,   203,    57,   208,   211,   212,-32768,-32768,-32768,
--32768,-32768,-32768,   205,   213,   224,   214,   215,    73,-32768,
-    15,-32768,   218,    41,    62,   216,   149,-32768,-32768,   115,
-     3,-32768,   215,-32768,-32768,    35,   227,   228,-32768,-32768,
--32768,-32768,   217,   219,-32768,-32768,   192,-32768,   221,   220,
--32768,   235,   253,   237,   238,-32768,   222,-32768,-32768,-32768,
-   243,-32768,   273,   275,-32768
+   149,   197,   149,-32768,-32768,-32768,-32768,-32768,   100,   100,
+   100,   100,   100,-32768,-32768,   200,-32768,    17,   199,   202,
+   210,   209,    27,   213,   204,-32768,-32768,    69,-32768,-32768,
+-32768,-32768,-32768,   149,-32768,   115,   165,-32768,-32768,    99,
+-32768,-32768,   205,    57,   223,   214,   208,-32768,-32768,-32768,
+-32768,-32768,-32768,   211,   215,   231,   216,   217,    96,-32768,
+    17,-32768,   221,    -6,    62,   212,   149,-32768,-32768,   115,
+     3,   224,   217,-32768,-32768,   166,   223,   235,-32768,-32768,
+-32768,-32768,   219,-32768,   223,-32768,   218,-32768,-32768,   194,
+-32768,   226,   222,-32768,   227,   242,   259,   223,   243,-32768,
+-32768,   225,   224,-32768,-32768,   246,-32768,-32768,   276,   278,
+-32768
 };
 
 static const short yypgoto[] = {-32768,
-   272,-32768,  -116,    -1,   -53,   263,   271,    67,-32768,-32768,
-   107,-32768,   177,-32768,   147,-32768,   -35,    54,-32768,   -59,
-   -13,   142,-32768,   144,   269,   270,   223,   131,-32768,     9,
-   145,-32768,-32768,    97,-32768,   -98,    79,-32768,-32768,-32768,
-   225,-32768,-32768,-32768,-32768,-32768,-32768,-32768,   130,-32768,
-   132,-32768,-32768,  -128,    78,-32768,-32768,-32768,-32768,    32,
--32768,-32768,-32768,-32768,-32768,  -173,    31,-32768,-32768
+   275,-32768,  -116,    -1,   -53,   266,   274,    68,-32768,-32768,
+   110,-32768,   180,-32768,   147,-32768,   -35,    58,-32768,   -59,
+   -13,   146,-32768,   143,   273,   277,   220,   134,-32768,     9,
+   148,-32768,-32768,    97,-32768,   -98,    82,-32768,-32768,-32768,
+   228,-32768,-32768,-32768,-32768,-32768,-32768,-32768,   136,-32768,
+   132,-32768,-32768,  -128,    81,-32768,-32768,-32768,-32768,    37,
+-32768,-32768,  -225,-32768,-32768,-32768,  -152,    35,-32768,-32768,
+     8
 };
 
 
-#define	YYLAST		299
+#define	YYLAST		302
 
 
 static const short yytable[] = {     6,
@@ -387,32 +395,33 @@ static const short yytable[] = {     6,
      2,   153,    17,    18,    19,    20,    21,    22,    23,   184,
    185,   186,    24,    13,   188,    39,    36,    58,    59,    60,
     40,    56,    17,    40,    41,    42,    43,    44,    45,    46,
-    47,    90,     5,   138,    61,    91,  -105,    25,  -105,    90,
-   272,   118,    96,   209,    97,   158,    98,    84,   140,   109,
-   -15,    85,    40,   275,   276,   199,   200,   201,   202,   203,
+    47,   282,   265,   138,     5,   266,  -105,    25,  -105,   285,
+   272,   118,    96,   209,    97,   158,    98,    84,    61,   109,
+   -15,    85,   294,     1,     2,   199,   200,   201,   202,   203,
    219,   220,   221,   222,   223,   116,    63,   135,   122,   123,
-   124,   125,    37,   270,     5,    39,   138,   273,    65,   265,
-    40,    66,   266,    67,    41,    42,    43,    44,    45,    46,
-    47,   117,   267,    96,    68,    97,   151,    98,    69,     9,
-   268,    10,    81,   252,   157,    96,   160,    97,    93,    98,
-   164,   165,   166,   167,   168,   169,   170,    94,    38,   238,
-    95,   239,   240,   241,   174,   242,   243,   100,   181,    39,
-   182,   128,   190,   121,    40,     1,     2,   118,    41,    42,
-    43,    44,    45,    46,    47,    39,     5,   108,   135,   129,
-    40,   130,   131,   143,    41,    42,    43,    44,    45,    46,
-    47,    39,    86,    87,    88,    89,    40,   190,   144,   218,
-    41,    42,    43,    44,    45,    46,    47,   246,   215,    40,
-   137,   249,   247,   111,   112,   136,    41,    42,    43,    44,
-    45,    46,    47,   104,   105,   106,   107,    91,   110,   146,
-   115,   156,   277,    70,    71,    72,    73,    74,    75,   195,
-   196,   152,   154,   155,   161,   248,   171,   162,   172,   173,
-   193,    90,   254,   175,   204,   140,   217,   187,   255,   207,
-   158,   206,   208,   224,   228,   230,   226,   229,   232,   263,
-   233,  -128,   253,   257,   259,   260,   264,   279,   280,   258,
-    -8,   261,   284,   286,   281,   269,   287,   289,   290,   285,
-   282,   292,   294,   291,   295,     8,    26,    12,   205,   145,
-   250,   176,    27,    28,   177,   189,   225,   216,   178,   197,
-   231,   271,   198,   274,     0,     0,     0,   127,   126
+   124,   125,    90,    37,     5,    39,   138,     5,   108,    90,
+    40,   140,    66,    91,    41,    42,    43,    44,    45,    46,
+    47,   117,   267,    96,   270,    97,   151,    98,   273,     9,
+   268,    10,    67,   252,   157,    96,   160,    97,    65,    98,
+   164,   165,   166,   167,   168,   169,   170,    68,    38,   238,
+    69,   239,   240,   241,   174,   242,   243,    81,   181,    39,
+   182,    93,   190,    94,    40,   111,   112,   118,    41,    42,
+    43,    44,    45,    46,    47,    39,    40,   137,   135,    95,
+    40,   130,   131,   100,    41,    42,    43,    44,    45,    46,
+    47,    39,    86,    87,    88,    89,    40,   190,   121,   218,
+    41,    42,    43,    44,    45,    46,    47,   246,   215,   195,
+   196,   249,   247,    40,   278,   279,    41,    42,    43,    44,
+    45,    46,    47,   104,   105,   106,   107,   128,   110,   129,
+   115,   144,   280,    70,    71,    72,    73,    74,    75,   136,
+   143,    91,   146,   155,   152,   248,   154,   156,   161,   162,
+   171,   172,   254,    90,   173,   193,   204,   175,   217,   140,
+   228,   187,   206,   208,   158,   207,   224,   226,   229,   263,
+   230,   232,   233,   255,   253,   258,   257,   260,  -128,   264,
+   259,   269,    -8,   261,   274,   283,   284,   288,   290,   286,
+   291,   289,   292,   295,   298,   300,   296,   301,     8,    26,
+    12,   205,   145,   177,   250,   176,    27,   216,   189,   225,
+    28,   178,   198,   231,   127,   197,   271,   277,     0,     0,
+   297,   126
 };
 
 static const short yycheck[] = {     1,
@@ -420,36 +429,37 @@ static const short yycheck[] = {     1,
      4,   110,     6,     7,     8,     9,    10,    11,    12,   148,
    149,   150,    16,     5,   153,    23,    42,    19,    20,    21,
     28,    49,     6,    28,    32,    33,    34,    35,    36,    37,
-    38,    40,    28,    97,    49,    44,    43,    41,    45,    40,
+    38,   267,    49,    97,    28,    52,    43,    41,    45,   275,
     48,    65,    47,    27,    49,    52,    51,    33,    49,    61,
-    42,    37,    28,    29,    30,   164,   165,   166,   167,   168,
+    42,    37,   288,     3,     4,   164,   165,   166,   167,   168,
    199,   200,   201,   202,   203,    13,    49,    91,    70,    71,
-    72,    73,    16,   257,    28,    23,   140,   261,    44,    49,
-    28,    25,    52,    39,    32,    33,    34,    35,    36,    37,
-    38,   161,    41,    47,    39,    49,   108,    51,    39,    39,
-    49,    41,    39,   230,   116,    47,   118,    49,    46,    51,
-   122,   123,   124,   125,   126,   127,   128,    46,    12,    15,
-    46,    17,    18,    19,   136,    21,    22,    20,    39,    23,
-    41,    46,   156,    42,    28,     3,     4,   161,    32,    33,
-    34,    35,    36,    37,    38,    23,    28,    29,   172,    40,
-    28,    29,    30,    50,    32,    33,    34,    35,    36,    37,
-    38,    23,    32,    33,    34,    35,    28,   191,    43,   193,
-    32,    33,    34,    35,    36,    37,    38,    23,   190,    28,
-    29,   227,    28,    25,    26,    46,    32,    33,    34,    35,
-    36,    37,    38,    57,    58,    59,    60,    44,    62,    40,
-    64,    41,   266,     7,     8,     9,    10,    11,    12,    29,
-    30,    50,    50,    43,    43,   227,    28,    45,    43,    45,
-    52,    40,   234,    50,    39,    49,    42,    50,    31,    50,
-    52,    48,    43,    47,    39,    42,    49,    39,    39,   251,
-    49,    28,    50,    43,    50,    43,    39,    31,    31,    48,
-    47,    47,    42,    29,    48,    50,    14,    31,    31,    50,
-    52,    29,     0,    52,     0,     4,    14,     7,   172,   103,
-   227,   140,    14,    14,   141,   155,   208,   191,   144,   160,
-   213,   260,   161,   263,    -1,    -1,    -1,    75,    74
+    72,    73,    40,    16,    28,    23,   140,    28,    29,    40,
+    28,    49,    25,    44,    32,    33,    34,    35,    36,    37,
+    38,   161,    41,    47,   257,    49,   108,    51,   261,    39,
+    49,    41,    39,   230,   116,    47,   118,    49,    44,    51,
+   122,   123,   124,   125,   126,   127,   128,    39,    12,    15,
+    39,    17,    18,    19,   136,    21,    22,    39,    39,    23,
+    41,    46,   156,    46,    28,    25,    26,   161,    32,    33,
+    34,    35,    36,    37,    38,    23,    28,    29,   172,    46,
+    28,    29,    30,    20,    32,    33,    34,    35,    36,    37,
+    38,    23,    32,    33,    34,    35,    28,   191,    42,   193,
+    32,    33,    34,    35,    36,    37,    38,    23,   190,    29,
+    30,   227,    28,    28,    29,    30,    32,    33,    34,    35,
+    36,    37,    38,    57,    58,    59,    60,    46,    62,    40,
+    64,    43,   266,     7,     8,     9,    10,    11,    12,    46,
+    50,    44,    40,    43,    50,   227,    50,    41,    43,    45,
+    28,    43,   234,    40,    45,    52,    39,    50,    42,    49,
+    39,    50,    48,    43,    52,    50,    47,    49,    39,   251,
+    42,    39,    49,    31,    50,    48,    43,    43,    28,    39,
+    50,    50,    47,    47,    41,    31,    48,    42,    42,    52,
+    29,    50,    14,    31,    29,     0,    52,     0,     4,    14,
+     7,   172,   103,   141,   227,   140,    14,   191,   155,   208,
+    14,   144,   161,   213,    75,   160,   260,   263,    -1,    -1,
+   293,    74
 };
 /* -*-C-*-  Note some compilers choke on comments on `#line' lines.  */
-#line 3 "/usr/share/bison.simple"
-/* This file comes from bison-1.27.  */
+#line 3 "/usr/lib/bison.simple"
+/* This file comes from bison-1.28.  */
 
 /* Skeleton output parser for bison,
    Copyright (C) 1984, 1989, 1990 Free Software Foundation, Inc.
@@ -662,7 +672,7 @@ __yy_memcpy (char *to, char *from, unsigned int count)
 #endif
 #endif
 
-#line 216 "/usr/share/bison.simple"
+#line 217 "/usr/lib/bison.simple"
 
 /* The user can define YYPARSE_PARAM as the name of an argument to be passed
    into yyparse.  The argument should have type void *.
@@ -991,43 +1001,43 @@ yyreduce:
   switch (yyn) {
 
 case 1:
-#line 100 "xi-grammar.y"
+#line 101 "xi-grammar.y"
 { yyval.modlist = yyvsp[0].modlist; modlist = yyvsp[0].modlist; ;
     break;}
 case 2:
-#line 104 "xi-grammar.y"
+#line 105 "xi-grammar.y"
 { yyval.modlist = 0; ;
     break;}
 case 3:
-#line 106 "xi-grammar.y"
+#line 107 "xi-grammar.y"
 { yyval.modlist = new ModuleList(lineno, yyvsp[-1].module, yyvsp[0].modlist); ;
     break;}
 case 4:
-#line 110 "xi-grammar.y"
+#line 111 "xi-grammar.y"
 { yyval.intval = 0; ;
     break;}
 case 5:
-#line 112 "xi-grammar.y"
+#line 113 "xi-grammar.y"
 { yyval.intval = 1; ;
     break;}
 case 6:
-#line 116 "xi-grammar.y"
+#line 117 "xi-grammar.y"
 { yyval.intval = 0; ;
     break;}
 case 7:
-#line 118 "xi-grammar.y"
+#line 119 "xi-grammar.y"
 { yyval.intval = 1; ;
     break;}
 case 8:
-#line 122 "xi-grammar.y"
+#line 123 "xi-grammar.y"
 { yyval.strval = yyvsp[0].strval; ;
     break;}
 case 9:
-#line 126 "xi-grammar.y"
+#line 127 "xi-grammar.y"
 { yyval.strval = yyvsp[0].strval; ;
     break;}
 case 10:
-#line 128 "xi-grammar.y"
+#line 129 "xi-grammar.y"
 {
 		  char *tmp = new char[strlen(yyvsp[-3].strval)+strlen(yyvsp[0].strval)+3];
 		  sprintf(tmp,"%s::%s", yyvsp[-3].strval, yyvsp[0].strval);
@@ -1035,247 +1045,247 @@ case 10:
 		;
     break;}
 case 11:
-#line 136 "xi-grammar.y"
+#line 137 "xi-grammar.y"
 { yyval.module = new Module(lineno, yyvsp[-1].strval, yyvsp[0].conslist); ;
     break;}
 case 12:
-#line 138 "xi-grammar.y"
+#line 139 "xi-grammar.y"
 { yyval.module = new Module(lineno, yyvsp[-1].strval, yyvsp[0].conslist); yyval.module->setMain(); ;
     break;}
 case 13:
-#line 142 "xi-grammar.y"
+#line 143 "xi-grammar.y"
 { yyval.conslist = 0; ;
     break;}
 case 14:
-#line 144 "xi-grammar.y"
+#line 145 "xi-grammar.y"
 { yyval.conslist = yyvsp[-2].conslist; ;
     break;}
 case 15:
-#line 148 "xi-grammar.y"
+#line 149 "xi-grammar.y"
 { yyval.conslist = 0; ;
     break;}
 case 16:
-#line 150 "xi-grammar.y"
+#line 151 "xi-grammar.y"
 { yyval.conslist = new ConstructList(lineno, yyvsp[-1].construct, yyvsp[0].conslist); ;
     break;}
 case 17:
-#line 154 "xi-grammar.y"
+#line 155 "xi-grammar.y"
 { if(yyvsp[-2].conslist) yyvsp[-2].conslist->setExtern(yyvsp[-4].intval); yyval.construct = yyvsp[-2].conslist; ;
     break;}
 case 18:
-#line 156 "xi-grammar.y"
+#line 157 "xi-grammar.y"
 { yyvsp[0].module->setExtern(yyvsp[-1].intval); yyval.construct = yyvsp[0].module; ;
     break;}
 case 19:
-#line 158 "xi-grammar.y"
+#line 159 "xi-grammar.y"
 { yyvsp[-1].readonly->setExtern(yyvsp[-2].intval); yyval.construct = yyvsp[-1].readonly; ;
     break;}
 case 20:
-#line 160 "xi-grammar.y"
+#line 161 "xi-grammar.y"
 { yyvsp[-1].readonly->setExtern(yyvsp[-2].intval); yyval.construct = yyvsp[-1].readonly; ;
     break;}
 case 21:
-#line 162 "xi-grammar.y"
+#line 163 "xi-grammar.y"
 { yyvsp[-1].message->setExtern(yyvsp[-2].intval); yyval.construct = yyvsp[-1].message; ;
     break;}
 case 22:
-#line 164 "xi-grammar.y"
+#line 165 "xi-grammar.y"
 { yyvsp[0].chare->setExtern(yyvsp[-1].intval); yyval.construct = yyvsp[0].chare; ;
     break;}
 case 23:
-#line 166 "xi-grammar.y"
+#line 167 "xi-grammar.y"
 { yyvsp[0].chare->setExtern(yyvsp[-1].intval); yyval.construct = yyvsp[0].chare; ;
     break;}
 case 24:
-#line 168 "xi-grammar.y"
+#line 169 "xi-grammar.y"
 { yyvsp[0].chare->setExtern(yyvsp[-1].intval); yyval.construct = yyvsp[0].chare; ;
     break;}
 case 25:
-#line 170 "xi-grammar.y"
+#line 171 "xi-grammar.y"
 { yyvsp[0].chare->setExtern(yyvsp[-1].intval); yyval.construct = yyvsp[0].chare; ;
     break;}
 case 26:
-#line 172 "xi-grammar.y"
+#line 173 "xi-grammar.y"
 { yyvsp[0].templat->setExtern(yyvsp[-1].intval); yyval.construct = yyvsp[0].templat; ;
     break;}
 case 27:
-#line 176 "xi-grammar.y"
+#line 177 "xi-grammar.y"
 { yyval.tparam = new TParamType(yyvsp[0].type); ;
     break;}
 case 28:
-#line 178 "xi-grammar.y"
+#line 179 "xi-grammar.y"
 { yyval.tparam = new TParamVal(yyvsp[0].strval); ;
     break;}
 case 29:
-#line 180 "xi-grammar.y"
+#line 181 "xi-grammar.y"
 { yyval.tparam = new TParamVal(yyvsp[0].strval); ;
     break;}
 case 30:
-#line 184 "xi-grammar.y"
+#line 185 "xi-grammar.y"
 { yyval.tparlist = new TParamList(yyvsp[0].tparam); ;
     break;}
 case 31:
-#line 186 "xi-grammar.y"
+#line 187 "xi-grammar.y"
 { yyval.tparlist = new TParamList(yyvsp[-2].tparam, yyvsp[0].tparlist); ;
     break;}
 case 32:
-#line 190 "xi-grammar.y"
+#line 191 "xi-grammar.y"
 { yyval.tparlist = 0; ;
     break;}
 case 33:
-#line 192 "xi-grammar.y"
+#line 193 "xi-grammar.y"
 { yyval.tparlist = yyvsp[0].tparlist; ;
     break;}
 case 34:
-#line 196 "xi-grammar.y"
+#line 197 "xi-grammar.y"
 { yyval.tparlist = 0; ;
     break;}
 case 35:
-#line 198 "xi-grammar.y"
+#line 199 "xi-grammar.y"
 { yyval.tparlist = yyvsp[-1].tparlist; ;
     break;}
 case 36:
-#line 202 "xi-grammar.y"
+#line 203 "xi-grammar.y"
 { yyval.type = new BuiltinType("int"); ;
     break;}
 case 37:
-#line 204 "xi-grammar.y"
+#line 205 "xi-grammar.y"
 { yyval.type = new BuiltinType("long"); ;
     break;}
 case 38:
-#line 206 "xi-grammar.y"
+#line 207 "xi-grammar.y"
 { yyval.type = new BuiltinType("short"); ;
     break;}
 case 39:
-#line 208 "xi-grammar.y"
+#line 209 "xi-grammar.y"
 { yyval.type = new BuiltinType("char"); ;
     break;}
 case 40:
-#line 210 "xi-grammar.y"
+#line 211 "xi-grammar.y"
 { yyval.type = new BuiltinType("unsigned int"); ;
     break;}
 case 41:
-#line 212 "xi-grammar.y"
+#line 213 "xi-grammar.y"
 { yyval.type = new BuiltinType("unsigned long"); ;
     break;}
 case 42:
-#line 214 "xi-grammar.y"
+#line 215 "xi-grammar.y"
 { yyval.type = new BuiltinType("unsigned short"); ;
     break;}
 case 43:
-#line 216 "xi-grammar.y"
+#line 217 "xi-grammar.y"
 { yyval.type = new BuiltinType("unsigned char"); ;
     break;}
 case 44:
-#line 218 "xi-grammar.y"
+#line 219 "xi-grammar.y"
 { yyval.type = new BuiltinType("long long"); ;
     break;}
 case 45:
-#line 220 "xi-grammar.y"
+#line 221 "xi-grammar.y"
 { yyval.type = new BuiltinType("float"); ;
     break;}
 case 46:
-#line 222 "xi-grammar.y"
+#line 223 "xi-grammar.y"
 { yyval.type = new BuiltinType("double"); ;
     break;}
 case 47:
-#line 224 "xi-grammar.y"
+#line 225 "xi-grammar.y"
 { yyval.type = new BuiltinType("long double"); ;
     break;}
 case 48:
-#line 226 "xi-grammar.y"
+#line 227 "xi-grammar.y"
 { yyval.type = new BuiltinType("void"); ;
     break;}
 case 49:
-#line 229 "xi-grammar.y"
-{ yyval.ntype = new NamedType(yyvsp[-1].strval,yyvsp[0].tparlist); ;
-    break;}
-case 50:
 #line 230 "xi-grammar.y"
 { yyval.ntype = new NamedType(yyvsp[-1].strval,yyvsp[0].tparlist); ;
     break;}
+case 50:
+#line 231 "xi-grammar.y"
+{ yyval.ntype = new NamedType(yyvsp[-1].strval,yyvsp[0].tparlist); ;
+    break;}
 case 51:
-#line 233 "xi-grammar.y"
+#line 234 "xi-grammar.y"
 { yyval.type = yyvsp[0].type; ;
     break;}
 case 52:
-#line 235 "xi-grammar.y"
+#line 236 "xi-grammar.y"
 { yyval.type = yyvsp[0].ntype; ;
     break;}
 case 53:
-#line 239 "xi-grammar.y"
+#line 240 "xi-grammar.y"
 { yyval.ptype = new PtrType(yyvsp[-1].type); ;
     break;}
 case 54:
-#line 243 "xi-grammar.y"
+#line 244 "xi-grammar.y"
 { yyvsp[-1].ptype->indirect(); yyval.ptype = yyvsp[-1].ptype; ;
     break;}
 case 55:
-#line 245 "xi-grammar.y"
+#line 246 "xi-grammar.y"
 { yyvsp[-1].ptype->indirect(); yyval.ptype = yyvsp[-1].ptype; ;
     break;}
 case 56:
-#line 249 "xi-grammar.y"
+#line 250 "xi-grammar.y"
 { yyval.ftype = new FuncType(yyvsp[-7].type, yyvsp[-4].strval, yyvsp[-1].plist); ;
     break;}
 case 57:
-#line 253 "xi-grammar.y"
+#line 254 "xi-grammar.y"
 { yyval.type = yyvsp[0].type; ;
     break;}
 case 58:
-#line 255 "xi-grammar.y"
+#line 256 "xi-grammar.y"
 { yyval.type = yyvsp[0].ptype; ;
     break;}
 case 59:
-#line 257 "xi-grammar.y"
+#line 258 "xi-grammar.y"
 { yyval.type = yyvsp[0].ptype; ;
     break;}
 case 60:
-#line 259 "xi-grammar.y"
+#line 260 "xi-grammar.y"
 { yyval.type = yyvsp[0].ftype; ;
     break;}
 case 61:
-#line 261 "xi-grammar.y"
+#line 262 "xi-grammar.y"
 { yyval.type = new ArrayType(yyvsp[-3].type,yyvsp[-1].val); ;
     break;}
 case 62:
-#line 263 "xi-grammar.y"
+#line 264 "xi-grammar.y"
 { yyval.type = new ReferenceType(yyvsp[-1].type); ;
     break;}
 case 63:
-#line 269 "xi-grammar.y"
+#line 270 "xi-grammar.y"
 { yyval.val = new Value(yyvsp[0].strval); ;
     break;}
 case 64:
-#line 271 "xi-grammar.y"
+#line 272 "xi-grammar.y"
 { yyval.val = new Value(yyvsp[0].strval); ;
     break;}
 case 65:
-#line 275 "xi-grammar.y"
+#line 276 "xi-grammar.y"
 { yyval.val = yyvsp[-1].val; ;
     break;}
 case 66:
-#line 279 "xi-grammar.y"
+#line 280 "xi-grammar.y"
 { yyval.vallist = 0; ;
     break;}
 case 67:
-#line 281 "xi-grammar.y"
+#line 282 "xi-grammar.y"
 { yyval.vallist = new ValueList(yyvsp[-1].val, yyvsp[0].vallist); ;
     break;}
 case 68:
-#line 285 "xi-grammar.y"
+#line 286 "xi-grammar.y"
 { yyval.readonly = new Readonly(lineno, yyvsp[-2].type, yyvsp[-1].strval, yyvsp[0].vallist); ;
     break;}
 case 69:
-#line 289 "xi-grammar.y"
+#line 290 "xi-grammar.y"
 { yyval.readonly = new Readonly(lineno, yyvsp[-2].type, yyvsp[0].strval, 0, 1); ;
     break;}
 case 70:
-#line 293 "xi-grammar.y"
+#line 294 "xi-grammar.y"
 { yyval.intval = 0; ;
     break;}
 case 71:
-#line 295 "xi-grammar.y"
+#line 296 "xi-grammar.y"
 { 
 		  /*
 		  printf("Warning: Message attributes are being phased out.\n");
@@ -1285,95 +1295,95 @@ case 71:
 		;
     break;}
 case 72:
-#line 305 "xi-grammar.y"
+#line 306 "xi-grammar.y"
 { yyval.intval = yyvsp[0].intval; ;
     break;}
 case 73:
-#line 307 "xi-grammar.y"
+#line 308 "xi-grammar.y"
 { yyval.intval = yyvsp[-2].intval | yyvsp[0].intval; ;
     break;}
 case 74:
-#line 311 "xi-grammar.y"
+#line 312 "xi-grammar.y"
 { yyval.intval = 0; ;
     break;}
 case 75:
-#line 313 "xi-grammar.y"
+#line 314 "xi-grammar.y"
 { yyval.intval = 0; ;
     break;}
 case 76:
-#line 317 "xi-grammar.y"
+#line 318 "xi-grammar.y"
 { yyval.cattr = 0; ;
     break;}
 case 77:
-#line 319 "xi-grammar.y"
+#line 320 "xi-grammar.y"
 { yyval.cattr = yyvsp[-1].cattr; ;
     break;}
 case 78:
-#line 323 "xi-grammar.y"
+#line 324 "xi-grammar.y"
 { yyval.cattr = yyvsp[0].cattr; ;
     break;}
 case 79:
-#line 325 "xi-grammar.y"
+#line 326 "xi-grammar.y"
 { yyval.cattr = yyvsp[-2].cattr | yyvsp[0].cattr; ;
     break;}
 case 80:
-#line 329 "xi-grammar.y"
+#line 330 "xi-grammar.y"
 { yyval.cattr = Chare::CMIGRATABLE; ;
     break;}
 case 81:
-#line 333 "xi-grammar.y"
+#line 334 "xi-grammar.y"
 { yyval.mv = new MsgVar(yyvsp[-4].type, yyvsp[-3].strval); ;
     break;}
 case 82:
-#line 337 "xi-grammar.y"
+#line 338 "xi-grammar.y"
 { yyval.mvlist = new MsgVarList(yyvsp[0].mv); ;
     break;}
 case 83:
-#line 339 "xi-grammar.y"
+#line 340 "xi-grammar.y"
 { yyval.mvlist = new MsgVarList(yyvsp[-1].mv, yyvsp[0].mvlist); ;
     break;}
 case 84:
-#line 343 "xi-grammar.y"
+#line 344 "xi-grammar.y"
 { yyval.message = new Message(lineno, yyvsp[0].ntype); ;
     break;}
 case 85:
-#line 345 "xi-grammar.y"
+#line 346 "xi-grammar.y"
 { yyval.message = new Message(lineno, yyvsp[-3].ntype, yyvsp[-1].mvlist); ;
     break;}
 case 86:
-#line 349 "xi-grammar.y"
+#line 350 "xi-grammar.y"
 { yyval.typelist = 0; ;
     break;}
 case 87:
-#line 351 "xi-grammar.y"
+#line 352 "xi-grammar.y"
 { yyval.typelist = yyvsp[0].typelist; ;
     break;}
 case 88:
-#line 355 "xi-grammar.y"
+#line 356 "xi-grammar.y"
 { yyval.typelist = new TypeList(yyvsp[0].ntype); ;
     break;}
 case 89:
-#line 357 "xi-grammar.y"
+#line 358 "xi-grammar.y"
 { yyval.typelist = new TypeList(yyvsp[-2].ntype, yyvsp[0].typelist); ;
     break;}
 case 90:
-#line 361 "xi-grammar.y"
+#line 362 "xi-grammar.y"
 { yyval.chare = new Chare(lineno, yyvsp[-3].cattr, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); ;
     break;}
 case 91:
-#line 363 "xi-grammar.y"
+#line 364 "xi-grammar.y"
 { yyval.chare = new MainChare(lineno, yyvsp[-3].cattr, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); ;
     break;}
 case 92:
-#line 367 "xi-grammar.y"
+#line 368 "xi-grammar.y"
 { yyval.chare = new Group(lineno, yyvsp[-3].cattr, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); ;
     break;}
 case 93:
-#line 371 "xi-grammar.y"
+#line 372 "xi-grammar.y"
 { yyval.chare = new NodeGroup(lineno, yyvsp[-3].cattr, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); ;
     break;}
 case 94:
-#line 375 "xi-grammar.y"
+#line 376 "xi-grammar.y"
 {/*Stupid special case for [1D] indices*/
 			char *buf=new char[40];
 			sprintf(buf,"%sD",yyvsp[-2].strval);
@@ -1381,280 +1391,303 @@ case 94:
 		;
     break;}
 case 95:
-#line 381 "xi-grammar.y"
+#line 382 "xi-grammar.y"
 { yyval.ntype = new NamedType(yyvsp[-1].strval); ;
     break;}
 case 96:
-#line 385 "xi-grammar.y"
+#line 386 "xi-grammar.y"
 { yyval.chare = new Array(lineno, 0, yyvsp[-3].ntype, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); ;
     break;}
 case 97:
-#line 389 "xi-grammar.y"
+#line 390 "xi-grammar.y"
 { yyval.chare = new Chare(lineno, yyvsp[-3].cattr, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist);;
     break;}
 case 98:
-#line 391 "xi-grammar.y"
+#line 392 "xi-grammar.y"
 { yyval.chare = new MainChare(lineno, yyvsp[-3].cattr, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); ;
     break;}
 case 99:
-#line 395 "xi-grammar.y"
+#line 396 "xi-grammar.y"
 { yyval.chare = new Group(lineno, yyvsp[-3].cattr, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); ;
     break;}
 case 100:
-#line 399 "xi-grammar.y"
+#line 400 "xi-grammar.y"
 { yyval.chare = new NodeGroup( lineno, yyvsp[-3].cattr, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); ;
     break;}
 case 101:
-#line 403 "xi-grammar.y"
+#line 404 "xi-grammar.y"
 { yyval.chare = new Array( lineno, 0, yyvsp[-3].ntype, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); ;
     break;}
 case 102:
-#line 407 "xi-grammar.y"
+#line 408 "xi-grammar.y"
 { yyval.message = new Message(lineno, new NamedType(yyvsp[-1].strval)); ;
     break;}
 case 103:
-#line 411 "xi-grammar.y"
+#line 412 "xi-grammar.y"
 { yyval.type = 0; ;
     break;}
 case 104:
-#line 413 "xi-grammar.y"
+#line 414 "xi-grammar.y"
 { yyval.type = yyvsp[0].type; ;
     break;}
 case 105:
-#line 417 "xi-grammar.y"
+#line 418 "xi-grammar.y"
 { yyval.strval = 0; ;
     break;}
 case 106:
-#line 419 "xi-grammar.y"
+#line 420 "xi-grammar.y"
 { yyval.strval = yyvsp[0].strval; ;
     break;}
 case 107:
-#line 421 "xi-grammar.y"
+#line 422 "xi-grammar.y"
 { yyval.strval = yyvsp[0].strval; ;
     break;}
 case 108:
-#line 425 "xi-grammar.y"
+#line 426 "xi-grammar.y"
 { yyval.tvar = new TType(new NamedType(yyvsp[-1].strval), yyvsp[0].type); ;
     break;}
 case 109:
-#line 427 "xi-grammar.y"
+#line 428 "xi-grammar.y"
 { yyval.tvar = new TFunc(yyvsp[-1].ftype, yyvsp[0].strval); ;
     break;}
 case 110:
-#line 429 "xi-grammar.y"
+#line 430 "xi-grammar.y"
 { yyval.tvar = new TName(yyvsp[-2].type, yyvsp[-1].strval, yyvsp[0].strval); ;
     break;}
 case 111:
-#line 433 "xi-grammar.y"
+#line 434 "xi-grammar.y"
 { yyval.tvarlist = new TVarList(yyvsp[0].tvar); ;
     break;}
 case 112:
-#line 435 "xi-grammar.y"
+#line 436 "xi-grammar.y"
 { yyval.tvarlist = new TVarList(yyvsp[-2].tvar, yyvsp[0].tvarlist); ;
     break;}
 case 113:
-#line 439 "xi-grammar.y"
+#line 440 "xi-grammar.y"
 { yyval.tvarlist = yyvsp[-1].tvarlist; ;
     break;}
 case 114:
-#line 443 "xi-grammar.y"
+#line 444 "xi-grammar.y"
 { yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].chare); yyvsp[0].chare->setTemplate(yyval.templat); ;
     break;}
 case 115:
-#line 445 "xi-grammar.y"
+#line 446 "xi-grammar.y"
 { yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].chare); yyvsp[0].chare->setTemplate(yyval.templat); ;
     break;}
 case 116:
-#line 447 "xi-grammar.y"
+#line 448 "xi-grammar.y"
 { yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].chare); yyvsp[0].chare->setTemplate(yyval.templat); ;
     break;}
 case 117:
-#line 449 "xi-grammar.y"
+#line 450 "xi-grammar.y"
 { yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].chare); yyvsp[0].chare->setTemplate(yyval.templat); ;
     break;}
 case 118:
-#line 451 "xi-grammar.y"
+#line 452 "xi-grammar.y"
 { yyval.templat = new Template(yyvsp[-1].tvarlist, yyvsp[0].message); yyvsp[0].message->setTemplate(yyval.templat); ;
     break;}
 case 119:
-#line 455 "xi-grammar.y"
+#line 456 "xi-grammar.y"
 { yyval.mbrlist = 0; ;
     break;}
 case 120:
-#line 457 "xi-grammar.y"
+#line 458 "xi-grammar.y"
 { yyval.mbrlist = yyvsp[-2].mbrlist; ;
     break;}
 case 121:
-#line 461 "xi-grammar.y"
+#line 462 "xi-grammar.y"
 { yyval.mbrlist = 0; ;
     break;}
 case 122:
-#line 463 "xi-grammar.y"
+#line 464 "xi-grammar.y"
 { yyval.mbrlist = new MemberList(yyvsp[-1].member, yyvsp[0].mbrlist); ;
     break;}
 case 123:
-#line 467 "xi-grammar.y"
+#line 468 "xi-grammar.y"
 { yyval.member = yyvsp[-1].entry; ;
     break;}
 case 124:
-#line 469 "xi-grammar.y"
+#line 470 "xi-grammar.y"
 { yyval.member = yyvsp[-1].readonly; ;
     break;}
 case 125:
-#line 471 "xi-grammar.y"
+#line 472 "xi-grammar.y"
 { yyval.member = yyvsp[-1].readonly; ;
     break;}
 case 126:
-#line 475 "xi-grammar.y"
-{ yyval.entry = new Entry(lineno, yyvsp[-5].intval|yyvsp[-1].intval, yyvsp[-4].type, yyvsp[-3].strval, yyvsp[-2].plist, yyvsp[0].val); ;
+#line 476 "xi-grammar.y"
+{ yyval.entry = new Entry(lineno, yyvsp[-6].intval|yyvsp[-2].intval, yyvsp[-5].type, yyvsp[-4].strval, yyvsp[-3].plist, yyvsp[-1].val); 
+		  yyval.entry->setSdagCode(yyvsp[0].strval);
+		;
     break;}
 case 127:
-#line 477 "xi-grammar.y"
-{ yyval.entry = new Entry(lineno, yyvsp[-2].intval,     0, yyvsp[-1].strval, yyvsp[0].plist,  0); ;
+#line 480 "xi-grammar.y"
+{ yyval.entry = new Entry(lineno, yyvsp[-3].intval,     0, yyvsp[-2].strval, yyvsp[-1].plist,  0); 
+		  yyval.entry->setSdagCode(yyvsp[0].strval);
+		;
     break;}
 case 128:
-#line 481 "xi-grammar.y"
+#line 486 "xi-grammar.y"
 { yyval.type = new BuiltinType("void"); ;
     break;}
 case 129:
-#line 483 "xi-grammar.y"
+#line 488 "xi-grammar.y"
 { yyval.type = yyvsp[0].ptype; ;
     break;}
 case 130:
-#line 487 "xi-grammar.y"
+#line 492 "xi-grammar.y"
 { yyval.intval = 0; ;
     break;}
 case 131:
-#line 489 "xi-grammar.y"
+#line 494 "xi-grammar.y"
 { yyval.intval = yyvsp[-1].intval; ;
     break;}
 case 132:
-#line 493 "xi-grammar.y"
+#line 498 "xi-grammar.y"
 { yyval.intval = yyvsp[0].intval; ;
     break;}
 case 133:
-#line 495 "xi-grammar.y"
+#line 500 "xi-grammar.y"
 { yyval.intval = yyvsp[-2].intval | yyvsp[0].intval; ;
     break;}
 case 134:
-#line 499 "xi-grammar.y"
+#line 504 "xi-grammar.y"
 { yyval.intval = STHREADED; ;
     break;}
 case 135:
-#line 501 "xi-grammar.y"
+#line 506 "xi-grammar.y"
 { yyval.intval = SSYNC; ;
     break;}
 case 136:
-#line 503 "xi-grammar.y"
+#line 508 "xi-grammar.y"
 { yyval.intval = SLOCKED; ;
     break;}
 case 137:
-#line 505 "xi-grammar.y"
+#line 510 "xi-grammar.y"
 { yyval.intval = SVIRTUAL; ;
     break;}
 case 138:
-#line 507 "xi-grammar.y"
+#line 512 "xi-grammar.y"
 { yyval.intval = SCREATEHERE; ;
     break;}
 case 139:
-#line 509 "xi-grammar.y"
+#line 514 "xi-grammar.y"
 { yyval.intval = SCREATEHOME; ;
     break;}
 case 140:
-#line 513 "xi-grammar.y"
+#line 518 "xi-grammar.y"
 { yyval.val = new Value(yyvsp[0].strval); ;
     break;}
 case 141:
-#line 515 "xi-grammar.y"
+#line 520 "xi-grammar.y"
 { yyval.val = new Value(yyvsp[0].strval); ;
     break;}
 case 142:
-#line 517 "xi-grammar.y"
+#line 522 "xi-grammar.y"
 { yyval.val = new Value(yyvsp[0].strval); ;
     break;}
 case 143:
-#line 521 "xi-grammar.y"
-{ yyval.strval = yyvsp[0].strval; ;
+#line 526 "xi-grammar.y"
+{ yyval.strval = ""; ;
     break;}
 case 144:
-#line 523 "xi-grammar.y"
+#line 528 "xi-grammar.y"
+{ yyval.strval = yyvsp[0].strval; ;
+    break;}
+case 145:
+#line 530 "xi-grammar.y"
 {  /*Returned only when in_bracket*/
 			char *tmp = new char[strlen(yyvsp[-4].strval)+strlen(yyvsp[-2].strval)+strlen(yyvsp[0].strval)+3];
 			sprintf(tmp,"%s[%s]%s", yyvsp[-4].strval, yyvsp[-2].strval, yyvsp[0].strval);
 			yyval.strval = tmp;
 		;
     break;}
-case 145:
-#line 529 "xi-grammar.y"
+case 146:
+#line 536 "xi-grammar.y"
 { /*Returned only when in_braces*/
 			char *tmp = new char[strlen(yyvsp[-4].strval)+strlen(yyvsp[-2].strval)+strlen(yyvsp[0].strval)+3];
 			sprintf(tmp,"%s{%s}%s", yyvsp[-4].strval, yyvsp[-2].strval, yyvsp[0].strval);
 			yyval.strval = tmp;
 		;
     break;}
-case 146:
-#line 537 "xi-grammar.y"
+case 147:
+#line 544 "xi-grammar.y"
 {  /*Start grabbing CPROGRAM segments*/
 			in_bracket=1;
 			yyval.pname = new Parameter(lineno, yyvsp[-2].type,yyvsp[-1].strval);
 		;
     break;}
-case 147:
-#line 544 "xi-grammar.y"
-{ yyval.pname = new Parameter(lineno, yyvsp[0].type);;
-    break;}
 case 148:
-#line 546 "xi-grammar.y"
-{ yyval.pname = new Parameter(lineno, yyvsp[-1].type,yyvsp[0].strval);;
+#line 551 "xi-grammar.y"
+{  /*Start grabbing CPROGRAM segments*/
+			in_braces=1;
+			yyval.intval = 0;
+		;
     break;}
 case 149:
-#line 548 "xi-grammar.y"
-{ yyval.pname = new Parameter(lineno, yyvsp[-3].type,yyvsp[-2].strval,0,yyvsp[0].val);;
+#line 558 "xi-grammar.y"
+{ yyval.pname = new Parameter(lineno, yyvsp[0].type);;
     break;}
 case 150:
-#line 550 "xi-grammar.y"
+#line 560 "xi-grammar.y"
+{ yyval.pname = new Parameter(lineno, yyvsp[-1].type,yyvsp[0].strval);;
+    break;}
+case 151:
+#line 562 "xi-grammar.y"
+{ yyval.pname = new Parameter(lineno, yyvsp[-3].type,yyvsp[-2].strval,0,yyvsp[0].val);;
+    break;}
+case 152:
+#line 564 "xi-grammar.y"
 { /*Stop grabbing CPROGRAM segments*/
 			in_bracket=0;
 			yyval.pname = new Parameter(lineno, yyvsp[-2].pname->getType(), yyvsp[-2].pname->getName() ,yyvsp[-1].strval);
 		;
     break;}
-case 151:
-#line 557 "xi-grammar.y"
+case 153:
+#line 571 "xi-grammar.y"
 { yyval.plist = new ParamList(yyvsp[0].pname); ;
     break;}
-case 152:
-#line 559 "xi-grammar.y"
+case 154:
+#line 573 "xi-grammar.y"
 { yyval.plist = new ParamList(yyvsp[-2].pname,yyvsp[0].plist); ;
     break;}
-case 153:
-#line 563 "xi-grammar.y"
+case 155:
+#line 577 "xi-grammar.y"
 { yyval.plist = yyvsp[-1].plist; ;
     break;}
-case 154:
-#line 565 "xi-grammar.y"
+case 156:
+#line 579 "xi-grammar.y"
 { yyval.plist = 0; ;
     break;}
-case 155:
-#line 569 "xi-grammar.y"
+case 157:
+#line 583 "xi-grammar.y"
 { yyval.val = 0; ;
     break;}
-case 156:
-#line 571 "xi-grammar.y"
+case 158:
+#line 585 "xi-grammar.y"
 { yyval.val = new Value(yyvsp[0].strval); ;
     break;}
-case 157:
-#line 575 "xi-grammar.y"
+case 159:
+#line 589 "xi-grammar.y"
 { yyval.intval = 0; ;
     break;}
-case 158:
-#line 577 "xi-grammar.y"
+case 160:
+#line 591 "xi-grammar.y"
 { if(strcmp(yyvsp[0].strval, "0")) { yyerror("pure virtual must '=0'"); exit(1); }
 		  yyval.intval = SPURE; 
 		;
     break;}
+case 161:
+#line 597 "xi-grammar.y"
+{ yyval.strval = 0; ;
+    break;}
+case 162:
+#line 599 "xi-grammar.y"
+{ in_braces = 0; yyval.strval = yyvsp[-1].strval; ;
+    break;}
 }
    /* the action file gets copied in in place of this dollarsign */
-#line 542 "/usr/share/bison.simple"
+#line 543 "/usr/lib/bison.simple"
 
   yyvsp -= yylen;
   yyssp -= yylen;
@@ -1874,7 +1907,7 @@ yyerrhandle:
     }
   return 1;
 }
-#line 581 "xi-grammar.y"
+#line 602 "xi-grammar.y"
 
 void yyerror(const char *mesg)
 {

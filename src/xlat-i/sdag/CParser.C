@@ -75,9 +75,6 @@ CParsedFile *CParser::doParse(void)
   CParsedFile *cParsedFile = new CParsedFile();
   CToken *tok;
 
-  tok = lookForToken(CLASS); delete tok;
-  tok = lookForToken(IDENT);
-  cParsedFile->className = tok->text;
   while(1) {
     tok = lookForToken(SDAGENTRY);
     if(tok == 0)

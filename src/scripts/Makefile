@@ -25,7 +25,7 @@ SHELL=/bin/sh
 
 all: charm++ bluegene LIBS ampi f90charm tsm sm pvm doc
 
-charm++: converse libck.a charmxi sdagx
+charm++: converse libck.a charmxi
 
 bluegene: charm++ libconv-bluegene.a
 
@@ -51,7 +51,7 @@ AMPIF: charm++ libconv-utilf.a LIBS libampif.a
 
 f90charm: charm++ libf90charm.a
 
-translators: sdagx charmxi conv-cpm
+translators: charmxi conv-cpm
 
 LIBS: CONVLIBS CHARMLIBS
 	cd libs; make otherlibs OPTS='$(OPTS)'
@@ -163,9 +163,9 @@ dirs+sources:
 	./gatherflat ../../src/Common/langs/pvmc       .
 	./gatherflat ../../src/Common/langs/ampi       .
 	./gatherflat ../../src/Common/langs/bluegene   .
-	./gatherflat ../../src/Common/langs/sdag/xlator       .
-	./gatherflat ../../src/Common/langs/f90charm      .
+	./gatherflat ../../src/Common/langs/f90charm   .
 	./gatherflat ../../src/Common/xlat-i           .
+	./gatherflat ../../src/Common/xlat-i/sdag      .
 	./gatherflat ../../src/Common/xlatcpm          .
 	./gathertree ../../src/QuickThreads QuickThreads
 	./gathertree ../../src/Common/libs libs
@@ -582,24 +582,55 @@ conv-cpm.o: conv-cpm.c
 
 XIHEADERS=xi-symbol.h xi-util.h xi-grammar.tab.h
 CHARMXI=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o
+SDAGOBJ=sdag-main.o trans.o CLexer.o CParser.o CParsedFile.o CParseNode.o \
+	sdag-globals.o CParseNodeProcess.o CEntry.o
+SDAGHEADERS=CLexer.h CToken.h EToken.h CParser.h CParsedFile.h CParseNode.h \
+	sdag-globals.h CEntry.h
 
-charmxi: $(CHARMXI)
-	$(SEQCHARMC) -language c++ -cp ../bin/ -o charmxi $(CHARMXI)
+charmxi: $(CHARMXI) $(SDAGOBJ)
+	$(SEQCHARMC) -language c++ -cp ../bin/ -o charmxi $(CHARMXI) $(SDAGOBJ)
 
-xi-main.o: xi-main.C $(XIHEADERS)
+xi-main.o: xi-main.C $(XIHEADERS) $(SDAGHEADERS)
 	$(SEQCHARMC) xi-main.C
 
-xi-symbol.o: xi-symbol.C $(XIHEADERS)
+xi-symbol.o: xi-symbol.C $(XIHEADERS) $(SDAGHEADERS)
 	$(SEQCHARMC) xi-symbol.C
 
-xi-util.o: xi-util.C $(XIHEADERS)
+xi-util.o: xi-util.C $(XIHEADERS) $(SDAGHEADERS)
 	$(SEQCHARMC) xi-util.C
 
-xi-grammar.tab.o: xi-grammar.tab.C $(XIHEADERS)
+xi-grammar.tab.o: xi-grammar.tab.C $(XIHEADERS) $(SDAGHEADERS)
 	$(SEQCHARMC) xi-grammar.tab.C
 
-xi-scan.o: xi-scan.C $(XIHEADERS)
+xi-scan.o: xi-scan.C $(XIHEADERS) $(SDAGHEADERS)
 	$(SEQCHARMC) -I. -DYY_NEVER_INTERACTIVE xi-scan.C
+
+sdag-main.o: sdag-main.C $(XIHEADERS) $(SDAGHEADERS)
+	$(SEQCHARMC) -c sdag-main.C
+
+trans.o: trans.c $(XIHEADERS) $(SDAGHEADERS)
+	$(SEQCHARMC) -c trans.c
+
+CLexer.o: CLexer.C $(XIHEADERS) $(SDAGHEADERS)
+	$(SEQCHARMC) -c CLexer.C
+
+CParser.o: CParser.C $(XIHEADERS) $(SDAGHEADERS)
+	$(SEQCHARMC) -c CParser.C
+
+CParsedFile.o: CParsedFile.C $(XIHEADERS) $(SDAGHEADERS)
+	$(SEQCHARMC) -c CParsedFile.C
+
+CParseNode.o: CParseNode.C $(XIHEADERS) $(SDAGHEADERS)
+	$(SEQCHARMC) -c CParseNode.C
+
+sdag-globals.o: sdag-globals.C $(XIHEADERS) $(SDAGHEADERS)
+	$(SEQCHARMC) -c sdag-globals.C
+
+CParseNodeProcess.o: CParseNodeProcess.C $(XIHEADERS) $(SDAGHEADERS)
+	$(SEQCHARMC) -c CParseNodeProcess.C
+
+CEntry.o: CEntry.C $(XIHEADERS) $(SDAGHEADERS)
+	$(SEQCHARMC) -c CEntry.C
 
 ###############################################################################
 #
@@ -666,39 +697,6 @@ libf90charm.a: f90main.ci f90main.h f90main.C charmf.h charmf.C futil.f90
 	$(CHARMC) -c -DAMPI_FORTRAN=1 charmf.C
 	$(CHARMC) -c futil.f90
 	$(CHARMC) -cp ../lib -o libf90charm.a f90main.o charmf.o futil.o
-
-SDAGOBJ=sdag-main.o trans.o CLexer.o CParser.o CParsedFile.o CParseNode.o \
-	sdag-globals.o CParseNodeProcess.o CEntry.o xi-util.o
-
-sdagx: $(SDAGOBJ)
-	$(SEQCHARMC) -cp ../bin -o sdagx -language c++ $(SDAGOBJ)
-
-sdag-main.o: sdag-main.C CLexer.h CToken.h
-	$(SEQCHARMC) -c sdag-main.C
-
-trans.o: trans.c EToken.h
-	$(SEQCHARMC) -c trans.c
-
-CLexer.o: CLexer.C CLexer.h
-	$(SEQCHARMC) -c CLexer.C
-
-CParser.o: CParser.C CParser.h
-	$(SEQCHARMC) -c CParser.C
-
-CParsedFile.o: CParsedFile.C CParsedFile.h
-	$(SEQCHARMC) -c CParsedFile.C
-
-CParseNode.o: CParseNode.C CParseNode.h
-	$(SEQCHARMC) -c CParseNode.C
-
-sdag-globals.o: sdag-globals.C sdag-globals.h
-	$(SEQCHARMC) -c sdag-globals.C
-
-CParseNodeProcess.o: CParseNodeProcess.C CParseNode.h
-	$(SEQCHARMC) -c CParseNodeProcess.C
-
-CEntry.o: CEntry.C CEntry.h
-	$(SEQCHARMC) -c CEntry.C
 
 ###############################################################################
 #

@@ -10,9 +10,6 @@
 
 void CParsedFile::print(int indent)
 {
-  printf("class ");
-  className->print(indent);
-  printf("\n");
   for(CEntry *ce=(CEntry *)(entryList->begin()); !entryList->end(); ce=(CEntry *)(entryList->next()))
   {
     ce->print(indent);
@@ -35,7 +32,7 @@ void CParsedFile::numberNodes(void)
 void CParsedFile::labelNodes(void)
 {
   for(CParseNode *cn=(CParseNode *)(nodeList->begin()); !nodeList->end(); cn=(CParseNode *)(nodeList->next())) {
-    cn->labelNodes(className);
+    cn->labelNodes();
   }
 }
 

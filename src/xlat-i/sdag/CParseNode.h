@@ -20,7 +20,6 @@ class CParser;
 
 class CParseNode {
   public:
-    XStr *className;
     void print(int indent);
     int nodeNum;
     XStr *label;
@@ -38,7 +37,7 @@ class CParseNode {
     CParseNode(EToken t, XStr *txt) : type(t), text(txt), con1(0), con2(0),
                                          con3(0), con4(0), constructs(0) {}
     void numberNodes(void);
-    void labelNodes(XStr *);
+    void labelNodes(void);
     void generateEntryList(TList *, CParseNode *);
     void propogateState(TList *);
     void generateCode(XStr& output);

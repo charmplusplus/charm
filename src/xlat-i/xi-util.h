@@ -47,6 +47,9 @@ class XStr {
       for (int i=0; i<indent; i++) cout << "  ";
       cout << get_string();
     }
+    // MAB: this method appends character c to every line
+    // basically substitutes every \n with a "c\n"
+    void line_append(const char c);
   public:
     XStr();
     XStr(const char *_s);

@@ -36,11 +36,10 @@ void CParseNode::numberNodes(void)
   }
 }
 
-void CParseNode::labelNodes(XStr *cname)
+void CParseNode::labelNodes(void)
 {
   char text[128];
 
-  className = cname;
   switch(type) {
     case ENTRY:
     case SDAGENTRY:
@@ -66,7 +65,7 @@ void CParseNode::labelNodes(XStr *cname)
     case IF: 
       sprintf(text, "_if_%d", nodeNum); 
       label = new XStr(text);
-      if(con2!=0) con2->labelNodes(cname);
+      if(con2!=0) con2->labelNodes();
       break;
     case ELSE: 
       sprintf(text, "_else_%d", nodeNum); 
@@ -96,7 +95,7 @@ void CParseNode::labelNodes(XStr *cname)
   }
   CParseNode *cn;
   for(cn=(CParseNode *)(constructs->begin()); !constructs->end(); cn=(CParseNode *)(constructs->next())) {
-    cn->labelNodes(cname);
+    cn->labelNodes();
   }
 }
 

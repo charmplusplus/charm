@@ -54,6 +54,19 @@ XStr& XStr::operator << (int i) {
       return *this;
 };
 
+void XStr::line_append(const char c)
+{
+  XStr xs;
+  for(int i=0; i<len; i++) {
+    if(s[i] == '\n')
+      xs << c << "\n";
+    else
+      xs << s[i];
+  }
+  delete[] s;
+  initTo(xs.charstar());
+}
+
 void 
 XStr::spew(const char*b, const char *a1, const char *a2, const char *a3, 
            const char *a4, const char *a5)

@@ -679,9 +679,6 @@ do
 		    Do $CHARMBIN/charmxi $CMK_XIOPTS $BASE.ci
 		fi
 		;;
-	*.sdag)
-		Do $CHARMBIN/sdagx $BASE.sdag
-		;;
 	*.c|*.s)
 		Do $CMK_CC $OPTSC $OPTS_CC -I$CHARMINC -c $FILE -o $BASE.o
 		NU_OBJ=$BASE.o

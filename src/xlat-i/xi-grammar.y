@@ -65,7 +65,7 @@ ModuleList *modlist;
 %type <module>		Module
 %type <conslist>	ConstructEList ConstructList
 %type <construct>	Construct
-%type <strval>		Name QualName CCode OptNameInit
+%type <strval>		Name QualName CCode OptSdagCode OptNameInit
 %type <val>		OptStackSize
 %type <intval>		OptExtern OptSemiColon MAttribs MAttribList MAttrib
 %type <intval>		EAttribs EAttribList EAttrib OptPure
@@ -93,6 +93,7 @@ ModuleList *modlist;
 %type <vallist>		DimList
 %type <mv>		Var
 %type <mvlist>		VarList
+%type <intval>		ParamBraceStart
 
 %%
 
@@ -471,10 +472,14 @@ Member		: Entry ';'
 		{ $$ = $1; }
 		;
 
-Entry		: ENTRY EAttribs EReturn Name EParameters OptPure OptStackSize
-		{ $$ = new Entry(lineno, $2|$6, $3, $4, $5, $7); }
-		| ENTRY EAttribs Name EParameters /*Constructor*/
-		{ $$ = new Entry(lineno, $2,     0, $3, $4,  0); }
+Entry		: ENTRY EAttribs EReturn Name EParameters OptPure OptStackSize OptSdagCode
+		{ $$ = new Entry(lineno, $2|$6, $3, $4, $5, $7); 
+		  $$->setSdagCode($8);
+		}
+		| ENTRY EAttribs Name EParameters OptSdagCode /*Constructor*/
+		{ $$ = new Entry(lineno, $2,     0, $3, $4,  0); 
+		  $$->setSdagCode($5);
+		}
 		;
 
 EReturn		: VOID
@@ -517,7 +522,9 @@ DefaultParameter: LITERAL
 		{ $$ = new Value($1); }
 		;
 
-CCode		: CPROGRAM
+CCode		: /* Empty */
+		{ $$ = ""; }
+		| CPROGRAM
 		{ $$ = $1; }
 		| CPROGRAM '[' CPROGRAM ']' CPROGRAM
 		{  /*Returned only when in_bracket*/
@@ -525,7 +532,7 @@ CCode		: CPROGRAM
 			sprintf(tmp,"%s[%s]%s", $1, $3, $5);
 			$$ = tmp;
 		}
-		| CPROGRAM '{' CPROGRAM '}' CPROGRAM
+		| CPROGRAM '{' CCode '}' CCode
 		{ /*Returned only when in_braces*/
 			char *tmp = new char[strlen($1)+strlen($3)+strlen($5)+3];
 			sprintf(tmp,"%s{%s}%s", $1, $3, $5);
@@ -537,6 +544,13 @@ ParamBracketStart : Type Name '['
 		{  /*Start grabbing CPROGRAM segments*/
 			in_bracket=1;
 			$$ = new Parameter(lineno, $1,$2);
+		}
+		;
+
+ParamBraceStart : '{'
+		{  /*Start grabbing CPROGRAM segments*/
+			in_braces=1;
+			$$ = 0;
 		}
 		;
 
@@ -578,6 +592,13 @@ OptPure		: /* Empty */
 		  $$ = SPURE; 
 		}
 		;
+
+OptSdagCode	: /* Empty */
+		{ $$ = 0; }
+		| ParamBraceStart CCode '}'
+		{ in_braces = 0; $$ = $2; }
+		;
+
 %%
 void yyerror(const char *mesg)
 {

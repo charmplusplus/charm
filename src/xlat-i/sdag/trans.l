@@ -34,7 +34,7 @@ octal_constant "0"[0-7]*{integer_suffix_opt}
 hex_constant "0"[xX][0-9a-fA-F]+{integer_suffix_opt}
 %%
 
-{comment}		{Return(WSPACE);}
+{comment}		{}
 
 {hwhite}+		{Return(WSPACE);}
 ({vt}|{cret}|{ff})+	{Return(WSPACE);}

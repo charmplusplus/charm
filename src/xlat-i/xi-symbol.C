@@ -478,6 +478,8 @@ Chare::genRegisterMethodDef(XStr& str)
   str << "#endif\n";
 }
 
+extern void sdag_trans(XStr& classname, XStr& input, XStr& output);
+
 void
 Chare::genDecls(XStr& str)
 {
@@ -490,6 +492,18 @@ Chare::genDecls(XStr& str)
   if(templat)
     templat->genSpec(str);
   genSubDecls(str);
+  if(list) {
+    int sdagPresent = 0;
+    XStr sdagStr;
+    list->collectSdagCode(sdagStr, sdagPresent);
+    if(sdagPresent) {
+      XStr classname;
+      XStr sdag_output;
+      classname << baseName(0);
+      sdag_trans(classname, sdagStr, sdag_output);
+      str << sdag_output;
+    }
+  }
 }
 
 
@@ -1151,6 +1165,16 @@ void MemberList::genDecls(XStr& str)
   }
 }
 
+void MemberList::collectSdagCode(XStr& str, int& sdagPresent)
+{
+  if(member)
+    member->collectSdagCode(str, sdagPresent);
+  if(next) {
+    str << endx;
+    next->collectSdagCode(str, sdagPresent);
+  }
+}
+
 void MemberList::genDefs(XStr& str)
 {
   if(member)
@@ -1179,6 +1203,7 @@ Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz) :
 { 
   line=l; container=NULL; 
   entryCount=-1;
+  sdagCode = 0;
   if(!isVirtual() && isPure()) die("Non-virtual methods cannot be pure virtual",line);
   if(!isThreaded() && stacksize) die("Non-Threaded methods cannot have stacksize",line);
   if(retType && !isSync() && !retType->isVoid()) 
@@ -1736,8 +1761,10 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
 	const char *NarrLen,Value *Nvalue)
     	:type(Ntype), name(Nname), arrLen(NarrLen), val(Nvalue),line(Nline)
 {
-	if (isMessage())
+        given_name = Nname;
+	if (isMessage()) {
 		name="impl_msg";
+        }
 	if (name==NULL && !isVoid()) 
 	{/*Fabricate a unique name for this marshalled param.*/
 		static int unnamedCount=0;

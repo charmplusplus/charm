@@ -25,16 +25,16 @@ class CParsedFile {
     void generateEntries(XStr& output);
     void generateInitFunction(XStr& output);
   public:
-    XStr *className;
     TList *entryList;
     TList *nodeList;
-    CParsedFile(void): className(0) {
+    CParsedFile(void) {
       entryList = new TList();
       nodeList = new TList();
     }
     ~CParsedFile(void){}
     void print(int indent);
-    void doProcess(XStr& output) {
+    void doProcess(XStr& classname, XStr& output) {
+      output << "#define " << classname << "_SDAG_CODE \n";
       numberNodes();
       labelNodes();
       propogateState();
@@ -42,6 +42,8 @@ class CParsedFile {
       generateCode(output);
       generateEntries(output);
       generateInitFunction(output);
+      output.line_append('\\');
+      output << "\n";
     }
 };
 

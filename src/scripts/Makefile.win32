@@ -107,10 +107,10 @@ DIRSSOURCES :
 	@xcopy /d /q  ..\..\src\Common\langs\ampi\* .
 	@xcopy /d /q  ..\..\src\Common\langs\bluegene\* .
 	@xcopy /d /q  ..\..\src\Common\langs\simplemsg\* .
-	@xcopy /d /q  ..\..\src\Common\langs\sdag\xlator\* .
 	@xcopy /d /q  ..\..\src\Common\langs\pvmc\* .
 	@xcopy /d /q  ..\..\src\Common\util\* .
 	@xcopy /d /q  ..\..\src\Common\xlat-i\* .
+	@xcopy /d /q  ..\..\src\Common\xlat-i\sdag\* .
 	@xcopy /d /q  ..\..\src\Common\xlatcpm\*.c .
 	@xcopy /d /q  ..\..\src\Common.win32\*.h .
 	@xcopy /d /q  ..\..\src\Common.net\* .
@@ -534,14 +534,18 @@ trace-summary.obj : trace-summary.C trace-summary.h trace.h $(CKHEADERS)
 
 XIHEADERS=xi-symbol.h xi-grammar.tab.h xi-util.h
 CHARMXLATI=xi-main.obj xi-symbol.obj xi-grammar.tab.obj xi-scan.obj xi-util.obj
+SDAGOBJ=sdag-main.obj trans.obj CLexer.obj CParser.obj CParsedFile.obj \
+	CParseNode.obj sdag-globals.obj CParseNodeProcess.obj CEntry.obj
+SDAGHEADERS=CLexer.h CToken.h EToken.h CParser.h CParsedFile.h CParseNode.h \
+	sdag-globals.h CEntry.h
 
 $(CONV_CPM): conv-cpm.c
 	$(CPP) $(SEQCPP_PROJ) conv-cpm.c
 	$(LINK) $(LINK_FLAGS) $(LINK_OTHER) /out:"$(XLATI_DIR)\conv-cpm.exe" conv-cpm.obj
 
-$(CHARMXI): $(CHARMXLATI)
+$(CHARMXI): $(CHARMXLATI) $(SDAGOBJ)
 	$(LINK) $(LINK_FLAGS) /out:"$(XLATI_DIR)\charmxi.exe" \
-	$(CHARMXLATI)
+	$(CHARMXLATI) $(SDAGOBJ)
 
 xi-main.obj :                                         
 	$(CPP) $(SEQCPP_PROJ) /TP $(COMMON_SRC)\xi-main.C
@@ -557,6 +561,33 @@ xi-grammar.tab.obj :
 
 xi-scan.obj :                                          
 	$(CPP) $(SEQCPP_PROJ) /TP /DYY_NEVER_INTERACTIVE $(COMMON_SRC)\xi-scan.C
+
+sdag-main.obj:
+	$(CPP) $(SEQCPP_PROJ) /TP $(COMMON_SRC)\sdag-main.C
+
+trans.obj:
+	$(CPP) $(SEQCPP_PROJ) $(COMMON_SRC)\trans.c
+
+CLexer.obj:
+	$(CPP) $(SEQCPP_PROJ) /TP $(COMMON_SRC)\CLexer.C
+
+CParser.obj:
+	$(CPP) $(SEQCPP_PROJ) /TP $(COMMON_SRC)\CParser.C
+
+CParsedFile.obj:
+	$(CPP) $(SEQCPP_PROJ) /TP $(COMMON_SRC)\CParsedFile.C
+
+CParseNode.obj:
+	$(CPP) $(SEQCPP_PROJ) /TP $(COMMON_SRC)\CParseNode.C
+
+sdag-globals.obj:
+	$(CPP) $(SEQCPP_PROJ) /TP $(COMMON_SRC)\sdag-globals.C
+
+CParseNodeProcess.obj:
+	$(CPP) $(SEQCPP_PROJ) /TP $(COMMON_SRC)\CParseNodeProcess.C
+
+CEntry.obj:
+	$(CPP) $(SEQCPP_PROJ) /TP $(COMMON_SRC)\CEntry.C
 
 .IGNORE:	 
 CLEAN :
