@@ -139,10 +139,13 @@ void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
   }
   CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
   CmiSetInfo(msg,infofn);
+  /*
   for(i=0;i<npes;i++) {
     CmiSyncSend(pes[i], len, msg);
   }
   CmiFree(msg);
+  */
+  CmiSyncListSendAndFree(npes, pes, len, msg);
 }
 
 void CldEnqueue(int pe, void *msg, int infofn)
