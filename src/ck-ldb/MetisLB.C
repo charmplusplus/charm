@@ -70,10 +70,10 @@ extern "C" void METIS_PartGraphVKway(int*, int*, int*, int*, int*,
 // the following are to compute a partitioning with a given partition weights
 // "W" means giving weights
 extern "C" void METIS_WPartGraphRecursive(int*, int*, int*, int*, int*,
-					  int*, int*, int*, int*, int*,
+					  int*, int*, int*, float*, int*,
 					  int*, int*);
 extern "C" void METIS_WPartGraphKway(int*, int*, int*, int*, int*,
-				     int*, int*, int*, int*, int*,
+				     int*, int*, int*, float*, int*,
 				     int*, int*);
 
 // the following are for multiple constraint partition "mC"
@@ -89,11 +89,11 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count,
 */
 CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 {
-  int option=0; // Future optional parameter
   // CkPrintf("[%d] MetisLB strategy\n",CkMyPe());
   CkVector migrateInfo;
 
   int i, j, m;
+  int option = 0;
   int numobjs = 0;
   for (j=0; j < count; j++) {
     numobjs += stats[j].n_objs;
@@ -231,12 +231,10 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 	  (maxtotal_walltime-stats[m].bg_walltime);
       }
       // set up the different weights
-      //  Float doesn't compile.  I'll try making it an int array
-      //      float *tpwgts = new float[count];
-      int *tpwgts = new int[count];
+      float *tpwgts = new float[count];
       for (m=0; m<count; m++) {
-	tpwgts[m] = (int)(0.5 + 100 * stats[m].pe_speed * 
-	  (maxtotal_walltime-stats[m].bg_walltime) / totaltimeAllPe);
+	tpwgts[m] = stats[m].pe_speed * 
+	  (maxtotal_walltime-stats[m].bg_walltime) / totaltimeAllPe;
       }
       if (count > 8)
 	METIS_WPartGraphKway(&numobjs, xadj, adjncy, objwt, edgewt, 
