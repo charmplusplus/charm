@@ -5,14 +5,14 @@ module ampi {
   initproc void ampiProcInit(void);
 
   array[1D] ampiParent {
-    entry ampiParent(int universeNo,CProxy_TCharm threads_, ComlibInstanceHandle comlib_);
+    entry [notrace] ampiParent(int universeNo,CProxy_TCharm threads_, ComlibInstanceHandle comlib_);
     entry void ResumeThread();
     entry void Checkpoint(int len, char dname[len]);
     entry void ExchangeProxy(CProxy_ampi);
   };
   array[1D] ampi {
     entry ampi();
-    entry ampi(CkArrayID parent_,ampiCommStruct s);
+    entry [notrace] ampi(CkArrayID parent_,ampiCommStruct s);
     entry void unblock(void);
     entry void generic(AmpiMsg *);
     entry void reduceResult(CkReductionMsg *m);

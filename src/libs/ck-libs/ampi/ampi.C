@@ -413,10 +413,6 @@ static void ampiNodeInit(void)
 
   AmpiReducer = CkReduction::addReducer(AmpiReducerFunc);
 
-  // disable tracing of constructors to avoid nested beginExecute
-  CkDisableTracing(CkIndex_ampiParent::ckNew(0, CProxy_TCharm(), ComlibInstanceHandle ()));
-  CkDisableTracing(CkIndex_ampi::ckNew(CkArrayID(), ampiCommStruct()));
-
   nodeinit_has_been_called=1;
 }
 
