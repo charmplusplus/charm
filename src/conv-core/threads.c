@@ -1099,8 +1099,8 @@ CthThread CthPup(pup_er p, CthThread t)
 {
   if (pup_isUnpacking(p)) {
 	  t=(CthThread)malloc(sizeof(struct CthThreadStruct));
-	  CthThreadInit(t);
 	  _MEMCHECK(t);
+	  CthThreadInit(t);
   }
   CthPupBase(p,&t->base,1);
   
