@@ -50,7 +50,7 @@ void pvmc_init_comm(void)
   if (CpvAccess(recv_seq_num)==NULL) {
     PRINTF("Pe(%d) tid=%d:%s:%d pvmc_init_comm() can't allocate seq buffer\n",
 	   MYPE(),pvm_mytid(),__FILE__,__LINE__);
-    exit();
+    exit(1);
   }
   for(i=0; i<CmiNumPes(); i++)
     CpvAccess(recv_seq_num)=0;
@@ -61,7 +61,7 @@ void pvmc_init_comm(void)
   if (CpvAccess(send_seq_num)==NULL) {
     PRINTF("Pe(%d) tid=%d:%s:%d pvmc_init_comm() can't allocate seq buffer\n",
 	   MYPE(),pvm_mytid(),__FILE__,__LINE__);
-    exit();
+    exit(1);
   }
   for(i=0; i<CmiNumPes(); i++)
     CpvAccess(send_seq_num)[i]=0;
@@ -89,7 +89,7 @@ static void pvmc_control_handler_func(control_msg *msg)
     break;
   case PVMC_CTRL_KILL:
     ConverseExit();
-    exit();
+    exit(0);
     break;
   default:
     PRINTF("WARNING: %s:%d, Illegal control message\n",__FILE__,__LINE__);
