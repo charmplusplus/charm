@@ -24,7 +24,7 @@
 
 #include "pup.h"
 
-#define PROJECTION_VERSION  "6.5"
+#define PROJECTION_VERSION  "6.6"
 
 // Macro to make projections check for errors before an fprintf succeeds.
 #define CheckAndFPrintF(f,string,data) \
@@ -49,6 +49,8 @@ class LogEntry {
     CmiObjId   id;
     int numpes;
     int *pes;
+    int numPapiEvents;
+    LONG_LONG_PAPI *papiValues;
     unsigned char type; 
 		char *fName;
 		int flen;
@@ -77,6 +79,12 @@ class LogEntry {
     // **CW** new constructor for multicast data
     LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
 	     int ml, CmiObjId *d, double rt, int num, int *pelist);
+    // **CW** this prototype is used for PAPI events (which has a dynamic
+    // structure to copy).
+    LogEntry(double tm, unsigned char t, unsigned short m, unsigned short e, 
+	     int ev, int p,
+	     int ml, CmiObjId *d, double rt, double cpuT, int numPap, 
+	     LONG_LONG_PAPI *papVals);
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
     void operator delete(void *ptr) {free(ptr); }
@@ -130,8 +138,8 @@ class LogPool {
     void writeLog(void);
     void write(int writedelta);
     void writeSts(void);
-    void add(unsigned char type,unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., double cpuT=0.0);
-		void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
+    void add(unsigned char type,unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., double cpuT=0.0, int numPap=0, LONG_LONG_PAPI *papVals=NULL);
+    void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
     void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int num=0, int *pelist=NULL);
     void postProcessLog();
 };

@@ -31,10 +31,21 @@ CkpvExtern(int, traceOnPe);
 #  define TRACE_CHARM_PE()  (CkMyRank() != CkMyNodeSize())
 #endif
 
+// A hack. We need to somehow tell the pup framework what size
+// long_long is wrt PAPI.
+#if CMK_HAS_COUNTER_PAPI
+typedef long_long LONG_LONG_PAPI;
+#else
+typedef int LONG_LONG_PAPI;
+#endif
+
 // Base class of all tracing strategies.
 // 
 class Trace {
   public:
+
+    LONG_LONG_PAPI *papiValues;
+
     virtual int traceOnPE() { return TRACE_CHARM_PE(); }
     // turn trace on/off, note that charm will automatically call traceBegin()
     // at the beginning of every run unless the command line option "+traceoff"
@@ -54,6 +65,15 @@ class Trace {
     virtual void creationDone(int num=1) {}
     // ???
     virtual void messageRecv(char *env, int pe) {}
+    virtual void beginSDAGBlock(
+      int event,   // event type defined in trace-common.h
+      int msgType, // message type
+      int ep,      // Charm++ entry point (will correspond to sts file) 
+      int srcPe,   // Which PE originated the call
+      int ml,      // message size
+      CmiObjId* idx)    // index
+    { }
+    virtual void endSDAGBlock(void) {}
     // **************************************************************
     // begin/end execution of a Charm++ entry point
     // NOTE: begin/endPack and begin/endUnpack can be called in between
@@ -137,6 +157,8 @@ public:
     void creationMulticast(envelope *env, int ep, int num=1, int *pelist=NULL);
     
     inline void creationDone(int num=1) { ALLDO(creationDone(num)); }
+    inline void beginSDAGBlock(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx=NULL) {ALLDO(beginSDAGBlock(event, msgType, ep, srcPe, mlen,idx));}
+    inline void endSDAGBlock(void) {ALLREVERSEDO(endExecute());}
     inline void beginExecute(envelope *env) {ALLDO(beginExecute(env));}
     inline void beginExecute(CmiObjId *tid) {ALLDO(beginExecute(tid));}
     inline void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx=NULL) {ALLDO(beginExecute(event, msgType, ep, srcPe, mlen,idx));}
@@ -202,6 +224,8 @@ extern "C" {
 #define _TRACE_CREATION_N(env, num) _TRACE_ONLY(CkpvAccess(_traces)->creation(env,env->getEpIdx(), num))
 #define _TRACE_CREATION_MULTICAST(env, num, pelist) _TRACE_ONLY(CkpvAccess(_traces)->creationMulticast(env, env->getEpIdx(), num, pelist))
 #define _TRACE_CREATION_DONE(num) _TRACE_ONLY(CkpvAccess(_traces)->creationDone(num))
+#define _TRACE_BEGIN_SDAG(env) _TRACE_ONLY(CkpvAccess(_traces)->beginSDAGBlock(env))
+#define _TRACE_END_SDAG(env) _TRACE_ONLY(CkpvAccess(_traces)->endSDAGBlock(env))
 #define _TRACE_BEGIN_EXECUTE(env) _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(env))
 #define _TRACE_BEGIN_EXECUTE_DETAILED(evt,typ,ep,src,mlen,idx) \
 	_TRACE_ONLY(CkpvAccess(_traces)->beginExecute(evt,typ,ep,src,mlen,idx))
