@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-09-20 15:58:09  gursoy
+ * Revision 2.11  1995-09-20 16:01:33  gursoy
+ * this time really made the arg of CmiFree and CmiSize void*
+ *
+ * Revision 2.10  1995/09/20  15:58:09  gursoy
  * made the arg of CmiFree and CmiSize void*
  *
  * Revision 2.9  1995/09/14  18:50:10  milind
@@ -109,13 +112,13 @@ return (void *)(res+8);
 }
 
 int CmiSize(blk)
-char *blk;
+void *blk;
 {
 return ((int *)( ((char *) blk) - 8))[0];
 }
 
 void CmiFree(blk)
-char *blk;
+void *blk;
 {
 free( ((char *)blk) - 8);
 }
