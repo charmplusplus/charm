@@ -146,43 +146,31 @@ typedef struct CthThreadStruct
 
 char *CthGetData(CthThread t) { return t->data; }
 
-CthThread CthPup(pup_er p, CthThread t, int *psz)
+CthThread CthPup(pup_er p, CthThread t)
 {
-  if(pup_isSizing(p)||pup_isPacking(p))
-  {
 #ifndef CMK_OPTIMIZE
-    if (t->savedsize == 0)
-      CmiAbort("Trying to pack a running thread!!\n");
-    if (t->insched)
-      CmiAbort("Trying to pack a thread in scheduler queue!!\n");
-#endif
-    *psz = 0;
-    pup_bytes(p, (void*) t, sizeof(CthThreadStruct)); 
-    *psz += sizeof(CthThreadStruct);
-    pup_bytes(p, (void*) t->data, t->datasize);
-    *psz += t->datasize;
-    pup_bytes(p, (void*) t->savedstack, t->savedsize);
-    *psz += t->savedsize;
-    if(pup_isPacking())
+    if (pup_isPacking(p))
     {
-      CthFree(t);
-      t = 0;
+      if (t->savedsize == 0)
+        CmiAbort("Trying to pack a running thread!!\n");
+      if (t->insched)
+        CmiAbort("Trying to pack a thread in scheduler queue!!\n");
     }
-  }
-  if(pup_isUnpacking(p))
-  {
-    t = (CthThread) malloc(sizeof(CthThreadStruct));
-    _MEMCHECK(t);
-    pup_bytes(p, (void*) t, sizeof(CthThreadStruct));
-    t->data = (char *) malloc(t->datasize);
-    _MEMCHECK(t->data);
-    pup_bytes(p, (void*) t->data, sizeof(t->datasize));
-    t->savedstack = (qt_t*) malloc(t->savedsize);
-    _MEMCHECK(t->savedstack);
-    t->stacklen = t->savedsize;
-    pup_bytes(p, (void*) t->savedstack, sizeof(t->savedsize));
-  }
-  return t;
+#endif
+    if (pup_isUnpacking(p))
+      { t = (CthThread) malloc(sizeof(CthThreadStruct));_MEMCHECK(t);}
+    pup_bytes(p, (void*) t, sizeof(CthThreadStruct)); 
+    if (pup_isUnpacking(p)) {
+      t->data = (char *) malloc(t->datasize);_MEMCHECK(t->data);
+      t->savedstack = (qt_t*) malloc(t->savedsize);_MEMCHECK(t->savedstack);
+    }
+    pup_bytes(p, (void*) t->data, t->datasize);
+    pup_bytes(p, (void*) t->savedstack, t->savedsize);
+    
+    if (pup_isDeleting(p))
+      {CthFree(t);t=0;}
+
+    return t;
 }
 
 struct CthProcInfo
@@ -733,7 +721,7 @@ void CthAutoYieldUnblock()
   CthCpvAccess(CthCurrent)->autoyield_blocks --;
 }
 
-CthThread CthPup(pup_er p, CthThread t, int *psz)
+CthThread CthPup(pup_er p, CthThread t)
 {
   CmiAbort("CthPup not implemented.\n");
   return 0;
@@ -1329,52 +1317,45 @@ int size;
   return result;
 }
 
-CthThread CthPup(pup_er p, CthThread t, int *psz)
+CthThread CthPup(pup_er p, CthThread t)
 {
-  qt_t *stackbase;
+  qt_t *stackbase,*stack;
   int ssz;
 
-  if(pup_isSizing(p)||pup_isPacking(p))
-  {
-    *psz = 0;
 #ifndef CMK_OPTIMIZE
+  if (pup_isPacking(p))
+  {
     if (CthCpvAccess(CthCurrent) == t)
       CmiAbort("Trying to pack a running thread!!\n");
     if(t->slotnum < 0)
       CmiAbort("Trying to pack a thread that is not migratable!!\n");
-#endif
-    pup_bytes(p, (void*)t, sizeof(struct CthThreadStruct));
-    *psz += sizeof(struct CthThreadStruct);
-    pup_bytes(p, (void*)t->data, t->datasize);
-    *psz += t->datasize;
-    /* FIXME: Assumption stackp < stackbase */
-    stackbase = QT_SP(t->stack, CpvAccess(_stksize));
-    ssz = ((char*)(stackbase)-(char*)(t->stackp));
-    pup_bytes(p, (void*)t->stackp, ssz);
-    *psz += ssz;
-    if(pup_isPacking(p))
-    {
-      CthFree(t);
-      t = 0;
-    }
   }
-  if(pup_isUnpacking(p))
-  {
-    qt_t *stack;
+#endif
+  if (pup_isUnpacking(p)) {
     t = (CthThread) malloc(sizeof(struct CthThreadStruct));
     _MEMCHECK(t);
-    pup_bytes(p, (void*)t, sizeof(struct CthThreadStruct));
+  }
+  pup_bytes(p, (void*)t, sizeof(struct CthThreadStruct));
+
+  if (pup_isUnpacking(p)) {
     t->data = (char *) malloc(t->datasize);
     _MEMCHECK(t->data);
-    pup_bytes(p, (void*)t->data, t->datasize);
     stack = (qt_t*) map_slots(t->slotnum, t->nslots);
     _MEMCHECK(stack);
     if(stack != t->stack)
-      CmiAbort("Stack pointers do not match after migration!!\n");
-    /* FIXME: Assumption stackp > stackbase */
-    stackbase = QT_SP(t->stack, CpvAccess(_stksize));
-    ssz = ((char*)(stackbase)-(char*)(t->stackp));
-    pup_bytes(p, (void*)t->stackp, ssz);
+      CmiAbort("Stack pointers do not match after migration!!\n");  
+  }
+  pup_bytes(p, (void*)t->data, t->datasize);
+
+  /* FIXME: Assumption stackp < stackbase */
+  stackbase = QT_SP(t->stack, CpvAccess(_stksize));
+  ssz = ((char*)(stackbase)-(char*)(t->stackp));
+  pup_bytes(p, (void*)t->stackp, ssz);
+
+  if(pup_isDeleting(p))
+  {
+    CthFree(t);
+    t = 0;
   }
   return t;
 }
@@ -1646,7 +1627,7 @@ int size;
   return result;
 }
 
-CthThread CthPup(pup_er p, CthThread t, int *psz)
+CthThread CthPup(pup_er p, CthThread t)
 {
   CmiAbort("CthPup not implemented.\n");
   return 0;
