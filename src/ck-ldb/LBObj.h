@@ -32,6 +32,7 @@ public:
     parentDB = _parentDB;
 //    migratable = _migratable;
 //    registered = CmiTrue;
+    startWTime = startCTime = -1.0;
     lastCpuTime = lastWallTime = .0;
   }
 
@@ -68,8 +69,10 @@ public:
 	startCTime = CkCpuTimer();
   }
   inline void StopTimer(double* walltime, double* cputime) {
-	*walltime = CkWallTimer() - startWTime;
-	*cputime = CkCpuTimer() - startCTime;
+	if (startWTime >= 0.0) {	// in case startOn in middle of entry
+	  *walltime = CkWallTimer() - startWTime;
+	  *cputime = CkCpuTimer() - startCTime;
+	}
   }
 
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
