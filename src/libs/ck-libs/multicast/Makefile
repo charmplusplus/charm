@@ -19,7 +19,7 @@ $(LIBDEST): $(LIBOBJ)
 	$(CHARMC) -o $(LIBDEST) $(LIBOBJ) 
 
 ckmulticast.o: ckmulticast.C ckmulticast.h CkMulticast.decl.h
-	$(CHARMC) -c ckmulticast.C
+	$(CHARMC) -c -I$(CDIR)/tmp ckmulticast.C
 
 CkMulticast.def.h: CkMulticast.decl.h
 

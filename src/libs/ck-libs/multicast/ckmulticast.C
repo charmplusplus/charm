@@ -1,5 +1,6 @@
 #include "charm++.h"
 #include "envelope.h"
+#include "register.h"
 
 #include "ckmulticast.h"
 
@@ -547,22 +548,31 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   int nLocal = entry->localElem.length();
   DEBUGF(("send to local %d\n", nLocal));
   for (i=0; i<nLocal-1; i++) {
-    //multicastGrpMsg *newm = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
-//    CProxyElement_ArrayBase ap(msg->aid, entry->localElem[i]);
-//    ap.ckSend((CkArrayMessage *)newm, msg->ep);
+    CProxyElement_ArrayBase ap(msg->aid, entry->localElem[i]);
+    if (_entryTable[msg->ep]->noKeep) {
+      CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[i], CK_MSG_KEEP);
+    }
+    else {
+      // send through scheduler queue
+      multicastGrpMsg *newm = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
+      ap.ckSend((CkArrayMessage *)newm, msg->ep);
+    }
     // use CK_MSG_DONTFREE so that the message can be reused
-    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[i], CK_MSG_KEEP);
+    // the drawback of this scheme bypassing queue is that 
+    // if # of local element is huge, this leads to a long time occupying CPU
+    // also load balancer seems not be able to correctly instrument load
+//    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[i], CK_MSG_KEEP);
+    //CmiNetworkProgressAfter(3);
   }
   if (nLocal) {
-//    CProxyElement_ArrayBase ap(msg->aid, entry->localElem[nLocal-1]);
-//    ap.ckSend((CkArrayMessage *)msg, msg->ep);
-    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[nLocal-1]);
+    CProxyElement_ArrayBase ap(msg->aid, entry->localElem[nLocal-1]);
+    ap.ckSend((CkArrayMessage *)msg, msg->ep);
+//    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[nLocal-1]);
   }
   else {
     CkAssert (entry->rootSid.get_pe() == CkMyPe());
     delete msg;
   }
-
 }
 
 // user function
