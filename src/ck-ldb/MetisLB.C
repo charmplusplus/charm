@@ -57,20 +57,36 @@ static void printStats(int count, int numobjs, double *cputimes,
   CkPrintf("\tCommunication (off proc msgs) = %d\n", ncomm/2);
 }
 
+extern "C" void METIS_PartGraphRecursive(int*, int*, int*, int*, int*,
+					 int*, int*, int*, int*,
+					 int*, int*);
 extern "C" void METIS_PartGraphKway(int*, int*, int*, int*, int*,
                                     int*, int*, int*, int*,
                                     int*, int*);
-extern "C" void METIS_PartGraphRecursive(int*, int*, int*, int*, int*,
-                                    int*, int*, int*, int*,
-                                    int*, int*);
 extern "C" void METIS_PartGraphVKway(int*, int*, int*, int*, int*,
-                                    int*, int*, int*, int*,
+				     int*, int*, int*, int*,
+				     int*, int*);
+
+// the following are to compute a partitioning with a given partition weights
+// "W" means giving weights
+extern "C" void METIS_WPartGraphRecursive(int*, int*, int*, int*, int*,
+					  int*, int*, int*, int*, int*,
+					  int*, int*);
+extern "C" void METIS_WPartGraphKway(int*, int*, int*, int*, int*,
+				     int*, int*, int*, int*, int*,
+				     int*, int*);
+
+// the following are for multiple constraint partition "mC"
+extern "C" void METIS_mCPartGraphRecursive(int*, int*, int*, int*, int*, int*,
+					 int*, int*, int*, int*,
+					 int*, int*);
+extern "C" void METIS_mCPartGraphKway(int*, int*, int*, int*, int*, int*,
+                                    int*, int*, int*, int*, int*,
                                     int*, int*);
 
 CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
 {
   // CkPrintf("[%d] MetisLB strategy\n",CkMyPe());
-
   CkVector migrateInfo;
 
   int i, j;
@@ -105,7 +121,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   }
   double ratio = 1000.0/max_cputime;
   for(i=0; i<numobjs; i++) {
-    objwt[i] = (int)(cputime[i]*ratio);
+      objwt[i] = (int)(cputime[i]*ratio);
   }
   int **comm = new int*[numobjs];
   for (i=0; i<numobjs; i++) {
@@ -163,6 +179,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   options[0] = 0;
   int edgecut;
   int *newmap;
+  int sameMapFlag = 0;
 
   if(count > 1) {
     newmap = new int[numobjs];
@@ -171,11 +188,17 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
     delete[] edgewt;
     edgewt = 0;
     wgtflag = 2;
-    METIS_PartGraphRecursive(&numobjs, xadj, adjncy, objwt, edgewt, 
-                         &wgtflag, &numflag, &count, options, 
-                         &edgecut, newmap);
+    if (count > 8)
+      METIS_PartGraphKway(&numobjs, xadj, adjncy, objwt, edgewt, 
+			  &wgtflag, &numflag, &count, options, 
+			  &edgecut, newmap);
+    else
+      METIS_PartGraphRecursive(&numobjs, xadj, adjncy, objwt, edgewt, 
+			       &wgtflag, &numflag, &count, options, 
+			       &edgecut, newmap);
   } else {
     newmap = origmap;
+    sameMapFlag = 1;
   }
   CkPrintf("Post-LDB Statistics step %d\n", step());
   printStats(count, numobjs, cputime, comm, newmap);
@@ -189,13 +212,15 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   if(objwt) delete[] objwt;
   if(edgewt) delete[] edgewt;
 
-  for(i=0; i<numobjs; i++) {
-    if(origmap[i] != newmap[i]) {
-      MigrateInfo* migrateMe = new MigrateInfo;
-      migrateMe->obj = handles[i];
-      migrateMe->from_pe = origmap[i];
-      migrateMe->to_pe = newmap[i];
-      migrateInfo.push_back((void*)migrateMe);
+  if(!sameMapFlag) {
+    for(i=0; i<numobjs; i++) {
+      if(origmap[i] != newmap[i]) {
+	MigrateInfo migrateMe;
+	migrateMe.obj = handles[i];
+	migrateMe.from_pe = origmap[i];
+	migrateMe.to_pe = newmap[i];
+	migrateInfo.push(migrateMe);
+      }
     }
   }
 
