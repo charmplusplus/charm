@@ -107,11 +107,10 @@ These are implemented in register.C.
 typedef void* (*CkPackFnPtr)(void *msg);
 /** Message unpack function: convert a buffer into a message. */
 typedef void* (*CkUnpackFnPtr)(void *buf);
-typedef void* (*CkCoerceFnPtr)(void *buf);
 
 /** Register this message name, with this basic size and pack and unpack functions. */
 extern int CkRegisterMsg(const char *name, CkPackFnPtr pack, 
-                       CkUnpackFnPtr unpack, CkCoerceFnPtr coerce, size_t size);
+                       CkUnpackFnPtr unpack, size_t size);
 
 /** This entry point flag indicates the method does not keep the passed-in message. */
 #define CK_EP_NOKEEP (1<<2) 
@@ -134,6 +133,8 @@ extern void CkRegisterDefaultCtor(int chareIndex, int ctorEpIndex);
 extern void CkRegisterMigCtor(int chareIndex, int ctorEpIndex);
 /** Indicate whether this group is an IrrGroup. */
 extern void CkRegisterGroupIrr(int chareIndex,int isIrr);
+/** Register the chare baseIdx as a base class of the chare derivedIdx. */
+extern void CkRegisterBase(int derivedIdx, int baseIdx);
 
 /** This function pup's a global variable.*/
 typedef void (*CkPupReadonlyFnPtr)(void *pup_er);

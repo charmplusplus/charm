@@ -378,7 +378,7 @@ static inline void _processRODataMsg(envelope *env)
 {
   //Unpack each readonly:
   PUP::fromMem pu((char *)EnvToUsr(env));
-  for(int i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(pu);
+  for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pu);
   CmiFree(env);
 }
 
@@ -583,7 +583,7 @@ void _initCharm(int unused_argc, char **argv)
 		CmiArgGroup("Charm++",NULL);
 		_parseCommandLineOpts(argv);
 		_registerInit();
-		CkRegisterMsg("System", 0, 0, 0, sizeof(int));
+		CkRegisterMsg("System", 0, 0, sizeof(int));
 		CkRegisterChare("null", 0);
 		CkIndex_Chare::__idx=CkRegisterChare("Chare", sizeof(Chare));
 		CkIndex_Group::__idx=CkRegisterChare("Group", sizeof(Group));
@@ -598,6 +598,7 @@ void _initCharm(int unused_argc, char **argv)
 		_registerCkCheckpoint();
 		_registerExternalModules(argv);
 		CkRegisterMainModule();
+		_registerDone();
 	}
 
 	if (!inCommThread) _TRACE_BEGIN_COMPUTATION();
@@ -613,8 +614,8 @@ void _initCharm(int unused_argc, char **argv)
 		_initDone();
 	}else if(CkMyPe()==0){
 		_allStats = new Stats*[CkNumPes()];
-		register int i;
-		for(i=0;i<_numMains;i++)  /* Create all mainchares */
+		register int i, nMains=_mainTable.size();
+		for(i=0;i<nMains;i++)  /* Create all mainchares */
 		{
 			register int size = _chareTable[_mainTable[i]->chareIdx]->size;
 			register void *obj = malloc(size);
@@ -628,10 +629,10 @@ void _initCharm(int unused_argc, char **argv)
 		}
                 _mainDone = 1;
 
-		_STATS_RECORD_CREATE_CHARE_N(_numMains);
-		_STATS_RECORD_PROCESS_CHARE_N(_numMains);
+		_STATS_RECORD_CREATE_CHARE_N(nMains);
+		_STATS_RECORD_PROCESS_CHARE_N(nMains);
 
-		for(i=0;i<_numReadonlyMsgs;i++) /* Send out readonly messages */
+		for(i=0;i<_readonlyMsgs.size();i++) /* Send out readonly messages */
 		{
 			register void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
 			if(roMsg==0)
@@ -654,12 +655,12 @@ void _initCharm(int unused_argc, char **argv)
 
 		//Determine the size of the RODataMessage
 		PUP::sizer ps;
-		for(i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(ps);
+		for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
 
 		//Allocate and fill out the RODataMessage
 		envelope *env = _allocEnv(RODataMsg, ps.size());
 		PUP::toMem pp((char *)EnvToUsr(env));
-		for(i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(pp);
+		for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
 
 		env->setCount(++_numInitMsgs);
 		env->setSrcPe(CkMyPe());

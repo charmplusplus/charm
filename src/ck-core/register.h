@@ -105,8 +105,6 @@ class MsgInfo {
      a living message.  It's just the opposite of pack.
      */
     CkUnpackFnPtr unpack;
-    /// FIXME: What is this?  It's always set to NULL, and never used.
-    CkCoerceFnPtr coerce;
     /**
      This message body's allocation size.  This does *not* include
      any dynamically allocated portion of the message, so is a lower
@@ -114,8 +112,8 @@ class MsgInfo {
      */
     size_t size;
 
-    MsgInfo(const char *n,CkPackFnPtr p,CkUnpackFnPtr u,CkCoerceFnPtr c,int s):
-      name(n), pack(p), unpack(u), coerce(c), size(s)
+    MsgInfo(const char *n,CkPackFnPtr p,CkUnpackFnPtr u,int s):
+      name(n), pack(p), unpack(u), size(s)
     {}
 };
 
@@ -129,8 +127,6 @@ class ChareInfo {
     const char *name;
     /// Size, in bytes, of the body of the chare.
     int size;
-    /// FIXME: This was once used to check typecasts on proxies, but is now useless.
-    int classIdx;
     
     /// Constructor epIdx: default constructor and migration constructor (or -1 if none).
     int defCtor,migCtor; 
@@ -142,12 +138,10 @@ class ChareInfo {
     /// For groups -- 1 if the group is Irreducible 
     int isIrr;
     
-    ChareInfo(const char *n, int s) : name(n), size(s), classIdx(1) {
+    ChareInfo(const char *n, int s) : name(n), size(s) {
       defCtor=migCtor=-1;
       isIrr = numbases = 0;
     }
-    void setClassIdx(int idx) { classIdx = idx; }
-    int getClassIdx(void) { return classIdx; }
     void setDefaultCtor(int idx) { defCtor = idx; }
     int getDefaultCtor(void) { return defCtor; }
     void setMigCtor(int idx) { migCtor = idx; }
@@ -200,30 +194,51 @@ class ReadonlyMsgInfo {
 	void **p) : name(n), type(t), pMsg(p) {}
 };
 
-/// Fixed-size tables, shared between all processors on a node.
-extern EntryInfo**        _entryTable;
-extern MsgInfo**          _msgTable;
-extern ChareInfo**        _chareTable;
-extern MainInfo**         _mainTable;
-extern ReadonlyInfo**     _readonlyTable;
-extern ReadonlyMsgInfo**  _readonlyMsgs;
+/**
+ This class stores registered entities, like EntryInfo's,
+ in a linear list indexed by index ("idx").
+*/
+template <class T>
+class CkRegisteredInfo {
+	CkVec<T *> vec;
+public:
+	/// Add a heap-allocated registration record,
+	///  returning the index used.
+	int add(T *t) {
+#ifndef CMK_OPTIMIZE
+		/* Make sure registrations only happen from rank 0: */
+		if (CkMyRank()!=0)
+			CkAbort("Can only do registrations from rank 0 processors");
+#endif
+		vec.push_back(t);
+		return vec.size()-1;
+	}
+	
+	/// Return the number of registered entities in this table.
+	/// (This is a reference so the CpdLists can stay up to date).
+	int &size(void) {return vec.length();}
+	
+	/// Return the registered data at this index.
+	T *operator[](int idx) {
+#ifndef CMK_OPTIMIZE
+		/* Bounds-check the index: */
+		if (idx<0 || idx>=vec.size())
+			CkAbort("Registered idx is out of bounds");
+#endif
+		return vec[idx];
+	}
+};
 
-/// Current used lengths of tables.
-extern int _numEntries;
-extern int _numMsgs;
-extern int _numChares;
-extern int _numMains;
-extern int _numReadonlies;
-extern int _numReadonlyMsgs;
-
-/// Maximum lengths of tables.
-#define _ENTRY_TABLE_SIZE     1024
-#define _MSG_TABLE_SIZE       256
-#define _CHARE_TABLE_SIZE     1024
-#define _MAIN_TABLE_SIZE      128
-#define _READONLY_TABLE_SIZE  128
+/// These tables are shared between all processors on a node.
+extern CkRegisteredInfo<EntryInfo> _entryTable;
+extern CkRegisteredInfo<MsgInfo> _msgTable;
+extern CkRegisteredInfo<ChareInfo> _chareTable;
+extern CkRegisteredInfo<MainInfo> _mainTable;
+extern CkRegisteredInfo<ReadonlyInfo> _readonlyTable;
+extern CkRegisteredInfo<ReadonlyMsgInfo> _readonlyMsgs;
 
 extern void _registerInit(void);
+extern void _registerDone(void);
 
 /*@}*/
 #endif

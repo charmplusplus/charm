@@ -97,6 +97,7 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	sprintf(filename,"%s/RO.dat",dirname);
 	FILE* fRO = fopen(filename,"wb");
 	if(!fRO) CkAbort("Failed to create checkpoint file for readonly data!");
+	int _numReadonlies=_readonlyTable.size();
 	fwrite(&_numReadonlies,sizeof(int),1,fRO);
 	PUP::toDisk pRO(fRO);
 	for(i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(pRO);
@@ -239,7 +240,10 @@ void CkRestartMain(const char* dirname){
 	sprintf(filename,"%s/RO.dat",dirname);
 	FILE* fRO = fopen(filename,"rb");
 	if(!fRO) CkAbort("Failed to open checkpoint file for readonly data!");
+	int _numReadonlies=-1;
 	fread(&_numReadonlies,sizeof(int),1,fRO);
+	if (_numReadonlies != _readonlyTable.size())
+		CkAbort("You cannot add readonlies and restore from checkpoint...");
 	PUP::fromDisk pRO(fRO);
 	for(i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(pRO);
 	fread(&cb,sizeof(CkCallback),1,fRO);

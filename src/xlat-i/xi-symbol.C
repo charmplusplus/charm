@@ -313,7 +313,6 @@ Module::generate()
     }
     defstr << 
     "  _register"<<name<<"();\n"
-    "  _REGISTER_DONE();\n"
     "}\n";
   }
   defstr << "#endif\n";
@@ -541,7 +540,7 @@ Chare::genRegisterMethodDef(XStr& str)
   "void "<<indexName()<<"::__register(const char *s, size_t size) {\n"
   "  __idx = CkRegisterChare(s, size);\n";
   // register all bases
-  genIndexNames(str, "  _REGISTER_BASE(__idx, ",NULL, "::__idx);\n", "");
+  genIndexNames(str, "  CkRegisterBase(__idx, ",NULL, "::__idx);\n", "");
   genSubRegisterMethodDef(str);
   if(list)
     list->genReg(str);
@@ -1093,7 +1092,7 @@ Message::genDecls(XStr& str)
   if(!(external||type->isTemplated())) {
    // generate register function
     str << "    static void __register(const char *s, size_t size, CkPackFnPtr pack, CkUnpackFnPtr unpack) {\n";
-    str << "      __idx = CkRegisterMsg(s, pack, unpack, 0, size);\n";
+    str << "      __idx = CkRegisterMsg(s, pack, unpack, size);\n";
     str << "    }\n";
   }
   str << "};\n";
