@@ -581,9 +581,13 @@ public:
 	MPI_Comm comm;
 	bool valid;
 
+	KeyvalNode(void): copy_fn(NULL), delete_fn(NULL), extra_state(NULL), value(NULL), comm(MPI_COMM_NULL), valid(false)
+	{ }
 	KeyvalNode(MPI_Copy_function *cf, MPI_Delete_function *df, void* es):
 		copy_fn(cf), delete_fn(df), extra_state(es), value(NULL), comm(MPI_COMM_NULL), valid(true)
 	{ }
+	// KeyvalNode is not supposed to be pup'ed
+	void pup(PUP::er& p){ /* empty */ }
 };
 
 /*
@@ -735,12 +739,11 @@ public:
       groupStruct vec = group2vec(group);
       return getPosOp(thisIndex,vec);
     }
-
-    ComlibInstanceHandle getComlib(void) {
-    	return comlib; 
+    inline ComlibInstanceHandle getComlib(void) {
+    	return comlib;
     }
-    
-    int hasWorld(void) const {
+
+    inline int hasWorld(void) const {
         return worldPtr!=NULL;
     }
 
@@ -828,7 +831,7 @@ class ampi : public CBase_ampi {
     inline int getSize(void) const {return myComm.getSize();}
     inline MPI_Comm getComm(void) const {return myComm.getComm();}
     inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
-    
+
     inline CProxy_ampi comlibBegin(void) const {
        CProxy_ampi p=getProxy();
        if (comlibEnabled) {
