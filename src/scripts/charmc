@@ -636,10 +636,10 @@ endsw
 
 # Check for valid choice of TRACEMODE
 
-if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
+if (($LANGUAGE == charm) || ($LANGUAGE == charm++) || ($LANGUAGE == converse) || ($LANGUAGE == converse++) ) then
 
     if (! -e $CHARMLIB/libck-trace-none.a) then
-        echo "charmc: charm libraries not installed."
+        echo "charmc: trace libraries not installed."
         goto failure
     endif
     
@@ -771,11 +771,13 @@ switch ($LANGUAGE)
     case "converse"
         ($ECHOCMD ; $CMK_LD $OPTS_LD -o $OBJECT -L$CHARMLIB \
 		      $OBJECTFILES $LIBRARIES -lconv-cplus-n -lconv-core\
+		      -lck-trace-$TRACEMODE \
 		      $CMK_LIBS -lm)
         breaksw
     case "converse++"
         ($ECHOCMD ; $CMK_LDXX $OPTS_LDXX -o $OBJECT -L$CHARMLIB \
 		      $OBJECTFILES $LIBRARIES -lconv-cplus-y -lconv-core \
+		      -lck-trace-$TRACEMODE \
 		      $CMK_LIBS -lm)
         breaksw
 endsw

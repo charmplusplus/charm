@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1997-08-22 19:29:04  milind
+ * Revision 2.16  1997-10-03 19:51:33  milind
+ * Made charmc to work again, after inserting trace calls in converse part,
+ * i.e. threads and user events.
+ *
+ * Revision 2.15  1997/08/22 19:29:04  milind
  * Added user-event tracing.
  *
  * Revision 2.14  1997/07/18 21:21:05  milind
@@ -152,10 +156,8 @@ CpvDeclare(int, nodeforCharesProcessed);
 CpvDeclare(int, PrintChareStat); 
 CpvDeclare(int, PrintSummaryStat);
 CpvDeclare(int, QueueingDefault);
-CpvDeclare(int, LogBufSize);
 
 CpvDeclare(int, RecdStatMsg);
-CpvDeclare(int, RecdTraceMsg);
 
 CpvDeclare(int, numHeapEntries);      /* heap of tme-dep calls   */
 CpvDeclare(int, numCondChkArryElts);  /* arry hldng conditon check info */
@@ -277,11 +279,9 @@ void globalsModuleInit()
    CpvInitialize(int, nodebocMsgsProcessed);
    CpvInitialize(int, nodeforCharesProcessed);
    CpvInitialize(int, PrintChareStat);
-   CpvInitialize(int, LogBufSize);
    CpvInitialize(int, PrintSummaryStat);
    CpvInitialize(int, QueueingDefault);
    CpvInitialize(int, RecdStatMsg);
-   CpvInitialize(int, RecdTraceMsg);
    CpvInitialize(int, numHeapEntries);      
    CpvInitialize(int, numCondChkArryElts); 
    CpvInitialize(int, _CK_13PackOffset);
@@ -305,7 +305,6 @@ void globalsModuleInit()
    CpvAccess(nodebocMsgsProcessed)   = 0;
    CpvAccess(nodeforCharesProcessed) = 0;
    CpvAccess(PrintChareStat)         = 0;
-   CpvAccess(LogBufSize)             = 10000;
    CpvAccess(PrintSummaryStat)       = 0;
    CpvAccess(numHeapEntries)         = 0;  
    CpvAccess(numCondChkArryElts)     = 0; 

@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.7  1997-07-26 16:41:41  jyelon
+ * Revision 1.8  1997-10-03 19:51:51  milind
+ * Made charmc to work again, after inserting trace calls in converse part,
+ * i.e. threads and user events.
+ *
+ * Revision 1.7  1997/07/26 16:41:41  jyelon
  * *** empty log message ***
  *
  * Revision 1.6  1997/04/25 20:48:11  jyelon
@@ -305,6 +309,7 @@ char * msg;
 
 void ConverseExit()
 {
+  ConverseCommonExit();
   exit(0);
 }
 

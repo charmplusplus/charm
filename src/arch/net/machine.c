@@ -1349,6 +1349,7 @@ char *msg;
   for (i=0; i<Cmi_numnodes; i++)
     KillIndividual(nodes[i].IP, nodes[i].ctrlport, 30, cmd, killed+i);
   log_done();
+  ConverseCommonExit();
   exit(1);
 }
 
@@ -1465,6 +1466,7 @@ static void ctrl_getone()
     } else if (strncmp(line,"die ",4)==0) {
       fprintf(stderr,"aborting: %s\n",line+4);
       log_done();
+      ConverseCommonExit();
       exit(0);
     }
     else KillEveryoneCode(2932);
@@ -2157,6 +2159,7 @@ void ConverseExit()
   ctrl_sendone(120,"ending\n");
   if (CmiMyRank()==0) {
     log_done();
+    ConverseCommonExit();
     CmiJoinThreads();
   }
 }

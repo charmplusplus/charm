@@ -12,7 +12,7 @@ CpvStaticDeclare(FILE*, log_file_desc);
 
 CpvDeclare(char*,pgm);
 
-CpvExtern(int,RecdTraceMsg);
+CpvExtern(int,CtrRecdTraceMsg);
 
 CpvDeclare(char*,log_file_name);    /* log file name        */
 CpvDeclare(int,current_event);
@@ -284,12 +284,12 @@ CmiMyPe(), CpvAccess(logcnt), type, msg_type, entry, t1, t2, event));
 
   /* if log buffer is full then write out */
   /* the log into log file     */
-  if (CpvAccess(logcnt) == CpvAccess(LogBufSize))
+  if (CpvAccess(logcnt) == CpvAccess(CtrLogBufSize))
   {
     int begin_interrupt;
 
     begin_interrupt = CkUTimer();
-    wrtlog(CmiMyPe(), CpvAccess(logbuf), CpvAccess(LogBufSize));
+    wrtlog(CmiMyPe(), CpvAccess(logbuf), CpvAccess(CtrLogBufSize));
 
     buf = &(CpvAccess(logbuf)[CpvAccess(logcnt)]);
     buf->type = BEGIN_INTERRUPT;
@@ -319,12 +319,12 @@ log_init()
   int length;
 
 
-  CpvAccess(RecdTraceMsg)=1;
+  CpvAccess(CtrRecdTraceMsg)=1;
   CpvAccess(current_event)=0;
   CpvAccess(begin_pe)=-1;
   CpvAccess(begin_event)=-1;
   CpvAccess(begin_processing_time)=-1;
-  CpvAccess(logbuf) = (LOGARR) CmiAlloc(sizeof(LOGSTR)*CpvAccess(LogBufSize));
+  CpvAccess(logbuf) = (LOGARR) CmiAlloc(sizeof(LOGSTR)*CpvAccess(CtrLogBufSize));
 
   pe = CmiMyPe();
 

@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1997-07-30 22:22:21  rbrunner
+ * Revision 1.2  1997-10-03 19:52:07  milind
+ * Made charmc to work again, after inserting trace calls in converse part,
+ * i.e. threads and user events.
+ *
+ * Revision 1.1  1997/07/30 22:22:21  rbrunner
  * Old t3d port, probably not working.
  *
  * Revision 1.8  1997/04/25 20:48:19  jyelon
@@ -373,6 +377,7 @@ char * msg;
 
 void ConverseExit()
 {
+  ConverseCommonExit();
   exit(0);
 }
 

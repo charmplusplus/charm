@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.46  1997-08-22 19:29:06  milind
+ * Revision 2.47  1997-10-03 19:51:35  milind
+ * Made charmc to work again, after inserting trace calls in converse part,
+ * i.e. threads and user events.
+ *
+ * Revision 2.46  1997/08/22 19:29:06  milind
  * Added user-event tracing.
  *
  * Revision 2.45  1997/07/30 17:30:59  jyelon
@@ -323,7 +327,6 @@ char **argv;
   tblModuleInit(); 
   CldModuleInit();
   futuresModuleInit();
-  traceModuleInit(&argc, argv); /* pass parameters */
 
   if (CmiMyRank() == 0) CmiNodeBarrier();
 }
@@ -427,7 +430,7 @@ FUNCTION_PTR donehandler;
         CmiNodeBarrier();          
   
  
-        log_init();
+        /* log_init(); Moved to convcore.c */
         trace_begin_computation();
         SysBocInit();
         CpvAccess(msgs_created) = CpvAccess(msgs_processed) = 0;
@@ -710,11 +713,6 @@ char          **argv;
       foundSysOpt = 2;
     } else if (sscanf(argv[i], "+p%d", &NumPes) == 1) {
       foundSysOpt = 1;
-    } else if (strcmp(argv[i], "+logsize") == 0 && i + 1 < argc) {
-      int logsize;
-      sscanf(argv[i + 1], "%d", &logsize);
-      CpvAccess(LogBufSize) = logsize;
-      foundSysOpt = 2;
     }
     if (foundSysOpt) {
       /* if system option, remove it. */

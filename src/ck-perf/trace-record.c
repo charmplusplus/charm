@@ -9,7 +9,7 @@
 #undef MAIN_PERF
 
 char *pgm, *machine;
-int RecdTraceMsg = 1;
+int CtrRecdTraceMsg = 1;
 char *log_file_name;		/* log file name      	*/
 LOGSTR logbuf[MAXLOGBUFSIZE];
 

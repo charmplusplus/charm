@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1997-07-18 21:21:11  milind
+ * Revision 2.15  1997-10-03 19:51:36  milind
+ * Made charmc to work again, after inserting trace calls in converse part,
+ * i.e. threads and user events.
+ *
+ * Revision 2.14  1997/07/18 21:21:11  milind
  * all files of the form perf-*.c have been changed to trace-*.c, with
  * name expansions. For example, perf-proj.c has been changed to
  * trace-projections.c.
@@ -244,7 +248,7 @@ TRACE(CmiPrintf("Host %d: Enter CollectFromNodes(): NumPes %d\n",
 	if (CpvAccess(NumPes) == 0)
 	{
 		CpvAccess(RecdStatMsg) = 1;
-		if (CpvAccess(RecdTraceMsg)) ExitNode();
+		if (CpvAccess(CtrRecdTraceMsg)) ExitNode();
 	}
 }
 

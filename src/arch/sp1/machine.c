@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1997-04-25 20:48:17  jyelon
+ * Revision 2.16  1997-10-03 19:52:01  milind
+ * Made charmc to work again, after inserting trace calls in converse part,
+ * i.e. threads and user events.
+ *
+ * Revision 2.15  1997/04/25 20:48:17  jyelon
  * Corrected CmiNotifyIdle
  *
  * Revision 2.14  1997/04/24 22:37:09  jyelon
@@ -446,6 +450,7 @@ void CmiDeclareArgs()
 void ConverseExit()
 {
   int msgid = allmsg, nbytes;
+  ConverseCommonExit();
   mpc_wait(&msgid, &nbytes);
   exit(0);
 }

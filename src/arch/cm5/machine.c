@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1997-04-25 20:48:14  jyelon
+ * Revision 2.17  1997-10-03 19:51:54  milind
+ * Made charmc to work again, after inserting trace calls in converse part,
+ * i.e. threads and user events.
+ *
+ * Revision 2.16  1997/04/25 20:48:14  jyelon
  * Corrected CmiNotifyIdle
  *
  * Revision 2.15  1997/04/24 22:37:04  jyelon
@@ -473,6 +477,7 @@ int node, neighbour;
 
 void ConverseExit()
 {
+  ConverseCommonExit();
   exit(0);
 }
 

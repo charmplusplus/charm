@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.2  1997-07-31 15:30:58  milind
+ * Revision 1.3  1997-10-03 19:52:03  milind
+ * Made charmc to work again, after inserting trace calls in converse part,
+ * i.e. threads and user events.
+ *
+ * Revision 1.2  1997/07/31 15:30:58  milind
  * ANSIfied.
  *
  * Revision 1.1  1997/07/08 22:10:56  milind
@@ -430,6 +434,7 @@ void ConverseExit(void)
 {
   int msgid = allmsg; 
   size_t nbytes;
+  ConverseCommonExit();
   mpc_wait(&msgid, &nbytes);
   exit(0);
 }

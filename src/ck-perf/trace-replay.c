@@ -28,7 +28,7 @@ int type, msg_type, entry, event, dest, pe;
 int read_in_debug_line(), read_in_projections_data(); 
 
 char *pgm;
-int RecdTraceMsg = 1;
+int CtrRecdTraceMsg = 1;
 char *event_file_name;			/* log file name      	*/
 int debug_replay, projections_replay;
 

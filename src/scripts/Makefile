@@ -120,7 +120,9 @@ dirs+sources:
 
 CVHEADERS=converse.h conv-mach.h conv-mach.csh
 
-CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a
+TRACELIBS=libck-trace-none.a libck-trace-summary.a libck-trace-projections.a
+
+CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a $(TRACELIBS)
 
 LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o
 
@@ -193,13 +195,11 @@ CKHEADERS=chare.h const.h msg_macros.h prio_macros.h env_macros.h globals.h\
 
 CK_LIBS_CORE=libck-core.a
 
-CK_LIBS_TRACE=libck-trace-none.a libck-trace-summary.a libck-trace-projections.a
-
 CK_LIBS_LDB=libck-ldb-rand.o libck-ldb-acwn.o libck-ldb-mngr.o # libck-ldb-priomngr.o libck-ldb-recv.o libck-ldb-tok.o libck-ldb-btok.o
 
 CK_LIBS_CPLUS=libck-cplus-n.a libck-defmain-std.a
 
-CK_LIBS=$(CK_LIBS_CORE) $(CK_LIBS_TRACE) $(CK_LIBS_LDB) $(CK_LIBS_CPLUS)
+CK_LIBS=$(CK_LIBS_CORE) $(CK_LIBS_LDB) $(CK_LIBS_CPLUS)
 
 LIBCK_CORE=common.o globals.o init.o register.o boc.o condsend.o qd.o vid.o rdonly.o stat.o wrtone.o acc.o mono.o tbl.o memstuff.o ldbcfns.o ck.o main.o
 

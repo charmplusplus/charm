@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.27  1997-08-01 22:38:50  milind
+ * Revision 2.28  1997-10-03 19:51:56  milind
+ * Made charmc to work again, after inserting trace calls in converse part,
+ * i.e. threads and user events.
+ *
+ * Revision 2.27  1997/08/01 22:38:50  milind
  * Fixed gatherflat problem.
  * Also fixed optimization flags.
  *
@@ -286,6 +290,7 @@ void CmiInitMc(char **);
 
 void ConverseExit(void)
 {
+   ConverseCommonExit();
    cps_barrier(barr,nthreads);
 }
 

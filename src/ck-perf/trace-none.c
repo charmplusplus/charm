@@ -1,12 +1,12 @@
 #include "chare.h"
 
-CpvExtern(int, RecdTraceMsg);
+CpvExtern(int, CtrRecdTraceMsg);
 
 void traceModuleInit(pargc, argv) int *pargc; char **argv; {}
 
 program_name(s,m) char *s, *m; {}
 
-log_init() {CpvAccess(RecdTraceMsg) = 1;}
+log_init() {CpvAccess(CtrRecdTraceMsg) = 1;}
 
 trace_user_event(int eventNum)
 {}

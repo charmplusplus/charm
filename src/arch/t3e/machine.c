@@ -291,6 +291,7 @@ ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
 void ConverseExit()
 {
+  ConverseCommonExit();
   exit(0);
 }
 

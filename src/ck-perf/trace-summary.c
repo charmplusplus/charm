@@ -10,7 +10,7 @@
 #include "stat.h"
 
 CpvDeclare(char*,pgm);
-CpvExtern(int,RecdTraceMsg); 
+CpvExtern(int,CtrRecdTraceMsg); 
 
 CpvDeclare(int,display_index);
 CpvDeclare(int,last_time_interval);
@@ -151,7 +151,7 @@ log_init()
 	int i, j;
 	CpvAccess(timestep) = INITIAL_TIMESTEP;
 
-	CpvAccess(RecdTraceMsg) = 0;
+	CpvAccess(CtrRecdTraceMsg) = 0;
 	CpvAccess(init_time) = CkTimer();
 	CpvAccess(start_processing_time) = -1;
         for (i=0; i<NUMBER_DISPLAYS; i++)
@@ -305,7 +305,7 @@ send_log()
 	int mype = CmiMyPe();
 	if (CmiNumSpanTreeChildren(mype) == 0)
 	{
-		CpvAccess(RecdTraceMsg) = 1;
+		CpvAccess(CtrRecdTraceMsg) = 1;
 		if (mype != 0)
 			SendOutTraceMsg(mype);
 	}
@@ -328,7 +328,7 @@ TRACE(CmiPrintf("[%d] CollectTrace..: num_childmsgs=%d,  span=%d\n",
 		mype, CpvAccess(num_childmsgs), CmiNumSpanTreeChildren(mype)));
 	if (CpvAccess(num_childmsgs) == CmiNumSpanTreeChildren(mype))
 	{
-		CpvAccess(RecdTraceMsg) = 1;
+		CpvAccess(CtrRecdTraceMsg) = 1;
 		if (mype != 0)
 			SendOutTraceMsg(mype);
 TRACE(CmiPrintf("[%d] RecdStatMsg=%d\n", CmiMyPe(), CpvAccess(RecdStatMsg)));

@@ -34,6 +34,7 @@ static char ident[] = "@(#)$Header$";
 #include <sys/resource.h>
 #endif
 
+
 /*****************************************************************************
  *
  * Unix Stub Functions
@@ -82,6 +83,13 @@ static char *DeleteArg(argv)
 }
 
 
+/**
+ * Global variable for Trace in converse (moved from charm)
+ */
+
+CpvDeclare(int, CtrRecdTraceMsg);
+CpvDeclare(int, CtrLogBufSize);
+
 /*****************************************************************************
  *
  * Statistics: currently, the following statistics are not updated by converse.
@@ -97,12 +105,18 @@ CpvStaticDeclare(int, CstatPrintMemStatsFlag);
 void CstatsInit(argv)
 char **argv;
 {
+  int argc;
+  char **origArgv = argv;
+
+  CpvInitialize(int, CtrRecdTraceMsg);
+  CpvInitialize(int, CtrLogBufSize);
   CpvInitialize(int, CstatsMaxChareQueueLength);
   CpvInitialize(int, CstatsMaxForChareQueueLength);
   CpvInitialize(int, CstatsMaxFixedChareQueueLength);
   CpvInitialize(int, CstatPrintQueueStatsFlag);
   CpvInitialize(int, CstatPrintMemStatsFlag);
 
+  CpvAccess(CtrLogBufSize) = 10000;
   CpvAccess(CstatsMaxChareQueueLength) = 0;
   CpvAccess(CstatsMaxForChareQueueLength) = 0;
   CpvAccess(CstatsMaxFixedChareQueueLength) = 0;
@@ -115,9 +129,20 @@ char **argv;
     if (strcmp(*argv, "+qs") == 0) {
       CpvAccess(CstatPrintQueueStatsFlag)=1;
       DeleteArg(argv);
+    } else if (strcmp(*argv, "+logsize") == 0) {
+      int logsize;
+      DeleteArg(argv);
+      sscanf(*argv, "%d", &logsize);
+      CpvAccess(CtrLogBufSize) = logsize;
+      DeleteArg(argv);
     } else
     argv++;
   }
+
+  argc = 0; argv=origArgv;
+  for(argc=0;argv[argc];argc++);
+  traceModuleInit(&argc, argv);
+  log_init();
 }
 
 int CstatMemory(i)
@@ -838,3 +863,7 @@ ConverseCommonInit(char *argv)
   CthSchedInit();
 }
 
+ConverseCommonExit()
+{
+  close_log();
+}

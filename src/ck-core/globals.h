@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.18  1997-08-22 19:29:05  milind
+ * Revision 2.19  1997-10-03 19:51:34  milind
+ * Made charmc to work again, after inserting trace calls in converse part,
+ * i.e. threads and user events.
+ *
+ * Revision 2.18  1997/08/22 19:29:05  milind
  * Added user-event tracing.
  *
  * Revision 2.17  1997/07/18 21:21:06  milind
@@ -151,10 +155,10 @@ CpvExtern(int, PrintMemStat);
 CpvExtern(int, PrintChareStat);
 CpvExtern(int, PrintSummaryStat);
 CpvExtern(int, QueueingDefault);
-CpvExtern(int, LogBufSize);
+CpvExtern(int, CtrLogBufSize);
 
 CpvExtern(int, RecdStatMsg);
-CpvExtern(int, RecdTraceMsg);
+CpvExtern(int, CtrRecdTraceMsg);
 
 CpvExtern(int, numHeapEntries);
 CpvExtern(int, numCondChkArryElts);

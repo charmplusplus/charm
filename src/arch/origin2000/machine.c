@@ -199,6 +199,7 @@ static void threadInit(void *arg)
 
 void ConverseExit(void)
 {
+  ConverseCommonExit();
   barrier(barr, nthreads);
 }
 
