@@ -147,6 +147,11 @@ const char *HiFormal0 = // type
 "\01"
 ;
 
+// gzheng
+const char *HiFormal01 = // type
+"\01 &"
+;
+
 const char *HiFormal1 =
 ", "
 ;
@@ -155,8 +160,18 @@ const char *HiFormal2 = // type, argname, arglen
 "\01 \02[\03]"
 ;
 
+// gzheng
+const char *HiFormal21 = // type, argname, arglen
+"\01 &\02[\03]"
+;
+
 const char *CiFormal0 = // type, argname
 "\01 \02"
+;
+
+// gzheng
+const char *CiFormal01 = // type, argname
+"\01 &\02"
 ;
 
 const char *CiFormal1 =
@@ -165,6 +180,11 @@ const char *CiFormal1 =
 
 const char *CiFormal2 = // type, argname, arglen
 "\01 \02[\03]"
+;
+
+// gzheng
+const char *CiFormal21 = // type, argname, arglen
+"\01 &\02[\03]"
 ;
 
 const char *CccFormal0 = // type, argname
@@ -259,12 +279,14 @@ BE_produce_parameters(be_operation *bop, int passnum)
             spew(Ccg, CcgFormal1, arrayType, argName, arraylen);
             spew(Hm, HmFormal1, arrayType, argName, arraylen);
 	  } else {		// dir_OUT dir_INOUT
-            cerr << "LIMIT: Out arguments not supported yet.\n";
-            spew(Hi, HiFormal2, arrayType, argName, arraylen);
-            spew(Ci, CiFormal2, arrayType, argName, arraylen);
+	    // gzheng
+	    // add & before arguments
+            spew(Hi, HiFormal21, arrayType, argName, arraylen); 
+            spew(Ci, CiFormal21, arrayType, argName, arraylen);
             spew(Ccc, CccFormal1, arrayType, argName, arraylen);
             spew(Ccg, CcgFormal1, arrayType, argName, arraylen);
             spew(Hm, HmFormal1, arrayType, argName, arraylen);
+//            cerr << "LIMIT: Out arguments not supported yet.\n";
 	  }
         } else {
 	  char *argType = a->field_type()->local_name()->get_string();
@@ -276,13 +298,13 @@ BE_produce_parameters(be_operation *bop, int passnum)
             spew(Ccc, CccFormal0, argType, argName);
             spew(Ccg, CcgFormal0, argType, argName);
             spew(Hm, HmFormal0, argType, argName);
-	  } else {
-            cerr << "LIMIT: Out arguments not supported yet.\n";
-            spew(Hi, HiFormal0, argType);
-            spew(Ci, CiFormal0, argType, argName);
+	  } else {	// gzheng
+            spew(Hi, HiFormal01, argType);	       // add & before arguments
+            spew(Ci, CiFormal01, argType, argName);
             spew(Ccc, CccFormal0, argType, argName);
             spew(Ccg, CcgFormal0, argType, argName);
             spew(Hm, HmFormal0, argType, argName);
+//            cerr << "LIMIT: Out arguments not supported yet.\n";
 	  }
         }
       } else { // not an argument
@@ -310,30 +332,30 @@ BE_produce_parameters(be_operation *bop, int passnum)
           sprintf(arraylen, "%ld", arraySizeNum);
           char argName[1024];
           sprintf(argName, "arg%d", argnum);
-	  if(a->direction() == AST_Argument::dir_IN) {
+	  if(a->direction() == AST_Argument::dir_IN || a->direction() == AST_Argument::dir_INOUT) {
             spew(Ci, CiActual1, argName, arraylen);
+            spew(Ccc, CccActual0, argName);
+            spew(Ccg, CcgActual0, argName);
+	  } else if (a->direction() == AST_Argument::dir_OUT) {	// gzheng
             spew(Ccc, CccActual0, argName);
             spew(Ccg, CcgActual0, argName);
 	  } else {
-            cerr << "LIMIT: Out arguments not supported yet.\n";
-            spew(Ci, CiActual1, argName, arraylen);
-            spew(Ccc, CccActual0, argName);
-            spew(Ccg, CcgActual0, argName);
-	  }
+            cerr << "LIMIT: arguments not supported yet.\n";
+          }
         } else {
 	  char *argType = a->field_type()->local_name()->get_string();
           char argName[1024];
           sprintf(argName, "arg%d", argnum);
-	  if(a->direction() == AST_Argument::dir_IN) {
+	  if(a->direction() == AST_Argument::dir_IN || a->direction() == AST_Argument::dir_INOUT) {
             spew(Ci, CiActual0, argName);
+            spew(Ccc, CccActual0, argName);
+            spew(Ccg, CcgActual0, argName);
+	  } else if (a->direction() == AST_Argument::dir_OUT) {
             spew(Ccc, CccActual0, argName);
             spew(Ccg, CcgActual0, argName);
 	  } else {
             cerr << "LIMIT: Out arguments not supported yet.\n";
-            spew(Ci, CiActual0, argName);
-            spew(Ccc, CccActual0, argName);
-            spew(Ccg, CcgActual0, argName);
-	  }
+          }
         }
       } else { // not an argument
         cerr << "LIMIT: Only arguments within method parameter list\n";
@@ -370,6 +392,11 @@ const char *HccMethod0 = // methodname, messagename
 "    void \01(\02 *);\n"
 ;
 
+// gzheng
+const char *HccMethods_1 = // methodname, messagename
+"    \02 * \01(\02 *);\n"
+;
+
 const char *HcgMethod0 = // methodname, messagename
 "    void \01(\02 *);\n"
 ;
@@ -398,15 +425,18 @@ const char *CiMethod2 = // classname, methodname, messagename
 ;
 
 // gzheng
-const char *CiMethod3 = // classname, methodname, messagename
+const char *CiMethods_3 = // classname, methodname, messagename
 "  if(isChare()) {\n"
 "    CkChareID cid = cih.ciCID();\n"
-"    CkRemoteCall(CProxy_CC\01::__idx_\02_\03,msg,&cid);\n"
+"    msg = (\03 *)CkRemoteCall(CProxy_CC\01::__idx_\02_\03,msg,&cid);\n"
 "  } else if(ciGetProc()==CI_PE_ALL) {\n"
-"    CkBroadcastMsgBranch(CProxy_CG\01::__idx_\02_\03,msg,cih.ciGID());\n"
+"//    CkBroadcastMsgBranch(CProxy_CG\01::__idx_\02_\03,msg,cih.ciGID());\n"
 "  } else {\n"
 "//    CkRemoteBranchCall(CProxy_CG\01::__idx_\02_\03,msg,cih.ciGID(),ciGetProc());\n"
 "  }\n"
+;
+
+const char *CiMethods_4 = //
 "}\n"
 "\n"
 ;
@@ -416,12 +446,28 @@ const char *CccMethod0 = // classname, methodname, messagename
 "{\n"
 ;
 
+// gzheng
+const char *CccMethods_1 = // classname, methodname, messagename
+"\03 * CC\01::\02(\03 *msg)\n"
+"{\n"
+;
+
 const char *CccMethod1 = // methodname
 "  obj->\01("
 ;
 
+// gzheng split CccMethod2 to two parts
 const char *CccMethod2 =
 ");\n"
+;
+
+const char *CccMethod3 =
+"}\n"
+"\n"
+;
+
+const char *CccMethods_3 =
+"  return msg;\n"
 "}\n"
 "\n"
 ;
@@ -446,7 +492,7 @@ const char *IccMethod0 = // methodname, messagename
 ;
 
 // gzheng
-const char *IccMethod1 = // methodname, messagename
+const char *IccMethods_1 = // methodname, messagename
 "  entry [sync] void \01(\02 *);\n"
 ;
 
@@ -455,12 +501,21 @@ const char *IcgMethod0 = // methodname, messagename
 ;
 
 // gzheng
-const char *IcgMethod1 = // methodname, messagename
+const char *IcgMethods_1 = // methodname, messagename
 "  entry [sync] void \01(\02 *);\n"
 ;
 
 const char *ImMethod0 = // messagename
 "message \01;\n"
+;
+
+// gzheng
+const char *CiMethod_1 = // argname
+"  \01 = msg->\01;\n"
+;
+
+const char *CccMethod1_1 = // argname
+"  msg->\01 = \01;\n"
 ;
 
 void
@@ -475,7 +530,7 @@ BE_produce_operation(AST_Decl *d_in, AST_Interface *parent_interface)
   String		    *s;
 
   // gzheng
-  // check if has INOUT
+  // check if has OUT
   int out_attr = 0;
   i = new UTL_ScopeActiveIterator(bop, UTL_Scope::IK_decls);
   while (!(i->is_done())) {
@@ -516,14 +571,17 @@ BE_produce_operation(AST_Decl *d_in, AST_Interface *parent_interface)
     if( out_attr == 0 ) {
        spew(Icc, IccMethod0, methodname, msgName);
        spew(Icg, IcgMethod0, methodname, msgName);
+       spew(Hcc, HccMethod0, methodname, msgName);
+       spew(Hcg, HcgMethod0, methodname, msgName);
+       spew(Ccc, CccMethod0, classname, methodname, msgName);
     }
     else {
-       spew(Icc, IccMethod1, methodname, msgName);
-       spew(Icg, IcgMethod1, methodname, msgName);
+       spew(Icc, IccMethods_1, methodname, msgName);
+       spew(Icg, IcgMethods_1, methodname, msgName);
+       spew(Hcc, HccMethods_1, methodname, msgName);
+       spew(Hcg, HcgMethod0, methodname, msgName);
+       spew(Ccc, CccMethods_1, classname, methodname, msgName);
     }
-    spew(Hcc, HccMethod0, methodname, msgName);
-    spew(Hcg, HcgMethod0, methodname, msgName);
-    spew(Ccc, CccMethod0, classname, methodname, msgName);
     spew(Ccg, CcgMethod0, classname, methodname, msgName);
   }
   BE_produce_parameters(bop, 1); // Produce Formals
@@ -533,15 +591,41 @@ BE_produce_operation(AST_Decl *d_in, AST_Interface *parent_interface)
   spew(Ccc, CccMethod1, methodname);
   spew(Ccg, CcgMethod1, methodname);
   BE_produce_parameters(bop, 2); // Produce Marshalling Code
+  spew(Ccc, CccMethod2);
+  spew(Ccg, CcgMethod2);
+
   // gzheng
   if( out_attr == 0 ) {
   	spew(Ci, CiMethod2, classname, methodname, msgName);
+  	spew(Ccc, CccMethod3);
   }
   else  {
-  	spew(Ci, CiMethod3, classname, methodname, msgName);
+  	spew(Ci, CiMethods_3, classname, methodname, msgName);
+	// pick up all the OUT arguments
+	int argnum = 0;
+  	i = new UTL_ScopeActiveIterator(bop, UTL_Scope::IK_decls);
+  	while (!(i->is_done())) {
+	    argnum++;
+      	    d = i->item();
+      	    if (d->node_type() == AST_Decl::NT_argument) {
+        	be_argument *a = be_argument::narrow_from_decl(d);
+        	if(a->direction() == AST_Argument::dir_OUT || 
+                   a->direction() == AST_Argument::dir_INOUT) {
+			// make assignment back
+          		char argName[1024];
+          		sprintf(argName, "arg%d", argnum);
+  			spew(Ci, CiMethod_1, argName);
+			// in CCclass, assign message back
+  			spew(Ccc, CccMethod1_1, argName);
+ 		}
+            }
+            i->next();
+  	}
+  	delete i;
+	// add "}" to close the function
+  	spew(Ci, CiMethods_4);
+  	spew(Ccc, CccMethods_3);
   }
-  spew(Ccc, CccMethod2);
-  spew(Ccg, CcgMethod2);
 }
 
 //----------------------------------------------------------------------
