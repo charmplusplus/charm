@@ -25,15 +25,7 @@ XStr::append(char c)
   append(tmp);
 }
 
-XStr::XStr()
-{
-  s = new char[SZ];
-  *s = '\0';
-  len = 0;
-  blklen = SZ;
-}
-
-XStr::XStr(const char *_s)
+void XStr::initTo(const char *_s)
 {
   len = strlen(_s);
   blklen = SZ;
@@ -43,6 +35,10 @@ XStr::XStr(const char *_s)
   s = new char[blklen];
   strcpy(s, _s);
 }
+
+XStr::XStr() {initTo("");}
+XStr::XStr(const char *_s) {initTo(_s);}
+XStr::XStr(const XStr &_s) {initTo(_s.get_string_const());}
 
 XStr& XStr::operator << (int i) {
       char tmp[100]; 
@@ -55,18 +51,18 @@ void
 XStr::spew(const char*b, const char *a1, const char *a2, const char *a3, 
            const char *a4, const char *a5)
 {
-  int i;
-  for(i=0; i<strlen(b); i++){
+  int i,len=strlen(b);
+  for(i=0; i<len; i++){
     switch(b[i]){
-    case '\01':
+    case '\001':
       if(a1==0) {cout << "Internal Error\n"; abort();} append(a1); break;
-    case '\02':
+    case '\002':
       if(a2==0) {cout << "Internal Error\n"; abort();} append(a2); break;
-    case '\03':
+    case '\003':
       if(a3==0) {cout << "Internal Error\n"; abort();} append(a3); break;
-    case '\04':
+    case '\004':
       if(a4==0) {cout << "Internal Error\n"; abort();} append(a4); break;
-    case '\05':
+    case '\005':
       if(a5==0) {cout << "Internal Error\n"; abort();} append(a5); break;
     default:
       append(b[i]);

@@ -81,7 +81,7 @@ class Type : public Printable {
     virtual void print(XStr&) = 0;
     virtual int isVoid(void) = 0;
     virtual const char *getBaseName(void) = 0;
-    virtual void genProxyName(XStr&) = 0;
+    virtual void genProxyName(XStr &str);
 };
 
 class TypeList : public Printable {
@@ -101,7 +101,10 @@ class TypeList : public Printable {
 
 class EnType : virtual public Type {
   public:
-    virtual void genMsgProxyName(XStr& str) = 0;
+    virtual void genMsgProxyName(XStr& str) { 
+      cerr << "Illegal genMsgProxy call?\n"; 
+      abort(); 
+    }
 };
 
 class SimpleType : virtual public Type {
@@ -115,28 +118,25 @@ class BuiltinType : public SimpleType , public EnType {
     void print(XStr& str) { str << name; }
     int isVoid(void) { return !strcmp(name, "void"); }
     const char *getBaseName(void) { return name; }
-    void genProxyName(XStr& str) { cerr << "Illegal Base Class ?\n"; abort(); }
-    void genMsgProxyName(XStr& str) { 
-      cerr << "Illegal Entry Param?\n"; 
-      abort(); 
-    }
 };
+
+class Chare;//Forward declaration
+static char *msg_prefix(void) {return "CMessage_";}
+static char *chare_prefix(void) {return "CProxy_";}
 
 class NamedType : public SimpleType {
   private:
     const char *name;
     TParamList *tparams;
   public:
-    NamedType(const char* n, TParamList* t=0) : name(n), tparams(t) {}
+    NamedType(const char* n, TParamList* t=0)
+       : name(n), tparams(t) {}
     void print(XStr& str);
     int isVoid(void) { return 0; }
     const char *getBaseName(void) { return name; }
     int isTemplated(void) { return (tparams!=0); }
-    void genProxyName(XStr& str) { genChareProxyName(str); }
-    void genChareProxyName(XStr& str) { str << chare_prefix(); print(str);}
-    void genGroupProxyName(XStr& str) { str << group_prefix() ; print(str);}
-    void genArrayProxyName(XStr& str) { str << array_prefix() ; print(str);}
-    void genMsgProxyName(XStr& str) { str << msg_prefix() ; print(str);}
+    virtual void genProxyName(XStr& str) { str << chare_prefix(); print(str);}
+    virtual void genMsgProxyName(XStr& str) { str << msg_prefix(); print(str);}
 };
 
 class PtrType : public EnType {
@@ -149,8 +149,7 @@ class PtrType : public EnType {
     void print(XStr& str);
     int isVoid(void) { return 0; }
     const char *getBaseName(void) { return type->getBaseName(); }
-    void genProxyName(XStr& str) { cerr << "Illegal Base Class ?\n"; abort(); }
-    void genMsgProxyName(XStr& str) { 
+    virtual void genMsgProxyName(XStr& str) { 
       if(numstars != 1) {
         cerr << "Illegal Entry Param ?\n"; 
         abort(); 
@@ -170,7 +169,6 @@ class ArrayType : public Type {
     void print(XStr& str){type->print(str);str<<"[";dim->print(str);str<<"]";}
     int isVoid(void) { return 0; }
     const char *getBaseName(void) { return type->getBaseName(); }
-    void genProxyName(XStr& str) { cerr << "Illegal Base Class ?\n"; abort(); }
 };
 
 class FuncType : public Type {
@@ -188,7 +186,6 @@ class FuncType : public Type {
     }
     int isVoid(void) { return 0; }
     const char *getBaseName(void) { return name; }
-    void genProxyName(XStr& str) { cerr << "Illegal Base Class ?\n"; abort(); }
 };
 
 /* A type instantiation parameter */
@@ -224,6 +221,7 @@ class Member : public Printable {
     virtual void genDecls(XStr& str) = 0;
     virtual void genDefs(XStr& str) = 0;
     virtual void genReg(XStr& str) = 0;
+    XStr makeDecl(const char *returnType);
 };
 
 /* List of members of a chare or group */
@@ -270,20 +268,14 @@ class TEntity : public Printable {
     virtual void genDecls(XStr& str) = 0;
     virtual void genDefs(XStr& str) = 0;
     virtual void genReg(XStr& str) = 0;
-    void genSpec(XStr& str) { templat->genSpec(str); }
-    void genVars(XStr& str) { templat->genVars(str); }
+    virtual void genTSpec(XStr& str) { if (templat) templat->genSpec(str); }
+    virtual void genTVars(XStr& str) { if (templat) templat->genVars(str); }
 };
-
-#define SCHARE 1
-#define SMAINCHARE 2
-#define SGROUP 3
-#define SARRAY 4
-#define SNODEGROUP 5
 
 /* Chare or group is a templated entity */
 
 class Chare : public TEntity, public Construct {
-    int chareType; // is chare/mainchare or group
+  protected:
     NamedType *type;
     MemberList *list;
     TypeList *bases;
@@ -291,26 +283,76 @@ class Chare : public TEntity, public Construct {
 
     void genRegisterMethod(XStr& str);
   public:
-    Chare(int c, NamedType *t, TypeList *b=0, MemberList *l=0) : 
-      chareType(c), type(t), bases(b), list(l) {setTemplate(0); abstract=0;}
-    int  getChareType(void) { return chareType; }
-    void genProxyName(XStr& str){type->genProxyName(str);}
+    Chare(NamedType *t, TypeList *b=0, MemberList *l=0) : 
+      type(t), list(l), bases(b) 
+    {
+      setTemplate(0); 
+      abstract=0;
+    }
     void genProxyBases(XStr& str,const char* p,const char* s,const char* sep) {
       bases->genProxyNames(str, p, s, sep);
     }
-    const char *getBaseName(void) { return type->getBaseName(); }
+    XStr proxyName(int withTemplates=1) 
+    {
+    	XStr str;
+    	str<<proxyPrefix()<<type;
+    	if (withTemplates) genTVars(str);
+    	return str;
+    }
+    XStr baseName(int withTemplates=1) 
+    {
+    	XStr str;
+    	str<<type->getBaseName();
+    	if (withTemplates) genTVars(str);
+    	return str;
+    }
     int  isTemplated(void) { return (templat!=0); }
     int  isDerived(void) { return (bases!=0); }
     int  isAbstract(void) { return abstract; }
+    virtual int isMainChare(void) {return 0;}
+    virtual int isArray(void) {return 0;}
+    virtual int isGroup(void) {return 0;}
+    virtual int isNodeGroup(void) {return 0;}
     void setAbstract(int a) { abstract = a; }
     void print(XStr& str);
-    void genChareDecls(XStr& str);
-    void genGroupDecls(XStr& str);
-    void genArrayDecls(XStr& str);
-    void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
+    void genDecls(XStr &str);
+    virtual void genSubDecls(XStr& str);
+    virtual char *chareTypeName(void) {return "chare";}
+    virtual char *proxyPrefix(void) {return "CProxy_";}
 };
+
+class MainChare : public Chare {
+  public:
+    MainChare(NamedType *t, TypeList *b=0, MemberList *l=0):Chare(t,b,l) {}
+    virtual int isMainChare(void) {return 1;}
+    virtual char *chareTypeName(void) {return "mainchare";}
+};
+
+class Array : public Chare {
+  public:
+    Array(NamedType *t, TypeList *b=0, MemberList *l=0):Chare(t,b,l) {}
+    virtual int isArray(void) {return 1;}
+    virtual void genSubDecls(XStr& str);
+    virtual char *chareTypeName(void) {return "array";}
+};
+
+class Group : public Chare {
+  public:
+    Group(NamedType *t, TypeList *b=0, MemberList *l=0):Chare(t,b,l) {}
+    virtual int isGroup(void) {return 1;}
+    virtual void genSubDecls(XStr& str);
+    virtual char *chareTypeName(void) {return "group";}
+};
+
+class NodeGroup : public Group {
+  public:
+    NodeGroup(NamedType *t, TypeList *b=0, MemberList *l=0):Group(t,b,l) {}
+    virtual int isNodeGroup(void) {return 1;}
+    virtual char *chareTypeName(void) {return "nodegroup";}
+};
+
 
 #define SPACKED  0x01
 #define SVARSIZE 0x02
@@ -319,13 +361,14 @@ class Message : public TEntity, public Construct {
     int attrib;
     NamedType *type;
   public:
-    Message(NamedType *t, int a) : type(t), attrib(a) { setTemplate(0); }
+    Message(NamedType *t, int a) : attrib(a), type(t) { setTemplate(0); }
     void print(XStr& str);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
     int  isPacked(void) { return attrib&SPACKED; }
     int  isVarsize(void) { return attrib&SVARSIZE; }
+    virtual char *proxyPrefix(void) {return msg_prefix();}
 };
 
 /* A formal argument of a template */
@@ -400,7 +443,7 @@ class Entry : public Member {
     char *name;
     EnType *param;
     Value *stacksize;
-    void genEpIdx(XStr& str);
+    XStr epIdx(int include__idx_=1);
     void genEpIdxDecl(XStr& str);
     void genEpIdxDef(XStr& str);
     void genChareStaticConstructorDecl(XStr& str);
@@ -413,6 +456,11 @@ class Entry : public Member {
     void genChareDefs(XStr& str);
     void genGroupStaticConstructorDefs(XStr& str);
     void genGroupDefs(XStr& str);
+    
+    XStr paramType(void);
+    XStr paramComma(void);
+    XStr voidParamDecl(void);
+    XStr callThread(const XStr &procName,int prependEntryName=0);
   public:
     Entry(int a, EnType *r, char *n, EnType *p, Value *sz=0) :
       attribs(a), retType(r), name(n), param(p), stacksize(sz)
@@ -433,9 +481,10 @@ class Entry : public Member {
     int getStackSize(void) { return (stacksize ? stacksize->getIntVal() : 0); }
     int isThreaded(void) { return (attribs & STHREADED); }
     int isSync(void) { return (attribs & SSYNC); }
-    int isConstructor(void) { return !strcmp(name, container->getBaseName());}
+    int isConstructor(void) { return !strcmp(name, container->baseName(0).get_string());}
     int isExclusive(void) { return (attribs & SLOCKED); }
     int isVirtual(void) { return (attribs & SVIRTUAL); }
+    const char *Virtual(void) {return isVirtual()?"virtual ":"";}
     int isPure(void) { return (attribs & SPURE); }
     void print(XStr& str);
     void genDecls(XStr& str);
@@ -473,7 +522,7 @@ class Readonly : public Construct, public Member {
     char *name;
     ValueList *dims;
   public:
-    Readonly(Type *t, char *n, ValueList* d, int m=0) : type(t), name(n), msg(m)
+    Readonly(Type *t, char *n, ValueList* d, int m=0) : msg(m), type(t), name(n)
     { dims=d; setChare(0); }
     void print(XStr& str);
     void genDecls(XStr& str);

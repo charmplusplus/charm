@@ -392,7 +392,7 @@ static const short yycheck[] = {     1,
    228,   211,    -1,   223
 };
 /* -*-C-*-  Note some compilers choke on comments on `#line' lines.  */
-#line 3 "/usr/dcs/software/supported/encap/bison-1.27/share/bison.simple"
+#line 3 "/usr/share/bison.simple"
 /* This file comes from bison-1.27.  */
 
 /* Skeleton output parser for bison,
@@ -606,7 +606,7 @@ __yy_memcpy (char *to, char *from, unsigned int count)
 #endif
 #endif
 
-#line 216 "/usr/dcs/software/supported/encap/bison-1.27/share/bison.simple"
+#line 216 "/usr/share/bison.simple"
 
 /* The user can define YYPARSE_PARAM as the name of an argument to be passed
    into yyparse.  The argument should have type void *.
@@ -1256,24 +1256,24 @@ case 80:
     break;}
 case 81:
 #line 317 "xi-grammar.y"
-{ yyval.chare = new Chare(SCHARE, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); 
+{ yyval.chare = new Chare(yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); 
 		  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
 		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 82:
 #line 321 "xi-grammar.y"
-{ yyval.chare = new Chare(SMAINCHARE, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); 
+{ yyval.chare = new MainChare(yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); 
                   if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
 		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 83:
 #line 327 "xi-grammar.y"
-{ yyval.chare = new Chare(SGROUP, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
+{ yyval.chare = new Group(yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
 		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 84:
 #line 332 "xi-grammar.y"
-{ yyval.chare = new Chare(SNODEGROUP, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); 
+{ yyval.chare = new NodeGroup(yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); 
 		  if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
 		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
@@ -1281,30 +1281,30 @@ case 85:
 #line 338 "xi-grammar.y"
 { if(strcmp(yyvsp[-2].ntype->getBaseName(), "ArrayElement"))
                     yyvsp[-1].typelist = new TypeList(new NamedType("ArrayElement"), yyvsp[-1].typelist);
-                  yyval.chare = new Chare(SARRAY, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
+                  yyval.chare = new Array(yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
 		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 86:
 #line 345 "xi-grammar.y"
-{ yyval.chare = new Chare(SCHARE, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); 
+{ yyval.chare = new Chare(new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); 
                   if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
 		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 87:
 #line 349 "xi-grammar.y"
-{ yyval.chare = new Chare(SMAINCHARE, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); 
+{ yyval.chare = new MainChare(new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); 
                   if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
 		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 88:
 #line 355 "xi-grammar.y"
-{ yyval.chare = new Chare(SGROUP, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); 
+{ yyval.chare = new Group(new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); 
                   if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
 		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
 case 89:
 #line 361 "xi-grammar.y"
-{ yyval.chare = new Chare(SNODEGROUP, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); 
+{ yyval.chare = new NodeGroup( new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); 
                   if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
 		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
@@ -1312,7 +1312,7 @@ case 90:
 #line 367 "xi-grammar.y"
 { if(strcmp(yyvsp[-2].strval, "ArrayElement"))
 		    yyvsp[-1].typelist = new TypeList(new NamedType("ArrayElement"), yyvsp[-1].typelist);
-		  yyval.chare = new Chare(SARRAY, new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); 
+		  yyval.chare = new Array( new NamedType(yyvsp[-2].strval), yyvsp[-1].typelist, yyvsp[0].mbrlist); 
                   if(yyvsp[0].mbrlist) yyvsp[0].mbrlist->setChare(yyval.chare);
 		  if(yyvsp[0].mbrlist && yyvsp[0].mbrlist->isPure()) yyval.chare->setAbstract(1);;
     break;}
@@ -1492,7 +1492,7 @@ case 133:
     break;}
 }
    /* the action file gets copied in in place of this dollarsign */
-#line 542 "/usr/dcs/software/supported/encap/bison-1.27/share/bison.simple"
+#line 542 "/usr/share/bison.simple"
 
   yyvsp -= yylen;
   yyssp -= yylen;
