@@ -1231,6 +1231,7 @@ static int copyRednData(CkDDT_DataType *ddt,const void *inbuf,void *outbuf,int c
   char *serialized=new char[len];
   ddt->serialize((char*)inbuf,(char*)serialized,count,1);
   ddt->serialize((char*)outbuf,(char*)serialized,count,-1); 
+  delete [] serialized;		// < memory leak!  // gzheng 
   
   return MPI_SUCCESS;
 }
@@ -1304,6 +1305,7 @@ int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
   MPI_Scatterv(tmpbuf, recvcounts, displs, datatype,
                recvbuf, recvcounts[ptr->getRank()], datatype, 0, comm);
   free(tmpbuf);
+  delete [] displs;	// < memory leak ! // gzheng
   return 0;
 }
 
