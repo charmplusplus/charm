@@ -13,7 +13,8 @@ KeyvalPair::KeyvalPair(char* k, char* v){
   vlen = strlen(v);
 }
 KeyvalPair::~KeyvalPair(void){
-  free(key); free(val);
+  free(key); 
+  free(val);
 }
 
 void InfoStruct::pup(PUP::er& p){

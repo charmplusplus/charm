@@ -599,14 +599,21 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
       }
       block[pos] = elt;
     }
+    void free(int pos) {
+      if (pos<0 || pos>=len) return;
+      block[pos]->free();
+      delete block[pos];
+      block[pos]=NULL;
+    }
     void push_back(AmpiRequest* elt) {insertAt(len,elt);}
     int insert(AmpiRequest* elt){
-/*      //search for invalidated slot
-      for(int i=0;i<len;i++)
-        if(!block[i]->isValid()){
+      //search for invalidated slot
+      for(int i=0;i<len;i++){
+        if(block[i]==NULL){
 	  block[i] = elt;
 	  return i;
-        } */
+	}
+      }
       push_back(elt);
       return len-1;
     }

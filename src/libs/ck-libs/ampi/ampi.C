@@ -2186,7 +2186,7 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
   AmpiRequestList* reqs = getReqs();
   AMPI_DEBUG("MPI_Wait: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
   (*reqs)[*request]->wait(sts);
-  (*reqs)[*request]->free();
+  reqs->free(*request);
   return 0;
 }
 
@@ -2291,7 +2291,7 @@ int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
   AmpiRequestList* reqs = getReqs();
   if(1 == (*flag = (*reqs)[*request]->test(sts))){
     (*reqs)[*request]->complete(sts);
-    (*reqs)[*request]->free();
+    reqs->free(*request);
   }
   return 0;
 }
@@ -2349,7 +2349,7 @@ int AMPI_Request_free(MPI_Request *request){
   AMPIAPI("AMPI_Request_free");
   if(*request==MPI_REQUEST_NULL) return 0;
   AmpiRequestList* reqs = getReqs();
-  (*reqs)[*request]->free();
+  reqs->free(*request);
   return 0;
 }
 
