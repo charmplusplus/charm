@@ -134,6 +134,10 @@ static void pupEntry(PUP::er &p,int i)
   PCOMS(name) 
   PCOM(msgIdx) 
   PCOM(chareIdx)
+  if (c->inCharm == CmiTrue)
+    p.comment("System Entry Point");
+  else
+    p.comment("User Entry Point");
 }
 static void pupMsg(PUP::er &p,int i)
 {
