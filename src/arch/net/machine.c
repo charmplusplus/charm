@@ -1909,6 +1909,7 @@ void DiscardImplicitDgram(ImplicitDgram dg)
 int TransmitAckDatagram(OtherNode node)
 {
   DgramAck ack; unsigned int i, seqno, slot; ExplicitDgram dg;
+  int retval;
   
   seqno = node->recv_next;
   DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, Cmi_host_pid, seqno);
@@ -1922,7 +1923,9 @@ int TransmitAckDatagram(OtherNode node)
   memcpy(&ack.window[Cmi_window_size], &(node->send_ack_seqno), 
           sizeof(unsigned int));
   node->send_ack_seqno = ((node->send_ack_seqno + 1) & DGRAM_SEQNO_MASK);
-  sendto(dataskt, (char *)&ack,
+  retval = (-1);
+  while(retval==(-1))
+    retval = sendto(dataskt, (char *)&ack,
 	 DGRAM_HEADER_SIZE + Cmi_window_size + sizeof(unsigned int), 0,
 	 (struct sockaddr *)&(node->addr),
 	 sizeof(struct sockaddr_in));
@@ -1940,6 +1943,7 @@ void TransmitImplicitDgram(ImplicitDgram dg)
 {
   char *data; DgramHeader *head; int len; DgramHeader temp;
   OtherNode dest;
+  int retval;
 
   len = dg->datalen;
   data = dg->dataptr;
@@ -1948,7 +1952,9 @@ void TransmitImplicitDgram(ImplicitDgram dg)
   dest = dg->dest;
   DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_host_pid, dg->seqno);
   LOG(Cmi_clock, Cmi_nodestart, 'T', dest->nodestart, dg->seqno);
-  sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
+  retval = (-1);
+  while(retval==(-1))
+    retval = sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
 	      (struct sockaddr *)&(dest->addr), sizeof(struct sockaddr_in));
   *head = temp;
   dest->stat_send_pkt++;
@@ -1958,6 +1964,7 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
 {
   char *data; DgramHeader *head; int len; DgramHeader temp;
   OtherNode dest;
+  int retval;
 
   len = dg->datalen;
   data = dg->dataptr;
@@ -1966,7 +1973,9 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
   dest = dg->dest;
   DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_host_pid, dg->seqno);
   LOG(Cmi_clock, Cmi_nodestart, 'P', dest->nodestart, dg->seqno);
-  sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
+  retval = (-1);
+  while (retval == (-1))
+    retval = sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
 	      (struct sockaddr *)&(dest->addr), sizeof(struct sockaddr_in));
   *head = temp;
   dest->stat_resend_pkt++;
