@@ -1068,8 +1068,10 @@ static void CmiStdoutInit(void) {
 		CmiEnableNonblockingIO(srcFd);
 #endif
 #if CMK_SHARED_VARS_UNAVAILABLE && !CMK_USE_GM
+                if (!Cmi_netpoll) {
   /*No communication thread-- get a SIGIO on each write(), which keeps the buffer clean*/
-		CmiEnableAsyncIO(readStdout[i]);
+			CmiEnableAsyncIO(readStdout[i]);
+		}
 #endif
 	}
 #else
