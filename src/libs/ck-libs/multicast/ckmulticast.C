@@ -521,6 +521,9 @@ void CkMulticastMgr::recvRedMsg(ReductionMsg *msg)
   entry->red.gcounter += msg->gcounter;
 
   // buffer this msg
+  // check first
+  if (entry->red.msgs.length() && msg->dataSize != entry->red.msgs[0]->dataSize)
+    CmiAbort("Reduction data are not of same length!");
   entry->red.msgs.push_back(msg);
 
 //if (CmiMyPe() == 0)
@@ -560,6 +563,8 @@ void CkMulticastMgr::recvRedMsg(ReductionMsg *msg)
       mCastGrp[entry->parentGrp.pe].recvRedMsg(newmsg);
     }
     else {   // root
+      if (entry->red.storedClient == NULL) 
+	CmiAbort("Did you forget to register a reduction client?");
       entry->red.storedClient(id, entry->red.storedClientParam, dataSize,
 	   newmsg->data);
       delete newmsg;
