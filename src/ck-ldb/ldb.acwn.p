@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-08-14 16:08:02  brunner
+ * Revision 2.3  1995-08-14 18:39:44  brunner
+ * Oops, forgot to take out debugging printfs
+ *
+ * Revision 2.2  1995/08/14  16:08:02  brunner
  * I corrected the function names to agree with those in use in ldb.rand.p.
  * I also tracked down a bug in FillLDB.  It used to call
  * SentUpdateStatus(destPe) i destPe != CmiNumPe().  Now it
@@ -179,18 +182,15 @@ int peNum;
 {
     int i;
 
-    printf("Starting SentUpdateStatus(%d)\n",peNum);
     if (peNum >=0)
     {
     	i = CmiNeighboursIndex(myPE, peNum);
     	if (i > -1)
     	{
-	        printf("i=%d\n",i);
 	 	statusList[i].myLoadSent = CldMyLoad();
 	 	/*statusList[i].timeLoadSent = CmiTimer();*/
     	}
     }
-    printf("Done with SentUpdateStatus(%d)\n",peNum);
 }
 
 
@@ -366,9 +366,7 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 	    neighboursList = (int *) CmiAlloc( numNeighbours * sizeof(int) );
 /*            CkMemError(neighboursList); */
 	    CmiGetNodeNeighbours(myPE, neighboursList );
-	    printf("Allocating statusList[%d]\n",numNeighbours);
 	    statusList = (LDB_STATUS *) CmiAlloc(numNeighbours * sizeof(LDB_STATUS)); 
-	    printf("statusList=%x\n",statusList);
 	    
 /*            CkMemError(statusList); */
 	    PrivateCall(PrintNodeNeighbours());
