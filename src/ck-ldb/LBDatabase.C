@@ -112,38 +112,6 @@ LBDBInit::LBDBInit(CkArgMsg *m)
   delete m;
 }
 
-LBDatabase::LBDatabase(CkMigrateMessage *m):IrrGroup(m) {
-#if 0
-CMK_LBDB_ON
-  if(CkMyPe()==0){
-    LBDefaultCreateFn lbFn = defaultCreate;
-    char *balancer = lbRegistry.defaultLB();
-    if (balancer) {
-      LBDefaultCreateFn fn = lbRegistry.search(balancer);
-      if (!fn) {
-        lbRegistry.displayLBs();
-        CmiPrintf("Abort: Unknown load balancer: '%s'!\n", balancer);
-        CkExit();
-      }else  // overwrite defaultCreate.
-        lbFn = fn;
-    }
-    // NullLB is the default
-    if (!lbFn) lbFn = CreateNullLB;
-    (lbFn)();
-    if (CkpvAccess(doSimulation)) {
-      CmiPrintf("Charm++> Entering Load Balancer Simulation Mode ... \n");
-      CProxy_LBDatabase(lbdb).ckLocalBranch()->StartLB();
-    }
-  }
-#endif
-
-  myLDHandle = LDCreate();
-  CkpvAccess(lbdatabaseInited) = 1;
-#if CMK_LBDB_ON
-  if (manualOn) TurnManualLBOn();
-#endif
-}
-
 
 void _loadbalancerInit()
 {
@@ -183,6 +151,50 @@ void _loadbalancerInit()
 }
 
 int LBDatabase::manualOn = 0;
+
+void LBDatabase::init(void) 
+{
+  myLDHandle = LDCreate();
+
+  int num_proc = CkNumPes();
+  avail_vector = new char[num_proc];
+  for(int proc = 0; proc < num_proc; proc++)
+      avail_vector[proc] = 1;
+  new_ld_balancer = 0;
+
+  CkpvAccess(lbdatabaseInited) = 1;
+#if CMK_LBDB_ON
+  if (manualOn) TurnManualLBOn();
+#endif
+}
+
+void LBDatabase::get_avail_vector(char * bitmap) {
+    const int num_proc = CkNumPes();
+    for(int proc = 0; proc < num_proc; proc++){
+      bitmap[proc] = avail_vector[proc];
+    }
+}
+
+// new_ld == -1(default) : calcualte a new ld
+//           -2 : ignore new ld
+//           >=0: given a new ld
+void LBDatabase::set_avail_vector(char * bitmap, int new_ld){
+    int assigned = 0;
+    const int num_proc = CkNumPes();
+    if (new_ld == -2) assigned = 1;
+    else if (new_ld >= 0) {
+      CmiAssert(new_ld < num_proc);
+      new_ld_balancer = new_ld;
+      assigned = 1;
+    }
+    for(int count = 0; count < num_proc; count++){
+        avail_vector[count] = bitmap[count];
+        if((bitmap[count] == 1) && !assigned){
+            new_ld_balancer = count;
+            assigned = 1;
+        }
+    }
+}
 
 void TurnManualLBOn()
 {

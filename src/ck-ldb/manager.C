@@ -13,9 +13,7 @@
 #include "converse.h"
 #include "conv-ccs.h"
 
-CkGroupID manager_group_id;
 extern int load_balancer_created;
-int group_created;
 
 void handler(char *bit_map)
 {
@@ -27,13 +25,15 @@ void handler(char *bit_map)
 	CkPrintf("%d, ",bit_map[i]);
 
     if((CkMyPe() == 0) && (load_balancer_created))
-	set_avail_vector(bit_map);
+	LBDatabaseObj()->set_avail_vector(bit_map);
 }
 
 void manager_init(){    
+    static int inited = 0;
+    if (inited) return;
     CcsRegisterHandler("set_bitmap", (CmiHandler) handler);
+    inited = 1;
 }
-
 
 
 /*@}*/

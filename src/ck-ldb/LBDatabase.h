@@ -45,16 +45,13 @@ class LBDatabase : public IrrGroup {
 public:
   static int manualOn;
 public:
-  LBDatabase(void) {
-    myLDHandle = LDCreate();
-    CkpvAccess(lbdatabaseInited) = 1;
-#if CMK_LBDB_ON
-    if (manualOn) TurnManualLBOn();
-#endif
-  };
-
-  LBDatabase(CkMigrateMessage *m);
+  LBDatabase(void)  { init(); }
+  LBDatabase(CkMigrateMessage *m)  { init(); }
+  ~LBDatabase()  { delete [] avail_vector; }
   
+private:
+  void init();
+public:
   inline static LBDatabase * Object() { return CkpvAccess(lbdatabaseInited)?(LBDatabase *)CkLocalBranch(lbdb):NULL; }
 #if CMK_LBDB_ON
   inline LBDB *getLBDB() {return (LBDB*)(myLDHandle.handle);}
@@ -176,6 +173,13 @@ public:
   inline double GetLBPeriod() { return LDGetLBPeriod(myLDHandle);}
 private:
   LDHandle myLDHandle;
+  char *avail_vector;			// processor bit vector
+  int new_ld_balancer;		// for Node 0
+public:
+  char *availVector() { return avail_vector; }
+  void get_avail_vector(char * bitmap);
+  void set_avail_vector(char * bitmap, int new_ld=-1);
+  int & new_lbbalancer() { return new_ld_balancer; }
 public:
   struct LastLBInfo {
     double *expectedLoad;
@@ -191,6 +195,7 @@ public:
 void TurnManualLBOn();
 void TurnManualLBOff();
 
+inline LBDatabase* LBDatabaseObj() { return LBDatabase::Object(); }
 #endif /* LDATABASE_H */
 
 /*@}*/

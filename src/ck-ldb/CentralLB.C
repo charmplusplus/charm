@@ -18,7 +18,6 @@
 #define  DEBUGF(x)    // CmiPrintf x;
 
 CkGroupID loadbalancer;
-char ** avail_vector_address;
 int * lb_ptr;
 int load_balancer_created;
 
@@ -31,18 +30,6 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count,
 void CreateCentralLB()
 {
   loadbalancer = CProxy_CentralLB::ckNew();
-}
-
-void set_avail_vector(char * bitmap){
-    int count;
-    int assigned = 0;
-    for(count = 0; count < CkNumPes(); count++){
-	(*avail_vector_address)[count] = bitmap[count];
-	if((bitmap[count] == 1) && !assigned){
-	    *lb_ptr = count;
-	    assigned = 1;
-	}
-    }
 }
 
 void CentralLB::staticStartLB(void* data)
@@ -69,12 +56,8 @@ CentralLB::CentralLB()
   mystep = 0;
   //  CkPrintf("Construct in %d\n",CkMyPe());
   theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
-  theLbdb->
-    AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),(void*)(this));
-  theLbdb->
-    NotifyMigrated((LDMigratedFn)(staticMigrated),(void*)(this));
-  theLbdb->
-    AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
+
+  setActive();
 
   stats_msg_count = 0;
   statsMsgsList = new CLBStatsMsg*[CkNumPes()];
@@ -89,13 +72,7 @@ CentralLB::CentralLB()
   migrates_expected = -1;
 
   cur_ld_balancer = 0;
-  new_ld_balancer = 0;
   int num_proc = CkNumPes();
-  avail_vector = new char[num_proc];
-  for(int proc = 0; proc < num_proc; proc++)
-      avail_vector[proc] = 1;
-  avail_vector_address = &(avail_vector);
-  lb_ptr = &new_ld_balancer;
 
   load_balancer_created = 1;
 }
@@ -104,9 +81,18 @@ CentralLB::~CentralLB()
 {
   CkPrintf("Going away\n");
   delete [] statsMsgsList;
-  delete [] avail_vector;
   theLbdb->
     RemoveStartLBFn((LDStartLBFn)(staticStartLB));
+}
+
+void CentralLB::setActive() 
+{
+  theLbdb->
+    AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),(void*)(this));
+  theLbdb->
+    NotifyMigrated((LDMigratedFn)(staticMigrated),(void*)(this));
+  theLbdb->
+    AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
 }
 
 void CentralLB::AtSync()
@@ -159,11 +145,8 @@ void CentralLB::ProcessAtSync()
 // Scheduler PART.
 
   if(CkMyPe() == cur_ld_balancer) {
-    int num_proc = CkNumPes();
-    for(int proc = 0; proc < num_proc; proc++){
-      msg->avail_vector[proc] = avail_vector[proc];
-    }
-    msg->next_lb = new_ld_balancer;
+    LBDatabaseObj()->get_avail_vector(msg->avail_vector);
+    msg->next_lb = LBDatabaseObj()->new_lbbalancer();
   }
 
   thisProxy[cur_ld_balancer].ReceiveStats(msg);
@@ -223,10 +206,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 //  	   pe,stats_msg_count,m->n_objs,m->serial,m);
 
   if((pe == 0) && (CkMyPe() != 0)){
-      new_ld_balancer = m->next_lb;
-      int num_proc = CkNumPes();
-      for(int proc = 0; proc < num_proc; proc++)
-	  avail_vector[proc] = m->avail_vector[proc];
+      LBDatabaseObj()->set_avail_vector(m->avail_vector,  m->next_lb);
   }
 
   DEBUGF(("ReceiveStats from %d step: %d\n", pe, mystep));
@@ -269,18 +249,16 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
     // if this is the step at which we need to dump the database
     simulation();
 
+    char *availVector = LBDatabaseObj()->availVector();
     for(proc = 0; proc < clients; proc++)
-      statsData->procs[proc].available = (CmiBool)avail_vector[proc];
+      statsData->procs[proc].available = (CmiBool)availVector[proc];
 
 //    CkPrintf("Before Calling Strategy\n");
     LBMigrateMsg* migrateMsg = Strategy(statsData, clients);
 
 //    CkPrintf("returned successfully\n");
-    int num_proc = CkNumPes();
-
-    for(proc = 0; proc < num_proc; proc++)
-	migrateMsg->avail_vector[proc] = avail_vector[proc];
-    migrateMsg->next_lb = new_ld_balancer;
+    LBDatabaseObj()->get_avail_vector(migrateMsg->avail_vector);
+    migrateMsg->next_lb = LBDatabaseObj()->new_lbbalancer();
 
 //  calculate predicted load
 //  very time consuming though, so only happen when debugging is on
@@ -398,9 +376,7 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 
   cur_ld_balancer = m->next_lb;
   if((CkMyPe() == cur_ld_balancer) && (cur_ld_balancer != 0)){
-      int num_proc = CkNumPes();
-      for(int proc = 0; proc < num_proc; proc++)
-	  avail_vector[proc] = m->avail_vector[proc];
+      LBDatabaseObj()->set_avail_vector(m->avail_vector, -2);
   }
 
   if (migrates_expected == 0 || migrates_completed == migrates_expected)

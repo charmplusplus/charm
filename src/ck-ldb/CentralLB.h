@@ -25,7 +25,6 @@ extern CkGroupID loadbalancer;
 #define PER_BYTE_RECV_OVERHEAD      0.0
 
 void CreateCentralLB();
-void set_avail_vector(char * bitmap);
 
 class CLBStatsMsg;
 class LBSimulation;
@@ -40,6 +39,7 @@ public:
   virtual ~CentralLB();
   CentralLB(CkMigrateMessage *m):CBase_CentralLB(m) {}
 
+  void setActive();
   int useDefCtor(void){ return 1; }
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
@@ -119,9 +119,6 @@ public:
    };
 
   int cur_ld_balancer;
-  char *avail_vector;
-  /* for Node 0 */
-  int new_ld_balancer;
 
   void readStatsMsgs(const char* filename);
   void writeStatsMsgs(const char* filename);
