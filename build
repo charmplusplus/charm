@@ -27,7 +27,7 @@ syntax() {
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc'
-  echo 'help smp gm tcp vmi scyld clustermatic opteron bluegene ooc syncft'
+  echo 'help smp gm tcp vmi scyld clustermatic opteron bluegene ooc syncft papi'
   echo '--incdir --libdir --basedir --no-build-shared -j'
   if test $more = 1
   then
@@ -59,6 +59,7 @@ syntax() {
   echo '  bluegene	  compile for BigSim (Blue Gene) simulator'
   echo '  ooc		  compile with out of core support'
   echo '  syncft	  compile with Charm++ fault tolerance support'
+  echo '  papi            compile with PAPI performance counter support (if any)'
   echo ''
   echo "Charm++ dynamic libraries:"
   echo "  --build-shared     build Charm++ dynamic libraries (.so) (default)"
@@ -347,11 +348,11 @@ then
       echo '. $CHARMINC/'"conv-mach-$i.sh" >> $ConvSh
     done
 fi
+
 if test  -n "$BUILD_SHARED" 
 then
     echo "CMK_NO_BUILD_SHARED=true" >> $ConvSh
 fi
-
 
 echo $BASEVERSION > $VERSION/tmp/.vdir
 
