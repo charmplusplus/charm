@@ -41,7 +41,6 @@ else
         script="charmrun_script.$$.sh"
         indir=`pwd`
         output="$indir/charmrun_script.$$.stdout"
-        errout="$indir/charmrun_script.$$.stderr"
         echo "Submitting batch job for> mpirun -np $pes $args"
         echo " using the command> qsub $script"
         cat > $script << EOF
@@ -71,12 +70,11 @@ else
 # Job name (default = name of script file)
 #PBS -N autobuild
 #
+#PBS -j oe
+#
 # Filename for standard output (default = <job_name>.o<job_id>)
 #PBS -o $output
 #
-# Filename for standard error (default = <job_name>.e<job_id>)
-#PBS -e $errout
-
 cd $indir
 
 # This is the actual command to run the job:
@@ -93,13 +91,13 @@ EOF
                 then
 # The job is done-- print its output
                         rm tmp.$$
-                        if test -s $errout 
+                        if `grep 'End of program' $output > /dev/null 2>/dev/null`
 			then
-				cat $output $errout 
-				rm $output $errout
-				exit 1
-			else
                         	exec cat $output
+			else
+				cat $output
+				rm $output 
+				exit 1
 			fi
                 fi
 # The job is still queued or running-- print status and wait
