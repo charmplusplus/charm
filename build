@@ -9,8 +9,18 @@ syntax() {
   echo ''
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
   echo ''
-  echo '<targets>: converse charm++ libs AMPI IDL TSM SM PVM bluegene'
+  echo '<targets>: converse charm++ libs AMPI bluegene pose'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
+  if test $more = 1
+  then
+  echo ''
+  echo '  charm++         compile Charm++ core only'
+  echo '  AMPI            compile Adaptive MPI'
+  echo '  libs            compile additional parallel libraries with Charm++ core'
+  echo '  bluegene        build additional BigSim libraries'
+  echo '  pose            build POSE parallel discrete event simulator'
+  echo ''
+  fi
   echo '<versions>: ' 
   ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^elan$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)|(^paragon$)|(^vmi$)' | pr -3 -t )
   echo ''
@@ -18,7 +28,7 @@ syntax() {
   if test $more = 1
   then
   echo ''
-  echo 'Not all these options are supported by one platform. For platform specific help, use help option:'
+  echo 'For platform specific options, use help option:'
   echo '  help		  platform specific help, e.g. ./build charm++ net-linux help'
   echo ''
   echo 'Choose a compiler (only one option is allowed from this section):'
@@ -45,26 +55,37 @@ syntax() {
   echo '  bluegene	  compile for BigSim (Blue Gene) simulator'
   echo '  occ		  compile with out of core support'
   echo ''
+  echo "Charm++ dynamic libraries:"
+  echo "  --build-shared  build Charm++ dynamic libaries (.so), this is on by default"
+  echo "  --no-shared	  disable the compilation for Charm++'s shared libraries"
+  echo ''
   echo 'Miscellaneous options:'
   echo '  --incdir=DIR	  specify additional include path for compilers'
   echo '  --libdir=DIR	  specify additional lib path for compilers'
   echo '  --basedir=DIR	  specify additional path at once - DIR/include and DIR/lib'
-  echo ''
-  echo "Charm++ dynamic libraries:"
-  echo "  --build-shared  build Charm++ dynamic libaries (.so), this is on by default"
-  echo "  --no-shared	  disable the compilation for Charm++'s shared libraries"
   fi
+  echo ''
+  echo '<charmc-options>: normal compiler options e.g. -g -O -save -verbose'
   if test $more = 1
   then
   echo ''
-  echo '<charmc-options>: normal compiler options e.g. -g -O -save -verbose'
+  echo 'Examples:'
+  echo '1. compile Charm++ on Linux with optimization for Charm++ (-DCMK_OPTIMIZE) and -O for g++:'
+  echo '  ./build charm++ net-linux -O -DCMK_OPTIMIZE'
+  echo '2. compile Charm++ for Linux clustermatic Beowulf cluster with Intel compiler:'
+  echo '  ./build charm++ net-linux clustermatic icc -O'
+  echo '3. compile Charm++ for IA64 Linux cluster with MPICH-GM:'
+  echo '  ./build charm++ mpi-linux-ia64 gm -O'
+  echo '4. compile Charm++ for Windows with VC++ (Cygwin required):'
+  echo '  ./build charm++ net-win32 -O'
+  echo ''
   echo 'Note: This script:'
   echo ' 1. Creates directories <version> and <version>/tmp';
-  echo ' 2. Copies src/Common/scripts/Makefile into <version>/tmp';
+  echo ' 2. Copies src/scripts/Makefile into <version>/tmp';
   echo ' 3. Does a "make <target> <version> OPTS=<charmc-options>" in <version>/tmp.'
   echo "That's all build does.  The rest is handled by the Makefile."
   echo ''
-  echo 'Thank you for using Charm++, please send questions or comments to "ppl@cs.uiuc.edu".'
+  echo 'Thank you for using Charm++, please send questions or comments to Parallel Programming Lab at University of Illinois at Urbana-Champaign at ppl@cs.uiuc.edu.'
   else
   echo ''
   echo "To get more detailed help, run ./build --help"
