@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-10-18 22:20:57  jyelon
+ * Revision 2.9  1995-10-20 20:26:45  sanjeev
+ * added CMK_SIZE_T
+ *
+ * Revision 2.8  1995/10/18  22:20:57  jyelon
  * enabled eatstack-threads.
  *
  * Revision 2.7  1995/10/13  18:17:44  jyelon
@@ -84,5 +87,7 @@
 /* #define CMK_THREADS_USE_EATSTACK */
 /* #define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE */
 #define CMK_THREADS_USE_ALLOCA
+
+#define CMK_SIZE_T unsigned int
 
 #endif

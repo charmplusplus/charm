@@ -62,4 +62,6 @@
 /* #define CMK_TIMER_USE_GETRUSAGE */
 #define CMK_TIMER_USE_TIMES
 
+#define CMK_SIZE_T unsigned int
+
 #endif

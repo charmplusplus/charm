@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.3  1995-10-18 22:20:57  jyelon
+ * Revision 1.4  1995-10-20 20:26:45  sanjeev
+ * added CMK_SIZE_T
+ *
+ * Revision 1.3  1995/10/18  22:20:57  jyelon
  * minor cleanup.
  *
  * Revision 1.2  1995/10/13  20:05:13  jyelon
@@ -136,5 +139,7 @@
 
 #define CMK_HAVE_SYS_WAIT_H
 /* #define CMK_HAVE_WAITFLAGS_H */
+
+#define CMK_SIZE_T unsigned int
 
 #endif

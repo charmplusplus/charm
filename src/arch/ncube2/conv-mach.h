@@ -59,4 +59,6 @@
 /* #define CMK_THREADS_UNAVAILABLE */
 #define CMK_THREADS_USE_EATSTACK
 
+#define CMK_SIZE_T unsigned int
+
 #endif

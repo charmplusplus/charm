@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-10-18 22:20:57  jyelon
+ * Revision 2.10  1995-10-20 20:26:45  sanjeev
+ * added CMK_SIZE_T
+ *
+ * Revision 2.9  1995/10/18  22:20:57  jyelon
  * enabled eatstack-threads.
  *
  * Revision 2.8  1995/10/13  18:17:44  jyelon
@@ -121,5 +124,7 @@
 
 /* #define CMK_HAVE_WAITFLAGS_H */
 #define CMK_HAVE_SYS_WAIT_H
+
+#define CMK_SIZE_T long unsigned int
 
 #endif
