@@ -1265,7 +1265,7 @@ CmiStartFn bgMain(int argc, char **argv)
   if(CmiGetArgFlagDesc(argv, "+bgstats", "Print correction statistics")) 
     bgstats_flag = 1;
 
-  if (CmiGetArgStringDesc(argv, "+bgtraceroot", &cva(bgMach).traceroot, "Directory to write bgTrace files to")) ) 
+  if (CmiGetArgStringDesc(argv, "+bgtraceroot", &cva(bgMach).traceroot, "Directory to write bgTrace files to"))
   {
     char *root = (char*)malloc(strlen(cva(bgMach).traceroot) + 10);
     sprintf(root, "%s/", cva(bgMach).traceroot);
