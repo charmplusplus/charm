@@ -394,9 +394,9 @@ methodDef[AST className]
                         + J.printParamList(parameters) + ")";
 
                     StringBuffer p = new StringBuffer();
-                    if (J.isX(m, "public")) {
+                    if (J.isX(m.getFirstChild(), "public")) {
                         p.append("public");
-                    } else if (J.isX(m, "protected"))
+                    } else if (J.isX(m.getFirstChild(), "protected"))
                         p.append("protected");
                     else {
                         p.append("private");
