@@ -7,14 +7,22 @@
 **
 ** HETEROGENEOUS SUPPORT
 **    * use network byte order for components of msg hdr
+**    * must use UINT64 instead of VMI_ADDR_CAST
 **
 ** IMPROVE STARTUP/SHUTDOWN
 **    * startup via charmrun
 **    * startup via improved CRM (include client code into machine.c)
 **    * processes organize into a ring for improved normal/fault shutdown
+**    * fix the race condition for shutdown
+**    * open connections as-needed, not all at startup
+**
+** ALLOCATE SEND AND RECEIVE HANDLES AT STARTUP
 **
 ** SHORT MESSAGE OPTIMIZATIONS
 **    * RDMA Short Message Protocol
+**
+** LARGE MESSAGE OPTIMIZATIONS
+**    * must use RDMA eager protocol, not rendezvous (due to latency)
 **
 ** SHARED MEMORY OPTIMIZATIONS
 **    * deal with SMP inside the machine layer -OR-
@@ -86,6 +94,17 @@ volatile int CMI_VMI_IError;
 volatile int CMI_VMI_IReject;
 
 
+
+#if CONVERSE_VERSION_VMI
+PVMI_BUFFER_POOL CMI_VMI_Bucket1_Pool;
+PVMI_BUFFER_POOL CMI_VMI_Bucket2_Pool;
+PVMI_BUFFER_POOL CMI_VMI_Bucket3_Pool;
+PVMI_BUFFER_POOL CMI_VMI_Bucket4_Pool;
+PVMI_BUFFER_POOL CMI_VMI_Bucket5_Pool;
+#endif
+
+
+
 /*
   The following global variables are used to compute statistics for the
   machine interface module.  For performance, they may be removed with a
@@ -130,12 +149,18 @@ PVMI_BUFFER_POOL CMI_VMI_CmiCommHandle_Pool;
 PVMI_BUFFER_POOL CMI_VMI_Handle_Pool;
 PVMI_BUFFER_POOL CMI_VMI_RDMABytesSent_Pool;
 PVMI_BUFFER_POOL CMI_VMI_RDMAPutContext_Pool;
-PVMI_BUFFER_POOL CMI_VMI_RDMAReceiveContext_Pool;
 PVMI_BUFFER_POOL CMI_VMI_RDMACacheEntry_Pool;
 
 
 /* This is the global list of all processes in the computation. */
 CMI_VMI_Process_Info_T *CMI_VMI_Procs;
+
+
+/*
+  The following global variable is used for RDMA receive contexts.
+*/
+CMI_VMI_RDMA_Receive_Context_T
+     CMI_VMI_RDMA_Receive_Context[CMI_VMI_MAX_RECEIVE_HANDLES];
 
 
 /*
@@ -371,6 +396,7 @@ VMI_RECV_STATUS CMI_VMI_Stream_Receive_Handler (PVMI_CONNECT connection,
   char *pubaddr;
   int pubsize;
   CMI_VMI_RDMA_Receive_Context_T *rdmarecvctxt;
+  int rdmarecvindx;
   VMI_virt_addr_t rhandleaddr;
   ULONG size;
   PVMI_SLAB_STATE state;
@@ -424,10 +450,9 @@ VMI_RECV_STATUS CMI_VMI_Stream_Receive_Handler (PVMI_CONNECT connection,
     status = VMI_Slab_Restore_State (slab, state);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Slab_Restore_State()");
 
-    /* Get an RDMA receive context from the buffer pool. */
-    status = VMI_Pool_Allocate_Buffer (CMI_VMI_RDMAReceiveContext_Pool,
-				       (PVOID) &rdmarecvctxt, NULL);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+    /* Get an RDMA receive context. */
+    rdmarecvindx = CMI_VMI_Get_RDMA_Receive_Context();
+    rdmarecvctxt = &(CMI_VMI_RDMA_Receive_Context[rdmarecvindx]);
 
     /* Initialize the RDAM receive context. */
     rdmarecvctxt->rhandleaddr = rhandleaddr;
@@ -478,7 +503,7 @@ VMI_RECV_STATUS CMI_VMI_Stream_Receive_Handler (PVMI_CONNECT connection,
       /* Publish the buffer. */
       status = VMI_RDMA_Publish_Buffer (connection, cacheentry->bufferHandle,
            (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr, pubsize,
-           (VMI_virt_addr_t) rhandleaddr, (UINT32) rdmarecvctxt);
+           (VMI_virt_addr_t) rhandleaddr, (UINT32) rdmarecvindx);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
 
       rdmarecvctxt->bytes_pub += pubsize;
@@ -792,7 +817,7 @@ void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT conn, UINT32 rdmasz,
 
   DEBUG_PRINT ("CMI_VMI_RDMA_Notification_Handler() called.\n");
 
-  rdmarecvctxt = (CMI_VMI_RDMA_Receive_Context_T *) context;
+  rdmarecvctxt = &(CMI_VMI_RDMA_Receive_Context[context]);
 
   rdmarecvctxt->bytes_rec += rdmasz;
   rdmarecvctxt->rdmacnt--;
@@ -827,7 +852,7 @@ void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT conn, UINT32 rdmasz,
 
     status = VMI_RDMA_Publish_Buffer (conn, cacheentry->bufferHandle,
          (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr, pubsz,
-         (VMI_virt_addr_t) rdmarecvctxt->rhandleaddr, (UINT32) rdmarecvctxt);
+         (VMI_virt_addr_t) rdmarecvctxt->rhandleaddr, context);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
 
     rdmarecvctxt->bytes_pub += pubsz;
@@ -846,9 +871,7 @@ void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT conn, UINT32 rdmasz,
 					 rdmarecvctxt->cacheentry);
     CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
 
-    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_RDMAReceiveContext_Pool,
-					 rdmarecvctxt);
-    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+    (&(CMI_VMI_RDMA_Receive_Context[context]))->allocated = FALSE;
 
 #if CMI_VMI_COLLECT_STATISTICS
     CMI_VMI_Count_RDMAReceive++;
@@ -1174,6 +1197,104 @@ BOOLEAN CMI_VMI_Open_Connections (PUCHAR synckey)
   /* Successfully setup connections. */
   return TRUE;
 }
+
+
+
+/**************************************************************************
+**
+*/
+int CMI_VMI_Get_RDMA_Receive_Context ()
+{
+  VMI_STATUS status;
+
+  int i;
+
+
+  i = 0;
+  while ((&(CMI_VMI_RDMA_Receive_Context[i]))->allocated) {
+    i++;
+
+    if (i >= CMI_VMI_MAX_RECEIVE_HANDLES) {
+      i = 0;
+
+      status = VMI_Poll ();
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_Poll()");
+    }      
+  }
+
+  (&(CMI_VMI_RDMA_Receive_Context[i]))->allocated = TRUE;
+
+  return (i);
+}
+
+
+
+#if CONVERSE_VERSION_VMI
+/**************************************************************************
+**
+*/
+void *CMI_VMI_CmiAlloc (int size)
+{
+  VMI_STATUS status;
+
+  void *ptr;
+
+
+  if (size < CMI_VMI_BUCKET1_SIZE) {
+    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket1_Pool, &ptr, NULL);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+  } else if (size < CMI_VMI_BUCKET2_SIZE) {
+    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket2_Pool, &ptr, NULL);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+  } else if (size < CMI_VMI_BUCKET3_SIZE) {
+    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket3_Pool, &ptr, NULL);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+  } else if (size < CMI_VMI_BUCKET4_SIZE) {
+    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket4_Pool, &ptr, NULL);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+  } else if (size < CMI_VMI_BUCKET5_SIZE) {
+    status = VMI_Pool_Allocate_Buffer (CMI_VMI_Bucket5_Pool, &ptr, NULL);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Allocate_Buffer()");
+  } else {
+    ptr = malloc (size);
+  }
+
+  return (ptr);
+}
+
+
+/**************************************************************************
+**
+*/
+void CMI_VMI_CmiFree (void *ptr)
+{
+  VMI_STATUS status;
+
+  int size;
+
+
+  size = ((int *) ptr)[0];
+
+  if (size < CMI_VMI_BUCKET1_SIZE) {
+    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket1_Pool, ptr);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+  } else if (size < CMI_VMI_BUCKET2_SIZE) {
+    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket2_Pool, ptr);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+  } else if (size < CMI_VMI_BUCKET3_SIZE) {
+    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket3_Pool, ptr);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+  } else if (size < CMI_VMI_BUCKET4_SIZE) {
+    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket4_Pool, ptr);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+  } else if (size < CMI_VMI_BUCKET5_SIZE) {
+    status = VMI_Pool_Deallocate_Buffer (CMI_VMI_Bucket5_Pool, ptr);
+    CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
+  } else {
+    free (ptr);
+  }
+}
+#endif
 
 
 
@@ -1607,18 +1728,42 @@ void ConverseInit (int argc, char **argv, CmiStartFn startFn,
        &CMI_VMI_RDMAPutContext_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
 
-  status = VMI_Pool_Create_Buffer_Pool (sizeof(CMI_VMI_RDMA_Receive_Context_T),
-       sizeof (PVOID), CMI_VMI_RDMA_RECEIVE_CONTEXT_POOL_PREALLOCATE,
-       CMI_VMI_RDMA_RECEIVE_CONTEXT_POOL_GROW, VMI_POOL_CLEARONCE,
-       &CMI_VMI_RDMAReceiveContext_Pool);
-  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
-
   status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_RDMA_Max_Outstanding *
        sizeof (PVMI_CACHE_ENTRY), sizeof (PVOID),
        CMI_VMI_RDMA_CACHE_ENTRY_POOL_PREALLOCATE,
        CMI_VMI_RDMA_CACHE_ENTRY_POOL_GROW, VMI_POOL_CLEARONCE,
        &CMI_VMI_RDMACacheEntry_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
+
+  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET1_SIZE, sizeof (PVOID),
+       CMI_VMI_BUCKET1_PREALLOCATE, CMI_VMI_BUCKET1_GROW, VMI_POOL_CLEARONCE,
+       &CMI_VMI_Bucket1_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
+
+  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET2_SIZE, sizeof (PVOID),
+       CMI_VMI_BUCKET2_PREALLOCATE, CMI_VMI_BUCKET2_GROW, VMI_POOL_CLEARONCE,
+       &CMI_VMI_Bucket2_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
+
+  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET3_SIZE, sizeof (PVOID),
+       CMI_VMI_BUCKET3_PREALLOCATE, CMI_VMI_BUCKET3_GROW, VMI_POOL_CLEARONCE,
+       &CMI_VMI_Bucket3_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
+
+  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET4_SIZE, sizeof (PVOID),
+       CMI_VMI_BUCKET4_PREALLOCATE, CMI_VMI_BUCKET4_GROW, VMI_POOL_CLEARONCE,
+       &CMI_VMI_Bucket4_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
+
+  status = VMI_Pool_Create_Buffer_Pool (CMI_VMI_BUCKET5_SIZE, sizeof (PVOID),
+       CMI_VMI_BUCKET5_PREALLOCATE, CMI_VMI_BUCKET5_GROW, VMI_POOL_CLEARONCE,
+       &CMI_VMI_Bucket5_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Create_Buffer_Pool()");
+
+  /* Initialize RDMA receive context table entries. */
+  for (i = 0; i < CMI_VMI_MAX_RECEIVE_HANDLES; i++) {
+    (&(CMI_VMI_RDMA_Receive_Context[i]))->allocated = FALSE;
+  }
 
   /* Create the FIFOs for holding local and remote messages. */
   CpvAccess (CmiLocalQueue) = CdsFifo_Create ();
@@ -1788,10 +1933,22 @@ void ConverseExit ()
   status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_RDMAPutContext_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
 
-  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_RDMAReceiveContext_Pool);
+  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_RDMACacheEntry_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
 
-  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_RDMACacheEntry_Pool);
+  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket1_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
+
+  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket2_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
+
+  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket3_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
+
+  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket4_Pool);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
+
+  status = VMI_Pool_Destroy_Buffer_Pool (CMI_VMI_Bucket5_Pool);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Destroy_Buffer_Pool()");
 
   /* Free all dynamically-allocated memory. */

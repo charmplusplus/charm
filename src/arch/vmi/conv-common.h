@@ -1,3 +1,9 @@
+/*
+  This #define only controls whether we use a memory pool or not.
+  That is, it could be 0 even in this code and things would be okay.
+*/
+#define CONVERSE_VERSION_VMI                               1
+
 #define CMK_CCS_AVAILABLE                                  1
 #define NODE_0_IS_CONVHOST                                 1
 #define CMK_WEB_MODE                                       0

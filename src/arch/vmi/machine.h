@@ -48,6 +48,12 @@
 #define CMI_VMI_SHORT_MESSAGE_BOUNDARY 4096
 
 /*
+  Receive contexts are stored in an array of CMI_VMI_MAX_RECEIVE_HANDLES
+  elements.
+*/
+#define CMI_VMI_MAX_RECEIVE_HANDLES 1000
+
+/*
   RDMA puts for large messages are done in a pipeline.  The following two
   defines are for the maximum length of the pipeline (alternatively, the
   maximum number of RDMA send buffers that may be outstanding at once) and
@@ -57,6 +63,32 @@
 */
 #define CMI_VMI_RDMA_MAX_OUTSTANDING 3
 #define CMI_VMI_RDMA_MAX_CHUNK 262144
+
+
+
+#if CONVERSE_VERSION_VMI
+#define CMI_VMI_BUCKET1_SIZE 1024
+#define CMI_VMI_BUCKET2_SIZE 2048
+#define CMI_VMI_BUCKET3_SIZE 4096
+#define CMI_VMI_BUCKET4_SIZE 8192
+#define CMI_VMI_BUCKET5_SIZE 16384
+
+#define CMI_VMI_BUCKET1_PREALLOCATE 100
+#define CMI_VMI_BUCKET1_GROW         50
+
+#define CMI_VMI_BUCKET2_PREALLOCATE 100
+#define CMI_VMI_BUCKET2_GROW         50
+
+#define CMI_VMI_BUCKET3_PREALLOCATE 100
+#define CMI_VMI_BUCKET3_GROW         50
+
+#define CMI_VMI_BUCKET4_PREALLOCATE 100
+#define CMI_VMI_BUCKET4_GROW         50
+
+#define CMI_VMI_BUCKET5_PREALLOCATE 100
+#define CMI_VMI_BUCKET5_GROW         50
+#endif
+
 
 
 
@@ -340,6 +372,7 @@ typedef struct
 */
 typedef struct
 {
+  BOOLEAN           allocated;
   char             *msg;
   int               msgsize;
   int               bytes_pub;
@@ -444,6 +477,9 @@ void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT conn, UINT32 rdmasz,
 
 int CMI_VMI_CRM_Register (PUCHAR key, int numProcesses, BOOLEAN reg);
 BOOLEAN CMI_VMI_Open_Connections (PUCHAR synckey);
+int CMI_VMI_Get_RDMA_Receive_Context ();
+void *CMI_VMI_CmiAlloc (int size);
+void CMI_VMI_CmiFree (void *ptr);
 #if CMK_BROADCAST_SPANNING_TREE
 int CMI_VMI_Spanning_Children_Count (char *msg);
 void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg);
