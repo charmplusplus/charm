@@ -15,6 +15,9 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 typedef void (*CkCallbackFn)(void *param,void *message);
 typedef void (*Ck1CallbackFn)(void *message);
 
+class CProxyElement_ArrayBase; /*forward declaration*/
+class CProxyElement_Group; /*forward declaration*/
+
 class CkCallback {
 public:
 	typedef enum {
@@ -94,6 +97,7 @@ public:
 	CkCallback(int ep,int onPE,const CkGroupID &id,bool doInline=false)
 		:type(doInline?isendGroup:sendGroup) 
 		{d.group.ep=ep; d.group.id=id; d.group.onPE=onPE;}
+	CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline=false);
 	
 	CkCallback(int ep,const CkArrayID &id)
 		:type(bcastArray) 
@@ -101,6 +105,7 @@ public:
 	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id,bool doInline=false)
 		:type(doInline?isendArray:sendArray) 
 		{d.array.ep=ep; d.array.id=id; d.array.idx.asMax()=idx;}
+	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInline=false);
 
 	int isInvalid(void) const {return type==invalid;}
 

@@ -64,6 +64,26 @@ void *CkCallback::impl_thread_delay(void) const
 	return dest->d.thread.ret;
 }
 
+
+/*These can't be defined in the .h file like the other constructors
+ * because we need CkCallback before CProxyElement* are defined.
+ */
+CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline) 
+	:type(doInline?isendGroup:sendGroup) 
+{
+	d.group.ep=ep; 
+	d.group.id=grpElt.ckGetGroupID(); 
+	d.group.onPE=grpElt.ckGetGroupPe();
+}
+CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInline)
+	:type(doInline?isendArray:sendArray) 
+{
+	d.array.ep=ep; 
+	d.array.id=arrElt.ckGetArrayID(); 
+	d.array.idx.asMax()=arrElt.ckGetIndex();
+}
+
+
 /*Libraries should call this from their "done" entry points.
   It takes the given message and handles it appropriately.
   After the send(), this callback is finished and cannot be reused.
