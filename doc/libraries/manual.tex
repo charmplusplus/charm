@@ -1,0 +1,81 @@
+\documentclass[11pt]{article}
+\usepackage{fullpage}
+\pagestyle{headings}
+\setlength{\parskip}{0.1in}
+\setlength{\textheight}{9.5in}
+\setlength{\textwidth}{6.5in}
+\setlength{\parindent}{0in}
+\setlength{\topmargin}{-.5in}
+\parskip 0.1in
+
+%
+% Constants
+%
+%\newcommand{\version}{1.0}		%%% The current version number
+%\newcommand{\prevversion}{}	%%% The previous version number
+
+%
+% Commands
+%
+\newcommand{\zap}[1]{ }
+\newcommand{\fcmd}{\bf}		%%% Font for Charm commands
+\newcommand{\fparm}{\it\sf}	%%% Font for parameters to Charm commands
+\newcommand{\fexec}{\bf}	%%% Font for compile/execute cmds/options
+\newcommand{\atitle}[1]{{\it #1}}
+\newcommand{\keyword}[1]{{\textbf{#1}}}
+\newcommand{\userword}[1]{{\fparm \textsf{#1}}}
+\newcommand{\constraint}[1]{Note: {\it #1}}
+\newcommand{\note}[1]{Note: {\it #1}}
+
+%
+% Conveniences
+%
+\newcommand{\uw}[1]{\userword{#1}}
+\newcommand{\kw}[1]{\keyword{#1}}
+\newcommand{\CLocalBranch}{\keyword{CLocalBranch}}
+
+%
+%       \CC gives "C++" that looks good.
+%
+\newcommand{\CC}{C\kern -0.0em\raise 0.5ex\hbox{\normalsize++}}
+\newcommand{\emCC}{C\kern -0.0em\raise 0.4ex\hbox{\normalsize\em++}}
+\newcommand{\charmpp}{{\sc Charm++}}
+
+\makeindex
+
+\begin{document}
+
+\begin{titlepage}
+\vspace*{2in}
+\Huge
+\begin{center}
+Converse and \charmpp \\
+Libraries
+\vspace*{0.5in}
+Version 1.0\\
+\vspace*{0.7in}
+\today
+\end{center}
+\normalsize
+\end{titlepage}
+
+\newpage
+\tableofcontents
+
+\newpage
+
+\input{intro}
+
+\nocite{InterOpIPPS96}  % Just put a citation in here, so the makefile 
+                        % doesn't complain
+
+\newpage
+\addtocontents{toc}{\contentsline {section}{\numberline {}References}{46}}
+\bibliographystyle{plain}
+\bibliography{group}
+
+\newpage
+\addtocontents{toc}{\contentsline {section}{\numberline {}Index}{47}}
+\include{index}
+
+\end{document}
