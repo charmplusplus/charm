@@ -204,6 +204,15 @@ class CkVec : private CkSTLHelper<T> {
        if (p.isUnpacking()) { setSize(l); len=l;}
        return l;
     }
+    
+#ifdef _MSC_VER
+/* Visual C++ 6.0's operator overloading is buggy,
+   so use default operator|, which calls this pup routine. */
+     void pup(PUP::er &p) {
+        int l=vec.pupbase(p);
+        for (int i=0;i<l;i++) p|vec[i];
+     }
+#endif
 };
 
 /// Default pup routine for CkVec: pup each of the elements
@@ -213,9 +222,11 @@ inline void pupCkVec(PUP::er &p,CkVec<T> &vec) {
     for (int i=0;i<l;i++) p|vec[i];
 }
 
+#ifndef _MSC_VER
 /// Default pup routine for CkVec: pup each of the elements
 template <class T>
 inline void operator|(PUP::er &p,CkVec<T> &vec) {pupCkVec(p,vec);}
+#endif
 
 
 ///A vector of basic types, which can be pupped as an array
