@@ -21,9 +21,9 @@ SED="sed"
 MACHTYPE=""
 SEQUENTIAL=""
 LANGUAGE=""
-BALANCE=""
-MEMORY=""
-TRACEMODE=""
+BALANCE="rand"
+TRACEMODE="none"
+MEMORY="default"
 VERBOSE=""
 DEBUG_SCRIPT=""
 SAVE=""
@@ -78,9 +78,10 @@ printUsage() {
     echo "  flags:"
     echo "        -o <target> -g -O"
     echo "        -D<define> -I<include path> -L<lib path> -l<library> -s"
-    echo "        -machine <mach> -seq -langage <lang> -balance"
-    echo "        -tracemode <mode> -verbose -save -purify -cp"
-    echo "        -use-reliable-cc -use-fastest-cc -gen-cpm <new gen>"
+    echo "        -machine <mach> -seq -langage <lang> "
+    echo "        -balance <mode> -tracemode <mode> -memory <mode>"
+    echo "        -verbose -save -purify -cp <dest> -gen-cpm <package>"
+    echo "        -use-reliable-cc -use-fastest-cc"
     echo "        -cc <new cc> -c++ <new CC>  -ld <new ld> -ld++ <new LD>"
     echo "        -cpp-option <opt> -ldro-option <opt> -cc-option <opt>"
     echo "        -c++-option <opt> -ld-option <opt> -ld++-option <opt>"
@@ -218,7 +219,7 @@ do
 		;;
 
 	"-memory")
-		echo "Warning: -memory currently being ignored."
+	        MEMORY="$1"
 		shift
 		;;
 
@@ -802,17 +803,13 @@ Debug "About to check TRACEMODE=$TRACEMODE and BALANCE=$BALANCE..."
 
 # Check for valid choice of TRACEMODE
 
-[ -r $CHARMLIB/libtrace-none.a ] || Abort "trace libraries not installed."
+[ -r $CHARMLIB/libtrace-none.a ] || Abort "trace libraries not installed.  Is Charm++ built properly?"
 
-[ -z "$TRACEMODE" ] && TRACEMODE="none"
-
-[ ! -r $CHARMLIB/libtrace-$TRACEMODE.a ] && Abort "charmc : No such tracemode $TRACEMODE"
+TRACE_OBJ="$CHARMLIB/libtrace-$TRACEMODE.a"
+[ ! -r $TRACE_OBJ ] && Abort "charmc : No such tracemode $TRACEMODE"
 
 
 # Check for valid choice of BALANCE
-
-[ -z "$BALANCE" ] && BALANCE=rand
-
 if [ "$TRACEMODE" = replay ]
 then
 	[ "$BALANCE" != replay ] && echo "Ignoring -balance $BALANCE, incompatible with -tracemode replay"
@@ -841,6 +838,15 @@ then
 		Abort "Unknown load balancer $BALANCE / $BAL_OBJ"
 	fi
 fi
+
+
+# Check for valid choice of MEMORY
+
+MEM_OBJ="$CHARMLIB/libmemory-$MEMORY.o"
+
+[ ! -r $MEM_OBJ ] && Abort "charmc : No such memory mode $MEMORY"
+
+
 
 ###############################################################################
 #
@@ -901,7 +907,7 @@ case "$LANGUAGE" in
 esac
 
 LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $PRE_LIBRARIES"
-CORE_LIBS="-lconv-core -lconv-util -ltrace-$TRACEMODE"
+CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ $MEM_OBJ "
 
 case "$LANGUAGE" in
 "charm"|"charm++"|"f90charm"|"ampi"|"ampif"|"fem"|"femf"|"ckbluegene")
