@@ -1746,6 +1746,7 @@ req_node     req_saved;
 #define REQ_OK 0
 #define REQ_POSTPONE -1
 #define REQ_FAILED -2
+#define REQ_OK_AWAKEN -3
 
 int req_handle_aset(line)
     char *line;
@@ -1754,7 +1755,7 @@ int req_handle_aset(line)
   ok = sscanf(line,"%s %s %d %s",cmd,var,&index,val);
   if (ok!=4) return REQ_FAILED;
   arvar_set(var,index,val);
-  return REQ_OK;
+  return REQ_OK_AWAKEN;
 }
 
 int req_reply(ip, port, pre, ans)
@@ -1904,38 +1905,38 @@ void req_run_saved()
 req_serve_client(f)
     FILE *f;
 {
-  char line[1000]; int status;
   while (1) {
-    line[0]=0;
-    if (fgets(line, 999, f)==0) break;
-    zap_newline(line);
-    status = req_handle(line);
-    if (status==REQ_OK) req_run_saved();
-    else if (status==REQ_POSTPONE) {
-      req_node n = (req_node)malloc(sizeof(struct req_node)+strlen(line));
-      strcpy(n->request, line);
-      n->next = req_saved;
-      req_saved = n;
-    }
-    else fprintf(stderr,"bad request: %s\n",line);
-    line[0]=0;
   }
 }
 
 req_serve()
 {
-  int client_ip, client_port, client_fd;
+  char line[1000]; int status; FILE *f;
+  int client_ip, client_port, client_fd; req_node n;
   while (1) {
-    FILE *f;
     skt_accept(req_fd, &client_ip, &client_port, &client_fd);
     if (client_fd==0) {
       perror("accept");
       notify_abort();
     }
     f = fdopen(client_fd, "r+");
-    req_serve_client(f);
-    fclose(f);
-    close(client_fd);
+    line[0]=0;
+    fgets(line, 999, f);
+    fclose(f); close(client_fd);
+    if (line[0]==0) continue;
+    zap_newline(line);
+    status = req_handle(line);
+    switch (status) {
+    case REQ_OK: break;
+    case REQ_FAILED: fprintf(stderr,"bad request: %s\n",line); break;
+    case REQ_OK_AWAKEN: req_run_saved(); break;
+    case REQ_POSTPONE:
+      n = (req_node)malloc(sizeof(struct req_node)+strlen(line));
+      strcpy(n->request, line);
+      n->next = req_saved;
+      req_saved = n;
+    }
+    line[0]=0;
   }
 }
 

@@ -1006,7 +1006,7 @@ static int        Cmi_shutdown_done;
 static CmiMutex   Cmi_scanf_mutex;
 static char      *Cmi_scanf_data;
 static int        Cmi_shutdown_done; 
-static int        Cmi_clock;
+static double     Cmi_clock;
 
 static void *transmit_queue;
 static void *retransmit_queue;
@@ -1372,8 +1372,6 @@ static void ctrl_sendone(va_alist) va_dcl
   fd = skt_connect(Cmi_host_IP, Cmi_host_port, delay);
   if (fd<0) KillEveryone("cannot contact host");
   writeall(fd, buffer, strlen(buffer));
-  shutdown(fd, 1);
-  while (read(fd, buffer, 1023)>0);
   close(fd);
 }
 
