@@ -737,7 +737,7 @@ stat
 	|	#("while" we:expression { J.c.append(J.indent()+"while("+J.printExpression(we)+")");} stat)
 	|	#("do" {J.c.append(J.indent()+"do");}
             stat { J.c.append(J.indent()+"while(");}
-            expression {J.c.append(");\n");})
+            dwe:expression {J.c.append(J.pE(dwe) + ");\n");})
 	|	#("break" (bi:IDENT)? {J.c.append(J.indent()+"break "+ J.pE(bi) +";\n");} )
 	|	#("continue" (ci:IDENT)? {J.c.append(J.indent()+"continue "+ J.pE(ci) +";\n");} )
 	|	#("return" (re:expression)? {J.c.append(J.indent()+"return "+ J.printExpression(re) +";\n");} )
