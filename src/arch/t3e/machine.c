@@ -475,7 +475,7 @@ static void McRetrieveRemote(void)
 #ifdef DEBUG
     printf("%d allocating %d bytes\n",Cmi_mype,cur_node->msg_sz);
 #endif
-    cur_msg = (McMsgHdr *)CmiAlloc(cur_node->msg_sz);
+    cur_msg = (McMsgHdr *)CmiAlloc((cur_node->msg_sz+7)/8);
     if (cur_msg ==NULL)
     {
       CmiError("%s:%d Cannot Allocate Memory\n",__FILE__,__LINE__);
@@ -489,7 +489,7 @@ static void McRetrieveRemote(void)
 #endif
 
     shmem_get(cur_msg, cur_node->nxt_addr,
-              cur_node->msg_sz/8, cur_node->nxt_node);
+              (cur_node->msg_sz+7)/8, cur_node->nxt_node);
 
 #ifdef DEBUG
     printf("[%d]   nxt_node = %d\n",
