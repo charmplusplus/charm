@@ -223,7 +223,7 @@ void ConverseCommonExit(void);
  * Handling Errors
  *
  * Errors should be handled by printing a message on stderr and
- * calling exit(1).  Nothing should be sent to the host, no attempt at
+ * calling exit(1).  Nothing should be sent to charmrun, no attempt at
  * communication should be made.  The other processes will notice the
  * abnormal termination and will deal with it.
  *
@@ -234,11 +234,11 @@ void ConverseCommonExit(void);
  *
  *****************************************************************************/
 
-static void host_abort(const char*);
+static void charmrun_abort(const char*);
 
 static void KillEveryone(const char *msg)
 {
-  host_abort(msg);
+  charmrun_abort(msg);
   exit(1);
 }
 
@@ -247,7 +247,7 @@ int n;
 {
   char _s[100];
   sprintf(_s, "[%d] Fatal error #%d\n", CmiMyPe(), n);
-  host_abort(_s);
+  charmrun_abort(_s);
   exit(1);
 }
 
@@ -263,7 +263,7 @@ static void KillOnAllSigs(int sigNo)
   if (sigNo==SIGQUIT) sig=": caught signal QUIT";
   
   sprintf(_s, "ERROR> Node program on PE %d%s\n", CmiMyPe(),sig);
-  host_abort(_s);
+  charmrun_abort(_s);
   exit(1);
 }
 
@@ -283,7 +283,7 @@ static void PerrorExit(const char *msg)
 
 static void KillOnSIGPIPE(int dummy)
 {
-  fprintf(stderr,"host exited, terminating.\n");
+  fprintf(stderr,"charmrun exited, terminating.\n");
   exit(0);
 }
 
@@ -458,7 +458,7 @@ void CmiAbort(const char *message)
   CmiPrintf("%s", message);
   *(int *)NULL = 0; /*Write to null, causing bus error*/
 #else
-  host_abort(message);
+  charmrun_abort(message);
   exit(1);
 #endif
 }
@@ -751,7 +751,7 @@ static ExplicitDgram Cmi_freelist_explicit;
  * Configuration Data
  *
  * This data is all read in from the NETSTART variable (provided by the
- * host) and from the command-line arguments.  Once read in, it is never
+ * charmrun) and from the command-line arguments.  Once read in, it is never
  * modified.
  *
  *****************************************************************************/
@@ -761,11 +761,11 @@ int               Cmi_mynodesize;/* Number of processors in my address space */
 int               Cmi_numnodes;  /* Total number of address spaces */
 int               Cmi_numpes;    /* Total number of processors */
 static int        Cmi_nodestart; /* First processor in this address space */
-static int        Cmi_host_IP;
 static int        Cmi_self_IP;
-static int        Cmi_host_port;
-static int        Cmi_host_pid;
-static int        Cmi_host_fd;
+static int        Cmi_charmrun_IP; /*Address of charmrun machine*/
+static int        Cmi_charmrun_port;
+static int        Cmi_charmrun_pid;
+static int        Cmi_charmrun_fd;
 static int    Cmi_max_dgram_size;
 static int    Cmi_os_buffer_size;
 static int    Cmi_window_size;
@@ -774,6 +774,7 @@ static double Cmi_delay_retransmit;
 static double Cmi_ack_delay;
 static int    Cmi_dgram_max_data;
 static int    Cmi_tickspeed;
+static int    Cmi_netpoll;
 
 static int Cmi_print_stats = 0;
 
@@ -860,15 +861,24 @@ static void parse_netstart()
   char *ns;
   int nread;
   ns = getenv("NETSTART");
-  if (ns==0) goto abort;
-  nread = sscanf(ns, "%d%d%d%d",
-		 &Cmi_mynode,&Cmi_host_IP, &Cmi_host_port, &Cmi_host_pid);
+  if (ns!=0) 
+  {/*Read values set by Charmrun*/
+  	nread = sscanf(ns, "%d%d%d%d",
+		 &Cmi_mynode,
+		 &Cmi_charmrun_IP, &Cmi_charmrun_port, 
+		 &Cmi_charmrun_pid);
 
-  if (nread!=4) goto abort;
-  return;
- abort:
-  fprintf(stderr,"You must run this program with 'charmrun <progName> <args>'.\n");
-  exit(1);
+  	if (nread!=4) {
+  		fprintf(stderr,"Error parsing NETSTART '%s'\n",ns);
+  		exit(1);
+  	}
+  } else 
+  {/*No charmrun-- set flag values for standalone operation*/
+  	Cmi_mynode=0;
+  	Cmi_charmrun_IP=0;
+  	Cmi_charmrun_port=0;
+  	Cmi_charmrun_pid=0;
+  }
 }
 
 static void extract_args(argv)
@@ -1010,16 +1020,19 @@ static int ctrlskt_ready_read;
 static int dataskt_ready_read;
 static int dataskt_ready_write;
 
-void CheckSocketsReady(int withDelayMs)
+int CheckSocketsReady(int withDelayMs)
 {
   static fd_set rfds; 
   static fd_set wfds; 
   struct timeval tmo;
   int nreadable;
   
-  FD_SET(Cmi_host_fd, &rfds);
-  FD_SET(dataskt, &rfds);
-  FD_SET(dataskt, &wfds);
+  if (Cmi_charmrun_fd!=-1)
+  	FD_SET(Cmi_charmrun_fd, &rfds);
+  if (dataskt!=-1) {
+  	FD_SET(dataskt, &rfds);
+  	FD_SET(dataskt, &wfds);
+  }
   tmo.tv_sec = 0;
   tmo.tv_usec = withDelayMs*1000;
   nreadable = select(FD_SETSIZE, &rfds, &wfds, NULL, &tmo);
@@ -1027,11 +1040,15 @@ void CheckSocketsReady(int withDelayMs)
     ctrlskt_ready_read = 0;
     dataskt_ready_read = 0;
     dataskt_ready_write = 0;
-    return;
+    return nreadable;
   }
-  ctrlskt_ready_read = (FD_ISSET(Cmi_host_fd, &rfds));
-  dataskt_ready_read = (FD_ISSET(dataskt, &rfds));
-  dataskt_ready_write = (FD_ISSET(dataskt, &wfds));
+  if (Cmi_charmrun_fd!=-1)
+	ctrlskt_ready_read = (FD_ISSET(Cmi_charmrun_fd, &rfds));
+  if (dataskt!=-1) {
+  	dataskt_ready_read = (FD_ISSET(dataskt, &rfds));
+  	dataskt_ready_write = (FD_ISSET(dataskt, &wfds));
+  }
+  return nreadable;
 }
 /******************************************************************************
  *
@@ -1162,7 +1179,7 @@ static HANDLE comm_mutex;
 static DWORD WINAPI comm_thread(LPVOID dummy)
 {  
   while (1) CommunicationServer(500);
-  return 0;//should never get here
+  return 0;/*should never get here*/
 }
 
 static DWORD WINAPI call_startfn(LPVOID vindex)
@@ -1507,29 +1524,34 @@ static void CmiStartThreads()
   Cmi_mype = Cmi_nodestart;
   Cmi_myrank = 0;
   
+  if (!Cmi_netpoll) 
+  {
 #if CMK_ASYNC_NOT_NEEDED
-  CmiSignal(SIGALRM, 0, 0, CommunicationInterrupt);
+    CmiSignal(SIGALRM, 0, 0, CommunicationInterrupt);
 #else
-  CmiSignal(SIGALRM, SIGIO, 0, CommunicationInterrupt);
-  CmiEnableAsyncIO(dataskt);
-  CmiEnableAsyncIO(Cmi_host_fd);
+    CmiSignal(SIGALRM, SIGIO, 0, CommunicationInterrupt);
+    if (dataskt!=-1) CmiEnableAsyncIO(dataskt);
+    if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
 #endif
+  }
   
   /* if running on only one node, the only thing an interrupt
-  is used for is to check if conv-host has been killed. And this is
+  is used for is to check if charmrun has been killed. And this is
   done only Cmi_check_delay seconds, so no need to have tickspeed
   any faster than that. */
 
   if(Cmi_numnodes==1) Cmi_tickspeed = (int)(Cmi_check_delay*1000000.0);
 
+  if (!Cmi_netpoll) 
+  {
   /*This will send us a SIGALRM every Cmi_tickspeed microseconds,
-  which will call the CommunicationInterrupt routine above.*/
-
-  i.it_interval.tv_sec = 0;
-  i.it_interval.tv_usec = Cmi_tickspeed;
-  i.it_value.tv_sec = 0;
-  i.it_value.tv_usec = Cmi_tickspeed;
-  setitimer(ITIMER_REAL, &i, NULL);
+    which will call the CommunicationInterrupt routine above.*/
+    i.it_interval.tv_sec = 0;
+    i.it_interval.tv_usec = Cmi_tickspeed;
+    i.it_value.tv_sec = 0;
+    i.it_value.tv_usec = Cmi_tickspeed;
+    setitimer(ITIMER_REAL, &i, NULL);
+  }
 }
 
 #endif
@@ -1557,10 +1579,12 @@ static void ctrl_sendone_nolock(const char *type,
 				const char *data2,int dataLen2)
 {
   ChMessageHeader hdr;
+  if (Cmi_charmrun_fd==-1) 
+  	charmrun_abort("ctrl_sendone called in standalone!\n");
   ChMessageHeader_new(type,dataLen1+dataLen2,&hdr);
-  skt_sendN(Cmi_host_fd,(const char *)&hdr,sizeof(hdr));
-  if (dataLen1>0) skt_sendN(Cmi_host_fd,data1,dataLen1);
-  if (dataLen2>0) skt_sendN(Cmi_host_fd,data2,dataLen2);
+  skt_sendN(Cmi_charmrun_fd,(const char *)&hdr,sizeof(hdr));
+  if (dataLen1>0) skt_sendN(Cmi_charmrun_fd,data1,dataLen1);
+  if (dataLen2>0) skt_sendN(Cmi_charmrun_fd,data2,dataLen2);
 }
 
 static void ctrl_sendone_locking(const char *type,
@@ -1576,10 +1600,15 @@ static void ctrl_sendone_locking(const char *type,
 }
 
 static int ignore_further_errors(int c,const char *msg) {exit(2);return -1;}
-static void host_abort(const char *s)
+static void charmrun_abort(const char *s)
 {
-  skt_set_abort(ignore_further_errors);
-  ctrl_sendone_nolock("abort",s,strlen(s)+1,NULL,0);
+  if (Cmi_charmrun_fd==-1) {/*Standalone*/
+  	fprintf(stderr,"Charm++ fatal error:\n%s\n",s);
+  	abort();
+  } else {
+  	skt_set_abort(ignore_further_errors);
+  	ctrl_sendone_nolock("abort",s,strlen(s)+1,NULL,0);
+  }
 }
 
 /****************************************************************************
@@ -1594,7 +1623,7 @@ static void host_abort(const char *s)
 static void ctrl_getone()
 {
   ChMessage msg;
-  ChMessage_recv(Cmi_host_fd,&msg);
+  ChMessage_recv(Cmi_charmrun_fd,&msg);
 
   if (strcmp(msg.header.type,"die")==0) {
     fprintf(stderr,"aborting: %s\n",msg.data);
@@ -1618,7 +1647,7 @@ static void ctrl_getone()
   /* We do not use KillEveryOne here because it calls CmiMyPe(),
    * which is not available to the communication thread on an SMP version.
    */
-    host_abort("ERROR> Unrecognized message from host.\n");
+    charmrun_abort("ERROR> Unrecognized message from charmrun.\n");
     exit(1);
   }
   
@@ -1627,7 +1656,7 @@ static void ctrl_getone()
 
 #if CMK_CCS_AVAILABLE
 /*Deliver this reply data to this reply socket.
-  The data is forwarded to CCS server via conv-host.*/
+  The data is forwarded to CCS server via charmrun.*/
 void CcsImpl_reply(SOCKET replFd,int repLen,const void *repData)
 {
   ChMessageInt_t skt=ChMessageInt_new(replFd);
@@ -1643,14 +1672,14 @@ void CcsImpl_reply(SOCKET replFd,int repLen,const void *repData)
  *  These two functions fill the node-table.
  *
  *
- *   This node, like all others, first sends its own address to the host
+ *   This node, like all others, first sends its own address to charmrun
  *   using this command:
  *
  *     Type: nodeinfo
  *     Data: Big-endian 4-byte ints
  *           <my-node #><Dataport>
  *
- *   When the host has all the addresses, he sends this table to me:
+ *   When charmrun has all the addresses, he sends this table to me:
  *
  *     Type: nodes
  *     Data: Big-endian 4-byte ints
@@ -1666,23 +1695,49 @@ static void node_addresses_store(ChMessage *msg);
 
 /*Note: node_addresses_obtain is called before starting
   threads, so no locks are needed (or valid!)*/
-static void node_addresses_obtain()
+static void node_addresses_obtain(char **argv)
 {
-  ChMessageInt_t info[2]; /*Info. about my node for conv-host*/
-  int infoLen=2*sizeof(ChMessageInt_t);
-  ChMessage nodetabmsg; /*Reply, info about all nodes*/
-  info[0]=ChMessageInt_new(Cmi_mynode);
-  info[1]=ChMessageInt_new(dataport);
+  ChMessage nodetabmsg; /* info about all nodes*/
+  if (Cmi_charmrun_fd==-1) 
+  {/*Standalone-- fake a single-node nodetab message*/
+  	int npes=1;
+  	int fakeLen=4*sizeof(ChMessageInt_t);
+  	ChMessageInt_t *fakeTab=(ChMessageInt_t *)malloc(fakeLen);
+  	CmiGetArgInt(argv,"+p",&npes);
+#if CMK_SHARED_VARS_UNAVAILABLE
+	if (npes!=1) {
+		fprintf(stderr,
+			"To use multiple processors, you must run this program as:\n"
+			" > charmrun +p%d %s <args>\n"
+			"or build the %s-smp version of Charm++.\n",
+			npes,argv[0],CMK_MACHINE_NAME);
+		exit(1);
+	}
+#endif
+	fakeTab[0]=ChMessageInt_new(1);
+	fakeTab[1]=ChMessageInt_new(npes);
+	fakeTab[2]=fakeTab[3]=ChMessageInt_new(0);
+ 	nodetabmsg.len=fakeLen;
+ 	nodetabmsg.data=(char *)fakeTab;
+  }
+  else 
+  { /*Contact charmrun for machine info.*/
+  	ChMessageInt_t info[2]; /*Info. about my node for charmrun*/
+  	int infoLen=2*sizeof(ChMessageInt_t);
+ 	
+  	info[0]=ChMessageInt_new(Cmi_mynode);
+  	info[1]=ChMessageInt_new(dataport);
 
-  /*Send our node info. to conv-host.
-  CommLock hasn't been initialized yet-- 
-  use non-locking version*/  
-  ctrl_sendone_nolock("initnode",(const char *)&info[0],infoLen,NULL,0);
+  	/*Send our node info. to charmrun.
+  	CommLock hasn't been initialized yet-- 
+  	use non-locking version*/  
+  	ctrl_sendone_nolock("initnode",(const char *)&info[0],infoLen,NULL,0);
   
-  /*We get the other node addresses from a message sent
-    back via the conv-host control port.*/
-  if (!skt_select1(Cmi_host_fd,600*1000)) CmiAbort("Timeout waiting for nodetab!\n");
-  ChMessage_recv(Cmi_host_fd,&nodetabmsg);
+  	/*We get the other node addresses from a message sent
+  	  back via the charmrun control port.*/
+  	if (!skt_select1(Cmi_charmrun_fd,600*1000)) CmiAbort("Timeout waiting for nodetab!\n");
+  	ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
+  }
   node_addresses_store(&nodetabmsg);
   ChMessage_free(&nodetabmsg);
 }
@@ -1753,14 +1808,20 @@ static void InternalPrintf(f, l) char *f; va_list l;
 {
   char *buffer = CpvAccess(internal_printf_buffer);
   vsprintf(buffer, f, l);
-  ctrl_sendone_locking("print", buffer,strlen(buffer)+1,NULL,0);
+  if (Cmi_charmrun_fd!=-1)
+  	ctrl_sendone_locking("print", buffer,strlen(buffer)+1,NULL,0);
+  else
+  	fprintf(stdout,"%s",buffer);
 }
 
 static void InternalError(f, l) char *f; va_list l;
 {
   char *buffer = CpvAccess(internal_printf_buffer);
   vsprintf(buffer, f, l);
-  ctrl_sendone_locking("printerr", buffer,strlen(buffer)+1,NULL,0);
+  if (Cmi_charmrun_fd!=-1)
+  	ctrl_sendone_locking("printerr", buffer,strlen(buffer)+1,NULL,0);
+  else
+  	fprintf(stderr,"%s",buffer);
 }
 
 static int InternalScanf(fmt, l)
@@ -1781,17 +1842,24 @@ static int InternalScanf(fmt, l)
   if (nargs > 18) KillEveryone("CmiScanf only does 18 args.\n");
   for (i=0; i<nargs; i++) ptr[i]=va_arg(l, char *);
   CmiLock(Cmi_scanf_mutex);
-  /*Send conv-host the format string*/
-  ctrl_sendone_locking("scanf", fmt, strlen(fmt)+1,NULL,0);
-  /*Wait for the reply (characters to scan) from conv-host*/
-  CmiCommLock();
-  ChMessage_recv(Cmi_host_fd,&replymsg);
-  i = sscanf((char*)replymsg.data, fmt,
-	     ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
-	     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
-	     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
-  ChMessage_free(&replymsg);
-  CmiCommUnlock();
+  if (Cmi_charmrun_fd!=-1)
+  {/*Send charmrun the format string*/
+  	ctrl_sendone_locking("scanf", fmt, strlen(fmt)+1,NULL,0);
+  	/*Wait for the reply (characters to scan) from charmrun*/
+  	CmiCommLock();
+  	ChMessage_recv(Cmi_charmrun_fd,&replymsg);
+  	i = sscanf((char*)replymsg.data, fmt,
+		     ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
+		     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
+		     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
+  	ChMessage_free(&replymsg);
+  	CmiCommUnlock();
+  } else 
+  {/*Just do the scanf normally*/
+  	i=scanf(fmt, ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
+		     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
+		     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
+  }
   CmiUnlock(Cmi_scanf_mutex);
   return i;
 }
@@ -1818,26 +1886,6 @@ int CmiScanf(const char *fmt, ...)
   va_end(p);
   return i;
 }
-
-#if 0 /*Old varargs.h declarations:  Obsolete?  OSL 9/10/2000*/
-void CmiPrintf(va_alist) va_dcl
-{
-  va_list p; char *f; va_start(p); f = va_arg(p, char *);
-  InternalPrintf(f, p);
-}
-
-void CmiError(va_alist) va_dcl
-{
-  va_list p; char *f; va_start(p); f = va_arg(p, char *);
-  InternalError(f, p);
-}
-
-int CmiScanf(va_alist) va_dcl
-{
-  va_list p; char *f; va_start(p); f = va_arg(p, char *);
-  return InternalScanf(f, p);
-}
-#endif
 
 /******************************************************************************
  *
@@ -1882,7 +1930,7 @@ void TransmitAckDatagram(OtherNode node)
   int retval;
   
   seqno = node->recv_next;
-  DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, Cmi_host_pid, seqno);
+  DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, Cmi_charmrun_pid, seqno);
   LOG(Cmi_clock, Cmi_nodestart, 'A', node->nodestart, seqno);
   for (i=0; i<Cmi_window_size; i++) {
     slot = seqno % Cmi_window_size;
@@ -1920,7 +1968,7 @@ void TransmitImplicitDgram(ImplicitDgram dg)
   head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
   temp = *head;
   dest = dg->dest;
-  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_host_pid, dg->seqno);
+  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, dg->seqno);
   LOG(Cmi_clock, Cmi_nodestart, 'T', dest->nodestart, dg->seqno);
   retval = (-1);
   while(retval==(-1))
@@ -1941,7 +1989,7 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
   head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
   temp = *head;
   dest = dg->dest;
-  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_host_pid, dg->seqno);
+  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, dg->seqno);
   LOG(Cmi_clock, Cmi_nodestart, 'P', dest->nodestart, dg->seqno);
   retval = (-1);
   while (retval == (-1))
@@ -2473,7 +2521,7 @@ void ReceiveDatagram()
   dg->len = ok;
   if (ok >= DGRAM_HEADER_SIZE) {
     DgramHeaderBreak(dg->data, dg->rank, dg->srcpe, magic, dg->seqno);
-    if (magic == (Cmi_host_pid&DGRAM_MAGIC_MASK)) {
+    if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK)) {
       if (dg->rank == DGRAM_ACKNOWLEDGE)
 	IntegrateAckDatagram(dg);
       else IntegrateMessageDatagram(dg);
@@ -2496,6 +2544,7 @@ void ReceiveDatagram()
 static void CommunicationServer(int withDelayMs)
 {
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
+  if (Cmi_charmrun_fd==-1) return; /*Standalone mode*/
 #if CMK_SHARED_VARS_UNAVAILABLE
   if (terrupt)
   {
@@ -2540,6 +2589,7 @@ static void CommunicationServer(int withDelayMs)
 char *CmiGetNonLocalNodeQ()
 {
   char *result = 0;
+  if (Cmi_netpoll) CommunicationServer(0);
   if(!PCQueueEmpty(CsvAccess(NodeRecv))) {
     CmiLock(CsvAccess(CmiNodeRecvLock));
     result = (char *) PCQueuePop(CsvAccess(NodeRecv));
@@ -2557,24 +2607,28 @@ char *CmiGetNonLocal()
 
 /******************************************************************************
  *
- * CmiNotifyIdle()
+ * CmiNotifyIdle()-- wait until a packet comes in
  *
  *****************************************************************************/
 
 void CmiNotifyIdle()
 {
-#if CMK_WHEN_PROCESSOR_IDLE_USLEEP
   struct timeval tv;
+#if CMK_SHARED_VARS_UNAVAILABLE
+  /*No comm. thread-- listen on sockets for incoming messages*/
   static fd_set rfds;
   static fd_set wfds;
-
-  FD_SET(Cmi_host_fd, &rfds);
-  FD_SET(dataskt, &rfds);
-  FD_SET(dataskt, &wfds);
   tv.tv_sec=0; tv.tv_usec=5000;
+  if (Cmi_charmrun_fd!=-1)
+    FD_SET(Cmi_charmrun_fd, &rfds);
+  if (dataskt!=-1)
+    FD_SET(dataskt, &rfds);
   select(FD_SETSIZE,&rfds,&wfds,0,&tv);
+  if (Cmi_netpoll) CommunicationServer(5);
 #else
-  CommunicationServer(5);
+  /*Comm. thread will listen on sockets-- just sleep*/
+  tv.tv_sec=0; tv.tv_usec=1000;
+  select(0,NULL,NULL,NULL,&tv);
 #endif
 }
 
@@ -2838,9 +2892,15 @@ void ConverseExit()
     log_done();
     ConverseCommonExit();
   }
-
-  ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes host to go away */
-  while (1) CmiYield();/*Loop until host dies, which will be caught by comm. thread*/
+  if (Cmi_charmrun_fd==-1)
+  	exit(0); /*Standalone version-- just leave*/
+  else {
+  	ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away */
+ 	while (1) {
+ 		if (Cmi_netpoll) CommunicationServer(500);
+ 		CmiYield();/*Loop until charmrun dies, which will be caught by comm. thread*/
+ 	}
+  }
 }
 
 static void exitDelay(void)
@@ -2851,10 +2911,8 @@ static void exitDelay(void)
 #endif
 }
 
-static void machine_init(void)
+static void set_signals(void)
 {
-  skt_init();
-  atexit(exitDelay);
 #if !CMK_TRUECRASH
   signal(SIGSEGV, KillOnAllSigs);
   signal(SIGFPE, KillOnAllSigs);
@@ -2887,63 +2945,27 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #endif
 #endif
   Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usc;
-  machine_init();
-/*See the win32 debugging instructions below:
-  * putenv("NETSTART=0 2130706433 1596 241"); **/
+  Cmi_netpoll=CmiGetArgFlag(argv,"+netpoll");
+  skt_init();
+  atexit(exitDelay);
   parse_netstart();
   extract_args(argv);
   log_init();
   Cmi_scanf_mutex = CmiCreateLock();
 
   skt_set_idle(obtain_idleFn);
-  dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
-  Cmi_host_fd = skt_connect(Cmi_host_IP, Cmi_host_port, 1800);
-  node_addresses_obtain();
+  if (Cmi_charmrun_IP!=0) {
+  	set_signals();
+  	dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
+  	Cmi_charmrun_fd = skt_connect(Cmi_charmrun_IP, Cmi_charmrun_port, 1800);
+  } else {/*Standalone operation*/
+  	printf("Charm++: standalone mode (not using charmrun)\n");
+  	dataskt=-1;
+  	Cmi_charmrun_fd=-1;
+  }
+  node_addresses_obtain(argv);
   skt_set_idle(CmiYield);
   Cmi_check_delay = 2.0+0.5*Cmi_numnodes;
   CmiStartThreads();
   ConverseRunPE(everReturn);
 }
-
-/*********** For NT testing: *****************
-The putenv line above allows you to start up a 
-node-program's machine.c in the Visual C++ debugger.  
-The steps are:
-	1.) Make a Visual C++ project containing your node-program.
-I do a command-line build first (win32-install.bat)
-Your node-program source files, if C++, need to be renamed to "Cxx".
-
-You need the headers in charm/net-win32/include:
-Choose Project->Settings...->C/C++->Preprocessor->
-Additional Include Directories-> absolute path name to includes.
-
-You need the Winsock library:
-Choose Project->Settings...->Link->Object/library modules:->
-add "ws2_32.lib" to list; add "/NODEFAULTLIB:LIBCMT" to link params.
-
-You'll need the libraries: 
-libldb-rand.obj, libtrace-none.lib, libconv-cplus-y.lib, 
-libpacklib.lib, libck.lib
-
-And also the conv-core sources:
-	cldb.c (from conv-ldb), conv-ccs.c, conv-conds.c, cpm.c, 
-cpthreads.c, futures.c, machine.c (this file, from Common.net), 
-memory.c, msgmgr.c, queueing.c, quiescence.c, random.c, threads.c, sockRoutines.c
- (whew!)
-
-	2.) Now, start the daemon, if it's not already running.
-	3.) Run conv-host.exe with the *wrong* executable name
-	(e.g., c:\winnt\notepad.exe).  This prepares a conv-host for
-	your node-program to connect to.
-	4.) Read the last 4 numbers (2 IP's, a socket number and PID)
-	from the "NETSTART" line of the daemon's output.
-	5.) Copy those numbers to the last 4 places in the NETSTART
-	line below. (On a given machine, only the last 2 numbers will change).
-	6.) Recompile and run your program.  It will connect to the 
-	waiting conv-host and all will continue normally.
-	Note, however, that conv-host has a 60-second timeout, so if steps
-	4-6 don't happen fast enough, conv-host will die with a 
-	"timeout waiting for nodes to connect" error message.
-	If you have your windows arranged properly, you should have plenty 
-	of time.
-*/
