@@ -108,6 +108,8 @@ static Stats** _allStats = 0;
 static int   _numStatsRecd = 0;
 static int   _exitStarted = 0;
 
+static InitCallTable _initCallTable;
+
 #ifndef CMK_OPTIMIZE
 #define _STATS_ON(x) (x) = 1
 #else
@@ -478,6 +480,21 @@ extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
 extern void _loadbalancerInit();
 
+void _registerInitCall(CkInitCallFn fn, int isNodeCall)
+{
+  if (isNodeCall) _initCallTable.initNodeCalls.enq(fn);
+  else _initCallTable.initProcCalls.enq(fn);
+}
+
+void InitCallTable::enumerateInitCalls()
+{
+  static int _done=0;
+  int i;
+  if (!_done) for (i=0; i<initNodeCalls.length(); i++) initNodeCalls[i]();
+  for (i=0; i<initProcCalls.length(); i++) initProcCalls[i]();
+  _done=1;
+}
+
 extern int flag;
 
 void _initCharm(int unused_argc, char **argv)
@@ -496,7 +513,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(UInt, _numGroups);
 	CkpvInitialize(int, _numInitsRecd);
 	CpvInitialize(QdState*, _qd);
-	CpvInitialize(char**, Ck_argv); CpvAccess(Ck_argv)=argv;
+	CkpvInitialize(char**, Ck_argv); CkpvAccess(Ck_argv)=argv;
 	CkpvInitialize(MsgPool*, _msgPool);
 	CkpvInitialize(CkCoreState *, _coreState);
 
@@ -600,6 +617,8 @@ void _initCharm(int unused_argc, char **argv)
 		CkRegisterMainModule();
 		_registerDone();
 	}
+        // enumerate call initcalls registered
+	_initCallTable.enumerateInitCalls();
 
 	if (!inCommThread) _TRACE_BEGIN_COMPUTATION();
 	CkpvAccess(_myStats) = new Stats();

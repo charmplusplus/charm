@@ -204,12 +204,12 @@ void *CkLocalChare(const CkChareID *pCid)
 	}
 }
 
-CpvDeclare(char **,Ck_argv);
+CkpvDeclare(char **,Ck_argv);
 extern "C" char **CkGetArgv(void) {
-	return CpvAccess(Ck_argv);
+	return CkpvAccess(Ck_argv);
 }
 extern "C" int CkGetArgc(void) {
-	return CmiGetArgc(CpvAccess(Ck_argv));
+	return CmiGetArgc(CkpvAccess(Ck_argv));
 }
 
 /******************** Basic support *****************/

@@ -94,6 +94,16 @@ class GroupIdxArray {
 typedef GroupIdxArray<TableEntry> GroupTable;
 typedef CkVec<CkGroupID> GroupIDTable;
 
+typedef void (*CkInitCallFn)(void);
+class InitCallTable 
+{
+public:
+  CkQ<CkInitCallFn>  initNodeCalls;
+  CkQ<CkInitCallFn>  initProcCalls;
+public:
+  void enumerateInitCalls();
+};
+void _registerInitCall(CkInitCallFn fn, int isNodeCall);
 
 /*********************************************************/
 /**
@@ -126,7 +136,7 @@ CkpvExtern(GroupTable*, _groupTable);
 CkpvExtern(GroupIDTable*, _groupIDTable);
 CkpvExtern(unsigned int, _numGroups);
 
-CpvExtern(char **,Ck_argv);
+CkpvExtern(char **,Ck_argv);
 
 static inline IrrGroup *_localBranch(CkGroupID gID)
 {

@@ -17,7 +17,7 @@ module CkArray {
   PUPable CkArrayBroadcaster;
   PUPable CkArrayReducer;
 
-  initcall void _ckArrayInit(void);
+  initnode void _ckArrayInit(void);
 
   array [none] ArrayElement {
     entry ArrayElement();

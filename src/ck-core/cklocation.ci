@@ -16,7 +16,7 @@ module CkLocation {
 	//Load balancing:
 	entry void dummyAtSync(void);
   };
-  initcall void _CkLocMgrInit(void);
+  initnode void _CkLocMgrInit(void);
   
 //Array Map object support:
   group [migratable] CkArrayMap {
@@ -27,8 +27,8 @@ module CkLocation {
     entry RRMap(void);
   };
 
-  initcall void _propMapInit(void);
-  initcall void _CkMigratable_initInfoInit(void);
+  initnode void _propMapInit(void);
+  initnode void _CkMigratable_initInfoInit(void);
 
   group [migratable] PropMap : CkArrayMap {
     entry PropMap(void);
