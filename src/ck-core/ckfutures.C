@@ -186,7 +186,7 @@ void *CkRemoteNodeBranchCall(int ep, void *m, CkGroupID group, int node)
 }
 
 extern "C" 
-CkFutureID CkRemoteCallAsync(int ep, void *m, CkChareID *ID)
+CkFutureID CkRemoteCallAsync(int ep, void *m, const CkChareID *ID)
 { 
   envelope *env = UsrToEnv(m);
   int i = createFuture();
@@ -196,7 +196,7 @@ CkFutureID CkRemoteCallAsync(int ep, void *m, CkChareID *ID)
 }
 
 extern "C" 
-void *CkRemoteCall(int ep, void *m, CkChareID *ID)
+void *CkRemoteCall(int ep, void *m, const CkChareID *ID)
 { 
   void * result;
   int i = CkRemoteCallAsync(ep, m, ID);
@@ -221,7 +221,7 @@ void CkSendToFuture(CkFutureID futNum, void *m, int PE)
 {
   UsrToEnv(m)->setRef(futNum);
   CProxy_FutureBOC fBOC(_fbocID);
-  fBOC.SetFuture((FutureInitMsg *)m,PE);
+  fBOC[PE].SetFuture((FutureInitMsg *)m);
 }
 
 #include "CkFutures.def.h"
