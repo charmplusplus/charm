@@ -4,7 +4,7 @@ void propagate_handler(void *message) {
   int instid = CmiGetXHandler(message);
   PipeBroadcastConverse *myStrategy = (PipeBroadcastConverse *)ConvComlibGetStrategy(instid);
   envelope *env = (envelope*)message;
-  myStrategy->propagate((char*)message, false, env->getSrcPe(), env->getTotalsize(), envelope::setSrcPe);
+  myStrategy->propagate((char*)message, false, env->getSrcPe(), env->getTotalsize(), &envelope::setSrcPe);
 }
 
 void PipeBroadcastStrategy::deliverer(char *msg, int dim) {
@@ -67,7 +67,7 @@ void PipeBroadcastStrategy::conversePipeBcast(envelope *env, int totalSize) {
     ComlibPrintf("[%d] Propagating message in one single chunk\n",CkMyPe());
     CmiSetHandler(env, propagateHandle);
     env->setSrcPe(CkMyPe());
-    ((PipeBroadcastConverse*)converseStrategy)->propagate((char*)env, false, CkMyPe(), totalSize, envelope::setSrcPe);
+    ((PipeBroadcastConverse*)converseStrategy)->propagate((char*)env, false, CkMyPe(), totalSize, &envelope::setSrcPe);
   }
 }
 
