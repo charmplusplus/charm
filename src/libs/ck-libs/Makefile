@@ -1,5 +1,5 @@
 CHARMC=../../bin/charmc $(OPTS)
-DIRS=commlib sparseContiguousReducer tcharm ampi idxl fem ifem \
+DIRS=sparseContiguousReducer tcharm ampi idxl fem ifem \
         armci collide mblock barrier multiphaseSharedArrays \
 	multicast irecv netfem liveViz liveViz3d taskGraph search datatransfer
 
