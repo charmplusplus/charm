@@ -1,2 +1,4 @@
 #S.no.	#date		#by	#description
 1	2/21/2000	milind	CCS does not work with SMP versions
+2     5/2/2000    sameerp     argv is not copied when it is passed by ConverseInit 
+					to threads causes deletion from argv to fail.
