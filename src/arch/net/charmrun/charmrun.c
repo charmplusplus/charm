@@ -1389,12 +1389,11 @@ void req_start_server(void)
  *
  ****************************************************************************/
 void start_nodes_daemon(void);
-void start_nodes_rsh(void);
+void start_nodes_rsh(char **envp);
 #if CMK_SCYLD
 void nodetab_init_for_scyld(void);
 void start_nodes_scyld(void);
 #endif
-void start_nodes_local(char ** envp);
 
 static void fast_idleFn(void) {sleep(0);}
 
@@ -1430,10 +1429,7 @@ int main(int argc, char **argv, char **envp)
 #if CMK_SCYLD
     start_nodes_scyld();
 #else
-    if (!arg_local)
-      start_nodes_rsh();
-    else
-      start_nodes_local(envp);
+    start_nodes_rsh(envp);
 #endif
 
   if(arg_verbose) fprintf(stderr, "Charmrun> node programs all started\n");
@@ -1522,7 +1518,7 @@ void start_nodes_daemon(void)
 /*Sadly, interprocess communication on Win32 is quite
   different, so we can't use Rsh on win32 yet.  
   Fall back to the daemon.*/
-void start_nodes_rsh(void) {start_nodes_daemon();}
+void start_nodes_rsh(char **envp) {start_nodes_daemon();}
 
 #elif CMK_SCYLD
 
@@ -2365,8 +2361,9 @@ void rsh_pump(p, nodeno, rank0no, argv)
 #endif
 }
 
+void start_nodes_local(char ** envp);
 
-void start_nodes_rsh(void)
+void start_nodes_rsh(char **envp)
 {
   prog        rsh_prog[200];
   int         rsh_node[200];
@@ -2374,6 +2371,12 @@ void start_nodes_rsh(void)
   int         rsh_nfinished;
   int         rsh_maxsim;
   fd_set rfds; int i; prog p; int pe;
+
+  /* ++local start node program locally */
+  if (arg_local) {
+    start_nodes_local(envp);
+    return;
+  }
 
   /* Return immediately.  That way, the nodes which are starting */
   /* Will be able to establish communication with the host */
