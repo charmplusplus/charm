@@ -22,6 +22,8 @@ sending and receiving elements need not belong to the same array.
 
 Strategy * strategy = new EachToManyStrategy(topology);
 
+The header file for this strategy is EachToManyStrategy.h.
+
 The constructor takes am integer parameter {\em topology}. This tells
 the strategy how to optimize the collective personalized communication
 pattern. The options for topology are USE\_DIRECT, USE\_MESH,
@@ -42,7 +44,8 @@ many other array elements.
 
 Strategy * strategy = new EachToManyMulticast(topology);
 
-here topology has the same values as explained above.
+here topology has the same values as explained above. Also the
+header file is EachToManyMulticast.h.
 
 \item StreamingStrategy. In this communication optimization strategy 
 each array element sends many small messages to other array elements
@@ -52,6 +55,8 @@ a parameter to the StreamingStrategy. It needs to be specified in
 milli seconds. 10ms is the default
 
 Strategy * strategy = new StreamingStrategy(period\_in\_ms);
+
+Header file is StreamingStrategy.h.
 
 \end{itemize}
 
