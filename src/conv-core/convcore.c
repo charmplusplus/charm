@@ -1485,7 +1485,6 @@ void ConverseCommonInit(char **argv)
   CldModuleInit();
   CmiGroupInit();
   CmiMulticastInit();
-  CmiGroupInit();
   CmiInitMultipleSend();
   CcsInit();
 }
