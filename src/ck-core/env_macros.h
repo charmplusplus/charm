@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-10-27 09:09:31  jyelon
+ * Revision 2.12  1997-02-06 19:52:44  jyelon
+ * Corrected the core field to take CmiMsgHeaderSizeBytes into account.
+ *
+ * Revision 2.11  1995/10/27 09:09:31  jyelon
  * *** empty log message ***
  *
  * Revision 2.10  1995/10/13  18:15:53  jyelon
@@ -98,8 +101,8 @@
  */
 
 typedef struct envelope {
-  unsigned int   core1;     /* first word of converse core. */
-
+  char     core[CmiMsgHeaderSizeBytes];
+  
   unsigned int   event;   /* unknown meaning. Used only for logging.*/
 
   unsigned int   i_tag2;  /* Count OR vidBlockPtr OR chareBlockPtr OR boc_num*/
