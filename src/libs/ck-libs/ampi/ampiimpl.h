@@ -11,6 +11,8 @@
 #include "ampi.h"
 #include "ampi.decl.h"
 
+#include "ddt.h"
+
 extern CkChareID mainhandle;
 
 /*

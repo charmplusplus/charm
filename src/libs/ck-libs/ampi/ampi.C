@@ -11,6 +11,8 @@
 #include "ampimain.decl.h"
 #endif
 
+#include "ddt.h"
+
 /*
 extern void _initCharm(int argc, char **argv);
 
