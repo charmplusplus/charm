@@ -21,7 +21,7 @@ class CkQ : private CkNoncopyable {
     int first;
     int len;
     void _expand(void) {
-      int newlen=len*2;
+      int newlen=16+len*2;
       T *newblk = new T[newlen];
       memcpy(newblk, block+first, sizeof(T)*(blklen-first));
       memcpy(newblk+blklen-first, block, sizeof(T)*first);
@@ -30,7 +30,7 @@ class CkQ : private CkNoncopyable {
     }
   public:
     CkQ() :first(0),len(0) {
-      block = new T[blklen=16];
+      block = NULL; blklen=0;
     }
     CkQ(int sz) :first(0),len(0) {
       block = new T[blklen=sz];
@@ -86,12 +86,23 @@ class CkQ : private CkNoncopyable {
 };
 
 template <class T>
-class CkVec : private CkNoncopyable {
+class CkVec {
     T *block;
     int blklen,len;
+    void copyFrom(const CkVec<T> &src) {
+       blklen=src.blklen; len=src.len;
+       block=new T[blklen];
+       memcpy(block,src.block,sizeof(T)*blklen);
+    }
   public:
     CkVec() {block=NULL;blklen=len=0;}
     ~CkVec() { delete[] block; }
+    CkVec(const CkVec<T> &src) {copyFrom(src);}
+    CkVec<T> &operator=(const CkVec<T> &src) {
+      delete[] block;
+      copyFrom(src);
+    }
+
     int &length(void) { return len; }
     int length(void) const {return len;}
     T *getVec(void) { return block; }
