@@ -13,13 +13,21 @@ for bal in $LOADBALANCERS
 do 
 	echo "   \$(L)/libmodule$bal.a \\" >> $out 
 done
-
+echo "   manager.o" >> $out
 echo >> $out
+
+cat >> $out << EOB 
+manager.o: manager.C manager.h
+	\$(CHARMC) -c manager.C
+
+EOB
 
 for bal in $LOADBALANCERS 
 do 
 	dep=""
 	[ -r libmodule$bal.dep ] && dep="cp libmodule$bal.dep "'$'"(L)/"
+        manager=""
+        [ $bal = 'CommLB' ] && manager="manager.o"
 	cat >> $out << EOB 
 $bal.decl.h: $bal.ci charmxi
 	\$(CHARMC) $bal.ci
@@ -27,8 +35,8 @@ $bal.decl.h: $bal.ci charmxi
 $bal.o: $bal.C $bal.decl.h \$(CKHEADERS)
 	\$(CHARMC) -c $bal.C
 
-\$(L)/libmodule$bal.a: $bal.o
-	\$(CHARMC) -o \$(L)/libmodule$bal.a $bal.o
+\$(L)/libmodule$bal.a: $bal.o $manager
+	\$(CHARMC) -o \$(L)/libmodule$bal.a $bal.o $manager
 	$dep
 
 EOB
@@ -48,6 +56,7 @@ for bal in $LOADBALANCERS
 do
 	echo "    $bal.o \\" >>$out
 done
+echo "    manager.o" >> $out
 cat >> $out <<EOB
 
 EveryLB.o: EveryLB.C EveryLB.decl.h
