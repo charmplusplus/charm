@@ -37,6 +37,15 @@ extern void CldModuleInit(void);
 #include <sys/resource.h>
 #endif
 
+#if CMK_TIMER_USE_RDTSC
+#include <string.h>
+#include <unistd.h>
+#include <time.h>
+#include <stdio.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+#endif
+
 #ifdef CMK_TIMER_USE_WIN32API
 #include <stdlib.h>
 #include <time.h>
@@ -429,6 +438,72 @@ double CmiWallTimer()
   gettimeofday(&tv,0);
   currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
   return currenttime - inittime_wallclock;
+}
+
+double CmiTimer()
+{
+  return CmiCpuTimer();
+}
+
+#endif
+
+#if CMK_TIMER_USE_RDTSC
+
+static __inline__ unsigned long long int rdtsc(void)
+{
+        unsigned long long int x;
+        __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
+        return x;
+}
+
+static double readMHz(void)
+{
+  double x;
+  char str[1000];
+  char buf[100];
+  FILE *fp = fopen("/proc/cpuinfo", "r");
+  while(fgets(str, 1000, fp)!=0) {
+    if(sscanf(str, "cpu MHz%[^:]",buf)==1)
+    {
+      char *s = strchr(str, ':'); s=s+1;
+      sscanf(s, "%lf", &x);
+      fclose(fp);
+      return x;
+    }
+  }
+  CmiAbort("Cannot read CPU MHz from /proc/cpuinfo file.");
+  return 0.0;
+}
+
+static double cpu_speed;
+CpvStaticDeclare(double, inittime_virtual);
+
+void CmiTimerInit()
+{
+  struct rusage ru;
+  cpu_speed = readMHz(); rdtsc(); rdtsc(); rdtsc(); rdtsc(); rdtsc();
+  CpvInitialize(double, inittime_virtual);
+  getrusage(0, &ru); 
+  CpvAccess(inittime_virtual) =
+    (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
+    (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+}
+
+double CmiCpuTimer()
+{
+  struct rusage ru;
+  double currenttime;
+
+  getrusage(0, &ru);
+  currenttime =
+    (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
+    (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+  return currenttime - CpvAccess(inittime_virtual);
+}
+
+double CmiWallTimer(void)
+{
+  return (double)rdtsc()/(cpu_speed*1.0e6);
 }
 
 double CmiTimer()
