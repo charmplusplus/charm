@@ -43,6 +43,7 @@ POST_LANGUAGE=""
 POST_LIBRARIES=""    
 PRE_LIBRARIES=""    
 COPIES=""        
+MODCOPIES=""        
 FILES=""       
 OBJECTFILES=""  
 DELETE=""    
@@ -312,6 +313,11 @@ do
 		shift
 		;;
 
+	"-cpmod")
+		MODCOPIES="$1 $MODCOPIES"
+		shift
+		;;
+
 	"-gen-cpm")
 		GENCPM="$GENCPM $1"
 		shift
@@ -500,6 +506,11 @@ then
     CMK_CC="$CMK_CC_FASTEST"
 fi
 
+if [ -n "$CMK_F90_USE_MODDIR" ]
+then
+    CMK_CF90="$CMK_CF90 -M$CHARMINC "
+fi
+
 if [ -n "$SEQUENTIAL" ]
 then
     CMK_CC="$CMK_SEQ_CC -DCMK_SEQUENTIAL=1 "
@@ -620,6 +631,23 @@ Copyobj() {
 	Success
 }
 
+Copymod() {
+	for COPY in `echo $MODCOPIES`
+	do
+		if [ "a$COPY" != "a$OBJECT" ] 
+		then
+			[ -d $COPY ] && COPY="$COPY/"
+			if [ -r "$OBJECT.$CMK_MOD_EXT" ] ; then
+			  echo "Appending .$CMK_MOD_EXT to object file name"
+			  OBJECT="$OBJECT.$CMK_MOD_EXT"
+			fi
+			[ ! -d $COPY ] && DoNoErrCheck $RM $COPY 
+			Do $CP $OBJECT $COPY
+		fi
+	done
+	Success
+}
+
 Success() {
 	End 0
 }
@@ -705,6 +733,11 @@ do
 		;;
 	*.o|*.a)
 		OBJECTFILES="$OBJECTFILES $FILE"
+		;;
+	*.M|*.mod)
+	        OBJECT="$BASE"
+		Copymod
+		Success
 		;;
 	*)
 		Abort "file with unrecognized extension $FILE"
@@ -843,11 +876,12 @@ Debug "About to perform final link..."
 
 case "$LANGUAGE" in
 "ampi")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lampi -lddt"
+        PRE_LIBRARIES="$PRE_LIBRARIES -lampi -lddt "
+        POST_LIBRARIES="$POST_LIBRARIES -lmetis"
 	;;
 "ampif")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lampif -lddt"
-        POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
+        PRE_LIBRARIES="$PRE_LIBRARIES -lampif -lddt -lconv-utilf "
+        POST_LIBRARIES="$POST_LIBRARIES -lmetis $CMK_F90LIBS"
         if [ ! -z "$CMK_F90OBJS" ] 
         then
           for f90obj in $CMK_F90OBJS
@@ -857,11 +891,12 @@ case "$LANGUAGE" in
         fi
 	;;
 "fem")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lfem -lddt -lmetis"
+        PRE_LIBRARIES="$PRE_LIBRARIES -lfem -lddt "
+        POST_LIBRARIES="$POST_LIBRARIES -lmetis "
 	;;
 "femf")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lfemf -lddt -lmetis"
-        POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
+        PRE_LIBRARIES="$PRE_LIBRARIES -lfemf -lddt -lconv-utilf"
+        POST_LIBRARIES="$POST_LIBRARIES -lmetis $CMK_F90LIBS"
         if [ ! -z "$CMK_F90OBJS" ] 
         then
           for f90obj in $CMK_F90OBJS
@@ -871,7 +906,7 @@ case "$LANGUAGE" in
         fi
 	;;
 "f90charm")
-        PRE_LIBRARIES="$PRE_LIBRARIES lib/libmain.a"
+        PRE_LIBRARIES="$PRE_LIBRARIES lib/libmain.a "
         POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
         if [ ! -z "$CMK_F90OBJS" ] 
         then

@@ -48,7 +48,7 @@ ampic: charm++ libs libampi.a
 	@touch ampif.tmp
 	@rm -f ampif.tmp
 
-ampif: charm++ libs libampif.a
+ampif: charm++ libconv-utilf.a libs libampif.a
 	@touch ampif.tmp
 	@rm -f ampif.tmp
 
@@ -186,6 +186,8 @@ LIBCONV_CORE=threads.o convcore.o conv-conds.o queueing.o fifo.o msgmgr.o memory
 
 LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o ckhashtable.o
 
+LIBCONV_UTILF=pup_f.o
+
 converse: basics QuickThreads/libckqt.a $(CVLIBS) conv-host-if-needed conv-cpm
 
 conv-host-if-needed: 
@@ -210,6 +212,9 @@ libconv-cplus-n.a: machine.c $(CVHEADERS)
 
 libconv-util.a: $(LIBCONV_UTIL)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTIL)
+
+libconv-utilf.a: $(LIBCONV_UTILF)
+	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTILF)
 
 cpm.o: cpm.c $(CVHEADERS)
 	$(CHARMC) cpm.c
@@ -282,6 +287,10 @@ pup_xlater.o: pup_xlater.C $(UTILHEADERS)
 
 pup_c.o: pup_c.C $(UTILHEADERS)
 	$(CHARMC) -o pup_c.o pup_c.C
+
+pup_f.o: pup_f.f90
+	$(CHARMC) -c pup_f.f90
+	$(CHARMC) -cpmod ../include pupmod.M
 
 ckhashtable.o: ckhashtable.C ckhashtable.h
 	$(CHARMC) -o ckhashtable.o ckhashtable.C
