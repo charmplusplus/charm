@@ -14,15 +14,8 @@ CkArrayReductionMgr::CkArrayReductionMgr(){
 	}
 };
 
-void CkArrayReductionMgr::contributeArrayReduction(CkReductionMsg *m){
-	//CkPrintf("[%d]Contribute Array Reduction called for RedNo %d\n",CkMyNode(),m->getRedNo());
-	/** store the contribution untill all procs have contributed. At that point reduce and
-	carry out a reduction among nodegroups*/
-	CmiLock(lockCount);
-	if(m->getRedNo() == redNo){
-		my_msgs.push_back(m);
-		count++;
-		if(count == size){
+void CkArrayReductionMgr::collectAllMessages(){
+	if(count == size){
 			//CkPrintf("[%d] About to call contributewithCounter for %d with %d\n",CkMyNode(),redNo,count);
 			CkReductionMsg *result = reduceMessages();
 			result->redNo = redNo;
@@ -36,12 +29,24 @@ void CkArrayReductionMgr::contributeArrayReduction(CkReductionMsg *m){
 				if(elementMesg->getRedNo() == redNo){
 					my_msgs.push_back(elementMesg);
 					count++;
+					collectAllMessages();
 				}else{
 					my_futureMsgs.enq(elementMesg);
 				}
 			}
 
-		}
+	}
+}
+
+void CkArrayReductionMgr::contributeArrayReduction(CkReductionMsg *m){
+	//CkPrintf("[%d]Contribute Array Reduction called for RedNo %d\n",CkMyNode(),m->getRedNo());
+	/** store the contribution untill all procs have contributed. At that point reduce and
+	carry out a reduction among nodegroups*/
+	CmiLock(lockCount);
+	if(m->getRedNo() == redNo){
+		my_msgs.push_back(m);
+		count++;
+		collectAllMessages();
 	}else{
 		//CkPrintf("[%d][%d]Out of sequence messages for %d Present redNo %d \n",CkMyNode(),CkMyPe(),m->getRedNo(),redNo);
 		my_futureMsgs.enq(m);
