@@ -660,7 +660,7 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) cons
 	  ckDelegatedTo()->ArraySend(ckDelegatedPtr(),ep,msg,_idx,ckGetArrayID());
 	else 
 	{ //Usual case: a direct send
-	  ckLocalBranch()->deliver(msg, CkDeliver_queue);
+	  ckLocalBranch()->deliver(msg, CkDeliver_queue, opts);
 	}
 }
 
