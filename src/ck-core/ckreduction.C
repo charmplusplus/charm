@@ -683,7 +683,7 @@ void CkReductionMgr::ArrayReductionHandler(CkReductionMsg *m){
 	finalMsgs.enq(m);
 	//CkPrintf("ArrayReduction Handler Invoked for %d \n",m->redNo);
 	adj(m->redNo).mainRecvd = 1;
-	//CkPrintf("~~~~~~~~~~~~~ ArrayReductionHandler Callback called for %d at %.6f %d\n",completedRedNo,CmiWallTimer());
+//	CkPrintf("~~~~~~~~~~~~~ ArrayReductionHandler Callback called for redNo %d with mesgredNo %d at %.6f %d\n",completedRedNo,m->redNo,CmiWallTimer());
 	endArrayReduction();
 }
 
@@ -722,7 +722,7 @@ void CkReductionMgr :: endArrayReduction(){
 
 	}
 	numMsgs = tempMsgs.length();
-	//CkPrintf("[%d]Total = %d %d Sources = %d Number of Messages %d\n",CkMyPe(),msgs_gcount,  adj(completedRedNo+1).gcount,msgs_nSources,numMsgs);
+//	CkPrintf("[%d]Total = %d %d Sources = %d Number of Messages %d Adj(Completed redno).mainRecvd %d\n",CkMyPe(),msgs_gcount,  adj(completedRedNo+1).gcount,msgs_nSources,numMsgs,adj(completedRedNo+1).mainRecvd);
 	if(numMsgs == 0){
 		return;
 	}
@@ -769,6 +769,7 @@ void CkReductionMgr :: endArrayReduction(){
   	ret->sourceFlag=msgs_nSources;
 	
 	secondaryStoredCallback = callbackQ.deq();
+//	CkPrintf("~~~~~~~~~~~~~~~~~ About to call callback from end of GROUP REDUCTION %d at %.6f\n",completedRedNo,CmiWallTimer());
 	if (!secondaryStoredCallback->isInvalid())
 	    secondaryStoredCallback->send(ret);
     else if (storedCallback!=NULL)
@@ -777,10 +778,11 @@ void CkReductionMgr :: endArrayReduction(){
 	    CkAbort("No reduction client!\n"
 		    "You must register a client with either SetReductionClient or during contribute.\n");
 	completedRedNo++;
-        //CkPrintf("[%d,%d]------------END OF GROUP REDUCTION %d at %.6f\n",CkMyNode(),CkMyPe(),completedRedNo,CkWallTimer());
+ //       CkPrintf("[%d,%d]------------END OF GROUP REDUCTION %d at %.6f\n",CkMyNode(),CkMyPe(),completedRedNo,CkWallTimer());
 	for (i=1;i<adjVec.length();i++)
     		adjVec[i-1]=adjVec[i];
 	adjVec.length()--;
+	endArrayReduction();
 }
 
 
@@ -1233,10 +1235,10 @@ void CkNodeReductionMgr::RecvMsg(CkReductionMsg *m)
 #ifndef CMK_CPV_IS_SMP
 #if CMK_IMMEDIATE_MSG
 	if(interrupt == 1){
-		 //CkPrintf("$$$$$$$$$How did i wake up in the middle of someone else's entry method ?\n");
-		/*CpvAccess(_qd)->process(-1);
+		//CkPrintf("$$$$$$$$$How did i wake up in the middle of someone else's entry method ?\n");
+		CpvAccess(_qd)->process(-1);
 		CmiDelayImmediate();
-		return;*/
+		return;
 	}
 #endif	
 #endif
