@@ -145,27 +145,46 @@ public:
 };
 
 class coarsenResults {
-	int nResults;
-	class resRec{
-		public:
-			int elemID,collapseEdge,nodeToKeep;
-			double nx,ny;
-			int flag;
-			resRec(int id,int edge,int n,double nx_,double ny_):elemID(id),collapseEdge(edge),nodeToKeep(n),nx(nx_),ny(ny_){
-				flag=0;
-			}
-			resRec(int id,int edge,int n,double nx_,double ny_,int flag_):elemID(id),collapseEdge(edge),nodeToKeep(n),nx(nx_),ny(ny_),flag(flag_){}
-	};
-	std::vector<resRec> res;
+	/*
+		coarsenData is defined in refine.h
+	*/
+	std::vector<coarsenData> res;
 	
 public:
-	coarsenResults(){nResults=0;}
-  void add(int elementID,int collapseEdge,int nodeToKeep,double nX,double nY,int flag){
-		nResults++;
-		res.push_back(resRec(elementID,collapseEdge,nodeToKeep,nX,nY,flag));
+	coarsenResults(){}
+  void addCollapse(int elementID,int nodeToKeep,int nodeToDelete,double nX,double nY,int flag){
+		coarsenData d;
+		d.type = COLLAPSE;
+		d.data.cdata.elemID = elementID;
+		d.data.cdata.nodeToKeep = nodeToKeep;
+		d.data.cdata.nodeToDelete = nodeToDelete;
+		d.data.cdata.newX = nX;
+		d.data.cdata.newY = nY;
+		d.data.cdata.flag = flag;
+		res.push_back(d);
 	};
-	int countResults(){return nResults;}
-	void extract(int i,int *conn,int *tri,int *nodeToThrow,int *nodeToKeep,double *nx,double *ny,int *flag,int idxbase){
+
+	void addUpdate(int nodeID,double newX,double newY){
+		coarsenData d;
+		d.type = UPDATE;
+		d.data.udata.nodeID = nodeID;
+		d.data.udata.newX = newX;
+		d.data.udata.newY = newY;
+		res.push_back(d);
+	};
+	
+	void addReplaceDelete(int elemID,int relnodeID,int oldNodeID,int newNodeID){
+		coarsenData d;
+		d.type = REPLACE;
+		d.data.rddata.elemID = elemID;
+		d.data.rddata.relnodeID = relnodeID;
+		d.data.rddata.oldNodeID = oldNodeID;
+		d.data.rddata.newNodeID = newNodeID;
+		res.push_back(d);
+	};
+	
+	int countResults(){return res.size();}
+	/*void extract(int i,int *conn,int *tri,int *nodeToThrow,int *nodeToKeep,double *nx,double *ny,int *flag,int idxbase){
 		int t;
 		t = res[i].elemID;
 		*tri = t +idxbase;
@@ -180,6 +199,9 @@ public:
 		*nx = res[i].nx;
 		*ny = res[i].ny;
 		*flag = res[i].flag;
+	}*/
+	void extract(int i,coarsenData *output){
+		*output = res[i];
 	}
 };
 
@@ -188,9 +210,15 @@ class resultsCoarsenClient : public refineClient {
   coarsenResults *res;
 public:
   resultsCoarsenClient(coarsenResults *res_) : res(res_){};
-  void collapse(int elementID,int collapseEdge,int nodeToKeep,double nX,double nY,int flag){
-		res->add(elementID,collapseEdge,nodeToKeep,nX,nY,flag);
+  void collapse(int elementID,int nodeToKeep,int nodeToDelete,double nX,double nY,int flag){
+		res->addCollapse(elementID,nodeToKeep,nodeToDelete,nX,nY,flag);
   }
+	void nodeUpdate(int nodeID, double newX, double newY){
+		res->addUpdate(nodeID,newX,newY);
+	}
+	void nodeReplaceDelete(int elementID, int relnodeID, int oldNodeID, int newNodeID){
+		res->addReplaceDelete(elementID,relnodeID,oldNodeID,newNodeID);
+	}
 };
 
 
@@ -279,9 +307,13 @@ static coarsenResults *getCoarsenResults(void) {
 CDECL int REFINE2D_Get_Collapse_Length(){
 	return getCoarsenResults()->countResults();
 }
-
+/*
 CDECL void REFINE2D_Get_Collapse(int i,int *conn,int *tri,int *nodeToThrow,int *nodeToKeep,double *nx,double *ny,int *flag,int idxbase){
 	return getCoarsenResults()->extract(i,conn,tri,nodeToThrow,nodeToKeep,nx,ny,flag,idxbase);
+}*/
+
+CDECL void REFINE2D_Get_Collapse(int i,coarsenData *output){
+	getCoarsenResults()->extract(i,output);
 }
 
 /********************* Check *****************/

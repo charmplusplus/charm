@@ -369,10 +369,10 @@ int element::nodeDelete(node n, edgeRef from, elemRef end, node ndReplace)
       }
       CkAssert((nIdx > -1) && (nIdx < 3));
       found = 1;
-      //CkPrintf("TMRC2D: about to remove node %d\n", nodes[nIdx]);
+      CkPrintf("TMRC2D: about to remove node %d\n", nodes[nIdx]);
       C->removeNode(nodes[nIdx]);
-      C->theClient->nodeDelete(nodes[nIdx]);
-      C->theClient->nodeReplace(myRef.idx, nodes[nIdx], j);
+ //     C->theClient->nodeDelete(nodes[nIdx]);
+      C->theClient->nodeReplaceDelete(myRef.idx,nIdx, nodes[nIdx], j);
       nodes[nIdx] = j;
       break;
     }
@@ -380,7 +380,7 @@ int element::nodeDelete(node n, edgeRef from, elemRef end, node ndReplace)
   CkAssert((fIdx > -1) && (fIdx < 3));
   C->theNodes[nodes[nIdx]].unlock();
   if (!found) {
-    //CkPrintf("TMRC2D: about to replace node %d\n", nodes[nIdx]);
+    CkPrintf("TMRC2D: about to replace node %d\n", nodes[nIdx]);
     C->theNodes[nodes[nIdx]] = ndReplace;
     C->theClient->nodeUpdate(nodes[nIdx], ndReplace.X(), ndReplace.Y());
     C->theNodes[nodes[nIdx]].present = 1;

@@ -106,10 +106,47 @@ void REFINE2D_Get_Split(int splitNo,const int *conn,
 	int *tri,int *A,int *B,int *C,double *frac,int *flags);
 
 
+/*
+	Data structures to store the changes caused by coarsening.  
+*/
+/* store the data for 1 collapse operation*/
+typedef struct {
+	int elemID,nodeToKeep,nodeToDelete;
+	double newX,newY;
+	int flag;
+} collapseData;
+
+/*store the data for 1 nodeUpdate operation*/
+typedef struct {
+	int nodeID;
+	double newX,newY;
+} updateData;
+
+/*store the data for 1 nodeReplaceDelete operation*/
+typedef struct {
+	int elemID,relnodeID,oldNodeID,newNodeID;
+} replacedeleteData;
+
+/*
+	store the data for a change caused by coarsening,
+	might be of 3 types: collapse, updatenode or replace and delete a node
+*/
+enum {INVALID=0,COLLAPSE,UPDATE,REPLACE};
+typedef struct {
+	int type;
+	union {
+		collapseData cdata;
+		updateData udata;
+		replacedeleteData rddata;
+	} data;
+} coarsenData;
+
 void REFINE2D_Coarsen(int nNode,double *coord,int nEl,double *desiredArea);
 
+/*
+void REFINE2D_Get_Collapse(int i,int *conn,int *tri,int *nodeToThrow,int *nodeToKeep,double *nx,double *ny,int *flag,int idxbase);*/
 
-void REFINE2D_Get_Collapse(int i,int *conn,int *tri,int *nodeToThrow,int *nodeToKeep,double *nx,double *ny,int *flag,int idxbase);
+void REFINE2D_Get_Collapse(int i,coarsenData *output);
 int REFINE2D_Get_Collapse_Length();
 
 /**

@@ -308,7 +308,7 @@ void calcMasses(myGlobals &g) {
 			int n2=g.conn[3*i+1];
 			int n3=g.conn[3*i+2];
 			double area=calcArea(g,i);
-			if (1 || i%100==0) CkPrintf("Triangle %d (%d %d %d) has area %.3g\n",i,n1,n2,n3,area);
+	//		if (1 || i%100==0) CkPrintf("Triangle %d (%d %d %d) has area %.3g\n",i,n1,n2,n3,area);
 			double mass=0.333*density*(thickness*area);
 			m_i[n1]+=mass;
 			m_i[n2]+=mass;
@@ -487,7 +487,7 @@ driver(void)
     CkPrintf("Entering timeloop\n");
   }	
   //  int tSteps=0x70FF00FF;
-  int tSteps=100;
+  int tSteps=10;
   int z=13;
   calcMasses(g);
   double startTime=CkWallTimer();
@@ -539,13 +539,16 @@ driver(void)
     CkPrintf("[%d] Done with coarsening step: %d nodes, %d elements\n",
 	     myChunk,g.nnodes,g.nelems);
     if (1) { //Publish data to the net
-      NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_POINTAT);
+      NetFEM n=NetFEM_Begin(myChunk,t,2,NetFEM_WRITE);
       int count=0;
       double *vcoord = new double[2*g.nnodes];
+			int *maptovalid = new int[g.nnodes];
       for(int i=0;i<g.nnodes;i++){
 	if(g.validNode[i]){
 	  vcoord[2*count] = ((double *)g.coord)[2*i];
 	  vcoord[2*count+1] = ((double *)g.coord)[2*i+1];
+		maptovalid[i] = count;
+		printf("~~~~~~~ %d %d %.6lf %.6lf \n",count,i,vcoord[2*count],vcoord[2*count+1]);
 	  count++;	
 	}
       }
@@ -557,9 +560,10 @@ driver(void)
       int *vconn = new int[3*g.nelems];
       for(int i=0;i<g.nelems;i++){
 	if(g.validElem[i]){
-	  vconn[3*count] = g.conn[3*i];
-	  vconn[3*count+1] = g.conn[3*i+1];
-	  vconn[3*count+2] = g.conn[3*i+2];
+	  vconn[3*count] = maptovalid[g.conn[3*i]];
+	  vconn[3*count+1] = maptovalid[g.conn[3*i+1]];
+	  vconn[3*count+2] = maptovalid[g.conn[3*i+2]];
+		printf("~~~~~~~ %d %d < %d,%d %d,%d %d,%d >\n",count,i,vconn[3*count],g.conn[3*i],vconn[3*count+1],g.conn[3*i+1],vconn[3*count+2],g.conn[3*i+2]);
 	  count++;	
 	}
       }
@@ -570,6 +574,7 @@ driver(void)
       NetFEM_End(n);
       delete [] vcoord;
       delete [] vconn;
+			delete [] maptovalid;
     }
   }
   
