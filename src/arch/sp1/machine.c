@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-11-09 18:23:11  milind
+ * Revision 2.8  1996-01-29 16:34:02  milind
+ * Corrected a minor bug in CmiReleaseSetntMessages
+ *
+ * Revision 2.7  1995/11/09  18:23:11  milind
  * Fixed the CmiFreeSendFn bug for messages to self.
  *
  * Revision 2.6  1995/10/27  21:45:35  jyelon
@@ -201,7 +204,7 @@ CmiReleaseSentMessages()
 	       msg_tmp = msg_tmp->next;
 	  }
      }
-     end_sent = msg_tmp;
+     end_sent = prev;
 }
 
 /********************* MESSAGE RECEIVE FUNCTIONS ******************/
