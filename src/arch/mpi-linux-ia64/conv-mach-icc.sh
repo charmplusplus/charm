@@ -1,0 +1,8 @@
+CMK_CPP_C='ecc -E '
+CMK_CC='ecc '
+CMK_CC_RELIABLE='ecc '
+CMK_CC_FASTEST='ecc '
+CMK_CXX='ecpc '
+CMK_CXXPP='ecpc -E '
+CMK_LD='ecc -static'
+CMK_LDXX='ecpc -static'
