@@ -51,7 +51,7 @@ void Refiner::create(int count, BaseLB::LDStats* stats, int* procs)
 	LDObjData &odata = stats->objData[i];
 	computes[i].Id = i;
         computes[i].id = odata.objID();
-        computes[i].handle = odata.handle;
+//        computes[i].handle = odata.handle;
         computes[i].load = odata.wallTime;     // was cpuTime
         computes[i].processor = -1;
         computes[i].oldProcessor = procs[i];
