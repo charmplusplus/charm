@@ -51,6 +51,9 @@
 /* wether has elf.h */
 #undef CMK_HAS_ELF_H
 
+/* whether has malloc.h */
+#undef CMK_HAS_MALLOC_H
+
 /* whether the mmap() syscall exists */
 #undef CMK_HAS_MMAP
 
@@ -60,11 +63,17 @@
 /* whether Python is installed */
 #undef CMK_HAS_PYTHON
 
+/* whether the setpriority() exists */
+#undef CMK_HAS_SETPRIORITY
+
 /* whether it has socklen_t */
 #undef CMK_HAS_SOCKLEN
 
 /* whether has stdint.h */
 #undef CMK_HAS_STDINT_H
+
+/* sync program */
+#undef CMK_HAS_SYNC
 
 /* whether typeinfo/typeid works */
 #undef CMK_HAS_TYPEINFO

@@ -159,10 +159,10 @@ trace-projections.o: trace-projections.C charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h trace-common.h trace-projections.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h trace-common.h trace-projections.h
 	$(CHARMC) -c -I. trace-projections.C
 
 trace-summary.o: trace-summary.C charm++.h charm.h converse.h \
@@ -176,10 +176,10 @@ trace-summary.o: trace-summary.C charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h trace-summary.h envelope.h register.h trace-common.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h trace-summary.h register.h trace-common.h \
   trace-summaryBOC.h TraceSummary.decl.h TraceSummary.def.h
 	$(CHARMC) -c -I. trace-summary.C
 
@@ -194,9 +194,9 @@ trace-counter.o: trace-counter.C charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h
 	$(CHARMC) -c -I. trace-counter.C
 
@@ -211,9 +211,9 @@ trace-bluegene.o: trace-bluegene.C charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h trace-common.h blue.h blue-conv.h blue_impl.h \
   ckliststring.h blue_types.h blue_timing.h blue_logs.h blue_defs.h \
   blue_network.h
@@ -230,12 +230,12 @@ trace-projector.o: trace-projector.C charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h trace-projector.h ck.h envelope.h qd.h register.h \
-  stats.h ckfutures.h allEvents.h charmEvents.h charmProjections.h \
-  traceCoreAPI.h converseEvents.h converseProjections.h machineEvents.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h trace-projector.h ck.h qd.h register.h stats.h \
+  ckfutures.h allEvents.h charmEvents.h charmProjections.h traceCoreAPI.h \
+  converseEvents.h converseProjections.h machineEvents.h \
   machineProjections.h traceCore.h threadEvents.h traceCoreCommon.h \
   trace-common.h trace-projections.h
 	$(CHARMC) -c -I. trace-projector.C
@@ -260,11 +260,10 @@ trace-recordreplay.o: trace-recordreplay.C charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h trace-recordreplay.h envelope.h register.h \
-  trace-common.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h trace-recordreplay.h register.h trace-common.h
 	$(CHARMC) -c -I. trace-recordreplay.C
 
 trace-common.o: trace-common.C charm.h converse.h conv-config.h \
@@ -289,9 +288,9 @@ tracef.o: tracef.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h charm-api.h
 	$(CHARMC) -c -I. tracef.C
 
@@ -306,10 +305,10 @@ init.o: init.C ck.h charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h qd.h register.h stats.h ckfutures.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h qd.h register.h stats.h ckfutures.h
 	$(CHARMC) -c -I. init.C
 
 register.o: register.C ck.h charm++.h charm.h converse.h conv-config.h \
@@ -323,10 +322,10 @@ register.o: register.C ck.h charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h qd.h register.h stats.h ckfutures.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h qd.h register.h stats.h ckfutures.h
 	$(CHARMC) -c -I. register.C
 
 qd.o: qd.C ck.h charm++.h charm.h converse.h conv-config.h conv-common.h \
@@ -340,10 +339,10 @@ qd.o: qd.C ck.h charm++.h charm.h converse.h conv-config.h conv-common.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h qd.h register.h stats.h ckfutures.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h qd.h register.h stats.h ckfutures.h
 	$(CHARMC) -c -I. qd.C
 
 ck.o: ck.C ck.h charm++.h charm.h converse.h conv-config.h conv-common.h \
@@ -357,11 +356,11 @@ ck.o: ck.C ck.h charm++.h charm.h converse.h conv-config.h conv-common.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h qd.h register.h stats.h ckfutures.h \
-  queueing.h CkMarshall.def.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h qd.h register.h stats.h ckfutures.h queueing.h \
+  CkMarshall.def.h
 	$(CHARMC) -c -I. ck.C
 
 main.o: main.C ck.h charm++.h charm.h converse.h conv-config.h \
@@ -375,10 +374,10 @@ main.o: main.C ck.h charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h qd.h register.h stats.h ckfutures.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h qd.h register.h stats.h ckfutures.h
 	$(CHARMC) -c -I. main.C
 
 msgalloc.o: msgalloc.C ck.h charm++.h charm.h converse.h conv-config.h \
@@ -392,11 +391,10 @@ msgalloc.o: msgalloc.C ck.h charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h qd.h register.h stats.h ckfutures.h \
-  queueing.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h qd.h register.h stats.h ckfutures.h queueing.h
 	$(CHARMC) -c -I. msgalloc.C
 
 ckfutures.o: ckfutures.C charm++.h charm.h converse.h conv-config.h \
@@ -410,10 +408,10 @@ ckfutures.o: ckfutures.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h ck.h envelope.h qd.h register.h stats.h ckfutures.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h ck.h qd.h register.h stats.h ckfutures.h \
   CkFutures.def.h
 	$(CHARMC) -c -I. ckfutures.C
 
@@ -428,11 +426,10 @@ debug-message.o: debug-message.C ck.h charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h qd.h register.h stats.h ckfutures.h \
-  queueing.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h qd.h register.h stats.h ckfutures.h queueing.h
 	$(CHARMC) -c -I. debug-message.C
 
 debug-charm.o: debug-charm.C converse.h conv-config.h conv-common.h \
@@ -446,10 +443,10 @@ debug-charm.o: debug-charm.C converse.h conv-config.h conv-common.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
   cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h NullLB.decl.h \
   BaseLB.decl.h CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h \
-  ComlibStrategy.h convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h \
-  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
-  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h qd.h stats.h ckfutures.h
+  ComlibStrategy.h convcomlibstrategy.h ComlibLearner.h envelope.h \
+  CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
+  waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
+  ckarrayreductionmgr.h trace.h trace-bluegene.h qd.h stats.h ckfutures.h
 	$(CHARMC) -c -I. debug-charm.C
 
 ckcallback.o: ckcallback.C charm++.h charm.h converse.h conv-config.h \
@@ -463,9 +460,9 @@ ckcallback.o: ckcallback.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h ckcallback-ccs.h CkCallback.decl.h CkCallback.def.h
 	$(CHARMC) -c -I. ckcallback.C
 
@@ -480,10 +477,10 @@ cklocation.o: cklocation.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h register.h ck.h envelope.h qd.h stats.h ckfutures.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h register.h ck.h qd.h stats.h ckfutures.h \
   CkLocation.def.h
 	$(CHARMC) -c -I. cklocation.C
 
@@ -498,11 +495,10 @@ ckarray.o: ckarray.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h register.h ck.h envelope.h qd.h stats.h ckfutures.h \
-  CkArray.def.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h register.h ck.h qd.h stats.h ckfutures.h CkArray.def.h
 	$(CHARMC) -c -I. ckarray.C
 
 ckreduction.o: ckreduction.C charm++.h charm.h converse.h conv-config.h \
@@ -516,10 +512,10 @@ ckreduction.o: ckreduction.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h ck.h envelope.h qd.h register.h stats.h ckfutures.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h ck.h qd.h register.h stats.h ckfutures.h \
   CkReduction.def.h
 	$(CHARMC) -c -I. ckreduction.C
 
@@ -534,10 +530,10 @@ ckarrayreductionmgr.o: ckarrayreductionmgr.C charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h ck.h envelope.h qd.h register.h stats.h ckfutures.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h ck.h qd.h register.h stats.h ckfutures.h \
   CkArrayReductionMgr.def.h
 	$(CHARMC) -c -I. ckarrayreductionmgr.C
 
@@ -552,9 +548,9 @@ tempo.o: tempo.C charm++.h charm.h converse.h conv-config.h conv-common.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h tempo.def.h
 	$(CHARMC) -c -I. tempo.C
 
@@ -569,8 +565,8 @@ waitqd.o: waitqd.C waitqd.h charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h sdag.h ckcheckpoint.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
   waitqd.decl.h waitqd.def.h
 	$(CHARMC) -c -I. waitqd.C
@@ -586,9 +582,9 @@ LBDatabase.o: LBDatabase.C converse.h conv-config.h conv-common.h \
   cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h \
   CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h NullLB.decl.h BaseLB.decl.h LBDatabase.def.h \
   LBSimulation.h CentralLB.h BaseLB.h CentralLB.decl.h CentralLBMsg.h \
   topology.h NullLB.h
@@ -606,9 +602,9 @@ lbdb.o: lbdb.C converse.h conv-config.h conv-common.h conv-mach.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h
 	$(CHARMC) -c -I. lbdb.C
 
@@ -623,9 +619,9 @@ lbdbf.o: lbdbf.C charm++.h charm.h converse.h conv-config.h conv-common.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h charm-api.h
 	$(CHARMC) -c -I. lbdbf.C
 
@@ -640,8 +636,8 @@ charisma.o: charisma.C charisma.h charisma.decl.h charm++.h charm.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h tempo.h \
-  tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
   charisma.def.h
 	$(CHARMC) -c -I. charisma.C
@@ -657,10 +653,10 @@ ckobjQ.o: ckobjQ.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h queueing.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h queueing.h
 	$(CHARMC) -c -I. ckobjQ.C
 
 ckcheckpoint.o: ckcheckpoint.C charm++.h charm.h converse.h conv-config.h \
@@ -674,10 +670,10 @@ ckcheckpoint.o: ckcheckpoint.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h ck.h envelope.h qd.h register.h stats.h ckfutures.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h ck.h qd.h register.h stats.h ckfutures.h \
   CkCheckpoint.def.h
 	$(CHARMC) -c -I. ckcheckpoint.C
 
@@ -692,10 +688,10 @@ ckmemcheckpoint.o: ckmemcheckpoint.C charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h ck.h envelope.h qd.h register.h stats.h ckfutures.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h ck.h qd.h register.h stats.h ckfutures.h \
   CkMemCheckpoint.def.h
 	$(CHARMC) -c -I. ckmemcheckpoint.C
 
@@ -710,9 +706,9 @@ LBDBManager.o: LBDBManager.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h LBDBManager.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h
 	$(CHARMC) -c -I. LBDBManager.C
 
@@ -733,9 +729,9 @@ LBObj.o: LBObj.C charm++.h charm.h converse.h conv-config.h conv-common.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h LBObj.h LBOM.h LBDBManager.h LBComm.h LBMachineUtil.h
 	$(CHARMC) -c -I. LBObj.C
 
@@ -750,9 +746,9 @@ LBMachineUtil.o: LBMachineUtil.C LBMachineUtil.h charm++.h charm.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h
 	$(CHARMC) -c -I. LBMachineUtil.C
 
@@ -767,10 +763,11 @@ BaseLB.o: BaseLB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h BaseLB.h BaseLB.def.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h BaseLB.h LBSimulation.h CentralLB.h CentralLB.decl.h \
+  CentralLBMsg.h BaseLB.def.h
 	$(CHARMC) -c -I. BaseLB.C
 
 CentralLB.o: CentralLB.C charm++.h charm.h converse.h conv-config.h \
@@ -784,12 +781,12 @@ CentralLB.o: CentralLB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h CentralLB.h BaseLB.h CentralLB.decl.h \
-  CentralLBMsg.h LBDBManager.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h \
-  LBSimulation.h CentralLB.def.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h CentralLB.h BaseLB.h CentralLB.decl.h CentralLBMsg.h \
+  LBDBManager.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h LBSimulation.h \
+  CentralLB.def.h
 	$(CHARMC) -c -I. CentralLB.C
 
 CentralPredictor.o: CentralPredictor.C charm++.h charm.h converse.h \
@@ -803,9 +800,9 @@ CentralPredictor.o: CentralPredictor.C charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h CentralLB.h BaseLB.h CentralLB.decl.h CentralLBMsg.h
 	$(CHARMC) -c -I. CentralPredictor.C
 
@@ -820,9 +817,9 @@ NborBaseLB.o: NborBaseLB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h BaseLB.h NborBaseLB.h NborBaseLB.decl.h \
   NeighborLBMsg.h topology.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
   LBMachineUtil.h NborBaseLB.def.h
@@ -839,9 +836,9 @@ WSLB.o: WSLB.C charm++.h charm.h converse.h conv-config.h conv-common.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h BaseLB.h heap.h elements.h Set.h WSLB.h WSLB.decl.h \
   topology.h LBDBManager.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h \
   WSLB.def.h
@@ -858,9 +855,9 @@ ObjGraph.o: ObjGraph.C ObjGraph.h lbdb.h converse.h conv-config.h \
   cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h \
   CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h NullLB.decl.h BaseLB.decl.h CentralLB.decl.h \
   CentralLBMsg.h
 	$(CHARMC) -c -I. ObjGraph.C
@@ -882,9 +879,9 @@ Refiner.o: Refiner.C Refiner.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
   cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h \
   CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h NullLB.decl.h BaseLB.decl.h CentralLB.decl.h \
   CentralLBMsg.h elements.h Set.h heap.h
 	$(CHARMC) -c -I. Refiner.C
@@ -900,9 +897,9 @@ RefinerComm.o: RefinerComm.C RefinerComm.h CentralLB.h BaseLB.h \
   cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h \
   CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h NullLB.decl.h BaseLB.decl.h CentralLB.decl.h \
   CentralLBMsg.h elements.h Set.h heap.h Refiner.h
 	$(CHARMC) -c -I. RefinerComm.C
@@ -933,9 +930,9 @@ CommLBHeap.o: CommLBHeap.C CommLBHeap.h charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h
 	$(CHARMC) -c -I. CommLBHeap.C
 
@@ -950,11 +947,11 @@ NullLB.o: NullLB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h BaseLB.h NullLB.h ck.h envelope.h qd.h register.h \
-  stats.h ckfutures.h NullLB.def.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h BaseLB.h NullLB.h ck.h qd.h register.h stats.h \
+  ckfutures.h NullLB.def.h
 	$(CHARMC) -c -I. NullLB.C
 
 LBSimulation.o: LBSimulation.C LBSimulation.h charm++.h charm.h \
@@ -968,9 +965,9 @@ LBSimulation.o: LBSimulation.C LBSimulation.h charm++.h charm.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h CentralLB.h BaseLB.h CentralLB.decl.h CentralLBMsg.h
 	$(CHARMC) -c -I. LBSimulation.C
 
@@ -985,10 +982,10 @@ ComlibStrategy.o: ComlibStrategy.C charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h register.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h register.h
 	$(CHARMC) -c -I. ComlibStrategy.C
 
 ComlibArrayListener.o: ComlibArrayListener.C charm++.h charm.h converse.h \
@@ -1002,10 +999,10 @@ ComlibArrayListener.o: ComlibArrayListener.C charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h
 	$(CHARMC) -c -I. ComlibArrayListener.C
 
 charmProjections.o: charmProjections.C converse.h conv-config.h \
@@ -1020,11 +1017,11 @@ charmProjections.o: charmProjections.C converse.h conv-config.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
   cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h NullLB.decl.h \
   BaseLB.decl.h CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h \
-  ComlibStrategy.h convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h \
-  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
-  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h qd.h register.h stats.h ckfutures.h \
-  trace-common.h
+  ComlibStrategy.h convcomlibstrategy.h ComlibLearner.h envelope.h \
+  CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
+  waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
+  ckarrayreductionmgr.h trace.h trace-bluegene.h qd.h register.h stats.h \
+  ckfutures.h trace-common.h
 	$(CHARMC) -c -I. charmProjections.C
 
 EveryLB.o: EveryLB.C charm++.h charm.h converse.h conv-config.h \
@@ -1038,15 +1035,15 @@ EveryLB.o: EveryLB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h EveryLB.decl.h DummyLB.decl.h CentralLB.decl.h \
   CentralLBMsg.h ComboCentLB.decl.h RandCentLB.decl.h RefineLB.decl.h \
   RefineCommLB.decl.h GreedyLB.decl.h GreedyCommLB.decl.h Comm1LB.decl.h \
-  OrbLB.decl.h RecBisectBfLB.decl.h MetisLB.decl.h NeighborLB.decl.h \
-  NborBaseLB.decl.h NeighborLBMsg.h NeighborCommLB.decl.h WSLB.decl.h \
-  EveryLB.def.h
+  OrbLB.decl.h RecBisectBfLB.decl.h MetisLB.decl.h RotateLB.decl.h \
+  NeighborLB.decl.h NborBaseLB.decl.h NeighborLBMsg.h \
+  NeighborCommLB.decl.h WSLB.decl.h EveryLB.def.h
 	$(CHARMC) -c -I. EveryLB.C
 
 DummyLB.o: DummyLB.C charm++.h charm.h converse.h conv-config.h \
@@ -1060,9 +1057,9 @@ DummyLB.o: DummyLB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h DummyLB.h CentralLB.h BaseLB.h CentralLB.decl.h \
   CentralLBMsg.h DummyLB.decl.h DummyLB.def.h
 	$(CHARMC) -c -I. DummyLB.C
@@ -1078,9 +1075,9 @@ ComboCentLB.o: ComboCentLB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h ComboCentLB.h CentralLB.h BaseLB.h CentralLB.decl.h \
   CentralLBMsg.h ComboCentLB.decl.h ComboCentLB.def.h
 	$(CHARMC) -c -I. ComboCentLB.C
@@ -1096,9 +1093,9 @@ RandCentLB.o: RandCentLB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h RandCentLB.h CentralLB.h BaseLB.h CentralLB.decl.h \
   CentralLBMsg.h RandCentLB.decl.h RandCentLB.def.h
 	$(CHARMC) -c -I. RandCentLB.C
@@ -1114,9 +1111,9 @@ RefineLB.o: RefineLB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h RefineLB.h CentralLB.h BaseLB.h CentralLB.decl.h \
   CentralLBMsg.h Refiner.h elements.h Set.h heap.h RefineLB.decl.h \
   RefineLB.def.h
@@ -1133,9 +1130,9 @@ RefineCommLB.o: RefineCommLB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h RefineCommLB.h CentralLB.h BaseLB.h CentralLB.decl.h \
   CentralLBMsg.h RefinerComm.h elements.h Set.h heap.h Refiner.h \
   RefineLB.h RefineLB.decl.h RefineCommLB.decl.h RefineCommLB.def.h
@@ -1152,9 +1149,9 @@ GreedyLB.o: GreedyLB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h GreedyLB.h CentralLB.h BaseLB.h CentralLB.decl.h \
   CentralLBMsg.h GreedyLB.decl.h GreedyLB.def.h
 	$(CHARMC) -c -I. GreedyLB.C
@@ -1170,12 +1167,12 @@ GreedyCommLB.o: GreedyCommLB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h GreedyCommLB.h CentralLB.h BaseLB.h CentralLB.decl.h \
-  CentralLBMsg.h GreedyCommLB.decl.h CommLBHeap.h GreedyCommLB.def.h \
-  manager.h
+  CentralLBMsg.h GreedyCommLB.decl.h CommLBHeap.h manager.h \
+  GreedyCommLB.def.h
 	$(CHARMC) -c -I. GreedyCommLB.C
 
 Comm1LB.o: Comm1LB.C charm++.h charm.h converse.h conv-config.h \
@@ -1189,9 +1186,9 @@ Comm1LB.o: Comm1LB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h Comm1LB.h CentralLB.h BaseLB.h CentralLB.decl.h \
   CentralLBMsg.h Comm1LB.decl.h CommLBHeap.h GreedyCommLB.h \
   GreedyCommLB.decl.h Comm1LB.def.h
@@ -1208,9 +1205,9 @@ OrbLB.o: OrbLB.C charm++.h charm.h converse.h conv-config.h conv-common.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h OrbLB.h CentralLB.h BaseLB.h CentralLB.decl.h \
   CentralLBMsg.h OrbLB.decl.h OrbLB.def.h
 	$(CHARMC) -c -I. OrbLB.C
@@ -1226,9 +1223,9 @@ RecBisectBfLB.o: RecBisectBfLB.C charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h RecBisectBfLB.h CentralLB.h BaseLB.h CentralLB.decl.h \
   CentralLBMsg.h RecBisectBfLB.decl.h ObjGraph.h graph.h bitvecset.h \
   RecBisectBfLB.def.h
@@ -1245,9 +1242,9 @@ MetisLB.o: MetisLB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h MetisLB.h CentralLB.h BaseLB.h CentralLB.decl.h \
   CentralLBMsg.h MetisLB.decl.h MetisLB.def.h
 	$(CHARMC) -c -I. MetisLB.C
@@ -1263,11 +1260,11 @@ RotateLB.o: RotateLB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h RotateLB.h CentralLB.h BaseLB.h CentralLB.decl.h \
-  CentralLBMsg.h RotateLB.decl.h RotateLB.def.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h RotateLB.decl.h CentralLB.decl.h CentralLBMsg.h \
+  RotateLB.h CentralLB.h BaseLB.h RotateLB.def.h
 	$(CHARMC) -c -I. RotateLB.C
 
 NeighborLB.o: NeighborLB.C charm++.h charm.h converse.h conv-config.h \
@@ -1281,9 +1278,9 @@ NeighborLB.o: NeighborLB.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h heap.h elements.h Set.h NeighborLB.h NborBaseLB.h \
   BaseLB.h NborBaseLB.decl.h NeighborLBMsg.h topology.h NeighborLB.decl.h \
   NeighborLB.def.h
@@ -1300,9 +1297,9 @@ NeighborCommLB.o: NeighborCommLB.C charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h heap.h elements.h Set.h NeighborCommLB.h NborBaseLB.h \
   BaseLB.h NborBaseLB.decl.h NeighborLBMsg.h topology.h \
   NeighborCommLB.decl.h NeighborCommLB.def.h
@@ -1319,9 +1316,9 @@ manager.o: manager.C manager.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
   cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h \
   CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h NullLB.decl.h BaseLB.decl.h CentralLB.decl.h \
   CentralLBMsg.h
 	$(CHARMC) -c -I. manager.C
@@ -1401,9 +1398,9 @@ blue_stub.o: blue_stub.C charm++.h charm.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h
 	$(CHARMC) -c -I. blue_stub.C
 
@@ -1425,18 +1422,18 @@ ComlibManager.o: ComlibManager.C ComlibManager.h charm++.h charm.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h comlib.h router.h convcomlibmanager.h \
-  ComlibStats.h comlib.decl.h EachToManyMulticastStrategy.h \
-  ComlibSectionInfo.h routerstrategy.h gridrouter.h petable.h \
-  graphrouter.h de.h treerouter.h 3dgridrouter.h \
-  DirectMulticastStrategy.h StreamingStrategy.h DummyStrategy.h \
-  MPIStrategy.h NodeMulticast.h MsgPacker.h register.h pup_cmialloc.h \
-  RingMulticastStrategy.h PipeBroadcastStrategy.h pipebroadcastconverse.h \
-  BroadcastStrategy.h MeshStreamingStrategy.h PrioStreaming.h qd.h \
-  CentralLB.h BaseLB.h CentralLB.decl.h CentralLBMsg.h comlib.def.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
+  comlib.decl.h EachToManyMulticastStrategy.h ComlibSectionInfo.h \
+  routerstrategy.h gridrouter.h petable.h graphrouter.h de.h treerouter.h \
+  3dgridrouter.h DirectMulticastStrategy.h StreamingStrategy.h \
+  DummyStrategy.h MPIStrategy.h NodeMulticast.h MsgPacker.h register.h \
+  pup_cmialloc.h RingMulticastStrategy.h PipeBroadcastStrategy.h \
+  pipebroadcastconverse.h BroadcastStrategy.h MeshStreamingStrategy.h \
+  PrioStreaming.h qd.h CentralLB.h BaseLB.h CentralLB.decl.h \
+  CentralLBMsg.h comlib.def.h
 	$(CHARMC) -c -I. ComlibManager.C
 
 MPIStrategy.o: MPIStrategy.C MPIStrategy.h ComlibManager.h charm++.h \
@@ -1451,11 +1448,10 @@ MPIStrategy.o: MPIStrategy.C MPIStrategy.h ComlibManager.h charm++.h \
   readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h \
   NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
   ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
-  ComlibLearner.h CkFutures.decl.h charisma.h charisma.decl.h tempo.h \
-  tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
+  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
+  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
-  envelope.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
-  comlib.decl.h
+  comlib.h router.h convcomlibmanager.h ComlibStats.h comlib.decl.h
 	$(CHARMC) -c -I. MPIStrategy.C
 
 StreamingStrategy.o: StreamingStrategy.C StreamingStrategy.h \
@@ -1470,11 +1466,11 @@ StreamingStrategy.o: StreamingStrategy.C StreamingStrategy.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h comlib.h router.h convcomlibmanager.h \
-  ComlibStats.h comlib.decl.h MsgPacker.h register.h pup_cmialloc.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
+  comlib.decl.h MsgPacker.h register.h pup_cmialloc.h
 	$(CHARMC) -c -I. StreamingStrategy.C
 
 DummyStrategy.o: DummyStrategy.C DummyStrategy.h ComlibManager.h \
@@ -1489,11 +1485,10 @@ DummyStrategy.o: DummyStrategy.C DummyStrategy.h ComlibManager.h \
   readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h \
   NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
   ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
-  ComlibLearner.h CkFutures.decl.h charisma.h charisma.decl.h tempo.h \
-  tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
+  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
+  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
-  envelope.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
-  comlib.decl.h
+  comlib.h router.h convcomlibmanager.h ComlibStats.h comlib.decl.h
 	$(CHARMC) -c -I. DummyStrategy.C
 
 NodeMulticast.o: NodeMulticast.C NodeMulticast.h ComlibManager.h \
@@ -1508,11 +1503,10 @@ NodeMulticast.o: NodeMulticast.C NodeMulticast.h ComlibManager.h \
   readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h \
   NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
   ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
-  ComlibLearner.h CkFutures.decl.h charisma.h charisma.decl.h tempo.h \
-  tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
+  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
+  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
-  envelope.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
-  comlib.decl.h
+  comlib.h router.h convcomlibmanager.h ComlibStats.h comlib.decl.h
 	$(CHARMC) -c -I. NodeMulticast.C
 
 EachToManyMulticastStrategy.o: EachToManyMulticastStrategy.C \
@@ -1527,13 +1521,13 @@ EachToManyMulticastStrategy.o: EachToManyMulticastStrategy.C \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h comlib.h router.h convcomlibmanager.h \
-  ComlibStats.h comlib.decl.h ComlibSectionInfo.h routerstrategy.h \
-  gridrouter.h petable.h graphrouter.h de.h treerouter.h 3dgridrouter.h \
-  AAPLearner.h AAMLearner.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
+  comlib.decl.h ComlibSectionInfo.h routerstrategy.h gridrouter.h \
+  petable.h graphrouter.h de.h treerouter.h 3dgridrouter.h AAPLearner.h \
+  AAMLearner.h
 	$(CHARMC) -c -I. EachToManyMulticastStrategy.C
 
 ComlibSectionInfo.o: ComlibSectionInfo.C ComlibManager.h charm++.h \
@@ -1548,11 +1542,11 @@ ComlibSectionInfo.o: ComlibSectionInfo.C ComlibManager.h charm++.h \
   readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h \
   NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
   ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
-  ComlibLearner.h CkFutures.decl.h charisma.h charisma.decl.h tempo.h \
-  tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
+  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
+  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
-  envelope.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
-  comlib.decl.h ComlibSectionInfo.h
+  comlib.h router.h convcomlibmanager.h ComlibStats.h comlib.decl.h \
+  ComlibSectionInfo.h
 	$(CHARMC) -c -I. ComlibSectionInfo.C
 
 AAPLearner.o: AAPLearner.C AAPLearner.h comlib.h converse.h conv-config.h \
@@ -1566,13 +1560,13 @@ AAPLearner.o: AAPLearner.C AAPLearner.h comlib.h converse.h conv-config.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h router.h ComlibManager.h envelope.h \
-  convcomlibmanager.h ComlibStats.h comlib.decl.h \
-  EachToManyMulticastStrategy.h ComlibSectionInfo.h routerstrategy.h \
-  gridrouter.h petable.h graphrouter.h de.h treerouter.h 3dgridrouter.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h router.h ComlibManager.h convcomlibmanager.h \
+  ComlibStats.h comlib.decl.h EachToManyMulticastStrategy.h \
+  ComlibSectionInfo.h routerstrategy.h gridrouter.h petable.h \
+  graphrouter.h de.h treerouter.h 3dgridrouter.h
 	$(CHARMC) -c -I. AAPLearner.C
 
 ComlibStats.o: ComlibStats.C ComlibStats.h charm++.h charm.h converse.h \
@@ -1586,11 +1580,11 @@ ComlibStats.o: ComlibStats.C ComlibStats.h charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h convcomlibmanager.h comlib.h router.h ComlibManager.h \
-  envelope.h comlib.decl.h
+  comlib.decl.h
 	$(CHARMC) -c -I. ComlibStats.C
 
 AAMLearner.o: AAMLearner.C AAMLearner.h ComlibManager.h charm++.h charm.h \
@@ -1604,11 +1598,11 @@ AAMLearner.o: AAMLearner.C AAMLearner.h ComlibManager.h charm++.h charm.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h comlib.h router.h convcomlibmanager.h \
-  ComlibStats.h comlib.decl.h AAPLearner.h EachToManyMulticastStrategy.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
+  comlib.decl.h AAPLearner.h EachToManyMulticastStrategy.h \
   ComlibSectionInfo.h routerstrategy.h gridrouter.h petable.h \
   graphrouter.h de.h treerouter.h 3dgridrouter.h RingMulticastStrategy.h \
   DirectMulticastStrategy.h
@@ -1625,12 +1619,11 @@ MsgPacker.o: MsgPacker.C MsgPacker.h charm++.h charm.h converse.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h ComlibManager.h comlib.h router.h \
-  convcomlibmanager.h ComlibStats.h comlib.decl.h register.h \
-  pup_cmialloc.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h ComlibManager.h comlib.h router.h convcomlibmanager.h \
+  ComlibStats.h comlib.decl.h register.h pup_cmialloc.h
 	$(CHARMC) -c -I. MsgPacker.C
 
 DirectMulticastStrategy.o: DirectMulticastStrategy.C \
@@ -1645,12 +1638,11 @@ DirectMulticastStrategy.o: DirectMulticastStrategy.C \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h comlib.h router.h convcomlibmanager.h \
-  ComlibStats.h comlib.decl.h ComlibSectionInfo.h AAMLearner.h \
-  AAPLearner.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
+  comlib.decl.h ComlibSectionInfo.h AAMLearner.h AAPLearner.h
 	$(CHARMC) -c -I. DirectMulticastStrategy.C
 
 RingMulticastStrategy.o: RingMulticastStrategy.C RingMulticastStrategy.h \
@@ -1665,11 +1657,11 @@ RingMulticastStrategy.o: RingMulticastStrategy.C RingMulticastStrategy.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h comlib.h router.h convcomlibmanager.h \
-  ComlibStats.h comlib.decl.h ComlibSectionInfo.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
+  comlib.decl.h ComlibSectionInfo.h
 	$(CHARMC) -c -I. RingMulticastStrategy.C
 
 PipeBroadcastStrategy.o: PipeBroadcastStrategy.C PipeBroadcastStrategy.h \
@@ -1684,11 +1676,11 @@ PipeBroadcastStrategy.o: PipeBroadcastStrategy.C PipeBroadcastStrategy.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h comlib.h router.h convcomlibmanager.h \
-  ComlibStats.h comlib.decl.h pipebroadcastconverse.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
+  comlib.decl.h pipebroadcastconverse.h
 	$(CHARMC) -c -I. PipeBroadcastStrategy.C
 
 MeshStreamingStrategy.o: MeshStreamingStrategy.C MeshStreamingStrategy.h \
@@ -1703,11 +1695,11 @@ MeshStreamingStrategy.o: MeshStreamingStrategy.C MeshStreamingStrategy.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h comlib.h router.h convcomlibmanager.h \
-  ComlibStats.h comlib.decl.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
+  comlib.decl.h pup_cmialloc.h MsgPacker.h register.h
 	$(CHARMC) -c -I. MeshStreamingStrategy.C
 
 PrioStreaming.o: PrioStreaming.C PrioStreaming.h ComlibManager.h \
@@ -1722,11 +1714,11 @@ PrioStreaming.o: PrioStreaming.C PrioStreaming.h ComlibManager.h \
   readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h \
   NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
   ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
-  ComlibLearner.h CkFutures.decl.h charisma.h charisma.decl.h tempo.h \
-  tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
+  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
+  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
-  envelope.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
-  comlib.decl.h StreamingStrategy.h MsgPacker.h register.h pup_cmialloc.h
+  comlib.h router.h convcomlibmanager.h ComlibStats.h comlib.decl.h \
+  StreamingStrategy.h MsgPacker.h register.h pup_cmialloc.h
 	$(CHARMC) -c -I. PrioStreaming.C
 
 BroadcastStrategy.o: BroadcastStrategy.C BroadcastStrategy.h \
@@ -1741,11 +1733,11 @@ BroadcastStrategy.o: BroadcastStrategy.C BroadcastStrategy.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h comlib.h router.h convcomlibmanager.h \
-  ComlibStats.h comlib.decl.h
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h comlib.h router.h convcomlibmanager.h ComlibStats.h \
+  comlib.decl.h
 	$(CHARMC) -c -I. BroadcastStrategy.C
 
 gridrouter.o: gridrouter.C gridrouter.h converse.h conv-config.h \
@@ -1759,10 +1751,10 @@ gridrouter.o: gridrouter.C gridrouter.h converse.h conv-config.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
   cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h NullLB.decl.h \
   BaseLB.decl.h CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h \
-  ComlibStrategy.h convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h \
-  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
-  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h router.h petable.h
+  ComlibStrategy.h convcomlibstrategy.h ComlibLearner.h envelope.h \
+  CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
+  waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
+  ckarrayreductionmgr.h trace.h trace-bluegene.h router.h petable.h
 	$(CHARMC) -c -I. gridrouter.C
 
 de.o: de.C de.h converse.h conv-config.h conv-common.h conv-mach.h \
@@ -1776,9 +1768,9 @@ de.o: de.C de.h converse.h conv-config.h conv-common.h conv-mach.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h router.h petable.h
 	$(CHARMC) -c -I. de.C
 
@@ -1793,10 +1785,10 @@ treerouter.o: treerouter.C treerouter.h converse.h conv-config.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
   cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h NullLB.decl.h \
   BaseLB.decl.h CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h \
-  ComlibStrategy.h convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h \
-  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
-  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h router.h petable.h
+  ComlibStrategy.h convcomlibstrategy.h ComlibLearner.h envelope.h \
+  CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
+  waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
+  ckarrayreductionmgr.h trace.h trace-bluegene.h router.h petable.h
 	$(CHARMC) -c -I. treerouter.C
 
 petable.o: petable.C converse.h conv-config.h conv-common.h conv-mach.h \
@@ -1810,9 +1802,9 @@ petable.o: petable.C converse.h conv-config.h conv-common.h conv-mach.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h router.h petable.h
 	$(CHARMC) -c -I. petable.C
 
@@ -1827,10 +1819,10 @@ petable.o: petable.C converse.h conv-config.h conv-common.h conv-mach.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
   cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h NullLB.decl.h \
   BaseLB.decl.h CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h \
-  ComlibStrategy.h convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h \
-  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
-  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h router.h petable.h
+  ComlibStrategy.h convcomlibstrategy.h ComlibLearner.h envelope.h \
+  CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
+  waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
+  ckarrayreductionmgr.h trace.h trace-bluegene.h router.h petable.h
 	$(CHARMC) -c -I. 3dgridrouter.C
 
 graphrouter.o: graphrouter.C graphrouter.h converse.h conv-config.h \
@@ -1844,10 +1836,11 @@ graphrouter.o: graphrouter.C graphrouter.h converse.h conv-config.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
   cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h NullLB.decl.h \
   BaseLB.decl.h CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h \
-  ComlibStrategy.h convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h \
-  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
-  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h router.h petable.h hypercubetopology.h
+  ComlibStrategy.h convcomlibstrategy.h ComlibLearner.h envelope.h \
+  CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
+  waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
+  ckarrayreductionmgr.h trace.h trace-bluegene.h router.h petable.h \
+  hypercubetopology.h
 	$(CHARMC) -c -I. graphrouter.C
 
 hypercubetopology.o: hypercubetopology.C hypercubetopology.h \
@@ -1862,9 +1855,9 @@ hypercubetopology.o: hypercubetopology.C hypercubetopology.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
   CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h CkFutures.decl.h charisma.h \
-  charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
-  ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h router.h petable.h
 	$(CHARMC) -c -I. hypercubetopology.C
 
@@ -1880,8 +1873,8 @@ routerstrategy.o: routerstrategy.C routerstrategy.h convcomlibmanager.h \
   readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h \
   NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
   ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
-  ComlibLearner.h CkFutures.decl.h charisma.h charisma.decl.h tempo.h \
-  tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
+  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
+  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
   router.h gridrouter.h petable.h graphrouter.h de.h treerouter.h \
   3dgridrouter.h
@@ -1899,8 +1892,8 @@ convcomlibmanager.o: convcomlibmanager.C convcomlibmanager.h converse.h \
   readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h \
   NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
   ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
-  ComlibLearner.h CkFutures.decl.h charisma.h charisma.decl.h tempo.h \
-  tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
+  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
+  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
   router.h routerstrategy.h gridrouter.h petable.h graphrouter.h de.h \
   treerouter.h 3dgridrouter.h
@@ -1918,9 +1911,9 @@ pipebroadcastconverse.o: pipebroadcastconverse.C pipebroadcastconverse.h \
   readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h \
   NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
   ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
-  ComlibLearner.h CkFutures.decl.h charisma.h charisma.decl.h tempo.h \
-  tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
+  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
+  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
-  envelope.h convcomlibmanager.h comlib.h router.h
+  convcomlibmanager.h comlib.h router.h
 	$(CHARMC) -c -I. pipebroadcastconverse.C
 
