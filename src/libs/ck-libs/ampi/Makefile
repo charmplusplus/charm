@@ -65,7 +65,7 @@ ampif.o: ampif.C $(HEADDEP)
 ampi.decl.h ampi.def.h: ampi.ci
 	$(CHARMC) ampi.ci
 
-ampiProjections.o: ampiProjections.C ampiEvents.h ampiProjections.h
+ampiProjections.o: ampiProjections.C ampiEvents.h ampiProjections.h $(HEADDEP)
 	$(CHARMC) -c ampiProjections.C
 
 clean: 
