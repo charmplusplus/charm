@@ -104,12 +104,16 @@ THRESHOLD  *threshold;
             }
 
 
-	else if (!strcmp(key,"broadcast_flag"))
-	    sscanf(line,"%s %d",gunk,&num->broadcast_flag);
-
-	else if (!strcmp(key,"latency"))
+	else if (!strcmp(key,"latency_fixed"))
+            num->latency_flag = 0;
 	    sscanf(line,"%s %d %le %le",gunk,&num->latency_flag,
 		   &num->latency_argv1, &num->latency_argv2);
+
+        else if (!strcmp(key,"latency_rand"))
+            {
+            num->latency_flag = 1;
+            sscanf(line,"%s %le",gunk,&num->latency_argv1);
+            }
 
 	else if (!strcmp(key,"processor_scale")) {
 	    sscanf(line,"%s %le",gunk,&num->processor_scale) ;
