@@ -18,12 +18,12 @@ static void memAbort(const char *err, void *ptr)
 {
 #if 1
 /*Parallel version*/
-	CmiPrintf("[%d] memory-wary> FATAL HEAP ERROR!  %s (block %p)\n",
+	CmiPrintf("[%d] memory-paranoid> FATAL HEAP ERROR!  %s (block %p)\n",
 		CmiMyPe(),err,ptr);
-	CmiAbort("memory-wary> FATAL HEAP ERROR");
+	CmiAbort("memory-paranoid> FATAL HEAP ERROR");
 #else
 /*Simple printf version*/
-	fprintf(stderr,"memory-wary> FATAL HEAP ERROR!  %s (block %p)\n",
+	fprintf(stderr,"memory-paranoid> FATAL HEAP ERROR!  %s (block %p)\n",
 		err,ptr);
 	fflush(stdout);fflush(stderr);
 	abort();
@@ -247,7 +247,7 @@ static void meta_init(char **argv)
     status(" phaseflip");
     memory_fillphase=1;
   }
-  if (CmiGetArgInt(argv,"+memory_verbose")) {
+  if (CmiGetArgFlag(argv,"+memory_verbose")) {
     status(" verbose");
     memory_verbose=1;
   }  
