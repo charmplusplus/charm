@@ -9,12 +9,15 @@ Orion Sky Lawlor, olawlor@acm.org, 8/28/2002
 #include "converse.h"
 #include "lv3d0.h"
 #include <string.h>
+#include <algorithm> /* for std::max and min */
 #include "stats.h"
 
 // Only include OpenGL utility routines if we're on the client.
 #ifdef CMK_LIVEVIZ3D_CLIENT
+#  include "ogl/ext.h"
 #  include "ogl/main.h"
 #  include "ogl/util.h"
+#  include "ogl/liltex.h"
 #  include "lv3dclient/stats.h"
 #endif
 
@@ -169,14 +172,17 @@ void CkQuadView::pup(PUP::er &p) {
 	if (p.isUnpacking()) { /* immediately upload image to OpenGL */
 		CkAllocImage *img=x_tex.getImage();
 		oglTextureFormat_t fmt=oglImageFormat(*img);
-		c_tex=new oglTexture(img->getData(),x_tex.gl_w,x_tex.gl_h,
-			oglTexture_mipmap, fmt.format,fmt.type);
+		c_tex=new oglLilTex(img->getData(),x_tex.gl_w,x_tex.gl_h,
+			fmt.format,fmt.type);
 		stats::get()->add(x_tex.w*x_tex.h,op_upload_pixels);
 		stats::get()->add(x_tex.gl_w*x_tex.gl_h,op_uploadpad_pixels);
+		/// Scale texture coordinates from the partial image to OpenGL fractions:
 		double tx=x_tex.w/(double)x_tex.gl_w;
 		double ty=x_tex.h/(double)x_tex.gl_h;
 		for (int i=0;i<nCorners;i++) 
-			texCoord[i]=CkVector3d(tx*texCoord[i].x,ty*texCoord[i].y,texCoord[i].z);
+			texCoord[i]=c_tex->texCoord(
+				CkVector3d(tx*texCoord[i].x,ty*texCoord[i].y,texCoord[i].z)
+			);
 		
 		//Now that we've copied the view into GL, 
 		// flush the old in-memory copy:
@@ -191,26 +197,70 @@ CkQuadView::~CkQuadView() {
 #endif
 }
 
-void CkQuadView::render(double alpha) {
-#ifndef CMK_LIVEVIZ3D_CLIENT
-	CkAbort("CkQuadView::render should never be called on server!\n");
-#else
-	glColor4f(1.0,1.0,1.0,alpha);
-	
-	/*
-	CkVector3d &bl=corners[0];
-	CkVector3d &br=corners[1];
-	CkVector3d &tl=corners[2];
-	CkVector3d &tr=corners[3];
-	oglTextureQuad(*c_tex,tl,tr,bl,br);
-	*/
+/* Render us using the current color and texture state */
+void CkQuadView::render(void) {
+#ifdef CMK_LIVEVIZ3D_CLIENT
 	c_tex->bind();
-	glEnable(GL_TEXTURE_2D);
 	glBegin (nCorners==4?GL_QUADS:GL_TRIANGLE_STRIP);
 	for (int i=0;i<nCorners;i++) {
 		glTexCoord2dv(texCoord[i]); glVertex3dv(corners[i]); 
 	}
 	glEnd();
+#endif
+}
+
+/** "Ease" function */
+static double smooth(double lin) {
+	if (lin<0) return 0;
+	if (lin>1) return 1;
+	// return lin; // linear ease
+	if (lin<0.5) return lin*lin;
+	else return 1-(1-lin)*(1-lin);
+}
+
+void CkQuadView::render(double alpha,CkView *v_old) {
+#ifndef CMK_LIVEVIZ3D_CLIENT
+	CkAbort("CkQuadView::render should never be called on server!\n");
+#else
+	glEnable(GL_TEXTURE_2D);
+	CkQuadView *old=(CkQuadView *)v_old; // FIXME: what if he's not a quadview?
+	
+	if (old==NULL || old->nCorners!=nCorners || alpha>0.99) 
+	{ /* just draw us */
+		glColor4f(1.0,1.0,1.0,1.0);
+		render();
+	} 
+	else 
+	{ /* have old, and need to blend with him. */
+#if 0 /* use multitexture: needs to have same corners (which sucks) */
+		c_tex->bind(); // we're in texture unit 0
+		glActiveTextureARB(GL_TEXTURE1_ARB);
+		old->c_tex->bind(); // he's in texture unit 1
+		glEnable(GL_TEXTURE_2D);
+		oglTextureCombineLinear(1.0-alpha);
+		glBegin (nCorners==4?GL_QUADS:GL_TRIANGLE_STRIP);
+		for (int i=0;i<nCorners;i++) {
+			glMultiTexCoord2dvARB(GL_TEXTURE0_ARB,texCoord[i]); 
+			glMultiTexCoord2dvARB(GL_TEXTURE1_ARB,old->texCoord[i]);
+			glVertex3dv(alpha*corners[i]+(1-alpha)*old->corners[i]); 
+		}
+		glEnd();
+		glDisable(GL_TEXTURE_2D);
+		glActiveTextureARB(GL_TEXTURE0_ARB);
+#else /* draw two copies: first him, then me. */
+		double separation=1.3;
+		float of=smooth(separation*(1-alpha));
+		glColor4f(of,of,of,of);
+		old->render();
+		
+		float nf=smooth(separation*alpha);
+		glColor4f(nf,nf,nf,nf);
+		render();
+		
+		glColor4f(1.0,1.0,1.0,1.0);
+#endif
+	}
+	
 	
 	if (oglToggles['f']) 
 	{ // Draw a little frame around this texture
@@ -297,6 +347,10 @@ CkInterestView::CkInterestView(int wid,int ht,int n_colors,
 	corners[1]=univ2texture.viewplane(CkVector3d(wid, 0, 0));
 	corners[2]=univ2texture.viewplane(CkVector3d(wid,ht, 0));
 	corners[3]=univ2texture.viewplane(CkVector3d(0  ,ht, 0));
+	int cx=wid/2, cy=ht/2;
+	projC=univ2texture.viewplane(CkVector3d(cx  ,cy  , 0));
+	projX=univ2texture.viewplane(CkVector3d(cx+1,cy  , 0));
+	projY=univ2texture.viewplane(CkVector3d(cx  ,cy+1, 0));
 	texCoord[0]=CkVector3d(0,0,0);
 	texCoord[1]=CkVector3d(1,0,0);
 	texCoord[2]=CkVector3d(1,1,0);
@@ -329,6 +383,17 @@ double CkInterestView::maxError(const CkViewpoint &univ2screen) const
 	}
 	return sqrt(max);
 }
+/// Return the ratio between our projected screen resolution
+///   and our current texture resolution.
+double CkInterestView::resRatio(const CkViewpoint &univ2screen) const
+{
+	CkVector2d c=univ2screen.project_noz(projC);
+	CkVector2d x=univ2screen.project_noz(projX);
+	CkVector2d y=univ2screen.project_noz(projY);
+	double lx=(x-c).mag(), ly=(y-c).mag(); // new screen projections of our texture axes
+	if (lx<1.0 && ly<1.0) return std::min(lx,ly);
+	else return std::max(lx,ly);
+}
 
 /********************* InterestViewable *************/
 /**
@@ -337,9 +402,17 @@ double CkInterestView::maxError(const CkViewpoint &univ2screen) const
  */
 bool CkInterestViewable::shouldRender(const CkViewpoint &univ2screen,const CkView &oldView)
 {
-	double rmsTol=0.5; // RMS reprojection error tolerance, in pixels
-	double rmsErr=((CkInterestView *)&oldView)->rmsError(univ2screen);
-	// printf("RMS error is %.1f pixels\n",rmsErr);
+	CkInterestView *v=(CkInterestView *)&oldView;
+	// Check if old resolution is now inadequate
+	double resMax=2.0; // under-resolution tolerance, as a resolution ratio
+	double resMin=0.3; // over-resolution tolerance
+	double res=v->resRatio(univ2screen);
+	if (res>resMax) return true;
+	if (res<resMin) return true;
+	
+	// Check geometric reprojection error
+	double rmsTol=1.0; // RMS reprojection error tolerance, in screen pixels
+	double rmsErr=v->rmsError(univ2screen);
 	return rmsErr>rmsTol;
 }
 
@@ -351,6 +424,7 @@ bool CkInterestViewable::shouldRender(const CkViewpoint &univ2screen,const CkVie
  */
 CkView *CkInterestViewable::renderView(const CkViewpoint &univ2screen) {
 	CkViewpoint univ2texture;
+	priorityAdjust=0; /* no priority */
 	if (!newViewpoint(univ2screen,univ2texture))
 		return NULL;
 	CkInterestView *ret=new CkInterestView(
@@ -372,16 +446,12 @@ bool CkInterestViewable::newViewpoint(const CkViewpoint &univ2screen,CkViewpoint
 	CkRect clipR; clipR.empty();
 	for (int i=0;i<interest.size();i++) { //Screen-project this interest point
 		CkVector3d s(univ2screen.project(interest[i]));
-		if (s.z<=0) continue; // Just ignore behind-the-viewer points
+		if (!(s.z>0)) continue; // Just ignore behind-the-viewer points
 		// return false;
 		r.add((int)s.x,(int)s.y);
 		univ2screen.clip(s);
 		clipR.add((int)s.x,(int)s.y);
 	}
-	/*
-	if (r.area()>4096*4096)
-		CmiAbort("liveViz3d> Absurdly large projected screen rectangle!");
-	*/
 	if (clipR.area()<2) return false;
 	
 	if (r.l==r.r) r.r++; /* enlarge vertical sliver */
@@ -410,7 +480,7 @@ bool CkInterestViewable::newViewpoint(const CkViewpoint &univ2screen,CkViewpoint
 	const CkVector3d &E=univ2screen.getEye();
 	double eyeCenter=(center-E).mag();
 	double eyeViewplane=(univ2screen.projectViewplane(center)-E).mag();
-	double perspectiveScale=eyeCenter/eyeViewplane;
+	double perspectiveScale=eyeCenter/(1.0e-10+eyeViewplane);
 	// printf("PerspectiveScale=%f\n",perspectiveScale);
 	
 	// New axes are just scaled versions of old axes:
@@ -432,6 +502,17 @@ bool CkInterestViewable::newViewpoint(const CkViewpoint &univ2screen,CkViewpoint
 	CkVector3d R=perspectiveScale*(univ2screen.viewplane(CkVector3d(r.l,r.t,0))-E)+E
 		-inset*X-inset*Y;
 	univ2texture=CkViewpoint(E,R,X,Y,wid,ht);
+	
+	if (1) {
+	/// Set priority:
+	// const static double distCutoff=10.0;
+	priorityAdjust=(int)(
+		std::max(wid,ht)*(1.0/1.0) /* area boost */
+		// +1.0/std::max(eyeCenter,distCutoff)*(50.0/distCutoff) /* nearness boost */
+		// +(r==clipR)*20.0 /* fully onscreen boost */
+	);
+	}
+	
 	return true;
 }
 

@@ -130,16 +130,14 @@ public:
 	CkViewpoint(const CkVector3d &E_,const CkVector3d &R_,CkVector3d Y_=CkVector3d(0,1,1.0e-8));
 	
 	/// Build a camera at eye point E for view plane with origin R
-	///  and X and Y as pixel sizes.  Note X and Y must be orthogonal.
-	/// This is a difficult-to-use, but completely general routine.
+	///  and X and Y as pixel sizes.  
 	CkViewpoint(const CkVector3d &E_,const CkVector3d &R_,
 		const CkVector3d &X_,const CkVector3d &Y_,int w,int h);
 	
 	/**
 	  Build an orthogonal camera for a view plane with origin R
 	   and X and Y as pixel sizes, and the given Z axis.
-	  This is a difficult-to-use, but completely general routine.
-	  For an orthongonal camera (yesThisIsPerspective==false),
+	  For a parallel-projection camera (yesThisIsPerspective==false) and
 	    project(R_+x*X_+y*Y_+z*Z_) = (x,y,z)
 	*/
 	CkViewpoint(const CkVector3d &R_,
@@ -286,6 +284,13 @@ public:
 			return CkRay(getEye(),viewplane(screen)-getEye());
 		else /* orthogonal camera */
 			return CkRay(viewplane(screen)-1000.0*Z, Z);
+	}
+	/// Get a universe-coords vector pointing to the camera from this point
+	CkVector3d toCamera(const CkVector3d &pt) const {
+		if (isPerspective)
+			return getEye()-pt;
+		else /* parallel projection */
+			return Z;
 	}
 	
 	//Return true if this screen location is (entirely) in-bounds:

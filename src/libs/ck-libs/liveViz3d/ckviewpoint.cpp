@@ -18,9 +18,18 @@ inline bool orthogonal(const CkVector3d &a,const CkVector3d &b) {
 
 /// Fill our projection matrix m with values from E, R, X, Y, Z
 void CkViewpoint::buildM(void) {
-	// if (!(orthogonal(X,Y) && orthogonal(Y,Z) && orthogonal(X,Z)))
-	//	osl::bad("Camera axes are non-orthogonal");
+	/**
+	  Want project(R+x*X+y*Y+z*Z) = (x,y,z).
+	    so, e.g.,
+	    	(x*X+y*Y+z*Z) dot sX = x
+	    so sX should be orthogonal to Y and Z, and
+	    have magnitude such that X dot sX = 1.
+	*/
+	CkVector3d sX=Y.cross(Z); sX*=1.0/X.dot(sX);
+	CkVector3d sY=X.cross(Z); sY*=1.0/Y.dot(sY);	
 	
+	if (isPerspective) 
+	{
 	/*
 	  The projection matrix derivation begins by postulating
 	  a universe point P, which we need to project into the view plane.
@@ -28,13 +37,8 @@ void CkViewpoint::buildM(void) {
 	  some parameter value t, and also Z.dot(S-R)=0.
 	  Solving this and taking screen_x=sX.dot(S-R), screen_y=sY.dot(S-R),
 	  and screen_z=Z.dot(R-E)/Z.dot(P-E) leads to our matrix.
-	 */
-	
-	if (isPerspective) 
-	{
-		// Scale X and Y so screen pixels==sX.dot(S)
-		CkVector3d sX=X/X.magSqr();
-		CkVector3d sY=Y/Y.magSqr();
+	 */		
+		
 		// Compute skew factors and skewed axes
 		double skew_x=sX.dot(R-E), skew_y=sY.dot(R-E), skew_z=Z.dot(R-E);
 		CkVector3d gX=skew_x*Z-skew_z*sX;
@@ -48,15 +52,6 @@ void CkViewpoint::buildM(void) {
 	}
 	else /* orthographic projection */
 	{
-		/**
-		  Want project(R+x*X+y*Y+z*Z) = (x,y,z).
-		    so, e.g.,
-		    	(x*X+y*Y+z*Z) dot sX = x
-		    so sX should be orthogonal to Y and Z, and
-		    have magnitude such that X dot sX = 1.
-		*/
-		CkVector3d sX=Y.cross(Z); sX*=1.0/X.dot(sX);
-		CkVector3d sY=X.cross(Z); sY*=1.0/Y.dot(sY);
 		CkVector3d sZ=X.cross(Y); sZ*=1.0/Z.dot(sZ);
 		m(0,0)=sX.x; m(0,1)=sX.y; m(0,2)=sX.z; m(0,3)=-sX.dot(R); 
 		m(1,0)=sY.x; m(1,1)=sY.y; m(1,2)=sY.z; m(1,3)=-sY.dot(R); 
@@ -89,16 +84,12 @@ CkViewpoint::CkViewpoint(const CkVector3d &E_,const CkVector3d &R_,CkVector3d Y_
 }
 
 /// Build a camera at eye point E for view plane with origin R
-///  and X and Y as pixel sizes.  Note X and Y must be orthogonal.
+///  and X and Y as pixel sizes. 
 CkViewpoint::CkViewpoint(const CkVector3d &E_,const CkVector3d &R_,
 	const CkVector3d &X_,const CkVector3d &Y_,int w,int h)
 	:E(E_), R(R_), X(X_), Y(Y_), wid(w), ht(h)
 {
 	isPerspective=true;
-	/*
-	if (!orthogonal(X,Y))
-		CmiAbort("Non-orthogonal X and Y passed to Camera::Camera");
-	*/
 	Z=X.cross(Y).dir();
 	buildM();
 }

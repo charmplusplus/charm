@@ -30,7 +30,7 @@ public:
 		void *obj;
 		while (NULL!=(obj=it->next())) {
 			CkView *v=*(CkView **)obj;
-			v->render(1.0);
+			v->render(1.0,0);
 		}
 		delete it;
 #endif

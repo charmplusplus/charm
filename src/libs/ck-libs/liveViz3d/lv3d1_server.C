@@ -22,7 +22,7 @@ class impl_LV3D_Array {
 	
 // All this state should be per-client:
 	CkView *view; // Should be per-viewable
-	// Throw out old views
+	// Throw out old views, and allow new render request
 	void flush(void) {
 		if (view) view->unref();
 		view=NULL;
@@ -94,9 +94,8 @@ public:
 			renderRequested=true;
 			renderUpdate(m);
 			
-			int prioAdj=0;
 			LV3D_RenderMsg *rm= LV3D_RenderMsg::new_(
-				m->clientID,m->frameID,0,prioAdj);
+				m->clientID,m->frameID,0,viewable->priorityAdjust);
 			array->thisProxy[array->thisIndexMax].LV3D_Render(rm);
 		  }
 		}
@@ -107,12 +106,14 @@ public:
 	*/
 	void render(LV3D_RenderMsg *m) {
 	status("Rendering...\n");
-		flush();
 		CkView *v=viewable->renderView(renderViewpoint);
+		flush(); /* subtle: otherwise a NULL-returning render never updates again! */
 		if (v) {
 			view=v;
 			view->id=makeViewableID(0);
-			view->prio=renderFrameID-m->prioAdj;
+			
+#define BUILD_PRIO(adj,frame) (0xC0000000u-(adj)+(frame))
+			view->prio=BUILD_PRIO(viewable->priorityAdjust,renderFrameID);
 			LV3D0_Deposit(view,m->clientID);
 		}
 		LV3D_RenderMsg::delete_(m);
@@ -244,23 +245,32 @@ skipit:/* nothing to show: deposit empty image (so reduction completes) */
  Simple map that stays away from PE 0.
 */
 class LV3D1_Map : public CkArrayMap {
+	unsigned int shiftPE, numPE;
+	void init(void) {
+		shiftPE=0;
+		numPE=CkNumPes();
+		if (numPE>1) {
+			shiftPE=1; /* don't put anything on PE 1 */
+			numPE-=shiftPE;
+		}
+	}
 public:
-	LV3D1_Map() {}
-	LV3D1_Map(CkMigrateMessage *m):CkArrayMap(m){}
+	LV3D1_Map() {init();}
+	LV3D1_Map(CkMigrateMessage *m):CkArrayMap(m){init();}
   
   int procNum(int arrayHdl, const CkArrayIndex &i)
   {
 #if 1
     if (i.nInts==1) {
       //Map 1D integer indices in simple round-robin fashion
-      return 1+((i.data()[0])%(CkNumPes()-1));
+      return shiftPE+((i.data()[0])%numPE);
     }
     else 
 #endif
       {
         //Map other indices based on their hash code, mod a big prime.
         unsigned int hash=(i.hash()+739)%1280107;
-        return 1+(hash % (CkNumPes()-1));
+        return shiftPE+(hash % numPE);
       }
   }
 };
@@ -283,7 +293,7 @@ LV3D_RenderMsg *LV3D_RenderMsg::new_(
 	m->viewableID=viewable;
 	m->prioAdj=prioAdj;
 	unsigned int *p=(unsigned int *)CkPriorityPtr(m);
-	p[0]=0x80000000u+(frame-prioAdj);
+	p[0]=BUILD_PRIO(prioAdj,frame);
 	if (LV3D_Disable_Render_Prio) p[0]=0;
 	CkSetQueueing(m,CK_QUEUEING_BFIFO);
 	return m;

@@ -100,9 +100,10 @@ public:
 	CkViewableID id;
 	const CkViewableID &getViewable(void) const {return id;}
 	
-	/// This is our approximate network priority. Prio==0 is highest.
+	/// This is our approximate network priority. 
+	///  Lower numbers mean higher priority.  Prio==0 is highest.
 	///  This field is set by LiveViz3dArray, not CkViewable.
-	int prio;
+	unsigned int prio;
 	
 	/// The number of pixels we represent.
 	int pixels;
@@ -117,12 +118,17 @@ public:
 	/// (CLIENT AND SERVER).
 	virtual void pup(PUP::er &p);
 	
-	/// Render our image to the current OpenGL context.
-	///  So the server can link without OpenGL, all OpenGL 
-	///   calls made by this routine should be protected 
-	///   by an ifdef CMK_LIVEVIZ3D_CLIENT
-	///  (CLIENT ONLY)
-	virtual void render(double alpha) =0;
+	/**
+	  Render our image to the current OpenGL context.
+	  Use "alpha" fraction of your own pixels; "1-alpha" 
+	  fraction of the "old" pixels.  "old" may be NULL.
+	  
+	  (CLIENT ONLY)
+	  So the server can link without OpenGL, all OpenGL 
+	   calls made by this routine should be protected 
+	   by an ifdef CMK_LIVEVIZ3D_CLIENT
+	*/
+	virtual void render(double alpha,CkView *old) =0;
 };
 
 /// Call this routine once per node at startup--
@@ -134,7 +140,13 @@ void CkViewNodeInit(void);
  */
 class CkViewable {
 public:
+	CkViewable() :priorityAdjust(0) {}
 	virtual ~CkViewable();
+
+	/// Priority adjustment for re-rendering.
+	///   This starts out at 0, but should be made more and more
+	///   positive for more and more important views.
+	int priorityAdjust;
 	
 	/**
 	 * Return true if this object needs to be redrawn,
@@ -172,7 +184,7 @@ public:
 
 /***************** Basic Implementations **************/
 
-class oglTexture; // Forward declaration-- defined in oglutil.h on client
+class oglLilTex; // Forward declaration-- defined in ogl/liltex.h on client
 
 /**
  Performs a simple zero-encoding of blank image pixels
@@ -241,14 +253,15 @@ public:
 
 // (CLIENT ONLY)
 private:
-	oglTexture *c_tex;
+	oglLilTex *c_tex;
+	void render(void);
 public:
 	/// Migration constructor-- prepare for pup.
 	/// (CLIENT ONLY)
 	CkQuadView(CkMigrateMessage *m);
 	
-	inline const oglTexture *getTexture(void) const {return c_tex;}
-	virtual void render(double alpha);
+	inline const oglLilTex *getTexture(void) const {return c_tex;}
+	virtual void render(double alpha,CkView *old);
 };
 
 
@@ -321,6 +334,8 @@ class CkInterestView : public CkQuadView {
 	CkInterestSet univ;
 	//These are the texture-projected locations of the interest points:
 	CkInterestSet proj;
+	/// World location of texture center, X, and Y axes. 
+	CkVector3d projC,projX,projY;
 
 	//Return the squared projection error (pixels) of point i:
 	double sqrError(int i,const CkViewpoint &univ2screen) const
@@ -335,6 +350,10 @@ public:
 	CkInterestView(int w,int h,int n_colors,
 		const CkInterestSet &univ_,
 		const CkViewpoint &univ2texture);
+	
+	/// Return the ratio between our projected screen resolution
+	///   and our current texture resolution.
+	double resRatio(const CkViewpoint &univ2screen) const;
 	
 	/// Evaluate the root-mean-square error, in pixels, between the
 	/// projection of our texture and the projection of the true object.
@@ -362,6 +381,7 @@ class CkInterestViewable : public CkViewable {
 	CkInterestSet interest; ///< Our 3D interest points
 	CkVector3d center; ///< Our 3D "center point", through which our impostor plane must pass
 protected:
+	/// Subclasses MUST call this from their constructors or pup routines.
 	void setUnivPoints(const CkInterestSet &univPoints_) {
 		interest=univPoints_;
 		center=interest.getMean();
