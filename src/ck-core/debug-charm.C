@@ -170,6 +170,7 @@ CpvExtern(char *, displayArgument);
 
 void CpdStartGdb(void)
 {
+#if !defined(_WIN32) || defined(__CYGWIN__)
   FILE *f;
   char gdbScript[200];
   int pid;
@@ -209,6 +210,7 @@ void CpdStartGdb(void)
 
       }
     }
+#endif
 }
 
 
