@@ -1,0 +1,19 @@
+message TeamData;
+message WorkerData;
+message SmallWorkMsg;
+message MediumWorkMsg;
+message LargeWorkMsg;
+
+poser team : sim adapt chpt {
+  entry team(TeamData *);
+  // Event methods
+  entry void addWorker(WorkerData *);
+  entry [event] void start(eventMsg *em);
+  entry [event] void workSmall(SmallWorkMsg *);
+  entry [event] void workMedium(MediumWorkMsg *);
+  entry [event] void workLarge(LargeWorkMsg *);
+};
+
+
+
+
