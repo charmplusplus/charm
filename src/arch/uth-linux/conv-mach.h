@@ -16,23 +16,17 @@
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 #define CMK_CMIPRINTF_IS_JUST_PRINTF                       1
 
-
 #define CMK_GETPAGESIZE_AVAILABLE                          0
 
 #define CMK_HANDLE_SIGUSR                                  1
 
 #define CMK_IS_HETERO                                      0
 
-
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             1
-
-#define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
-#define CMK_MSG_HEADER_EXT    { CmiUInt2 hdl,xhdl,info,d3; }
-#define CMK_MSG_HEADER_BLUEGENE    { CmiUInt2 hdl,xhdl,info,d3; int nd, n; double rt; CmiInt2 tID; CmiUInt2 hID; char t; int msgID; int srcPe;}
 
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
@@ -61,8 +55,6 @@
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
 #define CMK_SPANTREE_USE_SPECIAL_CODE                      0
 
-
-
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         1
@@ -88,10 +80,7 @@
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
-
 #define CMK_CONDS_USE_SPECIAL_CODE                         1
-
-#define CMK_LBDB_ON					   0
 
 #endif
 
