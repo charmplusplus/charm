@@ -66,7 +66,7 @@ class PairCalculator: public CBase_PairCalculator {
   PairCalculator(bool, int, int, int, int op1, FuncType fn1, int op2, FuncType fn2, CkCallback cb, CkGroupID gid);
   PairCalculator(CkMigrateMessage *);
   ~PairCalculator();
-  void calculatePairs(int, complex *, int, bool); 
+  void calculatePairs(int, complex *, int, bool, bool); 
   void acceptEntireResult(int size, double *matrix);
   void acceptEntireResult(int size, double *matrix, CkCallback cb);
   void acceptResult(int size, double *matrix, int rowNum, CkCallback cb);

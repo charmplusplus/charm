@@ -14,9 +14,10 @@ class PairCalcID {
   int instid;
   CkGroupID dmid;
   bool useComlib;
+  bool isDoublePacked;
   PairCalcID() {}
   ~PairCalcID() {}
-  void Init(CkArrayID aid, CkGroupID gid, int grain, int blk, int s, bool sym, bool _useComlib, int _instid, CkGroupID _dmid) {
+  void Init(CkArrayID aid, CkGroupID gid, int grain, int blk, int s, bool sym, bool _useComlib, int _instid, CkGroupID _dmid, bool _dp) {
     Aid = aid;
     Gid = gid;
     GrainSize = grain;
@@ -26,6 +27,7 @@ class PairCalcID {
     useComlib = _useComlib;
     instid = _instid; 
     dmid = _dmid; 
+    isDoublePacked = _dp;
   }
   void pup(PUP::er &p) {
     p|Aid;
@@ -37,10 +39,11 @@ class PairCalcID {
     p|instid;
     p|dmid;
     p|useComlib;
+    p|isDoublePacked;
   }
 };
 
-extern "C" void createPairCalculator(bool sym, int w, int grainSize, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, const CkCallback cb, PairCalcID* aid, int flag=0, CkGroupID *gid = 0);
+extern "C" void createPairCalculator(bool sym, int w, int grainSize, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, const CkCallback cb, PairCalcID* aid, int flag=0, CkGroupID *gid = 0, int flag_dp=0);
 
 void startPairCalcLeft(PairCalcID* aid, int n, complex* ptr, int myS, int myZ);
 

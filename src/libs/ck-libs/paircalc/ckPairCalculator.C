@@ -123,7 +123,7 @@ PairCalculator::~PairCalculator()
 }
 
 void
-PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromRow)
+PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromRow, bool flag_dp)
 {
 #ifdef _DEBUG_
   CkPrintf("     pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, symm=%d, from=%d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, sender, size, symmetric, fromRow);
@@ -225,6 +225,13 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
       kRightCount=0;
       kLeftMark=kLeftOffset;
       kRightMark=kRightOffset;
+      if (flag_dp) {
+	  if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
+	      for (int i = 0; i < grainSize*grainSize; i++)
+		  outData[i] *= 2.0;
+	  }
+      }
+
       //r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
       //r.contribute(this, sparse_sum_double);
       
@@ -274,13 +281,12 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
                                                                inDataRight[j]+size1, op1);      
         }
     }
-#if 0
+    if (flag_dp) {
     if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
 	for (i = 0; i < grainSize*grainSize; i++)
 	    outData[i] *= 2.0;
     }
-#endif 
-
+    }
     // FIXME: should do 'op2' here!!!
 
    r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);

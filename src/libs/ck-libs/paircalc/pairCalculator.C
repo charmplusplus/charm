@@ -2,7 +2,7 @@
 #include "ckPairCalculator.h"
 #include "pairCalculator.h"
 
-void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, CkCallback cb, PairCalcID* pcid, int comlib_flag, CkGroupID *mapid) {
+void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, CkCallback cb, PairCalcID* pcid, int comlib_flag, CkGroupID *mapid, int flag_dp) {
 
     //CkPrintf("create pair calculator %d, %d\n", s, grainSize);
 
@@ -34,7 +34,7 @@ void createPairCalculator(bool sym, int s, int grainSize, int numZ, int* z, int 
   ComlibInstanceHandle bcastInstance = CkGetComlibInstance();
   bcastInstance.setStrategy(bstrat);
 
-  pcid->Init(pairCalculatorProxy.ckGetArrayID(), pairCalcReducerProxy.ckGetGroupID(), grainSize, blkSize, s, sym, comlib_flag, bcastInstance._instid, bcastInstance._dmid);
+  pcid->Init(pairCalculatorProxy.ckGetArrayID(), pairCalcReducerProxy.ckGetGroupID(), grainSize, blkSize, s, sym, comlib_flag, bcastInstance._instid, bcastInstance._dmid, flag_dp);
   
   
   if(mapid) {
@@ -121,6 +121,7 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
   int blkSize =  pcid->BlkSize;
   int S = pcid->S;
   int symmetric = pcid->Symmetric;
+  bool flag_dp = pcid->isDoublePacked;
 
   x = myZ;
   s1 = (myS/grainSize) * grainSize;
@@ -128,15 +129,15 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
     for (c = 0; c < blkSize; c++)
       for(s2 = 0; s2 < S; s2 += grainSize){
 	if(s1 <= s2)
-	  pairCalculatorProxy(CkArrayIndexIndex4D(x, s1, s2, c)).calculatePairs(n, ptr, myS, true);
+	  pairCalculatorProxy(CkArrayIndexIndex4D(x, s1, s2, c)).calculatePairs(n, ptr, myS, true, flag_dp);
 	else
-	  pairCalculatorProxy(CkArrayIndexIndex4D(x, s2, s1, c)).calculatePairs(n, ptr, myS, false);
+	  pairCalculatorProxy(CkArrayIndexIndex4D(x, s2, s1, c)).calculatePairs(n, ptr, myS, false, flag_dp);
       }
   }
   else {
     for (c = 0; c < blkSize; c++)
       for(s2 = 0; s2 < S; s2 += grainSize){
-	pairCalculatorProxy(CkArrayIndexIndex4D(x, s1, s2, c)).calculatePairs(n, ptr, myS, true);
+	pairCalculatorProxy(CkArrayIndexIndex4D(x, s1, s2, c)).calculatePairs(n, ptr, myS, true, flag_dp);
       }
   }
 }
@@ -153,6 +154,7 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
   int blkSize =  pcid->BlkSize;
   int S = pcid->S;
   bool symmetric = pcid->Symmetric;
+  bool flag_dp = pcid->isDoublePacked;
 
   CkAssert(symmetric == false);
   
@@ -160,7 +162,7 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
   s2 = (myS/grainSize) * grainSize;
   for (c = 0; c < blkSize; c++)
     for(s1 = 0; s1 < S; s1 += grainSize){
-      pairCalculatorProxy(CkArrayIndexIndex4D(x, s1, s2, c)).calculatePairs(n, ptr, myS, false);
+      pairCalculatorProxy(CkArrayIndexIndex4D(x, s1, s2, c)).calculatePairs(n, ptr, myS, false, flag_dp);
     }
 }
 
