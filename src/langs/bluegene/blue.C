@@ -133,7 +133,7 @@ public:
     handlerTable = (BgHandler *)malloc(MAX_HANDLERS * sizeof(BgHandler));
     for (int i=0; i<MAX_HANDLERS; i++) handlerTable[i] = defaultBgHandler;
   }
-  int registerHandler(BgHandler h)
+  inline int registerHandler(BgHandler h)
   {
     ASSERT(!cva(inEmulatorInit));
     /* leave 0 as blank, so it can report error luckily */
@@ -143,14 +143,14 @@ public:
     handlerTable[cur] = h;
     return cur;
   }
-  void numberHandler(int idx, BgHandler h)
+  inline void numberHandler(int idx, BgHandler h)
   {
     ASSERT(!cva(inEmulatorInit));
     if (idx >= handlerTableCount || idx < 1)
       CmiAbort("BG> HandlerID exceed the maximum!\n");
     handlerTable[idx] = h;
   }
-  BgHandler getHandle(int handler)
+  inline BgHandler getHandle(int handler)
   {
 #if 0
     if (handler >= handlerTableCount) {
@@ -182,9 +182,11 @@ public:
   threadInfo  **threadinfo;
   ckMsgQueue   nodeQ;		/* non-affinity msg queue */
   ckMsgQueue  *affinityQ;	/* affinity msg queue for each work thread */
-  char        *udata;		/* node specific data pointer */
   double       startTime;	/* start time for a thread */
+  double       nodeTime;	/* node time to coordinate thread times */
+  short        lastW;           /* last worker thread assigned msg */
   char         started;		/* flag indicate if this node is started */
+  char        *udata;		/* node specific data pointer */
  
   HandlerTable handlerTable; /* node level handler table */
 #if BLUEGENE_TIMING
@@ -239,7 +241,7 @@ public:
 /**
   nodeInfo construtor
 */
-nodeInfo::nodeInfo(): udata(NULL), started(0) 
+nodeInfo::nodeInfo(): lastW(0), udata(NULL), started(0) 
 {
     int i;
     commThQ = new threadQueue;
@@ -366,15 +368,21 @@ void addBgNodeMessage(char *msgPtr)
 {
   /* find a idle worker thread */
   /* FIXME:  flat search is bad if there is many work threads */
-  for (int i=0; i<cva(numWth); i++)
-    if (tMYNODE->affinityQ[i].length() == 0)
+  int wID = tMYNODE->lastW;
+  for (int i=0; i<cva(numWth); i++) 
+  {
+    wID ++;
+    if (wID == cva(numWth)) wID = 0;
+    if (tMYNODE->affinityQ[wID].length() == 0)
     {
       /* this work thread is idle, schedule the msg here */
-      DEBUGF(("activate a work thread %d - %p.\n", i, tTHREADTABLE[i]));
-      tMYNODE->affinityQ[i].enq(msgPtr);
-      CthAwaken(tTHREADTABLE[i]);
+      DEBUGF(("activate a work thread %d - %p.\n", wID, tTHREADTABLE[wID]));
+      tMYNODE->affinityQ[wID].enq(msgPtr);
+      CthAwaken(tTHREADTABLE[wID]);
+      tMYNODE->lastW = wID;
       return;
     }
+  }
   /* all worker threads are busy */   
   DEBUGF(("all work threads are busy.\n"));
   tNODEQ.enq(msgPtr);
@@ -904,7 +912,8 @@ void comm_thread(threadInfo *tinfo)
         addBgNodeMessage(msg);			/* non-affinity message */
       }
       else {
-        DEBUGF(("affinity msg, call addBgThreadMessage to %d\n", CmiBgMsgThreadID(msg)));
+        DEBUGF(("affinity msg, call addBgThreadMessage to %d\n", 
+			CmiBgMsgThreadID(msg)));
         addBgThreadMessage(msg, CmiBgMsgThreadID(msg));
       }
     }
