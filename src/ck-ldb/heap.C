@@ -45,7 +45,7 @@ int minHeap::insert(InfoRecord *x)
     current = count;
     count++;
   } else {
-    cout << "minHeap overflow. \n" ; 
+    printf("minHeap overflow. \n") ; 
     return -1;
   }
 
@@ -144,7 +144,7 @@ int maxHeap::insert(InfoRecord *x)
     current = count;
     count++;
   } else {
-    cout << "maxHeap overflow. \n" ; 
+    printf("maxHeap overflow. \n"); 
     return -1;
   }
 

@@ -116,7 +116,7 @@ void Set::print()
 {
   listNode *p = head;
   while (p){
-    cout << p->info->Id << " ";
+    printf("%d ",p->info->Id);
     p = p->next;
   }
 }
