@@ -245,30 +245,9 @@ CpvStaticDeclare(double, beginTime);
 CpvStaticDeclare(double, usedTime);
 CpvStaticDeclare(int, PROCESSING);
 
-void usageStart(void);
-
-/* Call this when the program is started
- -> Whenever traceModuleInit would be called
- -> -> see conv-core/convcore.c
+/* Called when processor becomes busy
 */
-void initUsage()
-{
-   CpvInitialize(double, startTime);
-   CpvInitialize(double, beginTime);
-   CpvInitialize(double, usedTime);
-   CpvInitialize(int, PROCESSING);
-   CpvAccess(beginTime)  = CmiWallTimer();
-   CpvAccess(usedTime)   = 0.;
-   CpvAccess(PROCESSING) = 0;
-   usageStart();
-}
-
-/* Call this when a BEGIN_PROCESSING event occurs
- -> Whenever a trace_begin_execute or trace_begin_charminit
-    would be called
- -> -> See ck-core/init.c,main.c and conv-core/convcore.c
-*/
-void usageStart()
+static void usageStart()
 {
    if(CpvAccess(PROCESSING)) return;
 
@@ -276,12 +255,9 @@ void usageStart()
    CpvAccess(PROCESSING) = 1;
 }
 
-/* Call this when an END_PROCESSING event occurs
- -> Whenever a trace_end_execute or trace_end_charminit
-    would be called
- -> -> See ck-core/init.c,main.c and conv-core/threads.c
+/* Called when processor becomes idle
 */
-void usageStop()
+static void usageStop()
 {
    if(!CpvAccess(PROCESSING)) return;
 
@@ -289,6 +265,23 @@ void usageStop()
    CpvAccess(PROCESSING) = 0;
 }
 
+/* Call this when the program is started
+ -> Whenever traceModuleInit would be called
+ -> -> see conv-core/convcore.c
+*/
+static void initUsage()
+{
+   CpvInitialize(double, startTime);
+   CpvInitialize(double, beginTime);
+   CpvInitialize(double, usedTime);
+   CpvInitialize(int, PROCESSING);
+   CpvAccess(startTime)  = CmiWallTimer();
+   CpvAccess(beginTime)  = CmiWallTimer();
+   CpvAccess(usedTime)   = 0.;
+   CpvAccess(PROCESSING) = 1;
+   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,usageStart,0);
+   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,usageStop,0);      
+}
 
 static int getUsage(void)
 {
@@ -321,6 +314,7 @@ void CWebInit(void)
   CWeb_CollectIndex=CmiRegisterHandler(CWeb_Collect);
   CWeb_ReduceIndex=CmiRegisterHandler(CWeb_Reduce);
   
+  initUsage();
   CWebPerformanceRegisterFunction(getUsage);
   CWebPerformanceRegisterFunction(getSchedQlen);
 
@@ -559,61 +553,45 @@ CHostProcess if needed.
 #include <signal.h>
 #include "ccs-server.c" /*Include implementation here in this case*/
 
-static int inside_comm=0;
-int ccs_socket_ready=0;/*Data pending on CCS server socket?*/
-
-static void CommunicationInterrupt(void)
+/*Check for ready Ccs messages:*/
+static void CcsServerCheck(void)
 {
-  if(inside_comm)
-    return;
-  if (1==skt_select1(CcsServer_fd(),0))
-    ccs_socket_ready=1;
-}
-
-void CHostInit(int CCS_server_port)
-{
-  struct itimerval i;
-  CcsServer_new(NULL,&CCS_server_port);
-  CmiSignal(SIGALRM, 0, 0, CommunicationInterrupt);
-  /*We will receive alarm signals at 10Hz*/
-  i.it_interval.tv_sec = 0;
-  i.it_interval.tv_usec = 100000;
-  i.it_value.tv_sec = 0;
-  i.it_value.tv_usec = 100000;
-  setitimer(ITIMER_REAL, &i, NULL); 
-}
-
-void CHostProcess(void)
-{
-  CcsImplHeader hdr;
-  char *data;
-  if (1!=skt_select1(CcsServer_fd(),0)) return;
-  inside_comm=1;
-  /* printf("Got CCS connect...\n"); */
-  if (CcsServer_recvRequest(&hdr,&data))
-  {/*We got a network request*/
-    /* printf("Got CCS request...\n"); */
-    CcsImpl_netRequest(&hdr,data);
-    free(data);
+  while (1==skt_select1(CcsServer_fd(),0)) {
+    CcsImplHeader hdr;
+    void *data;
+    /* printf("Got CCS connect...\n"); */
+    if (CcsServer_recvRequest(&hdr,&data))
+    {/*We got a network request*/
+      /* printf("Got CCS request...\n"); */
+      CcsImpl_netRequest(&hdr,data);
+      free(data);
+    }
   }
-  inside_comm=0;
 }
 
 #endif /*NODE_0_IS_CONVHOST*/
 
-
-void CcsInit(void)
+void CcsInit(char **argv)
 {
+  int ccs_serverPort=0;
   CpvInitialize(CkHashtable_c, ccsTab);
   CpvAccess(ccsTab) = CkCreateHashtable_string(sizeof(int),5);
   CpvInitialize(CcsImplHeader, ccsReq);
   CpvAccess(ccsReq).ip = ChMessageInt_new(0);
   _ccsHandlerIdx = CmiRegisterHandler(req_fw_handler);
-#if NODE_0_IS_CONVHOST
-  rep_fw_handler_idx = CmiRegisterHandler(rep_fw_handler);
-#endif
   CcsRegisterHandler("ccs_getinfo",ccs_getinfo);
   CcsRegisterHandler("ccs_killport",ccs_killport);
+
+#if NODE_0_IS_CONVHOST
+  rep_fw_handler_idx = CmiRegisterHandler(rep_fw_handler);
+  if (CmiGetArgFlag(argv,"++server") | 
+      CmiGetArgInt(argv,"++server-port",&ccs_serverPort)) 
+    if (CmiMyPe()==0)
+    {/*Create and occasionally poll on a CCS server port*/
+      CcsServer_new(NULL,&ccs_serverPort);
+      CcdPeriodicCallKeep(CcsServerCheck,NULL);
+    }
+#endif
 }
 
 #endif /*CMK_CCS_AVAILABLE*/

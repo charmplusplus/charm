@@ -30,6 +30,7 @@ typedef struct {unsigned char hidden[4];} CcsDelayedReply;
 void CcsUseHandler(char *id, int hdlr);
 int CcsRegisterHandler(char *id, CmiHandler fn);
 
+void CcsInit(char **argv);
 int CcsEnabled(void);
 int CcsIsRemoteRequest(void);
 void CcsCallerId(unsigned int *pip, unsigned int *pport);
@@ -38,7 +39,7 @@ CcsDelayedReply CcsDelayReply(void);
 void CcsSendDelayedReply(CcsDelayedReply d,int size, const void *reply);
 
 #else
-#define CcsInit() /*empty*/
+#define CcsInit(argv) /*empty*/
 #define CcsUseHandler(x,y) /*empty*/ 
 #define CcsRegisterHandler(x,y) 0
 #define CcsEnabled() 0

@@ -53,7 +53,6 @@ void CcsImpl_reply(SOCKET replFd,int repLen,const void *repData);
 /*Send any registered clients kill messages before we exit*/
 void CcsImpl_kill(void);
 
-void CcsInit(void);
 /*Convert CCS header & message data into a converse message to handler*/
 char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_len);
 
@@ -88,7 +87,6 @@ void CcsServer_sendReply(SOCKET fd,int repBytes,const void *repData);
 #define CcsServer_recvReq(h,b) 0
 #define CcsServer_sendReply(f,l,d) /*empty*/
 #define CcsImpl_kill() /*empty*/
-#define CcsInit() /*empty*/
 #endif /*CCS available*/
 
 #ifdef __cplusplus
