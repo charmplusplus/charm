@@ -195,11 +195,23 @@ extremely verbose, 2 shows most procedure entrance/exits,
 3 shows most communication, and 5 only shows rare or unexpected items.
 Displaying lower priority messages doesn't stop higher priority ones.
 */
-#define MACHINE_DEBUG_PRIO 2
+#define MACHINE_DEBUG_PRIO 3
+#define MACHINE_DEBUG_LOG 1 /*Controls whether output goes to log file*/
 
-# define MACHSTATE(prio,str) if ((prio)>=MACHINE_DEBUG_PRIO) {printf("[%d %.3f] machine.c> %s\n",CmiMyPe(),CmiWallTimer(),str); fflush(stdout); }
+FILE *debugLog=stdout;
+# define MACHSTATE_I(prio,args) if ((prio)>=MACHINE_DEBUG_PRIO) {\
+	fprintf args ; fflush(debugLog); }
+# define MACHSTATE(prio,str) \
+	MACHSTATE_I(prio,(debugLog,"[%d %.3f]> "str"\n",CmiMyPe(),CmiWallTimer()))
+# define MACHSTATE1(prio,str,a) \
+	MACHSTATE_I(prio,(debugLog,"[%d %.3f]> "str"\n",CmiMyPe(),CmiWallTimer(),a))
+# define MACHSTATE2(prio,str,a,b) \
+	MACHSTATE_I(prio,(debugLog,"[%d %.3f]> "str"\n",CmiMyPe(),CmiWallTimer(),a,b))
 #else
+# define MACHINE_DEBUG_LOG 0
 # define MACHSTATE(n,x) /*empty*/
+# define MACHSTATE1(n,x,a) /*empty*/
+# define MACHSTATE2(n,x,a,b) /*empty*/
 #endif
 
 #if CMK_USE_POLL
@@ -239,7 +251,7 @@ static void CommunicationServer(int withDelayMs);
 extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
 static void ConverseRunPE(int everReturn);
-void CmiYield();
+void CmiYield(void);
 void ConverseCommonExit(void);
 
 static unsigned int dataport=0;
@@ -328,7 +340,7 @@ static void PerrorExit(const char *msg)
 *
  *****************************************************************************/
 
-double GetClock()
+double GetClock(void)
 {
 #if defined(_WIN32) && !defined(__CYGWIN__)
   struct _timeb tv; 
@@ -410,7 +422,7 @@ typedef struct PCQueueStruct
 }
 
 
-PCQueue PCQueueCreate()
+PCQueue PCQueueCreate(void)
 {
   CircQueue circ;
   PCQueue Q;
@@ -599,7 +611,8 @@ static void getTimespec(int msFromNow,struct timespec *dest) {
   int secFromNow;
   /*Get the current time*/
   gettimeofday(&cur,NULL);
-  TIMEVAL_TO_TIMESPEC(&cur,dest);
+  dest->tv_sec=cur.tv_sec;
+  dest->tv_nsec=cur.tv_usec*1000;
   /*Add in the wait time*/
   secFromNow=msFromNow/1000;
   msFromNow-=secFromNow*1000;
@@ -722,7 +735,7 @@ static int    Cmi_idlepoll;
 static int    Cmi_syncprint;
 static int Cmi_print_stats = 0;
 
-static void parse_netstart()
+static void parse_netstart(void)
 {
   char *ns;
   int nread;
@@ -789,7 +802,7 @@ logent log;
 int    log_pos;
 int    log_wrap;
 
-static void log_init()
+static void log_init(void)
 {
   log = (logent)malloc(50000 * sizeof(struct logent));
   _MEMCHECK(log);
@@ -797,7 +810,7 @@ static void log_init()
   log_wrap = 0;
 }
 
-static void log_done()
+static void log_done(void)
 {
   char logname[100]; FILE *f; int i, size;
   sprintf(logname, "log.%d", Cmi_mynode);
@@ -949,7 +962,7 @@ CmiState CmiGetState()
 }
 #endif
 
-CmiNodeLock CmiCreateLock()
+CmiNodeLock CmiCreateLock(void)
 {
   HANDLE hMutex = CreateMutex(NULL, FALSE, NULL);
   return hMutex;
@@ -960,7 +973,7 @@ void CmiDestroyLock(CmiNodeLock lk)
   CloseHandle(lk);
 }
 
-void CmiYield() 
+void CmiYield(void) 
 { 
   Sleep(0);
 }
@@ -969,8 +982,9 @@ void CmiYield()
 
 static DWORD WINAPI comm_thread(LPVOID dummy)
 {  
-  while (1) CommunicationServer(5);
-  return 0;/*should never get here*/
+  if (Cmi_charmrun_fd!=-1)
+    while (1) CommunicationServer(5);
+  return 0;
 }
 
 static DWORD WINAPI call_startfn(LPVOID vindex)
@@ -1058,7 +1072,7 @@ CmiNodeLock CmiMemLock_lock;
 
 #define CmiGetState() ((CmiState)pthread_getspecific(Cmi_state_key))
 
-CmiNodeLock CmiCreateLock()
+CmiNodeLock CmiCreateLock(void)
 {
   CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(pthread_mutex_t));
   _MEMCHECK(lk);
@@ -1072,7 +1086,7 @@ void CmiDestroyLock(CmiNodeLock lk)
   free(lk);
 }
 
-void CmiYield() { sched_yield(); }
+void CmiYield(void) { sched_yield(); }
 
 int barrier;
 pthread_cond_t barrier_cond;
@@ -1162,7 +1176,7 @@ void CmiMemUnlock() { memflag--; }
 static volatile int comm_flag=0;
 #define CmiCommLockOrElse(dothis) if (comm_flag!=0) dothis
 #if 1
-#  define CmiCommLock() (comm_flag=1)
+#  define CmiCommLock(void) (comm_flag=1)
 #else
 void CmiCommLock(void) {
   if (comm_flag!=0) CmiAbort("Comm lock *not* reentrant!\n");
@@ -1177,7 +1191,7 @@ int Cmi_myrank;
 #define CmiGetState() (&Cmi_state)
 #define CmiGetStateN(n) (&Cmi_state)
 
-void CmiYield() { sleep(0); }
+void CmiYield(void) { sleep(0); }
 
 static void CommunicationInterrupt(int ignored)
 {
@@ -1215,13 +1229,13 @@ CpvStaticDeclare(char *, internal_printf_buffer);
 
 
 #ifndef CmiMyPe
-int CmiMyPe() 
+int CmiMyPe(void) 
 { 
   return CmiGetState()->pe; 
 }
 #endif
 #ifndef CmiMyRank
-int CmiMyRank()
+int CmiMyRank(void)
 {
   return CmiGetState()->rank;
 }
@@ -1296,7 +1310,7 @@ static void CmiPushPE(int pe,void *msg)
   PCQueuePush(cs->recv,msg);
 }
 
-static void ctrl_getone()
+static void ctrl_getone(void)
 {
   ChMessage msg;
   ChMessage_recv(Cmi_charmrun_fd,&msg);
@@ -1686,7 +1700,7 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
  *****************************************************************************/
 
 #if CMK_NODE_QUEUE_AVAILABLE
-char *CmiGetNonLocalNodeQ()
+char *CmiGetNonLocalNodeQ(void)
 {
   char *result = 0;
   if(!PCQueueEmpty(CsvAccess(NodeRecv))) {
@@ -1953,6 +1967,13 @@ static void ConverseRunPE(int everReturn)
   CpvAccess(CmiLocalQueue) = cs->localqueue;
   CmiMyArgv=CmiCopyArgs(Cmi_argv);
   CthInit(CmiMyArgv);
+#if MACHINE_DEBUG_LOG
+  {
+    char ln[200];
+    sprintf(ln,"debugLog.%d",CmiMyPe());
+    debugLog=fopen(ln,"w");
+  }
+#endif
 
   /* better to show the status here */
   if (Cmi_netpoll == 1 && CmiMyPe() == 0)
@@ -1983,7 +2004,7 @@ static void ConverseRunPE(int everReturn)
   }
 }
 
-void ConverseExit()
+void ConverseExit(void)
 {
   if (CmiMyRank()==0) {
     if(Cmi_print_stats)
@@ -2043,9 +2064,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #endif
 #endif
   Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usc;
-#if CMK_NETPOLL
-  Cmi_netpoll = 1;      /* set as default, but still allow change next */
-#endif
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
   Cmi_idlepoll = 0;
 #else
