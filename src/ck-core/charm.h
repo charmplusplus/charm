@@ -144,7 +144,10 @@ extern CkGroupID CkCreateNodeGroupSync(int cIdx, int consIdx, void *msg);
 
 extern void CkSendMsg(int entryIndex, void *msg, CkChareID *chare);
 extern void CkSendMsgBranch(int eIdx, void *msg, int destPE, CkGroupID gID);
-extern void CkSendMsgNodeBranch(int eIdx, void *msg, int destNode, CkGroupID gID);
+extern void CkSendMsgBranchMulti(int eIdx, void *msg, int npes, int *pes, 
+                                 CkGroupID gID);
+extern void CkSendMsgNodeBranch(int eIdx, void *msg, int destNode, 
+                                CkGroupID gID);
 extern void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID);
 extern void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID);
 
@@ -163,8 +166,10 @@ extern void* CkRemoteCall(int eIdx, void *msg, CkChareID *chare);
 extern void* CkRemoteBranchCall(int eIdx, void *msg, CkGroupID gID, int pe);
 extern void* CkRemoteNodeBranchCall(int eIdx, void *msg, CkGroupID gID, int node);
 extern CkFutureID CkRemoteCallAsync(int eIdx, void *msg, CkChareID *chare);
-extern CkFutureID CkRemoteBranchCallAsync(int eIdx, void *msg, CkGroupID gID, int pe);
-extern CkFutureID CkRemoteNodeBranchCallAsync(int eIdx, void *msg, CkGroupID gID, int node);
+extern CkFutureID CkRemoteBranchCallAsync(int eIdx, void *msg, CkGroupID gID, 
+                                          int pe);
+extern CkFutureID CkRemoteNodeBranchCallAsync(int eIdx, void *msg, 
+                                              CkGroupID gID, int node);
 extern void* CkWaitFuture(CkFutureID futNum);
 extern void CkWaitVoidFuture(CkFutureID futNum);
 extern void CkReleaseFuture(CkFutureID futNum);

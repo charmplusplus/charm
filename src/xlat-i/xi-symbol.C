@@ -1455,6 +1455,15 @@ void Entry::genGroupDecl(XStr& str)
       str << "      CkSendMsg"<<node<<"Branch("<<epIdx()<<", msg, onPE, _ck_gid);\n";
       str << "    }\n";
     }
+    // entry method on multi PEs declaration
+    if(!isSync() && !container->isNodeGroup()) {
+      str << "    "<<Virtual()<<retType<<" "<<name<<"("<<paramComma();
+      str << "int npes, int *pes)";
+      str << " {\n"<<voidParamDecl();
+      str << "      CkSendMsg"<<node<<"BranchMulti(";
+      str <<epIdx()<<", msg, npes, pes, _ck_gid);\n";
+      str << "    }\n";
+    }
     // entry method onPE declaration with future
     if(isSync()) {
       str << "    "<<Virtual()<<"void "<<name<<"("<<paramComma()<<"int onPE, CkFutureID *fut)";

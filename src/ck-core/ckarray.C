@@ -1118,7 +1118,7 @@ CkArrayRec* CkArray::pupArrayRec(PUP::er &p, CkArrayRec *rec, CkArrayIndex *idx)
   ArrayElement *el;
   CkArrayRec_local *lrec;
   
-  rtypes = "0lrbmd";
+  rtypes = (char *) "0lrbmd";
   
   if (p.isPacking()) {
     type = rec->type();

@@ -148,6 +148,26 @@ void CldHopHandler(char *msg)
   }
 }
 
+void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
+{
+  int len, queueing, priobits,i; unsigned int *prioptr;
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  peinfo *pinf = &(CpvAccess(peinf));
+  CldPackFn pfn;
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  if (pfn) {
+    pfn(&msg);
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  }
+  CmiSetInfo(msg,infofn);
+  CmiSetXHandler(msg, CmiGetHandler(msg));
+  CmiSetHandler(msg, pinf->EnqueueHandler);
+  for(i=0;i<npes;i++) {
+    CmiSyncSend(pes[i], len, msg);
+  }
+  CmiFree(msg);
+}
+
 void CldEnqueue(int pe, void *msg, int infofn)
 {
   int len, queueing, priobits; unsigned int *prioptr;

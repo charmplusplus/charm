@@ -40,6 +40,24 @@ void CldHandler(char *msg)
   CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
 }
 
+void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
+{
+  int len, queueing, priobits,i; unsigned int *prioptr;
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  CldPackFn pfn;
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  if (pfn) {
+    pfn(&msg);
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  }
+  CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+  CmiSetInfo(msg,infofn);
+  for(i=0;i<npes;i++) {
+    CmiSyncSend(pes[i], len, msg);
+  }
+  CmiFree(msg);
+}
+
 void CldEnqueue(int pe, void *msg, int infofn)
 {
   int len, queueing, priobits; unsigned int *prioptr;

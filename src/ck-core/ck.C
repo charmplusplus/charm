@@ -670,12 +670,35 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
   CldEnqueue(pe, env, _infoIdx);
 }
 
+static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID, 
+                           int npes, int *pes)
+{
+  register envelope *env = UsrToEnv(msg);
+  _CHECK_USED(env);
+  _SET_USED(env, 1);
+  env->setMsgtype(ForBocMsg);
+  env->setEpIdx(eIdx);
+  env->setGroupNum(gID);
+  env->setSrcPe(CkMyPe());
+  _TRACE_CREATION_N(env, npes);
+  CmiSetHandler(env, _charmHandlerIdx);
+  CldEnqueueMulti(npes, pes, env, _infoIdx);
+}
+
 extern "C"
 void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID)
 {
   _sendMsgBranch(eIdx, msg, gID, pe);
   _STATS_RECORD_SEND_BRANCH_1();
   CpvAccess(_qd)->create();
+}
+
+extern "C"
+void CkSendMsgBranchMulti(int eIdx,void *msg,int npes,int *pes,CkGroupID gID)
+{
+  _sendMsgBranchMulti(eIdx, msg, gID, npes, pes);
+  _STATS_RECORD_SEND_BRANCH_N(npes);
+  CpvAccess(_qd)->create(npes);
 }
 
 extern "C"
