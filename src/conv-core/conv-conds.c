@@ -335,7 +335,7 @@ void CcdCallBacksReset(void *ignored);
 void CcdModuleInit(void)
 {
    int i;
-   double curTime=CmiWallTimer();
+   double curTime;
    CpvInitialize(ccd_heap_elem*, ccd_heap);
    CpvInitialize(ccd_cond_callbacks, conds);
    CpvInitialize(ccd_periodic_callbacks, pcb);
@@ -354,6 +354,7 @@ void CcdModuleInit(void)
    }
    CpvAccess(_ccd_numchecks) = 10;
    CpvAccess(pcb).nSkip = 10;
+   curTime=CmiWallTimer();
    CpvAccess(pcb).lastCheck = curTime;
    for (i=0;i<CCD_PERIODIC_MAX;i++)
 	   CpvAccess(pcb).nextCall[i]=curTime+periodicCallInterval[i];
@@ -443,7 +444,7 @@ void CcdCallBacks(void)
   for (i=0;i<CCD_PERIODIC_MAX;i++) 
     if (o->nextCall[i]<=currTime) {
       CcdRaiseCondition(CcdPERIODIC+i);
-      o->nextCall[i]+=periodicCallInterval[i];
+      o->nextCall[i]=currTime+periodicCallInterval[i];
     }
     else 
       break; /*<- because intervals are multiples of one another*/
@@ -459,15 +460,5 @@ void CcdCallBacksReset(void *ignored)
   CpvAccess(_ccd_numchecks)=o->nSkip;
   o->lastCheck=currTime;
 }
-
-
-
-
-
-
-
-
-
-
 
 
