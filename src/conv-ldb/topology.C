@@ -18,6 +18,109 @@
 #include "cklists.h"
 #include "topology.h"
 
+int LBTopology::get_hop_count(int src,int dest)
+{
+	int npe;
+	int *visited_srcs;
+
+	if(src==dest)
+		return 0;
+	
+	npe = max_neighbors();
+	visited_srcs = new int[npes];
+	
+ 	int count = rec_hop_count(src,dest,npe,1,visited_srcs);	
+	delete [] visited_srcs;
+
+	return count;
+}
+
+int LBTopology::rec_hop_count(int src,int dest,int max_neigh,int count,int *visited_srcs)
+{
+	int *pes = new int[max_neigh];
+	int min_hop_cnt=999999;
+	int ret_val=0;
+	int skip_neigh=0;
+
+	
+	neighbors(src,pes,max_neigh);
+	
+	visited_srcs[count-1]=src;
+	
+	for(int i=0;i<max_neigh;i++)
+	{
+		if(pes[i]==dest)
+			return count;
+	}
+	for(int i=0;i<max_neigh;i++)
+	{
+		for(int j=0;j<count;j++)
+			if(visited_srcs[j]==pes[i])
+			{
+				skip_neigh=1;
+				break;
+			}
+		if(!skip_neigh)
+		{
+			ret_val=rec_hop_count(pes[i],dest,max_neigh,count+1,visited_srcs);
+			if(ret_val < min_hop_cnt)
+				min_hop_cnt = ret_val;
+		}
+		else
+			skip_neigh=0;
+	}
+	delete [] pes;
+	return min_hop_cnt;
+}
+
+double LBTopology::per_hop_delay(int last_hop)
+{
+	if(!last_hop)
+		return (HOP_LINK_DELAY + HOP_PROC_DELAY);
+	else
+		return HOP_LINK_DELAY;
+}
+
+//smp - assume 1,2,3 or 4 processors per node
+
+template <int ppn>
+class LBTopo_smp_n: public LBTopology {
+public:
+  LBTopo_smp_n(int p): LBTopology(p) {}
+  virtual int max_neighbors() { return npes - 1; }
+
+  virtual void neighbors(int mype, int* _n, int &nb){
+		CkPrintf("neighbors:Nothing in here..\n");
+	}
+	
+	int get_hop_count(int src,int dest){
+		
+		//CkPrintf("in smp get_hop_count\n");
+		int a = src/ppn;
+		int b = dest/ppn;
+		
+		if(a!=b){
+			//CkPrintf("2 returned\n");
+			return 2;
+		}
+		else{
+			//CkPrintf("1 returned\n");
+			return 1;
+		}
+	}
+};
+
+typedef LBTopo_smp_n<1> LBTopo_smp_n_1;
+typedef LBTopo_smp_n<2> LBTopo_smp_n_2;
+typedef LBTopo_smp_n<3> LBTopo_smp_n_3;
+typedef LBTopo_smp_n<4> LBTopo_smp_n_4;
+
+LBTOPO_MACRO(LBTopo_smp_n_1);
+LBTOPO_MACRO(LBTopo_smp_n_2);
+LBTOPO_MACRO(LBTopo_smp_n_3);
+LBTOPO_MACRO(LBTopo_smp_n_4);
+
+
 // ring
 
 LBTOPO_MACRO(LBTopo_ring);
@@ -33,6 +136,17 @@ void LBTopo_ring::neighbors(int mype, int* _n, int &nb)
   nb = 0;
   if (npes>1) _n[nb++] = (mype + npes -1) % npes;
   if (npes>2) _n[nb++] = (mype + 1) % npes;
+}
+
+int LBTopo_ring::get_hop_count(int src,int dest){
+	
+	int dist=src-dest;
+	if(dist<0) dist=-dist;
+	
+	if((npes-dist) < dist)
+		return (npes-dist);
+	else
+		return dist;
 }
 
 //  TORUS 2D
@@ -93,6 +207,125 @@ void LBTopo_torus2d::neighbors(int mype, int* _n, int &nb)
   }
 }
 
+int LBTopo_torus2d::get_hop_count(int src,int dest){
+	int xpos_src,xpos_dest;
+	int ypos_src,ypos_dest;
+	int xdist=0;
+	int ydist=0;
+	
+	int xchange;
+	if(src > dest){
+		xchange = src;
+		src = dest;
+		dest = xchange;
+	}
+	
+	xpos_src=src%width;
+	ypos_src=src/width;
+
+	xpos_dest=dest%width;
+	ypos_dest=dest/width;
+
+	xdist = xpos_dest-xpos_src;
+	if(xdist<0) xdist=-xdist;
+	if((width-xdist) < xdist)
+		xdist = width-xdist;
+	
+	ydist = ypos_dest-ypos_src;
+	if(ydist<0) ydist=-ydist;
+
+	int lastpos=(npes-1)%width;
+	int otherylen=0;
+
+	if(xpos_src<=lastpos && xpos_dest<=lastpos)
+		otherylen=((npes-1)/width)+1-ydist;
+	else{
+		if(ypos_dest==((npes-1)/width))
+			otherylen=((npes-1)/width)+1-ydist;
+		else	
+			otherylen=((npes-1)/width)-ydist;
+	}
+	
+	if(otherylen < ydist)
+		ydist=otherylen;
+	
+	//added later
+	int sdist=0,adist=0,bdist=0,cdist=0,ddist=0;
+	
+	if(xpos_src>lastpos && xpos_dest>lastpos){
+		sdist = xpos_src;
+		if((width-sdist) < sdist)
+		sdist = width-sdist;
+
+		adist = ((npes-1)/width)-ypos_src;
+		if(adist<0) adist=-adist;
+		if(ypos_src+1 < adist)
+			adist = ypos_src+1;
+	
+		bdist = 1;
+
+		cdist = ((npes-1)/width)-ypos_dest;
+		if(cdist<0) cdist=-cdist;
+		if(ypos_dest+1 < cdist)
+			cdist = ypos_dest+1;
+
+		ddist = xpos_dest-lastpos;
+		if(ddist<0) ddist=-ddist;
+		if((width-ddist) < ddist)
+			ddist = width-ddist;
+	}
+	else{
+		if(xpos_src>lastpos){
+			xchange = src;
+			src = dest;
+			dest = xchange;
+			xpos_src=src%width;
+			ypos_src=src/width;
+			xpos_dest=dest%width;
+			ypos_dest=dest/width;
+		}
+		adist = ((npes-1)/width)-ypos_src;
+		if(adist<0) adist=-adist;
+		if(ypos_src+1 < adist)
+			adist = ypos_src+1;
+	
+		if(xpos_dest<=lastpos){
+			bdist = xpos_dest-xpos_src;
+			if(bdist<0) bdist=-bdist;
+			if((lastpos+1-bdist) < bdist)
+				bdist = lastpos+1-bdist;
+
+			cdist = ((npes-1)/width)-ypos_dest;
+			if(cdist<0) cdist=-cdist;
+			if(ypos_dest+1 < cdist)
+				cdist = ypos_dest+1;
+		
+			ddist=0;
+		}
+		else{
+			bdist = lastpos-xpos_src;
+			if(bdist<0) bdist=-bdist;
+			if((xpos_src+1) < bdist)
+				bdist = xpos_src+1;
+
+			cdist = ((npes-1)/width)-ypos_dest;
+			if(cdist<0) cdist=-cdist;
+			if(ypos_dest+1 < cdist)
+				cdist = ypos_dest+1;
+
+			ddist = xpos_dest-lastpos;
+			if(ddist<0) ddist=-ddist;
+			if((width-ddist) < ddist)
+				ddist = width-ddist;
+		}
+	}
+	
+	if((sdist+adist+bdist+cdist+ddist) < (xdist+ydist))
+		return (sdist+adist+bdist+cdist+ddist);
+	else
+		return (xdist+ydist);
+
+}
 
 //  TORUS 3D
 
@@ -376,6 +609,10 @@ public:
     lbTopos.push_back(new LBTopoMap("2_arytree", createLBTopo_2_arytree));
     lbTopos.push_back(new LBTopoMap("3_arytree", createLBTopo_3_arytree));
     lbTopos.push_back(new LBTopoMap("4_arytree", createLBTopo_4_arytree));
+    lbTopos.push_back(new LBTopoMap("smp_n_1", createLBTopo_smp_n_1));
+    lbTopos.push_back(new LBTopoMap("smp_n_2", createLBTopo_smp_n_2));
+    lbTopos.push_back(new LBTopoMap("smp_n_3", createLBTopo_smp_n_3));
+    lbTopos.push_back(new LBTopoMap("smp_n_4", createLBTopo_smp_n_4));
   }
   ~LBTopoVec() {
     for (int i=0; i<lbTopos.length(); i++)

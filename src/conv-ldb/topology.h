@@ -10,8 +10,12 @@
 */
 /*@{*/
 
+
 #ifndef _LBTOPOLOGY_H
 #define _LBTOPOLOGY_H
+
+#define HOP_LINK_DELAY 10e-6
+#define HOP_PROC_DELAY 10e-6
 
 #ifdef __cplusplus
 
@@ -29,11 +33,14 @@ public:
   virtual bool get_processor_id(const int* processor_coordinates, int* processor_id) { return false; }
   virtual bool coordinate_difference(const int* my_coordinates, const int* target_coordinates, int* difference) { return false;}
   virtual bool coordinate_difference(int my_processor_id, int target_processor_id, int* difference) { return false; }
+  virtual int get_hop_count(int src,int dest);
+  virtual int rec_hop_count(int src,int dest,int max_neigh,int count,int *visited_srcs);
+  virtual double per_hop_delay(int last_hop);
 };
 
 #define LBTOPO_MACRO(x) \
-  static LBTopology * create##x() { 	\
-    return new x(CkNumPes()); 	\
+  static LBTopology * create##x(int np) { 	\
+		return new x(np); 	\
   }
 
 class LBTopo_ring: public LBTopology {
@@ -41,6 +48,7 @@ public:
   LBTopo_ring(int p): LBTopology(p) {}
   virtual int max_neighbors();
   virtual void neighbors(int mype, int* _n, int &nb);
+  virtual int get_hop_count(int src,int dest);
 };
 
 class LBTopo_torus2d: public LBTopology {
@@ -51,6 +59,7 @@ public:
   LBTopo_torus2d(int p);
   virtual int max_neighbors();
   virtual void neighbors(int mype, int* _n, int &nb);
+  virtual int get_hop_count(int src,int dest);
 };
 
 class LBTopo_torus3d: public LBTopology {
@@ -70,7 +79,7 @@ public:
   virtual void neighbors(int mype, int* _n, int &nb);
 };
 
-typedef  LBTopology* (*LBtopoFn)();
+typedef  LBTopology* (*LBtopoFn)(int);
 
 #else
 typedef  void* (*LBtopoFn)();
