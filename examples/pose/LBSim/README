@@ -28,3 +28,9 @@ Note: endTime here is actual end of simulation i.e. last time entry in the dataf
 Next <outputfilename2>  should be appropriately entered in the gnuplot script such as plotsim.p 
 
 Then a command "gnuplot plotsim.p" will generate the graphical output.
+
+To add a new topology:
+1)Declare the topology class in topology.h.
+2)Include two functions: a) max_neighbors() which gives the number of neighbors and b)neighbors() which returns the list of neighbors
+3)Define the functions in topology.C
+4)Register the topology in class CkLBTopoVec
