@@ -1295,7 +1295,7 @@ void CthYield()
   CthSuspend();
 }
 
-void CthAwakenPrio(CthThread th, int s, int pb, int *prio)
+void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 {
   if (th->awakenfn == 0) CthNoStrategy();
   th->awakened = 1;
@@ -1309,7 +1309,7 @@ void CthAwakenPrio(CthThread th, int s, int pb, int *prio)
   th->awakenfn(th, s, pb, prio);
 }
 
-void CthYieldPrio(int s, int pb, int *prio)
+void CthYieldPrio(int s, int pb, unsigned int *prio)
 {
   CthAwakenPrio(CthCpvAccess(CthCurrent), s, pb, prio);
   CthSuspend();
