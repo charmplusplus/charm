@@ -121,7 +121,7 @@ void _futuresModuleInit(void)
   addedFutures(0,10);
 }
 
-CProxy_FutureBOC fBOC(0);
+CkGroupID _fbocID;
 
 class FutureInitMsg : public CMessage_FutureInitMsg {
   public: int x ;
@@ -130,7 +130,7 @@ class FutureInitMsg : public CMessage_FutureInitMsg {
 class  FutureMain : public Chare {
   public:
     FutureMain(CkArgMsg *m) {
-      fBOC.ckSetGroupId(CProxy_FutureBOC::ckNew(new FutureInitMsg));
+      _fbocID = CProxy_FutureBOC::ckNew(new FutureInitMsg);
       delete m;
     }
 };
@@ -209,6 +209,7 @@ extern "C"
 void CkSendToFuture(CkFutureID futNum, void *m, int PE)
 {
   UsrToEnv(m)->setRef(futNum);
+  CProxy_FutureBOC fBOC(_fbocID);
   fBOC.SetFuture((FutureInitMsg *)m,PE);
 }
 

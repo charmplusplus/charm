@@ -12,5 +12,5 @@ module CkFutures {
     entry FutureMain();
   };
 
-  readonly CProxy_FutureBOC fBOC;
+  readonly CkGroupID _fbocID;
 };
