@@ -237,6 +237,8 @@ void ComlibManager::endIteration(){
 //receive the list of strategies
 void ComlibManager::receiveTable(StrategyWrapper sw){
     
+    ComlibPrintf("[%d] In receiveTable\n", CkMyPe());
+
     receivedTable = 1;
     nstrats = sw.nstrats;
 

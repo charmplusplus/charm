@@ -13,6 +13,8 @@ void setReverseMap(int *procMap, int *pelist, int npes){
 }
 
 EachToManyStrategy::EachToManyStrategy(int substrategy){
+    CkAbort("This strategy is broken, use EachToManyMulticastStrategy\n");
+
     ComlibPrintf("In constructor, %d\n", substrategy);
     routerID = substrategy;
     messageBuf = 0;

@@ -13,14 +13,11 @@ class EachToManyMulticastStrategy: public Strategy {
 
     int ndestpes, *destpelist, *destMap; //Destination processors
 
-    long handler;  //Multicast Handler function pointer to be called on the 
-                   //receiving processors.
     int handlerId;
 
     CkArrayID destArrayID;
     int nDestElements;  //0 for all array elements
     CkArrayIndexMax *destIndices; //NULL for all indices
-    
     CkVec<CkArrayIndexMax> localDestIndices;
     
     void init();
@@ -28,22 +25,16 @@ class EachToManyMulticastStrategy: public Strategy {
     void setReverseMap();
 
  public:
-    EachToManyMulticastStrategy(int strategyId,int nsrcpes =0,int *srcpelist=0);
+    EachToManyMulticastStrategy(int strategyId,int nsrcpes =0,
+                                int *srcpelist=0);
     EachToManyMulticastStrategy(int strategyId, int nsrcpes, int *srcpelist, 
                                 int ndestpes =0, int *destpelist =0);
     
-    EachToManyMulticastStrategy(int substrategy, CkArrayID src, int nsrc=0, 
-                                CkArrayIndexMax *srcelements=0);
-
     EachToManyMulticastStrategy(int substrategy, CkArrayID src, 
-                                CkArrayID dest, int ndest=0, 
+                                CkArrayID dest, int nsrc=0, 
+                                CkArrayIndexMax *srcelements=0, int ndest=0, 
                                 CkArrayIndexMax *destelements=0);
     
-    EachToManyMulticastStrategy(int substrategy, CkArrayID src, int nsrc, 
-                                CkArrayIndexMax *srcelements, CkArrayID dest,
-                                int ndest=0, 
-                                CkArrayIndexMax *destelements=0);
-
     EachToManyMulticastStrategy(CkMigrateMessage *m){}
 
     //ComlibMulticastHandler getHandler()
