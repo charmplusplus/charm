@@ -91,7 +91,7 @@ static int typesize(int type, int count)
     case CMPI_REAL : return count*sizeof(float);
     case CMPI_COMPLEX: return 2*count*sizeof(double);
     case CMPI_LOGICAL: return 2*count*sizeof(int);
-    case CMPI_CHARACTER:
+    case CMPI_CHAR:
     case CMPI_BYTE:
     case CMPI_PACKED:
     default:
