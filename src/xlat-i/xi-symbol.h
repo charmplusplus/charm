@@ -240,6 +240,7 @@ class Parameter {
     void marshallArrayData(XStr &str);
     void beginUnmarshall(XStr &str);
     void unmarshallArrayData(XStr &str);
+    void pupAllValues(XStr &str);
   public:
     Parameter(int Nline,Type *Ntype,const char *Nname=0,
     	const char *NarrLen=0,Value *Nvalue=0);
@@ -322,6 +323,7 @@ class ParamList {
     void beginUnmarshall(XStr &str);
     void unmarshall(XStr &str);
     void unmarshallAddress(XStr &str);
+    void pupAllValues(XStr &str);
     void endUnmarshall(XStr &str);
     int operator==(const ParamList &plist) const {
       if (!(*param == *(plist.param))) return 0;

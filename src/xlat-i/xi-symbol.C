@@ -2258,6 +2258,9 @@ void Entry::genIndexDecls(XStr& str)
     str << "    static int _callmarshall_"<<epStr()<<"(char* impl_buf,"<<
       container->baseName()<<"* impl_obj);\n";
   }
+  if (param->isMarshalled()) {
+    str << "    static void _marshallmessagepup_"<<epStr()<<"(PUP::er &p,void *msg);\n";
+  }
 }
 
 void Entry::genDecls(XStr& str)
@@ -2564,6 +2567,13 @@ void Entry::genDefs(XStr& str)
     str << "  return implP.size();\n";
     str << "}\n";
   }
+  if (param->isMarshalled()) {
+     str << makeDecl("void")<<"::_marshallmessagepup_"<<epStr()<<"(PUP::er &implDestP,void *impl_msg) {\n";
+     str << "  char *impl_buf=((CkMarshallMsg *)impl_msg)->msgBuf;\n";
+     param->beginUnmarshall(str);
+     param->pupAllValues(str);
+     str << "}\n";
+  }
 }
 
 void Entry::genReg(XStr& str)
@@ -2598,6 +2608,15 @@ void Entry::genReg(XStr& str)
   if (hasCallMarshall)
       str << "  CkRegisterMarshallUnpackFn("<<epIdx(0)<<
             ",(CkMarshallUnpackFn)_callmarshall_"<<epStr()<<");\n";
+  
+  if (param->isMarshalled()) {
+      str << "  CkRegisterMessagePupFn("<<epIdx(0)<<
+  	    ",(CkMessagePupFn)_marshallmessagepup_"<<epStr()<<");\n";
+  }
+  else if (param->isMessage() && !attribs&SMIGRATE) {
+      str << "  CkRegisterMessagePupFn("<<epIdx(0)<<", (CkMessagePupFn)";
+      str << param->param->getType()->getBaseName() <<"::ckDebugPup);\n";
+  }
 }
 
 
@@ -2614,7 +2633,9 @@ The message looks like this:
 messagestart>--------- PUP'd data ----------------
 	|  PUP'd nx
 	|  PUP'd offset-to-xarr (from array start, int byte count)
+	|  PUP'd length-of-xarr (in elements)
 	|  PUP'd offset-to-yarr
+	|  PUP'd length-of-yarr (in elements)
 	|  PUP'd ny
 	+-------------------------------------------
 	|  alignment gap (to multiple of 16 bytes)
@@ -2804,7 +2825,10 @@ void Parameter::marshallArraySizes(XStr &str)
 	}
 }
 void Parameter::pup(XStr &str) {
-	if (isArray())  str<<"    implP|impl_off_"<<name<<";\n";
+	if (isArray()) {
+	   str<<"    implP|impl_off_"<<name<<";\n";
+	   str<<"    implP|impl_cnt_"<<name<<";\n";
+	}
 	else  {
 	  if (byReference) {
 	    str<<"    //Have to cast away const-ness to get pup routine\n";
@@ -2838,8 +2862,11 @@ void ParamList::beginUnmarshall(XStr &str)
 void Parameter::beginUnmarshall(XStr &str) 
 { //First pass: unpack pup'd entries
 	Type *dt=type->deref();//Type, without &
-	if (isArray())
-		str<<"  int impl_off_"<<name<<"; implP|impl_off_"<<name<<";\n";
+	if (isArray()) {
+		str<<"  int impl_off_"<<name<<", impl_cnt_"<<name<<"; \n";
+		str<<"  implP|impl_off_"<<name<<";\n";
+		str<<"  implP|impl_cnt_"<<name<<";\n";
+	}
 	else
 		str<<"  "<<dt<<" "<<name<<"; implP|"<<name<<";\n";
 }
@@ -2872,6 +2899,26 @@ void ParamList::unmarshallAddress(XStr &str)  //Pass-by-reference, for Fortran
     			next->unmarshallAddress(str);
     		}
     	}
+}
+void ParamList::pupAllValues(XStr &str) {
+	if (isMarshalled())
+		callEach(&Parameter::pupAllValues,str);
+}
+void Parameter::pupAllValues(XStr &str) {
+	str<<"  if (implDestP.hasComments()) implDestP.comment(\""<<name<<"\");\n";
+	if (isArray()) {
+	  str<<
+	  "  implDestP.synchronize(PUP::sync_begin_array);\n"
+	  "  { for (int impl_i=0;impl_i<impl_cnt_"<<name<<";impl_i++) { \n"
+	  "      implDestP.synchronize(PUP::sync_item);\n"
+	  "      implDestP|"<<name<<"[impl_i];\n"
+	  "  } } \n"
+	  "  implDestP.synchronize(PUP::sync_end_array);\n"
+	  ;
+	}
+	else /* not an array */ {
+	  str<<"  implDestP|"<<name<<";\n";
+	}
 }
 void ParamList::endUnmarshall(XStr &str) 
 {
