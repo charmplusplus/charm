@@ -113,7 +113,7 @@ void CmiMemoryInit(argv)
 void *malloc_reentrant(size_t size) { return malloc(size); }
 void free_reentrant(void *mem) { free(mem); }
 
-int CmiMemoryWatermark() { return 0; }
+int CmiMemoryUsage() { return 0; }
 #else 
 /*************************************************************
 *Not* using the system malloc-- first pick the implementation:
@@ -294,7 +294,7 @@ void free_reentrant(void *mem)
   REENTRANT_MEM_LOCK_AROUND( meta_free(mem); )
 }
 
-int CmiMemoryWatermark()
+int CmiMemoryUsage()
 {
 #ifndef CMK_OPTIMIZE
   return memory_allocated;
