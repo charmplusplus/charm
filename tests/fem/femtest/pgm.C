@@ -11,15 +11,21 @@ double *reduceValues=NULL;
 
 //Number of time steps to simulate
 int tsteps=10;
+const int dim=20;//Length of one side of the FEM mesh
+const int np=4; //Nodes per element for a quad
+
+//Sum of sparse data[0] for both sets
+double sparseSum[2];
 
 extern "C" void
 pupMyGlobals(pup_er p) 
 {
-	CkPrintf("pupMyGlobals on PE %d\n",CkMyPe());
+	//CkPrintf("pupMyGlobals on PE %d\n",CkMyPe());
 	pup_int(p,&tsteps);
 	if (pup_isUnpacking(p))
 		reduceValues=new double[tsteps];
 	pup_doubles(p,reduceValues,tsteps);
+	pup_doubles(p,sparseSum,2);
 }
 
 extern "C" void
@@ -34,8 +40,6 @@ init(void)
   CkPrintf("init called\n");
   tsteps=10;
   reduceValues=new double[tsteps];
-  const int dim=10;//Length of one side of the FEM mesh
-  const int np=4; //Nodes per element
   int *conn=new int[dim*dim*np];
   double *elements=new double[dim*dim];
   double *nodes=new double[(dim+1)*(dim+1)];
@@ -55,7 +59,28 @@ init(void)
 	   conn[(y*dim+x)*np+2]=(y+1)*(dim+1)+(x+1);
 	   conn[(y*dim+x)*np+3]=(y  )*(dim+1)+(x+1);
   }
-
+  
+  //Create some random sparse data.  The first set
+  // will run down the left side of the domain; the second set
+  // down the diagonal.
+  for (int sparseNo=0;sparseNo<2;sparseNo++) {
+    int nSparse=dim;
+    int *nodes=new int[2*nSparse];
+    double *data=new double[3*nSparse];
+    sparseSum[sparseNo]=0.0;
+    for (int y=0;y<nSparse;y++) {
+      nodes[2*y+0]=(y  )*(dim+1)+(y  )*sparseNo;
+      nodes[2*y+1]=(y+1)*(dim+1)+(y+1)*sparseNo;
+      double val=1.0+y*0.2+23.0*sparseNo;
+      sparseSum[sparseNo]+=val;
+      data[3*y+0]=data[3*y+1]=val;
+      data[3*y+2]=10.0;
+    }
+    FEM_Set_Sparse(sparseNo,nSparse, nodes,2, data,3,FEM_DOUBLE);
+    delete[] nodes;
+    delete[] data;
+  }
+  
   //Set the initial conditions
   elements[3*dim+1]=256;
   elements[2*dim+1]=256;
@@ -153,8 +178,9 @@ void testEqual(double is,double shouldBe,const char *what) {
 void testAssert(int shouldBe,const char *what,int myPartition=-1) 
 {
 	if (myPartition==-1) myPartition=FEM_My_Partition();
-	if (shouldBe)
-		CkPrintf("[chunk %d] %s test passed.\n",myPartition,what);
+	if (shouldBe) {
+		// CkPrintf("[chunk %d] %s test passed.\n",myPartition,what);
+	}
 	else /*test failed-- should not be*/
 	{
 		CkPrintf("[chunk %d] %s test FAILED! (pe %d)\n",
@@ -185,11 +211,45 @@ driver(void)
   //FEM_Print_Partition();
   Node *nodes = new Node[nnodes];
   Element *elements = new Element[nelems];
+  int doubleField=FEM_Create_Simple_Field(FEM_DOUBLE,1);
   int fid = FEM_Create_Field(FEM_DOUBLE, 1, 
 	(char *)(&nodes[0].val)-(char *)nodes, sizeof(Node));
   int efid = FEM_Create_Field(FEM_DOUBLE, 1, 
 	(char *)(&elements[0].val)-(char *)elements, sizeof(Element));
   int i;
+  
+//Test out reduction
+  double localSum = 1.0,globalSum;
+  FEM_Reduce(fid, &localSum, &globalSum, FEM_SUM);
+  testEqual(globalSum,(double)FEM_Num_Partitions(),"reduce");
+  
+//Test readonly global
+  testEqual(tsteps,nnodeData,"readonly");
+
+//Test barrier
+  FEM_Barrier();
+
+//Grab and check the sparse data:
+  for (int sparseNo=0;sparseNo<2;sparseNo++) {
+    int nSparse=FEM_Get_Sparse_Length(sparseNo);
+    //CkPrintf("FEM Chunk %d has %d sparse entries (pass %d)\n",myId,nSparse,sparseNo);
+    int *nodes=new int[2*nSparse];
+    double *data=new double[3*nSparse];
+    FEM_Get_Sparse(sparseNo,nodes,data);
+    double sum=0.0;
+    for (int y=0;y<nSparse;y++) {
+      testAssert(nodes[2*y]>=0 && nodes[2*y]<nnodes,"Sparse nodes");
+      testEqual(data[3*y+0],data[3*y+1],"Sparse data[0],[1]");
+      testEqual(data[3*y+2],10.0,"Sparse data[2]");
+      sum+=data[3*y];
+    }
+    double globalSum=0.0;
+    FEM_Reduce(doubleField,&sum,&globalSum,FEM_SUM);
+    if (globalSum<sparseSum[sparseNo]) //GlobalSum might be bigger because of duplicates
+    	CkAbort("Sparse data global sum indicates some missing sparse records!");
+    delete[] nodes;
+    delete[] data;
+  }
 
 //Set initial conditions
   for(i=0;i<nnodes;i++) {
@@ -213,14 +273,6 @@ driver(void)
 	  testEqual(elements[i].pad,123,"update element ghost field pad");
   for (i=0;i<ngelems;i++)
 	  testEqual(elements[i].val,elData[i],"update element ghost field test");
-
-//Test readonly global
-  testEqual(tsteps,nnodeData,"readonly");
-
-//Test barrier
-  FEM_Print("Going to barrier");
-  FEM_Barrier();
-  FEM_Print("Back from barrier");
 
   int *elList=new int[ngelems];
 
@@ -271,16 +323,11 @@ driver(void)
 	    if (elements[i].val>thresh)
 		    elList[elListLen++]=i;
 
-    FEM_Barrier();
-
-#if 0 /*FIXME: This seems to hang */
     //Get a list of ghost elements with large values
     FEM_Exchange_Ghost_Lists(0,elListLen,elList);
     elListLen=FEM_Get_Ghost_List_Length();
-    FEM_Print("GHOSTHANG> In");
     FEM_Get_Ghost_List(elList);
-    FEM_Print("GHOSTHANG>     Back");
-    CkPrintf("[%d] My ghost list has %d entries\n",myId,elListLen);
+    //CkPrintf("[%d] My ghost list has %d entries\n",myId,elListLen);
     //Make sure everything on the list are actually ghosts and
     // actually have large values
     for (i=0;i<elListLen;i++) {
@@ -288,7 +335,6 @@ driver(void)
 	    testAssert(elList[i]>=nelems,"Ghost list ghost test (lower)");
 	    testAssert(elements[elList[i]].val>thresh,"Ghost list contents test");
     }
-#endif
 
 #if 0 /*FIXME: This fails on more than two processors*/
     double *nodeOut=new double[nnodes];
@@ -300,10 +346,7 @@ driver(void)
 #endif
   }
 
-  double localSum = 1.0,globalSum;
-  FEM_Reduce(fid, &localSum, &globalSum, FEM_SUM);
-  testEqual(globalSum,(double)FEM_Num_Partitions(),"reduce");
-  FEM_Print("All tests passed.\n");
+  FEM_Print("All tests passed.");
 
   FEM_Done();
 }
