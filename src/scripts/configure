@@ -923,6 +923,22 @@ EOF
 
 
 
+#### check if socklen_t exists ####
+cat > $t <<EOT
+#include <sys/types.h>
+#include <sys/socket.h>
+
+void foo(void) {
+	int i;
+	socklen_t s=sizeof(i);
+}
+EOT
+test_cxx "whether it has socklen_t" "yes" "no" ""
+cat >> confdefs.h <<EOF
+#define CMK_HAS_SOCKLEN $pass
+EOF
+
+
 #### check if mmap exists ####
 cat > $t <<EOT
 #include <sys/types.h>
@@ -1049,7 +1065,7 @@ cat > conftest.f90 <<EOF
 EOF
 
 echo $ac_n "checking subroutine name used by Fortran compiler""... $ac_c" 1>&6
-echo "configure:1053: checking subroutine name used by Fortran compiler" >&5
+echo "configure:1069: checking subroutine name used by Fortran compiler" >&5
 $CMK_CF90 -c conftest.f90 > /dev/null 2> /dev/null
 
 if test -r conftest.o
@@ -1120,7 +1136,7 @@ case $version in
     # Extract the first word of "wget", so it can be a program name with args.
 set dummy wget; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1124: checking for $ac_word" >&5
+echo "configure:1140: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_WGET'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1149,7 +1165,7 @@ fi
     # Extract the first word of "lynx", so it can be a program name with args.
 set dummy lynx; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1153: checking for $ac_word" >&5
+echo "configure:1169: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_LYNX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1178,7 +1194,7 @@ fi
     # Extract the first word of "telnet", so it can be a program name with args.
 set dummy telnet; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1182: checking for $ac_word" >&5
+echo "configure:1198: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_TELNET'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1207,7 +1223,7 @@ fi
     # Extract the first word of "uudecode", so it can be a program name with args.
 set dummy uudecode; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1211: checking for $ac_word" >&5
+echo "configure:1227: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_UUDECODE'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1238,7 +1254,7 @@ fi
 #    CHARMIP='charm.cs.uiuc.edu'
 #    VERSION=`nm /lib/libc.so.6 | grep "A GLIBC_" | tail -1 | sed -e "s/00000000 A GLIBC_//g"`
     echo $ac_n "checking glibc version""... $ac_c" 1>&6
-echo "configure:1242: checking glibc version" >&5
+echo "configure:1258: checking glibc version" >&5
     get_glibc_version
     echo "$ac_t""$GLIBCVERSION" 1>&6
     if test 1 = `expr $GLIBCVERSION \> 2.2.92` 

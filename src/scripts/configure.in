@@ -335,6 +335,19 @@ test_cxx "whether getProcAddress works" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_DLL_USE_WIN32, $pass)
 
 
+#### check if socklen_t exists ####
+cat > $t <<EOT
+#include <sys/types.h>
+#include <sys/socket.h>
+
+void foo(void) {
+	int i;
+	socklen_t s=sizeof(i);
+}
+EOT
+test_cxx "whether it has socklen_t" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_SOCKLEN, $pass)
+
 #### check if mmap exists ####
 cat > $t <<EOT
 #include <sys/types.h>
