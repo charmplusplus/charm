@@ -52,8 +52,9 @@ public:
 private:
   char flag;
 public:
-  mCastEntry(): numChild(0),flag(COOKIE_NOTREADY), 
-                oldc(NULL), newc(NULL), needRebuild(0){}
+  mCastEntry(): numChild(0), 
+                oldc(NULL), newc(NULL), needRebuild(0),
+		flag(COOKIE_NOTREADY) {}
   mCastEntry(mCastEntry *);
   inline int hasParent() { return parentGrp.val?1:0; }
   inline int isObsolete() { return (flag == COOKIE_OLD); }
@@ -111,7 +112,7 @@ extern void CkPackMessage(envelope **pEnv);
 
 
 mCastEntry::mCastEntry (mCastEntry *old): 
-flag(COOKIE_NOTREADY), oldc(NULL), newc(NULL)
+  oldc(NULL), newc(NULL), flag(COOKIE_NOTREADY)
 {
   parentGrp = old->parentGrp;
   for (int i=0; i<old->allElem.length(); i++)
@@ -132,13 +133,11 @@ void CkMulticastMgr::setSection(CkSectionCookie &_id, CkArrayID aid, CkArrayInde
 //  entry->aid = aid;
   _id.aid = aid;
   _id.val = entry;		// allocate table for this section
-  CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   initCookie(_id);
 }
 
 void CkMulticastMgr::setSection(CkSectionCookie &id)
 {
-  CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   initCookie(id);
 }
 
@@ -154,7 +153,6 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
   }
   _id.aid = proxy.ckGetArrayID();
   _id.val = entry;		// allocate table for this section
-  CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   initCookie(_id);
 }
 

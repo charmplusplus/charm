@@ -209,7 +209,7 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
 
   const int clients = CkNumPes();
   if (stats_msg_count == clients) {
-    double strat_start_time = CmiWallTimer();
+//    double strat_start_time = CmiWallTimer();
 
 //    CkPrintf("Before setting bitmap\n");
     for(proc = 0; proc < clients; proc++)
@@ -235,8 +235,7 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
       statsMsgsList[i]=0;
     }
     stats_msg_count=0;
-    double strat_end_time = CmiWallTimer();
-    //    CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
+    //    CkPrintf("Strat elapsed time %f\n",CmiWallTimer()-strat_start_time);
   }
   
 }
@@ -262,8 +261,6 @@ void CentralLB::RemoveNonMigratable(LDStats* stats, int count)
   for (pe=0; pe<count; pe++) {
     int n_objs = stats[pe].n_objs;
     LDObjData *objData = stats[pe].objData; 
-    int n_comm = stats[pe].n_comm;
-    LDCommData *commData = stats[pe].commData;
     int l=-1, h=n_objs;
     while (l<h) {
       while (objData[l+1].migratable && l<h) l++;
@@ -290,8 +287,6 @@ void CentralLB::RemoveNonMigratable(LDStats* stats, int count)
 
   // modify comm data
   for (pe=0; pe<count; pe++) {
-    int n_objs = stats[pe].n_objs;
-    LDObjData *objData = stats[pe].objData; 
     int n_comm = stats[pe].n_comm;
     LDCommData *commData = stats[pe].commData;
     int l=-1, h=n_comm;

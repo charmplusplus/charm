@@ -117,12 +117,12 @@ int LBCommData::compute_key()
     pcount = sprintf(kptr,"%d",src_proc);
     kptr += pcount;
   } else {
-    pcount = sprintf(kptr,"%d%d%d%d%d",srcObj.omhandle.id.id,
+    pcount = sprintf(kptr,"%d%d%d%d%d",srcObj.omhandle.id.id.idx,
 		     srcObj.id.id[0],srcObj.id.id[1],
 		     srcObj.id.id[2],srcObj.id.id[3]);
     kptr += pcount;
   }
-  pcount += sprintf(kptr,"%d%d%d%d%dXXXXXXXX",destOM.id,
+  pcount += sprintf(kptr,"%d%d%d%d%dXXXXXXXX",destOM.id.idx,
 		    destObj.id[0],destObj.id[1],
 		    destObj.id[2],destObj.id[3]);
   pcount -= 8;  /* The 'X's insure that the next few bytes are fixed */

@@ -24,10 +24,10 @@ void printPartition(Graph * g, int nodes[], int numNodes)
 
 }
 
-intSqrt(int x)
+int intSqrt(int x)
 { 
-  int y;
-  y = 4; /* change later */
+  int y=1;
+  while (y*y<x) y++;
   return y; 
 }
 

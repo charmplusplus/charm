@@ -251,7 +251,7 @@ protected:
 	T *table; //Data in table [rows * cols]
 public:
 	BasicTable2d(T *src,int cols_,int rows_) 
-		:cols(cols_), rows(rows_), table(src) {}
+		:rows(rows_), cols(cols_), table(src) {}
 	
 	//"size" of the table is the number of rows:
 	inline int size(void) const {return rows;}
@@ -761,6 +761,7 @@ public:
 */
 class MeshChunkOutput {
  public:
+	virtual ~MeshChunkOutput() {} /*<- for whining compilers*/
 	//Transfer ownership of this mesh chunk
 	virtual void accept(int chunkNo,MeshChunk *msg) =0;
 };

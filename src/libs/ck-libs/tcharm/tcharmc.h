@@ -62,6 +62,9 @@ double TCharmWallTimer(void);
 /*Standalone startup routine*/
 void TCharmInit(int *argc,char ***argv);
 
+/*Internal library routine*/
+void TCharmInUserSetup(void);
+
 #ifdef __cplusplus
 };
 #endif

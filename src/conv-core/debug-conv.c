@@ -4,6 +4,8 @@ Converse-level debugger support
 Collected from convcore.c, conv-ccs.c, register.c by
 Orion Sky Lawlor, olawlor@acm.org, 4/10/2001
  */
+#include <stdio.h> /*for sscanf*/
+#include <string.h> /*for strcmp*/
 #include "converse.h"
 #include "conv-trace.h"
 #include "queueing.h"
@@ -33,7 +35,6 @@ static void CpdDebugHandler(char *msg)
       CpdUnFreeze();
       CmiPrintf("unfreeze received\n");
     }
-#if 0
     else if (strncmp(name, "step", strlen("step")) == 0){
       CmiPrintf("step received\n");
       CpvAccess(stepFlag) = 1;
@@ -44,6 +45,7 @@ static void CpdDebugHandler(char *msg)
       CpvAccess(continueFlag) = 1;
       CpdUnFreeze();
     }
+#if 0
     else if (strncmp(name, "setBreakPoint", strlen("setBreakPoint")) == 0){
       CmiPrintf("setBreakPoint received\n");
       temp = strstr(name, "#");

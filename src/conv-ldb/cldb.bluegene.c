@@ -96,9 +96,6 @@ void CldEnqueue(int pe, void *msg, int infofn)
   int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
-  int size;
-
-  int sx,sy,sz; BgGetSize(&sx, &sy, &sz); size = (sx*sy*sz);
 
   DEBUGF(("[%d>] CldEnqueue pe: %d infofn:%d\n", BgMyNode(), pe, infofn));
   if (pe == CLD_ANYWHERE) {

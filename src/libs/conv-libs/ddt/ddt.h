@@ -80,7 +80,7 @@ class DDT_DataType {
 
   public:
     DDT_DataType() { } ;
-    ~DDT_DataType() { }  ;
+    virtual ~DDT_DataType() { }  ;
     DDT_DataType(int type) ;
     DDT_DataType(const DDT_DataType& obj) ;
     DDT_DataType& operator=(const DDT_DataType& obj);

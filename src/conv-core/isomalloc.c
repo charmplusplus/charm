@@ -215,14 +215,14 @@ free_slots(slotset *ss, int sslot, int nslots)
 }
 
 /*
- * destroys slotset
- */
+ * destroys slotset-- currently unused
 static void
 delete_slotset(slotset* ss)
 {
   free_reentrant(ss->buf);
   free_reentrant(ss);
 }
+ */
 
 #if CMK_THREADS_DEBUG
 static void
@@ -294,7 +294,9 @@ init_map(char **argv)
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#if !CMK_HAS_MMAP_ANON
 CpvStaticDeclare(int, zerofd); /*File descriptor for /dev/zero, for mmap*/
+#endif
 
 /*
  * maps the virtual memory associated with slot using mmap

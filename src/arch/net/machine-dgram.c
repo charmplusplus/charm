@@ -113,7 +113,7 @@ static void extract_args(char **argv)
   Cmi_comm_clock_delay=(int)(1000*Cmi_ack_delay);
 }
 
-/* Compare seqnos using modular arithmetic */
+/* Compare seqnos using modular arithmetic-- currently unused
 static int seqno_in_window(unsigned int seqno,unsigned int winStart)
 {
   return ((DGRAM_SEQNO_MASK&(seqno-winStart)) < Cmi_window_size);
@@ -128,6 +128,8 @@ static int seqno_le(unsigned int seqA,unsigned int seqB)
   unsigned int del=seqB-seqA;
   return (del>=0u) && (del<(DGRAM_SEQNO_MASK/2));
 }
+*/
+
 
 /*****************************************************************************
  *

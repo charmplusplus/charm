@@ -122,7 +122,7 @@ class AmpiMsg : public CMessage_AmpiMsg {
 
   AmpiMsg(void) { data = (char *)this + sizeof(AmpiMsg); }
   AmpiMsg(int _s, int t, int s, int l, int c) : 
-    seq(_s), tag(t),src(s),length(l),comm(c) {
+    seq(_s), tag(t),src(s),comm(c), length(l) {
     data = (char *)this + sizeof(AmpiMsg);
   }
   static void *alloc(int msgnum, size_t size, int *sizes, int pbits) {

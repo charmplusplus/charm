@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> /*For memset, memcpy*/
+#include <unistd.h> /*For getpagesize*/
 #include "converse.h"
 
 /*Choose the proper default configuration*/

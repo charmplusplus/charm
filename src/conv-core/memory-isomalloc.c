@@ -12,8 +12,6 @@ be wrapped in CmiMemLock.  (Doesn't hurt, tho')
 
 #include "memory-isomalloc.h"
 
-static int memInit=0;
-
 /*The current allocation arena */
 CpvStaticDeclare(CmiIsomallocBlockList *,isomalloc_blocklist);
 

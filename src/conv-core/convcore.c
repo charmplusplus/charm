@@ -1552,8 +1552,6 @@ extern void CmiIsomallocInit(char **argv);
 
 void ConverseCommonInit(char **argv)
 {
-  int i;
-
   CmiMemoryInit(argv);
   CmiTimerInit();
   CstatsInit(argv);

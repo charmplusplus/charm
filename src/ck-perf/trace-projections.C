@@ -18,8 +18,6 @@
 CkpvStaticDeclare(Trace*, _trace);
 CtvStaticDeclare(int,curThreadEvent);
 
-static int _numEvents = 0;
-static int warned = 0;
 static int _threadMsg, _threadChare, _threadEP;
 
 CkpvStaticDeclare(CkVec<char *>, usrEventlist);
@@ -32,6 +30,7 @@ public:
 CkpvStaticDeclare(CkVec<UsrEvent *>, usrEvents);
 
 #ifdef CMK_OPTIMIZE
+static int warned=0;
 #define OPTIMIZED_VERSION 	\
 	if (!warned) { warned=1; 	\
 	CmiPrintf("\n\n!!!! Warning: traceUserEvent not availbale in optimized version!!!!\n\n\n"); }

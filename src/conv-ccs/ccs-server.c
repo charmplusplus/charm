@@ -402,7 +402,7 @@ static int CcsServer_recvRequestData(SOCKET fd,
 				     CcsImplHeader *hdr,void **reqData)
 {
   CcsMessageHeader req;/*CCS header, from requestor*/
-  int pe,reqBytes;
+  int reqBytes;
   const char *err;
   if (NULL!=(err=CcsServer_readHeader(fd,&ccs_clientlist,security,
 				      &hdr->attr,&req))) 

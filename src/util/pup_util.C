@@ -294,7 +294,7 @@ public:
 	PUP::able::constructor_function ctor;
 	PUP_regEntry(const char *Nname,
 		const PUP::able::PUP_ID &Nid,PUP::able::constructor_function Nctor)
-		:name(Nname),id(Nid),ctor(Nctor) {}
+		:id(Nid),name(Nname),ctor(Nctor) {}
 	PUP_regEntry(int zero) {
 		name=NULL; //For marking "not found"
 	}

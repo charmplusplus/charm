@@ -151,11 +151,11 @@ LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
 
     // Now empty out the heaps
     InfoRecord* p;
-    while (p=procs.deleteMin())
+    while (NULL!=(p=procs.deleteMin()))
       delete p;
 
     InfoRecord* obj;
-    while (obj=objs.deleteMax())
+    while (NULL!=(obj=objs.deleteMax()))
       delete obj;
   }  
 

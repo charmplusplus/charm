@@ -354,16 +354,9 @@ linkage qualifiers by Orion.
 extern "C" {
 #endif
 
-#if __STD_C
-extern Void_t*     sbrk(size_t);
-#else
-extern Void_t*     sbrk();
-#endif
-
 /* mechanics for getpagesize; adapted from bsd/gnu getpagesize.h */
 
 #if defined(BSD) || defined(DGUX) || defined(sun) || defined(_WIN32) || defined(HAVE_GETPAGESIZE)
-   extern size_t getpagesize();
 #  define malloc_getpagesize getpagesize()
 #else
 #  include <sys/param.h>

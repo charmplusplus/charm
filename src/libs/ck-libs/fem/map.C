@@ -888,7 +888,7 @@ void splitter::addLayer(const ghostLayer &g,const FEM_Ghost &ghosts)
 		//For every element of every chunk:
 		int nEl=dyn[c].elem[t].size();
 		for (int e=0;e<nEl;e++) {
-			int i,gNo=dyn[c].elem[t][e].gNo;
+			int gNo=dyn[c].elem[t][e].gNo;
 			const int *conn=mesh->elem[t].connFor(gNo);
 			if (hasGhostNodes(conn,mesh->elem[t].getNodesPer()))
 			{ //Loop over this element's tuples:
@@ -988,7 +988,7 @@ and elements are added at the end.
 FEM_Mesh *fem_assemble(int nchunks,MeshChunk **msgs)
 {
 	FEM_Mesh *m=new FEM_Mesh;
-	int i,t,c,e,n;
+	int t,c,e,n;
 
 //Find the global total number of nodes and elements
 	int minOld_n=1000000000,maxOld_n=0,new_n=0; //Pre-existing and newly-created nodes

@@ -195,7 +195,7 @@ static CpdListAccessor *CpdListHeader_ccs_list_items(char *msg,
   h.lo=ChMessageInt(req[0]);
   h.hi=ChMessageInt(req[1]);
   h.extraLen=ChMessageInt(req[2]);
-  if (h.extraLen>=0 && (3*sizeof(ChMessageInt_t)+h.extraLen)<msgLen) {
+  if (h.extraLen>=0 && ((int)(3*sizeof(ChMessageInt_t)+h.extraLen))<msgLen) {
     h.extra=(void *)(req+3);
     ret=CpdListLookup((ChMessageInt_t *)(h.extraLen+(char *)h.extra));
     if (ret!=NULL) CpdListBoundsCheck(ret,h.lo,h.hi);

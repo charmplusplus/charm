@@ -307,7 +307,7 @@ class CharismaOutPort
   protected:
     CharismaInPort *inport;
   public:
-    virtual void emit(void *data, int len)
+    virtual void emitData(void *data, int len)
     {
       inport->send(data, len);
     }
@@ -324,7 +324,7 @@ class CkOutPort: public CharismaOutPort
     CkOutPort(const char *name) { _create(name); }
     void emit(d &_d)
     {
-      emit((void *) &_d, sizeof(d));
+      CharismaOutPort::emitData((void *) &_d, sizeof(d));
     }
 };
 
@@ -384,7 +384,7 @@ class CkOutPortString : public CharismaOutPort
     CkOutPortString(const char *name) { _create(name); }
     void emit(char *str)
     {
-      CharismaOutPort::emit((void *) str, (int) strlen(str)+1);
+      CharismaOutPort::emitData((void *) str, (int) strlen(str)+1);
     }
 };
 
@@ -434,7 +434,7 @@ class CkOutPortArray : public CharismaOutPort
     CkOutPortArray(const char *name) { _create(name); }
     void emit(int n, const d *a)
     {
-      emit((void *)a, n*sizeof(d));
+      CharismaOutPort::emitData((void *)a, n*sizeof(d));
     }
 };
 
@@ -499,7 +499,7 @@ class CkOutPortVoid : public CharismaOutPort
     CkOutPortVoid(const char *name) { _create(name); }
     void emit(void)
     {
-      CharismaOutPort::emit((void*) 0, 0);
+      CharismaOutPort::emitData((void*) 0, 0);
     }
 };
 
@@ -547,7 +547,7 @@ class CkOutPortMsg : public CharismaOutPort
     void emit(d *data)
     {
       // TODO: do message packing, and get the actual buffer size
-      emit((void*) data, sizeof(d));
+      CharismaOutPort::emitData((void*) data, sizeof(d));
     }
 };
 

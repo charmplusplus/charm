@@ -686,7 +686,7 @@ void CkArray::recvBroadcast(CkMessage *m)
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	broadcaster.incoming(msg);
 	//Run through the list of local elements
-	int idx=0,len=elements->length();
+	int idx=0;
 	ArrayElement *el;
 	while (NULL!=(el=elements->next(idx)))
 		broadcaster.deliver(msg,el);

@@ -244,7 +244,7 @@ LBMigrateMsg* Comm1LB::Strategy(CentralLB::LDStats* stats, int count)
 	add_graph(xcoord,ycoord,stats[pe].commData[com].bytes, stats[pe].commData[com].messages);	
       }
   
-  unsigned int id,maxid,spe=0,minpe=0,mpos;
+  int id,maxid,spe=0,minpe=0,mpos;
   double temp_cost,min_cost;
 
   pe = 0;

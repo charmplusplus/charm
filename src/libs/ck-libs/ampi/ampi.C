@@ -69,8 +69,6 @@ extern "C" void MPI_threadstart(void *data)
 	t.start();
 }
 
-static void ampiAttach(void);
-
 void ampiCreateMain(MPI_MainFn mainFn)
 {
 	int _nchunks=TCharmGetNumChunks();
@@ -327,14 +325,14 @@ void ampi::checkpoint(DirMsg *msg)
 CDECL void MPI_Checkpoint(char *dirname)
 {
   mkdir(dirname, 0777);
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   ptr->cthread_id = CthSelf();
   int idx = ptr->thisIndex;
   CProxy_ampi aproxy(ampimain::mpi_comms[ptr->commidx].aid);
   aproxy[idx].checkpoint(new DirMsg(dirname));
   ptr->stop_running();
   CthSuspend();
-  ptr = CtvAccess(ampiPtr);
+  ptr = getAmpiInstance();
   if(ptr->cthread_id != 0)
     CkAbort("cthread_id not 0 upon return !!\n");
   ptr->start_running();
@@ -379,6 +377,7 @@ void ampi::pup(PUP::er &p)
 
 static ampi *getAmpiInstance(void) {
   ampi *ret = CtvAccess(ampiPtr);
+  if (ret==NULL) CkAbort("Cannot call MPI routines before AMPI is initialized.\n");
   return ret;
 }
 
@@ -421,7 +420,7 @@ int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
                         int tag, MPI_Comm comm)
 {
   AMPIAPI("MPI_Send");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   ptr->send(tag, ptr->getIndex(), msg, count, type, dest, comm);
   return 0;
 }
@@ -431,7 +430,7 @@ int MPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
                         int tag, MPI_Comm comm)
 {
   AMPIAPI("MPI_Ssend");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   ptr->send(tag, ptr->getIndex(), msg, count, type, dest, comm);
   return 0;
 }
@@ -441,7 +440,7 @@ int MPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
               MPI_Comm comm, MPI_Status *status)
 {
   AMPIAPI("MPI_Recv");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   ptr->recv(tag,src,msg,count,type, comm, (int*) status);
   return 0;
 }
@@ -450,7 +449,7 @@ CDECL
 int MPI_Probe(int src, int tag, MPI_Comm comm, MPI_Status *status)
 {
   AMPIAPI("MPI_Probe");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   ptr->probe(tag,src, comm, (int*) status);
   return 0;
 }
@@ -459,7 +458,7 @@ CDECL
 int MPI_Iprobe(int src,int tag,MPI_Comm comm,int *flag,MPI_Status *status)
 {
   AMPIAPI("MPI_Iprobe");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   *flag = ptr->iprobe(tag,src,comm,(int*) status);
   return 0;
 }
@@ -482,7 +481,7 @@ int MPI_Barrier(MPI_Comm comm)
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
   }
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   ptr->barrier();
   return 0;
 }
@@ -496,7 +495,7 @@ int MPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
   }
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   ptr->bcast(root, buf, count, type);
   return 0;
 }
@@ -562,7 +561,7 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
   }
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   CkReduction::reducerType mytype = getReductionType(type,op);
   int size = ptr->myDDT->getType(type)->getSize(count) ;
   CkCallback reduceCB(CkIndex_ampi::reduceResult(0),CkArrayIndex1D(root),
@@ -583,7 +582,7 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
   }
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   CkReduction::reducerType mytype = getReductionType(type,op);
   int size = ptr->myDDT->getType(type)->getSize(count) ;
   CkCallback allreduceCB(ampiAllReduceHandler,(void *)&mpi_comms[ptr->commidx]);
@@ -603,7 +602,7 @@ CDECL
 int MPI_Start(MPI_Request *reqnum)
 {
   AMPIAPI("MPI_Start");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   if(*reqnum >= ptr->nrequests) {
     CkAbort("Invalid persistent Request..\n");
   }
@@ -619,7 +618,7 @@ CDECL
 int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts)
 {
   AMPIAPI("MPI_Waitall");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   int i;
   for(i=0;i<count;i++) {
     if(request[i] == (-1))
@@ -652,7 +651,7 @@ CDECL
 int MPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
 {
   AMPIAPI("MPI_Waitany");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   while(1) {
     for(*idx=0;(*idx)<count;(*idx)++) {
       if(request[*idx] == (-1))
@@ -693,7 +692,7 @@ CDECL
 int MPI_Wait(MPI_Request *request, MPI_Status *sts)
 {
   AMPIAPI("MPI_Wait");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   if(*request == (-1))
       return 0;
   if(*request < 100) { // persistent request
@@ -723,7 +722,7 @@ CDECL
 int MPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
 {
   AMPIAPI("MPI_Test");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   if(*request==(-1)) {
     *flag = 1;
     return 0;
@@ -763,7 +762,7 @@ int MPI_Recv_init(void *buf, int count, int type, int src, int tag,
 {
   AMPIAPI("MPI_Recv_init");
 
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
 
   if(ptr->nrequests == 100) {
     CmiAbort("Too many persistent commrequests.\n");
@@ -785,7 +784,7 @@ int MPI_Send_init(void *buf, int count, int type, int dest, int tag,
                    MPI_Comm comm, MPI_Request *req)
 {
   AMPIAPI("MPI_Send_init");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   if(ptr->nrequests == 100) {
     CmiAbort("Too many persistent commrequests.\n");
   }
@@ -806,7 +805,7 @@ int MPI_Type_contiguous(int count, MPI_Datatype oldtype,
                          MPI_Datatype *newtype)
 {
   AMPIAPI("MPI_Type_contiguous");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   ptr->myDDT->newContiguous(count, oldtype, newtype); 
   return 0;
 }
@@ -816,7 +815,7 @@ int MPI_Type_vector(int count, int blocklength, int stride,
                      MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("MPI_Type_vector");
-  ampi  *ptr = CtvAccess(ampiPtr);
+  ampi  *ptr = getAmpiInstance();
   ptr->myDDT->newVector(count, blocklength, stride, oldtype, newtype);
   return 0 ;
 }
@@ -826,7 +825,7 @@ int MPI_Type_hvector(int count, int blocklength, int stride,
                       MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("MPI_Type_hvector");
-  ampi  *ptr = CtvAccess(ampiPtr);
+  ampi  *ptr = getAmpiInstance();
   ptr->myDDT->newHVector(count, blocklength, stride, oldtype, newtype);
   return 0 ;
 }
@@ -836,7 +835,7 @@ int MPI_Type_indexed(int count, int* arrBlength, int* arrDisp,
                       MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("MPI_Type_indexed");
-  ampi  *ptr = CtvAccess(ampiPtr);
+  ampi  *ptr = getAmpiInstance();
   ptr->myDDT->newIndexed(count, arrBlength, arrDisp, oldtype, newtype);
   return 0 ;
 }
@@ -846,7 +845,7 @@ int MPI_Type_hindexed(int count, int* arrBlength, int* arrDisp,
                        MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("MPI_Type_hindexed");
-  ampi  *ptr = CtvAccess(ampiPtr);
+  ampi  *ptr = getAmpiInstance();
   ptr->myDDT->newHIndexed(count, arrBlength, arrDisp, oldtype, newtype);
   return 0 ;
 }
@@ -856,7 +855,7 @@ int MPI_Type_struct(int count, int* arrBlength, int* arrDisp,
                      MPI_Datatype* oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("MPI_Type_struct");
-  ampi  *ptr = CtvAccess(ampiPtr);
+  ampi  *ptr = getAmpiInstance();
   ptr->myDDT->newStruct(count, arrBlength, arrDisp, oldtype, newtype);
   return 0 ;
 }
@@ -872,7 +871,7 @@ CDECL
 int MPI_Type_free(MPI_Datatype *datatype)
 {
   AMPIAPI("MPI_Type_free");
-  ampi  *ptr = CtvAccess(ampiPtr);
+  ampi  *ptr = getAmpiInstance();
   ptr->myDDT->freeType(datatype);
   return 0;
 }
@@ -882,7 +881,7 @@ CDECL
 int MPI_Type_extent(MPI_Datatype datatype, MPI_Aint extent)
 {
   AMPIAPI("MPI_Type_extent");
-  ampi *ptr = CtvAccess(ampiPtr) ;
+  ampi *ptr = getAmpiInstance() ;
   *extent = ptr->myDDT->getExtent(datatype);
   return 0;
 }
@@ -891,7 +890,7 @@ CDECL
 int MPI_Type_size(MPI_Datatype datatype, MPI_Aint size)
 {
   AMPIAPI("MPI_Type_size");
-  ampi *ptr = CtvAccess(ampiPtr) ;
+  ampi *ptr = getAmpiInstance() ;
   *size = ptr->myDDT->getSize(datatype);
   return 0;
 }
@@ -901,7 +900,7 @@ int MPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
               int tag, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("MPI_Isend");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   
   ptr->send(tag, ptr->getIndex(), buf, count, type, dest, comm);
   *request = (-1);
@@ -913,7 +912,7 @@ int MPI_Issend(void *buf, int count, MPI_Datatype type, int dest,
               int tag, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("MPI_Issend");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   
   ptr->send(tag, ptr->getIndex(), buf, count, type, dest, comm);
   *request = (-1);
@@ -925,7 +924,7 @@ int MPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
               int tag, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("MPI_Irecv");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   if(ptr->nirequests == 100) {
     CmiAbort("Too many Irecv requests.\n");
   }
@@ -958,7 +957,7 @@ int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
   }
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   int size = ptr->getArraySize();
   int i;
   for(i=0;i<size;i++) {
@@ -986,7 +985,7 @@ int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
   }
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   int size = ptr->getArraySize();
   int i;
   for(i=0;i<size;i++) {
@@ -1014,7 +1013,7 @@ int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
   }
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   int size = ptr->getArraySize();
   int i;
 
@@ -1043,7 +1042,7 @@ int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
   }
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   int size = ptr->getArraySize();
   int i;
   MPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
@@ -1071,7 +1070,7 @@ int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
   }
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   int size = ptr->getArraySize();
   DDT_DataType* dttype = ptr->myDDT->getType(sendtype) ;
   int itemsize = dttype->getSize() ;
@@ -1102,7 +1101,7 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   {
     CkAbort("AMPI> Cannot have global operations across communicators.\n");
   }
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   int size = ptr->getArraySize();
   DDT_DataType* dttype = ptr->myDDT->getType(sendtype) ;
   int itemsize = dttype->getSize(sendcount) ;
@@ -1150,7 +1149,7 @@ CDECL
 int MPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count)
 {
   AMPIAPI("MPI_Get_count");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   DDT_DataType* dttype = ptr->myDDT->getType(dtype) ;
   int itemsize = dttype->getSize() ;
   *count = sts->MPI_LENGTH/itemsize;
@@ -1162,7 +1161,7 @@ int MPI_Pack(void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
               int outsize, int *position, MPI_Comm comm)
 {
   AMPIAPI("MPI_Pack");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   DDT_DataType* dttype = ptr->myDDT->getType(dtype) ;
   int itemsize = dttype->getSize();
   dttype->serialize((char*)inbuf, ((char*)outbuf)+(*position), incount, 1);
@@ -1175,7 +1174,7 @@ int MPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
               int outcount, MPI_Datatype dtype, MPI_Comm comm)
 {
   AMPIAPI("MPI_Unpack");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   DDT_DataType* dttype = ptr->myDDT->getType(dtype) ;
   int itemsize = dttype->getSize();
   dttype->serialize(((char*)inbuf+(*position)), (char*)outbuf, outcount, 1);
@@ -1187,7 +1186,7 @@ CDECL
 int MPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz)
 {
   AMPIAPI("MPI_Pack_size");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   DDT_DataType* dttype = ptr->myDDT->getType(datatype) ;
   return incount*dttype->getSize() ;
 }
@@ -1216,7 +1215,7 @@ CDECL
 void MPI_Print(char *str)
 {
   AMPIAPI("MPI_Print");
-  ampi *ptr = CtvAccess(ampiPtr);
+  ampi *ptr = getAmpiInstance();
   CkPrintf("[%d] %s\n", ptr->thisIndex, str);
 }
 

@@ -146,7 +146,6 @@ void memory_check(void)
 {
 	Slot *cur=slot_first.next;
 	int nBlocks=0, nBytes=0;
-	int nMegs,nKb;
 	while (cur!=&slot_first) {
 		checkSlot(cur);
 		nBlocks++;

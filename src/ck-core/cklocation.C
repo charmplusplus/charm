@@ -1002,12 +1002,11 @@ CmiBool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg)
 {//Insert the new element into its manager's local list
 	int localIdx=rec->getLocalIndex();
-	const CkArrayIndex &idx=rec->getIndex();
 	if (m->elts.get(localIdx)!=NULL) CkAbort("Cannot insert array element twice!");
 	m->elts.put(elt,localIdx); //Local element table
 	
 //Call the element's constructor
-	DEBC((AA"Constructing element %s of array\n"AB,idx2str(idx)));
+	DEBC((AA"Constructing element %s of array\n"AB,idx2str(rec->getIndex())));
 	CkMigratable_initInfo &i=CkpvAccess(mig_initInfo);
 	i.locRec=rec;
 	i.chareType=_entryTable[ctorIdx]->chareIdx;
@@ -1154,10 +1153,9 @@ CmiBool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe)
 void CkLocMgr::multiHop(CkArrayMessage *msg)
 {
 	magic.check();
-	int hopCount=msg->array_hops();
 	int srcPe=msg->array_getSrcPe();
 	if (srcPe==CkMyPe())
-		DEB((AA"Odd routing: local element %s is %d hops away!\n"AB,idx2str(msg),hopCount));
+		DEB((AA"Odd routing: local element %s is %d hops away!\n"AB,idx2str(msg),msg->array_hops()));
 	else
 	{//Send a routing message letting original sender know new element location
 		DEBS((AA"Sending update back to %d for element\n"AB,srcPe,idx2str(msg)));

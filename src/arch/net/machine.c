@@ -1222,7 +1222,6 @@ static void node_addresses_obtain(char **argv)
   if (Cmi_charmrun_fd==-1) 
   {/*Standalone-- fake a single-node nodetab message*/
   	int npes=1;
-  	int fakeLen=sizeof(ChSingleNodeinfo);
   	ChSingleNodeinfo *fakeTab;
 	ChMessage_new("nodeinfo",sizeof(ChSingleNodeinfo),&nodetabmsg);
 	fakeTab=(ChSingleNodeinfo *)(nodetabmsg.data);

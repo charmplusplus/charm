@@ -50,8 +50,8 @@ void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty) {
 	  p.comment("Message Envelope:");
 	  env->pup(p);
 	  p.comment("Message User Data:");
-	  int ep=env->getEpIdx();
 #if 0 /* Messages *should* be packed according to entry point: */
+	  int ep=env->getEpIdx();
 	  if (ep>0 && ep<_numEntries)
 	    _entryTable[ep]->pupFn(p,*atMsg);
 	  else

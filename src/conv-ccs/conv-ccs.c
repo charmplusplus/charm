@@ -268,8 +268,6 @@ void CcsBuiltinsInit(char **argv);
 
 void CcsInit(char **argv)
 {
-  int ccs_serverPort=0;
-  char *ccs_serverAuth=NULL;
   CpvInitialize(CkHashtable_c, ccsTab);
   CpvAccess(ccsTab) = CkCreateHashtable_string(sizeof(CmiHandler),5);
   CpvInitialize(CcsImplHeader *, ccsReq);
@@ -280,14 +278,19 @@ void CcsInit(char **argv)
 
 #if NODE_0_IS_CONVHOST
   rep_fw_handler_idx = CmiRegisterHandler(rep_fw_handler);
-  if (CmiGetArgFlag(argv,"++server") | 
+  {
+   int ccs_serverPort=0;
+   char *ccs_serverAuth=NULL;
+   
+   if (CmiGetArgFlag(argv,"++server") | 
       CmiGetArgInt(argv,"++server-port",&ccs_serverPort) |
       CmiGetArgString(argv,"++server-auth",&ccs_serverAuth)) 
     if (CmiMyPe()==0)
     {/*Create and occasionally poll on a CCS server port*/
       CcsServer_new(NULL,&ccs_serverPort,ccs_serverAuth);
-      CcdCallOnConditionKeep(CcdPERIODIC,CcsServerCheck,NULL);
+      CcdCallOnConditionKeep(CcdPERIODIC,(CcdVoidFn)CcsServerCheck,NULL);
     }
+  }
 #endif
 }
 

@@ -388,20 +388,16 @@ do
 		OPTSL="$OPTSL $arg"
 		;;
 
-	"-pg"|"-g")
-		OPTS="$OPTS $arg"
-		;;
-
 	"-O")
 		OPTIMIZE_MODE=true
 		;;
 
-	-O*)
-		OPTS="$OPTS $arg"
-		;;
-
 	"-NO")
 		OPTIMIZE_MODE=false
+		;;
+	
+	"-pg"|"-g"|-W*|-O*)
+		OPTS="$OPTS $arg"
 		;;
 
 	-l*)

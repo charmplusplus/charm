@@ -9,8 +9,9 @@
 /*
  * converse master-slave (or manager-worker or agenda) paradigm library 
  */
-
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "cms.h"
 
 typedef struct {

@@ -65,7 +65,7 @@ static word32 rotlFixed(word32 x, word32 y)
 #elif defined(__MWERKS__) && TARGET_CPU_PPC
 	return y ? __rlwinm(x,y,0,31) : x;
 #else /*Default C version*/
-	return (0xFFffFFffu)&((x<<y)) | (((0xFFffFFffu)&x)>>(32-y));
+	return ((0xFFffFFffu)&(x<<y)) | (((0xFFffFFffu)&x)>>(32-y));
 #endif
 }
 

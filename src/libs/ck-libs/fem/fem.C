@@ -869,7 +869,7 @@ FDECL void FTN_NAME(FEM_GET_ELEM_CONN_C,fem_get_elem_conn_c)
 /******************** Reduction Support **********************/
 
 template<class d>
-void sum(const int len, d* lhs, const d* rhs)
+void sumFn(const int len, d* lhs, const d* rhs)
 {
   int i;
   for(i=0;i<len;i++) {
@@ -882,7 +882,7 @@ void sum(const int len, d* lhs, const d* rhs)
 #undef min
 
 template<class d>
-void max(const int len, d* lhs, const d* rhs)
+void maxFn(const int len, d* lhs, const d* rhs)
 {
   int i;
   for(i=0;i<len;i++) {
@@ -892,7 +892,7 @@ void max(const int len, d* lhs, const d* rhs)
 }
 
 template<class d>
-void min(const int len, d* lhs, const d* rhs)
+void minFn(const int len, d* lhs, const d* rhs)
 {
   int i;
   for(i=0;i<len;i++) {
@@ -902,13 +902,31 @@ void min(const int len, d* lhs, const d* rhs)
 }
 
 template<class d>
-void assign(const int len, d* lhs, d val)
+void assignFn(const int len, d* lhs, d val)
 {
   int i;
   for(i=0;i<len;i++) {
     *lhs = val;
   }
 }
+
+//Force template-fn instantiations (for compilers too stupid to figure them out)
+
+//Instantiate this routine for these arguments:
+#define force_routine(fnName,tempParam,args) \
+	template void fnName<tempParam> args
+
+//Instaniate all routines for this data type
+#define force_instantiate(datatype) \
+	force_routine(sumFn,datatype,(const int len,datatype *lhs,const datatype *rhs));\
+	force_routine(minFn,datatype,(const int len,datatype *lhs,const datatype *rhs));\
+	force_routine(maxFn,datatype,(const int len,datatype *lhs,const datatype *rhs));\
+	force_routine(assignFn,datatype,(const int len,datatype *lhs,datatype val));
+
+force_instantiate(unsigned char);
+force_instantiate(int);
+force_instantiate(float);
+force_instantiate(double);
 
 static inline void
 initialize(const DType& dt, void *lhs, int op)
@@ -917,31 +935,31 @@ initialize(const DType& dt, void *lhs, int op)
     case FEM_SUM:
       switch(dt.base_type) {
         case FEM_BYTE : 
-          assign(dt.vec_len,(unsigned char*)lhs, (unsigned char)0); 
+          assignFn(dt.vec_len,(unsigned char*)lhs, (unsigned char)0); 
           break;
-        case FEM_INT : assign(dt.vec_len,(int*)lhs, 0); break;
-        case FEM_REAL : assign(dt.vec_len,(float*)lhs, (float)0.0); break;
-        case FEM_DOUBLE : assign(dt.vec_len,(double*)lhs, 0.0); break;
+        case FEM_INT : assignFn(dt.vec_len,(int*)lhs, 0); break;
+        case FEM_REAL : assignFn(dt.vec_len,(float*)lhs, (float)0.0); break;
+        case FEM_DOUBLE : assignFn(dt.vec_len,(double*)lhs, 0.0); break;
       }
       break;
     case FEM_MAX:
       switch(dt.base_type) {
         case FEM_BYTE : 
-          assign(dt.vec_len,(unsigned char*)lhs, (unsigned char)CHAR_MIN); 
+          assignFn(dt.vec_len,(unsigned char*)lhs, (unsigned char)CHAR_MIN); 
           break;
-        case FEM_INT : assign(dt.vec_len,(int*)lhs, INT_MIN); break;
-        case FEM_REAL : assign(dt.vec_len,(float*)lhs, FLT_MIN); break;
-        case FEM_DOUBLE : assign(dt.vec_len,(double*)lhs, DBL_MIN); break;
+        case FEM_INT : assignFn(dt.vec_len,(int*)lhs, INT_MIN); break;
+        case FEM_REAL : assignFn(dt.vec_len,(float*)lhs, FLT_MIN); break;
+        case FEM_DOUBLE : assignFn(dt.vec_len,(double*)lhs, DBL_MIN); break;
       }
       break;
     case FEM_MIN:
       switch(dt.base_type) {
         case FEM_BYTE : 
-          assign(dt.vec_len,(unsigned char*)lhs, (unsigned char)CHAR_MAX); 
+          assignFn(dt.vec_len,(unsigned char*)lhs, (unsigned char)CHAR_MAX); 
           break;
-        case FEM_INT : assign(dt.vec_len,(int*)lhs, INT_MAX); break;
-        case FEM_REAL : assign(dt.vec_len,(float*)lhs, FLT_MAX); break;
-        case FEM_DOUBLE : assign(dt.vec_len,(double*)lhs, DBL_MAX); break;
+        case FEM_INT : assignFn(dt.vec_len,(int*)lhs, INT_MAX); break;
+        case FEM_REAL : assignFn(dt.vec_len,(float*)lhs, FLT_MAX); break;
+        case FEM_DOUBLE : assignFn(dt.vec_len,(double*)lhs, DBL_MAX); break;
       }
       break;
   }
@@ -954,11 +972,6 @@ typedef void (*combineFn_INT)(const int len,int *lhs,const int *rhs);
 typedef void (*combineFn_REAL)(const int len,float *lhs,const float *rhs);
 typedef void (*combineFn_DOUBLE)(const int len,double *lhs,const double *rhs);
 
-
-static combineFn
-combine(const DType& dt, int op)
-{
-  switch(op) {
 //This odd-looking define selects the appropriate templated type
     // of "fn", casts it to a void* type, and returns it.
 #define combine_switch(fn) \
@@ -969,9 +982,14 @@ combine(const DType& dt, int op)
         case FEM_DOUBLE : return (combineFn)(combineFn_DOUBLE)fn;\
       }\
       break;
-    case FEM_SUM: combine_switch(sum);
-    case FEM_MIN: combine_switch(min);
-    case FEM_MAX: combine_switch(max);
+
+static combineFn
+combine(const DType& dt, int op)
+{
+  switch(op) {
+    case FEM_SUM: combine_switch(sumFn);
+    case FEM_MIN: combine_switch(minFn);
+    case FEM_MAX: combine_switch(maxFn);
   }
   return NULL;
 }
@@ -1511,10 +1529,6 @@ static FEMchunk *getCurChunk(void)
   if (cptr==NULL) 
     CkAbort("Routine can only be called from driver()!\n");
   return cptr;
-}
-static MeshChunk *getCurMesh(void)
-{
-  return getCurChunk()->cur_mesh;
 }
 
 CDECL void FEM_Update_Mesh(int callMeshUpdated,int doRepartition) 

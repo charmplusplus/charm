@@ -12,6 +12,7 @@
 #include <string.h>
 #include <signal.h>
 #include <time.h>
+#include <ctype.h>
 #if CMK_SCYLD
 #include <sys/bproc.h>
 #endif
@@ -147,7 +148,7 @@ int skt_select1(SOCKET fd,int msec)
 
 
 /******* DNS *********/
-skt_ip_t skt_invalid_ip={0};
+skt_ip_t skt_invalid_ip={{0}};
 
 skt_ip_t skt_my_ip(void)
 {

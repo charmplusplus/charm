@@ -268,7 +268,7 @@ void BinEntry::writeU(FILE* fp, int u)
   fprintf(fp, "%4d", u);
 }
 
-TraceSummary::TraceSummary(char **argv):curevent(0),msgNum(0),binStart(0.0),bin(0.0)
+TraceSummary::TraceSummary(char **argv):curevent(0),binStart(0.0),bin(0.0),msgNum(0)
 {
   char *tmpStr;
   CkpvInitialize(double, binSize);

@@ -19,8 +19,8 @@
 
 #include "CommLB.h"
 
-#define alpha 35e-6
-#define beeta 8.5e-9
+#define alpha 35e-6 /*Startup time per message, seconds*/
+#define beeta 8.5e-9 /*Long-message time per byte, seconds*/
 
 void CreateCommLB()
 {
@@ -218,7 +218,7 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 		add_graph(xcoord,ycoord,stats[pe].commData[com].bytes, stats[pe].commData[com].messages);	
 	    }
     
-    unsigned int id,maxid,spe=0,minpe=0,mpos;
+    int id,maxid,spe=0,minpe=0,mpos;
     double temp,total_time,min_temp;
     /*
     for(pe=0;pe < count;pe++)

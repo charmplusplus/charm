@@ -30,9 +30,11 @@ void bbox3d::print(const char *desc) const
 		{::print(segs[i]);if (i<2) printf("x");}
 }
 
+#if 0
 static void print(const vector3d &v) {
 	printf("(%.3g,%.3g,%.3g) ",v.x,v.y,v.z);
 }
+#endif
 
 void octant::print(const char *desc) const
 {

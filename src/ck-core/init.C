@@ -542,7 +542,6 @@ void _initCharm(int argc, char **argv)
 				continue;
 			//Pack the message and send it to all other processors
 			register envelope *env = UsrToEnv(roMsg);
-			register int msgIdx = env->getMsgIdx();
 			env->setSrcPe(CkMyPe());
 			env->setMsgtype(ROMsgMsg);
 			env->setRoIdx(i);

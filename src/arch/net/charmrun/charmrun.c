@@ -413,7 +413,7 @@ char *pparam_getdef(def)
 
 void pparam_printdocs()
 {
-  ppdef def; int i, len, maxname, maxdoc;
+  ppdef def; int len, maxname, maxdoc;
   maxname = 0;
   maxdoc = 0;
   for (def=ppdefs; def; def=def->next)
@@ -1913,7 +1913,7 @@ void fprint_arg(FILE *f,char **argv)
 void rsh_Find(FILE *f,const char *program,const char *dest)
 {
     fprintf(f,"Find %s\n",program);
-    fprintf(f,"%s=$loc\n",dest,dest);
+    fprintf(f,"%s=$loc\n",dest);
 }
 void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
 {
@@ -1954,7 +1954,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   	"    Echo set your path in your ~/.charmrunrc\n"
   	"    Exit 1\n"
   	"  fi\n"
-  	"}\n",host,nodeno);
+  	"}\n");
   
   if (arg_verbose) fprintf(f,"Echo 'remote responding...'\n");
   
@@ -2179,7 +2179,7 @@ void start_nodes_local(char ** env)
     if (pid == 0)
     {
       int fd, fd1 = dup(1);
-      if (fd = open("/dev/null", O_RDWR)) {
+      if (-1!=(fd = open("/dev/null", O_RDWR))) {
         dup2(fd, 0); dup2(fd, 1); dup2(fd, 2);
       }
       status = execve(pparam_argv[1], pparam_argv+1, envp);
