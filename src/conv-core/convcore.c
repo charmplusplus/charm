@@ -560,6 +560,7 @@ void CHostGetOne()
     if (strncmp(line, "req ", 4)==0) {
       char cmd[5], *msg;
       int pe, size, len;
+      int ret;
 #if CMK_WEB_MODE   
       sscanf(line, "%s%d%d%d%d%s", cmd, &pe, &size, &svrip, &svrport, hndlrId);
       if(strcmp(hndlrId, "MonitorHandler") == 0) {
@@ -578,8 +579,10 @@ void CHostGetOne()
       if (!msg)
         CmiPrintf("%d: Out of mem\n", CmiMyPe());
       CmiSetHandler(msg, CpvAccess(strHandlerID));
+      CmiPrintf("hdlr ID = %d\n", CpvAccess(strHandlerID));
       strcpy(msg+CmiMsgHeaderSizeBytes, line);
-      fread(msg+CmiMsgHeaderSizeBytes+len, 1, size, f);
+      ret = fread(msg+CmiMsgHeaderSizeBytes+len, 1, size, f);
+      CmiPrintf("size = %d, ret =%d\n", size, ret);
       msg[CmiMsgHeaderSizeBytes+len+size] = '\0';
       CmiSyncSendAndFree(CmiMyPe(), CmiMsgHeaderSizeBytes+len+size+1, msg);
 
@@ -629,6 +632,11 @@ void CHostGetOne()
         strcat(reply, ans);
       }
       fd = skt_connect(clientIP, clientPort, 60);
+
+      /** Debugging **/
+      CmiPrintf("After Connect for getinfo reply\n");
+
+
       if (fd<=0) KillEveryoneCode(2932);
       write(fd, pre, strlen(pre));
       write(fd, " ", 1);
@@ -648,6 +656,10 @@ void CHostGetOne()
 	CmiPrintf("Rest = %s\n", rest);
 	
         sscanf(rest, "%d", &clientKillPort);
+
+	/* Debugging */
+
+	CmiPrintf("After sscanf\n");
       }
     }
     else {
@@ -655,6 +667,7 @@ void CHostGetOne()
       KillEveryoneCode(2933);
     }
   }
+  CmiPrintf("Out of fgets loop\n");
 #if CMK_WEB_MODE
   if(dont_close==0) {
 #endif
@@ -669,11 +682,8 @@ static void CommunicationServer()
 {
   if(inside_comm)
     return;
-  while (1) {
     CheckSocketsReady();
-    if (hostskt_ready_read) { CHostGetOne(); continue; }
-    break;
-  }
+     /*if (hostskt_ready_read) { CHostGetOne(); continue; }*/
 }
 
 void CHostHandler(char *msg)
@@ -1521,6 +1531,9 @@ int CsdScheduler(int maxmsgs)
 
   if(maxmsgs == 0) {
     while(1) {
+#if NODE_0_IS_CONVHOST
+      if(hostskt_ready_read) CHostGetOne();
+#endif
       msg = CmiGetNonLocal();
 #if CMK_DEBUG_MODE
       if(CpvAccess(freezeModeFlag)==1){
@@ -1535,8 +1548,6 @@ int CsdScheduler(int maxmsgs)
             FIFO_EnQueue(CpvAccess(debugQueue), msg);
             continue;
           }
-        } else {
-          continue;
         }
       } else {
         /* If the debugQueue contains any messages, process them */
@@ -1573,6 +1584,9 @@ int CsdScheduler(int maxmsgs)
   }
 
   while (1) {
+#if NODE_0_IS_CONVHOST
+    if(hostskt_ready_read) CHostGetOne();
+#endif
     msg = CmiGetNonLocal();
 #if CMK_DEBUG_MODE
     if(CpvAccess(freezeModeFlag) == 1){
@@ -1587,9 +1601,7 @@ int CsdScheduler(int maxmsgs)
 	  FIFO_EnQueue(CpvAccess(debugQueue), msg);
 	  continue;
         }
-      } else {
-	continue;
-      }
+      } 
     } else {
       /* If the debugQueue contains any messages, process them */
       while(((!FIFO_Empty(CpvAccess(debugQueue))) && (CpvAccess(freezeModeFlag)==0))){
@@ -2383,6 +2395,7 @@ static void CcsStringHandlerFn(char *msg)
   nread = sscanf(msg, "%s%d%d%d%d%s", 
                  cmd, &pe, &size, &ip, &port, hdlrName);
   if(nread!=6) CmiAbort("Garbled message from client");
+  CmiPrintf("message for %s\n", hdlrName);
   while(list!=0) {
     if(strcmp(hdlrName, list->name)==0) {
       hdlrID = list->hdlr;
