@@ -6,7 +6,8 @@ syntax() {
   echo ''
   echo 'targets: converse, charm++ libs ampi IDL tsm sm pvm sdag'
   echo ''
-  echo 'versions: ' `( cd src ; ls -1 | egrep -v '^Common' )`
+  echo 'versions: ' 
+  echo `( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' )`
   echo ''
   echo 'example charmc-options: -g -save -verbose'
   echo ''
