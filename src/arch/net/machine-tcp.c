@@ -25,7 +25,7 @@
 #define FRAGMENTATION		1
 
 #if FRAGMENTATION
-#define PACKET_MAX		65535
+#define PACKET_MAX		32767
 #else
 #define PACKET_MAX		1000000000
 #endif
@@ -581,7 +581,7 @@ static void open_tcp_sockets()
     if (ok<0) KillEveryoneCode(98246556);
     nodes[pe].sock = skt;
 #if FRAGMENTATION
-    skt_setSockBuf(skt, PACKET_MAX);
+    skt_setSockBuf(skt, PACKET_MAX*4);
 #endif
 #if 0
 #if !defined(_WIN32) || defined(__CYGWIN__)
@@ -601,7 +601,7 @@ static void open_tcp_sockets()
     if (ok<0) KillEveryoneCode(98246556);
     nodes[pe].sock = skt;
 #if FRAGMENTATION
-    skt_setSockBuf(skt, PACKET_MAX);
+    skt_setSockBuf(skt, PACKET_MAX*4);
 #endif
 #if 0
 #if !defined(_WIN32) || defined(__CYGWIN__)
