@@ -77,7 +77,7 @@ void HashTable::removeObject(Chare* charePtr)
   prev = 0;
   node = array[pigeonHole];
   while(node != 0){
-    if(node -> chareIndex == chareIndex){
+    if(node -> charePtr == charePtr){
       if(prev == 0){
 	array[pigeonHole] = node->next;
       } else {

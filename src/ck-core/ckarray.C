@@ -436,6 +436,10 @@ void Array1D::AckMigratedElement(ArrayElementAckMessage *msg)
 
   if (msg->hopCount > elementIDs[index].curHop) {
     if (msg->deleteElement) {
+      if(elementIDs[index].element == 0) {
+        CkError("Already deleted element %d\n", index);
+        abort();
+      }
       ArrayElementExitMessage *exitmsg = new ArrayElementExitMessage;
       //      CkPrintf("[%d] I want to delete the element %d\n",CkMyPe(),index);
       CProxy_ArrayElement elem(elementIDs[index].elementHandle);
