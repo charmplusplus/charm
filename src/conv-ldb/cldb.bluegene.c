@@ -66,14 +66,25 @@ void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
 }
 
 #if CMK_BLUEGENE_NODE
-#define BGSENDPE(pe, msg, len)  {	\
+static int BgMyPe() { return BgMyNode(); }
+static int BgNumPes() { int x,y,z; BgGetSize(&x, &y, &z); return (x*y*z); }
+#   define BGSENDPE(pe, msg, len)  {	\
       int x,y,z;	\
       BgGetXYZ(pe, &x, &y, &z);	\
       DEBUGF(("send to: (%d %d %d, %d) handle:%d\n", x,y,z,t, CmiGetHandler(msg)));  \
-      BgSendPacket(x,y,z, ANYTHREAD, CmiGetHandler(msg), LARGE_WORK, len, (char *)msg);	\
+      BgSendPacket(x,y,z, ANYTHREAD, CmiGetHandler(msg), LARGE_WORK, \
+                   len, (char *)msg);	\
       }
-#else
-#define BGSENDPE(pe, msg, len)  {	\
+#   define BGBDCASTALL(len, msg) 	\
+      BgBroadcastAllPacket(CmiGetHandler(msg), LARGE_WORK, len, msg);
+#   define BGBDCAST(len, msg) 	\
+      BgBroadcastPacketExcept(BgMyNode(), ANYTHREAD, CmiGetHandler(msg), \
+                              LARGE_WORK, len, msg);
+
+#elif CMK_BLUEGENE_THREAD
+static int BgMyPe() { return BgGetGlobalWorkerThreadID(); }
+static int BgNumPes() { return BgGetTotalSize()*BgGetNumWorkThread(); }
+#   define BGSENDPE(pe, msg, len)  {	\
       int x,y,z,t;	\
       t = (pe)%BgGetNumWorkThread();	\
       pe = (pe)/BgGetNumWorkThread();	\
@@ -81,15 +92,13 @@ void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
       DEBUGF(("send to: (%d %d %d, %d) handle:%d\n", x,y,z,t, CmiGetHandler(msg)));  \
       BgSendPacket(x,y,z, t, CmiGetHandler(msg), LARGE_WORK, len, (char *)msg);	\
       }
+#   define BGBDCASTALL(len, msg) 	\
+      BgThreadBroadcastAllPacket(CmiGetHandler(msg), LARGE_WORK, len, msg);
+#   define BGBDCAST(len, msg) 	\
+      BgThreadBroadcastPacketExcept(BgMyNode(), BgGetThreadID(), \
+                                    CmiGetHandler(msg), LARGE_WORK, len, msg);
 #endif
 
-#if CMK_BLUEGENE_NODE
-static int BgMyPe() { return BgMyNode(); }
-static int BgNumPes() { int x,y,z; BgGetSize(&x, &y, &z); return (x*y*z); }
-#else
-static int BgMyPe() { return BgGetGlobalWorkerThreadID(); }
-static int BgNumPes() { return BgGetTotalSize()*BgGetNumWorkThread(); }
-#endif
 
 void CldEnqueue(int pe, void *msg, int infofn)
 {
@@ -128,18 +137,9 @@ void CldEnqueue(int pe, void *msg, int infofn)
       CmiSyncSendAndFree(pe, len, (char *)msg);
 */
       BGSENDPE(pe, msg, len);
-/*
-      {
-      int x,y,z;
-      if (pe >= size) pe = size-1;
-      BgGetXYZ(pe, &x, &y, &z);
-      DEBUGF(("send to: %d %d %d handle:%d\n", x,y,z, CmiGetHandler(msg)));
-      BgSendPacket(x,y,z, ANYTHREAD, CmiGetHandler(msg), LARGE_WORK, len, (char *)msg);
-      }
-*/
     }
   }
-  else if ((pe == CmiMyPe()) || (CmiNumPes() == 1)) {
+  else if ((pe == BgMyPe()) || (BgNumPes() == 1)) {
     DEBUGF(("CldEnqueue pe == CmiMyPe()\n"));
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     CmiSetInfo(msg,infofn);
@@ -147,14 +147,6 @@ void CldEnqueue(int pe, void *msg, int infofn)
     CsdEnqueueGeneral(msg, CQS_QUEUEING_LIFO, priobits, prioptr);
 */
     BGSENDPE(pe, msg, len);
-/*
-    {
-    int x,y,z;
-    if (pe >= CmiNumPes()) pe = CmiNumPes()-1;
-    BgGetXYZ(pe, &x, &y, &z);
-    BgSendPacket(x,y,z, ANYTHREAD, CmiGetHandler(msg), LARGE_WORK, len, (char *)msg);
-    }
-*/
   }
   else {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -169,10 +161,16 @@ void CldEnqueue(int pe, void *msg, int infofn)
     DEBUGF(("CldEnqueue pe=%d\n", pe));
     if (pe==CLD_BROADCAST) { 
 CmiPrintf("CldEnqueue pe=%d\n", pe); CmiAbort("");
-      CmiSyncBroadcastAndFree(len, (char *)msg); }
+/*
+      CmiSyncBroadcastAndFree(len, (char *)msg);
+*/
+      BGBDCAST(len, (char *)msg);
+    }
     else if (pe==CLD_BROADCAST_ALL) { 
-CmiPrintf("CldEnqueue pe=%d\n", pe); CmiAbort("");
+/*
       CmiSyncBroadcastAllAndFree(len, (char *)msg); 
+*/
+      BGBDCASTALL(len, (char *)msg);
     }
     else {
 /*
