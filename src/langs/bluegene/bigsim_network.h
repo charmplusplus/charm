@@ -1,4 +1,5 @@
 
+const double CHARM_OVERHEAD = 2E-6;    // 2 us
 
 class BigSimNetwork
 {
@@ -7,6 +8,7 @@ protected:
   char *myname;
 public:
   inline double alphacost() { return alpha; }
+  inline double charmcost() { return CHARM_OVERHEAD; }
   inline char *name() { return myname; }
   virtual double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) = 0;
   virtual void print() = 0;
@@ -43,7 +45,7 @@ private:
 public:
   BlueGeneNetwork() { 
     myname = "bluegene";
-    alpha = 0.1E-6; 
+    alpha = 0.1E-6;    // 2E-6; 
     packetsize = PACKETSIZE;
   }
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
@@ -60,6 +62,37 @@ public:
   void print() {
     CmiPrintf("alpha: %e	packetsize: %d	CYCLE_TIME_FACTOR:%e.\n", alpha, packetsize, CYCLE_TIME_FACTOR);
     CmiPrintf("CYCLES_PER_HOP: %d	CYCLES_PER_CORNER: %d.\n", CYCLES_PER_HOP, CYCLES_PER_CORNER);
+  }
+};
+
+class BlueGeneLNetwork: public BigSimNetwork
+{
+private:
+  double bandwidth;
+  int packetsize;
+  double linkcost;
+public:
+  BlueGeneLNetwork() { 
+    myname = "bluegenel";
+    packetsize = 256;
+    bandwidth = 175E6; alpha = 2E-6; 
+    linkcost = packetsize/bandwidth;
+  }
+  inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
+    int sx, sy, sz;
+    int xd=BG_ABS(ox-nx), yd=BG_ABS(oy-ny), zd=BG_ABS(oz-nz);
+    BgGetSize(&sx, &sy, &sz);
+    if (xd>sx/2) xd = sx-xd;
+    if (yd>sy/2) yd = sy-yd;
+    if (zd>sz/2) zd = sz-zd;
+    CmiAssert(xd>=0 && yd>=0 && zd>=0);
+    int hops = xd + yd + zd;
+    int numpackets = bytes/packetsize;
+    if (bytes%packetsize) numpackets++;
+    return  linkcost * hops * numpackets;
+  }
+  void print() {
+    CmiPrintf("bandwidth: %e; alpha: %e.\n", bandwidth, alpha);
   }
 };
 
