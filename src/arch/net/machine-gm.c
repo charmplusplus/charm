@@ -448,12 +448,12 @@ void CmiMachineInit()
 
   for (i=1; i<maxsize; i++) {
     int len = gm_max_length_for_size(i);
-    int num = 5;
+    int num = 2;
 
     maxMsgSize = len;
 
-    if (i<6) num = 0;
-    else if (i<11)  num = 20;
+    if (i<5) num = 0;
+    else if (i<11 && i>6)  num = 20;
     else if (i>22) num = 1;
     for (j=0; j<num; j++) {
       buf = gm_dma_malloc(gmport, len);
