@@ -989,10 +989,10 @@ FDECL void FTN_NAME(FEM_ADD_GHOST_STENCIL,fem_add_ghost_stencil)(
 	const int *ends,int *adj)
 {
 	FEMAPI("FEM_Add_ghost_stencil");
-	int i;
-	for (i=0;i<*nElts;i++) adj[i]--; /* 1-based to 0-based */
+	int i, n=ends[*nElts-1];
+	for (i=0;i<n;i++) adj[i]--; /* 1-based to 0-based */
 	FEM_Add_ghost_stencil(*nElts,*addNodes,ends,adj);
-	for (i=0;i<*nElts;i++) adj[i]++; /* 0-based to 1-based */
+	for (i=0;i<n;i++) adj[i]++; /* 0-based to 1-based */
 }
 
 /******************** Ghost Layers *********************/
