@@ -268,7 +268,6 @@ extern "C" int LDProcessorSpeed()
     wps+=100;
   }
 
-  CmiPrintf("Initial wps= %d\n",wps);
   // Now we have a rough idea of how many iterations there are per
   // second, so just perform a few cycles of correction by
   // running for what we think is 1 second.  Then correct
@@ -281,7 +280,6 @@ extern "C" int LDProcessorSpeed()
     const double end_time = CmiCpuTimer();
     const double correction = 1. / (end_time-start_time);
     wps = (int)((double)wps * correction + 0.5);
-    CmiPrintf("wps= %d %f %f %f\n",wps,correction,start_time,end_time);
   }
   
   // If necessary, do a check now

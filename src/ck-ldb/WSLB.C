@@ -15,7 +15,8 @@ void CreateWSLB()
 
 WSLB::WSLB()
 {
-  CkPrintf("[%d] WSLB created\n",CkMyPe());
+  if (CkMyPe() == 0)
+    CkPrintf("[%d] WSLB created\n",CkMyPe());
 }
 
 NLBMigrateMsg* WSLB::Strategy(NeighborLB::LDStats* stats, int count)
@@ -92,10 +93,14 @@ NLBMigrateMsg* WSLB::Strategy(NeighborLB::LDStats* stats, int count)
 	if (obj == 0) break;
 
 	double new_p_load = p->load + obj->load;
-	if (new_p_load < avgload) {
+	double my_new_load = myload - obj->load;
+	if (new_p_load < my_new_load) {
+//	if (new_p_load < avgload) {
 	  objfound = CmiTrue;
 	} else {
 	  // This object is too big, so throw it away
+//	  CkPrintf("[%d] Can't move object w/ load %f to proc %d load %f %f\n",
+//		   CkMyPe(),obj->load,p->Id,p->load,avgload);
 	  delete obj;
 	}
       } while (!objfound);

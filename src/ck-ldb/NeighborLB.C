@@ -52,9 +52,9 @@ NeighborLB::NeighborLB()
   mig_msgs = 0;
 
   myStats.proc_speed = theLbdb->ProcessorSpeed();
-  char hostname[80];
-  gethostname(hostname,79);
-  CkPrintf("[%d] host %s speed %d\n",CkMyPe(),hostname,myStats.proc_speed);
+//  char hostname[80];
+//  gethostname(hostname,79);
+//  CkPrintf("[%d] host %s speed %d\n",CkMyPe(),hostname,myStats.proc_speed);
   myStats.obj_data_sz = 0;
   myStats.comm_data_sz = 0;
   receive_stats_ready = 0;

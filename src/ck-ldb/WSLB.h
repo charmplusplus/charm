@@ -1,6 +1,8 @@
 #ifndef _WSLB_H_
 #define _WSLB_H_
 
+#include <math.h>
+
 #include "NeighborLB.h"
 #include "WSLB.decl.h"
 
@@ -15,17 +17,20 @@ private:
     return (CkNumPes() > 5) ? 4 : (CkNumPes()-1);
   };
   virtual void neighbors(int* _n) {
-    CkPrintf("[%d] Saving neighbors\n",CkMyPe());
     const int me = CkMyPe();
     const int npe = CkNumPes();
     if (npe > 1)
       _n[0] = (me + npe - 1) % npe;
     if (npe > 2)
       _n[1] = (me + 1) % npe;
+
+    int bigstep = (npe - 1) / 3 + 1;
+    if (bigstep == 1) bigstep++;
+
     if (npe > 3)
-      _n[2] = (me + 2) % npe;
+      _n[2] = (me + bigstep) % npe;
     if (npe > 4)
-      _n[3] = (me + npe - 2) % npe;
+      _n[3] = (me + npe - bigstep) % npe;
   };
 
   NLBMigrateMsg* Strategy(NeighborLB::LDStats* stats, int count);
