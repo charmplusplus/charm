@@ -26,10 +26,12 @@ runtime system for machines from clusters of workstations to tightly-coupled
 SMPs.  The \charmpp{} FEM framework allows you to write a parallel FEM program,
 in C or Fortran 90, that closely resembles a serial version but includes
 a few framework calls.
+
 Using the FEM framework also allows you to take advantage of all the
 features of \charmpp, including run-time load balancing,  performance
 monitoring and visualization, and checkpoint/restart, with no additional
-effort.
+effort. The FEM framework also combines naturally with other \charmpp
+frameworks built on TCHARM.
 
 
 \section{Introduction/Terminology}
@@ -142,11 +144,14 @@ handle the node-updates.
 
 \section{Structure of a FEM Framework Program}
 
-A FEM framework program consists of three subroutines: \kw{init}, \kw{driver},
-and \kw{finalize}.  \kw{init} and \kw{finalize} are called by the FEM framework
+A FEM framework program consists of three subroutines: \kw{init()}, \kw{driver()},
+and \kw{mesh\_updated()}.  \kw{init()} and \kw{mesh\_updated()} are called by the FEM framework
 only on the first processor -- these routines typically do specialized I/O,
-startup and shutdown tasks.  \kw{driver} is called for every chunk on every
-processor, and does the main work of the program.
+startup and shutdown tasks.  \kw{driver()} is called for every chunk on every
+processor, and does the main work of the program.  In the language of the
+TCHARM manual, \kw{init()} and \kw{mesh\_updated()} run in the serial context, 
+and \kw{driver()} runs in the parallel context.
+
 
 \begin{alltt}
      subroutine init
@@ -163,10 +168,7 @@ processor, and does the main work of the program.
      end subroutine
 
      subroutine mesh_updated
-          write intermediate results; modify serial mesh
-     end subroutine
-     subroutine finalize
-           write results
+          write out results; possibly modify serial mesh
      end subroutine
 \end{alltt}
 
@@ -183,36 +185,100 @@ To compile a FEM program, pass the {\tt -language fem} (for C) or
 In a charm installation, see charm/version/pgms/charm++/fem/
 for several example and test programs.
 
+At runtime, an FEM framework program accepts the following
+options, in addition to all the usual Charm++ options described in 
+the Charm++ "Installation and Usage Manual".
+
+\begin{itemize}
+\item {\tt +vp} $v$  
+
+Create $v$ mesh chunks, or ``virtual processors''.
+By default, the number of mesh chunks is equal to the number of 
+physical processors (set with {\tt +p} $p$).
+
+
+\item {\tt +write}
+
+Skip \kw{driver()}.
+After running \kw{init()} normally, the framework partitions the mesh, 
+writes the mesh partitions to files, and exits.  As usual, the
+{\tt +vp} $v$ option controls the number of mesh partitions.
+
+
+\item {\tt +read}
+
+Skip \kw{init()}.
+The framework reads the partitioned input mesh from files
+and calls \kw{driver()}.  Together with {\tt +write}, this option
+allows you to separate out the mesh preparation and partitioning 
+phase from the actual parallel solution run.
+
+This can be useful, for example, if \kw{init()} requires more memory 
+to hold the unpartitioned mesh than is available on one processor of 
+the parallel machine.  To avoid this limitation, you can run the program
+with {\tt +write} on a machine with a lot of memory to prepare the input
+files, then copy the files and run with {\tt +read} on a machine with 
+a lot of processors.
+
+{\tt +read} can also be useful during debugging or performance tuning, 
+by skipping the (potentially slow) mesh preparation phase.
+
+
+\item {\tt +tcharm\_trace fem}
+
+Give a diagnostic printout on every call into the FEM framework.
+This can be useful for locating a sudden crash, or understanding
+how the program and framework interact.  Because printing the 
+diagnostics can slow a program down, use this option with care.
+
+\end{itemize}
+
 
 \section{FEM Framework API Reference}
 
+Some of the routines in the FEM framework have different requirements or meanings
+depending on where they are called from.  When a routine is described
+as being "called from driver", this means it is called in the parallel
+context---from \kw{driver()} itself, any subroutine called by \kw{driver()},
+or from whatever routine is runs the FEM-attached TCHARM threads.
+When a routine is described as being "called from init", this means it is 
+called in the serial context---from \kw{init()} itself, from any subroutine
+called from \kw{init()}, or from whatever TCHARM code executes before the
+\kw{FEM\_Attach}.
+
+
 \subsection{Utility}
 
-\function{int FEM\_Num\_Partitions();}
-\function{function integer :: FEM\_Num\_Partitions()}
+\prototype{FEM\_Num\_partitions}
+\function{int FEM\_Num\_partitions();}
+\function{function integer :: FEM\_Num\_partitions()}
 
      Return the number of mesh chunks in the current computation.  Can
      only be called from the driver routine.
 
-\function{int FEM\_My\_Partition();}
-\function{function integer :: FEM\_My\_Partition()}
+\prototype{FEM\_My\_partitions}
+\function{int FEM\_My\_partition();}
+\function{function integer :: FEM\_My\_partition()}
 
      Return the number of the current chunk, from 0 to
      \kw{num\_partitions}-1.  Can only be called from the driver routine.
 
+\prototype{FEM\_Timer}
 \function{double FEM\_Timer();}
 \function{function double precision :: FEM\_Timer()}
 
      Return the current wall clock time, in seconds.  Resolution is
      machine-dependent, but is at worst 10ms.
 
-\function{void FEM\_Print\_Partition();}
-\function{subroutine FEM\_Print\_Partition()}
+\prototype{FEM\_Print\_partition}
+\function{void FEM\_Print\_partition();}
+\function{subroutine FEM\_Print\_partition()}
 
      Print a debugging representation of the current chunk's mesh.
      Prints the entire connectivity array, and data associated with
      each local node and element.
 
+\prototype{FEM\_Print}
 \function{void FEM\_Print(const char *str);}
 \function{subroutine FEM\_Print(str)}
 \args{  character*, intent(in) :: str}
@@ -220,21 +286,21 @@ for several example and test programs.
      Print the given string.  Works on all machines; unlike \kw{printf} or
      \kw{print *}, which may not work on all parallel machines.
 
-\subsection{Mesh}
+\section{Mesh}
 
 These routines describe and retreive the finite element mesh for this
 computation.  A mesh, from the framework's perspective, is a list of
-elements, nodes, uninterpreted data associated with each, and the
-connectivity table.  Elements and nodes have both a global number (number in
+elements and nodes, together with uninterpreted data associated with each.
+Elements map to nodes via the connectivity table for that element type.
+Elements and nodes have both a global number (number in
 the serial mesh) as well as a chunk-local number (number in the partitioned
-mesh chunk).  The FEM framework currently uses the free Metis package for
+mesh chunk).  The FEM framework currently uses the package Metis to do 
 partitioning.
 
 A simple program would set the serial mesh in init, get the partitioned
 chunk in driver, and work on that chunk.  A more complex program would set
-the initial mesh in init; get, work on, update and repartition the mesh
-several times in driver; and perform post-processing on the reassembled,
-modified mesh in finalize.
+the initial mesh in init; then get, work on, update and repartition the mesh
+several times in driver via \kw{FEM\_Update\_mesh}.
 
 From \kw{init()}, the \kw{FEM\_Set\_} routines describe the serial mesh, which
 will be partitioned into chunks.
@@ -243,44 +309,42 @@ From \kw{driver()}, the \kw{FEM\_Get\_} routines ask for the current mesh
 chunk; the \kw{FEM\_Set\_} routines describe a new partitioned mesh chunk.  The
 new chunk need not have the same number of elements or nodes as the old chunk;
 but any new added nodes are assumed private (not shared).
-\kw{FEM\_Update\_Mesh} will reassemble a serial version of the mesh from the
+\kw{FEM\_Update\_mesh} will reassemble a serial version of the mesh from the
 new pieces and optionally repartition the serial mesh.
 
 From \kw{mesh\_updated()}, the \kw{FEM\_Get} and \kw{FEM\_Set} routines
-manipulate the serial mesh.   \kw{Mesh\_updated} is only executed if you call
-\kw{FEM\_Update\_Mesh} during driver-- otherwise, \kw{mesh\_updated} can be an
+manipulate the serial mesh.   \kw{mesh\_updated()} is only executed if you call
+\kw{FEM\_Update\_mesh} during driver-- otherwise, \kw{mesh\_updated()} can be an
 empty procedure.  The parameter \kw{callMeshUpdated} is passed down to
-\kw{mesh\_update}.
+\kw{mesh\_updated()}.
 
-From \kw{finalize(),} the \kw{FEM\_Get\_} routines ask for the reassembled
-serial mesh-- for this, you must have previously called \kw{FEM\_Update\_Mesh}
-during driver.
-
-\function{void FEM\_Set\_Mesh(int nElem, int nNodes, int nodePerEl,const int* conn);}
+\prototype{FEM\_Set\_mesh}
+\function{void FEM\_Set\_mesh(int nElem, int nNodes, int nodePerEl,const int* conn);}
 
      This is a convenience routine equivalent to:
 \begin{alltt}
-          FEM\_Set\_Node(nNodes,0);
-          FEM\_Set\_Elem(0,nElem,0,nodePerEl);
-          FEM\_Set\_Elem\_Conn(0,conn);
+          FEM\_Set\_node(nNodes,0);
+          FEM\_Set\_elem(0,nElem,0,nodePerEl);
+          FEM\_Set\_elem\_Conn(0,conn);
 \end{alltt}
 
-\function{subroutine FEM\_Set\_Mesh(nElem,nNodes,nodePerEl,conn)}
+\function{subroutine FEM\_Set\_mesh(nElem,nNodes,nodePerEl,conn)}
     \args{integer, intent(in) :: nElem, nNodes, nodePerEl}
     \args{integer, intent(in), dimension(nElem,nodePerEl) :: conn;}
 
      This is a convenience routine equivalent to:
 \begin{alltt}
-          CALL FEM\_Set\_Node(nNodes,0)
-          CALL FEM\_Set\_Elem(1,nElem,0,nodePerEl)
-          CALL FEM\_Set\_Elem\_Conn\_c(1,conn)
+          CALL FEM\_Set\_node(nNodes,0)
+          CALL FEM\_Set\_elem(1,nElem,0,nodePerEl)
+          CALL FEM\_Set\_elem\_Conn\_c(1,conn)
 \end{alltt}
 
-\function{void FEM\_Set\_Elem(int elType,int  nEl,int  doublePerEl,int  nodePerEl);}
-\function{void FEM\_Get\_Elem(int elType,int *nEl,int *doublePerEl,int *nodePerEl);}
-\function{subroutine FEM\_Set\_Elem(elType,nEl,doublePerEl,nodePerEl)}
+\prototype{FEM\_Get/Set\_elem}
+\function{void FEM\_Set\_elem(int elType,int  nEl,int  doublePerEl,int  nodePerEl);}
+\function{void FEM\_Get\_elem(int elType,int *nEl,int *doublePerEl,int *nodePerEl);}
+\function{subroutine FEM\_Set\_elem(elType,nEl,doublePerEl,nodePerEl)}
   \args{integer, intent(in)  :: elType,nEl,doublePerEl,nodePerEl}
-\function{subroutine FEM\_Get\_Elem(elType,nEl,doublePerEl,nodePerEl)}
+\function{subroutine FEM\_Get\_elem(elType,nEl,doublePerEl,nodePerEl)}
   \args{integer, intent(in)  :: elType}
   \args{integer, intent(out) :: nEl,doublePerEl,nodePerEl}
 
@@ -292,18 +356,24 @@ and \kw{nodePerEl} are the number of doubles of user data, and nodes (respective
      \kw{doublePerEl} or \kw{nodePerEl} may be zero, indicating that no user
 data or connectivity data (respectively) is associated with the element.
 
-\function{void FEM\_Set\_Elem\_Conn(int elType,const int *conn);}
-\function{void FEM\_Get\_Elem\_Conn(int elType,int *conn);}
-\function{subroutine FEM\_Set\_Elem\_Conn\_r(elType,conn)}
+     You can make this and any other mesh setup calls in any order---there is no need 
+to make them in linearly increasing order.  However, for a given type of element
+\kw{FEM\_Set\_elem} must be called before setting that element's connectivity or data.
+
+
+\prototype{FEM\_Get/Set\_elem\_conn}
+\function{void FEM\_Set\_elem\_conn(int elType,const int *conn);}
+\function{void FEM\_Get\_elem\_conn(int elType,int *conn);}
+\function{subroutine FEM\_Set\_elem\_conn\_r(elType,conn)}
   \args{integer, intent(in)  :: elType}
   \args{integer, intent(in),  dimension(nodePerEl,nEl) :: conn}
-\function{subroutine FEM\_Get\_Elem\_Conn\_r(elType,conn)}
+\function{subroutine FEM\_Get\_elem\_conn\_r(elType,conn)}
   \args{integer, intent(in)  :: elType}
   \args{integer, intent(out), dimension(nodePerEl,nEl) :: conn}
-\function{subroutine FEM\_Set\_Elem\_Conn\_c(elType,conn)}
+\function{subroutine FEM\_Set\_elem\_conn\_c(elType,conn)}
   \args{integer, intent(in)  :: elType}
   \args{integer, intent(in),  dimension(nEl,nodePerEl) :: conn}
-\function{subroutine FEM\_Get\_Elem\_Conn\_c(elType,conn)}
+\function{subroutine FEM\_Get\_elem\_conn\_c(elType,conn)}
   \args{integer, intent(in)  :: elType}
   \args{integer, intent(out), dimension(nEl,nodePerEl) :: conn}
 
@@ -319,12 +389,14 @@ data or connectivity data (respectively) is associated with the element.
      column-major (named \_c) versions.  We recommend row-major storage
      because it results in better cache utilization (because the nodes
      around an element are stored contiguously).
+     
 
-\function{void FEM\_Set\_Node(int  nNode,int  doublePerNode);}
-\function{void FEM\_Get\_Node(int *nNode,int *doublePerNode);}
-\function{subroutine FEM\_Set\_Node(nNode,doublePerNode)}
+\prototype{FEM\_Get/Set\_node}
+\function{void FEM\_Set\_node(int  nNode,int  doublePerNode);}
+\function{void FEM\_Get\_node(int *nNode,int *doublePerNode);}
+\function{subroutine FEM\_Set\_node(nNode,doublePerNode)}
   \args{integer, intent(in)  :: nNode,doublePerNode}
-\function{subroutine FEM\_Get\_Node(nNode,doublePerNode)}
+\function{subroutine FEM\_Get\_node(nNode,doublePerNode)}
   \args{integer, intent(out) :: nNode,doublePerNode}
 
      Describe/retreive the number of nodes and doubles of user data
@@ -334,47 +406,53 @@ data or connectivity data (respectively) is associated with the element.
      \kw{doublePerNode} may be zero, indicating that no user data is
      associated with each node.
 
-\function{void FEM\_Set\_Node\_Data(const double *data);}
-\function{void FEM\_Get\_Node\_Data(double *data);}
-\function{void FEM\_Set\_Elem\_Data(int elType,const double *data);}
-\function{void FEM\_Get\_Elem\_Data(int elType,double *data);}
-\function{subroutine FEM\_Set\_Node\_Data\_r(data)}
+\prototype{FEM\_Get/Set\_data}
+\function{void FEM\_Set\_node\_data(const double *data);}
+\function{void FEM\_Get\_node\_data(double *data);}
+\function{void FEM\_Set\_elem\_data(int elType,const double *data);}
+\function{void FEM\_Get\_elem\_data(int elType,double *data);}
+\function{subroutine FEM\_Set\_node\_data\_r(data)}
   \args{REAL*8, intent(in),  dimension(doublePerNode,nNode)  :: data}
-\function{subroutine FEM\_Get\_Node\_Data\_r(data)}
+\function{subroutine FEM\_Get\_node\_data\_r(data)}
   \args{REAL*8, intent(out), dimension(doublePerNode,nNode)  :: data}
-\function{subroutine FEM\_Set\_Elem\_Data\_r(data)}
-  \args{REAL*8, intent(in),  dimension(doublePerElem,nElem)  :: data}
-\function{subroutine FEM\_Get\_Elem\_Data\_r(data)}
-  \args{REAL*8, intent(out), dimension(doublePerElem,nElem)  :: data}
-\function{subroutine FEM\_Set\_Node\_Data\_c(data)}
+\function{subroutine FEM\_Set\_node\_data\_c(data)}
   \args{REAL*8, intent(in),  dimension(nNode,doublePerNode)  :: data}
-\function{subroutine FEM\_Get\_Node\_Data\_c(data)}
+\function{subroutine FEM\_Get\_node\_data\_c(data)}
   \args{REAL*8, intent(out), dimension(nNode,doublePerNode)  :: data}
-\function{subroutine FEM\_Set\_Elem\_Data\_c(data)}
+
+\function{subroutine FEM\_Set\_elem\_data\_r(elType,data)}
+  \args{integer, intent(in)  :: elType}
+  \args{REAL*8, intent(in),  dimension(doublePerElem,nElem)  :: data}
+\function{subroutine FEM\_Get\_elem\_data\_r(elType,data)}
+  \args{integer, intent(in)  :: elType}
+  \args{REAL*8, intent(out), dimension(doublePerElem,nElem)  :: data}
+\function{subroutine FEM\_Set\_elem\_data\_c(elType,data)}
+  \args{integer, intent(in)  :: elType}
   \args{REAL*8, intent(in),  dimension(nElem,doublePerElem)  :: data}
-\function{subroutine FEM\_Get\_Elem\_Data\_c(data)}
+\function{subroutine FEM\_Get\_elem\_data\_c(elType,data)}
+  \args{integer, intent(in)  :: elType}
   \args{REAL*8, intent(out), dimension(nElem,doublePerElem)  :: data}
 
      Describe/retrieve the optional, uninterpreted user data associated with
 each node and element.  This user data is partitioned and reassembled along
-with the connectivity matrix, and may include initial conditions, boundary
-values, or any other data needed or produced by the program.   The Fortran
-arrays can be row- or column- major (see \kw{FEM\_Set\_Elem\_Conn} for
+with the connectivity matrix, and may include initial conditions, node locations,
+material types, or any other data needed or produced by the program.   The Fortran
+arrays can be row- or column- major (see \kw{FEM\_Set\_elem\_conn} for
 details).  The row-major form is preferred.
 
 
-
-\function{void FEM\_Set\_Sparse(int sID,int nRec,
+\prototype{FEM\_Set\_sparse}
+\function{void FEM\_Set\_sparse(int S\_id,int nRec,
          const int *nodes,int nodesPerRec,
          const void *data,int dataPerRec,int dataType);}
-\function{subroutine FEM\_Set\_Sparse(sID,nRec,nodes,nodesPerRec,data,dataPerRec,dataType)}
-  \args{integer, intent(in) :: sID,nRec,nodesPerRec,dataPerRec,dataType}
+\function{subroutine FEM\_Set\_sparse(S\_id,nRec,nodes,nodesPerRec,data,dataPerRec,dataType)}
+  \args{integer, intent(in) :: S\_id,nRec,nodesPerRec,dataPerRec,dataType}
   \args{integer, intent(in) :: nodes(nodesPerRec,nRec)}
   \args{varies,  intent(in) :: data(dataPerRec,nRec)}
 
-Register \kw{nRec} sparse data records with the framework under the number \kw{sID}. 
-The first call to \kw{FEM\_Set\_Sparse} must give a \kw{sID} of zero in C (1 in fortran);
-and subsequent calls to \kw{FEM\_Set\_Sparse} must give increasing consecutive \kw{sID}s.
+Register \kw{nRec} sparse data records with the framework under the number \kw{S\_id}. 
+The first call to \kw{FEM\_Set\_sparse} must give a \kw{S\_id} of zero in C (1 in fortran);
+and subsequent calls to \kw{FEM\_Set\_sparse} must give increasing consecutive \kw{S\_id}s.
 
 One sparse data record consists of some number of nodes, listed in the
 \kw{nodes} array, and some amount of user data, listed in the data array.
@@ -396,35 +474,298 @@ containing 2 nodes stored in \kw{bNodes} and 3 integers stored in \kw{bDesc},
 we would make the call:
 \begin{alltt}
 /*C version*/
-  FEM_Set_Sparse(0,17, bNodes,2, bDesc,3,FEM_INT);
+  FEM_Set_sparse(0,17, bNodes,2, bDesc,3,FEM_INT);
 ! Fortran version
-  CALL FEM_Set_Sparse(1,17, bNodes,2, bDesc,3,FEM_INT);
+  CALL FEM_Set_sparse(1,17, bNodes,2, bDesc,3,FEM_INT)
+\end{alltt}
+
+\prototype{FEM\_Set\_sparse\_elem}
+\function{void FEM\_Set\_sparse\_elem(int S\_id,const int *rec2elem);}
+\function{subroutine FEM\_Set\_sparse\_elem(S\_id,rec2elem)}
+  \args{integer, intent(in) :: S\_id}
+  \args{integer, intent(in) :: rec2elem(2,nRec)}
+
+Attach the previously-set sparse records \kw{S\_id} to the given elements.
+\kw{rec2elem} consists of pairs of integers---one for each sparse data record.
+The first integer in the pair is the
+element type to attach the sparse record to, and the second integer
+gives the element number within that type.  For example, to attach
+the 3 sparse records at \kw{S\_id} to the elements numbered 10, 11, and 12
+of the element type \kw{elType}, use:
+
+\begin{alltt}
+/*C version*/
+  int rec2elem[]={elType,10, elType,11, elType,12};
+  FEM_Set_sparse_elem(S_id,rec2elem);
+! Fortran version
+  integer :: rec2elem(2,3);
+  rec2elem(1,:)=elType
+  rec2elem(2,1)=10; rec2elem(2,2)=11; rec2elem(2,3)=12;
+  CALL FEM_Set_sparse_elem(S_id,rec2elem)
 \end{alltt}
 
 
-\function{int  FEM\_Get\_Sparse\_Length(int sID);}
-\function{void FEM\_Get\_Sparse(int sID,int *nodes,void *data);}
-\function{function FEM\_Get\_Sparse\_Length(sID);}
-  \args{integer, intent(in) :: sID}
-  \args{integer, intent(out) :: FEM\_Get\_Sparse\_Length}
-\function{subroutine FEM\_Get\_Sparse(sID,nodes,data);}
-  \args{integer, intent(in) :: sID}
-  \args{integer, intent(out) :: nodes(nodesPerRec,FEM\_Get\_Sparse\_Length(sID))}
-  \args{varies,  intent(out) :: data(dataPerRec,FEM\_Get\_Sparse\_Length(sID))}
+\prototype{FEM\_Get\_sparse}
+\function{int  FEM\_Get\_sparse\_length(int S\_id);}
+\function{void FEM\_Get\_sparse(int S\_id,int *nodes,void *data);}
+\function{function FEM\_Get\_sparse\_length(S\_id);}
+  \args{integer, intent(in) :: S\_id}
+  \args{integer, intent(out) :: FEM\_Get\_sparse\_Length}
+\function{subroutine FEM\_Get\_sparse(S\_id,nodes,data);}
+  \args{integer, intent(in) :: S\_id}
+  \args{integer, intent(out) :: nodes(nodesPerRec,FEM\_Get\_sparse\_Length(S\_id))}
+  \args{varies,  intent(out) :: data(dataPerRec,FEM\_Get\_sparse\_Length(S\_id))}
 
 Retrieve the previously registered sparse data from the framework.
-\kw{FEM\_Get\_Sparse\_Length} returns the number of records of sparse
-data registered under the given \kw{sID}; zero indicates no records
-are available.  \kw{FEM\_Get\_Sparse} returns you the actual nodes
+\kw{FEM\_Get\_sparse\_length} returns the number of records of sparse
+data registered under the given \kw{S\_id}; zero indicates no records
+are available.  \kw{FEM\_Get\_sparse} returns you the actual nodes
 (translated to local node numbers) and unchanged user data for
 these sparse records.
 
 
+\subsection {Mesh Ghosts}
+An option to add "ghosts" to a mesh is provided by the framework. A ghost is a local read-only copy of a node or element that actually lives on another chunk.  Ghosts are typically added to the boundary of a chunk to allow the real (non-ghost) elements at the boundary to access values across the processor boundary.  This makes a chunk ``feel'' as if it was part of a complete unpartitioned mesh.
+
+\subsubsection{Setting up the ghost layer}
+The framework's ghost handling is element-centric. You specify which kinds of elements should be ghosts and how they connect by listing their "tuples" via calls in the \kw{init()} routine.  
+
+\begin{itemize}
+\item
+
+\prototype{FEM\_Add\_ghost\_layer}
+\function{void FEM\_Add\_ghost\_layer(int nodesPerTuple,int doAddNodes);}
+\function{subroutine FEM\_Add\_ghost\_layer(nodesPerTuple,doAddNodes)}
+  \args{integer, intent(in) :: nodesPerTuple,doAddNodes}
+This routine creates a new layer of ghosts around each FEM chunk. \kw{nodesPerTuple} is the number of shared nodes that together form a "tuple". \kw{doAddNodes} specifies that you want ghost nodes as well as elements.
+
+A tuple is an unordered set of nodes, and is an abstract way to describe which ghosts
+your application needs---an element will be added to your chunk if it connects to at 
+least one of your tuples.  For example, if you have a 3D, tetrahedral element that require ghosts 
+on all 4 of its sides, this is equivalent to requiring ghosts of every element that shares all 3
+nodes of one of your triangular faces, so for you a tuple is a 3-node face.  If you have a 2D shape
+and want edge-adjacency, for you a tuple is a 2-node edge.  If you want node-adjacent ghosts,
+a tuple is a single node.
+
+Calling this routine several times creates several layers of ghost elements, and the different layers need not have the same parameters.
+
+\item
+\prototype{FEM\_Add\_ghost\_elem}
+\function{void FEM\_Add\_ghost\_elem(int elType,int tuplesPerElem,const int *elem2tuple);}
+\function{subroutine FEM\_Add\_ghost\_elem(elType,tuplesPerElem,elem2tuple)}
+  \args{integer, intent(in) :: elType,tuplesPerElem}
+  \args{integer, intent(in) :: elem2tuple(nodesPerTuple,tuplesPerElem)}
+
+This call is used to specify which type of element is to be added to the current ghost layer. \kw{tuplesPerElem} and \kw{elem2tuple} specify a mapping between each element and the surrounding tuples.  The \kw{elem2tuple} table lists, for each tuple, the nodes of this element which form the tuple, specified as element-local numbers---indices into this element's connectivity entry. The \kw{elem2tuple} table should have nodesPerTuple*tuplesPerElem entries, and no entry should be greater than nodePerEl for that element type.
+
+\kw{elem2tuple} can include special indices--- -1 for C, 0 for Fortran---that indicate the
+corresponding tuple is shorter than usual.  For example, if \kw{nodesPerTuple} for this layer
+is 4, for 4-node quadrilateral faces, you could set one entry in \kw{elem2tuple} to -1 to specify
+a 3-node triangular face.  Tuples of different lengths will never match, so this is just
+a simple way to add ghosts from two kinds of tuples at once.
+
+\end{itemize}
+
+The above two routines are always used together. For example, if your elements are 3-node triangles and you only require one shared node for inclusion in a single ghost layer, you would use:
+\begin{alltt}
+   FEM\_Add\_ghost\_layer(1,0); /* 1 node per tuple */
+   const static int tri2node[]={0,1,2};
+   FEM\_Add\_ghost\_elem(0,3,tri2node); /* triangles are surrounded by 3 nodes */
+\end{alltt}
+
+If you require two shared nodes (a shared edge), the code will look like:
+\begin{alltt}    
+   FEM\_Add\_ghost\_layer(2,0); /* 2 nodes per tuple */
+   const static int tri2edge[]={0,1,  1,2,  2,0};
+   FEM\_Add\_ghost\_elem(0,3,tri2edge); /*triangles are surrounded by 3 edges */
+\end{alltt}
+
+
+
+\subsubsection{Extracting the ghost layer}
+After the ghost layer is created, we need a way to distinquish real nodes and elements 
+from ghost nodes and elements. FEM\_Get\_node and FEM\_Get\_elem return the 
+\textbf{total} number of nodes and elements, including ghosts. The routines below 
+return the index of the first ghost node or element.
+
+\prototype{FEM\_Get\_ghost}
+\function{int FEM\_Get\_node\_ghost(void);}
+\function{int FEM\_Get\_elem\_ghost(int elemType);}
+The examples below iterate over the real and ghost elements.
+\begin{alltt}
+C version:
+        int firstGhost,max;
+        FEM\_Get\_node(\&max, \&ignored);
+        firstGhost=FEM\_Get\_node\_ghost();
+        for (i=0;i<firstGhost;i++)
+                ... i is a real node...
+        for (i=firstGhost;i<max;i++)
+                ... i is a ghost node ...
+
+Fortran version:
+        call FEM\_Get\_node(max,ignored);
+        firstGhost=FEM\_Get\_node\_ghost();
+        do i=1,firstGhost-1
+                ... i is a real node...
+        end do
+        do i=firstGhost,max
+                ... i is a ghost node...
+        end do
+\end{alltt}
+
+\subsubsection{Symmetries and Ghosts--Geometric Layer}
+
+The FEM framework can create ghosts not only of things that are on other 
+processors, but also for various problem symmetries, like mirror reflection,
+and various types of periodicities.  The interface for these ghosts is 
+simple---you ask for the symmetries to be created, then you will get 
+extra ghosts along each symmetry boundary.  The symmetry ghosts are
+updated properly during any communication, even if the symmetry ghosts
+are ghosts of real local elements.
+
+
+\prototype{FEM\_Add\_linear\_periodicity}
+\function{void FEM\_Add\_linear\_periodicity(
+        int nFaces,int nPer,
+        const int *facesA,const int *facesB,
+        int nNodes,const double *nodeLocs
+        );}
+\function{
+SUBROUTINE FEM\_Add\_linear\_periodicity(nFaces,nPer,facesA,facesB,
+                                nNodes,nodeLocs)}
+  \args{integer, intent(in) :: nFaces, nPer, nNodes}
+  \args{integer, intent(in) :: facesA(nPer,nFaces), facesB(nPer,nFaces)}
+  \args{double precision, intent(in) :: nodeLocs(3,nNodes)}
+
+Make facesA and facesB match up under linear translation.
+Each face of facesA must match up with exactly one face of
+facesB, but both the faces and the nodes within a face can be
+permuted in any order---the order is recovered by matching 3d locations
+in the nodeLocs array.
+
+This call can be repeated, for example if the domain is periodic along several
+directions.  This call can only be issued from \kw{init()}.
+
+
+
+\prototype{FEM\_Sym\_coordinates}
+\function{void FEM\_Sym\_coordinates(int elTypeOrMinusOne,double *locs);}
+\function{SUBROUTINE FEM\_Sym\_coordinates(elTypeOrZero,locs)}
+  \args{integer, intent(in) :: elTypeOrZero}
+  \args{double precision, intent(inout) :: locs(3,<number of items>)}
+
+This call adjusts the 3d locations listed in \kw{locs} so they respect the symmetries
+of their corresponding item.  If elTypeOrZero is an element type,
+the locations are adjusted to match with the corresponding element;
+if elTypeOrZero is zero, the locations are adjusted to match up with
+the corresponding node.
+
+This call is needed because symmetry ghost nodes and elements
+initially have their original locations, which must be adjusted
+to respect the symmetry boundaries.  Thus this call is needed
+both for initial location data (e.g., from \kw{FEM\_Get\_node\_data})
+as well as any communicated location data (e.g., from
+\kw{FEM\_Update\_ghost\_field}).
+
+This call can only be issued from \kw{driver()}.
+
+
+
+\subsubsection{Symmetries and Ghosts--Lower Layer}
+
+The geometric symmetry layer in the preceeding section is actually
+a thin wrapper around this lower, more difficult to use layer.
+
+\prototype{FEM\_Set\_sym\_nodes}
+\function{void FEM\_Set\_sym\_nodes(const int *canon,const int *sym);}
+\function{SUBROUTINE FEM\_Set\_sym\_nodes(canon,sym)}
+  \args{integer, intent(in) :: canon(nNodes)}
+  \args{integer, intent(in) :: sym(nNodes)}
+
+This call describes all possible symmetries in an extremely terse format.
+It can only be called from \kw{init()}.
+The ``canonicalization array'' canon maps nodes to their canonical 
+representative---if canon($i$)=canon($j$), nodes $i$ and $j$ are 
+images of each other under some symmetry.  The sym array has bits set
+for each symmetry boundary passing through a node.
+
+For example, a 2d domain with 6 elements A, B, C, D, E, and F and 12 
+nodes numbered 1-12 that is 
+mirror-symmetric on the horizontal boundaries but periodic in the 
+vertical boundaries would look like:
+
+\begin{alltt}
+   D^'|  D^ |  E^ |  F^ |  F^`
+   -  1  -  2  -  3  -  4  -
+   A' |  A  |  B  |  C  |  C`
+   -  5  -  6  -  7  -  8  -
+   D' |  D  |  E  |  F  |  F`
+   -  9  - 10  -  11 -  12 -
+   Av'|  Av |  Bv |  Cv |  Cv`
+
+  v indicates the value has been shifted down (bottom boundary),
+  ^ indicates the value has been shifted up (top boundary),
+  ' indicates the value has been copied from the left (right boundary),
+  ` indicates the value has been copied from the right (left boundary).
+\end{alltt}
+
+If we mark the left border with 1, the top with 2, the right with 4,
+and the bottom with 8, this situation is indicated by topologically pasting the 
+top row to the bottom row by setting their \kw{canon} entries equal, and 
+marking each node with its symmetries.
+
+\begin{center}
+\begin{tabular}{|l|l|l|}\hline
+  Node & \kw{canon} &  \kw{sym}              \\\hline
+    1  &    1  &      3 (left + top)   \\
+    2  &    2  &      2 (top)   \\
+    3  &    3  &      2 (top)   \\
+    4  &    4  &      6 (top + right)   \\
+    5  &    5  &      1 (left)   \\
+    6  &    6  &      0 (none)   \\
+    7  &    7  &      0 (none)   \\
+    8  &    8  &      4 (right)   \\
+    9  &    1  &      9 (left+bottom)    \\
+    10 &    2  &      8 (bottom)   \\
+    11 &    3  &      8 (bottom)   \\
+    12 &    4  &      12 (bottom+right)   \\
+\hline
+\end{tabular}
+\end{center}
+
+
+\prototype{FEM\_Get\_sym}
+\function{void FEM\_Get\_sym(int elTypeOrMinusOne,int *destSym);}
+\function{void FEM\_Get\_sym(elTypeOrZero,destSym);}
+  \args{integer, intent(in) :: elTypeOrMinusOne }
+  \args{integer, intent(out) :: destSym(nItems)}
+
+This call extracts the list of symmetry conditions that apply to 
+an item type.  If elType is an element type, it returns the
+symmetry conditions that apply to that element type; if elType is
+-1 (zero for Fortran), it returns the symmetry conditions that apply
+to the nodes.  Symmetry conditions are normally only nonzero
+for ghost nodes and elements.
+
+
+Mirror symmetry conditions are not yet supported, nor are
+multiple layers of symmetry ghosts.  
+
+% FIXME: document these
+% void FEM_Set_partition(int *elem2chunk)
+% int FTN_NAME(FEM_GET_COMM_PARTNERS,fem_get_comm_partners)(void)
+% int FTN_NAME(FEM_GET_COMM_PARTNER,fem_get_comm_partner)(int *partnerNo)
+% int FTN_NAME(FEM_GET_COMM_COUNT,fem_get_comm_count)(int *partnerNo)
+% void FTN_NAME(FEM_GET_COMM_NODES,fem_get_comm_nodes)(int *pNo,int *nodeNos)
+% void FTN_NAME(FEM_GET_ELEM_NUMBERS,fem_get_elem_numbers)(int *gNo)
+% void fem_get_node_numbers(int *gNo)
+
 
 \subsection{Mesh Modification}
 
-\function{void FEM\_Add\_Node(int localIdx,int nBetween,int *betweenNodes);}
-\function{subroutine FEM\_Add\_Node(localIdx,nBetween,betweenNodes)}
+\prototype{FEM\_Add\_node}
+\function{void FEM\_Add\_node(int localIdx,int nBetween,int *betweenNodes);}
+\function{subroutine FEM\_Add\_node(localIdx,nBetween,betweenNodes)}
     \args{integer, intent(in) :: localIdx,nBetween}
     \args{integer, intent(in) :: betweenNodes(nBetween)}
 
@@ -432,46 +773,61 @@ This call adds a new node, with local index \kw{localIdx}, to the current mesh c
 BetweenNodes lists the local node numbers of the all the nodes the new node is 
 "between"-- for example, when adding a new node along an edge, nBetween is 2
 and betweenNodes lists the endpoints of the edge.
-\kw{FEM\_Add\_Node} only affects the current chunk-- no other chunks are affected.
+\kw{FEM\_Add\_node} only affects the current chunk-- no other chunks are affected.
 
-To create shared nodes, \kw{FEM\_Add\_Node} must be called on all the chunks that 
+To create shared nodes, \kw{FEM\_Add\_node} must be called on all the chunks that 
 share the node, to create the local copies of the node.
-When adding multiple nodes, \kw{FEM\_Add\_Node} must be called in the same order 
+When adding multiple nodes, \kw{FEM\_Add\_node} must be called in the same order 
 on all the processors that share the new node--that is, if two new
 nodes $x$ and $y$ are added between chunks $a$ and $b$, if $a$ calls
-\kw{FEM\_Add\_Node} with its local number for $x$ before it calls \kw{FEM\_Add\_Node}
+\kw{FEM\_Add\_node} with its local number for $x$ before it calls \kw{FEM\_Add\_node}
 with its local number for $y$, $b$ must also add its copy of node $x$ before $y$.
 
 
-\function{void FEM\_Update\_Mesh(int callMeshUpdated,int doRepartition);}
-\function{subroutine FEM\_Update\_Mesh(callMeshUpdated,doRepartition)}
-    \args{integer, intent(in) :: callMeshUpdated,doRepartition}
+\prototype{FEM\_Update\_mesh}
+\function{void FEM\_Update\_mesh(int callMeshUpdated,int doWhat);}
+\function{subroutine FEM\_Update\_mesh(callMeshUpdated,doWhat)}
+    \args{integer, intent(in) :: callMeshUpdated,doWhat}
 
-     Reassemble the mesh chunks from each partition into a single serial mesh.
+Reassemble the mesh chunks from each partition into a single serial mesh.
 Can only be called from driver; and must be called by the driver routine for
-every chunk.  The call is blocking only if \kw{doRepartition} is true;
-otherwise the call will immediately return.  \kw{FEM\_Get} calls from
-\kw{driver()} will only return the new mesh after a \kw{FEM\_Update\_Mesh} call
-where \kw{doRepartition} is true; otherwise \kw{FEM\_Get} returns the old mesh.
+every chunk. \kw{FEM\_Get} calls from
+\kw{driver()} will only return the new mesh after a \kw{FEM\_Update\_mesh} call
+where \kw{doWhat} is 1; otherwise \kw{FEM\_Get} returns the old mesh.
 
-     If \kw{callMeshUpdated} is not zero, \kw{mesh\_updated(callMeshUpdated)}
+If \kw{callMeshUpdated} is not zero, \kw{mesh\_updated(callMeshUpdated)}
 will be called on the first processor after the mesh is reassembled.
 
-     If \kw{doRepartition} is 1, the reassembled serial mesh will be
-repartitioned back into chunks and redistributed.  Otherwise,
-\kw{FEM\_Update\_Mesh} will return immediately.
+%     If \kw{doRepartition} is 0, the mesh is not repartitioned, and \kw{FEM\_Update\_mesh}
+%returns immediately.  If \kw{doRepartition} is 1, \kw{FEM\_Update\_mesh} blocks
+%until the reassembled serial mesh is repartitioned back into chunks and redistributed.
+%If \kw{doRepartition} is 2, 
 
-     If both \kw{doRepartition} and \kw{callMeshUpdated} are nonzero, the
-serial mesh will be reassembled on the first processor, \kw{mesh\_updated} will
-be called, and the resulting mesh (which \kw{mesh\_updated} may change) is
-repartitioned into chunks and redistributed.
+\begin{center}
+\begin{tabular}{|l|l|l|l|}\hline
+\kw{doWhat} & Repartition? & \kw{FEM\_Update\_mesh} \\\hline
+0 & No & Immediately continues execution \\
+1 & Yes & Blocks for the new partition \\
+2 & No & Blocks until \kw{mesh\_updated()} is complete\\
+\hline
+\end{tabular}
+\end{center}
 
-     If both \kw{doRepartition} and \kw{callMeshUpdated} are 0, the serial mesh
-will be reassembled on the first processor for use in the \kw{finalize()}
-routine.  Note that to use the serial mesh in \kw{finalize(),} you must call
-this routine from \kw{driver()}.
+For example, \kw{FEM\_Update\_mesh}(k,0) reassembles the mesh and calls
+\kw{mesh\_updated(k)} while the driver routines continue with the computation.
+This might be useful, for example, for writing out intermediate solutions as a 
+single file; writing outputs from \kw{driver()} is more efficient but often results 
+in a separate file for each mesh chunk.
 
-     \kw{FEM\_Update\_Mesh} reassembles the serial mesh with an attempt to
+   To block the driver routines during the call to \kw{mesh\_updated(k)}, such as 
+at the end of the computation when the drivers have no other work to do, 
+use \kw{FEM\_Update\_mesh}(k,2).
+
+     To reassemble, modify, and repartition the mesh, use \kw{FEM\_Update\_mesh}(k,1).
+It may be easier to perform major mesh modifications from \kw{mesh\_updated(k)} than
+the drivers, since the entire serial mesh is available to \kw{mesh\_updated(k)}.
+
+     \kw{FEM\_Update\_mesh} reassembles the serial mesh with an attempt to
      preserve the element and node global numbering.  If the new mesh
      has the same number and type of elements and nodes, the global
      numbers (and hence serial mesh) will be unchanged.  If new
@@ -479,13 +835,13 @@ this routine from \kw{driver()}.
      new unique global numbers.  If elements or nodes are removed,
      their global numbers are not re-used-- you can detect the
      resulting holes in the serial mesh since the user data associated
-     with the deleted elements will be all zero.
+     with the deleted elements will be all zero.  Generally, however, it
+     is less error-prone to perform mesh modifications only in \kw{driver()}
+     or only in \kw{mesh\_updated(k)}, rather than some in both.
 
-     It may be easier to perform major mesh modifications from
-     \kw{mesh\_updated}, since the entire serial mesh is available there.
 
 
-\subsection{Node Fields}
+\section{Communication Fields}
 
 The FEM framework handles the updating of the values of shared nodes-- that
 is, it combines shared nodes' values across all processors.  The basic
@@ -496,24 +852,25 @@ node.  To do this, the framework must be able to find the data items
 associated with each node in memory.
 
 Each field represents a (set of) node data items stored in a contiguous array,
-indexed by node number.  You create a field once, with \kw{FEM\_Create\_Field},
-then pass the resulting field ID to \kw{FEM\_Update\_Field} (which does the
-shared node communication) and/or \kw{FEM\_Reduce\_Field} (which applies a
+indexed by node number.  You create a field once, with \kw{FEM\_Create\_field},
+then pass the resulting field ID to \kw{FEM\_Update\_field} (which does the
+shared node communication) and/or \kw{FEM\_Reduce\_field} (which applies a
 reduction over node values).
 
-\function{int FEM\_Create\_Field(int base\_type,int vec\_len,int offset,int dist);}
-\function{function integer :: FEM\_Create\_Field(base\_type, vec\_len, offset, dist)}
-  \args{integer, intent(in)  :: base\_type, vec\_len, offset, dist}
+\prototype{FEM\_Create\_simple\_field}
+\function{int FEM\_Create\_simple\_field(int base\_type,int rec\_len);}
+\function{function integer :: FEM\_Create\_simple\_field(base\_type, rec\_len)}
+  \args{integer, intent(in)  :: base\_type, rec\_len}
+    
+    Creates and returns a FEM field ID, which can be passed to
+\kw{FEM\_Update\_field} and \kw{FEM\_Reduce\_field.}  Can only be called from
+\kw{driver()}.  A field is a range of values stored in your array that the framework
+can access.  For example, a field that describes data associated with each local 
+node can be used by \kw{FEM\_Update\_field} to find and update the values of 
+shared nodes.
 
-     Creates and returns a FEM field ID, which can be passed to
-\kw{FEM\_Update\_Field} and \kw{FEM\_Reduce\_Field.}  Can only be called from
-\kw{driver().}  A field is a range of values associated with each local node--
-the FEM framework uses the information you pass to find the values associated
-with shared nodes (for \kw{FEM\_Update\_Field}) and primary nodes (for
-\kw{FEM\_Reduce\_Field}).
-
-     \kw{base\_type} describes the kind of data item associated with each
-     node, one of:
+    \kw{base\_type} describes the kind of data item associated with each
+record, one of:
 
      \begin{itemize}
         \item \kw{FEM\_BYTE}-- unsigned char, INTEGER*1, or CHARACTER*1
@@ -522,41 +879,52 @@ with shared nodes (for \kw{FEM\_Update\_Field}) and primary nodes (for
         \item \kw{FEM\_DOUBLE}-- double, DOUBLE PRECISION, or REAL*8
      \end{itemize}
 
-     \kw{vec\_len} describes the number of data items associated with each
-     node, an integer at least 1.
+     \kw{rec\_len} describes the number of data items associated with each
+record, an integer at least 1.
 
-     \kw{offset} is the byte offset from the start of the nodes array to the
-     data items, a non-negative integer.
+     For example, if you store a 3D force for each node \kw{n}, in an array
+indexed by 3*\kw{n}, \kw{base\_type} is \kw{FEM\_DOUBLE} and \kw{rec\_len} is 3.
+You can register this node force for update with:
 
-     \kw{dist} is the byte offset from the first node's data item to the
-     second, a positive integer.
+\begin{alltt}
+          /* C */
+          double *nodeForce; ... allocated as 3*n_nodes...
+          int Fid=FEM_Create_simple_field(FEM_DOUBLE,3);
+ 
+          ! - Fortran90
+          REAL*8 ALLOCATABLE, dimension(:) :: nodeForce
+          INTEGER :: Fid
+          Fid=FEM_Create_simple_field(FEM_DOUBLE,3)
+\end{alltt}
+
+
+
+\prototype{FEM\_Create\_field}
+\function{int FEM\_Create\_field(int base\_type,int rec\_len,int offset,int dist);}
+\function{function integer :: FEM\_Create\_field(base\_type, rec\_len, offset, dist)}
+  \args{integer, intent(in)  :: base\_type, rec\_len, offset, dist}
+
+     A more sophisticated version of \kw{FEM\_Create\_simple\_field}, for 
+when your data is padded or stored in a complex structure.
+
+     \kw{offset} is the byte offset from the start of your array to the
+first data item, a non-negative integer.  In \kw{FEM\_Create\_simple\_field},
+\kw{offset} is always zero.
+
+     \kw{dist} is the byte offset from the first record to the
+second, a positive integer.  In \kw{FEM\_Create\_simple\_field}, this is
+always equal to \kw{rec\_len} times the size of one item.
 
 \begin{figure}[h]
 \begin{center}
 \includegraphics[width=4in]{create_field}
 \end{center}
-\caption{Creating a Node Field.}
+\caption{Creating a complex Node Field.}
 \label{fig:createfield}
 \end{figure}
 
-     For example, if you store a 3D force for each node \kw{n}, in an array
-indexed by 3*\kw{n}, \kw{vec\_len} is 3, \kw{offset} is 0, and \kw{dist} is
-3*8=24.  You can register the node force for update with:
 
-\begin{alltt}
-          /* C */
-          double *nodeForce;
-          ... allocate nodeForce as 3*n_nodes...
-          int fid=FEM_Create_Field(FEM_DOUBLE,3,0,24);
- 
-          ! - Fortran90
-          REAL*8 ALLOCATABLE, dimension(:) :: nodeForce
-          INTEGER :: fid
-          ... allocate nodeForce as 3*n_nodes...
-          fid=FEM_Create_Field(FEM_DOUBLE,3,0,24)
-\end{alltt}
-
-     If the 3D force is a member \kw{fXYZ} of a structure (in C) or named type
+If the 3D force is a member \kw{fXYZ} of a structure (in C) or named type
 (in Fortran 90) \kw{node\_type}, in an array called \kw{nodes}, you can
 register this node force for update with:
 
@@ -564,15 +932,15 @@ register this node force for update with:
           /* C */
           node_type *nodes;
           ...allocate nodes array as n_nodes...
-          int fid=FEM_Create_Field(FEM_DOUBLE,3,
+          int Fid=FEM_Create_field(FEM_DOUBLE,3,
               (int)((char *)\&nodes[0].fXYZ-(char *)nodes),
               (int)((char *)\&nodes[1]-(char *)\&nodes[0]) );
  
           ! - Fortran90
           TYPE(node_type), ALLOCATABLE, dimension(:) :: nodes
-          INTEGER :: fid
+          INTEGER :: Fid
           ...allocate nodes array as n_nodes...
-          fid=FEM_Create_Field(FEM_DOUBLE,3,
+          Fid=FEM_Create_field(FEM_DOUBLE,3,
               offsetof(nodes(1), nodes(1)%fXYZ),
               offsetof(nodes(1), nodes(2)) )
 \end{alltt}
@@ -582,9 +950,10 @@ register this node force for update with:
      variables.  The C version uses pointer arithmetic to achieve the
      same result.
 
-\function{void FEM\_Update\_Field(int fid,void *nodes);}
-\function{subroutine FEM\_Update\_Field(fid,nodes)}
-  \args{integer, intent(in)  :: fid}
+\prototype{FEM\_Update\_field}
+\function{void FEM\_Update\_field(int Fid,void *nodes);}
+\function{subroutine FEM\_Update\_field(Fid,nodes)}
+  \args{integer, intent(in)  :: Fid}
   \args{varies, intent(inout) :: nodes}
 
      Combine a field of all shared nodes with the other chunks.  Sums
@@ -593,15 +962,16 @@ register this node force for update with:
      force on each local node, this routine will sum the net force
      across all shared nodes.
 
-     \kw{FEM\_Update\_Field} can only be called from driver, and to be useful,
+     \kw{FEM\_Update\_field} can only be called from driver, and to be useful,
      must be called from every chunk's driver routine.
 
      After this routine returns, the given field of each shared node
      will be the same across all processors that share the node.
 
-\function{void FEM\_Read\_Field(int fid,void *nodes,char *fName);}
-\function{subroutine FEM\_Read\_Field(fid,nodes,fName)}
-  \args{integer, intent(in)  :: fid}
+\prototype{FEM\_Read\_field}
+\function{void FEM\_Read\_field(int Fid,void *nodes,char *fName);}
+\function{subroutine FEM\_Read\_field(Fid,nodes,fName)}
+  \args{integer, intent(in)  :: Fid}
   \args{varies, intent(out) :: nodes}
   \args{character*, intent(in) :: fName}
 
@@ -614,7 +984,7 @@ register this node force for update with:
      must be numbered zero.  All fields are separated by white space
      (any number of tabs or spaces).
 
-     For example, if we have called \kw{Create\_Field} to describe 3 doubles,
+     For example, if we have called \kw{Create\_field} to describe 3 doubles,
      the input file could begin with
 
 \begin{alltt}
@@ -623,18 +993,19 @@ register this node force for update with:
           ...
 \end{alltt}
 
-     \kw{FEM\_Read\_Field} must be called from driver at any time, independent
+     \kw{FEM\_Read\_field} must be called from driver at any time, independent
      of other chunks.
 
-\function{void FEM\_Reduce\_Field(int fid,const void *nodes,void *out,int op);}
-\function{subroutine FEM\_Reduce\_Field(fid,nodes,outVal,op)}
-  \args{integer, intent(in)  :: fid,op}
+\prototype{FEM\_Reduce\_field}
+\function{void FEM\_Reduce\_field(int Fid,const void *nodes,void *out,int op);}
+\function{subroutine FEM\_Reduce\_field(Fid,nodes,outVal,op)}
+  \args{integer, intent(in)  :: Fid,op}
   \args{varies, intent(in) :: nodes}
   \args{varies, intent(out) :: outVal}
 
-     Combine a field from each node, according to op, across all chunks.
+Combine a field from each node, according to op, across all chunks.
 Shared nodes are not double-counted-- only once copy will contribute to the
-reduction.  After \kw{Reduce\_Field} returns, all chunks will have identical
+reduction.  After \kw{Reduce\_field} returns, all chunks will have identical
 values in \kw{outVal,} which must be \kw{vec\_len} copies of \kw{base\_type}.
 
      May only be called from driver, and to complete, must be called
@@ -651,9 +1022,11 @@ smallest value among the corresponding field of all nodes
 value among the corresponding field of all nodes
 \end{itemize}
 
-\function{void FEM\_Reduce(int fid,const void *inVal,void *outVal,int op);}
-\function{subroutine FEM\_Reduce(fid,inVal,outVal,op)}
-  \args{integer, intent(in)  :: fid,op}
+
+\prototype{FEM\_Reduce}
+\function{void FEM\_Reduce(int Fid,const void *inVal,void *outVal,int op);}
+\function{subroutine FEM\_Reduce(Fid,inVal,outVal,op)}
+  \args{integer, intent(in)  :: Fid,op}
   \args{varies, intent(in) :: inVal}
   \args{varies, intent(out) :: outVal}
 
@@ -661,259 +1034,62 @@ value among the corresponding field of all nodes
 \kw{Fid} is only used for the \kw{base\_type} and \kw{vec\_len}-- offset and
 \kw{dist} are not used.  After this call returns, all chunks will have
 identical values in \kw{outVal}.  Op has the same values and meaning as
-\kw{FEM\_Reduce\_Field}.
+\kw{FEM\_Reduce\_field}.
 
      May only be called from driver, and to complete, must be called
      from every chunk's driver routine.
 
-\subsection{Migration}
 
-The \charmpp\ runtime framework includes an automated, run-time load balancer,
-which will automatically monitor the performance of your parallel program.
-If needed, the load balancer can ``migrate'' mesh chunks from heavily-loaded
-processors to more lightly-loaded processors, improving the load balance and
-speeding up the program.  For this to be useful, pass the \kw{+vpN} argument
-with a larger number of chunks \kw{N} than processors-- a few thousand
-finite elements per chunk acheives a good trade-off between overhead and
-ability to load balance.  Because this is somewhat involved, you
-may refrain from calling \kw{FEM\_Migrate} and migration will never take place.
 
-The runtime system can automatically move your thread stack to the new
-processor, but you must write a PUP function to move any global or
-heap-allocated data to the new processor (global data is declared at file scope
-or \kw{static} in C and \kw{COMMON} in Fortran77; heap allocated data comes
-from C \kw{malloc}, C++ \kw{new}, or Fortran90 \kw{ALLOCATE}).  A PUP
-(Pack/UnPack) function performs both packing (converting heap data into a
-message) and unpacking (converting a message back into heap data).  All your
-global and heap data must be collected into a single block (\kw{struct} in C;
-user-defined \kw{TYPE} in Fortran) so the PUP function can access it all.
+\subsection{Ghost Communication}
 
-Your PUP function will be passed a pointer to your heap data block and a
-special handle called a ``pupper'', which contains the network message to be
-sent.  Your PUP function returns a pointer to your heap data block.  In a PUP
-function, you pass all your heap data to routines named \kw{pup\_type}, where
-type is either a basic type (such as int, char, float, or double) or an array
-type (as before, but with a ``s'' suffix).  Depending on the direction of
-packing, the pupper will either read from or write to the values you pass--
-normally, you shouldn't even know which.  The only time you need to know the
-direction is when you are leaving a processor or just arriving.
-Correspondingly, the pupper passed to you may be deleting (indicating that you
-are leaving the processor, and should delete your heap storage after packing),
-unpacking (indicating you've just arrived on a processor, and should allocate
-your heap storage before unpacking), or neither (indicating the system is
-merely sizing a buffer, or checkpointing your values).
+It is possible to get values for a chunk's ghost nodes and elements from the neighbors. To do this, use:
 
-PUP functions are much easier to write than explain-- a simple C heap block
-and the corresponding PUP function is:
+\prototype{FEM\_Update\_ghost\_field}
+\function{void FEM\_Update\_ghost\_field(int Fid, int elTypeOrMinusOne, void *data);}
+\function{subroutine FEM\_Update\_ghost\_field(Fid,elTypeOrZero,data)}
+  \args{integer, intent(in)  :: Fid,elTypeOrZero}
+  \args{varies, intent(inout) :: data}
 
-\begin{alltt}
-     typedef struct {
-       int n1;/*Length of first array below*/
-       int n2;/*Length of second array below*/
-       double *arr1; /*Some doubles, allocated on the heap*/
-       int *arr2; /*Some ints, allocated on the heap*/
-     } my_block;
- 
-     my_block *pup_my_block(pup_er p,my_block *m)
-     {
-       if (pup_isUnpacking(p)) m=malloc(sizeof(my_block));
-       pup_int(p,\&m->n1);
-       pup_int(p,\&m->n2);
-       if (pup_isUnpacking(p)) {
-         m->arr1=malloc(m->n1*sizeof(double));
-         m->arr2=malloc(m->n2*sizeof(int));
-       }
-       pup_doubles(p,m->arr1,m->n1);
-       pup_ints(p,m->arr2,m->n2);
-       if (pup_isDeleting(p)) {
-         free(m->arr1);
-         free(m->arr2);
-         free(m);
-       }
-       return m;
-     }
-\end{alltt}
+This has the same requirements and call sequence as \kw{FEM\_Update\_field}, except it applies to ghosts. You specify which type of element to exchange using the elType parameter. Specify -1 (C version) or 0 (fortran version) to exchange node values.  
 
-This single PUP function can be used to copy the \kw{my\_block} data into a
-message buffer and free the old heap storage (deleting pupper); allocate
-storage on the new processor and copy the message data back (unpacking pupper);
-or save the heap data for debugging or checkpointing.
 
-A Fortran block TYPE and corresponding PUP routine is as follows:
-
-\begin{alltt}
-     MODULE my_block_mod
-       TYPE my_block
-         INTEGER :: n1,n2x,n2y
-         REAL*8, POINTER, DIMENSION(:) :: arr1
-         INTEGER, POINTER, DIMENSION(:,:) :: arr2
-       END TYPE
-     END MODULE
- 
-     SUBROUTINE pup_my_block(p,m)
-       IMPLICIT NONE
-       USE my_block_mod
-       USE pupmod
-       INTEGER :: p
-       TYPE(my_block) :: m
-       call pup_int(p,m%n1)
-       call pup_int(p,m%n2x)
-       call pup_int(p,m%n2y)
-       IF (pup_isUnpacking(p)) THEN
-         ALLOCATE(m%arr1(m%n1))
-         ALLOCATE(m%arr2(m%n2x,m%n2y))
-       END IF
-       call pup_doubles(p,m%arr1,m%n1)
-       call pup_ints(p,m%arr2,m%n2x*m%n2y)
-       IF (pup_isDeleting(p)) THEN
-         DEALLOCATE(m%arr1)
-         DEALLOCATE(m%arr2)
-       END IF
-     END SUBROUTINE
-\end{alltt}
-
-\function{int FEM\_Register(void *block, FEM\_PupFn pup\_ud)}
-\function{function integer :: FEM\_Register(block,pup\_ud)}
-    \args{TYPE(varies), POINTER :: block}
-    \args{SUBROUTINE :: pup\_ud}
-
-     Associates the given data block and PUP function.  Returns a block
-     ID, which can be passed to \kw{FEM\_Get\_Userdata} later.  Can only be
-     called from driver.  For the declarations above, you call
-     \kw{FEM\_Register} as:
-
-\begin{alltt}
-          /*C/C++ driver() function*/
-          my_block *m=malloc(sizeof(my_block));
-          int myId=FEM_Register(m,(FEM_PupFn)pup_my_block);
- 
-          !- Fortran driver subroutine
-          use my_block_mod
-          interface
-            subroutine pup_my_block(p,m)
-              use my_block_mod
-              INTEGER :: p
-              TYPE(my_block) :: m
-            end subroutine
-          end interface
-          TYPE(my_block) :: m
-          INTEGER :: myId
-          myId=FEM_Register(m,pup_my_block)
-\end{alltt}
-
-     Note that Fortran blocks must be allocated on the stack in driver;
-     while C/C++ blocks may be allocated on the heap.
-
-\function{void FEM\_Migrate()}
-\function{subroutine FEM\_Migrate()}
-
-     Informs the load balancing system that you are ready to be
-     migrated, if needed.  If the system decides to migrate you, the
-     PUP function passed to \kw{FEM\_Register} will be called with a sizing
-     pupper, then a packing, deleting pupper.  Your stack (and pupped
-     data) will then be sent to the destination machine, where your PUP
-     function will be called with an unpacking pupper.  \kw{FEM\_Migrate}
-     will then return, whereupon you should call \kw{FEM\_Get\_Userdata} to
-     get your unpacked data block.  Can only be called from driver.
-
-\function{void *FEM\_Get\_Userdata(int n)}
-
-     Return your unpacked userdata after migration-- that is, the
-     return value of the unpacking call to your PUP function.  Takes
-     the userdata ID returned by \kw{FEM\_Register}.  Can be called from
-     driver at any time.
-
-     Since Fortran blocks are always allocated on the stack, the system
-     migrates them to the same location on the new processor, so no
-     \kw{Get\_Userdata} call is needed from Fortran.
-
-\subsection {Ghost elements}
-	An option to add ghost elements is provided by the framework. The \kw{ghost elements} are the additional elements at the boundary of the chunk, which are added to make the real (inner) elements at the boundary ``feel'' exactly as if they were in a complete unparitioned mesh. The real version of a ghost element will reside on some other processor. 
-\subsubsection{Setting up the ghost layer}
-       The framework now allows you to add ghost elements. You specify which kinds of elements and how they connect right in Init routine.  The calls are:
-\begin{itemize}
-\item
-\begin{alltt}
-	void FEM\_Add\_Ghost\_Layer(int nodesPerTuple,int doAddNodes);
-\end{alltt}
-This routine creates a new layer of ghosts around each FEM chunk. NodesPerTuple is the number of shared nodes that together form a "tuple". An element will be added to your chunk if it connects to at least one of your tuples. DoAddNodes specifies that you want ghost nodes as well as elements. Calling this routine several times creates several layers of ghost elements; the different layers need not have the same parameters.
-
-\item
-\begin{alltt}
-void FEM\_Add\_Ghost\_Elem(int elType,int tuplesPerElem,const int *elem2tuple)
-\end{alltt}
-
-This call is used to specify which type of element is to be added to the current ghost layer. TuplesPerElem and elem2tuple specify a mapping between each element and the surrounding sets of shared nodes.  The elem2tuple table lists, for each tuple, the nodes of this element which form the tuple. The elem2tuple table should be nodesPerTuple*tuplesPerElem long.
-\end{itemize}
-
-The above two routines are always used together. For example, if your elements are 3-node triangles and you only require one shared node for inclusion in a single ghost layer, you would use:
-\begin{alltt}
-   FEM\_Add\_Ghost\_Layer(1,0);
-   const static int tri2node[]={0,1,2};
-   FEM\_Add\_Ghost\_Elem(0,3,tri2node);
-\end{alltt}
-
-If you require two shared nodes (a shared edge), the code will look like:
-\begin{alltt}    
-   FEM\_Add\_Ghost\_Layer(2,0);
-   const static int tri2edge[]={0,1,  1,2,  2,0};
-   FEM\_Add\_Ghost\_Elem(0,3,tri2edge);
-\end{alltt}
-
-\subsubsection{Extracting the ghost layer}
-After the ghost layer is created, we need a way to distinquish real nodes and elements from ghost nodes and elements. FEM\_Get\_Node and FEM\_Get\_Elem return the \textbf{total} number of nodes and elements, including ghosts. The routines below return the index of the first ghost node or element.
-\begin{alltt}
-int FEM\_Get\_Node\_Ghost(void);
-int FEM\_Get\_Elem\_Ghost(int elemType);
-\end{alltt}
-The examples below iterate over the real and ghost elements.
-\begin{alltt}
-C version:
-        int firstGhost,max;
-        FEM\_Get\_Node(\&max, \&ignored);
-        firstGhost=FEM\_Get\_Node\_Ghost();
-        for (i=0;i<firstGhost;i++)
-                ... i is a real node...
-        for (i=firstGhost;i<max;i++)
-                ... i is a ghost node ...
-
-Fortran version:
-        call FEM\_Get\_Node(max,ignored);
-        firstGhost=FEM\_Get\_Node\_Ghost();
-        do i=1,firstGhost-1
-                ... i is a real node...
-        end do
-        do i=firstGhost,max
-                ... i is a ghost node...
-        end do
-\end{alltt}
-
-\subsubsection{Exchanging stress values with neighboring triangles}
-
-It is possible to get values for the chunk's ghost nodes and elements from the neighbors. To do this, use:
-
-\begin{alltt}
-void FEM\_Update\_Ghost\_Field(int fid, int elTypeOrMinusOne, void *data);
-subroutine FEM\_Update\_Ghost\_Field(fid,elTypeOrZero,data);
-\end{alltt}
-
-This has the same requirements and call sequence as FEM\_Update\_Field, except it applies to ghosts. You specify which type of element to exchange using the elType parameter. Specify -1 (C version) or 0 (fortran version) to exchange node values.  
-
-\subsubsection{ Exchanging "split this edge" lists }
+\subsection{Ghost List Exchange}
 
 It is possible to exchange sparse lists of ghost elements between FEM chunks.
 
-\begin{alltt}
-void FEM\_Exchange\_Ghost\_Lists(int elemType,int nIdx,const int *localIdx);
-\end{alltt}
-This routine sends the local element indices in localIdx to only those neighboring chunks that connect to its ghost elements on the other side.  
+\prototype{FEM\_Exchange\_ghost\_lists}
+\function{void FEM\_Exchange\_ghost\_lists(int elemType,int nIdx,const int *localIdx);}
+\function{subroutine FEM\_Exchange\_ghost\_lists(elemType,nIdx,localIdx)}
+  \args{integer, intent(in)  :: elemType,nIdx}
+  \args{integer, intent(in) :: localIdx[nIdx]}
 
-\begin{alltt}
-int FEM\_Get\_Ghost\_List\_Length(void);
-void FEM\_Get\_Ghost\_List(int *retLocalIdx);
-\end{alltt}
+This routine sends the local element indices in localIdx to those neighboring chunks that connect to its ghost elements on the other side.  That is, if the element
+\kw{localIdx[i]} has a ghost on some chunk \kw{c}, \kw{localIdx[i]} will be sent to 
+and show up in the ghost list of chunk \kw{c}.
 
-These routines access the list of local elements sent by other chunks.  The returned indices will all refer to ghost elements in my chunk.
+\prototype{FEM\_Get\_ghost\_list\_length}
+\function{int FEM\_Get\_ghost\_list\_length(void);}
+Returns the number of entries in my ghost list---the number of my ghosts that
+other chunks passed to their call to \kw{FEM\_Exchange\_ghost\_lists}.
+
+\prototype{FEM\_Get\_ghost\_list}
+\function{void FEM\_Get\_ghost\_list(int *retLocalIdx);}
+\function{subroutine FEM\_Get\_ghost\_list(retLocalIdx)}
+  \args{integer, intent(out) :: retLocalIdx[FEM\_Get\_ghost\_list\_length()]}
+
+These routines access the list of local elements sent by other chunks.  
+The returned indices will all refer to ghost elements in my chunk.
+
+
+
+% Permanently undocumented (i.e., officially denied) features:
+%   FEM_Serial_Split(ndom) ! Partition into ndom domains
+%   FEM_Serial_Begin(idom) ! Begin accessing the idom'th domain
+%   
+% "There has to be a better way:"
+%   FEM_Composite_elem, FEM_Combine_elem
+
 
 \input{index}
 \end{document}
