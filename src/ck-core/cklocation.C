@@ -561,6 +561,7 @@ void CkMigratable::commonInit(void) {
 	thisIndexMax=myRec->getIndex();
 	thisChareType=i.chareType;
 	usesAtSync=CmiFalse;
+	usesSyncTiming=CmiFalse;
 	barrierRegistered=CmiFalse;
 	usesReadyMigrate=CmiFalse;
 }
@@ -613,6 +614,8 @@ CkMigratable::~CkMigratable() {
 		myRec->getLBDB()->RemoveLocalBarrierClient(ldBarrierHandle);
 	  else
 		myRec->getLBDB()->RemoveLocalBarrierReceiver(ldBarrierRecvHandle);
+	  if (usesSyncTiming)
+		myRec->getLBDB()->RemoveStatsBarrierClient(ldStatBarrierHandle);
 	}
 #endif
 	//To detect use-after-delete
@@ -642,6 +645,9 @@ void CkMigratable::ckFinishConstruction(void)
 		(LDBarrierFn)staticResumeFromSync,(void*)(this));
         else
 	  ldBarrierRecvHandle = myRec->getLBDB()->AddLocalBarrierReceiver(
+		(LDBarrierFn)staticResumeFromSync,(void*)(this));
+        if (usesSyncTiming)
+	  ldStatBarrierHandle = myRec->getLBDB()->AddStatsBarrierClient(
 		(LDBarrierFn)staticResumeFromSync,(void*)(this));
 	barrierRegistered=CmiTrue;
 }
@@ -1828,6 +1834,7 @@ void CkLocMgr::doneInserting(void)
 {
 	the_lbdb->DoneRegisteringObjects(myLBHandle);
 }
+
 #endif
 
 #include "CkLocation.def.h"

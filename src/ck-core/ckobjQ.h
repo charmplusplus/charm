@@ -9,8 +9,8 @@ class Chare;
 class ObjectToken {
 public:
   char core[CmiMsgHeaderSizeBytes];
-  Chare *objPtr;                   // point to object
-  void *message;			 // envelope
+  Chare *objPtr;               		// pointer to object
+  void *message;			// envelope
 };
 
 // object message queue

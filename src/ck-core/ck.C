@@ -31,7 +31,7 @@ Chare::Chare(void) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
 #if CMK_OBJECT_QUEUE_AVAILABLE
-  if (_defaultObjectQ) objQ.create();
+  if (_defaultObjectQ)  CkEnableObjQ();
 #endif
 }
 
@@ -39,7 +39,7 @@ Chare::Chare(CkMigrateMessage* m) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
 #if CMK_OBJECT_QUEUE_AVAILABLE
-  if (_defaultObjectQ) objQ.create();
+  if (_defaultObjectQ)  CkEnableObjQ();
 #endif
 }
 
@@ -77,7 +77,11 @@ void CkMessage::ckDebugPup(PUP::er &p,void *msg) {
 IrrGroup::IrrGroup(void) {
   thisgroup = CkpvAccess(_currentGroup);
 }
-IrrGroup::~IrrGroup() {}
+
+IrrGroup::~IrrGroup() {
+  // remove the object pointer
+  CkpvAccess(_groupTable)->find(thisgroup).setObj(NULL);
+}
 
 void IrrGroup::pup(PUP::er &p)
 {
@@ -1189,6 +1193,28 @@ void CkArrayManagerDeliver(int pe,void *msg) {
   register envelope *env = UsrToEnv(msg);
   _prepareOutgoingArrayMsg(env,ForArrayEltMsg);
   _skipCldEnqueue(pe, env, _infoIdx);
+}
+
+void CkDeleteChares() {
+  int i;
+  // TODO: delete all array elements
+
+  // delete all groups
+  int numGroups = CkpvAccess(_groupIDTable)->size();
+  for(i=0;i<numGroups;i++) {
+    CkGroupID gID = (*CkpvAccess(_groupIDTable))[i];
+    IrrGroup *obj = CkpvAccess(_groupTable)->find(gID).getObj();
+    if (obj) delete obj;
+  }
+  // delete all node groups
+  if (CkMyRank() == 0) {
+    int numNodeGroups = CksvAccess(_nodeGroupIDTable).size();
+    for(i=0;i<numNodeGroups;i++) {
+      CkGroupID gID = CksvAccess(_nodeGroupIDTable)[i];
+      IrrGroup *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();
+      if (obj) delete obj;
+    }
+  }
 }
 
 //------------------- Message Watcher (record/replay) ----------------
