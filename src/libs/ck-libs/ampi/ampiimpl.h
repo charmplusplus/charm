@@ -155,7 +155,7 @@ class AmpiMsg : public CMessage_AmpiMsg {
     }
     p(tag1); p(tag2); p(comm); p(length);
     if(p.isUnpacking()) {
-      m = new AmpiMsg(tag1, tag2, length, comm);
+      m = new (&length, 0) AmpiMsg(tag1, tag2, length, comm);
     }
     p(m->data, length);
     if(p.isDeleting()) {
