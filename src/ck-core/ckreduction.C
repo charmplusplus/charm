@@ -467,7 +467,7 @@ void CkReductionMgr::finishReduction(void)
   ret->callback = CkCallback(CkIndex_CkReductionMgr::ArrayReductionHandler(NULL),0,thisProxy);
   ret->secondaryCallback = result->callback;
 
-#if DEBUGRED 
+#if DEBUGRED
   CkPrintf("[%d,%d]Callback for redNo %d in group %d  mesggcount=%d localgcount=%d\n",CkMyNode(),CkMyPe(),redNo,thisgroup.idx,ret->gcount,gcount);
 #endif
     
@@ -628,9 +628,8 @@ void CkReductionMgr::pup(PUP::er &p)
     gcount=0;
 
   }
-
-#ifdef DEBUGRED
-    CkPrintf("[%d,%d] pupping _____________  gcount = %d \n",CkMyNode(),CkMyPe(),gcount);
+#if DEBUGRED
+  CkPrintf("[%d,%d] pupping _____________  gcount = %d \n",CkMyNode(),CkMyPe(),gcount);
 #endif
 }
 
@@ -643,7 +642,7 @@ void CkReductionMgr::ArrayReductionHandler(CkReductionMsg *m){
 	finalMsgs.enq(m);
 	//CkPrintf("ArrayReduction Handler Invoked for %d \n",m->redNo);
 	adj(m->redNo).mainRecvd = 1;
-#if DEBUGRED	
+#if DEBUGRED
 	CkPrintf("~~~~~~~~~~~~~ ArrayReductionHandler Callback called for redNo %d with mesgredNo %d at %.6f %d\n",completedRedNo,m->redNo,CmiWallTimer());
 #endif	
 	endArrayReduction();

@@ -39,23 +39,25 @@ void printIndex(const CkArrayIndex &idx,char *dest) {
 	}
 }
 ElementSaver::ElementSaver(const char *dirName_,const int locMgrIdx_) :dirName(dirName_),locMgrIdx(locMgrIdx_){
-	char indexName[1024];
-	sprintf(indexName,"%s/loc_%d_%d.idx",dirName,locMgrIdx,CkMyPe());
-	indexFile=fopen(indexName,"w");
-	if (indexFile==NULL){
-		CkPrintf("Could not create index file %s\n",indexName);
-		CkAbort("Could not create index file");
-	}
+	char fileName[1024];
+	sprintf(fileName,"%s/loc_%d_%d.idx",dirName,locMgrIdx,CkMyPe());
+	indexFile=fopen(fileName,"w");
+	if (indexFile==NULL) CkAbort("Could not create index file");
 	fprintf(indexFile,"CHARM++_Checkpoint_File 1.0 %d %d\n",CkMyPe(),CkNumPes());
+
+	sprintf(fileName,"%s/arr_%d_%d.dat",dirName,locMgrIdx,CkMyPe());
+	datFile=fopen(fileName,"wb");
+	if (indexFile==NULL) CkAbort("Could not create data file");
 }
 ElementSaver::~ElementSaver() {
+	fclose(datFile);
 	fclose(indexFile);
 }
 void ElementSaver::addLocation(CkLocation &loc) {
 	const CkArrayIndex &idx=loc.getIndex();
 	const int *idxData=idx.data();
 	char idxName[128]; printIndex(idx,idxName);
-	char fileName[1024]; sprintf(fileName,"arr_%d_%s.dat",locMgrIdx,idxName);
+	char fileName[1024]; sprintf(fileName,"arr_%d_%d.dat",locMgrIdx,CkMyPe());
 
 	//Write a file index entry
 	fprintf(indexFile,"%s %d ",fileName,idx.nInts);
@@ -63,14 +65,10 @@ void ElementSaver::addLocation(CkLocation &loc) {
 	fprintf(indexFile,"\n");
 
 	//Save the actual array element data to the file:
-	char pathName[1024];
-	sprintf(pathName,"%s/%s",dirName,fileName);
-	FILE* f=fopen(pathName,"wb");
-	if(!f) CkAbort("Could not create checkpoint file");
-	PUP::toDisk p(f);
+	if (!datFile) CkAbort("Could not write checkpoint file");
+	PUP::toDisk p(datFile);
 	loc.pup(p);
-	fclose(f);
-	DEBCHK("Saved array index %s to file %s\n",idxName,pathName);
+	//DEBCHK("Saved array index %s to datFile\n",idxName);
 }
 
 void CkCheckpointMgr::Checkpoint(const char *dirname,CkCallback& cb){
@@ -205,8 +203,13 @@ ElementRestorer::ElementRestorer(const char *dirName_,CkLocMgr *dest_)
 	if (4!=fscanf(indexFile,"%s%lf%d%d",ignored,&version,&srcPE,&srcSize))
 		CkAbort("Checkpoint index file format error");
 	if (version>=2.0) CkAbort("Checkpoint index file format is too new");
+
+	sprintf(indexName,"%s/arr_%d_%d.dat",dirName,dest->ckGetGroupID().idx,CkMyPe());
+	datFile=fopen(indexName,"rb");
+	if (datFile==NULL)  CkAbort("Could not read data file");
 }
 ElementRestorer::~ElementRestorer() {
+	fclose(datFile);
 	fclose(indexFile);
 }
 // Try to restore one array element.  If it worked, return true.
@@ -220,14 +223,10 @@ bool ElementRestorer::restore(void) {
 	for (int i=0;i<idx.nInts;i++) fscanf(indexFile,"%d",&idxData[i]);
 
 	//Restore the actual array element data from the file:
-	char pathName[1024];
-	sprintf(pathName,"%s/%s",dirName,fileName);
-	FILE *f=fopen(pathName,"rb");
-	if (!f) CkAbort("Could not read checkpoint file");
-	PUP::fromDisk p(f);
+	if (!datFile) CkAbort("Could not read checkpoint file");
+	PUP::fromDisk p(datFile);
 	dest->resume(idx,p);
-	fclose(f);
-	DEBCHK("Restored an index from file %s\n",pathName);
+	//DEBCHK("Restored an index from datFile\n");
 	return true;
 }
 

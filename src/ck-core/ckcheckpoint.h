@@ -22,6 +22,7 @@ void printIndex(const CkArrayIndex &idx,char *dest);
 class ElementSaver : public CkLocIterator {
 private:
 	FILE *indexFile; //Output list of array indices and data files
+	FILE *datFile; // data file containing all elements' data
 	const char *dirName; //Output directory
 	const int locMgrIdx;
 public:
@@ -36,6 +37,7 @@ public:
 class ElementRestorer {
 private:
 	FILE *indexFile; //Input list of array indices and data files
+	FILE *datFile; // data file containing all elements' data
 	const char *dirName; //Input directory
 	CkLocMgr *dest; //Place to put new array elements
 public:
