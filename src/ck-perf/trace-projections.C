@@ -621,7 +621,7 @@ void LogEntry::writeBinary(FILE* fp)
   }
 }
 
-TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0)
+TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0), inEntry(0)
 {
   if (TRACE_CHARM_PE() == 0) return;
 
@@ -784,19 +784,23 @@ void TraceProjections::creationDone(int num)
 
 void TraceProjections::beginExecute(CmiObjId *tid)
 {
+  if (inEntry) CmiAbort("Nested Begin Execute!\n");
   execEvent = CtvAccess(curThreadEvent);
   execEp = (-1);
   _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
                              execEvent,CkMyPe(), 0, tid);
+  inEntry = 1;
 }
 
 void TraceProjections::beginExecute(envelope *e)
 {
   if(e==0) {
+    if (inEntry) CmiAbort("Nested Begin Execute!\n");
     execEvent = CtvAccess(curThreadEvent);
     execEp = (-1);
     _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
                              execEvent,CkMyPe());
+    inEntry = 1;
   } else {
     beginExecute(e->getEvent(),e->getMsgtype(),e->getEpIdx(),e->getSrcPe(),e->getTotalsize());
   }
@@ -804,15 +808,18 @@ void TraceProjections::beginExecute(envelope *e)
 
 void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx)
 {
+  if (inEntry) CmiAbort("Nested Begin Execute!\n");
   execEvent=event;
   execEp=ep;
   execPe=srcPe;
   _logPool->add(BEGIN_PROCESSING,msgType,ep,TraceTimer(),
                              event,srcPe, mlen, idx);
+  inEntry = 1;
 }
 
 void TraceProjections::endExecute(void)
 {
+  if (!inEntry) CmiAbort("Nested EndExecute!\n");
   if(execEp == (-1)) {
     _logPool->add(END_PROCESSING,0,_threadEP,TraceTimer(),
                              execEvent,CkMyPe());
@@ -820,6 +827,7 @@ void TraceProjections::endExecute(void)
     _logPool->add(END_PROCESSING,0,execEp,TraceTimer(),
                              execEvent,execPe);
   }
+  inEntry = 0;
 }
 
 void TraceProjections::messageRecv(char *env, int pe)

@@ -124,6 +124,7 @@ class TraceProjections : public Trace {
     int execPe;
     int isIdle;
     int cancel_beginIdle, cancel_endIdle;
+    int inEntry;
   public:
     TraceProjections(char **argv);
     void userEvent(int e);
