@@ -6,6 +6,7 @@ StreamingStrategy::StreamingStrategy(int periodMs,int bufferMax_)
 {
     streamingMsgBuf=NULL;
     streamingMsgCount=NULL;
+    shortMsgPackingFlag = CmiFalse;
 }
 
 void StreamingStrategy::insertMessage(CharmMessageHolder *cmsg) {
@@ -61,7 +62,6 @@ void StreamingStrategy::flushPE(int pe) {
             CkAbort("streamingMsgCount doesn't match streamingMsgBuf!\n");
     
         ComlibPrintf("Sending %d Messagaes for PE %d\n", msg_count, pe);
-
 
         CmiMultipleSend(pe, msg_count, sizes, msgComps);
         delete [] msgComps;
