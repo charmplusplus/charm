@@ -301,6 +301,8 @@ rm -f $VERSION/tmp/Makefile
 rm -f $VERSION/tmp/Make.depends
 rm -f $VERSION/tmp/Make.lb
 
+
+# Create the bin, lib, include, etc. links:
 if [ "x_`echo $VERSION | awk -F- '{print $2}'`" = "x_win32" ]
 then
 #Win32 version needs special compilers and *copied* (not linked)
@@ -316,15 +318,15 @@ else
 ln -f -s \$@
 EOF
   chmod +x $VERSION/tmp/system_ln
-	for newdir in `echo bin lib lib_so include tmp`
-	do
-		echo "Soft-linking over $newdir"
+  for newdir in `echo bin lib lib_so include tmp`
+  do
+    echo "Soft-linking over $newdir"
     if [ -r $newdir ]
     then
-      rm -f $newdir
+      rm -fr $newdir || exit 1
     fi
-		$VERSION/tmp/system_ln $VERSION/$newdir $newdir
-	done
+    $VERSION/tmp/system_ln $VERSION/$newdir $newdir
+  done
 fi
 
 $VERSION/tmp/system_ln "../../src/scripts/Make.depends" $VERSION/tmp/Make.depends
