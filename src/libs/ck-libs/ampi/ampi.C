@@ -2660,6 +2660,12 @@ int AMPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
   AMPIAPI("AMPI_Isend");
   USER_CALL_DEBUG("AMPI_Isend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
   ampi *ptr = getAmpiInstance(comm);
+#if AMPI_COMLIB
+  if(enableStreaming && comm==MPI_COMM_WORLD){
+    ptr->getStreaming().beginIteration();
+    ptr->comlibsend(tag,ptr->getRank(comm),buf,count,type,dest,comm);
+  } else
+#endif
   ptr->send(tag, ptr->getRank(comm), buf, count, type, dest, comm);
   *request = MPI_REQUEST_NULL;
 #if AMPI_COUNTER
