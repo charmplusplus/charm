@@ -29,7 +29,7 @@
 
 #define CMK_IS_HETERO                                      0
 
-#define CMK_MACHINE_NAME                                   "origin2000"
+#define CMK_MACHINE_NAME                                   "origin-mpi"
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
@@ -83,7 +83,10 @@
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
+
+#ifndef CMK_THREADS_COPY_STACK
 #define CMK_THREADS_COPY_STACK                             0
+#define
 
 #define CMK_THREADS_UNAVAILABLE                            0
 #define CMK_THREADS_USE_ALLOCA                             0

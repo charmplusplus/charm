@@ -81,7 +81,10 @@
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
+
+#ifndef CMK_THREADS_COPY_STACK
 #define CMK_THREADS_COPY_STACK                             0
+#endif
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
