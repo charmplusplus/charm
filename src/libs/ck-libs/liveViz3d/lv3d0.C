@@ -55,6 +55,7 @@ void LV3D_Universe::setupClient(oglOptions &i)
 {
 	/* nothing */
 }
+void LV3D_Universe::setupGL(void) {}
 
 /**
   Return the client GUI controller.  Default is a trackball,
@@ -64,7 +65,6 @@ oglController *LV3D_Universe::makeController(void)
 {
 	return new oglTrackballController(3.0,40.0, CkVector3d(0.5,0.5,0.5));
 }
-#endif
 
 /**
   Add this view to the universe.  This is called
@@ -77,9 +77,7 @@ void LV3D_Universe::viewResponse(CkView *v) {
 	}
 	v->ref();
 	object_table->add(v);
-#ifdef CMK_LIVEVIZ3D_CLIENT
 	oglRepaint(10);
-#endif
 }
 
 CkView *LV3D_Universe::lookup(const CkViewableID &src) {
@@ -96,6 +94,10 @@ CkView *LV3D_Universe::lookup(const CkViewableID &src) {
 void LV3D_Universe::render(const CkViewpoint &vp) {
 	if (object_table) object_table->render(vp);
 }
+
+
+#endif
+
 
 PUPable_def(LV3D_Universe);
 

@@ -58,12 +58,14 @@ public:
 	*/
 	virtual void setupClient(oglOptions &i);
 	
+	/// Post-OpenGL initialization.
+	virtual void setupGL(void);
+	
 	/**
 	  Return the client GUI controller.  Default is a trackball,
 	  centered on the middle of the unit cube.
 	*/
 	virtual oglController *makeController(void);
-#endif
 
 	/**
 	  Add this view to the universe.  This is called
@@ -81,12 +83,14 @@ public:
 	virtual void render(const CkViewpoint &vp);
 
 protected:
-	/// Stores cached CkView's on the client side.
-	LV3D_Universe_Table *object_table;
-	
 	/// Return the last known view for this viewableID.
 	///   Returns NULL if no view is available.
 	CkView *lookup(const CkViewableID &src);
+#endif
+private:
+	/// Stores cached CkView's on the client side.
+	LV3D_Universe_Table *object_table;
+
 };
 
 

@@ -20,6 +20,22 @@ class liveVizRequestMsg;
 
 #include "lv3d1.decl.h" /* for message superclasses */
 
+/**  Manager for a LV3D_Array. */
+class LV3D1_ServerMgr : public LV3D_ServerMgr {
+	CProxy_LV3D_Array a;
+public:
+	
+	LV3D1_ServerMgr(const CProxy_LV3D_Array &a_) :a(a_) {}
+	virtual void newClient(int clientID) {
+		a.LV3D_NewClient(clientID);
+	}
+	virtual void newViewpoint(LV3D_ViewpointMsg *m) {
+		a.LV3D_Viewpoint(m);
+	}
+	virtual void doBalance(void);
+};
+
+
 
 /**
  * Register for lv3d redraw requests.  This routine

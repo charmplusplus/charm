@@ -1,14 +1,25 @@
 module lv3d0 {
 	message LV3D_ViewpointMsg;
-	readonly int LV3D_Disable_Ship_Prio;
+	readonly int LV3D_disable_ship_prio;
+	readonly int LV3D_disable_ship_replace;
+	readonly int LV3D_disable_ship_throttle;
+	readonly int LV3D_disable_ship;
+	readonly int LV3D0_toMaster_bytesPer;
+	readonly int LV3D0_toMaster_bytesMax;
+	readonly int LV3D0_toClient_bytesPer;
 	
 	message LV3D0_ViewMsg {
 		unsigned char view[];
 	};
-
+	
 	group LV3D0_Manager {
 		entry LV3D0_Manager(void);
 		entry void addView(LV3D0_ViewMsg *m);
+	};
+	group LV3D_PerfManager {
+		entry LV3D_PerfManager(void);
+		entry void zero(void);
+		entry void collect(void);
 	};
 	initproc void LV3D0_ProcInit(void);
 	initnode void LV3D0_NodeInit(void);

@@ -135,9 +135,13 @@ public:
 	CkViewpoint(const CkVector3d &E_,const CkVector3d &R_,
 		const CkVector3d &X_,const CkVector3d &Y_,int w,int h);
 	
-	/// Build an orthogonal camera for a view plane with origin R
-	///  and X and Y as pixel sizes, and the given Z axis.
-	/// This is a difficult-to-use, but completely general routine.
+	/**
+	  Build an orthogonal camera for a view plane with origin R
+	   and X and Y as pixel sizes, and the given Z axis.
+	  This is a difficult-to-use, but completely general routine.
+	  For an orthongonal camera (yesThisIsPerspective==false),
+	    project(R_+x*X_+y*Y_+z*Z_) = (x,y,z)
+	*/
 	CkViewpoint(const CkVector3d &R_,
 		const CkVector3d &X_,const CkVector3d &Y_,const CkVector3d &Z_,
 		int w,int h,bool yesThisIsPerspective);
@@ -165,12 +169,17 @@ public:
 	
 	/// Return the center of projection (eye point)
 	inline const CkVector3d &getEye(void) const {return E;}
+	/// Return true if this is an orthographic (perspective-free) camera.
+	inline bool isOrthographic(void) const {return !isPerspective;}
+	
 	/// Return the projection plane origin (View Reference Point)
 	inline const CkVector3d &getOrigin(void) const {return R;}
 	/// Return the projection plane pixel-length X axis
 	inline const CkVector3d &getX(void) const {return X;}
 	/// Return the projection plane pixel-length Y axis (View Up Vector)
 	inline const CkVector3d &getY(void) const {return Y;}
+	/// Return the z-unit-length Z axis (from reference towards camera)
+	inline const CkVector3d &getZ(void) const {return Z;}
 	
 	/// Return the number of pixels in the X direction
 	inline int getXsize(void) const { return wid; }
@@ -198,6 +207,27 @@ public:
 		  w*(m(1,0)*in.x+m(1,1)*in.y+m(1,2)*in.z+m(1,3)),
 		  w*(m(2,0)*in.x+m(2,1)*in.y+m(2,2)*in.z+m(2,3))
 		);
+	}
+	
+	enum {nClip=4};
+	
+	/// Get our i'th clipping plane.
+	///  0 and 1 are the left and right horizontal clip planes.
+	///  2 and 3 are the top and bottom vertical clip planes.
+	CkHalfspace3d getClip(int i) const; 
+	
+	/// Return true if any convex combination of these points is still offscreen.
+	bool allOffscreen(int n,const CkVector3d *p) const {
+		for (int c=0;c<nClip;c++) {
+			CkHalfspace3d h=getClip(c);
+			int i;
+			for (i=0;i<n;i++)
+				if (h.side(p[i])>=0)
+					break; /* this point in-bounds */
+			if (i==n) /* every point was outside halfspace h */
+				return true;
+		}
+		return false; /* not all points outside the same halfspace */
 	}
 	
 	/// Project this point onto the screen, returning zero for the z axis.
@@ -252,7 +282,10 @@ public:
 	}
 	//Get the universe-coords view ray passing through this screen point
 	CkRay getPixelRay(const CkVector2d &screen) const {
-		return CkRay(getEye(),viewplane(screen)-getEye());
+		if (isPerspective)
+			return CkRay(getEye(),viewplane(screen)-getEye());
+		else /* orthogonal camera */
+			return CkRay(viewplane(screen)-1000.0*Z, Z);
 	}
 	
 	//Return true if this screen location is (entirely) in-bounds:

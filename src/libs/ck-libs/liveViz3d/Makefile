@@ -40,6 +40,9 @@ ckviewable.o: ckviewable.cpp $(HEADDEP)
 ckviewpoint.o: ckviewpoint.cpp $(HEADDEP)
 	$(CHARMC) -c ckviewpoint.cpp
 
+stats.o: stats.cpp $(HEADDEP)
+	$(CHARMC) -c stats.cpp
+
 ckpointviewable.o: ckpointviewable.cpp $(HEADDEP)
 	$(CHARMC) -c ckpointviewable.cpp
 

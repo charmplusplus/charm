@@ -261,21 +261,10 @@ void LV3D_RenderMsg::delete_(LV3D_RenderMsg *m) {
 	delete m;
 }
 
-class LV3D1_ServerMgr : public LV3D_ServerMgr {
-	CProxy_LV3D_Array a;
-public:
-	
-	LV3D1_ServerMgr(const CProxy_LV3D_Array &a_) :a(a_) {}
-	virtual void newClient(int clientID) {
-		a.LV3D_NewClient(clientID);
-	}
-	virtual void newViewpoint(LV3D_ViewpointMsg *m) {
-		a.LV3D_Viewpoint(m);
-	}
-	virtual void doBalance(void) {
-		a.LV3D_DoBalance();
-	}	
-};
+void LV3D1_ServerMgr::doBalance(void)
+{
+	a.LV3D_DoBalance();
+}	
 
 void LV3D1_Init(CkArrayID aid,LV3D_Universe *theUniverse)
 {

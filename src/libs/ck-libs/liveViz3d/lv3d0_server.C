@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <algorithm>
+#include "stats.h"
 
 #include "lv3d0.decl.h" //For LV3D0_ViewMsg
 void _registerlv3d1(void);
@@ -16,7 +17,10 @@ void _registerliveViz(void);
 // #include "lv3d1.decl.h" //For LV3D1 registration (for .def file)
 
 static /* readonly */ CProxy_LV3D0_Manager mgrProxy;
-static /* readonly */ int LV3D_Disable_Ship_Prio=0;
+static /* readonly */ int LV3D_disable_ship_prio=0; ///< Set priorities to zero
+static /* readonly */ int LV3D_disable_ship_replace=0; ///< Don't replace old images from same impostor
+static /* readonly */ int LV3D_disable_ship_throttle=0; ///< Don't send a limited number at once
+static /* readonly */ int LV3D_disable_ship=0;  ///< Throw away images, don't ship any
 #define masterProcessor 0
 
 /**
@@ -26,11 +30,16 @@ static /* readonly */ int LV3D_Disable_Ship_Prio=0;
 */
 class LV3D0_ViewMsg : public CMessage_LV3D0_ViewMsg {
 public:
+// (these fields are all copied from our viewable)
 	/// This is the viewable we describe
 	CkViewableID id;
 	
-	/// This is our approximate network priority. Prio==0 is highest.
+	/// This is our approximate network priority
+	///   Prio==0 is highest.
 	int prio;
+	
+	/// Pixels we represent
+	int pixels;
 	
 	/// This is the client that requested the view.
 	int clientID;
@@ -53,6 +62,7 @@ LV3D0_ViewMsg *LV3D0_ViewMsg::new_(CkView *vp) {
 	LV3D0_ViewMsg *m=new (view_size,0) LV3D0_ViewMsg;
 	m->id=vp->id;
 	m->prio=vp->prio;
+	m->pixels=vp->pixels;
 	m->view_size=view_size;
 	PUP_toNetwork_pack pp(m->view); pp|vp;
 	return m;
@@ -72,6 +82,7 @@ public:
 	CkViewPrioHolder(LV3D0_ViewMsg *v_) :v(v_) {}
 	
 	// Comparison operator, used to keep a priority queue.
+	//  Returns true if we should be processed before this guy.
 	bool operator<(const CkViewPrioHolder &h) const {
 		if (v->prio<h.v->prio) return true;
 		if (v->prio>h.v->prio) return false;
@@ -87,10 +98,12 @@ public:
 };
 
 /**
- * A LV3D0_ClientManager buffers up outgoing views before
- * they're requested by, and sent off to, a client.
- */
-class LV3D0_ClientManager {
+ Stores a set of view messages:
+   - Sorts outgoing views by priority.
+   - Removes duplicate views from same viewable.
+*/
+class CkViewPrioSorter {
+
 	/*
 	  We generally want to process views in priority order;
 	  but we never want to send an earlier view to a client
@@ -109,14 +122,155 @@ class LV3D0_ClientManager {
 	typedef std::map<CkViewPrioHolder,char> prio2view_t;
 	prio2view_t prio2view;
 	
+public:
+	CkViewPrioSorter() 
+		:id2view(129,0.2)
+	{
+	}
+	~CkViewPrioSorter() {
+		for (iterator it=begin();it!=end();++it)
+			delete (*it).first.v;
+	}
+	
+	/// Return true if we have no stored, unsent views.
+	bool isEmpty(void) const {return prio2view.size()==0;}
+	
+	/// Add this view to our set.
+	void add(LV3D0_ViewMsg *v)
+	{
+		if (LV3D_disable_ship_prio) v->prio=0;
+		CkViewPrioHolder old=id2view.get(v->id);
+		/// FIXME: messages may come out of order-- check framenumber
+		if (old.v!=0 && !LV3D_disable_ship_replace) 
+		{ /* An old entry from this viewable exists: remove it.
+		     This is so we always send off the most up-to-date view. */
+			// printf("[OUT] Replacing old view for viewable %d\n",v->id.id[0]);
+			if (v->prio>old.v->prio)  // keep old priority if it's higher
+				v->prio=old.v->prio;
+			prio2view.erase(prio2view.find(old));
+			delete old.v;
+		}
+		else {
+			// printf("[OUT] Queueing new view for viewable %d\n",v->id.id[0]);
+		}
+		id2view.put(v->id)=CkViewPrioHolder(v);
+		prio2view.insert(std::make_pair(CkViewPrioHolder(v),(char)1));
+	}
+	
+	/// Peek through the set of high-priority views.
+	///  Get the iterator v, extract with (*v)
+	typedef prio2view_t::iterator iterator;
+	iterator begin(void) {return prio2view.begin();}
+	iterator end(void) {return prio2view.end();}
+	
+	/// Extract the corresponding view for this iterator.
+	///   Often it==begin().
+	LV3D0_ViewMsg *extract(const iterator &doomed) {
+		LV3D0_ViewMsg *v=(*doomed).first.v;
+		prio2view.erase(doomed);
+		id2view.remove(v->id);
+		return v;
+	}
+};
+
+/// Generic superclass for client managers.
+class LV3D0_ClientManager : public CkViewPrioSorter {
+public:
+	virtual ~LV3D0_ClientManager() {}
+	virtual void add(LV3D0_ViewMsg *v) =0;
+	virtual void getViews(void) {}
+	virtual void whenEmptyCallback(const CkCallback &cb) {}
+};
+
+/******************** Shipping views to Master ***************/
+/// Communication parameter: number of bytes to send per 10ms window.
+///  NOTE: this is reset in procInit, below.
+int LV3D0_toMaster_bytesPer=100*1024;
+/// Communication parameter: maximum number of bytes to store in bucket.
+int LV3D0_toMaster_bytesMax=2*LV3D0_toMaster_bytesPer;
+
+static void toMaster_fillBucket(void *ptr,double timer);
+
+static stats::op_t op_master_count=stats::count_op("master.count","Number of final master impostors","count");
+static stats::op_t op_master_bytes=stats::count_op("master.bytes","Number of final master bytes","bytes");
+static stats::op_t op_master_pixels=stats::count_op("master.pixels","Number of final master pixels","pixels");
+
+/**
+ * A LV3D0_ClientManager that buffers up outgoing views 
+ * for delivery to the master processor.  This throttles the
+ * cluster network utilization, preventing ancient views from
+ * piling up at the network interconnect.
+ */
+class LV3D0_ClientManager_toMaster : public LV3D0_ClientManager {
+	/// Bucket algorithm: remaining bytes we're allowed to send.
+	int bucket_bytes;
+	int cidx;
+public:
+	LV3D0_ClientManager_toMaster() {
+		bucket_bytes=LV3D0_toMaster_bytesMax;
+		cidx=CcdCallOnConditionKeep(CcdPERIODIC_10ms,toMaster_fillBucket,this);
+	}
+	~LV3D0_ClientManager_toMaster() {
+		CcdCancelCallOnConditionKeep(CcdPERIODIC_10ms,cidx);
+	}
+	
+	/// Add a view from a new viewable.
+	virtual void add(LV3D0_ViewMsg *v) {
+		CkViewPrioSorter::add(v);
+		progress();
+	}
+	/// Send everything we're ready to send.
+	void progress(void) {
+		// printf("progress: bucket=%d\n",bucket_bytes);
+		while ((!isEmpty()) && (bucket_bytes>0 || LV3D_disable_ship_throttle)) 
+		{
+			LV3D0_ViewMsg *v=extract(begin());
+			bucket_bytes-=v->view_size;
+			stats::get()->add(1.0,op_master_count);
+			stats::get()->add(v->view_size,op_master_bytes);
+			stats::get()->add(v->pixels,op_master_bytes);
+			mgrProxy[masterProcessor].addView(v);
+		}
+	}
+	/// Add bytes to our bucket, which allows us to send.
+	///  Called every 10ms via the CcdPERIODIC_10ms stuff.
+	void fillBucket(void) {
+		bucket_bytes+=LV3D0_toMaster_bytesPer;
+		if (bucket_bytes>LV3D0_toMaster_bytesMax) 
+			bucket_bytes=LV3D0_toMaster_bytesMax;
+		progress();
+	}
+};
+/// Called every 10ms via CcdPERIODIC_10ms.
+static void toMaster_fillBucket(void *ptr,double timer) {
+	LV3D0_ClientManager_toMaster *p=(LV3D0_ClientManager_toMaster *)ptr;
+	p->fillBucket();
+}
+
+/************** Shipping views to Client ***************/
+/// Communication parameter: maximum number of bytes to send per client request.
+int LV3D0_toClient_bytesPer=100*1024;
+
+static stats::op_t op_client_pack=stats::time_op("client.pack","Time spent packing final client impostors");
+static stats::op_t op_client_count=stats::count_op("client.count","Number of final client impostors","count");
+static stats::op_t op_client_bytes=stats::count_op("client.bytes","Number of final client bytes","bytes");
+static stats::op_t op_client_pixels=stats::count_op("client.pixels","Final client impostor pixels","pixels");
+
+/**
+ * A LV3D0_ClientManager buffers up outgoing views before
+ * they're requested by, and sent off to, a client.
+ */
+class LV3D0_ClientManager_toClient : public LV3D0_ClientManager
+{
+	typedef CkViewPrioSorter super;
 	bool hasDelayed;
 	CcsDelayedReply delayedReply;
 	
 	/// Emptiness detection (used for QD, below)
 	CkVec<CkCallback> emptyCallbacks;
 	void checkEmpty(void) {
-		if (prio2view.size()==0) { /* no views left-- send all empty callbacks */
-			for (unsigned int i=0;i<emptyCallbacks.size();i++)
+		if (isEmpty()) { /* no views left-- send all empty callbacks */
+			for (int i=0;i<emptyCallbacks.size();i++)
 				emptyCallbacks[i].send();
 			emptyCallbacks.resize(0);
 		}
@@ -124,17 +278,17 @@ class LV3D0_ClientManager {
 	
 	/// Pack up and send off up to 100KB of stored views:
 	void sendReply(CcsDelayedReply repl) {
-	
+		stats::op_sentry stats_sentry(op_client_pack);
+		
 	// Figure out how many views we can afford to send at once:
 		int len=4; /* leave room for the "length" field */
 		int n=0;
-		prio2view_t::iterator it=prio2view.begin();
-		while (len<100*1024 && it!=prio2view.end()) {
+		iterator it=begin();
+		while (it!=end() && (len<LV3D0_toClient_bytesPer || LV3D_disable_ship_throttle)) {
 			LV3D0_ViewMsg *v=(*it++).first.v;
 			len+=v->view_size;
 			n++;
 		}
-		prio2view_t::iterator sendEnd=it;
 	
 	// Pack the views into a network buffer:
 		// CmiPrintf("[OUT] Sending off %d new views (%d bytes)\n",n,len);
@@ -143,12 +297,10 @@ class LV3D0_ClientManager {
 		char *retMsg=new char[len];
 		PUP_toNetwork_pack pp(retMsg);
 		pp|n;
-		for (it=prio2view.begin(); it!=sendEnd; ++it) {
-			prio2view_t::iterator doomed=it;
-			LV3D0_ViewMsg *v=(*it).first.v;
+		for (int i=0;i<n;i++) {
+			LV3D0_ViewMsg *v=extract(begin());
 			pp(v->view,v->view_size);
-			prio2view.erase(doomed);
-			id2view.remove(v->id);
+			stats::get()->add(v->pixels,op_client_pixels);
 			delete v;
 		}
 		
@@ -158,47 +310,25 @@ class LV3D0_ClientManager {
 			CkAbort("Pup size mismatch (logic error) in LV3D0_!\n");
 		}
 
+		stats::get()->add(1.0,op_client_count);
+		stats::get()->add(len,op_client_bytes);
 		CcsSendDelayedReply(repl,len,retMsg);
 		delete[] retMsg;
 		
 		// CmiPrintf("[OUT] Done sending off %d views\n",n);
 		checkEmpty();
 	}
-
+	
 public:
-	LV3D0_ClientManager() 
-		:id2view(129,0.2)
+	LV3D0_ClientManager_toClient() 
 	{
 		hasDelayed=false;
 	}
-	~LV3D0_ClientManager() {
-		for (prio2view_t::iterator it=prio2view.begin();
-		  it!=prio2view.end();
-		  ++it)
-			delete (*it).first.v;
-	}
-	
-	/// Return true if we have no stored, unsent views.
-	bool isEmpty(void) const {return prio2view.size()==0;}
 	
 	/// A local object has a new view.
 	///  We are passed in our reference to this object.
-	void add(LV3D0_ViewMsg *v) {
-		if (LV3D_Disable_Ship_Prio) v->prio=0;
-		CkViewPrioHolder old=id2view.get(v->id);
-		/// FIXME: messages may come out of order-- check framenumber
-		if (old.v!=0) 
-		{ /* An old entry from this viewable exists: remove it.
-		     This is so we always send off the most up-to-date view. */
-			// printf("[OUT] Replacing old view for viewable %d\n",v->id.id[0]);
-			prio2view.erase(prio2view.find(old));
-			delete old.v;
-		}
-		else {
-			// printf("[OUT] Queueing new view for viewable %d\n",v->id.id[0]);
-		}
-		id2view.put(v->id)=CkViewPrioHolder(v);
-		prio2view.insert(std::make_pair(CkViewPrioHolder(v),(char)1));
+	virtual void add(LV3D0_ViewMsg *v) {
+		super::add(v);
 		
 		if (hasDelayed) { //There's already somebody waiting
 			hasDelayed=false;
@@ -208,8 +338,8 @@ public:
 	
 	/// A client is requesting the latest views
 	///   This routine must be called from a CCS handler.
-	void getViews(void) {
-		if (prio2view.size()==0) { //Nothing to send yet-- wait for it
+	virtual void getViews(void) {
+		if (isEmpty()) { //Nothing to send yet-- wait for it
 			// printf("[OUT] Views requested, but none available\n");
 			hasDelayed=true;
 			delayedReply=CcsDelayReply();
@@ -221,7 +351,7 @@ public:
 	}
 	
 	/// Call this callback as soon as we have nothing further to send.
-	void whenEmptyCallback(const CkCallback &cb) {
+	virtual void whenEmptyCallback(const CkCallback &cb) {
 		emptyCallbacks.push_back(cb);
 		checkEmpty();
 	}
@@ -249,18 +379,14 @@ public:
 	
 	/// This client is requesting the latest views.
 	///  This routine must be called from a CCS handler.
+	///  This routine is only called on processor 0.
 	void getViews(int clientID) {
 		getClient(clientID)->getViews();
 	}
 	
 	/// A local or remote viewable is adding this view for this client.
-	///  FIXME: use streaming commlib to forward messages to master.
 	inline void addView(LV3D0_ViewMsg *m) {
-		if (CkMyPe()==masterProcessor) {
-			// FIXME: look up based on clientID
-			getClient(m->clientID)->add(m);
-		} else /* forward to master processor */
-			thisProxy[masterProcessor].addView(m);
+		getClient(m->clientID)->add(m);
 	}
 };
 
@@ -273,7 +399,6 @@ LV3D0_Manager::LV3D0_Manager(void)
 
 int LV3D0_Manager::newClient(void)
 {
-	clientTable.put(nextClientID)=new LV3D0_ClientManager();
 	return nextClientID++;
 }
 
@@ -282,27 +407,80 @@ LV3D0_ClientManager *LV3D0_Manager::getClient(int clientID)
 {
 	LV3D0_ClientManager *m=clientTable.get(clientID);
 	if (m==NULL) {
-		CkPrintf("LV3D0: Unrecognized clientID %d (0x%08x)\n",clientID);
-		CkAbort("LV3D0: Unrecognized clientID");
+		if (CkMyPe()==masterProcessor) 
+			m=new LV3D0_ClientManager_toClient;
+		else
+			m=new LV3D0_ClientManager_toMaster;
+		clientTable.put(clientID)=m;
 	}
 	return m;
 }
+
+static stats::op_t op_deposit_views=stats::count_op("deposit.views","CkView count","CkViews");
+static stats::op_t op_deposit_bytes=stats::count_op("deposit.bytes","CkView sizes","bytes");
+static stats::op_t op_deposit_pixels=stats::count_op("deposit.pixels","CkView pixels","pixels");
 
 /**
   Send this view back to this client.
   You must set the view's id and prio fields.
  */
 void LV3D0_Deposit(CkView *v,int clientID) {
+	stats::stats *s=stats::get();
+	s->add(1.0,op_deposit_views);
+	s->add(v->pixels,op_deposit_pixels);
 	LV3D0_ViewMsg *vm=LV3D0_ViewMsg::new_(v);
+	s->add(vm->view_size,op_deposit_bytes);
+	if (LV3D_disable_ship) {delete vm; return;}
 	vm->clientID=clientID;
-    mgrProxy.ckLocalBranch()->addView(vm);
+	mgrProxy.ckLocalBranch()->addView(vm);
 }
+
+
+/**************** Performance collection ***************/
+
+static stats::op_t op_pes=stats::count_op("cmi.pes","Processors","pes");
+static stats::op_t op_time=stats::count_op("cmi.time","Time","s");
+static stats::op_t op_parallel=stats::time_op("cmi.unknown","Time");
+
+static void printStats(void *rednMsg) {
+	CkReductionMsg *m=(CkReductionMsg *)rednMsg;
+	const stats::stats *s=(const stats::stats *)m->getData();
+	s->print(stdout,"total",1.0);
+	s->print(stdout,"per pe",1.0/CkNumPes());
+	s->print(stdout,"per sec",1.0/s->t[op_time]);
+	s->print(stdout,"per pe-sec",1.0/(CkNumPes()*s->t[op_time]));
+	printf("\n");
+}
+
+class LV3D_PerfManager : public CBase_LV3D_PerfManager {
+public:
+	LV3D_PerfManager(void) {
+		zero();
+	}
+	void zero(void) { /* zero out collected statistics */
+		stats::stats *s=stats::get();
+		s->zero();
+		s->add(1.0,op_pes);
+		s->add(stats::time(),op_time);
+		stats::swap(op_parallel);
+	}
+	void collect(void) { /* contribute current stats to reduction */
+		stats::stats *s=stats::get();
+		if (CkMyPe()==0) s->t[op_time]=stats::time()-s->t[op_time];
+		else s->t[op_time]=0;
+		stats::swap(op_parallel);
+		contribute(sizeof(double)*stats::op_len,&s->t[0],CkReduction::sum_double,
+			CkCallback(printStats));
+		zero();
+	}
+};
 
 
 /*************** CCS Interface ***************/
 //This only ever gets set on processor 0 (FIXME: checkpointing)
 static LV3D_Universe *theUniverse=0;
 static LV3D_ServerMgr *theMgr=0;
+static CProxy_LV3D_PerfManager perfMgr;
 
 LV3D_ServerMgr::~LV3D_ServerMgr() {}
 
@@ -325,10 +503,12 @@ extern "C" void LV3D0_setup(char *msg) {
 	pp|theUniverse;
 	CcsSendReply(sp.size(),buf);
 	theMgr->newClient(clientID);
-	// CmiPrintf("Registered (client %d)\n",clientID);
+	CmiPrintf("Registered (client %d)\n",clientID);
 	delete[] buf;
 }
 
+
+static stats::op_t op_view_count=stats::count_op("client.views","New viewpoints","Views");
 
 /**
 "lv3d_newViewpoint" CCS handler:
@@ -346,6 +526,7 @@ extern "C" void LV3D0_newViewpoint(char *msg) {
 	m->viewpoint.pup(p);
 	// CmiPrintf("New user viewpoint (client %d, frame %d)\n",clientID,frameID);
 	theMgr->newViewpoint(m);
+	stats::get()->add(1.0,op_view_count);
 }
 
 /**
@@ -439,6 +620,20 @@ extern "C" void LV3D0_quit(char *msg)
 	CmiFree(msg);
 	CkExit();
 }
+/// lv3d_zero CCS handler: clear all collected statistics
+extern "C" void LV3D0_zero(char *msg) 
+{
+	CkPrintf("Zeroing statistics\n");
+	perfMgr.zero();
+	CmiFree(msg);
+}
+/// lv3d_stats CCS handler: sum and print all collected statistics, then zero
+extern "C" void LV3D0_stats(char *msg) 
+{
+	CkPrintf("Printing statistics\n");
+	perfMgr.collect();
+	CmiFree(msg);
+}
 
 /**
 Register for libsixty redraw requests.  This routine
@@ -457,14 +652,18 @@ void LV3D0_Init(LV3D_Universe *clientUniverse,LV3D_ServerMgr *mgr)
 	CcsRegisterHandler("lv3d_qd",(CmiHandler)LV3D0_qd);
 	CcsRegisterHandler("lv3d_balance",(CmiHandler)LV3D0_balance);
 	CcsRegisterHandler("lv3d_quit",(CmiHandler)LV3D0_quit);
+	CcsRegisterHandler("lv3d_zero",(CmiHandler)LV3D0_zero);
+	CcsRegisterHandler("lv3d_stats",(CmiHandler)LV3D0_stats);
 	CProxy_LV3D0_Manager::ckNew();
+	perfMgr=CProxy_LV3D_PerfManager::ckNew();
 }
 
 /**
  Per-processor initialization routine:
 */
 void LV3D0_ProcInit(void) {
-	
+	LV3D0_toMaster_bytesPer=LV3D0_toMaster_bytesPer*2/CkNumPes();
+	LV3D0_toMaster_bytesMax=LV3D0_toMaster_bytesMax*2/CkNumPes();
 }
 void LV3D0_NodeInit(void) {
 	CkViewNodeInit();

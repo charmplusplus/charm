@@ -29,12 +29,12 @@ void CkViewpoint::buildM(void) {
 	  Solving this and taking screen_x=sX.dot(S-R), screen_y=sY.dot(S-R),
 	  and screen_z=Z.dot(R-E)/Z.dot(P-E) leads to our matrix.
 	 */
-	// Scale X and Y so screen pixels==sX.dot(S)
-	CkVector3d sX=X/X.magSqr();
-	CkVector3d sY=Y/Y.magSqr();
 	
 	if (isPerspective) 
 	{
+		// Scale X and Y so screen pixels==sX.dot(S)
+		CkVector3d sX=X/X.magSqr();
+		CkVector3d sY=Y/Y.magSqr();
 		// Compute skew factors and skewed axes
 		double skew_x=sX.dot(R-E), skew_y=sY.dot(R-E), skew_z=Z.dot(R-E);
 		CkVector3d gX=skew_x*Z-skew_z*sX;
@@ -48,7 +48,16 @@ void CkViewpoint::buildM(void) {
 	}
 	else /* orthographic projection */
 	{
-		CkVector3d sZ=Z/Z.magSqr();
+		/**
+		  Want project(R+x*X+y*Y+z*Z) = (x,y,z).
+		    so, e.g.,
+		    	(x*X+y*Y+z*Z) dot sX = x
+		    so sX should be orthogonal to Y and Z, and
+		    have magnitude such that X dot sX = 1.
+		*/
+		CkVector3d sX=Y.cross(Z); sX*=1.0/X.dot(sX);
+		CkVector3d sY=X.cross(Z); sY*=1.0/Y.dot(sY);
+		CkVector3d sZ=X.cross(Y); sZ*=1.0/Z.dot(sZ);
 		m(0,0)=sX.x; m(0,1)=sX.y; m(0,2)=sX.z; m(0,3)=-sX.dot(R); 
 		m(1,0)=sY.x; m(1,1)=sY.y; m(1,2)=sY.z; m(1,3)=-sY.dot(R); 
 		m(2,0)=sZ.x; m(2,1)=sZ.y; m(2,2)=sZ.z; m(2,3)=-sZ.dot(R);
@@ -145,6 +154,29 @@ void CkViewpoint::disablePerspective(void)
 {
 	isPerspective=false;
 	buildM();
+}
+
+/// Get our i'th clipping plane.
+CkHalfspace3d CkViewpoint::getClip(int i) const
+{
+	double target=0, dir=1;
+	int r=0; // matrix row
+	switch (i) {
+	case 0: break;
+	case 1: target=-wid; dir=-1; break;
+	case 2: r=1; break;
+	case 3: target=-ht; dir=-1; r=1; break;
+	}
+	// Require:  dir * proj(v) >= target
+	//  where proj(x)=(v dot m(r) + m(r,3))/(v dot m(3) + m(3,3))
+	//  so  (assuming w positive)
+	//      dir * (v dot m(r) + m(r,3)) >= target * (v dot m(3) + m(3,3))
+	//  which we cast as (v dot h.n) + h.d >= 0
+	CkHalfspace3d h;
+	h.n=  dir*CkVector3d(m(r,0),m(r,1),m(r,2))
+	  -target*CkVector3d(m(3,0),m(3,1),m(3,2));
+	h.d=  dir*m(r,3) - target*m(3,3);
+	return h;
 }
 
 #ifdef __CK_PUP_H

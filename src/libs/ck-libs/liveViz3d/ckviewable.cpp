@@ -9,6 +9,7 @@ Orion Sky Lawlor, olawlor@acm.org, 8/28/2002
 #include "converse.h"
 #include "lv3d0.h"
 #include <string.h>
+#include "stats.h"
 
 // Only include OpenGL utility routines if we're on the client.
 #ifdef CMK_LIVEVIZ3D_CLIENT
@@ -38,14 +39,17 @@ int roundTo2(int x) {
 	return ret;
 }
 
+static stats::op_t op_pack_impostors=stats::time_op("image.pup","CkImageCompressor::pup");
+
 /**
   Compress an image by encoding away pixels with alpha==0
   on the start and end of each row.
   
   FIXME: doesn't work in binary across platforms *unless*
-    the PUP::er is xlating.
+    the PUP::er is network (or xlating.)
 */
 void CkImageCompressor::pup(PUP::er &p) {
+	stats::op_sentry stats_sentry(op_pack_impostors);
 	if (p.isUnpacking()) 
 	{ /* client side: decompression */
 		int colors,layout;
@@ -97,11 +101,15 @@ void CkImageCompressor::pup(PUP::er &p) {
 
 PUPable_def(CkQuadView);
 
+static stats::op_t op_render_pixels=stats::count_op("render.pixels","CkQuadView pixels","pixels");
+
 /// Build a new image: normally only on server
 CkQuadView::CkQuadView(int w,int h,int n_colors) 
 	:s_tex(w,h,n_colors), x_tex(&s_tex)
 {
 	c_tex=NULL;
+	pixels=w*h;
+	stats::get()->add(pixels,op_render_pixels);
 }
 
 /// Migration constructor-- prepare for pup.
@@ -162,7 +170,7 @@ void CkQuadView::pup(PUP::er &p) {
 		CkAllocImage *img=x_tex.getImage();
 		oglTextureFormat_t fmt=oglImageFormat(*img);
 		c_tex=new oglTexture(img->getData(),x_tex.gl_w,x_tex.gl_h,
-			oglTexture_linear, fmt.format,fmt.type);
+			oglTexture_mipmap, fmt.format,fmt.type);
 		stats::get()->add(x_tex.w*x_tex.h,op_upload_pixels);
 		stats::get()->add(x_tex.gl_w*x_tex.gl_h,op_uploadpad_pixels);
 		double tx=x_tex.w/(double)x_tex.gl_w;
@@ -206,8 +214,10 @@ void CkQuadView::render(double alpha) {
 	
 	if (oglToggles['f']) 
 	{ // Draw a little frame around this texture
+		glDisable(GL_TEXTURE_2D);
 		for (int i=0;i<nCorners;i++)
 			oglLine(corners[i],corners[(i+1)%nCorners]);
+		glEnable(GL_TEXTURE_2D);
 	}
 #endif
 }

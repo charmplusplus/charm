@@ -104,6 +104,9 @@ public:
 	///  This field is set by LiveViz3dArray, not CkViewable.
 	int prio;
 	
+	/// The number of pixels we represent.
+	int pixels;
+	
 	/// CkView subclasses are PUP::able's.
 	///  This means they should have a migration constructor,
 	///  working pup routine, and appropriate PUPable declarations.
@@ -244,6 +247,7 @@ public:
 	/// (CLIENT ONLY)
 	CkQuadView(CkMigrateMessage *m);
 	
+	inline const oglTexture *getTexture(void) const {return c_tex;}
 	virtual void render(double alpha);
 };
 
@@ -355,8 +359,8 @@ public:
  * and when views are out-of-date.
  */
 class CkInterestViewable : public CkViewable {
-	CkInterestSet interest; /// Our 3D interest points
-	CkVector3d center; /// Our 3D center point
+	CkInterestSet interest; ///< Our 3D interest points
+	CkVector3d center; ///< Our 3D "center point", through which our impostor plane must pass
 protected:
 	void setUnivPoints(const CkInterestSet &univPoints_) {
 		interest=univPoints_;
