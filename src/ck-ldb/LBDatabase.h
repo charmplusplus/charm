@@ -228,6 +228,9 @@ public:
 void TurnManualLBOn();
 void TurnManualLBOff();
 
+void LBTurnInstrumentOn();
+void LBTurnInstrumentOff();
+
 inline LBDatabase* LBDatabaseObj() { return LBDatabase::Object(); }
 
 inline void set_avail_vector(char * bitmap) {

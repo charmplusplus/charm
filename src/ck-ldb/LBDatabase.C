@@ -175,7 +175,7 @@ void _loadbalancerInit()
 
   // now called in cldb.c: CldModuleGeneralInit()
   // registerLBTopos();
-  //CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
+  CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
 
   /******************* SIMULATION *******************/
   // get the step number at which to dump the LB database
@@ -345,6 +345,18 @@ void TurnManualLBOff()
    else {
      LBDatabase::manualOn = 0;
    }
+#endif
+}
+
+void LBTurnInstrumentOn() { 
+#if CMK_LBDB_ON
+  LBDatabase::Object()->CollectStatsOn(); 
+#endif
+}
+
+void LBTurnInstrumentOff() { 
+#if CMK_LBDB_ON
+  LBDatabase::Object()->CollectStatsOff(); 
 #endif
 }
 
