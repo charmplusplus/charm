@@ -114,6 +114,7 @@ int LBDatabase::manualOn = 0;
 
 void TurnManualLBOn()
 {
+#if CMK_LBDB_ON
    LBDatabase * myLbdb = LBDatabase::Object();
    if (myLbdb) {
      myLbdb->TurnManualLBOn();
@@ -121,10 +122,12 @@ void TurnManualLBOn()
    else {
      LBDatabase::manualOn = 1;
    }
+#endif
 }
 
 void TurnManualLBOff()
 {
+#if CMK_LBDB_ON
    LBDatabase * myLbdb = LBDatabase::Object();
    if (myLbdb) {
      myLbdb->TurnManualLBOff();
@@ -132,6 +135,7 @@ void TurnManualLBOff()
    else {
      LBDatabase::manualOn = 0;
    }
+#endif
 }
 
 /*@}*/

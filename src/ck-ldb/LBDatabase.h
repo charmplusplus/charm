@@ -43,7 +43,9 @@ public:
   LBDatabase(void) {
     myLDHandle = LDCreate();  
     CkpvAccess(lbdatabaseInited) = 1;
+#if CMK_LBDB_ON
     if (manualOn) TurnManualLBOn();
+#endif
   };
   LBDatabase(CkMigrateMessage *m) { myLDHandle = LDCreate(); }
   inline static LBDatabase * Object() { return CkpvAccess(lbdatabaseInited)?(LBDatabase *)CkLocalBranch(lbdb):NULL; }
