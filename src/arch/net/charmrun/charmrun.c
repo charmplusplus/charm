@@ -603,7 +603,7 @@ void arg_init(int argc, char **argv)
     pparam_printdocs();
     exit(1);
   }
-  arg_argv = argv+2; /*Skip over conv-host (0) and program name (1)*/
+  arg_argv = argv+2; /*Skip over charmrun (0) and program name (1)*/
   arg_argc = pparam_countargs(arg_argv);
 
   arg_verbose = arg_verbose || arg_debug || arg_debug_no_pause;
@@ -809,7 +809,7 @@ void nodetab_init()
   /* Open the NODES_FILE. */
   nodesfile = nodetab_file_find();
   if(arg_verbose)
-    fprintf(stderr, "Conv-host> using %s as nodesfile\n", nodesfile);
+    fprintf(stderr, "Charmrun> using %s as nodesfile\n", nodesfile);
   if (!(f = fopen(nodesfile,"r"))) {
     fprintf(stderr,"ERROR> Cannot read %s: %s\n",nodesfile,strerror(errno));
     exit(1);
@@ -1036,7 +1036,7 @@ char *input_scanf_chars(fmt)
 
 /***************************************************************************
 CCS Interface:
-  Conv-host forwards CCS requests on to the node-programs' control
+  Charmrun forwards CCS requests on to the node-programs' control
 sockets.
 ***************************************************************************/
 
@@ -1048,7 +1048,7 @@ by forwarding the request to the appropriate node.
  */
 void req_ccs_connect(void)
 {
-  ChMessageHeader ch;/*Make a conv-host header*/
+  ChMessageHeader ch;/*Make a charmrun header*/
   CcsImplHeader hdr;/*Ccs internal header*/
   void *reqData;/*CCS request data*/
   int pe,reqBytes;
@@ -1057,7 +1057,7 @@ void req_ccs_connect(void)
   pe=ChMessageInt(hdr.pe);
   reqBytes=ChMessageInt(hdr.len);
 
-  /*Fill out the conv-host header & forward the CCS request*/
+  /*Fill out the charmrun header & forward the CCS request*/
   ChMessageHeader_new("req_fw",sizeof(hdr)+reqBytes,&ch);
   skt_sendN(nodetab_ctrlfd(pe),&ch,sizeof(ch));
   skt_sendN(nodetab_ctrlfd(pe),&hdr,sizeof(hdr));
@@ -1098,7 +1098,7 @@ int             req_ending=0;
 #define REQ_OK 0
 #define REQ_FAILED -1
 
-/* This is the only place where conv-host talks back to anyone. 
+/* This is the only place where charmrun talks back to anyone. 
 */
 int req_reply(SOCKET fd, char *type, 
 	      const char *data, int dataLen)
@@ -1120,7 +1120,7 @@ routines that actually respond to the request.
 int req_handle_initnode(ChMessage *msg,SOCKET fd)
 {
   if (msg->len!=2*sizeof(ChMessageInt_t)) {
-    fprintf(stderr,"Conv-host: Bad initnode data. Aborting\n");
+    fprintf(stderr,"Charmrun: Bad initnode data. Aborting\n");
     exit(1);
   }
   nodeinfo_add((ChMessageInt_t *)msg->data,fd);
@@ -1168,7 +1168,7 @@ int req_handle_ending(ChMessage *msg,SOCKET fd)
   {
     for (i=0;i<req_nClients;i++)
       skt_close(req_clients[i]);
-    if (arg_verbose) printf("Conv-host> Graceful exit.\n");
+    if (arg_verbose) printf("Charmrun> Graceful exit.\n");
     exit(0);
   }
   return REQ_OK;
@@ -1211,7 +1211,7 @@ int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
   else if (strcmp(cmd,"ending")==0)     return req_handle_ending(msg,replyFd);
   else if (strcmp(cmd,"abort")==0)      return req_handle_abort(msg,replyFd);
   else {
-        fprintf(stderr,"conv-host> Bad control socket request %s\n",cmd); 
+        fprintf(stderr,"charmrun> Bad control socket request %s\n",cmd); 
         abort();
   }
   return REQ_OK;
@@ -1229,7 +1229,7 @@ void req_serve_client(SOCKET fd)
   {
     case REQ_OK: break;
     case REQ_FAILED: 
-        fprintf(stderr,"conv-host> Error processing control socket request %s\n",msg.header.type); 
+        fprintf(stderr,"charmrun> Error processing control socket request %s\n",msg.header.type); 
         abort();
         break;
   }
@@ -1249,7 +1249,7 @@ int socket_error_in_poll(int code,const char *msg)
 {
 	int i;
 	skt_set_abort(ignore_socket_errors);
-	fprintf(stderr,"Conv-host: error on request socket--\n"
+	fprintf(stderr,"Charmrun: error on request socket--\n"
 			"%s\n",msg);
 	for (i=0;i<req_nClients;i++)
 		skt_close(req_clients[i]);
@@ -1303,7 +1303,7 @@ static SOCKET server_fd;
 
 int client_connect_problem(int code,const char *msg)
 {/*Called when something goes wrong during a client connect*/
-	fprintf(stderr,"conv-host> error attaching to node %d:\n"
+	fprintf(stderr,"charmrun> error attaching to node %d:\n"
 		"%s\n",code,msg);
 	exit(1);
 	return -1;
@@ -1320,7 +1320,7 @@ void req_client_connect(void)
 	for (client=0;client<req_nClients;client++)
 	{/*Wait for the next client to connect to our server port.*/
 		unsigned int clientIP,clientPort;/*These are actually ignored*/
-		if (arg_verbose) printf("Conv-host> Waiting for client %d to connect.\n",client);
+		if (arg_verbose) printf("Charmrun> Waiting for client %d to connect.\n",client);
 		if (0==skt_select1(server_fd,arg_timeout*1000))
 			client_connect_problem(client,"Timeout waiting for node-program to connect");
 		req_clients[client]=skt_accept(server_fd,&clientIP,&clientPort);
@@ -1336,10 +1336,10 @@ void req_client_connect(void)
 			ChMessage_free(&msg);
 		}
 	}
-	if (arg_verbose) printf("Conv-host> All clients connected.\n");
+	if (arg_verbose) printf("Charmrun> All clients connected.\n");
 	for (client=0;client<req_nClients;client++)
 	  req_handle_initnodetab(NULL,req_clients[client]);
-	if (arg_verbose) printf("Conv-host> IP tables sent.\n");
+	if (arg_verbose) printf("Charmrun> IP tables sent.\n");
 }
 
 /*Start the server socket the clients will connect to.*/
@@ -1348,7 +1348,7 @@ void req_start_server(void)
   server_port = 0;
   server_ip=skt_my_ip();
   server_fd=skt_server(&server_port);
-  DEBUGF(("Conv-host control IP = %d, port = %d\n", server_ip, server_port));
+  DEBUGF(("Charmrun control IP = %d, port = %d\n", server_ip, server_port));
   
 #if CMK_CCS_AVAILABLE
   if(arg_server == 1) CcsServer_new(NULL,&arg_server_port);
@@ -1379,7 +1379,7 @@ int main(int argc, char **argv)
   ping_developers();
   /* Compute the values of all constants */
   arg_init(argc, argv);
-  if(arg_verbose) fprintf(stderr, "Conv-host> conv-host started...\n");
+  if(arg_verbose) fprintf(stderr, "Charmrun> charmrun started...\n");
 #if CMK_SCYLD
   /* check scyld configuration */
   nodetab_init_for_scyld();
@@ -1404,11 +1404,11 @@ int main(int argc, char **argv)
     start_nodes_rsh();
 #endif
 
-  if(arg_verbose) fprintf(stderr, "Conv-host> node programs all started\n");
+  if(arg_verbose) fprintf(stderr, "Charmrun> node programs all started\n");
 
   /* Wait for all clients to connect */
   req_client_connect();
-  if(arg_verbose) fprintf(stderr, "Conv-host> node programs all connected\n");
+  if(arg_verbose) fprintf(stderr, "Charmrun> node programs all connected\n");
 
   /* enter request-service mode */
   while (1) req_poll();
@@ -1426,8 +1426,8 @@ const char *create_netstart(int node)
   return dest;
 }
 
-/* The remainder of conv-host is only concerned with starting all
-the node-programs, also known as conv-host clients.  We have to
+/* The remainder of charmrun is only concerned with starting all
+the node-programs, also known as charmrun clients.  We have to
 start nodetab_rank0_size processes on the remote machines.
 */
 
@@ -1463,7 +1463,7 @@ void start_nodes_daemon(void)
     int pe0=nodetab_rank0_table[nodeNumber];
     
 	if (arg_verbose)
-	  printf("Conv-host> Starting node program %d on '%s'.\n",nodeNumber,nodetab_name(pe0));
+	  printf("Charmrun> Starting node program %d on '%s'.\n",nodeNumber,nodetab_name(pe0));
 
     sprintf(task.env,"NETSTART=%s",create_netstart(nodeNumber));
 
@@ -1482,7 +1482,7 @@ void start_nodes_daemon(void)
 		  statusCode,nodetab_name(pe0),daemon_status2msg(statusCode));
 	  exit(1);
     } else if (arg_verbose)
-	  printf("Conv-host> Node program %d started.\n",nodeNumber);
+	  printf("Charmrun> Node program %d started.\n",nodeNumber);
   }
 }
 
@@ -1518,11 +1518,11 @@ void nodetab_init_for_scyld()
     if (nodetab_rank0_size == arg_requested_pes) break;
   }
   if (nodetab_rank0_size == 0) {
-    fprintf(stderr, "Conv-host> no slave node available!\n");
+    fprintf(stderr, "Charmrun> no slave node available!\n");
     exit (1);
   }
   if (arg_verbose)
-    printf("Conv-host> There are %d slave nodes available.\n", nodetab_rank0_size);
+    printf("Charmrun> There are %d slave nodes available.\n", nodetab_rank0_size);
 
   /* expand node table to arg_requested_pes */
   if (arg_requested_pes > nodetab_rank0_size) {
@@ -1550,7 +1550,7 @@ void start_nodes_scyld(void)
     int nodeno = atoi(nodetab_name(i));
 
     if (arg_verbose)
-      printf("Conv-host> start node program on slave node: %d.\n", nodeno);
+      printf("Charmrun> start node program on slave node: %d.\n", nodeno);
     sprintf(envp[0], "NETSTART=%s",  create_netstart(i));
     pid = 0;
     pid = fork();
@@ -1945,7 +1945,7 @@ prog rsh_start(nodeno)
   rshargv[4]="exec /bin/csh -f";
 #endif
   rshargv[5]=0;
-  if (arg_verbose) printf("Conv-host> Starting %s %s -l %s %s\n",nodetab_shell(nodeno), nodetab_name(nodeno),nodetab_login(nodeno), rshargv[4]);
+  if (arg_verbose) printf("Charmrun> Starting %s %s -l %s %s\n",nodetab_shell(nodeno), nodetab_name(nodeno),nodetab_login(nodeno), rshargv[4]);
 
   rsh = prog_start(nodetab_shell(nodeno), rshargv, 1);
   if ((rsh==0)&&(errno!=EMFILE)) { perror("ERROR> starting rsh"); exit(1); }
@@ -1955,7 +1955,7 @@ prog rsh_start(nodeno)
       fprintf(stderr,"(not enough file descriptors available?)\n");
     }
   if (rsh && arg_verbose)
-    fprintf(stderr,"Conv-host> node %d: rsh initiated...\n",nodeno);
+    fprintf(stderr,"Charmrun> node %d: rsh initiated...\n",nodeno);
   return rsh;
 }
 
@@ -1971,7 +1971,7 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
   
   xstr_printf(ibuf,"echo 'remote responding...'\n");
 
-  xstr_printf(ibuf,"test -f ~/.conv-hostrc && . ~/.conv-hostrc\n");
+  xstr_printf(ibuf,"test -f ~/.charmrunrc && . ~/.charmrunrc\n");
   if (arg_display)
     xstr_printf(ibuf,"DISPLAY=%s;export DISPLAY\n",arg_display);
   xstr_printf(ibuf,"NETSTART='%s';export NETSTART\n",create_netstart(rank0no));
@@ -1990,12 +1990,12 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
     xstr_printf(ibuf,"  test -f $dir/xrdb && F_XRDB=$dir/xrdb && export F_XRDB\n");
     xstr_printf(ibuf,"done\n");
     xstr_printf(ibuf,"if test -z \"$F_XTERM\";  then\n");
-    xstr_printf(ibuf,"   echo '%s not in path --- set your path in your ~/.conv-hostrc or profile.'\n", nodetab_xterm(nodeno));
+    xstr_printf(ibuf,"   echo '%s not in path --- set your path in your ~/.charmrunrc or profile.'\n", nodetab_xterm(nodeno));
     xstr_printf(ibuf,"   test -f /bin/sync && /bin/sync\n");
     xstr_printf(ibuf,"   exit 1\n");
     xstr_printf(ibuf,"fi\n");
     xstr_printf(ibuf,"if test -z \"$F_XRDB\"; then\n");
-    xstr_printf(ibuf,"   echo 'xrdb not in path - set your path in your ~/.conv-hostrc or profile.'\n");
+    xstr_printf(ibuf,"   echo 'xrdb not in path - set your path in your ~/.charmrunrc or profile.'\n");
     xstr_printf(ibuf,"   test -f /bin/sync && /bin/sync\n");
     xstr_printf(ibuf,"   exit 1\n");
     xstr_printf(ibuf,"fi\n");
@@ -2107,7 +2107,7 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
 	}
   } else if (arg_in_xterm) {
     if(arg_verbose) {
-      fprintf(stderr, "Conv-host> node %d: xterm is %s\n", 
+      fprintf(stderr, "Charmrun> node %d: xterm is %s\n", 
               nodeno, nodetab_xterm(nodeno));
     }
     xstr_printf(ibuf,"cat > /tmp/inx%08x << END_OF_SCRIPT\n", randno);
@@ -2152,7 +2152,7 @@ void rsh_pump_csh(p, nodeno, rank0no, argv)
   
   xstr_printf(ibuf,"echo 'remote responding...'\n");
 
-  xstr_printf(ibuf,"if ( -x ~/.conv-hostrc )   source ~/.conv-hostrc\n");
+  xstr_printf(ibuf,"if ( -x ~/.charmrunrc )   source ~/.charmrunrc\n");
   if (arg_display)
     xstr_printf(ibuf,"setenv DISPLAY %s\n",arg_display);
   xstr_printf(ibuf,"setenv NETSTART '%s'\n",create_netstart(rank0no));
@@ -2281,7 +2281,7 @@ void rsh_pump_csh(p, nodeno, rank0no, argv)
 	}
   } else if (arg_in_xterm) {
     if(arg_verbose) {
-      fprintf(stderr, "Conv-host> node %d: xterm is %s\n", 
+      fprintf(stderr, "Charmrun> node %d: xterm is %s\n", 
               nodeno, nodetab_xterm(nodeno));
     }
     xstr_printf(ibuf,"cat > /tmp/inx%08x << END_OF_SCRIPT\n", randno);
@@ -2393,7 +2393,7 @@ void start_nodes_rsh(void)
           if (arg_verbose ||
               (strcmp(line,"rsh phase successful.")
                &&strcmp(line,"remote responding...")))
-            fprintf(stderr,"Conv-host> node %d: %s\n",rsh_node[i],line);
+            fprintf(stderr,"Charmrun> node %d: %s\n",rsh_node[i],line);
           if (strcmp(line,"rsh phase successful.")==0) { done=1; break; }
       }
       if (!done) continue;
