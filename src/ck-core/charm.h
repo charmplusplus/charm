@@ -671,7 +671,9 @@ FUNCTION_PTR _CK_9GetMonoCompareFn();
    They work only for preprocessors with ANSI concatenation, e.g. g++
    So they wont work with cpp.	*/
 
-#define GetEntryPtr(ChareType,EP, MsgType) 	_CK_ep_##ChareType##_##EP##_##MsgType
+#define __ChareNum(ChareType) _CK_chare_##ChareType##::_CK_charenum_##ChareType
+
+#define GetEntryPtr(ChareType,EP, MsgType) 	_CK_chare_##ChareType##::##EP##_##MsgType
 
 #define CkEstablishGroup(npes, pes)     CmiEstablishGroup(npes, pes)
 #define CMulticastMsgBranch(ChareType,EP,MsgType,msg,ChareId,grp) GeneralMulticastMsgBranch(GetEntryPtr(ChareType,EP,MsgType), msg, -1, ChareId, grp)
@@ -690,15 +692,15 @@ FUNCTION_PTR _CK_9GetMonoCompareFn();
 
 #define MsgIndex(MessageType)	_CK_msg_##MessageType
 
-#define new_chare(ChareType, msgtype, msg)	CreateChare(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType,msgtype), msg, 0, (0xFFF2))
+#define new_chare(ChareType, msgtype, msg)	CreateChare(__ChareNum(ChareType), GetEntryPtr(ChareType,ChareType,msgtype), msg, 0, (0xFFF2))
 
-#define new_chare2(ChareType, msgtype, msg, vid, pe) 	CreateChare(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType,msgtype), msg, vid, pe)
-
-
-#define new_group(ChareType, msgtype, msg)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType,msgtype), msg, -1, 0)
+#define new_chare2(ChareType, msgtype, msg, vid, pe) 	CreateChare(__ChareNum(ChareType), GetEntryPtr(ChareType,ChareType,msgtype), msg, vid, pe)
 
 
-#define new_group2(ChareType, msgtype, msg, returnEP, returnID)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType,msgtype), msg, returnEP, returnID)
+#define new_group(ChareType, msgtype, msg)	CreateBoc(__ChareNum(ChareType), GetEntryPtr(ChareType,ChareType,msgtype), msg, -1, 0)
+
+
+#define new_group2(ChareType, msgtype, msg, returnEP, returnID)	CreateBoc(__ChareNum(ChareType), GetEntryPtr(ChareType,ChareType,msgtype), msg, returnEP, returnID)
 
 #define newMessage(msgtype)  new (MsgIndex(msgtype)) msgtype
 

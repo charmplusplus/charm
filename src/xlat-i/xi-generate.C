@@ -121,28 +121,33 @@ static const char *CITopStart = // modulename
 "extern char *_CK_\1_id;\n"
 ;
 
-static const char *CITopChareDecl = // charename
-"extern int _CK_chare_\1;\n"
+static const char *CITopChareDeclStart = // charename
+"  public:\n"
+"    static int _CK_charenum_\1;\n"
+;
+
+static const char *CITopChareDeclEnd = // charename
+"};\n"
 ;
 
 static const char *CIBotChareDef = // charename, modulename
-"int _CK_chare_\1 =  _CK_\2_id[0];\n"
+"int _CK_chare_\1::_CK_charenum_\1 =  _CK_\2_id[0];\n"
 ;
 
-static const char *CITopEPMDecl = // charename, epname, msgname
-"extern int _CK_ep_\1_\2_\3;\n"
+static const char *CITopEPMDecl = // epname, msgname
+"    static int \1_\2;\n"
 ;
 
-static const char *CITopEPDecl = // charename, epname
-"extern int _CK_ep_\1_\2;\n"
+static const char *CITopEPDecl = // epname
+"    static int \1;\n"
 ;
 
 static const char *CIBotEPMDef = // charename, epname, msgname
-"int _CK_ep_\1_\2_\3  = 0;\n"
+"int _CK_chare_\1::\2_\3  = 0;\n"
 ;
 
 static const char *CIBotEPDef = // charename, epname
-"int _CK_ep_\1_\2 = 0;\n"
+"int _CK_chare_\1::\2 = 0;\n"
 ;
 
 static const char *CIBotMainMainStub = 
@@ -293,20 +298,34 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
   spew(top, CITopStart, thismodule->name);
 
   for (c=thismodule->chares; c!=0; c=c->next ) {
-    spew(top, CITopChareDecl, c->name);
+    top << "class _CK_chare_" << c->name << " ";
+    if(c->numbases > 0) {
+      top << ": ";
+      int i;
+      for(i=c->numbases-1;i>=0; i--) {
+        top << "public _CK_chare_" << c->bases[i];
+        if(i == 0)
+          top << " ";
+        else
+          top << ", ";
+      }
+    }
+    top << " {\n";
+    spew(top, CITopChareDeclStart, c->name);
     if (!c->isExtern())
       spew(bot, CIBotChareDef, c->name, thismodule->name);
     for (e=c->entries; e!=0; e=e->next ) {
       if(e->isMessage())
-        spew(top, CITopEPMDecl, c->name, e->name, e->msgtype->name);
+        spew(top, CITopEPMDecl, e->name, e->msgtype->name);
       else
-        spew(top, CITopEPDecl, c->name, e->name);
+        spew(top, CITopEPDecl, e->name);
       if (!c->isExtern())
         if(e->isMessage())
           spew(bot, CIBotEPMDef, c->name, e->name, e->msgtype->name);
         else
           spew(bot, CIBotEPDef, c->name, e->name);
     }
+    spew(top, CITopChareDeclEnd, c->name);
   }
 
   /* Output EP stub functions. Note : we assume main::main always
@@ -397,7 +416,8 @@ static const char *CIBotRegisterStart = // moduleName
 ;
 
 static const char *CIBotRegisterMainChare =
-"  registerMainChare(_CK_chare_main, _CK_ep_main_main, 1);\n"
+"  registerMainChare(_CK_chare_main::_CK_charenum_main,\n"
+"                    _CK_chare_main::main, 1);\n"
 ;
 
 static const char *CIBotRegisterTable = // tableName
@@ -444,22 +464,23 @@ static const char *CIBotRegisterMsg = // msgname
 
 
 static const char *CIBotRegisterChare = // charename
-"  _CK_chare_\1 = registerChare(\"\1\", sizeof(\1), 0);\n"
+"  _CK_chare_\1::_CK_charenum_\1 = registerChare(\"\1\", sizeof(\1), 0);\n"
 ;
 
 static const char *CIBotRegisterMainMain =
-"  _CK_ep_main_main=registerEp(\"main\",(FUNCTION_PTR)&_CK_call_main_main,1,\n"
-"    0, _CK_chare_main);\n"
+"  _CK_chare_main::main=registerEp(\"main\",\n"
+"    (FUNCTION_PTR)&_CK_call_main_main,1,\n"
+"    0, _CK_chare_main::_CK_charenum_main);\n"
 ;
 
 static const char *CIBotRegisterChareEP = //charename, epname, msgname
-"  _CK_ep_\1_\2_\3 = registerEp(\"\2\", (FUNCTION_PTR)&_CK_call_\1_\2_\3, 1,\n"
-"    _CK_msg_\3, _CK_chare_\1);\n"
+"  _CK_chare_\1::\2_\3 = registerEp(\"\2\", (FUNCTION_PTR)&_CK_call_\1_\2_\3,\n"
+"    1, _CK_msg_\3, _CK_chare_\1::_CK_charenum_\1);\n"
 ;
 
 static const char *CIBotRegisterBocEP = //bocname, epname, msgname
-"  _CK_ep_\1_\2_\3=registerBocEp(\"\2\",(FUNCTION_PTR)&_CK_call_\1_\2_\3, 1,\n"
-"    _CK_msg_\3, _CK_chare_\1);\n"
+"  _CK_chare_\1::\2_\3=registerBocEp(\"\2\",(FUNCTION_PTR)&_CK_call_\1_\2_\3,\n"
+"    1, _CK_msg_\3, _CK_chare_\1::_CK_charenum_\1);\n"
 ;
 
 /* now register readonlies and readonli messages */
@@ -562,18 +583,15 @@ static const char *CIAsyncGroupCreateImpl = // groupname, msgname
 ;
 
 static const char *CIProxyClassStart = // classname
-"class \01;\n"
-"class CProxy_\01 {\n"
-"  private:\n"
-"    ChareIDType cid;\n"
+"  protected:\n"
 "    CProxy_\01() {};\n"
 "  public:\n"
-"    CProxy_\01(ChareIDType _cid) { cid = _cid; };\n"
+"    CProxy_\01(ChareIDType _cid) { _ck_cid = _cid; };\n"
 ;
 
 static const char *CIProxyClassConstructor = // classname, msgname
 "    CProxy_\01(\02 *m, int pe=CK_PE_ANY) {\n"
-"      new_chare2(\01, \02, m, &cid, pe);\n"
+"      new_chare2(\01, \02, m, &_ck_cid, pe);\n"
 "    };\n"
 "    int _ptr_\01(\02 *m) {\n"
 "      return GetEntryPtr(\01,\01,\02);\n"
@@ -582,7 +600,7 @@ static const char *CIProxyClassConstructor = // classname, msgname
 
 static const char *CIProxyClassMethod = // classname, methodname, msgname
 "    void \02(\03 *m) {\n"
-"      CSendMsg(\01, \02, \03, m, &cid);\n"
+"      CSendMsg(\01, \02, \03, m, &_ck_cid);\n"
 "    };\n"
 "    int _ptr_\02(\03 *m) {\n"
 "      return GetEntryPtr(\01,\02,\03);\n"
@@ -591,7 +609,7 @@ static const char *CIProxyClassMethod = // classname, methodname, msgname
 
 static const char *CIProxyClassRetMethod = // classname, methodname, msgname, retmsg
 "    \04 *\02(\03 *m) {\n"
-"      return (\04 *) CRemoteCallFn(GetEntryPtr(\01,\02,\03), m, &cid);\n"
+"      return (\04 *) CRemoteCallFn(GetEntryPtr(\01,\02,\03), m, &_ck_cid);\n"
 "    };\n"
 "    int _ptr_\02(\03 *m) {\n"
 "      return GetEntryPtr(\01,\02,\03);\n"
@@ -599,8 +617,8 @@ static const char *CIProxyClassRetMethod = // classname, methodname, msgname, re
 ;
 
 static const char *CIProxyClassEnd =
-"    ChareIDType _getCid(void) { return cid; }; \n"
-"    void _setCid(ChareIDType _cid) { cid = _cid; }; \n"
+"    ChareIDType _getCid(void) { return _ck_cid; }; \n"
+"    void _setCid(ChareIDType _cid) { _ck_cid = _cid; }; \n"
 "};\n"
 ;
 
@@ -608,7 +626,7 @@ static const char *CIProxyMainStart =
 "class main;\n"
 "class CProxy_main {\n"
 "  private:\n"
-"  int dummy;\n"
+"    int dummy;\n"
 "  public:\n"
 "    CProxy_main() {};\n"
 ;
@@ -641,18 +659,15 @@ static const char *CIProxyMainDef =
 ;
 
 static const char *CIProxyGroupStart = // classname
-"class \01;\n"
-"class CProxy_\01 {\n"
-"  private:\n"
-"    int bocid;\n"
+"  protected:\n"
 "    CProxy_\01() {};\n"
 "  public:\n"
-"    CProxy_\01(int _bocid) { bocid = _bocid; };\n"
+"    CProxy_\01(int _bocid) { _ck_bocid = _bocid; };\n"
 ;
 
 static const char *CIProxyGroupConstructor = // classname, msgname
 "    CProxy_\01(\02 *m) {\n"
-"      bocid = new_group(\01, \02, m);\n"
+"      _ck_bocid = new_group(\01, \02, m);\n"
 "    };\n"
 "    CProxy_\01(\02 *m, int retEP, ChareIDType *retID) {\n"
 "      new_group2(\01, \02, m, retEP, retID);\n"
@@ -664,10 +679,10 @@ static const char *CIProxyGroupConstructor = // classname, msgname
 
 static const char *CIProxyGroupMethod = // classname, methodname, msgname
 "    void \02(\03 *m) {\n"
-"      CBroadcastMsgBranch(\01, \02, \03, m, bocid);\n"
+"      CBroadcastMsgBranch(\01, \02, \03, m, _ck_bocid);\n"
 "    };\n"
 "    void \02(\03 *m, int onPE) {\n"
-"      CSendMsgBranch(\01, \02, \03, m, bocid, onPE);\n"
+"      CSendMsgBranch(\01, \02, \03, m, _ck_bocid, onPE);\n"
 "    };\n"
 "    int _ptr_\02(\03 *m) {\n"
 "      return GetEntryPtr(\01,\02,\03);\n"
@@ -676,7 +691,7 @@ static const char *CIProxyGroupMethod = // classname, methodname, msgname
 
 static const char *CIProxyGroupRetMethod = // classname, methodname, msgname, retmsg
 "    \04 *\02(\03 *m, int onPE) {\n"
-"      return (\04 *) CRemoteCallBranchFn(GetEntryPtr(\01,\02,\03), m, bocid, onPE);\n"
+"      return (\04 *) CRemoteCallBranchFn(GetEntryPtr(\01,\02,\03), m, _ck_bocid, onPE);\n"
 "    };\n"
 "    int _ptr_\02(\03 *m) {\n"
 "      return GetEntryPtr(\01,\02,\03);\n"
@@ -684,10 +699,10 @@ static const char *CIProxyGroupRetMethod = // classname, methodname, msgname, re
 ;
 
 static const char *CIProxyGroupEnd = // classname
-"    int _getBocid(void) { return bocid; }; \n"
-"    void _setBocid(int _bocid) { bocid = _bocid; }; \n"
+"    int _getBocid(void) { return _ck_bocid; }; \n"
+"    void _setBocid(int _bocid) { _ck_bocid = _bocid; }; \n"
 "    \01 *_localBranch(void) {\n"
-"      return (\01 *) CLocalBranch(\01, bocid);\n"
+"      return (\01 *) CLocalBranch(\01, _ck_bocid);\n"
 "    };\n"
 "};\n"
 ;
@@ -745,7 +760,17 @@ void GenerateProxies(ofstream& top, ofstream& bot)
         spew(top, CIProxyMainEnd);
         spew(bot, CIProxyMainDef);
       } else {
+        top << "class " << c->name << ";\n";
+        top << "class CProxy_" << c->name << " : public virtual _CK_CID";
+        if(c->numbases > 0) {
+          int i;
+          for(i=c->numbases-1;i>=0; i--) {
+            top << ", public CProxy_" << c->bases[i];
+          }
+        }
+        top << " {\n";
         spew(top, CIProxyClassStart, c->name);
+
         for(e=c->entries;e!=0;e=e->next) {
           if(strcmp(c->name, e->name)==0) {
             // Constructor
@@ -765,6 +790,15 @@ void GenerateProxies(ofstream& top, ofstream& bot)
         spew(top, CIProxyClassEnd);
       }
     } else {
+      top << "class " << c->name << ";\n";
+      top << "class CProxy_" << c->name << " : public virtual _CK_GID";
+      if(c->numbases > 0) {
+        int i;
+        for(i=0;i<c->numbases; i++) {
+          top << ", public CProxy_" << c->bases[i];
+        }
+      }
+      top << " {\n";
       spew(top, CIProxyGroupStart, c->name);
       for(e=c->entries;e!=0;e=e->next) {
         if(strcmp(c->name, e->name)==0) {

@@ -54,10 +54,13 @@ class Chare {
     char *name;
     Entry *entries;
     int chareboc ;
+    int numbases;
+    char *bases[10]; // right now maxbases is 10, to be replaced by a list
     Chare *next;
     int isextern;
     Chare(char *n, int cb, int e) ;
     void AddEntry(char *e, char *m, int t=0, char *r=0, int s=0) ;
+    void AddBase(char *bname);
     int isExtern() { return isextern ; }
 };
 
@@ -66,6 +69,7 @@ class Module {
   public: 
     char *name;
     Chare *chares;
+    Chare *curChare;
     Message *messages;
     ReadOnly *readonlys;
     Table *tables;

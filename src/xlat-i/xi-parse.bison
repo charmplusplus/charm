@@ -62,22 +62,36 @@ OptionalExtern
 		{ $$ = 0; }
 	;
 
-Boc	:	OptionalExtern BOC ChareName '{'
+OptionalBaseList
+	:	/* empty */
+	|	':' BaseList
+	;
+
+BaseList
+	:	ChareName
+		{ thismodule->curChare->AddBase($1); }
+	|	ChareName ',' BaseList
+		{ thismodule->curChare->AddBase($1); }
+	;
+
+Boc	:	OptionalExtern BOC ChareName
 		{
 			Chare *c = new Chare($3, BOC, $1) ;
 			delete $3;
 			thismodule->AddChare(c) ;
 		}
-		EntryList '}' ';'
+		OptionalBaseList
+		'{' EntryList '}' ';'
 	;
 
-Chare	:	OptionalExtern CHARE ChareName '{'
+Chare	:	OptionalExtern CHARE ChareName
 		{
 			Chare *c = new Chare($3, CHARE, $1) ;
 			delete $3;
 			thismodule->AddChare(c) ;
 		}
-		EntryList '}' ';'
+		OptionalBaseList
+		'{' EntryList '}' ';'
 	;
 
 ChareName:	Id
@@ -114,7 +128,7 @@ OptionalStackSize
 
 Entry	:	OptionalThreaded OptionalMessagePtr ENTRY EntryName '(' OptionalMessagePtr ')' OptionalStackSize ';'
 		{
-			thismodule->chares->AddEntry($4, $6, $1, $2, $8) ;
+			thismodule->curChare->AddEntry($4, $6, $1, $2, $8) ;
 			delete $4; delete $6;
 		}
 	;
@@ -146,7 +160,6 @@ VarsizeMessage	:	OptionalExtern VARSIZE MessageName ';'
 		}
 	;
 
-MessageName:	Id
 MessageName:	Id
 	;
 

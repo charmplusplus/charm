@@ -78,6 +78,7 @@ Chare::Chare(char *n, int cb, int e)
   chareboc = cb ;
   isextern = e ;
   next = 0 ;
+  numbases = 0;
 }
 
 void Chare::AddEntry(char *e, char *m, int t, char *r, int s)
@@ -85,6 +86,13 @@ void Chare::AddEntry(char *e, char *m, int t, char *r, int s)
   Entry *newe = new Entry(e, m, t, r, s) ;
   newe->next = entries ;
   entries = newe ;
+}
+
+void Chare::AddBase(char *bname)
+{
+  bases[numbases] = new char[strlen(bname)+1];
+  strcpy(bases[numbases], bname);
+  numbases++;
 }
 
 Module::Module(char *n)
@@ -99,13 +107,28 @@ Module::Module(char *n)
 }
 void Module::AddChare(Chare *c)
 {
-  c->next = chares ;
-  chares = c ;
+  curChare = c;
+  c->next = 0 ;
+  if(chares == 0) {
+    chares = c ;
+  } else {
+    Chare *tmpc = chares;
+    while (tmpc->next != 0)
+      tmpc = tmpc->next;
+    tmpc->next = c;
+  }
 }
 void Module::AddMessage(Message *m)
 {
-  m->next = messages ;
-  messages = m ;
+  m->next = 0 ;
+  if(messages == 0) {
+    messages = m ;
+  } else {
+    Message *tmpm = messages;
+    while (tmpm->next != 0)
+      tmpm = tmpm->next;
+    tmpm->next = m;
+  }
 }
 void Module::AddReadOnly(ReadOnly *r)
 {

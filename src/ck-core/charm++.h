@@ -258,5 +258,15 @@ public:
 	virtual void _CK_SysUpdate(void *) = 0 ;  /* called by system */
 } ;
 
+class _CK_CID {
+  public:
+    ChareIDType _ck_cid;
+};
+
+
+class _CK_GID {
+  public:
+    int _ck_bocid;
+};
 
 #endif
