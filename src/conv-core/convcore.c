@@ -1125,11 +1125,11 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	void *msg;
 	if((CpvAccess(CsdLocalCounter)--) >0)
 	  {
-	    CqsDequeue(s->schedQ,(void **)&msg);
-	    if (msg!=NULL) return msg;
-	    /* This avoids a race condition with migration detected by megatest*/
-	    msg=CdsFifo_Dequeue(s->localQ);
-	    if (msg!=NULL) return msg;	    
+              /* This avoids a race condition with migration detected by megatest*/
+              msg=CdsFifo_Dequeue(s->localQ);
+              if (msg!=NULL) return msg;	    
+              CqsDequeue(s->schedQ,(void **)&msg);
+              if (msg!=NULL) return msg;
 	  }
 	
 	CpvAccess(CsdLocalCounter)=CsdLocalMax;
@@ -1154,6 +1154,11 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
           return msg;
         }
 #endif
+        if(!CsdLocalMax) {
+            msg=CdsFifo_Dequeue(s->localQ);
+            if (msg!=NULL) return msg;	    
+        }
+
 	return NULL;
 
 }
