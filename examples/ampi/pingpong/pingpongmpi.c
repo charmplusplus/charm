@@ -1,3 +1,10 @@
+/***********************************************
+          MPI / AMPI pingpong test program
+          Prints bandwidth and latency for a specific message size
+       
+          Sameer Kumar 02/08/05
+**************************************/
+ 
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
