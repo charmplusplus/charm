@@ -626,6 +626,7 @@ private:
 	CProxyElement_CkLocMgr thislocalproxy;
 	/// The core of the location manager: map array index to element representative
 	CkHashtableT<CkArrayIndexMax,CkLocRec *> hash;
+	CmiImmediateLockType hashImmLock;
 
 	/// This flag is set while we delete an old copy of a migrator
 	CmiBool duringMigration;

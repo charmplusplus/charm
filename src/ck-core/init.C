@@ -81,6 +81,7 @@ CkpvDeclare(void*,       _currentNodeGroupObj);
 CkpvDeclare(CkGroupID,   _currentGroupRednMgr);
 CkpvDeclare(GroupTable*, _groupTable);
 CkpvDeclare(GroupIDTable*, _groupIDTable);
+CkpvDeclare(CmiImmediateLockType, _groupTableImmLock);
 CkpvDeclare(UInt, _numGroups);
 
 CkpvDeclare(CkCoreState *, _coreState);
@@ -88,6 +89,7 @@ CkpvDeclare(CkCoreState *, _coreState);
 CksvDeclare(UInt, _numNodeGroups);
 CksvDeclare(GroupTable*, _nodeGroupTable);
 CksvDeclare(GroupIDTable, _nodeGroupIDTable);
+CksvDeclare(CmiImmediateLockType, _nodeGroupTableImmLock);
 CksvDeclare(CmiNodeLock, _nodeLock);
 CksvStaticDeclare(PtrVec*,_nodeBocInitVec);
 CkpvDeclare(int, _charmEpoch);
@@ -573,6 +575,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(CkGroupID, _currentGroupRednMgr);
 	CkpvInitialize(GroupTable*, _groupTable);
 	CkpvInitialize(GroupIDTable*, _groupIDTable);
+	CkpvInitialize(CmiImmediateLockType, _groupTableImmLock);
 	CkpvInitialize(UInt, _numGroups);
 	CkpvInitialize(int, _numInitsRecd);
 	CpvInitialize(QdState*, _qd);
@@ -583,6 +586,7 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(UInt, _numNodeGroups);
 	CksvInitialize(GroupTable*, _nodeGroupTable);
 	CksvInitialize(GroupIDTable, _nodeGroupIDTable);
+	CksvInitialize(CmiImmediateLockType, _nodeGroupTableImmLock);
 	CksvInitialize(CmiNodeLock, _nodeLock);
 	CksvInitialize(PtrVec*,_nodeBocInitVec);
 	CksvInitialize(UInt,_numInitNodeMsgs);
@@ -596,6 +600,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvAccess(_groupIDTable) = new GroupIDTable(0);
 	CkpvAccess(_groupTable) = new GroupTable;
 	CkpvAccess(_groupTable)->init();
+	CkpvAccess(_groupTableImmLock) = CmiCreateImmediateLock();
 	CkpvAccess(_numGroups) = 1; // make 0 an invalid group number
 	CkpvAccess(_buffQ) = new PtrQ();
 	CkpvAccess(_bocInitVec) = new PtrVec();
@@ -609,6 +614,7 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeLock) = CmiCreateLock();
 		CksvAccess(_nodeGroupTable) = new GroupTable();
 		CksvAccess(_nodeGroupTable)->init();
+		CksvAccess(_nodeGroupTableImmLock) = CmiCreateImmediateLock();
 		CksvAccess(_nodeBocInitVec) = new PtrVec();
 	}
 

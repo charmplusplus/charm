@@ -15,6 +15,8 @@ clients, including the rest of Charm++, are actually C++.
 #include "ck.h"
 #include "trace.h"
 #include "queueing.h"
+ 
+#define CK_MSG_SKIP_OR_IMM    (CK_MSG_SKIPSCHEDULER | CK_MSG_IMMEDIATE)
 
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
 
@@ -87,11 +89,9 @@ IrrGroup::IrrGroup(void) {
 
 IrrGroup::~IrrGroup() {
   // remove the object pointer
-  CmiImmediateLockType immLock = CmiCreateImmediateLock();
-  CmiImmediateLock(immLock);
+  CmiImmediateLock(CkpvAccess(_groupTableImmLock));
   CkpvAccess(_groupTable)->find(thisgroup).setObj(NULL);
-  CmiImmediateUnlock(immLock);
-  CmiDestroyLock(immLock);
+  CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
 }
 
 void IrrGroup::pup(PUP::er &p)
@@ -427,8 +427,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   register int gIdx = _entryTable[epIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
-  CmiImmediateLockType immLock = CmiCreateImmediateLock();
-  CmiImmediateLock(immLock);
+  CmiImmediateLock(CkpvAccess(_groupTableImmLock));
   CkpvAccess(_groupTable)->find(groupID).setObj(obj);
   CkpvAccess(_groupTable)->find(groupID).setcIdx(gIdx);
   CkpvAccess(_groupIDTable)->push_back(groupID);
@@ -439,8 +438,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
       CldEnqueue(CkMyPe(), pending, _infoIdx);
     delete ptrq;
   }
-  CmiImmediateUnlock(immLock);
-  CmiDestroyLock(immLock);
+  CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
 
   CkpvAccess(_currentGroup) = groupID;
   CkpvAccess(_currentGroupRednMgr) = env->getRednMgr();
@@ -679,6 +677,8 @@ static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
 */
 IrrGroup *_lookupGroup(CkCoreState *ck,envelope *env,const CkGroupID &groupID)
 {
+
+	CmiImmediateLock(CkpvAccess(_groupTableImmLock));
 	IrrGroup *obj = ck->localBranch(groupID);
 	if (obj==NULL) { /* groupmember not yet created: stash message */
 		ck->getGroupTable()->find(groupID).enqMsg(env);
@@ -686,6 +686,7 @@ IrrGroup *_lookupGroup(CkCoreState *ck,envelope *env,const CkGroupID &groupID)
 	else { /* will be able to process message */
 		ck->process();
 	}
+	CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
 	return obj;
 }
 
@@ -722,26 +723,15 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register void *obj;
-#if CMK_IMMEDIATE_MSG && ! CMK_SMP
-  if (CmiTryLock(CksvAccess(_nodeLock))) {
-    CmiDelayImmediate();
-    return;
-  }
-#else
-  CmiLock(CksvAccess(_nodeLock));
-#endif
+
+  CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
   obj = CksvAccess(_nodeGroupTable)->find(groupID).getObj();
   if(!obj) { // groupmember not yet created
-#if CMK_IMMEDIATE_MSG
-    if (CmiIsImmediate(env))     // buffer immediate message
-      CmiDelayImmediate();
-    else
-#endif
     CksvAccess(_nodeGroupTable)->find(groupID).enqMsg(env);
-    CmiUnlock(CksvAccess(_nodeLock));
+    CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
     return;
   }
-  CmiUnlock(CksvAccess(_nodeLock));
+  CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
   ck->process();
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
@@ -1042,7 +1032,7 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
   if (destPE!=-1) {
     _TRACE_CREATION_1(env);
     CpvAccess(_qd)->create();
-    if (opts & CK_MSG_SKIPSCHEDULER)
+    if (opts & CK_MSG_SKIP_OR_IMM)
       _noCldEnqueue(destPE, env);
     else
       CldEnqueue(destPE, env, _infoIdx);
@@ -1093,7 +1083,7 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
   _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
   _TRACE_CREATION_N(env, numPes);
-  if (opts & CK_MSG_SKIPSCHEDULER)
+  if (opts & CK_MSG_SKIP_OR_IMM)
     _noCldEnqueue(pe, env);
   else
     _skipCldEnqueue(pe, env, _infoIdx);
@@ -1193,7 +1183,7 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
   _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
   _TRACE_CREATION_N(env, numPes);
-  if (opts & CK_MSG_SKIPSCHEDULER)
+  if (opts & CK_MSG_SKIP_OR_IMM)
     _noCldNodeEnqueue(node, env);
   else
     CldNodeEnqueue(node, env, _infoIdx);
@@ -1314,7 +1304,9 @@ extern "C"
 void CkArrayManagerDeliver(int pe,void *msg, int opts) {
   register envelope *env = UsrToEnv(msg);
   _prepareOutgoingArrayMsg(env,ForArrayEltMsg);
-  if (opts & CK_MSG_SKIPSCHEDULER)
+  if (opts & CK_MSG_IMMEDIATE)
+    CmiBecomeImmediate(env);
+  if (opts & CK_MSG_SKIP_OR_IMM)
     _noCldEnqueue(pe, env);
   else
     _skipCldEnqueue(pe, env, _infoIdx);
@@ -1326,15 +1318,13 @@ void CkDeleteChares() {
 
   // delete all groups
   int numGroups = CkpvAccess(_groupIDTable)->size();
-  CmiImmediateLockType immLock = CmiCreateImmediateLock();
-  CmiImmediateLock(immLock);
+  CmiImmediateLock(CkpvAccess(_groupTableImmLock));
   for(i=0;i<numGroups;i++) {
     CkGroupID gID = (*CkpvAccess(_groupIDTable))[i];
     IrrGroup *obj = CkpvAccess(_groupTable)->find(gID).getObj();
     if (obj) delete obj;
   }
-  CmiImmediateUnlock(immLock);
-  CmiDestroyLock(immLock);
+  CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
   // delete all node groups
   if (CkMyRank() == 0) {
     int numNodeGroups = CksvAccess(_nodeGroupIDTable).size();

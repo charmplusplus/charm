@@ -1148,23 +1148,21 @@ inline void CkLocMgr::springCleaning(void)
   //Poke through the hash table for old ArrayRecs.
   void *objp;
   void *keyp;
-  CmiImmediateLockType immLock = CmiCreateImmediateLock();
   
   CkHashtableIterator *it=hash.iterator();
+  CmiImmediateLock(hashImmLock);
   while (NULL!=(objp=it->next(&keyp))) {
     CkLocRec *rec=*(CkLocRec **)objp;
     CkArrayIndex &idx=*(CkArrayIndex *)keyp;
     if (rec->isObsolete(nSprings,idx)) {
       //This record is obsolete-- remove it from the table
       DEBK((AA"Cleaning out old record %s\n"AB,idx2str(idx)));
-      CmiImmediateLock(immLock);
       hash.remove(*(CkArrayIndexMax *)&idx);
-      CmiImmediateUnlock(immLock);
       delete rec;
       it->seek(-1);//retry this hash slot
     }
   }
-  CmiDestroyLock(immLock);
+  CmiImmediateUnlock(hashImmLock);
   delete it;
 }
 void CkLocMgr::staticSpringCleaning(void *forWhom,double curWallTime) {
@@ -1177,16 +1175,14 @@ void CkLocMgr::flushAllRecs(void)
 {
   void *objp;
   void *keyp;
-  CmiImmediateLockType immLock = CmiCreateImmediateLock();
-  
+    
   CkHashtableIterator *it=hash.iterator();
+  CmiImmediateLock(hashImmLock);
   while (NULL!=(objp=it->next(&keyp))) {
     CkLocRec *rec=*(CkLocRec **)objp;
     CkArrayIndex &idx=*(CkArrayIndex *)keyp;
     if (rec->type() != CkLocRec::local) {
-      CmiImmediateLock(immLock);
       hash.remove(*(CkArrayIndexMax *)&idx);
-      CmiImmediateUnlock(immLock);
       delete rec;
       it->seek(-1);//retry this hash slot
     }
@@ -1196,7 +1192,7 @@ void CkLocMgr::flushAllRecs(void)
     }
   }
   delete it;
-  CmiDestroyLock(immLock);
+  CmiImmediateUnlock(hashImmLock);
 }
 
 /*************************** LocMgr: CREATION *****************************/
@@ -1225,6 +1221,7 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 //Find and register with the load balancer
 	lbdbID = lbdbID_;
 	initLB(lbdbID_);
+	hashImmLock = CmiCreateImmediateLock();
 }
 
 CkLocMgr::CkLocMgr(CkMigrateMessage* m)
@@ -1237,6 +1234,7 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 	duringMigration=CmiFalse;
 	nSprings=0;
 	CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
+	hashImmLock = CmiCreateImmediateLock();
 }
 
 void CkLocMgr::pup(PUP::er &p){
@@ -1434,11 +1432,9 @@ void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
 	if (NULL==elementNrec(idx))
 		CkAbort("CkLocMgr::removeFromTable called on invalid index!");
 #endif
-        CmiImmediateLockType immLock = CmiCreateImmediateLock();
-        CmiImmediateLock(immLock);
+        CmiImmediateLock(hashImmLock);
 	hash.remove(*(CkArrayIndexMax *)&idx);
-        CmiImmediateUnlock(immLock);
-  	CmiDestroyLock(immLock);
+        CmiImmediateUnlock(hashImmLock);
 #ifndef CMK_OPTIMIZE
 	//Make sure it's really gone
 	if (NULL!=elementNrec(idx))
@@ -1567,6 +1563,7 @@ void CkLocMgr::iterate(CkLocIterator &dest) {
   //Poke through the hash table for local ArrayRecs.
   void *objp;
   CkHashtableIterator *it=hash.iterator();
+  CmiImmediateLock(hashImmLock);
   while (NULL!=(objp=it->next())) {
     CkLocRec *rec=*(CkLocRec **)objp;
     if (rec->type()==CkLocRec::local) {
@@ -1574,6 +1571,7 @@ void CkLocMgr::iterate(CkLocIterator &dest) {
       dest.addLocation(loc);
     }
   }
+  CmiImmediateUnlock(hashImmLock);
   delete it;
 }
 
@@ -1824,11 +1822,9 @@ void CkLocMgr::insertRec(CkLocRec *rec,const CkArrayIndex &idx) {
 //Add given record, when there is guarenteed to be no prior record
 void CkLocMgr::insertRecN(CkLocRec *rec,const CkArrayIndex &idx) {
 	DEBC((AA"  adding new rec(%s) for %s\n"AB,rec2str[rec->type()],idx2str(idx)));
-        CmiImmediateLockType immLock = CmiCreateImmediateLock();
-        CmiImmediateLock(immLock);
+        CmiImmediateLock(hashImmLock);
 	hash.put(*(CkArrayIndexMax *)&idx)=rec;
-        CmiImmediateUnlock(immLock);
-  	CmiDestroyLock(immLock);
+        CmiImmediateUnlock(hashImmLock);
 }
 
 //Call this on an unrecognized array index
