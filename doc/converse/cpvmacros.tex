@@ -12,7 +12,11 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.2  1995-10-27 21:02:54  milind
+% Revision 1.3  1995-10-30 17:33:54  milind
+% Changed Cth variables macros to Ctv macros.
+% Added "More on Shared Memory Machines" section.
+%
+% Revision 1.2  1995/10/27  21:02:54  milind
 % Integrated into Manual.
 %
 % Revision 1.1  1995/10/26  21:08:23  gursoy
@@ -72,11 +76,11 @@ CpvAccess(variable)
 
 Macros for thread-private variables:
 \begin{verbatim}
-CthDeclare(type,variable)
-CthStaticDeclare(type,variable)
-CthExtern(type,variable)
-CthInitialize(type,variable)
-CthAccess(variable)
+CtvDeclare(type,variable)
+CtvStaticDeclare(type,variable)
+CtvExtern(type,variable)
+CtvInitialize(type,variable)
+CtvAccess(variable)
 \end{verbatim}
 
 
@@ -129,3 +133,23 @@ File Module1.c
 \caption{An example code for global variable usage}
 \label{fig:cpv}
 \end{figure}
+
+\section{More on Shared-Memory machines}
+
+To simplify programming with global variables on shared memory machines,
+Converse provides following functions and/or macros. \note{These functions
+have the effect of only one processor per node and only one thread per 
+processor on other machines.}
+
+\function{int CmiMyRank()}
+\desc{Returns the rank of the calling processor within a shared memory node.}
+
+\function{void CmiNodeBarrier()}
+\desc{Provide barrier synchronization at the node level, i.e. all the 
+processors belonging to the node participate in this barrier.}
+
+\function{void *CmiSvAlloc(int size)}
+\desc{Allocates a block of memory of \param{size} bytes from the heap in node's 
+local memory and returns pointer to the start of this block. \note{On 
+machines other than shared-memory machines, this is equivalent to 
+\param{CmiAlloc}.}}
