@@ -797,7 +797,7 @@ static double Cmi_ack_delay;
 static int    Cmi_dgram_max_data;
 static int    Cmi_tickspeed;
 static int    Cmi_netpoll;
-static int    Cmi_idlepoll;;
+static int    Cmi_idlepoll;
 static int    Cmi_syncprint;
 static int writeableAcks,writeableDgrams;/*Write-queue counts (to know when to sleep)*/
 
