@@ -9,12 +9,14 @@
 // Hash table mostly based on open hash table from Introduction to
 // Algorithms by Cormen, Leiserson, and Rivest
 
-static inline CmiBool ObjIDEqual(const LDObjid i1, const LDObjid i2)
-{
-  return static_cast<CmiBool>(i1.id[0] == i2.id[0] 
-	 && i1.id[1] == i2.id[1] && i1.id[2] == i2.id[2] 
-	 && i1.id[3] == i2.id[3]);
-};
+// Moved comparison function to LDObjIDEqual
+
+// static inline CmiBool ObjIDEqual(const LDObjid i1, const LDObjid i2)
+// {
+//   return static_cast<CmiBool>(i1.id[0] == i2.id[0] 
+// 	 && i1.id[1] == i2.id[1] && i1.id[2] == i2.id[2] 
+// 	 && i1.id[3] == i2.id[3]);
+// };
 
 LBCommData* LBCommTable::HashInsert(const LBCommData data)
 {
@@ -83,12 +85,12 @@ CmiBool LBCommData::equal(const LBCommData d2) const
     if (src_proc != d2.src_proc)
       return CmiFalse;
   } else {
-    if (srcObj.omhandle.id.id != d2.srcObj.omhandle.id.id 
-	|| !ObjIDEqual(srcObj.id,d2.srcObj.id) )
+    if (!LDOMidEqual(srcObj.omhandle.id,d2.srcObj.omhandle.id)
+	|| !LDObjIDEqual(srcObj.id,d2.srcObj.id) )
       return CmiFalse;
   }
-  if (destOM.id != d2.destOM.id 
-      || !ObjIDEqual(destObj,d2.destObj))
+  if (!LDOMidEqual(destOM,d2.destOM)
+      || !LDObjIDEqual(destObj,d2.destObj))
     return CmiFalse;
   else return CmiTrue;
 }

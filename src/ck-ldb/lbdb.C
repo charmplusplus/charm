@@ -291,4 +291,16 @@ extern "C" int LDProcessorSpeed()
   return wps;
 }
 
+CmiBool LDOMidEqual(const LDOMid i1, const LDOMid i2)
+{
+ return static_cast<CmiBool>(i1.id == i2.id);
+}
+
+CmiBool LDObjIDEqual(const LDObjid i1, const LDObjid i2)
+{
+  return static_cast<CmiBool>(i1.id[0] == i2.id[0] 
+	 && i1.id[1] == i2.id[1] && i1.id[2] == i2.id[2] 
+	 && i1.id[3] == i2.id[3]);
+}
+
 #endif // CMK_LBDB_ON

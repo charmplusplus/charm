@@ -84,31 +84,20 @@ void LBDB::Send(LDOMHandle destOM, LDObjid destid, unsigned int bytes)
   LBCommData* item_ptr;
 
   if (obj_running) {
+
+    // Don't record self-messages from an object to an object
+    if ( LDOMidEqual(runningObj.omhandle.id,destOM.id)
+	 && LDObjIDEqual(runningObj.id,destid) )
+      return;
+
+    // In the future, we'll have to eliminate processor to same 
+    // processor messages as well
+
     LBCommData item(runningObj,destOM.id,destid);
     item_ptr = commTable->HashInsertUnique(item);
-
-//     CmiPrintf("[%d] Sending %d from object manager %d, object {%d,%d,%d,%d}\n"
-//  	      "     to object manager %d, object {%d,%d,%d,%d}\n",
-//   	      CmiMyPe(),bytes,
-//   	      runningObj.omhandle.id.id,
-//   	      runningObj.id.id[0],runningObj.id.id[1],
-//   	      runningObj.id.id[2],runningObj.id.id[3],
-//   	      destOM.id.id,
-//   	      destid.id[0],destid.id[1],
-//   	      destid.id[2],destid.id[3]
-//   	      );
   } else {
     LBCommData item(CmiMyPe(),destOM.id,destid);
     item_ptr = commTable->HashInsertUnique(item);
-
-//     CmiPrintf("[%d] Sending %d from processor %d\n"
-//   	      "     to object manager %d, object {%d,%d,%d,%d}\n",
-//  	      CmiMyPe(),bytes,
-// 	      CmiMyPe(),
-//    	      destOM.id.id,
-//    	      destid.id[0],destid.id[1],
-//    	      destid.id[2],destid.id[3]
-//    	      );
   }  
   item_ptr->addMessage(bytes);
 }

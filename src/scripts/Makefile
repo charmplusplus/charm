@@ -64,7 +64,7 @@ ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
 	pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h \
 	TList.h idl.h ckarray.h tempo.h waitqd.h LBDatabase.h \
 	lbdb.h LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
-	Refiner.h CentralLB.h RandCentLB.h RefineLB.h MetisLB.h \
+	Refiner.h ObjGraph.h CentralLB.h RandCentLB.h RefineLB.h MetisLB.h \
 	HeapCentLB.h Set.h elements.h heap.h conv-ccs.h NeighborLB.h \
 	WSLB.h CkLists.h GreedyRefLB.h RandRefLB.h
 
@@ -251,7 +251,8 @@ libldb-test.o: cldb.test.c $(CVHEADERS)
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
           ckfutures.h ckarray.h tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
-	  Refiner.h CentralLB.h RandCentLB.h RefineLB.h HeapCentLB.h \
+	  Refiner.h ObjGraph.h \
+	  CentralLB.h RandCentLB.h RefineLB.h HeapCentLB.h \
 	  MetisLB.h NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h CkLists.h \
 	  $(CVHEADERS)
 
@@ -260,6 +261,7 @@ CK_LIBS_CORE=libck.a
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            ckarray.o tempo.o waitqd.o LBDatabase.o lbdb.o \
 	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
+	   ObjGraph.o \
 	   CentralLB.o RandCentLB.o MetisLB.o RefineLB.o Set.o \
            HeapCentLB.o heap.o NeighborLB.o WSLB.o GreedyRefLB.o \
 	   RandRefLB.o
@@ -407,6 +409,9 @@ LBDatabase.o: LBDatabase.C $(CKHEADERS)
 
 Refiner.o: Refiner.C $(CKHEADERS)
 	$(CHARMC) -o Refiner.o Refiner.C
+
+ObjGraph.o: ObjGraph.C $(CKHEADERS)
+	$(CHARMC) -o ObjGraph.o ObjGraph.C
 
 CentralLB.o: CentralLB.C $(CKHEADERS)
 	$(CHARMC) -o CentralLB.o CentralLB.C

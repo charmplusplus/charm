@@ -164,6 +164,8 @@ void LDRemoveLocalBarrierReceiver(LDHandle lbdb,LDBarrierReceiver h);
 void LDAtLocalBarrier(LDHandle lbdb, LDBarrierClient h);
 void LDResumeClients(LDHandle lbdb);
 int LDProcessorSpeed();
+CmiBool LDOMidEqual(const LDOMid i1, const LDOMid i2);
+CmiBool LDObjIDEqual(const LDObjid i1, const LDObjid i2);
 
 #ifdef __cplusplus
 }
