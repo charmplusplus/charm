@@ -30,12 +30,24 @@ printOption() {
   exit 1
 }
 
+CheckDir() {
+  for dir in $*
+  do
+    if test ! -d $dir
+    then
+      echo Error: cannot find $1!
+      exit 1
+    fi
+  done
+}
+
   [ $# -lt 2 ] && syntax
 
 MAKEOPTS=""
 OPTS=""
 MORE=""
 COMPILER=""
+BASEDIR=
 LIBDIR=
 INCDIR=
 
@@ -70,13 +82,34 @@ do
                 fi
                 MORE="$MORE $1"; shift
 		;;
+    	    "--basedir")
+          	shift; CheckDir $1/include $1/lib
+          	LIBDIR="$LIBDIR -L$1/lib";
+          	INCDIR="$INCDIR -I$1/include"; shift
+ 	  	;;
+    	    --basedir=*)
+                dir=`echo $1 | awk -F= '{print $2}'`
+		CheckDir $dir/include $dir/lib
+          	LIBDIR="$LIBDIR -L$dir/lib";
+          	INCDIR="$INCDIR -I$dir/include"; shift
+ 	  	;;
     	    "--libdir")
-          	shift 
+          	shift; CheckDir $1
           	LIBDIR="$LIBDIR -L$1"; shift
  	  	;;
+    	    --libdir=*)
+                dir=`echo $1 | awk -F= '{print $2}'`
+		CheckDir $dir
+          	LIBDIR="$LIBDIR -L$dir"; shift
+ 	  	;;
     	    "--incdir")
-          	shift 
+          	shift; CheckDir $1
           	INCDIR="$INCDIR -I$1"; shift
+ 	  	;;
+    	    --incdir=*)
+                dir=`echo $1 | awk -F= '{print $2}'`
+		CheckDir $dir
+          	INCDIR="$INCDIR -I$dir"; shift
  	  	;;
             *)
                 OPTS="$OPTS $1"; shift
