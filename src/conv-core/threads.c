@@ -239,9 +239,8 @@ static void CthOnly(void *arg, void *vt, qt_userf_t fn)
 {
   CthThread t = (CthThread)vt; CthThread next;
   fn(arg);
-  if (t->choosefn==0) CthNoStrategy();
-  next = (t->choosefn)();
-  QT_ABORT((qt_helper_t*)CthAbortHelp, t, 0, next->stackp);
+  CthCpvAccess(CthExiting) = 1;
+  CthSuspend();
 }
 
 CthThread CthCreate(fn, arg, size)

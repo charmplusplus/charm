@@ -322,8 +322,8 @@ void Cpthread_exit(void *status)
   }
   /* handle the join-operation */
   if (pt->detached) {
-    free(pt);
     pt->magic = 0;
+    free(pt);
   } else {
     pt->joinstatus = status;
     pt->thread = 0;
