@@ -175,7 +175,7 @@ CK_LIBS_LDB=libck-ldb-rand.o libck-ldb-acwn.o libck-ldb-mngr.o # libck-ldb-priom
 
 CK_LIBS_CPLUS=libck-cplus-n.a
 
-CK_LIBS_MAIN=libck-defmain.a libck-unimain.a
+CK_LIBS_MAIN=libck-defmain.a
 
 CK_LIBS=$(CK_LIBS_CORE) $(CK_LIBS_LDB) $(CK_LIBS_CPLUS) $(CK_LIBS_MAIN)
 
