@@ -55,7 +55,7 @@ cat >> $out <<EOB
 EveryLB.def.h: EveryLB.decl.h
 
 EveryLB.decl.h: EveryLB.ci charmxi
-	\$(CHARMC) EveryLB.ci
+	\$(CHARMXI) EveryLB.ci
 
 \$(L)/libmoduleEveryLB.a: \$(LB_OBJ)
 	\$(CHARMC) -o \$(L)/libmoduleEveryLB.a \$(LB_OBJ)
