@@ -706,8 +706,8 @@ void CsdSchedulePoll(void)
   while (NULL!=(msg = CsdNextMessage(&state)))
   {
      SCHEDULE_MESSAGE 
-     if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks();
   }
+  if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks();
 }
 
 void CmiDeliverSpecificMsg(handler)
