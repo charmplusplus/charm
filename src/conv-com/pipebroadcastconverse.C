@@ -60,7 +60,7 @@ void PipeBroadcastConverse::propagate(char *env, int isFragmented, int srcPeNumb
     else setPeNumber(env,CkMyPe());  // where the message is coming from
     dest_pes = (int *)malloc(k*sizeof(int));
     --k;  // next dimension in the cube to be used
-    num_pes = HypercubeGetBcastDestinations(k, dest_pes);
+    num_pes = HypercubeGetBcastDestinations(CkMyPe(), CkNumPes(), k, dest_pes);
 
     /*
     for ( ; k>=0; --k) {
