@@ -571,6 +571,21 @@ PUPmarshall(AmpiSeqQ);
 inline CProxy_ampi ampiCommStruct::getProxy(void) const {return ampiID;}
 const ampiCommStruct &universeComm2proxy(MPI_Comm universeNo);
 
+/* KeyValue class for caching */
+class KeyvalNode {
+public:
+	MPI_Copy_function *copy_fn;
+	MPI_Delete_function *delete_fn;
+	void *extra_state;
+	void *value;
+	MPI_Comm comm;
+	bool valid;
+
+	KeyvalNode(MPI_Copy_function *cf, MPI_Delete_function *df, void* es):
+		copy_fn(cf), delete_fn(df), extra_state(es), value(NULL), comm(MPI_COMM_NULL), valid(true)
+	{ }
+};
+
 /*
 An ampiParent holds all the communicators and the TCharm thread
 for its children, which are bound to it.
@@ -612,15 +627,15 @@ class ampiParent : public CBase_ampiParent {
       return *groupComm[idx];
     }
     void groupChildRegister(const ampiCommStruct &s);
-
     inline int isInGroups(MPI_Group group) const {
       return (group>=0 && group<groups.size());
     }
 
     void cartChildRegister(const ampiCommStruct &s);
-    
     void graphChildRegister(const ampiCommStruct &s);
-    
+
+    CkPupPtrVec<KeyvalNode> kvlist;
+
 public:
     ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,ComlibInstanceHandle comlib_);
     ampiParent(CkMigrateMessage *msg);
@@ -639,24 +654,20 @@ public:
     //Grab the next available split/group communicator
     MPI_Comm getNextSplit(void) const {return MPI_COMM_FIRST_SPLIT+splitComm.size();}
     MPI_Comm getNextGroup(void) const {return MPI_COMM_FIRST_GROUP+groupComm.size();}
-    MPI_Comm getNextCart(void) const {return MPI_COMM_FIRST_CART+cartComm.size
-();}
+    MPI_Comm getNextCart(void) const {return MPI_COMM_FIRST_CART+cartComm.size();}
     MPI_Comm getNextGraph(void) const {return MPI_COMM_FIRST_GRAPH+graphComm.size();}
 
     inline int isCart(MPI_Comm comm) const {
       return (comm>=MPI_COMM_FIRST_CART && comm<MPI_COMM_FIRST_GRAPH);
     }
-    
     ampiCommStruct &getCart(MPI_Comm comm) {
       int idx=comm-MPI_COMM_FIRST_CART;
       if (idx>=cartComm.size()) CkAbort("Bad cartesian communicator used");
       return *cartComm[idx];
     }
-    
     inline int isGraph(MPI_Comm comm) const {
       return (comm>=MPI_COMM_FIRST_GRAPH && comm<MPI_COMM_FIRST_RESVD);
     }
-
     ampiCommStruct &getGraph(MPI_Comm comm) {
       int idx=comm-MPI_COMM_FIRST_GRAPH;
       if (idx>=graphComm.size()) CkAbort("Bad graph communicator used");
@@ -724,8 +735,8 @@ public:
       groupStruct vec = group2vec(group);
       return getPosOp(thisIndex,vec);
     }
-    
-    ComlibInstanceHandle getComlib(void) { 
+
+    ComlibInstanceHandle getComlib(void) {
     	return comlib; 
     }
     
@@ -740,11 +751,17 @@ public:
       return (MPI_Group)(s.getComm());
     }
 
+    int createKeyval(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
+                     int *keyval, void* extra_state);
+    int freeKeyval(int *keyval);
+    int putAttr(MPI_Comm comm, int keyval, void* attribute_val);
+    int getAttr(MPI_Comm comm, int keyval, void *attribute_val, int *flag);
+    int deleteAttr(MPI_Comm comm, int keyval);
+
     CkDDT myDDTsto;
     CkDDT *myDDT;
     AmpiRequestList ampiReqs;
 };
-
 
 /*
 An ampi manages the communication of one thread over
@@ -766,11 +783,11 @@ class ampi : public CBase_ampi {
     int *nextseq;
     AmpiSeqQ *oorder;
     void inorder(AmpiMsg *msg);
-    
+
     void init(void);
 
   public: // entry methods
-    
+
     ampi();
     ampi(CkArrayID parent_,const ampiCommStruct &s);
     ampi(CkMigrateMessage *msg);
@@ -791,8 +808,7 @@ class ampi : public CBase_ampi {
       return parent->comm2proxy(comm);
     }
 
-    AmpiMsg *makeAmpiMsg(int destIdx,
-    	int t,int sRank,const void *buf,int count,int type,MPI_Comm destcomm);
+    AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,int type,MPI_Comm destcomm);
 
     void send(int t, int s, const void* buf, int count, int type,  int rank, MPI_Comm destcomm);
     static void sendraw(int t, int s, void* buf, int len, CkArrayID aid,

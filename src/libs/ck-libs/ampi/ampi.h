@@ -133,6 +133,7 @@ This is needed so we can call the routine as a new thread.
 #define MPI_IDENT	0
 #define MPI_SIMILAR	1
 #define MPI_UNEQUAL	2
+#define MPI_CONGRUENT   3
 
 #define MPI_OP_NULL   0
 #define MPI_MAX       1
@@ -147,6 +148,7 @@ This is needed so we can call the routine as a new thread.
 #define MPI_BAND      10
 #define MPI_BOR       11
 #define MPI_BXOR      12
+#define MPI_CONCAT    13
 
 #define MPI_GRAPH 1
 #define MPI_CART 2
@@ -194,8 +196,12 @@ typedef int  (MPI_Delete_function)(MPI_Comm comm, int keyval,
 typedef void (MPI_User_function)( void *invec, void *inoutvec, int *len,
                       MPI_Datatype *datatype);
 
-#define MPI_NULL_COPY_FN 1
-#define MPI_DUP_FN	 2
+#define MPI_NULL_COPY_FN   MPI_null_copy_fn
+#define MPI_NULL_DELETE_FN MPI_null_delete_fn
+#define MPI_DUP_FN         MPI_dup_fn
+int MPI_NULL_COPY_FN ( MPI_Comm, int, void *, void *, void *, int * );
+int MPI_NULL_DELETE_FN ( MPI_Comm, int, void *, void * );
+int MPI_DUP_FN ( MPI_Comm, int, void *, void *, void *, int * );
 
 #include "pup_c.h"
 
@@ -353,7 +359,7 @@ int MPI_Comm_rank(MPI_Comm comm, int *rank);
 int MPI_Comm_dup(MPI_Comm src, MPI_Comm *dest);
 int MPI_Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest);
 int MPI_Comm_free(MPI_Comm *comm);
-/* MPI_Comm_test_inter */
+int MPI_Comm_test_inter(MPI_Comm comm, int *flag);
 /* MPI_Comm_remote_size */
 /* MPI_Comm_remote_group */
 /* MPI_Intercomm_create */

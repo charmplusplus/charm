@@ -415,7 +415,7 @@ static ampi *ampiInit(char **argv)
 
         ComlibInstanceHandle cinst;
 
-#if AMPI_COMLIB	
+#if AMPI_COMLIB
 	cinst=CkGetComlibInstance()
 #endif
         
@@ -573,6 +573,45 @@ void ampiParent::Checkpoint(int len, char* dname){
 }
 void ampiParent::ResumeThread(void){
   thread->resume();
+}
+
+int ampiParent::createKeyval(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
+                             int *keyval, void* extra_state){
+	KeyvalNode* newnode = new KeyvalNode(copy_fn, delete_fn, extra_state);
+	int idx = kvlist.size();
+	kvlist.resize(idx+1);
+	kvlist[idx] = newnode;
+	*keyval = idx;
+	return 0;
+}
+int ampiParent::freeKeyval(int *keyval){
+	if(*keyval != MPI_KEYVAL_INVALID && *keyval >= kvlist.size() && kvlist[*keyval] && !kvlist[*keyval]->valid) return -1;
+	delete kvlist[*keyval];
+	kvlist[*keyval] = NULL;
+	return 0;
+}
+int ampiParent::putAttr(MPI_Comm comm, int keyval, void* attribute_val){
+	if(keyval != MPI_KEYVAL_INVALID && keyval >= kvlist.size() && kvlist[keyval] && !kvlist[keyval]->valid) return -1;
+	KeyvalNode* node = kvlist[keyval];
+	node->comm = comm;
+	node->value = attribute_val;
+	return 0;
+}
+int ampiParent::getAttr(MPI_Comm comm, int keyval, void *attribute_val, int *flag){
+	if(keyval != MPI_KEYVAL_INVALID && keyval >= kvlist.size() && kvlist[keyval] && !kvlist[keyval]->valid) return -1;
+	KeyvalNode* node = kvlist[keyval];
+	if(comm == node->comm) {
+		*flag = true;
+		attribute_val = node->value;
+	}else{
+		*flag = false;
+	}
+	return 0;
+}
+int ampiParent::deleteAttr(MPI_Comm comm, int keyval){
+	if(keyval != MPI_KEYVAL_INVALID && keyval >= kvlist.size() && kvlist[keyval] && !kvlist[keyval]->valid) return -1;
+	kvlist[keyval]->valid = false;
+	return 0;
 }
 
 //----------------------- ampi -------------------------
@@ -1118,6 +1157,20 @@ ampi::bcastraw(void* buf, int len, CkArrayID aid)
   pa.generic(msg);
 }
 
+int MPI_null_copy_fn (MPI_Comm comm, int keyval, void *extra_state,
+			void *attr_in, void *attr_out, int *flag){
+  (*flag) = 0;
+  return (MPI_SUCCESS);
+}
+int MPI_dup_fn(MPI_Comm comm, int keyval, void *extra_state,
+			void *attr_in, void *attr_out, int *flag){
+  (*(void **)attr_out) = attr_in;
+  (*flag) = 1;
+  return (MPI_SUCCESS);
+}
+int MPI_null_delete_fn (MPI_Comm comm, int keyval, void *attr, void *extra_state ){
+  return (MPI_SUCCESS);
+}
 
 //------------------ External Interface -----------------
 
@@ -1432,6 +1485,8 @@ getReductionType(int type, int op)
           CmiAbort("exiting");
       }
       break;
+    case MPI_CONCAT :
+      mytype = CkReduction::concat; break;
     default:
       ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
       CmiAbort("exiting");
@@ -1460,7 +1515,7 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
 
 // Copy the MPI datatype "type" from inbuf to outbuf
 static int copyDatatype(MPI_Comm comm,MPI_Datatype type,int count,const void *inbuf,void *outbuf) {
-  // ddts don't have "copy", so fake it by serializing into a temp buffer, then 
+  // ddts don't have "copy", so fake it by serializing into a temp buffer, then
   //  deserializing into the output.
   ampi *ptr = getAmpiInstance(comm);
   CkDDT_DataType *ddt=ptr->getDDT()->getType(type);
@@ -1488,9 +1543,10 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
 
   if (ptr->thisIndex == rootIdx){
     /*HACK: Use recv() to block until reduction data comes back*/
+    if(op==MPI_CONCAT) count*=ptr->getSize();
     ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM);
   }
- return 0;
+  return 0;
 }
 
 CDECL
@@ -1563,7 +1619,88 @@ int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
 CDECL
 int MPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm ){
   AMPIAPI("MPI_Scan");
-  
+
+  ampi *ptr = getAmpiInstance(comm);
+  int numvps = ptr->getSize();
+  CkDDT_DataType *ddt = ptr->getDDT()->getType(datatype);
+  int blklen = ddt->getSize(count);
+  void* tmpbuf = malloc(blklen*numvps); // holds P*count*sizeof(datatype)
+
+  MPI_Reduce(sendbuf, tmpbuf, count, datatype, MPI_CONCAT, 0, comm);
+
+  if(ptr->getRank()==0){
+    switch(datatype){
+    case MPI_FLOAT:
+      for(int i=1;i<numvps;i++)
+        for(int j=0;j<count;j++)
+        switch(op){
+	  case MPI_MAX:
+	    if(((float *)tmpbuf)[count*(i-1)+j] > ((float *)tmpbuf)[count*i+j]) ((float *)tmpbuf)[count*i+j] = ((float *)tmpbuf)[count*(i-1)+j];
+	    break;
+	  case MPI_MIN:
+	    if(((float *)tmpbuf)[count*(i-1)+j] < ((float *)tmpbuf)[count*i+j]) ((float *)tmpbuf)[count*i+j] = ((float *)tmpbuf)[count*(i-1)+j];
+	    break;
+	  case MPI_SUM:
+	    ((float *)tmpbuf)[count*i+j] += ((float *)tmpbuf)[count*(i-1)+j];
+	    break;
+	  case MPI_PROD:
+	    ((float *)tmpbuf)[count*i+j] *= ((float *)tmpbuf)[count*(i-1)+j];
+	    break;
+	  default:
+            ckerr << "Scan on type " << datatype << " with Op " << op << " not supported." << endl;
+	    CmiAbort("MPI_Scan()");
+	  }
+      break;
+    case MPI_INT:
+      for(int i=1;i<numvps;i++)
+        for(int j=0;j<count;j++)
+          switch(op){
+	  case MPI_MAX:
+	    if(((int *)tmpbuf)[count*(i-1)+j] > ((int *)tmpbuf)[count*i+j]) ((int *)tmpbuf)[count*i+j] = ((int *)tmpbuf)[count*(i-1)+j];
+	    break;
+	  case MPI_MIN:
+	    if(((int *)tmpbuf)[count*(i-1)+j] < ((int *)tmpbuf)[count*i+j]) ((int *)tmpbuf)[count*i+j] = ((int *)tmpbuf)[count*(i-1)+j];
+	    break;
+	  case MPI_SUM:
+	    ((int *)tmpbuf)[count*i+j] += ((int *)tmpbuf)[count*(i-1)+j];
+	    break;
+	  case MPI_PROD:
+	    ((int *)tmpbuf)[count*i+j] *= ((int *)tmpbuf)[count*(i-1)+j];
+	    break;
+	  default:
+            ckerr << "Scan on type " << datatype << " with Op " << op << " not supported." << endl;
+	    CmiAbort("MPI_Scan()");
+	  }
+      break;
+    case MPI_DOUBLE:
+      for(int i=1;i<numvps;i++)
+        for(int j=0;j<count;j++)
+          switch(op){
+	  case MPI_MAX:
+	    if(((double *)tmpbuf)[count*(i-1)+j] > ((double *)tmpbuf)[count*i+j]) ((double *)tmpbuf)[count*i+j] = ((double *)tmpbuf)[count*(i-1)+j];
+	    break;
+	  case MPI_MIN:
+	    if(((double *)tmpbuf)[count*(i-1)+j] < ((double *)tmpbuf)[count*i+j]) ((double *)tmpbuf)[count*i+j] = ((double *)tmpbuf)[count*(i-1)+j];
+	    break;
+	  case MPI_SUM:
+	    ((double *)tmpbuf)[count*i+j] += ((double *)tmpbuf)[count*(i-1)+j];
+	    break;
+	  case MPI_PROD:
+	    ((double *)tmpbuf)[count*i+j] *= ((double *)tmpbuf)[count*(i-1)+j];
+	    break;
+	  default:
+            ckerr << "Scan on type " << datatype << " with Op " << op << " not supported." << endl;
+	    CmiAbort("MPI_Scan()");
+	  }
+      break;
+    default:
+      ckerr << "Scan on type " << datatype << " with Op " << op << " not supported." << endl;
+      CmiAbort("MPI_Scan()");
+    }
+  }
+
+  MPI_Scatter(tmpbuf, count, datatype, recvbuf, count, datatype, 0, comm);
+  free(tmpbuf);
   return 0;
 }
 
@@ -2120,13 +2257,16 @@ int MPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int i;
 
   if(ptr->getRank()==root) {
+    CProxy_ampi arrproxy = ptr->comlibBegin();
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize(sendcount) ;
     for(i=0;i<size;i++) {
-      MPI_Send(((char*)sendbuf)+(itemsize*i), sendcount, sendtype,
-               i, MPI_SCATTER_TAG, comm);
+      ptr->delesend(MPI_SCATTER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i),
+                    sendcount, sendtype, i, comm, arrproxy);
     }
+    ptr->comlibEnd();
   }
+
   MPI_Status status;
   MPI_Recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm, &status);
 
@@ -2145,13 +2285,16 @@ int MPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendt
   int i;
 
   if(ptr->getRank() == root) {
+    CProxy_ampi arrproxy = ptr->comlibBegin();
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize() ;
     for(i=0;i<size;i++) {
-      MPI_Send(((char*)sendbuf)+(itemsize*displs[i]), sendcounts[i], sendtype,
-               i, MPI_SCATTER_TAG, comm);
+      ptr->delesend(MPI_SCATTER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*displs[i]),
+                    sendcounts[i], sendtype, i, comm, arrproxy);
     }
+    ptr->comlibEnd();
   }
+
   MPI_Status status;
   MPI_Recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm, &status);
 
@@ -2275,6 +2418,13 @@ CDECL
 int MPI_Comm_free(int *comm)
 {
   AMPIAPI("MPI_Comm_free");
+  return 0;
+}
+
+CDECL
+int MPI_Comm_test_inter(MPI_Comm comm, int *flag){
+  AMPIAPI("MPI_Comm_test_inter");
+  *flag = false;
   return 0;
 }
 
@@ -2623,36 +2773,31 @@ void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
 CDECL
 int MPI_Keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn, int *keyval, void* extra_state){
   AMPIAPI("MPI_Keyval_create");
-
-  return 0;
+  return getAmpiParent()->createKeyval(copy_fn,delete_fn,keyval,extra_state);
 }
 
 CDECL
 int MPI_Keyval_free(int *keyval){
   AMPIAPI("MPI_Keyval_free");
-
-  return 0;
+  return getAmpiParent()->freeKeyval(keyval);
 }
 
 CDECL
 int MPI_Attr_put(MPI_Comm comm, int keyval, void* attribute_val){
   AMPIAPI("MPI_Attr_put");
-
-  return 0;
+  return getAmpiParent()->putAttr(comm,keyval,attribute_val);
 }
 
 CDECL
 int MPI_Attr_get(MPI_Comm comm, int keyval, void *attribute_val, int *flag){
   AMPIAPI("MPI_Attr_get");
-
-  return 0;
+  return getAmpiParent()->getAttr(comm,keyval,attribute_val,flag);
 }
 
 CDECL
 int MPI_Attr_delete(MPI_Comm comm, int keyval){
   AMPIAPI("MPI_Attr_delete");
-
-  return 0;
+  return getAmpiParent()->deleteAttr(comm,keyval);
 }
 
 CDECL
