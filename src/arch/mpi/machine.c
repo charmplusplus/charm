@@ -173,6 +173,8 @@ CsvStaticDeclare(CmiNodeLock, CmiNodeRecvLock);
 CsvStaticDeclare(PCQueue, NodeRecv);
 #endif
 
+/* fake Cmi_charmrun_fd */
+static int Cmi_charmrun_fd = 0;
 #include "machine-smp.c"
 
 #if ! CMK_SMP
