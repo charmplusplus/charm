@@ -510,6 +510,7 @@ extern void CsdExitScheduler(void);
 #endif
 
 void     CmiGrabBuffer(void **ppbuf);
+void     CmiReleaseBuffer(void *pbuf);
 
 #if CMK_SPANTREE_USE_COMMON_CODE
 
