@@ -73,6 +73,8 @@ void ComboCentLB::work(CentralLB::LDStats* stats, int count)
   }
 
   for (obj=0; obj<n_objs; obj++) stats->from_proc[obj] = from_orig[obj];
+
+  delete [] from_orig;
 }
 
 #include "ComboCentLB.def.h"
