@@ -3,6 +3,9 @@
 
 #include <stdlib.h>
 #include "charm.h"
+#if CMK_DEBUG_MODE
+#include <string.h>
+#endif
 
 #if CMK_DEBUG_MODE
 class Chare;
