@@ -146,7 +146,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  ckarrayreductionmgr.h cknodegroupreduction.h cksection.h \
-	  ckarray.h cklocation.h ckreduction.h ckcheckpoint.h\
+	  ckarray.h cklocation.h ckreduction.h ckcheckpoint.h ckmemcheckpoint.h\
 	  readonly.h charisma.h \
 	  $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h \
@@ -161,7 +161,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h 	\
           CkReduction.decl.h CkArrayReductionMgr.decl.h\
           tempo.decl.h waitqd.decl.h \
-          CkFutures.decl.h CkCheckpoint.decl.h \
+          CkFutures.decl.h CkCheckpoint.decl.h CkMemCheckpoint.decl.h \
           LBDatabase.decl.h CentralLB.decl.h ComboCentLB.decl.h NullLB.decl.h \
           RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h \
           MetisLB.decl.h DummyLB.decl.h RefineLB.decl.h RefineCommLB.decl.h  \
@@ -454,7 +454,8 @@ CK_LIBS_CORE=$(L)/libck.a
 LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o \
 	   ckfutures.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
-           tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o ckcheckpoint.o\
+           tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o 	\
+	   ckcheckpoint.o ckmemcheckpoint.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o \
            ObjGraph.o graph.o  \
@@ -515,6 +516,11 @@ CkCheckpoint.def.h: CkCheckpoint.decl.h
 
 CkCheckpoint.decl.h: ckcheckpoint.ci charmxi
 	$(CHARMXI) ckcheckpoint.ci
+
+CkMemCheckpoint.def.h: CkMemCheckpoint.decl.h
+
+CkMemCheckpoint.decl.h: ckmemcheckpoint.ci charmxi
+	$(CHARMXI) ckmemcheckpoint.ci
 
 CkMarshall.def.h: CkMarshall.decl.h
 
