@@ -10,6 +10,13 @@
 extern "C" complex zdotu_( const int *N,  complex *X, const int *incX, complex *Y, const int *incY);
 
 #endif
+#if USE_ZGEMM
+extern "C" void zgemm_(char *,char *, int *,int *, int *,complex *,complex *,int *,
+                       const complex *,int *,complex *,complex *,int *);
+
+extern "C" void dcopy_(int*,double *,int*, double *,int *);
+
+#endif
 
 typedef void (*FuncType) (complex a, complex b);
 PUPmarshallBytes(FuncType);

@@ -33,7 +33,6 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
   kRightCount=0;
   kLeftMark=kLeftOffset;
   kRightMark=kRightOffset;
-  
   inDataLeft = new complex*[numExpected];
   for (int i = 0; i < numExpected; i++)
     inDataLeft[i] = NULL;
@@ -101,9 +100,9 @@ PairCalculator::pup(PUP::er &p)
     for (int i = 0; i < numExpected; i++)
       inDataLeft[i] = new complex[N];
     if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y)){
-      inDataLeft = new complex*[numExpected];
+      inDataRight = new complex*[numExpected];
       for (int i = 0; i < numExpected; i++)
-	inDataLeft[i] = new complex[N];
+	inDataRight[i] = new complex[N];
     }
     kRightOffset= new int[numExpected];
     kLeftOffset= new int[numExpected];
@@ -168,11 +167,18 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
       }
 
   }
-
-  N = size;                                                             
+  N = size; 
 
   if (!inData[offset]) 
-    inData[offset] = new complex[size];
+    { // now that we know N we can allocate contiguous space
+      inData[0] = new complex[numExpected*N];
+      for(int i=0;i<numExpected;i++)
+	inData[i]=inData[0]+i*N;
+    }
+
+                                                 
+  //  if (inData[offset]==NULL)
+  //    inData[offset] = new complex[size];
   memcpy(inData[offset], points, size * sizeof(complex));
 
   numRecd++;   
@@ -397,6 +403,62 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
   }
 */
 
+  // replace with zgemm mynewData=inDataLeft * matrix
+  // convert matrix to complex
+#if USE_ZGEMM
+  int m_in=grainSize;
+  int n_in=N;
+  int k_in=grainSize;
+  int matrixSize=grainSize*grainSize;
+  complex *amatrix=new complex[matrixSize];
+  int incx=1;
+  int incy=2;
+  double *localMatrix=matrix+index;
+  for(int i=0;i<grainSize;i++)
+    dcopy_(&grainSize,localMatrix+i*grainSize,&incx,(double *) (amatrix+i*grainSize),&incy);
+
+  complex alpha=complex(1.0,0.0);//multiplicative identity 
+  complex beta=complex(0.0,0.0);
+  //  char transform='N';
+  char transform='N';
+  // hack inData into contiguous  space
+  /*
+  complex *one=new complex[N*grainSize];
+  for (int j = 0; j < grainSize; j++) 
+    memcpy(one+j*N,inDataLeft[j],N*sizeof(complex));
+  zgemm_(&transform, &transform, &n_in, &m_in, &k_in, &alpha, one, &n_in, amatrix, &k_in, &beta, mynewData, &n_in);
+  */
+  zgemm_(&transform, &transform, &n_in, &m_in, &k_in, &alpha, inDataLeft[0], &n_in, amatrix, &k_in, &beta, mynewData, &n_in);
+  /*
+  complex *tdata=new complex[N*grainSize];
+  memset(tdata, 0, sizeof(complex)*N*grainSize);
+  for (int i = 0; i < grainSize; i++) {
+    for (int j = 0; j < grainSize; j++){ 
+      m = matrix[index + j + i*S];
+      for (int p = 0; p < N; p++)
+	tdata[p + i*N] += inDataLeft[j][p] * m;
+    }
+  }
+  if(tdata[0].re!=mynewData[0].re)
+    CkPrintf("%d %d: %f  %f \n",0,0,tdata[0].re,mynewData[0].re);
+  delete [] tdata;
+  */
+  if(symmetric && thisIndex.x != thisIndex.y){
+    index = thisIndex.x*S + thisIndex.y;
+    localMatrix=matrix+index;
+    for(int i=0;i<grainSize;i++)
+      dcopy_(&grainSize,localMatrix+i*grainSize,&incx,(double *) (amatrix+i*grainSize),&incy);
+    // ahh if only we had contiguous data
+    /*
+    for (int j = 0; j < grainSize; j++) 
+      memcpy(one+j*N,inDataRight[j],N*sizeof(complex));
+    zgemm_(&transform, &transform, &n_in, &m_in, &k_in, &alpha, one, &n_in, amatrix, &k_in, &beta, othernewData, &n_in);
+    */
+    zgemm_(&transform, &transform, &n_in, &m_in, &k_in, &alpha, inDataRight[0], &n_in, amatrix, &k_in, &beta, othernewData, &n_in);
+  }
+  //  delete [] one;
+  delete [] amatrix;
+#else
   //  this one reads better but may take longer
   for (int i = 0; i < grainSize; i++) {
     for (int j = 0; j < grainSize; j++){ 
@@ -405,7 +467,6 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
 	mynewData[p + i*N] += inDataLeft[j][p] * m;
     }
   }
-
   index = thisIndex.x*S + thisIndex.y;
   if(symmetric && thisIndex.x != thisIndex.y){
       for (int i = 0; i < grainSize; i++) {
@@ -416,6 +477,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
 	  }
       }
   }
+#endif
   /* revise this to partition the data into S/M objects 
    * add new message and entry method for sumPartial result
    * to avoid message copying.
@@ -476,55 +538,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
       *((int*)CkPriorityPtr(pmsg)) = priority;
       CkSetQueueing(pmsg, CK_QUEUEING_IFIFO); 
       thisProxy(idx).sumPartialResult(pmsg);  
-    }                                                                             
-/*    for(int segment=0;segment < segments;segment++){
-
-      //      CkPrintf("[%d %d %d %d]: sending N %d segment %d of %d segments \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z, N, segment,segments);
-      CkArrayIndexIndex4D idx(thisIndex.w, segment*grainSize, thisIndex.y, thisIndex.z);
-
-      //	partialResultMsg *msg = new (N*blocksize, 8*sizeof(int) )partialResultMsg(N*blocksize, mynewData+segment*N*blocksize, priority, cb);
-      //	partialResultMsg *msg = new (N*blocksize, 0)partialResultMsg(N*blocksize, mynewData+segment*N*blocksize, priority, cb);
-      
-      partialResultMsg *msg = new (N*blocksize, 0)partialResultMsg;
-      msg->N=N*blocksize;
-      memcpy(msg->result, mynewData+segment*N*blocksize, N*blocksize*sizeof(complex));
-      msg->priority=priority;
-      msg->cb=cb;
-      //	*((int*)CkPriorityPtr(msg)) = priority;
-      //	CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
-      thisProxy(idx).sumPartialResult(msg);  
-      
-      if (rowNum != thisIndex.x){
-        CkArrayIndexIndex4D idx(thisIndex.w, segment*grainSize, thisIndex.x, thisIndex.z);
-	if(thisIndex.x < segment*grainSize && segment < segmants/2) {
-	    CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
-	}
-	else {
-	    CkArrayIndexIndex4D idx(thisIndex.w, thisIndex.x, thisIndex.x, thisIndex.z);
-	}
-
-	//	partialResultMsg *msg = new (N*blocksize, 8*sizeof(int) )partialResultMsg(N*blocksize, mynewData+segment*N*blocksize, priority, cb);
-	//	partialResultMsg *msg = new (N*blocksize, 0)partialResultMsg(N*blocksize, mynewData+segment*N*blocksize, priority, cb);
-      
-	partialResultMsg *msg1 = new (N*blocksize, 0)partialResultMsg;
-	msg1->N=N*blocksize;
-	memcpy(msg1->result, othernewData+segment*N*blocksize, N*blocksize*sizeof(complex));
-	msg1->priority=priority;
-	msg1->cb=cb;
-	//	*((int*)CkPriorityPtr(msg)) = priority;
-	//	CkSetQueueing(msg, CK_QUEUEING_IFIFO); 
-	thisProxy(idx).sumPartialResult(msg1);  
-      }
     }
-*/
-/*
-    CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
-    thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
-    if (rowNum != thisIndex.x){
-      CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
-      thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z, cb);
-
-    }                                                                             */
   }
   delete [] mynewData;
   if(symmetric && thisIndex.x != thisIndex.y){
@@ -558,13 +572,10 @@ PairCalculator::sumPartialResult(partialResultMsg *msg)
     for(int i=0;i<psumblocksize;i++)
       {
 	  // CkPrintf("[%d %d %d %d]: sending to [%d %d]  \n",thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,thisIndex.y+i+thisIndex.x/grainSize*psumblocksize,thisIndex.w);
-
-	  CkCallback mycb(cb_ep, CkArrayIndex2D(/*thisIndex.y/grainSize+i+thisIndex.x/grainSize*psumblocksize*/thisIndex.y+i+thisIndex.x/grainSize*psumblocksize, thisIndex.w), cb_aid);
-	
+	CkCallback mycb(cb_ep, CkArrayIndex2D(/*thisIndex.y/grainSize+i+thisIndex.x/grainSize*psumblocksize*/thisIndex.y+i+thisIndex.x/grainSize*psumblocksize, thisIndex.w), cb_aid);
           mySendMsg *outmsg = new (N,0)mySendMsg; // msg with newData (size N)
-          memcpy(outmsg->data, newData+i*psumblocksize, N* sizeof(complex));
+          memcpy(outmsg->data, newData+i*psumblocksize, N * sizeof(complex));
           outmsg->N = N;
-          
           mycb.send(outmsg);
       }
     sumPartialCount = 0;
