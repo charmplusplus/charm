@@ -29,8 +29,8 @@ void NodeMulticast::setDestinationArray(CkArrayID a, int nelem,
     mode = ARRAY_MODE;
     messageBuf = NULL;
     pes_per_node = 4;
-    if(getenv("RMS_NODES") != NULL)
-        pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
+    //if(getenv("RMS_NODES") != NULL)
+    //  pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
 
     mAid = a;
     nelements = nelem;
