@@ -99,28 +99,28 @@ do
           	INCDIR="$INCDIR -I$1/include"; shift
  	  	;;
     	    --basedir=*)
-                dir=`echo $1 | awk -F= '{print $2}'`
-		CheckDir $dir/include $dir/lib
-          	LIBDIR="$LIBDIR -L$dir/lib";
-          	INCDIR="$INCDIR -I$dir/include"; shift
+                basedir=`echo $1 | awk -F= '{print $2}'`
+		CheckDir $basedir/include $basedir/lib
+          	LIBDIR="$LIBDIR -L$basedir/lib";
+          	INCDIR="$INCDIR -I$basedir/include"; shift
  	  	;;
     	    "--libdir")
           	shift; CheckDir $1
           	LIBDIR="$LIBDIR -L$1"; shift
  	  	;;
     	    --libdir=*)
-                dir=`echo $1 | awk -F= '{print $2}'`
-		CheckDir $dir
-          	LIBDIR="$LIBDIR -L$dir"; shift
+                libdir=`echo $1 | awk -F= '{print $2}'`
+		CheckDir $libdir
+          	LIBDIR="$LIBDIR -L$libdir"; shift
  	  	;;
     	    "--incdir")
           	shift; CheckDir $1
           	INCDIR="$INCDIR -I$1"; shift
  	  	;;
     	    --incdir=*)
-                dir=`echo $1 | awk -F= '{print $2}'`
-		CheckDir $dir
-          	INCDIR="$INCDIR -I$dir"; shift
+                incdir=`echo $1 | awk -F= '{print $2}'`
+		CheckDir $incdir
+          	INCDIR="$INCDIR -I$incdir"; shift
  	  	;;
     -*) 
 # We hit a real compiler option (like -g, or -Dfoo),
