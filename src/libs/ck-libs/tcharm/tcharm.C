@@ -216,8 +216,9 @@ static void TCharmBuildThreads(TCharmInitMsg *msg,TCharmSetupCookie &cook)
 		propMapID=CkCreatePropMap();
 	}
 	opts.setMap(propMapID);
+	int nElem=msg->numElements; //<- save it because msg will be deleted.
 	CkArrayID id=CProxy_TCharm::ckNew(msg,opts);
-	cook.setThreads(id,msg->numElements);
+	cook.setThreads(id,nElem);
 }
 
 /****** Readonlys *****/
