@@ -244,7 +244,7 @@ namespace BGConverse {
 
 static inline void BgCharmExit()
 {
-  traceCharmClose();
+//  traceCharmClose();
   if (CkMyPe() == 0)  BgShutdown();
 }
 
