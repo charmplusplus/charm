@@ -14,7 +14,7 @@ CDECL void fem_impl_call_init(void);
 FDECL void FTN_NAME(INIT,init)(void);
 FDECL void FTN_NAME(DRIVER,driver)(void);
 
-void main(int argc,char **argv) {
+int main(int argc,char **argv) {
 	MPI_Comm comm=MPI_COMM_WORLD;
 	int myPart, nPart;
 	int parallelMesh=0, serialMesh=0;
@@ -56,5 +56,7 @@ void main(int argc,char **argv) {
 		FEM_Mesh_deallocate(FEM_Mesh_default_write());
 		FEM_Mesh_deallocate(FEM_Mesh_default_read());
 	}
+	MPI_Finalize();
+	return 0;
 }
 
