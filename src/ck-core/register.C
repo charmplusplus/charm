@@ -192,10 +192,11 @@ public:
         temp += strlen(temp);
      } 
      p(buf, strlen(buf));
-     loc.pup(p);
-     p.comment("VALUE");
+     //loc.pup(p);
    }
 };
+
+
 
 
 static void pupArray(PUP::er &p, int i)
@@ -203,20 +204,18 @@ static void pupArray(PUP::er &p, int i)
   IrrGroup * c;
   c = (CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i])).getObj();
   GroupIterator itr(p);
-  p.comment("name");
   char buf[128];
   if (c->isLocMgr())
   {
-   int groupID = (((CkLocMgr *)c)->getGroupID()).idx;
-   sprintf(buf, "Array Element %d", groupID);
-   p(buf, strlen(buf));
+   //int groupID = (((CkLocMgr *)c)->getGroupID()).idx;
+   p.comment("Array");
+   p(i);
    ((CkLocMgr*)(c))->iterate(itr);
     
   }
   else
   {
-    sprintf(buf,"Group");
-    p(buf, strlen(buf));
+    p.comment("Group");
     p.comment("Not an Array Location Mgr");
   }
 }
