@@ -358,6 +358,17 @@ EOT
 test_cxx "whether the poll() syscall exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass, [whether the poll() syscall exists])
 
+#### test for setpriority ###
+cat > $t <<EOT
+#include <sys/time.h>
+#include <sys/resource.h>
+void foo(void) { 
+  setpriority(PRIO_PROCESS, 0, 0);
+}
+EOT
+test_cxx "whether the setpriority() exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_SETPRIORITY, $pass, [whether the setpriority() exists])
+
 #### test for system ###
 cat > $t <<EOT
 #include "ckdll_system.C"
@@ -625,6 +636,14 @@ test_result 0 "bproc version" "$bproc_ver" ""
 bproc_ver=`echo $bproc_ver | cut -d'.' -f1`
 AC_DEFINE_UNQUOTED(CMK_BPROC_VERSION, $bproc_ver, [bproc version])
 fi
+fi
+
+
+#### test the if command sync exists ####
+AC_CHECK_PROG(SYNC, sync, sync )
+if test -n "$SYNC"
+then
+AC_DEFINE_UNQUOTED(CMK_HAS_SYNC, 1, [sync program])
 fi
 
 ################## Fortran #########################
