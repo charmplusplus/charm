@@ -81,6 +81,7 @@ BASEDIR=
 LIBDIR=
 INCDIR=
 ARCH=
+BUILD_SHARED="-build-shared"
 
 [ $# -lt 2 ] && syntax
 PROGRAM=$1
@@ -122,6 +123,9 @@ do
 		CheckDir $incdir
           	INCDIR="$INCDIR -I$incdir"; shift
  	  	;;
+	    --no-shared)
+		BUILD_SHARED=""; shift
+		;;
     -*) 
 # We hit a real compiler option (like -g, or -Dfoo),
 # so just copy over all remaining options
@@ -242,7 +246,7 @@ echo $BASEVERSION > $VERSION/tmp/.vdir
 
 echo "Performing 'make $MAKEOPTS $PROGRAM OPTS="$OPTS"' in $VERSION/tmp"
 cd $VERSION/tmp 
-make $MAKEOPTS $PROGRAM OPTS="$OPTS -build-shared"
+make $MAKEOPTS $PROGRAM OPTS="$OPTS $BUILD_SHARED"
 
 MAKEEXIT=$?
 if [ $MAKEEXIT -eq 0 ]
