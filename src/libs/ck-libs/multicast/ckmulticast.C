@@ -142,13 +142,13 @@ void CkMulticastMgr::setSection(CkSectionCookie &_id, CkArrayID aid, CkArrayInde
   _id.aid = aid;
   _id.val = entry;		// allocate table for this section
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-  mCastGrp[CmiMyPe()].init(_id);
+  mCastGrp[CkMyPe()].init(_id);
 }
 
 void CkMulticastMgr::setSection(CkSectionCookie &id)
 {
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-  mCastGrp[CmiMyPe()].init(id);
+  mCastGrp[CkMyPe()].init(id);
 }
 
 void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
@@ -163,7 +163,7 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
   _id.aid = proxy.ckGetArrayID();
   _id.val = entry;		// allocate table for this section
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-  mCastGrp[CmiMyPe()].init(_id);
+  mCastGrp[CkMyPe()].init(_id);
 }
 
 void CkMulticastMgr::init(CkSectionCookie s)
@@ -184,15 +184,15 @@ void CkMulticastMgr::init(CkSectionCookie s)
   }
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   // sync call to seup
-  cookieMsg *cookiemsg = mCastGrp[CmiMyPe()].setup(msg);
+  cookieMsg *cookiemsg = mCastGrp[CkMyPe()].setup(msg);
   delete cookiemsg;
 
   // clear msg buffer
   while (!entry->msgBuf.isEmpty()) {
      multicastGrpMsg *newmsg = entry->msgBuf.deq();
-//CmiPrintf("[%d] release buffer %p %d\n", CmiMyPe(), newmsg, newmsg->ep);
+//CmiPrintf("[%d] release buffer %p %d\n", CkMyPe(), newmsg, newmsg->ep);
 //    newmsg->cookie.val = entry;
-    mCastGrp[CmiMyPe()].recvMsg(newmsg);
+    mCastGrp[CkMyPe()].recvMsg(newmsg);
   }
   // release reduction msgs
   releaseFutureReduceMsgs(entry);
@@ -225,7 +225,7 @@ void CkMulticastMgr::freeup(CkSectionCookie cookie)
       mp[s.pe].freeup(s);
     }
     // free cookie
-CmiPrintf("[%d] Free up on %p\n", CmiMyPe(), sect);
+CmiPrintf("[%d] Free up on %p\n", CkMyPe(), sect);
     mCastEntry *oldc= sect->oldc;
     delete sect;
     sect = oldc;
@@ -236,20 +236,20 @@ cookieMsg * CkMulticastMgr::setup(multicastSetupMsg *msg)
 {
   int i,j;
   mCastEntry *entry;
-  if (msg->parent.pe == CmiMyPe()) entry = (mCastEntry *)msg->rootSid.val; //sid.val;
+  if (msg->parent.pe == CkMyPe()) entry = (mCastEntry *)msg->rootSid.val; //sid.val;
   else entry = new mCastEntry;
-  entry->pe = CmiMyPe();
+  entry->pe = CkMyPe();
   entry->rootSid = msg->rootSid;
   entry->parentGrp = msg->parent;
   entry->red.redNo = msg->redNo;
-//CmiPrintf("[%d] setup: redNo: %d\n", CmiMyPe(), entry->red.redNo);
+//CmiPrintf("[%d] setup: redNo: %d\n", CkMyPe(), entry->red.redNo);
 
-  int numpes = CmiNumPes();
+  int numpes = CkNumPes();
   arrayIndexPosList *lists = new arrayIndexPosList[numpes];
   for (i=0; i<msg->nIdx; i++) {
     // msg->arrIdx[i] is local ?
     int lastKnown = msg->lastKnown[i];
-    if (lastKnown == CmiMyPe()) {
+    if (lastKnown == CkMyPe()) {
       entry->localElem.insertAtEnd(msg->arrIdx[i]);
     }
     else {
@@ -260,7 +260,7 @@ cookieMsg * CkMulticastMgr::setup(multicastSetupMsg *msg)
   int numchild = 0;
   int num = 0;
   for (i=0; i<numpes; i++) {
-    if (i==CmiMyPe()) continue;
+    if (i==CkMyPe()) continue;
     if (lists[i].length()) num++;
   }
   if (MAXMCASTCHILDREN <= 0) numchild = num;
@@ -270,7 +270,7 @@ cookieMsg * CkMulticastMgr::setup(multicastSetupMsg *msg)
     arrayIndexPosList *slots = new arrayIndexPosList[numchild];
     num = 0;
     for (i=0; i<numpes; i++) {
-      if (i==CmiMyPe()) continue;
+      if (i==CkMyPe()) continue;
       if (lists[i].length() == 0) continue;
       for (j=0; j<lists[i].length(); j++)
 	slots[num].push_back(lists[i][j]);
@@ -291,7 +291,7 @@ cookieMsg * CkMulticastMgr::setup(multicastSetupMsg *msg)
         m->lastKnown[j] = slots[i][j].pe;
       }
       int childroot = slots[i][0].pe;
-//CmiPrintf("[%d]:call set up %d numelem:%d\n", CmiMyPe(), childroot, n);
+//CmiPrintf("[%d]:call set up %d numelem:%d\n", CkMyPe(), childroot, n);
       cookieMsg *retmsg = mCastGrp[childroot].setup(m);
       entry->children.push_back(retmsg->cookie);
       delete retmsg;
@@ -328,7 +328,7 @@ void CkMulticastMgr::rebuild(CkSectionCookie &sectId)
 
   curCookie->setObsolete();
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-  mCastGrp[CmiMyPe()].reset(sectId);
+  mCastGrp[CkMyPe()].reset(sectId);
 }
 
 // mark old cookie spanning tree as old and 
@@ -341,7 +341,7 @@ void CkMulticastMgr::reset(CkSectionCookie s)
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   // get rid of old one
 //CmiPrintf("reset: oldc: %p\n", oldCookie);
-  int mype = CmiMyPe();
+  int mype = CkMyPe();
   mCastGrp[mype].teardown(CkSectionCookie(mype, oldCookie, 0));
 
   // build a new one
@@ -352,7 +352,7 @@ void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCook
 {
 //CmiPrintf("ArraySectionSend\n");
 
-  if (s.pe == CmiMyPe()) {
+  if (s.pe == CkMyPe()) {
     mCastEntry *entry = (mCastEntry *)s.val;   
     if (entry == NULL) {
       CmiAbort("Unknown array section, Did you forget to register the array section to CkMulticastMgr using setSection()?");
@@ -376,7 +376,7 @@ void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCook
   msg->_cookie = s;
   msg->ep = ep;
 
-  if (s.pe == CmiMyPe())
+  if (s.pe == CkMyPe())
     recvMsg(msg);
   else {
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
@@ -416,7 +416,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
     ap.ckSend((CkArrayMessage *)msg, msg->ep);
   }
   else {
-    CkAssert (entry->rootSid.pe == CmiMyPe());
+    CkAssert (entry->rootSid.pe == CkMyPe());
     delete msg;
   }
 
@@ -465,11 +465,11 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
   msg->flag = 1;   // from array element
   msg->redNo = id.redNo;
   msg->gcounter = 1;
-  msg->rebuilt = (id.pe == CmiMyPe())?0:1;
+  msg->rebuilt = (id.pe == CkMyPe())?0:1;
 
   id.redNo++;
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-//CmiPrintf("[%d] val: %d %p\n", CmiMyPe(), id.pe, id.val);
+//CmiPrintf("[%d] val: %d %p\n", CkMyPe(), id.pe, id.val);
   mCastGrp[id.pe].recvRedMsg(msg);
 }
 
@@ -485,8 +485,8 @@ void CkMulticastMgr::recvRedMsg(ReductionMsg *msg)
 
   if (entry->isObsolete()) {
       // send up to root
-//CmiPrintf("[%d] send to root %d\n", CmiMyPe(), entry->rootSid.pe);
-      if (entry->rootSid.pe == CmiMyPe()) {
+//CmiPrintf("[%d] send to root %d\n", CkMyPe(), entry->rootSid.pe);
+      if (entry->rootSid.pe == CkMyPe()) {
 	// I am root, set to the new cookie if there is
 	mCastEntry *newentry = entry->newc;
 	while (newentry && newentry->newc) newentry=newentry->newc;
@@ -503,19 +503,19 @@ void CkMulticastMgr::recvRedMsg(ReductionMsg *msg)
       }
   }
 
-//CmiPrintf("[%d] msg red:%d, %p, entry:%p redno:%d\n", CmiMyPe(), msg->redNo, msg, entry, entry->red.redNo);
+//CmiPrintf("[%d] msg red:%d, %p, entry:%p redno:%d\n", CkMyPe(), msg->redNo, msg, entry, entry->red.redNo);
   // old message come, ignore
   if (msg->redNo < entry->red.redNo) {
-//CmiPrintf("[%d] msg redNo:%d, %p, entry:%p redno:%d\n", CmiMyPe(), msg->redNo, msg, entry, entry->red.redNo);
+//CmiPrintf("[%d] msg redNo:%d, %p, entry:%p redno:%d\n", CkMyPe(), msg->redNo, msg, entry, entry->red.redNo);
     CmiAbort("Could never happen! \n");
   }
   if (entry->notReady() || msg->redNo > entry->red.redNo) {
-//CmiPrintf("[%d] Future redmsgs, buffered! msg:%p entry:%p %d\n", CmiMyPe(), msg, entry, entry->flag);
+//CmiPrintf("[%d] Future redmsgs, buffered! msg:%p entry:%p %d\n", CkMyPe(), msg, entry, entry->flag);
     entry->red.futureMsgs.push_back(msg);
     return;
   }
 
-//CmiPrintf("[%d] recvRedMsg %d ref:%d\n", CmiMyPe(), msg->flag, entry->red.redNo);
+//CmiPrintf("[%d] recvRedMsg %d ref:%d\n", CkMyPe(), msg->flag, entry->red.redNo);
   if (msg->flag == 1) entry->red.lcounter ++;
   if (msg->flag == 2) entry->red.ccounter ++;
   entry->red.gcounter += msg->gcounter;
@@ -526,8 +526,8 @@ void CkMulticastMgr::recvRedMsg(ReductionMsg *msg)
     CmiAbort("Reduction data are not of same length!");
   entry->red.msgs.push_back(msg);
 
-//if (CmiMyPe() == 0)
-//CmiPrintf("[%d] lcounter:%d-%d, ccounter:%d-%d, gcounter:%d-%d\n", CmiMyPe(),entry->red.lcounter,entry->localElem.length(), entry->red.ccounter, entry->children.length(), entry->red.gcounter, entry->allElem.length());
+//if (CkMyPe() == 0)
+//CmiPrintf("[%d] lcounter:%d-%d, ccounter:%d-%d, gcounter:%d-%d\n", CkMyPe(),entry->red.lcounter,entry->localElem.length(), entry->red.ccounter, entry->children.length(), entry->red.gcounter, entry->allElem.length());
   int currentTreeUp = 0;
   if (entry->red.lcounter == entry->localElem.length() && 
       entry->red.ccounter == entry->children.length())
@@ -572,14 +572,14 @@ void CkMulticastMgr::recvRedMsg(ReductionMsg *msg)
 //CmiPrintf("currentTreeUp: %d entry:%p oldc: %p\n", currentTreeUp, entry, entry->oldc);
       if (currentTreeUp && entry->oldc) {
 	// free old tree;
-	mCastGrp[CmiMyPe()].freeup(CkSectionCookie(id.pe, entry->oldc, 0));
+	mCastGrp[CkMyPe()].freeup(CkSectionCookie(id.pe, entry->oldc, 0));
 	entry->oldc = NULL;
       }
       if (rebuilt) entry->needRebuild = 1;
     }
     entry->incReduceNo();
 //CmiPrintf("advanced entry:%p redNo: %d\n", entry, entry->red.redNo);
-    if (updateReduceNo) mCastGrp[CmiMyPe()].updateRedNo(entry,entry->red.redNo);
+    if (updateReduceNo) mCastGrp[CkMyPe()].updateRedNo(entry,entry->red.redNo);
 
     // reset counters
     entry->red.lcounter = entry->red.ccounter = entry->red.gcounter = 0;
@@ -595,7 +595,7 @@ void CkMulticastMgr::releaseFutureReduceMsgs(mCastEntryPtr entry)
 
   for (int i=0; i<entry->red.futureMsgs.length(); i++) {
 //CmiPrintf("releaseFutureReduceMsgs: %p\n", entry->red.futureMsgs[i]);
-    mCastGrp[CmiMyPe()].recvRedMsg(entry->red.futureMsgs[i]);
+    mCastGrp[CkMyPe()].recvRedMsg(entry->red.futureMsgs[i]);
   }
   entry->red.futureMsgs.length() = 0;
 }
@@ -625,7 +625,7 @@ void CkMulticastMgr::releaseBufferedReduceMsgs(mCastEntryPtr entry)
 
 void CkMulticastMgr::updateRedNo(mCastEntryPtr entry, int red)
 {
-//CmiPrintf("[%d] updateRedNo entry:%p to %d\n", CmiMyPe(), entry, red);
+//CmiPrintf("[%d] updateRedNo entry:%p to %d\n", CkMyPe(), entry, red);
   entry->red.redNo = red;
 
   CProxy_CkMulticastMgr mp(thisgroup);
