@@ -265,8 +265,14 @@ double CmiTimer()
  *
  * CmiEnableAsyncIO
  *
- * Some possible versions of CmiEnableAsyncIO.  Not all machines use CmiEnableAsyncIO,
- * but it's common enough to belong in the common code.
+ * The net and tcp versions use a bunch of unix processes talking to each
+ * other via file descriptors.  We need for a signal SIGIO to be generated
+ * each time a message arrives, making it possible to write a signal
+ * handler to handle the messages.  The vast majority of unixes can,
+ * in fact, do this.  However, there isn't any standard for how this is
+ * supposed to be done, so each version of UNIX has a different set of
+ * calls to turn this signal on.  So, there is like one version here for
+ * every major brand of UNIX.
  *
  *****************************************************************************/
 
