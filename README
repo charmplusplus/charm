@@ -107,12 +107,14 @@ mpi-origin           Origin2000     MPI           SGI C++ compiler
 
 net-ppc-darwin       MacOS X        UDP           GNU C++ compiler
 net-linux-ia64       IA64 Linux     UDP/Myrinet   GNU compiler
+net-linux-amd64      Opteron Linux  UDP           GNU compiler
 net-irix             IRIX	    UDP           GNU compiler
 net-axp              Alpha          UDP           GNU compiler
 net-hp               HP-UX          UDP           GNU compiler
 mpi-linux            PC Linux       MPI           GNU compiler
 mpi-ppc-darwin       MacOS X        MPI           GNU C++ compiler
 mpi-linux-ia64       IA64 Linux     MPI           GNU compiler
+mpi-linux-amd64      Opteron Linux  MPI           GNU compiler
 mpi-axp              Alpha          MPI           GNU compiler
 mpi-linux-axp        Alpha Linux    MPI           GNU compiler
 origin2000           Origin2000  shared-mem       SGI C++ compiler
@@ -157,7 +159,8 @@ threads; "sim-" switches between processors and counts communications.
 3.)  Some operating systems have other options, such as:
 	"-x86"     For Solaris, use PC hardware (instead of Sun).
 	"-axp"     For Linux, use Alpha hardware (instead of PC).
-        "-ia64"    Use Itanium(tm) instructions (instead of x86)
+        "-ia64"    Use Itanium(tm) instructions (instead of x86).
+        "-amd64"   Use AMD Opteron instructions (instead of x86).
 
 Your Charm++ version is made by concatenating the options, e.g.:
 
