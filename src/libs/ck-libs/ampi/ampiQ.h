@@ -29,7 +29,7 @@ public:
   AmpiQ () {
     m_first  = 0;
     m_len    = 0;
-    m_blklen = 1024; // default initial size
+    m_blklen = 8; // default initial size
     m_data   = new T [m_blklen];
   }
 
