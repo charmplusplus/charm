@@ -1970,8 +1970,8 @@ FEM_Mesh::count &FEM_Mesh::getCount(int elType)
 		CkError("FEM Error! Bad element type %d!\n",elType);
 		CkAbort("FEM Error! Bad element type used!\n");
 	}
-	else /*elType<nElemTypes*/
-		return elem[elType];
+	/*else elType<nElemTypes*/
+	return elem[elType];
 }
 
 
@@ -1995,7 +1995,7 @@ void commRec::add(int chk,int idx)
 		CkAbort("FEM commRec::add> Tried to add absurd chunk number!\n");
 #endif
 	shares.setSize(n+1); //Grow slowly, to save memory
-	shares.push_back(share(chk,idx));
+	shares.push_back(commShare(chk,idx));
 }
 
 /*CommMap: map item number to commRec.  

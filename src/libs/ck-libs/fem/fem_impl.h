@@ -40,20 +40,21 @@ public:
 	virtual int no(int localNo) const {return localNo;}
 };
 
+/*Inner class used by commRec:*/
+class commShare {
+ public:
+  int chk;  //Local number of chunk we're shared with
+  int idx; //Our index in the comm. list for that chunk
+  commShare(int x=0) {chk=idx=-1;}
+  commShare(int c,int i) :chk(c), idx(i) {}
+  void pup(PUP::er &p) {p(chk); p(idx);}
+};
+PUPmarshall(commShare);
+
 /* List the chunks that share an item */
 class commRec {
 	int item; //Index of item we describe
-public:
-	class share {
-	public:
-		int chk;  //Local number of chunk we're shared with
-		int idx; //Our index in the comm. list for that chunk
-		share(int x=0) {chk=idx=-1;}
-		share(int c,int i) :chk(c), idx(i) {}
-		void pup(PUP::er &p) {p(chk); p(idx);}
-	};
-private:
-	CkPupVec<share> shares;
+	CkPupVec<commShare> shares;
 public:
 	commRec(int item_=-1);
 	~commRec();
@@ -71,8 +72,6 @@ public:
 	}
 	void add(int chk,int idx);
 };
-PUPmarshall(commRec::share);
-
 
 /* Map an item to its commRec (if any) */
 class commMap {
