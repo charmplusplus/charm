@@ -10,6 +10,12 @@
 */
 /*@{*/
 
+/*
+Status:
+  * support nonmigratable attrib
+  * does not support processor avail bitvector
+*/
+
 #include <charm++.h>
 
 #if CMK_LBDB_ON
@@ -45,17 +51,20 @@ CmiBool RandCentLB::QueryBalanceNow(int _step)
 
 void RandCentLB::work(CentralLB::LDStats* stats, int count)
 {
+  int nmigrated = 0;
   for(int obj=0; obj < stats->n_objs; obj++) {
       LDObjData &odata = stats->objData[obj];
       if (odata.migratable) {
 	const int dest = (int)(CrnDrand()*(count-1) + 0.5);
 	if (dest != stats->from_proc[obj]) {
-	  if (lb_debug)
-	    CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),obj,stats->from_proc[obj],dest);
+          //CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),obj,stats->from_proc[obj],dest);
+          nmigrated ++;
 	  stats->to_proc[obj] = dest;
         }
       }
   }
+  if (lb_debug)
+    CkPrintf("%s: %d objects migrated.\n", lbname, nmigrated);
 }
 
 #endif

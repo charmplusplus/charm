@@ -11,6 +11,10 @@
 /*@{*/
 
 /**
+ Status:
+  * does not support processor avail bitvector
+  * does not support nonmigratable attrib
+
   FIXME:  need to remove outlier object load. Outlier object can cause
   failure of partitioning and often causes: "too few objects to paritition"
   error.

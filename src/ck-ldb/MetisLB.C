@@ -133,6 +133,8 @@ LBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
   int k=0;
   for (i=0; i<stats->n_objs; i++) {
       LDObjData &odata = stats->objData[i];
+      if (!odata.migratable) 
+        CmiAbort("MetisLB doesnot dupport nonmigratable object.\n");
       /*
       origmap[odata[i].id.id[0]] = j;
       cputime[odata[i].id.id[0]] = odata[i].cpuTime;
