@@ -70,14 +70,12 @@ static void CldTokenHandler(CldToken tok)
 {
   CldProcInfo proc = CpvAccess(CldProc);
   CldToken pred, succ;
-  if (tok->pred) {
+  if (tok->msg) {
     tok->pred->succ = tok->succ;
     tok->succ->pred = tok->pred;
     proc->load --;
     CmiHandleMessage(tok->msg);
     CldNotify(proc->load);
-  } else {
-    /* CmiFree(tok->msg); */
   }
 }
 
@@ -122,11 +120,9 @@ void CldGetToken(void **msg)
   }
   tok->pred->succ = tok->succ;
   tok->succ->pred = tok->pred;
-  tok->succ = 0;
-  tok->pred = 0;
   proc->load --;
   *msg = tok->msg;
-  CmiReference(*msg);
+  tok->msg = 0;
 }
 
 void CldModuleGeneralInit()

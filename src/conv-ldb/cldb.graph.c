@@ -33,21 +33,21 @@ int CldAvgNeighborLoad()
 
 void CldRebalance();
 
+typedef struct loadmsg_s {
+  char header[CmiMsgHeaderSizeBytes];
+  int pe, load;
+} loadmsg;
+
 void CldSendLoad()
 {
-  int len, myPe = CmiMyPe(), myLoad = CldCountTokens(), i;
-  char *msg, *msgPos;
-  
-  len = CmiMsgHeaderSizeBytes + 2*sizeof(int);
-  msg = (char *)CmiAlloc(len);
-  msgPos = (msg + CmiMsgHeaderSizeBytes);
-  memcpy((void *)msgPos, &myPe, sizeof(int));
-  msgPos += sizeof(int);
-  memcpy((void *)msgPos, &myLoad, sizeof(int));
-  CmiSetHandler(msg, CpvAccess(CldLoadResponseHandlerIndex));
+  loadmsg msg;
+  int i;
+
+  msg.pe = CmiMyPe();
+  msg.load = CldCountTokens();
+  CmiSetHandler(&msg, CpvAccess(CldLoadResponseHandlerIndex));
   for (i=0; i<CpvAccess(numNeighbors); i++)
-    CmiSyncSend(CpvAccess(neighbors)[i].pe, len, msg);
-  CmiFree(msg);
+    CmiSyncSend(CpvAccess(neighbors)[i].pe, sizeof(loadmsg), &msg);
   CpvAccess(CldLoadBalanceMessages) += CpvAccess(numNeighbors);
 }
 
@@ -63,7 +63,7 @@ void CldBalance()
   overload = CldCountTokens() - CpvAccess(CldAvgLoad);
   
   if ((float)overload > (THRESHOLD/100.0 * (float)CpvAccess(CldAvgLoad))) {
-    for (i=0; i<CpvAccess(numNeighbors); i++)
+    for (i=0; i<CpvAccess(numNeighbors); i++) {
       if (CpvAccess(neighbors)[i].load < CpvAccess(CldAvgLoad)) {
 	totalUnderAvg += CpvAccess(CldAvgLoad)-CpvAccess(neighbors)[i].load;
 	if (CpvAccess(CldAvgLoad) - CpvAccess(neighbors)[i].load 
@@ -71,6 +71,7 @@ void CldBalance()
 	  maxUnderAvg = CpvAccess(CldAvgLoad) - CpvAccess(neighbors)[i].load;
 	numUnderAvg++;
       }
+    }
     if (numUnderAvg > 0) {
       msgs = (void **)calloc(maxUnderAvg, sizeof(void *));
       msgSizes = (int *)calloc(maxUnderAvg, sizeof(int));
@@ -101,6 +102,9 @@ void CldBalance()
 			    msgs);
 	    CpvAccess(CldRelocatedMessages) += numSent;
 	    CpvAccess(CldMessageChunks)++;
+            for(i=0;i<numSent;i++) {
+              CmiFree(msgs[i]);
+            }
 	  }
 	}
       }
@@ -117,38 +121,34 @@ void CldRebalance()
   CcdCallFnAfter((CcdVoidFn)CldBalance, NULL, PERIOD);
 }
 
-void CldLoadResponseHandler(char *msg)
+void CldLoadResponseHandler(loadmsg *msg)
 {
-  int load, pe, i=0;
+  int i;
 
-  CmiGrabBuffer((void **)&msg);
-
-  memcpy(&pe, msg + CmiMsgHeaderSizeBytes, sizeof(int));
-  memcpy(&load, msg + CmiMsgHeaderSizeBytes + sizeof(int), sizeof(int));
-
-  while (i<CpvAccess(numNeighbors)) {
-    if (CpvAccess(neighbors)[i].pe == pe) {
-      CpvAccess(neighbors)[i].load = load;
+  for(i=0;i<CpvAccess(numNeighbors);i++) {
+    if (CpvAccess(neighbors)[i].pe == msg->pe) {
+      CpvAccess(neighbors)[i].load = msg->load;
       break;
     }
-    i++;
   }
 }	
 
 void CldRedo();
   
+typedef struct requestmsg_s {
+  char header[CmiMsgHeaderSizeBytes];
+  int pe;
+} requestmsg;
+
 void CldRequestTokens()
 {
-  int len, myPe = CmiMyPe(), i;
-  char *msg, *msgPos;
-  
-  len = CmiMsgHeaderSizeBytes + sizeof(int);
-  msg = (char *)CmiAlloc(len);
-  msgPos = (msg + CmiMsgHeaderSizeBytes);
-  memcpy((void *)msgPos, &myPe, sizeof(int));
-  CmiSetHandler(msg, CpvAccess(CldRequestResponseHandlerIndex));
+  requestmsg msg;
+  int i;
+
+  msg.pe = CmiMyPe();
+  CmiSetHandler(&msg, CpvAccess(CldRequestResponseHandlerIndex));
   for (i=0; i<CpvAccess(numNeighbors); i++) 
-    CmiSyncSend(CpvAccess(neighbors)[i].pe, len, msg);
+    CmiSyncSend(CpvAccess(neighbors)[i].pe, sizeof(requestmsg), &msg);
   CpvAccess(CldLoadBalanceMessages) += CpvAccess(numNeighbors);
   CcdCallFnAfter((CcdVoidFn)CldRedo, NULL, PERIODE);
 }
@@ -159,15 +159,14 @@ void CldRedo()
     CldRequestTokens();
 }
  
-void CldRequestResponseHandler(char *msg)
+void CldRequestResponseHandler(requestmsg *msg)
 {
   int pe, numToSend, numSent, j, len, queueing, priobits, *msgSizes;
   void **msgs;
   unsigned int *prioptr;
   CldInfoFn ifn; CldPackFn pfn;
 
-  CmiGrabBuffer((void **)&msg);
-  memcpy(&pe, msg + CmiMsgHeaderSizeBytes, sizeof(int));
+  pe = msg->pe;
 
   numToSend = CldCountTokens() / (CpvAccess(numNeighbors) + 1);
 
@@ -191,6 +190,9 @@ void CldRequestResponseHandler(char *msg)
       CmiMultipleSend(pe, numSent, msgSizes, msgs);
       CpvAccess(CldRelocatedMessages) += numSent;
       CpvAccess(CldMessageChunks)++;
+      for(j=0;j<numSent;j++) {
+        CmiFree(msgs[j]);
+      }
     }
     free(msgs);
     free(msgSizes);
@@ -222,22 +224,15 @@ void CldEnqueue(int pe, void *msg, int infofn)
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
 
-  if (CmiGetHandler(msg) >= CpvAccess(CmiHandlerMax)) *((int*)0)=0;
-
-  if (pe == CLD_ANYWHERE)
-    {
+  if (pe == CLD_ANYWHERE) {
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
       CmiSetInfo(msg,infofn);
       CldPutToken(msg); 
-    } 
-  else if (pe == CmiMyPe())
-    {
+  } else if (pe == CmiMyPe()) {
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
       CmiSetInfo(msg,infofn);
       CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
-    }
-  else
-    {
+  } else {
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
       if (pfn) {
 	pfn(&msg);
@@ -250,7 +245,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
       else if (pe==CLD_BROADCAST_ALL)
 	CmiSyncBroadcastAllAndFree(len, msg);
       else CmiSyncSendAndFree(pe, len, msg);
-    }
+  }
 }
 
 void CldNotify(int load)
@@ -266,20 +261,18 @@ void CldReadNeighborData()
   int i;
   
   sprintf(filename, "graph%d/graph%d", CmiNumPes(), CmiMyPe());
-  if ((fp = fopen(filename, "r")) == 0) 
-    {
+  if ((fp = fopen(filename, "r")) == 0) {
       CmiError("Error opening graph init file on PE: %d\n", CmiMyPe());
       return;
-    }
+  }
   fscanf(fp, "%d", &CpvAccess(numNeighbors));
   CpvAccess(neighbors) = 
     (struct CldNeighborData *)calloc(CpvAccess(numNeighbors), 
 				     sizeof(struct CldNeighborData));
-  for (i=0; i<CpvAccess(numNeighbors); i++)
-    {
+  for (i=0; i<CpvAccess(numNeighbors); i++) {
       fscanf(fp, "%d", &(CpvAccess(neighbors)[i].pe));
       CpvAccess(neighbors)[i].load = 0;
-    }
+  }
   fclose(fp);
 }
 
