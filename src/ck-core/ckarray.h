@@ -407,6 +407,9 @@ private:
   int numInitial;//Number of 1D initial array elements (backward-compatability)
   CmiBool isInserting;//Are we currently inserting elements?
 
+  //Deliver this message to this array element
+  void invokeEntry(ArrayElement *el,int entryIdx,void *msg);
+
   //Allocate a new, uninitialized array element of the given (chare) type
   // and owning the given index.
   ArrayElement *allocateElement(int type,const CkArrayIndex &ind);
