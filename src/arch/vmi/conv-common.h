@@ -10,7 +10,8 @@
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 #define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0
 
-#define CMK_PERSISTENT_COMM                                1
+//#define CMK_PERSISTENT_COMM                                1
+#define CMK_PERSISTENT_COMM                                0
 
 #if CMK_PERSISTENT_COMM
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
@@ -21,8 +22,8 @@
 #else
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
-#define CMK_MULTICAST_LIST_USE_COMMON_CODE                 0
-#define CMK_MULTICAST_LIST_USE_SPECIAL_CODE                1
+#define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
+#define CMK_MULTICAST_LIST_USE_SPECIAL_CODE                0
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 #endif
 
@@ -73,16 +74,16 @@
 #define CMK_SHARED_VARS_SUN_THREADS                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
-#define CMK_THREADS_USE_CONTEXT                            1
+#define CMK_THREADS_COPY_STACK                             0
+#define CMK_THREADS_USE_CONTEXT                            0
 #define CMK_THREADS_USE_PTHREADS                           0
 #define CMK_THREADS_ARE_WIN32_FIBERS                       0
+
+#define CMK_THREADS_REQUIRE_NO_CPV                         0
 
 #define CMK_SIGNAL_NOT_NEEDED                              0
 #define CMK_SIGNAL_USE_SIGACTION                           0
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              1
-
-#define CMK_THREADS_REQUIRE_NO_CPV                         0
-#define CMK_THREADS_COPY_STACK                             0
 
 #define CMK_TIMER_USE_RDTSC                                1
 #define CMK_TIMER_USE_GETRUSAGE                            0

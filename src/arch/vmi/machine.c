@@ -1,8 +1,23 @@
 /**************************************************************************
 ** Greg Koenig (koenig@uiuc.edu)
 **
+** If you are building this software with glibc <= 2.2.92, you must do the
+** following two things in order to ensure that you don't get segfaults
+** from Charm threads:
+**
+** 1.  Build VMI 2.0 with the option --enable-dlmalloc
+**
+** 2.  Go into Charm source code src/QuickThreads/md and replace all
+** occurrences of "longjmp" with "__libc_longjmp"
+**
+***************************************************************************
+**
 ** EFFICIENT DATA STRUCTURES
 **    * pass index as context instead of pointers
+**      (PVMI_REMOTE_BUFFER lctxt is a UINT64 - good!)
+**
+**    * can eliminate the RDMA Put Context by making a cacheentry field
+**      in RDMA broad and putting the last cacheentry in there instead
 **
 **    * fix persistent handles so they send data in chunks
 **      (probably need a "number of chunks" field in rdma/persistent
@@ -27,6 +42,8 @@
 **
 ** CONVERSE VECTOR SEND ROUTINES
 **    * not actually invoked by Charm++, so impact neglegible
+**
+** VMI HARDWARE MULTICAST SUPPORT
 */
 
 #include "machine.h"
@@ -755,6 +772,7 @@ void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT conn, UINT32 rdmasz,
 
     CdsFifo_Enqueue (CpvAccess (CMI_VMI_RemoteQueue), handle->msg);
 
+#if CMK_PERSISTENT_COMM
     if (handle->data.receive.receive_handle_type == CMI_VMI_RECEIVE_HANDLE_TYPE_PERSISTENT) {
       msg2 = (char *) CmiAlloc (handle->msgsize);
 
@@ -778,6 +796,9 @@ void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT conn, UINT32 rdmasz,
 	   (UINT32) handle->index);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
     } else {
+#else    /* CMK_PERSISTENT_COMM */
+    {
+#endif   /* CMK_PERSISTENT_COMM */
       status = VMI_Pool_Deallocate_Buffer (CMI_VMI_RDMACacheEntry_Pool,
 	   handle->data.receive.data.persistent.cacheentry);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_Pool_Deallocate_Buffer()");
@@ -1605,6 +1626,7 @@ void CMI_VMI_Send_Spanning_Children (int msgsize, char *msg)
     // If childcount is 0 here, we could exit immediately.
 
     handle.refcount = childcount + 1;
+    CMI_VMI_AsyncMsgCount += childcount;
 
     startrank = CMI_BROADCAST_ROOT (msg) - 1;
     for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
@@ -2246,6 +2268,8 @@ void CmiSyncSendFn (int destrank, int msgsize, char *msg)
     handle.data.send.send_handle_type = CMI_VMI_SEND_HANDLE_TYPE_RDMA;
     handle.data.send.data.rdma.bytes_sent = 0;
 
+    CMI_VMI_AsyncMsgCount += 1;
+
     CmiSetHandler (&rendezvous_msg, CMI_VMI_RDMA_Rendezvous_Handler_ID);
     rendezvous_msg.rank = _Cmi_mype;
     rendezvous_msg.msgsize = msgsize;
@@ -2512,6 +2536,7 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
     childcount = CMI_VMI_Spanning_Children_Count (msg);
 
     handle.refcount = childcount + 1;
+    CMI_VMI_AsyncMsgCount += childcount;
 
     startrank = CMI_BROADCAST_ROOT (msg) - 1;
     for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
@@ -2537,6 +2562,7 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
     }
 #else   /* CMK_BROADCAST_SPANNING_TREE */
     handle.refcount = _Cmi_numpes;
+    CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
 
     for (i = 0; i < _Cmi_mype; i++) {
       status = VMI_Stream_Send ((&CMI_VMI_Procs[i])->connection, bufHandles,
@@ -2593,6 +2619,7 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
     childcount = CMI_VMI_Spanning_Children_Count (msg);
 
     handle.refcount = childcount + 1;
+    CMI_VMI_AsyncMsgCount += childcount;
 
     startrank = CMI_BROADCAST_ROOT (msg) - 1;
     for (i = 1; i <= CMI_VMI_BROADCAST_SPANNING_FACTOR; i++) {
@@ -2617,6 +2644,7 @@ void CmiSyncBroadcastFn (int msgsize, char *msg)
     }
 #else   /* CMK_BROADCAST_SPANNING_TREE */
     handle.refcount = _Cmi_numpes;
+    CMI_VMI_AsyncMsgCount += (_Cmi_numpes - 1);
 
     for (i = 0; i < _Cmi_mype; i++) {
       status = VMI_Stream_Send_Inline ((&CMI_VMI_Procs[i])->connection,

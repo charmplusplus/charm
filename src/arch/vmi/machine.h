@@ -24,7 +24,7 @@
 
 
 
-#define CMI_VMI_MAX_HANDLES 1000
+#define CMI_VMI_MAX_HANDLES 100
 
 
 /* This is the number of seconds to wait for connection setup. */
