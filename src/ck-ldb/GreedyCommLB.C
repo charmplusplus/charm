@@ -14,6 +14,7 @@
 Status:
   * support processor avail bitvector
   * support nonmigratable attrib
+  * support background load
 
   rewritten by Gengbin Zheng to use the new load balancer database and hash table;
   modified to recognize the nonmigratable attrib of an object 
@@ -162,14 +163,14 @@ void GreedyCommLB::work(CentralLB::LDStats* _stats, int count)
     stats->makeCommHash();
     
     alloc_array = new double *[count+1];
-    
-    object_graph = new graph[nobj];
-
     for(pe=0;pe <= count;pe++)
 	alloc_array[pe] = new double[nobj +1];
 
+    object_graph = new graph[nobj];
+
     init_data(alloc_array,object_graph,npe,nobj);
 
+    // assign communication graph
     for(com =0; com< stats->n_comm;com++) {
          int xcoord=0,ycoord=0;
 	 LDCommData &commData = stats->commData[com];
@@ -183,6 +184,11 @@ void GreedyCommLB::work(CentralLB::LDStats* _stats, int count)
 		add_graph(xcoord,ycoord,commData.bytes, commData.messages);
 	 }
     }
+
+    // assign background load
+    if (!_lb_args.ignoreBgLoad())
+      for(pe=0;pe <= count;pe++)
+          alloc_array[pe][nobj] = stats->procs[pe].bg_walltime;
 
     // only build heap with migratable objects, 
     // mapping nonmigratable objects to the same processors
