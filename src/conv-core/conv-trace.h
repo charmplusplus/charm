@@ -26,6 +26,7 @@ int  traceRegisterUserEvent(const char*);
 void traceClose(void);
 void traceBegin(void);
 void traceEnd(void);
+void traceWriteSts(void);
 
 #ifndef CMK_OPTIMIZE
 CpvExtern(int, traceOn);
