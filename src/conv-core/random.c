@@ -79,7 +79,7 @@ void CrnInitStream(CrnStream *genptr, int seed, int type)
     ((INIT_SEED0^gennum)>>22 | ((INIT_SEED1 ^ (unsigned)seed<<1)&0xfff)<<10);
   genptr->state[2] = (double) ((INIT_SEED1 ^ (unsigned)seed<<1)>>12);
 
-  for(i=0; i<(1000+gennum); i++)
+  for(i=0; i<1000; i++)
     CrnDouble(genptr);
   CpvAccess(nstreams)++;
 } 
