@@ -780,7 +780,7 @@ void CentralLB::readStatsMsgs(const char* filename)
   pd((char *)&machInfo, sizeof(machInfo));	// read machine info
   PUP::xlater p(machInfo, pd);
 
-  if (_lb_args.lbversion() >= 1) {
+  if (_lb_args.lbversion() > 1) {
     p|_lb_args.lbversion();		// write version number
     CkPrintf("LB> File version detected: %d\n", _lb_args.lbversion());
     CmiAssert(_lb_args.lbversion() <= LB_FORMAT_VERSION);
