@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-06-29 21:49:07  narain
+ * Revision 2.4  1995-07-12 16:28:45  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.3  1995/06/29  21:49:07  narain
  * Changed member of MSG_STRUCT to packfn
  *
  * Revision 2.2  1995/06/14  19:38:29  gursoy
@@ -42,54 +45,59 @@
 #define _CK_MEMORY_MANAGER
 #include "chare.h"
 #undef _CK_MEMORY_MANAGER
+
+#define align(var) ((var+sizeof(int)-1)&(~(sizeof(int)-1)))
  
 #include "trans_defs.h"
 #include "trans_decls.h"
 
-void *CkAllocPackBuffer(msg, size)
+void *CkAllocPackBuffer(msg, bytespacked)
 char *msg;
-int size;
+unsigned int bytespacked;
 {
-	int i;
-	int prio_size;
-	int pack_size;
-	int headersize;
-	ENVELOPE *envelope, *pack_envelope;
-
-    pack_size = ((size + 3) & ~3);
-    prio_size = MSG_PRIORITY_SIZE(msg);
-    pack_envelope = (ENVELOPE *) 
-	CmiAlloc(TOTAL_MSG_SIZE(pack_size, prio_size));
-
-	/*** Now we need to copy the envelope  ***/
-	envelope = ENVELOPE_UPTR(msg); 
-	headersize = (msg - (char *) envelope);
-	memcpy( ((char *) pack_envelope), ((char *) envelope), headersize);
-
-	/**************** Converted to memcpy (Amitabh) ************/
-	/** for (i=0; i<headersize; i++) **/  
-	/** ((char *) pack_envelope)[i] = ((char *) envelope)[i]; **/
-	/**************** Converted to memcpy (Amitabh) ************/
-
-	/*** Now we insert the priority field ***/
-    INSERT_PRIO_OFFSET(pack_envelope, pack_size, prio_size);
-	COPY_PRIORITY(envelope, pack_envelope);
-    return( (void *) USER_MSG_PTR(pack_envelope));
+  int i;
+  unsigned int priowords;
+  unsigned int priobytes;
+  unsigned int headersize;
+  unsigned int totalsize;
+  char *ptr1, *ptr2; int size1, size2, size;
+  ENVELOPE *envelope, *pack_envelope;
+  
+  bytespacked = align(bytespacked);
+  priowords = MSG_PRIOSIZE_WORDS(msg);
+  priobytes = priowords * sizeof(int);
+  totalsize = TOTAL_MSG_SIZE(bytespacked, priowords);
+  pack_envelope = (ENVELOPE *)CmiAlloc(totalsize);
+  
+  /*** Now we need to copy the envelope, then adjust totalsize  ***/
+  envelope = ENVELOPE_UPTR(msg); 
+  headersize = (msg - (char *) envelope);
+  memcpy( ((char *) pack_envelope), ((char *) envelope), headersize);
+  SetEnv_TotalSize_packid(pack_envelope,totalsize,GetEnv_packid(envelope));
+  
+  /*** Now we copy the priority field ***/
+  ptr1 = GetEnv_prioend(envelope);
+  ptr2 = GetEnv_prioend(pack_envelope);
+  memcpy(ptr2-priobytes, ptr1-priobytes, priobytes);
+  return((void *)USER_MSG_PTR(pack_envelope));
 }
 
 
-void *CkAllocMsg(request)
-int request;
+void *CkAllocMsg(msgbytes)
+unsigned int msgbytes;
 {
-    ENVELOPE *envptr;
-
-    request = ((request + 3) & ~3);
-    envptr = (ENVELOPE *) CmiAlloc(TOTAL_MSG_SIZE(request, 0));
-    CkMemError(envptr);
-    SetEnv_isPACKED(envptr, NO_PACK);
-    SetEnv_packid(envptr, 0);
-    INSERT_PRIO_OFFSET(envptr, request, 0);
-    return( (void *) USER_MSG_PTR(envptr));
+  unsigned int totalsize;
+  ENVELOPE *envptr;
+  
+  msgbytes = align(msgbytes);
+  totalsize = TOTAL_MSG_SIZE(msgbytes, 0);
+  envptr = (ENVELOPE *)CmiAlloc(totalsize);
+  CkMemError(envptr);
+  SetEnv_isPACKED(envptr, NO_PACK);
+  SetEnv_TotalSize_packid(envptr, totalsize, 0);
+  SetEnv_priosize(envptr, 0);
+  SetEnv_queueing(envptr, CK_QUEUEING_FIFO);
+  return((void *)USER_MSG_PTR(envptr));
 }
 
 
@@ -111,13 +119,13 @@ char *ptr;
 ENVELOPE *CkCopyEnv(env)
 ENVELOPE *env ;
 {
-        int size = CmiSize(env) ;   /* size of env in bytes */
-        ENVELOPE *newenv ;
-
-        newenv = (ENVELOPE *) CmiAlloc(size) ;
-        memcpy(newenv, env, size) ;
-
-        return(newenv) ;
+  int size = GetEnv_TotalSize(env) ;   /* size of env in bytes */
+  ENVELOPE *newenv ;
+  
+  newenv = (ENVELOPE *) CmiAlloc(size) ;
+  memcpy(newenv, env, size) ;
+  
+  return(newenv) ;
 }
 
 /* Makes a copy of the entire system message (Envelope, priorities, user 
@@ -126,18 +134,18 @@ ENVELOPE *env ;
 void *CkCopyMsg(sourceUptr)
 char *sourceUptr ;
 {
-    int size ;
-    ENVELOPE *env, *newenv;
-
-    env = ENVELOPE_UPTR(sourceUptr) ;
-    
-    PACK(env);
-    size = CmiSize(env) ;   /* size of env in bytes */
-    newenv = (ENVELOPE *) CmiAlloc(size) ;
-    memcpy(newenv, env, size) ;
-    UNPACK(env);
-    UNPACK(newenv);
-    return((void *)USER_MSG_PTR(newenv)) ;
+  int size ;
+  ENVELOPE *env, *newenv;
+  
+  env = ENVELOPE_UPTR(sourceUptr) ;
+  
+  PACK(env);
+  size = GetEnv_TotalSize(env) ;   /* size of env in bytes */
+  newenv = (ENVELOPE *) CmiAlloc(size) ;
+  memcpy(newenv, env, size) ;
+  UNPACK(env);
+  UNPACK(newenv);
+  return((void *)USER_MSG_PTR(newenv)) ;
 }
 
 
@@ -167,40 +175,35 @@ allocfn(id, msgsize, sizearray, prio)
 
 /*****************************************************************/
 
-void * GenericCkAlloc(msgno, msgsize, prio_size)
+void *GenericCkAlloc(msgno, msgbytes, priobits)
 int msgno;
-int msgsize;
-int prio_size;
+unsigned int msgbytes;
+unsigned int priobits;
 {
-	ENVELOPE *env;
+    unsigned int msgwords;
+    unsigned int priowords;
+    unsigned int totalsize;
+    ENVELOPE *env;
 
-    /* msgsize is in bytes since theres a sizeof(MsgType) done by caller */
-    msgsize = ((msgsize + 3) & ~3);
-
-    /* priosize is in words */
-    prio_size *= 4 ;
-/*    prio_size = ((prio_size + 3) & ~3);  this was a bug : Sanjeev 3/11/95 */
-
-    env = (ENVELOPE *) CmiAlloc(TOTAL_MSG_SIZE(msgsize, prio_size));
+    msgbytes = align(msgbytes);
+    priowords = (priobits+(sizeof(int)*8)-1)/(sizeof(int)*8);
+    totalsize = TOTAL_MSG_SIZE(msgbytes, priowords);
+    env = (ENVELOPE *)CmiAlloc(totalsize);
     CkMemError(env);
 
-    INSERT_PRIO_OFFSET(env, msgsize, prio_size);
-
-    SetEnv_isPACKED(env, NO_PACK);
-    SetEnv_packid(env, 0);
+    SetEnv_priosize(env, priobits);
+    SetEnv_queueing(env, CK_QUEUEING_BFIFO);
 
     if (CsvAccess(MsgToStructTable)[msgno].packfn != NULL)
-#ifdef SHARED
-	{	
-	   env->needsPack = UNPACKED;
-       env->packid = msgno;
-	}
-#else
     {
         SetEnv_isPACKED(env, UNPACKED);
-        SetEnv_packid(env, msgno);
+        SetEnv_TotalSize_packid(env, totalsize, msgno);
     }
-#endif
-    return( (void *) USER_MSG_PTR(env));
+    else
+    {
+        SetEnv_isPACKED(env, NO_PACK);
+        SetEnv_TotalSize_packid(env, totalsize, 0);
+    }
+    return ((void *)USER_MSG_PTR(env));
 }
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-06 22:42:11  narain
+ * Revision 2.4  1995-07-12 16:28:45  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.3  1995/07/06  22:42:11  narain
  * Changes for LDB interface revision
  *
  * Revision 2.2  1995/06/29  21:38:00  narain
@@ -394,7 +397,7 @@ int DestPe;
 		if (CmiNumPe() > 1) 
 		  Ldb_NewSeed_FromLocal(env, LDB_ELEMENT_PTR(env), CkLdbSend);
 		else 
-		  CsdEnqueue(env);
+		  CkEnqueue(env);
 	      }
 	else
 	{
@@ -461,7 +464,7 @@ ChareIDType * pChareID;
 		{
 			trace_creation(VidMsg, GetEnv_vidEP(env), env);
 		        CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
-			CsdEnqueue(env);
+			CkEnqueue(env);
 		}
 		else
 		{
@@ -473,24 +476,6 @@ ChareIDType * pChareID;
 
 	}
 }
-
-
-
-
-int CkPrioritySize(priority, branch_bits)
-PVECTOR	*priority;
-int	branch_bits;
-{
-	int vectorLength;
-
-	vectorLength = ((*priority) >> 24) + branch_bits;
-
-	if ( vectorLength > 24 )
-		return( (((vectorLength - 25) >> 5) + 2) << 2 );
-	else
-		return (4);
-}
-
 
 
 /*****************************************************************/
@@ -518,12 +503,24 @@ int number;
 }
 
 
+void CkSetQueueing(usrptr, kind)
+void *usrptr;
+int kind;
+{
+  SetEnv_queueing(ENVELOPE_UPTR(usrptr), kind);
+}
+
 void *CkPriorityPtr(usrptr)
 void *usrptr;
 {
-	return PRIORITY_UPTR(usrptr);
+  return PRIORITY_UPTR(usrptr);
 }
 
+int   CkPriorityBits(usrptr)
+void *usrptr;
+{
+  return GetEnv_priosize(ENVELOPE_UPTR(usrptr));
+}
 
 /*****************************************************************************
  * CkLdbSend is a function that is passed to the Ldb strategy to send out a
@@ -539,4 +536,29 @@ void CkLdbSend(msgst, destPe)
   trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env); 
   SetEnv_destPE(env,destPe); 
   CkSend(destPe, env); 
+}
+
+CkEnqueue(env)
+void *env;
+{
+  switch (GetEnv_queueing(env)) {
+  case CK_QUEUEING_BFIFO: 
+    CsdEnqueueBFifo(env, GetEnv_priosize(env), GetEnv_priobgn(env));
+    break;
+  case CK_QUEUEING_BLIFO:
+    CsdEnqueueBLifo(env, GetEnv_priosize(env), GetEnv_priobgn(env));
+    break;
+  case CK_QUEUEING_IFIFO:
+    CsdEnqueueIFifo(env, *(int *)GetEnv_priobgn(env));
+    break;
+  case CK_QUEUEING_ILIFO:
+    CsdEnqueueILifo(env, *(int *)GetEnv_priobgn(env));
+    break;
+  case CK_QUEUEING_FIFO:
+    CsdEnqueueFifo(env);
+    break;
+  case CK_QUEUEING_LIFO:
+    CsdEnqueueLifo(env);
+    break;
+  }
 }

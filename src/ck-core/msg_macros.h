@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-29 22:35:57  narain
+ * Revision 2.3  1995-07-12 16:28:45  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.2  1995/06/29  22:35:57  narain
  * Changed cast of LDB_ELEMENT_UPTR to (void *) from (LDB_ELEMENT_PTR *)
  *
  * Revision 2.1  1995/06/08  17:07:12  gursoy
@@ -87,7 +90,7 @@ CpvExtern(int, _CK_Usr_To_Ldb);
 
 
 
-#define TOTAL_MSG_SIZE(usrsize, priosize) (CpvAccess(HEADER_SIZE) + priosize + usrsize)
+#define TOTAL_MSG_SIZE(usrsize, priosize) (CpvAccess(HEADER_SIZE) + (priosize*sizeof(int)) + usrsize)
 #define CHARRED(x) ((char *) (x))
 
 
@@ -96,40 +99,10 @@ CpvExtern(int, _CK_Usr_To_Ldb);
 /* The following macros assume that -env- is an ENVELOPE pointer */
 /**********************************************************************/
 #define LDB_ELEMENT_PTR(env)  \
-	(void *) (CHARRED(env) + _CK_Env_To_Ldb)
+    (void *) (CHARRED(env) + _CK_Env_To_Ldb)
 
 #define USER_MSG_PTR(env)\
     (CHARRED(env) + CpvAccess(_CK_Env_To_Usr))
-
-#define COPY_PRIORITY(env1, env2) {\
-        if ( GetEnv_PrioType(env1) == 0 ) { \
-                SetEnv_PrioType(env2,0) ; \
-                SetEnv_IntegerPrio(env2, GetEnv_IntegerPrio(env1)) ; \
-        } \
-        else { \
-                char *ptr1, *ptr2; \
-                SetEnv_PrioType(env2,1) ; \
-                ptr1 = (char *)env1 + *((int *)GetEnv_PrioOffset(env1));\
-                ptr2 = (char *)env2 + *((int *)GetEnv_PrioOffset(env2));\
-                memcpy( ((char *) ptr2), ((char *) ptr1), \
-                                GetEnv_PrioSize(env1) );   \
-        } \
-}
- 
-#define MSG_PRIORITY_PTR(env, priorityptr) GetEnv_PriorityPtr(env,priorityptr)
- 
-#define INSERT_PRIO_OFFSET(env, usrsize, priosize)\
-{\
-    if ( priosize > 4 ) { \
-        SetEnv_PrioType(env,1) ; \
-        SetEnv_PrioOffset(env,usrsize + CpvAccess(_CK_Env_To_Usr)) ; \
-        SetEnv_PrioSize(env,priosize) ; \
-    } \
-    else \
-        SetEnv_PrioType(env,0) ; \
-}
-
-
 
 /**********************************************************************/
 /* the following macros assume that -ldbptr- is a LDB_ELEMENT pointer */
@@ -141,7 +114,6 @@ CpvExtern(int, _CK_Usr_To_Ldb);
 #define USR_MSG_LDBPTR(ldbptr) \
 	(CHARRED(ldbptr) + CpvAccess(_CK_Ldb_To_Usr))
 
-
 /**********************************************************************/
 /* the following macros assume that "usrptr" is a pointer to a user defined 
    message */
@@ -150,12 +122,18 @@ CpvExtern(int, _CK_Usr_To_Ldb);
 	(ENVELOPE *) (CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Env))
 
 #define LDB_UPTR(usrptr)\
-    (LDB_ELEMENT *) (CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Ldb))
+        (LDB_ELEMENT *) (CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Ldb))
 
 #define PRIORITY_UPTR(usrptr) \
-    (PVECTOR *) ( ReturnEnv_PriorityPtr(CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Env)) )
+        (GetEnv_priobgn(CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Env)))
 
-#define MSG_PRIORITY_SIZE(usrptr) \
-		GetEnv_PrioSize(CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Env))
+#define MSG_PRIOSIZE_BITS(usrptr) \
+        GetEnv_priosize(CHARRED(usrptr) + CpvAccess(_CK_Usr_To_Env))
+
+#define MSG_PRIOSIZE_WORDS(usrptr) \
+        ((MSG_PRIOSIZE_BITS(usrptr)+(sizeof(int)*8)-1)/(sizeof(int)*8))
+
+#define MSG_PRIOSIZE_BYTES(usrptr) \
+        (MSG_PRIOSIZE_WORDS(usrptr)*sizeof(int))
 
 #endif

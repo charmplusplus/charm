@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-06-29 21:31:10  narain
+ * Revision 2.4  1995-07-12 16:28:45  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.3  1995/06/29  21:31:10  narain
  * Took out the LdbBocNum macro and made it a Extern in globals.h
  *
  * Revision 2.2  1995/06/20  14:50:24  gursoy
@@ -43,6 +46,14 @@
 /* Constant values for destPE in envelope */
 #define ALL_NODES           (-1)
 #define ALL_NODES_EXCEPT_ME (-2)
+
+/* Constant values for queueing in envelope */
+#define CK_QUEUEING_BFIFO 0
+#define CK_QUEUEING_BLIFO 1
+#define CK_QUEUEING_IFIFO 2
+#define CK_QUEUEING_ILIFO 3
+#define CK_QUEUEING_FIFO 4
+#define CK_QUEUEING_LIFO 5
 
 /* define the System BocNum's corresponding to system BOCs
    e.g LoadBalancing, Quiescence, Also Increment the NumSysBoc

@@ -539,7 +539,7 @@ endif
 
 # Check for valid choice of QUEUE
 
-if ($?QUEUE == 0) set QUEUE=fifo
+if ($?QUEUE == 0) set QUEUE=super
 
 if (! -e $CHARMLIB/libconv-qs-$QUEUE.o) then
    echo "charmc: Unknown queueing strategy $QUEUE"

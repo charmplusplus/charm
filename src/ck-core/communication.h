@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-07-06 22:42:11  narain
+ * Revision 2.7  1995-07-12 16:28:45  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.6  1995/07/06  22:42:11  narain
  * Changes for LDB interface revision
  *
  * Revision 2.5  1995/07/06  13:59:12  gursoy
@@ -127,7 +130,7 @@
 #define CkCheck_and_Send(env,Entry) { \
 	if ( GetEnv_destPE(env) == CmiMyPe()) { \
 	        CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ; \
-                CsdEnqueue(env); \
+                CkEnqueue(env); \
 	} \
         else \
 		CkSend(GetEnv_destPE(env), env); \

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:09:41  gursoy
+ * Revision 2.2  1995-07-12 16:28:45  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.1  1995/06/08  17:09:41  gursoy
  * Cpv macro changes done
  *
  * Revision 1.3  1995/04/23  21:23:04  sanjeev
@@ -49,7 +52,9 @@ typedef int 		FunctionRefType;
 typedef int 		WriteOnceID;    
 
 typedef struct chare_id_type  {
-  int tag1; /** This contains: pe, isBOC **/
+  unsigned short onPE;
+  unsigned char isBOC;
+  unsigned char isVID;
   union chareboc {
   	int chare_magic_number;
 	ChareNumType boc_num;

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-06-29 21:43:17  narain
+ * Revision 2.7  1995-07-12 16:28:45  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.6  1995/06/29  21:43:17  narain
  * Added LdbCreateBoc, Removed call to LdbBocInit in SysBocInit
  *
  * Revision 2.5  1995/06/29  15:54:09  gursoy
@@ -339,7 +342,7 @@ CharmInitLoop()
 
 		default:
 		        CmiSetHandler(envelope,CsvAccess(CallProcessMsg_Index));
-			CsdEnqueue(envelope);
+			CkEnqueue(envelope);
 			break;
 		}
 	}

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-07-05 19:38:31  narain
+ * Revision 2.3  1995-07-12 16:28:45  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.2  1995/07/05  19:38:31  narain
  * No LdbFillBlock and StripMsg while InsideDataInit
  *
  * Revision 2.1  1995/06/08  17:09:41  gursoy
@@ -345,7 +348,7 @@ TRACE(CmiPrintf("[%d] GeneralCreateBoc: SizeData=%d, Entry=%d, ReturnEP=%d\n",
 			CkCheck_and_BroadcastNoFree(env, Entry);
 
 		        CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
-			CsdEnqueue(env);
+			CkEnqueue(env);
 			QDCountThisCreation(Entry, USERcat, DynamicBocInitMsg, CmiNumPe());
 
 TRACE(CmiPrintf("[%d] GeneralCreateBoc: bocdata=0x%x\n", CmiMyPe(), element));

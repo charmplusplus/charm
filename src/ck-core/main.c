@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-07-06 22:42:11  narain
+ * Revision 2.6  1995-07-12 16:28:45  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.5  1995/07/06  22:42:11  narain
  * Changes for LDB interface revision
  *
  * Revision 2.4  1995/07/05  21:04:11  narain
@@ -99,7 +102,7 @@ ENVELOPE *env;
 	/* Fill in the language field in the message */
 	CmiSetHandler(env,CsvAccess(CallProcessMsg_Index)) ;
 	
-	CsdEnqueue(env);
+	CkEnqueue(env);
 }
 
 #else
@@ -129,7 +132,7 @@ ENVELOPE *env;
 					    CkLdbSend);
 		}
 		else 
-			CsdEnqueue(env);
+			CkEnqueue(env);
 		break;
 
 	default :
