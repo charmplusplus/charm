@@ -105,7 +105,12 @@
 #define CMK_USE_HP_MAIN_FIX                                0
 #define CMK_DONT_USE_HP_MAIN_FIX                           1
 
+#define CMK_DEBUG_MODE					   1 
+#define CMK_WEB_MODE                                       1
+#define CMK_USE_PERSISTENT_CCS                             1
+
 #define CPP_LOCATION "/lib/cpp"
 
 #endif
+
 
