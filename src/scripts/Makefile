@@ -66,7 +66,7 @@ ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
 	lbdb.h LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	Refiner.h ObjGraph.h CentralLB.h RandCentLB.h \
 	RecBisectBfLB.h graph.h fifoInt.h bitvecset.h \
-	RefineLB.h MetisLB.h \
+	RefineLB.h MetisLB.h  Comm1LB.h \
 	HeapCentLB.h Set.h elements.h heap.h conv-ccs.h NeighborLB.h \
 	WSLB.h CkLists.h GreedyRefLB.h RandRefLB.h CommLB.h CommLBHeap.h
 
@@ -148,7 +148,8 @@ CVHEADERS=converse.h conv-mach.h conv-mach.sh \
           ../include/RandRefLB.decl.h RandRefLB.def.h \
           ../include/tempo.decl.h tempo.def.h \
           ../include/waitqd.decl.h waitqd.def.h \
-	  ../include/CommLB.decl.h CommLB.def.h 
+	  ../include/CommLB.decl.h CommLB.def.h  \
+	  ../include/Comm1LB.decl.h Comm1LB.def.h 
 
 TRACELIBS=libtrace-none.a libtrace-projections.a libtrace-summary.a
 
@@ -257,7 +258,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h\
 	  CentralLB.h RandCentLB.h RecBisectBfLB.h \
-	  RefineLB.h HeapCentLB.h CommLB.h\
+	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h\
 	  MetisLB.h NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h CkLists.h \
 	  $(CVHEADERS)
 
@@ -268,7 +269,7 @@ LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
 	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
 	   ObjGraph.o \
 	   CentralLB.o RandCentLB.o RecBisectBfLB.o graph.o bitvecset.o fifoInt.o \
-	   MetisLB.o RefineLB.o Set.o CommLB.o\
+	   MetisLB.o RefineLB.o Set.o CommLB.o Comm1LB.o\
            HeapCentLB.o heap.o NeighborLB.o WSLB.o GreedyRefLB.o \
 	   RandRefLB.o CommLBHeap.o
 
@@ -313,6 +314,9 @@ libtrace-summary.a: $(LIBTRACE_SUMM)
 
 ../include/CommLB.decl.h : CommLB.decl.h
 	/bin/cp CommLB.decl.h ../include
+
+../include/Comm1LB.decl.h : Comm1LB.decl.h
+	/bin/cp Comm1LB.decl.h ../include
 
 ../include/HeapCentLB.decl.h : HeapCentLB.decl.h
 	/bin/cp HeapCentLB.decl.h ../include
@@ -370,6 +374,9 @@ RefineLB.decl.h RefineLB.def.h : RefineLB.ci charmxi
 
 CommLB.decl.h CommLB.def.h : CommLB.ci charmxi
 	$(CHARMC) CommLB.ci
+
+Comm1LB.decl.h Comm1LB.def.h : Comm1LB.ci charmxi
+	$(CHARMC) Comm1LB.ci
 
 HeapCentLB.decl.h HeapCentLB.def.h : HeapCentLB.ci charmxi
 	$(CHARMC) HeapCentLB.ci
@@ -457,6 +464,9 @@ RefineLB.o: RefineLB.C $(CKHEADERS)
 
 CommLB.o: CommLB.C $(CKHEADERS)
 	$(CHARMC) -o CommLB.o CommLB.C
+
+Comm1LB.o: Comm1LB.C $(CKHEADERS)
+	$(CHARMC) -o Comm1LB.o Comm1LB.C
 
 HeapCentLB.o: HeapCentLB.C $(CKHEADERS)
 	$(CHARMC) -o HeapCentLB.o HeapCentLB.C
