@@ -2485,7 +2485,7 @@ void CcsSendReply(unsigned int ip, unsigned int port, int size, void *msg)
 #endif
 }
 
-#if CMK_WEB_MODE
+#if CMK_USE_PERSISTENT_CCS
 void CcsSendReplyFd(unsigned int ip, unsigned int port, int size, void *msg)
 {
   char cmd[100], c;
