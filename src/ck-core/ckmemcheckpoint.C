@@ -60,9 +60,11 @@ void ArrayElement::init_checkpt() {
         checkptMgr[budPEs[0]].createEntry(thisArrayID, thisArray->getLocMgr()->getGroupID(), thisIndexMax, budPEs[1]);        
 	checkptMgr[budPEs[1]].createEntry(thisArrayID, thisArray->getLocMgr()->getGroupID(), thisIndexMax, budPEs[0]);
 }
+#endif
 
 // entry function invoked by checkpoint mgr asking for checkpoint data
 void ArrayElement::inmem_checkpoint(CkArrayCheckPTReqMessage *m) {
+#if CMK_MEM_CHECKPOINT
   //DEBUGF("[p%d] HERE checkpoint to %d %d \n", CkMyPe(), budPEs[0], budPEs[1]);
   CkLocMgr *locMgr = thisArray->getLocMgr();
   CmiAssert(myRec!=NULL);
@@ -88,8 +90,8 @@ void ArrayElement::inmem_checkpoint(CkArrayCheckPTReqMessage *m) {
   CProxy_CkMemCheckPT checkptMgr(ckCheckPTGroupID);
   checkptMgr.recvData(msg, 2, budPEs);
   delete m;
-}
 #endif
+}
 
 // called by checkpoint mgr to restore an array element
 void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m) 
