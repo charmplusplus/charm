@@ -42,9 +42,9 @@ class CkMulticastMgr: public CkDelegateMgr {
     // entry
     void teardown(CkSectionCookie s);
     void freeup(CkSectionCookie s);
-    void init(CkSectionCookie sid);
-    void reset(CkSectionCookie sid);
-    cookieMsg * setup(multicastSetupMsg *);
+    void setup(multicastSetupMsg *);
+    void recvCookie(CkSectionCookie sid, CkSectionCookie child);
+    void childrenReady(mCastEntry *entry);
     void recvMsg(multicastGrpMsg *m);
     // for reduction
     void setReductionClient(CProxySection_ArrayElement &, redClientFn fn,void *param=NULL);
@@ -56,6 +56,8 @@ class CkMulticastMgr: public CkDelegateMgr {
   public:
     typedef ReductionMsg *(*reducerFn)(int nMsg,ReductionMsg **msgs);
   private:
+    void initCookie(CkSectionCookie sid);
+    void resetCookie(CkSectionCookie sid);
     enum {MAXREDUCERS=256};
     static reducerFn reducerTable[MAXREDUCERS];
     void releaseFutureReduceMsgs(mCastEntryPtr entry);
