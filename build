@@ -51,6 +51,7 @@ syntax() {
   echo 'Platform specific options (choose multiple if apply):'
   echo '  opteron         compile for AMD Opteron'
   echo '  smp             support for SMP, multithreaded charm on each node'
+  echo '  mpt             use SGI Message Passing Toolkit (only for mpi version)'
   echo '  gm              use Myrinet for communication'
   echo '  tcp             use TCP sockets for communication (ony for net version)'
   echo "  vmi             use NCSA's VMI for communication (only for mpi version)"
