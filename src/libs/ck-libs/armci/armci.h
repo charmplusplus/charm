@@ -15,7 +15,7 @@ CDECL void armciStart(int argc, char **argv);
 CDECL void ARMCI_Attach(void);
 
 // redefine global variables used by armci
-#define armci_me TCharmElement()
+#define armci_me TCHARM_Element()
 #define armci_master 0
 // #define armci_nproc CpvAccess(_armci_nproc)
 // #define armci_nproc TCharmGetNumChunks() // not good. A once-only call!

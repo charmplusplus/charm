@@ -1,5 +1,5 @@
 #include "charm-api.h"
 #include "tcharmc.h"
-CDECL void TCharmUserSetup(void) {
+CDECL void TCHARM_User_setup(void) {
 	TCharmInDefaultSetup();
 }

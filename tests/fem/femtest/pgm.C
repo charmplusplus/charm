@@ -29,9 +29,9 @@ pupMyGlobals(pup_er p)
 }
 
 extern "C" void
-TCharmUserNodeSetup(void)
+TCHARM_User_node_setup(void)
 {
-	TCharmReadonlyGlobals(pupMyGlobals);
+	TCHARM_Readonly_globals(pupMyGlobals);
 }
 
 void printargs(void) {
@@ -58,8 +58,8 @@ init(void)
   for (int e=0;e<nelems;e++) elements[e]=0.3;
 
   //Describe the nodes and elements
-  FEM_Set_Node(nnodes,tsteps);
-  FEM_Set_Elem(0,nelems,1,np);
+  FEM_Set_node(nnodes,tsteps);
+  FEM_Set_elem(0,nelems,1,np);
 
   //Create the connectivity array
   for(int y=0;y<dim;y++) for (int x=0;x<dim;x++) {
@@ -89,8 +89,8 @@ init(void)
       data[3*y+0]=data[3*y+1]=val;
       data[3*y+2]=10.0;
     }
-    FEM_Set_Sparse(sparseNo,nSparse, nodes,2, data,3,FEM_DOUBLE);
-    FEM_Set_Sparse_Elem(sparseNo,elems);
+    FEM_Set_sparse(sparseNo,nSparse, nodes,2, data,3,FEM_DOUBLE);
+    FEM_Set_sparse_elem(sparseNo,elems);
     delete[] nodes;
     delete[] elems;
     delete[] data;
@@ -99,8 +99,8 @@ init(void)
   //Set the initial conditions
   elements[3*dim+1]=256;
   elements[2*dim+1]=256;
-  FEM_Set_Elem_Data(0,elements);
-  FEM_Set_Elem_Conn(0,conn);
+  FEM_Set_elem_data(0,elements);
+  FEM_Set_elem_conn(0,conn);
 
   //Run the time loop over our serial mesh--
   // we'll use this data to check the parallel calculation.
@@ -131,28 +131,28 @@ init(void)
 	for (i=0;i<nnodes;i++) reduceSum+=nodes[i];
 	reduceValues[t]=reduceSum;
   }
-  FEM_Set_Node_Data(noData);
+  FEM_Set_node_data(noData);
 
 //Set up ghost layers:
   if (0) 
   { /*Match across single nodes*/
      static const int quad2node[]={0,1,2,3};
-     FEM_Add_Ghost_Layer(1,1);
-     FEM_Add_Ghost_Elem(0,4,quad2node);
+     FEM_Add_ghost_layer(1,1);
+     FEM_Add_ghost_elem(0,4,quad2node);
   } else if (1) 
   { /*Match edges*/
 #if 1 /*Include ignored "-1" nodes as a test*/
      static const int quad2edge[]= {0,1,-1,  1,2,-1,  2,3,-1,  3,0,-1};
-     FEM_Add_Ghost_Layer(3,1);
-     FEM_Add_Ghost_Elem(0,4,quad2edge);
+     FEM_Add_ghost_layer(3,1);
+     FEM_Add_ghost_elem(0,4,quad2edge);
 #else
      static const int quad2edge[]= {0,1,  1,2,  2,3,  3,0};
-     FEM_Add_Ghost_Layer(2,1);
-     FEM_Add_Ghost_Elem(0,4,quad2edge);
+     FEM_Add_ghost_layer(2,1);
+     FEM_Add_ghost_elem(0,4,quad2edge);
 #endif
 /*Add a second layer
-     FEM_Add_Ghost_Layer(2,0);
-     FEM_Add_Ghost_Elem(0,4,quad2edge);
+     FEM_Add_ghost_layer(2,0);
+     FEM_Add_ghost_elem(0,4,quad2edge);
 */
   }
   delete[] conn;
@@ -163,12 +163,12 @@ init(void)
 #if 0 //Test out the serial split routines
   int nchunks=10;
   printf("Splitting into %d pieces:\n");
-  FEM_Serial_Split(nchunks);
+  FEM_Serial_split(nchunks);
   for (int i=0;i<nchunks;i++) {
-    FEM_Serial_Begin(i);
+    FEM_Serial_begin(i);
     int node,elem,ignored;
-    FEM_Get_Node(&node,&ignored);
-    FEM_Get_Elem(0,&elem,&ignored,&ignored);
+    FEM_Get_node(&node,&ignored);
+    FEM_Get_elem(0,&elem,&ignored,&ignored);
     printf(" partition[%d] has %d nodes, %d elems\n",i,node,elem);
   }
   FEM_Done();
@@ -187,18 +187,18 @@ typedef struct _element {
 
 void testEqual(double is,double shouldBe,const char *what) {
 	if (fabs(is-shouldBe)<0.000001) {
-		//CkPrintf("[chunk %d] %s test passed.\n",FEM_My_Partition(),what);
+		//CkPrintf("[chunk %d] %s test passed.\n",FEM_My_partition(),what);
 	} 
 	else {/*test failed*/
 		CkPrintf("[chunk %d] %s test FAILED-- expected %f, got %f (pe %d)\n",
-                        FEM_My_Partition(),what,shouldBe,is,CkMyPe());
+                        FEM_My_partition(),what,shouldBe,is,CkMyPe());
 		CkAbort("FEM Test failed\n");
 	}
 }
 
 void testAssert(int shouldBe,const char *what,int myPartition=-1) 
 {
-	if (myPartition==-1) myPartition=FEM_My_Partition();
+	if (myPartition==-1) myPartition=FEM_My_partition();
 	if (shouldBe) {
 		// CkPrintf("[chunk %d] %s test passed.\n",myPartition,what);
 	}
@@ -219,30 +219,30 @@ driver(void)
 
   FEM_Print("Starting driver...");
 printargs();
-  FEM_Get_Node(&nnodes,&nnodeData);
+  FEM_Get_node(&nnodes,&nnodeData);
   double *nodeData=new double[nnodeData*nnodes];
-  FEM_Get_Node_Data(nodeData);  
+  FEM_Get_node_data(nodeData);  
 
-  FEM_Get_Elem(0,&nelems,&nelemData,&np);
+  FEM_Get_elem(0,&nelems,&nelemData,&np);
   int *conn=new int[np*nelems];
-  FEM_Get_Elem_Conn(0,conn);
+  FEM_Get_elem_conn(0,conn);
   double *elData=new double[nelemData*nelems];
-  FEM_Get_Elem_Data(0,elData);
+  FEM_Get_elem_data(0,elData);
 
-  int myId = FEM_My_Partition();
-  //FEM_Print_Partition();
+  int myId = FEM_My_partition();
+  //FEM_Print_partition();
   Node *nodes = new Node[nnodes];
   Element *elements = new Element[nelems];
-  int doubleField=FEM_Create_Simple_Field(FEM_DOUBLE,1);
-  int fid = FEM_Create_Field(FEM_DOUBLE, 1, 
+  int doubleField=FEM_Create_simple_field(FEM_DOUBLE,1);
+  int fid = FEM_Create_field(FEM_DOUBLE, 1, 
 	(char *)(&nodes[0].val)-(char *)nodes, sizeof(Node));
-  int efid = FEM_Create_Field(FEM_DOUBLE, 1, 
+  int efid = FEM_Create_field(FEM_DOUBLE, 1, 
 	(char *)(&elements[0].val)-(char *)elements, sizeof(Element));
   
 //Test out reduction
   double localSum = 1.0,globalSum;
   FEM_Reduce(fid, &localSum, &globalSum, FEM_SUM);
-  testEqual(globalSum,(double)FEM_Num_Partitions(),"reduce");
+  testEqual(globalSum,(double)FEM_Num_partitions(),"reduce");
   
 //Test readonly global
   testEqual(tsteps,nnodeData,"readonly");
@@ -252,11 +252,11 @@ printargs();
 
 //Grab and check the sparse data:
   for (int sparseNo=0;sparseNo<2;sparseNo++) {
-    int nSparse=FEM_Get_Sparse_Length(sparseNo);
+    int nSparse=FEM_Get_sparse_length(sparseNo);
     //CkPrintf("FEM Chunk %d has %d sparse entries (pass %d)\n",myId,nSparse,sparseNo);
     int *nodes=new int[2*nSparse];
     double *data=new double[3*nSparse];
-    FEM_Get_Sparse(sparseNo,nodes,data);
+    FEM_Get_sparse(sparseNo,nodes,data);
     double sum=0.0;
     for (int y=0;y<nSparse;y++) {
       testAssert(nodes[2*y]>=0 && nodes[2*y]<nnodes,"Sparse nodes");
@@ -283,12 +283,12 @@ printargs();
 
 //Clip off ghost nodes/elements
   ngnodes=nnodes; ngelems=nelems;
-  nnodes=FEM_Get_Node_Ghost();
-  nelems=FEM_Get_Elem_Ghost(0);
+  nnodes=FEM_Get_node_ghost();
+  nelems=FEM_Get_elem_ghost(0);
 
 //Update ghost field test
   for (i=nelems;i<ngelems;i++) {elements[i].val=-1.0;}
-  FEM_Update_Ghost_Field(efid,0,elements);
+  FEM_Update_ghost_field(efid,0,elements);
   for (i=0;i<ngelems;i++)
 	  testEqual(elements[i].pad,123,"update element ghost field pad");
   for (i=0;i<ngelems;i++)
@@ -306,7 +306,7 @@ printargs();
         nodes[conn[i*np+j]].val += elements[i].val/np;
 
 	//Update shared nodes
-    FEM_Update_Field(fid, nodes);
+    FEM_Update_field(fid, nodes);
 
 	//Elements are average of surrounding nodes
     for(i=0;i<nelems;i++) {
@@ -321,25 +321,25 @@ printargs();
         testEqual(nodes[i].val,nodeData[nnodeData*i+t], "update_field");
 
     double sum = 0.0;
-    FEM_Reduce_Field(fid, nodes, &sum, FEM_SUM);
+    FEM_Reduce_field(fid, nodes, &sum, FEM_SUM);
     testEqual(sum,reduceValues[t],"reduce_field");
 
     //Communicate our ghost elements:
     for (i=nelems;i<ngelems;i++) elements[i].val=-1;
-    FEM_Update_Ghost_Field(efid,0,elements);
+    FEM_Update_ghost_field(efid,0,elements);
     for (i=nelems;i<ngelems;i++) {
       testAssert(elements[i].val!=-1,"update_ghost_field");
     }
 
     //Communicate our ghost nodes:
-    FEM_Update_Ghost_Field(fid,-1,nodes);
+    FEM_Update_ghost_field(fid,-1,nodes);
     for(i=nnodes;i<ngnodes;i++)
         testEqual(nodes[i].val,nodeData[nnodeData*i+t],
 	   "update_ghost_node_field");
 
 
     //Make a list of elements with odd global numbers
-    const int *elGnum=FEM_Get_Elem_Nums();
+    const int *elGnum=FEM_Get_elem_nums();
     int elListLen=0;
     double thresh=2.0;
     for (i=0;i<nelems;i++) 
@@ -349,9 +349,9 @@ printargs();
 	    }
 
     //Get a list of ghost elements with odd global numbers
-    FEM_Exchange_Ghost_Lists(0,elListLen,elList);
-    elListLen=FEM_Get_Ghost_List_Length();
-    FEM_Get_Ghost_List(elList);
+    FEM_Exchange_ghost_lists(0,elListLen,elList);
+    elListLen=FEM_Get_ghost_list_length();
+    FEM_Get_ghost_list(elList);
     //CkPrintf("[%d] My ghost list has %d entries\n",myId,elListLen);
     //Make sure everything on the list are actually ghosts and
     // actually have large values
@@ -371,23 +371,23 @@ printargs();
 
 #if 1
 /*Try reassembling the mesh*/
-    const int *noGnum=FEM_Get_Node_Nums();
+    const int *noGnum=FEM_Get_node_nums();
     double *nodeOut=new double[nnodes];
-    FEM_Set_Node(nnodes,1);
+    FEM_Set_node(nnodes,1);
     for (i=0;i<nnodes;i++) {
     	nodeOut[i]=0.1*noGnum[i];
     }
-    FEM_Set_Node_Data(nodeOut);
+    FEM_Set_node_data(nodeOut);
     delete[] nodeOut;
-    const int *elGnum=FEM_Get_Elem_Nums();
+    const int *elGnum=FEM_Get_elem_nums();
     double *elOut=new double[nelems];
-    FEM_Set_Elem(0,nelems,1,0);
+    FEM_Set_elem(0,nelems,1,0);
     for (i=0;i<nelems;i++) {
     	elOut[i]=0.1*elGnum[i];
     }
-    FEM_Set_Elem_Data(0,elOut);
+    FEM_Set_elem_data(0,elOut);
     delete[] elOut;
-    FEM_Update_Mesh(123,2);
+    FEM_Update_mesh(123,2);
 #endif
 
   FEM_Print("All tests passed.");
@@ -400,19 +400,19 @@ mesh_updated(int param)
   CkPrintf("mesh_updated(%d) called.\n",param);
   testEqual(param,123,"mesh_updated param");
   
-  FEM_Get_Node(&nnodes,&dataPer);
+  FEM_Get_node(&nnodes,&dataPer);
   CkPrintf("Getting %d nodes (%d data per)\n",nnodes,dataPer);
   double *ndata=new double[nnodes*dataPer];
-  FEM_Get_Node_Data(ndata);
+  FEM_Get_node_data(ndata);
   for (i=0;i<nnodes;i++) {
     testEqual(ndata[i],0.1*i,"mesh_updated node values");
   }
   delete[] ndata;
   
-  FEM_Get_Elem(0,&nelems,&dataPer,&nodePer);
+  FEM_Get_elem(0,&nelems,&dataPer,&nodePer);
   CkPrintf("Getting %d elems (%d data per)\n",nelems,dataPer);
   double *ldata=new double[nelems*dataPer];
-  FEM_Get_Elem_Data(0,ldata);
+  FEM_Get_elem_data(0,ldata);
   for (i=0;i<nelems;i++) {
     testEqual(ldata[i],0.1*i,"mesh_updated elem values");
   }

@@ -56,7 +56,7 @@ static void ampiNodeInit(void)
   {
     MPI_COMM_UNIVERSE[i] = MPI_COMM_WORLD+1+i;
   }
-  TCharmSetFallbackSetup(MPI_Setup_Switch);
+  TCHARM_Set_fallback_setup(MPI_Setup_Switch);
   nodeinit_has_been_called=1;
 }
 
@@ -86,12 +86,12 @@ extern "C" void MPI_threadstart(void *data)
 
 void ampiCreateMain(MPI_MainFn mainFn)
 {
-	int _nchunks=TCharmGetNumChunks();
+	int _nchunks=TCHARM_Get_num_chunks();
 	
 	//Make a new threads array
 	MPI_threadstart_t s(mainFn);
 	memBuf b; pupIntoBuf(b,s);
-	TCharmCreateData( _nchunks,MPI_threadstart,
+	TCHARM_Create_data( _nchunks,MPI_threadstart,
 			  b.getData(), b.getSize());
 }
 
@@ -569,7 +569,7 @@ static ampi *getAmpiInstance(MPI_Comm comm) {
 CDECL void MPI_Migrate(void)
 {
   AMPIAPI("MPI_Migrate");
-  TCharmMigrate();
+  TCHARM_Migrate();
 }
 
 CDECL int MPI_Init(int *argc, char*** argv)
@@ -609,7 +609,7 @@ int MPI_Comm_size(MPI_Comm comm, int *size)
 CDECL void MPI_Exit(int /*exitCode*/)
 {
 	AMPIAPI("MPI_Exit");
-	TCharmDone();
+	TCHARM_Done();
 }
 FDECL void FTN_NAME(MPI_EXIT,mpi_exit)(int *exitCode)
 {
@@ -810,7 +810,7 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
 CDECL
 double MPI_Wtime(void)
 {
-  return TCharmWallTimer();
+  return TCHARM_Wall_timer();
 }
 
 
@@ -1447,14 +1447,14 @@ CDECL
 int MPI_Register(void *d, MPI_PupFn f)
 {
 	AMPIAPI("MPI_Register");
-	return TCharmRegister(d,f);
+	return TCHARM_Register(d,f);
 }
 
 CDECL
 void *MPI_Get_userdata(int idx)
 {
 	AMPIAPI("MPI_Get_userdata");
-	return TCharmGetUserdata(idx);
+	return TCHARM_Get_userdata(idx);
 }
 
 CDECL void MPI_Register_main(MPI_MainFn mainFn,const char *name)

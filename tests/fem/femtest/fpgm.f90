@@ -14,8 +14,8 @@ include 'femf.h'
     read(20,*) (conn(i,j),j=1,esize)
   enddo
   close(20)
-  call FEM_Set_Elem(1,nelems,0,esize)
-  call FEM_Set_Elem_Conn_c(1,conn)
+  call FEM_Set_elem(1,nelems,0,esize)
+  call FEM_Set_elem_conn_c(1,conn)
   
   allocate(nodeData(nnodes,2))
   do i=1,nnodes
@@ -27,8 +27,8 @@ include 'femf.h'
   nodeData(2,2)=0.25
   nodeData(4,2)=0.25
   nodeData(5,2)=0.25
-  call FEM_Set_Node(nnodes,2)
-  call FEM_Set_Node_Data_c(nodeData)
+  call FEM_Set_node(nnodes,2)
+  call FEM_Set_node_data_c(nodeData)
 end subroutine init
 
 subroutine driver()
@@ -45,25 +45,25 @@ include 'femf.h'
   double precision, dimension(:), allocatable:: elements
 
 
-  call FEM_Get_Elem(1,nelems,elemData,npere)
-  call FEM_Get_Node(nnodes,nodeDataP)
+  call FEM_Get_elem(1,nelems,elemData,npere)
+  call FEM_Get_node(nnodes,nodeDataP)
 
   allocate(conn(nelems, npere))
-  call FEM_Get_Elem_Conn_c(1,conn)
+  call FEM_Get_elem_conn_c(1,conn)
   allocate(nodeData(nnodes,nodeDataP))
-  call FEM_Get_Node_Data_c(nodeData);
+  call FEM_Get_node_data_c(nodeData);
 
   allocate(nodes(nnodes))
   allocate(elements(nelems))
 
-  call FEM_Print_Partition()
+  call FEM_Print_partition()
 
   nodes = 0.0
   elements = 0.0
   do i=1,nnodes
      nodes(i)=nodeData(i,1)
   enddo
-  fid = FEM_Create_Field(FEM_DOUBLE, 1, 0, 8)
+  fid = FEM_Create_field(FEM_DOUBLE, 1, 0, 8)
   do i=1,nelems
     do j=1,npere
       elements(i) = elements(i) + nodes(conn(i,j))
@@ -76,7 +76,7 @@ include 'femf.h'
       nodes(conn(i,j)) = nodes(conn(i,j)) + elements(i)
     enddo
   enddo
-  call FEM_Update_Field(fid, nodes(1))
+  call FEM_Update_field(fid, nodes(1))
   failed = .FALSE.
   do i=1,nnodes
     if (nodes(i) .ne. nodeData(i,2)) failed= .TRUE.
@@ -87,7 +87,7 @@ include 'femf.h'
     call FEM_Print('update_field test passed.')
   endif
   sum = 0.0
-  call FEM_Reduce_Field(fid, nodes(1), sum, FEM_SUM)
+  call FEM_Reduce_field(fid, nodes(1), sum, FEM_SUM)
   if (sum .eq. 1.0) then
     call FEM_Print('reduce_field test passed.')
   else
@@ -95,7 +95,7 @@ include 'femf.h'
   endif
   sum = 1.0
   call FEM_Reduce(fid, sum, sum, FEM_SUM)
-  if (sum .eq. FEM_Num_Partitions()) then
+  if (sum .eq. FEM_Num_partitions()) then
     call FEM_Print('reduce test passed.')
   else
     call FEM_Print('reduce test failed.')

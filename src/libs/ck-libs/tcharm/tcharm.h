@@ -14,18 +14,18 @@ Orion Sky Lawlor, olawlor@acm.org, 7/17/2002
 /*
 Library "fallback setup" routine.
 From an initcall, you register one of your routines 
-here in case the user doesn't write a TCharmUserSetup
+here in case the user doesn't write a TCHARM_User_setup
 routine.  Your fallback version sets up (only) your 
 library by creating some TCharm threads and attaching to them,
 like:
 
 void myLibFallbackSetupFn(void) {
-	TCharmCreate(TCharmGetNumChunks(),myLibUserStart);
+	TCHARM_Create(TCHARM_Get_num_chunks(),myLibUserStart);
         myLib_Attach();
 }
 */
-typedef void (*TCharmFallbackSetupFn)(void);
-void TCharmSetFallbackSetup(TCharmFallbackSetupFn f);
+typedef void (*TCHARM_Fallback_setup_fn)(void);
+void TCHARM_Set_fallback_setup(TCHARM_Fallback_setup_fn f);
 
 
 /*
@@ -37,8 +37,8 @@ object to your array's ckNew.
 The "finish" call registers your newly-created array as a
 client of this set of TCharm threads.
 */
-CkArrayOptions TCharmAttachStart(CkArrayID *retTCharmArray,int *retNumElts=0);
-void TCharmAttachFinish(const CkArrayID &libraryArray);
+CkArrayOptions TCHARM_Attach_start(CkArrayID *retTCharmArray,int *retNumElts=0);
+void TCHARM_Attach_finish(const CkArrayID &libraryArray);
 
 
 /*
@@ -98,12 +98,12 @@ tracing (once tracing is generalized).
 #ifndef CMK_OPTIMIZE
 #  define TCHARM_API_TRACE(routineName,libraryName) \
 	TCharmAPIRoutine apiRoutineSentry;\
-	TCharmApiTrace(routineName,libraryName)
+	TCHARM_Api_trace(routineName,libraryName)
 #else
 #  define TCHARM_API_TRACE(routineName,libraryName) \
 	TCharmAPIRoutine apiRoutineSentry
 #endif
-void TCharmApiTrace(const char *routineName,const char *libraryName);
+void TCHARM_Api_trace(const char *routineName,const char *libraryName);
 
 
 #endif /*def(thisHeader)*/

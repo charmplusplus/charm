@@ -13,7 +13,7 @@ extern "C" void armciLibStart(void) {
 // in the Node initialization function.
 static void ArmciDefaultSetup(void) {
   // Create the base threads on TCharm using user-defined start routine.
-  TCharmCreate(TCharmGetNumChunks(), armciLibStart);
+  TCHARM_Create(TCHARM_Get_num_chunks(), armciLibStart);
   // Attach the array of TCShmemThreads to the corresponding TCharm threads.
   ARMCI_Attach();
 }
@@ -24,14 +24,14 @@ static void ArmciDefaultSetup(void) {
 // his/her own startup routine and/or employ multi-module programs.
 void ARMCI_Attach(void) {
   CkArrayID _tc_aid;
-  CkArrayOptions opt = TCharmAttachStart(&_tc_aid, NULL);
+  CkArrayOptions opt = TCHARM_Attach_start(&_tc_aid, NULL);
   CkArrayID aid = CProxy_ArmciVirtualProcessor::ckNew(_tc_aid, opt);
   CProxy_ArmciVirtualProcessor vpProxy = CProxy_ArmciVirtualProcessor(aid);
   CkArrayID *clientAid = new CkArrayID;
   *clientAid = aid;
   vpProxy.setReductionClient(mallocClient, (void *)clientAid);
-  TCharmAttachFinish(aid);
-  armci_nproc = TCharmNumElements();
+  TCHARM_Attach_finish(aid);
+  armci_nproc = TCHARM_Num_elements();
 }
 
 
@@ -43,7 +43,7 @@ void armciNodeInit(void) {
   CtvAccess(_armci_ptr) = NULL;
 
   // Register the library's default startup routine to TCharm
-  TCharmSetFallbackSetup(ArmciDefaultSetup);
+  TCHARM_Set_fallback_setup(ArmciDefaultSetup);
 };
 
 #include "armci.def.h"

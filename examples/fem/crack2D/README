@@ -1,10 +1,7 @@
 This is a 2D crack propagation application built on top of the
-FEM framework. Note that one needs to use migratable threads of
-converse in order to compile and run this application.
+FEM framework.  This program is now OBSOLETE, as it uses an older
+version of the FEM framework.
 
-So, make sure that you invoke super_install as
-
-SUPER_INSTALL ampi {net-sol-cc|mpi-origin} -O -DCMK_THREADS_USE_ISOMALLOC=1
 
 In order to compile the crack2d program, you need to just type "make"
 in this directory. This wll make two programs: pgm and getmesh

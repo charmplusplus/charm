@@ -1,19 +1,19 @@
-       external tcharm_set_stack_size
-       external tcharm_create
-       external tcharm_create_data
+       external TCHARM_Set_stack_size
+       external TCHARM_Create
+       external TCHARM_Create_data
        
-       integer, external :: tcharm_get_num_chunks
-       integer, external :: tcharm_element
-       integer, external :: tcharm_num_elements
+       integer, external :: TCHARM_Get_num_chunks
+       integer, external :: TCHARM_Element
+       integer, external :: TCHARM_Num_elements
        
-       external tcharm_barrier
+       external TCHARM_Barrier
 
-       external tcharm_register
-       external tcharm_migrate
-       external tcharm_done
+       external TCHARM_Register
+       external TCHARM_Migrate
+       external TCHARM_Done
 
-       external tcharm_readonly_globals
-       external tcharm_init
+       external TCHARM_Readonly_globals
+       external TCHARM_Init
 
-       integer, external :: tcharm_iargc
-       external tcharm_getarg
+       integer, external :: TCHARM_Iargc
+       external TCHARM_Getarg

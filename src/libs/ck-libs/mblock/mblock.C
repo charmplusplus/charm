@@ -57,7 +57,7 @@ static void callDrivers(void) {
 //Startup routine to use if the user doesn't register one
 static void MBlockFallbackSetup(void)
 {
-	TCharmCreate(TCharmGetNumChunks(),callDrivers);
+	TCHARM_Create(TCHARM_Get_num_chunks(),callDrivers);
         init();
         FTN_NAME(INIT,init)();
         MBLK_Attach();
@@ -67,7 +67,7 @@ static MBlockSetupCookie cookie;
 void MBlockInit(void) 
 {
   CtvInitialize(MBlockChunk *, _mblkptr);
-  TCharmSetFallbackSetup(MBlockFallbackSetup);
+  TCHARM_Set_fallback_setup(MBlockFallbackSetup);
 }
 
 MBlockSetupCookie::MBlockSetupCookie(void)
@@ -546,14 +546,14 @@ MBLK_Set_dim(const int n)
 CDECL int 
 MBLK_Get_nblocks(int *n)
 {
-  *n = TCharmNumElements();
+  *n = TCHARM_Num_elements();
   return MBLK_SUCCESS;
 }
 
 CDECL int 
 MBLK_Get_myblock(int *m)
 {
-  *m = TCharmElement();
+  *m = TCHARM_Element();
   return MBLK_SUCCESS;
 }
 
@@ -575,7 +575,7 @@ MBLK_Get_blocksize(int *dim)
 CDECL double 
 MBLK_Timer(void)
 {
-  return TCharmWallTimer();
+  return TCHARM_Wall_timer();
 }
 
 CDECL void 
@@ -593,14 +593,14 @@ MBLK_Print(const char *str)
 CDECL int 
 MBLK_Register(void *_ud,MBLK_PupFn _pup_ud, int *rid)
 {
-  *rid=TCharmRegister(_ud,_pup_ud);
+  *rid=TCHARM_Register(_ud,_pup_ud);
   return MBLK_SUCCESS;
 }
 
 CDECL int 
 MBLK_Get_registered(int n, void **b)
 {
-  *b=TCharmGetUserdata(n);
+  *b=TCHARM_Get_userdata(n);
   return MBLK_SUCCESS;
 }
 

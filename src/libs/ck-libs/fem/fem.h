@@ -36,90 +36,90 @@ extern "C" {
   void FEM_Attach(int flags);
 
   /*Utility*/
-  int FEM_My_Partition(void);
-  int FEM_Num_Partitions(void);
+  int FEM_My_partition(void);
+  int FEM_Num_partitions(void);
   double FEM_Timer(void);
   void FEM_Done(void);
   void FEM_Print(const char *str);
-  void FEM_Print_Partition(void);
+  void FEM_Print_partition(void);
 
-  int *FEM_Get_Node_Nums(void);
-  int *FEM_Get_Elem_Nums(void);
-  int *FEM_Get_Conn(int elemType);
+  int *FEM_Get_node_nums(void);
+  int *FEM_Get_elem_nums(void);
+  int *FEM_Get_gonn(int elemType);
 
   /*Mesh*/
-  void FEM_Set_Mesh(int nelem, int nnodes, int nodePerElem, int* conn);
+  void FEM_Set_mesh(int nelem, int nnodes, int nodePerElem, int* conn);
   
-  void FEM_Set_Node(int nNodes,int doublePerNode);
-  void FEM_Set_Node_Data(const double *data);
-  void FEM_Set_Elem(int elType,int nElem,int doublePerElem,int nodePerElem);
-  void FEM_Set_Elem_Data(int elType,const double *data);
-  void FEM_Set_Elem_Conn(int elType,const int *conn);
-  void FEM_Set_Sparse(int uniqueIdentifier,int nRecords,
+  void FEM_Set_node(int nNodes,int doublePerNode);
+  void FEM_Set_node_data(const double *data);
+  void FEM_Set_elem(int elType,int nElem,int doublePerElem,int nodePerElem);
+  void FEM_Set_elem_data(int elType,const double *data);
+  void FEM_Set_elem_conn(int elType,const int *conn);
+  void FEM_Set_sparse(int uniqueIdentifier,int nRecords,
   	const int *nodes,int nodesPerRec,
   	const void *data,int dataPerRec,int dataType);
-  void FEM_Set_Sparse_Elem(int uniqueIdentifier,const int *rec2elem);
+  void FEM_Set_sparse_elem(int uniqueIdentifier,const int *rec2elem);
 
-  void FEM_Get_Node(int *nNodes,int *doublePerNode);
-  void FEM_Get_Node_Data(double *data);
-  void FEM_Get_Elem(int elType,int *nElem,int *doublePerElem,int *nodePerElem);
-  void FEM_Get_Elem_Data(int elType,double *data);
-  void FEM_Get_Elem_Conn(int elType,int *conn);
-  int  FEM_Get_Sparse_Length(int uniqueIdentifier); //Returns nRecords
-  void FEM_Get_Sparse(int uniqueIdentifier,int *nodes,void *data);
+  void FEM_Get_node(int *nNodes,int *doublePerNode);
+  void FEM_Get_node_data(double *data);
+  void FEM_Get_elem(int elType,int *nElem,int *doublePerElem,int *nodePerElem);
+  void FEM_Get_elem_data(int elType,double *data);
+  void FEM_Get_elem_conn(int elType,int *conn);
+  int  FEM_Get_sparse_length(int uniqueIdentifier); //Returns nRecords
+  void FEM_Get_sparse(int uniqueIdentifier,int *nodes,void *data);
   
-  void FEM_Add_Linear_Periodicity(int nFaces,int nPer,
+  void FEM_Add_linear_periodicity(int nFaces,int nPer,
 	const int *facesA,const int *facesB,
 	int nNodes,const double *nodeLocs);
-  void FEM_Sym_Coordinates(int elType,double *d_locs);
+  void FEM_Sym_coordinates(int elType,double *d_locs);
   
-  void FEM_Set_Sym_Nodes(const int *canon,const int *sym);
-  void FEM_Get_Sym(int elTypeOrMinusOne,int *destSym);
+  void FEM_Set_sym_nodes(const int *canon,const int *sym);
+  void FEM_Get_sym(int elTypeOrMinusOne,int *destSym);
   
-  void FEM_Composite_Elem(int newElType);
-  void FEM_Combine_Elem(int srcElType,int destElType,
+  void FEM_Composite_elem(int newElType);
+  void FEM_Combine_elem(int srcElType,int destElType,
 	int newInteriorStartIdx,int newGhostStartIdx);
 
-  void FEM_Update_Mesh(int callMeshUpdated,int doRepartition);
+  void FEM_Update_mesh(int callMeshUpdated,int doRepartition);
   
-  void FEM_Set_Partition(int *elem2chunk);
-  void FEM_Serial_Split(int nchunks);
-  void FEM_Serial_Begin(int chunkNo);
+  void FEM_Set_partition(int *elem2chunk);
+  void FEM_Serial_split(int nchunks);
+  void FEM_Serial_begin(int chunkNo);
 
-  void FEM_Add_Ghost_Layer(int nodesPerTuple,int doAddNodes);
-  void FEM_Add_Ghost_Elem(int elType,int tuplesPerElem,const int *elem2tuple);
+  void FEM_Add_ghost_layer(int nodesPerTuple,int doAddNodes);
+  void FEM_Add_ghost_elem(int elType,int tuplesPerElem,const int *elem2tuple);
 
-  int FEM_Get_Node_Ghost(void);
-  int FEM_Get_Elem_Ghost(int elemType);  
+  int FEM_Get_node_ghost(void);
+  int FEM_Get_elem_ghost(int elemType);  
   
-  int FEM_Get_Comm_Partners(void);
-  int FEM_Get_Comm_Partner(int partnerNo);
-  int FEM_Get_Comm_Count(int partnerNo);
-  void FEM_Get_Comm_Nodes(int partnerNo,int *nodeNos);
+  int FEM_Get_comm_partners(void);
+  int FEM_Get_comm_partner(int partnerNo);
+  int FEM_Get_comm_count(int partnerNo);
+  void FEM_Get_comm_nodes(int partnerNo,int *nodeNos);
 
   /*Node update*/
-  int FEM_Create_Simple_Field(int base_type,int vec_len);
-  int FEM_Create_Field(int base_type, int vec_len, int init_offset, 
+  int FEM_Create_simple_field(int base_type,int vec_len);
+  int FEM_Create_field(int base_type, int vec_len, int init_offset, 
                        int distance);
-  void FEM_Update_Field(int fid, void *nodes);
-  void FEM_Update_Ghost_Field(int fid, int elTypeOrMinusOne, void *nodes);
-  void FEM_Reduce_Field(int fid, const void *nodes, void *outbuf, int op);
+  void FEM_Update_field(int fid, void *nodes);
+  void FEM_Update_ghost_field(int fid, int elTypeOrMinusOne, void *nodes);
+  void FEM_Reduce_field(int fid, const void *nodes, void *outbuf, int op);
   void FEM_Reduce(int fid, const void *inbuf, void *outbuf, int op);
-  void FEM_Read_Field(int fid, void *nodes, const char *fname);
+  void FEM_Read_field(int fid, void *nodes, const char *fname);
 
   /*Mesh modification*/
   void FEM_Barrier(void);
 
-  void FEM_Add_Node(int localIdx,int nBetween,int *betweenNodes);  
+  void FEM_Add_node(int localIdx,int nBetween,int *betweenNodes);  
 
-  void FEM_Exchange_Ghost_Lists(int elemType,int nIdx,const int *localIdx);
-  int FEM_Get_Ghost_List_Length(void);
-  void FEM_Get_Ghost_List(int *dest);
+  void FEM_Exchange_ghost_lists(int elemType,int nIdx,const int *localIdx);
+  int FEM_Get_ghost_list_length(void);
+  void FEM_Get_ghost_list(int *dest);
 
   /*Migration */
   int FEM_Register(void *userData,FEM_PupFn _pup_ud);
   void FEM_Migrate(void);
-  void *FEM_Get_Userdata(int n);
+  void *FEM_Get_userdata(int n);
   
   /* to be provided by the application */
   void init(void);

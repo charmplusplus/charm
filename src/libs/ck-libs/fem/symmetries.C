@@ -390,7 +390,7 @@ void FEM_Sym_Linear::pup(PUP::er &p) {
 }
 
 /********** High-Level (Faces & coordinates) API **********/
-CDECL void FEM_Add_Linear_Periodicity(
+CDECL void FEM_Add_linear_periodicity(
 	int nFaces,int nPer,
 	const int *facesA,const int *facesB,
 	int nNodes,const double *nodeLocs
@@ -411,9 +411,9 @@ FDECL void FTN_NAME(FEM_ADD_LINEAR_PERIODICITY,fem_add_linear_periodicity)(
 		facesA,facesB,1,*nNodes,(const CkVector3d *)nodeLocs);
 }
 
-CDECL void FEM_Sym_Coordinates(int elType,double *d_locs)
+CDECL void FEM_Sym_coordinates(int elType,double *d_locs)
 {
-	FEMAPI("FEM_Sym_Coordinates");
+	FEMAPI("FEM_Sym_coordinates");
 	
 	const FEM_Mesh *m=FEM_Get_FEM_Mesh();
 	const FEM_Item &c=m->getCount(elType);
@@ -429,15 +429,15 @@ CDECL void FEM_Sym_Coordinates(int elType,double *d_locs)
 FDECL void FTN_NAME(FEM_SYM_COORDINATES,fem_sym_coordinates)
 	(int *elType,double *locs)
 {
-	FEM_Sym_Coordinates(*elType-1,locs);
+	FEM_Sym_coordinates(*elType-1,locs);
 }
 
 
 /********** Low-Level (canonicalization array) API **********/
 
-CDECL void FEM_Set_Sym_Nodes(const int *canon,const int *sym)
+CDECL void FEM_Set_sym_nodes(const int *canon,const int *sym)
 {
-	FEMAPI("FEM_Set_Sym_Nodes");
+	FEMAPI("FEM_Set_sym_nodes");
 	int n=FEM_Get_FEM_Mesh()->node.size();
 	FEM_Set_FEM_Ghost().setSymmetries(n,CkCopyArray(canon,n,0),sym);
 }
@@ -458,9 +458,9 @@ void FEM_Item::setSymmetries(int r,FEM_Symmetries_t s)
 	}
 	sym->insert(r,s);
 }
-CDECL void FEM_Get_Sym(int elTypeOrMinusOne,int *destSym)
+CDECL void FEM_Get_sym(int elTypeOrMinusOne,int *destSym)
 {
-	FEMAPI("FEM_Get_Sym");
+	FEMAPI("FEM_Get_sym");
 	const FEM_Item &l=FEM_Get_FEM_Mesh()->getCount(elTypeOrMinusOne);
 	int n=l.size();
 	for (int i=0;i<n;i++) destSym[i]=l.getSymmetries(i);
@@ -468,7 +468,7 @@ CDECL void FEM_Get_Sym(int elTypeOrMinusOne,int *destSym)
 FDECL void FTN_NAME(FEM_GET_SYM,fem_get_sym)
 	(int *elTypeOrZero,int *destSym)
 {
-	FEM_Get_Sym(*elTypeOrZero-1,destSym);
+	FEM_Get_sym(*elTypeOrZero-1,destSym);
 }
 
 
