@@ -1164,7 +1164,15 @@ sub posefuncmap
 		if ($isconstructor) {
 		  $output=$preline."\n{\n";
 		  $output.="int _POSE_handle = ".$segments[3].";\n";
-		  $output.="POSE_TimeType _POSE_timeOffset = ".$segments[4].";\n" if ($#segments>=4);
+		  if ($#segments>=4)
+		  {
+		      $output.="POSE_TimeType _POSE_timeOffset = ".$segments[4].";\n";
+		  }
+		  else
+		  {
+		      $output.="POSE_TimeType _POSE_timeOffset = 0;\n";
+		  }
+		  $output.="CkAssert(_POSE_timeOffset >=0);";
 		  $output.=$msg."->Timestamp(ovt+(_POSE_timeOffset));\n";
 		  $output.="#ifndef SEQUENTIAL_POSE\n";
 		  $output.="PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n";
@@ -1215,6 +1223,7 @@ sub posefuncmap
 		    $output=$preline."\n{\n";
 		    $output.="int _POSE_handle = ".$segments[3].";\n";
 		    $output.="POSE_TimeType _POSE_atTime =".$segments[4].";\n";
+		    $output.="CkAssert(_POSE_atTime >=0);\n";
 		    $output.=$msg."->Timestamp(_POSE_atTime);\n";
 		    $output.="#ifndef SEQUENTIAL_POSE\n";
 		    $output.="PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n";
