@@ -10,18 +10,67 @@ init(void)
 static int
 mypksz(GlobalData *gd)
 {
-  return 0;
+  int size = sizeof(GlobalData);
+  size += gd->numProp*sizeof(int); // int *ts_proportion
+  size += gd->numProp*sizeof(double); // double *proportion
+  size += gd->numMatVol*sizeof(VolMaterial); // VolMaterial* volm
+  size += gd->numMatCoh*sizeof(CohMaterial); // CohMaterial* cohm
+  size += gd->nn*sizeof(Node); // Node *nodes
+  size += gd->ne*sizeof(Element); // Element *elements
+  return size;
 }
 
 static void
 mypk(GlobalData *gd, void *buffer)
 {
+  char *buf = (char *) buffer;
+  memcpy((void*)buf, (void*) gd, sizeof(GlobalData)); buf += sizeof(GlobalData);
+  memcpy((void*)buf, (void*) gd->ts_proportion, gd->numProp*sizeof(int));
+  buf += gd->numProp*sizeof(int);
+  memcpy((void*)buf, (void*) gd->proportion, gd->numProp*sizeof(double));
+  buf += gd->numProp*sizeof(double);
+  memcpy((void*)buf, (void*) gd->volm, gd->numMatVol*sizeof(VolMaterial));
+  buf += gd->numMatVol*sizeof(VolMaterial);
+  memcpy((void*)buf, (void*) gd->cohm, gd->numMatCoh*sizeof(CohMaterial));
+  buf += gd->numMatCoh*sizeof(CohMaterial);
+  memcpy((void*)buf, (void*) gd->nodes, gd->nn*sizeof(Node));
+  buf += gd->nn*sizeof(Node);
+  memcpy((void*)buf, (void*) gd->elements, gd->ne*sizeof(Element));
+  buf += gd->ne*sizeof(Element);
+  delete[] gd->ts_proportion;
+  delete[] gd->proportion;
+  delete[] gd->volm;
+  delete[] gd->cohm;
+  delete[] gd->nodes;
+  delete[] gd->elements;
 }
 
 static GlobalData *
 myupk(void *buffer)
 {
-  return 0;
+  char *buf = (char *) buffer;
+  GlobalData *gd = new GlobalData;
+  memcpy((void*) gd, (void*)buf, sizeof(GlobalData)); buf += sizeof(GlobalData);
+  gd->ts_proportion = new int[gd->numProp];
+  gd->proportion = new double[gd->numProp];
+  gd->volm = new VolMaterial[gd->numMatVol];
+  gd->cohm = new CohMaterial[gd->numMatCoh];
+  gd->nodes = new Node[gd->nn];
+  gd->elements = new Element[gd->ne];
+  memcpy((void*) gd->ts_proportion, (void*)buf, gd->numProp*sizeof(int));
+  buf += gd->numProp*sizeof(int);
+  memcpy((void*) gd->proportion, (void*)buf, gd->numProp*sizeof(double));
+  buf += gd->numProp*sizeof(double);
+  memcpy((void*) gd->volm, (void*)buf, gd->numMatVol*sizeof(VolMaterial));
+  buf += gd->numMatVol*sizeof(VolMaterial);
+  memcpy((void*) gd->cohm, (void*)buf, gd->numMatCoh*sizeof(CohMaterial));
+  buf += gd->numMatCoh*sizeof(CohMaterial);
+  memcpy((void*) gd->nodes, (void*)buf, gd->nn*sizeof(Node));
+  buf += gd->nn*sizeof(Node);
+  memcpy((void*) gd->elements, (void*)buf, gd->ne*sizeof(Element));
+  buf += gd->ne*sizeof(Element);
+
+  return gd;
 }
 
 static void
