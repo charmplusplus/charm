@@ -1,6 +1,6 @@
 CMK_CPP_C='icc -E '
-CMK_CC='icc '
-CMK_CXX='icpc '
+CMK_CC="icc -fpic "
+CMK_CXX="icpc -fpic "
 CMK_CXXPP='icpc -E '
 CMK_LD='icc -i_dynamic '
 CMK_LDXX='icpc -i_dynamic '
