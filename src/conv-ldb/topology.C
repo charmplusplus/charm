@@ -13,7 +13,6 @@
 
 #include <math.h>
 
-#include "charm++.h"
 #include "LBDatabase.h"
 #include "topology.h"
 
