@@ -38,7 +38,7 @@ FDECL {
 #define mpi_type_lb FTN_NAME( MPI_TYPE_LB , mpi_type_lb )
 #define mpi_type_ub FTN_NAME( MPI_TYPE_UB , mpi_type_ub )
 #define mpi_address FTN_NAME( MPI_ADDRESS , mpi_address )
-#define mpi_get_element FTN_NAME( MPI_GET_ELEMENT , mpi_get_element )
+#define mpi_get_elements FTN_NAME( MPI_GET_ELEMENTS , mpi_get_elements )
 #define mpi_pack FTN_NAME( MPI_PACK , mpi_pack )
 #define mpi_unpack FTN_NAME( MPI_UNPACK , mpi_unpack )
 #define mpi_pack_size FTN_NAME( MPI_PACK_SIZE , mpi_pack_size )
@@ -696,11 +696,11 @@ void mpi_get_count(int *sts, int *dtype, int *cnt, int *ierr)
   *ierr = MPI_Get_count((MPI_Status*) sts, *dtype, cnt);
 }
 
-void mpi_print(char *str, int len)
+void mpi_print(char *str, int *len)
 {
-  char *tmpstr = new char[len+1];
-  memcpy(tmpstr,str,len);
-  tmpstr[len] = '\0';
+  char *tmpstr = new char[*len+1];
+  memcpy(tmpstr,str,*len);
+  tmpstr[*len] = '\0';
   MPI_Print(tmpstr);
   delete[] tmpstr;
 }
@@ -713,6 +713,11 @@ void mpi_migrate(void)
 int mpi_register(void *d, MPI_PupFn f)
 {
   return MPI_Register(d,f);
+}
+
+void mpi_get_userdata(int* dn, void *data)
+{
+  data = MPI_Get_userdata(*dn); 
 }
 
 void mpi_checkpoint(char *dname){
