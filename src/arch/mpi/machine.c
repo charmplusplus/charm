@@ -203,7 +203,7 @@ void CmiTimerInit(void)
       if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
         CmiAbort("Timernit: MPI_Barrier failed!\n");
       t3 = MPI_Wtime();
-      starttimer = t3; //t1 + (t3-t1)/2;
+      starttimer = t3;
     }
   }
   CmiNodeAllBarrier();          /* for smp */
