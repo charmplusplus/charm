@@ -174,6 +174,8 @@ static inline void CkDeliverMsgs(int nmsg)	{ BgDeliverMsgs(nmsg); }
 #undef CmiSyncListSendAndFree
 #define CmiSyncListSendAndFree		BgSyncListSendAndFree
 
+#define CmiMultipleSend			BgMultipleSend
+
 #undef CsdEnqueueLifo
 #define CsdEnqueueLifo(m)  CmiSyncSendAndFree(CmiMyPe(),sizeof(m), (char*)(m));
 
