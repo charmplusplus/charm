@@ -14,7 +14,7 @@
 #include <limits.h>
 #include "charm++.h"
 #include "eventID.h"
-#include "evmpool.h"
+#include "mempool.h"
 #include "srtable.h"
 #include "stats.h"
 #include "cancel.h"

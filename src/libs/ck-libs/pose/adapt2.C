@@ -21,8 +21,9 @@ void adapt2::Step()
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(RB_TIMER);      
 #endif
-    timeLeash = RBevent->timestamp - lastGVT;
-    if (timeLeash < MIN_LEASH) timeLeash = MIN_LEASH;
+    //timeLeash = RBevent->timestamp - lastGVT;
+    //if (timeLeash < MIN_LEASH) timeLeash = MIN_LEASH;
+    timeLeash = MIN_LEASH;
     Rollback(); 
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(SIM_TIMER);      

@@ -26,10 +26,8 @@ void POSE_init()
   //comm_debug=1;
   CkPrintf("Simulation run with StreamingStrategy(%d,%d) for communication optimization...\n", COMM_TIMEOUT, COMM_MAXMSG);
 #endif
-  // Create an EventMsgPool with global handle for message recycling 
-  PoolInitMsg *m = new PoolInitMsg;
-  m->numPools = 1; //MapSizeToIdx(-1);
-  EvmPoolID = CProxy_EventMsgPool::ckNew(m);
+  // Create a MemoryPool with global handle for memory recycling 
+  MemPoolID = CProxy_MemoryPool::ckNew();
   // Create array to hold all POSE objects
   POSE_Objects = CProxy_sim::ckNew(); 
 #ifdef POSE_COMM_ON

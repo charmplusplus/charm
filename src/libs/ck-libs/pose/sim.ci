@@ -2,7 +2,7 @@
 module sim {
   extern module ldbal;
   extern module gvt;
-  extern module evmpool;
+  extern module mempool;
   extern module stats;
   readonly CProxy_sim POSE_Objects;
   readonly CkChareID POSE_Coordinator_ID;

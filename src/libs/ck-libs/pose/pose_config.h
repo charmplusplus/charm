@@ -22,7 +22,7 @@
 #define STORE_RATE 10       // default checkpoint rate: 1 for every n events
 #define SPEC_WINDOW 10      // speculative event window size
 #define MIN_LEASH 10        // min speculative window for adaptive strategy
-#define MAX_LEASH 20        // max  "     "     "     "        "     "
+#define MAX_LEASH 40        // max  "     "     "     "        "     "
 #define LEASH_FLEX 1        // leash increment
 
 /// Load balancer constants
@@ -31,7 +31,8 @@
 #define LB_DIFF 10000       // min diff between min and max load PEs
 
 // MISC
-#define MAX_POOL_SIZE 20    // maximum size of an eventMsg pool
+#define MAX_POOL_SIZE 10    // maximum size of a memory pool
+#define MAX_RECYCLABLE 1000 // maximum size of a recyclable block
 #define SEND 0
 #define RECV 1
 #define OPTIMISTIC 0

@@ -64,27 +64,27 @@ public:
   /// Allocates event message with space for priority
   /** This can also handle event message recycling (currently off) */
   void *operator new (size_t size) {  
-    //EventMsgPool *localPool = (EventMsgPool *)CkLocalBranch(EvmPoolID);
-    //if (localPool->CheckPool(MapSizeToIdx(size)))
-    //return localPool->GetEventMsg(MapSizeToIdx(size));
-    //else {
-    void *msg = CkAllocMsg(CMessage_eventMsg::__idx, size, 8*sizeof(int));
-    ((eventMsg *)msg)->msgSize = size;
-    return msg;
-    //}
+    MemoryPool *localPool = (MemoryPool *)CkLocalBranch(MemPoolID);
+    if (localPool->CheckPool(size) > 0)
+      return localPool->GetBlock(size);
+    else {
+      void *msg = CkAllocMsg(CMessage_eventMsg::__idx, size, 8*sizeof(int));
+      ((eventMsg *)msg)->msgSize = size;
+      return msg;
+    }
   }
-  //  void operator delete(void *p) { 
-    //EventMsgPool *localPool = (EventMsgPool *)CkLocalBranch(EvmPoolID);
-    //if (localPool->CheckPool(MapSizeToIdx(((eventMsg *)p)->msgSize)) 
-    //< MAX_POOL_SIZE) {
-    //size_t msgSize = ((eventMsg *)p)->msgSize;
-    //memset(p, 0, msgSize);
-    //((eventMsg *)p)->msgSize = msgSize;
-    //localPool->PutEventMsg(MapSizeToIdx(msgSize), p);
-    //}
-    //else
-  //CkFreeMsg(p);
-  //  }
+  void operator delete(void *p) { 
+    MemoryPool *localPool = (MemoryPool *)CkLocalBranch(MemPoolID);
+    int ps = localPool->CheckPool(((eventMsg *)p)->msgSize);
+    if ((ps < MAX_POOL_SIZE) && (ps > -1)) {
+      size_t msgSize = ((eventMsg *)p)->msgSize;
+      memset(p, 0, msgSize);
+      ((eventMsg *)p)->msgSize = msgSize;
+      localPool->PutBlock(msgSize, p);
+    }
+    else
+      CkFreeMsg(p);
+  }
   /// Set priority field and queuing strategy
   void setPriority(int prio) {  
     *((int*)CkPriorityPtr(this)) = prio;

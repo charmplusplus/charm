@@ -1,0 +1,10 @@
+/// Memory recycling for POSE
+/* Allows for the storage and reuse of memory blocks for event messages and 
+   checkpointing. */
+module mempool {
+  readonly CkGroupID MemPoolID;
+
+  group MemoryPool {
+    entry MemoryPool();
+  };
+};
