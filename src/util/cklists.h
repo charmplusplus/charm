@@ -123,6 +123,11 @@ inline void operator|(PUP::er &p,CkQ<T> &q) {
     }
 }
 
+/// "Flag" class: do not initialize this object.
+/// This is sometimes needed for global variables, 
+///  when the default zero-initialization is enough.
+class CkSkipInitialization {};
+
 
 /// A typesafe, automatically growing array.
 /// Classes used must have a default constructor and working copy constructor.
@@ -153,6 +158,7 @@ class CkVec : private CkSTLHelper<T> {
     ~CkVec() { freeBlock(); }
     CkVec(const this_type &src) {copyFrom(src);}
     CkVec(int size) { makeBlock(size,size); } 
+    CkVec(const CkSkipInitialization &skip) {/* don't initialize */}
     this_type &operator=(const this_type &src) {
       freeBlock();
       copyFrom(src);
