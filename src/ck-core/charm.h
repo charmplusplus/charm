@@ -168,7 +168,7 @@ typedef struct {
 } CkChareID;
 
 typedef struct _ckGroupID{
-  int idx;			// pe(processor number) is removed from the structure
+  int idx;		/* pe(processor number) is removed from the structure */
 #ifdef __cplusplus
   void pup(PUP::er &p) {  p|idx; }
   int isZero(void) const { return (idx==0); }
