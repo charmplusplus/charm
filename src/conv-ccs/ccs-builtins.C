@@ -256,6 +256,12 @@ public:
   }
 };
 
+#endif /*CMK_CCS_AVAILABLE*/
+/*We have to include these virtual functions, even when CCS is
+disabled, to avoid bizarre link-time errors.*/
+
+CpdListAccessor::~CpdListAccessor() { }
+CpdSimpleListAccessor::~CpdSimpleListAccessor() { }
 const char *CpdSimpleListAccessor::getPath(void) const {return path;}
 int CpdSimpleListAccessor::getLength(void) const {return length;}
 void CpdSimpleListAccessor::pup(PUP::er &p,CpdListItemsRequest &req) 
@@ -285,18 +291,27 @@ void CpdListAccessor::beginItem(PUP::er &p,int itemNo)
 
 // C++ and C client API
 void CpdListRegister(CpdListAccessor *acc)
+#if CMK_CCS_AVAILABLE
 {
   CpvAccess(cpdListTable)->put(acc->getPath())=acc;
 }
+#else
+{ }
+#endif
 
 extern "C" void CpdListRegister_c(const char *path,
             CpdListLengthFn_c len,void *lenParam,
             CpdListItemsFn_c items,void *itemsParam)
+#if CMK_CCS_AVAILABLE
 {
   CpdListRegister(new CpdListAccessor_c(path,
 	     len,lenParam,items,itemsParam));
 }
+#else
+{ }
+#endif
 
+#if CMK_CCS_AVAILABLE
 // Initialization	
 static void CpdListInit(void) {
   CpvInitialize(CpdListTable_t *,cpdListTable);
