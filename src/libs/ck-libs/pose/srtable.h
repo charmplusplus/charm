@@ -3,112 +3,126 @@
 #define SRTABLE_H
 #include "pose.h"
 
+#define MAX_B 10
+
 class UpdateMsg; // from gvt.h
 
 /// An entry for storing the number of sends and recvs at a timestamp
 /** This class is used in SendRecvTable to store residual send/recv data */
 class SRentry {
-  /// Timestamp of the message
-  int theTimestamp;  
-  /// The number of messages sent with theTimestamp
-  int sendCount;
-  /// The number of messages sent with theTimestamp
-  int recvCount;
-  /// Next SRentry in list
-  SRentry *nextPtr;
  public:
+  /// Timestamp of the message
+  int timestamp;  
+  /// The number of messages sent with theTimestamp
+  int sends;
+  /// The number of messages sent with theTimestamp
+  int recvs;
+  /// Next SRentry in list
+  SRentry *next;
   /// Basic constructor
   /** Initializes all data members */
   SRentry() { 
-    theTimestamp = -1; sendCount = recvCount = 0; nextPtr = NULL; 
+    timestamp = -1; sends = recvs = 0; next = NULL; 
   }
   /// Initializing constructor 1
-  /** Initializes theTimestamp & nextPtr w/parameters, 
-      sendCount & recvCount to 0 */
+  /** Initializes timestamp & next w/parameters, sends & recvs to 0 */
   SRentry(int ts, SRentry *p) { 
-    theTimestamp = ts; sendCount = recvCount = 0; nextPtr = p; 
+    timestamp = ts; sends = recvs = 0; next = p; 
   }
   /// Initializing constructor 2
-  /** Initializes theTimestamp, send/recv count and nextPtr
+  /** Initializes timestamp, send/recv count and next
       w/parameters */
   SRentry(int ts, int sr, SRentry *p) {
-    theTimestamp = ts;  nextPtr = p; 
-    if (sr == SEND) { sendCount = 1; recvCount = 0; }
-    else { sendCount = 0; recvCount = 1; }
+    timestamp = ts;  next = p; 
+    if (sr == SEND) { sends = 1; recvs = 0; }
+    else { sends = 0; recvs = 1; }
+  }
+  /// Initializing constructor
+  /** Initializes timestamp and send/recv count w/parameters */
+  SRentry(int ts, int sr) {
+    timestamp = ts;  next = NULL; 
+    if (sr == SEND) { sends = 1; recvs = 0; }
+    else { sends = 0; recvs = 1; }
   }
   /// Assignment operator
   SRentry& operator=(const SRentry& e) {
-    theTimestamp = e.theTimestamp;
-    sendCount = e.sendCount;
-    recvCount = e.recvCount;
+    timestamp = e.timestamp;
+    sends = e.sends;
+    recvs = e.recvs;
     return *this;
   }
-  /// Set timestamp
-  void setTimestamp(int ts) { theTimestamp = ts; }
-  /// Set next pointer
-  void setNext(SRentry *p) { nextPtr = p; }
-  /// Set sendCount
-  void setSends(int n) { sendCount = n; }
-  /// Set recvCount
-  void setRecvs(int n) { recvCount = n; }
-  /// Increment sendCount
-  void incSends() { sendCount++; } 
-  /// Increment recvCount
-  void incRecvs() { recvCount++; }
-  /// Get timestamp
-  int timestamp() { return theTimestamp; }
-  /// Get next pointer
-  SRentry *next() { return nextPtr; }
-  /// Get sendCount
-  int sends() { return sendCount; }
-  /// Get recvCount
-  int recvs() { return recvCount; }
   /// Dump data fields
   void dump() {
-    if (nextPtr)
-      CkPrintf("TS:%d #s:%d #r:%d n:!NULL ", theTimestamp, sendCount, 
-	       recvCount); 
-    else CkPrintf("TS:%d #s:%d #r:%d n:NULL ",theTimestamp, sendCount, 
-		  recvCount);
+    if (next)
+      CkPrintf("TS:%d #s:%d #r:%d n:!NULL ", timestamp, sends, recvs); 
+    else CkPrintf("TS:%d #s:%d #r:%d n:NULL ",timestamp, sends, recvs);
   }
   /// Check validity of data fields
   void sanitize() {
-    CmiAssert(theTimestamp >= -1); // should be -1 or > if initialized
-    CmiAssert(sendCount >= 0);  // cannot be less than zero
-    CmiAssert(recvCount >= 0);  // cannot be less than zero
-    if (nextPtr == NULL) return;   // nextPtr can be NULL
-    // if nextPtr != NULL, check if pointer looks valid
-    int test_ts = nextPtr->timestamp();
-    int test_sendCount = nextPtr->sends();
-    int test_recvCount = nextPtr->recvs();
-    SRentry *test_next = nextPtr->next();
-    nextPtr->setTimestamp(test_ts);
-    nextPtr->setSends(test_sendCount);
-    nextPtr->setRecvs(test_recvCount);
-    nextPtr->setNext(test_next);
+    CmiAssert(timestamp >= -1); // should be -1 or > if initialized
+    CmiAssert(sends >= 0);  // cannot be less than zero
+    CmiAssert(recvs >= 0);  // cannot be less than zero
+    if (next == NULL) return;   // next can be NULL
+    // if next != NULL, check if pointer looks valid
+    int test_ts = next->timestamp;
+    int test_sendCount = next->sends;
+    int test_recvCount = next->recvs;
+    SRentry *test_next = next->next;
+    next->timestamp = test_ts;
+    next->sends = test_sendCount;
+    next->recvs = test_recvCount;
+    next->next = test_next;
   }
 };
 
-/// An table for storing the number of sends and recvs at a timestamp
+/// A table for storing the number of sends and recvs at a timestamp
 /** This class is used in GVT to keep track of messages sent/received */
 class SRtable {
  public:
   /// Base timestamp to index tables
   /** offset is the current GVT */
   int offset;
-  /// Stores send/recv records 
-  /** One entry per timestamp, all sends/recvs stored in same entry */
-  SRentry *srs;
+  /// Number of buckets to sort sends/recvs into
+  /** Recomputed with each new offset */
+  int b;
+  /// Size of each bucket
+  /** Recomputed with each new offset */
+  int size_b;
+  /// The buckets to sort sends/recvs into
+  /** Only entries [0..b-1] are used */
+  SRentry *buckets[MAX_B];
+  /// The overflow bucket
+  /** What doesn't fit in buckets goes here */
+  SRentry *overflow;
+  /// Number of distinct timestamp entries per bucket
+  /** This is computed in CompressAndSortBucket */
+  int numEntries[MAX_B];
+  /// Number of distinct entries in overflow bucket
+  /** This is computed in CompressAndSortBucket */
+  int numOverflow;
+  
   /// Basic constructor
-  /** Initializes all data fields, including entire sends and recvs arrays */
+  /** Initializes all data fields */
   SRtable();
   /// Destructor
   ~SRtable() { FreeTable(); }
-  /// Insert send/recv record at timestamp
-  void Insert(int timestamp, int srSt); 
-  /// Purge entries from table with timestamp below ts
-  void PurgeBelow(int ts);      
-  /// Free residual entries, reset counters and pointers
+  /// Initialize table to a minimum size
+  void Initialize();
+  /// Insert send/recv record sr at timestamp ts
+  void Insert(int ts, int sr); 
+  /// Insert an existing SRentry e
+  void Insert(SRentry *e); 
+  /// Restructure the table according to new GVT estimate and first send/recv
+  /** Number of buckets and bucket size are determined from firstTS, and
+      entries below newGVTest are discarded. */
+  void Restructure(int newGVTest, int firstTS, int firstSR);
+  /// Compress and pack table into an UpdateMsg and return it
+  UpdateMsg *PackTable(int pvt);
+  /// CompressAndSort all buckets with timestamps <= pvt
+  void PartialSortTable(int pvt);
+  /// Compress a bucket so all SRentries have unique timestamps and are sorted
+  void CompressAndSortBucket(int i, int is_overflow);
+  /// Free all buckets and overflows, reset all counts
   void FreeTable();
   /// Dump data fields
   void dump();    

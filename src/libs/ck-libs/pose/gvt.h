@@ -29,16 +29,10 @@ public:
   int optPVT;
   /// PVT of local conservative objects
   int conPVT;
-  /// # sends/recvs at particular timestamps less than PVT
+  /// # sends/recvs at particular timestamps <= PVT
   SRentry *SRs;
   /// Count of entries in SRs
-  int countSRs;
-  /// Earliest send/recv timestamp in previous GVT invocation
-  int earlyTS;
-  /// Number of sends at lastEarliest
-  int earlySends;
-  /// Number of receives at lastEarliest
-  int earlyRecvs;
+  int numEntries;
   /// Inactive status (GVT only)
   int inactive;
   /// Inactive time (GVT only)
@@ -75,6 +69,11 @@ class PVT : public Group {
   int estGVT;       
   /// Simulation termination flag
   int simdone;
+  /// Minimum send/recv timestamp in this iteration
+  int iterMin;
+  /// Flag to indicate waiting for first send/recv of next iteration
+  /** Used to indicate when to restructure the SendsAndRecvs table */
+  int waitForFirst;
   /// Table to store send/recv timestamps
   SRtable *SendsAndRecvs;            
   /// List of objects registered with this PVT branch

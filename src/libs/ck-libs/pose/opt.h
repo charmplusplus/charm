@@ -48,7 +48,7 @@ public:
     if (RBevent)  theTime = RBevent->timestamp;
     if ((ec > -1) && ((ec < theTime) || (theTime == -1)))  theTime = ec;
     if ((worktime < theTime) || (theTime == -1))  theTime = worktime;
-    if (ovt > gvt)  theTime = ovt;
+    if ((ovt > theTime) && (ovt > gvt)) theTime = ovt;
     return theTime;
   }
   /// Add spawned event to current event's spawned event list
