@@ -236,7 +236,6 @@ void TCharm::ckCheckpoint(char* fname)
   p.becomeUserlevel();
   this->pup(p);
   fclose(chkptfile);
-  CkPrintf("[%d]TCharm::ckCheckpoint, tid = %x\n",thisIndex,tid);
 }
 
 void TCharm::ckRestart(char* fname)
@@ -249,7 +248,6 @@ void TCharm::ckRestart(char* fname)
   p.becomeUserlevel();
   this->pup(p);
   fclose(chkptfile);
-  CkPrintf("[%d]TCharm::ckRestart, tid = %x\n",thisIndex,tid);
 }
 
 //Register user data to be packed with the thread
@@ -323,7 +321,6 @@ void TCharm::migrate(void)
 //Resume from sync: start the thread again
 void TCharm::ResumeFromSync(void)
 {
-CkPrintf("ResumeFromSync!\n");
   start();
 }
 

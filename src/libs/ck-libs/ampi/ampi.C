@@ -225,7 +225,7 @@ void ampiParent::restart(int len, char dname[]){
   char str[256];
   sprintf(str, "%s/%d.cpt",dname, thisIndex);
   ckRestart(str);
-CkPrintf("[%d]ampiParent::restart this=%p\n",thisIndex,this);
+//CkPrintf("[%d]ampiParent::restart this=%p\n",thisIndex,this);
 }
 
 //----------------------- ampi -------------------------
@@ -337,7 +337,7 @@ void ampi::restart(int len, char dname[]){
   char str[256];
   sprintf(str, "%s/%d.cpt",dname,thisIndex);
   ckRestart(str);
-CkPrintf("[%d]ampi::restart this=%p\n",thisIndex,this);
+//CkPrintf("[%d]ampi::restart this=%p\n",thisIndex,this);
 }
 
 void ampi::restartthread(int len, char dname[]){
@@ -348,7 +348,7 @@ void ampi::restartthread(int len, char dname[]){
   thread->clear();
   thread->ckRestart(str);
   thread->start();
-CkPrintf("[%d]ampi::restartthread end\n",thisIndex);
+//CkPrintf("[%d]ampi::restartthread end\n",thisIndex);
 }
 
 /*
