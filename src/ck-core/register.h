@@ -202,6 +202,15 @@ template <class T>
 class CkRegisteredInfo {
 	CkVec<T *> vec;
 public:
+	/**
+	Subtle: we *don't* want to call vec's constructor,
+	because the order in which constructors for global
+	variables get called is undefined.
+	Hence we rely on the implicit zero-initialization 
+	that all globals get.
+	*/
+	CkRegisteredInfo() :vec(CkSkipInitialization()) {}
+
 	/// Add a heap-allocated registration record,
 	///  returning the index used.
 	int add(T *t) {
