@@ -817,7 +817,7 @@ void CentralLB::LDStats::pup(PUP::er &p)
 
 int CentralLB::LDStats::useMem() { 
   return sizeof(LDStats) + sizeof(ProcStats)*count + 
-	 (sizeof(LDObjData) + 2*sizeof(int)) * n_objs;
+	 (sizeof(LDObjData) + 2*sizeof(int)) * n_objs +
  	 sizeof(LDCommData) * n_comm;
 }
 
