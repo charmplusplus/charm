@@ -676,7 +676,7 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CmiBool viaScheduler, CmiBoo
 #if CMK_LBDB_ON
 void CkLocRec_local::staticMigrate(LDObjHandle h, int dest)
 {
-	CkLocRec_local *el=(CkLocRec_local *)h.user_ptr;
+	CkLocRec_local *el=(CkLocRec_local *)LDObjUserData(h);
 	DEBL((AA"Load balancer wants to migrate %s to %d\n"AB,idx2str(el->idx),dest));
 	el->migrateMe(dest);
 }
