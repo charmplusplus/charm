@@ -180,8 +180,16 @@ class CkImageCompressor {
 	// source/destination image
 	CkAllocImage *img;
 public:
-	CkImageCompressor(CkAllocImage *img_) :img(img_) { }
+	int w,h; ///< Size of original image.
+	int gl_w, gl_h; ///< Size of expanded image (to power of 2 for openGL)
+	CkImageCompressor(CkAllocImage *img_) 
+		:img(img_),w(img->getWidth()), h(img->getHeight()), gl_w(0), gl_h(0) { }
 	void pup(PUP::er &p);
+	CkAllocImage *getImage(void) {
+		CkAllocImage *i=img;
+		img=NULL;
+		return i;
+	}
 };
 
 /**
@@ -191,14 +199,18 @@ public:
  */
 class CkQuadView : public CkView {
 public:
-	/// These are the universe locations of the four 
-	///  corners of our texture image.  
+	/// These are the XYZ universe locations of the 
+	///  vertices of our texture image.  These go in a 
+	///   fan, like:
 	///    corners[0]==image.getPixel(0,0)
 	///    corners[1]==image.getPixel(w-1,0)
-	///    corners[2]==image.getPixel(0,h-1)
-	///    corners[3]==image.getPixel(w-1,h-1)
-	///  
-	CkVector3d corners[4];
+	///    corners[2]==image.getPixel(w-1,h-1)
+	///    corners[3]==image.getPixel(0,h-1)
+	/// Subclasses MUST set these fields on the server.
+	enum {maxCorners=8};
+	int nCorners;
+	CkVector3d corners[maxCorners]; // xyz vertices
+	CkVector3d texCoord[maxCorners]; // texture coordinates
 
 // (CLIENT AND SERVER)
 	virtual void pup(PUP::er &p);
@@ -327,6 +339,11 @@ public:
 	/// Evaluate the maximum error, in pixels, between the
 	/// projection of our texture and the projection of the true object.
 	double maxError(const CkViewpoint &univ2screen) const;
+
+#define CMK_LIVEVIZ3D_INTERESTVIEWRENDER 0 /* need to be pup::able to render... */
+#if CMK_LIVEVIZ3D_INTERESTVIEWRENDER
+	virtual void render(double alpha);
+#endif
 };
 
 

@@ -83,8 +83,9 @@ public:
 	status("Updating pending render...\n");
 			renderUpdate(m);
 		}
-		else if (!view || viewable->shouldRender(m->viewpoint,*view)) 
-		{ // Need to ask for a new rendering:
+		else if (viewable) {
+		  if ((!view) || viewable->shouldRender(m->viewpoint,*view)) 
+		  { // Need to ask for a new rendering:
 	status("Reqesting rendering...\n");
 			renderRequested=true;
 			renderUpdate(m);
@@ -95,6 +96,7 @@ public:
 					m->clientID,m->frameID,0,prioAdj
 				)
 			);
+		  }
 		}
 	}
 	
@@ -166,7 +168,6 @@ void LV3D_Array::LV3D_Viewpoint(LV3D_ViewpointMsg *m)
 */
 void LV3D_Array::LV3D_Render(LV3D_RenderMsg *m)
 {
-	LV3D_Prepare();
 	impl->render(m);
 }
 
@@ -188,6 +189,7 @@ void LV3D_Array::LV3D_Prepare(void) {}
 void impl_LV3D_Array::LV3D_FlatRender(liveVizRequestMsg *m,LV3D_Array *arr)
 {
 	if (!viewable) { /* nothing to show */
+	  // printf("Skipping deposit for %d\n",arr->thisIndex.data[0]);
 	  liveVizDeposit(m, 0,0, 0,0, 0, arr);
 	  return;
 	}
@@ -242,7 +244,7 @@ void LV3D_RenderMsg::delete_(LV3D_RenderMsg *m) {
 	delete m;
 }
 
-void LV3D1_Init(const CkBbox3d &box,CkArrayID aid,LV3D_Universe *theUniverse)
+void LV3D1_Init(CkArrayID aid,LV3D_Universe *theUniverse)
 {
 	// Broadcast to LV3D_Viewpoint when the viewpoint changes.
 	CkCallback frameUpdate(CkIndex_LV3D_Array::LV3D_Viewpoint(0),aid);

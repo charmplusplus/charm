@@ -31,6 +31,13 @@ void CkView::pup(PUP::er &p) {
 
 /***************** CkImageCompressor *****************/
 
+/* Round up to nearest power of 2 */
+int roundTo2(int x) {
+	int ret=1;
+	while (ret<x) ret*=2;
+	return ret;
+}
+
 /**
   Compress an image by encoding away pixels with alpha==0
   on the start and end of each row.
@@ -39,34 +46,39 @@ void CkView::pup(PUP::er &p) {
     the PUP::er is xlating.
 */
 void CkImageCompressor::pup(PUP::er &p) {
-	img->CkImage::pup(p);
-	int wid=img->getWidth(), ht=img->getHeight();
-	int colors=img->getColors();
 	if (p.isUnpacking()) 
 	{ /* client side: decompression */
-		img->allocate();
-		for (int y=0;y<ht;y++) {
+		int colors,layout;
+		p|w; p|h; p|colors; p|layout;
+		gl_w=roundTo2(w); gl_h=roundTo2(h); 
+		img=new CkAllocImage(gl_w,gl_h,colors); 
+		img->setLayout((CkImage::layout_t)layout);
+		for (int y=0;y<gl_h;y++) {
 			int first_x, last_x;
-			p|first_x; p|last_x;
+			if (y<h) {p|first_x; p|last_x;}
+			else {first_x=0; last_x=0;}
 			memset(img->getPixel(0,y),0,first_x*colors);
 			p(img->getPixel(first_x,y),(last_x-first_x)*colors);
-			memset(img->getPixel(last_x,y),0,(wid-last_x)*colors);
+			memset(img->getPixel(last_x,y),0,(gl_w-last_x)*colors);
 		}
 	} else /* server side: compress image */ {
+		int colors=img->getColors();
+		int layout=img->getLayout();
+		p|w; p|h; p|colors; p|layout;
 		int alpha_channel;
-		if (img->getColors()==3) alpha_channel=-1; /* no alpha: just RGB */
-		else if (img->getLayout()==CkImage::layout_reversed)
-			alpha_channel=img->getColors()-1; /* alpha in last channel */
-		else /* img->getLayout()==CkImage::layout_default */
+		if (colors==3) alpha_channel=-1; /* no alpha: just RGB */
+		else if (layout==CkImage::layout_reversed)
+			alpha_channel=colors-1; /* alpha in last channel */
+		else /* layout==CkImage::layout_default */
 			alpha_channel=0; /* alpha in first channel */
 		
-		for (int y=0;y<ht;y++) {
-			int first_x=0, last_x=wid-1;
+		for (int y=0;y<h;y++) {
+			int first_x=0, last_x=w-1;
 			if (alpha_channel!=-1) {
 				CkImage::channel_t *row=img->getPixel(0,y);
 				row+=alpha_channel; /* jump to alpha channel */
 				// Advance over black pixels on the left border
-				while (first_x<wid && row[colors*first_x]==0) 
+				while (first_x<w && row[colors*first_x]==0) 
 					first_x++;
 				// Advance over black pixels on the right border
 				while (last_x>=first_x && row[colors*last_x]==0) 
@@ -128,29 +140,39 @@ oglTextureFormat_t oglImageFormat(const CkImage &img)
 	return fmt;
 }
 
-static stats::op_t op_upload_pixels=stats::count_op("net.in","Uploaded texture pixels","pixels");
+static stats::op_t op_uploadpad_pixels=stats::count_op("net.in_pad","Uploaded padded texture pixels","pixels");
+static stats::op_t op_upload_pixels=stats::count_op("net.in","Uploaded valid texture pixels","pixels");
 #endif
 
 
 void CkQuadView::pup(PUP::er &p) {
 	CkView::pup(p);
 	p.comment("Texture corners");
-	for (int i=0;i<4;i++) p|corners[i];
+	p|nCorners;
+	for (int i=0;i<nCorners;i++) {
+		p|corners[i];
+		p|texCoord[i];
+	}
 	
 // Pup the image:
 	x_tex.pup(p);
 
 #ifdef CMK_LIVEVIZ3D_CLIENT
 	if (p.isUnpacking()) { /* immediately upload image to OpenGL */
-		int w=s_tex.getWidth(), h=s_tex.getHeight();
-		oglTextureFormat_t fmt=oglImageFormat(s_tex);
-		c_tex=new oglTexture(s_tex.getData(),w,h,oglTexture_linear, 
-			fmt.format,fmt.type);
-		stats::get()->add(w*h,op_upload_pixels);
+		CkAllocImage *img=x_tex.getImage();
+		oglTextureFormat_t fmt=oglImageFormat(*img);
+		c_tex=new oglTexture(img->getData(),x_tex.gl_w,x_tex.gl_h,
+			oglTexture_linear, fmt.format,fmt.type);
+		stats::get()->add(x_tex.w*x_tex.h,op_upload_pixels);
+		stats::get()->add(x_tex.gl_w*x_tex.gl_h,op_uploadpad_pixels);
+		double tx=x_tex.w/(double)x_tex.gl_w;
+		double ty=x_tex.h/(double)x_tex.gl_h;
+		for (int i=0;i<nCorners;i++) 
+			texCoord[i]=CkVector3d(tx*texCoord[i].x,ty*texCoord[i].y,texCoord[i].z);
 		
 		//Now that we've copied the view into GL, 
 		// flush the old in-memory copy:
-		s_tex.deallocate();
+		delete img;
 	}
 #endif
 
@@ -166,25 +188,34 @@ void CkQuadView::render(double alpha) {
 	CkAbort("CkQuadView::render should never be called on server!\n");
 #else
 	glColor4f(1.0,1.0,1.0,alpha);
+	
+	/*
 	CkVector3d &bl=corners[0];
 	CkVector3d &br=corners[1];
 	CkVector3d &tl=corners[2];
 	CkVector3d &tr=corners[3];
 	oglTextureQuad(*c_tex,tl,tr,bl,br);
+	*/
+	c_tex->bind();
+	glEnable(GL_TEXTURE_2D);
+	glBegin (nCorners==4?GL_QUADS:GL_TRIANGLE_STRIP);
+	for (int i=0;i<nCorners;i++) {
+		glTexCoord2dv(texCoord[i]); glVertex3dv(corners[i]); 
+	}
+	glEnd();
+	
 	if (oglToggles['f']) 
 	{ // Draw a little frame around this texture
-		oglLine(tl,tr); oglLine(tr,br);
-		oglLine(br,bl); oglLine(bl,tl);
+		for (int i=0;i<nCorners;i++)
+			oglLine(corners[i],corners[(i+1)%nCorners]);
 	}
 #endif
 }
 
-#if 0 /* not used */
+#if CMK_LIVEVIZ3D_INTERESTVIEWRENDER
 void CkInterestView::render(double alpha) {
-#ifndef CMK_LIVEVIZ3D_CLIENT
-	CkAbort("CkInterestView::render should never be called on server!\n");
-#else
 	CkQuadView::render(alpha);
+#ifdef CMK_LIVEVIZ3D_CLIENT
 	if (oglToggles['b']) 
 	{ // Draw a little box around this texture's interest points
 		oglLine(univ[0],univ[1]); 
@@ -251,10 +282,15 @@ CkInterestView::CkInterestView(int wid,int ht,int n_colors,
 	const CkViewpoint &univ2texture)
 	:CkQuadView(wid,ht,n_colors), univ(univ_)
 {
+	nCorners=4;
 	corners[0]=univ2texture.viewplane(CkVector3d(0  , 0, 0));
 	corners[1]=univ2texture.viewplane(CkVector3d(wid, 0, 0));
-	corners[2]=univ2texture.viewplane(CkVector3d(0  ,ht, 0));
-	corners[3]=univ2texture.viewplane(CkVector3d(wid,ht, 0));
+	corners[2]=univ2texture.viewplane(CkVector3d(wid,ht, 0));
+	corners[3]=univ2texture.viewplane(CkVector3d(0  ,ht, 0));
+	texCoord[0]=CkVector3d(0,0,0);
+	texCoord[1]=CkVector3d(1,0,0);
+	texCoord[2]=CkVector3d(1,1,0);
+	texCoord[3]=CkVector3d(0,1,0);
 	
 	proj.setPoints(univ.size());
 	for (int i=0;i<univ.size();i++) 
@@ -354,8 +390,8 @@ bool CkInterestViewable::newViewpoint(const CkViewpoint &univ2screen,CkViewpoint
 	while ((wid<target_w) || (ht<target_h)) {
 		ht*=2; wid*=2;
 	}
-#else /* for liveViz: non-power-of-two textures */
-	int max_sz=2048;
+#else /* non-power-of-two textures (sensible default) */
+	int max_sz=512;
 	int wid=target_w, ht=target_h;
 #endif
 	

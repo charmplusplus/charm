@@ -5,7 +5,7 @@
   Orion Sky Lawlor, olawlor@acm.org, 2003/9/13
 */
 #include "lv3d0_server.h"
-#include "pup_toNetwork4.h"
+#include "pup_toNetwork.h"
 #include <vector>
 #include <map>
 #include <algorithm>
@@ -36,7 +36,7 @@ public:
 	
 	/// Number of bytes in view array:
 	int view_size;
-	/// A PUP::toNetwork4'd CkView:
+	/// A PUP::toNetwork'd CkView:
 	unsigned char *view;
 	
 	/// Pack this CkView into a new message.  Does not keep the view.
@@ -46,14 +46,14 @@ public:
 
 /// Pack this CkView into a new message:
 LV3D0_ViewMsg *LV3D0_ViewMsg::new_(CkView *vp) {
-	PUP_toNetwork4_sizer ps; ps|vp;
+	PUP_toNetwork_sizer ps; ps|vp;
 	int view_size=ps.size();
 	
 	LV3D0_ViewMsg *m=new (view_size,0) LV3D0_ViewMsg;
 	m->id=vp->id;
 	m->prio=vp->prio;
 	m->view_size=view_size;
-	PUP_toNetwork4_pack pp(m->view); pp|vp;
+	PUP_toNetwork_pack pp(m->view); pp|vp;
 	return m;
 }
 void LV3D0_ViewMsg::delete_(LV3D0_ViewMsg *m) {
@@ -140,7 +140,7 @@ class LV3D0_ClientManager {
 		
 		// FIXME: special case this when n==1.
 		char *retMsg=new char[len];
-		PUP_toNetwork4_pack pp(retMsg);
+		PUP_toNetwork_pack pp(retMsg);
 		pp|n;
 		for (it=prio2view.begin(); it!=sendEnd; ++it) {
 			prio2view_t::iterator doomed=it;
@@ -312,11 +312,11 @@ Response is a 1-int clientID followed by a PUP::able universe.
 extern "C" void LV3D0_setup(char *msg) {
 	CmiFree(msg);
 	int clientID=mgrProxy.ckLocalBranch()->newClient();
-	PUP_toNetwork4_sizer sp;
+	PUP_toNetwork_sizer sp;
 	sp|clientID;
 	sp|theUniverse;
 	unsigned char *buf=new unsigned char[sp.size()];
-	PUP_toNetwork4_pack pp(buf);
+	PUP_toNetwork_pack pp(buf);
 	pp|clientID;
 	pp|theUniverse;
 	CcsSendReply(sp.size(),buf);
@@ -334,7 +334,7 @@ Outgoing request is an integer clientID, frameID,
 and a CkViewpoint. There is no response.
 */
 extern "C" void LV3D0_newViewpoint(char *msg) {
-	PUP_toNetwork4_unpack p(&msg[CmiMsgHeaderSizeBytes]);
+	PUP_toNetwork_unpack p(&msg[CmiMsgHeaderSizeBytes]);
 	LV3D_ViewpointMsg *m=new LV3D_ViewpointMsg;
 	p|m->clientID;
 	p|m->frameID;
@@ -354,7 +354,7 @@ Incoming response is a set of updated CkViews:
     for (int i=0;i<n;i++) p|view[i];
 */
 extern "C" void LV3D0_getViews(char *msg) {
-	PUP_toNetwork4_unpack p(&msg[CmiMsgHeaderSizeBytes]);
+	PUP_toNetwork_unpack p(&msg[CmiMsgHeaderSizeBytes]);
 	int clientID; p|clientID; CmiFree(msg);
 	mgrProxy.ckLocalBranch()->getViews(clientID);
 }
@@ -378,7 +378,7 @@ static void emptyDoneFn(void *param,void *msg);
 extern "C" void LV3D0_qd(char *msg) /* stage 1 */
 {
 	lv3d_qdState *s=new lv3d_qdState;
-	PUP_toNetwork4_unpack p(&msg[CmiMsgHeaderSizeBytes]);
+	PUP_toNetwork_unpack p(&msg[CmiMsgHeaderSizeBytes]);
 	p|s->clientID;
 	s->reply=CcsDelayReply();
 	CmiFree(msg);
