@@ -1,9 +1,8 @@
 module liveViz {
 message liveVizRequestMsg;
-readonly liveVizConfig lv_config;
 initcall void liveVizNodeInit(void);
 
-/*group liveViz {
-	entry liveViz(liveVizConfig cfg,CkArrayID A, CkCallback c);
-};*/
+group liveVizGroup {
+	entry liveVizGroup(const liveVizConfig &cfg);
+};
 }

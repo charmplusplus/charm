@@ -6,20 +6,38 @@ Orion Sky Lawlor, olawlor@acm.org, 6/11/2002
 #include "liveViz.h"
 #include "image.h"
 
-/*readonly*/ liveVizConfig lv_config;
+static liveVizConfig lv_config;
 static CkCallback clientGetImageCallback;
 
 //Called by clients to start liveViz.
-//  Because of the readonly initialization, this has to be called from
-//  the main chare; if we could set lv_config some other way, we wouldn't
-//  need this restriction.
 void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c)
 {
   if (CkMyPe()!=0) CkAbort("liveVizInit must be called only on processor 0!");
-  lv_config=cfg;
   clientGetImageCallback=c;
-  liveViz0Init(cfg);
+  //Broadcast the liveVizConfig object via our group:
+  //  lv_config can't be a readonly because we may be called after
+  //  main::main (because, e.g., communication is needed to find the
+  //  bounding box inside cfg).
+  CProxy_liveVizGroup::ckNew(cfg);
 }
+
+static void liveVizInitComplete(void *rednMessage);
+
+//The liveVizGroup is only used to set lv_config on every processor.
+class liveVizGroup : public Group {
+public:
+	liveVizGroup(const liveVizConfig &cfg) {
+		lv_config=cfg;
+		contribute(0,0,CkReduction::sum_int,liveVizInitComplete);
+	}
+};
+
+//Called by reduction handler once every processor has the lv_config object
+static void liveVizInitComplete(void *rednMessage) {
+  delete (CkReductionMsg *)rednMessage;
+  liveViz0Init(lv_config);
+}
+
 
 //Called by lower layers when an image request comes in on processor 0.
 //  Just forwards request on to user.
@@ -30,7 +48,7 @@ void liveViz0Get(const liveVizRequest3d &req)
 
 //Image combining reduction type: defined below.
 static CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs);
-static void vizReductionHandler(void *ignored,void *r_msg);
+static void vizReductionHandler(void *r_msg);
 static CkReduction::reducerType imageCombineReducer;
 
 static void liveVizNodeInit(void) {
@@ -99,7 +117,7 @@ void liveVizDeposit(const liveVizRequest &req,
   }
 
 //Contribute this image to the reduction
-  msg->setCallback(CkCallback(vizReductionHandler));
+  msg->setCallback(vizReductionHandler);
   client->contribute(msg);
 }
 
@@ -149,7 +167,7 @@ static CkReductionMsg *imageCombine(int nMsg,CkReductionMsg **msgs)
 Called once final image has been assembled (reduction handler).
 Unpacks image, and passes it on to layer 0.
 */
-static void vizReductionHandler(void *ignored,void *r_msg)
+static void vizReductionHandler(void *r_msg)
 {
   CkReductionMsg *msg = (CkReductionMsg*)r_msg;
   imageHeader *hdr=(imageHeader *)msg->getData();
