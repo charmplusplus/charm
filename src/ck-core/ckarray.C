@@ -396,6 +396,8 @@ void CProxySection_ArrayBase::pup(PUP::er &p)
 void _ckArrayInit(void)
 {
   CkpvInitialize(ArrayElement_initInfo,initInfo);
+  CkDisableTracing(CkIndex_CkArray::insertElement(0));
+  CkDisableTracing(CkIndex_CkArray::recvBroadcast(0));
 }
 
 CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionID)
