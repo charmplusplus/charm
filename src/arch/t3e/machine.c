@@ -465,7 +465,7 @@ void ConverseExit()
   }
 #endif
   ConverseCommonExit();
-  globalexit(0);
+  localexit(0);
 }
 
 void CmiNotifyIdle(void)
