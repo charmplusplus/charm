@@ -352,8 +352,8 @@ void CcdModuleInit(void)
      init_cblist(&(CpvAccess(conds).condcb[i]), CBLIST_INIT_LEN);
      init_cblist(&(CpvAccess(conds).condcb_keep[i]), CBLIST_INIT_LEN);
    }
-   CpvAccess(_ccd_numchecks) = 10;
-   CpvAccess(pcb).nSkip = 10;
+   CpvAccess(_ccd_numchecks) = 1;
+   CpvAccess(pcb).nSkip = 1;
    curTime=CmiWallTimer();
    CpvAccess(pcb).lastCheck = curTime;
    for (i=0;i<CCD_PERIODIC_MAX;i++)
@@ -428,15 +428,26 @@ void CcdCallBacks(void)
   
   /* Figure out how many times to skip Ccd processing */
   double currTime = CmiWallTimer();
+
+  unsigned int nSkip=o->nSkip;
+#if 1
+/* Dynamically adjust the number of messages to skip */
   double elapsed = currTime - o->lastCheck;
-  int nMsgs=o->nSkip-CpvAccess(_ccd_numchecks);
-  if (elapsed>0) /* Try to wait about 5 ms between time checks */
-     o->nSkip = (int)(5.0e-3*nMsgs/elapsed);
-  else
-    o->nSkip *= 2;
-  if (o->nSkip<1) o->nSkip=1;
-  if (o->nSkip>2000) o->nSkip=2000;
-  CpvAccess(_ccd_numchecks) = o->nSkip;
+#define targetElapsed 5.0e-3
+  if (elapsed<targetElapsed) nSkip*=2; /* too short: process more */
+  else /* elapsed>targetElapsed */ nSkip/=2; /* too long: process fewer */
+  
+/* Keep skipping within a sensible range */
+#define minSkip 1u
+#define maxSkip 20u
+  if (nSkip<minSkip) nSkip=minSkip;
+  else if (nSkip>maxSkip) nSkip=maxSkip;
+#else
+/* Always skip a fixed number of messages */
+  nSkip=1;
+#endif
+
+  CpvAccess(_ccd_numchecks)=o->nSkip=nSkip;
   o->lastCheck=currTime;
   
   ccd_heap_update(currTime);
@@ -456,8 +467,7 @@ void CcdCallBacksReset(void *ignored)
 {
   ccd_periodic_callbacks *o=&CpvAccess(pcb);
   double currTime=CmiWallTimer();
-  o->nSkip=1;
-  CpvAccess(_ccd_numchecks)=o->nSkip;
+  CpvAccess(_ccd_numchecks)=o->nSkip=1;
   o->lastCheck=currTime;
 }
 
