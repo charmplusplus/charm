@@ -54,6 +54,7 @@ void RefineLB::create(CentralLB::LDStats* stats, int count)
     for(i=0; i < osz; i++) {
 //      computes[index].omID = odata[i].omID;
 //      computes[index].id = odata[i].id;
+      computes[index].id = odata[i].id;
       computes[index].handle = odata[i].handle;
       computes[index].load = odata[i].cpuTime;
       computes[index].processor = -1;
@@ -131,9 +132,15 @@ int RefineLB::refine()
    for (i=0; i<P; i++)
    {
       if (processors[i].load > overLoad*averageLoad)
+      {
+CkPrintf("Processor %d is HEAVY: load:%f averageLoad:%f!\n", i, processors[i].load, averageLoad);
          heavyProcessors->insert((InfoRecord *) &(processors[i]));
+      }
       else if (processors[i].load < averageLoad)
+      {
+CkPrintf("Processor %d is LIGHT: load:%f averageLoad:%f!\n", i, processors[i].load, averageLoad);
 	      lightProcessors->insert((InfoRecord *) &(processors[i]));
+      }
    }
    int done = 0;
 
@@ -185,7 +192,7 @@ int RefineLB::refine()
       //we have narrowed the choice to 3 candidates.
       if (bestCompute)
       {
-//CkPrintf("Assign: from %d to %d \n", donor->Id, bestP->Id);
+CkPrintf("Assign: [%d] with load: %f from %d to %d \n", bestCompute->id.id[0], bestCompute->load, donor->Id, bestP->Id);
         deAssign(bestCompute, donor);      
         assign(bestCompute, bestP);
       }
