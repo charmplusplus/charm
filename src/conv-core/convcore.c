@@ -109,6 +109,7 @@ char **argv;
 {
   int argc;
   char **origArgv = argv;
+  int trace = 1;
 
   CpvInitialize(int, CtrRecdTraceMsg);
   CpvInitialize(int, CtrLogBufSize);
@@ -137,6 +138,9 @@ char **argv;
       sscanf(*argv, "%d", &logsize);
       CpvAccess(CtrLogBufSize) = logsize;
       DeleteArg(argv);
+    } else if (strcmp(*argv, "+traceoff") == 0) {
+      trace = 0;
+      DeleteArg(argv);
     } else
     argv++;
   }
@@ -144,6 +148,7 @@ char **argv;
   argc = 0; argv=origArgv;
   for(argc=0;argv[argc];argc++);
   traceModuleInit(&argc, argv);
+  CpvAccess(traceOn) = trace;
   log_init();
 }
 
