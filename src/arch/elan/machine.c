@@ -56,16 +56,16 @@ ELAN_BASE     *elan_base;
 ELAN_TPORT    *elan_port;
 ELAN_QUEUE    *elan_q;
 
-int enableGetBasedSend = 0;
+int enableGetBasedSend = 1;
 
-const int SMALL_MESSAGE_SIZE=8192;  /* Smallest message size queue 
+int SMALL_MESSAGE_SIZE=8192;  /* Smallest message size queue 
                                        used for receiving short messages */
                                      
-const int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages 
+int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages 
                                           which need pre posted receives
                                           Message sizes greater will be 
                                           probe received adding 5us overhead*/
-#define SYNC_MESSAGE_SIZE 65536    //MID_MESSAGE_SIZE  
+#define SYNC_MESSAGE_SIZE MID_MESSAGE_SIZE  
                              /* Message sizes greater will be 
                                 sent synchronously thus avoiding copying*/
 
@@ -648,7 +648,6 @@ int PumpMsgs(int retflag)
             ecount = (rcount + event_idx) % RECV_MSG_Q_SIZE;
             if(elan_tportRxDone(esmall[ecount]) || 
                (retflag == 3 && nlarge_torecv == 0 && !flg)) {
-                //elan_deviceCheck(elan_base->state);
                 elan_tportRxWait(esmall[ecount], &src, &tag, &size );
                 
                 msg = sbuf[ecount];
@@ -798,7 +797,7 @@ void CmiNotifyIdle(void)
     CmiReleaseSentMessages();
     ElanSendQueuedMessages();
     
-    if(!PumpMsgs(1) && blockingReceiveFlag /*&& (CmiMyPe() % 4 == 0)*/){
+    if(!PumpMsgs(1) && blockingReceiveFlag){
         if (!PCQueueEmpty(CmiGetState()->recv)) return; 
         if (!CdsFifo_Empty(CpvAccess(CmiLocalQueue))) return;
         if (!CqsEmpty(CpvAccess(CsdSchedQueue))) return;
@@ -870,6 +869,9 @@ void ElanBasicSendFn(SMSG_LIST * ptr){
     tiny_msg = 0; //A sizeof(int) byte message 
     //sent to wake up a blocked process
     
+    //WAKE A PROCESS SLEEPING ON A BLOCKING RECEIVE UP,
+    //WITH A SMALL MESSAGE THAT MATCHES THE TAG OF A SMALL MESSAGE
+    //BUT IS ACTUALLY A MID OR LARGE MESSAGE
     if(ptr->size > SMALL_MESSAGE_SIZE && blockingReceiveFlag) {
         elan_tportTxWait(elan_tportTxStart(elan_port, 0, ptr->destpe, 
                                            CmiMyPe(), TAG_LARGE_HEADER, 
@@ -1542,6 +1544,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
       blockingReceiveFlag = 1;
   }
 
+  CmiGetArgInt(argv,"+smallMessageSize", &SMALL_MESSAGE_SIZE);
+  CmiGetArgInt(argv,"+midMessageSize", &MID_MESSAGE_SIZE);
+  enableGetBasedSend = CmiGetArgFlag(argv,"+enableGetBasedSend");
+
+  //CmiPrintf("SMALL_MESSAGE_SIZE = %d\n", SMALL_MESSAGE_SIZE);
+
   CmiTimerInit();
   msgBuf = PCQueueCreate();
 
@@ -1580,7 +1588,7 @@ CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
 }
 
 extern void CmiReference(void *blk);
-#if 1
+#if 0
 #define ELAN_BUF_SIZE MID_MESSAGE_SIZE
 #define USE_NIC_MULTICAST 0
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
