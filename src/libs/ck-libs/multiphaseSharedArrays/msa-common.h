@@ -36,7 +36,7 @@ typedef enum { MSA_COL_MAJOR=0, MSA_ROW_MAJOR=1 } MSA_Array_Layout_t;
     operator if you use accumulate, typecast from int 0, 1, and pup.
 */
 
-template <class T, bool PUP_EVERY_ELEMENT=true >
+template <class T, bool PUP_EVERY_ELEMENT=false >
 class DefaultEntry {
 public:
     inline void accumulate(T& a, const T& b) { a += b; }
@@ -45,7 +45,7 @@ public:
     inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
 };
 
-template <class T, bool PUP_EVERY_ELEMENT=true >
+template <class T, bool PUP_EVERY_ELEMENT=false >
 class ProductEntry {
 public:
     inline void accumulate(T& a, const T& b) { a *= b; }
@@ -53,7 +53,7 @@ public:
     inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
 };
 
-template <class T, T minVal, bool PUP_EVERY_ELEMENT=true >
+template <class T, T minVal, bool PUP_EVERY_ELEMENT=false >
 class MaxEntry {
 public:
     inline void accumulate(T& a, const T& b) { a = (a<b)?b:a; }
