@@ -119,6 +119,7 @@ typedef struct CthThreadBase
   */
   char cmicore[CmiMsgHeaderSizeBytes];
   
+  CmiObjId tid;        /* globally unique tid */
   CthAwkFn   awakenfn;   /* Insert this thread into the ready queue */
   CthThFn    choosefn;   /* Return the next ready thread */
   CthThread  next; /* Next active thread */
@@ -183,6 +184,7 @@ CthCpvStatic(int, _defaultStackSize);
 
 static void CthThreadBaseInit(CthThreadBase *th)
 {
+  static int serialno = 0;
 #if CMK_LINUX_PTHREAD_HACK
   /*HACK for LinuxThreads: to support our user-level threads
     library, we use a slightly modified version of libpthread.a
@@ -209,7 +211,12 @@ static void CthThreadBaseInit(CthThreadBase *th)
   th->isIsomalloc=0;
   th->stack=NULL;
   th->stacksize=0;
+
+  th->tid.id[0] = CmiMyPe();
+  th->tid.id[1] = serialno++;
+  th->tid.id[2] = 0;
 }
+
 static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useIsomalloc)
 {
   void *ret=NULL;
@@ -1212,4 +1219,10 @@ CthThread CthPup(pup_er p, CthThread t)
   }
   return t;
 }
+
+void CthTraceResume(CthThread t)
+{
+  traceResume(&t->base.tid);
+}
+
 #endif

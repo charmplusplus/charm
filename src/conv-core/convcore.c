@@ -937,7 +937,7 @@ void CthResumeNormalThread(CthThread t)
 {
 #ifndef CMK_OPTIMIZE
   if(CpvAccess(traceOn))
-    traceResume();
+    CthTraceResume(t);
 #endif
   CthResume(t);
 }

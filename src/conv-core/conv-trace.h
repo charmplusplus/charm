@@ -20,7 +20,7 @@ void traceCharmInit(char **argv);	/* init trace module in ck */
 void traceMessageRecv(char *msg, int pe);
 void traceBeginIdle(void);
 void traceEndIdle(void);
-void traceResume(void);
+void traceResume(CmiObjId *);
 void traceSuspend(void);
 void traceAwaken(CthThread t);
 void traceUserEvent(int);

@@ -8,7 +8,7 @@
 #ifndef CONVERSE_H
 #define CONVERSE_H
 
-#ifndef _conv_mach_h
+#ifndef _CONV_MACH_H
 #include "conv-mach.h"
 #include "conv-autoconfig.h"
 #endif
@@ -929,6 +929,11 @@ void CmiPrintStackTrace(int nSkip);
 CpvExtern(void*, CmiLocalQueue);
 #endif
 
+/* this is the type for thread ID, mainly used for projection. */
+typedef struct {
+int id[3];
+} CmiObjId;
+
 #include "conv-cpm.h"
 #include "conv-cpath.h"
 #include "conv-qd.h"
@@ -936,7 +941,6 @@ CpvExtern(void*, CmiLocalQueue);
 #include "conv-lists.h"
 #include "conv-trace.h"
 #include "persistent.h"
-
 
 #if defined(__cplusplus)
 }
