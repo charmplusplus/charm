@@ -49,7 +49,7 @@ all:
 	$(CHARMC) -o util.o -seq util.C
 	test -d ../tmp || mkdir ../tmp; cp *.o ../tmp
 
-	cd ../tmp; /bin/rm -f moduleinit.o; $(CHARMC) *.o $(OTHER) $(LIBS) -o $(PGM) -lpose -ltrace-projections -language charm++ -module commlib
+	cd ../tmp; /bin/rm -f moduleinit.o; $(CHARMC) *.o $(OTHER) $(LIBS) -o $(PGM) -module pose -ltrace-projections -language charm++ -module commlib
 
 clean:
 	@echo

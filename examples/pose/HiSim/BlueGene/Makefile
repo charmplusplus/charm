@@ -42,6 +42,7 @@ MACHINE = BlueGene
 all:  
 	@echo
 	test -d ../tmp || mkdir ../tmp;
+	cd ..;
 	for i in $(SUBDIRS) ; do \
 	( cd $$i ; $(MAKE) $(MACHINE) MACHINE="../$(MACHINE)" ) || exit 1; \
 	done
@@ -58,6 +59,7 @@ $(OBJDIR)/util.o: util.C
 
 clean:
 	@echo
+	cd ..;
 	for i in $(SUBDIRS) ; do \
 	( cd $$i ; $(MAKE) clean ) ; \
 	done
