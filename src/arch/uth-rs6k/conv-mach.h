@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.9  1996-06-28 21:27:11  jyelon
+ * Revision 1.10  1996-07-02 21:22:24  jyelon
+ * Many small changes.
+ *
+ * Revision 1.9  1996/06/28 21:27:11  jyelon
  * Added CMK_USE_STANDARD_DEFAULT_MAIN and CMK_USE_SIMULATOR_DEFAULT_MAIN.
  *
  * Revision 1.8  1996/01/17 08:04:13  jyelon
@@ -85,8 +88,8 @@
 /* #define CMK_COMMHANDLE_IS_AN_INTEGER */
 #define CMK_COMMHANDLE_IS_A_POINTER
  
-/* #define CMK_USES_SPECIAL_CMIDELIVERS */ 
-#define CMK_USES_COMMON_CMIDELIVERS
+#define CMK_USES_SPECIAL_CMIDELIVERS
+/* #define CMK_USES_COMMON_CMIDELIVERS */
 
 /* #define CMK_SHARED_VARS_EXEMPLAR */
 /* #define CMK_NO_SHARED_VARS_AT_ALL */
