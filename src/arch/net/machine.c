@@ -620,7 +620,7 @@ char **argv;
   resend_wait = 10;
   resend_fail = 600000;
   Cmi_enableinterrupts = 1;
-  Topology = 'F';
+  Topology = 'H';
   outputfile = NULL;
 
   while (*argv) {
@@ -945,45 +945,50 @@ static int NumSends;
  *                                                                           
  * Neighbour-Lookup functions.                                               
  *                                                                           
- * the neighbour information is computed dynamically.  It is computed solely 
- * from the value of the Topology variable and the Cmi_numpes.             
+ * the neighbour information is computed dynamically.  It imposes a
+ * (maybe partial) hypercube on the machine.
  *                                                                           
  *****************************************************************************/
-
-int CmiNumNeighbours(node)
-     int node;
+ 
+long CmiNumNeighbours(node)
+int node;
 {
-  switch (Topology) {
-  case 'F': case 'f':		/* Full interconnectivity */
-    return CpvAccess(Cmi_numpes)-1;
-  default: KillEveryoneCode(233);
+  int bit, count=0;
+  bit = 1;
+  while (1) {
+    int neighbour = node ^ bit;
+    if (neighbour < Cmi_numpes) count++;
+    bit<<1; if (bit > Cmi_numpes) break;
   }
+  return count;
 }
-
-void CmiGetNodeNeighbours(node, nghbrs)
-     int node; int *nghbrs;
+ 
+ 
+int CmiGetNodeNeighbours(node, neighbours)
+int node, *neighbours;
 {
-  int i;
-  switch (Topology) {
-  case 'F': case 'f':		/* Full interconnectivity */
-    for (i=0; i<node; i++) *nghbrs++ = i;
-    for (i=node+1; i<CpvAccess(Cmi_numpes); i++) *nghbrs++ = i;
-    break;
-  default: KillEveryoneCode(234);
+  int bit, count=0;
+  bit = 1;
+  while (1) {
+    int neighbour = node ^ bit;
+    if (neighbour < Cmi_numpes) neighbours[count++] = neighbour;
+    bit<<1; if (bit > Cmi_numpes) break;
   }
+  return count;
 }
-
-int CmiNeighboursIndex(PeNum, neighbourPeNum)
-     int PeNum; int neighbourPeNum;
+ 
+ 
+int CmiNeighboursIndex(node, nbr)
+int node, nbr;
 {
-  int i=0;
-  switch (Topology) {
-  case 'F': case 'f':		/* Full interconnectivity */
-    if (neighbourPeNum < PeNum) return neighbourPeNum;
-    return neighbourPeNum-1;
-    break;
-  default: KillEveryoneCode(235);
+  int bit, count=0;
+  bit = 1;
+  while (1) {
+    int neighbour = node ^ bit;
+    if (neighbour < Cmi_numpes) { if (nbr==neighbour) return count; count++; }
+    bit<<=1; if (bit > Cmi_numpes) break;
   }
+  return(-1);
 }
 
 /*****************************************************************************
