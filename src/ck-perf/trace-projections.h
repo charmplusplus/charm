@@ -11,6 +11,7 @@
 #include "trace.h"
 #include "ck.h"
 #include "stdio.h"
+#include "errno.h"
 
 #define  CREATION           1
 #define  BEGIN_PROCESSING   2
@@ -65,10 +66,20 @@ class LogPool {
       int len = strlen(pgm) + strlen(".log.") + strlen(pestr) + 1;
       char *fname = new char[len];
       sprintf(fname, "%s.%s.log", pgm, pestr);
+/*
       fp = fopen(fname, "w");
       delete[] fname;
       if(!fp)
         CmiAbort("Cannot open Projections Trace File for writing...\n");
+*/
+      do
+      {
+      fp = fopen(fname, "w+");
+      } while (!fp && errno == EINTR);
+      delete[] fname;
+      if(!fp) {
+        CmiAbort("Cannot open Projections Trace File for writing...\n");
+      }
       fprintf(fp, "PROJECTIONS-RECORD\n");
     }
     ~LogPool() {

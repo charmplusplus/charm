@@ -195,7 +195,7 @@ void LogPool::writeSts(void)
   FILE *sts = fopen(fname, "w+");
   //CmiPrintf("File: %s \n", fname);
   if(sts==0)
-    CmiAbort("Cannot open projections sts file for writing.\n");
+    CmiAbort("Cannot open summary sts file for writing.\n");
   delete[] fname;
   fprintf(sts, "MACHINE %s\n",CMK_MACHINE_NAME);
   fprintf(sts, "PROCESSORS %d\n", CmiNumPes());

@@ -105,7 +105,7 @@ class LogPool {
       //CmiPrintf("TRACE: %s:%d\n", fname, errno);
       do
       {
-      fp = fopen(fname, "w");
+      fp = fopen(fname, "w+");
       } while (!fp && errno == EINTR);
       delete[] fname;
       if(!fp) {
