@@ -788,17 +788,17 @@ void toProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
 {
   for (int i=0;i<n;i++) 
     switch(t) {
-    case Tchar: fprintf(f,"%c",((char *)p)[i]); break;
+    case Tchar: CheckAndFPrintF(f,"%c",((char *)p)[i]); break;
     case Tuchar:
-    case Tbyte: fprintf(f,"%d",((unsigned char *)p)[i]); break;
-    case Tshort: fprintf(f," %d",((short *)p)[i]); break;
-    case Tushort: fprintf(f," %u",((unsigned short *)p)[i]); break;
-    case Tint: fprintf(f," %d",((int *)p)[i]); break;
-    case Tuint: fprintf(f," %u",((unsigned int *)p)[i]); break;
-    case Tlong: fprintf(f," %ld",((long *)p)[i]); break;
-    case Tulong: fprintf(f," %lu",((unsigned long *)p)[i]); break;
-    case Tfloat: fprintf(f," %.7g",((float *)p)[i]); break;
-    case Tdouble: fprintf(f," %.15g",((double *)p)[i]); break;
+    case Tbyte: CheckAndFPrintF(f,"%d",((unsigned char *)p)[i]); break;
+    case Tshort: CheckAndFPrintF(f," %d",((short *)p)[i]); break;
+    case Tushort: CheckAndFPrintF(f," %u",((unsigned short *)p)[i]); break;
+    case Tint: CheckAndFPrintF(f," %d",((int *)p)[i]); break;
+    case Tuint: CheckAndFPrintF(f," %u",((unsigned int *)p)[i]); break;
+    case Tlong: CheckAndFPrintF(f," %ld",((long *)p)[i]); break;
+    case Tulong: CheckAndFPrintF(f," %lu",((unsigned long *)p)[i]); break;
+    case Tfloat: CheckAndFPrintF(f," %.7g",((float *)p)[i]); break;
+    case Tdouble: CheckAndFPrintF(f," %.15g",((double *)p)[i]); break;
     default: CmiAbort("Unrecognized pup type code!");
     };
 }

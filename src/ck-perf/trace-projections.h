@@ -25,6 +25,15 @@
 
 #define PROJECTION_VERSION  "6.0"
 
+// Macro to make projections check for errors before an fprintf succeeds.
+#define CheckAndFPrintF(f,string,data) \
+{ \
+  int result = fprintf(f,string,data); \
+  if (result == -1) { \
+    CmiAbort("Projections I/O error!"); \
+  } \
+}
+
 /// a log entry in trace projection
 class LogEntry {
   public:
