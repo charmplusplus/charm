@@ -113,12 +113,11 @@ void BgMsgSetTiming(char *msg)
 void BgLogEntryCommit(BgTimeLineRec &tlinerec) {
   if (!genTimeLog) return;
   tlinerec.logEntryClose();
-  BgTimeLine &timeline = tlinerec.timeline;
-  timeline[timeline.length()-1]->closeLog();
 
   CmiAssert(tlinerec.bgCurLog == NULL);
   if (correctTimeLog) {
 	BgAdjustTimeLineInsert(tlinerec);
+  	BgTimeLine &timeline = tlinerec.timeline;
 	if (timeline.length()) 
           tCURRTIME = timeline[timeline.length()-1]->endTime;
 	tlinerec.clearSendingLogs();

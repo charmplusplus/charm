@@ -231,6 +231,7 @@ void BgTimeLineRec::logEntryInsert(bgTimeLog* log)
 
 void BgTimeLineRec::logEntryStart(bgTimeLog* log)
 {
+//CmiPrintf("[%d] BgTimeLineRec::logEntryStart with log\n", BgGetGlobalWorkerThreadID());
   logEntryInsert(log);
   bgCurLog = log;
 }
