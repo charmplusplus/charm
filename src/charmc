@@ -775,7 +775,11 @@ end:
         foreach FILE ($FILES)
             set BASE=$FILE:r
             set TMP=$BASE:t.TMP
-            /bin/rm -f $TMP.P.C $TMP.cpp $TMP.space $TMP.xlat $TMP.o $BASE.$CMK_CPP_SUFFIX $BASE.headers
+            # Warning: do not delete $BASE.anything or you can easily delete
+            # the user's source files.  (Remember, people frequently use the
+            # same extension for multiple purposes.)  If it's a temp file,
+            # put TMP in its name.
+            /bin/rm -f $TMP.P.C $TMP.cpp $TMP.space $TMP.xlat $TMP.o $BASE.headers
             /bin/rm -f $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h
         end
         rm -f core $DELETE
