@@ -276,6 +276,31 @@ the $i$, $j$, and $k$ dimensions of the block.
 Can only be called from the driver routine. 
 
 \vspace{0.2in}
+\function{int MBLK\_Get\_nodelocs(const int* nodedim,double *nodelocs);}
+\function{subroutine MBLK\_Get\_blocksize(nodedim,nodelocs,err)}
+  \args{integer,intent(in)::nodedims(3)}
+  \args{double precision,intent(out)::nodedims(3,nodedims(0),nodedims(1),nodedims(2))}
+  \args{integer,intent(out)::err }
+Get the $(x,y,z)$ locations of the nodes of the current block. 
+The 3-array nodedim should be the number of nodes you expect,
+which must be exactly one more than the number of interior voxels.
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=3in]{fig/nodeloc}
+\end{center}
+\caption{The C node and voxel $(i,j,k)$ numbering for a 2 x 2 voxel block.
+For the fortran numbering, add 1 to all indices.
+Ghost voxels are omitted.}
+\label{fig:indexing}
+\end{figure}
+
+You cannot obtain the locations of ghost nodes via this routine.
+To get the locations of ghost nodes, create a node-centered
+field containing the node locations and do an update field.
+Can only be called from the driver routine. 
+
+\vspace{0.2in}
 \function{double MBLK\_Timer(void);}
 \function{function double precision :: MBLK\_Timer()}
 
@@ -326,7 +351,7 @@ applies a reduction over block values).
 	The size should include the ghost regions-- i.e., pass the actual allocated
 	size of the array.
      \kw{isVoxel} describes whether the data item is to be associated with
-	a voxel (1, a volume-centered value) or the grid corners (0, a corner-centered
+	a voxel (1, a volume-centered value) or the nodes (0, a node-centered
 	value). 
      \kw{base\_type} describes the type of each data item, one of:
 
