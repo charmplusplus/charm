@@ -597,6 +597,7 @@ int   arg_debug;
 int   arg_debug_no_pause;
 
 int   arg_local;	/* start node programs directly by exec on localhost */
+int   arg_batch_spawn;  /* control starting node programs, several at a time */
 
 int   arg_help;		/* print help message */
 int   arg_ppn;		/* pes per node */
@@ -649,6 +650,7 @@ void arg_init(int argc, char **argv)
   pparam_str(&arg_server_auth,   0, "server-auth",   "CCS Authentication file");
 #endif
   pparam_flag(&arg_local,	local_def, "local", "Start node programs locally without daemon");
+  pparam_int(&arg_batch_spawn,	 0, "batch", "Rsh several node programs at a time, avoiding overloading charmrun pe");
   pparam_flag(&arg_usehostname,  0, "usehostname", "Send nodes our symbolic hostname instead of IP address");
   pparam_str(&arg_charmrunip,    0, "useip",      "Use IP address provided for charmrun IP");
 #if CMK_USE_RSH
@@ -1696,6 +1698,28 @@ int client_connect_problem(int code,const char *msg)
 	return -1;
 }
 
+/* allow one client to connect */
+void req_one_client_connect(int client)
+{
+	unsigned int clientPort;/*These are actually ignored*/
+	skt_ip_t clientIP;
+	if (arg_verbose) printf("Charmrun> Waiting for %d-th client to connect.\n",client);
+	if (0==skt_select1(server_fd,arg_timeout*1000))
+		client_connect_problem(client,"Timeout waiting for node-program to connect");
+	req_clients[client]=skt_accept(server_fd,&clientIP,&clientPort);
+	if (req_clients[client]==SOCKET_ERROR) 
+		client_connect_problem(client,"Failure in node accept");
+	else 
+	{ /*This client has just connected-- fetch his name and IP*/
+		ChMessage msg;
+		if (!skt_select1(req_clients[client],arg_timeout*1000))
+		   client_connect_problem(client,"Timeout on IP request");
+		ChMessage_recv(req_clients[client],&msg);
+		req_handle_initnode(&msg,req_clients[client]);
+		ChMessage_free(&msg);
+	}
+}
+
 /*Wait for all the clients to connect to our server port*/
 void req_client_connect(void)
 {
@@ -1708,23 +1732,38 @@ void req_client_connect(void)
 	
 	for (client=0;client<req_nClients;client++)
 	{/*Wait for the next client to connect to our server port.*/
-		unsigned int clientPort;/*These are actually ignored*/
-		skt_ip_t clientIP;
-		if (arg_verbose) printf("Charmrun> Waiting for %d-th client to connect.\n",client);
-		if (0==skt_select1(server_fd,arg_timeout*1000))
-			client_connect_problem(client,"Timeout waiting for node-program to connect");
-		req_clients[client]=skt_accept(server_fd,&clientIP,&clientPort);
-		if (req_clients[client]==SOCKET_ERROR) 
-			client_connect_problem(client,"Failure in node accept");
-		else 
-		{ /*This client has just connected-- fetch his name and IP*/
-			ChMessage msg;
-			if (!skt_select1(req_clients[client],arg_timeout*1000))
-			  client_connect_problem(client,"Timeout on IP request");
-			ChMessage_recv(req_clients[client],&msg);
-			req_handle_initnode(&msg,req_clients[client]);
-			ChMessage_free(&msg);
-		}
+		req_one_client_connect(client);
+	}
+        if (portOk == 0) exit(1);
+	if (arg_verbose) printf("Charmrun> All clients connected.\n");
+	for (client=0;client<req_nClients;client++)
+	  req_handle_initnodetab(NULL,req_clients[client]);
+	if (arg_verbose) printf("Charmrun> IP tables sent.\n");
+}
+
+void start_one_node_rsh(int rank0no);
+
+void req_client_start_and_connect(void)
+{
+	int client, c;
+	int batch = arg_batch_spawn;	    /* fire several at a time */
+
+	nodeinfo_allocate();
+	req_nClients=nodetab_rank0_size;
+	req_clients=(SOCKET *)malloc(req_nClients*sizeof(SOCKET));
+	
+	skt_set_abort(client_connect_problem);
+	
+	for (c=0;c<req_nClients;c+=batch)
+	{/*Wait for the next client to connect to our server port.*/
+	    int count = batch;
+	    if (c+batch-1 >= req_nClients) count = req_nClients-c;
+	    for (client=c; client<c+count; client++) {
+		start_one_node_rsh(client);
+	    }
+	    for (client=c; client<c+count; client++) {
+		req_one_client_connect(client);
+            }
 	}
         if (portOk == 0) exit(1);
 	if (arg_verbose) printf("Charmrun> All clients connected.\n");
@@ -1814,8 +1853,12 @@ int main(int argc, char **argv, char **envp)
 #if CMK_BPROC
     start_nodes_scyld();
 #else
-    if (!arg_local)
-      start_nodes_rsh();
+    if (!arg_local) {
+      if (!arg_batch_spawn)
+        start_nodes_rsh();
+      else
+        req_client_start_and_connect();
+    }
     else
       start_nodes_local(envp);
 #endif
@@ -1828,7 +1871,7 @@ int main(int argc, char **argv, char **envp)
 #endif
 #if ! CONVERSE_VERSION_VMI
   /* vmi version clients don't connect back */
-  req_client_connect();
+  if (!arg_batch_spawn) req_client_connect();
 #endif
 #if CMK_RSH_KILL
   kill_nodes();
@@ -2499,14 +2542,10 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
 }
 
 int *rsh_pids=NULL;
-void start_nodes_rsh()
+
+/* returns pid */
+void start_one_node_rsh(int rank0no)
 {
-  int rank0no;
-  rsh_pids=(int *)malloc(sizeof(int)*nodetab_rank0_size);
-  /*Start up the user program, by sending a message
-  to PE 0 on each node.*/
-  for (rank0no=0;rank0no<nodetab_rank0_size;rank0no++)
-  {
      int pe=nodetab_rank0_table[rank0no];
      FILE *f;
      char startScript[200];
@@ -2523,7 +2562,21 @@ void start_nodes_rsh()
      }
      rsh_script(f,pe,rank0no,arg_argv);
      fclose(f);
-     rsh_pids[rank0no]=rsh_fork(pe,startScript);
+     if (!rsh_pids)
+       rsh_pids=(int *)malloc(sizeof(int)*nodetab_rank0_size);
+     rsh_pids[rank0no] = rsh_fork(pe,startScript);
+}
+
+void start_nodes_rsh()
+{
+  int rank0no;
+  rsh_pids=(int *)malloc(sizeof(int)*nodetab_rank0_size);
+
+  /*Start up the user program, by sending a message
+  to PE 0 on each node.*/
+  for (rank0no=0;rank0no<nodetab_rank0_size;rank0no++)
+  {
+     start_one_node_rsh(rank0no);
   }
 }
 
