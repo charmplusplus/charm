@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-06-18 22:10:45  sanjeev
+ * Revision 2.4  1995-06-19 17:45:27  sanjeev
+ * bug in CallBocFn
+ *
+ * Revision 2.3  1995/06/18  22:10:45  sanjeev
  * Added Ccd
  *
  * Revision 2.2  1995/06/18  21:30:38  sanjeev
@@ -65,8 +68,10 @@ static int CallBocFn(void *arg)
 {
   CallBocStuff *cbocstruct;
   
-  cbocstruct = (void *)arg;
-  (*(cbocstruct->fn_ptr))(cbocstruct->bocNum);
+  cbocstruct = (CallBocStuff *)arg;
+  if ( !((*(cbocstruct->fn_ptr))(cbocstruct->bocNum)) )
+      CcdPeriodicallyCall(CallBocFn, arg);
+	
 }
 
 /*****************************************************************************
