@@ -62,40 +62,10 @@ class LogPool {
     FILE *fp;
     int binary;
   public:
-    LogPool(char *pgm, int b) {
-      binary = b;
-      pool = new LogEntry[CpvAccess(CtrLogBufSize)];
-      numEntries = 0;
-      poolSize = CpvAccess(CtrLogBufSize);
-      char pestr[10];
-      sprintf(pestr, "%d", CkMyPe());
-      int len = strlen(pgm) + strlen(".log.") + strlen(pestr) + 1;
-      char *fname = new char[len];
-      sprintf(fname, "%s.%s.log", pgm, pestr);
-/*
-      fp = fopen(fname, "w");
-      delete[] fname;
-      if(!fp)
-        CmiAbort("Cannot open Projections Trace File for writing...\n");
-*/
-      do
-      {
-      fp = fopen(fname, "w+");
-      } while (!fp && errno == EINTR);
-      delete[] fname;
-      if(!fp) {
-        CmiAbort("Cannot open Projections Trace File for writing...\n");
-      }
-      if(!binary) {
-        fprintf(fp, "PROJECTIONS-RECORD\n");
-      }
-    }
+    LogPool(char *pgm, int b); 
     ~LogPool() {
-      if(binary) {
-        writeBinary();
-      } else {
-        write();
-      }
+      if(binary) writeBinary();
+      else write();
       fclose(fp);
       delete[] pool;
     }

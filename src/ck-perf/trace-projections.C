@@ -11,7 +11,7 @@ CpvDeclare(Trace*, _trace);
 CpvDeclare(int, traceOn);
 CpvDeclare(int, CtrLogBufSize);
 CpvStaticDeclare(LogPool*, _logPool);
-CpvStaticDeclare(char*, pgmName);
+CpvStaticDeclare(char*, traceRoot);
 CpvExtern(CthThread, curThread);
 static int _numEvents = 0;
 static int _threadMsg, _threadChare, _threadEP;
@@ -26,18 +26,31 @@ void traceInit(char **argv)
   CpvInitialize(LogPool*, _logPool);
   CpvInitialize(int, traceOn);
   CpvInitialize(int, CtrLogBufSize);
-  CpvInitialize(char*, pgmName);
+  CpvInitialize(char*, traceRoot);
   CpvAccess(_trace) = new TraceProjections();
   CpvAccess(traceOn) = 1;
-  CpvAccess(pgmName) = (char *) malloc(strlen(argv[0])+1);
-  _MEMCHECK(CpvAccess(pgmName));
-  strcpy(CpvAccess(pgmName), argv[0]);
   CpvAccess(CtrLogBufSize) = 10000;
   CmiGetArgInt(argv,"+logsize",&CpvAccess(CtrLogBufSize));
   if (CmiGetArgFlag(argv,"+traceoff"))
     CpvAccess(traceOn) = 0;
   int binary = CmiGetArgFlag(argv,"+binary-trace");
-  CpvAccess(_logPool) = new LogPool(CpvAccess(pgmName),binary);
+  char *root;
+  if (CmiGetArgString(argv, "+trace-root", &root)) {
+    int i;
+    for (i=strlen(argv[0])-1; i>=0; i--) if (argv[0][i] == '/') break;
+    i++;
+    CpvAccess(traceRoot) = (char *)malloc(strlen(argv[0]+i) + strlen(root) + 2);
+    _MEMCHECK(CpvAccess(traceRoot));
+    strcpy(CpvAccess(traceRoot), root);
+    strcat(CpvAccess(traceRoot), "/");
+    strcat(CpvAccess(traceRoot), argv[0]+i);
+  }
+  else {
+    CpvAccess(traceRoot) = (char *) malloc(strlen(argv[0])+1);
+    _MEMCHECK(CpvAccess(traceRoot));
+    strcpy(CpvAccess(traceRoot), argv[0]);
+  }
+  CpvAccess(_logPool) = new LogPool(CpvAccess(traceRoot),binary);
 }
 
 extern "C"
@@ -100,15 +113,40 @@ void traceClose(void)
   if(CmiMyPe()==0)
     CpvAccess(_logPool)->writeSts();
   delete CpvAccess(_logPool);
+  delete CpvAccess(_trace);
+  free(CpvAccess(traceRoot));
 }
 
 extern "C" void traceBegin(void) {CpvAccess(traceOn) = 1;}
 extern "C" void traceEnd(void) {CpvAccess(traceOn) = 0;}
 
+LogPool::LogPool(char *pgm, int b) {
+  binary = b;
+  pool = new LogEntry[CpvAccess(CtrLogBufSize)];
+  numEntries = 0;
+  poolSize = CpvAccess(CtrLogBufSize);
+  char pestr[10];
+  sprintf(pestr, "%d", CkMyPe());
+  int len = strlen(pgm) + strlen(".log.") + strlen(pestr) + 1;
+  char *fname = new char[len];
+  sprintf(fname, "%s.%s.log", pgm, pestr);
+  do
+  {
+    fp = fopen(fname, "w+");
+  } while (!fp && errno == EINTR);
+  delete[] fname;
+  if(!fp) {
+    CmiAbort("Cannot open Projections Trace File for writing...\n");
+  }
+  if(!binary) {
+    fprintf(fp, "PROJECTIONS-RECORD\n");
+  }
+}
+
 void LogPool::writeSts(void)
 {
-  char *fname = new char[strlen(CpvAccess(pgmName))+strlen(".sts")+1];
-  sprintf(fname, "%s.sts", CpvAccess(pgmName));
+  char *fname = new char[strlen(CpvAccess(traceRoot))+strlen(".sts")+1];
+  sprintf(fname, "%s.sts", CpvAccess(traceRoot));
   FILE *sts = fopen(fname, "w");
   if(sts==0)
     CmiAbort("Cannot open projections sts file for writing.\n");
