@@ -173,7 +173,7 @@ public:
 	
 	/// This local entity number is shared with the given local chunk
 	void addNode(int localNo,int sharedWithChk) {
-		comm[sharedWithChk]->push_back(localNo);
+		comm[findLocalList(sharedWithChk)]->push_back(localNo);
 		flushMap();
 	}
 	
