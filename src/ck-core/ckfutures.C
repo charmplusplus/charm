@@ -215,7 +215,7 @@ static void setFuture(CkFutureID handle, void *pointer)
 void _futuresModuleInit(void)
 {
   CpvInitialize(FutureState, futurestate);
-  CpvInitialize(CkSemaPool, *semapool);
+  CpvInitialize(CkSemaPool *, semapool);
   CpvAccess(futurestate).array = (Future *)malloc(10*sizeof(Future));
   _MEMCHECK(CpvAccess(futurestate).array);
   CpvAccess(futurestate).max   = 10;
