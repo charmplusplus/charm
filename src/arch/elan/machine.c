@@ -1147,3 +1147,5 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 #if CMK_PERSISTENT_COMM
 #include "persistent.c"
 #endif
+
+#include "immediate.c"
