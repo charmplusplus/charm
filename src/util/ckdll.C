@@ -46,7 +46,6 @@ static void deleteFile(const char *fileName) { }
 #define CMK_SCRATCH_PATH ""
 #endif
 
-
 /****************************************************************
 CkCppInterpreter interface:
 	Call the C++ compiler on a string, then use CkDll to link the
@@ -85,6 +84,26 @@ Command-line compilers for various platforms (now in conv-mach.h files)
 #  define CMK_DLL_INC "-I" /*Assume unix-style command-line flags*/
 #endif
 
+/*Return 1 if this file exists*/
+static int fileExists(const char *fileName) {
+	FILE *f=fopen(fileName,"r");
+	if (f==NULL) return 0;
+	else {
+		fclose(f);
+		return 1;
+	}
+}
+
+
+#ifdef CMK_SIGSAFE_SYSTEM
+#  include "ckdll_system.C"
+#else
+/*No need for a signal-safe system call*/
+static int CkSystem (const char *command) {
+	system(command);
+}
+#endif
+
 //Compile "cppCode", making available the includes at inclPath
 CkCppInterpreter::CkCppInterpreter(const char *cppCode,const char *inclPath)
 	:library(NULL)
@@ -102,7 +121,7 @@ CkCppInterpreter::CkCppInterpreter(const char *cppCode,const char *inclPath)
 	fclose(f);
 
 /*Allocate a spot for the library file:*/
-	sprintf(libraryFile,"%s/ckSharedLib_%d_%d_%p.%s",
+	sprintf(libraryFile,"%s/ckSharedLib_%d_%d_%p%s",
 		CMK_SCRATCH_PATH,randA,randB,this,CkDll::extension);
 	
 //Compile the .cpp file into a .dll:
@@ -112,11 +131,11 @@ CkCppInterpreter::CkCppInterpreter(const char *cppCode,const char *inclPath)
 		inclPath!=NULL?CMK_DLL_INC:"",inclPath!=NULL?inclPath:"");
 	
 	if (verbose) CmiPrintf("Executing: '%s'\n",compilerCmd);
-	int compilerRet=system(compilerCmd);
+	int compilerRet=CkSystem(compilerCmd);
 	deleteFile(sourceFile);
-	if (compilerRet!=0) {
-		CmiPrintf("Compilation error! Cmd='%s', src='%s'\n",
-			compilerCmd,cppCode);
+	if (compilerRet!=0) { //!fileExists(libraryFile)) {
+		CmiPrintf("Compilation error! Cmd='%s', err=%d, src='%s'\n",
+			compilerCmd,compilerRet,cppCode);
 		return; /*with library set to NULL*/
 	}
 	
@@ -127,14 +146,14 @@ CkCppInterpreter::CkCppInterpreter(const char *cppCode,const char *inclPath)
 	//    CC foo.so -o foo.sop
 	sprintf(compilerCmd,"%s%sp %s",
 		CMK_DLL_LINK, libraryFile, libraryFile);
-	compilerRet=system(compilerCmd);
+	compilerRet=CkSystem(compilerCmd);
 	unlink(libraryFile);
-	if (compilerRet!=0) {
-		CmiPrintf("Link error! Cmd='%s', src='%s'\n",
-			compilerCmd,cppCode);
+	strcat(libraryFile,"p");
+	if (compilerRet!=0) { //!fileExists(libraryFile)) {
+		CmiPrintf("Link error! Cmd='%s', err=%d, src='%s'\n",
+			compilerCmd,compilerRet,cppCode);
 		return; 
 	}
-	strcat(libraryFile,"p");
 #endif
 	
 /*Link the library into the program: */	
