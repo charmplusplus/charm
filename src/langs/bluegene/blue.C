@@ -562,6 +562,9 @@ static inline void nodeBroadcastPacketExcept_(int node, CmiUInt2 threadID, int h
   BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, 0);
 
   DEBUGF(("[%d]CmiSyncBroadcastAllAndFree node: %d\n", BgMyNode(), node));
+#if DELAY_SEND
+  if (!correctTimeLog)
+#endif
   CmiSyncBroadcastAllAndFree(numbytes,sendmsg);
 }
 
