@@ -100,8 +100,9 @@ LIBS: CONVLIBS CHARMLIBS
 
 test-all: test
 
-test: test-charm test-AMPI test-fem
-	@echo "--- All tests passed ---"
+test: AMPI
+	cd ../tests ; $(MAKE) test OPTS='$(OPTS)'
+	cd ../examples ; $(MAKE) test OPTS='$(OPTS)'
 
 test-converse: converse
 	cd ../tests ; $(MAKE) test-converse  OPTS='$(OPTS)'
