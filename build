@@ -195,7 +195,7 @@ else
 ln -f -s \$@
 EOF
   chmod +x $VERSION/tmp/system_ln
-	for newdir in `echo bin lib include tmp`
+	for newdir in `echo bin lib lib_so include tmp`
 	do
 		echo "Soft-linking over $newdir"
     if [ -r $newdir ]
