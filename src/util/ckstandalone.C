@@ -119,6 +119,18 @@ CDECL int CmiGetArgFlagDesc(char **argv,const char *arg,const char *desc) {
 	return 0;/*Didn't find the argument*/
 }
 
+CDECL int CmiGetArgIntDesc(char **argv,const char *arg,int *optDest,const char *desc) {
+	int i;
+	saved_argv=argv;
+	for (i=0;argv[i]!=NULL;i++)
+		if (0==strcmp(argv[i],arg))
+		{/*We found the argument*/
+			*optDest = atoi(argv[i+1]);
+			return 1;
+		}
+	return 0;/*Didn't find the argument*/
+}
+
 FDECL void FTN_NAME(TCHARM_GETARG,tcharm_getarg)(int *arg,char *dest,int destLen) {
 	if (saved_argv==NULL)
 		CkAbort("TCHARM_GETARG not supported in FEM_ALONE mode!\n");
