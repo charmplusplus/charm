@@ -233,6 +233,7 @@ void LDDoneRegisteringObjects(LDOMHandle _h);
 LDObjHandle LDRegisterObj(LDOMHandle h, LDObjid id, void *userptr,
 			  int migratable);
 void LDUnregisterObj(LDObjHandle h);
+const LDObjHandle &LDGetObjHandle(LDHandle h, int idx);
 
 void * LDObjUserData(LDObjHandle &_h);
 void LDObjTime(LDObjHandle &h, double walltime, double cputime);

@@ -186,6 +186,7 @@ public:
   inline int RunningObject(LDObjHandle* _o) { 
     return LDRunningObject(myLDHandle,_o);
   };
+  inline const LDObjHandle &GetObjHandle(int idx) { return LDGetObjHandle(myLDHandle, idx);}
   inline void ObjectStart(const LDObjHandle &_h) { LDObjectStart(_h); };
   inline void ObjectStop(const LDObjHandle &_h) { LDObjectStop(_h); };
   inline void Send(const LDOMHandle &_om, const LDObjid _id, unsigned int _b, int _p) {
