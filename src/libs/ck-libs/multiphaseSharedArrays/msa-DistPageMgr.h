@@ -4,6 +4,7 @@
 #define MSA_DISTPAGEMGR_H
 
 #include <charm++.h>
+#include <string.h>
 #include "msa-common.h"
 #include "msa.decl.h"
 #include <list>
@@ -278,7 +279,7 @@ protected:
         }
         else if(why == Write_Fault)
         {
-            bzero(nu, bytesPerPage);
+            memset(nu, 0, bytesPerPage);
         }
         else
         {
@@ -650,7 +651,7 @@ public:
         {
             // the page we requested for is empty, so we week it uninitialized
             // TODO: this should ideally do type specific initialization
-            // bzero(pageTable[page], bytesPerPage);
+            // memset(pageTable[page], 0, bytesPerPage);
             // @@ do we need to allocate the page here?
         }
 
@@ -1055,7 +1056,7 @@ public:
      */
     inline void UnlockPages(unsigned int startPage, unsigned int endPage)
     {
-        bzero(pageLock + startPage, (endPage - startPage + 1)*sizeof(char));
+        memset(pageLock + startPage, 0, (endPage - startPage + 1)*sizeof(char));
     }
 
     inline void emit(int offset)
