@@ -968,11 +968,19 @@ static void sanityCheck()
   }
 }
 
+#undef CmiSwitchToPE
+extern "C" int CmiSwitchToPEFn(int pe);
+
 // main
 CmiStartFn bgMain(int argc, char **argv)
 {
   int i;
   char *configFile = NULL;
+
+#if CMK_CONDS_USE_SPECIAL_CODE
+  // overwrite possible implementation in machine.c
+  CmiSwitchToPE = CmiSwitchToPEFn;
+#endif
 
   /* initialize all processor level data */
   CpvInitialize(BGMach,bgMach);
@@ -1145,9 +1153,8 @@ CmiStartFn bgMain(int argc, char **argv)
 // for conv-conds:
 // if -2 untouch
 // if -1 main thread
-#undef CmiSwitchToPE
 #if CMK_BLUEGENE_THREAD
-extern "C" int CmiSwitchToPE(int pe)
+extern "C" int CmiSwitchToPEFn(int pe)
 {
   if (pe == -2) return -2;
   int oldpe;
@@ -1172,7 +1179,7 @@ extern "C" int CmiSwitchToPE(int pe)
   return oldpe;
 }
 #else
-extern "C" int CmiSwitchToPE(int pe)
+extern "C" int CmiSwitchToPEFn(int pe)
 {
   if (pe == -2) return -2;
   int oldpe;
