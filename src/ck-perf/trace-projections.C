@@ -374,15 +374,16 @@ void TraceProjections::beginExecute(envelope *e)
     CpvAccess(_logPool)->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,CmiWallTimer(),
                              execEvent,CmiMyPe());
   } else {
-    execEvent = e->getEvent();
-    int type=e->getMsgtype();
-    if(type==BocInitMsg)
-      execEvent += CmiMyPe();
-    execPe = e->getSrcPe();
-    execEp = e->getEpIdx();
-    CpvAccess(_logPool)->add(BEGIN_PROCESSING,type,execEp,CmiWallTimer(),
-                             execEvent,execPe);
+    beginExecute(e->getEvent(),e->getMsgtype(),e->getEpIdx(),e->getSrcPe());
   }
+}
+void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe)
+{
+  execEvent=event;
+  execEp=ep;
+  execPe=srcPe;
+  CpvAccess(_logPool)->add(BEGIN_PROCESSING,msgType,ep,CmiWallTimer(),
+                             event,srcPe);
 }
 
 void TraceProjections::endExecute(void)

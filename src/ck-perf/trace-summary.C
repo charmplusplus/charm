@@ -309,12 +309,16 @@ void TraceProjections::beginExecute(envelope *e)
 {
   // no message means thread execution
   if (e==NULL) {
-//    execEp = (-1);
-    execEp = _threadEP;
+    beginExecute(-1,-1,_threadEP,-1);
   }
   else {
-    execEp = e->getEpIdx();
-  }
+    beginExecute(-1,-1,e->getEpIdx(),-1);
+  }  
+}
+
+void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe)
+{
+  execEp=ep;
   double t = CmiWallTimer();
 //CmiPrintf("start: %f \n", start);
 
