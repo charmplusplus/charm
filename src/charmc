@@ -547,20 +547,18 @@ endif
 
 # Create MODULES.TMP.o
 
-set DELETE=(MODULES.TMP.d1 MODULES.TMP.d2 MODULES.TMP.c MODULES.TMP.o $DELETE)
-rm -f MODULES.TMP.d1 MODULES.TMP.d2 MODULES.TMP.c MODULES.TMP.o
-touch MODULES.TMP.d1 MODULES.TMP.c
-foreach x ($OBJECTFILES)
-    csh -fc "$CMK_NM $x|$CMK_NM_FILTER|egrep '^_CK_.*_init"'$'"'|egrep -v '^_CK_.*_struct_init"'$'"'|sed -e 's@_CK_@@' -e 's@_init"'$'"@@' >> MODULES.TMP.d1"
-end
-sort < MODULES.TMP.d1 | uniq > MODULES.TMP.d2
-echo 'Modules: '`cat MODULES.TMP.d2`
-awk '{print "extern void _CK_"$1"_init();";}' < MODULES.TMP.d2 >> MODULES.TMP.c
+if ($?VERBOSE) echo "Creating MODULES.TMP.c"
+set DELETE=(MODULES.TMP.dat MODULES.TMP.c MODULES.TMP.o $DELETE)
+rm -f MODULES.TMP.DAT MODULES.TMP.c MODULES.TMP.o
+$CMK_NM $OBJECTFILES | csh -fc "$CMK_NM_FILTER" | awk '(/^_CK_.*_init$/&&(\!/^_CK_.*_struct_init$/)) { print substr($1, 5, length($1)-9); }' | sort | uniq > MODULES.TMP.dat
+echo 'Modules: '`cat MODULES.TMP.dat`
+awk '{print "extern void _CK_"$1"_init();";}' < MODULES.TMP.dat >> MODULES.TMP.c
 echo '_CK_module_init_fn()' >> MODULES.TMP.c
 echo '{' >> MODULES.TMP.c
-awk '{print "_CK_"$1"_init();";}' < MODULES.TMP.d2 >> MODULES.TMP.c
+awk '{print "_CK_"$1"_init();";}' < MODULES.TMP.dat >> MODULES.TMP.c
 echo '}' >> MODULES.TMP.c
 
+if ($?VERBOSE) echo $CMK_CC $OPTS_CC -c MODULES.TMP.c
 $CMK_CC $OPTS_CC -c MODULES.TMP.c
 if ($status) goto failure
 set OBJECTFILES = ($OBJECTFILES MODULES.TMP.o)
