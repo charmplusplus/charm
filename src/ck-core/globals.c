@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-09-20 15:41:27  gursoy
+ * Revision 2.9  1995-09-30 15:02:25  jyelon
+ * Fixed a missing CpvInitialize.
+ *
+ * Revision 2.8  1995/09/20  15:41:27  gursoy
  * added new handler indexes
  *
  * Revision 2.7  1995/09/14  20:47:38  jyelon
@@ -239,6 +242,7 @@ void globalsModuleInit()
    CpvInitialize(int, nodeforCharesProcessed);
    CpvInitialize(int, PrintChareStat);
    CpvInitialize(int, PrintSummaryStat);
+   CpvInitialize(int, QueueingDefault);
    CpvInitialize(int, RecdStatMsg);
    CpvInitialize(int, RecdPerfMsg);
    CpvInitialize(int, numHeapEntries);      
@@ -251,7 +255,6 @@ void globalsModuleInit()
    CpvInitialize(int, CkInitCount);
    CpvInitialize(int, CkCountArrived);
    CpvInitialize(void*, CkBuffQueue); 
-
 
    CpvAccess(NumReadMsg)             = 0; 
    CpvAccess(InsideDataInit)         = 0;
