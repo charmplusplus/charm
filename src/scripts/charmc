@@ -83,6 +83,8 @@ SWAPGLOBALS="0"
 # PrintUsage: prints a helpful command-line usage message and quits
 # Args: any additional messages
 printUsage() {
+    printVersion
+    echo 
     echo "Usage: charmc [ flags ] <files>"
     echo
     echo "  flags:"
@@ -255,6 +257,47 @@ AppendList() {
 # each other's temporary files.
 TEMP_BASE="/tmp/charmc_tmp.$$"
 
+# Try to find CHARMBIN by looking in directory where charmc is
+findCharmBin() {
+if [ -z "$CHARMBIN" ]
+then
+	SCRIPT=$0
+	CHARMBIN=`dirname $SCRIPT`
+#	CHARMBIN=`cd $CHARMBIN; pwd`
+# NOTE: this script no longer tries to follow soft links
+# to find the "original" charmc-- if this is bad, 
+# translate these lines to Bourne shell from C shell:
+# -------------------- Begin C Shell ------------------------->
+#    if ($SCRIPT:h != $SCRIPT:t) then
+#        cd $SCRIPT:h
+#        set SCRIPT=$SCRIPT:t
+#    else
+#        foreach dir ($path)
+#            if (-x $dir/$SCRIPT && ! -d $dir/$SCRIPT) then
+#                cd $dir
+#                break
+#            endif
+#        end
+#    endif
+#    while (x`find $SCRIPT -type l -print` == x$SCRIPT)
+#        set SCRIPT=`ls -al ./$SCRIPT:t | sed -e "s@.*-> @@"`
+#        if ($SCRIPT:h != $SCRIPT:t) then
+#            cd $SCRIPT:h
+#            set SCRIPT=$SCRIPT:t
+#        endif
+#    end
+#    set CHARMBIN=`pwd`
+# <------------------ End C Shell -----------------------------
+fi
+}
+
+printVersion()
+{
+	findCharmBin
+	version=`cat $CHARMBIN/../include/VERSION`
+	echo Charm++ Version $version
+}
+
 ##############################################################################
 #
 # Parse the arguments
@@ -272,6 +315,11 @@ do
 	shift
 
 	case "$arg" in
+	"-V")
+		printVersion
+		exit 0
+		;;
+
 	"-machine")
 		MACHTYPE="$1"
 		shift
@@ -572,36 +620,7 @@ ORIGDIR=`pwd`
 
 # Try to find CHARMBIN by looking in directory where charmc is
 
-if [ -z "$CHARMBIN" ]
-then
-	SCRIPT=$0
-	CHARMBIN=`dirname $SCRIPT`
-#	CHARMBIN=`cd $CHARMBIN; pwd`
-# NOTE: this script no longer tries to follow soft links
-# to find the "original" charmc-- if this is bad, 
-# translate these lines to Bourne shell from C shell:
-# -------------------- Begin C Shell ------------------------->
-#    if ($SCRIPT:h != $SCRIPT:t) then
-#        cd $SCRIPT:h
-#        set SCRIPT=$SCRIPT:t
-#    else
-#        foreach dir ($path)
-#            if (-x $dir/$SCRIPT && ! -d $dir/$SCRIPT) then
-#                cd $dir
-#                break
-#            endif
-#        end
-#    endif
-#    while (x`find $SCRIPT -type l -print` == x$SCRIPT)
-#        set SCRIPT=`ls -al ./$SCRIPT:t | sed -e "s@.*-> @@"`
-#        if ($SCRIPT:h != $SCRIPT:t) then
-#            cd $SCRIPT:h
-#            set SCRIPT=$SCRIPT:t
-#        endif
-#    end
-#    set CHARMBIN=`pwd`
-# <------------------ End C Shell -----------------------------
-fi
+findCharmBin
 
 FIRST_THREE=`uname -s | awk '{print substr($1,1,3)}' `
 if [ "$FIRST_THREE" = "CYG" ]

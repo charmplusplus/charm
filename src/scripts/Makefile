@@ -899,8 +899,10 @@ COMLIB_OBJS = ComlibManager.o $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 
 comlib_objs: $(L)/libmodulecomlib.a
 
+#for backward compatibility, keep libmodulecommlib.a with double m.
 $(L)/libmodulecomlib.a: $(COMLIB_OBJS)
 	$(CHARMC) -o $(L)/libmodulecomlib.a $(COMLIB_OBJS)
+	cp $(L)/libmodulecomlib.a $(L)/libmodulecommlib.a
 
 ###############################################################################
 #
