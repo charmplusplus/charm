@@ -2567,15 +2567,15 @@ char *CmiGetNonLocal()
 void CmiNotifyIdle()
 {
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
-#if CMK_USE_NANOSLEEP
-  struct timespec tv;
-  tv.tv_sec = 0; tv.tv_nsec=5000000;
-  nanosleep(&tv, NULL);
-#else
   struct timeval tv;
+  static fd_set rfds;
+  static fd_set wfds;
+
+  FD_SET(Cmi_host_fd, &rfds);
+  FD_SET(dataskt, &rfds);
+  FD_SET(dataskt, &wfds);
   tv.tv_sec=0; tv.tv_usec=5000;
-  select(0,0,0,0,&tv);
-#endif
+  select(FD_SETSIZE,&rfds,&wfds,0,&tv);
 #else
   CommunicationServer(5);
 #endif
