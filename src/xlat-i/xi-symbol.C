@@ -839,11 +839,8 @@ Chare::genDefs(XStr& str)
     str << ";\n";
     str << "#endif\n";
   }
-  if(!external && !type->isTemplated())
-    genRegisterMethodDef(str);
   if(list) 
   {//Add definitions for all entry points
-    
     if(isTemplated())
       str << "#ifdef CK_TEMPLATES_ONLY\n";
     else
@@ -856,9 +853,10 @@ Chare::genDefs(XStr& str)
       list->genDefs(str);
       forElement=1;
     }
-  
     str << "#endif /*CK_TEMPLATES_ONLY*/\n";
   }
+  if(!external && !type->isTemplated())
+    genRegisterMethodDef(str);
 }
 
 void
@@ -1191,6 +1189,37 @@ Readonly::genIndexDecls(XStr& str)
   str << "/* DECLS: "; print(str); str << " */\n";
 }
 
+//Turn this string into a valid identifier
+XStr makeIdent(const XStr &in)
+{
+  XStr ret;
+  const char *i=in.get_string_const();
+  while (*i!=0) {
+    //Quote all "special" characters
+    if (*i==':') ret<<"_QColon_";
+    else if (*i==' ') ret<<"_QSpace_";
+    else if (*i=='+') ret<<"_QPlus_";
+    else if (*i=='-') ret<<"_QMinus_";
+    else if (*i=='*') ret<<"_QTimes_";
+    else if (*i=='/') ret<<"_QSlash_";
+    else if (*i=='%') ret<<"_QPercent_";
+    else if (*i=='&') ret<<"_QAmpersand_";
+    else if (*i=='.') ret<<"_QDot_";
+    else if (*i==',') ret<<"_QComma_";
+    else if (*i=='\'') ret<<"_QSQuote_";
+    else if (*i=='\"') ret<<"_QQuote_";
+    else if (*i=='(') ret<<"_QLparen_";
+    else if (*i==')') ret<<"_QRparen_";
+    else if (*i=='<') ret<<"_QLess_";
+    else if (*i=='>') ret<<"_QGreater_";
+    else if (*i=='{') ret<<"_QLbrace_";
+    else if (*i=='}') ret<<"_QRbrace_";
+    else ret << *i; //Copy character unmodified
+    i++; //Advance to next
+  }
+  return ret;
+}
+
 void
 Readonly::genDefs(XStr& str)
 {
@@ -1205,6 +1234,15 @@ Readonly::genDefs(XStr& str)
       dims->print(str);
     str << ";\n";
   }
+
+  if (!msg) { //Generate a pup for this readonly
+    str << "extern \"C\" void __xlater_roPup_"<<makeIdent(qName());
+    str <<    "(void *pup_er) {\n";
+    str << "  PUP::er &p=*(PUP::er *)pup_er;\n";
+    str << "  p|"<<qName()<<";\n";
+    str << "}\n";
+  }
+
   if (fortranMode) {
       str << "extern \"C\" void set_"
           << fortranify(name)
@@ -1222,21 +1260,12 @@ Readonly::genReg(XStr& str)
     return;
   if(msg) {
     if(dims) die("readonly Message cannot be an array",line);
-    str << "  CkRegisterReadonlyMsg((void **) &";
-    if(container) {
-      str << container->baseName()<<"::";
-    }
-    str << name<<");\n";
+    str << "  CkRegisterReadonlyMsg(\""<<qName()<<"\",\""<<type<<"\",";
+    str << "(void **)&"<<qName()<<");\n";
   } else {
-    str << "  CkRegisterReadonly(sizeof(";
-    type->print(str);
-    if(dims)
-      dims->print(str);
-    str << "), (void *) &";
-    if(container) {
-      str << container->baseName()<<"::";
-    }
-    str << name<<");\n";
+    str << "  CkRegisterReadonly(\""<<qName()<<"\",\""<<type<<"\",";
+    str << "sizeof("<<qName()<<"),(void *) &"<<qName()<<",";
+    str << "__xlater_roPup_"<<makeIdent(qName())<<");\n";
   }
 }
 

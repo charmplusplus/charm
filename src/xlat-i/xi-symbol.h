@@ -700,6 +700,12 @@ class Readonly : public Member {
     Type *type;
     char *name;
     ValueList *dims;
+    XStr qName(void) const { /*Return fully qualified name*/
+      XStr ret;
+      if(container) ret<<container->baseName()<<"::";
+      ret<<name;
+      return ret;
+    }
   public:
     Readonly(int l, Type *t, char *n, ValueList* d, int m=0) 
 	    : msg(m), type(t), name(n)
