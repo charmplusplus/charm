@@ -65,10 +65,10 @@ f90charm: charm++ $(L)/libf90charm.a
 default_libs: commlib multicast
 
 multicast: 
-	cd libs/ck-libs/multicast && make
+	cd libs/ck-libs/multicast && make OPTS='$(OPTS)'
 
 commlib:
-	cd libs/ck-libs/commlib && make
+	cd libs/ck-libs/commlib && make OPTS='$(OPTS)'
 
 translators: charmxi conv-cpm
 
