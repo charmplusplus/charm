@@ -431,7 +431,9 @@ int _getGroupIdx(int numNodes,int myNode,int numGroups)
         int n = 32 - (x+1);                                     // number of bits remaining for the index
         idx = (myNode<<n) + numGroups;                          // add number of processors, shift by the no. of bits needed,
                                                                 // then add the next available index
-        idx |= 0x80000000;                                      // set the most significant bit to 1
+	// of course this won't work when int is 8 bytes long on T3E 
+        //idx |= 0x80000000;                                      // set the most significant bit to 1
+	idx = - idx;
 								// if int is not 32 bits, wouldn't this be wrong?
         return idx;
 }
