@@ -365,7 +365,7 @@ class Array : public Chare {
     Array(int ln, NamedType *index,
     	NamedType *t, TypeList *b=0, MemberList *l=0);
     virtual int isArray(void) {return 1;}
-    virtual int is1D(void) {return indexSuffix=="1D";}
+    virtual int is1D(void) {return indexSuffix==(const char*)"1D";}
     virtual void genSubDecls(XStr& str);
     virtual char *chareTypeName(void) {return (char *) "array";}
 };

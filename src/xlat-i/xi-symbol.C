@@ -525,7 +525,7 @@ Array::Array(int ln, NamedType *index,
     : Chare(ln,t,b,l) 
 {
 	index->print(indexSuffix);
-	if (indexSuffix!="none")
+	if (indexSuffix!=(const char*)"none")
 		indexType<<"CkArrayIndex"<<indexSuffix;
 	else indexType<<"CkArrayIndex";
 //Add migration constructor entry point to MemberList
@@ -597,7 +597,7 @@ Array::genSubDecls(XStr& str)
   "    static CkArrayID ckNew(void) {return CkArrayID(buildArrayGroup());}\n"
   "    static CkArrayID ckNew_mapped(CkGroupID mapID) {return CkArrayID(buildArrayGroup(mapID));}\n";
   
-  if (indexSuffix!="none")
+  if (indexSuffix!=(const char*)"none")
   {
     str <<
     "//Generalized array indexing: (these KEEP the index you pass in!)\n"
@@ -608,22 +608,22 @@ Array::genSubDecls(XStr& str)
   }
   
   //Add specialized indexing for these common types
-  if (indexSuffix=="1D")
+  if (indexSuffix==(const char*)"1D")
   {
     str << 
     "    "<<ptype<<" operator [] (int idx) const \n"
     "        {return "<<ptype<<"(_aid, new CkArrayIndex1D(idx));}\n"
     "    "<<ptype<<" operator () (int idx) const \n"
     "        {return "<<ptype<<"(_aid, new CkArrayIndex1D(idx));}\n";
-  } else if (indexSuffix=="2D") {
+  } else if (indexSuffix==(const char*)"2D") {
     str << 
     "    "<<ptype<<" operator () (int i0,int i1) const \n"
     "        {return "<<ptype<<"(_aid, new CkArrayIndex2D(i0,i1));}\n";
-  } else if (indexSuffix=="3D") {
+  } else if (indexSuffix==(const char*)"3D") {
     str << 
     "    "<<ptype<<" operator () (int i0,int i1,int i2) const \n"
     "        {return "<<ptype<<"(_aid, new CkArrayIndex3D(i0,i1,i2));}\n";
-  } else if (indexSuffix=="4D") {
+  } else if (indexSuffix==(const char*)"4D") {
     str << 
     "    "<<ptype<<" operator () (int i0,int i1,int i2,int i3) const \n"
     "        {return "<<ptype<<"(_aid, new CkArrayIndex4D(i0,i1,i2,i3));}\n";
