@@ -15,6 +15,10 @@ SPRNG\footnote{URL:{\tt http://www.ncsa.uiuc.edu/Apps/SPRNG/www/}}
 package developed
 by Ashok Srinivasan\footnote{Email:{\tt ashoks@ncsa.uiuc.edu}} at NCSA.
 
+For minimal change to programs already using C functions {\tt rand()},
+{\tt srand()}, and {\tt drand48()}, Converse also maintains a ``default''
+random number stream.
+
 Interface to the Converse Pseudorandom Number Generator module is as follows:
 
 \function{typedef ... CrnStream;}
@@ -49,3 +53,23 @@ corresponding to the next
 random number in the sequence associated with \param{stream}. 
 Advances \param{stream} by one in the sequence.}
 
+\function{void CrnSrand(int seed)}
+\index{CrnSrand}
+\desc{
+Specifies a different seed for the default random number stream.
+Replaces {\tt srand()}.
+}
+
+\function{int CrnRand(void)}
+\index{CrnRand}
+\desc{
+Generate the next integer random number from the default random number
+stream. Replaces {\tt rand()}.
+}
+
+\function{double CrnDrand(void)}
+\index{CrnDrand}
+\desc{
+Generate the next double precision random number from the default random number
+stream. Replaces {\tt drand48()}.
+}

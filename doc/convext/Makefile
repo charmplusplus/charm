@@ -14,7 +14,11 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.4  2000-02-20 17:36:52  milind
+# Revision 1.5  2000-02-24 07:06:29  milind
+# Added new Crn functionality descriptions. And added an index to the
+# manual.
+#
+# Revision 1.4  2000/02/20 17:36:52  milind
 # Added -local_icons option to latex2html.
 #
 # Revision 1.3  1997/08/18 18:25:55  jyelon
@@ -32,7 +36,9 @@ thsync.tex pthreads.tex
 
 
 ps:
+	touch index.tex
 	latex manual.tex
+	makeindex -o index.tex manual.idx
 	latex manual.tex
 	latex manual.tex
 	dvips -o manual.ps manual.dvi
