@@ -1,0 +1,37 @@
+// double checkpointing in memory
+
+module CkMemCheckpoint {
+
+  readonly CkGroupID ckCheckPTGroupID;
+
+  message CkArrayCheckPTMessage {
+        double packData[];
+  };    
+  message CkProcCheckPTMessage {
+        char packData[];
+  };    
+  message CkArrayCheckPTReqMessage;
+
+  group [migratable] CkMemCheckPT {
+        entry CkMemCheckPT(void);
+	entry void createEntry(CkArrayID, CkGroupID, CkArrayIndexMax, int);
+        entry void doItNow(int spe, CkCallback &);  //checkpointing
+ 	entry void recvData(CkArrayCheckPTMessage *);
+	entry void recvProcData(CkProcCheckPTMessage *);
+        entry void restart(int);
+  	entry void resetReductionMgr();
+	entry void removeArrayElements();
+ 	entry void cpFinish();
+ 	entry void recoverBuddies();
+ 	entry void recoverArrayElements();
+	entry void finishUp();
+	entry void quiescence(CkCallback);
+        entry void inmem_restore(CkArrayCheckPTMessage *m);
+  };
+
+  initproc void CkRegisterRestartHandler();
+
+  mainchare CkMemCheckPTInit {
+	entry CkMemCheckPTInit(CkArgMsg *m);
+  };
+};
