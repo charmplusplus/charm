@@ -11,9 +11,9 @@ class maxHeap;
 #include "iostream.h"
 // Heap of pointers. The field to be compared is:
 
-minHeap::minHeap(int size)
+minHeap::minHeap(int nsize)
 {
-  this->size = size;
+  size = nsize;
   h = new heapRecord[size];
   count = 0;
 }
@@ -103,9 +103,9 @@ InfoRecord *minHeap::next(heapIterator *iter){
 //*****************
 
 
-maxHeap::maxHeap(int size)
+maxHeap::maxHeap(int nsize)
 {
-  this->size = size;
+  size = nsize;
   h = new heapRecord[size];
   count = 0;
 }
