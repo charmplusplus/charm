@@ -541,7 +541,14 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register void *obj;
+#if CMK_IMMEDIATE_MSG && ! defined(CMK_CPV_IS_SMP)
+  if (CmiTryLock(CksvAccess(_nodeLock))) {
+    CmiDelayImmediate();
+    return;
+  }
+#else
   CmiLock(CksvAccess(_nodeLock));
+#endif
   obj = CksvAccess(_nodeGroupTable)->find(groupID).getObj();
   if(!obj) { // groupmember not yet created
     CksvAccess(_nodeGroupTable)->find(groupID).enqMsg(env);
@@ -800,8 +807,7 @@ static inline int _prepareImmediateMsg(int eIdx,void *msg,const CkChareID *pCid)
   int destPE = _prepareMsg(eIdx, msg, pCid);
   if (destPE != -1) {
     register envelope *env = UsrToEnv(msg);
-    CmiSetHandler(env, CpvAccessOther(CmiImmediateMsgHandlerIdx,0));
-    CmiSetXHandler(env, _charmHandlerIdx);
+    CmiBecomeImmediate(env);
   }
   return destPE;
 }
@@ -866,8 +872,7 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
 static inline envelope *_prepareImmediateMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
 {
   envelope *env = _prepareMsgBranch(eIdx, msg, gID, type);
-  CmiSetHandler(env, CpvAccessOther(CmiImmediateMsgHandlerIdx,0));
-  CmiSetXHandler(env, _charmHandlerIdx);
+  CmiBecomeImmediate(env);
   return env;
 }
 
