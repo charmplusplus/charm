@@ -11,11 +11,16 @@ class maxHeap;
 #include "iostream.h"
 // Heap of pointers. The field to be compared is:
 
-minHeap::minHeap(int size)
+minHeap::minHeap(int nsize)
 {
-  this->size = size;
+  size = nsize;
   h = new heapRecord[size];
   count = 0;
+}
+
+minHeap::~minHeap()
+{
+  delete [] h;
 }
 
 int minHeap::numElements()
@@ -25,15 +30,17 @@ int minHeap::numElements()
 
 int minHeap::insert(InfoRecord *x)
 {
-  h[count].info = x;
-  h[count].deleted = 0;
+  int current;
 
-  int current = count;
-  count++;
-
-  if (count >= size) {
+  if (count < size) {
+    h[count].info = x;
+    h[count].deleted = 0;
+    current = count;
+    count++;
+  } else {
     cout << "minHeap overflow. \n" ; 
-    return -1;}
+    return -1;
+  }
 
   int parent = (current - 1)/2;
   while (current != 0)
@@ -103,11 +110,16 @@ InfoRecord *minHeap::next(heapIterator *iter){
 //*****************
 
 
-maxHeap::maxHeap(int size)
+maxHeap::maxHeap(int nsize)
 {
-  this->size = size;
+  size = nsize;
   h = new heapRecord[size];
   count = 0;
+}
+
+maxHeap::~maxHeap()
+{
+  delete [] h;
 }
 
 int maxHeap::numElements()
@@ -117,14 +129,17 @@ int maxHeap::numElements()
 
 int maxHeap::insert(InfoRecord *x)
 {
-  h[count].info = x;
-  h[count].deleted  = 0;
-  int current = count;
-  count++;
+  int current;
 
-  if (count >= size) {
+  if (count < size) {
+    h[count].info = x;
+    h[count].deleted  = 0;
+    current = count;
+    count++;
+  } else {
     cout << "maxHeap overflow. \n" ; 
-    return -1;}
+    return -1;
+  }
 
   int parent = (current - 1)/2;
   while (current != 0)
