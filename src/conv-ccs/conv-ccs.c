@@ -320,7 +320,7 @@ void CcsInit(char **argv)
   CcsBuiltinsInit(argv);
 
 #if NODE_0_IS_CONVHOST
-  rep_fw_handler_idx = CmiRegisterHandler(rep_fw_handler);
+  rep_fw_handler_idx = CmiRegisterHandler((CmiHandler)rep_fw_handler);
   {
    int ccs_serverPort=0;
    char *ccs_serverAuth=NULL;
