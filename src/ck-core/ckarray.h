@@ -25,157 +25,19 @@ Converted from 1-D arrays 2/27/2000 by
 Orion Sky Lawlor, olawlor@acm.org
 
 */
-#ifndef _CKARRAY_H
-#define _CKARRAY_H
+#ifndef __CKARRAY_H
+#define __CKARRAY_H
 
-/*******************************************************
-Array Index class.  An array index is just a HashKey-- 
-a run of bytes used to look up an object in a hash table.
-An Array Index cannot be modified once it is created.
- */
-
-#include "ckhashtable.h"
-
-#ifndef CK_ARRAYINDEX_MAXLEN 
-#define CK_ARRAYINDEX_MAXLEN 3 /*Max. # of integers in an array index*/
-#endif
-
-class CkArrayIndex
-{
-public:
-	//Length of index in *integers*
-	int nInts;
-	
-	//Index data immediately follows...
-	
-	int *data(void) {return (&nInts)+1;}
-	const int *data(void) const {return (&nInts)+1;}
-	
-	void pup(PUP::er &p);
-
-    //These routines allow CkArrayIndex to be used in
-    //  a CkHashtableT
-	CkHashCode hash(void) const;
-	static CkHashCode staticHash(const void *a,size_t);
-	int compare(const CkArrayIndex &ind) const;
-	static int staticCompare(const void *a,const void *b,size_t);
-};
-
-//Simple ArrayIndex classes: the key is just integer indices.
-class CkArrayIndex1D : public CkArrayIndex {
-public: int index;
-	CkArrayIndex1D(int i0) {index=i0;nInts=1;}
-};
-class CkArrayIndex2D : public CkArrayIndex {
-public: int index[2];
-	CkArrayIndex2D(int i0,int i1) {index[0]=i0;index[1]=i1;
-		nInts=2;}
-};
-class CkArrayIndex3D : public CkArrayIndex {
-public: int index[3];
-	CkArrayIndex3D(int i0,int i1,int i2) {index[0]=i0;index[1]=i1;index[2]=i2;
-		nInts=3;}
-};
-
-//A slightly more complex array index: the key is an object
-// whose size is fixed at compile time.
-template <class object> //Key object
-class CkArrayIndexT : public CkArrayIndex {
-public:
-	object obj;
-	CkArrayIndexT(const object &srcObj) {obj=srcObj; 
-		nInts=sizeof(obj)/sizeof(int);}
-};
-
-//This class is as large as any CkArrayIndex
-class CkArrayIndexMax : public CkArrayIndex {
-	struct {
-		int data[CK_ARRAYINDEX_MAXLEN];
-	} index;
-	void copyFrom(const CkArrayIndex &that)
-	{
-		nInts=that.nInts;
-		index=((const CkArrayIndexMax *)&that)->index;
-		//for (int i=0;i<nInts;i++) index[i]=that.data()[i];
-	}
-public:
-	CkArrayIndexMax(void) { }
-	CkArrayIndexMax(const CkArrayIndex &that) 
-		{copyFrom(that);}
-	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
-		{copyFrom(that); return *this;}
-};
-
-class CkArrayIndexStruct {
-public:
-	int nInts;
-	int index[CK_ARRAYINDEX_MAXLEN];
-};
-
-/*********************** Array Messages ************************/
-class CkArrayMessage : public Message {
-public:
-  //These routines are implementation utilities
-  inline CkArrayIndexMax &array_index(void);
-  unsigned short &array_ep(void);
-  unsigned char &array_hops(void);
-  unsigned int array_getSrcPe(void);
-  unsigned int array_ifNotThere(void);
-  void array_setIfNotThere(unsigned int);
-  
-  //This allows us to delete bare CkArrayMessages
-  void operator delete(void *p){CkFreeMsg(p);}
-  static void* alloc(int idx, size_t sz, int *szs, int pb) {
-    return CkAllocMsg(idx, sz, pb);
-  }
-  static void *pack(CkArrayMessage *m) { return (void *) m; }
-  static CkArrayMessage *unpack(void *buf) { return (CkArrayMessage*) buf; }
-};
-
+#include "cklocation.h"
 #include "ckreduction.h"
 
 /***********************************************************
 	Utility defines, includes, etc.
 */
-
-//#undef CMK_LBDB_ON  //FOR TESTING:  DISABLE LOAD BALANCER
-//#define CMK_LBDB_ON 0
-
-#if CMK_LBDB_ON
-#include "LBDatabase.h"
-class LBDatabase;
-#endif
-
 extern void _registerCkArray(void);
-extern CkGroupID _RRMapID;
 
 #define ALIGN8(x)       (int)((~7)&((x)+7))
 
-#define MessageIndex(mt)        CMessage_##mt##::__idx
-#define ChareIndex(ct)          CkIndex_##ct##::__idx
-#define EntryIndex(ct,ep,mt)    CkIndex_##ct##::ep##((mt *)0)
-#define ConstructorIndex(ct,mt) EntryIndex(ct,ckNew,mt)
-
-typedef int MessageIndexType;
-typedef int ChareIndexType;
-typedef int EntryIndexType;
-
-//Forward declarations
-class CkArray;
-class ArrayElement;
-class CkArrayMessage;
-class CkArrayElementMigrateMessage;
-class CkArrayCreateMsg;
-class CkArrayRemoveMsg;
-class CkArrayUpdateMsg;
-
-//What to do if an entry method is invoked on
-// an array element that does not (yet) exist:
-typedef enum {
-	CkArray_IfNotThere_buffer=0, //Wait for it to be created
-	CkArray_IfNotThere_createhere=1, //Make it on sending PE
-	CkArray_IfNotThere_createhome=2 //Make it on (a) home PE
-} CkArray_IfNotThere;
 
 //This class is a wrapper around a CkArrayIndex and ArrayID,
 // used by array element proxies.  This makes the translator's
@@ -188,13 +50,15 @@ public:
 	CProxy_ArrayBase(const CkArrayID &aid,CkGroupID dTo=-1) 
 		:CProxyBase_Delegatable(dTo), _aid(aid) { }
 
-	static CkGroupID ckCreateArray(CkGroupID mapID=_RRMapID,int numInitial=0);
+	static CkGroupID ckCreateArray(int numInitial,CkGroupID mapID,CkArrayID boundToArray);
 	static CkGroupID ckCreateArray1D(int ctorIndex,CkArrayMessage *m,
 	     int numInitial,CkGroupID mapID);
-	void ckInsertIdx(CkArrayMessage *m,int ctor,int onPE,const CkArrayIndex &idx);	
+	void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx);	
 	void ckBroadcast(CkArrayMessage *m, int ep) const;
 	CkArrayID ckGetArrayID(void) const { return _aid; }
 	CkArray *ckLocalBranch(void) const { return _aid.ckLocalBranch(); }	
+	inline operator CkArrayID () const {return ckGetArrayID();}
+
 	void doneInserting(void);
 	void setReductionClient(CkReductionMgr::clientFn fn,void *param=NULL);
 
@@ -203,21 +67,22 @@ public:
 PUPmarshall(CProxy_ArrayBase);
 #define CK_DISAMBIG_ARRAY(super) \
 	CK_DISAMBIG_DELEGATABLE(super) \
-	static CkGroupID ckCreateArray(CkGroupID mapID=_RRMapID,int numInitial=0)\
-	  { return super::ckCreateArray(mapID,numInitial); }\
-	static CkGroupID ckCreateArray1D(int ctorIndex,CkArrayMessage *m,\
+	inline operator CkArrayID () const {return ckGetArrayID();}\
+	inline static CkGroupID ckCreateArray(int numInitial,CkGroupID mapID,CkArrayID boundToArray)\
+	  { return super::ckCreateArray(numInitial,mapID,boundToArray); }\
+	inline static CkGroupID ckCreateArray1D(int ctorIndex,CkArrayMessage *m,\
 	     int numInitial,CkGroupID mapID)\
 	  { return super::ckCreateArray1D(ctorIndex,m,numInitial,mapID); }\
-	void ckInsertIdx(CkArrayMessage *m,int ctor,int onPE,const CkArrayIndex &idx) \
-	  { super::ckInsertIdx(m,ctor,onPE,idx); }\
-	void ckBroadcast(CkArrayMessage *m, int ep) const \
+	inline void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx) \
+	  { super::ckInsertIdx(m,ctor,onPe,idx); }\
+	inline void ckBroadcast(CkArrayMessage *m, int ep) const \
 	  { super::ckBroadcast(m,ep); } \
-	CkArrayID ckGetArrayID(void) const \
+	inline CkArrayID ckGetArrayID(void) const \
 	  { return super::ckGetArrayID();} \
-	CkArray *ckLocalBranch(void) const \
+	inline CkArray *ckLocalBranch(void) const \
 	  { return super::ckLocalBranch(); } \
-	void doneInserting(void) { super::doneInserting(); }\
-	void setReductionClient(CkReductionMgr::clientFn fn,void *param=NULL)\
+	inline void doneInserting(void) { super::doneInserting(); }\
+	inline void setReductionClient(CkReductionMgr::clientFn fn,void *param=NULL)\
 	  { super::setReductionClient(fn,param); }\
 
 
@@ -230,7 +95,7 @@ public:
 		const CkArrayIndex &idx,CkGroupID dTo=-1)
 		:CProxy_ArrayBase(aid,dTo), _idx(idx) { }
 	
-	void ckInsert(CkArrayMessage *m,int ctor,int onPE);
+	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep) const;
 	const CkArrayIndex &ckGetIndex() const {return _idx;}
 
@@ -240,100 +105,49 @@ public:
 PUPmarshall(CProxyElement_ArrayBase);
 #define CK_DISAMBIG_ARRAY_ELEMENT(super) \
 	CK_DISAMBIG_ARRAY(super) \
-	void ckInsert(CkArrayMessage *m,int ctor,int onPE) \
-	  { super::ckInsert(m,ctor,onPE); }\
-	void ckSend(CkArrayMessage *m, int ep) const \
+	inline void ckInsert(CkArrayMessage *m,int ctor,int onPe) \
+	  { super::ckInsert(m,ctor,onPe); }\
+	inline void ckSend(CkArrayMessage *m, int ep) const \
 	  { super::ckSend(m,ep); }\
-	const CkArrayIndex &ckGetIndex() const \
+	inline const CkArrayIndex &ckGetIndex() const \
 	  { return super::ckGetIndex(); }\
-
-
-/************************* Array Map  ************************
-An array map tells which PE to put each array element on.
-*/
-class CkArrayMapRegisterMessage
-{
-public:
-  int numElements;
-  CkArray *array;
-};
-
-class CkArrayMap : public CkGroupReadyCallback
-{
-public:
-  CkArrayMap(void);
-  CkArrayMap(CkMigrateMessage *m) {}
-  virtual int registerArray(CkArrayMapRegisterMessage *);
-  virtual int procNum(int arrayHdl,const CkArrayIndex &element);
-  virtual void pup(PUP::er &p) { CkGroupReadyCallback::pup(p); }
-};
 
 /************************ Array Element *********************/
 
-class ArrayElement : public Chare
+class ArrayElement : public CkMigratable
 {
-	friend class CkArray;
+  friend class CkArray;
   void initBasics(void);
 public:
   ArrayElement(void);
   ArrayElement(CkMigrateMessage *m);
   virtual ~ArrayElement();
   
-  CkArrayIndexMax thisIndexMax;//Index of this element
-  
-  void destroy(void);
+  int numElements; //Initial number of array elements (DEPRICATED)
   
 //Contribute to the given reduction type.  Data is copied, not deleted.
   void contribute(int dataSize,void *data,CkReduction::reducerType type);
 
-//Migrate to the given processor number
-  void migrateMe(int toPE);
 //Pack/unpack routine (called before and after migration)
   virtual void pup(PUP::er &p);
+
+//Overridden functions:
+  //Called by the system just before and after migration to another processor:  
+  virtual void ckAboutToMigrate(void); 
+  virtual void ckJustMigrated(void); 
+  virtual void ckDestroy(void);
+
+  //Synonym for ckMigrate
+  inline void migrateMe(int toPe) {ckMigrate(toPe);}
 
 protected:
   CkArray *thisArray;//My source array
-
   CkArrayID thisArrayID;//My source array's ID
-  int thisChareType;//My chare type index
-
-#if CMK_LBDB_ON  //For load balancing:
-  void AtSync(void);
-  virtual void ResumeFromSync(void);
-  CmiBool usesAtSync;//You must set this in the constructor to use AtSync().
-  LDObjHandle ldHandle;//Transient (not migrated)
-private: //Load balancer state:
-  CmiBool barrierRegistered;//True iff handle below is set
-  LDBarrierClient ldBarrierHandle;//Transient (not migrated)  
-  static void staticResumeFromSync(void* data);
-  static void staticMigrate(LDObjHandle h, int dest);
-#endif
-  void lbRegister(void);//Connect to load balancer
-  void lbUnregister(void);//Disconnect from load balancer
-
-//Array implementation methods: 
+  
 private:
+//Array implementation methods:   
   int bcastNo;//Number of broadcasts received (also serial number)
   CkReductionMgr::contributorInfo reductionInfo;//My reduction information
-};
-
-
-
-//An ArrayElement1D is a utility class where you are 
-// constrained to a 1D "thisIndex" and 1D "numElements".
-class ArrayElement1D : public ArrayElement
-{
-public:
-  ArrayElement1D(void);
-  ArrayElement1D(CkMigrateMessage *m);
-  int getIndex(void) {return thisIndex;}
-  int getArraySize(void)  {return numElements;}
-  
-//Pack/unpack routine (called before and after migration)
-  virtual void pup(PUP::er &p);
- 
-  int numElements;//Initial array size
-  int thisIndex;//1-D array index
 };
 
 //An ArrayElementT is a utility class where you are 
@@ -348,217 +162,100 @@ public:
   T thisIndex;//Object array index
 };
 
-typedef struct {int x,y;} CkArray_index2D;
-void operator|(PUP::er &p,CkArray_index2D &i);
-typedef ArrayElementT<CkArray_index2D> ArrayElement2D;
+typedef ArrayElementT<int> ArrayElement1D;
 
-typedef struct {int x,y,z;} CkArray_index3D;
-void operator|(PUP::er &p,CkArray_index3D &i);
-typedef ArrayElementT<CkArray_index3D> ArrayElement3D;
+typedef struct {int x,y;} CkIndex2D;
+void operator|(PUP::er &p,CkIndex2D &i);
+typedef ArrayElementT<CkIndex2D> ArrayElement2D;
+
+typedef struct {int x,y,z;} CkIndex3D;
+void operator|(PUP::er &p,CkIndex3D &i);
+typedef ArrayElementT<CkIndex3D> ArrayElement3D;
 
 /*********************** Array Manager BOC *******************/
 
+class CkArrayCreateInfo {
+ public:
+	CkGroupID locMgrID;
+	int numInitial;
+	CkArrayCreateInfo() {}
+	CkArrayCreateInfo(CkGroupID locMgrID_,int numInitial_)
+		:locMgrID(locMgrID_), numInitial(numInitial_) { }
+	void pup(PUP::er &p) {
+		p|locMgrID;
+		p|numInitial;
+	}
+};
+PUPmarshall(CkArrayCreateInfo);
+
 #include "CkArray.decl.h"
 
-/*This really doesn't belong here: need a marshall.h */
-class CkMarshallMsg : public CMessage_CkMarshallMsg {
-public: char *msgBuf;
-};
+class CkArray : public CkReductionMgr, public CkArrMgr {
+  friend class ArrayElement;
+  friend class CProxy_ArrayBase;
+  friend class CProxyElement_ArrayBase;
 
-static inline CkGroupID CkCreatePropMap(void)
-{
-  return CProxy_PropMap::ckNew();
-}
-
-extern void _propMapInit(void);
-
-class CkArrayRec;//An array element record
-
-class CkArray : public CkReductionMgr {
-	friend class ArrayElement;
-	friend class ArrayElement1D;
-	friend class CProxy_ArrayBase;
-	friend class CProxyElement_ArrayBase;
-	friend class CkArrayRec;
-	friend class CkArrayRec_aging;
-	friend class CkArrayRec_local;
-	friend class CkArrayRec_remote;
-	friend class CkArrayRec_buffering;
-
-//A fixed value, to detect bad GroupID/heap corruption
-#define CkArray_MAGIC 0xf1a5D00D
-  int CkArray_magic;
-#ifdef CMK_OPTIMIZE
-# define CkArray_MAGIC_CHECK() /*empty, for speed*/
-#else
-# define CkArray_MAGIC_CHECK() do{ \
-	if (CkArray_magic != CkArray_MAGIC) \
-		CkAbort("Charm++ array manager trashed-- indicates "\
-        "a bad GroupID, corrupted message, or heap corruption");\
-  } while(0)
-#endif
-
+  CkMagicNumber<ArrayElement> magic; //To detect heap corruption
+  CkLocMgr *locMgr;
   CProxy_CkArray thisproxy;
+  typedef CkMigratableListT<ArrayElement> ArrayElementList;
+  ArrayElementList *elements;  
+
 public:
 //Array Creation:
-  CkArray(CkArrayCreateMsg *);
-  CkArray(CkMigrateMessage *);
+  CkArray(const CkArrayCreateInfo &c);
   CkGroupID &getGroupID(void) {return thisgroup;}
 
-//Element creation/destruction:
-  void InsertElement(CkArrayMessage *m);
-  void DoneInserting(void);
-  void ElementDying(CkArrayRemoveMsg *m);
-  
+//Access & information routines
+  inline CkLocMgr *getLocMgr(void) {return locMgr;}
+  inline int getBcastNo(void) const {return bcastNo;}
+  inline int homePe(const CkArrayIndex &idx) const {return locMgr->homePe(idx);}
+
+  /* Return the last known processor for this array index.
+   Valid for any possible array index. */
+  inline int lastKnown(const CkArrayIndex &idx) const
+	  {return locMgr->lastKnown(idx);}
+  //Deliver message to this element (directly if local)
+  inline void deliver(CkArrayMessage *m) 
+	  {locMgr->deliver(m);}
+  inline void deliverViaQueue(CkArrayMessage *m) 
+	  {locMgr->deliverViaQueue(m);}
   //Fetch a local element via its index (return NULL if not local)
-  ArrayElement *getElement(const CkArrayIndex &index);
+  inline ArrayElement *lookup(const CkArrayIndex &index)
+	  {return (ArrayElement *)locMgr->lookup(index,thisgroup);}
 
-//Messaging:
-  //Called by proxy to deliver message to any array index
-  // After send, the array owns msg.
-  void Send(CkArrayMessage *msg);
-  //Called by send to deliver message to an element.
-  inline void RecvForElement(CkArrayMessage *msg);
-  //Called by CkArrayRec for a local message
-  void deliverLocal(CkArrayMessage *msg,ArrayElement *el);
-   //Called by CkArrayRec for a remote message
-  inline void deliverRemote(CkArrayMessage *msg,int onPE);
-   //Called by CkArrayRec for a remote message
-  void deliverUnknown(CkArrayMessage *msg);
+//Creation:
+  virtual CkMigratable *allocateMigrated(int elChareType,const CkArrayIndex &idx);
+  virtual bool insertElement(CkArrayMessage *);
+  virtual void doneInserting(void);
 
-//Migration:
-  void migrateMe(ArrayElement *elem, int where);
+//Demand-creation:
+  bool demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor);
+
+//Broadcast communication:
+  void sendBroadcast(CkArrayMessage *msg);
+  void recvBroadcast(CkArrayMessage *msg);
   
-  //Internal:
-  void RecvMigratedElement(CkArrayElementMigrateMessage *msg);
-  void UpdateLocation(CkArrayUpdateMsg *msg);
-
-//Load balancing:
-  void DummyAtSync(void);
-  
-//Housecleaning: called periodically from node zero
-  void SpringCleaning(void);
-
-//Broadcast:
-  void SendBroadcast(CkArrayMessage *msg);
-  void RecvBroadcast(CkArrayMessage *msg);
-  
-#if CMK_LBDB_ON
-  LBDatabase *the_lbdb;
-#endif
 private:
-#if CMK_LBDB_ON
-  LDBarrierClient dummyBarrierHandle;
-  static void staticDummyResumeFromSync(void* data);
-  void dummyResumeFromSync(void);
-  static void staticRecvAtSync(void* data);
-  void recvAtSync(void);
-  
-  //Load balancing callbacks:
-  static void staticSetStats(LDOMHandle _h, int _state);
-  void setStats(LDOMHandle _h, int _state);
-  static void staticQueryLoad(LDOMHandle _h);
-  void queryLoad(LDOMHandle _h);
-  
-  LDOMHandle myLBHandle;
-  void initLB(LBDatabase *Nlbdb);
-#endif
-
-  //This flag lets us detect element suicide, so we can stop timing
-  CmiBool curElementIsDead;
-  void localElementDying(ArrayElement *e);
-
-  //Maps array index to array element records (CkArrayRec)
-  CkHashtableT<CkArrayIndexMax,CkArrayRec *> hash;
-  
-  //Add given element array record (which then owns it) at idx.
-  void insertRec(CkArrayRec *rec,const CkArrayIndex &idx);
-  //Look up array element in hash table.  Index out-of-bounds if not found.
-  CkArrayRec *elementRec(const CkArrayIndex &idx);
-  //Look up array element in hash table.  Return NULL if not there.
-  CkArrayRec *elementNrec(const CkArrayIndex &idx);
-  
-  //This structure keeps counts of numbers of array elements:
-  struct {
-  	int local;//Living here
-  	int migrating;//Just left
-  } num;//<- array element counts
-  
   int numInitial;//Number of 1D initial array elements (backward-compatability)
   CmiBool isInserting;//Are we currently inserting elements?
 
-  //Deliver this message to this array element
-  void invokeEntry(ArrayElement *el,int entryIdx,void *msg);
-
-  //Create, but do not register an element
-  ArrayElement *buildElement(int type,int ctor,void *msg,
-		const CkArrayIndex &ind,bool fromMigration);
-
-  //Create, initialize, and register this new element
-  ArrayElement *newElement(int ctor,void *msg,const CkArrayIndex &ind);
-
+//Allocate space for a new array element
+  ArrayElement *allocate(int elChareType,const CkArrayIndex &idx,int bcast);
+  
 //Broadcast support
   int bcastNo;//Number of broadcasts received (also serial number)
   int oldBcastNo;//Above value last spring cleaning
   //This queue stores old broadcasts (in case a migrant arrives
   // and needs to be brought up to date)
   CkQ<CkArrayMessage *> oldBcasts;
-  void bringBroadcastUpToDate(ArrayElement *el);
+  bool bringBroadcastUpToDate(ArrayElement *el);
   void deliverBroadcast(CkArrayMessage *bcast);
-  void deliverBroadcast(CkArrayMessage *bcast,ArrayElement *el);
+  bool deliverBroadcast(CkArrayMessage *bcast,ArrayElement *el);
 
-//For houscleaning:
-  int nSprings;//Number of times "SpringCleaning" has been broadcast
-
-///// Map support:
-  CkGroupID mapID;
-  int mapHandle;
-  CkArrayMap *map;
-//Return the home PE of the given array index
-  int homePE(const CkArrayIndex &idx) const
-  	{return map->procNum(mapHandle,idx);}
-//Return 1 if this is the home PE of the given array index
-  CmiBool isHome(const CkArrayIndex &idx) const
-  	{return (CmiBool)(homePE(idx)==CkMyPe());}
-
-//Initialization support:
-  static void static_initAfterMap(void *dis);
-  void initAfterMap(void);
-  CkArrayRec* pupArrayRec(PUP::er &p, CkArrayRec *rec, CkArrayIndex *idx);
-  void pupHashTable(PUP::er &p);
-public:
-  int array_size(void) { return numInitial; } // required for historic reasons
-  virtual void pup(PUP::er &p); //pack-unpack method
-  static void pupArrayMsgQ(CkQ<CkArrayMessage *> &q, PUP::er &p);
-};
-
-/************************** Array Messages ****************************/
-
-
-//This is the default creation message sent to a new array element
-class CkArrayElementCreateMsg:public CMessage_CkArrayElementCreateMsg {};
-
-class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessage {
-protected:
-	friend class CkArray;
-	void* packData;
-	~CkArrayElementMigrateMessage() {}
-public:
-  static void *alloc(int msgnum, size_t size, int *array, int priobits);
-  static void *pack(CkArrayElementMigrateMessage *);
-  static CkArrayElementMigrateMessage *unpack(void *in);
-};
-
-//Message: Remove the array element at the given index.
-class CkArrayRemoveMsg : public CMessage_CkArrayRemoveMsg 
-{public:
-	CkArrayRemoveMsg(const CkArrayIndex &idx);	// move to ckarray.C
-};
-
-//Message: Direct future messages for this array element to this PE.
-class CkArrayUpdateMsg : public CMessage_CkArrayUpdateMsg 
-{public:
-	CkArrayUpdateMsg(const CkArrayIndex &idx);
+//Spring cleaning
+  void springCleaning(void);
+  static void staticSpringCleaning(void *forWhom);
 };
 
 #endif

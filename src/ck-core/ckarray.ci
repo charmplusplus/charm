@@ -1,63 +1,23 @@
 module CkArray {
   extern module CkReduction;
-	
-  readonly CkGroupID _RRMapID;
-/*This really doesn't belong here: need a marshall.ci */
-  message CkMarshallMsg {
-	char msgBuf[];
-  };
-
-  message CkArrayMessage;
-  message CkArrayElementCreateMsg;
-  message CkArrayElementMigrateMessage;
-  
-  message CkArrayCreateMsg;
-  message CkArrayRemoveMsg;
-  message CkArrayUpdateMsg;
+  extern module CkLocation;
 
   group CkArray : CkReductionMgr {
-	entry CkArray(CkArrayCreateMsg *);
-	//Insertion:
-	entry void InsertElement(CkArrayMessage *);
-	entry void DoneInserting(void);
-	entry void ElementDying(CkArrayRemoveMsg *);
-	//Messaging:
-	entry void Send(CkArrayMessage *);
-	entry void RecvForElement(CkArrayMessage *);
-	//Migration:
-	entry void RecvMigratedElement(CkArrayElementMigrateMessage *);
-	entry void UpdateLocation(CkArrayUpdateMsg *);
-	//Load balancing:
-	entry void DummyAtSync(void);
-	//Housecleaning:
-	entry void SpringCleaning(void);
+	entry CkArray(CkArrayCreateInfo i);
+	//Insertion
+	entry void insertElement(CkArrayMessage *);
+	entry void doneInserting(void);
+	//Messaging
+	entry void deliver(CkArrayMessage *);
+	entry void deliverViaQueue(CkArrayMessage *);
 	//Broadcast
-	entry void SendBroadcast(CkArrayMessage *);
-	entry void RecvBroadcast(CkArrayMessage *);	
+	entry void sendBroadcast(CkArrayMessage *);
+	entry void recvBroadcast(CkArrayMessage *);
   };
-
+  
   array [none] ArrayElement {
     entry ArrayElement();
     //Calls destructor:
-    entry void destroy(void);
-  };
-
-//Array Map object support:
-  group CkArrayMap : CkGroupReadyCallback {
-    entry CkArrayMap(void);
-  };
-
-  group RRMap : CkArrayMap {
-    entry RRMap(void);
-  };
-
-  initcall void _propMapInit(void);
-
-  group PropMap : CkArrayMap {
-    entry PropMap(void);
-  };
-
-  mainchare CkArrayInit {
-    entry CkArrayInit();
+    entry void ckDestroy(void);
   };
 };
