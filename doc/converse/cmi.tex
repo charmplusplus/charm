@@ -23,16 +23,53 @@ process. A separate call to \param{exit()} is needed after
 }
 
 
-\section{Message Handler Calls}
+\section{Converse Handlers and Handler Numbers}
 
+Prior to sending a message, the Converse user writes a function that
+the receiver of the message should use to {\em handle} the message.
+The Converse user puts a reference to that function in the message,
+and sends it to the destination processor.  The destination processor
+automatically calls the user's {\em handler} function, passing it the
+contents of the message.
+
+Ideally, this would be achieved by putting a pointer to the
+handler-function in the message.  However, in parallel programs
+running on heterogeneous machines, sending a function-pointer in a
+message doesn't work.  As a substitute, we use function-numbers.
+During program initialization time, the handler-functions are assigned
+numbers, and messages contain handler-numbers to specify which handler
+should process the message.  
+
+The following set of facilities are provided to assign handler-numbers
+to handler-functions, and to store handler-numbers in messages.  Note
+that while they may be called ``handler-numbers'', they can be used as
+a general substitute for function-pointers in messages.  Of the
+registration functions, the one which is normally used in Converse
+programs is CmiRegisterHandler.
+
+\function{typedef void (*CmiHandler)(void *)}
+\index{CmiHandler}
+\desc{Functions that handle Converse messages must be of this type.}
 
 \function {\#define CmiMsgHeaderSizeBytes}
 \index{CmiMsgHeaderSizeBytes}
-\desc{This constant, defined in {\tt converse.h}, denotes
-the size of the message header in bytes.
-Every message buffer must allocate these many bytes at its beginning
-for the header.}
- 
+\desc{Messages are stored in message buffers.  The first few bytes
+of the message-buffer is always the CMI header.  This constant,
+defined in {\tt converse.h}, denotes the size of the CMI message
+header in bytes.  Every message buffer must allocate these many bytes
+at its beginning for the header.}
+
+\function {int CmiRegisterHandler(CmiHandler h)}
+\index{CmiRegisterHandler}
+\desc{This call registers a message handler with the CMI and returns a
+handler index which can be subsequently used to specify the handler
+for a message. All processors must register the same handlers, in the
+same order, so that the handler-numbers remain consistent across
+processes. All handlers must be registered on a processor before any
+messages are received or sent by that processor.  For this purpose, it
+is useful to register all handlers at the initialization stage of an
+application.}
+
 \function {void CmiSetHandler(int *MessageBuffer, int HandlerId)}
 \index{CmiSetHandler}
 \desc{This macro sets the handler field of a message to \param{HandlerId}.}
@@ -41,51 +78,11 @@ for the header.}
 \index{CmiGetHandler}
 \desc{This call returns the handler field of a message \param{MessageBuffer}.}
  
-\function {HANDLER CmiGetHandlerFunction(int *MessageBuffer)}
+\function {CmiHandler CmiGetHandlerFunction(int *MessageBuffer)}
 \index{CmiGetHandlerFunction}
-\desc{This call returns the handler function pointer for a message 
-\param{MessageBuffer}. This
-usually involves looking up a table using the handler-id stored in
-the message header at the sending processor. HANDLER is defined as 
-{\tt typedef void (*HANDLER)(void *)} .}
-\index{HANDLER}
-
-\function {int CmiRegisterHandler(HANDLER HandlerFunction)}
-\index{CmiRegisterHandler}
-\desc{This call registers a message handler with the CMI and returns a
-handler index which can be subsequently used to specify the handler
-for a message. \note{This function should be called
-in the same order for all handlers in all the processes belonging to an 
-application so that the handler-ids remain consistent across processes.
-For this purpose, it is useful to register all handlers at the initialization
-stage of an application.}}
-
+\desc{This call returns the handler function pointer for a message.}
 
 \section{Point-To-Point Communication}
-
-\internal{
-\function{void *CmiGetSpecificMsg(int HandlerId)}
-\index{CmiGetSpecificMsg}
-\desc{This call waits until a message for the specified handler is
-available, and returns a pointer to the message buffer. Ownership of
-the message buffer is maintained with the CMI (e.g. another call to
-scheduler or \param{CmiSpecificMsg()} can overwrite the
-contents of this buffer.).  The message handler should explicitly call
-\param{CmiGrabBuffer()} to acquire ownership of the message buffer.}
-}
-
-\internal{
-\function{void *CmiGetMsg(void)}
-\desc{Retrieves a message from the network's message queue and
-returns a pointer to the message buffer. If network's message queue is
-empty, this function returns \param{(void *) 0}. Ownership of the
-message buffer is maintained with CMI. Another call to \param{CmiGetMsg()}
-or \param{CmiSpecificMsg()} could overwrite the contents of buffer.
-The calling function should
-explicitly call \param{CmiGrabBuffer()} to acquire ownership 
-the message buffer.} 
-}
-
 
 \function{void CmiSyncSend(unsigned int destPE, unsigned int size, void *msg)}
 \index{CmiSyncSend}
