@@ -124,3 +124,5 @@
 
        integer, external :: MPI_Register
        double precision, external :: MPI_WTIME
+       double precision, external :: MPI_WTICK
+
