@@ -43,9 +43,6 @@ CpvStaticDeclare(char**, _counterDesc);
 CpvStaticDeclare(int,    _numCounters);
 CpvStaticDeclare(int,    _reductionID);
 static int _numEvents = 0;
-static int _threadMsg, _threadChare, _threadEP;
-static int _packMsg, _packChare, _packEP;
-static int _unpackMsg, _unpackChare, _unpackEP;
 CpvDeclare(double, version);
 
 // a rudimentary reduction to print out the performance results across the run
@@ -1002,19 +999,6 @@ void TraceCounter::endUnpack() {
 //! begin/end of execution
 void TraceCounter::beginComputation()
 {
-  if (CmiMyRank()==0) {
-    _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
-    _threadChare = CkRegisterChare("dummy_thread_chare", 0);
-    _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare,0);
-
-    _packMsg = CkRegisterMsg("dummy_pack_msg", 0, 0, 0, 0);
-    _packChare = CkRegisterChare("dummy_pack_chare", 0);
-    _packEP = CkRegisterEp("dummy_pack_ep", 0, _packMsg,_packChare,0);
-
-    _unpackMsg = CkRegisterMsg("dummy_unpack_msg", 0, 0, 0, 0);
-    _unpackChare = CkRegisterChare("dummy_unpack_chare", 0);
-    _unpackEP = CkRegisterEp("dummy_unpack_ep", 0, _unpackMsg,_unpackChare,0);
-  }
 }
 
 //! end computation, do a reduction here in hopes that it finishes before 

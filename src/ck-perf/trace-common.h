@@ -37,6 +37,7 @@ CkpvExtern(int, CtrLogBufSize);
 CkpvExtern(char*, traceRoot);
 CkpvExtern(double, traceInitTime);
 
+
 #if CMK_BLUEGENE_CHARM
 #define  TRACE_TIMER   BgGetTime
 inline double TraceTimer() { return TRACE_TIMER(); }
@@ -46,6 +47,11 @@ inline double TraceTimer(double t) { return t; }
 inline double TraceTimer() { return TRACE_TIMER() - CkpvAccess(traceInitTime); }
 inline double TraceTimer(double t) { return t - CkpvAccess(traceInitTime); }
 #endif
+
+/** Tracing-specific registered Charm entities: */
+extern int _threadMsg, _threadChare, _threadEP;
+extern int _packMsg, _packChare, _packEP;
+extern int _unpackMsg, _unpackChare, _unpackEP;
 
 #endif
 

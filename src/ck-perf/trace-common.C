@@ -43,6 +43,11 @@ CkpvDeclare(int, traceOnPe);
 CkpvDeclare(int, CtrLogBufSize);
 CkpvDeclare(char*, traceRoot);
 
+int _threadMsg, _threadChare, _threadEP;
+int _packMsg, _packChare, _packEP;
+int _unpackMsg, _unpackChare, _unpackEP;
+
+
 /// decide parameters from command line
 static void traceCommonInit(char **argv)
 {
@@ -87,6 +92,25 @@ static void traceCommonInit(char **argv)
     CkpvAccess(traceRoot) = (char *) malloc(strlen(argv[0])+1);
     _MEMCHECK(CkpvAccess(traceRoot));
     strcpy(CkpvAccess(traceRoot), argv[0]);
+  }
+  
+  
+#ifdef __BLUEGENE__
+  if(BgNodeRank()==0) {
+#else
+  if(CkMyRank()==0) {
+#endif
+    _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
+    _threadChare = CkRegisterChare("dummy_thread_chare", 0);
+    _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare,0);
+
+    _packMsg = CkRegisterMsg("dummy_pack_msg", 0, 0, 0, 0);
+    _packChare = CkRegisterChare("dummy_pack_chare", 0);
+    _packEP = CkRegisterEp("dummy_pack_ep", 0, _packMsg,_packChare, 0);
+
+    _unpackMsg = CkRegisterMsg("dummy_unpack_msg", 0, 0, 0, 0);
+    _unpackChare = CkRegisterChare("dummy_unpack_chare", 0);
+    _unpackEP = CkRegisterEp("dummy_unpack_ep", 0, _unpackMsg,_unpackChare, 0);
   }
 }
 
