@@ -478,6 +478,10 @@ void CkMigratable::staticResumeFromSync(void* data)
 	DEBL((AA"Element %s resuming from sync\n"AB,idx2str(el->thisIndexMax)));
 	el->ResumeFromSync();
 }
+void CkMigratable::setMigratable(int migratable) 
+{
+	myRec->setMigratable(migratable);
+}
 #endif
 
 
@@ -660,6 +664,14 @@ void CkLocRec_local::staticMigrate(LDObjHandle h, int dest)
 	el->migrateMe(dest);
 }
 #endif
+
+void CkLocRec_local::setMigratable(int migratable)
+{
+	if (migratable)
+  	  the_lbdb->Migratable(ldHandle);
+	else
+  	  the_lbdb->NonMigratable(ldHandle);
+}
 
 /**
  * Represents a deleted array element (and prevents re-use).

@@ -196,6 +196,8 @@ private:
   LBDatabase *the_lbdb;
   LDObjHandle ldHandle;
 #endif
+public:
+  void setMigratable(int migratable);
 };
 class CkLocRec_remote;
 
@@ -258,6 +260,7 @@ private: //Load balancer state:
   static void staticResumeFromSync(void* data);
 public:
   void ckFinishConstruction(void);
+  void setMigratable(int migratable);
 #else
   void AtSync(void) { ResumeFromSync();}
 public:
