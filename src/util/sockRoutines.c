@@ -135,7 +135,7 @@ unsigned long skt_lookup_ip(const char *name)
 {
   unsigned long ret;
   ret=inet_addr(name);/*Try dotted decimal*/
-  if (ret!=(unsigned long)(-1)) 
+  if (ret!=(unsigned long)(-1) && ntohl(ret)!=-1) 
 	  return ntohl(ret);
   else {/*Try a DNS lookup*/
     struct hostent *h = gethostbyname(name);
