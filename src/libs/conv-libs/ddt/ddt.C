@@ -110,7 +110,8 @@ DDT::freeType(int* index)
 
 DDT::~DDT()
 {
-  delete [] typeTable ;
+  // typetable not dynamically allocated currently.
+  // delete [] typeTable ;
 }
 
 
