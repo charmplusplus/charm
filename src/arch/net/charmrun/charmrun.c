@@ -2035,7 +2035,7 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
     xstr_printf(ibuf," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
     xstr_printf(ibuf," -sl 5000");
     xstr_printf(ibuf," -e /tmp/inx%08x", randno);
-    xstr_printf(ibuf," < /dev/null >& /dev/null &");
+    xstr_printf(ibuf," < /dev/null 2> /dev/null &");
     xstr_printf(ibuf,"\n");
   } else {
     xstr_printf(ibuf,"%s",arg_nodeprog_r);
