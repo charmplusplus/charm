@@ -27,12 +27,13 @@ CDECL void fem_impl_call_init(void);
 
 FDECL void FTN_NAME(INIT,init)(void);
 FDECL void FTN_NAME(DRIVER,driver)(void);
-FDECL void FTN_NAME(MESH_UPDATED,mesh_updated)(int *userParameter);
 
 /*Startup:*/
 static void callDrivers(void) {
         driver();
+#ifndef CMK_FORTRAN_USES_NOSCORE
         FTN_NAME(DRIVER,driver)();
+#endif
 }
 
 static int initFlags=0;
@@ -44,7 +45,9 @@ static void FEMfallbackSetup(void)
 	TCHARM_Create(nChunks,callDrivers);
 	if (!(initFlags&FEM_INIT_READ)) {
 		fem_impl_call_init(); // init();
+#ifndef CMK_FORTRAN_USES_NOSCORE
 		FTN_NAME(INIT,init)();
+#endif
 	}
         FEM_Attach(initFlags);
 }
@@ -204,8 +207,8 @@ class FEMcoordinator : public Chare {
 	CProxy_FEMchunk femChunks;
 	MeshChunk **cmsgs; //Messages from/for array elements
 	int updateCount; //Number of mesh updates so far
-	CkQ<MeshChunk *> futureUpdates;
-	CkQ<MeshChunk *> curUpdates; 
+	CkQ<UpdateMeshChunk *> futureUpdates;
+	CkQ<UpdateMeshChunk *> curUpdates; 
 	int numdone; //Length of curUpdates 
 public:
 	FEMcoordinator(int nChunks_) 
@@ -220,7 +223,7 @@ public:
 	}
 	
 	void setArray(const CkArrayID &fem_) {femChunks=fem_;}
-	void updateMesh(marshallMeshChunk &chk);
+	void updateMesh(marshallUpdateMeshChunk &chk);
 };
 
 class MeshChunkOutputUpdate : public MeshChunkOutput {
@@ -236,9 +239,9 @@ public:
 };
 
 //Called by a chunk on FEM_Update_Mesh
-void FEMcoordinator::updateMesh(marshallMeshChunk &chk)
+void FEMcoordinator::updateMesh(marshallUpdateMeshChunk &chk)
 {
-  MeshChunk *msg=chk;
+  UpdateMeshChunk *msg=chk;
   if (msg->updateCount>updateCount) {
     //This is a message for a future update-- save it for later
     futureUpdates.enq(msg);
@@ -251,13 +254,16 @@ void FEMcoordinator::updateMesh(marshallMeshChunk &chk)
     while (curUpdates.length()==_nchunks) {
       //We have all the chunks of the current mesh-- process them and start over
       int i;
-      for (i=0;i<_nchunks;i++) {
-      	MeshChunk *m=curUpdates.deq();
-	cmsgs[m->fromChunk]=m;
-      }
       //Save what to do with the mesh
-      int callMeshUpdated=cmsgs[0]->callMeshUpdated;
-      int doWhat=cmsgs[0]->doWhat;
+      CallMeshUpdated meshUpdated;
+      int doWhat;
+      
+      for (i=0;i<_nchunks;i++) {
+      	UpdateMeshChunk *m=curUpdates.deq();
+	cmsgs[m->fromChunk]=m;
+	meshUpdated=m->meshUpdated;
+	doWhat=m->doWhat;
+      }
       //Assemble the current chunks into a serial mesh
       delete _meshptr;
       _meshptr=fem_assemble(_nchunks,cmsgs);
@@ -268,12 +274,10 @@ void FEMcoordinator::updateMesh(marshallMeshChunk &chk)
       }
 
       //Now that the mesh is assembled, handle it
-      if (callMeshUpdated) {
-	TCharm::setState(inInit);
-	FTN_NAME(MESH_UPDATED,mesh_updated) (&callMeshUpdated);
-	mesh_updated(callMeshUpdated);
-	TCharm::setState(inDriver);
-      }
+      TCharm::setState(inInit);
+      meshUpdated.call();
+      TCharm::setState(inDriver);
+      
       if (doWhat==1) { /*repartition the mesh*/
 	MeshChunkOutputUpdate u(femChunks);
 	mesh_split(_nchunks,&u);
@@ -372,7 +376,7 @@ static FEM_Mesh *setMesh(void) {
   if(TCharm::getState()==inDriver) {
     FEMchunk *cptr = CtvAccess(_femptr);
     if (cptr->updated_mesh==NULL)
-      cptr->updated_mesh=new MeshChunk;
+      cptr->updated_mesh=new UpdateMeshChunk;
     return &cptr->updated_mesh->m;
   } else {
     //Called from init, finalize, or meshUpdate
@@ -1284,13 +1288,12 @@ FEMchunk::reductionResult(FEM_DataMsg *msg)
 
 //Called by user to ask us to contribute our updated mesh chunk
 void 
-FEMchunk::updateMesh(int callMeshUpdated,int doWhat) {
+FEMchunk::updateMesh(int doWhat) {
   if (updated_mesh==NULL)
     CkAbort("FEM_Update_Mesh> You must first set the mesh before updating it!\n");
+  updated_mesh->doWhat=doWhat;
   updated_mesh->updateCount=updateCount++;
   updated_mesh->fromChunk=thisIndex;
-  updated_mesh->callMeshUpdated=callMeshUpdated;
-  updated_mesh->doWhat=doWhat;
 
   int t,i;
   int newElemTot=updated_mesh->m.nElems();
@@ -1425,10 +1428,12 @@ static FEMchunk *getCurChunk(void)
   return cptr;
 }
 
-CDECL void FEM_Update_mesh(int callMeshUpdated,int doWhat) 
+CDECL void FEM_Update_mesh(FEM_Update_mesh_fn callFn,int userValue,int doWhat) 
 { 
   FEMAPI("FEM_Update_mesh");
-  getCurChunk()->updateMesh(callMeshUpdated,doWhat); 
+  FEMchunk *chk=getCurChunk();
+  chk->updated_mesh->meshUpdated=CallMeshUpdated(callFn,userValue);
+  chk->updateMesh(doWhat); 
 }
 
 CDECL int FEM_Register(void *_ud,FEM_PupFn _pup_ud)
@@ -1585,9 +1590,12 @@ CDECL void FEM_Get_comm_nodes(int partnerNo,int *nodeNos)
 
 /************************ Fortran Bindings *********************************/
 FDECL void FTN_NAME(FEM_UPDATE_MESH,fem_update_mesh)
-  (int *callMesh, int *repart)
-{
-  FEM_Update_mesh(*callMesh,*repart);
+  (FEM_Update_mesh_fortran_fn callFn,int *userValue,int *doWhat) 
+{ 
+  FEMAPI("FEM_Update_mesh");
+  FEMchunk *chk=getCurChunk();
+  chk->updated_mesh->meshUpdated=CallMeshUpdated(callFn,*userValue);
+  chk->updateMesh(*doWhat);
 }
 
 FDECL int FTN_NAME(FEM_REGISTER,fem_register)
@@ -1660,8 +1668,7 @@ FDECL double FTN_NAME(FEM_TIMER,fem_timer)
 }
 
 // Utility functions for Fortran
-
-FDECL int FTN_NAME(OFFSETOF,offsetof)
+FDECL int FTN_NAME(FOFFSETOF,foffsetof)
   (void *first, void *second)
 {
   return (int)((char *)second - (char*)first);
@@ -2282,9 +2289,6 @@ void MeshChunk::pup(PUP::er &p) {
 		p(nodeNums,m.node.size());
 		p(isPrimary,m.node.size());
 	}
-	p.comment(" Misc. data: ");	
-	p(updateCount); p(fromChunk);
-	p(callMeshUpdated); p(doWhat);
 }
 
 void
@@ -2299,7 +2303,7 @@ FEMchunk::pup(PUP::er &p)
   if(p.isUnpacking())
   {
     cur_mesh=new MeshChunk;
-    if (hasUpdate) updated_mesh=new MeshChunk;
+    if (hasUpdate) updated_mesh=new UpdateMeshChunk;
   }
   if (hasUpdate) updated_mesh->pup(p);
   cur_mesh->pup(p);

@@ -613,10 +613,6 @@ class MeshChunk : public CkNoncopyable {
 	int *elemNums; // Maps local elem#-> global elem#  [m.nElems()]
 	int *nodeNums; // Maps local node#-> global node#  [m.node.n]
 	int *isPrimary; // Indicates us as owner of node  [m.node.n]
-	//These fields are (only) used during an updateMesh
-	int updateCount,fromChunk;
-	int callMeshUpdated; //if 0, skip meshUpdated call; else pass to mesh_updated
-	int doWhat; //If 0, do nothing; if 1, repartition; if 2, resume
 
 	MeshChunk(void);
 	~MeshChunk();
@@ -630,6 +626,44 @@ class MeshChunk : public CkNoncopyable {
 
 	void read(FILE *fp);
 	void write(FILE *fp);
+};
+
+class CallMeshUpdated {
+	int val; //Value to pass to function below
+	FEM_Update_mesh_fn cfn; //if 0, skip meshUpdated call
+	FEM_Update_mesh_fortran_fn ffn; //if 0, skip f90 meshUpdated call
+public:
+	CallMeshUpdated() 
+		:val(0), cfn(0), ffn(0) {}
+	CallMeshUpdated(FEM_Update_mesh_fn cfn_,int val_) 
+		:val(val_), cfn(cfn_), ffn(0) {}
+	CallMeshUpdated(FEM_Update_mesh_fortran_fn ffn_,int val_) 
+		:val(val_), cfn(0), ffn(ffn_) {}
+	void call(void) 
+	{ //Call the user's meshUpdated function:
+		if (cfn) { cfn(val); }
+		if (ffn) { ffn(&val); }
+	}
+};
+
+class UpdateMeshChunk : public MeshChunk {
+public:
+	//These fields are (only) used during an updateMesh
+	int updateCount; //Mesh update serial number
+	int fromChunk; //Source chunk
+	CallMeshUpdated meshUpdated;
+	int doWhat; //If 0, do nothing; if 1, repartition; if 2, resume
+	
+	UpdateMeshChunk() {
+		updateCount=fromChunk=doWhat=0;
+	}
+	void pup(PUP::er &p) {
+		MeshChunk::pup(p);
+		p.comment(" UpdateMesh data: ");	
+		p(updateCount); p(fromChunk);
+		p|meshUpdated;
+		p(doWhat);
+	}
 };
 
 /* Unmarshall into a heap-allocated copy */
@@ -647,9 +681,11 @@ public:
 		cur->pup(p);
 	}
 	operator T *() {return cur;}
+	friend void operator|(PUP::er &p,marshallNewHeapCopy<T> &h) {h.pup(p);}
 };
+typedef marshallNewHeapCopy<UpdateMeshChunk> marshallUpdateMeshChunk;
 typedef marshallNewHeapCopy<MeshChunk> marshallMeshChunk;
-PUPmarshall(marshallMeshChunk);
+
 
 #include "fem.decl.h"
 
@@ -681,7 +717,7 @@ class FEMchunk : public ArrayElement1D
 public:
 // updated_mesh keeps the still-being-assembled next mesh chunk.
 // It is created and written by the FEM_Set routines called from driver.
-  MeshChunk *updated_mesh;
+  UpdateMeshChunk *updated_mesh;
   int updateCount; //Number of mesh updates
 
   //The current finite-element mesh
@@ -738,7 +774,7 @@ private:
   void run(void);
   void run(marshallMeshChunk &);
   void reductionResult(FEM_DataMsg *);
-  void updateMesh(int callMeshUpdated,int doRepartition);
+  void updateMesh(int doWhat);
   void meshUpdated(marshallMeshChunk &);
   void meshUpdatedComplete(void) {thread->resume();}
 

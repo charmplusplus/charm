@@ -6,7 +6,7 @@ module fem {
   chare FEMcoordinator {
     entry FEMcoordinator(int nChunks);
     entry void setArray( CkArrayID fem);
-    entry void updateMesh(marshallMeshChunk);
+    entry void updateMesh(marshallUpdateMeshChunk);
   };
 
   array [1D] FEMchunk {

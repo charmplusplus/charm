@@ -80,7 +80,9 @@ extern "C" {
   void FEM_Combine_elem(int srcElType,int destElType,
 	int newInteriorStartIdx,int newGhostStartIdx);
 
-  void FEM_Update_mesh(int callMeshUpdated,int doRepartition);
+  typedef void (*FEM_Update_mesh_fn)(int userValue);
+  typedef void (*FEM_Update_mesh_fortran_fn)(int *userValue);
+  void FEM_Update_mesh(FEM_Update_mesh_fn callFn,int userValue,int doWhat);
   
   void FEM_Set_partition(int *elem2chunk);
   void FEM_Serial_split(int nchunks);
@@ -124,8 +126,6 @@ extern "C" {
   /* to be provided by the application */
   void init(void);
   void driver(void);
-  void finalize(void);
-  void mesh_updated(int callMeshUpdated);
 
 #ifdef __cplusplus
 }

@@ -63,13 +63,15 @@
        external FEM_Read_Field
        external FEM_Print
        external FEM_Print_Partition
-       integer, external :: offsetof
+       integer, external :: foffsetof
 
        external FEM_Barrier
        external FEM_Get_Ghost_List
 
        integer, external :: FEM_Register
        external FEM_Migrate 
+
+       external FEM_Update_mesh
 
        interface
        function FEM_Get_Node_Ghost()
