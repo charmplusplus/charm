@@ -1587,7 +1587,10 @@ void Entry::genDefs(XStr& str)
     }
     if(param->isVoid()) {
       str << ");\n";
-      str << "  CkFreeSysMsg(msg);\n";
+      if(container->getChareType() == SARRAY)
+        str << "  CkFreeMsg(msg);\n";
+      else
+        str << "  CkFreeSysMsg(msg);\n";
     } else {
       str << "(";
       param->print(str);
@@ -1692,7 +1695,10 @@ void Entry::genDefs(XStr& str)
       str << "  obj->" << name << "(";
       if(param->isVoid()) {
         str << ");\n";
-        str << "  CkFreeSysMsg(msg);\n";
+        if(container->getChareType() == SARRAY)
+          str << "  CkFreeMsg(msg);\n";
+        else
+          str << "  CkFreeSysMsg(msg);\n";
       } else {
         str << "(";
         param->print(str);
