@@ -101,6 +101,11 @@
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                  0
 
+#define CMK_REDUCTION_USES_COMMON_CODE                     1
+#define CMK_REDUCTION_USES_SPECIAL_CODE                    0
+
+#define CMK_NODE_QUEUE_AVAILABLE                           0
+
 #define CMK_WAIT_NOT_NEEDED                                0
 #define CMK_WAIT_USES_SYS_WAIT_H                           1
 #define CMK_WAIT_USES_WAITFLAGS_H                          0
