@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.12  1996-02-10 18:54:24  sanjeev
+ * Revision 1.13  1996-02-10 18:57:29  sanjeev
+ * fixed bugs in CmiGetNodeNeighbours, CmiNeighboursIndex
+ *
+ * Revision 1.12  1996/02/10 18:54:24  sanjeev
  * fixed bug in CmiNumNeighbours
  *
  * Revision 1.11  1995/11/07 23:20:32  jyelon
@@ -249,7 +252,8 @@ int node, *neighbours;
   while (1) {
     int neighbour = node ^ bit;
     if (neighbour < Cmi_numpes) neighbours[count++] = neighbour;
-    bit<<1; if (bit > Cmi_numpes) break;
+    bit = bit<<1; 
+    if (bit > Cmi_numpes) break;
   }
   return count;
 }
@@ -262,7 +266,8 @@ int node, nbr;
   while (1) {
     int neighbour = node ^ bit;
     if (neighbour < Cmi_numpes) { if (nbr==neighbour) return count; count++; }
-    bit<<=1; if (bit > Cmi_numpes) break;
+    bit = bit<<=1; 
+    if (bit > Cmi_numpes) break;
   }
   return(-1);
 }
