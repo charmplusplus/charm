@@ -14,7 +14,7 @@ BUILD_MPI_INFO = @BUILD_MPI_INFO@
 BUILD_MPI_ARRAY = @BUILD_MPI_ARRAY@
 DIRS        = mpi-io adio/common
 MPIO_DIRS   = mpi-io
-ALL_DIRS    = mpi-io mpi-io/fortran mpi2-other/info mpi2-other/info/fortran mpi2-other/array mpi2-other/array/fortran adio/common adio/ad_pfs adio/ad_piofs adio/ad_nfs adio/ad_ufs adio/ad_xfs adio/ad_hfs adio/ad_sfs adio/ad_testfs adio/ad_pvfs test
+ALL_DIRS    = mpi-io mpi-io/fortran mpi2-other/info mpi2-other/info/fortran mpi2-other/array mpi2-other/array/fortran adio/common adio/ad_pfs adio/ad_piofs adio/ad_nfs adio/ad_ufs adio/ad_xfs adio/ad_hfs adio/ad_sfs adio/ad_testfs adio/ad_pvfs
 SHELL       = /bin/sh
 
 @VPATH@
@@ -76,10 +76,7 @@ clean:
             echo cleaning directory $$dir ;\
             (cd $$dir; rm -f *.o) ;\
          done; \
-         echo " " ;\
-         echo cleaning directory test ;\
-         (cd test; $(MAKE) clean);\
-         echo " ";
+         echo " " 
 
 mpiolib:
 	@if test "$(FROM_MPICH)" = 0 -a "$(FROM_MPICH2)" = 0 ; then \
@@ -151,8 +148,6 @@ profile:
 
 cleanall:
 	@dirs=`echo "$(ALL_DIRS)"`; \
-	echo "cleaning test directory" ;\
-	(cd test ; ${MAKE} cleanall ) ;\
         echo cleaning current directory ;\
         (rm -f config.status Makefile *~ *.log romio.tar*) ;\
         for dir in $$dirs ;\

@@ -4667,7 +4667,8 @@ EOF
       print_error "Unable to compile a simple MPI program"
       print_error "Use the -mpi, -mpiincdir, and -mpilib options to configure to specify the"
       print_error "MPI implementation, the include path for mpi.h, and the MPI library to link"
-      rm -f conftest mpitest.c
+	echo "$CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest mpitest.c $MPI_LIB > /dev/null 2>&1"
+#      rm -f conftest mpitest.c
       exit 1
   else
       rm -f conftest mpitest.c
