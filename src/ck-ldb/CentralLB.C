@@ -124,8 +124,8 @@ void CentralLB::AtSync()
   msg->n_comm = csz;
   theLbdb->GetCommData(msg->commData);
   theLbdb->ClearLoads();
-  CkPrintf("PE %d sending %d to ReceiveStats %d objs, %d comm\n",
-  	   CkMyPe(),msg->serial,msg->n_objs,msg->n_comm);
+//  CkPrintf("PE %d sending %d to ReceiveStats %d objs, %d comm\n",
+//  	   CkMyPe(),msg->serial,msg->n_objs,msg->n_comm);
 
   // Scheduler PART.
 
@@ -154,8 +154,8 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
 {
   int proc;
   const int pe = m->from_pe;
-  CkPrintf("Stats msg received, %d %d %d %d %p\n",
-  	   pe,stats_msg_count,m->n_objs,m->serial,m);
+//  CkPrintf("Stats msg received, %d %d %d %d %p\n",
+//  	   pe,stats_msg_count,m->n_objs,m->serial,m);
 
   if((pe == 0) && (CkMyPe() != 0)){
       new_ld_balancer = m->next_lb;
@@ -189,22 +189,22 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
   if (stats_msg_count == clients) {
     double strat_start_time = CmiWallTimer();
 
-    CkPrintf("Before setting bitmap\n");
+//    CkPrintf("Before setting bitmap\n");
     for(proc = 0; proc < clients; proc++)
       statsDataList[proc].available = avail_vector[proc];
     
-    CkPrintf("Before Calling Strategy\n");
+//    CkPrintf("Before Calling Strategy\n");
 
     CLBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
 
-    CkPrintf("returned successfully\n");
+//    CkPrintf("returned successfully\n");
     int num_proc = CkNumPes();
 
     for(proc = 0; proc < num_proc; proc++)
 	migrateMsg->avail_vector[proc] = avail_vector[proc];
     migrateMsg->next_lb = new_ld_balancer;
 
-    CkPrintf("calling recv migration\n");
+//    CkPrintf("calling recv migration\n");
     CProxy_CentralLB(thisgroup).ReceiveMigration(migrateMsg);
 
     // Zero out data structures for next cycle
@@ -221,7 +221,7 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
 
 void CentralLB::ReceiveMigration(CLBMigrateMsg *m)
 {
-  CkPrintf("[%d] in ReceiveMigration %d moves\n",CkMyPe(),m->n_moves);
+//  CkPrintf("[%d] in ReceiveMigration %d moves\n",CkMyPe(),m->n_moves);
   migrates_expected = 0;
   for(int i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
@@ -264,7 +264,7 @@ void CentralLB::MigrationDone()
 
 void CentralLB::ResumeClients()
 {
-  CkPrintf("Resuming clients on PE %d\n",CkMyPe());
+//  CkPrintf("Resuming clients on PE %d\n",CkMyPe());
   theLbdb->ResumeClients();
 }
 
