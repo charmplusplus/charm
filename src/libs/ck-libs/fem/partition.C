@@ -210,9 +210,6 @@ METIS_PartGraphKway (int* nv, int* xadj, int* adjncy, int* vwgt, int* adjwgt,
 */
 void FEM_Mesh_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
 {
-#if FEM_ALONE
-	CkAbort("Partitioning not yet supported under FEM_ALONE mode.\n");
-#else
 	int nelems=mesh->nElems();
 	if (nchunks==1) {//Metis can't handle this case (!)
 		for (int i=0;i<nelems;i++) elem2chunk[i]=0;
@@ -238,5 +235,4 @@ void FEM_Mesh_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
 	CmiPrintf("FEM> Metis partitioner returned.\n");
 	delete[] adjStart;
 	delete[] adjList;
-#endif
 }

@@ -69,11 +69,12 @@ do
 done
 
 Do $get $charm/include/tcharm*.h .
+Do $get $charm/tmp/libs/conv-libs/metis/Lib/*.[ch] .
 Do $get $charm/tmp/libs/ck-libs/idxl/*.[Ch] .
 Do $get $charm/tmp/libs/ck-libs/fem/*.[Ch] .
 
 echo "Source code collected."
 echo " To build FEM alone, cd into fem_alone and build "
-echo "  all the .C source files using a command like:"
-echo "   > mpicc -I. -DFEM_ALONE=1 -c *.C " 
+echo "  all the .c and .C source files using a command like:"
+echo "   > mpicc -I. -DFEM_ALONE=1 -c *.c *.C " 
 echo "   > ar cr libfem_alone.a *.o "
