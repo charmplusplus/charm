@@ -9,11 +9,11 @@ HOST_DIR = ..\bin
 
 INC = /I"$(COMMON_SRC)"
 
-CPP_PROJ=/nologo /MT /W3 /GX /Z7 /Od $(INC)\
+CPP_PROJ=/nologo /MT /W3 /GX /Z7 /O2 $(INC)\
  /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX \
  /Fo /c
 
-SEQCPP_PROJ=/nologo /ML /W3 /GX /Z7 /Od $(INC) \
+SEQCPP_PROJ=/nologo /ML /W3 /GX /Z7 /O2 $(INC) \
  /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX \
  /Fo /c
 
