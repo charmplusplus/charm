@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.30  1995-10-27 21:31:25  jyelon
+ * Revision 2.31  1995-11-06 00:17:42  sanjeev
+ * magic numbers for main-chare and BOCs are not rand()
+ *
+ * Revision 2.30  1995/10/27  21:31:25  jyelon
  * changed NumPe --> NumPes
  *
  * Revision 2.29  1995/10/25  15:48:43  gursoy
@@ -391,7 +394,7 @@ FUNCTION_PTR donehandler;
 		CpvAccess(mainChareBlock) =
                     CpvAccess(currentChareBlock) = 
 			CreateChareBlock(CpvAccess(MainDataSize),
-						CHAREKIND_CHARE, rand());
+						CHAREKIND_CHARE, 0);
 
 		if (CsvAccess(MainChareLanguage) == CHARMPLUSPLUS) 
 			CPlus_SetMainChareID() ;  /* set mainhandle */
@@ -441,6 +444,11 @@ FUNCTION_PTR donehandler;
 	}
 	else
 	{
+        	/* This is so that all PEs have consistent magic numbers for 
+		   BOCs. 0 is the magic # of main chare on proc 0, 
+		   all other procs have magic numbers from 1 */
+		CpvAccess(nodecharesProcessed) = 1 ;
+
                 /* create the boc init message queue */
                 CpvAccess(BocInitQueueHead) = (BOCINIT_QUEUE *) BocInitQueueCreate();
 	}
@@ -537,7 +545,7 @@ ENVELOPE       *envelope;
   int             current_bocnum = GetEnv_boc_num(envelope);
   int             current_msgType = GetEnv_msgType(envelope);
   int             current_chare = current_epinfo->chareindex;
-  int             current_magic = rand();
+  int             current_magic = CpvAccess(nodecharesProcessed)++;
 
   CpvAccess(currentChareBlock) = bocBlock = 
 		CreateChareBlock(CsvAccess(ChareSizesTable)[current_chare], 
@@ -547,7 +555,7 @@ ENVELOPE       *envelope;
   SetBocBlockPtr(current_bocnum, bocBlock);
   trace_begin_execute(envelope);
   (current_epinfo->function)(usrMsg, bocBlock->chareptr);
-  trace_end_execute(current_bocnum, current_msgType, current_ep);
+  trace_end_execute(current_magic, current_msgType, current_ep);
 
   /* for dynamic BOC creation, used in node_main.c */
   return current_bocnum ;
