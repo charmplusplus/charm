@@ -137,6 +137,8 @@ static McDistList head;
 static long *my_lock;
 static long head_lock[MAX_PES];
 
+#define ALIGN8(x)  (8*(((x)+7)/8))
+
 /**********************************************************************
  *  CMI Functions START HERE
  */
@@ -151,7 +153,7 @@ void CmiSyncSendFn(int dest_pe, int size, char *msg)
 {
   McMsgHdr *dup_msg;
 
-  dup_msg = (McMsgHdr *)CmiAlloc(size);
+  dup_msg = (McMsgHdr *)CmiAlloc(ALIGN8(size));
   memcpy(dup_msg,msg,size);
 
   McRetrieveRemote();
@@ -160,7 +162,7 @@ void CmiSyncSendFn(int dest_pe, int size, char *msg)
     FIFO_EnQueue(CpvAccess(CmiLocalQueue),dup_msg);
   else
   {
-    McEnqueueRemote(dup_msg,size,dest_pe); 
+    McEnqueueRemote(dup_msg,ALIGN8(size),dest_pe); 
   }
 }
 
@@ -475,7 +477,7 @@ static void McRetrieveRemote(void)
 #ifdef DEBUG
     printf("%d allocating %d bytes\n",Cmi_mype,cur_node->msg_sz);
 #endif
-    cur_msg = (McMsgHdr *)CmiAlloc((cur_node->msg_sz+7)/8);
+    cur_msg = (McMsgHdr *)CmiAlloc(ALIGN8(cur_node->msg_sz));
     if (cur_msg ==NULL)
     {
       CmiError("%s:%d Cannot Allocate Memory\n",__FILE__,__LINE__);
@@ -489,7 +491,7 @@ static void McRetrieveRemote(void)
 #endif
 
     shmem_get(cur_msg, cur_node->nxt_addr,
-              (cur_node->msg_sz+7)/8, cur_node->nxt_node);
+              ALIGN8(cur_node->msg_sz)/8, cur_node->nxt_node);
 
 #ifdef DEBUG
     printf("[%d]   nxt_node = %d\n",
