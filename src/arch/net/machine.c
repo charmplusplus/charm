@@ -884,29 +884,22 @@ static void parse_netstart()
 {
   char *ns;
   int nread;
+  int port;
   ns = getenv("NETSTART");
   if (ns!=0) 
   {/*Read values set by Charmrun*/
-#if !CMK_USE_GM
-  	nread = sscanf(ns, "%d%d%d%d",
-		 &Cmi_mynode,
-		 &Cmi_charmrun_IP, &Cmi_charmrun_port, 
-		 &Cmi_charmrun_pid);
-
-  	if (nread!=4) {
-  		fprintf(stderr,"Error parsing NETSTART '%s'\n",ns);
-  		exit(1);
-  	}
-#else
         nread = sscanf(ns, "%d%d%d%d%d",
                  &Cmi_mynode,
                  &Cmi_charmrun_IP, &Cmi_charmrun_port,
-                 &Cmi_charmrun_pid, &dataport);
+                 &Cmi_charmrun_pid, &port);
 
         if (nread!=5) {
                 fprintf(stderr,"Error parsing NETSTART '%s'\n",ns);
                 exit(1);
         }
+#if CMK_USE_GM
+        /* port is only useful for Myrinet */
+        dataport = port;
 #endif
   } else 
   {/*No charmrun-- set flag values for standalone operation*/
@@ -1553,9 +1546,9 @@ static void CmiStartThreads()
 
 #if CMK_SHARED_VARS_UNAVAILABLE
 
-static volatile int memflag;
-void CmiMemLock() { memflag=1; }
-void CmiMemUnlock() { memflag=0; }
+static volatile int memflag=0;
+void CmiMemLock() { memflag++; }
+void CmiMemUnlock() { memflag--; }
 
 static struct CmiStateStruct Cmi_state;
 int Cmi_mype;
@@ -1563,9 +1556,9 @@ int Cmi_myrank;
 #define CmiGetState() (&Cmi_state)
 #define CmiGetStateN(n) (&Cmi_state)
 
-static int comm_flag;
-#define CmiCommLock() (comm_flag=1)
-#define CmiCommUnlock() (comm_flag=0)
+static int comm_flag=0;
+#define CmiCommLock() (comm_flag++)
+#define CmiCommUnlock() (comm_flag--)
 
 void CmiYield() { sleep(0); }
 
@@ -2167,53 +2160,6 @@ void *CmiGetNonLocal(void)
   return (void *) PCQueuePop(cs->recv);
 }
 
-/******************************************************************************
- *
- * CmiNotifyIdle()-- wait until a packet comes in
- *
- *****************************************************************************/
-
-void CmiNotifyIdle(void)
-{
-  struct timeval tv;
-#if CMK_SHARED_VARS_UNAVAILABLE
-  /*No comm. thread-- listen on sockets for incoming messages*/
-#if !CMK_USE_POLL
-  static fd_set rfds;
-  static fd_set wfds;
-  tv.tv_sec=0; tv.tv_usec=5000;
-  FD_ZERO(&rfds); FD_ZERO(&wfds);
-  if (Cmi_charmrun_fd!=-1)
-    FD_SET(Cmi_charmrun_fd, &rfds);
-  if (dataskt!=-1) {
-    FD_SET(dataskt, &rfds);
-    if (writeableDgrams || writeableAcks)
-      FD_SET(dataskt, &wfds); /*Outgoing queue is nonempty*/
-  }
-  select(FD_SETSIZE,&rfds,&wfds,0,&tv);
-#else
-  struct pollfd fds[2]; int n = 0;
-  int nreadable;
-  if (Cmi_charmrun_fd!=-1) {
-    fds[n].fd = Cmi_charmrun_fd;
-    fds[n].events = POLLIN;
-    n++;
-  }
-  if (dataskt!=-1) {
-    fds[n].fd = dataskt;
-    fds[n].events = POLLIN;
-    if (writeableDgrams || writeableAcks)  fds[n].events |= POLLOUT;
-    n++;
-  }
-  poll(fds, n, 5);
-#endif
-  if (Cmi_netpoll) CommunicationServer(5);
-#else
-  /*Comm. thread will listen on sockets-- just sleep*/
-  tv.tv_sec=0; tv.tv_usec=1000;
-  select(0,NULL,NULL,NULL,&tv);
-#endif
-}
 
 #if CMK_NODE_QUEUE_AVAILABLE
 
@@ -2457,7 +2403,6 @@ static void ConverseRunPE(int everReturn)
   CpvAccess(CmiLocalQueue) = cs->localqueue;
   CmiMyArgv=CmiCopyArgs(Cmi_argv);
   CthInit(CmiMyArgv);
-  ConverseCommonInit(CmiMyArgv);
 
   /* better to show the status here */
   if (Cmi_netpoll == 1 && CmiMyPe() == 0)
@@ -2465,9 +2410,11 @@ static void ConverseRunPE(int everReturn)
 #if CMK_USE_GM
   if(gmport == NULL) {
     CmiPrintf("Error> Node %d cannot open port %d!\n", CmiMyPe(), dataport);
-    CmiAbort("");
+    CmiAbort("Abort");
   }
 #endif
+
+  ConverseCommonInit(CmiMyArgv);
 
   if (!everReturn) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
