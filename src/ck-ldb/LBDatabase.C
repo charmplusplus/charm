@@ -15,13 +15,15 @@
 #include "LBDatabase.h"
 #include "LBDatabase.def.h"
 
+#include "NullLB.h"
 
 CkGroupID lbdb;
 
 static LBDefaultCreateFn defaultCreate=NULL;
 void LBSetDefaultCreate(LBDefaultCreateFn f)
 {
-	defaultCreate=f;
+  if (defaultCreate) CmiAbort("Error: try to create multiple load balancer strategies!");
+  defaultCreate=f;
 }
 
 class LBDBResgistry {
@@ -69,6 +71,8 @@ LBDBInit::LBDBInit(CkArgMsg *m)
 #if CMK_LBDB_ON
   lbdb = CProxy_LBDatabase::ckNew();
 
+  LBDefaultCreateFn lbFn = defaultCreate;
+
   char *balancer = NULL;
   if (CmiGetArgString(m->argv, "+balancer", &balancer)) {
     LBDefaultCreateFn fn = lbRegistry.search(balancer);
@@ -76,13 +80,13 @@ LBDBInit::LBDBInit(CkArgMsg *m)
       lbRegistry.displayLBs(); 
       CmiAbort("Unknown load balancer!"); 
     }
-    else {
-      if (defaultCreate) CmiAbort("Try to create multiple load balancer.");
-      (fn)();
-    }
+    else  // overwrite defaultCreate.
+      lbFn = fn;
   }
 
-  if (defaultCreate) (defaultCreate)();
+  // NullLB is the default
+  if (!lbFn) lbFn = CreateNullLB;
+  (lbFn)();
 #endif
   delete m;
 }

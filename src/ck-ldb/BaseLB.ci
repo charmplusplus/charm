@@ -1,0 +1,10 @@
+module BaseLB {
+
+extern module LBDatabase;
+
+group BaseLB {
+  entry void BaseLB(void);  
+  entry void unregister(void);
+};
+
+};

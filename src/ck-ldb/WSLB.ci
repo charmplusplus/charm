@@ -1,13 +1,14 @@
 module WSLB {
 
 extern module LBDatabase;
+extern module BaseLB;
 
 readonly CkGroupID wslb;
 
 message WSLBStatsMsg;
 message WSLBMigrateMsg;
 
-group WSLB {
+group WSLB: BaseLB {
   entry void WSLB(void);  
   entry void ReceiveStats(WSLBStatsMsg*);
   entry void ResumeClients(void);

@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 #include <charm++.h>
-#include <LBDatabase.h>
+#include <BaseLB.h>
 #include "NullLB.h"
 
 void CreateNullLB(void)
@@ -23,15 +23,26 @@ static void initNullLB(void) {
 #if CMK_LBDB_ON
 void NullLB::init(void)
 {
-  thisproxy=thisgroup;
+  // if (CkMyPe() == 0) CkPrintf("[%d] NullLB created\n",CkMyPe());
+  hasNullLB = 1;
   theLbdb=CProxy_LBDatabase(lbdb).ckLocalBranch();
-  theLbdb->
+  receiver = theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
 			    (void*)(this));
 }
 
+NullLB::~NullLB()
+{
+  theLbdb=CProxy_LBDatabase(lbdb).ckLocalBranch();
+  theLbdb->RemoveLocalBarrierReceiver(receiver);
+}
+
 void NullLB::staticAtSync(void* data)
 {
+  // if there is other LBs, just return
+  // CmiPrintf("numLoadBalancers = %d\n", numLoadBalancers);
+  if (numLoadBalancers > 1) return;
+
   NullLB *me = (NullLB*)(data);
   me->AtSync();
 }
@@ -42,7 +53,7 @@ void NullLB::AtSync()
   theLbdb->ClearLoads();
   
   //We don't *do* any migrations, so they're already done!
-  thisproxy[CkMyPe()].migrationsDone();
+  thisProxy[CkMyPe()].migrationsDone();
 }
 void NullLB::migrationsDone(void)
 {

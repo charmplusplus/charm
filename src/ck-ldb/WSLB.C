@@ -9,7 +9,7 @@
 #include <unistd.h>
 #endif
 #include <charm++.h>
-#include <LBDatabase.h>
+#include <BaseLB.h>
 #include <cklists.h>
 #include "heap.h"
 #include "WSLB.h"
@@ -45,7 +45,7 @@ void WSLB::staticAtSync(void* data)
   me->AtSync();
 }
 
-WSLB::WSLB()  :thisproxy(thisgroup)
+WSLB::WSLB()  
 {
   if (CkMyPe() == 0)
     CkPrintf("[%d] WSLB created\n",CkMyPe());
@@ -127,7 +127,7 @@ void WSLB::AtSync()
 
   WSLBStatsMsg* msg = AssembleStats();
 
-  thisproxy.ReceiveStats(msg,num_neighbors(),neighbor_pes);
+  thisProxy.ReceiveStats(msg,num_neighbors(),neighbor_pes);
 
   // Tell our own node that we are ready
   ReceiveStats((WSLBStatsMsg*)0);
@@ -277,7 +277,7 @@ void WSLB::ReceiveStats(WSLBStatsMsg *m)
     }
     
     // Now, send migrate messages to neighbors
-    thisproxy.ReceiveMigration(migrateMsg,
+    thisProxy.ReceiveMigration(migrateMsg,
     	num_neighbors(),neighbor_pes);
     
     // Zero out data structures for next cycle
@@ -348,7 +348,7 @@ void WSLB::MigrationDone()
   migrates_expected = -1;
   // Increment to next step
   mystep++;
-  thisproxy [CkMyPe()].ResumeClients();
+  thisProxy [CkMyPe()].ResumeClients();
 }
 
 void WSLB::ResumeClients()

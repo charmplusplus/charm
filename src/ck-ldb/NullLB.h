@@ -8,19 +8,18 @@
 #ifndef __CK_NULLLB_H
 #define __CK_NULLLB_H
 
-#include <LBDatabase.h>
+#include <BaseLB.h>
 #include "NullLB.decl.h"
 
 void CreateNullLB(void);
 
-class NullLB : public Group
+class NullLB : public CBase_NullLB
 {
-  CProxy_NullLB thisproxy;
-  LBDatabase *theLbdb;
   void init(void);
 public:
   NullLB() {init();}
   NullLB(CkMigrateMessage *m) {init();}
+  ~NullLB();
 
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier

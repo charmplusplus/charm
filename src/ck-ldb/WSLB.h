@@ -8,7 +8,7 @@
 #ifndef NEIGHBORLB_H
 #define NEIGHBORLB_H
 
-#include <LBDatabase.h>
+#include <BaseLB.h>
 #include "WSLB.decl.h"
 
 void CreateWSLB();
@@ -16,12 +16,11 @@ void CreateWSLB();
 class WSLBStatsMsg;
 class WSLBMigrateMsg;
 
-class WSLB : public Group
+class WSLB : public CBase_WSLB
 {
-  CProxy_WSLB thisproxy;
 public:
   WSLB();
-  WSLB(CkMigrateMessage *m) :thisproxy(thisgroup) {}
+  WSLB(CkMigrateMessage *m) {}
   ~WSLB();
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
@@ -80,7 +79,6 @@ protected:
       _n[3] = (me + npe - bigstep) % npe;
   };
 
-  LBDatabase* theLbdb;
   struct {
     int proc_speed;
     double total_walltime;

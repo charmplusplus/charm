@@ -9,5 +9,6 @@ module EveryLB {
    extern module NeighborLB;
    extern module GreedyRefLB;
    extern module RandRefLB;
+   extern module WSLB;
    initcall void initEveryLB(void);
 };

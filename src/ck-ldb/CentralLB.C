@@ -6,7 +6,6 @@
  *****************************************************************************/
 
 #include <charm++.h>
-#include <LBDatabase.h>
 #include "CentralLB.h"
 #include "CentralLB.def.h"
 
@@ -51,7 +50,6 @@ void CentralLB::staticAtSync(void* data)
 }
 
 CentralLB::CentralLB()
-  :thisproxy(thisgroup)
 {
   mystep = 0;
   //  CkPrintf("Construct in %d\n",CkMyPe());
@@ -97,7 +95,7 @@ void CentralLB::AtSync()
     MigrationDone();
     return;
   }
-  thisproxy [CkMyPe()].ProcessAtSync();
+  thisProxy [CkMyPe()].ProcessAtSync();
 }
 
 void CentralLB::ProcessAtSync()
@@ -144,7 +142,7 @@ void CentralLB::ProcessAtSync()
       msg->next_lb = new_ld_balancer;
   }
 
-  thisproxy [cur_ld_balancer].ReceiveStats(msg);
+  thisProxy [cur_ld_balancer].ReceiveStats(msg);
 }
 
 void CentralLB::Migrated(LDObjHandle h)
@@ -213,7 +211,7 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
     migrateMsg->next_lb = new_ld_balancer;
 
 //    CkPrintf("calling recv migration\n");
-    thisproxy.ReceiveMigration(migrateMsg);
+    thisProxy.ReceiveMigration(migrateMsg);
 
     // Zero out data structures for next cycle
     for(int i=0; i < clients; i++) {
@@ -267,7 +265,7 @@ void CentralLB::MigrationDone()
   migrates_expected = -1;
   // Increment to next step
   mystep++;
-  thisproxy [CkMyPe()].ResumeClients();
+  thisProxy [CkMyPe()].ResumeClients();
 }
 
 void CentralLB::ResumeClients()

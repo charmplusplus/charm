@@ -8,7 +8,7 @@
 #ifndef CENTRALLB_H
 #define CENTRALLB_H
 
-#include <LBDatabase.h>
+#include "BaseLB.h"
 #include "CentralLB.decl.h"
 
 extern CkGroupID loadbalancer;
@@ -19,13 +19,12 @@ void set_avail_vector(char * bitmap);
 class CLBStatsMsg;
 class CLBMigrateMsg;
 
-class CentralLB : public Group
+class CentralLB : public CBase_CentralLB
 {
-  CProxy_CentralLB thisproxy;
 public:
   CentralLB();
   ~CentralLB();
-  CentralLB(CkMigrateMessage *m) :thisproxy(thisgroup) {}
+  CentralLB(CkMigrateMessage *m) {}
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
@@ -79,7 +78,6 @@ public:
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CLBMigrateMsg* Strategy(LDStats* stats,int count);
-  LBDatabase* theLbdb;
 
 private:  
 

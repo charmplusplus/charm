@@ -1,6 +1,7 @@
 module NborBaseLB {
 
 extern module LBDatabase;
+extern module BaseLB;
 
 readonly CkGroupID nborBaselb;
 
@@ -11,7 +12,7 @@ message NLBStatsMsg {
 
 message NLBMigrateMsg;
 
-group NborBaseLB {
+group NborBaseLB: BaseLB {
   entry void NborBaseLB(void);  
   entry void ReceiveStats(NLBStatsMsg*);
   entry void ResumeClients(void);

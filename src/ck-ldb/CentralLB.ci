@@ -1,5 +1,6 @@
 module CentralLB {
 
+extern module BaseLB;
 extern module LBDatabase;
 
 readonly CkGroupID loadbalancer;
@@ -12,7 +13,7 @@ message CLBStatsMsg{
 
 message CLBMigrateMsg;
 
-group CentralLB {
+group CentralLB : BaseLB {
   entry void CentralLB(void);  
   entry void ProcessAtSync(void);
   entry void ReceiveStats(CLBStatsMsg*);

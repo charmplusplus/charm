@@ -8,7 +8,7 @@
 #ifndef NBORBASELB_H
 #define NBORBASELB_H
 
-#include <LBDatabase.h>
+#include <BaseLB.h>
 #include "NborBaseLB.decl.h"
 
 extern CkGroupID nborBaselb;
@@ -18,12 +18,11 @@ void CreateNborBaseLB();
 class NLBStatsMsg;
 class NLBMigrateMsg;
 
-class NborBaseLB : public Group
+class NborBaseLB : public CBase_NborBaseLB
 {
-  CProxy_NborBaseLB thisproxy;
 public:
   NborBaseLB();
-  NborBaseLB(CkMigrateMessage *m) :thisproxy(thisgroup) {}
+  NborBaseLB(CkMigrateMessage *m) {}
   ~NborBaseLB();
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
@@ -86,7 +85,6 @@ protected:
 
   int NeighborIndex(int pe);   // return the neighbor array index
 
-  LBDatabase* theLbdb;
   /*
   struct {
     int pe_speed;
