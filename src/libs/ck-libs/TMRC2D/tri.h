@@ -172,7 +172,6 @@ class chunk : public TCharmClient1D {
 
   // The following methods simply provide remote access to local data
   // See above for details of each
-  void setBorder(int n);
   intMsg *safeToMoveNode(int idx, double x, double y);
   splitOutMsg *split(int idx, elemRef e, node in, node fn);
   splitOutMsg *collapse(int idx, elemRef e, node kn, node dn, elemRef kNbr, 
@@ -216,7 +215,7 @@ class chunk : public TCharmClient1D {
   // *** These methods are part of the interface with the FEM framework ***
   // create a chunk's mesh data
   void newMesh(int nEl, int nGhost,const int *conn_,const int *gid_, 
-	       int nnodes, int *boundaries, int idxOffset);
+	       int nnodes, const int *boundaries, int idxOffset);
   // Sets target areas specified by desiredArea, starts refining
   void multipleRefine(double *desiredArea, refineClient *client);
   // Sets target areas specified by desiredArea, starts coarsening

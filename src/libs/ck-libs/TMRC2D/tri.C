@@ -118,13 +118,6 @@ void chunk::coarseningElements()
 }
 
 // many remote access methods follow
-void chunk::setBorder(int n)
-{
-  accessLock();
-  theNodes[n].setBorder();
-  releaseLock();
-}
-
 intMsg *chunk::safeToMoveNode(int idx, double x, double y)
 {
   node foo(x, y);
@@ -692,7 +685,7 @@ void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
 }
 
 void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_, 
-		    int nnodes, int *boundaries, int idxOffset)
+		    int nnodes, const int *boundaries, int idxOffset)
 {
   int i, j;
   CkPrintf("TMRC2D: newMesh on chunk %d...\n", cid);
@@ -849,7 +842,6 @@ int chunk::hasEdge(int n1, int n2, int *conn, int idx)
 void chunk::deriveBoundaries()
 {
   CkPrintf("TMRC2D: WARNING! Null list of boundary flags passed to newMesh...\n ...I hope you didn't want coarsening to work!\n");
-  //CkPrintf("TMRC2D: WARNING! chunk::deriveBorderNodes called but not implemented!\n");
   /*
   elemRef nullRef;
   for (int i=0; i<numEdges; i++) {

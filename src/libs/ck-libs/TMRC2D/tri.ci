@@ -21,7 +21,6 @@ module refine {
     entry [threaded] void refiningElements();	
     entry void coarsenElement(int, double);
     entry [threaded] void coarseningElements();	
-    entry [sync] void setBorder(int);
     entry [sync] intMsg *safeToMoveNode(int, double, double);
     entry [sync, threaded] splitOutMsg *split(int, elemRef, node, node);
     entry [sync, threaded] splitOutMsg *collapse(int, elemRef, node, node, 
@@ -54,7 +53,6 @@ module refine {
     entry void reportPos(int, double, double);
     entry [sync, threaded] void print();
     entry [sync, threaded] void out_print();
-    entry void deriveBorderNodes();
     entry void tweakMesh();
     entry void improveChunk();
     entry [sync, threaded] void improve();

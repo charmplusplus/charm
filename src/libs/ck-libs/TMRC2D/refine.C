@@ -57,13 +57,13 @@ CDECL void REFINE2D_NewMesh(int nEl,int nGhost,int nnodes,const int *conn,const 
   CkWaitQD(); //Wait for all edge numbering messages to finish
 }
 FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
-(int *nEl,int *nGhost,const int *conn,const int *gid)
+(int *nEl,int *nGhost,int nnodes,const int *conn,const int *gid,const int *boundaries)
 {
   TCHARM_API_TRACE("REFINE2D_NewMesh", "refine");
   if (!CtvAccess(_refineChunk))
     CkAbort("Forgot to call REFINE_Attach!!\n"); 
   
-  CtvAccess(_refineChunk)->newMesh(*nEl, *nGhost,conn, gid, 1);
+  CtvAccess(_refineChunk)->newMesh(*nEl, *nGhost,conn, gid, nnodes, boundaries, 1);
   CkWaitQD(); //Wait for all edge numbering messages to finish
 }
 
