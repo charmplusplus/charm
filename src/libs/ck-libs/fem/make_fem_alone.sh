@@ -71,7 +71,6 @@ done
 Do $get $charm/include/tcharm*.h .
 Do $get $charm/tmp/libs/ck-libs/idxl/*.[Ch] .
 Do $get $charm/tmp/libs/ck-libs/fem/*.[Ch] .
-rm femmain.C
 
 echo "Source code collected."
 echo " To build FEM alone, cd into fem_alone and build "

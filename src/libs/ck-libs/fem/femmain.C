@@ -31,8 +31,12 @@ int main(int argc,char **argv) {
 		{ // Make a little mesh, and call user's "init" routine to fill it out:
 			serialMesh=FEM_Mesh_allocate();
 			FEM_Mesh_set_default_write(serialMesh);
+#ifndef FEM_ALONE
 			fem_impl_call_init();
 #ifndef CMK_FORTRAN_USES_NOSCORE
+			FTN_NAME(INIT,init)();
+#endif
+#else /* FEM_ALONE version: just call F90 init routine */
 			FTN_NAME(INIT,init)();
 #endif
 		}
@@ -49,8 +53,12 @@ int main(int argc,char **argv) {
 	{ /* Call user's driver routine for the main computation */
 		FEM_Mesh_set_default_read(parallelMesh);
 		FEM_Mesh_set_default_write(FEM_Mesh_allocate());
+#ifndef FEM_ALONE
 	        driver();
 #ifndef CMK_FORTRAN_USES_NOSCORE
+	        FTN_NAME(DRIVER,driver)();
+#endif
+#else /* FEM_ALONE version: just call F90 init routine */
 	        FTN_NAME(DRIVER,driver)();
 #endif
 		FEM_Mesh_deallocate(FEM_Mesh_default_write());
