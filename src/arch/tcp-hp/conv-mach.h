@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.18  1996-01-17 19:48:07  jyelon
+ * Revision 2.19  1996-06-28 21:27:11  jyelon
+ * Added CMK_USE_STANDARD_DEFAULT_MAIN and CMK_USE_SIMULATOR_DEFAULT_MAIN.
+ *
+ * Revision 2.18  1996/01/17 19:48:07  jyelon
  * *** empty log message ***
  *
  * Revision 2.17  1996/01/17 08:04:13  jyelon
@@ -79,6 +82,9 @@
 #define CMK_MACHINE_NAME "tcp-hp"
 
 #define CmiMsgHeaderSizeBytes 8
+
+/* #define CMK_USE_SIMULATOR_DEFAULT_MAIN */
+#define CMK_USE_STANDARD_DEFAULT_MAIN
 
 /* #define CMK_USE_GNU_MALLOC */
 /* #define CMK_USE_OS_MALLOC */

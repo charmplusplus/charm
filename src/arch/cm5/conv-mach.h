@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1996-04-18 22:40:35  sanjeev
+ * Revision 2.15  1996-06-28 21:27:11  jyelon
+ * Added CMK_USE_STANDARD_DEFAULT_MAIN and CMK_USE_SIMULATOR_DEFAULT_MAIN.
+ *
+ * Revision 2.14  1996/04/18 22:40:35  sanjeev
  * CmiFreeSendFn uses CMMD_send_async
  *
  * Revision 2.13  1996/01/17 08:04:13  jyelon
@@ -65,6 +68,9 @@
 #define CMK_MACHINE_NAME "cm5"
 
 #define CmiMsgHeaderSizeBytes 4
+
+/* #define CMK_USE_SIMULATOR_DEFAULT_MAIN */
+#define CMK_USE_STANDARD_DEFAULT_MAIN
 
 /* #define CMK_USE_GNU_MALLOC */
 #define CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT

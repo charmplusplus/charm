@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.18  1996-01-30 20:20:36  kale
+ * Revision 2.19  1996-06-28 21:27:11  jyelon
+ * Added CMK_USE_STANDARD_DEFAULT_MAIN and CMK_USE_SIMULATOR_DEFAULT_MAIN.
+ *
+ * Revision 2.18  1996/01/30 20:20:36  kale
  * moved defs of WINDOW_SIZE and DGRAM_BUF_SIZE here from machine.h
  *
  * Revision 2.17  1996/01/17  08:04:13  jyelon
@@ -79,6 +82,9 @@
 #define CMK_MACHINE_NAME "net-hp"
 
 #define CmiMsgHeaderSizeBytes 4
+
+/* #define CMK_USE_SIMULATOR_DEFAULT_MAIN */
+#define CMK_USE_STANDARD_DEFAULT_MAIN
 
 /* #define CMK_USE_GNU_MALLOC */
 /* #define CMK_USE_OS_MALLOC */

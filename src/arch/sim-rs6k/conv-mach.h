@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.3  1996-01-17 08:04:13  jyelon
+ * Revision 1.4  1996-06-28 21:27:11  jyelon
+ * Added CMK_USE_STANDARD_DEFAULT_MAIN and CMK_USE_SIMULATOR_DEFAULT_MAIN.
+ *
+ * Revision 1.3  1996/01/17 08:04:13  jyelon
  * added CmiMsgHeaderSizeBytes
  *
  * Revision 1.2  1995/11/08 00:29:30  jyelon
@@ -71,6 +74,9 @@
 #define CMK_MACHINE_NAME "uth-rs6k"
 
 #define CmiMsgHeaderSizeBytes 4
+
+#define CMK_USE_SIMULATOR_DEFAULT_MAIN
+/* #define CMK_USE_STANDARD_DEFAULT_MAIN */
 
 /* #define CMK_USE_GNU_MALLOC */
 /* #define CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT */

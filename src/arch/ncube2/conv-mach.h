@@ -21,6 +21,9 @@
 
 #define CmiMsgHeaderSizeBytes 4
 
+/* #define CMK_USE_SIMULATOR_DEFAULT_MAIN */
+#define CMK_USE_STANDARD_DEFAULT_MAIN
+
 /* #define CMK_USE_GNU_MALLOC */
 /* #define CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT */
 #define CMK_USE_OS_MALLOC

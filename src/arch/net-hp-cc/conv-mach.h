@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1996-04-30 19:51:39  brunner
+ * Revision 1.2  1996-06-28 21:27:11  jyelon
+ * Added CMK_USE_STANDARD_DEFAULT_MAIN and CMK_USE_SIMULATOR_DEFAULT_MAIN.
+ *
+ * Revision 1.1  1996/04/30 19:51:39  brunner
  * Initial revision
  *
  *
@@ -24,6 +27,9 @@
 #define CMK_MACHINE_NAME "net-hp-cc"
 
 #define CmiMsgHeaderSizeBytes 4
+
+/* #define CMK_USE_SIMULATOR_DEFAULT_MAIN */
+#define CMK_USE_STANDARD_DEFAULT_MAIN
 
 /* #define CMK_USE_GNU_MALLOC */
 /* #define CMK_USE_OS_MALLOC */
