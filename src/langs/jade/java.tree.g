@@ -243,6 +243,7 @@ interfaceBlock
 
 objBlock[AST className, boolean insertMigrateConstructor]
 	:	#(	OBJBLOCK {
+		if(className!=null) J.curClassName = className.getText();
                 J.ci.append(J.indent() + " {\n");
                 J.h.append(J.indent() + " {\n");
                 J.h.append(J.indent() + "private: void _init();\n");
@@ -570,14 +571,17 @@ variableDef[boolean classVarq, boolean outputOnNewLine]
                     J.c.append(cproxytype + " " + varName + " = "
                         + cproxytype + "::ckNew");
 
-                    if (ts.getFirstChild().getText().equalsIgnoreCase(J.strChare))
+                    if (ts.getFirstChild().getText().equalsIgnoreCase(J.strChare)){
                         // for Chare, we have an ELIST
+			J.curClassDim = 0;
                         J.c.append("(" + J.printExpression(newAST.getFirstChild().getNextSibling()) +")");
-                    else if (ts.getFirstChild().getText().equalsIgnoreCase(J.strChareArray1D)) {
+                    } else if (ts.getFirstChild().getText().equalsIgnoreCase(J.strChareArray1D)) {
                         // For a ChareArray, we need to go down one more level.
+			J.curClassDim = 1;
                         J.c.append("(" + J.printExpression(newAST.getFirstChild().getNextSibling().getFirstChild()) +")");
                     } else if (ts.getFirstChild().getText().equalsIgnoreCase(J.strChareArray2D)) {
                         // For a ChareArray2D, we need to create elements using insert
+			J.curClassDim = 2;
                         AST e1 = J.getNode(newAST, "fnff"); // expr in first []
                         AST e2 = J.getNode(newAST, "fnfn"); // expr in 2nd []
                         J.c.append("(); {int e1="
