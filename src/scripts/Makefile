@@ -1045,6 +1045,16 @@ $(L)/libf90charm.a: f90main.ci f90main.h f90main.C charmf.h charmf.C futil.f90
 #
 ###############################################################################
 
+install:
+	-test ! -d $(DESTDIR)/include && mkdir -p $(DESTDIR)/include
+	-test ! -d $(DESTDIR)/lib && mkdir -p $(DESTDIR)/lib
+	-test ! -d $(DESTDIR)/lib_so && mkdir -p $(DESTDIR)/lib_so
+	-test ! -d $(DESTDIR)/bin && mkdir -p $(DESTDIR)/bin
+	cp -f ../include/*   $(DESTDIR)/include
+	cp -f ../lib/*       $(DESTDIR)/lib
+	cp -f ../lib_so/*    $(DESTDIR)/lib_so
+	cp -f ../bin/*       $(DESTDIR)/bin
+
 clean:
 	rm -f conv-autoconfig.h config.cache
 	rm -f QuickThreads/libqt.a
