@@ -3,6 +3,8 @@ AC_INIT(./Makefile)
 
 AC_CONFIG_HEADER(conv-autoconfig.h)
 
+test -r ./conv-mach-pre.sh && . ./conv-mach-pre.sh
+
 if test ! -r ./conv-mach.sh 
 then
         echo "Cannot find ./conv-mach.sh"
@@ -10,10 +12,7 @@ then
 fi
 . ./conv-mach.sh
 
-if test -r ./conv-mach-opt.sh 
-then
-        . ./conv-mach-opt.sh
-fi
+test -r ./conv-mach-opt.sh && . ./conv-mach-opt.sh
 
 VERSION=050405
 AC_DEFINE_UNQUOTED(CHARM_VERSION, $VERSION)
