@@ -10,7 +10,7 @@ strat::strat()
   eq = NULL;
   userObj = NULL;
   parent = NULL;
-  currentEvent = targetEvent = RBevent = NULL;
+  currentEvent = targetEvent = NULL;
 #ifndef SEQUENTIAL_POSE
   localPVT = (PVT *)CkLocalBranch(ThePVT);
 #endif

@@ -39,8 +39,6 @@ class strat
   Event *targetEvent; 
   /// Current event being executed  
   Event *currentEvent;
-  /// Current event to rollback to
-  Event *RBevent;   
   /// Basic Constructor
   strat();
   /// Destructor
@@ -60,13 +58,6 @@ class strat
   virtual void CancelEvents() { }  
   /// Calculate safe time (earliest time at which object can generate events)
   virtual POSE_TimeType SafeTime() { return userObj->OVT(); }
-  /// Set rollback point to event e
-  void ResetRBevent(Event *e) { 
-    if (!RBevent) RBevent = e; 
-    else if (RBevent->timestamp > e->timestamp) RBevent = e;
-    CmiAssert(RBevent->prev->next == RBevent);
-    CmiAssert(RBevent->next->prev == RBevent);
-  }
 };
 
 #endif
