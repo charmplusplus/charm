@@ -163,7 +163,7 @@ public:
 	~CkFixedViewable() {v->unref();}
 	
 	virtual void view(const CkViewpoint &univ2screen,CkViewConsumer &dest) {
-		return dest.add(v);
+		dest.add(v);
 	}
 };
 
