@@ -203,8 +203,9 @@ void receiver::recvAlready()
    int tags[3], ret_tags[3];
    tags[0] = CmmWildCard; tags[1] = CmmWildCard; tags[2] = counter;
    tblEntry *req1 = (tblEntry *)CmmProbe(reqTbl, 3, tags, ret_tags);
+   if (req1) return;
    tblEntry *req2 = (tblEntry *)CmmProbe(msgTbl, 3, tags, ret_tags);
-   if (req1 == NULL && req2 == NULL && startwaiting)  //  && callback != NULL) 
+   if (req2 == NULL)  //  && callback != NULL) 
    {
       startwaiting = 0;
       CProxy_receiver B(thisArrayID);
