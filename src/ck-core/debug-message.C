@@ -68,7 +68,7 @@ void envelope::pup(PUP::er &p) {
 	//message type, totalsize, and priobits are already pup'd (above)
 	p((void *)core,CmiMsgHeaderSizeBytes);
 	p(ref);
-	p|attribs;
+	p((void *)&attribs,sizeof(attribs));
 	p(epIdx);
 	p(pe);
 	p(event);

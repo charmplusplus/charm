@@ -51,7 +51,6 @@ NodeGroup::~NodeGroup() {
 void NodeGroup::pup(PUP::er &p)
 {
   IrrGroup::pup(p);
-  p|__nodelock;
 }
 
 void Group::pup(PUP::er &p) 

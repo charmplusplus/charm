@@ -562,16 +562,15 @@ public:\
 
 };//<- End "namespace" PUP
 
-/******** PUP via pipe: another way to access PUP::ers ******/
+/******** PUP via pipe: another way to access PUP::ers *****
+The parameter marshalling system pups each variable v using just:
+     p|v;
+Thus we need a "void operator|(PUP::er &p,T &v)" for all types
+that work with parameter marshalling.  This operator| is often
+defined by the PUPmarshall macro, below.
+*/
 
-//This catches "p|t" for all user-defined types T:
-template <class T>
-inline void operator|(PUP::er &p,T &t)
-{
-         p((void *)&t,sizeof(T));
-}
-
-//These more specific versions map p|t to p(t) for all handled types
+//These versions map p|t to p(t) for all built-in types
 inline void operator|(PUP::er &p,signed char &t) {p(t);}
 #if CMK_SIGNEDCHAR_DIFF_CHAR
 inline void operator|(PUP::er &p,char &t) {p(t);}
@@ -594,10 +593,26 @@ inline void operator|(PUP::er &p,CMK_PUP_LONG_LONG &t) {p(t);}
 inline void operator|(PUP::er &p,unsigned CMK_PUP_LONG_LONG &t) {p(t);}
 #endif
 
+#ifndef CK_STRICT_PUP
+//This byte-by-byte copy catches "p|t" for any
+//  user-defined type T that does not have a normal operator| defined.
+// It is a "convenient but error-prone" class.
+template <class T>
+inline void operator|(PUP::er &p,T &t)
+{
+         p((void *)&t,sizeof(T));
+}
+#endif
 
+//Marshall maps operator| to the classes' ordinary pup routine.
 #define PUPmarshall(type) \
   inline void operator|(PUP::er &p,type &t) {t.pup(p);}
 #define PUPmarshal(type) PUPmarshall(type) /*Support this common misspelling*/
+
+//Copy these classes as raw memory
+#define PUPmarshallBytes(type) \
+  inline void operator|(PUP::er &p,type &t) { p((void *)&t,sizeof(type)); }
+
 
 #endif //def __CK_PUP_H
 

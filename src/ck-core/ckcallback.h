@@ -123,7 +123,7 @@ public:
  */
 	void send(void *msg=NULL) const;
 };
-
+PUPmarshallBytes(CkCallback) //FIXME: write a real pup routine
 
 /**
  * Convenience class: a thread-suspending callback.  

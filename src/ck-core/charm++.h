@@ -19,85 +19,14 @@ public: static int __idx;
 };
 #define CK_ALIGN(val,to) (((val)+(to)-1)&~((to)-1))
 
+#include "pup.h"
 #include "cklists.h"
 #include "init.h"
-#include "pup.h"
-
-//Implementation class (don't instantiate)
-template <class T>
-class implCkVecPup : public CkVec<T> {
- protected:
-	int pupbase(PUP::er &p) {
-		int l=length();
-		p(l);
-		if (p.isUnpacking()) {
-			setSize(l);
-			length()=l;
-		}
-		return l;
-	}
-};
-
-///A vector of derived types, which must be pupped separately
-template <class T>
-class CkPupVec : public implCkVecPup<T> {
- public:
-	void pup(PUP::er &p) {
-		int l=pupbase(p);
-		for (int i=0;i<l;i++)
-			p|(*this)[i];
-	}
-	friend void operator|(PUP::er &p,CkPupVec<T> &v) {v.pup(p);}
-};
-
-///A vector of basic types, which can be pupped as an array
-/// (more restricted, but more efficient version of above)
-template <class T>
-class CkPupBasicVec : public implCkVecPup<T> {
- public:
-	void pup(PUP::er &p) {
-		int l=pupbase(p);
-		p(getVec(),l);
-	}
-	friend void operator|(PUP::er &p,CkPupBasicVec<T> &v) {v.pup(p);}
-};
-
-///A vector of heap-allocated objects of type T
-template <class T>
-class CkPupPtrVec : public implCkVecPup<T *> {
- public:
-	~CkPupPtrVec() {
-		for (int i=0;i<size();i++)
-			delete (*this)[i];
-	}
-	void pup(PUP::er &p) {
-		int l=pupbase(p);
-		for (int i=0;i<l;i++) {
-			if (p.isUnpacking()) (*this)[i]=new T;
-			(*this)[i]->pup(p);
-		}
-	}
-	friend void operator|(PUP::er &p,CkPupPtrVec<T> &v) {v.pup(p);}
-};
-
-///A vector of pointers-to-subclasses of a PUP::able parent
-template <class T>
-class CkPupAblePtrVec : public implCkVecPup<T *> {
- public:
-	~CkPupAblePtrVec() {
-		for (int i=0;i<size();i++)
-			delete (*this)[i];
-	}
-	void pup(PUP::er &p) {
-		int l=pupbase(p);
-		for (int i=0;i<l;i++)
-			p|(*this)[i]; //Pup framework will allocate appropriately
-	}
-	friend void operator|(PUP::er &p,CkPupAblePtrVec<T> &v) {v.pup(p);}
-};
-
-
 #include "debug-charm.h"
+
+PUPmarshallBytes(CkChareID)
+PUPmarshallBytes(CkGroupID)
+
 
 class CkMessage { //Superclass of all Charm++ messages
 	//Don't use these: use CkCopyMsg
@@ -207,7 +136,12 @@ public:
 	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
 		{copyFrom(that); return *this;}
         void print() { CmiPrintf("%d: %d %d %d\n", nInts,index.data[0], index.data[1], index.data[2]); }
+	void pup(PUP::er &p) {
+		p|nInts;
+		for (int i=0;i<nInts;i++) p|index.data[i];
+	}
 };
+PUPmarshall(CkArrayIndexMax)
 
 //A layout-compatible version of a CkArrayIndexMax.
 //  Needed, e.g., for use in unions where a constructor is forbidden.
@@ -219,7 +153,12 @@ public:
 		{return *(CkArrayIndexMax *)this;}
 	const CkArrayIndexMax &asMax(void) const
 		{return *(const CkArrayIndexMax *)this;}
+	void pup(PUP::er &p) {
+		p|nInts;
+		for (int i=0;i<nInts;i++) p|index[i];
+	}
 };
+PUPmarshall(CkArrayIndexStruct)
 
 class CkArrayID {
 	CkGroupID _gid;
@@ -248,6 +187,7 @@ public:
   CkSectionCookie(void *p): val(p), redNo(0) { pe = CkMyPe();};
   CkSectionCookie(int e, void *p, int r):  pe(e), val(p), redNo(r) {}
 };
+PUPmarshallBytes(CkSectionCookie) //FIXME: write a real pup routine
 
 class CkSectionID {
 public:
@@ -262,6 +202,7 @@ public:
   ~CkSectionID();
   void pup(PUP::er &p);
 };
+PUPmarshall(CkSectionID)
 
 #include "ckcallback.h"
 
@@ -321,6 +262,7 @@ class CkComponentID {
 	CkComponent *ckLookup(void) const;
 	void pup(PUP::er &p);
 };
+PUPmarshall(CkComponentID)
 
 //Superclass of all Groups that cannot participate in reductions.
 //  Undocumented: should only be used inside Charm++.
