@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-09-06 21:48:50  jyelon
+ * Revision 2.9  1995-09-07 05:27:47  gursoy
+ * fixed some missing CpvAccess usages.
+ *
+ * Revision 2.8  1995/09/06  21:48:50  jyelon
  * Eliminated 'CkProcess_BocMsg', using 'CkProcess_ForChareMsg' instead.
  *
  * Revision 2.7  1995/09/01  02:13:17  jyelon
@@ -115,9 +118,9 @@ TRACE(CmiPrintf("Node %d: Enter NodeCollectStatistics() \n", CmiMyPe()));
 	CkMemError(sPtr);
 
 	sPtr->srcPE = CmiMyPe();
-	sPtr->chareQueueLength = CstatsMaxChareQueueLength;
-	sPtr->forChareQueueLength = CstatsMaxForChareQueueLength;
-	sPtr->fixedChareQueueLength = CstatsMaxFixedChareQueueLength;
+	sPtr->chareQueueLength = CpvAccess(CstatsMaxChareQueueLength);
+	sPtr->forChareQueueLength = CpvAccess(CstatsMaxForChareQueueLength);
+	sPtr->fixedChareQueueLength = CpvAccess(CstatsMaxFixedChareQueueLength);
 	sPtr->charesCreated = CpvAccess(nodecharesCreated);
 	sPtr->charesProcessed = CpvAccess(nodecharesProcessed);
 	sPtr->forCharesCreated = CpvAccess(nodeforCharesCreated);
