@@ -1151,15 +1151,15 @@ public:
 	}
 };
 
-#define REPLAYDEBUG(args) ckout<<"["<<CkMyPe()<<"] "<< args <<endl;
-//#define REPLAYDEBUG(args) /* empty */
+//#define REPLAYDEBUG(args) ckout<<"["<<CkMyPe()<<"] "<< args <<endl;
+#define REPLAYDEBUG(args) /* empty */
 
 class CkMessageReplay : public CkMessageWatcher {
 	FILE *f;
 	int nextPE, nextSize, nextEvent; //Properties of next message we need:
 	/// Read the next message we need from the file:
 	void getNext(void) {
-		if (3!=fscanf(f,"%d%d%d",&nextPE,&nextSize,&nextEvent)) {
+		if (3!=fscanf(f,"%d%d%d", &nextPE,&nextSize,&nextEvent)) {
 			// CkAbort("CkMessageReplay> Syntax error reading replay file");
 			nextPE=nextSize=nextEvent=-1; //No destructor->record file just ends in the middle!
 		}
@@ -1169,7 +1169,10 @@ class CkMessageReplay : public CkMessageWatcher {
 		if (nextPE!=env->getSrcPe()) return CmiFalse;
 		if (nextEvent!=env->getEvent()) return CmiFalse;
 		if (nextSize!=env->getTotalsize())
-			CkAbort("CkMessageReplay> Message size changed during replay");
+                {
+			CkPrintf("CkMessageReplay> Message size changed during replay org: [%d %d %d] got: [%d %d %d]", nextPE, nextEvent, nextSize, env->getSrcPe(), env->getEvent(), env->getTotalsize());
+                        return CmiFalse;
+                }
 		return CmiTrue;
 	}
 	
@@ -1207,6 +1210,7 @@ public:
 			REPLAYDEBUG("Queueing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent()
 				<<" because we wanted "<<nextPE<<" "<<nextSize<<" "<<nextEvent)
 			delayed.enq(env);
+                        flush();
 			return CmiFalse;
 		}
 	}
@@ -1227,8 +1231,6 @@ static FILE *openReplayFile(const char *permissions) {
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	if (CmiGetArgFlagDesc(argv,"+record","Record message processing order"))
 		ck->watcher=new CkMessageRecorder(openReplayFile("w"));
-        else
-                CmiPrintf("Watcher is not used\n"); 
 	if (CmiGetArgFlagDesc(argv,"+replay","Re-play recorded message stream"))
 		ck->watcher=new CkMessageReplay(openReplayFile("r"));
 }
