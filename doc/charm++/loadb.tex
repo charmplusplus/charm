@@ -24,8 +24,8 @@ structure but without the predictability (i.e. where the principle of
 persistence does not apply), Charm++ supports "seed balancers" that
 move seeds for new chares among processors (possibly repeatedly) to
 achieve load balance. These strategies are currently available for
-chares alone (and may be extended to chare-arrays in future). Seed
-balancers were the original load balancers provided in Charm since the
+both chares and chare-arrays. 
+Seed balancers were the original load balancers provided in Charm since the
 late '80s. They are extremely useful for state-space search
 applications, and are also useful in other computations, as well as in
 conjunction with migration strategies.
