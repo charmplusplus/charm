@@ -79,13 +79,21 @@ Processing elements within a node are ranked starting from zero.}
 The following calls provide commonly needed functions.
 
 \function{void CkAbort(const char *message)} \index{CkAbort}
-\desc{Cause the program to abort, printing the given error message.}
+\desc{Cause the program to abort, printing the given error message.
+This routine never returns.}
 
 \function{void CkExit()} \index{CkExit}
 \desc{This call informs the Charm kernel that computation on all processors
 should terminate.  After the currently executing entry method completes, no
-more messages or entry methods will be called.  \kw{CkExit} should be the last
-call of the entry method from which it was called.}
+more messages or entry methods will be called on any other processor. 
+This routine never returns.}
+
+\function{void CkExitAfterQuiescence()} \index{CkExitAfterQuiescence}
+\desc{This call informs the Charm kernel that computation on all processors
+should terminate as soon as the machine becomes completely idle--that is,
+after all messages and entry methods are finished.  This is the state of 
+quiescence, as described further in Section~\ref{sec:qd}.
+This routine returns immediately.}
 
 \function{double CkCpuTimer()} \index{CkCpuTimer} \index{timers}
 \desc{Returns the current value of the system timer in seconds. The system
