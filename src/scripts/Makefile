@@ -209,13 +209,14 @@ libldb-test.o: cldb.test.c $(CVHEADERS)
 ###############################################################################
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
-          CkFutures.decl.h CkFutures.def.h ckfutures.h $(CVHEADERS)
+          CkFutures.decl.h CkFutures.def.h ckfutures.h ckarray.h \
+          CkArray.decl.h CkArray.def.h $(CVHEADERS)
 
 CK_LIBS_CORE=libck.a
 
 CK_LIBS=$(CK_LIBS_CORE)
 
-LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o
+LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o ckarray.o
 
 charmlibs: converse $(CK_LIBS)
 
@@ -234,6 +235,10 @@ CkFutures.decl.h CkFutures.def.h : ckfutures.ci charmxi
 	$(CHARMC) ckfutures.ci
 	/bin/cp CkFutures.decl.h CkFutures.def.h ../include
 
+CkArray.decl.h CkArray.def.h : ckarray.ci charmxi
+	$(CHARMC) ckarray.ci
+	/bin/cp CkArray.decl.h CkArray.def.h ../include
+
 init.o: init.C $(CKHEADERS)
 	$(CHARMC) -o init.o init.C
 
@@ -245,6 +250,9 @@ register.o: register.C $(CKHEADERS)
 
 ckfutures.o: ckfutures.C $(CKHEADERS)
 	$(CHARMC) -o ckfutures.o ckfutures.C
+
+ckarray.o: ckarray.C $(CKHEADERS)
+	$(CHARMC) -o ckarray.o ckarray.C
 
 qd.o: qd.C $(CKHEADERS)
 	$(CHARMC) -o qd.o qd.C
