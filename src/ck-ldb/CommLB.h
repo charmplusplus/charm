@@ -13,7 +13,7 @@
 #ifndef _COMMLB_H_
 #define _COMMLB_H_
 
-#include <CentralLB.h>
+#include "CentralLB.h"
 #include "CommLB.decl.h"
 
 #include "CommLBHeap.h"

@@ -63,7 +63,7 @@ LBMigrateMsg* LBMigrateMsg::unpack(void *m)
   LBMigrateMsg* ret_val = (LBMigrateMsg*)(m);
 
   ret_val->moves = (MigrateInfo*)
-    ((char*)(&ret_val->moves) 
+    ((char*)(&ret_val->moves)
      + (size_t)(ret_val->moves));
 
   ret_val->avail_vector =
@@ -71,6 +71,11 @@ LBMigrateMsg* LBMigrateMsg::unpack(void *m)
 			    +(size_t)(ret_val->avail_vector));
 
   return ret_val;
+}
+
+void LBMigrateMsg::print(LBMigrateMsg* in)
+{
+	ckout << "number of migrations " << in->n_moves << endl;
 }
 
 #include "BaseLB.def.h"

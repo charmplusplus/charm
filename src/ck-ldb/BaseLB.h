@@ -47,6 +47,7 @@ public:
   static void* alloc(int msgnum, size_t size, int* array, int priobits);
   static void* pack(LBMigrateMsg* in);
   static LBMigrateMsg* unpack(void* in);
+  static void print(LBMigrateMsg* in);
 };
 
 #endif
