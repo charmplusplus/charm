@@ -32,6 +32,7 @@ ModuleList *modlist;
   TVar *tvar;
   TVarList *tvarlist;
   Value *val;
+  ValueList *vallist;
   char *strval;
   int intval;
 }
@@ -81,7 +82,8 @@ ModuleList *modlist;
 %type <member>		Member
 %type <tvar>		TVar
 %type <tvarlist>	TVarList TemplateSpec
-%type <val>		ArrayDim
+%type <val>		ArrayDim Dim
+%type <vallist>		DimList
 
 %%
 
@@ -255,12 +257,22 @@ TypeList	: /* Empty */
 		{ $$ = new TypeList($1, $3); }
 		;
 
-Readonly	: READONLY Type Name
-		{ $$ = new Readonly($2, $3); }
+Dim		: '[' ArrayDim ']'
+		{ $$ = $2; }
+		;
+
+DimList		: /* Empty */
+		{ $$ = 0; }
+		| Dim DimList
+		{ $$ = new ValueList($1, $2); }
+		;
+
+Readonly	: READONLY Type Name DimList
+		{ $$ = new Readonly($2, $3, $4); }
 		;
 
 ReadonlyMsg	: READONLY MESSAGE SimpleType '*'  Name
-		{ $$ = new Readonly($3, $5, 1); }
+		{ $$ = new Readonly($3, $5, 0, 1); }
 		;
 
 MAttribs	: /* Empty */

@@ -235,7 +235,10 @@ Readonly::print(XStr& str)
     str << " *";
   else
     str << " ";
-  str << name << ";\n";
+  str << name;
+  if(dims)
+    dims->print(str);
+  str << ";\n";
 }
 
 void
@@ -694,7 +697,10 @@ Readonly::genDecls(XStr& str)
     type->print(str);
     if(msg)
       str << "*";
-    str<<" "<<name<<";";
+    str<<" "<<name;
+    if(dims)
+      dims->print(str);
+    str << ";";
   }
 }
 
@@ -710,6 +716,10 @@ Readonly::genReg(XStr& str)
   if(external)
     return;
   if(msg) {
+    if(dims) {
+      cerr << "Readonly Message cannot be an array!!\n";
+      exit(1);
+    }
     str << "  CkRegisterReadonlyMsg((void **) &";
     if(container) {
       str << container->getBaseName();
@@ -721,6 +731,8 @@ Readonly::genReg(XStr& str)
   } else {
     str << "  CkRegisterReadonly(sizeof(";
     type->print(str);
+    if(dims)
+      dims->print(str);
     str << "), (void *) &";
     if(container) {
       str << container->getBaseName();

@@ -21,6 +21,7 @@ typedef union {
   TVar *tvar;
   TVarList *tvarlist;
   Value *val;
+  ValueList *vallist;
   char *strval;
   int intval;
 } YYSTYPE;

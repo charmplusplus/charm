@@ -16,6 +16,21 @@ class Value : public Printable {
     void print(XStr& str) { str << val; }
 };
 
+class ValueList : public Printable {
+  private:
+    Value *val;
+    ValueList *next;
+  public:
+    ValueList(Value* v, ValueList* n=0) : val(v), next(n) {}
+    void print(XStr& str) {
+      if(val) {
+        str << "["; val->print(str); str << "]";
+      }
+      if(next)
+        next->print(str);
+    }
+};
+
 class Construct : public Printable {
   protected:
     int external;
@@ -421,9 +436,10 @@ class Readonly : public Construct, public Member {
     int msg; // is it a readonly var(0) or msg(1) ?
     Type *type;
     char *name;
+    ValueList *dims;
   public:
-    Readonly(Type *t, char *n, int m=0) : type(t), name(n), msg(m)
-    { setChare(0); }
+    Readonly(Type *t, char *n, ValueList* d, int m=0) : type(t), name(n), msg(m)
+    { dims=d; setChare(0); }
     void print(XStr& str);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
