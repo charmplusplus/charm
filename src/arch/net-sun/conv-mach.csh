@@ -30,4 +30,4 @@ set CMK_LIBS=
 set CMK_SEQ_CC=gcc
 set CMK_SEQ_LD=gcc
 set CMK_EXTRAS=gcc -o conv-host conv-host.c 
-set CMK_CLEAN=
+set CMK_CLEAN=rm -f conv-host
