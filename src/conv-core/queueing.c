@@ -280,13 +280,13 @@ void CqsEnqueueGeneral(Queue q, void *data, int strategy,
     CqsDeqEnqueueLifo(d, data);
     break;
   case CQS_QUEUEING_BFIFO:
-    if (priobits&&(((int)(prioptr[1]))<0))
+    if (priobits&&(((int)(prioptr[0]))<0))
        d=CqsPrioqGetDeq(&(q->posprioq), priobits, prioptr);
     else d=CqsPrioqGetDeq(&(q->negprioq), priobits, prioptr);
     CqsDeqEnqueueFifo(d, data);
     break;
   case CQS_QUEUEING_BLIFO:
-    if (priobits&&(((int)(prioptr[1]))<0))
+    if (priobits&&(((int)(prioptr[0]))<0))
        d=CqsPrioqGetDeq(&(q->posprioq), priobits, prioptr);
     else d=CqsPrioqGetDeq(&(q->negprioq), priobits, prioptr);
     CqsDeqEnqueueLifo(d, data);
