@@ -11,6 +11,11 @@
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
 
 int CMessage_CkArgMsg::__idx=0;
+int CkIndex_Chare::__idx=-1;
+int CkIndex_Group::__idx=-1;
+int CkIndex_ArrayBase::__idx=-1;
+
+Group::~Group() {}
 
 //Chare virtual functions: declaring these here results in a smaller executable
 #if CMK_DEBUG_MODE
@@ -45,6 +50,34 @@ void Group::pup(PUP::er &p)
 	Chare::pup(p);
 	p(thisgroup);
 } 
+CkDelegateMgr::~CkDelegateMgr() { }
+
+//Default delegator implementation: do not delegate-- send directly
+void CkDelegateMgr::ChareSend(int ep,void *m,const CkChareID *c)
+  { CkSendMsg(ep,m,c); }
+void CkDelegateMgr::GroupSend(int ep,void *m,int onPE,CkGroupID g)
+  { CkSendMsgBranch(ep,m,onPE,g); }
+void CkDelegateMgr::GroupBroadcast(int ep,void *m,CkGroupID g)
+  { CkBroadcastMsgBranch(ep,m,g); }
+void CkDelegateMgr::NodeGroupSend(int ep,void *m,int onNode,CkNodeGroupID g)
+  { CkSendMsgNodeBranch(ep,m,onNode,g); }
+void CkDelegateMgr::NodeGroupBroadcast(int ep,void *m,CkNodeGroupID g)
+  { CkBroadcastMsgNodeBranch(ep,m,g); }
+void CkDelegateMgr::ArrayCreate(int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a)
+{
+	CProxyElement_ArrayBase ap(a,idx);
+	ap.ckInsert((CkArrayMessage *)m,ep,onPE);
+}
+void CkDelegateMgr::ArraySend(int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a)
+{
+	CProxyElement_ArrayBase ap(a,idx);
+	ap.ckSend((CkArrayMessage *)m,ep);
+}
+void CkDelegateMgr::ArrayBroadcast(int ep,void *m,CkArrayID a)
+{
+	CProxy_ArrayBase ap(a);
+	ap.ckBroadcast((CkArrayMessage *)m,ep);
+}
 
 
 extern "C"
@@ -100,6 +133,24 @@ void *CkLocalNodeBranch(CkGroupID groupID)
   void *retval = _nodeGroupTable->find(groupID);
   CmiUnlock(_nodeLock);
   return retval;
+}
+
+extern "C"
+void *CkLocalChare(const CkChareID *pCid)
+{
+	int pe=pCid->onPE;
+	if (pe<0) { //A virtual chare ID
+		if (pe!=(-(CkMyPe()+1)))
+			return NULL;//VID block not on this PE
+		VidBlock *v=(VidBlock *)pCid->objPtr;
+		return v->getLocalChare();
+	}
+	else 
+	{ //An ordinary chare ID
+		if (pe!=CkMyPe())
+			return NULL;//Chare not on this PE
+		return pCid->objPtr;
+	}
 }
 
 /********************* Creation ********************/
@@ -323,7 +374,11 @@ CkGroupID CkCreateGroup(int cIdx, int eIdx, void *msg, int retEp,CkChareID *retC
   if(CkMyPe()==0) {
     return _staticGroupCreate(env, retEp, retChare);
   } else {
-    _dynamicGroupCreate(env, retEp, retChare);
+    if (retChare!=NULL)
+      _dynamicGroupCreate(env, retEp, retChare);
+    else
+      CkAbort("You must either create groups/arrays from PE 0, "
+	      "or else use the special return-entry syntax!");
     return (-1);
   }
 }
@@ -673,7 +728,7 @@ static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 }
 
 extern "C"
-void CkSendMsg(int entryIdx, void *msg, CkChareID *pCid)
+void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid)
 {
   register envelope *env = UsrToEnv(msg);
   _CHECK_USED(env);
