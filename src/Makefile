@@ -56,7 +56,7 @@ CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 #
 ###############################################################################
 
-ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h cpthreads.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h qd.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h conv-mach.h internal.h quiescence.h trace.h dag.h generic_redn.h charmFuturesInclude.h # pglib.h
+ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h cpthreads.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h qd.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h conv-mach.h internal.h quiescence.h simplemsg.h trace.h dag.h generic_redn.h charmFuturesInclude.h # pglib.h
 
 ALLINTERFACES=GENERIC-ACC.int GENERIC-HIST.int GENERIC-REDN.int barrier_redn.int cache.int dacc_count.int dacc_hist.int dcountredn.int dmaxredn.int dminredn.int dprodredn.int dsumredn.int facc_count.int facc_hist.int fcountredn.int fmaxredn.int fminredn.int fprodredn.int fsumredn.int iacc_count.int iacc_hist.int icountredn.int imaxredn.int iminredn.int iprodredn.int isumredn.int pg.int
 
@@ -133,7 +133,7 @@ CVHEADERS=converse.h conv-mach.h conv-mach.csh
 
 CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a
 
-LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o
+LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o
 
 converse: basics QuickThreads/libqt.a $(CVLIBS) conv-host-if-needed conv-cpm
 
@@ -180,6 +180,9 @@ queueing.o: queueing.c $(CVHEADERS)
 
 conv-conds.o: conv-conds.c $(CVHEADERS)
 	$(CHARMC) conv-conds.c
+
+futures.o: futures.c $(CVHEADERS)
+	$(CHARMC) futures.c
 
 msgmgr.o: msgmgr.c $(CVHEADERS)
 	$(CHARMC) msgmgr.c
@@ -358,7 +361,7 @@ LIBCHARM=cache.o dag.o barrier_redn.o pglib.o \
          iminredn.o imaxredn.o isumredn.o iprodredn.o icountredn.o \
 	 fminredn.o fmaxredn.o fsumredn.o fprodredn.o \
 	 dminredn.o dmaxredn.o dsumredn.o dprodredn.o \
-	 charmFutures.o futures.o
+	 charmFutures.o
 
 libcharm: charmxlat libcharm.a
 
@@ -439,9 +442,6 @@ dprodredn.o: dprodredn.int $(GENERIC_REDN_H)
 
 dcountredn.o: dcountredn.int $(GENERIC_REDN_H)
 	$(CHARMC) -o dcountredn.o GENERIC-REDN.p -DHEAD='"dcountredn.int"'
-
-futures.o: futures.c
-	$(CHARMC) -c futures.c
 
 charmFutures.o: charmFutures.C
 	$(CHARMC) charmFutures.ci
@@ -562,6 +562,15 @@ xi-parse.tab.o: xi-parse.tab.C $(XIHEADERS)
 
 xi-scan.o: xi-scan.C $(XIHEADERS)
 	$(CHARMC) -seq xi-scan.C
+
+###############################################################################
+#
+# Little languages.
+#
+###############################################################################
+
+libsimplemsg.a: simplemsg.c simplemsg.h
+	$(CHARMC) -cp ../lib/ -o $@ simplemsg.c
 
 ###############################################################################
 #

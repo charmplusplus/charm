@@ -126,6 +126,7 @@ struct CthThreadStruct
   int        autoyield_blocks;
   char      *data;
   int        datasize;
+  CthThread  qnext;
   qt_t      *stackp;
 };
 
@@ -150,6 +151,7 @@ CthThread t;
   t->choosefn = 0;
   t->data=0;
   t->datasize=0;
+  t->qnext=0;
   t->autoyield_enable = 0;
   t->autoyield_blocks = 0;
 }
@@ -323,4 +325,12 @@ void CthAutoYieldUnblock()
   CthCpvAccess(CthCurrent)->autoyield_blocks --;
 }
 
+void CthSetNext(CthThread t, CthThread v)
+{
+  t->qnext = v;
+}
 
+CthThread CthGetNext(CthThread t) 
+{
+  return t->qnext;
+}

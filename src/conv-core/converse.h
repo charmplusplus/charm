@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.66  1997-07-24 17:29:36  milind
+ * Revision 2.67  1997-07-24 18:32:12  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.66  1997/07/24 17:29:36  milind
  * Added Parallel Java to the CVS repository in Common/langs.
  * Fixed a problem with size_t in converse.h
  *
@@ -496,7 +499,9 @@ extern void CmiNumberHandler CMK_PROTO((int, CmiHandler));
  * If neither bit is set, the numbers are in local format, and no
  * conversion is needed whatsoever.  Thus, a value of 0 indicates that
  * the message is entirely in local format.  If the values are in wildly
- * different order, one has no choice but to use the CmiConvert functions.
+ * different format, one has no choice but to use the CmiConvert functions.
+ * If they're just in backward-byte-order, you can swap the bytes yourself,
+ * possibly faster than we can.
  *
  */
 
@@ -545,6 +550,8 @@ int   CmiScanf  CMK_PROTO((char *, ...));
 #define CmiError  printf
 #define CmiScanf  scanf
 #endif
+
+typedef void (*CmiStartFn) CMK_PROTO((int argc, char **argv));
 
 /********* CSD - THE SCHEDULER ********/
 
@@ -633,66 +640,14 @@ void       CthAwaken              CMK_PROTO((CthThread));
 void       CthSetStrategy         CMK_PROTO((CthThread, CthVoidFn, CthThFn));
 void       CthSetStrategyDefault  CMK_PROTO((CthThread));
 void       CthYield               CMK_PROTO((void));
+
+void       CthSetNext CMK_PROTO((CthThread t, CthThread next));
+CthThread  CthGetNext CMK_PROTO((CthThread t));
+
 void       CthAutoYield           CMK_PROTO((CthThread t, int flag));
 double     CthAutoYieldFreq       CMK_PROTO((CthThread t));
 void       CthAutoYieldBlock      CMK_PROTO((void));
 void       CthAutoYieldUnblock    CMK_PROTO((void));
-
-/****** CPTHREAD: the posix threads package ******/
-
-#include <sys/types.h>
-
-#define CPTHREAD_ONCE_INIT 0
-
-typedef int                         Cpthread_once_t;
-typedef struct Cpthread_attr_s      Cpthread_attr_t;
-typedef struct Cpthread_key_s      *Cpthread_key_t;
-typedef struct Cpthread_cleanup_s  *Cpthread_cleanup_t;
-typedef struct Cpthread_mutexattr_s Cpthread_mutexattr_t;
-typedef struct Cpthread_condattr_s  Cpthread_condattr_t;
-typedef struct Cpthread_mutex_s     Cpthread_mutex_t;
-typedef struct Cpthread_cond_s      Cpthread_cond_t;
-typedef struct Cpthread_s          *Cpthread_t;
-
-Cpthread_t Cpthread_self();
-int   Cpthread_attr_init(Cpthread_attr_t *attr);
-int   Cpthread_attr_destroy(Cpthread_attr_t *attr);
-int   Cpthread_attr_getstacksize(Cpthread_attr_t *attr, size_t *size);
-int   Cpthread_attr_setstacksize(Cpthread_attr_t *attr, size_t size);
-int   Cpthread_attr_getdetachstate(Cpthread_attr_t *attr, int *state);
-int   Cpthread_attr_setdetachstate(Cpthread_attr_t *attr, int state);
-int   Cpthread_key_create(Cpthread_key_t *keyp, void (*destructo)(void *));
-int   Cpthread_key_delete(Cpthread_key_t key);
-int   Cpthread_setspecific(Cpthread_key_t key, void *val);
-void *Cpthread_getspecific(Cpthread_key_t key);
-void  Cpthread_cleanup_push(void (*routine)(void*), void *arg);
-void  Cpthread_cleanup_pop(int execute);
-void  Cpthread_exit(void *status);
-void  Cpthread_top(Cpthread_t pt);
-int   Cpthread_create(Cpthread_t *thread, Cpthread_attr_t *attr,
-		      void *(*fn)(void *), void *arg);
-int   Cpthread_equal(Cpthread_t t1, Cpthread_t t2);
-int   Cpthread_detach(Cpthread_t pt);
-int   Cpthread_join(Cpthread_t pt, void **status);
-int   Cpthread_mutexattr_init(Cpthread_mutexattr_t *mattr);
-int   Cpthread_mutexattr_destroy(Cpthread_mutexattr_t *mattr);
-int   Cpthread_mutexattr_getpshared(Cpthread_mutexattr_t *mattr,int *pshared);
-int   Cpthread_mutexattr_setpshared(Cpthread_mutexattr_t *mattr,int  pshared);
-int   Cpthread_mutex_init(Cpthread_mutex_t *mutex,Cpthread_mutexattr_t *mattr);
-int   Cpthread_mutex_destroy(Cpthread_mutex_t *mutex);
-int   Cpthread_mutex_lock(Cpthread_mutex_t *mutex);
-int   Cpthread_mutex_trylock(Cpthread_mutex_t *mutex);
-int   Cpthread_mutex_unlock(Cpthread_mutex_t *mutex);
-int   Cpthread_condattr_init(Cpthread_condattr_t *cattr);
-int   Cpthread_condattr_destroy(Cpthread_condattr_t *cattr);
-int   Cpthread_condattr_getpshared(Cpthread_condattr_t *cattr, int *pshared);
-int   Cpthread_condattr_setpshared(Cpthread_condattr_t *cattr, int pshared);
-int   Cpthread_cond_init(Cpthread_cond_t *cond, Cpthread_condattr_t *cattr);
-int   Cpthread_cond_destroy(Cpthread_cond_t *cond);
-int   Cpthread_cond_wait(Cpthread_cond_t *cond, Cpthread_mutex_t *mutex);
-int   Cpthread_cond_signal(Cpthread_cond_t *cond);
-int   Cpthread_cond_broadcast(Cpthread_cond_t *cond);
-int   Cpthread_once(Cpthread_once_t *once, void (*fn)(void));
 
 /****** CTH: THREAD-PRIVATE VARIABLES ******/
 
@@ -717,8 +672,8 @@ int   Cpthread_once(Cpthread_once_t *once, void (*fn)(void));
 CthCpvExtern(char *,CthData);
 extern int CthRegister CMK_PROTO((int));
 #define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
-#define CtvStaticDeclare(t,v)   typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
-#define CtvExtern(t,v)          typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
+#define CtvStaticDeclare(t,v)   typedef t CtvType##v; CsvStaticDeclare(int,CtvOffs##v);
+#define CtvExtern(t,v)          typedef t CtvType##v; CsvExtern(int,CtvOffs##v);
 #define CtvAccess(v)            (*((CtvType##v *)(CthCpvAccess(CthData)+CsvAccess(CtvOffs##v))))
 #define CtvInitialize(t,v)      if (CmiMyRank()==0) (CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v)));
 
@@ -826,12 +781,46 @@ CpmDeclareSimple(CpmDim);
 #define CpmPack_CpmDim(v)
 #define CpmUnpack_CpmDim(v)
 
+CpmDeclareSimple(Cfuture);
+#define CpmPack_Cfuture(v)
+#define CpmUnpack_Cfuture(v)
+
 typedef char *CpmStr;
 CpmDeclarePointer(CpmStr);
 #define CpmPtrSize_CpmStr(v) (strlen(v)+1)
 #define CpmPtrPack_CpmStr(p, v) (strcpy(p, v))
 #define CpmPtrUnpack_CpmStr(v)
 #define CpmPtrFree_CpmStr(v)
+
+/****** CFUTURE: CONVERSE FUTURES ******/
+
+typedef struct Cfuture_s
+{
+  int pe;
+  struct Cfuture_data_s *data;
+}
+Cfuture;
+
+typedef struct CfutureValue_s
+{
+  char core[CmiMsgHeaderSizeBytes];
+  struct Cfuture_data_s *data;
+  int valsize;
+  double rest[1];
+}
+*CfutureValue;
+
+#define CfutureValueData(v) ((void*)((v)->rest))
+
+Cfuture       CfutureCreate(void);
+void          CfutureDestroy(Cfuture f);
+CfutureValue  CfutureCreateValue(int bytes);
+void          CfutureDestroyValue(CfutureValue v);
+void          CfutureSet(Cfuture f, CfutureValue val);
+CfutureValue  CfutureWait(Cfuture f, int freeflag);
+#define       CfuturePE(f) ((f).pe)
+
+void CfutureInit();
 
 /****** CMM: THE MESSAGE MANAGER ******/
 
@@ -847,8 +836,6 @@ void      *CmmFind CMK_PROTO((CmmTable t, int ntags, int *tags, int *returntags,
 #define    CmmProbe(t,nt,tg,rt) (CmmFind((t),(nt),(tg),(rt),0))
 
 /******** ConverseInit and ConverseExit ********/
-
-typedef void (*CmiStartFn) CMK_PROTO((int argc, char **argv));
 
 void ConverseInit CMK_PROTO((int, char**, CmiStartFn, int, int));
 void ConverseExit CMK_PROTO((void));

@@ -1,6 +1,11 @@
 /*
  * TO-DO:
  *
+ * what about shared memory machines?
+ *
+ * what about the fact that posix threads programs exit when all
+ * threads have completed?
+ *
  * write errcode, errspan.  Figure out errno thing.
  *
  * there's obviously something I don't understand about cond... what's
@@ -14,21 +19,9 @@
  *
  */
 
-#include "converse.h"
+#define CPTHREAD_IS_HERE
+#include "cpthreads.h"
 #include <sys/errno.h>
-
-static void errcode(int number)
-{
-  CmiPrintf("Cpthreads: %s\n", strerror(number));
-  exit(1);
-}
-
-static void errspan()
-{
-  CmiPrintf("Error: Cpthreads sync primitives do not work across processor boundaries.\n");
-  exit(1);
-}
-
 
 /******************************************************************************
  *
@@ -54,11 +47,15 @@ static void errspan()
  *
  *****************************************************************************/
  
+typedef void *(*voidfn)();
+
 struct Cpthread_s
 {
   int magic;
-  void *(*startfn)(void *);
-  void *startarg;
+  voidfn startfn;
+  void *startarg1;
+  void *startarg2;
+  void *startarg3;
   int detached;
   void *joinstatus;
   Cpthread_cleanup_t cleanups;
@@ -66,7 +63,7 @@ struct Cpthread_s
   CthThread thread;
 };
 
-CtvStaticDeclare(Cpthread_t, this_pthread);
+#define errcode(n) { Cpthread_errno=(n); return -1; }
 
 
 /******************************************************************************
@@ -92,34 +89,33 @@ struct Cpthread_key_s
   Cpthread_key_t next;
 };
 
-CpvStaticDeclare(Cpthread_key_t, keys_active);
-CpvStaticDeclare(Cpthread_key_t, keys_inactive);
+Cpthread_key_t keys_active = 0;
+Cpthread_key_t keys_inactive = 0;
 
 int Cpthread_key_create(Cpthread_key_t *keyp, void (*destructo)(void *))
 {
   Cpthread_key_t key;
-  key = CpvAccess(keys_inactive);
+  key = keys_inactive;
   if (key) {
-    CpvAccess(keys_inactive) = key->next;
+    keys_inactive = key->next;
   } else {
     key = (Cpthread_key_t)malloc(sizeof(struct Cpthread_key_s));
     key->offset = CthRegister(sizeof(void *));
   }
   key->magic = KEY_MAGIC;
   key->destructo = destructo;
-  key->next = CpvAccess(keys_active);
-  CpvAccess(keys_active) = key;
+  key->next = keys_active;
+  keys_active = key;
   *keyp = key;
   return 0;
 }
 
 int Cpthread_key_delete(Cpthread_key_t key)
 {
-  Cpthread_key_t active;
-  active = CpvAccess(keys_active);
+  Cpthread_key_t active = keys_active;
   if (key->magic != KEY_MAGIC) errcode(EINVAL);
   if (active==key) {
-    CpvAccess(keys_active) = key->next;
+    keys_active = key->next;
   } else {
     while (active) {
       if (active->next == key) {
@@ -132,8 +128,8 @@ int Cpthread_key_delete(Cpthread_key_t key)
   }
 deleted:
   key->magic = FKEY_MAGIC;
-  key->next = CpvAccess(keys_inactive);
-  CpvAccess(keys_inactive) = key;
+  key->next = keys_inactive;
+  keys_inactive = key;
 }
 
 int Cpthread_setspecific(Cpthread_key_t key, void *val)
@@ -147,9 +143,8 @@ int Cpthread_setspecific(Cpthread_key_t key, void *val)
 
 void *Cpthread_getspecific(Cpthread_key_t key)
 {
-  char *data;
-  data = CthCpvAccess(CthData);
-  if (key->magic != KEY_MAGIC) errcode(EINVAL);
+  char *data = CthCpvAccess(CthData);
+  if (key->magic != KEY_MAGIC) return 0;
   return *((void **)(data+(key->offset)));
 }
 
@@ -171,7 +166,7 @@ struct Cpthread_cleanup_s
 
 void Cpthread_cleanup_push(void (*routine)(void*), void *arg)
 {
-  Cpthread_t pt = CtvAccess(this_pthread);
+  Cpthread_t pt = CtvAccess(Cpthread_current);
   Cpthread_cleanup_t c =
     (Cpthread_cleanup_t)malloc(sizeof(struct Cpthread_cleanup_s));
   c->routine = routine;
@@ -182,7 +177,7 @@ void Cpthread_cleanup_push(void (*routine)(void*), void *arg)
 
 void Cpthread_cleanup_pop(int execute)
 {
-  Cpthread_t pt = CtvAccess(this_pthread);
+  Cpthread_t pt = CtvAccess(Cpthread_current);
   Cpthread_cleanup_t c = pt->cleanups;
   if (c) {
     pt->cleanups = c->next;
@@ -204,13 +199,6 @@ void Cpthread_cleanup_pop(int execute)
  * calling the thread creation function.
  *
  *****************************************************************************/
-
-struct Cpthread_attr_s
-{
-  int magic;
-  int detached;
-  int stacksize;
-};
 
 int Cpthread_attr_init(Cpthread_attr_t *attr)
 {
@@ -261,38 +249,50 @@ int Cpthread_attr_setdetachstate(Cpthread_attr_t *attr, int state)
  *
  * Every thread is associated with a CthThread and a pthread_t (which are
  * separate from each other).  The pthread_t contains a field pointing to the
- * CthThread, and the CthThread has a thread-private variable ``this_pthread''
+ * CthThread, and the CthThread has a thread-private variable ``Cpthread_current''
  * pointing to the pthread_t.
  *
  *****************************************************************************/
 
 void Cpthread_top(Cpthread_t pt)
 {
-  void *(*fn)(void *); void *arg, *result; 
-  Cpthread_key_t k; char *data;
+  Cpthread_key_t k; char *data; void *result; 
 
   data = CthCpvAccess(CthData);
-  for (k=CpvAccess(keys_active); k; k=k->next)
+  for (k=keys_active; k; k=k->next)
     *(void **)(data+(k->offset)) = 0;
-  result = (pt->startfn)(pt->startarg);
+  CtvAccess(Cpthread_errcode) = 0;
+  CtvAccess(Cpthread_current) = pt;
+  result = (pt->startfn)(pt->startarg1, pt->startarg2, pt->startarg3);
   Cpthread_exit(result);
 }
 
-int Cpthread_create(Cpthread_t *thread, Cpthread_attr_t *attr,
-		   void *(*fn)(void *), void *arg)
+int Cpthread_create3(Cpthread_t *thread, Cpthread_attr_t *attr,
+		     voidfn fn, void *a1, void *a2, void *a3)
 {
   Cpthread_t pt;
   if (attr->magic != ATTR_MAGIC) errcode(EINVAL);
   pt = (Cpthread_t)malloc(sizeof(struct Cpthread_s));
+  pt->magic = PT_MAGIC;
   pt->startfn = fn;
-  pt->startarg = arg;
+  pt->startarg1 = a1;
+  pt->startarg2 = a2;
+  pt->startarg3 = a3;
   pt->detached = attr->detached;
   pt->joinstatus = 0;
   pt->cleanups = 0;
   pt->waiting = 0;
   pt->thread = CthCreate((CthVoidFn)Cpthread_top, (void *)pt, attr->stacksize);
+  CthSetStrategyDefault(pt->thread);
+  CthAwaken(pt->thread);
   *thread = pt;
   return 0;
+}
+
+int Cpthread_create(Cpthread_t *thread, Cpthread_attr_t *attr,
+		     voidfn fn, void *arg)
+{
+  Cpthread_create3(thread, attr, fn, arg, 0, 0);
 }
 
 void Cpthread_exit(void *status)
@@ -300,7 +300,7 @@ void Cpthread_exit(void *status)
   Cpthread_t pt; Cpthread_cleanup_t c, cn; Cpthread_key_t k;
   void *priv; char *data; CthThread t;
 
-  pt = CtvAccess(this_pthread);
+  pt = CtvAccess(Cpthread_current);
   t = pt->thread;
   c = pt->cleanups;
   data = CthCpvAccess(CthData);
@@ -312,7 +312,7 @@ void Cpthread_exit(void *status)
     free(c); c=cn;
   }
   /* execute destructors for thread-private data */
-  k = CpvAccess(keys_active);
+  k = keys_active;
   while (k) {
     if (k->destructo) {
       priv = *(void **)(data+(k->offset));
@@ -323,12 +323,12 @@ void Cpthread_exit(void *status)
   /* handle the join-operation */
   if (pt->detached) {
     free(pt);
+    pt->magic = 0;
   } else {
     pt->joinstatus = status;
     pt->thread = 0;
     if (pt->waiting) CthAwaken(pt->waiting);
   }
-  pt->magic = 0;
   CthFree(t);
   CthSuspend();
 }
@@ -338,15 +338,11 @@ int Cpthread_equal(Cpthread_t t1, Cpthread_t t2)
   return (t1==t2);
 }
 
-Cpthread_t Cpthread_self()
-{
-  return CtvAccess(this_pthread);
-}
-
 int Cpthread_detach(Cpthread_t pt)
 {
   if (pt->magic != PT_MAGIC) errcode(EINVAL);
   if (pt->thread==0) {
+    pt->magic = 0;
     free(pt);
   } else {
     pt->detached = 1;
@@ -368,8 +364,13 @@ int Cpthread_join(Cpthread_t pt, void **status)
 
 int Cpthread_once(Cpthread_once_t *once, void (*fn)(void))
 {
-  if (*once) return 0;
-  *once = 1;
+  int rank = CmiMyRank();
+  if (rank>=32) {
+    CmiPrintf("error: cpthreads current implementation limited to 32 PE's per node.\n");
+    exit(1);
+  }
+  if (once->flag[rank]) return 0;
+  once->flag[rank] = 1;
   fn();
 }
 
@@ -382,18 +383,11 @@ int Cpthread_once(Cpthread_once_t *once, void (*fn)(void))
  *
  *****************************************************************************/
 
-struct Cpthread_mutexattr_s
+static void errspan()
 {
-  int magic;
-  int pshared;
-};
-
-struct Cpthread_mutex_s
-{
-  int magic;
-  int onpe;
-  void *users; /* fifo queue --- first on queue owns lock */
-};
+  CmiPrintf("Error: Cpthreads sync primitives do not work across processor boundaries.\n");
+  exit(1);
+}
 
 int Cpthread_mutexattr_init(Cpthread_mutexattr_t *mattr)
 {
@@ -482,19 +476,6 @@ int Cpthread_mutex_unlock(Cpthread_mutex_t *mutex)
  * Synchronization Structure: COND
  *
  *****************************************************************************/
-
-struct Cpthread_condattr_s
-{
-  int magic;
-  int pshared;
-};
-
-struct Cpthread_cond_s
-{
-  int magic;
-  int onpe;
-  void *users; /* fifo queue --- threads waiting on condition */
-};
 
 int Cpthread_condattr_init(Cpthread_condattr_t *cattr)
 {
@@ -586,3 +567,32 @@ int Cpthread_cond_broadcast(Cpthread_cond_t *cond)
   return 0;
 }
 
+/******************************************************************************
+ *
+ * Module initialization
+ *
+ *****************************************************************************/
+
+typedef void (*mainfn)(int argc, char **argv);
+
+int Cpthread_init()
+{
+  return 0;
+}
+
+void Cpthread_initialize()
+{
+  CtvInitialize(Cpthread_t, Cpthread_current);
+  CtvInitialize(int,        Cpthread_errcode);
+}
+
+void Cpthread_start_main(mainfn fn, int argc, char **argv)
+{
+  Cpthread_t pt;
+  Cpthread_attr_t attrib;
+  if (CmiMyRank()==0) {
+    Cpthread_attr_init(&attrib);
+    Cpthread_attr_setdetachstate(&attrib, 1);
+    Cpthread_create3(&pt, &attrib, (voidfn)fn, (void *)argc, argv, 0);
+  }
+}
