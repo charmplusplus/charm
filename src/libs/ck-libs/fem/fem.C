@@ -781,6 +781,31 @@ void
 chunk::pup(PUP::er &p)
 {
   ArrayElement1D::pup(p);
+  messages = CmmPup((pup_er) &p, messages);
+  p(tsize);
+  void *tbuf;
+  // thread needs to be packed later than user data, but needs to be unpacked
+  // earlier than the user data
+  if(p.isPacking())
+    tbuf = p.getBuf(tsize);
+  if(p.isUnpacking() || p.isSizing())
+    tid = CthPup((pup_er) &p, tid, &tsize);
+  p(nudata);
+  int i;
+  for(i=0;i<nudata;i++) {
+    p((void*)&(userdata[i]), sizeof(void*));
+    p((void*)&(pup_ud[i]), sizeof(FEM_PupFn));
+#if FEM_FORTRAN
+    pup_ud[i]((pup_er) &p, userdata[i]);
+#else
+    userdata[i] = pup_ud[i]((pup_er) &p, userdata[i]);
+#endif
+  }
+  if(p.isPacking())
+  {
+    PUP::toMem tm((PUP::myByte*)tbuf);
+    tid = CthPup((pup_er) &tm, tid, &tsize);
+  }
   p(numNodes);
   p(numElems);
   p(numPes);
@@ -802,7 +827,6 @@ chunk::pup(PUP::er &p)
   p(conn, numElems*numNodesPerElem);
   p(peNums, numPes);
   p(numNodesPerPe,numPes);
-  int i;
   for(i=0;i<numPes;i++)
   {
     if(p.isUnpacking())
@@ -826,8 +850,6 @@ chunk::pup(PUP::er &p)
   p(ntypes);
   p((void*)dtypes, MAXDT*sizeof(DType));
   p(wait_for);
-  messages = CmmPup((pup_er) &p, messages);
-  tid = CthPup((pup_er) &p, tid);
   if(p.isUnpacking())
     CtvAccessOther(tid,_femptr) = this;
   p(seqnum);
@@ -835,11 +857,8 @@ chunk::pup(PUP::er &p)
   // update should not be in progress when migrating, so curbuf is not valid
   p(doneCalled);
   // fp is not valid, because it has been closed a long time ago
-  p(nudata);
-  for(i=0;i<nudata;i++) {
-    p((void*)&(pup_ud[i]), sizeof(FEM_PupFn));
-    userdata[i] = pup_ud[i]((pup_er) &p, userdata[i]);
-  }
+  if(p.isPacking())
+    CthFree(tid);
 }
 
 void

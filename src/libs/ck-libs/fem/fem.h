@@ -27,7 +27,11 @@ extern unsigned int _nchunks;
 #define FEM_HEXAHEDRAL    3
 #define FEM_QUADRILATERAL 4
 
+#if FEM_FORTRAN
+typedef void (*FEM_PupFn)(pup_er, void*);
+#else
 typedef void *(*FEM_PupFn)(pup_er, void*);
+#endif
 
 // temporary Datatype representation
 // will go away once MPI user-defined datatypes are ready
@@ -135,6 +139,7 @@ class chunk : public ArrayElement1D
  public:
 
   CthThread tid; // waiting thread, 0 if no one is waiting
+  int tsize;
   int doneCalled;
 
   chunk(void);
