@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-06-29 15:54:09  gursoy
+ * Revision 2.6  1995-06-29 21:43:17  narain
+ * Added LdbCreateBoc, Removed call to LdbBocInit in SysBocInit
+ *
+ * Revision 2.5  1995/06/29  15:54:09  gursoy
  * fixed a CpvAccess -- ReadBufIndex
  *
  * Revision 2.4  1995/06/20  14:54:24  gursoy
@@ -199,6 +202,12 @@ char **argv;
 				 * node. assume an equal number gets sent to
 				 * every one. if there is a difference, have
 				 * to modify this somewhat */
+		CpvAccess(InsideDataInit) = 1;
+
+		LdbCreateBoc();
+
+		CpvAccess(InsideDataInit) = 0;
+
 #ifdef DEBUGGING_MODE
 		trace_begin_charminit();
 #endif
@@ -726,7 +735,7 @@ ENVELOPE *DeQueueBocInitMsgs()
 
 SysBocInit()
 {
-	LdbBocInit();
+/*	LdbBocInit(); */
 	QDBocInit();
 	VidBocInit();
 	TblBocInit();
