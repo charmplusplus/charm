@@ -1,24 +1,22 @@
-mainmodule fem {
-  extern module ampi;
-  extern module threadCollide;
-  extern module MetisLB;
-  readonly CProxy_main _mainproxy;
-  readonly CkArrayID _femaid;
-  readonly int _nchunks;
-  message DataMsg;
+module fem {
+  message FEM_DataMsg;
   message ChunkMsg;
-  mainchare main {
-    entry main();
+
+  initcall void FEMnodeInit(void);
+
+  chare FEMcoordinator {
+    entry FEMcoordinator(int nChunks);
+    entry void setArray( CkArrayID fem);
     entry void updateMesh(ChunkMsg *);
-    entry void done(void);
   };
-  array [1D] chunk {
-    entry chunk(void);
+
+  array [1D] FEMchunk {
+    entry FEMchunk(FEMinit f);
+    entry void run(void);
+    entry void run(ChunkMsg *);
     entry void write(ChunkMsg *);
-    entry [threaded] void run(void);
-    entry [threaded] void run(ChunkMsg*);
-    entry void recv(DataMsg *);
-    entry void reductionResult(DataMsg *);
+    entry void recv(FEM_DataMsg *);
+    entry void reductionResult(FEM_DataMsg *);
     entry void meshUpdated(ChunkMsg *);
   };
 };

@@ -9,14 +9,29 @@ Orion Sky Lawlor, olawlor@acm.org, 9/28/00
 
 #include <stdio.h>
 
-class collision{ }; //<- needed by parCollide.decl.h
-#include "fem.decl.h"
-#include "ampiimpl.h"
-#include "fem.h"
+#include "charm-api.h"
+#include "tcharm.h"
 
-extern CProxy_main _main;
-extern CkArrayID _femaid;
-extern int _nchunks;
+class FEMinit {
+ public:
+	int numElements;
+	CkArrayID threads;
+	int flags;
+	CkChareID coordinator;
+	FEMinit() {}
+	FEMinit(int ne_,const CkArrayID &t_,int f_,const CkChareID &c_)
+		:numElements(ne_),threads(t_),flags(f_),coordinator(c_) {}
+	void pup(PUP::er &p) {
+		p|numElements;
+		p|threads;
+		p|flags;
+		p|coordinator;
+	}
+};
+PUPmarshall(FEMinit);
+
+#include "fem.decl.h"
+#include "fem.h"
 
 #define CHK(p) do{if((p)==0)CkAbort("FEM>Memory Allocation failure.");}while(0)
 
@@ -53,18 +68,18 @@ struct DType {
   }
 };
 
-class DataMsg : public CMessage_DataMsg
+class FEM_DataMsg : public CMessage_FEM_DataMsg
 {
  public:
   int from;
   int dtype;
   void *data;
   int tag;
-  DataMsg(int t, int f, int d) : 
+  FEM_DataMsg(int t, int f, int d) : 
     from(f), dtype(d), tag(t) { data = (void*) (this+1); }
-  DataMsg(void) { data = (void*) (this+1); }
-  static void *pack(DataMsg *);
-  static DataMsg *unpack(void *);
+  FEM_DataMsg(void) { data = (void*) (this+1); }
+  static void *pack(FEM_DataMsg *);
+  static FEM_DataMsg *unpack(void *);
   static void *alloc(int, size_t, int*, int);
 };
 
@@ -193,12 +208,13 @@ class ChunkMsg : public CMessage_ChunkMsg {
 #define MAXDT 20
 #define FEM_MAXUDATA 20
 
-class chunk : public ampi
+class FEMchunk : public ArrayElement1D
 {
 //Stored_mesh keeps the initial mesh passed to run(), if any
 //  If this is non-NULL, all the mesh fields below point into it.
 //  Otherwise, the mesh fields are heap-allocated.
   ChunkMsg *stored_mesh;
+
 public:
 // updated_mesh keeps the still-being-assembled next mesh chunk.
 // It is created and written by the FEM_Set routines called from driver.
@@ -206,7 +222,13 @@ public:
   int updateCount;
 
   FEM_Mesh m; //The current chunk mesh
+
 private:
+  FEMinit init;
+
+  CProxy_FEMchunk thisproxy;
+  TCharm *thread;
+
   commCounts comm; //Shared nodes
   int *elemNums; // Maps local elem#-> global elem#  [m.nElems()]
   int *nodeNums; // Maps local node#-> global node#  [m.node.n]
@@ -225,25 +247,24 @@ private:
   int nRecd; // number of messages received for this seqnum
   void *curbuf; // data addr for current update operation
 
-  int nudata;
-  void *userdata[FEM_MAXUDATA];
-  FEM_PupFn pup_ud[FEM_MAXUDATA];
+  void initFields(void);
+
  public:
 
   int tsize;
   int doneCalled;
 
-  chunk(void);
-  chunk(CkMigrateMessage *msg): ampi(msg) {stored_mesh=NULL;}
-  ~chunk();
-  
-  void serialSwitch(ChunkMsg *);
-  
+  FEMchunk(const FEMinit &init);
+  FEMchunk(CkMigrateMessage *msg);
+  ~FEMchunk();
+
+  void ckJustMigrated(void);
+
   void run(void);
-  void write(ChunkMsg*);
   void run(ChunkMsg*);
-  void recv(DataMsg *);
-  void reductionResult(DataMsg *);
+  void write(ChunkMsg*);
+  void recv(FEM_DataMsg *);
+  void reductionResult(FEM_DataMsg *);
   void updateMesh(int callMeshUpdated,int doRepartition);
   void meshUpdated(ChunkMsg *);
 
@@ -259,56 +280,16 @@ private:
   void reduce_field(int fid, const void *nodes, void *outbuf, int op);
   void reduce(int fid, const void *inbuf, void *outbuf, int op);
   void readField(int fid, void *nodes, const char *fname);
-  int id(void) { return thisIndex; }
-  int total(void) { return numElements; }
   void print(void);
   int *get_nodenums(void) { return nodeNums; }
   int *get_elemnums(void) { return elemNums; }
 
-  int register_userdata(void *_userdata,FEM_PupFn _pup_ud)
-  {
-    if(nudata==FEM_MAXUDATA)
-      CkAbort("FEM> UserData registration limit exceeded.!\n");
-    userdata[nudata] = _userdata;
-    pup_ud[nudata] = _pup_ud;
-    return nudata++;
-  }
-  int check_userdata(int n);
-  void *get_userdata(int n) 
-    { return userdata[check_userdata(n)]; }
-    
   const commCounts &getComm(void) const {return comm;}
 
   void pup(PUP::er &p);
-  void readyToMigrate(void)
-  {
-    // CkPrintf("[%d] going to sync\n", thisIndex);
-#if CMK_LBDB_ON
-    AtSync();
-    thread_suspend();
-#endif
-  }
-  void ResumeFromSync(void)
-  {
-    // CkPrintf("[%d] returned from sync\n", thisIndex);
-    thread_resume();
-  }
 
  private:
-  CthThread tid; // waiting thread, 0 if no one is waiting
-  void thread_suspend(void); //Thread will block until resume
-  void thread_resume(void);  //Start thread running again
-  void start_running(void)
-  {
-    ampi::prepareCtv();
-    ckStartTiming();
-  }
-  void stop_running(void)
-  {
-    ckStopTiming();
-  }
-
-  void update_field(DataMsg *);
+  void update_field(FEM_DataMsg *);
   void send(int fid,const void *nodes);
   void readNodes(FILE *fp);
   void readElems(FILE *fp);
@@ -318,24 +299,6 @@ private:
   void writeElems(FILE *fp) const;
   void writeComm(FILE *fp) const;
   void writeChunk(void);
-  void callDriver(void);
-};
-
-
-
-class main : public Chare
-{
-  ChunkMsg **cmsgs;//Array of _nchunks chunk messages
-  int updateCount;
-  CkQ<ChunkMsg *> futureUpdates;
-  CkQ<ChunkMsg *> curUpdates;
-  int numdone;
- public:
-  main(CkArgMsg *);
-
-  void updateMesh(ChunkMsg *);
-
-  void done(void);
 };
 
 /*Partition this mesh's elements into n chunks,
@@ -350,27 +313,6 @@ void fem_map(const FEM_Mesh *mesh,int nchunks,int *elem2chunk,ChunkMsg **msgs);
 
 /*The inverse of fem_map: reassemble split chunks into a single mesh*/
 FEM_Mesh *fem_assemble(int nchunks,ChunkMsg **msgs);
-
-/*Decide how to declare C functions that are called from Fortran--
-  some fortran compiles expect all caps; some all lowercase, 
-  but with a trailing underscore.*/
-#if CMK_FORTRAN_USES_ALLCAPS
-# define FTN_NAME(caps,nocaps) caps  /*Declare name in all caps*/
-#else
-# if CMK_FORTRAN_USES_x__
-#  define FTN_NAME(caps,nocaps) nocaps##_ /*No caps, extra underscore*/
-# else
-#  define FTN_NAME(caps,nocaps) nocaps /*Declare name without caps*/
-# endif /*__*/
-#endif /*ALLCAPS*/
-
-#define CDECL extern "C" /*Function declaration for C linking*/
-#define FDECL extern "C" /*Function declaration for Fortran linking*/
-
-FDECL void FTN_NAME(INIT,init_) (void);
-FDECL void FTN_NAME(DRIVER,driver_) (void);
-FDECL void FTN_NAME(FINALIZE,finalize_) (void);
-FDECL void FTN_NAME(MESH_UPDATED,mesh_updated_) (int *param);
 
 #endif
 

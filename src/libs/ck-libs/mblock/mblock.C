@@ -26,82 +26,80 @@ then resume the thread when the results arrive.
 #define DBG(x) /*empty*/
 #endif
 
-
-CkChareID _mainhandle;
-CkArrayID _mblockaid;
-
 //_mblkptr gives the current chunk, and is only
 // valid in routines called from driver().
-CtvStaticDeclare(chunk*, _mblkptr);
-
-//This enum defines possible places the MBLK_* calls
-// can come from.  This is needed because, e.g., a
-// MBLK_Print call can prepend the chunk# if called from
-// driver; but not otherwise.
-typedef enum {
-  inInit,
-  inPup,
-  inBc,
-  inDriver //<- almost always here
-} mblk_state_t;
-
-CpvStaticDeclare(mblk_state_t,_mblk_state);
+CtvStaticDeclare(MBlockChunk *, _mblkptr);
 
 static void 
-_allReduceHandler(void *, int datasize, void *data)
+_allReduceHandler(void *proxy_v, int datasize, void *data)
 {
+  CProxy_MBlockChunk *proxy=(CProxy_MBlockChunk *)proxy_v;
   // the reduction handler is called on processor 0
   // with available reduction results
-  DataMsg *dmsg = new (&datasize, 0) DataMsg(0,datasize,0,0); CHK(dmsg);
+  MBlockDataMsg *dmsg = new (&datasize, 0) MBlockDataMsg(0,datasize,0,0); CHK(dmsg);
   memcpy(dmsg->data, data, datasize);
-  CProxy_chunk carr(_mblockaid);
+
   // broadcast the reduction results to all array elements
-  carr.reductionResult(dmsg);
+  proxy->reductionResult(dmsg);
 }
 
-extern void CreateMetisLB(void);
 
-static main *_mainptr = 0;
+CDECL void init(void);
+FDECL void FTN_NAME(INIT,init)(void);
+CDECL void driver(void);
+FDECL void FTN_NAME(DRIVER,driver)(void);
 
-main::main(CkArgMsg *am)
+static void callDrivers(void) {
+	driver();
+	FTN_NAME(DRIVER,driver)();
+}
+
+//Startup routine to use if the user doesn't register one
+static void MBlockFallbackSetup(void)
 {
-  int i;
-  delete am;
-  CreateMetisLB();
-  CpvInitialize(mblk_state_t,_mblk_state);
-  CpvAccess(_mblk_state)=inInit;
-  _mainptr = this;
+	TCharmCreate(TCharmGetNumChunks(),callDrivers);
+        init();
+        FTN_NAME(INIT,init)();
+        MBLK_Attach();
+}
+
+static MBlockSetupCookie cookie;
+void MBlockInit(void) 
+{
+  CtvInitialize(MBlockChunk *, _mblkptr);
+  TCharmSetFallbackSetup(MBlockFallbackSetup);
+}
+
+MBlockSetupCookie::MBlockSetupCookie(void)
+{
   nblocks=-1;
-  ndims=3;
-
-#if MBLK_FORTRAN
-  FTN_NAME(INIT,init_) ();
-#else // C/C++
-  init();
-#endif // Fortran
-
-  if (nblocks==-1)
-    CkAbort("You forgot to call MBLCK_Set_nblocks during init()!\n");
-  _mainhandle = thishandle;
-  _mblockaid = CProxy_chunk::ckNew();
-  CProxy_chunk farray(_mblockaid);
-  farray.setReductionClient(_allReduceHandler, 0);
-  for(i=0;i<nblocks;i++) {
-    farray[i].insert(new ChunkMsg((const char *)prefix, ndims));
-  }
-  farray.doneInserting();
-  numdone = 0;
-  farray.run();
+  ndims=3;	
 }
 
-void
-main::done(void)
+void MBlockSetupCookie::createArray(void)
 {
-  numdone++;
-  if (numdone == nblocks) {
-    CkExit();
-  }
+  if (nblocks==-1)
+    CkAbort("You must call MBLCK_Set_nblocks during init!\n");
+
+  CkArrayOptions opt(nblocks);
+  TCharmSetupCookie *tc=TCharmSetupCookie::get();
+  if (!tc->hasThreads())
+	  CkAbort("You must create a threads array with TCharmCreate before calling MBLK_Attach!\n");
+  opt.bindTo(tc->getThreads());
+  CkArrayID aid=CProxy_MBlockChunk::ckNew(
+	  new MBlockInitMsg((const char *)prefix, ndims,tc->getThreads()),opt);
+  CProxy_MBlockChunk *proxy=new CProxy_MBlockChunk(aid);
+  proxy->setReductionClient(_allReduceHandler,proxy);
+  tc->addClient(aid);
 }
+
+CDECL void MBLK_Attach(void)
+{
+	cookie.createArray();
+}
+FDECL void FTN_NAME(MBLK_ATTACH,mblk_attach)(void)
+{ MBLK_Attach(); }
+
 
 /******************** Reduction Support **********************/
 
@@ -214,27 +212,33 @@ combine(const DType& dt, int op)
   return NULL;
 }
 
-/******************************* CHUNK *********************************/
+/******************************* MBLOCKCHUNK *********************************/
 
-chunk::chunk(ChunkMsg *msg)
+void MBlockChunk::commonInit(void)
 {
 #if CMK_LBDB_ON
   usesAtSync = CmiTrue;
 #endif
   nfields = 0;
+  thisproxy=thisArrayID;
 
-  CpvInitialize(mblk_state_t,_mblk_state);
-  CpvAccess(_mblk_state)=inDriver;
+}
+
+MBlockChunk::MBlockChunk(MBlockInitMsg *msg)
+{
+  commonInit();
+
+  threads=msg->threads;
+  migInit();
+
   for (int bc=0;bc<MBLK_MAXBC;bc++)
     bcs[bc].fn=NULL;
   
-  messages = CmmNew();
-  tid = 0;
-  nudata = 0;
   seqnum = 0;
   update.nRecd = 0;
   update.wait_seqnum = -1;
-
+  messages = CmmNew();	
+  
   b = new block(msg->prefix, thisIndex);
   int n = b->getPatches();
   nRecvPatches = 0;
@@ -244,70 +248,58 @@ chunk::chunk(ChunkMsg *msg)
       nRecvPatches++;
   }
   delete msg;
+  thread->ready();
 }
 
-chunk::~chunk() //Destructor-- deallocate memory
+MBlockChunk::MBlockChunk(CkMigrateMessage *msg)
+	:ArrayElement1D(msg)
+{
+  b=NULL;
+  messages=NULL;
+  commonInit();
+}
+
+
+//Update fields after migration
+void MBlockChunk::migInit(void)
+{
+  thread=threads[thisIndex].ckLocal();
+  if (thread==NULL) CkAbort("MBlock can't locate its thread!\n");
+  CtvAccessOther(thread->getThread(),_mblkptr)=this;
+}
+
+void MBlockChunk::ckJustMigrated(void)
+{
+  ArrayElement1D::ckJustMigrated();
+  migInit();
+}
+
+MBlockChunk::~MBlockChunk() //Destructor-- deallocate memory
 {
         CmmFree(messages);
-        if (tid!=0)
-          CthFree(tid);
-}
-
-int
-chunk::check_userdata(int n)
-{
-  if (n<0 || n>=nudata)
-    CkAbort("Invalid userdata ID passed to MBLK_[SG]et_Userdata\n");
-  return n;
+	delete b;
 }
 
 void
-chunk::callDriver(void)
-{
-  // call the application-specific driver
-  DBG("------------------- BEGIN USER DRIVER -------------")
-#if MBLK_FORTRAN
-  FTN_NAME(DRIVER,driver_) ();
-#else // C/C++
-  driver();
-#endif // Fortran
-  DBG("-------------------- END USER DRIVER --------------")
-  CProxy_main mainproxy(_mainhandle);
-  mainproxy.done();
-}
-
-void
-chunk::run(void)
-{
-  start_running();
-  CtvInitialize(chunk*, _mblkptr);
-  CtvAccess(_mblkptr) = this;
-  callDriver();
-  // Note: "this may have changed after we come back here 
-  CtvAccess(_mblkptr)->stop_running();
-}
-
-void
-chunk::recv(DataMsg *dm)
+MBlockChunk::recv(MBlockDataMsg *dm)
 {
   if(dm->seqnum == update.wait_seqnum) {
     DBG( "recv: handling ("<<dm->seqnum<<")" )
     update_field(dm); // update the appropriate field value
     if(update.nRecd==nRecvPatches) {
       update.wait_seqnum = -1; //This update is complete
-      if(tid)
-        thread_resume();
+      thread->resume();
     }
   } else if (dm->seqnum>seqnum) {
     DBG( "recv: stashing early ("<<dm->seqnum<<")" )
     CmmPut(messages, 1, &(dm->seqnum), dm);
   } else
-    CkAbort("MBLOCK Chunk received message from the past!\n");
+    CkAbort("MBLOCK MBlockChunk received message from the past!\n");
 }
 
 //Send the values for my source patches out
 void
-chunk::send(int fid,const extrudeMethod &meth,const void *grid)
+MBlockChunk::send(int fid,const extrudeMethod &meth,const void *grid)
 {
   const DType &dt=fields[fid]->dt;
   int len = dt.length();
@@ -324,7 +316,7 @@ chunk::send(int fid,const extrudeMethod &meth,const void *grid)
     int dest = ip->dest;
     int num = src.getDim().getSize();
     int msgLen=len*num;
-    DataMsg *msg = new (&msgLen, 0) DataMsg(seqnum, thisIndex, fid, 
+    MBlockDataMsg *msg = new (&msgLen, 0) MBlockDataMsg(seqnum, thisIndex, fid, 
         ip->destPatch); 
     CHK(msg);
     blockLoc dsize; //Size in destination space
@@ -347,16 +339,15 @@ chunk::send(int fid,const extrudeMethod &meth,const void *grid)
         for(int i=0;i<dsize[0];i++)	
 	{
 	  blockLoc from=so+i*iDir+j*jDir+k*kDir;
-#if 1  /*Perform bounds check*/
+#ifndef CMK_OPTIMIZE  /*Perform bounds check*/
 	  if (!src.contains(from))
-	    CkAbort("Read location out of bounds in mblock::chunk::send!\n");
+	    CkAbort("Read location out of bounds in mblock::MBlockChunk::send!\n");
 #endif
           const void *src = (const void *)(fStart+d[from]*dt.distance);
           memcpy(data, src, len);
           data = (void*) ((char*)data + len);
         }
-    CProxy_chunk cp(thisArrayID);
-    cp[dest].recv(msg);
+    thisproxy[dest].recv(msg);
     DBG("  sending "<<num<<" data items ("<<seqnum<<") to processor "<<dest)
   }
 }
@@ -364,7 +355,7 @@ chunk::send(int fid,const extrudeMethod &meth,const void *grid)
 
 //Update my ghost cells based on these values
 void
-chunk::update_field(DataMsg *msg)
+MBlockChunk::update_field(MBlockDataMsg *msg)
 {
   DBG("    update_field ("<<msg->seqnum<<")")
   const DType &dt=fields[msg->fid]->dt;
@@ -383,9 +374,9 @@ chunk::update_field(DataMsg *msg)
       for(int i=dest.start[0]; i<dest.end[0]; i++) 
       {
         char *dest = fStart+dim.c_index(i,j,k)*dt.distance;
-#if 1 /*Perform bounds check*/
+#ifndef CMK_OPTIMIZE /*Perform bounds check*/
 	if (dest<aStart || dest>=aEnd)
-	  CkAbort("Chunk::update_field would write out of bounds!\n");
+	  CkAbort("MBlockChunk::update_field would write out of bounds!\n");
 #endif
         memcpy(dest, data, length);
         data = data + length;
@@ -395,7 +386,7 @@ chunk::update_field(DataMsg *msg)
 }
 
 void
-chunk::start_update(int fid,const extrudeMethod &m,void *ingrid, void *outgrid)
+MBlockChunk::start_update(int fid,const extrudeMethod &m,void *ingrid, void *outgrid)
 {
   //Update sequence number
   seqnum++;
@@ -410,8 +401,8 @@ chunk::start_update(int fid,const extrudeMethod &m,void *ingrid, void *outgrid)
 
   // now, if any of the field values have been received already,
   // process them
-  DataMsg *dm;
-  while ((dm = (DataMsg*)CmmGet(messages, 1, &seqnum, 0))!=NULL) {
+  MBlockDataMsg *dm;
+  while ((dm = (MBlockDataMsg*)CmmGet(messages, 1, &seqnum, 0))!=NULL) {
     DBG("   handling stashed message")
     update_field(dm);
   }
@@ -422,29 +413,29 @@ chunk::start_update(int fid,const extrudeMethod &m,void *ingrid, void *outgrid)
 }
 
 int
-chunk::test_update(void)
+MBlockChunk::test_update(void)
 {
   return (update.wait_seqnum==(-1))?MBLK_DONE : MBLK_NOTDONE;
 }
 
 int
-chunk::wait_update(void)
+MBlockChunk::wait_update(void)
 {
   if(update.wait_seqnum != (-1)) {
     DBG("sleeping for "<<nRecvPatches-nRecd<<" update messages")
-    thread_suspend();
+    thread->suspend();
     DBG("got all update messages for "<<seqnum)  
   }
   return MBLK_SUCCESS;
 }
 
 void
-chunk::reduce_field(int fid, const void *grid, void *outbuf, int op)
+MBlockChunk::reduce_field(int fid, const void *grid, void *outbuf, int op)
 {
   // first reduce over local gridpoints
   const DType &dt = fields[fid]->dt;
   const void *src = (const void *) ((const char *) grid + dt.init_offset);
-  initialize(dt,outbuf,op);
+  ::initialize(dt,outbuf,op);
   combineFn fn=combine(dt,op);
   int dim[3];
   MBLK_Get_blocksize(dim);
@@ -459,7 +450,7 @@ chunk::reduce_field(int fid, const void *grid, void *outbuf, int op)
 }
 
 void
-chunk::reduce(int fid, const void *inbuf, void *outbuf, int op)
+MBlockChunk::reduce(int fid, const void *inbuf, void *outbuf, int op)
 {
   const DType &dt = fields[fid]->dt;
   int len = dt.length();
@@ -493,44 +484,23 @@ chunk::reduce(int fid, const void *inbuf, void *outbuf, int op)
   }
   contribute(len, (void *)inbuf, rtype);
   reduce_output = outbuf;
-  thread_suspend();
+  thread->suspend();
 }
 
 void
-chunk::reductionResult(DataMsg *msg)
+MBlockChunk::reductionResult(MBlockDataMsg *msg)
 {
   //msg->from used as length
   memcpy(reduce_output, msg->data, msg->from);
   reduce_output=NULL;
-  thread_resume();
+  thread->resume();
   delete msg;
 }
 
 /********** Thread/migration support ************/
-void chunk::thread_suspend(void)
+static MBlockChunk *getCurMBlockChunk(void) 
 {
-  DBG("suspending thread");
-  if (tid!=0) 
-    CkAbort("chunk::thread_suspend: Tried to suspend; but already waiting!\n");
-  tid = CthSelf();
-  stop_running();
-  CthSuspend();
-  /*We have to do the CtvAccess because "this" may have changed
-    during a migration-suspend.*/
-  CtvAccess(_mblkptr)->start_running();
-}
-void chunk::thread_resume(void)
-{
-  if (tid==0) 
-    CkAbort("chunk::thread_resume: Tried to resume; but no waiting thread!\n");
-  DBG("awakening thread");
-  CthAwaken(tid);
-  tid = 0;
-}
-
-static chunk *getCurChunk(void) 
-{
-  chunk *cptr=CtvAccess(_mblkptr);
+  MBlockChunk *cptr=CtvAccess(_mblkptr);
   if (cptr==NULL) 
     CkAbort("Routine can only be called from driver()!\n");
   return cptr;
@@ -542,68 +512,58 @@ static chunk *getCurChunk(void)
 CDECL int 
 MBLK_Set_prefix(const char *prefix)
 {
-  if(CpvAccess(_mblk_state) != inInit) {
+  if(TCharm::getState() != inInit) {
     CkError("MBLK_Set_prefix called from outside init\n");
     return MBLK_FAILURE;
   }
-  strcpy(_mainptr->prefix,prefix);
+  strcpy(cookie.prefix,prefix);
   return MBLK_SUCCESS;
 }
 
 CDECL int 
 MBLK_Set_nblocks(const int n)
 {
-  if(CpvAccess(_mblk_state) != inInit) {
+  if(TCharm::getState() != inInit) {
     CkError("MBLK_Set_nblocks called from outside init\n");
     return MBLK_FAILURE;
   }
-  _mainptr->nblocks = n;
+  cookie.nblocks = n;
   return MBLK_SUCCESS;
 }
 
 CDECL int 
 MBLK_Set_dim(const int n)
 {
-  if(CpvAccess(_mblk_state) != inInit) {
+  if(TCharm::getState() != inInit) {
     CkError("MBLK_Set_dim called from outside init\n");
     return MBLK_FAILURE;
   }
-  _mainptr->ndims = n;
+  cookie.ndims = n;
   return MBLK_SUCCESS;
 }
 
 CDECL int 
 MBLK_Get_nblocks(int *n)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
-    CkError("MBLK_Get_nblocks  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
-  chunk *cptr = getCurChunk();
-  *n = cptr->total();
+  *n = TCharmNumElements();
   return MBLK_SUCCESS;
 }
 
 CDECL int 
 MBLK_Get_myblock(int *m)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
-    CkError("MBLK_Get_myblock  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
-  chunk *cptr = getCurChunk();
-  *m = cptr->id();
+  *m = TCharmElement();
   return MBLK_SUCCESS;
 }
 
 CDECL int 
 MBLK_Get_blocksize(int *dim)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
+  if(TCharm::getState() != inDriver) {
     CkError("MBLK_Get_blocksize  called from outside driver\n");
     return MBLK_FAILURE;
   }
-  chunk *cptr = getCurChunk();
+  MBlockChunk *cptr = getCurMBlockChunk();
   blockDim d = cptr->b->getDim();
   /*Subtract one to get to voxel coordinates*/
   dim[0] = d[0]-1; dim[1] = d[1]-1; dim[2] = d[2]-1;
@@ -619,8 +579,8 @@ MBLK_Timer(void)
 CDECL void 
 MBLK_Print(const char *str)
 {
-  if(CpvAccess(_mblk_state)==inDriver) {
-    chunk *cptr = getCurChunk();
+  if(TCharm::getState()==inDriver) {
+    MBlockChunk *cptr = getCurMBlockChunk();
     CkPrintf("[%d] %s\n", cptr->thisIndex, str);
   } else {
     CkPrintf("%s\n", str);
@@ -630,33 +590,21 @@ MBLK_Print(const char *str)
 CDECL int 
 MBLK_Register(void *_ud,MBLK_PupFn _pup_ud, int *rid)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
-    CkError("MBLK_Register  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
-  *rid = getCurChunk()->register_userdata(_ud,_pup_ud);
+  *rid=TCharmRegister(_ud,_pup_ud);
   return MBLK_SUCCESS;
 }
 
 CDECL int 
 MBLK_Get_registered(int n, void **b)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
-    CkError("MBLK_Get_registered  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
-  *b = getCurChunk()->get_userdata(n);
+  *b=TCharmGetUserdata(n);
   return MBLK_SUCCESS;
 }
 
 CDECL int 
 MBLK_Migrate(void)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
-    CkError("MBLK_Migrate  called from outside driver\n");
-    return MBLK_FAILURE;
-  }
-  getCurChunk()->readyToMigrate();
+  TCharm::get()->migrate();
   return MBLK_SUCCESS;
 }
 
@@ -666,20 +614,20 @@ MBLK_Create_field(int *dims,int isVoxel,
 		  int init_offset, int distance,
 		  int *fid)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
+  if(TCharm::getState() != inDriver) {
     CkError("MBLK_Create_field  called from outside driver\n");
     return MBLK_FAILURE;
   }
   field_t *f=new field_t(DType(base_type,vec_len,init_offset,distance),
 			 blockDim(dims[0],dims[1],dims[2]),isVoxel==1);
-  *fid = getCurChunk()->add_field(f);
+  *fid = getCurMBlockChunk()->add_field(f);
   return ((*fid==(-1)) ? MBLK_FAILURE : MBLK_SUCCESS);
 }
 
 CDECL int
 MBLK_Update_field(int fid, int ghostWidth, void *grid)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
+  if(TCharm::getState() != inDriver) {
     CkError("MBLK_Update_field  called from outside driver\n");
     return MBLK_FAILURE;
   }
@@ -690,114 +638,109 @@ MBLK_Update_field(int fid, int ghostWidth, void *grid)
 CDECL int
 MBLK_Iupdate_field(int fid, int ghostWidth, void *ingrid, void *outgrid)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
+  if(TCharm::getState() != inDriver) {
     CkError("MBLK_Iupdate_field  called from outside driver\n");
     return MBLK_FAILURE;
   }
-  getCurChunk()->start_update(fid,extrudeMethod(ghostWidth),ingrid,outgrid);
+  getCurMBlockChunk()->start_update(fid,extrudeMethod(ghostWidth),ingrid,outgrid);
   return MBLK_SUCCESS;
 }
 
 CDECL int
 MBLK_Test_update(int *status)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
+  if(TCharm::getState() != inDriver) {
     CkError("MBLK_Test_update  called from outside driver\n");
     return MBLK_FAILURE;
   }
-  *status=getCurChunk()->test_update();
+  *status=getCurMBlockChunk()->test_update();
   return MBLK_SUCCESS; 
 }
 
 CDECL int
 MBLK_Wait_update(void)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
+  if(TCharm::getState() != inDriver) {
     CkError("MBLK_Wait_update  called from outside driver\n");
     return MBLK_FAILURE;
   }
-  return getCurChunk()->wait_update();
+  return getCurMBlockChunk()->wait_update();
 }
 
 CDECL int
 MBLK_Reduce_field(int fid, void *ingrid, void *outbuf, int op)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
+  if(TCharm::getState() != inDriver) {
     CkError("MBLK_Reduce_field  called from outside driver\n");
     return MBLK_FAILURE;
   }
-  getCurChunk()->reduce_field(fid, ingrid, outbuf, op);
+  getCurMBlockChunk()->reduce_field(fid, ingrid, outbuf, op);
   return MBLK_SUCCESS;
 }
 
 CDECL int
 MBLK_Reduce(int fid, void *inbuf, void *outbuf, int op)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
+  if(TCharm::getState() != inDriver) {
     CkError("MBLK_Reduce  called from outside driver\n");
     return MBLK_FAILURE;
   }
-  getCurChunk()->reduce(fid, inbuf, outbuf, op);
+  getCurMBlockChunk()->reduce(fid, inbuf, outbuf, op);
   return MBLK_SUCCESS;
 }
 
 CDECL int
 MBLK_Register_bc(const int bcnum, int ghostWidth,const MBLK_BcFn bcfn)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
+  if(TCharm::getState() != inDriver) {
     CkError("MBLK_Register_bc  called from outside driver\n");
     return MBLK_FAILURE;
   }
-  return getCurChunk()->register_bc(bcnum, bcfn, extrudeMethod(ghostWidth));
+  return getCurMBlockChunk()->register_bc(bcnum, bcfn, extrudeMethod(ghostWidth), false);
 }
 
 CDECL int
 MBLK_Apply_bc(const int bcnum, void *p1,void *p2)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
+  if(TCharm::getState() != inDriver) {
     CkError("MBLK_Apply_bc  called from outside driver\n");
     return MBLK_FAILURE;
   }
-  CpvAccess(_mblk_state) = inBc;
-  int retval =  getCurChunk()->apply_bc(bcnum, p1,p2);
-  CpvAccess(_mblk_state) = inDriver;
+  int retval =  getCurMBlockChunk()->apply_bc(bcnum, p1,p2);
   return retval;
 }
 
 CDECL int
 MBLK_Apply_bc_all(void *p1,void *p2)
 {
-  if(CpvAccess(_mblk_state) != inDriver) {
+  if(TCharm::getState() != inDriver) {
     CkError("MBLK_Apply_bc_all  called from outside driver\n");
     return MBLK_FAILURE;
   }
-  CpvAccess(_mblk_state) = inBc;
-  int retval =  getCurChunk()->apply_bc_all(p1,p2);
-  CpvAccess(_mblk_state) = inDriver;
+  int retval =  getCurMBlockChunk()->apply_bc_all(p1,p2);
   return retval;
 }
 
 CDECL void 
 MBLK_Print_block(void)
 {
-  if(CpvAccess(_mblk_state)==inDriver) {
-    chunk *cptr = getCurChunk();
+  if(TCharm::getState()==inDriver) {
+    MBlockChunk *cptr = getCurMBlockChunk();
     cptr->print();
   }
 }
 
-#if MBLK_FORTRAN
 /************************ Fortran Bindings *********************************/
 
 // Utility functions for Fortran
 
-FDECL int FTN_NAME(OFFSETOF,offsetof_)
+FDECL int FTN_NAME(OFFSETOF,offsetof)
   (void *first, void *second)
 {
   return (int)((char *)second - (char*)first);
 }
 
-FDECL void FTN_NAME(MBLK_SET_PREFIX, mblk_set_prefix_)
+FDECL void FTN_NAME(MBLK_SET_PREFIX, mblk_set_prefix)
   (const char *str, int *ret)
 {
   int len=0; /*Find the end of the string by looking for the space*/
@@ -809,25 +752,25 @@ FDECL void FTN_NAME(MBLK_SET_PREFIX, mblk_set_prefix_)
   delete[] tmpstr;
 }
 
-FDECL void FTN_NAME(MBLK_SET_NBLOCKS, mblk_set_nblocks_)
+FDECL void FTN_NAME(MBLK_SET_NBLOCKS, mblk_set_nblocks)
   (int *nblocks, int *ret)
 {
   *ret = MBLK_Set_nblocks(*nblocks);
 }
 
-FDECL void FTN_NAME(MBLK_SET_DIM, mblk_set_dim_)
+FDECL void FTN_NAME(MBLK_SET_DIM, mblk_set_dim)
   (int *dim, int *ret)
 {
   *ret = MBLK_Set_dim(*dim);
 }
 
-FDECL void FTN_NAME(MBLK_GET_NBLOCKS, mblk_get_nblocks_)
+FDECL void FTN_NAME(MBLK_GET_NBLOCKS, mblk_get_nblocks)
   (int *n, int *ret)
 {
   *ret = MBLK_Get_nblocks(n);
 }
 
-FDECL void FTN_NAME(MBLK_GET_MYBLOCK, mblk_get_myblock_)
+FDECL void FTN_NAME(MBLK_GET_MYBLOCK, mblk_get_myblock)
   (int *m, int *ret)
 {
   *ret = MBLK_Get_myblock(m);
@@ -835,19 +778,19 @@ FDECL void FTN_NAME(MBLK_GET_MYBLOCK, mblk_get_myblock_)
 static void c2f_index3d(int *idx) {
   idx[0]++; idx[1]++; idx[2]++;
 }
-FDECL void FTN_NAME(MBLK_GET_BLOCKSIZE, mblk_get_blocksize_)
+FDECL void FTN_NAME(MBLK_GET_BLOCKSIZE, mblk_get_blocksize)
   (int *dims, int *ret)
 {
   *ret = MBLK_Get_blocksize(dims);
 }
 
-FDECL double FTN_NAME(MBLK_TIMER, mblk_timer_)
+FDECL double FTN_NAME(MBLK_TIMER, mblk_timer)
   (void)
 {
   return MBLK_Timer();
 }
 
-FDECL void FTN_NAME(MBLK_PRINT,mblk_print_)
+FDECL void FTN_NAME(MBLK_PRINT,mblk_print)
   (char *str, int len)
 {
   char *tmpstr = new char[len+1]; CHK(tmpstr);
@@ -857,89 +800,92 @@ FDECL void FTN_NAME(MBLK_PRINT,mblk_print_)
   delete[] tmpstr;
 }
 
-FDECL void FTN_NAME(MBLK_PRINT_BLOCK,mblk_print_block_)
+FDECL void FTN_NAME(MBLK_PRINT_BLOCK,mblk_print_block)
   (void)
 {
   MBLK_Print_block();
 }
 
-FDECL void FTN_NAME(MBLK_CREATE_FIELD, mblk_create_field_)
+FDECL void FTN_NAME(MBLK_CREATE_FIELD, mblk_create_field)
   (int *dims,int *forVox,int *b, int *l, int *o, int *d, int *f, int *ret)
 {
   *ret = MBLK_Create_field(dims,*forVox,*b, *l, *o, *d, f);
 }
 
-FDECL void FTN_NAME(MBLK_UPDATE_FIELD, mblk_update_field_)
+FDECL void FTN_NAME(MBLK_UPDATE_FIELD, mblk_update_field)
   (int *fid, int *ghostWidth,void *grid, int *ret)
 {
   *ret = MBLK_Update_field(*fid,*ghostWidth, grid);
 }
 
-FDECL void FTN_NAME(MBLK_IUPDATE_FIELD, mblk_iupdate_field_)
+FDECL void FTN_NAME(MBLK_IUPDATE_FIELD, mblk_iupdate_field)
   (int *fid, int *ghostWidth, void *igrid, void *ogrid, int *ret)
 {
   *ret = MBLK_Iupdate_field(*fid,*ghostWidth, igrid, ogrid);
 }
 
-FDECL void FTN_NAME(MBLK_TEST_UPDATE, mblk_test_update_)
+FDECL void FTN_NAME(MBLK_TEST_UPDATE, mblk_test_update)
   (int *status, int *ret)
 {
   *ret = MBLK_Test_update(status);
 }
 
-FDECL void FTN_NAME(MBLK_WAIT_UPDATE, mblk_wait_update_)
+FDECL void FTN_NAME(MBLK_WAIT_UPDATE, mblk_wait_update)
   (int *ret)
 {
   *ret = MBLK_Wait_update();
 }
 
-FDECL void FTN_NAME(MBLK_REDUCE_FIELD, mblk_reduce_field_)
+FDECL void FTN_NAME(MBLK_REDUCE_FIELD, mblk_reduce_field)
   (int *fid, void *grid, void *out, int *op, int *ret)
 {
   *ret = MBLK_Reduce_field(*fid, grid, out, *op);
 }
 
-FDECL void FTN_NAME(MBLK_REDUCE, mblk_reduce_)
+FDECL void FTN_NAME(MBLK_REDUCE, mblk_reduce)
   (int *fid, void *in, void *out, int *op, int *ret)
 {
   *ret = MBLK_Reduce_field(*fid, in, out, *op);
 }
 
-FDECL void FTN_NAME(MBLK_REGISTER_BC, mblk_register_bc_)
+FDECL void FTN_NAME(MBLK_REGISTER_BC, mblk_register_bc)
   (int *bcnum, int *ghostWidth,MBLK_BcFn bcfn, int *ret)
 {
-  *ret = MBLK_Register_bc(*bcnum, *ghostWidth, bcfn);
+  if(TCharm::getState() != inDriver) {
+    CkError("MBLK_Register_bc  called from outside driver\n");
+    *ret=MBLK_FAILURE;
+  } else {
+    *ret=getCurMBlockChunk()->register_bc(*bcnum, bcfn, extrudeMethod(*ghostWidth), true);	
+  }
 }
 
-FDECL void FTN_NAME(MBLK_APPLY_BC, mblk_apply_bc_)
+FDECL void FTN_NAME(MBLK_APPLY_BC, mblk_apply_bc)
   (int *bcnum, void *p1,void *p2, int *ret)
 {
   *ret = MBLK_Apply_bc(*bcnum, p1,p2);
 }
 
-FDECL void FTN_NAME(MBLK_APPLY_BC_ALL, mblk_apply_bc_all_)
+FDECL void FTN_NAME(MBLK_APPLY_BC_ALL, mblk_apply_bc_all)
   (void *p1,void *p2, int *ret)
 {
   *ret = MBLK_Apply_bc_all(p1,p2);
 }
 
-FDECL void FTN_NAME(MBLK_REGISTER, mblk_register_)
+FDECL void FTN_NAME(MBLK_REGISTER, mblk_register)
   (void *block, MBLK_PupFn pupfn, int *rid, int *ret)
 {
   *ret = MBLK_Register(block, pupfn, rid);
 }
 
-FDECL void FTN_NAME(MBLK_MIGRATE, mblk_migrate_)
+FDECL void FTN_NAME(MBLK_MIGRATE, mblk_migrate)
   (int *ret)
 {
   *ret = MBLK_Migrate();
 }
 
-#endif /*MBLK_FORTRAN*/
-
 
 void
-chunk::print(void)
+MBlockChunk::print(void)
 {
   CkPrintf("-------------------- Block %d --------------------\n",thisIndex);
   b->print();
@@ -948,66 +894,20 @@ chunk::print(void)
   
 
 void
-chunk::pup(PUP::er &p)
+MBlockChunk::pup(PUP::er &p)
 {
 //Pup superclass
   ArrayElement1D::pup(p);
 
-  if(p.isDeleting())
-  { //Resend saved messages to myself
-    DataMsg *dm;
-    int snum = CmmWildCard;
-    CProxy_chunk cp(thisArrayID);
-    while ((dm = (DataMsg*) CmmGet(messages, 1, &snum, 0))!=NULL)
-      cp[thisIndex].recv(dm);
-  }
-
-  //This seekBlock allows us to reorder the packing/unpacking--
-  // This is needed because the userData depends on the thread's stack
-  // both at pack and unpack time.
-  PUP::seekBlock s(p,2);
-  if (p.isUnpacking()) 
-  {//In this case, unpack the thread before the user data
-    s.seek(1);
-    tid = CthPup((pup_er) &p, tid);
-  }
-  
-  //Pack all user data
-  CpvAccess(_mblk_state)=inPup;
-  s.seek(0);
-  p(nudata);
-  int i;
-  for(i=0;i<nudata;i++) {
-    //Save userdata for Fortran-- stack allocated
-    p((void*)&(userdata[i]), sizeof(void *));
-    //FIXME: function pointers may not be valid across processors
-    p((void*)&(pup_ud[i]), sizeof(MBLK_PupFn));
-#if MBLK_FORTRAN
-    pup_ud[i]((pup_er) &p, userdata[i]);
-#else
-    userdata[i] = pup_ud[i]((pup_er) &p, userdata[i]);
-#endif
-  }
-  CpvAccess(_mblk_state)=inDriver;
-
-  if (!p.isUnpacking()) 
-  {//In this case, pack the thread after the user data
-    s.seek(1);
-    tid = CthPup((pup_er) &p, tid);
-  }
-  s.endBlock(); //End of seeking block
-  
+  threads.pup(p);
+  messages=CmmPup(&p,messages);
 
   if(p.isUnpacking())
-  {
-    messages = CmmNew();
     b = new block();
-    CtvAccessOther(tid,_mblkptr) = this;
-  }
   b->pup(p);
 //Pup all other fields
   p(nfields);
-  for (i=0;i<nfields;i++) {
+  for (int i=0;i<nfields;i++) {
     if (p.isUnpacking()) fields[i]=new field_t;
     fields[i]->pup(p);
   }
@@ -1017,25 +917,5 @@ chunk::pup(PUP::er &p)
   p(update.nRecd);
   p(nRecvPatches);
 }
-
-
-void *
-DataMsg::pack(DataMsg *in)
-{
-  return (void*) in;
-}
-
-DataMsg *
-DataMsg::unpack(void *in)
-{
-  return new (in) DataMsg;
-}
-
-void *
-DataMsg::alloc(int mnum, size_t size, int *sizes, int pbits)
-{
-  return CkAllocMsg(mnum, size+sizes[0], pbits);
-}
-
 
 #include "mblock.def.h"
