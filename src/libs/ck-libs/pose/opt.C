@@ -240,11 +240,9 @@ int opt::SafeTime()
   
   if (worktime > theTime)                         // check queued events
     theTime = worktime;
-  else if (theTime < 0) 
-    theTime = ovt;
-  if (RBevent && (RBevent->timestamp<theTime)) // rollbacks
+  if (RBevent && ((RBevent->timestamp<theTime) || (theTime == -1))) //rollbacks
     theTime = RBevent->timestamp;
-  if ((ec >= 0) && (ec < theTime))     // check cancellations
+  if ((ec >= 0) && ((ec < theTime) || (theTime == -1))) // check cancellations
     theTime = ec;
   if ((ovt < theTime) && (ovt > gvt))
     theTime = ovt;

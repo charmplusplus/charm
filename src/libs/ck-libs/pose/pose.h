@@ -17,7 +17,7 @@ extern int eventMsgsDiscarded;
 
 // Primary versions
 #define POSE_STATS_ON 1
-#define POSE_COMM_ON 1
+//#define POSE_COMM_ON 1
 //#define LB_ON 1
 
 #ifdef POSE_COMM_ON
@@ -28,12 +28,12 @@ extern int eventMsgsDiscarded;
 #include "pose.decl.h"
 
 // Strategy variables
-#define STORE_RATE 10000           // default store rate: 1 for every n events
+#define STORE_RATE 100           // default store rate: 1 for every n events
 #define SPEC_WINDOW 100         // speculative event window
 #define MIN_LEASH 10            // min spec window for adaptive strategy
-#define MAX_LEASH 2000         // max  "     "     "     "        " 
+#define MAX_LEASH 500         // max  "     "     "     "        " 
 #define LEASH_FLEX 1           // leash increment
-#define GVT_WINDOW 100000          // Maximum time GVT can advance
+#define GVT_WINDOW 500          // Maximum time GVT can advance
 
 // Load balancer variables
 #define LB_SKIP 51           // LB done 1/LB_SKIP times GVT iterations

@@ -195,6 +195,9 @@ void eventQueue::DeleteEvent(Event *ev)
 void eventQueue::AddSpawnToCurrent(int id, eventID e, int ts) 
 {
   SpawnedEvent *newnode = new SpawnedEvent(id, e, ts, currentPtr->spawnedList);
+  if (currentPtr->done != 2) {
+    CkPrintf("ERROR: eventQueue::AddSpawnToCurrent: adding spawn to non-executing event!!\n"); 
+  }
   currentPtr->spawnedList = newnode;
 }
 

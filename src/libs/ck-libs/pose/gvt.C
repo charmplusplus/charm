@@ -301,12 +301,6 @@ void GVT::computeGVT(UpdateMsg *m)
 	if (optGVT > conGVT) estGVT = optGVT;
 	else estGVT = conGVT;
     }
-    
-    if (estGVT < 0) {
-      inactive++; 
-      if (inactive == 1) inactiveTime = lastGVT;
-    }
-    else inactive = 0;
 
     // STEP 2: Check if send/recv activity provides lower possible estimate
     if (earliestMsg < 0) earliestMsg = estGVT;
@@ -338,8 +332,14 @@ void GVT::computeGVT(UpdateMsg *m)
     
     // STEP 3: In times of inactivity, GVT must be set to lastGVT
     if ((estGVT < 0) && (lastGVT < 0)) estGVT = 0;
-    else if (estGVT < 0) estGVT = lastGVT;
     
+    if (estGVT < 0) {
+      inactive++; 
+      estGVT = lastGVT;
+      if (inactive == 1) inactiveTime = lastGVT;
+    }
+    else inactive = 0;
+
     // STEP 4: If all has gone well, estimate >= previous estimate
     if ((estGVT < lastGVT) && (estGVT >= 0)) {
       CkPrintf("ERROR: new GVT estimate %d less than last one %d!\n",
