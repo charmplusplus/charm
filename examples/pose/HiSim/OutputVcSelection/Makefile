@@ -1,4 +1,4 @@
-OPTS=-g -Dcompile #-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
+OPTS=-g #-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
 
 include ../Makefile.common
 
@@ -17,16 +17,16 @@ IB: $(OBJDIR)/maxAvailBufferSwitch.o
 OB: $(OBJDIR)/outputBuffer.o
 
 $(OBJDIR)/maxAvailBuffer.o: maxAvailBuffer.C maxAvailBuffer.h
-	$(CHARMC) -o $@ -seq maxAvailBuffer.C -I$(MACHINE)
+	$(CHARMC) -Dcompile -o $@ -seq maxAvailBuffer.C -I$(MACHINE)
 
 $(OBJDIR)/maxAvailBufferBubbleVc.o: maxAvailBufferBubbleVc.C maxAvailBufferBubbleVc.h
-	$(CHARMC) -o $@ -seq maxAvailBufferBubbleVc.C -I$(MACHINE)
+	$(CHARMC) -Dcompile -o $@ -seq maxAvailBufferBubbleVc.C -I$(MACHINE)
 
 $(OBJDIR)/maxAvailBufferSwitch.o: maxAvailBufferSwitch.C maxAvailBufferSwitch.h
-	$(CHARMC) -o $@ -seq maxAvailBufferSwitch.C -I$(MACHINE)
-	
+	$(CHARMC) -Dcompile -o $@ -seq maxAvailBufferSwitch.C -I$(MACHINE)
+
 $(OBJDIR)/outputBuffer.o: outputBuffer.C outputBuffer.h
-	$(CHARMC) -o $@ -seq outputBuffer.C -I$(MACHINE)
+	$(CHARMC) -Dcompile -o $@ -seq outputBuffer.C -I$(MACHINE)
 
 clean:
 	rm -f charmrun conv-host *.o
