@@ -21,33 +21,18 @@
 
 #define CMI_VMI_USE_MEMORY_POOL   0
 #define CMI_VMI_OPTIMIZE          0
-
-
-
-#define CMI_VMI_MAX_HANDLES 100
-
-
-/* This is the number of seconds to wait for connection setup. */
+#define CMI_VMI_MAX_HANDLES 1000
 #define CMI_VMI_CONNECTION_TIMEOUT 300
-
-/* These are the message send strategy boundaries. */
 #define CMI_VMI_SMALL_MESSAGE_BOUNDARY 512
 #define CMI_VMI_MEDIUM_MESSAGE_BOUNDARY 4096
-
-/*
-  RDMA puts for large messages are done in a pipeline.  The following two
-  defines are for the maximum length of the pipeline (alternatively, the
-  maximum number of RDMA send buffers that may be outstanding at once) and
-  the maximum size of an individual chunk of message data that can be
-  transferred in a single RDMA put.  This is to prevent VMI from trying to
-  pin down unusually-large amounts of memory.
-*/
 #define CMI_VMI_RDMA_MAX_OUTSTANDING 3
 #define CMI_VMI_RDMA_MAX_CHUNK 262144
 
+#define CMI_VMI_MESSAGE_TYPE(msg) ((CmiMsgHeaderBasic *)msg)->vmitype
+#define CMI_VMI_MESSAGE_TYPE_STANDARD   1
+#define CMI_VMI_MESSAGE_TYPE_RENDEZVOUS 2
 
-
-#if CONVERSE_VERSION_VMI
+#if CMI_VMI_USE_MEMORY_POOL
 #define CMI_VMI_BUCKET1_SIZE 1024
 #define CMI_VMI_BUCKET2_SIZE 2048
 #define CMI_VMI_BUCKET3_SIZE 4096
