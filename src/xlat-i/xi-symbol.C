@@ -353,12 +353,26 @@ static const char *CIChareEnd =
 ;
 
 void
-Chare::genRegisterMethod(XStr& str)
+Chare::genRegisterMethodDecl(XStr& str)
 {
   if(external || type->isTemplated())
     return;
-  str << 
-  "    static void __register(const char *s, size_t size) {\n"
+  str << "    static void __register(const char *s, size_t size);\n";
+}
+
+void
+Chare::genRegisterMethodDef(XStr& str)
+{
+  if(external || type->isTemplated())
+    return;
+  if(!templat) {
+    str << "#ifndef CK_TEMPLATES_ONLY\n";
+  } else {
+    str << "#ifdef CK_TEMPLATES_ONLY\n";
+  }
+  genTSpec(str);
+  str <<  
+  "    void "<<proxyName()<<"::__register(const char *s, size_t size) {\n"
   "      __idx = CkRegisterChare(s, size);\n";
   // register all bases
   if(bases !=0)
@@ -366,8 +380,8 @@ Chare::genRegisterMethod(XStr& str)
   if(list)
     list->genReg(str);
   str << "    }\n";
+  str << "#endif\n";
 }
-
 
 void
 Chare::genDecls(XStr& str)
@@ -401,7 +415,7 @@ Chare::genSubDecls(XStr& str)
     bases->genProxyNames(str, "public ", "", ", ");
   }
   str << CIChareStart;
-  genRegisterMethod(str);
+  genRegisterMethodDecl(str);
   if(isAbstract())
     str << "    "<<ptype<<"(void) {};\n";
   str << "    "<<ptype<<"(CkChareID __cid) ";
@@ -442,7 +456,7 @@ Group::genSubDecls(XStr& str)
     bases->genProxyNames(str, "public ", "", ", ");
   }
   str << CIChareStart;
-  genRegisterMethod(str);
+  genRegisterMethodDecl(str);
   if(isAbstract())
     str << "    "<<ptype<<"(void) {};\n";
   str << "    "<<ptype<<"(CkGroupID _gid) ";
@@ -498,7 +512,7 @@ Array::genSubDecls(XStr& str)
     bases->genProxyNames(str, "public virtual ", "", ", ");
   }
   str << CIChareStart;
-  genRegisterMethod(str);
+  genRegisterMethodDecl(str);
   if(isAbstract())
     str << "    "<<ptype<<"(void) {};\n";
   str << "    "<<ptype<<"(CkArrayID _aid) ";
@@ -548,6 +562,8 @@ Chare::genDefs(XStr& str)
     str << ";\n";
     str << "#endif\n";
   }
+  if(!external && !type->isTemplated())
+    genRegisterMethodDef(str);
   if(list)
     list->genDefs(str);
 }

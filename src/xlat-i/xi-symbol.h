@@ -282,7 +282,8 @@ class Chare : public TEntity, public Construct {
     TypeList *bases;
     int abstract;
 
-    void genRegisterMethod(XStr& str);
+    void genRegisterMethodDecl(XStr& str);
+    void genRegisterMethodDef(XStr& str);
   public:
     Chare(NamedType *t, TypeList *b=0, MemberList *l=0) : 
       type(t), list(l), bases(b) 
