@@ -6,6 +6,7 @@
 #include "PipeBroadcastStrategy.h"
 #include "BroadcastStrategy.h"
 
+#define FUNDER
 
 #ifdef FUNDER
 #define ZGEMM zgemm_ 
@@ -18,11 +19,12 @@
 #endif
 
 
-#if USE_BLAS
+#ifdef _PAIRCALC_USE_BLAS_
 extern "C" complex ZTODO( const int *N,  complex *X, const int *incX, complex *Y, const int *incY);
 
 #endif
-#if USE_ZGEMM
+
+#ifdef _PAIRCALC_USE_ZGEMM_
 extern "C" void ZGEMM(char *,char *, int *,int *, int *,complex *,complex *,int *,
                        const complex *,int *,complex *,complex *,int *);
 
@@ -95,17 +97,8 @@ class PairCalculator: public CBase_PairCalculator {
   void pup(PUP::er &);
   inline double compute_entry(int n, complex *psi1, complex *psi2, int op) 
     {
-        /*
-          double re=0, im = 0;
-          double *ptr1 = (double*)psi1;
-          double *ptr2 = (double*)psi2;
-          for (int i = 0; i < 2*n; i+=2){
-          re += ptr1[i]*ptr2[i] - ptr1[i+1]*ptr2[i+1];
-          im += ptr1[i+1]*ptr2[i] + ptr1[i]*ptr2[i+1];
-          }
-          complex sum(re,im);
-        */
-#ifdef USE_BLAS
+
+#ifdef  _PAIRCALC_USE_BLAS_
       int incx=1;
       int incy=1;
       complex output=zdotu_(&n, &(psi1[0]), &incx,  &(psi2[0]), &incy);
@@ -124,6 +117,7 @@ class PairCalculator: public CBase_PairCalculator {
  private:
   int numRecd, numExpected, grainSize, S, blkSize, N;
   int kRightCount, kLeftCount, kUnits;
+  int kRightDoneCount, kLeftDoneCount;
   int *kLeftOffset;
   int *kRightOffset;
   int *kLeftMark;
@@ -170,9 +164,5 @@ class PairCalcReducer : public Group {
   bool symmtype;
   CkCallback cb;
 }; 
-
-
-
-//#define  _DEBUG_
 
 #endif
