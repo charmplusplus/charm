@@ -93,8 +93,14 @@ EOF
                 then
 # The job is done-- print its output
                         rm tmp.$$
-                        test -s $errout && cat $output && cat $errout && exit 1
-                        exec cat $output
+                        if test -s $errout 
+			then
+				cat $output $errout 
+				rm $output $errout
+				exit 1
+			else
+                        	exec cat $output
+			fi
                 fi
 # The job is still queued or running-- print status and wait
                 tail -1 tmp.$$
