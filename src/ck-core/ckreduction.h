@@ -330,7 +330,7 @@ private:
 	int userFlag=-1); \
   void contribute(int dataSize,const void *data,CkReduction::reducerType type, \
 	const CkCallback &cb,int userFlag=-1); \
-  
+  void contribute(CkReductionMsg *msg);\
 
 #define CK_REDUCTION_CONTRIBUTE_METHODS_DEF(me,myRednMgr,myRednInfo) \
 void me::contribute(int dataSize,const void *data,CkReduction::reducerType type,\
@@ -348,6 +348,8 @@ void me::contribute(int dataSize,const void *data,CkReduction::reducerType type,
 	msg->setCallback(cb);\
 	myRednMgr->contribute(&myRednInfo,msg);\
 }\
+void me::contribute(CkReductionMsg *msg) \
+	{myRednMgr->contribute(&myRednInfo,msg);}\
 
 
 //A group that can contribute to reductions
