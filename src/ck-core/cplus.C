@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-09-26 19:46:35  sanjeev
+ * Revision 2.5  1995-10-02 20:43:11  knauff
+ * Added return value to new operator.
+ *
+ * Revision 2.4  1995/09/26  19:46:35  sanjeev
  * moved new operator here
  *
  * Revision 2.3  1995/09/14  18:43:47  gursoy
@@ -70,6 +73,7 @@ void *
 comm_object::operator new(int size) 
 {
 	CmiPrintf("[%d] ERROR: wrong new operator for message allocation\n",CmiMyPe()) ;
+	return (void *)0;
 }
 
 void CPlus_ChareExit()
