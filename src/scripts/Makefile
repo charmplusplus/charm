@@ -152,7 +152,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h \
-	graph.h bitvecset.h Set.h SimResults.h
+	graph.h bitvecset.h Set.h LBSimulation.h
 
 basics: headers
 	touch basics
@@ -435,7 +435,7 @@ LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o ckfuture
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o ObjGraph.o graph.o  \
            Refiner.o bitvecset.o Set.o heap.o CommLBHeap.o NullLB.o \
-	   SimResults.o
+	   LBSimulation.o
 
 CHARMLIBS: charm++
 	cd libs; make charmlibs OPTS='$(OPTS)'
@@ -601,8 +601,8 @@ NborBaseLB.o: NborBaseLB.C NborBaseLB.decl.h $(CKHEADERS)
 CommLBHeap.o: CommLBHeap.C $(CKHEADERS)
 	$(CHARMC) -c CommLBHeap.C
 
-SimResults.o : SimResults.h SimResults.C
-	$(CHARMC) -c SimResults.C
+LBSimulation.o : LBSimulation.h LBSimulation.C
+	$(CHARMC) -c LBSimulation.C
 
 ## Tracing libraries (profiling, -tracemode)
 LIBTRACE_PROJ=trace-projections.o trace-common.o 
