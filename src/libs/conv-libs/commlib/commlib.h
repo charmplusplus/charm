@@ -29,6 +29,7 @@ typedef struct {
   short ImplType;
   short ImplIndex;
   int callbackHandler;
+  short instanceID;  
   int SwitchVal;
   int NumMembers;
   CmiGroup grp;
@@ -39,6 +40,13 @@ typedef struct {
   int msgsize;
   void *msg;
 } msgstruct ;
+
+typedef struct { 
+    char core[CmiMsgHeaderSizeBytes];
+    comID id;
+    int magic;
+    int refno;
+} DummyMsg ;
 
 class Router;
 

@@ -19,13 +19,6 @@
 typedef struct { 
     char core[CmiMsgHeaderSizeBytes];
     comID id;
-    int magic;
-    int refno;
-} DummyMsg ;
-
-typedef struct { 
-    char core[CmiMsgHeaderSizeBytes];
-    comID id;
 } GMsg ;
 
 typedef struct { 
