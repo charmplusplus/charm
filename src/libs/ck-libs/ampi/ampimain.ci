@@ -6,5 +6,6 @@ mainmodule ampimain {
     readonly int ncomms;
     entry ampimain();
     entry void done(void);
+    entry [threaded] void checkpoint(void);
   };
 }

@@ -849,60 +849,25 @@ get_slots(slotset *ss, int nslots)
   if(ss->emptyslots < nslots)
     return (-1);
   for(i=0;i<(ss->maxbuf);i++)
-  {
     if(ss->buf[i].nslots >= nslots)
-    {
-      int slot = ss->buf[i].startslot;
-      ss->buf[i].startslot += nslots;
-      ss->buf[i].nslots -= nslots;
-      ss->emptyslots -= nslots;
-      return slot;
-    }
-  }
+      return ss->buf[i].startslot;
   return (-1);
 }
 
-/*
- * Frees slot by adding it to one of the blocks of empty slots.
- * this slotblock is one which is contiguous with the slots to be freed.
- * if it cannot find such a slotblock, it creates a new slotblock.
- * If the buffer fills up, it adds up extra buffer space.
- */
+/* just adds a slotblock to an empty position in the given slotset. */
 static void
-free_slots(slotset *ss, int sslot, int nslots)
+add_slots(slotset *ss, int sslot, int nslots)
 {
-  int pos, emptypos = (-1);
-  /* eslot is the ending slot of the block to be freed */
-  int eslot = sslot + nslots;
-  ss->emptyslots += nslots;
-  for (pos=0; pos < (ss->maxbuf); pos++)
-  {
-    if (ss->buf[pos].nslots == 0 && emptypos==(-1))
-    {
-      /* find the first empty slot just in case it is required */
+  int pos, emptypos = -1;
+  if (nslots == 0)
+    return;
+  for (pos=0; pos < (ss->maxbuf); pos++) {
+    if (ss->buf[pos].nslots == 0) {
       emptypos = pos;
-    }
-    else
-    {
-      /* e is the ending slot of pos'th slotblock */
-      int e = ss->buf[pos].startslot + ss->buf[pos].nslots;
-      if (e == sslot)
-      {
-	ss->buf[pos].nslots += nslots;
-	return;
-      }
-      if(eslot == ss->buf[pos].startslot)
-      {
-	ss->buf[pos].startslot = sslot;
-	ss->buf[pos].nslots += nslots;
-	return;
-      }
+      break; /* found empty slotblock */
     }
   }
-  /* if we are here, it means we could not find a slotblock that the */
-  /* block to be freed was combined with. */
-  /* now check if we could not find an empty slotblock */
-  if (emptypos == (-1))
+  if (emptypos == (-1)) /*no empty slotblock found */
   {
     int i;
     int newsize = ss->maxbuf*2;
@@ -919,7 +884,70 @@ free_slots(slotset *ss, int sslot, int nslots)
   }
   ss->buf[emptypos].startslot = sslot;
   ss->buf[emptypos].nslots = nslots;
+  ss->emptyslots += nslots;
   return;
+}
+
+/* grab a slotblock with specified range of blocks
+ * this is different from get_slots, since it pre-specifies the
+ * slots to be grabbed.
+ */
+static void
+grab_slots(slotset *ss, int sslot, int nslots)
+{
+  int pos;
+  for (pos=0; pos < (ss->maxbuf); pos++)
+  {
+    if (ss->buf[pos].nslots == 0)
+      continue;
+    if(sslot >= ss->buf[pos].startslot && nslots <= ss->buf[pos].nslots)
+    {
+      int old_nslots;
+      old_nslots = ss->buf[pos].nslots;
+      ss->buf[pos].nslots = sslot - ss->buf[pos].startslot;
+      ss->emptyslots -= nslots;
+      add_slots(ss, sslot + nslots, old_nslots - ss->buf[pos].nslots - nslots);
+      return;
+    }
+  }
+  CmiAbort("requested a non-existent slotblock\n");
+}
+
+/*
+ * Frees slot by adding it to one of the blocks of empty slots.
+ * this slotblock is one which is contiguous with the slots to be freed.
+ * if it cannot find such a slotblock, it creates a new slotblock.
+ * If the buffer fills up, it adds up extra buffer space.
+ */
+static void
+free_slots(slotset *ss, int sslot, int nslots)
+{
+  int pos;
+  /* eslot is the ending slot of the block to be freed */
+  int eslot = sslot + nslots;
+  for (pos=0; pos < (ss->maxbuf); pos++)
+  {
+    int e = ss->buf[pos].startslot + ss->buf[pos].nslots;
+    if (ss->buf[pos].nslots == 0)
+      continue;
+    /* e is the ending slot of pos'th slotblock */
+    if (e == sslot) /* append to the current slotblock */
+    {
+	    ss->buf[pos].nslots += nslots;
+      ss->emptyslots += nslots;
+	    return;
+    }
+    if(eslot == ss->buf[pos].startslot) /* prepend to the current slotblock */
+    {
+	    ss->buf[pos].startslot = sslot;
+	    ss->buf[pos].nslots += nslots;
+      ss->emptyslots += nslots;
+	    return;
+    }
+  }
+  /* if we are here, it means we could not find a slotblock that the */
+  /* block to be freed was combined with. */
+  add_slots(ss, sslot, nslots);
 }
 
 /*
@@ -1003,6 +1031,7 @@ reqslots(slotmsg *msg)
     pe = msg->pe;
     msg->pe = CmiMyPe();
     msg->slot = slot;
+    grab_slots(CpvAccess(myss), msg->slot, msg->nslots);
     CmiSetHandler(msg,CpvAccess(respHdlr));
     CmiSyncSendAndFree(pe, sizeof(slotmsg), msg);
   }
@@ -1083,7 +1112,7 @@ map_slots(int slot, int nslots)
   pa = mmap((void*) addr, sz*nslots, 
             PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED,
             CpvAccess(zerofd), 0);
-  if(pa== (void*)(-1))
+  if(pa == (void*)(-1))
     CmiAbort("mmap call failed to allocate requested memory.\n");
   return pa;
 }
@@ -1263,6 +1292,7 @@ CthStackCreate(CthThread t, CthVoidFn fn, void *arg, int slotnum, int nslots)
   int size = CpvAccess(_stksize);
   t->slotnum = slotnum;
   t->nslots = nslots;
+  grab_slots(CpvAccess(myss), slotnum, nslots);
   stack = (qt_t*) map_slots(slotnum, nslots);
   _MEMCHECK(stack);
   stackbase = QT_SP(stack, size);
@@ -1403,6 +1433,7 @@ CthThread CthPup(pup_er p, CthThread t)
   if (pup_isUnpacking(p)) {
     t->data = (char *) malloc(t->datasize);
     _MEMCHECK(t->data);
+    grab_slots(CpvAccess(myss), t->slotnum, t->nslots);
     stack = (qt_t*) map_slots(t->slotnum, t->nslots);
     _MEMCHECK(stack);
     if(stack != t->stack)

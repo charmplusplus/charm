@@ -40,6 +40,7 @@ class ampimain : public Chare
 {
   int nobjs;
   int numDone;
+  int qwait;
   public:
     static CkChareID handle;
     static ampi_comm_struct ampi_comms[AMPI_MAX_COMM];
@@ -47,6 +48,7 @@ class ampimain : public Chare
     ampimain(CkArgMsg *);
     ampimain(CkMigrateMessage *m) {}
     void done(void);
+    void checkpoint(void);
 };
 
 static inline void 
@@ -145,6 +147,8 @@ class AmpiMsg : public CMessage_AmpiMsg {
 #define AMPI_MAXUDATA 20
 
 class ampi : public ArrayElement1D {
+      char str[128];
+      char idxstr[16];
   public: // entry methods
     ampi(AmpiStartMsg *);
     ampi(CkMigrateMessage *msg) {}
@@ -156,14 +160,8 @@ class ampi : public ArrayElement1D {
     {
       AtSync();
     }
-    void checkpoint(DirMsg *msg)
+    void saveState(void)
     {
-      char str[128];
-      char idxstr[16];
-      strcpy(str, msg->dname);
-      sprintf(idxstr, "/%d.cpt", thisIndex);
-      strcat(str, idxstr);
-      delete msg;
       FILE *fp = fopen(str, "wb");
       if(fp!=0) {
         PUP::toDisk p(fp); p.becomeUserlevel();
@@ -175,11 +173,20 @@ class ampi : public ArrayElement1D {
       thread_id = 0;
       return;
     }
+    void checkpoint(DirMsg *msg)
+    {
+      strcpy(str, msg->dname);
+      sprintf(idxstr, "/%d.cpt", thisIndex);
+      strcat(str, idxstr);
+      delete msg;
+      if(thisIndex==0) {
+        CProxy_ampimain pm(ampimain::handle); 
+        pm.checkpoint(); 
+      }
+    }
     void restart(DirMsg *);
     void restartThread(char *dname)
     {
-      char str[128];
-      char idxstr[16];
       strcpy(str, dname);
       sprintf(idxstr, "/%d.cpt", thisIndex);
       strcat(str, idxstr);

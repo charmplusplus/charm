@@ -11,6 +11,7 @@ module ampi {
     entry [threaded] void run(void);
     entry void migrate(void);
     entry void checkpoint(DirMsg *);
+    entry void saveState(void);
     entry void restart(DirMsg *);
   };
 }

@@ -34,6 +34,7 @@ extern void CreateMetisLB(void);
 ampimain::ampimain(CkArgMsg *m)
 {
   int i;
+  qwait = 0;
   for(i=0;i<AMPI_MAX_COMM;i++)
     ampi_comms[i].nobj = CkNumPes();
   i = 0;
@@ -86,6 +87,23 @@ ampimain::done(void)
   numDone++;
   if(numDone==nobjs) {
     CkExit();
+  }
+}
+
+void
+ampimain::checkpoint(void)
+{
+  if(qwait==0)
+  {
+    qwait = 1;
+    CkWaitQD();
+    for(int i=0;i<ncomms;i++)
+    {
+      CProxy_ampi jarray(ampi_comms[i].aid);
+      for(int j=0; j<ampi_comms[i].nobj; j++)
+        jarray[j].saveState();
+    }
+    qwait = 0;
   }
 }
 
