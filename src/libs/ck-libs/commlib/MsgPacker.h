@@ -21,16 +21,6 @@ class short_envelope {
 };
 PUPmarshall(short_envelope);
 
-#if CMK_BLUEGENE_CHARM
-#ifndef CmiReservedHeaderSize 
-#define CmiReservedHeaderSize   CmiBlueGeneMsgHeaderSizeBytes
-#endif
-#else
-#ifndef CmiReservedHeaderSize
-#define CmiReservedHeaderSize   CmiMsgHeaderSizeBytes
-#endif
-#endif
-
 struct CombinedMessage{
 
     char header[CmiReservedHeaderSize];
