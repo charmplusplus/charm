@@ -169,13 +169,13 @@ public:
 		int t;
 		t = res[i].elemID;
 		*tri = t +idxbase;
-		*nodeToKeep = res[i].nodeToKeep;
+		*nodeToKeep = conn[3*t+res[i].nodeToKeep];
 		int n1 = res[i].collapseEdge;
-		int n2 = (res[i].collapseEdge)%3;
-		if(*nodeToKeep == n1){
-			*nodeToThrow = n2;
+		int n2 = (res[i].collapseEdge+1)%3;
+		if(res[i].nodeToKeep == n1){
+			*nodeToThrow = conn[3*t+n2];
 		}else{
-			*nodeToThrow = n1;
+			*nodeToThrow = conn[3*t+n1];
 		}
 		*nx = res[i].nx;
 		*ny = res[i].ny;
