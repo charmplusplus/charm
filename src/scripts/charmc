@@ -54,6 +54,7 @@ POST_LIBRARIES=""
 PRE_LIBRARIES=""    
 COPIES=""        
 MODCOPIES=""        
+MODULES=""
 FILES=""       
 OBJECTFILES=""  
 DELETE=""    
@@ -80,6 +81,7 @@ printUsage() {
     echo "        -D<define> -I<include path> -L<lib path> -l<library> -s"
     echo "        -machine <mach> -seq -langage <lang> "
     echo "        -balance <mode> -tracemode <mode> -memory <mode>"
+    echo "        -modules <comma-separated list of C++ modules>"
     echo "        -verbose -save -purify -cp <dest> -gen-cpm <package>"
     echo "        -use-reliable-cc -use-fastest-cc"
     echo "        -cc <new cc> -c++ <new CC>  -ld <new ld> -ld++ <new LD>"
@@ -205,6 +207,11 @@ do
 	"-language")
 		LANGUAGE="$1"
 		POST_LANGUAGE=1
+		shift
+		;;
+
+	"-module"|"-modules")
+		MODULES="$MODULES `echo $1 | sed -e 's/,/ /g'`"
 		shift
 		;;
 
@@ -585,15 +592,6 @@ case "$LANGUAGE" in
 "c"|"C"|"c++"|"C++")
 	[ -z "$SEQUENTIAL" ] && Abort "Language $LANGUAGE is for sequential programs"
 	;;
-"charm"|"charm++"|"converse"|"converse++")
-	[ -z "$SEQUENTIAL" ] || Abort "Language $LANGUAGE is for parallel programs"
-	;;
-"fem"|"femf"|"ampi"|"ampif"|"mblock"|"mblockf"|"f90charm"|"bluegene"|"ckbluegene")
-	[ -z "$SEQUENTIAL" ] || Abort "Language $LANGUAGE is for parallel programs"
-	;;
-*)
-	Abort "Unrecognized choice of language $LANGUAGE"
-	;;
 esac
 
 ########################################################################
@@ -813,9 +811,8 @@ Debug "About to check TRACEMODE=$TRACEMODE and BALANCE=$BALANCE..."
 
 [ -r $CHARMLIB/libtrace-none.a ] || Abort "trace libraries not installed.  Is Charm++ built properly?"
 
-TRACE_OBJ="$CHARMLIB/libtrace-$TRACEMODE.a"
-[ ! -r $TRACE_OBJ ] && Abort "charmc : No such tracemode $TRACEMODE"
-
+[ ! -r "$CHARMLIB/libtrace-$TRACEMODE.a" ] && Abort "charmc : No such tracemode $TRACEMODE"
+TRACE_OBJ="-ltrace-$TRACEMODE"
 
 # Check for valid choice of BALANCE
 if [ "$TRACEMODE" = replay ]
@@ -854,44 +851,51 @@ MEM_OBJ="$CHARMLIB/libmemory-$MEMORY.o"
 
 [ ! -r $MEM_OBJ ] && Abort "charmc : No such memory mode $MEMORY"
 
-
-
-###############################################################################
-#
-#                               Finally, LINK
-#
-###############################################################################
-
-Debug "About to perform final link..."
-
+############ Determine the language and libraries ##########
 IS_F90="n"
 
+# Parse out the pseudo-languages (just libraries, but easier to say)
 case "$LANGUAGE" in
 "ampi")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lAMPI -lddt "
-        POST_LIBRARIES="$POST_LIBRARIES -lmetis"
+	MODULES="$MODULES ampi"
+	POST_LIBRARIES="$POST_LIBRARIES -lddt -lmetis"
+	LANGUAGE="tcharm"
 	;;
 "ampif")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lAMPIF -lddt -lconv-utilf "
-        POST_LIBRARIES="$POST_LIBRARIES -lmetis $CMK_F90LIBS"
-	IS_F90="y"
+	MODULES="$MODULES ampif"
+	POST_LIBRARIES="$POST_LIBRARIES -lddt -lmetis"
+	LANGUAGE="tcharmf"
 	;;
 "fem")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lfem  -lcollide -lAMPILIB -lddt "
-        POST_LIBRARIES="$POST_LIBRARIES -lmetis "
+	MODULES="$MODULES fem"
+	POST_LIBRARIES="$POST_LIBRARIES -lddt -lmetis"
+	LANGUAGE="tcharm"
 	;;
 "femf")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lfemf -lcollide -lAMPILIB -lddt -lconv-utilf"
-        POST_LIBRARIES="$POST_LIBRARIES -lmetis $CMK_F90LIBS"
-	IS_F90="y"
+	MODULES="$MODULES fem"
+	POST_LIBRARIES="$POST_LIBRARIES -lddt -lmetis"
+	LANGUAGE="tcharmf"
 	;;
 "mblock")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lfem -lddt "
-        POST_LIBRARIES="$POST_LIBRARIES -lmetis "
+	MODULES="$MODULES mblock"
+	POST_LIBRARIES="$POST_LIBRARIES -lddt -lmetis"
+	LANGUAGE="tcharm"
 	;;
 "mblockf")
-        PRE_LIBRARIES="$PRE_LIBRARIES -lmblockf -lddt"
-        POST_LIBRARIES="$POST_LIBRARIES -lmetis $CMK_F90LIBS"
+	MODULES="$MODULES mblock"
+	POST_LIBRARIES="$POST_LIBRARIES -lddt -lmetis"
+	LANGUAGE="tcharmf"
+	;;
+esac
+
+# Parse out the real languages
+case "$LANGUAGE" in
+"tcharm")
+	MODULES="$MODULES tcharm"
+	;;
+"tcharmf")
+	MODULES="$MODULES tcharm"
+        POST_LIBRARIES="$POST_LIBRARIES $CMK_F90LIBS"
 	IS_F90="y"
 	;;
 "f90charm")
@@ -918,11 +922,42 @@ then
         fi
 fi
 
-LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $PRE_LIBRARIES"
+# Add the modules to the link list
+LINK_MODULES=""
+for module in $MODULES; do
+    LINK_MODULES="$LINK_MODULES -lmodule$module"
+done
+PRE_LIBRARIES="$LINK_MODULES $PRE_LIBRARIES"
+
+################# Build the module initialization function ##################
+modInitName="moduleinit"
+modInitSrc="$modInitName.C"
+modInitObj="$modInitName.o"
+DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
+for module in $MODULES; do
+    echo "extern void _register$module(void);" >> $modInitSrc
+done
+echo "void _registerExternalModules(void) {" >> $modInitSrc
+for module in $MODULES; do
+    [ -n "$VERBOSE" ] && echo "Adding registration for module $module"
+    echo "  _register$module();" >> $modInitSrc
+done
+echo "}" >> $modInitSrc
+Do $CMK_CXX $OPTSC $OPTS_CXX -c $modInitSrc -o $modInitObj
+
+###############################################################################
+#
+#                               Finally, LINK
+#
+###############################################################################
+
+Debug "About to perform final link..."
+
+LANG_LIBS="$modInitObj -L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $PRE_LIBRARIES"
 CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ $MEM_OBJ "
 
 case "$LANGUAGE" in
-"charm"|"charm++"|"f90charm"|"ampi"|"ampif"|"fem"|"femf"|"mblock"|"mblockf"|"ckbluegene")
+"charm"|"charm++"|"f90charm"|"tcharm"|"tcharmf"|"ckbluegene")
 	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lck -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
@@ -933,6 +968,9 @@ case "$LANGUAGE" in
 "converse++"|"bluegene")
 	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
+	;;
+*)
+	Abort "Unrecognized choice of language $LANGUAGE"
 	;;
 esac
 
@@ -952,5 +990,9 @@ then
 	[ ! -f $convhost ] && Do $LN -f -s $targ $convhost
 fi
 
+
+DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
+
 Copyobj
+
 
