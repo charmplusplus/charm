@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-05 18:52:05  brunner
+ * Revision 2.1  1995-06-15 20:27:11  jyelon
+ * got rid of myfree.
+ *
+ * Revision 2.0  1995/06/05  18:52:05  brunner
  * Reorganized file structure
  *
  * Revision 1.2  1994/11/11  05:32:33  brunner
@@ -24,7 +27,7 @@
  ***************************************************************************/
 #include <stdio.h>
 
-#define free myfree
+#define free(x) (0)
 
 extern char *CkPrefix;	/* defined in outh.c */
 extern char *CkPrefix_;	/* defined in outh.c */

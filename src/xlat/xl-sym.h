@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-05 18:52:05  brunner
+ * Revision 2.1  1995-06-15 20:27:11  jyelon
+ * got rid of myfree.
+ *
+ * Revision 2.0  1995/06/05  18:52:05  brunner
  * Reorganized file structure
  *
  * Revision 1.3  1994/11/11  21:15:12  brunner
@@ -29,7 +32,7 @@
 
 extern char *MakeString();		/* in "string.c" */
 
-#define free myfree
+#define free(x) (0)
 
 #define TRUE 1
 #define FALSE 0
