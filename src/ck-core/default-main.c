@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1996-11-08 22:22:46  brunner
+ * Revision 2.15  1997-02-13 09:30:37  jyelon
+ * Modified default-main for new main structure.
+ *
+ * Revision 2.14  1996/11/08 22:22:46  brunner
  * Put _main in for HP-UX CC compilation.  It is ignored according to the
  * CMK_USE_HP_MAIN_FIX flag.
  *
@@ -77,21 +80,23 @@ CpvExtern(int, numHeapEntries);
 CpvExtern(int, numCondChkArryElts);
 CpvExtern(int, CsdStopFlag);
 
-user_main(argc, argv)
+charm_main(argc, argv)
+int argc;
+char **argv;
+{
+  InitializeCharm(argv);
+  StartCharm(argv, (void *)0);
+  CpvAccess(CsdStopFlag)=0;
+  CsdScheduler(-1) ;
+  EndCharm();
+  ConverseExit();
+}
+
+main(argc, argv)
 int argc;
 char *argv[];
 {
-  ConverseInit(argv);
-
-  InitializeCharm(argv) ;
-  StartCharm(argv, (void *)0);
-
-  CpvAccess(CsdStopFlag)=0;
-
-  CsdScheduler(-1) ;
-
-  EndCharm();
-  ConverseExit() ;
+  ConverseInit(argc, argv, charm_main);
 }
 
 #endif
@@ -107,7 +112,7 @@ void defaultmainModuleInit()
 {
 }
 
-user_main(argc, argv)
+main(argc, argv)
 int argc;
 char *argv[];
 {
@@ -126,7 +131,9 @@ char *argv[];
           StartCharm(argv, (void *)0); 
   }
 
-  for(i=0; i<CmiNumPes(); i++) {CmiUniContextSwitch(i);CpvAccess(CsdStopFlag)=0;}
+  for(i=0; i<CmiNumPes(); i++)
+    {CmiUniContextSwitch(i);CpvAccess(CsdStopFlag)=0;}
+  
   CsvAccess(CsdStopCount) = CmiNumPes();
   CmiUniContextSwitch(0);
   CsdUniScheduler(-1) ;
