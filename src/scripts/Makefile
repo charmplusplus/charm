@@ -114,7 +114,7 @@ UTILHEADERS=pup.h pup_c.h ckhashtable.h cklists.h conv-lists.h \
 	sockRoutines.h sockRoutines.c
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
-      ckfutures.h ckarray.h ckreduction.h $(UTILHEADERS) \
+	  ckfutures.h ckarray.h ckreduction.h $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h \
@@ -122,7 +122,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h \
 	  MetisLB.h NborBaseLB.h \
 	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h \
-      ampi.h ampif.h BlueGene.h \
+	  ampi.h BlueGene.h \
 	  $(CVHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
@@ -637,12 +637,15 @@ libampi.a: ampi.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h ampimain.decl.h \
 	$(CHARMC) -DAMPI_FORTRAN=0 -c ampi.C
 	$(CHARMC) -cp ../lib -o libampi.a ampi.o
 
-libampif.a: ampi.C ampimain.C ampif.C ampi.h ampiimpl.h ampi.decl.h ampi.def.h \
+libampif.a: ampi.C ampimain.C ampif.C ampimod.f90 ampi.h ampiimpl.h \
+            ampi.decl.h ampi.def.h \
             ampimain.decl.h ampimain.def.h
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampi.C
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampimain.C
 	$(CHARMC) -DAMPI_FORTRAN=1 -c ampif.C
-	$(CHARMC) -cp ../lib -o libampif.a ampimain.o ampi.o ampif.o
+	$(CHARMC) -c ampimod.f90
+	$(CHARMC) -cpmod ../include ampi.M
+	$(CHARMC) -cp ../lib -o libampif.a ampimain.o ampi.o ampif.o ampimod.o
 
 libf90charm.a: f90main.ci f90main.h f90main.C charmf.h charmf.C futil.f90
 	$(CHARMC) f90main.ci
