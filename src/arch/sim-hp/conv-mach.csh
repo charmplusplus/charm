@@ -17,6 +17,8 @@
 set CMK_CPP='/lib/cpp -P'
 set CMK_LDRO='ld -r -o'
 set CMK_CC='cc -O -Ae'
+set CMK_CC_RELIABLE='cc -O -Ae'
+set CMK_CC_FASTEST='cc -O -Ae'
 set CMK_CXX='CC'
 set CMK_CXXPP='CC -E'
 set CMK_CF77=''

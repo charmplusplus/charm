@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.6  1995-10-20 18:38:43  jyelon
+# Revision 2.7  1995-10-25 19:59:30  jyelon
+# added CMK_CC_RELIABLE and CMK_CC_FASTEST
+#
+# Revision 2.6  1995/10/20  18:38:43  jyelon
 # added CMK_C_DEBUG, CMK_C_OPTIMIZE, CMK_CXX_DEBUG, CMK_CXX_OPTIMIZE
 #
 # Revision 2.5  1995/10/19  17:55:37  jyelon
@@ -29,6 +32,8 @@
 set CMK_CPP='/lib/cpp -P'
 set CMK_LDRO='ld -r -o'
 set CMK_CC='gcc '
+set CMK_CC_RELIABLE='gcc '
+set CMK_CC_FASTEST='gcc '
 set CMK_CXX='g++ '
 set CMK_CXXPP='g++ -E '
 set CMK_CF77=''
