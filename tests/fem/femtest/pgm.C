@@ -34,10 +34,19 @@ TCharmUserNodeSetup(void)
 	TCharmReadonlyGlobals(pupMyGlobals);
 }
 
+void printargs(void) {
+  CkPrintf("Args for pe %d: ",CkMyPe());
+  for (int i=0;i<CkGetArgc();i++) {
+    CkPrintf("'%s' ",CkGetArgv()[i]);
+  }
+  CkPrintf("\n");
+}
+
 extern "C" void
 init(void)
 {
   CkPrintf("init called\n");
+  printargs();
   tsteps=10;
   reduceValues=new double[tsteps];
   int *conn=new int[dim*dim*np];
@@ -208,12 +217,11 @@ driver(void)
   int ngnodes, ngelems; //Counts including ghosts
 
   FEM_Print("Starting driver...");
-
+printargs();
   FEM_Get_Node(&nnodes,&nnodeData);
   double *nodeData=new double[nnodeData*nnodes];
   FEM_Get_Node_Data(nodeData);  
 
-  const int *elGnum=FEM_Get_Elem_Nums();
   FEM_Get_Elem(0,&nelems,&nelemData,&np);
   int *conn=new int[np*nelems];
   FEM_Get_Elem_Conn(0,conn);
@@ -333,6 +341,7 @@ driver(void)
 
 
     //Make a list of elements with odd global numbers
+    const int *elGnum=FEM_Get_Elem_Nums();
     int elListLen=0;
     double thresh=2.0;
     for (i=0;i<nelems;i++) 
@@ -341,7 +350,7 @@ driver(void)
 		    elList[elListLen++]=i;
 	    }
 
-    //Get a list of ghost elements with large values
+    //Get a list of ghost elements with odd global numbers
     FEM_Exchange_Ghost_Lists(0,elListLen,elList);
     elListLen=FEM_Get_Ghost_List_Length();
     FEM_Get_Ghost_List(elList);
@@ -362,6 +371,13 @@ driver(void)
     delete[] nodeOut;
     FEM_Update_Mesh(1+t,0);
 #endif
+
+#if ENABLE_MIG /*Only works with -memory isomalloc*/
+    CkPrintf("Before migrate: Thread %d on pe %d\n",myId,CkMyPe());
+    FEM_Migrate();
+    CkPrintf("After migrate: Thread %d on pe %d\n",myId,CkMyPe());
+#endif
+
   }
 
   FEM_Print("All tests passed.");

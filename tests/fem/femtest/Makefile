@@ -28,3 +28,8 @@ test: pgm
 	./charmrun ./pgm +vp3 -write
 	./charmrun ./pgm +vp3 -read
 	rm -f fem_mesh_vp3_*
+
+test-mig:
+	rm -fr pgm pgm.o
+	make OPTS="-DENABLE_MIG=1 -memory isomalloc -balancer RandCentLB" pgm
+	./charmrun ./pgm +p2
