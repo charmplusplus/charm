@@ -226,6 +226,9 @@ AddList() {
 }
 
 # Append the last word to this list, avoiding duplicates
+# the difference to previous AddList() is that when duplication happens,
+# only keep the last one, instead of keeping the first one as in AddList()
+# this helps to solve the multiple -lfoo in the link command. 
 AppendList() {
 	ret=""
 	search=$1
@@ -325,7 +328,13 @@ do
 		;;
 
 	"-tracemode")
-		TRACEMODE="$TRACEMODE $1"
+		TRACEMODE_NEW=`AddList $TRACEMODE $1`
+ 		if [ "$TRACEMODE_NEW" = "$TRACEMODE" ]
+		then
+			Warning "Warning: Duplicate tracemode $1 ignored"
+		else
+			TRACEMODE=$TRACEMODE_NEW
+		fi
 		shift
 		;;
 
@@ -649,7 +658,7 @@ then
 fi
 if [ "$LANGUAGE" = "bgcharm++" ]
 then
-	TRACEMODE="$TRACEMODE bluegene"
+	TRACEMODE=`AddList $TRACEMODE bluegene`
 fi
 
 if [ "$BUILD_SHARE" = "1" -a -n "$CMK_NO_BUILD_SHARED" ]
