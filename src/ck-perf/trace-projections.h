@@ -51,6 +51,7 @@ class LogEntry {
     UShort eIdx;
     UChar type; 
     void write(FILE *fp);
+    void writeBinary(FILE *fp);
 };
 
 class LogPool {
@@ -59,8 +60,10 @@ class LogPool {
     UInt numEntries;
     LogEntry *pool;
     FILE *fp;
+    int binary;
   public:
-    LogPool(char *pgm) {
+    LogPool(char *pgm, int b) {
+      binary = b;
       pool = new LogEntry[CpvAccess(CtrLogBufSize)];
       numEntries = 0;
       poolSize = CpvAccess(CtrLogBufSize);
@@ -83,10 +86,16 @@ class LogPool {
       if(!fp) {
         CmiAbort("Cannot open Projections Trace File for writing...\n");
       }
-      fprintf(fp, "PROJECTIONS-RECORD\n");
+      if(!binary) {
+        fprintf(fp, "PROJECTIONS-RECORD\n");
+      }
     }
     ~LogPool() {
-      write();
+      if(binary) {
+        writeBinary();
+      } else {
+        write();
+      }
       fclose(fp);
       delete[] pool;
     }
@@ -94,13 +103,17 @@ class LogPool {
       for(UInt i=0; i<numEntries; i++)
         pool[i].write(fp);
     }
+    void writeBinary(void) {
+      for(UInt i=0; i<numEntries; i++)
+        pool[i].writeBinary(fp);
+    }
     void writeSts(void);
     void add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe) {
       new (&pool[numEntries++])
         LogEntry(time, type, mIdx, eIdx, event, pe);
       if(poolSize==numEntries) {
         double writeTime = CkTimer();
-        write();
+        if(binary) writeBinary(); else write();
         numEntries = 0;
         new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
         new (&pool[numEntries++]) LogEntry(CkTimer(), END_INTERRUPT);

@@ -55,12 +55,26 @@ void traceInit(int* argc, char **argv)
   }
   if(i!=*argc) { // +traceoff parameter was found, delete it
     while((i+1)<= *argc) {
-      argv[i] = argv[i+2];
+      argv[i] = argv[i+1];
       i++;
     }
-    *argc -= 2;
+    *argc -= 1;
   }
-  CpvAccess(_logPool) = new LogPool(CpvAccess(pgmName));
+  int binary = 0;
+  for(i=1;i<*argc;i++) {
+    if(strcmp(argv[i], "+binary-trace")==0) {
+      binary = 1;
+      break;
+    }
+  }
+  if(i!=*argc) { // +traceoff parameter was found, delete it
+    while((i+1)<= *argc) {
+      argv[i] = argv[i+1];
+      i++;
+    }
+    *argc -= 1;
+  }
+  CpvAccess(_logPool) = new LogPool(CpvAccess(pgmName),binary);
 }
 
 extern "C"
@@ -194,6 +208,66 @@ void LogEntry::write(FILE* fp)
     case BEGIN_COMPUTATION:
     case END_COMPUTATION:
     fprintf(fp, "%u\n", (UInt) (time*1.0e6));
+      break;
+
+    default:
+      CmiError("***Internal Error*** Wierd Event %d.\n", type);
+      break;
+  }
+}
+
+void LogEntry::writeBinary(FILE* fp)
+{
+  UInt ttime = (UInt) (time*1.0e6);
+
+  fwrite(&type,sizeof(UChar),1,fp);
+
+  switch (type) {
+    case USER_EVENT:
+      fwrite(&mIdx,sizeof(UShort),1,fp);
+      fwrite(&ttime,sizeof(UInt),1,fp);
+      fwrite(&event,sizeof(int),1,fp);
+      fwrite(&pe,sizeof(int),1,fp);
+      break;
+
+    case BEGIN_IDLE:
+    case END_IDLE:
+    case BEGIN_PACK:
+    case END_PACK:
+    case BEGIN_UNPACK:
+    case END_UNPACK:
+      fwrite(&ttime,sizeof(UInt),1,fp);
+      fwrite(&pe,sizeof(int),1,fp);
+      break;
+
+    case CREATION:
+    case BEGIN_PROCESSING:
+    case END_PROCESSING:
+      fwrite(&mIdx,sizeof(UShort),1,fp);
+      fwrite(&eIdx,sizeof(UShort),1,fp);
+      fwrite(&ttime,sizeof(UInt),1,fp);
+      fwrite(&event,sizeof(int),1,fp);
+      fwrite(&pe,sizeof(int),1,fp);
+      break;
+
+    case ENQUEUE:
+    case DEQUEUE:
+      fwrite(&mIdx,sizeof(UShort),1,fp);
+      fwrite(&ttime,sizeof(UInt),1,fp);
+      fwrite(&event,sizeof(int),1,fp);
+      fwrite(&pe,sizeof(int),1,fp);
+      break;
+
+    case BEGIN_INTERRUPT:
+    case END_INTERRUPT:
+      fwrite(&ttime,sizeof(UInt),1,fp);
+      fwrite(&event,sizeof(int),1,fp);
+      fwrite(&pe,sizeof(int),1,fp);
+      break;
+
+    case BEGIN_COMPUTATION:
+    case END_COMPUTATION:
+      fwrite(&ttime,sizeof(UInt),1,fp);
       break;
 
     default:
