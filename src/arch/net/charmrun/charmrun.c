@@ -641,6 +641,7 @@ void arg_init(int argc, char **argv)
     printf("Charmrun> 'singlemaster' is ignored due to 'skipmaster'. \n");
     arg_singlemaster = 0;
   }
+  pparam_flag(&arg_debug,         0, "debug",         "turn on more verbose debug print");
 #endif
   pparam_str(&arg_runscript,    0, "runscript", "script to run node-program with");
   pparam_flag(&arg_help,	0, "help", "print help messages");
@@ -685,9 +686,6 @@ void arg_init(int argc, char **argv)
   if (arg_local) {
     fprintf(stderr,"Warning> ++local cannot be used in bproc version, ignored!\n");
     arg_local = 0;
-  }
-  if (arg_debug || arg_debug_no_pause) {
-    fprintf(stderr,"Warning> bproc version doesnot support ++debug option.\n");
   }
 #endif
 
