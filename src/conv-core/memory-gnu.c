@@ -362,7 +362,7 @@ extern Void_t*     sbrk();
 
 /* mechanics for getpagesize; adapted from bsd/gnu getpagesize.h */
 
-#if defined(BSD) || defined(DGUX) || defined(sun) || defined(HAVE_GETPAGESIZE)
+#if defined(BSD) || defined(DGUX) || defined(sun) || defined(_WIN32) || defined(HAVE_GETPAGESIZE)
    extern size_t getpagesize();
 #  define malloc_getpagesize getpagesize()
 #else
