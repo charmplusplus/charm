@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <errno.h>
 #include "converse.h"
+//#include <mpi.h>
 
 #include <elan/elan.h>
 
@@ -44,7 +45,7 @@
 #define CMK_BROADCAST_SPANNING_TREE    1
 #endif
 
-#define BROADCAST_SPANNING_FACTOR      20
+#define BROADCAST_SPANNING_FACTOR      4
 
 /*#define CMI_BROADCAST_ROOT(msg)          ((CmiUInt2 *)(msg))[4]*/
 #define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
@@ -60,7 +61,7 @@ ELAN_BASE     *elan_base;
 ELAN_TPORT    *elan_port;
 ELAN_QUEUE    *elan_q;
 #define SMALL_MESSAGE_SIZE 5000
-#define SYNC_MESSAGE_SIZE 5000
+#define SYNC_MESSAGE_SIZE 65536
 
 ELAN_EVENT *esmall, *emid, *elarge;
 #define TAG_SMALL 0x69
@@ -91,6 +92,7 @@ static void ConverseRunPE(int everReturn);
 static void CommunicationServer(int sleepTime);
 
 typedef struct msg_list {
+    /*MPI_Request req;*/
     ELAN_EVENT *e;
     char *msg;
     struct msg_list *next;
@@ -315,7 +317,7 @@ int PumpMsgs(void)
   static char *sbuf;
   static char *lbuf;
 
-  int nbytes, flg, res;
+  int flg, res;
   char *msg = 0;
 
   int recd=0;
@@ -326,7 +328,7 @@ int PumpMsgs(void)
 
     if(!recv_small_done) {
       sbuf = (char *) CmiAlloc(SMALL_MESSAGE_SIZE);
-      esmall = elan_tportRxStart(elan_port, 0, 0, 0, 0, TAG_SMALL, sbuf, SMALL_MESSAGE_SIZE);
+      esmall = elan_tportRxStart(elan_port, 0, 0, 0, -1, TAG_SMALL, sbuf, SMALL_MESSAGE_SIZE);
       recv_small_done = 1;
     }
     
@@ -337,7 +339,7 @@ int PumpMsgs(void)
     
     if(elan_tportRxDone(esmall)) {
       elan_tportRxWait(esmall, NULL, NULL, &size );
-      CmiPrintf("Received small Message in %d %d\n", CmiMyPe(), size);
+      //      CmiPrintf("Received small Message in %d %d\n", CmiMyPe(), size);
 
       msg = sbuf;
       recv_small_done = 0;
@@ -347,13 +349,13 @@ int PumpMsgs(void)
       
 #if CMK_BROADCAST_SPANNING_TREE
       if (CMI_BROADCAST_ROOT(msg))
-	SendSpanningChildren(nbytes, msg);
+	SendSpanningChildren(size, msg);
 #endif
     }
     
     if(elan_tportRxDone(elarge)) {
       elan_tportRxWait(elarge, NULL, NULL, &size );
-      CmiPrintf("Received large Message in %d %d\n", CmiMyPe(), size);
+      //      CmiPrintf("Received large Message in %d %d\n", CmiMyPe(), size);
       //printf("%d, ", size);
       
       lbuf = (char *) CmiAlloc(size);
@@ -367,10 +369,9 @@ int PumpMsgs(void)
       CmiPushPE(CMI_DEST_RANK(msg), msg);
 #if CMK_BROADCAST_SPANNING_TREE
       if (CMI_BROADCAST_ROOT(msg))
-	SendSpanningChildren(nbytes, msg);
+	SendSpanningChildren(size, msg);
 #endif
     }
-    
     
     if(!flg)
       return recd;
@@ -481,7 +482,7 @@ static int SendMsgBuf()
       CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
     */
 
-    msg_tmp->e = elan_tportTxStart(elan_port, 0, node, CmiMyNode(), (size <= SMALL_MESSAGE_SIZE)? TAG_SMALL : TAG_LARGE, msg, size);
+    msg_tmp->e = elan_tportTxStart(elan_port, (size <= SYNC_MESSAGE_SIZE)? 0: ELAN_TPORT_TXSYNC, node, CmiMyNode(), (size <= SMALL_MESSAGE_SIZE)? TAG_SMALL : TAG_LARGE, msg, size);
     
     MsgQueueLen++;
     if(sent_msgs==0)
@@ -538,7 +539,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
     CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
   */
 
-  CmiPrintf("Sending Message to %d from %d %d TAG = %d\n", destPE, CmiMyNode(), size, (size <= SMALL_MESSAGE_SIZE)? TAG_SMALL : TAG_LARGE);
+  //  CmiPrintf("Sending Message to %d from %d %d TAG = %d\n", destPE, CmiMyNode(), size, (size <= SMALL_MESSAGE_SIZE)? TAG_SMALL : TAG_LARGE);
   msg_tmp->e = elan_tportTxStart(elan_port, 0, destPE, CmiMyNode(), (size <= SMALL_MESSAGE_SIZE)? TAG_SMALL : TAG_LARGE, msg, size);
 
   /*
@@ -835,14 +836,14 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   
   
   if (!(elan_port = elan_tportInit(elan_base->state,
-                           (ELAN_QUEUE *)elan_q,
-                           /*elan_main2elan(elan_base->state, elan_q),*/
-                           elan_base->tport_nslots, 
-                           elan_base->tport_smallmsg,
-                           elan_base->tport_bigmsg,
-                           elan_base->waitType, elan_base->retryCount,
-                           &(elan_base->shm_key),
-                           elan_base->shm_fifodepth, elan_base->shm_fragsize))) {
+				   (ELAN_QUEUE *)elan_q,
+				   /*elan_main2elan(elan_base->state, q),*/
+				   elan_base->tport_nslots, 
+				   elan_base->tport_smallmsg,
+				   elan_base->tport_bigmsg,
+				   elan_base->waitType, elan_base->retryCount,
+				   &(elan_base->shm_key),
+				   elan_base->shm_fifodepth, elan_base->shm_fragsize))) {
     
     perror("Failed to to initialise TPORT");
     exit(1);
