@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.15  1995-10-18 01:58:43  jyelon
+ * Revision 1.16  1995-10-18 22:20:17  jyelon
+ * Added 'eatstack' threads implementation.
+ *
+ * Revision 1.15  1995/10/18  01:58:43  jyelon
  * added ifdef around 'alloca.h'
  *
  * Revision 1.14  1995/10/13  22:33:36  jyelon
@@ -158,38 +161,6 @@
  *     will eventually return.
  *
  *
- * The threads-package makes it possible to associate private data
- * with a thread.  to this end, we provide the following functions:
- *
- * void CthSetVar(CthThread t, void **var, void *val)
- *
- *     Specifies that the variable global variable pointed to by 'var'
- *     should be set to value 'val' whenever thread 't' is executing.
- *     'var' should be of type (void *), or at least should be coercible
- *     to a (void *).  This can be used to associate thread-private data
- *     with thread 't'.
- *
- * it is intended that this function be used as follows:
- *
- *     struct th_info { any thread-private info desired }
- *     struct th_info *curr_info;
- *
- *     ...
- *
- *     t = CthCreate(...);
- *     CthSetVar(t, &curr_info, malloc(sizeof(struct th_info));
- *
- * That way, whenever thread t is executing, it can access its private
- * data by dereferencing curr_info.  We also provide:
- *
- * void *CthGetVar(CthThread t, void **var)
- *
- *     This makes it possible to retrieve values previously stored with
- *     CthSetVar when t is _not_ executing.  Returns the value that 'var' will
- *     be set to when 't' is running.
- *
- *
- *
  * Note: there are several possible ways to implement threads.   No one
  * way works on all machines.  Instead, we provide one implementation which
  * covers a lot of machines, and a second implementation that simply prints
@@ -251,8 +222,14 @@ CthThread t;
  * threads: implementation CMK_THREADS_USE_ALLOCA.
  *
  * This particular implementation of threads works on most machines that
- * support alloca, and don't use shared-memory.  So far, all workstations
- * that we have tested can run this version.
+ * support alloca.
+ *
+ * Note that we have NOT used Cpv variables.  This makes it possible to use
+ * this version as the core threads package in the uth version.  I'm trying
+ * to get around this design... I'd rather use Cpv variables.
+ *
+ * As a result of the lack of Cpv variables, this version won't work on any
+ * shared-memory machine where globals are shared by default.
  *
  *****************************************************************************/
 
@@ -269,6 +246,8 @@ CthThread t;
 #define STACKSIZE (32768)
 #define SLACK     256
 
+char *CthData;
+
 struct CthThreadStruct
 {
   char cmicore[CmiMsgHeaderSizeBytes]; /* So we can enqueue them */
@@ -278,15 +257,16 @@ struct CthThreadStruct
   char      *top;
   CthVoidFn  awakenfn;
   CthThFn    choosefn;
-  void     **data_var[10];
-  void      *data_val[10];
-  int        data_count;
+  char      *data;
+  int        datasize;
   double     stack[1];
 };
 
-static CthThread thread_current;
-static CthThread thread_exiting;
-static int       thread_growsdown;
+
+static CthThread  thread_current;
+static CthThread  thread_exiting;
+static int        thread_growsdown;
+static int        thread_datasize;
 
 #define ABS(a) (((a) > 0)? (a) : -(a) )
 
@@ -299,11 +279,13 @@ void CthInit()
   char *sp2 = alloca(8);
   if (sp2<sp1) thread_growsdown = 1;
   else         thread_growsdown = 0;
+  thread_datasize=1;
   thread_current=
     (CthThread)CmiAlloc(sizeof(struct CthThreadStruct));
   thread_current->fn=0;
   thread_current->arg=0;
-  thread_current->data_count=0;
+  thread_current->data=0;
+  thread_current->datasize=0;
   thread_current->awakenfn = 0;
   thread_current->choosefn = 0;
 }
@@ -332,20 +314,42 @@ CthThread t;
     alloca(newsp - oldsp);
   }
   thread_current = t;
+  CthData = t->data;
   longjmp(t->jb, 1);
+}
+
+void CthFixData(t)
+CthThread t;
+{
+  if (t->data == 0) {
+    t->datasize = thread_datasize;
+    t->data = (char *)malloc(thread_datasize);
+    return;
+  }
+  if (t->datasize != thread_datasize) {
+    t->datasize = thread_datasize;
+    t->data = (char *)realloc(t->data, t->datasize);
+    return;
+  }
+}
+
+static void CthFreeNow(t)
+CthThread t;
+{
+  if (t->data) free(t->data); 
+  CmiFree(t);
 }
 
 void CthResume(t)
 CthThread t;
 {
   int i;
-  for (i=0; i<t->data_count; i++)
-    *(t->data_var[i]) = t->data_val[i];
   if (t == thread_current) return;
+  CthFixData(t);
   if ((setjmp(thread_current->jb))==0)
     CthTransfer(t);
   if (thread_exiting)
-    { CmiFree(thread_exiting); thread_exiting=0; }
+    { CthFreeNow(thread_exiting); thread_exiting=0; }
 }
 
 CthThread CthCreate(fn, arg, size)
@@ -367,11 +371,12 @@ CthVoidFn fn; void *arg; int size;
   result->top = newsp;
   result->awakenfn = 0;
   result->choosefn = 0;
-  result->data_count = 0;
+  result->data = 0;
+  result->datasize = 0;
   alloca(offs);
   if (setjmp(result->jb)) {
     if (thread_exiting)
-      { CmiFree(thread_exiting); thread_exiting=0; }
+      { CthFreeNow(thread_exiting); thread_exiting=0; }
     (thread_current->fn)(thread_current->arg);
     thread_exiting = thread_current;
     CthSuspend();
@@ -384,7 +389,7 @@ CthThread t;
 {
   if (t==thread_current) {
     thread_exiting = t;
-  } else CmiFree(t);
+  } else CthFreeNow(t);
 }
 
 static void CthNoStrategy()
@@ -423,39 +428,292 @@ void CthYield()
   CthSuspend();
 }
 
-void CthSetVar(thr, var, val)
-CthThread thr;
-void **var;
-void *val;
+int CthRegister(size)
+int size;
 {
-  int i;
-  int data_count = thr->data_count;
-  if (thr == CthSelf()) *var = val;
-  for (i=0; i<data_count; i++)
-    if (var == thr->data_var[i])
-      { thr->data_val[i]=val; return; }
-  if (data_count==10) {
-    fprintf(stderr,"CthSetVar: Thread data space full.\n");
-    exit(1);
-  }
-  thr->data_var[data_count]=var;
-  thr->data_val[data_count]=val;
-  thr->data_count++;
-}
-
-void *CthGetVar(thr, var)
-CthThread thr;
-void **var;
-{
-  int i;
-  int data_count = thr->data_count;
-  for (i=0; i<data_count; i++)
-    if (var == thr->data_var[i])
-      return thr->data_val[i];
-  return 0;
+  int result;
+  int align = 1;
+  while (size>align) align<<=1;
+  thread_datasize = (thread_datasize+align-1) & (align-1);
+  result = thread_datasize;
+  thread_datasize += size;
+  CthFixData(thread_current);
+  CthData = thread_current->data;
+  return result;
 }
 
 #endif /* CMK_THREADS_USE_ALLOCA */
+
+/*****************************************************************************
+ *
+ * threads: implementation CMK_THREADS_USE_EATSTACK
+ *
+ * I got the idea for this from a Dr. Dobb's journal, of all places.
+ * Threads are in the stack segment.  The topmost thread in the stack segment
+ * is responsible for creating new threads.  Whenever a new thread is needed,
+ * it recurses deeply until about 64k of stack space has been used up.  It
+ * then saves its state using setjmp, thereby creating a new top thread,
+ * and making the old top thread into a regular 64k thread, which goes on
+ * the freelist.
+ *
+ * This implementation has two distinct disadvantages.  One, the number of
+ * threads allowed is limited by the size to which your stack will grow.  Two,
+ * the size of the thread is fixed at 64k regardless of what you specify,
+ * since I haven't written any serious stack-memory allocation code yet.
+ *
+ * It has the obvious advantage that it doesn't require alloca.
+ *
+ *****************************************************************************/
+
+#ifdef CMK_THREADS_USE_EATSTACK
+#include <setjmp.h>
+#include <sys/types.h>
+
+#define STACKSIZE_MAIN 256000
+#define STACKSIZE_STD   64000
+
+CMK_STATIC_PROTO void CthClipTop CMK_PROTO((int));
+
+struct CthThreadStruct {
+  char cmicore[CmiMsgHeaderSizeBytes]; /* So we can enqueue them */
+  CthThread  next;
+  jmp_buf    ctrl;
+  jmp_buf    jb;
+  CthVoidFn  fn;
+  void      *arg;
+  CthVoidFn  awakenfn;
+  CthThFn    choosefn;
+  char      *data;
+  int        datasize;
+};
+
+CpvDeclare(char *, CthData);
+
+CpvStaticDeclare(CthThread, CthCurr);
+CpvStaticDeclare(CthThread, CthTop);
+CpvStaticDeclare(CthThread, CthFreeList);
+CpvStaticDeclare(CthThread, CthExiting);
+CpvStaticDeclare(int      , CthDatasize);
+
+int CthImplemented()
+{
+  return 1;
+}
+
+static void CthFreeNow(t)
+CthThread t;
+{
+  t->next = CpvAccess(CthFreeList);
+  CpvAccess(CthFreeList) = t;
+}
+
+static void CthFreeExiting()
+{
+  CthThread t = CpvAccess(CthExiting);
+  if (t && (t!=CpvAccess(CthCurr)))
+    { CthFreeNow(t); CpvAccess(CthExiting)=0; }
+}
+
+void CthFree(t)
+CthThread t;
+{
+  if (t==CpvAccess(CthCurr))
+    CpvAccess(CthExiting) = t;
+  else CthFreeNow(t);
+}
+
+static void CthSaveLoad(jmp_buf save, jmp_buf load, int index)
+{
+  if (setjmp(save)==0) longjmp(load, index);
+}
+
+static void CthNoStrategy()
+{
+  CmiPrintf("Called CthAwaken or CthSuspend before calling CthSetStrategy.\n");
+  exit(1);
+}
+    
+void CthSuspend()
+{
+  CthThread curr = CthSelf();
+  CthThread next;
+  if (curr->choosefn == 0) CthNoStrategy();
+  next = curr->choosefn();
+  CthResume(next);
+}
+ 
+void CthAwaken(th)
+CthThread th;
+{
+  if (th->awakenfn == 0) CthNoStrategy();
+  th->awakenfn(th);
+}
+ 
+void CthSetStrategy(t, awkfn, chsfn)
+CthThread t;
+CthVoidFn awkfn;
+CthThFn chsfn;
+{
+  t->awakenfn = awkfn;
+  t->choosefn = chsfn;
+}
+ 
+void CthYield()
+{
+  CthAwaken(CthSelf());
+  CthSuspend();
+}
+ 
+static void CthFixData(t)
+CthThread t;
+{
+  if (t->data == 0) {
+    t->datasize = CpvAccess(CthDatasize);
+    t->data = (char *)malloc(t->datasize);
+    return;
+  }
+  if (t->datasize != CpvAccess(CthDatasize)) {
+    t->datasize = CpvAccess(CthDatasize);
+    t->data = (char *)realloc(t->data, t->datasize);
+    return;
+  }
+}
+
+int CthRegister(size)
+int size;
+{
+  int dsize = CpvAccess(CthDatasize);
+  CthThread self = CthSelf();
+  int result;
+  int align = 1;
+  while (size>align) align<<=1;
+  dsize = (dsize + align-1) & (align-1);
+  result = dsize;
+  dsize += size;
+  CpvAccess(CthDatasize) = dsize;
+  CthFixData(self);
+  CpvAccess(CthData) = self->data;
+  return result;
+}
+
+static void CthReset(t,fn,arg)
+CthThread t; CthVoidFn fn; void *arg;
+{
+  memcpy(t->jb, t->ctrl, sizeof(t->jb));
+  t->fn = fn;
+  t->arg = arg;
+  t->awakenfn = 0;
+  t->choosefn = 0;
+  t->data = 0;
+  t->datasize = 0;
+}
+
+static void CthController()
+{
+  char base;
+  CthThread t;
+  /* I am the top thread, and I have recursed deeply to lower my     */
+  /* stack pointer. I break off what remains of the stack segment    */
+  /* and store it in CthTop, thereby making myself the second-from-  */
+  /* the-top thread, and then I return.  My callee will then take    */
+  /* me and push me on the freelist.                                 */
+  t = (CthThread)malloc(sizeof(struct CthThreadStruct));
+  CpvAccess(CthTop) = t;
+  switch(setjmp(t->ctrl)) {
+  case 0: return;
+  case 1:
+    /* I am top thread, and I have been asked by the current           */
+    /* thread to extend the freelist.  I must recurse deeply using     */
+    /* CthClipTop, which will truncate me and make me just another     */
+    /* unused thread.  I must push my truncated self onto to freelist, */
+    /* then go back to current thread (which invoked me).              */
+    t = CpvAccess(CthTop);
+    t->next = CpvAccess(CthFreeList);
+    CpvAccess(CthFreeList) = t;
+    CthClipTop(STACKSIZE_STD);
+    longjmp(CpvAccess(CthCurr)->jb,1);
+    break;
+  case 2:
+    /* I am a thread which has recently been removed from the     */
+    /* freelist and returned by CthCreate.  I have just been      */
+    /* awakened via CthResume, therefore, I am the current        */
+    /* thread.  I must start executing my func.                   */
+    t = CpvAccess(CthCurr);
+    CthFreeExiting();
+    (t->fn)(t->arg);
+    CthFree(CthSelf());
+    CthSuspend();
+    printf("thread ran off end!\n");
+    exit(1);
+  }
+}
+
+static void CthClip_1(int size)  { char gap[1024];  CthClipTop(size - 1024);  }
+static void CthClip_4(int size)  { char gap[4096];  CthClipTop(size - 4096);  }
+static void CthClip_16(int size) { char gap[16384]; CthClipTop(size - 16384); }
+static void CthClip_64(int size) { char gap[65536]; CthClipTop(size - 65536); }
+
+static void CthClipTop(size)
+int size;
+{
+  if       (size >= 65536) CthClip_64(size);
+  else if  (size >= 16384) CthClip_16(size);
+  else if  (size >=  4096) CthClip_4(size);
+  else if  (size >      0) CthClip_1(size);
+  else CthController();
+}
+
+CthThread CthCreate(fn, arg, size)
+CthVoidFn fn; void *arg; int size;
+{
+  CthThread new;
+  if (CpvAccess(CthFreeList)==0)
+    CthSaveLoad(CpvAccess(CthCurr)->jb, CpvAccess(CthTop)->ctrl, 1);
+  new = CpvAccess(CthFreeList);
+  CpvAccess(CthFreeList) = new->next;
+  CthReset(new, fn, arg);
+  return new;
+}
+
+CthThread CthSelf()
+{
+  return CpvAccess(CthCurr);
+}
+
+void CthResume(t)
+CthThread t;
+{
+  CthThread old;
+  old = CpvAccess(CthCurr);
+  CthFixData(t);
+  CpvAccess(CthCurr) = t;
+  CpvAccess(CthData) = t->data;
+  CthSaveLoad(old->jb, t->jb, 2);
+  CthFreeExiting();
+}
+
+void CthInit(argv)
+char **argv;
+{
+  CpvInitialize(CthThread, CthCurr);
+  CpvInitialize(CthThread, CthTop);
+  CpvInitialize(CthThread, CthFreeList);
+  CpvInitialize(CthThread, CthExiting);
+  CpvInitialize(int,       CthDatasize);
+  CpvInitialize(char *,    CthData);
+
+  CpvAccess(CthCurr) = (CthThread)malloc(sizeof(struct CthThreadStruct));
+  CpvAccess(CthTop) = 0;
+  CpvAccess(CthFreeList) = 0;
+  CpvAccess(CthExiting) = 0;
+  CpvAccess(CthDatasize) = 0;
+  CpvAccess(CthData) = 0;
+
+  CthReset(CpvAccess(CthCurr),0,0);
+  CthClipTop(STACKSIZE_MAIN);
+}
+
+#endif /* CMK_THREADS_USE_EATSTACK */
 
 /*****************************************************************************
  *
@@ -505,14 +763,6 @@ void CthSetStrategy(t, awkfn, chsfn)
     { CthFail(); }
 
 void CthYield()
-    { CthFail(); }
-
-void CthSetVar(t, var, val)
-    CthThread t; void **var; void *val;
-    { CthFail(); }
-
-void *CthGetVar(t, var)
-    CthThread t; void **var;
     { CthFail(); }
 
 void CthInit()

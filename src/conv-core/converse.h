@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.28  1995-10-13 22:34:07  jyelon
+ * Revision 2.29  1995-10-18 22:20:37  jyelon
+ * Added 'eatstack' threads implementation.
+ *
+ * Revision 2.28  1995/10/13  22:34:07  jyelon
  * *** empty log message ***
  *
  * Revision 2.27  1995/10/13  18:14:10  jyelon
@@ -99,7 +102,13 @@
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 
-#if defined(__cplusplus)
+/* the following flags denote properties of the C compiler,  */
+/* not the C++ compiler.  If this is C++, ignore them.       */
+#ifdef __cplusplus
+#undef CMK_COMPILER_HATES_PROTOTYPES
+#define CMK_COMPILER_LIKES_PROTOTYPES
+#undef CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
+#define CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
 extern "C" {
 #endif
 
@@ -119,7 +128,13 @@ extern "C" {
 #define CMK_CONCAT(x,y) x##y
 #endif
 
+#ifdef CMK_COMPILER_LIKES_STATIC_PROTO
+#define CMK_STATIC_PROTO static
+#endif
 
+#ifdef CMK_COMPILER_HATES_STATIC_PROTO
+#define CMK_STATIC_PROTO extern
+#endif
 
 /******** CPV, CSV: PRIVATE AND SHARED VARIABLES *******/
 
@@ -327,6 +342,7 @@ void   CmiDeliverSpecificMsg   CMK_PROTO((int handler));
 
 /****** CTH: THE THREADS PACKAGE ******/
 
+
 typedef struct CthThreadStruct *CthThread;
 
 typedef void        (*CthVoidFn)();
@@ -345,8 +361,76 @@ void       CthSetStrategy         CMK_PROTO((CthThread, CthVoidFn, CthThFn));
 void       CthSetStrategyDefault  CMK_PROTO((CthThread));
 void       CthYield               CMK_PROTO((void));
 
-void       CthSetVar   CMK_PROTO((CthThread, void **, void *));
-void      *CthGetVar   CMK_PROTO((CthThread, void **));
+/****** CTH: THREAD-PRIVATE VARIABLES (Geez, I hate C) ******/
+
+
+#ifdef CMK_THREADS_UNAVAILABLE
+#define CthDeclare(t,v)         CpvDeclare(t,v)
+#define CthStaticDeclare(t,v)   CpvStaticDeclare(t,v)
+#define CthExtern(t,v)          CpvExtern(t,v)
+#define CthAccess(v)            CpvAccess(v)
+#define CthInitialize(t,v)      CpvInitialize(t,v)
+#endif
+
+
+
+#ifdef CMK_THREADS_USE_ALLOCA
+#ifdef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
+extern char *CthData;
+extern int CthRegister CMK_PROTO((int));
+#define CthOffs(v) CthOffs##v
+#define CthType(v) CthType##v
+#define CthDeclare(t,v)         typedef t CthType(v); int CthOffs(v)
+#define CthStaticDeclare(t,v)   typedef t CthType(v); static int CthOffs(v)
+#define CthExtern(t,v)          typedef t CthType(v); extern int CthOffs(v)
+#define CthAccess(v)            (*((CthType(v) *)(CthData+CthOffs(v))))
+#define CthInitialize(t,v)      (CthOffs(v)=CthRegister(sizeof(CthType(v))))
+#endif /* CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION */
+#endif /* CMK_THREADS_USE_ALLOCA */
+
+
+
+#ifdef CMK_THREADS_USE_ALLOCA
+#ifdef CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
+extern char *CthData;
+extern int CthRegister CMK_PROTO((int));
+#define CthDeclare(t,v)         int v;          struct v { t data; }
+#define CthStaticDeclare(t,v)   static int v;   struct v { t data; }
+#define CthExtern(t,v)          extern int v;   struct v { t data; }
+#define CthAccess(v)            (((struct v *)(CthData+(v)))->data)
+#define CthInitialize(t,v)      (v=CthRegister(sizeof(struct v)))
+#endif /* CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION */
+#endif /* CMK_THREADS_USE_ALLOCA */
+
+
+
+#ifdef CMK_THREADS_USE_EATSTACK
+#ifdef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
+CpvExtern(char *, CthData);
+extern int CthRegister CMK_PROTO((int));
+#define CthOffs(v) CthOffs##v
+#define CthType(v) CthType##v
+#define CthDeclare(t,v)      typedef t CthType(v); int CthOffs(v)
+#define CthStaticDeclare(t,v)typedef t CthType(v); static int CthOffs(v)
+#define CthExtern(t,v)       typedef t CthType(v); extern int CthOffs(v)
+#define CthAccess(v)         (*((CthType(v) *)(CpvAccess(CthData)+CthOffs(v))))
+#define CthInitialize(t,v)   (CthOffs(v)=CthRegister(sizeof(CthType(v))))
+#endif /* CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION */
+#endif /* CMK_THREADS_USE_EATSTACK */
+
+
+
+#ifdef CMK_THREADS_USE_EATSTACK
+#ifdef CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
+CpvDeclare(char *, CthData);
+extern int CthRegister CMK_PROTO((int));
+#define CthDeclare(t,v)         int v;          struct v { t data; }
+#define CthStaticDeclare(t,v)   static int v;   struct v { t data; }
+#define CthExtern(t,v)          extern int v;   struct v { t data; }
+#define CthAccess(v)            (((struct v *)(CpvAccess(CthData)+(v)))->data)
+#define CthInitialize(t,v)      (v=CthRegister(sizeof(struct v)))
+#endif /* CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION */
+#endif /* CMK_THREADS_USE_EATSTACK */
 
 
 /****** CMM: THE MESSAGE MANAGER ******/
