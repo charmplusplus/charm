@@ -152,7 +152,7 @@ basics: headers
 headers: dirs+sources headerlinks $(ALLHEADERS)
 
 conv-autoconfig.h:
-	./charmconfig
+	./configure
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
 	@echo "Soft-linking headers..."
@@ -898,5 +898,5 @@ veryclean:
 	rm -rf .[a-z]* .[A-Z]*
 
 
-charmconfig: configure.in
-	autoconf && autoheader && /bin/mv -f configure charmconfig
+configure: configure.in
+	autoconf && autoheader 
