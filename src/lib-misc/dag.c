@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1995-06-13 11:32:16  jyelon
+ * Revision 1.2  1996-03-09 18:11:20  jyelon
+ * Fixed Ck --> Cmi
+ *
+ * Revision 1.1  1995/06/13 11:32:16  jyelon
  * Initial revision
  *
  * Revision 1.2  1995/04/14  05:26:11  milind
@@ -37,11 +40,11 @@ _dag3_COUNT  *_dag4_allocc();
 #define _DAG4_FREEB(l,p) _dag4_freeb(l,p)
 
 /*
-#define _DAG4_ALLOCC(l) (_dag3_COUNT *)CkAlloc(sizeof(_dag3_COUNT))
-#define _DAG4_ALLOCB(l) (_dag3_BUFFER *)CkAlloc(sizeof(_dag3_BUFFER))
+#define _DAG4_ALLOCC(l) (_dag3_COUNT *)CmiAlloc(sizeof(_dag3_COUNT))
+#define _DAG4_ALLOCB(l) (_dag3_BUFFER *)CmiAlloc(sizeof(_dag3_BUFFER))
 
-#define _DAG4_FREEC(l,p) CkFree(p)
-#define _DAG4_FREEB(l,p) CkFree(p)
+#define _DAG4_FREEC(l,p) CmiFree(p)
+#define _DAG4_FREEB(l,p) CmiFree(p)
 */
 
 #define MATCH    1
@@ -273,7 +276,7 @@ _dag3_BUFFER   *ep_buffer[];
    else
       buffer = _dag4_nonmfb(flist,ep_buffer,eno);
 
-   if (buffer->expect) CkPrintf("dag error: multiple expect\n");
+   if (buffer->expect) CmiPrintf("dag error: multiple expect\n");
    buffer->expect = 1;
 
    *msgcount = 0;
@@ -303,7 +306,7 @@ int          n;
    int  i,*index; 
 
    if (buffer->msg == (void *) NULL) { 
-      msgarray      = (void **) CkAlloc(sizeof(void *)*(2*n+2)); 
+      msgarray      = (void **) CmiAlloc(sizeof(void *)*(2*n+2)); 
       msgarray[0]   = (void *) n; 
       msgarray[n+1] = (void *) 1;  /* index , initially == 1*/
       buffer->msg   = (void *) msgarray;
@@ -335,7 +338,7 @@ void         *msg;
         buffer->ecount--; 
       } 
    else 
-      CkPrintf("dag error: unexpected message\n");
+      CmiPrintf("dag error: unexpected message\n");
 }
 
 
@@ -380,7 +383,7 @@ int          position,eno,etype;
                   msgarray[i] = PROCESSED;
                   return msgarray[j];
                }
-            CkPrintf("dag error: gb:can't find message\n"); 
+            CmiPrintf("dag error: gb:can't find message\n"); 
          }
     else {
          buffer->free_count--;
@@ -491,12 +494,12 @@ _dag3_RLNODE   *rlnode;
                   msgarray = (void **) buffer->msg;
                   if (msgarray) {
                     n = (int) (msgarray[0]);
-                    for(j=1; j<=n; j++) if (msgarray[j]) CkFreeMsg(msgarray[j]);
-                    CkFree(msgarray);
+                    for(j=1; j<=n; j++) if (msgarray[j]) CmiFreeMsg(msgarray[j]);
+                    CmiFree(msgarray);
                    }
                  }
                else {
-                  if (buffer->msg) CkFreeMsg(buffer->msg);
+                  if (buffer->msg) CmiFreeMsg(buffer->msg);
                }
 
                *(buffer->prev) = buffer->next;
@@ -521,8 +524,8 @@ _dag3_RLNODE   *rlnode;
                msgarray = (void **) buffer->msg;
                if (msgarray) {
                    n = (int) (msgarray[0]);
-                   for(i=1; i<=n; i++) if (msgarray[i]) CkFreeMsg(msgarray[i]);
-                   CkFree(msgarray);
+                   for(i=1; i<=n; i++) if (msgarray[i]) CmiFreeMsg(msgarray[i]);
+                   CmiFree(msgarray);
                }
                *(buffer->prev) = buffer->next;
                if (buffer->next) buffer->next->prev = buffer->prev;
@@ -608,7 +611,7 @@ _dag3_FREELIST *flist;
 {
       _dag3_BUFFER *temp;
       if (flist->b == NULL) 
-         return (_dag3_BUFFER *) CkAlloc(sizeof(_dag3_BUFFER));
+         return (_dag3_BUFFER *) CmiAlloc(sizeof(_dag3_BUFFER));
       temp = flist->b;
       flist->b = flist->b->next;
       flist->bcount--;
@@ -621,7 +624,7 @@ _dag3_FREELIST *flist;
 {
       _dag3_COUNT *temp;
       if (flist->c == NULL) 
-          return (_dag3_COUNT *) CkAlloc(sizeof(_dag3_COUNT));
+          return (_dag3_COUNT *) CmiAlloc(sizeof(_dag3_COUNT));
       temp = flist->c;
       flist->c = flist->c->next;
       flist->ccount--;
@@ -637,7 +640,7 @@ _dag3_BUFFER   *p;
            flist->b = p;
            flist->bcount++;
         }
-      else CkFree(p);
+      else CmiFree(p);
 }
           
 
@@ -650,5 +653,5 @@ _dag3_COUNT   *p;
            flist->c = p;
            flist->ccount++;
         }
-      else CkFree(p);
+      else CmiFree(p);
 }
