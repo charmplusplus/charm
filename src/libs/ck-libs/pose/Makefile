@@ -27,9 +27,9 @@ CIFILES = mempool.def.h gvt.def.h ldbal.def.h pose.def.h sim.def.h stats.def.h
 
 all:  $(LIBDEST) $(LIBSEQDEST)
 
-pose: $(LIBDEST) 
+POSE: $(LIBDEST)
 
-seqpose:  $(LIBSEQDEST) 
+SEQPOSE:  $(LIBSEQDEST) 
 
 $(LIBDEST):	$(OBJECTS)
 	$(CHARMC) -o $(LIBDEST) $(OBJECTS)
@@ -42,7 +42,7 @@ $(LIBSEQDEST):	$(SEQOBJECTS)
 	$(CHARMC) -o $(LIBSEQDEST) $(SEQOBJECTS)
 	test ! -d $(POSEINCDIR) && mkdir $(POSEINCDIR) || true
 	/bin/cp -f  *.h $(POSEINCDIR)
-	/bin/cp libmoduleseqpose.dep $(CDIR)/lib/.
+	/bin/cp libmodulepose.dep $(CDIR)/lib/libmoduleseqpose.dep
 	/bin/cp -f  etrans.pl $(CHARMBIN)
 
 # POSE COMPILATION RULES 
