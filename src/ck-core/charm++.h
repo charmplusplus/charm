@@ -269,28 +269,20 @@ public:
   void *val;    // point to mCastCookie
   int redNo;
 public:
-  CkSectionCookie(): redNo(0) {val = NULL; pe = CmiMyPe();}
+  CkSectionCookie(): val(NULL), redNo(0) {pe = CmiMyPe();}
   CkSectionCookie(void *p): val(p), redNo(0) { pe = CmiMyPe();};
-  CkSectionCookie(int e, void *p, int r):  pe(e), val(p), redNo(r) { }
-/*
-  void pup(PUP::er &p) {
-    p | aid; 
-    p(pe); 
-    p((char *)&val, sizeof(void *)); 
-    p(redNo);
-  }
-*/
+  CkSectionCookie(int e, void *p, int r):  pe(e), val(p), redNo(r) {}
 };
 
 class CkSectionID {
 public:
-  CkSectionCookie cookie;
+  CkSectionCookie _cookie;
   CkArrayIndexMax *_elems;
   int _nElems;
 public:
-  CkSectionID() {}
+  CkSectionID(): _elems(NULL), _nElems(0) {}
   CkSectionID(const CkSectionID &sid);
-  CkSectionID(const CkArrayIndexMax *elems, const int nElems);
+  CkSectionID(const CkArrayID &aid, const CkArrayIndexMax *elems, const int nElems);
   ~CkSectionID();
   void pup(PUP::er &p);
 };

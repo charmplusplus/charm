@@ -167,22 +167,23 @@ public:
 	CProxySection_ArrayBase() { }
 	CProxySection_ArrayBase(const CkArrayID &aid,
 		const CkArrayIndexMax *elems, const int nElems, CkGroupID dTo)
-		:CProxy_ArrayBase(aid,dTo), _sid(elems, nElems) { }
+		:CProxy_ArrayBase(aid,dTo), _sid(aid, elems, nElems) { }
 	CProxySection_ArrayBase(const CkArrayID &aid, 
 		const CkArrayIndexMax *elems, const int nElems) 
-		:CProxy_ArrayBase(aid), _sid(elems, nElems) { }
+		:CProxy_ArrayBase(aid), _sid(aid, elems, nElems) { }
 	CProxySection_ArrayBase(const CkSectionID &sid)
-		:CProxy_ArrayBase(sid.cookie.aid), _sid(sid){}
+		:CProxy_ArrayBase(sid._cookie.aid), _sid(sid){}
 	CProxySection_ArrayBase(const CkSectionID &sid, CkGroupID dTo)
-		:CProxy_ArrayBase(sid.cookie.aid, dTo), _sid(sid){}
+		:CProxy_ArrayBase(sid._cookie.aid, dTo), _sid(sid){}
 	
 	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep) ;
 
 //	ArrayElement *ckLocal(void) const;
-	inline CkSectionCookie &ckGetSectionID() {return _sid.cookie;}
+	inline CkSectionCookie &ckGetSectionCookie() {return _sid._cookie;}
+	inline CkSectionID &ckGetSectionID() {return _sid;}
         inline const CkArrayIndexMax *ckGetArrayElements() const {return _sid._elems;}
-	inline int ckGetNumElements() const { return _sid._nElems; }
+	inline const int ckGetNumElements() const { return _sid._nElems; }
 	void pup(PUP::er &p);
 };
 PUPmarshall(CProxySection_ArrayBase);
@@ -192,12 +193,15 @@ PUPmarshall(CProxySection_ArrayBase);
 	  { super::ckInsert(m,ctor,onPe); }\
 	inline void ckSend(CkArrayMessage *m, int ep) \
 	  { super::ckSend(m,ep); } \
-	inline const CkSectionCookie &ckGetSectionID() \
-	  {return super::ckGetSectionID();} \
-	inline const CkArrayIndexMax *ckGetArrayElements() const \
+        inline CkSectionCookie &ckGetSectionCookie() \
+	  { return super::ckGetSectionCookie(); } \
+        inline CkSectionID &ckGetSectionID() \
+	  { return super::ckGetSectionID(); } \
+        inline const CkArrayIndexMax *ckGetArrayElements() const \
 	  { return super::ckGetArrayElements(); } \
-	inline int ckGetNumElements() const \
-	  { return super::ckGetNumElements(); }
+        inline const int ckGetNumElements() const \
+	  { return super::ckGetNumElements(); }  \
+
 
 /************************ Array Element *********************/
 

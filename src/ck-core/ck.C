@@ -71,13 +71,15 @@ void CkDelegateMgr::ArraySectionSend(int ep,void *m, CkArrayID a,CkSectionCookie
 */
 }
 
-CkSectionID::CkSectionID(const CkArrayIndexMax *elems, const int nElems): _nElems(nElems) {
+
+CkSectionID::CkSectionID(const CkArrayID &aid, const CkArrayIndexMax *elems, const int nElems): _nElems(nElems) {
+  _cookie.aid = aid;
   _elems = new CkArrayIndexMax[nElems];
   for (int i=0; i<nElems; i++) _elems[i] = elems[i];
 }
 
 CkSectionID::CkSectionID(const CkSectionID &sid) {
-  cookie = sid.cookie;
+  _cookie = sid._cookie;
   _nElems = sid._nElems;
   _elems = new CkArrayIndexMax[_nElems];
   for (int i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
@@ -86,7 +88,7 @@ CkSectionID::CkSectionID(const CkSectionID &sid) {
 CkSectionID::~CkSectionID() { delete [] _elems; }
 
 void CkSectionID::pup(PUP::er &p) {
-    p | cookie;
+    p | _cookie;
     p(_nElems);
     if (p.isUnpacking()) _elems = new CkArrayIndexMax[_nElems];
     for (int i=0; i< _nElems; i++) p(_elems[i].data(),_elems[i].nInts);

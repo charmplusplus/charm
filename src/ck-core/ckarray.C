@@ -418,7 +418,7 @@ void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep)
 {
 	msg_prepareSend(msg,ep,ckGetArrayID());
 	if (ckIsDelegated()) //Just call our delegateMgr
-	  ckDelegatedTo()->ArraySectionSend(ep,msg,ckGetArrayID(),ckGetSectionID());
+	  ckDelegatedTo()->ArraySectionSend(ep,msg,ckGetArrayID(),ckGetSectionCookie());
 	else {
 	  // send through all
 	  for (int i=0; i< _sid._nElems-1; i++) {
