@@ -1032,7 +1032,7 @@ int CmiScanf(const char *fmt, ...)
 static int readStdout[2]; 
 static int writeStdout[2]; /*The original stdout/stderr sockets*/ 
 static int serviceStdout[2]; /*(bool) Normally zero; one if service needed.*/
-#define readStdoutBufLen 8192
+#define readStdoutBufLen (16*1024)
 static char readStdoutBuf[readStdoutBufLen+1]; /*Protected by comm. lock*/
 static int servicingStdout;
 
@@ -1053,18 +1053,21 @@ static void CmiStdoutInit(void) {
 		
 		/*First, save a copy of the original stdout*/
 		writeStdout[i]=dup(srcFd);
-		
-		/*Now build a pipe to connect to stdout*/
-		if (-1==pipe(pair)) {perror("building redirection pipe"); exit(1);}
+	#if 0
+		/*Build a pipe to connect to stdout (4kb buffer, but no SIGIO...)*/
+		if (-1==pipe(pair)) {perror("building stdio redirection pipe"); exit(1);}
+	#else
+	       /* UNIX socket (16kb default buffer, and works with SIGIO!) */
+		if (-1==socketpair(PF_LOCAL,SOCK_STREAM,0,pair)) 
+			{perror("building stdio redirection socketpair"); exit(1);}
+	#endif
 		readStdout[i]=pair[0]; /*We get the read end of pipe*/
 		if (-1==dup2(pair[1],srcFd)) {perror("dup2 redirection pipe"); exit(1);}
-		/*Prevent StdoutServiceAll from blocking if there's nothing available*/
-		CmiEnableNonblockingIO(readStdout[i]);
 		
 #if 0 /*Keep writes from blocking.  This just drops excess output, which is bad.*/
 		CmiEnableNonblockingIO(srcFd);
 #endif
-#if 0	/*Get a SIGIO on each write().  Doesn't seem to actually work (no SIGIO's).*/
+#if 1	/*Get a SIGIO on each write(), which keeps the buffer clean*/
 		CmiEnableAsyncIO(readStdout[i]);
 #endif
 	}
@@ -1095,6 +1098,7 @@ static void CmiStdoutServiceOne(int i) {
 	servicingStdout=1;
 	while(1) {
 		const char *tooMuchWarn=NULL; int tooMuchLen=0;
+		if (!skt_select1(readStdout[i],0)) break; /*Nothing to read*/
 		nBytes=read(readStdout[i],readStdoutBuf,readStdoutBufLen);
 		if (nBytes<=0) break; /*Nothing to send*/
 		
@@ -1102,7 +1106,7 @@ static void CmiStdoutServiceOne(int i) {
 		readStdoutBuf[nBytes]=0; /*Zero-terminate read string*/
 		nBytes++; /*Include zero-terminator in message to charmrun*/
 		
-		if (nBytes>=4000) 
+		if (nBytes>=readStdoutBufLen-100) 
 		{ /*We must have filled up our output pipe-- most output libraries
 		   don't handle this well (e.g., glibc printf just drops the line).*/
 			
