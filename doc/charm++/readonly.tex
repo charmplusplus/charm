@@ -6,7 +6,7 @@ data amongst all objects. {\it Read-only} variables, messages and arrays are
 used to share information that is obtained only after the program begins
 execution and does not change after they are initialized in the dynamic scope
 of {\tt main::main()} function. They can be accessed from any
-\index{chare}chare on any processor as ``global'' variables. Large data
+\index{chare}chare on any processor as ``global'' variables.When a variable is declared as read only,it is PUPped so that it can be accessed from any chare on any processor. Large data
 structures containing pointers can be made available as read-only variables
 using read-only messages or read-only arrays. Read-only variables, messages and
 arrays can be used just like local variables for each processor, but the user
