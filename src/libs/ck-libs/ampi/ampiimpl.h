@@ -9,6 +9,7 @@
 #define _AMPIIMPL_H
 
 #include "ampi.h"
+#include "ampiQ.h"
 #include "charm++.h"
 #include "EachToManyMulticastStrategy.h" /* for ComlibManager Strategy*/
 #include <string.h> /* for strlen */
@@ -550,7 +551,7 @@ class AmpiMsg : public CMessage_AmpiMsg {
 
 class AmpiSeqQ : private CkNoncopyable {
   int next;
-  CkQ<AmpiMsg*> q;
+  AmpiQ<AmpiMsg*> q;
  public:
   AmpiSeqQ() { init(); }
   void init(void) { next = 0; }
