@@ -193,6 +193,7 @@ extern CkGroupID   CkGetNodeGroupID(void);
 extern void  CkExit(void);
 
 extern void CkSummary_MarkEvent(int);
+extern void CkSummary_StartPhase(int);
 
 #ifdef __cplusplus
 }
