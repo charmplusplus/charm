@@ -13,6 +13,9 @@
   * persist_machine_init  // machine specific initialization call
 */
 
+#define STRATEGY_ONE_ELANPUT   0
+#define STRATEGY_TWO_ELANPUT   1
+
 /****************************************************************************
        Pending send messages
 ****************************************************************************/
@@ -21,8 +24,9 @@ typedef struct pmsg_list {
   char *msg;
   struct pmsg_list *next;
   int size, destpe;
+  void *addr;
   PersistentHandle  h;
-  int sent;
+  int strategy, phase;
 } PMSG_LIST;
 
 static PMSG_LIST *pending_persistent_msgs = NULL;
@@ -30,7 +34,7 @@ static PMSG_LIST *end_pending_persistent_msgs = NULL;
 static PMSG_LIST *free_list_head = NULL;
 
 /* free_list_head keeps a list of reusable PMSG_LIST */
-#define NEW_PMSG_LIST(evt, m, s, dest, ph) \
+#define NEW_PMSG_LIST(evt, m, s, dest, _addr, ph, stra) \
   if (free_list_head) { msg_tmp = free_list_head; free_list_head=free_list_head->next; }  \
   else msg_tmp = (PMSG_LIST *) CmiAlloc(sizeof(PMSG_LIST));	\
   msg_tmp->msg = m;	\
@@ -38,8 +42,10 @@ static PMSG_LIST *free_list_head = NULL;
   msg_tmp->size = s;	\
   msg_tmp->next = NULL;	\
   msg_tmp->destpe = dest;	\
+  msg_tmp->addr = _addr;	\
   msg_tmp->h = ph;		\
-  msg_tmp->sent = 0;
+  msg_tmp->phase = 0;	\
+  msg_tmp->strategy = stra;	
 
 #define APPEND_PMSG_LIST(msg_tmp)	\
   if (pending_persistent_msgs==0)	\
@@ -60,23 +66,35 @@ void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
     CmiAbort("Abort: Invalid size\n");
   }
 
-/*CmiPrintf("[%d] CmiSendPersistentMsg h=%p hdl=%d destAddress=%p size=%d\n", CmiMyPe(), *phs, CmiGetHandler(m), slot->destAddress, size);*/
+/*CmiPrintf("[%d] CmiSendPersistentMsg h=%p hdl=%d destPE=%d destAddress=%p size=%d\n", CmiMyPe(), *phs, CmiGetHandler(m), destPE, slot->destAddress[0], size);*/
 
-  if (slot->destAddress) {
+  if (slot->destAddress[0]) {
     ELAN_EVENT *e1, *e2;
-    /*CmiPrintf("[%d]Calling elan put\n", CmiMyPe());*/
-    e1 = elan_put(elan_base->state, m, slot->destAddress, size, destPE);
-#if 1
-    PMSG_LIST *msg_tmp;
-    NEW_PMSG_LIST(e1, m, size, destPE, h);
-    APPEND_PMSG_LIST(msg_tmp);
-#else
-    elan_wait(e1, ELAN_POLL_EVENT);
-    e2 = elan_put(elan_base->state, &size, slot->destSizeAddress, sizeof(int), destPE);
-    elan_wait(e2, ELAN_POLL_EVENT);
-    /*CmiPrintf("[%d] elan finished. \n", CmiMyPe());*/
-    CmiFree(m);
-#endif
+    int strategy = STRATEGY_ONE_ELANPUT;
+    /* if (size > 280) strategy = STRATEGY_TWO_ELANPUT; */
+    int *footer = (int*)((char*)m + size);
+    footer[0] = size;
+    footer[1] = 1;
+    if (strategy == STRATEGY_ONE_ELANPUT) CMI_MESSAGE_SIZE(m) = size;
+    else CMI_MESSAGE_SIZE(m) = 0;
+    e1 = elan_put(elan_base->state, m, slot->destAddress[0], size+sizeof(int)*2, destPE);
+    switch (strategy ) {
+    case STRATEGY_ONE_ELANPUT:
+    case STRATEGY_TWO_ELANPUT:  {
+      PMSG_LIST *msg_tmp;
+      NEW_PMSG_LIST(e1, m, size, destPE, slot->destSizeAddress[0], h, strategy);
+      APPEND_PMSG_LIST(msg_tmp);
+      swapSendSlotBuffers(slot);
+      break;
+      }
+    case 2:
+      elan_wait(e1, ELAN_POLL_EVENT);
+      e2 = elan_put(elan_base->state, &size, slot->destSizeAddress[0], sizeof(int), destPE);
+      elan_wait(e2, ELAN_POLL_EVENT);
+      CMI_MESSAGE_SIZE(m) = 0;
+      /*CmiPrintf("[%d] elan finished. \n", CmiMyPe());*/
+      CmiFree(m);
+    }
   }
   else {
 #if 1
@@ -123,20 +141,27 @@ static int remote_put_done(PMSG_LIST *smsg)
 {
   int flag = elan_poll(smsg->e, ELAN_POLL_EVENT);
   if (flag) {
-    if (smsg->sent == 1) {
-        /*
-          CmiPrintf("remote_put_done on %d\n", CmiMyPe());
-        */
+      switch (smsg->strategy) {
+      case 0: 
+        smsg->phase = 1;
+        CmiFree(smsg->msg);
         return 2;
-    }
-    else {
-      smsg->sent = 1;
-      CmiFree(smsg->msg);
-
-      PersistentSendsTable *slot = (PersistentSendsTable *)(smsg->h);
-      smsg->e = elan_put(elan_base->state, &smsg->size, slot->destSizeAddress, sizeof(int), smsg->destpe);
-      return 1;
-    }
+      case 1:
+        if (smsg->phase == 1) {
+          /*
+            CmiPrintf("remote_put_done on %d\n", CmiMyPe());
+          */
+          return 2;
+        }
+        else {
+          smsg->phase = 1;
+          CmiFree(smsg->msg);
+                                                                                
+          PersistentSendsTable *slot = (PersistentSendsTable *)(smsg->h);
+          smsg->e = elan_put(elan_base->state, &smsg->size, smsg->addr, sizeof(int), smsg->destpe);
+          return 1;
+        }
+     }
   }
   return 0;
 }
@@ -171,27 +196,33 @@ void release_pmsg_list()
 extern void CmiReference(void *blk);
 
 /* called in PumpMsgs */
-void PumpPersistent()
+int PumpPersistent()
 {
+  int status = 0;
   PersistentReceivesTable *slot = persistentReceivesTableHead;
   while (slot) {
-    if (slot->recvSize)
+    char *msg = slot->messagePtr[0];
+    int size = *(slot->recvSizePtr[0]);
+    if (size)
     {
-      int size = slot->recvSize;
-      void *msg = slot->messagePtr;
+      int *footer = (int*)(msg + size);
+      if (footer[0] == size && footer[1] == 1) {
+/*CmiPrintf("[%d] PumpPersistent messagePtr=%p size:%d\n", CmiMyPe(), slot->messagePtr, size);*/
 
 #if 0
       void *dupmsg;
       dupmsg = CmiAlloc(size);
-      
+                                                                                
       _MEMCHECK(dupmsg);
       memcpy(dupmsg, msg, size);
+      memset(msg, 0, size+2*sizeof(int));
       msg = dupmsg;
 #else
       /* return messagePtr directly and user MUST make sure not to delete it. */
       /*CmiPrintf("[%d] %p size:%d rank:%d root:%d\n", CmiMyPe(), msg, size, CMI_DEST_RANK(msg), CMI_BROADCAST_ROOT(msg));*/
 
       CmiReference(msg);
+      swapRecvSlotBuffers(slot);
 #endif
 
       CmiPushPE(CMI_DEST_RANK(msg), msg);
@@ -199,10 +230,19 @@ void PumpPersistent()
       if (CMI_BROADCAST_ROOT(msg))
           SendSpanningChildren(size, msg);
 #endif
-      slot->recvSize = 0;
+
+      /* not safe at all! */
+      msg=slot->messagePtr[0];
+      size = *(slot->recvSizePtr[0]);
+      footer = (int*)(msg + size);
+      *(slot->recvSizePtr[0]) = 0;
+      footer[0] = footer[1] = 0;
+      status = 1;
+      }
     }
     slot = slot->next;
   }
+  return status;
 }
 
 void *PerAlloc(int size)
