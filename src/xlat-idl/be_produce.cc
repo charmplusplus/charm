@@ -254,8 +254,13 @@ BE_produce_parameters(be_operation *bop, int passnum)
             spew(Ccc, CccFormal1, arrayType, argName, arraylen);
             spew(Ccg, CcgFormal1, arrayType, argName, arraylen);
             spew(Hm, HmFormal1, arrayType, argName, arraylen);
-	  } else {
+	  } else {		// dir_OUT dir_INOUT
             cerr << "LIMIT: Out arguments not supported yet.\n";
+            spew(Hi, HiFormal2, arrayType, argName, arraylen);
+            spew(Ci, CiFormal2, arrayType, argName, arraylen);
+            spew(Ccc, CccFormal1, arrayType, argName, arraylen);
+            spew(Ccg, CcgFormal1, arrayType, argName, arraylen);
+            spew(Hm, HmFormal1, arrayType, argName, arraylen);
 	  }
         } else {
 	  char *argType = a->field_type()->local_name()->get_string();
@@ -269,6 +274,11 @@ BE_produce_parameters(be_operation *bop, int passnum)
             spew(Hm, HmFormal0, argType, argName);
 	  } else {
             cerr << "LIMIT: Out arguments not supported yet.\n";
+            spew(Hi, HiFormal0, argType);
+            spew(Ci, CiFormal0, argType, argName);
+            spew(Ccc, CccFormal0, argType, argName);
+            spew(Ccg, CcgFormal0, argType, argName);
+            spew(Hm, HmFormal0, argType, argName);
 	  }
         }
       } else { // not an argument
@@ -302,6 +312,9 @@ BE_produce_parameters(be_operation *bop, int passnum)
             spew(Ccg, CcgActual0, argName);
 	  } else {
             cerr << "LIMIT: Out arguments not supported yet.\n";
+            spew(Ci, CiActual1, argName, arraylen);
+            spew(Ccc, CccActual0, argName);
+            spew(Ccg, CcgActual0, argName);
 	  }
         } else {
 	  char *argType = a->field_type()->local_name()->get_string();
@@ -313,6 +326,9 @@ BE_produce_parameters(be_operation *bop, int passnum)
             spew(Ccg, CcgActual0, argName);
 	  } else {
             cerr << "LIMIT: Out arguments not supported yet.\n";
+            spew(Ci, CiActual0, argName);
+            spew(Ccc, CccActual0, argName);
+            spew(Ccg, CcgActual0, argName);
 	  }
         }
       } else { // not an argument
@@ -377,6 +393,20 @@ const char *CiMethod2 = // classname, methodname, messagename
 "\n"
 ;
 
+// gzheng
+const char *CiMethod3 = // classname, methodname, messagename
+"  if(isChare()) {\n"
+"    CkChareID cid = cih.ciCID();\n"
+"    CkRemoteCall(CProxy_CC\01::__idx_\02_\03,msg,&cid);\n"
+"  } else if(ciGetProc()==CI_PE_ALL) {\n"
+"    CkBroadcastMsgBranch(CProxy_CG\01::__idx_\02_\03,msg,cih.ciGID());\n"
+"  } else {\n"
+"//    CkRemoteBranchCall(CProxy_CG\01::__idx_\02_\03,msg,cih.ciGID(),ciGetProc());\n"
+"  }\n"
+"}\n"
+"\n"
+;
+
 const char *CccMethod0 = // classname, methodname, messagename
 "void CC\01::\02(\03 *msg)\n"
 "{\n"
@@ -411,8 +441,18 @@ const char *IccMethod0 = // methodname, messagename
 "  entry void \01(\02 *);\n"
 ;
 
+// gzheng
+const char *IccMethod1 = // methodname, messagename
+"  entry [sync] void \01(\02 *);\n"
+;
+
 const char *IcgMethod0 = // methodname, messagename
 "  entry void \01(\02 *);\n"
+;
+
+// gzheng
+const char *IcgMethod1 = // methodname, messagename
+"  entry [sync] void \01(\02 *);\n"
 ;
 
 const char *ImMethod0 = // messagename
@@ -429,6 +469,23 @@ BE_produce_operation(AST_Decl *d_in, AST_Interface *parent_interface)
   AST_Decl		    *d;
   AST_Exception		    *e;
   String		    *s;
+
+  // gzheng
+  // check if has INOUT
+  int out_attr = 0;
+  i = new UTL_ScopeActiveIterator(bop, UTL_Scope::IK_decls);
+  while (!(i->is_done())) {
+      d = i->item();
+      if (d->node_type() == AST_Decl::NT_argument) {
+        be_argument *a = be_argument::narrow_from_decl(d);
+        if(a->direction() == AST_Argument::dir_OUT || 
+           a->direction() == AST_Argument::dir_INOUT) {
+		out_attr = 1;
+ 	}
+      }
+      i->next();
+  }
+  delete i;
 
   char *classname = parent_interface->local_name()->get_string();
   char *methodname = bop->local_name()->get_string();
@@ -451,8 +508,15 @@ BE_produce_operation(AST_Decl *d_in, AST_Interface *parent_interface)
     } else {
       strcpy(msgName, "CIMsgEmpty");
     }
-    spew(Icc, IccMethod0, methodname, msgName);
-    spew(Icg, IcgMethod0, methodname, msgName);
+    // gzheng
+    if( out_attr == 0 ) {
+       spew(Icc, IccMethod0, methodname, msgName);
+       spew(Icg, IcgMethod0, methodname, msgName);
+    }
+    else {
+       spew(Icc, IccMethod1, methodname, msgName);
+       spew(Icg, IcgMethod1, methodname, msgName);
+    }
     spew(Hcc, HccMethod0, methodname, msgName);
     spew(Hcg, HcgMethod0, methodname, msgName);
     spew(Ccc, CccMethod0, classname, methodname, msgName);
@@ -465,7 +529,13 @@ BE_produce_operation(AST_Decl *d_in, AST_Interface *parent_interface)
   spew(Ccc, CccMethod1, methodname);
   spew(Ccg, CcgMethod1, methodname);
   BE_produce_parameters(bop, 2); // Produce Marshalling Code
-  spew(Ci, CiMethod2, classname, methodname, msgName);
+  // gzheng
+  if( out_attr == 0 ) {
+  	spew(Ci, CiMethod2, classname, methodname, msgName);
+  }
+  else  {
+  	spew(Ci, CiMethod3, classname, methodname, msgName);
+  }
   spew(Ccc, CccMethod2);
   spew(Ccg, CcgMethod2);
 }
