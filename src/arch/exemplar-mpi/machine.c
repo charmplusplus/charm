@@ -127,11 +127,12 @@ static void CmiReleaseSentMessages(void)
   end_sent = prev;
 }
 
-static void PumpMsgs(void)
+static int PumpMsgs(void)
 {
   int nbytes, flg, res;
   char *msg;
   MPI_Status sts;
+  int recd=0;
 
   while(1) {
     flg = 0;
@@ -139,7 +140,8 @@ static void PumpMsgs(void)
     if(res != MPI_SUCCESS)
       CmiAbort("MPI_Iprobe failed\n");
     if(!flg)
-      return;
+      return recd;
+    recd = 1;
     MPI_Get_count(&sts, MPI_BYTE, &nbytes);
     msg = (char *) CmiAlloc(nbytes);
     MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,1,MPI_COMM_WORLD,&sts);
@@ -151,9 +153,15 @@ static void PumpMsgs(void)
 
 void *CmiGetNonLocal(void)
 {
-  CmiReleaseSentMessages();
-  PumpMsgs();
-  return recdQueueRemoveFromFront();
+  void *msg = recdQueueRemoveFromFront();
+  if(!msg) {
+    CmiReleaseSentMessages();
+    if (PumpMsgs())
+      return recdQueueRemoveFromFront();
+    else
+      return 0;
+  }
+  return msg;
 }
 
 void CmiNotifyIdle(void)
