@@ -39,6 +39,8 @@
 
 #include "machine.h"
 
+#define VMI21 1
+
 /* The following are external variables used by the VMI core. */
 extern USHORT VMI_DEVICE_RUNTIME;
 extern PVMI_NETADDRESS localAddress;
@@ -530,12 +532,18 @@ CMI_VMI_Connection_Accept_Handler (PVMI_CONNECT connection, PVMI_SLAB slab,
   VMI_CONNECT_SET_RECEIVE_CONTEXT (connection, (&CMI_VMI_Processes[rank]));
 
   status = VMI_RDMA_Set_Publish_Callback (connection,
-					  CMI_VMI_RDMA_Publish_Handler);
+             (VMIRDMABuffer) CMI_VMI_RDMA_Publish_Handler);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Publish_Callback()");
 
+#if VMI21
+  status = VMI_RDMA_Set_Put_Notification_Callback (connection,
+	                   CMI_VMI_RDMA_Notification_Handler);
+  CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Put_Notification_Callback()");
+#else
   status = VMI_RDMA_Set_Notification_Callback (connection,
 		       CMI_VMI_RDMA_Notification_Handler);
   CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Notification_Callback()");
+#endif
 
   /* Free the connect data buffer. */
   free (data);
@@ -577,9 +585,16 @@ void CMI_VMI_Connection_Response_Handler (PVOID context, PVOID response,
 					      CMI_VMI_RDMA_Publish_Handler);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Publish_Callback()");
 
+#if VMI21
+      status = VMI_RDMA_Set_Put_Notification_Callback (process->connection,
+				        CMI_VMI_RDMA_Notification_Handler);
+      CMI_VMI_CHECK_SUCCESS (status,
+			     "VMI_RDMA_Set_Put_Notification_Callback()");
+#else
       status = VMI_RDMA_Set_Notification_Callback (process->connection,
 				    CMI_VMI_RDMA_Notification_Handler);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Set_Notification_Callback()");
+#endif
 
       /* Increment the count of outgoing connection accepts. */
       CMI_VMI_OAccept++;
@@ -1179,10 +1194,17 @@ VMI_RECV_STATUS CMI_VMI_Stream_Receive_Handler (PVMI_CONNECT connection,
 
       handle->data.receive.data.rdma.chunks_outstanding++;
 
+#if VMI21
+      status = VMI_RDMA_Publish_Buffer (connection,
+           cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr,
+           pubsize, remote_handle_address, (UINT32) handle->index, NULL, 0);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#else
       status = VMI_RDMA_Publish_Buffer (connection,
            cacheentry->bufferHandle, (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr,
            pubsize, remote_handle_address, (UINT32) handle->index);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
 
       handle->data.receive.data.rdma.bytes_published += pubsize;
     }
@@ -1411,13 +1433,25 @@ void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT connection,
     if (complete_flag) {
       handle->data.send.data.rdma.cacheentry = cacheentry;
 
+#if VMI21
+      status = VMI_RDMA_Put (connection, rdmaop, (PVOID) handle,
+	   (VMIRDMACompleteNotification) CMI_VMI_RDMA_Completion_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+#else
       status = VMI_RDMA_Put (connection, rdmaop, (PVOID) handle,
 	   (VMIRDMAWriteComplete) CMI_VMI_RDMA_Completion_Handler);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+#endif
     } else {
+#if VMI21
+      status = VMI_RDMA_Put (connection, rdmaop, (PVOID) cacheentry, 
+	   (VMIRDMACompleteNotification) CMI_VMI_RDMA_Fragment_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+#else
       status = VMI_RDMA_Put (connection, rdmaop, (PVOID) cacheentry, 
 	   (VMIRDMAWriteComplete) CMI_VMI_RDMA_Fragment_Handler);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+#endif
     }
   } else if (handle->data.send.send_handle_type ==
 	     CMI_VMI_SEND_HANDLE_TYPE_RDMABROAD) {
@@ -1453,13 +1487,25 @@ void CMI_VMI_RDMA_Publish_Handler (PVMI_CONNECT connection,
     if (complete_flag) {
       handle->data.send.data.rdmabroad.cacheentry[rank] = cacheentry;
 
+#if VMI21
+      status = VMI_RDMA_Put (connection, rdmaop, (PVOID) handle,
+	   (VMIRDMACompleteNotification) CMI_VMI_RDMA_Completion_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+#else
       status = VMI_RDMA_Put (connection, rdmaop, (PVOID) handle,
 	   (VMIRDMAWriteComplete) CMI_VMI_RDMA_Completion_Handler);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+#endif
     } else {
+#if VMI21
+      status = VMI_RDMA_Put (connection, rdmaop, (PVOID) cacheentry,
+	   (VMIRDMACompleteNotification) CMI_VMI_RDMA_Fragment_Handler);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+#else
       status = VMI_RDMA_Put (connection, rdmaop, (PVOID) cacheentry,
 	   (VMIRDMAWriteComplete) CMI_VMI_RDMA_Fragment_Handler);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Put()");
+#endif
     }
   } else {
 #if CMK_PERSISTENT_COMM
@@ -1532,11 +1578,19 @@ void CMI_VMI_RDMA_Notification_Handler (PVMI_CONNECT connection,
 
       handle->data.receive.data.rdma.chunks_outstanding++;
 
+#if VMI21
+      status = VMI_RDMA_Publish_Buffer (connection, cacheentry->bufferHandle,
+                 (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr, pubsize,
+		 handle->data.receive.data.rdma.remote_handle_address,
+		 (UINT32) handle->index, NULL, 0);
+      CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#else
       status = VMI_RDMA_Publish_Buffer (connection, cacheentry->bufferHandle,
                           (VMI_virt_addr_t) (VMI_ADDR_CAST) pubaddr, pubsize,
 	                handle->data.receive.data.rdma.remote_handle_address,
                                                      (UINT32) handle->index);
       CMI_VMI_CHECK_SUCCESS (status, "VMI_RDMA_Publish_Buffer()");
+#endif
 
       handle->data.receive.data.rdma.bytes_published += pubsize;
     }
