@@ -7,11 +7,34 @@
 
 #include <stdio.h>
 #include <sys/time.h>
+#include <assert.h>
 #include "converse.h"
 #include <mpi.h>
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 #define MAX_QLEN 200
+
+/*
+    To reduce the buffer used in broadcast and distribute the load from 
+  broadcasting node, define CMK_BROADCAST_SPANNING_TREE enforce the use of 
+  spanning tree broadcast algorithm.
+    This will use the fourth short in message as an indicator of spanning tree
+  root.
+*/
+#define CMK_BROADCAST_SPANNING_TREE    1
+
+#define BROADCAST_SPANNING_FACTOR      20
+
+#define CMI_BROADCAST_ROOT(msg)          ((CmiUInt2 *)(msg))[3]
+
+#if CMK_BROADCAST_SPANNING_TREE
+#  define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
+#else
+#  define CMI_SET_BROADCAST_ROOT(msg, root)
+#endif
+
+
+#define TAG     1375
 
 int Cmi_mype;
 int Cmi_numpes;
@@ -50,6 +73,8 @@ double starttimer;
 void CmiAbort(const char *message);
 void CmiMemLock(void) {}
 void CmiMemUnlock(void) {}
+
+void SendSpanningChildren(int size, char *msg);
 /**************************  TIMER FUNCTIONS **************************/
 
 void CmiTimerInit(void)
@@ -80,7 +105,8 @@ static int CmiAllAsyncMsgsSent(void)
      
    while(msg_tmp!=0) {
     done = 0;
-    MPI_Test(&(msg_tmp->req), &done, &sts);
+    if (MPI_SUCCESS != MPI_Test(&(msg_tmp->req), &done, &sts)) 
+      CmiAbort("CmiAllAsyncMsgsSent: MPI_Test failed!\n");
     if(!done)
       return 0;
     msg_tmp = msg_tmp->next;
@@ -99,7 +125,8 @@ int CmiAsyncMsgSent(CmiCommHandle c) {
     msg_tmp = msg_tmp->next;
   if(msg_tmp) {
     done = 0;
-    MPI_Test(&(msg_tmp->req), &done, &sts);
+    if (MPI_SUCCESS != MPI_Test(&(msg_tmp->req), &done, &sts)) 
+      CmiAbort("CmiAsyncMsgSent: MPI_Test failed!\n");
     return ((done)?1:0);
   } else {
     return 1;
@@ -123,7 +150,7 @@ static void CmiReleaseSentMessages(void)
   while(msg_tmp!=0) {
     done =0;
     if(MPI_Test(&(msg_tmp->req), &done, &sts) != MPI_SUCCESS)
-      CmiAbort("MPI_Test failed\n");
+      CmiAbort("CmiReleaseSentMessages: MPI_Test failed!\n");
     if(done) {
       MsgQueueLen--;
       /* Release the message */
@@ -152,7 +179,7 @@ static int PumpMsgs(void)
 
   while(1) {
     flg = 0;
-    res = MPI_Iprobe(MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &flg, &sts);
+    res = MPI_Iprobe(MPI_ANY_SOURCE, TAG, MPI_COMM_WORLD, &flg, &sts);
     if(res != MPI_SUCCESS)
       CmiAbort("MPI_Iprobe failed\n");
     if(!flg)
@@ -160,8 +187,13 @@ static int PumpMsgs(void)
     recd = 1;
     MPI_Get_count(&sts, MPI_BYTE, &nbytes);
     msg = (char *) CmiAlloc(nbytes);
-    MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,1,MPI_COMM_WORLD,&sts);
+    if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
+      CmiAbort("PumpMsgs: MPI_Recv failed!\n");
     recdQueueAddToBack(msg);
+#if CMK_BROADCAST_SPANNING_TREE
+    if (CMI_BROADCAST_ROOT(msg))
+      SendSpanningChildren(nbytes, msg);
+#endif
   }
 }
 
@@ -192,6 +224,9 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
 {
   char *dupmsg = (char *) CmiAlloc(size);
   memcpy(dupmsg, msg, size);
+
+  CMI_SET_BROADCAST_ROOT(dupmsg, 0);
+
   if (Cmi_mype==destPE) {
     CQdCreate(CpvAccess(cQdState), 1);
     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
@@ -219,7 +254,8 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 	/*printf("Waiting for %d messages to be sent\n", MsgQueueLen);*/
 	CmiReleaseSentMessages();
   }
-  MPI_Isend((void *)msg,size,MPI_BYTE,destPE,1,MPI_COMM_WORLD,&(msg_tmp->req));
+  if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
+    CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
   MsgQueueLen++;
   if(sent_msgs==0)
     sent_msgs = msg_tmp;
@@ -231,6 +267,8 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 
 void CmiFreeSendFn(int destPE, int size, char *msg)
 {
+  CMI_SET_BROADCAST_ROOT(msg, 0);
+
   if (Cmi_mype==destPE) {
     CQdCreate(CpvAccess(cQdState), 1);
     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
@@ -242,17 +280,57 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
 
 /*********************** BROADCAST FUNCTIONS **********************/
 
+/* same as CmiSyncSendFn, but don't set broadcast root in msg header */
+void CmiSyncSendFn1(int destPE, int size, char *msg)
+{
+  char *dupmsg = (char *) CmiAlloc(size);
+  memcpy(dupmsg, msg, size);
+  if (Cmi_mype==destPE) {
+    CQdCreate(CpvAccess(cQdState), 1);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
+  }
+  else
+    CmiAsyncSendFn(destPE, size, dupmsg);
+}
+
+/* send msg to its spanning children in broadcast. G. Zheng */
+void SendSpanningChildren(int size, char *msg)
+{
+  int startpe = CMI_BROADCAST_ROOT(msg)-1;
+  int i;
+
+  assert(startpe>=0 && startpe<Cmi_numpes);
+
+  for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
+    int p = Cmi_mype-startpe;
+    if (p<0) p+=Cmi_numpes;
+    p = BROADCAST_SPANNING_FACTOR*p + i;
+    if (p > Cmi_numpes - 1) break;
+    p += startpe;
+    p = p%Cmi_numpes;
+//CmiPrintf("send: %d %d %d %d\n", startpe, Cmi_mype, p , p%Cmi_numpes);
+    assert(p>=0 && p<Cmi_numpes && p!=Cmi_mype);
+    CmiSyncSendFn1(p, size, msg);
+  }
+}
+
 void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
 {
+#if CMK_BROADCAST_SPANNING_TREE
+  CMI_SET_BROADCAST_ROOT(msg, Cmi_mype+1);
+  SendSpanningChildren(size, msg);
+#else
   int i ;
      
   for ( i=Cmi_mype+1; i<Cmi_numpes; i++ ) 
     CmiSyncSendFn(i, size,msg) ;
   for ( i=0; i<Cmi_mype; i++ ) 
     CmiSyncSendFn(i, size,msg) ;
+#endif
 }
 
 
+/*  FIXME: luckily async is never used  G. Zheng */
 CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)  
 {
   int i ;
@@ -272,10 +350,16 @@ void CmiFreeBroadcastFn(int size, char *msg)
  
 void CmiSyncBroadcastAllFn(int size, char *msg)        /* All including me */
 {
+#if CMK_BROADCAST_SPANNING_TREE
+  CmiSyncSendFn(Cmi_mype, size,msg) ;
+  CMI_SET_BROADCAST_ROOT(msg, Cmi_mype+1);
+  SendSpanningChildren(size, msg);
+#else
   int i ;
      
   for ( i=0; i<Cmi_numpes; i++ ) 
     CmiSyncSendFn(i,size,msg) ;
+#endif
 }
 
 CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)  
@@ -289,15 +373,21 @@ CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)
 
 void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 {
+#if CMK_BROADCAST_SPANNING_TREE
+  CmiSyncSendFn(Cmi_mype, size,msg) ;
+  CMI_SET_BROADCAST_ROOT(msg, Cmi_mype+1);
+  SendSpanningChildren(size, msg);
+#else
   int i ;
      
   for ( i=0; i<Cmi_numpes; i++ ) 
     CmiSyncSendFn(i,size,msg) ;
+#endif
   CmiFree(msg) ;
 }
 
 /************************** MAIN ***********************************/
-#define MPI_REQUEST_MAX=1024*10 
+#define MPI_REQUEST_MAX 1024*10 
 
 void ConverseExit(void)
 {
@@ -305,7 +395,8 @@ void ConverseExit(void)
     PumpMsgs();
     CmiReleaseSentMessages();
   }
-  MPI_Barrier(MPI_COMM_WORLD);
+  if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD)) 
+    CmiAbort("ConverseExit: MPI_Barrier failed!\n");
   ConverseCommonExit();
   MPI_Finalize();
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
