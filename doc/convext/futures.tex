@@ -1,65 +1,61 @@
 \chapter{Futures}
 
 This library supports the {\em future} abstraction, defined and used by
-Halstead and other researchers. The library itself provides only
-local (sequential) functions. If necessary, the user (or a language
-implementor who wishes to use futures) can send converse messages
-across processors, and have their handlers set the future's values.
-
-\verb#futuresInitialize()#
-
-This function initializes the futures module. It can deal with
-repeated (redundant) initializations, without losing information
-entered after the previous initialization. Currently, 100 distinct
-future values may be alive at any moment on each processor. This
-number will be made a parameter to the futuresInitialize function in
-future versions.
-
-{\large \bf createFuture}
-
-\verb#int createFuture()#
-
-Returns an integer key designating the future-value-holder just
-created.
+Halstead and other researchers.
 
 
-{\large \bf setFuture}
+{\bf Cfuture CfutureCreate()}
 
-\verb#setFuture(int key, void*pointer)#
+Returns the handle of an empty future.  The future is said to reside
+on the processor that created it.  The handle is a {\em global}
+reference to the future, in other words, it may be copied freely
+across processors.  However, while the handle may be moved across
+processors freely, some operations can only be performed on the
+processor where the future resides.
 
-Sets the value of the future indicate by the key to the given pointer.
-All the threads waiting for the future specified by the key are
-awakened. (Each such thread, when it resumes, will return from the
-waitFuture function with the \verb#pointer# as its return value.)
+{\bf Cfuture CfutureSet(Cfuture future, void *value, int nbytes)}
 
-{\large \bf sendToFuture}
+Makes a copy of the value and stores it in the future.  CfutureSet
+may be performed on processors other than the one where the future
+resides.  If done remotely, the copy of the value is created on the
+processor where the future resides.
 
-\verb#sendToFuture(void *m, int key)#
+{\bf void *CfutureWait(Cfuture fut)}
 
-Makes an entry in the scheduler's queue that will (when scheduled) set
-the future value, and awaken the waiting threads. This is an
-asynchronous version of \verb#setFuture#. 
+Waits until the future has been filled, then returns a pointer to the
+contents of the future.  If the future has already been filled, this
+happens immediately (without blocking).  If the destroy flag is set,
+the future is destroyed (freed) in the process.  The pointer returned
+by CfutureWait must eventually be freed using CfutureDestroyValue
+below.  Caution: CfutureWait can only be done on the processor where
+the Cfuture resides.  A second caution: blocking operations (such as
+this one) can only be done in user-created threads.
 
+{\bf void CfutureDestroy(Cfuture f)}
 
-{\large \bf  waitFuture}
+Frees the space used by the specified Cfuture.  This also frees the
+value stored in the future.  Caution: this operation can only be done
+on the processor where the Cfuture resides.
 
-\verb#void* waitFuture (int key, int free)#
+{\bf void* CfutureCreateValue(int nbytes)}
 
-The caller for this function must be a thread. If the future value is
-ready (i.e. set by \verb#setFuture# or \verb#sendToFuture#), the
-function returns immediately with a pointer to the value. Otherwise,
-the calling thread suspends, and the call returns after another thread
-has set the future value. This call can be made before or after the future
-is set.
+Allocates the specified amount of memory and returns a pointer to it.
+The memory can be freed by CfutureDestroyValue, just as if it had been
+extracted from a future.  It can also be filled with data and stored
+into a future, using CfutureStoreBuffer below.
 
-destroyFuture(int key)
+{\bf void CfutureStoreValue(Cfuture fut, void *value)}
 
-Allows  the key to be used for other futures.
+Make a copy of the value and stores it in the future, destroying the
+original copy of the value.  This may be significantly faster than the
+more general function, CfutureSet (it may avoid copying).  This
+function can {\em only} used to store values that were previously
+extracted from other futures, or values that were allocated using
+CfutureCreateValue.
 
-{\large \bf Bugs:} Currently, the number of futures is limited to 100.
-Although you can reuse a key with destroyFuture, this limits the
-number of futures alive at a time to 100. With a hash table
-implementation this could be completely eliminated in a future
-release, or at least an ability to change the number of available keys
-at the initialization time will be added.
+{\bf void CfutureModuleInit()}
+
+This function initializes the futures module.  It must be called once
+on each processor, during the handler-registration process (see the
+Converse manual regarding CmiRegisterHandler).
 
