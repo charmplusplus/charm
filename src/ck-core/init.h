@@ -79,6 +79,7 @@ extern int     _initHandlerIdx;
 extern int     _bocHandlerIdx;
 extern int     _nodeBocHandlerIdx;
 extern int     _qdHandlerIdx;
+extern CmiNodeLock _nodeLock;
 
 CpvExtern(void*,       _currentChare);
 CpvExtern(int,         _currentGroup);

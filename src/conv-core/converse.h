@@ -878,8 +878,6 @@ void CfutureInit();
 #define CLD_ANYWHERE (-1)
 #define CLD_BROADCAST (-2)
 #define CLD_BROADCAST_ALL (-3)
-#define CLD_NODE_BROADCAST (-4)
-#define CLD_NODE_BROADCAST_ALL (-5)
 
 typedef void (*CldPackFn)(void *msg);
 
@@ -899,6 +897,7 @@ int CldEstimate(void);
 char *CldGetStrategy(void);
 
 void CldEnqueue(int pe, void *msg, int infofn);
+void CldNodeEnqueue(int node, void *msg, int infofn);
 
 /****** CMM: THE MESSAGE MANAGER ******/
 

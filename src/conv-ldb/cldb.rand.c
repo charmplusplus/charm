@@ -44,10 +44,35 @@ void CldEnqueue(int pe, void *msg, int infofn)
     CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
     CmiSetInfo(msg,infofn);
     if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, msg); }
-    else if (pe==CLD_NODE_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, msg); }
     else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, msg); }
-    else if (pe==CLD_NODE_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, msg); }
     else CmiSyncSendAndFree(pe, len, msg);
+  }
+}
+
+void CldNodeEnqueue(int node, void *msg, int infofn)
+{
+  int len, queueing, priobits; unsigned int *prioptr;
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  CldPackFn pfn;
+  if (node == CLD_ANYWHERE) {
+    node = (((rand()+CmiMyNode())&0x7FFFFFFF)%CmiNumNodes());
+    if (node != CmiMyNode())
+      CpvAccess(CldRelocatedMessages)++;
+  }
+  if (node == CmiMyNode()) {
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    CsdNodeEnqueueGeneral(msg, queueing, priobits, prioptr);
+  } else {
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    if (pfn) {
+      pfn(&msg);
+      ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    }
+    CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+    CmiSetInfo(msg,infofn);
+    if (node==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, msg); }
+    else if (node==CLD_BROADCAST_ALL){CmiSyncNodeBroadcastAllAndFree(len,msg);}
+    else CmiSyncNodeSendAndFree(node, len, msg);
   }
 }
 

@@ -107,7 +107,10 @@ static inline void _processForBocMsg(envelope *env)
 static inline void _processForNodeBocMsg(envelope *env)
 {
   register int groupID = env->getGroupNum();
-  register void *obj = _nodeGroupTable->find(groupID);
+  register void *obj;
+  CmiLock(_nodeLock);
+  obj = _nodeGroupTable->find(groupID);
+  CmiUnlock(_nodeLock);
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
   CpvAccess(_currentNodeGroup) = groupID;
@@ -131,7 +134,8 @@ static inline void _processForVidMsg(envelope *env)
 static inline void _processDBocReqMsg(envelope *env)
 {
   assert(CkMyPe()==0);
-  register int groupNum = _numGroups++;
+  register int groupNum;
+  groupNum = _numGroups++;
   env->setMsgtype(DBocNumMsg);
   register int srcPe = env->getSrcPe();
   env->setSrcPe(CkMyPe());
@@ -143,7 +147,9 @@ static inline void _processDBocReqMsg(envelope *env)
 static inline void _processDNodeBocReqMsg(envelope *env)
 {
   assert(CkMyNode()==0);
+  CmiLock(_nodeLock);
   register int groupNum = _numNodeGroups++;
+  CmiUnlock(_nodeLock);
   env->setMsgtype(DNodeBocNumMsg);
   register int srcNode = CmiNodeOf(env->getSrcPe());
   env->setSrcPe(CkMyPe());
@@ -375,7 +381,9 @@ void _createNodeGroupMember(int groupID, int eIdx, void *msg)
 {
   register int gIdx = _entryTable[eIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
+  CmiLock(_nodeLock);
   _nodeGroupTable->add(groupID, obj);
+  CmiUnlock(_nodeLock);
   register void *prev = CpvAccess(_currentChare);
   CpvAccess(_currentChare) = obj;
   register int prevGrp = CpvAccess(_currentNodeGroup);
@@ -479,7 +487,9 @@ static void _dynamicGroupCreate(envelope *env, int retEp, CkChareID * retChare)
 
 static int _staticNodeGroupCreate(envelope *env, int retEp, CkChareID *retChare)
 {
+  CmiLock(_nodeLock);
   register int groupNum = _numNodeGroups++;
+  CmiUnlock(_nodeLock);
   _createNodeGroup(groupNum, env, retEp, retChare);
   return groupNum;
 }
@@ -543,7 +553,10 @@ void *CkLocalBranch(int groupID)
 extern "C"
 void *CkLocalNodeBranch(int groupID)
 {
-  return _nodeGroupTable->find(groupID);
+  CmiLock(_nodeLock);
+  void *retval = _nodeGroupTable->find(groupID);
+  CmiUnlock(_nodeLock);
+  return retval;
 }
 
 static inline void _sendMsgBranch(int eIdx, void *msg, int gID, 
@@ -579,7 +592,7 @@ void CkBroadcastMsgBranch(int eIdx, void *msg, int gID)
 }
 
 static inline void _sendMsgNodeBranch(int eIdx, void *msg, int gID, 
-                           int pe=CLD_NODE_BROADCAST_ALL)
+                           int node=CLD_BROADCAST_ALL)
 {
   register envelope *env = UsrToEnv(msg);
   env->setMsgtype(ForNodeBocMsg);
@@ -587,15 +600,15 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, int gID,
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
   CmiSetHandler(env, _charmHandlerIdx);
-  CldEnqueue(pe, env, _infoIdx);
+  CldNodeEnqueue(node, env, _infoIdx);
 }
 
 extern "C"
-void CkSendMsgNodeBranch(int eIdx, void *msg, int pe, int gID)
+void CkSendMsgNodeBranch(int eIdx, void *msg, int node, int gID)
 {
   if(CpvAccess(traceOn))
     CpvAccess(_trace)->creation(UsrToEnv(msg));
-  _sendMsgNodeBranch(eIdx, msg, gID, pe);
+  _sendMsgNodeBranch(eIdx, msg, gID, node);
   CpvAccess(_myStats)->recordSendNodeBranch();
   CpvAccess(_qd)->create();
 }

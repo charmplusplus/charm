@@ -14,6 +14,8 @@ int   _bocHandlerIdx;
 int   _nodeBocHandlerIdx;
 int   _qdHandlerIdx;
 
+CmiNodeLock _nodeLock;
+
 CkOutStream ckout;
 CkErrStream ckerr;
 CkInStream  ckin;
@@ -145,6 +147,7 @@ static void _exitHandler(envelope *env)
       _exitStarted = 1; 
       CmiNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CmiNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
+      CmiNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
       CmiSyncBroadcastAllAndFree(env->getTotalsize(), env);
@@ -152,6 +155,7 @@ static void _exitHandler(envelope *env)
     case ReqStatMsg:
       CmiNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CmiNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
+      CmiNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
       CmiFree(env);
       _sendStats();
       if(CkMyPe())
@@ -208,8 +212,7 @@ static inline void _processBufferedMsgs(void)
   CmiNumberHandler(_charmHandlerIdx,(CmiHandler)_processHandler);
   envelope *env;
   while(env=(envelope*)CpvAccess(_buffQ)->deq()) {
-    // CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), env);
-    CldEnqueue(CkMyPe(), env, _infoIdx);
+    CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), env);
   }
 }
 
@@ -397,8 +400,10 @@ void _initCharm(int argc, char **argv)
   CpvAccess(_bocInitQ) = new PtrQ();
   CpvAccess(_nodeBocInitQ) = new PtrQ();
   CpvAccess(_groupTable) = new GroupTable();
-  if(CmiMyRank()==0)
+  if(CmiMyRank()==0) {
+    _nodeLock = CmiCreateLock();
     _nodeGroupTable = new GroupTable();
+  }
   CmiNodeBarrier();
   CpvAccess(_qd) = new QdState();
   CpvAccess(_numInitsRecd) = 0;
