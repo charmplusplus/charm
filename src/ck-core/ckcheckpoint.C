@@ -74,10 +74,10 @@ void CkCheckpointMgr::Checkpoint(int len, char dirname[],CkCallback& cb){
 	dirname[len]='\0';
 	//DEBCHK("[%d]CkCheckpointMgr::Checkpoint called, len=%d, dirname={%s}\n",CkMyPe(),len,dirname);
 	IrrGroup* obj;
-	int numGroups = CkpvAccess(_groupIDTable).size();
+	int numGroups = CkpvAccess(_groupIDTable)->size();
 	for(int i=0;i<numGroups;i++) {
-		obj = CkpvAccess(_groupTable)->find(CkpvAccess(_groupIDTable)[i]).getObj();
-		//DEBCHK("tmpInfo[%d]:gID = %d, eIdx = %d, obj->ckGetGroupID() = %d\n",i,CkpvAccess(_groupIDTable)[i].idx,CkpvAccess(_groupTable)->find(CkpvAccess(_groupIDTable)[i]).getMigCtor(),obj->ckGetGroupID().idx);
+		obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
+		//DEBCHK("tmpInfo[%d]:gID = %d, eIdx = %d, obj->ckGetGroupID() = %d\n",i,(*CkpvAccess(_groupIDTable))[i].idx,CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getMigCtor(),obj->ckGetGroupID().idx);
 		if(obj->isLocMgr()){
 			DEBCHK("\tThis is a location manager!\n");
 			ElementSaver saver(dirname,obj->ckGetGroupID().idx);
@@ -106,7 +106,7 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 
 	// save groups into Groups.dat
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
-	int numGroups = CkpvAccess(_groupIDTable).size();
+	int numGroups = CkpvAccess(_groupIDTable)->size();
 	sprintf(filename,"%s/Groups.dat",dirname);
 	FILE* fGroups = fopen(filename,"wb");
 	if(!fGroups) CkAbort("Failed to create checkpoint file for group table!");
@@ -116,7 +116,7 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	GroupInfo *tmpInfo = new GroupInfo [numGroups];
 	for(int i=0;i<numGroups;i++) {
 		int tmpCtor;
-		tmpInfo[i].gID = CkpvAccess(_groupIDTable)[i];
+		tmpInfo[i].gID = (*CkpvAccess(_groupIDTable))[i];
 		tmpCtor = (tmpInfo[i].eIdx = CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getMigCtor());
 		//DEBCHK("[%d]tmpInfo[%d].gID:%d,migCtor:%d\n",CkMyPe(),i,tmpInfo[i].gID.idx,tmpCtor);
 		if(tmpCtor==-1) {
@@ -252,7 +252,7 @@ void CkRestartMain(const char* dirname){
 	for(int i=0;i<numGroups;i++) {
 		CkGroupID gID = tmpInfo[i].gID;
 		//DEBCHK("tmpInfo[%d]:gID = %d, eIdx = %d\n",i,gID.idx,tmpInfo[i].eIdx);
-		CkpvAccess(_groupIDTable).push_back(gID);
+		CkpvAccess(_groupIDTable)->push_back(gID);
 		int eIdx = tmpInfo[i].eIdx;
 		CkMigrateMessage m;
 		envelope* env = UsrToEnv(&m);

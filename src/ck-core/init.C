@@ -41,7 +41,7 @@ CkpvDeclare(CkGroupID,   _currentGroup);
 CkpvDeclare(CkGroupID, _currentGroupRednMgr);
 CkpvDeclare(CkGroupID,   _currentNodeGroup);
 CkpvDeclare(GroupTable*, _groupTable);
-CkpvDeclare(GroupIDTable, _groupIDTable);
+CkpvDeclare(GroupIDTable*, _groupIDTable);
 CkpvDeclare(UInt, _numGroups);
 
 CkpvDeclare(CkCoreState *, _coreState);
@@ -287,7 +287,7 @@ static int _charmLoadEstimator(void)
 static void _sendTriggers(void)
 {
   int i, num, first;
-  CmiLock(CsvAccess(_nodeLock));
+  CmiLock(CksvAccess(_nodeLock));
   if (_triggersSent == 0)
   {
     _triggersSent++;
@@ -378,7 +378,7 @@ static void _initHandler(void *msg)
     default:
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
-  if(_numExpectInitMsgs&&(CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs)==_numExpectInitMsgs)) {
+  if(_numExpectInitMsgs&&(CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs)>=_numExpectInitMsgs)) {
     _initDone();
   }
 }
@@ -452,7 +452,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(CkGroupID, _currentGroupRednMgr);
 	CkpvInitialize(CkGroupID, _currentNodeGroup);
 	CkpvInitialize(GroupTable*, _groupTable);
-	CkpvInitialize(GroupIDTable, _groupIDTable);
+	CkpvInitialize(GroupIDTable*, _groupIDTable);
 	CkpvInitialize(UInt, _numGroups);
 	CkpvInitialize(int, _numInitsRecd);
 	CpvInitialize(QdState*, _qd);
@@ -473,6 +473,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(_CkErrStream*, _ckerr);
 	CkpvInitialize(Stats*, _myStats);
 
+	CkpvAccess(_groupIDTable) = new GroupIDTable(0);
 	CkpvAccess(_groupTable) = new GroupTable;
 	CkpvAccess(_groupTable)->init();
 	CkpvAccess(_numGroups) = 1; // make 0 an invalid group number
@@ -491,7 +492,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	CmiNodeAllBarrier();
 #ifdef __BLUEGENE__
-	if(CkMyRank()==0)
+	if(BgNodeRank()==0)
 #endif
 	{
 		CpvAccess(_qd) = new QdState();
@@ -509,7 +510,7 @@ void _initCharm(int unused_argc, char **argv)
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 	_nodeBocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 #ifdef __BLUEGENE__
-	if(CkMyRank()==0)
+	if(BgNodeRank()==0)
 #endif
 	{
 	_qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);

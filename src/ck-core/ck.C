@@ -294,7 +294,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   CkpvAccess(_groupTable)->find(groupID).setDefCtor(_chareTable[gIdx]->defCtor);
   CkpvAccess(_groupTable)->find(groupID).setMigCtor(_chareTable[gIdx]->migCtor);
   CkpvAccess(_groupTable)->find(groupID).setName(_chareTable[gIdx]->name);
-  CkpvAccess(_groupIDTable).push_back(groupID);
+  CkpvAccess(_groupIDTable)->push_back(groupID);
   PtrQ *ptrq = CkpvAccess(_groupTable)->find(groupID).getPending();
   if(ptrq) {
     void *pending;

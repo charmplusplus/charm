@@ -117,7 +117,7 @@ CkpvExtern(CkGroupID,_currentGroup);
 CkpvExtern(CkGroupID, _currentGroupRednMgr);
 
 CkpvExtern(GroupTable*, _groupTable);
-CkpvExtern(GroupIDTable, _groupIDTable);
+CkpvExtern(GroupIDTable*, _groupIDTable);
 CkpvExtern(unsigned int, _numGroups);
 
 CpvExtern(char **,Ck_argv);
