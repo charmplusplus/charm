@@ -1163,6 +1163,8 @@ arg_init(argc, argv)
   arg_maxrsh         = pparam_getint("maxrsh");
   arg_nodelist       = pparam_getstr("nodelist");
   arg_nodegroup      = pparam_getstr("nodegroup");
+
+  arg_verbose = arg_verbose || arg_debug || arg_debug_no_pause;
   
   /* Find the current value of the DISPLAY variable */
   arg_display = getenv_display();
@@ -1885,7 +1887,7 @@ prog rsh_start(nodeno)
       fprintf(stderr,"caution: cannot start specified number of rsh's\n");
       fprintf(stderr,"(not enough file descriptors available).\n");
     }
-  if (rsh && (arg_debug || arg_debug_no_pause))
+  if (rsh && arg_verbose)
     fprintf(stderr,"node %d: rsh initiated...\n",nodeno);
   return rsh;
 }
@@ -2091,7 +2093,7 @@ int start_nodes()
 	line = xstr_gets(buffer, 999, p->obuf);
 	if (line==0) break;
 	if (strncmp(line,"[1] ",4)==0) continue;
-	if (arg_debug || arg_debug_no_pause ||
+	if (arg_verbose ||
 	    (strcmp(line,"rsh phase successful.")
 	     &&strcmp(line,"remote responding...")))
 	  fprintf(stderr,"node %d: %s\n",rsh_node[i],line);
