@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-10-13 18:15:53  jyelon
+ * Revision 2.6  1995-10-19 18:21:18  jyelon
+ * added typecasts to remove warnings.
+ *
+ * Revision 2.5  1995/10/13  18:15:53  jyelon
  * K&R changes.
  *
  * Revision 2.4  1995/06/19  17:45:27  sanjeev
@@ -74,8 +77,8 @@ static int CallBocFn(arg)
   
   cbocstruct = (CallBocStuff *)arg;
   if ( !((*(cbocstruct->fn_ptr))(cbocstruct->bocNum)) )
-      CcdPeriodicallyCall(CallBocFn, arg);
-	
+      CcdPeriodicallyCall((CcdVoidFn)CallBocFn, (void *)arg);
+
 }
 
 /*****************************************************************************
@@ -99,7 +102,7 @@ int size; ChareIDType *pChareID;
 
     CpvAccess(outstanding_sends)++;
     
-    CcdCallOnCondition(condnum, SendMsgFn, (void *)newEntry);
+    CcdCallOnCondition(condnum, (CcdVoidFn)SendMsgFn, (void *)newEntry);
     }
 } 
 
@@ -121,7 +124,7 @@ void CallBocIfConditionArises(condnum, fn_ptr, bocNum)
   else {
     newEntry->bocNum   = bocNum;
     newEntry->fn_ptr   = fn_ptr;;
-    CcdCallOnCondition(condnum, CallBocFn, (void *)newEntry);
+    CcdCallOnCondition(condnum, (CcdVoidFn)CallBocFn, (void *)newEntry);
     }
 }
 
@@ -148,7 +151,7 @@ void SendMsgAfter(deltaT, entry, msgToSend, size, pChareID)
       
       CpvAccess(outstanding_sends)++;
       
-      CcdCallFnAfter(SendMsgFn, (void *)newEntry, deltaT);
+      CcdCallFnAfter((CcdVoidFn)SendMsgFn, (void *)newEntry, deltaT);
     }
 } 
 
@@ -170,7 +173,7 @@ void CallBocAfter(fn_ptr, bocNum, deltaT)
     {
       newEntry->bocNum = bocNum;  
       newEntry->fn_ptr = fn_ptr;  
-      CcdCallFnAfter(CallBocFn, (void *)newEntry, deltaT);
+      CcdCallFnAfter((CcdVoidFn)CallBocFn, (void *)newEntry, deltaT);
     } 
 } 
 
@@ -192,7 +195,7 @@ void CallBocOnCondition(fn_ptr, bocNum)
     {
       newEntry->bocNum = bocNum;  
       newEntry->fn_ptr = fn_ptr;  
-      CcdPeriodicallyCall(CallBocFn, (void *)newEntry);
+      CcdPeriodicallyCall((CcdVoidFn)CallBocFn, (void *)newEntry);
     } 
 } 
 
