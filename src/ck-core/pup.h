@@ -53,7 +53,6 @@ public:
 
 
 #include <stdio.h> //<- for FILE *
-
 class PUP {//<- Should be "namespace", once all compilers support them
 public:
 //Item data types-- these are used to do byte swapping, etc.
@@ -142,13 +141,13 @@ public:
 };
 
 //Superclass of packers
-class packer : public PUP::er {
+class packer : public er {
 public:
 	virtual bool isPacking(void) const;
 };
 
 //Superclass of unpackers
-class unpacker : public PUP::er {
+class unpacker : public er {
  public://<- for some reason the xlator needs "bytes" to be public
 	//Generic bottleneck: pack/unpack n items of size itemSize 
 	// and data type t from p.  Desc describes the data item
@@ -158,7 +157,7 @@ public:
 };
 
 //For finding the number of bytes to pack (e.g., to preallocate a memory buffer)
-class sizer : public PUP::er {
+class sizer : public er {
 protected:
 	int nBytes;
 	//Generic bottleneck: n items of size itemSize
@@ -173,7 +172,7 @@ public:
 };
 
 //For packing into a preallocated, presized memory buffer
-class toMem : public PUP::packer {
+class toMem : public packer {
 protected:
 	myByte *buf;//destination buffer (stuff gets packed *in* here)
 	//Generic bottleneck: pack n items of size itemSize from p.
@@ -184,7 +183,7 @@ public:
 };
 
 //For unpacking from a memory buffer
-class fromMem : public PUP::unpacker {
+class fromMem : public unpacker {
 protected:
 	const myByte *buf;//source buffer (stuff gets unpacked *from* here)
 	//Generic bottleneck: unpack n items of size itemSize from p.
@@ -195,7 +194,7 @@ public:
 };
 
 //For packing to a disk file
-class toDisk : public PUP::packer {
+class toDisk : public packer {
 protected:
 	FILE *outF;
 	//Generic bottleneck: pack n items of size itemSize from p.
@@ -207,7 +206,7 @@ public:
 };
 
 //For unpacking from a disk file
-class fromDisk : public PUP::unpacker {
+class fromDisk : public unpacker {
 protected:
 	FILE *inF;
 	//Generic bottleneck: unpack n items of size itemSize from p.
@@ -250,7 +249,7 @@ public:
 //For translating some odd disk/memory representation into the 
 // current machine representation.  (We really only need to
 // translate during unpack-- "reader makes right".)
-class xlater : public PUP::unpacker {
+class xlater : public unpacker {
 protected:
 	typedef void (*dataConverterFn)(int N,const myByte *in,myByte *out,int nElem);
 	
@@ -263,11 +262,11 @@ protected:
 	void setConverterInt(const machineInfo &m,const machineInfo &cur,
 		int isUnsigned,int intType,dataType dest);
 	
-	PUP::unpacker &myUnpacker;//Raw data unpacker
+	unpacker &myUnpacker;//Raw data unpacker
 	//Generic bottleneck: unpack n items of size itemSize from p.
 	virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc);
 public:
-	xlater(const PUP::machineInfo &fromMachine,PUP::unpacker &fromData);
+	xlater(const machineInfo &fromMachine, unpacker &fromData);
 };
 
 };//<- End "namespace" PUP
@@ -278,5 +277,19 @@ void operator|(PUP::er &p,T &t)
 {
          p((void *)&t,sizeof(T));
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
