@@ -375,6 +375,14 @@ static void copyAdd(int nx,int ny,const int *in,int add,int *out)
     out[i] = in[i]+add;
 }
 
+//Make a heap-allocated copy of this (len-item) array, changing the index as spec'd
+static int *copyArray(const int *src,int len,int indexBase)
+{
+	int *ret=new int[len];
+	for (int i=0;i<len;i++) ret[i]=src[i]-indexBase;
+	return ret;
+}
+
 void FEM_Item::setUdata_r(const double *Nudata)
 {
 	allocUdata();
@@ -436,6 +444,12 @@ const FEM_Sparse &FEM_Mesh::getSparse(int uniqueID) const
 		CkAbort("FEM: Invalid sparse identifier!");
 	return *sparse[uniqueID];
 }
+FEM_Sparse &FEM_Mesh::setSparse(int uniqueID)
+{
+	if (uniqueID<0 || uniqueID>=sparse.size())
+		CkAbort("FEM: Invalid sparse identifier!");
+	return *sparse[uniqueID];
+}
 void FEM_Mesh::setSparse(int uniqueID,FEM_Sparse *s)
 {
 	if (uniqueID<sparse.size()) CkAbort("FEM: Cannot re-use sparse identifiers!");
@@ -484,6 +498,19 @@ FDECL void FTN_NAME(FEM_SET_SPARSE,fem_set_sparse)
 	FEM_Sparse *s=new FEM_Sparse(*nodesPerTuple,bytesPerTuple);
 	s->set(*nTuples,nodes,1,(char *)data);
 	setMesh()->setSparse(*uniqueID-1,s);
+}
+CDECL void FEM_Set_Sparse_Elem(int uniqueID,const int *rec2elem)
+{
+	FEMAPI("FEM_Set_Sparse_Elem");
+	FEM_Sparse &s=setMesh()->setSparse(uniqueID);
+	s.setElem(copyArray(rec2elem,2*s.size(),0));
+}
+FDECL void FTN_NAME(FEM_SET_SPARSE_ELEM,fem_set_sparse_elem)
+	(const int *uniqueID,int *rec2elem)
+{
+	FEMAPI("FEM_Set_Sparse_Elem");
+	FEM_Sparse &s=setMesh()->setSparse(*uniqueID-1);
+	s.setElem(copyArray(rec2elem,2*s.size(),1));
 }
 
 CDECL int  FEM_Get_Sparse_Length(int uniqueID)
@@ -1706,14 +1733,6 @@ CDECL void FEM_Add_Ghost_Layer(int nodesPerTuple,int doAddNodes)
 FDECL void FTN_NAME(FEM_ADD_GHOST_LAYER,fem_add_ghost_layer)
 	(int *nodesPerTuple,int *doAddNodes)
 { FEM_Add_Ghost_Layer(*nodesPerTuple,*doAddNodes); }
-
-//Make a heap-allocated copy of this (len-item) array, changing the index as spec'd
-static int *copyArray(const int *src,int len,int indexBase)
-{
-	int *ret=new int[len];
-	for (int i=0;i<len;i++) ret[i]=src[i]-indexBase;
-	return ret;
-}
 
 CDECL void FEM_Add_Ghost_Elem(int elType,int tuplesPerElem,const int *elem2tuple)
 {

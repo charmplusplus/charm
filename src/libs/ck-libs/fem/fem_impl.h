@@ -316,6 +316,21 @@ public:
 };
 
 
+//Smart pointer-to-new[]'d array-of-ints
+class intArrayPtr : public CkNoncopyable {
+	int *sto;
+public:
+	intArrayPtr() {sto=NULL;}
+	intArrayPtr(int *src) {sto=src;}
+	~intArrayPtr() {if (sto) delete[] sto;}
+	void operator=(int *src) {
+		if (sto) delete[] sto;
+		sto=src;
+	}
+	operator int *(void) {return sto;}
+	operator const int *(void) const {return sto;}
+};
+
 /*Describes a set of records of sparse data that are all the
 same size and all associated with the same number of nodes.
 Sparse data is associated with some subset of the nodes in the mesh,
@@ -325,12 +340,13 @@ use of sparse data is to describe boundary conditions.
 class FEM_Sparse : public CkNoncopyable {
 	AllocTable2d<int> nodes; //Each row is the nodes surrounding a tuple
 	AllocTable2d<char> data; //Each row is the user data for a tuple
+	intArrayPtr elem; //*OPTIONAL* partitioning based on elements (2*size() ints)
 public:
 	void allocate(int n_); //Allocate storage for data and nodes of n tuples
 	
-	FEM_Sparse() {} //Used during pup
+	FEM_Sparse() { } //Used during pup
 	FEM_Sparse(int nodesPer_,int bytesPer_) 
-		:nodes(nodesPer_), data(bytesPer_) {}
+		:nodes(nodesPer_), data(bytesPer_) { }
 	
 	//Return the number of records:
 	inline int size(void) const {return data.size();}
@@ -352,6 +368,11 @@ public:
 	//Get the entire table:
 	void get(int *n,int idxBase,char *d) const;
 	
+	//Set the optional element-partitioning array
+	void setElem(int *elem_) {elem=elem_;}
+	int *getElem(void) {return elem;}
+	const int *getElem(void) const {return elem;}
+	
 	void pup(PUP::er &p) {p|nodes; p|data;}
 };
 PUPmarshall(FEM_Sparse);
@@ -362,8 +383,9 @@ class FEM_Mesh : public CkNoncopyable {
 	CkPupPtrVec<FEM_Sparse> sparse;
 public:
 	int nSparse(void) const {return sparse.size();}
-	const FEM_Sparse &getSparse(int uniqueID) const;
 	void setSparse(int uniqueID,FEM_Sparse *s);
+	FEM_Sparse &setSparse(int uniqueID);
+	const FEM_Sparse &getSparse(int uniqueID) const;
 	
 	FEM_Item node; //Describes the nodes in the mesh
 	NumberedVec<FEM_Elem> elem; //Describes the different types of elements in the mesh
@@ -388,6 +410,7 @@ public:
 	int nElems() const //Return total number of elements (of all types)
 	  {return nElems(elem.size());}
 	int nElems(int t) const;//Return total number of elements before type t
+	int getGlobalElem(int elType,int elNo) const {return nElems(elType)+elNo;}
 	void pup(PUP::er &p); //For migration
 	void print(const l2g_t &l2g);//Write human-readable description to CkPrintf
 };
@@ -571,9 +594,9 @@ public:
 	public:
 		bool add; //Add this kind of ghost element to the chunks
 		int tuplesPerElem; //# of tuples surrounding this element
-		int *elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
-		elemGhostInfo(void) {add=false;tuplesPerElem=0; elem2tuple=NULL;}
-		~elemGhostInfo(void) {delete[] elem2tuple;}
+		intArrayPtr elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
+		elemGhostInfo(void) {add=false;tuplesPerElem=0;}
+		~elemGhostInfo(void) {}
 		void pup(PUP::er &p) {CkAbort("FEM> Shouldn't call elemGhostInfo::pup!\n");}
 	};
 	NumberedVec<elemGhostInfo> elem;

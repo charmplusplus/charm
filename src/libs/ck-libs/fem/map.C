@@ -132,7 +132,31 @@ class splitter {
 //Processing:
 	peList *gNode; //Map global node to owning processors [mesh->node.n]
 	dynChunk *chunks; //Growing list of output elements [nchunks]
+
+//------- Used by sparse data splitter ------------
+	typedef peList* peListPtr;
+	peList **srcPes;
 	
+	int getSparseChunks(const FEM_Sparse &src,int record,int *chunks)
+	{
+		const int *srcElem=src.getElem();
+		if (srcElem!=NULL) 
+		{ //We have an element list-- put this record on its element's chunk
+			const int *elemRec=&srcElem[2*record];
+			chunks[0]=elem2chunk[mesh->getGlobalElem(elemRec[0],elemRec[1])];
+			return 1;
+		}
+		else
+		{ //No element list-- split up based on nodes
+			int nNodes=src.getNodesPer();
+			for (int i=0;i<nNodes;i++) 
+				srcPes[i]=&gNode[src.getNodes(record)[i]];
+			int nDest=0;
+			intersectPeLists(srcPes,nNodes,chunks,&nDest);
+			return nDest;
+		}
+	}
+
 //---- Used by ghost layer builder ---
 	CkVec<peList *> gElem;//Map global element to owning processors
 	unsigned char *ghostNode; //Flag: this node borders ghost elements [mesh->node.n]
@@ -364,12 +388,9 @@ void splitter::separateSparse(void)
 		//Determine which chunks each sparse record will land in,
 		// to count up the length of each chunk in destLen:
 		int nSrc=src.size(),nNodes=src.getNodesPer();
-		int nDest; //Number of destination chunks for this record
-		typedef peList* peListPtr;
-		peList **srcPes=new peListPtr[nNodes];
+		srcPes=new peListPtr[nNodes]; //Used in getSparseChunks
 		for (s=0;s<nSrc;s++) {
-			for (i=0;i<nNodes;i++) srcPes[i]=&gNode[src.getNodes(s)[i]];
-			intersectPeLists(srcPes,nNodes,destChunks,&nDest);
+			int nDest=getSparseChunks(src,s,destChunks);
 			if (nDest==0) CkAbort("FEM Partitioning> Sparse record does not lie on any PE!");
 			for (int destNo=0;destNo<nDest;destNo++) 
 				destLen[destChunks[destNo]]++;
@@ -385,8 +406,7 @@ void splitter::separateSparse(void)
 		
 		//Insert each sparse record into its chunks:
 		for (s=0;s<nSrc;s++) {
-			for (i=0;i<nNodes;i++) srcPes[i]=&gNode[src.getNodes(s)[i]];
-			intersectPeLists(srcPes,nNodes,destChunks,&nDest);
+			int nDest=getSparseChunks(src,s,destChunks);
 			for (int destNo=0;destNo<nDest;destNo++) {
 				c=destChunks[destNo];
 				int d=destLen[c]++;
@@ -395,10 +415,9 @@ void splitter::separateSparse(void)
 				//Nodes have to be given local numbers:
 				int *destNodes=dest[c]->getNodes(d);
 				for (i=0;i<nNodes;i++)
-					destNodes[i]=srcPes[i]->localOnPE(c);
+					destNodes[i]=gNode[src.getNodes(s)[i]].localOnPE(c);
 			}
 		}
-		
 		delete[] srcPes;
 	}
 	delete[] dest;

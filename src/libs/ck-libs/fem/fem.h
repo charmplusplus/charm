@@ -58,6 +58,7 @@ extern "C" {
   void FEM_Set_Sparse(int uniqueIdentifier,int nRecords,
   	const int *nodes,int nodesPerRec,
   	const void *data,int dataPerRec,int dataType);
+  void FEM_Set_Sparse_Elem(int uniqueIdentifier,const int *rec2elem);
 
   void FEM_Get_Node(int *nNodes,int *doublePerNode);
   void FEM_Get_Node_Data(double *data);

@@ -87,9 +87,14 @@
          integer :: FEM_Get_Ghost_List_Length
        end function
 
-       function FEM_Get_Sparse_Length(uniqueID)
+       subroutine FEM_Set_Sparse_Elem(sID,rec2elem)
+         integer,intent (in) :: sID
+         integer, intent(in) :: rec2elem(2,:)
+       end subroutine 
+
+       function FEM_Get_Sparse_Length(sID)
          integer :: FEM_Get_Sparse_Length
-         integer, intent(in) ::uniqueID
+         integer, intent(in) ::sID
        end function
        
        function FEM_Get_Comm_Partners()
