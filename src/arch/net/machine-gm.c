@@ -10,8 +10,7 @@
   Gengbin Zheng, gzheng@uiuc.edu  4/22/2001
 
   TODO:
-  1. packetizing;
-  2. DMAable buffer reuse;
+  1. DMAable buffer reuse;
 */
 
 
@@ -193,28 +192,47 @@ static void processMessage(char *msg, int len)
 {
   char *newmsg;
   int rank, srcpe, seqno, magic, i;
+  int size;
   
   if (len >= DGRAM_HEADER_SIZE) {
     DgramHeaderBreak(msg, rank, srcpe, magic, seqno);
     if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK)) {
-      /* node = nodes_by_pe[srcpe]; */
-      newmsg = (char *)CmiAlloc(len);
-      _MEMCHECK(newmsg);
-      memcpy(newmsg, msg, len);
-      if (rank == DGRAM_BROADCAST) {
-        for (i=1; i<Cmi_mynodesize; i++)
-          PCQueuePush(CmiGetStateN(i)->recv, CopyMsg(newmsg, len));
-        PCQueuePush(CmiGetStateN(0)->recv, newmsg);
+      OtherNode node = nodes_by_pe[srcpe];
+      newmsg = node->asm_msg;
+      if (newmsg == 0) {
+        size = CmiMsgHeaderGetLength(msg);
+        newmsg = (char *)CmiAlloc(size);
+        if (!newmsg)
+          fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
+        if (size < len) KillEveryoneCode(4559312);
+        memcpy(newmsg, msg, len);
+        node->asm_rank = rank;
+        node->asm_total = size;
+        node->asm_fill = len;
+        node->asm_msg = newmsg;
       } else {
-#if CMK_NODE_QUEUE_AVAILABLE
-         if (rank==DGRAM_NODEMESSAGE) {
-           PCQueuePush(CsvAccess(NodeRecv), newmsg);
-         }
-         else
-#endif
-           PCQueuePush(CmiGetStateN(rank)->recv, newmsg);
+        size = len - DGRAM_HEADER_SIZE;
+        memcpy(newmsg + node->asm_fill, msg+DGRAM_HEADER_SIZE, size);
+        node->asm_fill += size;
       }
-
+      if (node->asm_fill > node->asm_total)
+         CmiAbort("\n\n\t\tLength mismatch!!\n\n");
+      if (node->asm_fill == node->asm_total) {
+        if (rank == DGRAM_BROADCAST) {
+          for (i=1; i<Cmi_mynodesize; i++)
+            PCQueuePush(CmiGetStateN(i)->recv, CopyMsg(newmsg, len));
+          PCQueuePush(CmiGetStateN(0)->recv, newmsg);
+        } else {
+#if CMK_NODE_QUEUE_AVAILABLE
+           if (rank==DGRAM_NODEMESSAGE) {
+             PCQueuePush(CsvAccess(NodeRecv), newmsg);
+           }
+           else
+#endif
+             PCQueuePush(CmiGetStateN(rank)->recv, newmsg);
+        }
+        node->asm_msg = 0;
+      }
     } 
     else {
       CmiPrintf("message ignored1: magic not agree:%d != %d!\n", magic, Cmi_charmrun_pid&DGRAM_MAGIC_MASK);
@@ -237,7 +255,6 @@ static int processEvent(gm_recv_event_t *e)
       size = gm_ntohc(e->recv.size);
       msg = gm_ntohp(e->recv.buffer);
       len = gm_ntohl(e->recv.length);
-      if (CmiMsgHeaderGetLength(msg) != len) CmiPrintf("Message corrupted!\n");;
       processMessage(msg, len);
       gm_provide_receive_buffer(gmport, msg, size, GM_LOW_PRIORITY);
       break;
@@ -305,16 +322,16 @@ static void send_progress()
  * penging message queue, otherwise invoke the GM send.
  ***********************************************************************/
 
-void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
+void EnqueueOutgoingDgram
+        (OutgoingMsg ogm, char *ptr, int dlen, OtherNode node, int rank)
 {
   char *buf;
-  int size = gm_min_size_for_length(ogm->size);
-  int len = ogm->size;
+  int size, len;
   int alloclen, allocSize;
 
 /* CmiPrintf("DeliverViaNetwork: size:%d\n", size); */
 
-  DgramHeaderMake(ogm->data, rank, ogm->src, Cmi_charmrun_pid, node->send_next);
+  len = dlen + DGRAM_HEADER_SIZE;
 
   /* allocate DMAable memory to prepare sending */
 #if !CMK_MSGPOOL
@@ -323,7 +340,10 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
   getPool(buf, len);
 #endif
   _MEMCHECK(buf);
-  memcpy(buf, ogm->data, len);
+
+  DgramHeaderMake(buf, rank, ogm->src, Cmi_charmrun_pid, node->send_next);
+  memcpy(buf+DGRAM_HEADER_SIZE, ptr, dlen);
+  size = gm_min_size_for_length(len);
 
   /* if queue is not empty, enqueue msg. this is to guarantee the order */
   if (pendinglen != 0) {
@@ -344,6 +364,20 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
   gm_send_with_callback(gmport, buf, size, len, 
                         GM_LOW_PRIORITY, node->IP, node->dataport, 
                         send_callback, buf);
+}
+
+void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
+{
+  int size; char *data;
+ 
+  size = ogm->size - DGRAM_HEADER_SIZE;
+  data = ogm->data + DGRAM_HEADER_SIZE;
+  while (size > Cmi_dgram_max_data) {
+    EnqueueOutgoingDgram(ogm, data, Cmi_dgram_max_data, node, rank);
+    data += Cmi_dgram_max_data;
+    size -= Cmi_dgram_max_data;
+  }
+  EnqueueOutgoingDgram(ogm, data, size, node, rank);
 }
 
 /***********************************************************************
@@ -376,7 +410,12 @@ void CmiMachineInit()
   skt_set_abort(gmExit);
 
   /* set up recv buffer */
-  maxsize = 24;
+/*
+  maxsize = gm_min_size_for_length(4096);
+  Cmi_dgram_max_data = 4096 - DGRAM_HEADER_SIZE;
+*/
+  maxsize = 22;
+
   for (i=1; i<maxsize; i++) {
     int len = gm_max_length_for_size(i);
     int num = 2;
@@ -392,6 +431,7 @@ void CmiMachineInit()
       gm_provide_receive_buffer(gmport, buf, i, GM_LOW_PRIORITY);
     }
   }
+  Cmi_dgram_max_data = maxMsgSize - DGRAM_HEADER_SIZE;
 
   status = gm_set_acceptable_sizes (gmport, GM_LOW_PRIORITY, (1<<(maxsize))-1);
 
