@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1995-09-20 13:16:33  jyelon
+ * Revision 2.15  1995-09-20 14:58:12  jyelon
+ * Did some work on threads stuff.
+ *
+ * Revision 2.14  1995/09/20  13:16:33  jyelon
  * Added prototypes for Cth (thread) functions.
  *
  * Revision 2.13  1995/09/19  21:43:58  brunner
@@ -228,15 +231,18 @@ typedef struct CthThread *CthThread;
 typedef void        (*CthVoidFn)();
 typedef CthThread   (*CthThFn)();
 
-
-CthThread  CthCreate   CMK_PROTO((voidfn, void *, int, CthVoidFn, CthThFn));
-void       CthYield    CMK_PROTO((void));
-void       CthSuspend  CMK_PROTO((void));
-void       CthExit     CMK_PROTO((void));
-void       CthAwaken   CMK_PROTO((CthThread));
 CthThread  CthSelf     CMK_PROTO((void));
-void       CthSetVal   CMK_PROTO((CthThread, void **, void *));
-void      *CthGetVal   CMK_PROTO((CthThread, void **));
+CthThread  CthCreate   CMK_PROTO((voidfn, void *, int));
+void       CthResume   CMK_PROTO((CthThread));
+void       CthFree     CMK_PROTO((CthThread));
+
+void       CthSuspend      CMK_PROTO((void));
+void       CthAwaken       CMK_PROTO((CthThread));
+void       CthSetStrategy  CMK_PROTO((CthThread, CthVoidFn, CthThFn));
+void       CthYield        CMK_PROTO((void));
+
+void       CthSetVar   CMK_PROTO((CthThread, void **, void *));
+void      *CthGetVar   CMK_PROTO((CthThread, void **));
 
 
 /******** PROTOTYPES FOR CSD FUNCTIONS AND MACROS ********/
