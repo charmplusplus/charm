@@ -26,16 +26,16 @@ class main : public Chare
 
 static inline void itersDone(void) { CProxy_main pm(mainhandle); pm.done(); }
 
-class BlockMap : public ArrayMap {
+class BlockMap : public CkArrayMap {
  public:
   BlockMap(void) {
   }
-  void registerArray(ArrayMapRegisterMessage *m) {
-    Array1D *array = (Array1D *) CkLocalBranch(m->groupID);
-    array->RecvMapID(this, 0);
+  int registerArray(CkArrayMapRegisterMessage *m) {
     delete m;
+    return 0;
   }
-  int procNum(int /*arrayHdl*/, int elem) {
+  int procNum(int /*arrayHdl*/,const CkArrayIndex &idx) {
+    int elem=*(int *)idx.data();
     int penum =  (elem/(32/CkNumPes()));
     CkPrintf("%d mapped to %d proc\n", elem, penum);
     return penum;
@@ -46,9 +46,9 @@ class BlockMap : public ArrayMap {
 
 class MigrateInfo : public CMessage_MigrateInfo {
   public:
-    ArrayElement *elem;
+    ArrayElement1D *elem;
     int where;
-    MigrateInfo(ArrayElement *e, int w) : elem(e), where(w) {}
+    MigrateInfo(ArrayElement1D *e, int w) : elem(e), where(w) {}
 };
 
 class PersReq {
@@ -78,9 +78,11 @@ class ampi : public TempoArray {
     int nAllReductions;
 
     ampi(ArrayElementCreateMessage *msg);
-    ampi(ArrayElementMigrateMessage *msg);
-    int packsize(void);
-    void pack(void *buf);
+    ampi(ArrayElementMigrateMessage *msg); 
+    
+    virtual int packsize(void) const;//Returns number of bytes I need
+    virtual void *pack(void *intoBuf);//Write me to given buffer
+
     void run(void);
 };
 
@@ -90,7 +92,7 @@ class migrator : public Group {
   public:
     migrator(void) { migHandle = thisgroup; }
     void migrateElement(MigrateInfo *msg) {
-      msg->elem->migrate(msg->where);
+      msg->elem->migrateMe(msg->where);
       delete msg;
     }
 };

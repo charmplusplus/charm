@@ -7,7 +7,7 @@ mainmodule ampi {
     entry void done(void);
     entry [threaded] void qd(void);
   };
-  group BlockMap : ArrayMap {
+  group BlockMap : CkArrayMap {
     entry BlockMap(void);
   };
 

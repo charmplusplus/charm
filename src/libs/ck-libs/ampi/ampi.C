@@ -84,7 +84,7 @@ int migHandle;
 CtvDeclare(ampi *, ampiPtr);
 CtvDeclare(int, numMigrateCalls);
 extern "C" void main_(void);
-static Array1D *ampiArray;
+static CkArray *ampiArray;
 
 extern "C" void get_size_(int *, int *, int *, int *);
 extern "C" void pack_(char*,int*,int*,int*,float*,int*,int*,int*);
@@ -113,7 +113,7 @@ ampi::ampi(ArrayElementMigrateMessage *msg) : TempoArray(msg)
   //CkPrintf("[%d] called migration constructor\n", thisIndex);
   nrequests = 0;
   ampiArray = thisArray;
-  void *buf = msg->packData;
+  const void *buf = ArrayElement1D::unpack(msg->packData);
   totsize = *(int *)buf;
   buf = (void *) ((int *)buf + 1);
   csize = *(int *)buf;
@@ -127,20 +127,20 @@ ampi::ampi(ArrayElementMigrateMessage *msg) : TempoArray(msg)
   packedBlock = malloc(totsize);
   memcpy(packedBlock, buf, totsize);
   buf = (void *) ((char *)buf + totsize);
-  thread_id = CthUnpackThread(buf);
+  thread_id = CthUnpackThread((void *)buf);//<- should be const_cast<void *>
   CthAwaken(thread_id);
-  finishMigration(); 
   delete msg;
   //CkPrintf("[%d] finished migration constructor\n", thisIndex);
 }
 
 int
-ampi::packsize(void)
+ampi::packsize(void) const
 {
-  return 5*sizeof(int) + totsize + CthPackBufSize(thread_id);
+  return ArrayElement1D::packsize()+
+  	5*sizeof(int) + totsize + CthPackBufSize(thread_id);
 }
 
-void
+void *
 ampi::pack(void *buf)
 {
   TempoMessage *msg;
@@ -150,6 +150,7 @@ ampi::pack(void *buf)
   while((msg=(TempoMessage *)CmmGet(tempoMessages, 2, itags, 0))) {
     ckTempoSendElem(msg->tag1, msg->tag2, msg->data, msg->length, thisIndex);
   }
+  buf=ArrayElement1D::pack(buf);
   *(int *)buf = totsize;
   buf = (void *) ((int *)buf + 1);
   *(int *)buf = csize;
@@ -164,14 +165,13 @@ ampi::pack(void *buf)
   free(packedBlock);
   buf = (void *) ((char *)buf + totsize);
   CthPackThread(thread_id, buf);
+  return buf;
 }
 
 void
 ampi::run(void)
 {
   static int initCtv = 0;
-  int myIdx = getIndex();
-  ampi *myThis;
 
   if(!initCtv) {
     CtvInitialize(ampi *, ampiPtr);
@@ -184,25 +184,16 @@ ampi::run(void)
   // CkPrintf("[%d] main_ called\n", getIndex());
   main_();
   // CkPrintf("[%d] main_ finished\n", getIndex());
-  myThis = (ampi*) ampiArray->getElement(myIdx);
 
   // itersDone();
   CProxy_main mp(mainhandle);
   mp.done();
   // CkPrintf("[%d] sent donemsg\n", myThis->getIndex());
   CkPrintf("[%d] #ctxt switches: %d\n", CmiMyPe(), CpvAccess(_numSwitches));
-  CkPrintf("[%d] #reductions: %d\n", myIdx, nReductions);
-  CkPrintf("[%d] #Allreductions: %d\n", myIdx, nAllReductions);
+  CkPrintf("[%d] #reductions: %d\n", thisIndex, nReductions);
+  CkPrintf("[%d] #Allreductions: %d\n", thisIndex, nAllReductions);
   CthSuspend();
 
-  // myThis->ckTempoBarrier();
-
-/*
-  if(myThis->getIndex()==0)
-    CmiAbort("");
-  else
-    CthSuspend();
-*/
 }
 
 extern "C" void migrate_(void *gptr)
@@ -231,7 +222,7 @@ extern "C" void migrate_(void *gptr)
     //CkPrintf("[%d] Migrating from %d to %d\n", index, CkMyPe(), where);
     CthSuspend();
     //CkPrintf("[%d] awakened on %d \n", index, CkMyPe());
-    CtvAccess(ampiPtr) = ptr = (ampi*) ampiArray->getElement(index);
+    CtvAccess(ampiPtr) = ptr = (ampi*) ampiArray->getElement(CkArrayIndex1D(index));
     pb = ptr->packedBlock; csize = ptr->csize; isize = ptr->isize;
     rsize = ptr->rsize; fsize = ptr->fsize;
     cb = (char *)pb;
