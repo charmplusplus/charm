@@ -199,6 +199,7 @@ class TypeList : public Printable {
     TypeList(Type *t, TypeList *n=0) : type(t), next(n) {}
     int length(void) const;
     Type *getFirst(void) {return type;}
+    Type *getSecond(void) {if (next) return next->getFirst(); return NULL;}
     void print(XStr& str);
     void genProxyNames(XStr& str, const char *prefix, const char *middle, 
                         const char *suffix, const char *sep, forWhom forElement);
@@ -462,7 +463,8 @@ class Chare : public TEntity {
 
     NamedType *type;
     MemberList *list;
-    TypeList *bases;
+    TypeList *bases; //Base classes used by proxy
+    TypeList *bases_CBase; //Base classes used by CBase (or NULL)
     
     int entryCount;
 

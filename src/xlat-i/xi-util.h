@@ -34,6 +34,7 @@ class XStr {
     char *s;
     unsigned int len, blklen;
     void initTo(const char *_s);
+    void operator=(const XStr &str); //<- don't use this
   public:
     // MAB: following append methods were earlier private. However,
     // in order to minimize changes to sdag translator, they have been made
@@ -63,10 +64,10 @@ class XStr {
     //This operator allows us to use XStr's interchangably with char *'s:
     operator char *() {return get_string();}
     //Comparison operators
-    int operator==(XStr &s2) {return 0==strcmp(s,s2.s);}
-    int operator!=(XStr &s2) {return 0!=strcmp(s,s2.s);}
-    int operator==(const char *s2) {return 0==strcmp(s,s2);}
-    int operator!=(const char *s2) {return 0!=strcmp(s,s2);}
+    int operator==(XStr &s2) const {return 0==strcmp(s,s2.s);}
+    int operator!=(XStr &s2) const {return 0!=strcmp(s,s2.s);}
+    int operator==(const char *s2) const {return 0==strcmp(s,s2);}
+    int operator!=(const char *s2) const {return 0!=strcmp(s,s2);}
     //Addition operator
     XStr operator+ (const XStr &s2) const {XStr ret(*this);ret.append(s2.s); return ret;}
     //Insertion operators

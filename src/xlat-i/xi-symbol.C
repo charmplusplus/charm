@@ -493,6 +493,7 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, MemberList *l)
 	entryCount=1;
         hasElement=0;
 	forElement=forAll;
+	bases_CBase=NULL;
 	setTemplate(0); 
 	if (list)
 	{
@@ -587,6 +588,24 @@ Chare::genDecls(XStr& str)
       str << sdag_output;
     }
   }
+
+  if (!templat) 
+  { //Generate a CBase typedef:
+    TypeList *b=bases_CBase;
+    if (b==NULL) b=bases; //Fall back to normal bases list if no CBase available
+    switch(b->length()) {
+    case 1: //Just one base class: typedef CBaseT<parent,CProxy_me> CBase_me;
+	    str << "typedef CBaseT<"<<b->getFirst()<<",CProxy_"<<type<<"> "
+		<<" CBase_"<<type<<";\n"; 
+	    break;
+    case 2: //Two base classes: typedef CBaseT2<parent1,parent2,CProxy_me> CBase_me;
+	    str << "typedef CBaseT2<"<<b->getFirst()<<","<<b->getSecond()<<","
+		<<"CProxy_"<<type<<"> "<<" CBase_"<<type<<";\n"; 
+	    break;
+    default: //No base class, or several: give up, don't generate a CBase_me.
+	    break;
+    };
+  }
 }
 
 void
@@ -606,6 +625,9 @@ Chare::genSubDecls(XStr& str)
   str << "    "<<ptype<<"(void) {};\n";
   str << "    "<<ptype<<"(CkChareID __cid) : ";
   genProxyNames(str, "",NULL, "(__cid)", ", ");
+  str << "{  }\n";
+  str << "    "<<ptype<<"(const Chare *c) : ";
+  genProxyNames(str, "",NULL, "(c)", ", ");
   str << "{  }\n";
   //Multiple inheritance-- resolve inheritance ambiguity
     XStr super;
@@ -632,6 +654,7 @@ Group::Group(int ln, attrib_t Nattr,
         hasElement=1;
 	forElement=forIndividual;
 	hasSection=0;
+	bases_CBase=NULL;
 	if (b==NULL) {//Add Group as a base class
 		if (isNodeGroup())
 			bases = new TypeList(new NamedType("NodeGroup"), NULL);
@@ -657,6 +680,10 @@ Group::genSubDecls(XStr& str)
   genProxyNames(str, "public ",NULL, "", ", ");
   str << CIClassStart;
   str << "    "<<ptype<<"(void) {}\n";
+  str << "    "<<ptype<<"(const Group *g) : ";
+  genProxyNames(str, "", NULL,"(g)", ", ");
+  str << "{  }\n";
+
   if (forElement==forIndividual) 
   {//For a single element
     str << "    "<<ptype<<"(CkGroupID _gid,int _onPE,CkGroupID dTo) : ";
@@ -709,6 +736,12 @@ Group::genSubDecls(XStr& str)
 
 }
 
+XStr indexSuffix2object(const XStr &indexSuffix) {
+	if (indexSuffix==(const char*)"1D") return "CkIndex1D";
+	if (indexSuffix==(const char*)"2D") return "CkIndex2D";
+	if (indexSuffix==(const char*)"3D") return "CkIndex3D";
+	else return indexSuffix;
+}
 
 //Array Constructor
 Array::Array(int ln, attrib_t Nattr, NamedType *index,
@@ -727,8 +760,14 @@ Array::Array(int ln, attrib_t Nattr, NamedType *index,
 		if (0==strcmp(type->getBaseName(),"ArrayElement"))
 			//ArrayElement has special "ArrayBase" superclass
 			bases = new TypeList(new NamedType("ArrayBase"), NULL);
-		else //Everybody else inherits from ArrayBase
-			bases = new TypeList(new NamedType("ArrayElement"), NULL);
+		else {//Everybody else inherits from ArrayElementT<indexType>
+			bases=new TypeList(new NamedType("ArrayElement"),NULL);
+			XStr indexObject(indexSuffix2object(indexSuffix));
+			XStr parentClass;
+			parentClass<<"ArrayElementT<"<<indexObject<<">";
+			const char *parentClassName=strdup(parentClass);
+			bases_CBase = new TypeList(new NamedType(parentClassName), NULL);
+		}
 	}
 }
 
@@ -748,6 +787,12 @@ Array::genSubDecls(XStr& str)
   str << CIClassStart;
   
   str << "    "<<ptype<<"(void) {}\n";//An empty constructor
+  if (forElement!=forSection) 
+  { //Generate constructor based on array element
+	  str << "    "<<ptype<<"(const ArrayElement *e) : ";
+    genProxyNames(str, "", NULL,"(e)", ", ");
+    str << "{  }\n";
+  }
   
   //Resolve multiple inheritance ambiguity
   XStr super;
