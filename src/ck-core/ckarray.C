@@ -219,6 +219,7 @@ static int serial_num = 0;
 
 void Array1D::send(ArrayMessage *msg, int index, EntryIndexType ei)
 {
+  msg->from_pe = CkMyPe();
   msg->destIndex = index;
   msg->entryIndex = ei;
   msg->hopCount = 0;
@@ -280,13 +281,25 @@ void Array1D::RecvForElement(ArrayMessage *msg)
     return;
   }
   msg->hopCount++;
-  if (elementIDs[msg->destIndex].state == here) {
+  const int index = msg->destIndex;
+  if (elementIDs[index].state == here) {
     // CkPrintf("PE %d DELIVERING index %d RecvForElement state %d\n",
     // CkMyPe(),msg->destIndex,elementIDs[msg->destIndex].state);
 
     register int epIdx = msg->entryIndex;
-    CkChareID handle = elementIDs[msg->destIndex].elementHandle;
+    CkChareID handle = elementIDs[index].elementHandle;
     register void *obj = handle.objPtr;
+
+    if (msg->hopCount > 1) {
+      //      CkPrintf("[%d] Sending update to %d for %d\n",
+      //	       CkMyPe(),msg->from_pe,msg->destIndex);
+      ArrayElementUpdateMessage* update = new ArrayElementUpdateMessage;
+      update->index = index;
+      update->hopCount = elementIDs[index].curHop;
+      update->pe = CkMyPe();
+      CProxy_Array1D arr(thisgroup);
+      arr.UpdateLocation(update, msg->from_pe);
+    }
 
 #if CMK_LBDB_ON
     const int index = msg->destIndex;
@@ -466,6 +479,23 @@ void Array1D::AckMigratedElement(ArrayElementAckMessage *msg)
     //    CkPrintf("PE %d index %d STALE Message acknowledged hop=%d curHop=%d\n",
     //	     CkMyPe(),index,msg->hopCount,elementIDs[index].curHop);
     
+  }
+  delete msg;
+}
+
+void Array1D::UpdateLocation(ArrayElementUpdateMessage* msg)
+{
+  const int index = msg->index;
+  ElementIDs* elementID = &elementIDs[index];
+  
+  if (elementID->state == at) {
+    const int msghop = msg->hopCount;
+    if (msghop > elementID->curHop) {
+      //CkPrintf("[%d] Receiving update %d from hop %d:%d to hop %d:%d\n",
+      //       CkMyPe(),index,elementID->curHop,elementID->pe,
+      //       msghop,msg->pe);
+      elementID->pe = msg->pe;
+    }
   }
   delete msg;
 }
