@@ -77,6 +77,13 @@ ampi::ampi(void)
   }
 }
 
+ampi::~ampi()
+{
+  if (thread_id!=0)
+    CthFree(thread_id);
+  CmmFree(msgs);
+}
+
 void
 ampi::generic(AmpiMsg* msg)
 {
@@ -171,8 +178,8 @@ ampi::bcastraw(void* buf, int len, CkArrayID aid)
 void ampi::pup(PUP::er &p)
 {
   ArrayElement1D::pup(p);//Pack superclass
-  if(p.isPacking())
-  {
+  if(p.isDeleting())
+  {//Resend saved messages to myself
     AmpiMsg *msg;
     int snum[2];
     snum[0] = CmmWildCard;
@@ -180,16 +187,12 @@ void ampi::pup(PUP::er &p)
     CProxy_ampi ap(thisArrayID);
     while(msg = (AmpiMsg*)CmmGet(msgs,2,snum,0))
       ap[thisIndex].generic(msg);
-    CmmFree(msgs);
   }
-  p(tsize);
-  void *tbuf;
-  // thread needs to be packed later than user data, but needs to be unpacked
-  // earlier than the user data
-  if(p.isPacking())
-    tbuf = p.getBuf(tsize);
-  if(p.isUnpacking() || p.isSizing())
-    thread_id = CthPup((pup_er) &p, thread_id, &tsize);
+
+  unsigned int oldPstate=p.setState();//Clear p.isDeleting flag
+  thread_id = CthPup((pup_er) &p, thread_id);
+  p.setState(oldPstate);
+  
   p(nudata);
   int i;
   for(i=0;i<nudata;i++) {
@@ -201,11 +204,7 @@ void ampi::pup(PUP::er &p)
     userdata[i] = pup_ud[i]((pup_er) &p, userdata[i]);
 #endif
   }
-  if(p.isPacking())
-  {
-    PUP::toMem tm((PUP::myByte*)tbuf);
-    thread_id = CthPup((pup_er) &tm, thread_id, &tsize);
-  }
+
   p(nbcasts);
   // persistent comm requests will have to be re-registered after
   // migration anyway, so no need to pup them

@@ -105,6 +105,7 @@ class ampi : public ArrayElement1D {
   public: // entry methods
     ampi(void);
     ampi(CkMigrateMessage *msg) {}
+    ~ampi();
     void run(ArgsInfo *);
     void run(void);
     void generic(AmpiMsg *);
@@ -134,7 +135,6 @@ class ampi : public ArrayElement1D {
   public:
     CmmTable msgs;
     CthThread thread_id;
-    int tsize;
     int nbcasts;
     PersReq requests[100];
     int nrequests;
