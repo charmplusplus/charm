@@ -29,5 +29,7 @@ set CMK_RANLIB='ranlib'
 set CMK_LIBS=''
 set CMK_SEQ_CC='cc -no'
 set CMK_SEQ_LD='cc'
+set CMK_NM='nm'
+set CMK_NM_FILTER="grep '|extern|' | awk '{print "'$'"1;}'"
 set CMK_EXTRAS=''
 set CMK_CLEAN=''
