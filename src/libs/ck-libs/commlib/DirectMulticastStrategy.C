@@ -139,7 +139,7 @@ void DirectMulticastStrategy::doneInserting(){
 
             CmiSyncListSendAndFree(cur_npes, cur_map, 
                                    UsrToEnv(msg)->getTotalsize(), 
-                                   UsrToEnv(msg));            
+                                   (char*)(UsrToEnv(msg)));            
         }
         else {
             CmiSyncSendAndFree(cmsg->dest_proc, UsrToEnv(msg)->getTotalsize(), 
