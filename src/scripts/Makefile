@@ -39,11 +39,11 @@ pvm: converse libpvmc.a
 
 sdag: charm++ sdagx libsdag.a
 
-ampi: charm++ libs ampic ampif
+ampi: ampic ampif
 
-ampic: charm++ libampi.a
+ampic: charm++ libs libampi.a
 
-ampif: charm++ libampif.a
+ampif: charm++ libs libampif.a
 
 translators: sdagx charmxi conv-cpm charmidl
 
