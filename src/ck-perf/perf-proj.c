@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-10-27 21:37:45  jyelon
+ * Revision 2.9  1995-11-03 04:34:38  sanjeev
+ * for END_PROCESSING, put overload the msg_type field with chare-magic
+ *
+ * Revision 2.8  1995/10/27  21:37:45  jyelon
  * changed NumPe --> NumPes
  *
  * Revision 2.7  1995/09/26  19:47:51  sanjeev
@@ -164,7 +167,8 @@ ENVELOPE *envelope;
 trace_end_execute(id, msg_type, entry)
 int id, msg_type, entry;
 {
-	add_to_buffer(END_PROCESSING, msg_type, entry, CkUTimer(),
+	/* Overload the msg_type field : put the id (magic number) into it */
+	add_to_buffer(END_PROCESSING, id, entry, CkUTimer(),
 						CpvAccess(begin_event), CpvAccess(begin_pe));
 }
 
