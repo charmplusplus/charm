@@ -96,36 +96,8 @@ occur as a result of this combination.}
 
 A message handler function is just a C function that accepts a void
 pointer (to a message buffer) as an argument, and returns nothing.  The
-handler may use the message buffer until it returns, at which time
-\converse{} will automatically free the message buffer.  This behavior
-can be overridden using \kw{CmiGrabBuffer}:
-
-\function{void CmiGrabBuffer(void **pbuf)}
-\index{CmiGrabBuffer}
-\desc{A handler function receives a pointer to a message buffer
-as an argument.  Normally, it is supposed to copy the data out of the
-message buffer before it returns, at which time \converse{} automatically
-frees the message buffer.  However, a handler function may use
-\kw{CmiGrabBuffer} to claim ownership of the message buffer (and therefore
-prevent \converse{} from freeing it).  Assuming, for example, that the
-handler function called its argument \uw{msg}, it would call 
-\begin{alltt}
-CmiGrabBuffer(\&msg)
-\end{alltt}
-Afterward, \uw{msg} contains a pointer to the
-message, or a copy of it.  From that point forward, it is the user's
-responsibility to free the message using \kw{CmiFree}.
-}
-
-\function{void CmiReleaseBuffer(void *buf)}
-\index{CmireleaseBuffer}
-\desc{A handler function receives a pointer to a message buffer
-as an argument.  Normally, it is supposed to copy the data out of the
-message buffer before it returns, at which time \converse{} automatically
-frees the message buffer or may reuse it for further communication.  
-However, a handler function may use
-\kw{CmiReleaseBuffer} to give up ownership of the message buffer in the
-middle of handler execution (and therefore allowing \converse{} to reuse it).}
+handler may use the message buffer for any purpose, but is responsible
+for eventually deleting the message using CmiFree.
 
 \section{Building Messages}
 
@@ -201,12 +173,12 @@ is still using the message buffer when the function returns, you can't
 reuse the message buffer immediately.  The background job sets a flag
 when it is done and you can then reuse the message buffer.}
 
-\item{{\bf sync and free}: a version that returns almost instantaneously,
+\item{{\bf send and free}: a version that returns almost instantaneously,
 and then continues working in the background.  The background job
 transfers the data from the message buffer into the network.  When the
 background job finishes, it \kw{CmiFree}s the message buffer.  In
-this situation, you can't reuse the message buffer at all.  Of course,
-to use a function of this type, you must allocate the message buffer
+this situation, you can't reuse the message buffer at all. 
+To use a function of this type, you must allocate the message buffer
 using \kw{CmiAlloc}.}
 
 \item{{\bf node}\experimental{}: a version that send a message to a node 
@@ -685,20 +657,32 @@ the lowest level of \converse{}, the CMI.  A third polling function,
 \kw{CmiDeliverSpecificMsg}, is used when you know the exact event you want
 to wait for: it does not allow any other event to occur.
 
-\function {void CsdScheduler(int NumberOfMessages)}
-\index{CsdScheduler}
-\desc{This call invokes the \converse{} scheduler, which repeatedly
-delivers messages to their handlers (i.e. invokes the handler for each
-message it selects).  In each iteration, the scheduler first looks for
-any message that has arrived from another processor, and delivers it.
+In each iteration, a scheduler first looks for any message that 
+has arrived from another processor, and delivers it.
 If there isn't any, it selects a message from the locally enqueued
-messages, and delivers it.  The \uw{NumberOfMessages} parameter
-specifies how many messages should be processed (i.e. delivered to
-their handlers). If set to -1, the scheduler continues delivering
-messages until \kw{CsdExitScheduler} is called from a message handler.
-if \uw{NumberOfMessages} is 0, the scheduler continues delivering
-messages until it exhausts its supply of messages (i.e. becomes idle)
-or some handler calls \kw{CsdExitScheduler}.}
+messages, and delivers it. 
+
+\function {void CsdScheduleForever(void)} \index{CsdScheduleForever}
+\desc{Extract and deliver messages until the scheduler is stopped.
+Raises the idle handling converse signals.  This is the scheduler to
+use in most \converse{} programs.}
+
+\function {int CsdScheduleCount(int n)} \index{CsdScheduleCount}
+\desc{Extract and deliver messages until $n$ messages
+have been delivered, then return 0. If the scheduler is stopped
+early, return $n$ minus the number of messages delivered so far.
+Raises the idle handling converse signals.}
+
+\function {void CsdSchedulePoll(void)} \index{CsdSchedulePoll}
+\desc{Extract and deliver messages until no more messages
+are available, then return.  This is useful for running
+non-networking code when the networking code has nothing to do.}
+
+\function {void CsdScheduler(int n)}
+\index{CsdScheduler}
+\desc{If $n$ is zero, call CsdSchedulePoll.  If $n$ is negative, call
+CsdScheduleForever.  If $n$ is positive, call CsdScheduleCount($n$).}
+
 
 \function{int CmiDeliverMsgs(int MaxMsgs)}
 \index{CmiDeliverMsgs}
@@ -722,35 +706,6 @@ function returns.}
 control has returned back to it. The scheduler then returns to its
 calling routine.}
 
-\section{Scheduler Callbacks}
-\label{schedcallbacks}
-
-Scheduler callbacks are provided for programmers who want to utilize in
-some way the event of scheduler becoming idle, or the scheduler becoming
-busy again.  Typically, these callbacks are useful for determining idle
-time in complex multilingual programs.  The callback function should not
-contain calls to scheduler related functions.  Also, the callback
-functions should not block indefinitely.  Doing so will cause the
-conditional callbacks to fail.  Following functions are provided for
-controlling the scheduler callbacks.
-
-\function{void CsdStartNotifyIdle(void)}
-\index{CsdStartNotifyIdle}
-\desc{This call causes \kw{CsdScheduler} to invoke callback functions for
-idle and busy notifications. Initially, the scheduler does not call
-any callback functions.}
-
-\function{void CsdStopNotifyIdle(void)}
-\index{CsdStopNotifyIdle}
-\desc{This call causes \kw{CsdScheduler} to stop invoking callback functions
-for idle and busy norifications.}
-
-\function{void CsdSetNotifyIdle(void (* fIdle)(void), void (* fBusy)(void))}
-\index{CsdSetNotifyIdle}
-\desc{This call registers the functions to be called when \kw{CsdScheduler} 
-becomes
-idle (\uw{fIdle}) or busy (\uw{fBusy}). These functions can be
-overridden with another call to \kw{CsdSetNotifyIdle}.}
 
 \zap{
 \section{Global Pointer}
