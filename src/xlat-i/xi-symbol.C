@@ -270,7 +270,7 @@ Module::generate()
   topname<<name<<".decl.h";
   botname<<name<<".def.h";
   ofstream decl(topname.get_string()), def(botname.get_string());
-  if(decl==0 || def==0) {
+  if(!decl || !def) {
     cerr<<"Cannot open "<<topname.get_string()<<"or "
 	<<botname.get_string()<<" for writing!!\n";
     exit(1);
