@@ -73,8 +73,11 @@ CLBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats,
   //  printGraph(g);
   int* nodes = (int *) malloc(sizeof(int)*g->V);
 
-  for (i=0; i<g->V; i++)
+  for (i=0; i<g->V; i++) 
     nodes[i] = i;
+
+/*  for (i=0; i<g->V; i++) 
+    CkPrintf("%d: %f\n", i, graph_weightof(g, i)); */
 
   partitions = (PartitionList *) malloc(sizeof(PartitionList));
   partitions->next = 0;
@@ -176,17 +179,31 @@ void RecBisectBfLB::partitionInTwo(Graph *g, int nodes[], int numNodes,
 	       int ** pp1, int *numP1, int **pp2, int *numP2, 
 	       int ratio1, int ratio2)
 {
-  int r1, r2, weight1, weight2;
+  int r1, r2;
+  int i;
+  float w, weight1, weight2;
   BV_Set *all, *s1, *s2; 
   IntQueue * q1, *q2;
   int * p1, *p2;
 
+  if (numNodes <2) CkPrintf("error: too few objects to paritition\n");
   r1 = nodes[0];
-  r2 = nodes[numNodes-1];
+/*  r2 = nodes[numNodes-1];*/
+  r2 = nodes[1]; 
+  weight1 = graph_weightof(g, r1);
+  weight2 = graph_weightof(g, r2);
+
   /* Improvement:
      select r1 and r2 more carefully: 
      e.g. farthest away from each other. */
 
+  for (i=2; i<numNodes; i++) {
+    w = graph_weightof(g, nodes[i]);
+    if (w > weight1) { weight1 = w; r1 = nodes[i]; }
+    else if (w > weight2) { weight2 = w; r2 = nodes[i]; }
+  }
+//  CkPrintf("starting weights: %f, %f\n", weight1, weight2);
+  
   all = makeSet(nodes, numNodes, g->V);
   s1 = makeEmptySet(g->V);
   s2 = makeEmptySet(g->V);
@@ -200,6 +217,7 @@ void RecBisectBfLB::partitionInTwo(Graph *g, int nodes[], int numNodes,
 
   weight1 = 0; weight2 = 0;
   while (   (bvset_size(s1) + bvset_size(s2)) < numNodes ) {
+    //    CkPrintf("weights: %f, %f\n", weight1, weight2);
     if (weight1*ratio2 < weight2*ratio1) 
       weight1 += addToQ(q1, g, all, s1,s2);      
     else 
@@ -214,6 +232,8 @@ void RecBisectBfLB::partitionInTwo(Graph *g, int nodes[], int numNodes,
   destroySet(s2);
   fifoInt_destroy(q1);
   fifoInt_destroy(q2);
+/*  CmiPrintf("==exiting partitionInTwo, ratios: (%d, %d); weights: %f %f \n",
+	    ratio1, ratio2, weight1, weight2); */
 }
 
 int 
@@ -274,9 +294,17 @@ void RecBisectBfLB::addPartition(PartitionList * partitions,
 				 int * nodes, int num) 
 {
   int i;
+  int j;
+  float w = 0.0;
+
   i =  partitions->next++;
   partitions->partitions[i].size = num;
   partitions->partitions[i].nodeArray = nodes ;
+  /*  CkPrintf("addition partition %d :", i);
+  for (j=0; j<num; j++) {
+    CkPrintf("%d,", nodes[j]);
+  }
+  CkPrintf("\n"); */
 }
 
 void RecBisectBfLB::printPartitions(PartitionList * partitions)
@@ -314,4 +342,5 @@ void RecBisectBfLB::recursivePartition(int numParts, Graph *g,
 }
 
 #endif
+
 
