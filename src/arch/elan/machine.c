@@ -93,6 +93,14 @@ static SMSG_LIST *sent_msgs=0;
 static SMSG_LIST *end_sent=0;
 static SMSG_LIST *cur_unsent=0;
 
+PersistentHandle  *phs = NULL;
+int phsSize;
+
+void PumpPersistent();
+void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m);
+
+void ElanSendQueuedMessages();
+
 #if NODE_0_IS_CONVHOST
 int inside_comm = 0;
 #endif
@@ -343,7 +351,7 @@ int PumpMsgs(int retflag)
 
 	if(!CqsEmpty(localMsgBuf)) {
 	  //CmiPrintf("ELAN Getting message from queue\n");
-	  CqsDequeue(localMsgBuf, &sbuf[ecount]);
+	  CqsDequeue(localMsgBuf, (void *)&sbuf[ecount]);
 	}
 	else
 	  sbuf[ecount] = (char *) CmiAlloc(SMALL_MESSAGE_SIZE);
@@ -418,6 +426,8 @@ int PumpMsgs(int retflag)
     }
     event_idx = ecount + 1;
 
+    PumpPersistent();
+
     if(!flg) {
 #ifndef CMK_OPTIMIZE 
       double pmp_end_time = CmiWallTimer();
@@ -489,6 +499,9 @@ void CmiNotifyIdle(void)
   CmiReleaseSentMessages();
   PumpMsgs(0); // PumpMsgs(1)
   ElanSendQueuedMessages();
+/*
+  usleep(0);
+*/
 }
  
 /********************* MESSAGE SEND FUNCTIONS ******************/
@@ -527,6 +540,15 @@ CmiCommHandle ElanSendFn(int destPE, int size, char *msg, int flag)
     return 0;
   }
 
+  if (phs) {
+/*
+CmiPrintf("CmiSendPersistentMsg h=%d hdl=%d\n", h, CmiGetHandler(msg));
+*/
+    CmiAssert(phsSize == 1);
+    CmiSendPersistentMsg(*phs, destPE, size, msg);
+    return NULL;
+  }
+  
   msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
   msg_tmp->msg = msg;
   msg_tmp->next = 0;
@@ -823,7 +845,7 @@ static void ConverseRunPE(int everReturn)
 
   ConverseCommonInit(CmiMyArgv);
 
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,CmiNotifyIdle,NULL);
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
   
   PumpMsgs(0);
   if (!everReturn) {
@@ -917,6 +939,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CmiTimerInit();
   msgBuf = PCQueueCreate();
 
+
   CmiStartThreads(argv);
   ConverseRunPE(initret);
 
@@ -950,14 +973,38 @@ CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
   return (CmiCommHandle) 0;
 }
 
+void CmiSyncSendPersistent(int destPE, int size, char *msg, PersistentHandle h)
+{
+  CmiState cs = CmiGetState();
+  char *dupmsg = (char *) CmiAlloc(size);
+  memcpy(dupmsg, msg, size);
+
+  //  CmiPrintf("Setting root to %d\n", 0);
+  CMI_SET_BROADCAST_ROOT(dupmsg, 0);
+
+  if (cs->pe==destPE) {
+    CQdCreate(CpvAccess(cQdState), 1);
+    CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
+  }
+  else
+    CmiSendPersistentMsg(h, destPE, size, dupmsg);
+}
+
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {
   //  CmiError("ListSend not implemented.");
+//CmiPrintf("[%d] CmiFreeListSendFn %d\n", CmiMyPe(), usePhs);
   
-  int i = 0;
-  for(i=0;i<npes;i++) {
-    CmiSyncSend(pes[i], len, msg);
+  int i;
+  if (phs) {
+    CmiAssert(phsSize == npes);
+    for(i=0;i<npes;i++) 
+      CmiSyncSendPersistent(pes[i], len, msg, phs[i]);
   }
+  else 
+    for(i=0;i<npes;i++)
+      CmiSyncSend(pes[i], len, msg);
+
   CmiFree(msg);
 
   /*
@@ -965,3 +1012,69 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
     }
   */
 }
+
+
+#if 0
+
+typedef struct _PersistentRequestMsg {
+  char core[CmiMsgHeaderSizeBytes];
+  int maxBytes;
+  int sourceHandlerIndex;
+  int requestorPE;
+} PersistentRequestMsg;
+
+typedef struct _PersistentReqGrantedMsg {
+  char core[CmiMsgHeaderSizeBytes];
+  void *slotFlagAddress;
+  void *msgAddr;
+  int sourceHandlerIndex;
+} PersistentReqGrantedMsg;
+
+#define RESET 0
+#define SET 1
+
+int getFreeRecvSlot()
+{
+}
+
+int setPersistent(int destPE, int maxBytes)
+{
+}
+
+
+void persistentRequestHandler(envelope *env)
+{             
+  PersistentRequestMsg *msg = (PersistentRequestMsg *)env;
+  int slotIdx;
+  PersistentReceivesTable *slot;
+
+  slotIdx = getFreeRecvSlot();
+  slot = &persistentReceivesTable[slotIdx];
+  slot->messagePtr = CmiAlloc(msg->maxBytes);
+  slot->flag = RESET;
+
+  PersistentReqGrantedMsg *gmsg = CmiAlloc(sizeof(PersistentReqGrantedMsg));
+  gmsg->slotFlagAddress = &slot->flag;
+  gmsg->msgAddr = messagePtr;
+  gmsg->sourceHandlerIndex = msg->sourceHandlerIndex;
+
+  CmiSetHandler(gmsg, persistenceReqGrantedHandlerIdx);
+  CmiSyncSendAndFree(msg->requestorPE,sizeof(PersistentReqGrantedMsg),gmsg);
+}
+
+void persistenceReqGrantedHandler(envelope *env)
+{
+  PersistentReqGrantedMsg *msg = (PersistentReqGrantedMsg *)env;
+  int h = msg->sourceHandlerIndex;
+  persistentSendsTable[h].destSlotFlagAddress = msg->slotFlagAddress;
+  persistentSendsTable[h].destAddress = msg->msgAddr;
+
+  if (persistentSendsTable[h].messagePtr) {
+  }
+}
+
+
+#endif
+
+
+#include "persistent.c"

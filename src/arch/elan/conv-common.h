@@ -36,3 +36,4 @@
 #define NODE_0_IS_CONVHOST                                 1
 #define CONVERSE_VERSION_ELAN
 
+#define  CMK_PERSISTENT_COMM                               1
