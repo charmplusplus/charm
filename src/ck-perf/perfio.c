@@ -1,0 +1,188 @@
+/***************************************************************************
+ * RCS INFORMATION:
+ *
+ *	$RCSfile$
+ *	$Author$	$Locker$		$State$
+ *	$Revision$	$Date$
+ *
+ ***************************************************************************
+ * DESCRIPTION:
+ *
+ ***************************************************************************
+ * REVISION HISTORY:
+ *
+ * $Log$
+ * Revision 2.0  1995-06-02 17:40:29  brunner
+ * Reorganized directory structure
+ *
+ * Revision 1.2  1994/11/16  20:06:25  sanjeev
+ * removed char *ident.....
+ *
+ * Revision 1.1  1994/11/03  17:40:12  brunner
+ * Initial revision
+ *
+ ***************************************************************************/
+#include <stdio.h>
+#include "chare.h"
+#include "globals.h"
+#include "performance.h"
+
+read_in_debug_line(fp, replay, type, mtype, entry, time, event, dest, pe)
+FILE *fp;
+int replay;
+int *type, *mtype, *entry;
+unsigned int *time;
+int *event, *dest,  *pe;
+{
+	int value;
+
+	value = fscanf(fp, "%d", type);
+	if (value==EOF) return value;
+
+	switch (*type)
+	{
+		case CREATION:
+			value = fscanf(fp, "%d %d %d\n", mtype, entry, event);
+			if (value==EOF) return value;
+			if (replay && *mtype==NewChareMsg) 
+				value = fscanf(fp, "%d", dest);
+			return value;
+
+		case BEGIN_PROCESSING:
+			return fscanf(fp, "%d %d %d %d\n", mtype, entry, event, pe);
+
+		case END_COMPUTATION:
+			return value;
+
+		default:
+			printf("***ERROR*** Wierd Event %d.\n", type);
+			return value; 
+	}
+}
+
+
+write_out_debug_line(fp, type, mtype, entry, time, event, pe)
+FILE *fp;
+int type, mtype, entry;
+unsigned int time;
+int event, pe;
+{
+	fprintf(fp, "%d ", type);
+
+	switch (type)
+	{
+		case CREATION:
+			fprintf(fp, "%d %d %d", mtype, entry, event);
+			break;
+
+		case BEGIN_PROCESSING:
+			fprintf(fp, "%d %d %d %d", mtype, entry, event, pe);
+			break;
+
+		case END_COMPUTATION:
+			break;
+
+		default:
+			printf("***ERROR*** Wierd Event %d.\n", type);
+			break;
+	}
+}
+
+
+read_in_projections_data(fp, replay, type, mtype, entry, time, event, dest, pe)
+FILE *fp;
+int replay;
+int *type, *mtype, *entry;
+unsigned int *time;
+int *event, *dest, *pe;
+{
+	int value;
+
+   	value = fscanf(fp, "%d", type);
+	if (value==EOF) return value;
+
+   	switch (*type) {
+       	case CREATION:
+       	case END_PROCESSING:
+	 	case BEGIN_PROCESSING:
+          	value = fscanf(fp, "%d %d %u %d %d", mtype, entry, time, event, pe);
+			if (value==EOF) return value;
+			if (replay && *type==CREATION && *mtype==NewChareMsg) 
+				value = fscanf(fp, "%d", dest);
+			return value;
+          	break;
+
+       	case ENQUEUE:
+       	case DEQUEUE:
+           	return fscanf(fp, "%d %u %d %d", mtype, time, event, pe);
+           	break;
+	
+       	case INSERT:
+       	case FIND:
+       	case DELETE:
+           	return fscanf(fp, "%d %d %u %d", mtype, entry, time, pe);
+           	break;
+
+       	case BEGIN_INTERRUPT:
+       	case END_INTERRUPT:
+           	return fscanf(fp, "%u %d %d", time, event, pe);
+           	break;
+	
+       	case BEGIN_COMPUTATION:
+       	case END_COMPUTATION:
+           	return fscanf(fp, "%u", &time);
+           	break;
+	
+       	default:
+           	printf("***ERROR*** Wierd Event %d.\n", *type);
+			return value;
+    }
+}
+
+write_out_projections_line(fp, type, mtype, entry, time, event, pe)
+FILE *fp;
+int type, mtype, entry;
+unsigned int time;
+int event, pe;
+{
+	fprintf(fp, "%d ", type);
+
+	/*************************************************/
+	/** Perform appropriate actions for this entry.	**/
+	/*************************************************/
+	switch (type)
+	{
+	case CREATION:
+	case BEGIN_PROCESSING:
+	case END_PROCESSING:
+		fprintf(fp, "%d %d %u %d %d", mtype, entry, time, event, pe);
+		break;
+
+	case ENQUEUE:
+	case DEQUEUE:
+		fprintf(fp, "%d %u %d %d", mtype, time, event, pe);
+		break;
+
+	case INSERT:
+	case FIND:
+	case DELETE:
+		fprintf(fp, "%d %d %u %d", mtype, entry, time, pe);
+		break;
+
+	case BEGIN_INTERRUPT:
+	case END_INTERRUPT:
+		fprintf(fp, "%d %d", event, pe);
+		break;
+
+	case BEGIN_COMPUTATION:
+	case END_COMPUTATION:
+    	fprintf(fp, "%u", time);
+		break;
+
+	default:
+		printf("***ERROR*** Wierd Event %d.\n", type);
+		break;
+	}
+}
+
+
