@@ -113,7 +113,8 @@ extern int CkRegisterMsg(const char *name, CkPackFnPtr pack,
                        CkUnpackFnPtr unpack, size_t size);
 
 /** This entry point flag indicates the method does not keep the passed-in message. */
-#define CK_EP_NOKEEP (1<<2) 
+#define CK_EP_NOKEEP   (1<<2) 
+#define CK_EP_INTRINSIC  (1<<3) 
 
 /** A "call function" to invoke a method on an object. See EntryInfo */
 typedef void  (*CkCallFnPtr) (void *msg, void *obj);

@@ -48,6 +48,7 @@ int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
 {
   EntryInfo *e = new EntryInfo(name, call, msgIdx, chareIdx);
   if (ck_ep_flags & CK_EP_NOKEEP) e->noKeep=CmiTrue;
+  if (ck_ep_flags & CK_EP_INTRINSIC) e->inCharm=CmiTrue;
   return _entryTable.add(e);
 }
 

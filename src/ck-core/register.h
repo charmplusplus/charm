@@ -62,6 +62,8 @@ class EntryInfo {
     CmiBool traceEnabled; 
     /// Method doesn't keep (and delete) message passed in to it.
     CmiBool noKeep; 
+    /// true if this EP is charm internal functions
+    CmiBool inCharm;
     
     /** 
       A "marshall unpack" function:
@@ -75,7 +77,7 @@ class EntryInfo {
 
     EntryInfo(const char *n, CkCallFnPtr c, int m, int ci) : 
       name(n), call(c), msgIdx(m), chareIdx(ci), marshallUnpack(0)
-    { traceEnabled=CmiTrue; noKeep=CmiFalse; }
+    { traceEnabled=CmiTrue; noKeep=CmiFalse; inCharm=CmiFalse;}
 };
 
 /**
