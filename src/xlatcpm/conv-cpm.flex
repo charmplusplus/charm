@@ -108,7 +108,7 @@ int type_simple(char *type)
       return (type_kind[i]=='S') ? 1:0;
   }
   fprintf(stderr,"Unknown type %s\n", type);
-  exit(1);
+  exit(1); return 0;
 }
 
 void type_declare(char *type, int kind)
@@ -457,7 +457,6 @@ void disclaim(FILE *f, char *src)
 
 main(int argc, char **argv)
 {
-  int i; char *tail;
   if (argc != 3) usage();
   file_src = fopen_nofail(argv[1], "r");
   file_cpm = fopen_nofail(argv[2], "w");

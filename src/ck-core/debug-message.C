@@ -93,8 +93,6 @@ static const char *HeaderUnknownFormat =
 //      = 1 contents required
 char* genericViewMsgFunction(char *msg, int type){
   int hndlrID;
-  char *unknownContentsMsg;
-  char *unknownFormatMsg;
   char *temp;
   hndlrIDFunction f;
 

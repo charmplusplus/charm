@@ -12,10 +12,10 @@ extern char* getObjectContents(void);
 
 extern "C" void  CpdInitializeObjectTable(void);
 
-typedef struct HashTableElement {
+struct HashTableElement {
   Chare* charePtr;
   int chareIndex;
-  struct HashTableElement *next;
+  HashTableElement *next;
 };
 
 class HashTable{

@@ -81,7 +81,6 @@ char *getSymbolTableInfo(void)
 void setBreakPoints(char *newBreakPoints)
 {
   int i;
-  char *temp;
 
   for(i = 0; i < CpvAccess(numBreakPoints); i++)
     CsvAccess(BreakPoints)[i] = (newBreakPoints[i] - '0');

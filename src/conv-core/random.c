@@ -65,7 +65,6 @@ void CrnInitStream(CrnStream *genptr, int seed, int type)
 {
   int gennum = CmiMyPe()+CpvAccess(nstreams)*CmiNumPes();
   int i;
-  double tempdbl;
 
   genptr->prime = prime_list[gennum%MAX_STREAMS];
   genptr->multiplier[0] = (double) (PARAMLIST[type][0]&0x3fffff);
@@ -78,7 +77,7 @@ void CrnInitStream(CrnStream *genptr, int seed, int type)
   genptr->state[2] = (double) ((INIT_SEED1 ^ (unsigned)seed<<1)>>12);
 
   for(i=0; i<(1000+gennum); i++)
-    tempdbl = CrnDouble(genptr);
+    CrnDouble(genptr);
 } 
 
 

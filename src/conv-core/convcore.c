@@ -370,7 +370,6 @@ CpvExtern(int, strHandlerID);
 
 static int hostport, hostskt;
 static int hostskt_ready_read;
-static int hostskt_ready_write;
 
 CpvStaticDeclare(int, CHostHandlerIndex);
 static unsigned int *nodeIPs;
@@ -444,7 +443,7 @@ int skt_connect(ip, port, seconds)
 unsigned int ip; int port; int seconds;
 {
   struct sockaddr_in remote; short sport=port;
-  int fd, ok, len, retry, begin;
+  int fd, ok, begin;
 
   /* create an address structure for the server */
   memset(&remote, 0, sizeof(remote));
@@ -481,7 +480,7 @@ unsigned int *pip;
 unsigned int *ppo;
 unsigned int *pfd;
 {
-  int i, fd, ok;
+  int i, fd;
   struct sockaddr_in remote;
   i = sizeof(remote);
  acc:
@@ -509,11 +508,9 @@ static void CheckSocketsReady(void)
   nreadable = select(FD_SETSIZE, &rfds, &wfds, NULL, &tmo);
   if (nreadable <= 0) {
     hostskt_ready_read = 0;
-    hostskt_ready_write = 0;
     return;
   }
   hostskt_ready_read = (FD_ISSET(hostskt, &rfds));
-  hostskt_ready_write = (FD_ISSET(hostskt, &wfds));
 }
 
 void CHostRegister(void)
@@ -551,7 +548,7 @@ void CHostGetOne()
 {
   char line[10000];
   char rest[1000];
-  int ok, ip, port, fd;  FILE *f;
+  int ip, port, fd;  FILE *f;
 #if CMK_WEB_MODE
   char hndlrId[100];
   int dont_close = 0;
@@ -852,7 +849,6 @@ void dummyF()
 
 static void CpdDebugHandler(char *msg)
 {
-  char *normMsg;
   char *reply, *temp;
   int index;
   
@@ -1034,7 +1030,7 @@ static void CpdDebugHandler(char *msg)
       CsdExitScheduler();
     }
     else{
-      CmiPrintf("incorrect command:%s received,len=%d\n",name,strlen(name));
+      CmiPrintf("incorrect command:%s received,len=%ld\n",name,strlen(name));
     }
   }
 }
@@ -1129,7 +1125,6 @@ static void sendDataFunction(void)
 
 void CWebPerformanceDataCollectionHandler(char *msg){
   int src;
-  int value;
   char *prev;
 
   if(CmiMyPe() != 0){
@@ -1210,7 +1205,7 @@ static void CWebHandler(char *msg){
       }
     }
     else{
-      CmiPrintf("incorrect command:%s received, len=%d\n",name,strlen(name));
+      CmiPrintf("incorrect command:%s received, len=%ld\n",name,strlen(name));
     }
   }
   else{
@@ -1661,7 +1656,7 @@ int CsdScheduler(int maxmsgs)
 void CmiDeliverSpecificMsg(handler)
 int handler;
 {
-  int *msg, *t; int side;
+  int *msg; int side;
   void *localqueue = CpvAccess(CmiLocalQueue);
  
   side = 0;
@@ -1930,7 +1925,6 @@ CpvStaticDeclare(GroupDef *, CmiGroupTable);
 void CmiGroupHandler(GroupDef def)
 {
   /* receive group definition, insert into group table */
-  int i;
   GroupDef *table = CpvAccess(CmiGroupTable);
   unsigned int hashval, bucket;
   CmiGrabBuffer((void*)&def);
@@ -2004,6 +1998,7 @@ void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
 CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
 {
   CmiError("ListSend not implemented.");
+  return (CmiCommHandle) 0;
 }
 
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
@@ -2097,6 +2092,7 @@ void CmiFreeMulticastFn(CmiGroup grp, int len, char *msg)
 CmiCommHandle CmiAsyncMulticastFn(CmiGroup grp, int len, char *msg)
 {
   CmiError("Async Multicast not implemented.");
+  return (CmiCommHandle) 0;
 }
 
 void CmiMulticastInit()
@@ -2176,7 +2172,6 @@ void *blk;
 void CmiFree(blk)
 void *blk;
 {
-  int offset;
   int refCount;
 
   refCount = REFFIELD(blk);
@@ -2291,7 +2286,7 @@ void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[]
 *
 ****************************************************************************/
 
-static CmiHandler CmiMultiMsgHandler(char *msgWhole);
+static void CmiMultiMsgHandler(char *msgWhole);
 
 void CmiInitMultipleSend(void)
 {
@@ -2308,7 +2303,7 @@ void CmiInitMultipleSend(void)
 
 static void memChop(char *msgWhole);
 
-static CmiHandler CmiMultiMsgHandler(char *msgWhole)
+static void CmiMultiMsgHandler(char *msgWhole)
 {
   int len;
   int *sizes;
@@ -2491,7 +2486,7 @@ extern void writeall(int, char *, int);
 
 void CcsSendReply(unsigned int ip, unsigned int port, int size, void *msg)
 {
-  char cmd[100], c;
+  char cmd[100];
   int fd;
 
   fd = skt_connect(ip, port, 120);
@@ -2516,7 +2511,7 @@ void CcsSendReply(unsigned int ip, unsigned int port, int size, void *msg)
 #if CMK_USE_PERSISTENT_CCS
 void CcsSendReplyFd(unsigned int ip, unsigned int port, int size, void *msg)
 {
-  char cmd[100], c;
+  char cmd[100];
   int fd;
 
   fd = appletFd;

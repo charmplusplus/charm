@@ -30,7 +30,6 @@ typedef struct msg_list {
 } SMSG_LIST;
 
 static int Cmi_dim;
-static double itime;
 
 static SMSG_LIST *sent_msgs=0;
 static SMSG_LIST *end_sent=0;
@@ -195,7 +194,6 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
 CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 {
   SMSG_LIST *msg_tmp;
-  int res;
      
   if(destPE == CmiMyPe()) {
     char *dupmsg = (char *) CmiAlloc(size);
@@ -210,7 +208,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 	/*printf("Waiting for %d messages to be sent\n", MsgQueueLen);*/
 	CmiReleaseSentMessages();
   }
-  res = MPI_Isend((void *)msg,size,MPI_BYTE,destPE,1,MPI_COMM_WORLD,&(msg_tmp->req));
+  MPI_Isend((void *)msg,size,MPI_BYTE,destPE,1,MPI_COMM_WORLD,&(msg_tmp->req));
   MsgQueueLen++;
   if(sent_msgs==0)
     sent_msgs = msg_tmp;
@@ -331,7 +329,6 @@ void ConverseExit(void)
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   int n,i ;
-  int nbuf[4];
   
   Cmi_myrank = 0;
   MPI_Init(&argc, &argv);

@@ -40,13 +40,14 @@ static void addedFutures(int lo, int hi)
 static int createFuture()
 {
   FutureState *fs = &(CpvAccess(futurestate));
-  Future *fut; int handle, origsize, newsize, i;
+  Future *fut; int handle, origsize;
 
   /* if the freelist is empty, allocate more futures. */
   if (fs->freelist == -1) {
+    origsize = fs->max;
     fs->max = fs->max * 2;
     fs->array = (Future*)realloc(fs->array, sizeof(Future)*(fs->max));
-    addedFutures(origsize, newsize);
+    addedFutures(origsize, fs->max);
   }
   handle = fs->freelist;
   fut = fs->array + handle;
@@ -97,7 +98,6 @@ static void setFuture(int handle, void *pointer)
 
 void _futuresModuleInit(void)
 {
-  int i; Future *array;
   CpvInitialize(FutureState, futurestate);
   CpvAccess(futurestate).array = (Future *)malloc(10*sizeof(Future));
   CpvAccess(futurestate).max   = 10;

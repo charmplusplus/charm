@@ -61,14 +61,12 @@ void *CfutureCreateBuffer(int bytes)
 
 void CfutureDestroyBuffer(void *v)
 {
-  CfutureValue value = void_to_value(v);
   CmiFree(v);
 }
 
 void CfutureStoreBuffer(Cfuture f, void *value)
 {
   CfutureValue m = void_to_value(value);
-  futdata data;
   if (f.pe == CmiMyPe()) {
     CfutureAwaken(f.data, m);
   } else {

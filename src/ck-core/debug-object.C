@@ -136,8 +136,8 @@ char* HashTable::getObjectContents(int chareIndex)
       return((node -> charePtr) -> showContents());
     node = node -> next;
   }
-  
   CkError("Erroneous chareIndex supplied in getObjectCOntents()\n");
+  return 0;
 }
 
 extern "C"

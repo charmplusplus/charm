@@ -232,8 +232,6 @@ void Array1D::migrateMe(int index, int where)
 
 void Array1D::RecvMigratedElement(ArrayMigrateMessage *msg)
 {
-  CkChareID vid;
-  
   int index =msg->index;
 
   elementIDs[index].state = arriving;

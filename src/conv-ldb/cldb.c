@@ -81,7 +81,6 @@ CpvDeclare(CldProcInfo, CldProc);
 static void CldTokenHandler(CldToken tok)
 {
   CldProcInfo proc = CpvAccess(CldProc);
-  CldToken pred, succ;
   if (tok->msg) {
     tok->pred->succ = tok->succ;
     tok->succ->pred = tok->pred;

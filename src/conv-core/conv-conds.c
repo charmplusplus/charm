@@ -119,8 +119,6 @@ void CcdCallFnAfter(CcdVoidFn fnp, void *arg, unsigned int deltaT)
 void CcdCallBacks()
 {
   double currTime;
-  int index;
-  int i,j;
   FN_ARG *temp, *next;
   
   if ( CpvAccess(numHeapEntries) > 0 ) {

@@ -126,7 +126,7 @@ unsigned int priobits, *priodata;
 {
   unsigned int prioints = (priobits+CINTBITS-1)/CINTBITS;
   unsigned int hashval;
-  int heappos, i, j; 
+  int heappos, i; 
   prioqelt *heap, pe, next;
   prio pri;
 
