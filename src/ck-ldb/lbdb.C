@@ -284,8 +284,14 @@ static void work(int iter_block, int* result) {
 
 extern "C" int LDProcessorSpeed()
 {
+  // for SMP version, if one processor have done this testing,
+  // we can skip the other processors by remember the number here
+  static int thisProcessorSpeed = -1;
+
   if (CmiNumPes() == 0)  // I think it is safe to assume that we can
     return 1;            // skip this if we are only using 1 PE
+  
+  if (thisProcessorSpeed != -1) return thisProcessorSpeed;
 
   static int result=0;  // I don't care what this is, its just for
 			// timing, so this is thread safe.
@@ -319,6 +325,7 @@ extern "C" int LDProcessorSpeed()
   //    const double end_time3 = CmiWallTimer();
   //    CkPrintf("[%d] Work block size is %d %d %f\n",
   //	     thisIndex,wps,msec,1.e3*(end_time3-start_time3));
+  thisProcessorSpeed = wps;
   return wps;
 }
 
