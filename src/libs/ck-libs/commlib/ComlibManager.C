@@ -515,7 +515,7 @@ void ComlibManager::learnPattern(int total_msg_count, int total_bytes) {
         cost_dir = ALPHA * avg_message_count + BETA * avg_message_bytes;
         cost_mesh = ALPHA * 2 * sqrt(CmiNumPes()) + BETA * avg_message_bytes * 2;
         cost_grid = ALPHA * 3 * cbrt(CmiNumPes()) + BETA * avg_message_bytes * 3;
-        cost_hyp =  (log(CmiNumPes())/log(2.0))*(ALPHA  + BETA * avg_message_bytes/2.0);
+        cost_hyp =  (log((double)CmiNumPes())/log(2.0))*(ALPHA  + BETA * avg_message_bytes/2.0);
         
         // Find the one with the minimum cost!
         int min_strat = USE_MESH; 
