@@ -33,7 +33,7 @@ CkReduction::reducerType sparse_min_double;
   This function returns the index of jth data segment header in the 
   array of headers pointed to by 'ptr'.
 */
-int getIndex(CkDataSegHeader *r, const unsigned char *ptr, int j);
+//int getIndex(CkDataSegHeader *r, const unsigned char *ptr, int j);
 
 /*
   macro defining various reducer functions
@@ -156,7 +156,10 @@ static CkReductionMsg *name(int nMsg, CkReductionMsg ** msg){\
  /* number of non-null data blocks and total number of elements in them is\
     known. Now pack the input data into one buffer resolving the overlap.*/\
 \
-  int dataSize = sizeof(int) + sizeof(CkDataSegHeader)*totalHeader + \
+  int alignedHdrSize = 2*sizeof(int) + sizeof(CkDataSegHeader)*totalHeader;\
+  if (alignedHdrSize%sizeof(double))\
+    alignedHdrSize += sizeof(double) - (alignedHdrSize%sizeof(double));\
+  int dataSize = alignedHdrSize + \
                  currDataOff + \
                  sizeof(dataType)*finalHeaderArr [totalHeader-1].getNumElements();\
 \
@@ -164,11 +167,12 @@ static CkReductionMsg *name(int nMsg, CkReductionMsg ** msg){\
   unsigned char *data = (unsigned char*)(m->getData ());\
   memset (flag, 0, totalHeader*sizeof(int));\
 \
-  memcpy(data, &totalHeader, sizeof(int));\
-\
+  *(int*)data = totalHeader;\
+  data += sizeof(int);\
+  *(int*)data = alignedHdrSize;\
   data += sizeof(int);\
 \
-  int dataOffset = sizeof (CkDataSegHeader)*totalHeader;\
+  int dataOffset = alignedHdrSize - 2*sizeof (int);\
   int numElems;\
   CkDataSegHeader* hdrPtr = (CkDataSegHeader*)data;\
   dataType*        dataptr = (dataType*)(data + dataOffset);\
@@ -268,26 +272,29 @@ CkDataSegHeader getDataSegHeader(int index, const unsigned char *data){
   if(index >= size)
     CkAbort("Error!!!\n");
 
-  memcpy(&r, data+sizeof(int)+sizeof(CkDataSegHeader)*index, sizeof(CkDataSegHeader));
+  memcpy(&r, data+2*sizeof(int)+sizeof(CkDataSegHeader)*index, sizeof(CkDataSegHeader));
   return r;
 }
 
-int getIndex(CkDataSegHeader *r, const unsigned char *ptr, int j){
+/*int getIndex(CkDataSegHeader *r, const unsigned char *ptr, int j){
   int i=0;
   CkDataSegHeader header = getDataSegHeader(j, ptr);
   while(!(header == r[i]))
     i++;
   return i;
-}
+}*/
 
-unsigned char * getDataPtr(const unsigned char *ptr){
+unsigned char * getDataPtr(unsigned char *ptr){
+/*
   int size;
   size = numDataSegs(ptr);
   return (unsigned char*)(ptr + sizeof(int) + size*sizeof(CkDataSegHeader));
+*/
+  return (ptr + *(((int*)ptr)+1));
 }
 
 CkDataSegHeader* getDataSegHeaderPtr(const unsigned char *ptr) {
-  return (CkDataSegHeader*)(ptr + sizeof(int));
+  return (CkDataSegHeader*)(ptr + 2*sizeof(int));
 }
 
 CkDataSegHeader getDecompressedDataHdr(const unsigned char *msg){

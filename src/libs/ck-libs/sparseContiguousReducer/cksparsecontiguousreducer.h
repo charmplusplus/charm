@@ -151,7 +151,12 @@ class CkSparseContiguousReducer
   */
   void contribute(ArrayElement *elem, CkReduction::reducerType type, const
 		  CkCallback &cb){
-    int size = r.getNumElements()*sizeof(T) + sizeof(int) + sizeof(CkDataSegHeader);
+    int dataAlignSize = sizeof(int)*2 + sizeof(CkDataSegHeader);
+    if(dataAlignSize%sizeof(double)) {
+      dataAlignSize += sizeof(double) - (dataAlignSize%sizeof(double));
+    }
+
+    int size = r.getNumElements()*sizeof(T) + dataAlignSize;
     CkReductionMsg* msg = CkReductionMsg::buildNew (size, NULL, type);
     msg->setCallback(cb);
 
@@ -159,8 +164,9 @@ class CkSparseContiguousReducer
     int count = 1;
     /* pack data */
     memcpy(ptr, &count, sizeof(int));
-    memcpy(ptr + sizeof(int), &r, sizeof(CkDataSegHeader));
-    memcpy(ptr + sizeof(int) + sizeof(CkDataSegHeader), data,
+    memcpy(ptr+sizeof(int), &dataAlignSize, sizeof(int));
+    memcpy(ptr + 2*sizeof(int), &r, sizeof(CkDataSegHeader));
+    memcpy(ptr + 2*sizeof(int) + sizeof(CkDataSegHeader), data,
 	   r.getNumElements()*sizeof(T));
     /* contribute on behalf of chare calling this function */
     elem->contribute(msg);
@@ -198,7 +204,7 @@ CkDataSegHeader* getDataSegHeaderPtr(const unsigned char *data);
    arranged in row major order in the data portion of the buffer, starting at 
    the returned pointer
 */
-unsigned char * getDataPtr(const unsigned char *ptr);
+unsigned char * getDataPtr(unsigned char *ptr);
 
 /*
    expands the message returned by reduction, into a 2D array returned as a 1D
