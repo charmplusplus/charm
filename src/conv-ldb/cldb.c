@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #ifdef WIN32
 #include <stdlib.h>
 #include "queueing.h"
@@ -14,8 +7,10 @@ extern unsigned int CqsLength(Queue);
 #endif
 
 #include "cldb.h"
+#include <math.h>
 
 CpvDeclare(int, CldHandlerIndex);
+CpvDeclare(int, CldPEBitVector);
 CpvDeclare(int, CldBalanceHandlerIndex);
 
 CpvDeclare(int, CldRelocatedMessages);
@@ -50,6 +45,7 @@ static int CsdEstimator(void)
 */
 
 CpvDeclare(int, CldLoadOffset);
+
 
 int CldRegisterInfoFn(CldInfoFn fn)
 {
@@ -146,7 +142,6 @@ void CldPutToken(char *msg)
   /* add token to the scheduler */
   CmiSetHandler(tok, proc->tokenhandleridx);
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-  queueing = CQS_QUEUEING_LIFO; 
   CsdEnqueueGeneral(tok, queueing, priobits, prioptr);
 }
 
@@ -167,6 +162,43 @@ void CldGetToken(char **msg)
   CpvAccess(CldLoadOffset)++;
 }
 
+/* Bit Vector Stuff */
+
+int CldPresentPE(int pe)
+{
+  int shift = CpvAccess(CldPEBitVector) >> pe;
+  return (shift % 2);
+}
+
+void CldMoveAllSeedsAway()
+{
+  char *msg;
+  int len, queueing, priobits, pe;
+  unsigned int *prioptr;
+  CldInfoFn ifn;  CldPackFn pfn;
+
+  CldGetToken(&msg);
+  while (msg != 0) {
+    ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    CldSwitchHandler(msg, CpvAccess(CldBalanceHandlerIndex));
+    pe = (((CrnRand()+CmiMyPe())&0x7FFFFFFF)%CmiNumPes());
+    while (!CldPresentPE(pe))
+      pe = (((CrnRand()+CmiMyPe())&0x7FFFFFFF)%CmiNumPes());
+    CmiSyncSendAndFree(pe, len, msg);
+    CldGetToken(&msg);
+  }
+}
+
+void CldSetPEBitVector(int newBV)
+{
+  CpvAccess(CldPEBitVector) = newBV;
+  if (!CldPresentPE(CmiMyPe()))
+    CldMoveAllSeedsAway();
+}
+
+/* End Bit Vector Stuff */
+
 void CldModuleGeneralInit()
 {
   CldToken sentinel = (CldToken)CmiAlloc(sizeof(struct CldToken_s));
@@ -174,6 +206,8 @@ void CldModuleGeneralInit()
 
   CpvInitialize(CldProcInfo, CldProc);
   CpvInitialize(int, CldLoadOffset);
+  CpvInitialize(int, CldPEBitVector);
+  CpvAccess(CldPEBitVector) = (int)(pow(2.0, (double)CmiNumPes())) - 1;
   CpvAccess(CldLoadOffset) = 0;
   CpvAccess(CldProc) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
   proc = CpvAccess(CldProc);
@@ -239,3 +273,4 @@ void CldMultipleSend(int pe, int numToSend)
   free(msgs);
   free(msgSizes);
 }
+
