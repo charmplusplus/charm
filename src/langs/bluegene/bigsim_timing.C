@@ -16,10 +16,10 @@ CpvStaticDeclare(int, msgCounter);
 CpvDeclare(int, heartbeatHandler);
 CpvDeclare(int, heartbeatBcastHandler);
 
-int traceBluegeneLinked=0;
 extern int programExit;
-static int deadlock = 0;
+extern int traceBluegeneLinked;
 extern int delayCheckFlag;
+static int deadlock = 0;
 
 #if USE_MULTISEND
 CkVec<char *>   *corrMsgBucket;
