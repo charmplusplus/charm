@@ -27,7 +27,7 @@ all: charm++ bluegene LIBS ampi f90charm tsm sm pvm sdag doc
 
 charm++: converse libck.a charmxi
 
-bluegene: charm++ libbluegene.a
+bluegene: charm++ libconv-bluegene.a libbluegene.a
 
 for-namd: charm++ pvm AMPIC
 
@@ -106,7 +106,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h conv-ccs.h \
       WSLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
       tempo.decl.h waitqd.decl.h \
 	  CommLB.decl.h Comm1LB.decl.h  \
-	  ampi.decl.h ampimain.decl.h BlueGene.decl.h
+	  ampi.decl.h ampimain.decl.h BlueGene.decl.h blue.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -560,6 +560,11 @@ libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
 	$(CHARMC) -c BlueGene.C
 	$(CHARMC) -cp ../lib -o libbluegene.a BlueGene.o
 
+blue.o:  blue.h blue.C
+	$(CHARMC) -c blue.C
+
+libconv-bluegene.a:   blue.o
+	$(CHARMC) -cp ../lib -o libconv-bluegene.a blue.o
 
 ###############################################################################
 #

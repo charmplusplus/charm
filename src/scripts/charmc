@@ -569,7 +569,7 @@ case "$LANGUAGE" in
 "charm"|"charm++"|"converse"|"converse++")
 	[ -z "$SEQUENTIAL" ] || Abort "Language $LANGUAGE is for parallel programs"
 	;;
-"fem"|"femf"|"ampi"|"ampif"|"f90charm"|"bluegene")
+"fem"|"femf"|"ampi"|"ampif"|"f90charm"|"bluegene"|"ckbluegene")
 	[ -z "$SEQUENTIAL" ] || Abort "Language $LANGUAGE is for parallel programs"
 	;;
 *)
@@ -886,6 +886,9 @@ case "$LANGUAGE" in
 #        fi
 	;;
 "bluegene")
+        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene"
+	;;
+"ckbluegene")
         POST_LIBRARIES="$POST_LIBRARIES -lbluegene"
 	;;
 esac
@@ -902,11 +905,11 @@ case "$LANGUAGE" in
 	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lck -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
-"ampi"|"ampif"|"fem"|"femf"|"bluegene")
+"ampi"|"ampif"|"fem"|"femf"|"ckbluegene")
 	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lck -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
-"converse")
+"converse"|"bluegene")
 	Do $CMK_LD $OPTSL $OPTS_LD -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-n $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
