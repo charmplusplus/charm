@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-10-13 18:17:44  jyelon
+ * Revision 2.8  1995-10-18 22:20:57  jyelon
+ * enabled eatstack-threads.
+ *
+ * Revision 2.7  1995/10/13  18:17:44  jyelon
  * I can't even remember.
  *
  * Revision 2.6  1995/10/11  00:35:06  jyelon
@@ -40,6 +43,8 @@
 
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
+
+#define CMK_MACHINE_NAME "sp1"
 
 /* #define CMK_USE_GNU_MALLOC */
 /* #define CMK_USE_GNU_MALLOC_WITH_INTERRUPT_SUPPORT */
@@ -75,9 +80,9 @@
 /* #define CMK_CMIPRINTF_IS_A_BUILTIN */
 #define CMK_CMIPRINTF_IS_JUST_PRINTF
 
-/* #define CMK_THREADS_USE_ALLOCA */
-#define CMK_THREADS_UNAVAILABLE
-
-#define CMK_MACHINE_NAME "SP1"
+/* #define CMK_THREADS_UNAVAILABLE */
+/* #define CMK_THREADS_USE_EATSTACK */
+/* #define CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE */
+#define CMK_THREADS_USE_ALLOCA
 
 #endif
