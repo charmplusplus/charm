@@ -14,7 +14,7 @@ ps:
 html:
 	touch index.tex
 	-@ln -s ../pplmanual.* .
-        latex manual.tex
+	latex manual.tex
 	latex2html -local_icons manual.tex
 
 pdf:
