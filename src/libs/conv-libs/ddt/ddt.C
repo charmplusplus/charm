@@ -31,7 +31,7 @@ DDT::getType(int nIndex)
   if( (nIndex > 0) && (nIndex < MAX_TYPES))
     return typeTable[nIndex] ;
   else
-    return NULL ;
+    return 0 ;
 }
 
 void 
@@ -85,18 +85,15 @@ DDT::pup(PUP::er  &p)
 int  
 DDT::getNextFreeIndex(void)
 {
-  bool indexFound = false ;
   int  i ;
 
   for(i=currentIndex; i<MAX_TYPES; i++) {
-    if(typeTable[i] == NULL) {
-      indexFound = true ;
+    if(typeTable[i] == 0) {
       return i ;
     }
   }
   for(i=0; i < currentIndex; i++) {
-    if(typeTable[i] == NULL) {
-      indexFound = true ;
+    if(typeTable[i] == 0) {
       return i ;
     }
   }
@@ -106,7 +103,7 @@ DDT::getNextFreeIndex(void)
 void 
 DDT::freeType(int* index)
 {
-  typeTable[*index] = NULL ;
+  typeTable[*index] = 0 ;
   types[*index] = DDT_TYPE_NULL ;
   *index = -1 ;
 }
@@ -287,6 +284,8 @@ DDT_DataType::operator=(const DDT_DataType& obj)
   size = obj.size ;
   extent = obj.extent ;
   count = obj.count ;
+
+  return *this;
 }
 
 int 
@@ -522,7 +521,6 @@ DDT_Indexed::copyBuffer(char* oldBuffer, char* newBuffer)
   char* tempOldBuffer = oldBuffer ;
   char* tempNewBuffer = newBuffer ;
   int bytesCopied = 0 ;
-  int bytes ;
 
   for(int i = 0 ; i < count; i++) {
     oldBuffer = tempOldBuffer + baseSize * arrayDisplacements[i] ;
