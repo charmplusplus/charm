@@ -40,6 +40,7 @@ typedef struct _LDOMid {
   CmiBool operator==(const struct _LDOMid& omId) const {
     return (CmiBool)(id == omId.id);
   }
+  inline void pup(PUP::er &p);
 #endif
 } LDOMid;
 
@@ -48,6 +49,9 @@ typedef struct {
 //  void *user_ptr;
   LDOMid id;
   int handle;		// index to LBOM
+#ifdef __cplusplus
+  inline void pup(PUP::er &p);
+#endif
 } LDOMHandle;
 
 typedef struct _LDObjid {
@@ -57,6 +61,7 @@ typedef struct _LDObjid {
     for (int i=0; i<OBJ_ID_SZ; i++) if (id[i] != objid.id[i]) return CmiFalse;
     return CmiTrue;
   }
+  inline void pup(PUP::er &p);
 #endif
 } LDObjid;
 
@@ -73,6 +78,7 @@ public:
   inline LDObjid &objID() { return objId; }
   inline const LDOMid &omID() const { return omId; }
   inline const LDObjid &objID() const { return objId; }
+  inline void pup(PUP::er &p);
 #endif
 } LDObjKey;
 
@@ -86,6 +92,7 @@ typedef struct {
 #ifdef __cplusplus
   inline const LDOMid &omID() const { return omhandle.id; }
   inline const LDObjid &objID() const { return id; }
+  inline void pup(PUP::er &p);
 #endif
 } LDObjHandle;
 
@@ -99,6 +106,7 @@ typedef struct {
   inline const LDOMid &omID() const { return handle.omhandle.id; }
   inline const LDObjid &objID() const { return handle.id; }
   inline const LDObjid &id() const { return handle.id; }
+  inline void pup(PUP::er &p);
 #endif
 } LDObjData;
 
@@ -108,6 +116,9 @@ typedef struct {
   LDObjData data;
   int from_proc;
   int to_proc;
+#ifdef __cplusplus
+  inline void pup(PUP::er &p);
+#endif
 } LDObjStats;
 
 #define LD_PROC_MSG      1
@@ -293,11 +304,45 @@ int LDMemusage(LDHandle _db);
 
 #ifdef __cplusplus
 /* put outside of __cplusplus */
-PUPbytes(LDOMid)
-PUPbytes(LDObjid)
-PUPbytes(LDObjKey)
-PUPbytes(LDObjData)
-PUPbytes(LDObjStats)
+inline void LDOMid::pup(PUP::er &p) {
+  id.pup(p);
+}
+PUPmarshall(LDOMid);
+inline void LDObjid::pup(PUP::er &p) {
+  for (int i=0; i<OBJ_ID_SZ; i++) p|id[i];
+}
+PUPmarshall(LDObjid);
+inline void LDObjKey::pup(PUP::er &p) {
+  p|omId;
+  p|objId;
+}
+PUPmarshall(LDObjKey);
+inline void LDObjStats::pup(PUP::er &p) {
+  p|index;
+  p|data;
+  p|from_proc;
+  p|to_proc;
+}
+PUPmarshall(LDObjStats);
+inline void LDOMHandle::pup(PUP::er &p) {
+  // skip ldb since it is a pointer
+  p|id;
+  p|handle;
+}
+PUPmarshall(LDOMHandle);
+inline void LDObjHandle::pup(PUP::er &p) {
+  p|omhandle;
+  p|id;
+  p|handle;
+}
+PUPmarshall(LDObjHandle);
+inline void LDObjData::pup(PUP::er &p) {
+  p|handle;
+  p|cpuTime;
+  p|wallTime;
+  p|migratable;
+}
+PUPmarshall(LDObjData);
 inline void LDCommDesc::pup(PUP::er &p) {
   p|type;
   switch (type) {
