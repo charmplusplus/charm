@@ -535,8 +535,10 @@ int ComlibGetLastKnown(CkArrayID aid, CkArrayIndexMax idx) {
     }
     CkAssert(CkpvAccess(locationTable) != NULL);
 
+    /*
     if(CkpvAccess(cache_index) == idx && CkpvAccess(cache_aid) == aid)
         return CkpvAccess(cache_pe);
+    */
 
     ClibGlobalArrayIndex cidx;
     cidx.aid = aid;
