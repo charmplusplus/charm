@@ -17,12 +17,9 @@ Orion Sky Lawlor, olawlor@acm.org, 2003/6/20
 class TCharmMain : public Chare {
 public:
   static void nodeInit(void) {
-    TCharm::setState(inNodeSetup);
     TCHARM_User_node_setup();
     FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)();
-    TCharm::setState(inInit);
   }
-  
   
   TCharmMain(CkArgMsg *msg) {
     delete msg;
