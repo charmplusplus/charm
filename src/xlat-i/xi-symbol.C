@@ -1850,7 +1850,7 @@ Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz, SdagConstr
   line=l; container=NULL; 
   entryCount=-1;
   isWhenEntry=0;
-  if (param && param->isMarshalled()) attribs|=SNOKEEP;
+  if (param && param->isMarshalled() && !isThreaded()) attribs|=SNOKEEP;
 
   if(!isThreaded() && stacksize) die("Non-Threaded methods cannot have stacksize",line);
   if(retType && !isSync() && !retType->isVoid()) 
@@ -2552,6 +2552,7 @@ void Entry::genDefs(XStr& str)
   genCall(str,preCall);
   param->endUnmarshall(str);
   str << postCall;
+  if(isThreaded() && param->isMarshalled()) str << "  delete (CkMarshallMsg *)impl_msg;\n";
   str << "}\n";
   
   if (hasCallMarshall) {
