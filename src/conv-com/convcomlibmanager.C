@@ -70,11 +70,11 @@ extern void propagate_handler_frag(void *);
 //An initialization routine which does prelimnary initialization of the 
 //Converse commlib manager. 
 void initComlibManager(){ 
-    if(!CpvInitialized(conv_com_ptr))
+    if(!CkpvInitialized(conv_com_ptr))
         CkpvInitialize(ConvComlibManager *, conv_com_ptr);
 
-    if(CkpvAccess(conv_com_ptr) != 0)
-       return;   
+    //if(CkpvAccess(conv_com_ptr) != 0)
+    //   return;   
  
     ConvComlibManager *conv_com = new ConvComlibManager();
     CkpvAccess(conv_com_ptr) = conv_com;
