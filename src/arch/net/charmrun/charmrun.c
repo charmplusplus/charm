@@ -23,7 +23,7 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <time.h>
-#if CMK_SCYLD
+#if CMK_BPROC
 #include <sys/bproc.h>
 #endif
 
@@ -590,7 +590,7 @@ int   arg_server;
 int   arg_server_port=0;
 char *arg_server_auth=NULL;
 
-#if CMK_SCYLD
+#if CMK_BPROC
 int   arg_startpe;
 int   arg_endpe;
 int   arg_singlemaster;
@@ -629,7 +629,7 @@ void arg_init(int argc, char **argv)
   pparam_flag(&arg_in_xterm,      0, "in-xterm",      "Run each node in an xterm window");
   pparam_str(&arg_xterm,          0, "xterm",         "which xterm to use");
 #endif
-#ifdef CMK_SCYLD
+#ifdef CMK_BPRO
   /* options for Scyld */
   pparam_int(&arg_startpe,   0, "startpe",   "first pe to start job(SCYLD)");
   pparam_int(&arg_endpe,  1000000, "endpe",   "last pe to start job(SCYLD)");
@@ -1604,7 +1604,7 @@ void req_start_server(void)
  ****************************************************************************/
 void start_nodes_daemon(void);
 void start_nodes_rsh(void);
-#if CMK_SCYLD
+#if CMK_BPROC
 void nodetab_init_for_scyld(void);
 void start_nodes_scyld(void);
 #endif
@@ -1624,7 +1624,7 @@ int main(int argc, char **argv, char **envp)
   /* Compute the values of all constants */
   arg_init(argc, argv);
   if(arg_verbose) fprintf(stderr, "Charmrun> charmrun started...\n");
-#if CMK_SCYLD
+#if CMK_BPROC
   /* check scyld configuration */
   nodetab_init_for_scyld();
 #else
@@ -1642,7 +1642,7 @@ int main(int argc, char **argv, char **envp)
   if (0!=getenv("CONV_DAEMON"))
     start_nodes_daemon();
   else
-#if CMK_SCYLD
+#if CMK_BPROC
     start_nodes_scyld();
 #else
     if (!arg_local)
@@ -1834,7 +1834,7 @@ void start_nodes_local(char ** env)
   }
 }
 
-#elif CMK_SCYLD
+#elif CMK_BPROC
 
 /**
   ++ppn now is supported in both SMP and non SMP version

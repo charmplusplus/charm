@@ -13,7 +13,7 @@
 #include <signal.h>
 #include <time.h>
 #include <ctype.h>
-#if CMK_SCYLD
+#if CMK_BPROC
 #include <sys/bproc.h>
 #endif
 
@@ -226,7 +226,7 @@ skt_ip_t skt_lookup_ip(const char *name)
 */
 skt_ip_t skt_innode_my_ip(void)
 {  
-#if CMK_SCYLD
+#if CMK_BPROC
   /* on Scyld, the hostname is just the node number */
   char hostname[200];
   sprintf(hostname, "%d", bproc_currnode());
@@ -238,7 +238,7 @@ skt_ip_t skt_innode_my_ip(void)
 
 skt_ip_t skt_innode_lookup_ip(const char *name)
 {
-#if CMK_SCYLD
+#if CMK_BPROC
   struct sockaddr_in addr;
   int len = sizeof(struct sockaddr_in);
   if (-1 == bproc_nodeaddr(atoi(name), &addr, &len)) {
