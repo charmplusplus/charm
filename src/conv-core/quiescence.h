@@ -10,27 +10,27 @@
 
 struct ConvQdMsg 
 {  
-	char core[CmiMsgHeaderSizeBytes];
-	int phase; /* 0..2*/
-	union 
-	{
-		struct { int created; int processed; } p1;
-		struct { int dirty; } p2;
-	} u;
+  char core[CmiMsgHeaderSizeBytes];
+  int phase; /* 0..2*/
+  union 
+  {
+    struct { int created; int processed; } p1;
+    struct { int dirty; } p2;
+  } u;
 };
 
 
 struct ConvQdState 
 {
-    int stage; /* 0..2*/
-    int oProcessed;
-    int mCreated, mProcessed;
-    int cCreated, cProcessed;
-    int cDirty;
-    int nReported;
-    int nChildren;
-    int parent;
-    int *children;
+  int stage; /* 0..2*/
+  int oProcessed;
+  int mCreated, mProcessed;
+  int cCreated, cProcessed;
+  int cDirty;
+  int nReported;
+  int nChildren;
+  int parent;
+  int *children;
 };
 
 
