@@ -80,7 +80,7 @@ class ComlibInstanceHandle {
     
     CkGroupID getComlibManagerID();
     void setStrategy(CharmStrategy *);
-
+    CharmStrategy *getStrategy();        
     int getSourcePe() {return _srcPe;}
 
     friend class ComlibManager;

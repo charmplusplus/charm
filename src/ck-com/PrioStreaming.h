@@ -1,5 +1,7 @@
+
 #ifndef PRIO_STREAMING
 #define PRIO_STREAMING
+
 #include "ComlibManager.h"
 #include "StreamingStrategy.h"
 
@@ -28,6 +30,10 @@ class PrioStreaming : public StreamingStrategy {
     PrioStreaming(CkMigrateMessage *){}
     
     virtual void insertMessage(CharmMessageHolder *msg);
+
+    inline void setBasePriority(int p) {
+        basePriority = p;
+    }
 
     virtual void pup(PUP::er &p);
     PUPable_decl(PrioStreaming);

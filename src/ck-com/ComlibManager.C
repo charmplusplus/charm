@@ -806,13 +806,21 @@ void ComlibInstanceHandle::setStrategy(CharmStrategy *s) {
     (cgproxy.ckLocalBranch())->registerStrategy(_instid, s);
 }
 
+CharmStrategy *ComlibInstanceHandle::getStrategy() {
+    if(_instid < 0) 
+        return NULL;    
+    
+    CProxy_ComlibManager cgproxy(_dmid);
+    return (cgproxy.ckLocalBranch())->getStrategy(_instid);
+}
+
 CkGroupID ComlibInstanceHandle::getComlibManagerID() {return _dmid;}    
 
 void ComlibInitSectionID(CkSectionID &sid){
-
+    
     sid._cookie.type = COMLIB_MULTICAST_MESSAGE;
     sid._cookie.pe = CkMyPe();
-
+    
     sid._cookie.sInfo.cInfo.id = 0;    
     sid.npes = 0;
     sid.pelist = NULL;
