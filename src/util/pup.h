@@ -539,8 +539,6 @@ public:
 	virtual void pup(er &p);
 	virtual const PUP_ID &get_PUP_ID(void) const=0;
 
-    friend inline void operator|(er &p,able &a) {a.pup(p);}
-    friend inline void operator|(er &p,able* &a) {p(&a);}
 };
 
 //Declarations to include in a PUP::able's body
@@ -584,6 +582,8 @@ public:\
 
 };//<- End namespace PUP
 
+inline void operator|(PUP::er &p,PUP::able &a) {a.pup(p);}
+inline void operator|(PUP::er &p,PUP::able* &a) {p(&a);}
 
 //Holds a pointer to a (possibly dynamically allocated) PUP::able.
 //  Extracting the pointer hands the deletion responsibility over.
@@ -632,7 +632,7 @@ public:
 		bool ptrWasNull=(ptr==0);
 		
 		PUP::able *ptr_able=ptr; // T must inherit from PUP::able!
-		p(&ptr_able); //Pack as a PUP::able *
+		p|ptr_able; //Pack as a PUP::able *
 		ptr=(T *)ptr_able;
 		
 		if (ptrWasNull) 
