@@ -24,8 +24,8 @@
 /* All flags after this line are currently used only by the Common.net     */
 /***************************************************************************/
 
-/* #define CMK_SIGHOLD_IS_A_BUILTIN */
-   #define CMK_SIGHOLD_USE_SIGMASK
+   #define CMK_SIGHOLD_IS_A_BUILTIN 
+/* #define CMK_SIGHOLD_USE_SIGMASK */
 
    #define CMK_RSH_IS_A_COMMAND
 /* #define CMK_RSH_USE_REMSH */
