@@ -767,7 +767,7 @@ int f3()
 
 /** ADDED 2-14-99 BY MD FOR USAGE TRACKING (TEMPORARY) **/
 
-// #define CkUTimer()      ((int)(CmiWallTimer() * 1000000.0))
+/* #define CkUTimer()      ((int)(CmiWallTimer() * 1000000.0)) */
 
 CpvDeclare(double, startTime);
 CpvDeclare(double, beginTime);
