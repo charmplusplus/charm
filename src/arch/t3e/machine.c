@@ -445,7 +445,6 @@ void *CmiGetNonLocal()
 void 
 ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
-  CmiSpanTreeInit();
   McInit();
   CthInit(argv);
   ConverseCommonInit(argv);
@@ -802,8 +801,11 @@ static McQueue * McQueueCreate(void)
   return queue;
 }
 
+int inside_comm = 0;
+
 static void McQueueAddToBack(McQueue *queue, void *element)
 {
+  inside_comm = 1;
   if(queue->len==queue->blk_len) {
     void **blk;
 
@@ -818,6 +820,7 @@ static void McQueueAddToBack(McQueue *queue, void *element)
   CmiPrintf("[%d] Adding %x\n",Cmi_mype,element);
 #endif
   queue->blk[(queue->first+queue->len++)%queue->blk_len] = element;
+  inside_comm = 0;
 }
 
 static void * McQueueRemoveFromBack(McQueue *queue)

@@ -481,7 +481,7 @@ unsigned int *pfd;
   i = sizeof(remote);
  acc:
   fd = accept(src, (struct sockaddr *)&remote, &i);
-  if ((fd<0)&&((errno==EINTR)||(errno==EBADF)||(errno==EPROTO))) goto acc;
+  if ((fd<0)&&((errno==EINTR)||(errno==EBADF))) goto acc;
   if (fd<0) { perror("accept"); KillEveryoneCode(39489); }
   *pip=htonl(remote.sin_addr.s_addr);
   *ppo=htons(remote.sin_port);

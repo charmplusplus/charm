@@ -2,6 +2,7 @@
 #define _PROJECTIONS_H
 
 #include "trace.h"
+#include "ck.h"
 #include "stdio.h"
 
 #define  CREATION           1

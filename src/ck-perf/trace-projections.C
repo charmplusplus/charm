@@ -84,7 +84,7 @@ void traceUserEvent(int e)
 extern "C"
 int traceRegisterUserEvent(const char*)
 {
-  if(CkMyPe()==0)
+  if(CmiMyPe()==0)
     return _numEvents++;
   else
     return 0;
@@ -93,7 +93,7 @@ int traceRegisterUserEvent(const char*)
 extern "C"
 void traceClose(void)
 {
-  if(CkMyPe()==0)
+  if(CmiMyPe()==0)
     CpvAccess(_logPool)->writeSts();
   delete CpvAccess(_logPool);
 }
@@ -107,7 +107,7 @@ void LogPool::writeSts(void)
     CmiAbort("Cannot open projections sts file for writing.\n");
   delete[] fname;
   fprintf(sts, "MACHINE %s\n",CMK_MACHINE_NAME);
-  fprintf(sts, "PROCESSORS %d\n", CkNumPes());
+  fprintf(sts, "PROCESSORS %d\n", CmiNumPes());
   fprintf(sts, "TOTAL_CHARES %d\n", _numChares);
   fprintf(sts, "TOTAL_EPS %d\n", _numEntries);
   fprintf(sts, "TOTAL_MSGS %d\n", _numMsgs);
@@ -167,14 +167,14 @@ void LogEntry::write(FILE* fp)
       break;
 
     default:
-      CkError("***Internal Error*** Wierd Event %d.\n", type);
+      CmiError("***Internal Error*** Wierd Event %d.\n", type);
       break;
   }
 }
 
 void TraceProjections::userEvent(int e)
 {
-  CpvAccess(_logPool)->add(USER_EVENT, e, -1, CkTimer(),curevent++,CkMyPe());
+  CpvAccess(_logPool)->add(USER_EVENT, e, -1, CmiTimer(),curevent++,CmiMyPe());
 }
 
 void TraceProjections::creation(envelope *e)
@@ -191,32 +191,32 @@ void TraceProjections::endExecute(void)
 
 void TraceProjections::beginIdle(void)
 {
-  CpvAccess(_logPool)->add(BEGIN_IDLE, 0, 0, CkTimer(), 0, CkMyPe());
+  CpvAccess(_logPool)->add(BEGIN_IDLE, 0, 0, CmiTimer(), 0, CmiMyPe());
 }
 
 void TraceProjections::endIdle(void)
 {
-  CpvAccess(_logPool)->add(END_IDLE, 0, 0, CkTimer(), 0, CkMyPe());
+  CpvAccess(_logPool)->add(END_IDLE, 0, 0, CmiTimer(), 0, CmiMyPe());
 }
 
 void TraceProjections::beginPack(void)
 {
-  CpvAccess(_logPool)->add(BEGIN_PACK, 0, 0, CkTimer(), 0, CkMyPe());
+  CpvAccess(_logPool)->add(BEGIN_PACK, 0, 0, CmiTimer(), 0, CmiMyPe());
 }
 
 void TraceProjections::endPack(void)
 {
-  CpvAccess(_logPool)->add(END_PACK, 0, 0, CkTimer(), 0, CkMyPe());
+  CpvAccess(_logPool)->add(END_PACK, 0, 0, CmiTimer(), 0, CmiMyPe());
 }
 
 void TraceProjections::beginUnpack(void)
 {
-  CpvAccess(_logPool)->add(BEGIN_UNPACK, 0, 0, CkTimer(), 0, CkMyPe());
+  CpvAccess(_logPool)->add(BEGIN_UNPACK, 0, 0, CmiTimer(), 0, CmiMyPe());
 }
 
 void TraceProjections::endUnpack(void)
 {
-  CpvAccess(_logPool)->add(END_UNPACK, 0, 0, CkTimer(), 0, CkMyPe());
+  CpvAccess(_logPool)->add(END_UNPACK, 0, 0, CmiTimer(), 0, CmiMyPe());
 }
 
 void TraceProjections::beginCharmInit(void)
@@ -237,10 +237,10 @@ void TraceProjections::dequeue(envelope *e)
 
 void TraceProjections::beginComputation(void)
 {
-  CpvAccess(_logPool)->add(BEGIN_COMPUTATION, -1, -1, CkTimer(), -1, -1);
+  CpvAccess(_logPool)->add(BEGIN_COMPUTATION, -1, -1, CmiTimer(), -1, -1);
 }
 
 void TraceProjections::endComputation(void)
 {
-  CpvAccess(_logPool)->add(END_COMPUTATION, -1, -1, CkTimer(), -1, -1);
+  CpvAccess(_logPool)->add(END_COMPUTATION, -1, -1, CmiTimer(), -1, -1);
 }

@@ -1,7 +1,9 @@
 #ifndef _TRACE_H
 #define _TRACE_H
 
-#include "ck.h"
+#include "converse.h"
+
+class envelope;
 
 // Base class of all tracing strategies.
 
