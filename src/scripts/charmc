@@ -125,14 +125,14 @@ End() {
 # Write this error message to stderr
 # ("1>&2" redirects the echo output to stderr).
 Warning() {
-	echo $* 1>&2
+	echo "$@" 1>&2
 }
 
 # This procedure prints an error message and exits.
 # Args: written to stderr
 Abort() {
 	Warning "Fatal Error by charmc in directory "`pwd`
-	Warning "   $*"
+	Warning "   $@"
 	Warning "charmc exiting..."
 	End 1
 }
@@ -142,14 +142,14 @@ Abort() {
 # which (possibly) echos, runs, and tests the errors of the given command.
 # Args: executed as given
 DoNoErrCheck() {
-	[ -n "$VERBOSE" ] && echo "charmc: Executing $*" 1>&2
-	eval $*
+	[ -n "$VERBOSE" ] && echo "charmc: Executing $@" 1>&2
+	"$@"
 }
 Do() {
-	DoNoErrCheck $*
+	DoNoErrCheck "$@"
 	Do_res=$?
 # The UNIX result code better be zero, or we die
-	[ $Do_res -eq 0 ] || Abort "Command $* returned error code $Do_res"
+	[ $Do_res -eq 0 ] || Abort "Command $@ returned error code $Do_res"
 }
 
 # This procedure removes the extention (the ".c" in "./main.c") from
