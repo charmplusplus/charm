@@ -66,9 +66,9 @@
  * Datagrams have this format:
  *
  *   srcpe   (16 bits) --- source processor number.
- *   magic   (16 bits) --- magic number to make sure DG is good.
+ *   magic   ( 8 bits) --- magic number to make sure DG is good.
  *   dstrank ( 8 bits) --- destination processor rank.
- *   seqno   (24 bits) --- packet sequence number.
+ *   seqno   (32 bits) --- packet sequence number.
  *   data    (XX byte) --- user data.
  *
  * The only reason the srcpe is in there is because the receiver needs
@@ -789,8 +789,8 @@ int node, nbr;
 #define CmiMsgNext(msg) (*((void**)(msg)))
 
 #define DGRAM_SRCPE_MASK    (0xFFFF)
-#define DGRAM_MAGIC_MASK    (0xFFFF)
-#define DGRAM_SEQNO_MASK    (0xFFFFFF)
+#define DGRAM_MAGIC_MASK    (0xFF)
+#define DGRAM_SEQNO_MASK    (0xFFFFFFFF)
 
 #if CMK_NODE_QUEUE_AVAILABLE
 #define DGRAM_NODEMESSAGE   (0xFB)
@@ -809,16 +809,16 @@ typedef struct { DgramHeader head; char window[1024]; } DgramAck;
 
 #define DgramHeaderMake(ptr, dstrank, srcpe, magic, seqno) { \
    ((unsigned short *)ptr)[0] = srcpe; \
-   ((unsigned short *)ptr)[1] = magic; \
-   ((unsigned int *)ptr)[1] = (seqno<<8) | dstrank; \
+   ((unsigned short *)ptr)[1] = ((magic & DGRAM_MAGIC_MASK)<<8) | dstrank; \
+   ((unsigned int *)ptr)[1] = seqno; \
 }
 
 #define DgramHeaderBreak(ptr, dstrank, srcpe, magic, seqno) { \
-   unsigned int tmp; \
+   unsigned short tmp; \
    srcpe = ((unsigned short *)ptr)[0]; \
-   magic = ((unsigned short *)ptr)[1]; \
-   tmp = ((unsigned int *)ptr)[1]; \
-   dstrank = (tmp&0xFF); seqno = (tmp>>8); \
+   tmp = ((unsigned short *)ptr)[1]; \
+   dstrank = (tmp&0xFF); magic = (tmp>>8); \
+   seqno = ((unsigned int *)ptr)[1]; \
 }
 
 #define PE_BROADCAST_OTHERS (-1)
@@ -2564,7 +2564,7 @@ void ReceiveDatagram()
   dg->len = ok;
   if (ok >= DGRAM_HEADER_SIZE) {
     DgramHeaderBreak(dg->data, dg->rank, dg->srcpe, magic, dg->seqno);
-    if (magic == Cmi_host_pid) {
+    if (magic == (Cmi_host_pid&DGRAM_MAGIC_MASK)) {
       if (dg->rank == DGRAM_ACKNOWLEDGE)
 	IntegrateAckDatagram(dg);
       else IntegrateMessageDatagram(dg);
