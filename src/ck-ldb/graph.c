@@ -31,7 +31,7 @@ int intSqrt(int x)
   return y; 
 }
 
-Graph * initGraph(int V, int E) {
+Graph * g_initGraph(int V, int E) {
   Graph *g;
 
   g = (Graph *) malloc(sizeof(Graph));
@@ -45,7 +45,7 @@ Graph * initGraph(int V, int E) {
   return g;
 }
 
-void freeGraph(Graph* g)
+void g_freeGraph(Graph* g)
 {
   free(g->vertices);
   g->vertices=0;
@@ -54,7 +54,7 @@ void freeGraph(Graph* g)
   free(g);
 }
 
-static void nextVertex(Graph *g, int v, float weight)
+void g_nextVertex(Graph *g, int v, float weight)
 {
   int current;
 
@@ -71,7 +71,7 @@ static void nextVertex(Graph *g, int v, float weight)
 }
 
 
-static void addEdge(Graph *g, int w, float weight)
+void g_addEdge(Graph *g, int w, float weight)
 {
   /* for now , ignore weight */
   int v, i;
@@ -97,7 +97,7 @@ static void addEdge(Graph *g, int w, float weight)
 
 }
 
-static void finishVertex(Graph *g) {
+void g_finishVertex(Graph *g) {
 
 if (g->vertices[g->currentVertex].numEdges != g->currentEdge - g->vertices[g->currentVertex].firstEdge)
  printf("Error in finishVertex\n");
@@ -140,7 +140,7 @@ return g;
 
 
 
-void printGraph(Graph *g) {
+void g_printGraph(Graph *g) {
   int i, j;
 
    CmiPrintf("%d vertices, %d edges \n", g->V, g->E); 
@@ -151,12 +151,12 @@ void printGraph(Graph *g) {
 
  }
 
-int numNeighbors(Graph *g, int node) {
+int g_numNeighbors(Graph *g, int node) {
 
   return g->vertices[node].numEdges;
 }
 
-int getNeighbor(Graph *g, int node, int i) {
+int g_getNeighbor(Graph *g, int node, int i) {
   
   if (i >= g->vertices[node].numEdges) {
     printf("error: node %d has only %d neighbors. You asked for %d'th nbr\n",

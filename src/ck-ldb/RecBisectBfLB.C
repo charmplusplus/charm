@@ -17,15 +17,15 @@
 #include "RecBisectBfLB.h"
 
 extern "C" {
-  Graph * initGraph(int v, int e);
-  void freeGraph(Graph* g);
-  void nextVertex(Graph *g, int v, float w);
-  void finishVertex(Graph *g);
-  void addEdge(Graph *g, int w, float w2);
+  Graph * g_initGraph(int v, int e);
+  void g_freeGraph(Graph* g);
+  void g_nextVertex(Graph *g, int v, float w);
+  void g_finishVertex(Graph *g);
+  void g_addEdge(Graph *g, int w, float w2);
   float graph_weightof(Graph *g, int vertex);
-  int numNeighbors(Graph *g, int node);
-  int getNeighbor(Graph *g, int d , int i);
-  void printGraph(Graph *g);
+  int g_numNeighbors(Graph *g, int node);
+  int g_getNeighbor(Graph *g, int d , int i);
+  void g_printGraph(Graph *g);
 
   int bvset_size(BV_Set *);
   int bvset_find(BV_Set *, int i);
@@ -97,7 +97,7 @@ LBMigrateMsg* RecBisectBfLB::Strategy(CentralLB::LDStats* stats,
   
   //  CmiPrintf("\ngraph partitioned\n");
 
-  freeGraph(g);
+  g_freeGraph(g);
   
   //  printPartitions(partitions);
 
@@ -152,13 +152,13 @@ RecBisectBfLB::convertGraph(ObjGraph *og) {
   V = og->NodeCount();
   E = og->EdgeCount();
 
-  g = initGraph(V, E);
+  g = g_initGraph(V, E);
 
   //  CkPrintf("[%d] RecBisectBfLB: convert (v=%d, e=%d, g=%p\n",
   //	   CkMyPe(), V, E, g);
 
   for (i =0; i<V; i++) {
-    nextVertex(g, i, og->LoadOf(i));
+    g_nextVertex(g, i, og->LoadOf(i));
 
     ObjGraph::Node n = og->GraphNode(i);
     ObjGraph::Edge *l;
@@ -168,17 +168,17 @@ RecBisectBfLB::convertGraph(ObjGraph *og) {
     l = n.edges_from();
     while (l) {
       // CkPrintf("[%d] RecBisectBfLB: convert in addEdge Loop1\n");
-      addEdge(g, l->to_node, 1.0); /* get edgeweight */
+      g_addEdge(g, l->to_node, 1.0); /* get edgeweight */
       l = l->next_from();
     }
 
     l = n.edges_to();
     while (l) {
       // CkPrintf("[%d] RecBisectBfLB: convert in addEdge Loop2\n");
-      addEdge(g, l->from_node, 1.0); /* get edgeweight */
+      g_addEdge(g, l->from_node, 1.0); /* get edgeweight */
       l = l->next_to();
     }
-    finishVertex(g);
+    g_finishVertex(g);
   }
   return g;
 }
@@ -287,9 +287,9 @@ void RecBisectBfLB::enqChildren(IntQueue * q, Graph *g, BV_Set * all,
 {
   int nbrs, i, j;
 
-  nbrs = numNeighbors(g, node);
+  nbrs = g_numNeighbors(g, node);
   for (i=0; i<nbrs; i++) {
-    j = getNeighbor(g, node, i);
+    j = g_getNeighbor(g, node, i);
     if (  (bvset_find(all,j)) && (!bvset_find(s1,j)) 
 	  && (!bvset_find(s2,j)) ) {
       q->enq(j);
