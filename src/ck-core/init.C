@@ -187,10 +187,8 @@ static void _exitHandler(envelope *env)
 		     // is 0, it will assume that the readonly variable was
 		     // declared locally. On all processors other than 0, 
 		     // _mainDone is never set to 1 before the program exits.
-#ifndef __BLUEGENE__
       if(CkMyPe())
         ConverseExit();
-#endif
       break;
     case StatMsg:
       CkAssert(CkMyPe()==0);
@@ -201,11 +199,7 @@ static void _exitHandler(envelope *env)
       DEBUGF(("StatMsg on %d with %d\n", CkMyPe(), _numStatsRecd));
       if(_numStatsRecd==CkNumPes()) {
         _printStats();
-#ifdef __BLUEGENE__
-        BgShutdown();
-#else
         ConverseExit();
-#endif
       }
       break;
     default:
@@ -409,6 +403,9 @@ extern void _loadbalancerInit();
 
 void _initCharm(int argc, char **argv)
 {
+        // initialize trace module in ck
+        traceCharmInit(argv);
+
 	CkpvInitialize(PtrQ*,_buffQ);
 	CkpvInitialize(PtrVec*,_bocInitVec);
 	CkpvInitialize(void*, _currentChare);

@@ -15,6 +15,9 @@
 #define CkRegisterHandler(x)     BgRegisterHandler((BgHandler)(x))
 #define CkNumberHandler(n, x)    BgNumberHandler(n, (BgHandler)(x))
 
+#define ConverseExit             BgCharmExit
+
+
 /**
   This version Blue Gene Charm++ use a whole Blue Gene node as 
   a Charm PE.
@@ -158,5 +161,17 @@ static inline void CmiSyncBroadcastAllAndFree(int nb, char *m)
 
 }  /* end of namespace */
 
-
 #endif
+
+
+/** common functions for two versions */
+namespace BGConverse {
+
+static inline void BgCharmExit()
+{
+  traceCharmClose();
+  if (CkMyPe() == 0)  BgShutdown();
+}
+
+}
+
