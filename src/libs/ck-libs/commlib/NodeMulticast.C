@@ -29,8 +29,8 @@ void NodeMulticast::setDestinationArray(CkArrayID a, int nelem,
     mode = ARRAY_MODE;
     messageBuf = NULL;
     pes_per_node = 4;
-    if(getenv("RMS_NODES") != NULL)
-	pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
+    //if(getenv("RMS_NODES") != NULL)
+    //pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
 
     mAid = a;
     nelements = nelem;
@@ -194,7 +194,7 @@ void NodeMulticast::doneInserting(){
         ComlibPrintf("After set handler\n");
         
         for(int count = 0; count < numNodes; count++) {
-	    int dest_node = count;
+	    int dest_node = count ^ (CkMyPe()/pes_per_node);
 	    //int dest_node = count ^ (CkMyPe()/pes_per_node);
 	    if(nodeMap[dest_node]) {
 		void *newcharmmsg = CkCopyMsg((void **)&msg); 
