@@ -14,9 +14,9 @@ module CkMulticast {
     entry CkMulticastMgr(void);
     // set up
     entry void setup(multicastSetupMsg *);
-    entry void recvCookie(CkSectionCookie sid, CkSectionCookie child);
-    entry void teardown(CkSectionCookie sid);
-    entry void freeup(CkSectionCookie sid);
+    entry void recvCookie(CkSectionInfo sid, CkSectionInfo child);
+    entry void teardown(CkSectionInfo sid);
+    entry void freeup(CkSectionInfo sid);
     // multicast
     entry void recvMsg(multicastGrpMsg *m);
     // reduction
@@ -24,5 +24,5 @@ module CkMulticast {
     entry void updateRedNo(mCastEntryPtr e, int no);
   };
 
-  initcall void _ckMulticastInit(void);
+  initnode void _ckMulticastInit(void);
 };
