@@ -78,6 +78,19 @@ translators: charmxi conv-cpm
 pose:  charm++
 	cd libs/ck-libs/pose && $(MAKE)
 
+jade:
+#	make the lib, include
+	cd langs/jade && $(MAKE)
+
+# This should be done offline, since the user does not need to compile
+# parser files, etc.  All they need is the libjade + include files,
+# antlr.jar, jade.jar, and a few scripts.
+jadeall: jade
+#	make parser.g -> .java files
+	cd langs/jade && $(MAKE) p
+#	make the jade.jar file
+	cd ../../java/charm/jade && $(MAKE)
+
 LIBS: CONVLIBS CHARMLIBS
 	cd libs; $(MAKE) otherlibs
 
@@ -224,6 +237,7 @@ dirs+sources:
 	./gathertree ../../src/libs libs
 	./gathertree ../../src/arch/util      .
 	./gathertree ../../src/langs langs
+	./gathertree ../../src/langs/jade langs/jade
 	./gathertree ../../src/arch/common           .
 	./gathertree ../../src/arch/`cat .gdir`      .
 	./gatherflat ../../src/arch/`cat .vdir`      .
