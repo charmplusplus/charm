@@ -10,19 +10,25 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <converse.h>
+#include "converse.h"
+
+#if CMK_BLUEGENE_CHARM
+#define CmiReservedHeaderSize   CmiBlueGeneMsgHeaderSizeBytes
+#else
+#define CmiReservedHeaderSize   CmiExtHeaderSizeBytes
+#endif
 
 
 #define PRC 0
 #define RCV 1
 
 typedef struct { 
-    char core[CmiMsgHeaderSizeBytes];
+    char core[CmiReservedHeaderSize];
     comID id;
 } GMsg ;
 
 typedef struct { 
-    char core[CmiMsgHeaderSizeBytes];
+    char core[CmiReservedHeaderSize];
     comID id;
     int val;
     int impltype;

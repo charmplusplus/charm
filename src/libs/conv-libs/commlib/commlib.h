@@ -9,10 +9,8 @@
 #define COMLIB_H
 
 #include <converse.h>
-#if CMK_BLUEGENE_CHARM
-#include <bgconverse.h>
-#endif
 #include <stdlib.h>
+#include "charm++.h"
 
 #ifndef NULL
 #define NULL 0
@@ -49,7 +47,7 @@ typedef struct {
 } msgstruct ;
 
 typedef struct { 
-    char core[CmiMsgHeaderSizeBytes];
+    char core[CmiReservedHeaderSize];
     comID id;
     int magic;
     int refno;
@@ -75,9 +73,9 @@ void EachToManyMulticast(comID id, int size, void *msg, int npe, int * pelist);
 void CComlibEachToManyMulticast(comID, int, void *, CkGroupID, int, int *);
 
 /**************** Declarations for the Developer *************/
-CpvExtern(int, RecvHandle);
-CpvExtern(int, ProcHandle);
-CpvExtern(int, DummyHandle);
+CkpvExtern(int, RecvHandle);
+CkpvExtern(int, ProcHandle);
+CkpvExtern(int, DummyHandle);
 
 void KSendDummyMsg(comID id, int pe, int magic);
 int KMyActiveRefno(comID);

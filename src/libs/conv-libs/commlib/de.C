@@ -186,7 +186,7 @@ void DimexRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes,
 	}
         ComlibPrintf("Before Gmap %d\n", nextpe);
 	nextpe=gmap(nextpe);
-	HCUBESENDFN(MyID, Dim, Dim, NumPes, pelist, CpvAccess(RecvHandle), nextpe, PeHcube);
+	HCUBESENDFN(MyID, Dim, Dim, NumPes, pelist, CkpvAccess(RecvHandle), nextpe, PeHcube);
  	CmiFree(pelist);
 	return;
     }
@@ -229,7 +229,7 @@ void DimexRouter::RecvManyMsg(comID id, char *msg)
         ComlibPrintf("Before Gmap %d\n", nextpe);
         nextpe=gmap(nextpe);
         ComlibPrintf("%d Sending to %d\n", MyPe, nextpe);
-	HCUBESENDFN(MyID, stage, stage, penum[stage], next[stage], CpvAccess(RecvHandle), nextpe, PeHcube);
+	HCUBESENDFN(MyID, stage, stage, penum[stage], next[stage], CkpvAccess(RecvHandle), nextpe, PeHcube);
 
   	//Go to the next stage
   	stage--; 
@@ -258,7 +258,7 @@ void DimexRouter::RecvManyMsg(comID id, char *msg)
             char *newmsg;
             newmsg=PeHcube->ExtractAndPackAll(MyID, stage, &len);
             if (newmsg) {
-                CmiSetHandler(newmsg, CpvAccess(ProcHandle));
+                CmiSetHandler(newmsg, CkpvAccess(ProcHandle));
                 CmiSyncListSendAndFree(two_pow_ndirect, pelist, len, newmsg);
             }
             
@@ -324,10 +324,10 @@ void DimexRouter:: LocalProcMsg()
         ComlibPrintf("%d Sending to %d\n", MyPe, mynext);        
         
         if(MyID.isAllToAll){
-            HCUBESENDFN(MyID, Dim, -1, 1, pelist, CpvAccess(ProcHandle), mynext, PeHcube1);
+            HCUBESENDFN(MyID, Dim, -1, 1, pelist, CkpvAccess(ProcHandle), mynext, PeHcube1);
         }
         else {
-            HCUBESENDFN(MyID, Dim, -1, 1, pelist, CpvAccess(ProcHandle), mynext, PeHcube);
+            HCUBESENDFN(MyID, Dim, -1, 1, pelist, CkpvAccess(ProcHandle), mynext, PeHcube);
         }
     }
   

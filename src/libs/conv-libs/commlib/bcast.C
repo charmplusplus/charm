@@ -71,12 +71,12 @@ void BcastRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes,
   if (size) {
 
   int mask=~7;
-  int offset=(CmiMsgHeaderSizeBytes+sizeof(comID)+3*sizeof(int)+7)&mask;
+  int offset=(CmiReservedHeaderSize+sizeof(comID)+3*sizeof(int)+7)&mask;
   int totsize=offset+numpes*sizeof(int)+size;
   char *m=(char *)CmiAlloc(totsize);
-  char *p=m+CmiMsgHeaderSizeBytes;
+  char *p=m+CmiReservedHeaderSize;
 
-  CmiSetHandler(m, CpvAccess(RecvHandle));
+  CmiSetHandler(m, CkpvAccess(RecvHandle));
 
   int refno=KMyActiveRefno(id);
   memcpy(p, (char *)&refno, sizeof(int)); 
@@ -137,8 +137,8 @@ void BcastRouter::RecvManyMsg(comID, char *m)
   }
   Buffer *node;
   int mask=~7;
-  int offset=(CmiMsgHeaderSizeBytes+sizeof(comID)+3*sizeof(int)+7)&mask;
-  char *p=m+CmiMsgHeaderSizeBytes+sizeof(int)+sizeof(comID);
+  int offset=(CmiReservedHeaderSize+sizeof(comID)+3*sizeof(int)+7)&mask;
+  char *p=m+CmiReservedHeaderSize+sizeof(int)+sizeof(comID);
 
   int size;
   memcpy(&size, p, sizeof(int));

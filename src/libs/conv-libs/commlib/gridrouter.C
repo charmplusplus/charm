@@ -170,7 +170,7 @@ void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, 
   int a2a_len;
   if(id.isAllToAll) {
       a2amsg = PeMesh->ExtractAndPackAll(id, 0, &a2a_len);
-      CmiSetHandler(a2amsg, CpvAccess(RecvHandle));
+      CmiSetHandler(a2amsg, CkpvAccess(RecvHandle));
       CmiReference(a2amsg);
       CmiSyncListSendAndFree(rvecSize, growVector, a2a_len, a2amsg);      
       RecvManyMsg(id, a2amsg);
@@ -199,7 +199,7 @@ void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, 
       gmap(nextpe);
       ComlibPrintf("%d:sending to %d of column %d\n", MyPe, nextpe, i);
       
-      GRIDSENDFN(MyID, 0, 0, length, onerow, CpvAccess(RecvHandle), nextpe); 
+      GRIDSENDFN(MyID, 0, 0, length, onerow, CkpvAccess(RecvHandle), nextpe); 
   }
   RecvManyMsg(id, NULL);
 }
@@ -224,7 +224,7 @@ void GridRouter::RecvManyMsg(comID id, char *msg)
       int a2a_len;
       if(id.isAllToAll) {
           a2amsg = PeMesh1->ExtractAndPackAll(id, 1, &a2a_len);
-          CmiSetHandler(a2amsg, CpvAccess(ProcHandle));
+          CmiSetHandler(a2amsg, CkpvAccess(ProcHandle));
           CmiReference(a2amsg);
           CmiSyncListSendAndFree(cvecSize, gcolVector, a2a_len, a2amsg);   
           ProcManyMsg(id, a2amsg);
@@ -246,7 +246,7 @@ void GridRouter::RecvManyMsg(comID id, char *msg)
           ComlibPrintf("%d:sending message to %d of row %d\n", MyPe, nextpe, 
                        rowcount);
           
-          GRIDSENDFN(MyID, 0, 1, 1, pelist, CpvAccess(ProcHandle), nextpe);
+          GRIDSENDFN(MyID, 0, 1, 1, pelist, CkpvAccess(ProcHandle), nextpe);
       }
       
       LocalProcMsg();

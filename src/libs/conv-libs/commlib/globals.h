@@ -13,15 +13,15 @@ typedef Overlapper * Overlapperp;
 typedef Overlapperp * Overlapperpp;
 typedef Overlapperpp * Overlapperppp;
 
-CpvDeclare(Overlapperppp , ImplTable);
-CpvDeclare(NEWFN*, StrategyTable);
-CpvDeclare(int, StrategyTableIndex);
-CpvDeclare(int, ImplIndex);
-CpvDeclare(int, RecvHandle);
-CpvDeclare(int, ProcHandle);
-CpvDeclare(int, DummyHandle);
-CpvDeclare(int, SwitchHandle);
-CpvDeclare(int, KDoneHandle);
-CpvDeclare(int, KGMsgHandle);
+CkpvDeclare(Overlapperppp , ImplTable);
+CkpvDeclare(NEWFN*, StrategyTable);
+CkpvDeclare(int, StrategyTableIndex);
+CkpvDeclare(int, ImplIndex);
+CkpvDeclare(int, RecvHandle);
+CkpvDeclare(int, ProcHandle);
+CkpvDeclare(int, DummyHandle);
+CkpvDeclare(int, SwitchHandle);
+CkpvDeclare(int, KDoneHandle);
+CkpvDeclare(int, KGMsgHandle);
 
 #endif

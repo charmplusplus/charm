@@ -88,9 +88,9 @@ void GraphRouter::sendMessages(int cur_stage){
         
 	if (newmsg) {
             if(cur_stage < nstages - 2)
-                CmiSetHandler(newmsg, CpvAccess(RecvHandle));
+                CmiSetHandler(newmsg, CkpvAccess(RecvHandle));
             else
-                CmiSetHandler(newmsg, CpvAccess(ProcHandle));
+                CmiSetHandler(newmsg, CkpvAccess(ProcHandle));
 
             CmiSyncSendAndFree(nextpe, len, newmsg);
         }

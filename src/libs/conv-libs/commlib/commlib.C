@@ -38,31 +38,31 @@ Router * newgraphobject(int, int);
  ********************************************/
 void UpdateImplTable(comID id)
 {
-  if (CpvAccess(ImplTable)[id.srcpe] == NULL) {
-        CpvAccess(ImplTable)[id.srcpe]=(Overlapper **) CmiAlloc(sizeof(Overlapper *)*MAXINSTANCE);
-        for (int j=1;j<MAXINSTANCE;j++) CpvAccess(ImplTable)[id.srcpe][j]=0;
-        CpvAccess(ImplTable)[id.srcpe][0]=0;
+  if (CkpvAccess(ImplTable)[id.srcpe] == NULL) {
+        CkpvAccess(ImplTable)[id.srcpe]=(Overlapper **) CmiAlloc(sizeof(Overlapper *)*MAXINSTANCE);
+        for (int j=1;j<MAXINSTANCE;j++) CkpvAccess(ImplTable)[id.srcpe][j]=0;
+        CkpvAccess(ImplTable)[id.srcpe][0]=0;
   }
 
-  if (CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]) {
+  if (CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex]) {
   	if (id.SwitchVal >0) { 
-  	  CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->SetID(id);
+  	  CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->SetID(id);
   	}
 	return;
   }
 
-  if(CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]== NULL)
-      CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]=new Overlapper(id);
+  if(CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex]== NULL)
+      CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex]=new Overlapper(id);
 
   if (id.SwitchVal >0) { 
-      CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->SetID(id);
+      CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->SetID(id);
   }
 }
 
 int ComlibRegisterStrategy(NEWFN newfun)
 {
-  CpvAccess(StrategyTable)[CpvAccess(StrategyTableIndex)++]=newfun;
-  return(CpvAccess(StrategyTableIndex)-1);
+  CkpvAccess(StrategyTable)[CkpvAccess(StrategyTableIndex)++]=newfun;
+  return(CkpvAccess(StrategyTableIndex)-1);
 }
 
 /**************************************************
@@ -70,32 +70,32 @@ int ComlibRegisterStrategy(NEWFN newfun)
  *************************************************/
 void ComlibInit()
 {
-  CpvInitialize(int, ImplIndex);
-  CpvInitialize(int, RecvHandle);
-  CpvInitialize(int, ProcHandle);
-  CpvInitialize(int, DummyHandle);
-  CpvInitialize(int, SwitchHandle);
-  CpvInitialize(int, KDoneHandle);
-  CpvInitialize(int, KGMsgHandle);
-  CpvInitialize(Overlapperppp, ImplTable);
-  CpvInitialize(NEWFN *, StrategyTable);
-  CpvInitialize(int, StrategyTableIndex);
+  CkpvInitialize(int, ImplIndex);
+  CkpvInitialize(int, RecvHandle);
+  CkpvInitialize(int, ProcHandle);
+  CkpvInitialize(int, DummyHandle);
+  CkpvInitialize(int, SwitchHandle);
+  CkpvInitialize(int, KDoneHandle);
+  CkpvInitialize(int, KGMsgHandle);
+  CkpvInitialize(Overlapperppp, ImplTable);
+  CkpvInitialize(NEWFN *, StrategyTable);
+  CkpvInitialize(int, StrategyTableIndex);
 
-  CpvAccess(StrategyTable)=(NEWFN *)CmiAlloc(MAXNUMSTRATEGY*sizeof(NEWFN *));
-  CpvAccess(StrategyTableIndex)=0;
+  CkpvAccess(StrategyTable)=(NEWFN *)CmiAlloc(MAXNUMSTRATEGY*sizeof(NEWFN *));
+  CkpvAccess(StrategyTableIndex)=0;
 
-  CpvAccess(RecvHandle)=CmiRegisterHandler((CmiHandler)KRecvManyCombinedMsg);
-  CpvAccess(ProcHandle)=CmiRegisterHandler((CmiHandler)KProcManyCombinedMsg);
-  CpvAccess(DummyHandle)=CmiRegisterHandler((CmiHandler)KDummyEP);
-  CpvAccess(SwitchHandle)=CmiRegisterHandler((CmiHandler)KSwitchEP);
-  CpvAccess(KDoneHandle)=CmiRegisterHandler((CmiHandler)KDoneEP);
-  CpvAccess(KGMsgHandle)=CmiRegisterHandler((CmiHandler)KGMsgHandler);
+  CkpvAccess(RecvHandle)=CkRegisterHandler((CmiHandler)KRecvManyCombinedMsg);
+  CkpvAccess(ProcHandle)=CkRegisterHandler((CmiHandler)KProcManyCombinedMsg);
+  CkpvAccess(DummyHandle)=CkRegisterHandler((CmiHandler)KDummyEP);
+  CkpvAccess(SwitchHandle)=CkRegisterHandler((CmiHandler)KSwitchEP);
+  CkpvAccess(KDoneHandle)=CkRegisterHandler((CmiHandler)KDoneEP);
+  CkpvAccess(KGMsgHandle)=CkRegisterHandler((CmiHandler)KGMsgHandler);
 
-  CpvAccess(ImplIndex)=1;
-  CpvAccess(ImplTable)=(Overlapper ***) CmiAlloc(sizeof(Overlapper *)*CmiNumPes());
+  CkpvAccess(ImplIndex)=1;
+  CkpvAccess(ImplTable)=(Overlapper ***) CmiAlloc(sizeof(Overlapper *)*CkNumPes());
   
-  for (int i=0;i<CmiNumPes();i++) {
-      CpvAccess(ImplTable)[i]=NULL;
+  for (int i=0;i<CkNumPes();i++) {
+      CkpvAccess(ImplTable)[i]=NULL;
   }
   
   ComlibRegisterStrategy(newbcastobject);
@@ -109,7 +109,7 @@ void ComlibInit()
 
 Router * GetStrategyObject(int n, int me, int indx)
 {
-    return((CpvAccess(StrategyTable)[indx])(n, me));
+    return((CkpvAccess(StrategyTable)[indx])(n, me));
 }
 
 //comID CreateInstance(int ImplType, int numpart)
@@ -117,8 +117,8 @@ comID ComlibInstance(int ImplType, int numpart)
 {
   comID id;
   id.ImplType=ImplType;
-  id.ImplIndex=CpvAccess(ImplIndex);
-  id.srcpe=CmiMyPe();
+  id.ImplIndex=CkpvAccess(ImplIndex);
+  id.srcpe=CkMyPe();
   id.SwitchVal=-1;
   id.callbackHandler = 0;
   id.isAllToAll = 0;
@@ -126,7 +126,7 @@ comID ComlibInstance(int ImplType, int numpart)
   id.NumMembers=numpart;
   UpdateImplTable(id);
 
-  CpvAccess(ImplIndex) +=1 % MAXINSTANCE;
+  CkpvAccess(ImplIndex) +=1 % MAXINSTANCE;
   return(id);
 }
 
@@ -136,40 +136,40 @@ comID ComlibEstablishGroup(comID id, int npes, int *pes)
   id.grp=CmiEstablishGroup(npes, pes);
   UpdateImplTable(id);
   
-  CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->GroupMap(npes, pes);
-  CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->SetID(id);
+  CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->GroupMap(npes, pes);
+  CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->SetID(id);
   return(id);
 }
 
 Overlapper * GetComlibObject(comID id)
 {
   UpdateImplTable(id);
-  return(CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]);
+  return(CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex]);
 }
 
 void DeleteInstance(comID id)
 {
-  Overlapper *o=CpvAccess(ImplTable)[id.srcpe][id.ImplIndex];
+  Overlapper *o=CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex];
   o->DeleteInstance();
-  //CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]=NULL;
+  //CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex]=NULL;
 }
 
 void EachToAllMulticast(comID id, int size, void * msg)
 {
   UpdateImplTable(id);
-  (CpvAccess(ImplTable)[id.srcpe][id.ImplIndex])->EachToAllMulticast(id, size, msg);
+  (CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex])->EachToAllMulticast(id, size, msg);
 }
 
 void EachToManyMulticast(comID id, int size, void * msg, int pesize, int * pelist)
 {
   UpdateImplTable(id);
-  (CpvAccess(ImplTable)[id.srcpe][id.ImplIndex])->EachToManyMulticast(id, size, msg, pesize, pelist);
+  (CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex])->EachToManyMulticast(id, size, msg, pesize, pelist);
 }
 
 void NumDeposits(comID id, int num)
 {
   UpdateImplTable(id);
-  (CpvAccess(ImplTable)[id.srcpe][id.ImplIndex])->NumDeposits(id, num);
+  (CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex])->NumDeposits(id, num);
 }
 
 /*****************************************************
@@ -177,32 +177,32 @@ void NumDeposits(comID id, int num)
  ****************************************************/
 void KRecvManyCombinedMsg(char *msg)
 {
-    //  ComlibPrintf("In Recv combined message at %d\n", CmiMyPe());
+    //  ComlibPrintf("In Recv combined message at %d\n", CkMyPe());
 
   comID id;
-  memcpy(&id,(msg+CmiMsgHeaderSizeBytes+sizeof(int)), sizeof(comID));
+  memcpy(&id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
 
   UpdateImplTable(id);
-  (CpvAccess(ImplTable)[id.srcpe][id.ImplIndex])->RecvManyMsg(id, msg);
+  (CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex])->RecvManyMsg(id, msg);
 }
 
 void KProcManyCombinedMsg(char *msg)
 {
   comID id;
-  //  ComlibPrintf("In Recv combined message at %d\n", CmiMyPe());
-  memcpy(&id,(msg+CmiMsgHeaderSizeBytes+sizeof(int)), sizeof(comID));
+  //  ComlibPrintf("In Recv combined message at %d\n", CkMyPe());
+  memcpy(&id,(msg+CmiReservedHeaderSize+sizeof(int)), sizeof(comID));
 
   UpdateImplTable(id);
-  (CpvAccess(ImplTable)[id.srcpe][id.ImplIndex])->ProcManyMsg(id, msg);
+  (CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex])->ProcManyMsg(id, msg);
 }
 
 void KDummyEP(DummyMsg *m)
 {
 
-    //  ComlibPrintf("In Recv dummy message at %d\n", CmiMyPe());
+    //  ComlibPrintf("In Recv dummy message at %d\n", CkMyPe());
   comID id=m->id;
   UpdateImplTable(id);
-  CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->DummyEP(m->id, m->magic, m->refno);
+  CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->DummyEP(m->id, m->magic, m->refno);
   CmiFree(m);
 }
 
@@ -212,14 +212,14 @@ void KDummyEP(DummyMsg *m)
 void KBcastSwitchMsg(comID id)
 {
   SwitchMsg *m=(SwitchMsg *)CmiAlloc(sizeof(SwitchMsg));
-  CmiSetHandler(m, CpvAccess(SwitchHandle));
+  CmiSetHandler(m, CkpvAccess(SwitchHandle));
   m->id=id;
   CmiSyncBroadcastAndFree(sizeof(SwitchMsg), (char *)m);
 }
 
 void KSwitchEP(SwitchMsg *m)
 {
-  //ComlibPrintf("%d switchep called\n", CmiMyPe());
+  //ComlibPrintf("%d switchep called\n", CkMyPe());
   comID id=m->id;
   UpdateImplTable(id);
 
@@ -229,7 +229,7 @@ void KSwitchEP(SwitchMsg *m)
 void KSendDummyMsg(comID id, int pe, int magic)
 {
   DummyMsg *m=(DummyMsg *)CmiAlloc(sizeof(DummyMsg));
-  CmiSetHandler(m, CpvAccess(DummyHandle));
+  CmiSetHandler(m, CkpvAccess(DummyHandle));
   m->id=id;
   m->magic=magic;
   m->refno=KMyActiveRefno(id);
@@ -244,17 +244,17 @@ void KCsdEnqueue(void *m)
 int KMyActiveRefno(comID id)
 {
   //ComlibPrintf("KMyActive calling update\n");
-  return(CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->MyActiveIndex());
+  return(CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->MyActiveIndex());
 }
 
 void KDoneEP(DummyMsg *m)
 {
   comID id=m->id;
-  CpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->Done();
+  CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex]->Done();
   
   if(id.callbackHandler != 0) {
       CmiSetHandler(m, id.callbackHandler);
-      CmiSyncSendAndFree(CmiMyPe(), sizeof(DummyMsg), (char*)m);
+      CmiSyncSendAndFree(CkMyPe(), sizeof(DummyMsg), (char*)m);
   }
   else 
       CmiFree(m);
@@ -264,8 +264,8 @@ void KDone(comID id)
 {
   DummyMsg *m=(DummyMsg *)CmiAlloc(sizeof(DummyMsg));
   m->id=id;
-  CmiSetHandler(m, CpvAccess(KDoneHandle));
-  CmiSyncSendAndFree(CmiMyPe(), sizeof(DummyMsg), (char*)m);
+  CmiSetHandler(m, CkpvAccess(KDoneHandle));
+  CmiSyncSendAndFree(CkMyPe(), sizeof(DummyMsg), (char*)m);
 }
 
 /****************************************************
@@ -275,8 +275,8 @@ void KsendGmsg(comID id)
 {
   GMsg *gmsg=(GMsg *)CmiAlloc(sizeof(GMsg));
   gmsg->id=id;
-  CmiSetHandler(gmsg, CpvAccess(KGMsgHandle));
-  CmiSyncSendAndFree(CmiMyPe(),sizeof(GMsg), (char*)gmsg);
+  CmiSetHandler(gmsg, CkpvAccess(KGMsgHandle));
+  CmiSyncSendAndFree(CkMyPe(),sizeof(GMsg), (char*)gmsg);
   //KCsdEnqueue(gmsg);
 }
 
@@ -289,11 +289,11 @@ void KGMsgHandler(GMsg *msg)
   //ComlibPrintf("grppe=%d, grpindex=%d\n", grp.pe, grp.id);
   CmiLookupGroup((msg->id).grp, &npes, &pes);
   if (pes==0) {
-  	//CmiSyncSendAndFree(CmiMyPe(),sizeof(GMsg), (char*)msg);
+  	//CmiSyncSendAndFree(CkMyPe(),sizeof(GMsg), (char*)msg);
 	KCsdEnqueue(msg);
   }
   else {
-  	(CpvAccess(ImplTable)[id.srcpe][id.ImplIndex])->GroupMap(npes, pes);
+  	(CkpvAccess(ImplTable)[id.srcpe][id.ImplIndex])->GroupMap(npes, pes);
   }
 }
 

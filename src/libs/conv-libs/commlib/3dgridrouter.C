@@ -247,7 +247,7 @@ void D3GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes
         
         gmap(nextpe);
         ComlibPrintf("sending to column %d and dest %d in %d\n", i, nextpe, CkMyPe());
-        GRIDSENDFN(MyID, 0, 0, idx, oneplane, CpvAccess(RecvHandle), nextpe); 
+        GRIDSENDFN(MyID, 0, 0, idx, oneplane, CkpvAccess(RecvHandle), nextpe); 
     }
 }
 
@@ -303,7 +303,7 @@ void D3GridRouter::RecvManyMsg(comID id, char *msg)
             ComlibPrintf("After gmap %d\n", nextpe);
             
             ComlibPrintf("%d:sending recv message %d %d\n", MyPe, nextpe, myrep);
-            GRIDSENDFN(MyID, 1, 1, k, pelist, CpvAccess(RecvHandle), nextpe);
+            GRIDSENDFN(MyID, 1, 1, k, pelist, CkpvAccess(RecvHandle), nextpe);
         }
     }
     
@@ -325,7 +325,7 @@ void D3GridRouter::RecvManyMsg(comID id, char *msg)
             ComlibPrintf("After gmap %d\n", nextpe);
             
             ComlibPrintf("%d:sending proc message %d %d\n", MyPe, nextpe, nplanes);
-            GRIDSENDFN(MyID, 2, 2, 1, pelist, CpvAccess(ProcHandle), nextpe);
+            GRIDSENDFN(MyID, 2, 2, 1, pelist, CkpvAccess(ProcHandle), nextpe);
         }
         LocalProcMsg();
     }
