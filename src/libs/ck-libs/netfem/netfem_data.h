@@ -1,6 +1,7 @@
 /*Charm++ Network FEM: internal data format
 
 Orion Sky Lawlor, olawlor@acm.org, 11/2/2001
+Isaac Dooley 3/15/05
 */
 #ifndef __OSL_NETFEM_DATA_H
 #define __OSL_NETFEM_DATA_H
@@ -182,19 +183,13 @@ public:
 	const int *getNodes(int elementNo) const {return &conn[elementNo*nodesPer];}
 	const char *getName(void) const {return name;}
 
-	// To make accessing conn easier:
+	// To make accessing conn easier for Isaac's Paraview Converter:
     // get the element connectivity information. dimension is zero indexed
     // For a triangle, you will have dimensions 0,1,2 available
-    int getConnData(int elementNo, int dimension) const {
-      return conn[elementNo*bytesPer/sizeof(int)+dimension];
-    }
-	
-    int getConnWidth() const {
-      return bytesPer/sizeof(int);
-    }
+    int getConnData(int elementNo, int dimension) const {return conn[elementNo*bytesPer/sizeof(int)+dimension];}
+    int getConnWidth() const {return bytesPer/sizeof(int);}
 
 	virtual void copy(void);
-	
 	virtual void pup(PUP::er &p);
 };
 
