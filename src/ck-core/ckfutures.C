@@ -164,12 +164,12 @@ public:
 extern "C" void futuresCreateBOC()
 {
   FutureInitMsg *message2 = new (MsgIndex(FutureInitMsg)) FutureInitMsg ;
-  futureBocNum = new_group (FutureBOC, message2);
+  futureBocNum = new_group (FutureBOC, FutureInitMsg, message2);
 }
 
 extern "C" void CSendToFuture(void *m, int processor)
 {
-  CSendMsgBranch(FutureBOC, SetFuture, m, futureBocNum, processor);
+  CSendMsgBranch(FutureBOC, SetFuture, FutureInitMsg, m, futureBocNum, processor);
 }
 
 
