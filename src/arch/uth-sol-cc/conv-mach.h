@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.22  1998-06-15 22:12:26  jyelon
+ * Revision 1.23  1998-06-15 23:50:33  milind
+ * Fixed typedef macros.
+ *
+ * Revision 1.22  1998/06/15 22:12:26  jyelon
  * changed the way converse headers are done.
  *
  * Revision 1.21  1998/06/15 19:54:27  jyelon
@@ -181,14 +184,14 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                1
 
-#define CMK_TYPEDEF_INT2 unknown
-#define CMK_TYPEDEF_INT4 unknown
-#define CMK_TYPEDEF_INT8 unknown
-#define CMK_TYPEDEF_UINT2 unknown
-#define CMK_TYPEDEF_UINT4 unknown
-#define CMK_TYPEDEF_UINT8 unknown
-#define CMK_TYPEDEF_FLOAT4 unknown
-#define CMK_TYPEDEF_FLOAT8 unknown
+#define CMK_TYPEDEF_INT2 short
+#define CMK_TYPEDEF_INT4 int
+#define CMK_TYPEDEF_INT8 long
+#define CMK_TYPEDEF_UINT2 unsigned short
+#define CMK_TYPEDEF_UINT4 unsigned int
+#define CMK_TYPEDEF_UINT8 unsigned long
+#define CMK_TYPEDEF_FLOAT4 float
+#define CMK_TYPEDEF_FLOAT8 double
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                        1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                        0
