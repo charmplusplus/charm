@@ -3,6 +3,7 @@
 void propagate_handler(void *message) {
   int instid = CmiGetXHandler(message);
   PipeBroadcastConverse *myStrategy = (PipeBroadcastConverse *)ConvComlibGetStrategy(instid);
+  ComlibPrintf("[%d] propagate_handler: calling on %x\n",CmiMyPe(),myStrategy);
   envelope *env = (envelope*)message;
   myStrategy->propagate((char*)message, false, env->getSrcPe(), env->getTotalsize(), &envelope::setSrcPe);
 }
@@ -29,14 +30,15 @@ void PipeBroadcastStrategy::commonInit(int _topology, int _pipeSize) {
   converseStrategy = new PipeBroadcastConverse(_topology, _pipeSize, this);
 }
 
-PipeBroadcastStrategy::PipeBroadcastStrategy(int _topology, int _pipeSize)
+/*PipeBroadcastStrategy::PipeBroadcastStrategy(int _topology, int _pipeSize)
   : CharmStrategy() {
   //isArray = 0;
   commonInit(_topology, _pipeSize);
-}
+  }*/
 
 PipeBroadcastStrategy::PipeBroadcastStrategy(int _topology, CkArrayID _aid, int _pipeSize)
   : CharmStrategy() {
+  ComlibPrintf("Creating charm pipebcast (%x)\n",this);
   setType(ARRAY_STRATEGY);
   ainfo.setDestinationArray(_aid);
   commonInit(_topology, _pipeSize);
@@ -93,6 +95,7 @@ void PipeBroadcastStrategy::pup(PUP::er &p){
 
   if (p.isUnpacking()) {
     propagateHandle = CmiRegisterHandler((CmiHandler)propagate_handler);
+    ComlibPrintf("[%d] registered handler single to %d\n",CmiMyPe(),propagateHandle);
     messageBuf = new CkQ<CharmMessageHolder *>;
     converseStrategy->setHigherLevel(this);
   }

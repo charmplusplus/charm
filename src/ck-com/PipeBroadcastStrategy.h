@@ -13,7 +13,7 @@ class PipeBroadcastStrategy : public CharmStrategy {
   void commonInit(int _top, int _pipe);
 
  public:
-  PipeBroadcastStrategy(int _topology=USE_HYPERCUBE, int _pipeSize=DEFAULT_PIPE);
+  //PipeBroadcastStrategy(int _topology=USE_HYPERCUBE, int _pipeSize=DEFAULT_PIPE);
   PipeBroadcastStrategy(int _topology, CkArrayID _aid, int _pipeSize=DEFAULT_PIPE);
   PipeBroadcastStrategy(CkGroupID _gid, int _topology=USE_HYPERCUBE, int _pipeSize=DEFAULT_PIPE);
   PipeBroadcastStrategy(CkMigrateMessage *){}
