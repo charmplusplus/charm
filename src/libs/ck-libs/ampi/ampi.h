@@ -442,9 +442,8 @@ int MPI_Type_get_contents(MPI_Datatype datatype, int max_integers, int max_addre
                           int max_datatypes, int array_of_integers[], MPI_Aint array_of_addresses[],
                           MPI_Datatype array_of_datatypes[]);
 
-//----------------------------ADDED by YAN---------------------------
-/*********************One sided communication routines *******************/			  
 
+/*********************One sided communication routines *******************/			  
 /*************************************************************
  *  MPI_Win : defined as the ID number(index) of this window object 
  *    This ensures that MPI_Win is universal and can be passed around
@@ -521,7 +520,6 @@ void*
 MPI_Alloc_mem(MPI_Aint size, MPI_Info info, void *baseptr);
 int 
 MPI_Free_mem(void *base);
-//----------------------------END OF ADDING by YAN---------------------------
 
 #include "ampiProjections.h"
 #ifdef __cplusplus
