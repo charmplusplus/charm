@@ -51,7 +51,8 @@ void printargs(void) {
 void tryPrint(void) {
   int nNodes, ignored;
   FEM_Get_node(&nNodes,&ignored);
-  if (nNodes<500) FEM_Print_partition();
+  if (nNodes<50) 
+    FEM_Print_partition();
 }
 
 extern "C" void
