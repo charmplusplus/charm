@@ -69,7 +69,8 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 
 //----------------------------------------------------------------------
 #include <assert.h>
-#if !defined(__KCC) && !defined(__sgi)              // Works for KCC linux
+#if !defined(__STDCPP__) && !defined(__KCC) && !defined(__sgi)
+                       // Works for KCC linux
 typedef int bool;
 #endif
 const int FALSE = 0;
