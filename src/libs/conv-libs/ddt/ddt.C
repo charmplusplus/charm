@@ -572,7 +572,7 @@ CkDDT_Vector::serialize(char* userdata, char* buffer, int num, int dir)
     for(int i = 0 ; i < count; i++) {
       bytesCopied += baseType->serialize(userdata, buffer, blockLength, dir);
       buffer += (blockLength*baseSize) ;
-      userdata += ((blockLength+strideLength)*baseExtent);
+      userdata += (strideLength*baseExtent);
     }
   }
   return bytesCopied ;
@@ -635,12 +635,11 @@ int
 CkDDT_HVector::serialize(char* userdata, char* buffer, int num, int dir)
 {
   int  bytesCopied = 0 ;
-
   for(;num;num--) {
     for(int i = 0 ; i < count; i++) {
       bytesCopied += baseType->serialize(userdata, buffer, blockLength, dir);
       buffer += (blockLength*baseSize) ;
-      userdata += ((blockLength+strideLength)*baseExtent);
+      userdata += strideLength;
     }
   }
   return bytesCopied ;
@@ -894,7 +893,7 @@ CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int dir)
       for(int j = 0 ; j < arrayBlockLength[i] ; j++) {
         bytesCopied += arrayDataType[i]->serialize(userdata, buffer, 1, dir);
         buffer += arrayDataType[i]->getSize();
-        userdata += arrayDataType[i]->getExtent();
+	userdata += arrayDataType[i]->getExtent();	
       }
     }
   }
