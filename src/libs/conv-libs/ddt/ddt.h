@@ -273,6 +273,7 @@ class DDT {
 
   public:
 
+  DDT(void*) {} // emulates migration constructor
   DDT()
   {
     max_types = 20;
