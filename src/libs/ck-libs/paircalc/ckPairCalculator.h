@@ -15,6 +15,7 @@
 // Optimize flags: 
 #define _PAIRCALC_FIRSTPHASE_STREAM_
 #define _PAIRCALC_USE_ZGEMM_
+#define _PAIRCALC_USE_DGEMM_
 // Flags not yet correct
 //#define _PAIRCALC_SECONDPHASE_LOADBAL_
 
@@ -135,12 +136,15 @@ class PairCalculator: public CBase_PairCalculator {
   }
  private:
   int numRecd, numExpected, grainSize, S, blkSize, N;
-  int kRightCount, kLeftCount, kUnits;
+  int kUnits;
+#ifdef NOGEMM
+  int kRightCount, kLeftCount;
   int kRightDoneCount, kLeftDoneCount;
   int *kLeftOffset;
   int *kRightOffset;
   int *kLeftMark;
   int *kRightMark;
+#endif
   int op1, op2;
   FuncType fn1, fn2;
   complex **inDataLeft, **inDataRight;

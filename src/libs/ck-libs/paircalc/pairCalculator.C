@@ -135,28 +135,31 @@ void startPairCalcLeft(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
     for (c = 0; c < blkSize; c++)
       for(s2 = 0; s2 < S; s2 += grainSize){
 
+#ifdef NOGEMM
 	if(s1 <= s2)
-#ifdef GEMM
-	  pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(n, ptr, myS, true, flag_dp);
+	  pairCalculatorProxy(x, s1, s2, c).calculatePairs(n, ptr, myS, true, flag_dp);	 
 #else
-	  pairCalculatorProxy(x, s1, s2, c).calculatePairs(n, ptr, myS, true, flag_dp);
+	if(s1 <= s2)
+	  pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(n, ptr, myS, true, flag_dp);
 #endif
 
+
+#ifdef NOGEMM
 	else
-#ifdef GEMM
-	  pairCalculatorProxy(x, s2, s1, c).calculatePairs_gemm(n, ptr, myS, false, flag_dp);
+	  pairCalculatorProxy(x, s2, s1, c).calculatePairs(n, ptr, myS, false, flag_dp);	 
 #else
-	  pairCalculatorProxy(x, s2, s1, c).calculatePairs(n, ptr, myS, false, flag_dp);
+	else
+	  pairCalculatorProxy(x, s2, s1, c).calculatePairs_gemm(n, ptr, myS, false, flag_dp);
 #endif
       }
   }
   else {
     for (c = 0; c < blkSize; c++)
       for(s2 = 0; s2 < S; s2 += grainSize){
-#ifdef GEMM
-	pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(n, ptr, myS, true, flag_dp);
-#else
+#ifdef NOGEMM
 	pairCalculatorProxy(x, s1, s2, c).calculatePairs(n, ptr, myS, true, flag_dp);
+#else
+	pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(n, ptr, myS, true, flag_dp);
 #endif
       }
   }
@@ -182,11 +185,10 @@ void startPairCalcRight(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ)
   s2 = (myS/grainSize) * grainSize;
   for (c = 0; c < blkSize; c++)
     for(s1 = 0; s1 < S; s1 += grainSize){
-#ifdef GEMM
-      pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(n, ptr, myS, false, flag_dp);
-
-#else
+#ifdef NOGEMM
       pairCalculatorProxy(x, s1, s2, c).calculatePairs(n, ptr, myS, false, flag_dp);
+#else
+      pairCalculatorProxy(x, s1, s2, c).calculatePairs_gemm(n, ptr, myS, false, flag_dp);
 #endif
     }
 }

@@ -30,7 +30,7 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
 
   kUnits=5;     // trial non streaming
 
-
+#ifdef NOGEMM  
   kLeftOffset= new int[numExpected];
   kRightOffset= new int[numExpected];
 
@@ -39,6 +39,7 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
 
   kLeftDoneCount = 0;
   kRightDoneCount = 0;
+#endif
 
   inDataLeft = new complex*[numExpected];
   for (int i = 0; i < numExpected; i++)
@@ -79,10 +80,12 @@ PairCalculator::pup(PUP::er &p)
   p|op2;
   p|fn1;
   p|fn2;
+#ifdef NOGEMM
   p|kRightCount;
   p|kLeftCount;
   p|kRightDoneCount;
   p|kLeftDoneCount;
+#endif
   p|kUnits;
   p|cb_aid;
   p|cb_ep;
@@ -90,14 +93,17 @@ PairCalculator::pup(PUP::er &p)
   p|symmetric;
   p|sumPartialCount;
   p|N;
-
+#ifdef NOGEMM
   int rdiff,ldiff;
+#endif
   if(p.isPacking())
     {//store offset calculation
+#ifdef NOGEMM      
       rdiff=kRightMark-kRightOffset; 
       ldiff=kLeftMark-kLeftOffset;
       p|rdiff;
       p|ldiff;
+#endif
     }
   if (p.isUnpacking()) {
 #ifdef _SPARSECONT_ 
@@ -115,12 +121,14 @@ PairCalculator::pup(PUP::er &p)
 	for (int i = 0; i < numExpected; i++)
 	  inDataRight[i] = new complex[N * blkSize];
     }
+#ifdef NOGEMM
     kRightOffset= new int[numExpected];
     kLeftOffset= new int[numExpected];
     p|rdiff;
     p|ldiff;
     kRightMark=kRightOffset+rdiff;
     kLeftMark=kLeftOffset+ldiff;
+#endif
   }
   if(N>0)
     for (int i = 0; i < numExpected; i++)
@@ -130,9 +138,10 @@ PairCalculator::pup(PUP::er &p)
       for (int i = 0; i < numExpected; i++)
 	p(inDataRight[i], N * blkSize);
   }
+#ifdef NOGEMM  
   p(kRightOffset, numExpected);
   p(kLeftOffset, numExpected);
-
+#endif
   //p(cb);      // PUP the callback function: ???
               // How about sparseCont reducer???
 
@@ -159,10 +168,12 @@ PairCalculator::~PairCalculator()
 
   if(newData!=NULL)
     delete [] newData;
+#ifdef NOGEMM
   if(kRightOffset!=NULL)
     delete [] kRightOffset;
   if(kLeftOffset!=NULL)
     delete [] kLeftOffset;
+#endif
 }
 
 
@@ -174,95 +185,64 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
 #endif
 
   numRecd++;   // increment the number of received counts
-  int offset = -1;
   complex **inData;
+  int offset = -1;
   if (fromRow) {   // This could be the symmetric diagonal case
     offset = sender - thisIndex.x;
     inData = inDataLeft;
-    kLeftOffset[kLeftDoneCount + kLeftCount]=offset;
-    kLeftCount++;
   }
   else {
     offset = sender - thisIndex.y;
     inData = inDataRight;
-    kRightOffset[kRightDoneCount + kRightCount]=offset;
-    kRightCount++;
   }
-
-  /** The new way is to append the new data
-   * Recording its offset in the offset array
-   * NOTE: may need to count from 1 for fortran scatter joy
-   * Once we have accumulated kUnits new rows (or have all)
-   * we zgemm it.
-   *
-   * Scheme 1: Keep each partition of kUnit rows as its own matrix
-   *           multiply the new matrix by all previous partitions each time.
-   *           Resulting in a new kUnits X kUnits solution matrix for each.
-   *
-   * Scheme 2: each time we have kUnits of new data
-   *    We can consider ourselves to have a sGrainsize X kUnits matrix
-   *    at the end of our inData.
-   *    We can then take inData up to the new mark and multiply it by
-   *    the new inData for a (kUnixs*p X sGrainSize) X ( sGrainsize X kUnits)
-   *     
-   * Scheme 3: Collect everything and do it in one big zgemm.
-   * Scheme 3 is implemented below.
-   */
-  /* 
-     NOTE: Assumes that data chunk of the same plane across all states are of the same size 
-  */
   
   if (inData[0]==NULL) 
-  { // now that we know N we can allocate contiguous space
-    N = size; // N is init here with the size of the data chunk. 
-    inData[0] = new complex[numExpected*N];
-    for(int i=1;i<numExpected;i++)
-      inData[i] = inData[i-1] + N;
-  }
+    { // now that we know N we can allocate contiguous space
+      N = size; // N is init here with the size of the data chunk. 
+      inData[0] = new complex[numExpected*N];
+      for(int i=1;i<numExpected;i++)
+	inData[i] = inData[i-1] + N;
+    }
   CkAssert(N==size);
+  /* 
+   *  NOTE: For this to work the data chunks of the same plane across
+   *  all states must be of the same size
+   */
+
+  // copy the input into our matrix
   memcpy(inData[offset], points, size * sizeof(complex));
-  
-  // In scheme 3 we'll have everything collected
+
+  /*
+   * Once we have accumulated all rows  we gemm it.
+   * (numExpected X N) X (N X numExpected) = (numExpected X numExpected) 
+   */
+  /* To make this work, we transpose the first matrix (A). 
+     In C++ it appears to be: 
+   * (ydima X ydimb) = (ydima X xdima) X (xdimb X ydimb)
+   * Which would be wrong.
+   * We're using fortran BLAS, so the actual multiplication is: 
+   * (xdima X xdimb) = (xdima X ydima) X (ydimb X xdimb)
+   *
+   * Since xdima==xdimb==numExpected==grainSize this gives us the
+   * solution matrix we want in one step.
+   */
 
   if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
     char transform='N';
+    int doubleN=2*N;
     char transformT='T';
-    int incx=2;
-    int incy=1;
-#ifdef _SPARSECONT_  
     int m_in=numExpected;
     int n_in=numExpected;
-    int k_in=N;
-    int matrixSize=numExpected*numExpected;
-#else
-    int m_in=numExpected;
-    int n_in=numExpected;
-    int k_in=N;
-    int matrixSize=numExpected*numExpected;
-    // This distinction is left here because it was in the original pairCalc.
-    // But really I fail to see how these parameters are dependant on the _SPARSECONT_ flag.
-    //  
-    /*  int m_in=S;
-	int n_in=N;
-	int k_in=S;
-	int matrixSize=S*S;
-    */
-#endif
-    // so this should be a (numExpected X N) X (N X numExpected) = (numExpected X numExpected) operation
-    // Not a (N X numExpected) X (numExpected X N) = (N X N) operation
-    int lda=N;   //leading dimension A
-    int ldb=N;   //leading dimension B
+    int k_in=doubleN;
+    int lda=doubleN;   //leading dimension A
+    int ldb=doubleN;   //leading dimension B
     int ldc=numExpected;   //leading dimension C
 
-
-#ifdef _PAIRCALC_USE_DGEMM_
-    lda*=2;
-    ldb*=2;
-    k_in*=2;
     double alpha=double(1.0);//multiplicative identity 
-    double beta=double(0.0);
+    double beta=double(0.0); // C is unset
+
     double *ldata= reinterpret_cast <double *> (inDataLeft[0]);
-    // if we have everthing blast it in one big gemm
+
     if( numRecd == numExpected * 2) 
       {
 	double *rdata= reinterpret_cast <double *> (inDataRight[0]); 
@@ -272,32 +252,7 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
       {
 	DGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, ldata, &lda, ldata, &ldb, &beta, outData, &ldc);
       }
-#else
-    complex **outComplex= new complex*[numExpected];
-    outComplex[0] = new complex[matrixSize];
-    complex alpha(1.0,0.0);//multiplicative identity 
-    complex beta(0.0,0.0);
-    // if we have everthing blast it in one big gemm
-    if( numRecd == numExpected * 2)
-      {
-	ZGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, &(inDataLeft[0][0]), &lda, &(inDataRight[0][0]), &ldb, &beta, &(outComplex[0][0]), &ldc);
-      }
-    else if (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)
-      {
-	ZGEMM(&transformT, &transform, &m_in, &n_in, &k_in, &alpha, &(inDataLeft[0][0]), &lda, &(inDataLeft[0][0]), &ldb, &beta, &(outComplex[0][0]), &ldc);
-
-      }
-    // now crunch out the imaginary
-    double *inmatrix= reinterpret_cast <double *> (outComplex[0]);
-    DCOPY(&matrixSize, inmatrix, &incx, outData, &incy);
-    delete [] outComplex[0];
-    delete [] outComplex;
-#endif
     numRecd = 0;
-    kLeftCount=0;
-    kRightCount=0;
-    kLeftDoneCount = 0;
-    kRightDoneCount = 0;
 
     if (flag_dp) {
       if(thisIndex.w != 0) {   // Adjusting for double packing of incoming data
@@ -315,6 +270,7 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
     r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), outData);
     r.contribute(this, sparse_sum_double);
 #else
+
 #if !CONVERSE_VERSION_ELAN
     contribute(S * S *sizeof(double), outData, CkReduction::sum_double);
 #else
@@ -322,8 +278,9 @@ PairCalculator::calculatePairs_gemm(int size, complex *points, int sender, bool 
     CProxy_PairCalcReducer pairCalcReducerProxy(reducer_id); 
     pairCalcReducerProxy.ckLocalBranch()->acceptContribute(S * S, outData, 
 							   cb, !symmetric, symmetric);
-#endif
-#endif
+#endif //!CONVERSE_VERSION_ELAN
+
+#endif //_SPARSECONT_
   }
 
 }
@@ -335,6 +292,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
   CkPrintf("     pairCalc[%d %d %d %d] got from [%d %d] with size {%d}, symm=%d, from=%d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z,  thisIndex.w, sender, size, symmetric, fromRow);
 #endif
 
+#ifdef NOGEMM
   numRecd++;   // increment the number of received counts
 
   int offset = -1;
@@ -355,16 +313,6 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     kRightCount++;
 #endif
   }
-  /*
-  if(symmetric && thisIndex.x == thisIndex.y){
-    inData = inDataLeft;
-#ifdef _PAIRCALC_FIRSTPHASE_STREAM_
-    if(!fromRow)  CkAbort("Wrong call: fromRow flag should only be true here! \n");
-    kLeftOffset[kLeftDoneCount + kLeftCount]=offset;
-    kLeftCount++;
-#endif
-  }
-  */
 
   N = size; // N is init here with the size of the data chunk. 
             // Assuming that data chunk of the same plane across all states are of the same size
@@ -582,6 +530,8 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
   }
 #endif
 #endif
+
+#endif //NOGEMM
 }
 
 void
@@ -612,55 +562,7 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   //ASSUMING TMATRIX IS REAL (LOSS OF GENERALITY)
   register double m=0;  
 
-#ifdef _PAIRCALC_SECONDPHASE_BLOCKING_  
-  // Obsolete Opt: substitute with ZGEMM 
-  // Note: This is not correct, need to be fixed or removed!!!
-  memset(mynewData, 0, grainSize*N*sizeof(complex));
-  int size1 = 0;
-  for(size1 = 0; size1 + PARTITION_SIZE < N; size1 += PARTITION_SIZE) {
-    for (int i = 0; i < grainSize; i++) {
-      int iSindex=i*S+index;
-      int iN=i*N;
-      complex *newiNdata=&mynewData[iN];
-      for (int j = 0; j < grainSize; j++){ 
-	  m = matrix1[iSindex + j];
-	  for (int p = size1; p < size1+PARTITION_SIZE; p++)
-	    newiNdata[p] += inDataLeft[j][p] * m;
-      }
-      if(!unitcoef){
-	  for (int j = 0; j < grainSize; j++){ 
-	    m = matrix2[iSindex + j];
-	    for (int p = size1; p < size1+PARTITION_SIZE; p++)
-		newiNdata[p] += inDataRight[j][p] * m;
-	  }
-      }
-    }
-  }
-  if(size1 > N) {
-    int start_offset = N-size1;
-    for (int i = 0; i < grainSize; i++) {
-      int iSindex=i*S+index;
-      int iN=i*N;
-      complex *newiNdata=&mynewData[iN];
-      for (int j = 0; j < grainSize; j++){ 
-	  m = matrix1[iSindex + j];
-	  for (int p = start_offset; p < N; p++)
-	    newiNdata[p] += inDataLeft[j][p] * m;
-      }
-      if(!unitcoef){
-	  for (int j = 0; j < grainSize; j++){ 
-	    m = matrix2[iSindex + j];
-	    for (int p = start_offset; p < N; p++)
-		newiNdata[p] += inDataRight[j][p] * m;
-	  }
-      }
-    }
-  }
-#else
 
-  // replace with zgemm mynewData=inDataLeft * matrix
-  // convert matrix to complex
-#ifdef _PAIRCALC_USE_ZGEMM_
   int m_in=grainSize;
   int n_in=N;
   int k_in=grainSize;
@@ -686,8 +588,10 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   for (int i = 0; i < grainSize; i++) {
     for (int j = 0; j < grainSize; j++){ 
       m = matrix1[index + j + i*S];
+#ifdef _PAIRCALC_DEBUG_
       if(m!=amatrix[i*grainSize+j].re){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n",
-      						m, amatrix[i*grainSize+j].re);}
+       						m, amatrix[i*grainSize+j].re);}
+#endif _PAIRCALC_DEBUG_
     }
   }
 
@@ -707,8 +611,10 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
   for (int i = 0; i < grainSize; i++) {
     for (int j = 0; j < grainSize; j++){ 
       m = matrix2[index + j + i*S];
+#ifdef _PAIRCALC_DEBUG_
       if(m!=amatrix[i*grainSize+j].re){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n",
 						m, amatrix[i*grainSize+j]);}
+#endif
     }
   }
 
@@ -716,58 +622,8 @@ PairCalculator::acceptResult(int size, double *matrix1, double *matrix2)
         &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
   }
 
-  /*
-  if(symmetric && thisIndex.x != thisIndex.y){
-    index = thisIndex.x*S + thisIndex.y;
-    localMatrix=matrix1+index;
-    for(int i=0;i<grainSize;i++){
-      localMatrix=matrix1+index+i*S;
-      outMatrix   = (double*)(amatrix+i*grainSize);
-      DCOPY(&grainSize,localMatrix,&incx,outMatrix,&incy);
-    }
-    ZGEMM(&transform, &transform, &n_in, &m_in, &k_in, &alpha, &(inDataRight[0][0]), &n_in, 
-	  &(amatrix[0]), &k_in, &beta, &(othernewData[0]), &n_in);
-  }
-  */
-
   delete [] amatrix;
 
-#else
-
-  complex *leftptr = inDataLeft[0];
-  complex *rightptr = inDataRight[0];
-
-  // Original calculation : without optimize
-  memset(mynewData, 0, N*grainSize*sizeof(complex));
-  index = thisIndex.y*S + thisIndex.x;
-  for (int i = 0; i < grainSize; i++) {
-    for (int j = 0; j < grainSize; j++){ 
-      m = matrix1[index + j + i*S];
-      for (int p = 0; p < N; p++){
-	mynewData[p + i*N] += leftptr[j*N + p] * m;
-	if(!unitcoef){
-	  m = matrix2[index + j + i*S];
-	  for (int p = 0; p < N; p++){
-	    mynewData[p + i*N] += rightptr[j*N + p] * m;
-	  }
-      }
-    }
-  }
-  index = thisIndex.x*S + thisIndex.y;
-  /*
-  if(symmetric && thisIndex.x != thisIndex.y){
-      memset(othernewData, 0, N*grainSize*sizeof(complex));
-      for (int i = 0; i < grainSize; i++) {
-	  for (int j = 0; j < grainSize; j++){ 
-	      m = matrix1[index + j + i*S];
-	      for (int p = 0; p < N; p++)
-		  othernewData[p + i*N] += rightptr[j*N + p] * m;
-	  }
-      }
-  }
-  */
-#endif
-#endif
 
   /* revise this to partition the data into S/M objects 
    * add new message and entry method for sumPartial result
