@@ -112,7 +112,7 @@ static int maxMsgSize = 0;
  *
  *****************************************************************************/
 typedef struct {
-  
+char none;  
 } CmiIdleState;
 
 static CmiIdleState *CmiNotifyGetState(void) { return NULL; }
