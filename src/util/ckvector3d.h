@@ -127,7 +127,7 @@ public:
 		if (max.y<p.y) max.y=p.y;
 		if (max.z<p.z) max.z=p.z;
 	}
-	void union(const CkBbox3d &b) {
+	void add(const CkBbox3d &b) {
 		add(b.min); add(b.max);
 	}
 };
