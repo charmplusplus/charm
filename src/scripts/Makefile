@@ -220,8 +220,9 @@ dirs+sources:
 #
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-graph.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
-TRACELIBS=$(L)/libtrace-projections.a $(L)/libtrace-summary.a $(L)/libtrace-counter.a \
-	$(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a
+TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a \
+          $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
+	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
    $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o $(L)/libmemory-isomalloc.o
 
@@ -617,6 +618,10 @@ LIBTRACE_COUNT=trace-counter.o trace-common.o
 $(L)/libtrace-counter.a: $(LIBTRACE_COUNT)
 	$(CHARMC) -o $@ $(LIBTRACE_COUNT)
 
+LIBTRACE_BG=trace-bluegene.o trace-common.o
+$(L)/libtrace-bluegene.a:$(LIBTRACE_BG)
+	$(CHARMC) -o $@ $(LIBTRACE_BG)
+
 LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-common.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o ampiProjections.o
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
@@ -646,6 +651,9 @@ trace-summary.o:trace-summary.C trace-summary.h trace-common.h trace-summaryBOC.
 
 trace-counter.o:trace-counter.C trace-counter.h trace-common.h $(CKHEADERS)
 	$(CHARMC) -o trace-counter.o trace-counter.C
+
+trace-bluegene.o: trace-bluegene.C trace-bluegene.h $(CKHEADERS) blue_timing.h
+	$(CHARMC) -o trace-bluegene.o trace-bluegene.C
 
 traceCore.o: traceCore.C $(CVHEADERS)
 	$(CHARMC) traceCore.C
