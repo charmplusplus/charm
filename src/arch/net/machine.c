@@ -2096,6 +2096,7 @@ extern void CthInit(char **argv);
 extern void ConverseCommonInit(char **);
 
 static char     **Cmi_argv;
+static char     **Cmi_argvcopy;
 static CmiStartFn Cmi_startfn;   /* The start function */
 static int        Cmi_usrsched;  /* Continue after start function finishes? */
 
@@ -2111,7 +2112,12 @@ static void ConverseRunPE(int everReturn)
   _MEMCHECK(CpvAccess(internal_printf_buffer));
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
-  CmiMyArgv=CmiCopyArgs(Cmi_argv);
+
+  /* all non 0 pe use the copied one while pe 0 will modify the actual argv */
+  if (CmiMyPe())
+    CmiMyArgv = CmiCopyArgs(Cmi_argvcopy);
+  else
+    CmiMyArgv = Cmi_argv;
   CthInit(CmiMyArgv);
 #if MACHINE_DEBUG_LOG
   {
@@ -2239,6 +2245,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   _main(argc,argv);
 #endif
 #endif
+  Cmi_argvcopy = CmiCopyArgs(argv);
   Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usc;
   Cmi_netpoll = 0;
 #if CMK_NETPOLL
