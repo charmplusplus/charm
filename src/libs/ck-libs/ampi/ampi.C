@@ -450,15 +450,15 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
 }
 
 void ampiParent::checkpoint(int len, char dname[]){
-  char str[256];
-  sprintf(str, "%s/%d.cpt",dname, thisIndex);
-  ckCheckpoint(str);
+//  char str[256];
+//  sprintf(str, "%s/%d.cpt",dname, thisIndex);
+//  CkCheckpoint(str);
 }
 
 void ampiParent::restart(int len, char dname[]){
-  char str[256];
-  sprintf(str, "%s/%d.cpt",dname, thisIndex);
-  ckRestart(str);
+//  char str[256];
+//  sprintf(str, "%s/%d.cpt",dname, thisIndex);
+//  ckRestart(str);
 //CkPrintf("[%d]ampiParent::restart this=%p\n",thisIndex,this);
 }
 
@@ -554,26 +554,33 @@ void ampi::stopthread(){
 
 void ampi::checkpoint(int len, char dname[])
 {
+/*
   char str[256];
   sprintf(str, "%s/%d.cpt",dname,thisIndex);
   ckCheckpoint(str);
+*/
 }
 
 void ampi::checkpointthread(int len, char dname[]){
+/*
   char str[256];
   sprintf(str, "%s/thread%d.cpt", dname, thisIndex);
   thread->ckCheckpoint(str);
   thread->resume();
+*/
 }
 
 void ampi::restart(int len, char dname[]){
+/*
   char str[256];
   sprintf(str, "%s/%d.cpt",dname,thisIndex);
   ckRestart(str);
 //CkPrintf("[%d]ampi::restart this=%p\n",thisIndex,this);
+*/
 }
 
 void ampi::restartthread(int len, char dname[]){
+/*
 //CkPrintf("[%d]ampi::restartthread\n",thisIndex);
   char str[256];
   sprintf(str, "%s/thread%d.cpt", dname, thisIndex);
@@ -582,6 +589,7 @@ void ampi::restartthread(int len, char dname[]){
   thread->ckRestart(str);
   thread->start();
 //CkPrintf("[%d]ampi::restartthread end\n",thisIndex);
+*/
 }
 
 
