@@ -185,6 +185,11 @@ char *pathfix(char *path, pathfixlist fixes)
  *
  ****************************************************************************/
 
+int is_quote(char c)
+{
+  return (c=='\'' || c == '"');
+}
+
 void zap_newline(char *s)
 {
   char *p;
@@ -192,10 +197,15 @@ void zap_newline(char *s)
   if (*p == '\n') *p = '\0';
 }
 
+/* get substring from lo to hi, remove quote chars */
 char *substr(char *lo, char *hi)
 {
-  int len = hi-lo;
-  char *res = (char *)malloc(1+len);
+  int len;
+  char *res;
+  if (is_quote(*lo)) lo++;
+  if (is_quote(*(hi-1))) hi--;
+  len = hi-lo;
+  res = (char *)malloc(1+len);
   memcpy(res, lo, len);
   res[len]=0;
   return res;
@@ -216,10 +226,21 @@ char *skipblanks(char *p)
   return p;
 }
 
-/* advance pointer over nonblank characters */
+/* advance pointer over nonblank characters and a quoted string */
 char *skipstuff(char *p)
 {
-  while ((*p)&&(*p!=' ')&&(*p!='\t')) p++;
+  char quote = 0;
+  if (*p && (*p=='\'' || *p=='"')) { quote=*p; p++; }
+  if (quote != 0) {
+    while (*p&&*p!=quote) p++;
+    if (*p!=quote) {
+      fprintf(stderr, "ERROR> Unmatched quote in nodelist file.\n");
+      exit(1);
+    }
+    p++;
+  }
+  else
+    while ((*p)&&(*p!=' ')&&(*p!='\t')) p++;
   return p;
 }
 
@@ -1828,14 +1849,20 @@ int rsh_fork(int nodeno,const char *startScript)
 {
   char *rshargv[6];
   int pid;
-  
-  rshargv[0]=nodetab_shell(nodeno);
-  rshargv[1]=nodetab_name(nodeno);
-  rshargv[2]="-l";
-  rshargv[3]=nodetab_login(nodeno);
-  rshargv[4]="/bin/sh -f";
-  rshargv[5]=0;
-  if (arg_verbose) printf("Charmrun> Starting %s %s -l %s %s\n",nodetab_shell(nodeno), nodetab_name(nodeno),nodetab_login(nodeno), rshargv[4]);
+  int num=0;
+  char *s, *e;
+
+  s=nodetab_shell(nodeno); e=skipstuff(s);
+  while (*s) {
+    rshargv[num++]=substr(s, e);
+    s = skipblanks(e); e = skipstuff(s);
+  }
+  rshargv[num++]=nodetab_name(nodeno);
+  rshargv[num++]="-l";
+  rshargv[num++]=nodetab_login(nodeno);
+  rshargv[num++]="/bin/sh -f";
+  rshargv[num++]=0;
+  if (arg_verbose) printf("Charmrun> Starting %s %s -l %s %s\n",nodetab_shell(nodeno), nodetab_name(nodeno),nodetab_login(nodeno), rshargv[num-2]);
   
   pid = fork();
   if (pid < 0) 
