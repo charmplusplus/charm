@@ -761,9 +761,9 @@ static void CommunicationInterrupt(int ignored)
   {
     /*Make sure any malloc's we do in here are NOT migratable:*/
     CmiIsomallocBlockList *oldList=CmiIsomallocBlockListActivate(NULL);
-//    Cmi_myrank=1;
+/*    Cmi_myrank=1; */
     CommunicationServerThread(0);
-//    Cmi_myrank=0;
+/*    Cmi_myrank=0; */
     CmiIsomallocBlockListActivate(oldList);
   }
   MACHSTATE(2,"--END SIGIO--")
