@@ -54,6 +54,9 @@ then
 		ppn='#PBS -l nodes='$pes':ppn=1'
 		extra='-machinefile $PBS_NODEFILE'
 		;;
+	co-login*.ncsa.uiuc.edu)
+		mem='#PBS -l mem=500mb'
+		;;
 	esac
         cat > $script << EOF
 #!/bin/sh
@@ -67,6 +70,8 @@ $ppn
 #
 # This determines the wall-clock time limit (here 5 minutes):
 #PBS -l walltime=5:00
+#
+$mem
 #
 # Queue name (see info about other queues in web documentation)
 #PBS -q $PBS_QUEUE
@@ -106,7 +111,8 @@ EOF
 # When job hangs, result file does not exist
 			test -f $result && status=`cat $result` || status=1
 			cat $output
-			rm -f $script $result $output
+			rm -f $result
+			test -f $status && rm -f $script $output
 			exit $status
                 fi
 # The job is still queued or running-- print status and wait
