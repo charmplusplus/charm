@@ -6,6 +6,7 @@
  * - CmiNotifyIdle()
  * - DeliverViaNetwork()
  * - CommunicationServer()
+ * - CmiMachineExit()
 
   written by 
   Gengbin Zheng, gzheng@uiuc.edu  4/22/2001
@@ -40,6 +41,21 @@
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP 0
 
 static gm_alarm_t gmalarm;
+
+/******************************************************************************
+ *
+ *  GM layer network statistics collection
+ *
+ *****************************************************************************/
+
+#define GM_STATS		0
+
+#if GM_STATS
+static FILE *gmf;			/* one file per processor */
+static int *gm_stats;			/* send count for each size */
+static int  possible_streamed = 0;	/* possible streaming counts */
+static int  defrag = 0;		/* number of defragment */
+#endif
 
 /******************************************************************************
  *
@@ -170,9 +186,9 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
   e = gm_blocking_receive_no_spin(gmport);
   MACHSTATE(3,"} receive returned");
 #else
-  MACHSTATE(3,"NonBlocking on receive {")
+  MACHSTATE(3,"CmiNotifyStillIdle NonBlocking on receive {")
   e = gm_receive(gmport);
-  MACHSTATE(3,"} nonblocking receive returned");
+  MACHSTATE(3,"} CmiNotifyStillIdle nonblocking receive returned");
 #endif
 
 #if SLEEP_USING_ALARM /*Cancel the alarm*/
@@ -246,10 +262,11 @@ int CheckSocketsReady(int withDelayMs)
  *
  ***********************************************************************/
 
-static void ServiceCharmrun()
+/* always called from interrupt */
+static void ServiceCharmrun_nolock()
 {
   int again = 1;
-  CmiCommLock();
+  MACHSTATE(2,"ServiceCharmrun_nolock begin {")
   while (again)
   {
   again = 0;
@@ -257,34 +274,42 @@ static void ServiceCharmrun()
   if (ctrlskt_ready_read) { ctrl_getone(); again=1; }
   if (CmiStdoutNeedsService()) { CmiStdoutService(); }
   }
-  CmiCommUnlock();
+  MACHSTATE(2,"} ServiceCharmrun_nolock end")
 }
 
 static void CommunicationServer_nolock(int withDelayMs) {
   gm_recv_event_t *e;
 
+  MACHSTATE(2,"CommunicationServer_nolock start {")
   while (1) {
     MACHSTATE(3,"Non-blocking receive {")
     e = gm_receive(gmport);
     MACHSTATE(3,"} Non-blocking receive")
     if (!processEvent(e)) break;
   }
+  MACHSTATE(2,"}CommunicationServer_nolock end")
 }
 
 /*
 0: from smp thread
 1: from interrupt
 2: from worker thread
+   Note in netpoll mode, charmrun service is only performed in interrupt, 
+ pingCharmrun is from sig alarm, so it is lock free 
 */
 static void CommunicationServer(int withDelayMs, int where)
 {
   /* standalone mode */
   if (Cmi_charmrun_pid == 0 && gmport == NULL) return;
 
-  ServiceCharmrun();
-  if (where == 1) return;
+  MACHSTATE2(2,"CommunicationServer(%d) from %d {",withDelayMs, where)
 
-  MACHSTATE1(2,"CommunicationServer(%d)",withDelayMs)
+  if (where == 1) {
+    /* don't service charmrun if converse exits, this fixed a hang bug */
+    if (!machine_initiated_shutdown) ServiceCharmrun_nolock();
+    return;
+  }
+
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
 
   CmiCommLock();
@@ -353,6 +378,7 @@ static void processMessage(char *msg, int len)
   else CmiPrintf("message ignored2!\n");
 }
 
+/* return 1 - recv'ed  0 - no msg */
 static int processEvent(gm_recv_event_t *e)
 {
   int size, len;
@@ -374,7 +400,7 @@ static int processEvent(gm_recv_event_t *e)
     case GM_ALARM_EVENT:
       status = 0;
     default:
-      MACHSTATE1(3,"Unrecognized GM event %d",evt)
+      MACHSTATE1(3,"Unrecognized GM event %d", gm_ntohc(e->recv.type))
       gm_unknown(gmport, e);
   }
   return status;
@@ -456,10 +482,22 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
   send_progress();
 }
 
-
 static void send_progress()
 {
   PendingMsg  out;
+
+#if GM_STATS
+  /* if we streaming, count how many message we possibly can combine */
+  PendingMsg  curout;
+  curout = peek_sending();
+  if (!curout) return;
+  out = curout->next;
+  while (out) {
+    if (out->mach_id == curout->mach_id && out->dataport == curout->dataport)
+       possible_streamed ++;
+    out = out->next;
+  }
+#endif
 
   while (1)
   {
@@ -468,7 +506,11 @@ static void send_progress()
       gm_send_with_callback(gmport, out->msg, out->size, out->length, 
                             GM_LOW_PRIORITY, out->mach_id, out->dataport, 
                             send_callback, out);
+       /* dequeue out, but not free it, used at callback */
       dequeue_sending();
+#if GM_STATS
+      gm_stats[out->size] ++;
+#endif
     }
     else break;
   }
@@ -529,6 +571,9 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
  
   size = ogm->size - DGRAM_HEADER_SIZE;
   data = ogm->data + DGRAM_HEADER_SIZE;
+#if GM_STATS
+  if (size > Cmi_dgram_max_data) defrag ++;
+#endif
   while (size > Cmi_dgram_max_data) {
     EnqueueOutgoingDgram(ogm, data, Cmi_dgram_max_data, node, rank);
     data += Cmi_dgram_max_data;
@@ -576,7 +621,7 @@ static void recvBarrierMessage()
       case GM_NO_RECV_EVENT:
         continue ;
       default:
-        MACHSTATE1(3,"Unrecognized GM event %d",evt)
+        MACHSTATE1(3,"Unrecognized GM event %d", gm_ntohc(e->recv.type))
         gm_unknown(gmport, e);
     }
   }
@@ -654,11 +699,13 @@ void CmiBarrierZero()
  *
  ***********************************************************************/
 
+static int maxsize;
+
 void CmiMachineInit(char **argv)
 {
   int dataport_max=16; /*number of largest GM port to check*/
   gm_status_t status;
-  int device, i, j, maxsize;
+  int device, i, j;
   char *buf;
   int mlen;
 
@@ -716,8 +763,13 @@ void CmiMachineInit(char **argv)
   maxsize = gm_min_size_for_length(4096);
   Cmi_dgram_max_data = 4096 - DGRAM_HEADER_SIZE;
 */
-  maxsize = 16;
+  maxsize = 18;
   CmiGetArgIntDesc(argv,"+gm_maxsize",&maxsize,"maximum packet size in rank (2^maxsize)");
+
+#if GM_STATS
+  gm_stats = (int*)malloc(maxsize * sizeof(int));
+  for (i=0; i<maxsize; i++) gm_stats[i] = 0;
+#endif
 
   for (i=1; i<maxsize; i++) {
     int len = gm_max_length_for_size(i);
@@ -726,7 +778,7 @@ void CmiMachineInit(char **argv)
     maxMsgSize = len;
 
     if (i<5) num = 0;
-    else if (i<9)  num = 4;
+    else if (i<7)  num = 4;
     else if (i<17)  num = 20;
     else if (i>22) num = 1;
     for (j=0; j<num; j++) {
@@ -808,6 +860,23 @@ static char *getErrorMsg(gm_status_t status)
     errmsg = ""; break;
   }
   return errmsg;
+}
+
+void CmiMachineExit()
+{
+#if GM_STATS
+  int i;
+  int mype;
+  char fname[128];
+  sprintf(fname, "gm-stats.%d", CmiMyPe());
+  gmf = fopen(fname, "w");
+  mype = CmiMyPe();
+  for (i=5; i<maxsize; i++)  {
+    fprintf(gmf, "[%d] size:%d count:%d\n", mype, i, gm_stats[i]);
+  }
+  fprintf(gmf, "[%d] possible streaming: %d  defrag: %d \n", mype, possible_streamed, defrag);
+  fclose(gmf);
+#endif
 }
 
 /*@}*/

@@ -769,3 +769,6 @@ void CmiMachineInit(char **argv)
 {
 }
 
+void CmiMachineExit()
+{
+}

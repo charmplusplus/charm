@@ -572,6 +572,9 @@ void CmiMachineInit(char **argv)
 #endif
 }
 
+void CmiMachineExit()
+{
+}
 
 static void open_tcp_sockets()
 {

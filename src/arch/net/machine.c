@@ -793,7 +793,7 @@ static void CommunicationInterrupt(int ignored)
     MACHSTATE(5,"--SKIPPING SIGIO--");
     return;
   }
-  MACHSTATE(2,"--BEGIN SIGIO--")
+  MACHSTATE1(2,"--BEGIN SIGIO comm_flag: %d--", comm_flag)
   {
     /*Make sure any malloc's we do in here are NOT migratable:*/
     CmiIsomallocBlockList *oldList=CmiIsomallocBlockListActivate(NULL);
@@ -956,12 +956,16 @@ static void ctrl_sendone_locking(const char *type,
 
 static double Cmi_check_last;
 
+/* if charmrun dies, we finish */
 static void pingCharmrun(void *ignored) 
 {
   double clock=GetClock();
   if (clock > Cmi_check_last + Cmi_check_delay) {
-    MACHSTATE(1,"CommunicationsClock pinging charmrun");       
+    MACHSTATE2(2,"CommunicationsClock pinging charmrun comm_flag=%d Cmi_charmrun_fd_sendflag=%d", comm_flag, Cmi_charmrun_fd_sendflag);
     Cmi_check_last = clock; 
+#if CMK_USE_GM
+    if (!Cmi_netpoll)  /* GM netpoll, charmrun service is done in interrupt */
+#endif
     CmiCommLockOrElse(return;); /*Already busy doing communication*/
     if (Cmi_charmrun_fd_sendflag) return; /*Busy talking to charmrun*/
     CmiCommLock();
@@ -969,6 +973,9 @@ static void pingCharmrun(void *ignored)
     CmiCommUnlock();
   }
 #if 1
+#if CMK_USE_GM
+  if (!Cmi_netpoll)
+#endif
   CmiStdoutFlush(); /*Make sure stdout buffer hasn't filled up*/
 #endif
 }
@@ -1008,8 +1015,10 @@ static void ctrl_getone(void)
   MACHSTATE(2,"ctrl_getone")
   MACHLOCK_ASSERT(comm_flag,"ctrl_getone")
   ChMessage_recv(Cmi_charmrun_fd,&msg);
+  MACHSTATE1(2,"ctrl_getone recv one '%s'", msg.header.type)
 
   if (strcmp(msg.header.type,"die")==0) {
+    MACHSTATE(2,"ctrl_getone bye bye")
     fprintf(stderr,"aborting: %s\n",msg.data);
     log_done();
     ConverseCommonExit();
@@ -1049,6 +1058,7 @@ static void ctrl_getone(void)
     machine_exit(1);
   }
   
+  MACHSTATE(2,"ctrl_getone done")
   ChMessage_free(&msg);
 }
 
@@ -2015,6 +2025,7 @@ void ConverseExit(void)
     if(Cmi_print_stats)
       printNetStatistics();
     log_done();
+    CmiMachineExit();
     CmiStdoutFlush();
     ConverseCommonExit();
     if (Cmi_charmrun_fd==-1) exit(0); /*Standalone version-- just leave*/
