@@ -4,7 +4,12 @@ extern module LBDatabase;
 
 readonly CkGroupID loadbalancer;
 
-message CLBStatsMsg;
+message CLBStatsMsg{
+ LDObjData  objData[];
+ LDCommData commData[];
+ char       avail_vector[];
+};
+
 message CLBMigrateMsg;
 
 group CentralLB {

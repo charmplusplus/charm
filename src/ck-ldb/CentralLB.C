@@ -108,11 +108,10 @@ void CentralLB::ProcessAtSync()
     step(),start_lb_time, cur_ld_balancer);
   }
   // Send stats
-  int sizes[2];
-  const int osz = sizes[0] = theLbdb->GetObjDataSz();
-  const int csz = sizes[1] = theLbdb->GetCommDataSz();
+  const int osz = theLbdb->GetObjDataSz();
+  const int csz = theLbdb->GetCommDataSz();
   
-  CLBStatsMsg* msg = new(sizes,2) CLBStatsMsg;
+  CLBStatsMsg* msg = new(osz, csz, CkNumPes(), 0) CLBStatsMsg;
   msg->from_pe = CkMyPe();
   // msg->serial = rand();
   msg->serial = CrnRand();
@@ -330,52 +329,6 @@ CLBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
   return msg;
 }
 
-void* CLBStatsMsg::alloc(int msgnum, size_t size, int* array, int priobits)
-{
-  int totalsize = size + array[0] * sizeof(LDObjData) 
-    + array[1] * sizeof(LDCommData) + CkNumPes() * sizeof(char);
-
-  CLBStatsMsg* ret =
-    (CLBStatsMsg*)(CkAllocMsg(msgnum,totalsize,priobits));
-
-  ret->objData = (LDObjData*)(((char*)(ret) + size));
-  ret->commData = (LDCommData*)(ret->objData + array[0]);
-
-  ret->avail_vector = (char *)(ret->commData + array[1]);
-
-  return (void*)(ret);
-}
-
-void* CLBStatsMsg::pack(CLBStatsMsg* m)
-{
-  m->objData = 
-    (LDObjData*)((char*)(m->objData) - (char*)(&m->objData));
-  m->commData = 
-    (LDCommData*)((char*)(m->commData)
-      - (char*)(&m->commData));
-
-  m->avail_vector =(char*)(m->avail_vector
-      - (char*)(&m->avail_vector));
-
-  return (void*)(m);
-}
-
-CLBStatsMsg* CLBStatsMsg::unpack(void *m)
-{
-  CLBStatsMsg* ret_val = (CLBStatsMsg*)(m);
-
-  ret_val->objData = 
-    (LDObjData*)((char*)(&ret_val->objData) + (size_t)(ret_val->objData));
-  ret_val->commData = 
-    (LDCommData*)((char*)(&ret_val->commData)
-	     + (size_t)(ret_val->commData));
-
-  ret_val->avail_vector =
-    (char*)((char*)(&ret_val->avail_vector)
-			    +(size_t)(ret_val->avail_vector));
-
-  return ret_val;
-}
 
 void* CLBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
 {

@@ -112,12 +112,6 @@ public:
 
   char * avail_vector;
   int next_lb;
-
-  // Other methods & data members 
-
-  static void* alloc(int msgnum, size_t size, int* array, int priobits); 
-  static void* pack(CLBStatsMsg* in); 
-  static CLBStatsMsg* unpack(void* in); 
 }; 
 
 class CLBMigrateMsg : public CMessage_CLBMigrateMsg {
