@@ -142,18 +142,6 @@ void _createTraceprojections(char **argv)
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
 }
 
-extern "C"
-void traceProjectionsBeginIdle(void)
-{
-  CkpvAccess(_trace)->beginIdle();
-}
-
-extern "C"
-void traceProjectionsEndIdle(void)
-{
-  CkpvAccess(_trace)->endIdle();
-}
-
 LogPool::LogPool(char *pgm) {
   pool = new LogEntry[CkpvAccess(CtrLogBufSize)];
   numEntries = 0;
@@ -528,7 +516,7 @@ void LogEntry::pup(PUP::er &p)
 }
 
 TraceProjections::TraceProjections(char **argv): 
-curevent(0), isIdle(0), inEntry(0), computationStarted(0)
+curevent(0), inEntry(0), computationStarted(0)
 {
   if (TRACE_CHARM_PE() == 0) return;
 
@@ -609,21 +597,9 @@ void TraceProjections::traceClose(void)
 //  free(CkpvAccess(traceRoot));
 }
 
-void TraceProjections::traceBegin(void)
-{
-#if ! CMK_TRACE_IN_CHARM
-  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceProjectionsBeginIdle,0);
-  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceProjectionsEndIdle,0);
-#endif
-}
+void TraceProjections::traceBegin(void) { }
 
-void TraceProjections::traceEnd(void) 
-{
-#if ! CMK_TRACE_IN_CHARM
-  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, cancel_beginIdle);
-  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY, cancel_endIdle);
-#endif
-}
+void TraceProjections::traceEnd(void) { }
 
 void TraceProjections::userEvent(int e)
 {
@@ -762,20 +738,14 @@ void TraceProjections::messageRecv(char *env, int pe)
 #endif
 }
 
-void TraceProjections::beginIdle(void)
+void TraceProjections::beginIdle(double curWallTime)
 {
-  if (isIdle == 0) {
-    _logPool->add(BEGIN_IDLE, 0, 0, TraceTimer(), 0, CkMyPe());
-    isIdle = 1;
-  }
+  _logPool->add(BEGIN_IDLE, 0, 0, TraceTimer(curWallTime), 0, CkMyPe());
 }
 
-void TraceProjections::endIdle(void)
+void TraceProjections::endIdle(double curWallTime)
 {
-  if (isIdle) {
-    _logPool->add(END_IDLE, 0, 0, TraceTimer(), 0, CkMyPe());
-    isIdle = 0;
-  }
+  _logPool->add(END_IDLE, 0, 0, TraceTimer(curWallTime), 0, CkMyPe());
 }
 
 void TraceProjections::beginPack(void)

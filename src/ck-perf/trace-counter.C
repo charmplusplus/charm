@@ -198,18 +198,6 @@ void _createTracecounter(char **argv)
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
 }
 
-extern "C"
-void traceCounterBeginIdle(void)
-{
-  CkpvAccess(_trace)->beginIdle();
-}
-
-extern "C"
-void traceCounterEndIdle(void)
-{
-  CkpvAccess(_trace)->endIdle();
-}
-
 // constructor
 StatTable::StatTable():
   stats_(NULL), numStats_(0)
@@ -795,11 +783,6 @@ void TraceCounter::traceBegin() {
     if (writeByPhase_) { phase_++; }
     traceOn_ = true;
   }
-
-#if ! CMK_TRACE_IN_CHARM
-  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceCounterBeginIdle,0);
-  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceCounterEndIdle,0);
-#endif
 }
 
 //! turn trace on/off, note that charm will automatically call traceBegin()
@@ -838,12 +821,6 @@ void TraceCounter::traceEnd() {
     DEBUGF(("%d/%d DEBUG: Created _logPool at %08x\n", 
 	    CmiMyPe(), CmiNumPes(), CpvAccess(_logPool)));
   }
-
-#if ! CMK_TRACE_IN_CHARM
-  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, cancel_beginIdle);
-  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY, cancel_endIdle);
-#endif
-
 }
 
 //! begin/end execution of a Charm++ entry point
@@ -948,13 +925,13 @@ void TraceCounter::endExecute()
 }
 
 //! begin/end idle time for this pe
-void TraceCounter::beginIdle() {
-  if (traceOn_) { startIdle_ = TraceTimer(); } 
+void TraceCounter::beginIdle(double curWallTime) {
+  if (traceOn_) { startIdle_ = TraceTimer(curWallTime); } 
 }
 
 //! begin/end idle time for this pe
-void TraceCounter::endIdle() {
-  if (traceOn_) { idleTime_ += TraceTimer()-startIdle_; }
+void TraceCounter::endIdle(double curWallTime) {
+  if (traceOn_) { idleTime_ += TraceTimer(curWallTime)-startIdle_; }
 }
 
 //! begin/end the process of packing a message (to send)

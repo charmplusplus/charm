@@ -133,8 +133,8 @@ class TraceCounter : public Trace {
       CmiObjId *idx=0);   //! array idx
     void endExecute();
     //! begin/end idle time for this pe
-    void beginIdle();
-    void endIdle();
+    void beginIdle(double curWallTime);
+    void endIdle(double curWallTime);
     //! begin/end the process of packing a message (to send)
     void beginPack();
     void endPack();

@@ -70,8 +70,8 @@ class Trace {
     { }
     virtual void endExecute(void) {}
     // begin/end idle time for this pe
-    virtual void beginIdle(void) {}
-    virtual void endIdle(void) {}
+    virtual void beginIdle(double curWallTime) {}
+    virtual void endIdle(double curWallTime) {}
     // begin/end the process of packing a message (to send)
     virtual void beginPack(void) {}
     virtual void endPack(void) {}
@@ -103,6 +103,7 @@ class TraceArray {
 private:
   CkVec<Trace *>  traces;
   int n;
+  int cancel_beginIdle, cancel_endIdle;
 public:
     TraceArray(): n(0) {}
     inline void addTrace(Trace *tr) { traces.push_back(tr); n++;}
@@ -135,8 +136,6 @@ public:
     inline void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx=NULL) {ALLDO(beginExecute(event, msgType, ep, srcPe, mlen,idx));}
     inline void endExecute(void) {ALLREVERSEDO(endExecute());}
     inline void messageRecv(char *env, int pe) {ALLDO(messageRecv(env, pe));}
-    inline void beginIdle(void) {ALLDO(beginIdle());}
-    inline void endIdle(void) {ALLDO(endIdle());}
     inline void beginPack(void) {ALLDO(beginPack());}
     inline void endPack(void) {ALLDO(endPack());}
     inline void beginUnpack(void) {ALLDO(beginUnpack());}
@@ -157,8 +156,12 @@ public:
     inline void traceClearEps() {ALLDO(traceClearEps());}
     inline void traceWriteSts() {ALLDO(traceWriteSts());}
     inline void traceClose() {ALLDO(traceClose()); clearTrace();}
-    inline void traceBegin() {ALLDO(traceBegin());}
-    inline void traceEnd() {ALLDO(traceEnd());}
+    
+    // Tracing module registers *itself* for begin/end idle callbacks:
+    inline void beginIdle(double curWallTime) {ALLDO(beginIdle(curWallTime));}
+    inline void endIdle(double curWallTime) {ALLDO(endIdle(curWallTime));}
+    void traceBegin();
+    void traceEnd();
 };
 
 CkpvExtern(TraceArray*, _traces);
@@ -187,8 +190,6 @@ extern "C" {
 	_TRACE_ONLY(CkpvAccess(_traces)->beginExecute(evt,typ,ep,src,mlen,idx))
 #define _TRACE_END_EXECUTE() _TRACE_ONLY(CkpvAccess(_traces)->endExecute())
 #define _TRACE_MESSAGE_RECV(env, pe) _TRACE_ONLY(CkpvAccess(_traces)->messageRecv(env, pe))
-#define _TRACE_BEGIN_IDLE() _TRACE_ONLY(CkpvAccess(_traces)->beginIdle())
-#define _TRACE_END_IDLE() _TRACE_ONLY(CkpvAccess(_traces)->endIdle())
 #define _TRACE_BEGIN_PACK() _TRACE_ONLY(CkpvAccess(_traces)->beginPack())
 #define _TRACE_END_PACK() _TRACE_ONLY(CkpvAccess(_traces)->endPack())
 #define _TRACE_BEGIN_UNPACK() _TRACE_ONLY(CkpvAccess(_traces)->beginUnpack())

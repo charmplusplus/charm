@@ -144,6 +144,37 @@ extern void traceWriteSTS(FILE *stsfp,int nUserEvents) {
     fprintf(stsfp, "MESSAGE %d %d\n", i, _msgTable[i]->size);
 }
 
+
+extern "C"
+void traceCommonBeginIdle(void *proj,double curWallTime)
+{
+  ((TraceArray *)proj)->beginIdle(curWallTime);
+}
+
+extern "C"
+void traceCommonEndIdle(void *proj,double curWallTime)
+{
+  ((TraceArray *)proj)->endIdle(curWallTime);
+}
+
+void TraceArray::traceBegin() {
+  if (n==0) return; // No tracing modules registered.
+#if ! CMK_TRACE_IN_CHARM
+  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceCommonBeginIdle,this);
+  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceCommonEndIdle,this);
+#endif
+  ALLDO(traceBegin());
+}
+
+void TraceArray::traceEnd() {
+  if (n==0) return; // No tracing modules registered.
+  ALLDO(traceEnd());
+#if ! CMK_TRACE_IN_CHARM
+  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, cancel_beginIdle);
+  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY, cancel_endIdle);
+#endif
+}
+
 /*Install the beginIdle/endIdle condition handlers.*/
 extern "C" void traceBegin(void) {
   OPTIMIZE_WARNING

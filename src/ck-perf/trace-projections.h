@@ -115,8 +115,6 @@ class TraceProjections : public Trace {
     int execEvent;
     int execEp;
     int execPe;
-    int isIdle;
-    int cancel_beginIdle, cancel_endIdle;
     int inEntry;
     int computationStarted;
   public:
@@ -131,8 +129,8 @@ class TraceProjections : public Trace {
     void beginExecute(int event,int msgType,int ep,int srcPe,int ml,CmiObjId *idx=NULL);
     void endExecute(void);
     void messageRecv(char *env, int pe);
-    void beginIdle(void);
-    void endIdle(void);
+    void beginIdle(double curWallTime);
+    void endIdle(double curWallTime);
     void beginPack(void);
     void endPack(void);
     void beginUnpack(void);

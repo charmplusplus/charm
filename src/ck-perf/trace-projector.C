@@ -166,12 +166,12 @@ void TraceProjector::messageRecv(char *env, int pe)
 	_LOG_E_MSG_RECV_CHARM(env, pe);
 }
 
-void TraceProjector::beginIdle(void)
+void TraceProjector::beginIdle(double curWallTime)
 {
 	_LOG_E_PROC_IDLE();
 }
 
-void TraceProjector::endIdle(void)
+void TraceProjector::endIdle(double curWallTime)
 {
 	_LOG_E_PROC_BUSY();
 }
