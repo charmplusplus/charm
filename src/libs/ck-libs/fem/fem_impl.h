@@ -98,7 +98,7 @@ public:
 	}
 	//Reinitialize element i:
 	void reinit(int doomedEl) {
-		delete vec[doomedEl];
+		vec[doomedEl].destroy();
 		vec[doomedEl]=new T;
 	}
 	
