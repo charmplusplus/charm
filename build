@@ -25,11 +25,11 @@ syntax() {
   echo ''
   fi
   echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^elan$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)|(^paragon$)|(^vmi$)' | pr -3 -t )
+  ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^elan$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)|(^paragon$)|(^vmi$)|(^lapi$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc'
-  echo 'help smp gm tcp vmi scyld clustermatic opteron bluegene ooc syncft papi'
+  echo 'help smp gm tcp vmi scyld clustermatic bluegene ooc syncft papi'
   echo '--incdir --libdir --basedir --no-build-shared -j'
   if test $more = 1
   then
@@ -49,7 +49,6 @@ syntax() {
   echo '  mpcc            SUN Solaris C++ compiler for MPI'
   echo ''
   echo 'Platform specific options (choose multiple if apply):'
-  echo '  opteron         compile for AMD Opteron'
   echo '  smp             support for SMP, multithreaded charm on each node'
   echo '  mpt             use SGI Message Passing Toolkit (only for mpi version)'
   echo '  gm              use Myrinet for communication'
@@ -73,7 +72,7 @@ syntax() {
   echo '  --libdir=DIR	  specify additional lib path for compiler'
   echo '  --basedir=DIR	  shortcut for the above two - DIR/include and DIR/lib'
   echo '  -j[N]           parallel make, N is the number of paralle make jobs'
-  echo "  --with-romio       build AMPI with ROMIO library"
+  echo "  --with-romio    build AMPI with ROMIO library"
   fi
   echo ''
   echo '<charmc-options>: normal compiler options e.g. -g -O -save -verbose'
