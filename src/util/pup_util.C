@@ -147,7 +147,7 @@ PUP::seekBlock::seekBlock(PUP::er &Np,int nSections)
 		for (int i=0;i<=nSec;i++) secTab[i]=-1;
 	}
 	p(secTab,nSec+1);
-	hasEnded=false;
+	hasEnded=CmiFalse;
 }
 PUP::seekBlock::~seekBlock() 
 {
@@ -177,7 +177,7 @@ void PUP::seekBlock::endBlock(void)
 	//Seek to the end of the seek block
 	p.impl_seek(*this,secTab[nSec]);
 	p.impl_endSeek(*this);
-	hasEnded=true;
+	hasEnded=CmiTrue;
 }
 
 /** PUP::er seek implementation routines **/

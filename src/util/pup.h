@@ -61,9 +61,22 @@ class bar {
 #  include <converse.h> // <- for CmiBool
 #else
 #  include <conv-mach.h>
+#  include "conv-autoconfig.h"
+// you cannot define Bool twice !!
+#ifndef CONVERSE_H
+#if CMK_BOOL_UNDEFINED
+enum CmiBool {CmiFalse=0, CmiTrue=1};
+#else
+typedef bool CmiBool;
+#define CmiFalse false
+#define CmiTrue true
+#endif
+#endif
+/*
 #  define CmiBool bool
 #  define CmiTrue true
 #  define CmiFalse false
+*/
 #endif
 
 
@@ -130,23 +143,29 @@ class er {
         IS_UNPACKING=0x0400,
         TYPE_MASK   =0xFF00};
   unsigned int PUP_er_state;
+#if CMK_EXPLICIT
   explicit er(unsigned int inType) //You don't want to create raw PUP::er's.
+#else
+  er(unsigned int inType) //You don't want to create raw PUP::er's.
+#endif
     {PUP_er_state=inType;}
  public:
   virtual ~er();//<- does nothing, but might be needed by some child
   
   //State queries (exactly one of these will be true)
-  CmiBool isSizing(void) const {return (PUP_er_state&IS_SIZING)!=0;}
-  CmiBool isPacking(void) const {return (PUP_er_state&IS_PACKING)!=0;}
-  CmiBool isUnpacking(void) const {return (PUP_er_state&IS_UNPACKING)!=0;}
+  CmiBool isSizing(void) const {return (PUP_er_state&IS_SIZING)!=0?CmiTrue:CmiFalse;}
+  CmiBool isPacking(void) const {return (PUP_er_state&IS_PACKING)!=0?CmiTrue:CmiFalse;}
+  CmiBool isUnpacking(void) const {return (PUP_er_state&IS_UNPACKING)!=0?CmiTrue:CmiFalse;}
 
   //This indicates that the pup routine should free memory during packing.
   void becomeDeleting(void) {PUP_er_state|=IS_DELETING;}
-  CmiBool isDeleting(void) const {return (PUP_er_state&IS_DELETING)!=0;}
+  CmiBool isDeleting(void) const {return (PUP_er_state&IS_DELETING)!=0?CmiTrue:CmiFalse;}
   
 //For single elements, pretend it's an array containing one element
   void operator()(signed char &v,const char *desc=NULL)     {(*this)(&v,1,desc);}
+#if CMK_SIGNEDCHAR_DIFF_CHAR
   void operator()(char &v,const char *desc=NULL)            {(*this)(&v,1,desc);}
+#endif
   void operator()(short &v,const char *desc=NULL)           {(*this)(&v,1,desc);}
   void operator()(int &v,const char *desc=NULL)             {(*this)(&v,1,desc);}
   void operator()(long &v,const char *desc=NULL)            {(*this)(&v,1,desc);}
@@ -162,8 +181,10 @@ class er {
   //Integral types:
   void operator()(signed char *a,int nItems,const char *desc=NULL) 
     {bytes((void *)a,nItems,sizeof(signed char),Tchar,desc);}
+#if CMK_SIGNEDCHAR_DIFF_CHAR
   void operator()(char *a,int nItems,const char *desc=NULL) 
     {bytes((void *)a,nItems,sizeof(char),Tchar,desc);}
+#endif
   void operator()(short *a,int nItems,const char *desc=NULL) 
     {bytes((void *)a,nItems,sizeof(short),Tshort,desc);}
   void operator()(int *a,int nItems,const char *desc=NULL)
@@ -227,11 +248,11 @@ public:
 		ID() {}
 		ID(const char *name) {setName(name);}
 		void setName(const char *name);//Write name into hash
-		bool operator==(const ID &other) const {
+		CmiBool operator==(const ID &other) const {
 			for (int i=0;i<len;i++) 
 				if (hash[i]!=other.hash[i])
-					return false;
-			return true;
+					return CmiFalse;
+			return CmiTrue;
 		}
 	};
 	
