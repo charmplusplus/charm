@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.21  1995-09-20 14:24:27  jyelon
+ * Revision 2.22  1995-09-20 15:41:56  gursoy
+ * added  a new handler index
+ *
+ * Revision 2.21  1995/09/20  14:24:27  jyelon
  * *** empty log message ***
  *
  * Revision 2.20  1995/09/19  17:59:26  sanjeev
@@ -172,6 +175,7 @@ extern void CPlus_SetMainChareID();	/* in cplus_node_init.c */
 extern CHARE_BLOCK *CreateChareBlock();
 
 
+extern void BUFFER_INCOMING_MSG() ;
 extern void HANDLE_INCOMING_MSG() ;
 extern void HANDLE_INIT_MSG();
 extern void CkProcess_ForChareMsg();
@@ -249,6 +253,9 @@ static void EndInitPhase()
 
   /* initialization phase is done, set the flag to 0 */
   CpvAccess(CkInitPhase) = 0;
+
+  /* set the main handler to the unbuffering one */
+  CsvAccess(HANDLE_INCOMING_MSG_Index) = CsvAccess(MAIN_HANDLE_INCOMING_MSG_Index);
   
   if (CpvAccess(UserStartCharmDoneHandler))
     CpvAccess(UserStartCharmDoneHandler)();
@@ -734,7 +741,9 @@ InitializeEPTables()
   }
   
   /* Register the Charm handlers with Converse */
-  CsvAccess(HANDLE_INCOMING_MSG_Index)
+  CsvAccess(BUFFER_INCOMING_MSG_Index)
+    = CmiRegisterHandler(BUFFER_INCOMING_MSG) ;
+  CsvAccess(MAIN_HANDLE_INCOMING_MSG_Index)
     = CmiRegisterHandler(HANDLE_INCOMING_MSG) ;
   CsvAccess(HANDLE_INIT_MSG_Index)
     = CmiRegisterHandler(HANDLE_INIT_MSG);
@@ -746,6 +755,13 @@ InitializeEPTables()
     = CmiRegisterHandler(CkProcess_NewChareMsg);
   CsvAccess(CkProcIdx_VidSendOverMsg)
     = CmiRegisterHandler(CkProcess_VidSendOverMsg);
+
+  /* set the main message handler to buffering handler */
+  /* after initialization phase, it will be assigned to regular handler */
+  CsvAccess(HANDLE_INCOMING_MSG_Index) = CsvAccess(BUFFER_INCOMING_MSG_Index);
+
+
+
   
   /* set all the "Total" variables so that the rest of the modules work */
   CsvAccess(TotalEps) = CpvAccess(chareEpsCount);
