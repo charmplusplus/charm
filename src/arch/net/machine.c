@@ -2630,6 +2630,7 @@ char *CmiGetNonLocalNodeQ()
 char *CmiGetNonLocal()
 {
   CmiState cs = CmiGetState();
+  if (Cmi_netpoll) CommunicationServer(0);
   return (char *) PCQueuePop(cs->recv);
 }
 
