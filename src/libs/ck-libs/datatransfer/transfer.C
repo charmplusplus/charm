@@ -75,7 +75,7 @@ void transferCells(int valsPerTet,
 		
 		//Accumulate volume-weighted-average destination values
 		double destAccum[maxV]; 
-		for (int v=0;v<nv;v++) destAccum[v]=0.0;
+		for (v=0;v<nv;v++) destAccum[v]=0.0;
 		double destVolume=0; // Volume accumulator
 		
 		/* For each source cell: */
@@ -104,7 +104,7 @@ void transferCells(int valsPerTet,
 		}
 		
 		/* Copy the accumulated values into dest */
-		for (int v=0;v<nv;v++) 
+		for (v=0;v<nv;v++) 
 			destVals[d*nv+v]=destAccum[v]*accumScale;
 	}
 }
