@@ -36,8 +36,9 @@ CmmTable CmmNew()
 void CmmFree(t)
 CmmTable t;
 {
-  CmmEntry n;
-  CmmEntry e = t->first;
+  CmmEntry n,e;
+  if (t==NULL) return;
+  e = t->first;
   while (e) {
     CmiFree(e->msg);
     n = e->next;
@@ -126,7 +127,7 @@ CmmTable CmmPup(pup_er p, CmmTable t)
 {
   int nentries;
 
-  if(pup_isSizing(p)||pup_isPacking(p))
+  if(!pup_isUnpacking(p))
   {
     CmmEntry e = t->first;
     nentries = CmmEntries(t);
@@ -140,9 +141,11 @@ CmmTable CmmPup(pup_er p, CmmTable t)
       pup_bytes(p, e->msg, msize);
       e = e->next;
     }
-    if(pup_isPacking(p))
+    if(pup_isDeleting(p)) {
       CmmFree(t);
-    return (pup_isSizing(p) ? t : 0);
+      return 0;
+    } else
+      return t;
   }
   if(pup_isUnpacking(p))
   {
