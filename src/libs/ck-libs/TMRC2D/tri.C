@@ -294,13 +294,15 @@ void chunk::nodeReplaceDelete(node kn, node dn, node nn)
     theClient->nodeUpdate(kIdx, nn.X(), nn.Y());
     CkPrintf("TMRC2D: [%d] (c)theClient->nodeUpdate(%d, %2.10f, %2.10f\n", cid, 
 	     kIdx, nn.X(), nn.Y());
-    for (int j=0; j<numElements; j++) {
-      for (int k=0; k<3; k++) {
-	if (theElements[j].isPresent() && (theElements[j].nodes[k] == dIdx)) {
-	  theElements[j].nodes[k] = kIdx;
-	  theClient->nodeReplaceDelete(j, k, dIdx, kIdx);
-	  CkPrintf("TMRC2D: [%d]theClient->nodeReplaceDelete(%d, %d, %d, %d\n",
-		   cid, j, k, dIdx, kIdx);
+    for (int j=0; j<elementSlots; j++) {
+      if (theElements[j].isPresent()) {
+	for (int k=0; k<3; k++) {
+	  if (theElements[j].nodes[k] == dIdx) {
+	    theElements[j].nodes[k] = kIdx;
+	    theClient->nodeReplaceDelete(j, k, dIdx, kIdx);
+	    CkPrintf("TMRC2D: [%d]theClient->nodeReplaceDelete(%d, %d, %d, %d\n",
+		     cid, j, k, dIdx, kIdx);
+	  }
 	}
       }
     }
