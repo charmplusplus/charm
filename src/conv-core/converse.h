@@ -14,7 +14,7 @@
 #endif
 
 /* Paste the tokens x and y together, without any space between them.
-   The ANSI way to do this is the bizarre ## "token-pasting" 
+   The ANSI C way to do this is the bizarre ## "token-pasting" 
    preprocessor operator.
  */
 #define CMK_CONCAT(x,y) x##y
@@ -63,6 +63,7 @@ extern "C" {
 
 extern int Cmi_mype;
 extern int Cmi_numpes;
+extern int Cmi_myrank; /* Normally zero; only 1 during SIGIO handling */
 
 #define CmiMyPe()           Cmi_mype
 #define CmiMyRank()         0
@@ -75,13 +76,13 @@ extern int Cmi_numpes;
 #define CmiNodeOf(pe)       (pe)
 #define CmiRankOf(pe)       0
 
-#define CpvDeclare(t,v) t CMK_TAG(Cpv_,v)
-#define CpvExtern(t,v)  extern t CMK_TAG(Cpv_,v)
-#define CpvStaticDeclare(t,v) static t CMK_TAG(Cpv_,v)
+#define CpvDeclare(t,v) t CMK_TAG(Cpv_,v)[2]
+#define CpvExtern(t,v)  extern t CMK_TAG(Cpv_,v)[2]
+#define CpvStaticDeclare(t,v) static t CMK_TAG(Cpv_,v)[2]
 #define CpvInitialize(t,v) do {} while(0)
 #define CpvInitialized(v) 1
-#define CpvAccess(v) CMK_TAG(Cpv_,v)
-#define CpvAccessOther(v, r) CMK_TAG(Cpv_,v)
+#define CpvAccess(v) CMK_TAG(Cpv_,v)[Cmi_myrank]
+#define CpvAccessOther(v, r) CMK_TAG(Cpv_,v)[r]
 
 extern void CmiMemLock();
 extern void CmiMemUnlock();
@@ -385,6 +386,11 @@ extern void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr);
 void    *CmiAlloc(int size);
 int      CmiSize(void *);
 void     CmiFree(void *);
+
+#ifndef CMI_TMP_SKIP
+void *CmiTmpAlloc(int size);
+void CmiTmpFree(void *);
+#endif
 
 double   CmiCpuTimer(void);
 
@@ -960,6 +966,12 @@ CpvExtern(int, CmiImmediateMsgHandlerIdx);
 void CmiProbeImmediateMsg();
 #if CMK_IMMEDIATE_MSG
 void CmiDelayImmediate();
+#  define CmiBecomeImmediate(msg) do {\
+	CmiSetXHandler(msg,CmiGetHandler(msg)); \
+	CmiSetHandler(msg,CpvAccessOther(CmiImmediateMsgHandlerIdx,0)); \
+     } while (0)
+#else
+#  define CmiBecomeImmediate(msg) /* empty */
 #endif
 
 /******** Object ID ********/
