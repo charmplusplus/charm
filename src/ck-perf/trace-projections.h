@@ -52,8 +52,8 @@ class LogEntry {
     int numPapiEvents;
     LONG_LONG_PAPI *papiValues;
     unsigned char type; 
-		char *fName;
-		int flen;
+    char *fName;
+    int flen;
   public:
     LogEntry() {}
     LogEntry(double tm, unsigned char t, unsigned short m=0, unsigned short e=0, int ev=0, int p=0, int ml=0, CmiObjId *d=NULL, double rt=0., double cputm=0.) {

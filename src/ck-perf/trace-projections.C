@@ -526,7 +526,7 @@ LogEntry::LogEntry(double tm, unsigned char t, unsigned short m,
 
 void LogEntry::pup(PUP::er &p)
 {
-  int itime, irecvtime, icputime;
+  int itime, irecvtime, icputime, i;
   char ret = '\n';
 
   p|type;
@@ -553,7 +553,7 @@ void LogEntry::pup(PUP::er &p)
       p|msglen; p|irecvtime; p|id.id[0]; p|id.id[1]; p|id.id[2];
       p|icputime;
       p|numPapiEvents;
-      for (int i=0; i<numPapiEvents; i++) {
+      for (i=0; i<numPapiEvents; i++) {
 	p|papiValues[i];
       }
       // **CW** I believe we still need to properly implement unpacking
@@ -567,7 +567,7 @@ void LogEntry::pup(PUP::er &p)
       if (p.isPacking()) icputime = (int)(1.0e6*cputime);
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; p|msglen; p|icputime;
       p|numPapiEvents;
-      for (int i=0; i<numPapiEvents; i++) {
+      for (i=0; i<numPapiEvents; i++) {
 	p|papiValues[i];
       }
       if (p.isUnpacking()) cputime = icputime/1.0e6;
@@ -587,7 +587,7 @@ void LogEntry::pup(PUP::er &p)
         p(n);
       }
       else {
-	for (int i=0; i<numpes; i++) p|pes[i];
+	for (i=0; i<numpes; i++) p|pes[i];
       }
       // **CW** I believe we still need to properly implement unpacking
       // for pes ...
@@ -616,18 +616,18 @@ void LogEntry::pup(PUP::er &p)
     case END_TRACE:
       p|itime;
       break;
-		case BEGIN_FUNC:
-			p | itime;
-			p | mIdx;
-			p | event;
-			if(!p.isUnpacking()){
-				p(fName,flen-1);
-			}
-			break;
-		case END_FUNC:
-			p | itime;
-			p | mIdx;
-			break;
+    case BEGIN_FUNC:
+	p | itime;
+	p | mIdx;
+	p | event;
+	if(!p.isUnpacking()){
+		p(fName,flen-1);
+	}
+	break;
+    case END_FUNC:
+	p | itime;
+	p | mIdx;
+	break;
     default:
       CmiError("***Internal Error*** Wierd Event %d.\n", type);
       break;
@@ -1034,7 +1034,7 @@ void toProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tulong: CheckAndFPrintF(f," %lu",((unsigned long *)p)[i]); break;
     case Tfloat: CheckAndFPrintF(f," %.7g",((float *)p)[i]); break;
     case Tdouble: CheckAndFPrintF(f," %.15g",((double *)p)[i]); break;
-    case Tlonglong: CheckAndFPrintF(f," %lld",((long long *)p)[i]); break;
+    case Tlonglong: CheckAndFPrintF(f," %lld",((LONG_LONG_PAPI *)p)[i]); break;
     default: CmiAbort("Unrecognized pup type code!");
     };
 }
@@ -1081,6 +1081,7 @@ void toProjectionsGZFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tulong: gzprintf(f," %lu",((unsigned long *)p)[i]); break;
     case Tfloat: gzprintf(f," %.7g",((float *)p)[i]); break;
     case Tdouble: gzprintf(f," %.15g",((double *)p)[i]); break;
+    case Tlonglong: gzprintf(f," %lld",((CMK_TYPEDEF_INT8 *)p)[i]); break;
     default: CmiAbort("Unrecognized pup type code!");
     };
 }
