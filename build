@@ -24,7 +24,10 @@ syntax() {
   echo '<versions>: ' 
   ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^elan$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)|(^paragon$)|(^vmi$)' | pr -3 -t )
   echo ''
-  echo '<options>: help cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc smp gm tcp vmi scyld clustermatic opteron bluegene --incdir --libdir --basedir --build-shared --no-shared'
+  echo '<options>: compiler and platform specific options'
+  echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 mpcc'
+  echo 'help smp gm tcp vmi scyld clustermatic opteron bluegene'
+  echo '--incdir --libdir --basedir --build-shared --no-shared -j'
   if test $more = 1
   then
   echo ''
@@ -63,6 +66,7 @@ syntax() {
   echo '  --incdir=DIR	  specify additional include path for compiler'
   echo '  --libdir=DIR	  specify additional lib path for compiler'
   echo '  --basedir=DIR	  shortcut for the above two - DIR/include and DIR/lib'
+  echo '  -j NUM          parallel make, NUM is the number of paralle make jobs'
   fi
   echo ''
   echo '<charmc-options>: normal compiler options e.g. -g -O -save -verbose'
@@ -70,7 +74,7 @@ syntax() {
   then
   echo ''
   echo 'Examples:'
-  echo '1. compile Charm++ on Linux with optimization for Charm++ (-DCMK_OPTIMIZE) and -O for g++:'
+  echo '1. compile Charm++ on Linux with optimizations:'
   echo '  ./build charm++ net-linux -O -DCMK_OPTIMIZE'
   echo '2. compile Charm++ for Linux clustermatic Beowulf cluster with Intel compiler:'
   echo '  ./build charm++ net-linux clustermatic icc -O'
@@ -78,6 +82,8 @@ syntax() {
   echo '  ./build charm++ mpi-linux-ia64 gm -O'
   echo '4. compile Charm++ for Windows with VC++ (Cygwin required):'
   echo '  ./build charm++ net-win32 -O'
+  echo '5. compile on IBM SP with MPI using parallel gmake, 4 jobs simultaneously:'
+  echo '  MAKE=gmake  ./build charm++ mpi-sp -j 4'
   echo ''
   echo 'Note: This script:'
   echo ' 1. Creates directories <version> and <version>/tmp';
@@ -196,6 +202,17 @@ do
 	    --no-shared)
 		BUILD_SHARED=""; shift
 		;;
+	    -j)
+		shift
+		MAKEOPTS="$MAKEOPTS -j $1"
+		if [ -z "$1" ] 
+		then
+                  echo "Error> Number of jobs for parallel make is not specified!"
+		  echo ''
+		  printOption
+		fi
+		shift;
+		;;
     -*) 
 # We hit a real compiler option (like -g, or -Dfoo),
 # so just copy over all remaining options
@@ -230,6 +247,8 @@ do
 done
 
 [ "x$VERSION" = "x" ] && syntax
+
+[ -z "$MAKE" ] && MAKE='make'
 
 [ -f $src/$BASEVERSION/conv-mach.h ] || syntax
 
@@ -317,9 +336,9 @@ fi
 
 echo $BASEVERSION > $VERSION/tmp/.vdir
 
-echo "Performing 'make $MAKEOPTS $PROGRAM OPTS="$OPTS"' in $VERSION/tmp"
+echo "Performing '$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS"' in $VERSION/tmp"
 cd $VERSION/tmp 
-make $MAKEOPTS $PROGRAM OPTS="$OPTS $BUILD_SHARED"
+$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS $BUILD_SHARED"
 
 MAKEEXIT=$?
 if [ $MAKEEXIT -eq 0 ]
