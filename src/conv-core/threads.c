@@ -1444,6 +1444,7 @@ struct CthThreadStruct
   int        suspendable;
   int        Event;
   CthThread  qnext;
+  char       inited;
 };
 
 char *CthGetData(CthThread t) { return t->data; }
@@ -1463,6 +1464,7 @@ CthThread t;
   t->datasize=0;
   t->qnext=0;
   t->suspendable = 1;
+  t->inited = 0;
   pthread_cond_init(&(t->cond) , (pthread_condattr_t *) 0);
 }
 
@@ -1540,17 +1542,23 @@ void CthResume(CthThread t)
     pthread_mutex_unlock(&CthCpvAccess(sched_mutex));
     pthread_exit(0);
   } else {
-    pthread_cond_signal(&(t->cond));
+    /* pthread_cond_wait might (with low probability) return when the 
+      condition variable has not been signaled, guarded with 
+      predicate checks */
+    do {
     pthread_cond_wait(&(tc->cond), &CthCpvAccess(sched_mutex));
+    } while (tc!=CthCpvAccess(CthCurrent)) ;
   }
-  if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
 }
 
 static void *CthOnly(CthThread arg)
 {
+  arg->inited = 1;
   pthread_mutex_lock(&CthCpvAccess(sched_mutex));
   pthread_cond_signal(arg->creator);
+  do {
   pthread_cond_wait(&(arg->cond), &CthCpvAccess(sched_mutex));
+  } while (arg!=CthCpvAccess(CthCurrent)) ;
   arg->fn(arg->arg);
   CthCpvAccess(CthExiting) = 1;
   CthSuspend();
@@ -1571,7 +1579,9 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   result->creator = &(self->cond);
   pthread_create(&(result->self), (pthread_attr_t *) 0, CthOnly, 
                  (void*) result);
+  do {
   pthread_cond_wait(&(self->cond), &CthCpvAccess(sched_mutex));
+  } while (result->inited==0);
   return result;
 }
 
