@@ -1,0 +1,9 @@
+module RefineLB {
+
+extern module CentralLB;
+
+group RefineLB : CentralLB {
+  entry void RefineLB(void);  
+};
+
+};
