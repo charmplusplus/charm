@@ -47,11 +47,12 @@ then
 	mpirun=`which mpirun`
 # Some machine specific 
 	hostname=`hostname`
-	if [ $hostname = 'turing-2.turing.uiuc.edu' ] 
-	then 
+	case "$hostname" in
+	turing*.turing.uiuc.edu) 
 		ppn='#PBS -l nodes='$pes':ppn=1'
 		extra='-machinefile $PBS_NODEFILE'
-	fi
+		;;
+	esac
         cat > $script << EOF
 #!/bin/sh
 # This is a charmrun-generated PBS batch job script.
