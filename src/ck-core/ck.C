@@ -88,7 +88,7 @@ CkGroupID CkGetNodeGroupID(void) {
 
 extern "C"
 void *CkLocalBranch(int gID) {
-  return CpvAccess(_groupTable).find(gID);
+  return _localBranch(gID);
 }
 
 extern "C"
@@ -405,7 +405,7 @@ static inline void _processForChareMsg(envelope *env)
 static inline void _processForBocMsg(envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
-  register void *obj = CkLocalBranch(groupID);
+  register void *obj = _localBranch(groupID);
   if(!obj) { // groupmember not yet created
     CpvAccess(_groupTable).enqmsg(groupID, env);
     return;

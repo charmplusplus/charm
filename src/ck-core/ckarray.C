@@ -782,7 +782,7 @@ CkArray::CkArray(CkArrayCreateMsg *msg) :CkReductionMgr(),
   mapID=msg->mapID;map=NULL;
   delete msg;
   
-  if (NULL!=CkLocalBranch(mapID))
+  if (NULL!=_localBranch(mapID))
     initAfterMap();
   else //Wait for the map to be created 
     CProxy_CkArrayMap(mapID).callMeBack(
@@ -800,7 +800,7 @@ void CkArray::static_initAfterMap(void *dis)
 void CkArray::initAfterMap(void)
 {
   //The map is alive-- register with it
-  map=(CkArrayMap *)CkLocalBranch(mapID);
+  map=(CkArrayMap *)_localBranch(mapID);
   if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
   CkArrayMapRegisterMessage *mapMsg = new CkArrayMapRegisterMessage;
   mapMsg->numElements = numInitial;
@@ -1505,7 +1505,7 @@ void CkArray::pup(PUP::er &p)
   p(oldBcastNo);
   p(mapID);
   p(mapHandle);
-  map = (CkArrayMap *) CkLocalBranch(mapID);
+  map = (CkArrayMap *) _localBranch(mapID);
   pupArrayMsgQ(oldBcasts, p);
   pupHashTable(p);
 }

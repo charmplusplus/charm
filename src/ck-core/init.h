@@ -49,6 +49,11 @@ CpvExtern(CkGroupID,         _currentGroup);
 CpvExtern(CkGroupID,         _currentNodeGroup);
 CpvExtern(GroupTable, _groupTable);
 
+static inline void *_localBranch(int gID)
+{
+  return CpvAccess(_groupTable).find(gID);
+}
+
 extern GroupTable*    _nodeGroupTable;
 
 extern void _initCharm(int argc, char **argv);
