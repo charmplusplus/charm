@@ -2,11 +2,12 @@
 \label{lbFramework}
 
 In \charmpp{}, objects(except groups) can migrate from processor to 
-processor at run-time. Object migration can potentially improve the parallel 
-program to be more efficient by migrating objects from overloaded processors 
-at run-time. However, we can see it is not trivial to decide 
-which objects to move and where to move them in order to achieve load
-balance in a fashion without the knowledge about the application. 
+processor at run-time. Object migration can potentially improve the 
+performance of the parallel program by migrating objects from overloaded 
+processors to underloaded ones at run-time. However, we can see it is 
+non-trivial to decide which objects to move and where to move them in 
+order to achieve load balance in a fashion without the knowledge about the 
+application. 
 
  \charmpp{} implements a generic, measurement-based load balancing framework 
 which automatically instruments all \charmpp{} objects, collects computation 
@@ -34,13 +35,14 @@ Here are the two terms often used in \charmpp{} load balancing framework:
 \subsubsection{Available Load Balancing Strategies}
 \label{lbStrategy}
 
-Below are the available load balancers and their brief description:
+Listed below are the available load balancers and their brief 
+descriptions:
 \begin{itemize}
 \item \kw{RandCentLB}:   Randomly assign objects to processors;
 \item \kw{RandRefLB}:    Randomly assign objects to processors, then refine;
 \item \kw{RefineLB}:     Move a few objects away from the most overloaded processors;
-\item \kw{RecBisectBfLB}:        Recursive partitioning with Breadth first enumeration;
-\item \kw{MetisLB}:      Use Metis(tm) to partition object communication graph;
+\item \kw{RecBisectBfLB}:        Recursive partition with Breadth first enumeration;
+\item \kw{MetisLB}:      Use Metis(tm) to partitioning object communication graph;
 \item \kw{CommLB}:       Greedy with communication;
 \item \kw{Comm1LB}:      another variation of CommLB;
 \item \kw{HeapCentLB}:   Heap Centralized;
@@ -61,8 +63,8 @@ chare array when created automatically registers itself to load balancing
 framework, instrument of compute wall/cpu time and communication is 
 done automatically and APIs are provided for triggering the load balancing; 
 thus load balancing with array is prefered in \charmpp{}, although it is doable 
-for load balancing individule Chares for experienced users.(this is currently
-beyond the scope of this manual)
+for load balancing individual Chares for experienced users. (This topic is 
+currently beyond the scope of this manual.)
 
 To use the load balancer, you must make your array elements migratable
 (see migration section above) and choose a \kw{load balancing strategy} 
@@ -75,11 +77,12 @@ The three methods to use the load balancer with chare arrays are:
 {\bf automatic without Sync}, {\bf automatic with Sync} and {\bf manual mode}.
 In case of {\em automatic} load balancing, user don't need to worry about 
 how and when to start the load balancing phase. Load balancer will start 
-itself when it think it is ready based on the hint given by users.
+itself when it decides it is ready based on the hints given by users.
 In the case of {\bf automatic without Sync}, application simply asserts
 that load balancer can happen at any time during the execution, and 
-the chare arrays are always ready to migrate\footnote{all the temporary 
-data of the array in the application has to be properly packed for migraton}. 
+the chare arrays are always ready to migrate\footnote{All the temporary 
+data of the array in the application has to be properly packed for 
+migration.}. 
 In this mode, load balancer works in the background and application 
 doesn't need to stop waiting for load balancing to complete. In most cases, 
 application doesn't want load balancing occurs arbitarily because it knows 
@@ -89,28 +92,28 @@ iterations}. {\bf Automatic with Sync} is designed for this scenario.
 In this mode, user insert {\em AtSync()} calls at certain points when load 
 balancing is desired. Load balancing takes control after all the 
 local array elements reach the sync point, and start load balancing 
-from there. The application better takes a break and wait for the load 
+from there. The application would take a break and wait for the load 
 balancing complete and regain the control from {\em ResumeFromSync()}.
-When user want to have more control on the time and want to avoid
-the synchronizition of the {\em AtSync} method, he may want to use 
+When user wants to have more control on the time and want to avoid
+the synchronization of the {\em AtSync()} method, he may want to use 
 the {\bf manual} mode to start load balancer himself.
 
-The detailed API of these three methods is described as follows:
+The detailed APIs of these three methods are described as follows:
 \begin{itemize}
 
 \item Method 1: By default, the array elements may be asked to migrate at any time
-provided they are not in the middle of executing an entry method. 
+provided that they are not in the middle of executing an entry method. 
 The array element's variable \kw{usesAtSync} being false attributes
 to this default behaviour. 
 
 \item  Method 2: Using the AtSync method, elements can be migrated at certain
-times.  For the AtSync method, set \kw{usesAtSync} to true in your 
+times.  For the AtSync method, set \kw{usesAtSync} to CmiTrue in your 
 array element constructor.  When an element is ready to migrate,
 call \kw{ArrayElement::AtSync()}.  
 After the first \kw{doneInserting} call (which starts the load balancer)
 and once all local elements have reached \kw{AtSync},
 the load balancer runs and migrates elements.  Once
-all migrations are complete, the load balancer calls the 
+all migrations are completed, the load balancer calls the 
 virtual function \kw{ArrayElement::ResumeFromSync()} for each of the
 array element.  One must ensure that no messages are
 sent to an array element between its calls to \kw{AtSync} and
