@@ -787,6 +787,7 @@ int node, nbr;
 #define DGRAM_MAGIC_MASK    (0xFFFF)
 #define DGRAM_SEQNO_MASK    (0xFFFFFF)
 
+#define DGRAM_NODEMESSAGE   (0xFB)
 #define DGRAM_DSTRANK_MAX   (0xFC)
 #define DGRAM_SIMPLEKILL    (0xFD)
 #define DGRAM_BROADCAST     (0xFE)
@@ -816,6 +817,8 @@ typedef struct { DgramHeader head; char window[1024]; } DgramAck;
 #define PE_BROADCAST_OTHERS (-1)
 #define PE_BROADCAST_ALL    (-2)
 
+#define NODE_BROADCAST_OTHERS (-1)
+#define NODE_BROADCAST_ALL    (-2)
 
 typedef struct OutgoingMsgStruct
 {
@@ -896,9 +899,12 @@ typedef struct CmiStateStruct
 {
   int pe, rank;
   PCQueue recv;
+  PCQueue noderecv;
   void *localqueue;
 }
 *CmiState;
+
+CsvDeclare(PCQueue, NodeRecv);
 
 void CmiStateInit(int pe, int rank, CmiState state)
 {
@@ -906,6 +912,14 @@ void CmiStateInit(int pe, int rank, CmiState state)
   state->rank = rank;
   state->recv = PCQueueCreate();
   state->localqueue = FIFO_Create();
+  if (rank==0) {
+	CsvInitialize(PCQueue, NodeRecv);
+	state->noderecv=PCQueueCreate();
+  	CsvAccess(NodeRecv)=state->noderecv;
+  }	
+  else {
+	state->noderecv=CsvAccess(NodeRecv);
+  }
 }
 
 static ExplicitDgram Cmi_freelist_explicit;
@@ -2088,7 +2102,60 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
   EnqueueOutgoingDgram(ogm, data, size, node, rank);
 }
 
+#if CMK_NODE_QUEUE_AVAILABLE
 
+/***********************************************************************
+ * DeliverOutgoingNodeMessage()
+ *
+ * This function takes care of delivery of outgoing node messages from the
+ * sender end. Broadcast messages are divided into sets of messages that 
+ * are bound to the local node, and to remote nodes. For local
+ * transmission, the messages are directly pushed into the recv
+ * queues. For non-local transmission, the function DeliverViaNetwork()
+ * is called
+ ***********************************************************************/
+void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
+{
+  int i, rank, dst; OtherNode node;
+
+  dst = ogm->dst;
+  switch (dst) {
+  case NODE_BROADCAST_OTHERS:
+    for (i = 0; i<Cmi_numnodes; i++)
+      if (i!=Cmi_mynode)
+	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
+    GarbageCollectMsg(ogm);
+    break;
+  case NODE_BROADCAST_ALL:
+    PCQueuePush(CmiGetStateN(0)->noderecv,CopyMsg(ogm->data,ogm->size));
+    for (i=0; i<Cmi_numnodes; i++)
+      if (i!=Cmi_mynode)
+	DeliverViaNetwork(ogm, nodes + i, DGRAM_NODEMESSAGE);
+    GarbageCollectMsg(ogm);
+    break;
+  default:
+    node = nodes+dst;
+    rank=DGRAM_NODEMESSAGE;
+    if (dst != Cmi_mynode) {
+      DeliverViaNetwork(ogm, node, rank);
+      GarbageCollectMsg(ogm);
+    } else {
+      if (ogm->freemode == 'A') {
+	PCQueuePush(CmiGetStateN(0)->noderecv,CopyMsg(ogm->data,ogm->size));
+	ogm->freemode = 'X';
+      } else {
+	PCQueuePush(CmiGetStateN(0)->noderecv, ogm->data);
+	FreeOutgoingMsg(ogm);
+      }
+    }
+  }
+}
+
+#else
+
+#define DeliverOutgoingNodeMessage() DeliverOutgoingMessage()
+
+#endif
 
 /***********************************************************************
  * DeliverOutgoingMessage()
@@ -2184,9 +2251,13 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
       for (i=1; i<Cmi_mynodesize; i++)
 	PCQueuePush(CmiGetStateN(i)->recv, CopyMsg(msg, len));
       PCQueuePush(CmiGetStateN(0)->recv, msg);
-    } else 
-    {
-      PCQueuePush(CmiGetStateN(node->asm_rank)->recv, msg);
+    } else {
+         if (node->asm_rank==DGRAM_NODEMESSAGE) {
+	   PCQueuePush(CmiGetStateN(0)->noderecv, msg);
+         }
+	 else {
+	   PCQueuePush(CmiGetStateN(node->asm_rank)->recv, msg);
+	 }
     }
     node->asm_msg = 0;
   node->recd_msgs++;
@@ -2466,6 +2537,22 @@ static void CommunicationServer()
  *
  *****************************************************************************/
 
+#if CMK_NODE_QUEUE_AVAILABLE
+char *CmiGetNonLocalNodeQ()
+{
+  CmiState cs = CmiGetState();
+  void *result = PCQueuePop(cs->noderecv);
+  return (char *) result;
+}
+#else
+
+char *CmiGetNonLocalNodeQ()
+{
+}
+
+#endif
+
+
 char *CmiGetNonLocal()
 {
   CmiState cs = CmiGetState();
@@ -2490,6 +2577,53 @@ void CmiNotifyIdle()
   CmiCommUnlock();
 #endif
 }
+
+#if CMK_NODE_QUEUE_AVAILABLE
+
+/******************************************************************************
+ *
+ * CmiGeneralNodeSend
+ *
+ * Description: This is a generic message sending routine. All the
+ * converse message send functions are implemented in terms of this
+ * function. (By setting appropriate flags (eg freemode) that tell
+ * CmiGeneralSend() how exactly to handle the particular case of
+ * message send)
+ *
+ *****************************************************************************/
+
+CmiCommHandle CmiGeneralNodeSend(int pe, int size, int freemode, char *data)
+{
+  CmiState cs = CmiGetState(); OutgoingMsg ogm;
+
+  if (freemode == 'S') {
+    char *copy = (char *)CmiAlloc(size);
+  if (!copy)
+      fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
+    memcpy(copy, data, size);
+    data = copy; freemode = 'F';
+  }
+
+  MallocOutgoingMsg(ogm);
+  CmiMsgHeaderSetLength(data, size);
+  ogm->size = size;
+  ogm->data = data;
+  ogm->src = cs->pe;
+  ogm->dst = pe;
+  ogm->freemode = freemode;
+  ogm->refcount = 0;
+  CmiCommLock();
+  DeliverOutgoingNodeMessage(ogm);
+  CommunicationServer();
+  CmiCommUnlock();
+  return (CmiCommHandle)ogm;
+}
+
+#else
+
+#define CmiGeneralNodeSend(p,s,m,d) CmiGeneralSend(p,s,m,d)
+
+#endif
 
 /******************************************************************************
  *
@@ -2539,29 +2673,56 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   return (CmiCommHandle)ogm;
 }
 
+void CmiSyncNodeSendFn(int p, int s, char *m)
+{ CmiGeneralNodeSend(p,s,'S',m); }
+
 void CmiSyncSendFn(int p, int s, char *m)
 { CmiGeneralSend(p,s,'S',m); }
+
+CmiCommHandle CmiAsyncNodeSendFn(int p, int s, char *m)
+{ return CmiGeneralNodeSend(p,s,'A',m); }
 
 CmiCommHandle CmiAsyncSendFn(int p, int s, char *m)
 { return CmiGeneralSend(p,s,'A',m); }
 
+void CmiFreeNodeSendFn(int p, int s, char *m)
+{ CmiGeneralNodeSend(p,s,'F',m); }
+
 void CmiFreeSendFn(int p, int s, char *m)
 { CmiGeneralSend(p,s,'F',m); }
+
+void CmiSyncNodeBroadcastFn(int s, char *m)
+{ CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'S',m); }
 
 void CmiSyncBroadcastFn(int s, char *m)
 { CmiGeneralSend(PE_BROADCAST_OTHERS,s,'S',m); }
 
+CmiCommHandle CmiAsyncNodeBroadcastFn(int s, char *m)
+{ CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'A',m); }
+
 CmiCommHandle CmiAsyncBroadcastFn(int s, char *m)
 { return CmiGeneralSend(PE_BROADCAST_OTHERS,s,'A',m); }
+
+void CmiFreeNodeBroadcastFn(int s, char *m)
+{ CmiGeneralNodeSend(NODE_BROADCAST_OTHERS,s,'F',m); }
 
 void CmiFreeBroadcastFn(int s, char *m)
 { CmiGeneralSend(PE_BROADCAST_OTHERS,s,'F',m); }
 
+void CmiSyncNodeBroadcastAllFn(int s, char *m)
+{ CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'S',m); }
+
 void CmiSyncBroadcastAllFn(int s, char *m)
 { CmiGeneralSend(PE_BROADCAST_ALL,s,'S',m); }
 
+CmiCommHandle CmiAsyncNodeBroadcastAllFn(int s, char *m)
+{ CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'A',m); }
+
 CmiCommHandle CmiAsyncBroadcastAllFn(int s, char *m)
 { return CmiGeneralSend(PE_BROADCAST_ALL,s,'A',m); }
+
+void CmiFreeNodeBroadcastAllFn(int s, char *m)
+{ CmiGeneralNodeSend(NODE_BROADCAST_ALL,s,'F',m); }
 
 void CmiFreeBroadcastAllFn(int s, char *m)
 { CmiGeneralSend(PE_BROADCAST_ALL,s,'F',m); }
