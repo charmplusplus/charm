@@ -26,7 +26,8 @@ void InitNetwork(MachineParams *mp) {
 
 	// For output buffering
 	mp->config->inputBuffering = 0; mp->config->switchVc = mp->config->numP = counter;
-	mp->config->sourceRouting = 1;
+	mp->config->sourceRouting = 0; mp->config->loadRoutingTable = 1;
+	mp->config->numSwitches = mp->config->numNodes;
 
 	// The code here is mostly for the future incomplete hypercube. 
 	// The implementation is based on the fact that an incomplete hypercube

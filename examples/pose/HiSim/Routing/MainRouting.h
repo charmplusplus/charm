@@ -11,5 +11,7 @@ class RoutingAlgorithm {
 	//virtual int selectRoute(int,int,const Packet *){}
 	virtual int convertOutputToInputPort(int,Packet *,int)=0;
 	virtual void populateRoutes(Packet *,int){}
+	virtual int loadTable(Packet *,int){}
+	virtual int getNextSwitch(int){}
 };
 #endif

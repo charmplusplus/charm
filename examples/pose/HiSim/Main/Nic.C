@@ -6,12 +6,34 @@ extern void initializeNetwork(Topology **,RoutingAlgorithm **,InputVcSelection *
 extern void initializeNetwork(Topology **,RoutingAlgorithm **); 
 
 NetInterface::NetInterface(NetInterfaceMsg *niMsg) { 
+   Packet *p; 
    nicConsts = new NicConsts;
    nicConsts->id = niMsg->id;  nicConsts->numP = niMsg->numP;
    nicConsts->startId = niMsg->startId;
 
    numRecvd = 0; prevIntervalStart = 0; counter = 0; roundRobin = 0;
    initializeNetwork(&topology,&routingAlgorithm);
+   int delay = 0,size;
+   if(config.loadRoutingTable) { 
+	if((nicConsts->id-config.nicStart) == SUBNET_MANAGER) {
+	for(int i=0;i<config.numSwitches;i++) {
+		p = new Packet; CkAssert(p != NULL);
+		p->hdr.controlInfo = CONTROL_PACKET;
+		p->hdr.routeInfo.dst = routingAlgorithm->getNextSwitch(i); 
+		p->hdr.routeInfo.datalen = 0;
+        	p->hdr.portId = topology->getStartPort(nicConsts->id-config.nicStart,nicConsts->numP);
+        	p->hdr.vcid = roundRobin; roundRobin = (roundRobin+1)%config.switchVc;
+        	p->hdr.prevId = nicConsts->id; p->hdr.hop = 0;
+        	p->hdr.prev_vcid = -1; p->hdr.src = p->hdr.prev_src = SUBNET_MANAGER;
+        	p->hdr.nextId = topology->getStartSwitch(nicConsts->id-config.nicStart);
+
+		routingAlgorithm->loadTable(p,nicConsts->numP);
+		POSE_invoke(recvPacket(p),Switch,nicConsts->startId,delay);
+		elapse(sizeof(char)*config.numNodes);
+	}
+	} else
+	elapse((config.numSwitches+1)*sizeof(char)*config.numNodes);
+   }	
 }
 
 // Packetize message and pump it out
@@ -36,9 +58,10 @@ void NetInterface::recvMsg(NicMsg *nic) {
                 p->hdr.prevId = nicConsts->id; p->hdr.hop = 0;
                 p->hdr.prev_vcid = -1; p->hdr.prev_src = p->hdr.src;
                 p->hdr.nextId = topology->getStartSwitch(nicConsts->id-config.nicStart);
+		p->hdr.controlInfo = DATA_PACKET;
 		if(config.sourceRouting) {
 		routingAlgorithm->populateRoutes(p,nicConsts->numP); // Should do it just once later per message
-		}
+		} 
 
                 POSE_invoke(recvPacket(p),Switch,nicConsts->startId,delay);
                 delay += ((POSE_TimeType)(curlen/config.switchC_BW));  msgLenRest -= curlen; 

@@ -42,10 +42,19 @@ void Switch::recvPacket(Packet *copyP) {
         Packet *p; p = new Packet; *p = *copyP;
         int outPort,outVc,inPort,inVc,outVcId,nextChannel,inVcId,bufferid,setRequest;
 
+	if((p->hdr.controlInfo == CONTROL_PACKET) && (p->hdr.routeInfo.dst == (id-config.switchStart))) {
+		memcpy(routeTable,p->hdr.nextPort,MAX_ROUTE_HEADER * sizeof(char));
+		return;
+	}
+
         inPort = routingAlgorithm->convertOutputToInputPort(id-config.switchStart,p,numP); inVc = p->hdr.vcid;
         p->hdr.portId = inPort;
+
 	if(config.sourceRouting) {
 		outPort = p->hdr.nextPort[p->hdr.hop++];
+	} else
+	if(config.loadRoutingTable) {
+		outPort = routeTable[p->hdr.routeInfo.dst];
 	} else
         	outPort = routingAlgorithm->selectRoute(id-config.switchStart,p->hdr.routeInfo.dst,numP,topology,p,availBufsize);
 			

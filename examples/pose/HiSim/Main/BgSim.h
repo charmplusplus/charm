@@ -134,7 +134,11 @@ class NicMsg {
 	}
 };
 
-#define MAX_ROUTE_HEADER 16
+#define MAX_ROUTE_HEADER 128  // This variable sucks
+#define CONTROL_PACKET 0x01
+#define DATA_PACKET 0x02
+#define SUBNET_MANAGER 0
+
 // Part of the packet. Contains all neccessary details required for protocol and routing
 class Header {
         public:
@@ -147,8 +151,8 @@ class Header {
         int totalLen,nextId,prevId;    // total length of message
         int portId; 		       // output port id
         int vcid,prev_vcid;	       // vcid = vcid at input , prev_vcid = prev output global vcid
-        Header(){}
-
+	int controlInfo;
+        Header(){} // most common case
         Header & operator=(const Header &obj)
         {
                 src = obj.src; routeInfo = obj.routeInfo;
@@ -156,7 +160,7 @@ class Header {
                 totalLen = obj.totalLen; prevId = obj.prevId;
                 portId = obj.portId; nextId = obj.nextId;
                 vcid = obj.vcid; prev_vcid = obj.prev_vcid;
-		prev_src = obj.prev_src; hop = obj.hop;
+		prev_src = obj.prev_src; hop = obj.hop; controlInfo = obj.controlInfo;
 		memcpy(nextPort, obj.nextPort, MAX_ROUTE_HEADER * sizeof(char));
                 return *this;
         }
@@ -371,7 +375,8 @@ class Switch {
 	map <int,int> mapVc;     // map input to output
 	map <int,vector <Header> > Buffer;  // Save the packets when path is stalled
 	map <int,int> requested;  // Used to do head of line blocking
-
+	unsigned char routeTable[MAX_ROUTE_HEADER]; // next port to take 
+	
 	int id,numP;
         unsigned  char InputRoundRobin,RequestRoundRobin,AssignVCRoundRobin;
 	// Be careful not to put variable data in any of these. Rollback will kill the simulation
@@ -401,6 +406,7 @@ class Switch {
 	availBufsize = obj.availBufsize; InputRoundRobin = obj.InputRoundRobin; RequestRoundRobin = obj.RequestRoundRobin;  
 	Buffer = obj.Buffer; AssignVCRoundRobin = obj.AssignVCRoundRobin; topology = obj.topology; 
 	requested = obj.requested; mapVc = obj.mapVc;
+	memcpy(routeTable, obj.routeTable, MAX_ROUTE_HEADER * sizeof(char));
 	return *this;
 	}
 	bool operator==(const Switch& obj) {

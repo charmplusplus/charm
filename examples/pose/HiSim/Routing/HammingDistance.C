@@ -20,6 +20,29 @@ int HammingDistance::selectRoute(int c,int d,int numP,Topology *top,Packet *p,ma
         return portid;
 }
 
+int HammingDistance::loadTable(Packet *p,int numP) {
+	int current = p->hdr.routeInfo.dst;
+	int mask,xorResult,port;
+
+	for(int dst=0;dst<config.numNodes;dst++) {
+        mask = 0x01; 
+        xorResult = current ^ dst;
+        port = 0;
+       	if(!xorResult) port = numP;
+	else
+        while(!(xorResult & mask)) { mask *= 2; port ++; }
+
+	p->hdr.nextPort[dst] = port;
+	}
+	if(p->hdr.routeInfo.dst == p->hdr.src) return -1;
+	return 1;
+}
+
+int HammingDistance::getNextSwitch(int switchIndex) {
+	return switchIndex; 
+	// Beautiful property, verify it by drawing figure
+}
+	
 void HammingDistance::populateRoutes(Packet *p,int numP) {
 	int current,dst,mask,i,n,xorResult,port;
 

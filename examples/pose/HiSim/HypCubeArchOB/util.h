@@ -30,6 +30,7 @@ public:
    int use_transceiver;
    int inputBuffering;
    int sourceRouting;
+   int loadRoutingTable;
 
   int NodeStart;
   int HCAStart;
