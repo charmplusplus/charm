@@ -18,6 +18,10 @@
 #include "trace.h"
 #include "ck.h"
 #include "trace-common.h"
+#include "conv-mach.h"
+#ifdef CMK_ORIGIN2000
+#include <sys/hwperftypes.h>
+#endif
 
 #define MAX_ENTRIES 500
 
@@ -71,6 +75,7 @@ class CountLogPool {
 class TraceCounter : public Trace {
   public:
     TraceCounter();
+    ~TraceCounter();
     void userEvent(int e) { }
     void creation(envelope *e, int num=1) { }
     void beginExecute(envelope *e);
@@ -96,9 +101,9 @@ class TraceCounter : public Trace {
     void traceClose();
     void traceBegin() { }
     void traceEnd() { }
- 
-    //! CounterArg is a linked list of strings that allows 
-    //! processing of command line args 
+
+    //! CounterArg is a linked list of strings that allows
+    //! processing of command line args
     struct CounterArg {
       int         code;
       char*       arg;
@@ -106,10 +111,10 @@ class TraceCounter : public Trace {
       CounterArg* next;
 
       CounterArg(): code(-1), arg(NULL), desc(NULL), next(NULL) { }
-      CounterArg(int c, char* a, char* d): 
-	code(c), arg(a), desc(d), next(NULL) { }
+      CounterArg(int c, char* a, char* d):
+        code(c), arg(a), desc(d), next(NULL) { }
       void setValues(int _code, char* _arg, char* _desc) {
-	code = _code;  arg = _arg;  desc = _desc;
+        code = _code;  arg = _arg;  desc = _desc;
       }
     };
 
@@ -122,9 +127,29 @@ class TraceCounter : public Trace {
     CounterArg* lastArg_;      // pointer to end of linked list of args
     int         argStrSize_;   // size of maximum arg string (formatted output)
 
-    int         genStart_;     // track value of start_counters
     int         counter1_;     // 1st counter to track
     int         counter2_;     // 2nd counter to track
+
+    #ifdef CMK_ORIGIN2000
+    enum Status { IDLE, WORKING };
+    Status      status_;       // to prevent errors
+    int         genStart_;     // track value of start_counters
+    int         fileDesc_;     // file descriptor for accessing hw counters
+    hwperf_profevctrarg_t evctrArgs_;  // tells what type of counter to profile
+    hwperf_cntr_t         cnts_;       // reads the counters values
+    // starts hw profiling for these counters
+    // returns -1 if error, generation number if no error
+    int startCounter(int counter1, int counter2);
+    // gets hw profile values for these counters
+    // returns -1 if error, generation number if no error
+    int readCounters
+    (
+      int        counter1,
+      long long* value1,
+      int        counter2,
+      long long* value2
+    );
+    #endif // CMK_ORIGIN2000
 
     //! add the argument parameters to the linked list of args choices
     void registerArg(CounterArg* arg);
@@ -139,3 +164,5 @@ class TraceCounter : public Trace {
 #endif  // __trace_counter_h__
 
 /*@}*/
+
+

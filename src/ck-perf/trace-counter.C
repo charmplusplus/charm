@@ -10,13 +10,22 @@
 */
 /*@{*/
 
-#include "conv-mach.h"
-// #define CMK_ORIGIN2000
 #ifdef CMK_ORIGIN2000
-#include "trace-counter.h"
-#include "limits.h"  // for LONGLONG_MAX
 
-#define DEBUGF(x) // CmiPrintf("%d/%d DEBUG: ", CkMyPe(), CkNumPes()); CmiPrintf x
+#include "conv-mach.h"
+#include "trace-counter.h"
+
+#ifdef CMK_ORIGIN2000
+#include <fcntl.h>
+#include <sys/hwperfmacros.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+//#include "limits.h"  // for LONGLONG_MAX
+#endif // CMK_ORIGIN2000
+
+#define DEBUGF(x) CmiPrintf x
 #define VER 1.0
 
 // for performance monitoring
@@ -79,7 +88,7 @@ static TraceCounter::CounterArg COUNTER_ARG[NUM_COUNTER_ARGS] =
 
 void _createTracecounter(char **argv)
 {
-  DEBUGF(("%d createTraceCounter\n", CkMyPe()));
+  DEBUGF(("%d/%d DEBUG: createTraceCounter\n", CkMyPe(), CkNumPes()));
   CpvInitialize(Trace*, _trace);
   TraceCounter* tc = new TraceCounter();  _MEMCHECK(tc);
   tc->traceInit(argv);
@@ -89,12 +98,13 @@ void _createTracecounter(char **argv)
 
 StatTable::StatTable(char** args, int argc): stats_(NULL), numStats_(0)
 {
-  DEBUGF(("StatTable::StatTable %08x size %d\n", this, argc));
+  DEBUGF(("%d/%d DEBUG: StatTable::StatTable %08x size %d\n", 
+          CkMyPe(), CkNumPes(), this, argc));
 
   stats_ = new Statistics[argc];  _MEMCHECK(stats_);
   numStats_ = argc;
   for (int i=0; i<argc; i++) { 
-    DEBUGF(("  %d name %s\n", i, args[i]));
+    DEBUGF(("%d/%d DEBUG:   %d name %s\n", CkMyPe(), CkNumPes(), i, args[i]));
     stats_[i].name = args[i]; 
   }
   clear();
@@ -124,7 +134,7 @@ void StatTable::setEp(int epidx, int stat, long long value, double time)
 //!   3. total time in us spent for each entry
 void StatTable::write(FILE* fp) 
 {
-  DEBUGF(("Writing StatTable\n"));
+  DEBUGF(("%d/%d DEBUG: Writing StatTable\n", CkMyPe(), CkNumPes()));
   int i, j;
   for (i=0; i<numStats_; i++) {
     // write number of calls for each entry
@@ -146,7 +156,7 @@ void StatTable::write(FILE* fp)
     }
     fprintf(fp, "\n");
   }
-  DEBUGF(("Finished writing StatTable\n"));
+  DEBUGF(("%d/%d DEBUG: Finished writing StatTable\n", CkMyPe(), CkNumPes()));
 }
 
 void StatTable::clear() 
@@ -163,8 +173,9 @@ void StatTable::clear()
 CountLogPool::CountLogPool(char* pgm, char** args, int argc): 
   stats_(args, argc)
 {
-  DEBUGF(("CountLogPool::CountLogPool() %08x\n", this));
-  for (int j=0; j<argc; j++) { DEBUGF(("  %d %s\n", j, args[j])); }
+  DEBUGF(("%d/%d DEBUG: CountLogPool::CountLogPool() %08x\n", 
+          CkMyPe(), CkNumPes(), this));
+  // for (int j=0; j<argc; j++) { DEBUGF(("    DEBUG:   %d %s\n", j, args[j])); }
 
   char pestr[10];
   sprintf(pestr, "%d", CkMyPe());
@@ -172,7 +183,7 @@ CountLogPool::CountLogPool(char* pgm, char** args, int argc):
   char* fname = new char[len+1];  _MEMCHECK(fname);
   sprintf(fname, "%s.%s.count", pgm, pestr);
   fp_ = NULL;
-  DEBUGF(("TRACE: %s:%d\n", fname, errno));
+  DEBUGF(("%d/%d DEBUG: TRACE: %s:%d\n", CkMyPe(), CkNumPes(), fname, errno));
   do {
     fp_ = fopen(fname, "w+");
   } while (!fp_ && errno == EINTR);
@@ -201,7 +212,7 @@ void CountLogPool::writeSts(void)
   _MEMCHECK(fname);
   sprintf(fname, "%s.count.sts", CpvAccess(pgmName));
   FILE *sts = fopen(fname, "w+");
-  // DEBUGF(("File: %s \n", fname));
+  // DEBUGF(("%d/%d DEBUG: File: %s \n", CkMyPe(), CkNumPes(), fname));
   if(sts==0)
     CmiAbort("Cannot open summary sts file for writing.\n");
   delete[] fname;
@@ -228,8 +239,8 @@ void CountLogPool::writeSts(void)
 
 void CountLogPool::setEp(int epidx, long long count1, long long count2, double time) 
 {
-  // DEBUGF(("CountLogPool::setEp %08x %d %d %d %f\n", 
-  //         this, epidx, count1, count2, time));
+  // DEBUGF(("%d/%d DEBUG: CountLogPool::setEp %08x %d %d %d %f\n", 
+  //        CkMyPe(), CkNumPes(), this, epidx, count1, count2, time));
 
   if (epidx >= MAX_ENTRIES) {
     CmiAbort("CountLogPool::setEp too many entry points!\n");
@@ -245,11 +256,29 @@ TraceCounter::TraceCounter() :
   startUnpack_ (0.0),
   firstArg_    (NULL),
   lastArg_     (NULL),
-  argStrSize_  (0)
+  argStrSize_  (0),
+  #ifdef CMK_ORIGIN2000
+  status_      (IDLE),
+  #endif
+  fileDesc_    (-1)
 {
   for (int i=0; i<NUM_COUNTER_ARGS; i++) { registerArg(&COUNTER_ARG[i]); }
 }
 
+TraceCounter::~TraceCounter() 
+{
+  #ifdef CMK_ORIGIN2000
+  if (fileDesc_ != -1) {
+    // release the counters 
+    if ((ioctl(fileDesc_, HWPERF_RELSYSCNTRS)) < 0) {
+      CmiPrintf("%d/%d prioctl HWPERF_RELSYSCNTRS returns error\n", 
+		CkMyPe(), CkNumPes());
+      ConverseExit(); 
+    }
+  }
+  #endif
+}
+  
 void TraceCounter::traceInit(char **argv)
 {
   CpvInitialize(CountLogPool*, _logPool);
@@ -269,7 +298,7 @@ void TraceCounter::traceInit(char **argv)
   if (CmiGetArgString(argv,"+counter1",&counterArg1.arg)) {
     arg1valid = matchArg(&counterArg1);
     if (CkMyPe() == 0) { 
-      DEBUGF(("arg1 is %s\n", counterArg1.arg)); 
+      DEBUGF(("    DEBUG: arg1 is %s\n", counterArg1.arg)); 
       if (!arg1valid) { CmiPrintf("Bad +counter1 arg %s\n", counterArg1.arg); }
     }
     badArg = !arg1valid;
@@ -277,7 +306,7 @@ void TraceCounter::traceInit(char **argv)
   if (CmiGetArgString(argv,"+counter2",&counterArg2.arg)) {
     arg2valid = matchArg(&counterArg2);
     if (CkMyPe() == 0) { 
-      DEBUGF(("arg2 is %s\n", counterArg2.arg)); 
+      DEBUGF(("    DEBUG: arg2 is %s\n", counterArg2.arg)); 
       if (!arg2valid) { CmiPrintf("Bad +counter2 arg %s\n", counterArg2.arg); }
     }
     badArg = badArg || !arg2valid;
@@ -290,7 +319,7 @@ void TraceCounter::traceInit(char **argv)
   }
   else if (!arg1valid || !arg2valid) {
     if (CkMyPe() == 0) {
-      CmiPrintf("ERROR: You've linked with '+tracemode counter', therefore you\n"
+      CmiPrintf("ERROR: You've linked with '-tracemode counter', therefore you\n"
 		"  must specify '+counter1 <arg1>' and '+counter2 <arg2>' to run.\n"
 		"  Type '+counter-help' to get list of counters.\n");
     }
@@ -307,13 +336,15 @@ void TraceCounter::traceInit(char **argv)
   }
   counter1_ = counterArg1.code;
   counter2_ = counterArg2.code;
-  DEBUGF(("Counter1=%d Counter2=%d\n", counter1_, counter2_));
+  DEBUGF(("    DEBUG: Counter1=%d Counter2=%d\n", counter1_, counter2_));
   char* args[2];  // prepare arguments for creating log pool
   args[0] = counterArg1.arg;
   args[1] = counterArg2.arg;
   CpvAccess(_logPool) = new CountLogPool(CpvAccess(pgmName), args, 2);
   _MEMCHECK(CpvAccess(_logPool));
-  DEBUGF(("%d Created _logPool at %08x\n", CkMyPe(), CpvAccess(_logPool)));
+  DEBUGF(("%d/%d DEBUG: Created _logPool at %08x\n", 
+          CkMyPe(), CkNumPes(), CpvAccess(_logPool)));
+
 }
 
 void TraceCounter::traceClearEps(void)
@@ -352,19 +383,35 @@ void TraceCounter::beginExecute
 {
   execEP_=ep;
   startEP_=TraceTimer();
-  // DEBUGF(("start: %f \n", start));
+  DEBUGF(("%d/%d DEBUG: beginExecute EP %d\n", CkMyPe(), CkNumPes(), ep));
 
-  if ((genStart_=start_counters(counter1_, counter2_)) < 0) {
-    CmiPrintf("counter1=%d counter2=%d\n", counter1_, counter2_);
-    CmiAbort("ERROR: start_counters()\n");
+  if (status_!= IDLE) { 
+    CmiPrintf("WARN: %d beginExecute called when status not IDLE!\n", CkMyPe());
+    return;
+  }
+  else { status_=WORKING; }
+
+  if ((genStart_=start_counters(counter1_, counter2_))<0)
+  {
+    CmiPrintf("genStart=%d counter1=%d counter2=%d\n", 
+              genStart_, counter1_, counter2_);
+    CmiAbort("ERROR: start_counters() in beginExecute\n");
   }
 
-  DEBUGF(("beginExecute EP %d genStart %d\n", ep, genStart_));
+  DEBUGF(("%d/%d DEBUG:   beginExecute EP %d genStart %d\n", 
+          CkMyPe(), CkNumPes(), ep, genStart_));
 }
 
 void TraceCounter::endExecute(void)
 {
-  DEBUGF(("endExecute EP %d genStart_ %d ", execEP_, genStart_));
+  DEBUGF(("%d/%d DEBUG: endExecute EP %d genStart_ %d\n", 
+          CkMyPe(), CkNumPes(), execEP_, genStart_));
+
+  if (status_!=WORKING) {
+    CmiPrintf("WARN: %d endExecute called when status not WORKING!\n", CkMyPe());
+    return;
+  }
+  else { status_=IDLE; }
 
   long long value1 = 0, value2 = 0;
   int genRead;
@@ -374,12 +421,12 @@ void TraceCounter::endExecute(void)
     traceWriteSts();
     CmiPrintf("genRead %d genStart_ %d counter1 %ld counter2 %ld\n",
 	      genRead, genStart_, value1, value2);
-    CmiAbort("ERROR: read_counters()\n");
+    CmiAbort("ERROR: read_counters() in endExecute\n");
   }
   double t = TraceTimer();
 
-  DEBUGF(("genRead %d Time %f counter1 %d counter2 %ld\n", 
-	  genRead, t-startEP_, value1, value2));
+  DEBUGF(("%d/%d DEBUG:   endExecute genRead %d Time %f counter1 %d counter2 %ld\n", 
+	  CkMyPe(), CkNumPes(), genRead, t-startEP_, value1, value2));
   if (execEP_ != -1) { 
     CpvAccess(_logPool)->setEp(execEP_, value1, value2, t-startEP_); 
   }
@@ -387,17 +434,33 @@ void TraceCounter::endExecute(void)
 
 void TraceCounter::beginPack(void) 
 { 
-  startPack_ = CmiWallTimer(); 
-  if ((genStart_=start_counters(counter1_, counter2_)) < 0) {
-    CmiPrintf("counter1=%d counter2=%d\n", counter1_, counter2_);
-    CmiAbort("ERROR: start_counters()\n");
+  DEBUGF(("%d/%d DEBUG: beginPack\n", CkMyPe(), CkNumPes()));
+
+  if (status_!= IDLE) { 
+    CmiPrintf("WARN: %d beginPack called when status not IDLE!\n", CkMyPe());
+    return;
   }
-  DEBUGF(("beginPack genStart %d\n", genStart_));
+  else { status_=WORKING; }
+
+  startPack_ = CmiWallTimer(); 
+  if ((genStart_=start_counters(counter1_, counter2_))<0) {
+    CmiPrintf("genStart=%d counter1=%d counter2=%d\n", 
+              genStart_, counter1_, counter2_);
+    CmiAbort("ERROR: start_counters() in beginPack\n");
+  }
+  DEBUGF(("%d/%d DEBUG:   beginPack genStart %d\n", 
+          CkMyPe(), CkNumPes(), genStart_));
 }
 
 void TraceCounter::endPack(void) 
 {
-  DEBUGF(("endPack "));
+  DEBUGF(("%d/%d DEBUG: endPack\n", CkMyPe(), CkNumPes()));
+
+  if (status_!=WORKING) {
+    CmiPrintf("WARN: %d endPack called when status not WORKING!\n", CkMyPe());
+    return;
+  }
+  else { status_=IDLE; }
 
   long long value1 = 0, value2 = 0;
   int genRead;
@@ -407,43 +470,59 @@ void TraceCounter::endPack(void)
     traceWriteSts();
     CmiPrintf("genRead %d genStart_ %d counter1 %ld counter2 %ld\n",
 	      genRead, genStart_, value1, value2);
-    CmiAbort("ERROR: read_counters()\n");
+    CmiAbort("ERROR: read_counters() in endPack\n");
   }
   double t = CmiWallTimer();
 
-  DEBUGF(("EP %d Time %f counter1 %d counter2 %ld\n", 
-	  _packEP, t-startPack_, value1, value2));
+  DEBUGF(("%d/%d DEBUG:   endPack genRead %d EP %d Time %f counter1 %d counter2 %ld\n", 
+	  CkMyPe(), CkNumPes(), genRead, _packEP, t-startPack_, value1, value2));
   CpvAccess(_logPool)->setEp(_packEP, value1, value2, t - startPack_);
 }
 
 void TraceCounter::beginUnpack(void) 
 { 
-  startUnpack_ = CmiWallTimer(); 
-  if ((genStart_=start_counters(counter1_, counter2_)) < 0) {
-    CmiPrintf("counter1=%d counter2=%d\n", counter1_, counter2_);
-    CmiAbort("ERROR: start_counters()\n");
+  DEBUGF(("%d/%d DEBUG: beginUnpack\n", CkMyPe(), CkNumPes()));
+
+  if (status_!= IDLE) { 
+    CmiPrintf("WARN: %d beginUnpack called when status not IDLE!\n", CkMyPe());
+    return;
   }
-  DEBUGF(("beginUnpack genStart %d\n", genStart_));
+  else { status_=WORKING; }
+
+  startUnpack_ = CmiWallTimer(); 
+  if ((genStart_=start_counters(counter1_, counter2_))<0) {
+    CmiPrintf("genStart=%d counter1=%d counter2=%d\n", 
+              genStart_, counter1_, counter2_);
+    CmiAbort("ERROR: start_counters() in beginUnpack\n");
+  }
+  DEBUGF(("%d/%d DEBUG:   beginUnpack genStart %d\n", 
+          CkMyPe(), CkNumPes(), genStart_));
 }
 
 void TraceCounter::endUnpack(void) 
 {
-  DEBUGF(("endUnpack "));
+  DEBUGF(("%d/%d DEBUG: endUnpack\n", CkMyPe(), CkNumPes()));
+     
+  if (status_!=WORKING) {
+    CmiPrintf("WARN: %d endUnack called when status not WORKING!\n", CkMyPe());
+    return;
+  }
+  else { status_=IDLE; }
 
   long long value1 = 0, value2 = 0;
   int genRead;
-  if ((genRead=read_counters(counter1_, &value1, counter2_, &value2)) < 0 ||
+  if ((genRead=read_counters(counter1_, &value1, counter2_, &value2))<0 ||
       genRead != genStart_)
   {
     traceWriteSts();
     CmiPrintf("genRead %d genStart_ %d counter1 %ld counter2 %ld\n",
 	      genRead, genStart_, value1, value2);
-    CmiAbort("ERROR: read_counters()\n");
+    CmiAbort("ERROR: read_counters() in endUnpack\n");
   }
   double t = CmiWallTimer();
 
-  DEBUGF(("EP %d Time %f counter1 %d counter2 %ld\n", 
-	  _unpackEP, t-startUnpack_, value1, value2));
+  DEBUGF(("%d/%d DEBUG:   endUnpack genRead %d EP %d Time %f counter1 %d counter2 %ld\n", 
+	  CkMyPe(), CkNumPes(), genRead, _unpackEP, t-startUnpack_, value1, value2));
   CpvAccess(_logPool)->setEp(_unpackEP, value1, value2, t-startUnpack_);
 }
 
@@ -503,9 +582,9 @@ bool TraceCounter::matchArg(CounterArg* arg)
   if (matchCode == 0) {
     if (arg->arg[0] != '0' || arg->arg[1] != '\0') { matchCode = -1; }
   }
-  // DEBUGF(("Matching %s or %d\n", arg->arg, matchCode));
+  // DEBUGF(("%d/%d DEBUG: Matching %s or %d\n", CkMyPe(), CkNumPes(), arg->arg, matchCode));
   while (matchArg != NULL && !match) {
-    // DEBUGF(("  Examining %d %s\n", matchArg->code, matchArg->arg));
+    // DEBUGF(("%d/%d DEBUG:   Examining %d %s\n", CkMyPe(), CkNumPes(), matchArg->code, matchArg->arg));
     if (strcmp(matchArg->arg, arg->arg)==0) {
       match = true;
       arg->code = matchArg->code;
@@ -519,7 +598,7 @@ bool TraceCounter::matchArg(CounterArg* arg)
     }
     matchArg = matchArg->next;
   }
-  // DEBUGF(("Match = %d\n", match));
+  // DEBUGF(("%d/%d DEBUG: Match = %d\n", CkMyPe(), CkNumPes(), match));
   return match;
 }
 
@@ -541,6 +620,86 @@ void TraceCounter::printHelp()
     help = help->next;
   }
 }
+
+#ifdef CMK_ORIGIN2000
+// starts hw profiling for these counters
+// returns -1 if error, generation number if no error
+int TraceCounter::startCounter(int counter1, int counter2)
+{
+  static bool TraceCounterInit = false;
+  if (!TraceCounterInit) {
+    TraceCounterInit = true;
+
+    pid_t pid = getpid();
+    char pfile[16];
+    sprintf(pfile, "/proc/%05d", pid);
+    fileDesc_ = open(pfile, O_RDWR);
+    if (fileDesc_ == -1) {
+      CmiPrintf("ERROR: %d/%d could not open %s\n", CkMyPe(), CkNumPes(), pfile);
+      ConverseExit();  return -1;
+    }
+  }
+  
+  if (counter1 != counter1_ || counter2 != counter2_) {
+    counter1_ = counter1;
+    counter2_ = counter2;
+    for (int i = 0; i < HWPERF_MAXEVENT; i++) {
+      if (i == counter1_ || i == counter2_) {
+        evctrArgs_.hwp_evctrargs.hwp_evctrl[i].hwperf_creg.hwp_mode = 
+          HWPERF_CNTEN_U;
+        // HWPERF_CNTEN_U;  // user mode counting
+        // HWPERF_CNTEN_S;  // supervisor mode   
+        // HWPERF_CNTEN_K;  // kernel mode       
+        // HWPERF_CNTEN_E;  // exception level   
+        // HWPERF_CNTEN_A;  // all "real" modes  
+        evctrArgs_.hwp_evctrargs.hwp_evctrl[i].hwperf_creg.hwp_ie = 1;
+        evctrArgs_.hwp_evctrargs.hwp_evctrl[i].hwperf_creg.hwp_ev = 
+          (i>=HWPERF_CNT1BASE) ? HWPERF_CNT1BASE-i : i;
+        evctrArgs_.hwp_ovflw_freq[i] = 0;
+      }
+      else {
+        evctrArgs_.hwp_evctrargs.hwp_evctrl[i].hwperf_spec = 0;
+        evctrArgs_.hwp_ovflw_freq[i] = 0;
+      }
+    }
+    evctrArgs_.hwp_ovflw_sig = 0;
+  }
+
+  if ((genStart_=ioctl(fileDesc_, HWPERF_ENSYSCNTRS, (void*)&evctrArgs_))<0)
+  {
+    CmiPrintf("genStart=%d counter1=%d counter2=%d\n", 
+              genStart_, counter1_, counter2_);
+    CmiAbort("ERROR: TraceCounter::startCounters()\n");
+  }
+  return genStart_;
+}
+
+// gets hw profile values for these counters
+// returns -1 if error, generation number if no error
+int TraceCounter::readCounters
+(
+  int        counter1, 
+  long long* value1, 
+  int        counter2, 
+  long long* value2
+)
+{
+  int genRead;
+  if ((genRead=ioctl(fileDesc_, HWPERF_GET_CPUCNTRS, (void*)&cnts_)) < 0 ||
+      genRead != genStart_)
+  {
+    traceWriteSts();
+    CmiPrintf("genRead %d genStart_ %d counter1 %ld counter2 %ld\n",
+	      genRead, genStart_, value1, value2);
+    CmiAbort("ERROR: readCounters()\n");
+  }
+  double t = TraceTimer();
+  *value1 = cnts_.hwp_evctr[counter1_];
+  *value2 = cnts_.hwp_evctr[counter2_];
+  return genRead;
+}
+
+#endif // CMK_ORIGIN2000
 
 #endif // CMK_ORIGIN2000
 
