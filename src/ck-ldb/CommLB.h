@@ -43,6 +43,7 @@ public:
   CommLB();
   CommLB(CkMigrateMessage *m);
 private:
+  CentralLB::LDStats* stats;
   CmiBool QueryBalanceNow(int step);
   LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
   void alloc(int pe, int id, double load);
@@ -50,6 +51,7 @@ private:
   int search(LDObjid oid, LDOMid mid);
   void add_graph(int x, int y, int data, int nmsg);
   void make_hash();
+  void update(int id, int pe);
 };
 
 #endif

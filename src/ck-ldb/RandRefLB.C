@@ -47,10 +47,12 @@ void RandRefLB::work(CentralLB::LDStats* stats, int count)
   CkVec<MigrateInfo*> migrateInfo;
   int obj;
 
-  int* from_procs = Refiner::AllocProcs(count,stats);
+  RandCentLB::work(stats, count);
 
+  // from_proc after first lb strategy
+  int* from_procs = Refiner::AllocProcs(count,stats);
   for(obj=0; obj < stats->n_objs; obj++)
-      from_procs[obj] = (int)(CrnDrand()*(CkNumPes()-1) + 0.5 );
+      from_procs[obj] = stats->to_proc[obj];
 
   int* to_procs = Refiner::AllocProcs(count,stats);
 
@@ -60,8 +62,8 @@ void RandRefLB::work(CentralLB::LDStats* stats, int count)
   for(obj=0; obj < stats->n_objs; obj++) {
       LDObjData &oData = stats->objData[obj];
       if (stats->from_proc[obj] != to_procs[obj]) {
-	CkPrintf("[%d] Obj %d migrating from %d to %d\n",
-			 CkMyPe(),obj,stats->from_proc[obj],to_procs[obj]);
+	// CkPrintf("[%d] Obj %d migrating from %d to %d\n",
+	// 		 CkMyPe(),obj,stats->from_proc[obj],to_procs[obj]);
         stats->to_proc[obj] = to_procs[obj];
       }
   }

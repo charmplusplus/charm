@@ -19,8 +19,8 @@
 
 #include "CommLB.h"
 
-#define alpha 35e-6 /*Startup time per message, seconds*/
-#define beeta 8.5e-9 /*Long-message time per byte, seconds*/
+#define alpha PER_MESSAGE_SEND_OVERHEAD  /*Startup time per message, seconds*/
+#define beeta PER_BYTE_SEND_OVERHEAD     /*Long-message time per byte, seconds*/
 
 void CreateCommLB()
 {
@@ -43,6 +43,7 @@ CommLB::CommLB()
 	CkPrintf("[%d] CommLB created\n",CkMyPe());
     manager_init();
 }
+
 CommLB::CommLB(CkMigrateMessage *m):CentralLB(m) {
     lbname = "CommLB";
     manager_init();
@@ -86,7 +87,7 @@ double CommLB::compute_com(int id, int pe){
     
     for(j=0;(j<2*nobj)&&(ptr != NULL);j++,ptr=ptr->next){
 	int destObj = ptr->id;
-	if(alloc_array[npe][destObj] == 0.0)  // this obj has been assigned
+	if(alloc_array[npe][destObj] == 0.0)  // this obj has not been assigned
 	    continue;
 	if(alloc_array[pe][destObj] > 0.0)    // this obj is assigned to same pe
 	    continue;
@@ -98,7 +99,26 @@ double CommLB::compute_com(int id, int pe){
     return total_time;
 }
 
+void CommLB::update(int id, int pe){
+    graph * ptr = object_graph[id].next;
+    
+    for(int j=0;(j<2*nobj)&&(ptr != NULL);j++,ptr=ptr->next){
+	int destObj = ptr->id;
+	if(alloc_array[npe][destObj] == 0.0)  // this obj has been assigned
+	    continue;
+	if(alloc_array[pe][destObj] > 0.0)    // this obj is assigned to same pe
+	    continue;
+	int destPe = stats->to_proc[destObj];
+	int com_data = ptr->data;
+	int com_msg = ptr->nmsg;
+        double total_time = alpha*com_msg + beeta*com_data;
+        alloc_array[destPe][nobj] += total_time;
+    }
+    
+}
+
 // add comm between obj x and y
+// two direction
 void CommLB::add_graph(int x, int y, int data, int nmsg){
     graph * ptr, *temp;
     
@@ -158,14 +178,14 @@ void init(double **a, graph * object_graph, int l, int b){
     }
 }
 
-LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
+LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* _stats, int count)
 {
     int pe,obj,com;
     ObjectRecord *x;
+    CkVec<MigrateInfo*> migrateInfo;
     
     //  CkPrintf("[%d] CommLB strategy\n",CkMyPe());
-    
-    CkVec<MigrateInfo*> migrateInfo;
+    stats = _stats; 
     
     alloc_array = new double *[count+1];
     
@@ -235,6 +255,7 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
     delete x;
     //  CkPrintf("before alloc firstpe = %d\n",pe);
     alloc(pe,maxid,stats->objData[mpos].wallTime);
+    stats->assign(maxid, pe);
     if(pe != spe){
 	//    CkPrintf("**Moving from %d to %d\n",spe,pe);
 	MigrateInfo* migrateMe = new MigrateInfo;
@@ -272,8 +293,12 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 	}
 	/* CkPrintf("check id = %d, processor = %d, obj = %lf com = %lf, pro = %lf, comp=%lf\n", maxid,minpe,x->load,min_temp,alloc_array[minpe][nobj],total_time); */
 	
+	// now that maxid assigned to minpe, update other pes load
+	update(maxid, minpe);
+
 	//    CkPrintf("before 2nd alloc\n");
 	alloc(minpe,maxid,x->load + min_temp);
+        stats->assign(maxid, minpe);
 	
 	if(minpe != spe){
 	    //      CkPrintf("**Moving from %d to %d\n",spe,minpe);

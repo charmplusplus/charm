@@ -49,9 +49,9 @@ void RandCentLB::work(CentralLB::LDStats* stats, int count)
   for(int obj=0; obj < stats->n_objs; obj++) {
       LDObjData &odata = stats->objData[obj];
       if (odata.migratable) {
-	const int dest = (int)(CrnDrand()*(CkNumPes()-1) + 0.5);
+	const int dest = (int)(CrnDrand()*(count-1) + 0.5);
 	if (dest != stats->from_proc[obj]) {
-	  // CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),obj,odata.from_proc,dest);
+	  // CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),obj,stats->from_proc[obj],dest);
 	  stats->to_proc[obj] = dest;
         }
       }

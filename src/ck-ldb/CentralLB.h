@@ -104,6 +104,7 @@ public:
     void makeCommHash();
     void deleteCommHash();
     int getHash(LDObjid oid, LDOMid mid);
+    void assign(int oid, int pe) { to_proc[oid] = pe; }
     void clear() {
       n_objs = n_comm = 0;
       delete [] objData;
