@@ -153,10 +153,10 @@ void traceMessageRecv(char *msg, int pe)
 
 // CMK_OPTIMIZE is already guarded in convcore.c
 extern "C"
-void traceResume(void)
+void traceResume(CmiObjId *tid)
 {
 #if ! CMK_TRACE_IN_CHARM
-    CkpvAccess(_traces)->beginExecute(0);
+    CkpvAccess(_traces)->beginExecute(tid);
 #endif
 }
 

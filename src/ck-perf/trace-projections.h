@@ -24,6 +24,8 @@
 
 #include "trace-common.h"
 
+#define PROJECTION_VERSION  "4.0"
+
 /// a log entry in trace projection
 class LogEntry {
   public:
@@ -34,10 +36,14 @@ class LogEntry {
     UShort eIdx;
     UChar type; 
     int msglen;
+    double recvTime;
+    CmiObjId   id;
   public:
     LogEntry() {}
-    LogEntry(double tm, UChar t, UShort m=0, UShort e=0, int ev=0, int p=0, int ml=0) { 
+    LogEntry(double tm, UChar t, UShort m=0, UShort e=0, int ev=0, int p=0, int ml=0, CmiObjId *d=NULL, double rt=0.) {
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
+      if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
+      recvTime = rt; 
     }
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
@@ -85,7 +91,7 @@ class LogPool {
     void writeCompressed(void);
 #endif
     void writeSts(void);
-    void add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml=0);
+    void add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0.);
     void postProcessLog();
 };
 
@@ -108,6 +114,7 @@ class TraceProjections : public Trace {
     void userBracketEvent(int e, double bt, double et);
     void creation(envelope *e, int num=1);
     void beginExecute(envelope *e);
+    void beginExecute(CmiObjId  *tid);
     void beginExecute(int event,int msgType,int ep,int srcPe,int ml);
     void endExecute(void);
     void messageRecv(char *env, int pe);

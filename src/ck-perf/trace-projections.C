@@ -208,6 +208,7 @@ void LogPool::writeCompressed(void) {
 
 void LogPool::writeSts(void)
 {
+  fprintf(stsfp, "VERSION %s\n", PROJECTION_VERSION);
   fprintf(stsfp, "MACHINE %s\n",CMK_MACHINE_NAME);
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
   fprintf(stsfp, "TOTAL_CHARES %d\n", _numChares);
@@ -229,10 +230,10 @@ void LogPool::writeSts(void)
   fclose(stsfp);
 }
 
-void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml) 
+void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml, CmiObjId *id, double recvT) 
 {
   new (&pool[numEntries++])
-    LogEntry(time, type, mIdx, eIdx, event, pe, ml);
+    LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT);
   if(poolSize==numEntries) {
     double writeTime = TraceTimer();
     writeLog();
@@ -287,8 +288,10 @@ void LogEntry::write(FILE* fp)
       fprintf(fp, "%u %d\n", (UInt) (time*1.0e6), pe);
       break;
 
-    case CREATION:
     case BEGIN_PROCESSING:
+      fprintf(fp, "%d %d %u %d %d %d %d %d %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe, msglen, (UInt)(recvTime*1.e6), id.id[0], id.id[1], id.id[2]);
+      break;
+    case CREATION:
     case END_PROCESSING:
     case MESSAGE_RECV:
       fprintf(fp, "%d %d %u %d %d %d\n", mIdx, eIdx, (UInt) (time*1.0e6), event, pe, msglen);
@@ -553,6 +556,14 @@ void TraceProjections::creation(envelope *e, int num)
     }
     curevent += num;
   }
+}
+
+void TraceProjections::beginExecute(CmiObjId *tid)
+{
+  execEvent = CtvAccess(curThreadEvent);
+  execEp = (-1);
+  _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
+                             execEvent,CkMyPe(), 0, tid);
 }
 
 void TraceProjections::beginExecute(envelope *e)

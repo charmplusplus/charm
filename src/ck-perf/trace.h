@@ -42,6 +42,7 @@ class Trace {
     // NOTE: begin/endPack and begin/endUnpack can be called in between
     //       a beginExecute and its corresponding endExecute.
     virtual void beginExecute(envelope *) {}
+    virtual void beginExecute(CmiObjId *tid) {}
     virtual void beginExecute(
       int event,   // event type defined in trace-common.h
       int msgType, // message type
@@ -90,6 +91,7 @@ public:
     inline void userBracketEvent(int e,double bt, double et) {ALLDO(userBracketEvent(e,bt,et));}
     inline void creation(envelope *env, int num=1) { ALLDO(creation(env, num));}
     inline void beginExecute(envelope *env) {ALLDO(beginExecute(env));}
+    inline void beginExecute(CmiObjId *tid) {ALLDO(beginExecute(tid));}
     inline void beginExecute(int event,int msgType,int ep,int srcPe, int mlen) {ALLDO(beginExecute(event, msgType, ep, srcPe, mlen));}
     inline void endExecute(void) {ALLDO(endExecute());}
     inline void messageRecv(char *env, int pe) {ALLDO(messageRecv(env, pe));}
