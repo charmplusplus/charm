@@ -500,6 +500,8 @@ handle, int atTime)}\\
 \item {\tt {\bf OVT()}}\\
 	$\circ$ Returns the object virtual time (OVT) of the poser in
 	which it is called
+\item {\tt void $MySim$::{\bf terminus}()}\\
+	$\circ$ When simulation has terminated and program is about to exit, this method is called on all posers.  Implemented as an empty method in the base {\tt rep} class, the programmer may choose to override this with whatever actions may need to be performed per object at the end of the simulation.
 \end{itemize}
 
 \section{Compiling and Running a Sample \pose{} Program}
@@ -527,6 +529,11 @@ pose\_config.h} file in the \pose{} installation, and rebuilding
 	operations.  Produces a small slowdown in program.\\
 \item {\tt {\bf POSE\_DOP\_ON}}\\
 	$\circ$ Turn on timing and statistics gathering for degree of parallelism calculations.  Generates log files that can be loaded by ploticus scripts to produce graphs plotting active entities over time.  Slows down program dramatically.\\
+\item {\tt {\bf PRIO\_MSGS}}\\ $\circ$ Turn on prioritized event
+	scheduling in the Charm++ scheduler.  This prioritizes the
+	events by timestamp.  To use ``big timestamp'' type (coming
+	soon), PRIO\_MSGS must be off.  PRIO\_MSGS off makes the program
+	a little slower.\\
 \item {\tt {\bf POSE\_COMM\_ON}}\\
 	$\circ$ Turn on streaming communication optimization for small message packing.\\
 \item {\tt {\bf COMM\_TIMEOUT}}\\
