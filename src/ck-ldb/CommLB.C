@@ -146,7 +146,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
 {
   int pe,obj,com;
   double load_pe=0.0;
-  InfoRecord *x;
+  ObjectRecord *x;
 
   CkPrintf("[%d] CommLB strategy\n",CkMyPe());
 
@@ -164,7 +164,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
       nobj++;
   CkPrintf("OBJ: Before \n");
 
-  maxHeap maxh(nobj);
+  ObjectHeap maxh(nobj);
   nobj =0;
   for(pe=0; pe < count; pe++) {
     CkPrintf("[%d] PE %d : %d Objects : %d Communication\n",
@@ -174,7 +174,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
       load_pe += stats[pe].objData[obj].wallTime;
       CkPrintf("OBJ: %d , %d , %5.3lf\n",pe,stats[pe].objData[obj].id.id[0],stats[pe].objData[obj].wallTime);
       nobj++;
-      x = new InfoRecord;
+      x = new ObjectRecord;
       x->id = nobj -1;
       x->pos = obj;
       x->load = stats[pe].objData[obj].wallTime;
