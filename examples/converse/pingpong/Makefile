@@ -7,7 +7,7 @@ pingpong.o: pingpong.C
 	$(CHARMC) -language converse++ -c pingpong.C
 
 test: pingpong
-	./charmrun pingpong +p2
+	./charmrun ./pingpong +p2
 
 clean:
 	rm -f core *.cpm.h

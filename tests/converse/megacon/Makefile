@@ -8,7 +8,7 @@ link:
 	$(CHARMC) -o pgm $(OBJS) -language converse++
 
 test: pgm
-	./charmrun pgm +p4 -deadlock
+	./charmrun ./pgm +p4 -deadlock
 
 megacon.o: megacon.c
 	$(CHARMC) -gen-cpm megacon.c
