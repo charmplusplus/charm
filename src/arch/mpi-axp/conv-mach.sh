@@ -7,6 +7,7 @@ CMK_CF77='f77'
 CMK_CF90='f90'
 CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt -lpmpi -lelan'
+CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/"
 CMK_QT='axp-gcc'
 CMK_XIOPTS='-ansi'
 
