@@ -1296,6 +1296,18 @@ static void ctrl_sendone_locking(const char *type,
 
 static double Cmi_check_last;
 
+/* no lock charm ping */
+static void pingCharmrunNoLock(void *context)
+{
+  double clock=GetClock();
+  if (clock > Cmi_check_last + Cmi_check_delay) {
+    MACHSTATE(1,"CommunicationsClock pinging charmrun");       
+    Cmi_check_last = clock; 
+    if (Cmi_charmrun_fd_sendflag) return; /*Busy talking to charmrun*/
+    ctrl_sendone_nolock("ping",NULL,0,NULL,0); /*Charmrun may have died*/
+  }
+}
+
 static void pingCharmrun(int ignored) 
 {
   double clock=GetClock();
@@ -2019,6 +2031,11 @@ static void ConverseRunPE(int everReturn)
 
   if (CmiMyRank()==0 && Cmi_charmrun_fd!=-1) {
 #if CMK_SHARED_VARS_UNAVAILABLE
+    if (Cmi_netpoll == 1) {
+    /* gm cannot live with setitimer */
+    CcdCallFnAfter(pingCharmrunNoLock,NULL,1000);
+    }
+    else {
     /*Occasionally ping charmrun, to test if it's dead*/
     struct itimerval i;
     CmiSignal(SIGALRM, 0, 0, pingCharmrun);
@@ -2027,9 +2044,13 @@ static void ConverseRunPE(int everReturn)
     i.it_value.tv_sec = 1;
     i.it_value.tv_usec = 0;
     setitimer(ITIMER_REAL, &i, NULL);
+    }
 
+#if ! CMK_USE_GM
     /*Occasionally check for retransmissions, outgoing acks, etc.*/
+    /*no need in GM case */
     CcdCallFnAfter(CommunicationsClockCaller,NULL,Cmi_comm_clock_delay);
+#endif
 #endif
     
     /*Initialize the clock*/
@@ -2106,6 +2127,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #endif
 #endif
   Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usc;
+  Cmi_netpoll = 0;
+#if CMK_NETPOLL
+  Cmi_netpoll = 1;
+#endif
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
   Cmi_idlepoll = 0;
 #else
