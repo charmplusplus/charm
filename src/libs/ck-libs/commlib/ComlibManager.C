@@ -610,6 +610,9 @@ void ComlibManager::ArraySend(int ep, void *msg,
     //    CmiSetHandler(env, _charmHandlerIdx);
     CmiSetHandler(env, CpvAccess(RecvmsgHandle));
     
+    messageCount ++;
+    totalBytes += UsrToEnv(msg)->getTotalsize();
+
     if(strategy == USE_DIRECT) {
         ComlibPrintf("Sending Directly\n");
         CmiSyncSendAndFree(dest_proc, UsrToEnv(msg)->getTotalsize(), (char *)UsrToEnv(msg));
@@ -624,9 +627,6 @@ void ComlibManager::ArraySend(int ep, void *msg,
     cmsg->idx = idx;
     cmsg->ep = ep;
     */
-    messageCount ++;
-
-    totalBytes += UsrToEnv(msg)->getTotalsize();
 
     if(strategy != USE_STREAMING) {
         cmsg->next = messageBuf;

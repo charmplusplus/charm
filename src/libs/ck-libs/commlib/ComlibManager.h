@@ -32,7 +32,7 @@ char mpi_recvbuf[MPI_BUF_SIZE];
 #endif
 
 #define LEARNING_PERIOD 2
-#define ALPHA 50E-6
+#define ALPHA 5E-6
 #define BETA 3.33E-9
 
 #include "ComlibModule.decl.h"
