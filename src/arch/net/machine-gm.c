@@ -10,26 +10,43 @@
 */
 
 
-#define MAXPENDINGSEND  50
+/* default as in busywaiting mode */
+#undef CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT
+#undef CMK_WHEN_PROCESSOR_IDLE_USLEEP
+#define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT 1
+#define CMK_WHEN_PROCESSOR_IDLE_USLEEP 0
+
+static gm_alarm_t gmalarm;
+
+
+/******************************************************************************
+ *
+ * Send messages pending queue (used internally)
+ *
+ *****************************************************************************/
+
+
+/* max length of pending messages */
+#define MAXPENDINGSEND  100
 
 typedef struct PendingMsgStruct
 {
-  OutgoingMsg ogm;
-  OtherNode   node;
-  int size;
+  void *msg;
+  int length;		/* length of message */
+  int size;		/* size of message, usually around log2(length)  */
+  OtherNode   node;	/* receiver node */
   struct PendingMsgStruct *next;
 }
 *PendingMsg;
 
-static PendingMsg  sendhead = 0, sendtail = 0;
+static PendingMsg  sendhead = NULL, sendtail = NULL;
 static int pendinglen = 0;
 
-static gm_alarm_t gmalarm;
-
-void enqueue_sending(OutgoingMsg out, OtherNode node, int size)
+void enqueue_sending(char *msg, int length, OtherNode node, int size)
 {
   PendingMsg pm = (PendingMsg) malloc(sizeof(struct PendingMsgStruct));
-  pm->ogm = out;
+  pm->msg = msg;
+  pm->length = length;
   pm->node = node;
   pm->size = size;
   pm->next = NULL;
@@ -87,7 +104,9 @@ void CmiNotifyIdle(void)
   CmiCommLock();
   nreadable = processEvent(e);
   CmiCommUnlock();
-  if (nreadable) return;
+  if (nreadable) {
+    return;
+  }
   pollMs = 0;
   if (Cmi_charmrun_fd!=-1) {
     fds[n].fd = Cmi_charmrun_fd;
@@ -104,9 +123,7 @@ void CmiNotifyIdle(void)
 #endif
 }
 
-static void alarmcallback (void *context)
-{
-}
+static void alarmcallback (void *context) {}
 
 static void processMessage(char *msg, int len)
 {
@@ -117,12 +134,12 @@ static void processMessage(char *msg, int len)
     DgramHeaderBreak(msg, rank, srcpe, magic, seqno);
     if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK)) {
       /* node = nodes_by_pe[srcpe]; */
-      newmsg = gm_dma_malloc(gmport, len);
+      newmsg = (char *)CmiAlloc(len);
       _MEMCHECK(newmsg);
       memcpy(newmsg, msg, len);
       if (rank == DGRAM_BROADCAST) {
         for (i=1; i<Cmi_mynodesize; i++)
-          PCQueuePush(CmiGetStateN(i)->recv, CopyMsg(msg, len));
+          PCQueuePush(CmiGetStateN(i)->recv, CopyMsg(newmsg, len));
         PCQueuePush(CmiGetStateN(0)->recv, newmsg);
       } else {
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -147,26 +164,27 @@ static int processEvent(gm_recv_event_t *e)
 {
   int size, len;
   char *msg, *buf;
+  int status = 1;
 
     switch (gm_ntohc(e->recv.type))
     {
     case GM_HIGH_RECV_EVENT:
     case GM_RECV_EVENT:
       size = gm_ntohc(e->recv.size);
-//CmiPrintf("size:%d\n",size);
       msg = gm_ntohp(e->recv.buffer);
       len = gm_ntohl(e->recv.length);
       if (CmiMsgHeaderGetLength(msg) != len) CmiPrintf("Message corrupted!\n");;
       processMessage(msg, len);
-//CmiPrintf("receive tkens:%d\n", gm_num_receive_tokens(gmport));
       gm_provide_receive_buffer(gmport, msg, size, GM_LOW_PRIORITY);
       break;
     case GM_NO_RECV_EVENT:
       return 0;
+    case GM_ALARM_EVENT:
+      status = 0;
     default:
       gm_unknown(gmport, e);
     }
-    return 1;
+    return status;
 }
 
 static void CommunicationServer(int withDelayMs)
@@ -208,20 +226,18 @@ static void CommunicationServer(int withDelayMs)
 
 void send_callback(struct gm_port *p, void *msg, gm_status_t status)
 {
-  OutgoingMsg ogm = (OutgoingMsg)msg;
-
   if (status != GM_SUCCESS) { 
     CmiPrintf("error in send. %d\n", status); 
     CmiAbort("");
   }
 
+  gm_dma_free(gmport, msg);
   gm_free_send_token (gmport, GM_LOW_PRIORITY);
-  ogm->refcount--;
-  GarbageCollectMsg(ogm);
 
-  /* since we have one free senf token, start next send */
+  /* since we have one free send token, start next send */
   send_progress();
 }
+
 
 static void send_progress()
 {
@@ -231,11 +247,11 @@ static void send_progress()
   {
     out = peek_sending();
     if (out && gm_alloc_send_token(gmport, GM_LOW_PRIORITY)) {
-      OutgoingMsg ogm = out->ogm;
       OtherNode node = out->node;
-      gm_send_with_callback(gmport, ogm->data, out->size, ogm->size, 
+      char *msg = out->msg;
+      gm_send_with_callback(gmport, msg, out->size, out->length, 
                             GM_LOW_PRIORITY, node->IP, node->dataport, 
-                            send_callback, ogm);
+                            send_callback, msg);
       dequeue_sending();
       free(out);
     }
@@ -244,32 +260,48 @@ static void send_progress()
 }
 
 
+/***********************************************************************
+ * DeliverViaNetwork()
+ *
+ * This function is responsible for all non-local transmission. It
+ * first allocate a send token, if fails, put the send message to
+ * penging message queue, otherwise invoke the GM send.
+ ***********************************************************************/
+
 void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
 {
+  char *buf;
   int size = gm_min_size_for_length(ogm->size);
-
-  DgramHeaderMake(ogm->data, rank, ogm->src, Cmi_charmrun_pid, node->send_next);
-  ogm->refcount++;
+  int len = ogm->size;
 
 //CmiPrintf("DeliverViaNetwork: size:%d\n", size);
 
-  /* if queue is not empty, this is to gurantee the sequence */
+  DgramHeaderMake(ogm->data, rank, ogm->src, Cmi_charmrun_pid, node->send_next);
+
+  /* allocate DMAable memory to prepare sending */
+  buf = (char *)gm_dma_malloc(gmport, len);
+  _MEMCHECK(buf);
+  memcpy(buf, ogm->data, len);
+
+  /* if queue is not empty, enqueue msg. this is to guarantee the order */
   if (pendinglen != 0) {
     while (pendinglen == MAXPENDINGSEND) {
-      /* pending max len exceeded, spin until get a token */
+      /* pending max len exceeded, busy wait until get a token */
 //      CmiPrintf("pending max len exceeded.\n");
         CommunicationServer(0);
     }
-    enqueue_sending(ogm, node, size);
+    enqueue_sending(buf, len, node, size);
     return;
   }
   /* see if we can get a send token from gm */
   if (!gm_alloc_send_token(gmport, GM_LOW_PRIORITY)) {
     /* save to pending send list */
-    enqueue_sending(ogm, node, size);
+    enqueue_sending(buf, len, node, size);
     return;
   }
-  gm_send_with_callback(gmport, ogm->data, size, ogm->size, GM_LOW_PRIORITY, node->IP, node->dataport, send_callback, ogm);
+  gm_send_with_callback(gmport, buf, size, len, 
+                        GM_LOW_PRIORITY, node->IP, node->dataport, 
+                        send_callback, buf);
 }
 
 
