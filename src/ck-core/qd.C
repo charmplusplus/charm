@@ -7,6 +7,14 @@
 
 #include "ck.h"
 
+#define  DEBUGP(x)   // CmiPrintf x;
+
+#if CMK_BLUEGENE_CHARM
+// this is a hack for bgcharm++, I need to figure out a better
+// way to do this
+#define CmiSyncSendAndFree    CmiFreeSendFn
+#endif
+
 CpvDeclare(QdState*, _qd);
 
 static inline void _bcastQD1(QdState* state, QdMsg *msg)
@@ -14,10 +22,11 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
   msg->setPhase(0);
   state->propagate(msg);
   msg->setPhase(1);
+  DEBUGP(("[%d] State: getCreated:%d getProcessed:%d\n", CmiMyPe(), state->getCreated(), state->getProcessed()));
   msg->setCreated(state->getCreated());
   msg->setProcessed(state->getProcessed());
   envelope *env = UsrToEnv((void*)msg);
-  CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), env);
+  CmiSyncSendAndFree(CmiMyPe(), env->getTotalsize(), (char *)env);
   state->markProcessed();
   state->reset();
   state->setStage(1);
@@ -30,15 +39,15 @@ static inline void _bcastQD2(QdState* state, QdMsg *msg)
   msg->setPhase(2);
   msg->setDirty(state->isDirty());
   envelope *env = UsrToEnv((void*)msg);
-  CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), env);
+  CmiSyncSendAndFree(CmiMyPe(), env->getTotalsize(), (char *)env);
   state->reset();
   state->setStage(2);
 }
 
 static inline void _handlePhase0(QdState *state, QdMsg *msg)
 {
-  CkAssert(CkMyPe()==0 || state->getStage()==0);
-  if(CkMyPe()==0) {
+  CkAssert(CmiMyPe()==0 || state->getStage()==0);
+  if(CmiMyPe()==0) {
     QdCallback *qdcb = new QdCallback(msg->getEp(), msg->getCid());
     _MEMCHECK(qdcb);
     state->enq(qdcb);
@@ -53,15 +62,17 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
 {
   switch(state->getStage()) {
     case 0 :
-      CkAssert(CkMyPe()!=0);
+      CkAssert(CmiMyPe()!=0);
       _bcastQD2(state, msg);
       break;
     case 1 :
+      DEBUGP(("[%d] msg: getCreated:%d getProcessed:%d\n", CmiMyPe(), msg->getCreated(), msg->getProcessed()));
       state->subtreeCreate(msg->getCreated());
       state->subtreeProcess(msg->getProcessed());
       state->reported();
       if(state->allReported()) {
-        if(CkMyPe()==0) {
+        if(CmiMyPe()==0) {
+          DEBUGP(("ALL: %p getCCreated:%d getCProcessed:%d\n", state, state->getCCreated(), state->getCProcessed()));
           if(state->getCCreated()==state->getCProcessed()) {
             _bcastQD2(state, msg);
           } else {
@@ -72,7 +83,7 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
           msg->setProcessed(state->getCProcessed());
           envelope *env = UsrToEnv((void*)msg);
           CmiSyncSendAndFree(state->getParent(), 
-                             env->getTotalsize(), env);
+                             env->getTotalsize(), (char *)env);
           state->reset();
           state->setStage(0);
         }
@@ -89,7 +100,7 @@ static inline void _handlePhase2(QdState *state, QdMsg *msg)
   state->subtreeSetDirty(msg->getDirty());
   state->reported();
   if(state->allReported()) {
-    if(CkMyPe()==0) {
+    if(CmiMyPe()==0) {
       if(state->isDirty()) {
         _bcastQD1(state, msg);
       } else {
@@ -105,7 +116,7 @@ static inline void _handlePhase2(QdState *state, QdMsg *msg)
     } else {
       msg->setDirty(state->isDirty());
       envelope *env = UsrToEnv((void*)msg);
-      CmiSyncSendAndFree(state->getParent(), env->getTotalsize(), env);
+      CmiSyncSendAndFree(state->getParent(), env->getTotalsize(), (char *)env);
       state->reset();
       state->setStage(0);
     }
@@ -115,6 +126,7 @@ static inline void _handlePhase2(QdState *state, QdMsg *msg)
 
 static void _callWhenIdle(QdMsg *msg)
 {
+  DEBUGP(("[%d] callWhenIdle\n", CmiMyPe()));
   QdState *state = CpvAccess(_qd);
   switch(msg->getPhase()) {
     case 0 : _handlePhase0(state, msg); break;
@@ -139,5 +151,9 @@ void CkStartQD(int eIdx, const CkChareID *cid)
   msg->setCid(*cid);
   register envelope *env = UsrToEnv((void *)msg);
   CmiSetHandler(env, _qdHandlerIdx);
+#if CMK_BLUEGENE_CHARM
+  CmiFreeSendFn(0, env->getTotalsize(), (char *)env);
+#else
   CldEnqueue(0, env, _infoIdx);
+#endif
 }

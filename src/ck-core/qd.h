@@ -39,7 +39,12 @@ class QdCallback {
     CkChareID cid;
   public:
     QdCallback(int e, CkChareID c) : ep(e), cid(c) {}
-    void send(void) { CkSendMsg(ep,CkAllocMsg(0,0,0),&cid); }
+//    void send(void) { CkSendMsg(ep,CkAllocMsg(0,0,0),&cid); }
+    void send(void) { 
+      int old = CmiSwitchToPE(0);
+      CkSendMsg(ep,CkAllocMsg(0,0,0),&cid); 
+      CmiSwitchToPE(old);
+    } 
 };
 
 class QdState {
@@ -60,19 +65,24 @@ class QdState {
       oProcessed = 0;
       callbacks = new PtrQ();
       _MEMCHECK(callbacks);
-      nChildren = CmiNumSpanTreeChildren(CkMyPe());
-      parent = CmiSpanTreeParent(CkMyPe());
+      nChildren = CmiNumSpanTreeChildren(CmiMyPe());
+      parent = CmiSpanTreeParent(CmiMyPe());
       if (nChildren != 0) {
 	children = new int[nChildren];
 	_MEMCHECK(children);
-	CmiSpanTreeChildren(CkMyPe(), children);
+	CmiSpanTreeChildren(CmiMyPe(), children);
       }
     }
     void propagate(QdMsg *msg) {
       envelope *env = UsrToEnv((void *)msg);
       CmiSetHandler(env, _qdHandlerIdx);
-      for(int i=0; i<nChildren; i++)
-        CmiSyncSend(children[i], env->getTotalsize(), env);
+      for(int i=0; i<nChildren; i++) {
+#if CMK_BLUEGENE_CHARM
+        CmiSyncSendFn(children[i], env->getTotalsize(), (char *)env);
+#else
+        CmiSyncSend(children[i], env->getTotalsize(), (char *)env);
+#endif
+      }
     }
     int getParent(void) { return parent; }
     QdCallback *deq(void) { return (QdCallback*) callbacks->deq(); }
