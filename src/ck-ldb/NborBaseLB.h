@@ -70,18 +70,18 @@ protected:
   virtual NLBMigrateMsg* Strategy(LDStats* stats,int count);
 
   virtual int max_neighbors() {
-    if (CmiNumPes() > 2) return 2;
-    else return (CmiNumPes()-1);
+    if (CkNumPes() > 2) return 2;
+    else return (CkNumPes()-1);
   }
 
   virtual int num_neighbors() {
-    if (CmiNumPes() > 2) return 2;
-    else return (CmiNumPes()-1);
+    if (CkNumPes() > 2) return 2;
+    else return (CkNumPes()-1);
   };
 
   virtual void neighbors(int* _n) {
-    _n[0] = (CmiMyPe() + CmiNumPes() -1) % CmiNumPes();
-    _n[1] = (CmiMyPe() + 1) % CmiNumPes();
+    _n[0] = (CkMyPe() + CkNumPes() -1) % CkNumPes();
+    _n[1] = (CkMyPe() + 1) % CkNumPes();
   };
 
   int NeighborIndex(int pe);   // return the neighbor array index
