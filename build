@@ -142,4 +142,21 @@ fi
 echo $BASEVERSION > $VERSION/tmp/.vdir
 
 echo "Performing 'make $MAKEOPTS $PROGRAM OPTS="$OPTS"' in $VERSION/tmp"
-cd $VERSION/tmp ; make $MAKEOPTS $PROGRAM OPTS="$OPTS"
+cd $VERSION/tmp 
+make $MAKEOPTS $PROGRAM OPTS="$OPTS"
+
+MAKEEXIT=$?
+if [ $MAKEEXIT -eq 0 ]
+then
+	echo "-------------------------------------------------"
+	echo "$PROGRAM built successfully."
+	echo "Next, try out a sample program like" \
+	     "$VERSION/pgms/charm++/simplearrayhello"
+else
+	echo "-------------------------------------------------"
+	echo "Charm++ NOT BUILT. Either cd into $VERSION/tmp and try"
+	echo "to resolve the problems yourself, visit"
+	echo "    http://charm.cs.uiuc.edu/"
+	echo "for more information. Otherwise, email the developers at ppl@cs.uiuc.edu"
+	exit $MAKEEXIT
+fi
