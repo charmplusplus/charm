@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-09-14 20:49:17  jyelon
+ * Revision 2.12  1995-09-14 21:23:52  jyelon
+ * Added "globals.h"
+ *
+ * Revision 2.11  1995/09/14  20:49:17  jyelon
  * Added +fifo +lifo +ififo +ilifo +bfifo +blifo command-line options.
  *
  * Revision 2.10  1995/09/07  21:21:38  jyelon
@@ -68,7 +71,8 @@
 #undef _CK_MEMORY_MANAGER
 
 #define align(var) ((var+sizeof(int)-1)&(~(sizeof(int)-1)))
- 
+
+#include "globals.h" 
 #include "trans_defs.h"
 #include "trans_decls.h"
 
