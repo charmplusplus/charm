@@ -582,7 +582,7 @@ set DELETE=(CHARMC-USR.TMP.o CHARMC-USR.TMP.nm $DELETE)
 if ($?VERBOSE) echo $CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB $OBJECTFILES $LIBRARIES
 $CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB $OBJECTFILES $LIBRARIES
 if ($status) goto failure
-nm CHARMC-USR.TMP.o | csh -fc "$CMK_NM_FILTER" > CHARMC-USR.TMP.nm
+$CMK_NM CHARMC-USR.TMP.o | csh -fc "$CMK_NM_FILTER" > CHARMC-USR.TMP.nm
 if ($status) goto failure
 
 # Scan user-object for initialization functions, create CHARMC-MOD.TMP.o
