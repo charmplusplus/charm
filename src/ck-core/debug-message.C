@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 #include <converse.h>
-#include <charm.h>
+#include <charm++.h>
 #ifdef CMK_OPTIMIZE
 #define NDEBUG
 #endif
