@@ -80,13 +80,13 @@ static int CmiSetupSockets()
   int i;
   numSocks = 0;
   if (!fds)
-    fds = (struct pollfd  *)malloc((CmiNumPes()+5)*sizeof(struct pollfd));
+    fds = (struct pollfd  *)malloc((CmiNumNodes()+5)*sizeof(struct pollfd));
   MACHSTATE(2,"CmiSetupSockets")
   if (dataskt!=-1) {
-    for (i=0; i<CmiNumPes(); i++)
+    for (i=0; i<CmiNumNodes(); i++)
     {
 /*CmiPrintf("[%d] %d - %d\n", CmiMyPe(), i, nodes[i].sock);*/
-      if (i == CmiMyPe()) continue;
+      if (i == CmiMyNode()) continue;
       fds[numSocks].fd = nodes[i].sock;
       fds[numSocks].events = POLLIN;
       if (nodes[i].send_queue_h) fds[numSocks].events |= POLLOUT;
@@ -105,9 +105,9 @@ static void CmiCheckSocks()
 {
   int n = 0, pe;
   if (dataskt!=-1) {
-    for (pe=0; pe<CmiNumPes(); pe++)
+    for (pe=0; pe<CmiNumNodes(); pe++)
     {
-      if (pe == CmiMyPe()) continue;
+      if (pe == CmiMyNode()) continue;
       if (fds[n].revents & POLLIN) {
 	dataskt_ready_read = 1;
         MACHSTATE1(2,"go to ReceiveDatagram %d", pe)
@@ -143,10 +143,10 @@ static int CmiSetupSockets()
   if (Cmi_charmrun_fd!=-1)
   	FD_SET(Cmi_charmrun_fd, &rfds);
   if (dataskt!=-1) {
-    for (i=0; i<CmiNumPes(); i++)
+    for (i=0; i<CmiNumNodes(); i++)
     {
 /*CmiPrintf("[%d] %d - %d\n", CmiMyPe(), i, nodes[i].sock);*/
-      if (i == CmiMyPe()) continue;
+      if (i == CmiMyNode()) continue;
       FD_SET(nodes[i].sock, &rfds);
       if (nodes[i].send_queue_h) FD_SET(nodes[i].sock, &wfds);
     }
@@ -162,7 +162,7 @@ static void CmiCheckSocks()
   if (dataskt!=-1) {
     for (i=0; i<Cmi_numnodes; i++)
     {
-      if (i == CmiMyPe()) continue;
+      if (i == CmiMyNode()) continue;
       if (FD_ISSET(nodes[i].sock, &rfds)) {
   	dataskt_ready_read = 1;
 	ReceiveDatagram(nodes[i].sock);
@@ -214,7 +214,7 @@ here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK.
     MACHSTATE(2,"} CheckSocketsReady (INTERRUPTED!)")
     return CheckSocketsReady(0);
   }
-  CmiCheckSocks();
+/*  CmiCheckSocks(); */
   MACHSTATE(1,"} CheckSocketsReady")
   return nreadable;
 }
@@ -257,6 +257,7 @@ static void CommunicationServer(int sleepTime)
     sleepTime=0;
     if (ctrlskt_ready_read) {again=1;ctrl_getone();}
     if (dataskt_ready_read || dataskt_ready_write) {again=1;}
+    CmiCheckSocks();
     if (CmiStdoutNeedsService()) {CmiStdoutService();}
     if (!again) break; /* Nothing more to do */
     if ((nTimes++ &16)==15) {
@@ -288,7 +289,7 @@ static void IntegrateMessageDatagram(char *msg, int len)
     if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK)) {
       OtherNode node = nodes_by_pe[srcpe];
       newmsg = node->asm_msg;
-      if (newmsg == 0) {
+      if (newmsg == NULL) {
         size = CmiMsgHeaderGetLength(msg);
         if (size < len) KillEveryoneCode(4559312);
 #if FRAGMENTATION
@@ -304,6 +305,9 @@ static void IntegrateMessageDatagram(char *msg, int len)
         node->asm_fill = len;
         node->asm_msg = newmsg;
       } else {
+#if ! FRAGMENTATION
+	CmiAssert(0);
+#endif
         size = len - DGRAM_HEADER_SIZE;
         memcpy(newmsg + node->asm_fill, msg+DGRAM_HEADER_SIZE, size);
         node->asm_fill += size;
@@ -337,7 +341,7 @@ static void IntegrateMessageDatagram(char *msg, int len)
 
 void ReceiveDatagram(SOCKET fd)
 {
-  static int *buf = NULL;
+  static char *buf = NULL;
   int size;
   int ok;
   double t;
@@ -346,15 +350,15 @@ void ReceiveDatagram(SOCKET fd)
     CmiAbort("Error in ReceiveDatagram.");
 
 #if FRAGMENTATION
-  if (!buf) buf = (int *)CmiAlloc(Cmi_dgram_max_data+DGRAM_HEADER_SIZE);
+  if (!buf) buf = (char *)CmiAlloc(Cmi_dgram_max_data+DGRAM_HEADER_SIZE);
 #else
-  buf = (int *)CmiAlloc(size);
+  buf = (char *)CmiAlloc(size);
 #endif
-  buf[0] = size;
-  if (-1==skt_recvN(fd, buf+1, size-sizeof(int)))
+  /* buf[0] = size; */
+  if (-1==skt_recvN(fd, buf, size))
     CmiAbort("Error in ReceiveDatagram.");
 
-  IntegrateMessageDatagram((char *)buf, size);
+  IntegrateMessageDatagram(buf, size);
 }
 
 
@@ -389,6 +393,8 @@ int TransmitImplicitDgram(ImplicitDgram dg)
   if (-1==skt_sendN(dest->sock,head,len))
     CmiAbort("EnqueueOutgoingDgram"); 
   */
+  if (-1==skt_sendN(dest->sock,(const char *)&len,sizeof(len))) 
+    CmiAbort("EnqueueOutgoingDgram"); 
   if (-1==skt_sendN(dest->sock,(const char *)head,len)) 
     CmiAbort("EnqueueOutgoingDgram"); 
     
