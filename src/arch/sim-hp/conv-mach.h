@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.10  1996-07-19 17:07:37  jyelon
+ * Revision 1.11  1996-07-24 21:28:11  gursoy
+ * added new timer flags for simulator
+ *
+ * Revision 1.10  1996/07/19  17:07:37  jyelon
  * *** empty log message ***
  *
  * Revision 1.9  1996/07/16 17:23:37  jyelon
@@ -110,7 +113,9 @@
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
-#define CMK_TIMER_USE_TIMES                                1
+#define CMK_TIMER_USE_TIMES                                0
+#define CMK_TIMER_SIM_USE_GETRUSAGE                        0
+#define CMK_TIMER_SIM_USE_TIMES                            1
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                        1
 #define CMK_VECTOR_SEND_USES_SPECIAL_CODE                        0
