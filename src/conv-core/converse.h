@@ -77,6 +77,7 @@ extern int Cmi_myrank; /* Normally zero; only 1 during SIGIO handling */
 
 #define CpvDeclare(t,v) t CMK_TAG(Cpv_,v)[2]
 #define CpvExtern(t,v)  extern t CMK_TAG(Cpv_,v)[2]
+#define CpvCExtern(t,v)    CpvExtern(t,v)
 #define CpvStaticDeclare(t,v) static t CMK_TAG(Cpv_,v)[2]
 #define CpvInitialize(t,v) do {} while(0)
 #define CpvInitialized(v) 1
@@ -196,6 +197,7 @@ extern int Cmi_numpes;
 
 #define CpvDeclare(t,v) t* CMK_TAG(Cpv_,v)
 #define CpvExtern(t,v)  extern t* CMK_TAG(Cpv_,v)
+#define CpvCExtern(t,v)  extern "C" t* CMK_TAG(Cpv_,v)
 #define CpvStaticDeclare(t,v) static t* CMK_TAG(Cpv_,v)
 #define CpvInitialize(t,v)\
   do  { if (CMK_TAG(Cpv_,v)==0)\
@@ -301,6 +303,7 @@ for each processor in the node.
 
 #define CpvDeclare(t,v) t* CMK_TAG(Cpv_,v)
 #define CpvExtern(t,v)  extern t* CMK_TAG(Cpv_,v)
+#define CpvCExtern(t,v)  extern "C" t* CMK_TAG(Cpv_,v)
 #define CpvStaticDeclare(t,v) static t* CMK_TAG(Cpv_,v)
 #define CpvInitialize(t,v)\
     do { \
