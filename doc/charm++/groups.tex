@@ -63,7 +63,8 @@ we can create a \index{group}group in a manner similar to a regular
 \index{chare}chare. 
 
 \begin{alltt}
-CProxy_G groupProxy = CProxy_G::ckNew(\uw{parameters1});
+CkGroupID groupId = CProxy_G::ckNew(\uw{parameters1});
+CProxy_G groupProxy(groupId);
 \end{alltt}
 
 \subsubsection{Method Invocation on Groups}
