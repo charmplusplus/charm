@@ -98,9 +98,9 @@ CkReductionMgr::CkReductionMgr()//Constructor
 	storedClient=NULL;
 	storedClientParam=NULL;
 	redNo=0;
-	inProgress=false;
-	creating=false;
-	startRequested=false;
+	inProgress=CmiFalse;
+	creating=CmiFalse;
+	startRequested=CmiFalse;
 	gcount=lcount=0;
 	nContrib=nRemote=0;
 	DEBR((AA"In reductionMgr constructor\n"AB));
@@ -132,12 +132,12 @@ void CkReductionMgr::contributorInfo::pup(PUP::er &p)
 void CkReductionMgr::creatingContributors(void)
 {
 	DEBR((AA"Creating contributors...\n"AB));
-	creating=true;
+	creating=CmiTrue;
 }
 void CkReductionMgr::doneCreatingContributors(void)
 {
 	DEBR((AA"Done creating contributors...\n"AB));
-	creating=false;
+	creating=CmiFalse;
 	if (startRequested) startReduction(redNo);
 	finishReduction();
 }
@@ -280,13 +280,13 @@ void CkReductionMgr::startReduction(int number)
 	if (creating) //Don't start yet-- we're creating elements
 	{
 		DEBR((AA"Postponing start request #%d until we're done creating\n"AB,redNo));
-		startRequested=true;
+		startRequested=CmiTrue;
 		return;
 	}
 	
 //If none of these cases, we need to start the reduction--
 	DEBR((AA"Starting reduction #%d\n"AB,redNo));
-	inProgress=true;
+	inProgress=CmiTrue;
 	//Sent start requests to our kids (in case they don't already know)
 	for (int k=0;k<treeKids();k++)
 	{
@@ -359,8 +359,8 @@ void CkReductionMgr::finishReduction(void)
 	for (i=1;i<adjVec.length();i++)
 		adjVec[i-1]=adjVec[i];
 	adjVec.length()--;
-	inProgress=false;
-	startRequested=false;
+	inProgress=CmiFalse;
+	startRequested=CmiFalse;
 	nRemote=nContrib=0;
 
 	//Look through the future queue for messages we can now handle
@@ -384,9 +384,9 @@ int CkReductionMgr::treeRoot(void)
 {
 	return 0;
 }
-bool CkReductionMgr::hasParent(void) //Root PE
+CmiBool CkReductionMgr::hasParent(void) //Root PE
 {
-	return CkMyPe()!=treeRoot();
+	return (CmiBool)(CkMyPe()!=treeRoot());
 }
 int CkReductionMgr::treeParent(void) //My parent PE
 {

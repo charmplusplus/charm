@@ -18,7 +18,7 @@ which will perform all needed packing/unpacking.
 A simple example is:
 class foo {
 private:
-	bool isBar;
+	CmiBool isBar;
 	int x;
 	char y;
 	unsigned long z;
@@ -53,6 +53,8 @@ public:
 
 
 #include <stdio.h> //<- for FILE *
+#include <converse.h> // <- for CmiBool
+
 class PUP {//<- Should be "namespace", once all compilers support them
 public:
 //Item data types-- these are used to do byte swapping, etc.
@@ -85,9 +87,9 @@ public:
 	virtual ~er();//<- does nothing, but might be needed by some child
 	
 	//State queries (exactly one of these will be true)
-	virtual bool isSizing(void) const;
-	virtual bool isPacking(void) const;//<- these all default to false
-	virtual bool isUnpacking(void) const;
+	virtual CmiBool isSizing(void) const;
+	virtual CmiBool isPacking(void) const;//<- these all default to false
+	virtual CmiBool isUnpacking(void) const;
 //For single elements, pretend it's an array containing one element
 	void operator()(signed char &v,const char *desc=NULL)     {(*this)(&v,1,desc);}
 	void operator()(char &v,const char *desc=NULL)            {(*this)(&v,1,desc);}
@@ -100,7 +102,7 @@ public:
 	void operator()(unsigned long &v,const char *desc=NULL)   {(*this)(&v,1,desc);}
 	void operator()(float &v,const char *desc=NULL)           {(*this)(&v,1,desc);}
 	void operator()(double &v,const char *desc=NULL)          {(*this)(&v,1,desc);}
-	void operator()(bool &v,const char *desc=NULL)            {(*this)(&v,1,desc);}
+	void operator()(CmiBool &v,const char *desc=NULL)            {(*this)(&v,1,desc);}
 
 //For arrays:
 	//Integral types:
@@ -132,8 +134,8 @@ public:
 		{bytes((void *)a,nItems,sizeof(double),Tdouble,desc);}
 	
 	//For bools:
-	void operator()(bool *a,int nItems,const char *desc=NULL)
-		{bytes((void *)a,nItems,sizeof(bool),Tbool,desc);}
+	void operator()(CmiBool *a,int nItems,const char *desc=NULL)
+		{bytes((void *)a,nItems,sizeof(CmiBool),Tbool,desc);}
 	
 	//For raw memory (n gives number of bytes)
 	void operator()(void *a,int nBytes,const char *desc=NULL)
@@ -143,7 +145,7 @@ public:
 //Superclass of packers
 class packer : public er {
 public:
-	virtual bool isPacking(void) const;
+	virtual CmiBool isPacking(void) const;
 };
 
 //Superclass of unpackers
@@ -153,7 +155,7 @@ class unpacker : public er {
 	// and data type t from p.  Desc describes the data item
 	virtual void bytes(void *p,int n,size_t itemSize,dataType t,const char *desc) =0;
 public:
-	virtual bool isUnpacking(void) const;
+	virtual CmiBool isUnpacking(void) const;
 };
 
 //For finding the number of bytes to pack (e.g., to preallocate a memory buffer)
@@ -165,7 +167,7 @@ protected:
 public:
 	//Write data to the given buffer
 	sizer(void) {nBytes=0;}
-	virtual bool isSizing(void) const;
+	virtual CmiBool isSizing(void) const;
 	
 	//Return the current number of bytes to be packed
 	int size(void) const {return nBytes;}
@@ -238,9 +240,9 @@ public:
 	myByte padding[2];//Padding to 16 bytes
 
 	//Return true if our magic number is valid.
-	bool valid(void) const;
+	CmiBool valid(void) const;
 	//Return true if we differ from the current (running) machine.
-	bool needsConversion(void) const;
+	CmiBool needsConversion(void) const;
 	
 	//Get a machineInfo for the current machine
 	static const machineInfo &current(void);

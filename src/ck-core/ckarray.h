@@ -269,7 +269,7 @@ protected:
 #if CMK_LBDB_ON  //For load balancing:
   void AtSync(void);
   virtual void ResumeFromSync(void);
-  bool usesAtSync;//You must set this in the constructor to use AtSync().
+  CmiBool usesAtSync;//You must set this in the constructor to use AtSync().
 private: //Load balancer state:
   LDObjHandle ldHandle;//Transient (not migrated)
   LDBarrierClient ldBarrierHandle;//Transient (not migrated)  
@@ -402,7 +402,7 @@ private:
   LBDatabase *the_lbdb;
 #endif
   //This flag lets us detect element suicide, so we can stop timing
-  bool curElementIsDead;
+  CmiBool curElementIsDead;
 
   Hashtable hash;//Maps array index to array element records (CkArrayRec)
   //Add given element array record (which then owns it) at idx.
@@ -421,7 +421,7 @@ private:
   
   CkArrayElementType type;
   int numInitial;//Initial array size (used only for 1D case)
-  bool isInserting;//Are we currently inserting elements?
+  CmiBool isInserting;//Are we currently inserting elements?
 
   //Allocate a new, uninitialized array element of the given (chare) type
   // and owning the given index.
@@ -452,8 +452,8 @@ private:
   int homePE(const CkArrayIndex &idx) const
   	{return map->procNum(mapHandle,idx);}
 //Return 1 if this is the home PE of the given array index
-  bool isHome(const CkArrayIndex &idx) const
-  	{return homePE(idx)==CkMyPe();}
+  CmiBool isHome(const CkArrayIndex &idx) const
+  	{return (CmiBool)(homePE(idx)==CkMyPe());}
 
 //Initialization support:
   static void static_initAfterMap(void *dis);

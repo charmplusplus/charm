@@ -9,6 +9,7 @@
 #define _CHARMPP_H_
 
 #include <stdlib.h>
+#include <memory.h>
 #include "charm.h"
 
 #include "pup.h"

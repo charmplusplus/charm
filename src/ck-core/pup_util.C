@@ -18,16 +18,16 @@ virtual functions are defined here.
 #include "pup.h"
 
 PUP::er::~er() {} //<- might be needed by some child
-bool PUP::er::isSizing(void) const {return false;}
-bool PUP::er::isPacking(void) const {return false;}
-bool PUP::er::isUnpacking(void) const {return false;}
+CmiBool PUP::er::isSizing(void) const {return CmiFalse;}
+CmiBool PUP::er::isPacking(void) const {return CmiFalse;}
+CmiBool PUP::er::isUnpacking(void) const {return CmiFalse;}
 
-bool PUP::packer::isPacking(void) const {return true;}
-bool PUP::unpacker::isUnpacking(void) const {return true;}
+CmiBool PUP::packer::isPacking(void) const {return CmiTrue;}
+CmiBool PUP::unpacker::isUnpacking(void) const {return CmiTrue;}
 
 void PUP::sizer::bytes(void * /*p*/,int n,size_t itemSize,dataType /*t*/,const char *desc)
 	{nBytes+=n*itemSize;}
-bool PUP::sizer::isSizing(void) const {return true;}
+CmiBool PUP::sizer::isSizing(void) const {return CmiTrue;}
 
 void PUP::toMem::bytes(void *p,int n,size_t itemSize,dataType /*t*/,const char *desc)
 	{n*=itemSize; memcpy((void *)buf,p,n); buf+=n;}

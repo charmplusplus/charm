@@ -180,9 +180,9 @@ private:
 	void *storedClientParam;
 
 	int redNo;//Number of current reduction (incremented at end)
-	bool inProgress;//Is a reduction started, but not complete?
-	bool creating;//Are elements still being created?
-	bool startRequested;//Should we start the next reduction when creation finished?
+	CmiBool inProgress;//Is a reduction started, but not complete?
+	CmiBool creating;//Are elements still being created?
+	CmiBool startRequested;//Should we start the next reduction when creation finished?
 	int gcount;//=el't created here - el't deleted here
 	int lcount;//Number of local contributors
 	
@@ -204,7 +204,7 @@ private:
 //Reduction tree utilities
 	enum {TREE_WID=4};
 	int treeRoot(void);//Root PE
-	bool hasParent(void);
+	CmiBool hasParent(void);
 	int treeParent(void);//My parent PE
 	int firstKid(void);//My first child PE
 	int treeKids(void);//Number of children in tree
@@ -213,9 +213,9 @@ private:
 	CkReductionMsg *reduceMessages(void);
 	
 	//Map reduction number to a time
-	bool isPast(int num) const {return num<redNo;}
-	bool isPresent(int num) const {return num==redNo;}
-	bool isFuture(int num) const {return num>redNo;}
+	CmiBool isPast(int num) const {return (CmiBool)(num<redNo);}
+	CmiBool isPresent(int num) const {return (CmiBool)(num==redNo);}
+	CmiBool isFuture(int num) const {return (CmiBool)(num>redNo);}
 
 	class countAdjustment {
 	public:

@@ -355,7 +355,7 @@ public:
 	{/*Default: ignore replacement*/}	
 	
 	//Return if this rec is now obsolete
-	virtual bool isObsolete(int nSprings,const CkArrayIndex &idx)=0;
+	virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx)=0;
 	
 	//Return this rec's array element; or NULL if none
 	virtual ArrayElement *element(void) {return NULL;}
@@ -388,7 +388,7 @@ public:
 		arr->deliverLocal(msg,el);
 	}
 	//Return if this element is now obsolete (it isn't)
-	virtual bool isObsolete(int nSprings,const CkArrayIndex &idx) {return false;}
+	virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx) {return CmiFalse;}
 	
 	//Return this rec's array element
 	virtual ArrayElement *element(void) {return el;}
@@ -414,7 +414,7 @@ public:
 	{CkAbort("Can't re-use dead array element!\n");}
 	
 	//Return if this element is now obsolete (it isn't)
-	virtual bool isObsolete(int nSprings,const CkArrayIndex &idx) {return false;}
+	virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx) {return CmiFalse;}
 	
 };
 
@@ -429,15 +429,15 @@ protected:
 		lastAccess=arr->nSprings;
 	}
 	//Return if we are "stale"-- we were last accessed a while ago
-	bool isStale(void) 
+	CmiBool isStale(void) 
 	{
-		if (arr->nSprings-lastAccess>3) return true;
-		else return false;
+		if (arr->nSprings-lastAccess>3) return CmiTrue;
+		else return CmiFalse;
 	}
 public:
 	CkArrayRec_aging(CkArray *Narr):CkArrayRec(Narr) {lastAccess=arr->nSprings;}
 	//Return if this element is now obsolete
-	virtual bool isObsolete(int nSprings,const CkArrayIndex &idx)=0;
+	virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx)=0;
 };
 
 
@@ -463,16 +463,16 @@ public:
 		arr->deliverRemote(msg, onPE);
 	}
 	//Return if this element is now obsolete
-	virtual bool isObsolete(int nSprings,const CkArrayIndex &idx)
+	virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx)
 	{
 		if (arr->isHome(idx)) 
 		//Home elements never become obsolete
 		// if they did, we couldn't deliver messages to that element.
-			return false;
+			return CmiFalse;
 		else if (isStale())
-			return true;//We haven't been used in a long time
+			return CmiTrue;//We haven't been used in a long time
 		else
-			return false;//We're fairly recent
+			return CmiFalse;//We're fairly recent
 	}
 };
 
@@ -519,7 +519,7 @@ public:
 	}
 	
 	//Return if this element is now obsolete
-	virtual bool isObsolete(int nSprings,const CkArrayIndex &idx)
+	virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx)
 	{
 		if (isStale())
 		{/*This indicates something is seriously wrong--
@@ -533,7 +533,7 @@ public:
 			
 			CkAbort("Stale array manager message(s)!\n");
 		}
-		return false;
+		return CmiFalse;
 	}
 };
 
@@ -702,7 +702,7 @@ CkArray::CkArray(CkArrayCreateMsg *msg) : CkReductionMgr()
   num.local=num.migrating=0;
   bcastNo=oldBcastNo=0;
   nSprings=0;
-  isInserting=true;
+  isInserting=CmiTrue;
   lastCleaning=CmiWallTimer();   
   
 #if CMK_LBDB_ON
@@ -828,7 +828,7 @@ ArrayElement *CkArray::newElement(int chareType,CkArrayIndex *ind)
 //Call the user's given constructor, passing the given message.
 void CkArray::ctorElement(ArrayElement *el,int ctor,CkArrayMessage *m)
 {
-	curElementIsDead=false;
+	curElementIsDead=CmiFalse;
 	
 	//Call the user's constructor
 	_entryTable[ctor]->call(m, (void *)el);
@@ -853,7 +853,7 @@ void CkArray::InsertElement(CkArrayMessage *m)
 	CkArrayIndex *elIdx=m->copyIndex();
 	ArrayElement *el=newElement(type.chareType,elIdx);
 #if CMK_LBDB_ON //Load balancer utilities:
-	el->usesAtSync=false;
+	el->usesAtSync=CmiFalse;
 #endif
 	el->bcastNo=bcastNo;
 	contributorCreated(&el->reductionInfo);
@@ -881,7 +881,7 @@ void CkArray::DoneInserting(void)
 {
 	if (isInserting)
 	{
-		isInserting=false;
+		isInserting=CmiFalse;
 		DEBC((AA"Done inserting objects\n"AB));
 #if CMK_LBDB_ON
 		the_lbdb->DoneRegisteringObjects(myLBHandle);
@@ -906,7 +906,7 @@ void CkArray::ElementDying(CkArrayRemoveMsg *m)
 	CkArrayRec *rec=elementNrec(idx);
 	if (rec==NULL) {delete m;return; }//<- ignore this one.  We never knew him.
 	CkArrayRec::RecType rtype=rec->type();
-	curElementIsDead=true;
+	curElementIsDead=CmiTrue;
 	
 	if (rtype==CkArrayRec::buffering_migrated)
 	{//This is just the old copy of a migrator-- ignore him
@@ -1043,7 +1043,7 @@ void CkArray::deliverLocal(CkArrayMessage *msg,ArrayElement *el)
 			thisproxy.UpdateLocation((new CkArrayUpdateMsg)->insert(*el->thisindex),srcPE);
 		}
 	}
-	curElementIsDead=false;
+	curElementIsDead=CmiFalse;
 	
 	int entry=msg->type.msg.entryIndex;
 #if CMK_LBDB_ON
@@ -1214,7 +1214,7 @@ void CkArray::DummyAtSync(void)
 
 void CkArray::staticDummyResumeFromSync(void* data)
 {
-  CkArray* me = static_cast<CkArray*>(data);
+  CkArray* me = (CkArray*)(data);
   me->dummyResumeFromSync();
 }
 void CkArray::dummyResumeFromSync()
@@ -1232,7 +1232,7 @@ OSL, 3/12/2000
 */
 void CkArray::staticRecvAtSync(void* data)
 {
-  static_cast<CkArray*>(data)->recvAtSync();
+  ((CkArray*)data)->recvAtSync();
 }
 void CkArray::recvAtSync()
 {
@@ -1244,7 +1244,7 @@ void CkArray::recvAtSync()
 //These functions never seem to get called-- OSL, 3/7/2000
 void CkArray::staticSetStats(LDOMHandle _h, int _state)
 {
-  (static_cast<CkArray*>(_h.user_ptr))->setStats(_h,_state);   
+  ((CkArray*)(_h.user_ptr))->setStats(_h,_state);   
 }
 void CkArray::setStats(LDOMHandle _h, int _state)
 {
@@ -1254,7 +1254,7 @@ void CkArray::setStats(LDOMHandle _h, int _state)
 
 void CkArray::staticQueryLoad(LDOMHandle _h)
 {
-  (static_cast<CkArray*>(_h.user_ptr))->queryLoad(_h);
+  ((CkArray*)_h.user_ptr)->queryLoad(_h);
 }
 void CkArray::queryLoad(LDOMHandle _h)
 {
