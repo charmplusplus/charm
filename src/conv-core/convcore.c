@@ -105,8 +105,6 @@ char **argv;
 
   if (CmiMyRank() != 0) CmiNodeBarrier();
 
-  convcoreModuleInit();
-  conv_condsModuleInit() ;
 
   if (CmiMyRank() == 0) 
   {
@@ -354,6 +352,9 @@ static int ConverseParseOptions(argv)
 ConverseInit(argv)
 char **argv;
 {
+  convcoreModuleInit();
+  conv_condsModuleInit() ;
+
   ConverseParseOptions(argv);
   CmiInit(argv);
   CsdInit(argv);
