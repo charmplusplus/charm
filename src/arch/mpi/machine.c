@@ -16,6 +16,12 @@
 #include <unistd.h> /*For getpid()*/
 #include <stdlib.h> /*For sleep()*/
 
+#ifndef CMK_SMP
+#if defined(CMK_SHARED_VARS_POSIX_THREADS_SMP)
+# define CMK_SMP 1
+#endif
+#endif
+
 #include "machine.h"
 
 #include "pcqueue.h"
