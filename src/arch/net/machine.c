@@ -1703,29 +1703,38 @@ void CmiReleaseCommHandle(CmiCommHandle handle)
 }
 
 #if CMK_IMMEDIATE_MSG
+static int immDone=1;
+void CmiDelayImmediate()
+{
+  immDone = 0;
+}
+
 void CmiHandleImmediate()
 {
    static int intr = 0;
+   int qlen, i;
    if (intr) { return; }
    intr = 1;
-   if (PCQueueEmpty(CsvAccess(NodeState).imm)) { intr=0; return; }
+   qlen = PCQueueLength(CsvAccess(NodeState).imm);
+   if (qlen == 0) { intr=0; return; }
+   else
    {
-   void *msg;
 #ifdef CMK_CPV_IS_SMP
-   CmiState cs = CmiGetState();
-   int oldRank = cs->rank;
+     CmiState cs = CmiGetState();
+     int oldRank = cs->rank;
 #endif
-   while (msg = PCQueuePop(CsvAccess(NodeState).imm)) {
-/*CmiPrintf("[%d] CmiHandleMessage\n", CmiMyNode());*/
-     /* switch to the worker thread */
+     for (i=0; i<qlen; i++) {
+       void *msg = PCQueuePop(CsvAccess(NodeState).imm);
 #ifdef CMK_CPV_IS_SMP
-     cs->rank = *(int*)msg;
+       /* switch to the worker thread */
+       cs->rank = *(int*)msg;
 #endif
-     CmiHandleMessage(msg);
-/*CmiPrintf("[%d] CmiHandleMessage done\n", CmiMyNode());*/
-   }
+       immDone = 1;
+       CmiHandleMessage(msg);
+       if (!immDone) PCQueuePush(CsvAccess(NodeState).imm, msg);
+     }
 #ifdef CMK_CPV_IS_SMP
-   cs->rank = oldRank;
+     cs->rank = oldRank;
 #endif
    }
    intr = 0;
