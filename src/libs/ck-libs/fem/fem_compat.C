@@ -114,12 +114,18 @@ CDECL void FEM_Set_sparse_elem(int sid,const int *rec2elem)
 		(void *)rec2elem, 0,n, FEM_INDEX_0,2);
 }
 FDECL void FTN_NAME(FEM_SET_SPARSE_ELEM,fem_set_sparse_elem)
-	(int *sid,const int *rec2elem) 
+	(int *sid,int *rec2elem) 
 {
 	int entity=FEM_SPARSE+*sid;
-	int n=FEM_Mesh_get_length(S,entity);
+	int i,n=FEM_Mesh_get_length(S,entity);
+	// FEM_ELEM+rec2elem[2*i+0] is an element entity type--0 based
+	// rec2elem[2*i+1] is an element number--1-based
+	//  This means I can't naively use FEM_INDEX_0 *or* FEM_INDEX_1,
+	//  so I have to do the index conversion right here.
+	for (i=0;i<n;i++) rec2elem[2*i+1]--; //F to C indexing
 	FEM_Mesh_set_data(S,entity,FEM_SPARSE_ELEM,
-		(void *)rec2elem, 0,n, FEM_INDEX_1,2);
+		(void *)rec2elem, 0,n, FEM_INDEX_0,2);
+	for (i=0;i<n;i++) rec2elem[2*i+1]++; //Convert back	
 }
 
 
