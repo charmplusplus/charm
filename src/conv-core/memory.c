@@ -65,6 +65,26 @@ int CmiMemoryIs(int flag)
 static char *memory_lifeRaft=NULL;
 
 void CmiOutOfMemoryInit(void) {
+#if CMK_MEMORY_PREALLOCATE_HACK
+  /* Work around problems with brk() on some systems (e.g., Blue Gene/L)
+     by grabbing a bunch of memory from the OS (which calls brk()),
+     then releasing the memory back to malloc(), except for one block
+     at the end, which is used to prevent malloc from moving brk() back down. 
+  */
+#define MEMORY_PREALLOCATE_MAX 1024
+  void *ptrs[MEMORY_PREALLOCATE_MAX];
+  int i,len=0;
+  for (i=0;i<MEMORY_PREALLOCATE_MAX;i++) {
+    ptrs[i]=malloc(1024*1024);
+    if (ptrs[i]==NULL) break;
+    else len=i+1; /* this allocation worked */
+  }
+  /* we now own all the memory-- release all but the last meg. */
+  printf("CMK_MEMORY_PREALLOCATE_HACK claimed %d megs\n",len);
+  for (i=len-2;i>=0;i--) {
+    free(ptrs[i]);
+  }
+#endif
   memory_lifeRaft=(char *)malloc(65536/2);
 }
 
