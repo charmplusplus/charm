@@ -19,6 +19,7 @@ module CkMemCheckpoint {
         entry void doItNow(int spe, CkCallback &);  //checkpointing
  	entry void recvData(CkArrayCheckPTMessage *);
 	entry void recvProcData(CkProcCheckPTMessage *);
+	entry void syncFiles(CkReductionMsg *);
  	entry void cpFinish();
  	entry void report();
 	// restart

@@ -1,5 +1,5 @@
-#ifndef _CKCHECKPT_
-#define _CKCHECKPT_
+#ifndef _CK_MEM_CHECKPT_
+#define _CK_MEM_CHECKPT_
 
 #include "CkMemCheckpoint.decl.h"
 
@@ -31,30 +31,30 @@ public:
 	char *packData;
 };
 
-// table entry
-class CkMemCheckPTInfo {
+// table entry base class
+class CkCheckPTInfo {
    friend class CkMemCheckPT;
-private:
+protected:
    CkArrayID aid;
    CkGroupID locMgr;
    CkArrayIndexMax index;
    int pNo;   //another buddy
-   CkArrayCheckPTMessage* ckBuffer; 
 public:
-   CkMemCheckPTInfo(CkArrayID a, CkGroupID loc, CkArrayIndexMax idx, int no):
-            aid(a), locMgr(loc), index(idx), pNo(no), ckBuffer(NULL)  {}
-   ~CkMemCheckPTInfo() { if (ckBuffer) delete ckBuffer; }
-   void updateBuffer(CkArrayCheckPTMessage *data) { 
-	if (ckBuffer) delete ckBuffer;
-	ckBuffer = data;
-   }
+   CkCheckPTInfo();
+   CkCheckPTInfo(CkArrayID a, CkGroupID loc, CkArrayIndexMax idx, int pno):
+                  aid(a), locMgr(loc), index(idx), pNo(pno)   {}
+   virtual ~CkCheckPTInfo() {}
+   virtual void updateBuffer(CkArrayCheckPTMessage *data) = 0;
+   virtual CkArrayCheckPTMessage * getCopy() = 0;
+   virtual void updateBuddy(int b1, int b2) = 0;
+   virtual int getSize() = 0;
 };
 
 class CkMemCheckPT: public CBase_CkMemCheckPT {
 public:
   CkMemCheckPT();
   CkMemCheckPT(CkMigrateMessage *m):CBase_CkMemCheckPT(m) { }
-  ~CkMemCheckPT();
+  virtual ~CkMemCheckPT();
   void pup(PUP::er& p);
   void doItNow(int sp, CkCallback &);
   void restart(int failedPe);
@@ -63,6 +63,7 @@ public:
   void recvData(CkArrayCheckPTMessage *);
   void recvProcData(CkProcCheckPTMessage *);
   void cpFinish();
+  void syncFiles(CkReductionMsg *);
   void report();
   void recoverBuddies();
   void recoverArrayElements();
@@ -78,7 +79,7 @@ public:
   static double startTime;
   static char*  stage;
 private:
-  CkVec<CkMemCheckPTInfo *> ckTable;
+  CkVec<CkCheckPTInfo *> ckTable;
 
   int recvCount, peCount;
   int cpStarter;
