@@ -1525,6 +1525,17 @@ int          default_cpus;
 int          default_rank;
 char        *default_shell;
 
+char        *host_login;
+char        *host_group;
+char        *host_passwd;
+pathfixlist  host_pathfixes;
+char        *host_ext;
+char        *host_setup;
+double       host_speed;
+int          host_cpus;
+int          host_rank;
+char        *host_shell;
+
 void nodetab_reset()
 {
   default_login = "*";
@@ -1537,6 +1548,20 @@ void nodetab_reset()
   default_cpus = 1;
   default_rank = 0;
   default_shell = arg_shell;
+}
+
+void host_reset()
+{
+  host_login = default_login;
+  host_group = default_group;
+  host_passwd = default_passwd;
+  host_pathfixes = default_pathfixes;
+  host_ext = default_ext;
+  host_setup = default_setup;
+  host_speed = default_speed;
+  host_cpus = default_cpus;
+  host_rank = default_rank;
+  host_shell = default_shell;
 }
 
 void nodetab_add(nodetab_host res)
@@ -1560,17 +1585,58 @@ void nodetab_makehost(char *host)
   if (nodetab_size == nodetab_max) return;
   res = (nodetab_host)malloc(sizeof(struct nodetab_host));
   res->name = host;
-  res->login = default_login;
-  res->passwd = default_passwd;
-  res->pathfixes = default_pathfixes;
-  res->ext = default_ext;
-  res->setup = default_setup;
-  res->speed = default_speed;
-  res->rank = default_rank;
-  res->cpus = default_cpus;
+  res->login = host_login;
+  res->passwd = host_passwd;
+  res->pathfixes = host_pathfixes;
+  res->ext = host_ext;
+  res->setup = host_setup;
+  res->speed = host_speed;
+  res->rank = host_rank;
+  res->cpus = host_cpus;
   res->ip = ip;
-  res->shell = default_shell;
+  res->shell = host_shell;
   nodetab_add(res);
+}
+
+void setup_host_args(char *args)
+{
+  while(*args != 0) {
+    char *b1 = args, *e1 = skipstuff(b1);
+    char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
+    args = skipblanks(e2);
+    if (subeqs(b1,e1,"++login")) host_login = substr(b2,e2);
+    else if (subeqs(b1,e1,"++passwd")) host_passwd = substr(b2,e2);
+    else if (subeqs(b1,e1,"++shell")) host_shell = substr(b2,e2);
+    else if (subeqs(b1,e1,"++speed")) host_speed = atof(b2);
+    else if (subeqs(b1,e1,"++cpus")) host_cpus = atol(b2);
+    else if (subeqs(b1,e1,"++pathfix")) {
+      char *b3 = skipblanks(e2), *e3 = skipstuff(b3);
+      args = skipblanks(e3);
+      host_pathfixes=pathfix_append(substr(b2,e2),substr(b3,e3),host_pathfixes);
+    } else if (subeqs(b1,e1,"++ext")) host_ext = substr(b2,e2);
+    else if (subeqs(b1,e1,"++setup")) host_setup = strdup(b2);
+  }
+}
+
+void setup_group_args(char *args)
+{
+  while(*args != 0) {
+    char *b1 = args, *e1 = skipstuff(b1);
+    char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
+    args = skipblanks(e2);
+    if (subeqs(b1,e1,"++login")) default_login = substr(b2,e2);
+    else if (subeqs(b1,e1,"++passwd")) default_passwd = substr(b2,e2);
+    else if (subeqs(b1,e1,"++shell")) default_shell = substr(b2,e2);
+    else if (subeqs(b1,e1,"++speed")) default_speed = atof(b2);
+    else if (subeqs(b1,e1,"++cpus")) default_cpus = atol(b2);
+    else if (subeqs(b1,e1,"++pathfix")) {
+      char *b3 = skipblanks(e2), *e3 = skipstuff(b3);
+      args = skipblanks(e3);
+      default_pathfixes=pathfix_append(substr(b2,e2),substr(b3,e3),
+                                       default_pathfixes);
+    } else if (subeqs(b1,e1,"++ext")) default_ext = substr(b2,e2);
+    else if (subeqs(b1,e1,"++setup")) default_setup = strdup(b2);
+  }
 }
 
 void nodetab_init()
@@ -1615,16 +1681,21 @@ void nodetab_init()
     else if (subeqs(b1,e1,"speed")&&(*b3==0))    default_speed = atof(b2);
     else if (subeqs(b1,e1,"cpus")&&(*b3==0))     default_cpus = atol(b2);
     else if (subeqs(b1,e1,"pathfix")) 
-      default_pathfixes=pathfix_append(substr(b2,e2),substr(b3,e3),default_pathfixes);
+      default_pathfixes=pathfix_append(substr(b2,e2),substr(b3,e3),
+                                       default_pathfixes);
     else if (subeqs(b1,e1,"ext")&&(*b3==0))      default_ext = substr(b2,e2);
     else if (subeqs(b1,e1,"setup"))              default_setup = strdup(b2);
-    else if (subeqs(b1,e1,"host")&&(*b3==0)) {
-      if (rightgroup)
-	for (default_rank=0; default_rank<default_cpus; default_rank++)
+    else if (subeqs(b1,e1,"host")) {
+      if (rightgroup) {
+        host_reset();
+        setup_host_args(b3);
+	for (host_rank=0; host_rank<host_cpus; host_rank++)
 	  nodetab_makehost(substr(b2,e2));
-    } else if (subeqs(b1,e1, "group")&&(*b3==0)) {
+      }
+    } else if (subeqs(b1,e1, "group")) {
       nodetab_reset();
       rightgroup = subeqs(b2,e2,arg_nodegroup);
+      if(rightgroup) setup_group_args(b3);
     } else {
       fprintf(stderr,"ERROR> unrecognized command in nodesfile:\n");
       fprintf(stderr,"ERROR> %s\n", input_line);
