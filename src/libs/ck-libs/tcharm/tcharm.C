@@ -219,7 +219,7 @@ void TCharm::ResumeFromSync(void)
 void TCharm::check(void)
 {
 	if (getState()!=inDriver)
-		CkAbort("TCharm> Can only use that routine from within driver!\n");
+		::CkAbort("TCharm> Can only use that routine from within driver!\n");
 }
 #endif
 
