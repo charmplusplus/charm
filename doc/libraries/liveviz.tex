@@ -44,11 +44,29 @@ image. This entry method has following structure:
 To know the width and height of image data m->req.wid and m->req.ht can 
 be used, here 'm' is the pointer to 'liveVizRequestMsg'. 
 
+By default liveViz combines image chuncks by doing a saturating sum of 
+overlapping pixel values. If you want liveViz to combine image chuncks by using 
+max (i.e. for overlapping pixels in deposited image chuncks final image will 
+have the pixel with highest intensity or in other words largest value), you need
+to pass one more parameter (reducerType) to 'liveVizDeposit' function.
+
+\begin{alltt}
+ > liveVizDeposit (m, startX, startY, width, height, imageBuff, this, 
+                   max_image_data);
+\end{alltt}
+
+For this to compile, you must declare 
+
+\begin{alltt}
+ > extern CkReduction::reducerType max_image_data;
+\end{alltt}
+
 \section{Format of deposit image}
 
-'imageBuff' is run of bytes representing image. if image is gray-scale each
- byte represents one pixel otherwise 3 consecutive bytes (starting at 
-array index which is a multiple of 3) represents a pixel.
+'imageBuff' is run of bytes representing image.This buffer represents image in 
+row-major format. if image is gray-scale each byte represents one pixel 
+otherwise 3 consecutive bytes (starting at array index which is a multiple of 3)
+ represents a pixel.
 
 \section{liveViz Initialization}
 
@@ -76,7 +94,7 @@ visualization. For initialization follow the following steps:
 compiling liveViz program, liveViz library needs to be compiled. To compile
 liveViz library:
 \begin{itemize}
-\item go to .../charm/tmp/libs/ck-libs/liveVize
+\item go to .../charm/tmp/libs/ck-libs/liveViz
 \item make
 \end{itemize}
 
