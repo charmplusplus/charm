@@ -144,6 +144,7 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
   return 0;
 }
 */
+
 static DWORD WINAPI call_startfn(LPVOID vindex)
 {
   int index = (int)vindex;
@@ -198,7 +199,6 @@ static void CmiStartThreads(char **argv)
   int     i;
   DWORD   threadID;
   HANDLE  thr;
-  int     val = 0;
 
   CmiMemLock_lock=CmiCreateLock();
   comm_mutex = CmiCreateLock();
@@ -398,11 +398,7 @@ void  CmiNodeBarrier(void) {
 /* unfortunately this could also be called in a non smp version, e.g.
    net-win32 */
 void CmiNodeAllBarrier(void) {
-#if CMK_SMP
   CmiNodeBarrierCount(CmiMyNodeSize()+1);
-#else
-  CmiNodeBarrierCount(CmiMyNodeSize());
-#endif
 }
 
 #endif
