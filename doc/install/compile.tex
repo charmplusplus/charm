@@ -2,7 +2,7 @@
 % RCS INFORMATION:
 %
 %       $RCSfile$
-%       $Author$        $Locker$                $State$
+%       $Author$        $Locker$       $State$
 %       $Revision$      $Date$
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -12,8 +12,179 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.1  1995-10-31 22:27:53  milind
+% Revision 1.2  1995-11-02 22:40:39  brunner
+% Includes short description of what charmc does, and description
+% of options
+%
+% Revision 1.1  1995/10/31  22:27:53  milind
 % Initial revision
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Compiling Converse, Charm, and Charm++ Programs}
+
+The shell script, {\tt charmc}, is a versatile program to standardize
+compiling and linking procedures among various machines and operating
+systems.  The script selects the appropriate libraries to compile
+Charm, Charm++, or Converse programs.  It also standardizes compiling
+and linking procedures and options for sequential C and C++ programs
+on the supported systems.  The {\tt charmc} program is executed in the
+following way:
+
+\begin{verbatim}
+charmc [options] input-files
+\end{verbatim}
+
+Files with the following extensions are handled by {\verb+charmc+}
+\begin{description}
+\item[{\verb+.p+}] Charm code
+\item[{\verb+.P+}] Charm++ code
+\item[{\verb+.c+}] C code
+\item[{\verb+.C+}] C++ code
+\item[{\verb+.o+}] Object files
+\item[{\verb+.a+}] Library files
+\end{description}
+
+The following options are supported by charmc:
+\begin{description}
+
+\item[{\tt -machine} {\em machine-type}]
+
+If more than one version of converse/charm/charm++ has been installed,
+allows selection of versions other than the default.  The default
+version is the version last installed. For a list of machine types
+currently supported, see the previous section.
+
+\item[{\tt -seq}]
+
+Compiles C and C++ files using the system's sequential/front end
+compilers.
+
+\item[{\tt -language \{converse|charm|charm++\}}]
+
+Selects compiler and linker options, and appropriate libraries
+to compile the selected language.  Default is {\tt -language charm}.
+
+\item[{\tt -balance} {\em load-balance-strategy}]
+
+Selects the desired load balancing strategies.  Currently, only {\tt rand}
+(random) is supported. Default is {\tt -balance rand}.
+	
+\item[{\tt -queue} {\em queueing strategy}]
+
+Currently ignored
+
+\item[{\tt -memory}]
+
+Currently ignored
+
+\item[{\tt -execmode} {\em execution-mode}]
+
+Selects the desired execution mode.  Currently supported modes are
+{\tt none}, {\tt summary}, and {\tt projections}. Default is {\tt
+-execmode none}.
+	
+\item[{\tt -verbose}]
+
+All commands executed by charmc are echoed to stdout.
+
+\item[{\tt -save}]
+
+Intermediate files produced by the Charm or Charm++ translator are saved.
+
+\item[{\tt -use-reliable-cc}]
+
+Some environments provide more than one C compiler (cc and gcc, for
+example).  This option selects the compiler most likely to succesfully
+compile C code.
+
+\item[{\tt -use-fastest-cc}]
+
+Some environments provide more than one C compiler (cc and gcc, for
+example).  This option selects the compiler most likely to produce
+faster executing code.
+
+\item[{\tt -cc} {\em C-compiler}]
+
+Forces the specified C compiler to ge used.
+
+\item[{\tt -c++} {\em C++ compiler}]
+
+Forces the specified C++ compiler to be used.
+
+\item[{\tt -ld} {\em linker}]
+
+Forces the specified linker to be used for {\tt -language charm}.
+
+\item[{\tt -ld++} {\em linker}]
+
+Forces the specified linker to be used for {\tt -language charm++}.
+
+\item[{\tt -cpp-option} {\em options}]
+
+Options passed to the C pre-processor.
+
+\item[{\tt -ldro-option} {\em options}]
+
+Options passes to the linker when linking {\tt .o} files.
+
+\item[{\tt -ld-option} {\em options}]
+
+Options passed to the linker for {\tt -language charm}.
+
+\item[{\tt -ld++-option} {\em options}]
+
+Options passed to the linker for {\tt -language charm++}.
+
+\item[{\tt -c}]
+
+Ignored.  For compatibility with {\tt cc} and {\tt ld}.
+
+\item[{\tt -o} {\em output-file}]
+
+Output file name.
+
+\item[{\tt -cp} {\em copy-file}]
+
+Creates a copy of the output file in {\em copy-file}.
+
+\item[{\tt -D*}]
+
+Passed to C preprocessor, C and C++ compilers.
+
+\item[{\tt -I*}]
+
+Passed to C preprocessor, C and C++ compilers.
+
+\item[{\tt -L*}]
+
+Passed to all linkers.
+
+\item[{\tt -g}]
+
+Causes compiled files to include debugging information.
+
+\item[{\tt -O}]
+
+Causes files to be compiled with default optimization.  Default.
+
+\item[{\tt -NO}]
+
+Causes no optimization to be used.  Overrides {\tt -O}.
+
+\item[{\tt -O*}]
+
+Passed to C/C++ compiler.
+
+\item[{\tt -l*}]
+
+Specifies libraries which are passed to all linkers.
+
+\item[{\tt -s}]
+
+Passed to C and C++ linkers.
+
+\end{description}
+
+
 
