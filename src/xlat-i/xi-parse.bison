@@ -57,9 +57,9 @@ Item	:	Boc | Chare | Message | ReadOnly | Table | PackMessage | VarsizeMessage
 
 OptionalExtern
 	:	/* empty */
-		{ $$ = FALSE; }
+		{ $$ = 0; }
 	|	EXTERN
-		{ $$ = TRUE; }
+		{ $$ = 0; }
 	;
 
 Boc	:	OptionalExtern BOC ChareName '{'
@@ -100,9 +100,9 @@ OptionalMessagePtr
 
 OptionalThreaded
 	:	/* empty */
-		{ $$ = FALSE; }
+		{ $$ = 0; }
 	|	THREADED
-		{ $$ = TRUE; }
+		{ $$ = 0; }
 	;
 
 OptionalStackSize

@@ -379,7 +379,7 @@ unsigned int lineno = 1;
 // int yylex()
 
 /* Local to file */
-static unsigned char in_comment=FALSE;
+static unsigned char in_comment=0;
 int binsearch(char *s, int lb, int ub);
 static int check_name(char *);
 
@@ -634,12 +634,12 @@ YY_RULE_SETUP
 case 2:
 YY_RULE_SETUP
 #line 49 "xi-scan.flex"
-{ in_comment = TRUE; /* Single line C-style comments */ }
+{ in_comment = 1; /* Single line C-style comments */ }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
 #line 50 "xi-scan.flex"
-{ in_comment = FALSE; }
+{ in_comment = 0; }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP

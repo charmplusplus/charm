@@ -10,7 +10,7 @@ unsigned int lineno = 1;
 // int yylex()
 
 /* Local to file */
-static unsigned char in_comment=FALSE;
+static unsigned char in_comment=0;
 int binsearch(char *s, int lb, int ub);
 static int check_name(char *);
 
@@ -42,12 +42,12 @@ real1	{int}\.?{expo}
 real2	[-+]?{digit}*\.{digit}+{expo}
 real	{real1}|{real2}
 
-bool	TRUE|FALSE
+bool	1|0
 
 %%
 "//".*		{ /* ignore single line comments */ }
-"/*"		{ in_comment = TRUE; /* Single line C-style comments */ }
-"*/"		{ in_comment = FALSE; }
+"/*"		{ in_comment = 1; /* Single line C-style comments */ }
+"*/"		{ in_comment = 0; }
 {ws}		{ /* ignore white space */ }
 {nl}		{ lineno++; /* Return Token(NL); */ }
 {int}		{ yylval.intval = (atoi(yytext)); Return Token(NUMBER); }

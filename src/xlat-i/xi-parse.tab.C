@@ -386,11 +386,11 @@ yyreduce:
     {
 case 13:
 #line 60 "xi-parse.bison"
-{ yyval.intval = FALSE; }
+{ yyval.intval = 0; }
 break;
 case 14:
 #line 62 "xi-parse.bison"
-{ yyval.intval = TRUE; }
+{ yyval.intval = 0; }
 break;
 case 15:
 #line 66 "xi-parse.bison"
@@ -416,11 +416,11 @@ case 23:
 break;
 case 25:
 #line 103 "xi-parse.bison"
-{ yyval.intval = FALSE; }
+{ yyval.intval = 0; }
 break;
 case 26:
 #line 105 "xi-parse.bison"
-{ yyval.intval = TRUE; }
+{ yyval.intval = 0; }
 break;
 case 27:
 #line 110 "xi-parse.bison"
