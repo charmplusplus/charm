@@ -15,7 +15,7 @@ then
         . ./conv-mach-opt.sh
 fi
 
-VERSION=050404
+VERSION=050405
 AC_DEFINE_UNQUOTED(CHARM_VERSION, $VERSION)
 
 AC_MSG_CHECKING(machine name)
@@ -195,6 +195,16 @@ void foo(void) {
 EOT
 test_cxx "whether it has poll" "yes" "no"
 AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass)
+
+#test if has sys/mman.h
+cat > $t <<EOT
+#include <sys/types.h>
+#include <sys/mman.h>
+void foo(void) { 
+}
+EOT
+test_cxx "whether it has sys/mman.h" "yes" "no"
+AC_DEFINE_UNQUOTED(CMK_HAS_MMAN_H, $pass)
 
 #test fortran subroutine name
 FCC=`echo $CMK_CF90 | cut -d' ' -f1`
