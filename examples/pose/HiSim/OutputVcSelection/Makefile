@@ -11,7 +11,7 @@ LIBS=-Lstdc++ -lm
 RedStorm: maxAvailBuffer.o
 	cp maxAvailBuffer.o ../tmp
 
-HypCubeArch: maxAvailBuffer.o
+HypCubeArch: maxAvailBuffer.o  
 	cp maxAvailBuffer.o ../tmp
 
 BlueGene: maxAvailBufferBubbleVc.o

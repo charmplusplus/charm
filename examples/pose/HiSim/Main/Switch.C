@@ -5,6 +5,10 @@
 extern void initializeNetwork(Topology **,RoutingAlgorithm **,InputVcSelection **,OutputVcSelection **);
 extern void initializeNetwork(Topology **,RoutingAlgorithm **);
 
+/***************************************************************
+ * Switch constructor. Initialize data structures and topology *
+ ***************************************************************/
+
 Switch::Switch(SwitchMsg *s) {
         id = s->id; numP = s->numP;
         for(int i=0;i<numP*config.switchVc;i++) {
@@ -19,13 +23,20 @@ Switch::Switch(SwitchMsg *s) {
 //      for(int i =0;i<6;i++) CkPrintf(" %d:%d  ",i,topology->next[i]);
 }
 
+/******************************************************************
+ * Select the output port based on routing algorithm. Then select *
+ * an available vc at the port. If no vc available buffer it.     *
+ * Otherwise call sendPacket to send the packet			  *
+ ******************************************************************/
+
 // Receive packet and route it or buffer depending on current state
 
 void Switch::recvPacket(Packet *copyP) {
         Packet *p; p = new Packet; *p = *copyP;
         int outPort,outVc,inPort,inVc,outVcId,nextChannel,inVcId,bufferid;
 
-        inPort = routingAlgorithm->convertOutputToInputPort(p->hdr.portId); inVc = p->hdr.vcid;
+//	CkPrintf("At switch %d \n",id-config.switchStart);
+        inPort = routingAlgorithm->convertOutputToInputPort(id-config.switchStart,p,numP); inVc = p->hdr.vcid;
         p->hdr.portId = inPort;
         outPort = routingAlgorithm->selectRoute(id-config.switchStart,p->hdr.routeInfo.dst,numP,topology,p,availBufsize);
 
@@ -43,8 +54,10 @@ void Switch::recvPacket(Packet *copyP) {
         else { Buffer[inVcId].push_back(p->hdr); delete p;}
 }
 
-// Send packet to next switch and update credits in previous switch and finally 
-// invoke a procedure to check next packet to send in the input
+/******************************************************************************
+ *Send packet to next switch and update credits in previous switch and finally* 
+ *invoke a procedure to check next packet to send in the input 		      *
+ ******************************************************************************/
 
 void Switch::sendPacket(Packet *p,const int & outVcId,const int & outPort,const int & inVcId) {
         int goingToNic=0,fromNic=0;
@@ -62,7 +75,7 @@ void Switch::sendPacket(Packet *p,const int & outVcId,const int & outPort,const 
 
         if(!goingToNic) availBufsize[outVcId] -= p->hdr.routeInfo.datalen;
 
-        nextChannel = topology->getNextChannel(outPort,id);
+        nextChannel = topology->getNextChannel(outPort,id,numP);
 
         p->hdr.vcid = (outVcId%config.switchVc);
         flowStart *f,*f2; f= new flowStart; f->vcid = p->hdr.prev_vcid; f->datalen = p->hdr.routeInfo.datalen;
@@ -75,7 +88,8 @@ void Switch::sendPacket(Packet *p,const int & outVcId,const int & outPort,const 
         else delete f;
 
         p->hdr.prev_vcid = outVcId;
-        p->hdr.prevId = id;
+        p->hdr.prevId = id; 
+	p->hdr.prev_src = id-config.switchStart;  // For direct networks
 //      p->hdr.dump();
 //      parent->CommitPrintf("sendPacket: ovt %d portid %d supposed portid %d nextid is %d nicEnd is %d src %d dst %d\n",
 //                      ovt,outPort,p->hdr.portId,p->hdr.nextId,config.nicStart+config.numNodes,p->hdr.src,p->hdr.routeInfo.dst);

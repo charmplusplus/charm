@@ -95,7 +95,8 @@ int TorusRouting::expectedTime(int s,int d,int ovt,int origovt,int len,int *hops
         return extra;
 }
 
-int TorusRouting::convertOutputToInputPort(int port) {
+int TorusRouting::convertOutputToInputPort(int id,Packet *p,int numP) {
+	int port = p->hdr.portId;
 	if(port == 6) return 6;
 	return((port+3)%6);
 }

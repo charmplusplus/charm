@@ -86,7 +86,7 @@ int FatTree::getNext(int portid,int nodeid,int numP) {
         return(next[portid]);
 }
 
-int FatTree::getNextChannel(int portid,int switchid) {
+int FatTree::getNextChannel(int portid,int switchid,int numP) {
 	// Offset for nodes to connect to switches ( if channels are added)
 	int offset = 0,startChan; 
 	startChan = config.numP * (switchid-config.switchStart) + portid;
@@ -97,7 +97,7 @@ int FatTree::getStartSwitch(int nodeid) {
 	return(nodeid/(config.numP/2));
 }
 
-int FatTree::getStartPort(int nodeid) {
+int FatTree::getStartPort(int nodeid,int nump) {
 	int fanout;
 	fanout = (config.numP/2);
 	return((nodeid%fanout)+fanout);

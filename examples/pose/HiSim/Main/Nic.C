@@ -28,17 +28,11 @@ void NetInterface::recvMsg(NicMsg *nic) {
                 p->hdr.routeInfo.datalen = curlen;
                 CkAssert(delay >= 0);
 
-                p->hdr.portId = topology->getStartPort(nicConsts->id-config.nicStart);
+                p->hdr.portId = topology->getStartPort(nicConsts->id-config.nicStart,nicConsts->numP);
                 p->hdr.vcid = roundRobin; roundRobin = (roundRobin+1)%config.switchVc;
                 p->hdr.prevId = nicConsts->id;
-                p->hdr.prev_vcid = -1;
+                p->hdr.prev_vcid = -1; p->hdr.prev_src = p->hdr.src;
                 p->hdr.nextId = topology->getStartSwitch(nicConsts->id-config.nicStart);
-
-//              p->hdr.dump(); CkPrintf("startId = %d nextid %d\n",nicConsts->startId,p->hdr.nextId);
-                // Cut-through directly to switch. "delay" variable will act as elapse b/w packets.
-                // Should add a channel later for elapse b/w  last packet of message and first pkt of next message
-                // Currently though there is a elapse in TCsim, b/w messages. So it's fine. Not the best option as cpu is dumb
-                // Anyway, a DMA/PCI channel should do the trick. Will add it soon after I get a fat-tree running.
 
                 POSE_invoke(recvPacket(p),Switch,nicConsts->startId,delay);
                 delay += ((int)(curlen/config.switchC_BW));  msgLenRest -= curlen; packetnum ++;

@@ -91,7 +91,8 @@ int UpDown::expectedTime(int s,int d,int ovt,int origovt,int len,int *hops) {
         return extra;
 }
 
-int UpDown::convertOutputToInputPort(int portid) {
+int UpDown::convertOutputToInputPort(int id,Packet *p,int numP) {
+	int portid = p->hdr.portId;
 	int fanout = (config.numP/2);
 	return (((portid+fanout)%config.numP));    // Hehehe
 }

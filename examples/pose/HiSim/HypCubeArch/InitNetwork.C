@@ -2,8 +2,8 @@
 #include "BgSim_sim.h"
 #include "../Topology/HyperCube.h"
 #include "../Routing/HammingDistance.h"
-#include "../OutputVcSelection/maxAvailBuffer.h"
-#include "../InputVcSelection/SLQ.h"
+#include "../OutputVcSelection/maxAvailBuffer.h"  
+#include "../InputVcSelection/RoundRobin.h"
 
 void InitNetwork(MachineParams *mp) {
 
@@ -24,6 +24,14 @@ void InitNetwork(MachineParams *mp) {
         diff = mp->BGnodes; counter = 0; nnodes = 1; portindex[0] = 0;
         while(diff = diff >> 1)  { counter ++; nnodes *= 2; }
 
+	// The code here is mostly for the future incomplete hypercube. 
+	// The implementation is based on the fact that an incomplete hypercube
+	// is composed of two parts. one complete sub-hypercube and one incomplete one
+	// The complete one has number of ports corresponding to the log2(sub-hypercube)
+	// and some nodes have an extra port as they connect to nodes in incomplete sub-hypercube
+	// Now takes this logic recursively for the incomplete sub-hypercube ( now sub-sub complete and incomplete)
+	// and so on.
+
         for(i=0;i<mp->BGnodes;i++) {
         if(i < nnodes) {
                 ports[i] = counter;
@@ -43,11 +51,11 @@ void InitNetwork(MachineParams *mp) {
         for(k=0;k<mp->BGnodes;k++)
                 topology[k] = new HyperCube;
 
-        chanStart = mp->config->ChannelStart = mp->config->switchStart +  ;
+        chanStart = mp->config->ChannelStart = mp->config->switchStart + mp->BGnodes  ;
 
-        for(i=nicStart;i< mp->switchStart;i++) {
+        for(i=nicStart;i< mp->config->switchStart;i++) {
                 topology[i-nicStart]->getNeighbours(i-nicStart,ports[i-nicStart]);
-                nic = new NetInterfaceMsg(i,config.switchStart+(i-nicStart),ports[i-nicStart]);
+                nic = new NetInterfaceMsg(i,switchStart+(i-nicStart),ports[i-nicStart]);
                 nic->Timestamp(0);
                 mapPE = mp->procs*(i-nicStart)/mp->BGnodes;
 
@@ -67,7 +75,7 @@ void InitNetwork(MachineParams *mp) {
                 sbuf = new SwitchMsg(i,ports[nodeid]);
                 sbuf->Timestamp(0);
                 mapPE = mp->procs*(nodeid-1)/mp->BGnodes;
-                (*(CProxy_InputBuffer *) &POSE_Objects)[i].insert(inpbuf,mapPE);
+                (*(CProxy_Switch *) &POSE_Objects)[i].insert(sbuf,mapPE);
                 portid ++; counter--;
         }
 
@@ -91,8 +99,9 @@ void initializeNetwork(Topology **topology,RoutingAlgorithm **routing,InputVcSel
 {
    *topology = new HyperCube;
    *routing = new HammingDistance;
-   *invc = new SLQ;
-   *outvc = new maxAvailBuffer;
+   *invc = new RoundRobin;
+   *outvc = new maxAvailBuffer; 
+
 }
 
 void initializeNetwork(Topology **topology,RoutingAlgorithm **routing)

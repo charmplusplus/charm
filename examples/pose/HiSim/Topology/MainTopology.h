@@ -8,8 +8,8 @@ class Topology {
 	int nodeRangeStart,nodeRangeEnd;
         virtual void getNeighbours(int nodeid,int numP)=0;
         virtual int getNext(int portid,int nodeid,int numP) = 0;
-	virtual int getNextChannel(int,int) = 0;
-	virtual int getStartPort(int id) = 0;
+	virtual int getNextChannel(int,int,int) = 0;
+	virtual int getStartPort(int id,int) = 0;
 	virtual int getStartVc() = 0;
 	virtual int getStartSwitch(int id) = 0;
 	virtual int getStartNode(){}

@@ -7,8 +7,8 @@ class Mesh3D : public Topology {
 	Mesh3D();
         void getNeighbours(int nodeid,int numP);
         int getNext(int portid,int nodeid,int numP);
-	int getNextChannel(int,int);
-	int getStartPort(int);
+	int getNextChannel(int,int,int);
+	int getStartPort(int,int);
 	int getStartVc();
 	int getStartSwitch(int);
 };

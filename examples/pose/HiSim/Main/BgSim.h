@@ -20,16 +20,8 @@ using namespace std;
 #define print_praveen //
 #endif
 
-#define SIMPLE_SEND 0
-#define BROADCAST 1
-#define INTERNAL_DELAY 1
-#define ARBITRATION_DELAY 1
-#define REQUEST_DELAY 1
-#define ACK_DELAY 1
 #define START_LATENCY 200
 #define IDLE -1
-#define MESH3D 1
-#define HYPERCUBE 2
 
 enum {
 	X_POS = 0,
@@ -48,6 +40,13 @@ extern Config config;
 
 #define maxP(a,b) ((a)>(b)?(a):(b))
 #define minP(a,b) ((a)<(b)?(a):(b))
+
+/*******************************************************
+ * Used for signifiying position of a node in 3D grid  *
+ * Contains functions to get neighbours of a node and  *
+ * also conversion from id to (x,y,z) co-ordinates and *
+ * vice versa 					       *
+ *******************************************************/
 
 class Position {
 	public :
@@ -98,12 +97,14 @@ class Position {
 	}
 };
 
+// Part of packet header
 class RoutingInformation {
 	public:
 	int dst;
-	int datalen;
+	int datalen; // Current packet length
 };
 
+// message passed from Node to Nic. For explanation of fields look at class Packet
 class NicMsg {
 	public:
 	RoutingInformation routeInfo;
@@ -132,15 +133,16 @@ class NicMsg {
 	}
 };
 
+// Part of the packet. Contains all neccessary details required for protocol and routing
 class Header {
         public:
-	RoutingInformation routeInfo;
-        int src;
-        int pktId;
-        int msgId;
-        int totalLen,nextId,prevId;
-        int portId;
-        int vcid,prev_vcid;
+	RoutingInformation routeInfo;  // routing informating
+        int src,prev_src;              // original source and previous node id
+        int pktId;		       // packet id , not used in inorder arrival
+        int msgId;		       // message id, set by node
+        int totalLen,nextId,prevId;    // total length of message
+        int portId; 		       // output port id
+        int vcid,prev_vcid;	       // vcid = vcid at input , prev_vcid = prev output global vcid
         Header(){}
 
         Header & operator=(const Header &obj)
@@ -150,6 +152,7 @@ class Header {
                 totalLen = obj.totalLen; prevId = obj.prevId;
                 portId = obj.portId; nextId = obj.nextId;
                 vcid = obj.vcid; prev_vcid = obj.prev_vcid;
+		prev_src = obj.prev_src;
                 return *this;
         }
 
@@ -179,6 +182,7 @@ class Header {
         }
 };
 
+// Packet message
 class Packet {
 	public:
 	Header hdr;
@@ -193,7 +197,10 @@ class Packet {
         void dump() { hdr.dump(); }
 
 };
-	
+
+
+// Used to store message details directly at the destination, bypassing intermediate nodes
+// For details of fields, look at class Header or TCsim.C
 class MsgStore {
         public:
         int src;
@@ -229,9 +236,10 @@ class MsgStore {
         }
 };
 
+// Message to restart stopped flow at buffers
 class flowStart {
         public:
-	int nextId;
+	int nextId; 
         int vcid;
 	int prev_vcid;
 	int datalen;
@@ -251,6 +259,7 @@ class flowStart {
 	}
 };
 
+// Unique id to recognize a message, comprising source and message id
 class remoteMsgId
 {
 	public:
@@ -272,10 +281,11 @@ class remoteMsgId
 	}
 };
 
+// Message while initializing a network
 class NetInterfaceMsg {
 	public:
 	int id;
-	int startId;
+	int startId; // startId of next switch
 	int numP;
 	
 	NetInterfaceMsg(){}
@@ -294,6 +304,7 @@ class NetInterfaceMsg {
 		
 };
 
+// Message while initializing a channel
 class ChannelMsg {
 	public:
 	int id;
@@ -317,6 +328,7 @@ class ChannelMsg {
 	}
 };		
 
+// Message while initializing a Switch
 class SwitchMsg {
 	public:
 	int id;
@@ -334,6 +346,7 @@ class SwitchMsg {
 
 #define NO_VC_AVAILABLE -1
 
+// Constants in a NIC poser, which are not stored during checkpointing
 class NicConsts {
 	public:
 	int id;
@@ -357,10 +370,10 @@ class Switch {
 	int id,numP;
         unsigned  char InputRoundRobin,RequestRoundRobin,AssignVCRoundRobin;
 	// Be careful not to put variable data in any of these. Rollback will kill the simulation
-        Topology *topology;
-        RoutingAlgorithm *routingAlgorithm;
-        OutputVcSelection *outputVcSelect;
-        InputVcSelection *inputVcSelect;
+        Topology *topology;  // Topology of machine
+        RoutingAlgorithm *routingAlgorithm; // Routing strategy
+        OutputVcSelection *outputVcSelect; // Output VC selection strategy
+        InputVcSelection *inputVcSelect;  // Input VC selection strategy
 
 	Switch(){}
 	Switch(SwitchMsg *m);
@@ -393,11 +406,11 @@ class Switch {
 // Should take care of contention when multiple ports are sending data to nic ...
 class NetInterface {
 	public:
-	map <remoteMsgId,int > pktMap;
-	map <remoteMsgId,MsgStore> storeBuf;
-	int numRecvd,roundRobin;
-	int prevIntervalStart,counter;
-	Topology *topology;
+	map <remoteMsgId,int > pktMap; // Used to keep track of packets received from various sources
+	map <remoteMsgId,MsgStore> storeBuf; // Used to store part of incoming messages directly. See class MsgStore for details
+	int numRecvd,roundRobin; // roundRobin is used for load balancing packets.
+	int prevIntervalStart,counter; // These are used for statistics printing
+	Topology *topology; 
 	RoutingAlgorithm *routingAlgorithm;
 	
 	NicConsts *nicConsts;
@@ -428,29 +441,12 @@ class NetInterface {
 	}
 };
 
-class Request
-{
-        public:
-        int nextId;
-        int datalen; 
-	int vcid;
-        Request(){}
-        Request(int n,int d):nextId(n),datalen(d){}
-        Request & operator=(const Request &obj)
-        {
-	       nextId = obj.nextId; 
-		datalen = obj.datalen;  vcid = obj.vcid; }
-        bool operator == (const Request &obj) const {
-               if((nextId == obj.nextId) && (vcid == obj.vcid) && (datalen == obj.datalen)) return true; else return false;
-        }
-};
-
 #endif
-
+// Channel poser
 class Channel {
 	public:
 	int id;
-	int prevIntervalStart,counter,portid,nodeid,numP;
+	int prevIntervalStart,counter,portid,nodeid,numP; // To do statistics collection for link 
 
 	Channel() {}
 	~Channel(){}

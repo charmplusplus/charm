@@ -1,13 +1,7 @@
 #include "HyperCube.h"
 #include "InitNetwork.h"
-#include ROUTING_FILE
-#include OUTPUT_VC_FILE
-#include INPUT_VC_FILE
 
 HyperCube::HyperCube() {
-	routingAlgorithm = new ROUTING_ALGORITHM;
-	outputVcSelect = new OUTPUT_VC_SELECTION;
-	inputVcSelect = new INPUT_VC_SELECTION;	
 }
 
 void HyperCube::getNeighbours(int nodeid,int numP) {
@@ -62,24 +56,21 @@ id -= pow2; c  -= pow2;
 y++; i--;
 }
                                                                                                                                                              
-        CkAssert(portid < numP);
-        return(config.InputBufferStart + next[portid] + p + nextPort); // Add next[portid] to account for injection port
+        CkAssert(portid <= numP);
+  //      return(config.InputBufferStart + next[portid] + p + nextPort); // Add next[portid] to account for injection port
+        return(config.switchStart + next[portid] ); // Add next[portid] to account for injection port
 }
 
-
-// Modify the functions below to work for hypercube, just flicked it from Mesh3D. 
-
-int HyperCube::getNextChannel(int portid,int switchid) {
-        int numP = 6;
-
+int HyperCube::getNextChannel(int portid,int switchid,int numP) {
+// Don't support incomplete hypercubes for now
         if(portid < numP)
                 return(config.ChannelStart + (numP+1)*next[portid]+portid);
         else
                 return(config.ChannelStart + (switchid-config.switchStart)*(numP+1)+numP);
 }
 
-int HyperCube::getStartPort(int id) {
-        return(6);  // There are 7 input ports
+int HyperCube::getStartPort(int id,int numP) {
+        return(numP);  // There are 7 input ports
 }
 
 int HyperCube::getStartVc() { // Assume no end to end flow control
@@ -89,4 +80,3 @@ int HyperCube::getStartVc() { // Assume no end to end flow control
 int HyperCube::getStartSwitch(int id) {
         return(config.switchStart +  id);
 }
-

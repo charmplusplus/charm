@@ -4,17 +4,17 @@ i) Main :- Contains the core code which is common to all network architectures
 ii) BlueGene :- Contains initialization routines for Bluegene Network
 iii) IB :- Input Buffered Fat tree
 iv) OB :- Output Buffered Fat tree
+v) HyperCube :- Contains initialization routines for Hypercube
 
-v) Routing :- Contains files which define different routing strategies
-vi)Topology:- Contains files which define different topologies
-vii)OutputVcSelection :- Contains files which define different output virtual channel
+vi) Routing :- Contains files which define different routing strategies
+vii)Topology:- Contains files which define different topologies
+viii)OutputVcSelection :- Contains files which define different output virtual channel
                          selection policies
-vii)InputVcSelection :- Contains files which define different input virtual channel
+ix)InputVcSelection :- Contains files which define different input virtual channel
                          selection policies
 
-viii) HyperCube :- Some work to be done in syncing it up with the latest framework.
-                   No coding to be done though. Just change some prototypes and makefiles
-ix)   RedStorm  :- Same as above
+x)   RedStorm  :- Some syncing work to be done. Should be easy if you follow bluegene as
+		  redstorm is a simplified version.
 
 
 How do I run a code ?
@@ -31,7 +31,6 @@ Step 3) ./pgm 1 1
 
 I want to write a new network architecture ?
 
-Step 1) Make sure that framework is adhered to by creating strategies in v,vi,vii and viii. 
+Step 1) Make sure that framework is adhered to by creating strategies in vi,vii,viii and ix. 
         Then add a line in each makefile for the new machine architecture
 Step 2) Make a new directory for the network architecture. Adhere to the framework of Initialization.
-

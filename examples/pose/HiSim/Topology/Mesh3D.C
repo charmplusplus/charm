@@ -23,7 +23,7 @@ int Mesh3D::getNext(int portid,int switchid,int numP) {
         	return(config.switchStart + next[portid]);
 }
 
-int Mesh3D::getNextChannel(int portid,int switchid) {
+int Mesh3D::getNextChannel(int portid,int switchid,int nump) {
 	int numP = 6; 
 
 	if(portid < numP)
@@ -32,7 +32,7 @@ int Mesh3D::getNextChannel(int portid,int switchid) {
 		return(config.ChannelStart + (switchid-config.switchStart)*(numP+1)+numP);
 }
 
-int Mesh3D::getStartPort(int id) {
+int Mesh3D::getStartPort(int id,int numP) {
         return(6);  // There are 7 input ports
 }
 
