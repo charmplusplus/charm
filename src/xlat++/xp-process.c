@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-11-04 00:10:56  sanjeev
+ * Revision 2.7  1995-11-14 21:24:25  sanjeev
+ * fixed "_CK_ReadMsgTable not used" warning
+ *
+ * Revision 2.6  1995/11/04  00:10:56  sanjeev
  * fixes for nCUBE
  *
  * Revision 2.5  1995/11/02  23:22:52  sanjeev
@@ -440,7 +443,8 @@ void GenerateStructsFns()
 /* Output _CK_mod_CopyFromBuffer, _CK_mod_CopyToBuffer for readonly vars */
 	fprintf(outfile,"extern \"C\" void _CK_13CopyFromBuffer(void *,int) ;\n") ;
 	fprintf(outfile,"void _CK_%s_CopyFromBuffer(void **_CK_ReadMsgTable)\n",CoreName) ;
-	fprintf(outfile,"{\n") ;
+	/* This is so that CC doesnt complain */
+	fprintf(outfile,"{\tvoid *junk = _CK_ReadMsgTable[0] ;\n") ; 
 	for ( i=0; i<TotalReads; i++ ) 
 		fprintf(outfile,"\t_CK_13CopyFromBuffer(&%s,sizeof(%s)) ;\n",ReadTable[i],ReadTable[i]) ;
 	for ( i=0; i<TotalReadMsgs; i++ ) {
