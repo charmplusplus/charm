@@ -107,9 +107,7 @@ public:
     int *objHash; 
     int  hashSize;
 
-    LDStats(): n_objs(0), n_migrateobjs(0), objData(NULL), 
-               n_comm(0), commData(NULL), from_proc(NULL), to_proc(NULL), 
-               objHash(NULL) { procs = new ProcStats[CkNumPes()]; }
+    LDStats();
     void assign(int oid, int pe) { CmiAssert(procs[pe].available); to_proc[oid] = pe; }
       // build hash table
     void makeCommHash();

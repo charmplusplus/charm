@@ -1262,6 +1262,12 @@ inline static int ObjKey(const LDObjid &oid, const int hashSize) {
 	 |i_abs(oid.id[0])) % hashSize;
 }
 
+CentralLB::LDStats::LDStats():  
+	n_objs(0), n_migrateobjs(0), objData(NULL), 
+        n_comm(0), commData(NULL), from_proc(NULL), to_proc(NULL), 
+        objHash(NULL) { 
+  procs = new ProcStats[CkNumPes()]; 
+}
 void CentralLB::LDStats::makeCommHash() {
   // hash table is already build
   if (objHash) return;
