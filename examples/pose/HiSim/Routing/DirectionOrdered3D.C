@@ -14,11 +14,11 @@ int DirectionOrdered3D::selectRoute(int c,int d,int numP,int *next) {
         return nextPort;
 }
 
-int DirectionOrdered3D::expectedTime(int s,int d,int ovt,int origovt,int len,int *hops) {
+int DirectionOrdered3D::expectedTime(int s,int d,POSE_TimeType ovt,POSE_TimeType origovt,int len,int *hops) {
         Position src,pos;  src.init(s);pos.init(d);
-        int extra,expected;
+        POSE_TimeType extra,expected;
         *hops = abs(pos.x-src.x)+abs(pos.y-src.y)+abs(pos.z-src.y);
-        expected = *hops * config.switchC_Delay + (int)(len/config.switchC_BW) + START_LATENCY;
+        expected = *hops * config.switchC_Delay + (POSE_TimeType)(len/config.switchC_BW) + START_LATENCY + CPU_OVERHEAD;
         extra = (ovt-origovt) - expected;
         if(extra < 0) extra = 0;
         return extra;

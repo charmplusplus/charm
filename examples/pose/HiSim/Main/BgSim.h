@@ -20,6 +20,7 @@ using namespace std;
 #define print_praveen //
 #endif
 
+#define CPU_OVERHEAD 400
 #define START_LATENCY 200
 #define IDLE -1
 
@@ -115,8 +116,8 @@ class NicMsg {
 	int destNodeCode;
 	int index;
 	int destTID;
-	int recvTime;
-	int origovt;
+	POSE_TimeType recvTime;
+	POSE_TimeType origovt;
 
 	NicMsg(){}
 	NicMsg & operator=(const NicMsg &obj)
@@ -207,11 +208,11 @@ class MsgStore {
         int pktId;
         int msgId;
         int totalLen;
-        int recvTime;
+        POSE_TimeType recvTime;
         int destNodeCode;
         int index;
         int destTID;
-	int origovt;
+	POSE_TimeType origovt;
 
         MsgStore(){}
 
@@ -409,7 +410,7 @@ class NetInterface {
 	map <remoteMsgId,int > pktMap; // Used to keep track of packets received from various sources
 	map <remoteMsgId,MsgStore> storeBuf; // Used to store part of incoming messages directly. See class MsgStore for details
 	int numRecvd,roundRobin; // roundRobin is used for load balancing packets.
-	int prevIntervalStart,counter; // These are used for statistics printing
+	POSE_TimeType prevIntervalStart,counter; // These are used for statistics printing
 	Topology *topology; 
 	RoutingAlgorithm *routingAlgorithm;
 	
@@ -446,7 +447,8 @@ class NetInterface {
 class Channel {
 	public:
 	int id;
-	int prevIntervalStart,counter,portid,nodeid,numP; // To do statistics collection for link 
+	POSE_TimeType prevIntervalStart,counter;
+	int portid,nodeid,numP; // To do statistics collection for link 
 
 	Channel() {}
 	~Channel(){}

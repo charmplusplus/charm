@@ -66,7 +66,7 @@ int UpDown::selectRoute(int c,int d,int numP,Topology *top,Packet *p,map<int,int
 }
 
 
-int UpDown::expectedTime(int s,int d,int ovt,int origovt,int len,int *hops) {
+int UpDown::expectedTime(int s,int d,POSE_TimeType ovt,POSE_TimeType origovt,int len,int *hops) {
       	int fanout = (config.numP/2),numhops=0; 
         int dimSize = config.numNodes/fanout,tmp=config.numNodes;
 	*hops = 0; 
@@ -82,8 +82,8 @@ int UpDown::expectedTime(int s,int d,int ovt,int origovt,int len,int *hops) {
                 numhops -= 2;
         }
 
-        int expected = numhops * config.switchC_Delay + (int)(len/config.switchC_BW) + START_LATENCY;
-        int extra = (ovt-origovt) - expected;
+        POSE_TimeType expected = numhops * config.switchC_Delay + (POSE_TimeType)(len/config.switchC_BW) + START_LATENCY + CPU_OVERHEAD;
+        POSE_TimeType extra = (ovt-origovt) - expected;
         if(extra < 0) extra = 0;
 	// The actual might be slightly lower in no-latency case than "expected" as
 	//  round-off during integer/fp division occurs in transit (i.e POSE_invoke or elapse delays are rounded off)

@@ -88,9 +88,9 @@ int TorusRouting::selectRoute(int c,int d,int numP,Topology *top,Packet *p,map<i
         return nextPort;
 }
 
-int TorusRouting::expectedTime(int s,int d,int ovt,int origovt,int len,int *hops) {
+int TorusRouting::expectedTime(int s,int d,POSE_TimeType ovt,POSE_TimeType origovt,int len,int *hops) {
         Position src,pos;  src.init(s);pos.init(d);
-        int extra,expected,xdist,ydist,zdist;
+        POSE_TimeType extra,expected,xdist,ydist,zdist;
 	xdist = netLength-abs(pos.x-src.x);
 	ydist = netHeight-abs(pos.y-src.y);
 	zdist = netWidth-abs(pos.z-src.z);
@@ -100,7 +100,7 @@ int TorusRouting::expectedTime(int s,int d,int ovt,int origovt,int len,int *hops
 	if(zdist > abs(pos.z-src.z))  zdist = abs(pos.z-src.z);
 	
         *hops = xdist+ydist+zdist;
-        expected = *hops * config.switchC_Delay + (int)(len/config.switchC_BW) + START_LATENCY;
+        expected = *hops * config.switchC_Delay + (POSE_TimeType)(len/config.switchC_BW) + START_LATENCY + 2*CPU_OVERHEAD;
         extra = (ovt-origovt) - expected;
         if(extra < 0) extra = 0;
         return extra;

@@ -7,11 +7,11 @@ extern int currTlineIdx;
 // the application name to simulate
 extern roarray<char, 1024>  appname;
 
-int Task::convertToInt(double inp) 
+POSE_TimeType Task::convertToInt(double inp) 
 {
-  int out = (int)(inp*factor);
+  long long out = (long long)(inp*factor);
   if (out <0 && inp != -1.0) {
-    CmiPrintf("Invalid value in convertToInt() - %d %f\n", out, inp);
+    CmiPrintf("Invalid value in convertToInt() - %ld %f\n", out, inp);
     CmiPrintf("Considering changing factor %e to a smaller value. \n", factor);
     CmiAssert(out >= 0 || inp == -1);
   }
@@ -291,18 +291,18 @@ void BGproc::executeTask(TaskMsg *m)
     char str[1024];
     sprintf(str, "[%d] Event #%d '%s' already done!\n", procNum, taskLoc, taskList[taskLoc].name);
     parent->CommitError(str);
-    CkPrintf("POTENTIAL ERROR: [%d] Event %d '%s' already done! %d %d %d at %d evID=", procNum, taskLoc, taskList[taskLoc].name, m->taskID.srcNode, m->taskID.msgID, m->taskID.index, m->timestamp); m->evID.dump(); CkPrintf("\n");
+    CkPrintf("POTENTIAL ERROR: [%d] Event %d '%s' already done! %d %d %d at %ld evID=", procNum, taskLoc, taskList[taskLoc].name, m->taskID.srcNode, m->taskID.msgID, m->taskID.index, m->timestamp); m->evID.dump(); CkPrintf("\n");
     return;
   }
 
-  int oldRT = getReceiveTime(m->taskID);
-  int newRT = m->timestamp;
+  POSE_TimeType oldRT = getReceiveTime(m->taskID);
+  POSE_TimeType newRT = m->timestamp;
   //if(!(m->isNull()))
   //updateReceiveTime(m);
   if (dependenciesMet(&(m->taskID))) { // dependencies met; we can execute this
     Task &task = taskList[taskLoc];
-    int oldStartTime = task.startTime;
-    int newStartTime = ovt;
+    POSE_TimeType oldStartTime = task.startTime;
+    POSE_TimeType newStartTime = ovt;
     task.newStartTime = newStartTime;   // store new start time and used later
     //updateStartTime(&m->taskID, newStartTime);
     markTask(&m->taskID);  // what is this doing?
@@ -348,7 +348,7 @@ return;
   }
 }
 
-void BGproc::enableGenTasks(TaskID* taskID, int oldStartTime, int newStartTime)
+void BGproc::enableGenTasks(TaskID* taskID, POSE_TimeType oldStartTime, POSE_TimeType newStartTime)
 {
   TaskMsg* generatedTasks = getGeneratedTasks(taskID);
   int numGenTasks = getNumGeneratedTasks(taskID);
@@ -486,6 +486,7 @@ void BGproc::DirectSend(TaskMsg *inMsg, int myNode, int srcSwitch,
     POSE_invoke(recvIncomingMsg(tm), BGnode, destNodePID, taskOffset);
 }
 
+
 void BGproc::NetSend(TaskMsg *inMsg, int myNode, int srcSwitch,
 		     int destSwitch, int destNodeCode, int destTID, 
 		     int destNode, int taskOffset)
@@ -501,10 +502,12 @@ void BGproc::NetSend(TaskMsg *inMsg, int myNode, int srcSwitch,
   m->totalLen = inMsg->msgsize;
   m->origovt = ovt+taskOffset;
   //CkPrintf("%d BgSim : Sent %d -> %d msgid %d len %d \n",ovt,m->src,m->dst,m->msgId,m->totalLen);
-  elapse(START_LATENCY);
-  POSE_invoke(recvMsg(m), NetInterface, config.nicStart+m->src, taskOffset);
-  elapse((int)(m->totalLen/config.switchC_BW)); // dumb dumb dumb !!!!!!!!!!!
 
+  elapse(CPU_OVERHEAD);
+  POSE_invoke(recvMsg(m), NetInterface, config.nicStart+m->src, taskOffset+START_LATENCY);
+//  elapse((int)(m->totalLen/config.switchC_BW)); 
+  elapse(CPU_OVERHEAD);
+ 
   //CkPrintf("[NETWORK: BGproc:%d BGnode:%d srcSwitch:%d destSwitch:%d destNodeCode:%d destTID:%d]\n", parent->thisIndex, myNode, srcSwitch, destSwitch, destNodeCode, destTID);
   //parent->CommitPrintf("[NETWORK: BGproc:%d BGnode:%d srcSwitch:%d destSwitch:%d destNodeCode:%d destTID:%d]\n", parent->thisIndex, myNode, srcSwitch, destSwitch, destNodeCode, destTID);
 }
@@ -529,7 +532,7 @@ void BGproc::executeTask_commit(TaskMsg *m)
       toProjectionsFile p(proj);
       for (int i=0; i<task.projevtLen; i++) {
         int idx = task.projevts[i].index;
-        int newStart = task.newStartTime +  task.projevts[i].startTime;
+        POSE_TimeType newStart = task.newStartTime +  task.projevts[i].startTime;
 	CmiAssert(idx < numLogs);
         logs[idx].time = newStart/1e9;
         logs[idx].pup(p);
@@ -582,6 +585,8 @@ int BGproc::locateTask(TaskID* t){
   if (t->index >= 0) return t->index;
 #if 1
   t->index = msgTable.get(*t);
+  if(t->index == 0) t->index = -1;
+
   if (t->index>0) {
     return --t->index;
   }
@@ -633,7 +638,7 @@ int BGproc::dependenciesMet(yourUniqueTaskIDtype taskID)
 }
 
 // not used
-void BGproc::updateStartTime(TaskID* taskID, int newTime)
+void BGproc::updateStartTime(TaskID* taskID, POSE_TimeType newTime)
 {
   // update the task's start time to newTime
   taskList[locateTask(taskID)].startTime = newTime;
@@ -644,7 +649,7 @@ void BGproc::enableDependents(TaskID* taskID)
   TaskMsg *tm;
   TaskID* ftid;
   int taskIdx = locateTask(taskID);
-  int execT = taskList[taskIdx].execTime;
+  POSE_TimeType execT = taskList[taskIdx].execTime;
   
   int fDepsLen = taskList[taskIdx].fDepsLen;
   for(int i=0;i<fDepsLen;i++){
@@ -684,14 +689,14 @@ int BGproc::getNumGeneratedTasks(yourUniqueTaskIDtype taskID)
   return taskList[locateTask(taskID)].taskMsgsLen;
 }
 
-int BGproc::getDuration(TaskID taskID)
+POSE_TimeType BGproc::getDuration(TaskID taskID)
 {
   // get the duration of this task
   return taskList[locateTask(taskID)].execTime;
 }
 
  
-int BGproc::getReceiveTime(TaskID taskID)
+POSE_TimeType BGproc::getReceiveTime(TaskID taskID)
 {
   // get the receive time of this task
   return taskList[locateTask(taskID)].receiveTime;
@@ -773,6 +778,7 @@ void BGnode::recvIncomingMsg(TaskMsg *m)
   // 1) send message to one worker thread on this node
   // 2) send message to all worker threads on this node
   // 3) send messages to all but one worker threads on this node
+  elapse(2*CPU_OVERHEAD);
   CmiAssert(m->destNode == myNodeIndex);
 
   int destNodeCode = m->destNodeCode;

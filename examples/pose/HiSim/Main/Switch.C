@@ -63,7 +63,7 @@ void Switch::sendPacket(Packet *p,const int & outVcId,const int & outPort,const 
         int goingToNic=0,fromNic=0;
         int nextChannel;
         mapVc[outVcId] =  inVcId;
-	if(config.inputBuffering)
+	if(config.inputBuffering)  // Uncomment this !!!!!!!!!!!!!!!!!!
         requested[inVcId] = 1;
 
         CkAssert(outPort == p->hdr.portId);
@@ -81,9 +81,9 @@ void Switch::sendPacket(Packet *p,const int & outVcId,const int & outPort,const 
         flowStart *f,*f2; f= new flowStart; f->vcid = p->hdr.prev_vcid; f->datalen = p->hdr.routeInfo.datalen;
         f2 = new flowStart; *f2 = *f; f2->vcid = inVcId;
 
-        POSE_local_invoke(checkNextPacketInVc(f2),(int)(f->datalen/config.switchC_BW));
+        POSE_local_invoke(checkNextPacketInVc(f2),(POSE_TimeType)(f->datalen/config.switchC_BW));
         if(!fromNic) {
-                POSE_invoke(updateCredits(f),Switch,p->hdr.prevId,(int)(f->datalen/config.switchC_BW));
+                POSE_invoke(updateCredits(f),Switch,p->hdr.prevId,(POSE_TimeType)(f->datalen/config.switchC_BW));
         }
         else delete f;
 
@@ -104,7 +104,7 @@ void Switch::checkNextPacketInVc(flowStart *f) {
         requested[f->vcid] = 0;
 
         if(Buffer[f->vcid].size()) {
-        headOfBuf = Buffer[f->vcid].begin();
+        headOfBuf = Buffer[f->vcid].begin(); p.hdr = *headOfBuf;
                 // Be careful so that neccessary data in packet "p" is populated
 		p.hdr = *headOfBuf;	
                 outVc = outputVcSelect->selectOutputVc(availBufsize,&p,f->vcid%config.switchVc);

@@ -16,18 +16,19 @@ NetInterface::NetInterface(NetInterfaceMsg *niMsg) {
 
 // Packetize message and pump it out
 void NetInterface::recvMsg(NicMsg *nic) {
-        int delay=0,inputPort,msgLenRest = nic->totalLen,packetnum  = 0,curlen,initPort,initVc;
+        POSE_TimeType delay=0,inputPort,msgLenRest = nic->totalLen,packetnum  = 0,curlen,initPort,initVc;
         Packet *p;
         NicMsg *newNic = new NicMsg; *newNic = *nic;
         POSE_invoke(storeMsgInAdvance(newNic),NetInterface,nic->routeInfo.dst+config.nicStart,0);
 
+//	parent->CommitPrintf("-%d %d %d %d\n",nic->src,nic->msgId,nic->routeInfo.dst,nic->totalLen);
         while(msgLenRest > 0) {
                 p = new Packet;
                 p->hdr = *nic;
                 curlen  = minP(config.maxpacksize,msgLenRest);
                 p->hdr.routeInfo.datalen = curlen;
                 CkAssert(delay >= 0);
-
+		p->hdr.pktId = packetnum ++;
                 p->hdr.portId = topology->getStartPort(nicConsts->id-config.nicStart,nicConsts->numP);
                 p->hdr.vcid = roundRobin; roundRobin = (roundRobin+1)%config.switchVc;
                 p->hdr.prevId = nicConsts->id;
@@ -35,9 +36,9 @@ void NetInterface::recvMsg(NicMsg *nic) {
                 p->hdr.nextId = topology->getStartSwitch(nicConsts->id-config.nicStart);
 
                 POSE_invoke(recvPacket(p),Switch,nicConsts->startId,delay);
-                delay += ((int)(curlen/config.switchC_BW));  msgLenRest -= curlen; packetnum ++;
+                delay += ((POSE_TimeType)(curlen/config.switchC_BW));  msgLenRest -= curlen; 
         }
-
+elapse((POSE_TimeType)(nic->totalLen/config.switchC_BW));
 }
 
 
@@ -52,7 +53,7 @@ void NetInterface::storeMsgInAdvance(NicMsg *m) {
 // Receive packet by packet and finally send message to node
 
 void NetInterface::recvPacket(Packet *p) {
-        int tmp,expected,extra,hops,remlen; TaskMsg *tm; TransMsg *tr;Position src; MsgStore ms;
+        POSE_TimeType tmp,expected,extra,hops,remlen; TaskMsg *tm; TransMsg *tr;Position src; MsgStore ms;
         remoteMsgId rmid(p->hdr.msgId,p->hdr.src);
         map<remoteMsgId,int>::iterator it2 = pktMap.find(rmid);
 
@@ -68,10 +69,12 @@ void NetInterface::recvPacket(Packet *p) {
                 return;
         }
 
+	numRecvd+= p->hdr.routeInfo.datalen;
         if(it2 == pktMap.end())  {
                 remlen = p->hdr.totalLen - (p->hdr.routeInfo.datalen); pktMap[rmid] = remlen;
-        } else
+        } else {
                 pktMap[rmid] -= p->hdr.routeInfo.datalen;
+	}
 
         if(!pktMap[rmid])  {
         map<remoteMsgId,MsgStore>::iterator it1 = storeBuf.find(rmid);
@@ -88,21 +91,22 @@ void NetInterface::recvPacket(Packet *p) {
         if(config.msgstats_on) {
         extra =
         routingAlgorithm->expectedTime(p->hdr.src,nicConsts->id-config.nicStart,ovt,ms.origovt,p->hdr.totalLen,&hops);
-        int curInterval,tmp=prevIntervalStart;
+        POSE_TimeType curInterval,tmp=prevIntervalStart;
         if(config.collection_interval != 0) {
         curInterval = ovt/config.collection_interval;
         if((curInterval > prevIntervalStart) && (numRecvd)) {
         prevIntervalStart = curInterval;
-        parent->CommitPrintf("%d*%d %d %d %.2f\n",nicConsts->id-config.nicStart,numRecvd,
+        parent->CommitPrintf("%d*%d %d %ld %.2f\n",nicConsts->id-config.nicStart,numRecvd,
         hops,prevIntervalStart,(float)counter/numRecvd);counter=0; numRecvd = 0;
         }
         }
-        counter += (int)(100.0 * extra/(ovt-ms.origovt)); numRecvd++;
+        counter += ((POSE_TimeType)(100.0 * extra/(ovt-ms.origovt))) * (p->hdr.totalLen); 
         }
 
         pktMap.erase(rmid);
         storeBuf.erase(rmid);
 
+//	parent->CommitPrintf("%d %d %d %d\n",ms.src,ms.msgId,nicConsts->id-config.nicStart,ovt);
 	if(config.use_transceiver) {
                 tr = new TransMsg(ms.src,ms.msgId,(nicConsts->id-config.nicStart)); 
 		// Be careful. Making assumption that nodeStart == 0

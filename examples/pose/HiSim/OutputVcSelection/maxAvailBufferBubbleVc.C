@@ -18,9 +18,11 @@ int maxAvailBufferBubbleVc::selectOutputVc(map<int,int> & Bufsize,const Packet *
                 return vc;
         else {
                 //Check for Bubble VC
-                if(Bufsize[start+config.switchVc-1] < h->hdr.routeInfo.datalen)
+                if(Bufsize[start+config.switchVc-1] < h->hdr.routeInfo.datalen) {
                 return NO_VC_AVAILABLE;
-                else
+		}
+                else {
                 return (config.switchVc-1);
+		}
         }
 }

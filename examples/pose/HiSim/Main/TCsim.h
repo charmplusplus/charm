@@ -113,7 +113,7 @@ class TaskMsg {
   int destNode;
   int destNodeCode;
   int desttID;   //dest threadID
-  int receiveTime;
+  POSE_TimeType receiveTime;
   int msgsize;
   
   TaskMsg(){destNode=desttID=-1;receiveTime=0;msgsize=0;taskID.srcNode=taskID.msgID=taskID.index=-1;}
@@ -125,7 +125,7 @@ class TaskMsg {
     desttID = -1;
     receiveTime = msgsize = 0;
   }
-  TaskMsg(int s, int m, int i, int rt, int ms, int dn, int dnc, int dt){
+  TaskMsg(int s, int m, int i, POSE_TimeType rt, int ms, int dn, int dnc, int dt){
     taskID.srcNode=s;
     taskID.msgID=m;
     taskID.index=i;
@@ -135,7 +135,7 @@ class TaskMsg {
     destNodeCode = dnc;
     desttID = dt;
   }
-  TaskMsg(TaskID& t, int rt, int ms, int dn, int dnc, int dt){
+  TaskMsg(TaskID& t, POSE_TimeType rt, int ms, int dn, int dnc, int dt){
     taskID.srcNode=t.srcNode;
     taskID.msgID=t.msgID;
     taskID.index=t.index;
@@ -174,15 +174,15 @@ class Task
   //implement a taskList type to store a list of generated tasks
   // datafields: 
  private:
-  int convertToInt(double inp);
+  POSE_TimeType convertToInt(double inp);
   struct ProjEvent {
     int index;
-    int startTime;
+    POSE_TimeType startTime;
     void pup(PUP::er &p) { p|index; p|startTime; }
   };
   struct bgPrintEvent {
     char* data;
-    int sTime;
+    POSE_TimeType sTime;
     void pup(PUP::er &p) { p|sTime;
    			   int slen = 0;
 	                   if (p.isPacking()) slen = strlen((char *)data)+1;
@@ -192,7 +192,7 @@ class Task
   };  
  public:
   TaskID taskID;
-  int receiveTime, execTime, startTime, newStartTime;
+  POSE_TimeType receiveTime, execTime, startTime, newStartTime;
   char name[20];
   TaskID* backwardDeps;
   TaskID* forwardDeps;
@@ -204,7 +204,7 @@ class Task
   int done;
   void convertFrom(BgTimeLog*, int index, int numWth);
   // implement these events
-  int getRecvTime(){return receiveTime;}
+  POSE_TimeType getRecvTime(){return receiveTime;}
   yourUniqueTaskIDtype getTaskID();
   void pup(PUP::er &p);
 };
@@ -255,8 +255,8 @@ class BGproc {
   //local methods (maybe make private)
   void updateReceiveTime(TaskMsg* m);
   int dependenciesMet(yourUniqueTaskIDtype taskID);
-  void updateStartTime(yourUniqueTaskIDtype taskID, int newTime);
-  void enableGenTasks(TaskID* taskID,int oldStartTime, int newStartTime);
+  void updateStartTime(yourUniqueTaskIDtype taskID, POSE_TimeType newTime);
+  void enableGenTasks(TaskID* taskID,POSE_TimeType oldStartTime, POSE_TimeType newStartTime);
   void SendMessage(TaskMsg *inMsg, int myNode, int srcSwitch,
 		   int destNodeCode, int destTID, int taskOffset);
   void GeneralSend(TaskMsg *inMsg, int myNode, int srcSwitch, 
@@ -271,9 +271,9 @@ class BGproc {
   void enableDependents(yourUniqueTaskIDtype taskID);
   TaskMsg* getGeneratedTasks(yourUniqueTaskIDtype taskID);
   int getNumGeneratedTasks(yourUniqueTaskIDtype taskID);
-  int getDuration(yourUniqueTaskIDtype taskID);
-  int getDuration(TaskID taskID);
-  int getReceiveTime(TaskID taskID);
+  POSE_TimeType getDuration(yourUniqueTaskIDtype taskID);
+  POSE_TimeType getDuration(TaskID taskID);
+  POSE_TimeType getReceiveTime(TaskID taskID);
   void terminus();
 };
 

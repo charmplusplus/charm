@@ -17,6 +17,7 @@ public:
    int msgstats_on;
    int netsim_on;
    int skip_on;
+   int check_on;
    int InputBufferStart;
    int nicStart;
    int ChannelStart;
@@ -69,7 +70,7 @@ public:
  
  public:
 
-  Config () {}
+  Config (): check_on(0) {}
   
   void readConfig(CkArgMsg *m);
   int getNumVC           () {return numVC;           }
