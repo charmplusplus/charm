@@ -1,5 +1,6 @@
 
 #include "traceCore.h"
+#include "traceCoreAPI.h"
 #include "traceCoreCommon.h"
 #include "charmProjections.h"
 //#include "ampiProjections.h"
@@ -79,11 +80,13 @@ extern "C" void endTraceCore(void) {}
  * Implementation of functions declared in traceCoreAPI.h 
  *****************************************************************/
 extern "C" void RegisterLanguage(int lID, char* ln)
-{ CpvAccess(_traceCore)->RegisterLanguage(lID, ln); }
+{ LOGCONDITIONAL(CpvAccess(_traceCore)->RegisterLanguage(lID, ln)); }
 
 extern "C" void RegisterEvent(int lID, int eID)
-{ CpvAccess(_traceCore)->RegisterEvent(lID, eID); }
+{ LOGCONDITIONAL(CpvAccess(_traceCore)->RegisterEvent(lID, eID)); }
 
+/* These Log routines will segfault if called under CMK_OPTIMIZE;
+   the solution is to surround their callers with LOGCONDITIONAL. */
 extern "C" void LogEvent(int lID, int eID)
 { CpvAccess(_traceCore)->LogEvent(lID, eID); }
 
