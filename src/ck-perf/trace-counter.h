@@ -132,10 +132,8 @@ class TraceCounter : public Trace {
       int ml=0);   //! message size
     void endExecute();
     //! begin/end idle time for this pe
-    void beginIdle() { if (traceOn_) { startIdle_ = TraceTimer(); } }
-    void endIdle() { 
-      if (traceOn_) { idleTime_ += TraceTimer()-startIdle_; }
-    }
+    void beginIdle();
+    void endIdle();
     //! begin/end the process of packing a message (to send)
     void beginPack();
     void endPack();
@@ -175,6 +173,7 @@ class TraceCounter : public Trace {
 
   private:
     enum TC_Status { IDLE, WORKING };
+    int cancel_beginIdle, cancel_endIdle;
     
     // command line processing
     CounterArg* firstArg_;      // pointer to start of linked list of args

@@ -201,6 +201,18 @@ void _createTracecounter(char **argv)
   CpvAccess(_traces)->addTrace(CpvAccess(_trace));
 }
 
+extern "C"
+void traceCounterBeginIdle(void)
+{
+  CkpvAccess(_trace)->beginIdle();
+}
+
+extern "C"
+void traceCounterEndIdle(void)
+{
+  CkpvAccess(_trace)->endIdle();
+}
+
 // constructor
 StatTable::StatTable():
   stats_(NULL), numStats_(0)
@@ -254,6 +266,8 @@ void StatTable::setEp(int epidx, int stat, long long value, double time)
   avg = stats_[stat].avgCount[epidx];
   stats_[stat].stdDevCount[epidx] = 
     (stdDev * numCalled + (value-avg)*(value-avg)) / (numCalled+1);
+  // CmiPrintf("variance %f avg %f value %ld calcVariance %f\n", 
+  // stdDev, avg, value, stats_[stat].stdDevCount[epidx]);
   stats_[stat].totTime[epidx] += time;
   if (stats_[stat].maxCount[epidx] < value) {
     stats_[stat].maxCount[epidx] = value;
@@ -290,7 +304,7 @@ void StatTable::write(FILE* fp)
     // write standard deviation of count for each 
     fprintf(fp, "[%s std_dev_count] ", stats_[i].name);
     for (j=0; j<_numEntries+1; j++) { 
-      fprintf(fp, "%f ", stats_[i].stdDevCount[j]); 
+      fprintf(fp, "%f ", sqrt(stats_[i].stdDevCount[j])); 
     }
     fprintf(fp, "\n");
     // write total time in us spent for each entry
@@ -781,6 +795,11 @@ void TraceCounter::traceBegin() {
     if (writeByPhase_) { phase_++; }
     traceOn_ = true;
   }
+
+#if ! CMK_TRACE_IN_CHARM
+  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceCounterBeginIdle,0);
+  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceCounterEndIdle,0);
+#endif
 }
 
 //! turn trace on/off, note that charm will automatically call traceBegin()
@@ -811,7 +830,6 @@ void TraceCounter::traceEnd() {
     }
     reductionPhase_++;
     CpvAccess(_logPool)->doReduction(reductionPhase_, idleTime_); 
-    CmiPrintf("idleTime (us)=%f\n", idleTime_);
     if (writeByPhase_) {
       idleTime_ = 0.0;
       CpvAccess(_logPool)->clearEps(); 
@@ -820,6 +838,12 @@ void TraceCounter::traceEnd() {
     DEBUGF(("%d/%d DEBUG: Created _logPool at %08x\n", 
 	    CmiMyPe(), CmiNumPes(), CpvAccess(_logPool)));
   }
+
+#if ! CMK_TRACE_IN_CHARM
+  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, cancel_beginIdle);
+  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY, cancel_endIdle);
+#endif
+
 }
 
 //! begin/end execution of a Charm++ entry point
@@ -920,6 +944,16 @@ void TraceCounter::endExecute()
 			       counter2_->index, value2, t-startEP_); 
     if (!switchByPhase_) { switchCounters(); }
   }
+}
+
+//! begin/end idle time for this pe
+void TraceCounter::beginIdle() {
+  if (traceOn_) { startIdle_ = TraceTimer(); } 
+}
+
+//! begin/end idle time for this pe
+void TraceCounter::endIdle() {
+  if (traceOn_) { idleTime_ += TraceTimer()-startIdle_; }
 }
 
 //! begin/end the process of packing a message (to send)
