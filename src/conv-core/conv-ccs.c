@@ -805,10 +805,6 @@ int getUsage()
    CpvAccess(usedTime)  = 0.;
    CpvAccess(beginTime) = time;
 
-   /* jeff */
-   CmiPrintf("PE = %d, usage = %d\n", CmiMyPe(), usage);
-   /* jeff */
-
    return usage;
 }
 
