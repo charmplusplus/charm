@@ -320,6 +320,20 @@ AC_DEFINE_UNQUOTED(CMK_GCC_IA64_ASM, $strictpass, [Allows gcc IA64 assembly.])
 
 ################### Syscalls and Libraries ###################
 
+#### test for mkstemp ###
+cat > $t <<EOT
+#include <stdlib.h>
+#include <string.h>
+int main() { 
+  char fname[[128]];
+  strcpy(fname, "/tmp/fdXXX.XXX");
+  mkstemp(fname);
+  return 0;
+}
+EOT
+test_link "whether it has mkstemp" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_USE_MKSTEMP, $pass, [whether it has mkstemp])
+
 #### test for poll ###
 cat > $t <<EOT
 #include <poll.h>

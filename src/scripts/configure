@@ -1586,6 +1586,24 @@ _ACEOF
 
 ################### Syscalls and Libraries ###################
 
+#### test for mkstemp ###
+cat > $t <<EOT
+#include <stdlib.h>
+#include <string.h>
+int main() {
+  char fname[128];
+  strcpy(fname, "/tmp/fdXXX.XXX");
+  mkstemp(fname);
+  return 0;
+}
+EOT
+test_link "whether it has mkstemp" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_USE_MKSTEMP $pass
+_ACEOF
+
+
 #### test for poll ###
 cat > $t <<EOT
 #include <poll.h>
