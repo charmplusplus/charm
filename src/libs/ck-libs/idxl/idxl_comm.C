@@ -81,6 +81,7 @@ bool doubleeq(double a,double b){
 		}
 		return false;
 }
+
 void IDXL_List::sort2d(double *coord){
 	double *dist = new double[shared.size()];
 	int i;
@@ -104,6 +105,54 @@ void IDXL_List::sort2d(double *coord){
 						dist[j] = dist[i];
 						shared[i] = k;
 						dist[i] = temp;
+					}
+			}
+			if(dist[i] > dist[j]){
+				int k = shared[j];
+				double temp = dist[j];
+				shared[j] = shared[i];
+				dist[j] = dist[i];
+				shared[i] = k;
+				dist[i] = temp;
+			}
+		}
+	}
+	delete [] dist;
+}
+
+void IDXL_List::sort3d(double *coord){
+	double *dist = new double[shared.size()];
+	int i;
+	for(i=0;i<shared.size();i++){
+		int idx = shared[i];
+		dist[i] = coord[3*idx]*coord[3*idx]+coord[3*idx+1]*coord[3*idx+1]+coord[3*idx+2]*coord[3*idx+2];
+	}
+	for(i=0;i<shared.size();i++){
+		for(int j=i;j<shared.size();j++){
+			/**
+				if the 2 points are equidistant from the origin,
+				sort by x and then by y
+			*/
+			if(doubleeq(dist[i],dist[j])){
+					int idxi = shared[i];
+					int idxj = shared[j];
+					if(coord[3*idxi] > coord[3*idxj]){
+						int k = shared[j];
+						double temp = dist[j];
+						shared[j] = shared[i];
+						dist[j] = dist[i];
+						shared[i] = k;
+						dist[i] = temp;
+					}
+					else if(coord[3*idxi] == coord[3*idxj]) {
+					  if(coord[3*idxi+1] > coord[3*idxj+1]){
+						int k = shared[j];
+						double temp = dist[j];
+						shared[j] = shared[i];
+						dist[j] = dist[i];
+						shared[i] = k;
+						dist[i] = temp;
+					  }
 					}
 			}
 			if(dist[i] > dist[j]){
@@ -211,6 +260,14 @@ void IDXL_Side::sort2d(double *coord){
 	flushMap();
 }
 
+void IDXL_Side::sort3d(double *coord){
+	for(int i=0;i<comm.size();i++){
+		IDXL_List *l = comm[i];
+		l->sort3d(coord);
+	}
+	flushMap();
+}
+
 
 /*
 	IDXL functions
@@ -223,5 +280,15 @@ void IDXL::sort2d(double *coord){
 	if(!isSingle()){
 		IDXL_Side &recvSide = getRecv();
 		recvSide.sort2d(coord);
+	}
+}
+
+void IDXL::sort3d(double *coord){
+	IDXL_Side &side = getSend();
+	side.sort3d(coord);
+	
+	if(!isSingle()){
+		IDXL_Side &recvSide = getRecv();
+		recvSide.sort3d(coord);
 	}
 }
