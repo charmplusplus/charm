@@ -1,10 +1,11 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
+DEST=$(CDIR)/lib/libddt.a
 
-all:libddt.a $(CDIR)/include/ddt.h
+all: $(DEST) $(CDIR)/include/ddt.h
 	
-libddt.a:ddt.o
-	$(CHARMC) -cp $(CDIR)/lib -o libddt.a ddt.o
+$(DEST): ddt.o
+	$(CHARMC) -o $(DEST) ddt.o
 
 ddt.o:ddt.C ddt.h
 	$(CHARMC) -c ddt.C 
