@@ -220,7 +220,7 @@ Module::generate()
   clist->genDecls(declstr);
   declstr<<"extern void _register"<<name<<"(void);"<<endx;
   if(isMain()) {
-    defstr << "extern void CkRegisterMainModule(void);" << endx;
+    defstr << "extern \"C\" void CkRegisterMainModule(void);" << endx;
   }
   declstr<<"#endif"<<endx;
   defstr<<"#ifndef _DEFS_" << name << "_H_"<<endx;
@@ -232,7 +232,7 @@ Module::generate()
   clist->genReg(defstr);
   defstr << "}" << endx;
   if(isMain()) {
-    defstr << "void CkRegisterMainModule(void) {" << endx;
+    defstr << "extern \"C\" void CkRegisterMainModule(void) {" << endx;
     defstr << "  _register" << name << "();" << endx;
     defstr << "  _REGISTER_DONE();" << endx;
     defstr << "}" << endx;
