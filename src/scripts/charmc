@@ -277,12 +277,12 @@ do
 	"-language")
 		# Parse out some fake languages (that are actually modules)
 		case "$1" in
-		"ampi") AddModules ampi ;;
-		"ampif") AddModules ampif ;;
-		"fem") AddModules fem ;;
-		"femf") AddModules fem ; USE_F90_LIBRARIES="1" ;;
-		"mblock") AddModules mblock ;;
-		"mblockf") AddModules mblock ; USE_F90_LIBRARIES="1" ;;
+		"ampi") AddModules tcharmmain ampi ;;
+		"ampif") AddModules tcharmmain ampif ; USE_F90_LIBRARIES="1" ;;
+		"fem") AddModules tcharmmain fem ;;
+		"femf") AddModules tcharmmain fem ; USE_F90_LIBRARIES="1" ;;
+		"mblock") AddModules tcharmmain mblock ;;
+		"mblockf") AddModules tcharmmain mblock ; USE_F90_LIBRARIES="1" ;;
 		*) 
 			LANGUAGE="$1"
 			POST_LANGUAGE=1
