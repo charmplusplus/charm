@@ -7,10 +7,10 @@
 
 #include "fftlib.decl.h"
 
-#define COMPLEX_TO_REAL 11
-#define REAL_TO_COMPLEX 12
-#define COMPLEX_TO_COMPLEX 13
-#define NULL_TO_NULL 14
+#define COMPLEX_TO_REAL -11
+#define REAL_TO_COMPLEX -12
+#define COMPLEX_TO_COMPLEX -13
+#define NULL_TO_NULL -14
 
 #define MAX_FFTS 5
 
@@ -51,10 +51,10 @@ class NormalFFTinfo {
 	int srcSize[2], destSize[2];
 	bool isSrcSlab;
 	int srcPlanesPerSlab, destPlanesPerSlab;
-        void *dataPtr;
-        int transformType;
- 
-       void init(CProxy_SlabArray &sProxy,
+	void *dataPtr;
+	int transformType;
+	
+	void init(CProxy_SlabArray &sProxy,
 		 CProxy_SlabArray &dProxy,
 		 int sDim[2], int dDim[2], int isSrc,
 		 void *dptr, int transT,

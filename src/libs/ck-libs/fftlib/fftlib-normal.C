@@ -8,6 +8,10 @@ void
 NormalSlabArray::doFFT(int src_id, int dst_id)
 {
     NormalFFTinfo &fftinfo = *(fftinfos[src_id]);
+
+    if(fftinfo.transformType != COMPLEX_TO_COMPLEX) CkPrintf("Transform Type at doFFT is %d\n", fftinfo.transformType);
+    CkAssert(fftinfo.transformType == COMPLEX_TO_COMPLEX);
+
     complex *dataPtr = (complex*)fftinfo.dataPtr;
 
     int planeSize = fftinfo.srcSize[0] * fftinfo.srcSize[1];
@@ -47,6 +51,9 @@ void
 NormalSlabArray::acceptDataForFFT(int numPoints, complex *points, int posn, int info_id)
 {
     NormalFFTinfo &fftinfo = *(fftinfos[info_id]);
+
+    CkAssert(fftinfo.transformType == COMPLEX_TO_COMPLEX);
+
     complex *dataPtr = (complex*)fftinfo.dataPtr;
     int lineSize = fftinfo.destSize[1];
     
@@ -84,6 +91,10 @@ void
 NormalSlabArray::doIFFT(int src_id, int dst_id)
 {
     NormalFFTinfo &fftinfo = *(fftinfos[src_id]);
+
+    if(fftinfo.transformType != COMPLEX_TO_COMPLEX) CkPrintf("Transform Type at doFFT is %d\n", fftinfo.transformType);
+    CkAssert(fftinfo.transformType == COMPLEX_TO_COMPLEX);
+
     complex *dataPtr = (complex*)fftinfo.dataPtr;
     int planeSize = fftinfo.destSize[0] * fftinfo.destSize[1];
     int lineSize = fftinfo.destSize[1];
@@ -117,6 +128,9 @@ void
 NormalSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn, int info_id)
 {
     NormalFFTinfo &fftinfo = *(fftinfos[info_id]);
+
+    CkAssert(fftinfo.transformType == COMPLEX_TO_COMPLEX);
+
     complex *dataPtr = (complex*)fftinfo.dataPtr;
     int planeSize = fftinfo.destSize[0] * fftinfo.destSize[1];
     int lineSize = fftinfo.destSize[1];
