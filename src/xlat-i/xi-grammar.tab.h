@@ -87,13 +87,15 @@ typedef union {
 # define	NUMBER	301
 # define	LITERAL	302
 # define	CPROGRAM	303
-# define	INT	304
-# define	LONG	305
-# define	SHORT	306
-# define	CHAR	307
-# define	FLOAT	308
-# define	DOUBLE	309
-# define	UNSIGNED	310
+# define	HASHIF	304
+# define	HASHIFDEF	305
+# define	INT	306
+# define	LONG	307
+# define	SHORT	308
+# define	CHAR	309
+# define	FLOAT	310
+# define	DOUBLE	311
+# define	UNSIGNED	312
 
 
 extern YYSTYPE yylval;
