@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-05 19:05:23  brunner
- * Reorganized directory structure
+ * Revision 2.1  1995-06-12 22:49:59  jyelon
+ * *** empty log message ***
  *
  * Revision 1.2  1995/04/13  05:51:12  narain
  * Mc -> Cmi

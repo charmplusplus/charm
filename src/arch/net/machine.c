@@ -27,12 +27,22 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <strings.h>
 #include <varargs.h>
 
-#ifdef CMK_NEED_DECLARATION_FOR_STRING_FNS
-char *strdup();
-char *strchr();
+#ifdef CMK_HAVE_STRINGS_H
+#include <strings.h>
+#endif
+
+#ifdef CMK_HAVE_STRING_H
+#include <string.h>
+#endif
+
+#ifdef CMK_TIMER_USE_TIMES
+#include <sys/times.h>
+#endif
+
+#ifdef CMK_JUST_DECLARE_STRING_FNS
+char *strchr(), *strrchr(), *strdup();
 #endif
 
 #ifdef CMK_RSH_IS_A_COMMAND
@@ -1953,4 +1963,11 @@ CmiExit()
   outlog_done();
 
   Cmi_insidemachine = saveflag;
+}
+
+main(argc, argv)
+int argc;
+char **argv;
+{
+charm_main(argc, argv);
 }

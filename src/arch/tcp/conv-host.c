@@ -22,18 +22,25 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <strings.h>
 #include <varargs.h>
+
+#ifdef CMK_HAVE_STRINGS_H
+#include <strings.h>
+#endif
+
+#ifdef CMK_HAVE_STRING_H
+#include <string.h>
+#endif
+
+#ifdef CMK_JUST_DECLARE_STRING_FNS
+char *strchr(), *strrchr(), *strdup();
+#endif
 
 #ifdef CMK_HAVE_WAITFLAGS_H
 #include <waitflags.h>
 #endif
 #ifdef CMK_HAVE_SYS_WAIT_H
 #include <sys/wait.h>
-#endif
-
-#ifdef CMK_NEED_DECLARATION_FOR_STRING_FNS
-char *strchr(), *strrchr(), *strdup();
 #endif
 
 #ifdef CMK_STRERROR_USE_SYS_ERRLIST
