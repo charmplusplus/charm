@@ -6,8 +6,7 @@ Things to do for Charm++/Converse Release 5.5
 * Move all the data structures headers and sources to util.
 * Check documentation for correctness (mainly see that all example
   programs in the manual work.)
-* Host a bug-tracking system on TBRes.
-* Write a README file that describes how to install from source as well as
-  binary.
-* FEM Framework manual, and AMPI manual to be integrated.
+* AMPI manual to be integrated.
+* Make migratable threads available on intel machines (linux)
+* Fortran90 support on blue horizon.
 * Test. Test. Test.
