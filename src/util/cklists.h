@@ -57,7 +57,7 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
         first = (first+1)%blklen;
         len--;
       	return ret;
-      } else return T(0);
+      } else return T(); //For builtin types like int, void*, this is equivalent to T(0)
     }
     void enq(const T &elt) {
       if(len==blklen) _expand();
