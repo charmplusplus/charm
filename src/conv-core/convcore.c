@@ -1497,7 +1497,13 @@ void *CmiAlloc(size)
 int size;
 {
   char *res;
-  res =(char *)malloc_nomigrate(size+2*sizeof(int));
+
+#if CONVERSE_VERSION_ELAN
+  res = (char *) elan_CmiAlloc(size+2*sizeof(int));
+#else
+  res =(char *) malloc_nomigrate(size+2*sizeof(int));
+#endif
+
   _MEMCHECK(res);
 
 #ifdef MEMMONITOR
@@ -1560,7 +1566,13 @@ void *blk;
     CpvAccess(BlocksAllocated)--;
     CmiPrintf("Refcount 0 case called\n");
 #endif
+
+#if CONVERSE_VERSION_ELAN
+    elan_CmiFree(BLKSTART(blk));
+#else
     free_nomigrate(BLKSTART(blk));
+#endif
+
     return;
   }
   refCount--;
@@ -1571,7 +1583,13 @@ void *blk;
     CpvAccess(MemoryUsage) -= (SIZEFIELD(blk) + 2*sizeof(int));
     CpvAccess(BlocksAllocated)--;
 #endif
+
+#if CONVERSE_VERSION_ELAN
+    elan_CmiFree(BLKSTART(blk));
+#else
     free_nomigrate(BLKSTART(blk));
+#endif
+
     return;
   }
   REFFIELD(blk) = refCount;
