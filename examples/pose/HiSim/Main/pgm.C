@@ -18,6 +18,10 @@ main::main(CkArgMsg *m)
   CkGetChareID(&mainhandle);
   CProxy_main M(mainhandle);
 
+  if (CmiGetArgFlag(m->argv, "-check")) {
+    config.check_on = 1;
+  }
+
   config.readConfig(m);
 
   if(!config.use_transceiver) {
@@ -37,6 +41,8 @@ main::main(CkArgMsg *m)
   } 
 
   CkPrintf("Opts: netsim on: %d\n", config.netsim_on);
+  if (config.check_on)
+    CkPrintf("Opts: check enabled. \n");
 
   POSE_init();
 

@@ -320,11 +320,15 @@ void BGproc::executeTask(TaskMsg *m)
     	    char str[1000];
 	    strcpy(str, "[%d:%s] ");
 	    strcat(str, task.printevts[i].data);
+/*
+	    CkPrintf("uncommited ");
+	    CkPrintf(str,procNum, taskList[taskLoc].name, (double)(task.printevts[i].sTime+newStartTime)/factor); 
+*/
 	    parent->CommitPrintf(str,procNum, taskList[taskLoc].name, (double)(task.printevts[i].sTime+newStartTime)/factor); 
     }
+return;
     // HACK:
     // look forward and see if there is any standalone or addMsg events
-return;
     for (int i=taskLoc+1; i<numTasks; i++) {
       if (!strcmp(taskList[i].name, "standalone")) continue; 
       if (!strcmp(taskList[i].name, "addMsg"))  {
@@ -540,6 +544,26 @@ void BGproc::terminus()
     toProjectionsFile p(proj);
     logs[numLogs-1].time = ovt/1e9;
     logs[numLogs-1].pup(p);
+  }
+  if (config.check_on) 
+  {
+  // error checking
+  int i, count=0;
+  for (i=0; i<numTasks; i++) if (done[i] == 0) count++;
+  if (count) {
+    CkPrintf("[%d] Having %d/%d uncommitted events: ", procNum, count, numTasks);
+    i=0;
+    while (i<numTasks) {
+      if (done[i] == 0) {
+        CkPrintf(" %d", i);
+        i++; count = 0;
+        while (i<numTasks && done[i] == 0) { i++; count++; }
+        if (count) CkPrintf("-%d", i-1);
+      }
+      i++;
+    }
+    CkPrintf("\n");
+  }
   }
 }
 
