@@ -1010,7 +1010,7 @@ void Entry::genChareStaticConstructorDecl(XStr& str)
     return;
   str << "    static void ckNew("<<paramComma()<<"int onPE=CK_PE_ANY);\n";
   str << "    static void ckNew("<<paramComma()<<"CkChareID* pcid, int onPE=CK_PE_ANY);\n";
-  str << "    "<<container->proxyName()<<"("<<paramComma()<<"int onPE=CK_PE_ANY);\n";
+  str << "    "<<container->proxyName(0)<<"("<<paramComma()<<"int onPE=CK_PE_ANY);\n";
   // entry ptr declaration
   str << "    static int ckIdx_"<<name<<"("<<paramType()<<") ";
   str << "{ return "<<epIdx()<<"; }\n";
@@ -1022,8 +1022,8 @@ void Entry::genGroupStaticConstructorDecl(XStr& str)
     return;
   str << "    static CkGroupID ckNew("<<paramType()<<");\n";
   str << "    static CkGroupID ckNewSync("<<paramType()<<");\n";
-  str << "    "<<container->proxyName()<<"("<<paramComma()<<"int retEP, CkChareID *cid);\n";
-  str << "    "<<container->proxyName()<<"("<<paramType()<<");\n";
+  str << "    "<<container->proxyName(0)<<"("<<paramComma()<<"int retEP, CkChareID *cid);\n";
+  str << "    "<<container->proxyName(0)<<"("<<paramType()<<");\n";
   // entry ptr declaration
   str << "    static int ckIdx_"<<name<<"("<<paramType()<<") ";
   str << "{ return "<<epIdx()<<"; }\n";
@@ -1044,7 +1044,7 @@ void Entry::genArrayStaticConstructorDecl(XStr& str)
   "        {return CkArrayID(ckNew_GID(numElements,mapID),-1);}\n"
   "    ";
   
-  str << container->proxyName()<<"(int numElements,CkGroupID mapID=_RRMapID)";
+  str << container->proxyName(0)<<"(int numElements,CkGroupID mapID=_RRMapID)";
   if(container->isDerived()) {
     str << ": ";
     container->genProxyBases(str, "", "(numElements,mapID)", ", ");
@@ -1256,7 +1256,7 @@ void Entry::genChareStaticConstructorDefs(XStr& str)
   str << "  CkCreateChare(__idx, "<<epIdx()<<", msg, pcid, onPE);\n";
   str << "}\n";
 
-  str << makeDecl(" ")<<"::"<<container->proxyName()<<"("<<paramComma()<<"int onPE)\n";
+  str << makeDecl(" ")<<"::"<<container->proxyName(0)<<"("<<paramComma()<<"int onPE)\n";
   str << "{\n"<<voidParamDecl();
   str << "  CkCreateChare(__idx, "<<epIdx()<<", msg, &_ck_cid, onPE);\n";
   str << "}\n";
@@ -1280,14 +1280,14 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
   str << "  return CkCreate"<<node<<"GroupSync(__idx, "<<epIdx()<<", msg);\n";
   str << "}\n";
 
-  str << makeDecl(" ")<<"::"<<container->proxyName()<<
-  "("<<paramComma()<<"int retEP, CkChareID *cid)\n";
+  str << makeDecl(" ")<<"::"<<container->proxyName(0)<<
+         "("<<paramComma()<<"int retEP, CkChareID *cid)\n";
   str << "{\n"<<voidParamDecl();
   str << "  _ck_gid = CkCreate"<<node<<"Group(__idx, "<<epIdx()<<", msg, retEP, cid);\n";
   str << "  _setChare(0);\n";
   str << "}\n";
 
-  str << makeDecl(" ")<<"::"<<container->proxyName()<<"("<<paramType()<<")\n";
+  str << makeDecl(" ")<<"::"<<container->proxyName(0)<<"("<<paramType()<<")\n";
   str << "{\n"<<voidParamDecl();
   str << "  _ck_gid = CkCreate"<<node<<"Group(__idx, "<<epIdx()<<", msg, 0, 0);\n";
   str << "  _setChare(0);\n";
