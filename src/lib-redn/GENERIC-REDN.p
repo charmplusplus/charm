@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.2  1995-10-27 22:09:16  jyelon
+ * Revision 1.3  1995-11-09 01:33:38  gursoy
+ * fixed bugs in f and f_msg, memory leaks collect and DeleteRef
+ *
+ * Revision 1.2  1995/10/27  22:09:16  jyelon
  * Changed Cmi to Ck in all charm files.
  *
  * Revision 1.1  1995/06/13  11:31:15  jyelon
@@ -126,20 +129,18 @@ BranchOffice reduce {
 	    PrivateCall(AddRef(ref,refnum)) ;
 	}
 	
-	x = (GENERIC_DATATYPE *)CkAlloc(sizeof(GENERIC_DATATYPE)*ref->numEls) ;
-	for(i=0 ; i<ref->numEls ; i++) 
-	    x[i] = (GENERIC_DATATYPE)cMsg->data[i] ;
-
+        x = (GENERIC_DATATYPE)cMsg->data;
 	ReductionOperation(x,ref->y,ref->numEls,ref->is_first) ;
+
 	ref->is_first = 0 ;
 	ref->leftToCollect-- ;
 
 	if (ref->leftToCollect == 0) {
+	    SetRefNumber(cMsg, refnum) ;
+            for(i=0;i<ref->numEls;i++)
+                    cMsg->data[i] = (GENERIC_DATATYPE) ref->y[i] ;
 	    /* If I'm the root, then reduction is done - else keep sending
 	     * it up the tree */
-	    for(i=0;i<ref->numEls;i++) 
-		cMsg->data[i] = (GENERIC_DATATYPE) ref->y[i] ;
-	    SetRefNumber(cMsg, refnum) ;
 	    if (myParent == -1) {
 		if(gid == 0) 
 		    BroadcastMsgBranch(distribute, cMsg, MyBocNum()) ;
@@ -147,9 +148,6 @@ BranchOffice reduce {
   	            PG::Multicast(pgBoc, gid, cMsg, distribute, MyBocNum()) ;
 	    }
 	    else {
-		SetRefNumber(cMsg, refnum) ;
-		for(i=0;i<ref->numEls;i++)
-		    cMsg->data[i] = (GENERIC_DATATYPE) ref->y[i] ;
 		SendMsgBranch(collect, cMsg, myParent) ;
 	    }
 	}
@@ -249,14 +247,14 @@ BranchOffice reduce {
 	cMsg = (REDN_MSG_INTERNAL *)CkAllocMsg(REDN_MSG_INTERNAL, varSizes) ;
 	cMsg->size = ref->numEls ;
 	for(i=0;i<ref->numEls;i++){
-	    ref->y[i] = x[i] ;
+	    /* ref->y[i] = x[i] ; this  is wrong tooo */
 	    cMsg->data[i] = (GENERIC_DATATYPE) x[i] ;
 	}
 	SetRefNumber(cMsg, refnum) ;
 
 	/* If I'm a leaf, then start by sending up the tree.  Otherwise,
 	 * send the portion to myself */
-	if(numToCollect == 0) 
+	if(numToCollect == 0)
 	    SendMsgBranch(collect,cMsg,myParent) ;
 	else {
 	    SendMsgBranch(collect,cMsg,me) ;
@@ -296,7 +294,7 @@ BranchOffice reduce {
 	/* Fill in the return information */
 
 	ref->r_type = R_BY_MESSAGE ;
-	ref->is_first = 1 ;
+	/* ref->is_first = 1 ; this is an error */
 	if (id == NULL) 
 	    ref->send_result_flag = 0 ;
 	else {
@@ -309,7 +307,7 @@ BranchOffice reduce {
 	cMsg = (REDN_MSG_INTERNAL *)CkAllocMsg(REDN_MSG_INTERNAL, varSizes) ;
 	cMsg->size = ref->numEls ;
 	for(i=0;i<ref->numEls;i++){
-	    ref->y[i] = x[i] ;
+	    /* ref->y[i] = x[i] ; this is wrong */
 	    cMsg->data[i] = (GENERIC_DATATYPE) x[i] ;
 	}
 	SetRefNumber(cMsg, refnum) ;
@@ -346,6 +344,7 @@ BranchOffice reduce {
         int refnum ;
         {
 	    ReductionRefInstance *temp ;
+
 	    temp = refList ;
 	    if (temp == NULL)
 		refList = newRef ;
@@ -377,6 +376,7 @@ BranchOffice reduce {
 	    temp = refList ;
 	    if (refList->refnum == refNum) {
 		refList = refList->next ;
+                if (temp->y) CkFree(temp->y);
 		CkFree(temp) ;
 	    }
 	    else {
@@ -385,6 +385,7 @@ BranchOffice reduce {
 		    skip = NULL ;
 		else
 		    skip = temp->next->next ;
+                if (temp->next->y) CkFree(temp->next->y);
 		CkFree(temp->next) ;
 		temp->next = skip ;
 	    }
