@@ -50,7 +50,7 @@ bgTimeLog::bgTimeLog(int epc, char *msg)
 {
   ep = epc;
   startTime = BgGetCurTime();
-  recvTime = CmiBgMsgRecvTime(msg);
+  recvTime = msg?CmiBgMsgRecvTime(msg):startTime;
   endTime = 0.0;
   srcpe = msg?CmiBgMsgSrcPe(msg):-1;
   msgID = msg?CmiBgMsgID(msg):-1;
@@ -180,84 +180,89 @@ void BgAdjustTimeLineInsert(BgTimeLine &tline)
 	}
 }
 
-void BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline)
+int BgAdjustTimeLineForward(int msgID, double tAdjustAbs, BgTimeLine &tline)
 {
-	/* ASSUMPTION: BgAdjustTimeLineForward is called only if necessary */
-	/* ASSUMPTION: no error testing needed */
+  /* ASSUMPTION: BgAdjustTimeLineForward is called only if necessary */
+  /* ASSUMPTION: no error testing needed */
 
 
-	// CmiPrintf("BgAdjustTimeLineForward\n"); 
-	testCount++;
-	if((testCount%1000)==0)
-			CmiPrintf("BgAdjustTimeLineForward\n");
+  // CmiPrintf("BgAdjustTimeLineForward\n"); 
+  testCount++;
+  if((testCount%1000)==0)
+  		CmiPrintf("BgAdjustTimeLineForward\n");
 
 
-	// FIXME can this search be made faster than linear search ?
-	// It cannot be made binary search, since there is no ordering for msgIDs
-	int idxOld = tline.length()-1;
-	while((idxOld >= 0) && (tline[idxOld]->msgID != msgID))
-		idxOld--;
+  // FIXME can this search be made faster than linear search ?
+  // It cannot be made binary search, since there is no ordering for msgIDs
+  int idxOld = tline.length()-1;
+  while((idxOld >= 0) && (tline[idxOld]->msgID != msgID))
+  	idxOld--;
+  // msg come earlier
+  if (idxOld == -1) return 0;
 
-	int idx=0;
-	double startTime=0;
-	bgTimeLog* tlog = tline.remove(idxOld);
+  int idx=0;
+  double startTime=0;
+  bgTimeLog* tlog = tline.remove(idxOld);
 
-	tlog->recvTime = tAdjustAbs;
-	BgGetMsgStartTime(tlog->recvTime, tline, &startTime, &idx);
-	tline.insert(idx, tlog);
-	double tAdjust = startTime - tlog->startTime;
-	tline[idx]->adjustTimeLog(tAdjust);
+  tlog->recvTime = tAdjustAbs;
+  BgGetMsgStartTime(tlog->recvTime, tline, &startTime, &idx);
+  tline.insert(idx, tlog);
+  double tAdjust = startTime - tlog->startTime;
+  tline[idx]->adjustTimeLog(tAdjust);
 
-	if(tAdjust==0) return;
-	if(tAdjust<0) {
-		// move log forward if required.
-		while(idx < idxOld) {
-			tAdjust = max(tline[idx]->endTime,tline[idx+1]->recvTime) - tline[idx+1]->startTime;
-			if(tAdjust <= 0)	// log fits in the idle time, would never be -ve
-				break;
-			else {
-				idx++;
-				tline[idx]->adjustTimeLog(tAdjust); // tAdjust would be +ve
-			}
-		}
-		// move log backward if required
-		idx = idxOld+1;
-		while(idx < tline.length()) {
-			tAdjust = max(tline[idx-1]->endTime,tline[idx]->recvTime) - tline[idx]->startTime;
-			if(tAdjust >= 0)	// would never be positive
-				break;
-			else {
-				tline[idx]->adjustTimeLog(tAdjust);
-				idx++;
-			}
-		}
-	}
-	else {
-		// move log forward if required
-		while(idx < tline.length()-1) {
-			tAdjust = max(tline[idx]->endTime,tline[idx+1]->recvTime) - tline[idx+1]->startTime;
-			if(tAdjust <= 0)	// log fits in the idle time
-				break;
-			else {
-				idx++;
-				tline[idx]->adjustTimeLog(tAdjust); // tAdjust would be +ve
-			}
-
-		}
-		// move log backward if required
-		while(idxOld < idx) {
-			if(idxOld==0)
-				tAdjust = tline[idxOld]->recvTime - tline[idxOld]->startTime;
-			else
-				tAdjust = max(tline[idxOld-1]->endTime,tline[idxOld]->recvTime) - tline[idxOld]->startTime;
-			if(tAdjust >= 0)	// would never be positive
-				break;
-			else {
-				tline[idxOld]->adjustTimeLog(tAdjust);
-				idxOld++;
-			}
-		}
-	}
+  if(tAdjust==0) return 1;
+  if(tAdjust<0) {
+  	// move log forward if required.
+  	while(idx < idxOld) {
+  	  tAdjust = max(tline[idx]->endTime,tline[idx+1]->recvTime) - 
+                        tline[idx+1]->startTime;
+  	  if(tAdjust <= 0)	// log fits in the idle time, would never be -ve
+  		break;
+  	  else {
+  		idx++;
+  		tline[idx]->adjustTimeLog(tAdjust); // tAdjust would be +ve
+  	  }
+  	}
+  	// move log backward if required
+  	idx = idxOld+1;
+  	while(idx < tline.length()) {
+  	  tAdjust = max(tline[idx-1]->endTime,tline[idx]->recvTime) - 
+                        tline[idx]->startTime;
+  	  if(tAdjust >= 0)	// would never be positive
+  		break;
+  	  else {
+  		tline[idx]->adjustTimeLog(tAdjust);
+  		idx++;
+  	  }
+  	}
+  }
+  else {
+  	// move log forward if required
+  	while(idx < tline.length()-1) {
+  	  tAdjust = max(tline[idx]->endTime,tline[idx+1]->recvTime) - 
+                        tline[idx+1]->startTime;
+  	  if(tAdjust <= 0)	// log fits in the idle time
+  		break;
+  	  else {
+  		idx++;
+  		tline[idx]->adjustTimeLog(tAdjust); // tAdjust would be +ve
+  	  }
+  	}
+  	// move log backward if required
+  	while(idxOld < idx) {
+  	  if(idxOld==0)
+  		tAdjust = tline[idxOld]->recvTime - tline[idxOld]->startTime;
+  	  else
+  		tAdjust = max(tline[idxOld-1]->endTime,tline[idxOld]->recvTime) - tline[idxOld]->startTime;
+  	  if(tAdjust >= 0)	// would never be positive
+  		break;
+  	  else {
+  		tline[idxOld]->adjustTimeLog(tAdjust);
+  		idxOld++;
+  	  }
+  	}
+  }
+  return 1;
 }
 
 void BgPrintThreadTimeLine(int pe, int th, BgTimeLine &tline)

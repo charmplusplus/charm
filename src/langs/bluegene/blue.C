@@ -1171,7 +1171,8 @@ static inline int handleCorrectionMsg(BgTimeLine *logs, bgCorrectionMsg *m)
 		return 0;
 	  }
 	}
-	BgAdjustTimeLineForward(m->msgID, m->tAdjust, logs[tID]);
+	if (BgAdjustTimeLineForward(m->msgID, m->tAdjust, logs[tID]) == 0)
+          return 0;
 	CmiFree(m);
 	return 1;
 }
@@ -1182,6 +1183,7 @@ void bgCorrectionFunc(char *msg)
     int i;
     bgCorrectionMsg* m = (bgCorrectionMsg*)msg;
     int nodeidx = nodeInfo::Global2Local(m->destNode);	
+    CmiAssert(nodeidx != -1);
     bgCorrectionQ &cmsg = cva(nodeinfo)[nodeidx].cmsg;
     BgTimeLine *logs = cva(nodeinfo)[nodeidx].timelines;
 
