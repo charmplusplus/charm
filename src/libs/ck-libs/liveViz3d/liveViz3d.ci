@@ -1,0 +1,8 @@
+module liveViz3d {
+	message liveViz3dRequestMsg;
+
+	group liveViz3dManager {
+		entry liveViz3dManager(void);
+		entry void addView(pupPtrHolder<CkView> v,int clientID);
+	};
+};
