@@ -1,0 +1,38 @@
+module CkLocation {
+  extern module CkMarshall;
+
+  message CkArrayMessage;
+  message CkArrayElementMigrateMessage {
+	double packData[];
+  };
+
+  group CkLocMgr {
+	entry CkLocMgr(CkGroupID map,CkGroupID lbdb,int numInitial);
+	entry void deliver(CkArrayMessage *m);
+	entry void migrateIncoming(CkArrayElementMigrateMessage *msg);
+	entry void updateLocation(CkArrayIndexMax idx,int nowOnPe);
+	entry void reclaimRemote(CkArrayIndexMax idx,int deletedOnPe);
+	
+	//Load balancing:
+	entry void dummyAtSync(void);
+  };
+  
+//Array Map object support:
+  group CkArrayMap {
+  };
+
+  readonly CkGroupID _RRMapID;
+  group RRMap : CkArrayMap {
+    entry RRMap(void);
+  };
+
+  initcall void _propMapInit(void);
+
+  group PropMap : CkArrayMap {
+    entry PropMap(void);
+  };
+
+  mainchare CkMapsInit {
+    entry CkMapsInit();
+  };
+};
