@@ -1,7 +1,0 @@
-interface module Barrier {
-
-message {ChareNumType id;} BARRIER_MSG;
-Create();
-Signal();
-SignalMsg();
-}

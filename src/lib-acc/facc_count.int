@@ -1,7 +1,0 @@
-#undef GENERIC_MODULE_NAME
-#undef GENERIC_ACC_NAME
-#undef GENERIC_DATATYPE
-#define GENERIC_MODULE_NAME FCount
-#define GENERIC_ACC_NAME FAcc
-#define GENERIC_DATATYPE float
-#include "GENERIC-ACC.int"

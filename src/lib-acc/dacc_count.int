@@ -1,7 +1,0 @@
-#undef GENERIC_MODULE_NAME
-#undef GENERIC_ACC_NAME
-#undef GENERIC_DATATYPE
-#define GENERIC_MODULE_NAME DCount
-#define GENERIC_ACC_NAME DAcc
-#define GENERIC_DATATYPE double
-#include "GENERIC-ACC.int"
