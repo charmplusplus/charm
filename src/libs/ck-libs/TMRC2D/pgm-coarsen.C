@@ -494,7 +494,7 @@ CkPrintf("[%d] end init\n",myChunk);
     CkPrintf("Entering timeloop\n");
 	}	
 //  int tSteps=0x70FF00FF;
-  int tSteps=1;
+  int tSteps=2;
 	calcMasses(g);
   double startTime=CkWallTimer();
   double curArea=2.5e-5/1024;
@@ -539,7 +539,7 @@ CkPrintf("[%d] end init\n",myChunk);
       }
 
 			//coarsen in the last step
-//      if(t >= tSteps-1){
+      if(t >= tSteps-1){
 				CkPrintf("[%d] Starting coarsening step: %d nodes, %d elements to %.3g\n",
 		       myChunk,g.nnodes,g.nelems,curArea);
 			
@@ -553,7 +553,7 @@ CkPrintf("[%d] end init\n",myChunk);
 	      CkPrintf("[%d] Done with coarsening step: %d nodes, %d elements\n",
 	       myChunk,g.nnodes,g.nelems);
 
-	//}		    
+	}		    
     
     if (1) { //Publish data to the net
     		
