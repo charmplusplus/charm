@@ -281,6 +281,10 @@ Minor Features:
 				scyld version, and redirect all output to 
 				/dev/null, otherwise all node program can send 
 				its output to console in scyld. Also implemented				++local in net-win32 version.
+02/26/2000	milind		Changed the varsize syntax. Now one can specify
+				actual varsize arrays in the interface file
+				and have the translator generate alloc, pack 
+				and unpack.
 
 --------------------------------------------------------------------------------
 Bug Fixes:
