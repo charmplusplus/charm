@@ -5,14 +5,15 @@ HEADERS=ampi.h ampif.h
 HEADDEP=$(HEADERS) ampiimpl.h ampi.decl.h
 COMPAT=compat_ampius.o compat_ampifus.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o
-OBJS=ampi.o ampif.o $(COMPAT)
+OBJS=ampi.o ampif.o
 
 LIB=libmoduleampi
 LIBDIR=$(CDIR)/lib
 DEST=$(LIBDIR)/$(LIB).a
 DESTF=$(LIBDIR)/$(LIB)f.a
+COMPATLIB=$(LIBDIR)/libmoduleampi-compat.a
 
-all: AMPI AMPIF
+all: AMPI AMPIF $(COMPATLIB)
 
 AMPI: $(DEST) 
 	@echo "AMPI built successfully"
@@ -28,6 +29,9 @@ $(DESTF): $(OBJS) headers
 	-$(CHARMC) -cpmod ../../../../include mpiincl.M
 	-$(CHARMC) $(OBJS) ampimod.o -o $@
 	-cp $(LIB)f.dep $(LIBDIR)/$(LIB)f.dep
+
+$(COMPATLIB): $(COMPAT)
+	$(CHARMC) $(COMPAT) -o $@
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
@@ -54,4 +58,4 @@ ampi.decl.h ampi.def.h: ampi.ci
 	$(CHARMC) ampi.ci
 
 clean: 
-	-rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) $(DESTF) conv-host charmrun headers *.mod
+	-rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) $(DESTF) $(COMPATLIB) conv-host charmrun headers *.mod

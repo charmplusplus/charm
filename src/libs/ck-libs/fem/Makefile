@@ -10,12 +10,16 @@ LIB=libmodulefem
 
 LIBDIR=$(CDIR)/lib
 DEST=$(LIBDIR)/$(LIB).a
+COMPATLIB=$(LIBDIR)/libmodulefem-compat.a
 
-all: $(DEST)
+all: $(DEST) $(COMPATLIB)
 
 $(DEST): $(OBJS) $(COMPAT) headers
-	$(CHARMC) $(OBJS) $(COMPAT) -o $@
+	$(CHARMC) $(OBJS) -o $@
 	cp $(LIB).dep $(LIBDIR)/$(LIB).dep
+
+$(COMPATLIB): $(COMPAT)
+	$(CHARMC) $(COMPAT) -o $@
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
@@ -60,4 +64,4 @@ call_init.o: call_init.c
 	$(CHARMC) -c call_init.c
 
 clean:
-	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) headers
+	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) $(COMPATLIB) headers
