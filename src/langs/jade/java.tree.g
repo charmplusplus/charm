@@ -105,11 +105,11 @@ typeDefinition
 //                     J.ciOn();
                     if (e.getFirstChild() == null)
                         J.fatalError( e, "synchronized class " + #IDENT.getText() + " must extend chare, charearray1d, or charearray2d");
-                    else if (e.getFirstChild().getText().equalsIgnoreCase("chare"))
+                    else if (e.getFirstChild().getText().equalsIgnoreCase(J.strChare))
                         J.ci.append(J.indent() + (((ASTJ)c).status?"main":"") + "chare " + #IDENT.getText());
-                    else if (e.getFirstChild().getText().equalsIgnoreCase("charearray1d"))
+                    else if (e.getFirstChild().getText().equalsIgnoreCase(J.strChareArray1D))
                         J.ci.append(J.indent() + "array [1D] " + #IDENT.getText());
-                    else if (e.getFirstChild().getText().equalsIgnoreCase("charearray2d"))
+                    else if (e.getFirstChild().getText().equalsIgnoreCase(J.strChareArray2D))
                         J.ci.append(J.indent() + "array [2D] " + #IDENT.getText());
                     else
                         J.fatalError( e, "synchronized class " + #IDENT.getText() + " must extend chare, charearray1d, or charearray2d");
@@ -125,9 +125,9 @@ typeDefinition
                     s.append(": public ");
                     AST i = e.getFirstChild();
                     while (null != i) {
-                        if (i.getText().equalsIgnoreCase("chare")
-                            || i.getText().equalsIgnoreCase("charearray1d")
-                            || i.getText().equalsIgnoreCase("charearray2d")
+                        if (i.getText().equalsIgnoreCase(J.strChare)
+                            || i.getText().equalsIgnoreCase(J.strChareArray1D)
+                            || i.getText().equalsIgnoreCase(J.strChareArray2D)
                         ) {
                             s.append("CBase_" + #IDENT.getText());
                         } else {
@@ -148,7 +148,7 @@ typeDefinition
 //                     //((#m.getFirstChild()==null)?"":"modi_here ")  +
 //                     #IDENT.getText() + " {");
 //             }
-            o:objBlock[#IDENT, e.getFirstChild().getText().equalsIgnoreCase("charearray1d") || e.getFirstChild().getText().equalsIgnoreCase("charearray2d") ]
+            o:objBlock[#IDENT, e.getFirstChild().getText().equalsIgnoreCase(J.strChareArray1D) || e.getFirstChild().getText().equalsIgnoreCase(J.strChareArray2D) ]
         ) { J.tmp.pop(); }
 	|	#(INTERFACE_DEF modifiers IDENT extendsClause interfaceBlock )  // skip
 	;
@@ -208,7 +208,7 @@ modifier
     |   "volatile"
 	|	"strictfp"
 	|	"threaded"
-	|	"sync"
+ 	|	"blocking"
 	|	"readonly"
     ;
 
@@ -327,9 +327,12 @@ methodDecl
 	;
 
 methodDef[AST className]
-	:	#(m:METHOD_DEF modifiers ts:typeSpec mh:methodHead
-        //{ System.out.println("MethodDef " + #mh.getText()); }
+	:	#(m:METHOD_DEF modifiers ts:typeSpec
+            { J.startBlock(); }
+            mh:methodHead
             {
+//                 System.out.println("MethodDef " + #mh.getText());
+
                 J.tmp.push(new String(mh.getText()));
                 //System.out.println("Method: " + #m.toStringTree());
                 AST modifiers = #m.getFirstChild();
@@ -355,7 +358,7 @@ methodDef[AST className]
                     //System.out.println("Method: " + #m.toStringTree());
                     String s = methodName.getText() + "("
                         + J.printParamList(parameters) + ")";
-                    J.ci.append(J.indent() + "entry void " + s + ";\n");
+                    J.ci.append(J.indent() + "entry " + (J.isX(modifiers, "threaded")?"[threaded] ":"") + "void " + s + ";\n");
                     J.h.append(J.indent() + "public: void " + s + ";\n");
                     J.c.append(J.indent() + "void " + className.getText() + "::" + s + "\n");
                 }
@@ -374,8 +377,19 @@ methodDef[AST className]
                 else {
                     String s = methodName.getText() + "("
                         + J.printParamList(parameters) + ")";
-                    J.h.append(J.indent() + "TBD public: " + J.printTypeSpec(ts, null) + s + ";\n");
-                    J.c.append(J.indent() + "TBD public: " + J.printTypeSpec(ts, null) + className.getText() + "::" + s + "\n");
+
+                    StringBuffer p = new StringBuffer();
+                    if (J.isX(m, "public")) {
+                        p.append("public");
+                    } else if (J.isX(m, "protected"))
+                        p.append("protected");
+                    else {
+                        p.append("private");
+                    }
+                    // @@ other modifiers ?
+
+                    J.h.append(J.indent() + p + ": " + J.printTypeSpec(ts, null) + s + ";\n");
+                    J.c.append(J.indent() + J.printTypeSpec(ts, null) + className.getText() + "::" + s + "\n");
                 }
 
 //                 System.out.println("entry "
@@ -395,6 +409,8 @@ methodDef[AST className]
                 J.tmp.pop();
 //                 J.indentLevel--;
 //                 J.c.append(J.indent() + "}\n");
+
+                J.endBlock();
             }
         )
 	;
@@ -420,7 +436,7 @@ variableDef[boolean classVarq, boolean outputOnNewLine]
                 // sync
                 // readonly
                 //
-                if (J.isX(m, new String[]{"threaded", "sync", "abstract", "native", "strictfp", "synchronized"}))
+                if (J.isX(m, new String[]{"threaded", "blocking", "abstract", "native", "strictfp", "synchronized"}))
                     J.nonfatalError(m, "Variables cannot be threaded, sync, abstract, native, strictfp, synchronized.  Ignoring.");
                 if (!classVarq)
                     if (J.isX(m, new String[]{"private", "public", "protected"}))
@@ -432,6 +448,10 @@ variableDef[boolean classVarq, boolean outputOnNewLine]
                     J.fatalError(m, "Variable can only be one of private public protected.");
 
                 String varName = J.printVariableDeclarator(vd);
+                if (!classVarq){
+                    J.localStack.push(varName);
+                    J.localStackShadow.push(v);
+                }
 
                 // class variable def
                 if (classVarq) {
@@ -521,9 +541,9 @@ variableDef[boolean classVarq, boolean outputOnNewLine]
                 // local variable, "new" chare, i.e. Chare a = new Hello(params);
                 // or, ChareArray a = new Hello[5];
                 else if (
-                    (ts.getFirstChild().getText().equalsIgnoreCase("chare")
-                      || ts.getFirstChild().getText().equalsIgnoreCase("charearray")
-                      || ts.getFirstChild().getText().equalsIgnoreCase("charearray2d")
+                    (ts.getFirstChild().getText().equalsIgnoreCase(J.strChare)
+                      || ts.getFirstChild().getText().equalsIgnoreCase(J.strChareArray1D)
+                      || ts.getFirstChild().getText().equalsIgnoreCase(J.strChareArray2D)
                     )
                     && vi != null
                     && EXPR == vi.getFirstChild().getType()
@@ -540,13 +560,13 @@ variableDef[boolean classVarq, boolean outputOnNewLine]
                     J.c.append(cproxytype + " " + varName + " = "
                         + cproxytype + "::ckNew");
 
-                    if (ts.getFirstChild().getText().equalsIgnoreCase("chare"))
+                    if (ts.getFirstChild().getText().equalsIgnoreCase(J.strChare))
                         // for Chare, we have an ELIST
                         J.c.append("(" + J.printExpression(newAST.getFirstChild().getNextSibling()) +")");
-                    else if (ts.getFirstChild().getText().equalsIgnoreCase("charearray")) {
+                    else if (ts.getFirstChild().getText().equalsIgnoreCase(J.strChareArray1D)) {
                         // For a ChareArray, we need to go down one more level.
                         J.c.append("(" + J.printExpression(newAST.getFirstChild().getNextSibling().getFirstChild()) +")");
-                    } else if (ts.getFirstChild().getText().equalsIgnoreCase("charearray2d")) {
+                    } else if (ts.getFirstChild().getText().equalsIgnoreCase(J.strChareArray2D)) {
                         // For a ChareArray2D, we need to create elements using insert
                         AST e1 = J.getNode(newAST, "fnff"); // expr in first []
                         AST e2 = J.getNode(newAST, "fnfn"); // expr in 2nd []
@@ -565,7 +585,7 @@ variableDef[boolean classVarq, boolean outputOnNewLine]
 
                 // local variable, chare with getProxy, i.e.
                 // Chare c = id.getProxy(Hello)
-                else if (ts.getFirstChild().getText().equalsIgnoreCase("chare")
+                else if (ts.getFirstChild().getText().equalsIgnoreCase(J.strChare)
                     && vi != null
                     && METHOD_CALL == vi.getFirstChild().getFirstChild().getType()
                     && vi.getFirstChild().getFirstChild().getFirstChild().getFirstChild().getNextSibling().getText().equalsIgnoreCase("getProxy")) {
@@ -627,7 +647,7 @@ variableDef[boolean classVarq, boolean outputOnNewLine]
 // called from methodHead, handled there
 // called from handler, TBD
 parameterDef
-	:	#(PARAMETER_DEF modifiers typeSpec IDENT )
+	:	#(PARAMETER_DEF modifiers typeSpec IDENT {}) // @@ if in methodHead, add parameter to localstack
 	;
 
 objectinitializer

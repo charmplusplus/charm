@@ -260,7 +260,7 @@ modifier
 	|	"volatile"
 	|	"strictfp"
 	|	"threaded"
-	|	"sync"
+ 	|	"blocking"
 	|	"readonly"
 	;
 
