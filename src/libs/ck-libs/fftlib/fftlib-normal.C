@@ -162,12 +162,8 @@ NormalSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn, int
     }
 }
 
-void NormalSlabArray::setup(NormalFFTinfo &info)
+void NormalSlabArray::createPlans(NormalFFTinfo &info)
 {
-    fftinfos[0] = new NormalFFTinfo(info);
-    counts[0] = 0;
-    fwd1DPlan = bwd1DPlan = NULL;
-    fwd2DPlan = bwd2DPlan = NULL;
     if (info.isSrcSlab) {
 	fwd2DPlan = fftw2d_create_plan(info.srcSize[0], info.srcSize[1], FFTW_FORWARD, FFTW_MEASURE|FFTW_IN_PLACE);
 	bwd1DPlan = fftw_create_plan(info.srcSize[0], FFTW_BACKWARD, FFTW_MEASURE|FFTW_IN_PLACE);
@@ -176,6 +172,16 @@ void NormalSlabArray::setup(NormalFFTinfo &info)
 	bwd2DPlan = fftw2d_create_plan(info.destSize[0], info.destSize[1], FFTW_BACKWARD, FFTW_MEASURE|FFTW_IN_PLACE);
 	fwd1DPlan = fftw_create_plan(info.destSize[0], FFTW_FORWARD, FFTW_MEASURE|FFTW_IN_PLACE);
     }
+}
+
+void NormalSlabArray::setup(NormalFFTinfo &info)
+{
+    fftinfos[0] = new NormalFFTinfo(info);
+    counts[0] = 0;
+    fwd1DPlan = bwd1DPlan = NULL;
+    fwd2DPlan = bwd2DPlan = NULL;
+    
+    createPlans(info);
 }
 
 
@@ -213,22 +219,10 @@ void NormalSlabArray::pup(PUP::er &p)
 	    fftinfos[i]->pup(p);
 	    
             if (p.isUnpacking()){
-	    if (fftinfos[i]->isSrcSlab) {
-		fwd2DPlan = fftw2d_create_plan(fftinfos[i]->srcSize[0],
-					       fftinfos[i]->srcSize[1], FFTW_FORWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
-		bwd1DPlan = fftw_create_plan(fftinfos[i]->srcSize[0],
-					     FFTW_BACKWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
+		createPlans(*fftinfos[i]);
 	    }
-	    else {
-		bwd2DPlan = fftw2d_create_plan(fftinfos[i]->destSize[0],
-					       fftinfos[i]->destSize[1], FFTW_BACKWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
-		fwd1DPlan = fftw_create_plan(fftinfos[i]->destSize[0],
-					     FFTW_FORWARD, FFTW_USE_WISDOM|FFTW_MEASURE|FFTW_IN_PLACE);
-	    }
-	    }	    
 	}
     }
-    
     p(counts, MAX_FFTS);
 }
 
