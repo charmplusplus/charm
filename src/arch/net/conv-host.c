@@ -122,7 +122,7 @@ void notify_die_doit(msg)
     fd = skt_connect(ip, port);
     if (fd>=0) { write(fd, buffer, strlen(buffer)); close(fd); }
   }
-  fprintf(stderr,"aborting: %s\n",msg);
+  fprintf(stderr,"ERROR> aborting: %s\n",msg);
   exit(1);
 }
 
@@ -288,16 +288,16 @@ void skt_server(pip,ppo,pfd)
   struct sockaddr_in addr;
   
   fd = socket(PF_INET, SOCK_STREAM, 0);
-  if (fd < 0) { perror("socket"); exit(1); }
+  if (fd < 0) { perror("ERROR> socket"); exit(1); }
   memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
   ok = bind(fd, (struct sockaddr *)&addr, sizeof(addr));
-  if (ok < 0) { perror("bind"); exit(1); }
+  if (ok < 0) { perror("ERROR> bind"); exit(1); }
   ok = listen(fd,5);
-  if (ok < 0) { perror("listen"); exit(1); }
+  if (ok < 0) { perror("ERROR> listen"); exit(1); }
   len = sizeof(addr);
   ok = getsockname(fd, (struct sockaddr *)&addr, &len);
-  if (ok < 0) { perror("getsockname"); exit(1); }
+  if (ok < 0) { perror("ERROR> getsockname"); exit(1); }
 
   *pfd = fd;
   *pip = skt_ip();
@@ -450,7 +450,7 @@ char *mylogin()
   struct passwd *self;
 
   self = getpwuid(getuid());
-  if (self==0) { perror("getpwuid"); exit(1); }
+  if (self==0) { perror("ERROR> getpwuid"); exit(1); }
   return self->pw_name;
 } 
 
@@ -563,7 +563,7 @@ static ppdef pparam_hfind(lname)
 {
   ppdef def = pparam_find(lname);
   if (def) return def;
-  fprintf(stderr,"No such program parameter %s\n",lname);
+  fprintf(stderr,"ERROR> No such program parameter %s\n",lname);
   exit(1);
 }
 
@@ -1009,7 +1009,7 @@ int prog_flush(c)
       int nwrote = write(ifd, xstr_lptr(ibuf), xstr_len(ibuf));
       if (nwrote < 0) return -1;
       if (nwrote==0)
-	{ fprintf(stderr,"error: write returned 0???\n"); exit(1); }
+	{ fprintf(stderr,"ERROR> write returned 0???\n"); exit(1); }
       xstr_lshrink(ibuf, nwrote);
     }
   return 0;
@@ -1147,7 +1147,7 @@ arg_init(argc, argv)
   pparam_doc("nodegroup",     "which group of nodes to use");
 
   if (pparam_parsecmd('+', argv) < 0) {
-    fprintf(stderr,"syntax: %s\n",pparam_error);
+    fprintf(stderr,"ERROR> syntax: %s\n",pparam_error);
     pparam_printdocs();
     exit(1);
   }
@@ -1169,7 +1169,7 @@ arg_init(argc, argv)
   /* Find the current value of the DISPLAY variable */
   arg_display = getenv_display();
   if ((arg_debug || arg_debug_no_pause || arg_in_xterm) && (arg_display==0)) {
-    fprintf(stderr,"DISPLAY must be set to use debugging mode\n");
+    fprintf(stderr,"ERROR> DISPLAY must be set to use debugging mode\n");
     exit(1);
   }
 
@@ -1179,7 +1179,7 @@ arg_init(argc, argv)
   
   /* find the node-program, absolute version */
   if (argc<2) {
-    fprintf(stderr,"You must specify a node-program.\n");
+    fprintf(stderr,"ERROR> You must specify a node-program.\n");
     exit(1);
   }
   if (argv[1][0]=='/') {
@@ -1206,14 +1206,14 @@ char *nodetab_file_find()
   if (arg_nodelist) {
     char *path = arg_nodelist;
     if (probefile(path)) return strdup(path);
-    fprintf(stderr,"No such nodelist file %s\n",path);
+    fprintf(stderr,"ERROR> No such nodelist file %s\n",path);
     exit(1);
   }
   /* Find a nodes-file as specified by getenv("NODELIST") */
   if (getenv("NODELIST")) {
     char *path = getenv("NODELIST");        
     if (path && probefile(path)) return strdup(path);
-    fprintf(stderr,"Cannot find nodelist file %s\n",path);
+    fprintf(stderr,"ERROR> Cannot find nodelist file %s\n",path);
     exit(1);
   }
   /* Find a nodes-file by looking under 'nodelist' in the current directory */
@@ -1223,7 +1223,7 @@ char *nodetab_file_find()
     sprintf(buffer,"%s/.nodelist",getenv("HOME"));
     if (probefile(buffer)) return strdup(buffer);
   }
-  fprintf(stderr,"Cannot find a nodes file.\n");
+  fprintf(stderr,"ERROR> Cannot find a nodes file.\n");
   exit(1);
 }
 
@@ -1283,8 +1283,8 @@ void nodetab_makehost(char *host)
   int ip;
   ip = lookup_ip(host);
   if (ip==0) {
-    fprintf(stderr,"Cannot obtain IP address of %s\n", host);
-    exit(0);
+    fprintf(stderr,"ERROR> Cannot obtain IP address of %s\n", host);
+    exit(1);
   }
   if (nodetab_size == nodetab_max) return;
   res = (nodetab_host)malloc(sizeof(struct nodetab_host));
@@ -1311,8 +1311,10 @@ void nodetab_init()
   
   /* Open the NODES_FILE. */
   nodesfile = nodetab_file_find();
+  if(arg_verbose)
+    fprintf(stderr, "INFO> using %s as nodesfile\n", nodesfile);
   if (!(f = fopen(nodesfile,"r"))) {
-    fprintf(stderr,"Cannot read %s: %s\n",nodesfile,strerror(errno));
+    fprintf(stderr,"ERROR> Cannot read %s: %s\n",nodesfile,strerror(errno));
     exit(1);
   }
   
@@ -1350,14 +1352,14 @@ void nodetab_init()
       nodetab_reset();
       rightgroup = subeqs(b2,e2,arg_nodegroup);
     } else {
-      fprintf(stderr,"unrecognized command in nodesfile:\n");
-      fprintf(stderr,"%s\n", input_line);
+      fprintf(stderr,"ERROR> unrecognized command in nodesfile:\n");
+      fprintf(stderr,"ERROR> %s\n", input_line);
       exit(1);
     }
   }
   basicsize = nodetab_size;
   if (basicsize==0) {
-    fprintf(stderr,"No hosts in group %s\n", arg_nodegroup);
+    fprintf(stderr,"ERROR> No hosts in group %s\n", arg_nodegroup);
     exit(1);
   }
   while ((nodetab_size < arg_requested_pes)&&(arg_requested_pes!=MAX_NODES)) {
@@ -1371,11 +1373,11 @@ nodetab_host nodetab_getinfo(i)
   int i;
 {
   if (nodetab_table==0) {
-    fprintf(stderr,"Node table not initialized.\n");
+    fprintf(stderr,"ERROR> Node table not initialized.\n");
     exit(1);
   }
   if ((i<0)||(i>=nodetab_size)) {
-    fprintf(stderr,"No such node %d\n",i);
+    fprintf(stderr,"ERROR> No such node %d\n",i);
     exit(1);
   }
   return nodetab_table[i];
@@ -1881,14 +1883,14 @@ prog rsh_start(nodeno)
   rshargv[4]="exec /bin/csh -f";
   rshargv[5]=0;
   rsh = prog_start(RSH_CMD, rshargv, 0);
-  if ((rsh==0)&&(errno!=EMFILE)) { perror("starting rsh"); exit(1); }
+  if ((rsh==0)&&(errno!=EMFILE)) { perror("ERROR> starting rsh"); exit(1); }
   if (rsh==0)
     {
       fprintf(stderr,"caution: cannot start specified number of rsh's\n");
       fprintf(stderr,"(not enough file descriptors available).\n");
     }
   if (rsh && arg_verbose)
-    fprintf(stderr,"node %d: rsh initiated...\n",nodeno);
+    fprintf(stderr,"INFO> node %d: rsh initiated...\n",nodeno);
   return rsh;
 }
 
@@ -2056,7 +2058,7 @@ int start_nodes()
     rsh_prog[i] = p;
     rsh_node[i] = pe;
   }
-  if (rsh_maxsim==0) { perror("starting rsh"); exit(1); }
+  if (rsh_maxsim==0) { perror("ERROR> starting rsh"); exit(1); }
   rsh_nstarted = rsh_maxsim;
   rsh_nfinished = 0;
   
@@ -2071,7 +2073,7 @@ int start_nodes()
     }
     do ok = select(maxfd+1, &rfds, NULL, NULL, NULL);
     while ((ok<0)&&(errno==EINTR));
-    if (ok<0) { perror("select"); exit(1); }
+    if (ok<0) { perror("ERROR> select"); exit(1); }
     do ok = waitpid((pid_t)(-1), NULL, WNOHANG);
     while (ok>=0);
     for (i=0; i<rsh_maxsim; i++) {
@@ -2083,9 +2085,9 @@ int start_nodes()
       if (!FD_ISSET(p->ofd, &rfds)) continue;
       do nread = read(p->ofd, buffer, 1000);
       while ((nread<0)&&(errno==EINTR));
-      if (nread<0) { perror("read"); exit(1); }
+      if (nread<0) { perror("ERROR> read"); exit(1); }
       if (nread==0) {
-	fprintf(stderr,"node %d: rsh phase failed.\n",rsh_node[i]);
+	fprintf(stderr,"ERROR> node %d: rsh phase failed.\n",rsh_node[i]);
 	exit(1);
       }
       xstr_write(p->obuf, buffer, nread);
@@ -2096,7 +2098,7 @@ int start_nodes()
 	if (arg_verbose ||
 	    (strcmp(line,"rsh phase successful.")
 	     &&strcmp(line,"remote responding...")))
-	  fprintf(stderr,"node %d: %s\n",rsh_node[i],line);
+	  fprintf(stderr,"INFO> node %d: %s\n",rsh_node[i],line);
 	if (strcmp(line,"rsh phase successful.")==0) { done=1; break; }
       }
       if (!done) continue;
@@ -2106,7 +2108,7 @@ int start_nodes()
       if (rsh_nstarted==nodetab_rank0_size) break;
       pe = nodetab_rank0_table[rsh_nstarted];
       p = rsh_start(pe);
-      if (p==0) { perror("starting rsh"); exit(1); }
+      if (p==0) { perror("ERROR> starting rsh"); exit(1); }
       rsh_pump(p, pe, rsh_nstarted, arg_argv);
       rsh_prog[i] = p;
       rsh_node[i] = pe;
@@ -2129,6 +2131,8 @@ main(argc, argv)
   ping_developers();
   /* Compute the values of all constants */
   arg_init(argc, argv);
+  if(arg_verbose)
+    fprintf(stderr, "INFO> conv-host started...\n");
   /* Initialize the node-table by reading nodesfile */
   nodetab_init();
   /* Initialize the request-server */
