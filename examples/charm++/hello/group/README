@@ -1,0 +1,7 @@
+Hello World in Charm with a Chare group.
+
+Demonstrates basic chare group creation and use.  The Hi message is
+passed along the group from 0th to Nth.  Illustrates output
+nondeterminism as an interesting side effect.
+
+
