@@ -1852,7 +1852,11 @@ void Entry::genChareDecl(XStr& str)
 
 void Entry::genChareDefs(XStr& str)
 {
-  const char *immediate = isImmediate()?"Inline":"";
+  if (isImmediate()) {
+      cerr << (char *)container->baseName() << ": Chare doesnot allow immediate message.\n";
+      exit(1);
+  }
+
   if(isConstructor()) {
     genChareStaticConstructorDefs(str);
   } else {
@@ -1868,7 +1872,7 @@ void Entry::genChareDefs(XStr& str)
       str << "    int destPE=CkChareMsgPrep("<<params<<");\n";
       str << "    if (destPE!=-1) ckDelegatedTo()->ChareSend("<<params<<",destPE);\n";
       str << "  }\n";
-      str << "  else CkSendMsg"<<immediate<<"("<<params<<");\n";
+      str << "  else CkSendMsg("<<params<<");\n";
     }
     str << "}\n";
   }
@@ -1920,6 +1924,11 @@ void Entry::genArrayDecl(XStr& str)
 
 void Entry::genArrayDefs(XStr& str)
 {
+  if (isImmediate()) {
+      cerr << (char *)container->baseName() << ": Chare Array doesnot allow immediate message.\n";
+      exit(1);
+  }
+
   if (isConstructor())
     genArrayStaticConstructorDefs(str);
   else
@@ -1941,8 +1950,10 @@ void Entry::genArrayDefs(XStr& str)
     else 
     {
       if (container->isForElement() || container->isForSection()) {
+/*
         if (isImmediate())
           str << "  impl_amsg->array_setImmediate(CmiTrue);\n";
+*/
         str << "  ckSend(impl_amsg, "<<epIdx()<<");\n";
       }
       else
@@ -1987,6 +1998,10 @@ void Entry::genGroupDecl(XStr& str)
   //Selects between NodeGroup and Group
   char *node = (char *)(container->isNodeGroup()?"Node":"");
   const char *immediate = isImmediate()?"Inline":"";
+  if (isImmediate() && !container->isNodeGroup()) {
+      cerr << (char *)container->baseName() << ": Group doesnot allow immediate message.\n";
+      exit(1);
+  }
 
   if(isConstructor()) {
     genGroupStaticConstructorDecl(str);
