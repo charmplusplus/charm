@@ -518,7 +518,7 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, MemberList *l)
 			  (char *)type->getBaseName(),
 			  new ParamList(new Parameter(line,
 				new PtrType(new NamedType("CkMigrateMessage"))
-			  )),0, 0);
+			  )));
 			e->setChare(this);
 			list=new MemberList(e,list);
 		}
@@ -548,7 +548,7 @@ Chare::genRegisterMethodDef(XStr& str)
   str << "#endif\n";
 }
 
-//extern void sdag_trans(XStr& classname, xiParsedFile *input, XStr& output);
+extern void sdag_trans(XStr& classname, XStr& input, XStr& output);
 
 void
 Chare::genDecls(XStr& str)
@@ -593,15 +593,12 @@ Chare::genDecls(XStr& str)
   if(list) {
     int sdagPresent = 0;
     XStr sdagStr;
-    xiParsedFile *myParsedFile = new xiParsedFile();
-    list->collectSdagCode(myParsedFile, sdagPresent);
+    list->collectSdagCode(sdagStr, sdagPresent);
     if(sdagPresent) {
       XStr classname;
       XStr sdag_output;
       classname << baseName(0);
-      resetNumbers();
-      myParsedFile->doProcess(classname, sdag_output);
-     // sdag_trans(classname, myParsedFile, sdag_output);
+      sdag_trans(classname, sdagStr, sdag_output);
       str << sdag_output;
     }
   }
@@ -785,7 +782,7 @@ Array::Array(int ln, attrib_t Nattr, NamedType *index,
 			XStr indexObject(indexSuffix2object(indexSuffix));
 			XStr parentClass;
 			parentClass<<"ArrayElementT<"<<indexObject<<">";
-			char *parentClassName=strdup(parentClass);
+			const char *parentClassName=strdup(parentClass);
 			bases_CBase = new TypeList(new NamedType(parentClassName), NULL);
 		}
 	}
@@ -1446,14 +1443,13 @@ void MemberList::genDecls(XStr& str)
   }
 }
 
-void MemberList::collectSdagCode(xiParsedFile *pf, int& sdagPresent)
+void MemberList::collectSdagCode(XStr& str, int& sdagPresent)
 {
-  if(member){
-    member->collectSdagCode(pf, sdagPresent);
-  }
+  if(member)
+    member->collectSdagCode(str, sdagPresent);
   if(next) {
-    //str << endx;
-    next->collectSdagCode(pf, sdagPresent);
+    str << endx;
+    next->collectSdagCode(str, sdagPresent);
   }
 }
 
@@ -1477,132 +1473,15 @@ void MemberList::genReg(XStr& str)
   }
 }
 
-///////////////////////////// xiPARSEDFILE //////////////////////
-/*void xiParsedFile::print(int indent)
-{
-  for(CEntry *ce=entryList.begin(); !entryList.end(); ce=entryList.next())
-  {
-    ce->print(indent);
-    printf("\n");
-  }
-  for(SdagConstruct *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next())
-  {
-    cn->print(indent);
-    printf("\n");
-  }
-}
-*/
-void xiParsedFile::numberNodes(void)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->numberNodes();
-    }
-  }
-}
-
-void xiParsedFile::labelNodes(void)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) 
-      cn->sdagCon->labelNodes();
-  }
-}
-
-void xiParsedFile::propagateState(void)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->sdagCon->propagateState(0);
-  }
-}
-
-void xiParsedFile::generateEntryList(void)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->sdagCon->generateEntryList(entryList, 0);
-  }
-}
-
-void xiParsedFile::generateCode(XStr& op)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->sdagCon->setNext(0,0);
-    cn->sdagCon->generateCode(op);
-  }
-}
-
-void xiParsedFile::generateEntries(XStr& op)
-{
-  CEntry *en;
-  op << "public:\n";
-  for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
-    en->generateCode(op);
-  }
-}
-
-void xiParsedFile::generateInitFunction(XStr& op)
-{
-  op << "private:\n";
-  op << "  CDep *__cDep;\n";
-  op << "  void __sdag_init(void) {\n";
-  op << "    __cDep = new CDep("<<numEntries<<","<<numWhens<<");\n";
-  CEntry *en;
-  for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
-    en->generateDeps(op);
-  }
-  op << "  }\n";
-}
-
-void xiParsedFile::generatePupFunction(XStr& op)
-{
-  op << "public:\n";
-  op << "  void __sdag_pup(PUP::er& p) {\n";
-  op << "    if (__cDep) { __cDep->pup(p); }\n";
-  op << "  }\n";
-}
-
-////////////////////////// SDAGCONSTRUCT ///////////////////////
-SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1)
-{
-  con1 = 0;  con2 = 0; con3 = 0; con4 = 0;
-  type = t;
-  constructs = new TList<SdagConstruct*>();
-  constructs->append(construct1);
-}
-
-SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct *aList)
-{
-  con1=0; con2=0; con3=0; con4=0;
-  type = t;
-  constructs = new TList<SdagConstruct*>();
-  constructs->append(construct1);
-  SdagConstruct *sc;
-  for(sc = aList->constructs->begin(); !aList->constructs->end(); sc=aList->constructs->next())
-    constructs->append(sc);
-}
-
-SdagConstruct::SdagConstruct(EToken t, SdagConstruct *c1, SdagConstruct *c2, SdagConstruct *c3, 
-			     SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el)
-{
-  type = t; 
-  con1 = c1; con2 = c2; con3 = c3; con4 = c4;
-  if (constructAppend != 0) {
-    constructs = new TList<SdagConstruct*>();
-    constructs->append(constructAppend);
-  }
-  else
-    constructAppend = 0;
-  elist = el;
-}
-
 ///////////////////////////// ENTRY ////////////////////////////
 
 
-Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz, SdagConstruct *sc, char *e) :
-      attribs(a), retType(r), name(n), param(p), stacksize(sz), sdagCon(sc), intExpr(e)
+Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz) :
+      attribs(a), retType(r), name(n), param(p), stacksize(sz)
 { 
   line=l; container=NULL; 
   entryCount=-1;
+  sdagCode = 0;
   if (param && param->isMarshalled()) attribs|=SNOKEEP;
 
   if(!isThreaded() && stacksize) die("Non-Threaded methods cannot have stacksize",line);
@@ -1664,14 +1543,6 @@ XStr Entry::eo(int withDefaultVals,int priorComma) {
     if (withDefaultVals) str<<"=NULL";
   }
   return str;
-}
-
-void Entry::collectSdagCode(xiParsedFile *pf, int& sdagPresent)
-{
-  if (isSdag()) {
-    sdagPresent = 1;
-    pf->nodeList.append(this);
-  }
 }
 
 XStr Entry::marshallMsg(void)
@@ -2264,20 +2135,7 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
 		name=new char[50];
 		sprintf((char *)name,"impl_noname_%x",unnamedCount++);
 	}
-	byReference=false;
-	if ((arrLen==NULL)&&(val==NULL)) 
-	{ /* Consider passing type by reference: */
-		if (type->isNamed()) 
-		{ /* Some user-defined type: pass by reference */
-			byReference=true;
-		}
-		if (type->isReference()) {
-			byReference=true;
-			/* Clip off the ampersand--we'll add
-			   it back ourselves in Parameter::print. */
-			type=type->deref();
-		}
-	}
+	byReference=(type->isNamed())&&(arrLen==NULL)&&(val==NULL);
 }
 
 void ParamList::print(XStr &str,int withDefaultValues)

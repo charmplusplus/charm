@@ -13,21 +13,18 @@
 #include "CList.h"
 #include "CStateVar.h"
 
-class SdagConstruct;
-class ParamList;
+class CParseNode;
 
 class CEntry{
   public:
     XStr *entry;
-    //CParseNode *paramlist;
-    ParamList *paramlist;
+    CParseNode *paramlist;
     int entryNum;
     int needsParamMarshalling;
     int refNumNeeded;
     TList<CStateVar*> *myParameters;
-    //TList<CParseNode*> whenList;
-    TList<SdagConstruct*> whenList;
-    CEntry(XStr *e, ParamList *p, TList<CStateVar*>& list, int pm) : entry(e), paramlist(p), needsParamMarshalling(pm) {
+    TList<CParseNode*> whenList;
+    CEntry(XStr *e, CParseNode *p, TList<CStateVar*>& list, int pm) : entry(e), paramlist(p), needsParamMarshalling(pm) {
        myParameters = new TList<CStateVar*>();
        CStateVar *sv;
        for(sv=list.begin(); !list.end(); sv=list.next()) {

@@ -6,10 +6,11 @@
  *****************************************************************************/
 
 #include "CEntry.h"
-#include "xi-symbol.h"
+#include "CParseNode.h"
+
 void CEntry::generateDeps(XStr& op)
 {
-  SdagConstruct *cn;
+  CParseNode *cn;
   for(cn=whenList.begin(); !whenList.end(); cn=whenList.next()) {
     op << "    __cDep->addDepends("<<cn->nodeNum<<","<<entryNum<<");\n";
   }
@@ -17,7 +18,7 @@ void CEntry::generateDeps(XStr& op)
 
 void CEntry::generateCode(XStr& op)
 {
-  SdagConstruct *cn;
+  CParseNode *cn;
   CStateVar *sv;
   int i;
   int isVoid = 1;
@@ -30,22 +31,24 @@ void CEntry::generateCode(XStr& op)
     if ((sv->isMsg != 1) && (sv->isVoid != 1)) {
        if (i >0)
          op <<", ";
-       op << sv->type->charstar() << " ";
+       if (sv->isconst != 0)
+          op <<sv->isconst->charstar();
+       op << sv->type1->charstar() << " ";
+       if (sv->type2 != 0)
+          op <<sv->type2->charstar() << " ";
        if (sv->arrayLength != 0)
          op << "*";
        else if (sv->byRef != 0) {
          op <<"&";
        }
-       if (sv->numPtrs != 0) {
-         for(int k = 0; k< sv->numPtrs; k++)
-	    op<<"*";
-       }
+       if (sv->allPtrs != 0)
+         op <<sv->allPtrs->charstar();
        if (sv->name != 0)
          op << sv->name->charstar();
     }
     else if (sv->isVoid != 1){
       if (i < 1) 
-         op << sv->type->charstar() <<" *"<<sv->name->charstar() <<"_msg";
+         op << sv->type1->charstar() <<" *"<<sv->name->charstar() <<"_msg";
       else
          printf("ERROR: A message must be the only parameter in an entry function\n");
     }
@@ -75,8 +78,8 @@ void CEntry::generateCode(XStr& op)
 	   if (sv->numPtrs > 0)
               printf("ERROR: can't pass pointers across processors \n -- Indicate the array length with []'s, or pass a reference\n");
            op <<"    int impl_off_"<<sv->name->charstar()<<", impl_cnt_"<<sv->name->charstar()<<";\n";
-           op <<"    impl_off_"<<sv->name->charstar()<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<sv->type->charstar()<<"));\n";
-           op <<"    impl_off+=(impl_cnt_"<<sv->name->charstar()<<"=sizeof("<<sv->type->charstar()<<")*("<<sv->arrayLength->charstar()<<"));\n";
+           op <<"    impl_off_"<<sv->name->charstar()<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<sv->type1->charstar()<<"));\n";
+           op <<"    impl_off+=(impl_cnt_"<<sv->name->charstar()<<"=sizeof("<<sv->type1->charstar()<<")*("<<sv->arrayLength->charstar()<<"));\n";
         }
         if (paramMarshalling ==0) {
            if(refNumNeeded) {
@@ -101,7 +104,7 @@ void CEntry::generateCode(XStr& op)
         if(sv->arrayLength != 0)
            op <<"      implP1|impl_off_"<<sv->name->charstar()<<";\n";
         else if(sv->byRef != 0)
-	   op <<"      implP1|(" <<sv->type->charstar() <<" &)" <<sv->name->charstar() <<";\n";
+	   op <<"      implP1|(" <<sv->type1->charstar() <<" &)" <<sv->name->charstar() <<";\n";
 	else   
 	   op <<"      implP1|"<<sv->name->charstar()<<";\n";
      }
@@ -128,7 +131,7 @@ void CEntry::generateCode(XStr& op)
         if(sv->arrayLength != 0)
            op <<"      implP1|impl_off_"<<sv->name->charstar()<<";\n";
         else if(sv->byRef != 0)
-           op <<"      implP1|(" <<sv->type->charstar() <<" &)" <<sv->name->charstar() <<";\n";
+           op <<"      implP1|(" <<sv->type1->charstar() <<" &)" <<sv->name->charstar() <<";\n";
         else   
 	   op <<"      implP1|"<<sv->name->charstar()<<";\n";
      }
@@ -169,6 +172,21 @@ void CEntry::generateCode(XStr& op)
     sv = (CStateVar *)cn->stateVars->begin();
     i = 0; iArgs = 0;
     lastWasVoid = 0;
+    /*for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
+       if (sv->isMsg == 1) {
+          if((i!=0) && (lastWasVoid == 0))
+	     whenParams->append(", ");
+          whenParams->append("(");
+	  whenParams->append(sv->type1->charstar());
+	  whenParams->append(" *) tr->args[");
+	  *whenParams<<iArgs;
+	  whenParams->append("]");
+	  iArgs++;
+       }
+       else if (sv->isVoid == 1) 
+           op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
+       lastWasVoid = sv->isVoid;
+    }*/
     sv = (CStateVar *)cn->stateVars->begin();
     i = 0;
     paramMarshalling = 0;
@@ -185,7 +203,7 @@ void CEntry::generateCode(XStr& op)
           if((i!=0) && (lastWasVoid == 0))
 	     whenParams->append(", ");
           whenParams->append("(");
-	  whenParams->append(sv->type->charstar());
+	  whenParams->append(sv->type1->charstar());
 	  whenParams->append(" *) tr->args[");
 	  *whenParams<<iArgs;
 	  whenParams->append("]");
@@ -200,7 +218,7 @@ void CEntry::generateCode(XStr& op)
           if (sv->arrayLength != 0) 
              op<<"    int impl_off_"<<sv->name->charstar()<<"; implP|impl_off_"<<sv->name->charstar()<<";\n";
           else
-             op<<"    "<<sv->type->charstar()<<" "<<sv->name->charstar()<<"; implP|"<<sv->name->charstar()<<";\n";
+             op<<"    "<<sv->type1->charstar()<<" "<<sv->name->charstar()<<"; implP|"<<sv->name->charstar()<<";\n";
        }
        lastWasVoid = sv->isVoid;
       
@@ -211,7 +229,7 @@ void CEntry::generateCode(XStr& op)
     sv = (CStateVar *)cn->stateVars->begin();
     for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
        if (sv->arrayLength != 0) 
-          op<<"    "<<sv->type->charstar()<<" *"<<sv->name->charstar()<<"=("<<sv->type->charstar()<<" *)(impl_buf+impl_off_"<<sv->name->charstar()<<");\n";
+          op<<"    "<<sv->type1->charstar()<<" *"<<sv->name->charstar()<<"=("<<sv->type1->charstar()<<" *)(impl_buf+impl_off_"<<sv->name->charstar()<<");\n";
     }
     if (paramMarshalling == 1) 
        op << "    delete (CkMarshallMsg *)impl_msg;\n";
@@ -244,7 +262,7 @@ void CEntry::generateCode(XStr& op)
             if((i!=0) && (lastWasVoid == 0))
 	       whenParams->append(", ");
             whenParams->append("(");
-	    whenParams->append(sv->type->charstar());
+	    whenParams->append(sv->type1->charstar());
 	    whenParams->append(" *) tr->args[");
 	    *whenParams<<iArgs;
 	    whenParams->append("]");
@@ -260,7 +278,7 @@ void CEntry::generateCode(XStr& op)
                op<<"        int impl_off"<<cn->nodeNum <<"_"<<sv->name->charstar()<<"; implP"
                  <<cn->nodeNum <<"|impl_off" <<cn->nodeNum <<"_"<<sv->name->charstar()<<";\n";
             else
-               op<<"        "<<sv->type->charstar()<<" "<<sv->name->charstar()<<"; implP"
+               op<<"        "<<sv->type1->charstar()<<" "<<sv->name->charstar()<<"; implP"
                  <<cn->nodeNum <<"|"<<sv->name->charstar()<<";\n";
          }
          lastWasVoid = sv->isVoid;
@@ -271,7 +289,7 @@ void CEntry::generateCode(XStr& op)
       sv = (CStateVar *)cn->stateVars->begin();
       for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
          if (sv->arrayLength != 0) 
-            op<<"        "<<sv->type->charstar()<<" *"<<sv->name->charstar()<<"=("<<sv->type->charstar()<<" *)(impl_buf" <<cn->nodeNum
+            op<<"        "<<sv->type1->charstar()<<" *"<<sv->name->charstar()<<"=("<<sv->type1->charstar()<<" *)(impl_buf" <<cn->nodeNum
               <<"+impl_off" <<cn->nodeNum <<"_"<<sv->name->charstar()<<");\n";
       }
       if (paramMarshalling == 1) 

@@ -16,13 +16,7 @@
 //  using std::map;//<-- may cause problems for pre-ISO C++ compilers
 
 #include "xi-util.h"
-#include "EToken.h"
-#include "CEntry.h"
-#include "sdag-globals.h"
-#include "CList.h"
-#include <stdio.h>
-#include "CStateVar.h"
-#include "xiParsedFile.h"
+
 
 /******************* Utilities ****************/
 
@@ -108,10 +102,8 @@ class Type : public Printable {
     virtual int isNamed(void) const { return 0; }
     virtual int isCkArgMsgPtr(void) const {return 0;}
     virtual int isCkArgMsg(void) const {return 0;}
-    virtual int isReference(void) const {return 0;}
     virtual Type *deref(void) {return this;}
-    virtual char *getBaseName(void) = 0;
-    virtual int getNumStars(void) const {return 0;}
+    virtual const char *getBaseName(void) = 0;
     virtual void genProxyName(XStr &str,forWhom forElement);
     virtual void genIndexName(XStr &str);
     virtual void genMsgProxyName(XStr& str);
@@ -126,27 +118,27 @@ class Type : public Printable {
 
 class BuiltinType : public Type {
   private:
-    char *name;
+    const char *name;
   public:
-    BuiltinType(char *n) : name(n) {}
+    BuiltinType(const char *n) : name(n) {}
     int isBuiltin(void) const {return 1;}
     void print(XStr& str) { str << name; }
     int isVoid(void) const { return !strcmp(name, "void"); }
-    char *getBaseName(void) { return name; }
+    const char *getBaseName(void) { return name; }
 };
 
 class NamedType : public Type {
   private:
-    char *name;
+    const char *name;
     TParamList *tparams;
   public:
-    NamedType(char* n, TParamList* t=0)
+    NamedType(const char* n, TParamList* t=0)
        : name(n), tparams(t) {}
     int isTemplated(void) const { return (tparams!=0); }
     int isCkArgMsg(void) const {return 0==strcmp(name,"CkArgMsg");}
     void print(XStr& str);
     int isNamed(void) const {return 1;}
-    char *getBaseName(void) { return name; }
+    const char *getBaseName(void) { return name; }
     virtual void genProxyName(XStr& str,forWhom forElement);
     virtual void genIndexName(XStr& str) 
     { 
@@ -169,9 +161,8 @@ class PtrType : public Type {
     int isCkArgMsgPtr(void) const {return numstars==1 && type->isCkArgMsg();}
     int isMessage(void) const {return numstars==1 && !type->isBuiltin();}
     void indirect(void) { numstars++; }
-    int getNumStars(void) {return numstars; }
     void print(XStr& str);
-    char *getBaseName(void) { return type->getBaseName(); }
+    const char *getBaseName(void) { return type->getBaseName(); }
     virtual void genMsgProxyName(XStr& str) { 
       if(numstars != 1) {
         die("too many stars-- entry parameter must have form 'MTYPE *msg'"); 
@@ -182,7 +173,7 @@ class PtrType : public Type {
     }
 };
 
-/* I don't think these are useful any longer (OSL 11/30/2001) */
+/* I don't think these are useful any longer (OSL 11/30/2001)
 class ReferenceType : public Type {
   private:
     Type *referant;
@@ -191,9 +182,9 @@ class ReferenceType : public Type {
     int isReference(void) const {return 1;}
     void print(XStr& str) {str<<referant<<" &";}
     virtual Type *deref(void) {return referant;}
-    char *getBaseName(void) { return referant->getBaseName(); }
+    const char *getBaseName(void) { return referant->getBaseName(); }
 };
-/* I don't think these are useful any longer (OSL 11/30/2001)
+
 class ConstType : public Type {
   private:
     Type *type;
@@ -201,9 +192,10 @@ class ConstType : public Type {
     ConstType(Type *t) : type(t) {}
     int isConst(void) const {return 1;}
     void print(XStr& str) {str<<"const "<<type;}
-    char *getBaseName(void) { return type->getBaseName(); }
+    const char *getBaseName(void) { return type->getBaseName(); }
 };
 */
+
 //This is used as a list of base classes
 class TypeList : public Printable {
     Type *type;
@@ -245,9 +237,23 @@ class Parameter {
     int isCkArgMsgPtr(void) const {return type->isCkArgMsgPtr();}
     int isArray(void) const {return arrLen!=NULL;}
     Type *getType(void) {return type;}
-    const char *getArrayLen(void) const {return arrLen;}
-    const char *getGivenName(void) const {return given_name;}
     const char *getName(void) const {return name;}
+    void printSdagParam(XStr& str) {
+      if (type != NULL) {
+         type->print(str);
+      }
+      if(given_name!=0) {
+        str <<" " << given_name;
+      }
+      if (byReference !=0)
+         str <<" &";
+      if (arrLen != NULL) 
+        str <<"[" <<arrLen <<"]";
+      if (val != NULL) {
+        str <<" = ";
+        val->print(str);
+      }
+    }
     void printMsg(XStr& str) {
       type->print(str);
       if(given_name!=0)
@@ -255,44 +261,50 @@ class Parameter {
     }
 };
 class ParamList {
+    Parameter *param;
+    ParamList *next;
     typedef int (Parameter::*pred_t)(void) const;
     int orEach(pred_t f);
     typedef void (Parameter::*fn_t)(XStr &str);
     void callEach(fn_t f,XStr &str);
   public:
-    Parameter *param;
-    ParamList *next;
-    ParamList(ParamList *pl) :param(pl->param), next(pl->next) {}
     ParamList(Parameter *Nparam,ParamList *Nnext=NULL)
     	:param(Nparam), next(Nnext) {}
     void print(XStr &str,int withDefaultValues=0);
     void printAddress(XStr &str);
     void printValue(XStr &str);
-    int isNamed(void) const {return param->type->isNamed();}
-    int isBuiltin(void) const {return param->type->isBuiltin();}
     int isMessage(void) const {
     	return (next==NULL) && param->isMessage();
     }
-    const char *getArrayLen(void) const {return param->getArrayLen();}
-    int isArray(void) const {return param->isArray();}
-    int isReference(void) const {return param->type->isReference();}
     int isVoid(void) const {
     	return (next==NULL) && param->isVoid();
     }
-    int isPointer(void) const {return param->type->isPointer();}
-    const char *getGivenName(void) const {return param->getGivenName();}
     int isMarshalled(void) const {
     	return !isVoid() && !isMessage();
     }
     int isCkArgMsgPtr(void) const {
         return (next==NULL) && param->isCkArgMsgPtr();
     }
-    int getNumStars(void) const {return param->type->getNumStars(); }
-    char *getBaseName(void) {
+    const char *getBaseName(void) {
     	return param->type->getBaseName();
     }
     void genMsgProxyName(XStr &str) {
     	param->type->genMsgProxyName(str);
+    }
+    void printSdagParam(XStr& str) {
+        ParamList *pl;
+        if (param != NULL) {
+          param->printSdagParam(str);
+        }
+        if (next != NULL) {
+          pl = next;
+          while (pl != NULL)
+          {
+             str <<", ";
+             pl->param->printSdagParam(str);
+             pl = pl->next;
+          }
+        } 
     }
     void printMsg(XStr& str) {
         ParamList *pl;
@@ -315,10 +327,10 @@ class ParamList {
 class FuncType : public Type {
   private:
     Type *rtype;
-    char *name;
+    const char *name;
     ParamList *params;
   public:
-    FuncType(Type* r, char* n, ParamList* p) 
+    FuncType(Type* r, const char* n, ParamList* p) 
     	:rtype(r),name(n),params(p) {}
     void print(XStr& str) { 
       rtype->print(str);
@@ -326,7 +338,7 @@ class FuncType : public Type {
       if(params)
         params->print(str);
     }
-    char *getBaseName(void) { return name; }
+    const char *getBaseName(void) { return name; }
 };
 
 /****************** Template Support **************/
@@ -454,20 +466,18 @@ class TVarList : public Printable {
 
 /* Member of a chare or group, i.e. entry, RO or ROM */
 class Member : public Construct {
-   //friend class xiParsedFile;
   protected:
     Chare *container;
   public:
     virtual void setChare(Chare *c) { container = c; }
     virtual int isSdag(void) { return 0; }
-    virtual void collectSdagCode(xiParsedFile *pf, int& sdagPresent) { return; }
+    virtual void collectSdagCode(XStr& str, int& sdagPresent) { return; }
     XStr makeDecl(const XStr &returnType,int forProxy=0);
     virtual void genIndexDecls(XStr& str)=0;
 };
 
 /* List of members of a chare or group */
 class MemberList : public Printable {
-    //friend class xiParsedFile;
     Member *member;
     MemberList *next;
   public:
@@ -478,7 +488,7 @@ class MemberList : public Printable {
     void genIndexDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
-    void collectSdagCode(xiParsedFile *pf, int& sdagPresent);
+    void collectSdagCode(XStr& str, int& sdagPresent);
 };
 
 /* Chare or group is a templated entity */
@@ -628,10 +638,6 @@ class Message : public TEntity {
     int numVars(void) { return ((mvlist==0) ? 0 : mvlist->len()); }
 };
 
-
-
-
-
 /******************* Entry Point ****************/
 // Entry attributes
 #define STHREADED 0x01
@@ -650,12 +656,14 @@ class Entry : public Member {
     int line,entryCount;
     int attribs;    
     Type *retType;
+    char *name;
+    ParamList *param;
     Value *stacksize;
+    XStr *sdagCode;
     
     XStr proxyName(void) {return container->proxyName();}
     XStr indexName(void) {return container->indexName();}
 
-//    friend class xiParsedFile;
     int hasCallMarshall;
     void genCall(XStr &dest,const XStr &preCall);
 
@@ -687,18 +695,8 @@ class Entry : public Member {
     XStr marshallMsg(void);
     XStr callThread(const XStr &procName,int prependEntryName=0);
   public:
-    SdagConstruct *sdagCon;
-    TList<CStateVar *> *stateVars;
-    TList<CStateVar *> *stateVarsChildren;
-    TList<CStateVar *> estateVars;
-    CEntry *entryPtr;
-    XStr *label;
-    char *name;
-    char *intExpr;
-    ParamList *param;
-    Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, char *e=0);
+    Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz=0);
     void setChare(Chare *c);
-    int paramIsMarshalled(void) { return param->isMarshalled(); }
     int getStackSize(void) { return (stacksize ? stacksize->getIntVal() : 0); }
     int isThreaded(void) { return (attribs & STHREADED); }
     int isSync(void) { return (attribs & SSYNC); }
@@ -708,26 +706,32 @@ class Entry : public Member {
     int isCreate(void) { return (attribs & SCREATEHERE)||(attribs & SCREATEHOME); }
     int isCreateHome(void) { return (attribs & SCREATEHOME); }
     int isCreateHere(void) { return (attribs & SCREATEHERE); }
-    int isSdag(void) { return (sdagCon!=0); }
+    int isSdag(void) { return (sdagCode!=0); }
     void print(XStr& str);
     void genIndexDecls(XStr& str);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
-    char *getEntryName() { return name; }
-    void generateEntryList(TList<CEntry*>&, SdagConstruct *);
-    void collectSdagCode(xiParsedFile *pf, int& sdagPresent);
-    void propagateState(int);
+    void setSdagCode(char *str) {
+      if(str!=0) {
+        sdagCode = new XStr("sdagentry ");
+	*sdagCode << name << "(";
+        if (param != NULL)
+          param->printSdagParam(*sdagCode);
+        //param->printMsg(*sdagCode);
+        *sdagCode << ") ";
+        *sdagCode << "{\n" << str << "\n}\n";
+      }
+    }
+    void collectSdagCode(XStr& str, int& sdagPresent) {
+       if(isSdag()) {
+         str << *sdagCode;
+         sdagPresent = 1;
+       }
+    }
 };
 
-class EntryList {
-  public:
-    Entry *entry;
-    EntryList *next;
-    EntryList(Entry *e,EntryList *elist=NULL):
-    	entry(e), next(elist) {}
-    void generateEntryList(TList<CEntry*>&, SdagConstruct *);
-};
+
 /****************** Modules, etc. ****************/
 class Module : public Construct {
     int _isMain;
@@ -800,63 +804,6 @@ public:
     void genIndexDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
-};
-
-
-/******************* Structured Dagger Constructs ***************/
-class SdagConstruct { 
-private:
-  void generateWhen(XStr& op);
-  void generateOverlap(XStr& op);
-  void generateWhile(XStr& op);
-  void generateFor(XStr& op);
-  void generateIf(XStr& op);
-  void generateElse(XStr& op);
-  void generateForall(XStr& op);
-  void generateOlist(XStr& op);
-  void generateSdagEntry(XStr& op);
-  void generateSlist(XStr& op);
-  void generateAtomic(XStr& op);
-  void generateForward(XStr& op);
-  void generatePrototype(XStr& op, TList<CStateVar*>&);
-  void generateCall(XStr& op, TList<CStateVar*>&);
-public:
-  int nodeNum;
-  XStr *label;
-  XStr *counter;
-  EToken type;
-  TList<SdagConstruct *> *constructs;
-  TList<CStateVar *> *stateVars;
-  TList<CStateVar *> *stateVarsChildren;
-  SdagConstruct *next;
-  ParamList *param;
-  XStr *text;
-  int nextBeginOrEnd;
-  EntryList *elist;
-  SdagConstruct *con1, *con2, *con3, *con4;
-  SdagConstruct(EToken t, SdagConstruct *construct1);
-
-  SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct *aList);
-
-  SdagConstruct(EToken t, SdagConstruct *c1, SdagConstruct *c2, SdagConstruct *c3,
-              SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el);
-
-  SdagConstruct(EToken t, const char *str) : type(t), con1(0), con2(0), con3(0), con4(0)
-		{ text = new XStr(str); constructs = new TList<SdagConstruct*>();}
-                                             
- 
-  SdagConstruct(EToken t) : type(t), con1(0), con2(0), con3(0), con4(0) 
-		{constructs = new TList<SdagConstruct*>(); }
-
-  SdagConstruct(EToken t, XStr *txt) : type(t), text(txt), con1(0), con2(0), con3(0), con4(0) 
-                { constructs = new TList<SdagConstruct*>(); }
-  void numberNodes(void);
-  void labelNodes(void);
-  void generateEntryList(TList<CEntry*>&, SdagConstruct *);
-  void propagateState(int);
-  void propagateState(TList<CStateVar*>&, TList<CStateVar*>&, int);
-  void generateCode(XStr& output);
-  void setNext(SdagConstruct *, int);
 };
 
 #endif
