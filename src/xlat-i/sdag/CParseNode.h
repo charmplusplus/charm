@@ -37,7 +37,6 @@ class CParseNode {
     TList<CStateVar*> estateVars;
     TList<CStateVar*> *stateVars;
     TList<CStateVar*> *stateVarsChildren;
-    TList<CStateVar*> *allstateVars;
     CParseNode *next;
     int nextBeginOrEnd;
     CEntry *entryPtr;
@@ -52,7 +51,7 @@ class CParseNode {
     void generateCode(XStr& output);
     void setNext(CParseNode *, int);
   private:
-    TList<CStateVar*> propagateState(TList<CStateVar*>&, TList<CStateVar*>&, int);
+    void propagateState(TList<CStateVar*>&, TList<CStateVar*>&, int);
     void generateWhen(XStr& op);
     void generateOverlap(XStr& op);
     void generateWhile(XStr& op);

@@ -204,19 +204,16 @@ void CParseNode::generateEntryList(TList<CEntry*>& elist, TList<COverlap*>& olis
 
 void CParseNode::propagateState(int uniqueVarNum)
 { 
-  TList<CStateVar*> returnStateVars;
   int count = 0;
   int isMsg = 0;
   int isVoidParameter = 0;
   int numParameters = 0;
   needsParamMarshalling = 0;
   CStateVar *sv; 
-  CStateVar *sv1; 
   if(type != SDAGENTRY) {
     fprintf(stderr, "use of non-entry as the outermost construct..\n");
     exit(1);
   }
-  allstateVars = new TList<CStateVar*>();
   stateVars = new TList<CStateVar*>();
 
   CParseNode *parameter1;
@@ -275,18 +272,10 @@ void CParseNode::propagateState(int uniqueVarNum)
 	       uniqueVarNum++;
                sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, name, byRef, 0, isMsg);
 	   }
-	   else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) {   // Type Name
-	       //name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
-	       //uniqueVarNum++;
-               //sv = new CStateVar(constStr, 0,vType1, vType2, 0, 0, name ,byRef,0, isMsg);
+	   else if ((parameter1->con2 != 0) && (parameter1->con3 == 0))    // Type Name
                sv = new CStateVar(constStr, 0,vType1, vType2, 0, 0, new XStr(*(parameter1->con2->text)),byRef,0, isMsg);
-	   }
-	   else if ((parameter1->con2 != 0) && (parameter1->con3 != 0)) {  // Type Name [ArrayLength]
-	       //name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
-	       //uniqueVarNum++;
-	       //sv = new CStateVar(constStr, 0,vType1, vType2, 0, 0, name, byRef,new XStr(*(parameter1->con3->text)), isMsg);
+	   else if ((parameter1->con2 != 0) && (parameter1->con3 != 0))   // Type Name [ArrayLength]
 	       sv = new CStateVar(constStr, 0,vType1, vType2, 0, 0, new XStr(*(parameter1->con2->text)), byRef,new XStr(*(parameter1->con3->text)), isMsg);
-           }
 	   stateVars->append(sv);
         }
         else if (vartype1->con3->type == PTRTYPE) {
@@ -314,18 +303,10 @@ void CParseNode::propagateState(int uniqueVarNum)
 	      uniqueVarNum++;
               sv = new CStateVar(constStr, 0, vType1, vType2, pt, vartype1->con3->numPtrs, name,byRef, 0, isMsg);
 	   }
-	   else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) {
-	      //name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
-	      //uniqueVarNum++;
-              //sv = new CStateVar(constStr,0, vType1, vType2, pt, vartype1->con3->numPtrs, name, byRef, 0, isMsg);
+	   else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) 
               sv = new CStateVar(constStr,0, vType1, vType2, pt, vartype1->con3->numPtrs, new XStr(*(parameter1->con2->text)), byRef, 0, isMsg);
-	   }
-	   else if ((parameter1->con2 != 0) && (parameter1->con3 != 0)) {
-	      //name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
-	      //uniqueVarNum++;
-              //sv = new CStateVar(constStr, 0, vType1, vType2, pt, vartype1->con3->numPtrs, name, byRef, new XStr(*(parameter1->con3->text)), isMsg);
+	   else if ((parameter1->con2 != 0) && (parameter1->con3 != 0)) 
               sv = new CStateVar(constStr, 0, vType1, vType2, pt, vartype1->con3->numPtrs, new XStr(*(parameter1->con2->text)), byRef, new XStr(*(parameter1->con3->text)), isMsg);
-	   }
            stateVars->append(sv);
         }
         if (byRef != 0) {
@@ -336,55 +317,33 @@ void CParseNode::propagateState(int uniqueVarNum)
 
   } 
   stateVarsChildren = stateVars; 
-  for(sv=stateVars->begin(); !stateVars->end(); sv=stateVars->next())
-     allstateVars->append(sv);
   CParseNode *cn;
   TList<CStateVar*> *whensEntryMethodStateVars; 
   whensEntryMethodStateVars = new TList<CStateVar*>();
-  int c1, c2;
   if (constructs != 0) {
     for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      returnStateVars = cn->propagateState(*allstateVars, *whensEntryMethodStateVars , uniqueVarNum);
-      c1=0; c2=0;
-      for (sv=allstateVars->begin(); !allstateVars->end(); sv=allstateVars->next()) { c1++; }
-      for (sv=returnStateVars.begin(); !returnStateVars.end(); sv=returnStateVars.next()) { c2++; }
-      if (c2 != 0)
-        sv = returnStateVars.begin();
-      for(int i=2; i<=c1; i++) {
-        sv = returnStateVars.next();
-      }
-      for(int j=1; j<=c2-c1; j++) {
-         sv = returnStateVars.next();
-         allstateVars->append(sv);
-      }
+      cn->propagateState(*stateVarsChildren, *whensEntryMethodStateVars , uniqueVarNum);
     }
   }
 
 }
 
-TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& elist, int uniqueVarNum)
+void CParseNode::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& wlist, int uniqueVarNum)
 {
   CStateVar *sv;
-  CStateVar *sv1;
-  int c1;
-  int c2;
-  int i, j;
+  int i;
   TList <CStateVar*> *olistTempStateVars;
   TList<CStateVar*> *whensEntryMethodStateVars; 
-  TList<CStateVar*> returnStateVars;
   olistTempStateVars = new TList<CStateVar*>();
-  allstateVars = new TList<CStateVar*>();
   stateVars = new TList<CStateVar*>();
   switch(type) {
     case FORALL:
       stateVarsChildren = new TList<CStateVar*>();
       for(sv=list.begin(); !list.end(); sv=list.next()) {
         stateVars->append(sv);
-        allstateVars->append(sv);
         stateVarsChildren->append(sv);
       }
       sv = new CStateVar(0,0, new XStr("int"), 0, 0, 0, new XStr(*(con1->text)), 0,0, 0);
-      //allstateVars->append(sv);
       stateVarsChildren->append(sv);
       {
         char txt[128];
@@ -392,7 +351,6 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, TList<CSta
         counter = new XStr(txt);
         XStr *ptrs = new XStr("*");
         sv = new CStateVar(0, 0, new XStr("CCounter" ), 0, ptrs, 1, counter,0,0, 1);
-        allstateVars->append(sv);
         stateVarsChildren->append(sv);
       }
       break;
@@ -419,12 +377,10 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, TList<CSta
 	 else if (sv->isVoid != 1)
 	    stateVars->append(sv);
 	 if ((sv->isVoid == 1) && (stateVarsChildrenHasVoid != 1)) {
-	    allstateVars->append(sv);
 	    stateVarsChildren->append(sv);
 	    stateVarsChildrenHasVoid == 1;
 	 }
 	 else if (sv->isVoid != 1) {
-	    allstateVars->append(sv);
 	    stateVarsChildren->append(sv);
 	 }
       }
@@ -449,7 +405,6 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, TList<CSta
                sv = new CStateVar(0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
 	       if (stateVarsChildrenHasVoid != 1) {
                   stateVarsChildren->append(sv);
-                  allstateVars->append(sv);
 	       }
  	       entry1->stateVars->append(sv);
                whensEntryMethodStateVars->append(sv); 
@@ -502,19 +457,10 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, TList<CSta
 	                uniqueVarNum++;
                         sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, name, byRef, 0, isMsg);
 		     }
-	             else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) {
-	                //name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
-	                //uniqueVarNum++;
-                        //sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, name ,byRef,0, isMsg);
+	             else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) 
                         sv = new CStateVar(constStr, 0, vType1, vType2, 0, 0, new XStr(*(parameter1->con2->text)),byRef,0, isMsg);
-		     }
-		     else if ((parameter1->con2 != 0) && (parameter1->con3 != 0)) {
-	                //name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
-	                //uniqueVarNum++;
-                        //sv = new CStateVar(constStr, 0, vType1, vType2, 0,0 , name, byRef,new XStr(*(parameter1->con3->text)), isMsg);
+		     else if ((parameter1->con2 != 0) && (parameter1->con3 != 0)) 
                         sv = new CStateVar(constStr, 0, vType1, vType2, 0,0 , new XStr(*(parameter1->con2->text)), byRef,new XStr(*(parameter1->con3->text)), isMsg);
-		     }
-                     allstateVars->append(sv);
                      stateVarsChildren->append(sv);
                      whensEntryMethodStateVars->append(sv); 
  		     entry1->estateVars.append(sv);
@@ -544,20 +490,14 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, TList<CSta
 	                uniqueVarNum++;
                         sv = new CStateVar(constStr, 0,  vType1, vType2, pt, type1->con3->numPtrs, name,byRef, 0, isMsg);
 		     }
-	             else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) {
-	                //name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
-	                //uniqueVarNum++;
-                        //sv = new CStateVar(constStr, 0, vType1, vType2, pt, type1->con3->numPtrs, name ,byRef,0, isMsg);
-                        sv = new CStateVar(constStr, 0, vType1, vType2, pt, type1->con3->numPtrs, new XStr(*(parameter1->con2->text)),byRef,0, isMsg);
-		     }
-		     else if ((parameter1->con2 != 0) && (parameter1->con3 != 0)) { 
-	               // name = new XStr(parameter1->con2->text->charstar()); name->append("_"); *name<<uniqueVarNum;
-	               // uniqueVarNum++;
-                        //sv = new CStateVar(constStr, 0, vType1, vType2, pt, type1->con3->numPtrs, name , byRef, new XStr(*(parameter1->con3->text)), isMsg);
-                        sv = new CStateVar(constStr, 0, vType1, vType2, pt, type1->con3->numPtrs, new XStr(*(parameter1->con2->text)), byRef, new XStr(*(parameter1->con3->text)), isMsg);
-		     }
+	             else if ((parameter1->con2 != 0) && (parameter1->con3 == 0)) 
+                        sv = new CStateVar(constStr, 0, vType1, vType2, pt, type1->con3->numPtrs, 
+                                           new XStr(*(parameter1->con2->text)),byRef,0, isMsg);
+		     else if ((parameter1->con2 != 0) && (parameter1->con3 != 0))  
+                        sv = new CStateVar(constStr, 0, vType1, vType2, pt, type1->con3->numPtrs, 
+                                           new XStr(*(parameter1->con2->text)), byRef, 
+                                           new XStr(*(parameter1->con3->text)), isMsg);
                      stateVarsChildren->append(sv);
-                     allstateVars->append(sv);
  	             entry1->stateVars->append(sv);
                      whensEntryMethodStateVars->append(sv); 
        	             entry1->estateVars.append(sv);
@@ -579,15 +519,12 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, TList<CSta
         stateVars->append(sv);
       }
       stateVarsChildren = stateVars;
-      for(sv=stateVars->begin(); !stateVars->end(); sv=stateVars->next())
-         allstateVars->append(sv);
-      if(con2 != 0) con2->propagateState(list, elist, uniqueVarNum);
+      if(con2 != 0) con2->propagateState(list, wlist, uniqueVarNum);
       break;
     case OLIST:
       stateVarsChildren = new TList<CStateVar*>();
       for(sv=list.begin(); !list.end(); sv=list.next()) {
         stateVars->append(sv);
-        allstateVars->append(sv);
         stateVarsChildren->append(sv);
       }
       {
@@ -596,7 +533,6 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, TList<CSta
         counter = new XStr(txt);
 	XStr *ptrs = new XStr("*");
         sv = new CStateVar(0,0, new XStr("CCounter"), 0, ptrs, 1, counter,0, 0, 1);
-        allstateVars->append(sv);
         stateVarsChildren->append(sv);
       }
       break;
@@ -608,7 +544,6 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, TList<CSta
     case ATOMIC:
       for(sv=list.begin(); !list.end(); sv=list.next()) {
         stateVars->append(sv);
-        allstateVars->append(sv);
       }
       stateVarsChildren = stateVars;
       break;
@@ -616,9 +551,8 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, TList<CSta
       stateVarsChildren = new TList<CStateVar*>();
       for(sv=list.begin(); !list.end(); sv=list.next()) { 
         stateVars->append(sv);
-        allstateVars->append(sv);
       }
-      for(sv=elist.begin(); !elist.end(); sv=elist.next()) { 
+      for(sv=wlist.begin(); !wlist.end(); sv=wlist.next()) { 
         stateVarsChildren->append(sv);
       }
 
@@ -634,102 +568,14 @@ TList<CStateVar*> CParseNode::propagateState(TList<CStateVar*>& list, TList<CSta
       break;
   }
   CParseNode *cn;
-  c1 = 0;
-  c2 = 0;
   if (constructs != 0) {
     for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      if (type == FORALL)
-         returnStateVars = cn->propagateState(*stateVarsChildren, elist,  uniqueVarNum);
-      else if (type == WHEN)
-         returnStateVars = cn->propagateState(*allstateVars, *whensEntryMethodStateVars,  uniqueVarNum);
+      if (type == WHEN)
+         cn->propagateState(*stateVarsChildren, *whensEntryMethodStateVars,  uniqueVarNum);
       else
-         returnStateVars = cn->propagateState(*allstateVars, elist,  uniqueVarNum);
-      c1=0; c2=0;
-      for (sv=returnStateVars.begin(); !returnStateVars.end(); sv=returnStateVars.next()) { c2++; }
-      for (sv=allstateVars->begin(); !allstateVars->end(); sv=allstateVars->next()) { c1++; }
-      if ((type != FOR) && (type != IF) && (type != ELSE) &&(type != FORALL) 
-          && (type != OLIST) && (type != WHILE)) {
-         if (c2 != 0) {
-           sv = returnStateVars.begin();
-           for(i=2; i<=c1; i++) {
-             sv = returnStateVars.next();
-           }
-           for(j=1; j<=c2-c1; j++) {
-              sv = returnStateVars.next();
-              allstateVars->append(sv);
-           }
-         }
-      }
-      else if (type == OLIST) {
-        int foundEnd = 0;
-        sv = returnStateVars.begin();
-        sv1 = olistTempStateVars->begin();
-        if (!returnStateVars.end() && !olistTempStateVars->end()) {
-	  while (foundEnd != 1) {
-	      if ((sv->isVoid == 1) && (sv1->isVoid ==1)) {
-                  sv = returnStateVars.next();
-	          sv1 = olistTempStateVars->next();
-	          if (returnStateVars.end() || olistTempStateVars->end()) {
-                    foundEnd = 1;
-	          }
-               }
-	       else if (sv->isVoid != sv1->isVoid ) {
-	          foundEnd = 1;
-	       }
-	       else if (*(sv->name) == *(sv1->name)) {
-                  sv = returnStateVars.next();
-	          sv1 = olistTempStateVars->next();
-	          if (returnStateVars.end() || olistTempStateVars->end()) {
-                    foundEnd = 1;
-	          }
-	       }
-	       else 
-	         foundEnd = 1;
-          }
-        }
-        for(; !returnStateVars.end(); sv=returnStateVars.next()) {
-           olistTempStateVars->append(sv);
-        } 
-      }
-
+         cn->propagateState(*stateVarsChildren, wlist,  uniqueVarNum);
     }
  } 
-  if ((type == FORALL) || (type == OLIST)) {
-     sv=allstateVars->begin();
-     i = 0;
-     while (!allstateVars->end() && (i == 0)) {
-        if (sv->isVoid != 1) {
-           if (*(sv->name) == *(counter)) {
-              allstateVars->remove(sv);
-	      i =1;
-            }
-            else
-               sv= allstateVars->next();
-	 }
-	 else
-	  sv = allstateVars->next();
-     }
-  }
-    if (type == OLIST) {
-       c2 = 0;
-       for (sv=olistTempStateVars->begin(); !olistTempStateVars->end(); sv=olistTempStateVars->next()) {
-          c2++;
-       }
-       if (c2 != 0) {
-         sv = olistTempStateVars->begin();
-         for(i=2; i<=c1; i++) {
-         sv = olistTempStateVars->next();
-         }
-         for(j=1; j<=c2-c1; j++) {
-            sv = olistTempStateVars->next();
-	    if (sv->isVoid == 1)
-               allstateVars->append(sv);
-	    else if (*(sv->name) != *(counter))
-               allstateVars->append(sv);
-         }
-       } 
-    }
-  return *allstateVars;
 }
 
 void CParseNode::generateCode(XStr& op)
@@ -961,7 +807,6 @@ void CParseNode::generateWhen(XStr& op)
 		     MAXANY);
     exit(1);
   }
-/******************* BEGIN *************************************/
   op << "       CWhenTrigger *tr;\n";
   op << "       tr = new CWhenTrigger(" << nodeNum << ", " <<
         stateVars->length() << ", " << nRefs << ", " << nAny << ");\n";
@@ -1053,127 +898,19 @@ void CParseNode::generateWhen(XStr& op)
   op << "       return 0;\n";
   op << "    }\n";
 
-
-  /********************************************** END **************************/
   // end actual code
   op << "  }\n\n";
   // end function
   op << "  void " << label->charstar() << "_end(";
-  //generatePrototype(op, *stateVarsChildren);
-  generatePrototype(op, *allstateVars);
+  generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   // actual code here 
-
- if (isOverlaped == 1) {
-  op << "    CWhenTrigger *tr;\n";
-  op << "    tr = new CWhenTrigger(" << nodeNum << ", " <<
-        stateVars->length() << ", " << nRefs << ", " << nAny << ");\n";
-  int iArgs=0;
- 
-  hasArray = 0;
-  isVoid = 0;
-  numParamsNeedingMarshalling =0;
-  paramIndex =0;
-  for(el=con1->constructs->begin(); !con1->constructs->end(); el= con1->constructs->next()) {
-    for(sv=el->estateVars.begin();!el->estateVars.end();sv=el->estateVars.next()) {
-       if (sv->isVoid == 1) {
-          isVoid = 1;
-          op <<"       tr->args[" <<iArgs++ <<"] = (size_t) CkAllocSysMsg();\n";
-       }
-       else {
-          if (sv->isMsg == 1) {
-             op << "       tr->args["<<iArgs++ <<"] = (size_t) " <<sv->name->charstar()<<";\n";
-          }
-          else 
-             numParamsNeedingMarshalling++;
-          if (numParamsNeedingMarshalling == 1) {
-             op << "       int impl_off=0;\n";
-             paramIndex = iArgs;
-             iArgs++;
-          }
-         if (sv->arrayLength !=0) {
-            hasArray++;
-            if (hasArray == 1)
-      	       op<< "       int impl_arrstart=0;\n";
-            op <<"       int impl_off_"<<sv->name->charstar()<<", impl_cnt_"<<sv->name->charstar()<<";\n";
-            op <<"       impl_off_"<<sv->name->charstar()<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<sv->type1->charstar()<<"));\n";
-            op <<"       impl_off+=(impl_cnt_"<<sv->name->charstar()<<"=sizeof("<<sv->type1->charstar()<<")*("<<sv->arrayLength->charstar()<<"));\n";
-         }
-       }
-    }
-  }
-  if (numParamsNeedingMarshalling > 0) {
-     op << "       { \n";
-     op << "         PUP::sizer implP;\n";
-     for(el=con1->constructs->begin(); !con1->constructs->end(); el= con1->constructs->next()) {
-       for(sv=el->estateVars.begin();!el->estateVars.end();sv=el->estateVars.next()) {
-          if (sv->arrayLength !=0)
-             op << "         implP|impl_off_" <<sv->name->charstar() <<";\n";
-          else if ((sv->isMsg != 1) && (sv->isVoid !=1)) 
-             op << "         implP|" <<sv->name->charstar() <<";\n";
-       }
-     }
-     if (hasArray > 0) {
-        op <<"         impl_arrstart=CK_ALIGN(implP.size(),16);\n";
-        op <<"         impl_off+=impl_arrstart;\n";
-     }
-     else {
-        op << "         impl_off+=implP.size();\n";
-     }
-     op << "       }\n";
-     op << "       CkMarshallMsg *impl_msg;\n";
-     op << "       impl_msg = CkAllocateMarshallMsg(impl_off,NULL);\n";
-     op << "       {\n";
-     op << "         PUP::toMem implP((void *)impl_msg->msgBuf);\n";
-     for(el=con1->constructs->begin(); !con1->constructs->end(); el= con1->constructs->next()) {
-       for(sv=el->estateVars.begin();!el->estateVars.end();sv=el->estateVars.next()) {
-          if (sv->arrayLength !=0)
-             op << "         implP|impl_off_" <<sv->name->charstar() <<";\n";
-          else if ((sv->isMsg != 1) && (sv->isVoid != 1))  
-             op << "         implP|" <<sv->name->charstar() <<";\n";
-       }
-     }
-     op << "       }\n";
-     if (hasArray > 0) {
-        op <<"       char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
-        for(el=con1->constructs->begin(); !con1->constructs->end(); el= con1->constructs->next()) {
-          for(sv=el->estateVars.begin();!el->estateVars.end();sv=el->estateVars.next()) {
-            if (sv->arrayLength !=0)
-               op << "       memcpy(impl_buf+impl_off_"<<sv->name->charstar()<<
-	           ","<<sv->name->charstar()<<",impl_cnt_"<<sv->name->charstar()<<");\n";
-          }
-	}
-     }
-  op << "       tr->args[" <<paramIndex <<"] = (size_t) impl_msg;\n";
-  }   
-  int iRef=0, iAny=0;
-  for(el=elist->begin(); !elist->end(); el=elist->next()) {
-    if(el->con2 == 0) {
-      op << "       tr->anyEntries[" << iAny++ << "] = " <<
-            el->entryPtr->entryNum << ";\n";
-    } else {
-      op << "       tr->entries[" << iRef << "] = " << 
-            el->entryPtr->entryNum << ";\n";
-      op << "       tr->refnums[" << iRef++ << "] = " <<
-            el->con2->text->charstar() << ";\n";
-    }
-  }
-  op << "       __cOverDep->Register(tr);\n";
-
- }
   if(nextBeginOrEnd == 1)
    op << "    " << next->label->charstar() << "(";
   else 
    op << "    " << next->label->charstar() << "_end(";
 
-
-  if (isOverlaped == 1)
-    generateCall(op, *stateVars);
-  else if ((next->type == FOR) || (next->type == FORALL) || (next->type == IF) 
-       || (next->type == ELSE) || (next->type == WHILE)) 
-     generateCall(op, *stateVars); 
-  else
-    generateCall(op, *allstateVars);
+  generateCall(op, *stateVars); 
   
   op << ");\n";
   // end actual code
@@ -1243,14 +980,12 @@ void CParseNode::generateFor(XStr& op)
   else
    op << "      " << next->label->charstar() << "_end(";
   generateCall(op, *stateVars);
-  //generateCall(op, *allstateVars);
   op << ");\n";
   op << "    }\n";
   // end actual code
   op << "  }\n";
   // inlined end function
   op << "  void " << label->charstar() << "_end(";
- // generatePrototype(op, *allstateVars);
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   // actual code here 
@@ -1266,7 +1001,6 @@ void CParseNode::generateFor(XStr& op)
   else
    op << "      " << next->label->charstar() << "_end(";
    generateCall(op, *stateVars);
- // generateCall(op, *allstateVars);
   op << ");\n";
   op << "    }\n";
   // end actual code
@@ -1301,7 +1035,6 @@ void CParseNode::generateIf(XStr& op)
   // inlined end function
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
-  //generatePrototype(op, *allstateVars);
   op << ") {\n";
   // actual code here 
   if(nextBeginOrEnd == 1)
@@ -1309,7 +1042,6 @@ void CParseNode::generateIf(XStr& op)
   else
    op << "      " << next->label->charstar() << "_end(";
   generateCall(op, *stateVars);
-  //generateCall(op, *allstateVars);
   op << ");\n";
   // end actual code
   op << "  }\n\n";
@@ -1331,7 +1063,6 @@ void CParseNode::generateElse(XStr& op)
   // inlined end function
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
-  //generatePrototype(op, *allstateVars);
   op << ") {\n";
   // actual code here 
   if(nextBeginOrEnd == 1)
@@ -1339,7 +1070,6 @@ void CParseNode::generateElse(XStr& op)
   else
    op << "      " << next->label->charstar() << "_end(";
   generateCall(op, *stateVars);
-  //generateCall(op, *allstateVars);
   op << ");\n";
   // end actual code
   op << "  }\n\n";
@@ -1415,87 +1145,12 @@ void CParseNode::generateOlist(XStr& op)
   op << "    " << counter->charstar() << "->decrement();\n";
   op << "    if (" << counter->charstar() << "->isDone()) {\n";
   op << "      delete " << counter->charstar() << ";\n";
-/******************** BEGIN pup code ****************************/
-  CParseNode *entryCN;
-  CStateVar *sv;
-  int paramMarshalling, lastWasVoid;
-  int trval; trval = 0;
-  int iArgs, i ;
-  for (cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-     if(cn->type == WHEN) {
-         for(entryCN=cn->con1->constructs->begin(); !cn->con1->constructs->end(); entryCN=cn->con1->constructs->next()) {
-            for(sv=entryCN->estateVars.begin(); !entryCN->estateVars.end(); sv=entryCN->estateVars.next()) {
-               if (sv->isMsg == 1) 
-                  op << "      "<<sv->type1->charstar()<<" *"<<sv->name->charstar()<<";\n";
-               else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
-                  if (sv->arrayLength != 0)
-                    op <<"      "<<sv->type1->charstar()<<" *"<<sv->name->charstar()<<";\n";
-                  else
-                     op<<"      "<<sv->type1->charstar()<<" "<<sv->name->charstar()<<";\n";
-               }
-	    }
-	 }
-         op << "      CWhenTrigger *tr_"<<trval<<";\n";
-         op << "      tr_"<<trval<<" = __cOverDep->getTrigger("<<nodeNum<<","<<cn->nodeNum<<");\n";
-         op << "      if (tr_"<<trval<<" != 0) {\n";
-
-         paramMarshalling =0;
-	 iArgs = 0;
-	 i = 0;
-	 
-         for(entryCN=cn->con1->constructs->begin(); !cn->con1->constructs->end(); entryCN=cn->con1->constructs->next()) {
-            for(sv=entryCN->estateVars.begin(); !entryCN->estateVars.end(); sv=entryCN->estateVars.next()) {
-               if ((sv->isMsg == 0) && (paramMarshalling == 0) && (sv->isVoid ==0)){
-                 paramMarshalling =1; 
-                 op << "        CkMarshallMsg *impl_msg_"<<trval<<" = (CkMarshallMsg *) tr_"<<trval<<"->args[" <<iArgs <<"];\n";
-                 op << "        char *impl_buf=((CkMarshallMsg *)impl_msg_"<<trval<<")->msgBuf;\n";
-                 op << "        PUP::fromMem implP(impl_buf);\n";
-                 iArgs++;
-               }
-               if ((sv->isMsg == 0) && (sv->isVoid ==0)) { i++; }
-               if (sv->isMsg == 1) {
-                  op << "        "<<sv->name->charstar()<<" = ("
-		     <<sv->type1->charstar()<<"*) tr_"<<trval<<"->args["<<iArgs<<"];\n";
-                  iArgs++;
-               }
-               else if (sv->isVoid == 1)
-                  op <<"        CkFreeSysMsg((void  *)tr_"<<trval<<"->args[" <<iArgs++ <<"]);\n";
-               else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
-                  if (sv->arrayLength != 0)
-                    op<<"        int impl_off_"<<sv->name->charstar()<<"; implP|impl_off_"<<sv->name->charstar()<<";\n";
-                  else
-                     op<<"        implP|"<<sv->name->charstar()<<";\n";
-               }
-	    }
-            if (i == 1)
-               op<<"         impl_buf+=CK_ALIGN(implP.size(),16);\n";
-            for(sv=entryCN->estateVars.begin(); !entryCN->estateVars.end(); sv=entryCN->estateVars.next()) {
-               if (sv->arrayLength != 0)
-                  op <<"        "<<sv->name->charstar()<<"=("<<sv->type1->charstar()
-                     <<" *)(impl_buf+impl_off_"<<sv->name->charstar()<<");\n";
-	    }
-	 }
-	 if (paramMarshalling == 1)
-	   op << "        delete (CkMarshallMsg *)impl_msg_"<<trval<<";\n";
-	 op << "      }\n"; 
-         op << "      delete tr_"<<trval<<";\n";
-	 trval++;
-     }
-  }   
-
-
-
-/******************** END pup code ******************************/
 
   if(nextBeginOrEnd == 1)
    op << "      " << next->label->charstar() << "(";
   else
    op << "      " << next->label->charstar() << "_end(";
-  if ((next->type == FOR) || (next->type == FORALL) || (next->type == IF) 
-       || (next->type == ELSE) || (next->type == WHILE)) 
-     generateCall(op, *stateVars);
-  else
-     generateCall(op, *allstateVars);
+  generateCall(op, *stateVars);
   op << ");\n";
   // end actual code
   op << "    }\n";
@@ -1517,20 +1172,14 @@ void CParseNode::generateOverlap(XStr& op)
   op << "  }\n";
   // inlined end function
   op << "  void " << label->charstar() << "_end(";
-  //generatePrototype(op, *stateVarsChildren);
-  generatePrototype(op, *allstateVars);
+  generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   // actual code here 
   if(nextBeginOrEnd == 1)
    op << "    " << next->label->charstar() << "(";
   else
    op << "    " << next->label->charstar() << "_end(";
-  if ((next->type == FOR) || (next->type == FORALL) || (next->type == IF) 
-       || (next->type == ELSE) || (next->type == WHILE)) 
-     generateCall(op, *stateVars);
-  else 
-     generateCall(op, *allstateVars);
-  //generateCall(op, *stateVars);
+  generateCall(op, *stateVars);
   op << ");\n";
   // end actual code
   op << "  }\n";
@@ -1551,8 +1200,7 @@ void CParseNode::generateSlist(XStr& op)
   op << "  }\n";
   // inlined end function
   op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, *allstateVars);
-  //generatePrototype(op, *stateVarsChildren); 
+  generatePrototype(op, *stateVarsChildren); 
   op << ") {\n";
   // actual code here 
   if(nextBeginOrEnd == 1)
@@ -1560,11 +1208,7 @@ void CParseNode::generateSlist(XStr& op)
   else
    op << "    " << next->label->charstar() << "_end(";
   //generateCall(op, *stateVars);
-  if ((next->type == FOR) || (next->type == FORALL) || (next->type == IF) 
-       || (next->type == ELSE) || (next->type == WHILE)) 
-     generateCall(op, *stateVars);
-  else 
-     generateCall(op, *allstateVars);
+  generateCall(op, *stateVars);
   op << ");\n";
   // end actual code
   op << "  }\n";
@@ -1586,8 +1230,7 @@ void CParseNode::generateSdagEntry(XStr& op)
   op << "  }\n\n";
   op << "private:\n";
   op << "  void " << con1->text->charstar() << "_end(";
-  //generatePrototype(op, *stateVars);
-  generatePrototype(op, *allstateVars);
+  generatePrototype(op, *stateVars);
   op << ") {\n";
   op << "  }\n\n";
 }
