@@ -1381,13 +1381,13 @@ void Entry::genDefs(XStr& str)
 {
   XStr containerType=container->baseName();
   XStr cpType,cpComma;
-  char *freeMsgVoid="";
+  char *freeMsgVoid=(char*) "";
   if((!param)||(param->isVoid()))
   {
     if(container->isArray())
-      freeMsgVoid="  CkFreeMsg(msg);\n";
+      freeMsgVoid=(char*) "  CkFreeMsg(msg);\n";
     else
-      freeMsgVoid="  CkFreeSysMsg(msg);\n";
+      freeMsgVoid=(char*) "  CkFreeSysMsg(msg);\n";
   }
   if(param&&!param->isVoid())
   {//Add type casts for the message parameter
