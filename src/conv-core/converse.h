@@ -191,7 +191,6 @@ extern void CmiDestroyLock(CmiNodeLock lock);
 
 #include <pthread.h>
 #include <sched.h>
-#include <synch.h>
 
 extern int Cmi_numpes;
 extern int Cmi_mynodesize;

@@ -52,7 +52,8 @@
 
 #define CMK_SHARED_VARS_EXEMPLAR                           0
 #define CMK_SHARED_VARS_UNAVAILABLE                        0
-#define CM_SHARED_VARS_POSIX_SMP			   1
+#define CMK_SHARED_VARS_PTHREADS 			   0
+#define CMK_SHARED_VARS_POSIX_THREADS_SMP 		   1
 #define CMK_SHARED_VARS_SUN_THREADS                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
