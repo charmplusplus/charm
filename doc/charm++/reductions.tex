@@ -104,6 +104,7 @@ void myClient(void *param,int dataSize,void *data)
 
 
 \subsubsection{Built-in Reduction Types}
+\label{builtin_reduction}
 
 \charmpp{} includes several built-in reduction types, used to combine 
 the separate contributions.  Any of them may be passed as an
@@ -180,6 +181,7 @@ The reduction set order is undefined.  Add a source field to your contribution
 if you need to know which array element gave a particular contribution.
 
 \subsubsection{Defining a New Reduction Type}
+\label{new_type_reduction}
 
 It is possible to define a new type of reduction, performing a 
 user-defined operation on user-defined data.  A reduction function

@@ -751,8 +751,8 @@ array section that the array element belongs to.
 When doing section reduction, the array element needs to pass the 
 \kw{CkSectionCookie} as a parameter in the \kw{contribute()}. 
 The \kw{CkSectionCookie} can be retrieved
-from a message in a multicast entry function for that array section
-using function call \kw{CkGetSectionCookie}:
+from a message in a multicast entry function using function call 
+\kw{CkGetSectionCookie}:
 
 \begin{alltt}
   CkSectionCookie cookie;
@@ -765,16 +765,17 @@ using function call \kw{CkGetSectionCookie}:
   \}
 \end{alltt}
 
-Note that the cookie cannot be used as a local variable in the function,
-the same cookie is needed for the next contribute. This is because cookie 
-includes some context sensive information for example the reduction counter.
-Function \kw{CkGetSectionCookie()} only update some part of the data in cookie.
+Note that the cookie cannot be used as a one-time local variable in the 
+function, the same cookie is needed for the next contribute. This is 
+because cookie includes some context sensive information for example the 
+reduction counter. Function \kw{CkGetSectionCookie()} only update some part 
+of the data in cookie, not creating a brand new one.
 
 Similar to array reduction, to use section based reduction, a reduction
 client CkCallback object need to be created. You may pass the client callback 
 as an additional parameter to \kw{contribute}. If different contribute calls 
 pass different callbacks, some (unspecified, unreliable) callback will be 
-chosen for use. 
+chosen for use. See the followin example:
 
 \begin{alltt}
     CkCallback cb(CkIndex_myArrayType::myReductionEntry(NULL),thisProxy); 
@@ -783,8 +784,8 @@ chosen for use.
 
 If no member passes a callback to contribute, the reduction will use the 
 default callback. You set the default callback for an array section using the 
-\kw{setReductionClient} call to the section root member. A 
-{\bf CkMcastReductionMsg} message will be passed to this callback, which 
+\kw{setReductionClient} call by the section root member. A 
+{\bf CkReductionMsg} message will be passed to this callback, which 
 must delete the message when done.
 
 \begin{alltt}
@@ -792,6 +793,10 @@ must delete the message when done.
   CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
   mcastGrp->setReductionClient(sectProxy, new CkCallback(...));
 \end{alltt}
+
+Same as in array reduction, users can use built-in reduction 
+types(Section~\ref{builtin_reduction}) or define his/her own reducer functions
+(Section~\ref{new_type_reduction}).
 
 \paragraph{Array section multicast/reduction when migration happens}
 Using multicast/reduction, you don't need to worry about array migrations.
