@@ -377,10 +377,9 @@ void ComlibManager::receiveTable(StrategyWrapper &sw,
                 
                 calistener->registerStrategy(&((* strategyTable)[loc]));
             }
-        }              
-        
-        if(cur_strategy->getType() == GROUP_STRATEGY){
-            (* strategyTable)[loc].numElements = 1;
+        }                      
+        else { //if(cur_strategy->getType() == GROUP_STRATEGY){
+	  (* strategyTable)[loc].numElements = 1;
         }
         
         (* strategyTable)[loc].elementCount = 0;

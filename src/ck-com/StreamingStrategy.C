@@ -55,6 +55,8 @@ void StreamingStrategy::insertMessage(CharmMessageHolder *cmsg) {
 void StreamingStrategy::doneInserting() {
   ComlibPrintf("[%d] In Streaming strategy::doneInserting\n", CkMyPe());
   //Do nothing
+
+  periodicFlush();
 }
 
 /// Send off all accumulated messages for this PE:
