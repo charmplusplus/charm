@@ -133,8 +133,8 @@ void deadlock_moduleinit()
   CpvInitialize(int, deadlock_inc_idx);
   CpvInitialize(int, deadlock_cram_idx);
   CpvInitialize(int, deadlock_count);
-  CpvAccess(deadlock_inc_idx) = CmiRegisterHandler(deadlock_inc);
-  CpvAccess(deadlock_cram_idx) = CmiRegisterHandler(deadlock_cram);
+  CpvAccess(deadlock_inc_idx) = CmiRegisterHandler((CmiHandler)deadlock_inc);
+  CpvAccess(deadlock_cram_idx) = CmiRegisterHandler((CmiHandler)deadlock_cram);
 #if CMK_DEBUG_MODE
   handlerArrayRegister(CpvAccess(deadlock_inc_idx), fIncHeader, fIncContent);
   handlerArrayRegister(CpvAccess(deadlock_cram_idx),fCramHeader, fCramContent);

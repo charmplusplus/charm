@@ -29,7 +29,7 @@ void broadc_recv(mesg m)
     exit(1);
   }
   CmiSetHandler(m, CpvAccess(broadc_reply_idx));
-  CmiSyncSend(m->reply_pe, sizeof(struct mesg), m);
+  CmiSyncSendAndFree(m->reply_pe, sizeof(struct mesg), m);
 }
 
 void broadc_start_cycle(bchare c)
@@ -80,6 +80,6 @@ void broadc_moduleinit()
 {
   CpvInitialize(int, broadc_recv_idx);
   CpvInitialize(int, broadc_reply_idx);
-  CpvAccess(broadc_recv_idx) = CmiRegisterHandler(broadc_recv);
-  CpvAccess(broadc_reply_idx) = CmiRegisterHandler(broadc_reply);
+  CpvAccess(broadc_recv_idx) = CmiRegisterHandler((CmiHandler)broadc_recv);
+  CpvAccess(broadc_reply_idx) = CmiRegisterHandler((CmiHandler)broadc_reply);
 }

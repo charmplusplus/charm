@@ -58,5 +58,5 @@ void vecsend_init()
 void vecsend_moduleinit()
 {
   CpvInitialize(int, vecsend_index);
-  CpvAccess(vecsend_index) = CmiRegisterHandler(vecsend_handler);
+  CpvAccess(vecsend_index) = CmiRegisterHandler((CmiHandler)vecsend_handler);
 }

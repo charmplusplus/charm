@@ -62,7 +62,7 @@ void multisend_third_handler(multisendmsg *msg)
       multisend_fail();
   }
   CmiSetHandler(msg, CpvAccess(multisend_recv_index));
-  CmiSyncSend(0, sizeof(multisendmsg), msg);
+  CmiSyncSendAndFree(0, sizeof(multisendmsg), msg);
 }
 
 void multisend_recv_handler(multisendmsg *msg)
@@ -120,13 +120,13 @@ void multisend_moduleinit()
   CpvInitialize(int, multisend_recv_index);
   CpvInitialize(int, multisend_replies);
   CpvAccess(multisend_first_index) = 
-    CmiRegisterHandler(multisend_first_handler);
+    CmiRegisterHandler((CmiHandler)multisend_first_handler);
   CpvAccess(multisend_second_index) = 
-    CmiRegisterHandler(multisend_second_handler);
+    CmiRegisterHandler((CmiHandler)multisend_second_handler);
   CpvAccess(multisend_third_index) = 
-    CmiRegisterHandler(multisend_third_handler);
+    CmiRegisterHandler((CmiHandler)multisend_third_handler);
   CpvAccess(multisend_recv_index) = 
-    CmiRegisterHandler(multisend_recv_handler);
+    CmiRegisterHandler((CmiHandler)multisend_recv_handler);
 }
 
 

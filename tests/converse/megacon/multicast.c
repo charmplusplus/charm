@@ -94,8 +94,8 @@ void multicast_moduleinit()
 {
   CpvInitialize(int, multicast_recv_idx);
   CpvInitialize(int, multicast_reply_idx);
-  CpvAccess(multicast_recv_idx) = CmiRegisterHandler(multicast_recv);
-  CpvAccess(multicast_reply_idx) = CmiRegisterHandler(multicast_reply);
+  CpvAccess(multicast_recv_idx) = CmiRegisterHandler((CmiHandler)multicast_recv);
+  CpvAccess(multicast_reply_idx) = CmiRegisterHandler((CmiHandler)multicast_reply);
 }
 
 
