@@ -38,7 +38,7 @@ public:
   inline char *lbName() { return lbname; }
   virtual void turnOff() { CmiAbort("turnOff not implemented"); }
   virtual void turnOn()  { CmiAbort("turnOn not implemented"); }
-  void pup(PUP::er &p){ IrrGroup::pup(p); ckout<<"BaseLB::pup"; }
+  void pup(PUP::er &p){ IrrGroup::pup(p); }
 };
 
 /// migration decision for an obj.

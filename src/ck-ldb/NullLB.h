@@ -33,7 +33,11 @@ public:
   void AtSync(void); // Everything is at the PE barrier
 
   void migrationsDone(void);
-  void pup(PUP::er &p){ BaseLB::pup(p); init(); lbname="NullLB"; }
+  void pup(PUP::er &p){ 
+    BaseLB::pup(p); 
+    if(p.isUnpacking()) init(); 
+    lbname="NullLB"; 
+  }
 private:
   CProxy_NullLB thisProxy;
   void init();
