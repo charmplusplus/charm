@@ -323,6 +323,13 @@ static void CthBaseResume(CthThread t)
   CthCpvAccess(CthData) = B(t)->data;
 }
 
+/**
+  switch the thread to t
+*/
+void CthSwitchThread(CthThread t)
+{
+  CthBaseResume(t);
+}
 
 /*
 Suspend: finds the next thread to execute, and resumes it

@@ -716,6 +716,8 @@ double     CthAutoYieldFreq(CthThread t);
 void       CthAutoYieldBlock(void);
 void       CthAutoYieldUnblock(void);
 
+void       CthSwitchThread(CthThread t);
+
 /****** CTH: THREAD-PRIVATE VARIABLES ******/
 
 #if CMK_THREADS_REQUIRE_NO_CPV
