@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-11-03 04:34:38  sanjeev
+ * Revision 2.10  1995-11-05 17:54:33  sanjeev
+ * current_event should be initialized to 0, not 1
+ *
+ * Revision 2.9  1995/11/03  04:34:38  sanjeev
  * for END_PROCESSING, put overload the msg_type field with chare-magic
  *
  * Revision 2.8  1995/10/27  21:37:45  jyelon
@@ -107,6 +110,8 @@ char *prog_name;
   CpvInitialize(char*,pgm);
   CpvInitialize(char*,log_file_name);
   CpvInitialize(int,current_event);
+  CpvAccess(current_event) = 0 ;
+
   CpvInitialize(LOGARR,logbuf);
   CpvInitialize(int,logcnt);        /* no. of log entries 	*/
   CpvInitialize(int,iteration);
@@ -303,7 +308,7 @@ log_init()
 
 
 	CpvAccess(RecdPerfMsg)=1;
-	CpvAccess(current_event)=1;
+	CpvAccess(current_event)=0;
 	CpvAccess(begin_pe)=-1;
 	CpvAccess(begin_event)=-1;
 	CpvAccess(begin_processing_time)=-1;
