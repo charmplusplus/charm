@@ -183,7 +183,7 @@ void LBDB::Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int by
   item_ptr->addMessage(bytes);
 }
 
-void LBDB::MulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes)
+void LBDB::MulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes, int nMsgs)
 {
   LBCommData* item_ptr;
 
@@ -193,7 +193,7 @@ void LBDB::MulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests,
 
     LBCommData item(runObj,destOM.id,destids, ndests);
     item_ptr = commTable->HashInsertUnique(item);
-    item_ptr->addMessage(bytes);
+    item_ptr->addMessage(bytes, nMsgs);
   } 
 }
 

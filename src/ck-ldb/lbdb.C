@@ -212,11 +212,11 @@ extern "C" void LDSend(const LDOMHandle &destOM, const LDObjid &destid, unsigned
     db->Send(destOM,destid,bytes, destObjProc);
 }
 
-extern "C" void LDMulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes)
+extern "C" void LDMulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes, int nMsgs)
 {
   LBDB *const db = (LBDB*)(destOM.ldb.handle);
   if (db->StatsOn() && _lb_args.traceComm())
-    db->MulticastSend(destOM,destids,ndests,bytes);
+    db->MulticastSend(destOM,destids,ndests,bytes,nMsgs);
 }
 
 extern "C" void LDBackgroundLoad(LDHandle _db,

@@ -145,6 +145,7 @@ public:
       delete [] to_proc;
       deleteCommHash();
     }
+    void print();
     double computeAverageLoad();
     void pup(PUP::er &p);
     int useMem();
@@ -249,6 +250,7 @@ public:
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryDumpData() { return CmiFalse; };  
+  virtual void LoadbalanceDone(int balancing) {}
 
   void simulationRead();
   void simulationWrite();

@@ -239,7 +239,7 @@ int LDRunningObject(LDHandle _h, LDObjHandle* _o );
 void LDObjectStart(const LDObjHandle &_h);
 void LDObjectStop(const LDObjHandle &_h);
 void LDSend(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc);
-void LDMulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes);
+void LDMulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes, int nMsgs);
 
 void LDMessage(LDObjHandle from, 
 	       LDOMid toOM, LDObjid *toID, int bytes);

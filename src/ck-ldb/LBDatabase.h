@@ -191,8 +191,8 @@ public:
   inline void Send(const LDOMHandle &_om, const LDObjid _id, unsigned int _b, int _p) {
     LDSend(_om, _id, _b, _p);
   };
-  inline void MulticastSend(const LDOMHandle &_om, LDObjid *_ids, int _n, unsigned int _b) {
-    LDMulticastSend(_om, _ids, _n, _b);
+  inline void MulticastSend(const LDOMHandle &_om, LDObjid *_ids, int _n, unsigned int _b, int _nMsgs=1) {
+    LDMulticastSend(_om, _ids, _n, _b, _nMsgs);
   };
 
   inline void EstObjLoad(LDObjHandle h, double load) { LDEstObjLoad(h,load); };

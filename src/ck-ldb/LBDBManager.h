@@ -122,7 +122,7 @@ public:
   }
 
   void Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc);
-  void MulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes);
+  void MulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes, int nMsgs);
   int ObjDataCount();
   void GetObjData(LDObjData *data);
   inline int CommDataCount() { 

@@ -513,6 +513,9 @@ void CentralLB::MigrationDone(int balancing)
   if (balancing) theLbdb->ClearLoads();
   // Increment to next step
   theLbdb->incStep();
+
+  LoadbalanceDone(balancing);        // callback
+
   // if sync resume invoke a barrier
   if (balancing && _lb_args.syncResume()) {
     CkCallback cb(CkIndex_CentralLB::ResumeClients((CkReductionMsg*)NULL), 
@@ -614,54 +617,8 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
 
 void CentralLB::work(LDStats* stats,int count)
 {
-#if CMK_LBDB_ON
-  int i;
-  for(int pe=0; pe < count; pe++) {
-    struct ProcStats &proc = stats->procs[pe];
-
-    CkPrintf(
-      "Proc %d Sp %d Total time (wall,cpu) = (%f %f) Idle = %f Bg = (%f %f)\n",
-      pe,proc.pe_speed,proc.total_walltime,proc.total_cputime,
-      proc.idletime,proc.bg_walltime,proc.bg_cputime);
-  }
-
-  int osz = stats->n_objs;
-    CkPrintf("------------- Object Data: %d objects -------------\n",
-	     stats->n_objs);
-    for(i=0; i < osz; i++) {
-      LDObjData &odata = stats->objData[i];
-      CkPrintf("Object %d\n",i);
-      CkPrintf("     id = %d\n",odata.objID().id[0]);
-      CkPrintf("  OM id = %d\n",odata.omID().id);
-      CkPrintf("   Mig. = %d\n",odata.migratable);
-      CkPrintf("    CPU = %f\n",odata.cpuTime);
-      CkPrintf("   Wall = %f\n",odata.wallTime);
-    }
-
-    const int csz = stats->n_comm;
-
-    CkPrintf("------------- Comm Data: %d records -------------\n",
-	     csz);
-    LDCommData *cdata = stats->commData;
-    for(i=0; i < csz; i++) {
-      CkPrintf("Link %d\n",i);
-
-      if (cdata[i].from_proc())
-	CkPrintf("    sender PE = %d\n",cdata[i].src_proc);
-      else
-	CkPrintf("    sender id = %d:%d\n",
-		 cdata[i].sender.omID().id,cdata[i].sender.objID().id[0]);
-
-      if (cdata[i].recv_type() == LD_PROC_MSG)
-	CkPrintf("  receiver PE = %d\n",cdata[i].receiver.proc());
-      else	
-	CkPrintf("  receiver id = %d:%d\n",
-		 cdata[i].receiver.get_destObj().omID().id,cdata[i].receiver.get_destObj().objID().id[0]);
-      
-      CkPrintf("     messages = %d\n",cdata[i].messages);
-      CkPrintf("        bytes = %d\n",cdata[i].bytes);
-    }
-#endif
+  // does nothing but print the database
+  stats->print();
 }
 
 // generate migrate message from stats->from_proc and to_proc
@@ -1168,6 +1125,60 @@ int CentralLB::LDStats::getRecvHash(LDCommData &cData)
     cData.recvHash =  getHash(cData.receiver.get_destObj());
   }
   return cData.recvHash;
+}
+
+void CentralLB::LDStats::print()
+{
+#if CMK_LBDB_ON
+  int i;
+  CkPrintf("------------- Processor Data: %d -------------\n", count);
+  for(int pe=0; pe < count; pe++) {
+    struct ProcStats &proc = procs[pe];
+
+    CkPrintf(
+      "Proc %d Sp %d Total(wall,cpu) = (%f %f) Idle = %f Bg = (%f %f) nObjs = %d\n",
+      pe,proc.pe_speed,proc.total_walltime,proc.total_cputime,
+      proc.idletime,proc.bg_walltime,proc.bg_cputime,proc.n_objs);
+  }
+
+  CkPrintf("------------- Object Data: %d objects -------------\n", n_objs);
+  for(i=0; i < n_objs; i++) {
+      LDObjData &odata = objData[i];
+      CkPrintf("Object %d\n",i);
+      CkPrintf("     id = %d %d %d %d\n",odata.objID().id[0],odata.objID().id[1
+], odata.objID().id[2], odata.objID().id[3]);
+      CkPrintf("  OM id = %d\t",odata.omID().id);
+      CkPrintf("   Mig. = %d\n",odata.migratable);
+      CkPrintf("    CPU = %f\t",odata.cpuTime);
+      CkPrintf("   Wall = %f\n",odata.wallTime);
+  }
+
+  CkPrintf("------------- Comm Data: %d records -------------\n", n_comm);
+  LDCommData *cdata = commData;
+  for(i=0; i < n_comm; i++) {
+      CkPrintf("Link %d\n",i);
+
+      LDObjid &sid = cdata[i].sender.objID();
+      if (cdata[i].from_proc())
+	CkPrintf("    sender PE = %d\t",cdata[i].src_proc);
+      else
+	CkPrintf("    sender id = %d:[%d %d %d %d]\t",
+		 cdata[i].sender.omID().id,sid.id[0], sid.id[1], sid.id[2], sid.id[3]);
+
+      LDObjid &rid = cdata[i].receiver.get_destObj().objID();
+      if (cdata[i].recv_type() == LD_PROC_MSG)
+	CkPrintf("  receiver PE = %d\n",cdata[i].receiver.proc());
+      else	
+	CkPrintf("  receiver id = %d:[%d %d %d %d]\n",
+		 cdata[i].receiver.get_destObj().omID().id,rid.id[0],rid.id[1],rid.id[2],rid.id[3]);
+      
+      CkPrintf("     messages = %d\t",cdata[i].messages);
+      CkPrintf("        bytes = %d\n",cdata[i].bytes);
+  }
+  CkPrintf("------------- Object to PE mapping -------------\n");
+  for (i=0; i<n_objs; i++) CkPrintf(" %d", from_proc[i]);
+  CkPrintf("\n");
+#endif
 }
 
 double CentralLB::LDStats::computeAverageLoad()
