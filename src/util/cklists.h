@@ -25,6 +25,10 @@ protected:
     }
 };
 
+// Forward declarations:
+template <class T> class CkQ;
+template <class T> void pupCkQ(PUP::er &p,CkQ<T> &q);
+
 /// A single-ended FIFO queue.
 ///  See CkMsgQ if T is a Charm++ message type.
 template <class T>
@@ -110,11 +114,18 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
       }
       return newblk;
     }
+#ifdef _MSC_VER
+/* Visual C++ 6.0's operator overloading is buggy,
+   so use default operator|, which calls this pup routine. */
+     void pup(PUP::er &p) {
+        pupCkQ(p,*this);
+     }
+#endif
 };
 
 /// Default pup routine for CkQ: pup each of the elements
 template <class T>
-inline void operator|(PUP::er &p,CkQ<T> &q) {
+inline void pupCkQ(PUP::er &p,CkQ<T> &q) {
     p.syncComment(PUP::sync_begin_array);
     int l=q.length();
     p|l;
@@ -130,6 +141,12 @@ inline void operator|(PUP::er &p,CkQ<T> &q) {
     }
     p.syncComment(PUP::sync_end_array);
 }
+
+#ifndef _MSC_VER
+/// Default pup routine for CkVec: pup each of the elements
+template <class T>
+inline void operator|(PUP::er &p,CkQ<T> &q) {pupCkQ(p,q);}
+#endif
 
 /// "Flag" class: do not initialize this object.
 /// This is sometimes needed for global variables, 
