@@ -578,12 +578,6 @@ NborBaseLB.decl.h: NborBaseLB.ci charmxi
 NborBaseLB.o: NborBaseLB.C NborBaseLB.decl.h $(CKHEADERS)
 	$(CHARMC) -c NborBaseLB.C
 
-WSLB.decl.h: WSLB.ci charmxi
-	$(CHARMC) WSLB.ci
-
-WSLB.o: WSLB.C WSLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c WSLB.C
-
 CommLBHeap.o: CommLBHeap.C $(CKHEADERS)
 	$(CHARMC) -c CommLBHeap.C
 
@@ -667,7 +661,7 @@ LOADBALANCERS=\
    $(L)/libmoduleNeighborLB.a \
    $(L)/libmoduleGreedyRefLB.a \
    $(L)/libmoduleRandRefLB.a \
-   $(L)/libmoduleWSLB.a \
+   $(L)/libmoduleWSLB.a
 
 RandCentLB.decl.h: RandCentLB.ci charmxi
 	$(CHARMC) RandCentLB.ci
@@ -790,7 +784,7 @@ LB_OBJ=EveryLB.o \
     NeighborLB.o \
     GreedyRefLB.o \
     RandRefLB.o \
-    WSLB.o \
+    WSLB.o
 
 EveryLB.o: EveryLB.C EveryLB.decl.h
 	$(CHARMC) -c EveryLB.C
