@@ -121,6 +121,9 @@ class CkArrayListener : public PUP::able {
   /// Return false if the element migrated away or deleted itself.
   virtual CmiBool ckElementArriving(ArrayElement *elt)
     { return CmiTrue; }
+
+  /// used by checkpointing to reset the states
+  virtual void flushState()  {}
 };
 
 /*@}*/
@@ -479,6 +482,7 @@ public:
 
   void springCleaning(void);
 
+  void flushState() { bcastNo = oldBcastNo = -1; }
 private:
   int bcastNo;//Number of broadcasts received (also serial number)
   int oldBcastNo;//Above value last spring cleaning
@@ -518,6 +522,7 @@ public:
     {mgr->contributorLeaving(getData(elt));}
   CmiBool ckElementArriving(ArrayElement *elt)
     {mgr->contributorArriving(getData(elt)); return CmiTrue; }
+  void flushState(ArrayElement *elt) { getData(elt)->redNo = 0; }
 };
 
 void _ckArrayInit(void);
@@ -621,6 +626,9 @@ private:
 
   CkArrayReducer *reducer; //Read-only copy of default reducer
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
+public:
+  int isCkArray() { return 1; }
+  void flushStates() { CK_ARRAYLISTENER_LOOP(listeners, l->flushState()); }
 };
 /*@}*/
 
