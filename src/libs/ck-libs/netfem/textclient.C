@@ -8,7 +8,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/2/2001
 #include <string.h>
 #include "ccs-client.h"
 #include "pup.h"
-#include "toNetwork4.h"
+#include "pup_toNetwork4.h"
 #include "conv-mach.h"
 #include "netfem_data.h"
 

@@ -11,7 +11,7 @@ Orion Sky Lawlor, olawlor@acm.org, 10/28/2001
 
 #include "netfem_data.h"
 
-#include "toNetwork4.h"
+#include "pup_toNetwork4.h"
 
 #include "tcharm.h"
 #define NETFEMAPI(routineName) TCHARM_API_TRACE(routineName,"netfem")
