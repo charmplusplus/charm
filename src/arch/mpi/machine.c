@@ -44,7 +44,6 @@
 
 #define BROADCAST_SPANNING_FACTOR      20
 
-/*#define CMI_BROADCAST_ROOT(msg)          ((CmiUInt2 *)(msg))[4]*/
 #define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
 #define CMI_DEST_RANK(msg)               ((CmiMsgHeaderBasic *)msg)->rank
 
@@ -74,8 +73,6 @@ CpvDeclare(void*, CmiLocalQueue);
 #define NODE_BROADCAST_ALL    (-2)
 #endif
 
-static int MsgQueueLen=0;
-static int request_max;
 #if 0
 static void **recdQueue_blk;
 static unsigned int recdQueue_blk_len;
@@ -85,6 +82,7 @@ static void recdQueueInit(void);
 static void recdQueueAddToBack(void *element);
 static void *recdQueueRemoveFromFront(void);
 #endif
+
 static void ConverseRunPE(int everReturn);
 static void CommunicationServer(int sleepTime);
 
@@ -95,10 +93,13 @@ typedef struct msg_list {
      int size, destpe;
 } SMSG_LIST;
 
-static int Cmi_dim;
+static int MsgQueueLen=0;
+static int request_max;
 
 static SMSG_LIST *sent_msgs=0;
 static SMSG_LIST *end_sent=0;
+
+static int Cmi_dim;
 
 #if NODE_0_IS_CONVHOST
 int inside_comm = 0;
@@ -311,9 +312,8 @@ static int PumpMsgs(void)
     if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
       CmiAbort("PumpMsgs: MPI_Recv failed!\n");
 #if CMK_NODE_QUEUE_AVAILABLE
-    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE) {
+    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
       PCQueuePush(CsvAccess(NodeRecv), msg);
-    }
     else
 #endif
     CmiPushPE(CMI_DEST_RANK(msg), msg);
@@ -336,16 +336,19 @@ static int MsgQueueEmpty()
   return 1;
 }
 
+/**
+CommunicationServer calls MPI to send messages in the queues and probe message from network.
+*/
 static void CommunicationServer(int sleepTime)
 {
-  SendMsgBuf(); 
   CmiReleaseSentMessages();
-  PumpMsgs();
+  SendMsgBuf(); 
+  if (!PumpMsgs()) CmiYield(); 
   if (inexit == 1) {
     while(!MsgQueueEmpty() || !CmiAllAsyncMsgsSent()) {
+      CmiReleaseSentMessages();
       SendMsgBuf(); 
       PumpMsgs();
-      CmiReleaseSentMessages();
     }
     if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
       CmiAbort("ConverseExit: MPI_Barrier failed!\n");
@@ -448,12 +451,13 @@ static int SendMsgBuf()
 }
 
 #if CMK_SMP
-#define EnqueueMsg(m, size, node)	\
+#define EnqueueMsg(m, size, node)    { 	\
   msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));	\
   msg_tmp->msg = m;	\
   msg_tmp->size = size;	\
   msg_tmp->destpe = node;	\
-  PCQueuePush(msgBuf[CmiMyRank()],(char *)msg_tmp);
+  PCQueuePush(msgBuf[CmiMyRank()],(char *)msg_tmp);	\
+  }
 #endif
 
 CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
@@ -643,21 +647,19 @@ CmiCommHandle CmiAsyncNodeSendFn(int dstNode, int size, char *msg)
     CQdCreate(CpvAccess(cQdState), Cmi_mynode-1);
     for (i=0; i<Cmi_numnodes; i++)
       if (i!=Cmi_mynode) {
-	dupmsg = (char *)CopyMsg(msg,size);
-        EnqueueMsg(dupmsg, size, i);
+        EnqueueMsg((char *)CopyMsg(msg,size), size, i);
       }
-    CmiFree(msg);
     break;
   default:
     CQdCreate(CpvAccess(cQdState), 1);
+    dupmsg = (char *) CmiAlloc(size);
+    memcpy(dupmsg, msg, size);
     if(dstNode == Cmi_mynode) {
-      char *dupmsg = (char *) CmiAlloc(size);
-      memcpy(dupmsg, msg, size);
       PCQueuePush(CsvAccess(NodeRecv), dupmsg);
       return 0;
     }
     else {
-      EnqueueMsg(msg, size, dstNode);
+      EnqueueMsg(dupmsg, size, dstNode);
     }
   }
   return 0;
@@ -671,14 +673,13 @@ void CmiSyncNodeSendFn(int p, int s, char *m)
 void CmiFreeNodeSendFn(int p, int s, char *m)
 {
   CmiAsyncNodeSendFn(p, s, m);
+  CmiFree(m);
 }
 
 /* need */
 void CmiSyncNodeBroadcastFn(int s, char *m)
 {
-  char *dupmsg = (char *) CmiAlloc(s);
-  memcpy(dupmsg, m, s);
-  CmiAsyncNodeSendFn(NODE_BROADCAST_OTHERS, s, dupmsg);
+  CmiAsyncNodeSendFn(NODE_BROADCAST_OTHERS, s, m);
 }
 
 CmiCommHandle CmiAsyncNodeBroadcastFn(int s, char *m)
@@ -689,10 +690,12 @@ CmiCommHandle CmiAsyncNodeBroadcastFn(int s, char *m)
 void CmiFreeNodeBroadcastFn(int s, char *m)
 {
   CmiAsyncNodeSendFn(NODE_BROADCAST_OTHERS, s, m);
+  CmiFree(m);
 }
 
 void CmiSyncNodeBroadcastAllFn(int s, char *m)
 {
+  CmiAsyncNodeSendFn(NODE_BROADCAST_ALL, s, m);
 }
 
 CmiCommHandle CmiAsyncNodeBroadcastAllFn(int s, char *m)
@@ -703,6 +706,7 @@ CmiCommHandle CmiAsyncNodeBroadcastAllFn(int s, char *m)
 void CmiFreeNodeBroadcastAllFn(int s, char *m)
 {
   CmiAsyncNodeSendFn(NODE_BROADCAST_ALL, s, m);
+  CmiFree(m);
 }
 #endif
 
