@@ -11,8 +11,11 @@
  ***************************************************************************
  * REVISION HISTORY:
  *      $Log$
- *      Revision 2.6  1995-07-22 23:44:01  jyelon
+ *      Revision 2.7  1995-07-27 20:48:27  jyelon
  *      *** empty log message ***
+ *
+ * Revision 2.6  1995/07/22  23:44:01  jyelon
+ * *** empty log message ***
  *
  * Revision 2.5  1995/07/12  21:36:20  brunner
  * Added prog_name to perfModuleInit(), so argv[0] can be used
@@ -95,7 +98,7 @@ ENVELOPE *envelope;
 	int msg_type = GetEnv_msgType(envelope);
 	if (((msg_type == BocMsg) || (msg_type == BroadcastBocMsg) ||
                	(msg_type == QdBocMsg) || (msg_type == QdBroadcastBocMsg)) &&
-		(GetEnv_EP(envelope) < NumSysBocEps))
+		(GetEnv_EP(envelope) < CsvAccess(NumSysBocEps)))
 		return;
 
 	CpvAccess(now) = CkTimer(); 
@@ -322,7 +325,7 @@ int mype;
 TRACE(CmiPrintf("[%d] Send out perf message to %d\n", 
 		mype, CmiSpanTreeParent(mype)));
 
-	GeneralSendMsgBranch(StatPerfCollectNodes_EP, msg,
+	GeneralSendMsgBranch(CsvAccess(CkEp_Stat_PerfCollectNodes), msg,
 		CmiSpanTreeParent(mype), USERcat, BocMsg, StatisticBocNum);
 }
 

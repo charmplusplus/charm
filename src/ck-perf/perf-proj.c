@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-07-12 21:36:20  brunner
+ * Revision 2.5  1995-07-27 20:48:27  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.4  1995/07/12  21:36:20  brunner
  * Added prog_name to perfModuleInit(), so argv[0] can be used
  * to generate a unique tace file name.
  *
@@ -353,7 +356,7 @@ close_log()
            		fprintf(CpvAccess(state_file_fd), "CHARE %d %s\n",
 			 	i, ChareNamesTable[i]);
 
-       		for (i=NumSysBocEps; i<TotalEps; i++) {
+       		for (i=CsvAccess(NumSysBocEps); i<TotalEps; i++) {
 		    if ( EpChareTypeTable[i] == CHARE ) {
            			fprintf(CpvAccess(state_file_fd), "ENTRY CHARE %d %s %d %d\n",
                			i, EpNameTable[i], EpChareTable[i],
