@@ -176,7 +176,8 @@ class CkVec : private CkSTLHelper<T> {
     }
     void freeBlock(void) {
        len=0; blklen=0;
-       delete[] block; block=NULL;
+       delete[] block; 
+       block=NULL;
     }
     void copyFrom(const this_type &src) {
        makeBlock(src.blklen, src.len);
@@ -199,8 +200,21 @@ class CkVec : private CkSTLHelper<T> {
     T *getVec(void) { return block; }
     const T *getVec(void) const { return block; }
     
-    T& operator[](size_t n) { return block[n]; }
-    const T& operator[](size_t n) const { return block[n]; }
+    T& operator[](size_t n) {
+#if CMK_PARANOID 
+      if (n >= len || n < 0) 
+	CmiAbort("CkVec Out Of Bounds\n\n"); 
+#endif
+      return block[n]; 
+    }
+    
+    const T& operator[](size_t n) const { 
+#if CMK_PARANOID 
+      if (n >= len || n < 0) 
+	CmiAbort("CkVec Out Of Bounds\n\n");  
+#endif
+      return block[n]; 
+    }
     
     /// Reserve at least this much space (changes capacity, size unchanged)
     void reserve(int newcapacity) {
@@ -229,7 +243,11 @@ class CkVec : private CkSTLHelper<T> {
       block[pos] = elt;
     }
     void remove(int pos) {
-      if (pos<0 || pos>=len) return;
+      if (pos<0 || pos>=len) 
+	{
+	  CmiAbort("CkVec ERROR: out of bounds\n\n"); 
+	  return;
+	}
       for (int i=pos; i<len-1; i++)
         block[i] = block[i+1];
       len--;
@@ -354,18 +372,18 @@ public:
 ///A vector of zero-initialized heap-allocated objects of type T
 template <class T, class PUP_PTR=CkPupAllocatePtr<T> >
 class CkPupPtrVec : public CkVec< CkZeroPtr<T, PUP_PTR> > {
- public:
-	typedef CkPupPtrVec<T,PUP_PTR> this_type;
-	typedef CkVec< CkZeroPtr<T, PUP_PTR> > super;
-	CkPupPtrVec() {}
-	CkPupPtrVec(int size) :super(size) {}
-
-	~CkPupPtrVec() {
-		for (int i=0;i<length();i++)
-			operator[] (i).destroy();
-	}
-	void pup(PUP::er &p) { pupCkVec(p,*this); }
-	friend void operator|(PUP::er &p,this_type &v) {v.pup(p);}
+  public:
+  typedef CkPupPtrVec<T,PUP_PTR> this_type;
+  typedef CkVec< CkZeroPtr<T, PUP_PTR> > super;
+  CkPupPtrVec() {}
+  CkPupPtrVec(int size) :super(size) {}
+  
+  ~CkPupPtrVec() {
+    for (int i=0;i<length();i++)
+    operator[] (i).destroy();
+  }
+  void pup(PUP::er &p) { pupCkVec(p,*this); }
+  friend void operator|(PUP::er &p,this_type &v) {v.pup(p);}
 };
 
 ///A vector of pointers-to-subclasses of a PUP::able parent
