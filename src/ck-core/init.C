@@ -652,6 +652,7 @@ void _initCharm(int unused_argc, char **argv)
 			register int size = _chareTable[_mainTable[i]->chareIdx]->size;
 			register void *obj = malloc(size);
 			_MEMCHECK(obj);
+			_mainTable[i]->setObj(obj);
 			CkpvAccess(_currentChare) = obj;
 			CkpvAccess(_currentChareType) = _mainTable[i]->chareIdx;
 			register CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);

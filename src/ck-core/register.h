@@ -155,7 +155,11 @@ class MainInfo {
     const char *name;
     int chareIdx;
     int entryIdx;
+    int entryMigCtor;
+    void* obj; // real type is Chare*
     MainInfo(int c, int e) : name("main"), chareIdx(c), entryIdx(e) {}
+    inline void* getObj(void) { return obj; }
+    inline void setObj(void *_obj) { obj=_obj; }
 };
 
 /// Describes a readonly global variable.
