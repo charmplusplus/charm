@@ -96,11 +96,12 @@ void PVT::setGVT(GVTMsg *m)
 #endif
   simdone = m->done;
   estGVT = m->estGVT;
+  CmiAssert((optPVT < 0) || (estGVT <= optPVT));
+  SendsAndRecvs->PurgeBelow(estGVT);
   if (m->resize < 0)
     SendsAndRecvs->shrink();
   else if (m->resize > 0)
     SendsAndRecvs->expand();
-  SendsAndRecvs->PurgeBelow(estGVT);
   CkFreeMsg(m);
   if (!simdone)  SendsAndRecvs->FileResiduals();
   objs.Commit();
@@ -247,14 +248,13 @@ void GVT::computeGVT(UpdateMsg *m)
     else inactive = 0;
 
     // STEP 2: Check if send/recv activity provides lower possible estimate
-    int testResult = SendsAndRecvs->TestThreshold();
     int unmatchedMsg = SendsAndRecvs->FindDifferenceTimestamp(LastSR);
     if ((unmatchedMsg < estGVT) || (estGVT < 0))
       estGVT = unmatchedMsg;
     //SendsAndRecvs->dump();
     
-    //CkPrintf("opt=%d con=%d lastGVT=%d lastMsg=%d\n", 
-    //	     optGVT, conGVT, lastGVT, unmatchedMsg);
+    CkPrintf("opt=%d con=%d lastGVT=%d lastMsg=%d\n", 
+    	     optGVT, conGVT, lastGVT, unmatchedMsg);
     
     // STEP 3: In times of inactivity, GVT must be set to lastGVT
     if ((estGVT < 0) && (lastGVT < 0)) { estGVT = 0; }
@@ -266,7 +266,7 @@ void GVT::computeGVT(UpdateMsg *m)
       SendsAndRecvs->dump();
     }
     
-    //CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
+    CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
 
     // STEP 5: Check for termination conditions
     int term = 0;
@@ -280,6 +280,9 @@ void GVT::computeGVT(UpdateMsg *m)
     }
 
     // STEP 6: Report the new GVT estimate to all PVT branches
+    SendsAndRecvs->PurgeBelow(estGVT);
+    int testResult = SendsAndRecvs->TestThreshold();
+
     gmsg->estGVT = estGVT;
     gmsg->done = term;
     gmsg->resize = testResult;
@@ -308,7 +311,7 @@ void GVT::computeGVT(UpdateMsg *m)
       localStats->SwitchTimer(GVT_TIMER);
 #endif
 #endif
-      SendsAndRecvs->PurgeBelow(estGVT);
+
       UpdateMsg *umsg = SendsAndRecvs->packTable();
       umsg->optPVT = estGVT;
       umsg->conPVT = SendsAndRecvs->offset;

@@ -17,6 +17,8 @@ void rep::init(eventMsg *m)
 // timestamps event message, sets priority, and makes a record of the send
 void rep::registerTimestamp(int idx, eventMsg *m, int offset)
 {
+  PVT *localPVT = (PVT *)CkLocalBranch(ThePVT);
+  CmiAssert(ovt+offset >= localPVT->getGVT());
   m->Timestamp(ovt+offset);
   m->setPriority(ovt+offset-INT_MAX);
   m->fromPE = CkMyPe();  // for comm-based LB

@@ -32,7 +32,7 @@ SRtable::SRtable()
 
 // Destructor: needed to free linked lists
 SRtable::~SRtable()
-{
+{ // why on earth is this implemented like this?
   SRentry *next, *current=residuals;
   while (current) {
     next = current->next;
@@ -52,7 +52,6 @@ void SRtable::Insert(int timestamp, int srSt)
   SRentry *entry;
   //  sanitize();
   CmiAssert(timestamp >= offset);
-  CmiAssert((srSt == 0) || (srSt == 1));
   if (timestamp >= offset+gvtWindow) {
     if (recyc) {
       entry = recyc;
@@ -85,7 +84,7 @@ void SRtable::Insert(int timestamp, int srSt)
 // purge tables below timestamp ts
 void SRtable::PurgeBelow(int ts)
 {
-  sanitize();
+  //sanitize();
   CmiAssert(ts >= offset);
   int start = (ts - offset)/bktSz, i;
   if (ts == offset) return;  // purge nothing
@@ -154,7 +153,7 @@ void SRtable::PurgeBelow(int ts)
       recyc = tmp;
     }
   }
-  sanitize();
+  //sanitize();
 }
 
 // try to file each residual event in table
@@ -222,8 +221,6 @@ UpdateMsg *SRtable::packTable()
   for (i=0; i<numBuckets; i++) {
     j=sends[i].bucket;
     while (j) {
-      CmiAssert(count < um->msgCount);
-      CmiAssert(j->timestamp >= offset);
       um->msgs[count] = *j;
       um->msgs[count].next = NULL;
       count++;
@@ -231,8 +228,6 @@ UpdateMsg *SRtable::packTable()
     }
     j=recvs[i].bucket;
     while (j) {
-      CmiAssert(count < um->msgCount);
-      CmiAssert(j->timestamp >= offset);
       um->msgs[count] = *j;
       um->msgs[count].next = NULL;
       count++;
@@ -246,9 +241,12 @@ UpdateMsg *SRtable::packTable()
 void SRtable::addEntries(UpdateMsg *um)
 {
   int i, bkt;
-  SRentry *entry;
+  SRentry *entry, *bkup_resid;
   //  sanitize();
 
+  // backup residuals
+  bkup_resid = residuals;
+  residuals = NULL;
   // first, resize if necessary
   int oldNumBuckets = numBuckets;
   CmiAssert(offset == um->offset);
@@ -279,6 +277,13 @@ void SRtable::addEntries(UpdateMsg *um)
   recvs = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
   SetOffset(offset);
   FileResiduals();
+  // put residuals back
+  while (bkup_resid) {
+    tmp = bkup_resid;
+    bkup_resid = tmp->next;
+    tmp->next = residuals;
+    residuals = tmp;
+  }
 
   // now move the new stuff in
   for (i=0; i<um->msgCount; i++) {
@@ -305,11 +310,15 @@ void SRtable::shrink()
   // Minimum GVT Window is 8; minimum bucket size is 1
   // Both should always be a power of 2 to make life easy...
   int oldNumBuckets = numBuckets;
+  SRentry *tmp, *bkup_resid;
+
   if (gvtWindow > 16) gvtWindow = gvtWindow-8;
   else return;
   numBuckets = gvtWindow/8;
+  // backup residuals
+  bkup_resid = residuals;
+  residuals = NULL;
   // move all elements to residuals
-  SRentry *tmp;
   for (int i=0; i<oldNumBuckets; i++) {
     while (sends[i].bucket) {
       tmp = sends[i].bucket;
@@ -324,7 +333,7 @@ void SRtable::shrink()
       residuals = tmp;
     }
   }
-  // free and realloc arrays
+  // free and re-malloc arrays
   free(sends);
   free(recvs);
   inBuckets = 0;
@@ -333,16 +342,27 @@ void SRtable::shrink()
   recvs = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
   SetOffset(offset);
   FileResiduals();
+  // put residuals back
+  while (bkup_resid) {
+    tmp = bkup_resid;
+    bkup_resid = tmp->next;
+    tmp->next = residuals;
+    residuals = tmp;
+  }
 }
 
 void SRtable::expand()
 {
   int oldNumBuckets = numBuckets;
-  if (gvtWindow > 2048) return;
+  SRentry *tmp, *bkup_resid;
+
+  if (gvtWindow > MAX_GVT_WINDOW) return;
   gvtWindow = gvtWindow+8;
   numBuckets = gvtWindow/8;
+  // backup residuals
+  bkup_resid = residuals;
+  residuals = NULL;
   // move all elements to residuals
-  SRentry *tmp;
   for (int i=0; i<oldNumBuckets; i++) {
     while (sends[i].bucket) {
       tmp = sends[i].bucket;
@@ -357,7 +377,7 @@ void SRtable::expand()
       residuals = tmp;
     }
   }
-  // free and realloc arrays
+  // free and re-malloc arrays (fastest for expand -- avoids unnecessary copy)
   free(sends);
   free(recvs);
   inBuckets = 0;
@@ -366,6 +386,13 @@ void SRtable::expand()
   recvs = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
   SetOffset(offset);
   FileResiduals();
+  // put residuals back
+  while (bkup_resid) {
+    tmp = bkup_resid;
+    bkup_resid = tmp->next;
+    tmp->next = residuals;
+    residuals = tmp;
+  }
 }
 
 void SRtable::dump()

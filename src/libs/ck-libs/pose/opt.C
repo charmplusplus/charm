@@ -38,6 +38,7 @@ void opt::Step()
   if ((POSE_endtime > -1) && (lastGVT + timeLeash > POSE_endtime))
     timeLeash = POSE_endtime - lastGVT + 1;
 
+  // This code is currently operating under BEST FIRST mode
   if ((ev->timestamp >= 0) && (ev->timestamp <= lastGVT + timeLeash)) {
     int fix_timestamp = ev->timestamp;
     while (ev->timestamp == fix_timestamp) {

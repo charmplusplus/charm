@@ -52,7 +52,12 @@ void sim::Step()
     localStats->TimerStart(SIM_TIMER);
   else localStats->SwitchTimer(SIM_TIMER);
 #endif
-  myStrat->Step(); // Call Step on strategy
+  if (eq->currentPtr->timestamp >= 0) {
+    prioMsg *pm = new prioMsg;
+    pm->setPriority(eq->currentPtr->timestamp);
+    POSE_Objects[thisIndex].Step(pm);
+  }
+  //  myStrat->Step(); // Call Step on strategy
 #ifdef POSE_STATS_ON
   if (!tstat)
     localStats->TimerStop();

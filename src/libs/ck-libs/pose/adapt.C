@@ -26,7 +26,8 @@ void adapt::Step()
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(RB_TIMER);      
 #endif
-    timeLeash = MIN_LEASH;
+    //CkPrintf("<%d:%d @ %d (%d)", RBevent->evID.id, RBevent->evID.pe, RBevent->timestamp, timeLeash);
+    timeLeash = MIN_LEASH-1;
     Rollback(); 
 #ifdef POSE_STATS_ON
     localStats->SwitchTimer(SIM_TIMER);      

@@ -1,6 +1,6 @@
 // File: pose.C
 // Global POSE data and functions; includes and dependencies handled here
-// Last Modified: 5.30.01 by Terry L. Wilmarth
+// Last Modified: 25.11.03 by Terry L. Wilmarth
 
 #include "pose.h"
 #include "pose.def.h"
@@ -29,7 +29,7 @@ void POSE_init()
   // Create the communication library for POSE
   ComlibInstanceHandle cinst = CkGetComlibInstance();
   // Create the communication strategy for POSE
-  Strategy *strategy = new StreamingStrategy(10,10);
+  Strategy *strategy = new StreamingStrategy(10,2);
   //Register the strategy
   cinst.setStrategy(strategy);
 #endif

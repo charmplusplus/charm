@@ -24,7 +24,7 @@ class rep
   void elapse(int dt) { ovt += dt; }  // user calls to elapse time
   void update(int t) { ovt = (ovt < t) ? t : ovt; }  // call at start of event
   virtual void terminus() { 
-    CkPrintf("Object %d terminus at time %d\n", myHandle, ovt);
+    //CkPrintf("Object %d terminus at time %d\n", myHandle, ovt);
   }
   virtual Event *getCommitEvent(Event *e);  // get event to rollback to
 
