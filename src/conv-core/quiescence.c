@@ -121,7 +121,8 @@ CQdState CQdStateCreate(void)
 	state->nChildren = CmiNumSpanTreeChildren(CmiMyPe());
 	state->parent = CmiSpanTreeParent(CmiMyPe());
 	state->children = (int *) malloc(state->nChildren*sizeof(int));
-	_MEMCHECK(state->children);
+    /* fixed bug on SP3, when nChildren is 0, NULL will be returned by malloc */
+	if (state->nChildren) _MEMCHECK(state->children);
 	CmiSpanTreeChildren(CmiMyPe(), state->children);
 
 	return state;
