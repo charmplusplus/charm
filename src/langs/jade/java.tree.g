@@ -464,7 +464,7 @@ variableDef[boolean classVarq, boolean outputOnNewLine]
                     if (J.isX(m, "public") && J.isX(m, "static") && J.isX(m, "readonly")) {
                         if (ARRAY_DECLARATOR == ts.getType() || ARRAY_DECLARATOR == ts.getFirstChild().getType())
                             J.fatalError(m, "readonly arrays not supported.");
-                        else if (ts.getFirstChild().getText().equalsIgnoreCase("MSA2D"))
+                        else if (J.isStrMSA(ts.getFirstChild().getText()))
                             J.fatalError(m, "readonly msa not supported");
                         // jade: module M { class C { public static readonly int ro; } }
                         // .ci: module M { readonly int ro; }
@@ -593,28 +593,6 @@ variableDef[boolean classVarq, boolean outputOnNewLine]
                     String cproxytype = "CProxy_" + vi.getFirstChild().getFirstChild().getFirstChild().getNextSibling().getFirstChild().getFirstChild().getText();
                     J.c.append(J.indent() + cproxytype + " " + varName + "(" + cidName + ");\n");
                 }
-
-                // MSA2D m = new MSA2D(a, b, c, d, ...);
-                // becomes MSA2D<a, b, c> m = new MSA2D<a, b, c>(d, ...);
-//                 else if (ts.getFirstChild().getText().equalsIgnoreCase("MSA2D")) {
-//                     System.out.println("VARIABLE_DEF: MSA2D reached");
-//                     if (outputOnNewLine) J.c.append(J.indent());
-//                     J.c.append(J.printTypeSpec(ts, varName));
-//                     if (vi == null) {
-//                         J.fatalError(vd, "MSA2D needs parameters");
-//                     } else {
-//                         J.assert1((EXPR == vi.getFirstChild().getType())
-//                             && (LITERAL_new == vi.getFirstChild().getFirstChild().getType())
-//                             && J.getNode(vi, "fff").getText().equals("MSA2D"));
-//                         AST p1 = J.getNode(vi, "fffnf");
-//                         AST p2 = p1.getNextSibling();
-//                         AST p3 = p2.getNextSibling();
-//                         J.c.append("<"+J.pE(p1)+","+J.pE(p2)+","+J.pE(p3)+"> ");
-//                         J.c.append(varName + " = new " + J.getNode(vi, "fff").getText());
-//                         J.c.append("<"+J.pE(p1)+","+J.pE(p2)+","+J.pE(p3)+"> ");
-//                         J.c.append("(" + J.pElist(p3.getNextSibling())+ ");\n");
-//                     }
-//                 }
 
                 // local non-chare/non-ChareArray variable
                 else {
