@@ -14,7 +14,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.2  1997-07-26 16:04:45  jyelon
+# Revision 1.3  1997-08-18 18:25:55  jyelon
+# *** empty log message ***
+#
+# Revision 1.2  1997/07/26 16:04:45  jyelon
 # Added stuff.
 #
 #
@@ -36,13 +39,13 @@ html:
 	latex2html manual.tex
 
 install:
-	rm -f /expand1/groupMosaic/distrib/converse.manual.ps.gz
-	cp manual.ps /expand1/groupMosaic/distrib/converse.manual.ps
-	gzip /expand1/groupMosaic/distrib/converse.manual.ps
-	chmod 664 /expand1/groupMosaic/distrib/converse.manual.ps.gz
-	rm -f /expand1/groupMosaic/html-manuals/converse.manual/*
-	cp manual/* /expand1/groupMosaic/html-manuals/converse.manual/
-	chmod 664 /expand1/groupMosaic/html-manuals/converse.manual/*
+	rm -f /expand1/groupMosaic/distrib/convext.manual.ps.gz
+	cp manual.ps /expand1/groupMosaic/distrib/convext.manual.ps
+	gzip /expand1/groupMosaic/distrib/convext.manual.ps
+	chmod 664 /expand1/groupMosaic/distrib/convext.manual.ps.gz
+	rm -f /expand1/groupMosaic/html-manuals/convext.manual/*
+	cp manual/* /expand1/groupMosaic/html-manuals/convext.manual/
+	chmod 664 /expand1/groupMosaic/html-manuals/convext.manual/*
 
 all: ps html install
 
