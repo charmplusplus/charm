@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-07-05 22:11:59  sanjeev
+ * Revision 2.3  1995-07-05 22:51:39  sanjeev
+ * added comments at top
+ *
+ * Revision 2.2  1995/07/05  22:11:59  sanjeev
  * put SetEnv_EP(env, 0) in VidSend() to fix CM5 bug
  *
  * Revision 2.1  1995/06/08  17:07:12  gursoy
@@ -32,6 +35,34 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
+
+
+/************************************************************************
+Comments : 7/5/95 (after debugging bug on CM5 with Megatest++).
+Bug was intermittent crash in TTAB and ACC.
+Caused due to EP field not being filled in VidSend, so causing
+EpLanguageTable to be indexed by 65535 in CallProcessMsg.
+The VidMsg msg-type is used for
+1. In SendMsg when a msg is sent to a vid.
+In this case the EP field holds the actual user EP in the chare.
+The vidEP field holds "VidQueueUpInVidBlock_EP".
+2. In VidSend (called from NewChareMsg in ProcessMsg() after chare has 
+actually been created) to tell vid to send over its buffered msgs.
+Here vidEP field holds "VidSendOverMessages_EP"
+
+The vidEP field is used to distinguish the two cases for a VidMsg 
+in the switch in ProcessMsg().
+As the real EP field is not used in case 2, we could use it to encode
+VidSendOverMessages_EP, and send the msg as a regular BocMsg.
+So in case 1, we dont need the vidEP field, so can call VidQueueUpInVidBlock()
+directly from ProcessMsg().
+So we dont need the vidEP field, so we can possibly
+save 14 bits in tag2 of ENVELOPE.
+************************************************************************/
+
+
+
+
 #include "chare.h"
 #include "globals.h"
 #include "performance.h"
