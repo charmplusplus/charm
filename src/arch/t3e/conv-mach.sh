@@ -11,3 +11,4 @@ CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt'
 CMK_QT='cray-t3e-cc'
 CMK_XIOPTS=''
+CMK_NO_BUILD_SHARED="true"
