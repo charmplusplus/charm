@@ -712,9 +712,7 @@ rm -f CHARMC-MOD.TMP.dat CHARMC-MOD.TMP.c CHARMC-MOD.TMP.o
 ###############################################################################
 
 if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
-    if ($CMK_LDRO_WORKS) then
-        ($ECHOCMD ; $CMK_LDRO CHARMC-PRE.TMP.xxx $OPTS_LDRO -L$CHARMLIB $OBJECTFILES $LIBRARIES $BAL_OBJ)
-    else if ($LANGUAGE == charm) then
+    if ($LANGUAGE == charm) then
 	echo '_CK_module_init_fn() {}' > CHARMC-MOD.TMP.c
 	($ECHOCMD ; $CMK_CC $OPTS_CC -c -o CHARMC-MOD.TMP.o CHARMC-MOD.TMP.c)
         ($ECHOCMD ; $CMK_LD $OPTS_LD -o CHARMC-PRE.TMP.xxx -L$CHARMLIB \
@@ -731,9 +729,9 @@ if (($LANGUAGE == charm) || ($LANGUAGE == charm++)) then
                       -lck-cplus-y -lconv-cplus-y -lconv-core -lck-defmain-cpp\
 		      $CMK_LIBS -lm)
     endif
-    $CMK_NM CHARMC-PRE.TMP.xxx | csh -fc "$CMK_NM_FILTER" > CHARMC-PRE.TMP.nm
+    strings CHARMC-PRE.TMP.xxx | awk '/^charmc autoinit / { print $3; }' > CHARMC-PRE.TMP.nm
     if ($status) goto failure
-    awk '(/^_CK_.*_init$/&&(\!/^_CK_.*_struct_init$/)) { print substr($1, 5, length($1)-9); }' < CHARMC-PRE.TMP.nm | sort | uniq > CHARMC-MOD.TMP.dat
+    sort < CHARMC-PRE.TMP.nm | uniq > CHARMC-MOD.TMP.dat
     echo 'Charm Modules: '`cat CHARMC-MOD.TMP.dat`
     rm -f CHARMC-MOD.TMP.c
     awk '{print "extern void _CK_"$1"_init();";}' < CHARMC-MOD.TMP.dat >> CHARMC-MOD.TMP.c

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1997-03-18 20:25:57  milind
+ * Revision 2.10  1997-07-15 21:09:58  jyelon
+ * Got rid of the ^$#*&&$ NM stuff once and for all!
+ *
+ * Revision 2.9  1997/03/18 20:25:57  milind
  * Changed another address to int conversion to address to size_t conversion.
  *
  * Revision 2.8  1996/08/01 21:07:30  jyelon
@@ -495,6 +498,8 @@ void GenerateRegisterCalls()
 	EP *ep ;
 
 /* generate the beginning of this Module's Init function */
+	fprintf(outfile,"char *_CK_%s_id=\"\\0charmc autoinit %s\";\n",
+		CoreName, CoreName);
 	fprintf(outfile,"extern \"C\" void _CK_%s_init() ;\n",CoreName) ;
 	fprintf(outfile,"void _CK_%s_init()\n{\n",CoreName) ;
 

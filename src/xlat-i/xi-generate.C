@@ -292,6 +292,9 @@ void GenerateRegisterCalls(ofstream& top, ofstream& bot)
   char str[2048] ;
 
 /* generate the beginning of this Module's Init function */
+  sprintf(str,"char *_CK_%s_id=\"\\0charmc autoinit %s\";\n",
+	  thismodule->name, thismodule->name);
+  bot << str ;
   sprintf(str,"extern \"C\" void _CK_%s_init() ;\n",thismodule->name) ;
   bot << str ;
   sprintf(str,"void _CK_%s_init()\n{\n",thismodule->name) ;

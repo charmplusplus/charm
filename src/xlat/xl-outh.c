@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-10-30 20:04:59  jyelon
+ * Revision 2.7  1997-07-15 21:09:56  jyelon
+ * Got rid of the ^$#*&&$ NM stuff once and for all!
+ *
+ * Revision 2.6  1995/10/30 20:04:59  jyelon
  * Fixed same bug again.
  *
  * Revision 2.5  1995/10/30  19:42:48  jyelon
@@ -413,6 +416,9 @@ CreateOwnImportInitFunction()
 	if (ModuleDefined == NULL)
 		error("Module Undefined? Something Wrong!", EXIT);
 	outh = outh2;
+	fprintf(outh,
+		"char *_CK_%s_struct_id=\"\\0charmc autoinit %s_struct\";\n",
+		ModuleDefined->name, ModuleDefined->name);
 	fprintf(outh, "void %s%s_struct_init()\n{\n", CkPrefix,
 		ModuleDefined->name);
 	fprintf(outh, "/* ImportStructInit */\n");
@@ -451,9 +457,9 @@ SYMTABPTR       table;
 	CallOtherModuleInits(table->right);
 	outh = outh2;
 	if ((table->idtype == MODULENAME) && (table->declflag == IMPORTED))
-	{
-		fprintf(outh, "\n  %s%s_init();", CkPrefix, table->name);
-	}
+	  {
+	    fprintf(outh, "\n  %s%s_init();", CkPrefix, table->name);
+	  }
 }
 
 void
@@ -778,6 +784,9 @@ void
 CreateOwnModuleInitFunction()
 {
 	outh = outh2;
+	fprintf(outh,
+		"char *_CK_%s_id=\"\\0charmc autoinit %s\";\n",
+		ModuleDefined->name, ModuleDefined->name);
 	fprintf(outh, "%s%s_init()\n",CkPrefix,ModuleDefined->name);
 	fprintf(outh, "{\n  static int visited=0;\n  int count;\n\n");
 	fprintf(outh, "  if (visited) return; else visited=1;\n");
