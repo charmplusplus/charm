@@ -267,18 +267,12 @@ perf-proj.o : perf-proj.c performance.h $(CKHEADERS)
 
 charm++libs: charmlibs libck-cplus-y.o libck-cplus-y.o 
 
-LIBCK_CPLUS_Y=ck.cplus.o acc.cplus.o mono.cplus.o
+LIBCK_CPLUS_Y=cplus.o 
 libck-cplus-y.o: $(LIBCK_CPLUS_Y)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CPLUS_Y)
 
-ck.cplus.o: ck.cplus.C $(CKHEADERS) c++interface.h
-	$(CHARMC) -o ck.cplus.o ck.cplus.C
-
-acc.cplus.o: acc.cplus.C $(CKHEADERS) c++interface.h acc.h
-	$(CHARMC) -o acc.cplus.o acc.cplus.C
-
-mono.cplus.o: mono.cplus.C $(CKHEADERS) c++interface.h mono.h
-	$(CHARMC) -o mono.cplus.o mono.cplus.C
+cplus.o: cplus.C $(CKHEADERS) c++interface.h
+	$(CHARMC) -o cplus.o cplus.C
 
 ###############################################################################
 #
