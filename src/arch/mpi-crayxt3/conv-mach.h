@@ -64,6 +64,7 @@
 
 #define CMK_NO_SOCKETS                                     1
 
+#undef  CMK_CCS_AVAILABLE
 #define CMK_CCS_AVAILABLE                                  0
 
 #endif
