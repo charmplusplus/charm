@@ -66,7 +66,7 @@ static const char *idx2str(const CkArrayMessage *m)
 /*LBDB object handles are fixed-sized, and not necc.
 the same size as ArrayIndices.
 */
-static LDObjid idx2LDObjid(const CkArrayIndex &idx)
+LDObjid idx2LDObjid(const CkArrayIndex &idx)
 {
   LDObjid r;
   int i;
@@ -1454,8 +1454,10 @@ void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 	CkLocRec *rec=elementNrec(idx);
 #if CMK_LBDB_ON
 	if (type==CkDeliver_queue) {
+		if (!(opts & CK_MSG_LB_NOTRACE)) {
 		if(rec!=NULL) the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(), rec->lookupProcessor());
 		else /*rec==NULL*/ the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(),homePe(msg->array_index()));
+		}
 	}
 #endif
 	if (rec!=NULL) rec->deliver(msg,type,opts);

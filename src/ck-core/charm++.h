@@ -498,7 +498,7 @@ class CkDelegateMgr : public IrrGroup {
     virtual void ArrayCreate(CkDelegateData *pd,int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a);
     virtual void ArraySend(CkDelegateData *pd,int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a);
     virtual void ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a);
-    virtual void ArraySectionSend(CkDelegateData *pd,int ep,void *m,CkArrayID a,CkSectionID &s);
+    virtual void ArraySectionSend(CkDelegateData *pd,int ep,void *m,CkArrayID a,CkSectionID &s,int opts);
     virtual void initDelegateMgr(CProxy *proxy)  {}
     virtual CkDelegateData* ckCopyDelegateData(CkDelegateData *data) {
         data->ref();
