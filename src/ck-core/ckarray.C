@@ -352,7 +352,7 @@ void CProxyElement_ArrayBase::pup(PUP::er &p)
 void CProxySection_ArrayBase::pup(PUP::er &p)
 {
   CProxy_ArrayBase::pup(p);
-  p | _sid;
+  _sid.pup(p);
 }
 
 /*********************** CkArray Creation *************************/
