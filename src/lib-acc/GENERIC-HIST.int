@@ -12,9 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1995-06-13 10:45:22  jyelon
- * Initial revision
+ * Revision 1.2  1995-06-20 23:03:03  jyelon
+ * *** empty log message ***
  *
+# Revision 1.1  1995/06/13  10:45:22  jyelon
+# Initial revision
+#
 # Revision 1.1  1995/06/13  10:06:34  jyelon
 # Initial revision
 #
@@ -25,9 +28,10 @@
 
 interface module GENERIC_MODULE_NAME {
 
-message {
-	int size;
-    	varSize GENERIC_DATATYPE  data[];
+message
+{
+    int size;
+    varSize GENERIC_DATATYPE  data[];
 } MSG;
 
 Create();
