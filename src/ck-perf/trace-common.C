@@ -177,7 +177,7 @@ extern "C"
 void traceUserBracketEvent(int e, double beginT, double endT)
 {
 #ifndef CMK_OPTIMIZE
-  if (CpvAccess(traceOn))
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
     CkpvAccess(_traces)->userBracketEvent(e, beginT, endT);
 #endif
 }
