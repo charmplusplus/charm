@@ -11,10 +11,12 @@ CkGroupID wslb;
 #if CMK_LBDB_ON
 
 // Temporary vacating flags
+// Set PROC to -1 to disable
 
+#define VACATE_PROC -1
 //#define VACATE_PROC (CkNumPes()/2)
-//#define VACATE_AFTER 30
-//#define UNVACATE_AFTER 15
+#define VACATE_AFTER 30
+#define UNVACATE_AFTER 15
 
 void CreateWSLB()
 {
@@ -332,7 +334,7 @@ CmiBool WSLB::QueryBalanceNow(int step)
     first_step_time = now;
   else if (CkMyPe() == VACATE_PROC && now > VACATE_AFTER
 	   && now < (VACATE_AFTER+UNVACATE_AFTER)) {
-    if (vacate == CmiFalse)
+    if (vacate == CmiFalse) 
       CkPrintf("PE %d vacating at %f\n",CkMyPe(),now);
     vacate = CmiTrue;
   } else {
@@ -350,6 +352,10 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
   // Compute the average load to see if we are overloaded relative
   // to our neighbors
   double myload = myStats.total_walltime - myStats.idletime;
+  const double myusage = myStats.total_cputime / myload;
+
+  CkPrintf("PE %d myload = %f myusage = %f\n",CkMyPe(),myload,myusage);
+
   double avgload = myload;
   int i;
   int unvacated_neighbors = 0;
@@ -359,13 +365,18 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
       continue;
 
     // Scale times we need appropriately for relative proc speeds
-    const double scale =  ((double)myStats.proc_speed) 
-      / stats[i].proc_speed;
+    double hisload = stats[i].total_walltime - stats[i].idletime;
+    const double hisusage = stats[i].total_cputime / hisload;
+    const double scale =  ((double)myStats.proc_speed * myusage) 
+      / (stats[i].proc_speed * hisusage);
 
+    hisload *= scale;
     stats[i].total_walltime *= scale;
     stats[i].idletime *= scale;
 
-    avgload += (stats[i].total_walltime - stats[i].idletime);
+    //    CkPrintf("PE %d %d hisload = %f hisusage = %f\n",
+    //	     CkMyPe(),i,hisload,hisusage);
+    avgload += hisload;
     unvacated_neighbors++;
   }
   if (vacate && unvacated_neighbors == 0)
@@ -487,6 +498,7 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
     CkPrintf("PE %d vacating: Sent away %d of %d objects\n",
 	     CkMyPe(),migrate_count,myStats.obj_data_sz);
   }
+  //  CkPrintf("PE %d has %d objects\n",myStats.obj_data_sz - migrate_count);
 
   //  if (migrate_count > 0) {
   //    CkPrintf("PE %d migrating %d elements\n",CkMyPe(),migrate_count);
