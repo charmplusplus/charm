@@ -1,7 +1,7 @@
 include ../Makefile.in
 
 
-CFLAGS = $(COPTIONS) $(OPTFLAGS) -I. $(INCDIR)
+CFLAGS = $(OPTFLAGS) -I. 
 
 
 OBJS = coarsen.o fm.o initpart.o match.o ccgraph.o \
@@ -19,7 +19,9 @@ OBJS = coarsen.o fm.o initpart.o match.o ccgraph.o \
 .c.o:
 	$(CC) $(CFLAGS) -c $*.c
 
-../libmetis.a: $(OBJS)
+DEST=$(LIBDIR)/libmetis.a
+
+$(DEST): $(OBJS)
 	$(CC) -o $@ $(OBJS)
 
 clean:

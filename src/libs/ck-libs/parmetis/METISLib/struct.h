@@ -24,6 +24,11 @@ typedef short idxtype;
 #endif
 
 #define MAXIDX	(1<<8*sizeof(idxtype)-2)
+/* This is the type passed as the size argument to malloc().
+  It can be helpful to have this be longer than "int"
+  on 64-bit machines that still have a 32-bit "int".
+*/
+typedef unsigned long memsize_t;
 
 
 /*************************************************************************
@@ -99,7 +104,7 @@ typedef struct vedegreedef VEDegreeType;
 **************************************************************************/
 struct workspacedef {
   idxtype *core;			/* Where pairs, indices, and degrees are coming from */
-  int maxcore, ccore;
+  memsize_t maxcore, ccore;
 
   EDegreeType *edegrees;
   VEDegreeType *vedegrees;

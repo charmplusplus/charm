@@ -20,6 +20,8 @@
 **************************************************************************/
 void AllocateWorkSpace(CtrlType *ctrl, GraphType *graph, int nparts)
 {
+	memsize_t nedges=graph->nedges;
+	memsize_t nvtxs=graph->nvtxs;
   ctrl->wspace.pmat = NULL;
 
   if (ctrl->optype == OP_KMETIS) {
@@ -42,34 +44,34 @@ void AllocateWorkSpace(CtrlType *ctrl, GraphType *graph, int nparts)
 
          Total = 5*nparts + 3*nvtxs + 2*nedges 
     */
-    ctrl->wspace.maxcore = 3*(graph->nvtxs+1) +                 /* Match/Refinement vectors */
+    ctrl->wspace.maxcore = 3*(nvtxs+1) +                 /* Match/Refinement vectors */
                            5*(nparts+1) +                       /* Partition weights etc */
-                           graph->nvtxs*(sizeof(ListNodeType)/sizeof(idxtype)) + /* Greedy k-way balance/refine */
+                           nvtxs*(sizeof(ListNodeType)/sizeof(idxtype)) + /* Greedy k-way balance/refine */
                            20  /* padding for 64 bit machines */
                            ;
   }
   else if (ctrl->optype == OP_KVMETIS) {
     ctrl->wspace.edegrees = NULL;
-    ctrl->wspace.vedegrees = (VEDegreeType *)GKmalloc(graph->nedges*sizeof(VEDegreeType), "AllocateWorkSpace: vedegrees");
+    ctrl->wspace.vedegrees = (VEDegreeType *)GKmalloc(nedges*sizeof(VEDegreeType), "AllocateWorkSpace: vedegrees");
     ctrl->wspace.auxcore = (idxtype *)ctrl->wspace.vedegrees;
 
     ctrl->wspace.pmat = idxmalloc(nparts*nparts, "AllocateWorkSpace: pmat");
 
     /* Memory requirements for different phases are identical to KMETIS */
-    ctrl->wspace.maxcore = 3*(graph->nvtxs+1) +                 /* Match/Refinement vectors */
+    ctrl->wspace.maxcore = 3*(nvtxs+1) +                 /* Match/Refinement vectors */
                            3*(nparts+1) +                       /* Partition weights etc */
-                           graph->nvtxs*(sizeof(ListNodeType)/sizeof(idxtype)) + /* Greedy k-way balance/refine */
+                           nvtxs*(sizeof(ListNodeType)/sizeof(idxtype)) + /* Greedy k-way balance/refine */
                            20  /* padding for 64 bit machines */
                            ;
   }
   else {
-    ctrl->wspace.edegrees = (EDegreeType *)idxmalloc(graph->nedges, "AllocateWorkSpace: edegrees");
+    ctrl->wspace.edegrees = (EDegreeType *)idxmalloc(nedges, "AllocateWorkSpace: edegrees");
     ctrl->wspace.vedegrees = NULL;
     ctrl->wspace.auxcore = (idxtype *)ctrl->wspace.edegrees;
 
-    ctrl->wspace.maxcore = 5*(graph->nvtxs+1) +                 /* Refinement vectors */
+    ctrl->wspace.maxcore = 5*(nvtxs+1) +                 /* Refinement vectors */
                            4*(nparts+1) +                       /* Partition weights etc */
-                           2*graph->ncon*graph->nvtxs*(sizeof(ListNodeType)/sizeof(idxtype)) + /* 2-way refinement */
+                           2*graph->ncon*nvtxs*(sizeof(ListNodeType)/sizeof(idxtype)) + /* 2-way refinement */
                            2*graph->ncon*(NEG_GAINSPAN+PLUS_GAINSPAN+1)*(sizeof(ListNodeType *)/sizeof(idxtype)) + /* 2-way refinement */
                            20  /* padding for 64 bit machines */
                            ;
@@ -101,7 +103,7 @@ int WspaceAvail(CtrlType *ctrl)
 /*************************************************************************
 * This function allocate space from the core 
 **************************************************************************/
-idxtype *idxwspacemalloc(CtrlType *ctrl, int n)
+idxtype *idxwspacemalloc(CtrlType *ctrl, memsize_t n)
 {
   n += n%2; /* This is a fix for 64 bit machines that require 8-byte pointer allignment */
 
@@ -125,7 +127,7 @@ void idxwspacefree(CtrlType *ctrl, int n)
 /*************************************************************************
 * This function allocate space from the core 
 **************************************************************************/
-float *fwspacemalloc(CtrlType *ctrl, int n)
+float *fwspacemalloc(CtrlType *ctrl, memsize_t n)
 {
   n += n%2; /* This is a fix for 64 bit machines that require 8-byte pointer allignment */
 
@@ -137,7 +139,7 @@ float *fwspacemalloc(CtrlType *ctrl, int n)
 /*************************************************************************
 * This function frees space from the core 
 **************************************************************************/
-void fwspacefree(CtrlType *ctrl, int n)
+void fwspacefree(CtrlType *ctrl, memsize_t n)
 {
   n += n%2; /* This is a fix for 64 bit machines that require 8-byte pointer allignment */
 
