@@ -21,12 +21,17 @@
 
 #define MAX_ENTRIES 500
 
+//*******************************************************
+//* TIME IS ALWAYS IN SECONDS UNTIL IT IS PRINTED OUT,  *
+//* IN WHICH CASE IT IS CONVERTED TO (us)               *
+//*******************************************************
+
 //! track statistics for all entry points
 class StatTable {
   public:
     StatTable();
     ~StatTable();
-    void init(char** name, char** desc, int argc);
+    void init(int argc);
     //! one entry is called for 'time' seconds, value is counter reading 
     void setEp(int epidx, int stat, long long value, double time);
     //! write three lines for each stat:
@@ -36,15 +41,22 @@ class StatTable {
     void write(FILE* fp);
     void clear();
     int numStats() { return numStats_; }
+    //! do a reduction across processors to calculate the total count for
+    //! each count, and if the count has flops, etc, then calc the 
+    //! the flops/s, etc...
+    void doReduction(int phase, double idleTime);
 
   private:
     //! struct to maintain statistics
     struct Statistics {
       char*  name;                    // name of stat being tracked
       char*  desc;                    // description of stat being tracked
-      unsigned int numCalled[MAX_ENTRIES];  // total number times called
-      double avgCount[MAX_ENTRIES];   // track average of value
-      double totTime[MAX_ENTRIES];    // total time associated with counter
+      unsigned int numCalled  [MAX_ENTRIES];  // total number times called
+      double       avgCount   [MAX_ENTRIES];  // track average of value
+      double       stdDevCount[MAX_ENTRIES];  // track stddev of value
+      double       totTime    [MAX_ENTRIES];  // total time assoc with counter
+      long long    maxCount   [MAX_ENTRIES];  // maximum count among all times
+      long long    minCount   [MAX_ENTRIES];  // minimum count among all times
 
       Statistics(): name(NULL) { }
     };
@@ -58,14 +70,22 @@ class StatTable {
 class CountLogPool {
   public:
     CountLogPool();
-    ~CountLogPool();
+    ~CountLogPool() { }
+    // if phase is -1 and always has been, write normal filename
+    // if phase not -1, but has been higher before, write filename + "phaseX"
     void write(int phase=-1) ;
+    // if phase is -1 and always has been, write normal filename
+    // if phase not -1, but has been higher before, write filename + "phaseX"
     void writeSts(int phase=-1);
     FILE* openFile(int phase=-1);
-    void setEp(int epidx, long long count1, long long count2, double time);
+    void setEp(int epidx, 
+	       int index1, long long count1, 
+	       int index2, long long count2, 
+	       double time);
     void clearEps() { stats_.clear(); }
-    void init(char** name, char** desc, int argc) { 
-      stats_.init(name, desc, argc);
+    void init(int argc) { stats_.init(argc); }
+    void doReduction(int phase, double idleTime) { 
+      stats_.doReduction(phase, idleTime); 
     }
 
   private:
@@ -110,25 +130,25 @@ class TraceCounter : public Trace {
       int ep,      //! Charm++ entry point (will correspond to sts file) 
       int srcPe,   //! Which PE originated the call
       int ml=0);   //! message size
-    void endExecute(void);
+    void endExecute();
     //! begin/end idle time for this pe
-    void beginIdle(void) { if (traceOn_) { startIdle_ = TraceTimer(); } }
-    void endIdle(void) { 
+    void beginIdle() { if (traceOn_) { startIdle_ = TraceTimer(); } }
+    void endIdle() { 
       if (traceOn_) { idleTime_ += TraceTimer()-startIdle_; }
     }
     //! begin/end the process of packing a message (to send)
-    void beginPack(void);
-    void endPack(void);
+    void beginPack();
+    void endPack();
     //! begin/end the process of unpacking a message (can occur before calling
     //! a entry point or during an entry point when 
-    void beginUnpack(void);
-    void endUnpack(void);
+    void beginUnpack();
+    void endUnpack();
     //! ???
     void enqueue(envelope *e) { }
     void dequeue(envelope *e) { }
     //! begin/end of execution
-    void beginComputation(void);
-    void endComputation(void) { }
+    void beginComputation();
+    void endComputation();
     //! clear all data collected for entry points
     void traceClearEps();
     //! write the summary sts file for this trace
@@ -143,10 +163,11 @@ class TraceCounter : public Trace {
       char*       arg;
       char*       desc;
       CounterArg* next;
+      int         index;  // index into statTable
 
-      CounterArg(): code(-1), arg(NULL), desc(NULL), next(NULL) { }
+      CounterArg(): code(-1), arg(NULL), desc(NULL), next(NULL), index(-1) { }
       CounterArg(int c, char* a, char* d):
-        code(c), arg(a), desc(d), next(NULL) { }
+        code(c), arg(a), desc(d), next(NULL), index(-1) { }
       void setValues(int _code, char* _arg, char* _desc) {
         code = _code;  arg = _arg;  desc = _desc;
       }
@@ -170,6 +191,8 @@ class TraceCounter : public Trace {
     bool        overview_;      // if true, just measure between phases
     bool        switchRandom_;  // if true, switch counters randomly
     bool        switchByPhase_; // if true, switch counters only at phases
+    bool        noLog_;         // if true, don't write a log file
+    bool        writeByPhase_;  // if true, write out a log file every phase
 
     // store between start/stop of counter read
     int         execEP_;        // id currently executing entry point
@@ -178,11 +201,12 @@ class TraceCounter : public Trace {
     int         genStart_;      // track value of start_counters
 
     // store state
-    double      idleTime_;      // total idle time
-    int         phase_;         // current phase
-    bool        traceOn_;       // true if trace is turned on
-    TC_Status   status_;        // to prevent errors
-    bool        dirty_;         // true if endExecute called 
+    double      idleTime_;        // total idle time
+    int         phase_;           // current phase
+    int         reductionPhase_;  // for reduction output
+    bool        traceOn_;         // true if trace is turned on
+    TC_Status   status_;          // to prevent errors
+    bool        dirty_;           // true if endExecute called 
 
     //! start/stop the overall counting ov eps (don't write to logCount, 
     //! just print to screen

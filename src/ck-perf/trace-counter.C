@@ -18,6 +18,7 @@
 #include "trace-counter.h"
 #include "ck.h"
 #include <inttypes.h>
+#include <values.h>
 
 #define DEBUGF(x) // CmiPrintf x
 #define VER 1.0
@@ -26,14 +27,123 @@
 extern "C" int start_counters(int e0, int e1);
 extern "C" int read_counters(int e0, long long *c0, int e1, long long *c1);
 
+// a message will be composed of 2*numCounters + NUM_EXTRA_PERF
+// reduction[0-(numStats-1)] correspond to counters 0-(numStats-1)
+// the next is phase (only write if CmiMyPe() == 0)
+// the next is the idle time (if any calculated)
+// the next four are (respectively) flops/s, l1 miss%, l2 miss%, tlb miss%
+// write -1 if not able to calculate
+static const int NUM_EXTRA_PERF = 6;
+
 CpvStaticDeclare(Trace*, _trace);
 CpvStaticDeclare(CountLogPool*, _logPool);
-CpvStaticDeclare(char*, pgmName);
+CpvStaticDeclare(char*,  _logName);
+CpvStaticDeclare(char**, _counterNames);
+CpvStaticDeclare(char**, _counterDesc);
+CpvStaticDeclare(int,    _numCounters);
+CpvStaticDeclare(int,    _reductionID);
 static int _numEvents = 0;
 static int _threadMsg, _threadChare, _threadEP;
 static int _packMsg, _packChare, _packEP;
 static int _unpackMsg, _unpackChare, _unpackEP;
 CpvDeclare(double, version);
+
+// a rudimentary reduction to print out the performance results across the run
+CmiHandler StatTableReduction(char* msg)
+{
+  DEBUGF(("StatTableReduction called\n", CmiMyPe(), CmiNumPes()));
+  static double* reduce = NULL;
+  static int numReduce = 0;
+  int numCounters = CpvAccess(_numCounters);
+  int size = 2*CpvAccess(_numCounters)+NUM_EXTRA_PERF;
+  int i;
+  if (reduce == NULL) {
+    // allocate
+    reduce = new double[size];
+    for (i=0; i<size; i++) { reduce[i] = 0.0; }
+    DEBUGF(("  allocated reduce numCounters %d size %d\n", 
+	    numCounters, size));
+  }
+
+  // see above for the feilds of this message
+  double* msgResults = (double *)(msg+ALIGN8(CmiMsgHeaderSizeBytes));
+  for (i=0; i<size; i++) { 
+    reduce[i] += msgResults[i]; 
+  }
+  
+  char** counterNames = CpvAccess(_counterNames);
+  numReduce++;
+  DEBUGF(("      numReduce %d numPes %d\n", numReduce, CmiNumPes()));
+  int phase = reduce[2*numCounters];
+  if (numReduce >= CmiNumPes()) {
+    // finished with reduction, print out results
+    numReduce = 0;
+    for (i=0; i<numCounters; i++) {
+      if (reduce[2*i+1]>0.0) { // is time > 0?
+	if (phase >= 0) {
+	  CmiPrintf("PHASE %d %s totalCount %f totalTime (us) %f\n" 
+		    "PHASE %d %s count/proc %f avgTime (us)/phase %f\n",
+		    phase, counterNames[i], reduce[2*i], reduce[2*i+1]*1e6,
+		    phase, counterNames[i], reduce[2*i]/CmiNumPes(), 
+		    reduce[2*i+1]*1e6/CmiNumPes());
+	}
+	else {
+	  CmiPrintf("%s totalCount %f totalTime (us) %f\n" 
+		    "%s count/proc %f avgTime (us)/phase %f\n",
+		    counterNames[i], reduce[2*i], reduce[2*i+1]*1e6,
+		    counterNames[i], reduce[2*i]/CmiNumPes(), 
+		    reduce[2*i+1]*1e6/CmiNumPes());
+	}
+      }
+    }
+    if (phase >= 0) {
+      CmiPrintf("PHASE %d totalIdleTime (us) %f avgIdleTime (us)/phase %f\n",
+		phase, reduce[2*numCounters+1]*1e6, 
+		reduce[2*numCounters+1]*1e6/CmiNumPes());
+    }
+    else {
+      CmiPrintf("totalIdleTime (us) %f avgIdleTime (us)/phase %f\n",
+		reduce[2*numCounters+1]*1e6, 
+		reduce[2*numCounters+1]*1e6/CmiNumPes());
+    }
+    if (reduce[2*numCounters+2] > 0.0) {
+      // we have flops
+      if (phase >= 0) {
+	CmiPrintf("PHASE %d flops/s %f flops/s/PE %f\n",
+		  phase, reduce[2*numCounters+2], 
+		  reduce[2*numCounters+2]/CmiNumPes());
+      }
+      else {
+	CmiPrintf("flops/s %f flops/s/PE %f\n",
+		  reduce[2*numCounters+2], 
+		  reduce[2*numCounters+2]/CmiNumPes());
+      }
+    }
+    char* missRate = NULL;
+    for (i=0; i<3; i++) {
+      switch (i) {
+      case 0: missRate = "l1 avg miss rate (%)";  break;
+      case 1: missRate = "l2 avg miss rate (%)";  break;
+      case 2: missRate = "tlb avg miss rate (%)";  break;
+      }
+      if (reduce[2*numCounters+3+i] >= 0.0) {
+	if (phase >= 0) {
+	  CmiPrintf("PHASE %d %s %f\n", 
+		    phase, missRate, reduce[2*numCounters+3+i]/CmiNumPes()*100);
+	}
+	else {
+	  CmiPrintf("%s %f\n", 
+		    missRate, reduce[2*numCounters+3+i]/CmiNumPes()*100);
+	}
+      }
+    }
+
+    // clean up
+    delete [] reduce;
+    reduce = NULL;
+  }
+  CmiFree(msg);
+}
 
 //! The following is the list of arguments that can be passed to 
 //!   the +counter{1|2} command line arguments.
@@ -83,7 +193,7 @@ static TraceCounter::CounterArg COUNTER_ARG[NUM_COUNTER_ARGS] =
 // this is called by the Charm++ runtime system
 void _createTracecounter(char **argv)
 {
-  DEBUGF(("%d/%d DEBUG: createTraceCounter\n", CkMyPe(), CkNumPes()));
+  DEBUGF(("%d/%d DEBUG: createTraceCounter\n", CmiMyPe(), CmiNumPes()));
   CpvInitialize(Trace*, _trace);
   TraceCounter* tc = new TraceCounter();  _MEMCHECK(tc);
   tc->traceInit(argv);
@@ -96,15 +206,21 @@ StatTable::StatTable():
   stats_(NULL), numStats_(0)
 {
   DEBUGF(("%d/%d DEBUG: StatTable::StatTable %08x size %d\n", 
-          CkMyPe(), CkNumPes(), this));
+          CmiMyPe(), CmiNumPes(), this));
+
+  DEBUGF(("%d/%d registering reductionID\n", CmiMyPe(), CmiNumPes()));
+  CpvAccess(_reductionID) = CmiRegisterHandler((CmiHandler)StatTableReduction); 
 }
 
 // destructor
 StatTable::~StatTable() { if (stats_ != NULL) { delete [] stats_; } }
 
 // initialize the stat table internals
-void StatTable::init(char** name, char** desc, int argc)
+void StatTable::init(int argc)
 {
+  char** counterNames = CpvAccess(_counterNames);
+  char** counterDesc = CpvAccess(_counterDesc);
+
   if (argc > numStats_) {
     if (stats_ != NULL) { delete [] stats_; }
     stats_ = new Statistics[argc];  _MEMCHECK(stats_);
@@ -112,9 +228,9 @@ void StatTable::init(char** name, char** desc, int argc)
   }
   for (int i=0; i<argc; i++) { 
     DEBUGF(("%d/%d DEBUG:   %d name %s\n     desc %s\n", 
-	    CkMyPe(), CkNumPes(), i, name[i], desc[i]));
-    stats_[i].name = name[i]; 
-    stats_[i].desc = desc[i];
+	    CmiMyPe(), CmiNumPes(), i, name[i], desc[i]));
+    stats_[i].name = counterNames[i]; 
+    stats_[i].desc = counterDesc[i];
   }
   clear();
 }
@@ -126,13 +242,25 @@ void StatTable::setEp(int epidx, int stat, long long value, double time)
   //           this, epidx, stat, value, time);
 
   CkAssert(epidx<MAX_ENTRIES);
-  CkAssert(stat<numStats_);
+  CkAssert(stat<numStats_ && stat>=0);
   
   int numCalled = stats_[stat].numCalled[epidx];
   double avg = stats_[stat].avgCount[epidx];
+  double stdDev = stats_[stat].stdDevCount[epidx];
   stats_[stat].numCalled[epidx]++;
   stats_[stat].avgCount[epidx] = (avg * numCalled + value) / (numCalled + 1);
+  // note that the stddev calculation is not quite correct, but it's
+  // almost correct and over time will converge with true value
+  avg = stats_[stat].avgCount[epidx];
+  stats_[stat].stdDevCount[epidx] = 
+    (stdDev * numCalled + (value-avg)*(value-avg)) / (numCalled+1);
   stats_[stat].totTime[epidx] += time;
+  if (stats_[stat].maxCount[epidx] < value) {
+    stats_[stat].maxCount[epidx] = value;
+  }
+  if (stats_[stat].minCount[epidx] > value) {
+    stats_[stat].minCount[epidx] = value;
+  }
 }
 
 //! write three lines for each stat:
@@ -141,31 +269,51 @@ void StatTable::setEp(int epidx, int stat, long long value, double time)
 //!   3. total time in us spent for each entry
 void StatTable::write(FILE* fp) 
 {
-  DEBUGF(("%d/%d DEBUG: Writing StatTable\n", CkMyPe(), CkNumPes()));
+  DEBUGF(("%d/%d DEBUG: Writing StatTable\n", CmiMyPe(), CmiNumPes()));
   int i, j;
   for (i=0; i<numStats_; i++) {
+    // FAKE OUT AND WRITE AN OVERVIEW AS LAST ENTRY
     // write description of the entry
     fprintf(fp, "[%s {%s}]\n", stats_[i].name, stats_[i].desc);
     // write number of calls for each entry
     fprintf(fp, "[%s num_called] ", stats_[i].name);
-    for (j=0; j<_numEntries; j++) { 
+    for (j=0; j<_numEntries+1; j++) { 
       fprintf(fp, "%d ", stats_[i].numCalled[j]); 
     }
     fprintf(fp, "\n");
     // write average count for each 
     fprintf(fp, "[%s avg_count] ", stats_[i].name);
-    for (j=0; j<_numEntries; j++) { 
+    for (j=0; j<_numEntries+1; j++) { 
       fprintf(fp, "%f ", stats_[i].avgCount[j]); 
+    }
+    fprintf(fp, "\n");
+    // write standard deviation of count for each 
+    fprintf(fp, "[%s std_dev_count] ", stats_[i].name);
+    for (j=0; j<_numEntries+1; j++) { 
+      fprintf(fp, "%f ", stats_[i].stdDevCount[j]); 
     }
     fprintf(fp, "\n");
     // write total time in us spent for each entry
     fprintf(fp, "[%s total_time(us)] ", stats_[i].name);
-    for (j=0; j<_numEntries; j++) {
+    for (j=0; j<_numEntries+1; j++) {
       fprintf(fp, "%f ", stats_[i].totTime[j]*1e6);
     }
     fprintf(fp, "\n");
+    // write max count for each entry
+    fprintf(fp, "[%s max_count] ", stats_[i].name);
+    for (j=0; j<_numEntries+1; j++) { 
+      fprintf(fp, "%ld ", stats_[i].maxCount[j]); 
+    }
+    fprintf(fp, "\n");
+    // write min count for each entry
+    fprintf(fp, "[%s min_count] ", stats_[i].name);
+    for (j=0; j<_numEntries+1; j++) { 
+      if (stats_[i].minCount[j] == MAXLONGLONG) { stats_[i].minCount[j] = 0; }
+      fprintf(fp, "%ld ", stats_[i].minCount[j]); 
+    }
+    fprintf(fp, "\n");
   }
-  DEBUGF(("%d/%d DEBUG: Finished writing StatTable\n", CkMyPe(), CkNumPes()));
+  DEBUGF(("%d/%d DEBUG: Finished writing StatTable\n", CmiMyPe(), CmiNumPes()));
 }
 
 //! set all of internals to null
@@ -175,9 +323,93 @@ void StatTable::clear()
     for (int j=0; j<MAX_ENTRIES; j++) {
       stats_[i].numCalled[j] = 0;
       stats_[i].avgCount[j] = 0.0;
+      stats_[i].stdDevCount[j] = 0.0;
       stats_[i].totTime[j] = 0.0;
+      stats_[i].maxCount[j] = 0.0;
+      stats_[i].minCount[j] = MAXLONGLONG;
     }
   }
+}
+
+//! do a reduction across processors to calculate the total count for
+//! each count, and if the count has flops, etc, then calc the 
+//! the flops/s, etc...
+void StatTable::doReduction(int phase, double idleTime) {
+  DEBUGF(("%d/%d DEBUG: StatTable::doReduction()\n",
+	  CmiMyPe(), CmiNumPes(), this));
+  // see above (NUM_EXTRA_PERF) for the fields in the message
+  int msgSize = 
+    ALIGN8(CmiMsgHeaderSizeBytes)+
+    sizeof(double)*(2*numStats_+NUM_EXTRA_PERF);
+  char *msg = (char *)CmiAlloc(msgSize);
+  double* reduction = (double*)(msg+ALIGN8(CmiMsgHeaderSizeBytes));
+  // calculate flops/s, l1%, l2%, tlb% if it's there
+  char** counterNames = CpvAccess(_counterNames);
+  int GR_FLOPS = -1;  double flopsRate = -1.0;  
+  int LOAD     = -1;  double loadRate = -1.0;
+  int STORE    = -1;  double storeRate = -1.0;
+  int L1_DMISS = -1;  double l1Rate = -1.0;
+  int L2_DMISS = -1;  double l2Rate = -1.0;
+  int TLB_MISS = -1;  double tlbRate = -1.0;
+  int i, j;
+  for (i=0; i<2*numStats_+NUM_EXTRA_PERF; i++) { reduction[i] = 0.0; }
+  for (i=0; i<numStats_; i++) {
+    for (int j=0; j<MAX_ENTRIES; j++) { 
+      reduction[2*i] += stats_[i].numCalled[j]*stats_[i].avgCount[j]; 
+      reduction[2*i+1] += stats_[i].totTime[j];
+    }
+    if (strcmp(counterNames[i], "GR_FLOPS")==0) { GR_FLOPS = i; }
+    else if (strcmp(counterNames[i], "LOAD")==0) { LOAD = i; }
+    else if (strcmp(counterNames[i], "STORE")==0) { STORE = i; }
+    else if (strcmp(counterNames[i], "L1_DMISS")==0) { L1_DMISS = i; }
+    else if (strcmp(counterNames[i], "L2_DMISS")==0) { L2_DMISS = i; }
+    else if (strcmp(counterNames[i], "TLB_MISS")==0) { TLB_MISS = i; }
+  }
+  if (CmiMyPe()==0) { reduction[2*numStats_] = phase; }
+  reduction[2*numStats_+1] = idleTime;  
+  // -1 for the rest of the calc values
+  reduction[2*numStats_+2] = -1.0;
+  reduction[2*numStats_+3] = -1.0;
+  reduction[2*numStats_+4] = -1.0;
+  reduction[2*numStats_+5] = -1.0;
+  // calculate flops/s, l1%, l2%, tlb% if it's there
+  double* rate = NULL;
+  int  index;
+  for (i=0; i<6; i++) {
+    switch (i) {
+    case 0: rate = &flopsRate; index = GR_FLOPS;   break;
+    case 1: rate = &loadRate;  index = LOAD;       break;
+    case 2: rate = &storeRate; index = STORE;      break;
+    case 3: rate = &l1Rate;    index = L1_DMISS;   break;
+    case 4: rate = &l2Rate;    index = L2_DMISS;   break; 
+    case 5: rate = &tlbRate;   index = TLB_MISS;   break;
+    }
+    if (index >= 0 && reduction[2*index+1] > 0.0) { 
+      // if we have the counter AND it's times were non-zero
+      *rate = reduction[2*index]/reduction[2*index+1]; 
+    }
+  }
+  // store rates if there
+  if (GR_FLOPS >= 0) { reduction[2*numStats_+2] = flopsRate; }
+  if (LOAD >= 0 && STORE >= 0) {
+    double memRate = loadRate + storeRate;
+    if (L1_DMISS >= 0 & memRate > 0) { 
+      reduction[2*numStats_+3] = l1Rate / memRate; 
+    }
+    if (L2_DMISS >= 0 & memRate > 0) { 
+      reduction[2*numStats_+4] = l2Rate / memRate; 
+    }
+    if (TLB_MISS >= 0 & memRate > 0) { 
+      reduction[2*numStats_+5] = tlbRate / memRate; 
+    }
+  }
+
+  // send the data
+  CmiSetHandler(msg, (int)CpvAccess(_reductionID));
+  int handlerID = CmiGetHandler(msg);
+  DEBUGF(("%d/%d handlerID %d reductionID %d\n", 
+	  CmiMyPe(), CmiNumPes(), handlerID, CpvAccess(_reductionID)));
+  CmiSyncSendAndFree(0, msgSize, msg);
 }
 
 CountLogPool::CountLogPool():
@@ -185,7 +417,7 @@ CountLogPool::CountLogPool():
   lastPhase_ (-1)
 {
   DEBUGF(("%d/%d DEBUG: CountLogPool::CountLogPool() %08x\n", 
-          CkMyPe(), CkNumPes(), this));
+          CmiMyPe(), CmiNumPes(), this));
 }
 
 // open file, if phase is -1, don't add the phase string
@@ -193,22 +425,22 @@ FILE* CountLogPool::openFile(int phase) {
   // technically, the sprintf into pestr & phasestr are unnecessary,
   // can just make a limit and check for that
 
-  DEBUGF(("%d CountLogPool::openFile(%d)\n", CkMyPe(), phase));
+  DEBUGF(("%d CountLogPool::openFile(%d)\n", CmiMyPe(), phase));
   const static int strSize = 10;
   char pestr[strSize+1];
   char phasestr[strSize+1];
-  snprintf(pestr, strSize, "%d", CkMyPe());
+  snprintf(pestr, strSize, "%d", CmiMyPe());
   pestr[strSize] = '\0';
-  int len = strlen(CpvAccess(pgmName)) + strlen("phase.count.") + 2*strSize + 1;
+  int len = strlen(CpvAccess(_logName)) + strlen("phase.count.") + 2*strSize + 1;
   char* fname = new char[len+1];  _MEMCHECK(fname);
   if (phase >= 0) { 
     snprintf(phasestr, strSize, "%d", phase);
     phasestr[strSize] = '\0';
-    sprintf(fname, "%s.phase%s.%s.count", CpvAccess(pgmName), phasestr, pestr); 
+    sprintf(fname, "%s.phase%s.%s.count", CpvAccess(_logName), phasestr, pestr); 
   }
-  else { sprintf(fname, "%s.%s.count", CpvAccess(pgmName), pestr); }
+  else { sprintf(fname, "%s.%s.count", CpvAccess(_logName), pestr); }
   FILE* fp = NULL;
-  DEBUGF(("%d/%d DEBUG: TRACE: %s:%d\n", CkMyPe(), CkNumPes(), fname, errno));
+  DEBUGF(("%d/%d DEBUG: TRACE: %s:%d\n", CmiMyPe(), CmiNumPes(), fname, errno));
   do {
     fp = fopen(fname, "w+");
   } while (!fp && errno == EINTR);
@@ -217,10 +449,6 @@ FILE* CountLogPool::openFile(int phase) {
     CmiAbort("Cannot open Summary Trace File for writing...\n");
   }
   return fp;
-}
-
-CountLogPool::~CountLogPool() 
-{ 
 }
 
 void CountLogPool::write(int phase) 
@@ -242,23 +470,23 @@ void CountLogPool::writeSts(int phase)
   // can just make a limit and check for that
 
   if (phase >= 0) { lastPhase_ = phase; }
-  DEBUGF(("%d CountLogPool::writeSts(%d)\n", CkMyPe(), phase));
+  DEBUGF(("%d CountLogPool::writeSts(%d)\n", CmiMyPe(), phase));
 
   const static int strSize = 10;
   char phasestr[strSize+1];
   // add strSize for phase number
   char *fname = 
-    new char[strlen(CpvAccess(pgmName))+strlen(".count.sts")+strSize];
+    new char[strlen(CpvAccess(_logName))+strlen(".count.sts")+strSize];
   _MEMCHECK(fname);
   if (phase < 0 && lastPhase_ >= 0) { phase = lastPhase_; }
   if (phase >= 0) { 
     snprintf(phasestr, strSize, "%d", phase);
     phasestr[strSize] = '\0';
-    sprintf(fname, "%s.phase%s.count.sts", CpvAccess(pgmName), phasestr); 
+    sprintf(fname, "%s.phase%s.count.sts", CpvAccess(_logName), phasestr); 
   } 
-  else { sprintf(fname, "%s.count.sts", CpvAccess(pgmName)); }
+  else { sprintf(fname, "%s.count.sts", CpvAccess(_logName)); }
   FILE *sts = fopen(fname, "w+");
-  // DEBUGF(("%d/%d DEBUG: File: %s \n", CkMyPe(), CkNumPes(), fname));
+  // DEBUGF(("%d/%d DEBUG: File: %s \n", CmiMyPe(), CmiNumPes(), fname));
   if(sts==0)
     CmiAbort("Cannot open summary sts file for writing.\n");
   CmiPrintf("WRITING FILE=%s\n", fname); 
@@ -266,7 +494,7 @@ void CountLogPool::writeSts(int phase)
   fprintf(sts, "MACHINE %s\n",CMK_MACHINE_NAME);
   fprintf(sts, "PROCESSORS %d\n", CmiNumPes());
   fprintf(sts, "TOTAL_CHARES %d\n", _numChares);
-  fprintf(sts, "TOTAL_EPS %d\n", _numEntries);
+  fprintf(sts, "TOTAL_EPS %d\n", _numEntries+1);  // make extra overview
   fprintf(sts, "TOTAL_MSGS %d\n", _numMsgs);
   fprintf(sts, "TOTAL_PSEUDOS %d\n", 0);
   fprintf(sts, "TOTAL_EVENTS %d\n", _numEvents);
@@ -276,6 +504,8 @@ void CountLogPool::writeSts(int phase)
   for(i=0;i<_numEntries;i++)
     fprintf(sts, "ENTRY CHARE %d %s %d %d\n", i, _entryTable[i]->name,
                  _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
+  // fake out, make OVERVIEW
+  fprintf(sts, "ENTRY CHARE %d OVERVIEW -1 -1\n", _numEntries);
   for(i=0;i<_numMsgs;i++)
     fprintf(sts, "MESSAGE %d %ld\n", i, _msgTable[i]->size);
   for(i=0;i<_numEvents;i++)
@@ -284,16 +514,19 @@ void CountLogPool::writeSts(int phase)
   fclose(sts);
 }
 
-void CountLogPool::setEp(int epidx, long long count1, long long count2, double time) 
+void CountLogPool::setEp(int epidx, 
+			 int index1, long long count1, 
+			 int index2, long long count2, 
+			 double time) 
 {
   // DEBUGF(("%d/%d DEBUG: CountLogPool::setEp %08x %d %d %d %f\n", 
-  //        CkMyPe(), CkNumPes(), this, epidx, count1, count2, time));
+  //        CmiMyPe(), CmiNumPes(), this, epidx, count1, count2, time));
 
   if (epidx >= MAX_ENTRIES) {
     CmiAbort("CountLogPool::setEp too many entry points!\n");
   }
-  stats_.setEp(epidx, 0, count1, time);
-  stats_.setEp(epidx, 1, count2, time);
+  stats_.setEp(epidx, index1, count1, time);
+  stats_.setEp(epidx, index2, count2, time);
 }
 
 //! constructor
@@ -312,6 +545,8 @@ TraceCounter::TraceCounter() :
   overview_      (false),
   switchRandom_  (false),
   switchByPhase_ (false),
+  noLog_         (false),
+  writeByPhase_  (false),
   // store between start/stop of counter read
   execEP_        (-1),
   startEP_       (0.0),
@@ -319,6 +554,7 @@ TraceCounter::TraceCounter() :
   // store state
   idleTime_      (0.0),
   phase_         (-1),
+  reductionPhase_(-1),
   traceOn_       (false),
   status_        (IDLE),
   dirty_         (false)
@@ -336,31 +572,26 @@ TraceCounter::~TraceCounter() {
 void TraceCounter::traceInit(char **argv)
 {
   CpvInitialize(CountLogPool*, _logPool);
-  CpvInitialize(char*, pgmName);
+  CpvInitialize(char*, _logName);
   CpvInitialize(double, version);
-  CpvAccess(pgmName) = (char *) malloc(strlen(argv[0])+1);
-  _MEMCHECK(CpvAccess(pgmName));
-  strcpy(CpvAccess(pgmName), argv[0]);
+  CpvInitialize(char**, _counterNames);
+  CpvInitialize(char**, _counterDesc);
+  CpvInitialize(int,    _numCounters);
+  CpvInitialize(int, _reductionID);
+
+  CpvAccess(_logName) = (char *) malloc(strlen(argv[0])+1);
+  _MEMCHECK(CpvAccess(_logName));
+  strcpy(CpvAccess(_logName), argv[0]);
   CpvAccess(version) = VER;
 
   int i;
-  // get optional command line args
-  overview_      = CmiGetArgFlag(argv, "+count-overview");  
-  switchRandom_  = CmiGetArgFlag(argv, "+count-switchrandom");  
-  switchByPhase_ = CmiGetArgFlag(argv, "+count-switchbyphase");
-
-  if (!switchByPhase_) {
-    if (CkMyPe()==0) { usage(); }
-    CmiAbort("PHASE ONLY SWITCH IMPLEMENTED ONLY (use +count-switchbyphase)\n");
-  }
-
   // parse command line args
   char* counters = NULL;
   CounterArg* commandLine_ = NULL;
   bool badArg = false;
   int numCounters = 0;
   if (CmiGetArgString(argv, "+counters", &counters)) {
-    if (CkMyPe()==0) { CmiPrintf("Counters: %s\n", counters); }
+    if (CmiMyPe()==0) { CmiPrintf("Counters: %s\n", counters); }
     int offset = 0;
     int limit = strlen(counters);
     char* ptr = counters;
@@ -371,14 +602,17 @@ void TraceCounter::traceInit(char **argv)
       ptr = &ptr[strlen(ptr)+1];
       numCounters++; 
     }
-    if (CkMyPe()==0) { 
+    if (CmiMyPe()==0) { 
       CmiPrintf("There are %d counters\n", numCounters); 
     }
     commandLine_ = new CounterArg[numCounters];
     ptr = counters;
     for (i=0; i<numCounters; i++) {
       commandLine_[i].arg = ptr;
-      if (!matchArg(&commandLine_[i])) { badArg = true; }
+      if (!matchArg(&commandLine_[i])) { 
+	if (CmiMyPe()==0) { CmiPrintf("Bad arg: [%s]\n", ptr); }
+	badArg = true; 
+      }
       ptr = &ptr[strlen(ptr)+1];
     }
   }
@@ -386,12 +620,46 @@ void TraceCounter::traceInit(char **argv)
 
   // check to see if args are valid, output if not
   if (badArg || CmiGetArgFlag(argv, "+counterhelp")) {
-    if (CkMyPe() == 0) { printHelp(); }
+    if (CmiMyPe() == 0) { printHelp(); }
     ConverseExit();  return;
   }
   else if (counters == NULL) {
-    if (CkMyPe() == 0) { usage(); }
+    if (CmiMyPe() == 0) { usage(); }
     ConverseExit();  return;
+  }
+
+  // get optional command line args
+  overview_      = CmiGetArgFlag(argv, "+count-overview");  
+  switchRandom_  = CmiGetArgFlag(argv, "+count-switchrandom");  
+  switchByPhase_ = CmiGetArgFlag(argv, "+count-switchbyphase");
+  noLog_         = CmiGetArgFlag(argv, "+count-nolog");
+  writeByPhase_  = CmiGetArgFlag(argv, "+count-writebyphase");
+  char* logName  = NULL;
+  if (CmiGetArgString(argv, "+count-logname", &logName)) {
+    CpvAccess(_logName) = logName;
+    if (noLog_) {
+      if (CkMyPe()==0) {
+	CmiPrintf("+count-logname and +count-nolog are MUTUALLY EXCLUSIVE\n");
+	usage();
+	CmiAbort("");
+      }
+    }
+  }
+  if (switchByPhase_ && overview_) {
+    if (CkMyPe()==0) {
+      CmiPrintf(
+	"+count-switchbyphase and +count-overview are MUTUALLY EXCLUSIVE\n"
+	"+count-overview automatically switches by phase.\n");
+      usage();
+      CmiAbort("");
+    }
+  }
+  if (writeByPhase_ && noLog_) {
+    if (CkMyPe()==0) {
+      CmiPrintf("+count-writebyphase and +count-nolog are MUTUALLY EXCLUSIVE\n");
+      usage();
+      CmiAbort("");
+    }
   }
 
   // parse through commandLine_, figure out which belongs on which list (1 vs 2)
@@ -414,7 +682,7 @@ void TraceCounter::traceInit(char **argv)
   }
   if (counter1_ == NULL) {
     printHelp();
-    if (CkMyPe()==0) {
+    if (CmiMyPe()==0) {
       CmiPrintf("\nMust specify some counters with code < %d\n", 
 		NUM_COUNTER_ARGS/2);
     }
@@ -422,7 +690,7 @@ void TraceCounter::traceInit(char **argv)
   }
   if (counter2_ == NULL) {
     printHelp();
-    if (CkMyPe()==0) {
+    if (CmiMyPe()==0) {
       CmiPrintf("\nMust specify some counters with code >= %d\n", 
 		NUM_COUNTER_ARGS/2);
     }
@@ -432,7 +700,7 @@ void TraceCounter::traceInit(char **argv)
   last2->next = counter2_;
 
   // all args valid, now set up logging
-  if (CkMyPe() == 0) {
+  if (CmiMyPe() == 0) {
     CmiPrintf("Running with tracemode=counter and args:\n");
     // print out counter1 set
     tmp = counter1_;
@@ -452,43 +720,65 @@ void TraceCounter::traceInit(char **argv)
     } while (tmp != counter2_);
 
     CmiPrintf(
-      "+count-overview %d +count-switchrandom %d +count-switchbyphase %d\n",
-      overview_, switchRandom_, switchByPhase_);
+      "+count-overview %d\n+count-switchrandom %d\n"
+      "+count-switchbyphase %d\n+count-nolog %d\n"
+      "+count-logname %s\n+count-writebyphase %d\n",
+      overview_, switchRandom_, switchByPhase_, noLog_, 
+      logName, writeByPhase_);
   }
-	    
 
   // DEBUGF(("    DEBUG: Counter1=%d Counter2=%d\n", counter1_, counter2_));
-  char* name[2];  // prepare names for creating log pool
-  char* desc[2];  // prepare descriptions for creating log 
-  name[0] = counter1_->arg;  desc[0] = counter1_->desc;
-  name[1] = counter2_->arg;  desc[1] = counter2_->desc;
   CpvAccess(_logPool) = new CountLogPool();
+
+  // allocate names so can do reduction/analysis on the fly
+  char** counterNames = new char*[counter1Sz_+counter2Sz_];
+  char** counterDesc = new char*[counter1Sz_+counter2Sz_];
+  tmp = counter1_;
+  for (i=0; i<counter1Sz_; i++) {
+    tmp->index = i;
+    counterNames[i] = tmp->arg; 
+    counterDesc[i] = tmp->desc;
+    tmp = tmp->next;
+  }
+  tmp = counter2_;
+  for (i=0; i<counter2Sz_; i++) {
+    tmp->index = counter1Sz_+i;
+    counterNames[counter1Sz_+i] = tmp->arg; 
+    counterDesc[counter1Sz_+i] = tmp->desc;
+    tmp = tmp->next;
+  }
+  CpvAccess(_counterNames) = counterNames;
+  CpvAccess(_counterDesc) = counterDesc;
+  CpvAccess(_numCounters) = numCounters;
+  // don't erase counterNames or counterDesc, 
+  // the reduction client will do it on the final reduction
+
   _MEMCHECK(CpvAccess(_logPool));
-  CpvAccess(_logPool)->init(name, desc, 2);
+  CpvAccess(_logPool)->init(numCounters);
   DEBUGF(("%d/%d DEBUG: Created _logPool at %08x\n", 
-          CkMyPe(), CkNumPes(), CpvAccess(_logPool)));
+          CmiMyPe(), CmiNumPes(), CpvAccess(_logPool)));
 }
 
 //! turn trace on/off, note that charm will automatically call traceBegin()
 //! at the beginning of every run unless the command line option "+traceoff"
 //! is specified
 void TraceCounter::traceBegin() {
-  DEBUGF(("%d/%d traceBegin called\n", CkMyPe(), CkNumPes()));
+  DEBUGF(("%d/%d traceBegin called\n", CmiMyPe(), CmiNumPes()));
   if (traceOn_) { 
       static bool print = true;
       if (print) {
 	print = false;
-	if (CkMyPe()==0) {
+	if (CmiMyPe()==0) {
 	  CmiPrintf("%d/%d WARN: traceBegin called but trace already on!\n"
 		    "            Sure you didn't mean to use +traceoff?\n",
-		    CkMyPe(), CkNumPes());
+		    CmiMyPe(), CmiNumPes());
 	}
     } 
   }
   else {
     if (overview_) { beginOverview(); }
     idleTime_ = 0.0;
-    phase_++;
+    if (writeByPhase_) { phase_++; }
     traceOn_ = true;
   }
 }
@@ -497,36 +787,37 @@ void TraceCounter::traceBegin() {
 //! at the beginning of every run unless the command line option "+traceoff"
 //! is specified
 void TraceCounter::traceEnd() {
-  DEBUGF(("%d/%d traceEnd called\n", CkMyPe(), CkNumPes()));
+  DEBUGF(("%d/%d traceEnd called\n", CmiMyPe(), CmiNumPes()));
   if (!traceOn_) { 
     static bool print = true;
     if (print) {
       print = false;
-      if (CkMyPe()==0) {
+      if (CmiMyPe()==0) {
 	CmiPrintf("%d/%d WARN: traceEnd called but trace not on!\n"
 		  "            Sure you didn't mean to use +traceoff?\n",
-		  CkMyPe(), CkNumPes());
+		  CmiMyPe(), CmiNumPes());
       }
     }
   }
   else {
     traceOn_ = false;
     dirty_ = false;
-    if (overview_) { endOverview(); }
-    else {
+    if (overview_) { endOverview(); }  // overview switches counters automatic
+    else if (switchByPhase_) { switchCounters(); };
+
+    if (!noLog_ && writeByPhase_) {
       if (CmiMyPe()==0) { CpvAccess(_logPool)->writeSts(phase_); }
       CpvAccess(_logPool)->write(phase_); 
+    }
+    reductionPhase_++;
+    CpvAccess(_logPool)->doReduction(reductionPhase_, idleTime_); 
+    if (writeByPhase_) {
+      idleTime_ = 0.0;
       CpvAccess(_logPool)->clearEps(); 
     }
-    if (switchByPhase_) { switchCounters(); };
-    char* name[2];
-    char* desc[2];
-    name[0] = counter1_->arg;  desc[0] = counter1_->desc;
-    name[1] = counter2_->arg;  desc[1] = counter2_->desc;
-    CpvAccess(_logPool)->init(name, desc, 2);
     // setTrace must go after the writes otherwise the writes won't go through
     DEBUGF(("%d/%d DEBUG: Created _logPool at %08x\n", 
-	    CkMyPe(), CkNumPes(), CpvAccess(_logPool)));
+	    CmiMyPe(), CmiNumPes(), CpvAccess(_logPool)));
   }
 }
 
@@ -552,7 +843,7 @@ void TraceCounter::beginExecute
   int mlen
 )
 {
-  DEBUGF(("%d/%d DEBUG: beginExecute EP %d\n", CkMyPe(), CkNumPes(), ep));
+  DEBUGF(("%d/%d DEBUG: beginExecute EP %d\n", CmiMyPe(), CmiNumPes(), ep));
 
   if (!traceOn_ || overview_) { return; }
 
@@ -562,9 +853,9 @@ void TraceCounter::beginExecute
     static bool print = true;
     if (print) {
       print = false;
-      if (CkMyPe()==0) { 
+      if (CmiMyPe()==0) { 
 	CmiPrintf("WARN: %d beginExecute called when status not IDLE!\n", 
-		  CkMyPe());
+		  CmiMyPe());
       }
     }
     return;
@@ -580,16 +871,16 @@ void TraceCounter::beginExecute
 
   startEP_=TraceTimer();
   DEBUGF(("%d/%d DEBUG:   beginExecute EP %d genStart %d\n", 
-          CkMyPe(), CkNumPes(), ep, genStart_));
+          CmiMyPe(), CmiNumPes(), ep, genStart_));
 }
 
 //! begin/end execution of a Charm++ entry point
 //! NOTE: begin/endPack and begin/endUnpack can be called in between
 //!       a beginExecute and its corresponding endExecute.
-void TraceCounter::endExecute(void)
+void TraceCounter::endExecute()
 {
   DEBUGF(("%d/%d DEBUG: endExecute EP %d genStart_ %d\n", 
-          CkMyPe(), CkNumPes(), execEP_, genStart_));
+          CmiMyPe(), CmiNumPes(), execEP_, genStart_));
 
   if (!traceOn_ || overview_) { return; }
 
@@ -597,9 +888,9 @@ void TraceCounter::endExecute(void)
     static bool print = true;
     if (print) {
       print = false;
-      if (CkMyPe()==0) {
+      if (CmiMyPe()==0) {
 	CmiPrintf("WARN: %d endExecute called when status not WORKING!\n", 
-		  CkMyPe());
+		  CmiMyPe());
       }
     }
     return;
@@ -621,18 +912,19 @@ void TraceCounter::endExecute(void)
 
   DEBUGF((
     "%d/%d DEBUG:   endExecute genRead %d Time %f counter1 %d counter2 %ld\n", 
-    CkMyPe(), CkNumPes(), genRead, t-startEP_, value1, value2));
+    CmiMyPe(), CmiNumPes(), genRead, t-startEP_, value1, value2));
   if (execEP_ != -1) { 
     dirty_ = true;
-    CpvAccess(_logPool)->setEp(execEP_, value1, value2, t-startEP_); 
+    CpvAccess(_logPool)->setEp(execEP_, counter1_->index, value1, 
+			       counter2_->index, value2, t-startEP_); 
     if (!switchByPhase_) { switchCounters(); }
   }
 }
 
 //! begin/end the process of packing a message (to send)
-void TraceCounter::beginPack(void) 
+void TraceCounter::beginPack() 
 { 
-  DEBUGF(("%d/%d DEBUG: beginPack\n", CkMyPe(), CkNumPes()));
+  DEBUGF(("%d/%d DEBUG: beginPack\n", CmiMyPe(), CmiNumPes()));
 
   // beginPack/endPack can get called between beginExecute/endExecute 
   // and can't have nested counter reads on certain architectures and on
@@ -641,8 +933,8 @@ void TraceCounter::beginPack(void)
 }
 
 //! begin/end the process of packing a message (to send)
-void TraceCounter::endPack(void) {
-  DEBUGF(("%d/%d DEBUG: endPack\n", CkMyPe(), CkNumPes()));
+void TraceCounter::endPack() {
+  DEBUGF(("%d/%d DEBUG: endPack\n", CmiMyPe(), CmiNumPes()));
 
   // beginPack/endPack can get called between beginExecute/endExecute 
   // and can't have nested counter reads on certain architectures and on
@@ -652,8 +944,8 @@ void TraceCounter::endPack(void) {
 
 //! begin/end the process of unpacking a message (can occur before calling
 //! a entry point or during an entry point when 
-void TraceCounter::beginUnpack(void) { 
-  DEBUGF(("%d/%d DEBUG: beginUnpack\n", CkMyPe(), CkNumPes()));
+void TraceCounter::beginUnpack() { 
+  DEBUGF(("%d/%d DEBUG: beginUnpack\n", CmiMyPe(), CmiNumPes()));
 
   // beginUnpack/endUnpack can get called between beginExecute/endExecute 
   // and can't have nested counter reads on certain architectures and on
@@ -663,8 +955,8 @@ void TraceCounter::beginUnpack(void) {
 
 //! begin/end the process of unpacking a message (can occur before calling
 //! a entry point or during an entry point when 
-void TraceCounter::endUnpack(void) {
-  DEBUGF(("%d/%d DEBUG: endUnpack\n", CkMyPe(), CkNumPes()));
+void TraceCounter::endUnpack() {
+  DEBUGF(("%d/%d DEBUG: endUnpack\n", CmiMyPe(), CmiNumPes()));
   
   // beginUnpack/endUnpack can get called between beginExecute/endExecute 
   // and can't have nested counter reads on certain architectures and on
@@ -673,7 +965,7 @@ void TraceCounter::endUnpack(void) {
 }
 
 //! begin/end of execution
-void TraceCounter::beginComputation(void)
+void TraceCounter::beginComputation()
 {
   if (CmiMyRank()==0) {
     _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
@@ -690,28 +982,36 @@ void TraceCounter::beginComputation(void)
   }
 }
 
+//! end computation, do a reduction here in hopes that it finishes before 
+//! traceClose called and the program exits
+void TraceCounter::endComputation() {
+  CpvAccess(_logPool)->doReduction(-1, idleTime_); 
+}
+
 //! clear all data collected for entry points
-void TraceCounter::traceClearEps(void) {
+void TraceCounter::traceClearEps() {
   CpvAccess(_logPool)->clearEps();
 }
 
 //! write the summary sts file for this trace
-void TraceCounter::traceWriteSts(void) {
-  if (traceOn_) {
+void TraceCounter::traceWriteSts() {
+  if (traceOn_ && !noLog_) {
     if (CmiMyPe()==0) { CpvAccess(_logPool)->writeSts(); }
   }
 }
 
 //! do any clean-up necessary for tracing
-void TraceCounter::traceClose(void)
+void TraceCounter::traceClose()
 {
   if (dirty_) {
     if (overview_) { endOverview(); }
     else {
-      CpvAccess(_logPool)->write();
-      if(CmiMyPe()==0) { 
-	CpvAccess(_logPool)->writeSts(); 
-	CmiPrintf("TraceCounter dirty, writing results\n");
+      if (!noLog_) {
+	CpvAccess(_logPool)->write();
+	if(CmiMyPe()==0) { 
+	  CpvAccess(_logPool)->writeSts(); 
+	  CmiPrintf("TraceCounter dirty, writing results\n");
+	}
       }
     }
     dirty_ = false;
@@ -728,7 +1028,7 @@ void TraceCounter::traceClose(void)
 void TraceCounter::beginOverview()
 {
   DEBUGF(("%d/%d DEBUG:   beginOverview\n", 
-          CkMyPe(), CkNumPes()));
+          CmiMyPe(), CmiNumPes()));
   if ((genStart_=start_counters(counter1_->code, counter2_->code))<0)
   {
     CmiPrintf("genStart=%d counter1=%d counter2=%d\n", 
@@ -736,13 +1036,13 @@ void TraceCounter::beginOverview()
     CmiAbort("ERROR: start_counters() in beginOverview\n");
   }
   startEP_=TraceTimer();
-  DEBUGF(("%d/%d DEBUG:   beginOverview\n", CkMyPe(), CkNumPes()));
+  DEBUGF(("%d/%d DEBUG:   beginOverview\n", CmiMyPe(), CmiNumPes()));
   dirty_ = true;
 }
 
 void TraceCounter::endOverview()
 {
-  DEBUGF(("%d/%d DEBUG:   endOverview\n", CkMyPe(), CkNumPes()));
+  DEBUGF(("%d/%d DEBUG:   endOverview\n", CmiMyPe(), CmiNumPes()));
  
   double t = TraceTimer();
 
@@ -759,14 +1059,20 @@ void TraceCounter::endOverview()
 
   DEBUGF((
     "%d/%d DEBUG:   endOverview genRead %d Time %f counter1 %ld counter2 %ld\n", 
-    CkMyPe(), CkNumPes(), genRead, t-startEP_, value1, value2));
+    CmiMyPe(), CmiNumPes(), genRead, t-startEP_, value1, value2));
   dirty_ = false;
 
-  CmiPrintf(
+  CpvAccess(_logPool)->setEp(_numEntries, 
+			     counter1_->index, value1, 
+			     counter2_->index, value2, 
+			     t-startEP_); 
+  DEBUGF((
     "%d/%d OVERVIEW phase%d Time(us) %f %s %ld %s %ld Idle(us) %f"
     " (overflow? MAX=%ld)\n",
-    CkMyPe(), CkNumPes(), phase_, (t-startEP_)*1e6, counter1_->arg, value1, 
-    counter2_->arg, value2, idleTime_*1e6, INTMAX_MAX);
+    CmiMyPe(), CmiNumPes(), phase_, (t-startEP_)*1e6, counter1_->arg, value1, 
+    counter2_->arg, value2, idleTime_*1e6, MAXLONGLONG));
+  // this is phase boundary anyway, so switch counters
+  switchCounters(); 
 }
 
 //! switch counters by whatever switching strategy 
@@ -777,9 +1083,14 @@ void TraceCounter::switchCounters()
     int i;
     if (first) { first = false;  srand(TraceTimer()*1e6); }
     int counter1Change = 
-      (int) (rand() / (double) INT32_MAX * counter1Sz_ + 0.5);
+      (int) (rand() / (double) 0x7FFF * counter1Sz_ + 0.5);  // 2^15-1
     int counter2Change = 
-      (int) (rand() / (double) INT32_MAX * counter2Sz_ + 0.5);
+      (int) (rand() / (double) 0x7FFF * counter2Sz_ + 0.5);  // 2^15-1
+    if (CmiMyPe()==0) {
+      DEBUGF(("change %d/%d %d/%d\n", 
+	      counter1Change, counter1Sz_, 
+	      counter2Change, counter2Sz_));
+    }
     if (counter1Change > counter1Sz_) { counter1Change = counter1Sz_; }
     if (counter2Change > counter2Sz_) { counter2Change = counter2Sz_; }
     for (i=0; i<counter1Change; i++) { counter1_ = counter1_->next; }
@@ -789,9 +1100,9 @@ void TraceCounter::switchCounters()
     counter1_ = counter1_->next;
     counter2_ = counter2_->next;
   }
-  if (CkMyPe()==0) {
-    CmiPrintf("%d/%d New counters are %s %s\n", 
-	      CkMyPe(), CkNumPes(), counter1_->arg, counter2_->arg);
+  if (CmiMyPe()==0) {
+    DEBUGF(("%d/%d New counters are %s %s\n", 
+	    CmiMyPe(), CmiNumPes(), counter1_->arg, counter2_->arg));
   }
 }
 
@@ -807,7 +1118,7 @@ void TraceCounter::registerArg(CounterArg* arg)
     CounterArg* check = firstArg_;
     while (check != NULL) {
       if (strcmp(check->arg, arg->arg)==0 || check->code == arg->code) {
-	if (CkMyPe()==0) { 
+	if (CmiMyPe()==0) { 
 	  CmiPrintf("Two args with same name %s or code %d\n", 
 		    arg->arg, arg->code); 
 	}
@@ -834,9 +1145,9 @@ bool TraceCounter::matchArg(CounterArg* arg)
   if (matchCode == 0) {
     if (arg->arg[0] != '0' || arg->arg[1] != '\0') { matchCode = -1; }
   }
-  // DEBUGF(("%d/%d DEBUG: Matching %s or %d\n", CkMyPe(), CkNumPes(), arg->arg, matchCode));
+  // DEBUGF(("%d/%d DEBUG: Matching %s or %d\n", CmiMyPe(), CmiNumPes(), arg->arg, matchCode));
   while (matchArg != NULL && !match) {
-    // DEBUGF(("%d/%d DEBUG:   Examining %d %s\n", CkMyPe(), CkNumPes(), matchArg->code, matchArg->arg));
+    // DEBUGF(("%d/%d DEBUG:   Examining %d %s\n", CmiMyPe(), CmiNumPes(), matchArg->code, matchArg->arg));
     if (strcmp(matchArg->arg, arg->arg)==0) {
       match = true;
       arg->code = matchArg->code;
@@ -850,7 +1161,7 @@ bool TraceCounter::matchArg(CounterArg* arg)
     }
     matchArg = matchArg->next;
   }
-  // DEBUGF(("%d/%d DEBUG: Match = %d\n", CkMyPe(), CkNumPes(), match));
+  // DEBUGF(("%d/%d DEBUG: Match = %d\n", CmiMyPe(), CmiNumPes(), match));
   return match;
 }
 
@@ -882,6 +1193,7 @@ void TraceCounter::usage() {
     "  +count-switchbyphase: Counters will switch not every EP call,\n"
     "                        but only in between phases (between each\n"
     "                        traceBegin/traceEnd call).\n"
+    "  +count-nolog:         Don't write any log files.\n"
     "\n"
     "See the Performance Counter section of the Charm++ manual for\n"
     "examples of different options.\n"
