@@ -105,7 +105,7 @@ cmk_clean:
 ###############################################################################
 
 CKHEADERS=chare.h const.h msg_macros.h prio_macros.h env_macros.h globals.h\
-	  sys_macros.h communication.h performance.h converse.h
+	  sys_macros.h communication.h performance.h $(CVHEADERS)
 
 LIBCK_CORE_N=common.n.o globals.n.o init.n.o register.n.o boc.n.o condsend.n.o quies.n.o vid.n.o rdonly.n.o stat.n.o wrtone.n.o acc.n.o mono.n.o tbl.n.o memstuff.n.o
 
@@ -127,7 +127,7 @@ CK_LIBS_N=$(CK_LDB_N) $(CK_CPLUS_N) $(CK_CORE_N) libckn-defmain.a
 
 CK_LIBS_D=$(CK_LDB_D) $(CK_CPLUS_D) $(CK_CORE_D) libckd-defmain.a
 
-charm: converse $(CK_LIBS_N) $(CK_LIBS_D) charmxlat charmfilter
+charm: charmxlat charmfilter libcharm.a converse $(CK_LIBS_N) $(CK_LIBS_D)
 
 libckn-core-notrace.a: $(LIBCK_CORE_N) perf-none.n.o main.n.o ck.n.o
 	charmc -cwd -o $@ $(LIBCK_CORE_N) perf-none.n.o main.n.o ck.n.o
@@ -322,6 +322,101 @@ charmreplay: charmreplay.o perfio.o
 charmreplay.o: charmreplay.c
 	charmc -seq -cwd -c charmreplay.c
 
+
+###############################################################################
+#
+# libcharm
+#
+###############################################################################
+
+LIBCHARM=pglib.o cache.o dag.o barrier_redn.o \
+	 iacc_count.o facc_count.o dacc_count.o \
+         iacc_hist.o facc_hist.o dacc_hist.o \
+         iminredn.o imaxredn.o isumredn.o iprodredn.o icountredn.o \
+	 fminredn.o fmaxredn.o fsumredn.o fprodredn.o \
+	 dminredn.o dmaxredn.o dsumredn.o dprodredn.o
+
+GENERIC_ACC_H=GENERIC-ACC.int GENERIC-ACC.p $(CKHEADERS)
+GENERIC_HIST_H=GENERIC-HIST.int GENERIC-HIST.p $(CKHEADERS)
+GENERIC_REDN_H=GENERIC-REDN.int GENERIC-REDN.p $(CKHEADERS)
+
+libcharm.a: $(LIBCHARM)
+	charmc -cwd -o libcharm.a $(LIBCHARM)
+
+pglib.o: pglib.p pglib.h pg.int $(CKHEADERS)
+	charmc -cwd -c pglib.p
+
+cache.o: cache.p cache.int $(CKHEADERS)
+	charmc -cwd -c cache.p
+
+dag.o: dag.c dag.h $(CKHEADERS)
+	charmc -cwd -c dag.c
+
+barrier_redn.o: barrier_redn.p barrier_redn.int $(CKHEADERS)
+	charmc -cwd -c barrier_redn.p
+
+iacc_count.o: iacc_count.p iacc_count.int $(GENERIC_ACC_H)
+	charmc -cwd -c iacc_count.p
+
+facc_count.o: facc_count.p facc_count.int $(GENERIC_ACC_H)
+	charmc -cwd -c facc_count.p
+
+dacc_count.o: dacc_count.p dacc_count.int $(GENERIC_ACC_H)
+	charmc -cwd -c dacc_count.p
+
+iacc_hist.o: iacc_hist.p iacc_hist.int $(GENERIC_HIST_H)
+	charmc -cwd -c iacc_hist.p
+
+facc_hist.o: facc_hist.p facc_hist.int $(GENERIC_HIST_H)
+	charmc -cwd -c facc_hist.p
+
+dacc_hist.o: dacc_hist.p dacc_hist.int $(GENERIC_HIST_H)
+	charmc -cwd -c dacc_hist.p
+
+imaxredn.o: imaxredn.p imaxredn.int $(GENERIC_REDN_H)
+	charmc -cwd -c imaxredn.p
+
+iminredn.o: iminredn.p iminredn.int $(GENERIC_REDN_H)
+	charmc -cwd -c iminredn.p
+
+isumredn.o: isumredn.p isumredn.int $(GENERIC_REDN_H)
+	charmc -cwd -c isumredn.p
+
+iprodredn.o: iprodredn.p iprodredn.int $(GENERIC_REDN_H)
+	charmc -cwd -c iprodredn.p
+
+icountredn.o: icountredn.p icountredn.int $(GENERIC_REDN_H)
+	charmc -cwd -c icountredn.p
+
+fmaxredn.o: fmaxredn.p fmaxredn.int $(GENERIC_REDN_H)
+	charmc -cwd -c fmaxredn.p
+
+fminredn.o: fminredn.p fminredn.int $(GENERIC_REDN_H)
+	charmc -cwd -c fminredn.p
+
+fsumredn.o: fsumredn.p fsumredn.int $(GENERIC_REDN_H)
+	charmc -cwd -c fsumredn.p
+
+fprodredn.o: fprodredn.p fprodredn.int $(GENERIC_REDN_H)
+	charmc -cwd -c fprodredn.p
+
+fcountredn.o: fcountredn.p fcountredn.int $(GENERIC_REDN_H)
+	charmc -cwd -c fcountredn.p
+
+dmaxredn.o: dmaxredn.p dmaxredn.int $(GENERIC_REDN_H)
+	charmc -cwd -c dmaxredn.p
+
+dminredn.o: dminredn.p dminredn.int $(GENERIC_REDN_H)
+	charmc -cwd -c dminredn.p
+
+dsumredn.o: dsumredn.p dsumredn.int $(GENERIC_REDN_H)
+	charmc -cwd -c dsumredn.p
+
+dprodredn.o: dprodredn.p dprodredn.int $(GENERIC_REDN_H)
+	charmc -cwd -c dprodredn.p
+
+dcountredn.o: dcountredn.p dcountredn.int $(GENERIC_REDN_H)
+	charmc -cwd -c dcountredn.p
 
 ###############################################################################
 #

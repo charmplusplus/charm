@@ -14,7 +14,7 @@
 #
 ############################################################################
 
-set CMK_CPP='/usr/lib/cpp'
+set CMK_CPP='/usr/ccs/lib/cpp'
 set CMK_LDRO='ld -r -o'
 set CMK_CC='gcc'
 set CMK_CXX='g++'

@@ -23,7 +23,6 @@
 #    $VERSION/tmp       - used to build the specified version
 #    $VERSION/lib       - used to hold object files once compiled.
 #    $VERSION/bin       - used to hold binary files once compiled.
-#    $VERSION/make      - used to hold make-include files
 #    $VERSION/include   - used to hold include files
 #
 # To compile a version of Converse, SUPER_INSTALL performs the following
@@ -43,22 +42,6 @@
 #
 # That's all SUPER_INSTALL does.  The rest is handled by the Makefile.
 # 
-# Note: As SUPER_INSTALL copies files from the src directories to the
-# tmp directory, two of the files that happen to get copied are Makefile
-# and converse.mk.  Makefile comes from src/Common, and converse.mk comes
-# from src/$VERSION.  Together, these form the makefile that gets used in
-# the "make all".  The contents of converse.mk is fully specified: it
-# must define exactly the following symbols:
-#
-#   <put symbols here>
-#
-# It must also contain rules for making cmk_extras, cmk_clean, and
-# cmk_install.  Those three rules can be used to compile and install
-# any machine-specific utilities (eg, a host program or something like
-# that).  converse.mk must not define anything else (the intention is
-# that the converse-user, eg charm, can include converse.mk in his own
-# makefiles as well).
-#
 
 set PROGRAM=$1
 set VERSION=$2
@@ -119,8 +102,12 @@ install:
       find $VERSION/tmp -type f -name "libconv-*.a" -exec cp {} $VERSION/lib \;
       echo "Copying libck?-*.a  from $VERSION/tmp to $VERSION/lib"
       find $VERSION/tmp -type f -name "libck?-*.a"  -exec cp {} $VERSION/lib \;
+      echo "Copying libcharm.a  from $VERSION/tmp to $VERSION/lib"
+      find $VERSION/tmp -type f -name "libcharm.a"  -exec cp {} $VERSION/lib \;
       echo "Copying *.h         from $VERSION/tmp to $VERSION/include"
       find $VERSION/tmp -name "*.h"       -exec cp {} $VERSION/include \;
+      echo "Copying *.int       from $VERSION/tmp to $VERSION/include"
+      find $VERSION/tmp -name "*.int"     -exec cp {} $VERSION/include \;
       echo "Copying conv-*.mk   from $VERSION/tmp to $VERSION/include"
       find $VERSION/tmp -name "conv-*.mk" -exec cp {} $VERSION/include \;
       echo "Copying conv-*.sh   from $VERSION/tmp to $VERSION/include"
