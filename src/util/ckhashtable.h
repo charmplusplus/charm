@@ -17,8 +17,13 @@ so the keys can be interpreted any way you like.  The default
 */
 
 #ifdef __cplusplus
+#include "pup.h"
 extern "C" {
 #endif
+#ifndef __cplusplus
+#include "pup_c.h"
+#endif
+
 #ifndef __OSL_HASH_TABLE_C
 #define __OSL_HASH_TABLE_C
 
@@ -266,7 +271,10 @@ public:
 	 :CkHashtable(getLayout(),initLen,NloadFactor,Nhash,Ncompare)
 	 {}
 	
-	OBJ &put(const KEY &key) {return *(OBJ *)CkHashtable::put((const void *)&key);}
+	OBJ &put(const KEY &key) {
+		void *obj = CkHashtable::put((const void *)&key);
+		return *(OBJ *)obj;
+	}
 	OBJ get(const KEY &key) const {
 		void *r=CkHashtable::get((const void *)&key);
 		if (r==NULL) return OBJ(0);
@@ -303,7 +311,9 @@ public:
 		while(1) {//Assumes key or empty slot will be found
 			char *cur=entry(i);
 			//An empty slot indicates the key is not here
-			if (layout.isEmpty(cur)) return OBJ(0);
+			if (layout.isEmpty(cur)){ 
+				return OBJ(0);
+			}
 			//Is this the key?
 			if (key.compare(*(KEY *)layout.getKey(cur)))
 				return *(OBJ *)layout.getObject(cur);
@@ -322,6 +332,32 @@ public:
 			inc(i);
 		};
 	}
+	void pup(PUP::er &p){
+		if(!p.isUnpacking()){
+			/*packing phase: loop through the hashtable values*/
+			CkHashtableIterator *it=iterator();
+			int hasNext=1;
+			OBJ *o; KEY *k;
+			while (NULL!=(o=(OBJ *)it->next((void **)&k))) {
+				p|hasNext;
+				p|*k;
+				p|*o;
+			}
+			hasNext=0; p|hasNext;
+			delete it;
+		}else{
+		/*Unpacking phase: add each hashtable item*/
+			int hasNext;
+			p|hasNext;
+			while (hasNext) {
+				OBJ o; KEY k;
+				p|k;
+				p|o;
+				put(k)=o;
+				p|hasNext;
+			}
+		}
+	}
 };
 
 /*A useful adaptor class for using basic (memory only)
@@ -331,6 +367,8 @@ template <class T> class CkHashtableAdaptorT {
 	T val;
 public:
 	CkHashtableAdaptorT<T>(const T &v):val(v) {}
+	/**added to allow pup to do Key k while unPacking*/
+	CkHashtableAdaptorT<T>(){}
 	operator T & () {return val;}
 	operator const T & () const {return val;}
 	inline CkHashCode hash(void) const 
@@ -343,6 +381,9 @@ public:
 	{
 		return ((CkHashtableAdaptorT<T> *)a)->
 		     compare(*(CkHashtableAdaptorT<T> *)b);
+	}
+	void pup(PUP::er &p){
+		p | val;
 	}
 };
 
