@@ -1889,7 +1889,7 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
   
   xstr_printf(ibuf,"echo 'remote responding...'\n");
 
-  xstr_printf(ibuf,"test -x ~/.conv-hostrc && . ~/.conv-hostrc\n");
+  xstr_printf(ibuf,"test -f ~/.conv-hostrc && . ~/.conv-hostrc\n");
   if (arg_display)
     xstr_printf(ibuf,"DISPLAY=%s;export DISPLAY\n",arg_display);
   xstr_printf(ibuf,"NETSTART='%s';export NETSTART\n",create_netstart(rank0no));
@@ -1908,11 +1908,13 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
     xstr_printf(ibuf,"  test -f $dir/xrdb && F_XRDB=$dir/xrdb && export F_XRDB\n");
     xstr_printf(ibuf,"done\n");
     xstr_printf(ibuf,"if test -z \"$F_XTERM\";  then\n");
-    xstr_printf(ibuf,"   echo '%s not in path --- set your path in your profile.'\n", nodetab_xterm(nodeno));
+    xstr_printf(ibuf,"   echo '%s not in path --- set your path in your ~/.conv-hostrc or profile.'\n", nodetab_xterm(nodeno));
+    xstr_printf(ibuf,"   test -f /bin/sync && sync\n");
     xstr_printf(ibuf,"   exit 1\n");
     xstr_printf(ibuf,"fi\n");
     xstr_printf(ibuf,"if test -z \"$F_XRDB\"; then\n");
-    xstr_printf(ibuf,"   echo 'xrdb not in path - set your path in your profile.'\n");
+    xstr_printf(ibuf,"   echo 'xrdb not in path - set your path in your ~/.conv-hostrc or profile.'\n");
+    xstr_printf(ibuf,"   test -f /bin/sync && sync\n");
     xstr_printf(ibuf,"   exit 1\n");
     xstr_printf(ibuf,"fi\n");
     if(arg_verbose) xstr_printf(ibuf,"echo 'using xterm' $F_XTERM\n");
@@ -1926,13 +1928,14 @@ void rsh_pump_sh(p, nodeno, rank0no, argv)
           xstr_printf(ibuf,"done\n");
           xstr_printf(ibuf,"if -z \"$F_DBG\"; then\n");
           xstr_printf(ibuf,"   echo '%s not in path - set your path in your cshrc.'\n",dbg);
+          xstr_printf(ibuf,"   test -f /bin/sync && sync\n");
           xstr_printf(ibuf,"   exit 1\n");
           xstr_printf(ibuf,"fi\n");
           prog_flush(p);
        }
 
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
-    xstr_printf(ibuf,"xrdb -query > /dev/null\n");
+    xstr_printf(ibuf,"$F_XRDB -query > /dev/null\n");
     xstr_printf(ibuf,"if test $? != 0; then\n");
     xstr_printf(ibuf,"  echo 'Cannot contact X Server '$DISPLAY'.  You probably'\n");
     xstr_printf(ibuf,"  echo 'need to run xhost to authorize connections.'\n");
