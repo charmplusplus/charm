@@ -10,12 +10,6 @@
 
 #define CMK_NO_SOCKETS                                     1
 
-#define CMK_ASYNC_NOT_NEEDED                               1
-#define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
-#define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
-#define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
-#define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 0
-
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 #define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0
 

@@ -8,14 +8,6 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_ASYNC_NOT_NEEDED                               0
-#define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
-#define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
-#define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
-#define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 1
-
-#define FASYNC O_ASYNC
-
 #define CMK_CCS_AVAILABLE                                  1
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1

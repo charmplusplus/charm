@@ -467,6 +467,91 @@ void CmiAbort(const char *message)
 }
 
 
+/******************************************************************************
+ *
+ * CmiEnableAsyncIO
+ *
+ * The net and tcp versions use a bunch of unix processes talking to each
+ * other via file descriptors.  We need for a signal SIGIO to be generated
+ * each time a message arrives, making it possible to write a signal
+ * handler to handle the messages.  The vast majority of unixes can,
+ * in fact, do this.  However, there isn't any standard for how this is
+ * supposed to be done, so each version of UNIX has a different set of
+ * calls to turn this signal on.  So, there is like one version here for
+ * every major brand of UNIX.
+ *
+ *****************************************************************************/
+
+#if CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN
+#include <sys/filio.h>
+void CmiEnableAsyncIO(fd)
+int fd;
+{
+  int pid = getpid();
+  int async = 1;
+  if ( ioctl(fd, FIOSETOWN, &pid) < 0  ) {
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+  if ( ioctl(fd, FIOASYNC, &async) < 0 ) {
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+}
+#endif
+
+#if CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP
+#include <sys/filio.h>
+void CmiEnableAsyncIO(fd)
+int fd;
+{
+  int pid = -getpid();
+  int async = 1;
+  if ( ioctl(fd, SIOCSPGRP, &pid) < 0  ) {
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+  if ( ioctl(fd, FIOASYNC, &async) < 0 ) {
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+}
+#endif
+
+#if CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN
+#include <sys/ioctl.h>
+void CmiEnableAsyncIO(fd)
+int fd;
+{
+  int pid = getpid();
+  int async = 1;
+  if ( ioctl(fd, FIOSSAIOOWN, &pid) < 0  ) {
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+  if ( ioctl(fd, FIOSSAIOSTAT, &async) < 0 ) {
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+}
+#endif
+
+#if CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN
+#include <fcntl.h>
+void CmiEnableAsyncIO(fd)
+int fd;
+{
+  if ( fcntl(fd, F_SETOWN, getpid()) < 0 ) {
+    CmiError("setting socket owner: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+  if ( fcntl(fd, F_SETFL, FASYNC) < 0 ) {
+    CmiError("setting socket async: %s\n", strerror(errno)) ;
+    exit(1);
+  }
+}
+#endif
+
 /*****************************************************************************
  *
  * Communication Structures
