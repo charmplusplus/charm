@@ -4,6 +4,7 @@
 #define STRAT_H
 
 /// Strategy types
+#define SEQ_T -3
 #define INIT_T -2
 #define CONS_T -1
 #define OPT_T 0

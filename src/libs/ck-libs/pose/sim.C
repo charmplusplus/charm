@@ -16,7 +16,9 @@ extern CkGroupID dmid;
 /// Basic Constructor
 sim::sim() 
 {
+#ifndef SEQUENTIAL_POSE
   localPVT = (PVT *)CkLocalBranch(ThePVT);
+#endif
 #ifdef LB_ON
   localLBG = TheLBG.ckLocalBranch();
 #endif
@@ -50,6 +52,7 @@ void sim::Step()
 #endif
   prioMsg *pm;
   switch (myStrat->STRAT_T) { // step based on strategy type
+  case SEQ_T:
   case CONS_T:
   case OPT_T:
   case OPT2_T: // pass this step call directly to strategy

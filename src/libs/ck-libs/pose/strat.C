@@ -11,7 +11,9 @@ strat::strat()
   userObj = NULL;
   parent = NULL;
   currentEvent = targetEvent = RBevent = NULL;
+#ifndef SEQUENTIAL_POSE
   localPVT = (PVT *)CkLocalBranch(ThePVT);
+#endif
   STRAT_T = INIT_T;
 }
 

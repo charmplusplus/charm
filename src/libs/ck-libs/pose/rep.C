@@ -25,10 +25,14 @@ void rep::update(POSE_TimeType t, double rt)
 /// Timestamps event message, sets priority, and records in spawned list
 void rep::registerTimestamp(int idx, eventMsg *m, POSE_TimeType offset)
 {
+#ifndef SEQUENTIAL_POSE
   PVT *localPVT = (PVT *)CkLocalBranch(ThePVT);
   CmiAssert(ovt+offset >= localPVT->getGVT());
+#endif
   m->Timestamp(ovt+offset);
   m->setPriority(ovt+offset-INT_MAX);
   m->evID.setObj(myHandle);
+#ifndef SEQUENTIAL_POSE
   parent->registerSent(ovt+offset);
+#endif
 }

@@ -229,19 +229,23 @@ class sim : public ArrayElement1D {
 #ifdef POSE_STATS_ON
       localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
-      localPVT = (PVT *)CkLocalBranch(ThePVT);
 #ifdef LB_ON
       localLBG = TheLBG.ckLocalBranch();
 #endif
       active = 0;
+#ifndef SEQUENTIAL_POSE
+      localPVT = (PVT *)CkLocalBranch(ThePVT);
       myPVTidx = localPVT->objRegister(thisIndex, localPVT->getGVT(), sync, this);
+#endif
 #ifdef LB_ON
       myLBidx = localLBG->objRegister(thisIndex, sync, this);
 #endif
     }
     else if (p.isPacking()) { // deactivate migrating object
       active = -1;
+#ifndef SEQUENTIAL_POSE
       localPVT->objRemove(myPVTidx);
+#endif
 #ifdef LB_ON
       localLBG->objRemove(myLBidx);
 #endif

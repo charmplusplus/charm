@@ -28,6 +28,7 @@ void POSE_init(int IDflag, int ET) // can specify both
   CkPrintf("Initializing POSE...  \n");
   POSE_inactDetect = IDflag;
   POSE_endtime = ET;
+#ifndef SEQUENTIAL_POSE
 #ifdef POSE_COMM_ON
   // Create the communication library for POSE
   ComlibInstanceHandle cinst = CkGetComlibInstance();
@@ -42,17 +43,21 @@ void POSE_init(int IDflag, int ET) // can specify both
 #endif
   // Create a MemoryPool with global handle for memory recycling 
   MemPoolID = CProxy_MemoryPool::ckNew();
+#endif
   // Create array to hold all POSE objects
   POSE_Objects = CProxy_sim::ckNew(); 
+#ifndef SEQUENTIAL_POSE
 #ifdef POSE_COMM_ON
   // Make POSE_Objects use the comm lib
   ComlibDelegateProxy(&POSE_Objects);
+#endif
 #endif
   // Initialize statistics collection if desired
 #ifdef POSE_STATS_ON
   theLocalStats = CProxy_localStat::ckNew();
   CProxy_globalStat::ckNew(&theGlobalStats);
 #endif
+#ifndef SEQUENTIAL_POSE
   // Initialize global handles to GVT and PVT
   ThePVT = CProxy_PVT::ckNew(); 
   TheGVT = CProxy_GVT::ckNew();
@@ -65,8 +70,15 @@ void POSE_init(int IDflag, int ET) // can specify both
   TheLBstrategy = CProxy_LBstrategy::ckNew();
   CkPrintf("Load balancing is ON.\n");
 #endif
-  CkPrintf("POSE initialization complete.\n");
+#endif
   CProxy_pose::ckNew(&POSE_Coordinator_ID, 0);
+#ifdef SEQUENTIAL_POSE
+  if (CkNumPes() > 1) CkAbort("ERROR: Cannot run a sequential simulation on more than one processor!\n");
+  CkPrintf("NOTE: POSE running in sequential simulation mode!\n");
+  int fnIdx = CkIndex_pose::stop();
+  CkStartQD(fnIdx, &POSE_Coordinator_ID);
+#endif  
+  CkPrintf("POSE initialization complete.\n");
   if (POSE_inactDetect) CkPrintf("Using Inactivity Detection for termination.\n");
   else CkPrintf("Using endTime of %d for termination.\n", POSE_endtime);
   CkPrintf("Starting simulation...\n"); 

@@ -11,7 +11,7 @@ POSEINCDIR = $(CHARMINC)/pose
 #***********************************
 OBJECTS=	eventID.o stats.o pose.o srtable.o cancel.o mempool.o \
 		pvtobj.o lbObject.o ldbal.o gvt.o event.o eqheap.o \
-		evq.o sim.o rep.o strat.o cons.o opt.o opt2.o opt3.o \
+		evq.o sim.o rep.o strat.o seq.o cons.o opt.o opt2.o opt3.o \
 		spec.o adapt.o adapt2.o adapt3.o
 LIB = libpose.a
 LIBDEST =  $(CDIR)/lib/$(LIB)
@@ -60,7 +60,7 @@ mempool.def.h: mempool.decl.h
 mempool.decl.h: mempool.ci
 	$(CHARMC) mempool.ci
 
-docs: pose.doxy adapt2.C adapt3.C eventID.C lbObject.C spec.C adapt2.h adapt3.h eventID.h lbObject.h pose.C spec.h pose.ci adapt.C ldbal.C srtable.C adapt.h mempool.C ldbal.ci srtable.h mempool.ci pose.h cancel.C stats.C cancel.h ldbal.h pvtobj.C stats.ci mempool.h pvtobj.h chpt.h cons.C evq.C rep.C stats.h cons.h evq.h opt2.C rep.h opt2.h strat.C eqheap.C gvt.C sim.C strat.h eqheap.h gvt.ci opt3.C sim.ci opt3.h event.C gvt.h opt.C sim.h event.h opt.h
+docs: pose.doxy adapt2.C adapt3.C eventID.C lbObject.C spec.C adapt2.h adapt3.h eventID.h lbObject.h pose.C spec.h pose.ci adapt.C ldbal.C srtable.C adapt.h mempool.C ldbal.ci srtable.h mempool.ci pose.h cancel.C stats.C cancel.h ldbal.h pvtobj.C stats.ci mempool.h pvtobj.h chpt.h seq.C cons.C evq.C rep.C stats.h seq.h cons.h evq.h opt2.C rep.h opt2.h strat.C eqheap.C gvt.C sim.C strat.h eqheap.h gvt.ci opt3.C sim.ci opt3.h event.C gvt.h opt.C sim.h event.h opt.h
 	doxygen pose.doxy
 
 # HOUSE-KEEPING RULES

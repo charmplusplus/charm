@@ -78,6 +78,10 @@ class rep
   virtual void pup(PUP::er &p) { 
     p(ovt); p(ort); p(myHandle); p(copy); p(anti_methods); 
   }
+#ifdef SEQUENTIAL_POSE
+  void checkpoint(rep *) { }
+  void restore(rep *) { }
+#endif  
 };
 
 #endif

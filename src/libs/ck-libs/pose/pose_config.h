@@ -6,6 +6,9 @@
 #define POSE_CONFIG_H
 #include <limits.h>
 
+/// Uncomment to run POSE is sequential mode
+//#define SEQUENTIAL_POSE 1
+
 /// Uncomment to gather and print POSE statistics set
 #define POSE_STATS_ON 1
 /// Insane level of analysis
@@ -18,7 +21,7 @@
 #define DETERMINISTIC_EVENTS 1
 
 /// Uncomment to save time on memory allocation and freeing
-#define MSG_RECYCLING 1
+//#define MSG_RECYCLING 1
 
 /// Uncomment to make use of the Streaming Communication Library optimizations
 //#define POSE_COMM_ON 1

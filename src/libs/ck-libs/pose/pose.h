@@ -44,6 +44,7 @@ class strat; // defined later in strat.h
 #include "adapt2.h"
 #include "adapt3.h"
 #include "cons.h"
+#include "seq.h"
 #include "chpt.h"
 
 /// Main initialization for all of POSE
