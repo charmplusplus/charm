@@ -24,3 +24,7 @@ test: pgm
 	./charmrun ./pgm +p2 +vp2
 	./charmrun ./pgm +p2 +vp3
 	./charmrun ./pgm +p2 +vp4
+	-@rm -f fem_mesh_vp3_*
+	./charmrun ./pgm +vp3 -write
+	./charmrun ./pgm +vp3 -read
+	rm -f fem_mesh_vp3_*
