@@ -1,4 +1,4 @@
-CC=../../bin/charmc -I. -DALLOCA_H=1
+CC=../../bin/charmc -I. -ma $(OPTS)
 
 all: qt stp testpgm
 
