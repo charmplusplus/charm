@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-10-11 17:54:40  sanjeev
+ * Revision 2.7  1995-10-11 19:30:33  sanjeev
+ * removed CPlus_ChareExit
+ *
+ * Revision 2.6  1995/10/11  17:54:40  sanjeev
  * fixed Charm++ chare creation
  *
  * Revision 2.5  1995/10/02  20:43:11  knauff
@@ -109,14 +112,9 @@ groupmember::groupmember()
 
 
 
-void CPlus_ChareExit()
-{
-	_CK_Object *temp = (_CK_Object *)CpvAccess(currentChareBlock)->chareptr;
-	delete temp ;
 
-        SetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID,0) ;
-	CmiFree(CpvAccess(currentChareBlock));
-}
+
+
 
 void CPlus_StartQuiescence(int epnum, ChareIDType cid)
 {

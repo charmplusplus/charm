@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1995-10-11 17:54:40  sanjeev
+ * Revision 2.17  1995-10-11 19:30:33  sanjeev
+ * removed CPlus_ChareExit
+ *
+ * Revision 2.16  1995/10/11  17:54:40  sanjeev
  * fixed Charm++ chare creation
  *
  * Revision 2.15  1995/10/03  19:54:21  sanjeev
@@ -116,13 +119,6 @@ extern ChareIDType NULL_HANDLE;
 
 
 
-/* These are C++ functions in the Charm runtime system */
-
-extern void CPlus_ChareExit() ;
-
-
-
-
 /* These are C functions in the Charm runtime system */
 
 extern "C" int registerMsg(char *name, FUNCTION_PTR allocf, FUNCTION_PTR packf, FUNCTION_PTR unpackf, int size) ;
@@ -155,6 +151,7 @@ extern "C" void CreateChare(int, int, void *, ChareIDType *, int) ;
 extern "C" int CreateAcc(int, void *, int, ChareIDType *) ;
 extern "C" int CreateMono(int, void *, int, ChareIDType *) ;
 extern "C" void CkExit() ;
+extern "C" void ChareExit() ;
 extern "C" void CkFreeMsg(void *) ;
 extern "C" void GeneralSendMsgBranch(int, void *, int, int, int) ;
 extern "C" void GeneralBroadcastMsgBranch(int, void *, int, int) ;
