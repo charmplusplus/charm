@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.34  1995-10-27 22:37:08  jyelon
+ * Revision 2.35  1995-10-31 19:53:21  jyelon
+ * Added 'CMK_THREADS_USE_ALLOCA_WITH_PRAGMA'
+ *
+ * Revision 2.34  1995/10/27  22:37:08  jyelon
  * Changed NumPe -> NumPes
  *
  * Revision 2.33  1995/10/27  21:39:32  jyelon
@@ -358,6 +361,10 @@ void   CmiDeliverSpecificMsg   CMK_PROTO((int handler));
 /****** CTH: THE THREADS PACKAGE ******/
 
 #ifdef CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE
+#define CMK_THREADS_USE_ALLOCA
+#endif
+
+#ifdef CMK_THREADS_USE_ALLOCA_WITH_PRAGMA
 #define CMK_THREADS_USE_ALLOCA
 #endif
 

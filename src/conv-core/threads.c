@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.20  1995-10-31 19:49:30  jyelon
+ * Revision 1.21  1995-10-31 19:53:21  jyelon
+ * Added 'CMK_THREADS_USE_ALLOCA_WITH_PRAGMA'
+ *
+ * Revision 1.20  1995/10/31  19:49:30  jyelon
  * Added 'pragma alloca'
  *
  * Revision 1.19  1995/10/20  17:29:10  jyelon
@@ -196,12 +199,14 @@
 #include <alloca.h>
 #endif
 
+#ifdef CMK_THREADS_USE_ALLOCA_WITH_PRAGMA
+#pragma alloca
+#endif
 
 #ifdef CMK_THREADS_USE_ALLOCA
 #include <stdio.h>
 #include <setjmp.h>
 #include <sys/types.h>
-#pragma alloca
 
 #define STACKSIZE (32768)
 #define SLACK     256
