@@ -26,6 +26,8 @@ CkGroupID lbdb;
 CkpvDeclare(int, numLoadBalancers);  /**< num of lb created */
 CkpvDeclare(int, hasNullLB);         /**< true if NullLB is created */
 CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
+CkpvDeclare(int, dumpStep);			 /**< the load balancing step at which to dump data */
+CkpvDeclare(char*, dumpFile);		 /**< the name of the file in which the data will be dumped */
 
 static LBDefaultCreateFn defaultCreate=NULL;
 void LBSetDefaultCreate(LBDefaultCreateFn f)
@@ -111,12 +113,20 @@ void _loadbalancerInit()
   CkpvAccess(numLoadBalancers) = 0;
   CkpvInitialize(int, hasNullLB);
   CkpvAccess(hasNullLB) = 0;
+  CkpvInitialize(int, dumpStep);
+  CkpvAccess(dumpStep) = -1;
+  CkpvInitialize(char*, dumpFile);
+  CkpvAccess(dumpFile) = NULL;
 
   char **argv = CkGetArgv();
   char *balancer = NULL;
   if (CmiGetArgString(argv, "+balancer", &balancer)) {
     lbRegistry.defaultLB() = balancer;
   }
+
+  // get the step number at which to dump the LB database
+  CmiGetArgInt(argv, "+LBDump", &CkpvAccess(dumpStep));
+  CmiGetArgString(argv, "+LBDumpFile", &CkpvAccess(dumpFile));
 }
 
 int LBDatabase::manualOn = 0;
