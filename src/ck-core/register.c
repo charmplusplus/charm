@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.2  1995-06-27 22:10:49  gursoy
+ * Revision 2.3  1995-06-29 21:51:53  narain
+ * Changed members of MSG_STRUCT and PSEUDO_STRUCT : packfn, unpackfn and tbl
+ *
+ * Revision 2.2  1995/06/27  22:10:49  gursoy
  * fixed some CpvAccess'es (not CpvAccess(i-1) bu CpvAccess(i)-1)
  *
  * Revision 2.1  1995/06/08  17:07:12  gursoy
@@ -82,8 +85,8 @@ int size ;
 {
 /* fills in MsgToStructTable */
 	CsvAccess(MsgToStructTable)[CpvAccess(msgCount)].alloc = allocf ;
-	CsvAccess(MsgToStructTable)[CpvAccess(msgCount)].pack = packf ;
-	CsvAccess(MsgToStructTable)[CpvAccess(msgCount)].unpack = unpackf ;
+	CsvAccess(MsgToStructTable)[CpvAccess(msgCount)].packfn = packf ;
+	CsvAccess(MsgToStructTable)[CpvAccess(msgCount)].unpackfn = unpackf ;
 	CsvAccess(MsgToStructTable)[CpvAccess(msgCount)].size = size ;
 	CpvAccess(msgCount) ++ ;
 	return(CpvAccess(msgCount)-1) ;
@@ -192,7 +195,7 @@ FUNCTION_PTR initfn, hashfn ;
 	strcpy(CsvAccess(PseudoTable)[CpvAccess(pseudoCount)].name,name) ;
 	CsvAccess(PseudoTable)[CpvAccess(pseudoCount)].type = TABLE ;
 	CsvAccess(PseudoTable)[CpvAccess(pseudoCount)].initfn = initfn ;
-	CsvAccess(PseudoTable)[CpvAccess(pseudoCount)].pseudo_type.table.hashfn = hashfn ;
+	CsvAccess(PseudoTable)[CpvAccess(pseudoCount)].pseudo_type.tbl.hashfn = hashfn ;
 	CpvAccess(pseudoCount)++ ;
 
 	return(CpvAccess(pseudoCount)-1) ;
