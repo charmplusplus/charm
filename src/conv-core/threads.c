@@ -1006,11 +1006,40 @@ char *CthGetData(CthThread t) { return t->data; }
 CpvStaticDeclare(int, _stksize);
 
 CpvStaticDeclare(int, reqHdlr);
+CpvStaticDeclare(int, reqSpecHdlr);
 CpvStaticDeclare(int, respHdlr);
+CpvStaticDeclare(int, respSpecHdlr);
 CpvStaticDeclare(slotset *, myss);
 CpvStaticDeclare(void *, heapbdry);
 CpvStaticDeclare(int, zerofd);
+CpvStaticDeclare(int, numslots);
 
+
+/* 
+ * this handler responds to a specific request for slotblock
+ */
+static void
+reqspecific(slotmsg *msg)
+{
+  CmiPrintf("[%d] req from %d for %d slots starting from %d\n", CmiMyPe(), msg->pe, msg->nslots, msg->slot);
+  grab_slots(CpvAccess(myss),msg->slot,msg->nslots);
+  CmiSetHandler(msg,CpvAccess(respSpecHdlr));
+  CmiSyncSendAndFree(msg->pe, sizeof(slotmsg), msg);
+}
+
+/* 
+ * this handler is invoked as a response to a specific request for slotblock
+ */
+static void
+respspecific(slotmsg *msg)
+{
+  CthThread t = msg->t;
+  CmiPrintf("[%d] response for %d slots starting from %d\n", CmiMyPe(), msg->nslots, msg->slot);
+  t->slotnum = msg->slot;
+  if(t->awakened)
+    CthAwaken(t);
+  CmiFree(msg);
+}
 
 /*
  * this handler is invoked by a request for slot.
@@ -1057,7 +1086,7 @@ respslots(slotmsg *msg)
   CthStackCreate(t, msg->fn, msg->arg, msg->slot, msg->nslots);
   if(t->awakened)
     CthAwaken(t);
-  /* msg will be automatically freed by the scheduler */
+  CmiFree(msg);
 }
 
 CthCpvDeclare(char *,    CthData);
@@ -1138,7 +1167,7 @@ static void *__cur_stack_frame(void)
 void CthInit(char **argv)
 {
   CthThread t;
-  int i, numslots;
+  int i;
 
   CpvInitialize(int, _stksize);
   CpvAccess(_stksize) = 0;
@@ -1152,6 +1181,7 @@ void CthInit(char **argv)
 
   CpvInitialize(void *, heapbdry);
   CpvInitialize(int, zerofd);
+  CpvInitialize(int, numslots);
   /*
    * calculate the number of slots according to stacksize
    * divide up into number of available processors
@@ -1171,18 +1201,18 @@ void CthInit(char **argv)
 #ifdef QT_GROW_UP
     CpvAccess(heapbdry) = (void *)(((size_t)heap-(2<<30))&(~((1<<30)-1)));
     stackbdry = (void *)(((size_t)stack+(1<<28))&(~((1<<28)-1)));
-    numslots = (((size_t)CpvAccess(heapbdry)-(size_t)stackbdry)/stacksize)
+    CpvAccess(numslots) = (((size_t)CpvAccess(heapbdry)-(size_t)stackbdry)/stacksize)
                  / CmiNumPes();
 #else
     CpvAccess(heapbdry) = (void *)(((size_t)heap+(2<<30))&(~((1<<30)-1)));
     stackbdry = (void *)(((size_t)stack-(1<<28))&(~((1<<28)-1)));
-    numslots = (((size_t)stackbdry-(size_t)CpvAccess(heapbdry))/stacksize)
+    CpvAccess(numslots) = (((size_t)stackbdry-(size_t)CpvAccess(heapbdry))/stacksize)
                  / CmiNumPes();
 #endif
 #if CMK_THREADS_DEBUG
     CmiPrintf("[%d] heapbdry=%p\tstackbdry=%p\n",
               CmiMyPe(),CpvAccess(heapbdry),stackbdry);
-    CmiPrintf("[%d] numthreads per pe=%d\n",CmiMyPe(),numslots);
+    CmiPrintf("[%d] numthreads per pe=%d\n",CmiMyPe(),CpvAccess(numslots));
 #endif
     CpvAccess(zerofd) = open("/dev/zero", O_RDWR);
     if(CpvAccess(zerofd)<0)
@@ -1191,13 +1221,17 @@ void CthInit(char **argv)
   } while(0);
 
   CpvInitialize(slotset *, myss);
-  CpvAccess(myss) = new_slotset(CmiMyPe()*numslots, numslots);
+  CpvAccess(myss) = new_slotset(CmiMyPe()*CpvAccess(numslots), CpvAccess(numslots));
 
   CpvInitialize(int, reqHdlr);
   CpvInitialize(int, respHdlr);
+  CpvInitialize(int, reqSpecHdlr);
+  CpvInitialize(int, respSpecHdlr);
 
   CpvAccess(reqHdlr) = CmiRegisterHandler((CmiHandler)reqslots);
   CpvAccess(respHdlr) = CmiRegisterHandler((CmiHandler)respslots);
+  CpvAccess(reqSpecHdlr) = CmiRegisterHandler((CmiHandler)reqspecific);
+  CpvAccess(respSpecHdlr) = CmiRegisterHandler((CmiHandler)respspecific);
 
   CpvInitialize(int, _numSwitches);
   CpvAccess(_numSwitches) = 0;
@@ -1431,13 +1465,31 @@ CthThread CthPup(pup_er p, CthThread t)
   pup_bytes(p, (void*)t, sizeof(struct CthThreadStruct));
 
   if (pup_isUnpacking(p)) {
+    int homePe = t->slotnum/CpvAccess(numslots);
     t->data = (char *) malloc(t->datasize);
     _MEMCHECK(t->data);
-    grab_slots(CpvAccess(myss), t->slotnum, t->nslots);
+    /* 
+     * allocate the stack whether I am the homePe or not. Adjust slotset
+     * by sending a message later.
+     */
     stack = (qt_t*) map_slots(t->slotnum, t->nslots);
     _MEMCHECK(stack);
     if(stack != t->stack)
       CmiAbort("Stack pointers do not match after migration!!\n");  
+    if(homePe == CmiMyPe())
+    {
+      grab_slots(CpvAccess(myss), t->slotnum, t->nslots);
+    } else {
+      slotmsg *msg = (slotmsg*) CmiAlloc(sizeof(slotmsg));
+      msg->pe = CmiMyPe();
+      msg->slot = t->slotnum;
+      t->slotnum = (-2);
+      msg->nslots = t->nslots;
+      msg->t = t;
+      CmiPrintf("[%d] Sending request to %d\n", CmiMyPe(), homePe);
+      CmiSetHandler(msg, CpvAccess(reqSpecHdlr));
+      CmiSyncSendAndFree(homePe, sizeof(slotmsg), msg);
+    }
   }
   pup_bytes(p, (void*)t->data, t->datasize);
 
