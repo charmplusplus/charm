@@ -883,7 +883,7 @@ int BgAdjustTimeLineInsert(BgTimeLineRec &tlinerec)
   return minIdx;
 }
 
-bgTimeLog *BgGetTimeLog(BgTimeLineRec &tline, int srcnode, int msgID, int *index)
+static bgTimeLog *BgGetTimeLogOnThread(BgTimeLineRec &tline, int srcnode, int msgID, int *index)
 {
   int idxOld = tline.length()-1;
   while (idxOld >= 0)  {
@@ -894,6 +894,20 @@ bgTimeLog *BgGetTimeLog(BgTimeLineRec &tline, int srcnode, int msgID, int *index
   *index = idxOld;
   if (idxOld == -1) return NULL;
   return tline[idxOld];
+}
+
+bgTimeLog *BgGetTimeLog(BgTimeLineRec *tline, CmiInt2 tID, int srcnode, int msgID, int *index)
+{
+  if (tID == ANYTHREAD) {
+    for (int i=0; i<cva(numWth); i++) {
+      bgTimeLog *tlog = BgGetTimeLogOnThread(tline[i], srcnode, msgID, index);
+      if (tlog) return tlog;
+    }
+    return NULL;
+  }
+  else {
+    return BgGetTimeLogOnThread(tline[tID], srcnode, msgID, index);
+  }
 }
 
 int BgAdjustTimeLineForward(int srcnode, int msgID, double tAdjustAbs, BgTimeLineRec &tline, int mynode, int tid)
@@ -1026,11 +1040,12 @@ static inline int handleCorrectionMsg(int mynode, BgTimeLineRec *logs, bgCorrect
 }
 
 /* no need to consider the case when tID is ANYTHREAD */
-static inline int batchHandleCorrectionMsg(int mynode, BgTimeLineRec &tlinerec, bgCorrectionQ &cmsg, int *mIdx)
+static inline int batchHandleCorrectionMsg(int mynode, BgTimeLineRec *tlinerecs, CmiInt2 tID, bgCorrectionQ &cmsg, int *mIdx)
 {
   int i;
-  int tID = 0;
   int worked = 0;
+  CmiAssert(tID != ANYTHREAD);
+  BgTimeLineRec &tlinerec = tlinerecs[tID];
   bgCorrectionQ tmpQ;
   int len = cmsg.length();
   int minIdx = -1;
@@ -1042,7 +1057,7 @@ static inline int batchHandleCorrectionMsg(int mynode, BgTimeLineRec &tlinerec, 
     bgCorrectionMsg *cm = cmsg.deq();
     if (cm->tAdjust >= 0.) {
       int oldIdx;
-      bgTimeLog *tlog = BgGetTimeLog(tlinerec, cm->srcNode, cm->msgID, &oldIdx);
+      bgTimeLog *tlog = BgGetTimeLogOnThread(tlinerec, cm->srcNode, cm->msgID, &oldIdx);
       if (tlog==NULL) {
 //	if (!programExit) {             // HACK ?
 	if (1) {
@@ -1129,7 +1144,7 @@ void processCorrectionMsg(int nodeidx)
 //CmiPrintf("[%d:%d] processCorrectionMsg len:%d\n", CmiMyPe(), nodeidx, len);
 
     for (tID=0; tID<cva(numWth); tID++) {
-      worked = batchHandleCorrectionMsg(nodeidx, tlinerec[tID], cmsg, &minIdx);
+      worked = batchHandleCorrectionMsg(nodeidx, tlinerec, tID, cmsg, &minIdx);
       if (worked && minIdx !=-1)
         BgFinishCorrection(tlinerec[tID], nodeidx, tID, minIdx);
     }
@@ -1306,8 +1321,7 @@ static double findLeastTime()
 	int index;
 	bgTimeLog* tlog;
 	//Comapre startTime
-	tlog =
-	  BgGetTimeLog(tlinerecs[cmsg->tID], cmsg->srcNode, cmsg->msgID, &index);
+	tlog = BgGetTimeLog(tlinerecs, cmsg->tID, cmsg->srcNode, cmsg->msgID, &index);
 	if(tlog != NULL){
 	  if(tlog->startTime < minT)
 	    minT = tlog->startTime;

@@ -1454,9 +1454,57 @@ extern "C" int CmiSwitchToPE(int pe)
 
 extern void processCorrectionMsg(int nodeidx);
 
+// return the msg pointer, and the index of the message in the affinity queue.
+static inline char* searchInAffinityQueue(int nodeidx, int msgID, int srcnode, CmiInt2 tID, int &index)
+{
+  CmiAssert(tID != ANYTHREAD);
+  ckMsgQueue &affinityQ = cva(nodeinfo)[nodeidx].affinityQ[tID];
+  for (int i=0; i<affinityQ.length(); i++)  {
+      char *msg = affinityQ[i];
+      int m_msgID = CmiBgMsgID(msg);
+      int m_srcnode = CmiBgMsgSrcPe(msg);
+      if (msgID == m_msgID && srcnode == m_srcnode) {
+        index = i;
+        return msg;
+      }
+  }
+  return NULL;
+}
+
+// return the msg pointer, thread id and the index of the message in the affinity queue.
+static char* searchInAffinityQueueInNode(int nodeidx, int msgID, int srcnode, CmiInt2 &tID, int &index)
+{
+  for (tID=0; tID<cva(numWth); tID++) {
+    char *msg = searchInAffinityQueue(nodeidx, msgID, srcnode, tID, index);
+    if (msg) return msg;
+  }
+  return NULL;
+}
+
 int updateRealMsgs(bgCorrectionMsg *cm, int nodeidx)
 {
-  CmiAssert(cm->tID!=ANYTHREAD);
+  char *msg;
+  CmiInt2 tID = cm->tID;
+  int index;
+  if (tID == ANYTHREAD) {
+    msg = searchInAffinityQueueInNode(nodeidx, cm->msgID, cm->srcNode, tID, index);
+  }
+  else {
+    msg = searchInAffinityQueue(nodeidx, cm->msgID, cm->srcNode, tID, index);
+  }
+  if (msg == NULL) return 0;
+
+  ckMsgQueue &affinityQ = cva(nodeinfo)[nodeidx].affinityQ[tID];
+  CmiBgMsgRecvTime(msg) = cm->tAdjust;
+  affinityQ.update(index);
+  CthThread tid = cva(nodeinfo)[nodeidx].threadTable[tID];
+  unsigned int prio = (unsigned int)(cm->tAdjust*PRIO_FACTOR)+1;
+  CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
+  stateCounters.corrMsgCRCnt++;
+  return 1;       /* invalidate this msg */
+}
+
+#if 0
   ckMsgQueue &affinityQ = cva(nodeinfo)[nodeidx].affinityQ[cm->tID];
   for (int i=0; i<affinityQ.length(); i++)  {
     char *msg = affinityQ[i];
@@ -1475,6 +1523,7 @@ int updateRealMsgs(bgCorrectionMsg *cm, int nodeidx)
   }
   return 0;
 }
+#endif
 
 // Coverse handler for begin exit
 // flush and process all correction messages

@@ -244,11 +244,11 @@ void BgSkipEndExecuteEvent();
 
 #ifdef __cplusplus
 template <class d>
-class Cpv {
+class Cnv {
 public:
   d **data;
 public:
-  Cpv(): data(NULL) {}
+  Cnv(): data(NULL) {}
   inline void init() {
     if (data == NULL) {
       data = new d*[CmiMyNodeSize()];
@@ -257,21 +257,50 @@ public:
     }
   }
 };
-#define BnvDeclare(T,v)        Cpv<T> CMK_CONCAT(Bnv_Var, v); 
-#define BnvStaticDeclare(T,v)  static Cpv<T> CMK_CONCAT(Bnv_Var, v); 
-#define BnvExtern(T,v)         extern Cpv<T> CMK_CONCAT(Bnv_Var, v);
+#define BnvDeclare(T,v)        Cnv<T> CMK_CONCAT(Bnv_Var, v); 
+#define BnvStaticDeclare(T,v)  static Cnv<T> CMK_CONCAT(Bnv_Var, v); 
+#define BnvExtern(T,v)         extern Cnv<T> CMK_CONCAT(Bnv_Var, v);
 #define BnvInitialize(T,v)     CMK_CONCAT(Bnv_Var, v).init()
-#define BnvAccess(v)       CMK_CONCAT(Bnv_Var, v).data[CmiMyRank()][BgMyRank()]
-#define BnvAccessOther(v, r)       CMK_CONCAT(Bnv_Var, v).data[CmiMyRank()][r]
+#define BnvAccess(v)           CMK_CONCAT(Bnv_Var, v).data[CmiMyRank()][BgMyRank()]
+#define BnvAccessOther(v, r)   CMK_CONCAT(Bnv_Var, v).data[CmiMyRank()][r]
 #endif
 
 #endif
 
+#if 1
+#ifdef __cplusplus
+template <class d>
+class Cpv {
+public:
+  d ***data;
+public:
+  Cpv(): data(NULL) {}
+  inline void init() {
+    if (data == NULL) {
+      data = new d**[CmiMyNodeSize()];
+      for (int i=0; i<CmiMyNodeSize(); i++) {
+        data[i] = new d*[BgNodeSize()];
+	for (int j=0; j<BgNodeSize(); j++)
+	  data[i][j] = new d[BgGetNumWorkThread()];
+      }
+    }
+  }
+};
+#define BpvDeclare(T,v)        Cpv<T> CMK_CONCAT(Bpv_Var, v); 
+#define BpvStaticDeclare(T,v)  static Cpv<T> CMK_CONCAT(Bpv_Var, v); 
+#define BpvExtern(T,v)         extern Cpv<T> CMK_CONCAT(Bpv_Var, v);
+#define BpvInitialize(T,v)     CMK_CONCAT(Bpv_Var, v).init()
+#define BpvAccess(v)           CMK_CONCAT(Bpv_Var, v).data[CmiMyRank()][BgMyRank()][BgGetThreadID()]
+#define BpvAccessOther(v, r)   CMK_CONCAT(Bpv_Var, v).data[CmiMyRank()][BgMyRank()][r]
+#endif
+
+#else
 #define BpvDeclare(T, v)            CtvDeclare(T, v)
 #define BpvStaticDeclare(T, v)      CtvStaticDeclare(T, v)
 #define BpvExtern(T, v)             CtvExtern(T, v)
 #define BpvInitialize(T, v)         CtvInitialize(T, v)
 #define BpvAccess(v)                CtvAccess(v)
 #define BpvAccessOther(v, r)        CtvAccess(v, r)
+#endif
 
 #endif

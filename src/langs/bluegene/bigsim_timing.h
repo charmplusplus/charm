@@ -246,6 +246,7 @@ public:
   }
   bgTimeLog * operator[](size_t n)
   {
+	CmiAssert(n!=-1);
         return timeline[n];
   }
   int length() { return timeline.length(); }
@@ -293,7 +294,7 @@ extern void BgPrintThreadTimeLine(int node, int th, BgTimeLine &tline);
 extern void BgWriteThreadTimeLine(char **argv, int x, int y, int z, int th, BgTimeLine &tline);
 extern void BgFinishCorrection(BgTimeLineRec &tlinerec, int mynode, int tid, int idx, int send=1);
 extern void BgSendBufferedCorrMsgs();
-extern bgTimeLog *BgGetTimeLog(BgTimeLineRec &tline, int srcnode, int msgID, int *index);
+extern bgTimeLog *BgGetTimeLog(BgTimeLineRec *tline, CmiInt2 tID, int srcnode, int msgID, int *index);
 extern int BgGetTimeLineIndexByRecvTime(BgTimeLineRec &, bgTimeLog *, int, int);
 extern int BgAdjustTimeLineFromIndex(int index, BgTimeLineRec &tlinerec, int mynode);
 extern int BgGetIndexFromTime(double effT, int seqno, BgTimeLineRec &tline);
