@@ -21,6 +21,7 @@ public: static int __idx;
 
 #include "pup.h"
 #include "cklists.h"
+#include "ckbitvector.h"
 #include "init.h"
 #include "debug-charm.h"
 
@@ -99,6 +100,13 @@ public:
 		queueingtype=CK_QUEUEING_BFIFO;
 		prioBits=prioBits_;
 		prioPtr=prioPtr_;
+	}
+	inline void setPriority(CkBitVector prioBitVector_) {
+		queueingtype=CK_QUEUEING_BFIFO;
+		prioBits = prioBitVector_.usedBits;
+		prio_t *tmp = new prio_t[prioBitVector_.dataLength];
+		memcpy(tmp, prioBitVector_.data, prioBitVector_.dataLength*sizeof(prio_t));
+		prioPtr = tmp;
 	}
 	
 	inline void setQueueing(int queueingtype_) {queueingtype=queueingtype_;}
