@@ -1,12 +1,12 @@
 vmidir=gcc
 case "$CMK_CC" in
-ecc*)   vmidir=ecc ;;
+ecc*)   vmidir=ecc6 ;;
 icc*)   vmidir=icc ;;
 pgcc*)  vmidir=pgi ;;
 esac   
 
 test -z "$CMK_INCDIR" && CMK_INCDIR='-I /usr/local/vmi/mpich/include'
-test -z "$CMK_LIBDIR" && CMK_LIBDIR='-L /usr/local/vmi/mpich/lib/$vmidir'
+test -z "$CMK_LIBDIR" && CMK_LIBDIR="-L /usr/local/vmi/mpich/lib/$vmidir"
 
 CMK_CC="$CMK_CC $CMK_INCDIR "
 CMK_CXX="$CMK_CXX $CMK_INCDIR "
