@@ -26,14 +26,15 @@ team::team(TeamData *m)
   myWorkers = new worker[numWorkers/numTeams];
 
   WorkMsg *wm;
-  int offset = teamID * numWorkers/numTeams;
-  //CkPrintf("Team %d(%d) constructed.  Offset=%d\n", parent->thisIndex, teamID, offset);
+  int offset = teamID * (numWorkers/numTeams);
+  CkAssert(offset >= 0);
+  CkPrintf("Team %d(%d) constructed.  Offset=%d\n", parent->thisIndex, teamID, offset);
   for (int i=0; i<numWorkers/numTeams; i++) {
     myWorkers[i].set(offset+i);
     wm = new WorkMsg;
     wm->workerID = offset+i;
     memset(wm->data, 0, 10*sizeof(int));
-    //CkPrintf("Team %d(%d) generated initial work for worker %d\n", parent->thisIndex, teamID, wm->workerID);
+    CkPrintf("Team %d(%d) generated initial work for worker %d\n", parent->thisIndex, teamID, wm->workerID);
     POSE_local_invoke(work(wm), 0);
   }
 }
@@ -60,21 +61,21 @@ void team::doWork(int k)
     wm = new WorkMsg;
     wm->workerID = (k+20)%numWorkers;
     memset(wm->data, 0, 10*sizeof(int));
-    //CkPrintf("At(%d): Team %d(%d) worker %d generated actual work for worker %d\n", ovt, parent->thisIndex, teamID, k, wm->workerID);
+    CkPrintf("At(%d): Team %d(%d) worker %d generated actual work for worker %d\n", ovt, parent->thisIndex, teamID, k, wm->workerID);
     POSE_invoke(work(wm), team, (wm->workerID)/(numWorkers/numTeams), k%50+10);
   }
   if (k%4==0) {
     wm = new WorkMsg;
     wm->workerID = (k+1)%numWorkers;
     memset(wm->data, 0, 10*sizeof(int));
-    //CkPrintf("At(%d): Team %d(%d) worker %d generated actual work for worker %d\n", ovt, parent->thisIndex, teamID, k, wm->workerID);
+    CkPrintf("At(%d): Team %d(%d) worker %d generated actual work for worker %d\n", ovt, parent->thisIndex, teamID, k, wm->workerID);
     POSE_invoke(work(wm), team, (wm->workerID)/(numWorkers/numTeams), 100);
   }
   if (k%33==0) {
     wm = new WorkMsg;
     wm->workerID = (k+3)%numWorkers;
     memset(wm->data, 0, 10*sizeof(int));
-    //CkPrintf("At(%d): Team %d(%d) worker %d generated actual work for worker %d\n", ovt, parent->thisIndex, teamID, k, wm->workerID);
+    CkPrintf("At(%d): Team %d(%d) worker %d generated actual work for worker %d\n", ovt, parent->thisIndex, teamID, k, wm->workerID);
     POSE_invoke(work(wm), team, (wm->workerID)/(numWorkers/numTeams), k+31);
   }
 }
