@@ -238,7 +238,7 @@ struct sockaddr_in skt_build_addr(skt_ip_t IP,unsigned int port)
   struct sockaddr_in ret={0};
   ret.sin_family=AF_INET;
   ret.sin_port = htons((short)port);
-  memcpy(&ret.sin_addr.s_addr,&IP,sizeof(IP));
+  memcpy(&ret.sin_addr,&IP,sizeof(IP));
   return ret;  
 }
 
@@ -315,7 +315,7 @@ retry:
   }
   
   if (port!=NULL) *port=ntohs(addr.sin_port);
-  if (pip!=NULL) memcpy(pip,&addr.sin_addr.s_addr,sizeof(*pip));
+  if (pip!=NULL) memcpy(pip,&addr.sin_addr,sizeof(*pip));
   return ret;
 }
 
