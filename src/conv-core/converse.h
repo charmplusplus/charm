@@ -12,8 +12,8 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.92  1998-09-01 04:29:32  pramacha
- * Added declarations for CmiNodeBarrier() (and associated CmiNodeBarrierInit())
+ * Revision 2.93  1998-09-23 15:46:23  pramacha
+ * modified for client server module
  *
  * Revision 2.91  1998/07/02 02:52:18  jyelon
  * Changed CldEnqueue to three parameters ( no pack function )
@@ -273,7 +273,6 @@ extern int CmiRankOf(int pe);
 
 extern void CmiMemLock();
 extern void CmiMemUnlock();
-extern void CmiNodeBarrierInit();
 extern void CmiNodeBarrier CMK_PROTO((void));
 #define CmiSvAlloc CmiAlloc
 
@@ -283,6 +282,59 @@ extern CmiNodeLock CmiCreateLock();
 #define CmiLock(lock) (mutex_lock(lock))
 #define CmiUnlock(lock) (mutex_unlock(lock))
 #define CmiTryLock(lock) (mutex_trylock(lock))
+extern void CmiDestroyLock(CmiNodeLock lock);
+
+#endif
+
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+
+#include <pthread.h>
+#include <sched.h>
+#include <synch.h>
+
+extern int Cmi_numpes;
+extern int Cmi_mynodesize;
+extern int Cmi_mynode;
+extern int Cmi_numnodes;
+
+extern int CmiMyPe();
+extern int CmiMyRank();
+#define CmiNumPes()         Cmi_numpes
+#define CmiMyNodeSize()     Cmi_mynodesize
+#define CmiMyNode()         Cmi_mynode
+#define CmiNumNodes()       Cmi_numnodes
+extern int CmiNodeFirst(int node);
+extern int CmiNodeSize(int node);
+extern int CmiNodeOf(int pe);
+extern int CmiRankOf(int pe);
+
+#define SHARED_DECL
+
+#define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
+#define CpvInitialize(t,v)\
+  { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0) sched_yield();\
+    else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize()); }}
+#define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
+
+#define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
+#define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
+#define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
+#define CsvInitialize(t,v)
+#define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
+
+extern void CmiMemLock();
+extern void CmiMemUnlock();
+extern void CmiNodeBarrier CMK_PROTO((void));
+#define CmiSvAlloc CmiAlloc
+
+
+typedef pthread_mutex_t *CmiNodeLock;
+extern CmiNodeLock CmiCreateLock();
+#define CmiLock(lock) (pthread_mutex_lock(lock))
+#define CmiUnlock(lock) (pthread_mutex_unlock(lock))
+#define CmiTryLock(lock) (pthread_mutex_trylock(lock))
 extern void CmiDestroyLock(CmiNodeLock lock);
 
 #endif
