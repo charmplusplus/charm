@@ -46,7 +46,12 @@ every element, from each element call:
 Note that since C++ arrays (like \uw{forces}[2]) are already pointers, we 
 don't use \&\uw{forces}.
 
+The result of the reduction operation is passed to the {\em reduction
+client}.  Many different kinds of reduction clients can be used, as
+explained below (Section~\ref{reductionClients}).
+
 \subsubsection{Reduction Clients}
+\label{reductionClients}
 
 After the data is reduced, it is passed to a you via a callback object,
 as described in section~\ref{callbacks}.  The message passed to
