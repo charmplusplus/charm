@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-11-06 17:55:09  milind
+ * Revision 2.7  1995-11-06 21:44:19  milind
+ * Fixed BranchInit to call CldPeriodicCheckInit().
+ *
+ * Revision 2.6  1995/11/06  17:55:09  milind
  * Changed to conform to the definition of functions NewSeedFrom*
  *
  * Revision 2.5  1995/10/27  22:09:16  jyelon
@@ -105,7 +108,8 @@ export_to_C CldCreateBoc()
 {
   DUMMYMSG *msg;
   msg = (DUMMYMSG *)CkAllocMsg(DUMMYMSG);	
-  CreateBoc(LDB, LDB@BranchInit, msg);
+  LdbBocNum = CreateBoc(LDB, LDB@BranchInit, msg);
+  ReadInit(LdbBocNum);
 }
 
 export_to_C CldFillLdb(destPe, ldb)
@@ -364,8 +368,8 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 	LDB_ELEMENT *ldb;
 
 	TRACE(CkPrintf("Enter Node LdbInit()\n"));
-	LdbBocNum = LdbBoc = MyBocNum();
-	ReadInit(LdbBocNum);
+	LdbBoc = MyBocNum();
+	CldPeriodicCheckInit();
 	numPe = CkNumPes();
 	myPE = CkMyPe();
 	numNeighbours = CmiNumNeighbours(myPE);
