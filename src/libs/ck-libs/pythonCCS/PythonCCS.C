@@ -176,12 +176,26 @@ void PythonObject::iterate (CkCcsRequestMsg *msg) {
   struct _node* programNode = PyParser_SimpleParseString(userCode, Py_file_input);
   if (programNode==NULL) {
     CkPrintf("Program error\n");
+    // distroy map element in pyWorkers and terminate interpreter
+    Py_EndInterpreter(pts);
+    PyEval_ReleaseLock();
+    CmiLock(CsvAccess(pyLock));
+    CsvAccess(pyWorkers)->erase(pyReference);
+    CmiUnlock(CsvAccess(pyLock));
+    delete msg;
     return;
   }
   PyCodeObject *program = PyNode_Compile(programNode, "");
   if (program==NULL) {
     CkPrintf("Program error\n");
     PyNode_Free(programNode);
+    // distroy map element in pyWorkers and terminate interpreter
+    Py_EndInterpreter(pts);
+    PyEval_ReleaseLock();
+    CmiLock(CsvAccess(pyLock));
+    CsvAccess(pyWorkers)->erase(pyReference);
+    CmiUnlock(CsvAccess(pyLock));
+    delete msg;
     return;
   }
   PyObject *code = PyEval_EvalCode(program, dict, dict);
@@ -189,6 +203,13 @@ void PythonObject::iterate (CkCcsRequestMsg *msg) {
     CkPrintf("Program error\n");
     PyNode_Free(programNode);
     Py_DECREF(program);
+    // distroy map element in pyWorkers and terminate interpreter
+    Py_EndInterpreter(pts);
+    PyEval_ReleaseLock();
+    CmiLock(CsvAccess(pyLock));
+    CsvAccess(pyWorkers)->erase(pyReference);
+    CmiUnlock(CsvAccess(pyLock));
+    delete msg;
     return;
   }
 
@@ -200,6 +221,13 @@ void PythonObject::iterate (CkCcsRequestMsg *msg) {
     PyNode_Free(programNode);
     Py_DECREF(program);
     Py_DECREF(code);
+    // distroy map element in pyWorkers and terminate interpreter
+    Py_EndInterpreter(pts);
+    PyEval_ReleaseLock();
+    CmiLock(CsvAccess(pyLock));
+    CsvAccess(pyWorkers)->erase(pyReference);
+    CmiUnlock(CsvAccess(pyLock));
+    delete msg;
     return;
   }
 
@@ -217,6 +245,10 @@ void PythonObject::iterate (CkCcsRequestMsg *msg) {
   PyObject *result;
   while (more) {
     result = PyObject_CallObject(item, arg);
+    if (!result) {
+      CkPrintf("Python Call error\n");
+      break;
+    }
     more = nextIteratorUpdate(part, result, userIterator);
     Py_DECREF(result);
   }

@@ -70,14 +70,14 @@ class PythonObject {
   // methods for accessing charm varibles from inside python
   // read: input an object which describes where the data should be read from, return a PyObject with the given data
   // write: input two object describing where the data should be written, and the actual data
-  virtual PyObject* read(PyObject* where) {CkAbort("PythonCCS: Method read should be reimplemented");};
+  virtual PyObject* read(PyObject* where) {CkAbort("PythonCCS: Method read should be reimplemented"); return NULL; };
   virtual void write(PyObject* where, PyObject* what) {CkAbort("PythonCCS: Method write should be reimplemented");};
 
   // methods to create iterators for iterative python invocations
   // buildIterator: input a PyObject, which is an empty class to be filled with data, and a void pointer describing over what to iterate (user defined format). Should return 1, if it returns 0 no computation is done
   // nextIteratorUpdate: input a PyObject to be filled with the next iterator, this contains the previous iterator, so if the python code modified the object, here the new information can be found. A Python object with the result returned by the python code, and the description of the iterator (as in buildIterator). Return 1 if there is a new object, 0 if there are no more objects in the iterator.
-  virtual int buildIterator(PyObject*, void*) {CkAbort("PythonCCS: Method buildIterator should be reimplemented");};
-  virtual int nextIteratorUpdate(PyObject*, PyObject*, void*) {CkAbort("PythonCCS: Method nextIteratorUpdate should be reimplemented");};
+  virtual int buildIterator(PyObject*, void*) {CkAbort("PythonCCS: Method buildIterator should be reimplemented"); return 0; };
+  virtual int nextIteratorUpdate(PyObject*, PyObject*, void*) {CkAbort("PythonCCS: Method nextIteratorUpdate should be reimplemented"); return 0; };
 
 };
 
