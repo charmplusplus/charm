@@ -63,7 +63,7 @@ static void traceCommonInit(char **argv)
   CmiArgGroup("Charm++","Tracing");
   DEBUGF(("[%d] in traceCommonInit.\n", CkMyPe()));
   CkpvInitialize(double, traceInitTime);
-  CkpvAccess(traceInitTime) = TRACE_TIMER();
+  CkpvAccess(traceInitTime) = CmiStartTimer();
   CkpvInitialize(double, traceInitCpuTime);
   CkpvAccess(traceInitCpuTime) = TRACE_CPUTIMER();
   CpvInitialize(int, traceOn);
