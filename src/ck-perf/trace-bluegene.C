@@ -169,6 +169,7 @@ void TraceBluegene::userBracketEvent(char* name, double bt, double et, void** pa
   if(*parentLogPtr)
     newLog->addBackwardDep(*(BgTimeLog**)parentLogPtr);
   *parentLogPtr = newLog;
+  CmiAssert(*parentLogPtr != NULL);
   tTIMELINEREC.logEntryInsert(newLog);
 }
 
