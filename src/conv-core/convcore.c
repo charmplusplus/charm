@@ -77,10 +77,6 @@ char **argv;
       CpvAccess(CstatPrintQueueStatsFlag)=1;
       DeleteArg(argv);
     } else
-    if (strcmp(*argv, "+qs") == 0) {
-      CpvAccess(CstatPrintQueueStatsFlag)=1;
-      DeleteArg(argv);
-    } else
     argv++;
   }
 }
