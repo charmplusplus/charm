@@ -428,24 +428,40 @@ foreach FILE ($FILES)
       breaksw
     case "*.P"
 # Put pgm.P into pgm.TMP.P.C because CC needs source files to end with .C
-      echo '#line 1 "'$BASE.P'"' > $TMP.P.C
+      echo '#include "ckdefs.h"' > $TMP.P.C
+      echo '#include "chare.h"' >> $TMP.P.C
+      echo '#include "c++interface.h"' >> $TMP.P.C
+      echo '#line 1 "'$BASE.P'"' >> $TMP.P.C
       /bin/cat $BASE.P >> $TMP.P.C
       if ($?VERBOSE) echo "$CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.C > $TMP.cpp"
       $CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.C > $TMP.cpp
-      if ($?VERBOSE) echo "$CHARMBIN/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space"
-      $CHARMBIN/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space
-      if ($?VERBOSE) echo "$CHARMBIN/charmxlat++ $TMP.space $TMP.C"
-      $CHARMBIN/charmxlat++ $TMP.space $TMP.C
+
+#     if ($?VERBOSE) echo "$CHARMBIN/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space"
+#     $CHARMBIN/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space
+
+      if ($?VERBOSE) echo "$CHARMBIN/charmxlat++ $TMP.cpp $TMP.xlat"
+      $CHARMBIN/charmxlat++ $TMP.cpp $TMP.xlat
       if ($status) goto failure
-      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CXX -I$CHARMINC -c $TMP.C"
-      $CMK_CXX $OPTS_CXX -I$CHARMINC -c $TMP.C
+
+      if ($?VERBOSE) echo "/bin/cat $BASE.headers > $BASE.$CMK_CPP_SUFFIX"
+      /bin/cat $BASE.headers > $BASE.$CMK_CPP_SUFFIX
+      if ($?VERBOSE) echo "/bin/cat $TMP.xlat >> $BASE.$CMK_CPP_SUFFIX"
+      /bin/cat $TMP.xlat >> $BASE.$CMK_CPP_SUFFIX
+
+      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.$CMK_CPP_SUFFIX"
+      $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.$CMK_CPP_SUFFIX
       if ($status) goto failure
-      if ($?OBJECT == 0) then
-        if ($?VERBOSE) echo "/bin/mv $TMP.o $BASE.o"
-        /bin/mv $TMP.o $BASE.o
-      else
-        set OBJECTFILES=( $OBJECTFILES $TMP.o )
+
+      if ($?OBJECT != 0) then
+        set OBJECTFILES=( $OBJECTFILES $BASE.o )
       endif
+
+#     if ($?OBJECT == 0) then
+#       if ($?VERBOSE) echo "/bin/mv $TMP.o $BASE.o"
+#       /bin/mv $TMP.o $BASE.o
+#     else
+#       set OBJECTFILES=( $OBJECTFILES $TMP.o )
+#     endif
       breaksw
     case "*.c"
       if ($?VERBOSE) echo "$CMK_CC $OPTS_CC -I$CHARMINC -c $BASE.c"
@@ -759,8 +775,8 @@ end:
         foreach FILE ($FILES)
             set BASE=$FILE:r
             set TMP=$BASE:t.TMP
-            /bin/rm -f $TMP.P.C $TMP.C $TMP.cpp $TMP.space $TMP.o
-            /bin/rm -f $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h $BASE:t.headers
+            /bin/rm -f $TMP.P.C $TMP.cpp $TMP.space $TMP.xlat $TMP.o $BASE.$CMK_CPP_SUFFIX $BASE.headers
+            /bin/rm -f $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h
         end
         rm -f core $DELETE
     endif
