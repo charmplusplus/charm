@@ -262,6 +262,12 @@ void CthSetThreadID(CthThread th, int a, int b, int c)
   B(th)->tid.id[2] = c;
 }
 
+/* possible hack? CW */
+CmiObjId *CthGetThreadID(CthThread th)
+{
+  return &(B(th)->tid);
+}
+
 char *CthGetData(CthThread t) { return B(t)->data; }
 
 /* Ensure this thread has at least enough 

@@ -67,8 +67,9 @@ void Chare::ckDebugPup(PUP::er &p) {
 }
 
 /// This method is called before starting a [threaded] entry method.
-void Chare::CkAddThreadListeners(CthThread th) {
-  /* FIXME: add tracing here */
+void Chare::CkAddThreadListeners(CthThread th, void *msg) {
+  CthSetThreadID(th, thishandle.onPE, (int)thishandle.objPtr, 0);
+  traceAddThreadListeners(th, UsrToEnv(msg));
 }
 
 
@@ -101,6 +102,15 @@ void IrrGroup::pup(PUP::er &p)
 
 void IrrGroup::ckJustMigrated(void)
 {
+}
+
+void IrrGroup::CkAddThreadListeners(CthThread tid, void *msg) {
+  /* FIXME: **CW** not entirely sure what we should do here yet */
+}
+
+void Group::CkAddThreadListeners(CthThread th, void *msg) {
+  Chare::CkAddThreadListeners(th, msg);
+  CthSetThreadID(th, thisgroup.idx, 0, 0);
 }
 
 void Group::pup(PUP::er &p)

@@ -367,7 +367,7 @@ class Chare {
     virtual char *ckDebugChareName(void);
     virtual void ckDebugPup(PUP::er &p);
     /// Called when a [threaded] charm entry method is created:
-    virtual void CkAddThreadListeners(CthThread tid);
+    virtual void CkAddThreadListeners(CthThread tid, void *msg);
 };
 
 //Superclass of all Groups that cannot participate in reductions.
@@ -393,6 +393,7 @@ class IrrGroup : public Chare {
     virtual CmiBool isReductionMgr(void){ return CmiFalse; }
     static int isIrreducible(){ return 1;}
     virtual void flushStates() {}
+    virtual void CkAddThreadListeners(CthThread tid, void *msg);
 };
 
 #define CBASE_PROXY_MEMBERS(CProxy_Derived) \

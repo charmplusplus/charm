@@ -662,6 +662,45 @@ void CkMigratable::setMigratable(int migratable)
 {
 	myRec->setMigratable(migratable);
 }
+
+struct CkArrayThreadListener {
+        struct CthThreadListener base;
+        CkMigratable *mig;
+};
+
+extern "C"
+void CkArrayThreadListener_suspend(struct CthThreadListener *l)
+{
+        CkArrayThreadListener *a=(CkArrayThreadListener *)l;
+        a->mig->ckStopTiming();
+}
+
+extern "C"
+void CkArrayThreadListener_resume(struct CthThreadListener *l)
+{
+        CkArrayThreadListener *a=(CkArrayThreadListener *)l;
+        a->mig->ckStartTiming();
+}
+
+extern "C"
+void CkArrayThreadListener_free(struct CthThreadListener *l)
+{
+        CkArrayThreadListener *a=(CkArrayThreadListener *)l;
+        delete a;
+}
+
+void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
+{
+        Chare::CkAddThreadListeners(tid, msg);
+        CthSetThreadID(tid, thisIndexMax.data()[0], thisIndexMax.data()[1], 
+		       thisIndexMax.data()[2]);
+	CkArrayThreadListener *a=new CkArrayThreadListener;
+	a->base.suspend=CkArrayThreadListener_suspend;
+	a->base.resume=CkArrayThreadListener_resume;
+	a->base.free=CkArrayThreadListener_free;
+	a->mig=this;
+	CthAddListener(tid,(struct CthThreadListener *)a);
+}
 #endif
 
 

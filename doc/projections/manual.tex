@@ -291,9 +291,9 @@ The following is a list of runtime options available under this tracemode:
    Make sure the JDK commands ``java'', ``javac'' and ``jar''
    are in your path
 \item[2)]
-   Type ``make''
+   From {\tt PROJECTIONS\_LOCATION/}, type ``make''
 \item[3)]
-   The following files will be placed in `bin':
+   The following files are placed in `bin':
 
       {\tt projections}           : Starts projections, for UNIX machines
 
@@ -310,40 +310,22 @@ From any location, type
 where {\tt PROJECTIONS\_LOCATION} is the path to the main projections
 directory.
 
-Also, if you attach a .sts file after the command line, \projections{} will
-open the file and initialize immediately. This trick saves time selecting file
-from the GUI filechooser.
+Supplying the optional {\tt NAME.sts} file in the command line will
+cause projections to load data from the file at startup. This shortcut
+saves time selecting a set of data from the GUI's file dialog.
 
 \subsection{Using \projections{}}
-When \projections{} starts, you will see the main window with a title and
-six buttons:
 
 \begin{figure}[htb]
 \center
-\epsfig{figure=fig/mainwindow.eps,height=3in}
+\epsfig{figure=fig/front-with-summary.eps,height=3in}
 \caption{\projections{} main window}
 \label{mainwindow}
 \end{figure}
 
-1. Open File
+When \projections{} is started, it will display a main window as shown in figure \ref{mainwindow}. If summary (.sum) files are available in the set of data, a low-resolution utilization graph will be displayed as shown. Otherwise, the main window shows a blank screen.
 
-2. Graphs
 
-3. Timelines
-
-4. Usage Profile
-
-5. Animations
-
-6. View Log Files
-
-7. Histograms
-
-8. Overview
-
-Clicking on any of the buttons will bring up the appropriate next window, as
-described in the following sections.  Initially, only the Open File button
-will be active.
 
 \subsubsection{Open File}
 

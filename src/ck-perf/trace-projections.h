@@ -275,6 +275,9 @@ class TraceProjections : public Trace {
     void regFunc(char *name);
     void beginFunc(char *name,char *file,int line);
     void endFunc(char *name);
+
+    /* for overiding basic thread listener support in Trace class */
+    virtual void traceAddThreadListeners(CthThread tid, envelope *e);
 };
 
 using namespace PUP;

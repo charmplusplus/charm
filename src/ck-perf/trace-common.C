@@ -147,13 +147,12 @@ extern void traceWriteSTS(FILE *stsfp,int nUserEvents) {
     fprintf(stsfp, "MESSAGE %d %d\n", i, _msgTable[i]->size);
 }
 
-
 extern "C"
 void traceCommonBeginIdle(void *proj,double curWallTime)
 {
   ((TraceArray *)proj)->beginIdle(curWallTime);
 }
-
+ 
 extern "C"
 void traceCommonEndIdle(void *proj,double curWallTime)
 {
@@ -339,6 +338,14 @@ void traceCharmClose(void)
   OPTIMIZE_WARNING
   CkpvAccess(_traces)->traceClose();
 #endif
+}
+
+/* **CW** Support for thread listeners. This makes a call to each
+   trace module which must support the call.
+*/
+extern "C"
+void traceAddThreadListeners(CthThread tid, envelope *e) {
+  CkpvAccess(_traces)->traceAddThreadListeners(tid, e);
 }
 
 #if 0

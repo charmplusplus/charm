@@ -1248,6 +1248,10 @@ typedef struct {
 int id[3];
 } CmiObjId;
 
+/* public interface for thread id acquisition */
+CmiObjId *CthGetThreadID(CthThread th);
+void CthSetThreadID(CthThread th, int a, int b, int c);
+
 void CthTraceResume(CthThread t);
 
 #include "conv-cpm.h"

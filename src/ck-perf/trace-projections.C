@@ -67,6 +67,67 @@ int numPAPIEvents = 2;
 int papiEvents[] = {PAPI_TOT_INS, PAPI_L1_DCM};
 char *papiEventNames[] = {"PAPI_TOT_INS", "PAPI_L1_DCM"};
 #endif
+ 
+/* ****** CW TEMPORARY LOCATION ***** Support for thread listeners */
+
+struct TraceThreadListener {
+  struct CthThreadListener base;
+  int event;
+  int msgType;
+  int ep;
+  int srcPe;
+  int ml;
+  CmiObjId idx;
+};
+
+
+extern "C"
+void traceThreadListener_suspend(struct CthThreadListener *l)
+{
+  TraceThreadListener *a=(TraceThreadListener *)l;
+  /* here, we activate the appropriate trace codes for the appropriate
+     registered modules */
+  traceSuspend();
+}
+
+extern "C"
+void traceThreadListener_resume(struct CthThreadListener *l) 
+{
+  TraceThreadListener *a=(TraceThreadListener *)l;
+  /* here, we activate the appropriate trace codes for the appropriate
+     registered modules */
+  _TRACE_BEGIN_EXECUTE_DETAILED(a->event,a->msgType,a->ep,a->srcPe,a->ml,
+				CthGetThreadID(a->base.thread));
+  a->event=-1;
+  a->srcPe=CkMyPe(); /* potential lie to migrated threads */
+  a->ml=0;
+}
+
+extern "C"
+void traceThreadListener_free(struct CthThreadListener *l) 
+{
+  TraceThreadListener *a=(TraceThreadListener *)l;
+  delete a;
+}
+
+void TraceProjections::traceAddThreadListeners(CthThread tid, envelope *e)
+{
+#ifndef CMK_OPTIMIZE
+  /* strip essential information from the envelope */
+  TraceThreadListener *a= new TraceThreadListener;
+  
+  a->base.suspend=traceThreadListener_suspend;
+  a->base.resume=traceThreadListener_resume;
+  a->base.free=traceThreadListener_free;
+  a->event=e->getEvent();
+  a->msgType=e->getMsgtype();
+  a->ep=e->getEpIdx();
+  a->srcPe=e->getSrcPe();
+  a->ml=e->getTotalsize();
+
+  CthAddListener(tid, (CthThreadListener *)a);
+#endif
+}
 
 void LogPool::openLog(const char *mode)
 {
@@ -358,6 +419,8 @@ void LogPool::writeSts(void)
   // for whining compilers
   int i;
   char name[30];
+  // generate an automatic unique ID for each log
+  fprintf(stsfp, "PROJECTIONS_ID %s\n", "");
   fprintf(stsfp, "VERSION %s\n", PROJECTION_VERSION);
 #if CMK_HAS_COUNTER_PAPI
   fprintf(stsfp, "TOTAL_PAPI_EVENTS %d\n", numPAPIEvents);
@@ -374,21 +437,20 @@ void LogPool::writeSts(void)
 }
 
 void LogPool::writeSts(TraceProjections *traceProj){
-	writeSts();
-	if(traceProj != NULL){
-		CkHashtableIterator  *funcIter = traceProj->getfuncIterator();		
-		funcIter->seekStart();
-		int numFuncs = traceProj->getFuncNumber();
-		fprintf(stsfp,"TOTAL FUNCTIONS %d \n",numFuncs);
-		while(funcIter->hasNext()){
-			StrKey *key;
-			int *obj = (int *)funcIter->next((void **)&key);
-			fprintf(stsfp,"FUNCTION %s %d \n",key->getStr(),*obj);
-		}
-	}
-	fprintf(stsfp, "END\n");
-	fclose(stsfp);
-	
+  writeSts();
+  if (traceProj != NULL) {
+    CkHashtableIterator  *funcIter = traceProj->getfuncIterator();
+    funcIter->seekStart();
+    int numFuncs = traceProj->getFuncNumber();
+    fprintf(stsfp,"TOTAL_FUNCTIONS %d \n",numFuncs);
+    while(funcIter->hasNext()) {
+      StrKey *key;
+      int *obj = (int *)funcIter->next((void **)&key);
+      fprintf(stsfp,"FUNCTION %d %s \n",*obj,key->getStr());
+    }
+  }
+  fprintf(stsfp, "END\n");
+  fclose(stsfp);
 }
 
 

@@ -25,6 +25,9 @@ extern double CmiTraceTimer();
 
 extern int _dummyMsg, _dummyChare, _dummyEP;
 
+/* CW Support for Thread Listener interface */
+extern "C" void traceAddThreadListeners(CthThread tid, envelope *e);
+
 // trace_in_charm means only do trace for Charm++ level
 // traceOnPe controls if charm pe will generate trace logs
 #if CMK_TRACE_IN_CHARM
@@ -120,6 +123,9 @@ class Trace {
     virtual void beginFunc(char *name,char *file,int line){}
     virtual void endFunc(char *name){}
 
+    /* for implementing thread listeners */
+    virtual void traceAddThreadListeners(CthThread tid, envelope *e) {}
+
     virtual ~Trace() {} /* for whining compilers */
 };
 
@@ -197,10 +203,15 @@ public:
     void traceBegin();
     void traceEnd();
 
-		/*Calls for tracing function begins and ends*/
+    /*Calls for tracing function begins and ends*/
     inline void regFunc(char *name){ ALLDO(regFunc(name)); }
     inline void beginFunc(char *name,char *file,int line){ ALLDO(beginFunc(name,file,line)); };
     inline void endFunc(char *name){ ALLDO(endFunc(name)); }
+
+    /* calls for thread listener registration for each trace module */
+    inline void traceAddThreadListeners(CthThread tid, envelope *e) {
+      ALLDO(traceAddThreadListeners(tid, e));
+    }
 };
 
 CkpvExtern(TraceArray*, _traces);

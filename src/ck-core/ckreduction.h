@@ -318,6 +318,7 @@ class Group : public CkReductionMgr
 		CkReductionMgr::flushStates();
 		reductionInfo.redNo = 0;
  	}
+	virtual void CkAddThreadListeners(CthThread tid, void *msg);
 
 	CK_REDUCTION_CONTRIBUTE_METHODS_DECL
 };
