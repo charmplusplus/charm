@@ -18,6 +18,7 @@ CHARMBASE=../../../../
 CHARMBIN=$(CHARMBASE)/bin
 CHARMINC=$(CHARMBASE)/include
 CHARMC=$(CHARMBIN)/charmc -I$(CHARMINC)/pose $(OPTS)
+ETRANS=$(CHARMBIN)/etrans.pl
 
 # Default Location variables
 # **************************
@@ -63,7 +64,7 @@ TCsim.def.h TCsim.decl.h : TCsim_sim.ci
  
 TCsim_sim.C TCsim_sim.h TCsim_sim.ci: TCsim.C \
 		TCsim.h TCsim.ci 
-	$(CHARMBIN)/etrans.pl TCsim
+	$(ETRANS) TCsim
 
 BgSim_sim.o :	TCsim.def.h BgSim_sim.C BgSim_sim.h \
 			BgSim.def.h BgSim.decl.h
@@ -74,7 +75,7 @@ BgSim.def.h BgSim.decl.h : BgSim_sim.ci
  
 BgSim_sim.C BgSim_sim.h BgSim_sim.ci: BgSim.C \
 		BgSim.h BgSim.ci Switch.C Nic.C Channel.C
-	$(CHARMBIN)/etrans.pl BgSim Switch.C Nic.C Channel.C
+	$(ETRANS) BgSim Switch.C Nic.C Channel.C
 
 clean:
 	rm -f charmrun conv-host *.o
