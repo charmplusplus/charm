@@ -29,6 +29,7 @@ eventQueue::eventQueue()
   // link them together
   frontPtr->next = backPtr;
   backPtr->prev = frontPtr;
+  //sanitize();
 }
 
 /// Destructor
@@ -47,6 +48,7 @@ eventQueue::~eventQueue()
 /// Insert e in the queue in timestamp order
 void eventQueue::InsertEvent(Event *e)
 {
+  //sanitize();
   Event *tmp = backPtr->prev; // start at back of queue
 
   // check if new event should go on heap: 
@@ -68,6 +70,7 @@ void eventQueue::InsertEvent(Event *e)
     if ((currentPtr->prev == e) && (currentPtr->done <= 0))
       currentPtr = currentPtr->prev;
   }
+  //sanitize();
 }
 
 /// Move currentPtr to next event in queue
@@ -84,11 +87,13 @@ void eventQueue::ShiftEvent() {
     e->prev->next = e;
     currentPtr = e;
   }
+  //sanitize();
 }
 
 /// Commit (delete) events before target timestamp ts
 void eventQueue::CommitEvents(sim *obj, int ts)
 {
+  //sanitize();
   Event *target, *commitPtr;
   if (ts >= 0) { // commit up to ts
     target = currentPtr->prev;
@@ -119,6 +124,7 @@ void eventQueue::CommitEvents(sim *obj, int ts)
   commitPtr->prev = frontPtr; // reattach front sentinel node
   frontPtr->next = commitPtr;
   commitPtr = NULL;
+  //sanitize();
 }
 
 /// Change currentPtr to point to event e
@@ -151,12 +157,14 @@ Event *eventQueue::RecomputeRollbackTime()
 /// Delete event and reconnect surrounding events in queue
 void eventQueue::DeleteEvent(Event *ev) 
 {
+  //sanitize();
   CmiAssert(ev != currentPtr);
   CmiAssert(ev->spawnedList == NULL);
   // first connect surrounding events
   ev->prev->next = ev->next;
   ev->next->prev = ev->prev;
   delete ev; // then delete the event
+  //sanitize();
 }
 
 /// Add id, e and ts as an entry in currentPtr's spawned list
@@ -231,4 +239,53 @@ void eventQueue::pup(PUP::er &p)
     }
     eqh->pup(p); // pack the heap
   }
+}
+
+/// Check validity of data fields
+void eventQueue::sanitize()
+{
+  // check sentinel nodes
+  CmiAssert(frontPtr != NULL);
+  CmiAssert(frontPtr->timestamp == -1);
+  CmiAssert(frontPtr->done == -1);
+  CmiAssert(frontPtr->fnIdx == -99);
+  CmiAssert(frontPtr->msg == NULL);
+  CmiAssert(frontPtr->commitBfr == NULL);
+  CmiAssert(frontPtr->spawnedList == NULL);
+  CmiAssert(frontPtr->next != NULL);
+  CmiAssert(frontPtr->prev == NULL);
+  CmiAssert(frontPtr->commitBfrLen == 0);
+  CmiAssert(backPtr != NULL);
+  CmiAssert(backPtr->timestamp == -1);
+  CmiAssert(backPtr->done == -1);
+  CmiAssert(backPtr->fnIdx == -100);
+  CmiAssert(backPtr->msg == NULL);
+  CmiAssert(backPtr->commitBfr == NULL);
+  CmiAssert(backPtr->spawnedList == NULL);
+  CmiAssert(backPtr->next == NULL);
+  CmiAssert(backPtr->prev != NULL);
+  CmiAssert(backPtr->commitBfrLen == 0);
+
+  // traverse forward
+  Event *tmp = frontPtr->next;
+  while (tmp != backPtr) {
+    CmiAssert(tmp->next != NULL);
+    tmp->sanitize();
+    tmp = tmp->next;
+  }
+
+  // traverse backward
+  tmp = backPtr->prev;
+  while (tmp != frontPtr) {
+    CmiAssert(tmp->prev != NULL);
+    tmp->sanitize();
+    tmp = tmp->prev;
+  }
+
+  // check currentPtr
+  CmiAssert(currentPtr != NULL);
+  // should also make sure that the event this points to is in the queue!
+
+  // check eqheap
+  eqh->sanitize();
 }

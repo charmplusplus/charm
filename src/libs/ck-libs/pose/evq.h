@@ -6,9 +6,10 @@
 /** Doubly-linked list with front and back sentinels and a heap of unexecuted
     events */
 class eventQueue {
+ public:
   /// Sentinel nodes
   Event *frontPtr, *backPtr;
- public:
+  /// Pointer to next unexecuted event
   Event *currentPtr;
   /// Heap of unexecuted events
   EqHeap *eqh;
@@ -49,6 +50,8 @@ class eventQueue {
   void dump();        
   /// Pack/unpack/sizing operator
   void pup(PUP::er &p);   
+  /// Check validity of data fields
+  void sanitize();
 };
 
 #endif

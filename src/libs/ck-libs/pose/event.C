@@ -101,3 +101,23 @@ void Event::pup(PUP::er &p)
   if (p.isUnpacking())
     cpData = NULL; // to be set later
 }
+
+/// Check validity of data fields
+void Event::sanitize()
+{
+  // check that evID is kosher
+  // evID->sanitize();   
+  // check fnIdx... not clear how
+  // check timestamp... not clear how
+  /// Execution status: 0=not done, 1=done, 2=executing
+  CmiAssert((done == 0) || (done == 1) || (done == 2));
+  CmiAssert(commitBfrLen >= 0);
+  CmiAssert((commitErr == 0) || (commitErr == 1));
+  /// check commitBfr... not sure how
+  /// check msg... not sure how
+  /// check spawnedList... later
+  /// check cpData... not sure how
+  /// check links
+  CmiAssert(next->prev == this);
+  CmiAssert(prev->next == this);
+}

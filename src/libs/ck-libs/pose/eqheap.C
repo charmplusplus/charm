@@ -237,3 +237,7 @@ void EqHeap::dump()
   CkPrintf(" end EQHEAP]\n");
 }
 
+/// Check validity of data fields
+void EqHeap::sanitize()
+{
+}

@@ -60,6 +60,8 @@ class Event {
   ~Event();
   /// Pack/unpack/sizing operator
   void pup(PUP::er &p);  
+  /// Check validity of data fields
+  void sanitize();
 };
 
 #endif

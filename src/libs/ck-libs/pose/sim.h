@@ -265,7 +265,7 @@ class sim : public ArrayElement1D {
     va_start(ap,Fmt);
     InternalCommitPrintf(Fmt, ap);
     va_end(ap);
-    eq->currentPtr->commitErr = 1;
+    myStrat->currentEvent->commitErr = 1;
   }
   /// Dump all data fields
   void dump();
@@ -273,19 +273,19 @@ class sim : public ArrayElement1D {
   /// Used by buffered print functions
   void InternalCommitPrintf (const char *Fmt, va_list ap) {
     char *tmp;
-    size_t tmplen=eq->currentPtr->commitBfrLen + strlen(Fmt) + 1 +100;
+    size_t tmplen=myStrat->currentEvent->commitBfrLen + strlen(Fmt) + 1 +100;
     if (!(tmp = (char *)malloc(tmplen * sizeof(char)))) {
       CkPrintf("ERROR: sim::CommitPrintf: OUT OF MEMORY!\n");
       CkExit();
     }
-    if (eq->currentPtr->commitBfr && eq->currentPtr->commitBfrLen) {
-      strcpy(tmp, eq->currentPtr->commitBfr);
-      free(eq->currentPtr->commitBfr);
+    if (myStrat->currentEvent->commitBfr && myStrat->currentEvent->commitBfrLen) {
+      strcpy(tmp, myStrat->currentEvent->commitBfr);
+      free(myStrat->currentEvent->commitBfr);
       vsnprintf(tmp+strlen(tmp), tmplen, Fmt, ap); 
     }
     else vsnprintf(tmp, tmplen, Fmt, ap); 
-    eq->currentPtr->commitBfrLen = strlen(tmp) + 1;  
-    eq->currentPtr->commitBfr = tmp;
+    myStrat->currentEvent->commitBfrLen = strlen(tmp) + 1;  
+    myStrat->currentEvent->commitBfr = tmp;
   }
 };
 

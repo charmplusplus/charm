@@ -65,7 +65,9 @@ class EqHeap {
   void dump();                      
   /// Pack/unpack/sizing operator
   /** Pups entire heap relying on recursive HeapNode::pup */
-  void pup(PUP::er &p);                          
+  void pup(PUP::er &p);     
+  /// Check validity of data fields
+  void sanitize();
 };
 
 #endif
