@@ -13,7 +13,8 @@ shamelessly stolen from java.util.Hashtable.
 #include <string.h>
 #include "ckhashtable.h"
 
-#define DEBUGF(x) /*printf x;*/
+#include "converse.h"
+#define DEBUGF(x) /*CmiPrintf x;*/
 
 ///////////////////// Default hash/compare functions ////////////////////
 CkHashCode CkHashFunction_default(const void *keyData,size_t keyLen)
@@ -83,7 +84,7 @@ char *CkHashtable::findKey(const void *key) const
 		if (layout.isEmpty(cur)) return NULL;
 		char *curKey=layout.getKey(cur);
 		if (compare(key,curKey,layout.keySize())) return curKey;
-		DEBUGF(("   still looking for key...\n"))
+		DEBUGF(("   still looking for key (at %d)\n",i))
 	} while (inc(i)!=startSpot);
 	DEBUGF(("  No key found!\n"))
 	return NULL;//We've searched the whole table-- no key.
@@ -100,9 +101,9 @@ char *CkHashtable::findEntry(const void *key) const
 		if (layout.isEmpty(cur)) return cur; //Empty spot
 		char *curKey=layout.getKey(cur);
 		if (compare(key,curKey,layout.keySize())) return cur; //Its old spot
-		DEBUGF(("   still looking for spot...\n"))
+		DEBUGF(("   still looking for spot (at %d)\n",i))
 	} while (inc(i)!=startSpot);
-	DEBUGF(("  No spot found!\n"))
+	CmiAbort("  No spot found!\n");
 	return NULL;//We've searched the whole table-- no room!
 }
 
@@ -110,7 +111,6 @@ char *CkHashtable::findEntry(const void *key) const
 void CkHashtable::buildTable(int newLen)
 {
 	len=newLen;
-	nObj=0;
 	resizeAt=(int)(len*loadFactor);
 	DEBUGF(("Building table of %d (resize at %d)\n",len,resizeAt))
 	table=new char[layout.entrySize()*len];
@@ -145,6 +145,7 @@ CkHashtable::CkHashtable(const CkHashtableLayout &layout_,
 	CkHashCompare Ncompare)
   :layout(layout_)
 {
+	nObj=0;
 	hash=Nhash;
 	compare=Ncompare;
 	loadFactor=NloadFactor;
@@ -175,6 +176,14 @@ void CkHashtable::empty(void)
 void *CkHashtable::put(const void *key)
 {
 	DEBUGF(("Putting key\n"))
+#if 0
+/*Check to make sure this table is consistent*/
+	  int nActualObj=0;
+	  for (int i=0;i<len;i++)
+	    if (!layout.isEmpty(entry(i)))
+	      nActualObj++;
+	  if (nActualObj!=nObj) CmiAbort("Table corruption!\n");
+#endif
 	if (nObj>=resizeAt) rehash(primeLargerThan(len));
 	char *ent=findEntry(key);
 	if (layout.isEmpty(ent))
