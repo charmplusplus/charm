@@ -1,0 +1,31 @@
+This is a parallel data transfer program built on
+the Charm++ FEM framework, collision library, and 
+AMPI.  It's *NOT* a library yet; it's just a 
+demo program; but it will eventually be a library
+so I'm putting it here in ck-libs.
+
+It reads in an old mesh and partitions it, reads in 
+a new mesh and partitions it (both in pgm.C), 
+uses collision detection to match up old and new,
+sends data so the new data has all the corresponding
+old data, and finally uses a conservative transfer
+method to transfer cell-centered data from old to new
+(all in paralleltransfer.C).
+
+  pgm.C does basic setup and I/O.
+  paralleltransfer.C does all communication.
+  tetmesh.C is a mesh of 3d tets.
+  cg3d.C are computational geometry utility routines.
+  transfer.C is the glue that binds cg3d.C to paralleltransfer.C
+
+There are also several serial testing routines:
+  test_transfer.C tests out cg3d and transfer.C; you run it like
+      > make test_transfer
+      > ./test_transfer test_transfer_dir/src.noboite test_transfer_dir/dest.noboite 
+Source Tetrahedral mesh: 15 tets, 11 points
+Coordinate range: 
+Destination Tetrahedral mesh: 479 tets, 130 points
+Coordinate range: 
+Transfer successful: total error 9.09e-13
+
+Orion Sky Lawlor, olawlor@acm.org, 2003/8/4

@@ -1,0 +1,69 @@
+----------------------- StarSlice perf. tests -------------------
+old and new meshes are named ".noboite" (tetmesh format)
+in
+	~olawlor/csar/meshing/starslice/transfer/
+so you've got to do
+	ln -s ~olawlor/csar/meshing/starslice/transfer/*.noboite .
+
+Transfer from old to new, with fabricated solution data
+Read input file old.noboite: 18232 nodes, 86906 tets
+Read input file new.noboite: 23274 nodes, 117787 tets
+
+-- Serial tests on thrift4 (AthlonXP2000, 1GB ram) --
+  (-memory os is *much* better than our builtin allocator--
+   the builtin version doesn't seem to release metis' huge
+   buffers when they get freed (sbrk issue?))
+
+Everything is built with -O -g
+
+ +p1 +vp1
+Finding bounding boxes took 0.154904 s (+0.000193 s imbalance)
+Colliding bounding boxes took 13.764658 s (+0.000318 s imbalance)
+Extracting collision list took 0.434714 s (+0.000228 s imbalance)
+Rank 0: 5597657 collisions, 
+Finding communication size took 0.120343 s (+0.000155 s imbalance)
+Creating outgoing messages took 0.116760 s (+0.000185 s imbalance)
+Isend took 0.000211 s (+0.000060 s imbalance)
+Recv took 0.000079 s (+0.000053 s imbalance)
+Wait took 0.000077 s (+0.000051 s imbalance)
+Transferring solution took 48.980991 s (+0.000217 s imbalance)
+  (lots of warnings about little boundary elements that 
+   are getting clipped off)
+Normalizing transfer took 0.057111 s (+0.000184 s imbalance)
+[64.517 s] Transferred.
+
+ +p1 +vp2 (peak memory is close to 500MB during collide (!))
+Similar overall, collide is slightly slower (16s now).
+Send/recv lists are pretty dang big-- 5.5m collisions for
+only  100K elements....
+[78.622 s] Transferred, counting 11s in metis.
+
+Varying numbers of processes on single-PE thrift4:
+Input/partition:
+log_thrift4_1:[0.826 s] Input files read
+log_thrift4_2:[11.004 s] Input files read
+log_thrift4_4:[15.652 s] Input files read
+log_thrift4_8:[11.917 s] Input files read
+log_thrift4_16:[12.692 s] Input files read
+  -> This is surpisingly slow.  Metis isn't such a problem,
+     but node adjacency spits out too many links.
+     Changing the adjacency to face-based both speeds up
+     the solution and cuts the memory dramatically (to like 3s!).
+
+Collide:
+log_thrift4_1:Colliding bounding boxes took 13.621231 s (+0.000344 s imbalance)
+log_thrift4_2:Colliding bounding boxes took 21.385291 s (+0.064712 s imbalance)
+log_thrift4_4:Colliding bounding boxes took 22.907772 s (+1.533167 s imbalance)
+log_thrift4_8:Colliding bounding boxes took 20.893643 s (+3.414591 s imba
+log_thrift4_16:Colliding bounding boxes took 17.842731 s (+12.608363 s imbalance)
+
+Total time:
+log_thrift4_1:[63.437 s] Transferred.
+log_thrift4_2:[83.291 s] Transferred.
+log_thrift4_4:[91.333 s] Transferred.
+log_thrift4_8:[87.812 s] Transferred.
+log_thrift4_16:[96.161 s] Transferred.
+
+ -> This is excellent overall scaling. Be interesting to 
+    see how the real parallel performance is.
+
