@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.5  1995-10-13 22:34:42  jyelon
+ * Revision 1.6  1995-10-13 22:36:29  jyelon
+ * changed exit() --> exit(1)
+ *
+ * Revision 1.5  1995/10/13  22:34:42  jyelon
  * added CmiNext to CmiCallMain.
  *
  * Revision 1.4  1995/10/13  20:05:13  jyelon
@@ -491,7 +494,7 @@ char **argv;
   
   if (Cmi_numpe<1) {
     printf("Error: must specify number of processors to simulate with +pXXX\n",Cmi_numpe);
-    exit();
+    exit(1);
   }
 }
 
