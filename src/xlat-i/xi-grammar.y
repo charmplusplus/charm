@@ -1,12 +1,12 @@
-%expect 2
+%expect 4 
 %{
 #include <iostream.h>
 #include "xi-symbol.h"
-
+#include "EToken.h"
 extern int yylex (void) ;
 void yyerror(const char *);
 extern unsigned int lineno;
-extern int in_bracket,in_braces;
+extern int in_bracket,in_braces,in_int_expr;
 ModuleList *modlist;
 
 %}
@@ -26,6 +26,7 @@ ModuleList *modlist;
   Message *message;
   Chare *chare;
   Entry *entry;
+  EntryList *entrylist;
   Parameter *pname;
   ParamList *plist;
   Template *templat;
@@ -42,6 +43,7 @@ ModuleList *modlist;
   char *strval;
   int intval;
   Chare::attrib_t cattr;
+  SdagConstruct *sc;
 }
 
 %token MODULE
@@ -62,6 +64,15 @@ ModuleList *modlist;
 %token PACKED
 %token VARSIZE
 %token ENTRY
+%token FOR
+%token FORALL
+%token WHILE
+%token WHEN
+%token OVERLAP
+%token ATOMIC
+%token FORWARD
+%token IF
+%token ELSE
 %token <strval> IDENT NUMBER LITERAL CPROGRAM
 %token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED
 
@@ -69,7 +80,7 @@ ModuleList *modlist;
 %type <module>		Module
 %type <conslist>	ConstructEList ConstructList
 %type <construct>	Construct
-%type <strval>		Name QualName CCode OptSdagCode OptNameInit
+%type <strval>		Name QualName CCode OptNameInit
 %type <val>		OptStackSize
 %type <intval>		OptExtern OptSemiColon MAttribs MAttribList MAttrib
 %type <intval>		EAttribs EAttribList EAttrib OptVoid
@@ -84,7 +95,8 @@ ModuleList *modlist;
 %type <readonly>	Readonly ReadonlyMsg
 %type <message>		Message TMessage
 %type <chare>		Chare Group NodeGroup Array TChare TGroup TNodeGroup TArray
-%type <entry>		Entry
+%type <entry>		Entry SEntry
+%type <entrylist>	SEntryList
 %type <templat>		Template
 %type <pname>           Parameter ParamBracketStart
 %type <plist>           ParamList EParameters
@@ -98,7 +110,9 @@ ModuleList *modlist;
 %type <vallist>		DimList
 %type <mv>		Var
 %type <mvlist>		VarList
-%type <intval>		ParamBraceStart
+%type <intval>		ParamBraceStart SParamBracketStart SParamBracketEnd StartIntExpr EndIntExpr
+%type <sc>		Slist SingleConstruct Olist OptSdagCode HasElse ForwardList
+
 
 %%
 
@@ -262,7 +276,8 @@ Type		: SimpleType
 		| FuncType
 		{ $$ = $1; }
 		| Type '&'
-		{ $$ = $1; }
+		{ $$ = new ReferenceType($1); }
+		//{ $$ = $1; }
 		| CONST Type 
 		{ $$ = $2; }
 		;
@@ -502,12 +517,26 @@ Member		: Entry ';'
 		;
 
 Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
-		{ $$ = new Entry(lineno, $2, $3, $4, $5, $6); 
-		  $$->setSdagCode($7);
+		{ 
+		  if ($7 != 0) { 
+		    $7->con1 = new SdagConstruct(SIDENT, $4);
+  		    if ($5 != 0)
+                      $7->param = new ParamList($5);
+ 		    else 
+ 	 	      $7->param = new ParamList(new Parameter(0, new BuiltinType("void")));
+                  }
+		  $$ = new Entry(lineno, $2, $3, $4, $5, $6, $7, 0); 
 		}
 		| ENTRY EAttribs Name EParameters OptSdagCode /*Constructor*/
-		{ $$ = new Entry(lineno, $2,     0, $3, $4,  0); 
-		  $$->setSdagCode($5);
+		{ 
+		  if ($5 != 0) {
+		    $5->con1 = new SdagConstruct(SIDENT, $3);
+		    if ($4 != 0)
+                      $5->param = new ParamList($4);
+		    else
+                      $5->param = new ParamList(new Parameter(0, new BuiltinType("void")));
+                  }
+		  $$ = new Entry(lineno, $2,     0, $3, $4,  0, $5, 0); 
 		}
 		;
 
@@ -569,6 +598,12 @@ CCode		: /* Empty */
 			sprintf(tmp,"%s{%s}%s", $1, $3, $5);
 			$$ = tmp;
 		}
+		| CPROGRAM '(' CCode ')' CCode
+		{ /*Returned only when in_braces*/
+			char *tmp = new char[strlen($1)+strlen($3)+strlen($5)+3];
+			sprintf(tmp,"%s(%s)%s", $1, $3, $5);
+			$$ = tmp;
+		}
 		;
 
 ParamBracketStart : Type Name '['
@@ -579,7 +614,8 @@ ParamBracketStart : Type Name '['
 		;
 
 ParamBraceStart : '{'
-		{  /*Start grabbing CPROGRAM segments*/
+		{ 
+                   /*Start grabbing CPROGRAM segments*/
 			in_braces=1;
 			$$ = 0;
 		}
@@ -618,9 +654,111 @@ OptStackSize	: /* Empty */
 
 OptSdagCode	: /* Empty */
 		{ $$ = 0; }
-		| ParamBraceStart CCode '}'
-		{ in_braces = 0; $$ = $2; }
+		| SingleConstruct
+		{ $$ = new SdagConstruct(SSDAGENTRY, $1); }
+		| '{' Slist '}'
+		{ $$ = new SdagConstruct(SSDAGENTRY, $2); }
 		;
+
+Slist		: SingleConstruct
+		{ $$ = new SdagConstruct(SSLIST, $1); }
+		| SingleConstruct Slist
+		{ $$ = new SdagConstruct(SSLIST, $1, $2);  }
+		;
+
+Olist		: SingleConstruct
+		{ $$ = new SdagConstruct(SOLIST, $1); }
+		| SingleConstruct Slist
+		{ $$ = new SdagConstruct(SOLIST, $1, $2); } 
+		;
+
+SingleConstruct : ATOMIC ParamBraceStart CCode '}' 
+		  {
+		     in_braces =0;
+		     $$ = new SdagConstruct(SATOMIC, $3);  
+		  }
+		| WHEN SEntryList '{' '}'
+		{ $$ = new SdagConstruct(SWHEN, 0,0,0,0,0,$2); }
+		| WHEN SEntryList SingleConstruct
+		{ $$ = new SdagConstruct(SWHEN, 0, 0,0,0, $3, $2); }
+		| WHEN SEntryList '{' Slist '}'
+		{ $$ = new SdagConstruct(SWHEN, 0, 0,0,0, $4, $2); }
+		| OVERLAP '{' Olist '}'
+		{ $$ = new SdagConstruct(SOVERLAP, 0,0,0,0,$3, 0); }	
+		| FOR StartIntExpr CCode ';' CCode ';' CCode  EndIntExpr '{' Slist '}'
+		{ $$ = new SdagConstruct(SFOR, new SdagConstruct(SINT_EXPR, $3), new SdagConstruct(SINT_EXPR, $5),
+		             new SdagConstruct(SINT_EXPR, $7), 0, $10, 0); }
+		| FOR StartIntExpr CCode ';' CCode ';' CCode  EndIntExpr SingleConstruct
+		{ $$ = new SdagConstruct(SFOR, new SdagConstruct(SINT_EXPR, $3), new SdagConstruct(SINT_EXPR, $5), 
+		         new SdagConstruct(SINT_EXPR, $7), 0, $9, 0); }
+		| FORALL '[' IDENT ']' StartIntExpr CCode ':' CCode ',' CCode  EndIntExpr SingleConstruct
+		{ $$ = new SdagConstruct(SFORALL, new SdagConstruct(SIDENT, $3), new SdagConstruct(SINT_EXPR, $6), 
+		             new SdagConstruct(SINT_EXPR, $8), new SdagConstruct(SINT_EXPR, $10), $12, 0); }
+		| FORALL '[' IDENT ']' StartIntExpr CCode ':' CCode ',' CCode  EndIntExpr '{' Slist '}' 
+		{ $$ = new SdagConstruct(SFORALL, new SdagConstruct(SIDENT, $3), new SdagConstruct(SINT_EXPR, $6), 
+		                 new SdagConstruct(SINT_EXPR, $8), new SdagConstruct(SINT_EXPR, $10), $13, 0); }
+		| IF StartIntExpr CCode EndIntExpr SingleConstruct HasElse
+		{ $$ = new SdagConstruct(SIF, new SdagConstruct(SINT_EXPR, $3), $6,0,0,$5,0); }
+		| IF StartIntExpr CCode EndIntExpr '{' Slist '}' HasElse
+		{ $$ = new SdagConstruct(SIF, new SdagConstruct(SINT_EXPR, $3), $8,0,0,$6,0); }
+		| WHILE StartIntExpr CCode EndIntExpr SingleConstruct 
+		{ $$ = new SdagConstruct(SIF, new SdagConstruct(SINT_EXPR, $3), 0,0,0,$5,0); }
+		| WHILE StartIntExpr CCode EndIntExpr '{' Slist '}' 
+		{ $$ = new SdagConstruct(SWHILE, new SdagConstruct(SINT_EXPR, $3), 0,0,0,$6,0); }
+		| FORWARD ForwardList ';'
+		{ $$ = $2; }
+	 	;	
+
+HasElse		: /* Empty */
+		{ $$ = 0; }
+		| ELSE SingleConstruct
+		{ $$ = new SdagConstruct(SELSE, 0,0,0,0, $2,0); }
+		| ELSE '{' Slist '}'
+		{ $$ = new SdagConstruct(SELSE, 0,0,0,0, $3,0); }
+		;
+ForwardList	: IDENT 
+		{ $$ = new SdagConstruct(SFORWARD, new SdagConstruct(SIDENT, $1)); }
+		| IDENT ',' ForwardList 
+		{ $$ = new SdagConstruct(SFORWARD, new SdagConstruct(SIDENT, $1), $3);  }
+		;
+
+EndIntExpr	: ')'
+		{ in_int_expr = 0; $$ = 0; }
+		;
+
+StartIntExpr	: '('
+		{ in_int_expr = 1; $$ = 0; }
+		;
+
+SEntry		: IDENT EParameters
+		{ 
+		  if ($2 != 0)
+		     $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0); 
+		  else
+		     $$ = new Entry(lineno, 0, 0, $1, 
+				new ParamList(new Parameter(0, new BuiltinType("void"))), 0, 0, 0); 
+		}
+		| IDENT SParamBracketStart CCode SParamBracketEnd EParameters 
+		{ if ($5 != 0)
+		    $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3); 
+		  else
+		    $$ = new Entry(lineno, 0, 0, $1, new ParamList(new Parameter(0, new BuiltinType("void"))), 0, 0, $3); 
+		}
+		;
+
+SEntryList	: SEntry 
+		{ $$ = new EntryList($1); }
+		| SEntry ',' SEntryList
+		{ $$ = new EntryList($1,$3); }
+		;
+
+SParamBracketStart : '['
+		   { in_bracket=1; } 
+		   ;
+SParamBracketEnd   : ']'
+		   { in_bracket=0; } 
+		   ;
+
 
 %%
 void yyerror(const char *mesg)
