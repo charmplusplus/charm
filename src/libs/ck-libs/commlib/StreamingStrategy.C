@@ -40,15 +40,15 @@ void StreamingStrategy::flushPE(int pe) {
         return; //Nothing to do.
 
     CharmMessageHolder *cmsg, *toBeDeleted = NULL;
-    
     if(shortMsgPackingFlag){
         MsgPacker mpack(streamingMsgBuf[pe], streamingMsgCount[pe]);
         CombinedMessage *msg; 
         int size;
         mpack.getMessage(msg, size);
-        
+	ComlibPrintf("[%d] Streaming :flushPE %d messages, \n", CkMyPe(),streamingMsgCount[pe]);            
         CmiSyncSendAndFree(pe, size, (char *)msg);
         streamingMsgCount[pe] = 0;
+
     }
     else {
         // Build a CmiMultipleSend list of messages to be sent off:
@@ -60,7 +60,7 @@ void StreamingStrategy::flushPE(int pe) {
             envelope *env = UsrToEnv(msg);
             int size = env->getTotalsize();
             CmiSyncSendAndFree(pe, size, (char *)env);
-
+	    ComlibPrintf("[%d] Streaming :flushPE 1 message \n", CkMyPe());            
             delete cmsg;
             streamingMsgCount[pe] = 0;
             return;
@@ -68,6 +68,7 @@ void StreamingStrategy::flushPE(int pe) {
 
         char **msgComps = new char*[msg_count];
         int *sizes = new int[msg_count];
+	ComlibPrintf("[%d] Streaming :flushPE %d messages \n", CkMyPe(),msg_count);            
         while (!streamingMsgBuf[pe].isEmpty()) {
             cmsg = streamingMsgBuf[pe].deq();
             char *msg = cmsg->getCharmMessage();
