@@ -69,6 +69,10 @@ public:
   double * expectedLoad;
 };
 
+// for a FooLB, the following macro defines function:
+// CreateFooLB(): which register with LBDatabase with sequence ticket
+// and 
+// AllocateFooLB(): which only locally allocate the class
 #if CMK_LBDB_ON
 #define CreateLBFunc_Def(x)		\
 void Create##x(void) { 	\
