@@ -528,7 +528,6 @@ unsigned int ip; int port; int seconds;
   begin = time(0); ok= -1;
   while (time(0)-begin < seconds) {
   sock:
-    CmiYield();
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if ((fd<0)&&((errno==EINTR)||(errno==EBADF))) goto sock;
     if (fd < 0) { perror("socket 3"); exit(1); }
@@ -542,12 +541,10 @@ unsigned int ip; int port; int seconds;
     case ECONNREFUSED: jsleep(1,0); break;
     case EADDRINUSE: jsleep(1,0); break;
     case EADDRNOTAVAIL: jsleep(5,0); break;
-    default: KillEveryone(strerror(errno));
+    default: return -1;
     }
   }
-  if (ok<0) {
-    KillEveryone(strerror(errno)); exit(1);
-  }
+  if (ok<0) return -1;
   return fd;
 }
 
@@ -792,13 +789,14 @@ typedef struct OtherNodeStruct
   int nodestart, nodesize;
   unsigned int IP, dataport, ctrlport;
   struct sockaddr_in addr;
-  
-  double                   send_primer;    /* time to send primer packet */
-  unsigned int             send_last;      /* seqno of last dgram sent */
-  ImplicitDgram           *send_window;    /* datagrams sent, not acked */
-  ImplicitDgram            send_queue_h;   /* head of send queue */
-  ImplicitDgram            send_queue_t;   /* tail of send queue */
-  unsigned int             send_next;      /* next seqno to go into queue */
+
+  double                   send_give_up; /* time to give up on retrying */
+  double                   send_primer;  /* time to send primer packet */
+  unsigned int             send_last;    /* seqno of last dgram sent */
+  ImplicitDgram           *send_window;  /* datagrams sent, not acked */
+  ImplicitDgram            send_queue_h; /* head of send queue */
+  ImplicitDgram            send_queue_t; /* tail of send queue */
+  unsigned int             send_next;    /* next seqno to go into queue */
   
   int                      asm_rank;
   int                      asm_total;
@@ -1765,7 +1763,9 @@ int TransmitDatagram()
 	TransmitImplicitDgram(dg);
 	if (seqno == ((node->send_last+1)&DGRAM_SEQNO_MASK))
 	  node->send_last = seqno;
+	node->send_give_up = Cmi_clock + 300; /* five minutes */
 	node->send_primer = Cmi_clock + Cmi_delay_retransmit;
+	/* Note --- give up delay is 5 min because I/O could stall node */
 	return 1;
       }
     }
@@ -1779,6 +1779,8 @@ int TransmitDatagram()
       if (dg) {
 	TransmitImplicitDgram1(node->send_window[slot]);
 	node->send_primer = Cmi_clock + Cmi_delay_retransmit;
+	if (Cmi_clock > node->send_give_up)
+	  KillEveryone("processor not responding");
 	return 1;
       }
     }
@@ -1958,9 +1960,7 @@ void IntegrateAckDatagram(ExplicitDgram dg)
     if (idg) {
       if (idg->seqno == seqno) {
 	if (ack->window[i]) {
-	  /*
 	  LOG(Cmi_clock, Cmi_nodestart, 'r', node->nodestart, seqno);
-	  */
 	  node->send_window[slot] = 0;
 	  DiscardImplicitDgram(idg);
 	  rxing = 1;
@@ -1973,9 +1973,7 @@ void IntegrateAckDatagram(ExplicitDgram dg)
 	  node->send_queue_h = idg;
 	}
       } else if (((idg->seqno - dgseqno) & DGRAM_SEQNO_MASK)>=Cmi_window_size){
-	/*
 	LOG(Cmi_clock, Cmi_nodestart, 'r', node->nodestart, idg->seqno);
-	*/
 	node->send_window[slot] = 0;
 	DiscardImplicitDgram(idg);
       }
