@@ -105,7 +105,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if CMK_MEMORY_PROTECTABLE
 #include <malloc.h> /*<- for memalign*/
+#endif
 
 #include "converse.h"
 #ifndef _WIN32
