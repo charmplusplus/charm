@@ -1,7 +1,7 @@
 \section{Structured Dagger}
 
 \charmpp\ is based on the Message-Driven parallel programming paradigm.  The
-message-drivern programming style avoids the use of blocking receives and
+message-driven programming style avoids the use of blocking receives and
 allows overlap of computation and communication by scheduling computations
 depending on availability of data.  This programing style enables \charmpp\
 programs to tolerate communication latencies adaptively. Threads suffer from
@@ -128,8 +128,10 @@ adding any significant overhead.
 \begin{figure}[ht]
 \begin{center}
 \begin{alltt}
-  class compute_object
-    sdagentry compute_object(MSG *msg)\{
+  array[1D] compute_object \{
+    entry void recv_first(Patch *first);
+    entry void recv_second(Patch *first);
+    entry void compute_object(MSG *msg)\{
       atomic \{
          PatchManager->Get(msg->first_index,\dots);
          PatchManager->Get(msg->second_index,\dots);
@@ -166,6 +168,48 @@ writing a \sdag\ program, one has to declare these entries in \charmpp\
 interface file. The implementation of the entry methods that contain the
 when-block is written using the \sdag\ language. Grammar of \sdag\ is given in
 the EBNF form below.
+
+\subsection{Usage}
+
+\sdag{} code can be inserted into the .ci file for any array, group, or chare's entry methods.
+
+If you've added \sdag\ code to your class, you must link in the code by:
+\begin{itemize}
+  \item Adding ``{\it className}\_SDAG\_CODE'' inside the class declaration
+     in the .h file.  This macro defines the entry points and support
+     code used by \sdag{}.  Forgetting this results in a compile error
+     (undefined sdag entry methods referenced from the .def file).
+  \item Adding a call to the routine ``\_\_sdag\_init();'' from every constructor,
+     including the migration constructor.  Forgetting this results in
+     using uninitalized data, and a horrible runtime crash.
+  \item Adding a call to the pup routine ``\_\_sdag\_pup(p);'' from your pup routine.
+     Forgetting this results in failure after migration.
+\end{itemize}
+
+For example, an array named ``Foo'' that uses sdag code might contain:
+
+\begin{alltt}
+class Foo : public CBase_Foo \{
+public:
+    Foo_SDAG_CODE
+    Foo(...) \{
+       __sdag_init();
+       ...
+    \}
+    Foo(CkMigrateMessage *m) \{
+       __sdag_init();
+    \}
+    
+    void pup(PUP::er &p) \{
+       CBase_Foo::pup(p);
+       __sdag_pup(p);
+    \}
+\};
+\end{alltt}
+
+For more details regarding \sdag{}, look at the examples located in
+{\tt pgms/sdag} directory in the \charmpp\ distribution.
+
 
 \subsection{Grammar}
 
@@ -221,8 +265,4 @@ the EBNF form below.
 <entry> := <ident> [ "[" <int-expr> "]" ] "(" <ident> "*" <ident> ")" 
   
 \end{alltt}
-
-
-For more details regarding \sdag, look at the examples located in
-{\tt pgms/sdag} directory in the \charmpp\ distribution.
 
