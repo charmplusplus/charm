@@ -90,7 +90,8 @@ void LogPool::closeLog(void)
 void _createTraceprojections(char **argv)
 {
   DEBUGF(("%d createTraceProjections\n", CkMyPe()));
-  CkpvInitialize(CkVec<char *>, usrEvents);
+  CkpvInitialize(CkVec<char *>, usrEventlist);
+  CkpvInitialize(CkVec<UsrEvent *>, usrEvents);
   CkpvInitialize(Trace*, _trace);
   CkpvAccess(_trace) = new  TraceProjections(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
@@ -451,9 +452,7 @@ int TraceProjections::traceRegisterUserEvent(const char* evt, int e)
   }
   if (e==-1) event = biggest;
   else event = e;
-  if(CkMyPe()==0) {
-    CkpvAccess(usrEvents).push_back(new UsrEvent(event,(char *)evt));
-  }
+  CkpvAccess(usrEvents).push_back(new UsrEvent(event,(char *)evt));
   return event;
 }
 
