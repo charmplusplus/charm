@@ -69,64 +69,42 @@ basics: dirs+sources $(ALLHEADERS) $(ALLINTERFACES) charmc conv-mach.csh
 
 dirs+sources:
 	@rm -f .vdir .gdir
-	@(cd .. ; basename `pwd` > tmp/.vdir)
-	@cat .vdir | sed -e 's@-.*@@' > .gdir
+	@(cd .. ; basename `pwd`) 			> .vdir
+	@(cd .. ; basename `pwd` | sed -e 's@-.*@@') 	> .gdir
 	@echo
-	@echo 'Creating directory tree '`cat .vdir`'/...'
+	@echo 'Gathering source code.'
 	@echo
+	find . -type l -exec rm {} \;
 	rm -rf ../bin ; mkdir ../bin
 	rm -rf ../lib ; mkdir ../lib
 	rm -rf ../src ; mkdir ../src
-	@echo
-	@echo 'Gathering source code in '`cat .vdir`'/tmp'
-	@echo
-	rm -f ../../bin ; ln -s `cat .vdir`/bin ../../bin
-	find . -type l -exec rm {} \;
-	find ../../src/Common -name CVS -prune -o -name pJava -prune -o -name mdPerl -prune -o -type f -exec ln -s {} . \;
-	find ../../src/`cat .vdir` -name CVS -prune -o -type f -exec ln -s {} . \;
-	if [ -d ../../src/Common.`cat .gdir` ] ; then find ../../src/Common.`cat .gdir` -name CVS -prune -o -type f -exec ln -s {} . \; ; fi
-	@echo
-	@echo 'Gathering quickthreads tree.'
-	@echo
-	rm -rf QuickThreads ../src/QuickThreads
-	(cd ../../src ; find QuickThreads -type d -print) | sed -e 's@^@mkdir @' > tmp.sh
-	sh tmp.sh ; cd ../src ; sh ../tmp/tmp.sh ; rm -f tmp.sh
-	rt=`(cd ../../src ; pwd)` ; (cd ../../src ; find QuickThreads -type f -print) | awk '{ print "ln -s '$$rt'/"$$1" "$$1; }' > tmp.sh
-	sh tmp.sh ; cd ../src ; sh ../tmp/tmp.sh ; rm -f tmp.sh
-	@echo
-	@echo 'Gathering test-programs in '`cat .vdir`/pgms
-	@echo
 	rm -rf ../pgms
-	(cd ../.. ; find pgms -type d -print) | sed -e 's@^@mkdir ../@' | sh
-	rt=`(cd ../.. ; pwd)` ; (cd ../.. ; find pgms -type f -print) | awk '{ print "ln -s '$$rt'/"$$1" ../"$$1; }' > tmp.sh
-	sh tmp.sh ; rm -f tmp.sh
+	../../src/Common/scripts/gatherflat ../../src/Common/scripts .
+	./gatherflat ../../src/Common/conv-core        .
+	./gatherflat ../../src/Common/ck-core          .
+	./gatherflat ../../src/Common/ck-ldb           .
+	./gatherflat ../../src/Common/ck-perf          .
+	./gatherflat ../../src/Common/langs/simplemsg  .
+	./gatherflat ../../src/Common/langs/pvmc       .
+	./gatherflat ../../src/Common/lib-acc          .
+	./gatherflat ../../src/Common/lib-misc         .
+	./gatherflat ../../src/Common/lib-redn         .
+	./gatherflat ../../src/Common/xlat             .
+	./gatherflat ../../src/Common/xlat++           .
+	./gatherflat ../../src/Common/xlat-i           .
+	./gatherflat ../../src/Common/xlatcpm          .
+	./gathertree ../../src/QuickThreads QuickThreads
+	./gatherflat ../../src/Common.`cat .gdir`      .
+	./gatherflat ../../src/`cat .vdir`             .
+	./gathertree ../../src/Common/langs   ../src/langs
+	./gathertree ../../src/Common/xlat    ../src/xlat
+	./gathertree ../../src/Common/xlat++  ../src/xlat++
+	./gathertree ../../src/Common/xlat-i  ../src/xlat-i
+	./gathertree ../../src/Common/xlatcpm ../src/xlatcpm
+	./gathertree ../../pgms ../pgms
+	ln -s ../../src/Common/scripts/Makefile ../src
 	@echo
-	@echo 'Gathering little languages in '`cat .vdir`/src
 	@echo
-	rm -rf ../src/langs
-	(cd ../../src/Common ; find langs -type d ! -name CVS -print) | sed -e 's@^@mkdir @' > tmp.sh
-	cd ../src ; sh ../tmp/tmp.sh ; rm -f ../tmp/tmp.sh
-	rt=`(cd ../../src/Common ; pwd)` ; (cd ../../src/Common ; find langs -type f -print) | grep -v '/CVS/' | awk '{ print "ln -s '$$rt'/"$$1" "$$1; }' > tmp.sh
-	cd ../src ; sh ../tmp/tmp.sh ; rm -f ../tmp/tmp.sh
-	@echo
-	@echo 'Gathering translator source in '`cat .vdir`/src
-	@echo
-	mkdir ../src/xlat
-	mkdir ../src/xlat++
-	mkdir ../src/xlat-i
-	mkdir ../src/xlatcpm
-	ln -s ../../src/Common/xlat/xl-*           ../src/xlat
-	ln -s ../../src/Common/xlat++/xp-*         ../src/xlat++
-	ln -s ../../src/Common/xlat-i/xi-*         ../src/xlat-i
-	ln -s ../../src/Common/xlatcpm/conv-cpm.*  ../src/xlatcpm
-	ln -s ../../src/Common/Makefile            ../src/xlat
-	ln -s ../../src/Common/Makefile            ../src/xlat++
-	ln -s ../../src/Common/Makefile            ../src/xlat-i
-	ln -s ../../src/Common/Makefile            ../src/xlatcpm
-	@echo
-	@echo 'Gathering little languages in '`cat .vdir`/src
-	@echo
-
 	@rm -f .vdir .gdir
 	touch dirs+sources
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.26  1997-07-30 17:31:13  jyelon
+ * Revision 1.27  1997-07-30 19:58:09  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.26  1997/07/30 17:31:13  jyelon
  * *** empty log message ***
  *
  * Revision 1.25  1997/07/29 16:09:47  milind
@@ -154,13 +157,6 @@ void CmiFree(blk)
 void *blk;
 {
 free( ((char *)blk)-8);
-}
-
-CmiNodeLock_t CmiCreateLock(void)
-{
-  int *x = malloc(sizeof(int));
-  *x = 0;
-  return (CmiNodeLock_t) x;
 }
 
 /*****************************************************************************

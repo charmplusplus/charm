@@ -1037,10 +1037,10 @@ static int        ctrlport, dataport, ctrlskt, dataskt;
 static OtherNode *nodes_by_pe;  /* OtherNodes indexed by processor number */
 static OtherNode  nodes;        /* Indexed only by ``node number'' */
 
-static int        Cmi_shutdown_done;
-static mutex_t    Cmi_scanf_mutex;
-static char      *Cmi_scanf_data;
-static double     Cmi_clock;
+static int          Cmi_shutdown_done;
+static CmiNodeLock  Cmi_scanf_mutex;
+static char        *Cmi_scanf_data;
+static double       Cmi_clock;
 
 /****************************************************************************
  *                                                                          
@@ -1593,7 +1593,7 @@ static int InternalScanf(fmt, l)
   }
   if (nargs > 18) KillEveryone("CmiScanf only does 18 args.\n");
   for (i=0; i<nargs; i++) ptr[i]=va_arg(l, char *);
-  mutex_lock(&Cmi_scanf_mutex);
+  CmiLock(Cmi_scanf_mutex);
   ctrl_sendone(120, "scanf %s %d %s", Cmi_self_IP_str, ctrlport, fmt);
   while (Cmi_scanf_data == 0) jsleep(0, 250000);
   i = sscanf(Cmi_scanf_data, fmt,
@@ -1602,7 +1602,7 @@ static int InternalScanf(fmt, l)
 	     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
   free(Cmi_scanf_data);
   Cmi_scanf_data=0;
-  mutex_unlock(&Cmi_scanf_mutex);
+  CmiUnlock(Cmi_scanf_mutex);
   return i;
 }
 
@@ -2155,6 +2155,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   CmiTimerInit();
   CmiStartThreads();
   ConverseInitPE();
+  Cmi_scanf_mutex = CmiCreateLock();
   if (ret==0) {
     fn(argc, argv);
     if (usc==0) CsdScheduler(-1);

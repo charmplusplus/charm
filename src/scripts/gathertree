@@ -1,0 +1,13 @@
+#!/bin/sh
+
+SRC=`(cd $1 ; pwd)`
+DST=$2
+
+rm -f temp.d temp.f temp.m temp.l
+(cd $SRC ; find . -name CVS -prune -o -type d -print )|sed -e s@.@@> temp.d
+(cd $SRC ; find . -name CVS -prune -o -type f -print )|sed -e s@.@@> temp.f
+awk '{print "mkdir '$DST'"$1;}' < temp.d > temp.m
+awk '{print "ln -s '$SRC'"$1" '$DST'"$1;}' < temp.f > temp.l
+sh temp.m
+sh temp.l
+rm -f temp.d temp.f temp.m temp.l
