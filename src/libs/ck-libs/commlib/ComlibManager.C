@@ -253,20 +253,17 @@ void ComlibManager::receiveTable(StrategyWrapper sw){
 
     ComlibPrintf("receivedTable %d\n", nstrats);
 
-    if(flushTable){
-        for(count = 0; count < nstrats; count ++){
-            if(strategyTable[count].tmplist_top) {
-                CharmMessageHolder *tmp, *cptr = strategyTable[count].tmplist_top;
-                while(cptr != NULL) {
-		  tmp= cptr->next; 
-                    strategyTable[count].strategy->insertMessage(cptr);
-                    cptr = tmp;
-                }
-            }
-             
-            if(strategyTable[count].numElements ==  strategyTable[count].elementCount)
-                strategyTable[count].strategy->doneInserting();
-        }
+    if (flushTable) {
+      for (count = 0; count < nstrats; count ++) {
+	if (!strategyTable[count].tmplist.isEmpty()) {
+	  CharmMessageHolder *cptr;
+	  while (!strategyTable[count].tmplist.isEmpty())
+	    strategyTable[count].strategy->insertMessage(strategyTable[count].tmplist.deq());
+	}
+	
+	if (strategyTable[count].numElements == strategyTable[count].elementCount)
+	  strategyTable[count].strategy->doneInserting();
+      }
     }
 }
 
@@ -311,11 +308,7 @@ void ComlibManager::ArraySend(int ep, void *msg,
     else {
         flushTable = 1;
         cmsg->next = NULL;
-        if(strategyTable[curStratID].tmplist_end) 
-            strategyTable[curStratID].tmplist_end->next = cmsg;
-        else
-            strategyTable[curStratID].tmplist_top = cmsg;
-        strategyTable[curStratID].tmplist_end = cmsg;
+        strategyTable[curStratID].tmplist.enq(cmsg);
     }
 
     //CmiPrintf("After Insert\n");
@@ -355,11 +348,7 @@ void ComlibManager::GroupSend(int ep, void *msg, int onPE, CkGroupID gid){
     else {
         flushTable = 1;
         cmsg->next = NULL;
-        if(strategyTable[curStratID].tmplist_end) 
-            strategyTable[curStratID].tmplist_end->next = cmsg;
-        else 
-            strategyTable[curStratID].tmplist_top = cmsg;
-        strategyTable[curStratID].tmplist_end = cmsg;
+        strategyTable[curStratID].tmplist.enq(cmsg);
     }
 }
 

@@ -91,7 +91,7 @@ struct StrategyList {
 
 struct StrategyTable {
     Strategy *strategy;
-    CharmMessageHolder* tmplist_top, *tmplist_end;
+    CkQ<CharmMessageHolder*> tmplist;
     int numElements;
     int elementCount;
 };
