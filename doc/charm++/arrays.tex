@@ -204,13 +204,25 @@ aF[CkArrayIndexFoo(...)].doAgain();
 \end{alltt}
 
 You may invoke methods on array elements that have not yet
-been created-- the system will buffer the message until the
-element is created.  However, the element must eventually be 
-created (currently, there is a 3-minute buffering period).
+been created-- by default, the system will buffer the message until the
+element is created\footnote{However, the element must eventually be 
+created-- i.e., within a 3-minute buffering period.}.
+Instead, if you declare an entry method with the attribute 
+\index{createhere} \index{createhome}
+\kw{[createhere]} or \kw{[createhome]}, the array manager will 
+``demand create'' a new element (using the element's default constructor)
+to handle the message.  With \kw{[createhome]}, the new element
+is created on the home processor (most efficient when messages for
+the element may arrive from across the machine); with \kw{[createhere]},
+the new elment is created on the sending processor (most efficient
+when messages will often be sent from that processor).
+Of course, a single array can have a mix of demand-created and
+classic entry methods.
+
+
 Messages sent to migrating elements will be delivered after
 the migrating element arrives.  It is an error to send 
 a message to a deleted array element.
-
 
 To \index{Array broadcast} broadcast a message to all the current elements of an array, 
 simply omit the index, as:
@@ -488,12 +500,8 @@ void A2::pup(PUP::er \&p)
 \}
 \end{alltt}
 
-You can apply a \kw{PUP::er} to any primitive variable
-(as with ``p(nt)'') or array of primitive variables-- there,
-the second parameter gives the length of the array (as with
-``p(flt,7)'').  You can pass a simple run of bytes 
-by calling the \kw{PUP::er} with a ``void *'' and number of bytes
-(packing bytes, however, prevents cross-platform pack/unpacking).
+See the \index{PUP} section ``PUP'' for more details on pup routines
+and the \kw{PUP::er} type.
 
 The system uses one pup routine to do both packing and unpacking by
 passing different types of \kw{PUP::er}s to it.  You can determine
@@ -523,48 +531,6 @@ the element.
 Migration constructors, then, are normally empty-- all the unpacking
 and allocation of the data items is done in the element's \uw{pup} routine.
 Deallocation is done in the element destructor as usual.
-
-The \kw{PUP::er} overhead is very small-- one virtual function call
-for each item to be packed/unpacked.  The actual packing/unpacking is
-a simple memory-to-memory binary copy.  In addition, the \uw{pup}
-routine may also be called to pack your array element to disk (e.g.,
-for a ``checkpoint'' operation), and unpack it from disk afterwards
-(e.g., for ``restart'' operation).  During unpacking, a
-``translating'' \kw{PUP::er} can be used to perform binary format
-conversion if needed.
-
-To easily pack user-defined types, we recommend adding
-a \uw{pup} method to the user-defined type:
-
-\begin{alltt}
-class myData 
-\{
-private:
-    int a,b;
-    char c;
-public:
-    ...
-    void pup(PUP::er \&p) \{
-        p(a);
-        p(b);
-        p(c);
-    \}
-\};
-
-//... array element can now easily pack myData as:
-class myElement:public ArrayElement1D 
-\{
-private:
-    myData d;
-public:
-    ...
-    void pup(PUP::er \&p)
-    \{
-        ArrayElement1D::pup(p); //Call superclass
-        d.pup(p); //<- pack/unpacks myData
-    \}
-\};
-\end{alltt}
 
 
 \subsubsection{Load Balancing Chare Arrays}

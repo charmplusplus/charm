@@ -1,0 +1,101 @@
+\subsection{Parameter Marshalling}
+	
+In \charmpp, \index{chare}chares, \index{group}groups and \index{nodegroup}
+nodegroups communicate by invoking each others methods. 
+The methods may either take several parameters, described here; 
+or take a special message object as described in the next section.
+Since parameters get marshalled into a message before being
+sent across the network, in this manual we use ``message''
+to mean either a literal message object or a set of marshalled
+parameters.
+
+For example, a chare could have this entry method declaration in 
+the interface ({\tt .ci}) file:
+\begin{alltt}
+  entry void foo(int i,int k);
+\end{alltt}
+Then invoking foo(2,3) on the chare proxy will eventually
+invoke foo(2,3) on the remote chare.
+
+Since \charmpp\ runs on distributed memory machines, we cannot
+pass an array via a pointer in the usual \CC\ way.  Instead,
+we must specify the length of the array in the interface file, as:
+\begin{alltt}
+  entry void bar(int n,double arr[n]);
+\end{alltt}
+Since \CC\ does not recognize this syntax, the array data
+should be passed to the chare proxy as a simple pointer.
+The array data will be copied sent to the
+destination processor, where the chare will receive the copy
+via a simple pointer again.  The remote copy of the data
+will be kept until the remote method returns, when
+it will be freed.  
+This means any modifications made locally after the call will not be 
+seen by the remote chare; and the remote chare's modifications
+will be lost after the remote method returns-- \charmpp\ always 
+uses call-by-value, even for arrays and structures.  
+
+This also means the data must be copied on the sending 
+side, and to be kept must be copied again 
+at the receive side-- for a more efficient approach,
+use the message objects described in the next section.
+
+Array parameters and other parameters can be combined in arbitrary ways, as:
+\begin{alltt}
+  entry void doLine(float data[n],int n);
+  entry void doPlane(float data[n*n],int n);
+  entry void doSpace(int n,int m,int o,float data[n*m*o]);
+  entry void doGeneral(int nd,int dims[nd],float data[product(dims,nd)]);
+\end{alltt}
+The array length expression between the square brackets can be 
+any valid C++ expression, and may depend in any way on any of the passed
+parameters, global variables, or global data.  The array length expression
+is evaluated exactly once per invocation, on the sending side only.
+
+\subsubsection{Marshalling User-Defined Structures and Classes}
+
+For a ``simple'' struct or class without dynamic allocation,
+virtual methods, or subclasses, the marshalling system will
+copy the type across machines as flat bytes.  Thus these sorts
+of structures will work properly as parameters or in arrays
+with no further effort:
+
+\begin{alltt}
+//Declarations:
+class point3d {
+public:
+    double x,y,z;    
+};
+
+typedef struct {
+    int refCount;
+    char data[17];
+} refChars;
+
+class date {
+public:
+    char month,day;
+    int year;
+    //...non-virtual manipulation routines...
+};
+
+//In the .ci file:
+    entry void pointRefOnDate(point3d &p,refChars r[d.year],date &d);
+\end{alltt}
+
+Any user-defined types in the argument list must be declared 
+before including the ``.decl.h'' file.
+As usual in \CC, it is often dramatically more efficient to pass
+a large structure by reference (as shown) than by value.
+
+Complicated structures, such as those with dynamically
+allocated data or virtual methods can only be passed as
+parameters, but never in arrays.  They also must include a pup
+routine and \CC\ operator| (see the PUP chapter for details).
+\kw{PUP::able} structures may be passed via a pointer,
+but will be dynamically allocated on the receive side
+but, for historical reasons, cannot appear alone in the
+parameter list (or else they are confused with messages).
+
+Complicated structures are usually most efficiently passed 
+via messages; not marshalling.

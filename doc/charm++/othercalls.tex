@@ -1,3 +1,27 @@
+\subsection{\kw{initcall} routines}
+Some registration routines need be executed exactly once
+on every processor before the computation begins.
+By declaring a regular \CC subroutine \index{initcall}
+\kw{initcall} in the .ci file, you ask \charmpp to execute 
+the routine exactly once on every processor before the
+computation begins.
+
+\begin{alltt}
+module foo {
+    initcall void fooGlobalInit(void);
+    chare bar {
+        ...
+        initcall void barInit(void);
+    };
+};
+\end{alltt}
+
+This code will execute the routines \uw{fooGlobalInit} and
+\uw{bar::barInit} before the main computation starts.
+These routines should only do registration, not computation--
+use a mainchare, which gets executed on only one processor,
+to begin the computation.
+
 \subsection{Other Calls}
 
 \label{other Charm++ calls}
