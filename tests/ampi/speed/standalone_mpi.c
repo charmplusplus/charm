@@ -10,6 +10,8 @@ Orion Sky Lawlor, olawlor@acm.org, 2003/9/2
 #include <mpi.h>
 
 int main(int argc,char **argv) {
+	int verbose=0;
 	MPI_Init(&argc,&argv);
-	startMPItest(MPI_COMM_WORLD,0);
+	if (argc>1) verbose=atoi(argv[1]);
+	startMPItest(MPI_COMM_WORLD,verbose);
 }

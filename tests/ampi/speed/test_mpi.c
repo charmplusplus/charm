@@ -46,12 +46,13 @@ void mpi_isend_poll(msg_comm *comm) {
 
 void mpi_isend_fn(void *data,int len, int dest,msg_comm *comm)
 {
+  int n;
   mpiComm *c=(mpiComm *)comm;
   while (c->nIsend>=maxIsend) {
     // Outgoing queue full-- clean out messages
     mpi_isend_poll(comm);
   }
-  int n=c->nIsend++;
+  n=c->nIsend++;
   c->isend[n].data=data;
   c->isend[n].len=len;
   MPI_Isend(data,len,MPI_BYTE, dest,0, c->comm,&c->isend[n].req);
@@ -76,7 +77,6 @@ void startMPItest(MPI_Comm comm,int verbose)
 {
   int bufSize=2*1024*1024;
   char *buf=malloc(bufSize);
-  MPI_Buffer_attach(buf,bufSize);
   
   mpiComm msg;
   mpiComm *c=&msg;
@@ -85,6 +85,8 @@ void startMPItest(MPI_Comm comm,int verbose)
   c->comm=comm;
   MPI_Comm_rank(c->comm,&c->myRank);
 
+  MPI_Buffer_attach(buf,bufSize);
+  
   // Run the Bsend test, which is non-blocking:
   c->b.send_fn=mpi_bsend_fn;
   c->doneFlag=0;
