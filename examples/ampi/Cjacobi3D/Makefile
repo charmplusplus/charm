@@ -13,7 +13,7 @@ test: ampi
 	./charmrun +p3 jacobi 2 2 2 +vp8 +balancer GreedyCommLB
 
 bgtest: jacobi
-	./charmrun +p2 jacobi 2 2 2 10 +vp8 +bgconfig ./bg_config
+	./charmrun +p2 jacobi 2 2 2 10 +vp8 +balancer GreedyCommLB +x2 +y2 +z1
 
 clean:
 	rm -f *.o jacobi *~ moduleinit.C charmrun conv-host
