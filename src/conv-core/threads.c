@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.10  1995-09-30 11:48:15  jyelon
+ * Revision 1.11  1995-09-30 15:03:33  jyelon
+ * Cleared up some confusion about 'private' variables in uniprocessor version.
+ *
+ * Revision 1.10  1995/09/30  11:48:15  jyelon
  * Fixed a bug (CthSetVar(t,...) failed when t is current thread.)
  *
  * Revision 1.9  1995/09/27  22:23:15  jyelon
@@ -95,6 +98,10 @@
  *     to ask the scheduler which thread to execute next.
  *
  * The interface to the scheduler is formalized in the following functions:
+ *
+ * void CthSchedInit()
+ *
+ *   - you must call this before any of the following functions will work.
  *
  * void CthSuspend()
  *
@@ -212,7 +219,7 @@ CthThread t;
   CsdEnqueueFifo(t);
 }
 
-static void CthSchedInit()
+void CthSchedInit()
 {
   CpvInitialize(CthThread, CthSchedThreadVar);
   CpvInitialize(int, CthSchedResumeIndex);
@@ -231,8 +238,8 @@ CthThread t;
  * threads: implementation CMK_THREADS_USE_ALLOCA.
  *
  * This particular implementation of threads works on most machines that
- * support alloca.  So far, all workstations that we have tested can run this
- * version.
+ * support alloca, and don't use shared-memory.  So far, all workstations
+ * that we have tested can run this version.
  *
  *****************************************************************************/
 
@@ -260,9 +267,9 @@ struct CthThreadStruct
   double     stack[1];
 };
 
-CpvStaticDeclare(CthThread, thread_current);
-CpvStaticDeclare(CthThread, thread_exiting);
-CpvStaticDeclare(int,       thread_growsdown);
+static CthThread thread_current;
+static CthThread thread_exiting;
+static int       thread_growsdown;
 
 #define ABS(a) (((a) > 0)? (a) : -(a) )
 
@@ -273,24 +280,20 @@ void CthInit()
 {
   char *sp1 = alloca(8);
   char *sp2 = alloca(8);
-  CpvInitialize(CthThread, thread_current);
-  CpvInitialize(CthThread, thread_exiting);
-  CpvInitialize(int      , thread_growsdown);
-  if (sp2<sp1) CpvAccess(thread_growsdown) = 1;
-  else         CpvAccess(thread_growsdown) = 0;
-  CpvAccess(thread_current)=
+  if (sp2<sp1) thread_growsdown = 1;
+  else         thread_growsdown = 0;
+  thread_current=
     (CthThread)CmiAlloc(sizeof(struct CthThreadStruct));
-  CpvAccess(thread_current)->fn=0;
-  CpvAccess(thread_current)->arg=0;
-  CpvAccess(thread_current)->data_count=0;
-  CpvAccess(thread_current)->awakenfn = CthSchedEnqueue;
-  CpvAccess(thread_current)->choosefn = CthSchedThread;
-  CthSchedInit();
+  thread_current->fn=0;
+  thread_current->arg=0;
+  thread_current->data_count=0;
+  thread_current->awakenfn = CthSchedEnqueue;
+  thread_current->choosefn = CthSchedThread;
 }
 
 CthThread CthSelf()
 {
-  return CpvAccess(thread_current);
+  return thread_current;
 }
 
 static void CthTransfer(t)
@@ -303,15 +306,15 @@ CthThread t;
   /* inactive stack frame"                                */
   oldsp = alloca(0);
   newsp = t->top;
-  CpvAccess(thread_current)->top = oldsp;
-  if (CpvAccess(thread_growsdown)) {
+  thread_current->top = oldsp;
+  if (thread_growsdown) {
     newsp -= SLACK;
     alloca(oldsp - newsp);
   } else {
     newsp += SLACK;
     alloca(newsp - oldsp);
   }
-  CpvAccess(thread_current) = t;
+  thread_current = t;
   longjmp(t->jb, 1);
 }
 
@@ -321,11 +324,11 @@ CthThread t;
   int i;
   for (i=0; i<t->data_count; i++)
     *(t->data_var[i]) = t->data_val[i];
-  if (t == CpvAccess(thread_current)) return;
-  if ((setjmp(CpvAccess(thread_current)->jb))==0)
+  if (t == thread_current) return;
+  if ((setjmp(thread_current->jb))==0)
     CthTransfer(t);
-  if (CpvAccess(thread_exiting))
-    { CmiFree(CpvAccess(thread_exiting)); CpvAccess(thread_exiting)=0; }
+  if (thread_exiting)
+    { CmiFree(thread_exiting); thread_exiting=0; }
 }
 
 CthThread CthCreate(fn, arg, size)
@@ -335,7 +338,7 @@ CthVoidFn fn; void *arg; int size;
   if (size==0) size = STACKSIZE;
   result = (CthThread)CmiAlloc(sizeof(struct CthThreadStruct) + size);
   oldsp = alloca(0);
-  if (CpvAccess(thread_growsdown)) {
+  if (thread_growsdown) {
       newsp = ((char *)(result->stack)) + size - SLACK;
       offs = oldsp - newsp;
   } else {
@@ -352,10 +355,10 @@ CthVoidFn fn; void *arg; int size;
   if (ABS(erralloc) >= SLACK) 
     { printf("error #83742.\n"); exit(1); }
   if (setjmp(result->jb)) {
-    if (CpvAccess(thread_exiting))
-      { CmiFree(CpvAccess(thread_exiting)); CpvAccess(thread_exiting)=0; }
-    (CpvAccess(thread_current)->fn)(CpvAccess(thread_current)->arg);
-    CpvAccess(thread_exiting) = CpvAccess(thread_current);
+    if (thread_exiting)
+      { CmiFree(thread_exiting); thread_exiting=0; }
+    (thread_current->fn)(thread_current->arg);
+    thread_exiting = thread_current;
     CthSuspend();
   }
   else return result;
@@ -364,8 +367,8 @@ CthVoidFn fn; void *arg; int size;
 void CthFree(t)
 CthThread t;
 {
-  if (t==CpvAccess(thread_current)) {
-    CpvAccess(thread_exiting) = t;
+  if (t==thread_current) {
+    thread_exiting = t;
   } else CmiFree(t);
 }
 
@@ -378,8 +381,8 @@ static void CthNoStrategy()
 void CthSuspend()
 {
   CthThread next;
-  if (CpvAccess(thread_current)->choosefn == 0) CthNoStrategy();
-  next = CpvAccess(thread_current)->choosefn();
+  if (thread_current->choosefn == 0) CthNoStrategy();
+  next = thread_current->choosefn();
   CthResume(next);
 }
 
@@ -401,7 +404,7 @@ CthThFn chsfn;
 
 void CthYield()
 {
-  CthAwaken(CpvAccess(thread_current));
+  CthAwaken(thread_current);
   CthSuspend();
 }
 
@@ -412,7 +415,7 @@ void *val;
 {
   int i;
   int data_count = thr->data_count;
-  if (thr == thread_current) *var = val;
+  if (thr == CthSelf()) *var = val;
   for (i=0; i<data_count; i++)
     if (var == thr->data_var[i])
       { thr->data_val[i]=val; return; }
