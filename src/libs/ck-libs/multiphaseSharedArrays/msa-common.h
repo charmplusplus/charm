@@ -1,6 +1,15 @@
 // emacs mode line -*- mode: c++; tab-width: 4 -*-
 #ifndef MSA_COMMON_H
 #define MSA_COMMON_H
+/************DEBUG MACRO*********************************/
+#if 0
+#define MSADEBPRINT(x) printf("MSA[%d]:",CkMyPe());x;
+#else
+#define MSADEBPRINT(x) 
+#endif
+/*********************************************************/
+
+
 
 enum { MSA_INVALID_PAGE_NO = 0xFFFFFFFF };
 enum { MSA_INVALID_PE = -1 };

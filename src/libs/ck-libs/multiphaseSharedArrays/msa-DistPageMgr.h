@@ -400,13 +400,16 @@ class MSA_PageT {
 	ENTRY *data;
 	/** Merger object */
 	MERGER m;
-    bool duplicate;
+  bool duplicate;
 
 public:
 	MSA_PageT():duplicate(false), n(ENTRIES_PER_PAGE) {
 		data=new ENTRY[ENTRIES_PER_PAGE];
-		for (int i=0;i<ENTRIES_PER_PAGE;i++)
+		for (int i=0;i<ENTRIES_PER_PAGE;i++){
 			data[i]=m.getIdentity();
+		}
+		//shouldn't n be set to ENTRIES_PER_PAGE
+		n = ENTRIES_PER_PAGE;
 	}
     // This constructor is used in PageArray to quickly convert an
     // array of ENTRY into an MSA_PageT.  So we just make a copy of
@@ -424,9 +427,27 @@ public:
 	}
 
 	virtual void pup(PUP::er &p) {
-        p | n;
-		for (int i=0;i<n;i++)
+    p | n;
+		/*this pup routine was broken, It didnt consider the case
+		 	in which n > 0 and data = NULL. This is possible when  
+			sending empty pages. It also doesnt seem to do any allocation
+			for the data variable while unpacking which seems to be wrong
+		*/
+		bool nulldata;
+		if(!p.isUnpacking()){
+				nulldata = (data == NULL);
+		}
+		p | nulldata;
+		if(nulldata){
+				data = NULL;
+				return;
+		}
+		if(p.isUnpacking()){
+				data = new ENTRY[n];
+		}
+		for (int i=0;i<n;i++){
 			p|data[i];
+		}	
 	}
 
 	virtual void merge(MSA_PageT<ENTRY, MERGER, ENTRIES_PER_PAGE> &otherPage) {
@@ -484,19 +505,19 @@ protected:
     std::map<CthThread, MSA_Thread_Listener *> threadList;
     /// Look up or create the listener for the current thread.
     MSA_Thread_Listener *getListener(void) {
-        CthThread t=CthSelf();
-        MSA_Thread_Listener *l=threadList[t];
-	if (l==NULL) {
-	    l=new MSA_Thread_Listener;
-	    threadList[t]=l;
-	}
-	return l;
+    	CthThread t=CthSelf();
+    	MSA_Thread_Listener *l=threadList[t];
+			if (l==NULL) {
+	    	l=new MSA_Thread_Listener;
+	    	threadList[t]=l;
+			}
+			return l;
     }
     /// Add our thread to this list and suspend
     void addAndSuspend(MSA_Listeners &dest) {
-        MSA_Thread_Listener *l=getListener();
-	dest.add(l);
-	l->suspend();
+    	MSA_Thread_Listener *l=getListener();
+			dest.add(l);
+			l->suspend();
     }
 
     stack<ENTRY_TYPE*> pagePool;     // a pool of unused pages
@@ -772,6 +793,7 @@ public:
             pageTable[i] = 0;
             pageStateStorage[i] = 0;
         }
+				MSADEBPRINT(printf("MSA_CacheGroup nEntries %d \n",nEntries););
     }
 
     // MSA_CacheGroup::
@@ -875,6 +897,7 @@ public:
     // synchronize all the pages and also clear up the cache
     inline void SyncReq(int single)
     {
+				MSADEBPRINT(printf("SyncReq single %d\n",single););
         if(single)
         {
             /*ask all the caches to send their updates to the page array, but we don't need to empty the caches on the other PEs*/
@@ -883,8 +906,9 @@ public:
 
             getListener()->suspend();
         }
-        else
+        else{
             Sync();
+				}		
     }
 
     // MSA_CacheGroup::
@@ -979,8 +1003,10 @@ public:
         // call; only then can we proceed with merging the data.  Only
         // the last thread on this processor needs to do the FlushCache,
         // etc.  Others just suspend until the sync is over.
+				MSADEBPRINT(printf("Sync syncThreadCount %d \n",syncThreadCount););
         if(syncThreadCount < numberLocalWorkerThreads)
         {
+						MSADEBPRINT(printf("Sync addAndSuspend \n"););
             addAndSuspend(syncWaiters);
             return;
         }
@@ -997,7 +1023,9 @@ public:
         // Now, we suspend too (if we had at least one dirty page).
         // We will be awoken when all our dirty pages have been
         // written and acknowledged.
+				MSADEBPRINT(printf("Sync calling suspend on getListener\n"););
         getListener()->suspend();
+				MSADEBPRINT(printf("Sync awakening after suspend\n"););
 
         // So far, the sync has been asynchronous, i.e. PE0 might be ahead
         // of PE1.  Next we basically do a barrier to ensure that all PE's
@@ -1015,8 +1043,11 @@ public:
         {
             SyncAck();
         }
+				MSADEBPRINT(printf("Sync all local threads done, going to addAndSuspend\n"););
         /* Wait until sync is reflected from PE 0 */
         addAndSuspend(syncWaiters);
+				
+				MSADEBPRINT(printf("Sync all local threads done waking up after addAndSuspend\n"););
 	
     }
 
@@ -1031,8 +1062,10 @@ public:
         //ckout << "[" << CkMyPe() << "] SyncAckcount = " << syncAckCount << endl;
         // DONE @@ what if fewer worker threads than pe's ?
         // @@ what if fewer worker threads than pe's and >1 threads on 1 pe?
-        if(syncAckCount == min(numberOfWorkerThreads, CkNumPes()))
-            pageArray.Sync();
+        if(syncAckCount == min(numberOfWorkerThreads, CkNumPes())){
+						MSADEBPRINT(printf("SyncAck starting reduction on pageArray of size %d number of pages %d\n",nEntries,nPages););
+            pageArray.Sync();					
+				}		
     }
 
     inline void SyncDone()
@@ -1042,6 +1075,7 @@ public:
         /* Reset for next sync */
         syncThreadCount = 0;
         syncAckCount = 0;
+				MSADEBPRINT(printf("SyncDone syncWaiters signal to be called\n"););
         syncWaiters.signal(0);
     }
 
@@ -1318,6 +1352,7 @@ public:
     // MSA_PageArray::
     inline void Sync()
     {
+				MSADEBPRINT(printf("MSA_PageArray::Sync about to call contribute \n");); 
         contribute(0, NULL, CkReduction::concat);
     }
 
