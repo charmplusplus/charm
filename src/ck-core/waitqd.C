@@ -65,7 +65,7 @@ void waitqd_QDChare::waitQD(void) {
 void waitqd_QDChare::onQD(CkQdMsg *ckqm) {
   CthThread pthr;
   while(!CdsFifo_Empty((CdsFifo) threadList)) {
-    pthr = CdsFifo_Dequeue((CdsFifo) threadList);
+    pthr = (CthThread)CdsFifo_Dequeue((CdsFifo) threadList);
     CthAwaken(pthr);
   }
   CdsFifo_Destroy((CdsFifo) threadList);
