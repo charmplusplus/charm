@@ -378,8 +378,8 @@ class CBaseT : public Parent {
 public:
 	CBASE_PROXY_MEMBERS(CProxy_Derived)
 
-	CBaseT(void) :Parent(), thisProxy(this) {}
-	CBaseT(CkMigrateMessage *m) :Parent(m), thisProxy(this) {}
+	CBaseT(void) :Parent()  { thisProxy=this; }
+	CBaseT(CkMigrateMessage *m) :Parent(m) { thisProxy=this; }
 	void pup(PUP::er &p) {
 		Parent::pup(p);
 		p|thisProxy;
