@@ -35,6 +35,21 @@ void IrrGroup::pup(PUP::er &p)
 	p|ckEnableTracing;
 } 
 
+#ifndef CMK_OPTIMIZE
+void CProxy_Chare::ckCheck(void) const {
+	if (_ck_cid.objPtr==0)
+		CkAbort("Error! This chare proxy has not been initialized!");
+}
+void CProxy_Group::ckCheck(void) const {
+	if (_ck_gid.isZero())
+		CkAbort("Error! This group proxy has not been initialized!");
+}
+void CProxy_ArrayBase::ckCheck(void) const {
+	if (_aid.isZero())
+		CkAbort("Error! This array proxy has not been initialized!");
+}
+#endif
+
 CkDelegateMgr::~CkDelegateMgr() { }
 
 //Default delegator implementation: do not delegate-- send directly

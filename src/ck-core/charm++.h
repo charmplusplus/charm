@@ -203,6 +203,11 @@ class CProxy_Chare : public CProxy {
 	_ck_cid.onPE=0; _ck_cid.objPtr=0;
 #endif
     }
+#ifndef CMK_OPTIMIZE
+    void ckCheck(void) const; //Make sure this proxy has a value
+#else
+    inline void ckCheck() const {}
+#endif
     CProxy_Chare(const CkChareID &c) : _ck_cid(c) {}
     CProxy_Chare(const Chare *c) : _ck_cid(c->ckGetChareID()) {}
     const CkChareID &ckGetChareID(void) const {return _ck_cid;}
@@ -220,6 +225,7 @@ PUPmarshall(CProxy_Chare)
 
 #define CK_DISAMBIG_CHARE(super) \
 	CK_DISAMBIG_CPROXY(super) \
+	inline void ckCheck(void) const {super::ckCheck();} \
 	const CkChareID &ckGetChareID(void) const\
     	   {return super::ckGetChareID();} \
         operator const CkChareID &(void) const {return ckGetChareID();}
@@ -239,7 +245,11 @@ class CProxy_Group : public CProxy {
   private:
     CkGroupID _ck_gid;
   public:
-    CProxy_Group() { }
+    CProxy_Group() { 
+#ifndef CMK_OPTIMIZE
+	_ck_gid.setZero();
+#endif
+    }
     CProxy_Group(CkGroupID g) 
     	:CProxy(),_ck_gid(g) {}
     CProxy_Group(CkGroupID g,CkGroupID dTo) 
@@ -248,6 +258,13 @@ class CProxy_Group : public CProxy {
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}
     CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}
+
+#ifndef CMK_OPTIMIZE
+    void ckCheck(void) const; //Make sure this proxy has a value
+#else
+    inline void ckCheck() const {}
+#endif
+
     CkChareID ckGetChareID(void) const { 
     	CkChareID ret;
     	ret.onPE=CkMyPe();
@@ -266,6 +283,7 @@ class CProxy_Group : public CProxy {
 PUPmarshall(CProxy_Group)
 #define CK_DISAMBIG_GROUP(super) \
 	CK_DISAMBIG_CPROXY(super) \
+	inline void ckCheck(void) const {super::ckCheck();} \
 	CkChareID ckGetChareID(void) const\
     	   {return super::ckGetChareID();} \
 	CkGroupID ckGetGroupID(void) const\
@@ -330,6 +348,8 @@ class CkArrayID {
 public:
 	CkArrayID() : _gid() { }
 	CkArrayID(CkGroupID g) :_gid(g) {}
+	inline void setZero(void) {_gid.setZero();}
+	inline bool isZero(void) const {return _gid.isZero();}
 	operator CkGroupID() const {return _gid;}
 	CkArray *ckLocalBranch(void) const
 		{ return (CkArray *)CkLocalBranch(_gid); }

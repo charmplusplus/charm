@@ -89,12 +89,22 @@ class CProxy_ArrayBase :public CProxy {
 private:
 	CkArrayID _aid;
 public:
-	CProxy_ArrayBase() { }
+	CProxy_ArrayBase() { 
+#ifndef CMK_OPTIMIZE
+		_aid.setZero();
+#endif
+	}
 	CProxy_ArrayBase(const CkArrayID &aid,CkGroupID dTo) 
 		:CProxy(dTo), _aid(aid) { }
 	CProxy_ArrayBase(const CkArrayID &aid) 
 		:CProxy(), _aid(aid) { }
 	CProxy_ArrayBase(const ArrayElement *e);
+
+#ifndef CMK_OPTIMIZE
+	void ckCheck(void) const; //Make sure this proxy has a value
+#else
+	inline void ckCheck(void) const {}
+#endif
 
 	static CkArrayID ckCreateEmptyArray(void);
 	static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,CkArrayOptions opts);
@@ -113,6 +123,7 @@ public:
 PUPmarshall(CProxy_ArrayBase);
 #define CK_DISAMBIG_ARRAY(super) \
 	CK_DISAMBIG_CPROXY(super) \
+	inline void ckCheck(void) const {super::ckCheck();} \
 	inline operator CkArrayID () const {return ckGetArrayID();}\
 	inline static CkArrayID ckCreateEmptyArray(void)\
 	  { return super::ckCreateEmptyArray(); }\
