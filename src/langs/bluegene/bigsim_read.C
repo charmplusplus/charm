@@ -43,11 +43,12 @@ void BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNod
 }
 
 
+// user has to remember to free allProcOffsets
 int* BgLoadOffsets(int totalProcs, int numPes){
 
   int* allProcOffsets = new int[totalProcs];
   int arrayOffset=0, procsInPe;
-  char* d = new char[10];
+  char d[128];
 
   PUP::machineInfo machInfo;
   for (int i=0; i<numPes; i++){

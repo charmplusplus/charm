@@ -126,8 +126,11 @@ bgTimeLog::bgTimeLog(char *msg, char *str)
 
 bgTimeLog::~bgTimeLog()
 {
-  for (int i=0; i<msgs.length(); i++)
+  int i;
+  for (i=0; i<msgs.length(); i++)
     delete msgs[i];
+  for (i=0; i<evts.length(); i++)
+    delete evts[i];
 }
 
 

@@ -185,15 +185,18 @@ public:
   CkQ<bgTimeLog *>   sendingLogs;	// send buffered
 #endif
 public:
-  BgTimeLineRec(): timeline(1024), commit(0), counter(1), correctSendIdx(0), startIdx(0), bgCurLog(NULL) {
-    if (bgcorroff) startCorrFlag=0; else startCorrFlag=1;
-    minCorrection = INVALIDTIME;
-  }
-  bgTimeLog * operator[](size_t n)
-  {
+  BgTimeLineRec(): timeline(1024), commit(0), counter(1), correctSendIdx(0), 
+		   startIdx(0), bgCurLog(NULL) {
+      if (bgcorroff) startCorrFlag=0; else startCorrFlag=1;
+      minCorrection = INVALIDTIME;
+    }
+  ~BgTimeLineRec() {
+      for (int i=0; i<timeline.length(); i++)  delete timeline[i];
+    }
+  bgTimeLog * operator[](size_t n) {
 	CmiAssert(n!=(size_t)-1);
         return timeline[n];
-  }
+    }
   int length() { return timeline.length(); }
   // special enq which will assign seqno
   void enq(bgTimeLog *log, int isnew) {
