@@ -533,6 +533,7 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, MemberList *l)
 	entryCount=1;
         hasElement=0;
 	forElement=forAll;
+	hasSection=0;
 	bases_CBase=NULL;
 	setTemplate(0); 
 	hasSdagEntry=0;
