@@ -2,8 +2,8 @@ module ampi {
   message AmpiMsg;
  
   initcall void ampiNodeInit(void);
-  readonly ampi_comm_structs ampi_comms;
-  readonly int ampi_ncomms;
+  readonly mpi_comm_structs mpi_comms;
+  readonly int mpi_ncomms;
 
   array[1D] ampi {
     entry ampi(int commidx,CProxy_TCharm threads_);

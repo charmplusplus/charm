@@ -132,22 +132,22 @@ char *CopyMsg(char *msg, int len)
 
 void CmiTimerInit(void)
 {
-  starttimer = MPI_Wtime();
+  starttimer = PMPI_Wtime();
 }
 
 double CmiTimer(void)
 {
-  return MPI_Wtime() - starttimer;
+  return PMPI_Wtime() - starttimer;
 }
 
 double CmiWallTimer(void)
 {
-  return MPI_Wtime() - starttimer;
+  return PMPI_Wtime() - starttimer;
 }
 
 double CmiCpuTimer(void)
 {
-  return MPI_Wtime() - starttimer;
+  return PMPI_Wtime() - starttimer;
 }
 
 static PCQueue  *msgBuf;
@@ -228,8 +228,8 @@ static int CmiAllAsyncMsgsSent(void)
      
    while(msg_tmp!=0) {
     done = 0;
-    if (MPI_SUCCESS != MPI_Test(&(msg_tmp->req), &done, &sts)) 
-      CmiAbort("CmiAllAsyncMsgsSent: MPI_Test failed!\n");
+    if (MPI_SUCCESS != PMPI_Test(&(msg_tmp->req), &done, &sts)) 
+      CmiAbort("CmiAllAsyncMsgsSent: PMPI_Test failed!\n");
     if(!done)
       return 0;
     msg_tmp = msg_tmp->next;
@@ -248,8 +248,8 @@ int CmiAsyncMsgSent(CmiCommHandle c) {
     msg_tmp = msg_tmp->next;
   if(msg_tmp) {
     done = 0;
-    if (MPI_SUCCESS != MPI_Test(&(msg_tmp->req), &done, &sts)) 
-      CmiAbort("CmiAsyncMsgSent: MPI_Test failed!\n");
+    if (MPI_SUCCESS != PMPI_Test(&(msg_tmp->req), &done, &sts)) 
+      CmiAbort("CmiAsyncMsgSent: PMPI_Test failed!\n");
     return ((done)?1:0);
   } else {
     return 1;
@@ -273,8 +273,8 @@ static void CmiReleaseSentMessages(void)
      
   while(msg_tmp!=0) {
     done =0;
-    if(MPI_Test(&(msg_tmp->req), &done, &sts) != MPI_SUCCESS)
-      CmiAbort("CmiReleaseSentMessages: MPI_Test failed!\n");
+    if(PMPI_Test(&(msg_tmp->req), &done, &sts) != MPI_SUCCESS)
+      CmiAbort("CmiReleaseSentMessages: PMPI_Test failed!\n");
     if(done) {
       MsgQueueLen--;
       /* Release the message */
@@ -303,16 +303,16 @@ static int PumpMsgs(void)
 
   while(1) {
     flg = 0;
-    res = MPI_Iprobe(MPI_ANY_SOURCE, TAG, MPI_COMM_WORLD, &flg, &sts);
+    res = PMPI_Iprobe(MPI_ANY_SOURCE, TAG, MPI_COMM_WORLD, &flg, &sts);
     if(res != MPI_SUCCESS)
-      CmiAbort("MPI_Iprobe failed\n");
+      CmiAbort("PMPI_Iprobe failed\n");
     if(!flg)
       return recd;
     recd = 1;
-    MPI_Get_count(&sts, MPI_BYTE, &nbytes);
+    PMPI_Get_count(&sts, MPI_BYTE, &nbytes);
     msg = (char *) CmiAlloc(nbytes);
-    if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
-      CmiAbort("PumpMsgs: MPI_Recv failed!\n");
+    if (MPI_SUCCESS != PMPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
+      CmiAbort("PumpMsgs: PMPI_Recv failed!\n");
 #if CMK_NODE_QUEUE_AVAILABLE
     if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
       PCQueuePush(CsvAccess(NodeRecv), msg);
@@ -353,9 +353,9 @@ static void CommunicationServer(int sleepTime)
       SendMsgBuf(); 
       PumpMsgs();
     }
-    if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
-      CmiAbort("ConverseExit: MPI_Barrier failed!\n");
-    MPI_Finalize();
+    if (MPI_SUCCESS != PMPI_Barrier(MPI_COMM_WORLD))
+      CmiAbort("ConverseExit: PMPI_Barrier failed!\n");
+    PMPI_Finalize();
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
     if (CmiMyNode() == 0){
       CmiPrintf("End of program\n");
@@ -442,8 +442,8 @@ static int SendMsgBuf()
 	CmiReleaseSentMessages();
 	PumpMsgs();
       }
-      if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
-        CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
+      if (MPI_SUCCESS != PMPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
+        CmiAbort("CmiAsyncSendFn: PMPI_Isend failed!\n");
       MsgQueueLen++;
       if(sent_msgs==0)
         sent_msgs = msg_tmp;
@@ -496,8 +496,8 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 	CmiReleaseSentMessages();
 	PumpMsgs();
   }
-  if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
-    CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
+  if (MPI_SUCCESS != PMPI_Isend((void *)msg,size,MPI_BYTE,destPE,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
+    CmiAbort("CmiAsyncSendFn: PMPI_Isend failed!\n");
   MsgQueueLen++;
   if(sent_msgs==0)
     sent_msgs = msg_tmp;
@@ -724,10 +724,10 @@ void ConverseExit(void)
     PumpMsgs();
     CmiReleaseSentMessages();
   }
-  if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD)) 
-    CmiAbort("ConverseExit: MPI_Barrier failed!\n");
+  if (MPI_SUCCESS != PMPI_Barrier(MPI_COMM_WORLD)) 
+    CmiAbort("ConverseExit: PMPI_Barrier failed!\n");
   ConverseCommonExit();
-  MPI_Finalize();
+  PMPI_Finalize();
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
   if (CmiMyPe() == 0){
     CmiPrintf("End of program\n");
@@ -836,9 +836,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
 #endif
   
-  MPI_Init(&argc, &argv);
-  MPI_Comm_size(MPI_COMM_WORLD, &Cmi_numnodes);
-  MPI_Comm_rank(MPI_COMM_WORLD, &Cmi_mynode);
+  PMPI_Init(&argc, &argv);
+  PMPI_Comm_size(MPI_COMM_WORLD, &Cmi_numnodes);
+  PMPI_Comm_rank(MPI_COMM_WORLD, &Cmi_mynode);
   /* processor per node */
   Cmi_mynodesize = 1;
   CmiGetArgInt(argv,"+ppn", &Cmi_mynodesize);
@@ -894,7 +894,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 void CmiAbort(const char *message)
 {
   CmiError(message);
-  MPI_Abort(MPI_COMM_WORLD, 1);
+  PMPI_Abort(MPI_COMM_WORLD, 1);
 }
 
 
@@ -911,7 +911,7 @@ static void ** AllocBlock(unsigned int len)
   blk=(void **)CmiAlloc(len*sizeof(void *));
   if(blk==(void **)0) {
     CmiError("Cannot Allocate Memory!\n");
-    MPI_Abort(MPI_COMM_WORLD, 1);
+    PMPI_Abort(MPI_COMM_WORLD, 1);
   }
   return blk;
 }

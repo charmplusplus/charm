@@ -5,163 +5,163 @@
  * $Revision$
  *****************************************************************************/
 
-#ifndef _AMPI_H
-#define _AMPI_H
+#ifndef _MPI_H
+#define _MPI_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /*NON-standard define: this lets people #ifdef on
-AMPI, e.g. for our bizarre AMPI_Main.
+AMPI, e.g. for our bizarre MPI_Main.
 */
 #define AMPI
 
 /* MPI prototypes and #defines here */
-#define AMPI_SUCCESS 0
-/* Somebody needs to define AMPI_ERRs here */
+#define MPI_SUCCESS 0
+/* Somebody needs to define MPI_ERRs here */
 
 /* these values have to match values in ampif.h */
-#define AMPI_DOUBLE 0
-#define AMPI_INT 1
-#define AMPI_FLOAT 2
-#define AMPI_COMPLEX 3
-#define AMPI_LOGICAL 4
-#define AMPI_CHAR 5
-#define AMPI_BYTE 6
-#define AMPI_PACKED 7
-#define AMPI_SHORT  8
-#define AMPI_LONG  9
-#define AMPI_UNSIGNED_CHAR  10
-#define AMPI_UNSIGNED_SHORT  11
-#define AMPI_UNSIGNED    12
-#define AMPI_UNSIGNED_LONG  13
-#define AMPI_LONG_DOUBLE  14
+#define MPI_DOUBLE 0
+#define MPI_INT 1
+#define MPI_FLOAT 2
+#define MPI_COMPLEX 3
+#define MPI_LOGICAL 4
+#define MPI_CHAR 5
+#define MPI_BYTE 6
+#define MPI_PACKED 7
+#define MPI_SHORT  8
+#define MPI_LONG  9
+#define MPI_UNSIGNED_CHAR  10
+#define MPI_UNSIGNED_SHORT  11
+#define MPI_UNSIGNED    12
+#define MPI_UNSIGNED_LONG  13
+#define MPI_LONG_DOUBLE  14
 
-#define AMPI_COMM_WORLD (0)
-#define AMPI_ANY_SOURCE (-1)
-#define AMPI_ANY_TAG (-1)
-#define AMPI_REQUEST_NULL (-1)
+#define MPI_COMM_WORLD (0)
+#define MPI_ANY_SOURCE (-1)
+#define MPI_ANY_TAG (-1)
+#define MPI_REQUEST_NULL (-1)
 
-#define AMPI_TYPE_NULL  (-1)
+#define MPI_TYPE_NULL  (-1)
 
-#define AMPI_MAX 1
-#define AMPI_MIN 2
-#define AMPI_SUM 3
-#define AMPI_PROD 4
+#define MPI_MAX 1
+#define MPI_MIN 2
+#define MPI_SUM 3
+#define MPI_PROD 4
 
-typedef int AMPI_Comm;
-typedef int AMPI_Op;
-typedef int AMPI_Request;
+typedef int MPI_Comm;
+typedef int MPI_Op;
+typedef int MPI_Request;
 typedef struct {
-  int AMPI_TAG, AMPI_SOURCE, AMPI_COMM, AMPI_LENGTH;
-} AMPI_Status;
+  int MPI_TAG, MPI_SOURCE, MPI_COMM, MPI_LENGTH;
+} MPI_Status;
 
-typedef int AMPI_Datatype;
-typedef int*  AMPI_Aint ;
+typedef int MPI_Datatype;
+typedef int*  MPI_Aint ;
 
 #include "pup_c.h"
 
-typedef void (*AMPI_PupFn)(pup_er, void*);
+typedef void (*MPI_PupFn)(pup_er, void*);
 
-int AMPI_Init(int *argc, char*** argv);
-int AMPI_Comm_rank(AMPI_Comm comm, int *rank);
-int AMPI_Comm_size(AMPI_Comm comm, int *size);
-int AMPI_Finalize(void);
-int AMPI_Send(void *msg, int count, AMPI_Datatype type, int dest,
-             int tag, AMPI_Comm comm);
-int AMPI_Ssend(void *msg, int count, AMPI_Datatype type, int dest,
-             int tag, AMPI_Comm comm);
-int AMPI_Recv(void *msg, int count, int type, int src, int tag,
-             AMPI_Comm comm, AMPI_Status *status);
-int AMPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
+int MPI_Init(int *argc, char*** argv);
+int MPI_Comm_rank(MPI_Comm comm, int *rank);
+int MPI_Comm_size(MPI_Comm comm, int *size);
+int MPI_Finalize(void);
+int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
+             int tag, MPI_Comm comm);
+int MPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
+             int tag, MPI_Comm comm);
+int MPI_Recv(void *msg, int count, int type, int src, int tag,
+             MPI_Comm comm, MPI_Status *status);
+int MPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
                  int stag, void *rbuf, int rcount, int rtype,
-                 int src, int rtag, AMPI_Comm comm, AMPI_Status *sts);
-int AMPI_Barrier(AMPI_Comm comm);
-int AMPI_Bcast(void *buf, int count, int type, int root,
-              AMPI_Comm comm);
-int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type,
-               AMPI_Op op, int root, AMPI_Comm comm);
-int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
-                  AMPI_Op op, AMPI_Comm comm);
-double AMPI_Wtime(void);
-int AMPI_Start(AMPI_Request *reqnum);
-int AMPI_Probe(int source, int tag, AMPI_Comm comm, AMPI_Status *sts);
-int AMPI_Iprobe(int src, int tag, AMPI_Comm comm, int *flag, AMPI_Status *sts);
-int AMPI_Waitall(int count, AMPI_Request *request, AMPI_Status *sts);
-int AMPI_Waitany(int count, AMPI_Request *request, int *index,AMPI_Status *sts);
-int AMPI_Wait(AMPI_Request *request, AMPI_Status *sts);
-int AMPI_Test(AMPI_Request *request, int *flag, AMPI_Status *sts);
-int AMPI_Testall(int count, AMPI_Request *request, int *flag, AMPI_Status *sts);
-int AMPI_Get_count(AMPI_Status *sts, AMPI_Datatype dtype, int *count);
-int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
-                  AMPI_Comm comm, AMPI_Request *req);
-int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
-                  AMPI_Comm comm, AMPI_Request *req);
+                 int src, int rtag, MPI_Comm comm, MPI_Status *sts);
+int MPI_Barrier(MPI_Comm comm);
+int MPI_Bcast(void *buf, int count, int type, int root,
+              MPI_Comm comm);
+int MPI_Reduce(void *inbuf, void *outbuf, int count, int type,
+               MPI_Op op, int root, MPI_Comm comm);
+int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
+                  MPI_Op op, MPI_Comm comm);
+double MPI_Wtime(void);
+int MPI_Start(MPI_Request *reqnum);
+int MPI_Probe(int source, int tag, MPI_Comm comm, MPI_Status *sts);
+int MPI_Iprobe(int src, int tag, MPI_Comm comm, int *flag, MPI_Status *sts);
+int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts);
+int MPI_Waitany(int count, MPI_Request *request, int *index,MPI_Status *sts);
+int MPI_Wait(MPI_Request *request, MPI_Status *sts);
+int MPI_Test(MPI_Request *request, int *flag, MPI_Status *sts);
+int MPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts);
+int MPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count);
+int MPI_Recv_init(void *buf, int count, int type, int src, int tag,
+                  MPI_Comm comm, MPI_Request *req);
+int MPI_Send_init(void *buf, int count, int type, int dest, int tag,
+                  MPI_Comm comm, MPI_Request *req);
 
-int AMPI_Type_contiguous(int count, AMPI_Datatype oldtype, 
-                         AMPI_Datatype *newtype);
-int AMPI_Type_vector(int count, int blocklength, int stride, 
-                     AMPI_Datatype oldtype, AMPI_Datatype *newtype);
-int AMPI_Type_hvector(int count, int blocklength, int stride, 
-                      AMPI_Datatype oldtype, AMPI_Datatype *newtype);
-int AMPI_Type_indexed(int count, int* arrBlength, int* arrDisp, 
-                      AMPI_Datatype oldtype, AMPI_Datatype *newtype);
-int AMPI_Type_hindexed(int count, int* arrBlength, int* arrDisp, 
-                       AMPI_Datatype oldtype, AMPI_Datatype *newtype);
-int  AMPI_Type_struct(int count, int* arrBLength, int* arrDisp, 
-                      AMPI_Datatype *oldType, AMPI_Datatype *newType);
-int AMPI_Type_commit(AMPI_Datatype *datatype);
-int AMPI_Type_free(AMPI_Datatype *datatype);
-int  AMPI_Type_extent(AMPI_Datatype datatype, AMPI_Aint extent);
-int  AMPI_Type_size(AMPI_Datatype datatype, AMPI_Aint size);
+int MPI_Type_contiguous(int count, MPI_Datatype oldtype, 
+                         MPI_Datatype *newtype);
+int MPI_Type_vector(int count, int blocklength, int stride, 
+                     MPI_Datatype oldtype, MPI_Datatype *newtype);
+int MPI_Type_hvector(int count, int blocklength, int stride, 
+                      MPI_Datatype oldtype, MPI_Datatype *newtype);
+int MPI_Type_indexed(int count, int* arrBlength, int* arrDisp, 
+                      MPI_Datatype oldtype, MPI_Datatype *newtype);
+int MPI_Type_hindexed(int count, int* arrBlength, int* arrDisp, 
+                       MPI_Datatype oldtype, MPI_Datatype *newtype);
+int  MPI_Type_struct(int count, int* arrBLength, int* arrDisp, 
+                      MPI_Datatype *oldType, MPI_Datatype *newType);
+int MPI_Type_commit(MPI_Datatype *datatype);
+int MPI_Type_free(MPI_Datatype *datatype);
+int  MPI_Type_extent(MPI_Datatype datatype, MPI_Aint extent);
+int  MPI_Type_size(MPI_Datatype datatype, MPI_Aint size);
 
-int AMPI_Pack(void *inbuf, int incount, AMPI_Datatype dtype, void *outbuf,
-              int outsize, int *position, AMPI_Comm comm);
-int AMPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
-              int outcount, AMPI_Datatype dtype, AMPI_Comm comm);
-int AMPI_Pack_size(int incount,AMPI_Datatype datatype,AMPI_Comm comm,int *sz);
+int MPI_Pack(void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
+              int outsize, int *position, MPI_Comm comm);
+int MPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
+              int outcount, MPI_Datatype dtype, MPI_Comm comm);
+int MPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz);
 
-int AMPI_Isend(void *buf, int count, AMPI_Datatype datatype, int dest, 
-              int tag, AMPI_Comm comm, AMPI_Request *request);
-int AMPI_Issend(void *buf, int count, AMPI_Datatype datatype, int dest, 
-              int tag, AMPI_Comm comm, AMPI_Request *request);
-int AMPI_Irecv(void *buf, int count, AMPI_Datatype datatype, int src, 
-              int tag, AMPI_Comm comm, AMPI_Request *request);
-int AMPI_Allgatherv(void *sendbuf, int sendcount, AMPI_Datatype sendtype, 
+int MPI_Isend(void *buf, int count, MPI_Datatype datatype, int dest, 
+              int tag, MPI_Comm comm, MPI_Request *request);
+int MPI_Issend(void *buf, int count, MPI_Datatype datatype, int dest, 
+              int tag, MPI_Comm comm, MPI_Request *request);
+int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int src, 
+              int tag, MPI_Comm comm, MPI_Request *request);
+int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype, 
                    void *recvbuf, int *recvcounts, int *displs, 
-                   AMPI_Datatype recvtype, AMPI_Comm comm) ;
-int AMPI_Allgather(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
-                  void *recvbuf, int recvcount, AMPI_Datatype recvtype,
-                  AMPI_Comm comm);
-int AMPI_Gatherv(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
+                   MPI_Datatype recvtype, MPI_Comm comm) ;
+int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                  MPI_Comm comm);
+int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 void *recvbuf, int *recvcounts, int *displs,
-                AMPI_Datatype recvtype, int root, AMPI_Comm comm);
-int AMPI_Gather(void *sendbuf, int sendcount, AMPI_Datatype sendtype,
-               void *recvbuf, int recvcount, AMPI_Datatype recvtype, 
-               int root, AMPI_Comm comm);
-int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
-                  AMPI_Datatype sendtype, void *recvbuf, int *recvcounts,
-                  int *rdispls, AMPI_Datatype recvtype, AMPI_Comm comm);
-int AMPI_Alltoall(void *sendbuf, int sendcount, AMPI_Datatype sendtype, 
-                 void *recvbuf, int recvcount, AMPI_Datatype recvtype, 
-                 AMPI_Comm comm);
-int AMPI_Comm_dup(AMPI_Comm comm, AMPI_Comm *newcomm);
-int AMPI_Comm_free(AMPI_Comm *comm);
-int AMPI_Abort(AMPI_Comm comm, int errorcode);
+                MPI_Datatype recvtype, int root, MPI_Comm comm);
+int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+               void *recvbuf, int recvcount, MPI_Datatype recvtype, 
+               int root, MPI_Comm comm);
+int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
+                  MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
+                  int *rdispls, MPI_Datatype recvtype, MPI_Comm comm);
+int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype, 
+                 void *recvbuf, int recvcount, MPI_Datatype recvtype, 
+                 MPI_Comm comm);
+int MPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm);
+int MPI_Comm_free(MPI_Comm *comm);
+int MPI_Abort(MPI_Comm comm, int errorcode);
 
-void AMPI_Print(char *str);
-int AMPI_Register(void *, AMPI_PupFn);
-void AMPI_Migrate(void);
-void AMPI_Checkpoint(char *dirname);
-void *AMPI_Get_userdata(int);
+void MPI_Print(char *str);
+int MPI_Register(void *, MPI_PupFn);
+void MPI_Migrate(void);
+void MPI_Checkpoint(char *dirname);
+void *MPI_Get_userdata(int);
 
 /*Create a new threads array and attach to it*/
-typedef void (*AMPI_MainFn) (int,char**);
-void AMPI_Register_main(AMPI_MainFn mainFn, const char *name);
+typedef void (*MPI_MainFn) (int,char**);
+void MPI_Register_main(MPI_MainFn mainFn, const char *name);
 
 /*Attach a new AMPI to each existing threads array element*/
-void AMPI_Attach(const char *name);
+void MPI_Attach(const char *name);
 
 #ifdef __cplusplus
 }

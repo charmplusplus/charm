@@ -11,26 +11,26 @@
 #include "ampi.h"
 #include "charm++.h"
 
-#define AMPI_MAX_COMM 8
+#define MPI_MAX_COMM 8
 
-struct ampi_redn_spec
+struct mpi_redn_spec
 {
   int type;
   int root;
 };
 
-struct ampi_comm_struct
+struct mpi_comm_struct
 {
   CkArrayID aid;
   void (*mainfunc)(int, char **);
   char *name;
   int nobj;
-  ampi_redn_spec rspec;
+  mpi_redn_spec rspec;
 };
-class ampi_comm_structs {
-	ampi_comm_struct s[AMPI_MAX_COMM];
+class mpi_comm_structs {
+	mpi_comm_struct s[MPI_MAX_COMM];
 public:
-	ampi_comm_struct &operator[](int i) {return s[i];}
+	mpi_comm_struct &operator[](int i) {return s[i];}
 };
 
 #include "tcharm.h"
@@ -40,12 +40,12 @@ public:
 #include "charm-api.h"
 #include <sys/stat.h> // for mkdir
 
-extern int ampi_ncomms;
+extern int mpi_ncomms;
 
-#define AMPI_BCAST_TAG  1025
-#define AMPI_BARR_TAG   1026
-#define AMPI_REDUCE_TAG 1027
-#define AMPI_GATHER_TAG 1028
+#define MPI_BCAST_TAG  1025
+#define MPI_BARR_TAG   1026
+#define MPI_REDUCE_TAG 1027
+#define MPI_GATHER_TAG 1028
 
 #if 0
 // This is currently not used.
@@ -187,7 +187,7 @@ class ampi : public ArrayElement1D {
     virtual void pup(PUP::er &p);
     void generic(AmpiMsg *);
     
-  public: // to be used by AMPI_* functions
+  public: // to be used by MPI_* functions
     void send(int t1, int t2, void* buf, int count, int type, int idx, int comm);
     static void sendraw(int t1, int t2, void* buf, int len, CkArrayID aid, 
                         int idx);
