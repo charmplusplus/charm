@@ -29,6 +29,7 @@ void traceClose(void);
 void traceCharmClose(void);          /* close trace in ck */
 void traceBegin(void);
 void traceEnd(void);
+int traceIsOn(void);			/* return if trace is on */
 void traceWriteSts(void);
 
 #ifndef CMK_OPTIMIZE
