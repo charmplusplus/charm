@@ -2411,7 +2411,7 @@ void Entry::genPythonDecls(XStr& str) {
       die("A python entry method must accept only one parameter of type `int`");
     }
 
-    str << "static PyObject *_Python_"<<container->baseName()<<"_"<<name<<"(PyObject *self, PyObject *arg);\n";
+    str << "PyObject *_Python_"<<container->baseName()<<"_"<<name<<"(PyObject *self, PyObject *arg);\n";
   }
 }
 
