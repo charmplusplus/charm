@@ -179,11 +179,6 @@ public:
 	FEM_Mesh_list() :super(FEM_MESH_FIRST) { }
 	
 	virtual void bad(int l,int bad_code,const char *caller) const;
-	
-	int put(FEM_Mesh *m) {
-		m->registerIDXL(IDXL_Chunk::get("FEM_Mesh_list"));
-		return super::put(m);
-	}
 };
 
 #define CHK(p) do{if((p)==0)CkAbort("FEM>Memory Allocation failure.");}while(0)

@@ -132,7 +132,6 @@ FEM_Mesh_allocate(void) /* build new mesh */
 	FEMchunk *c=FEMchunk::get(caller);
 	FEM_Mesh *m=new FEM_Mesh;
 	m->becomeSetting();
-	m->registerIDXL(IDXL_Chunk::get(caller));
 	return c->meshes.put(m);
 }
 FORTRAN_AS_C_RETURN(int,

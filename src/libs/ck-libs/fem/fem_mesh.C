@@ -15,12 +15,12 @@ FEM Implementation file: mesh creation and user-data manipulation.
 FEM_Comm_Holder::FEM_Comm_Holder(FEM_Comm *sendComm, FEM_Comm *recvComm)
 	:comm(sendComm,recvComm)
 {
-	owner=NULL; 
+	registered=false;
 	idx=-1; 
 }
 void FEM_Comm_Holder::registerIdx(IDXL_Chunk *c) {
-	assert(owner==NULL);
-	owner=c;
+	assert(!registered);
+	IDXL_Chunk *owner=c;
 	if (idx!=-1) // had an old index: try to get it back
 		idx=owner->addStatic(&comm,idx);
 	else //No old index:
@@ -28,12 +28,20 @@ void FEM_Comm_Holder::registerIdx(IDXL_Chunk *c) {
 }
 void FEM_Comm_Holder::pup(PUP::er &p) {
 	p|idx;
-	// if idx!=-1, better hope a "registerIDXL" call is on the way
+	if (p.isUnpacking() && idx!=1) 
+	{ // Try to grab the same index we had on our old processor:
+		registerIdx(IDXL_Chunk::get("FEM_Comm_Holder::pup"));
+	}
 }
 
 FEM_Comm_Holder::~FEM_Comm_Holder(void)
 {
-	if (owner) owner->destroy(idx,"FEM_Comm_Holder::~FEM_Comm_Holder"); 
+	if (registered) 
+	{ // Try to unregister from IDXL:
+		const char *caller="FEM_Comm_Holder::~FEM_Comm_Holder";
+		IDXL_Chunk *owner=IDXL_Chunk::getNULL();
+		if (owner) owner->destroy(idx,caller); 
+	}
 }
 
 /******* FEM_Mesh API ******/
@@ -762,9 +770,6 @@ void FEM_Entity::pup(PUP::er &p) {
 		ghost->pup(p);
 	}
 }
-void FEM_Entity::registerIDXL(IDXL_Chunk *c) {
-	ghostIDXL.registerIDXL(c);
-}
 FEM_Entity::~FEM_Entity() 
 {
 	delete ghost;
@@ -928,10 +933,6 @@ void FEM_Node::pup(PUP::er &p) {
 	shared.pup(p);
 	p.comment(" shared nodes IDXL ");
 	sharedIDXL.pup(p);
-}
-void FEM_Node::registerIDXL(IDXL_Chunk *c) {
-	super::registerIDXL(c);
-	sharedIDXL.registerIDXL(c);
 }
 FEM_Node::~FEM_Node() {
 }
@@ -1120,13 +1121,6 @@ void FEM_Mesh::pup(PUP::er &p)  //For migration
    be sure to add new stuff at the *end* of this routine--
    it will be read as zeros for old files. */
 }
-
-void FEM_Mesh::registerIDXL(IDXL_Chunk *c) {
-	node.registerIDXL(c);
-	elem.registerIDXL(c);
-	sparse.registerIDXL(c);
-}
-
 
 int FEM_Mesh::chkET(int elType) const {
 	if ((elType<0)||(elType>=elem.size())) {

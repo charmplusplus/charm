@@ -26,11 +26,12 @@ class IDXL_Chunk;
 
 /// We want the FEM_Comm/IDXL_Side's to be accessible to *both* 
 ///  FEM routines (via these data structures) and IDXL routines
-///  (via an idxl->addStatic registration).  Hence this class.
+///  (via an idxl->addStatic registration).  Hence this class, which
+///  manages IDXL's view of FEM's data structures.
 class FEM_Comm_Holder {
 	IDXL comm; //Our communication lists.
-	IDXL_Chunk *owner; //The chunk we're registered with, or NULL if there's no chunk.
-	IDXL_Comm_t idx; //Our index in owner's list, or -1 if we're unregistered
+	bool registered; //We're registered with IDXL
+	IDXL_Comm_t idx; //Our IDXL index, or -1 if we're unregistered
 	void registerIdx(IDXL_Chunk *c);
 public:
 	FEM_Comm_Holder(FEM_Comm *sendComm, FEM_Comm *recvComm);
@@ -41,11 +42,6 @@ public:
 	inline IDXL_Comm_t getIndex(IDXL_Chunk *c) {
 		if (idx==-1) registerIdx(c);
 		return idx;
-	}
-	
-	/// Register ourselves with this owner IF we were previously registered
-	void registerIDXL(IDXL_Chunk *c) {
-		if (owner==NULL && idx!=-1) registerIdx(c);
 	}
 };
 
@@ -614,7 +610,6 @@ public:
 	}
 	const FEM_Comm &getGhostRecv(void) const { return ghost->ghostRecv; }
 	FEM_Comm_Holder ghostIDXL; //IDXL interface
-	virtual void registerIDXL(IDXL_Chunk *c);
 	
 	void print(const char *type,const IDXL_Print_Map &map);
 };
@@ -643,7 +638,6 @@ protected:
 public:
 	FEM_Comm shared; //Shared nodes
 	FEM_Comm_Holder sharedIDXL; //IDXL interface to shared nodes
-	virtual void registerIDXL(IDXL_Chunk *c);
 	
 	FEM_Node(FEM_Node *ghost_);
 	void pup(PUP::er &p);
@@ -841,10 +835,6 @@ public:
 			if (types[i]) delete types[i];
 	}
 	
-	void registerIDXL(IDXL_Chunk *c) {
-		for (int i=0;i<size();i++) if (has(i)) types[i]->registerIDXL(c);
-	}
-	
 	/// Return the number of different entity types
 	inline int size(void) const {return types.size();}
 	
@@ -897,7 +887,6 @@ class FEM_Mesh : public CkNoncopyable {
 public:
 	FEM_Mesh();
 	void pup(PUP::er &p); //For migration
-	void registerIDXL(IDXL_Chunk *c);
 	~FEM_Mesh();
 	
 	/// The nodes in this mesh:
