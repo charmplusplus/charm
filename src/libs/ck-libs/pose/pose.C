@@ -12,6 +12,7 @@ double sim_timer;
 int POSE_inactDetect;
 POSE_TimeType POSE_endtime;
 POSE_TimeType POSE_GlobalClock;
+POSE_TimeType POSE_GlobalTS;
 ComlibInstanceHandle POSE_commlib_insthndl;
 
 // Main initialization for all of POSE
@@ -95,6 +96,7 @@ void POSE_init(int IDflag, int ET) // can specify both
   int fnIdx = CkIndex_pose::stop();
   CkStartQD(fnIdx, &POSE_Coordinator_ID);
   POSE_GlobalClock = 0;
+  POSE_GlobalTS = 0;
 #endif  
   CkPrintf("POSE initialization complete.\n");
   if (POSE_inactDetect) CkPrintf("Using Inactivity Detection for termination.\n");

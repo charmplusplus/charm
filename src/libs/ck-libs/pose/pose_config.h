@@ -37,7 +37,7 @@
 #include <StreamingStrategy.h>
 #include <MeshStreamingStrategy.h>
 #include <PrioStreaming.h>
-#define COMM_TIMEOUT 2
+#define COMM_TIMEOUT 1
 #define COMM_MAXMSG 20
 
 /// Synchronization strategy constants

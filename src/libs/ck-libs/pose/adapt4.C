@@ -9,7 +9,13 @@ void adapt4::Step()
   int itersAllowed, iter=0, offset=-1;
   double critStart;
 
-  itersAllowed = specEventCount * specTol;
+  rbFlag = 0;
+  if (!parent->cancels.IsEmpty()) CancelUnexecutedEvents();
+  if (eq->RBevent) Rollback();
+  if (!parent->cancels.IsEmpty()) CancelEvents();
+  parent->Status();
+
+  itersAllowed = (int)((double)specEventCount * specTol);
   itersAllowed -= specEventCount - eventCount;
   if (itersAllowed < 1) itersAllowed = 1;
   
@@ -24,7 +30,7 @@ void adapt4::Step()
   ev = eq->currentPtr;
   //  CkPrintf("offset=%d timeLeash=%d avgRBoffset=%d specEventCount=%d eventCount=%d\n", offset, timeLeash, avgRBoffset, specEventCount, eventCount);
   while ((ev->timestamp > POSE_UnsetTS) && (ev->timestamp <= offset) &&
-	 (itersAllowed > 0))) { 
+	 (itersAllowed > 0)) { 
 #ifdef MEM_COARSE
     // note: first part of check below ensures we don't deadlock:
     //       can't advance gvt if we don't execute events with timestamp > gvt

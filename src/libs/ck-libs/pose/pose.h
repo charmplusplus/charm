@@ -84,6 +84,7 @@ extern int POSE_inactDetect;
 
 /// Global clock (for sequential simulation)
 extern POSE_TimeType POSE_GlobalClock;
+extern POSE_TimeType POSE_GlobalTS;
 
 /// For getting access to the commlib strategy
 extern ComlibInstanceHandle POSE_commlib_insthndl;
