@@ -1,0 +1,9 @@
+Hello World in Charm with a dynamic code creation and execution.
+
+Demonstrates basic CkCpp DLL use.  The basic hello world program
+source code is passed to the interpreter compiled and executed within
+the array1d hello.
+
+
+
+

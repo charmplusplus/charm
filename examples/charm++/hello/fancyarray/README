@@ -1,0 +1,7 @@
+Hello World in Charm with custom index Chare array.
+
+Demonstrates basic chare array creation and use with a custom array
+index.  The Hi message is passed along the array from 0th to Nth.
+Illustrates output nondeterminism as an interesting side effect.
+
+
