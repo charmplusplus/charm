@@ -72,7 +72,7 @@ CpvExtern(int,    CcdNumChecks) ;
 CpvDeclare(void*, CsdSchedQueue);
 #if CMK_NODE_QUEUE_AVAILABLE
 CsvDeclare(void*, CsdNodeQueue);
-CsvDeclare(CmiNodeLock, NodeQueueLock);
+CsvDeclare(CmiNodeLock, CsdNodeQueueLock);
 #endif
 CpvDeclare(int,   CsdStopFlag);
 
@@ -1571,14 +1571,14 @@ int CsdScheduler(int maxmsgs)
       if (msg==0) FIFO_DeQueue(localqueue, (void **)&msg);
 #if CMK_NODE_QUEUE_AVAILABLE
       if (msg==0) {
-	CmiLock(CsvAccess(NodeQueueLock));
       	msg = CmiGetNonLocalNodeQ();
+	CmiLock(CsvAccess(CsdNodeQueueLock));
 	if (msg==0 && 
             !CqsPrioGT(CqsGetPriority(CsvAccess(CsdNodeQueue)), 
                        CqsGetPriority(CpvAccess(CsdSchedQueue)))) {
 	  CqsDequeue(CsvAccess(CsdNodeQueue),&msg);
 	}
-	CmiUnlock(CsvAccess(NodeQueueLock));
+	CmiUnlock(CsvAccess(CsdNodeQueueLock));
       }
 #endif
       if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
@@ -1624,14 +1624,14 @@ int CsdScheduler(int maxmsgs)
     if (msg==0) FIFO_DeQueue(localqueue, (void**)&msg);
 #if CMK_NODE_QUEUE_AVAILABLE
     if (msg==0) {
-      CmiLock(CsvAccess(NodeQueueLock));
       msg = CmiGetNonLocalNodeQ();
+      CmiLock(CsvAccess(CsdNodeQueueLock));
       if (msg==0 && 
             !CqsPrioGT(CqsGetPriority(CsvAccess(CsdNodeQueue)), 
                        CqsGetPriority(CpvAccess(CsdSchedQueue)))) {
 	  CqsDequeue(CsvAccess(CsdNodeQueue),&msg);
       }
-      CmiUnlock(CsvAccess(NodeQueueLock));
+      CmiUnlock(CsvAccess(CsdNodeQueueLock));
     }
 
 #endif
@@ -1821,10 +1821,6 @@ void CsdInit(argv)
 
   CpvInitialize(int,   disable_sys_msgs);
   CpvInitialize(void*, CsdSchedQueue);
-#if CMK_NODE_QUEUE_AVAILABLE
-  CsvInitialize(void*, CsdNodeQueue);
-  CsvInitialize(CmiNodeLock, NodeQueueLock);
-#endif
   CpvInitialize(int,   CsdStopFlag);
   CpvInitialize(int,   CsdStopNotifyFlag);
   CpvInitialize(int,   CsdIdleDetectedFlag);
@@ -1835,8 +1831,10 @@ void CsdInit(argv)
   CpvAccess(CsdSchedQueue) = CqsCreate();
 
 #if CMK_NODE_QUEUE_AVAILABLE
+  CsvInitialize(CmiLock, CsdNodeQueueLock);
+  CsvInitialize(void*, CsdNodeQueue);
   if (CmiMyRank() ==0) {
-	CsvAccess(NodeQueueLock) = CmiCreateLock();
+	CsvAccess(CsdNodeQueueLock) = CmiCreateLock();
 	CsvAccess(CsdNodeQueue) = CqsCreate();
   }
   CmiNodeBarrier();

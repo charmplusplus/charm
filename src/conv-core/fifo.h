@@ -27,7 +27,7 @@ void FIFO_Enumerate(FIFO_QUEUE *queue, void ***element);
 void FIFO_Destroy(FIFO_QUEUE *queue);
 
 #ifdef __cplusplus
-};
+}
 #endif
 
 #endif

@@ -660,6 +660,13 @@ PCQueue PCQueueCreate()
   return Q;
 }
 
+int PCQueueEmpty(PCQueue Q)
+{
+  CircQueue circ = Q->head;
+  char *data = circ->data[circ->pull];
+  return (data == 0);
+}
+
 char *PCQueuePop(PCQueue Q)
 {
   CircQueue circ; int pull; char *data;
@@ -910,6 +917,7 @@ typedef struct CmiStateStruct
 *CmiState;
 
 #if CMK_NODE_QUEUE_AVAILABLE
+CsvStaticDeclare(CmiNodeLock, CmiNodeRecvLock);
 CsvStaticDeclare(PCQueue, NodeRecv);
 #endif
 
@@ -920,8 +928,10 @@ void CmiStateInit(int pe, int rank, CmiState state)
   state->recv = PCQueueCreate();
   state->localqueue = FIFO_Create();
 #if CMK_NODE_QUEUE_AVAILABLE
+  CsvInitialize(CmiNodeLock, CmiNodeRecvLock);
+  CsvInitialize(PCQueue, NodeRecv);
   if (rank==0) {
-    CsvInitialize(PCQueue, NodeRecv);
+    CsvAccess(CmiNodeRecvLock) = CmiCreateLock();
     CsvAccess(NodeRecv) = PCQueueCreate();
   }
 #endif
@@ -2618,8 +2628,13 @@ static void CommunicationServer()
 char *CmiGetNonLocalNodeQ()
 {
   CmiState cs = CmiGetState();
-  void *result = PCQueuePop(CsvAccess(NodeRecv));
-  return (char *) result;
+  char *result = 0;
+  if(!PCQueueEmpty(CsvAccess(NodeRecv))) {
+    CmiLock(CsvAccess(CmiNodeRecvLock));
+    result = (char *) PCQueuePop(CsvAccess(NodeRecv));
+    CmiUnlock(CsvAccess(CmiNodeRecvLock));
+  }
+  return result;
 }
 #endif
 

@@ -357,7 +357,7 @@ CpvExtern(int,         CmiHandlerMax);
 CpvExtern(void*,       CsdSchedQueue);
 #if CMK_NODE_QUEUE_AVAILABLE
 CsvExtern(void*,       CsdNodeQueue);
-CsvExtern(CmiNodeLock, NodeQueueLock);
+CsvExtern(CmiNodeLock, CsdNodeQueueLock);
 #endif
 CpvExtern(int,         CsdStopFlag);
 CpvExtern(CmiHandler,  CsdNotifyIdle);
@@ -438,23 +438,24 @@ double   CmiCpuTimer();
 #if CMK_NODE_QUEUE_AVAILABLE
 
 #define CsdNodeEnqueueGeneral(x,s,i,p) { \
-          CmiLock(CsvAccess(NodeQueueLock));\
+          CmiLock(CsvAccess(CsdNodeQueueLock));\
           CqsEnqueueGeneral(CsvAccess(CsdNodeQueue),(x),(s),(i),(p)); \
-          CmiUnlock(CsvAccess(NodeQueueLock)); \
+          CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         }
 #define CsdNodeEnqueueFifo(x)     { \
-          CmiLock(CsvAccess(NodeQueueLock));\
+          CmiLock(CsvAccess(CsdNodeQueueLock));\
           CqsEnqueueFifo(CsvAccess(CsdNodeQueue),(x)); \
-          CmiUnlock(CsvAccess(NodeQueueLock)); \
+          CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         }
 #define CsdNodeEnqueueLifo(x)     { \
+          CmiLock(CsvAccess(CsdNodeQueueLock));\
           CqsEnqueueLifo(CsvAccess(CsdNodeQueue),(x))); \
-          CmiUnlock(CsvAccess(NodeQueueLock)); \
+          CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         }
 #define CsdNodeEnqueue(x)     { \
-          CmiLock(CsvAccess(NodeQueueLock));\
+          CmiLock(CsvAccess(CsdNodeQueueLock));\
           CqsEnqueueFifo(CsvAccess(CsdNodeQueue),(x));\
-          CmiUnlock(CsvAccess(NodeQueueLock)); \
+          CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         }
 
 #define CsdNodeEmpty()            (CqsEmpty(CpvAccess(CsdNodeQueue)))
