@@ -160,13 +160,13 @@ Debug() {
     then
 	echo 
 	echo "------- Charmc Debugging info: $* -------"
-#	echo "CHARMBIN=$CHARMBIN"
-#	echo "CHARMINC=$CHARMINC"
-#	echo "CHARMLIB=$CHARMLIB"
-#	echo "FILES=$FILES"
-#	echo "DELETE=$DELETE"
-#	echo "OBJECT=$OBJECT"
-#	echo "LANGUAGE=$LANGUAGE"
+	echo "CHARMBIN=$CHARMBIN"
+	echo "CHARMINC=$CHARMINC"
+	echo "CHARMLIB=$CHARMLIB"
+	echo "FILES=$FILES"
+	echo "DELETE=$DELETE"
+	echo "OBJECT=$OBJECT"
+	echo "LANGUAGE=$LANGUAGE"
 #	echo "Working directory="`pwd`
     fi
 }
@@ -415,8 +415,7 @@ if [ -z "$CHARMBIN" ]
 then
 	SCRIPT=$0
 	CHARMBIN=`dirname $SCRIPT`
-	cd $CHARMBIN
-	CHARMBIN=`pwd`
+#	CHARMBIN=`cd $CHARMBIN; pwd`
 # NOTE: this script no longer tries to follow soft links
 # to find the "original" charmc-- if this is bad, 
 # translate these lines to Bourne shell from C shell:
@@ -450,29 +449,8 @@ then
 	PROG_EXT=".exe"
 fi
 
-if [ -n "$MACHTYPE" ]
-then
-    if [ -d $CHARMBIN/../../$MACHTYPE/bin ]
-    then
-		cd $CHARMBIN/../../$MACHTYPE/bin
-		CHARMBIN=`pwd`
-    else
-        Abort "there is no installed charm for $MACHTYPE in $CHARMBIN"
-    fi
-fi
-
-if [ -z "$CHARMLIB" ]
-then
-	cd $CHARMBIN/../lib
-	CHARMLIB=`pwd`
-fi
-if [ -z "$CHARMINC" ]
-then
-	cd $CHARMBIN/../include
-	CHARMINC=`pwd`
-fi
-
-cd $ORIGDIR
+CHARMLIB="$CHARMBIN/../lib"
+CHARMINC="$CHARMBIN/../include"
 
 ##############################################################################
 #
