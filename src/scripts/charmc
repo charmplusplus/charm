@@ -967,7 +967,11 @@ case "$OBJECT" in
 	;;
 *.so|*.sl)
 # Make shared library
-	if [ "$MAKELIBCHARM" = 0 -a "$CHARM_SHARED" = "0" ]
+	# if no build share is set, exit normally.
+	if [ "$BUILD_SHARE" = 0 ]
+	then
+		End 0
+	elif [ "$MAKELIBCHARM" = 0 -a "$CHARM_SHARED" = "0" ]
 	then
 	  	MakeSO
 	fi
