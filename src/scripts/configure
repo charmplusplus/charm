@@ -995,50 +995,20 @@ fi
 ################## Fortran #########################
 
 ### test fortran subroutine name ###
-FCC=`echo $CMK_CF90 | cut -d' ' -f1`
+cat > conftest.f90 <<EOF
+      SUBROUTINE FOO_foo
+      END
+EOF
 
-# Extract the first word of ""$FCC"", so it can be a program name with args.
-set dummy "$FCC"; ac_word=$2
-echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1004: checking for $ac_word" >&5
-if eval "test \"`echo '$''{'ac_cv_prog_FCL'+set}'`\" = set"; then
-  echo $ac_n "(cached) $ac_c" 1>&6
-else
-  if test -n "$FCL"; then
-  ac_cv_prog_FCL="$FCL" # Let the user override the test.
-else
-  IFS="${IFS= 	}"; ac_save_ifs="$IFS"; IFS=":"
-  ac_dummy="$PATH"
-  for ac_dir in $ac_dummy; do
-    test -z "$ac_dir" && ac_dir=.
-    if test -f $ac_dir/$ac_word; then
-      ac_cv_prog_FCL=""$FCC" "
-      break
-    fi
-  done
-  IFS="$ac_save_ifs"
-fi
-fi
-FCL="$ac_cv_prog_FCL"
-if test -n "$FCL"; then
-  echo "$ac_t""$FCL" 1>&6
-else
-  echo "$ac_t""no" 1>&6
-fi
+echo $ac_n "checking subroutine name used by Fortran compiler""... $ac_c" 1>&6
+echo "configure:1005: checking subroutine name used by Fortran compiler" >&5
+$CMK_CF90 -c conftest.f90 > /dev/null 2> /dev/null
 
-if test -n "$FCL"
+if test -r conftest.o
 then
-  echo $ac_n "checking subroutine name used by Fortran compiler""... $ac_c" 1>&6
-echo "configure:1033: checking subroutine name used by Fortran compiler" >&5
   if eval "test \"`echo '$''{'fortran_postfix'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
-  cat > conftest.f <<EOF
-      SUBROUTINE FOO_FOO
-      END
-EOF
-  $CMK_CF90 -c conftest.f > /dev/null 2> /dev/null
-
   NAME=`nm conftest.o | grep "foo_foo__"`
   if test "$NAME" != ""
   then
@@ -1100,7 +1070,7 @@ case $version in
     # Extract the first word of "wget", so it can be a program name with args.
 set dummy wget; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1104: checking for $ac_word" >&5
+echo "configure:1074: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_WGET'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1129,7 +1099,7 @@ fi
     # Extract the first word of "lynx", so it can be a program name with args.
 set dummy lynx; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1133: checking for $ac_word" >&5
+echo "configure:1103: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_LYNX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1158,7 +1128,7 @@ fi
     # Extract the first word of "telnet", so it can be a program name with args.
 set dummy telnet; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1162: checking for $ac_word" >&5
+echo "configure:1132: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_TELNET'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1187,7 +1157,7 @@ fi
     # Extract the first word of "uudecode", so it can be a program name with args.
 set dummy uudecode; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1191: checking for $ac_word" >&5
+echo "configure:1161: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_UUDECODE'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1403,7 +1373,6 @@ s%@includedir@%$includedir%g
 s%@oldincludedir@%$oldincludedir%g
 s%@infodir@%$infodir%g
 s%@mandir@%$mandir%g
-s%@FCL@%$FCL%g
 s%@WGET@%$WGET%g
 s%@LYNX@%$LYNX%g
 s%@TELNET@%$TELNET%g

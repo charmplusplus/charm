@@ -396,18 +396,17 @@ fi
 ################## Fortran #########################
 
 ### test fortran subroutine name ###
-FCC=`echo $CMK_CF90 | cut -d' ' -f1`
-
-AC_CHECK_PROG(FCL, "$FCC", "$FCC" )
-if test -n "$FCL"
-then
-  AC_MSG_CHECKING(subroutine name used by Fortran compiler)
-  AC_CACHE_VAL(fortran_postfix,
-  cat > conftest.f <<EOF
-      SUBROUTINE FOO_FOO
+cat > conftest.f90 <<EOF
+      SUBROUTINE FOO_foo
       END
 EOF
-  $CMK_CF90 -c conftest.f > /dev/null 2> /dev/null
+
+AC_MSG_CHECKING(subroutine name used by Fortran compiler)
+$CMK_CF90 -c conftest.f90 > /dev/null 2> /dev/null
+
+if test -r conftest.o
+then
+  AC_CACHE_VAL(fortran_postfix,
 
   NAME=`nm conftest.o | grep "foo_foo__"`
   if test "$NAME" != ""
