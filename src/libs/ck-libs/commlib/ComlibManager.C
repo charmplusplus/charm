@@ -1,14 +1,15 @@
-//#include "ck.h"
-//#include "ckarray.h"
 #include "ComlibManager.h"
 
 CpvDeclare(int, RecvmsgHandle);
 CpvDeclare(int, RecvdummyHandle);
 
-//CpvDeclare(int, AllDoneHandle);
-
 CkGroupID cmgrID;
 extern CkGroupID delegateMgr;
+
+#ifdef CHARM_MPI
+MPI_Comm groupComm;
+MPI_Group group, groupWorld;
+#endif
 
 void recv_msg(void *msg){
 
@@ -35,7 +36,7 @@ ComlibManager::ComlibManager(int s){
     init(s, 0, 1000000, 5000000);
 }
 
-//s = Strategy (0 = tree, 1 = mesh, 2 = hypercube) 
+//s = Strategy (0 = tree, 1 = tree, 2 = mesh, 3 = hypercube) 
 ComlibManager::ComlibManager(int s, int n){
     init(s, n, 1000000, 5000000);
 }
@@ -53,7 +54,7 @@ void ComlibManager::init(int s, int n, int nmFlush, int bFlush){
     
     //comm_debug = 1;
 
-    npes = 0;
+    npes = CkNumPes();
     pelist = NULL;
 
     cmgrID = thisgroup;
@@ -121,8 +122,14 @@ void ComlibManager::done(){
       if(createDone){
         CProxy_ComlibManager cgproxy(cmgrID);
 
-        if(npes != 0)
-            cgproxy.receiveID(npes, pelist, comid);
+        if(npes != CkNumPes()) {
+	    ComlibPrintf("Calling receive id\n");
+	    //#ifdef CHARM_MPI
+	    //cgproxy.receiveID(npes, pelist, comid, groupComm);
+	    //#else
+	    cgproxy.receiveID(npes, pelist, comid);
+	    //#endif
+	}
         else
             cgproxy.receiveID(comid);
       }
@@ -131,39 +138,40 @@ void ComlibManager::done(){
 }
 
 void ComlibManager::createId(){
-  comid = ComlibInstance(strategy, CkNumPes());
-
-  if(doneReceived){
-    CProxy_ComlibManager cgproxy(cmgrID);
-    //    cgproxy.receiveID(npes, pelist, comid);
-    if(npes != 0)
-        cgproxy.receiveID(npes, pelist, comid);
-    else
-        cgproxy.receiveID(comid);
-  }
-  createDone = 1;
+    if(strategy < USE_GRID) {
+	comid = ComlibInstance(strategy, CkNumPes());
+    }
+    
+    if(doneReceived){
+      
+	CProxy_ComlibManager cgproxy(cmgrID);
+	cgproxy.receiveID(comid);
+    }
+    createDone = 1;
 }
 
 void ComlibManager::createId(int *pelist, int npes){
-    comid = ComlibInstance(strategy, npes);
-    comid = ComlibEstablishGroup(comid, npes, pelist);
+    if(strategy < USE_GRID) {
+	comid = ComlibInstance(strategy, npes);
+	comid = ComlibEstablishGroup(comid, npes, pelist);
+    }
 
     this->pelist = pelist;
     this->npes = npes;
 
-    ComlibPrintf("Creating comid with %d processors\n", npes);
-
+    ComlibPrintf("[%d]Creating comid with %d processors\n", CkMyPe(), npes);
+    
     if(doneReceived){
-      CProxy_ComlibManager cgproxy(cmgrID);
-      //      cgproxy.receiveID(npes, pelist, comid);
-      if(npes != 0)
-          cgproxy.receiveID(npes, pelist, comid);
-      else
-          cgproxy.receiveID(comid);
+	ComlibPrintf("Calling receive id\n");
+	CProxy_ComlibManager cgproxy(cmgrID);
+	
+	//#ifdef CHARM_MPI
+	//cgproxy.receiveID(npes, pelist, comid, groupComm);
+	//#else
+	cgproxy.receiveID(npes, pelist, comid);
+	//#endif
     }
     createDone = 1;
-    
-    //    setReverseMap(pelist, npes);
 }
 
 void ComlibManager::setReverseMap(int *pelist, int npes){
@@ -171,8 +179,13 @@ void ComlibManager::setReverseMap(int *pelist, int npes){
     for(int pcount = 0; pcount < CkNumPes(); pcount++)
         procMap[pcount] = -1;
     
-    for(int pcount = 0; pcount < npes; pcount++)
+    for(int pcount = 0; pcount < npes; pcount++) 
         procMap[pelist[pcount]] = pcount;
+
+    //for(int pcount = 0; pcount < CkNumPes(); pcount++) 
+    //if(procMap[pcount] != -1)
+    //    ComlibPrintf("(%d, %d), ", pcount, procMap[pcount]);
+    //ComlibPrintf("\n");
 }
 
 void ComlibManager::localElement(){
@@ -212,31 +225,9 @@ void ComlibManager::endIteration(){
         }
         
         if(idSet) {	    
-            
-            if(strategy != NAMD_STRAT) {
-                
-                ComlibPrintf("%d:Setting Num Deposit to %d\n", CkMyPe(), messageCount);
-                NumDeposits(comid, messageCount);
-                
-                CharmMessageHolder *cmsg = messageBuf;
-                for(count = 0; count < messageCount; count ++) {
-                    if(strategy != USE_DIRECT) {
-                        char * msg = cmsg->getCharmMessage();
-                        ComlibPrintf("Calling EachToMany %d %d %d procMap=%d\n", 
-                                     UsrToEnv(msg)->getTotalsize(), CkMyPe(), cmsg->dest_proc,
-                                     procMap[cmsg->dest_proc]);
-                        EachToManyMulticast(comid, UsrToEnv(msg)->getTotalsize(), UsrToEnv(msg), 
-                                            1, &procMap[cmsg->dest_proc]);
-                    }
-                    CharmMessageHolder *prev = cmsg;
-                    cmsg = cmsg->next;
-                    if(prev != NULL)
-                        delete prev;                //foobar getrid of the delete
-                    
-                }
-            }
-            else{
-                // In the Namd Strategy half the messages are sent to a remote 
+            if(strategy == NAMD_STRAT) {
+		/*
+		// In the Namd Strategy half the messages are sent to a remote 
                 //processor and the remaining half are sent directly.
                 
                 CharmMessageHolder *cmsg = messageBuf;
@@ -265,7 +256,92 @@ void ComlibManager::endIteration(){
                 }
                 
                 CProxy_ComlibManager cmgr(thisgroup);
-                cmgr[/*yet to decide*/0].receiveNamdMessage(newmsg);
+                cmgr[0].receiveNamdMessage(newmsg); // yet to decide!
+		*/
+	    }
+	    else if(strategy == USE_MPI){
+#ifdef CHARM_MPI
+		
+		ComlibPrintf("[%d] In MPI strategy\n", CkMyPe());
+		
+		CharmMessageHolder *cmsg = messageBuf;
+		char *buf_ptr = mpi_sndbuf;
+
+		//if(npes == 0)
+		//  npes = CkNumPes();
+
+		for(count = 0; count < npes; count ++) {
+		    ((int *)buf_ptr)[0] = 0;
+		    buf_ptr += MPI_MAX_MSG_SIZE;
+		}
+
+		buf_ptr = mpi_sndbuf;
+                for(count = 0; count < messageCount; count ++) {
+		    if(npes < CkNumPes()) {
+			ComlibPrintf("[%d] Copying data to %d and rank %d\n", cmsg->dest_proc, 
+				     procMap[cmsg->dest_proc]);
+			buf_ptr = mpi_sndbuf + MPI_MAX_MSG_SIZE * procMap[cmsg->dest_proc];  
+		    }
+		    else
+			buf_ptr = mpi_sndbuf + MPI_MAX_MSG_SIZE * cmsg->dest_proc; 
+		    
+		    char * msg = cmsg->getCharmMessage();
+		    envelope * env = UsrToEnv(msg);
+		    
+		    ((int *)buf_ptr)[0] = env->getTotalsize();
+
+		    ComlibPrintf("[%d] Copying message\n", CkMyPe());
+		    memcpy(buf_ptr + sizeof(int), (char *)env, env->getTotalsize());
+
+		    ComlibPrintf("[%d] Deleting message\n", CkMyPe());
+		    CmiFree((char *) env);
+		    CharmMessageHolder *prev = cmsg;
+		    cmsg = cmsg->next;
+		    delete prev;
+		}
+
+		//ComlibPrintf("[%d] Calling Barrier\n", CkMyPe());
+		//PMPI_Barrier(groupComm);
+		
+		ComlibPrintf("[%d] Calling All to all\n", CkMyPe());
+		PMPI_Alltoall(mpi_sndbuf, MPI_MAX_MSG_SIZE, MPI_CHAR, mpi_recvbuf, 
+			     MPI_MAX_MSG_SIZE, MPI_CHAR, groupComm);
+		
+		ComlibPrintf("[%d] All to all finished\n", CkMyPe());
+		buf_ptr = mpi_recvbuf;
+		for(count = 0; count < npes; count ++) {
+		    int recv_msg_size = ((int *)buf_ptr)[0];
+		    char * recv_msg = buf_ptr + sizeof(int);
+		    
+		    if((recv_msg_size > 0) && recv_msg_size < MPI_MAX_MSG_SIZE) {
+			ComlibPrintf("[%d] Receiving message of size %d\n", CkMyPe(), recv_msg_size);
+			CmiSyncSend(CmiMyPe(), recv_msg_size, recv_msg);
+		    }
+		    buf_ptr += MPI_MAX_MSG_SIZE;
+		}
+#endif
+	    }
+	    else{
+                ComlibPrintf("%d:Setting Num Deposit to %d\n", CkMyPe(), messageCount);
+                NumDeposits(comid, messageCount);
+                
+                CharmMessageHolder *cmsg = messageBuf;
+                for(count = 0; count < messageCount; count ++) {
+                    if(strategy != USE_DIRECT) {
+                        char * msg = cmsg->getCharmMessage();
+                        ComlibPrintf("Calling EachToMany %d %d %d procMap=%d\n", 
+                                     UsrToEnv(msg)->getTotalsize(), CkMyPe(), 
+				     cmsg->dest_proc, procMap[cmsg->dest_proc]);
+                        EachToManyMulticast(comid, UsrToEnv(msg)->getTotalsize(), 
+					    UsrToEnv(msg), 1, 
+					    &procMap[cmsg->dest_proc]);
+                    }
+                    CharmMessageHolder *prev = cmsg;
+                    cmsg = cmsg->next;
+                    if(prev != NULL)
+                        delete prev;                //foobar getrid of the delete
+                    
+                }
             }
             messageCount = 0;
         }
@@ -273,63 +349,58 @@ void ComlibManager::endIteration(){
     }
 }
 
+
 void ComlibManager::receiveID(comID id){
-    receiveID(0, NULL, id);
+    //#ifdef CHARM_MPI
+    //receiveID(CkNumPes(), NULL, id, MPI_COMM_WORLD);
+    //#else
+    receiveID(CkNumPes(), NULL, id);
+    //#endif
 }
 
 void ComlibManager::receiveID(int npes, int *pelist, comID id){
-    
-    //    ComlibPrintf("received id in %d\n", CkMyPe());
-    
+
+    this->npes = npes;
+    this->pelist = pelist;
+
+#ifdef CHARM_MPI
+    if(npes < CkNumPes()){
+        PMPI_Comm_group(MPI_COMM_WORLD, &groupWorld);
+	PMPI_Group_incl(groupWorld, npes, pelist, &group);
+	PMPI_Comm_create(MPI_COMM_WORLD, group, &groupComm);
+    }
+    else groupComm = MPI_COMM_WORLD;
+#endif
+
+    ComlibPrintf("received id in %d, npes = %d\n", CkMyPe(), npes);
+    int count = 0;
+
     if(idSet)
         return;
 
-    if(npes != 0)
-        setReverseMap(pelist, npes);
+    if(npes != CkNumPes())
+	setReverseMap(pelist, npes);
 
     comid = id; 
     idSet = 1;
 
     if(iterationFinished){
 
-        if(strategy != NAMD_STRAT) {
-
-            NumDeposits(comid, messageCount);
-            ComlibPrintf("Setting Num Deposit to %d\n", messageCount);
-            
-            CharmMessageHolder *cmsg = messageBuf;
-            for(int count = 0; count < messageCount; count ++) {
-                if(strategy != USE_DIRECT) {
-                    char * msg = cmsg->getCharmMessage();
-
-                    ComlibPrintf("Calling EachToMany %d %d %d procMap=%d\n", 
-                                 UsrToEnv(msg)->getTotalsize(), CkMyPe(), cmsg->dest_proc,
-                                 procMap[cmsg->dest_proc]);
-
-                    EachToManyMulticast(comid, UsrToEnv(msg)->getTotalsize(), UsrToEnv(msg), 
-                                        1, &procMap[cmsg->dest_proc]);
-                }
-                CharmMessageHolder *prev = cmsg;
-                cmsg = cmsg->next;
-                if(prev != NULL)
-                    delete prev;                //foobar getrid of the delete
-            }
-        }
-        else {
-            // In the Namd Strategy half the messages are sent to a remote 
-            //processor and the remaining half are sent directly.
+        if(strategy == NAMD_STRAT) {
+	  // In the Namd Strategy half the messages are sent to a remote 
+	  //processor and the remaining half are sent directly.
 
             CharmMessageHolder *cmsg = messageBuf;
             envelope *env = (envelope *)cmsg->data;
-            for(int count = 0; count < messageCount/2; count ++) {
-                CkSendMsgBranch(env->getEpIdx(), cmsg->getCharmMessage(), cmsg->dest_proc, 
-                                env->getGroupNum());
+            for(count = 0; count < messageCount/2; count ++) {
+                CkSendMsgBranch(env->getEpIdx(), cmsg->getCharmMessage(), 
+				cmsg->dest_proc, env->getGroupNum());
                 cmsg = cmsg->next;
             }
 
             CharmMessageHolder *tmpbuf = cmsg;
             int tot_size = 0;
-            for(int count = messageCount/2; count < messageCount; count ++) {
+            for(count = messageCount/2; count < messageCount; count ++) {
                 tot_size += cmsg->getSize();
                 cmsg =  cmsg->next;
             }
@@ -337,7 +408,7 @@ void ComlibManager::receiveID(int npes, int *pelist, comID id){
             ComlibMsg *newmsg = new(&tot_size, 0) ComlibMsg;
             
             cmsg = tmpbuf;
-            for(int count = messageCount/2; count < messageCount; count ++) {
+            for(count = messageCount/2; count < messageCount; count ++) {
                 newmsg->insert(cmsg);
                 delete tmpbuf;
                 cmsg = cmsg->next;
@@ -346,7 +417,80 @@ void ComlibManager::receiveID(int npes, int *pelist, comID id){
 
             CProxy_ComlibManager cmgr(thisgroup);
             cmgr[/*yet to decide*/0].receiveNamdMessage(newmsg);
+	}
+	else if(strategy == USE_MPI) {
+#ifdef CHARM_MPI
+	    CharmMessageHolder *cmsg = messageBuf;
+	    char *buf_ptr = mpi_sndbuf;
+	    
+	    //if(npes == 0)
+	    //npes = CkNumPes();
+	    
+	    for(count = 0; count < npes; count ++) {
+		((int *)buf_ptr)[0] = 0;
+		buf_ptr += MPI_MAX_MSG_SIZE;
+	    }
+	    
+	    buf_ptr = mpi_sndbuf;
+	    for(count = 0; count < messageCount; count ++) {
+		if(npes < CkNumPes())
+		    buf_ptr = mpi_sndbuf + MPI_MAX_MSG_SIZE * procMap[cmsg->dest_proc];
+		else
+		    buf_ptr = mpi_sndbuf + MPI_MAX_MSG_SIZE * cmsg->dest_proc; 
+
+		char * msg = cmsg->getCharmMessage();
+		envelope * env = UsrToEnv(msg);
+		
+		((int *)buf_ptr)[0] = env->getTotalsize();
+		memcpy(buf_ptr + sizeof(int), (char *)env, env->getTotalsize());
+		CmiFree((char *) env);
+		CharmMessageHolder *prev = cmsg;
+		cmsg = cmsg->next;
+		delete prev;
+	    }
+	    
+	    PMPI_Alltoall(mpi_sndbuf, MPI_MAX_MSG_SIZE, MPI_CHAR, mpi_recvbuf, 
+			  MPI_MAX_MSG_SIZE, MPI_CHAR, groupComm);
+	    
+	    ComlibPrintf("[%d] All to all finished\n", CkMyPe());
+	    buf_ptr = mpi_recvbuf;
+	    for(count = 0; count < npes; count ++) {
+		int recv_msg_size = ((int *)buf_ptr)[0];
+		char * recv_msg = buf_ptr + sizeof(int);
+		
+		if((recv_msg_size > 0) && recv_msg_size < MPI_MAX_MSG_SIZE) {
+		    ComlibPrintf("[%d] Receiving message of size %d\n", CkMyPe(), recv_msg_size);
+		    CmiSyncSend(CmiMyPe(), recv_msg_size, recv_msg);
+		}
+		buf_ptr += MPI_MAX_MSG_SIZE;
+	    }
+#endif
         }
+	else {
+	    
+	    NumDeposits(comid, messageCount);
+	    ComlibPrintf("Setting Num Deposit to %d\n", messageCount);
+	    
+            CharmMessageHolder *cmsg = messageBuf;
+            for(count = 0; count < messageCount; count ++) {
+                if(strategy != USE_DIRECT) {
+                    char * msg = cmsg->getCharmMessage();
+		    
+                    ComlibPrintf("Calling EachToMany %d %d %d procMap=%d\n", 
+                                 UsrToEnv(msg)->getTotalsize(), CkMyPe(), 
+				 cmsg->dest_proc,
+                                 procMap[cmsg->dest_proc]);
+		    
+                    EachToManyMulticast(comid, UsrToEnv(msg)->getTotalsize(), 
+					UsrToEnv(msg), 1, &procMap[cmsg->dest_proc]);
+                }
+                CharmMessageHolder *prev = cmsg;
+                cmsg = cmsg->next;
+                if(prev != NULL)
+                    delete prev;                //foobar getrid of the delete
+            }
+        }
+	
         messageCount = 0;
         messageBuf = NULL;
     }
@@ -359,7 +503,8 @@ void ComlibManager::ArraySend(int ep, void *msg,
     CkArrayIndexMax myidx = idx;
     int dest_proc = CkArrayID::CkLocalBranch(a)->lastKnown(myidx);
     
-    ComlibPrintf("Send Data %d %d %d\n", CkMyPe(), dest_proc, UsrToEnv(msg)->getTotalsize());
+    ComlibPrintf("Send Data %d %d %d\n", CkMyPe(), dest_proc, 
+		 UsrToEnv(msg)->getTotalsize());
 
     if(dest_proc == CkMyPe()){
         //CkArrayID::CkLocalBranch(a)->deliverViaQueue((CkArrayMessage *) msg);

@@ -6,19 +6,30 @@
 #include "envelope.h"
 #include "commlib.h"
 
-#include "ComlibModule.decl.h"
-
 #define USE_DIRECT 0
 #define USE_TREE 1
 #define USE_MESH 2
 #define USE_HYPERCUBE 3
-#define USE_GRID 4
-#define NAMD_STRAT 5
+#define USE_GRID 5
+#define NAMD_STRAT 6
+#define USE_MPI 7
 
 #define GROUP_SEND 0
 #define ARRAY_SEND 1
 #define CHARE_SEND 2
 #define RECV 4
+
+#define CHARM_MPI 1
+
+#ifdef CHARM_MPI
+#include "mpi.h"
+#define MPI_MAX_MSG_SIZE 1000
+#define MPI_BUF_SIZE 2000000
+char mpi_sndbuf[MPI_BUF_SIZE];
+char mpi_recvbuf[MPI_BUF_SIZE];
+#endif
+
+#include "ComlibModule.decl.h"
 
 class CharmMessageHolder {
  public:
@@ -86,6 +97,7 @@ class ComlibManager: public CkDelegateMgr{
     void localElement();
 
     void receiveID(comID id);
+
     void receiveID(int npes, int *pelist, comID id);
 
     void ArraySend(int ep, void *msg, const CkArrayIndexMax &idx, CkArrayID a);
