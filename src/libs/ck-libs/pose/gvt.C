@@ -335,15 +335,24 @@ void GVT::computeGVT(UpdateMsg *m)
     CmiAssert(estGVT >= lastGVT); 
     //if (estGVT % 1000 == 0)
     //CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
+    //CkPrintf("[%d] New GVT = %lld\n", CkMyPe(), estGVT);
 
     // check for termination conditions
     int term = 0;
     if ((estGVT >= POSE_endtime) && (POSE_endtime > POSE_UnsetTS)) {
+#if USE_LONG_TIMESTAMPS      
+      CkPrintf("At endtime: %lld\n", POSE_endtime);
+#else
       CkPrintf("At endtime: %d\n", POSE_endtime);
+#endif
       term = 1;
     }
     else if (inactive > 5) {
+#if USE_LONG_TIMESTAMPS      
+      CkPrintf("Simulation inactive at time: %lld\n", inactiveTime);
+#else
       CkPrintf("Simulation inactive at time: %d\n", inactiveTime);
+#endif
       term = 1;
     }
 
@@ -353,7 +362,11 @@ void GVT::computeGVT(UpdateMsg *m)
     if (term) {
       if (POSE_endtime > POSE_UnsetTS) gmsg->estGVT = POSE_endtime + 1;
       else gmsg->estGVT++;
+#if USE_LONG_TIMESTAMPS      
+      CkPrintf("Final GVT = %lld\n", gmsg->estGVT);
+#else
       CkPrintf("Final GVT = %d\n", gmsg->estGVT);
+#endif
       p.setGVT(gmsg);
       POSE_stop();
     }
