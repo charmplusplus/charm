@@ -257,17 +257,21 @@ void CmiYield();
  *
  *****************************************************************************/
 
+static void host_abort(char*);
+
 static void KillEveryone(msg)
 char *msg;
 {
-  fprintf(stderr,"Fatal error: %s\n", msg);
+  host_abort(msg);
   exit(1);
 }
 
 static void KillEveryoneCode(n)
 int n;
 {
-  fprintf(stderr,"Fatal error #%d\n", n);
+  char _s[100];
+  sprintf(_s, "Fatal error #%d\n", n);
+  host_abort(_s);
   exit(1);
 }
 
@@ -712,8 +716,7 @@ void PCQueuePush(PCQueue Q, char *data)
 
 void CmiAbort(char *message)
 {
-  CmiError(message);
-  KillEveryone("");
+  host_abort(message);
 }
 
 
@@ -1667,6 +1670,13 @@ static void ctrl_sendone(va_alist) va_dcl
   vsprintf(buffer, f, p);
   writeall(Cmi_host_fd, buffer, strlen(buffer)+1);
   CmiCommUnlock();
+}
+
+static void host_abort(char *s)
+{
+  char *buffer = ctrl_sendone_buffer;
+  sprintf(buffer, "abort %s", s);
+  writeall(Cmi_host_fd, buffer, strlen(buffer)+1);
 }
 
 /****************************************************************************
