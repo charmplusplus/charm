@@ -71,18 +71,23 @@ extern UInt    _printCS;
 extern UInt    _printSS;
 
 extern UInt    _numGroups;
+extern UInt    _numNodeGroups;
 extern int     _infoIdx;
 extern UInt    _numInitMsgs;
 extern int     _charmHandlerIdx;
 extern int     _initHandlerIdx;
 extern int     _bocHandlerIdx;
+extern int     _nodeBocHandlerIdx;
 extern int     _qdHandlerIdx;
 
 CpvExtern(void*,       _currentChare);
 CpvExtern(int,         _currentGroup);
+CpvExtern(int,         _currentNodeGroup);
 CpvExtern(GroupTable*, _groupTable);
+
+extern GroupTable*    _nodeGroupTable;
 
 extern void _initCharm(int argc, char **argv);
 extern void _processBocInitMsg(envelope *);
-
+extern void _processNodeBocInitMsg(envelope *);
 #endif

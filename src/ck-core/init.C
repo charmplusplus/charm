@@ -5,11 +5,13 @@ UChar _defaultQueueing = CK_QUEUEING_FIFO;
 UInt  _printCS = 0;
 UInt  _printSS = 0;
 UInt  _numGroups = 0;
+UInt  _numNodeGroups = 0;
 UInt  _numInitMsgs = 0;
 int   _infoIdx;
 int   _charmHandlerIdx;
 int   _initHandlerIdx;
 int   _bocHandlerIdx;
+int   _nodeBocHandlerIdx;
 int   _qdHandlerIdx;
 
 CkOutStream ckout;
@@ -18,7 +20,9 @@ CkInStream  ckin;
 
 CpvDeclare(void*,       _currentChare);
 CpvDeclare(int,         _currentGroup);
+CpvDeclare(int,         _currentNodeGroup);
 CpvDeclare(GroupTable*, _groupTable);
+GroupTable* _nodeGroupTable = 0;
 CpvDeclare(Stats*, _myStats);
 CpvDeclare(MsgPool*, _msgPool);
 
@@ -28,6 +32,7 @@ CpvDeclare(_CkErrStream*, _ckerr);
 CpvStaticDeclare(UInt,  _numInitsRecd);
 CpvStaticDeclare(PtrQ*, _buffQ);
 CpvStaticDeclare(PtrQ*, _bocInitQ);
+CpvStaticDeclare(PtrQ*, _nodeBocInitQ);
 
 static int    _exitHandlerIdx;
 static Stats** _allStats = 0;
@@ -100,17 +105,21 @@ static inline void _printStats(void)
   }
   if(_printCS) {
     CkPrintf("Charm Kernel Detailed Statistics:\n");
-    CkPrintf("PE\tCC\tCP\tFCC\tFCP\tGC\tGP\tFGC\tFGP\n");
+    CkPrintf("PE\tCC\tCP\tFCC\tFCP\tGC\tNGC\tGP\tNGP\tFGC\tFNGC\tFGP\tFNGP\n");
     for(i=0;i<CkNumPes();i++) {
-      CkPrintf("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",i,
+      CkPrintf("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",i,
                _allStats[i]->getCharesCreated(),
                _allStats[i]->getCharesProcessed(),
                _allStats[i]->getForCharesCreated(),
                _allStats[i]->getForCharesProcessed(),
                _allStats[i]->getGroupsCreated(),
+               _allStats[i]->getNodeGroupsCreated(),
                _allStats[i]->getGroupsProcessed(),
+               _allStats[i]->getNodeGroupsProcessed(),
                _allStats[i]->getGroupMsgsCreated(),
-               _allStats[i]->getGroupMsgsProcessed());
+               _allStats[i]->getNodeGroupMsgsCreated(),
+               _allStats[i]->getGroupMsgsProcessed(),
+               _allStats[i]->getNodeGroupMsgsProcessed());
     }
   }
 }
@@ -178,6 +187,22 @@ static inline void _processBufferedBocInits(void)
   }
 }
 
+static inline void _processBufferedNodeBocInits(void)
+{
+  register envelope *env;
+  CmiNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_processHandler);
+  while(env=(envelope *)CpvAccess(_nodeBocInitQ)->deq()) {
+    if(env->isPacked() && _msgTable[env->getMsgIdx()]->unpack) {
+      if(CpvAccess(traceOn))
+        CpvAccess(_trace)->beginUnpack();
+      env = UsrToEnv(_msgTable[env->getMsgIdx()]->unpack(EnvToUsr(env)));
+      if(CpvAccess(traceOn))
+        CpvAccess(_trace)->endUnpack();
+    }
+    _processNodeBocInitMsg(env);
+  }
+}
+
 static inline void _processBufferedMsgs(void)
 {
   CmiNumberHandler(_charmHandlerIdx,(CmiHandler)_processHandler);
@@ -197,6 +222,7 @@ static inline void _initDone(void)
 {
   CmiNumberHandler(_exitHandlerIdx, (CmiHandler)_exitHandler);
   _processBufferedBocInits();
+  _processBufferedNodeBocInits();
   _processBufferedMsgs();
 }
 
@@ -227,6 +253,10 @@ static void _initHandler(void *msg)
       CpvAccess(_qd)->process();
       CpvAccess(_bocInitQ)->enq(msg);
       break;
+    case NodeBocInitMsg:
+      CpvAccess(_qd)->process();
+      CpvAccess(_nodeBocInitQ)->enq(msg);
+      break;
     case ROMsgMsg:
       CpvAccess(_qd)->process();
       if(env->isPacked()) _unpackFn((void **)&env);
@@ -249,6 +279,7 @@ void CkExit(void)
 {
   CmiNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
   CmiNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
+  CmiNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
   if(CkMyPe()==0) {
     if(_exitStarted)
       return;
@@ -348,8 +379,10 @@ void _initCharm(int argc, char **argv)
 {
   CpvInitialize(PtrQ*,_buffQ);
   CpvInitialize(PtrQ*,_bocInitQ);
+  CpvInitialize(PtrQ*,_nodeBocInitQ);
   CpvInitialize(void*, _currentChare);
   CpvInitialize(int, _currentGroup);
+  CpvInitialize(int, _currentNodeGroup);
   CpvInitialize(GroupTable*, _groupTable);
   CpvInitialize(UInt, _numInitsRecd);
   CpvInitialize(QdState*, _qd);
@@ -362,7 +395,11 @@ void _initCharm(int argc, char **argv)
 
   CpvAccess(_buffQ) = new PtrQ();
   CpvAccess(_bocInitQ) = new PtrQ();
+  CpvAccess(_nodeBocInitQ) = new PtrQ();
   CpvAccess(_groupTable) = new GroupTable();
+  if(CmiMyRank()==0)
+    _nodeGroupTable = new GroupTable();
+  CmiNodeBarrier();
   CpvAccess(_qd) = new QdState();
   CpvAccess(_numInitsRecd) = 0;
 
@@ -373,6 +410,7 @@ void _initCharm(int argc, char **argv)
   _initHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
   _exitHandlerIdx = CmiRegisterHandler((CmiHandler)_bufferHandler);
   _bocHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
+  _nodeBocHandlerIdx = CmiRegisterHandler((CmiHandler)_initHandler);
   _qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
   _infoIdx = CldRegisterInfoFn(_infoFn);
   CldRegisterEstimator(_charmLoadEstimator);

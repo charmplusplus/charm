@@ -43,8 +43,10 @@ void CldEnqueue(int pe, void *msg, int infofn)
     }
     CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
     CmiSetInfo(msg,infofn);
-    if (pe==CLD_BROADCAST) CmiSyncBroadcastAndFree(len, msg);
-    else if (pe==CLD_BROADCAST_ALL) CmiSyncBroadcastAllAndFree(len, msg);
+    if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, msg); }
+    else if (pe==CLD_NODE_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, msg); }
+    else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, msg); }
+    else if (pe==CLD_NODE_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, msg); }
     else CmiSyncSendAndFree(pe, len, msg);
   }
 }

@@ -878,6 +878,8 @@ void CfutureInit();
 #define CLD_ANYWHERE (-1)
 #define CLD_BROADCAST (-2)
 #define CLD_BROADCAST_ALL (-3)
+#define CLD_NODE_BROADCAST (-4)
+#define CLD_NODE_BROADCAST_ALL (-5)
 
 typedef void (*CldPackFn)(void *msg);
 

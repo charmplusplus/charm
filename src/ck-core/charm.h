@@ -117,6 +117,8 @@ extern void CkCreateChare(int chareIdx, int constructorIdx, void *msg,
                           CkChareID *vid, int destPE);
 extern int CkCreateGroup(int chareIdx, int constructorIdx, void *msg,
                          int returnEpIdx, CkChareID *returnChare);
+extern int CkCreateNodeGroup(int chareIdx, int constructorIdx, void *msg,
+                         int returnEpIdx, CkChareID *returnChare);
 
 /******************************************************************************
  *
@@ -126,11 +128,14 @@ extern int CkCreateGroup(int chareIdx, int constructorIdx, void *msg,
 
 extern void CkSendMsg(int entryIndex, void *msg, CkChareID *chare);
 extern void CkSendMsgBranch(int entryIdx, void *msg, int destPE, int groupID);
+extern void CkSendMsgNodeBranch(int entryIdx, void *msg, int destNode, int groupID);
 extern void CkBroadcastMsgBranch(int entryIdx, void *msg, int groupID);
+extern void CkBroadcastMsgNodeBranch(int entryIdx, void *msg, int groupID);
 
 extern void CkSetRefNum(void *msg, int ref);
 extern int  CkGetRefNum(void *msg);
 extern int  CkGetSrcPe(void *msg);
+extern int  CkGetSrcNode(void *msg);
 
 /******************************************************************************
  *
@@ -140,6 +145,7 @@ extern int  CkGetSrcPe(void *msg);
 
 extern void* CkRemoteCall(int entryIdx, void *msg, CkChareID *chare);
 extern void* CkRemoteBranchCall(int entryIdx, void *msg, int groupID, int pe);
+extern void* CkRemoteNodeBranchCall(int entryIdx, void *msg, int groupID, int node);
 extern void  CkSendToFuture(int futNum, void *msg, int pe);
 
 /******************************************************************************
@@ -157,8 +163,10 @@ extern void CkStartQD(int entryIdx, CkChareID *chare);
  *****************************************************************************/
 
 extern void *CkLocalBranch(int groupID);
+extern void *CkLocalNodeBranch(int groupID);
 extern void  CkGetChareID(CkChareID *pcid);
 extern int   CkGetGroupID(void);
+extern int   CkGetNodeGroupID(void);
 extern void  CkExit(void);
 
 #ifdef __cplusplus
