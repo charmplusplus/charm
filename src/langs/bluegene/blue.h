@@ -133,12 +133,12 @@ void BgNumberHandler(int, BgHandler h);
 void BgNumberHandlerEx(int, BgHandlerEx h, void *userPtr);
 
 /************************ send packet functions ************************/
-#if 0
 /**
   Send a packet to a thread in same Blue Gene node
 */
 void BgSendLocalPacket(int threadID, int handlerID, WorkType type, 
                        int numbytes, char* data);
+#if 0
 /**
   Send a packet to a thread(threadID) to Blue Gene node (x,y,z)
 */
@@ -148,6 +148,7 @@ void BgSendNonLocalPacket(int x, int y, int z, int threadID, int handlerID,
 /**
   Send a packet to a thread(threadID) on Blue Gene node (x,y,z)
   this is a wrapper of above two.
+  message "data" will be freed
 */
 void BgSendPacket(int x, int y, int z, int threadID, int handlerID, 
                   WorkType type, int numbytes, char* data);

@@ -479,9 +479,16 @@ void BgSendNonLocalPacket(nodeInfo *myNode, int x, int y, int z, int threadID, i
   sendPacket_(myNode, x, y, z, threadID, handlerID, type, numbytes, data, 0);
 }
 
-void BgSendLocalPacket(nodeInfo *myNode, int threadID, int handlerID, WorkType type, int numbytes, char * data)
+static void _BgSendLocalPacket(nodeInfo *myNode, int threadID, int handlerID, WorkType type, int numbytes, char * data)
 {
   sendPacket_(myNode, myNode->x, myNode->y, myNode->z, threadID, handlerID, type, numbytes, data, 1);
+}
+
+void BgSendLocalPacket(int threadID, int handlerID, WorkType type,
+                       int numbytes, char* data)
+{
+  nodeInfo *myNode = cta(threadinfo)->myNode;
+  _BgSendLocalPacket(myNode, threadID, handlerID, type, numbytes, data);
 }
 
 /* wrapper of the previous two functions */
@@ -489,7 +496,7 @@ void BgSendPacket(int x, int y, int z, int threadID, int handlerID, WorkType typ
 {
   nodeInfo *myNode = cta(threadinfo)->myNode;
   if (myNode->x == x && myNode->y == y && myNode->z == z)
-    BgSendLocalPacket(myNode,threadID, handlerID, type, numbytes, data);
+    _BgSendLocalPacket(myNode,threadID, handlerID, type, numbytes, data);
   else
     BgSendNonLocalPacket(myNode,x,y,z,threadID,handlerID, type, numbytes, data);
 }
