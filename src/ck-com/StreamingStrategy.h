@@ -8,7 +8,8 @@ class StreamingStrategy : public CharmStrategy {
  protected:
     CkQ<CharmMessageHolder *> *streamingMsgBuf;
     int *streamingMsgCount;
-    int PERIOD, bufferMax;
+    int bufferMax;
+    double PERIOD;
     CmiBool shortMsgPackingFlag, idleFlush;
 
     int streaming_handler_id; //Getting rid of multiple send
@@ -25,7 +26,9 @@ class StreamingStrategy : public CharmStrategy {
      Thses criteria flush a single PE's pending messages:
        - more than bufferMax messages to buffered for one PE.
     */
-    StreamingStrategy(int periodMs=10,int bufferMax=1000);
+    StreamingStrategy(int periodMs=1, int bufferMax=1000);
+    StreamingStrategy(double periodMs=1.0, int bufferMax=1000);
+
     StreamingStrategy(CkMigrateMessage *m) : CharmStrategy(m) {}
     
     virtual void insertMessage(CharmMessageHolder *msg);

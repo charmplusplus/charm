@@ -19,11 +19,22 @@ void StreamingHandlerFn(void *msg) {
     return;
 }
 
-StreamingStrategy::StreamingStrategy(int periodMs,int bufferMax_)
+StreamingStrategy::StreamingStrategy(int periodMs, int bufferMax_)
     : PERIOD(periodMs), bufferMax(bufferMax_), CharmStrategy()
 {
     streamingMsgBuf=NULL;
     streamingMsgCount=NULL;
+    shortMsgPackingFlag = CmiFalse;
+    idleFlush = CmiTrue;
+    streaming_handler_id = 0;
+    setType(ARRAY_STRATEGY);
+}
+
+StreamingStrategy::StreamingStrategy(double periodMs, int bufferMax_)
+    : PERIOD(periodMs), bufferMax(bufferMax_), CharmStrategy()
+{
+    streamingMsgBuf = NULL;
+    streamingMsgCount = NULL;
     shortMsgPackingFlag = CmiFalse;
     idleFlush = CmiTrue;
     streaming_handler_id = 0;
@@ -44,8 +55,8 @@ void StreamingStrategy::insertMessage(CharmMessageHolder *cmsg) {
         return;
     }
 
-    ComlibPrintf("StreamingStrategy::insertMessage: buffering t=%d, n=%d, s=%d\n",  
-		 PERIOD, bufferMax, size);
+    ComlibPrintf("StreamingStrategy::insertMessage: buffering t=%g, n=%d, s=%d\n",  
+                 PERIOD, bufferMax, size);
     
     streamingMsgBuf[pe].enq(cmsg);
     streamingMsgCount[pe]++;
