@@ -2421,9 +2421,12 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
 void Entry::genCall(XStr& str, const XStr &preCall)
 {
   bool isArgcArgv=false;
+  bool isMigMain=false;
   if (isConstructor() && container->isMainChare() && 
-      (!param->isVoid()) && (!param->isCkArgMsgPtr()))
-  	isArgcArgv=true;
+      (!param->isVoid()) && (!param->isCkArgMsgPtr())){
+  	if(param->isCkMigMsgPtr()) isMigMain = true;
+	else isArgcArgv = true;
+  }
   else //Normal case: Unmarshall variables
 	param->beginUnmarshall(str);
   str << preCall;
@@ -2447,6 +2450,8 @@ void Entry::genCall(XStr& str, const XStr &preCall)
     if (isArgcArgv) { //Extract parameters from CkArgMsg (should be parameter marshalled)
         str<<"(m->argc,m->argv);\n";
 	str<<"  delete m;\n";
+    }else if(isMigMain){
+	str<<"((CkMigrateMessage*)impl_msg);\n";
     }
     else {//Normal case: unmarshall parameters (or just pass message)
         str<<"("; param->unmarshall(str); str<<");\n";
@@ -2576,7 +2581,7 @@ void Entry::genReg(XStr& str)
   if (attribs & SNOKEEP) str << "+CK_EP_NOKEEP";
   str << ");\n";
   if (isConstructor()) {
-    if(container->isMainChare())
+    if(container->isMainChare()&&!(attribs&SMIGRATE))
       str << "  CkRegisterMainChare(__idx, "<<epIdx(0)<<");\n";
     if(param->isVoid())
       str << "  CkRegisterDefaultCtor(__idx, "<<epIdx(0)<<");\n";

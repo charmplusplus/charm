@@ -106,6 +106,8 @@ class Type : public Printable {
     virtual int isNamed(void) const { return 0; }
     virtual int isCkArgMsgPtr(void) const {return 0;}
     virtual int isCkArgMsg(void) const {return 0;}
+    virtual int isCkMigMsgPtr(void) const {return 0;}
+    virtual int isCkMigMsg(void) const {return 0;}
     virtual int isReference(void) const {return 0;}
     virtual Type *deref(void) {return this;}
     virtual char *getBaseName(void) const = 0;
@@ -145,6 +147,7 @@ class NamedType : public Type {
        : name(n), tparams(t) {}
     int isTemplated(void) const { return (tparams!=0); }
     int isCkArgMsg(void) const {return 0==strcmp(name,"CkArgMsg");}
+    int isCkMigMsg(void) const {return 0==strcmp(name,"CkMigrateMessage");}
     void print(XStr& str);
     int isNamed(void) const {return 1;}
     char *getBaseName(void) const { return name; }
@@ -168,6 +171,7 @@ class PtrType : public Type {
     PtrType(Type *t) : type(t), numstars(1) {}
     int isPointer(void) const {return 1;}
     int isCkArgMsgPtr(void) const {return numstars==1 && type->isCkArgMsg();}
+    int isCkMigMsgPtr(void) const {return numstars==1 && type->isCkMigMsg();}
     int isMessage(void) const {return numstars==1 && !type->isBuiltin();}
     void indirect(void) { numstars++; }
     int getNumStars(void) const {return numstars; }
@@ -244,6 +248,7 @@ class Parameter {
     int isMessage(void) const {return type->isMessage();}
     int isVoid(void) const {return type->isVoid();}
     int isCkArgMsgPtr(void) const {return type->isCkArgMsgPtr();}
+    int isCkMigMsgPtr(void) const {return type->isCkMigMsgPtr();}
     int isArray(void) const {return arrLen!=NULL;}
     Type *getType(void) {return type;}
     const char *getArrayLen(void) const {return arrLen;}
@@ -290,6 +295,9 @@ class ParamList {
     }
     int isCkArgMsgPtr(void) const {
         return (next==NULL) && param->isCkArgMsgPtr();
+    }
+    int isCkMigMsgPtr(void) const {
+        return (next==NULL) && param->isCkMigMsgPtr();
     }
     int getNumStars(void) const {return param->type->getNumStars(); }
     char *getBaseName(void) {
