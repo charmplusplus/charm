@@ -30,18 +30,11 @@ void Refiner::create(int count, CentralLB::LDStats* stats, int* procs)
 {
   int i;
 
-  P = count;
-
-  // now numComputes is all the computes: migratable and not.
+  // now numComputes is all the computes: both migratable and nonmigratable.
   // afterwards, nonmigratable computes will be taken off
-  numComputes = stats->n_objs;
-  computes = new computeInfo[numComputes];
 
-  processors = new processorInfo[count];
-
-  int index = 0;
   numAvail = 0;
-  for(i=0; i < count; i++) {
+  for(i=0; i < P; i++) {
     processors[i].Id = i;
     processors[i].backgroundLoad = stats->procs[i].bg_cputime;
     processors[i].load = processors[i].backgroundLoad;
@@ -56,15 +49,14 @@ void Refiner::create(int count, CentralLB::LDStats* stats, int* procs)
   LDObjData *odata = stats->objData;
   for (i=0; i<stats->n_objs; i++)
   {
-        computes[index].id = odata[i].objID();
-        computes[index].handle = odata[i].handle;
-        computes[index].load = odata[i].cpuTime;
-        computes[index].originalPE = stats->from_proc[i];
-        computes[index].originalIdx = i;
-        computes[index].processor = -1;
-        computes[index].oldProcessor = procs[i];
-        computes[index].migratable = odata[i].migratable;
-        index ++;
+        computes[i].id = odata[i].objID();
+        computes[i].handle = odata[i].handle;
+        computes[i].load = odata[i].cpuTime;
+        computes[i].originalPE = stats->from_proc[i];
+        computes[i].originalIdx = i;
+        computes[i].processor = -1;
+        computes[i].oldProcessor = procs[i];
+        computes[i].migratable = odata[i].migratable;
 /*
       if (odata[i].migratable == CmiTrue)
       {
@@ -178,18 +170,16 @@ void Refiner::removeComputes()
 
 int Refiner::refine()
 {
+  int i;
   int finish = 1;
   maxHeap *heavyProcessors = new maxHeap(P);
 
   Set *lightProcessors = new Set();
-  int i;
   for (i=0; i<P; i++) {
-//    if (processors[i].load > overLoad*averageLoad) {
     if (isHeavy(&processors[i])) {  
       //      CkPrintf("Processor %d is HEAVY: load:%f averageLoad:%f!\n",
       //	       i, processors[i].load, averageLoad);
       heavyProcessors->insert((InfoRecord *) &(processors[i]));
-//    } else if (processors[i].load < averageLoad) {
     } else if (isLight(&processors[i])) {
       //      CkPrintf("Processor %d is LIGHT: load:%f averageLoad:%f!\n",
       //	       i, processors[i].load, averageLoad);
@@ -262,13 +252,15 @@ int Refiner::refine()
     if (bestP->load > averageLoad)
       lightProcessors->remove(bestP);
     
-//    if (donor->load > overLoad*averageLoad)
     if (isHeavy(donor))
       heavyProcessors->insert((InfoRecord *) donor);
-//    else if (donor->load < averageLoad)
     else if (isLight(donor))
       lightProcessors->insert((InfoRecord *) donor);
   }  
+
+  delete heavyProcessors;
+  delete lightProcessors;
+
   return finish;
 }
 
@@ -276,6 +268,11 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
 		     int* cur_p, int* new_p)
 {
   //  CkPrintf("[%d] Refiner strategy\n",CkMyPe());
+
+  P = count;
+  numComputes = stats->n_objs;
+  computes = new computeInfo[numComputes];
+  processors = new processorInfo[count];
 
   create(count, stats, cur_p);
 
@@ -297,14 +294,15 @@ void Refiner::Refine(int count, CentralLB::LDStats* stats,
       processors[pe].computeSet->iterator((Iterator *)&nextCompute);
     while(c) {
       new_p[c->originalIdx] = c->processor;
-//       if (c->oldProcessor != c->processor)
-//      	CkPrintf("Refiner::Refine: from %d to %d\n",
-//      		 c->oldProcessor, c->processor);
+//      if (c->oldProcessor != c->processor)
+//      CkPrintf("Refiner::Refine: from %d to %d\n", c->oldProcessor, c->processor);
       nextCompute.id++;
       c = (computeInfo *) processors[pe].computeSet->
 	             next((Iterator *)&nextCompute);
     }
   }
+  delete [] computes;
+  delete [] processors;
 };
 
 
