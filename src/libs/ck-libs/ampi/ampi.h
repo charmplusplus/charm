@@ -166,13 +166,15 @@ int MPI_Main(int argc,char **argv); /* prototype for C main routine */
 typedef int MPI_Comm;
 typedef int MPI_Group;
 
-#define MPI_COMM_FIRST_SPLIT (MPI_Comm)(1000000) /*Communicator from a "split"*/
-#define MPI_COMM_FIRST_GROUP (MPI_Comm)(2000000) /*Communicator from a process group*/
-#define MPI_COMM_FIRST_CART (MPI_Comm)(3000000) /*Communicator from a cartesian virtual topology*/
-#define MPI_COMM_FIRST_GRAPH (MPI_Comm)(4000000) /*Communicator from a generic graph virtual topology*/
-#define MPI_COMM_FIRST_RESVD (MPI_Comm)(5000000) /*Communicator reserved for now*/
-#define MPI_COMM_SELF (MPI_Comm)(7000000)
-#define MPI_COMM_WORLD (MPI_Comm)(8000000) /*Start of universe*/
+#define MPI_COMM_FIRST_SPLIT (MPI_Comm)(1000000) /*Communicator from MPI_Comm_split */
+#define MPI_COMM_FIRST_GROUP (MPI_Comm)(2000000) /*Communicator from MPI_Comm_group */
+#define MPI_COMM_FIRST_CART  (MPI_Comm)(3000000) /*Communicator from MPI_Cart_create */
+#define MPI_COMM_FIRST_GRAPH (MPI_Comm)(4000000) /*Communicator from MPI_Graph_create */
+#define MPI_COMM_FIRST_INTER (MPI_Comm)(5000000) /*Communicator from MPI_Intercomm_create*/
+#define MPI_COMM_FIRST_INTRA (MPI_Comm)(6000000) /*Communicator from MPI_Intercomm_merge*/
+#define MPI_COMM_FIRST_RESVD (MPI_Comm)(7000000) /*Communicator reserved for now*/
+#define MPI_COMM_SELF (MPI_Comm)(8000000)
+#define MPI_COMM_WORLD (MPI_Comm)(9000000) /*Start of universe*/
 #define MPI_MAX_COMM_WORLDS 8
 extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
 
@@ -361,14 +363,14 @@ int MPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm);
 int MPI_Comm_size(MPI_Comm comm, int *size);
 int MPI_Comm_rank(MPI_Comm comm, int *rank);
 int MPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result);
-int MPI_Comm_dup(MPI_Comm src, MPI_Comm *dest);
 int MPI_Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest);
+int MPI_Comm_dup(MPI_Comm src, MPI_Comm *dest);
 int MPI_Comm_free(MPI_Comm *comm);
 int MPI_Comm_test_inter(MPI_Comm comm, int *flag);
-/* MPI_Comm_remote_size */
-/* MPI_Comm_remote_group */
-/* MPI_Intercomm_create */
-/* MPI_Intercomm_merge */
+int MPI_Comm_remote_size(MPI_Comm comm, int *size);
+int MPI_Comm_remote_group(MPI_Comm comm, MPI_Group *group);
+int MPI_Intercomm_create(MPI_Comm local_comm, int local_leader, MPI_Comm peer_comm, int remote_leader, int tag, MPI_Comm *newintercomm);
+int MPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm);
 int MPI_Keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn, int *keyval, void* extra_state);
 int MPI_Keyval_free(int *keyval);
 int MPI_Attr_put(MPI_Comm comm, int keyval, void* attribute_val);
@@ -376,7 +378,6 @@ int MPI_Attr_get(MPI_Comm comm, int keyval, void *attribute_val, int *flag);
 int MPI_Attr_delete(MPI_Comm comm, int keyval);
 
 /***topologies***/
-
 int MPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
 		    int reorder, MPI_Comm *comm_cart);
 int MPI_Graph_create(MPI_Comm comm_old, int nnodes, int *index, int *edges,
@@ -391,13 +392,13 @@ int MPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods,
 		 int *coords);
 int MPI_Cart_rank(MPI_Comm comm, int *coords, int *rank);
 int MPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords);
-int MPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source, 
+int MPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source,
 		   int *rank_dest);
 int MPI_Graphdims_get(MPI_Comm comm, int *nnodes, int *nedges);
-int MPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index, 
-		  int *edges); 
+int MPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index,
+		  int *edges);
 int MPI_Graph_neighbors_count(MPI_Comm comm, int rank, int *nneighbors);
-int MPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors, 
+int MPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors,
 			int *neighbors);
 int MPI_Dims_create(int nnodes, int ndims, int *dims);
 int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm);

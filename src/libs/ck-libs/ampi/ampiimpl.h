@@ -22,7 +22,9 @@ class ampiCommStruct {
 	CkArrayID ampiID; //ID of corresponding ampi array
 	int size; //Number of processes in communicator
 	int isWorld; //1 if ranks are 0..size-1?
+	int isInter; // 0: intra-communicator; 1: inter-communicator
 	CkPupBasicVec<int> indices;  //indices[r] gives the array index for rank r
+	CkPupBasicVec<int> remoteIndices;  // remote group for inter-communicator
 	// cartesian virtual topology parameters
 	int ndims;
 	CkPupBasicVec<int> dims;
@@ -39,13 +41,19 @@ public:
 		:comm(comm_), ampiID(id_),size(size_), isWorld(1) {}
 	ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
 		int size_,const CkPupBasicVec<int> &indices_)
-		:comm(comm_), ampiID(id_),size(size_),
+		:comm(comm_), ampiID(id_),size(size_),isInter(0),
 		 isWorld(0), indices(indices_) {}
+	ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
+		int size_,const CkPupBasicVec<int> &indices_,
+		const CkPupBasicVec<int> &remoteIndices_)
+		:comm(comm_),ampiID(id_),size(size_),isWorld(0),isInter(1),
+		indices(indices_),remoteIndices(remoteIndices_) {}
 
 	void setArrayID(const CkArrayID &nID) {ampiID=nID;}
 
 	MPI_Comm getComm(void) const {return comm;}
 	const CkPupBasicVec<int> &getIndices(void) const {return indices;}
+	const CkPupBasicVec<int> &getRemoteIndices(void) const {return remoteIndices;}
 
 	//Get the proxy for the entire array
 	CProxy_ampi getProxy(void) const;
@@ -57,6 +65,13 @@ public:
 #endif
 		if (isWorld) return r;
 		else return indices[r];
+	}
+	int getIndexForRemoteRank(int r) const {
+#ifndef CMK_OPTIMIZE
+		if (r>=remoteIndices.size()) CkAbort("AMPI> You passed in an out-of-bounds process rank!");
+#endif
+		if (isWorld) return r;
+		else return remoteIndices[r];
 	}
 	//Get the rank for this array index (Warning: linear time)
 	int getRankForIndex(int i) const {
@@ -70,14 +85,12 @@ public:
 
 	int getSize(void) const {return size;}
 
-	/* For cartesian topologies
-	   Hack -- fix this
-	*/
-	inline int getndims() {return ndims;}
+	inline const int isinter(void) const { return isInter; }
 	inline const CkPupBasicVec<int> &getindices() const {return indices;}
 	inline const CkPupBasicVec<int> &getdims() const {return dims;}
 	inline const CkPupBasicVec<int> &getperiods() const {return periods;}
 
+	inline int getndims() {return ndims;}
 	inline void setndims(int ndims_) {ndims = ndims_; }
 	inline void setdims(const CkPupBasicVec<int> &dims_) { dims = dims_; }
 	inline void setperiods(const CkPupBasicVec<int> &periods_) { periods = periods_; }
@@ -86,17 +99,19 @@ public:
 	inline int getnvertices() {return nvertices;}
 	inline const CkPupBasicVec<int> &getindex() const {return index;}
 	inline const CkPupBasicVec<int> &getedges() const {return edges;}
-	
+
 	inline void setnvertices(int nvertices_) {nvertices = nvertices_; }
 	inline void setindex(const CkPupBasicVec<int> &index_) { index = index_; }
 	inline void setedges(const CkPupBasicVec<int> &edges_) { edges = edges_; }
-	
+
 	void pup(PUP::er &p) {
 		p|comm;
 		p|ampiID;
 		p|size;
 		p|isWorld;
+		p|isInter;
 		p|indices;
+		p|remoteIndices;
 		p|ndims;
 		p|dims;
 		p|periods;
@@ -151,6 +166,10 @@ public:
 typedef CkPupBasicVec<int> groupStruct;
 // groupStructure operations
 inline void outputOp(groupStruct vec){
+  if(vec.size()>50){
+    CkPrintf("vector too large to output!\n");
+    return;
+  }
   CkPrintf("output vector: size=%d  {",vec.size());
   for(int i=0;i<vec.size();i++)
     CkPrintf(" %d ",vec[i]);
@@ -569,8 +588,9 @@ class AmpiSeqQ : private CkNoncopyable {
 
 PUPmarshall(AmpiSeqQ);
 
+
 inline CProxy_ampi ampiCommStruct::getProxy(void) const {return ampiID;}
-const ampiCommStruct &universeComm2proxy(MPI_Comm universeNo);
+const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo);
 
 /* KeyValue class for caching */
 class KeyvalNode {
@@ -610,6 +630,8 @@ class ampiParent : public CBase_ampiParent {
     CkPupPtrVec<ampiCommStruct> groupComm; //Communicators from MPI_Comm_group
     CkPupPtrVec<ampiCommStruct> cartComm;  //Communicators from MPI_Cart_create
     CkPupPtrVec<ampiCommStruct> graphComm; //Communicators from MPI_Graph_create
+    CkPupPtrVec<ampiCommStruct> interComm; //Communicators from MPI_Intercomm_create
+    CkPupPtrVec<ampiCommStruct> intraComm; //Communicators from MPI_Intercomm_merge
 
     CkPupPtrVec<groupStruct> groups; // "Wild" groups that don't have a communicator
 
@@ -638,8 +660,22 @@ class ampiParent : public CBase_ampiParent {
 
     void cartChildRegister(const ampiCommStruct &s);
     void graphChildRegister(const ampiCommStruct &s);
+    void interChildRegister(const ampiCommStruct &s);
+
+    inline int isIntra(MPI_Comm comm) const {
+      return (comm>=MPI_COMM_FIRST_INTRA && comm<MPI_COMM_FIRST_RESVD);
+    }
+    const ampiCommStruct &getIntra(MPI_Comm comm) {
+      int idx=comm-MPI_COMM_FIRST_INTRA;
+      if (idx>=intraComm.size()) CkAbort("Bad intra-communicator used");
+      return *intraComm[idx];
+    }
+    void intraChildRegister(const ampiCommStruct &s);
 
     CkPupPtrVec<KeyvalNode> kvlist;
+
+    int RProxyCnt;
+    CProxy_ampi tmpRProxy;
 
 public:
     ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,ComlibInstanceHandle comlib_);
@@ -656,11 +692,20 @@ public:
     //Children call this when they are first created, or just migrated
     TCharm *registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration);
 
+    // exchange proxy info between two ampi proxies
+    void ExchangeProxy(CProxy_ampi rproxy){
+      if(RProxyCnt==0){ tmpRProxy=rproxy; RProxyCnt=1; }
+      else if(RProxyCnt==1) { tmpRProxy.setRemoteProxy(rproxy); rproxy.setRemoteProxy(tmpRProxy); RProxyCnt=0; }
+      else CkAbort("ExchangeProxy: RProxyCnt>1");
+    }
+
     //Grab the next available split/group communicator
     MPI_Comm getNextSplit(void) const {return MPI_COMM_FIRST_SPLIT+splitComm.size();}
     MPI_Comm getNextGroup(void) const {return MPI_COMM_FIRST_GROUP+groupComm.size();}
     MPI_Comm getNextCart(void) const {return MPI_COMM_FIRST_CART+cartComm.size();}
     MPI_Comm getNextGraph(void) const {return MPI_COMM_FIRST_GRAPH+graphComm.size();}
+    MPI_Comm getNextInter(void) const {return MPI_COMM_FIRST_INTER+interComm.size();}
+    MPI_Comm getNextIntra(void) const {return MPI_COMM_FIRST_INTRA+intraComm.size();}
 
     inline int isCart(MPI_Comm comm) const {
       return (comm>=MPI_COMM_FIRST_CART && comm<MPI_COMM_FIRST_GRAPH);
@@ -671,12 +716,20 @@ public:
       return *cartComm[idx];
     }
     inline int isGraph(MPI_Comm comm) const {
-      return (comm>=MPI_COMM_FIRST_GRAPH && comm<MPI_COMM_FIRST_RESVD);
+      return (comm>=MPI_COMM_FIRST_GRAPH && comm<MPI_COMM_FIRST_INTER);
     }
     ampiCommStruct &getGraph(MPI_Comm comm) {
       int idx=comm-MPI_COMM_FIRST_GRAPH;
       if (idx>=graphComm.size()) CkAbort("Bad graph communicator used");
       return *graphComm[idx];
+    }
+    inline int isInter(MPI_Comm comm) const {
+      return (comm>=MPI_COMM_FIRST_INTER && comm<MPI_COMM_FIRST_INTRA);
+    }
+    const ampiCommStruct &getInter(MPI_Comm comm) {
+      int idx=comm-MPI_COMM_FIRST_INTER;
+      if (idx>=interComm.size()) CkAbort("Bad inter-communicator used");
+      return *interComm[idx];
     }
 
     void pup(PUP::er &p);
@@ -685,7 +738,7 @@ public:
     void Checkpoint(int len, char* dname);
     void ResumeThread(void);
 
-    inline const ampiCommStruct &comm2proxy(MPI_Comm comm) {
+    inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) {
       if (comm==MPI_COMM_WORLD) return worldStruct;
       if (comm==MPI_COMM_SELF) return selfStruct;
       if (comm==worldNo) return worldStruct;
@@ -693,7 +746,9 @@ public:
       if (isGroup(comm)) return getGroup(comm);
       if (isCart(comm)) return getCart(comm);
       if (isGraph(comm)) return getGraph(comm);
-      return universeComm2proxy(comm);
+      if (isInter(comm)) return getInter(comm);
+      if (isIntra(comm)) return getIntra(comm);
+      return universeComm2CommStruct(comm);
     }
     inline ampi *comm2ampi(MPI_Comm comm) {
       if (comm==MPI_COMM_WORLD) return worldPtr;
@@ -715,17 +770,25 @@ public:
 	const ampiCommStruct &st = getGraph(comm);
 	return st.getProxy()[thisIndex].ckLocal();
       }
+      if (isInter(comm)) {
+         const ampiCommStruct &st=getInter(comm);
+	 return st.getProxy()[thisIndex].ckLocal();
+      }
+      if (isIntra(comm)) {
+         const ampiCommStruct &st=getIntra(comm);
+	 return st.getProxy()[thisIndex].ckLocal();
+      }
       if (comm>MPI_COMM_WORLD) return worldPtr; //Use MPI_WORLD ampi for cross-world messages:
       CkAbort("Invalid communicator used!");
     }
 
     inline int hasComm(const MPI_Group group){
       MPI_Comm comm = (MPI_Comm)group;
-      return (comm==MPI_COMM_WORLD || comm==worldNo || isSplit(comm) || isGroup(comm) || isCart(comm) || isGraph(comm));
+      return ( comm==MPI_COMM_WORLD || comm==worldNo || isSplit(comm) || isGroup(comm) || isCart(comm) || isGraph(comm) || isIntra(comm) ); //isInter omitted because its comm number != its group number
     }
     inline const groupStruct group2vec(MPI_Group group){
       if(hasComm(group))
-        return comm2proxy((MPI_Comm)group).getIndices();
+        return comm2CommStruct((MPI_Comm)group).getIndices();
       if(isInGroups(group))
         return *groups[group];
       CkAbort("ampiParent::group2vec: Invalid group id!");
@@ -741,20 +804,30 @@ public:
       return getPosOp(thisIndex,vec);
     }
     inline ComlibInstanceHandle getComlib(void) {
-    	return comlib;
+      return comlib;
     }
     inline int getMyPe(void){
-        return CkMyPe();
+      return CkMyPe();
     }
     inline int hasWorld(void) const {
-        return worldPtr!=NULL;
+      return worldPtr!=NULL;
     }
 
-    /// this is assuming no inter-communicator
+    /// if intra-communicator, return comm, otherwise return null group
     inline MPI_Group comm2group(const MPI_Comm comm){
-      ampiCommStruct s = comm2proxy(comm);
+      if(isInter(comm)) return MPI_GROUP_NULL;   // we don't support inter-communicator in such functions
+      ampiCommStruct s = comm2CommStruct(comm);
       if(comm!=MPI_COMM_WORLD && comm!=s.getComm()) CkAbort("Error in ampiParent::comm2group()");
       return (MPI_Group)(s.getComm());
+    }
+
+    inline int getRemoteSize(const MPI_Comm comm){
+      if(isInter(comm)) return getInter(comm).getRemoteIndices().size();
+      else return -1;
+    }
+    inline MPI_Group getRemoteGroup(const MPI_Comm comm){
+      if(isInter(comm)) return saveGroupStruct(getInter(comm).getRemoteIndices());
+      else return MPI_GROUP_NULL;
     }
 
     int createKeyval(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
@@ -783,7 +856,8 @@ class ampi : public CBase_ampi {
 
     ampiCommStruct myComm;
     int myRank;
-    groupStruct tmpVec; // stores the group info temporarily
+    groupStruct tmpVec; // stores temp group info
+    CProxy_ampi remoteProxy; // valid only for intercommunicator
 
     int seqEntries; //Number of elements in below arrays
     int *nextseq;
@@ -810,11 +884,13 @@ class ampi : public CBase_ampi {
     void commCreatePhase1(CkReductionMsg *msg);
     void cartCreatePhase1(CkReductionMsg *m);
     void graphCreatePhase1(CkReductionMsg *m);
+    void intercommCreatePhase1(CkReductionMsg *m);
+    void intercommMergePhase1(CkReductionMsg *msg);
 
   public: // to be used by MPI_* functions
 
-    inline const ampiCommStruct &comm2proxy(MPI_Comm comm) {
-      return parent->comm2proxy(comm);
+    inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) {
+      return parent->comm2CommStruct(comm);
     }
 
     AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,int type,MPI_Comm destcomm);
@@ -834,12 +910,21 @@ class ampi : public CBase_ampi {
     void commCreate(const groupStruct vec,MPI_Comm *newcomm);
     void cartCreate(const groupStruct vec, MPI_Comm *newcomm);
     void graphCreate(const groupStruct vec, MPI_Comm *newcomm);
+    void intercommCreate(const groupStruct rvec, int root, MPI_Comm *ncomm);
 
+    inline int isInter(void) { return myComm.isinter(); }
+    void intercommMerge(int first, MPI_Comm *ncomm);
+
+    inline int getWorldRank(void) const {return parent->thisIndex;}
     inline int getRank(void) const {return myRank;}
     inline int getSize(void) const {return myComm.getSize();}
     inline MPI_Comm getComm(void) const {return myComm.getComm();}
     inline CkPupBasicVec<int> getIndices(void) const { return myComm.getindices(); }
     inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
+    inline const CProxy_ampi &getRemoteProxy(void) const {return remoteProxy;}
+    inline void setRemoteProxy(CProxy_ampi rproxy) { remoteProxy = rproxy; thread->resume(); }
+    inline const int getIndexForRank(int r) const {return myComm.getIndexForRank(r);}
+    inline const int getIndexForRemoteRank(int r) const {return myComm.getIndexForRemoteRank(r);}
 
     inline CProxy_ampi comlibBegin(void) const {
        CProxy_ampi p=getProxy();

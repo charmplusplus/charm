@@ -8,6 +8,7 @@ module ampi {
     entry ampiParent(int universeNo,CProxy_TCharm threads_, ComlibInstanceHandle comlib_);
     entry void ResumeThread();
     entry void Checkpoint(int len, char dname[len]);
+    entry void ExchangeProxy(CProxy_ampi);
   };
   array[1D] ampi {
     entry ampi();
@@ -19,7 +20,9 @@ module ampi {
     entry void commCreatePhase1(CkReductionMsg *msg);
     entry void cartCreatePhase1(CkReductionMsg *msg);
     entry void graphCreatePhase1(CkReductionMsg *msg);
-
+    entry void intercommCreatePhase1(CkReductionMsg *msg);
+    entry void intercommMergePhase1(CkReductionMsg *msg);
+    entry void setRemoteProxy(CProxy_ampi rproxy);
   };
   group ampiWorlds {
     entry ampiWorlds();
