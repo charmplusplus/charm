@@ -13,8 +13,7 @@ int getCharmMsgHandlers(int *handleArray)
 CsvDeclare(int*,  BreakPoints);
 CsvDeclare(char*, SymbolTableInfo);
 
-CpvExtern(int*, handlerArray);
-CpvExtern(int,  noOfHandlers);
+CpvExtern(handlerType, handlerArray);
 
 char* getEnvInfo(envelope *env)
 {
@@ -120,8 +119,7 @@ int isBreakPoint(char *msg)
       CsvAccess(BreakPoints)[i] = 0;
   }
   hndlrID = CmiGetHandler(msg);
-  if((hndlrID == CpvAccess(handlerArray)[0]) || 
-     (hndlrID == CpvAccess(handlerArray)[1])){
+  if(CpvAccess(handlerArray)[hndlrID][0] != 0){
     env = (envelope *)msg;
     return(CsvAccess(BreakPoints)[env->getEpIdx()]);
   } else {
@@ -134,8 +132,7 @@ int isEntryPoint(char *msg)
   int hndlrID;
 
   hndlrID = CmiGetHandler(msg);
-  if((hndlrID == CpvAccess(handlerArray)[0]) || 
-     (hndlrID == CpvAccess(handlerArray)[1])){
+  if(CpvAccess(handlerArray)[hndlrID][0] != 0){
     return 1;
   } else {
     return 0;

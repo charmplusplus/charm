@@ -257,6 +257,28 @@ static void _nullFn(void *, void *)
   CmiAbort("Null-Method Called. Program may have Unregistered Module!!\n");
 }
 
+#if CMK_DEBUG_MODE
+extern char* getEnvInfo(envelope *env);
+
+static char* fHeader(char* msg)
+{
+  return(getEnvInfo((envelope *)msg));
+}
+
+static const char *_contentStr = 
+"Contents not known in this implementation"
+;
+
+static char* fContent(char *msg)
+{
+  char *temp;
+
+  temp = (char *)malloc(strlen(_contentStr) + 1);
+  strcpy(temp, _contentStr);
+  return(temp);
+}
+
+#endif
 void _initCharm(int argc, char **argv)
 {
   CpvInitialize(PtrQ*,_buffQ);
@@ -290,8 +312,8 @@ void _initCharm(int argc, char **argv)
   _infoIdx = CldRegisterInfoFn(_infoFn);
 
 #if CMK_DEBUG_MODE
-  handlerArrayRegister(_charmHandlerIdx);
-  handlerArrayRegister(_initHandlerIdx);
+  handlerArrayRegister(_charmHandlerIdx, fHeader, fContent);
+  handlerArrayRegister(_initHandlerIdx, fHeader, fContent);
 #endif
 
   _futuresModuleInit(); // part of futures implementation is a converse module
@@ -357,3 +379,4 @@ GroupTable::GroupTable()
   for(int i=0;i<MAXBINS;i++) 
     bins[i] = 0;
 }
+

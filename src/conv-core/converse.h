@@ -986,7 +986,10 @@ void CpdInitializeObjectTable();
 void CpdInitializeHandlerArray();
 void CpdInitializeBreakPoints();
 
-void handlerArrayRegister(int);
+#define MAX_NUM_HANDLERS 1000
+typedef char* (*hndlrIDFunction)(char *);
+typedef hndlrIDFunction handlerType[MAX_NUM_HANDLERS][2];
+void handlerArrayRegister(int, hndlrIDFunction, hndlrIDFunction);
 
 char* getSymbolTableInfo();
 int isBreakPoint(char *msg);
@@ -1013,7 +1016,10 @@ char* getMsgContentsDebug(int index);
 #endif
 
 #if CMK_WEB_MODE
-void CWebInit(void);
+void CWebInit (void);
+void CWebPlateRegisterCell (void);
+void CWebPlateDataDeposit (int timestep, int cellx, int celly, 
+                           int rows, int columns, int **data);
 #endif
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE

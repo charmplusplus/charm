@@ -298,12 +298,18 @@ CthVoidFn fn; void *arg; int size;
 void CthSuspend()
 {
   CthThread next;
+#if CMK_WEB_MODE
+  void usageStop();
+#endif
   if (CthCpvAccess(CthCurrent)->choosefn == 0) CthNoStrategy();
   next = CthCpvAccess(CthCurrent)->choosefn();
   /** addition for tracing */
   if(CpvAccess(traceOn))
     traceSuspend();
   /* end addition */
+#if CMK_WEB_MODE
+  usageStop();
+#endif
   CthResume(next);
 }
 

@@ -11,7 +11,7 @@
 #define NUM_MESSAGES 100
 
 extern "C" void  CpdInitializeHandlerArray(void);
-extern void  handlerArrayRegister(int);
+extern void handlerArrayRegister(int, hndlrIDFunction, hndlrIDFunction);
 extern char* genericViewMsgFunction(char *msg, int type);
 extern char* getMsgListSched(void);
 extern char* getMsgListPCQueue(void);
@@ -30,8 +30,7 @@ extern char* getSymbolTableInfo(void);
 extern "C" void  CqsEnumerateQueue(Queue, void ***);
 extern "C" void  FIFO_Enumerate(FIFO_QUEUE*, void***);
 
-CpvDeclare(int*, handlerArray);
-CpvDeclare(int,  noOfHandlers);
+CpvDeclare(handlerType, handlerArray);
 
 void **schedQueue=0;
 void **FIFOQueue=0;
@@ -65,23 +64,21 @@ void msgListCache(void)
 }
 
 extern "C"
-void CpdInitializeHandlerArray(void)
-{
-  CpvInitialize(int *, handlerArray);
-  CpvInitialize(int, noOfHandlers);
-  CpvAccess(handlerArray) = (int *)malloc(10 * sizeof(int));
-  CpvAccess(noOfHandlers) = 0;
+void CpdInitializeHandlerArray(void){
+  int i;
+
+  CpvInitialize(handlerType, handlerArray);
+  for(i = 0; i < MAX_NUM_HANDLERS; i++){
+    CpvAccess(handlerArray)[i][0] = 0;
+    CpvAccess(handlerArray)[i][1] = 0;
+  }
 }
 
-void handlerArrayRegister(int hndlrID)
-{
-  CpvAccess(handlerArray)[CpvAccess(noOfHandlers)] = hndlrID;
-  CpvAccess(noOfHandlers)++;
+void handlerArrayRegister(int hndlrID, hndlrIDFunction fHeader, 
+                                       hndlrIDFunction fContent){
+    CpvAccess(handlerArray)[hndlrID][0] = fHeader;
+    CpvAccess(handlerArray)[hndlrID][1] = fContent;
 }
-
-static const char *ContentsNotKnown = 
-"Contents not known in this implementation."
-;
 
 static const char *HeaderUnknownFormat =
 "<HEADER>:Unknown # Format #"
@@ -89,32 +86,22 @@ static const char *HeaderUnknownFormat =
 
 // type = 0 header required
 //      = 1 contents required
-char* genericViewMsgFunction(char *msg, int type)
-{
+char* genericViewMsgFunction(char *msg, int type){
   int hndlrID;
   char *unknownContentsMsg;
   char *unknownFormatMsg;
   char *temp;
-    
-  hndlrID = CmiGetHandler(msg);
+  hndlrIDFunction f;
 
-  //Look though the handlers in the handlerArray
-  //and perform the appropriate action
-  if((hndlrID == CpvAccess(handlerArray)[0]) || 
-     (hndlrID == CpvAccess(handlerArray)[1])){  // Charm handlers
-    //For now call the getEnvInfo function,
-    //Later, incorporate Milind's changes
-    if(type == 0){
-      return(getEnvInfo((envelope*) msg));
-    } else {
-      temp = (char *)malloc((strlen(ContentsNotKnown)+1) * sizeof(char));
-      strcpy(temp, ContentsNotKnown);
-      return(temp);
-    }
-  } else {
+  hndlrID = CmiGetHandler(msg);
+  f = CpvAccess(handlerArray)[hndlrID][type];
+  if(f == 0){
+    // Undefined Content/Header function
     temp = (char *)malloc(strlen(HeaderUnknownFormat)+1);
     strcpy(temp, HeaderUnknownFormat);
     return(temp);
+  } else{
+    return((*f)(msg));
   }
 }
 
@@ -215,6 +202,7 @@ char* getMsgListDebug(void)
   list = (char *)malloc(maxLength);
   strcpy(list, "");
 
+  if(DQueue != 0) free(DQueue);
   FIFO_Enumerate((FIFO_QUEUE *)CpvAccess(debugQueue), &DQueue);
 
   for(int i=debugIndex; i < ending+debugIndex; i++){

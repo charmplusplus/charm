@@ -110,6 +110,10 @@ char **argv;
   int argc;
   char **origArgv = argv;
 
+#if CMK_WEB_MODE
+  void initUsage();
+#endif
+
 #ifdef MEMMONITOR
   CpvInitialize(mmulong,MemoryUsage);
   CpvAccess(MemoryUsage) = 0;
@@ -150,6 +154,10 @@ char **argv;
   argc = 0; argv=origArgv;
   for(argc=0;argv[argc];argc++);
   traceInit(&argc, argv);
+
+#if CMK_WEB_MODE
+  initUsage();
+#endif
 }
 
 int CstatMemory(i)
@@ -521,7 +529,7 @@ void CHostRegister(void)
   if (hostent == 0)
     ip = 0x7f000001;
   else
-    ip = htonl(*((int *)(hostent->h_addr_list[0])));
+    ip = htonl(*((CmiUInt4 *)(hostent->h_addr_list[0])));
 
   msg = (char *)CmiAlloc(msgSize * sizeof(char));
   ptr = (int *)(msg + CmiMsgHeaderSizeBytes);
@@ -575,6 +583,7 @@ void CHostGetOne()
         fgets(rest, 999, f);
         sscanf(rest, "%u%u", &clientIP, &clientPort);
       }
+      clientIP = (CmiUInt4) clientIP;
       strcpy(pre, "info");
       reply[0] = 0;
       sprintf(ans, "%d ", nodetab_rank0_size);
@@ -583,7 +592,7 @@ void CHostGetOne()
         strcat(reply, "1 ");
       }
       for(i=0;i<nodetab_rank0_size;i++) {
-        sprintf(ans, "%d ", nodeIPs[i]);
+        sprintf(ans, "%d ", (CmiUInt4) nodeIPs[i]);
         strcat(reply, ans);
       }
       for(i=0;i<nodetab_rank0_size;i++) {
@@ -624,7 +633,7 @@ void CHostHandler(char *msg)
   numRegistered++;
  
   if(numRegistered == CmiNumPes()){
-    CmiPrintf("Server IP = %u, Server port = %u $\n",nodeIPs[0], nodePorts[0]);
+    CmiPrintf("Server IP = %u, Server port = %u $\n",(CmiUInt4) nodeIPs[0], nodePorts[0]);
   }
 }
 
@@ -770,6 +779,10 @@ unsigned int freezeIP;
 int freezePort;
 char* breakPointHeader;
 char* breakPointContents;
+
+void dummyF()
+{
+}
 
 static void CpdDebugHandler(char *msg)
 {
@@ -945,14 +958,11 @@ static void CpdDebugHandler(char *msg)
       temp++;
       setBreakPoints(temp);
     }
-    else if (strncmp(name, "backtrace", strlen("backtrace")) == 0){
-      CmiPrintf("backtrace received\n");
-      /*
-      call the necessary function (result goes into reply)
-      CcsSendReply(ip, port, strlen(reply) + 1, reply);
-      free(reply);
-      */
+    else if (strncmp(name, "gdbRequest", strlen("gdbRequest")) == 0){
+      CmiPrintf("gdbRequest received\n");
+      dummyF();
     }
+
     else if (strcmp(name, "quit") == 0){
       CsdExitScheduler();
     }
@@ -998,83 +1008,102 @@ void CpdUnFreeze(void)
 
 #if CMK_WEB_MODE
 
+#define WEB_INTERVAL 1000
+#define MAXFNS 20
+
+/* For Web Performance */
+typedef int (*CWebFunction)();
 unsigned int appletIP;
 unsigned int appletPort;
 
 int countMsgs;
-int *valueArray;
+char **valueArray;
+CWebFunction CWebPerformanceFunctionArray[MAXFNS];
+int CWebNoOfFns;
 CpvDeclare(int, CWebPerformanceDataCollectionHandlerIndex);
 CpvDeclare(int, CWebHandlerIndex);
 
-#define WEB_INTERVAL 2000
-
-void sendDataFunction(){
+void sendDataFunction(void)
+{
   char *reply;
-  int i;
-  
-  /* NOTE : This needs to be made something BETTER */
-  reply = (char *)malloc(100 * sizeof(char));
-  strcpy(reply, "");
-  
-  /* create string to send */
-  for(i = 0; i < CmiNumPes(); i++)
-    sprintf(reply, "%s %d", reply, valueArray[i]);
-  
+  int len = 0, i;
+
+  for(i=0; i<CmiNumPes(); i++){
+    len += (strlen((char*)(valueArray[i]+CmiMsgHeaderSizeBytes+sizeof(int)))+1);
+    /* for the spaces in between */
+  }
+  len+=6; /* for 'perf ' and the \0 at the end */
+
+  reply = (char *)malloc(len * sizeof(char));
+  strcpy(reply, "perf ");
+
+  for(i=0; i<CmiNumPes(); i++){
+    strcat(reply, (valueArray[i] + CmiMsgHeaderSizeBytes + sizeof(int)));
+    strcat(reply, " ");
+  }
+
   /* Do the CcsSendReply */
   CcsSendReply(appletIP, appletPort, strlen(reply) + 1, reply);
-  CmiPrintf("reply = %s\n", reply);
+  CmiPrintf("Reply = %s\n", reply);
   free(reply);
-  
+
+  /* Free valueArray contents */
+  for(i = 0; i < CmiNumPes(); i++){
+    CmiFree(valueArray[i]);
+    valueArray[i] = 0;
+  }
+
   countMsgs = 0;
 }
 
 void CWebPerformanceDataCollectionHandler(char *msg){
   int src;
   int value;
+  char *prev;
 
   if(CmiMyPe() != 0){
-    CmiError("Wrong processor....\n");
-    /* CmiAbort(); */
+    CmiAbort("Wrong processor....\n");
   }
   src = ((int *)(msg + CmiMsgHeaderSizeBytes))[0];
-  value = ((int *)(msg + CmiMsgHeaderSizeBytes))[1];
-  valueArray[src] = value;
-  countMsgs++;
-
-  CmiPrintf("In handler for message totalling..%d..\n", CmiMyPe());
+  CmiGrabBuffer((void **)&msg);
+  prev = valueArray[src]; /* Previous value, ideally 0 */
+  valueArray[src] = (msg);
+  if(prev == 0) countMsgs++;
+  else CmiFree(prev);
 
   if(countMsgs == CmiNumPes()){
-    CmiPrintf("Calling sendDataFunction...%d..\n", CmiMyPe());
     sendDataFunction();
   }
 }
-
-static void CWebPerformanceDataFunction(){
-  char *msg;
-  int randNum;
-  int i;
+void CWebPerformanceGetData(void *dummy)
+{
+  char *msg, data[100];
   int msgSize;
+  int i;
 
-  /* some initialization of seed */
-  srand(CmiMyPe());
+  if(appletIP == 0) {
+    return;  /* No use if client is not yet connected */
+  }
 
-  randNum = CqsLength(CpvAccess(CsdSchedQueue));
-  
-  msgSize = 2 * sizeof(int) + CmiMsgHeaderSizeBytes;
+  strcpy(data, "");
+  /* Evaluate each of the functions and get the values */
+  for(i = 0; i < CWebNoOfFns; i++)
+    sprintf(data, "%s %d", data, (*(CWebPerformanceFunctionArray[i]))());
+
+  msgSize = (strlen(data)+1) + sizeof(int) + CmiMsgHeaderSizeBytes;
   msg = (char *)CmiAlloc(msgSize);
   ((int *)(msg + CmiMsgHeaderSizeBytes))[0] = CmiMyPe();
-  ((int *)(msg + CmiMsgHeaderSizeBytes))[1] = randNum;
+  strcpy(msg + CmiMsgHeaderSizeBytes + sizeof(int), data);
   CmiSetHandler(msg, CpvAccess(CWebPerformanceDataCollectionHandlerIndex));
   CmiSyncSendAndFree(0, msgSize, msg);
-  
-  CcdCallFnAfter(CWebPerformanceDataFunction, 0, WEB_INTERVAL);
+
+  CcdCallFnAfter(CWebPerformanceGetData, 0, WEB_INTERVAL);
 }
 
-static void CWebHandlerOther(char *msg)
+void CWebPerformanceRegisterFunction(CWebFunction fn)
 {
-  /* Ordinary converse message */
-  CmiPrintf("getStuff in Processor %d\n", CmiMyPe());
-  CcdCallFnAfter(CWebPerformanceDataFunction, 0, WEB_INTERVAL);
+  CWebPerformanceFunctionArray[CWebNoOfFns] = fn;
+  CWebNoOfFns++;
 }
 
 static void CWebHandler(char *msg){
@@ -1092,25 +1121,19 @@ static void CWebHandler(char *msg){
     if(strcmp(name, "getStuff") == 0){
       appletIP = ip;
       appletPort = port;
-      valueArray = (int *)malloc(sizeof(int) * CmiNumPes());
-      CcdCallFnAfter(CWebPerformanceDataFunction, 0, WEB_INTERVAL);
+      valueArray = (char **)malloc(sizeof(char *) * CmiNumPes());
+      for(i = 0; i < CmiNumPes(); i++)
+        valueArray[i] = 0;
 
-      CmiPrintf("After setting the Ccd function..\n");
-
-      /*
-      reply = (char *)malloc(10 * sizeof(char));
-      randNum = random();
-      sprintf(reply, "%d", randNum);
-      CcsSendReply(ip, port, strlen(reply) + 1, reply);
-      free(reply);
-      */
-      
       for(i = 1; i < CmiNumPes(); i++){
-	CmiPrintf("Forwarding message to processor %d\n", i);
-	msgSize = CmiMsgHeaderSizeBytes + sizeof(char);
-	getStuffMsg = (char *)CmiAlloc(msgSize);
-	CmiSetHandler(getStuffMsg, CpvAccess(CWebHandlerIndex));
-	CmiSyncSendAndFree(i, msgSize, getStuffMsg);
+        msgSize = CmiMsgHeaderSizeBytes + 2*sizeof(int);
+        getStuffMsg = (char *)CmiAlloc(msgSize);
+        ((int *)(getStuffMsg + CmiMsgHeaderSizeBytes))[0] = appletIP;
+        ((int *)(getStuffMsg + CmiMsgHeaderSizeBytes))[1] = appletPort;
+        CmiSetHandler(getStuffMsg, CpvAccess(CWebHandlerIndex));
+        CmiSyncSendAndFree(i, msgSize, getStuffMsg);
+
+        CcdCallFnAfter(CWebPerformanceGetData, 0, WEB_INTERVAL);
       }
     }
     else{
@@ -1119,9 +1142,93 @@ static void CWebHandler(char *msg){
   }
   else{
     /* Ordinary converse message */
-    CmiPrintf("getStuff in Processor %d\n", CmiMyPe());
-    CcdCallFnAfter(CWebPerformanceDataFunction, 0, WEB_INTERVAL);
+    appletIP = ((int *)(msg + CmiMsgHeaderSizeBytes))[0];
+    appletPort = ((int *)(msg + CmiMsgHeaderSizeBytes))[1];
+
+    CcdCallFnAfter(CWebPerformanceGetData, 0, WEB_INTERVAL);
   }
+}
+
+int f2()
+{
+  return(CqsLength(CpvAccess(CsdSchedQueue)));
+}
+
+int f3()
+{
+  struct timeval tmo;
+
+  gettimeofday(&tmo, NULL);
+  return(tmo.tv_sec % 10 + CmiMyPe() * 3);
+}
+
+/** ADDED 2-14-99 BY MD FOR USAGE TRACKING (TEMPORARY) **/
+
+#define CkUTimer()      ((int)(CmiWallTimer() * 1000000.0))
+
+typedef unsigned int un_int;
+CpvDeclare(un_int, startTime);
+CpvDeclare(un_int, beginTime);
+CpvDeclare(un_int, usedTime);
+CpvDeclare(int, PROCESSING);
+
+/* Call this when the program is started
+ -> Whenever traceModuleInit would be called
+ -> -> see conv-core/convcore.c
+*/
+void initUsage()
+{
+   CpvInitialize(un_int, startTime);
+   CpvInitialize(un_int, beginTime);
+   CpvInitialize(un_int, usedTime);
+   CpvInitialize(int, PROCESSING);
+   CpvAccess(beginTime)  = CkUTimer();
+   CpvAccess(usedTime)   = 0;
+   CpvAccess(PROCESSING) = 0;
+}
+
+int getUsage()
+{
+   int usage = 0;
+   un_int time      = CkUTimer();
+   un_int totalTime = time - CpvAccess(beginTime);
+
+   if(CpvAccess(PROCESSING))
+   {
+      CpvAccess(usedTime) += time - CpvAccess(startTime);
+      CpvAccess(startTime) = time;
+   }
+   if(totalTime > 0)
+      usage = (100 * CpvAccess(usedTime))/totalTime;
+   CpvAccess(usedTime)  = 0;
+   CpvAccess(beginTime) = time;
+   return usage;
+}
+
+/* Call this when a BEGIN_PROCESSING event occurs
+ -> Whenever a trace_begin_execute or trace_begin_charminit
+    would be called
+ -> -> See ck-core/init.c,main.c and conv-core/convcore.c
+*/
+void usageStart()
+{
+   if(CpvAccess(PROCESSING)) return;
+
+   CpvAccess(startTime)  = CkUTimer();
+   CpvAccess(PROCESSING) = 1;
+}
+
+/* Call this when an END_PROCESSING event occurs
+ -> Whenever a trace_end_execute or trace_end_charminit
+    would be called
+ -> -> See ck-core/init.c,main.c and conv-core/threads.c
+*/
+void usageStop()
+{
+   if(!CpvAccess(PROCESSING)) return;
+
+   CpvAccess(usedTime)   += CkUTimer() - CpvAccess(startTime);
+   CpvAccess(PROCESSING) = 0;
 }
 
 void CWebInit(void)
@@ -1132,11 +1239,14 @@ void CWebInit(void)
   CpvAccess(CWebHandlerIndex) = CmiRegisterHandler(CWebHandler);
 
   CpvInitialize(int, CWebPerformanceDataCollectionHandlerIndex);
-  CpvAccess(CWebPerformanceDataCollectionHandlerIndex) = 
+  CpvAccess(CWebPerformanceDataCollectionHandlerIndex) =
     CmiRegisterHandler(CWebPerformanceDataCollectionHandler);
-}
-    
 
+  CWebPerformanceRegisterFunction(getUsage);
+  CWebPerformanceRegisterFunction(f2);
+  CWebPerformanceRegisterFunction(f3);
+
+}
 
 #endif
 
@@ -1217,6 +1327,9 @@ void CsdEndIdle()
         traceEndIdle();
     }
   }
+#if CMK_WEB_MODE
+  usageStart();  
+#endif
 }
 
 void CsdBeginIdle()
@@ -1229,7 +1342,9 @@ void CsdBeginIdle()
         traceBeginIdle();
     }
   }
-
+#if CMK_WEB_MODE
+  usageStop();  
+#endif
   CmiNotifyIdle();
   CcdRaiseCondition(CcdPROCESSORIDLE) ;
 }
@@ -1550,6 +1665,9 @@ static void CthResumeNormalThread(CthThread t)
   if(CpvAccess(traceOn))
     traceResume();
   /* end addition */
+#if CMK_WEB_MODE
+  usageStart();  
+#endif
   CthResume(t);
 }
 
