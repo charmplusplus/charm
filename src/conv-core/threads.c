@@ -1099,6 +1099,7 @@ CthThread CthPup(pup_er p, CthThread t)
 {
   if (pup_isUnpacking(p)) {
 	  t=(CthThread)malloc(sizeof(struct CthThreadStruct));
+	  CthThreadInit(t);
 	  _MEMCHECK(t);
   }
   CthPupBase(p,&t->base,1);
@@ -1107,8 +1108,9 @@ CthThread CthPup(pup_er p, CthThread t)
   pup_bytes(p,&t->context,sizeof(t->context));
   if (pup_isDeleting(p)) {
 	  CthFree(t);
+	  return 0;
   }
-  return 0;
+  return t;
 }
 
 #else 
