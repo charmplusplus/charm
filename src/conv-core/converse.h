@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.37  1996-01-17 08:04:56  jyelon
+ * Revision 2.38  1996-02-14 20:46:11  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.37  1996/01/17 08:04:56  jyelon
  * *** empty log message ***
  *
  * Revision 2.36  1996/01/03 23:18:37  sanjeev
@@ -345,7 +348,7 @@ void          CmiFreeBroadcastAllFn   CMK_PROTO((int, char *));
 #define CmiSyncBroadcastAndFree(s,m)    (CmiFreeBroadcastFn((s),(char *)(m)))
 
 #define CmiSyncBroadcastAll(s,m)        (CmiSyncBroadcastAllFn((s),(char *)(m)))
-#define CmiASyncBroadcastAll(s,m)       (CmiAsyncBroadcastAllFn((s),(char *)(m)))
+#define CmiAsyncBroadcastAll(s,m)       (CmiAsyncBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncBroadcastAllAndFree(s,m) (CmiFreeBroadcastAllFn((s),(char *)(m)))
 
 /******** CMI MESSAGE RECEPTION ********/
@@ -489,11 +492,12 @@ CpvExtern(CthVoidFn, CmiInterruptFuncSaved);
     { CpvAccess(CmiInterruptsBlocked)++; }
 
 #define CmiInterruptsRelease() { \
-    if (CpvAccess(CmiInterruptsBlocked)==0) {\
+    int val = CpvAccess(CmiInterruptsBlocked)-1;\
+    CpvAccess(CmiInterruptsBlocked) = val;\
+    if (val == 0) {\
         CthVoidFn f = CpvAccess(CmiInterruptFuncSaved);\
         if (f) { CpvAccess(CmiInterruptFuncSaved)=0; (f)(); }\
     }\
-    CpvAccess(CmiInterruptsBlocked)--; \
 }
 
 

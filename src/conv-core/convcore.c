@@ -409,6 +409,8 @@ CmiInterruptsInit()
 {
   CpvInitialize(int, CmiInterruptsBlocked);
   CpvInitialize(CthVoidFn, CmiInterruptFuncSaved);
+  CpvAccess(CmiInterruptsBlocked) = 0;
+  CpvAccess(CmiInterruptFuncSaved) = 0;
 }
 
 /*****************************************************************************
