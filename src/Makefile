@@ -426,7 +426,7 @@ charmxlat++: $(XPFILES)
 charmfilter++: $(XPFILES)
 	make -f Maketrans charmfilter++ OPTS='$(OPTS)'
 
-yacc: $(XLFILES)
+yacc:
 	make -f Maketrans yacc OPTS='$(OPTS)'
 
 xlatyacc: $(XLFILES)
@@ -438,7 +438,7 @@ xlatlex: $(XLFILES)
 sfilterlex: $(XLFILES)
 	make -f Maketrans sfilterlex OPTS='$(OPTS)'
 
-yacc++: $(XPFILES)
+yacc++:
 	make -f Maketrans yacc++ OPTS='$(OPTS)'
 
 xlat++yacc: $(XPFILES)
@@ -453,8 +453,14 @@ sfilter++lex: $(XPFILES)
 charmxi: $(XIFILES)
 	make -f Maketrans charmxi OPTS='$(OPTS)'
 
-yacci: $(XIFILES)
+yacci:
 	make -f Maketrans yacci OPTS='$(OPTS)'
+
+conv-cpm: conv-cpm.c conv-cpm.l
+	make -f Maketrans conv-cpm OPTS='$(OPTS)'
+
+yacc-cpm:
+	make -f Maketrans yacc-cpm OPTS='$(OPTS)'
 
 ###############################################################################
 #
