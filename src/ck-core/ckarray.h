@@ -39,6 +39,7 @@ class ArrayMapRegisterMessage;
 class ArrayElementCreateMessage;
 class ArrayElementMigrateMessage;
 class ArrayElementExitMessage;
+class ArrayReductionHeartbeatM;
 
 
 class ArrayMap : public Group
@@ -163,6 +164,7 @@ public:
       (aid)._array->registerReductionHandler(handler,param)
   void registerReductionHandler(ArrayReductionClientFn handler,void *param);
   void RecvReductionMessage(ArrayReductionMessage *msg);
+  void ReductionHeartbeat(ArrayReductionHeartbeatM *msg);
 #endif
 
 #if CMK_LBDB_ON
@@ -234,32 +236,29 @@ private:
  
 #ifdef CK_ARRAY_REDUCTIONS
 // Array Reduction Implementation:
-	ArrayReductionClientFn reductionClient;//Will be called when reduction is complete
+	ArrayReductionClientFn reductionClient;//Will be called with reduction result
 	void *reductionClientParam;//Parameter to pass to reduction client
 
-#define ARRAY_RED_TREE_LOG 2 //Log-base-2 of fan-out of reduction tree (for binary tree, 1)
-#define ARRAY_RED_TREE (1<<ARRAY_RED_TREE_LOG) //Number of kids of each tree node
+#define ARRAY_RED_TREE 4 //Number of kids of each tree node
 
 //This is used to hold messages that arrive for reductions we haven't started yet
-#define ARRAY_RED_FUTURE_MAX 250 //The length of the out-of-order-reduction-message buffer
-	int nFuture;//Number of messages waiting in queue below
-	ArrayReductionMessage *futureBuffer[ARRAY_RED_FUTURE_MAX];
+	PtrQ *futureBuffer;//Holds ArrayReductionMessages from future reductions
 	
 	int reductionNo;//The number of the current reduction (starts at -1)
 	int reductionFinished;//Flag: is the current reduction (above) complete? (as far as we are concerned)
-	ArrayReductionFn curReducer;//Current reduction function (or NULL)
-	ArrayReductionMessage **curMsgs;//Buffered message array for the current reduction
-	int curMax;//Dimentions of above array
-	int nCur;//Number of reduction messages we have received so far.
-	int nComposite;//Number of messages recieved up the reduction tree
-	int expectedComposite;//Number of messages we expect to receive from our kids
+	PtrQ *curMsgs;//Holds ArrayReductionMessages for current reduction
+	int nContributions;//Number of contributions, counting combined
+	int nRemote;//Number of messages recieved up the reduction tree
+	int expectedRemote;//Number of messages we expect to receive from our kids
 
 //This is called by ArrayElement::contribute() and RcvReductionMessage.
 // reducer may be NULL. The given message is kept by Array1D.
-	void addReductionContribution(ArrayReductionMessage *m,ArrayReductionFn reducer);
+	void addContribution(ArrayReductionMessage *m);
+//Like above, but only handles messages from current reduction
+	void addCurrentContribution(ArrayReductionMessage *m);
 
 //These two are called by addReductionContribution, above
-	void beginReduction(int extraLocal);//Allocate msgs array above, increment reductionNo
+	void tryBeginReduction(int atLeast);//increment reductionNo, compute expectedComposite
 	int expectedLocalMessages(void);//How many messages do we still need from locals?
 	void tryEndReduction(void);//Check if we're done, and if so, finish.
 	void endReduction(void);//Combine msgs array and send off, set finished flag
@@ -390,11 +389,13 @@ public:
   //Reduction data
   void *data;
   //Index of array element which made this contribution,
-  //  or -n, where n is the number of contributing elements
+  //  or -n-1, where n is the number of contributing elements
   int source;
   
+  //Return if this is a single element's contribution
+  int isSingleton(void);
   //Return the number of array elements from which this message's data came
-  int getSources();
+  int getSources(void);
   
   //"Constructor"-- builds and returns a new ArrayReductionMessage.
   //  the "srcData" array you specify will be copied into this object (unless NULL).
@@ -404,13 +405,20 @@ public:
 //Internal fields
   //The number of this reduction (0, 1, ...)
   int reductionNo;
-  //(non-packed field) Used only if this message needs to be buffered in the future buffer.
-  ArrayReductionFn futureReducer;
+  //The reduction function pointer.
+  ArrayReductionFn reducer;
  
   //Message runtime support
   static void *alloc(int msgnum, int size, int *reqSize, int priobits);
   static void *pack(ArrayReductionMessage *);
   static ArrayReductionMessage *unpack(void *in);
+};
+
+class ArrayReductionHeartbeatM : public CMessage_ArrayReductionHeartbeatM
+{
+public:
+  int currentReduction;
+  ArrayReductionHeartbeatM(int r) {currentReduction=r;}
 };
 
 //Reduction Library:

@@ -141,7 +141,7 @@ ArrayReductionMessage *CkReduction_set(int nMsg,ArrayReductionMessage **msg)
 	//Copy the source message data into the return message
 	CkReduction_set_element *cur=(CkReduction_set_element *)(ret->data);
 	for (i=0;i<nMsg;i++)
-		if (msg[i]->source<0)
+		if (!msg[i]->isSingleton())
 		{//This message is composite-- just copy it over (less terminating -1)
 			int messageBytes=msg[i]->dataSize-sizeof(int);
 			RED_DEB(("|\tmsg[%d] is %d bytes from %d sources\n",i,msg[i]->dataSize,msg[i]->getSources()));
