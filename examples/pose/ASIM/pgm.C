@@ -82,15 +82,11 @@ main::main(CkArgMsg *m)
   CkPrintf("  %d elapsePattern  %d offsetPattern  %d sendPattern\n",
 	   elapsePattern, offsetPattern, sendPattern);
 
-  POSE_init();
-  //POSE_useQD();
 #if USE_LONG_TIMESTAMPS
-  POSE_useET(atoll(m->argv[7]));
+  POSE_init(atoll(m->argv[7]));
 #else
-  POSE_useET(atoi(m->argv[7]));
+  POSE_init(atoi(m->argv[7]));
 #endif
-
-  //  POSE_useID();
 
   // create all the workers
   WorkerData *wd;
@@ -157,7 +153,6 @@ main::main(CkArgMsg *m)
     //wd->dump();
     (*(CProxy_worker *) &POSE_Objects)[i].insert(wd, dest);
   }
-  POSE_start();
 }
 
 void main::buildMap(int numObjs, int dist)
