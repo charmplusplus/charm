@@ -1595,6 +1595,7 @@ void req_poll()
   int status,i;
   fd_set  rfds;
   struct timeval tmo;
+  int readcount;
 
   skt_set_abort(socket_error_in_poll);
 
@@ -1617,9 +1618,12 @@ void req_poll()
 	}
   for (i=0;i<req_nClients;i++)
 	if (FD_ISSET(req_clients[i],&rfds))
-	/*This client is ready to read*/
-		do { req_serve_client(req_clients[i]); }
-		while (1==skt_select1(req_clients[i],0));
+	  {
+	    readcount=10;   //number of successive reads we serve per socket
+	    /*This client is ready to read*/
+	    do { req_serve_client(req_clients[i]); readcount--;}
+	    while (1==skt_select1(req_clients[i],0) && readcount>0);
+	  }
 
   if (CcsServer_fd()!=INVALID_SOCKET)
 	 if (FD_ISSET(CcsServer_fd(),&rfds)) {
