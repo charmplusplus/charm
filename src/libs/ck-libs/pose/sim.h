@@ -70,7 +70,7 @@ public:
   /** This can also handle event message recycling (currently off) */
   void *operator new (size_t size) {  
     MemoryPool *localPool = (MemoryPool *)CkLocalBranch(MemPoolID);
-    if (localPool->CheckPool(size) > 0)
+    if (0) //(localPool->CheckPool(size) > 0)
       return localPool->GetBlock(size);
     else {
 #ifdef PRIO_MSGS
@@ -85,7 +85,7 @@ public:
   void operator delete(void *p) { 
     MemoryPool *localPool = (MemoryPool *)CkLocalBranch(MemPoolID);
     int ps = localPool->CheckPool(((eventMsg *)p)->msgSize);
-    if ((ps < MAX_POOL_SIZE) && (ps > -1)) {
+    if (0) { // ((ps < MAX_POOL_SIZE) && (ps > -1)) {
       size_t msgSize = ((eventMsg *)p)->msgSize;
       memset(p, 0, msgSize);
       ((eventMsg *)p)->msgSize = msgSize;
