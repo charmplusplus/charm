@@ -117,7 +117,7 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
   ArrayElement *elt = (ArrayElement *)mgr->lookup(m->index, m->aid);
   CkLocRec_local *rec = elt->myRec;
   CkVec<CkMigratable *> list;
-  mgr->elementList(rec, list);
+  mgr->migratableList(rec, list);
   CmiAssert(list.length() > 0);
   for (int l=0; l<list.length(); l++) {
     elt = (ArrayElement *)list[l];
@@ -441,7 +441,7 @@ void CkMemCheckPT::removeArrayElements()
   if (CkMyPe()==thisFailedPe) CmiAssert(len == 0);
 
   // get rid of all buffering and remote recs
-  CKLOCMGR_LOOP(mgr->flushCkRecs(););
+  CKLOCMGR_LOOP(mgr->flushAllRecs(););
 
 //  CKLOCMGR_LOOP(ElementDestoryer chk(mgr); mgr->iterate(chk););
 
