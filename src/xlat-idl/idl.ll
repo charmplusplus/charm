@@ -457,7 +457,8 @@ idl_escape_reader(
       case 'x':
 	{
 	    // hex value
-	    for (int i = 2; str[i] != '\0' && isxdigit(str[i]); i++) {
+	    int i;
+	    for (i = 2; str[i] != '\0' && isxdigit(str[i]); i++) {
 		continue;
 	    }
 	    char save = str[i];
@@ -470,7 +471,8 @@ idl_escape_reader(
       default:
 	// check for octal value
 	if (str[1] >= '0' && str[1] <= '7') {
-	    for (int i = 1; str[i] >= '0' && str[i] <= '7'; i++) {
+	    int i;	
+	    for (i = 1; str[i] >= '0' && str[i] <= '7'; i++) {
 		continue;
 	    }
 	    char save = str[i];

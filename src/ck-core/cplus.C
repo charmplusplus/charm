@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1998-04-16 16:28:43  milind
+ * Revision 2.16  1998-05-28 21:02:19  rbrunner
+ * Changes to make source compatable with KCC-linux.  I think these will work
+ * on other platforms as well
+ *
+ * Revision 2.15  1998/04/16 16:28:43  milind
  * Fixed a charmc bug detected by a CS497 student and a size_t bug.
  *
  * Revision 2.14  1998/02/27 11:51:59  jyelon
@@ -64,7 +68,8 @@
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
 
-#include <varargs.h>
+// #include <varargs.h>  // Not needed for linux, hopefully not elsewhere
+
 #include "charm++.h"
 #include "trace.h"
 #include <stdio.h>

@@ -49,7 +49,8 @@ void CDep::removeMessage(CMsgBuffer *msg)
 // called by entry funcion
 int CDep::depSatisfied(CWhenTrigger *trigger)
 {
-  for(int i=0;i<trigger->nEntries;i++) {
+  int i;
+  for(i=0;i<trigger->nEntries;i++) {
     if(!getMessage(trigger->entries[i], trigger->refnums[i]))
       return 0;
   }

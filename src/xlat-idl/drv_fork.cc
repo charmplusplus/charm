@@ -81,6 +81,14 @@ trademarks or registered trademarks of Sun Microsystems, Inc.
 
 #endif		// SOLARIS2
 
+#ifdef		__KCC                   // This works for Linux. I don't
+					// know about other KCCs
+
+#include	<unistd.h>		// POSIX standard types
+#include	<wait.h>		// POSIX definition of wait()
+
+#endif		// __KCC
+
 #if defined(apollo)
 #include	<sysent.h>
 #endif		// apollo
