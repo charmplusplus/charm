@@ -366,6 +366,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
     env->setMsgtype(NewChareMsg);
   } else {
     pCid->onPE = (-(CkMyPe()+1));
+    pCid->magic = _GETIDX(cIdx);
     pCid->objPtr = (void *) new VidBlock();
     _MEMCHECK(pCid->objPtr);
     env->setMsgtype(NewVChareMsg);
