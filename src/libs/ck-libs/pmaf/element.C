@@ -499,7 +499,7 @@ void element::refineLF()
   elemRef abc, acd, bcd;
   double f[4]; // to store face areas
 
-  // CmiAssert(connectTest());
+  //CmiAssert(connectTest());
   CkPrintf("Refine: %d on %d: volume=%lf target=%lf\n",
   	   myRef.idx, myRef.cid, currentVolume, targetVolume);
   if ((currentVolume < targetVolume) || (currentVolume == 0.0) 
@@ -558,6 +558,7 @@ void element::refineLF()
     }
     CkFreeMsg(result);
   }
+  // acd is locked
   if (bcd.cid != -1) {
     result = mesh[bcd.cid].lockChunk(myRef.cid, f[lf]);
     while (result->anInt != 1) {
@@ -575,6 +576,7 @@ void element::refineLF()
     }
     CkFreeMsg(result);
   }
+  // bcd is locked
   if (abc.cid != -1) {
     CkPrintf("  -> Refine: %d on %d: Locking %d on %d.\n", myRef.idx, 
 	     myRef.cid, abc.idx, abc.cid);
@@ -592,7 +594,7 @@ void element::refineLF()
 	     myRef.cid, abc.idx, abc.cid);
     CkFreeMsg(result);
   }
-
+  // abc and neighbors lockes
   // get nodeRefs for nodes
   CkPrintf("  -> Refine: %d on %d: Cloud locked.\n", myRef.idx, myRef.cid);
   // test if face is on surface of mesh
@@ -700,6 +702,7 @@ void element::refineLF()
   }
   if (bcd.cid != -1) mesh[bcd.cid].unlockChunk(myRef.cid);
   if (acd.cid != -1) mesh[acd.cid].unlockChunk(myRef.cid);
+  if (abc.cid != -1) mesh[abc.cid].unlockChunk(myRef.cid);
   C->unlockLocalChunk(myRef.cid);
   CkPrintf("Refine: DONE %d on %d\n", myRef.idx, myRef.cid);
 }
@@ -843,7 +846,8 @@ splitResponse *element::splitLF(node in1, node in2, node in3, node in4, elemRef 
   // done: unlockChunks
   if (bcd.cid != -1) mesh[bcd.cid].unlockChunk(requester.cid);
   if (acd.cid != -1) mesh[acd.cid].unlockChunk(requester.cid);
-  C->unlockLocalChunk(requester.cid);
+  // do this on originator instead
+  // C->unlockLocalChunk(requester.cid);
   return theResult;
 }
 
@@ -893,13 +897,13 @@ void element::refineLE()
   }
   if (abc.cid != -1) { // abc element exists
     arc1 = 1;
+    // first lock abc
     result = mesh[abc.cid].lockChunk(myRef.cid, length);
     while (result->anInt != 1) {
       CkPrintf("Chunk %d trying to lock %d\n", myRef.cid, abc.cid);
       if (result->anInt == 0) {
 	CkPrintf("Chunk %d failed to lock %d\n", myRef.cid, abc.cid);
-	if (bcd.cid != -1)
-	  mesh[bcd.cid].unlockChunk(myRef.cid);
+	if (bcd.cid != -1) mesh[bcd.cid].unlockChunk(myRef.cid);
 	C->unlockLocalChunk(myRef.cid);
 	return;
       }
@@ -910,6 +914,7 @@ void element::refineLE()
 	result = mesh[abc.cid].lockChunk(myRef.cid, length);
       }
     }
+    // abc locked
     CkFreeMsg(result);
     CkPrintf("3: Refine: %d on %d: locking abc arc\n", myRef.idx, myRef.cid);
     lockArcMsg *lm1 = new lockArcMsg;
@@ -923,11 +928,14 @@ void element::refineLE()
     if (lr1->result == 1) {} // all's well
     else if ((lr1->result == -1) && (abd.cid != -1)) { // didn't reach abd
       arc2 = 1;
+      // first lock abd
       result = mesh[abd.cid].lockChunk(myRef.cid, length);
       while (result->anInt != 1) {
 	if (result->anInt == 0) {
-	  if (bcd.cid != -1)
-	    mesh[bcd.cid].unlockChunk(myRef.cid);
+	  mesh[abc.cid].unlockArc1(abc.idx, myRef.cid, myRef, abd, 
+				   C->theNodes[nodes[a].idx], 
+				   C->theNodes[nodes[b].idx]);
+	  if (bcd.cid != -1) mesh[bcd.cid].unlockChunk(myRef.cid);
 	  C->unlockLocalChunk(myRef.cid);
 	  return;
 	}
@@ -937,6 +945,7 @@ void element::refineLE()
 	  result = mesh[abd.cid].lockChunk(myRef.cid, length);
 	}
       }
+      // abd locked
       CkFreeMsg(result);
       CkPrintf("3.5: Refine: %d on %d: now abd arc\n", myRef.idx, myRef.cid);
       lockArcMsg *lm2 = new lockArcMsg;
@@ -948,17 +957,16 @@ void element::refineLE()
       lm2->b = C->theNodes[nodes[b].idx];
       lockResult *lr2 = mesh[abd.cid].lockArc(lm2);
       if (lr2->result == 0) {
-	mesh[abc.cid].unlockArc1(abc.idx, myRef.cid, myRef, abd, C->theNodes[nodes[a].idx],
-				C->theNodes[nodes[b].idx]);
-	if (bcd.cid != -1)
-	  mesh[bcd.cid].unlockChunk(myRef.cid);
+	mesh[abc.cid].unlockArc1(abc.idx, myRef.cid, myRef, abd, 
+				 C->theNodes[nodes[a].idx], 
+				 C->theNodes[nodes[b].idx]);
+	if (bcd.cid != -1) mesh[bcd.cid].unlockChunk(myRef.cid);
 	C->unlockLocalChunk(myRef.cid);
 	return;
       }
     }
     else if (lr1->result == 0) { // failed
-      if (bcd.cid != -1)
-	mesh[bcd.cid].unlockChunk(myRef.cid);
+      if (bcd.cid != -1) mesh[bcd.cid].unlockChunk(myRef.cid);
       C->unlockLocalChunk(myRef.cid);
       return;  
     }
@@ -968,8 +976,7 @@ void element::refineLE()
     result = mesh[abd.cid].lockChunk(myRef.cid, length);
     while (result->anInt != 1) {
       if (result->anInt == 0) {
-	if (bcd.cid != -1)
-	  mesh[bcd.cid].unlockChunk(myRef.cid);
+	if (bcd.cid != -1) mesh[bcd.cid].unlockChunk(myRef.cid);
 	C->unlockLocalChunk(myRef.cid);
 	return;
       }
@@ -990,8 +997,7 @@ void element::refineLE()
     lm3->b = C->theNodes[nodes[b].idx];
     lockResult *lr3 = mesh[abd.cid].lockArc(lm3);
     if (lr3->result == 0) { // failed
-      if (bcd.cid != -1)
-	mesh[bcd.cid].unlockChunk(myRef.cid);
+      if (bcd.cid != -1) mesh[bcd.cid].unlockChunk(myRef.cid);
       C->unlockLocalChunk(myRef.cid);
       return;  
     }
