@@ -346,6 +346,40 @@ class CkMagicNumber : public CkMagicNumber_impl {
 #endif
 };
 
+/**
+ * The "data" class passed to a CkLocIterator, which refers to a bound
+ * glob of array elements.
+ * This is a transient class-- do not attempt to store it or send 
+ * it across processors.
+ */
+class CkLocation {
+	CkLocMgr *mgr;
+	CkLocRec_local *rec;
+public:
+	CkLocation(CkLocMgr *mgr_, CkLocRec_local *rec_);
+	
+	/// Find our location manager
+	inline CkLocMgr *getManager(void) const {return mgr;}
+	
+	/// Look up and return the array index of this location.
+	const CkArrayIndex &getIndex(void) const;
+	
+	/// Pup all the array elements at this location.
+	void pup(PUP::er &p);
+};
+
+/**
+ * This interface describes the destination for an iterator over
+ * the locations in an array.
+ */
+class CkLocIterator {
+public:
+	virtual ~CkLocIterator();
+	
+	/// This location is part of the calling location manager.
+	virtual void addLocation(CkLocation &loc) =0;
+};
+
 /// Abstract superclass of all array manager objects 
 class CkArrMgr {
 public:
@@ -444,10 +478,19 @@ public:
 		{return map->procNum(mapHandle,idx);}	
 	inline CmiBool isHome(const CkArrayIndex &idx) const
 		{return (CmiBool)(homePe(idx)==CkMyPe());}
+	
 	/// Look up the object with this array index, or return NULL
 	CkMigratable *lookup(const CkArrayIndex &idx,CkArrayID aid);
+	
 	/// Return the "last-known" location (returns a processor number)
 	int lastKnown(const CkArrayIndex &idx) const;
+	
+	/// Pass each of our locations (each separate array index) to this destination.
+	void iterate(CkLocIterator &dest);
+	
+	/// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
+	void resume(const CkArrayIndex &idx, PUP::er &p);
+	
 
 //Communication:
 	CmiBool deliver(CkMessage *m);
@@ -473,8 +516,18 @@ private:
 	//Remove this entry from the table (does not delete record)
 	void removeFromTable(const CkArrayIndex &idx);
 
+	friend class CkLocation; //so it can call pupElementsFor
 	void pupElementsFor(PUP::er &p,CkLocRec_local *rec);
+	
+	/// Call this member function on each element of this location:
+	typedef void (CkMigratable::* CkMigratable_voidfn_t)(void);
+	void callMethod(CkLocRec_local *rec,CkMigratable_voidfn_t fn);
+	
 	CmiBool deliverUnknown(CkArrayMessage *msg, CmiBool immediate);
+	
+	/// Create a new local record at this array index.
+	CkLocRec_local *createLocal(const CkArrayIndex &idx, CmiBool forMigration,
+		CmiBool notifyHome);
 
 //Data Members:
 	//Map array ID to manager and elements

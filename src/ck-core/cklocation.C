@@ -993,6 +993,17 @@ void CkLocMgr::informHome(const CkArrayIndex &idx,int nowOnPe)
 	}
 }
 
+CkLocRec_local *CkLocMgr::createLocal(const CkArrayIndex &idx, CmiBool forMigration,
+		CmiBool notifyHome)
+{
+	int localIdx=nextFree();
+	DEBC((AA"Adding new record for element %s at local index %d\n"AB,idx2str(idx),localIdx));
+	CkLocRec_local *rec=new CkLocRec_local(this,forMigration,idx,localIdx);
+	insertRec(rec,idx); //Add to global hashtable
+	if (notifyHome) informHome(idx,CkMyPe());
+	return rec;
+}
+
 //Add a new local array element, calling element's constructor
 CmiBool CkLocMgr::addElement(CkArrayID id,const CkArrayIndex &idx,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg)
@@ -1002,11 +1013,7 @@ CmiBool CkLocMgr::addElement(CkArrayID id,const CkArrayIndex &idx,
 	CkLocRec_local *rec;
 	if (oldRec==NULL||oldRec->type()!=CkLocRec::local) 
 	{ //This is the first we've heard of that element-- add new local record
-		int localIdx=nextFree();
-		DEBC((AA"Adding new record for element %s at local index %d\n"AB,idx2str(idx),localIdx));
-		rec=new CkLocRec_local(this,CmiFalse,idx,localIdx);
-		insertRec(rec,idx); //Add to global hashtable
-		informHome(idx,CkMyPe());
+		rec=createLocal(idx,CmiFalse,CmiTrue);
 	} else 
 	{ //rec is *already* local-- must not be the first insertion	
 		rec=((CkLocRec_local *)oldRec);
@@ -1197,6 +1204,38 @@ void CkLocMgr::multiHop(CkArrayMessage *msg)
 	}
 }
 
+/************************** LocMgr: ITERATOR *************************/
+CkLocation::CkLocation(CkLocMgr *mgr_, CkLocRec_local *rec_)
+	:mgr(mgr_), rec(rec_) {}
+	
+const CkArrayIndex &CkLocation::getIndex(void) const {
+	return rec->getIndex();
+}
+
+void CkLocation::pup(PUP::er &p) {
+	mgr->pupElementsFor(p,rec);
+}
+
+CkLocIterator::~CkLocIterator() {}
+
+/// Iterate over our local elements:
+void CkLocMgr::iterate(CkLocIterator &dest) {
+  //Poke through the hash table for local ArrayRecs.
+  void *objp;
+  CkHashtableIterator *it=hash.iterator();
+  while (NULL!=(objp=it->next())) {
+    CkLocRec *rec=*(CkLocRec **)objp;
+    if (rec->type()==CkLocRec::local) {
+      CkLocation loc(this,(CkLocRec_local *)rec);
+      dest.addLocation(loc);
+    }
+  }
+  delete it;
+}
+
+
+
+
 /************************** LocMgr: MIGRATION *************************/
 
 CkMigratable *CkArrMgr::allocateMigrated(int elChareType,const CkArrayIndex &idx)
@@ -1206,6 +1245,7 @@ CkMigratable *CkArrMgr::allocateMigrated(int elChareType,const CkArrayIndex &idx
 
 void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec)
 {
+	p.comment("-------- Array Location --------");
 	register ManagerRec *m;
 	int localIdx=rec->getLocalIndex();
 	
@@ -1235,6 +1275,16 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec)
 	}
 }
 
+/// Call this member function on each element of this location:
+void CkLocMgr::callMethod(CkLocRec_local *rec,CkMigratable_voidfn_t fn)
+{
+	int localIdx=rec->getLocalIndex();
+	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
+		CkMigratable *el=m->element(localIdx);
+		if (el) (el->* fn)();
+	}
+}
+
 /// Migrate this element to another processor.
 void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 {
@@ -1245,10 +1295,7 @@ void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 	CkArrayIndexMax idx=rec->getIndex();
 
 	//Let all the elements know we're leaving
-	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
-		CkMigratable *el=m->element(localIdx);
-		if (el) el->ckAboutToMigrate();
-	}
+	callMethod(rec,&CkMigratable::ckAboutToMigrate);
 
 //First pass: find size of migration message
 	int bufSize;
@@ -1308,9 +1355,7 @@ void CkLocMgr::migrateIncoming(CkArrayElementMigrateMessage *msg)
 	}
 
 	//Create a record for this element
-	int localIdx=nextFree();
-	CkLocRec_local *rec=new CkLocRec_local(this,CmiTrue,idx,localIdx);
-	insertRec(rec,idx); //Add to global hashtable
+	CkLocRec_local *rec=createLocal(idx,CmiTrue,CmiFalse /* home told on departure */ );
 	
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec);
@@ -1325,11 +1370,20 @@ void CkLocMgr::migrateIncoming(CkArrayElementMigrateMessage *msg)
 	}
 	
 	//Let all the elements know we've arrived
-	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
-		CkMigratable *el=m->element(localIdx);
-		if (el) el->ckJustMigrated();
-	}
+	callMethod(rec,&CkMigratable::ckJustMigrated);
 	delete msg;
+}
+
+
+/// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
+void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p)
+{
+	CkLocRec_local *rec=createLocal(idx,CmiTrue,CmiTrue /* home doesn't know yet */ );
+	
+	//Create the new elements as we unpack the message
+	pupElementsFor(p,rec);
+	
+	callMethod(rec,&CkMigratable::ckJustMigrated);
 }
 
 /********************* LocMgr: UTILITY ****************/
