@@ -297,7 +297,19 @@ void TCharmReadonlys::add(TCpupReadonlyGlobal fn)
 {
 	entries.push_back(fn);
 }
+
 //Pups all registered readonlys
+void TCharmReadonlys::pupAllReadonlys(PUP::er &p) {
+	//Pup the globals for this node:
+	int i,n=entries.length();
+	p.comment("TCharm Readonly global variables:");
+	p(n);
+	if (n!=entries.length())
+		CkAbort("TCharmReadonly list length mismatch!\n");
+	for (i=0;i<n;i++)
+		(entries[i])((pup_er)&p);
+}
+
 void TCharmReadonlys::pup(PUP::er &p) {
 	if (p.isUnpacking()) {
 		//HACK: Rather than sending this message only where its needed,
@@ -305,13 +317,7 @@ void TCharmReadonlys::pup(PUP::er &p) {
 		if (CkMyPe()==0) return; //Processor 0 is the source-- no unpacking needed
 		if (CkMyRank()!=0) return; //Some other processor will do the unpacking
 	}
-	//Pup the globals for this node:
-	int i,n=entries.length();
-	p(n);
-	if (n!=entries.length())
-		CkAbort("TCharmReadonly list length mismatch!\n");
-	for (i=0;i<n;i++)
-		(entries[i])((pup_er)&p);
+	pupAllReadonlys(p);
 }
 
 CDECL void TCharmReadonlyGlobals(TCpupReadonlyGlobal fn)
@@ -673,7 +679,8 @@ FDECL void FTN_NAME(TCHARM_BARRIER,tcharm_barrier)(void)
 CDECL void TCharmDone(void)
 {
 	TCHARMAPI("TCharmDone");
-	TCharm::get()->done();
+	if (TCharm::getState()!=inDriver) CkExit();
+	else TCharm::get()->done();
 }
 FDECL void FTN_NAME(TCHARM_DONE,tcharm_done)(void)
 {

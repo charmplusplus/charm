@@ -23,7 +23,10 @@ class TCharmReadonlys {
 	static CkVec<TCpupReadonlyGlobal> entries;
  public:
 	static void add(TCpupReadonlyGlobal fn);
-	//Pups all registered readonlys
+	//Pups all registered readonlys	
+	static void pupAllReadonlys(PUP::er &p);
+
+	//Used by parameter marshalling:
 	void pup(PUP::er &p);
 };
 PUPmarshall(TCharmReadonlys);
