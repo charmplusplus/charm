@@ -574,13 +574,6 @@ inline void msg_prepareSend(CkArrayMessage *msg, int ep,CkArrayID aid)
 	env->setEpIdx(ep);
 	env->getsetArrayHops()=0;
 }
-inline void msg_prepareSendImmediate(CkArrayMessage *msg, int ep,CkArrayID aid)
-{
-        msg_prepareSend(msg, ep, aid);
-	envelope *env=UsrToEnv((void *)msg);
-	CmiSetHandler(env, CpvAccessOther(CmiImmediateMsgHandlerIdx,0));
-  	CmiSetXHandler(env, _charmHandlerIdx);
-}
 void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep) const
 {
 #ifndef CMK_OPTIMIZE
@@ -591,13 +584,6 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep) const
 			"use bytes instead of integers?\n");
 #endif
         CmiBool immediate = (CmiBool)msg->array_isImmediate();
-#if CMK_IMMEDIATE_MSG
-	if (immediate) {
-	  msg_prepareSendImmediate(msg,ep,ckGetArrayID());
-	  msg->array_setImmediate(CmiFalse);
-        }
-        else
-#endif
 	msg_prepareSend(msg,ep,ckGetArrayID());
 	msg->array_index()=_idx;//Insert array index
 	if (ckIsDelegated()) //Just call our delegateMgr
