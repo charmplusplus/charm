@@ -112,9 +112,9 @@ dirs+sources:
 
 CVHEADERS=converse.h conv-mach.h 
 
-CVLIBS=libconv-core.a $(CVLIBS_QS)
+CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a
 
-LIBCONV_CORE=threads.o convcore.o conv-conds.o machine.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o
+LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o
 
 converse: basics $(CVLIBS) conv-host-if-needed conv-cpm
 
@@ -130,6 +130,12 @@ conv-host: conv-host.c
 libconv-core.a: $(LIBCONV_CORE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_CORE)
 
+libconv-cplus-y.a: machine.c
+	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=0 machine.c
+
+libconv-cplus-n.a: machine.c
+	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=1 machine.c
+
 cpm.o: cpm.c $(CVHEADERS)
 	$(CHARMC) cpm.c
 
@@ -141,9 +147,6 @@ threads.o: threads.c $(CVHEADERS)
 
 spantree.o: spantree.c $(CVHEADERS)
 	$(CHARMC) spantree.c
-
-machine.o: machine.c $(CVHEADERS)
-	$(CHARMC) machine.c
 
 convcore.o: convcore.c $(CVHEADERS)
 	$(CHARMC) convcore.c

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.49  1996-11-08 22:22:51  brunner
+ * Revision 2.50  1996-11-20 06:45:40  jyelon
+ * Repaired rob's HP/C++ mods.
+ *
+ * Revision 2.49  1996/11/08 22:22:51  brunner
  * Put _main in for HP-UX CC compilation.  It is ignored according to the
  * CMK_USE_HP_MAIN_FIX flag.
  *
@@ -295,19 +298,19 @@ CpvExtern(void*,       CsdSchedQueue);
 CpvExtern(int,         CsdStopFlag);
 
 extern int CmiRegisterHandler CMK_PROTO((CmiHandler));
+extern int CmiRegisterHandlerLocal CMK_PROTO((CmiHandler));
+extern int CmiRegisterHandlerGlobal CMK_PROTO((CmiHandler));
+extern void CmiNumberHandler CMK_PROTO((int, CmiHandler));
 
 #if CMK_IS_HETERO
 
 #include <netinet/in.h>
-
 #define CmiGetHandler(env)  (ntohl((*((int *)(env)))))
-
 #define CmiSetHandler(env,x)  (*((int *)(env)) = (htonl(x)))
 
 #else
 
 #define CmiGetHandler(env)  (*((int *)(env)))
-
 #define CmiSetHandler(env,x)  (*((int *)(env)) = x)
 
 #endif

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.17  1996-11-08 22:22:53  brunner
+ * Revision 1.18  1996-11-20 06:46:54  jyelon
+ * Repaired rob's HP/C++ mods.
+ *
+ * Revision 1.17  1996/11/08 22:22:53  brunner
  * Put _main in for HP-UX CC compilation.  It is ignored according to the
  * CMK_USE_HP_MAIN_FIX flag.
  *
@@ -536,7 +539,9 @@ char *argv[];
   CthThread t; Fifo q; int stacksize, i;
 
 #if CMK_USE_HP_MAIN_FIX
+#if FOR_CPLUS
   _main(argc,argv);
+#endif
 #endif
   CmiArgv = argv;
   CmiParseArgs(argv);

@@ -142,24 +142,72 @@ int CstatPrintMemStats()
  *****************************************************************************/
 
 CpvDeclare(CmiHandler*, CmiHandlerTable);
-CpvStaticDeclare(int, CmiHandlerCount);
+CpvStaticDeclare(int  , CmiHandlerCount);
+CpvStaticDeclare(int  , CmiHandlerLocal);
+CpvStaticDeclare(int  , CmiHandlerGlobal);
+CpvStaticDeclare(int  , CmiHandlerMax);
 
-int CmiRegisterHandler(handlerf)
-CmiHandler handlerf ;
+void CmiNumberHandler(n, h)
+int n; CmiHandler h;
 {
-  CpvAccess(CmiHandlerTable)[CpvAccess(CmiHandlerCount)] = handlerf;
-  CpvAccess(CmiHandlerCount)++ ;
-  return CpvAccess(CmiHandlerCount)-1 ;
+  CmiHandler *tab = CpvAccess(CmiHandlerTable);
+  int         max = CpvAccess(CmiHandlerMax);
+
+  if (n == max) {
+    int bytes = max*sizeof(CmiHandler);
+    CmiHandler *new = (CmiHandler*)CmiAlloc(bytes<<1);
+    memcpy(new, tab, bytes);
+    memset(new+max, 0, bytes);
+    free(tab); tab=new;
+    CpvAccess(CmiHandlerTable) = tab;
+    CpvAccess(CmiHandlerMax) = (max<<1);
+  }
+  tab[n] = h;
+}
+
+int CmiRegisterHandler(h)
+CmiHandler h;
+{
+  int Count = CpvAccess(CmiHandlerCount);
+  CmiNumberHandler(Count, h);
+  CpvAccess(CmiHandlerCount) = Count+2;
+  return Count;
+}
+
+int CmiRegisterHandlerLocal(h)
+CmiHandler h;
+{
+  int Local = CpvAccess(CmiHandlerLocal);
+  CmiNumberHandler(Local, h);
+  CpvAccess(CmiHandlerLocal) = Local+2;
+  return Local;
+}
+
+int CmiRegisterHandlerGlobal(h)
+CmiHandler h;
+{
+  int Global = CpvAccess(CmiHandlerGlobal);
+  if (CmiMyPe()!=0) 
+    CmiError("CmiRegisterHandlerGlobal must only be called on PE 0.\n");
+  CmiNumberHandler(Global, h);
+  CpvAccess(CmiHandlerGlobal) = Global+2;
+  return Global;
 }
 
 static void CmiHandlerInit()
 {
-  CpvInitialize(int, CmiHandlerCount);
   CpvInitialize(CmiHandler *, CmiHandlerTable);
-  CpvAccess(CmiHandlerCount) = 0;
-  CpvAccess(CmiHandlerTable) =
-    (CmiHandler *)CmiAlloc((MAX_HANDLERS + 1) * sizeof(CmiHandler)) ;
+  CpvInitialize(int         , CmiHandlerCount);
+  CpvInitialize(int         , CmiHandlerLocal);
+  CpvInitialize(int         , CmiHandlerGlobal);
+  CpvInitialize(int         , CmiHandlerMax);
+  CpvAccess(CmiHandlerCount)  = 0;
+  CpvAccess(CmiHandlerLocal)  = 1;
+  CpvAccess(CmiHandlerGlobal) = 2;
+  CpvAccess(CmiHandlerMax) = 100;
+  CpvAccess(CmiHandlerTable) = (CmiHandler *)malloc(100*sizeof(CmiHandler)) ;
 }
+
 
 /******************************************************************************
  *
