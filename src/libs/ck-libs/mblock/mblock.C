@@ -42,7 +42,7 @@ typedef enum {
   inInit,
   inPup,
   inBc,
-  inDriver, //<- almost always here
+  inDriver //<- almost always here
 } mblk_state_t;
 
 CpvStaticDeclare(mblk_state_t,_mblk_state);
