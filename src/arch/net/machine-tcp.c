@@ -12,6 +12,7 @@
   Gengbin Zheng, 12/21/2001
   gzheng@uiuc.edu
 
+  now also works with SMP version  //  Gengbin 6/18/2003
 */
 
 #if !defined(_WIN32) || defined(__CYGWIN__)
@@ -23,7 +24,7 @@
 #define NO_NAGLE_ALG		1
 #define FRAGMENTATION		0
 
-void ReceiveDatagram(SOCKET fd);
+void ReceiveDatagram(int pe);
 int TransmitDatagram(int pe);
 
 /******************************************************************************
@@ -32,31 +33,52 @@ int TransmitDatagram(int pe);
  *
  *****************************************************************************/
 typedef struct {
-char none;  
+  int sleepMs; /*Milliseconds to sleep while idle*/
+  int nIdles; /*Number of times we've been idle in a row*/
+  CmiState cs; /*Machine state*/
 } CmiIdleState;
 
-static CmiIdleState *CmiNotifyGetState(void) { return NULL; }
 
-static void CmiNotifyStillIdle(CmiIdleState *s);
+static CmiIdleState *CmiNotifyGetState(void) 
+{
+  CmiIdleState *s=(CmiIdleState *)malloc(sizeof(CmiIdleState));
+  s->sleepMs=0;
+  s->nIdles=0;
+  s->cs=CmiGetState();
+  return s;
+}
 
 static void CmiNotifyBeginIdle(CmiIdleState *s)
 {
-  CmiNotifyStillIdle(s);
+  s->sleepMs=0;
+  s->nIdles=0;
 }
-
 
 static void CmiNotifyStillIdle(CmiIdleState *s)
 {
 #if CMK_SHARED_VARS_UNAVAILABLE
   CommunicationServerThread(1);
 #else
+  int nSpins=20; /*Number of times to spin before sleeping*/
+  s->nIdles++;
+  if (s->nIdles>nSpins) { /*Start giving some time back to the OS*/
+    s->sleepMs+=2;
+    if (s->sleepMs>10) s->sleepMs=10;
+  }
   /*Comm. thread will listen on sockets-- just sleep*/
-  CmiIdleLock_sleep(&CmiGetState()->idle,5);
+  if (s->sleepMs>0) {
+    MACHSTATE1(3,"idle lock(%d) {",CmiMyPe())
+    CmiIdleLock_sleep(&s->cs->idle,s->sleepMs);
+    CsdResetPeriodic();		/* check ccd callbacks when I am awakened */
+    MACHSTATE1(3,"} idle lock(%d)",CmiMyPe())
+  }
 #endif
 }
 
 void CmiNotifyIdle(void) {
-  CmiNotifyStillIdle(NULL);
+  CmiIdleState s;
+  s.sleepMs=5; 
+  CmiNotifyStillIdle(&s);
 }
 
 /****************************************************************************
@@ -70,128 +92,92 @@ void CmiNotifyIdle(void) {
  *
  ***************************************************************************/
 
+/*
+  FIXME !
+  current tcp version only allow the program to run on <= 1000 nodes
+  due to the static fixed size array below.
+  This can be easily fixed, however, I suspect tcp version won't scale well
+  on large number of processors due to the checking of sockets, 
+  so I don't bother.
+*/
+
+static char sockReadStates[1000] = {0};
+static char sockWriteStates[1000] = {0};
+
 #if CMK_USE_POLL
-static struct pollfd *fds=0;
-static int numSocks=0;
-static int numDataSocks=0;
 
-static int CmiSetupSockets()
-{
-  int i;
-  numSocks = 0;
-  if (!fds)
-    fds = (struct pollfd  *)malloc((CmiNumNodes()+5)*sizeof(struct pollfd));
-  MACHSTATE(2,"CmiSetupSockets")
-  if (dataskt!=-1) {
-    for (i=0; i<CmiNumNodes(); i++)
-    {
-/*CmiPrintf("[%d] %d - %d\n", CmiMyPe(), i, nodes[i].sock);*/
-      if (i == CmiMyNode()) continue;
-      fds[numSocks].fd = nodes[i].sock;
-      fds[numSocks].events = POLLIN;
-      if (nodes[i].send_queue_h) fds[numSocks].events |= POLLOUT;
-      numSocks++;
-    }
-  }
-  if (Cmi_charmrun_fd!=-1) {
-    fds[numSocks].fd = Cmi_charmrun_fd;
-    fds[numSocks].events = POLLIN;
-    numSocks ++;
-  }
-  CmiStdoutAdd(fds,&numSocks);
-}
+#undef CMK_PIPE_DECL
+#define CMK_PIPE_DECL(delayMs)  \
+	struct pollfd  fds[1000];	\
+	int nFds_sto=0; int *nFds=&nFds_sto; \
+	int pollDelayMs=delayMs;
 
+#define CMK_PIPE_ADDREADWRITE(afd)	\
+      CMK_PIPE_ADDREAD(afd);	\
+      if (nodes[i].send_queue_h) fds[(*nFds)-1].events |= POLLOUT;
+	
+#undef CMK_PIPE_CHECKWRITE
+#define CMK_PIPE_CHECKWRITE(afd)	\
+	fds[*nFds].revents&POLLOUT
+
+#define CMK_PIPE_SETUP	\
+	CmiStdoutAdd(CMK_PIPE_SUB);	\
+  	if (Cmi_charmrun_fd!=-1) { CMK_PIPE_ADDREAD(Cmi_charmrun_fd); }	\
+  	if (dataskt!=-1) {	\
+    	  for (i=0; i<CmiNumNodes(); i++)	\
+    	  {	\
+      	    if (i == CmiMyNode()) continue;	\
+      	    CMK_PIPE_ADDREADWRITE(nodes[i].sock);	\
+   	  }	\
+  	} 	
+
+#else
+
+#define CMK_PIPE_SETUP	\
+  	CmiStdoutAdd(CMK_PIPE_SUB);	\
+	if (Cmi_charmrun_fd!=-1) { CMK_PIPE_ADDREAD(Cmi_charmrun_fd); }	\
+  	if (dataskt!=-1) {	\
+    	  for (i=0; i<CmiNumNodes(); i++)	\
+    	  {	\
+      	    if (i == CmiMyNode()) continue;	\
+      	    CMK_PIPE_ADDREAD(nodes[i].sock);	\
+      	    if (nodes[i].send_queue_h) CMK_PIPE_ADDWRITE(nodes[i].sock);\
+    	  }	\
+  	}	 	
+
+#endif
+
+/* check data sockets and invoking functions */
 static void CmiCheckSocks()
 {
-  int n = 0, pe;
+  int pe;
   if (dataskt!=-1) {
     for (pe=0; pe<CmiNumNodes(); pe++)
     {
       if (pe == CmiMyNode()) continue;
-      if (fds[n].revents & POLLIN) {
-	dataskt_ready_read = 1;
+      if (sockReadStates[pe]) {
         MACHSTATE1(2,"go to ReceiveDatagram %d", pe)
-	ReceiveDatagram(fds[n].fd);
+	ReceiveDatagram(pe);
       }
-      if (fds[n].revents & POLLOUT) {
+      if (sockWriteStates[pe]) {
         MACHSTATE1(2,"go to TransmitDatagram %d", pe)
-	dataskt_ready_write = 1;
 	TransmitDatagram(pe);
       }
-      n++;
     }
   }
-  if (Cmi_charmrun_fd!=-1) {
-    ctrlskt_ready_read = fds[n].revents & POLLIN;
-    n++;
-  }
-  CmiStdoutCheck(fds,&numSocks);
 }
-#else
 
 /*
-WARNING: fd_set gets zero'd out after you call select, so this
-code won't work as written!
- */
-static fd_set rfds; 
-static fd_set wfds; 
-
-static int CmiSetupSockets()
-{
-  int i;
-  FD_ZERO(&rfds);FD_ZERO(&wfds);
-  if (Cmi_charmrun_fd!=-1)
-  	FD_SET(Cmi_charmrun_fd, &rfds);
-  if (dataskt!=-1) {
-    for (i=0; i<CmiNumNodes(); i++)
-    {
-/*CmiPrintf("[%d] %d - %d\n", CmiMyPe(), i, nodes[i].sock);*/
-      if (i == CmiMyNode()) continue;
-      FD_SET(nodes[i].sock, &rfds);
-      if (nodes[i].send_queue_h) FD_SET(nodes[i].sock, &wfds);
-    }
-  }  
-  CmiStdoutAdd(&rfds,&wfds);
-}
-
-static void CmiCheckSocks()
-{
-  int i;
-  if (Cmi_charmrun_fd!=-1)
-	ctrlskt_ready_read = (FD_ISSET(Cmi_charmrun_fd, &rfds));
-  if (dataskt!=-1) {
-    for (i=0; i<Cmi_numnodes; i++)
-    {
-      if (i == CmiMyNode()) continue;
-      if (FD_ISSET(nodes[i].sock, &rfds)) {
-  	dataskt_ready_read = 1;
-	ReceiveDatagram(nodes[i].sock);
-      }
-      if (FD_ISSET(nodes[i].sock, &wfds)) {
-	dataskt_ready_write = 1;
-	TransmitDatagram(i);
-      }
-    }
-  }
-  CmiStdoutCheck(&rfds,&wfds);
-}
-#endif
-
-int CheckSocketsReady(int withDelayMs)
+  when output = 1, this function is not thread safe
+*/
+int CheckSocketsReady(int withDelayMs, int output)
 {   
   int nreadable,i;
-#if !CMK_USE_POLL
-  struct timeval tmo;
-  MACHSTATE(1,"CheckSocketsReady {")
-  tmo.tv_sec = 0;
-  tmo.tv_usec = withDelayMs*1000;
-  CmiSetupSockets();
-  nreadable = select(FD_SETSIZE, &rfds, &wfds, NULL, &tmo);
-#else
-  MACHSTATE(1,"CheckSocketsReady {")
-  CmiSetupSockets();
-  nreadable = poll(fds, numSocks, withDelayMs);
-#endif
+  CMK_PIPE_DECL(withDelayMs);
+
+  CMK_PIPE_SETUP;
+  nreadable=CMK_PIPE_CALL();
+
   ctrlskt_ready_read = 0;
   dataskt_ready_read = 0;
   dataskt_ready_write = 0;
@@ -212,9 +198,30 @@ here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK.
 		KillEveryone("Socket error in CheckSocketsReady!\n");
 #endif
     MACHSTATE(2,"} CheckSocketsReady (INTERRUPTED!)")
-    return CheckSocketsReady(0);
+    return CheckSocketsReady(0, output);
   }
-/*  CmiCheckSocks(); */
+
+  if (output) {
+
+    CmiStdoutCheck(CMK_PIPE_SUB);
+    if (Cmi_charmrun_fd!=-1)
+	ctrlskt_ready_read = CMK_PIPE_CHECKREAD(Cmi_charmrun_fd);
+    if (dataskt!=-1) {
+      for (i=0; i<Cmi_numnodes; i++)
+      {
+        if (i == CmiMyNode()) continue;
+        if (nodes[i].send_queue_h) {
+          sockWriteStates[i] = CMK_PIPE_CHECKWRITE(nodes[i].sock);
+          if (sockWriteStates[i]) dataskt_ready_write = 1;
+        }
+        else
+          sockWriteStates[i] = 0;
+        sockReadStates[i] = CMK_PIPE_CHECKREAD(nodes[i].sock);
+        if (sockReadStates[i])  dataskt_ready_read = 1;
+      }
+    }
+  }
+
   MACHSTATE(1,"} CheckSocketsReady")
   return nreadable;
 }
@@ -243,24 +250,27 @@ static void CommunicationServer(int sleepTime)
 #if !CMK_SHARED_VARS_UNAVAILABLE /*SMP mode: comm. lock is precious*/
   if (sleepTime!=0) {/*Sleep *without* holding the comm. lock*/
     MACHSTATE(2,"CommServer going to sleep (NO LOCK)");
-    if (CheckSocketsReady(sleepTime)<=0) {
+    if (CheckSocketsReady(sleepTime, 0)<=0) {
       MACHSTATE(2,"CommServer finished without anything happening.");
     }
   }
   sleepTime=0;
 #endif
   CmiCommLock();
+  CommunicationsClock();
   /*Don't sleep if a signal has stored messages for us*/
   if (sleepTime&&CmiGetState()->idle.hasMessages) sleepTime=0;
-  while (CheckSocketsReady(sleepTime)>0) {
+  while (CheckSocketsReady(sleepTime, 1)>0) {
     int again=0;
     sleepTime=0;
+    CmiCheckSocks();
     if (ctrlskt_ready_read) {again=1;ctrl_getone();}
     if (dataskt_ready_read || dataskt_ready_write) {again=1;}
-    CmiCheckSocks();
     if (CmiStdoutNeedsService()) {CmiStdoutService();}
     if (!again) break; /* Nothing more to do */
     if ((nTimes++ &16)==15) {
+      /*We just grabbed a whole pile of packets-- try to retire a few*/
+      CommunicationsClock();
       break;
     }
   }
@@ -339,15 +349,15 @@ static void IntegrateMessageDatagram(char *msg, int len)
   else CmiPrintf("message ignored2!\n");
 }
 
-void ReceiveDatagram(SOCKET fd)
+void ReceiveDatagram(int pe)
 {
   static char *buf = NULL;
   int size;
-  int ok;
   double t;
 
-  if (-1==skt_recvN(fd, &size, sizeof(int)))
-    CmiAbort("Error in ReceiveDatagram.");
+  SOCKET fd = nodes[pe].sock;
+  if (-1 == skt_recvN(fd, &size, sizeof(int)))
+    KillEveryoneCode(4559318);
 
 #if FRAGMENTATION
   if (!buf) buf = (char *)CmiAlloc(Cmi_dgram_max_data+DGRAM_HEADER_SIZE);
@@ -356,7 +366,7 @@ void ReceiveDatagram(SOCKET fd)
 #endif
   /* buf[0] = size; */
   if (-1==skt_recvN(fd, buf, size))
-    CmiAbort("Error in ReceiveDatagram.");
+    KillEveryoneCode(4559319);
 
   IntegrateMessageDatagram(buf, size);
 }
