@@ -1,4 +1,7 @@
-// File: BlueGene.h
+/**********************************************************************
+ * File : BlueGene.h
+ * Author : Arun Singla, Neelam Saboo
+ *********************************************************************/
 
 #ifndef _BlueGene_h
 #define _BlueGene_h
@@ -12,18 +15,13 @@
 
 enum WorkType {LARGE_WORK=0, SMALL_WORK=1};
 
-#if BG_TIMER
-#define BGTimer() CkWallTimer()
-#else
-#define BGTimer() 0.0
-#endif
-
 class BgNode ;
 class InBuffer ;
 class SchedulerQ ;
 class ThreadInfo ;
 class PacketMsg ;
 class Main ;
+
 // CkQ is defined in charm++.h
 typedef CkQ<PacketMsg*> MsgQ;
 
@@ -36,21 +34,40 @@ typedef void (*BgHandler)(ThreadInfo *) ;
 class CreateBgNodeMsg: public CMessage_CreateBgNodeMsg
 {
 public:
-  int numCTh ;
-  int numWTh ;
-  int numBgX ;
-  int numBgY ;
-  int numBgZ ;
+  //int numCTh ;
+  //int numWTh ;
+  //int numBgX ;
+  //int numBgY ;
+  //int numBgZ ;
+  int argc   ;
+  char **argv;
+
+  void pup(PUP::er &p) 
+  { 
+     p(argc);
+     if(p.isUnpacking())
+        argv = new (char*) [argc] ;
+
+     for (int i=0;i<argc;i++) 
+     {
+        //Unpack each arguemnt
+        int len; //<- the length of argv[i]
+        if (!p.isUnpacking()) len=strlen(argv[i])+1;
+        p(len);
+        if (p.isUnpacking()) argv[i]=new char[len];
+        p(argv[i],len);
+     }
+  }
 } ;
 //~~~ end of class CreateBgNodeMsg ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class PacketMsg: public CMessage_PacketMsg
 {
 public:
-  int handlerID ;
+  int      handlerID ;
   WorkType type;
-  double sendTime ;
-  double recvTime ;
+  double   sendTime ;
+  double   recvTime ;
 } ;
 //~~~ end of class PacketMsg ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -59,7 +76,7 @@ class Main: public Chare
 private:
   CkArgMsg *args ;
   int       numBgX, numBgY, numBgZ ;   
-  double starttime, endtime;
+  double    starttime, endtime;
 
 public:
        Main(CkArgMsg *msg) ;
@@ -86,13 +103,19 @@ private:
   SchedulerQ*  commForMsg;
   SchedulerQ*  commForWork;
   MsgQ*        addMsgQ;
-  CProxy_BgNode**** proxies;
+  //CProxy_BgNode**** proxies;
+
+  friend class ThreadInfo ;
+  void   sendPacket(int x, int y, int z, PacketMsg *msgPtr, 
+                    int handlerID, WorkType type) ;
 
 public:
   int         numBgX ;
   int         numBgY ;
   int         numBgZ ;
   void*       nvData ;
+  int	      argc   ;
+  char**      argv   ;
 
 public:   
        BgNode(CreateBgNodeMsg *msgPtr) ;
@@ -107,11 +130,9 @@ public:
   void startCommTh(ThreadInfo *info) ;
   void startWorkTh(ThreadInfo *info) ;
 
-  void sendPacket(int x, int y, int z, PacketMsg *msgPtr, 
-                  int handlerID, WorkType type) ;
+  int  getNumCTh() { return numCTh; }
+  int  getNumWTh() { return numWTh; }
   void getXYZ(int& x, int& y, int& z) ;
-  double getNumCTh() { return numCTh; }
-  double getNumWTh() { return numWTh; }
   void finish() ;
 } ;
 //~~~ end of class BgNode
@@ -121,7 +142,7 @@ class InBuffer
 {
   PacketMsg *msgs[SIZE_INBUFFER];
   int first, count;
-  BgNode *bgNode ;
+  BgNode *bgNode;
   MsgQ *mq;
 
 public:
@@ -202,18 +223,19 @@ public:
 class ThreadInfo
 {
 public:
-  BgNode *bgNode ;
-  int     selfID ;
-  void   *msg ;
-  double currTime;
-  double handlerStartTime;
+  BgNode *bgNode;
+  int     selfID;
+  void   *msg;
+  double  currTime;
+  double  handlerStartTime;
 
 public:
   double getTime(void)
   {
-    double tp2 ;
-    tp2 = BGTimer()*1e6;
-    return (tp2 - handlerStartTime + currTime);
+    //double tp2;
+    //tp2 = CkWallTimer()*1e6;
+    //return (tp2 - handlerStartTime + currTime);
+    return (1.0 + currTime);
   }
   void sendPacket(int x, int y, int z, PacketMsg *msgPtr, int handlerID, 
                   WorkType type)
