@@ -95,11 +95,7 @@
  *     will eventually return.
  *
  *
- * Note: there are several possible ways to implement threads.   No one
- * way works on all machines.  Instead, we provide one implementation which
- * covers a lot of machines, and a second implementation that simply prints
- * "Not Implemented".  We may provide other implementations in the future.
- *
+ * Note: there are several possible ways to implement threads.   
  *****************************************************************************/
  
 #include <stdio.h>
@@ -110,21 +106,248 @@
 #endif
 
 #include "converse.h"
-#ifndef _WIN32
 #include "qt.h"
-#endif
-
-#if CMK_THREADS_USE_PTHREADS
-#include <pthread.h>
-#endif
 
 #include "conv-trace.h"
 #include <sys/types.h>
 
-static void CthNoStrategy(void);
+/**************************** Shared Base Thread Class ***********************/
+typedef struct CthThreadBase
+{
+  /*Start with a message header so threads can be enqueued 
+    as messages (e.g., by CthEnqueueNormalThread in convcore.c)
+  */
+  char cmicore[CmiMsgHeaderSizeBytes];
+  
+  CthAwkFn   awakenfn;   /* Insert this thread into the ready queue */
+  CthThFn    choosefn;   /* Return the next ready thread */
+  CthThread  next; /* Next active thread */
+  int        suspendable; /* Can this thread be blocked */
+  int        exiting;    /* Is this thread finished */
 
-CpvDeclare(int, _numSwitches);
+  char      *data;       /* thread private data */
+  int        datasize;   /* size of thread-private data, in bytes */
 
+  int        Event;      /* For tracing (?) */
+} CthThreadBase;
+
+/*Macros to convert between base and specific thread types*/
+#define B(t) ((CthThreadBase *)(t))
+#define S(t) ((CthThread)(t))
+
+static void CthThreadBaseInit(CthThreadBase *th)
+{
+  th->awakenfn = 0;
+  th->choosefn = 0;
+  th->next=0;
+  th->suspendable = 1;
+  th->exiting = 0;
+
+  th->data=0;
+  th->datasize=0;
+
+  th->Event = 0;
+
+  CthSetStrategyDefault(S(th));
+}
+static void CthThreadBaseFree(CthThreadBase *th)
+{
+  free(th->data);
+}
+
+CthCpvStatic(int, _defaultStackSize);
+
+CpvDeclare(int, _numSwitches); /*Context switch count*/
+CthCpvStatic(CthThread,  CthCurrent); /*Current thread*/
+CthCpvDeclare(char *,    CthData); /*Current thread's private data (externally visible)*/
+CthCpvStatic(int,        CthDatasize);
+
+static void CthBaseInit(char **argv,CthThread mainThread)
+{
+  CpvInitialize(int, _numSwitches);
+  CpvAccess(_numSwitches) = 0;
+
+  CthCpvInitialize(int,  _defaultStackSize);
+  CthCpvAccess(_defaultStackSize)=32768;
+  CmiGetArgInt(argv,"+stacksize",&CthCpvAccess(_defaultStackSize));  
+  
+  CthCpvInitialize(CthThread,  CthCurrent);
+  CthCpvInitialize(char *, CthData);
+  CthCpvInitialize(int,        CthDatasize);
+  
+  CthCpvAccess(CthCurrent)=mainThread;
+  CthCpvAccess(CthData)=0;
+  CthCpvAccess(CthDatasize)=0;
+}
+
+int CthImplemented() { return 1; } 
+
+CthThread CthSelf()
+{
+  return CthCpvAccess(CthCurrent);
+}
+
+void CthPupBase(pup_er p,CthThreadBase *t)
+{
+	/*Really need a pup_functionPtr here:*/
+	pup_bytes(p,&t->awakenfn,sizeof(t->awakenfn));
+	pup_bytes(p,&t->choosefn,sizeof(t->choosefn));
+	pup_bytes(p,&t->next,sizeof(t->next));
+	pup_int(p,&t->suspendable);
+	pup_int(p,&t->Event);
+	pup_int(p,&t->datasize);
+	if (pup_isUnpacking(p)) { 
+		t->data = (char *) malloc(t->datasize);_MEMCHECK(t->data);
+	}
+	pup_bytes(p,(void *)t->data,t->datasize);
+}
+
+static void CthThreadFinished(CthThread t)
+{
+	B(t)->exiting=1;
+	CthSuspend();
+}
+
+/* For tracing module */
+void setEvent(CthThread t, int event) { B(t)->Event = event; }
+int getEvent(CthThread t) { return B(t)->Event; }
+
+
+/*********** Thread-local storage *********/
+
+char *CthGetData(CthThread t) { return B(t)->data; }
+
+/* Ensure this thread has at least enough 
+room for all the thread-local variables 
+initialized so far on this processor.
+*/
+static void CthFixData(CthThread t)
+{
+  int datasize = CthCpvAccess(CthDatasize);
+  if (B(t)->datasize < datasize) {
+    B(t)->datasize = datasize;
+    /* Note: realloc(NULL,size) is equivalent to malloc(size) */
+    B(t)->data = (char *)realloc(B(t)->data, datasize);
+  }
+}
+
+/*
+Allocate another size bytes of thread-local storage,
+and return the offset into the thread storage buffer.
+ */
+int CthRegister(int size)
+{
+  int datasize=CthCpvAccess(CthDatasize);
+  CthThreadBase *th=(CthThreadBase *)CthCpvAccess(CthCurrent);
+  int result, align = 1;
+  while (size>align) align<<=1;
+  datasize = (datasize+align-1) & ~(align-1);
+  result = datasize;
+  datasize += size;
+  CthCpvAccess(CthDatasize) = datasize;
+  CthFixData(S(th)); /*Make the current thread have this much storage*/
+  CthCpvAccess(CthData) = th->data;
+  return result;
+}
+
+
+/************ Scheduler Interface **********/
+
+void CthSetSuspendable(CthThread t, int val) { B(t)->suspendable = val; }
+int CthIsSuspendable(CthThread t) { return B(t)->suspendable; }
+
+void CthSetNext(CthThread t, CthThread v) { B(t)->next = v; }
+CthThread CthGetNext(CthThread t) { return B(t)->next; }
+
+static void CthNoStrategy(void)
+{
+  CmiAbort("Called CthAwaken or CthSuspend before calling CthSetStrategy.\n");
+}
+
+void CthSetStrategy(CthThread t, CthAwkFn awkfn, CthThFn chsfn)
+{
+  B(t)->awakenfn = awkfn;
+  B(t)->choosefn = chsfn;
+}
+
+static void CthBaseResume(CthThread t)
+{
+  CpvAccess(_numSwitches)++;
+  CthFixData(t); /*Thread-local storage may have changed in other thread.*/
+  CthCpvAccess(CthCurrent) = t;
+  CthCpvAccess(CthData) = B(t)->data;
+}
+
+
+/*
+Suspend: finds the next thread to execute, and resumes it
+*/
+#if CMK_WEB_MODE
+void usageStop();
+#endif
+void CthSuspend(void)
+{
+  CthThread next;
+  CthThreadBase *cur=B(CthCpvAccess(CthCurrent));
+  
+  if (cur->choosefn == 0) CthNoStrategy();
+  next = cur->choosefn();
+#ifndef CMK_OPTIMIZE
+  if(CpvAccess(traceOn))
+    traceSuspend();
+#endif
+#if CMK_WEB_MODE
+  usageStop();
+#endif
+  CthResume(next);
+}
+
+void CthAwaken(CthThread th)
+{
+  if (B(th)->awakenfn == 0) CthNoStrategy();
+#ifndef CMK_OPTIMIZE
+  CpvAccess(curThread) = th;
+  if(CpvAccess(traceOn))
+    traceAwaken();
+#endif
+  B(th)->awakenfn(th, CQS_QUEUEING_FIFO, 0, 0);
+}
+
+void CthYield()
+{
+  CthAwaken(CthCpvAccess(CthCurrent));
+  CthSuspend();
+}
+
+void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
+{
+  if (B(th)->awakenfn == 0) CthNoStrategy();
+#ifndef CMK_OPTIMIZE
+  CpvAccess(curThread) = th;
+  if(CpvAccess(traceOn))
+    traceAwaken();
+#endif
+  B(th)->awakenfn(th, s, pb, prio);
+}
+
+void CthYieldPrio(int s, int pb, unsigned int *prio)
+{
+  CthAwakenPrio(CthCpvAccess(CthCurrent), s, pb, prio);
+  CthSuspend();
+}
+
+
+/*************************** Stack-Copying Threads (obsolete) *******************
+Basic idea: switch from thread A (currently running) to thread B by copying
+A's stack from the system stack area into A's buffer in the heap, then
+copy B's stack from its heap buffer onto the system stack.
+
+This allows thread migration, because the system stack is in the same
+location on every processor; but the context-switching overhead (especially
+for threads with deep stacks) is extremely high.
+
+Written by Josh Yelon around May 1999
+*/
 #if CMK_THREADS_COPY_STACK
 
 #define SWITCHBUF_SIZE 16384
@@ -133,25 +356,14 @@ typedef struct CthProcInfo *CthProcInfo;
 
 typedef struct CthThreadStruct
 {
-  char cmicore[CmiMsgHeaderSizeBytes];
-  CthAwkFn  awakenfn;
-  CthThFn    choosefn;
+  CthThreadBase base;
   CthVoidFn  startfn;    /* function that thread will execute */
   void      *startarg;   /* argument that start function will be passed */
-  int        insched;    /* is this thread in scheduler queue */
-  int        killed;     /* thread is marked for death */
-  char      *data;       /* thread private data */
-  int        datasize;   /* size of thread-private data, in bytes */
-  int        suspendable;
-  int        Event;
-  CthThread  qnext;      /* for cthsetnext and cthgetnext */
   qt_t      *savedstack; /* pointer to saved stack */
   int        savedsize;  /* length of saved stack (zero when running) */
   int        stacklen;   /* length of the allocated savedstack >= savedsize */
   qt_t      *savedptr;   /* stack pointer */
 } CthThreadStruct;
-
-char *CthGetData(CthThread t) { return t->data; }
 
 CthThread CthPup(pup_er p, CthThread t)
 {
@@ -160,18 +372,16 @@ CthThread CthPup(pup_er p, CthThread t)
     {
       if (t->savedsize == 0)
         CmiAbort("Trying to pack a running thread!!\n");
-      if (t->insched)
-        CmiAbort("Trying to pack a thread in scheduler queue!!\n");
     }
 #endif
     if (pup_isUnpacking(p))
       { t = (CthThread) malloc(sizeof(CthThreadStruct));_MEMCHECK(t);}
     pup_bytes(p, (void*) t, sizeof(CthThreadStruct)); 
+    CthPupBase(p,&t->base);
+    pup_int(p,&t->savedsize);
     if (pup_isUnpacking(p)) {
-      t->data = (char *) malloc(t->datasize);_MEMCHECK(t->data);
       t->savedstack = (qt_t*) malloc(t->savedsize);_MEMCHECK(t->savedstack);
     }
-    pup_bytes(p, (void*) t->data, t->datasize);
     pup_bytes(p, (void*) t->savedstack, t->savedsize);
     
     if (pup_isDeleting(p))
@@ -182,55 +392,27 @@ CthThread CthPup(pup_er p, CthThread t)
 
 struct CthProcInfo
 {
-  CthThread  current;
-  int        datasize;
   qt_t      *stackbase;
   qt_t      *switchbuf_sp;
   qt_t      *switchbuf;
 };
 
-CthCpvDeclare(char *, CthData);
 CthCpvDeclare(CthProcInfo, CthProc);
 
 static void CthThreadInit(CthThread t, CthVoidFn fn, void *arg)
 {
-  t->awakenfn = 0;
-  t->choosefn = 0;
+  CthThreadBaseInit(&t->base);
   t->startfn = fn;
   t->startarg = arg;
-  t->insched = 0;
-  t->killed = 0;
-  t->data = 0;
-  t->datasize = 0;
-  t->qnext = 0;
   t->savedstack = 0;
   t->savedsize = 0;
   t->stacklen = 0;
   t->savedptr = 0;
-  t->suspendable = 1;
-  CthSetStrategyDefault(t);
 }
 
-void CthFixData(CthThread t)
+static void CthThreadFree(CthThread t)
 {
-  CthProcInfo proc = CthCpvAccess(CthProc);
-  int datasize = proc->datasize;
-  if (t->data == 0) {
-    t->datasize = datasize;
-    t->data = (char *)malloc(datasize);
-    _MEMCHECK(t->data);
-    return;
-  }
-  if (t->datasize != datasize) {
-    t->datasize = datasize;
-    t->data = (char *)realloc(t->data, datasize);
-    return;
-  }
-}
-
-static void CthFreeNow(CthThread t)
-{
-  if (t->data) free(t->data);
+  CthThreadBaseFree(&t->base);
   if (t->savedstack) free(t->savedstack);
   free(t);
 }
@@ -239,11 +421,10 @@ void CthFree(t)
 CthThread t;
 {
   CthProcInfo proc = CthCpvAccess(CthProc);
-  if ((t->insched == 0)&&(t != proc->current)) {
-    CthFreeNow(t);
-    return;
-  }
-  t->killed = 1;
+  if (t != CthSelf()) {
+    CthThreadFree(t);
+  } else
+    t->base.exiting = 1;
 }
 
 void CthDummy() { }
@@ -252,24 +433,19 @@ void CthInit(char **argv)
 {
   CthThread t; CthProcInfo p; qt_t *switchbuf, *sp;
 
-  CpvInitialize(int, _numSwitches);
-  CpvAccess(_numSwitches) = 0;
-
-  CthCpvInitialize(char *, CthData);
   CthCpvInitialize(CthProcInfo, CthProc);
 
   t = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(t);
+  CthThreadInit(t,0,0);
+  CthBaseInit(argv,t);
+
   p = (CthProcInfo)malloc(sizeof(struct CthProcInfo));
   _MEMCHECK(p);
-  CthThreadInit(t,0,0);
-  CthCpvAccess(CthData)=0;
   CthCpvAccess(CthProc)=p;
   /* leave some space for current stack frame < 256 bytes */
   sp = (qt_t*)(((size_t)&t) & ~((size_t)0xFF));
   p->stackbase = QT_SP(sp, 0x100);
-  p->current = t;
-  p->datasize = 0;
   switchbuf = (qt_t*)malloc(QT_STKALIGN + SWITCHBUF_SIZE);
   _MEMCHECK(switchbuf);
   switchbuf = (qt_t*)((((size_t)switchbuf)+QT_STKALIGN) & ~(QT_STKALIGN-1));
@@ -277,29 +453,22 @@ void CthInit(char **argv)
   sp = QT_SP(switchbuf, SWITCHBUF_SIZE);
   sp = QT_ARGS(sp,0,0,0,(qt_only_t*)CthDummy);
   p->switchbuf_sp = sp;
-  CthSetStrategyDefault(t);
-}
 
-CthThread CthSelf()
-{
-  CthThread result = CthCpvAccess(CthProc)->current;
-  if (result==0) CmiAbort("BARF!\n");
-  return result;
 }
 
 static void CthOnly(CthThread t, void *dum1, void *dum2)
 {
   t->startfn(t->startarg);
-  t->killed = 1;
-  CthSuspend();
+  CthThreadFinished(t);
 }
 
 static void CthResume1(qt_t *sp, CthProcInfo proc, CthThread t)
 {
   int bytes; qt_t *lo, *hi;
-  CthThread old = proc->current;
-  if (old->killed) {
-    if (old->insched==0) CthFreeNow(old);
+  CthThread old = CthCpvAccess(CthCurrent);
+  CthBaseResume(t);
+  if (old->base.exiting) {
+    CthThreadFree(old);
   } else {
 #ifdef QT_GROW_DOWN
     lo = sp; hi = proc->stackbase;
@@ -317,8 +486,6 @@ static void CthResume1(qt_t *sp, CthProcInfo proc, CthThread t)
     old->savedptr = sp;
     memcpy(old->savedstack, lo, bytes);
   }
-  CthFixData(t);
-  CthCpvAccess(CthData) = t->data;
   if (t->savedstack) {
 #ifdef QT_GROW_DOWN
     lo = t->savedptr;
@@ -332,8 +499,6 @@ static void CthResume1(qt_t *sp, CthProcInfo proc, CthThread t)
     sp = proc->stackbase;
     sp = QT_ARGS(sp,t,0,0,(qt_only_t*)CthOnly);
   }
-  proc->current = t;
-  t->insched = 0;
   QT_ABORT((qt_helper_t*)CthDummy,0,0,sp);
 }
 
@@ -341,7 +506,6 @@ void CthResume(t)
 CthThread t;
 {
   CthProcInfo proc = CthCpvAccess(CthProc);
-  CpvAccess(_numSwitches)++;
   QT_BLOCK((qt_helper_t*)CthResume1, proc, t, proc->switchbuf_sp);
 }
 
@@ -354,67 +518,14 @@ CthVoidFn fn; void *arg; int size;
   return result;
 }
 
-void CthSuspend()
-{
-  CthThread current, next;
-  current = CthCpvAccess(CthProc)->current;
-  if(!(current->suspendable))
-    CmiAbort("trying to suspend main thread!!\n");
-  if (current->choosefn == 0) CthNoStrategy();
-  /* Pick a thread, discarding dead ones */
-  while (1) {
-    next = current->choosefn();
-    if (next->killed == 0) break;
-    CmiAbort("picked dead thread.\n");
-    if (next==current)
-      CmiAbort("Current thread dead, cannot pick new thread.\n");
-    CthFreeNow(next);
-  }
-  CthResume(next);
-}
 
-void CthAwaken(th)
-CthThread th;
-{
-  if (th->awakenfn == 0) CthNoStrategy();
-  if (th->insched) CmiAbort("CthAwaken: thread already awake.\n");
-  th->awakenfn(th, CQS_QUEUEING_FIFO, 0, 0);
-  th->insched = 1;
-}
+/**************************************************************************
+QuickThreads does not work on Win32-- our stack-shifting large allocas
+fail a stack depth check.  Windows NT and 98 provide a user-level thread 
+interface called "Fibers", used here.
 
-void CthAwakenPrio(CthThread th, int s, int pb, int *prio)
-{
-  if (th->awakenfn == 0) CthNoStrategy();
-  if (th->insched) CmiAbort("CthAwaken: thread already awake.\n");
-  th->awakenfn(th, s, pb, prio);
-  th->insched = 1;
-}
-
-void CthYield()
-{
-  CthAwaken(CthCpvAccess(CthProc)->current);
-  CthSuspend();
-}
-
-void CthYieldPrio(int s, int pb, int *prio)
-{
-  CthAwakenPrio(CthCpvAccess(CthProc)->current, s, pb, prio);
-  CthSuspend();
-}
-
-int CthRegister(size)
-int size;
-{
-  CthProcInfo proc = CthCpvAccess(CthProc);
-  int result;
-  proc->datasize = (proc->datasize + 7) & (~7);
-  result = proc->datasize;
-  proc->datasize += size;
-  CthFixData(proc->current);
-  CthCpvAccess(CthData) = proc->current->data;
-  return result;
-}
-
+Written by Sameer Paranjpye around October 2000
+*/
 #elif  CMK_THREADS_ARE_WIN32_FIBERS
 
 #include <windows.h>
@@ -471,31 +582,13 @@ SwitchToThread(
 #endif /* _WIN32_WINNT >= 0x0400 */
 
 
-typedef void *(qt_userf_t)(void *pu);
-
 struct CthThreadStruct
 {
-  char cmicore[CmiMsgHeaderSizeBytes];
-  CthAwkFn  awakenfn;
-  CthThFn    choosefn;
-  int        autoyield_enable;
-  int        autoyield_blocks;
-  char      *data;
-  int        datasize;
-  int        suspendable;
-  int        killed;
-  int        Event;
-  CthThread  qnext;
+  CthThreadBase base;
   LPVOID     fiber;
 };
 
-char *CthGetData(CthThread t) { return t->data; }
-
-CthCpvDeclare(char *,    CthData);
-CthCpvStatic(CthThread,  CthCurrent);
 CthCpvStatic(CthThread,  CthPrevious);
-CthCpvStatic(int,        CthExiting);
-CthCpvStatic(int,        CthDatasize);
 
 typedef CthThread threadTable[100];
 CthCpvStatic(threadTable, exitThreads);
@@ -503,79 +596,34 @@ CthCpvStatic(int, 	nExit);
 
 static void CthThreadInit(CthThread t)
 {
-  t->awakenfn = 0;
-  t->choosefn = 0;
-  t->data=0;
-  t->datasize=0;
-  t->killed = 0;
-  t->qnext=0;
-  t->autoyield_enable = 0;
-  t->autoyield_blocks = 0;
-  t->suspendable = 1;
-}
-
-void CthFixData(CthThread t)
-{
-  int datasize = CthCpvAccess(CthDatasize);
-  
-  if (t->data == 0) 
-  {
-    t->datasize = datasize;
-    t->data = (char *)malloc(datasize);
-    _MEMCHECK(t->data);
-  }
-  
-  else if (t->datasize != datasize) 
-  {
-    t->datasize = datasize;
-    t->data = (char *)realloc(t->data, datasize);
-    _MEMCHECK(t->data);
-  }
+  CthThreadBaseInit(&t->base);
 }
 
 void CthInit(char **argv)
 {
   CthThread t;
-  LPVOID    fiber;
 
-  CpvInitialize(int, _numSwitches);
-  CpvAccess(_numSwitches) = 0;
-
-  CthCpvInitialize(char *,     CthData);
-  CthCpvInitialize(CthThread,  CthCurrent);
   CthCpvInitialize(CthThread,  CthPrevious);
-  CthCpvInitialize(int,        CthDatasize);
-  CthCpvInitialize(int,        CthExiting);
   CthCpvInitialize(int,        nExit);
   CthCpvInitialize(threadTable,        exitThreads);
 
+  CthCpvAccess(CthPrevious)=0;
+  CthCpvAccess(nExit)=0;
+
   t = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(t);
-  
   CthThreadInit(t);
-  CthCpvAccess(CthData)=0;
-  CthCpvAccess(CthPrevious)=0;
-  CthCpvAccess(CthCurrent)=t;
-  CthCpvAccess(CthDatasize)=1;
-  CthCpvAccess(CthExiting)=0;
-  CthCpvAccess(nExit)=0;
-  CthSetStrategyDefault(t);
-  fiber = ConvertThreadToFiber(t);
-  _MEMCHECK(fiber);
-  t->fiber = fiber;
+  t->fiber = ConvertThreadToFiber(t);
+  _MEMCHECK(t->fiber);
+  CthBaseInit(argv,t);
+
 }
 
-CthThread CthSelf()
+void CthThreadFree(CthThread old)
 {
-  return CthCpvAccess(CthCurrent);
-}
-
-void *CthAbortHelp(CthThread old)
-{
-  if (old->data) free(old->data);
+  CthThreadBaseFree(&old->base);
   if (old->fiber) DeleteFiber((PVOID)old->fiber);
   free(old);
-  return (void *) 0;
 }
 
 static void CthClearThreads()
@@ -589,7 +637,7 @@ static void CthClearThreads()
   for (i=0; i<m; i++) {
     CthThread t = CthCpvAccess(exitThreads)[i];
     if (t && t != tc && t != tp) {
-      CthAbortHelp(t);
+      CthThreadFree(t);
       CthCpvAccess(nExit) --;
     }
     else {
@@ -609,7 +657,7 @@ void CthFree(CthThread t)
   CthCpvAccess(exitThreads)[CthCpvAccess(nExit)++] = t;
   if (t==CthCpvAccess(CthCurrent)) 
   {
-    CthCpvAccess(CthExiting) = 1;
+     t->base.exiting = 1;
   } 
   else 
   {
@@ -630,7 +678,7 @@ void CthFiberBlock(CthThread t)
   SwitchToFiber(t->fiber);
   tp = CthCpvAccess(CthPrevious);
   if (tp != 0 && tp->killed == 1)
-    CthAbortHelp(tp);
+    CthThreadFree(tp);
 }
 #endif
 
@@ -640,16 +688,11 @@ void CthResume(CthThread t)
 
   tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
-  CpvAccess(_numSwitches)++;
-  CthFixData(t);
-  CthCpvAccess(CthCurrent) = t;
-  CthCpvAccess(CthData) = t->data;
+  CthBaseResume(t);
   CthCpvAccess(CthPrevious)=tc;
 #if 0
-  if (CthCpvAccess(CthExiting)) 
+  if (tc->base.exiting) 
   {
-    CthCpvAccess(CthExiting)=0;
-    tc->killed = 1;
     SwitchToFiber(t->fiber);
   } 
   else 
@@ -658,16 +701,6 @@ void CthResume(CthThread t)
   SwitchToFiber(t->fiber);
 }
 
-#if 0
-void CthOnly(void *arg, void *vt, qt_userf_t fn)
-{
-  fn(arg);
-  CthCpvAccess(CthExiting) = 1;
-CthCpvAccess(exitThreads)[CthCpvAccess(nExit)++] = CthSelf();
-  CthSuspend();
-}
-#endif
-
 VOID CALLBACK FiberSetUp(PVOID fiberData)
 {
   void **ptr = (void **) fiberData;
@@ -675,17 +708,12 @@ VOID CALLBACK FiberSetUp(PVOID fiberData)
   void *arg = ptr[1];
   CthThread  t = CthSelf();
 
-/*was:
-  CthOnly((void *)ptr[1], 0, ptr[0]);
-*/
-
   CthClearThreads();
 
   fn(arg);
 
-  CthCpvAccess(CthExiting) = 1;
   CthCpvAccess(exitThreads)[CthCpvAccess(nExit)++] = t;
-  CthSuspend();
+  CthThreadFinished(t);
 }
 
 CthThread CthCreate(CthVoidFn fn, void *arg, int size)
@@ -703,93 +731,7 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   if (!result->fiber)
     CmiAbort("CthCreate failed to create fiber!\n");
   
-  CthSetStrategyDefault(result);
   return result;
-}
-
-void CthSuspend()
-{
-  CthThread next;
-
-  if(!(CthCpvAccess(CthCurrent)->suspendable))
-    CmiAbort("trying to suspend main thread!!\n");
-  if (CthCpvAccess(CthCurrent)->choosefn == 0) CthNoStrategy();
-  next = CthCpvAccess(CthCurrent)->choosefn();
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceSuspend();
-#endif
-  CthResume(next);
-}
-
-void CthAwaken(CthThread th)
-{
-  if (th->awakenfn == 0) CthNoStrategy();
-  CpvAccess(curThread) = th;
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceAwaken();
-#endif
-  th->awakenfn(th, CQS_QUEUEING_FIFO, 0, 0);
-}
-
-void CthYield()
-{
-  CthAwaken(CthCpvAccess(CthCurrent));
-  CthSuspend();
-}
-
-void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
-{
-  if (th->awakenfn == 0) CthNoStrategy();
-  CpvAccess(curThread) = th;
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceAwaken();
-#endif
-  th->awakenfn(th, s, pb, prio);
-}
-
-void CthYieldPrio(int s, int pb, unsigned int *prio)
-{
-  CthAwakenPrio(CthCpvAccess(CthCurrent), s, pb, prio);
-  CthSuspend();
-}
-
-int CthRegister(int size)
-{
-  int result;
-  int align = 1;
-  while (size>align) align<<=1;
-  
-  CthCpvAccess(CthDatasize) = 
-    (CthCpvAccess(CthDatasize)+align-1) & ~(align-1);
-  result = CthCpvAccess(CthDatasize);
-  CthCpvAccess(CthDatasize) += size;
-  CthFixData(CthCpvAccess(CthCurrent));
-  CthCpvAccess(CthData) = CthCpvAccess(CthCurrent)->data;
-  return result;
-}
-
-
-void CthAutoYield(CthThread t, int flag)
-{
-  t->autoyield_enable = flag;
-}
-
-int CthAutoYielding(CthThread t)
-{
-  return t->autoyield_enable;
-}
-
-void CthAutoYieldBlock()
-{
-  CthCpvAccess(CthCurrent)->autoyield_blocks ++;
-}
-
-void CthAutoYieldUnblock()
-{
-  CthCpvAccess(CthCurrent)->autoyield_blocks --;
 }
 
 CthThread CthPup(pup_er p, CthThread t)
@@ -797,6 +739,14 @@ CthThread CthPup(pup_er p, CthThread t)
   CmiAbort("CthPup not implemented.\n");
   return 0;
 }
+
+/**********************************************************************
+Efficient migratable threads.  This approach reserves virtual address space
+for every thread's stack, on every processor, across the machine.  This allows
+thread migration with quick context switching.
+
+Written by Milind Bhandarkar around August 2000
+*/
 #elif CMK_THREADS_USE_ISOMALLOC
 
 #include <stdlib.h>
@@ -1000,27 +950,13 @@ typedef struct _slotmsg
 
 struct CthThreadStruct
 {
-  char cmicore[CmiMsgHeaderSizeBytes];
-  CthAwkFn   awakenfn;
-  CthThFn    choosefn;
-  int        autoyield_enable;
-  int        autoyield_blocks;
-  char      *data;
-  int        datasize;
-  int        suspendable;
-  int        Event;
-  CthThread  qnext;
+  CthThreadBase base;
   int        slotnum;
   int        nslots;
   int        awakened;
   qt_t      *stack;
   qt_t      *stackp;
 };
-
-char *CthGetData(CthThread t) { return t->data; }
-
-#define STACKSIZE (32768)
-CpvStaticDeclare(int, _stksize);
 
 CpvStaticDeclare(int, reqHdlr);
 CpvStaticDeclare(int, reqSpecHdlr);
@@ -1104,43 +1040,14 @@ respslots(slotmsg *msg)
   CmiFree(msg);
 }
 
-CthCpvDeclare(char *,    CthData);
-CthCpvStatic(CthThread,  CthCurrent);
-CthCpvStatic(int,        CthExiting);
-CthCpvStatic(int,        CthDatasize);
 
 static void CthThreadInit(t)
 CthThread t;
 {
-  t->awakenfn = 0;
-  t->choosefn = 0;
-  t->data=0;
-  t->datasize=0;
-  t->qnext=0;
-  t->autoyield_enable = 0;
-  t->autoyield_blocks = 0;
-  t->suspendable = 1;
+  CthThreadBaseInit(&t->base);
   t->slotnum = (-1);
   t->nslots = 0;
   t->awakened = 0;
-}
-
-void CthFixData(t)
-CthThread t;
-{
-  int datasize = CthCpvAccess(CthDatasize);
-  if (t->data == 0) {
-    t->datasize = datasize;
-    t->data = (char *)malloc(datasize);
-    _MEMCHECK(t->data);
-    return;
-  }
-  if (t->datasize != datasize) {
-    t->datasize = datasize;
-    t->data = (char *)realloc(t->data, datasize);
-    _MEMCHECK(t->data);
-    return;
-  }
 }
 
 /*
@@ -1151,7 +1058,7 @@ map_slots(int slot, int nslots)
 {
   void *pa;
   char *addr;
-  size_t sz = CpvAccess(_stksize);
+  size_t sz = CpvAccess(_defaultStackSize);
   addr = (char*) CpvAccess(heapbdry) + slot*sz;
   pa = mmap((void*) addr, sz*nslots, 
             PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED,
@@ -1169,7 +1076,7 @@ map_slots(int slot, int nslots)
 static void
 unmap_slots(int slot, int nslots)
 {
-  size_t sz = CpvAccess(_stksize);
+  size_t sz = CpvAccess(_defaultStackSize);
   char *addr = (char*) CpvAccess(heapbdry) + slot*sz;
   int retval = munmap((void*) addr, sz*nslots);
   if (retval==(-1))
@@ -1178,7 +1085,8 @@ unmap_slots(int slot, int nslots)
 static void *__cur_stack_frame(void)
 {
   char __dummy;
-  return (void*) &__dummy;
+  void *top_of_stack=(void *)&__dummy;
+  return top_of_stack;
 }
 
 void CthInit(char **argv)
@@ -1186,14 +1094,16 @@ void CthInit(char **argv)
   CthThread t;
   int i;
 
-  CpvInitialize(int, _stksize);
-  CpvAccess(_stksize) = 0;
-  CmiGetArgInt(argv,"+stacksize",&CpvAccess(_stksize));
-  CpvAccess(_stksize) = CpvAccess(_stksize) ? CpvAccess(_stksize) : STACKSIZE;
-  CpvAccess(_stksize) = (CpvAccess(_stksize)+(CMK_MEMORY_PAGESIZE*2)-1) & 
-                       ~(CMK_MEMORY_PAGESIZE-1);
+  t = (CthThread)malloc(sizeof(struct CthThreadStruct));
+  _MEMCHECK(t);
+  CthThreadInit(t);
+  CthBaseInit(argv,t);
+
+  /*Round stack size up to nearest page size*/
+  CpvAccess(_defaultStackSize) = (CpvAccess(_defaultStackSize)
+	+CMK_MEMORY_PAGESIZE-1) & ~(CMK_MEMORY_PAGESIZE-1);
 #if CMK_THREADS_DEBUG
-  CmiPrintf("[%d] Using stacksize of %d\n", CmiMyPe(), CpvAccess(_stksize));
+  CmiPrintf("[%d] Using stacksize of %d\n", CmiMyPe(), CpvAccess(_defaultStackSize));
 #endif
 
   CpvInitialize(void *, heapbdry);
@@ -1208,7 +1118,7 @@ void CthInit(char **argv)
     void *heap = (void*) malloc(1);
     void *stack = __cur_stack_frame();
     void *stackbdry;
-    int stacksize = CpvAccess(_stksize);
+    int stacksize = CpvAccess(_defaultStackSize);
     _MEMCHECK(heap);
 #if CMK_THREADS_DEBUG
     CmiPrintf("[%d] heap=%p\tstack=%p\n",CmiMyPe(),heap,stack);
@@ -1240,22 +1150,6 @@ void CthInit(char **argv)
   CpvInitialize(slotset *, myss);
   CpvAccess(myss) = new_slotset(CmiMyPe()*CpvAccess(numslots), CpvAccess(numslots));
 
-  CpvInitialize(int, _numSwitches);
-  CpvAccess(_numSwitches) = 0;
-
-  CthCpvInitialize(char *,     CthData);
-  CthCpvInitialize(CthThread,  CthCurrent);
-  CthCpvInitialize(int,        CthDatasize);
-  CthCpvInitialize(int,        CthExiting);
-
-  t = (CthThread)malloc(sizeof(struct CthThreadStruct));
-  _MEMCHECK(t);
-  CthThreadInit(t);
-  CthCpvAccess(CthData)=0;
-  CthCpvAccess(CthCurrent)=t;
-  CthCpvAccess(CthDatasize)=1;
-  CthCpvAccess(CthExiting)=0;
-  CthSetStrategyDefault(t);
 }
 
 void CthHandlerInit(void)
@@ -1271,18 +1165,13 @@ void CthHandlerInit(void)
   CpvAccess(respSpecHdlr) = CmiRegisterHandler((CmiHandler)respspecific);
 }
 
-CthThread CthSelf()
-{
-  return CthCpvAccess(CthCurrent);
-}
-
 static void
 CthFreeKeepSlots(CthThread t)
 {
   if (t==CthCpvAccess(CthCurrent)) {
-    CthCpvAccess(CthExiting) = 1;
+    t->base.exiting = 1;
   } else {
-    if (t->data) free(t->data);
+    CthThreadBaseFree(&t->base);
     if(t->slotnum >= 0) unmap_slots(t->slotnum, t->nslots);
     free(t);
   }
@@ -1298,7 +1187,7 @@ CthThread t;
 static void *
 CthAbortHelp(qt_t *sp, CthThread old, void *null)
 {
-  if (old->data) free(old->data);
+  CthThreadBaseFree(&old->base);  
   if(old->slotnum >= 0)
   {
     free_slots(CpvAccess(myss), old->slotnum, old->nslots);
@@ -1317,15 +1206,10 @@ static void *CthBlockHelp(qt_t *sp, CthThread old, void *null)
 void CthResume(t)
 CthThread t;
 {
-  CthThread tc;
-  tc = CthCpvAccess(CthCurrent);
+  CthThread tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
-  CpvAccess(_numSwitches)++;
-  CthFixData(t);
-  CthCpvAccess(CthCurrent) = t;
-  CthCpvAccess(CthData) = t->data;
-  if (CthCpvAccess(CthExiting)) {
-    CthCpvAccess(CthExiting)=0;
+  CthBaseResume(t);
+  if (tc->base.exiting) {
     QT_ABORT((qt_helper_t*)CthAbortHelp, tc, 0, t->stackp);
   } else {
     QT_BLOCK((qt_helper_t*)CthBlockHelp, tc, 0, t->stackp);
@@ -1338,15 +1222,14 @@ CthThread t;
 static void CthOnly(void *arg, void *vt, qt_userf_t fn)
 {
   fn(arg);
-  CthCpvAccess(CthExiting) = 1;
-  CthSuspend();
+  CthThreadFinished(CthSelf());
 }
 
 static void
 CthStackCreate(CthThread t, CthVoidFn fn, void *arg, int slotnum, int nslots)
 {
   qt_t *stack, *stackbase, *stackp;
-  int size = CpvAccess(_stksize);
+  int size = CpvAccess(_defaultStackSize);
   t->slotnum = slotnum;
   t->nslots = nslots;
   stack = (qt_t*) map_slots(slotnum, nslots);
@@ -1362,12 +1245,11 @@ CthVoidFn fn; void *arg; int size;
 {
   CthThread result; 
   int slotnum, nslots = 1;
-  if(size>CpvAccess(_stksize))
-    nslots = (int) (size/CpvAccess(_stksize)) + 1;
+  if(size>CpvAccess(_defaultStackSize))
+    nslots = (int) (size/CpvAccess(_defaultStackSize)) + 1;
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
-  CthSetStrategyDefault(result);
   slotnum = get_slots(CpvAccess(myss), nslots);
   if(slotnum == (-1)) /* mype does not have any free slots left */
   {
@@ -1387,82 +1269,6 @@ CthVoidFn fn; void *arg; int size;
     grab_slots(CpvAccess(myss), slotnum, nslots);
     CthStackCreate(result, fn, arg, slotnum, nslots);
   }
-  return result;
-}
-
-void CthSuspend()
-{
-  CthThread next;
-#if CMK_WEB_MODE
-  void usageStop();
-#endif
-  if(!(CthCpvAccess(CthCurrent)->suspendable))
-    CmiAbort("trying to suspend main thread!!\n");
-  if (CthCpvAccess(CthCurrent)->choosefn == 0) CthNoStrategy();
-  next = CthCpvAccess(CthCurrent)->choosefn();
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceSuspend();
-#endif
-#if CMK_WEB_MODE
-  usageStop();
-#endif
-  CthResume(next);
-}
-
-void CthAwaken(th)
-CthThread th;
-{
-  if (th->awakenfn == 0) CthNoStrategy();
-  th->awakened = 1;
-  /* thread stack is not yet allocated. */
-  if (th->slotnum == (-2))
-    return;
-  CpvAccess(curThread) = th;
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceAwaken();
-#endif
-  th->awakenfn(th, CQS_QUEUEING_FIFO, 0, 0);
-}
-
-void CthYield()
-{
-  CthAwaken(CthCpvAccess(CthCurrent));
-  CthSuspend();
-}
-
-void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
-{
-  if (th->awakenfn == 0) CthNoStrategy();
-  th->awakened = 1;
-  if (th->slotnum == (-2))
-    return;
-  CpvAccess(curThread) = th;
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceAwaken();
-#endif
-  th->awakenfn(th, s, pb, prio);
-}
-
-void CthYieldPrio(int s, int pb, unsigned int *prio)
-{
-  CthAwakenPrio(CthCpvAccess(CthCurrent), s, pb, prio);
-  CthSuspend();
-}
-
-int CthRegister(size)
-int size;
-{
-  int result;
-  int align = 1;
-  while (size>align) align<<=1;
-  CthCpvAccess(CthDatasize) = (CthCpvAccess(CthDatasize)+align-1) & ~(align-1);
-  result = CthCpvAccess(CthDatasize);
-  CthCpvAccess(CthDatasize) += size;
-  CthFixData(CthCpvAccess(CthCurrent));
-  CthCpvAccess(CthData) = CthCpvAccess(CthCurrent)->data;
   return result;
 }
 
@@ -1486,11 +1292,10 @@ CthThread CthPup(pup_er p, CthThread t)
     _MEMCHECK(t);
   }
   pup_bytes(p, (void*)t, sizeof(struct CthThreadStruct));
+  CthPupBase(p,&t->base);
 
   if (pup_isUnpacking(p)) {
     int homePe = t->slotnum/CpvAccess(numslots);
-    t->data = (char *) malloc(t->datasize);
-    _MEMCHECK(t->data);
     /* 
      * allocate the stack whether I am the homePe or not. Adjust slotset
      * by sending a message later.
@@ -1517,9 +1322,8 @@ CthThread CthPup(pup_er p, CthThread t)
       }
     }
   }
-  pup_bytes(p, (void*)t->data, t->datasize);
 
-  stackbase = QT_SP(t->stack, CpvAccess(_stksize));
+  stackbase = QT_SP(t->stack, CpvAccess(_defaultStackSize));
 #ifdef QT_GROW_UP
   ssz = ((char*)(t->stackp)-(char*)(stackbase));
   pup_bytes(p, (void*)stackbase, ssz);
@@ -1536,78 +1340,42 @@ CthThread CthPup(pup_er p, CthThread t)
   return t;
 }
 
+/***************************************************
+Use Posix Threads to simulate cooperative user-level
+threads.  This version is very portable but inefficient.
+
+Written by Milind Bhandarkar around November 2000
+*/
 #elif CMK_THREADS_USE_PTHREADS
 
-#define CthMemAlign(x,n) malloc(n)
-#define memalign(m, a) valloc(a)
+#include <pthread.h>
 
 struct CthThreadStruct
 {
-  char cmicore[CmiMsgHeaderSizeBytes];
-  CthAwkFn  awakenfn;
-  CthThFn    choosefn;
+  CthThreadBase base;
   pthread_t  self;
   pthread_cond_t cond;
   pthread_cond_t *creator;
   CthVoidFn  fn;
   void      *arg;
-  char      *data;
-  int        datasize;
-  int        suspendable;
-  int        Event;
-  CthThread  qnext;
   char       inited;
 };
 
-char *CthGetData(CthThread t) { return t->data; }
 
-CthCpvDeclare(char *,    CthData);
-CthCpvStatic(CthThread,  CthCurrent);
-CthCpvStatic(int,        CthExiting);
-CthCpvStatic(int,        CthDatasize);
 CthCpvStatic(pthread_mutex_t, sched_mutex);
 
 static void CthThreadInit(t)
 CthThread t;
 {
-  t->awakenfn = 0;
-  t->choosefn = 0;
-  t->data=0;
-  t->datasize=0;
-  t->qnext=0;
-  t->suspendable = 1;
+  CthThreadBaseInit(&t->base);
   t->inited = 0;
   pthread_cond_init(&(t->cond) , (pthread_condattr_t *) 0);
-}
-
-void CthFixData(t)
-CthThread t;
-{
-  int datasize = CthCpvAccess(CthDatasize);
-  if (t->data == 0) {
-    t->datasize = datasize;
-    t->data = (char *)malloc(datasize);
-    _MEMCHECK(t->data);
-    return;
-  }
-  if (t->datasize != datasize) {
-    t->datasize = datasize;
-    t->data = (char *)realloc(t->data, datasize);
-    return;
-  }
 }
 
 void CthInit(char **argv)
 {
   CthThread t;
 
-  CpvInitialize(int, _numSwitches);
-  CpvAccess(_numSwitches) = 0;
-
-  CthCpvInitialize(char *,     CthData);
-  CthCpvInitialize(CthThread,  CthCurrent);
-  CthCpvInitialize(int,        CthDatasize);
-  CthCpvInitialize(int,        CthExiting);
   CthCpvInitialize(pthread_mutex_t, sched_mutex);
 
   pthread_mutex_init(&CthCpvAccess(sched_mutex), (pthread_mutexattr_t *) 0);
@@ -1616,41 +1384,27 @@ void CthInit(char **argv)
   _MEMCHECK(t);
   CthThreadInit(t);
   t->self = pthread_self();
-  CthCpvAccess(CthData)=0;
-  CthCpvAccess(CthCurrent)=t;
-  CthCpvAccess(CthDatasize)=1;
-  CthCpvAccess(CthExiting)=0;
-  CthSetStrategyDefault(t);
-}
-
-CthThread CthSelf()
-{
-  return CthCpvAccess(CthCurrent);
+  CthBaseInit(argv,t);
 }
 
 void CthFree(t)
 CthThread t;
 {
   if (t==CthCpvAccess(CthCurrent)) {
-    CthCpvAccess(CthExiting) = 1;
+    t->base.exiting = 1;
   } else {
-    if (t->data) free(t->data);
+    CthThreadBaseFree(&t->base);
     free(t);
   }
 }
 
 void CthResume(CthThread t)
 {
-  CthThread tc;
-  tc = CthCpvAccess(CthCurrent);
+  CthThread tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
-  CpvAccess(_numSwitches)++;
-  CthFixData(t);
-  CthCpvAccess(CthCurrent) = t;
-  CthCpvAccess(CthData) = t->data;
+  CthBaseResume(t);
   pthread_cond_signal(&(t->cond));
-  if (CthCpvAccess(CthExiting)) {
-    CthCpvAccess(CthExiting)=0;
+  if (tc->base.exiting) {
     pthread_mutex_unlock(&CthCpvAccess(sched_mutex));
     pthread_exit(0);
   } else {
@@ -1672,8 +1426,7 @@ static void *CthOnly(CthThread arg)
   pthread_cond_wait(&(arg->cond), &CthCpvAccess(sched_mutex));
   } while (arg!=CthCpvAccess(CthCurrent)) ;
   arg->fn(arg->arg);
-  CthCpvAccess(CthExiting) = 1;
-  CthSuspend();
+  CthThreadFinished(arg);
   return 0;
 }
 
@@ -1685,7 +1438,6 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
-  CthSetStrategyDefault(result);
   result->fn = fn;
   result->arg = arg;
   result->creator = &(self->cond);
@@ -1697,189 +1449,63 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   return result;
 }
 
-void CthSuspend()
-{
-  CthThread t = CthSelf();
-  CthThread next;
-#if CMK_WEB_MODE
-  void usageStop();
-#endif
-  if(!(t->suspendable))
-    CmiAbort("trying to suspend main thread!!\n");
-  if (t->choosefn == 0) CthNoStrategy();
-  next = t->choosefn();
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceSuspend();
-#endif
-#if CMK_WEB_MODE
-  usageStop();
-#endif
-  CthResume(next);
-}
-
-void CthAwaken(th)
-CthThread th;
-{
-  if (th->awakenfn == 0) CthNoStrategy();
-  CpvAccess(curThread) = th;
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceAwaken();
-#endif
-  th->awakenfn(th, CQS_QUEUEING_FIFO, 0, 0);
-}
-
-void CthYield()
-{
-  CthAwaken(CthCpvAccess(CthCurrent));
-  CthSuspend();
-}
-
-void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
-{
-  if (th->awakenfn == 0) CthNoStrategy();
-  CpvAccess(curThread) = th;
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceAwaken();
-#endif
-  th->awakenfn(th, s, pb, prio);
-}
-
-void CthYieldPrio(int s, int pb, unsigned int *prio)
-{
-  CthAwakenPrio(CthCpvAccess(CthCurrent), s, pb, prio);
-  CthSuspend();
-}
-
-int CthRegister(size)
-int size;
-{
-  int result;
-  int align = 1;
-  while (size>align) align<<=1;
-  CthCpvAccess(CthDatasize) = (CthCpvAccess(CthDatasize)+align-1) & ~(align-1);
-  result = CthCpvAccess(CthDatasize);
-  CthCpvAccess(CthDatasize) += size;
-  CthFixData(CthCpvAccess(CthCurrent));
-  CthCpvAccess(CthData) = CthCpvAccess(CthCurrent)->data;
-  return result;
-}
-
 CthThread CthPup(pup_er p, CthThread t)
 {
   CmiAbort("CthPup not implemented.\n");
   return 0;
 }
 
+/***************************************************************
+Use SysV r3 setcontext/getcontext calls instead of
+quickthreads.  This works on some architectures (such as
+IA64) where quickthreads' setjmp/alloca/longjmp fails.
+
+Written by Gengbin Zheng around April 2001
+*/
 #elif  CMK_THREADS_USE_CONTEXT
 
 #include <signal.h>
 #include <ucontext.h>
 
-#define STACKSIZE (32768)
-static int _stksize = 0;
-
 struct CthThreadStruct
 {
-  char cmicore[CmiMsgHeaderSizeBytes];
-  CthAwkFn  awakenfn;
-  CthThFn    choosefn;
-  int        autoyield_enable;
-  int        autoyield_blocks;
-  char      *data;
-  int        datasize;
-  int        suspendable;
-  int        Event;
-  CthThread  qnext;
+  CthThreadBase base;
+  ucontext_t context;
   char      *stack;
-  ucontext_t      stackp;
 };
 
-char *CthGetData(CthThread t) { return t->data; }
-
-CthCpvDeclare(char *,    CthData);
-CthCpvStatic(CthThread,  CthCurrent);
-CthCpvStatic(int,        CthExiting);
-CthCpvStatic(int,        CthDatasize);
 
 static void CthThreadInit(t)
 CthThread t;
 {
-  t->awakenfn = 0;
-  t->choosefn = 0;
-  t->data=0;
-  t->datasize=0;
-  t->qnext=0;
-  t->autoyield_enable = 0;
-  t->autoyield_blocks = 0;
-  t->suspendable = 1;
-}
-
-void CthFixData(t)
-CthThread t;
-{
-  int datasize = CthCpvAccess(CthDatasize);
-  if (t->data == 0) {
-    t->datasize = datasize;
-    t->data = (char *)malloc(datasize);
-    _MEMCHECK(t->data);
-    return;
-  }
-  if (t->datasize != datasize) {
-    t->datasize = datasize;
-    t->data = (char *)realloc(t->data, datasize);
-    return;
-  }
+  CthThreadBaseInit(&t->base);
+  t->stack=NULL;
 }
 
 void CthInit(char **argv)
 {
   CthThread t;
 
-  CmiGetArgInt(argv,"+stacksize",&_stksize);
-  CpvInitialize(int, _numSwitches);
-  CpvAccess(_numSwitches) = 0;
-
-  CthCpvInitialize(char *,     CthData);
-  CthCpvInitialize(CthThread,  CthCurrent);
-  CthCpvInitialize(int,        CthDatasize);
-  CthCpvInitialize(int,        CthExiting);
-
   t = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(t);
   CthThreadInit(t);
-  CthCpvAccess(CthData)=0;
-  CthCpvAccess(CthCurrent)=t;
-  CthCpvAccess(CthDatasize)=1;
-  CthCpvAccess(CthExiting)=0;
-  CthSetStrategyDefault(t);
+  CthBaseInit(argv,t);
 }
 
-CthThread CthSelf()
+static void CthThreadFree(CthThread t)
 {
-  return CthCpvAccess(CthCurrent);
+  CthThreadBaseFree(&t->base);
+  free(t->stack);
+  free(t);
 }
 
-void CthFree(t)
-CthThread t;
+void CthFree(CthThread t)
 {
   if (t==CthCpvAccess(CthCurrent)) {
-    CthCpvAccess(CthExiting) = 1;
+    t->base.exiting = 1;
   } else {
-    if (t->data) free(t->data);
-    free(t->stack);
-    free(t);
+    CthThreadFree(t);
   }
-}
-
-static void *CthAbortHelp(ucontext_t *sp, CthThread old, void *null)
-{
-  if (old->data) free(old->data);
-  free(old->stack);
-  free(old);
-  return (void *) 0;
 }
 
 void CthResume(t)
@@ -1888,129 +1514,40 @@ CthThread t;
   CthThread tc;
   tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
-  CpvAccess(_numSwitches)++;
-  CthFixData(t);
-  CthCpvAccess(CthCurrent) = t;
-  CthCpvAccess(CthData) = t->data;
-  if (CthCpvAccess(CthExiting)) {
-    CthCpvAccess(CthExiting)=0;
-    CthAbortHelp(&tc->stackp, tc, 0);
-    setcontext(&t->stackp);
+  CthBaseResume(t);
+  if (tc->base.exiting) {
+    CthThreadFree(tc);
+    setcontext(&t->context);
   } else {
-    if (0 != swapcontext(&tc->stackp, &t->stackp)) 
+    if (0 != swapcontext(&tc->context, &t->context)) 
       CmiAbort("CthResume: swapcontext failed.\n");
   }
   if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
 }
 
-void CthOnly(void *arg, void *vt, qt_userf_t fn)
+void CthStartThread(qt_userf_t fn,void *arg)
 {
   fn(arg);
-  CthCpvAccess(CthExiting) = 1;
-  CthSuspend();
+  CthThreadFinished(CthSelf());
 }
-
-#define STP_STKALIGN(sp, alignment) \
-  ((void *)((((qt_word_t)(sp)) + (alignment) - 1) & ~((alignment)-1)))
 
 CthThread CthCreate(fn, arg, size)
 CthVoidFn fn; void *arg; int size;
 {
-  CthThread result; char *stack, *stackbase;
-  ucontext_t *jb, *stackp;
-  size = 16384*2;
+  CthThread result; char *stack;
+  if (size==0) size = CthCpvAccess(_defaultStackSize);
   stack = (char*)malloc(size);
   _MEMCHECK(stack);
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
-  stackbase = stack;
-  stackbase = STP_STKALIGN(stackbase, 16);
-#if CMK_STACK_GROWDOWN
-  stackbase = stackbase+size-2048;
-#elif CMK_STACK_GROWUP
-  stackbase = stackbase+8192;
-#else
-  #error "Must define stack grow up or down in conv-mach.h!"
-  CmiAbort("Must define stack grow up or down in conv-mach.h!\n");
-#endif
-  getcontext(&result->stackp);
-  result->stackp.uc_stack.ss_sp = stackbase;
-  result->stackp.uc_stack.ss_size = size - 8192;
-  result->stackp.uc_stack.ss_flags = 0;
-  result->stackp.uc_link = 0;
-  makecontext(&result->stackp, (void (*) (void))CthOnly, 3, arg, result, fn);
   result->stack = stack;
-  CthSetStrategyDefault(result);
-  return result;
-}
-
-void CthSuspend()
-{
-  CthThread next;
-#if CMK_WEB_MODE
-  void usageStop();
-#endif
-  if(!(CthCpvAccess(CthCurrent)->suspendable))
-    CmiAbort("trying to suspend main thread!!\n");
-  if (CthCpvAccess(CthCurrent)->choosefn == 0) CthNoStrategy();
-  next = CthCpvAccess(CthCurrent)->choosefn();
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceSuspend();
-#endif
-#if CMK_WEB_MODE
-  usageStop();
-#endif
-  CthResume(next);
-}
-
-void CthAwaken(th)
-CthThread th;
-{
-  if (th->awakenfn == 0) CthNoStrategy();
-  CpvAccess(curThread) = th;
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceAwaken();
-#endif
-  th->awakenfn(th, CQS_QUEUEING_FIFO, 0, 0);
-}
-
-void CthYield()
-{
-  CthAwaken(CthCpvAccess(CthCurrent));
-  CthSuspend();
-}
-
-void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
-{
-  if (th->awakenfn == 0) CthNoStrategy();
-  CpvAccess(curThread) = th;
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceAwaken();
-#endif
-  th->awakenfn(th, s, pb, prio);
-}
-
-void CthYieldPrio(int s, int pb, unsigned int *prio)
-{
-  CthAwakenPrio(CthCpvAccess(CthCurrent), s, pb, prio);
-  CthSuspend();
-}
-
-int CthRegister(size)
-int size;
-{
-  int result;
-  int align = 1;
-  while (size>align) align<<=1;
-  CthCpvAccess(CthDatasize) = (CthCpvAccess(CthDatasize)+align-1) & ~(align-1);
-  result = CthCpvAccess(CthDatasize);
-  CthCpvAccess(CthDatasize) += size;
-  CthFixData(CthCpvAccess(CthCurrent));
-  CthCpvAccess(CthData) = CthCpvAccess(CthCurrent)->data;
+  getcontext(&result->context);
+  result->context.uc_stack.ss_sp = stack;
+  result->context.uc_stack.ss_size = size;
+  result->context.uc_stack.ss_flags = 0;
+  result->context.uc_link = 0;
+  makecontext(&result->context, (void (*) (void))CthStartThread, 2, fn, arg);
   return result;
 }
 
@@ -2020,46 +1557,36 @@ CthThread CthPup(pup_er p, CthThread t)
   return 0;
 }
 
-#else /*Default, stack-on-heap threads*/
+#else 
+/***************************************************************
+Non-migratable, stack-on-heap threads implementation. 
+These threads can also add a "protection block" of
+inaccessible memory to detect stack overflows, which
+would otherwise just trash the heap.
 
-#define STACKSIZE (32768)
-static int _stksize = 0;
+(7/13/2001 creation times on 300MHz AMD K6-3 x86, Linux 2.2.18:
+Qt setjmp, without stackprotect: 18.5 us
+Qt i386, without stackprotect: 17.9 us
+Qt setjmp, with stackprotect: 68.6 us
+)
 
-#ifdef CMK_OPTIMIZE
+Written by Josh Yelon around 1995
+*/
+
+#if defined(CMK_OPTIMIZE) || (!CMK_MEMORY_PROTECTABLE)
 #  define CMK_STACKPROTECT 0
 #else
 #  define CMK_STACKPROTECT 1
 
-#  if CMK_MEMORY_PROTECTABLE
-
-#    include "sys/mman.h"
-#    define CthMemAlign(x,n) memalign((x),(n))
-#    define CthMemoryProtect(p,l) mprotect(p,l,PROT_NONE)
-#    define CthMemoryUnprotect(p,l) mprotect(p,l,PROT_READ | PROT_WRITE)
-
-#  else
-
-#    define CthMemAlign(x,n) malloc(n)
-#    define CthMemoryProtect(p,l) 
-#    define CthMemoryUnprotect(p,l)
-#    define memalign(m, a) valloc(a)
-
-#  endif
-
+#  include "sys/mman.h"
+#  define CthMemAlign(x,n) memalign((x),(n))
+#  define CthMemoryProtect(p,l) mprotect(p,l,PROT_NONE)
+#  define CthMemoryUnprotect(p,l) mprotect(p,l,PROT_READ | PROT_WRITE)
 #endif
 
 struct CthThreadStruct
 {
-  char cmicore[CmiMsgHeaderSizeBytes];
-  CthAwkFn  awakenfn;
-  CthThFn    choosefn;
-  int        autoyield_enable;
-  int        autoyield_blocks;
-  char      *data;
-  int        datasize;
-  int        suspendable;
-  int        Event;
-  CthThread  qnext;
+  CthThreadBase base;
 #if CMK_STACKPROTECT
   char      *protect;
   int        protlen;
@@ -2068,98 +1595,50 @@ struct CthThreadStruct
   qt_t      *stackp;
 };
 
-char *CthGetData(CthThread t) { return t->data; }
-
-CthCpvDeclare(char *,    CthData);
-CthCpvStatic(CthThread,  CthCurrent);
-CthCpvStatic(int,        CthExiting);
-CthCpvStatic(int,        CthDatasize);
-
-static void CthThreadInit(t)
-CthThread t;
+static CthThread CthThreadInit(void)
 {
-  t->awakenfn = 0;
-  t->choosefn = 0;
-  t->data=0;
-  t->datasize=0;
-  t->qnext=0;
-  t->autoyield_enable = 0;
-  t->autoyield_blocks = 0;
-  t->suspendable = 1;
+  CthThread ret=(CthThread)malloc(sizeof(struct CthThreadStruct));
+  _MEMCHECK(ret);
+  CthThreadBaseInit(&ret->base);
+#if CMK_STACKPROTECT
+  ret->protect = 0;
+  ret->protlen = 0;
+#endif
+  
+  return ret;
 }
 
-void CthFixData(t)
-CthThread t;
+static void CthThreadFree(CthThread t)
 {
-  int datasize = CthCpvAccess(CthDatasize);
-  if (t->data == 0) {
-    t->datasize = datasize;
-    t->data = (char *)malloc(datasize);
-    _MEMCHECK(t->data);
-    return;
-  }
-  if (t->datasize != datasize) {
-    t->datasize = datasize;
-    t->data = (char *)realloc(t->data, datasize);
-    return;
-  }
+  CthThreadBaseFree(&t->base);
+#if CMK_STACKPROTECT
+  CthMemoryUnprotect(t->protect, t->protlen);
+#endif  
+  free(t->stack);
+  free(t);
 }
 
 void CthInit(char **argv)
 {
-  CthThread t;
+  CthThread mainThread;
 
-  CmiGetArgInt(argv,"+stacksize",&_stksize);
-  CpvInitialize(int, _numSwitches);
-  CpvAccess(_numSwitches) = 0;
-
-  CthCpvInitialize(char *,     CthData);
-  CthCpvInitialize(CthThread,  CthCurrent);
-  CthCpvInitialize(int,        CthDatasize);
-  CthCpvInitialize(int,        CthExiting);
-
-  t = (CthThread)malloc(sizeof(struct CthThreadStruct));
-  _MEMCHECK(t);
-#if CMK_STACKPROTECT
-  t->protect = 0;
-  t->protlen = 0;
-#endif
-  CthThreadInit(t);
-  CthCpvAccess(CthData)=0;
-  CthCpvAccess(CthCurrent)=t;
-  CthCpvAccess(CthDatasize)=1;
-  CthCpvAccess(CthExiting)=0;
-  CthSetStrategyDefault(t);
+  mainThread=CthThreadInit();
+  mainThread->base.suspendable=0; /*Can't suspend main thread (trashes Quickthreads jump buffer)*/
+  CthBaseInit(argv,mainThread);
 }
 
-CthThread CthSelf()
-{
-  return CthCpvAccess(CthCurrent);
-}
-
-void CthFree(t)
-CthThread t;
+void CthFree(CthThread t)
 {
   if (t==CthCpvAccess(CthCurrent)) {
-    CthCpvAccess(CthExiting) = 1;
+    t->base.exiting = 1;
   } else {
-#if CMK_STACKPROTECT
-    CthMemoryUnprotect(t->protect, t->protlen);
-#endif
-    if (t->data) free(t->data);
-    free(t->stack);
-    free(t);
+    CthThreadFree(t);
   }
 }
 
 static void *CthAbortHelp(qt_t *sp, CthThread old, void *null)
 {
-#if CMK_STACKPROTECT
-  CthMemoryUnprotect(old->protect, old->protlen);
-#endif
-  if (old->data) free(old->data);
-  free(old->stack);
-  free(old);
+  CthThreadFree(old);
   return (void *) 0;
 }
 
@@ -2172,15 +1651,10 @@ static void *CthBlockHelp(qt_t *sp, CthThread old, void *null)
 void CthResume(t)
 CthThread t;
 {
-  CthThread tc;
-  tc = CthCpvAccess(CthCurrent);
+  CthThread tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
-  CpvAccess(_numSwitches)++;
-  CthFixData(t);
-  CthCpvAccess(CthCurrent) = t;
-  CthCpvAccess(CthData) = t->data;
-  if (CthCpvAccess(CthExiting)) {
-    CthCpvAccess(CthExiting)=0;
+  CthBaseResume(t);
+  if (tc->base.exiting) {
     QT_ABORT((qt_helper_t*)CthAbortHelp, tc, 0, t->stackp);
   } else {
     QT_BLOCK((qt_helper_t*)CthBlockHelp, tc, 0, t->stackp);
@@ -2191,15 +1665,15 @@ CthThread t;
 static void CthOnly(void *arg, void *vt, qt_userf_t fn)
 {
   fn(arg);
-  CthCpvAccess(CthExiting) = 1;
-  CthSuspend();
+  CthThreadFinished(CthSelf());
 }
 
 CthThread CthCreate(fn, arg, size)
 CthVoidFn fn; void *arg; int size;
 {
   CthThread result; qt_t *stack, *stackbase, *stackp;
-  size = (size) ? size : ((_stksize) ? _stksize : STACKSIZE);
+  if (size==0)
+    size = CthCpvAccess(_defaultStackSize);
 #if CMK_STACKPROTECT
   size = (size+(CMK_MEMORY_PAGESIZE*2)-1) & ~(CMK_MEMORY_PAGESIZE-1);
   stack = (qt_t*)CthMemAlign(CMK_MEMORY_PAGESIZE, size);
@@ -2207,93 +1681,22 @@ CthVoidFn fn; void *arg; int size;
   stack = (qt_t*)malloc(size);
 #endif
   _MEMCHECK(stack);
-  result = (CthThread)malloc(sizeof(struct CthThreadStruct));
-  _MEMCHECK(result);
-  CthThreadInit(result);
+  result=CthThreadInit();
   stackbase = QT_SP(stack, size);
   stackp = QT_ARGS(stackbase, arg, result, (qt_userf_t *)fn, CthOnly);
   result->stack = stack;
   result->stackp = stackp;
 #if CMK_STACKPROTECT
-  if (stack==stackbase) {
-    result->protect = ((char*)stack) + size - CMK_MEMORY_PAGESIZE;
-    result->protlen = CMK_MEMORY_PAGESIZE;
-  } else {
-    result->protect = ((char*)stack);
-    result->protlen = CMK_MEMORY_PAGESIZE;
-  }
+#ifdef QT_GROW_UP
+  /*Stack grows up-- barrier at high end of stack*/
+  result->protect = ((char*)stack) + size - CMK_MEMORY_PAGESIZE;
+#else
+  /*Stack grows down-- barrier at low end of stack*/
+  result->protect = ((char*)stack);
+#endif
+  result->protlen = CMK_MEMORY_PAGESIZE;
   CthMemoryProtect(result->protect, result->protlen);
 #endif
-  CthSetStrategyDefault(result);
-  return result;
-}
-
-void CthSuspend()
-{
-  CthThread next;
-#if CMK_WEB_MODE
-  void usageStop();
-#endif
-  if(!(CthCpvAccess(CthCurrent)->suspendable))
-    CmiAbort("trying to suspend main thread!!\n");
-  if (CthCpvAccess(CthCurrent)->choosefn == 0) CthNoStrategy();
-  next = CthCpvAccess(CthCurrent)->choosefn();
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceSuspend();
-#endif
-#if CMK_WEB_MODE
-  usageStop();
-#endif
-  CthResume(next);
-}
-
-void CthAwaken(th)
-CthThread th;
-{
-  if (th->awakenfn == 0) CthNoStrategy();
-  CpvAccess(curThread) = th;
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceAwaken();
-#endif
-  th->awakenfn(th, CQS_QUEUEING_FIFO, 0, 0);
-}
-
-void CthYield()
-{
-  CthAwaken(CthCpvAccess(CthCurrent));
-  CthSuspend();
-}
-
-void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
-{
-  if (th->awakenfn == 0) CthNoStrategy();
-  CpvAccess(curThread) = th;
-#ifndef CMK_OPTIMIZE
-  if(CpvAccess(traceOn))
-    traceAwaken();
-#endif
-  th->awakenfn(th, s, pb, prio);
-}
-
-void CthYieldPrio(int s, int pb, unsigned int *prio)
-{
-  CthAwakenPrio(CthCpvAccess(CthCurrent), s, pb, prio);
-  CthSuspend();
-}
-
-int CthRegister(size)
-int size;
-{
-  int result;
-  int align = 1;
-  while (size>align) align<<=1;
-  CthCpvAccess(CthDatasize) = (CthCpvAccess(CthDatasize)+align-1) & ~(align-1);
-  result = CthCpvAccess(CthDatasize);
-  CthCpvAccess(CthDatasize) += size;
-  CthFixData(CthCpvAccess(CthCurrent));
-  CthCpvAccess(CthData) = CthCpvAccess(CthCurrent)->data;
   return result;
 }
 
@@ -2303,27 +1706,3 @@ CthThread CthPup(pup_er p, CthThread t)
   return 0;
 }
 #endif
-
-/* Common Functions */
-
-void setEvent(CthThread t, int event) { t->Event = event; }
-int getEvent(CthThread t) { return t->Event; }
-
-void CthSetSuspendable(CthThread t, int val) { t->suspendable = val; }
-int CthIsSuspendable(CthThread t) { return t->suspendable; }
-
-void CthSetNext(CthThread t, CthThread v) { t->qnext = v; }
-CthThread CthGetNext(CthThread t) { return t->qnext; }
-
-static void CthNoStrategy(void)
-{
-  CmiAbort("Called CthAwaken or CthSuspend before calling CthSetStrategy.\n");
-}
-
-int CthImplemented() { return 1; } 
-
-void CthSetStrategy(CthThread t, CthAwkFn awkfn, CthThFn chsfn)
-{
-  t->awakenfn = awkfn;
-  t->choosefn = chsfn;
-}
