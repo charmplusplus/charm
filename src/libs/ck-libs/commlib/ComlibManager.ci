@@ -1,0 +1,19 @@
+module ComlibModule { 
+  readonly CkGroupID cmgrID;
+  message [varsize] ComlibMsg;
+	
+  group ComlibManager{
+//    entry ComlibManager(int s, int n);
+    entry ComlibManager(int s);
+
+    entry void done(void);
+    entry void receiveID(comID id);
+    entry void localElement(void);
+    entry void ArraySend(int ep, void *msg, CkArrayIndexMax &idx, CkArrayID a);
+    entry void receiveMessage(ComlibMsg *);
+
+    //Called by each array element
+    entry void beginIteration();
+    entry void endIteration();
+  }
+};
