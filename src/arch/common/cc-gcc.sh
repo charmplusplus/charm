@@ -1,4 +1,6 @@
-CMK_CPP_C='gcc -E '
-CMK_CC='gcc '
-CMK_CXX='g++ '
-CMK_CXXPP='g++ -E '
+CMK_CPP_C="gcc -E $CMK_INCDIR "
+CMK_CC="gcc $CMK_INCDIR -Wno-deprecated "
+CMK_LD="gcc $CMK_LIBDIR "
+CMK_CXX="g++ $CMK_INCDIR -Wno-deprecated "
+CMK_CXXPP="g++ -E $CMK_INCDIR "
+CMK_LDXX="g++ $CMK_LIBDIR "
