@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-11-02 20:23:01  sanjeev
+ * Revision 2.13  1996-02-22 21:36:18  sanjeev
+ * added macros for non-translator version of Charm++
+ *
+ * Revision 2.12  1995/11/02 20:23:01  sanjeev
  * removed CFunctionRefToName and CFunctionNameToRef
  *
  * Revision 2.11  1995/11/02  18:24:35  sanjeev
@@ -190,6 +193,36 @@
 #define McSpanTreeChild(node, children) CmiSpanTreeChildren(node, children)
 #define McNumSpanTreeChildren(node) CmiNumSpanTreeChildren(node)
 #define McSendToSpanTreeLeaves(size, msg) CmiSendToSpanTreeLeaves(size, msg)
+
+
+
+
+/* These are macros for the non-translator version of Charm++.
+   They work only for preprocessors with ANSI concatenation, e.g. g++
+   So they wont work with cpp or CC.	*/
+
+#define GetEntryPtr(ChareType,EP) 	_CK_ep_##ChareType##_##EP
+
+#define CSendMsg(ChareType,EP,msg,ChareId) 	SendMsg(GetEntryPtr(ChareType,EP), msg, ChareId)
+
+#define CSendMsgBranch(ChareType,EP,msg,ChareId,Pe) 	SendMsgBranch(GetEntryPtr(ChareType,EP), msg, ChareId, Pe)
+
+#define CBroadcastMsgBranch(ChareType,EP,msg,ChareId) 	BroadcastMsgBranch(GetEntryPtr(ChareType,EP), msg, ChareId)
+
+#define CLocalBranch(BocType, BocId)	((BocType *)GetBocDataPtr(BocId))
+
+#define MsgIndex(MessageType)	_CK_msg_##MessageType
+
+#define newchare(ChareType, msg)	CreateChare(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, 0, (0xFFF2))
+
+#define newchare2(ChareType, msg, vid, pe) 	CreateChare(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, vid, pe)
+
+
+#define newgroup(ChareType, msg)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, 0, 0)
+
+
+#define newgroup2(ChareType, msg, returnEP, returnID)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType), msg, returnEP, returnID)
+
 
 
 #endif
