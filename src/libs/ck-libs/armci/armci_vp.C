@@ -7,11 +7,23 @@ ArmciVirtualProcessor::ArmciVirtualProcessor(const CProxy_TCharm &_thr_proxy)
   tcharmClientInit();
   memBlock = CmiIsomallocBlockListNew();
   thisProxy = CProxy_ArmciVirtualProcessor(thisArrayID);
+  addressReply = NULL;
   thread->ready();
 }
 
 ArmciVirtualProcessor::ArmciVirtualProcessor(CkMigrateMessage *m) 
-  : TCharmClient1D(m) {}
+  : TCharmClient1D(m) 
+{
+  memBlock = NULL; //Paranoia-- makes sure we initialize this in pup
+  thread = NULL;
+  addressReply = NULL;
+}
+
+ArmciVirtualProcessor::~ArmciVirtualProcessor()
+{
+  CmiIsomallocBlockListDelete(memBlock);
+  if (addressReply) {delete addressReply;}
+}
 
 void ArmciVirtualProcessor::setupThreadPrivate(CthThread forThread) {
   CtvAccessOther(forThread, _armci_ptr) = this;
@@ -22,9 +34,9 @@ void ArmciVirtualProcessor::getAddresses(AddressMessage *msg) {
   thread->resume();
 }
 
-void ArmciVirtualProcessor::putData(int local, int nbytes, char *data,
+void ArmciVirtualProcessor::putData(pointer local, int nbytes, char *data,
 				    int sourceVP) {
-  memcpy((void *)local, data, nbytes);
+  memcpy(local, data, nbytes);
   thisProxy[sourceVP].putAck(thisIndex);
 }
 
@@ -32,19 +44,19 @@ void ArmciVirtualProcessor::putAck(int sourceVP) {
   thread->resume();
 }
 
-void ArmciVirtualProcessor::putFromGet(int local, int remote, int nbytes,
+void ArmciVirtualProcessor::putFromGet(pointer local, pointer remote, int nbytes,
 				       int sourceVP) {
   char *buffer;
   buffer = new char[nbytes];
-  buffer = (char *)memcpy(buffer, (void *)local, nbytes);
+  buffer = (char *)memcpy(buffer, local, nbytes);
   thisProxy[sourceVP].putDataFromGet(remote, nbytes, buffer);
 }
 
 // this is essentially the same as putData except that no acknowledgement
 // is required and the thread suspended while waiting for the data is
 // awoken.
-void ArmciVirtualProcessor::putDataFromGet(int local, int nbytes, char *data) {
-  memcpy((void *)local, data, nbytes);
+void ArmciVirtualProcessor::putDataFromGet(pointer local, int nbytes, char *data) {
+  memcpy(local, data, nbytes);
   thread->resume();
 }
 
@@ -52,7 +64,7 @@ void ArmciVirtualProcessor::pup(PUP::er &p) {
   TCharmClient1D::pup(p);
   CmiIsomallocBlockListPup(&p, &memBlock);
   p|thisProxy;
-  CkPupMessage(p, &(void *)addressReply, 1);
+  CkPupMessage(p, (void **)&addressReply, 1);
 }
 
 // NOT an entry method. This is an object-interface to the API interface.
@@ -79,6 +91,7 @@ int ArmciVirtualProcessor::requestAddresses(pointer ptr_arr[], int bytes) {
     ptr_arr[i] = addressReply->addresses[i];
   }
   delete addressReply;
+  addressReply = NULL;
 
   // need to find out and return a proper error code if something bad happens
   return 0;
@@ -91,7 +104,7 @@ int ArmciVirtualProcessor::put(pointer local, pointer remote,
   buffer = new char[nbytes];
   buffer = (char *)memcpy(buffer, local, nbytes);
 
-  thisProxy[destVP].putData((int)remote, nbytes, buffer, thisIndex);
+  thisProxy[destVP].putData(remote, nbytes, buffer, thisIndex);
 
   // blocking call. Wait for acknowledgement from target
   thread->suspend();
@@ -102,7 +115,7 @@ int ArmciVirtualProcessor::put(pointer local, pointer remote,
 
 int ArmciVirtualProcessor::get(pointer remote, pointer local,
 			       int nbytes, int destVP) {
-  thisProxy[destVP].putFromGet((int)remote, (int)local, nbytes, thisIndex);
+  thisProxy[destVP].putFromGet(remote, local, nbytes, thisIndex);
   // wait for reply
   thread->suspend();
 

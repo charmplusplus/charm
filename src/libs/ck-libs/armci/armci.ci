@@ -10,9 +10,9 @@ module armci {
 	array [1D] ArmciVirtualProcessor {
 		entry ArmciVirtualProcessor(CProxy_TCharm _thr_proxy);
 		entry void getAddresses(AddressMessage *msg);
-		entry void putData(int remote, int nbytes, char data[nbytes], int sourceVP);
+		entry void putData(pointer remote, int nbytes, char data[nbytes], int sourceVP);
 		entry void putAck(int sourceVP);
-		entry void putFromGet(int local, int remote, int nbytes, int sourceVP);
-		entry void putDataFromGet(int remote, int nbytes, char data[nbytes]);
+		entry void putFromGet(pointer local, pointer remote, int nbytes, int sourceVP);
+		entry void putDataFromGet(pointer remote, int nbytes, char data[nbytes]);
 	};
 };

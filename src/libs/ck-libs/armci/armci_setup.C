@@ -26,9 +26,13 @@ void ARMCI_Attach(void) {
   armci_nproc = TCharmNumElements();
 }
 
+
+CtvDeclare(ArmciVirtualProcessor *, _armci_ptr);
+
 // Node initialization (made by initcall of the module armci)
 void armciNodeInit(void) {
   CtvInitialize(ArmciVirtualProcessor, _armci_ptr);
+  CtvAccess(_armci_ptr) = NULL;
 
   // Register the library's default startup routine to TCharm
   TCharmSetFallbackSetup(ArmciDefaultSetup);

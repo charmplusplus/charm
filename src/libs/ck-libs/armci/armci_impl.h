@@ -4,13 +4,13 @@
 #include "tcharmc.h"
 #include "tcharm.h"
 
+//Types needed for remote method parameters:
+typedef void* pointer;
+
 #include "armci.decl.h"
 #include "armci.h"
 
 // structure definitions and forward declarations (for reductions)
-
-typedef void* pointer;
-
 typedef struct peAddr {
   int pe;
   pointer ptr;
@@ -32,11 +32,13 @@ class ArmciVirtualProcessor : public TCharmClient1D {
  public:
   ArmciVirtualProcessor(const CProxy_TCharm &_thr_proxy);
   ArmciVirtualProcessor(CkMigrateMessage *m);
+  ~ArmciVirtualProcessor();
+  
   void getAddresses(AddressMessage *msg);
-  void putData(int local, int nbytes, char *data, int sourceVP);
+  void putData(pointer local, int nbytes, char *data, int sourceVP);
   void putAck(int sourceVP);
-  void putFromGet(int local, int remote, int nbytes, int sourceVP);
-  void putDataFromGet(int local, int nbytes, char *data);
+  void putFromGet(pointer local, pointer remote, int nbytes, int sourceVP);
+  void putDataFromGet(pointer local, int nbytes, char *data);
 
   // non-entry methods. Mainly interfaces to API interface methods.
   int requestAddresses(pointer ptr_arr[], int bytes);
@@ -54,6 +56,6 @@ class AddressMessage : public CMessage_AddressMessage {
 
 // pointer to the current tcshmem thread. Needed to regain context after
 // getting called by user.
-CtvStaticDeclare(ArmciVirtualProcessor *, _armci_ptr);
+CtvExtern(ArmciVirtualProcessor *, _armci_ptr);
 
 #endif
