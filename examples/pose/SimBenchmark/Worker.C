@@ -111,34 +111,30 @@ void worker::doWork()
   int localNbr;
   for (int i=0; i<msgsPerWork; i++) {
     if (sent >= numMsgs) return;
-    localNbr = (myHandle+1) % numObjs;
+    sent++;
+    localNbr = ((myHandle+1) % numObjs) + (CkMyPe() * numObjs);
+    if (local > 0) local--;
+    else localNbr = neighbor;
     elapse(elapseTime);
     if (msgSize == MIX_MS) actualMsgSize = (actualMsgSize + 1) % 3;
     if (actualMsgSize == SMALL) {
       sm = new SmallWorkMsg;
       memset(sm->data, 0, SM_MSG_SZ*sizeof(int));
-      if (local > 0) local--;
-      else localNbr = neighbor;
       POSE_invoke(workSmall(sm), worker, localNbr, 0);
-      CkPrintf("%d sending small work to %d at %d. Sent=%d\n",myHandle,localNbr,ovt,sent);
+      //CkPrintf("%d sending small work to %d at %d. Sent=%d\n",myHandle,localNbr,ovt,sent);
     }
     else if (actualMsgSize == MEDIUM) {
       mm = new MediumWorkMsg;
       memset(mm->data, 0, MD_MSG_SZ*sizeof(int));
-      if (local > 0) local--;
-      else localNbr = neighbor;
       POSE_invoke(workMedium(mm), worker, localNbr, 0);
       //CkPrintf("%d sending medium work to %d at %d\n",myHandle,localNbr,ovt);
     }
     else if (actualMsgSize == LARGE) {
       lm = new LargeWorkMsg;
       memset(lm->data, 0, LG_MSG_SZ*sizeof(int));
-      if (local > 0) local--;
-      else localNbr = neighbor;
       POSE_invoke(workLarge(lm), worker, localNbr, 0);
       //CkPrintf("%d sending large work to %d at %d\n",myHandle,localNbr,ovt);
     }
-    sent++;
   }
   elapse(elapseRem);
   int elapseCheck = sent * (1.0/density);
