@@ -69,7 +69,7 @@ class TList
         return;
       // case 2: first element to be removed
       if(first->data == data) {
-	Elemt *tbr = first;
+	Elem *tbr = first;
         first = first->next;
         len --;
 	delete tbr;
