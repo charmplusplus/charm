@@ -121,7 +121,7 @@ static void CldTokenHandler(CldToken tok)
     proc->load --;
     CmiHandleMessage(tok->msg);
   } else {
-    CmiFree(tok->msg);
+    /* CmiFree(tok->msg); */
   }
 }
 
@@ -169,8 +169,8 @@ void CldGetToken(void **msg, int *infofn, int *packfn)
   tok->succ = 0;
   tok->pred = 0;
   proc->load --;
-  CmiReference(msg);
   *msg = tok->msg;
+  CmiReference(*msg);
   *infofn = tok->infofn;
   *packfn = tok->packfn;
 }
@@ -178,7 +178,11 @@ void CldGetToken(void **msg, int *infofn, int *packfn)
 void CldModuleGeneralInit()
 {
   CldToken sentinel = (CldToken)CmiAlloc(sizeof(struct CldToken_s));
-  CldProcInfo proc = (CldProcInfo)malloc(sizeof(struct CldProcInfo_s));
+  CldProcInfo proc;
+
+  CpvInitialize(CldProcInfo, CldProc);
+  CpvAccess(CldProc) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
+  proc = CpvAccess(CldProc);
   proc->load = 0;
   proc->tokenhandleridx = CmiRegisterHandler((CmiHandler)CldTokenHandler);
   proc->sentinel = sentinel;
