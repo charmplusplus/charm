@@ -72,11 +72,6 @@ char **argv;
   CpvInitialize(int, threadEp);
   CpvInitialize(int, threadPe);
   CpvInitialize(int, threadEvent);
-  CpvAccess(threadMsg) = registerMsg("dummy_thread_msg", 0, 0, 0, 0);
-  CpvAccess(threadChare) = registerChare("dummy_thread_chare", 0, 0);
-  CpvAccess(threadEp) = registerEp("dummy_thread_ep", 0, 0,
-                                   CpvAccess(threadMsg),
-                                   CpvAccess(threadChare));
 /* end addition */
   program_name(argv[0]);
 }
@@ -218,6 +213,13 @@ int type, tbl, key, pe;
 
 trace_begin_computation()
 {
+/* Addition for threads tracing */
+  CpvAccess(threadMsg) = registerMsg("dummy_thread_msg", 0, 0, 0, 0);
+  CpvAccess(threadChare) = registerChare("dummy_thread_chare", 0, 0);
+  CpvAccess(threadEp) = registerEp("dummy_thread_ep", 0, 0,
+                                   CpvAccess(threadMsg),
+                                   CpvAccess(threadChare));
+/* end addition */
 	add_to_buffer(BEGIN_COMPUTATION, -1, -1, CkUTimer(), -1, -1);
 }
 
