@@ -25,17 +25,17 @@ PVT::PVT()
   specEventCount = eventCount = waitForFirst = 0;
   iterMin = POSE_UnsetTS;
   int P=CkNumPes(), N=CkMyPe();
-  if ((N < P-2) && (N%2 == 1)) {
+  if ((N < P-2) && (N%2 == 1)) { //odd
     reportTo = N-1;
     reportReduceTo =  -1;
     reportsExpected = reportEnd = 0;
   }
-  else if (N < P-2) {
+  else if (N < P-2) { //even
     reportTo = N;
     reportsExpected = 2; 
     if (N == P-3)
       reportsExpected = 1;
-    if (N <= (P-2)/2)
+    if (N < (P-2)/2)
       reportReduceTo = P-2;
     else reportReduceTo = P-1;
     reportEnd = 0;
@@ -43,7 +43,7 @@ PVT::PVT()
   if (N == P-2) {
     reportTo = N;
     reportEnd = 1;
-    reportsExpected = 1 + (P-2)/4 + 1;
+    reportsExpected = 1 + ((((double)P)-2.0)/4.0)+0.5;
   }
   else if (N == P-1) {
     reportTo = N;
@@ -313,7 +313,7 @@ GVT::GVT()
   estGVT = lastEarliest = inactiveTime = POSE_UnsetTS;
   lastSends = lastRecvs = inactive = 0;
   reportsExpected = 1;
-  if (CkNumPes() > 2) reportsExpected = 2;
+  if (CkNumPes() >= 2) reportsExpected = 2;
     
   //  CkPrintf("GVT expects %d reports!\n", reportsExpected);
   if (CkMyPe() == 0) { // start the PVT phase of the GVT algorithm
