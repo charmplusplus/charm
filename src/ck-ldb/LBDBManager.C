@@ -294,7 +294,8 @@ void LocalBarrier::CallReceivers(void)
 {
   CmiBool called_receiver=CmiFalse;
 
-  for(int i=0; i < max_receiver; i++)
+//  for(int i=0; i < max_receiver; i++)
+    for (int i=max_receiver-1; i>=0; i--)
     if (receivers[i] != 0) {
       receivers[i]->fn(receivers[i]->data);
       called_receiver = CmiTrue;
