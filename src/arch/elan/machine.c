@@ -365,7 +365,7 @@ int PumpMsgs(int retflag)
   static int post_idx = 0;
   static int step1 = 0;
 
-  int flg, res;
+  int flg, res,rcount;
   char *msg = 0;
 
   int recd=0;
@@ -380,7 +380,7 @@ int PumpMsgs(int retflag)
     msg = 0;
     
     ecount = 0;
-    for(int rcount = 0; rcount < RECV_MSG_Q_SIZE; rcount ++){
+    for(rcount = 0; rcount < RECV_MSG_Q_SIZE; rcount ++){
       ecount = (rcount + post_idx) % RECV_MSG_Q_SIZE;
       if(!recv_small_done[ecount]) {
 
@@ -443,7 +443,7 @@ int PumpMsgs(int retflag)
     }
     
     ecount = 0;
-    for(int rcount = 0; rcount < RECV_MSG_Q_SIZE; rcount ++){
+    for(rcount = 0; rcount < RECV_MSG_Q_SIZE; rcount ++){
       ecount = (rcount + event_idx) % RECV_MSG_Q_SIZE;
       if(elan_tportRxDone(esmall[ecount]) || retflag == 3) {
 	
