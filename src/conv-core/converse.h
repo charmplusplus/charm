@@ -927,6 +927,8 @@ void CtgInstall(CtgGlobals g);
 CtgGlobals CtgPup(pup_er, CtgGlobals g);
 /** Delete this (not currently installed) set of globals. */
 void CtgFree(CtgGlobals g);
+/** Return the current global list */
+CtgGlobals CtgCurrentGlobals(void);
 
 /* The thread listener structure. The user must register one such listener
 	if he wants to find out when a thread is suspended or when it starts running

@@ -319,6 +319,9 @@ void CtgFree(CtgGlobals g) {
 	delete g;
 }
 
+CtgGlobals CtgCurrentGlobals(void){
+	return CpvAccess(_curCtg);
+}
 
 #else
 
