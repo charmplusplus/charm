@@ -75,11 +75,18 @@ dirs+sources:
 	@(cd .. ; basename `pwd` > tmp/.vdir)
 	@cat .vdir | sed -e 's@-.*@@' > .gdir
 	@echo
-	@echo 'Gathering source code in '`cat .vdir`'/tmp'
+	@echo 'Creating directory tree '`cat .vdir`'/...'
 	@echo
 	rm -rf ../bin ; mkdir ../bin
 	rm -rf ../lib ; mkdir ../lib
 	rm -rf ../src ; mkdir ../src
+	mkdir ../src/xlat
+	mkdir ../src/xlat++
+	mkdir ../src/xlat-i
+	mkdir ../src/xlatcpm
+	@echo
+	@echo 'Gathering source code in '`cat .vdir`'/tmp'
+	@echo
 	rm -f ../../bin ; ln -s `cat .vdir`/bin ../../bin
 	find . -type l -exec rm {} \;
 	find ../../src/Common -type f \! -name Entries \! -name Entries.log \! -name Root \! -name Repository -exec ln -s {} . \;
@@ -101,13 +108,16 @@ dirs+sources:
 	rt=`(cd ../.. ; pwd)` ; (cd ../.. ; find pgms -type f -print) | awk '{ print "ln -s '$$rt'/"$$1" ../"$$1; }' > tmp.sh
 	sh tmp.sh ; rm -f tmp.sh
 	@echo
-	@echo 'Gathering translator source.'
+	@echo 'Gathering translator source in '`cat .vdir`/src
 	@echo
-	ln -s ../../src/Common/xlat/xl-*           ../src
-	ln -s ../../src/Common/xlat++/xp-*         ../src
-	ln -s ../../src/Common/xlat-i/xi-*         ../src
-	ln -s ../../src/Common/xlatcpm/conv-cpm.*  ../src
-	ln -s ../../src/Common/Makefile            ../src
+	ln -s ../../src/Common/xlat/xl-*           ../src/xlat
+	ln -s ../../src/Common/xlat++/xp-*         ../src/xlat++
+	ln -s ../../src/Common/xlat-i/xi-*         ../src/xlat-i
+	ln -s ../../src/Common/xlatcpm/conv-cpm.*  ../src/xlatcpm
+	ln -s ../../src/Common/Makefile            ../src/xlat
+	ln -s ../../src/Common/Makefile            ../src/xlat++
+	ln -s ../../src/Common/Makefile            ../src/xlat-i
+	ln -s ../../src/Common/Makefile            ../src/xlatcpm
 	@echo
 	@rm -f .vdir .gdir
 	touch dirs+sources
