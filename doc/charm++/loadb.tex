@@ -1,7 +1,7 @@
 \subsection{Load Balancing Framework}
 \label{lbFramework}
 
-In \charmpp{}, objects(except groups) can even migrate from processor to 
+In \charmpp{}, objects(except groups) can migrate from processor to 
 processor at run-time. Object migration can potentially improve the parallel 
 program to be more efficient by migrating objects from overloaded processors 
 at run-time. However, we can see it is not trivial to decide 
@@ -32,6 +32,7 @@ Here are the two terms often used in \charmpp{} load balancing framework:
 \end{itemize}
 
 \subsubsection{Available Load Balancing Strategies}
+\label{lbStrategy}
 
 Below are the available load balancers and their brief description:
 \begin{itemize}
@@ -47,24 +48,54 @@ Below are the available load balancers and their brief description:
 \item \kw{NeighborLB}:   The neighborhood load balancer
 \end{itemize}
 
+It is up to the users to choose which load balancing algorithm for the 
+application at compile or run-time. The compiler and run-time options 
+is described at section\ref{lbOption}.
+
 \subsubsection{Load Balancing Chare Arrays}
 \label{lbarray}
 
-Using load balancer with Chare arrays is considered easy because
+Load balancing Chare arrays is considered easy because
 load balancer is well coupled with Chare array implementation - 
 chare array when created automatically registers itself to load balancing
 framework, instrument of compute wall/cpu time and communication is 
 done automatically and APIs are provided for triggering the load balancing; 
-thus load balancing with array is prefered in Charm++, although it is doable 
+thus load balancing with array is prefered in \charmpp{}, although it is doable 
 for load balancing individule Chares for experienced users.(this is currently
 beyond the scope of this manual)
 
-To use the load balancer, you must make your elements migratable
-(see migration section above) and choose a load balancing 
-``strategy'' (see the load balancing section for a description
-of load balancing strategy routines).
+To use the load balancer, you must make your array elements migratable
+(see migration section above) and choose a \kw{load balancing strategy} 
+(see the section\ref{lbStrategy} for a description
+of available load balancing strategies).
 
-There are three ways to use the load balancer-- 
+Considering how and when a load balancing phase starts, we implemented three
+methods to meet different needs of the application.
+The three methods to use the load balancer with chare arrays are:
+{\bf automatic without Sync}, {\bf automatic with Sync} and {\bf manual mode}.
+In case of {\em automatic} load balancing, user don't need to worry about 
+how and when to start the load balancing phase. Load balancer will start 
+itself when it think it is ready based on the hint given by users.
+In the case of {\bf automatic without Sync}, application simply asserts
+that load balancer can happen at any time during the execution, and 
+the chare arrays are always ready to migrate\footnote{all the temporary 
+data of the array in the application has to be properly packed for migraton}. 
+In this mode, load balancer works in the background and application 
+doesn't need to stop waiting for load balancing to complete. In most cases, 
+application doesn't want load balancing occurs arbitarily because it knows 
+what is the proper time for load balancing\footnote{for example, the 
+application with iteration, load balancing best happens after several 
+iterations}. {\bf Automatic with Sync} is designed for this scenario. 
+In this mode, user insert {\em AtSync()} calls at certain points when load 
+balancing is desired. Load balancing takes control after all the 
+local array elements reach the sync point, and start load balancing 
+from there. The application better takes a break and wait for the load 
+balancing complete and regain the control from {\em ResumeFromSync()}.
+When user want to have more control on the time and want to avoid
+the synchronizition of the {\em AtSync} method, he may want to use 
+the {\bf manual} mode to start load balancer himself.
+
+The detailed API of these three methods is described as follows:
 \begin{itemize}
 
 \item Method 1: By default, the array elements may be asked to migrate at any time
@@ -75,12 +106,12 @@ to this default behaviour.
 \item  Method 2: Using the AtSync method, elements can be migrated at certain
 times.  For the AtSync method, set \kw{usesAtSync} to true in your 
 array element constructor.  When an element is ready to migrate,
-call \kw{ArrayElement::AtSync}.  
+call \kw{ArrayElement::AtSync()}.  
 After the first \kw{doneInserting} call (which starts the load balancer)
-and once all elements have reached \kw{AtSync},
+and once all local elements have reached \kw{AtSync},
 the load balancer runs and migrates elements.  Once
 all migrations are complete, the load balancer calls the 
-virtual function \kw{ArrayElement::ResumeFromSync} for each of the
+virtual function \kw{ArrayElement::ResumeFromSync()} for each of the
 array element.  One must ensure that no messages are
 sent to an array element between its calls to \kw{AtSync} and
 \kw{ResumeFromSync}. \kw{AtSync}/\kw{ResumeFromSync} is currently
@@ -100,23 +131,24 @@ For example,
 LBDatabase * myLbdb = LBDatabase::Object()
 \end{alltt}
 
-{\kw myLbdb-$>$TurnManualLBOn()} will enable the manual switching on of
+{\em myLbdb-$>$TurnManualLBOn()} will enable the manual switching on of
 the Load Balancer, so that no Load Balancer will be started automatically.
-\kw{TurnManualLBOn()} should be called as early as possible in the
+{\em TurnManualLBOn()} should be called as early as possible in the
 program. It must be ideally called in the constructor of a static array and
 definitely before the doneInserting call for a dynamic array.  This call 
 has to be made on all processors. It can be called multiple times on one 
 pe, but the last one takes effect.   
-The function call {\kw myLbdb-$>$StartLB()} will start the load balancer. 
+The function call {\em myLbdb-$>$StartLB()} will start the load balancer. 
 This call can be made on only one pe as the start message is broadcast 
 to all processors. The load balancing happens in the background and 
 won't stop the chares from functioning. 
-\kw{myLbdb-$>$TurnManualLBOff()} turns off manual load balancing and switches back to the automatic Load balancing mode (using or not using AtSync). 
+{\em myLbdb-$>$TurnManualLBOff()} turns off manual load balancing and switches back to the automatic Load balancing mode (using or not using AtSync). 
 
 \end{itemize}
 
 
 \subsubsection{Compiler and run-time options to use load balancing module}
+\label{lbOption}
 
 Load balancing strategies are implemented as libraries in \charmpp{}. This
 allow programmers to easily experiment with different existing strategies 
