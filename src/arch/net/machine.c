@@ -1302,19 +1302,6 @@ static void ctrl_sendone_locking(const char *type,
 
 static double Cmi_check_last;
 
-/* no lock charm ping, for gm */
-static void pingCharmrunNoLock(void *context)
-{
-  double clock=GetClock();
-  if (clock > Cmi_check_last + Cmi_check_delay) {
-    MACHSTATE(1,"CommunicationsClock pinging charmrun");       
-    Cmi_check_last = clock; 
-    if (!Cmi_charmrun_fd_sendflag)  /*Busy talking to charmrun*/
-      ctrl_sendone_nolock("ping",NULL,0,NULL,0); /*Charmrun may have died*/
-    CcdCallFnAfter(pingCharmrunNoLock,NULL,1000);
-  }
-}
-
 static void pingCharmrun(int ignored) 
 {
   double clock=GetClock();
@@ -1327,6 +1314,13 @@ static void pingCharmrun(int ignored)
     ctrl_sendone_nolock("ping",NULL,0,NULL,0); /*Charmrun may have died*/
     CmiCommUnlock();
   }
+}
+
+/* periodic charm ping, for gm and netpoll */
+static void pingCharmrunPeriodic(int ignored)
+{
+  pingCharmrun(ignored);
+  CcdCallFnAfter(pingCharmrunPeriodic,NULL,1000);
 }
 
 static int ignore_further_errors(int c,const char *msg) {machine_exit(2);return -1;}
@@ -2043,7 +2037,7 @@ static void ConverseRunPE(int everReturn)
 #if CMK_SHARED_VARS_UNAVAILABLE
     if (Cmi_netpoll == 1) {
     /* gm cannot live with setitimer */
-    CcdCallFnAfter(pingCharmrunNoLock,NULL,1000);
+    CcdCallFnAfter(pingCharmrunPeriodic,NULL,1000);
     }
     else {
     /*Occasionally ping charmrun, to test if it's dead*/
