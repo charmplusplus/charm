@@ -127,7 +127,7 @@ UTILHEADERS=pup.h pup_c.h ckhashtable.h cklists.h conv-lists.h \
 	sockRoutines.h sockRoutines.c
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
-	  ckfutures.h ckarray.h cklocation.h ckreduction.h readonly.h \
+	  ckfutures.h ckcallback.h ckarray.h cklocation.h ckreduction.h readonly.h \
 	  $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
@@ -394,7 +394,7 @@ $(L)/libmemory-cache.o: memory-cache.c $(MEM_DEPS)
 CK_LIBS_CORE=libck.a
 
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
-           debug-message.o cklocation.o ckarray.o ckreduction.o \
+           debug-message.o ckcallback.o cklocation.o ckarray.o ckreduction.o \
            tempo.o waitqd.o LBDatabase.o lbdb.o \
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o ObjGraph.o graph.o  \
@@ -476,6 +476,11 @@ CkLocation.decl.h: cklocation.ci charmxi
 cklocation.o: cklocation.C $(CKHEADERS)
 	$(CHARMC) -c cklocation.C
 
+ckcallback.o: ckcallback.C $(CKHEADERS) CkCallback.decl.h
+	$(CHARMC) -c ckcallback.C
+
+CkCallback.decl.h: ckcallback.ci $(CHARMXI)
+	$(CHARMC) ckcallback.ci
 
 ## Charm++ Load balancer (Dynamic load balancer)
 
