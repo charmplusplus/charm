@@ -15,6 +15,8 @@ class node {  // a 2D double coordinate
   int reports;  // for smoothing
   double sumReports[DIM];  // for smoothing
   int theLock; // locking is for coarsening
+  double lockLength;
+  edgeRef lockHolder;
  public:
   int present;  // indicates this is an edge present in the mesh
   int border; // mesh boundary info
@@ -55,7 +57,34 @@ class node {  // a 2D double coordinate
   int isPresent() { return present; }
   double X() { return x; }
   double Y() { return y; }
-  int lock() { return (theLock ? 0 : theLock = 1); }
+  int lock(double l, edgeRef e) { 
+    if (theLock == 0) {
+      theLock = 1;
+      lockLength = l;
+      lockHolder = e;
+      return 1;
+    }
+    else if ((l == lockLength) && (e == lockHolder)) return 1;
+    else if (l == lockLength) {
+      if ((e.cid < lockHolder.cid) ||
+	  ((e.cid == lockHolder.cid) && (e.idx < lockHolder.idx))) {
+	while (theLock) CthYield();
+	theLock = 1;
+	lockLength = l;
+	lockHolder = e;
+	return 1;
+      }
+      else return 0;
+    }
+    else if (l > lockLength) return 0;
+    else if (l < lockLength) {
+      while (theLock) CthYield();
+      theLock = 1;
+      lockLength = l;
+      lockHolder = e;
+      return 1;
+    }
+  }
   void unlock() { theLock = 0; }
   double distance(const node& n) { // get distance to n
     double dx = n.x - x, dy = n.y - y;

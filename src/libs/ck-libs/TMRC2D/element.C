@@ -244,8 +244,7 @@ int element::nodeLockup(node n, edgeRef from, edgeRef start, elemRef end,
     if (n == C->theNodes[nodes[i]]) nIdx = i;
     if (from == edges[i]) fIdx = i;
   }
-  /*
-  int lockResult = C->theNodes[nIdx].lock(start, l);
+  int lockResult = C->theNodes[nIdx].lock(l, start);
   if (!lockResult) return 0;
   if (myRef == end) return 1;
   if (nIdx == fIdx) nextIdx = (nIdx + 2) % 3;
@@ -254,7 +253,41 @@ int element::nodeLockup(node n, edgeRef from, edgeRef start, elemRef end,
   intMsg *im = mesh[nextRef.cid].nodeLockupER(nextRef.idx, n, start, end, 
 					      myRef, l);
   return im->anInt;
-  */
+}
+
+int element::nodeUpdate(node n, edgeRef from, elemRef end, node newNode)
+{
+  int nIdx, fIdx, nextIdx;
+  for (int i=0; i<3; i++) {
+    if (n == C->theNodes[nodes[i]]) nIdx = i;
+    if (from == edges[i]) fIdx = i;
+  }
+  C->theNodes[nIdx].unlock();
+  C->theNodes[nIdx].set(newNode.X(), newNode.Y());
+  if (myRef == end) return 1;
+  if (nIdx == fIdx) nextIdx = (nIdx + 2) % 3;
+  else nextIdx = nIdx;
+  edgeRef nextRef = edges[nextIdx];
+  intMsg *im = mesh[nextRef.cid].nodeUpdateER(nextRef.idx, n, myRef, end, 
+					      newNode);
+  return im->anInt;
+}
+
+int element::nodeDelete(node n, edgeRef from, elemRef end)
+{
+  int nIdx, fIdx, nextIdx;
+  for (int i=0; i<3; i++) {
+    if (n == C->theNodes[nodes[i]]) nIdx = i;
+    if (from == edges[i]) fIdx = i;
+  }
+  C->theNodes[nIdx].unlock();
+  C->removeNode(nIdx);
+  if (myRef == end) return 1;
+  if (nIdx == fIdx) nextIdx = (nIdx + 2) % 3;
+  else nextIdx = nIdx;
+  edgeRef nextRef = edges[nextIdx];
+  intMsg *im = mesh[nextRef.cid].nodeDeleteER(nextRef.idx, n, myRef, end);
+  return im->anInt;
 }
 
 int element::findLongestEdge()

@@ -93,20 +93,33 @@ int edge::split(int *m, edgeRef *e_prime, node iNode, node fNode,
 
 int edge::collapse(elemRef requester, node kNode, node dNode)
 {
-  return -1;
   // element requester has asked this edge to collapse and give back new node
   // coordinates resulting node; return value is 1 if successful, 0 if
   // dNode is the node that is kept
-
+  intMsg *im;
   elemRef nbr = getNot(requester), nullRef;
   nullRef.reset();
   if (pending && (waitingFor == requester)) { // collapsed; awaiting requester
     CkPrintf("TMRC2D: edge::collapse: ** PART 2! ** On edge=%d on chunk=%d, requester=(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);
-    //remove this edge
-    //update & unlock kNode or dNode
-    //delete dNode or kNode
-    if (dNode == incidentNode) return 1; // incidence as planned
-    else return 0; // incidence is on kNode
+    C->removeEdge(myRef.idx);
+    if (dNode == incidentNode) { // incidence as planned
+      im = mesh[requester.cid].nodeUpdate(requester.idx,kNode,myRef,nbr,newNode);
+      if (im->anInt == -1)
+	im = mesh[nbr.cid].nodeUpdate(nbr.idx,kNode,myRef,requester,newNode);
+      im = mesh[requester.cid].nodeDelete(requester.idx,dNode,myRef,nbr);
+      if (im->anInt == -1)
+	im = mesh[nbr.cid].nodeDelete(nbr.idx,dNode,myRef,requester);
+      return 1; 
+    }
+    else { // incidence is on kNode
+      im = mesh[requester.cid].nodeUpdate(requester.idx,dNode,myRef,nbr,newNode);
+      if (im->anInt == -1)
+	im = mesh[nbr.cid].nodeUpdate(nbr.idx,dNode,myRef,requester,newNode);
+      im = mesh[requester.cid].nodeDelete(requester.idx,kNode,myRef,nbr);
+      if (im->anInt == -1)
+	im = mesh[nbr.cid].nodeDelete(nbr.idx,kNode,myRef,requester);
+      return 0; 
+    }
   }
   else if (pending) { // can't collapse a second time yet; waiting for nbr elem
   CkPrintf("TMRC2D: edge::collapse: ** Pending on (%d,%d)! ** On edge=%d on chunk=%d, requester=%d on chunk=%d\n", waitingFor.cid, waitingFor.idx, myRef.idx, myRef.cid, requester.idx, requester.cid);
@@ -114,7 +127,7 @@ int edge::collapse(elemRef requester, node kNode, node dNode)
   }
   else { // Need to do the collapse
     // need to lock adjacent nodes
-    /*
+    length = kNode.distance(dNode);
     intMsg *im = mesh[requester.cid].nodeLockup(requester.idx, kNode, myRef, myRef,
 						nbr, length);
     if (im->anInt == -1) 
@@ -141,12 +154,15 @@ int edge::collapse(elemRef requester, node kNode, node dNode)
       mesh[nbr.cid].coarsenElement(nbr.idx, nbrArea);
     }
     else {
-      //remove this edge
-      //update and unlock kNode
-      //delete dNode
+      C->removeEdge(myRef.idx);
+      im = mesh[requester.cid].nodeUpdate(requester.idx,kNode,myRef,nbr,newNode);
+      if (im->anInt == -1)
+	im = mesh[nbr.cid].nodeUpdate(nbr.idx,kNode,myRef,requester,newNode);
+      im = mesh[requester.cid].nodeDelete(requester.idx,dNode,myRef,nbr);
+      if (im->anInt == -1)
+	im = mesh[nbr.cid].nodeDelete(nbr.idx,dNode,myRef,requester);
     }
     return 1;
-    */
   }
 }
 
@@ -156,6 +172,22 @@ int edge::nodeLockup(node n, edgeRef start, elemRef from, elemRef end,
   elemRef next = getNot(from);
   if (next.cid == -1) return -1;
   intMsg *im = mesh[next.cid].nodeLockup(next.idx, n, myRef, start, end, l);
+  return im->anInt;
+}
+
+int edge::nodeUpdate(node n, elemRef from, elemRef end, node newNode)
+{
+  elemRef next = getNot(from);
+  if (next.cid == -1) return -1;
+  intMsg *im = mesh[next.cid].nodeUpdate(next.idx, n, myRef, end, newNode);
+  return im->anInt;
+}
+
+int edge::nodeDelete(node n, elemRef from, elemRef end)
+{
+  elemRef next = getNot(from);
+  if (next.cid == -1) return -1;
+  intMsg *im = mesh[next.cid].nodeDelete(next.idx, n, myRef, end);
   return im->anInt;
 }
 

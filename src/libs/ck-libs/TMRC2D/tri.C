@@ -173,6 +173,44 @@ intMsg *chunk::nodeLockupER(int idx, node n, edgeRef start, elemRef from,
   return im;
 }
 
+intMsg *chunk::nodeUpdate(int idx, node n, edgeRef from, elemRef end, 
+			  node newNode)
+{
+  intMsg *im = new intMsg;
+  accessLock();
+  im->anInt = theElements[idx].nodeUpdate(n, from, end, newNode);
+  releaseLock();
+  return im;
+}
+
+intMsg *chunk::nodeUpdateER(int idx, node n, elemRef from, elemRef end, 
+			    node newNode)
+{
+  intMsg *im = new intMsg;
+  accessLock();
+  im->anInt = theEdges[idx].nodeUpdate(n, from, end, newNode);
+  releaseLock();
+  return im;
+}
+
+intMsg *chunk::nodeDelete(int idx, node n, edgeRef from, elemRef end)
+{
+  intMsg *im = new intMsg;
+  accessLock();
+  im->anInt = theElements[idx].nodeDelete(n, from, end);
+  releaseLock();
+  return im;
+}
+
+intMsg *chunk::nodeDeleteER(int idx, node n, elemRef from, elemRef end)
+{
+  intMsg *im = new intMsg;
+  accessLock();
+  im->anInt = theEdges[idx].nodeDelete(n, from, end);
+  releaseLock();
+  return im;
+}
+
 void chunk::checkPending(int idx, objRef aRef)
 {
   elemRef eRef;
@@ -240,22 +278,6 @@ void chunk::resetEdge(int n)
 {
   accessLock();
   theEdges[n].reset();
-  releaseLock();
-}
-
-intMsg *chunk::lockNode(int n)
-{
-  intMsg *rm = new intMsg;
-  accessLock();
-  rm->anInt = theNodes[n].lock();
-  releaseLock();
-  return rm;
-}
-
-void chunk::unlockNode(int n)
-{
-  accessLock();
-  theNodes[n].unlock();
   releaseLock();
 }
 

@@ -29,6 +29,10 @@ module refine {
 	double);
     entry [sync, threaded] intMsg *nodeLockupER(int, node, edgeRef, elemRef, elemRef, 
 	double);
+    entry [sync, threaded] intMsg *nodeUpdate(int, node, edgeRef, elemRef, node);
+    entry [sync, threaded] intMsg *nodeUpdateER(int, node, elemRef, elemRef, node);
+    entry [sync, threaded] intMsg *nodeDelete(int, node, edgeRef, elemRef);
+    entry [sync, threaded] intMsg *nodeDeleteER(int, node, elemRef, elemRef);
     entry void checkPending(int, objRef);
     entry void checkPending(int, objRef, objRef);
     entry [sync] void updateElement(int, objRef, objRef);
@@ -36,8 +40,6 @@ module refine {
     entry void updateReferences(int, objRef, objRef);
     entry [sync, threaded] doubleMsg *getArea(int);
     entry [sync] void resetEdge(int);
-    entry [sync] intMsg *lockNode(int);
-    entry [sync] void unlockNode(int);
     entry [sync] refMsg *getNbr(int, objRef);
     entry [sync] void setTargetArea(int, double);
     entry [sync] void resetTargetArea(int, double);

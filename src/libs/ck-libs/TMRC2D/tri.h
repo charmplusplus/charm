@@ -160,6 +160,10 @@ class chunk : public TCharmClient1D {
 		     double l);
   intMsg *nodeLockupER(int idx, node n, edgeRef start, elemRef from, 
 		       elemRef end, double l);
+  intMsg *nodeUpdate(int idx, node n, edgeRef from, elemRef end, node newNode);
+  intMsg *nodeUpdateER(int idx, node n, elemRef from, elemRef end, node newNode);
+  intMsg *nodeDelete(int idx, node n, edgeRef from, elemRef end);
+  intMsg *nodeDeleteER(int idx, node n, elemRef from, elemRef end);
   void checkPending(int idx, objRef aRef);
   void checkPending(int idx, objRef aRef1, objRef aRef2);
   void updateElement(int idx, objRef oldval, objRef newval);
@@ -167,8 +171,6 @@ class chunk : public TCharmClient1D {
   void updateReferences(int idx, objRef oldval, objRef newval);
   doubleMsg *getArea(int n);
   void resetEdge(int n);
-  intMsg *lockNode(int n);
-  void unlockNode(int n);
   refMsg *getNbr(int idx, objRef aRef);
   void setTargetArea(int idx, double aDouble);
   void resetTargetArea(int idx, double aDouble);

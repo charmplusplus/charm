@@ -9,6 +9,7 @@
 class edge {
  public:
   int pending, newNodeIdx;
+  double length;
   elemRef waitingFor;
   node newNode, incidentNode, fixNode;
   edgeRef newEdgeRef; // half of this edge: from newNode to incidentNode
@@ -38,6 +39,7 @@ class edge {
     newEdgeRef = e.newEdgeRef;
     myRef = e.myRef;
     present = e.present;
+    length = e.length;
   }
   void set(int idx, int cid, chunk *myChk)  { 
     unsetPending(); myRef.set(cid, idx); C = myChk; present = 1;
@@ -83,6 +85,8 @@ class edge {
   int collapse(elemRef requester, node kNode, node dNode);
   void sanityCheck(chunk *c, edgeRef shouldRef);
   int nodeLockup(node n, edgeRef start, elemRef from, elemRef end, double l);
+  int nodeUpdate(node n, elemRef from, elemRef end, node newNode);
+  int nodeDelete(node n, elemRef from, elemRef end);
 };
 
 #endif
