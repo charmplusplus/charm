@@ -11,8 +11,9 @@ given a giant list of polygons.
 
 #include <math.h>
 #include "ckhashtable.h"
+#include "ckvector3d.h"
+typedef CkVector3d vector3d;
 typedef double real;
-#include "vector3d.h"
 #include "bbox.h"
 
 //Java programmer compatability
