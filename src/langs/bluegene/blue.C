@@ -154,7 +154,7 @@ public:
 
 class threadInfo {
 public:
-  int id;
+  short id;
 //  int globalId;
   ThreadType  type;
   CthThread me;			/* Converse thread handler */
