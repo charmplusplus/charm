@@ -72,20 +72,25 @@ public:
   /// Allocates event message with space for priority
   /** This can also handle event message recycling (currently off) */
   void *operator new (size_t size) {  
+#ifndef SEQUENTIAL_POSE
 #ifdef MSG_RECYCLING
     MemoryPool *localPool = (MemoryPool *)CkLocalBranch(MemPoolID);
     if (localPool->CheckPool(size) > 0)
       return localPool->GetBlock(size);
     else {
 #endif
+#endif
       void *msg = CkAllocMsg(CMessage_eventMsg::__idx, size, 8*sizeof(POSE_TimeType));
       ((eventMsg *)msg)->msgSize = size;
       return msg;
+#ifndef SEQUENTIAL_POSE
 #ifdef MSG_RECYCLING
     }
 #endif
+#endif
   }
   void operator delete(void *p) { 
+#ifndef SEQUENTIAL_POSE
 #ifdef MSG_RECYCLING
     MemoryPool *localPool = (MemoryPool *)CkLocalBranch(MemPoolID);
     int ps = localPool->CheckPool(((eventMsg *)p)->msgSize);
@@ -96,6 +101,7 @@ public:
       localPool->PutBlock(msgSize, p);
     }
     else
+#endif
 #endif
       CkFreeMsg(p);
   }
