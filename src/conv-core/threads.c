@@ -12,119 +12,8 @@
  ***************************************************************************
  * REVISION HISTORY:
  *
- * $Log$
- * Revision 1.34  1997-05-05 16:38:14  jyelon
- * *** empty log message ***
- *
  * Revision 1.33  1997/05/05 13:47:14  jyelon
  * Revamped threads package using quickthreads.
- *
- * Revision 1.32  1997/04/03 19:42:10  jyelon
- * Working on threads stuff.
- *
- * Revision 1.31  1997/04/01 08:09:51  jyelon
- * Spent a few hours integrating three versions of the threads package into one,
- * in preparation for the addition of preemption-support.
- *
- * Revision 1.30  1997/03/25 23:09:02  milind
- * Got threads to work on 64-bit irix. Had to add JB_TWEAKING_ORIGIN flag to
- * all the conv-mach.h files. Also, _PAGESZ was undefined on irix. Added
- * code to memory.c to make it a static variable.
- *
- * Revision 1.29  1997/03/21 02:18:05  milind
- * Fixed a bug due to CthCurrent not accessed thru Cpv macros.
- *
- * Revision 1.28  1997/03/19 05:36:50  jyelon
- * Made some corrections to the ALLOCA version --- trying to get IRIX working.
- *
- * Revision 1.27  1997/01/17 19:20:48  milind
- * Fixed static variable declarations bugs in JB_TWEAKING part.
- *
- * Revision 1.26  1997/01/17 15:49:08  jyelon
- * Made many changes for SMP version.  In particular, memory module now uses
- * CmiMemLock and CmiMemUnlock instead of CmiInterruptsBlock, which no longer
- * exists.  Threads package uses CthCpv to declare all its global vars.
- * Much other restructuring.
- *
- * Revision 1.25  1996/11/23 02:25:34  milind
- * Fixed several subtle bugs in the converse runtime for convex
- * exemplar.
- *
- * Revision 1.24  1996/10/24 20:51:50  milind
- * Removed the additional token after one #endif.
- *
- * Revision 1.23  1996/07/15 21:00:49  jyelon
- * Moved some code into common, changed mach-flags from #ifdef to #if
- *
- * Revision 1.22  1996/07/02 21:01:39  jyelon
- * Added CMK_THREADS_USE_JB_TWEAKING
- *
- * Revision 1.21  1995/10/31 19:53:21  jyelon
- * Added 'CMK_THREADS_USE_ALLOCA_WITH_PRAGMA'
- *
- * Revision 1.20  1995/10/31  19:49:30  jyelon
- * Added 'pragma alloca'
- *
- * Revision 1.19  1995/10/20  17:29:10  jyelon
- * *** empty log message ***
- *
- * Revision 1.18  1995/10/19  18:21:39  jyelon
- * moved CthSetStrategyDefault to convcore.c
- *
- * Revision 1.17  1995/10/19  04:19:47  jyelon
- * A correction to eatstack.
- *
- * Revision 1.16  1995/10/18  22:20:17  jyelon
- * Added 'eatstack' threads implementation.
- *
- * Revision 1.15  1995/10/18  01:58:43  jyelon
- * added ifdef around 'alloca.h'
- *
- * Revision 1.14  1995/10/13  22:33:36  jyelon
- * There was some bizzare test in CthCreate which I think was supposed
- * to check for failure of some kind, but it didn't work.
- *
- * Revision 1.13  1995/10/13  18:14:10  jyelon
- * K&R changes, etc.
- *
- * Revision 1.12  1995/10/10  06:15:23  jyelon
- * Fixed a bug.
- *
- * Revision 1.11  1995/09/30  15:03:33  jyelon
- * Cleared up some confusion about 'private' variables in uniprocessor version.
- *
- * Revision 1.10  1995/09/30  11:48:15  jyelon
- * Fixed a bug (CthSetVar(t,...) failed when t is current thread.)
- *
- * Revision 1.9  1995/09/27  22:23:15  jyelon
- * Many bug-fixes.  Added Cpv macros to threads package.
- *
- * Revision 1.8  1995/09/26  18:30:46  jyelon
- * *** empty log message ***
- *
- * Revision 1.7  1995/09/26  18:26:00  jyelon
- * Added CthSetStrategyDefault, and cleaned up a bit.
- *
- * Revision 1.6  1995/09/20  17:22:14  jyelon
- * Added CthImplemented
- *
- * Revision 1.5  1995/09/20  16:36:56  jyelon
- * *** empty log message ***
- *
- * Revision 1.4  1995/09/20  15:39:54  jyelon
- * Still ironing out initial bugs.
- *
- * Revision 1.3  1995/09/20  15:07:44  jyelon
- * *** empty log message ***
- *
- * Revision 1.2  1995/09/20  14:58:12  jyelon
- * Did some work on threads stuff.
- *
- * Revision 1.1  1995/09/20  13:16:33  jyelon
- * Initial revision
- *
- * Revision 2.0  1995/07/05  22:22:26  brunner
- * Separated out megatest, and added RCS headers to all files
  *
  ***************************************************************************
  *
@@ -365,6 +254,7 @@ CthVoidFn fn; void *arg; int size;
   result->stackp = QT_SP(stack, size - QT_STKALIGN);
   result->stackp = 
     QT_ARGS(result->stackp, arg, result, (qt_userf_t *)fn, CthOnly);
+  CthSetStrategyDefault(result);
   return result;
 }
 
