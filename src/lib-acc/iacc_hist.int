@@ -1,0 +1,4 @@
+#define GENERIC_MODULE_NAME IHistogram
+#define GENERIC_ACC_NAME IHistAcc
+#define GENERIC_DATATYPE int
+#include "GENERIC-HIST.int"

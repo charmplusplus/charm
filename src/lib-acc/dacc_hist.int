@@ -1,0 +1,4 @@
+#define GENERIC_MODULE_NAME DHistogram
+#define GENERIC_ACC_NAME DHistAcc
+#define GENERIC_DATATYPE double
+#include "GENERIC-HIST.int"

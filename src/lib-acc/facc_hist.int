@@ -1,0 +1,4 @@
+#define GENERIC_MODULE_NAME FHistogram
+#define GENERIC_ACC_NAME FHistAcc
+#define GENERIC_DATATYPE float
+#include "GENERIC-HIST.int"

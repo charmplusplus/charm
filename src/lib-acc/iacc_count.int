@@ -1,0 +1,4 @@
+#define GENERIC_MODULE_NAME ICount
+#define GENERIC_ACC_NAME IAcc
+#define GENERIC_DATATYPE int
+#include "GENERIC-ACC.int"

@@ -1,0 +1,4 @@
+#define GENERIC_MODULE_NAME FCount
+#define GENERIC_ACC_NAME FAcc
+#define GENERIC_DATATYPE float
+#include "GENERIC-ACC.int"
