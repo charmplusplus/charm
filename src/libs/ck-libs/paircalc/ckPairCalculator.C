@@ -161,7 +161,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     }
 
     // FIXME: should do 'op2' here!!!
-    /*
+    
     double *ptr = new double[S*S*2];
     for(int i=0; i<S*S*2; i++)
       ptr[i] =0; 
@@ -173,7 +173,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	ptr[(i*S+j+thisIndex.y+thisIndex.x*S)*2+1] = outData[i*grainSize+j].im;
       }
     }
-#if 0
+#ifdef _DEBUG_
     CkPrintf("--------Partial Result----------\n");
     for (int i = 0; i < grainSize; i++){
       for (int j = 0; j < grainSize; j++)
@@ -189,11 +189,11 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     
     contribute(S*S*sizeof(double) * 2, ptr, CkReduction::sum_double);
     delete [] ptr;
-    */
 
+    /*
     r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
     r.contribute(this, sparse_sum_TwoDoubles);
- 
+    */
   }
 }
 
@@ -208,9 +208,10 @@ PairCalculator::acceptEntireResult(int size, complex *matrix, CkCallback cb)
 #ifdef _DEBUG_
   CkPrintf("[%d %d %d %d]: Accept EntireResult with size %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, size);
 #endif
-  complex *myportion = new complex[grainSize * grainSize];	
   CkArrayIndexIndex4D myidx(thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
   
+#if 0
+  complex *myportion = new complex[grainSize * grainSize];	
   for (int i = 0; i < grainSize; i++)
     memcpy(myportion + i*grainSize,
 	   matrix + thisIndex.y + (thisIndex.x+i)*S,
@@ -224,6 +225,11 @@ PairCalculator::acceptEntireResult(int size, complex *matrix, CkCallback cb)
     acceptResult(grainSize*grainSize, myportion, thisIndex.y, cb);
   }
   delete [] myportion;
+#else
+  acceptResult(size, matrix, thisIndex.x, cb);
+  if(symmetric && thisIndex.x != thisIndex.y)
+    acceptResult(size, matrix, thisIndex.y, cb);
+#endif
 }
 
 
@@ -234,24 +240,26 @@ PairCalculator::acceptResult(int size, complex *matrix, int rowNum, CkCallback c
   CkPrintf("[%d %d %d %d]: Accept Result with size %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, size);
 #endif
   complex *mynewData = new complex[N*grainSize];
+  memset(mynewData, 0, sizeof(complex)*N*grainSize);
 
-
-  int offset = 0;  
+  int offset = 0, index = thisIndex.y*S + thisIndex.x;
+  complex m=complex(0,0);  
   for (int i = 0; i < grainSize; i++) {
-    for (int p = 0; p < N; p++){
-      for (int j = 0; j < grainSize; j++) 
-	mynewData[p + i*N] += inDataLeft[j][p] * matrix[j + i*grainSize];
+    for (int j = 0; j < grainSize; j++){ 
+      m = matrix[index + j + i*S];
+      for (int p = 0; p < N; p++)
+	mynewData[p + i*N] += inDataLeft[j][p] * m;
     }
   }
 
   if(!symmetric){
-    //    CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
-    CkArrayIndexIndex4D idx(thisIndex.w, thisIndex.x, 0, thisIndex.z);
+    CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
+    //CkArrayIndexIndex4D idx(thisIndex.w, thisIndex.x, 0, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);
   }
   else {
-    //CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
-    CkArrayIndexIndex4D idx(thisIndex.w, thisIndex.x, 0, thisIndex.z);
+    CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
+    //CkArrayIndexIndex4D idx(thisIndex.w, thisIndex.x, 0, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z, cb);  
     if (rowNum != thisIndex.x){
       CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
