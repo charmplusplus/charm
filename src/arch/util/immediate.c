@@ -67,6 +67,7 @@ static void CmiHandleImmediateMessage(void *msg) {
   int handlerNo=CmiGetXHandler(msg);
 /*  CmiHandlerInfo *h=&CpvAccessOther(CmiHandlerTable,0)[handlerNo]; */
   CmiHandlerInfo *h=&CpvAccess(CmiHandlerTable)[handlerNo];
+  CmiAssert(h && h->hdlr);
 
   MACHLOCK_ASSERT(immRunning,"CmiHandleImmediateMessage");
   CQdProcess(CpvAccess(cQdState),1);
