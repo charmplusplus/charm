@@ -19,34 +19,38 @@ PVT::PVT()
   localStats->TimerStart(GVT_TIMER);
 #endif
   optPVT = conPVT = estGVT = repPVT = POSE_UnsetTS;
-  simdone = 0;
+  gvtTurn = simdone = 0;
   SendsAndRecvs = new SRtable();
   SendsAndRecvs->Initialize();
   waitForFirst = 0;
   iterMin = POSE_UnsetTS;
-  if (CkNumPes() == 1) {
-  }
-  else if (CkNumPes() == 2) {
-  }
-  else if (CkMyPe()%2 == 1) {
-    reportTo = CkMyPe()-1;
+  int P=CkNumPes(), N=CkMyPe();
+  if ((N < P-2) && (N%2 == 1)) {
+    reportTo = N-1;
     reportReduceTo =  -1;
     reportsExpected = reportEnd = 0;
-    if (CkMyPe() >= CkNumPes()-2) {
-      reportEnd = 1;
-      reportsExpected = CkNumPes()/4;
-    }
   }
-  else {
-    reportTo = CkMyPe();
-    if (CkMyPe() <= CkNumPes()/2)
-      reportReduceTo = CkNumPes()-2;
-    else reportReduceTo = CkNumPes()-1;
-    if (CkMyPe() >= CkNumPes()-2) {
-      reportEnd = 1;
-      reportsExpected = CkNumPes()/4;
-    }
+  else if (N < P-2) {
+    reportTo = N;
+    reportsExpected = 2; 
+    if (N == P-3)
+      reportsExpected = 1;
+    if (N <= (P-2)/2)
+      reportReduceTo = P-2;
+    else reportReduceTo = P-1;
+    reportEnd = 0;
   }
+  if (N == P-2) {
+    reportTo = N;
+    reportEnd = 1;
+    reportsExpected = 1 + (P-2)/4 + 1;
+  }
+  else if ((N == P-1) && (N != 1)) {
+    reportTo = N;
+    reportEnd = 1;
+    reportsExpected = 1 + (P-2)/4;
+  }
+  //  CkPrintf("PE %d reports to %d, receives %d reports, reduces and sends to %d, and reports directly to GVT if %d = 1!\n", CkMyPe(), reportTo, reportsExpected, reportReduceTo, reportEnd);
 #ifdef POSE_STATS_ON
   localStats->TimerStop();
 #endif
@@ -59,7 +63,7 @@ void PVT::startPhase()
   localStats->TimerStart(GVT_TIMER);
 #endif
   CProxy_GVT g(TheGVT);
-  static int gvtTurn = 0;
+  CProxy_PVT p(ThePVT);
   register int i;
 
   objs.Wake(); // wake objects to make sure all have reported
@@ -126,12 +130,16 @@ void PVT::startPhase()
 	     CkMyPe(), um->numEntries, um->SRs[0].timestamp, pvt);
   */
   // send data to GVT estimation
+  p[reportTo].reportReduce(um);
+
+  /*
   if (simdone) // transmit final info to GVT on PE 0
     g[0].computeGVT(um);              
   else {
     g[gvtTurn].computeGVT(um);           // transmit info to GVT
     gvtTurn = (gvtTurn + 1) % CkNumPes();  // calculate next GVT location
   }
+  */
   objs.SetIdle(); // Set objects to idle
   iterMin = POSE_UnsetTS;
 #ifdef POSE_STATS_ON
@@ -230,6 +238,78 @@ void PVT::objUpdateOVT(int pvtIdx, POSE_TimeType safeTime, POSE_TimeType ovt)
     objs.objs[index].setOVT(safeTime);
 }
 
+/// Reduction point for PVT reports
+void PVT::reportReduce(UpdateMsg *m)
+{
+#ifdef POSE_STATS_ON
+  localStats->TimerStart(GVT_TIMER);
+#endif
+  CProxy_PVT p(ThePVT);
+  CProxy_GVT g(TheGVT);
+  POSE_TimeType lastGVT = 0;
+  static POSE_TimeType optGVT = POSE_UnsetTS, conGVT = POSE_UnsetTS;
+  static int done=0;
+  static SRentry *SRs = NULL;
+
+  // see if message provides new min optGVT or conGVT
+  if ((optGVT < 0) || ((m->optPVT > POSE_UnsetTS) && (m->optPVT < optGVT)))
+    optGVT = m->optPVT;
+  if ((conGVT < 0) || ((m->conPVT > POSE_UnsetTS) && (m->conPVT < conGVT)))
+    conGVT = m->conPVT;
+  addSR(&SRs, m->SRs, optGVT, m->numEntries);
+  done++;
+  CkFreeMsg(m);
+
+  if (done == reportsExpected) { // all PVT reports are in
+    UpdateMsg *um;
+    int entryCount = 0;
+    // pack data into um
+    SRentry *tmp = SRs;
+    while (tmp && (tmp->timestamp <= optGVT)) {
+      entryCount++;
+      tmp = tmp->next;
+    }
+    um = new (entryCount * sizeof(SRentry), 0) UpdateMsg;
+    tmp = SRs;
+    int i=0;
+    while (tmp && (tmp->timestamp <= optGVT)) {
+      um->SRs[i] = *tmp;
+      tmp = tmp->next;
+      i++;
+    }
+    um->numEntries = entryCount;
+    um->optPVT = optGVT;
+    um->conPVT = conGVT;
+    um->runGVTflag = 0;
+
+    if (reportEnd) { //send to computeGVT
+      if (simdone) // transmit final info to GVT on PE 0
+	g[0].computeGVT(um);              
+      else {
+	g[gvtTurn].computeGVT(um);           // transmit info to GVT
+	gvtTurn = (gvtTurn + 1) % CkNumPes();  // calculate next GVT location
+      }
+    }
+    else { //send to pvt reportReduceTo
+      p[reportReduceTo].reportReduce(um);
+    }
+
+    // reset static data
+    optGVT = conGVT = POSE_UnsetTS;
+    SRentry *cur = SRs;
+    SRs = NULL;
+    while (cur) {
+      tmp = cur->next;
+      delete cur;
+      cur = tmp;
+    }
+    done = 0;
+  }
+#ifdef POSE_STATS_ON
+  localStats->TimerStop();
+#endif
+}
+
 /// Basic Constructor
 GVT::GVT() 
 {
@@ -242,7 +322,9 @@ GVT::GVT()
   estGVT = lastEarliest = inactiveTime = POSE_UnsetTS;
   lastSends = lastRecvs = inactive = 0;
   reportsExpected = 1;
-  if (CkNumPes() > 1) reportsExpected = 2;
+  if (CkNumPes() > 2) reportsExpected = 2;
+    
+  //  CkPrintf("GVT expects %d reports!\n", reportsExpected);
   if (CkMyPe() == 0) { // start the PVT phase of the GVT algorithm
     CProxy_PVT p(ThePVT);
     p.startPhase(); // broadcast PVT calculation to all PVT branches
@@ -307,7 +389,7 @@ void GVT::computeGVT(UpdateMsg *m)
   }
   CkFreeMsg(m);
 
-  if (done == CkNumPes()+startOffset) { // all PVT reports are in
+  if (done == reportsExpected+startOffset) { // all PVT reports are in
 #ifdef POSE_STATS_ON
     localStats->GvtInc();
 #endif
@@ -358,10 +440,10 @@ void GVT::computeGVT(UpdateMsg *m)
     else inactive = 0;
 
     // check the estimate
-    /*
+        /*
     CkPrintf("opt=%d con=%d lastGVT=%d early=%d lastSR=%d et=%d\n", 
 	     optGVT, conGVT, lastGVT, earliestMsg, lastSR, POSE_endtime);
-    */
+        */
     CmiAssert(estGVT >= lastGVT); 
     //if (estGVT % 1000 == 0)
     //CkPrintf("[%d] New GVT = %d\n", CkMyPe(), estGVT);
@@ -447,6 +529,61 @@ void GVT::computeGVT(UpdateMsg *m)
 }
 
 void GVT::addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne)
+{
+  register int i;
+  SRentry *tab = (*SRs);
+  SRentry *tmp = tab;
+
+  for (i=0; i<ne; i++) {
+    if ((e[i].timestamp < og) || (og == POSE_UnsetTS)) {
+      if (!tmp) { // no entries yet
+	tab = new SRentry(e[i].timestamp, (SRentry *)NULL);
+	tab->sends = e[i].sends;
+	tab->recvs = e[i].recvs;
+	tmp = tab;
+	*SRs = tmp;
+      }
+      else {
+	if (e[i].timestamp < tmp->timestamp) { // goes before tmp
+	  CkAssert(tmp == *SRs);
+	  tab = new SRentry(e[i].timestamp, tmp);
+	  tab->sends = e[i].sends;
+	  tab->recvs = e[i].recvs;
+	  tmp = tab;
+	  *SRs = tmp;
+	}
+	else if (e[i].timestamp == tmp->timestamp) { // goes in first entr
+	  tmp->sends = tmp->sends + e[i].sends;
+	  tmp->recvs = tmp->recvs + e[i].recvs;
+	}
+	else { // search for position
+	  while (tmp->next && (e[i].timestamp > tmp->next->timestamp))
+	    tmp = tmp->next;
+	  if (!tmp->next) { // goes at end of SRs
+	    tmp->next = new SRentry(e[i].timestamp, (SRentry *)NULL);
+	    tmp->next->sends = tmp->next->sends + e[i].sends;
+	    tmp->next->recvs = tmp->next->recvs + e[i].recvs;
+	    tmp = tmp->next;
+	  }
+	  else if (e[i].timestamp == tmp->next->timestamp) {//goes in tmp->next
+	    tmp->next->sends = tmp->next->sends + e[i].sends;
+	    tmp->next->recvs = tmp->next->recvs + e[i].recvs;
+	    tmp = tmp->next;
+	  }
+	  else { // goes after tmp but before tmp->next
+	    tmp->next = new SRentry(e[i].timestamp, tmp->next);
+	    tmp->next->sends = tmp->next->sends + e[i].sends;
+	    tmp->next->recvs = tmp->next->recvs + e[i].recvs;
+	    tmp = tmp->next;
+	  }
+	}
+      }
+    }
+    else break;
+  }
+}
+
+void PVT::addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne)
 {
   register int i;
   SRentry *tab = (*SRs);

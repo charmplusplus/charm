@@ -15,6 +15,7 @@ module gvt {
     entry PVT(void);
     entry void startPhase(void);
     entry void setGVT(GVTMsg *);
+    entry void reportReduce(UpdateMsg *);
   };
 
   /// GVT chare group for estimating GVT

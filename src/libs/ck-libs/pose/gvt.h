@@ -82,6 +82,8 @@ class PVT : public Group {
   pvtObjects objs;           
   /// reduction-related vars
   int reportTo, reportsExpected, reportReduceTo, reportEnd;
+  /// where the centralized GVT goes
+  int gvtTurn;
  public:
   /// Basic Constructor
   PVT(void);
@@ -104,6 +106,10 @@ class PVT : public Group {
   void objUpdate(POSE_TimeType timestamp, int sr); 
   /// Update PVT with safeTime and send/recv table at timestamp
   void objUpdateOVT(int pvtIdx, POSE_TimeType safeTime, POSE_TimeType ovt);
+  /// Reduction point for PVT reports
+  void reportReduce(UpdateMsg *);
+  /// Adds incoming send/recv information to a list
+  void addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne);
 };
 
 /// GVT chare group for estimating GVT
