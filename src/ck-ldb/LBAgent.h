@@ -25,7 +25,7 @@ public:
 	Agent(int p): npes(p) { }
 	virtual ~Agent() { }
 
-	virtual Elem* my_preferred_procs(int *existing_map,int object,int *trialpes,int metric){ }
+	virtual Elem* my_preferred_procs(int *existing_map,int object,int *trialpes,int metric){ return NULL; }
 };
 
 class TopologyAgent : public Agent {
