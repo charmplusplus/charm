@@ -72,10 +72,7 @@ CpvDeclare(int,BlocksAllocated);
 #if CMK_NODE_QUEUE_AVAILABLE
 void  *CmiGetNonLocalNodeQ();
 #endif
-void  *CmiGetNonLocal();
-void   CmiNotifyIdle();
 
-CpvExtern(int, _ccd_numchecks) ;
 CpvDeclare(void*, CsdSchedQueue);
 #if CMK_NODE_QUEUE_AVAILABLE
 CsvDeclare(void*, CsdNodeQueue);
@@ -640,88 +637,6 @@ void CsdEndIdle(void)
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
 
-#if CMK_DEBUG_MODE
-void CmiHandleMessage(void *msg)
-{
-  CpvExtern(int, freezeModeFlag);
-  CpvExtern(int, continueFlag);
-  CpvExtern(int, stepFlag);
-  CpvExtern(void *, debugQueue);
-  extern unsigned int freezeIP;
-  extern int freezePort;
-  extern char* breakPointHeader;
-  extern char* breakPointContents;
-
-  char *freezeReply;
-  int fd;
-
-  if(CpvAccess(continueFlag) && (isBreakPoint((char *)msg))) {
-
-    if(breakPointHeader != 0){
-      free(breakPointHeader);
-      breakPointHeader = 0;
-    }
-    if(breakPointContents != 0){
-      free(breakPointContents);
-      breakPointContents = 0;
-    }
-    
-    breakPointHeader = genericViewMsgFunction((char *)msg, 0);
-    breakPointContents = genericViewMsgFunction((char *)msg, 1);
-
-    CmiPrintf("BREAKPOINT REACHED :\n");
-    CmiPrintf("Header : %s\nContents : %s\n", breakPointHeader, breakPointContents);
-
-    /* Freeze and send a message back */
-    CpdFreeze();
-    freezeReply = (char *)malloc(strlen("freezing@")+strlen(breakPointHeader)+1);
-    _MEMCHECK(freezeReply);
-    sprintf(freezeReply, "freezing@%s", breakPointHeader);
-    fd = skt_connect(freezeIP, freezePort, 120);
-    if(fd > 0){
-      skt_sendN(fd, freezeReply, strlen(freezeReply) + 1);
-      skt_close(fd);
-    } else {
-      CmiPrintf("unable to connect");
-    }
-    free(freezeReply);
-    CpvAccess(continueFlag) = 0;
-  } else if(CpvAccess(stepFlag) && (isEntryPoint((char *)msg))){
-    if(breakPointHeader != 0){
-      free(breakPointHeader);
-      breakPointHeader = 0;
-    }
-    if(breakPointContents != 0){
-      free(breakPointContents);
-      breakPointContents = 0;
-    }
-
-    breakPointHeader = genericViewMsgFunction((char *)msg, 0);
-    breakPointContents = genericViewMsgFunction((char *)msg, 1);
-
-    CmiPrintf("STEP POINT REACHED :\n");
-    CmiPrintf("Header:%s\nContents:%s\n",breakPointHeader,breakPointContents);
-
-    /* Freeze and send a message back */
-    CpdFreeze();
-    freezeReply = (char *)malloc(strlen("freezing@")+strlen(breakPointHeader)+1);
-    _MEMCHECK(freezeReply);
-    sprintf(freezeReply, "freezing@%s", breakPointHeader);
-    fd = skt_connect(freezeIP, freezePort, 120);
-    if(fd > 0){
-      skt_sendN(fd, freezeReply, strlen(freezeReply) + 1);
-      skt_close(fd);
-    } else {
-      CmiPrintf("unable to connect");
-    }
-    free(freezeReply);
-    CpvAccess(stepFlag) = 0;
-  }
-  (CmiGetHandlerFunction(msg))(msg);
-}
-#endif  
-
-
 void CmiDeliversInit()
 {
 }
@@ -733,51 +648,17 @@ int CmiDeliverMsgs(int maxmsgs)
 
 int CsdScheduler(int maxmsgs)
 {
-#if CMK_DEBUG_MODE
-  CpvExtern(int, freezeModeFlag);
-#endif
-
   int *msg, csdMsgFlag = 0; /* To signal a message coming from the CsdNodeQueue */
   void *localqueue = CpvAccess(CmiLocalQueue);
   int cycle = CpvAccess(CsdStopFlag);
   int pollmode = (maxmsgs==0);
   int isIdle=0;
   
-#if CMK_DEBUG_MODE
-  /* To allow start in freeze state */
-  msgListCleanup();
-  msgListCache();
-#endif
-
   while (1) {
 #if NODE_0_IS_CONVHOST
     if (ccs_socket_ready) CHostProcess();
 #endif
     msg = CmiGetNonLocal();
-#if CMK_DEBUG_MODE
-    if(CpvAccess(freezeModeFlag) == 1){
-      
-      /* Check if the msg is an debug message to let it go
-	 else, enqueue in the FIFO 
-      */
-
-      if(msg != 0){
-	if(strncmp((char *)((char *)msg+CmiMsgHeaderSizeBytes),"req",3)!=0){
-          /*CQdCreate(CpvAccess(cQdState), 1);*/
-	  CsdEndIdle();
-	  CdsFifo_Enqueue(CpvAccess(debugQueue), msg);
-	  continue;
-        }
-      } 
-    } else {
-      /* If the debugQueue contains any messages, process them */
-      while(((!CdsFifo_Empty(CpvAccess(debugQueue))) && (CpvAccess(freezeModeFlag)==0))){
-        char *queuedMsg = (char *)CdsFifo_Dequeue(CpvAccess(debugQueue));
-	CmiHandleMessage(queuedMsg);
-	maxmsgs--; if (maxmsgs==0) return maxmsgs;	
-      }
-    }
-#endif
     if (msg==0) msg = CdsFifo_Dequeue(localqueue);
 #if CMK_NODE_QUEUE_AVAILABLE
 	csdMsgFlag = 0;
@@ -798,7 +679,7 @@ int CsdScheduler(int maxmsgs)
       CmiHandleMessage(msg);
       maxmsgs--; if (maxmsgs==0) return maxmsgs;
       if (CpvAccess(CsdStopFlag) != cycle) return maxmsgs;
-    } else {
+    } else { /*No message available-- go (or remain) idle*/
       if (!isIdle) {isIdle=1;CsdBeginIdle();}
       else CsdStillIdle();
       if(pollmode) return maxmsgs;
