@@ -51,9 +51,9 @@ void RefineLB::create(CentralLB::LDStats* stats, int count)
 
   int index = 0;
   for(j=0; j < count; j++) {
-    processors[j].Id = i;
+    processors[j].Id = j;
     processors[j].backgroundLoad = 0;
-    processors[j].load = processors[i].backgroundLoad;
+    processors[j].load = processors[j].backgroundLoad;
     processors[j].computeLoad = 0;
     processors[j].computeSet = new Set();
 
@@ -132,12 +132,12 @@ int RefineLB::refine()
    {
       if (processors[i].load > overLoad*averageLoad)
       {
-CkPrintf("Processor %d is HEAVY: load:%f averageLoad:%f!\n", i, processors[i].load, averageLoad);
+//CkPrintf("Processor %d is HEAVY: load:%f averageLoad:%f!\n", i, processors[i].load, averageLoad);
          heavyProcessors->insert((InfoRecord *) &(processors[i]));
       }
       else if (processors[i].load < averageLoad)
       {
-CkPrintf("Processor %d is LIGHT: load:%f averageLoad:%f!\n", i, processors[i].load, averageLoad);
+//CkPrintf("Processor %d is LIGHT: load:%f averageLoad:%f!\n", i, processors[i].load, averageLoad);
 	      lightProcessors->insert((InfoRecord *) &(processors[i]));
       }
    }
@@ -190,7 +190,7 @@ CkPrintf("Processor %d is LIGHT: load:%f averageLoad:%f!\n", i, processors[i].lo
 
       if (bestCompute)
       {
-CkPrintf("Assign: [%d] with load: %f from %d to %d \n", bestCompute->id.id[0], bestCompute->load, donor->Id, bestP->Id);
+//CkPrintf("Assign: [%d] with load: %f from %d to %d \n", bestCompute->id.id[0], bestCompute->load, donor->Id, bestP->Id);
         deAssign(bestCompute, donor);      
         assign(bestCompute, bestP);
       }
