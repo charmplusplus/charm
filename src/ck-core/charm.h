@@ -98,7 +98,8 @@ typedef struct _ckGroupID{
   int idx;
 #ifdef __cplusplus
   void pup(PUP::er &p) { p(pe); p(idx); }
-  int isZero(void) { return (idx==0); }
+  int isZero(void) const { return (idx==0); }
+  void setZero(void) { idx=0; }
   CmiBool operator==(const struct _ckGroupID& gid) const { 
     return ((gid.pe==pe) && (gid.idx==idx));
   }
@@ -189,6 +190,8 @@ extern void CkWaitVoidFuture(CkFutureID futNum);
 extern void CkReleaseFuture(CkFutureID futNum);
 extern int CkProbeFuture(CkFutureID futNum);
 extern void  CkSendToFuture(CkFutureID futNum, void *msg, int pe);
+extern CkFutureID CkCreateAttachedFuture(void *msg);
+extern void *CkWaitReleaseFuture(CkFutureID futNum);
 
 /******************************************************************************
  *
