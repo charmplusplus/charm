@@ -226,16 +226,32 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
 	migrateMsg->avail_vector[proc] = avail_vector[proc];
     migrateMsg->next_lb = new_ld_balancer;
 
-//    CkPrintf("calling recv migration\n");
+//  CkPrintf("calling recv migration\n");
     thisProxy.ReceiveMigration(migrateMsg);
 
+#if 0
+    {
+      char fname[1024];
+      static int phase = 0;
+      if (QueryDumpData()) {
+        sprintf(fname, "load%d", phase);
+	writeStatsMsgs(fname);
+      }
+      phase ++;
+    }
+#endif
+
     // Zero out data structures for next cycle
+    // CkPrintf("zeroing out data\n");
     for(int i=0; i < clients; i++) {
+#if 0
       delete statsMsgsList[i];
+#endif
       statsMsgsList[i]=0;
     }
     stats_msg_count=0;
-    //    CkPrintf("Strat elapsed time %f\n",CmiWallTimer()-strat_start_time);
+    double strat_end_time = CmiWallTimer();
+    //     CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
   }
   
 }
@@ -411,6 +427,20 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
   return msg;
 }
 
+void CentralLB::readStatsMsgs(const char* filename) {
+
+  int i;
+  FILE *f = fopen(filename, "r");
+
+  PUP::fromDisk p(f);
+  p|stats_msg_count;
+  for (i = 0; i < stats_msg_count; i++) {
+    CkPupMessage(p, (void **)&statsMsgsList[i], 0);
+  }
+
+  fclose(f);
+}
+
 void CentralLB::writeStatsMsgs(const char* filename) {
 
   int i;
@@ -423,6 +453,7 @@ void CentralLB::writeStatsMsgs(const char* filename) {
   }
 
   fclose(f);
+  CmiPrintf("writeStatsMsgs to %s\n", filename);
 }
 
 #endif

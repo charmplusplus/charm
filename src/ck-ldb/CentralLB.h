@@ -80,8 +80,12 @@ public:
   /* for Node 0 */
   int new_ld_balancer;
 
+  void readStatsMsgs(const char* filename);
+  void writeStatsMsgs(const char* filename);
+
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
+  virtual CmiBool QueryDumpData() { return CmiFalse; };  
   virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
 
   void RemoveNonMigratable(LDStats* statsDataList, int count);
@@ -97,8 +101,6 @@ private:
   int migrates_expected;
   int startFlag;
   double start_lb_time;
-
-  void writeStatsMsgs(const char* filename);
 };
 
 class CLBStatsMsg : public CMessage_CLBStatsMsg {
