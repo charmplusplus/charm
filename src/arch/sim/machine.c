@@ -235,50 +235,6 @@ char * msg;
 }
 
 
-
-
-/**********************  LOAD BALANCER NEEDS **********************/
-
-long CmiNumNeighbours(node)
-int node;
-{
-  int bit, count=0;
-  bit = 1;
-  while (1) {
-    int neighbour = node ^ bit;
-    if (neighbour < Cmi_numpes) count++;
-    bit<<1; if (bit > Cmi_numpes) break;
-  }
-  return count;
-}
-
-int CmiGetNodeNeighbours(node, neighbours)
-int node, *neighbours;
-{
-  int bit, count=0;
-  bit = 1;
-  while (1) {
-    int neighbour = node ^ bit;
-    if (neighbour < Cmi_numpes) neighbours[count++] = neighbour;
-    bit<<1; if (bit > Cmi_numpes) break;
-  }
-  return count;
-}
- 
-int CmiNeighboursIndex(node, nbr)
-int node, nbr;
-{
-  int bit, count=0;
-  bit = 1;
-  while (1) {
-    int neighbour = node ^ bit;
-    if (neighbour < Cmi_numpes) { if (nbr==neighbour) return count; count++; }
-    bit<<=1; if (bit > Cmi_numpes) break;
-  }
-  return(-1);
-}
-
-
 /************************** SETUP ***********************************/
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)

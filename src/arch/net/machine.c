@@ -733,57 +733,6 @@ void CmiAbort(const char *message)
 
 
 /*****************************************************************************
- *                                                                           
- * Neighbour-Lookup functions.                                               
- *                                                                           
- * the neighbour information is computed dynamically.  It imposes a
- * (maybe partial) hypercube on the machine.
- *                                                                           
- *****************************************************************************/
- 
-long CmiNumNeighbours(node)
-int node;
-{
-  int bit, count=0;
-  bit = 1;
-  while (1) {
-    int neighbour = node ^ bit;
-    if (neighbour < CmiNumPes()) count++;
-    bit = bit<<1; 
-    if (bit > CmiNumPes()) break;
-  }
-  return count;
-}
- 
-int CmiGetNodeNeighbours(node, neighbours)
-int node, *neighbours;
-{
-  int bit, count=0;
-  bit = 1;
-  while (1) {
-    int neighbour = node ^ bit;
-    if (neighbour < CmiNumPes()) neighbours[count++] = neighbour;
-    bit = bit<<1; 
-    if (bit > CmiNumPes()) break;
-  }
-  return count;
-}
- 
-int CmiNeighboursIndex(node, nbr)
-int node, nbr;
-{
-  int bit, count=0;
-  bit = 1;
-  while (1) {
-    int neighbour = node ^ bit;
-    if (neighbour < CmiNumPes()) { if (nbr==neighbour) return count; count++; }
-    bit = bit<<=1; 
-    if (bit > CmiNumPes()) break;
-  }
-  return(-1);
-}
-
-/*****************************************************************************
  *
  * Communication Structures
  *

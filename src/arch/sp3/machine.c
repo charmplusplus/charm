@@ -258,33 +258,6 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
   CmiFree(msg) ;
 }
 
-/* Neighbour functions used mainly in LDB : pretend the SP1 is a hypercube */
-
-int CmiNumNeighbours(int node)
-{
-  return Cmi_dim;
-}
-
-void CmiGetNodeNeighbours(int node, int *neighbours)
-{
-  int i;
-     
-  for (i = 0; i < Cmi_dim; i++)
-    neighbours[i] = FLIPBIT(node,i);
-}
-
-int CmiNeighboursIndex(int node, int neighbour)
-{
-  int index = 0;
-  int linenum = node ^ neighbour;
-
-  while (linenum > 1) {
-    linenum = linenum >> 1;
-    index++;
-  }
-  return index;
-}
-
 /************************** MAIN ***********************************/
 
 void ConverseExit(void)

@@ -213,43 +213,6 @@ char * msg;
 
 
 
-/**********************  LOAD BALANCER NEEDS **********************/
-
-long CmiNumNeighbours(node)
-int node;
-{
-    return Cmi_dim;
-}
-
-
-CmiGetNodeNeighbours(node, neighbours)
-int node, *neighbours;
-{
-    int i;
-
-    for (i = 0; i < Cmi_dim; i++)
-	neighbours[i] = FLIPBIT(node,i);
-}
-
-
-
-
-int CmiNeighboursIndex(node, neighbour)
-int node, neighbour;
-{
-    int index = 0;
-    int linenum = node ^ neighbour;
-
-    while (linenum > 1)
-    {
-	linenum = linenum >> 1;
-	index++;
-    }
-    return index;
-}
-
-
-
 /************************** SETUP ***********************************/
 
 void ConverseExit()
