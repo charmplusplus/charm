@@ -201,17 +201,48 @@ void ampi::pup(PUP::er &p)
   if(!p.isUserlevel())
     ArrayElement1D::pup(p);//Pack superclass
   p(commidx);
-  // TODO: Make the messages also part of the saved and restored state
-  if(p.isDeleting())
-  {//Resend saved messages to myself
+  if(p.isPacking()||p.isSizing())
+  {
+    int moremsgs;
+    CmmTable newmsgs;
+    if(!p.isDeleting())
+      newmsgs = CmmNew();
     AmpiMsg *msg;
     int snum[3];
     snum[0] = CmmWildCard;
     snum[1] = CmmWildCard;
     snum[2] = CmmWildCard;
-    CProxy_ampi ap(thisArrayID);
     while(msg = (AmpiMsg*)CmmGet(msgs,3,snum,0))
-      ap[thisIndex].generic(msg);
+    {
+      moremsgs = 1;
+      p(moremsgs);
+      msg = AmpiMsg::pup(p, msg);
+      if(!p.isDeleting())
+      {
+        int tags[3];
+        tags[0] = msg->tag1; tags[1] = msg->tag2; tags[2] = msg->comm;
+        CmmPut(newmsgs, 3, tags, msg);
+      }
+    }
+    moremsgs = 0;
+    p(moremsgs);
+    if(!p.isDeleting())
+      msgs = newmsgs;
+  }
+  if(p.isUnpacking())
+  {
+    msgs = CmmNew();
+    int moremsgs;
+    p(moremsgs);
+    while(moremsgs)
+    {
+      AmpiMsg *msg;
+      msg = AmpiMsg::pup(p, 0);
+      int tags[3];
+      tags[0] = msg->tag1; tags[1] = msg->tag2; tags[2] = msg->comm;
+      CmmPut(msgs, 3, tags, msg);
+      p(moremsgs);
+    }
   }
   //This seekBlock allows us to reorder the packing/unpacking--
   // This is needed because the userData depends on the thread's stack
@@ -254,7 +285,6 @@ void ampi::pup(PUP::er &p)
   // to pup them as well.
   if(p.isUnpacking())
   {
-    msgs = CmmNew();
   	if(p.isUserlevel())
       CtvAccessOther(cthread_id, ampiPtr) = this;
     else
