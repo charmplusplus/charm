@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-09-06 04:20:54  sanjeev
+ * Revision 2.2  1995-09-07 18:58:15  sanjeev
+ * fixed bug in Graph_OutputPrivateCall
+ *
+ * Revision 2.1  1995/09/06  04:20:54  sanjeev
  * new Charm++ syntax, CHARE_BLOCK changes
  *
  * Revision 2.0  1995/06/05  19:01:24  brunner
@@ -647,9 +650,22 @@ char *fnname ;
 {
 	/* First find if this is indeed a public/privatecall */
 	FN *f ;
+	EP *e ;
 
 	for ( f=CurrentCharePtr->fns; f!=NULL; f=f->next )
 		if ( strcmp(fnname,f->fnname) == 0 ) {
+			if (FoundInChareTable(ChareTable,charecount+1,
+                                                        CurrentChare)!=-1) 
+				fprintf(graphfile,"CALLCHARE %s %s : %s %s\n", 
+				CurrentChare, CurrentEP, CurrentChare, fnname);
+			else if (FoundInChareTable(BOCTable,boccount+1,
+                                                        CurrentChare)!=-1) 
+				fprintf(graphfile,"CALLBOC %s %s : %s %s\n", 
+				CurrentChare, CurrentEP, CurrentChare, fnname);
+			return ;
+		}
+	for ( e=CurrentCharePtr->eps; e!=NULL; e=e->next )
+		if ( strcmp(fnname,e->epname) == 0 ) {
 			if (FoundInChareTable(ChareTable,charecount+1,
                                                         CurrentChare)!=-1) 
 				fprintf(graphfile,"CALLCHARE %s %s : %s %s\n", 
