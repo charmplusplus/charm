@@ -132,6 +132,11 @@ int event, pe;
                 fprintf(fp, "%d %u %d %d", mtype, time, event, pe);
                 break;
 
+        case BEGIN_IDLE:
+        case END_IDLE:
+                fprintf(fp, "%u %d", time, pe);
+                break;
+
 	case CREATION:
 	case BEGIN_PROCESSING:
 	case END_PROCESSING:

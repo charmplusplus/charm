@@ -30,6 +30,12 @@ trace_begin_charminit()
 trace_end_charminit()
 {}
 
+trace_begin_idle()
+{}
+
+trace_end_idle()
+{}
+
 trace_begin_computation()
 {}
 

@@ -11,6 +11,8 @@
 #define  DELETE 			11
 #define  FIND			    12
 #define  USER_EVENT                 13
+#define  BEGIN_IDLE		    14
+#define  END_IDLE		    15
 
 
 #define  NUMBER_DISPLAYS	7

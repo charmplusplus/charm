@@ -168,6 +168,18 @@ int id, msg_type, entry;
 						CpvAccess(begin_event), CpvAccess(begin_pe));
 }
 
+trace_begin_idle()
+{
+  /* msgtype, entry, and event are not used */
+  add_to_buffer(BEGIN_IDLE, 0, 0, CkUTimer(), 0, CmiMyPe());
+}
+
+trace_end_idle()
+{
+  /* msgtype, entry, and event are not used */
+  add_to_buffer(END_IDLE, 0, 0, CkUTimer(), 0, CmiMyPe());
+}
+
 trace_begin_charminit() 
 {
     int *msg;

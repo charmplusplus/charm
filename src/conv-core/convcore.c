@@ -535,7 +535,10 @@ int maxmsgs;
     if (msg1) {
       if(CpvAccess(CsdIdleDetectedFlag)) {
          CpvAccess(CsdIdleDetectedFlag) = 0;
-         if(!CpvAccess(CsdStopNotifyFlag)) (CpvAccess(CsdNotifyBusy))();
+         if(!CpvAccess(CsdStopNotifyFlag)) {
+           (CpvAccess(CsdNotifyBusy))();
+           trace_end_idle();
+         }
       }
       *buffergrabbed = 0;
       (CmiGetHandlerFunction(msg1))(msg1);
@@ -546,7 +549,10 @@ int maxmsgs;
     if (msg2) {
       if(CpvAccess(CsdIdleDetectedFlag)) {
          CpvAccess(CsdIdleDetectedFlag) = 0;
-         if(!CpvAccess(CsdStopNotifyFlag)) (CpvAccess(CsdNotifyBusy))();
+         if(!CpvAccess(CsdStopNotifyFlag)) {
+           (CpvAccess(CsdNotifyBusy))();
+           trace_end_idle();
+         }
       }
       *buffergrabbed = 0;
       (CmiGetHandlerFunction(msg2))(msg2);
@@ -727,7 +733,10 @@ int maxmsgs;
     if ( !CqsEmpty(CpvAccess(CsdSchedQueue)) ) {
       if(CpvAccess(CsdIdleDetectedFlag)) {
         CpvAccess(CsdIdleDetectedFlag) = 0;
-        if(!CpvAccess(CsdStopNotifyFlag)) (CpvAccess(CsdNotifyBusy))();
+        if(!CpvAccess(CsdStopNotifyFlag)) {
+          (CpvAccess(CsdNotifyBusy))();
+          trace_end_idle();
+        }
       }
       CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
       (CmiGetHandlerFunction(msg))(msg);
@@ -736,14 +745,20 @@ int maxmsgs;
     } else { /* Processor is idle */
       if (ndelivered == 0 && !CpvAccess(CsdIdleDetectedFlag)) {
         CpvAccess(CsdIdleDetectedFlag) = 1;
-        if(!CpvAccess(CsdStopNotifyFlag)) (CpvAccess(CsdNotifyIdle))();
+        if(!CpvAccess(CsdStopNotifyFlag)) {
+          (CpvAccess(CsdNotifyIdle))();
+          trace_begin_idle();
+        }
       }
       CmiNotifyIdle();
       CcdRaiseCondition(CcdPROCESSORIDLE) ;
       if (CpvAccess(CsdStopFlag)) { 
         if(CpvAccess(CsdIdleDetectedFlag)) {
           CpvAccess(CsdIdleDetectedFlag) = 0;
-          if(!CpvAccess(CsdStopNotifyFlag)) (CpvAccess(CsdNotifyBusy))();
+          if(!CpvAccess(CsdStopNotifyFlag)) {
+            (CpvAccess(CsdNotifyBusy))();
+            trace_end_idle();
+          }
         }
         return maxmsgs;
       }
