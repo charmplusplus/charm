@@ -1,3 +1,5 @@
+#ifndef STREAMING_STRATEGY
+#define STREAMING_STRATEGY
 #include "ComlibManager.h"
 
 class StreamingStrategy : public Strategy {
@@ -15,3 +17,4 @@ class StreamingStrategy : public Strategy {
     virtual void pup(PUP::er &p);
     PUPable_decl(StreamingStrategy);
 };
+#endif

@@ -1,3 +1,6 @@
+#ifndef MPI_STRATEGY
+#define MPI_STRATEGY
+
 #include "ComlibManager.h"
 
 #if CHARM_MPI
@@ -24,3 +27,4 @@ class MPIStrategy : public Strategy {
     virtual void pup(PUP::er &p);
     PUPable_decl(MPIStrategy);
 };
+#endif

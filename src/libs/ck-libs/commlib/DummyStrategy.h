@@ -1,3 +1,5 @@
+#ifndef DUMMY_STRATEGY
+#define DUMMY_STRATEGY
 #include "ComlibManager.h"
 
 class DummyStrategy : public Strategy {
@@ -10,3 +12,4 @@ class DummyStrategy : public Strategy {
     virtual void pup(PUP::er &p);
     PUPable_decl(DummyStrategy);
 };
+#endif

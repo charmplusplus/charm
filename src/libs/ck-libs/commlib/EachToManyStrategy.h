@@ -1,3 +1,5 @@
+#ifndef EACH_TO_MANY_STRATEGY
+#define EACH_TO_MANY_STRATEGY
 #include "ComlibManager.h"
 
 class EachToManyStrategy : public Strategy {
@@ -20,3 +22,5 @@ class EachToManyStrategy : public Strategy {
     virtual void pup(PUP::er &p);
     PUPable_decl(EachToManyStrategy);
 };
+#endif
+
