@@ -37,6 +37,7 @@ void broadc_init(void);
 void multicast_init(void);
 void deadlock_init(void);
 void multisend_init(void);
+void handler_init(void);
 
 void blkinhand_moduleinit(void);
 void posixth_moduleinit(void);
@@ -55,6 +56,7 @@ void broadc_moduleinit(void);
 void multicast_moduleinit(void);
 void deadlock_moduleinit(void);
 void multisend_moduleinit(void);
+void handler_moduleinit(void);
 
 struct testinfo
 {
@@ -81,6 +83,7 @@ tests[] = {
   { "broadc",    broadc_init,    broadc_moduleinit,     1,  1 },
   { "multicast", multicast_init, multicast_moduleinit,  1,  1 },
   { "deadlock",  deadlock_init,  deadlock_moduleinit,   0,  2 },
+  { "handler",  handler_init,  handler_moduleinit,   1,  1 },
   { "multisend", multisend_init, multisend_moduleinit,  0,  1 },
   { 0,0,0,0 },
 };
