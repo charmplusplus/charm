@@ -1,0 +1,10 @@
+module Counter {
+  message countMsg;
+  message DUMMY;
+  
+  group counter {
+    entry counter(DUMMY *);
+    entry void sendCounts(DUMMY *);
+    entry void childCount(countMsg *);
+  };
+};
