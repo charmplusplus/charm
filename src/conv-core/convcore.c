@@ -262,6 +262,8 @@ void CsdScheduler(counter)
 int counter;
 {
 	int *msg;
+
+	CpvAccess(CsdStopFlag) = 0 ;
   
 	while (1) {
 		/* This is CmiDeliverMsgs */
