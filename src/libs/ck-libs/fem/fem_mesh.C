@@ -508,6 +508,7 @@ void FEM_Attribute::pup(PUP::er &p) {
 	// e, attr, and ghost are always set by the constructor
 	p|width;
 	p|datatype;
+	if (width<0) width=0;
 	if (p.isUnpacking()) tryAllocate();
 }
 FEM_Attribute::~FEM_Attribute() {}
@@ -908,7 +909,7 @@ FEM_Entity::FEM_Entity(FEM_Entity *ghost_) //Default constructor
 } 
 void FEM_Entity::pup(PUP::er &p) {
 	p|length;
-	
+	if (length<0) length=0;
 	p.comment(" Ghosts to send out: ");
 	ghostSend.pup(p);
 	p.comment(" Ghosts to recv: ");
