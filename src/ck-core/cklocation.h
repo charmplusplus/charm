@@ -606,8 +606,8 @@ private:
 	int mapHandle;
 	CkArrayMap *map;
 
-#if CMK_LBDB_ON
 	CkGroupID lbdbID;
+#if CMK_LBDB_ON
 	LBDatabase *the_lbdb;
 	LDBarrierClient dummyBarrierHandle;
 	static void staticDummyResumeFromSync(void* data);
