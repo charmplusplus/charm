@@ -2102,10 +2102,6 @@ void Entry::genArrayDefs(XStr& str)
       char *opts = "";
       if (isSkipscheduler())  opts=",CK_MSG_SKIPSCHEDULER";
       if (container->isForElement() || container->isForSection()) {
-/*
-        if (isImmediate())
-          str << "  impl_amsg->array_setImmediate(CmiTrue);\n";
-*/
         str << "  ckSend(impl_amsg, "<<epIdx()<<opts<<");\n";
       }
       else
@@ -2180,8 +2176,6 @@ void Entry::genGroupDecl(XStr& str)
     { //Non-sync entry method
       if (forElement)
       {// Send
-	if (isImmediate())
-	  str << "      ((CkMessage*)impl_msg)->setImmediate(CmiTrue);\n";
         str << "      if (ckIsDelegated()) {\n";
         str << "         Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
 	str << "         ckDelegatedTo()->"<<node<<"GroupSend(ckDelegatedPtr(),"<<parampg<<");\n";
