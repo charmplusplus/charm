@@ -123,6 +123,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       WSLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
       tempo.decl.h waitqd.decl.h \
       CommLB.decl.h Comm1LB.decl.h  \
+      charisma.decl.h \
       BlueGene.decl.h blue.h
 
 # The .c files are there to be #included by clients whole
@@ -131,7 +132,8 @@ UTILHEADERS=pup.h pupf.h pup_c.h ckhashtable.h cklists.h conv-lists.h \
 	sockRoutines.h sockRoutines.c
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
-	  ckfutures.h ckcallback.h ckarray.h cklocation.h ckreduction.h readonly.h \
+	  ckfutures.h ckcallback.h ckarray.h cklocation.h ckreduction.h \
+	  readonly.h charisma.h \
 	  $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
@@ -402,7 +404,7 @@ CK_LIBS_CORE=libck.a
 
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            debug-message.o ckcallback.o cklocation.o ckarray.o ckreduction.o \
-           tempo.o waitqd.o LBDatabase.o lbdb.o \
+           tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o \
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o ObjGraph.o graph.o  \
            Refiner.o bitvecset.o Set.o heap.o CommLBHeap.o NullLB.o \
@@ -488,6 +490,12 @@ ckcallback.o: ckcallback.C $(CKHEADERS) CkCallback.decl.h
 
 CkCallback.decl.h: ckcallback.ci $(CHARMXI)
 	$(CHARMC) ckcallback.ci
+
+charisma.decl.h charisma.def.h : charisma.ci charmxi
+	$(CHARMC) charisma.ci
+
+charisma.o: charisma.C $(CKHEADERS)
+	$(CHARMC) -o charisma.o charisma.C
 
 ## Charm++ Load balancer (Dynamic load balancer)
 
