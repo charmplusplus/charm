@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-06-13 14:33:55  gursoy
+ * Revision 2.4  1995-06-13 17:00:16  jyelon
+ * *** empty log message ***
+ *
+ * Revision 2.3  1995/06/13  14:33:55  gursoy
  * *** empty log message ***
  *
  * Revision 2.2  1995/06/09  16:37:40  gursoy
@@ -66,7 +69,6 @@ char *argv[];
   statModuleInit();
   tblModuleInit(); 
   ldbModuleInit();
-
 
   if (CmiMyRank() == 0) CmiNodeBarrier();
 

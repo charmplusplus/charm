@@ -29,9 +29,9 @@ set OPTS_CPP=
 set FILES=
 set OBJECTFILES=
 set LIBRARIES=
-set CONVERSE=
 set DELETE=
-set SEQUENTIAL=
+unset SEQUENTIAL
+unset VERBOSE
 onintr failure
 
 ##############################################################################
@@ -61,7 +61,7 @@ while ($argindex <= $#argv)
             breaksw
 
         case "-seq"
-	    set SEQUENTIAL=1
+	    set SEQUENTIAL=yes
             breaksw
 
         case "-language"
@@ -90,7 +90,7 @@ while ($argindex <= $#argv)
             breaksw
 
         case "-verbose"
-            set VERBOSE=1
+            set VERBOSE=yes
             breaksw
 
         case "-save"
@@ -232,7 +232,7 @@ if ($?CHARMBIN == 0) then
             set SCRIPT=$SCRIPT:t
         endif
     end
-    set CHARMBIN=`pwd`
+    set CHARMBIN=$cwd
 endif
 
 # Give an error message
@@ -258,15 +258,21 @@ endif
 if ($?MACHTYPE) then
     if (-d $CHARMBIN/../../$MACHTYPE/bin) then
         cd $CHARMBIN/../../$MACHTYPE/bin
-	set CHARMBIN=`pwd`
+	set CHARMBIN=$cwd
     else
         echo 'error - there is no installed charm for "'$MACHTYPE'"'
         goto failure
     endif
 endif
 
-if ($?CHARMLIB == 0) set CHARMLIB=$CHARMBIN/../lib
-if ($?CHARMINC == 0) set CHARMINC=$CHARMBIN/../include
+if ($?CHARMLIB == 0) then
+    cd $CHARMBIN/../lib
+    set CHARMLIB=$cwd
+endif
+if ($?CHARMINC == 0) then
+    cd $CHARMBIN/../include
+    set CHARMINC=$cwd
+endif
 
 ##############################################################################
 #
@@ -438,13 +444,15 @@ if ($?OBJECT == 0) goto success
 switch ($OBJECT)
   case "*.o":
     rm -f $OBJECT
-    if (($#FILES == 1)&&($#OBJECTFILES == 1)&&($OBJECT != $OBJECTFILES)) then
-        if ($?VERBOSE) echo mv $OBJECTFILES $OBJECT
-        mv $OBJECTFILES $OBJECT
-        if ($status) goto failure
-        if (! -e $OBJECT:r.$FILES:e) then
-            if ($?VERBOSE) echo ln -s $FILES $OBJECT:r.$FILES:e
-            ln -s $FILES $OBJECT:r.$FILES:e
+    if (($#FILES == 1)&&($#OBJECTFILES == 1)) then
+        if ($OBJECT != $OBJECTFILES) then
+            if ($?VERBOSE) echo mv $OBJECTFILES $OBJECT
+            mv $OBJECTFILES $OBJECT
+            if ($status) goto failure
+            if (! -e $OBJECT:r.$FILES:e) then
+                if ($?VERBOSE) echo ln -s $FILES $OBJECT:r.$FILES:e
+                ln -s $FILES $OBJECT:r.$FILES:e
+            endif
         endif
     else
         if ( $?VERBOSE ) echo $CMK_LDRO $OBJECT $OBJECTFILES
@@ -597,7 +605,7 @@ set OBJECTFILES = ($OBJECTFILES \
 
 set LIBRARIES = ($LIBRARIES $CMK_LIBS -lm)
 
-if ($?MAINOBJ == 0) set MAINOBJ=$CHARMLIB/lib${LIBCLASS}-defmain
+if ($?MAINOBJ == 0) set MAINOBJ=$CHARMLIB/lib${LIBCLASS}-defmain.o
 
 set OBJECTFILES=($MAINOBJ $OBJECTFILES)
 
