@@ -5,12 +5,18 @@
  * $Revision$
  *****************************************************************************/
 
-#include <winsock2.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+#ifdef _WINDOWS
+#include <windows.h>
 #include <sys/types.h>
 #include <process.h>
+#else
+#include <errno.h>
+typedef unsigned int BYTE;
+#endif
 #include <time.h>
 
 #include "sockRoutines.h"
@@ -22,27 +28,7 @@ Otherwise, the daemon logs things to its DOS window.
 */
 /*#define FACELESS  /*<- sent in from the makefile*/
 
-/*
-Paste the environment string oldEnv just after dest.
-This is a bit of a pain since windows environment strings
-are double-null terminated.
-  */
-void envCat(char *dest,LPTSTR oldEnv)
-{
-  char *src=oldEnv;
-  dest+=strlen(dest);//Advance to end of dest
-  dest++;//Advance past terminating NULL character
-  while ((*src)!='\0') {
-    int adv=strlen(src)+1;//Length of newly-copied string plus NULL
-    strcpy(dest,src);//Copy another environment string
-    dest+=adv;//Advance past newly-copied string and NULL
-    src+=adv;//Ditto for src
-  }
-  *dest='\0';//Paste on final terminating NULL character
-  FreeEnvironmentStrings(oldEnv);
-}
-
-FILE *logfile=stdout;/*Status messages to standard output*/
+FILE *logfile;/*Status messages to standard output*/
 
 int abort_writelog(int code,const char *msg) {
 	fprintf(logfile,"Socket error %d-- %s!\n",code,msg);
@@ -51,12 +37,12 @@ int abort_writelog(int code,const char *msg) {
 	return -1;
 }
 
-int startProgram(const char *exeName, const char *args, 
+char startProgram(const char *exeName, const char *args, 
 				const char *cwd, const char *env);
 
 void goFaceless(void);
 
-void main()
+int main()
 {
   unsigned int myPortNumber = DAEMON_IP_PORT;
   int myfd;
@@ -68,6 +54,7 @@ void main()
   taskStruct task;      /* Information about the task to be performed */
   time_t curTime;
 
+  logfile=stdout;
 #ifdef FACELESS
   logfile=fopen("daemon.log","w+");
   if (logfile==NULL) /*Couldn't open log file*/
@@ -131,28 +118,49 @@ void main()
 	    task.pgm,task.env,task.cwd);fflush(logfile);
     
     /* Finally, create the process*/
-    if(startProgram(task.pgm,argLine,task.cwd,task.env) == 0){
-      /*Something went wrong!  Look up the Windows error code*/
-      int error=GetLastError();
-      statusCode=daemon_err2status(error);
-      fprintf(logfile,"******************* ERROR *****************\n"
-	      "Error in creating process!\n"
-	      "Error code = %ld-- %s\n\n\n", error,
-	      daemon_status2msg(statusCode));fflush(logfile);
-    }
-    else
-      statusCode='G';//Status is good-- started program sucessfully
+    statusCode=startProgram(task.pgm,argLine,task.cwd,task.env);
+
     /*Send status byte back to requestor*/
     skt_sendN(remotefd,(BYTE *)&statusCode,sizeof(char));
+	skt_close(remotefd);
 
     /*Free recv'd arguments*/
 	free(argLine);
   }
-  
+  return 0;  
 }
 
 #ifdef _WIN32
-int startProgram(const char *exeName, const char *args, 
+/********************** Win32 Spawn ****************/
+void goFaceless(void)
+{
+    printf("Switching to background mode...\n");
+	fflush(stdout);
+    sleep(2);/*Give user a chance to read message*/
+    FreeConsole();
+}
+/*
+Paste the environment string oldEnv just after dest.
+This is a bit of a pain since windows environment strings
+are double-null terminated.
+  */
+void envCat(char *dest,LPTSTR oldEnv)
+{
+  char *src=oldEnv;
+  dest+=strlen(dest);//Advance to end of dest
+  dest++;//Advance past terminating NULL character
+  while ((*src)!='\0') {
+    int adv=strlen(src)+1;//Length of newly-copied string plus NULL
+    strcpy(dest,src);//Copy another environment string
+    dest+=adv;//Advance past newly-copied string and NULL
+    src+=adv;//Ditto for src
+  }
+  *dest='\0';//Paste on final terminating NULL character
+  FreeEnvironmentStrings(oldEnv);
+}
+
+
+char startProgram(const char *exeName, const char *args, 
 				const char *cwd, const char *env)
 {
   int ret;
@@ -191,19 +199,87 @@ int startProgram(const char *exeName, const char *args,
 			    cwd,							/* working directory */
 			    &si,							/* startup info */
 			    &pi);
-  return ret;
-}
-
-void goFaceless(void)
-{
-    printf("Switching to background mode...\n");
-	fflush(stdout);
-    sleep(2);/*Give user a chance to read message*/
-    FreeConsole();
+ 
+  if (ret==0)
+  {
+      /*Something went wrong!  Look up the Windows error code*/
+      int error=GetLastError();
+      char statusCode=daemon_err2status(error);
+      fprintf(logfile,"******************* ERROR *****************\n"
+	      "Error in creating process!\n"
+	      "Error code = %ld-- %s\n\n\n", error,
+	      daemon_status2msg(statusCode));
+	  fflush(logfile);
+	  return statusCode;
+  } 
+  else
+	return 'G';
 }
 
 #else /*UNIX systems*/
 
-# error "UNIX daemon not implemented."
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+void goFaceless(void)
+{
+    printf("Switching to background mode...\n");
+	if (fork()!=0) 
+		exit(0); /*Kill off the parent process, freeing terminal*/
+}
+
+char ** args2argv(const char *args,char **argv) {
+	int cur=0,len=strlen(args);
+	int argc=0;
+	while (cur<len) {
+		int start,end;
+		while (cur<len && args[cur]==' ') cur++;
+		start=cur;
+		while (cur<len && args[cur]!=' ') cur++;
+		end=cur;
+		if (start<end){
+			int i;
+			argv[argc]=(char *)malloc(sizeof(char)*(end-start+1));
+			for (i=0;i<end-start;i++)
+				argv[argc][i]=args[start+i];
+			argv[argc++][end-start]=0;/*Null-terminate*/
+		}
+	}
+	argv[argc]=0;/* Null-terminate arg list */
+	return argv;
+}
+
+
+
+char startProgram(const char *exeName, const char *args, 
+				const char *cwd, const char *env)
+{
+	int ret=0,fd;
+	if (0!=access(cwd,F_OK)) return 'D';
+	if (0!=access(cwd,X_OK)) return 'A';
+	if (0!=access(exeName,F_OK)) return 'F';
+	if (0!=access(exeName,R_OK|X_OK)) return 'A';
+	
+	if (fork()==0)
+	{
+		char **argv=(char **)malloc(sizeof(char *)*1000);
+		ret|=chdir(cwd);
+		putenv(env);
+#ifdef FACELESS
+		/*Redirect program's stdin, out, err to /dev/null*/
+		fd=open("/dev/null",O_RDWR);
+		dup2(fd,0);
+		dup2(fd,1);
+		dup2(fd,2);
+#endif
+		for (fd=3;fd<1024;fd++) close(fd);
+		ret|=execvp(exeName,args2argv(args,argv));
+	}
+	/*FIXME: parent needs to check on child's status, e.g., by 
+	  child sending SIGUSR2 back to parent on error.*/
+	return 'G';
+}
 
 #endif

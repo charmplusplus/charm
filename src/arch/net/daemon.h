@@ -44,6 +44,7 @@ const static struct {
 				char *reason;
 } daemon_errtab[]= {
 				{ERROR_FILE_NOT_FOUND,'F',"executable not found."},
+				{-1,'D',"directory not found."},
 				{ERROR_NOT_ENOUGH_MEMORY,'M',"not enough memory."},
 				{ERROR_OUTOFMEMORY,'M',"not enough memory."},
 				{ERROR_ACCESS_DENIED,'A',"access denied."},
