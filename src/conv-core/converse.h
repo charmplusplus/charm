@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.44  1996-07-02 21:01:55  jyelon
+ * Revision 2.45  1996-07-15 21:02:39  jyelon
+ * Changed mach-flags #ifdef to #if, added timer stuff.
+ *
+ * Revision 2.44  1996/07/02 21:01:55  jyelon
  * Added CMK_THREADS_USE_JB_TWEAKING
  *
  * Revision 2.43  1996/06/24 18:56:25  jyelon
@@ -147,43 +150,47 @@
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 
-#ifdef CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
+#if CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
 #define CMK_CONCAT(x,y) y
 #endif
 
-#ifdef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
+#if CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
 #define CMK_CONCAT(x,y) x##y
 #endif
 
 /* the following flags denote properties of the C compiler,  */
 /* not the C++ compiler.  If this is C++, ignore them.       */
 #ifdef __cplusplus
-#undef CMK_COMPILER_HATES_PROTOTYPES
-#define CMK_COMPILER_LIKES_PROTOTYPES
+#undef CMK_PROTOTYPES_FAIL
+#undef CMK_PROTOTYPES_WORK
+#define CMK_PROTOTYPES_FAIL 0
+#define CMK_PROTOTYPES_WORK 1
 #undef CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION
-#define CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
+#undef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
+#define CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION 0
+#define CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION 1
 extern "C" {
 #endif
 
-#ifdef CMK_COMPILER_LIKES_PROTOTYPES
+#if CMK_PROTOTYPES_WORK
 #define CMK_PROTO(x) x
 #endif
 
-#ifdef CMK_COMPILER_HATES_PROTOTYPES
+#if CMK_PROTOTYPES_FAIL
 #define CMK_PROTO(x) ()
 #endif
 
-#ifdef CMK_COMPILER_LIKES_STATIC_PROTO
+#if CMK_STATIC_PROTO_WORKS
 #define CMK_STATIC_PROTO static
 #endif
 
-#ifdef CMK_COMPILER_HATES_STATIC_PROTO
+#if CMK_STATIC_PROTO_FAILS
 #define CMK_STATIC_PROTO extern
 #endif
 
 /******** CPV, CSV: PRIVATE AND SHARED VARIABLES *******/
 
-#ifdef CMK_NO_SHARED_VARS_AT_ALL
+#if CMK_SHARED_VARS_UNAVAILABLE
 
 #define SHARED_DECL
 #define CpvDeclare(t,v) t CMK_CONCAT(Cpv_Var_,v)
@@ -205,7 +212,7 @@ extern "C" {
 #endif
 
 
-#ifdef CMK_SHARED_VARS_EXEMPLAR
+#if CMK_SHARED_VARS_EXEMPLAR
 #include <spp_prog_model.h>
 #include <memory.h>
 
@@ -230,7 +237,7 @@ extern void *CmiSvAlloc CMK_PROTO((int));
 
 
 
-#ifdef CMK_SHARED_VARS_UNIPROCESSOR
+#if CMK_SHARED_VARS_UNIPROCESSOR
 
 #define SHARED_DECL
 #define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
@@ -255,11 +262,13 @@ extern void CmiNodeBarrier();
 
 /******** CMI: TYPE DEFINITIONS ********/
 
-#ifdef CMK_COMMHANDLE_IS_A_POINTER
+#define CmiMsgHeaderSizeBytes CMK_MSG_HEADER_SIZE_BYTES
+
+#if CMK_COMMHANDLE_IS_A_POINTER
 typedef void  *CmiCommHandle;
 #endif
 
-#ifdef CMK_COMMHANDLE_IS_AN_INTEGER
+#if CMK_COMMHANDLE_IS_AN_INTEGER
 typedef int    CmiCommHandle;
 #endif
 
@@ -285,7 +294,9 @@ void    *CmiAlloc  CMK_PROTO((int size));
 int      CmiSize   CMK_PROTO((void *));
 void     CmiFree   CMK_PROTO((void *));
 
-double   CmiTimer  CMK_PROTO(());
+double   CmiTimer      CMK_PROTO(());
+double   CmiWallTimer  CMK_PROTO(());
+double   CmiCpuTimer   CMK_PROTO(());
 
 #define CsdEnqueueGeneral(x,s,i,p)\
     (CqsEnqueueGeneral(CpvAccess(CsdSchedQueue),(x),(s),(i),(p)))
@@ -294,32 +305,32 @@ double   CmiTimer  CMK_PROTO(());
 #define CsdEnqueue(x)         (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
 #define CsdEmpty()            (CqsEmpty(CpvAccess(CsdSchedQueue)))
 
-#ifdef CMK_CMIMYPE_IS_A_BUILTIN
+#if CMK_CMIMYPE_IS_A_BUILTIN
 int CmiMyPe CMK_PROTO((void));
 int CmiNumPes CMK_PROTO((void));
 #endif
 
-#ifdef CMK_CMIMYPE_IS_A_VARIABLE
+#if CMK_CMIMYPE_IS_A_VARIABLE
 CpvExtern(int, Cmi_mype);
 CpvExtern(int, Cmi_numpes);
 #define CmiMyPe() CpvAccess(Cmi_mype)
 #define CmiNumPes() CpvAccess(Cmi_numpes)
 #endif
 
-#ifdef CMK_CMIMYPE_UNIPROCESSOR
+#if CMK_CMIMYPE_UNIPROCESSOR
 extern int Cmi_mype;
 extern int Cmi_numpes;
 #define CmiMyPe() Cmi_mype
 #define CmiNumPes() Cmi_numpes
 #endif
 
-#ifdef CMK_CMIPRINTF_IS_A_BUILTIN
+#if CMK_CMIPRINTF_IS_A_BUILTIN
 void  CmiPrintf CMK_PROTO((char *, ...));
 void  CmiError  CMK_PROTO((char *, ...));
 int   CmiScanf  CMK_PROTO((char *, ...));
 #endif
 
-#ifdef CMK_CMIPRINTF_IS_JUST_PRINTF
+#if CMK_CMIPRINTF_IS_JUST_PRINTF
 #define CmiPrintf printf
 #define CmiError  printf
 #define CmiScanf  scanf
@@ -329,11 +340,11 @@ int   CmiScanf  CMK_PROTO((char *, ...));
 
 extern  int CsdScheduler CMK_PROTO((int));
 
-#ifdef CMK_CSDEXITSCHEDULER_IS_A_FUNCTION
+#if CMK_CSDEXITSCHEDULER_IS_A_FUNCTION
 extern void CsdExitScheduler CMK_PROTO((void));
 #endif 
 
-#ifdef CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG
+#if CMK_CSDEXITSCHEDULER_SET_CSDSTOPFLAG
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)=1)
 #endif
 
@@ -385,12 +396,14 @@ void   CmiDeliverSpecificMsg   CMK_PROTO((int handler));
 
 /****** CTH: THE THREADS PACKAGE ******/
 
-#ifdef CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE
-#define CMK_THREADS_USE_ALLOCA
+#if CMK_THREADS_USE_ALLOCA_WITH_HEADER_FILE
+#undef CMK_THREADS_USE_ALLOCA
+#define CMK_THREADS_USE_ALLOCA 1
 #endif
 
-#ifdef CMK_THREADS_USE_ALLOCA_WITH_PRAGMA
-#define CMK_THREADS_USE_ALLOCA
+#if CMK_THREADS_USE_ALLOCA_WITH_PRAGMA
+#undef CMK_THREADS_USE_ALLOCA
+#define CMK_THREADS_USE_ALLOCA 1
 #endif
 
 typedef struct CthThreadStruct *CthThread;
@@ -414,7 +427,7 @@ void       CthYield               CMK_PROTO((void));
 /****** CTH: THREAD-PRIVATE VARIABLES (Geez, I hate C) ******/
 
 
-#ifdef CMK_THREADS_UNAVAILABLE
+#if CMK_THREADS_UNAVAILABLE
 #define CtvDeclare(t,v)         CpvDeclare(t,v)
 #define CtvStaticDeclare(t,v)   CpvStaticDeclare(t,v)
 #define CtvExtern(t,v)          CpvExtern(t,v)
@@ -424,8 +437,8 @@ void       CthYield               CMK_PROTO((void));
 
 
 
-#ifdef CMK_THREADS_USE_ALLOCA
-#ifdef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
+#if CMK_THREADS_USE_ALLOCA
+#if CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
 extern char *CthData;
 extern int CthRegister CMK_PROTO((int));
 #define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
@@ -437,8 +450,8 @@ extern int CthRegister CMK_PROTO((int));
 #endif /* CMK_THREADS_USE_ALLOCA */
 
 
-#ifdef CMK_THREADS_USE_JB_TWEAKING
-#ifdef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
+#if CMK_THREADS_USE_JB_TWEAKING
+#if CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
 extern char *CthData;
 extern int CthRegister CMK_PROTO((int));
 #define CtvDeclare(t,v)         typedef t CtvType##v; CsvDeclare(int,CtvOffs##v);
