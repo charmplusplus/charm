@@ -51,7 +51,9 @@ int _Cmi_numnodes=1;
 /* CmiWallTimer support */
 double _cpu_speed_factor=0.0;
 CDECL double CmiTimer(void) {return 0.0;}
+#ifndef CmiWallTimer
 CDECL double CmiWallTimer(void) {return 0.0;}
+#endif
 
 /* Mini-micro TCHARM */
 #include "tcharmc.h"
