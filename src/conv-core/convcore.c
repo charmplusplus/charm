@@ -582,6 +582,10 @@ CmiHandler h;
 }
 #endif
 
+static void _cmiZeroHandler(void *msg) {
+	CmiAbort("Converse zero handler executed-- was a message corrupted?\n");
+}
+
 static void CmiHandlerInit()
 {
   CpvInitialize(CmiHandlerInfo *, CmiHandlerTable);
@@ -594,6 +598,7 @@ static void CmiHandlerInit()
   CpvAccess(CmiHandlerGlobal) = 2;
   CpvAccess(CmiHandlerMax) = 0; /* Table will be extended on the first registration*/
   CpvAccess(CmiHandlerTable) = NULL;
+  CmiRegisterHandler((CmiHandler)_cmiZeroHandler);
 }
 
 
