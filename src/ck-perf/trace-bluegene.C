@@ -208,5 +208,10 @@ void TraceBluegene::bgPrint(char* str){
 
 }
 
+extern "C" void BgPrintf(char *str)
+{
+  BgPrint(str);
+}
+
 /*@}*/
 

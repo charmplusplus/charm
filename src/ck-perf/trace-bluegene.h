@@ -99,6 +99,7 @@ extern int traceBluegeneLinked;
     	  _TRACE_BG_ADD_BACKWARD_DEP(log);	\
         }
 #else
+# define BgPrint(x)  
 # define _TRACE_BG_TLINE_END(x)
 
 # define TRACE_BG_AMPI_SUSPEND()
