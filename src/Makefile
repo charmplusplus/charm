@@ -111,9 +111,9 @@ cmk_clean:
 CKHEADERS=chare.h const.h msg_macros.h prio_macros.h env_macros.h globals.h\
 	  sys_macros.h communication.h performance.h $(CVHEADERS)
 
-LIBCK_CORE_N=common.n.o globals.n.o init.n.o register.n.o boc.n.o condsend.n.o quies.n.o vid.n.o rdonly.n.o stat.n.o wrtone.n.o acc.n.o mono.n.o tbl.n.o memstuff.n.o
+LIBCK_CORE_N=common.n.o globals.n.o init.n.o register.n.o boc.n.o condsend.n.o qd.n.o vid.n.o rdonly.n.o stat.n.o wrtone.n.o acc.n.o mono.n.o tbl.n.o memstuff.n.o
 
-LIBCK_CORE_D=common.d.o globals.d.o init.d.o register.d.o boc.d.o condsend.d.o quies.d.o vid.d.o rdonly.d.o stat.d.o wrtone.d.o acc.d.o mono.d.o tbl.d.o memstuff.d.o
+LIBCK_CORE_D=common.d.o globals.d.o init.d.o register.d.o boc.d.o condsend.d.o qd.d.o vid.d.o rdonly.d.o stat.d.o wrtone.d.o acc.d.o mono.d.o tbl.d.o memstuff.d.o
 
 CK_LDB_N=libckn-ldb-acwn.o libckn-ldb-rand.o # libckn-ldb-mngr.o libckn-ldb-priomngr.o libckn-ldb-recv.o libckn-ldb-tok.o libckn-ldb-btok.o
 
@@ -212,9 +212,9 @@ condsend.n.o condsend.d.o: condsend.c condsend.h $(CKHEADERS)
 	charmc -cwd -o condsend.n.o condsend.c
 	charmc -cwd -o condsend.d.o condsend.c -DDEBUGGING_MODE
 
-quies.n.o quies.d.o: quies.c quies.h $(CKHEADERS)
-	charmc -cwd -o quies.n.o quies.c
-	charmc -cwd -o quies.d.o quies.c -DDEBUGGING_MODE
+qd.n.o qd.d.o: qd.c qd.h $(CKHEADERS)
+	charmc -cwd -o qd.n.o qd.c
+	charmc -cwd -o qd.d.o qd.c -DDEBUGGING_MODE
 
 vid.n.o vid.d.o: vid.c vid.h $(CKHEADERS)
 	charmc -cwd -o vid.n.o vid.c
