@@ -571,7 +571,7 @@ fi
 
 CHARMLIB="$CHARMBIN/../lib"
 CHARMINC="$CHARMBIN/../include"
-CHARMLIBSO="$CHARMBIN/../lib_so"
+CHARMLIBSO=`cd "$CHARMBIN/../lib_so"; pwd`
 
 
 ##############################################################################
