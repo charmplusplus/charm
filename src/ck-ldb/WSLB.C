@@ -353,6 +353,8 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
   // to our neighbors
   double myload = myStats.total_walltime - myStats.idletime;
   const double myusage = myStats.total_cputime / myload;
+  const double load_factor = 1.05;
+  double objload;
 
   CkPrintf("PE %d myload = %f myusage = %f\n",CkMyPe(),myload,myusage);
 
@@ -441,8 +443,10 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 	obj = objs.deleteMax();
 	if (obj == 0) break;
 
-	double new_p_load = p->load + obj->load;
-	double my_new_load = myload - obj->load;
+	objload = load_factor * obj->load;
+
+	double new_p_load = p->load + objload;
+	double my_new_load = myload - objload;
 
 	// If we're vacating, the biggest object is always good.
 	// Otherwise, only take it if it doesn't produce overload
@@ -476,8 +480,8 @@ WSLBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
       
       // We may want to assign more to this processor, so lets
       // update it and put it back in the heap
-      p->load += obj->load;
-      myload -= obj->load;
+      p->load += objload;
+      myload -= objload;
       procs.insert(p);
       
       // This object is assigned, so we delete it from the heap
