@@ -38,7 +38,7 @@ fftlib-sparse.o: fftlib-sparse.C fftlib.h fftlib.decl.h
 	$(COMPILER) fftlib-sparse.C
 
 fftlib.decl.h: fftlib.ci
-	$(CHARMC) $<
+	$(CHARMC) fftlib.ci
 
 clean:
 	rm -f core 
