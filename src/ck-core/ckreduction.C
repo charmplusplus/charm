@@ -644,7 +644,7 @@ void CkReductionMgr::pup(PUP::er &p)
     thisProxy = thisgroup;
     lcount=0;
     gcount=0;
-
+    maxStartRequest=0;
   }
 #if DEBUGRED
   CkPrintf("[%d,%d] pupping _____________  gcount = %d \n",CkMyNode(),CkMyPe(),gcount);
