@@ -1758,7 +1758,7 @@ static void node_addresses_obtain()
   ctrl_sendone(120, "aget %s %d addr 0 %d",
 	       Cmi_self_IP_str,ctrlport,Cmi_numnodes-1);
   while (nodes == 0) {
-    if (wait_readable(ctrlskt, 60)<0)
+    if (wait_readable(ctrlskt, 60*Cmi_numnodes)<0)
       KillEveryoneCode(21323);
     ctrl_getone();
   }
