@@ -725,6 +725,11 @@ void CmiHandleMessage(void *msg)
  	(CmiGetHandlerFunction(msg))(msg);
 }
 
+void CmiCommHandleMessage(void *msg)
+{
+ 	(CmiCommGetHandlerFunction(msg))(msg);
+}
+
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
 
 void CmiDeliversInit()
@@ -1510,7 +1515,7 @@ CpvDeclare(int, CmiImmediateMsgHandlerIdx); /* Main handler that is run on every
 static void CmiImmediateMsgHandler(char *msg)
 {
   CmiSetHandler(msg, CmiGetXHandler(msg));
-  CmiHandleMessage(msg);
+  CmiCommHandleMessage(msg);
 }
 
 void CmiInitImmediateMsg(void)

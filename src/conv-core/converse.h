@@ -364,6 +364,9 @@ extern void CmiNumberHandler(int, CmiHandler);
 
 #define CmiHandlerToFunction(n) (CpvAccess(CmiHandlerTable)[n])
 #define CmiGetHandlerFunction(env) (CmiHandlerToFunction(CmiGetHandler(env)))
+/* for communication thread */
+#define CmiCommHandlerToFunction(n) (CpvAccessOther(CmiHandlerTable,0)[n])
+#define CmiCommGetHandlerFunction(env) (CmiCommHandlerToFunction(CmiGetHandler(env)))
 
 void    *CmiAlloc(int size);
 int      CmiSize(void *);
@@ -666,6 +669,7 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 int    CmiDeliverMsgs(int maxmsgs);
 void   CmiDeliverSpecificMsg(int handler);
 void   CmiHandleMessage(void *msg);
+void   CmiCommHandleMessage(void *msg);
 
 /******** CQS: THE QUEUEING SYSTEM ********/
 
