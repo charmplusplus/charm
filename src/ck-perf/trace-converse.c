@@ -36,6 +36,7 @@ void traceCharmClose(void) {}
 void traceBegin(void) {}
 void traceEnd(void) {}
 void traceWriteSts(void) {}
+void traceFlushLog(void) {}
 int  traceAvailable() {return 0;}
 void registerFunction(char *name){
 }

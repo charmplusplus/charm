@@ -426,6 +426,18 @@ static void updateProjLog(void *data, double t, double recvT, void *ptr)
 }
 #endif
 
+// flush log entries to disk
+void LogPool::flushLogBuffer()
+{
+  if (numEntries) {
+    double writeTime = TraceTimer();
+    writeLog();
+    numEntries = 0;
+    new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
+    new (&pool[numEntries++]) LogEntry(TraceTimer(), END_INTERRUPT);
+  }
+}
+
 void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,
 		  int pe, int ml, CmiObjId *id, double recvT, double cpuT, 
 		  int numPap, int *pap_ids, LONG_LONG_PAPI *papVals) 
@@ -434,11 +446,7 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,
     LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT, numPap,
 	     pap_ids, papVals);
   if(poolSize==numEntries) {
-    double writeTime = TraceTimer();
-    writeLog();
-    numEntries = 0;
-    new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
-    new (&pool[numEntries++]) LogEntry(TraceTimer(), END_INTERRUPT);
+    flushLogBuffer();
 #if CMK_BLUEGENE_CHARM
     extern int correctTimeLog;
     if (correctTimeLog) CmiAbort("I/O interrupt!\n");
@@ -464,15 +472,11 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,
 
 void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileName){
 #ifndef CMK_BLUEGENE_CHARM
-	new (&pool[numEntries++])
-		LogEntry(time,type,funcID,lineNum,fileName);
-	if(poolSize == numEntries){
-    double writeTime = TraceTimer();		
-		writeLog();
-		numEntries=0;
-		new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
-    new (&pool[numEntries++]) LogEntry(TraceTimer(), END_INTERRUPT);
-	}
+  new (&pool[numEntries++])
+	LogEntry(time,type,funcID,lineNum,fileName);
+  if(poolSize == numEntries){
+    flushLogBuffer();
+  }
 #endif	
 }
 
@@ -491,11 +495,7 @@ void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time,
   new (&pool[numEntries++])
     LogEntry(time, mIdx, eIdx, event, pe, ml, id, recvT, num, pelist);
   if(poolSize==numEntries) {
-    double writeTime = TraceTimer();
-    writeLog();
-    numEntries = 0;
-    new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
-    new (&pool[numEntries++]) LogEntry(TraceTimer(), END_INTERRUPT);
+    flushLogBuffer();
   }
 }
 

@@ -23,6 +23,7 @@ FDECL {
 #define ftraceregisteruserevent  FTN_NAME(FTRACEREGISTERUSEREVENT, ftraceregisteruserevent)
 #define ftraceuserbracketevent   FTN_NAME(FTRACEUSERBRACKETEVENT, ftraceuserbracketevent)
 #define ftraceUserEvent   	 FTN_NAME(FTRACEUSEREVENT, ftraceuserevent)
+#define ftraceFlushLog   	 FTN_NAME(FTRACEFLUSHLOG, ftraceflushlog)
 
 void ftracebegin()
 {
@@ -67,6 +68,11 @@ void ftraceuserbracketevent(int *e, double *begint, double *endt)
 void ftraceUserEvent(int *e)
 {
   traceUserEvent(*e);
+}
+
+void ftraceFlushLog()
+{
+  traceFlushLog();
 }
 
 }  // FDECL

@@ -310,6 +310,13 @@ void traceWriteSts(void)
   CkpvAccess(_traces)->traceWriteSts();
 }
 
+extern "C"
+void traceFlushLog(void)
+{
+  OPTIMIZE_WARNING
+  CkpvAccess(_traces)->traceFlushLog();
+}
+
 /**
     traceClose: 	this function is called at Converse
     traceCharmClose:	called at Charm++ level

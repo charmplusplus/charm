@@ -17,6 +17,8 @@
         subroutine ftraceUserEvent(ev)
           integer, intent(in) :: ev 
         end subroutine
+        subroutine ftraceFlushLog()
+        end subroutine
       end interface
       end module
 

@@ -116,6 +116,8 @@ class Trace {
     virtual void traceWriteSts() {}
     // do any clean-up necessary for tracing
     virtual void traceClose() {}
+    // flush log buffer immediately
+    virtual void traceFlushLog() {}
 
     //for tracing function calls
     virtual void regFunc(char *name){}
@@ -188,6 +190,7 @@ public:
     inline void traceClearEps() {ALLDO(traceClearEps());}
     inline void traceWriteSts() {ALLDO(traceWriteSts());}
     inline void traceClose() {ALLDO(traceClose()); clearTrace();}
+    inline void traceFlushLog() {ALLDO(traceFlushLog());}
     
     // Tracing module registers *itself* for begin/end idle callbacks:
     inline void beginIdle(double curWallTime) {ALLDO(beginIdle(curWallTime));}
