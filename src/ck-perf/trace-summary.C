@@ -364,7 +364,8 @@ void SumLogPool::setEp(int epidx, double time)
   phaseTab.setEp(epidx, time);
 }
 
-// Called once from endExecute, this function updates the intervals.
+// Called once from endExecute, endPack, etc. this function updates
+// the sumDetail intervals.
 void SumLogPool::updateSummaryDetail(int epIdx, double startTime, double endTime)
 {
         if (epIdx >= epInfoSize) {
@@ -374,6 +375,11 @@ void SumLogPool::updateSummaryDetail(int epIdx, double startTime, double endTime
         double binSz = CkpvAccess(binSize);
         int startingBinIdx = (int)(startTime/binSz);
         int endingBinIdx = (int)(endTime/binSz);
+        // Ensure that shrink() has been called.
+        if (startingBinIdx >= epInfoSize)
+            CmiAbort("Internal Error: startingBinIdx\n");
+        if (endingBinIdx >= epInfoSize)
+            CmiAbort("Internal Error: endingBinIdx\n");
 
         if (startingBinIdx == endingBinIdx) {
             addToCPUtime(startingBinIdx, epIdx, endTime - startTime);
@@ -389,7 +395,7 @@ void SumLogPool::updateSummaryDetail(int epIdx, double startTime, double endTime
         incNumExecutions(startingBinIdx, epIdx);
 };
 
-// Shrinks poop[], cpuTime[], and numExecutions[]
+// Shrinks pool[], cpuTime[], and numExecutions[]
 void SumLogPool::shrink(void)
 {
 //  double t = CmiWallTimer();
@@ -541,7 +547,7 @@ void TraceSummary::endExecute(void)
   {
      bin += nts-ts;
      binStart  = nts;
-     _logPool->add(bin, CkMyPe());
+     _logPool->add(bin, CkMyPe()); // This calls shrink() if needed
      bin = 0;
      ts = nts;
   }
@@ -593,7 +599,7 @@ void TraceSummary::beginComputation(void)
     _unpackEP = CkRegisterEp("dummy_unpack_ep", 0, _unpackMsg,_unpackChare);
   }
 
-  // initialze arrays becasue now the number of entries is known.
+  // initialze arrays because now the number of entries is known.
   _logPool->initMem();
 }
 
