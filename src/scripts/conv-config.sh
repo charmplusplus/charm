@@ -68,4 +68,5 @@ fi
 [ -z "$CMK_SEQ_F90" ] && CMK_SEQ_F90="$CMK_CF90"
 [ -z "$CMK_SEQ_AR" ] && CMK_SEQ_AR="$CMK_AR"
 [ -z "$CMK_SEQ_RANLIB" ] && CMK_SEQ_RANLIB="$CMK_RANLIB"
+[ -z "$CMK_SEQ_LIBS" ] && CMK_SEQ_LIBS="$CMK_NATIVE_LIBS"
 
