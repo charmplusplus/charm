@@ -11,4 +11,8 @@
   integer, parameter :: AMPI_BYTE=6
   integer, parameter :: AMPI_PACKED=7
 
+  INTERFACE
+    DOUBLE PRECISION  FUNCTION IMPI_Wtime()
+    END FUNCTION
+  END INTERFACE
 #endif
