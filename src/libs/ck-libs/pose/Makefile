@@ -27,9 +27,11 @@ CIFILES = mempool.def.h gvt.def.h ldbal.def.h pose.def.h sim.def.h stats.def.h
 
 all:  $(LIBDEST) $(LIBSEQDEST)
 
-POSE: $(LIBDEST)
+.PHONY:  pose seqpose
 
-SEQPOSE:  $(LIBSEQDEST) 
+pose: $(LIBDEST)
+
+seqpose:  $(LIBSEQDEST) 
 
 $(LIBDEST):	$(OBJECTS)
 	$(CHARMC) -o $(LIBDEST) $(OBJECTS)
