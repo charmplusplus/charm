@@ -7,7 +7,7 @@
 
 // Primary versions
 #define POSE_STATS_ON 1
-#define POSE_COMM_ON 1
+//#define POSE_COMM_ON 1
 //#define LB_ON 1
 
 #ifdef POSE_COMM_ON
