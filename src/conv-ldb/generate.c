@@ -141,7 +141,7 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 	
 	if (C>1) c1 = C-1;
 
-	for (i=0; i< V/c1; i++)
+	for (i=0; i<= V/c1; i++)
 	  for (j=0; j<c1; j++) {
 	      w = c1*i + j +1; 
 	      if (w < V) {
@@ -230,12 +230,21 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 				     y = rand() % varrlen;
 				   } while (y == x) ;
 
-				if (edgeExists(varr[x][0],varr[y][0])) 
+				/*if (edgeExists(varr[x][0],varr[y][0])) 
 					if (j==k-1) addspEdge(EdgeList,varr[x][0],varr[y][0]);
 			        	else do {
 				     			y = rand() % varrlen;
 				         	 } while (y == x);
-				else addEdge(EdgeList,varr[x][0],varr[y][0]); 
+				else addEdge(EdgeList,varr[x][0],varr[y][0]); */
+
+				if (edgeExists(varr[x][0],varr[y][0])&&(j==k-1))
+					addspEdge(EdgeList,varr[x][0],varr[y][0]);
+				else	
+				{
+					while((y==x)||(edgeExists(varr[x][0],varr[y][0])))
+				     		y = rand() % varrlen;
+					addEdge(EdgeList,varr[x][0],varr[y][0]); 
+				}
 
 				varr[x][1]=varr[x][1]-1;
 	     			varr[y][1]=varr[y][1]-1;
