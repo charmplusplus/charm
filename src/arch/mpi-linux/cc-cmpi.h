@@ -6,5 +6,8 @@
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
+/* keep using QT, context thread migration is broken (megampi) on tungsten
+/*
 #undef CMK_THREADS_USE_CONTEXT
 #define CMK_THREADS_USE_CONTEXT                            1
+*/
