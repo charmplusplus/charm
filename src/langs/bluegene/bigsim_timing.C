@@ -737,18 +737,6 @@ void BgPrintThreadTimeLine(int pe, int th, BgTimeLine &tline)
     tline[i]->print(pe, th);
 }
 
-void BgWriteThreadTimeLine(char **argv, int x, int y, int z, int th, BgTimeLine &tline)
-{
-  char *fname = (char *)malloc(strlen(argv[0])+100);
-  sprintf(fname, "%s-%d-%d-%d.%d.log", argv[0], x,y,z,th);
-  FILE *fp = fopen(fname, "w+");
-  CmiAssert(fp!=NULL);
-  for (int i=0; i<tline.length(); i++)
-    tline[i]->write(fp);
-  fclose(fp);
-  free(fname);
-}
-
 /*****************************************************************************
 		TimeLog correction with trace projection
 *****************************************************************************/

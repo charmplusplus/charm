@@ -163,11 +163,11 @@ void bgTimeLog::write(FILE *fp)
   // fprintf(fp,"\nbackwardDeps [%d]:\n",backwardDeps.length());
   fprintf(fp, "backward: ");
   for (i=0; i<backwardDeps.length(); i++)
-    fprintf(fp,"[%p] ",backwardDeps[i]);
+    fprintf(fp,"[%p %d] ",backwardDeps[i], backwardDeps[i]->index);
   fprintf(fp, "\n");
   fprintf(fp, "forward: ");
   for (i=0; i<forwardDeps.length(); i++)
-    fprintf(fp,"[%p] ",forwardDeps[i]);
+    fprintf(fp,"[%p %d] ",forwardDeps[i], forwardDeps[i]->index);
   fprintf(fp, "\n");
   fprintf(fp, "==>>\n");
 }
@@ -333,5 +333,19 @@ void bgTimeLog::pup(PUP::er &p){
       else
 	p|forwardDeps[i]->index;
     }
+}
+
+void BgWriteThreadTimeLine(char *pgm, int x, int y, int z, int th, BgTimeLine &tline)
+{
+  char *fname = (char *)malloc(strlen(pgm)+100);
+  sprintf(fname, "%s-%d-%d-%d.%d.log", pgm, x,y,z,th);
+  FILE *fp = fopen(fname, "w");
+  CmiAssert(fp!=NULL);
+  for (int i=0; i<tline.length(); i++) {
+    fprintf(fp, "[%d] ", i);
+    tline[i]->write(fp);
+  }
+  fclose(fp);
+  free(fname);
 }
 

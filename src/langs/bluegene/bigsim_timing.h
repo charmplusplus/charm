@@ -72,7 +72,6 @@ extern int BgAdjustTimelineByIndex(int idxOld, double tAdjustAbs, BgTimeLineRec 
 extern int BgAdjustTimeLineInsert(BgTimeLineRec &tline);
 extern int BgAdjustTimeLineForward(int src, int msgID, double tAdjustAbs, BgTimeLineRec &tline, int mynode, int tid);
 extern void BgPrintThreadTimeLine(int node, int th, BgTimeLine &tline);
-extern void BgWriteThreadTimeLine(char **argv, int x, int y, int z, int th, BgTimeLine &tline);
 extern void BgFinishCorrection(BgTimeLineRec &tlinerec, int mynode, int tid, int idx, int send=1);
 extern void BgSendBufferedCorrMsgs();
 extern bgTimeLog *BgGetTimeLog(BgTimeLineRec *tline, CmiInt2 tID, int srcnode, int msgID, int *index);

@@ -1170,7 +1170,7 @@ CmiHandler exitHandlerFunc(char *msg)
 //      BgPrintThreadTimeLine(nodeInfo::Local2Global(j), i, log);
       int x,y,z;
       nodeInfo::Local2XYZ(j, &x, &y, &z);
-      BgWriteThreadTimeLine(arg_argv, x, y, z, i, log);
+      BgWriteThreadTimeLine(arg_argv[0], x, y, z, i, log);
     }
 
   }

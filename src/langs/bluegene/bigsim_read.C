@@ -29,13 +29,14 @@ void BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNod
   sprintf(fName,"bgTrace%d",fileNum);
   FILE*  f = fopen(fName,"r");
 //  PUP::fromDisk p(f);
-  PUP::fromDisk p(f);
+  PUP::fromDisk pd(f);
   PUP::machineInfo machInfo;
-  p((char *)&machInfo, sizeof(machInfo));
-  PUP::xlater p_xlater(machInfo, p);
+  pd((char *)&machInfo, sizeof(machInfo));
+  if (!machInfo.valid()) CmiAbort("Invalid machineInfo on disk file!\n");
+  PUP::xlater p(machInfo, pd);
 
   fseek(f,fileOffset,SEEK_SET);
-  tlinerec.pup(p_xlater);
+  tlinerec.pup(p);
   fclose(f);
 
   return;
@@ -52,12 +53,13 @@ int* BgLoadOffsets(int totalProcs, int numPes){
   for (int i=0; i<numPes; i++){
     sprintf(d,"bgTrace%d",i);
     FILE *f = fopen(d,"r");
-    PUP::fromDisk p(f);
-    p((char *)&machInfo, sizeof(machInfo));
-    PUP::xlater p_xlater(machInfo, p);
-    p_xlater|procsInPe;
+    PUP::fromDisk pd(f);
+    pd((char *)&machInfo, sizeof(machInfo));
+    PUP::xlater p(machInfo, pd);
+    if (!machInfo.valid()) CmiAbort("Invalid machineInfo on disk file!\n");
+    p|procsInPe;
 
-    p_xlater(allProcOffsets+arrayOffset,procsInPe);
+    p(allProcOffsets+arrayOffset,procsInPe);
     arrayOffset += procsInPe;
     fclose(f);
   }
@@ -70,14 +72,15 @@ int BgLoadTraceSummary(char *fname, int &totalProcs, int &numX, int &numY, int &
   PUP::machineInfo machInfo;
 
   FILE* f = fopen(fname,"r");
-  PUP::fromDisk p(f);
 
-  p((char *)&machInfo, sizeof(machInfo));	// load machine info
-  PUP::xlater p_xlater(machInfo, p);
-  p_xlater|totalProcs;
-  p_xlater|numX; p_xlater|numY; p_xlater|numZ;
-  p_xlater|numCth;p_xlater|numWth;
-  p_xlater|numPes;
+  PUP::fromDisk pd(f);
+  pd((char *)&machInfo, sizeof(machInfo));	// load machine info
+  if (!machInfo.valid()) CmiAbort("Invalid machineInfo on disk file!\n");
+  PUP::xlater p(machInfo, pd);
+  p|totalProcs;
+  p|numX; p|numY; p|numZ;
+  p|numCth;p|numWth;
+  p|numPes;
   fclose(f);
   return 0;
 }
