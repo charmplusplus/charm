@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.11  1995-11-07 23:20:32  jyelon
+ * Revision 1.12  1996-02-10 18:54:24  sanjeev
+ * fixed bug in CmiNumNeighbours
+ *
+ * Revision 1.11  1995/11/07 23:20:32  jyelon
  * removed neighbour_init residue.
  *
  * Revision 1.10  1995/11/07  18:24:53  jyelon
@@ -232,7 +235,8 @@ int node;
   while (1) {
     int neighbour = node ^ bit;
     if (neighbour < Cmi_numpes) count++;
-    bit<<1; if (bit > Cmi_numpes) break;
+    bit = bit<<1; 
+    if (bit > Cmi_numpes) break;
   }
   return count;
 }
