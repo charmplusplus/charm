@@ -287,12 +287,12 @@ TraceSummary::TraceSummary(char **argv):curevent(0),binStart(0.0),bin(0.0),msgNu
   _logPool = new SumLogPool(CkpvAccess(traceRoot));
   execEp=INVALIDEP;
 
-  SumEntryInfo::threshold = 0.001; 
+  epThreshold = 0.001; 
   if (CmiGetArgString(argv,"+epThreshold",&tmpStr))
-  	sscanf(tmpStr,"%lf",&SumEntryInfo::threshold);
-  SumEntryInfo::epIncrease = 0.001; 
+  	sscanf(tmpStr,"%lf",&epThreshold);
+  epInterval = 0.001; 
   if (CmiGetArgString(argv,"+epInterval",&tmpStr))
-  	sscanf(tmpStr,"%lf",&SumEntryInfo::epIncrease);
+  	sscanf(tmpStr,"%lf",&epInterval);
 }
 
 void TraceSummary::traceClearEps(void)

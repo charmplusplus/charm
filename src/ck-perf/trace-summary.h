@@ -132,6 +132,9 @@ class PhaseTable {
     }
 };
 
+double epThreshold;
+double epInterval;
+
 /// info for each entry
 class SumEntryInfo {
 public:
@@ -140,8 +143,6 @@ public:
   int epCount;
   static const int SIZE = 10;
   int hist[SIZE];
-  static double threshold;
-  static double epIncrease;
 public:
   SumEntryInfo(): epTime(0.), epMaxTime(0.), epCount(0) {}
   void clear() {
@@ -154,7 +155,7 @@ public:
     epCount ++;
     if (epMaxTime < t) epMaxTime = t;
     for (int i=SIZE-1; i>=0; i--) {
-      if (t>threshold+i*epIncrease) {
+      if (t>epThreshold+i*epInterval) {
         hist[i]++; break;
       }
     }
