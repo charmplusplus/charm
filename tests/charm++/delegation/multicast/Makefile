@@ -9,10 +9,10 @@ hello.o : hello.C hello.def.h hello.decl.h
 hello.decl.h hello.def.h : hello.ci
 	$(CHARMC) hello.ci
 
-test:
+test: hello
 	./charmrun +p2 ./hello 10
 
-bgtest:
+bgtest: hello
 	./charmrun +p2 ./hello 10 +x1 +y1 +z2
 
 clean:
