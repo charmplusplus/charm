@@ -229,7 +229,7 @@ CDECL void
 IDXL_Layout_destroy(IDXL_Layout_t l) {
 	const char *callingRoutine="IDXL_Layout_destroy";
 	IDXLAPI(callingRoutine);
-	return getLayouts().destroy(l,callingRoutine);
+	getLayouts().destroy(l,callingRoutine);
 }
 FORTRAN_AS_C(IDXL_LAYOUT_DESTROY,IDXL_Layout_destroy,idxl_layout_destroy,
 	(int *l), (*l) )
