@@ -1,0 +1,79 @@
+
+\section{Synchronization Mechanisms}
+To use the following calls, include the file ``sync.h''
+
+\subsection{Locks}
+
+Locks (or mutexes) are synchronization mechanisms that can be used by user 
+programs to provide mutual exclusion to critical sections. Threads that attempt
+to ``lock'' such a variable are suspended if the lock is already taken and are
+awakened when the lock becomes available to them.
+
+\function{LOCK *CtsNewLock(void)}
+\desc{This call can be used to create a new lock variable.}
+
+\function{CtsLockInit(LOCK *lock)}
+\desc{This call can be used to initialize a lock \param{lock} that was 
+earlier allocated.}
+
+\function{int CtsTryLock(LOCK *lock)}
+\desc{This call is a nonblocking attempt to lock \param{lock}. It returns 
+1 immediately if \param{lock} is available after making the current thread 
+\param{lock}'s owner and returns 0 if \param{lock} is already locked.}
+
+\function{int CtsLock(LOCK *lock)}
+\desc{This call is used by a thread to wait until it obtains the ownership of 
+\param{lock}. Several threads making this call may be queued up at the lock,
+which is then ``given'' to each in turn.}
+
+\function{int CtsUnLock(LOCK *lock)}
+\desc{This call is used by a thread to relinquish the control of \param{lock}.
+An error value is returned if the thread attempts the unlock is not 
+\param{lock}'s owner.}
+
+\subsection{Condition Variables}
+
+Condition variables are synchronization mechanisms that are used to implement 
+trigger like functionality. Threads can wait on a condition variable. Other
+threads can either signal or broadcast this condition variable causing the 
+awakening of either one or all of the threads waiting on this variable.
+
+\function{CONDN *CtsNewCondn(void)}
+\desc{This call returns a new initialized condition variable.}
+
+\function{int CtsCondnInit(CONDN *condn)}
+\desc{This call can be used to initialize a condition variable that was earlier
+allocated. This call causes all the waiting threads on this condition variable 
+to be awakened.}
+
+\function{int CtsCondnWait(CONDN *condn)}
+\desc{This call is used by thread that want to wait on the condition 
+variable \param{condn}.}
+
+\function{int CtsCondnSignal(CONDN *condn)}
+\desc{This call releases one of the threads waiting on the condition 
+variable \param{condn}.}
+
+\function{int CtsCondnBroadcast(CONDN *condn)}
+\desc{This call releases all the threads waiting on the condition variable
+\param{condn}.}
+
+\subsection{Barriers}
+Barriers are a specialization of condition variables. A barrier is 
+a condition variable whose {\em k}th wait is a broadcast for some initial k.
+That is, the barrier waits for k threads to reach a particular point before it
+lets them all go.
+
+\function{BARRIER *CtsNewBarrier(void)}
+\desc{can be used to create a new barrier.}
+
+\function{int CtsBarrierReinit(BARRIER *bar, int num)}
+\desc{This call (re)initializes the barrier \param{bar} to free any 
+threads waiting on it and then to await the arrival of {\tt num} threads.}
+
+\function{int CtsAtBarrier(BARRIER *bar)}
+\desc{Following the initialization of the barrier, the {\tt num} participating 
+threads need to make this call before they can proceed beyond this point in 
+the program. This call hence blocks all but the last thread to make this call, 
+and awakens them all upon the arrival of this thread at the barrier.}
+
