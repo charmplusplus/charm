@@ -153,7 +153,7 @@ void eventQueue::CommitEvents(sim *obj, int ts)
 	localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
 #endif
 	if (commitPtr->commitBfrLen > 0)  { // print buffered output
-	  CkPrintf("%s [commit error: gvt=%d, ts=%d\n", commitPtr->commitBfr, ts, commitPtr->timestamp);
+	  CkPrintf("%s", commitPtr->commitBfr, ts, commitPtr->timestamp);
 	  if (commitPtr->commitErr) CmiAbort("Commit ERROR");
 	}
 	if (commitPtr->cpData) delete commitPtr->cpData;
