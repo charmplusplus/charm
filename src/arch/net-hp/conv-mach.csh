@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 2.18  1996-08-05 15:28:49  jyelon
+# Revision 2.19  1996-10-01 18:11:51  jyelon
+# Changed all translator linking to static.
+#
+# Revision 2.18  1996/08/05 15:28:49  jyelon
 # *** empty log message ***
 #
 # Revision 2.17  1996/08/04 04:19:50  jyelon
@@ -86,9 +89,9 @@ set CMK_RANLIB='true'
 set CMK_LIBS=''
 set CMK_SEQ_LIBS=''
 set CMK_SEQ_CC='gcc '
-set CMK_SEQ_LD='gcc '
+set CMK_SEQ_LD='gcc -static '
 set CMK_SEQ_CXX='g++ '
-set CMK_SEQ_LDXX='g++ '
+set CMK_SEQ_LDXX='g++ -static '
 set CMK_NM='nm'
 set CMK_NM_FILTER="grep '|extern|' | sed -e 's@ *|.*@@'"
 set CMK_CPP_SUFFIX="ii"
