@@ -415,6 +415,8 @@ XPFILES=xp-extn.h xp-lexyy.c xp-process.c xp-sfilter xp-space.c xp-t.h xp-t.l xp
 
 XIFILES=xi-generate.C xi-parse.y xi-parse.C xi-parse.h xi-scan.l xi-scan.C xi-symbol.C xi-symbol.h xi-main.C
 
+CPMFILES=conv-cpm.c conv-cpm-lex
+
 charmxlat: $(XLFILES)
 	make -f Maketrans charmxlat OPTS='$(OPTS)'
 
@@ -427,41 +429,11 @@ charmxlat++: $(XPFILES)
 charmfilter++: $(XPFILES)
 	make -f Maketrans charmfilter++ OPTS='$(OPTS)'
 
-yacc:
-	make -f Maketrans yacc OPTS='$(OPTS)'
-
-xlatyacc: $(XLFILES)
-	make -f Maketrans xlatyacc OPTS='$(OPTS)'
-
-xlatlex: $(XLFILES)
-	make -f Maketrans xlatlex OPTS='$(OPTS)'
-
-sfilterlex: $(XLFILES)
-	make -f Maketrans sfilterlex OPTS='$(OPTS)'
-
-yacc++:
-	make -f Maketrans yacc++ OPTS='$(OPTS)'
-
-xlat++yacc: $(XPFILES)
-	make -f Maketrans xlat++yacc OPTS='$(OPTS)'
-
-xlat++lex: $(XPFILES)
-	make -f Maketrans xlat++lex OPTS='$(OPTS)'
-
-sfilter++lex: $(XPFILES)
-	make -f Maketrans sfilter++lex OPTS='$(OPTS)'
-
 charmxi: $(XIFILES)
 	make -f Maketrans charmxi OPTS='$(OPTS)'
 
-yacci:
-	make -f Maketrans yacci OPTS='$(OPTS)'
-
-conv-cpm: conv-cpm.c
+conv-cpm: $(CPMFILES)
 	make -f Maketrans conv-cpm OPTS='$(OPTS)'
-
-yacc-cpm:
-	make -f Maketrans yacc-cpm OPTS='$(OPTS)'
 
 ###############################################################################
 #
