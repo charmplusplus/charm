@@ -70,7 +70,7 @@ main::done(void)
 }
 
 template<class d>
-void sum(int len, d* lhs, d* rhs)
+void sum(const int len, d* lhs, d* rhs)
 {
   int i;
   for(i=0;i<len;i++) {
@@ -79,7 +79,7 @@ void sum(int len, d* lhs, d* rhs)
 }
 
 static inline void
-combine(DType& dt, void *lhs, void *rhs)
+combine(const DType& dt, void* lhs, void* rhs)
 {
   switch(dt.base_type) {
     case FEM_BYTE : 
@@ -94,10 +94,10 @@ combine(DType& dt, void *lhs, void *rhs)
 chunk::chunk(void)
 {
   ntypes = 0;
-  new_DT(FEM_BYTE, 1);
-  new_DT(FEM_INT, 1);
-  new_DT(FEM_REAL, 1);
-  new_DT(FEM_DOUBLE, 1);
+  new_DT(FEM_BYTE);
+  new_DT(FEM_INT);
+  new_DT(FEM_REAL);
+  new_DT(FEM_DOUBLE);
 
   messages = CmmNew();
   seqnum = 1;
@@ -140,12 +140,12 @@ chunk::send(int fid, void *nodes)
     int dest = peNums[i];
     int num = numNodesPerPe[i];
     int len = dtypes[fid].length(num);
-    DataMsg *msg = new (&len, 0) DataMsg(seqnum, thisIndex, len);
+    DataMsg *msg = new (&len, 0) DataMsg(seqnum, thisIndex, fid);
     len = dtypes[fid].length();
     void *data = msg->getData();
-    void *src = nodes;
+    void *src = (void *) ((char *)nodes + dtypes[fid].init_offset);
     for(j=0;j<num;j++) {
-      src = (void *)((char*)nodes+(nodesPerPe[i][j]*nsize));
+      src = (void *)((char*)nodes+(nodesPerPe[i][j]*dtypes[fid].distance));
       memcpy(data, src, len);
       data = (void*) ((char*)data + len);
     }
@@ -161,7 +161,6 @@ chunk::update(int fid, void *nodes)
   seqnum++;
   send(fid, nodes);
   curnodes = nodes;
-  curfid = fid;
   nRecd = 0;
   // now, if any of the field values have been received already,
   // process them
@@ -190,9 +189,9 @@ chunk::update_field(DataMsg *msg)
   int i;
   for(i=0;i<nnodes;i++) {
     int cnum = nodesPerPe[from][i];
-    void *cnode = (void*) ((char*)curnodes+cnum*nsize);
-    combine(dtypes[curfid], cnode, data);
-    data = (void *)((char*)data+(dtypes[curfid].length()));
+    void *cnode = (void*) ((char*)curnodes+cnum*dtypes[msg->dtype].distance);
+    combine(dtypes[msg->dtype], cnode, data);
+    data = (void *)((char*)data+(dtypes[msg->dtype].length()));
   }
 }
 
@@ -206,8 +205,9 @@ chunk::readNodes(FILE* fp)
 {
   fscanf(fp, "%d", &numNodes);
   gNodeNums = new int[numNodes];
+  isPrimary = new int[numNodes];
   for(int i=0;i<numNodes;i++) {
-    fscanf(fp, "%d", &gNodeNums[i]);
+    fscanf(fp, "%d%d", &gNodeNums[i], &isPrimary[i]);
   }
 }
 
@@ -268,18 +268,11 @@ FEM_Done(void)
   mainproxy.done();
 }
 
-void
-FEM_Set_Node_Size(int nsize)
-{
-  chunk *cptr = CtvAccess(_femptr);
-  cptr->set_node_size(nsize);
-}
-
 int 
-FEM_Create_Field(int base_type, int vec_len)
+FEM_Create_Field(int base_type, int vec_len, int init_offset, int distance)
 {
   chunk *cptr = CtvAccess(_femptr);
-  return cptr->new_DT(base_type, vec_len);
+  return cptr->new_DT(base_type, vec_len, init_offset, distance);
 }
 
 void
@@ -298,16 +291,10 @@ FEM_Reduce_Field(int fid, void *nodes, void *outbuf)
 
 // Fortran Bindings
 
-extern "C" void
-fem_set_node_size_(int *nsize)
-{
-  FEM_Set_Node_Size(*nsize);
-}
-
 extern "C" int
-fem_create_field_(int *bt, int *vl)
+fem_create_field_(int *bt, int *vl, int *io, int *d)
 {
-  return FEM_Create_Field(*bt, *vl);
+  return FEM_Create_Field(*bt, *vl, *io, *d);
 }
 
 extern "C" void

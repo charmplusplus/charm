@@ -19,11 +19,23 @@ extern unsigned int _nchunks;
 struct DType {
   int base_type;
   int vec_len;
+  int init_offset; // offset of field in bytes from the beginning of data
+  int distance; // distance in bytes between successive field values
   DType(void) {}
-  DType(DType& dt) : base_type(dt.base_type), vec_len(dt.vec_len) {}
-  DType(int b, int v) : base_type(b), vec_len(v) {}
-  DType(int b) : base_type(b), vec_len(1) {}
-  int length(int nitems=1) {
+  DType(const DType& dt) : 
+    base_type(dt.base_type), vec_len(dt.vec_len), init_offset(dt.init_offset),
+    distance(dt.distance) {}
+  void operator=(const DType& dt) {
+    base_type = dt.base_type; 
+    vec_len = dt.vec_len; 
+    init_offset = dt.init_offset;
+    distance = dt.distance;
+  }
+  DType( const int b,  const int v=1,  const int i=0,  const int d=0) : 
+    base_type(b), vec_len(v), init_offset(i) {
+    distance = (d ? d : length());
+  }
+  int length(const int nitems=1) const {
     int blen;
     switch(base_type) {
       case FEM_BYTE : blen = 1; break;
@@ -39,11 +51,11 @@ class DataMsg : public CMessage_DataMsg
 {
  public:
   int from;
-  int len;
+  int dtype;
   void *data;
   int tag;
-  DataMsg(int t, int f, int l) : 
-    tag(t), from(f), len(l) { data = (void*) (this+1); }
+  DataMsg(int t, int f, int d) : 
+    tag(t), from(f), dtype(d) { data = (void*) (this+1); }
   DataMsg(void) { data = (void*) (this+1); }
   static void *pack(DataMsg *);
   static DataMsg *unpack(void *);
@@ -67,6 +79,7 @@ class chunk : public ArrayElement1D
   int numElems; // number of local elements
   int numPes; // number of Pes I need to communicate with
   int *gNodeNums; // global node numbers for local nodes [numNodes]
+  int *isPrimary; // 1 true if primary (i.e. owner of a shared node)
   int numNodesPerElem; // number of Nodes per element *a constant*
   int *gElemNums; // global element numbers for local elements [numElems]
   int *conn; // elem->node connectivity, a 2-D array stored in row-order
@@ -76,7 +89,6 @@ class chunk : public ArrayElement1D
   int *gPeToIdx; // which local index does the global PeNum map to [TotalPes]
 
   DType dtypes[MAXDT];
-  int nsize; // size of the app's node type, separation between values
   int ntypes;
 
   CmmTable messages; // messages to be processed
@@ -86,24 +98,22 @@ class chunk : public ArrayElement1D
   int seqnum; // sequence number for update operation
   int nRecd; // number of messages received for this seqnum
   void *curnodes; // data addr for current update operation
-  int curfid; // field descriptor for current update operation
 
  public:
   chunk(void);
   chunk(CkMigrateMessage *) {}
   void run(void);
   void recv(DataMsg *);
-  int new_DT(int base_type, int vec_len) {
+  int new_DT(int base_type, int vec_len=1, int init_offset=0, int distance=0) {
     if(ntypes==MAXDT) {
       CkAbort("FEM: registered datatypes limit exceeded.");
     }
-    dtypes[ntypes] = DType(base_type, vec_len);
+    dtypes[ntypes] = DType(base_type, vec_len, init_offset, distance);
     ntypes++;
     return ntypes-1;
   }
   void update(int fid, void *nodes);
   void reduce(int fid, void *nodes, void *outbuf);
-  void set_node_size(int n) { nsize = n; }
  private:
   void update_field(DataMsg *);
   void send(int fid, void *nodes);
@@ -114,15 +124,13 @@ class chunk : public ArrayElement1D
 };
 
 void FEM_Done(void);
-void FEM_Set_Node_Size(int nsize);
-int FEM_Create_Field(int base_type, int vec_len);
+int FEM_Create_Field(int base_type, int vec_len, int init_offset, int distance);
 void FEM_Update_Field(int fid, void *nodes);
 void FEM_Reduce_Field(int fid, void *nodes, void *outbuf);
 
 // Fortran Bindings
 
-extern "C" void fem_set_node_size_(int *nsize);
-extern "C" int fem_create_field_(int *bt, int *vl);
+extern "C" int fem_create_field_(int *bt, int *vl, int *io, int *d);
 extern "C" void fem_update_field_(int *fid, void *nodes);
 extern "C" void fem_reduce_field_(int *fid, void *nodes, void *outbuf);
 
