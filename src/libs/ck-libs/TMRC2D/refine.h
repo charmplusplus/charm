@@ -108,6 +108,8 @@ void REFINE2D_Get_Split(int splitNo,const int *conn,
 
 void REFINE2D_Coarsen(int nNode,double *coord,int nEl,double *desiredArea);
 
+
+void REFINE2D_Get_Collapse(int i,int *conn,int *tri,int *nodeToThrow,int *nodeToKeep,double *nx,double *ny,int *flag,int idxbase);
 int REFINE2D_Get_Collapse_Length();
 
 /**
