@@ -1023,10 +1023,16 @@ case "$LANGUAGE" in
         PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene"
 	;;
 esac
-[ -r $CHARMLIB/libconv-utilf.a ] || USE_F90_LIBRARIES="0"
 
 if [ $USE_F90_LIBRARIES = "1" ]
 then
+	if [ ! -r $CHARMLIB/libconv-utilf.a ]
+	then
+		echo "Fortran support library $CHARMLIB/libconv-utilf.a missing"
+		echo "Is your Fortran compiler working?"
+		exit 1
+	fi
+	
 	POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf $CMK_F90LIBS"
         if [ -z "$SEQUENTIAL" -a ! -z "$CMK_F90OBJS" ] 
         then
