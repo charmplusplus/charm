@@ -14,6 +14,9 @@
 CkGroupID dmid;
 char *comlibStrat;
 
+/* change this define to "x" to trace all send/recv's */
+#define MSG_ORDER_DEBUG(x) /* empty */
+
 //------------- startup -------------
 static mpi_comm_worlds mpi_worlds;
 
@@ -406,21 +409,11 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
   worldPtr=NULL;
   myDDT=&myDDTsto;
   prepareCtv();
-
-  CkPupBasicVec<int> _indices;
-  _indices.push_back(thisIndex);
-  ampiCommStruct _selfStruct(MPI_COMM_SELF,thisProxy,1,_indices);
-  selfStruct = _selfStruct;
 }
 ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
   thread=NULL;
   worldPtr=NULL;
   myDDT=&myDDTsto;
-
-  CkPupBasicVec<int> _indices;
-  _indices.push_back(thisIndex);
-  ampiCommStruct _selfStruct(MPI_COMM_SELF,thisProxy,1,_indices);
-  selfStruct = _selfStruct;
 }
 void ampiParent::pup(PUP::er &p) {
   ArrayElement1D::pup(p);
@@ -458,6 +451,11 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
      if (worldPtr!=NULL) CkAbort("One ampiParent has two MPI_COMM_WORLDs");
      worldPtr=ptr;
      worldStruct=s;
+
+    //MPI_COMM_SELF has the same member as MPI_COMM_WORLD, but it's alone:
+     CkPupBasicVec<int> _indices;
+     _indices.push_back(thisIndex);
+     selfStruct = ampiCommStruct(MPI_COMM_SELF,s.getProxy(),1,_indices);
   }
 
   if (!forMigration)
@@ -733,10 +731,14 @@ const ampiCommStruct &universeComm2proxy(MPI_Comm universeNo)
 void
 ampi::generic(AmpiMsg* msg)
 {
+MSG_ORDER_DEBUG(
+  CkPrintf("AMPI Rank %d arrival: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
+  	getRank(),msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
+)
   if(msg->seq != -1) {
-    int src = msg->src;
-    oorder[src].put(msg->seq, msg);
-    while((msg=oorder[src].get())!=0) {
+    int srcIdx = msg->srcIdx;
+    oorder[srcIdx].put(msg->seq, msg);
+    while((msg=oorder[srcIdx].get())!=0) {
       inorder(msg);
     }
   } else { //Cross-world or system messages are unordered
@@ -749,57 +751,58 @@ ampi::generic(AmpiMsg* msg)
 void
 ampi::inorder(AmpiMsg* msg)
 {
+MSG_ORDER_DEBUG(
+  CkPrintf("AMPI Rank %d inorder: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
+  	getRank(),msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
+)
   int tags[3];
-  tags[0] = msg->tag; tags[1] = msg->src; tags[2] = msg->comm;
+  tags[0] = msg->tag; tags[1] = msg->srcRank; tags[2] = msg->comm;
   CmmPut(msgs, 3, tags, msg);
 }
 
-AmpiMsg *ampi::makeAmpiMsg(int t,int s,const void *buf,int count,int type,MPI_Comm destcomm,int seqNo)
+AmpiMsg *ampi::makeAmpiMsg(int destIdx,
+	int t,int sRank,const void *buf,int count,int type,MPI_Comm destcomm)
 {
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
-  AmpiMsg *msg = new (&len, 0) AmpiMsg(seqNo, t, s, len, destcomm);
+  int sIdx=thisIndex;
+  int seq = -1;
+  if (destIdx>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_TAG_UB)
+  { //Not cross-module: set seqno
+     seq = nextseq[destIdx]++;
+  }
+  AmpiMsg *msg = new (&len, 0) AmpiMsg(seq, t, sIdx, sRank, len, destcomm);
   ddt->serialize((char*)buf, (char*)msg->data, count, 1);
   return msg;
 }
 
 void
-ampi::send(int t, int s, const void* buf, int count, int type,  int rank, MPI_Comm destcomm)
+ampi::send(int t, int sRank, const void* buf, int count, int type,  int rank, MPI_Comm destcomm)
 {
   const ampiCommStruct &dest=comm2proxy(destcomm);
-  int idx = dest.getIndexForRank(rank);
-  int seq = -1;
-  if (destcomm<=MPI_COMM_WORLD && t<=MPI_TAG_UB)
-  { //Not cross-module: set seqno
-     seq = nextseq[idx]++;
-  }
-
-  AmpiMsg *msg = makeAmpiMsg(t,s,buf,count,type,destcomm,seq);
-  dest.getProxy()[idx].generic(msg);
+  int destIdx = dest.getIndexForRank(rank);
+MSG_ORDER_DEBUG(
+  CkPrintf("AMPI Rank %d send: tag=%d, src=%d, comm=%d (to %d)\n",
+  	getRank(),t,sRank,destcomm,destIdx);
+)
+  dest.getProxy()[destIdx].generic(makeAmpiMsg(destIdx, t,sRank,buf,count,type,destcomm));
 }
 
 void
-ampi::sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx)
+ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
 {
-  AmpiMsg *msg = new (&len, 0) AmpiMsg(-1, t, s, len, MPI_COMM_WORLD);
+  AmpiMsg *msg = new (&len, 0) AmpiMsg(-1, t, -1, sRank, len, MPI_COMM_WORLD);
   memcpy(msg->data, buf, len);
   CProxy_ampi pa(aid);
   pa[idx].generic(msg);
 }
 
 void
-ampi::delesend(int t, int s, const void* buf, int count, int type,  int rank, MPI_Comm destcomm, CProxy_ampi arrproxy)
+ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank, MPI_Comm destcomm, CProxy_ampi arrproxy)
 {
   const ampiCommStruct &dest=comm2proxy(destcomm);
-  int idx = dest.getIndexForRank(rank);
-  int seq = -1;
-  if (destcomm<=MPI_COMM_WORLD && t<=MPI_TAG_UB)
-  { //Not cross-module: set seqno
-     seq = nextseq[idx]++;
-  }
-
-  AmpiMsg *msg = makeAmpiMsg(t,s,buf,count,type,destcomm,seq);
-  arrproxy[idx].generic(msg);
+  int destIdx = dest.getIndexForRank(rank);
+  arrproxy[destIdx].generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm));
 }
 
 void
@@ -809,6 +812,9 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   AmpiMsg *msg = 0;
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
+MSG_ORDER_DEBUG(
+  CkPrintf("AMPI Rank %d blocking recv: tag=%d, src=%d, comm=%d\n",getRank(),t,s,comm);
+)
   waitingForGeneric=1;
   while(1) {
     tags[0] = t; tags[1] = s; tags[2] = comm;
@@ -826,7 +832,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 	"  but received %d bytes from rank %d\n",
             thisIndex,t,s, 
 	    len, count, type, 
-	    msg->length, msg->src);
+	    msg->length, msg->srcRank);
     CkAbort("AMPI> MPI_Send was longer than matching MPI_Recv.");
   }
   ddt->serialize((char*)buf, (char*)msg->data, msg->length/(ddt->getSize(1)), (-1));
@@ -865,23 +871,24 @@ ampi::iprobe(int t, int s, int comm, int *sts)
 }
 
 
+const int MPI_BCAST_COMM=MPI_COMM_WORLD+1000;
 void
 ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
 {
   const ampiCommStruct &dest=comm2proxy(destcomm);
-  int rootDex=dest.getIndexForRank(root);
-  if(rootDex==thisIndex) {
+  int rootIdx=dest.getIndexForRank(root);
+  if(rootIdx==thisIndex) {
     /* Broadcast my message to the array proxy */
-    dest.getProxy().generic(makeAmpiMsg(MPI_BCAST_TAG,nbcasts,buf,count,type,destcomm,-1));
+    dest.getProxy().generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM));
   }
-  recv(MPI_BCAST_TAG, nbcasts, buf, count, type, destcomm);
+  recv(MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM);
   nbcasts++;
 }
 
 void
 ampi::bcastraw(void* buf, int len, CkArrayID aid)
 {
-  AmpiMsg *msg = new (&len, 0) AmpiMsg(-1, MPI_BCAST_TAG, 0, len, 0);
+  AmpiMsg *msg = new (&len, 0) AmpiMsg(-1, MPI_BCAST_TAG, -1, 0, len, 0);
   memcpy(msg->data, buf, len);
   CProxy_ampi pa(aid);
   pa.generic(msg);
@@ -928,7 +935,7 @@ CDECL int MPI_Initialized(int *isInit)
 CDECL int MPI_Comm_rank(MPI_Comm comm, int *rank)
 {
   AMPIAPI("MPI_Comm_rank");
-  *rank = getAmpiInstance(comm)->getRank();
+  *rank = (comm==MPI_COMM_SELF)?0:getAmpiInstance(comm)->getRank();
   return 0;
 }
 
@@ -936,7 +943,7 @@ CDECL
 int MPI_Comm_size(MPI_Comm comm, int *size)
 {
   AMPIAPI("MPI_Comm_size");
-  *size = getAmpiInstance(comm)->getSize();
+  *size = (comm==MPI_COMM_SELF)?1:getAmpiInstance(comm)->getSize();
   return 0;
 }
 
@@ -958,13 +965,15 @@ int MPI_Finalize(void)
   return 0;
 }
 
-CDECL
-int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
+static int common_send(void *msg, int count, MPI_Datatype type, int dest,
                         int tag, MPI_Comm comm)
 {
-  AMPIAPI("MPI_Send");
   ampi *ptr = getAmpiInstance(comm);
-  ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm);
+  int srcRank=ptr->getRank();
+  if(comm==MPI_COMM_SELF) { /* our rank in MPI_COMM_SELF is zero*/
+  	srcRank=0;
+  }
+  ptr->send(tag, srcRank, msg, count, type, dest, comm);
 #ifndef CMK_OPTIMIZE
   int size=0;
   MPI_Type_size(type,&size);
@@ -973,20 +982,21 @@ int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
   return 0;
 }
 
+CDECL
+int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
+                        int tag, MPI_Comm comm)
+{
+  AMPIAPI("MPI_Send");
+  return common_send(msg,count,type,dest,tag,comm);
+}
+
 //FIXME: This doesn't give the semantics of SSEND:
 CDECL
 int MPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
                         int tag, MPI_Comm comm)
 {
   AMPIAPI("MPI_Ssend");
-  ampi *ptr = getAmpiInstance(comm);
-  ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm);
-#ifndef CMK_OPTIMIZE
-  int size =0;
-  MPI_Type_size(type,&size);
-  _LOG_E_AMPI_MSG_SEND(tag,dest,count,size)
-#endif
-  return 0;
+  return common_send(msg,count,type,dest,tag,comm);
 }
 
 CDECL
@@ -1060,6 +1070,7 @@ int MPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
                          MPI_Comm comm)
 {
   AMPIAPI("MPI_Bcast");
+  if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   ptr->bcast(root, buf, count, type,comm);
   return 0;
@@ -1201,9 +1212,12 @@ getReductionType(int type, int op)
   return mytype;
 }
 
+/// This routine is called with the results of a Reduce or AllReduce
+const int MPI_REDUCE_SOURCE=0;
+const int MPI_REDUCE_COMM=MPI_COMM_WORLD;
 void ampi::reduceResult(CkReductionMsg *msg)
 {
-  ampi::sendraw(MPI_REDUCE_TAG, 0, msg->getData(), msg->getSize(),
+  ampi::sendraw(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, msg->getData(), msg->getSize(),
              thisArrayID,thisIndex);
   delete msg;
 }
@@ -1216,6 +1230,16 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
   ddt->serialize((char*)inbuf, (char*)msg->getData(), count, 1);
   return msg;
 }
+static int copyRednData(CkDDT_DataType *ddt,const void *inbuf,void *outbuf,int count) {
+  // ddts don't have "copy", so fake it by serializing into a temp buffer, then 
+  //  deserializing into the output.
+  int len=ddt->getSize(count);
+  char *serialized=new char[len];
+  ddt->serialize((char*)inbuf,(char*)serialized,count,1);
+  ddt->serialize((char*)outbuf,(char*)serialized,count,-1); 
+  
+  return MPI_SUCCESS;
+}
 
 CDECL
 int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
@@ -1223,6 +1247,10 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
 {
   AMPIAPI("MPI_Reduce");
   ampi *ptr = getAmpiInstance(comm);
+  if(comm==MPI_COMM_SELF) {
+    // Just do a local copy: no need to do a reduction:
+    return copyRednData(ptr->getDDT()->getType(type),inbuf,outbuf,count);
+  }
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
   int rootIdx=ptr->comm2proxy(comm).getIndexForRank(root);
   CkCallback reduceCB(CkIndex_ampi::reduceResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy(),true);
@@ -1231,7 +1259,7 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
 
   if (ptr->thisIndex == rootIdx)
   /*HACK: Use recv() to block until reduction data comes back*/
-    ptr->recv(MPI_REDUCE_TAG, 0, outbuf, count, type, comm);//MPI_COMM_WORLD);
+    ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM);
   return 0;
 }
 
@@ -1241,13 +1269,17 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
 {
   AMPIAPI("MPI_Allreduce");
   ampi *ptr = getAmpiInstance(comm);
+  if(comm==MPI_COMM_SELF) {
+    // Just do a local copy: no need to do a reduction:
+    return copyRednData(ptr->getDDT()->getType(type),inbuf,outbuf,count);
+  }
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
   CkCallback allreduceCB(CkIndex_ampi::reduceResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
 
   /*HACK: Use recv() to block until the reduction data comes back*/
-  ptr->recv(MPI_REDUCE_TAG, 0, outbuf, count, type, comm);//MPI_COMM_WORLD);
+  ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM);
   return 0;
 }
 
@@ -1257,6 +1289,10 @@ int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
 {
   AMPIAPI("MPI_Reduce_scatter");
   ampi *ptr = getAmpiInstance(comm);
+  if(comm==MPI_COMM_SELF) {
+    // Just do a local copy: no need to do a reduction:
+    return copyRednData(ptr->getDDT()->getType(datatype),sendbuf,recvbuf,recvcounts[0]);
+  }
   int size = ptr->getSize();
   int count=0;
   int *displs = new int [size];
@@ -1667,6 +1703,7 @@ CDECL
 int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, int root, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("MPI_Ireduce");
+  if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,op);
   int rootIdx=ptr->comm2proxy(comm).getIndexForRank(root);
@@ -1702,10 +1739,11 @@ int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op, in
 
 CDECL
 int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                   void *recvbuf, int *recvcounts, int *displs, 
-                   MPI_Datatype recvtype, MPI_Comm comm) 
+                   void *recvbuf, int *recvcounts, int *displs,
+                   MPI_Datatype recvtype, MPI_Comm comm)
 {
   AMPIAPI("MPI_Allgatherv");
+  if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
@@ -1730,6 +1768,7 @@ int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                   MPI_Comm comm)
 {
   AMPIAPI("MPI_Allgather");
+  if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
@@ -1740,7 +1779,7 @@ int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   MPI_Status status;
   CkDDT_DataType* dttype = ptr->getDDT()->getType(recvtype) ;
   int itemsize = dttype->getSize(recvcount) ;
-  
+
   for(i=0;i<size;i++) {
     MPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
              i, MPI_GATHER_TAG, comm, &status);
@@ -1754,6 +1793,7 @@ int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 MPI_Datatype recvtype, int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Gatherv");
+  if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
@@ -1779,6 +1819,7 @@ int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Gather");
+  if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
@@ -1803,6 +1844,7 @@ int MPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendt
                  int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Scatterv");
+  if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
@@ -1827,6 +1869,7 @@ int MPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 int root, MPI_Comm comm)
 {
   AMPIAPI("MPI_Scatter");
+  if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
@@ -1851,6 +1894,7 @@ int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
                   int *rdispls, MPI_Datatype recvtype, MPI_Comm comm)
 {
   AMPIAPI("MPI_Alltoallv");
+  if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
@@ -1895,6 +1939,7 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  MPI_Comm comm)
 {
   AMPIAPI("MPI_Alltoall");
+  if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
