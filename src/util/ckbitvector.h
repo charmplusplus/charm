@@ -86,7 +86,7 @@ class CkBitVector {
 
   // This should probably be in CkEntryOptions not in here but until
   // the class is put in the core it'll have to hold here.
-  void setEO(CkEntryOptions *eo);
+//  void setEO(CkEntryOptions *eo);
 
   // This is an integer log base 2 function. Some glibcs have them,
   // some don't. Not a very bright one, it just tests for less than
@@ -106,6 +106,7 @@ class CkBitVector {
 #endif
 
   friend CkOutStream & operator<< (CkOutStream& ckos, CkBitVector const b );
+  friend class CkEntryOptions;
 };
 
 

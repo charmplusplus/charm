@@ -361,9 +361,11 @@ char * CkBitVector::string() {
 }
 
 
+/*
 void CkBitVector::setEO( CkEntryOptions *eo ) {
   eo->setPriority(usedBits, data);
 }
+*/
 
 
 unsigned int CkBitVector::log2 ( unsigned int val ) {
