@@ -321,12 +321,9 @@ static inline void _processROMsgMsg(envelope *env)
 
 static inline void _processRODataMsg(envelope *env)
 {
-  register int i;
-  register char *msg = (char *)EnvToUsr(env);
-  for(i=0;i<_numReadonlies;i++) {
-    memcpy(_readonlyTable[i]->ptr, msg, _readonlyTable[i]->size);
-    msg += _readonlyTable[i]->size;
-  }
+  //Unpack each readonly:
+  PUP::fromMem pu((char *)EnvToUsr(env));
+  for(int i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(pu);
   CmiFree(env);
 }
 
@@ -572,17 +569,16 @@ void _initCharm(int argc, char **argv)
 			_processROMsgMsg(env);
 			_numInitMsgs++;
 		}
-		register int roSize = 0;
-		for(i=0;i<_numReadonlies;i++)
-			roSize += _readonlyTable[i]->size;
-		register envelope *env = _allocEnv(RODataMsg, roSize);
-		register char *tmp;
-		for(tmp=(char *)EnvToUsr(env), i=0;i<_numReadonlies;i++) 
-		{
-			memcpy(tmp, _readonlyTable[i]->ptr, _readonlyTable[i]->size);
-			tmp += _readonlyTable[i]->size;
-		}
-    
+		
+		//Determine the size of the RODataMessage
+		PUP::sizer ps;
+		for(i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(ps);
+		
+		//Allocate and fill out the RODataMessage
+		envelope *env = _allocEnv(RODataMsg, ps.size());
+		PUP::toMem pp((char *)EnvToUsr(env));
+		for(i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(pp);
+		
 		env->setCount(++_numInitMsgs);
 		env->setSrcPe(CkMyPe());
 		CmiSetHandler(env, _initHandlerIdx);
