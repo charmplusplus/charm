@@ -4,7 +4,34 @@
  *
  ****************************************************************************/
 
+/*
+ * I_Hate_C because the ansi prototype for a varargs function is incompatible
+ * with the K&R definition of that varargs function.  Eg, this doesn't compile:
+ *
+ * void CmiPrintf(char *, ...);
+ *
+ * void CmiPrintf(va_alist) va_dcl
+ * {
+ *    ...
+ * }
+ *
+ * I can't define the function in an ANSI way, because our stupid SUNs dont
+ * yet have stdarg.h, even though they have gcc (which is ANSI).  So I have
+ * to leave the definition of CmiPrintf as a K&R form, but I have to
+ * deactivate the protos or the compiler barfs.  That's why I_Hate_C.
+ *
+ */
+
+#define CmiPrintf I_Hate_C_1
+#define CmiError  I_Hate_C_2
+#define CmiScanf  I_Hate_C_3
 #include "converse.h"
+#undef CmiPrintf
+#undef CmiError
+#undef CmiScanf
+void CmiPrintf();
+void CmiError();
+int  CmiScanf();
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -815,10 +842,12 @@ static void node_addresses_store(addrs) char *addrs;
  * CmiPrintf, CmiError, CmiScanf
  *
  *****************************************************************************/
-
-static void InternalPrintf(buf) char *buf; 
+static void InternalPrintf(f, l) char *f; va_list l;
 {
-  char *p;
+  char *p, *buf;
+  char buffer[8192];
+  vsprintf(buffer, f, l);
+  buf = buffer;
   outlog_output(buf);
   while (*buf) {
     p = strchr(buf, '\n');
@@ -826,15 +855,18 @@ static void InternalPrintf(buf) char *buf;
       *p=0; ctrl_sendone(120, "print %s\n", buf);
       *p='\n'; buf=p+1;
     } else {
-      ctrl_sendone(120, "princ %s\n", buf); 
+      ctrl_sendone(120, "princ %s\n", buf);
       break;
     }
   }
 }
 
-static void InternalError(buf) char *buf;
+static void InternalError(f, l) char *f; va_list l;
 {
-  char *p;
+  char *p, *buf;
+  char buffer[8192];
+  vsprintf(buffer, f, l);
+  buf = buffer;
   outlog_output(buf);
   while (*buf) {
     p = strchr(buf, '\n');
@@ -842,42 +874,19 @@ static void InternalError(buf) char *buf;
       *p=0; ctrl_sendone(120, "printerr %s\n", buf);
       *p='\n'; buf = p+1;
     } else {
-      ctrl_sendone(120, "princerr %s\n", buf); 
+      ctrl_sendone(120, "princerr %s\n", buf);
       break;
     }
   }
 }
 
-void CmiPrintf(va_alist) va_dcl
-{
-  char buffer[8192];
-  va_list p;
-  char *f;
-  va_start(p);
-  f = va_arg(p, char *);
-  vsprintf(buffer, f, p);
-  InternalPrintf(buffer);
-}
-
-void CmiError(va_alist) va_dcl
-{
-  char buffer[8192];
-  va_list p;
-  char *f;
-  va_start(p);
-  f = va_arg(p, char *);
-  vsprintf(buffer, f, p);
-  InternalError(buffer);
-}
-
-int CmiScanf(va_alist) va_dcl
+static int InternalScanf(fmt, l)
+    char *fmt;
+    va_list l;
 {
   static int CmiProbe();
   char *ptr[20];
-  char *fmt; char *p; int nargs, i;
-  va_list l;
-  va_start(l);
-  fmt = va_arg(l, char *);
+  char *p; int nargs, i;
   nargs=0;
   p=fmt;
   while (*p) {
@@ -890,14 +899,33 @@ int CmiScanf(va_alist) va_dcl
   for (i=0; i<nargs; i++) ptr[i]=va_arg(l, char *);
   ctrl_sendone(120, "scanf %s %d %s", self_IP_str, ctrl_port, fmt);
   while (scanf_data==0) CmiProbe();
-  i = sscanf(scanf_data, fmt, 
-	 ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
-	 ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
-	 ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
+  i = sscanf(scanf_data, fmt,
+         ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
+         ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
+         ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
   CmiFree(scanf_data);
   scanf_data=0;
   return i;
 }
+
+void CmiPrintf(va_alist) va_dcl
+{
+  va_list p; char *f; va_start(p); f = va_arg(p, char *);
+  InternalPrintf(f, p);
+}
+
+void CmiError(va_alist) va_dcl
+{
+  va_list p; char *f; va_start(p); f = va_arg(p, char *);
+  InternalError(f, p);
+}
+
+int CmiScanf(va_alist) va_dcl
+{
+  va_list p; char *f; va_start(p); f = va_arg(p, char *);
+  return InternalScanf(f, p);
+}
+
 
 /*****************************************************************************
  *
