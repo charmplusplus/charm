@@ -29,9 +29,10 @@ void POSE_init()
   // Create the communication library for POSE
   ComlibInstanceHandle cinst = CkGetComlibInstance();
   // Create the communication strategy for POSE
-  Strategy *strategy = new StreamingStrategy(5,5);
+  Strategy *strategy = new StreamingStrategy(5,1000);
   //Register the strategy
   cinst.setStrategy(strategy);
+  CkPrintf("Simulation run with StreamingStrategy(5,1000) for communication optimization...\n");
 #endif
 
   // Create an EventMsgPool with global handle for message recycling 

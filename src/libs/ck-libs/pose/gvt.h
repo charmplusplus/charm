@@ -25,16 +25,15 @@ class SRtable;
 class UpdateMsg : public CMessage_UpdateMsg {
 public:
   int optPVT, conPVT;         // pvts of local optimistic/conservative objects
-  SRentry *msgs;              // send/recv events on the PVT
-  int msgCount;
-  int gvtW, numB, offset;
+  int earlyTS, earlySends, earlyRecvs;
+  int nextTS, nextSends, nextRecvs;
   int nextLB;                 // iterations of GVT since last LB
 };
 
 // Message for the exchange of basic info between PVT & GVT
 class GVTMsg : public CMessage_GVTMsg {
 public:
-  int estGVT, done, resize;
+  int estGVT, done;
 };
 
 class PVT : public Group {  // PVT chare group
@@ -66,8 +65,7 @@ private:
   int estGVT;                        // GVT estimates
   int inactive, inactiveTime;        // #iterations since change in state
   int nextLBstart;                   // #iterations since last LB run
-  int lastEarliest, lastCount;
-  SRtable *SendsAndRecvs, *LastSR;   // Send and Recv events
+  int lastEarliest, lastSends, lastRecvs;
 #ifdef POSE_STATS_ON
   localStat *localStats;
 #endif

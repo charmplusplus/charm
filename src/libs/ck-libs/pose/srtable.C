@@ -196,85 +196,13 @@ void SRtable::FileResiduals()
 }
 
 UpdateMsg *SRtable::packTable()
-{ // packs only entries with the two earliest timestamps available in buckets;
-  // packed into an UpdateMsg; residuals left behind
-  UpdateMsg *um;
-  int count=0, i;
-  SRentry *j;
+{ // packs entries with two earliest timestamps from buckets into an UpdateMsg
+  UpdateMsg *um = new UpdateMsg;
 
   //sanitize();
-  um = new (inBuckets, 8*sizeof(int)) UpdateMsg;
-  um->msgCount = inBuckets;
-  um->gvtW = gvtWindow;
-  um->numB = numBuckets;
-  um->offset = offset;
-  count = 0;
-  for (i=0; i<numBuckets; i++) {
-    j=sends[i].bucket;
-    while (j) {
-      um->msgs[count] = *j;
-      // um->msgs[count].next = NULL;
-      count++;
-      j = j->next;
-    }
-    j=recvs[i].bucket;
-    while (j) {
-      um->msgs[count] = *j;
-      // um->msgs[count].next = NULL;
-      count++;
-      j = j->next;
-    }
-  }
+  FindEarliest(&(um->earlyTS), &(um->earlySends), &(um->earlyRecvs), 
+	       &(um->nextTS), &(um->nextSends), &(um->nextRecvs));
   return um;
-}
-
-void SRtable::addEntries(UpdateMsg *um)
-{ // table we are adding to should be either empty, or of the right size
-  int i, bkt;
-  SRentry *entry;
-
-  // first, resize if necessary
-  CmiAssert((offset == -1) || (offset == um->offset));
-  if ((gvtWindow != um->gvtW) || (numBuckets != um->numB) || 
-      (offset != um->offset)) {
-    int oldNumBuckets = numBuckets;
-    gvtWindow = um->gvtW;
-    numBuckets = um->numB;
-    offset = um->offset;
-    CmiAssert(residuals == NULL);
-    for (i=0; i<oldNumBuckets; i++) {
-      CmiAssert(sends[i].count == 0);
-      CmiAssert(recvs[i].count == 0);
-    }
-    // free and realloc arrays
-    free(sends);
-    free(recvs);
-    inBuckets = 0;
-    bktSz = gvtWindow / numBuckets;
-    sends = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
-    recvs = (SRbucket *)malloc(numBuckets*sizeof(SRbucket));
-    SetOffset(offset);
-    FileResiduals();
-  }
-
-  //sanitize();
-  // now move the new stuff in
-  for (i=0; i<um->msgCount; i++) {
-    if (recyc) {
-      entry = recyc;
-      recyc = recyc->next;
-      if (!recyc) recycTail = NULL;
-      recycCount--;
-      entry->Set(um->msgs[i].timestamp, um->msgs[i].sr, NULL);
-    }
-    else
-      entry = new SRentry(um->msgs[i].timestamp, um->msgs[i].sr, NULL);
-    bkt = (um->msgs[i].timestamp - offset)/bktSz;
-    inBuckets++;
-    if (um->msgs[i].sr == SEND)  sends[bkt].addToBucket(entry);
-    else  recvs[bkt].addToBucket(entry);
-  }
-  //sanitize();
 }
 
 void SRtable::shrink()

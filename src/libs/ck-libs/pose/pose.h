@@ -28,7 +28,7 @@
 #define MAX_LEASH 200        // max  "     "     "     "        " 
 #define GVT_WINDOW 8         // GVT improvement limit; sets s/r table size
 #define GVT_bucket 1         // number of buckets to sort sends/recvs into
-#define TBL_THRESHOLD 2000   // max # entries in table before it shrinks
+#define TBL_THRESHOLD 5000   // max # entries in table before it shrinks
 #define MAX_GVT_WINDOW 10000 // don't expand GVT SRtable beyond this
 #define MAX_EVENTS 50        // eventLeash controls quantity of events that
 #define MIN_EVENTS 1         // are executed by a Step call on a strategy
