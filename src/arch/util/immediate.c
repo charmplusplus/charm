@@ -58,4 +58,9 @@ void CmiHandleImmediate()
    intr = 0;
 }
 
+#else
+int CmiImmediateInline()
+{
+  return 0;
+}
 #endif
