@@ -18,8 +18,8 @@ Strategy::Strategy() : PUP::able() {
 
 //Each strategy must define his own Pup interface.
 void Strategy::pup(PUP::er &p){ 
-
-    PUP::able::pup(p);
+    
+    //PUP::able::pup(p);
 
     p | isStrategyBracketed;
     p | type;
@@ -53,7 +53,7 @@ char * MessageHolder::getMessage(){
 }
 
 void MessageHolder::pup(PUP::er &p) {
-    PUP::able::pup(p);
+    //PUP::able::pup(p);
 
     p | dest_proc;
     p | isDummy;
