@@ -1,3 +1,5 @@
+       external REFINE2D_Get_Split
+
        interface
        subroutine REFINE2D_Init()
        end subroutine
@@ -14,15 +16,16 @@
        function REFINE2D_Get_Split_Length()
           integer  :: REFINE2D_Get_Split_Length
        end function REFINE2D_Get_Split_Length
-       subroutine REFINE2D_Get_Split(splitNo,conn,tri,A,B,C,frac)
-          integer, intent(in) :: splitNo
-          integer, intent(in) :: conn(:,:)
-          integer, intent(out) :: tri
-          integer, intent(out) :: A
-          integer, intent(out) :: B
-          integer, intent(out) :: C
-          double precision, intent(out) :: frac
-       end subroutine 
+!       subroutine REFINE2D_Get_Split(splitNo,conn,tri,A,B,C,frac)
+!          integer, intent(in) :: splitNo
+!          integer, intent(in) :: conn(:,:)
+!          integer, intent(out) :: tri
+!          integer, intent(out) :: A
+!          integer, intent(out) :: B
+!          integer, intent(out) :: C
+!          double precision, intent(out) :: frac
+!          !real, intent(out) :: frac
+!       end subroutine 
        subroutine REFINE2D_Check(nEl,conn,nNode)
           integer, intent(in) :: nEl,nNode
           integer, intent(in) :: conn(3,nEl)
