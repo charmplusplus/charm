@@ -144,6 +144,7 @@ void PUP_toNetwork4_sizer::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
 {
 	switch (t) {
 	case PUP::Tchar: //Strings and bytes get copied as-is
+	case PUP::Tuchar:
 	case PUP::Tbyte:
 		nBytes+=n;
 		break;
