@@ -98,7 +98,7 @@ static void mesh_split(int _nchunks,MeshChunkOutput *out) {
     delete _meshptr; _meshptr=NULL;
 }
 
-static const char *meshFileNames="meshdata.pe%d";
+static const char *meshFileNames="femdata.pe%d";
 
 static FILE *openMeshFile(int chunkNo,bool forRead)
 {
@@ -125,7 +125,6 @@ void MeshChunkOutputWriter::accept(int chunkNo,MeshChunk *chk)
 	fclose(fp);
 	delete chk;
 }
-
 
 class MeshChunkOutputSender : public MeshChunkOutput {
 	CProxy_FEMchunk dest;
@@ -272,6 +271,53 @@ void FEMcoordinator::updateMesh(marshallMeshChunk &chk)
     }
   }
   
+}
+
+/*******************************************************
+  Code used only by serial framework clients-- they want
+  to set the mesh, partition, and get the mesh out piece by piece.
+*/
+class MeshChunkOutputStorer : public MeshChunkOutput {
+  int nchunks;
+  MeshChunk **chks;
+public:
+  MeshChunkOutputStorer(int nc) :nchunks(nc) {
+    typedef MeshChunk* MeshChunkPtr;
+    chks=new MeshChunkPtr[nc];
+  }
+  ~MeshChunkOutputStorer() {
+    for (int i=0;i<nchunks;i++) delete chks[i];
+    delete[] chks;
+  }
+  void accept(int chunkNo,MeshChunk *chk) {
+    chks[chunkNo]=chk;
+  }
+  void useChunk(int i) {
+    if (i<0 || i>=nchunks) CkAbort("Invalid index passed to FEM_Serial_Begin!");
+    FILE *fp=openMeshFile(i,false);
+    chks[i]->write(fp);
+    fclose(fp);
+    _meshptr=&chks[i]->m;
+  }
+};
+
+static MeshChunkOutputStorer *meshChunkStore=NULL;
+CDECL void FEM_Serial_Split(int npieces) {
+  FEMAPI("FEM_Serial_Split");
+  meshChunkStore=new MeshChunkOutputStorer(npieces);
+  mesh_split(npieces,meshChunkStore);
+}
+FDECL void FTN_NAME(FEM_SERIAL_SPLIT,fem_serial_split)(int *npieces)
+{ FEM_Serial_Split(*npieces); }
+
+CDECL void FEM_Serial_Begin(int chunkNo) {
+  FEMAPI("FEM_Serial_Begin");
+  if (!meshChunkStore) CkAbort("Can't call FEM_Serial_Begin before FEM_Serial_Split!");
+  meshChunkStore->useChunk(chunkNo);
+}
+FDECL void FTN_NAME(FEM_SERIAL_BEGIN,fem_serial_begin)(int *pieceNo)
+{
+  FEM_Serial_Begin(*pieceNo-1);
 }
 
 

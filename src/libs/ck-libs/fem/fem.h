@@ -65,6 +65,8 @@ extern "C" {
   void FEM_Update_Mesh(int callMeshUpdated,int doRepartition);
   
   void FEM_Set_Partition(int *elem2chunk);
+  void FEM_Serial_Split(int nchunks);
+  void FEM_Serial_Begin(int chunkNo);
 
   void FEM_Add_Ghost_Layer(int nodesPerTuple,int doAddNodes);
   void FEM_Add_Ghost_Elem(int elType,int tuplesPerElem,const int *elem2tuple);

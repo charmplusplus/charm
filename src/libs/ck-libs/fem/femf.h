@@ -35,6 +35,8 @@
        external FEM_Get_Elem_Data_c
 
        external FEM_Set_Partition
+       external FEM_Serial_Split
+       external FEM_Serial_Begin
 
        external FEM_Get_Elem_Numbers
        external FEM_Get_Node_Numbers
