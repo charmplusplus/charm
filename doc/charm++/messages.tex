@@ -628,7 +628,13 @@ However, it makes a serious attempt to be ``close'', so priorities
 can strongly affect the efficiency of your program.
 
 
+\subsubsection{Immediate Messages}
 
+Immediate messages are specical messages that skip the Charm scheduler, they
+can be executed in an ``immediate'' fashion even in the middle of 
+a normal running entry method. 
+They are supported only in nodegroup.
+Also see Section~\ref{attributes} and example in {\it charm/pgms/charm++/megatest/immediatering.C}.
 
 
 
