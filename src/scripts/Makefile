@@ -23,11 +23,13 @@
 
 SHELL=/bin/sh
 
-all: charm++ smsg pvm sdag
+all: charm++ idl smsg pvm sdag
 
 charm: converse charmxlat charmlibs libcharm
 
-charm++: converse charmxlat charmlibs charmxlat++ charmfilter++ charmxi charmidl libcharm libck-cplus-y.a libck-defmain-cpp.a
+charm++: charm charmxlat++ charmfilter++ charmxi libck-cplus-y.a libck-defmain-cpp.a
+
+idl: charm++ charmidl
 
 smsg: converse libsimplemsg.a
 
