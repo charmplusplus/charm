@@ -44,21 +44,21 @@ image. This entry method has following structure:
 To know the width and height of image data m->req.wid and m->req.ht can 
 be used, here 'm' is the pointer to 'liveVizRequestMsg'. 
 
-By default liveViz combines image chuncks by doing a saturating sum of 
-overlapping pixel values. If you want liveViz to combine image chuncks by using 
-max (i.e. for overlapping pixels in deposited image chuncks final image will 
+By default liveViz combines image chunks by doing a saturating sum of 
+overlapping pixel values. If you want liveViz to combine image chunks by using 
+max (i.e. for overlapping pixels in deposited image chunks, final image will 
 have the pixel with highest intensity or in other words largest value), you need
 to pass one more parameter (reducerType) to 'liveVizDeposit' function.
 
 \begin{alltt}
  > liveVizDeposit (m, startX, startY, width, height, imageBuff, this, 
-                   max_image_data);
+                   max\_image\_data);
 \end{alltt}
 
 For this to compile, you must declare 
 
 \begin{alltt}
- > extern CkReduction::reducerType max_image_data;
+ > extern CkReduction::reducerType max\_image\_data;
 \end{alltt}
 
 \section{Format of deposit image}
