@@ -12,10 +12,12 @@
 argvPupable::~argvPupable()
 {
 	if (!isSeparate) return;
+/* //This causes a crash if the thread migrates, so just leak it (!)
 	int argc=getArgc();
 	for (int i=0;i<argc;i++)
 		delete[] argv[i];
 	delete[] argv;
+*/
 }
 
 argvPupable::argvPupable(const argvPupable &p)
