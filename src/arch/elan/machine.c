@@ -27,7 +27,7 @@ Developed by Sameer Kumar
 #define QSNETLIBS_VERSION_CODE          QSNETLIBS_VERSION(1,3,0)
 #endif
 
-#define MAX_QLEN 16
+#define MAX_QLEN 100
 #define MAX_BYTES 1000000
 
 #define USE_SHM 1
@@ -55,6 +55,8 @@ Developed by Sameer Kumar
 ELAN_BASE     *elan_base;
 ELAN_TPORT    *elan_port;
 ELAN_QUEUE    *elan_q;
+
+int enableGetBasedSend = 0;
 
 const int SMALL_MESSAGE_SIZE=8192;  /* Smallest message size queue 
                                        used for receiving short messages */
@@ -854,7 +856,7 @@ void ElanBasicSendFn(SMSG_LIST * ptr){
     else if (ptr->size < MID_MESSAGE_SIZE)
         tag = TAG_MID;
     else {        
-        if(!ptr->is_broadcast) {
+        if(!ptr->is_broadcast && enableGetBasedSend) {
             ElanGetBasedSend(ptr);
             return;
         }
