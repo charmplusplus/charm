@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-10-13 18:17:13  jyelon
+ * Revision 2.13  1995-10-27 20:48:17  sanjeev
+ * bug fixes
+ *
+ * Revision 2.12  1995/10/13  18:17:13  jyelon
  * K&R changes.
  *
  * Revision 2.11  1995/10/11  22:20:23  sanjeev
@@ -308,7 +311,7 @@ int CheckCharmName()
 				if ( strcmp(SymTable[i].name,lastagg)==0 )
 					break ;
 			if ( i==-1 )
-				fprintf(stderr,"TRANSLATOR ERROR: %s, line %d : aggregate not found in symbol table\n",CurrentFileName,CurrentLine) ;
+				fprintf(stderr,"TRANSLATOR ERROR: %s, line %d : class/struct not found in symbol table\n",CurrentFileName,CurrentLine) ;
 			CurrentCharmNameIndex = BASE_PERM_INDEX + SymTable[i].permanentindex ;
 			/* > BASE_PERM_INDEX means it is a permanentindex*/
 		}
@@ -428,7 +431,7 @@ char **charename ;
 	if ( SendType == SIMPLE ) {
 		ind = SearchHandleTable(ChareHandleTable,ChareHandleTableSize,ident) ;
 		if ( ind == -1 ) {
-			sprintf(errstr,"%s is not a Chare handle or is a field inside an aggregate",ident) ;
+			sprintf(errstr,"%s is not a Chare handle or is a complex expression",ident) ;
 			CharmError(errstr) ;
 			scopestr = NULL ;
 			*charename = NULL ;
@@ -476,7 +479,7 @@ char **charename ;
 	else if ( SendType == BRANCH || SendType == BROADCAST ) {
 		ind = SearchHandleTable(BOCHandleTable,BOCHandleTableSize,ident) ;
 		if ( ind == -1 ) {
-			sprintf(errstr,"%s is not a Branched Chare handle or is a field inside an aggregate",ident) ;
+			sprintf(errstr,"%s is not a Branched Chare handle or is a complex expression",ident) ;
 			CharmError(errstr) ;
 			scopestr = NULL ;
 			goto endfn ;
@@ -993,7 +996,7 @@ char *name ;
 		FoundGlobalScope = 0 ;
 	}
 	if ( i == TotalSyms || ind == -1 ) {
-		fprintf(stderr,"POSSIBLE ERROR: %s, line %d : is %s an aggregate name in current scope ?\n",CurrentFileName,CurrentLine,name) ;
+		fprintf(stderr,"ERROR: %s, line %d : %s is not a class/struct type.\n",CurrentFileName,CurrentLine,name) ;
 		return ;
 	}
 
