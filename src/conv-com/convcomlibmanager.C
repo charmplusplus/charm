@@ -13,12 +13,14 @@
 
 int comm_debug;
 
+CkpvDeclare(ConvComlibManager, conv_com_object);
 CkpvDeclare(ConvComlibManager *, conv_com_ptr);
 CkpvDeclare(int, RecvdummyHandle);
 
 
 ConvComlibManager::ConvComlibManager(): strategyTable(MAX_NUM_STRATS){
     nstrats = 0;
+    init_flag = CmiFalse;
 }
 
 void ConvComlibManager::insertStrategy(Strategy *s) {
@@ -70,15 +72,17 @@ extern void propagate_handler_frag(void *);
 //An initialization routine which does prelimnary initialization of the 
 //Converse commlib manager. 
 void initComlibManager(){ 
-    if(!CkpvInitialized(conv_com_ptr))
-        CkpvInitialize(ConvComlibManager *, conv_com_ptr);
 
-    //if(CkpvAccess(conv_com_ptr) != 0)
-    //   return;   
- 
-    ConvComlibManager *conv_com = new ConvComlibManager();
-    CkpvAccess(conv_com_ptr) = conv_com;
+    if(!CkpvInitialized(conv_com_object))
+	CkpvInitialize(ConvComlibManager, conv_com_object);
     
+    if(!CkpvInitialized(conv_com_ptr))
+	CkpvInitialize(ConvComlibManager *, conv_com_ptr);
+    
+    if(CkpvAccess(conv_com_object).getInitialized()) 
+      return;
+    
+    CkpvAccess(conv_com_ptr) = &(CkpvAccess(conv_com_object));
     //comm_debug = 1;
     ComlibPrintf("Init Call\n");
     
@@ -94,6 +98,7 @@ void initComlibManager(){
     PUPable_reg(Strategy);
     PUPable_reg(RouterStrategy);
     PUPable_reg(MessageHolder);
+    CkpvAccess(conv_com_object).setInitialized();
 }
 
 Strategy *ConvComlibGetStrategy(int loc) {
