@@ -128,14 +128,10 @@ void NborBaseLB::AtSync()
 
   NLBStatsMsg* msg = AssembleStats();
 
-  int i;
-  for(i=0; i < mig_msgs_expected-1; i++) {
-    NLBStatsMsg* m2 = new NLBStatsMsg(msg);
-    thisProxy [neighbor_pes[i]].ReceiveStats(m2);
+  if (mig_msgs_expected > 0) {
+    CkMarshalledNLBStatsMessage marshmsg(msg);
+    thisProxy.ReceiveStats(marshmsg, mig_msgs_expected, neighbor_pes, NULL);
   }
-  if (0 < mig_msgs_expected) {
-    thisProxy [neighbor_pes[i]].ReceiveStats(msg);
-  } else delete msg;
 
   // Tell our own node that we are ready
   CkMarshalledNLBStatsMessage mmsg(NULL);
@@ -271,18 +267,13 @@ void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &data)
     }
     
     // Now, send migrate messages to neighbors
-    for(i=1; i < clients; i++) {
-      LBMigrateMsg* m2 = (LBMigrateMsg*) CkCopyMsg((void**)&migrateMsg);
-      thisProxy [neighbor_pes[i]].ReceiveMigration(m2);
-    }
-    if (0 < clients)
-      thisProxy [neighbor_pes[0]].ReceiveMigration(migrateMsg);
-    else delete migrateMsg;
+    if (clients > 0)
+      thisProxy.ReceiveMigration(migrateMsg, clients, neighbor_pes);
     
     // Zero out data structures for next cycle
     for(i=0; i < clients; i++) {
       delete statsMsgsList[i];
-      statsMsgsList[i]=0;
+      statsMsgsList[i]=NULL;
     }
     stats_msg_count=0;
 
