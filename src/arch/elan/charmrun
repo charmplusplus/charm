@@ -90,8 +90,15 @@ EOF
 		if [ ! $? -eq 0 ]
 		then
 # The job is done-- print its output			
-			rm tmp.$$
-			exec cat $output
+			rm tmp.$$ $script
+			if `grep 'End of program' $output > /dev/null 2>/dev/null`
+                        then
+                                exec cat $output
+                        else
+                                cat $output
+                                rm $output
+                                exit 1
+                        fi
 		fi
 # The job is still queued or running-- print status and wait
 		tail -1 tmp.$$
