@@ -108,7 +108,7 @@ CmiPrintf("start\n");
     cnt->reductionsRemaining=REDUCE_TIME;
     cnt->reductionNo=0;
 //    mg->setReductionClient(mcp, client, cnt);
-    CkCallback *cb = new CkCallback(CkIndex_Hello::cb_client((CkSectionReductionMsg*)NULL), CkArrayIndex1D(0), thisProxy);
+    CkCallback *cb = new CkCallback(CkIndex_Hello::cb_client(NULL), CkArrayIndex1D(0), thisProxy);
     mg->setReductionClient(mcp, cb);
 
     HiMsg *hiMsg = new (1, 0) HiMsg;
@@ -117,7 +117,7 @@ CmiPrintf("start\n");
   }
   
 //  void cb_client(CkSectionCookie sid, void *param, int dataSize, void *data)
-  void cb_client(CkSectionReductionMsg *msg)
+  void cb_client(CkMcastReductionMsg *msg)
   {
     int dataSize = msg->getSize();
     void *data = msg->getData();

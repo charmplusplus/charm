@@ -17,6 +17,6 @@ mainmodule hello {
     entry Hello();
     entry void SayHi(HiMsg *);
     entry void start();
-    entry void cb_client(CkSectionReductionMsg *msg);
+    entry void cb_client(CkMcastReductionMsg *msg);
   };        	
 };
