@@ -37,11 +37,11 @@ FEM_Comm_Holder::~FEM_Comm_Holder(void)
 
 /******* FEM_Mesh API ******/
 
-static void checkIsSet(int fem_mesh,bool wantSet,const char *callingRoutine) {
+static void checkIsSet(int fem_mesh,bool wantSet,const char *caller) {
 	if (FEM_Mesh_is_set(fem_mesh)!=wantSet) {
 		const char *msg=wantSet?"This mesh (%d) is not a setting mesh":
 			"This mesh (%d) is not a getting mesh";
-		FEM_Abort(callingRoutine,msg,fem_mesh);
+		FEM_Abort(caller,msg,fem_mesh);
 	}
 }
 
@@ -132,9 +132,9 @@ CDECL void
 FEM_Mesh_data_layout(int fem_mesh,int entity,int attr, 	
   	void *data, int firstItem,int length, IDXL_Layout_t layout)
 {
-	const char *callingRoutine="FEM_Mesh_data_layout";
+	const char *caller="FEM_Mesh_data_layout";
 	FEM_Mesh_data_layout(fem_mesh,entity,attr,data,firstItem,length,
-		getLayouts().get(layout,callingRoutine));
+		getLayouts().get(layout,caller));
 }
 FORTRAN_AS_C(FEM_MESH_DATA_LAYOUT,FEM_Mesh_data_layout,fem_mesh_data_layout,
 	(int *fem_mesh,int *entity,int *attr,void *data,int *firstItem,int *length,int *layout),
@@ -146,7 +146,7 @@ FEM_Mesh_data_offset(int fem_mesh,int entity,int attr,
   	void *data, int firstItem,int length,
 	int type,int width, int offsetBytes,int distanceBytes,int skewBytes)
 {
-	const char *callingRoutine="FEM_Mesh_data_offset";
+	const char *caller="FEM_Mesh_data_offset";
 	FEM_Mesh_data_layout(fem_mesh,entity,attr,data,firstItem,length,
 		IDXL_Layout(type,width,offsetBytes,distanceBytes,skewBytes));
 }
@@ -163,10 +163,10 @@ FORTRAN_AS_C(FEM_MESH_DATA_OFFSET,FEM_Mesh_data_offset,fem_mesh_data_offset,
 
 CDECL void 
 FEM_Mesh_set_length(int fem_mesh,int entity,int newLength) {
-	const char *callingRoutine="FEM_Mesh_set_length";
-	FEMAPI(callingRoutine);
-	checkIsSet(fem_mesh,true,callingRoutine);
-	FEM_Entity_lookup(fem_mesh,entity,callingRoutine)->setLength(newLength);
+	const char *caller="FEM_Mesh_set_length";
+	FEMAPI(caller);
+	checkIsSet(fem_mesh,true,caller);
+	FEM_Entity_lookup(fem_mesh,entity,caller)->setLength(newLength);
 }
 FORTRAN_AS_C(FEM_MESH_SET_LENGTH,FEM_Mesh_set_length,fem_mesh_set_length,
 	(int *fem_mesh,int *entity,int *newLength),
@@ -176,9 +176,9 @@ FORTRAN_AS_C(FEM_MESH_SET_LENGTH,FEM_Mesh_set_length,fem_mesh_set_length,
 
 CDECL int 
 FEM_Mesh_get_length(int fem_mesh,int entity) {
-	const char *callingRoutine="FEM_Mesh_get_length";
-	FEMAPI(callingRoutine);
-	int len=FEM_Entity_lookup(fem_mesh,entity,callingRoutine)->size();
+	const char *caller="FEM_Mesh_get_length";
+	FEMAPI(caller);
+	int len=FEM_Entity_lookup(fem_mesh,entity,caller)->size();
 	if (len==-1) return 0; //Special marker value-- shouldn't make it outside...
 	return len;
 }
@@ -190,10 +190,10 @@ FORTRAN_AS_C_RETURN(int,
 
 CDECL void 
 FEM_Mesh_set_width(int fem_mesh,int entity,int attr,int newWidth) {
-	const char *callingRoutine="FEM_Mesh_set_width";
-	FEMAPI(callingRoutine);
-	checkIsSet(fem_mesh,true,callingRoutine);
-	FEM_Attribute_lookup(fem_mesh,entity,attr,callingRoutine)->setWidth(newWidth,callingRoutine);
+	const char *caller="FEM_Mesh_set_width";
+	FEMAPI(caller);
+	checkIsSet(fem_mesh,true,caller);
+	FEM_Attribute_lookup(fem_mesh,entity,attr,caller)->setWidth(newWidth,caller);
 }
 FORTRAN_AS_C(FEM_MESH_SET_WIDTH,FEM_Mesh_set_width,fem_mesh_set_width,
 	(int *fem_mesh,int *entity,int *attr,int *newWidth),
@@ -202,9 +202,9 @@ FORTRAN_AS_C(FEM_MESH_SET_WIDTH,FEM_Mesh_set_width,fem_mesh_set_width,
 
 CDECL int 
 FEM_Mesh_get_width(int fem_mesh,int entity,int attr) {
-	const char *callingRoutine="FEM_Mesh_get_width";
-	FEMAPI(callingRoutine);
-	return FEM_Attribute_lookup(fem_mesh,entity,attr,callingRoutine)->getWidth();
+	const char *caller="FEM_Mesh_get_width";
+	FEMAPI(caller);
+	return FEM_Attribute_lookup(fem_mesh,entity,attr,caller)->getWidth();
 }
 FORTRAN_AS_C_RETURN(int,
 	FEM_MESH_GET_WIDTH,FEM_Mesh_get_width,fem_mesh_get_width,
@@ -213,9 +213,9 @@ FORTRAN_AS_C_RETURN(int,
 
 CDECL int 
 FEM_Mesh_get_datatype(int fem_mesh,int entity,int attr) {
-	const char *callingRoutine="FEM_Mesh_get_datatype";
-	FEMAPI(callingRoutine);
-	return FEM_Attribute_lookup(fem_mesh,entity,attr,callingRoutine)->getDatatype();
+	const char *caller="FEM_Mesh_get_datatype";
+	FEMAPI(caller);
+	return FEM_Attribute_lookup(fem_mesh,entity,attr,caller)->getDatatype();
 }
 FORTRAN_AS_C_RETURN(int,
 	FEM_MESH_GET_DATATYPE,FEM_Mesh_get_datatype,fem_mesh_get_datatype,
@@ -244,10 +244,11 @@ FORTRAN_AS_C_RETURN(int,
 
 CDECL IDXL_t 
 FEM_Comm_shared(int fem_mesh,int entity) {
-	const char *callingRoutine="FEM_Comm_shared";
-	FEMAPI(callingRoutine); FEMchunk *fem=FEMchunk::lookup(callingRoutine);
-	if (entity!=FEM_NODE) FEM_Abort(callingRoutine,"Only shared nodes supported");
-	return fem->meshLookup(fem_mesh,callingRoutine)->node.sharedIDXL.getIndex(fem);
+	const char *caller="FEM_Comm_shared";
+	FEMAPI(caller);  FEMchunk *fem=FEMchunk::lookup(caller);
+	if (entity!=FEM_NODE) FEM_Abort(caller,"Only shared nodes supported");
+	return FEM_Mesh_lookup(fem_mesh,caller)->node.
+		sharedIDXL.getIndex(fem);
 }
 FORTRAN_AS_C_RETURN(int,
 	FEM_COMM_SHARED,FEM_Comm_shared,fem_comm_shared,
@@ -256,11 +257,10 @@ FORTRAN_AS_C_RETURN(int,
 
 CDECL IDXL_t 
 FEM_Comm_ghost(int fem_mesh,int entity) {
-	const char *callingRoutine="FEM_Comm_ghost";
-	FEMAPI(callingRoutine); FEMchunk *fem=FEMchunk::lookup(callingRoutine);
-	FEM_Entity *e=fem->meshLookup(fem_mesh,callingRoutine)->
-		lookup(entity,callingRoutine);
-	if (e->isGhost()) FEM_Abort(callingRoutine,"Can only call FEM_Comm_ghost on real entity type");
+	const char *caller="FEM_Comm_ghost";
+	FEMAPI(caller); FEMchunk *fem=FEMchunk::lookup(caller);
+	FEM_Entity *e=FEM_Entity_lookup(fem_mesh,entity,caller);
+	if (e->isGhost()) FEM_Abort(caller,"Can only call FEM_Comm_ghost on real entity type");
 	return e->ghostIDXL.getIndex(fem);
 }
 FORTRAN_AS_C_RETURN(int,
@@ -274,32 +274,63 @@ void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr,
   	void *data, int firstItem,int length, const IDXL_Layout &layout) 
 {
 	if (length==0) return;
-	const char *callingRoutine="FEM_Mesh_data";
-	FEMAPI(callingRoutine);
-	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,callingRoutine);
-	FEM_Attribute *a=m->lookup(entity,callingRoutine)->
-		lookup(attr,callingRoutine);
+	const char *caller="FEM_Mesh_data";
+	FEMAPI(caller);
+	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
+	FEM_Attribute *a=m->lookup(entity,caller)->lookup(attr,caller);
 	
 	if (m->isSetting()) 
-		a->set(data,firstItem,length,layout,callingRoutine);
+		a->set(data,firstItem,length,layout,caller);
 	else /* m->isGetting()*/
-		a->get(data,firstItem,length,layout,callingRoutine);
+		a->get(data,firstItem,length,layout,caller);
 }
 
 
-FEM_Entity *FEM_Entity_lookup(int fem_mesh,int entity,const char *callingRoutine) {
-	return FEM_Mesh_lookup(fem_mesh,callingRoutine)->lookup(entity,callingRoutine);
+FEM_Entity *FEM_Entity_lookup(int fem_mesh,int entity,const char *caller) {
+	return FEM_Mesh_lookup(fem_mesh,caller)->lookup(entity,caller);
 }
-FEM_Attribute *FEM_Attribute_lookup(int fem_mesh,int entity,int attr,const char *callingRoutine) {
-	return FEM_Entity_lookup(fem_mesh,entity,callingRoutine)->lookup(attr,callingRoutine);
+FEM_Attribute *FEM_Attribute_lookup(int fem_mesh,int entity,int attr,const char *caller) {
+	return FEM_Entity_lookup(fem_mesh,entity,caller)->lookup(attr,caller);
 }
 
+CDECL int FEM_Mesh_get_entities(int fem_mesh, int *entities) {
+	const char *caller="FEM_Mesh_get_entities";
+	FEMAPI(caller); 
+	return FEM_Mesh_lookup(fem_mesh,caller)->getEntities(entities);
+}
+FORTRAN_AS_C_RETURN(int,
+	FEM_MESH_GET_ENTITIES,FEM_Mesh_get_entities,fem_mesh_get_entities,
+	(int *mesh,int *ent), (*mesh,ent)
+)
+
+CDECL int FEM_Mesh_get_attributes(int fem_mesh,int entity,int *attributes) {
+	const char *caller="FEM_Mesh_get_attributes";
+	FEMAPI(caller);
+	return FEM_Entity_lookup(fem_mesh,entity,caller)->getAttrs(attributes);
+}
+FORTRAN_AS_C_RETURN(int,
+	FEM_MESH_GET_ATTRIBUTES,FEM_Mesh_get_attributes,fem_mesh_get_attributes,
+	(int *mesh,int *ent,int *attrs), (*mesh,*ent,attrs)
+)
 
 /************** FEM_Attribute ****************/
 
+CDECL const char *FEM_Get_datatype_name(int datatype,char *storage) {
+	switch(datatype) {
+	case FEM_BYTE: return "FEM_BYTE";
+	case FEM_INT: return "FEM_INT";
+	case FEM_FLOAT: return "FEM_FLOAT";
+	case FEM_DOUBLE: return "FEM_DOUBLE";
+	case FEM_INDEX_0: return "FEM_INDEX_0";
+	case FEM_INDEX_1: return "FEM_INDEX_1";
+	};
+	sprintf(storage,"unknown datatype code (%d)",datatype);
+	return storage;
+}
+
 /// Return the human-readable version of this FEM_ATTR code.
 ///  For example, FEM_attr2name(FEM_CONN)=="FEM_CONN".
-const char *FEM_Get_attr_name(int attr,char *storage) 
+CDECL const char *FEM_Get_attr_name(int attr,char *storage) 
 {
 	if (attr<FEM_ATTRIB_TAG_MAX) 
 	{ //It's a user tag:
@@ -322,7 +353,7 @@ const char *FEM_Get_attr_name(int attr,char *storage)
 
 //Abort with a nice error message saying: 
 // Our <field> was previously set to <cur>; it cannot now be <operation> <next>
-void FEM_Attribute::bad(const char *field,bool forRead,int cur,int next,const char *callingRoutine) const
+void FEM_Attribute::bad(const char *field,bool forRead,int cur,int next,const char *caller) const
 {
 	char nameStorage[256];
 	const char *name=FEM_Get_attr_name(attr,nameStorage);
@@ -343,7 +374,7 @@ void FEM_Attribute::bad(const char *field,bool forRead,int cur,int next,const ch
 		sprintf(errBuf,"The %s %s %s was previously set to %d; it cannot now be %s %d",
 			e->getName(),name,field,cur,cannotBe,next);
 	
-	FEM_Abort(callingRoutine,errBuf);
+	FEM_Abort(caller,errBuf);
 }
 
 
@@ -360,30 +391,30 @@ void FEM_Attribute::pup(PUP::er &p) {
 }
 FEM_Attribute::~FEM_Attribute() {}
 
-void FEM_Attribute::setLength(int next,const char *callingRoutine) {
+void FEM_Attribute::setLength(int next,const char *caller) {
 	int cur=getLength();
 	if (next==cur) return; //Already set--nothing to do 
-	if (cur!=-1) bad("length",false,cur,next, callingRoutine);
+	if (cur!=-1) bad("length",false,cur,next, caller);
 	e->setLength(next);
 	tryAllocate();
 }
 	
-void FEM_Attribute::setWidth(int next,const char *callingRoutine) {
+void FEM_Attribute::setWidth(int next,const char *caller) {
 	int cur=getWidth();
 	if (next==cur) return; //Already set--nothing to do 
-	if (cur!=-1) bad("width",false,cur,next, callingRoutine);
+	if (cur!=-1) bad("width",false,cur,next, caller);
 	width=next;
 	tryAllocate();
-	if (ghost) ghost->setWidth(width,callingRoutine);
+	if (ghost) ghost->setWidth(width,caller);
 }
 
-void FEM_Attribute::setDatatype(int next,const char *callingRoutine) {
+void FEM_Attribute::setDatatype(int next,const char *caller) {
 	int cur=getDatatype();
 	if (next==cur) return; //Already set--nothing to do 
-	if (cur!=-1) bad("datatype",false,cur,next, callingRoutine);
+	if (cur!=-1) bad("datatype",false,cur,next, caller);
 	datatype=next;
 	tryAllocate();
-	if (ghost) ghost->setDatatype(datatype,callingRoutine);
+	if (ghost) ghost->setDatatype(datatype,caller);
 }
 
 void FEM_Attribute::copyShape(const FEM_Attribute &src) {
@@ -391,7 +422,7 @@ void FEM_Attribute::copyShape(const FEM_Attribute &src) {
 	setDatatype(src.getDatatype()); //Automatically calls tryAllocate
 }
 void FEM_Attribute::set(const void *src, int firstItem,int length, 
-		const IDXL_Layout &layout, const char *callingRoutine) 
+		const IDXL_Layout &layout, const char *caller) 
 {
 	if (firstItem!=0) { /* If this isn't the start... */
 		if (length!=1) /* And we're not setting one at a time */
@@ -400,36 +431,36 @@ void FEM_Attribute::set(const void *src, int firstItem,int length,
 
 	if (getLength()==-1) setLength(length);
 	else if (length!=1 && length!=getLength()) 
-		bad("length",false,getLength(),length, callingRoutine);
+		bad("length",false,getLength(),length, caller);
 	
 	int width=layout.width;
 	if (getWidth()==-1) setWidth(width);
 	else if (width!=getWidth()) 
-		bad("width",false,getWidth(),width, callingRoutine);
+		bad("width",false,getWidth(),width, caller);
 	
 	int datatype=layout.type;
 	if (getDatatype()==-1) setDatatype(datatype);
 	else if (datatype!=getDatatype()) 
-		bad("datatype",false,getDatatype(),datatype, callingRoutine);
+		bad("datatype",false,getDatatype(),datatype, caller);
 	
 	/* Assert: our storage should be allocated now.
 	   Our subclass will actually copy user data */
 }
 
 void FEM_Attribute::get(void *dest, int firstItem,int length, 
-		const IDXL_Layout &layout, const char *callingRoutine)  const
+		const IDXL_Layout &layout, const char *caller)  const
 {
 	if (length==0) return; //Nothing to get
 	if (length!=1 && length!=getLength()) 
-		bad("length",true,getLength(),length, callingRoutine);
+		bad("length",true,getLength(),length, caller);
 	
 	int width=layout.width;
 	if (width!=getWidth()) 
-		bad("width",true,getWidth(),width, callingRoutine);
+		bad("width",true,getWidth(),width, caller);
 	
 	int datatype=layout.type;
 	if (datatype!=getDatatype()) 
-		bad("datatype",true,getDatatype(),datatype, callingRoutine);
+		bad("datatype",true,getDatatype(),datatype, caller);
 	
 	/* our subclass will actually copy into user data */
 }
@@ -493,9 +524,9 @@ inline void getTableData(void *user, int firstItem, int length,
 }
 
 void FEM_DataAttribute::set(const void *u, int f,int l, 
-		const IDXL_Layout &layout, const char *callingRoutine)
+		const IDXL_Layout &layout, const char *caller)
 {
-	super::set(u,f,l,layout,callingRoutine);
+	super::set(u,f,l,layout,caller);
 	switch(getDatatype()) {
 	case FEM_BYTE:  setTableData(u,f,l,IDXL_LAYOUT_CALL(layout),char_data); break;
 	case FEM_INT: setTableData(u,f,l,IDXL_LAYOUT_CALL(layout),int_data); break;
@@ -505,9 +536,9 @@ void FEM_DataAttribute::set(const void *u, int f,int l,
 }
 	
 void FEM_DataAttribute::get(void *u, int f,int l,
-		const IDXL_Layout &layout, const char *callingRoutine) const
+		const IDXL_Layout &layout, const char *caller) const
 {
-	super::get(u,f,l,layout,callingRoutine);
+	super::get(u,f,l,layout,caller);
 	switch(getDatatype()) {
 	case FEM_BYTE:  getTableData(u,f,l,IDXL_LAYOUT_CALL(layout),char_data); break;
 	case FEM_INT: getTableData(u,f,l,IDXL_LAYOUT_CALL(layout),int_data); break;
@@ -569,10 +600,10 @@ void FEM_IndexAttribute::allocate(int length,int width,int datatype)
  * the first valid index (base index) of that type.  Otherwise 
  * call FEM_Abort, because the datatype is wrong.
  */
-static int type2base(int base_type,const char *callingRoutine) {
+static int type2base(int base_type,const char *caller) {
 	if (base_type==FEM_INDEX_0) return 0;
 	if (base_type==FEM_INDEX_1) return 1;
-	FEM_Abort(callingRoutine,"You must use the datatype FEM_INDEX_0 or FEM_INDEX_1 with FEM_CONN, not %d",
+	FEM_Abort(caller,"You must use the datatype FEM_INDEX_0 or FEM_INDEX_1 with FEM_CONN, not %d",
 		base_type);
 	return 0; //< for whining compilers
 }
@@ -600,26 +631,26 @@ void getIndexTableData(void *user, int firstItem, int length,
 }
 
 void FEM_IndexAttribute::set(const void *src, int firstItem,int length,
-		const IDXL_Layout &layout,const char *callingRoutine)
+		const IDXL_Layout &layout,const char *caller)
 {
 	IDXL_Layout lo=layout; lo.type=FEM_INT; //Pretend it's always int data, not INDEX
-	super::set(src,firstItem,length,lo,callingRoutine);
+	super::set(src,firstItem,length,lo,caller);
 	
-	int indexBase=type2base(layout.type,callingRoutine);
+	int indexBase=type2base(layout.type,caller);
 	setIndexTableData(src,firstItem,length,IDXL_LAYOUT_CALL(layout),&idx,indexBase);
 	
 	if (checker) 
 		for (int r=0;r<length;r++)
-			checker->check(firstItem+r,idx,callingRoutine);
+			checker->check(firstItem+r,idx,caller);
 }
 
 void FEM_IndexAttribute::get(void *dest, int firstItem,int length, 
-		const IDXL_Layout &layout,const char *callingRoutine) const
+		const IDXL_Layout &layout,const char *caller) const
 {
 	IDXL_Layout lo=layout; lo.type=FEM_INT; //Pretend it's always int data, not INDEX
-	super::get(dest,firstItem,length,lo,callingRoutine);
+	super::get(dest,firstItem,length,lo,caller);
 	
-	int indexBase=type2base(layout.type,callingRoutine);
+	int indexBase=type2base(layout.type,caller);
 	getIndexTableData(dest,firstItem,length,IDXL_LAYOUT_CALL(layout),&idx,indexBase);
 }
 
@@ -630,6 +661,29 @@ void FEM_IndexAttribute::copyEntity(int dstEntity,const FEM_Attribute &src,int s
 }
 
 /********************** Entity **************************/
+
+/// Return the human-readable version of this entity code.
+CDECL const char *FEM_Get_entity_name(int entity,char *storage) 
+{
+	char *dest=storage;
+	if (entity<FEM_ENTITY_FIRST || entity>=FEM_ENTITY_LAST) {
+		sprintf(dest,"unknown entity code (%d)",entity);
+	}
+	else {
+		if (entity>FEM_ENTITY_FIRST+FEM_GHOST) {
+			sprintf(dest,"FEM_GHOST+");
+			dest+=strlen(dest); /* we want "FEM_GHOST+foo" */
+			entity-=FEM_GHOST;
+		}
+		if (entity==FEM_NODE)
+			sprintf(dest,"FEM_NODE");
+		else if (entity>=FEM_SPARSE)
+			sprintf(dest,"FEM_SPARSE+%d",entity-FEM_SPARSE);
+		else /* entity>=FEM_ELEM */
+			sprintf(dest,"FEM_ELEM+%d",entity-FEM_ELEM);
+	}
+	return storage;
+}
 
 FEM_Entity::FEM_Entity(FEM_Entity *ghost_) //Default constructor
 	:length(-1), ghost(ghost_), sym(0), globalno(0), 
@@ -748,7 +802,7 @@ void FEM_Entity::add(FEM_Attribute *attribute) {
  * The default implementation searches the list of userdata attributes;
  * subclasses with other attributes should override this routine.
  */
-FEM_Attribute *FEM_Entity::lookup(int attr,const char *callingRoutine) {
+FEM_Attribute *FEM_Entity::lookup(int attr,const char *caller) {
 	//Try to find an existing attribute (FIXME: keep attributes in a map, to speed this up)
 	for (int a=0;a<attributes.size();a++) {
 		if (attributes[a]->getAttr()==attr)
@@ -756,10 +810,10 @@ FEM_Attribute *FEM_Entity::lookup(int attr,const char *callingRoutine) {
 	}
 	
 	//If we get here, no existing attribute fits the bill: create one
-	create(attr,callingRoutine);
+	create(attr,caller);
 	
 	// If create did its job, the next lookup should succeed:
-	return lookup(attr,callingRoutine);
+	return lookup(attr,caller);
 }
 
 /**
@@ -768,7 +822,7 @@ FEM_Attribute *FEM_Entity::lookup(int attr,const char *callingRoutine) {
  * attributes (like FEM_CONN) need to be overridden and created 
  * by subclasses.
  */
-void FEM_Entity::create(int attr,const char *callingRoutine) {
+void FEM_Entity::create(int attr,const char *caller) {
 	if (attr<=FEM_ATTRIB_TAG_MAX) 
 	{ //It's a valid user data tag
 		add(new FEM_DataAttribute(this,attr));
@@ -782,7 +836,7 @@ void FEM_Entity::create(int attr,const char *callingRoutine) {
 		char attrNameStorage[256], msg[1024];
 		sprintf(msg,"Could not locate the attribute %s for entity %s",
 			FEM_Get_attr_name(attr,attrNameStorage), getName());
-		FEM_Abort(callingRoutine,msg);
+		FEM_Abort(caller,msg);
 	}
 }
 
@@ -858,11 +912,11 @@ FEM_Node::~FEM_Node() {
 
 const char *FEM_Node::getName(void) const {return "FEM_NODE";}
 
-void FEM_Node::create(int attr,const char *callingRoutine) {
+void FEM_Node::create(int attr,const char *caller) {
 	if (attr==FEM_NODE_PRIMARY) {
 		allocatePrimary();
 	} 
-	else  super::create(attr,callingRoutine);
+	else  super::create(attr,caller);
 }
 
 /********************** Elem *****************/
@@ -874,7 +928,7 @@ public:
 	FEM_Elem_Conn_Checker(const FEM_Entity &sizeSrc_,const FEM_Entity *sizeSrc2_) 
 		:sizeSrc(sizeSrc_), sizeSrc2(sizeSrc2_) {}
 	
-	void check(int row,const BasicTable2d<int> &table,const char *callingRoutine) const {
+	void check(int row,const BasicTable2d<int> &table,const char *caller) const {
 		const int *idx=table.getRow(row);
 		int n=table.width();
 		int max=sizeSrc.size();
@@ -883,9 +937,9 @@ public:
 			if ((idx[i]<0) || (idx[i]>=max))
 			{ /* This index is out of bounds: */
 				if (idx[i]<0)
-					FEM_Abort(callingRoutine,"Connectivity entry %d's value, %d, is negative",row,idx[i]);
+					FEM_Abort(caller,"Connectivity entry %d's value, %d, is negative",row,idx[i]);
 				else /* (idx[i]>=max) */
-					FEM_Abort(callingRoutine,
+					FEM_Abort(caller,
 						"Connectivity entry %d's value, %d, should be less than the number of nodes, %d",
 						row,idx[i],max);
 			}
@@ -924,19 +978,19 @@ class FEM_Sparse_Elem_Checker : public FEM_IndexAttribute::Checker {
 public:
 	FEM_Sparse_Elem_Checker(const FEM_Mesh &mesh_) :mesh(mesh_) {}
 	
-	void check(int row,const BasicTable2d<int> &table,const char *callingRoutine) const {
+	void check(int row,const BasicTable2d<int> &table,const char *caller) const {
 		//assert: table.getWidth==2
 		const int *elem=table.getRow(row);
 		int maxT=mesh.elem.size();
 		if ((elem[0]<0) || (elem[1]<0))
-			FEM_Abort(callingRoutine,"Sparse element entry %d's values, %d and %d, are negative",
+			FEM_Abort(caller,"Sparse element entry %d's values, %d and %d, are negative",
 				row,elem[0],elem[1]);
 		int t=elem[0];
 		if (t>=maxT)
-			FEM_Abort(callingRoutine,"Sparse element entry %d's element type, %d, is too big",
+			FEM_Abort(caller,"Sparse element entry %d's element type, %d, is too big",
 				row,elem[0]);
 		if (elem[1]>=mesh.elem[t].size())
-			FEM_Abort(callingRoutine,"Sparse element entry %d's element index, %d, is too big",
+			FEM_Abort(caller,"Sparse element entry %d's element index, %d, is too big",
 				row,elem[1]);
 	}
 };
@@ -961,11 +1015,11 @@ FEM_Sparse::~FEM_Sparse() {
 
 const char *FEM_Sparse::getName(void) const { return "FEM_SPARSE"; }
 
-void FEM_Sparse::create(int attr,const char *callingRoutine) {
+void FEM_Sparse::create(int attr,const char *caller) {
 	if (attr==FEM_SPARSE_ELEM) {
 		allocateElem();
 	}
-	else /*super*/ FEM_Entity::create(attr,callingRoutine);
+	else /*super*/ FEM_Entity::create(attr,caller);
 }
 
 
@@ -980,7 +1034,7 @@ FEM_Mesh::FEM_Mesh()
 FEM_Mesh::~FEM_Mesh() {
 }
 
-FEM_Entity *FEM_Mesh::lookup(int entity,const char *callingRoutine) {
+FEM_Entity *FEM_Mesh::lookup(int entity,const char *caller) {
 	FEM_Entity *e=NULL;
 	if (entity>=FEM_ENTITY_FIRST && entity<FEM_ENTITY_LAST) 
 	{ //It's in the right range for an entity code:
@@ -1007,13 +1061,13 @@ FEM_Entity *FEM_Mesh::lookup(int entity,const char *callingRoutine) {
 	}
 	
 	if (e==NULL) //We didn't find an entity!
-		FEM_Abort(callingRoutine,"Expected an entity type (FEM_NODE, FEM_ELEM, etc.) but got %d",entity);
+		FEM_Abort(caller,"Expected an entity type (FEM_NODE, FEM_ELEM, etc.) but got %d",entity);
 	return e;
 }
-const FEM_Entity *FEM_Mesh::lookup(int entity,const char *callingRoutine) const {
+const FEM_Entity *FEM_Mesh::lookup(int entity,const char *caller) const {
 	/// FIXME: the const version is quite similar to the above, 
 	/// but it should *not* create new Entity types...
-	return ((FEM_Mesh *)this)->lookup(entity,callingRoutine);
+	return ((FEM_Mesh *)this)->lookup(entity,caller);
 }
 
 
@@ -1095,18 +1149,18 @@ void FEM_Mesh::copyOldGlobalno(const FEM_Mesh &m) {
 			sparse[s].copyOldGlobalno(m.sparse[s]);
 }
 
-void FEM_Index_Check(const char *callingRoutine,const char *entityType,int type,int maxType) {
+void FEM_Index_Check(const char *caller,const char *entityType,int type,int maxType) {
 	if (type<0 || type>maxType) {
 		char msg[1024];
 		sprintf(msg,"%s %d is not a valid entity type (it must be between %d and %d)",
 			entityType,type, 0, maxType-1);
-		FEM_Abort(callingRoutine,msg);
+		FEM_Abort(caller,msg);
 	}
 }
-void FEM_Is_NULL(const char *callingRoutine,const char *entityType,int type) {
+void FEM_Is_NULL(const char *caller,const char *entityType,int type) {
 	char msg[1024];
 	sprintf(msg,"%s %d was never set--it cannot now be read",entityType,type);
-	FEM_Abort(callingRoutine,msg);
+	FEM_Abort(caller,msg);
 }
 
 void FEM_Mesh::copyShape(const FEM_Mesh &src)
@@ -1121,6 +1175,16 @@ void FEM_Mesh::copyShape(const FEM_Mesh &src)
 	setSymList(src.getSymList());
 }
 
+/// Extract a list of our entities:
+int FEM_Mesh::getEntities(int *entities) {
+	int len=0;
+	entities[len++]=FEM_NODE;
+	for (int t=0;t<elem.size();t++) 
+		if (elem.has(t)) entities[len++]=FEM_ELEM+t;
+	for (int s=0;s<sparse.size();s++)
+		if (sparse.has(s)) entities[len++]=FEM_SPARSE+s;
+	return len;
+}
 
 static const char *meshFileNames="fem_mesh_vp%d_%d.dat";
 

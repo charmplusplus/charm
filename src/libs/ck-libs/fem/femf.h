@@ -165,7 +165,14 @@
          integer :: FEM_Mesh_default_write
        end function
        
-       
+       integer function FEM_Mesh_get_entities(mesh,entities)
+         integer, intent(in) :: mesh
+         integer, intent(out) :: entities(:)
+       end function
+       integer function FEM_Mesh_get_attributes(mesh,entity,attrs)
+         integer, intent(in) :: mesh, entity
+         integer, intent(out) :: attrs(:)
+       end function
        
        function FEM_Get_node_ghost()
          integer :: FEM_Get_node_ghost

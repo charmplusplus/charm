@@ -269,10 +269,15 @@ class FEM_Entity; // Forward declaration
 class FEM_Mesh; 
 
 
-/// Return the human-readable version of this attribute code, like "FEM_CONN"
+/// Return the human-readable version of this entity code, like "FEM_NODE".
+///  storage, which must be at least 80 bytes long, is used for
+///  non-static names, like the user tag "FEM_ELEM+2".
+CDECL const char *FEM_Get_entity_name(int entity,char *storage);
+
+/// Return the human-readable version of this attribute code, like "FEM_CONN".
 ///  storage, which must be at least 80 bytes long, is used for
 ///  non-static names, like the user tag "FEM_DATA+7".
-const char *FEM_Get_attr_name(int attr,char *storage);
+CDECL const char *FEM_Get_attr_name(int attr,char *storage);
 
 
 
@@ -568,6 +573,16 @@ public:
 	 * not found.
 	 */
 	FEM_Attribute *lookup(int attr,const char *callingRoutine);
+	
+	/**
+	 * Get a list of the attribute numbers for this entity.
+	 */
+	int getAttrs(int *attrs) const {
+		int len=attributes.size();
+		for (int i=0;i<len;i++) 
+			attrs[i]=attributes[i]->getAttr();
+		return len;
+	}
 	
 	//Symmetry array access:
 	const FEM_Symmetries_t *getSymmetries(void) const {
@@ -876,6 +891,8 @@ public:
 	void setAscendingGlobalno(void);
 	void copyOldGlobalno(const FEM_Mesh &m);
 	void print(int idxBase);//Write a human-readable description to CkPrintf
+	/// Extract a list of our entities:
+	int getEntities(int *entites);
 }; 
 PUPmarshall(FEM_Mesh);
 FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *callingRoutine);

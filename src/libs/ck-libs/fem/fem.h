@@ -130,6 +130,12 @@ extern "C" {
   int FEM_Mesh_get_width(int fem_mesh,int entity,int attr);
   void FEM_Mesh_set_width(int fem_mesh,int entity,int attr,int newWidth);
   int FEM_Mesh_get_datatype(int fem_mesh,int entity,int attr);
+  int FEM_Mesh_get_entities(int fem_mesh, int *entities);
+  int FEM_Mesh_get_attributes(int fem_mesh,int entity,int *attributes);
+  
+  const char *FEM_Get_entity_name(int entity,char *storage);
+  const char *FEM_Get_attr_name(int attr,char *storage);
+  const char *FEM_Get_datatype_name(int datatype,char *storage);
 
 /* ghosts and spatial symmetries */
 #define FEM_Is_ghost_index(idx) ((idx)<-1)
