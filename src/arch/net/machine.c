@@ -347,7 +347,7 @@ double GetClock()
 
 void jmemcpy(char *dst, char *src, int len)
 {
-  char *sdend = (char *)(((int)(src + len)) & ~(sizeof(double)-1));
+  char *sdend = (char *)(((CMK_SIZE_T)(src + len)) & ~(sizeof(double)-1));
   while (src != sdend) {
     *((double*)dst) = *((double*)src);
     dst+=sizeof(double); src+=sizeof(double);
@@ -1471,27 +1471,27 @@ static pthread_mutex_t memmutex;
 void CmiMemLock() { pthread_mutex_lock(&memmutex); }
 void CmiMemUnlock() { pthread_mutex_unlock(&memmutex); }
 
-static pthread_thread_key_t Cmi_state_key;
+static pthread_key_t Cmi_state_key;
 static CmiState     Cmi_state_vector;
 
 CmiState CmiGetState()
 {
   CmiState result = 0;
-  result = pthread__getspecific(Cmi_state_key);
+  result = pthread_getspecific(Cmi_state_key);
   return result;
 }
 
 int CmiMyPe()
 {
   CmiState result = 0;
-  result = pthread__getspecific(Cmi_state_key);
+  result = pthread_getspecific(Cmi_state_key);
   return result->pe;
 }
 
 int CmiMyRank()
 {
   CmiState result = 0;
-  result = pthread__getspecific(Cmi_state_key);
+  result = pthread_getspecific(Cmi_state_key);
   return result->rank;
 }
 
@@ -1570,20 +1570,21 @@ static void *call_startfn(void *vindex)
 
 static void CmiStartThreads()
 {
-  int i, pid, ok;
+  pthread_t pid;
+  int i, ok;
   
   //thr_setconcurrency(Cmi_mynodesize);
-  pthread_keycreate(&Cmi_state_key, 0);
+  pthread_key_create(&Cmi_state_key, 0);
   Cmi_state_vector =
     (CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
   for (i=0; i<Cmi_mynodesize; i++)
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
   for (i=1; i<Cmi_mynodesize; i++) {
-    ok = thr_create(&pid, NULL, call_startfn, (void *)i);
+    ok = pthread_create(&pid, NULL, call_startfn, (void *)i);
     if (ok<0) { perror("pthread_create"); exit(1); }
   }
   pthread_setspecific(Cmi_state_key, Cmi_state_vector);
-  ok = thr_create(&pid, NULL, (void *(*)(void *))comm_thread, 0);
+  ok = pthread_create(&pid, NULL, (void *(*)(void *))comm_thread, 0);
   if (ok<0) { perror("pthread_create"); exit(1); }
 }
 
