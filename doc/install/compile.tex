@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.2  1995-11-02 22:40:39  brunner
+% Revision 1.3  1995-11-14 21:23:55  brunner
+% Added paragraph on including a user-defined load balance strategy.
+%
+% Revision 1.2  1995/11/02  22:40:39  brunner
 % Includes short description of what charmc does, and description
 % of options
 %
@@ -45,6 +48,18 @@ Files with the following extensions are handled by {\verb+charmc+}
 \item[{\verb+.a+}] Library files
 \end{description}
 
+\subsection{Compiling with a user-defined load-balance strategy}
+
+The {\tt charmc} script is designed to link in either one of the
+standard load balance libraries, or a user written library.  A
+user-defined strategy needs to define all of the {\tt Cld} calls
+described in the {\em Converse API Reference} manual.  A {\tt .o} file
+containing these functions is created, given the name {\tt
+libck-ldb-xxx.o}, where {\tt xxx} is the name of the strategy, and
+placed in the {\em Converse} library directory.  Then that strategy
+can be linked with a user program using the {\tt -balance} option.
+
+\subsection{Command line options for {\tt charmc}}
 The following options are supported by charmc:
 \begin{description}
 
@@ -67,9 +82,12 @@ to compile the selected language.  Default is {\tt -language charm}.
 
 \item[{\tt -balance} {\em load-balance-strategy}]
 
-Selects the desired load balancing strategies.  Currently, only {\tt rand}
-(random) is supported. Default is {\tt -balance rand}.
+Selects the desired load balancing strategies.  Currently, only {\tt
+rand}, {\tt acwn}, and {\tt mngr} are supported. If a user-defined
+strategy has been placed in the charm library directory, it may also
+be selected with this option.  Default is {\tt -balance rand}.
 	
+
 \item[{\tt -queue} {\em queueing strategy}]
 
 Currently ignored
