@@ -94,6 +94,7 @@ class CkDDT_DataType {
     int count;
     int lb;
     int ub;
+    int iscontig;
     int baseSize;
     int baseExtent;
     CkDDT_DataType *baseType;
@@ -107,14 +108,15 @@ class CkDDT_DataType {
     CkDDT_DataType(const CkDDT_DataType& obj) ;
     CkDDT_DataType& operator=(const CkDDT_DataType& obj);
 
+    virtual int isContig(void);
     virtual int getSize(int count=1);
-    virtual int getExtent();
+    virtual int getExtent(void);
     virtual int getBaseSize(void);
     virtual int getLB(void);
     virtual int getUB(void);
     virtual int getType(void);
-    virtual void inrRefCount() ;
-    virtual int getRefCount() ;
+    virtual void inrRefCount(void) ;
+    virtual int getRefCount(void) ;
     virtual void pupType(PUP::er &p, CkDDT* ddt) ;
 
     virtual int getEnvelope(int *num_integers, int *num_addresses, int *num_datatypes, int *combiner);
@@ -395,10 +397,8 @@ class CkDDT {
   int   getNextFreeIndex(void) ;
   void  pup(PUP::er &p);
   CkDDT_DataType*  getType(int nIndex);
-  int iscontig(int nIndex){
-    if(nIndex<num_types) return (types[nIndex]==CkDDT_CONTIGUOUS);
-    else return 0;
-  }
+
+  int isContig(int nIndex);
   int getSize(int nIndex, int count=1);
   int getExtent(int nIndex);
   int getLB(int nIndex);

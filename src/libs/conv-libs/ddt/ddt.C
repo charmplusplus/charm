@@ -96,7 +96,7 @@ CkDDT::getNextFreeIndex(void)
   return num_types++;
 }
 
-void 
+void
 CkDDT::freeType(int* index)
 {
   // FIXME: Use reference counting
@@ -120,14 +120,25 @@ CkDDT::~CkDDT()
 }
 
 
-int 
+int
+CkDDT::isContig(int nIndex)
+{
+  return !(types[nIndex]==CkDDT_VECTOR||
+  	   types[nIndex]==CkDDT_HVECTOR||
+	   types[nIndex]==CkDDT_INDEXED||
+	   types[nIndex]==CkDDT_HINDEXED||
+	   types[nIndex]==CkDDT_STRUCT);
+  //getType(nIndex)->isContig();
+}
+
+int
 CkDDT::getSize(int nIndex, int count)
 {
   CkDDT_DataType* dttype = getType(nIndex);
   return count*dttype->getSize();
 }
 
-int 
+int
 CkDDT::getExtent(int nIndex)
 {
   CkDDT_DataType* dttype = getType(nIndex);
@@ -313,6 +324,7 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
   extent = size;
   lb = 0;
   ub = size;
+  iscontig = 1;
 DDTDEBUG("CkDDT_DataType constructor: type=%d, size=%d, extent=%d\n",type,size,extent);
 }
 
@@ -357,6 +369,13 @@ CkDDT_DataType::serialize(char* userdata, char* buffer, int num, int dir)
     CkAbort("CkDDT: Invalid dir in serialize.\n");
   }
   return size ;
+}
+
+
+int
+CkDDT_DataType::isContig()
+{
+  return iscontig;
 }
 
 int
@@ -418,6 +437,7 @@ CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt)
   p(oldtype);
   p(lb);
   p(ub);
+  p(iscontig);
 }
 
 int CkDDT_DataType::getEnvelope(int *ni, int *na, int *nd, int *combiner){
@@ -447,6 +467,7 @@ CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldTy
 
   lb = baseType->getLB();
   ub = lb + extent;
+
 }
 
 CkDDT_Contiguous::CkDDT_Contiguous(const CkDDT_Contiguous& obj)
