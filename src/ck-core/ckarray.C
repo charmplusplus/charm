@@ -834,15 +834,22 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 	else 
 	{ //Broadcast message via serializer node
 	  _TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
+ 	  int skipsched = opts & CK_MSG_SKIPSCHEDULER;
 	  int serializer=0;//1623802937%CkNumPes();
 	  if (CkMyPe()==serializer)
 	  {
 		DEBB((AA"Sending array broadcast\n"AB));
-		CProxy_CkArray(_aid).recvBroadcast(msg);
+		if (skipsched)
+			CProxy_CkArray(_aid).recvImmediateBroadcast(msg);
+		else
+			CProxy_CkArray(_aid).recvBroadcast(msg);
 	  } else {
 		DEBB((AA"Forwarding array broadcast to serializer node %d\n"AB,serializer));
 		CProxy_CkArray ap(_aid);
-		ap[serializer].sendBroadcast(msg);
+		if (skipsched)
+			ap[serializer].sendImmediateBroadcast(msg);
+		else
+			ap[serializer].sendBroadcast(msg);
 	  }
 	}
 }
