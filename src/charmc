@@ -592,15 +592,56 @@ if (! -e $BAL_OBJ) then
    goto failure
 endif
 
+# Select linkers
+
+switch ($LANGUAGE)
+    case "charm"
+        set PRELOAD=($CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB \
+                      $OBJECTFILES $LIBRARIES $BAL_OBJ)
+	set LOADER=($CMK_LD $OPTS_LD -o $OBJECT \
+		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
+        	      $CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
+        	      $CHARMLIB/lib${LIBCLASS}-cplus-n.o \
+        	      $CHARMLIB/libconv-core.o \
+        	      $CHARMLIB/libconv-qs-$QUEUE.o \
+		      $CMK_LIBS -lm )
+        breaksw
+    case "charm++"
+        set PRELOAD=($CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB \
+                      $OBJECTFILES $LIBRARIES $BAL_OBJ)
+        set LOADER =($CMK_LDXX $OPTS_LD -o $OBJECT \
+		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
+                      $CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
+        	      $CHARMLIB/lib${LIBCLASS}-cplus-y.o \
+        	      $CHARMLIB/libconv-core.o \
+        	      $CHARMLIB/libconv-qs-$QUEUE.o \
+		      $CMK_LIBS -lm )
+        breaksw
+    case "converse"
+        set PRELOAD=($CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB \
+                      $OBJECTFILES $LIBRARIES)
+        set LOADER = ($CMK_LD $OPTS_LD -o $OBJECT \
+		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o \
+        	      $CHARMLIB/libconv-core.o \
+        	      $CHARMLIB/libconv-qs-$QUEUE.o \
+		      $CMK_LIBS -lm )
+        breaksw
+endsw
+
 # Bind together user-specified objects and libraries,
 # thereby creating CHARMC-USR.TMP.o and CHARMC-USR.TMP.nm
 
 echo "linking $OBJECT with -language $LANGUAGE"
 
 set DELETE=(CHARMC-USR.TMP.o CHARMC-USR.TMP.nm $DELETE)
-if ($?VERBOSE) echo $CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB $OBJECTFILES $LIBRARIES
-$CMK_LDRO CHARMC-USR.TMP.o $OPTS_LDRO -L$CHARMLIB $OBJECTFILES $LIBRARIES
+if ($?VERBOSE) echo $PRELOAD
+$PRELOAD
 if ($status) goto failure
+
+#
+# 'nm' the user-specified code, to find function names.
+#
+
 $CMK_NM CHARMC-USR.TMP.o | csh -fc "$CMK_NM_FILTER" > CHARMC-USR.TMP.nm
 if ($status) goto failure
 
@@ -616,47 +657,15 @@ echo '_CK_module_init_fn()' >> CHARMC-MOD.TMP.c
 echo '{' >> CHARMC-MOD.TMP.c
 awk '{print "_CK_"$1"_init();";}' < CHARMC-MOD.TMP.dat >> CHARMC-MOD.TMP.c
 echo '}' >> CHARMC-MOD.TMP.c
-
 if ($?VERBOSE) echo $CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c
 $CMK_CC $OPTS_CC -c CHARMC-MOD.TMP.c
 if ($status) goto failure
 
 # Scan user-object for user_main, if none, set MAINOBJ
 
-set MAINOBJ=$CHARMLIB/lib${LIBCLASS}-defmain.o
-if { (egrep '^user_main$' < CHARMC-USR.TMP.nm >& /dev/null) } set MAINOBJ=
-
-# Perform final linkage
-
-switch ($LANGUAGE)
-    case "charm"
-	set LOADER=($CMK_LD $OPTS_LD -o $OBJECT \
-		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o $MAINOBJ \
-        	      $CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
-        	      $BAL_OBJ \
-        	      $CHARMLIB/lib${LIBCLASS}-cplus-n.o \
-        	      $CHARMLIB/libconv-core.o \
-        	      $CHARMLIB/libconv-qs-$QUEUE.o \
-		      $CMK_LIBS -lm )
-        breaksw
-    case "charm++"
-        set LOADER =($CMK_LDXX $OPTS_LD -o $OBJECT \
-		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o $MAINOBJ \
-                      $CHARMLIB/lib${LIBCLASS}-core-$EXECMODE.o \
-        	      $BAL_OBJ \
-        	      $CHARMLIB/lib${LIBCLASS}-cplus-y.o \
-        	      $CHARMLIB/libconv-core.o \
-        	      $CHARMLIB/libconv-qs-$QUEUE.o \
-		      $CMK_LIBS -lm )
-        breaksw
-    case "converse"
-        set LOADER = ($CMK_LD $OPTS_LD -o $OBJECT \
-		      CHARMC-USR.TMP.o CHARMC-MOD.TMP.o $MAINOBJ \
-        	      $CHARMLIB/libconv-core.o \
-        	      $CHARMLIB/libconv-qs-$QUEUE.o \
-		      $CMK_LIBS -lm )
-        breaksw
-endsw
+if (!{ (egrep '^user_main$' < CHARMC-USR.TMP.nm >& /dev/null) }) then
+    set LOADER=($LOADER $CHARMLIB/lib${LIBCLASS}-defmain.o)
+endif
 
 if ($?VERBOSE) echo $LOADER
 $LOADER
