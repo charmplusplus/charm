@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-10-31 23:15:22  knauff
+ * Revision 2.11  1995-11-02 20:23:20  sanjeev
+ * added CFunctionRefToName
+ *
+ * Revision 2.10  1995/10/31  23:15:22  knauff
  * Undid my previous unnecessary change.
  *
  * Revision 2.9  1995/10/31  23:06:08  knauff
@@ -197,4 +200,9 @@ void CPlus_SetMonoId(_CK_Monotonic *mono, int bocnum)
 void *CPlus_CallMonoInit(int id, void *msg)
 {
 	return( ((ACCFNTYPE)(CsvAccess(PseudoTable)[id].initfn))(msg) ) ;
+}
+
+FUNCTION_PTR CFunctionRefToName(int index)
+{
+	return (CsvAccess(_CK_9_GlobalFunctionTable)[index]) ;
 }

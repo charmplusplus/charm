@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.23  1995-10-31 23:15:08  knauff
+ * Revision 2.24  1995-11-02 20:23:20  sanjeev
+ * added CFunctionRefToName
+ *
+ * Revision 2.23  1995/10/31  23:15:08  knauff
  * Undid my previous unnecessary change.
  *
  * Revision 2.22  1995/10/31  23:05:54  knauff
@@ -138,6 +141,9 @@ typedef void * (*ALLOCFNPTR)(int, int, int*, int) ;
 extern ChareIDType mainhandle;
 extern ChareIDType NULL_HANDLE;
 
+
+/* These are C++ functions in the runtime system */
+FUNCTION_PTR CFunctionRefToName(int index) ;
 
 
 /* These are C functions in the Charm runtime system */
