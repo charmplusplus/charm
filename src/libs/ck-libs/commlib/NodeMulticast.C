@@ -13,7 +13,9 @@ void* NodeMulticastCallbackHandler(void *msg){
     ComlibPrintf("[%d]:In Node MulticastCallbackHandler\n", CkMyPe());
     register envelope *env = (envelope *)msg;
     CkUnpackMessage(&env);
-    nm_mgr->getCallback().send(EnvToUsr(env));
+    //nm_mgr->getCallback().send(EnvToUsr(env));
+
+    nm_mgr->getHandler()(env);
     return NULL;
 }
 
@@ -48,20 +50,20 @@ void NodeMulticast::setDestinationArray(CkArrayID a, int nelem,
         nodeMap[dest_proc/pes_per_node] = 1;
         
         indexVec[dest_proc].insertAtEnd(*idx[count]);
-    }
-    
+    }    
 
     ComlibPrintf("After SetDestinationArray\n");
 }
 
-void NodeMulticast::setPeList(int npes, int *pelist, CkCallback callback){
+void NodeMulticast::setPeList(int npes, int *pelist, ComlibMulticastHandler handler){
     mode = PROCESSOR_MODE;
     messageBuf = NULL;
     pes_per_node = 4;
     //if(getenv("RMS_NODES") != NULL)
     //pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
 
-    cb = callback;
+    //cb = callback;
+    this->handler = (long)handler;
   
     numNodes = CkNumPes()/pes_per_node;
     myRank = 0;
@@ -119,7 +121,7 @@ void NodeMulticast::recvHandler(void *msg) {
 		ComlibPrintf("[%d] In receive Handler (proc mode), sending message to %d at handler %d\n", 
 			     CkMyPe(), (CkMyPe()/pes_per_node) * pes_per_node + count, 
 			     NodeMulticastCallbackHandlerId);
-
+                
 		CmiSyncSendAndFree((CkMyPe()/pes_per_node) *pes_per_node + count, 
 				   newenv->getTotalsize(), (char *)newenv);
 	    }
@@ -227,6 +229,7 @@ void NodeMulticast::pup(PUP::er &p){
     }
 
     p | cb;
+    p | handler;
     p(nodeMap, numNodes);
 
     if(mode == PROCESSOR_MODE)

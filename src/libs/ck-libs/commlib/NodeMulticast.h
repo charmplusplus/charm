@@ -6,6 +6,8 @@
 #define PROCESSOR_MODE 0
 #define ARRAY_MODE 1
 
+typedef void (*ComlibMulticastHandler)(void *msg);
+
 class NodeMulticast : public Strategy {
     CkQ <CharmMessageHolder*> *messageBuf;
     int pes_per_node, *nodeMap, numNodes, myRank;
@@ -18,18 +20,23 @@ class NodeMulticast : public Strategy {
     int npes, *pelist, NodeMulticastCallbackHandlerId;
     int validRank[MAX_PES_PER_NODE];
     CkCallback cb;
+    long handler;
 
  public:
     NodeMulticast(){}
     void setDestinationArray(CkArrayID a, int nelem, 
 			     CkArrayIndexMax **idx, int ep);
-    void setPeList(int npes, int *pelist, CkCallback callback);
+
+    //void setPeList(int npes, int *pelist, CkCallback callback);
+    void setPeList(int npes, int *pelist, ComlibMulticastHandler handler);
     
     NodeMulticast(CkMigrateMessage *){}
     void recvHandler(void *msg);
     void insertMessage(CharmMessageHolder *msg);
     void doneInserting();
+
     CkCallback getCallback() { return cb;}
+    ComlibMulticastHandler getHandler() { return (ComlibMulticastHandler)handler;}
 
     virtual void pup(PUP::er &p);
     PUPable_decl(NodeMulticast);
