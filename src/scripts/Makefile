@@ -83,7 +83,7 @@ html-doc: basics
 	cd doc ; make html
 
 doc: basics
-	cd doc ; make all
+	cd doc ; make doc
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 

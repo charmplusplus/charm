@@ -42,6 +42,30 @@ html:
 	( cd ampi; $(LNCMD); make html )
 	( cd bluegene; $(LNCMD); make html )
 
+doc:
+	( cd install; $(LNCMD); make doc )
+	( cd converse; $(LNCMD); make doc )
+	( cd convext; $(LNCMD); make doc )
+	( cd charm++; $(LNCMD); make doc )
+	( cd ck; $(LNCMD); make doc )
+	( cd libraries; $(LNCMD); make doc )
+	( cd f90charm; $(LNCMD); make doc )
+	( cd fem; $(LNCMD); make doc )
+	( cd ampi; $(LNCMD); make doc )
+	( cd bluegene; $(LNCMD); make doc )
+
+web:
+	( cd install; $(LNCMD); make web )
+	( cd converse; $(LNCMD); make web )
+	( cd convext; $(LNCMD); make web )
+	( cd charm++; $(LNCMD); make web )
+	( cd ck; $(LNCMD); make web )
+	( cd libraries; $(LNCMD); make web )
+	( cd f90charm; $(LNCMD); make web )
+	( cd fem; $(LNCMD); make web )
+	( cd ampi; $(LNCMD); make web )
+	( cd bluegene; $(LNCMD); make web )
+
 clean:
 	( cd install; $(RMCMD); make clean )
 	( cd converse; $(RMCMD); make clean )
