@@ -1,4 +1,6 @@
 // File: BlueGene.C
+// Author: Arun Kumar Singla <asingla@uiuc.edu> Nov 2000
+// Updated: Milind Bhandarkar 
 
 #define protected public
 #include "BlueGene.h"

@@ -1,4 +1,5 @@
 // File: BlueGene.ci
+// Author: Arun Kumar Singla <asingla@uiuc.edu> Nov 2000
 
 mainmodule BlueGene
 {

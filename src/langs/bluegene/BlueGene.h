@@ -1,4 +1,6 @@
 // File: BlueGene.h
+// Author: Arun Kumar Singla <asingla@uiuc.edu> Nov 2000
+// Updated by: Milind Bhandarkar
 
 #ifndef _BlueGene_h
 #define _BlueGene_h
