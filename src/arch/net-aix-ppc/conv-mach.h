@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.25  1997-01-17 15:50:25  jyelon
+ * Revision 1.26  1997-02-06 20:20:41  jyelon
+ * Added BLANK_SPACE bla bla.
+ *
+ * Revision 1.25  1997/01/17 15:50:25  jyelon
  * Minor adjustments to deal with recent changes to Common code.
  *
  * Revision 1.24  1996/11/23 02:25:38  milind
@@ -82,6 +85,7 @@
 #define CMK_MALLOC_USE_OS_BUILTIN                          0
 
 #define CMK_MSG_HEADER_SIZE_BYTES                          4
+#define CMK_MSG_HEADER_BLANK_SPACE                         0
 
 #define CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION           0
 #define CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION  1
