@@ -6,7 +6,7 @@ OBJS=cst_nl.o pgm.o
 
 DEST=$(CHARMDIR)/lib/libmodulerefine.a
 LOBJS=refine.o tri.o femrefine.o
-HEADERS=refine.h refinef.h
+HEADERS=refine.h refinef.h femrefine.h femrefinef.h
 
 all: $(DEST) pgm
 
