@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.7  1995-11-08 00:42:13  jyelon
+ * Revision 1.8  1995-11-08 23:40:58  gursoy
+ * fixed varsize msg related bug
+ *
+ * Revision 1.7  1995/11/08  00:42:13  jyelon
  * *** empty log message ***
  *
  * Revision 1.6  1995/11/08  00:40:20  jyelon
@@ -166,8 +169,7 @@ int destPE;
 int size;
 char * msg;
 {
-    CmiSyncSendFn(destPE, size, msg);
-    CmiFree(msg);
+     sim_send_message(Cmi_mype,msg,size,FALSE,destPE);
 }
 
 
