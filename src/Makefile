@@ -296,24 +296,24 @@ libckd-cplus-y.a: $(LIBCP_D)
 	charmc -cwd -o $@ $(LIBCP_D)
 
 init.cplus.n.o init.cplus.d.o : init.cplus.cxx $(CKHEADERS) c++interface.h
-	charmc -cwd -o init.cplus.n.o init.cplus.c
-	charmc -cwd -o init.cplus.d.o init.cplus.c -DDEBUGGING_MODE
+	charmc -cwd -o init.cplus.n.o init.cplus.cxx
+	charmc -cwd -o init.cplus.d.o init.cplus.cxx -DDEBUGGING_MODE
 
 main.cplus.n.o main.cplus.d.o : main.cplus.cxx $(CKHEADERS) c++interface.h
-	charmc -cwd -o main.cplus.n.o main.cplus.c
-	charmc -cwd -o main.cplus.d.o main.cplus.c -DDEBUGGING_MODE
+	charmc -cwd -o main.cplus.n.o main.cplus.cxx
+	charmc -cwd -o main.cplus.d.o main.cplus.cxx -DDEBUGGING_MODE
 
 ck.cplus.n.o ck.cplus.d.o : ck.cplus.cxx $(CKHEADERS) c++interface.h
-	charmc -cwd -o ck.cplus.n.o ck.cplus.c
-	charmc -cwd -o ck.cplus.d.o ck.cplus.c -DDEBUGGING_MODE
+	charmc -cwd -o ck.cplus.n.o ck.cplus.cxx
+	charmc -cwd -o ck.cplus.d.o ck.cplus.cxx -DDEBUGGING_MODE
 
 acc.cplus.n.o acc.cplus.d.o : acc.cplus.cxx $(CKHEADERS) c++interface.h acc.h
-	charmc -cwd -o acc.cplus.n.o acc.cplus.c
-	charmc -cwd -o acc.cplus.d.o acc.cplus.c -DDEBUGGING_MODE
+	charmc -cwd -o acc.cplus.n.o acc.cplus.cxx
+	charmc -cwd -o acc.cplus.d.o acc.cplus.cxx -DDEBUGGING_MODE
 
 mono.cplus.n.o mono.cplus.d.o : mono.cplus.cxx $(CKHEADERS) c++interface.h mono.h
-	charmc -cwd -o mono.cplus.n.o mono.cplus.c
-	charmc -cwd -o mono.cplus.d.o mono.cplus.c -DDEBUGGING_MODE
+	charmc -cwd -o mono.cplus.n.o mono.cplus.cxx
+	charmc -cwd -o mono.cplus.d.o mono.cplus.cxx -DDEBUGGING_MODE
 
 ###############################################################################
 #

@@ -399,6 +399,15 @@ foreach FILE ($FILES)
         set OBJECTFILES=( $OBJECTFILES $BASE.o )
       endif
       breaksw
+    case "*.cxx"
+      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CPLUS -I$CHARMINC $BASE.cxx"
+      $CMK_CXX $OPTS_CPLUS -I$CHARMINC $BASE.cxx
+      if ($status) goto failure
+      if ($?OBJECT) then
+	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
+        set OBJECTFILES=( $OBJECTFILES $BASE.o )
+      endif
+      breaksw
     case "*.f"
     case "*.F"
     case "*.fc"
