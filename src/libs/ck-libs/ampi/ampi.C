@@ -2168,7 +2168,7 @@ int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
   AmpiRequestList* reqs = getReqs();
   if(1 == (*flag = (*reqs)[*request]->test(sts))){
     if((*reqs)[*request]->getType() != 1) { // only free non-blocking request
-      (*reqs)g[*request]->complete(sts);
+      (*reqs)[*request]->complete(sts);
       reqs->free(*request);
       *request = MPI_REQUEST_NULL;
     }
