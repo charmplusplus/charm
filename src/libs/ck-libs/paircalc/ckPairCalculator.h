@@ -41,9 +41,8 @@ class PairCalculator: public CBase_PairCalculator {
 	re += ptr1[i]*ptr2[i] - ptr1[i+1]*ptr2[i+1];
 	im += ptr1[i+1]*ptr2[i] + ptr1[i]*ptr2[i+1];
       }
-  complex sum(re,im);
-  return sum;
-
+      complex sum(re,im);
+      return sum;
   }
  private:
   int numRecd, numExpected, grainSize, S, blkSize, N;

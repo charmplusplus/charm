@@ -170,18 +170,20 @@ PairCalculator::acceptResult(int size, complex *matrix, int rowNum, CkCallback c
 
   int offset = 0, index = thisIndex.y*S + thisIndex.x;
   complex m=complex(0,0);  
-  complex zero=complex(0,0);  
+  //  complex zero=complex(0,0);  
 
   for (int i = 0; i < grainSize; i++) {
     int iSindex=i*S+index;
     int iN=i*N;
     complex *newiNdata=&mynewData[iN];
     for (int j = 0; j < grainSize; j++){ 
-      m = matrix[iSindex + j];
-      if(m!=zero)
-	for (int p = 0; p < N; p++)
-	  if(inDataLeft[j][p]!=zero)
-	    newiNdata[p] += inDataLeft[j][p] * m;
+      if(matrix[iSindex + j].notzero())
+	{
+	  m = matrix[iSindex + j];
+	  for (int p = 0; p < N; p++)
+	    if(inDataLeft[j][p].notzero())
+	      newiNdata[p] += inDataLeft[j][p] * m;
+	}
     }
   }
   /*  this one reads better but takes twice as long
@@ -231,9 +233,9 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset, CkCallba
       mycb.send(msg);
     }
     sumPartialCount = 0;
-    for(int k=0; k<N*grainSize; k++){
-      newData[k] = complex(0,0);
-    }
+    memset(newData,0,N*grainSize);
+    //    for(int k=0; k<N*grainSize; k++)
+    //	 newData[k] = complex(0,0);
   }
 }
 
