@@ -15,10 +15,11 @@
 static char ident[] = "@(#)$Header$";
 
 #include <stdio.h>
+#include "converse.h"
 #ifdef CMK_USLEEP_WHEN_PROCESSOR_IDLE
+#include <sys/types.h>
 #include <sys/time.h>
 #endif
-#include "converse.h"
 
 #define MAX_HANDLERS 512
 
