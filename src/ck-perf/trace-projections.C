@@ -176,7 +176,8 @@ LogPool::~LogPool()
 #if CMK_BLUEGENE_CHARM
   extern int correctTimeLog;
   if (correctTimeLog) {
-    creatFiles("-bg");
+    creatFiles("-bg");			// create *-bg.log and *-bg.sts
+    if (CkMyPe() == 0) writeSts();      // write "*-bg.sts"
     postProcessLog();
   }
 #endif
@@ -269,10 +270,11 @@ void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int p
   }
 #if CMK_BLUEGENE_CHARM
   switch (type) {
+    case BEGIN_PROCESSING:
+      pool[numEntries-1].recvTime = BgGetRecvTime();
+    case END_PROCESSING:
     case BEGIN_COMPUTATION:
     case END_COMPUTATION:
-    case BEGIN_PROCESSING:
-    case END_PROCESSING:
     case CREATION:
     case BEGIN_PACK:
     case END_PACK:
