@@ -748,8 +748,7 @@ MBLK_Print_block(void)
 /************************ Fortran Bindings *********************************/
 
 // Utility functions for Fortran
-
-FDECL int FTN_NAME(OFFSETOF,offsetof)
+FDECL int FTN_NAME(FOFFSETOF,foffsetof)
   (void *first, void *second)
 {
   return (int)((char *)second - (char*)first);

@@ -14,7 +14,7 @@
        integer, parameter :: MBLK_DONE=1
        integer, parameter :: MBLK_NOTDONE=0
 
-       integer, external :: offsetof
+       integer, external :: foffsetof
 
        external :: MBLK_Set_prefix
        external :: MBLK_Set_nblocks
