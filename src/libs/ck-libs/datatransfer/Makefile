@@ -1,5 +1,5 @@
 CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc $(OPTS)
+CHARMC=$(CDIR)/bin/charmc -I. $(OPTS)
 
 # Directory where Magic software headers live:
 MGC=.
@@ -8,15 +8,15 @@ MGCOBJS=$(MGC)/MgcIntr3DTetrTetr.o  $(MGC)/MgcMath.o  $(MGC)/MgcPlane.o \
 
 HEADERS=paralleltransfer.h tetmesh.h
 HEADDEP=$(HEADERS) 
-TOBJS=$(MGCOBJS) transfer.o tetmesh.o tetmesh_noboite.o
+TOBJS=$(MGCOBJS) GenericElement.o transfer.o tetmesh.o tetmesh_noboite.o
 OBJS=$(TOBJS) tetmesh_fem.o paralleltransfer.o
 LIB=libdatatransfer
 
 LIBDIR=$(CDIR)/lib
 DEST=$(LIBDIR)/$(LIB).a
 
-test1=test_cg3d
-test1o=$(test1).C $(TOBJS) charm_standalone.o
+test1=test_GenericElement
+test1o=$(test1).C GenericElement.o
 test2=test_noboite
 test2o=$(test2).C $(TOBJS) charm_standalone.o
 test3=test_transfer

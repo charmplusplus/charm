@@ -1,5 +1,5 @@
 /**
- * Standalone version of common Charm++ routines:
+ * Serial version of common Charm++ routines:
  */
 #include <stdio.h>
 #include <stdlib.h>

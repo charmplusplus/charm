@@ -6,7 +6,7 @@
 #include <string.h> // For memmove
 #include <stdlib.h> // for abort
 #include <vector> //for std::vector 
-#include "tetmesh.h" 
+#include "transfer.h" 
 #include "charm++.h" 
 #include "MgcIntr3DTetrTetr.h"
 using namespace Mgc;
@@ -21,13 +21,15 @@ double tetVolume(const Mgc::Vector3 &A,const Mgc::Vector3 &B,
 	return oneSixth*(B-A).Dot((D-A).Cross(C-A));
 }
 
-double getSharedVolumeMgc(const TetMesh &srcMesh,const TetMesh &destMesh,const int *sc,const int *ds){
+/// Compute the volume shared by elements A and B, which must be tets.
+double getSharedVolumeTets(const ConcreteElement &A,const ConcreteElement &B)
+{
 	Mgc::Tetrahedron kT0,kT1;
 	std::vector<Tetrahedron> kIntr;
 	for(int i=0;i<4;i++){
-		CkVector3d pts0 = srcMesh.getPoint(sc[i]);
+		CkVector3d pts0 = A.getNodeLocation(i);
 		kT0[i] = Mgc::Vector3((double)pts0.x,(double)pts0.y,(double)pts0.z);
-		CkVector3d pts1 = destMesh.getPoint(ds[i]);
+		CkVector3d pts1 = B.getNodeLocation(i);
 		kT1[i] = Mgc::Vector3((double)pts1.x,(double)pts1.y,(double)pts1.z);
 	}
 	Mgc::FindIntersection(kT0,kT1,kIntr);
@@ -39,7 +41,8 @@ double getSharedVolumeMgc(const TetMesh &srcMesh,const TetMesh &destMesh,const i
 		sumVol += fabs(tetVolume(kT2[0],kT2[1],kT2[2],kT2[3]));
 	}
 	if(sumVol < 0){
-		printf("volume less than zero \n");
+		printf("volume less than zero!\n");
+		abort();
 	}
 	return sumVol;
 }
@@ -49,9 +52,9 @@ double getSharedVolumeMgc(const TetMesh &srcMesh,const TetMesh &destMesh,const i
 double getSharedVolume(int s,const TetMesh &srcMesh,
 	int d,const TetMesh &destMesh) 
 {
-	const int *sc=srcMesh.getTet(s);
-	const int *ds=destMesh.getTet(d);
-	return getSharedVolumeMgc(srcMesh,destMesh,sc,ds);
+	TetMeshElement se(s,srcMesh);
+	TetMeshElement de(d,destMesh);
+	return getSharedVolumeTets(se,de);
 }
 
 

@@ -1,19 +1,52 @@
 /**
- * Conservative, accurate parallel cell-centered data transfer.
+ * Conservative, accurate parallel cell-centered;
+ * and interpolation-based node-centered data transfer.
  * Orion Sky Lawlor, olawlor@acm.org, 2003/3/24
  */
 #include "tetmesh.h"
+#include "transfer.h"
 #include "bbox.h"
 #include "paralleltransfer.h"
 #include "charm++.h" /* for CmiAbort */
+#include "GenericElement.h"
 
 #define OSL_COMM_DEBUG 0
+#define COORD_PER_POINT 3 /* coordinates per point (e.g., 3d) */
+#define POINT_PER_TET 4 /* points per element (e.g., 4 for tets) */
 
 class progress_t {
 public:
 	virtual ~progress_t();
 	virtual void p(const char *where) {}
 };
+
+
+/**
+  Provides access to a local element.
+*/
+class ConcreteLocalElement : public ConcreteElementNodeData {
+	const TetMesh &mesh;
+	const int *conn;
+	const xfer_t *ptVals; // contains valsPerPt values for each point
+	int valsPerPt;
+public:
+	ConcreteLocalElement(const TetMesh &mesh_,const xfer_t *ptVals_,int valsPerPt_)
+		:mesh(mesh_), conn(0), ptVals(ptVals_), valsPerPt(valsPerPt_) { }
+	void set(int tet) {
+		conn=mesh.getTet(tet);
+	}
+	
+	/** Return the location of the i'th node of this element. */
+        virtual CPoint getNodeLocation(int i) const {
+		return mesh.getPoint(conn[i]);
+	}
+        
+        /** Return the vector of data associated with our i'th node. */
+        virtual const double *getNodeData(int i) const {
+		return &ptVals[conn[i]*valsPerPt];
+	}
+};
+
 
 class parallelTransfer_c {
 	collide_t voxels;
@@ -33,15 +66,33 @@ class parallelTransfer_c {
 	const xfer_t *srcPt; // srcMesh.getPts()*valsPerTet source values
 	const TetMesh &destMesh;
 	xfer_t *destTet; // destMesh.getTets()*valsPerTet partial values
-	xfer_t *destPt; // destMesh.getPts()*valsPerPt partial values
+	xfer_t *destPt; // destMesh.getPts()*valsPerPt values
 	double *destVolumes; // destMesh.getTets() partial volumes
 	
+	ConcreteLocalElement theLocalElement;
+	
 	/// A source cell, with values sVals, overlaps with this dest cell
-	///  with this much shared volume.
-	void addVolume(const xfer_t *sVals,int dest,double sharedVolume) {
+	///  with this much shared volume.  Transfer cell-centered values.
+	void accumulateCellValues(const xfer_t *sCellVals,int dest,double sharedVolume) {
 		for (int v=0;v<valsPerTet;v++) 
-			destTet[dest*valsPerTet+v]+=sharedVolume*sVals[v];
+			destTet[dest*valsPerTet+v]+=sharedVolume*sCellVals[v];
 		destVolumes[dest]+=sharedVolume;
+	}
+	
+	/// This source element, with values sPt, overlaps with this dest element.
+	///   Transfer any possible node-centered values.
+	void transferNodeValues(const ConcreteElementNodeData &srcElement, int dest)
+	{
+		GenericElement el(POINT_PER_TET);
+		for (int dni=0;dni<POINT_PER_TET;dni++) {
+			int dn=destMesh.getTet(dest)[dni];
+			CkVector3d dnLoc=destMesh.getPoint(dn);
+			CVector natc;
+			if (el.element_contains_point(dnLoc,srcElement,natc)) 
+			{ /* this source element overlaps our destination */
+				el.interpolate_natural(valsPerPt,srcElement,natc,&destPt[dn*valsPerPt]);
+			}
+		}
 	}
 public:
 	parallelTransfer_c(collide_t voxels_,MPI_Comm mpi_comm_,
@@ -50,8 +101,9 @@ public:
 		xfer_t *destTet_,xfer_t *destPt_,const TetMesh &destMesh_)
 		:voxels(voxels_), mpi_comm(mpi_comm_), 
 		 valsPerTet(valsPerTet_), valsPerPt(valsPerPt_),
-		 srcTet(srcTet_),srcPt(srcPt_),srcMesh(srcMesh_),
-		 destTet(destTet_),destPt(destPt_),destMesh(destMesh_) 
+		 srcMesh(srcMesh_),srcTet(srcTet_),srcPt(srcPt_),
+		 destMesh(destMesh_),destTet(destTet_),destPt(destPt_),
+		 theLocalElement(srcMesh, srcPt,valsPerPt)
 	{
 		MPI_Comm_rank(mpi_comm,&myRank);
 		MPI_Comm_size(mpi_comm,&commSize);
@@ -81,19 +133,7 @@ static bbox3d getBox(int t,const TetMesh &mesh) {
 	return ret;
 }
 
-/**
- The on-the-wire mesh format looks like this:
-   list of points 0..nPoints-1
-      x,y,z for point; ptVal values per point
-   list of tets 0..nTets-1
-      p1,p2,p3,p4 point indices; tetVal values per tet
-   list of tet indices, in order they're shared
-*/
-#define COORD_PER_POINT 3
-#define POINT_PER_TET 4
-#define DOUBLES_PER_TET (COORD_PER_POINT*POINT_PER_TET+valsPerTet)
-
-// Return the number of xfer_t this many bytes corresponds to:
+// Return the number of xfer_t's (usual doubles) this many bytes corresponds to:
 inline int bytesToXfer(int nBytes) {
 	return (nBytes+sizeof(xfer_t)-1)/sizeof(xfer_t);
 }
@@ -160,7 +200,17 @@ public:
 	int getGlobal(int local) const {return locals[local];}
 };
 
-/** On-the-wire mesh format when sending/receiving tet mesh chunks: */
+/** 
+ Manages the on-the-wire mesh format when sending or receiving 
+ tet mesh chunks.
+
+ The on-the-wire mesh format looks like this:
+   - list of points 0..nPoints-1
+        x,y,z for point; ptVal values per point
+   - list of tets 0..nTets-1
+        p1,p2,p3,p4 point indices; tetVal values per tet
+   - list of tet indices, in order they're shared in collision records
+*/
 class tetMeshChunk {
 	xfer_t *buf; // Message buffer
 	
@@ -227,12 +277,12 @@ public:
 	/// Return the number of tets included in this message:
 	inline int nTets(void) const {return header->nTet;}
 	/// Return the connectivity array associated with this tet:
-	inline int *getTetConn(const meshState &s,int n) {
-		return (int *)&tetData[n*tetDataRecordSize(s)];
+	inline int *getTetConn(const meshState &s,int t) {
+		return (int *)&tetData[t*tetDataRecordSize(s)];
 	}
 	/// Return the user data associated with this tet:
-	inline xfer_t *getTetData(const meshState &s,int n) {
-		return &tetData[n*tetDataRecordSize(s)+bytesToXfer(POINT_PER_TET)];
+	inline xfer_t *getTetData(const meshState &s,int t) {
+		return &tetData[t*tetDataRecordSize(s)+bytesToXfer(POINT_PER_TET*sizeof(int))];
 	}
 	
 	/// Return the number of points included in this message:
@@ -330,14 +380,43 @@ public:
 };
 
 
+
+/**
+  Provides access to an element received off the network.
+*/
+class ConcreteNetworkElement : public ConcreteElementNodeData {
+	const meshState *s;
+	tetMeshChunk &ck;
+	int tet;
+	const int *tetConn;
+public:
+	ConcreteNetworkElement(tetMeshChunk &ck_)
+		:s(0), ck(ck_), tet(-1), tetConn(0) {}
+	void setTet(const meshState &s_,int tet_) {
+		s=&s_;
+		tet=tet_;
+		tetConn=ck.getTetConn(*s,tet);
+	}
+
+	/** Return the location of the i'th node of this element. */
+        virtual CPoint getNodeLocation(int i) const {
+		return CPoint(ck.getPtLoc(*s,tetConn[i]));
+	}
+        
+        /** Return the vector of data associated with our i'th node. */
+        virtual const double *getNodeData(int i) const {
+		return ck.getPtData(*s,tetConn[i]);
+	}
+};
+
 /** Receives tets from the wire */
 class tetReceiver {
 	int nRecv;
 	tetMeshChunk ck; // Incoming message data
 	int outCount;
-	TetMesh mesh; // HACK: temporary output mesh
+	ConcreteNetworkElement outElement;
 public:
-	tetReceiver() { nRecv=0; }
+	tetReceiver() :outElement(ck) { nRecv=0; }
 	~tetReceiver() { }
 	
 	void count(void) { nRecv++;}
@@ -357,22 +436,16 @@ public:
 		MPI_Recv(buf,msgLen,PARALLELTRANSFER_MPI_DTYPE,src,PARALLELTRANSFER_MPI_TAG,comm,&sts);
 		ck.receive(s,buf,msgLen);
 		
-		// Unpack the message into our mesh:
-		mesh.allocate(ck.nTets(), ck.nPts());
-		for (int t=0;t<mesh.getTets();t++) 
-			copy(mesh.getTet(t), ck.getTetConn(s,t), POINT_PER_TET);
-		for (int p=0;p<mesh.getPoints();p++)
-			copy((double *)mesh.getPoint(p), ck.getPtLoc(s,p), COORD_PER_POINT);
 		outCount=0;
 	}
 	
 	/// Extract the next tet (tet t of returned mesh) from the list.
 	///  Tets must be returned in the same order as presented in tetSender::putTet.
-	TetMesh *getTet(const meshState &s,int &t,const xfer_t* &tets,const xfer_t* &pts) { 
-		t=ck.getSendTets()[outCount++]; // Local number of this tet
-		tets=ck.getTetData(s,t);
-		pts=ck.getPtData(s,0);
-		return &mesh; 
+	ConcreteElementNodeData *getTet(const meshState &s,const xfer_t* &cells) { 
+		int t=ck.getSendTets()[outCount++]; // Local number of this tet
+		cells=ck.getTetData(s,t);
+		outElement.setTet(s,t);
+		return &outElement;
 	}
 };
 
@@ -383,7 +456,6 @@ void parallelTransfer_c::transfer(progress_t &progress) {
 	int s,d; //Source and destination tets
 	int p; //Processor
 	int c; //Collision
-	int v; //Value
 /* Convert input and output cells into bounding boxes:
 	    numbers 0..firstDest-1 are source tets (priority 1)
 	    numbers firstDest..lastDest-1 are dest tets (priority 2)
@@ -456,28 +528,30 @@ void parallelTransfer_c::transfer(progress_t &progress) {
 	progress.p("Transferring solution");
 	for (c=0;c<nColl;c++) {
 		const int *cr=&coll[3*c]; //Collision record:
-		int src,dest=-1; // Source and destination tets
-		const TetMesh *sMesh; // Source mesh
-		const xfer_t *sTet, *sPt; // Source tet and point values
+		int dest=-1; // Local destination tet number
+		const xfer_t *sCell; // Source cell-centered values
+		ConcreteElementNodeData *srcElement=NULL;
 		if (isLocal(cr)) { /* src and dest are local */
-			src=cr[0], dest=cr[2]-firstDest;
+			int src=cr[0]; dest=cr[2]-firstDest;
 			// Ordering *should* be maintained by voxels:
 			if (isDest(src) || dest<0) CmiAbort("Collision library did not respect local priority");
-			sMesh=&srcMesh; 
-			sTet=&srcTet[src*valsPerTet];
-			sPt=srcPt;
+			theLocalElement.set(src);
+			srcElement=&theLocalElement;
+			sCell=&srcTet[src*valsPerTet];
 		}
 		else if (isDest(cr[0])) { /* dest is local, src is remote */
-			src=-1, dest=cr[0]-firstDest;
-			sMesh=recv[cr[1]].getTet(ss,src,sTet,sPt);
+			dest=cr[0]-firstDest;
+			srcElement=recv[cr[1]].getTet(ss,sCell);
 		}
 		/* else isSrc, so it's send-only */
 		
 		if  (dest!=-1) {
-			// FIXME: actually transfer point data from sPt to destPt
-			double sharedVolume=getSharedVolume(src,*sMesh,dest,destMesh);
-			if (sharedVolume>0) 
-				addVolume(sTet,dest,sharedVolume);
+			TetMeshElement destElement(dest,destMesh);
+			double sharedVolume=getSharedVolumeTets(*srcElement,destElement);
+			if (sharedVolume>0) { /* source and dest really overlap-- transfer */
+				accumulateCellValues(sCell,dest,sharedVolume);
+				transferNodeValues(*srcElement, dest);
+			}
 		}
 	}
 	delete[] recv;
@@ -491,14 +565,12 @@ void parallelTransfer_c::transfer(progress_t &progress) {
 		// double accumScale=1.0/trueVolume; // testing version: uncompensated
 		double accumScale=1.0/destVolumes[d]; //Reverse volume weighting
 		double relErr=volErr*accumScale;
-#if OSL_CG3D_DEBUG
-		if (fabs(relErr)>1.0e-6 && volErr>1.0e-8) {
+		if (0 && (fabs(relErr)>1.0e-6 && volErr>1.0e-8)) {
 			printf("WARNING: ------------- volume mismatch for cell %d -------------\n"
 				" True volume %g, but total is only %g (err %g)\n",
 				d,trueVolume,destVolumes[d],volErr);
 			// abort();
 		}
-#endif
 		for (int v=0;v<valsPerTet;v++) destTet[d*valsPerTet+v]*=accumScale;
 	}
 }
@@ -506,6 +578,7 @@ void parallelTransfer_c::transfer(progress_t &progress) {
 class VerboseProgress_t : public progress_t {
 	MPI_Comm comm;
 	int myRank;
+	const char *module;
 	const char *last;
 	double start;
 	void printLast(void) {
@@ -514,15 +587,19 @@ class VerboseProgress_t : public progress_t {
 		MPI_Barrier(comm);
 		t=MPI_Wtime();
 		double barrier=t-start; start=t;
-		if (myRank==0 && last)
-			CkPrintf("%s took %.6f s (+%.6f s imbalance)\n",
-				last,withoutBarrier,barrier);
+		if (myRank==0 && last && ((withoutBarrier>0.1) || (barrier>0.1)))
+		{
+			CkPrintf("%s: %s took %.6f s (+%.6f s imbalance)\n",
+				module,last,withoutBarrier,barrier);
+			fflush(stdout);
+		}
 	}
 public:
-	VerboseProgress_t(MPI_Comm comm_) {
+	VerboseProgress_t(MPI_Comm comm_,const char *module_) {
 		comm=comm_;
 		MPI_Comm_rank(comm,&myRank);
 		last=NULL;
+		module=module_;
 	}
 	~VerboseProgress_t() {
 		if (last) printLast();
@@ -543,7 +620,7 @@ void ParallelTransfer(collide_t voxels,MPI_Comm mpi_comm,
 {
 	parallelTransfer_c t(voxels,mpi_comm,valsPerTet,valsPerPt,
 		srcTet,srcPt,srcMesh, destTet,destPt,destMesh);
-	VerboseProgress_t p(mpi_comm);
+	VerboseProgress_t p(mpi_comm,"ParallelTransfer");
 	t.transfer(p);
 }
 

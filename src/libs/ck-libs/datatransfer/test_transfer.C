@@ -7,7 +7,7 @@ However, it's very easy to use.
 */
 #include <stdio.h>
 #include <stdlib.h>
-#include "tetmesh.h"
+#include "transfer.h"
 #include "charm.h" //For CkAbort
 
 int main(int argc,char *argv[]) {

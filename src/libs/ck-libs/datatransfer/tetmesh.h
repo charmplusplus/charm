@@ -86,23 +86,6 @@ void writeFEM(int m,TetMesh &t);
 namespace cg3d { class Planar3dDest; };
 
 /**
- * Compute the volume of the intersection of these two cells.
- */
-double getSharedVolume(int s,const TetMesh &srcMesh,
-	int d,const TetMesh &destMesh);
-
-/**
- * Conservatively, accurately transfer 
- *   srcVals, tet-centered values on srcMesh
- * to
- *   destVals, tet-centered values on destMesh
- * WARNING: uses O(srcMesh * destMesh) time!
- */
-void transferCells(int valsPerTet,
-	double *srcVals,const TetMesh &srcMesh,
-	double *destVals,const TetMesh &destMesh);
-
-/**
  * Return the average edge length on this mesh.
  */
 double averageEdgeLength(const TetMesh &m);
