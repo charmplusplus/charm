@@ -19,7 +19,15 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
   int pe;
   for(pe=0; pe < count; pe++) {
     n_objs += stats[pe].n_objs;
-    n_edges += stats[pe].n_comm;
+    int index;
+    // initialize node array
+    for(index = 0; index < stats[pe].n_comm; index++) {
+      const LDCommData newedgedata = stats[pe].commData[index];
+
+      // If this isn't an object-to-object message, ignore it
+      if (!newedgedata.from_proc && !newedgedata.to_proc)
+	n_edges++;
+    }
   }
   nodelist = new Node[n_objs];
   edgelist = new Edge[n_edges];
@@ -111,6 +119,7 @@ int ObjGraph::calc_hashval(LDOMid omid, LDObjid id)
 ObjGraph::Node* ObjGraph::find_node(LDOMid edge_omid, LDObjid edge_id)
 {
   const int from_hashval = calc_hashval(edge_omid,edge_id);
+  //  CkPrintf("From = %d\n",from_hashval);
   Node* from_node = node_table[from_hashval];
 
   while (from_node != 0) {
@@ -118,6 +127,7 @@ ObjGraph::Node* ObjGraph::find_node(LDOMid edge_omid, LDObjid edge_id)
       stats[from_node->proc].objData[from_node->index].omID;
     const LDObjid objid =
       stats[from_node->proc].objData[from_node->index].id;
+    //    CkPrintf("Comparing %d to %d\n",objid.id[0],edge_id.id[0]);
     if (LDOMidEqual(omid,edge_omid) && LDObjIDEqual(objid,edge_id) )
       break;
   }
