@@ -637,12 +637,12 @@ of load balancing strategy routines).
 There are three ways to use the load balancer-- 
 \begin{itemize}
 
-\item \bf{Method 1}: By default, the array elements may be asked to migrate at any time
+\item Method 1: By default, the array elements may be asked to migrate at any time
 provided they are not in the middle of executing an entry method. 
 The array element's variable \kw{usesAtSync} being false attributes
 to this default behaviour. 
 
-\item \bf{Method 2}: Using the AtSync method, elements can be migrated at certain
+\item  Method 2: Using the AtSync method, elements can be migrated at certain
 times.  For the AtSync method, set \kw{usesAtSync} to true in your 
 array element constructor.  When an element is ready to migrate,
 call \kw{ArrayElement::AtSync}.  
@@ -660,13 +660,15 @@ Note: Setting usesAtSync to true makes it mandatory for the array
 element to call \kw{AtSync} and implement the \kw{ResumeFromSync}
  function.
 
-\item \bf{ Method 3}: The load balancer can be programmed to be started
+\item Method 3: The load balancer can be programmed to be started
 manually. 
  To use this feature, the LBDatabase object
 can be got explicitly by making the call \kw{LBDatabase::Object()}
 For example, 
 
-\kw{LBDatabase * myLbdb = LBDatabase::Object()}
+\begin{alltt}
+LBDatabase * myLbdb = LBDatabase::Object()
+\end{alltt}
 
 \kw{myLbdb->TurnManualLBOn()} will enable the manual switching on of
 the Load Balancer, so that no Load Balancer will be started automatically.
