@@ -50,13 +50,16 @@ private:
   double  rTime;	// relative time from the start entry
   bgEventCallBackFn  callbackFn;
   void* usrPtr;
-  char   eType;
 public:
-  bgEvents(void *d, double t, bgEventCallBackFn fn, void *uptr, char e): 
-	data(d), rTime(t), callbackFn(fn), usrPtr(uptr), eType(e) {}
+  char   eType;
+  int     index;		// index of the event to its original log pool.
+  bgEvents(): index(-1) {}
+  bgEvents(void *d, int idx, double t, bgEventCallBackFn fn, void *ptr, char e):
+	data(d), index(idx), rTime(t), callbackFn(fn), usrPtr(ptr), eType(e) {}
   inline void update(double startT, double recvT, int e) {
 	if (eType==e) callbackFn(data, startT+rTime, recvT, usrPtr);
   }
+  void pup(PUP::er &p) {  p|eType; p|index; p|rTime; }
 };
 
 /**
@@ -115,8 +118,8 @@ public:
     return maxEndTime;
   }
 
-  inline void addEvent(void *data,double absT,bgEventCallBackFn fn,void *p,int e) { 
-    evts.push_back(new bgEvents(data, absT-startTime, fn, p, e)); 
+  inline void addEvent(void *data,int idx,double absT,bgEventCallBackFn fn,void *p,int e) { 
+    evts.push_back(new bgEvents(data, idx, absT-startTime, fn, p, e)); 
   }
   inline void updateEvents(int e) {
     for (int i=0; i<evts.length(); i++)

@@ -175,8 +175,10 @@ void bgTimeLog::write(FILE *fp)
 
 void bgTimeLog::addBackwardDep(bgTimeLog* log){
   
- CmiAssert(recvTime < 0.);
+  CmiAssert(recvTime < 0.);
   if(log != NULL){
+    for (int i=0; i<backwardDeps.length(); i++)
+      if (backwardDeps[i] == log) return;	// already exist
     backwardDeps.insertAtEnd(log);
     log->forwardDeps.insertAtEnd(this);
     effRecvTime = max(effRecvTime, log->effRecvTime);
@@ -290,20 +292,26 @@ void bgTimeLog::pup(PUP::er &p){
       threadNum = currTlineIdx;
     }
 
-    if(!p.isUnpacking()){
-      l=msgs.length();
-    }
+    // pup for bgMsgEntry
+    if(!p.isUnpacking()) l=msgs.length();
     p|l;
 
-    for(i=0;i<l;i++){
-      if (p.isUnpacking()){
-         msgs.push_back(new bgMsgEntry);
-      }
+    for(i=0;i<l;i++) {
+      if (p.isUnpacking()) msgs.push_back(new bgMsgEntry);
       msgs[i]->pup(p);
     }
 
-    if(!p.isUnpacking())
-      l = backwardDeps.length();
+    // pup events list for projections
+    if(!p.isUnpacking()) l=evts.length();
+    p|l;
+
+    for(i=0;i<l;i++) {
+      if (p.isUnpacking()) evts.push_back(new bgEvents);
+      evts[i]->pup(p);
+    }
+
+    // pup for backwardDeps
+    if(!p.isUnpacking()) l = backwardDeps.length();
     p|l;    
 
     for(i=0;i<l;i++){
@@ -316,9 +324,7 @@ void bgTimeLog::pup(PUP::er &p){
       }
     }
  
-   if(!p.isUnpacking()){
-      l=forwardDeps.length();
-    }
+    if(!p.isUnpacking()) l=forwardDeps.length();
     p|l;
 
     for(i=0;i<l;i++){ 
@@ -326,9 +332,6 @@ void bgTimeLog::pup(PUP::er &p){
 	p|idx;
       else
 	p|forwardDeps[i]->index;
-      
     }
-
 }
-
 

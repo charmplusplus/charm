@@ -753,7 +753,7 @@ void BgWriteThreadTimeLine(char **argv, int x, int y, int z, int th, BgTimeLine 
 		TimeLog correction with trace projection
 *****************************************************************************/
 
-void bgAddProjEvent(void *data, double t, bgEventCallBackFn fn, void *uPtr, int eType)
+void bgAddProjEvent(void *data, int idx, double t, bgEventCallBackFn fn, void *uPtr, int eType)
 {
   if (!genTimeLog) return;
   CmiAssert(tTHREADTYPE == WORK_THREAD);
@@ -773,7 +773,7 @@ void bgAddProjEvent(void *data, double t, bgEventCallBackFn fn, void *uPtr, int 
     tlog->recvTime = tlog->effRecvTime = endT;
     tlinerec.enq(tlog, 0);
   }
-  tlog->addEvent(data, t, fn, uPtr, eType);
+  tlog->addEvent(data, idx, t, fn, uPtr, eType);
 }
 
 

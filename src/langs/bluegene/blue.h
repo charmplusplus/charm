@@ -210,7 +210,8 @@ void BgStartCorrection();
 
 void *BgCreateEvent(int eidx);
 void BgEntrySplit();
-void bgAddProjEvent(void *data, double t, bgEventCallBackFn fn, void *uptr, int eType);
+void bgAddProjEvent(void *data, int idx, double t, 
+		    bgEventCallBackFn fn, void *uptr, int eType);
 void bgUpdateProj(int eType);
 double BgGetRecvTime();
 void BgResetRecvTime();
