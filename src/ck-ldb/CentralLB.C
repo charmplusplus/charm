@@ -94,7 +94,11 @@ void CentralLB::AtSync()
     MigrationDone();
     return;
   }
+  CProxy_CentralLB(thisgroup).ProcessAtSync(CkMyPe());
+}
 
+void CentralLB::ProcessAtSync()
+{
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CmiWallTimer();
     CkPrintf("Load balancing step %d starting at %f in %d\n",

@@ -27,6 +27,8 @@ public:
   CentralLB(CkMigrateMessage *m) {}
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
+  void ProcessAtSync(void); // Receive a message from AtSync to avoid
+                            // making projections output look funny
 
   void ReceiveStats(CLBStatsMsg *); 		// Receive stats on PE 0
   void ResumeClients(void);                     // Resuming clients needs
