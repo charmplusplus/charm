@@ -16,6 +16,7 @@ static int curEvent;
 static int execEvent;
 static int execEp;
 static int execPe;
+static int curevent=0;
 
 extern "C" void initCharmProjections() 
 {
@@ -142,7 +143,27 @@ extern "C" void charm_endComputation(void)
 
 extern "C" void charm_messageRecv(char *env, int pe) {} //TODO
 
-extern "C" void charm_userEvent(int e) {}	//TODO
+extern "C" void charm_userEvent(int e) {
+	int *iData = (int *)malloc(sizeof(int)*3);
+	iData[0] = e;
+	iData[1] = curevent;
+	iData[2] = CkMyPe();
+	curevent++;
+	LogEvent1(_CHARM_LANG_ID, _E_USER_EVENT_CHARM,3,iData);
+}	
+
+
+extern "C" void charm_userPairEvent(int e,double bt,double et){
+	int *iData1 = (int *)malloc(sizeof(int)*3);
+	int *iData2 = (int *)malloc(sizeof(int)*3);
+	iData1[0] = iData2[0] = e;
+	iData1[1] = iData2[1] = curevent;
+	iData1[2] = iData2[2] = CkMyPe();
+	curevent++;
+	LogEvent4(_CHARM_LANG_ID, _E_USER_EVENT_PAIR,3,iData1,bt);
+	LogEvent4(_CHARM_LANG_ID, _E_USER_EVENT_PAIR,3,iData2,et);
+	
+}
 
 extern "C" void charm_beginPack(void)
 {

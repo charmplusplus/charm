@@ -22,6 +22,7 @@ CpvStaticDeclare(int ,staticNumEntries);
 /* Trace Timer */
 #define  TRACE_CORE_TIMER   CmiWallTimer
 inline double TraceCoreTimer() { return TRACE_CORE_TIMER() - CpvAccess(_traceCoreInitTime); }
+inline double TraceCoreTimer(double t) { return t - CpvAccess(_traceCoreInitTime); }
 
 /***************** Class TraceCore Definition *****************/
 TraceCore::TraceCore(char** argv)
@@ -173,6 +174,16 @@ void TraceCore::LogEvent(int lID, int eID, int iLen, int* iData)
 	LogEvent(lID, eID, iLen, iData, 0, NULL); 
 }
 
+void TraceCore::LogEvent(int lID, int eID, int iLen, int* iData,double t){
+	if(traceCoreOn == 0){
+		return;
+	}
+#ifndef CMK_OPTIMIZE	
+	traceLogger->add(lID,eID,TraceCoreTimer(t),iLen,iData,0,NULL);
+#endif
+}
+
+
 void TraceCore::LogEvent(int lID, int eID, int sLen, char* sData)
 { 
 	if(traceCoreOn == 0){
@@ -187,15 +198,7 @@ void TraceCore::LogEvent(int lID, int eID, int iLen, int* iData, int sLen, char*
 	if(traceCoreOn == 0){
 		return;
 	}
-	if(iData != NULL) {
-	//	CmiPrintf(" iData(%d): ",iLen);
-		for(int i=0; i<iLen; i++) { //CmiPrintf("%d ", iData[i]);
-		}
-	}
-	if(sData != NULL) {
-//		CmiPrintf("sData: %s", sData);
-	}
-//	CmiPrintf("\n");
+	
 
 #ifndef CMK_OPTIMIZE
 	traceLogger->add(lID, eID, TraceCoreTimer(), iLen, iData, sLen, sData);
@@ -249,11 +252,11 @@ void TraceEntry::write(FILE* fp, int prevLID, int prevSeek, int nextLID, int nex
 	else fprintf(fp, "\n");
 
 	// free memory
-/*	if(entity) delete [] entity;
+	if(entity) delete [] entity;
 	//entity = NULL;
 	if(iData)  delete [] iData;
 	//iData = NULL;
-	if(sData)  delete [] sData;*/
+	if(sData)  delete [] sData;
 	//sData=NULL;
 }
 
@@ -275,6 +278,8 @@ TraceLogger::TraceLogger(char* program, int b):
   pgm = new char[strlen(program)+1];
   sprintf(pgm, "%s", program);
   numEntries = 0;
+  isWriting = 0;
+  buffer = NULL;
 
   //CmiPrintf("In TraceLogger Constructor %s %d",pgm,strlen(program)+1);
   //initlogfiles();
@@ -391,27 +396,32 @@ void TraceLogger::writeSts(void) {};
 
 void TraceLogger::add(int lID, int eID, double timestamp, int iLen, int* iData, int sLen, char* sData)
 {
-  
+  if(isWriting){
+	//  CmiPrintf("Printing in buffer \n");
+	  buffer = new TraceEntry(lID, eID, timestamp, iLen, iData, sLen, sData);
+  }else{
   new (&pool[CpvAccess(staticNumEntries)]) TraceEntry(lID, eID, timestamp, iLen, iData, sLen, sData);
   CpvAccess(staticNumEntries) = CpvAccess(staticNumEntries)+1;
 if(CpvAccess(staticNumEntries)>= poolSize) {
-  //  if(numEntries>= poolSize) {
     double writeTime = TraceCoreTimer();
-
+    isWriting = 1;
     if(binary) writeBinary();
 	else 	   write();
+    isWriting = 0;
 
-	// move the last entry of pool to first position
- /*   for(int i=0;i<numEntries;i++){
-	    delete pool[i];
-    }*/
     new (&pool[0]) TraceEntry(pool[CpvAccess(staticNumEntries)-1]);
     //numEntries = 1;
     CpvAccess(staticNumEntries)=1;
+    if(buffer != NULL){
+	    new (&pool[1]) TraceEntry(*buffer);
+	    CpvAccess(staticNumEntries)=2;
+	    buffer = NULL;
+    }
 	//TODO
     //new (&pool[numEntries++]) TraceEntry(0, BEGIN_INTERRUPT, writeTime);
     //new (&pool[numEntries++]) TraceEntry(0, END_INTERRUPT, TraceCoreTimer());
   }
+ }
 }
 
 void TraceLogger::openLogFiles()

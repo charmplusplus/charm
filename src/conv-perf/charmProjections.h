@@ -21,6 +21,7 @@ void charm_beginComputation(void);
 void charm_endComputation(void);
 void charm_messageRecv(char *env, int pe);
 void charm_userEvent(int e);
+void charm_userPairEvent(int e,double bt,double et);
 void charm_beginPack(void);
 void charm_endPack(void);
 void charm_beginUnpack(void);

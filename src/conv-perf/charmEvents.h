@@ -25,6 +25,8 @@
 #define  _E_BEGIN_UNPACK        18
 #define  _E_END_UNPACK          19
 
+#define  _E_USER_EVENT_PAIR    100
+
 /* Trace Macros */
 #define REGISTER_CHARM \
 	{ RegisterLanguage(_CHARM_LANG_ID, "charm\0"); \
@@ -43,6 +45,7 @@
 	  RegisterEvent(_CHARM_LANG_ID, _E_END_PACK         ); \
 	  RegisterEvent(_CHARM_LANG_ID, _E_BEGIN_UNPACK     ); \
 	  RegisterEvent(_CHARM_LANG_ID, _E_END_UNPACK       ); \
+	  RegisterEvent(_CHARM_LANG_ID, _E_USER_EVENT_PAIR  ); \
 	  \
 	}
 #define _LOG_E_CREATION_1(env) 		{ charm_creation(env); }
@@ -69,5 +72,5 @@
 #define _LOG_E_END_PACK() 				{ charm_endPack(); }
 #define _LOG_E_BEGIN_UNPACK() 			{ charm_beginUnpack(); }
 #define _LOG_E_END_UNPACK() 			{ charm_endUnpack(); }
-
+#define _LOG_E_USER_EVENT_PAIR_CHARM(x,bt,et)	{ charm_userPairEvent(x,bt,et);}
 #endif

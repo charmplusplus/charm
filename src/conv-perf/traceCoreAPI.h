@@ -14,7 +14,7 @@ void LogEvent(int lID, int eID);
 void LogEvent1(int lID, int eID, int iLen, int* iData);
 void LogEvent2(int lID, int eID, int sLen, char* sData);
 void LogEvent3(int lID, int eID, int iLen, int* iData, int sLen, char* sData);
-
+void LogEvent4(int lID, int eID, int iLen, int* iData, double t);
 #ifdef __cplusplus
 }
 #endif
