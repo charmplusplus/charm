@@ -430,17 +430,20 @@ void CqsEnumerateQueue(Queue q, void ***resp){
     (*resp)[j] = result[i];
     j++;
   }
+  CmiFree(result);
   
   result = CqsEnumerateDeq(&(q->zeroprio), &num);
   for(i = 0; i < num; i++){
     (*resp)[j] = result[i];
     j++;
   }
+  CmiFree(result);
 
   result = CqsEnumeratePrioq(&(q->posprioq), &num);
   for(i = 0; i < num; i++){
     (*resp)[j] = result[i];
     j++;
   }
+  CmiFree(result);
 }
 

@@ -75,7 +75,7 @@ _CK_Object::~_CK_Object() {
 
 char *
 _CK_Object::showHeader(){
-  char *ret  = (char *)malloc(sizeof(strlen("Default Header")));
+  char *ret  = (char *)malloc(strlen("Default Header")+1);
   strcpy(ret, "Default Header");
   return(ret);  
 }
@@ -84,8 +84,8 @@ char *
 _CK_Object::showContents(){
   char *ret;
 
-  ret = (char *)malloc(sizeof(char) *15);
-  sprintf(ret, "Contents : %d", (int)this);
+  ret = (char *)malloc(sizeof(char) *50);
+  sprintf(ret, "Contents : %x", this);
   return(ret);
 }
 

@@ -1005,7 +1005,7 @@ void CmiHandleMessage(void *msg)
 
     /* Freeze and send a message back */
     CpdFreeze();
-    freezeReply = (char *)malloc(strlen("freezing")+strlen(breakPointHeader)+1);
+    freezeReply = (char *)malloc(strlen("freezing@")+strlen(breakPointHeader)+1);
     sprintf(freezeReply, "freezing@%s", breakPointHeader);
     fd = skt_connect(freezeIP, freezePort, 120);
     if(fd > 0){
@@ -1034,7 +1034,7 @@ void CmiHandleMessage(void *msg)
 
     /* Freeze and send a message back */
     CpdFreeze();
-    freezeReply = (char *)malloc(strlen("freezing")+strlen(breakPointHeader)+1);
+    freezeReply = (char *)malloc(strlen("freezing@")+strlen(breakPointHeader)+1);
     sprintf(freezeReply, "freezing@%s", breakPointHeader);
     fd = skt_connect(freezeIP, freezePort, 120);
     if(fd > 0){
@@ -1937,8 +1937,9 @@ static void CcsStringHandlerFn(char *msg)
   if(list==0) CmiAbort("Invalid Service Request\n");
   while(*msg != '\n') msg++;
   msg++;
-  cmsg = (char *) CmiAlloc(size+CmiMsgHeaderSizeBytes);
+  cmsg = (char *) CmiAlloc(size+CmiMsgHeaderSizeBytes+1);
   memcpy(cmsg+CmiMsgHeaderSizeBytes, msg, size);
+  cmsg[CmiMsgHeaderSizeBytes+size] = '\0';
 
   CmiSetHandler(cmsg, hdlrID);
   CpvAccess(callerIP) = ip;

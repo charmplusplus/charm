@@ -1696,12 +1696,13 @@ static void ctrl_getone()
       int pe, size, len;
       sscanf(line, "%s%d%d", cmd, &pe, &size);
       len = strlen(line);
-      msg = (char *) CmiAlloc(len+size+CmiMsgHeaderSizeBytes);
+      msg = (char *) CmiAlloc(len+size+CmiMsgHeaderSizeBytes+1);
       if (!msg)
         CmiPrintf("%d: Out of mem\n", Cmi_mynode);
       CmiSetHandler(msg, CpvAccess(strHandlerID));
       strcpy(msg+CmiMsgHeaderSizeBytes, line);
       fread(msg+CmiMsgHeaderSizeBytes+len, 1, size, f);
+      msg[CmiMsgHeaderSizeBytes+len+size] = '\0';
       PCQueuePush(CmiGetStateN(pe)->recv, msg);
 #endif
     } else if (strncmp(line,"die ",4)==0) {

@@ -19,9 +19,9 @@ char* getEnvInfo(ENVELOPE *env){
   int size;
   int chareIndex;
   int epIndex = env -> EP;
-  size = strlen((CsvAccess(EpInfoTable) + epIndex) -> name);
+  size = strlen((CsvAccess(EpInfoTable) + epIndex) -> name)+1;
   chareIndex = (CsvAccess(EpInfoTable) + epIndex) -> chareindex;
-  size += strlen((CsvAccess(ChareNamesTable))[chareIndex]);
+  size += strlen((CsvAccess(ChareNamesTable))[chareIndex])+1;
   
   returnInfo = (char *)malloc((size + 2) * sizeof(char));
   strcpy(returnInfo, (CsvAccess(EpInfoTable) + epIndex) -> name);
@@ -91,14 +91,14 @@ char *getBreakPoints()
       CsvAccess(BreakPoints)[i] = 0;
   }
 
-  temp = (char *)malloc((CsvAccess(TotalEps) + 1) * 2 * sizeof(char));
+  temp = (char *)malloc(CsvAccess(TotalEps)*2*sizeof(char)+6);
   strcpy(temp, "");
-  sprintf(temp, "%s%d", temp, CsvAccess(TotalEps));
-  strcat(temp, "#");
+  sprintf(temp, "%d#", CsvAccess(TotalEps));
   for(i = 0; i < CsvAccess(TotalEps); i++){
-    sprintf(temp, "%s%d#", temp, CsvAccess(BreakPoints)[i]);
+    char t[3];
+    sprintf(t, "%d#", CsvAccess(BreakPoints)[i]);
+    strcat(temp, t);
   }
-
   return(temp);
 }
 

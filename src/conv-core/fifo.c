@@ -105,6 +105,9 @@ void FIFO_Enumerate(queue, element)
   int i = 0;
   int num = queue->fill;
   int pull = queue->pull;
+  *element = 0;
+  if(num == 0)
+    return;
   *element = (void **)malloc(num * sizeof(void *));
   while(num > 0){
     (*element)[i++] = queue->block[pull];

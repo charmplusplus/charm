@@ -36,16 +36,16 @@ extern "C" char* getSymbolTableInfo();
 CpvDeclare(int *, handlerArray);
 CpvDeclare(int, noOfHandlers);
 
-void **schedQueue;
-void **FIFOQueue;
-void **DQueue;
+void **schedQueue=0;
+void **FIFOQueue=0;
+void **DQueue=0;
 
 int schedIndex;
 int debugIndex;
 int FIFOIndex;
 
 void msgListCleanup(){
-  if(schedQueue != 0) free(schedQueue);
+  if(schedQueue != 0) CmiFree(schedQueue);
   if(FIFOQueue != 0) free(FIFOQueue);
   if(DQueue != 0) free(DQueue);
   schedIndex = 0;
@@ -101,7 +101,7 @@ char* genericViewMsgFunction(char *msg, int type){
 	}
 	else{
 	    //str << "Contents not known in this implementation" << '\0';
-	    temp = (char *)malloc(strlen("Contents not known in this implementation") * sizeof(char));
+	    temp = (char *)malloc((strlen("Contents not known in this implementation") + 1) * sizeof(char));
 	    strcpy(temp, "Contents not known in this implementation");
 	    //return(str.str());
 	    return(temp);
@@ -109,7 +109,7 @@ char* genericViewMsgFunction(char *msg, int type){
     }
     else {
         //str << "<HEADER>:Unknown # Format #" << '\0';
-        temp = (char *)malloc(strlen("<HEADER>:Unknown # Format #") * sizeof(char));
+        temp = (char *)malloc((strlen("<HEADER>:Unknown # Format #") + 1) * sizeof(char));
 	strcpy(temp, "<HEADER>:Unknown # Format #");
 	return(temp);
         //return(str.str());
@@ -128,8 +128,12 @@ char* getMsgListSched(){
     /*** ***/
 
     ending = NUM_MESSAGES;
-    ending = (ending + schedIndex < ((Queue)(CpvAccess(CsdSchedQueue)))->length) ? ending : (((Queue)(CpvAccess(CsdSchedQueue)))->length) - schedIndex;
-    maxLength = ending * sizeof(char) * 20;
+    if ( (ending + schedIndex) >
+         ((Queue)(CpvAccess(CsdSchedQueue)))->length) {
+      ending = (((Queue)(CpvAccess(CsdSchedQueue)))->length) 
+               - schedIndex;
+    }
+    maxLength = ending * sizeof(char) * 20 + 1;
     list = (char *)malloc(maxLength);
     strcpy(list, "");
 
@@ -137,8 +141,10 @@ char* getMsgListSched(){
     for(int i = schedIndex; i < ending + schedIndex; i++){
         temp = genericViewMsgFunction((char *)schedQueue[i], 0);
 	//str << temp << "#" << i << "#";
-	if(strlen(list) + strlen(temp) + 10 > maxLength) 
+	if(strlen(list) + strlen(temp) + 10 > maxLength){ 
+	  free(temp);
 	  break;
+	}
 	strcat(list, temp);
 	strcat(list, "#");
 	sprintf(t, "%d", i);
@@ -170,7 +176,7 @@ char* getMsgListPCQueue(){
     strstream str;
     char *list;
 
-    list = (char *)malloc(strlen("Not implemented") * sizeof(char));
+    list = (char *)malloc((strlen("Not implemented") + 1) * sizeof(char));
     strcpy(list, "Not implemented");
     //str << "Not implemented" << '\0';
     //return(str.str());
@@ -187,8 +193,12 @@ char* getMsgListFIFO(){
     int maxLength;
 
     ending = NUM_MESSAGES;
-    ending = (ending + FIFOIndex < ((FIFO_QUEUE *)(CpvAccess(CmiLocalQueue)))->fill) ? ending : (((FIFO_QUEUE *)(CpvAccess(CmiLocalQueue)))->fill) - FIFOIndex;
-    maxLength = ending * sizeof(char) * 20;
+    if ( (ending + FIFOIndex) >
+         ((FIFO_QUEUE *)(CpvAccess(CmiLocalQueue)))->fill) {
+      ending = (((FIFO_QUEUE *)(CpvAccess(CmiLocalQueue)))->fill) 
+               - FIFOIndex;
+    }
+    maxLength = ending * sizeof(char) * 20 + 1;
     list = (char *)malloc(maxLength);
     strcpy(list, "");
 
@@ -196,8 +206,10 @@ char* getMsgListFIFO(){
     for(int i = FIFOIndex; i < FIFOIndex + ending; i++){
         temp = genericViewMsgFunction((char *)FIFOQueue[i], 0);
         //str << temp << "#" << i << "#";
-	if(strlen(list) + strlen(temp) + 10 > maxLength) 
+	if(strlen(list) + strlen(temp) + 10 > maxLength){
+	  free(temp); 
 	  break;
+	}
 	strcat(list, temp);
 	strcat(list, "#");
 	sprintf(t, "%d", i);
@@ -223,8 +235,12 @@ char* getMsgListDebug(){
     char *temp;
 
     ending = NUM_MESSAGES;
-    ending = (ending + debugIndex < ((FIFO_QUEUE *)(CpvAccess(debugQueue)))->fill) ? ending : (((FIFO_QUEUE *)(CpvAccess(debugQueue)))->fill) - debugIndex;
-    maxLength = ending * sizeof(char) * 20;
+    if ( (ending + debugIndex) >
+         ((FIFO_QUEUE *)(CpvAccess(debugQueue)))->fill) {
+      ending = (((FIFO_QUEUE *)(CpvAccess(debugQueue)))->fill) 
+               - debugIndex;
+    }
+    maxLength = ending * sizeof(char) * 20 + 1;
     list = (char *)malloc(maxLength);
     strcpy(list, "");
 
@@ -236,8 +252,10 @@ char* getMsgListDebug(){
     for(int i = debugIndex; i < ending + debugIndex; i++){
         temp = genericViewMsgFunction((char *)DQueue[i], 0);
         //str << genericViewMsgFunction((char *)DQueue[i], 0) << "#" << i << "#";
-	if(strlen(list) + strlen(temp) + 10 > maxLength) 
+	if(strlen(list) + strlen(temp) + 10 > maxLength){ 
+	  free(temp);
 	  break;
+	}
 	strcat(list, temp);
 	strcat(list, "#");
 	sprintf(t, "%d", i);
@@ -270,7 +288,7 @@ char* getMsgContentsPCQueue(int index){
     //str << "Not implemented";
     //str << '\0';
     //return(str.str());
-    temp = (char *)malloc(strlen("Not implemented") * sizeof(char));
+    temp = (char *)malloc((strlen("Not implemented") + 1) * sizeof(char));
     strcpy(temp, "Not implemented");
     return(temp);
 }
