@@ -54,6 +54,7 @@ POST_LIBRARIES=""
 PRE_LIBRARIES=""  
 USE_F90_LIBRARIES="0"  
 USE_F77_LIBRARIES="0"  
+F90_MODDIR=
 AMPIMAIN=""
 COPYTO=""        
 MODCOPIES=""        
@@ -573,6 +574,11 @@ do
 		OPTS="$OPTS $arg"
 		;;
 
+	"-p")
+		F90_MODDIR="$F90_MODDIR $1"
+		shift
+		;;
+
 	-l*|*.a)
 		if [ -n "$POST_LANGUAGE" ]
 		then
@@ -745,6 +751,14 @@ then
     CMK_CF90_MODINC="$CMK_F90_MODINC"
 else
     CMK_CF90_MODINC="-M"
+fi
+
+if [ -n "$F90_MODDIR" ]
+then
+    for dir in $F90_MODDIR
+    do
+      OPTS_F90="$OPTS_F90 $CMK_CF90_MODINC $dir"
+    done
 fi
 
 if [ -n "$CMK_F90_USE_MODDIR" ]
