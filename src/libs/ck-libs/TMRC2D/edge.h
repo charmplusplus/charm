@@ -95,12 +95,8 @@ class edge {
 	    elemRef requester, int *local, int *first, int *nullNbr);
   int collapse(elemRef requester, node kNode, node dNode, elemRef kNbr,
 	       elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node oNode,
-	       int *local, int *first);
+	       int *local, int *first, node newN);
   void sanityCheck(chunk *c, edgeRef shouldRef);
-  int nodeLockup(node n, edgeRef start, elemRef from, elemRef end, double l);
-  void nodeUnlock(node n, elemRef from, elemRef end);
-  int nodeUpdate(node n, elemRef from, elemRef end, node newNode);
-  int nodeDelete(node n, elemRef from, elemRef end, node ndReplace);
 };
 
 #endif

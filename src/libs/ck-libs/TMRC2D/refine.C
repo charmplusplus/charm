@@ -51,10 +51,8 @@ CDECL void REFINE2D_NewMesh(int nEl,int nGhost,int nnodes,const int *conn,const 
   if (!CtvAccess(_refineChunk))
     CkAbort("Forgot to call REFINE_Attach!!\n");
 
-/* FIXME: global barrier is a silly way to avoid early edge numbering messages */
   MPI_Barrier(MPI_COMM_WORLD);
-  CtvAccess(_refineChunk)->newMesh(nEl,nGhost,conn, gid, nnodes, boundaries, 0);
-  CkWaitQD(); //Wait for all edge numbering messages to finish
+  CtvAccess(_refineChunk)->newMesh(nEl,nGhost,conn, gid, nnodes, boundaries,0);
 }
 FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
 (int *nEl,int *nGhost,int nnodes,const int *conn,const int *gid,const int *boundaries)
@@ -63,8 +61,8 @@ FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
   if (!CtvAccess(_refineChunk))
     CkAbort("Forgot to call REFINE_Attach!!\n"); 
   
+  MPI_Barrier(MPI_COMM_WORLD);
   CtvAccess(_refineChunk)->newMesh(*nEl, *nGhost,conn, gid, nnodes, boundaries, 1);
-  CkWaitQD(); //Wait for all edge numbering messages to finish
 }
 
 /********************** Splitting ******************/
@@ -234,7 +232,6 @@ CDECL void REFINE2D_Split(int nNode,double *coord,int nEl,double *desiredArea)
 
   C->updateNodeCoords(nNode, coord, nEl);
   C->multipleRefine(desiredArea, &client);
-  CkWaitQD();
 }
 
 CDECL void REFINE2D_Coarsen(int nNode,double *coord,int nEl,double *desiredArea)
@@ -248,7 +245,6 @@ CDECL void REFINE2D_Coarsen(int nNode,double *coord,int nEl,double *desiredArea)
 
   C->updateNodeCoords(nNode, coord, nEl);
   C->multipleCoarsen(desiredArea, &client);
-  CkWaitQD();
 }
 
 
@@ -338,7 +334,6 @@ static void checkConn(int nEl,const int *conn,int idxBase,int nNode)
 {
   chunk *C = CtvAccess(_refineChunk);
   if (!C) CkAbort("Did you forget to call REFINE2D_Attach?");
-  C->sanityCheck();
   //This check stolen from updateNodeCoords:
   if (nEl != C->numElements || nNode != C->numNodes) {
     CkPrintf("ERROR: inconsistency in REFINE2D_Check on chunk %d:\n"

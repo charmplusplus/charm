@@ -13,6 +13,7 @@
 #include "element.h"
 #include "refine.decl.h"
 #include "messages.h"
+#include "mpi.h"
 
 // ------------------------ Global Read-only Data ---------------------------
 extern CProxy_chunk mesh;
@@ -93,6 +94,8 @@ class chunk : public TCharmClient1D {
   int sizeElements, sizeEdges, sizeNodes;
   // first empty slot in each mesh array
   int firstFreeElement, firstFreeEdge, firstFreeNode;
+
+  int edgesSent, edgesRecvd, first;
 
   void setupThreadPrivate(CthThread forThread) {
     CtvAccessOther(forThread, _refineChunk) = this;
@@ -175,20 +178,14 @@ class chunk : public TCharmClient1D {
   intMsg *safeToMoveNode(int idx, double x, double y);
   splitOutMsg *split(int idx, elemRef e, node in, node fn);
   splitOutMsg *collapse(int idx, elemRef e, node kn, node dn, elemRef kNbr, 
-		   elemRef dNbr, edgeRef kEdge, edgeRef dEdge, node opnode);
+			elemRef dNbr, edgeRef kEdge, edgeRef dEdge, 
+			node opnode, node newN);
   void collapseHelp(int idx, edgeRef er, node n1, node n2);
-  intMsg *nodeLockup(int idx, node n, edgeRef from, edgeRef start, elemRef end,
-		     double l);
-  intMsg *nodeLockupER(int idx, node n, edgeRef start, elemRef from, 
-		       elemRef end, double l);
-  void nodeUnlock(int idx, node n, edgeRef from, elemRef end);
-  void nodeUnlockER(int idx, node n, elemRef from, elemRef end);
-  intMsg *nodeUpdate(int idx, node n, edgeRef from, elemRef end, node newNode);
-  intMsg *nodeUpdateER(int idx, node n, elemRef from, elemRef end, node newNode);
-  intMsg *nodeDelete(int idx, node n, edgeRef from, elemRef end, 
-		     node ndReplace);
-  intMsg *nodeDeleteER(int idx, node n, elemRef from, elemRef end, 
-		       node ndReplace);
+  intMsg *nodeLockup(node n, double l, edgeRef start);
+  void nodeUnlock(node n);
+  void nodeUpdate(node n, node newNode);
+  void nodeDelete(node n, node ndReplace);
+  void nodeReplaceDelete(node kn, node dn, node nn);
   intMsg *isPending(int idx, objRef e);
   void checkPending(int idx, objRef aRef);
   void checkPending(int idx, objRef aRef1, objRef aRef2);

@@ -24,21 +24,12 @@ module refine {
     entry [sync] intMsg *safeToMoveNode(int, double, double);
     entry [sync, threaded] splitOutMsg *split(int, elemRef, node, node);
     entry [sync, threaded] splitOutMsg *collapse(int, elemRef, node, node, 
-	elemRef, elemRef, edgeRef, edgeRef, node);
-    entry [sync, threaded] intMsg *nodeLockup(int, node, edgeRef, edgeRef, 
-	elemRef, double);
-    entry [sync, threaded] intMsg *nodeLockupER(int, node, edgeRef, elemRef, 
-	elemRef, double);
-    entry [sync, threaded] void nodeUnlock(int, node, edgeRef, elemRef);
-    entry [sync, threaded] void nodeUnlockER(int, node, elemRef, elemRef);
-    entry [sync, threaded] intMsg *nodeUpdate(int, node, edgeRef, elemRef, 
-	node);
-    entry [sync, threaded] intMsg *nodeUpdateER(int, node, elemRef, elemRef, 
-	node);
-    entry [sync, threaded] intMsg *nodeDelete(int, node, edgeRef, elemRef, 
-	node);
-    entry [sync, threaded] intMsg *nodeDeleteER(int, node, elemRef, elemRef,
-	node);
+	elemRef, elemRef, edgeRef, edgeRef, node, node);
+    entry [sync, threaded] intMsg *nodeLockup(node, double, edgeRef);
+    entry [sync, threaded] void nodeUnlock(node);
+    entry [sync, threaded] void nodeUpdate(node, node);
+    entry [sync, threaded] void nodeDelete(node, node);
+    entry [sync, threaded] void nodeReplaceDelete(node, node, node);
     entry [sync] intMsg *isPending(int, objRef);
     entry void checkPending(int, objRef);
     entry void checkPending(int, objRef, objRef);

@@ -62,34 +62,37 @@ class node {  // a 2D double coordinate
       theLock = 1;
       lockLength = l;
       lockHolder = e;
-      CkPrintf("TMRC2D: LOCK w/l=%f edge=%d node %f,%f\n", l, e.idx, x, y);
+      CkPrintf("TMRC2D: LOCK w/l=%f edge=%d,%d node %f,%f\n", l, e.idx, e.cid, x, y);
       return 1;
     }
     else if (e == lockHolder) {
-      CkPrintf("TMRC2D: HOLD w/l=%f edge=%d node %f,%f\n", l, e.idx, x, y);
+      CkPrintf("TMRC2D: HOLD w/l=%f edge=%d,%d node %f,%f\n", l, e.idx, e.cid, x, y);
       return 1;
     }
     else if (e.cid == lockHolder.cid) {
-      CkPrintf("TMRC2D: FAIL w/l=%f edge=%d node %f,%f\n", l, e.idx, x, y);
+      CkPrintf("TMRC2D: FAIL w/l=%f edge=%d,%d node %f,%f... held w/l=%f edge=%d,%d\n", l, e.idx, e.cid, x, y, lockLength, lockHolder.idx, lockHolder.cid);
       return 0;
     }
     else if (l >= lockLength) {
-      CkPrintf("TMRC2D: FAIL w/l=%f edge=%d node %f,%f\n", l, e.idx, x, y);
+      CkPrintf("TMRC2D: FAIL w/l=%f edge=%d,%d node %f,%f... held w/l=%f edge=%d,%d\n", l, e.idx, e.cid, x, y, lockLength, lockHolder.idx, lockHolder.cid);
       return 0;
     }
     else if (l < lockLength) {
-      CkPrintf("TMRC2D: SPIN w/l=%f edge=%d node %f,%f\n", l, e.idx, x, y);
+      CkPrintf("TMRC2D: SPIN w/l=%f edge=%d,%d node %f,%f\n", l, e.idx, e.cid, x, y);
       while (theLock) CthYield();
       theLock = 1;
       lockLength = l;
       lockHolder = e;
-      CkPrintf("TMRC2D: LOCK w/l=%f edge=%d node %f,%f\n", l, e.idx, x, y);
+      CkPrintf("TMRC2D: LOCK w/l=%f edge=%d,%d node %f,%f\n", l, e.idx, e.cid, x, y);
       return 1;
     }
     CkPrintf("WARNING: node::lock: unhandled case.\n");
     return 0;
   }
-  void unlock() { theLock = 0; }
+  void unlock() { 
+    theLock = 0; 
+    CkPrintf("TMRC2D: UNLOCK was held w/l=%f edge=%d,%d\n", lockLength, lockHolder.idx, lockHolder.cid);
+  }
   double distance(const node& n) { // get distance to n
     double dx = n.x - x, dy = n.y - y;
     return (sqrt ((dx * dx) + (dy * dy)));
@@ -179,7 +182,9 @@ class node {  // a 2D double coordinate
   }
   void sanityCheck(int cid, int idx) {
     if ((x == -1.0) && (y == -1.0))
-      CkPrintf("TMRC2D: sanityCheck WARNING: node %d on chunk %d has default coordinate values.\n", idx, cid);
+      CkPrintf("TMRC2D: [%d] node::sanityCheck WARNING: node %d has default coordinate values.\n", cid, idx);
+    if (theLock)
+      CkAbort("TMRC2D: node::sanityCheck ERROR: node is locked.\n");
   }
 };
 
