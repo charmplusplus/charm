@@ -167,8 +167,10 @@ extern "C" {
 
 #ifndef CMK_OPTIMIZE
 #  define _TRACE_ONLY(code) do{if(CpvAccess(traceOn)){ code; }} while(0)
+#  define _TRACE_ALWAYS(code) do{ code; } while(0)
 #else
 #  define _TRACE_ONLY(code) /*empty*/
+#  define _TRACE_ALWAYS(code) /*empty*/
 #endif
 
 #define _TRACE_USER_EVENT(x) _TRACE_ONLY(CkpvAccess(_traces)->userEvent(x))
@@ -189,8 +191,8 @@ extern "C" {
 #define _TRACE_END_PACK() _TRACE_ONLY(CkpvAccess(_traces)->endPack())
 #define _TRACE_BEGIN_UNPACK() _TRACE_ONLY(CkpvAccess(_traces)->beginUnpack())
 #define _TRACE_END_UNPACK() _TRACE_ONLY(CkpvAccess(_traces)->endUnpack())
-#define _TRACE_BEGIN_COMPUTATION() (CkpvAccess(_traces)->beginComputation())
-#define _TRACE_END_COMPUTATION() (CkpvAccess(_traces)->endComputation())
+#define _TRACE_BEGIN_COMPUTATION() _TRACE_ALWAYS(CkpvAccess(_traces)->beginComputation())
+#define _TRACE_END_COMPUTATION() _TRACE_ALWAYS(CkpvAccess(_traces)->endComputation())
 #define _TRACE_ENQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->enqueue(env))
 #define _TRACE_DEQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->dequeue(env))
 
