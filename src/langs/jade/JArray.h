@@ -231,6 +231,9 @@ public:
 
 	// 2D
 	inline T& getElement(int i, int j) {
+		return data[i*dimSize[0]+j];
+	}
+	inline T& getElementSlow(int i, int j) {
 		uint idx[] = { i, j };
 		return getElement(idx);
 	}
