@@ -25,7 +25,7 @@ public:
 	Agent(int p): npes(p) { }
 	virtual ~Agent() { }
 
-	virtual Elem* my_preferred_procs(int *existing_map,int object,int *trialpes){ }
+	virtual Elem* my_preferred_procs(int *existing_map,int object,int *trialpes){ return NULL; }
 };
 
 class topoAgent : public Agent {
