@@ -1,4 +1,4 @@
-IDIR=../../doc
+IDIR=../..
 
 all: ps pdf html
 
