@@ -136,6 +136,11 @@ public:
 	}
 };
 
+FDECL void FTN_NAME(FEM_ATTACH,fem_attach)(int *flags) 
+{
+	FEM_Attach(*flags);
+}
+
 CDECL void FEM_Attach(int flags)
 {
 	//Make sure the threads array exists
@@ -187,7 +192,7 @@ public:
 	{
 		cmsgs=new MeshChunk*[nChunks]; CHK(cmsgs);		
 		numdone=0;
-		updateCount=0;
+		updateCount=1;
 	}
 	~FEMcoordinator() {
 		delete[] cmsgs;
@@ -1480,7 +1485,7 @@ FDECL int FTN_NAME(FEM_NUM_PARTITIONS,fem_num_partitions)
   return FEM_Num_Partitions();
 }
 
-FDECL double FTN_NAME(FEM_TIMER_,fem_timer)
+FDECL double FTN_NAME(FEM_TIMER,fem_timer)
   (void)
 {
   return CkTimer();
