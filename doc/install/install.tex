@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.7  1995-11-01 22:06:30  jyelon
+% Revision 1.8  1995-11-01 22:13:37  jyelon
+% *** empty log message ***
+%
+% Revision 1.7  1995/11/01  22:06:30  jyelon
 % *** empty log message ***
 %
 % Revision 1.6  1995/11/01  22:01:32  jyelon
@@ -132,9 +135,9 @@ The network versions utilize many unix processes communicating with
 each other via UDP.  No attempt is currently being made to filter out
 unauthorized packets.  Therefore, it is theoretically possible to
 mount a security attack by sending UDP packets to a executing
-charm program's sockets.
+converse, charm, or charm++ program's sockets.
 
-The second security issue associated with networked charm programs is
+The second security issue associated with networked programs is
 associated with the fact that we, the charm developers, need evidence
 that our tools are being used.  (Such evidence is useful in convincing
 funding agencies to continue to support our work.)  To this end, we
@@ -169,7 +172,8 @@ notification code:
 \end{verbatim}
 
 Note: even though the other versions contain programs named {\tt
-conv-host.notify} and {\tt conv-host.silent}, they never actually
+conv-host.notify} and\linebreak
+{\tt conv-host.silent}, they never actually
 notify us.  The existence of the extra files is just to make our
 compilation scripts more consistent across versions.  The {\em only}
 versions that ever notify us are the network versions.
