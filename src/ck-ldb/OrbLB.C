@@ -394,7 +394,7 @@ LBMigrateMsg* OrbLB::Strategy(CentralLB::LDStats* stats, int count)
   int migrate_count=migrateInfo.length();
   LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
   msg->n_moves = migrate_count;
-  for(int i=0; i < migrate_count; i++) {
+  for(i=0; i < migrate_count; i++) {
     MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
     msg->moves[i] = *item;
     delete item;
@@ -427,8 +427,8 @@ LBMigrateMsg* OrbLB::Strategy(CentralLB::LDStats* stats, int count)
 
   // Save output
   objIdx = 0;
-  for(int pe=0;pe < count; pe++) {
-    for(int obj=0;obj<stats[pe].n_objs;obj++) {
+  for(pe=0;pe < count; pe++) {
+    for(obj=0;obj<stats[pe].n_objs;obj++) {
       if (to_procs[pe][obj] != pe) {
 	//	CkPrintf("[%d] Obj %d migrating from %d to %d\n",
 	//		 CkMyPe(),obj,pe,to_procs[pe][obj]);
