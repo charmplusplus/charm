@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-06-27 22:10:49  gursoy
+ * fixed some CpvAccess'es (not CpvAccess(i-1) bu CpvAccess(i)-1)
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.5  1995/04/02  00:49:08  sanjeev
@@ -133,7 +136,7 @@ int msgIndx, chareIndx;
 	CsvAccess(EpChareTypeTable)[CpvAccess(chareEpsCount)] = CHARE ;
 
 	CpvAccess(chareEpsCount)++ ;
-	return(CpvAccess(chareEpsCount-1)) ;
+	return(CpvAccess(chareEpsCount)-1) ;
 }
 
 int registerChare(name,dataSz,createfn)
@@ -149,7 +152,7 @@ FUNCTION_PTR createfn ;
 
         strcpy(CsvAccess(ChareNamesTable)[CpvAccess(chareCount)], name) ;
 	CpvAccess(chareCount)++ ;
-	return(CpvAccess(chareCount-1)) ;
+	return(CpvAccess(chareCount)-1) ;
 }
 
 
@@ -159,7 +162,7 @@ FUNCTION_PTR fn ;
 /* fills in _CK_9_GlobalFunctionTable */
 	_CK_9_GlobalFunctionTable[CpvAccess(fnCount)] = fn ;
 	CpvAccess(fnCount)++;	
-	return(CpvAccess(fnCount-1)) ;
+	return(CpvAccess(fnCount)-1) ;
 }
 
 
@@ -177,7 +180,7 @@ int language ;
 	CsvAccess(PseudoTable)[CpvAccess(pseudoCount)].pseudo_type.mono.updatefn=updatefn;
 	CpvAccess(pseudoCount)++ ;
 
-	return(CpvAccess(pseudoCount-1)) ;
+	return(CpvAccess(pseudoCount)-1) ;
 }
 
 int registerTable(name, initfn, hashfn)
@@ -192,7 +195,7 @@ FUNCTION_PTR initfn, hashfn ;
 	CsvAccess(PseudoTable)[CpvAccess(pseudoCount)].pseudo_type.table.hashfn = hashfn ;
 	CpvAccess(pseudoCount)++ ;
 
-	return(CpvAccess(pseudoCount-1)) ;
+	return(CpvAccess(pseudoCount)-1) ;
 }
 
 int registerAccumulator(name, initfn, addfn, combinefn,language)
@@ -210,7 +213,7 @@ int language ;
 	CsvAccess(PseudoTable)[CpvAccess(pseudoCount)].pseudo_type.acc.combinefn=combinefn;
 	CpvAccess(pseudoCount)++ ;
 
-	return(CpvAccess(pseudoCount-1)) ;
+	return(CpvAccess(pseudoCount)-1) ;
 }
 
 
@@ -218,7 +221,7 @@ int registerReadOnlyMsg()
 {
 /* this is only needed to give a unique index to all all readonly msgs */
 	CpvAccess(readMsgCount)++ ;
-	return(CpvAccess(readMsgCount-1)) ;
+	return(CpvAccess(readMsgCount)-1) ;
 }
 
 
