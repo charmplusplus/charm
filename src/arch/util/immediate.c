@@ -6,6 +6,9 @@ int _immediateReady = 0;
 
 int _immRunning=0; /* if set, somebody's inside an immediate message */
 
+int _immdtMsgLock = 0; /* if set, all immediate message handling will be delayed. */
+int _immdtMsgFlag = 0; /* if set, there is delayed immediate message. */
+
 #if CMK_IMMEDIATE_MSG
 
 /* SMP: These variables are protected by immRecvLock. */
@@ -79,13 +82,13 @@ SMP: This routine must be called holding no locks, not even the comm. lock.
 void CmiHandleImmediate()
 {
    void *msg;
-   
+
    /* If somebody else is checking the queue, we don't need to
    if (CmiTryLock(CsvAccess(NodeState).immRecvLock)!=0) return;
    */
    /* converse init hasn't finish */
    if (!_immediateReady) return;
-   
+  
    /* Make sure only one thread is running immediate messages: */
    CmiLock(CsvAccess(NodeState).immRecvLock);
 
@@ -110,6 +113,8 @@ void CmiHandleImmediate()
    _immRunning = 0;
    
    CmiUnlock(CsvAccess(NodeState).immRecvLock);
+
+   CmiClearImmdtMsgFlag();
 }
 
 #endif

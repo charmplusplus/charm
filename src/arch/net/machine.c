@@ -771,7 +771,7 @@ void CmiYield(void) { sleep(0); }
 static void CommunicationInterrupt(int ignored)
 {
   MACHLOCK_ASSERT(!_Cmi_myrank,"CommunicationInterrupt");
-  if (memflag || comm_flag || _immRunning) 
+  if (memflag || comm_flag || _immRunning || CmiTryImmdtMsgLock()) 
   { /* Already busy inside malloc, comm, or immediate messages */
     MACHSTATE(5,"--SKIPPING SIGIO--");
     return;

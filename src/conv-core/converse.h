@@ -64,7 +64,6 @@ extern "C" {
 #endif
 
 #if CMK_SHARED_VARS_UNAVAILABLE /* Non-SMP version of shared vars. */
-
 extern int _Cmi_mype;
 extern int _Cmi_numpes;
 extern int _Cmi_myrank; /* Normally zero; only 1 during SIGIO handling */
@@ -101,6 +100,19 @@ typedef int CmiNodeLock;
 #define CmiUnlock(lock)  {(lock)--;}
 #define CmiTryLock(lock)  ((lock)?1:((lock)=1,0))
 #define CmiDestroyLock(lock) /*empty*/
+
+extern int _immdtMsgLock;
+extern int _immdtMsgFlag;
+// before and after critical code
+#define CmiLockImmdtMsg() {_immdtMsgLock=1;}
+#define CmiUnlockImmdtMsg() \
+  { _immdtMsgLock=0; \
+    if(_immdtMsgFlag) \
+      CmiProbeImmediateMsg(); }
+// before handling interrupt
+#define CmiTryImmdtMsgLock() \
+  (_immdtMsgLock?((_immdtMsgFlag=1),1):0)
+#define CmiClearImmdtMsgFlag() {_immdtMsgFlag=0;}
 
 #endif
 
@@ -145,6 +157,12 @@ extern void CmiDestroyLock(CmiNodeLock lock);
 extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemLock() do{if (CmiMemLock_lock) CmiLock(CmiMemLock_lock);} while (0)
 #define CmiMemUnlock() do{if (CmiMemLock_lock) CmiUnlock(CmiMemLock_lock);} while (0)
+
+extern int _immdtMsgLock;
+#define CmiLockImmdtMsg() { _immdtMsgLock=1; }
+#define CmiUnlockImmdtMsg() { _immdtMsgLock=0; } 
+#define CmiTryImmdtMsgLock() (_immdtMsgLock)
+#define CmiClearImmdtMsgFlag() 
 
 #endif
 
