@@ -1191,6 +1191,7 @@ test -r ./conv-config.sh && . ./conv-config.sh
 
 #turn out to be in octal number, don't use digit >= 8
 VERSION=050612
+
 cat >>confdefs.h <<_ACEOF
 #define CHARM_VERSION $VERSION
 _ACEOF
@@ -1200,6 +1201,7 @@ echo "$as_me:$LINENO: checking machine name" >&5
 echo $ECHO_N "checking machine name... $ECHO_C" >&6
 version=`pwd | awk -F/ '{print $(NF-1)}'`
 base_version=`cat .vdir`
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_MACHINE_NAME "$version"
 _ACEOF
@@ -1342,6 +1344,7 @@ cat > $t <<EOT
 bool foo(void) { return true; }
 EOT
 test_cxx "whether C++ bool works" "ok" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_BOOL_DEFINED $pass
 _ACEOF
@@ -1353,6 +1356,7 @@ cat > $t <<EOT
 long long foo(void) { return 17; }
 EOT
 test_cxx "whether long long works" "ok" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_LONG_LONG_DEFINED $pass
 _ACEOF
@@ -1364,8 +1368,9 @@ cat > $t <<EOT
 __int64 foo(void) { return 17; }
 EOT
 test_cxx "whether __int64 works" "ok" "no" ""
+
 cat >>confdefs.h <<_ACEOF
-#define CMK___int64_DEFINED $pass
+#define CMK___int64_DEFINED 1
 _ACEOF
 
 
@@ -1375,6 +1380,7 @@ cat > $t <<EOT
 long double foo(void) { return 17.0; }
 EOT
 test_cxx "whether long double works" "ok" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_LONG_DOUBLE_DEFINED $pass
 _ACEOF
@@ -1391,6 +1397,7 @@ class er {
 };
 EOT
 test_cxx "whether C++ class explicit keyword works" "ok" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_EXPLICIT $pass
 _ACEOF
@@ -1406,6 +1413,7 @@ class er {
 };
 EOT
 test_cxx "whether C++ signed char and char differ" "yes" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_SIGNEDCHAR_DIFF_CHAR $pass
 _ACEOF
@@ -1416,9 +1424,11 @@ cat > $t <<EOT
 int foo(float *t) {return *reinterpret_cast<int *>(t);}
 EOT
 test_cxx "whether C++ *_casts<> work" "ok" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_CPP_CAST_LEGAL $pass
 _ACEOF
+
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_CPP_CAST_ILLEGAL $fail
@@ -1446,6 +1456,7 @@ void myfunc()
 }
 EOT
 test_cxx "whether templated member functions work" "ok" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_TEMPLATE_MEMBERS_BROKEN $fail
 _ACEOF
@@ -1457,9 +1468,11 @@ cat > $t <<EOT
 void foo(void) { std::cout<<"Hello, world"<<std::endl; }
 EOT
 test_cxx "whether including STL <foo> works" "ok" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_STL_USE_DOT_H $fail
 _ACEOF
+
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_STL_DONT_USE_DOT_H $pass
@@ -1479,6 +1492,7 @@ int foo(void) {
 }
 EOT
 test_cxx "whether the std:: names for STL work" "ok" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_USE_STL $pass
 _ACEOF
@@ -1491,6 +1505,7 @@ namespace foo {
 };
 EOT
 test_cxx "whether namespaces work" "ok" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_NAMESPACES_BROKEN $fail
 _ACEOF
@@ -1506,6 +1521,7 @@ const char *foo(void) {
 }
 EOT
 test_cxx "whether typeinfo/typeid works" "ok" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_TYPEINFO $pass
 _ACEOF
@@ -1521,6 +1537,7 @@ public:
 };
 EOT
 test_cxx "whether operator delete can be overloaded in same class" "ok" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_MULTIPLE_DELETE $strictpass
 _ACEOF
@@ -1537,6 +1554,7 @@ void foo(void) {
 }
 EOT
 test_cxx "whether the poll() syscall exists" "yes" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_USE_POLL $pass
 _ACEOF
@@ -1547,6 +1565,7 @@ cat > $t <<EOT
 #include "ckdll_system.C"
 EOT
 test_cxx "whether to use signal-safe system() " "yes" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_SIGSAFE_SYSTEM $pass
 _ACEOF
@@ -1572,7 +1591,8 @@ fi
 if test $pass -eq 1 -o $noldl -eq 1
 then
 # One version or another of dlopen worked: compile it in
-	cat >>confdefs.h <<_ACEOF
+
+cat >>confdefs.h <<_ACEOF
 #define CMK_DLL_USE_DLOPEN 1
 _ACEOF
 
@@ -1584,6 +1604,7 @@ cat > $t <<EOT
 #include "ckdll_win32.C"
 EOT
 test_cxx "whether getProcAddress works" "yes" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_DLL_USE_WIN32 $pass
 _ACEOF
@@ -1601,6 +1622,7 @@ void foo(void) {
 }
 EOT
 test_cxx "whether it has socklen_t" "yes" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_SOCKLEN $pass
 _ACEOF
@@ -1617,6 +1639,7 @@ void *foo(void *a,int l,int fd) {
 }
 EOT
 test_cxx "whether the mmap() syscall exists" "yes" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_MMAP $pass
 _ACEOF
@@ -1633,6 +1656,7 @@ void *foo(void *a,int l) {
 }
 EOT
 test_cxx "whether mmap() accepts MAP_ANON" "yes" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_MMAP_ANON $pass
 _ACEOF
@@ -1651,6 +1675,7 @@ int main() {
 EOT
 TRACE_LINK_FLAG="-rdynamic"
 test_link "whether glibc backtrace works" "yes" "no" "-DCMK_USE_BACKTRACE=1 $TRACE_LINK_FLAG"
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_USE_BACKTRACE $pass
 _ACEOF
@@ -1674,6 +1699,7 @@ int main() {
 }
 EOT
 test_link "whether it has zlib" "yes" "no" "-lz"
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_PROJECTIONS_USE_ZLIB $pass
 _ACEOF
@@ -1692,6 +1718,7 @@ int main() {
 }
 EOT
 test_cxx "whether has values.h " "yes" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_VALUES_H $pass
 _ACEOF
@@ -1705,8 +1732,23 @@ int main() {
 }
 EOT
 test_cxx "whether has alloca.h " "yes" "no" ""
+
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_ALLOCA $pass
+_ACEOF
+
+
+#### test if has elf.h ####
+cat > $t <<EOT
+#include <elf.h>
+typedef Elf32_Addr ELF_TYPE_Addr;
+int main() {
+}
+EOT
+test_cxx "whether has elf.h " "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_ELF_H $pass
 _ACEOF
 
 
@@ -1745,7 +1787,8 @@ else
   if test "$NAME" != ""
   then
     fortran_postfix=TWOSCORE
-    cat >>confdefs.h <<_ACEOF
+
+cat >>confdefs.h <<_ACEOF
 #define CMK_FORTRAN_USES_TWOSCORE 1
 _ACEOF
 
@@ -1754,7 +1797,8 @@ _ACEOF
     if test "$NAME" != ""
     then
       fortran_postfix=ONESCORE
-      cat >>confdefs.h <<_ACEOF
+
+cat >>confdefs.h <<_ACEOF
 #define CMK_FORTRAN_USES_ONESCORE 1
 _ACEOF
 
@@ -1763,7 +1807,8 @@ _ACEOF
       if test "$NAME" != ""
       then
         fortran_postfix=NOSCORE
-        cat >>confdefs.h <<_ACEOF
+
+cat >>confdefs.h <<_ACEOF
 #define CMK_FORTRAN_USES_NOSCORE 1
 _ACEOF
 
@@ -1772,7 +1817,8 @@ _ACEOF
         if test "$NAME" != ""
         then
           fortran_postfix=ALLCAPS
-          cat >>confdefs.h <<_ACEOF
+
+cat >>confdefs.h <<_ACEOF
 #define CMK_FORTRAN_USES_ALLCAPS 1
 _ACEOF
 

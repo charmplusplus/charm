@@ -8,12 +8,12 @@ test -r ./conv-config.sh && . ./conv-config.sh
 
 #turn out to be in octal number, don't use digit >= 8
 VERSION=050612
-AC_DEFINE_UNQUOTED(CHARM_VERSION, $VERSION)
+AC_DEFINE_UNQUOTED([CHARM_VERSION], $VERSION, [Charm++ version number])
 
 AC_MSG_CHECKING(machine name)
 version=`pwd | awk -F/ '{print $(NF-1)}'`
 base_version=`cat .vdir`
-AC_DEFINE_UNQUOTED(CMK_MACHINE_NAME, "$version")
+AC_DEFINE_UNQUOTED(CMK_MACHINE_NAME, "$version",[machine name])
 AC_MSG_RESULT($version)
 
 t="test.cpp"
@@ -146,7 +146,7 @@ cat > $t <<EOT
 bool foo(void) { return true; }
 EOT
 test_cxx "whether C++ bool works" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_BOOL_DEFINED, $pass)
+AC_DEFINE_UNQUOTED(CMK_BOOL_DEFINED, $pass, [whether C++ bool works])
 
 #### Check long long ####
 cat > $t <<EOT
@@ -154,7 +154,7 @@ cat > $t <<EOT
 long long foo(void) { return 17; }
 EOT
 test_cxx "whether long long works" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_LONG_LONG_DEFINED, $pass)
+AC_DEFINE_UNQUOTED(CMK_LONG_LONG_DEFINED, $pass, [whether long long works])
 
 #### Check __int64 ####
 cat > $t <<EOT
@@ -162,7 +162,7 @@ cat > $t <<EOT
 __int64 foo(void) { return 17; }
 EOT
 test_cxx "whether __int64 works" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK___int64_DEFINED, $pass)
+AC_DEFINE_UNQUOTED([CMK___int64_DEFINED], 1, [wether __int64 works])
 
 #### Check long double ####
 cat > $t <<EOT
@@ -170,7 +170,7 @@ cat > $t <<EOT
 long double foo(void) { return 17.0; }
 EOT
 test_cxx "whether long double works" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_LONG_DOUBLE_DEFINED, $pass)
+AC_DEFINE_UNQUOTED(CMK_LONG_DOUBLE_DEFINED, $pass, [whether long double works])
 
 ###################### C++ Compiler Features #####################
 
@@ -183,7 +183,7 @@ class er {
 };
 EOT
 test_cxx "whether C++ class explicit keyword works" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_EXPLICIT, $pass)
+AC_DEFINE_UNQUOTED(CMK_EXPLICIT, $pass, [whether C++ class explicit keyword works])
 
 #### check if signed char is same as char ####
 cat > $t <<EOT
@@ -195,15 +195,15 @@ class er {
 };
 EOT
 test_cxx "whether C++ signed char and char differ" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_SIGNEDCHAR_DIFF_CHAR, $pass)
+AC_DEFINE_UNQUOTED(CMK_SIGNEDCHAR_DIFF_CHAR, $pass, [whether C++ signed char and char differ])
 
 #### check if C++ casts work ####
 cat > $t <<EOT
 int foo(float *t) {return *reinterpret_cast<int *>(t);}
 EOT
 test_cxx "whether C++ *_casts<> work" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_CPP_CAST_LEGAL, $pass)
-AC_DEFINE_UNQUOTED(CMK_CPP_CAST_ILLEGAL, $fail)
+AC_DEFINE_UNQUOTED(CMK_CPP_CAST_LEGAL, $pass, [C++ *_casts<> work])
+AC_DEFINE_UNQUOTED(CMK_CPP_CAST_ILLEGAL, $fail, [C++ *_casts<> does not work])
 
 
 #### check if templated members work ####
@@ -226,7 +226,7 @@ void myfunc()
 }
 EOT
 test_cxx "whether templated member functions work" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_TEMPLATE_MEMBERS_BROKEN, $fail)
+AC_DEFINE_UNQUOTED(CMK_TEMPLATE_MEMBERS_BROKEN, $fail, [whether templated member functions work])
 
 ##### check if the stl headers use .h #####
 cat > $t <<EOT
@@ -234,8 +234,8 @@ cat > $t <<EOT
 void foo(void) { std::cout<<"Hello, world"<<std::endl; }
 EOT
 test_cxx "whether including STL <foo> works" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_STL_USE_DOT_H, $fail)
-AC_DEFINE_UNQUOTED(CMK_STL_DONT_USE_DOT_H, $pass)
+AC_DEFINE_UNQUOTED(CMK_STL_USE_DOT_H, $fail, [including STL <foo> does not works])
+AC_DEFINE_UNQUOTED(CMK_STL_DONT_USE_DOT_H, $pass, [including STL <foo> works])
 
 #### check if std::vector works ######
 cat > $t <<EOT
@@ -250,7 +250,7 @@ int foo(void) {
 }
 EOT
 test_cxx "whether the std:: names for STL work" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_USE_STL, $pass)
+AC_DEFINE_UNQUOTED(CMK_USE_STL, $pass, [whether the std:: names for STL work])
 
 #### check if namespaces can be defined #####
 cat > $t <<EOT
@@ -259,7 +259,7 @@ namespace foo {
 };
 EOT
 test_cxx "whether namespaces work" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_NAMESPACES_BROKEN, $fail)
+AC_DEFINE_UNQUOTED(CMK_NAMESPACES_BROKEN, $fail, [whether namespaces work])
 
 
 #### check if typeinfo exists and works #####
@@ -271,7 +271,7 @@ const char *foo(void) {
 }
 EOT
 test_cxx "whether typeinfo/typeid works" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_TYPEINFO, $pass)
+AC_DEFINE_UNQUOTED(CMK_HAS_TYPEINFO, $pass, [whether typeinfo/typeid works])
 
 
 #### test if we can have multiple delete like this ####
@@ -283,7 +283,7 @@ public:
 };
 EOT
 test_cxx "whether operator delete can be overloaded in same class" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_MULTIPLE_DELETE, $strictpass)
+AC_DEFINE_UNQUOTED(CMK_MULTIPLE_DELETE, $strictpass, [whether operator delete can be overloaded in same class])
 
 ################### Syscalls and Libraries ###################
 
@@ -296,14 +296,14 @@ void foo(void) {
 }
 EOT
 test_cxx "whether the poll() syscall exists" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass)
+AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass, [whether the poll() syscall exists])
 
 #### test for system ###
 cat > $t <<EOT
 #include "ckdll_system.C"
 EOT
 test_cxx "whether to use signal-safe system() " "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_SIGSAFE_SYSTEM, $pass)
+AC_DEFINE_UNQUOTED(CMK_SIGSAFE_SYSTEM, $pass, [whether to use signal-safe system()])
 
 #### check if dlopen works ####
 cat > $t <<EOT
@@ -325,7 +325,7 @@ fi
 if test $pass -eq 1 -o $noldl -eq 1
 then
 # One version or another of dlopen worked: compile it in
-	AC_DEFINE_UNQUOTED(CMK_DLL_USE_DLOPEN, 1)
+	AC_DEFINE_UNQUOTED(CMK_DLL_USE_DLOPEN, 1, [dlopen])
 fi
 
 
@@ -334,7 +334,7 @@ cat > $t <<EOT
 #include "ckdll_win32.C"
 EOT
 test_cxx "whether getProcAddress works" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_DLL_USE_WIN32, $pass)
+AC_DEFINE_UNQUOTED(CMK_DLL_USE_WIN32, $pass, [whether getProcAddress works])
 
 
 #### check if socklen_t exists ####
@@ -348,7 +348,7 @@ void foo(void) {
 }
 EOT
 test_cxx "whether it has socklen_t" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_SOCKLEN, $pass)
+AC_DEFINE_UNQUOTED(CMK_HAS_SOCKLEN, $pass, [whether it has socklen_t])
 
 #### check if mmap exists ####
 cat > $t <<EOT
@@ -361,7 +361,7 @@ void *foo(void *a,int l,int fd) {
 }
 EOT
 test_cxx "whether the mmap() syscall exists" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_MMAP, $pass)
+AC_DEFINE_UNQUOTED(CMK_HAS_MMAP, $pass, [whether the mmap() syscall exists])
 
 #### check if mmap accepts MAP_ANON ####
 cat > $t <<EOT
@@ -374,7 +374,7 @@ void *foo(void *a,int l) {
 }
 EOT
 test_cxx "whether mmap() accepts MAP_ANON" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_MMAP_ANON, $pass)
+AC_DEFINE_UNQUOTED(CMK_HAS_MMAP_ANON, $pass, [whether mmap() accepts MAP_ANON])
 
 #### check if glibc backtrace exists ####
 cat > $t <<EOT
@@ -389,7 +389,7 @@ int main() {
 EOT
 TRACE_LINK_FLAG="-rdynamic"
 test_link "whether glibc backtrace works" "yes" "no" "-DCMK_USE_BACKTRACE=1 $TRACE_LINK_FLAG"
-AC_DEFINE_UNQUOTED(CMK_USE_BACKTRACE, $pass)
+AC_DEFINE_UNQUOTED(CMK_USE_BACKTRACE, $pass, [whether glibc backtrace works])
 
 if test $pass -eq 1
 then 
@@ -409,7 +409,7 @@ int main() {
 }
 EOT
 test_link "whether it has zlib" "yes" "no" "-lz"
-AC_DEFINE_UNQUOTED(CMK_PROJECTIONS_USE_ZLIB, $pass)
+AC_DEFINE_UNQUOTED(CMK_PROJECTIONS_USE_ZLIB, $pass, [whether it has zlib])
 if test $pass -eq 1
 then 
 	add_flag 'CMK_LIBS="$CMK_LIBS -lz"' "zlib"
@@ -424,7 +424,7 @@ int main() {
 }
 EOT
 test_cxx "whether has values.h " "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_VALUES_H, $pass)
+AC_DEFINE_UNQUOTED(CMK_HAS_VALUES_H, $pass, [whether has values.h])
 
 #### test if has alloca.h ####
 cat > $t <<EOT
@@ -434,7 +434,17 @@ int main() {
 }
 EOT
 test_cxx "whether has alloca.h " "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_ALLOCA, $pass)
+AC_DEFINE_UNQUOTED([CMK_HAS_ALLOCA], $pass, [whether has alloca.h])
+
+#### test if has elf.h ####
+cat > $t <<EOT
+#include <elf.h>
+typedef Elf32_Addr ELF_TYPE_Addr;
+int main() { 
+}
+EOT
+test_cxx "whether has elf.h " "yes" "no" ""
+AC_DEFINE_UNQUOTED([CMK_HAS_ELF_H], $pass, [wether has elf.h])
 
 #### test if it can build shared library ####
 cat > $t <<EOT
@@ -469,25 +479,25 @@ then
   if test "$NAME" != ""
   then
     fortran_postfix=TWOSCORE
-    AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_TWOSCORE, 1)
+    AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_TWOSCORE, 1, [TWOSCORE])
   else
     NAME=`$CMK_NM conftest.o | grep "foo_foo_"`
     if test "$NAME" != ""
     then
       fortran_postfix=ONESCORE
-      AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_ONESCORE, 1)
+      AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_ONESCORE, 1, [ONESCORE])
     else
       NAME=`$CMK_NM conftest.o | grep "foo_foo"`
       if test "$NAME" != ""
       then
         fortran_postfix=NOSCORE
-        AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_NOSCORE, 1)
+        AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_NOSCORE, 1, [NOSCORE])
       else
         NAME=`$CMK_NM conftest.o | grep "FOO_FOO"`
         if test "$NAME" != ""
         then
           fortran_postfix=ALLCAPS
-          AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_ALLCAPS, 1)
+          AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_ALLCAPS, 1, [ALLCAPS])
         else
           echo "#################################################"
           echo "FORTRAN compiler generated name not supported yet"

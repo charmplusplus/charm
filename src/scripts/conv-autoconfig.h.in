@@ -1,55 +1,115 @@
-/* conv-autoconfig.h.in.  Generated automatically from configure.in by autoheader.  */
+/* conv-autoconfig.h.in.  Generated from configure.in by autoheader.  */
 
-#undef CMK_MACHINE_NAME
-
-#undef CMK_BOOL_DEFINED
-#undef CMK_LONG_LONG_DEFINED
-#undef CMK___int64_DEFINED
-#undef CMK_LONG_DOUBLE_DEFINED
-
-#undef CMK_EXPLICIT
-
-#undef CMK_SIGNEDCHAR_DIFF_CHAR
-
-#undef CMK_CPP_CAST_LEGAL
-#undef CMK_CPP_CAST_ILLEGAL
-
-#undef CMK_TEMPLATE_MEMBERS_BROKEN
-
-#undef CMK_USE_STL
-
-#undef CMK_STL_USE_DOT_H
-#undef CMK_STL_DONT_USE_DOT_H
-
-#undef CMK_NAMESPACES_BROKEN
-
-#undef CMK_HAS_TYPEINFO
-
-#undef CMK_MULTIPLE_DELETE
-
-#undef CMK_SIGSAFE_SYSTEM
-
-#undef CMK_USE_POLL
-
-#undef CMK_DLL_USE_DLOPEN
-#undef CMK_DLL_USE_WIN32
-
-#undef CMK_HAS_SOCKLEN
-
-#undef CMK_HAS_MMAP
-#undef CMK_HAS_MMAP_ANON
-
-#undef CMK_USE_BACKTRACE
-
-#undef CMK_FORTRAN_USES_ALLCAPS
-#undef CMK_FORTRAN_USES_TWOSCORE
-#undef CMK_FORTRAN_USES_ONESCORE
-#undef CMK_FORTRAN_USES_NOSCORE
-
+/* Charm++ version number */
 #undef CHARM_VERSION
 
-#undef CMK_PROJECTIONS_USE_ZLIB
+/* whether C++ bool works */
+#undef CMK_BOOL_DEFINED
 
+/* C++ *_casts<> does not work */
+#undef CMK_CPP_CAST_ILLEGAL
+
+/* C++ *_casts<> work */
+#undef CMK_CPP_CAST_LEGAL
+
+/* dlopen */
+#undef CMK_DLL_USE_DLOPEN
+
+/* whether getProcAddress works */
+#undef CMK_DLL_USE_WIN32
+
+/* whether C++ class explicit keyword works */
+#undef CMK_EXPLICIT
+
+/* ALLCAPS */
+#undef CMK_FORTRAN_USES_ALLCAPS
+
+/* NOSCORE */
+#undef CMK_FORTRAN_USES_NOSCORE
+
+/* ONESCORE */
+#undef CMK_FORTRAN_USES_ONESCORE
+
+/* TWOSCORE */
+#undef CMK_FORTRAN_USES_TWOSCORE
+
+/* whether has alloca.h */
+#undef CMK_HAS_ALLOCA
+
+/* wether has elf.h */
+#undef CMK_HAS_ELF_H
+
+/* whether the mmap() syscall exists */
+#undef CMK_HAS_MMAP
+
+/* whether mmap() accepts MAP_ANON */
+#undef CMK_HAS_MMAP_ANON
+
+/* whether it has socklen_t */
+#undef CMK_HAS_SOCKLEN
+
+/* whether typeinfo/typeid works */
+#undef CMK_HAS_TYPEINFO
+
+/* whether has values.h */
 #undef CMK_HAS_VALUES_H
 
-#undef CMK_HAS_ALLOCA
+/* whether long double works */
+#undef CMK_LONG_DOUBLE_DEFINED
+
+/* whether long long works */
+#undef CMK_LONG_LONG_DEFINED
+
+/* machine name */
+#undef CMK_MACHINE_NAME
+
+/* whether operator delete can be overloaded in same class */
+#undef CMK_MULTIPLE_DELETE
+
+/* whether namespaces work */
+#undef CMK_NAMESPACES_BROKEN
+
+/* whether it has zlib */
+#undef CMK_PROJECTIONS_USE_ZLIB
+
+/* whether C++ signed char and char differ */
+#undef CMK_SIGNEDCHAR_DIFF_CHAR
+
+/* whether to use signal-safe system() */
+#undef CMK_SIGSAFE_SYSTEM
+
+/* including STL <foo> works */
+#undef CMK_STL_DONT_USE_DOT_H
+
+/* including STL <foo> does not works */
+#undef CMK_STL_USE_DOT_H
+
+/* whether templated member functions work */
+#undef CMK_TEMPLATE_MEMBERS_BROKEN
+
+/* whether glibc backtrace works */
+#undef CMK_USE_BACKTRACE
+
+/* whether the poll() syscall exists */
+#undef CMK_USE_POLL
+
+/* whether the std:: names for STL work */
+#undef CMK_USE_STL
+
+/* wether __int64 works */
+#undef CMK___int64_DEFINED
+
+/* Define to the address where bug reports for this package should be sent. */
+#undef PACKAGE_BUGREPORT
+
+/* Define to the full name of this package. */
+#undef PACKAGE_NAME
+
+/* Define to the full name and version of this package. */
+#undef PACKAGE_STRING
+
+/* Define to the one symbol short name of this package. */
+#undef PACKAGE_TARNAME
+
+/* Define to the version of this package. */
+#undef PACKAGE_VERSION
