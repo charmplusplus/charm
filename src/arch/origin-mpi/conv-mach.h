@@ -86,7 +86,7 @@
 
 #ifndef CMK_THREADS_COPY_STACK
 #define CMK_THREADS_COPY_STACK                             0
-#define
+#endif
 
 #define CMK_THREADS_UNAVAILABLE                            0
 #define CMK_THREADS_USE_ALLOCA                             0
