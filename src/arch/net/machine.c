@@ -186,6 +186,8 @@
 #include <setjmp.h>
 #include <signal.h>
 #include <stdarg.h> /*<- was <varargs.h>*/
+#include <strings.h>
+#include <string.h>
 
 #include "conv-ccs.h"
 #include "ccs-server.h"
@@ -206,18 +208,6 @@
 #  include <pwd.h>
 #  include <unistd.h>
 #  include <sys/file.h>
-#endif
-
-#if CMK_STRINGS_USE_STRINGS_H
-#include <strings.h>
-#endif
-
-#if CMK_STRINGS_USE_STRING_H
-#include <string.h>
-#endif
-
-#if CMK_STRINGS_USE_OWN_DECLARATIONS
-char *strchr(), *strrchr(), *strdup();
 #endif
 
 #define PRINTBUFSIZE 16384
