@@ -133,7 +133,12 @@ GridRouter::~GridRouter()
   delete PeMesh1;
   delete PeMesh2;
     
+  delete [] growVector;
+  delete [] gcolVector;
+
   CmiFree(onerow);
+  CmiFree(rowVector);
+  CmiFree(colVector);
 }
 
 void GridRouter :: InitVars()

@@ -107,7 +107,7 @@ DimexRouter::DimexRouter(int n, int me, int ndirect)
 
   //Create the message array, buffer and the next stage table
   buffer=new int[Dim+1];
-  next=(int **)CmiAlloc(sizeof(int *)*Dim);
+  next= new int* [Dim];
   for (i=0;i<Dim;i++) {
 	next[i]=new int[NumPes];
 	buffer[i]=0;
@@ -142,6 +142,7 @@ DimexRouter :: ~DimexRouter()
 	delete next[i];
   }
   delete next;
+  delete penum;
 }
 
 void DimexRouter :: SetMap(int *pes)

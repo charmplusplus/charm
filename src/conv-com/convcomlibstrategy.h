@@ -148,6 +148,7 @@ class StrategyWrapper  {
  public:
     Strategy **s_table;
     int nstrats;
+    int total_nstrats;
 
     void pup(PUP::er &p);
 };
@@ -174,8 +175,11 @@ struct StrategyTableEntry {
     //programs.
     int nEndItr;       //#elements that called end iteration
     int call_doneInserting; //All elements deposited their data
-
+    int flag;          //status of the strategy, 
+                       //whether it is new, learned,or returned unchanged 
     StrategyTableEntry();
+
+    void reset();
 };
 
 typedef CkVec<StrategyTableEntry> StrategyTable;

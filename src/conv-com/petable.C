@@ -232,10 +232,11 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
 {
     char *junk;
     int nummsgs, offset, num_distinctmsgs;
-    
-    ComlibPrintf("In ExtractAndPack %d\n", npe); 
-    
+        
     int tot_msgsize=TotalMsgSize(npe, pelist, &nummsgs, &num_distinctmsgs);
+
+    ComlibPrintf("%d In ExtractAndPack %d, %d\n", CmiMyPe(), npe, nummsgs); 
+
     if (tot_msgsize ==0) {
 	*length=0;
         
@@ -263,7 +264,7 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
     PACK(int, refno);
     PACK(comID, id);
     PACK(int, ufield);
-    PACK(int , npe);
+    PACK(int, npe);
     
     int lesspe=0;
     int npacked = 0;
@@ -273,13 +274,14 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
         if (msgnum[index]<=0) {
             lesspe++;
             
-            ComlibPrintf("msgnum[index]<=0 !!!!!\n");
+            ComlibPrintf("[%d] msgnum[index]<=0 !!!!!\n", CkMyPe());
             continue;
         }
         
         ComlibPrintf("%d Packing pelist[%d]\n", CkMyPe(), index);
         register int newval=-1*pelist[i];
-        PACK(int,newval); 
+        PACK(int, newval); 
+
         for (j=0;j<msgnum[index];j++) {
             if (PeList[index][j]->magic == magic) {
                 offset=(PeList[index][j]->offset);
@@ -302,7 +304,7 @@ char * PeTable ::ExtractAndPack(comID id, int ufield, int npe,
             }
             
             //ComlibPrintf("%d Packing msg_offset=%d\n", CkMyPe(), offset);
-            PACK(int,offset); 
+            PACK(int, offset); 
 
             if (--(PeList[index][j]->refCount) <=0) {
                 CmiFree(PeList[index][j]->msg);

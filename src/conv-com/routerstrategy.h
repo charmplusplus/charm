@@ -27,6 +27,7 @@ class RouterStrategy : public Strategy {
     int *pelist;
     int npes;
     int *procMap;
+    int *bcast_pemap;
     int myPe;
     int routerID;
 
@@ -45,6 +46,8 @@ class RouterStrategy : public Strategy {
     //pelist = list of processors
     RouterStrategy(int stratid, int handle, int npes, int *pelist);
     RouterStrategy(CkMigrateMessage *m): Strategy(m){}
+    
+    ~RouterStrategy();
 
     //Insert messages
     void insertMessage(MessageHolder *msg);

@@ -18,13 +18,15 @@ class D3GridRouter : public Router
 {
   private:
 	PeTable *PeGrid;
-  	int *oneplane, *zline, *gpes;
+  	int **oneplane, *psize, *zline, *gpes;
 	int MyPe, NumPes, COLLEN, nPlanes;
  	int LPMsgCount, LPMsgExpected;
 	int recvExpected[2], recvCount[2];
         int routerStage;
 	void InitVars();
 	void LocalProcMsg(comID id);
+        int nplanes;
+
   public:
 	D3GridRouter(int, int);
 	~D3GridRouter();

@@ -27,7 +27,6 @@
 }
 
 #define ROWLEN COLLEN
-#define NPLANES (int)ceil(((double)NumPes) / (ROWLEN * COLLEN))
 
 #define RowLen(pe) ColLen3D(pe)
 #define PELISTSIZE ((ROWLEN-1)/sizeof(int)+1)
@@ -149,8 +148,27 @@ D3GridRouter::D3GridRouter(int n, int me)
     
     PeGrid = new PeTable(/*CkNumPes()*/NumPes);
     
-    oneplane = new int[NPLANES * ROWLEN];
-    zline = new int[NPLANES];
+    nplanes = (int)ceil(((double)NumPes) / (ROWLEN * COLLEN));
+
+    oneplane = new int*[COLLEN];
+    psize = new int[COLLEN];
+    for(int count = 0; count < COLLEN; count ++) {
+        oneplane[count] = new int[nplanes * ROWLEN];
+
+        int idx = 0;
+        
+        for (int j=0;j< ROWLEN;j++) 
+            for(int k = 0; k < nplanes; k++) {
+                int dest = count * ROWLEN + j + ROWLEN * COLLEN * k;
+                if(dest < NumPes) {
+                    oneplane[count][idx++] = dest;
+                }
+                else break;
+            }
+        psize[count] = idx;
+    }
+
+    zline = new int[nplanes];
     
     InitVars();
     ComlibPrintf("%d:%d:COLLEN=%d, ROWLEN=%d, recvexpected=%d,%d\n", CkMyPe(), MyPe, COLLEN, ROWLEN, recvExpected[0], recvExpected[1]);
@@ -160,6 +178,9 @@ D3GridRouter::~D3GridRouter()
 {
     delete PeGrid;
     delete[] zline;
+    for(int count = 0; count < COLLEN; count ++)
+        delete[] oneplane[count];
+    
     delete[] oneplane;
 }
 
@@ -220,21 +241,6 @@ void D3GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes
             nextpe=nextrowrep+mm;
         }
         
-        int nplanes = (int)ceil(((double)NumPes) / (ROWLEN * COLLEN));
-        int idx = 0;
-        
-        //ComlibPrintf("%d->%d:(", MyPe, nextpe);
-        for (int j=0;j< ROWLEN;j++) 
-            for(int k = 0; k < nplanes; k++) {
-                int dest = i * ROWLEN + j + ROWLEN * COLLEN * k;
-                if(dest < NumPes) {
-                    oneplane[idx++] = dest;
-                    //ComlibPrintf("%d,", oneplane[idx-1]);
-                }
-                else break;
-            }
-        //ComlibPrintf(")\n");
-        
         if (nextpe == MyPe) {
             ComlibPrintf("%d calling recv directly\n", MyPe);
             recvCount[0]++;
@@ -246,7 +252,7 @@ void D3GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes
         
         gmap(nextpe);
         ComlibPrintf("sending to column %d and dest %d in %d\n", i, nextpe, CkMyPe());
-        GRIDSENDFN(id, 0, 0, idx, oneplane, CkpvAccess(RecvHandle), nextpe); 
+        GRIDSENDFN(id, 0, 0, psize[i], oneplane[i],CkpvAccess(RecvHandle), nextpe); 
     }
 }
 
@@ -281,7 +287,6 @@ void D3GridRouter::RecvManyMsg(comID id, char *msg)
             }
 
             int *pelist = zline;
-            int nplanes = (int)ceil(((double)NumPes) / (ROWLEN * COLLEN));
             int k = 0;
             
             //ComlibPrintf("recv:myrow = %d, nplanes = %d\n", myrow, nplanes);
@@ -307,7 +312,6 @@ void D3GridRouter::RecvManyMsg(comID id, char *msg)
     
     if((recvCount[1] == recvExpected[1]) && (routerStage == 1)){
         routerStage = 2;
-        int nplanes = (int)ceil(((double)NumPes) / (ROWLEN * COLLEN));
         for (int k=0; k < nplanes; k++) {
             int nextpe = (MyPe % (ROWLEN * COLLEN)) + k * ROWLEN * COLLEN;
 

@@ -15,12 +15,14 @@
 #include "comlib.h"
 #include <convcomlibstrategy.h>
 
-class ConvComlibManager {
+#define MAX_NUM_STRATS 128
 
+class ConvComlibManager {
+    
     StrategyTable strategyTable;
-    int nstrats;
 
  public:
+    int nstrats;
 
     ConvComlibManager();
     void insertStrategy(Strategy *s);

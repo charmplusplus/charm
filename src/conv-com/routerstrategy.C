@@ -100,14 +100,32 @@ RouterStrategy::RouterStrategy(int stratid, int handle, int _npes,
     routerID = stratid;
 
     npes = _npes;
-    pelist = new int[npes];
-    procMap = new int[CkNumPes()];
-    
-    memcpy(pelist, _pelist, sizeof(int) * npes);    
+    //pelist = new int[npes];
+    pelist = _pelist;
+    //memcpy(pelist, _pelist, sizeof(int) * npes);    
+
+    procMap = new int[CkNumPes()];    
     setReverseMap();
 
+    bcast_pemap = NULL;
+
     ComlibPrintf("Router Strategy : %d, MYPE = %d, NUMPES = %d \n", stratid, 
-           myPe, npes);
+                 myPe, npes);
+
+    if(myPe < 0) {
+        //I am not part of this strategy
+
+        doneFlag = 0;
+        router = NULL;
+        bufferedDoneInserting = 0;
+        return;        
+    }
+
+    //Start with all iterations done
+    doneFlag = 1;
+    
+    //No Buffered doneInserting at the begining
+    bufferedDoneInserting = 0;
 
     switch(stratid) {
     case USE_TREE: 
@@ -138,19 +156,29 @@ RouterStrategy::RouterStrategy(int stratid, int handle, int _npes,
         router->setDoneHandle(myDoneHandle);
         //router->SetID(id);
     }
-
-    //Start with all iterations done
-    doneFlag = 1;
-
-    //No Buffered doneInserting at the begining
-    bufferedDoneInserting = 0;
 }
+
+
+RouterStrategy::~RouterStrategy() {
+    //delete [] pelist;
+
+    if(bcast_pemap)
+        delete [] bcast_pemap;
+    
+    delete [] procMap;
+    if(router)
+        delete router;
+}
+
 
 void RouterStrategy::insertMessage(MessageHolder *cmsg){
 
+    if(myPe < 0)
+        CmiAbort("insertMessage: mype < 0\n");
+
     int count = 0;
     if(routerID == USE_DIRECT) {
-        if(cmsg->dest_proc == IS_MULTICAST) {
+        if(cmsg->dest_proc == IS_BROADCAST) {
             for(count = 0; count < cmsg->npes-1; count ++)
                 CmiSyncSend(cmsg->pelist[count], cmsg->size, 
                             cmsg->getMessage());
@@ -164,14 +192,21 @@ void RouterStrategy::insertMessage(MessageHolder *cmsg){
         delete cmsg;
     }
     else {
-        if(cmsg->dest_proc != IS_MULTICAST) {
+        if(cmsg->dest_proc >= 0) {
             cmsg->pelist = &procMap[cmsg->dest_proc];
             cmsg->npes = 1;
         }
-        else {
-            for(count = 0; count < cmsg->npes; count ++) {
-                cmsg->pelist[count] = procMap[cmsg->pelist[count]];
+        else if (cmsg->dest_proc == IS_BROADCAST){
+
+            if(bcast_pemap == NULL) {
+                bcast_pemap = new int[npes];
+                for(count = 0; count < npes; count ++) {
+                    bcast_pemap[count] = count;
+                }
             }
+
+            cmsg->pelist = bcast_pemap;
+            cmsg->npes = npes;
         }
         
         msgQ.push(cmsg);
@@ -180,14 +215,13 @@ void RouterStrategy::insertMessage(MessageHolder *cmsg){
 
 void RouterStrategy::doneInserting(){
     
+    if(myPe < 0)
+        CmiAbort("insertMessage: mype < 0\n");
+
     id.instanceID = getInstance();
 
-    ComlibPrintf("Instance ID = %d\n", getInstance());
-
-    if(routerID == USE_DIRECT)
-        return;
-
-    ComlibPrintf("%d: DoneInserting \n", CkMyPe());
+    //ComlibPrintf("Instance ID = %d\n", getInstance());
+    ComlibPrintf("%d: DoneInserting %d \n", CkMyPe(), msgQ.length());
     
     if(doneFlag == 0) {
         ComlibPrintf("%d:Waiting for previous iteration to Finish\n", 
@@ -196,6 +230,15 @@ void RouterStrategy::doneInserting(){
         return;
     }
     
+    if(routerID == USE_DIRECT) {
+        DummyMsg *m = (DummyMsg *)CmiAlloc(sizeof(DummyMsg));
+        memset((char *)m, 0, sizeof(DummyMsg)); 
+        m->id.instanceID = getInstance();
+        
+        Done(m);
+        return;
+    }
+
     doneFlag = 0;
     bufferedDoneInserting = 0;
 
@@ -218,7 +261,8 @@ void RouterStrategy::doneInserting(){
         msgQ.push(cmsg);
     }
 
-    /*
+    /*  // OLDER version which called an extra virtual method for each
+        //message 
       int numToDeposit = msgQ.length();
       
       while(!msgQ.isEmpty()) {
@@ -230,7 +274,7 @@ void RouterStrategy::doneInserting(){
       //order of relative processors numbering and NOT absolute
       //processor numbering
       
-      if(cmsg->dest_proc == IS_MULTICAST) {  
+      if(cmsg->dest_proc == IS_BROADCAST) {  
       router->EachToManyMulticast(id, cmsg->size, msg, cmsg->npes, 
       cmsg->pelist, 
       numToDeposit > 1);

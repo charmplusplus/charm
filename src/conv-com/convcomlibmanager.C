@@ -13,19 +13,28 @@
 
 int comm_debug;
 
-CkpvDeclare(ConvComlibManager *, conv_comm_ptr);
+CkpvDeclare(ConvComlibManager *, conv_com_ptr);
 CkpvDeclare(int, RecvdummyHandle);
 
 
-ConvComlibManager::ConvComlibManager(): strategyTable(10){
+ConvComlibManager::ConvComlibManager(): strategyTable(MAX_NUM_STRATS){
     nstrats = 0;
 }
 
 void ConvComlibManager::insertStrategy(Strategy *s) {
+
+    if(nstrats >= MAX_NUM_STRATS)
+        CkAbort("Too Many strategies\n");
+    
     StrategyTableEntry &st = strategyTable[nstrats];
+    
+    if(st.strategy != NULL)
+        delete st.strategy;
+
     st.strategy = s;
 
     s->setInstance(nstrats);
+    
     // if the strategy is pure converse or pure charm the following line is a
     // duplication, but if a charm strategy embed a converse strategy it is
     // necessary to set the instanceID in both
@@ -36,9 +45,16 @@ void ConvComlibManager::insertStrategy(Strategy *s) {
 
 void ConvComlibManager::insertStrategy(Strategy *s, int loc) {
 
+    if(loc >= MAX_NUM_STRATS)
+        CkAbort("Too Many strategies\n");
+
     //For now allow insertion of any location    
     StrategyTableEntry &st = strategyTable[loc];
 
+    //Check to check for the case where the old strategy is not re inserted 
+    if(st.strategy != NULL && st.strategy != s)
+        delete st.strategy;
+    
     st.strategy = s;
 }
 
@@ -51,12 +67,17 @@ void recv_dummy(void *msg){
 extern void propagate_handler(void *);
 extern void propagate_handler_frag(void *);
 
-//An initialization routine which does preliminary initialization of the 
-//Converse commlib manager. Currently also initialized krishnans code
+//An initialization routine which does prelimnary initialization of the 
+//Converse commlib manager. 
 void initComlibManager(){ 
-    CkpvInitialize(ConvComlibManager *, conv_comm_ptr);
+    if(!CpvInitialized(conv_com_ptr))
+        CkpvInitialize(ConvComlibManager *, conv_com_ptr);
+
+    if(CkpvAccess(conv_com_ptr) != 0)
+       return;   
+ 
     ConvComlibManager *conv_com = new ConvComlibManager();
-    CkpvAccess(conv_comm_ptr) = conv_com;
+    CkpvAccess(conv_com_ptr) = conv_com;
     
     //comm_debug = 1;
     ComlibPrintf("Init Call\n");
@@ -74,18 +95,18 @@ void initComlibManager(){
     PUPable_reg(RouterStrategy);
     PUPable_reg(MessageHolder);
 }
- 
+
 Strategy *ConvComlibGetStrategy(int loc) {
     //Calling converse strategy lets Charm++ strategies one strategy
     //table entry but multiple layers of strategies (Charm on top of Converse).
-    return (CkpvAccess(conv_comm_ptr))->getStrategy(loc)->getConverseStrategy();
+    return (CkpvAccess(conv_com_ptr))->getStrategy(loc)->getConverseStrategy();
 }
 
 void ConvComlibRegisterStrategy(Strategy *s) {
-    (CkpvAccess(conv_comm_ptr))->insertStrategy(s);    
+    (CkpvAccess(conv_com_ptr))->insertStrategy(s);    
 }
 
 void ConvComlibScheduleDoneInserting(int loc) {
-    (* (CkpvAccess(conv_comm_ptr))->getStrategyTable())[loc].
+    (* (CkpvAccess(conv_com_ptr))->getStrategyTable())[loc].
         call_doneInserting++;
 }

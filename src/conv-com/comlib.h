@@ -29,12 +29,11 @@ enum{BCAST=0,TREE, GRID, HCUBE};
 #define USE_GRID 5            //Virtual topology is a 3d grid
 #define USE_LINEAR 6          //Virtual topology is a linear array
 
-#define IS_MULTICAST -1
+#define IS_BROADCAST -1
+#define IS_SECTION_MULTICAST -2
 
 #define MAXNUMMSGS 1000
-#define MSGSIZETHRESHOLD 5000000
-#define MAXBUFSIZE 65536
-#define PERSISTENT_BUFSIZE 131072
+
 
 typedef struct {
     int refno;

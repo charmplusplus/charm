@@ -26,6 +26,7 @@ void Strategy::pup(PUP::er &p){
     p | isStrategyBracketed;
     p | type;
     p | destinationHandler;
+    p | myInstanceID;
 
     if (p.isUnpacking()) {
       converseStrategy = this;
@@ -64,6 +65,8 @@ void StrategyWrapper::pup (PUP::er &p) {
     //CkPrintf("In PUP of StrategyWrapper\n");
 
     p | nstrats;
+    p | total_nstrats;
+
     if(p.isUnpacking())
 	s_table = new Strategy * [nstrats];
     
@@ -75,6 +78,17 @@ void StrategyWrapper::pup (PUP::er &p) {
 StrategyTableEntry::StrategyTableEntry() {
     strategy = NULL;
     
+    numElements = 0;   //used by the array listener, 
+                       //could also be used for other objects
+    elementCount = 0;  //Count of how many elements have deposited
+                       //their data
+    nEndItr = 0;       //#elements that called end iteration
+    call_doneInserting = 0;
+}
+
+//called during learning, when all fields except
+//strategy need to be zeroed out
+void StrategyTableEntry::reset() {
     numElements = 0;   //used by the array listener, 
                        //could also be used for other objects
     elementCount = 0;  //Count of how many elements have deposited
