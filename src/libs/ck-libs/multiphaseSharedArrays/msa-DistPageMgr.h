@@ -1092,7 +1092,7 @@ public:
                 }
 
                 /* mark the page as being locked */
-                state(p)->lock = 1;
+                state(p)->locked = true;
             }
         }
     }
