@@ -77,7 +77,7 @@ CVHEADERS=converse.h conv-conds.h conv-mach.h
 
 CVLIBS=libconv-core.a $(CVLIBS_QS)
 
-LIBCONV_CORE=convcore.o conv-conds.o machine.o spantree.o queueing.o fifo.o threads.o msgmgr.o
+LIBCONV_CORE=convcore.o conv-conds.o machine.o spantree.o queueing.o fifo.o threads.o msgmgr.o memory.o
 
 converse: basics $(CVLIBS) cmk_extras
 
@@ -107,6 +107,9 @@ threads.o: threads.c $(CVHEADERS)
 
 msgmgr.o: msgmgr.c $(CVHEADERS)
 	$(CHARMC) msgmgr.c
+
+memory.o: memory.c $(CVHEADERS)
+	$(CHARMC) memory.c
 
 cmk_extras:
 	csh -fc 'source conv-mach.csh ; set echo ; $$CMK_EXTRAS'
