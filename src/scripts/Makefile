@@ -689,7 +689,7 @@ trace-summary.o:trace-summary.C trace-summary.h trace-common.h trace-summaryBOC.
 trace-counter.o:trace-counter.C trace-counter.h trace-common.h $(CKHEADERS)
 	$(CHARMC) -o trace-counter.o trace-counter.C
 
-trace-bluegene.o: trace-bluegene.C trace-bluegene.h $(CKHEADERS) blue_timing.h
+trace-bluegene.o: trace-bluegene.C trace-bluegene.h $(CKHEADERS) $(BLUE_HEADERS)
 	$(CHARMC) -o trace-bluegene.o trace-bluegene.C
 
 traceCore.o: traceCore.C $(CVHEADERS)
