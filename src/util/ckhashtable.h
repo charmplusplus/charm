@@ -22,7 +22,7 @@ extern "C" {
 #ifndef __OSL_HASH_TABLE_C
 #define __OSL_HASH_TABLE_C
 
-#include <converse.h>
+#include <stddef.h>
 
 /*C Version of Hashtable header file: */
 typedef void *CkHashtable_c;
@@ -31,8 +31,7 @@ typedef void *CkHashtable_c;
 CkHashtable_c CkCreateHashtable_int(int objBytes,int initSize);
 /*Create hashtable with a C string pointer as the key */
 CkHashtable_c CkCreateHashtable_string(int objBytes,int initSize);
-/*Generic create*/
-CkHashtable_c CkCreateHashtable(int keyBytes,int objBytes,int initSize);
+
 void CkDeleteHashtable(CkHashtable_c h);
 
 /*Return object storage for this (possibly new) key*/
@@ -85,21 +84,69 @@ inline int CkHashCompare_int(const void *k1,const void *k2,size_t /*len*/)
 
 class CkHashtableIterator;
 
+/* Describes the in-memory layout of a hashtable entry.
+"key" is a user-defined type, used as the unique object identifier.
+The key is assumed to begin at the start of the entry.  
+"empty" is a character, set to 1 if this entry in the table 
+is unused, zero otherwise. "object" is the thing the table stores;
+it is of a user-defined type.
+
+     | key | empty | gap? | object | gap? |
+==   | <------- hashtable entry --------> |
+
+*/
+class CkHashtableLayout {
+  int size; //Size of entire table entry, at least ks+os.
+  int ko,ks; //Key byte offset (always zero) and size
+  int po,ps; //"empty bit" offset and size (always 1)
+  int oo,os; //Object byte offset and size
+ public:
+  CkHashtableLayout(int keySize,int emptyOffset,
+		    int objectOffset,int objectSize,int entryLength)
+  {
+    size=entryLength;
+    ko=0; ks=keySize;
+    po=emptyOffset; ps=1;
+    oo=objectOffset; os=objectSize;
+  }
+
+  inline int entrySize(void) const {return size;}
+  inline int keySize(void) const {return ks;}
+  inline int objectSize(void) const {return os;}
+
+//Utility functions:
+  //Given an entry pointer, return a pointer to the key
+  inline char *getKey(char *entry) const {return entry+ko;}
+  //Given an entry pointer, return a pointer to the object
+  inline char *getObject(char *entry) const {return entry+oo;}
+  
+  //Is this entry empty?
+  inline char isEmpty(char *entry) const {return *(entry+po);}
+  //Mark this entry as empty
+  inline void empty(char *entry) const {*(entry+po)=1;}  
+  //Mark this entry as full
+  inline void fill(char *entry) const {*(entry+po)=0;}
+
+  //Move to the next entry
+  inline char *nextEntry(char *entry) const {return entry+size;}
+
+  //Get entry pointer from key pointer
+  inline char *entryFromKey(char *key) const {return key-ko;}
+};
+
 class CkHashtable {
 private:
 	CkHashtable(const CkHashtable &); //Don't use these
 	void operator=(const CkHashtable &);
 protected:
-	int len;//Vertical dimention of below array (best if prime)
-	unsigned short kb,ob;//Bytes per key; bytes per object. eb=kb+ob
-	unsigned short eb; //Bytes per hash entry-- horizontal dimention of below array
-	typedef char entry_t;
-	entry_t *table;//Storage for keys and objects (len rows; eb columns)
+	int len;//Vertical dimension of below array (best if prime)
+	CkHashtableLayout layout; //Byte-wise storage layout for an entry
+	char *table;//len hashtable entries
 	
 	int nObj;//Number of objects actually stored (0..len)
 	int resizeAt;//Resize when nObj>=resizeAt
-	CkHashFunction hash;
-	CkHashCompare compare;
+	CkHashFunction hash; //Function pointer to compute key hash
+	CkHashCompare compare; //Function pointer to compare keys
 	
 	float loadFactor;//Maximum fraction of table to fill 
 	// (0->always enlarge; 1->only when absolutely needed)
@@ -108,12 +155,12 @@ protected:
 	int inc(int &i) const {i++; if (i>=len) i=0; return i;}
 	
 	//Return the start of the i'th entry in the hash table
-	entry_t *entry(int i) const {return (entry_t *)(table+i*eb);}
-	
+	char *entry(int i) const {return (char *)(table+i*layout.entrySize());}
+
 	//Find the given key in the table.  If it's not there, return NULL
-	entry_t *findKey(const void *key) const;
+	char *findKey(const void *key) const;
 	//Find a spot for the given key in the table.  If there's not room, return NULL
-	entry_t *findEntry(const void *key) const;
+	char *findEntry(const void *key) const;
 	
 	//Build a new empty table of the given size
 	void buildTable(int newLen);
@@ -121,9 +168,8 @@ protected:
 	void rehash(int newLen);
 public:
 	//Constructor-- create an empty hash table of the given size
-	CkHashtable(
-		int keyBytes,int objBytes,//Bytes per key, object
-		int initLen=5,float NloadFactor=0.75,
+	CkHashtable(const CkHashtableLayout &layout_,
+		int initLen=5,float NloadFactor=0.5,
 		CkHashFunction hash=CkHashFunction_default,
 		CkHashCompare compare=CkHashCompare_default);
 	//Destructor-- destroy table
@@ -136,9 +182,9 @@ public:
 	
 	//Look up the given object in this table.  Return NULL if not found.
 	void *get(const void *key) {
-		entry_t *r=findKey(key);
-		if (r==NULL) return NULL;
-		else return (void *)(r+kb);
+		char *ent=findKey(key);
+		if (ent==NULL) return NULL;
+		else return layout.getObject(ent);
 	}
 	
 	//Remove this object from the hashtable (re-hashing if needed)
@@ -157,15 +203,16 @@ public:
 // in a hash table (without knowing all the keys).
 class CkHashtableIterator {
 protected:
+	int len;
+	CkHashtableLayout layout; //Byte-wise storage layout for an entry
 	char *table;
-	int len; short kb,ob,eb;
 	int curNo;//Table index of current object (to be returned next)
 	//Return the start of the i'th entry in the hash table
-	char *entry(int i) const {return table+i*eb;}
+	char *entry(int i) const {return table+i*layout.entrySize();}
 public:
-	CkHashtableIterator(void *Ntable,int Nlen,
-		int Nkb,int Nob):table((char *)Ntable),len(Nlen),kb(Nkb),ob(Nob) 
-		{curNo=0;eb=kb+ob;}
+	CkHashtableIterator(char *table_,int len_,const CkHashtableLayout &lo)
+	  :len(len_),layout(lo),table(table_)
+		{curNo=0;}
 	
 	//Seek to start of hash table
 	void seekStart(void);
@@ -192,13 +239,26 @@ with profligate use of templates.
 
 template <class KEY, class OBJ> 
 class CkHashtableTslow:public CkHashtable {
+  //Return the layout for this hashtable:
+  static inline CkHashtableLayout getLayout(void) {
+    //This struct defines the in-memory layout that we will use.
+    //  By including it in a struct rather than figuring it out ourselves, 
+    //  we let the compiler figure out what the (bizarre) alignment requirements are.
+    struct entry_t {
+      KEY k;
+      char empty;
+      OBJ o;
+    };
+    return CkHashtableLayout(sizeof(KEY),offsetof(entry_t,empty),
+			     offsetof(entry_t,o),sizeof(OBJ),sizeof(entry_t));
+  }
 public:
 	//Constructor-- create an empty hash table of at least the given size
 	CkHashtableTslow(
 		int initLen=5,float NloadFactor=0.5,
 		CkHashFunction Nhash=CkHashFunction_default,
 		CkHashCompare Ncompare=CkHashCompare_default)
-	 :CkHashtable(sizeof(KEY),sizeof(OBJ),initLen,NloadFactor,Nhash,Ncompare)
+	 :CkHashtable(getLayout(),initLen,NloadFactor,Nhash,Ncompare)
 	 {}
 	
 	OBJ &put(const KEY &key) {return *(OBJ *)CkHashtable::put((const void *)&key);}
@@ -223,7 +283,8 @@ class CkHashtableT:public CkHashtableTslow<KEY,OBJ> {
 public:
 	//Constructor-- create an empty hash table of at least the given size
 	CkHashtableT(int initLen=5,float NloadFactor=0.5)
-		:CkHashtableTslow<KEY,OBJ>(initLen,NloadFactor,KEY::staticHash,KEY::staticCompare)
+	  :CkHashtableTslow<KEY,OBJ>(initLen,NloadFactor,
+				     KEY::staticHash,KEY::staticCompare)
 	{}
 	CkHashtableT(
 		int initLen,float NloadFactor,
@@ -231,26 +292,28 @@ public:
 		:CkHashtableTslow<KEY,OBJ>(initLen,NloadFactor,Nhash,Ncompare)
 	 {}
 	
+	//Return the object, or "0" if it doesn't exist
 	OBJ get(const KEY &key) {
 		int i=key.hash()%len;
-		while(CmiTrue) {//Assumes key or empty slot will be found
-			char *cur=table+i*(sizeof(KEY)+sizeof(OBJ));
+		while(1) {//Assumes key or empty slot will be found
+			char *cur=entry(i);
 			//An empty slot indicates the key is not here
-			if (-17==*(int *)cur) return OBJ(0);
+			if (layout.isEmpty(cur)) return OBJ(0);
 			//Is this the key?
-			if (key.compare(*(const KEY *)cur))
-				return *(OBJ *)(cur+sizeof(KEY));
+			if (key.compare(*(KEY *)layout.getKey(cur)))
+				return *(OBJ *)layout.getObject(cur);
 			inc(i);
 		};
 	}
-	//Use this version when you're sure the entry exists
+	//Use this version when you're sure the entry exists--
+	// avoids the test for an empty entry
 	OBJ &getRef(const KEY &key) {
 		int i=key.hash()%len;
-		while(true) {//Assumes key or empty slot will be found
-			char *cur=table+i*(sizeof(KEY)+sizeof(OBJ));
+		while(1) {//Assumes key or empty slot will be found
+			char *cur=entry(i);
 			//Is this the key?
-			if (key.compare(*(const KEY *)cur))
-				return *(OBJ *)(cur+sizeof(KEY));
+			if (key.compare(*(KEY *)layout.getKey(cur)))
+				return *(OBJ *)layout.getObject(cur);
 			inc(i);
 		};
 	}

@@ -11,12 +11,9 @@ shamelessly stolen from java.util.Hashtable.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "conv-autoconfig.h"
 #include "ckhashtable.h"
 
 #define DEBUGF(x) /*printf x;*/
-#define ABORT(str) /*CkAbort(str)*/ do {printf(str);abort();} while (0)
-
 
 ///////////////////// Default hash/compare functions ////////////////////
 CkHashCode CkHashFunction_default(const void *keyData,size_t keyLen)
@@ -69,26 +66,23 @@ int CkHashCompare_string(const void *key1,const void *key2,size_t keyLen)
 
 /////////////////////// Hashtable implementation ///////////////
 static unsigned int primeLargerThan(unsigned int x);
-#define copyKey(dest,src,len) memcpy(dest,src,len) //Move a key
-#define copyObj(dest,src,len) memcpy(dest,src,len) //Move an object
-#define keyEmpty(key) (*(int *)(key)==-17) //Is this key empty?
-#define emptyKey(key) (*(int *)(key)=-17)  //Make this key empty
-#define e2k(e) ((void *)(e))  //Entry -> key
-#define e2o(e) ((void *)((e)+kb)) //Entry -> object
-#define e2i(e) (((e)-table)/eb) //Entry -> index
+#define copyKey(dest,src) memcpy(dest,src,layout.keySize())
+#define copyObj(dest,src) memcpy(dest,src,layout.objectSize())
+#define copyEntry(dest,src) memcpy(dest,src,layout.entrySize())
 
 ////////////////////////// Hash Utility routines //////////////////////////
 
 //Find the given key in the table.  If it's not there, return NULL
-CkHashtable::entry_t *CkHashtable::findKey(const void *key) const
+char *CkHashtable::findKey(const void *key) const
 {
 	DEBUGF(("  Finding key in table of %d--\n",len))
-	int i=hash(key,kb)%len;
+	int i=hash(key,layout.keySize())%len;
 	int startSpot=i;
 	do {
-		entry_t *cur=entry(i);
-		if (keyEmpty(e2k(cur))) return NULL;
-		if (compare(key,e2k(cur),kb)) return cur;
+		char *cur=entry(i);
+		if (layout.isEmpty(cur)) return NULL;
+		char *curKey=layout.getKey(cur);
+		if (compare(key,curKey,layout.keySize())) return curKey;
 		DEBUGF(("   still looking for key...\n"))
 	} while (inc(i)!=startSpot);
 	DEBUGF(("  No key found!\n"))
@@ -96,15 +90,16 @@ CkHashtable::entry_t *CkHashtable::findKey(const void *key) const
 }
 
 //Find a spot for the given key in the table.  If there's not room, return NULL
-CkHashtable::entry_t *CkHashtable::findEntry(const void *key) const
+char *CkHashtable::findEntry(const void *key) const
 {
 	DEBUGF(("  Finding spot in table of %d--\n",len))
-	int i=hash(key,kb)%len;
+	int i=hash(key,layout.keySize())%len;
 	int startSpot=i;
 	do {
-		entry_t *cur=entry(i);
-		if (keyEmpty(e2k(cur))) return cur;
-		if (compare(key,e2k(cur),kb)) return cur;
+		char *cur=entry(i);
+		if (layout.isEmpty(cur)) return cur; //Empty spot
+		char *curKey=layout.getKey(cur);
+		if (compare(key,curKey,layout.keySize())) return cur; //Its old spot
 		DEBUGF(("   still looking for spot...\n"))
 	} while (inc(i)!=startSpot);
 	DEBUGF(("  No spot found!\n"))
@@ -118,24 +113,24 @@ void CkHashtable::buildTable(int newLen)
 	nObj=0;
 	resizeAt=(int)(len*loadFactor);
 	DEBUGF(("Building table of %d (resize at %d)\n",len,resizeAt))
-	table=new entry_t[eb*len];
-	for (int i=0;i<len;i++) {
-		entry_t *dest=entry(i);
-		emptyKey(e2k(dest));
-	}
+	table=new char[layout.entrySize()*len];
+	for (int i=0;i<len;i++) layout.empty(entry(i));
 }
 
 //Set the table to the given size, re-hashing everything.
 void CkHashtable::rehash(int newLen)
 {
 	DEBUGF(("Beginning rehash from %d to %d--\n",len,newLen))
-	entry_t *oldTable=table; //Save the old table
+	char *oldTable=table; //Save the old table
 	int oldLen=len;
 	buildTable(newLen); //Make a new table
 	for (int i=0;i<oldLen;i++) {//Add all the old entries to the new table
-		entry_t *e=oldTable+i*eb;
-		if (!keyEmpty(e2k(e)))
-			copyObj(put(e2k(e)),e2o(e),ob);
+		char *src=oldTable+i*layout.entrySize();
+		if (!layout.isEmpty(src)) {
+		  //There was an entry here-- copy it to the new table
+		  char *dest=findEntry(layout.getKey(src));
+		  copyEntry(dest,src);
+		}
 	}
 	delete[] oldTable;
 	DEBUGF(("Rehash complete\n"))
@@ -144,21 +139,12 @@ void CkHashtable::rehash(int newLen)
 ///////////////////////// Hashtable Routines //////////////////////
 
 //Constructor-- create an empty hash table of at least the given size
-CkHashtable::CkHashtable(
-	int keyBytes,int objBytes,//Bytes per key, object
+CkHashtable::CkHashtable(const CkHashtableLayout &layout_,
 	int initLen,float NloadFactor,
 	CkHashFunction Nhash, //Maps keys to CkHashCodes
 	CkHashCompare Ncompare)
+  :layout(layout_)
 {
-	kb=keyBytes;ob=objBytes;eb=kb+ob;
-	
-	/*Since we use int(-1) as the empty key sentinal, we require
-	  enough space for the int and the records to be aligned. */
-	if (eb<sizeof(int))
-		ABORT("CkHashtable needs keyBytes+objBytes>=sizeof(int)!");
-	if (eb/sizeof(int)*sizeof(int)!=eb)
-		ABORT("CkHashtable needs sizeof(key+obj) to be a multiple of sizeof(int)!");
-	
 	hash=Nhash;
 	compare=Ncompare;
 	loadFactor=NloadFactor;
@@ -178,8 +164,8 @@ CkHashtable::~CkHashtable()
 void CkHashtable::empty(void)
 {
 	for (int i=0;i<len;i++) {
-		entry_t *dest=entry(i);
-		emptyKey(e2k(dest));
+		char *dest=entry(i);
+		layout.empty(dest);
 	}
 }
 
@@ -190,40 +176,43 @@ void *CkHashtable::put(const void *key)
 {
 	DEBUGF(("Putting key\n"))
 	if (nObj>=resizeAt) rehash(primeLargerThan(len));
-	entry_t *ent=findEntry(key);
-	if (keyEmpty(e2k(ent)))
-	{//Filling new entry (*not* just replacing old one)
+	char *ent=findEntry(key);
+	if (layout.isEmpty(ent))
+	{//Filling a new entry (*not* just replacing old one)
 		nObj++;
-		copyKey(e2k(ent),key,kb);
+		copyKey(layout.getKey(ent),key);
+		layout.fill(ent);
 	}
-	return e2o(ent);
+	return layout.getObject(ent);
 }
 
 //Remove this object from the hashtable (re-hashing if needed)
 void CkHashtable::remove(const void *key)
 {
 	DEBUGF(("Asked to remove key\n"))
-	entry_t *doomed=findKey(key);
-	if (doomed==NULL) return;
+	char *doomedKey=findKey(key);
+	if (doomedKey==NULL) return; //It's already gone!
 	nObj--;
-	emptyKey(e2k(doomed));
+	char *doomed=layout.entryFromKey(doomedKey);
+	layout.empty(doomed);
+	//Figure out where that entry came from in the table:
+#define e2i(entry) (((entry)-table)/layout.entrySize())
 	int i=e2i(doomed);
 	DEBUGF(("Remove-rehashing later keys\n"))
 	while (1) {
 		inc(i);
-		entry_t *src=entry(i);
-		if (keyEmpty(e2k(src))) 
+		char *src=entry(i);
+		if (layout.isEmpty(src))
 		{//Stop once we find an empty key
 			DEBUGF(("Remove-rehash complete\n"))
 			return;
 		}
-		entry_t *dest=findEntry(e2k(src));
+		//This was a valid entry-- figure out where it goes now
+		char *dest=findEntry(layout.getKey(src));
 		if (src!=dest) {
-			//Move src to dest; clear src
 			DEBUGF(("Remove-rehashing %d to %d\n",e2i(src),e2i(dest)))
-			copyKey(e2k(dest),e2k(src),kb);
-			copyObj(e2o(dest),e2o(src),ob);
-			emptyKey(e2k(src));
+			copyEntry(dest,src);
+			layout.empty(src);
 		} else {
 			DEBUGF(("Remove-rehashing not needed for %d\n",e2i(src)))
 		}
@@ -234,7 +223,7 @@ void CkHashtable::remove(const void *key)
 CkHashtableIterator *CkHashtable::iterator(void)
 {
 	DEBUGF(("Building iterator\n"))
-	return new CkHashtableIterator(table,len,kb,ob);
+	return new CkHashtableIterator(table,len,layout);
 }
 
 //////////////////////// HashtableIterator //////////////////
@@ -256,7 +245,7 @@ void CkHashtableIterator::seek(int n)
 int CkHashtableIterator::hasNext(void)
 {
   while (curNo<len) {
-    if (!keyEmpty(e2k(entry(curNo))))
+    if (!layout.isEmpty(entry(curNo)))
       return 1;//We have a next object
     else 
       curNo++;//This spot is blank-- skip over it
@@ -270,10 +259,10 @@ void *CkHashtableIterator::next(void **retKey)
 {
   while (curNo<len) {
     char *cur=entry(curNo++);
-    if (!keyEmpty(e2k(cur))) {
+    if (!layout.isEmpty(cur)) {
       //Here's the next object
-      if (retKey) *retKey=e2k(cur);
-      return e2o(cur);
+      if (retKey) *retKey=layout.getKey(cur);
+      return layout.getObject(cur);
     }
   }
   return NULL;//We went through the whole table-- no object
@@ -361,22 +350,24 @@ static unsigned int primeLargerThan(unsigned int x)
 
 /*************** C Interface routines ****************/
 #define CDECL extern "C" 
-/*Create generic hashtable (any sort of key)*/
-CDECL CkHashtable_c CkCreateHashtable(int keyBytes,int objBytes,int initSize)
-{
-	return (CkHashtable_c)new CkHashtable(keyBytes,objBytes,initSize);
-}
+
 /*Create hashtable with a single integer as the key*/
 CDECL CkHashtable_c CkCreateHashtable_int(int objBytes,int initSize)
 {
-	return (CkHashtable_c)new CkHashtable(sizeof(int),objBytes,initSize,0.75,
-		CkHashFunction_int,CkHashCompare_int);
+  int objStart=2*sizeof(int);
+  CkHashtableLayout layout(sizeof(int),sizeof(int),
+			   objStart,objBytes,objStart+objBytes);
+  return (CkHashtable_c)new CkHashtable(layout,initSize,0.5,
+					CkHashFunction_int,CkHashCompare_int);
 }
 /*Create hashtable with a C string pointer as the key*/
 CDECL CkHashtable_c CkCreateHashtable_string(int objBytes,int initSize)
 {
-	return (CkHashtable_c)new CkHashtable(sizeof(char *),objBytes,initSize,0.75,
-		CkHashFunction_string,CkHashCompare_string);
+  int objStart=2*sizeof(char *);
+  CkHashtableLayout layout(sizeof(char *),sizeof(char *),
+			   objStart,objBytes,objStart+objBytes);  
+  return (CkHashtable_c)new CkHashtable(layout,initSize,0.5,
+					CkHashFunction_string,CkHashCompare_string);
 }
 CDECL void CkDeleteHashtable(CkHashtable_c h)
 {
@@ -398,3 +389,4 @@ CDECL void CkHashtableRemove(CkHashtable_c h,const void *doomedKey)
 {
 	((CkHashtable *)h)->remove(doomedKey);
 }
+
