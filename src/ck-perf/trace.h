@@ -40,7 +40,7 @@ CkpvExtern(int, traceOnPe);
 #if CMK_HAS_COUNTER_PAPI
 typedef long_long LONG_LONG_PAPI;
 #else
-typedef CMK_TYPEDEF_INT8  LONG_LONG_PAPI;
+typedef CMK_TYPEDEF_INT8 LONG_LONG_PAPI;
 #endif
 
 // Base class of all tracing strategies.
@@ -48,6 +48,7 @@ typedef CMK_TYPEDEF_INT8  LONG_LONG_PAPI;
 class Trace {
   public:
 
+    int *papiIDs;
     LONG_LONG_PAPI *papiValues;
 
     virtual int traceOnPE() { return TRACE_CHARM_PE(); }

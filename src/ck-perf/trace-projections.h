@@ -54,6 +54,7 @@ class LogEntry {
     int numpes;
     int *pes;
     int numPapiEvents;
+    int *papiIDs;
     LONG_LONG_PAPI *papiValues;
     unsigned char type; 
     char *fName;
@@ -88,7 +89,7 @@ class LogEntry {
     LogEntry(double tm, unsigned char t, unsigned short m, unsigned short e, 
 	     int ev, int p,
 	     int ml, CmiObjId *d, double rt, double cpuT, int numPap, 
-	     LONG_LONG_PAPI *papVals);
+	     int *pap_ids, LONG_LONG_PAPI *papVals);
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
     void operator delete(void *ptr) {free(ptr); }
@@ -146,7 +147,7 @@ class LogPool {
     void writeSts(void);
     void writeSts(TraceProjections *traceProj);
 
-    void add(unsigned char type,unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., double cpuT=0.0, int numPap=0, LONG_LONG_PAPI *papVals=NULL);
+    void add(unsigned char type,unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., double cpuT=0.0, int numPap=0, int *pap_ids=NULL, LONG_LONG_PAPI *papVals=NULL);
     void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
     void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int num=0, int *pelist=NULL);
     void postProcessLog();

@@ -65,10 +65,11 @@ On T3E, we need to have file number control by open/close files only when needed
 // for each processor (group).
 //
 // For now, we trace only two events - # Floating Point Instructions &
-// # L1 Cache Misses.
+// # of L2 Cache Misses.
 int numPAPIEvents = 2;
 int papiEventSet = PAPI_NULL;
 int papiEvents[] = {PAPI_TOT_INS, PAPI_L1_DCM};
+char *papiEventNames[] = {"PAPI_TOT_INS", "PAPI_L1_DCM"};
 #endif
 
 void LogPool::openLog(const char *mode)
@@ -166,8 +167,13 @@ void _createTraceprojections(char **argv)
   if (PAPI_create_eventset(&papiEventSet) != PAPI_OK) {
     CmiAbort("PAPI failed to create event set!\n");
   }
-  if (PAPI_add_events(papiEventSet, papiEvents, numPAPIEvents) != PAPI_OK) {
-    CmiAbort("PAPI failed to add designated events!\n");
+  papiRetValue = PAPI_add_events(papiEventSet, papiEvents, numPAPIEvents);
+  if (papiRetValue != PAPI_OK) {
+    if (papiRetValue == PAPI_ECNFLCT) {
+      CmiAbort("PAPI events conflict! Please re-assign event types!\n");
+    } else {
+      CmiAbort("PAPI failed to add designated events!\n");
+    }
   }
   CkpvAccess(_trace)->papiValues = new long_long[numPAPIEvents];
   memset(CkpvAccess(_trace)->papiValues, 0, numPAPIEvents*sizeof(long_long));
@@ -370,9 +376,20 @@ void LogPool::write(int writedelta)
 
 void LogPool::writeSts(void)
 {
+  // for whining compilers
+  int i;
+  char name[30];
   fprintf(stsfp, "VERSION %s\n", PROJECTION_VERSION);
+#if CMK_HAS_COUNTER_PAPI
+  fprintf(stsfp, "TOTAL_PAPI_EVENTS %d\n", numPAPIEvents);
+  // for now, use i, next time use papiEvents[i].
+  // **CW** papi event names is a hack.
+  for (i=0;i<numPAPIEvents;i++) {
+    fprintf(stsfp, "PAPI_EVENT %d %s\n", i, papiEventNames[i]);
+  }
+#endif
   traceWriteSTS(stsfp,CkpvAccess(usrEvents)->length());
-  for(int i=0;i<CkpvAccess(usrEvents)->length();i++){
+  for(i=0;i<CkpvAccess(usrEvents)->length();i++){
     fprintf(stsfp, "EVENT %d %s\n", (*CkpvAccess(usrEvents))[i]->e, (*CkpvAccess(usrEvents))[i]->str);
   }	
 }
@@ -409,12 +426,13 @@ static void updateProjLog(void *data, double t, double recvT, void *ptr)
 }
 #endif
 
-void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,int pe, int ml, CmiObjId *id, double recvT, double cpuT, int numPap, 
-		  LONG_LONG_PAPI *papVals) 
+void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,
+		  int pe, int ml, CmiObjId *id, double recvT, double cpuT, 
+		  int numPap, int *pap_ids, LONG_LONG_PAPI *papVals) 
 {
   new (&pool[numEntries++])
     LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT, numPap,
-	     papVals);
+	     pap_ids, papVals);
   if(poolSize==numEntries) {
     double writeTime = TraceTimer();
     writeLog();
@@ -508,18 +526,22 @@ LogEntry::LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
 LogEntry::LogEntry(double tm, unsigned char t, unsigned short m, 
 		   unsigned short e, int ev,
 		   int p, int ml, CmiObjId *d, double rt,
-		   double cpuT, int numPapiEvts, LONG_LONG_PAPI *papiVals)
+		   double cpuT, int numPapiEvts, int *papi_ids,
+		   LONG_LONG_PAPI *papiVals)
 {
   type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
   if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0;};
   recvTime = rt;
   numPapiEvents = numPapiEvts; cputime = cpuT;
   if (papiVals != NULL) {
+    papiIDs = new int[numPapiEvents];
     papiValues = new LONG_LONG_PAPI[numPapiEvents];
     for (int i=0; i<numPapiEvents; i++) {
+      papiIDs[i] = papi_ids[i];
       papiValues[i] = papiVals[i];
     }
   } else {
+    papiIDs = NULL;
     papiValues = NULL;
   }
 }
@@ -554,10 +576,10 @@ void LogEntry::pup(PUP::er &p)
       p|icputime;
       p|numPapiEvents;
       for (i=0; i<numPapiEvents; i++) {
+	// not yet!!!
+	//	p|papiIDs[i]; 
 	p|papiValues[i];
       }
-      // **CW** I believe we still need to properly implement unpacking
-      // for papiValues ...
       if (p.isUnpacking()) {
 	recvTime = irecvtime/1.0e6;
 	cputime = icputime/1.0e6;
@@ -568,6 +590,8 @@ void LogEntry::pup(PUP::er &p)
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; p|msglen; p|icputime;
       p|numPapiEvents;
       for (i=0; i<numPapiEvents; i++) {
+	// not yet!!!
+	//	p|papiIDs[i];
 	p|papiValues[i];
       }
       if (p.isUnpacking()) cputime = icputime/1.0e6;
@@ -589,8 +613,6 @@ void LogEntry::pup(PUP::er &p)
       else {
 	for (i=0; i<numpes; i++) p|pes[i];
       }
-      // **CW** I believe we still need to properly implement unpacking
-      // for pes ...
       if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
       break;
     case MESSAGE_RECV:
@@ -817,7 +839,8 @@ void TraceProjections::beginExecute(CmiObjId *tid)
 #if CMK_HAS_COUNTER_PAPI
   _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
 		execEvent,CkMyPe(), 0, tid, 0.0, TraceCpuTimer(),
-		numPAPIEvents, CkpvAccess(_trace)->papiValues);
+		numPAPIEvents, papiEvents,
+		CkpvAccess(_trace)->papiValues);
 #else
   _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
                              execEvent,CkMyPe(), 0, tid);
@@ -839,7 +862,8 @@ void TraceProjections::beginExecute(envelope *e)
 #if CMK_HAS_COUNTER_PAPI
     _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
 		  execEvent,CkMyPe(), 0, 0, 0.0, TraceCpuTimer(),
-		  numPAPIEvents, CkpvAccess(_trace)->papiValues);
+		  numPAPIEvents, papiEvents,
+		  CkpvAccess(_trace)->papiValues);
 #else
     _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
 		  execEvent,CkMyPe(), 0, 0, 0.0, TraceCpuTimer());
@@ -864,7 +888,8 @@ void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe, int 
 #if CMK_HAS_COUNTER_PAPI
   _logPool->add(BEGIN_PROCESSING,msgType,ep,TraceTimer(),event,
 		srcPe, mlen, idx, 0.0, TraceCpuTimer(),
-		numPAPIEvents, CkpvAccess(_trace)->papiValues);
+		numPAPIEvents, papiEvents,
+		CkpvAccess(_trace)->papiValues);
 #else
   _logPool->add(BEGIN_PROCESSING,msgType,ep,TraceTimer(),event,
 		srcPe, mlen, idx, 0.0, TraceCpuTimer());
@@ -885,11 +910,13 @@ void TraceProjections::endExecute(void)
   if(execEp == (-1)) {
     _logPool->add(END_PROCESSING,0,_threadEP,TraceTimer(),
 		  execEvent,CkMyPe(),0,0,0.0,cputime,
-		  numPAPIEvents, CkpvAccess(_trace)->papiValues);
+		  numPAPIEvents, papiEvents,
+		  CkpvAccess(_trace)->papiValues);
   } else {
     _logPool->add(END_PROCESSING,0,execEp,TraceTimer(),
 		  execEvent,execPe,0,0,0.0,cputime,
-		  numPAPIEvents, CkpvAccess(_trace)->papiValues);
+		  numPAPIEvents, papiEvents,
+		  CkpvAccess(_trace)->papiValues);
   }
 #else
   if(execEp == (-1)) {
@@ -980,6 +1007,8 @@ void TraceProjections::endComputation(void)
 		CkpvAccess(_trace)->papiValues) != PAPI_OK) {
     CkPrintf("Warning: PAPI failed to stop correctly!\n");
   }
+  // NOTE: We should not do a complete close of PAPI until after the
+  // sts writer is done.
 #endif
   _logPool->add(END_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
 }

@@ -137,10 +137,6 @@ extern void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "TOTAL_MSGS %d\n", _msgTable.size());
   fprintf(stsfp, "TOTAL_PSEUDOS %d\n", 0);
   fprintf(stsfp, "TOTAL_EVENTS %d\n", nUserEvents);
-#if CMK_HAS_COUNTER_PAPI
-  // **CW** for now, hardcode ... 
-  fprintf(stsfp, "TOTAL_PAPI_EVENTS %d\n", 2);
-#endif
   int i;
   for(i=0;i<_chareTable.size();i++)
     fprintf(stsfp, "CHARE %d %s\n", i, _chareTable[i]->name);
@@ -149,11 +145,6 @@ extern void traceWriteSTS(FILE *stsfp,int nUserEvents) {
                  _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
   for(i=0;i<_msgTable.size();i++)
     fprintf(stsfp, "MESSAGE %d %d\n", i, _msgTable[i]->size);
-#if CMK_HAS_COUNTER_PAPI
-  // **CW** for now, hardcode ... 
-  fprintf(stsfp, "PAPI_EVENT %d %s\n", 0, "PAPI_TOT_INS");
-  fprintf(stsfp, "PAPI_EVENT %d %s\n", 1, "PAPI_L1_DCM");
-#endif
 }
 
 
