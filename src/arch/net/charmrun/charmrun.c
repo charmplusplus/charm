@@ -1763,10 +1763,10 @@ void req_client_start_and_connect(void)
 		start_one_node_rsh(client);
 	    }
 	    for (client=c; client<c+count; client++) {
-		req_one_client_connect(client);
+		finish_one_node(client);
             }
 	    for (client=c; client<c+count; client++) {
-		finish_one_node(client);
+		req_one_client_connect(client);
             }
 	}
         if (portOk == 0) exit(1);
