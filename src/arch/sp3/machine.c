@@ -1,9 +1,9 @@
 /***************************************************************************
  * RCS INFORMATION:
  *
- *	$RCSfile$
- *	$Author$	$Locker$		$State$
- *	$Revision$	$Date$
+ *  $RCSfile$
+ *  $Author$  $Locker$    $State$
+ *  $Revision$  $Date$
  *
  ***************************************************************************
  * DESCRIPTION:
@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.4  1997-12-10 21:01:41  jyelon
+ * Revision 1.5  1998-01-15 22:25:52  milind
+ * Fixed bugs in latencyBWtest and optimized SP3 communication.
+ *
+ * Revision 1.4  1997/12/10 21:01:41  jyelon
  * *** empty log message ***
  *
  * Revision 1.3  1997/10/03 19:52:03  milind
@@ -82,24 +85,8 @@ static char ident[] = "@(#)$Header$";
 #include "converse.h"
 #include <mpproto.h>
 
-#define MSG_TYPE 1
-
-#define PROCESS_PID 1
-
-#define _CK_VARSIZE_UNIT 8
-#define MAXUSERARGS 20
-#define MAXARGLENGTH 50
-
-#define MAX_OUTSTANDING_MSGS	1024
-
-#define STATIC 
-
-/* Scanf related constants */
-#define SCANFMSGLENGTH  1024
-#define SCANFNVAR       16
-#define SCANFBUFFER     8192
-
-#define WORDSIZE 	sizeof(int)
+void CmiMemLock() {}
+void CmiMemUnlock() {}
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 
@@ -116,7 +103,6 @@ typedef struct msg_list {
 } MSG_LIST;
 
 static int Cmi_dim;
-static int numpes ;
 static double itime;
 
 static MSG_LIST *sent_msgs=0;
@@ -135,61 +121,57 @@ static void CmiTimerInit(void)
 
 double CmiTimer(void)
 {
-  double tmsec, t;
+  double t;
   struct timestruc_t time;
   
   gettimer(TIMEOFDAY,&time);
   t=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
-  tmsec = (double) (1.0e3*(t-itime));
-  return tmsec / 1000.0;
+  return (t-itime);
 }
 
 double CmiWallTimer(void)
 {
-  double tmsec, t;
+  double t;
   struct timestruc_t time;
   
   gettimer(TIMEOFDAY,&time);
   t=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
-  tmsec = (double) (1.0e3*(t-itime));
-  return tmsec / 1000.0;
+  return (t-itime);
 }
 
 double CmiCpuTimer(void)
 {
-  double tmsec, t;
+  double t;
   struct timestruc_t time;
   
   gettimer(TIMEOFDAY,&time);
   t=(double)time.tv_sec + 1.0e-9*((double) time.tv_nsec);
-  tmsec = (double) (1.0e3*(t-itime));
-  return tmsec / 1000.0;
+  return (t-itime);
 }
 
 static int CmiAllAsyncMsgsSent(void)
 {
-     MSG_LIST *msg_tmp = sent_msgs;
+   MSG_LIST *msg_tmp = sent_msgs;
      
-     while(msg_tmp!=0)
-     {
-	  if(mpc_status(msg_tmp->msgid)<0)
-	       return 0;
-	  msg_tmp = msg_tmp->next;
-     }
-     return 1;
+   while(msg_tmp!=0) {
+    if(mpc_status(msg_tmp->msgid)<0)
+      return 0;
+    msg_tmp = msg_tmp->next;
+   }
+   return 1;
 }
 
 int CmiAsyncMsgSent(CmiCommHandle c) {
      
-     MSG_LIST *msg_tmp = sent_msgs;
+  MSG_LIST *msg_tmp = sent_msgs;
 
-     while ((msg_tmp) && ((CmiCommHandle)msg_tmp->msgid != c))
-	  msg_tmp = msg_tmp->next;
+  while ((msg_tmp) && ((CmiCommHandle)msg_tmp->msgid != c))
+    msg_tmp = msg_tmp->next;
      
-     if ((msg_tmp) && (mpc_status(msg_tmp->msgid)<0))
-	  return 0;
-     else
-	  return 1;
+  if ((msg_tmp) && (mpc_status(msg_tmp->msgid)<0))
+    return 0;
+  else
+    return 1;
 }
 
 void CmiReleaseCommHandle(CmiCommHandle c)
@@ -200,31 +182,27 @@ void CmiReleaseCommHandle(CmiCommHandle c)
 
 static void CmiReleaseSentMessages(void)
 {
-     MSG_LIST *msg_tmp=sent_msgs;
-     MSG_LIST *prev=0;
-     MSG_LIST *temp;
+  MSG_LIST *msg_tmp=sent_msgs;
+  MSG_LIST *prev=0;
+  MSG_LIST *temp;
      
-     while(msg_tmp!=0)
-     {
-	  if(mpc_status(msg_tmp->msgid)>=0)
-	  {
-	       /* Release the message */
-	       temp = msg_tmp->next;
-	       if(prev==0)	/* first message */
-		    sent_msgs = temp;
-	       else
-		    prev->next = temp;
-	       CmiFree(msg_tmp->msg);
-	       CmiFree(msg_tmp);
-	       msg_tmp = temp;
-	  }
-	  else
-	  {
-	       prev = msg_tmp;
-	       msg_tmp = msg_tmp->next;
-	  }
-     }
-     end_sent = prev;
+  while(msg_tmp!=0) {
+    if(mpc_status(msg_tmp->msgid)>=0) {
+      /* Release the message */
+      temp = msg_tmp->next;
+      if(prev==0)  /* first message */
+        sent_msgs = temp;
+      else
+        prev->next = temp;
+      CmiFree(msg_tmp->msg);
+      CmiFree(msg_tmp);
+      msg_tmp = temp;
+    } else {
+      prev = msg_tmp;
+      msg_tmp = msg_tmp->next;
+    }
+  }
+  end_sent = prev;
 }
 
 typedef struct rmsg_list {
@@ -242,23 +220,22 @@ static void PumpMsgs(void)
   char *msg;
   RMSG_LIST *msg_tmp;
 
-  CmiReleaseSentMessages();
   while(1) {
     src = dontcare; type = msgtype;
-	 mpc_probe(&src, &type, &mstat);
-	 if(mstat<0)
-		return;
-	 nbytes = mstat;
-	 msg = (char *) CmiAlloc(nbytes);
-	 mpc_brecv(msg, nbytes, &src, &type, &nbytes);
-	 msg_tmp = (RMSG_LIST *) CmiAlloc(sizeof(RMSG_LIST));
-	 msg_tmp->msg = msg;
-	 msg_tmp->next = 0;
-	 if(recd_msgs==0)
-		recd_msgs = msg_tmp;
-	 else
+    mpc_probe(&src, &type, &mstat);
+    if(mstat<0)
+      return;
+    nbytes = mstat;
+    msg = (char *) CmiAlloc(nbytes);
+    mpc_brecv(msg, nbytes, &src, &type, &nbytes);
+    msg_tmp = (RMSG_LIST *) CmiAlloc(sizeof(RMSG_LIST));
+    msg_tmp->msg = msg;
+    msg_tmp->next = 0;
+    if(recd_msgs==0)
+      recd_msgs = msg_tmp;
+    else
       end_recd->next = msg_tmp;
-	 end_recd = msg_tmp;
+    end_recd = msg_tmp;
   }
 }
 
@@ -266,70 +243,69 @@ static void PumpMsgs(void)
 
 void *CmiGetNonLocal(void)
 {
-     void *msg;
-	  RMSG_LIST *msg_tmp;
+  void *msg;
+  RMSG_LIST *msg_tmp;
 
-	  PumpMsgs();
-	  msg_tmp = recd_msgs;
-	  if(msg_tmp == 0)
-		 return 0;
-	  if(msg_tmp == end_recd) {
-		 recd_msgs = end_recd = 0;
-	  } else {
-		 recd_msgs = msg_tmp->next;
-	  }
-	  msg = msg_tmp->msg;
-	  CmiFree(msg_tmp);
-	  return msg;
+  msg_tmp = recd_msgs;
+  if(msg_tmp == 0) {
+    PumpMsgs();
+    msg_tmp = recd_msgs;
+    if(msg_tmp==0)
+      return 0;
+  }
+  if(msg_tmp == end_recd) {
+    recd_msgs = end_recd = 0;
+  } else {
+    recd_msgs = msg_tmp->next;
+  }
+  msg = msg_tmp->msg;
+  CmiFree(msg_tmp);
+  return msg;
 }
 
 void CmiNotifyIdle(void)
 {
-#if CMK_WHEN_PROCESSOR_IDLE_USLEEP
-  tv.tv_sec=0; tv.tv_usec=5000;
-  select(0,0,0,0,&tv);
-#endif
+  CmiReleaseSentMessages();
+  PumpMsgs();
 }
  
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
 void CmiSyncSendFn(int destPE, int size, char *msg)
 {
-     char *dupmsg = (char *) CmiAlloc(size);
-	  memcpy(dupmsg, msg, size);
-	  PumpMsgs();
-	  if (Cmi_mype==destPE)
-		 FIFO_EnQueue(CpvAccess(CmiLocalQueue),dupmsg);
-	  else
-	    CmiAsyncSendFn(destPE, size, dupmsg);
+  char *dupmsg = (char *) CmiAlloc(size);
+  memcpy(dupmsg, msg, size);
+  if (Cmi_mype==destPE)
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue),dupmsg);
+  else
+    CmiAsyncSendFn(destPE, size, dupmsg);
 }
 
 
 CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 {
-     MSG_LIST *msg_tmp;
-     int msgid;
+  MSG_LIST *msg_tmp;
+  int msgid;
      
-	  PumpMsgs();
-     mpc_send(msg, size, destPE, msgtype, &msgid);
-     msg_tmp = (MSG_LIST *) CmiAlloc(sizeof(MSG_LIST));
-     msg_tmp->msgid = msgid;
-     msg_tmp->msg = msg;
-     msg_tmp->next = 0;
-     if(sent_msgs==0)
-	    sent_msgs = msg_tmp;
-     else
-	    end_sent->next = msg_tmp;
-     end_sent = msg_tmp;
+  mpc_send(msg, size, destPE, msgtype, &msgid);
+  msg_tmp = (MSG_LIST *) CmiAlloc(sizeof(MSG_LIST));
+  msg_tmp->msgid = msgid;
+  msg_tmp->msg = msg;
+  msg_tmp->next = 0;
+  if(sent_msgs==0)
+    sent_msgs = msg_tmp;
+  else
+    end_sent->next = msg_tmp;
+  end_sent = msg_tmp;
 }
 
 void CmiFreeSendFn(int destPE, int size, char *msg)
 {
-	if (Cmi_mype==destPE) {
-		FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
-	} else {
-		CmiAsyncSendFn(destPE, size, msg);
-	}
+  if (Cmi_mype==destPE) {
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+  } else {
+    CmiAsyncSendFn(destPE, size, msg);
+  }
 }
 
 
@@ -337,101 +313,86 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
 
 void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
 {
-     int i ;
+  int i ;
      
-     for ( i=Cmi_mype+1; i<numpes; i++ ) 
-	    CmiSyncSendFn(i, size,msg) ;
-     for ( i=0; i<Cmi_mype; i++ ) 
-	    CmiSyncSendFn(i, size,msg) ;
+  for ( i=Cmi_mype+1; i<Cmi_numpes; i++ ) 
+    CmiSyncSendFn(i, size,msg) ;
+  for ( i=0; i<Cmi_mype; i++ ) 
+    CmiSyncSendFn(i, size,msg) ;
 }
 
 
 CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)  
 {
-	int i ;
+  int i ;
 
-	for ( i=Cmi_mype+1; i<numpes; i++ ) 
-		CmiAsyncSendFn(i,size,msg) ;
-	for ( i=0; i<Cmi_mype; i++ ) 
-		CmiAsyncSendFn(i,size,msg) ;
-	return (CmiCommHandle) (CmiAllAsyncMsgsSent());
+  for ( i=Cmi_mype+1; i<Cmi_numpes; i++ ) 
+    CmiAsyncSendFn(i,size,msg) ;
+  for ( i=0; i<Cmi_mype; i++ ) 
+    CmiAsyncSendFn(i,size,msg) ;
+  return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
 
 void CmiFreeBroadcastFn(int size, char *msg)
 {
-    CmiSyncBroadcastFn(size,msg);
-	 CmiFree(msg);
+   CmiSyncBroadcastFn(size,msg);
+   CmiFree(msg);
 }
  
 void CmiSyncBroadcastAllFn(int size, char *msg)        /* All including me */
 {
-     int i ;
+  int i ;
      
-     for ( i=0; i<numpes; i++ ) 
-	  CmiSyncSendFn(i,size,msg) ;
+  for ( i=0; i<Cmi_numpes; i++ ) 
+    CmiSyncSendFn(i,size,msg) ;
 }
 
 CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)  
 {
-	int i ;
+  int i ;
 
-	for ( i=1; i<numpes; i++ ) 
-		CmiAsyncSendFn(i,size,msg) ;
-	return (CmiCommHandle) (CmiAllAsyncMsgsSent());
+  for ( i=1; i<Cmi_numpes; i++ ) 
+    CmiAsyncSendFn(i,size,msg) ;
+  return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
 
 void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 {
-     int i ;
+  int i ;
      
-     for ( i=0; i<numpes; i++ ) 
-	  CmiSyncSendFn(i,size,msg) ;
-     CmiFree(msg) ;
+  for ( i=0; i<Cmi_numpes; i++ ) 
+    CmiSyncSendFn(i,size,msg) ;
+  CmiFree(msg) ;
 }
-
-
 
 /* Neighbour functions used mainly in LDB : pretend the SP1 is a hypercube */
 
 int CmiNumNeighbours(int node)
 {
-     return Cmi_dim;
+  return Cmi_dim;
 }
-
 
 void CmiGetNodeNeighbours(int node, int *neighbours)
 {
-     int i;
+  int i;
      
-     for (i = 0; i < Cmi_dim; i++)
-	  neighbours[i] = FLIPBIT(node,i);
+  for (i = 0; i < Cmi_dim; i++)
+    neighbours[i] = FLIPBIT(node,i);
 }
-
-
-
 
 int CmiNeighboursIndex(int node, int neighbour)
 {
-    int index = 0;
-    int linenum = node ^ neighbour;
+  int index = 0;
+  int linenum = node ^ neighbour;
 
-    while (linenum > 1)
-    {
-        linenum = linenum >> 1;
-        index++;
-    }
-    return index;
+  while (linenum > 1) {
+    linenum = linenum >> 1;
+    index++;
+  }
+  return index;
 }
 
-int CmiFlushPrintfs(void)
-{ }
-
-
-
 /************************** MAIN ***********************************/
-
-void CmiDeclareArgs(void)
-{}
 
 void ConverseExit(void)
 {
@@ -449,7 +410,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   
   Cmi_myrank = 0;
   mpc_environ(&Cmi_numpes, &Cmi_mype);
-  numpes = Cmi_numpes;
   mpc_task_query(nbuf, 4, 3);
   dontcare = nbuf[0];
   allmsg = nbuf[1];
@@ -457,7 +417,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   msgtype = nbuf[0];
   
   /* find dim = log2(numpes), to pretend we are a hypercube */
-  for ( Cmi_dim=0,n=numpes; n>1; n/=2 )
+  for ( Cmi_dim=0,n=Cmi_numpes; n>1; n/=2 )
     Cmi_dim++ ;
   CmiSpanTreeInit();
   CmiTimerInit();
@@ -480,22 +440,26 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
  
 void *CmiAlloc(int size)
 {
-     char *res;
-     res =(char *)malloc(size+8);
-     if (res==0) {
-	    fprintf(stderr, "Memory allocation failed.");
-		 mpc_stopall(1);
-	  }
-     ((int *)res)[0]=size;
-     return (void *)(res+8);
+  char *res;
+  res =(char *)malloc(size+8);
+  if (res==0) {
+    CmiReleaseSentMessages();
+    res =(char *)malloc(size+8);
+    if(res==0) {
+      fprintf(stderr, "Memory allocation failed.");
+      mpc_stopall(1);
+    }
+  }
+  ((int *)res)[0]=size;
+  return (void *)(res+8);
 }
 
 int CmiSize(void *blk)
 {
-	return ((int *)( ((char *)blk)-8))[0];
+  return ((int *)( ((char *)blk)-8))[0];
 }
  
 void CmiFree(void *blk)
 {
-	free( ((char*)blk)-8);
+  free( ((char*)blk)-8);
 }

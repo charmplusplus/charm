@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.5  1997-12-22 21:58:25  jyelon
+ * Revision 1.6  1998-01-15 22:25:51  milind
+ * Fixed bugs in latencyBWtest and optimized SP3 communication.
+ *
+ * Revision 1.5  1997/12/22 21:58:25  jyelon
  * Changed LDB initialization scheme.
  *
  * Revision 1.4  1997/08/06 20:36:14  jyelon
@@ -107,8 +110,8 @@
 
 #define CMK_MACHINE_NAME                                   "sp3"
 
-#define CMK_MALLOC_USE_GNU_MALLOC                          0
-#define CMK_MALLOC_USE_OS_BUILTIN                          1
+#define CMK_MALLOC_USE_GNU_MALLOC                          1
+#define CMK_MALLOC_USE_OS_BUILTIN                          0
 
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             0
