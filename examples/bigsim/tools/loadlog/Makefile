@@ -1,4 +1,4 @@
-CHARMC=../../../../../bin/charmc $(OPTS)
+CHARMC=../../../../bin/charmc $(OPTS)
 
 loadlog: loadlog.o
 	$(CHARMC) -o loadlog loadlog.o -lconv-bluegene-logs -language converse++
