@@ -187,7 +187,43 @@ class TCharm: public ArrayElement1D
 	}
 };
 
-//Controls array startup, ready, run and shutdown
+//A simple client array that can be bound to a tcharm array:
+class TCharmClient1D : public ArrayElement1D {
+  CProxy_TCharm threadProxy; //Proxy for our bound TCharm array
+ protected:
+  TCharm *thread; //The actual TCharm object we're bound to.
+  
+  //Clients need to override this function to set their
+  // thread-private variables.  You usually use something like:
+  //  CtvAccessOther(forThread,_myFooPtr)=this;
+  virtual void setupThreadPrivate(CthThread forThread) =0;
+  
+ public:
+  TCharmClient1D(const CProxy_TCharm &threadProxy_) 
+    :threadProxy(threadProxy_)
+  {
+    //Argh!  Can't call setupThreadPrivate yet, because
+    // virtual functions don't work within constructors!
+    thread=NULL;
+  }
+  TCharmClient1D(CkMigrateMessage *m) //Migration, etc. constructor
+  {
+    thread=NULL;
+  }
+  
+  //You MUST call this from your constructor:
+  inline void tcharmClientInit(void) {
+    thread=threadProxy[thisIndex].ckLocal();  
+    if (thread==NULL) CkAbort("FEM can't locate its thread!\n");
+    setupThreadPrivate(thread->getThread());
+  }
+  
+  virtual void ckJustMigrated(void);
+  virtual void pup(PUP::er &p);
+};
+
+
+//TCharm internal class: Controls array startup, ready, run and shutdown
 class TCharmCoordinator {
 	static int nArrays; //Total number of running thread arrays
 	static TCharmCoordinator *head; //List of coordinators

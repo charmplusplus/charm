@@ -291,6 +291,18 @@ static void TCharmBuildThreads(TCharmInitMsg *msg,TCharmSetupCookie &cook)
 	cook.setThreads(id,nElem);
 }
 
+/****** TcharmClient ******/
+void TCharmClient1D::ckJustMigrated(void) {
+  ArrayElement1D::ckJustMigrated();
+  tcharmClientInit();
+}
+
+void TCharmClient1D::pup(PUP::er &p) {
+  ArrayElement1D::pup(p);
+  p|threadProxy;
+}
+
+
 /****** Readonlys *****/
 CkVec<TCpupReadonlyGlobal> TCharmReadonlys::entries;
 void TCharmReadonlys::add(TCpupReadonlyGlobal fn)
