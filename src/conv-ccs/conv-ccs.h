@@ -7,7 +7,7 @@
 
 /*This file describes the CCS Server-side handler
 interface.  A CCS handler is just a CMI handler,
-but it can use the functions 
+but it can use the CcsSendReply function.
 */
 
 #ifndef CONV_CCS_H
@@ -23,6 +23,8 @@ extern "C" {
 
 #define CMK_CCS_VERSION "2"
 
+typedef struct {unsigned char hidden[4];} CcsDelayedReply;
+
 #if CMK_CCS_AVAILABLE
 void CcsUseHandler(char *id, int hdlr);
 int CcsRegisterHandler(char *id, CmiHandler fn);
@@ -30,8 +32,9 @@ int CcsRegisterHandler(char *id, CmiHandler fn);
 int CcsEnabled(void);
 int CcsIsRemoteRequest(void);
 void CcsCallerId(unsigned int *pip, unsigned int *pport);
-
-void CcsSendReply(int size, const char *reply);
+void CcsSendReply(int size, const void *reply);
+CcsDelayedReply CcsDelayReply(void);
+void CcsSendDelayedReply(CcsDelayedReply d,int size, const void *reply);
 
 #else
 #define CcsInit() /*empty*/
@@ -40,7 +43,9 @@ void CcsSendReply(int size, const char *reply);
 #define CcsEnabled() 0
 #define CcsIsRemoteRequest() 0
 #define CcsCallerId(x,y)  /*empty*/
-#define CcsSendReply(s,r) /*empty*/ 
+#define CcsDelayReply() /*Empty*/
+#define CcsSendReply(s,r) /*empty*/
+#define CcsSendDelayedReply(d,s,r); 
 #endif
 
 #ifdef __cplusplus

@@ -43,19 +43,19 @@ void CcsImplHeader_new(char *handler,
 		       CcsImplHeader *imp);
 /********* CCS Implementation (not in ccs-server.c) ********/
 /*Deliver this request data to the appropriate PE. */
-void CcsImpl_netRequest(CcsImplHeader *hdr,const char *reqData);
+void CcsImpl_netRequest(CcsImplHeader *hdr,const void *reqData);
 
 /*Deliver this reply data to this reply socket.
   The data will have to be forwarded to CCS server.
 */
-void CcsImpl_reply(SOCKET replFd,int repLen,const char *repData);
+void CcsImpl_reply(SOCKET replFd,int repLen,const void *repData);
 
 /*Send any registered clients kill messages before we exit*/
 void CcsImpl_kill(void);
 
 void CcsInit(void);
 /*Convert CCS header & message data into a converse message to handler*/
-char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const char *data,int *ret_len);
+char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_len);
 
 /******************* ccs-server.c routines ***************/
 /*Make a new Ccs Server socket, on the given port.
@@ -74,12 +74,12 @@ Returns 1 if a request was successfully received;
 0 otherwise.
 reqData is allocated with malloc(hdr->len).
 */
-int CcsServer_recvRequest(CcsImplHeader *hdr,char **reqData);
+int CcsServer_recvRequest(CcsImplHeader *hdr,void **reqData);
 
 /*Send a Ccs reply down the given socket.
 Closes the socket afterwards.
 */
-void CcsServer_sendReply(SOCKET fd,int repBytes,const char *repData);
+void CcsServer_sendReply(SOCKET fd,int repBytes,const void *repData);
 
 #else /*CCS not available*/
 

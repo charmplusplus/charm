@@ -12,7 +12,7 @@ network are actually received.
 
 #if CMK_CCS_AVAILABLE
 
-#define CCSDBG(x) printf x
+#define CCSDBG(x) /*printf x*/
 
 static SOCKET ccs_server_fd=SOCKET_ERROR;/*CCS request socket*/
 
@@ -43,7 +43,7 @@ receive a ccs request from the network.
 Returns 1 if a request was successfully received.
 reqData is allocated with malloc(hdr->len).
 */
-int CcsServer_recvRequest(CcsImplHeader *hdr,char **reqData) 
+int CcsServer_recvRequest(CcsImplHeader *hdr,void **reqData) 
 {
   CcsMessageHeader req;/*CCS header, from requestor*/
   unsigned int ip,port;
@@ -70,21 +70,26 @@ int CcsServer_recvRequest(CcsImplHeader *hdr,char **reqData)
   return 1;
 }
 
+static int reply_abortFn(int code,const char *msg) {
+	/*Just ignore bad replies-- just indicates a client has died*/
+	fprintf(stderr,"CCS  ABORT called during reply-- ignoring\n");
+	CCSDBG(("CCS  ABORT called during reply-- ignoring\n"));
+	return -1;
+}
+
 /*Send a Ccs reply down the given socket.
 Closes the socket afterwards.
 */
-void CcsServer_sendReply(SOCKET fd,int repBytes,const char *repData)
+void CcsServer_sendReply(SOCKET fd,int repBytes,const void *repData)
 {
-  if (repBytes>0)
-  {
-    ChMessageInt_t len=ChMessageInt_new(repBytes);
-	CCSDBG(("CCS   Sending %d bytes of reply data\n",repBytes));
-	skt_sendN(fd,(const char *)&len,sizeof(len));
-    skt_sendN(fd,repData,repBytes);
-  } else  
-	CCSDBG(("CCS   Reply empty.  Just closing socket.\n"));
+  ChMessageInt_t len=ChMessageInt_new(repBytes);
+  skt_abortFn old=skt_set_abort(reply_abortFn);
+  CCSDBG(("CCS   Sending %d bytes of reply data\n",repBytes));
+  skt_sendN(fd,(const char *)&len,sizeof(len));
+  skt_sendN(fd,repData,repBytes);
   skt_close(fd);
   CCSDBG(("CCS Reply socket closed.\n"));
+  skt_set_abort(old);
 }
 
 /*Build a new CcsImplHeader*/

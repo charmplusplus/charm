@@ -66,7 +66,7 @@ static void ccs_killport(char *msg)
   CmiGrabBuffer((void **)&msg);CmiFree(msg);
 }
 /*Send any registered clients kill messages before we exit*/
-static void noMoreErrors(int c,const char *m) {exit(1);}
+static int noMoreErrors(int c,const char *m) {return -1;}
 void CcsImpl_kill(void)
 {
   skt_set_abort(noMoreErrors);
@@ -320,96 +320,121 @@ void CpdUnFreeze(void)
 
 
 #if CMK_WEB_MODE
+/******************************************************
+Web performance monitoring interface:
+	Clients will register for performance data with 
+processor 0.  Every WEB_INTERVAL (few seconds), this code
+calls all registered web performance functions on all processors.  
+The resulting integers are sent back to the client.  The current
+reply format is ASCII and rather nasty. 
 
-#define WEB_INTERVAL 2000
-#define MAXFNS 20
+	Like the debugger support above, there's no good reason 
+for this to be defined here.
 
-/* For Web Performance */
-typedef int (*CWebFunction)();
-unsigned int appletIP;
-unsigned int appletPort;
-int countMsgs;
-char **valueArray;
-CWebFunction CWebPerformanceFunctionArray[MAXFNS];
-int CWebNoOfFns;
-CpvDeclare(int, CWebPerformanceDataCollectionHandlerIndex);
-CpvDeclare(int, CWebHandlerIndex);
+The actual call sequence is:
+CCS Client->CWebHandler->...  (processor 0)
+  ...->CWeb_Collect->... (all processors)
+...->CWeb_Reduce->CWeb_Deliver (processor 0 again)
+*/
 
-static void sendDataFunction(void)
+
+#define WEB_INTERVAL 2000 /*Time, in milliseconds, between performance snapshots*/
+#define MAXFNS 20 /*Largest number of performance functions to expect*/
+
+typedef struct {
+	char hdr[CmiMsgHeaderSizeBytes];
+	int fromPE;/*Source processor*/
+	int perfData[MAXFNS];/*Performance numbers*/
+} CWeb_CollectedData;
+
+/*This needs to be made into a list of registered clients*/
+static int hasApplet=0;
+static CcsDelayedReply appletReply;
+
+typedef int (*CWebFunction)(void);
+static CWebFunction CWebPerformanceFunctionArray[MAXFNS];
+static int CWebNoOfFns;
+static int CWeb_ReduceIndex;
+static int CWeb_CollectIndex;
+
+/*Deliver the reduced web performance data to the waiting client:
+*/
+static int collectedCount;
+static CWeb_CollectedData **collectedValues;
+
+static void CWeb_Deliver(void)
 {
-  char *reply;
-  int len = 0, i;
+  int i,j;
 
-  for(i=0; i<CmiNumPes(); i++){
-    len += (strlen((char*)(valueArray[i]+
-			   CmiMsgHeaderSizeBytes+sizeof(int)))+1);
-    /* for the spaces in between */
+  if (hasApplet) {
+    /*Send the performance data off to the applet*/
+    char *reply=(char *)malloc(6+14*CmiNumPes()*CWebNoOfFns);
+    sprintf(reply,"perf");
+  
+    for(i=0; i<CmiNumPes(); i++){
+      for (j=0;j<CWebNoOfFns;j++)
+      {
+        char buf[20];
+        sprintf(buf," %d",collectedValues[i]->perfData[j]);
+        strcat(reply,buf);
+      }
+    }
+    CcsSendDelayedReply(appletReply,strlen(reply) + 1, reply);
+    free(reply);
+    hasApplet=0;
   }
-  len+=6; /* for 'perf ' and the \0 at the end */
-
-  reply = (char *)malloc(len * sizeof(char));
-  strcpy(reply, "perf ");
-
-  for(i=0; i<CmiNumPes(); i++){
-    strcat(reply, (valueArray[i] + CmiMsgHeaderSizeBytes + sizeof(int)));
-    strcat(reply, " ");
-  }
-
-  /* Do the CcsSendReply */
-  CcsSendReply(strlen(reply) + 1, reply);
-
-  /*
-  CmiPrintf("Reply = %s\n", reply);
-  */
-  free(reply);
-
-  /* Free valueArray contents */
+  
+  /* Free saved performance data */
   for(i = 0; i < CmiNumPes(); i++){
-    CmiFree(valueArray[i]);
-    valueArray[i] = 0;
+    CmiFree(collectedValues[i]);
+    collectedValues[i] = 0;
   }
-
-  countMsgs = 0;
+  collectedCount = 0;
 }
 
-void CWebPerformanceDataCollectionHandler(char *msg){
+/*On PE 0, this handler accumulates all the performace data
+*/
+static void CWeb_Reduce(void *msg){
+  CWeb_CollectedData *cur,*prev;
   int src;
-  char *prev;
 
   if(CmiMyPe() != 0){
-    CmiAbort("Wrong processor....\n");
+    CmiAbort("CWeb performance data sent to wrong processor...\n");
   }
-  src = ((int *)(msg + CmiMsgHeaderSizeBytes))[0];
   CmiGrabBuffer((void **)&msg);
-  prev = valueArray[src]; /* Previous value, ideally 0 */
-  valueArray[src] = (msg);
-  if(prev == 0) countMsgs++;
-  else CmiFree(prev);
+  cur=(CWeb_CollectedData *)msg;
+  src=cur->fromPE;
+  prev = collectedValues[src]; /* Previous value, ideally 0 */
+  collectedValues[src] = cur;
+  if(prev == 0) collectedCount++;
+  else CmiFree(prev); /*<- caused by out-of-order perf. data delivery*/
 
-  if(countMsgs == CmiNumPes()){
-    sendDataFunction();
+  if(collectedCount == CmiNumPes()){
+    CWeb_Deliver();
   }
 }
 
-void CWebPerformanceGetData(void *dummy)
+/*On each PE, this handler collects the performance data
+and sends it to PE 0.
+*/
+static void CWeb_Collect(void *dummy)
 {
-  char *msg, data[100];
-  int msgSize;
+  CWeb_CollectedData *msg;
   int i;
 
-  strcpy(data, "");
-  /* Evaluate each of the functions and get the values */
+  msg = (CWeb_CollectedData *)CmiAlloc(sizeof(CWeb_CollectedData));
+  msg->fromPE = CmiMyPe();
+  
+  /* Evaluate each performance function*/
   for(i = 0; i < CWebNoOfFns; i++)
-    sprintf(data, "%s %d", data, (*(CWebPerformanceFunctionArray[i]))());
+    msg->perfData[i] = CWebPerformanceFunctionArray[i] ();
 
-  msgSize = (strlen(data)+1) + sizeof(int) + CmiMsgHeaderSizeBytes;
-  msg = (char *)CmiAlloc(msgSize);
-  ((int *)(msg + CmiMsgHeaderSizeBytes))[0] = CmiMyPe();
-  strcpy(msg + CmiMsgHeaderSizeBytes + sizeof(int), data);
-  CmiSetHandler(msg, CpvAccess(CWebPerformanceDataCollectionHandlerIndex));
-  CmiSyncSendAndFree(0, msgSize, msg);
+  /* Send result off to node 0 */  
+  CmiSetHandler(msg, CWeb_ReduceIndex);
+  CmiSyncSendAndFree(0, sizeof(CWeb_CollectedData), msg);
 
-  CcdCallFnAfter(CWebPerformanceGetData, 0, WEB_INTERVAL);
+  /* Re-call this function after a delay */
+  CcdCallFnAfter(CWeb_Collect, 0, WEB_INTERVAL);
 }
 
 void CWebPerformanceRegisterFunction(CWebFunction fn)
@@ -418,59 +443,40 @@ void CWebPerformanceRegisterFunction(CWebFunction fn)
   CWebNoOfFns++;
 }
 
-static void CWebHandler(char *msg){
-  int msgSize;
-  char *getStuffMsg;
-  int i;
-
+/*This is called on PE 0 by clients that wish
+to receive performance data.
+*/
+static void CWebHandler(char *ignoredMsg){
   if(CcsIsRemoteRequest()) {
-    char name[32];
-    unsigned int ip, port;
-
-    CcsCallerId(&ip, &port);
-    sscanf(msg+CmiMsgHeaderSizeBytes, "%s", name);
-
-    if(strcmp(name, "getStuff") == 0){
-      appletIP = ip;
-      appletPort = port;
-
-      valueArray = (char **)malloc(sizeof(char *) * CmiNumPes());
+    static int startedCollection=0;
+    
+    hasApplet=1;
+    appletReply=CcsDelayReply();
+    
+    if(startedCollection == 0){
+      int i;
+      startedCollection=1;
+      collectedCount=0;
+      collectedValues = (CWeb_CollectedData **)malloc(sizeof(void *) * CmiNumPes());
       for(i = 0; i < CmiNumPes(); i++)
-        valueArray[i] = 0;
-
+        collectedValues[i] = 0;
+      
+      /*Start collecting data on each processor*/
       for(i = 0; i < CmiNumPes(); i++){
-        msgSize = CmiMsgHeaderSizeBytes + 2*sizeof(int);
-        getStuffMsg = (char *)CmiAlloc(msgSize);
-        ((int *)(getStuffMsg + CmiMsgHeaderSizeBytes))[0] = appletIP;
-        ((int *)(getStuffMsg + CmiMsgHeaderSizeBytes))[1] = appletPort;
-        CmiSetHandler(getStuffMsg, CpvAccess(CWebHandlerIndex));
-        CmiSyncSendAndFree(i, msgSize, getStuffMsg);
-
-        CcdCallFnAfter(CWebPerformanceGetData, 0, WEB_INTERVAL);
+        char *msg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
+        CmiSetHandler(msg, CWeb_CollectIndex);
+        CmiSyncSendAndFree(i, CmiMsgHeaderSizeBytes,msg);
       }
-    }
-    else{
-      CmiPrintf("incorrect command:%s received, len=%ld\n",name,strlen(name));
     }
   }
 }
 
-static int f2()
-{
-  return(CqsLength(CpvAccess(CsdSchedQueue)));
-}
+/** This "usage" section keeps track of percent of wall clock time
+spent actually processing messages on each processor.   
+It's a simple performance measure collected by the CWeb framework.
 
-static int f3()
-{
-  struct timeval tmo;
-
-  gettimeofday(&tmo, NULL);
-  return(tmo.tv_sec % 10 + CmiMyPe() * 3);
-}
-
-/** ADDED 2-14-99 BY MD FOR USAGE TRACKING (TEMPORARY) **/
-
-/* #define CkUTimer()      ((int)(CmiWallTimer() * 1000000.0)) */
+It really aught to be integrated with the tracemode facility.
+**/
 
 CpvStaticDeclare(double, startTime);
 CpvStaticDeclare(double, beginTime);
@@ -490,25 +496,6 @@ void initUsage()
    CpvAccess(beginTime)  = CmiWallTimer();
    CpvAccess(usedTime)   = 0.;
    CpvAccess(PROCESSING) = 0;
-}
-
-int getUsage()
-{
-   int usage = 0;
-   double time      = CmiWallTimer();
-   double totalTime = time - CpvAccess(beginTime);
-
-   if(CpvAccess(PROCESSING))
-   {
-      CpvAccess(usedTime) += time - CpvAccess(startTime);
-      CpvAccess(startTime) = time;
-   }
-   if(totalTime > 0.)
-      usage = (100 * CpvAccess(usedTime))/totalTime;
-   CpvAccess(usedTime)  = 0.;
-   CpvAccess(beginTime) = time;
-
-   return usage;
 }
 
 /* Call this when a BEGIN_PROCESSING event occurs
@@ -537,28 +524,47 @@ void usageStop()
    CpvAccess(PROCESSING) = 0;
 }
 
+
+static int getUsage(void)
+{
+   int usage = 0;
+   double time      = CmiWallTimer();
+   double totalTime = time - CpvAccess(beginTime);
+
+   if(CpvAccess(PROCESSING))
+   {
+      CpvAccess(usedTime) += time - CpvAccess(startTime);
+      CpvAccess(startTime) = time;
+   }
+   if(totalTime > 0.)
+      usage = (int)((100 * CpvAccess(usedTime))/totalTime);
+   CpvAccess(usedTime)  = 0.;
+   CpvAccess(beginTime) = time;
+
+   return usage;
+}
+
+static int getSchedQlen()
+{
+  return(CqsLength(CpvAccess(CsdSchedQueue)));
+}
+
 void CWebInit(void)
 {
-  CcsRegisterHandler("MonitorHandler", CWebHandler);
-
-  CpvInitialize(int, CWebHandlerIndex);
-  CpvAccess(CWebHandlerIndex) = CmiRegisterHandler(CWebHandler);
-
-  CpvInitialize(int, CWebPerformanceDataCollectionHandlerIndex);
-  CpvAccess(CWebPerformanceDataCollectionHandlerIndex) =
-    CmiRegisterHandler(CWebPerformanceDataCollectionHandler);
-
+  CcsRegisterHandler("perf_monitor", CWebHandler);
+  
+  CWeb_CollectIndex=CmiRegisterHandler(CWeb_Collect);
+  CWeb_ReduceIndex=CmiRegisterHandler(CWeb_Reduce);
+  
   CWebPerformanceRegisterFunction(getUsage);
-  CWebPerformanceRegisterFunction(f2);
+  CWebPerformanceRegisterFunction(getSchedQlen);
 
 }
 
-#endif
+#endif /*CMK_WEB_MODE*/
 
 /* \move */
 
-
-/* move */
 
 /*****************************************************************************
  *
@@ -611,15 +617,29 @@ void CcsCallerId(unsigned int *pip, unsigned int *pport)
   *pport = ChMessageInt(CpvAccess(ccsReq).port);
 }
 
-void CcsSendReply(int size, const char *msg)
+CcsDelayedReply CcsDelayReply(void)
+{
+  ChMessageInt_t fd=CpvAccess(ccsReq).replyFd;
+  if (ChMessageInt(fd)==0)
+     CmiAbort("CCS: Cannot delay reply to same request twice.\n");
+  CpvAccess(ccsReq).replyFd=ChMessageInt_new(0);
+  return *(CcsDelayedReply *)&fd;
+}
+
+void CcsSendReply(int size, const void *msg)
 {
   int fd=ChMessageInt(CpvAccess(ccsReq).replyFd);
-  if (fd<=0)
+  if (fd==0)
       CmiAbort("CCS: Cannot reply to same request twice.\n");
   CcsImpl_reply(fd,size,msg);
   CpvAccess(ccsReq).replyFd=ChMessageInt_new(0);
 }
 
+void CcsSendDelayedReply(CcsDelayedReply d,int size, const void *msg)
+{
+  int fd=ChMessageInt( *(ChMessageInt_t *)&d );
+  CcsImpl_reply(fd,size,msg);
+}
 
 
 /**********************************
@@ -680,7 +700,7 @@ static void req_fw_handler(char *msg)
 
 /*Convert CCS header & message data into a converse message 
  addressed to handler*/
-char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const char *data,int *ret_len)
+char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_len)
 {
   int reqLen=ChMessageInt(hdr->len);
   int len=CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader)+reqLen;
@@ -693,7 +713,7 @@ char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const char *data,int *ret_le
 }
 
 /*Forward this request to the appropriate PE*/
-void CcsImpl_netRequest(CcsImplHeader *hdr,const char *reqData)
+void CcsImpl_netRequest(CcsImplHeader *hdr,const void *reqData)
 {
   int len,repPE=ChMessageInt(hdr->pe);
   char *msg=CcsImpl_ccs2converse(hdr,reqData,&len);
@@ -743,7 +763,7 @@ Note: on Net- versions, CcsImpl_reply is implemented in machine.c
 */
 static int rep_fw_handler_idx;
 
-void CcsImpl_reply(SOCKET repFd,int repLen,const char *repData)
+void CcsImpl_reply(SOCKET repFd,int repLen,const void *repData)
 {
   const int repPE=0;
 
