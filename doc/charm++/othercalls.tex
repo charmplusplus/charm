@@ -3,7 +3,7 @@
 \label{initcall}
 \experimental{}
 Some registration routines need be executed exactly once
-on every processor before the computation begins.
+everywhere before the computation begins.
 By declaring a regular \CC\ subroutine \index{initcall}
 \kw{initcall} in the .ci file, you ask \charmpp to execute 
 the routine exactly once on every node before the
@@ -23,7 +23,10 @@ This code will execute the routines \uw{fooGlobalInit} and
 \uw{bar::barInit} before the main computation starts.
 These routines should only do registration, not computation--
 use a mainchare, which gets executed on only one processor,
-to begin the computation.
+to begin the computation.  Initcall routines are typically
+used to do special registrations and global variable setup
+before the computation actually begins.
+
 
 \subsection{Other Calls}
 
