@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.9  1997-07-15 21:15:43  jyelon
+# Revision 1.10  1998-05-22 22:06:55  milind
+# Added Charm-IDL
+#
+# Revision 1.9  1997/07/15 21:15:43  jyelon
 # Removed CMK_NM stuff once and for all!
 #
 # Revision 1.8  1997/05/05 14:25:21  jyelon
@@ -71,8 +74,8 @@ set CMK_LIBS='-lqt'
 set CMK_SEQ_LIBS=''
 set CMK_SEQ_CC='cc -Aa -D_HPUX_SOURCE '
 set CMK_SEQ_LD='cc -Aa -D_HPUX_SOURCE '
-set CMK_SEQ_CXX='CC -D_HPUX_SOURCE '
-set CMK_SEQ_LDXX='CC -D_HPUX_SOURCE '
+set CMK_SEQ_CXX='CC -Aa -D_HPUX_SOURCE '
+set CMK_SEQ_LDXX='CC -Aa -D_HPUX_SOURCE '
 set CMK_CPP_SUFFIX="i"
 set CMK_XLATPP='charmxlat++ '
 set CMK_QT='hpux-cc'

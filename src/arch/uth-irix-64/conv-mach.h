@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.8  1998-04-17 17:18:31  milind
+ * Revision 1.9  1998-05-22 22:07:32  milind
+ * Added Charm-IDL
+ *
+ * Revision 1.8  1998/04/17 17:18:31  milind
  * Added CMK_CCS_AVAILABLE flag.
  *
  * Revision 1.7  1998/02/19 08:40:52  jyelon
@@ -193,6 +196,8 @@
 
 #define CMK_USE_HP_MAIN_FIX                                0
 #define CMK_DONT_USE_HP_MAIN_FIX                           1
+
+#define CPP_LOCATION "/usr/lib/cpp"
 
 #endif
 

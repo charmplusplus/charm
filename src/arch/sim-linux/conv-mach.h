@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.5  1998-05-03 11:03:56  milind
+ * Revision 1.6  1998-05-22 22:07:15  milind
+ * Added Charm-IDL
+ *
+ * Revision 1.5  1998/05/03 11:03:56  milind
  * Fixed some linux-specific bugs.
  *
  * Revision 1.4  1998/04/17 17:18:10  milind
@@ -189,6 +192,8 @@
 
 #define CMK_USE_HP_MAIN_FIX                                0
 #define CMK_DONT_USE_HP_MAIN_FIX                           1
+
+#define CPP_LOCATION "/lib/cpp"
 
 #endif
 

@@ -558,6 +558,14 @@ foreach FILE ($FILES)
         set OBJECTFILES=( $OBJECTFILES $BASE.o )
       endif
       breaksw
+    case "*.cc"
+      ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.cc -o $BASE.o)
+      if ($status) goto failure
+      if ($?OBJECT) then
+	if ($OBJECT != $BASE.o) set DELETE=( $DELETE $BASE.o )
+        set OBJECTFILES=( $OBJECTFILES $BASE.o )
+      endif
+      breaksw
     case "*.cxx"
       ($ECHOCMD ; $CMK_CXX $OPTS_CXX -I$CHARMINC -c $BASE.cxx -o $BASE.o)
       if ($status) goto failure
