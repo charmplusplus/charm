@@ -232,6 +232,7 @@ int s; char *msg; int len; int flags; struct sockaddr *to; int tolen;
     ok = sendto(s, msg, len, flags, to, tolen);
     if (ok>=0) break;
   }
+  if (ok != len) KillEveryoneCode(21);
   return ok;
 }
 
@@ -498,50 +499,90 @@ unsigned int ip; int port; int seconds;
 
 #ifdef CMK_TIMER_USE_TIMES
 
-static struct tms inittime;
+static double  clocktick;
+static int     inittime_wallclock;
+static int     inittime_virtual;
 
 static void CmiTimerInit()
 {
-  times(&inittime);
+  struct tms temp;
+  inittime_wallclock = times(&temp);
+  inittime_virtual = temp.tms_utime + temp.tms_stime;
+  clocktick = 1.0 / (sysconf(_SC_CLK_TCK));
+}
+
+double CmiTimerWallClock()
+{
+  struct tms temp;
+  double currenttime;
+  int now;
+
+  now = times(&temp);
+  currenttime = (now - inittime_wallclock) * clocktick;
+  return (currenttime);
+}
+
+double CmiTimerVirtual()
+{
+  struct tms temp;
+  double currenttime;
+  int now;
+
+  times(&temp);
+  now = temp.tms_stime + temp.tms_utime;
+  currenttime = (now - inittime_virtual) * clocktick;
+  return (currenttime);
 }
 
 double CmiTimer()
 {
-  double currenttime;
-  int clk_tck;
-    struct tms temp;
-
-    times(&temp);
-    clk_tck=sysconf(_SC_CLK_TCK);
-    currenttime = 
-     (((temp.tms_utime - inittime.tms_utime)+
-       (temp.tms_stime - inittime.tms_stime))*1.0)/clk_tck;
-    return (currenttime);
+  return CmiTimerVirtual();
 }
 
 #endif
 
 #ifdef CMK_TIMER_USE_GETRUSAGE
 
-static struct rusage inittime;
+static double inittime_wallclock;
+static double inittime_virtual;
 
 static void CmiTimerInit()
 {
-  getrusage(0, &inittime); 
+  struct timeval tv;
+  struct rusage ru;
+  gettimeofday(&tv);
+  inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
+  getrusage(0, &ru); 
+  inittime_virtual =
+    (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
+    (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
 }
 
-double CmiTimer() {
+double CmiTimerVirtual()
+{
+  struct rusage ru;
   double currenttime;
 
-  struct rusage temp;
-  getrusage(0, &temp);
+  getrusage(0, &ru);
   currenttime =
-    (temp.ru_utime.tv_usec - inittime.ru_utime.tv_usec) * 0.000001+
-      (temp.ru_utime.tv_sec - inittime.ru_utime.tv_sec) +
-	(temp.ru_stime.tv_usec - inittime.ru_stime.tv_usec) * 0.000001+
-	  (temp.ru_stime.tv_sec - inittime.ru_stime.tv_sec) ; 
-  
-  return (currenttime);
+    (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
+    (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+  return currenttime - inittime_virtual;
+}
+
+double CmiTimerWallClock()
+{
+  struct timeval tv;
+  double currenttime;
+
+  getttimeofday(&tv);
+  currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
+  return currenttime - inittime_wallclock;
+}
+
+double CmiTimer()
+{
+  return CmiTimerVirtual();
 }
 
 #endif
@@ -560,8 +601,8 @@ double CmiTimer() {
  *
  *****************************************************************************/
 
-static int    resend_wait;        /* millisecs to wait before re-sending. */
-static int    resend_fail;        /* millisecs to wait before giving up. */
+static double resend_wait;        /* seconds to wait before re-sending. */
+static double resend_fail;        /* seconds to wait before giving up. */
 static int    Cmi_enableinterrupts;
 static char   Topology;
 static char  *outputfile;
@@ -617,18 +658,18 @@ char **argv;
 static void ExtractArgs(argv)
 char **argv;
 {
-  resend_wait = 10;
-  resend_fail = 600000;
+  resend_wait =   0.010;
+  resend_fail = 600.000;
   Cmi_enableinterrupts = 1;
   Topology = 'H';
   outputfile = NULL;
 
   while (*argv) {
     if (strcmp(*argv,"++resend-wait")==0) {
-      DeleteArg(argv); resend_wait = atoi(DeleteArg(argv));
+      DeleteArg(argv); resend_wait = atoi(DeleteArg(argv)) * 1000.0;
     } else
     if (strcmp(*argv,"++resend-fail")==0) {
-      DeleteArg(argv); resend_fail = atoi(DeleteArg(argv));
+      DeleteArg(argv); resend_fail = atoi(DeleteArg(argv)) * 1000.0;
     } else
     if (strcmp(*argv,"++no-interrupts")==0) {
       DeleteArg(argv); Cmi_enableinterrupts=0;
@@ -1034,7 +1075,7 @@ typedef struct
 {
   DATA_HDR        *packet;
   unsigned int     seq_num;
-  int              send_time;
+  double           send_time;
 }
 WindowElement;
 
@@ -1122,16 +1163,16 @@ CpvDeclare(void *,CmiLocalQueue);
 ** incorrect for ACK's).
 */
 static void send_ack(packet) 
-    DATA_HDR *packet; 
-    {
-    node_info *dest = node_table + packet->SourcePeNum;
-    struct sockaddr_in addr;
-    addr.sin_family      = AF_INET;
-    addr.sin_port        = htons(dest->dataport);
-    addr.sin_addr.s_addr = htonl(dest->IP);
-    NumSends++;
-    my_sendto(data_skt, (char *)packet, sizeof(DATA_HDR), 0, (struct sockaddr *)&addr, sizeof(addr));
-    }
+     DATA_HDR *packet; 
+{
+  node_info *dest = node_table + packet->SourcePeNum;
+  struct sockaddr_in addr;
+  addr.sin_family      = AF_INET;
+  addr.sin_port        = htons(dest->dataport);
+  addr.sin_addr.s_addr = htonl(dest->IP);
+  NumSends++;
+  my_sendto(data_skt, (char *)packet, sizeof(DATA_HDR), 0, (struct sockaddr *)&addr, sizeof(addr));
+}
 
 
 static char *
@@ -1205,7 +1246,7 @@ static void SendWindowInit()
 	    {
 		send_window[i][j].packet = NULL;
 		send_window[i][j].seq_num = 0;
-		send_window[i][j].send_time = 0;
+		send_window[i][j].send_time = 0.0;
 	    }
 	}
 	else send_window[i] = NULL;  /* never used */
@@ -1273,7 +1314,7 @@ int destpe;
 {
     send_window[destpe][last_window_index[destpe]].packet =  packet;
     send_window[destpe][last_window_index[destpe]].seq_num = next_seq_num[destpe];
-    send_window[destpe][last_window_index[destpe]].send_time = CmiTimer()*1000;
+    send_window[destpe][last_window_index[destpe]].send_time = CmiTimerWallClock();
     packet->seq_num = next_seq_num[destpe];
     next_seq_num[destpe]++;
     last_window_index[destpe] = (last_window_index[destpe] + 1) % WINDOW_SIZE;
@@ -1307,7 +1348,6 @@ int destpe;
 	bytes_sent = my_sendto(data_skt, (char *)packet,
 			    packet->size + sizeof(DATA_HDR),
 			    0, (struct sockaddr *)&addr, sizeof(addr));
-	/* if (bytes_sent != packet->size + sizeof(DATA_HDR)) KillEveryoneCode(21); */
     }
 }
 
@@ -1367,7 +1407,7 @@ static int RetransmitPackets()
     index = first_window_index[i];
     if (cur_window_size[i] > 0) {
       sending = 1;
-      if ((CmiTimer()*1000 - send_window[i][index].send_time) > 
+      if ((CmiTimerWallClock() - send_window[i][index].send_time) > 
 	  (resend_wait * timeout_factor[i])) {
 	/* timeout_factor[i] *= 2 ;  for exponential backoff */
 	if (resend_wait * timeout_factor[i] > resend_fail) {
@@ -1382,7 +1422,7 @@ static int RetransmitPackets()
 	NumSends++;
 	my_sendto(data_skt, (char *)packet,
 		  packet->size + sizeof(DATA_HDR), 0, (struct sockaddr *)&addr, sizeof(addr)); 
-	  send_window[i][index].send_time = CmiTimer() * 1000;
+	send_window[i][index].send_time = CmiTimerWallClock();
       }
     }
   }
@@ -1405,10 +1445,6 @@ static void fragment_send(destPE,size,msg,full_size,msg_type, numfrags)
   /* Is datagram too small to hold fragment and data header? */ 
   if (MAX_FRAG_SIZE + sizeof(DATA_HDR) > CMK_MAX_DGRAM_SIZE)
     KillEveryoneCode(5);
-  
-  TRACE(CmiPrintf("Node %d: sending fragment. fragsize=%d msgsize=%d\n", 
- 		  CpvAccess(Cmi_mype), size, full_size));
-  
   
   /* Initialize the data header part of the send space. */
   hd = (DATA_HDR *)CmiAlloc(sizeof(DATA_HDR) + size);
@@ -1471,7 +1507,7 @@ static RecvWindowInit()
 	    {
 		recv_window[i][j].packet = NULL;
 		recv_window[i][j].seq_num = 0;
-		recv_window[i][j].send_time = 0;
+		recv_window[i][j].send_time = 0.0;
 	    }
 	}
 	else recv_window[i] = NULL;  /* never used */
