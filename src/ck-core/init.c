@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.41  1997-03-24 23:14:03  milind
+ * Revision 2.42  1997-07-18 19:14:50  milind
+ * Fixed the perfModuleInit call to pass command-line params.
+ * Also added trace_enqueue call to Charm message handler.
+ *
+ * Revision 2.41  1997/03/24 23:14:03  milind
  * Made Charm-runtime 64-bit safe by removing conversions of pointers to
  * integers. Also, removed charm runtime's dependence of unused argv[]
  * elements being 0. Also, added sim-irix-64 version. It works.
@@ -293,7 +297,7 @@ char **argv;
   statModuleInit();
   tblModuleInit(); 
   CldModuleInit();
-  perfModuleInit(argv[0]); /* pass program name */
+  perfModuleInit(&argc, argv); /* pass parameters */
 
   if (CmiMyRank() == 0) CmiNodeBarrier();
 }

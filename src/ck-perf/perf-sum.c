@@ -11,7 +11,11 @@
  ***************************************************************************
  * REVISION HISTORY:
  *      $Log$
- *      Revision 2.11  1997-03-19 23:17:38  milind
+ *      Revision 2.12  1997-07-18 19:14:58  milind
+ *      Fixed the perfModuleInit call to pass command-line params.
+ *      Also added trace_enqueue call to Charm message handler.
+ *
+ *      Revision 2.11  1997/03/19 23:17:38  milind
  *      Got net-irix to work. Had to modify jsleep to deal with restaring
  *      system calls on interrupts.
  *
@@ -76,8 +80,9 @@ CpvDeclare(int,num_childmsgs);
 
 CpvExtern(int,RecdStatMsg);
 
-perfModuleInit(prog_name)
-char *prog_name;
+perfModuleInit(pargc, argv)
+int *pargc;
+char **argv;
 {
   char nodename[80];
 
@@ -93,7 +98,7 @@ char *prog_name;
   CpvInitialize(int,num_childmsgs);
 
   sprintf(nodename,"%d",CmiMyPe());
-  program_name(prog_name,nodename);
+  program_name(argv[0],nodename);
 }
 
 trace_creation(msg_type, entry, envelope)

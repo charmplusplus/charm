@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1997-03-14 20:23:52  milind
+ * Revision 2.12  1997-07-18 19:14:56  milind
+ * Fixed the perfModuleInit call to pass command-line params.
+ * Also added trace_enqueue call to Charm message handler.
+ *
+ * Revision 2.11  1997/03/14 20:23:52  milind
  * Made MAXLOGBUFSIZE in projections a commandline parameter.
  * One can now specify it as "+logsize 10000" on the program
  * command line.
@@ -109,8 +113,9 @@ CpvExtern(int, chareEpsCount);
 
 
 
-perfModuleInit(prog_name)
-char *prog_name;
+perfModuleInit(pargc, argv)
+int *pargc;
+char **argv;
 {
   CpvInitialize(char*,pgm);
   CpvInitialize(char*,log_file_name);
@@ -128,7 +133,7 @@ char *prog_name;
   CpvInitialize(un_int,begin_processing_time);
   CpvInitialize(FILE*,state_file_fd);
 
-  program_name(prog_name);
+  program_name(argv[0]);
 }
 
 void PrintStsFile(str)

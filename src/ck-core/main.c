@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.24  1996-02-10 18:11:11  sanjeev
+ * Revision 2.25  1997-07-18 19:14:52  milind
+ * Fixed the perfModuleInit call to pass command-line params.
+ * Also added trace_enqueue call to Charm message handler.
+ *
+ * Revision 2.24  1996/02/10 18:11:11  sanjeev
  * fixed bug: if(CpvAccess(InsideDataInit)) CldStripLdb(LDB_ELEMENT_PTR(env));
  *
  * Revision 2.23  1995/11/06 00:17:26  sanjeev
@@ -285,6 +289,7 @@ ENVELOPE *env;
 
   CmiGrabBuffer(&env);
   UNPACK(env);
+  trace_enqueue(env);
   if(!CpvAccess(InsideDataInit))
       CldStripLdb(LDB_ELEMENT_PTR(env));
   switch (type)
