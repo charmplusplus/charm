@@ -2,44 +2,55 @@
 \usepackage{../pplmanual}
 \input{../pplmanual}
 
-\title{Parallel Simulator for Large Parallel Machines}
+\title{BigSim Parallel Simulator for Extremely Large Parallel Machines}
 \version{1.00}
-\credits{Charm++ BlueGene Emulator was developed by Arun Singla, Neelam Saboo
+\credits{Charm++ Blue Gene Emulator was developed by Arun Singla, Neelam Saboo
 and Joshua Unger under the guidance of Prof. L. V. Kale. The new Converse 
 Blue Gene Emulator is completely rewritten by Gengbin Zheng. Converse Blue Gene 
 Emulator is the only version under maintenance now. Charm++ and Adaptive MPI
 (AMPI) was ported onto the Blue Gene Emulator by Gengbin Zheng. The parallel
 performance simulator was developed by Gengbin Zheng and 
-Gunavardhan Kakulapati.}
+Gunavardhan Kakulapati. A postmortem network simulator was developed by 
+Terry Wilmarth, Eric Bohm and Gengbin Zheng}
 
 \begin{document}
 \maketitle
 
 \section{Introduction}
 
-One approach for building the next generation of parallel computers
-is based on large aggregates of multiprocessor chips with support
-for hardware multithreading. 
-An initial design for IBM's Blue Gene/C project exemplifies this approach.
-Blue Gene/C was a proposed one million processor machine from IBM.
+%One approach for building the next generation of parallel computers
+%is based on large aggregates of multiprocessor chips with support
+%for hardware multithreading. 
+%An initial design for IBM's Blue Gene/C project exemplifies this approach.
+%Blue Gene/C was a proposed one million processor machine from IBM.
+
+Parallel machines with an extremely large number of processors are now
+being designed and built. For example, the BlueGene (BG/L) machine
+being built by IBM will have 64,000 dual-processor nodes with 360 teraflops
+peak performance. Another more radical design from IBM,
+code-named Cyclops (BlueGene/C), had over one million floating point units,
+fed by 8 million instructions streams supported by individual thread units,
+targeting 1 petaflops of peak performance.
+
 
 It is important that one can study the programming issues and performance
 of paralle applications on such machines even before the machine is built.
-Thus, we have developed a parallel simulator to facilitate this research.
+Thus, we have developed a parallel simulator --- BigSim to facilitate this research.
 
 Since our research was initiated by Blue Gene/C project, in this manual, 
 we also call our simulator as Blue Gene Simulator.
 Our simulator is capable of simulating a broad class of "Massively Parallel
 Processors-In-Memory", or MPPIMs machines. 
 
-\subsection{Simulator system components:}
+\subsection{Simulator system components}
 
 Our simulator system includes these components: 
 \begin{enumerate}
 \item a parallel emulator which emulates the low level machine API; 
 \item a message driven programming language (Charm++) running on top of the emulator; 
 \item adaptive MPI (an implementation of MPI on top of Charm++) environment; 
-\item a parallel simulator for performance prediction. 
+\item a parallel online mode simulator for performance prediction. 
+\item a parallel postmoterm mode network simulator for performance prediction. 
 \end{enumerate}
 
 \subsection{History}
@@ -50,14 +61,24 @@ parallel object language in fall, 2001.
 The second version of Blue Gene emulator was completely rewritten on top 
 of Converse instead of Charm++ in spring 2002. 
 While the API supported by the original emulator remains almost same,
-many new features were added - support of thread-committed messages that 
-can be send to a specific thread in a Blue Gene node; support of Blue Gene 
-node level broadcast.
-The new emulator was implemented on a lower layer communication 
+many new features were added.
+% - support of thread-committed messages that 
+%can be send to a specific thread in a Blue Gene node; support of Blue Gene 
+%node level broadcast.
+The new emulator was implemented on a portable low layer communication 
 library - Converse in order to achieve better 
-performance by avoiding the cross layer overhead. 
-Another advantage is that the lighter weighted emulator makes it easier
-to port higher level of programming language onto the emulator.
+performance by avoiding the cross layer overhead.
+%Another advantage is that the lighter weighted emulator makes it easier
+%to port higher level of programming language onto the emulator.
+
+Charm++ was soon ported to the emulator later in 2002 which provided
+first parallel language model on top of the emulator.
+
+A performance simulation capability was added to the emulator in spring 2003.
+The new simulator was renamed to BigSim at the same time.
+During the same year, we developed a POSE-based postmoterm mode network
+simulator called BigNetSim.
+
 
 In the following sections, we will first describe how to download and compile
 Blue Gene simulator(Sec. ~\ref{install}). Section~\ref{bgemulator} will describe
@@ -66,6 +87,9 @@ the low level machine API in detail.
 
 \input{install}
 \input{emulator}
+\input{simulator}
+\input{bignetsim}
+\input{bgapi}
 
 \input{index}
 \end{document}
