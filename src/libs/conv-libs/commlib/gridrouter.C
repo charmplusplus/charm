@@ -61,7 +61,7 @@ GridRouter::GridRouter(int n, int me)
           //We have a processor which wants to send data to that hole
           recvExpected ++;
       
-      if((myrow == 0) && ((NumPes - 1)%COLLEN == COLLEN - 1))
+      if((myrow == 0) && (NumPes%COLLEN == COLLEN - 1))
           //Special case with one hole only
           recvExpected ++;      
   }
