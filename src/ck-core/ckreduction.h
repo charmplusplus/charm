@@ -434,6 +434,7 @@ public:
 	void ReductionStarting(CkReductionNumberMsg *m);
 	//Sent up the reduction tree with reduced data
 	void RecvMsg(CkReductionMsg *m);
+	void doRecvMsg(CkReductionMsg *m);
 
 
 private:
@@ -468,6 +469,7 @@ private:
 
 //State:
 	void startReduction(int number);
+	void doAddContribution(CkReductionMsg *m);
 	void addContribution(CkReductionMsg *m);
 	void finishReduction(void);
 	
