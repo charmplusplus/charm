@@ -273,8 +273,12 @@ static SOCKET       dataskt;
  *
  *****************************************************************************/
 
+static int machine_initiated_shutdown=0;
+static int already_in_signal_handler=0;
+
 static void machine_exit(int status)
 {
+  machine_initiated_shutdown=1;
 #if CMK_USE_GM
   if (gmport) { 
     gm_close(gmport); gmport = 0;
@@ -305,19 +309,49 @@ int n;
 
 static void KillOnAllSigs(int sigNo)
 {
-  char _s[100];
-  const char *sig=" received signal";
-  if (sigNo==SIGSEGV) sig=": segmentation violation.\n"
-	"Try running with '++debug', or linking with '-memory paranoid'";
-  if (sigNo==SIGFPE) sig=": floating point exception.\nDid you divide by zero?";
-  if (sigNo==SIGILL) sig=": illegal instruction";
-  if (sigNo==SIGBUS) sig=": bus error";
-  if (sigNo==SIGKILL) sig=": caught signal KILL";
-  if (sigNo==SIGQUIT) sig=": caught signal QUIT";
+  const char *sig="unknown signal";
+  const char *suggestion="";
+  if (machine_initiated_shutdown ||
+      already_in_signal_handler) 
+  	machine_exit(1); /*Don't infinite loop if there's a signal during a signal handler-- just die.*/
+  already_in_signal_handler=1;
+
+  if (sigNo==SIGSEGV) {
+     sig="segmentation violation";
+     suggestion="Try running with '++debug', or linking with '-memory paranoid'.\n";
+  }
+  if (sigNo==SIGFPE) {
+     sig="floating point exception";
+     suggestion="Check for integer or floating-point division by zero.\n";
+  }
+  if (sigNo==SIGBUS) {
+     sig="bus error";
+     suggestion="Check for misaligned reads or writes to memory.\n";
+  }
+  if (sigNo==SIGILL) {
+     sig="illegal instruction";
+     suggestion="Check for calls to uninitialized function pointers.\n";
+  }
+  if (sigNo==SIGKILL) sig="caught signal KILL";
+  if (sigNo==SIGQUIT) sig="caught signal QUIT";
   
-  sprintf(_s, "ERROR> Node program on PE %d%s\n", CmiMyPe(),sig);
-  charmrun_abort(_s);
+  CmiError("------------- Processor %d Exiting: Caught Signal ------------\n"
+  	"Signal: %s\n",CmiMyPe(),sig);
+  if (0!=suggestion[0])
+  	CmiError("Suggestion: %s",suggestion);
+  CmiPrintStackTrace(1);
+  charmrun_abort(sig);
   machine_exit(1);
+}
+
+static void machine_atexit_check(void)
+{
+  if (!machine_initiated_shutdown)
+    CmiAbort("unexpected call to exit by user program. Must use CkExit, not exit!");
+  printf("Program finished.\n");
+#if 0 /*Wait for the user to press any key (for Win32 debugging)*/
+  fgetc(stdin);
+#endif
 }
 
 #if !defined(_WIN32) || defined(__CYGWIN__)
@@ -430,6 +464,10 @@ static int  Cmi_truecrash;
 
 void CmiAbort(const char *message)
 {
+  CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
+  	"Reason: %s\n",CmiMyPe(),message);
+  CmiPrintStackTrace(0);
+  
   /*Send off any remaining prints*/
   CmiStdoutFlush();
   
@@ -1760,6 +1798,7 @@ static void ConverseRunPE(int everReturn)
 
 void ConverseExit(void)
 {
+  machine_initiated_shutdown=1;
   if (CmiMyRank()==0) {
     if(Cmi_print_stats)
       printNetStatistics();
@@ -1776,14 +1815,6 @@ void ConverseExit(void)
   }
 /*Comm. thread will kill us.*/
   while (1) CmiYield();
-}
-
-static void exitDelay(void)
-{
-  printf("Program finished.\n");
-#if 0
-  fgetc(stdin);
-#endif
 }
 
 static void set_signals(void)
@@ -1846,7 +1877,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   MACHSTATE2(5,"Init: (netpoll=%d), (idlepoll=%d)",Cmi_netpoll,Cmi_idlepoll);
 
   skt_init();
-  atexit(exitDelay);
+  atexit(machine_atexit_check);
   parse_netstart();
   extract_args(argv);
   log_init();
