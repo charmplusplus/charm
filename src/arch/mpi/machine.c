@@ -94,7 +94,7 @@ static int mpi_tag = TAG;
 #define NEW_MPI_TAG	mpi_tag++; if (mpi_tag == MPI_TAG_UB) mpi_tag=TAG;
 */
 
-int _Cmi_numpes;
+int 		  _Cmi_numpes;
 int               _Cmi_mynode;    /* Which address space am I */
 int               _Cmi_mynodesize;/* Number of processors in my address space */
 int               _Cmi_numnodes;  /* Total number of address spaces */
@@ -168,15 +168,15 @@ extern unsigned char computeCheckSum(unsigned char *data, int len);
 
 /* MPI calls are not threadsafe, even the timer on some machines */
 static CmiNodeLock  timerLock = 0;
-static int _is_global = 0;
 static double starttimer;
+static int _is_global = 0;
 
-void CmiTimerInit(void)
+int CmiTimerIsSynchronized(void)
 {
   int  flag;
   void *v;
 
-  /*  check if using synchronized timer */
+  /*  check if it using synchronized timer */
   if (MPI_SUCCESS != MPI_Attr_get(MPI_COMM_WORLD, MPI_WTIME_IS_GLOBAL, &v, &flag))
     printf("MPI_WTIME_IS_GLOBAL not valid!\n");
   if (flag) {
@@ -184,7 +184,11 @@ void CmiTimerInit(void)
     if (_is_global && CmiMyPe() == 0) 
       printf("Charm++> MPI timer is synchronized!\n");
   }
+  return _is_global;
+}
 
+void CmiTimerInit(void)
+{
   if (CmiMyRank() == 0) {
     if (_is_global) { 
       double minTimer;
@@ -195,17 +199,7 @@ void CmiTimerInit(void)
     }
     else {
       /* we don't have a synchronous timer, set our own start time */
-      double t1, t2, t3;
-      if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
-        CmiAbort("Timernit: MPI_Barrier failed!\n");
-      t1 = MPI_Wtime();
-      if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
-        CmiAbort("Timernit: MPI_Barrier failed!\n");
-      t2 = MPI_Wtime();
-      if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
-        CmiAbort("Timernit: MPI_Barrier failed!\n");
-      t3 = MPI_Wtime();
-      starttimer = t3;
+      starttimer = MPI_Wtime();
     }
   }
   CmiNodeAllBarrier();          /* for smp */
@@ -253,6 +247,21 @@ double CmiCpuTimer(void)
 
 #endif
 
+void MPITimerInit(void)
+{
+  if (!CmiTimerIsSynchronized()) {
+    if (CmiMyRank() == 0) {
+      /* we don't have a synchronous timer, set our own start time */
+      if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
+        CmiAbort("Timernit: MPI_Barrier failed!\n");
+      if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
+        CmiAbort("Timernit: MPI_Barrier failed!\n");
+      if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
+        CmiAbort("Timernit: MPI_Barrier failed!\n");
+    }
+  }
+  CmiTimerInit();
+}
 
 typedef struct ProcState {
 /* PCQueue      sendMsgBuf; */      /* per processor message sending queue */
@@ -316,7 +325,8 @@ CmiPrintf("[node %d] Immediate Message hdl: %d rank: %d {{. \n", CmiMyNode(), Cm
     CmiHandleMessage(msg);
 CmiPrintf("[node %d] Immediate Message done.}} \n", CmiMyNode());
 */
-    *(CmiUInt2 *)msg = pe;
+    /**(CmiUInt2 *)msg = pe;*/
+    CMI_DEST_RANK(msg) = pe;
     CmiPushImmediateMsg(msg);
     return;
   }
@@ -937,8 +947,9 @@ void SendHypercube(int size, char *msg)
 
 void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
 {
+  CmiState cs = CmiGetState();
 #if CMK_BROADCAST_SPANNING_TREE
-  CMI_SET_BROADCAST_ROOT(msg, _Cmi_mype+1);
+  CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
   SendSpanningChildren(size, msg);
   
 #elif CMK_BROADCAST_HYPERCUBE
@@ -946,7 +957,6 @@ void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
   SendHypercube(size, msg);
     
 #else
-  CmiState cs = CmiGetState();
   int i;
 
   for ( i=cs->pe+1; i<_Cmi_numpes; i++ ) 
