@@ -230,13 +230,19 @@ int PumpPersistent()
       if (CMI_BROADCAST_ROOT(msg))
           SendSpanningChildren(size, msg);
 #endif
+      /* clear footer after message used */
+      *(slot->recvSizePtr[0]) = 0;
+      footer[0] = footer[1] = 0;
 
+#if 0
       /* not safe at all! */
+      /* instead of clear before use, do it earlier */
       msg=slot->messagePtr[0];
       size = *(slot->recvSizePtr[0]);
       footer = (int*)(msg + size);
       *(slot->recvSizePtr[0]) = 0;
       footer[0] = footer[1] = 0;
+#endif
       status = 1;
       }
     }

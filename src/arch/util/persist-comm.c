@@ -158,8 +158,25 @@ PersistentHandle CmiCreatePersistent(int destPE, int maxBytes)
   return h;
 }
 
+static void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
+{
+  int i;
+  for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
+    char *buf = PerAlloc(maxBytes+sizeof(int)*2);
+    _MEMCHECK(buf);
+    memset(buf, 0, maxBytes+sizeof(int)*2);
+    slot->messagePtr[i] = buf;
+#if CONVERSE_VERSION_ELAN
+    /* note: assume first integer in elan converse header is the msg size */
+    slot->recvSizePtr[i] = (unsigned int*)buf;
+#else
+    slot->recvSizePtr[i] = (unsigned int*)CmiAlloc(sizeof(unsigned int));
+#endif
+  }
+  slot->sizeMax = maxBytes;
+}
 
-void persistentRequestHandler(void *env)
+static void persistentRequestHandler(void *env)
 {             
   PersistentRequestMsg *msg = (PersistentRequestMsg *)env;
   char *buf;
@@ -172,21 +189,12 @@ void persistentRequestHandler(void *env)
   /* build reply message */
   PersistentReqGrantedMsg *gmsg = CmiAlloc(sizeof(PersistentReqGrantedMsg));
 
+  setupRecvSlot(slot, msg->maxBytes);
+
   for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
-    buf = PerAlloc(msg->maxBytes+sizeof(int)*2);
-    _MEMCHECK(buf);
-    memset(buf, 0, msg->maxBytes+sizeof(int)*2);
-    slot->messagePtr[i] = buf;
-#if CONVERSE_VERSION_ELAN
-    /* note: assume first integer in elan converse header is the msg size */
-    slot->recvSizePtr[i] = (unsigned int*)buf;
-#else
-    slot->recvSizePtr[i] = (unsigned int*)CmiAlloc(sizeof(unsigned int));
-#endif
     gmsg->msgAddr[i] = slot->messagePtr[i];
     gmsg->slotFlagAddress[i] = slot->recvSizePtr[i];
   }
-  slot->sizeMax = msg->maxBytes;
 
   gmsg->sourceHandlerIndex = msg->sourceHandlerIndex;
   gmsg->destHandlerIndex = h;
@@ -197,7 +205,7 @@ void persistentRequestHandler(void *env)
   CmiFree(msg);
 }
 
-void persistentReqGrantedHandler(void *env)
+static void persistentReqGrantedHandler(void *env)
 {
   int i;
   /*CmiPrintf("Persistent handler granted\n");*/
@@ -216,6 +224,49 @@ void persistentReqGrantedHandler(void *env)
     slot->messageBuf = NULL;
   }
   CmiFree(msg);
+}
+
+/*
+  Another API:
+  receiver initiate the persistent communication
+*/
+PersistentReq CmiCreateReceiverPersistent(int maxBytes)
+{
+  PersistentReq ret;
+  int i;
+
+  PersistentHandle h = getFreeRecvSlot();
+  PersistentReceivesTable *slot = (PersistentReceivesTable *)h;
+
+  setupRecvSlot(slot, maxBytes);
+
+  ret.pe = CmiMyPe();
+  ret.maxBytes = maxBytes;
+  ret.myHand = h;
+  for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
+    ret.messagePtr[i] = slot->messagePtr[i];
+    ret.recvSizePtr[i] = slot->recvSizePtr[i];
+  }
+
+  return ret;
+}
+
+PersistentHandle CmiRegisterReceivePersistent(PersistentReq recvHand)
+{
+  int i;
+  PersistentHandle h = getFreeSendSlot();
+
+  PersistentSendsTable *slot = (PersistentSendsTable *)h;
+  slot->used = 1;
+  slot->destPE = recvHand.pe;
+  slot->sizeMax = recvHand.maxBytes;
+
+  for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
+    slot->destAddress[i] = recvHand.messagePtr[i];
+    slot->destSizeAddress[i] = recvHand.recvSizePtr[i];
+  }
+  slot->destHandle = recvHand.myHand;
+  return h;
 }
 
 /******************************************************************************
