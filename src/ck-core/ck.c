@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.20  1997-03-24 23:14:01  milind
+ * Revision 2.21  1997-04-21 20:58:48  jyelon
+ * Simplified the shutdown protocol a little.
+ *
+ * Revision 2.20  1997/03/24 23:14:01  milind
  * Made Charm-runtime 64-bit safe by removing conversions of pointers to
  * integers. Also, removed charm runtime's dependence of unused argv[]
  * elements being 0. Also, added sim-irix-64 version. It works.
@@ -186,13 +189,6 @@ CkExit()
 }
 
 
-EndCharm()
-{
-       CkEndCharm();
-       CsdScheduler(-1);
-}
-
-
 CkEndCharm()
 {
 	int *msg;
@@ -245,7 +241,7 @@ void *usr, *data;
 	}
 	else /* If the user called CkExit */
 	{
-		CsdExitScheduler();
+	        CkEndCharm();
 		if(CmiMyPe())
 			CpvAccess(num_exits)++;
 	}
