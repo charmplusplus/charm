@@ -1069,6 +1069,7 @@ char **arg_argv;
 int    arg_argc;
 
 int   arg_requested_pes;
+int   arg_timeout;
 int   arg_verbose;
 int   arg_debug;
 int   arg_debug_no_pause;
@@ -1092,6 +1093,7 @@ void arg_init(int argc, char **argv)
   static char buf[1024]; int len, i;
   
   pparam_defint ("p"             ,  MAX_NODES);
+  pparam_defint ("timeout"       ,  2);
   pparam_defflag("verbose"           );
   pparam_defflag("debug"             );
   pparam_defflag("debug-no-pause"    );
@@ -1103,6 +1105,7 @@ void arg_init(int argc, char **argv)
   pparam_defstr ("remote-shell"  ,  0);
   
   pparam_doc("p",             "number of processes to create");
+  pparam_doc("timeout",       "seconds to wait per host connection");
   pparam_doc("in-xterm",      "Run each node in an xterm window");
   pparam_doc("verbose",       "Print diagnostic messages");
   pparam_doc("debug",         "Run each node under gdb in an xterm window");
@@ -1122,6 +1125,7 @@ void arg_init(int argc, char **argv)
   arg_argc = pparam_countargs(argv+2);
   
   arg_requested_pes  = pparam_getint("p");
+  arg_timeout        = pparam_getint("timeout");
   arg_in_xterm       = pparam_getflag("in-xterm");
   arg_verbose        = pparam_getflag("verbose");
   arg_debug          = pparam_getflag("debug");
@@ -1921,7 +1925,7 @@ void req_worker(int workerno)
   skt_server(&master_ip, &master_port, &master_fd);
   sprintf(reply,"worker %d %d %d", workerno, master_ip, master_port);
   req_write_to_host(hostfd, reply, strlen(reply)+1);
-  timeout = (nodetab_rank0_size*2) + 60;
+  timeout = (nodetab_rank0_size*arg_timeout) + 60;
   for (i=0; i<numclients; i++) {
     while (1) {
       if (timeout <= 0) {
