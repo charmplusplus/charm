@@ -91,7 +91,7 @@ static HANDLE comm_mutex;
 static DWORD Cmi_state_key = 0xFFFFFFFF;
 static CmiState     Cmi_state_vector = 0;
 
-#ifdef CMK_OPTIMIZE
+#if 0
 #  define CmiGetState() ((CmiState)TlsGetValue(Cmi_state_key))
 #else
 CmiState CmiGetState()
