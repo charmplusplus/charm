@@ -15,7 +15,7 @@
 
 #define GAMMA_NIC   2.6e-9   //DMA bandwidth to copy data into NIC memory
 #define BETA        4e-9   //Network bandwidth
-#define GAMMA       9e-10     //Memory bandwidth (copied twice)
+#define GAMMA_MEM       9e-10     //Memory bandwidth (copied twice)
 
 #define min(x,y) ((x < y) ? x : y)
 
