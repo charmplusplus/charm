@@ -1392,7 +1392,7 @@ extern void writeall(int, char *, int);
 
 void CcsSendReply(unsigned int ip, unsigned int port, int size, void *msg)
 {
-  char cmd[100];
+  char cmd[100], c;
   int fd = skt_connect(ip, port, 120);
   if (fd<0) return; /* maybe the requester exited */
   sprintf(cmd, "reply %d\n", size);
