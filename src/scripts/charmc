@@ -37,10 +37,6 @@ OVERRIDE_LD=""
 OVERRIDE_LDXX=""
 #Generic options, passed to everything
 OPTS=""
-#Compiler-only options
-OPTSC=""
-#Linker-only options
-OPTSL=""
 #Specific options
 OPTS_CPP=""
 OPTS_LDRO="" 
@@ -380,21 +376,16 @@ do
 		shift
 		;;
 
-	-D*)
-		OPTSC="$OPTSC $arg"
-		;;
-
-	-I*)
-		OPTSC="$OPTSC $arg"
-		OPTS_F90="$OPTS_F90 $arg"
+	-D*|-I*)
+		OPTS_CPP="$OPTS_CPP $arg"
 		;;
 
 	-LANG*)
 		echo "passing unrecognized option $arg to all compilers and linkers"
-		OPTSC="$OPTSC  $arg"
+		OPTS="$OPTS $arg"
 		;;
 	-L*)
-		OPTSL="$OPTSL $arg"
+		OPTS_LD="$OPTS_LD $arg"
 		;;
 
 	"-O")
@@ -419,7 +410,7 @@ do
 		;;
 
 	-s)
-		OPTSL="$OPTSL   $arg"
+		OPTS_LD="$OPTS_LD   $arg"
 		;;
 
         -h|--help)
@@ -598,9 +589,11 @@ then
 fi
 
 #Add generic options to the compiler- and linker-options
-OPTSC="$OPTS $OPTSC"
+OPTS_CC="$OPTS $OPTS_CC"
+OPTS_CXX="$OPTS $OPTS_CXX"
 OPTS_F90="$OPTS $OPTS_F90"
-OPTSL="$OPTS $OPTSL"
+OPTS_LD="$OPTS $OPTS_LD"
+OPTS_LDXX="$OPTS $OPTS_LDXX"
 
 # There's really no analog for this in the Bourne shell: 
 #  -------- C Shell ------> onintr failure
@@ -693,7 +686,7 @@ do
 	DoNoErrCheck $RM $BASE.cpm.h $TMP.c
 	Do touch $BASE.cpm.h
 	Do $LN -f -s $FILE $TMP.c
-	Do $CMK_CPP_C $OPTSC $OPTS_CPP -I$CHARMINC $TMP.c > $TMP.i
+	Do $CMK_CPP_C $OPTS_CC $OPTS_CPP -I$CHARMINC $TMP.c > $TMP.i
 	Do $CHARMBIN/conv-cpm $TMP.i $BASE.cpm.h
 done
 
@@ -734,19 +727,19 @@ do
 		fi
 		;;
 	*.c|*.s)
-		Do $CMK_CC $OPTSC $OPTS_CC -I$CHARMINC -c $FILE $DESTO
+		Do $CMK_CC $OPTS_CPP $OPTS_CC -I$CHARMINC -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.C|*.cc|*.cxx|*.cpp|*.c++)
-		Do $CMK_CXX $OPTSC $OPTS_CXX -I$CHARMINC -c $FILE $DESTO
+		Do $CMK_CXX $OPTS_CPP $OPTS_CXX -I$CHARMINC -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.f|*.F)
-		Do $CMK_CF90 $OPTS_F90 -I$CHARMINC -c $FILE $DESTO
+		Do $CMK_CF90 $OPTS_CPP $OPTS_F90 -I$CHARMINC -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.f90|*.F90)
-		Do $CMK_CF90 $OPTS_F90 -I$CHARMINC -c $FILE $DESTO
+		Do $CMK_CF90 $OPTS_CPP $OPTS_F90 -I$CHARMINC -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
 	*.fc|*.FC)
@@ -814,7 +807,7 @@ case "$OBJECT" in
 # Multiple source files, one .o: make shared library
 		Debugf "Running ldro..."
 		DoNoErrCheck $RM $OBJECT
-		Do $CMK_LDRO $OBJECT $OPTSL $OPTS_LDRO $OBJECTFILES
+		Do $CMK_LDRO $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES
 	fi
 	Copyobj
 	;;
@@ -830,11 +823,11 @@ esac
 
 case "$LANGUAGE" in
 "c"|"C"|"f90"|"f77")
-	Do $CMK_SEQ_LD $OPTSL $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
+	Do $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
 	Copyobj
 	;;
 "c++"|"C++")
-	Do $CMK_SEQ_LDXX $OPTSL $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
+	Do $CMK_SEQ_LDXX $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
 	Copyobj
 	;;
 esac
@@ -1020,7 +1013,7 @@ for trace in $TRACEMODE; do
 done
 echo "}" >> $modInitSrc
 
-Do $CMK_CXX $OPTSC $OPTS_CXX -c $modInitSrc -o $modInitObj
+Do $CMK_CXX $OPTS_CPP $OPTS_CXX -c $modInitSrc -o $modInitObj
 
 ###############################################################################
 #
@@ -1035,15 +1028,15 @@ CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ $MEM_OBJ "
 
 case "$LANGUAGE" in
 "charm"|"charm++"|"f90charm"|"tcharm"|"tcharmf"|"ckbluegene"|"bgcharm++")
-	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
+	Do $CMK_LDXX $OPTS_LD $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lck -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
 "converse")
-	Do $CMK_LD $OPTSL $OPTS_LD -o $OBJECT \
+	Do $CMK_LD $OPTS_LD -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-n $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
 "converse++"|"bluegene")
-	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
+	Do $CMK_LDXX $OPTS_LD $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
 *)
