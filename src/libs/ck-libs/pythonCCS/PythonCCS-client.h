@@ -68,11 +68,11 @@ class PythonExecute : private PythonAbstract {
   } code;
 
   /* the following parameters are used when the iterator mode is invoked */
-  CmiUInt4 methodNameLength;
   union {
     char * methodName;
     char dummy[8];
   } methodName;
+  CmiUInt4 methodNameLength;
   CmiUInt4 infoSize; /* must contain the size of the info structure passed */
   union {
     PythonIterator *info;
