@@ -136,6 +136,8 @@ NLBStatsMsg* NborBaseLB::AssembleStats()
   theLbdb->IdleTime(&myStats.idletime);
   theLbdb->BackgroundLoad(&myStats.bg_walltime,&myStats.bg_cputime);
 
+  myStats.move = QueryMigrateStep(step());
+
   myStats.n_objs = theLbdb->GetObjDataSz();
   if (myStats.objData) delete [] myStats.objData;
   myStats.objData = new LDObjData[myStats.n_objs];

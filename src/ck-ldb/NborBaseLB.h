@@ -56,6 +56,7 @@ public:
     double obj_cputime;
     int pe_speed;
     CmiBool available;
+    CmiBool move;
 
     int n_objs;
     LDObjData* objData;
@@ -65,6 +66,7 @@ public:
 
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
+  virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
   virtual NLBMigrateMsg* Strategy(LDStats* stats,int count);
 
   virtual int max_neighbors() {
