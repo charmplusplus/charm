@@ -37,16 +37,6 @@ CmiBool DummyLB::QueryBalanceNow(int _step)
   return CmiTrue;
 }
 
-LBMigrateMsg* DummyLB::Strategy(CentralLB::LDStats* stats, int count)
-{
-
-  int sizes=0;
-  LBMigrateMsg* msg = new(&sizes,1) LBMigrateMsg;
-  msg->n_moves = 0;
-
-  return msg;
-};
-
 #endif
 
 
