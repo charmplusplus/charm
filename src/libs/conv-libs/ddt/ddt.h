@@ -277,6 +277,7 @@ class DDT {
   {
     max_types = 20;
     typeTable = new DDT_DataType*[max_types];
+    types = new int[max_types];
     typeTable[0] = new DDT_DataType(DDT_DOUBLE);
     typeTable[1] = new DDT_DataType(DDT_INT);
     typeTable[2] = new DDT_DataType(DDT_FLOAT);
