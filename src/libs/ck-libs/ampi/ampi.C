@@ -309,16 +309,20 @@ void ampi::pup(PUP::er &p)
   // This is needed because the userData depends on the thread's stack
   // both at pack and unpack time.
   PUP::seekBlock s(p,2);
+  bool haveThread=(cthread_id||mthread_id);
+  p(haveThread);
   if (p.isUnpacking()) 
   {//In this case, unpack the thread before the user data
     thread_id = 0;
     cthread_id = 0;
     mthread_id = 0;
-  	s.seek(1);
-  	if(p.isUserlevel())
-      cthread_id = CthPup((pup_er) &p, cthread_id);
-    else
-      mthread_id = CthPup((pup_er) &p, mthread_id);
+    if (haveThread) {
+      s.seek(1);
+      if(p.isUserlevel())
+	cthread_id = CthPup((pup_er) &p, cthread_id);
+      else
+	mthread_id = CthPup((pup_er) &p, mthread_id);
+    }
   }
   //Pack all user data
   s.seek(0);
@@ -329,10 +333,10 @@ void ampi::pup(PUP::er &p)
     p((void*)&(pup_ud[i]), sizeof(AMPI_PupFn));
     pup_ud[i]((pup_er) &p, userdata[i]);
   }
-  if (p.isPacking() || p.isSizing()) 
+  if (haveThread && !p.isUnpacking())
   {//In this case, pack the thread after the user data
-  	s.seek(1);
-  	if(p.isUserlevel())
+    s.seek(1);
+    if(p.isUserlevel())
       cthread_id = CthPup((pup_er) &p, cthread_id);
     else
       mthread_id = CthPup((pup_er) &p, mthread_id);
@@ -346,10 +350,10 @@ void ampi::pup(PUP::er &p)
   // to pup them as well.
   if(p.isUnpacking())
   {
-  	if(p.isUserlevel())
-      CtvAccessOther(cthread_id, ampiPtr) = this;
+    if(p.isUserlevel())
+      {if (cthread_id) CtvAccessOther(cthread_id, ampiPtr) = this;}
     else
-      CtvAccessOther(mthread_id, ampiPtr) = this;
+      {if (mthread_id) CtvAccessOther(mthread_id, ampiPtr) = this;}
     myDDT = new DDT((void*)0);
     nrequests = 0;
     nirequests = 0;
