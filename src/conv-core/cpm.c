@@ -200,7 +200,6 @@ void CpmThread3(void *msg)
 {
   int *env = (int *)CpmEnv(msg);
   CpvAccess(CmiHandlerTable)[env[0]](msg);
-  // Had to do Free here... milind
   CmiFree(msg);
   CthFree(CthSelf()); CthSuspend();
 }
