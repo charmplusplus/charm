@@ -1084,7 +1084,7 @@ ampi::generic(AmpiMsg* msg)
 MSG_ORDER_DEBUG(
   CkPrintf("AMPI Rank %d arrival: tag=%d, src=%d, comm=%d  (from %d, seq %d)\n",
   	getRank(),msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
-	 parent->thisIndex,getRank(),msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq);
+)
 //	AmpiMsg *msgcopy = msg;
   if(msg->seq != -1) {
     int srcIdx = msg->srcIdx;
