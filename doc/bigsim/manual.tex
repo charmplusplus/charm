@@ -58,8 +58,10 @@ example programs and instructions for executing them.
 
 \section{History}
 
-The first version of BlueGene emulator was first written on Charm++, a 
-parallel object language. The second version of Blue Gene emulator is now 
+The first version of BlueGene emulator was written on Charm++, a 
+parallel object language. 
+
+The second version of Blue Gene emulator is now 
 completely rewritten on top of Converse instead of Charm++, while the API 
 supported by the original emulator is kept without major changes. The new 
 emulator is implemented on a lower layer communication library - Converse 
@@ -585,8 +587,9 @@ void computeMax(char *info) {
 \section{Compiling and Running}
 
 BlueGene Emulator now is integrated into Charm++ distribution as a runtime 
-library. Download Charm++ from Charm++ website and install properly before 
-using Bluegene emulator.
+library. Download Charm++ from Charm++ website and compile Charm++ and bluegene
+emulator by command "./build bluegene net-linux", change net-linux to whatever
+platform you are compiling on.
 
 Compile Blue Gene emulator programs using {\tt charmc} as one would
 in the case of compiling normal \charmpp{} programs. In order to link the
