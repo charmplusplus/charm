@@ -170,14 +170,10 @@ LogPool::LogPool(char *pgm, int b) {
   if(!fp) {
     CmiAbort("Cannot open Projections Trace File for writing...\n");
   }
-#if CMK_TRACE_LOGFILE_NUM_CONTROL
-  CLOSE_LOG 
-#endif
   if(!binary) {
-    OPEN_LOG
     fprintf(fp, "PROJECTIONS-RECORD\n");
-    CLOSE_LOG 
   }
+  CLOSE_LOG 
 }
 
 LogPool::~LogPool() 
@@ -207,7 +203,7 @@ void LogPool::writeSts(void)
   do
   {
     sts = fopen(fname, "w");
-  } while (!fp && (errno == EINTR || errno == EMFILE));
+  } while (!sts && (errno == EINTR || errno == EMFILE));
   if(sts==0)
     CmiAbort("Cannot open projections sts file for writing.\n");
   delete[] fname;
