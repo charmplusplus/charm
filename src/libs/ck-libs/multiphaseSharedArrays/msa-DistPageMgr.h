@@ -651,6 +651,7 @@ protected:
     inline void accessPage(unsigned int page,MSA_Page_Fault_t access)
     {
         if (pageTable[page] == 0) {
+//             ckout << "p" << CkMyPe() << ": Calling pageFault" << endl;
             pageFault(page, access);
         }
 #ifndef CMK_OPTIMIZE
