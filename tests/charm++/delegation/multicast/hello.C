@@ -58,7 +58,7 @@ public:
   };
 };
 
-void client(CkSectionID sid, void *param, int dataSize, void *data)
+void client(CkSectionCookie sid, void *param, int dataSize, void *data)
 {
   myReductionCounter *c=(myReductionCounter *)param;
   CmiPrintf("RESULT [%d]: %d\n", c->reductionNo, *(int *)data); 
@@ -99,7 +99,7 @@ void client(CkSectionID sid, void *param, int dataSize, void *data)
 class Hello : public ArrayElement1D
 {
 private:
-  CkSectionID sid;
+  CkSectionCookie sid;
   int init;
 
 public:

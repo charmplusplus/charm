@@ -24,31 +24,31 @@ public:
 
 #define MAXMCASTCHILDREN  2
 
-typedef void (*redClientFn)(CkSectionID sid, void *param,int dataSize,void *data);
+typedef void (*redClientFn)(CkSectionCookie sid, void *param,int dataSize,void *data);
 
 class CkMulticastMgr: public CkDelegateMgr {
   private:
-    CkSectionID sid;  // for now
+    CkSectionCookie sid;  // for now
     int idNum;
   public:
     CkMulticastMgr(): idNum(0) {};
-    void setSection(CkSectionID &id, CkArrayID aid, CkArrayIndexMax *, int n);
-    void setSection(CkSectionID &id);
+    void setSection(CkSectionCookie &id, CkArrayID aid, CkArrayIndexMax *, int n);
+    void setSection(CkSectionCookie &id);
     void setSection(CProxySection_ArrayElement *proxy);
-    void teardown(CkSectionID s);
-    void freeup(CkSectionID s);
-    void init(CkSectionID sid);
-    void reset(CkSectionID sid);
+    void teardown(CkSectionCookie s);
+    void freeup(CkSectionCookie s);
+    void init(CkSectionCookie sid);
+    void reset(CkSectionCookie sid);
     cookieMsg * setup(multicastSetupMsg *);
     void ArraySend(int ep, void *m, const CkArrayIndexMax &idx, CkArrayID a);
     void ArrayBroadcast(int ep,void *m, CkArrayID a);
-    void ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionID &s);
+    void ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionCookie &s);
     void recvMsg(multicastGrpMsg *m);
     // for reduction
-    void setReductionClient(CkSectionID sid, redClientFn fn,void *param=NULL);
+    void setReductionClient(CkSectionCookie sid, redClientFn fn,void *param=NULL);
     void setReductionClient(CProxySection_ArrayElement *, redClientFn fn,void *param=NULL);
-    void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionID &sid);
-    void rebuild(CkSectionID &);
+    void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionCookie &sid);
+    void rebuild(CkSectionCookie &);
     // entry
     void recvRedMsg(ReductionMsg *msg);
     void updateRedNo(mCastCookie *, int red);
@@ -62,7 +62,7 @@ class CkMulticastMgr: public CkDelegateMgr {
 };
 
 
-extern void setSectionID(void *msg, CkSectionID sid);
-extern void CkGetSectionID(CkSectionID &id, void *msg);
+extern void setSectionID(void *msg, CkSectionCookie sid);
+extern void CkGetSectionID(CkSectionCookie &id, void *msg);
 
 #endif

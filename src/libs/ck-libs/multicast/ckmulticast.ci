@@ -15,10 +15,10 @@ module CkMulticast {
   group CkMulticastMgr {
     entry CkMulticastMgr(void);
     entry void recvMsg(multicastGrpMsg *m);
-    entry [threaded] void init(CkSectionID sid) stacksize=10k;
-    entry [threaded] void reset(CkSectionID sid);
-    entry [sync, threaded] void teardown(CkSectionID sid);
-    entry void freeup(CkSectionID sid);
+    entry [threaded] void init(CkSectionCookie sid) stacksize=10k;
+    entry [threaded] void reset(CkSectionCookie sid);
+    entry [sync, threaded] void teardown(CkSectionCookie sid);
+    entry void freeup(CkSectionCookie sid);
     entry [sync, threaded] cookieMsg * setup(multicastSetupMsg *);
     // reduction
     entry void recvRedMsg(ReductionMsg *msg);
