@@ -22,10 +22,10 @@ class element {  // triangular elements defined by three node references,
      orientation:
                        0
                       / \
-                    2/   \0
+                    1/   \0
                     /     \
                    2_______1
-	               1                              */
+	               2                              */
  public:
   nodeRef nodes[3];
   edgeRef edges[3];
@@ -61,7 +61,6 @@ class element {  // triangular elements defined by three node references,
   int getNodeIdx(nodeRef n);
   elemRef getElement(int edgeIdx);
   edgeRef& getEdge(edgeRef eR, nodeRef nR);
-  nodeRef& getOpnode(edgeRef& e);
   
   void clear() { present = 0; }
   int isPresent() { return present; }

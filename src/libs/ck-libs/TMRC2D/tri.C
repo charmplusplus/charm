@@ -72,7 +72,6 @@ void chunk::refiningElements()
 {
   int i;
 
-  CkPrintf("Refining...\n");
   while (modified) { 
     // continue trying to refine elements until nothing changes during
     // a refinement cycle
@@ -94,7 +93,6 @@ void chunk::refiningElements()
   }
   // nothing is in need of refinement; turn refine loop off
   refineInProgress = 0;  
-  CkPrintf("Refining done.\n");
 }
 
 
@@ -117,7 +115,6 @@ void chunk::coarseningElements()
 {
   int i;
 
-  CkPrintf("Coarsening...\n");
   while (modified) { // try to coarsen elements until no changes occur
     i = 0;
     modified = 0;
@@ -135,7 +132,6 @@ void chunk::coarseningElements()
     CthYield(); // give other chunks on the same PE a chance
   }
   coarsenInProgress = 0;  // turn coarsen loop off
-  CkPrintf("Coarsening done.\n");
 }
 
 // many remote access methods follow
@@ -372,18 +368,6 @@ void chunk::resetTargetArea(doubleMsg *dm)
   modified = 1;
 }
 
-refMsg *chunk::getOpposingNode(refMsg *m)
-{
-  refMsg *rm = new refMsg;
-  nodeRef nRef;
-  edgeRef eRef;
-  eRef.idx = m->aRef.idx;  eRef.cid = m->aRef.cid;
-  nRef = theElements[m->idx].getOpnode(eRef);
-  CkFreeMsg(m);
-  rm->aRef = nRef;
-  return rm;
-}
-
 void chunk::updateEdges(edgeUpdateMsg *em)
 {
   theElements[em->idx].set(em->e0, em->e1, em->e2);
@@ -452,14 +436,14 @@ void chunk::adjustMesh()
   if (sizeElements <= numElements+100) {
     adjustFlag();
     adjustLock();
-    CkPrintf("[%d] Adjusting mesh size...\n", cid);
+    CkPrintf("TMRC2D: [%d] Adjusting mesh size...\n", cid);
     sizeElements += 100;
     sizeEdges += 300;
     sizeNodes += 300;
     theElements.resize(sizeElements);
     theEdges.resize(sizeEdges);
     theNodes.resize(sizeNodes);
-    CkPrintf("[%d] Done adjusting mesh size...\n", cid);
+    CkPrintf("TMRC2D: [%d] Done adjusting mesh size...\n", cid);
     adjustRelease();
   }
 }
@@ -622,7 +606,6 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
   // do some error checking
   CkAssert(nEl == numElements);
   CkAssert(nNode == numNodes);
-  sanityCheck();
   
   // update node coordinates from coord
   for (i=0; i<numNodes; i++)
@@ -736,8 +719,9 @@ void chunk::deriveEdges(int *conn, int *gid)
 	  theElements[i].set(j, er);
 	  // if not on border, point nbrRef at the edge
 	  if (nbrRef.cid != -1) {
+	    CkAssert(edgeIdx > -1);
 	    remoteEdgeMsg *rem = new remoteEdgeMsg;
-	    rem->elem = nbrRef.cid;
+	    rem->elem = nbrRef.idx;
 	    rem->er = er;
 	    rem->localEdge = edgeIdx;
 	    mesh[nbrRef.cid].addRemoteEdge(rem);
@@ -762,7 +746,7 @@ void chunk::deriveNodes()
 	numNodes = nr.idx + 1;
     }
   }
-  CkPrintf("NumNodes = %d; max node idx = %d\n", numNodes, numNodes-1);
+  CkPrintf("TMRC2D: NumNodes = %d; max node idx = %d\n", numNodes, numNodes-1);
 }
 
 int chunk::edgeLocal(elemRef e1, elemRef e2)
@@ -799,7 +783,8 @@ int chunk::getNbrRefOnEdge(int n1, int n2, int *conn, int nGhost, int *gid,
 			   int idx, elemRef *er)
 {
   int i, e;
-  
+  er->set(-1, -1);
+
   for (i=idx+1; i<nGhost; i++)
     if ((e = hasEdge(n1, n2, conn, i)) != -1) {
       er->set(gid[i*2], gid[i*2+1]);

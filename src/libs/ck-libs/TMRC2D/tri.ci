@@ -82,6 +82,5 @@ module refine {
     entry [sync] void removeEdge(intMsg *);
     entry [sync] void removeElement(intMsg *);
     entry [sync] void updateNode(updateMsg *);
-    entry [sync] refMsg *getOpposingNode(refMsg *);
   };
 };

@@ -137,24 +137,6 @@ elemRef element::getElement(int edgeIdx)
   return edges[edgeIdx].get(myRef);
 }
 
-
-nodeRef& element::getOpnode(edgeRef& e)
-{ // find node opposite to edge e on this element
-  /*                  opnode
-                         @
-                        / \  
-                       /   \
-                      /     \
-                     @_______@
-                         e                       */
-  if (!(edges[0] == e)) {
-    if (edges[1] == e)
-      return nodes[1];
-    else return nodes[0];
-  }
-  return nodes[2];
-}
-
 double element::getArea()
 { 
   calculateArea();
@@ -201,9 +183,9 @@ void element::split(int longEdge)
            otherEdge  /     \  modEdge
                      /       \
                     /         \
-                   @___________@ othernode
+           fixnode @___________@ othernode
                       longEdge                         */
-  int opnode, othernode, modEdge, otherEdge, result;
+  int opnode, othernode, fixnode, modEdge, otherEdge, result;
   edgeRef *e_prime, *newEdge;
   nodeRef *m;
   elemRef *newElem, nullRef;
@@ -214,16 +196,43 @@ void element::split(int longEdge)
   // initializations of shortcuts to affected parts of element
   opnode = 2 - longEdge;
   othernode = (opnode + 1) % 3;
-  modEdge = (opnode + othernode) - 1;
-  otherEdge = 3 - (longEdge + modEdge);
-  CkPrintf("Refining element %d, opnode=%d othernode=%d modEdge=%d longEdge=%d\n", myRef.idx, nodes[opnode].idx, nodes[othernode].idx, edges[modEdge].idx, edges[longEdge].idx);
-  CkAssert(nodes[othernode].idx < C->numNodes);
-  if ((result = edges[longEdge].split(m, e_prime, nodes[othernode], myRef)) == 1) {
+  fixnode = (othernode + 1) % 3;
+  modEdge = 2 - fixnode;
+  otherEdge = 2 - othernode;
+  if ((result=edges[longEdge].split(m,e_prime,nodes[othernode],myRef)) == 1) {
     // e_prime successfully created incident on othernode
-    CkPrintf("Bisecting element %d, othernode %d, longEdge %d\n", myRef.idx, nodes[othernode].idx, edges[longEdge].idx);
+  CkPrintf("TMRC2D: Refining element %d, opnode=%d othernode=%d fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.idx, nodes[opnode].idx, nodes[othernode].idx, nodes[fixnode].idx, edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);
     newEdge = C->addEdge(nodes[opnode], *m);
+
+    /* old code disregards orientation
     newElem = C->addElement(nodes[opnode], nodes[othernode], *m, 
 			    edges[modEdge], *newEdge, *e_prime);
+    */
+    // add new element to preserve orientation
+    if (opnode == 0) {
+      if (othernode == 1)
+	newElem = C->addElement(nodes[0], nodes[1], *m, 
+				edges[modEdge], *newEdge, *e_prime);
+      else // othernode == 2
+	newElem = C->addElement(nodes[0], *m, nodes[2],
+				*newEdge, edges[modEdge], *e_prime);
+    }
+    else if (opnode == 1) {
+      if (othernode == 0)
+	newElem = C->addElement(nodes[0], nodes[1], *m,
+				edges[modEdge], *e_prime, *newEdge);
+      else // othernode == 2
+	newElem = C->addElement(*m, nodes[1], nodes[2],
+				*newEdge, *e_prime, edges[modEdge]);
+    }
+    else { // opnode == 2
+      if (othernode == 0)
+	newElem = C->addElement(nodes[0], *m, nodes[2],
+				*e_prime, edges[modEdge], *newEdge);
+      else // othernode == 1
+	newElem = C->addElement(*m, nodes[1], nodes[2],
+				*e_prime, *newEdge, edges[modEdge]);
+    }
 
     edges[modEdge].update(myRef, *newElem);
     C->theEdges[newEdge->idx].update(nullRef, myRef);
@@ -241,18 +250,46 @@ void element::split(int longEdge)
     delete m; delete newEdge; delete e_prime; delete newElem;
   }
   else if (result == 0) { 
-    // e_prime already incident on n_prime
-    int n_prime = 3 - (opnode + othernode);
-    CkPrintf("Bisecting pending element %d, othernode %d longEdge %d\n", myRef.idx, nodes[n_prime].idx, edges[longEdge].idx);
+    // e_prime already incident on fixnode
+  CkPrintf("TMRC2D: Refining element %d, opnode=%d othernode=%d fixnode=%d longEdge=%d modEdge=%d otherEdge=%d\n", myRef.idx, nodes[opnode].idx, nodes[othernode].idx, nodes[fixnode].idx, edges[longEdge].idx, edges[modEdge].idx, edges[otherEdge].idx);
     newEdge = C->addEdge(nodes[opnode], *m);
-    newElem = C->addElement(nodes[opnode], nodes[n_prime], *m, 
+
+    /* old code disregards orientation
+    newElem = C->addElement(nodes[opnode], nodes[fixnode], *m, 
 			    edges[otherEdge], *newEdge, *e_prime);
+    */
+
+    // add new element to preserve orientation
+    if (opnode == 0) {
+      if (fixnode == 1)
+	newElem = C->addElement(nodes[0], nodes[1], *m, 
+				edges[otherEdge], *newEdge, *e_prime);
+      else // fixnode == 2
+	newElem = C->addElement(nodes[0], *m, nodes[2],
+				*newEdge, edges[otherEdge], *e_prime);
+    }
+    else if (opnode == 1) {
+      if (fixnode == 0)
+	newElem = C->addElement(nodes[0], nodes[1], *m,
+				edges[otherEdge], *e_prime, *newEdge);
+      else // fixnode == 2
+	newElem = C->addElement(*m, nodes[1], nodes[2],
+				*newEdge, *e_prime, edges[otherEdge]);
+    }
+    else { // opnode == 2
+      if (fixnode == 0)
+	newElem = C->addElement(nodes[0], *m, nodes[2],
+				*e_prime, edges[otherEdge], *newEdge);
+      else // fixnode == 1
+	newElem = C->addElement(*m, nodes[1], nodes[2],
+				*e_prime, *newEdge, edges[otherEdge]);
+    }
 
     edges[otherEdge].update(myRef, *newElem);
     C->theEdges[newEdge->idx].update(nullRef, myRef);
     C->theEdges[newEdge->idx].update(nullRef, *newElem);
     e_prime->update(nullRef, *newElem);
-    nodes[n_prime] = *m;
+    nodes[fixnode] = *m;
     edges[otherEdge].checkPending(myRef, *newElem);
     edges[otherEdge] = *newEdge;
     edges[modEdge].checkPending(myRef);
@@ -260,12 +297,12 @@ void element::split(int longEdge)
     calculateArea(); // update cached area of original element
     C->theElements[newElem->idx].calculateArea(); // and of new element
     // tell the world outside about the split
-    if (C->theClient) C->theClient->split(myRef.idx, longEdge, n_prime, 0.5);
+    if (C->theClient) C->theClient->split(myRef.idx, longEdge, fixnode, 0.5);
     delete m; delete newEdge; delete e_prime; delete newElem;
   }
   else { // longEdge still trying to complete previous split; try later
     // do nothing for now
-    CkPrintf("Can't bisect element %d, longEdge %d pending\n", myRef.idx, edges[longEdge].idx);
+    CkPrintf("TMRC2D: Can't bisect element %d, longEdge %d pending\n", myRef.idx, edges[longEdge].idx);
   }
 }
 

@@ -73,7 +73,6 @@ class elemRef : public objRef {
   void setTargetArea(double ta);
   void resetTargetArea(double ta);
   void update(edgeRef& e0, edgeRef& e1, edgeRef& e2);
-  nodeRef getOpnode(const edgeRef& e);
   void remove();
   void collapseHelp(edgeRef er, nodeRef nr1, nodeRef nr2);
 };

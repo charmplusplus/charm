@@ -1,5 +1,5 @@
 OPTS=-g -Wall #-O -DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
-CHARMDIR=../../../../net-linux
+CHARMDIR=../../../../
 CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
 
 OBJS=cst_nl.o pgm.o

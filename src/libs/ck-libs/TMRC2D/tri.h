@@ -178,7 +178,6 @@ class chunk : public TCharmClient1D {
   intMsg *isLongestEdge(refMsg *);
   void setTargetArea(doubleMsg *);
   void resetTargetArea(doubleMsg *);
-  refMsg *getOpposingNode(refMsg *);
   void updateEdges(edgeUpdateMsg *);
   void updateNodeCoords(nodeMsg *);
   void reportPos(nodeMsg *);

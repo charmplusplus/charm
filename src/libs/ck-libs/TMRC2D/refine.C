@@ -55,6 +55,7 @@ CDECL void REFINE2D_NewMesh(int nEl,int nGhost,const int *conn,const int *gid)
   MPI_Barrier(MPI_COMM_WORLD);
   CtvAccess(_refineChunk)->newMesh(nEl,nGhost,conn, gid, 0);
   CkWaitQD(); //Wait for all edge numbering messages to finish
+  CtvAccess(_refineChunk)->sanityCheck();
 }
 FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
 (int *nEl,int *nGhost,const int *conn,const int *gid)
@@ -103,7 +104,8 @@ public:
 		int edgeOfTri=res[i].s;
 		int movingNode=res[i].n;
 		
-		int c=(edgeOfTri+2)%3; //==opnode
+		// TLW: changed this to reflect new numbering scheme in TMRC2D
+		int c=2-edgeOfTri; //==opnode
 		*A=conn[3*tri+movingNode]; //==othernode
 		*B=conn[3*tri+otherThan(c,movingNode)];
 		*C=conn[3*tri+c];

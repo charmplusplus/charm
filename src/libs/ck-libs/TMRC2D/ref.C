@@ -288,17 +288,6 @@ void elemRef::resetTargetArea(double ta)
   mesh[cid].resetTargetArea(dm);
 }
 
-nodeRef elemRef::getOpnode(const edgeRef& e)
-{
-  refMsg *rm1, *rm2 = new refMsg;
-  rm2->idx = idx;
-  rm2->aRef = e;
-  rm1 = mesh[cid].getOpposingNode(rm2);
-  nodeRef nRef(rm1->aRef.cid, rm1->aRef.idx);
-  CkFreeMsg(rm1);
-  return nRef;
-}
-
 void elemRef::remove()
 {
   intMsg *im = new intMsg;
