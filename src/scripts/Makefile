@@ -686,7 +686,7 @@ RefineCommLB.decl.h: RefineCommLB.ci charmxi
 
 $(L)/libmoduleRefineCommLB.a: RefineCommLB.o 
 	$(CHARMC) -o $(L)/libmoduleRefineCommLB.a RefineCommLB.o 
-	
+	cp libmoduleRefineCommLB.dep $(L)/
 
 GreedyCommLB.def.h: GreedyCommLB.decl.h
 
@@ -740,7 +740,7 @@ GreedyRefLB.decl.h: GreedyRefLB.ci charmxi
 
 $(L)/libmoduleGreedyRefLB.a: GreedyRefLB.o 
 	$(CHARMC) -o $(L)/libmoduleGreedyRefLB.a GreedyRefLB.o 
-	
+	cp libmoduleGreedyRefLB.dep $(L)/
 
 OrbLB.def.h: OrbLB.decl.h
 
@@ -758,6 +758,7 @@ RandRefLB.decl.h: RandRefLB.ci charmxi
 
 $(L)/libmoduleRandRefLB.a: RandRefLB.o 
 	$(CHARMC) -o $(L)/libmoduleRandRefLB.a RandRefLB.o 
+	cp libmoduleRandRefLB.dep $(L)/
 	
 
 WSLB.def.h: WSLB.decl.h
