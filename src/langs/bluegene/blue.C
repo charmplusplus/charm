@@ -249,7 +249,7 @@ nodeInfo::nodeInfo(): lastW(0), udata(NULL), started(0)
     commThQ->initialize(cva(numCth));
 
     threadTable = new CthThread[cva(numWth)+cva(numCth)];
-    threadinfo = new (threadInfo*)[cva(numWth)+cva(numCth)];
+    threadinfo = new threadInfo*[cva(numWth)+cva(numCth)];
 
     affinityQ = new ckMsgQueue[cva(numWth)];
 
@@ -1174,11 +1174,6 @@ static inline int handleCorrectionMsg(BgTimeLine *logs, bgCorrectionMsg *m)
 	BgAdjustTimeLineForward(m->msgID, m->tAdjust, logs[tID]);
 	CmiFree(m);
 	return 1;
-}
-
-static inline int handleCorrectionMsgInQueue(BgTimeLine *logs, bgCorrectionMsg *m)
-{
-  // search affinity queue
 }
 
 // entry function for correction msgs

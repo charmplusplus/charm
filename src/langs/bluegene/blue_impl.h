@@ -109,6 +109,7 @@ public:
       start = end+1;
     }
     CmiAbort("Global2PE: unknown pe!");
+    return -1;
   }
 
     /* map global serial node ID to local node array index  ++++ */
@@ -124,6 +125,7 @@ public:
       start = end+1;
     }
     CmiAbort("Global2Local:unknown pe!");
+    return -1;
   }
 
     /* map local node index to global serial node id ++++ */
@@ -210,7 +212,7 @@ private:
 public:
   minMsgHeap() {
      size = 16;
-     h = new (char *)[size];
+     h = new char *[size];
      count = 0;
   }
   ~minMsgHeap() {
@@ -222,7 +224,7 @@ public:
     char **oldh = h;
     int oldcount = count;
     size *=2;
-    h = new (char *)[size];
+    h = new char *[size];
     count = 0;
     for (int i=0; i<oldcount; i++) enq(oldh[i]);
     delete [] oldh;
