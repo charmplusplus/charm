@@ -793,23 +793,6 @@ CkMessageWatcherInit(argv,CkpvAccess(_coreState));
 
 }
 
-#ifdef __BLUEGENE__
-
-#if  CMK_BLUEGENE_THREAD
-void BgEmulatorInit(int argc, char **argv)
-{
-  BgSetWorkerThreadStart(_initCharm);
-}
-void BgNodeStart(int argc, char **argv) {}
-#else
-void BgEmulatorInit(int argc, char **argv) {}
-void BgNodeStart(int argc, char **argv)
-{
-  _initCharm(argc, argv);
-}
-#endif
-#endif
-
 // this is needed because on o2k, f90 programs have to have main in
 // fortran90.
 extern "C" void fmain_(int *argc,char _argv[][80],int length[])
