@@ -143,7 +143,8 @@ Return the default reading mesh.  This routine is valid:
 
 \begin{itemize}
 \item From \kw{driver()}, to return the partitioned mesh.
-\item From the \kw{FEM\_Update\_mesh} routine, to return the assembled mesh.
+\item During your FEM\_Update\_mesh routine, to return the assembled mesh.
+\item Anytime after a call to FEM\_Mesh\_set\_default\_read.
 \end{itemize}
 
 \prototype{FEM\_Mesh\_default\_write}
@@ -155,14 +156,15 @@ Return the default writing mesh.  This routine is valid:
 \begin{itemize}
 \item From \kw{init()}, to change the new serial mesh.
 \item From \kw{driver()}, to change the new partitioned mesh.
-\item From the \kw{FEM\_Update\_mesh} routine, to change the new serial mesh.
+\item During your FEM\_Update\_mesh routine, to change the new serial mesh.
+\item Anytime after a call to FEM\_Mesh\_set\_default\_write.
 \end{itemize}
 
 
 \prototype{FEM\_Mesh\_get\_length}  
 \function{int FEM\_Mesh\_get\_length(int mesh,int entity);}
 \function{INTEGER function :: FEM\_Mesh\_get\_length(mesh,entity)}
-  \args{INTEGER, INTENT(IN) :: mesh,entity) }
+  \args{INTEGER, INTENT(IN) :: mesh,entity }
 
 Return the number of \uw{entity}s that exist in this \uw{mesh}.
 
@@ -262,16 +264,68 @@ user data "tag", for example 13, and:
   \end{alltt}
 
 
-\subsection{Advanced Entity Manipulation}
+\subsection{Entity Inquiry}
 
 \prototype{FEM\_Mesh\_get\_width}  
 \function{int FEM\_Mesh\_get\_width(int mesh,int entity,int attr);}
 \function{INTEGER function :: FEM\_Mesh\_get\_width(mesh,entity,attr)}
-  \args{INTEGER, INTENT(IN) :: mesh,entity,attr) }
+  \args{INTEGER, INTENT(IN) :: mesh,entity,attr }
 
 Return the width of the attribute \uw{attr} of \uw{entity} of \uw{mesh}.
 This is the value previously passed as ``width'' to FEM\_Mesh\_data.
 
+
+\prototype{FEM\_Mesh\_get\_datatype}  
+\function{int FEM\_Mesh\_get\_datatype(int mesh,int entity,int attr);}
+\function{INTEGER function :: FEM\_Mesh\_get\_datatype(mesh,entity,attr)}
+  \args{INTEGER, INTENT(IN) :: mesh,entity,attr }
+
+Return the FEM data type of the attribute \uw{attr} of \uw{entity} of \uw{mesh}.
+This is the value previously passed as ``datatype'' to FEM\_Mesh\_data.
+
+
+\prototype{FEM\_Mesh\_get\_entities}  
+\function{int FEM\_Mesh\_get\_entities(int mesh,int *entities);}
+\function{INTEGER function :: FEM\_Mesh\_get\_entities(mesh,entities)}
+  \args{INTEGER, INTENT(IN) :: mesh}
+  \args{INTEGER, INTENT(OUT) :: entities(:) }
+
+Extract an array of the different entities present in this mesh.
+Returns the number of entity types present.  The \uw{entities}
+array must be big enough to hold all the different entities in
+the mesh.
+
+For example, a simple mesh might have two entity types:
+FEM\_NODE and FEM\_ELEM+1.
+
+
+\prototype{FEM\_Mesh\_get\_attributes}  
+\function{int FEM\_Mesh\_get\_attributes(int mesh,int entity,int *attributes);}
+\function{INTEGER function :: FEM\_Mesh\_get\_attributes(mesh,entity,attributes)}
+  \args{INTEGER, INTENT(IN) :: mesh, entity}
+  \args{INTEGER, INTENT(OUT) :: attributes(:) }
+
+Extract an array of the different attributes of this entity.
+Returns the number of attribute types present.  The \uw{attributes}
+array must be big enough to hold all the attributes.
+
+For example, a simple element might have three attributes:
+FEM\_CONN for node connectivity, FEM\_GLOBALNO for global element
+numbers, and FEM\_DATA+7 for a material type.
+
+\prototype{FEM\_Get\_*\_name}  
+\function{const char *FEM\_Get\_entity\_name(int entity,char *storage);}
+\function{const char *FEM\_Get\_attr\_name(int attr,char *storage);}
+\function{const char *FEM\_Get\_datatype\_name(int datatype,char *storage);}
+
+Return a human-readable name for this FEM entity, attribute, or datatype.
+The \uw{storage} array must point to a buffer of at least 100 characters;
+this array might be used as temporary space to store the returned string.
+
+These routines are only available in C.
+
+
+\subsection{Advanced Entity Manipulation}
 
 \prototype{FEM\_Mesh\_data\_offset}  
 \function{void FEM\_Mesh\_data\_offset(int mesh,int entity,int attr,
@@ -308,9 +362,9 @@ expects the structure to be described by an IDXL\_Layout object.
 \label{sec:mesh}
 
 A "mesh" is a collection of nodes and elements 
-bundled together on a single processor.
+knit together in memory, as described in Section~\ref{sec:terminology}.
 Meshes are always referred to by an integer that 
-serves as a handle to the mesh.
+serves as a handle to the local mesh.
 
 This section describes routines to manipulate entire meshes
 at once: this includes calls to create and delete meshes,
@@ -400,7 +454,7 @@ processor \uw{fromRank} needs to pass in a \uw{mesh}; the
 \uw{mesh} value is ignored on other processors.
 
 For example, if rank 0 has a mesh named ``src'', we can 
-partition src for all the processors using:
+partition src for all the processors by executing:
 \begin{alltt}
   m=FEM_Mesh_broadcast(src,0,MPI_COMM_WORLD);
 \end{alltt}
@@ -426,6 +480,40 @@ The new, reassembled mesh is in getting mode.
 This call does not affect \uw{mesh}.
 
 
+\subsection{Mesh Utility}
+
+\prototype{FEM\_Mesh\_is\_get}
+\function{int FEM\_Mesh\_is\_get(int mesh)}
+\function{INTEGER FUNCTION :: FEM\_Mesh\_is\_get(mesh)}
+  \args{INTEGER, INTENT(IN) :: mesh }
+
+Return true if this mesh is in getting mode.
+A getting mesh returns values to FEM\_Mesh\_data.
+
+\prototype{FEM\_Mesh\_is\_set}
+\function{int FEM\_Mesh\_is\_set(int mesh)}
+\function{INTEGER FUNCTION :: FEM\_Mesh\_is\_set(mesh)}
+  \args{INTEGER, INTENT(IN) :: mesh }
+
+Return true if this mesh is in setting mode.
+A setting mesh extracts values from FEM\_Mesh\_data.
+
+
+\prototype{FEM\_Mesh\_become\_get}
+\function{void FEM\_Mesh\_become\_get(int mesh)}
+\function{SUBROUTINE :: FEM\_Mesh\_become\_get(mesh)}
+  \args{INTEGER, INTENT(IN) :: mesh }
+
+Put this mesh in getting mode, so you can read back
+its values.
+
+\prototype{FEM\_Mesh\_become\_set}
+\function{void FEM\_Mesh\_become\_set(int mesh)}
+\function{SUBROUTINE :: FEM\_Mesh\_become\_set(mesh)}
+  \args{INTEGER, INTENT(IN) :: mesh }
+
+Put this mesh in setting mode, so you can set its values.
+
 \prototype{FEM\_Mesh\_print}
 \function{void FEM\_Mesh\_print(int mesh);}
 \function{SUBROUTINE FEM\_Mesh\_print(mesh)}
@@ -435,16 +523,61 @@ Print out a text description of the nodes and elements
 of this mesh.
 
 
-
 \subsection{Advanced Mesh Manipulation}
+
+\prototype{FEM\_Mesh\_pup}
+\function{typedef void (*FEM\_Userdata\_fn)(pup\_er p,void *data);}
+\function{void FEM\_Mesh\_pup(int mesh,int pupTag,FEM\_Userdata\_fn fn,void *data);}
+\function{SUBROUTINE myPupFn(p,data);}
+   \args{INTEGER, INTENT(IN) :: p}
+   \args{TYPE(myType) :: data}
+\function{SUBROUTINE FEM\_Mesh\_pup(mesh,pupTag,myPupFn,data);}
+   \args{INTEGER, INTENT(IN) :: mesh,pupTag}
+   \args{SUBROUTINE :: myPupFn}
+   \args{TYPE(myType) :: data}
+
+Store \uw{data} with this \uw{mesh}.  \uw{data} is a struct or TYPE
+with a pup function \uw{myPupFn}---see the TCharm manual for details 
+on writing a pup function.
+\uw{pupTag} is an integer used to distinguish different pieces of data
+associated with this mesh.
+
+When called on a setting mesh, this routine stores \uw{data};
+when called on a getting mesh, this routine reads out \uw{data}.
+
+\uw{data} will be associated with the mesh itself, not any 
+entity in the mesh.  This makes it useful for storing shared
+data, often simulation constants such as the timestep or material 
+properties.  \uw{data} is made a part of the mesh, and it will be 
+read and written, sent and received, partitioned and assembled
+with the mesh.
+
 
 \prototype{FEM\_Mesh\_send}
   \function{void FEM\_Mesh\_send(int mesh,int toRank,int tag,FEM\_Comm\_t comm\_context);}
-  Send the mesh \uw{mesh} 
+  \function{SUBROUTINE FEM\_Mesh\_send(mesh,toRank,tag,comm)}
+    \args{INTEGER, INTENT(IN) :: mesh,toRank,tag,comm}
   
+  Send the mesh \uw{mesh} to the processor \uw{toRank}, using
+  the MPI tag \uw{tag} and communicator \uw{comm\_context}.
+  Tags are normally only needed if you plan to mix direct MPI
+  calls with your FEM calls.
+  
+  This call does not affect \uw{mesh}.
+  
+
 \prototype{FEM\_Mesh\_recv}
   \function{int FEM\_Mesh\_recv(int fromRank,int tag,FEM\_Comm\_t comm\_context);}
+  \function{INTEGER FUNCTION FEM\_Mesh\_recv(fromRank,tag,comm)}
+    \args{INTEGER, INTENT(IN) :: fromRank,tag,comm}
   
+  Receive a new mesh from the processor \uw{fromRank}, using
+  the MPI tag \uw{tag} and communicator \uw{comm\_context}.
+  You can also use the special values MPI\_ANY\_SOURCE as \uw{fromRank}
+  to receive a mesh from any processor, or use
+  MPI\_ANY\_TAG for \uw{tag} to match any tag.
+
+  The new mesh is returned in getting mode.
 
 \prototype{FEM\_Mesh\_partition}
   \function{void FEM\_Mesh\_partition(int mesh,int nParts,int *destMeshes);}
@@ -456,7 +589,9 @@ Divide \uw{mesh} into \uw{nParts} pieces, and store the pieces
 into the array \uw{destMeshes}. 
 
 The partitioned mesh is returned in getting mode.
+This is a local call; FEM\_Mesh\_broadcast is the collective version.
 This call does not affect the source mesh \uw{mesh}.
+
   
 \prototype{FEM\_Mesh\_assemble}
   \function{int FEM\_Mesh\_assemble(int nParts,const int *srcMeshes);}
@@ -464,9 +599,15 @@ This call does not affect the source mesh \uw{mesh}.
     \args{INTEGER, INTENT(IN) :: nParts, srcMeshes(nParts)}
 
 Assemble the \uw{nParts} meshes listed in \uw{srcMeshes} into
-a single mesh.  
+a single mesh.  Corresponding mesh pieces are matched using 
+the attribute FEM\_GLOBALNO.  Specifically, if the value of 
+the integer index attribute FEM\_GLOBALNO for an entity is $i$,
+the entity will be given the number $i$ in the reassembled mesh.
+If you do not set FEM\_GLOBALNO, the different pieces of the 
+mesh will remain separate---even ``matching'' nodes will not be merged.
 
 The assembled mesh is returned in getting mode.
+This is a local call; FEM\_Mesh\_reduce is the collective version.
 This call does not affect the source meshes.
 
 
@@ -475,7 +616,11 @@ This call does not affect the source meshes.
   \function{SUBROUTINE FEM\_Mesh\_copy\_globalno(src\_mesh,dest\_mesh)}
     \args{INTEGER, INTENT(IN) :: src\_mesh,dest\_mesh}
 
-
+Copy the FEM\_GLOBALNO attribute for all the entity types in 
+\uw{src\_mesh} into all the matching types in \uw{dest\_mesh},
+where the matching types exist.  This call is often used 
+before an FEM\_Mesh\_assemble or FEM\_Mesh\_reduce to synchronize
+global numbers before reassembly.
 
 
 %%%%%%%%%%%%%%%%%%%%%% Ghosts %%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -285,7 +285,7 @@ This section brings together all the pieces of IDXL: Index Lists are used to det
 \function{void IDXL\_Comm\_sendsum(IDXL\_Comm\_t comm,IDXL\_t indices,IDXL\_Layout\_t layout,void *data);}
 \function{SUBROUTINE IDXL\_Comm\_sendsum(comm,indices,layout,data)}
   \args{INTEGER, INTENT(IN)  :: comm,indices,layout}
-  \args{varies, intent(inout) :: data}
+  \args{varies, INTENT(INOUT) :: data}
 
 Sum these \kw{indices} of shared entites across all chunks that share them.
 The user \kw{data} array is interpreted according to the given \kw{layout}.
@@ -325,7 +325,7 @@ by node, you would use:
 \function{void IDXL\_Comm\_sendrecv(IDXL\_Comm\_t comm,IDXL\_t indices,IDXL\_Layout\_t layout,void *data);}
 \function{SUBROUTINE IDXL\_Comm\_sendrecv(comm,indices,layout,data)}
   \args{INTEGER, INTENT(IN)  :: comm,indices,layout}
-  \args{varies, intent(inout) :: data}
+  \args{varies, INTENT(INOUT) :: data}
 
 Send these (typically real) send \kw{indices} and copy in these 
 (typically ghost) receive \kw{indices}.
@@ -408,7 +408,7 @@ will not be copied into until the call to \kw{IDXL\_Comm\_wait}.
 \function{void IDXL\_Comm\_sum(IDXL\_Comm\_t comm,IDXL\_t indices,IDXL\_Layout\_t layout,void *data);}
 \function{SUBROUTINE IDXL\_Comm\_sum(comm,indices,layout,data)}
   \args{INTEGER, INTENT(IN)  :: comm,indices,layout}
-  \args{varies, intent(inout) :: data}
+  \args{varies, INTENT(INOUT) :: data}
 
 When \kw{comm} is finished, add in the values for these receive \kw{indices}, 
 with this \kw{layout}, into this \kw{data} array.
