@@ -32,6 +32,7 @@ unsetenv MEMORY
 unsetenv EXECMODE
 unsetenv VERBOSE
 unsetenv SAVE
+unsetenv PURIFY
 unsetenv OVERRIDE_CC
 unsetenv OVERRIDE_CXX
 unsetenv OVERRIDE_LD
@@ -112,6 +113,10 @@ while ($argindex <= $#argv)
 
         case "-save"
             set SAVE=1
+            breaksw
+
+        case "-purify"
+            set PURIFY=1
             breaksw
 
         case "-use-reliable-cc"
@@ -371,6 +376,11 @@ endif
 if ($?OVERRIDE_LD) then
     set CMK_LD[1]=""
     set CMK_LD = ( $OVERRIDE_LD $CMK_LD )
+endif
+
+if ($?PURIFY == 1) then
+    set CMK_LD = ( purify $CMK_LD )
+    set CMK_LDXX = ( purify $CMK_LDXX )
 endif
 
 if ($?OVERRIDE_LDXX) then

@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.39  1996-04-24 22:53:27  jyelon
+ * Revision 2.40  1997-03-14 20:23:50  milind
+ * Made MAXLOGBUFSIZE in projections a commandline parameter.
+ * One can now specify it as "+logsize 10000" on the program
+ * command line.
+ *
+ * Revision 2.39  1996/04/24 22:53:27  jyelon
  * *** empty log message ***
  *
  * Revision 2.38  1996/04/07 19:16:52  jyelon
@@ -675,6 +680,11 @@ char          **argv;
       foundSysOpt = 2;
     } else if (sscanf(argv[i], "+p%d", &NumPes) == 1) {
       foundSysOpt = 1;
+    } else if (strcmp(argv[i], "+logsize") == 0 && i + 1 < argc) {
+      int logsize;
+      sscanf(argv[i + 1], "%d", &logsize);
+      CpvAccess(LogBufSize) = logsize;
+      foundSysOpt = 2;
     }
     if (foundSysOpt) {
       /* if system option, remove it. */

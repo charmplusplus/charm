@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1995-11-13 04:04:33  gursoy
+ * Revision 2.16  1997-03-14 20:23:49  milind
+ * Made MAXLOGBUFSIZE in projections a commandline parameter.
+ * One can now specify it as "+logsize 10000" on the program
+ * command line.
+ *
+ * Revision 2.15  1995/11/13 04:04:33  gursoy
  * made changes related to initial msg synchronization
  *
  * Revision 2.14  1995/11/06  22:59:01  sanjeev
@@ -126,6 +131,7 @@ CpvExtern(int, PrintMemStat);
 CpvExtern(int, PrintChareStat);
 CpvExtern(int, PrintSummaryStat);
 CpvExtern(int, QueueingDefault);
+CpvExtern(int, LogBufSize);
 
 CpvExtern(int, RecdStatMsg);
 CpvExtern(int, RecdPerfMsg);

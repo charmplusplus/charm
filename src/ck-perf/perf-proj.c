@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-11-05 17:54:33  sanjeev
+ * Revision 2.11  1997-03-14 20:23:52  milind
+ * Made MAXLOGBUFSIZE in projections a commandline parameter.
+ * One can now specify it as "+logsize 10000" on the program
+ * command line.
+ *
+ * Revision 2.10  1995/11/05 17:54:33  sanjeev
  * current_event should be initialized to 0, not 1
  *
  * Revision 2.9  1995/11/03  04:34:38  sanjeev
@@ -79,7 +84,7 @@ CpvExtern(int,RecdPerfMsg);
 CpvDeclare(char*,log_file_name);		/* log file name      	*/
 CpvDeclare(int,current_event);
 
-typedef LOGSTR LOGARR[MAXLOGBUFSIZE];
+typedef LOGSTR * LOGARR;
 CpvDeclare(LOGARR,logbuf);
 
 CpvDeclare(int,logcnt);        		/* no. of log entries 	*/
@@ -271,12 +276,12 @@ CmiMyPe(), CpvAccess(logcnt), type, msg_type, entry, t1, t2, event));
 
 	/* if log buffer is full then write out */
 	/* the log into log file 		*/
-	if (CpvAccess(logcnt) == MAXLOGBUFSIZE)
+	if (CpvAccess(logcnt) == CpvAccess(LogBufSize))
 	{
 		int begin_interrupt;
 
 		begin_interrupt = CkUTimer();
-		wrtlog(CmiMyPe(), CpvAccess(logbuf), MAXLOGBUFSIZE);
+		wrtlog(CmiMyPe(), CpvAccess(logbuf), CpvAccess(LogBufSize));
 
 		buf = &(CpvAccess(logbuf)[CpvAccess(logcnt)]);
 		buf->type = BEGIN_INTERRUPT;
@@ -312,6 +317,8 @@ log_init()
 	CpvAccess(begin_pe)=-1;
 	CpvAccess(begin_event)=-1;
 	CpvAccess(begin_processing_time)=-1;
+        CpvAccess(logbuf) = 
+           (LOGARR) CmiAlloc(sizeof(LOGSTR)*CpvAccess(LogBufSize));
 
 	pe = CmiMyPe();
 
@@ -404,6 +411,7 @@ close_log()
 		fflush(CpvAccess(state_file_fd));
 		fclose(CpvAccess(state_file_fd));
 	}
+        CmiFree(CpvAccess(logbuf));
 }
 
 

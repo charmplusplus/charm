@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1995-11-13 04:05:29  gursoy
+ * Revision 2.13  1997-03-14 20:23:48  milind
+ * Made MAXLOGBUFSIZE in projections a commandline parameter.
+ * One can now specify it as "+logsize 10000" on the program
+ * command line.
+ *
+ * Revision 2.12  1995/11/13 04:05:29  gursoy
  * made changes related to sync (init messages).
  *
  * Revision 2.11  1995/11/06  22:59:01  sanjeev
@@ -127,6 +132,7 @@ CpvDeclare(int, nodeforCharesProcessed);
 CpvDeclare(int, PrintChareStat); 
 CpvDeclare(int, PrintSummaryStat);
 CpvDeclare(int, QueueingDefault);
+CpvDeclare(int, LogBufSize);
 
 CpvDeclare(int, RecdStatMsg);
 CpvDeclare(int, RecdPerfMsg);
@@ -251,6 +257,7 @@ void globalsModuleInit()
    CpvInitialize(int, nodebocMsgsProcessed);
    CpvInitialize(int, nodeforCharesProcessed);
    CpvInitialize(int, PrintChareStat);
+   CpvInitialize(int, LogBufSize);
    CpvInitialize(int, PrintSummaryStat);
    CpvInitialize(int, QueueingDefault);
    CpvInitialize(int, RecdStatMsg);
@@ -278,6 +285,7 @@ void globalsModuleInit()
    CpvAccess(nodebocMsgsProcessed)   = 0;
    CpvAccess(nodeforCharesProcessed) = 0;
    CpvAccess(PrintChareStat)         = 0;
+   CpvAccess(LogBufSize)             = 10000;
    CpvAccess(PrintSummaryStat)       = 0;
    CpvAccess(numHeapEntries)         = 0;  
    CpvAccess(numCondChkArryElts)     = 0; 

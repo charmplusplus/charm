@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.15  1995-11-13 04:04:33  gursoy
+ * Revision 2.16  1997-03-14 20:23:47  milind
+ * Made MAXLOGBUFSIZE in projections a commandline parameter.
+ * One can now specify it as "+logsize 10000" on the program
+ * command line.
+ *
+ * Revision 2.15  1995/11/13 04:04:33  gursoy
  * made changes related to initial msg synchronization
  *
  * Revision 2.14  1995/09/29  09:51:12  jyelon
@@ -145,8 +150,11 @@
                 usermsg = USER_MSG_PTR(env); \
                 (*(CsvAccess(MsgToStructTable)[GetEnv_packid(env)].packfn)) \
                         (usermsg, &packedmsg, &size); \
-                if (usermsg != packedmsg) \
+                if (usermsg != packedmsg) { \
+                        /* Free the usermsg here. */ \
+                        CkFreeMsg(usermsg); \
                         env = ENVELOPE_UPTR(packedmsg); \
+                }\
         }\
 
 

@@ -12,7 +12,12 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-07-22 23:44:01  jyelon
+ * Revision 2.6  1997-03-14 20:23:51  milind
+ * Made MAXLOGBUFSIZE in projections a commandline parameter.
+ * One can now specify it as "+logsize 10000" on the program
+ * command line.
+ *
+ * Revision 2.5  1995/07/22 23:44:01  jyelon
  * *** empty log message ***
  *
  * Revision 2.4  1995/07/12  21:36:20  brunner
@@ -46,7 +51,7 @@ void perfModuleInit(prog_name) char *prog_name; {}
 
 program_name(s,m) char *s, *m; {}
 
-log_init(){CpvAccess(RecdPerfMsg) = 1;}
+log_init() {CpvAccess(RecdPerfMsg) = 1;}
 
 trace_creation(msg_type,entry,envelope)
 int msg_type, entry;
