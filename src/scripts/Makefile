@@ -139,7 +139,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 # This is a bit unusual, but makes client linking simpler.
 UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_toNetwork4.h pup_paged.h \
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h \
-	ckstatistics.h ckvector3d.h conv-lists.h \
+	ckstatistics.h ckvector3d.h conv-lists.h RTH.h \
 	sockRoutines.h sockRoutines.c
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
@@ -269,7 +269,7 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 
 LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o pup_paged.o\
 	ckimage.o ckdll.o ckhashtable.o ckbitvector.o sockRoutines.o \
-	conv-lists.o
+	conv-lists.o RTH.o
 
 LIBCONV_UTILF=pup_f.o
 
@@ -359,6 +359,9 @@ ckdll.o: ckdll.C ckdll.h $(CVHEADERS)
 
 ckimage.o: ckimage.C ckimage.h $(CVHEADERS)
 	$(CHARMC) -o ckimage.o ckimage.C
+
+RTH.o: RTH.C RTH.h $(CVHEADERS)
+	$(CHARMC) -o RTH.o RTH.C
 
 conv-lists.o: conv-lists.C $(UTILHEADERS) $(CVHEADERS)
 	$(CHARMC) -o conv-lists.o conv-lists.C
