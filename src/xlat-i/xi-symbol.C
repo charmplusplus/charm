@@ -1540,8 +1540,10 @@ void Entry::genChareDefs(XStr& str)
     if(isSync()) {
       str << syncReturn() << "CkRemoteCall("<<params<<"));\n";
     } else {//Regular, non-sync message
-      str << "  if (ckIsDelegated())\n";
-      str << "    ckDelegatedTo()->ChareSend("<<params<<");\n";
+      str << "  if (ckIsDelegated()) {\n";
+      str << "    int destPE=CkChareMsgPrep("<<params<<");\n";
+      str << "    if (destPE!=-1) ckDelegatedTo()->ChareSend("<<params<<",destPE);\n";
+      str << "  }\n";
       str << "  else CkSendMsg("<<params<<");\n";
     }
     str << "}\n";
@@ -1679,15 +1681,17 @@ void Entry::genGroupDecl(XStr& str)
     { //Non-sync entry method
       if (forElement)
       {// Send
-        str << "      if (ckIsDelegated()) \n";
+        str << "      if (ckIsDelegated()) {\n";
+        str << "         Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
 	str << "         ckDelegatedTo()->"<<node<<"GroupSend("<<parampg<<");\n";
-        str << "      else CkSendMsg"<<node<<"Branch("<<parampg<<");\n";
+        str << "      } else CkSendMsg"<<node<<"Branch("<<parampg<<");\n";
       }
       else
       {// Broadcast
-        str << "      if (ckIsDelegated()) \n";
+        str << "      if (ckIsDelegated()) {\n";
+        str << "         Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
         str << "         ckDelegatedTo()->"<<node<<"GroupBroadcast("<<paramg<<");\n";
-        str << "      else CkBroadcastMsg"<<node<<"Branch("<<paramg<<");\n";
+        str << "      } else CkBroadcastMsg"<<node<<"Branch("<<paramg<<");\n";
       }
     }
     str << "    }\n";

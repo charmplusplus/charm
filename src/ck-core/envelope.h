@@ -229,6 +229,9 @@ inline void *_allocMsg(const int msgtype, const int size, const int prio=0) {
 
 extern UChar   _defaultQueueing;
 
+extern void CkPackMessage(envelope **pEnv);
+extern void CkUnpackMessage(envelope **pEnv);
+
 #define MAXMSGS 32
 
 class MsgPool {

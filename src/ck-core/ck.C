@@ -36,7 +36,7 @@ void Group::pup(PUP::er &p)
 CkDelegateMgr::~CkDelegateMgr() { }
 
 //Default delegator implementation: do not delegate-- send directly
-void CkDelegateMgr::ChareSend(int ep,void *m,const CkChareID *c)
+void CkDelegateMgr::ChareSend(int ep,void *m,const CkChareID *c,int onPE)
   { CkSendMsg(ep,m,c); }
 void CkDelegateMgr::GroupSend(int ep,void *m,int onPE,CkGroupID g)
   { CkSendMsgBranch(ep,m,onPE,g); }
@@ -634,69 +634,83 @@ static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
   }
 }
 
+static int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
+{
+  register envelope *env = UsrToEnv(msg);
+  _CHECK_USED(env);
+  _SET_USED(env, 1);
+  env->setMsgtype(ForChareMsg);
+  env->setEpIdx(eIdx);
+  env->setSrcPe(CkMyPe());
+  CmiSetHandler(env, _charmHandlerIdx);
+  if (pCid->onPE < 0) { //Virtual chare ID (VID)
+    register int pe = -(pCid->onPE+1);
+    if(pe==CkMyPe()) {
+      VidBlock *vblk = (VidBlock *) pCid->objPtr;
+      void *objPtr;
+      if (NULL!=(objPtr=vblk->getLocalChare())) 
+      { //A ready local chare
+	env->setObjPtr(objPtr);
+	return pe;
+      }
+      else { //The vidblock is not ready-- forget it
+        vblk->send(env);
+        return -1;
+      }
+    } else { //Valid vidblock for another PE:
+      env->setMsgtype(ForVidMsg);
+      env->setVidPtr(pCid->objPtr);
+      return pe;
+    }
+  }
+  else {
+    env->setObjPtr(pCid->objPtr);
+    return pCid->onPE;
+  }
+}
+
 extern "C"
 void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid)
 {
   register envelope *env = UsrToEnv(msg);
-  _CHECK_USED(env);
-  env->setMsgtype(ForChareMsg);
-  env->setEpIdx(entryIdx);
-  CmiSetHandler(env, _charmHandlerIdx);
-  _SET_USED(env, 1);
-  if(pCid->onPE < 0) {
-    register int pe = -(pCid->onPE+1);
-    if(pe==CkMyPe()) {
-      VidBlock *vblk = (VidBlock *) pCid->objPtr;
-      vblk->send(env);
-    } else {
-      env->setMsgtype(ForVidMsg);
-      env->setSrcPe(CkMyPe());
-      env->setVidPtr(pCid->objPtr);
-      _TRACE_CREATION_1(env);
-      CpvAccess(_qd)->create();
-      CldEnqueue(pe, env, _infoIdx);
-    }
-  } else {
-    env->setSrcPe(CkMyPe());
-    env->setObjPtr(pCid->objPtr);
+  int destPE=_prepareMsg(entryIdx,msg,pCid);
+  if (destPE!=-1) {
     _TRACE_CREATION_1(env);
     CpvAccess(_qd)->create();
-    CldEnqueue(pCid->onPE, env, _infoIdx);
+    CldEnqueue(destPE, env, _infoIdx);
   }
-  _STATS_RECORD_SEND_MSG_1();
+}
+
+static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
+{
+  register envelope *env = UsrToEnv(msg);
+  _CHECK_USED(env);
+  _SET_USED(env, 1);
+  env->setMsgtype(type);
+  env->setEpIdx(eIdx);
+  env->setGroupNum(gID);
+  env->setSrcPe(CkMyPe());
+  CmiSetHandler(env, _charmHandlerIdx);
+  return env;
 }
 
 static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID, 
                            int pe=CLD_BROADCAST_ALL)
 {
-  register envelope *env = UsrToEnv(msg);
-  _CHECK_USED(env);
-  _SET_USED(env, 1);
-  env->setMsgtype(ForBocMsg);
-  env->setEpIdx(eIdx);
-  env->setGroupNum(gID);
-  env->setSrcPe(CkMyPe());
+  register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
   if(pe==CLD_BROADCAST_ALL) {
     _TRACE_CREATION_N(env, CkNumPes());
   } else {
     _TRACE_CREATION_1(env);
   }
-  CmiSetHandler(env, _charmHandlerIdx);
   _skipCldEnqueue(pe, env, _infoIdx);
 }
 
 static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID, 
                            int npes, int *pes)
 {
-  register envelope *env = UsrToEnv(msg);
-  _CHECK_USED(env);
-  _SET_USED(env, 1);
-  env->setMsgtype(ForBocMsg);
-  env->setEpIdx(eIdx);
-  env->setGroupNum(gID);
-  env->setSrcPe(CkMyPe());
+  register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
   _TRACE_CREATION_N(env, npes);
-  CmiSetHandler(env, _charmHandlerIdx);
   CldEnqueueMulti(npes, pes, env, _infoIdx);
 }
 
@@ -727,19 +741,12 @@ void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID)
 static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID, 
                            int node=CLD_BROADCAST_ALL)
 {
-  register envelope *env = UsrToEnv(msg);
-  _CHECK_USED(env);
-  _SET_USED(env, 1);
-  env->setMsgtype(ForNodeBocMsg);
-  env->setEpIdx(eIdx);
-  env->setGroupNum(gID);
-  env->setSrcPe(CkMyPe());
+  register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
   if(node==CLD_BROADCAST_ALL) {
     _TRACE_CREATION_N(env, CkNumNodes());
   } else {
     _TRACE_CREATION_1(env);
   }
-  CmiSetHandler(env, _charmHandlerIdx);
   CldNodeEnqueue(node, env, _infoIdx);
 }
 
@@ -758,6 +765,17 @@ void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID)
   _STATS_RECORD_SEND_NODE_BRANCH_N(CkNumNodes());
   CpvAccess(_qd)->create(CkNumNodes());
 }
+
+//Needed by delegation manager:
+extern "C"
+int CkChareMsgPrep(int eIdx, void *msg,const CkChareID *pCid)
+{ return _prepareMsg(eIdx,msg,pCid); }
+extern "C"
+void CkGroupMsgPrep(int eIdx, void *msg, CkGroupID gID)
+{ _prepareMsgBranch(eIdx,msg,gID,ForBocMsg); }
+extern "C"
+void CkNodeGroupMsgPrep(int eIdx, void *msg, CkGroupID gID)
+{ _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg); }
 
 void _ckModuleInit(void) {
 	index_skipCldHandler = CmiRegisterHandler((CmiHandler)_skipCldHandler);

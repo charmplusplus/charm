@@ -36,8 +36,6 @@ class VidBlock {
       if(state==UNFILLED) {
         msgQ->enq((void *)env);
       } else {
-        env->setSrcPe(CkMyPe());
-        env->setMsgtype(ForChareMsg);
         env->setObjPtr(actualID.objPtr);
         CldEnqueue(actualID.onPE, env, _infoIdx);
         CpvAccess(_qd)->create();
@@ -50,8 +48,6 @@ class VidBlock {
       actualID.magic = magic;
       envelope *env;
       while(NULL!=(env=(envelope*)msgQ->deq())) {
-        env->setSrcPe(CkMyPe());
-        env->setMsgtype(ForChareMsg);
         env->setObjPtr(actualID.objPtr);
         CldEnqueue(actualID.onPE, env, _infoIdx);
         CpvAccess(_qd)->create();
@@ -68,8 +64,6 @@ class VidBlock {
 extern void _processHandler(void *);
 extern void _infoFn(void *msg, CldPackFn *pfn, int *len,
                     int *queueing, int *priobits, UInt **prioptr);
-extern void CkPackMessage(envelope **pEnv);
-extern void CkUnpackMessage(envelope **pEnv);
 extern void _createGroupMember(CkGroupID groupID, int eIdx, void *env);
 extern void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *env);
 extern void _createGroup(CkGroupID groupID, envelope *env);

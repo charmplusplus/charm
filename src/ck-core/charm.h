@@ -166,6 +166,10 @@ extern void CkSendMsgNodeBranch(int eIdx, void *msg, int destNode,
 extern void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID);
 extern void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID);
 
+extern int  CkChareMsgPrep(int eIdx, void *msg,const CkChareID *pCid);
+extern void CkGroupMsgPrep(int eIdx, void *msg, CkGroupID gID);
+extern void CkNodeGroupMsgPrep(int eIdx, void *msg, CkGroupID gID);
+
 extern void CkSetRefNum(void *msg, int ref);
 extern int  CkGetRefNum(void *msg);
 extern int  CkGetSrcPe(void *msg);
