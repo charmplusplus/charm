@@ -536,7 +536,7 @@ foreach my $incfile ($inC,@otherfiles)
 	$outChandle->print("#ifndef SEQUENTIAL_POSE\n");
 	$outChandle->print("  PVT *pvt = (PVT *)CkLocalBranch(ThePVT);\n");
 	$outChandle->print("  pvt->objUpdate($messagename->timestamp, RECV);\n");
-	$outChandle->print("  srVector[$messagename->evID.getPE()]++;\n");
+	#$outChandle->print("  srVector[$messagename->evID.getPE()]++;\n");
 	$outChandle->print("#endif\n");
 	$outChandle->print("  Event *e = new Event();\n");
 	$outChandle->print("  if ((POSE_endtime < 0) || ($messagename->timestamp <= POSE_endtime)) {\n");
@@ -1186,9 +1186,9 @@ sub posefuncmap
 		  $output.="$msg->sanitize();\n";
 		  $output.="#endif\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
-		  $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
+		  #$output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 
-		  $output.="parent->srVector[_destPE]++;\n";
+		  #$output.="parent->srVector[_destPE]++;\n";
 		  $output.="}\n";
 		} else {
 		  $output=$preline."\n{\n";
@@ -1206,8 +1206,8 @@ sub posefuncmap
 		  $output.="$msg->sanitize();\n";
 		  $output.="#endif\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
-		  $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
-		  $output.="parent->srVector[_destPE]++;\n";
+		  #$output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
+		  #$output.="parent->srVector[_destPE]++;\n";
 		  $output.="}\n";
 		  $output.="else delete ".$msg.";}\n";
 		}
@@ -1237,8 +1237,8 @@ sub posefuncmap
 		    $output.="$msg->sanitize();\n";
 		    $output.="#endif\n";
 		    $output.="(*(CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
-		    $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
-		    $output.="parent->srVector[_destPE]++;\n";
+		    #$output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
+		    #$output.="parent->srVector[_destPE]++;\n";
 		    $output.="}\n";
 	      
 		    $output.="}\n";
@@ -1259,8 +1259,8 @@ sub posefuncmap
 		    $output.="$msg->sanitize();\n";
 		    $output.="#endif\n";
 		    $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
-		    $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
-		    $output.="parent->srVector[_destPE]++;\n";
+		    #$output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
+		    #$output.="parent->srVector[_destPE]++;\n";
 		    $output.="}\n";
 		    $output.="else delete ".$msg.";}\n";
 		  }
@@ -1288,7 +1288,7 @@ sub posefuncmap
 		      $output.="#endif\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
 
-		      $output.="parent->srVector[CkMyPe()]++;\n";
+		      #$output.="parent->srVector[CkMyPe()]++;\n";
 		      $output.="}\n";
 		    } elsif ($issim) {
 		      $output=$preline."\n{\n";
@@ -1305,7 +1305,7 @@ sub posefuncmap
 		      $output.="$msg->sanitize();\n";
 		      $output.="#endif\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
-		      $output.="parent->srVector[CkMyPe()]++;\n";
+		      #$output.="parent->srVector[CkMyPe()]++;\n";
 		      $output.="}\n";
 		      $output.="else delete(".$msg.");\n}";
 		    } else {

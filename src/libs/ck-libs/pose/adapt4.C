@@ -6,7 +6,7 @@ void adapt4::Step()
 {
   Event *ev;
   POSE_TimeType lastGVT = localPVT->getGVT();
-  int itersAllowed, iter=0, offset=-1;
+  int itersAllowed=-1, iter=0, offset=-1;
   double critStart;
 
   rbFlag = 0;
@@ -15,13 +15,33 @@ void adapt4::Step()
   if (!parent->cancels.IsEmpty()) CancelEvents();
   parent->Status();
 
-  itersAllowed = (int)((double)specEventCount * specTol);
-  itersAllowed -= specEventCount - eventCount;
-  if (itersAllowed < 1) itersAllowed = 1;
+  if (rbFlag) { 
+    if (timeLeash > avgRBoffset)
+      timeLeash = avgRBoffset;
+    else timeLeash = avgRBoffset/2;
+  }
+  else if (timeLeash < POSE_TimeMax/2) {
+    timeLeash *= 2;
+  }
+  if (timeLeash > POSE_TimeMax-lastGVT) {
+    timeLeash = POSE_TimeMax/2;
+  }
+
+  if (itersAllowed < 0) {
+    itersAllowed = 10;
+  }
+  else {
+    itersAllowed = (int)((double)specEventCount * specTol);
+    itersAllowed -= specEventCount - eventCount;
+    if (itersAllowed < 1) itersAllowed = 1;
+  }
   
   // Prepare to execute an event
-  //offset = lastGVT + timeLeash;
-  if (offset < 0) offset = POSE_TimeMax;
+  offset = lastGVT + timeLeash;
+  //  if (lastGVT == 15999) 
+  //CkPrintf("itersAllowed=%d timeLeash=%d offset=%d nextTS=%d\n", itersAllowed, 
+  //	     timeLeash, offset, eq->currentPtr->timestamp);
+  //if (offset < 0) offset = POSE_TimeMax;
   // Shorten the leash as we near POSE_endtime
   if ((POSE_endtime > POSE_UnsetTS) && ((lastGVT+offset > POSE_endtime) ||
 					(lastGVT+offset <= POSE_UnsetTS)))
