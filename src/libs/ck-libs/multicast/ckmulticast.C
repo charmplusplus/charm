@@ -573,6 +573,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
       if (!redInfo.msgs[i]->callback.isInvalid()) msg_cb = redInfo.msgs[i]->callback;
     }
     CkReductionMsg *newmsg = (*f)(redInfo.msgs.length(), redInfo.msgs.getVec());
+    newmsg->redNo = redInfo.redNo;
     // check if migration and free messages
     for (i=0; i<redInfo.msgs.length(); i++) {
       delete redInfo.msgs[i];
