@@ -12,27 +12,6 @@
 #include "ampiEvents.h" /*** for trace generation for projector *****/
 #include "ampiProjections.h"
 
-/* these MPI functions can be called in PMPI_Init() in mpi/machine.c */
-/* can not include mpi.h for these prototype */
-#if CMK_CONVERSE_MPI
-extern "C" {
-int PMPI_Type_contiguous(int, MPI_Datatype, MPI_Datatype *);
-int PMPI_Type_struct(int, int *, MPI_Aint *, MPI_Datatype *, MPI_Datatype *);
-int PMPI_Type_commit(MPI_Datatype *);
-int PMPI_Keyval_create(MPI_Copy_function *, MPI_Delete_function *, int *, void*);
-int PMPI_Keyval_free(int *);
-int PMPI_Attr_put(MPI_Comm, int, void*);
-int PMPI_Attr_get(MPI_Comm, int, void *, int *);
-int PMPI_Attr_delete(MPI_Comm, int);
-int PMPI_Errhandler_create(MPI_Handler_function *, MPI_Errhandler *);
-int PMPI_Errhandler_set(MPI_Comm, MPI_Errhandler);
-int PMPI_Errhandler_get(MPI_Comm, MPI_Errhandler *);
-int PMPI_Errhandler_free(MPI_Errhandler *);
-int PMPI_Error_string(int, char *, int *);
-int PMPI_Error_class(int, int *);
-}
-#endif
-
 #define CART_TOPOL 1
 
 /* change this define to "x" to trace all send/recv's */
@@ -321,16 +300,16 @@ static void ampiSetupReductions(void) {
 // ------------ startup support -----------
 
 int _ampi_fallback_setup_count;
-CDECL void MPI_Setup(void);
+CDECL void AMPI_Setup(void);
 FDECL void FTN_NAME(MPI_SETUP,mpi_setup)(void);
 
 FDECL void FTN_NAME(MPI_MAIN,mpi_main)(void);
 
 /*Main routine used when missing MPI_Setup routine*/
-CDECL void MPI_Fallback_Main(int argc,char **argv)
+CDECL void AMPI_Fallback_Main(int argc,char **argv)
 {
-  MPI_Main_cpp(argc,argv);
-  MPI_Main(argc,argv);
+  AMPI_Main_cpp(argc,argv);
+  AMPI_Main(argc,argv);
   FTN_NAME(MPI_MAIN,mpi_main)();
 }
 
@@ -338,18 +317,17 @@ void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen);
 /*Startup routine used if user *doesn't* write
   a TCHARM_User_setup routine.
  */
-CDECL void MPI_Setup_Switch(void) {
+CDECL void AMPI_Setup_Switch(void) {
   _ampi_fallback_setup_count=0;
   FTN_NAME(MPI_SETUP,mpi_setup)();
-  MPI_Setup();
+  AMPI_Setup();
   if (_ampi_fallback_setup_count==2)
-  { //Missing MPI_Setup in both C and Fortran:
-    ampiCreateMain(MPI_Fallback_Main,"default",strlen("default"));
+  { //Missing AMPI_Setup in both C and Fortran:
+    ampiCreateMain(AMPI_Fallback_Main,"default",strlen("default"));
   }
 }
 
 static int nodeinit_has_been_called=0;
-static int ampiInited = 0;        // used only for AMPI on top of MPI
 CtvDeclare(ampiParent*, ampiPtr);
 CtvDeclare(int, ampiInitDone);
 static void ampiNodeInit(void)
@@ -359,12 +337,11 @@ static void ampiNodeInit(void)
   {
     MPI_COMM_UNIVERSE[i] = MPI_COMM_WORLD+1+i;
   }
-  TCHARM_Set_fallback_setup(MPI_Setup_Switch);
+  TCHARM_Set_fallback_setup(AMPI_Setup_Switch);
 
   ampiSetupReductions();
 
   nodeinit_has_been_called=1;
-  ampiInited = 1;
 }
 
 static void ampiProcInit(void){
@@ -393,7 +370,7 @@ public:
 };
 PUPmarshall(MPI_threadstart_t);
 
-extern "C" void MPI_threadstart(void *data)
+CDECL void AMPI_threadstart(void *data)
 {
 	STARTUP_DEBUG("MPI_threadstart")
 	MPI_threadstart_t t;
@@ -408,7 +385,7 @@ void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen)
 	//Make a new threads array:
 	MPI_threadstart_t s(mainFn);
 	memBuf b; pupIntoBuf(b,s);
-	TCHARM_Create_data( _nchunks,MPI_threadstart,
+	TCHARM_Create_data( _nchunks,AMPI_threadstart,
 			  b.getData(), b.getSize());
 }
 
@@ -1042,7 +1019,7 @@ void ampi::split(int color,int key,MPI_Comm *dest, int type)
   }
 }
 
-extern "C" int compareAmpiSplitKey(const void *a_, const void *b_) {
+CDECL int compareAmpiSplitKey(const void *a_, const void *b_) {
 	const ampiSplitKey *a=(const ampiSplitKey *)a_;
 	const ampiSplitKey *b=(const ampiSplitKey *)b_;
 	if (a->color!=b->color) return a->color-b->color;
@@ -1618,9 +1595,9 @@ static AmpiRequestList *getReqs(void) {
   return &(getAmpiParent()->ampiReqs);
 }
 
-CDECL void MPI_Migrate(void)
+CDECL void AMPI_Migrate(void)
 {
-  AMPIAPI("MPI_Migrate");
+  AMPIAPI("AMPI_Migrate");
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_SUSPEND();
 #endif
@@ -1630,9 +1607,9 @@ CDECL void MPI_Migrate(void)
 #endif
 }
 
-CDECL void MPI_Setmigratable(MPI_Comm comm, int mig){
+CDECL void AMPI_Setmigratable(MPI_Comm comm, int mig){
 #if CMK_LBDB_ON
-  AMPIAPI("MPI_Setmigratable");
+  AMPIAPI("AMPI_Setmigratable");
   ampi *ptr=getAmpiInstance(comm);
   ptr->setMigratable(mig);
 #else
@@ -1641,10 +1618,10 @@ CDECL void MPI_Setmigratable(MPI_Comm comm, int mig){
 }
 
 
-CDECL int MPI_Init(int *p_argc, char*** p_argv)
+CDECL int AMPI_Init(int *p_argc, char*** p_argv)
 {
   if (nodeinit_has_been_called) {
-    AMPIAPI("MPI_Init");
+    AMPIAPI("AMPI_Init");
     char **argv;
     if (p_argv) argv=*p_argv;
     else argv=CkGetArgv();
@@ -1658,9 +1635,9 @@ CDECL int MPI_Init(int *p_argc, char*** p_argv)
   return 0;
 }
 
-CDECL int MPI_Initialized(int *isInit)
+CDECL int AMPI_Initialized(int *isInit)
 {
-  AMPIAPI("MPI_Initialized");
+  AMPIAPI("AMPI_Initialized");
   if (nodeinit_has_been_called) {
   	*isInit=CtvAccess(ampiInitDone);
   }
@@ -1670,25 +1647,25 @@ CDECL int MPI_Initialized(int *isInit)
   return 0;
 }
 
-CDECL int MPI_Comm_rank(MPI_Comm comm, int *rank)
+CDECL int AMPI_Comm_rank(MPI_Comm comm, int *rank)
 {
-  AMPIAPI("MPI_Comm_rank");
+  AMPIAPI("AMPI_Comm_rank");
   *rank = (comm==MPI_COMM_SELF)?0:getAmpiInstance(comm)->getRank();
   return 0;
 }
 
 CDECL
-int MPI_Comm_size(MPI_Comm comm, int *size)
+int AMPI_Comm_size(MPI_Comm comm, int *size)
 {
-  AMPIAPI("MPI_Comm_size");
+  AMPIAPI("AMPI_Comm_size");
   *size = (comm==MPI_COMM_SELF)?1:getAmpiInstance(comm)->getSize();
   return 0;
 }
 
 CDECL
-int MPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result)
+int AMPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result)
 {
-  AMPIAPI("MPI_Comm_compare");
+  AMPIAPI("AMPI_Comm_compare");
   if(comm1==comm2) *result=MPI_IDENT;
   else{
     int equal=1;
@@ -1705,33 +1682,32 @@ int MPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result)
   return 0;
 }
 
-CDECL void MPI_Exit(int /*exitCode*/)
+CDECL void AMPI_Exit(int /*exitCode*/)
 {
-  AMPIAPI("MPI_Exit");
-  ampiInited = 0;
+  AMPIAPI("AMPI_Exit");
   TCHARM_Done();
 }
 FDECL void FTN_NAME(MPI_EXIT,mpi_exit)(int *exitCode)
 {
-  MPI_Exit(*exitCode);
+  AMPI_Exit(*exitCode);
 }
 
 CDECL
-int MPI_Finalize(void)
+int AMPI_Finalize(void)
 {
-  AMPIAPI("MPI_Finalize");
+  AMPIAPI("AMPI_Finalize");
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_SUSPEND();
 #endif
-  MPI_Exit(0);
+  AMPI_Exit(0);
   return 0;
 }
 
 CDECL
-int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
+int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
                         int tag, MPI_Comm comm)
 {
-  AMPIAPI("MPI_Send");
+  AMPIAPI("AMPI_Send");
   ampi *ptr = getAmpiInstance(comm);
   int srcRank=ptr->getRank();
   if(comm==MPI_COMM_SELF) { srcRank=0; }
@@ -1740,10 +1716,10 @@ int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
 }
 
 CDECL
-int MPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
+int AMPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
               MPI_Comm comm, MPI_Status *status)
 {
-	AMPIAPI("MPI_Recv");
+	AMPIAPI("AMPI_Recv");
 	ampi *ptr = getAmpiInstance(comm);
 
 //CkPrintf("dedede%d[[",CpvAccess(_traceCoreOn));if(CpvAccess(_traceCoreOn) !=0) ampi_endProcessing(ptr->thisIndex); else CkPrintf("]]]] %ddededededededede\n",CpvAccess(_traceCoreOn));
@@ -1753,29 +1729,29 @@ int MPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
 }
 
 CDECL
-int MPI_Probe(int src, int tag, MPI_Comm comm, MPI_Status *status)
+int AMPI_Probe(int src, int tag, MPI_Comm comm, MPI_Status *status)
 {
-  AMPIAPI("MPI_Probe");
+  AMPIAPI("AMPI_Probe");
   ampi *ptr = getAmpiInstance(comm);
   ptr->probe(tag,src, comm, (int*) status);
   return 0;
 }
 
 CDECL
-int MPI_Iprobe(int src,int tag,MPI_Comm comm,int *flag,MPI_Status *status)
+int AMPI_Iprobe(int src,int tag,MPI_Comm comm,int *flag,MPI_Status *status)
 {
-  AMPIAPI("MPI_Iprobe");
+  AMPIAPI("AMPI_Iprobe");
   ampi *ptr = getAmpiInstance(comm);
   *flag = ptr->iprobe(tag,src,comm,(int*) status);
   return 0;
 }
 
 CDECL
-int MPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
+int AMPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
                   int stag, void *rbuf, int rcount, int rtype,
                   int src, int rtag, MPI_Comm comm, MPI_Status *sts)
 {
-  AMPIAPI("MPI_Sendrecv");
+  AMPIAPI("AMPI_Sendrecv");
   int se=MPI_Send(sbuf,scount,stype,dest,stag,comm);
   int re=MPI_Recv(rbuf,rcount,rtype,src,rtag,comm,sts);
   if (se) return se;
@@ -1783,31 +1759,31 @@ int MPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
 }
 
 CDECL
-int MPI_Sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
+int AMPI_Sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
                          int dest, int sendtag, int source, int recvtag,
                          MPI_Comm comm, MPI_Status *status)
 {
-  AMPIAPI("MPI_Sendrecv_replace");
-  return MPI_Sendrecv(buf, count, datatype, dest, sendtag,
+  AMPIAPI("AMPI_Sendrecv_replace");
+  return AMPI_Sendrecv(buf, count, datatype, dest, sendtag,
                       buf, count, datatype, source, recvtag, comm, status);
 }
 
 
 CDECL
-int MPI_Barrier(MPI_Comm comm)
+int AMPI_Barrier(MPI_Comm comm)
 {
-  AMPIAPI("MPI_Barrier");
+  AMPIAPI("AMPI_Barrier");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Barrier not allowed for Inter-communicator!");
   //HACK: Use collective operation as a barrier.
-  MPI_Allreduce(NULL,NULL,0,MPI_INT,MPI_SUM,comm);
+  AMPI_Allreduce(NULL,NULL,0,MPI_INT,MPI_SUM,comm);
   return 0;
 }
 
 CDECL
-int MPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
+int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
                          MPI_Comm comm)
 {
-  AMPIAPI("MPI_Bcast");
+  AMPIAPI("AMPI_Bcast");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Bcast not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
@@ -1989,10 +1965,10 @@ static int copyDatatype(MPI_Comm comm,MPI_Datatype type,int count,const void *in
 }
 
 CDECL
-int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
+int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
                int root, MPI_Comm comm)
 {
-  AMPIAPI("MPI_Reduce");
+  AMPIAPI("AMPI_Reduce");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Reduce not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
   ampi *ptr = getAmpiInstance(comm);
@@ -2012,10 +1988,10 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
 }
 
 CDECL
-int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
+int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
                   MPI_Op op, MPI_Comm comm)
 {
-  AMPIAPI("MPI_Allreduce");
+  AMPIAPI("AMPI_Allreduce");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Allreduce not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
   ampi *ptr = getAmpiInstance(comm);
@@ -2031,10 +2007,10 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
 }
 
 CDECL
-int MPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
+int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
                    MPI_Op op, MPI_Comm comm, MPI_Request* request)
 {
-  AMPIAPI("MPI_Allreduce");
+  AMPIAPI("AMPI_Allreduce");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Iallreduce not allowed for Inter-communicator!");
   ampi *ptr = getAmpiInstance(comm);
   if(comm==MPI_COMM_SELF) {
@@ -2054,10 +2030,10 @@ int MPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
 }
 
 CDECL
-int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
+int AMPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
                        MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
 {
-  AMPIAPI("MPI_Reduce_scatter");
+  AMPIAPI("AMPI_Reduce_scatter");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Reduce_scatter not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,datatype,recvcounts[0],sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
@@ -2074,15 +2050,16 @@ int MPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
   }
   len = ptr->getDDT()->getType(datatype)->getSize(count);
   tmpbuf = malloc(len);
-  MPI_Reduce(sendbuf, tmpbuf, count, datatype, op, 0, comm);
-  MPI_Scatterv(tmpbuf, recvcounts, displs, datatype,
+  AMPI_Reduce(sendbuf, tmpbuf, count, datatype, op, 0, comm);
+  AMPI_Scatterv(tmpbuf, recvcounts, displs, datatype,
                recvbuf, recvcounts[ptr->getRank()], datatype, 0, comm);
   free(tmpbuf);
   delete [] displs;	// < memory leak ! // gzheng
   return 0;
 }
 
-extern "C" void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* a, void* b) { // a[i] = a[i] op b[i]
+extern "C"
+void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* a, void* b) { // a[i] = a[i] op b[i]
   int i;
   switch(datatype){
   case MPI_FLOAT:
@@ -2191,10 +2168,9 @@ extern "C" void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* a, vo
       mask <<= 1;
    }
  ***** MPI_Scan algorithm (from MPICH) *******/
-
 CDECL
-int MPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm ){
-  AMPIAPI("MPI_Scan");
+int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm ){
+  AMPIAPI("AMPI_Scan");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Scan not allowed for Inter-communicator!");
   MPI_Status sts;
   ampi *ptr = getAmpiInstance(comm);
@@ -2211,7 +2187,7 @@ int MPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI
   while(mask < size){
     dst = rank^mask;
     if(dst < size){
-      MPI_Sendrecv(partial_scan,count,datatype,dst,MPI_SCAN_TAG,
+      AMPI_Sendrecv(partial_scan,count,datatype,dst,MPI_SCAN_TAG,
 		   tmp_buf,count,datatype,dst,MPI_SCAN_TAG,comm,&sts);
       applyOp(datatype,op,count,partial_scan,tmp_buf);
       if(rank > dst){
@@ -2227,9 +2203,9 @@ int MPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI
 }
 
 CDECL
-double MPI_Wtime(void)
+double AMPI_Wtime(void)
 {
-  AMPIAPI("MPI_Wtime");
+  AMPIAPI("AMPI_Wtime");
 #if CMK_BLUEGENE_CHARM
   return BgGetTime();
 #else
@@ -2238,8 +2214,8 @@ double MPI_Wtime(void)
 }
 
 CDECL
-double MPI_Wtick(void){
-  AMPIAPI("MPI_Wtick");
+double AMPI_Wtick(void){
+  AMPIAPI("AMPI_Wtick");
   return 1e-6;
 }
 
@@ -2252,9 +2228,9 @@ int PersReq::start(){
 }
 
 CDECL
-int MPI_Start(MPI_Request *request)
+int AMPI_Start(MPI_Request *request)
 {
-  AMPIAPI("MPI_Start");
+  AMPIAPI("AMPI_Start");
   AmpiRequestList *reqs = getReqs();
   if(-1==(*reqs)[*request]->start()){
     CkAbort("MPI_Start could be used only on persistent communication requests!");
@@ -2263,8 +2239,8 @@ int MPI_Start(MPI_Request *request)
 }
 
 CDECL
-int MPI_Startall(int count, MPI_Request *requests){
-  AMPIAPI("MPI_Startall");
+int AMPI_Startall(int count, MPI_Request *requests){
+  AMPIAPI("AMPI_Startall");
   AmpiRequestList *reqs = getReqs();
   for(int i=0;i<count;i++){
     if(-1==(*reqs)[requests[i]]->start())
@@ -2309,9 +2285,9 @@ int ATAReq::wait(MPI_Status *sts){
 }
 
 CDECL
-int MPI_Wait(MPI_Request *request, MPI_Status *sts)
+int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
 {
-  AMPIAPI("MPI_Wait");
+  AMPIAPI("AMPI_Wait");
   if(*request == MPI_REQUEST_NULL)
     return 0;
   AmpiRequestList* reqs = getReqs();
@@ -2322,11 +2298,11 @@ int MPI_Wait(MPI_Request *request, MPI_Status *sts)
 }
 
 CDECL
-int MPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
+int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 {
-  AMPIAPI("MPI_Waitall");
+  AMPIAPI("AMPI_Waitall");
   for(int i=0;i<count;i++) {
-    MPI_Wait(&request[i], sts+i);
+    AMPI_Wait(&request[i], sts+i);
   }
 #if CMK_BLUEGENE_CHARM
   // in Blue Gene simulator, setup forward and backward dependence
@@ -2336,13 +2312,13 @@ int MPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 }
 
 CDECL
-int MPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
+int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
 {
-  AMPIAPI("MPI_Waitany");
+  AMPIAPI("AMPI_Waitany");
   int flag=0;
   while(count>0){
     for(int i=0;i<count;i++) {
-      MPI_Test(&request[i], &flag, sts);
+      AMPI_Test(&request[i], &flag, sts);
       if(flag == 1){
         *idx = i;
         return 0;
@@ -2354,16 +2330,16 @@ int MPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
 }
 
 CDECL
-int MPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
+int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
                  int *array_of_indices, MPI_Status *array_of_statuses)
 {
-  AMPIAPI("MPI_Waitsome");
+  AMPIAPI("AMPI_Waitsome");
   MPI_Status sts;
   int flag;
   *outcount = 0;
   while(1){
     for(int i=0;i<incount;i++) {
-      MPI_Test(&array_of_requests[i], &flag, &sts);
+      AMPI_Test(&array_of_requests[i], &flag, &sts);
       if(flag == 1){
         array_of_indices[(*outcount)]=i;
 	array_of_statuses[(*outcount)++]=sts;
@@ -2412,9 +2388,9 @@ void ATAReq::complete(MPI_Status *sts){
 }
 
 CDECL
-int MPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
+int AMPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
 {
-  AMPIAPI("MPI_Test");
+  AMPIAPI("AMPI_Test");
   if(*request==MPI_REQUEST_NULL) {
     *flag = 1;
     return 0;
@@ -2428,12 +2404,12 @@ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *sts)
 }
 
 CDECL
-int MPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Status *sts){
-  AMPIAPI("MPI_Testany");
+int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Status *sts){
+  AMPIAPI("AMPI_Testany");
   *flag=0;
   for(int i=0;i<count;i++)
   {
-    MPI_Test(&request[i], flag, sts);
+    AMPI_Test(&request[i], flag, sts);
     if(*flag==1){
       *index = i;
       return 0;
@@ -2444,29 +2420,29 @@ int MPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Stat
 }
 
 CDECL
-int MPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
+int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
 {
-  AMPIAPI("MPI_Testall");
+  AMPIAPI("AMPI_Testall");
   int tmpflag;
   *flag = 1;
   for(int i=0;i<count;i++)
   {
-    MPI_Test(&request[i], &tmpflag, sts+i);
+    AMPI_Test(&request[i], &tmpflag, sts+i);
     *flag *= tmpflag;
   }
   return 0;
 }
 
 CDECL
-int MPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
+int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
                  int *array_of_indices, MPI_Status *array_of_statuses)
 {
-  AMPIAPI("MPI_Testsome");
+  AMPIAPI("AMPI_Testsome");
   MPI_Status sts;
   int flag;
   *outcount = 0;
   for(int i=0;i<incount;i++) {
-    MPI_Test(&array_of_requests[i], &flag, &sts);
+    AMPI_Test(&array_of_requests[i], &flag, &sts);
     if(flag == 1){
       array_of_indices[(*outcount)]=i;
       array_of_statuses[(*outcount)++]=sts;
@@ -2476,8 +2452,8 @@ int MPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
 }
 
 CDECL
-int MPI_Request_free(MPI_Request *request){
-  AMPIAPI("MPI_Request_free");
+int AMPI_Request_free(MPI_Request *request){
+  AMPIAPI("AMPI_Request_free");
   if(*request==MPI_REQUEST_NULL) return 0;
   AmpiRequestList* reqs = getReqs();
   (*reqs)[*request]->free();
@@ -2485,16 +2461,16 @@ int MPI_Request_free(MPI_Request *request){
 }
 
 CDECL
-int MPI_Cancel(MPI_Request *request){
-  AMPIAPI("MPI_Request_free");
-  return MPI_Request_free(request);
+int AMPI_Cancel(MPI_Request *request){
+  AMPIAPI("AMPI_Request_free");
+  return AMPI_Request_free(request);
 }
 
 CDECL
-int MPI_Recv_init(void *buf, int count, int type, int src, int tag,
+int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
                    MPI_Comm comm, MPI_Request *req)
 {
-  AMPIAPI("MPI_Recv_init");
+  AMPIAPI("AMPI_Recv_init");
   AmpiRequestList* reqs = getReqs();
   PersReq *newreq = new PersReq(buf,count,type,src,tag,comm,2);
   *req = reqs->insert(newreq);
@@ -2502,10 +2478,10 @@ int MPI_Recv_init(void *buf, int count, int type, int src, int tag,
 }
 
 CDECL
-int MPI_Send_init(void *buf, int count, int type, int dest, int tag,
+int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
                    MPI_Comm comm, MPI_Request *req)
 {
-  AMPIAPI("MPI_Send_init");
+  AMPIAPI("AMPI_Send_init");
   AmpiRequestList* reqs = getReqs();
   PersReq *newreq = new PersReq(buf,count,type,dest,tag,comm,1);
   *req = reqs->insert(newreq);
@@ -2517,105 +2493,96 @@ static CkDDT *getDDT(void) {
 }
 
 CDECL
-int MPI_Type_contiguous(int count, MPI_Datatype oldtype,
+int AMPI_Type_contiguous(int count, MPI_Datatype oldtype,
                          MPI_Datatype *newtype)
 {
-#if CMK_CONVERSE_MPI
-  if (!ampiInited) return PMPI_Type_contiguous(count, oldtype, newtype);
-#endif
-  AMPIAPI("MPI_Type_contiguous");
+  AMPIAPI("AMPI_Type_contiguous");
   getDDT()->newContiguous(count, oldtype, newtype);
   return 0;
 }
 
 extern  "C"
-int MPI_Type_vector(int count, int blocklength, int stride,
+int AMPI_Type_vector(int count, int blocklength, int stride,
                      MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
-  AMPIAPI("MPI_Type_vector");
+  AMPIAPI("AMPI_Type_vector");
   getDDT()->newVector(count, blocklength, stride, oldtype, newtype);
   return 0 ;
 }
 
 extern  "C"  
-int MPI_Type_hvector(int count, int blocklength, MPI_Aint stride, 
+int AMPI_Type_hvector(int count, int blocklength, MPI_Aint stride, 
                       MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
-  AMPIAPI("MPI_Type_hvector");
+  AMPIAPI("AMPI_Type_hvector");
   getDDT()->newHVector(count, blocklength, stride, oldtype, newtype);
   return 0 ;
 }
 
 extern  "C"  
-int MPI_Type_indexed(int count, int* arrBlength, int* arrDisp, 
+int AMPI_Type_indexed(int count, int* arrBlength, int* arrDisp, 
                       MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
-  AMPIAPI("MPI_Type_indexed");
+  AMPIAPI("AMPI_Type_indexed");
   getDDT()->newIndexed(count, arrBlength, arrDisp, oldtype, newtype);
   return 0 ;
 }
 
 extern  "C"  
-int MPI_Type_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp,
+int AMPI_Type_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp,
                        MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
-  AMPIAPI("MPI_Type_hindexed");
+  AMPIAPI("AMPI_Type_hindexed");
   getDDT()->newHIndexed(count, arrBlength, arrDisp, oldtype, newtype);
   return 0 ;
 }
 
 extern  "C"  
-int MPI_Type_struct(int count, int* arrBlength, int* arrDisp, 
+int AMPI_Type_struct(int count, int* arrBlength, int* arrDisp, 
                      MPI_Datatype* oldtype, MPI_Datatype*  newtype)
 {
-#if CMK_CONVERSE_MPI
-  if (!ampiInited) return PMPI_Type_struct(count, arrBlength, arrDisp, oldtype, newtype);
-#endif
-  AMPIAPI("MPI_Type_struct");
+  AMPIAPI("AMPI_Type_struct");
   getDDT()->newStruct(count, arrBlength, arrDisp, oldtype, newtype);
   return 0 ;
 }
 
 CDECL
-int MPI_Type_commit(MPI_Datatype *datatype)
+int AMPI_Type_commit(MPI_Datatype *datatype)
 {
-#if CMK_CONVERSE_MPI
-  if (!ampiInited) return PMPI_Type_commit(datatype);
-#endif
-  AMPIAPI("MPI_Type_commit");
+  AMPIAPI("AMPI_Type_commit");
   return 0;
 }
 
 CDECL
-int MPI_Type_free(MPI_Datatype *datatype)
+int AMPI_Type_free(MPI_Datatype *datatype)
 {
-  AMPIAPI("MPI_Type_free");
+  AMPIAPI("AMPI_Type_free");
   getDDT()->freeType(datatype);
   return 0;
 }
 
 
 CDECL
-int MPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent)
+int AMPI_Type_extent(MPI_Datatype datatype, MPI_Aint *extent)
 {
-  AMPIAPI("MPI_Type_extent");
+  AMPIAPI("AMPI_Type_extent");
   *extent = getDDT()->getExtent(datatype);
   return 0;
 }
 
 CDECL
-int MPI_Type_size(MPI_Datatype datatype, int *size)
+int AMPI_Type_size(MPI_Datatype datatype, int *size)
 {
-  AMPIAPI("MPI_Type_size");
+  AMPIAPI("AMPI_Type_size");
   *size=getDDT()->getSize(datatype);
   return 0;
 }
 
 CDECL
-int MPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
+int AMPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
               int tag, MPI_Comm comm, MPI_Request *request)
 {
-  AMPIAPI("MPI_Isend");
+  AMPIAPI("AMPI_Isend");
   ampi *ptr = getAmpiInstance(comm);
   ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm);
   *request = MPI_REQUEST_NULL;
@@ -2623,10 +2590,10 @@ int MPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
 }
 
 CDECL
-int MPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
+int AMPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
               int tag, MPI_Comm comm, MPI_Request *request)
 {
-  AMPIAPI("MPI_Irecv");
+  AMPIAPI("AMPI_Irecv");
   AmpiRequestList* reqs = getReqs();
   IReq *newreq = new IReq(buf,count,type,src,tag,comm);
   *request = reqs->insert(newreq);
@@ -2634,10 +2601,10 @@ int MPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
 }
 
 CDECL
-int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op,
+int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op,
                  int root, MPI_Comm comm, MPI_Request *request)
 {
-  AMPIAPI("MPI_Ireduce");
+  AMPIAPI("AMPI_Ireduce");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,op);
@@ -2656,11 +2623,11 @@ int MPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op,
 }
 
 CDECL
-int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                   void *recvbuf, int recvcount, MPI_Datatype recvtype,
                   MPI_Comm comm)
 {
-  AMPIAPI("MPI_Allgather");
+  AMPIAPI("AMPI_Allgather");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Allgather not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
@@ -2680,18 +2647,18 @@ int MPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int itemsize = dttype->getSize(recvcount) ;
 
   for(i=0;i<size;i++) {
-    MPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
+    AMPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
              i, MPI_GATHER_TAG, comm, &status);
   }
   return 0;
 }
 
 CDECL
-int MPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                     void *recvbuf, int recvcount, MPI_Datatype recvtype,
                     MPI_Comm comm, MPI_Request* request)
 {
-  AMPIAPI("MPI_Iallgather");
+  AMPIAPI("AMPI_Iallgather");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Iallgather not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
@@ -2723,11 +2690,11 @@ int MPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                    void *recvbuf, int *recvcounts, int *displs,
                    MPI_Datatype recvtype, MPI_Comm comm)
 {
-  AMPIAPI("MPI_Allgatherv");
+  AMPIAPI("AMPI_Allgatherv");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Allgatherv not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
@@ -2747,24 +2714,24 @@ int MPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int itemsize = dttype->getSize() ;
 
   for(i=0;i<size;i++) {
-    MPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
+    AMPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
              i, MPI_GATHER_TAG, comm, &status);
   }
   return 0;
 }
 
 CDECL
-int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                void *recvbuf, int recvcount, MPI_Datatype recvtype,
                int root, MPI_Comm comm)
 {
-  AMPIAPI("MPI_Gather");
+  AMPIAPI("AMPI_Gather");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Gather not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
-  MPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
+  AMPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
 
   if(ptr->getRank()==root) {
     MPI_Status status;
@@ -2772,7 +2739,7 @@ int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     int itemsize = dttype->getSize(recvcount) ;
 
     for(i=0;i<size;i++) {
-      MPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
+      AMPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
                i, MPI_GATHER_TAG, comm, &status);
     }
   }
@@ -2780,18 +2747,18 @@ int MPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 void *recvbuf, int *recvcounts, int *displs,
                 MPI_Datatype recvtype, int root, MPI_Comm comm)
 {
-  AMPIAPI("MPI_Gatherv");
+  AMPIAPI("AMPI_Gatherv");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Gatherv not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize();
   int i;
 
-  MPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
+  AMPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
 
   if(ptr->getRank() == root) {
     MPI_Status status;
@@ -2799,7 +2766,7 @@ int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     int itemsize = dttype->getSize() ;
 
     for(i=0;i<size;i++) {
-      MPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
+      AMPI_Recv(((char*)recvbuf)+(itemsize*displs[i]), recvcounts[i], recvtype,
                i, MPI_GATHER_TAG, comm, &status);
     }
   }
@@ -2807,11 +2774,11 @@ int MPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int MPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
                 int root, MPI_Comm comm)
 {
-  AMPIAPI("MPI_Scatter");
+  AMPIAPI("AMPI_Scatter");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Scatter not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
@@ -2830,17 +2797,17 @@ int MPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 
   MPI_Status status;
-  MPI_Recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm, &status);
+  AMPI_Recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm, &status);
 
   return 0;
 }
 
 CDECL
-int MPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
+int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
                  int root, MPI_Comm comm)
 {
-  AMPIAPI("MPI_Scatterv");
+  AMPIAPI("AMPI_Scatterv");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Scatterv not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcounts[0],sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
@@ -2859,17 +2826,17 @@ int MPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendt
   }
 
   MPI_Status status;
-  MPI_Recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm, &status);
+  AMPI_Recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm, &status);
 
   return 0;
 }
 
 CDECL
-int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
                  MPI_Comm comm)
 {
-  AMPIAPI("MPI_Alltoall");
+  AMPIAPI("AMPI_Alltoall");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Alltoall not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
@@ -2891,18 +2858,18 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   itemsize = dttype->getSize(recvcount) ;
 
   for(i=0;i<size;i++) {
-    MPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
+    AMPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
               i, MPI_ATA_TAG, comm, &status);
   }
   return 0;
 }
 
 CDECL
-int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
                  MPI_Comm comm, MPI_Request *request)
 {
-  AMPIAPI("MPI_Ialltoall");
+  AMPIAPI("AMPI_Ialltoall");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Ialltoall not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
@@ -2933,11 +2900,11 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
+int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
                   MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
                   int *rdispls, MPI_Datatype recvtype, MPI_Comm comm)
 {
-  AMPIAPI("MPI_Alltoallv");
+  AMPIAPI("AMPI_Alltoallv");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Alltoallv not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
@@ -2959,64 +2926,64 @@ int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
   itemsize = dttype->getSize() ;
 
   for(i=0;i<size;i++) {
-    MPI_Recv(((char*)recvbuf)+(itemsize*rdispls[i]), recvcounts[i], recvtype,
+    AMPI_Recv(((char*)recvbuf)+(itemsize*rdispls[i]), recvcounts[i], recvtype,
              i, MPI_GATHER_TAG, comm, &status);
   }
   return 0;
 }
 
 CDECL
-int MPI_Comm_dup(int comm, int *newcomm)
+int AMPI_Comm_dup(int comm, int *newcomm)
 {
-  AMPIAPI("MPI_Comm_dup");
+  AMPIAPI("AMPI_Comm_dup");
   *newcomm = comm;
   return 0;
 }
 
 CDECL
-int MPI_Comm_split(int src,int color,int key,int *dest)
+int AMPI_Comm_split(int src,int color,int key,int *dest)
 {
-  AMPIAPI("MPI_Comm_split");
+  AMPIAPI("AMPI_Comm_split");
   getAmpiInstance(src)->split(color,key,dest, 0);
   return 0;
 }
 
 CDECL
-int MPI_Comm_free(int *comm)
+int AMPI_Comm_free(int *comm)
 {
-  AMPIAPI("MPI_Comm_free");
+  AMPIAPI("AMPI_Comm_free");
   return 0;
 }
 
 CDECL
-int MPI_Comm_test_inter(MPI_Comm comm, int *flag){
-  AMPIAPI("MPI_Comm_test_inter");
+int AMPI_Comm_test_inter(MPI_Comm comm, int *flag){
+  AMPIAPI("AMPI_Comm_test_inter");
   *flag = getAmpiParent()->isInter(comm);
   return 0;
 }
 
 CDECL
-int MPI_Comm_remote_size(MPI_Comm comm, int *size){
-  AMPIAPI("MPI_Comm_remote_size");
+int AMPI_Comm_remote_size(MPI_Comm comm, int *size){
+  AMPIAPI("AMPI_Comm_remote_size");
   *size = getAmpiParent()->getRemoteSize(comm);
   return 0;
 }
 
 CDECL
-int MPI_Comm_remote_group(MPI_Comm comm, MPI_Group *group){
-  AMPIAPI("MPI_Comm_remote_group");
+int AMPI_Comm_remote_group(MPI_Comm comm, MPI_Group *group){
+  AMPIAPI("AMPI_Comm_remote_group");
   *group = getAmpiParent()->getRemoteGroup(comm);
   return 0;
 }
 
 CDECL
-int MPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm pcomm, int rleader, int tag, MPI_Comm *newintercomm){
-  AMPIAPI("MPI_Intercomm_create");
+int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm pcomm, int rleader, int tag, MPI_Comm *newintercomm){
+  AMPIAPI("AMPI_Intercomm_create");
   ampi *ptr = getAmpiInstance(lcomm);
   int root = ptr->getIndexForRank(lleader);
   CkPupBasicVec<int> rvec;
   int lrank;
-  MPI_Comm_rank(lcomm,&lrank);
+  AMPI_Comm_rank(lcomm,&lrank);
 
   if(lrank==lleader){
     int lsize, rsize;
@@ -3030,12 +2997,12 @@ int MPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm pcomm, int rleade
     int i;
     for(i=0;i<lsize;i++)
       larr[i] = lvec[i];
-    MPI_Send(&lsize,1,MPI_INT,rleader,tag,pcomm);
-    MPI_Recv(&rsize,1,MPI_INT,rleader,tag,pcomm,&sts);
+    AMPI_Send(&lsize,1,MPI_INT,rleader,tag,pcomm);
+    AMPI_Recv(&rsize,1,MPI_INT,rleader,tag,pcomm,&sts);
 
     rarr = new int [rsize];
-    MPI_Send(larr,lsize,MPI_INT,rleader,tag+1,pcomm);
-    MPI_Recv(rarr,rsize,MPI_INT,rleader,tag+1,pcomm,&sts);
+    AMPI_Send(larr,lsize,MPI_INT,rleader,tag+1,pcomm);
+    AMPI_Recv(rarr,rsize,MPI_INT,rleader,tag+1,pcomm,&sts);
     for(i=0;i<rsize;i++)
       rvec.push_back(rarr[i]);
 
@@ -3050,8 +3017,8 @@ int MPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm pcomm, int rleade
 }
 
 CDECL
-int MPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm){
-  AMPIAPI("MPI_Intercomm_merge");
+int AMPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm){
+  AMPIAPI("AMPI_Intercomm_merge");
   ampi *ptr = getAmpiInstance(intercomm);
   int lroot, rroot, lrank, lhigh, rhigh, first;
   lroot = ptr->getIndexForRank(0);
@@ -3061,8 +3028,8 @@ int MPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm){
 
   if(lrank==0){
     MPI_Status sts;
-    MPI_Send(&lhigh,1,MPI_INT,0,10010,intercomm);
-    MPI_Recv(&rhigh,1,MPI_INT,0,10010,intercomm,&sts);
+    AMPI_Send(&lhigh,1,MPI_INT,0,10010,intercomm);
+    AMPI_Recv(&rhigh,1,MPI_INT,0,10010,intercomm,&sts);
 
     if((lhigh && rhigh) || (!lhigh && !rhigh)){ // same value: smaller root goes first (first=1 if local goes first)
       first = (lroot < rroot);
@@ -3076,16 +3043,16 @@ int MPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm){
 }
 
 CDECL
-int MPI_Abort(int comm, int errorcode)
+int AMPI_Abort(int comm, int errorcode)
 {
-  AMPIAPI("MPI_Abort");
+  AMPIAPI("AMPI_Abort");
   CkAbort("AMPI: User called MPI_Abort!\n");
   return errorcode;
 }
 
 CDECL
-int MPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count){
-  AMPIAPI("MPI_Get_count");
+int AMPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count){
+  AMPIAPI("AMPI_Get_count");
   CkDDT_DataType* dttype = getDDT()->getType(dtype);
   int itemsize = dttype->getSize() ;
   *count = sts->MPI_LENGTH/itemsize;
@@ -3093,29 +3060,29 @@ int MPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count){
 }
 
 CDECL
-int MPI_Type_lb(MPI_Datatype dtype, MPI_Aint* displacement){
-  AMPIAPI("MPI_Type_lb");
+int AMPI_Type_lb(MPI_Datatype dtype, MPI_Aint* displacement){
+  AMPIAPI("AMPI_Type_lb");
   *displacement = getDDT()->getLB(dtype);
   return 0;
 }
 
 CDECL
-int MPI_Type_ub(MPI_Datatype dtype, MPI_Aint* displacement){
-  AMPIAPI("MPI_Type_ub");
+int AMPI_Type_ub(MPI_Datatype dtype, MPI_Aint* displacement){
+  AMPIAPI("AMPI_Type_ub");
   *displacement = getDDT()->getUB(dtype);
   return 0;
 }
 
 CDECL
-int MPI_Address(void* location, MPI_Aint *address){
-  AMPIAPI("MPI_Address");
+int AMPI_Address(void* location, MPI_Aint *address){
+  AMPIAPI("AMPI_Address");
   *address = (MPI_Aint)(unsigned long)(char *)location;
   return 0;
 }
 
 CDECL
-int MPI_Get_elements(MPI_Status *sts, MPI_Datatype dtype, int *count){
-  AMPIAPI("MPI_Get_elements");
+int AMPI_Get_elements(MPI_Status *sts, MPI_Datatype dtype, int *count){
+  AMPIAPI("AMPI_Get_elements");
   CkDDT_DataType* dttype = getDDT()->getType(dtype) ;
   int basesize = dttype->getBaseSize() ;
   if(basesize==0) basesize=dttype->getSize();
@@ -3124,10 +3091,10 @@ int MPI_Get_elements(MPI_Status *sts, MPI_Datatype dtype, int *count){
 }
 
 CDECL
-int MPI_Pack(void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
+int AMPI_Pack(void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
               int outsize, int *position, MPI_Comm comm)
 {
-  AMPIAPI("MPI_Pack");
+  AMPIAPI("AMPI_Pack");
   CkDDT_DataType* dttype = getDDT()->getType(dtype) ;
   int itemsize = dttype->getSize();
   dttype->serialize((char*)inbuf, ((char*)outbuf)+(*position), incount, 1);
@@ -3136,10 +3103,10 @@ int MPI_Pack(void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
 }
 
 CDECL
-int MPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
+int AMPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
               int outcount, MPI_Datatype dtype, MPI_Comm comm)
 {
-  AMPIAPI("MPI_Unpack");
+  AMPIAPI("AMPI_Unpack");
   CkDDT_DataType* dttype = getDDT()->getType(dtype) ;
   int itemsize = dttype->getSize();
   dttype->serialize(((char*)inbuf+(*position)), (char*)outbuf, outcount, 1);
@@ -3148,16 +3115,16 @@ int MPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
 }
 
 CDECL
-int MPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz)
+int AMPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz)
 {
-  AMPIAPI("MPI_Pack_size");
+  AMPIAPI("AMPI_Pack_size");
   CkDDT_DataType* dttype = getDDT()->getType(datatype) ;
   return incount*dttype->getSize() ;
 }
 
 CDECL
-int MPI_Get_processor_name(char *name, int *resultlen){
-  AMPIAPI("MPI_Get_processor_name");
+int AMPI_Get_processor_name(char *name, int *resultlen){
+  AMPIAPI("AMPI_Get_processor_name");
   ampiParent *ptr = getAmpiParent();
   sprintf(name,"AMPI_VP[%d]_PE[%d]",ptr->thisIndex,ptr->getMyPe());
   *resultlen = strlen(name);
@@ -3172,58 +3139,40 @@ void error_handler ( MPI_Comm *, int * );
 #endif
 
 CDECL
-int MPI_Errhandler_create(MPI_Handler_function *function, MPI_Errhandler *errhandler){
-#if CMK_CONVERSE_MPI
-  if (!ampiInited) return PMPI_Errhandler_create(function, errhandler);
-#endif
-	AMPIAPI("MPI_Errhandler_create");
+int AMPI_Errhandler_create(MPI_Handler_function *function, MPI_Errhandler *errhandler){
+	AMPIAPI("AMPI_Errhandler_create");
 	return MPI_SUCCESS;
 }
 
 CDECL
-int MPI_Errhandler_set(MPI_Comm comm, MPI_Errhandler errhandler){
-#if CMK_CONVERSE_MPI
-  if (!ampiInited) return PMPI_Errhandler_set(comm, errhandler);
-#endif
-	AMPIAPI("MPI_Errhandler_set");
+int AMPI_Errhandler_set(MPI_Comm comm, MPI_Errhandler errhandler){
+	AMPIAPI("AMPI_Errhandler_set");
 	return MPI_SUCCESS;
 }
 
 CDECL
-int MPI_Errhandler_get(MPI_Comm comm, MPI_Errhandler *errhandler){
-#if CMK_CONVERSE_MPI
-  if (!ampiInited) return PMPI_Errhandler_get(comm, errhandler);
-#endif
-	AMPIAPI("MPI_Errhandler_get");
+int AMPI_Errhandler_get(MPI_Comm comm, MPI_Errhandler *errhandler){
+	AMPIAPI("AMPI_Errhandler_get");
 	return MPI_SUCCESS;
 }
 
 CDECL
-int MPI_Errhandler_free(MPI_Errhandler *errhandler){
-#if CMK_CONVERSE_MPI
-  if (!ampiInited) return PMPI_Errhandler_free(errhandler);
-#endif
-	AMPIAPI("MPI_Errhandler_free");
+int AMPI_Errhandler_free(MPI_Errhandler *errhandler){
+	AMPIAPI("AMPI_Errhandler_free");
 	return MPI_SUCCESS;
 }
 
 CDECL
-int MPI_Error_class(int errorcode, int *errorclass){
-#if CMK_CONVERSE_MPI
-  if (!ampiInited) return PMPI_Error_class(errorcode, errorclass);
-#endif
-	AMPIAPI("MPI_Error_class");
+int AMPI_Error_class(int errorcode, int *errorclass){
+	AMPIAPI("AMPI_Error_class");
 	*errorclass = errorcode;
 	return MPI_SUCCESS;
 }
 
 CDECL
-int MPI_Error_string(int errorcode, char *string, int *resultlen)
+int AMPI_Error_string(int errorcode, char *string, int *resultlen)
 {
-#if CMK_CONVERSE_MPI
-  if (!ampiInited) return PMPI_Error_string(errorcode, string, resultlen);
-#endif
-  AMPIAPI("MPI_Error_string");
+  AMPIAPI("AMPI_Error_string");
   const char *ret="";
   switch(errorcode) {
   case MPI_SUCCESS:
@@ -3240,17 +3189,17 @@ int MPI_Error_string(int errorcode, char *string, int *resultlen)
 
 /* Group operations */
 CDECL
-int MPI_Comm_group(MPI_Comm comm, MPI_Group *group)
+int AMPI_Comm_group(MPI_Comm comm, MPI_Group *group)
 {
-  AMPIAPI("MPI_Comm_Group");
+  AMPIAPI("AMPI_Comm_Group");
   *group = getAmpiParent()->comm2group(comm);
   return 0;
 }
 
 CDECL
-int MPI_Group_union(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
+int AMPI_Group_union(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
 {
-  AMPIAPI("MPI_Group_union");
+  AMPIAPI("AMPI_Group_union");
   groupStruct vec1, vec2, newvec;
   ampiParent *ptr = getAmpiParent();
   vec1 = ptr->group2vec(group1);
@@ -3261,9 +3210,9 @@ int MPI_Group_union(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
 }
 
 CDECL
-int MPI_Group_intersection(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
+int AMPI_Group_intersection(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
 {
-  AMPIAPI("MPI_Group_intersection");
+  AMPIAPI("AMPI_Group_intersection");
   groupStruct vec1, vec2, newvec;
   ampiParent *ptr = getAmpiParent();
   vec1 = ptr->group2vec(group1);
@@ -3274,9 +3223,9 @@ int MPI_Group_intersection(MPI_Group group1, MPI_Group group2, MPI_Group *newgro
 }
 
 CDECL
-int MPI_Group_difference(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
+int AMPI_Group_difference(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
 {
-  AMPIAPI("MPI_Group_difference");
+  AMPIAPI("AMPI_Group_difference");
   groupStruct vec1, vec2, newvec;
   ampiParent *ptr = getAmpiParent();
   vec1 = ptr->group2vec(group1);
@@ -3287,25 +3236,25 @@ int MPI_Group_difference(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup
 }
 
 CDECL
-int MPI_Group_size(MPI_Group group, int *size)
+int AMPI_Group_size(MPI_Group group, int *size)
 {
-  AMPIAPI("MPI_Group_size");
+  AMPIAPI("AMPI_Group_size");
   *size = (getAmpiParent()->group2vec(group)).size();
   return 0;
 }
 
 CDECL
-int MPI_Group_rank(MPI_Group group, int *rank)
+int AMPI_Group_rank(MPI_Group group, int *rank)
 {
-  AMPIAPI("MPI_Group_rank");
+  AMPIAPI("AMPI_Group_rank");
   *rank = getAmpiParent()->getRank(group);
   return 0;
 }
 
 CDECL
-int MPI_Group_translate_ranks (MPI_Group group1, int n, int *ranks1, MPI_Group group2, int *ranks2)
+int AMPI_Group_translate_ranks (MPI_Group group1, int n, int *ranks1, MPI_Group group2, int *ranks2)
 {
-  AMPIAPI("MPI_Group_translate_ranks");
+  AMPIAPI("AMPI_Group_translate_ranks");
   ampiParent *ptr = getAmpiParent();
   groupStruct vec1, vec2;
   vec1 = ptr->group2vec(group1);
@@ -3315,9 +3264,9 @@ int MPI_Group_translate_ranks (MPI_Group group1, int n, int *ranks1, MPI_Group g
 }
 
 CDECL
-int MPI_Group_compare(MPI_Group group1,MPI_Group group2, int *result)
+int AMPI_Group_compare(MPI_Group group1,MPI_Group group2, int *result)
 {
-  AMPIAPI("MPI_Group_compare");
+  AMPIAPI("AMPI_Group_compare");
   ampiParent *ptr = getAmpiParent();
   groupStruct vec1, vec2;
   vec1 = ptr->group2vec(group1);
@@ -3327,9 +3276,9 @@ int MPI_Group_compare(MPI_Group group1,MPI_Group group2, int *result)
 }
 
 CDECL
-int MPI_Group_incl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup)
+int AMPI_Group_incl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup)
 {
-  AMPIAPI("MPI_Group_incl");
+  AMPIAPI("AMPI_Group_incl");
   groupStruct vec, newvec;
   ampiParent *ptr = getAmpiParent();
   vec = ptr->group2vec(group);
@@ -3338,9 +3287,9 @@ int MPI_Group_incl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup)
   return 0;
 }
 CDECL
-int MPI_Group_excl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup)
+int AMPI_Group_excl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup)
 {
-  AMPIAPI("MPI_Group_excl");
+  AMPIAPI("AMPI_Group_excl");
   groupStruct vec, newvec;
   ampiParent *ptr = getAmpiParent();
   vec = ptr->group2vec(group);
@@ -3350,9 +3299,9 @@ int MPI_Group_excl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup)
   return 0;
 }
 CDECL
-int MPI_Group_range_incl(MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup)
+int AMPI_Group_range_incl(MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup)
 {
-  AMPIAPI("MPI_Group_range_incl");
+  AMPIAPI("AMPI_Group_range_incl");
   groupStruct vec, newvec;
   ampiParent *ptr = getAmpiParent();
   vec = ptr->group2vec(group);
@@ -3361,9 +3310,9 @@ int MPI_Group_range_incl(MPI_Group group, int n, int ranges[][3], MPI_Group *new
   return 0;
 }
 CDECL
-int MPI_Group_range_excl(MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup)
+int AMPI_Group_range_excl(MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup)
 {
-  AMPIAPI("MPI_Group_range_excl");
+  AMPIAPI("AMPI_Group_range_excl");
   groupStruct vec, newvec;
   ampiParent *ptr = getAmpiParent();
   vec = ptr->group2vec(group);
@@ -3372,15 +3321,15 @@ int MPI_Group_range_excl(MPI_Group group, int n, int ranges[][3], MPI_Group *new
   return 0;
 }
 CDECL
-int MPI_Group_free(MPI_Group *group)
+int AMPI_Group_free(MPI_Group *group)
 {
-  AMPIAPI("MPI_Group_free");
+  AMPIAPI("AMPI_Group_free");
   return 0;
 }
 CDECL
-int MPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
+int AMPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
 {
-  AMPIAPI("MPI_Comm_create");
+  AMPIAPI("AMPI_Comm_create");
   groupStruct vec = getAmpiParent()->group2vec(group);
   getAmpiInstance(comm)->commCreate(vec, newcomm);
   return 0;
@@ -3388,39 +3337,39 @@ int MPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
 
 /* Charm++ Extentions to MPI standard: */
 CDECL
-void MPI_Checkpoint(char *dname)
+void AMPI_Checkpoint(char *dname)
 {
-  AMPIAPI("MPI_Checkpoint");
-  MPI_Barrier(MPI_COMM_WORLD);
+  AMPIAPI("AMPI_Checkpoint");
+  AMPI_Barrier(MPI_COMM_WORLD);
   getAmpiParent()->startCheckpoint(dname);
 }
 
 CDECL
-void MPI_Print(char *str)
+void AMPI_Print(char *str)
 {
-  AMPIAPI("MPI_Print");
+  AMPIAPI("AMPI_Print");
   ampiParent *ptr = getAmpiParent();
   CkPrintf("[%d] %s\n", ptr->thisIndex, str);
 }
 
 CDECL
-int MPI_Register(void *d, MPI_PupFn f)
+int AMPI_Register(void *d, MPI_PupFn f)
 {
-  AMPIAPI("MPI_Register");
+  AMPIAPI("AMPI_Register");
   return TCHARM_Register(d,f);
 }
 
 CDECL
 void *MPI_Get_userdata(int idx)
 {
-  AMPIAPI("MPI_Get_userdata");
+  AMPIAPI("AMPI_Get_userdata");
   return TCHARM_Get_userdata(idx);
 }
 
 CDECL
-void MPI_Register_main(MPI_MainFn mainFn,const char *name)
+void AMPI_Register_main(MPI_MainFn mainFn,const char *name)
 {
-  AMPIAPI("MPI_Register_main");
+  AMPIAPI("AMPI_Register_main");
   if (TCHARM_Element()==0)
   { // I'm responsible for building the TCHARM threads:
     ampiCreateMain(mainFn,name,strlen(name));
@@ -3430,7 +3379,7 @@ FDECL
 void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
   (MPI_MainFn mainFn,const char *name,int nameLen)
 {
-  AMPIAPI("MPI_register_main");
+  AMPIAPI("AMPI_register_main");
   if (TCHARM_Element()==0)
   { // I'm responsible for building the TCHARM threads:
     ampiCreateMain(mainFn,name,nameLen);
@@ -3438,74 +3387,59 @@ void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
 }
 
 CDECL
-int MPI_Keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn, int *keyval, void* extra_state){
-#if CMK_CONVERSE_MPI
-  if (!ampiInited) return PMPI_Keyval_create(copy_fn, delete_fn, keyval, extra_state);
-#endif
-  AMPIAPI("MPI_Keyval_create");
+int AMPI_Keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn, int *keyval, void* extra_state){
+  AMPIAPI("AMPI_Keyval_create");
   return getAmpiParent()->createKeyval(copy_fn,delete_fn,keyval,extra_state);
 }
 
 CDECL
-int MPI_Keyval_free(int *keyval){
-#if CMK_CONVERSE_MPI
-  if (!ampiInited) return PMPI_Keyval_free(keyval);
-#endif
-  AMPIAPI("MPI_Keyval_free");
+int AMPI_Keyval_free(int *keyval){
+  AMPIAPI("AMPI_Keyval_free");
   return getAmpiParent()->freeKeyval(keyval);
 }
 
 CDECL
-int MPI_Attr_put(MPI_Comm comm, int keyval, void* attribute_val){
-#if CMK_CONVERSE_MPI
-  if (!ampiInited) return PMPI_Attr_put(comm, keyval, attribute_val);
-#endif
-  AMPIAPI("MPI_Attr_put");
+int AMPI_Attr_put(MPI_Comm comm, int keyval, void* attribute_val){
+  AMPIAPI("AMPI_Attr_put");
   return getAmpiParent()->putAttr(comm,keyval,attribute_val);
 }
 
 CDECL
-int MPI_Attr_get(MPI_Comm comm, int keyval, void *attribute_val, int *flag){
-#if CMK_CONVERSE_MPI
-  if (!ampiInited) return PMPI_Attr_get(comm, keyval, attribute_val, flag);
-#endif
-  AMPIAPI("MPI_Attr_get");
+int AMPI_Attr_get(MPI_Comm comm, int keyval, void *attribute_val, int *flag){
+  AMPIAPI("AMPI_Attr_get");
   return getAmpiParent()->getAttr(comm,keyval,attribute_val,flag);
 }
 
 CDECL
-int MPI_Attr_delete(MPI_Comm comm, int keyval){
-#if CMK_CONVERSE_MPI
-  if (!ampiInited) return PMPI_Attr_delete(comm, keyval);
-#endif
-  AMPIAPI("MPI_Attr_delete");
+int AMPI_Attr_delete(MPI_Comm comm, int keyval){
+  AMPIAPI("AMPI_Attr_delete");
   return getAmpiParent()->deleteAttr(comm,keyval);
 }
 
 CDECL
-int MPI_Cart_map(MPI_Comm comm, int ndims, int *dims, int *periods,
+int AMPI_Cart_map(MPI_Comm comm, int ndims, int *dims, int *periods,
 		 int *newrank) {
-  AMPIAPI("MPI_Cart_map");
+  AMPIAPI("AMPI_Cart_map");
 
-  MPI_Comm_rank(comm, newrank);
+  AMPI_Comm_rank(comm, newrank);
 
   return 0;
 }
 
 CDECL
-int MPI_Graph_map(MPI_Comm comm, int nnodes, int *index, int *edges,
+int AMPI_Graph_map(MPI_Comm comm, int nnodes, int *index, int *edges,
 		  int *newrank) {
-  AMPIAPI("MPI_Graph_map");
-  MPI_Comm_rank(comm, newrank);
+  AMPIAPI("AMPI_Graph_map");
+  AMPI_Comm_rank(comm, newrank);
 
   return 0;
 }
 
 CDECL
-int MPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
+int AMPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
                    int reorder, MPI_Comm *comm_cart) {
 
-  AMPIAPI("MPI_Cart_create");
+  AMPIAPI("AMPI_Cart_create");
 
   /* Create new cartesian communicator. No attention is being paid to mapping
      virtual processes to processors, which ideally should be handled by the
@@ -3516,7 +3450,7 @@ int MPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
   */
   
   int newrank;
-  MPI_Cart_map(comm_old, ndims, dims, periods, &newrank);//no change in rank 
+  AMPI_Cart_map(comm_old, ndims, dims, periods, &newrank);//no change in rank 
 
   ampiParent *ptr = getAmpiParent();
   groupStruct vec = ptr->group2vec(ptr->comm2group(comm_old));
@@ -3541,13 +3475,13 @@ int MPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
 }
 
 CDECL
-int MPI_Graph_create(MPI_Comm comm_old, int nnodes, int *index, int *edges,
+int AMPI_Graph_create(MPI_Comm comm_old, int nnodes, int *index, int *edges,
 		     int reorder, MPI_Comm *comm_graph) {
-  AMPIAPI("MPI_Graph_create");
+  AMPIAPI("AMPI_Graph_create");
   
   /* No mapping done */
   int newrank;
-  MPI_Graph_map(comm_old, nnodes, index, edges, &newrank);
+  AMPI_Graph_map(comm_old, nnodes, index, edges, &newrank);
   
   ampiParent *ptr = getAmpiParent();
   groupStruct vec = ptr->group2vec(ptr->comm2group(comm_old));
@@ -3574,8 +3508,8 @@ int MPI_Graph_create(MPI_Comm comm_old, int nnodes, int *index, int *edges,
 }
 
 CDECL
-int MPI_Topo_test(MPI_Comm comm, int *status) {
-  AMPIAPI("MPI_Topo_test");
+int AMPI_Topo_test(MPI_Comm comm, int *status) {
+  AMPIAPI("AMPI_Topo_test");
   
   ampiParent *ptr = getAmpiParent();
   
@@ -3589,8 +3523,8 @@ int MPI_Topo_test(MPI_Comm comm, int *status) {
 }
 
 CDECL
-int MPI_Cartdim_get(MPI_Comm comm, int *ndims) {
-  AMPIAPI("MPI_Cartdim_get");
+int AMPI_Cartdim_get(MPI_Comm comm, int *ndims) {
+  AMPIAPI("AMPI_Cartdim_get");
 
   *ndims = getAmpiParent()->getCart(comm).getndims();
 
@@ -3598,17 +3532,17 @@ int MPI_Cartdim_get(MPI_Comm comm, int *ndims) {
 }
 
 CDECL
-int MPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods, 
+int AMPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods, 
 		 int *coords){
   int i, ndims;
 
-  AMPIAPI("MPI_Cart_get");
+  AMPIAPI("AMPI_Cart_get");
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   ndims = c.getndims();
   int rank;
 
-  MPI_Comm_rank(comm, &rank);
+  AMPI_Comm_rank(comm, &rank);
 
   const CkPupBasicVec<int> &dims_ = c.getdims();
   const CkPupBasicVec<int> &periods_ = c.getperiods();
@@ -3628,8 +3562,8 @@ int MPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods,
 }
 
 CDECL
-int MPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
-  AMPIAPI("MPI_Cart_rank");
+int AMPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
+  AMPIAPI("AMPI_Cart_rank");
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
@@ -3656,8 +3590,8 @@ int MPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
 }
 
 CDECL
-int MPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords) {
-  AMPIAPI("MPI_Cart_coords");
+int AMPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords) {
+  AMPIAPI("AMPI_Cart_coords");
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
@@ -3673,9 +3607,9 @@ int MPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords) {
 }
 
 CDECL
-int MPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source, 
+int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source, 
 		   int *rank_dest) {
-  AMPIAPI("MPI_Cart_shift");
+  AMPIAPI("AMPI_Cart_shift");
   
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
@@ -3683,8 +3617,8 @@ int MPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source,
   const CkPupBasicVec<int> &periods = c.getperiods();
   int *coords = new int[ndims];
 
-  MPI_Comm_rank(comm, rank_source);
-  MPI_Cart_coords(comm, *rank_source, ndims, coords);
+  AMPI_Comm_rank(comm, rank_source);
+  AMPI_Cart_coords(comm, *rank_source, ndims, coords);
 
   if ((direction < 0) || (direction >= ndims))
     CkAbort("MPI_Cart_shift: direction not within dimensions range");
@@ -3693,20 +3627,20 @@ int MPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source,
   if (coords[direction] < 0)
     if (periods[direction] == 1) {
       coords[direction] += dims[direction];
-      MPI_Cart_rank(comm, coords, rank_dest);
+      AMPI_Cart_rank(comm, coords, rank_dest);
     }
     else
       *rank_dest = MPI_PROC_NULL;
   else
-    MPI_Cart_rank(comm, coords, rank_dest);
+    AMPI_Cart_rank(comm, coords, rank_dest);
 
   delete [] coords;
   return 0;
 }
 
 CDECL
-int MPI_Graphdims_get(MPI_Comm comm, int *nnodes, int *nedges) {
-  AMPIAPI("MPI_Graphdim_get");
+int AMPI_Graphdims_get(MPI_Comm comm, int *nnodes, int *nedges) {
+  AMPIAPI("AMPI_Graphdim_get");
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
   *nnodes = c.getnvertices();
@@ -3717,9 +3651,9 @@ int MPI_Graphdims_get(MPI_Comm comm, int *nnodes, int *nedges) {
 }
 
 CDECL
-int MPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index, 
+int AMPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index, 
 		  int *edges) {
-  AMPIAPI("MPI_Graph_get");
+  AMPIAPI("AMPI_Graph_get");
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
 
@@ -3740,8 +3674,8 @@ int MPI_Graph_get(MPI_Comm comm, int maxindex, int maxedges, int *index,
 } 
 
 CDECL
-int MPI_Graph_neighbors_count(MPI_Comm comm, int rank, int *nneighbors) {
-  AMPIAPI("MPI_Graph_neighbors_count");
+int AMPI_Graph_neighbors_count(MPI_Comm comm, int rank, int *nneighbors) {
+  AMPIAPI("AMPI_Graph_neighbors_count");
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
 
@@ -3759,9 +3693,9 @@ int MPI_Graph_neighbors_count(MPI_Comm comm, int rank, int *nneighbors) {
 }
 
 CDECL
-int MPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors,
+int AMPI_Graph_neighbors(MPI_Comm comm, int rank, int maxneighbors,
 			int *neighbors) {
-  AMPIAPI("MPI_Graph_neighbors");
+  AMPIAPI("AMPI_Graph_neighbors");
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
   const CkPupBasicVec<int> &index = c.getindex();
@@ -3829,8 +3763,8 @@ bool factors(int n, int d, int *dims, int m) {
 }
 
 CDECL
-int MPI_Dims_create(int nnodes, int ndims, int *dims) {
-  AMPIAPI("MPI_Dims_create");
+int AMPI_Dims_create(int nnodes, int ndims, int *dims) {
+  AMPIAPI("AMPI_Dims_create");
 
   int i, n, d, *pdims;
 
@@ -3869,19 +3803,19 @@ int MPI_Dims_create(int nnodes, int ndims, int *dims) {
 */
 
 CDECL
-int MPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
-  AMPIAPI("MPI_Cart_sub");
+int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
+  AMPIAPI("AMPI_Cart_sub");
 
   int i, color, key, *coords, ndims, rank;
 
-  MPI_Comm_rank(comm, &rank);
+  AMPI_Comm_rank(comm, &rank);
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   ndims = c.getndims();
   const CkPupBasicVec<int> &dims = c.getdims();
   int num_remain_dims = 0;
 
   coords = new int [ndims];
-  MPI_Cart_coords(comm, rank, ndims, coords);
+  AMPI_Cart_coords(comm, rank, ndims, coords);
 
   for (i = 0; i < ndims; i++)
     if (remain_dims[i]) {
@@ -3919,39 +3853,39 @@ void _registerampif(void)
   _registerampi();
 }
 
-void MPI_Datatype_iscontig(MPI_Datatype datatype, int *flag){
+void AMPI_Datatype_iscontig(MPI_Datatype datatype, int *flag){
   *flag = getDDT()->isContig(datatype);
 }
 
 CDECL
-int MPI_Type_get_envelope(MPI_Datatype datatype, int *ni, int *na, int *nd, int *combiner){
-  AMPIAPI("MPI_Type_get_envelope");
+int AMPI_Type_get_envelope(MPI_Datatype datatype, int *ni, int *na, int *nd, int *combiner){
+  AMPIAPI("AMPI_Type_get_envelope");
   return getDDT()->getEnvelope(datatype,ni,na,nd,combiner);
 }
 
 CDECL
-int MPI_Type_get_contents(MPI_Datatype datatype, int ni, int na, int nd, int i[], MPI_Aint a[], MPI_Datatype d[]){
-  AMPIAPI("MPI_Type_get_contents");
+int AMPI_Type_get_contents(MPI_Datatype datatype, int ni, int na, int nd, int i[], MPI_Aint a[], MPI_Datatype d[]){
+  AMPIAPI("AMPI_Type_get_contents");
   return getDDT()->getContents(datatype,ni,na,nd,i,a,d);
 }
 
 CDECL
-int MPI_Suspend(int comm) {
-	AMPIAPI("MPI_Suspend");
+int AMPI_Suspend(int comm) {
+	AMPIAPI("AMPI_Suspend");
 	getAmpiInstance(comm)->block();
 	return 0;
 }
 
 CDECL
-int MPI_Yield(int comm) {
-	AMPIAPI("MPI_Yield");
+int AMPI_Yield(int comm) {
+	AMPIAPI("AMPI_Yield");
 	getAmpiInstance(comm)->yield();
 	return 0;
 }
 
 CDECL
-int MPI_Resume(int dest, int comm) {
-	AMPIAPI("MPI_Resume");
+int AMPI_Resume(int dest, int comm) {
+	AMPIAPI("AMPI_Resume");
 	getAmpiInstance(comm)->getProxy()[dest].unblock();
 	return 0;
 }

@@ -3,7 +3,7 @@
 
 extern int _ampi_fallback_setup_count;
 
-CDECL void MPI_Setup(void)
+CDECL void AMPI_Setup(void)
 {
 	_ampi_fallback_setup_count++;
 }

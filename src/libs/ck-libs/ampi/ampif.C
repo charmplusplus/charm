@@ -167,50 +167,50 @@ void mpi_init_universe(int *unicomm)
 }
 
 void mpi_init(int *ierr){
-  *ierr = MPI_Init(NULL,NULL);
+  *ierr = AMPI_Init(NULL,NULL);
 }
 
 void mpi_initialized(int *isInit, int* ierr)
 {
-  *ierr = MPI_Initialized(isInit);
+  *ierr = AMPI_Initialized(isInit);
 }
 
 void mpi_comm_rank(int *comm, int *rank, int *ierr)
 {
-  *ierr = MPI_Comm_rank(*comm, rank);
+  *ierr = AMPI_Comm_rank(*comm, rank);
 }
 
 void mpi_comm_size(int *comm, int *size, int *ierr)
 {
-  *ierr = MPI_Comm_size(*comm, size);
+  *ierr = AMPI_Comm_size(*comm, size);
 }
 
 void mpi_finalize(int *ierr)
 {
-  *ierr = MPI_Finalize();
+  *ierr = AMPI_Finalize();
 }
 
 void mpi_send(void *msg, int *count, int *type, int *dest,
   int *tag, int *comm, int *ierr)
 {
-  *ierr = MPI_Send(msg, *count, *type, *dest, *tag, *comm);
+  *ierr = AMPI_Send(msg, *count, *type, *dest, *tag, *comm);
 }
 
 void mpi_recv(void *msg, int *count, int *type, int *src,
   int *tag, int *comm, int *status, int *ierr)
 {
-  *ierr = MPI_Recv(msg, *count, *type, *src, *tag, *comm,
+  *ierr = AMPI_Recv(msg, *count, *type, *src, *tag, *comm,
                     (MPI_Status*) status);
 }
 
 void mpi_probe(int *src, int *tag, int *comm, int *status, int *ierr)
 {
-  *ierr = MPI_Probe(*src, *tag, *comm, (MPI_Status*) status);
+  *ierr = AMPI_Probe(*src, *tag, *comm, (MPI_Status*) status);
 }
 
 void mpi_iprobe(int *src,int *tag,int *comm,int *flag,int *status,int *ierr)
 {
-  *ierr = MPI_Iprobe(*src, *tag, *comm, flag, (MPI_Status*) status);
+  *ierr = AMPI_Iprobe(*src, *tag, *comm, flag, (MPI_Status*) status);
 }
 
 void mpi_sendrecv(void *sndbuf, int *sndcount, int *sndtype,
@@ -218,7 +218,7 @@ void mpi_sendrecv(void *sndbuf, int *sndcount, int *sndtype,
   int *rcvcount, int *rcvtype, int *src,
   int *rcvtag, int *comm, int *status, int *ierr)
 {
-  *ierr = MPI_Sendrecv(sndbuf, *sndcount, *sndtype, *dest, *sndtag,
+  *ierr = AMPI_Sendrecv(sndbuf, *sndcount, *sndtype, *dest, *sndtag,
                         rcvbuf, *rcvcount, *rcvtype, *src, *rcvtag,
 			*comm, (MPI_Status*) status);
 }
@@ -227,231 +227,231 @@ void mpi_sendrecv_replace(void *buf, int* count, int* datatype,
                           int* dest, int* sendtag, int* source, int* recvtag,
                           int* comm, int* status, int *ierr)
 {
-  *ierr = MPI_Sendrecv_replace(buf, *count, *datatype, *dest, *sendtag,
+  *ierr = AMPI_Sendrecv_replace(buf, *count, *datatype, *dest, *sendtag,
                                *source, *recvtag, *comm, (MPI_Status*) status);
 }
 
 void mpi_barrier(int *comm, int *ierr)
 {
-  *ierr = MPI_Barrier(*comm);
+  *ierr = AMPI_Barrier(*comm);
 }
 
 void mpi_bcast(void *buf, int *count, int *type, int *root, int *comm, 
    int *ierr)
 {
-  *ierr = MPI_Bcast(buf, *count, *type, *root, *comm);
+  *ierr = AMPI_Bcast(buf, *count, *type, *root, *comm);
 }
 
 void mpi_reduce(void *inbuf, void *outbuf, int *count, int *type,
    int *op, int *root, int *comm, int *ierr)
 {
-  *ierr = MPI_Reduce(inbuf, outbuf, *count, *type, *op, *root, *comm);
+  *ierr = AMPI_Reduce(inbuf, outbuf, *count, *type, *op, *root, *comm);
 }
 
 void mpi_allreduce(void *inbuf,void *outbuf,int *count,int *type,
    int *op, int *comm, int *ierr)
 {
-  *ierr = MPI_Allreduce(inbuf, outbuf, *count, *type, *op, *comm);
+  *ierr = AMPI_Allreduce(inbuf, outbuf, *count, *type, *op, *comm);
 }
 
 double mpi_wtime(void)
 {
-  return MPI_Wtime();
+  return AMPI_Wtime();
 }
 
 double mpi_wtick(void)
 {
-  return MPI_Wtick();
+  return AMPI_Wtick();
 }
 
 void mpi_start(int *reqnum, int *ierr)
 {
-  *ierr = MPI_Start((MPI_Request*) reqnum);
+  *ierr = AMPI_Start((MPI_Request*) reqnum);
 }
 
 void mpi_startall(int *count, int *reqnum, int *ierr)
 {
-  *ierr = MPI_Startall(*count, (MPI_Request*) reqnum);
+  *ierr = AMPI_Startall(*count, (MPI_Request*) reqnum);
 }
 
 void mpi_waitall(int *count, int *request, int *status, int *ierr)
 {
-  *ierr = MPI_Waitall(*count, (MPI_Request*) request, (MPI_Status*) status);
+  *ierr = AMPI_Waitall(*count, (MPI_Request*) request, (MPI_Status*) status);
 }
 
 void mpi_waitany(int *count, int *request, int *index, int *status, int *ierr)
 {
-  *ierr = MPI_Waitany(*count, (MPI_Request*) request, index,
+  *ierr = AMPI_Waitany(*count, (MPI_Request*) request, index,
                        (MPI_Status*) status);
 }
 
 void mpi_wait(int *request, int *status, int *ierr)
 {
-  *ierr = MPI_Wait((MPI_Request*) request, (MPI_Status*) status);
+  *ierr = AMPI_Wait((MPI_Request*) request, (MPI_Status*) status);
 }
 
 void mpi_testall(int *count, int *request, int *flag, int *status, int *ierr)
 {
-  *ierr = MPI_Testall(*count, (MPI_Request*) request, flag,
+  *ierr = AMPI_Testall(*count, (MPI_Request*) request, flag,
       (MPI_Status*) status);
 }
 
 void mpi_waitsome(int *incount, int *array_of_requests, int *outcount, int *array_of_indices, int *array_of_statuses, int *ierr)
 {
-  *ierr = MPI_Waitsome(*incount, (MPI_Request *)array_of_requests, outcount, array_of_indices, (MPI_Status*) array_of_statuses);
+  *ierr = AMPI_Waitsome(*incount, (MPI_Request *)array_of_requests, outcount, array_of_indices, (MPI_Status*) array_of_statuses);
 }
 
 void mpi_testsome(int *incount, int *array_of_requests, int *outcount, int *array_of_indices, int *array_of_statuses, int *ierr)
 {
-  *ierr = MPI_Testsome(*incount, (MPI_Request *)array_of_requests, outcount, array_of_indices, (MPI_Status*) array_of_statuses);
+  *ierr = AMPI_Testsome(*incount, (MPI_Request *)array_of_requests, outcount, array_of_indices, (MPI_Status*) array_of_statuses);
 }
 
 void mpi_testany(int *count, int *request, int *index, int *flag, int *status, int *ierr)
 {
-  *ierr = MPI_Testany(*count, (MPI_Request*) request, index, flag,
+  *ierr = AMPI_Testany(*count, (MPI_Request*) request, index, flag,
       (MPI_Status*) status);
 }
 
 void mpi_test(int *request, int *flag, int *status, int *ierr)
 {
-  *ierr = MPI_Test((MPI_Request*) request, flag, (MPI_Status*) status);
+  *ierr = AMPI_Test((MPI_Request*) request, flag, (MPI_Status*) status);
 }
 
 void mpi_request_free(int *request, int *ierr)
 {
-  *ierr = MPI_Request_free((MPI_Request *)request);
+  *ierr = AMPI_Request_free((MPI_Request *)request);
 }
 
 void mpi_cancel(int *request, int *ierr)
 {
-  *ierr = MPI_Cancel((MPI_Request *)request);
+  *ierr = AMPI_Cancel((MPI_Request *)request);
 }
 
 void mpi_recv_init(void *buf, int *count, int *type, int *srcpe,
    int *tag, int *comm, int *req, int *ierr)
 {
-  *ierr = MPI_Recv_init(buf,*count,*type,*srcpe,*tag,*comm,(MPI_Request*)req);
+  *ierr = AMPI_Recv_init(buf,*count,*type,*srcpe,*tag,*comm,(MPI_Request*)req);
 }
 
 void mpi_send_init(void *buf, int *count, int *type, int *destpe,
    int *tag, int *comm, int *req, int *ierr)
 {
-  *ierr = MPI_Send_init(buf,*count,*type,*destpe,*tag,*comm,
+  *ierr = AMPI_Send_init(buf,*count,*type,*destpe,*tag,*comm,
                          (MPI_Request*)req);
 }
 
 void mpi_type_contiguous(int *count, int *oldtype, int *newtype, int *ierr)
 {
-  *ierr = MPI_Type_contiguous(*count, *oldtype, newtype);
+  *ierr = AMPI_Type_contiguous(*count, *oldtype, newtype);
 }
 
 void mpi_type_vector(int *count, int *blocklength, int *stride,
    int *oldtype, int*  newtype, int *ierr)
 {
-  *ierr = MPI_Type_vector(*count, *blocklength, *stride, *oldtype, newtype);
+  *ierr = AMPI_Type_vector(*count, *blocklength, *stride, *oldtype, newtype);
 }
 
 void mpi_type_hvector(int *count, int *blocklength, int *stride,
    int* oldtype, int* newtype, int* ierr)
 {
-  *ierr = MPI_Type_hvector(*count, *blocklength, *stride, *oldtype, newtype);
+  *ierr = AMPI_Type_hvector(*count, *blocklength, *stride, *oldtype, newtype);
 }
 
 void mpi_type_indexed(int *count, int* arrBlength, int* arrDisp,
    int* oldtype, int*  newtype, int* ierr)
 {
-  *ierr = MPI_Type_indexed(*count, arrBlength, arrDisp, *oldtype, newtype);
+  *ierr = AMPI_Type_indexed(*count, arrBlength, arrDisp, *oldtype, newtype);
 }
 
 void mpi_type_hindexed(int* count, int* arrBlength, int* arrDisp,
    int* oldtype, int* newtype, int* ierr)
 {
-  *ierr = MPI_Type_hindexed(*count, arrBlength, arrDisp, *oldtype, newtype);
+  *ierr = AMPI_Type_hindexed(*count, arrBlength, arrDisp, *oldtype, newtype);
 }
 
 void mpi_type_struct(int* count, int* arrBlength, int* arrDisp,
    int* oldtype, int* newtype, int* ierr)
 {
-  *ierr = MPI_Type_struct(*count, arrBlength, arrDisp, oldtype, newtype);
+  *ierr = AMPI_Type_struct(*count, arrBlength, arrDisp, oldtype, newtype);
 }
 
 
 void mpi_type_commit(int *type, int *ierr)
 {
-  *ierr = MPI_Type_commit(type);
+  *ierr = AMPI_Type_commit(type);
 }
 
 void mpi_type_free(int *type, int *ierr)
 {
-  *ierr = MPI_Type_free(type);
+  *ierr = AMPI_Type_free(type);
 }
 
 void  mpi_type_extent(int* type, int* extent, int* ierr)
 {
-  *ierr = MPI_Type_extent(*type, extent);
+  *ierr = AMPI_Type_extent(*type, extent);
 }
 
 void  mpi_type_size(int* type, int* size, int* ierr)
 {
-  *ierr = MPI_Type_size(*type, size);
+  *ierr = AMPI_Type_size(*type, size);
 }
 
 void mpi_type_lb(int* datatype, int* displacement, int* ierr)
 {
-  *ierr = MPI_Type_lb(*datatype, displacement);
+  *ierr = AMPI_Type_lb(*datatype, displacement);
 }
 
 void mpi_type_ub(int* datatype, int* displacement, int* ierr)
 {
-  *ierr = MPI_Type_ub(*datatype, displacement);
+  *ierr = AMPI_Type_ub(*datatype, displacement);
 }
 
 void mpi_address(int* location, int *address, int* ierr)
 {
-  *ierr = MPI_Address(location, address);
+  *ierr = AMPI_Address(location, address);
 }
 
 void mpi_get_elements(int *status, int* datatype, int *count, int* ierr)
 {
-  *ierr = MPI_Get_elements((MPI_Status*) status, *datatype, count);
+  *ierr = AMPI_Get_elements((MPI_Status*) status, *datatype, count);
 }
 
 void mpi_pack(void *inbuf, int *incount, int *datatype, void *outbuf,
     int *outsize, int *position, int *comm, int *ierr)
 {
-  *ierr = MPI_Pack(inbuf, *incount, (MPI_Datatype)*datatype, outbuf,
+  *ierr = AMPI_Pack(inbuf, *incount, (MPI_Datatype)*datatype, outbuf,
       *outsize, position, *comm);
 }
 
 void mpi_unpack(void *inbuf, int *insize, int *position, void *outbuf,
     int *outcount, int *datatype, int *comm, int *ierr)
 {
-  *ierr = MPI_Unpack(inbuf, *insize, position, outbuf, *outcount,
+  *ierr = AMPI_Unpack(inbuf, *insize, position, outbuf, *outcount,
       (MPI_Datatype) *datatype, (MPI_Comm) *comm);
 }
 
 void mpi_pack_size(int *incount, int *datatype, int *comm, int *size, int *ierr)
 {
-  *ierr = MPI_Pack_size(*incount, (MPI_Datatype) *datatype, *comm, size);
+  *ierr = AMPI_Pack_size(*incount, (MPI_Datatype) *datatype, *comm, size);
 }
 
 void mpi_isend(void *buf, int *count, int *datatype, int *dest,
    int *tag, int *comm, int *request, int *ierr)
 {
-  *ierr = MPI_Isend(buf, *count, *datatype, *dest, *tag, *comm, (MPI_Request *)request);
+  *ierr = AMPI_Isend(buf, *count, *datatype, *dest, *tag, *comm, (MPI_Request *)request);
 }
 
 void mpi_irecv(void *buf, int *count, int *datatype, int *src,
    int *tag, int *comm, int *request, int *ierr)
 {
-  *ierr = MPI_Irecv(buf, *count, *datatype, *src, *tag, *comm, (MPI_Request *)request);
+  *ierr = AMPI_Irecv(buf, *count, *datatype, *src, *tag, *comm, (MPI_Request *)request);
 }
 
 void mpi_allgatherv(void *sendbuf, int *sendcount, int *sendtype,
    void *recvbuf, int *recvcounts, int *displs,
    int *recvtype, int *comm, int *ierr)
 {
-  *ierr = MPI_Allgatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
+  *ierr = AMPI_Allgatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
                           displs, *recvtype, *comm);
 }
 
@@ -459,7 +459,7 @@ void mpi_allgather(void *sendbuf, int *sendcount, int *sendtype,
    void *recvbuf, int *recvcount, int *recvtype,
    int *comm, int *ierr)
 {
-  *ierr = MPI_Allgather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
+  *ierr = AMPI_Allgather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                          *recvtype, *comm);
 }
 
@@ -467,7 +467,7 @@ void mpi_gatherv(void *sendbuf, int *sendcount, int *sendtype,
    void *recvbuf, int *recvcounts, int *displs,
    int *recvtype, int *root, int *comm, int *ierr)
 {
-  *ierr = MPI_Gatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
+  *ierr = AMPI_Gatherv(sendbuf, *sendcount, *sendtype, recvbuf, recvcounts,
                        displs, *recvtype, *root, *comm);
 }
 
@@ -475,14 +475,14 @@ void mpi_gather(void *sendbuf, int *sendcount, int *sendtype,
    void *recvbuf, int *recvcount, int *recvtype,
    int *root, int *comm, int *ierr)
 {
-  *ierr = MPI_Gather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
+  *ierr = AMPI_Gather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                       *recvtype, *root, *comm);
 }
 
 void mpi_scatterv(void *sendbuf, int *sendcounts, int *displs, int *sendtype,
    void *recvbuf, int *recvcount, int *recvtype, int *root, int *comm, int *ierr)
 {
-  *ierr = MPI_Scatterv(sendbuf, sendcounts, displs, *sendtype, recvbuf, *recvcount,
+  *ierr = AMPI_Scatterv(sendbuf, sendcounts, displs, *sendtype, recvbuf, *recvcount,
                        *recvtype, *root, *comm);
 }
 
@@ -490,7 +490,7 @@ void mpi_scatter(void *sendbuf, int *sendcount, int *sendtype,
    void *recvbuf, int *recvcount, int *recvtype,
    int *root, int *comm, int *ierr)
 {
-  *ierr = MPI_Scatter(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
+  *ierr = AMPI_Scatter(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                       *recvtype, *root, *comm);
 }
 
@@ -498,7 +498,7 @@ void mpi_alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
    int *sendtype, void *recvbuf, int *recvcounts,
    int *rdispls, int *recvtype, int *comm, int *ierr)
 {
-  *ierr = MPI_Alltoallv(sendbuf, sendcounts, sdispls, *sendtype, recvbuf,
+  *ierr = AMPI_Alltoallv(sendbuf, sendcounts, sdispls, *sendtype, recvbuf,
                          recvcounts, rdispls, *recvtype, *comm);
 }
 
@@ -506,7 +506,7 @@ void mpi_alltoall(void *sendbuf, int *sendcount, int *sendtype,
    void *recvbuf, int *recvcount, int *recvtype,
    int *comm, int *ierr)
 {
-  *ierr = MPI_Alltoall(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
+  *ierr = AMPI_Alltoall(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                        *recvtype, *comm);
 }
 
@@ -514,7 +514,7 @@ void mpi_iallgather(void *sendbuf, int* sendcount, int* sendtype,
                     void *recvbuf, int* recvcount, int* recvtype,
                     int* comm, int* request, int* ierr)
 {
-  *ierr = MPI_Iallgather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
+  *ierr = AMPI_Iallgather(sendbuf, *sendcount, *sendtype, recvbuf, *recvcount,
                          *recvtype, *comm, (MPI_Request *)request);
 
 }
@@ -523,7 +523,7 @@ void mpi_ialltoall(void *sendbuf, int* sendcount, int* sendtype,
                  void *recvbuf, int* recvcount, int* recvtype,
                  int* comm, int *request, int* ierr)
 {
-  *ierr = MPI_Ialltoall(sendbuf, *sendcount, *sendtype,
+  *ierr = AMPI_Ialltoall(sendbuf, *sendcount, *sendtype,
                         recvbuf, *recvcount, *recvtype,
                         *comm, (MPI_Request *)request);
 }
@@ -531,26 +531,26 @@ void mpi_ialltoall(void *sendbuf, int* sendcount, int* sendtype,
 void mpi_ireduce(void *sendbuf, void *recvbuf, int* count, int* type,
                 int* op, int* root, int* comm, int *request, int* ierr)
 {
-  *ierr = MPI_Ireduce(sendbuf, recvbuf, *count, *type,
+  *ierr = AMPI_Ireduce(sendbuf, recvbuf, *count, *type,
                       *op, *root, *comm, (MPI_Request*) request);
 }
 
 void mpi_iallreduce(void *inbuf, void *outbuf, int* count, int* type,
                    int* op, int* comm, int *request, int* ierr)
 {
-  *ierr = MPI_Iallreduce(inbuf, outbuf, *count, *type,
+  *ierr = AMPI_Iallreduce(inbuf, outbuf, *count, *type,
                          *op, *comm, (MPI_Request*) request);
 }
 void mpi_reduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
                        int* datatype, int* op, int* comm, int* ierr)
 {
-  *ierr = MPI_Reduce_scatter(sendbuf, recvbuf, recvcounts,
+  *ierr = AMPI_Reduce_scatter(sendbuf, recvbuf, recvcounts,
                              *datatype, *op, *comm);
 }
 
 void mpi_scan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* op, int* comm, int* ierr)
 {
-  *ierr = MPI_Scan(sendbuf,recvbuf,*count,*datatype,*op,*comm );
+  *ierr = AMPI_Scan(sendbuf,recvbuf,*count,*datatype,*op,*comm );
 }
 
 void mpi_comm_dup(int *comm, int *newcomm, int *ierr)
@@ -561,7 +561,7 @@ void mpi_comm_dup(int *comm, int *newcomm, int *ierr)
 
 void mpi_comm_split(int* src, int* color, int* key, int *dest, int *ierr)
 {
-  *ierr = MPI_Comm_split(*src, *color, *key, dest);
+  *ierr = AMPI_Comm_split(*src, *color, *key, dest);
 }
 
 void mpi_comm_free(int *comm, int *ierr)
@@ -571,100 +571,100 @@ void mpi_comm_free(int *comm, int *ierr)
 
 void mpi_comm_test_inter(int* comm, int* flag, int* ierr)
 {
-  *ierr = MPI_Comm_test_inter(*comm, flag);
+  *ierr = AMPI_Comm_test_inter(*comm, flag);
 }
 
 void mpi_cart_create(int* comm_old, int* ndims, int *dims, int *periods,
 		    int* reorder, int* comm_cart, int* ierr)
 {
-  *ierr = MPI_Cart_create(*comm_old, *ndims, dims, periods, *reorder, comm_cart);
+  *ierr = AMPI_Cart_create(*comm_old, *ndims, dims, periods, *reorder, comm_cart);
 }
 
 void mpi_graph_create(int* comm_old, int* nnodes, int *index, int *edges,
 		     int* reorder, int* comm_graph, int* ierr)
 {
-  *ierr = MPI_Graph_create(*comm_old, *nnodes, index, edges, *reorder, comm_graph);
+  *ierr = AMPI_Graph_create(*comm_old, *nnodes, index, edges, *reorder, comm_graph);
 }
 
 void mpi_topo_test(int* comm, int *status, int* ierr)
 {
-  *ierr = MPI_Topo_test(*comm, status);
+  *ierr = AMPI_Topo_test(*comm, status);
 }
 
 void mpi_cart_map(int* comm, int* ndims, int *dims, int *periods,
                  int *newrank, int* ierr)
 {
-  *ierr = MPI_Cart_map(*comm, *ndims, dims, periods, newrank);
+  *ierr = AMPI_Cart_map(*comm, *ndims, dims, periods, newrank);
 }
 
 void mpi_graph_map(int* comm, int* nnodes, int *index, int *edges,
 		  int *newrank, int* ierr)
 {
-  *ierr = MPI_Graph_map(*comm, *nnodes, index, edges, newrank);
+  *ierr = AMPI_Graph_map(*comm, *nnodes, index, edges, newrank);
 }
 
 void mpi_cartdim_get(int* comm, int *ndims, int* ierr)
 {
-  *ierr = MPI_Cartdim_get(*comm, ndims);
+  *ierr = AMPI_Cartdim_get(*comm, ndims);
 }
 
 void mpi_cart_get(int* comm, int* maxdims, int *dims, int *periods,
 		 int *coords, int* ierr)
 {
-  *ierr = MPI_Cart_get(*comm, *maxdims, dims, periods, coords);
+  *ierr = AMPI_Cart_get(*comm, *maxdims, dims, periods, coords);
 }
 
 void mpi_cart_rank(int* comm, int *coords, int *rank, int* ierr)
 {
-  *ierr = MPI_Cart_rank(*comm, coords, rank);
+  *ierr = AMPI_Cart_rank(*comm, coords, rank);
 }
 
 void mpi_cart_coords(int* comm, int* rank, int* maxdims, int *coords, int* ierr)
 {
-  *ierr = MPI_Cart_coords(*comm, *rank, *maxdims, coords);
+  *ierr = AMPI_Cart_coords(*comm, *rank, *maxdims, coords);
 }
 
 void mpi_cart_shift(int* comm, int* direction, int* disp, int *rank_source,
 		   int *rank_dest, int* ierr)
 {
-  *ierr = MPI_Cart_shift(*comm, *direction, *disp, rank_source, rank_dest);
+  *ierr = AMPI_Cart_shift(*comm, *direction, *disp, rank_source, rank_dest);
 }
 
 void mpi_graphdims_get(int* comm, int *nnodes, int *nedges, int* ierr)
 {
-  *ierr = MPI_Graphdims_get(*comm, nnodes, nedges);
+  *ierr = AMPI_Graphdims_get(*comm, nnodes, nedges);
 }
 
 void mpi_graph_get(int* comm, int *maxindex, int *maxedges, int *index,
 		  int *edges, int* ierr)
 {
-  *ierr = MPI_Graph_get(*comm, *maxindex, *maxedges, index, edges);
+  *ierr = AMPI_Graph_get(*comm, *maxindex, *maxedges, index, edges);
 }
 
 void mpi_graph_neighbors_count(int* comm, int *rank, int *nneighbors, int* ierr)
 {
-  *ierr = MPI_Graph_neighbors_count(*comm, *rank, nneighbors);
+  *ierr = AMPI_Graph_neighbors_count(*comm, *rank, nneighbors);
 }
 
 void mpi_graph_neighbors(int* comm, int *rank, int *maxneighbors,
 			int *neighbors, int* ierr)
 {
-  *ierr = MPI_Graph_neighbors(*comm, *rank, *maxneighbors, neighbors);
+  *ierr = AMPI_Graph_neighbors(*comm, *rank, *maxneighbors, neighbors);
 }
 
 void mpi_dims_create(int *nnodes, int *ndims, int *dims, int* ierr)
 {
-  *ierr = MPI_Dims_create(*nnodes, *ndims, dims);
+  *ierr = AMPI_Dims_create(*nnodes, *ndims, dims);
 }
 
 void mpi_cart_sub(int* comm, int *remain_dims, int* newcomm, int* ierr)
 {
-  *ierr = MPI_Cart_sub(*comm, remain_dims, newcomm);
+  *ierr = AMPI_Cart_sub(*comm, remain_dims, newcomm);
 }
 
 void mpi_get_processor_name(char* name, int *resultlen, int *ierr)
 {
-  *ierr = MPI_Get_processor_name(name, resultlen);
+  *ierr = AMPI_Get_processor_name(name, resultlen);
 }
 
 void mpi_errhandler_create(int *function, int *errhandler, int *ierr){  *ierr = 0;  }
@@ -673,64 +673,64 @@ void mpi_errhandler_get(int* comm, int *errhandler, int *ierr){  *ierr = 0;  }
 void mpi_errhandler_free(int *errhandler, int *ierr){  *ierr = 0;  }
 void mpi_error_string(int* errorcode, char *string, int *resultlen, int *ierr)
 {
-  *ierr = MPI_Error_string(*errorcode, string, resultlen);
+  *ierr = AMPI_Error_string(*errorcode, string, resultlen);
 }
 void mpi_error_class(int* errorcode, int *errorclass, int *ierr)
 {
-  *ierr = MPI_Error_class(*errorcode, errorclass);
+  *ierr = AMPI_Error_class(*errorcode, errorclass);
 }
 
 void mpi_group_size(int* group, int* size, int* ierror){
-  *ierror = MPI_Group_size(*group, size);
+  *ierror = AMPI_Group_size(*group, size);
 }
 void mpi_group_rank(int* group, int* rank, int* ierror){
-  *ierror = MPI_Group_rank(*group, rank);
+  *ierror = AMPI_Group_rank(*group, rank);
 }
 void mpi_group_translate_ranks(int* group1, int* n, int* ranks1, int* group2, int* ranks2, int* ierror){
-  *ierror = MPI_Group_translate_ranks(*group1, *n, ranks1, *group2, ranks2);
+  *ierror = AMPI_Group_translate_ranks(*group1, *n, ranks1, *group2, ranks2);
 }
 void mpi_group_compare(int* group1, int* group2, int* result, int* ierror){
-  *ierror = MPI_Group_compare(*group1, *group2, result);
+  *ierror = AMPI_Group_compare(*group1, *group2, result);
 }
 void mpi_comm_group(int* comm, int* group, int* ierror){
-  *ierror = MPI_Comm_group(*comm, group);
+  *ierror = AMPI_Comm_group(*comm, group);
 }
 void mpi_group_union(int* group1, int* group2, int* newgroup, int* ierror){
-  *ierror = MPI_Group_union(*group1, *group2, newgroup);
+  *ierror = AMPI_Group_union(*group1, *group2, newgroup);
 }
 void mpi_group_intersection(int* group1, int* group2, int* newgroup, int* ierror){
-  *ierror = MPI_Group_intersection(*group1, *group2, newgroup);
+  *ierror = AMPI_Group_intersection(*group1, *group2, newgroup);
 }
 void mpi_group_difference(int* group1, int* group2, int* newgroup, int* ierror){
-  *ierror = MPI_Group_difference(*group1, *group2, newgroup);
+  *ierror = AMPI_Group_difference(*group1, *group2, newgroup);
 }
 void mpi_group_incl(int* group, int* n, int* ranks, int* newgroup, int* ierror){
-  *ierror = MPI_Group_incl(*group, *n, ranks, newgroup);
+  *ierror = AMPI_Group_incl(*group, *n, ranks, newgroup);
 }
 void mpi_group_excl(int* group, int* n, int* ranks, int* newgroup, int* ierror){
-  *ierror = MPI_Group_excl(*group, *n, ranks, newgroup);
+  *ierror = AMPI_Group_excl(*group, *n, ranks, newgroup);
 }
 void mpi_group_range_incl(int* group, int* n, int ranges[][3], int* newgroup, int* ierror){
-  *ierror = MPI_Group_range_incl(*group, *n, ranges, newgroup);
+  *ierror = AMPI_Group_range_incl(*group, *n, ranges, newgroup);
 }
 void mpi_group_range_excl(int* group,int*  n, int ranges[][3], int* newgroup, int* ierror){
-  *ierror = MPI_Group_range_excl(*group, *n, ranges, newgroup);
+  *ierror = AMPI_Group_range_excl(*group, *n, ranges, newgroup);
 }
 void mpi_group_free(int*  group, int*  ierror){
   *ierror = 0;
 }
 void mpi_comm_create(int*  comm, int*  group, int*  newcomm, int*  ierror){
-  *ierror = MPI_Comm_create(*comm, *group, newcomm);
+  *ierror = AMPI_Comm_create(*comm, *group, newcomm);
 }
 
 void mpi_abort(int *comm, int *errorcode, int *ierr)
 {
-  *ierr = MPI_Abort(*comm, *errorcode);
+  *ierr = AMPI_Abort(*comm, *errorcode);
 }
 
 void mpi_get_count(int *sts, int *dtype, int *cnt, int *ierr)
 {
-  *ierr = MPI_Get_count((MPI_Status*) sts, *dtype, cnt);
+  *ierr = AMPI_Get_count((MPI_Status*) sts, *dtype, cnt);
 }
 
 void mpi_print(char *str, int *len)
@@ -738,153 +738,153 @@ void mpi_print(char *str, int *len)
   char *tmpstr = new char[*len+1];
   memcpy(tmpstr,str,*len);
   tmpstr[*len] = '\0';
-  MPI_Print(tmpstr);
+  AMPI_Print(tmpstr);
   delete[] tmpstr;
 }
 
 void mpi_migrate(void)
 {
-  MPI_Migrate();
+  AMPI_Migrate();
 }
 
 void mpi_register(void *d, MPI_PupFn f)
 {
-  MPI_Register(d,f);
+  AMPI_Register(d,f);
 }
 
 void mpi_get_userdata(int* dn, void *data)
 {
-  data = MPI_Get_userdata(*dn); 
+  data = AMPI_Get_userdata(*dn); 
 }
 
 void mpi_checkpoint(char *dname){
-  MPI_Checkpoint(dname);
+  AMPI_Checkpoint(dname);
 }
 
 void mpi_comm_remote_size(int *comm, int *size, int *ierr){
-  *ierr = MPI_Comm_remote_size(*comm, size);
+  *ierr = AMPI_Comm_remote_size(*comm, size);
 }
 
 void mpi_comm_remote_group(int *comm, int *group, int *ierr){
-  *ierr = MPI_Comm_remote_group(*comm, group);
+  *ierr = AMPI_Comm_remote_group(*comm, group);
 }
 
 void mpi_intercomm_create(int *local_comm, int *local_leader, int *peer_comm, int *remote_leader, int *tag, int *newintercomm, int *ierr){
-  *ierr = MPI_Intercomm_create(*local_comm, *local_leader, *peer_comm, *remote_leader, *tag, newintercomm);
+  *ierr = AMPI_Intercomm_create(*local_comm, *local_leader, *peer_comm, *remote_leader, *tag, newintercomm);
 }
 
 void mpi_intercomm_merge(int *intercomm, int *high, int *newintracomm, int *ierr){
-  *ierr = MPI_Intercomm_merge(*intercomm, *high, newintracomm);
+  *ierr = AMPI_Intercomm_merge(*intercomm, *high, newintracomm);
 }
 
 void mpi_keyval_create(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn, int *keyval, void* extra_state, int *ierr) {
-  *ierr = MPI_Keyval_create(copy_fn, delete_fn, keyval, extra_state);
+  *ierr = AMPI_Keyval_create(copy_fn, delete_fn, keyval, extra_state);
 }
 
 void mpi_keyval_free(int *keyval, int *ierr){
-  *ierr = MPI_Keyval_free(keyval);
+  *ierr = AMPI_Keyval_free(keyval);
 }
 
 void mpi_attr_put(int *comm, int *keyval, void* attribute_val, int *ierr){
-  *ierr = MPI_Attr_put(*comm, *keyval, attribute_val);
+  *ierr = AMPI_Attr_put(*comm, *keyval, attribute_val);
 }
 
 void mpi_attr_get(int *comm, int *keyval, void *attribute_val, int *flag, int *ierr){
-  *ierr = MPI_Attr_get(*comm, *keyval, attribute_val, flag);
+  *ierr = AMPI_Attr_get(*comm, *keyval, attribute_val, flag);
 }
 
 void mpi_attr_delete(int *comm, int *keyval, int *ierr) {
-  *ierr = MPI_Attr_delete(*comm, *keyval);
+  *ierr = AMPI_Attr_delete(*comm, *keyval);
 }
 
 void mpi_type_get_envelope(int *datatype, int *num_integers, int *num_addresses,
                           int *num_datatypes, int *combiner, int *ierr){
- *ierr = MPI_Type_get_envelope(*datatype, num_integers, num_addresses, num_datatypes, combiner);
+ *ierr = AMPI_Type_get_envelope(*datatype, num_integers, num_addresses, num_datatypes, combiner);
 }
 
 void mpi_type_get_contents(int *datatype, int *max_integers, int *max_addresses,
 			   int *max_datatypes, int array_of_integers[], int array_of_addresses[],
 			   int array_of_datatypes[], int *ierr){
-  *ierr = MPI_Type_get_contents(*datatype, *max_integers, *max_addresses, *max_datatypes, array_of_integers, 
+  *ierr = AMPI_Type_get_contents(*datatype, *max_integers, *max_addresses, *max_datatypes, array_of_integers, 
 				array_of_addresses, array_of_datatypes);
 }
 
 
 void mpi_win_create(void *base, int *size, int *disp_unit,
 		   int *info, int *comm, MPI_Win *newwin, int *ierr) {
-  *ierr = MPI_Win_create(base, *size, *disp_unit, *info, *comm, newwin);
+  *ierr = AMPI_Win_create(base, *size, *disp_unit, *info, *comm, newwin);
 }
 
 void mpi_win_free(int *win, int *ierr) {
-  *ierr = MPI_Win_free(win);
+  *ierr = AMPI_Win_free(win);
 }
 
 void mpi_win_delete_attr(int win, int *key, int *ierr){
-  *ierr = MPI_Win_delete_attr(win, *key);
+  *ierr = AMPI_Win_delete_attr(win, *key);
 }
 
 void mpi_win_get_group(int win, int *group, int *ierr){
-  *ierr = MPI_Win_get_group(win, group);
+  *ierr = AMPI_Win_get_group(win, group);
 }
 
 void mpi_win_set_name(int win, char *name, int *ierr){
-  *ierr = MPI_Win_set_name(win, name);
+  *ierr = AMPI_Win_set_name(win, name);
 }
 
 void mpi_win_get_name(int win, char *name, int *length, int *ierr){
-  *ierr = MPI_Win_get_name(win, name, length);
+  *ierr = AMPI_Win_get_name(win, name, length);
 }
 
 void mpi_win_fence(int *assertion, int win, int *ierr){
-  *ierr = MPI_Win_fence(*assertion, win);
+  *ierr = AMPI_Win_fence(*assertion, win);
 }
 
 void mpi_win_lock(int *lock_type, int *rank, int *assert, int win, int *ierr){
-  *ierr = MPI_Win_lock(*lock_type, *rank, *assert, win);
+  *ierr = AMPI_Win_lock(*lock_type, *rank, *assert, win);
 }
 
 void mpi_win_unlock(int *rank, int win, int *ierr){
-  *ierr = MPI_Win_unlock(*rank, win);
+  *ierr = AMPI_Win_unlock(*rank, win);
 }
 
 void mpi_win_post(int *group, int *assertion, int win, int *ierr){
-  *ierr = MPI_Win_post(*group, *assertion, win);
+  *ierr = AMPI_Win_post(*group, *assertion, win);
 }
 
 void mpi_win_wait(int win, int *ierr){
-  *ierr = MPI_Win_wait(win);
+  *ierr = AMPI_Win_wait(win);
 }
 
 void mpi_win_start(int *group, int *assertion, int win, int *ierr){
-  *ierr = MPI_Win_start(*group, *assertion, win);
+  *ierr = AMPI_Win_start(*group, *assertion, win);
 }
 
 void mpi_win_complete(int win, int *ierr){
-  *ierr = MPI_Win_complete(win);
+  *ierr = AMPI_Win_complete(win);
 }
 
 void mpi_alloc_mem(int *size, int *info, void *baseptr, int *ierr){
-  *ierr = MPI_Alloc_mem(*size, *info, baseptr);
+  *ierr = AMPI_Alloc_mem(*size, *info, baseptr);
 }
 
 void mpi_free_mem(void *base, int *ierr){
-  *ierr = MPI_Free_mem(base);
+  *ierr = AMPI_Free_mem(base);
 }
 
 void mpi_put(void *orgaddr, int *orgcnt, int *orgtype, int *rank, 
 	    int *targdisp, int *targcnt, int *targtype, int win, int *ierr){
-  *ierr = MPI_Put(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, win);
+  *ierr = AMPI_Put(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, win);
 }
 
 void mpi_get(void *orgaddr, int *orgcnt, int *orgtype, int *rank, 
 	    int *targdisp, int *targcnt, int *targtype, int win, int *ierr){
-  *ierr = MPI_Get(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, win);
+  *ierr = AMPI_Get(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, win);
 }
 
 void mpi_accumulate(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
 		   int *targdisp, int *targcnt, int *targtype, 
 		   int *op, int win, int *ierr){
-  *ierr = MPI_Accumulate(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, *op, win);
+  *ierr = AMPI_Accumulate(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, *op, win);
 }
 } // extern "C"
 

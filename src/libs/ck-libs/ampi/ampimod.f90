@@ -146,7 +146,7 @@ module MPIINCL
   external MPI_Win_wait
   external MPI_Win_start
   external MPI_Win_complete
-  external  MPI_Alloc_mem
+  external MPI_Alloc_mem
   external MPI_Free_mem
   external MPI_Put
   external MPI_Get
