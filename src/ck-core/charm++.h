@@ -140,6 +140,7 @@ static inline void _CHECK_CID(CkChareID cid, int idx)
 static inline void _CHECK_CID(CkChareID, int){}
 #endif
 
+#include "readonly.h"
 #include "ckarray.h"
 #include "ckstream.h"
 #include "CkFutures.decl.h"

@@ -27,6 +27,7 @@ int   _nodeBocHandlerIdx;
 int   _qdHandlerIdx;
 int   _triggerHandlerIdx;
 int   _triggersSent = 0;
+int   _mainDone = 0;
 
 CmiNodeLock _nodeLock;
 
@@ -565,6 +566,7 @@ void _initCharm(int argc, char **argv)
 			msg->argv = argv;
 			_entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
 		}
+    _mainDone = 1;
 
 		_STATS_RECORD_CREATE_CHARE_N(_numMains);
 		_STATS_RECORD_PROCESS_CHARE_N(_numMains);

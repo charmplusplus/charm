@@ -21,8 +21,12 @@ int _numMains;
 int _numReadonlies;
 int _numReadonlyMsgs;
 
+static int __registerDone = 0;;
+
 void _registerInit(void)
 {
+  if(__registerDone)
+    return;
   _numEntries =0;
   _numMsgs = 0;
   _numChares = 0;
@@ -41,12 +45,15 @@ void _registerInit(void)
   _MEMCHECK(_readonlyTable);
   _readonlyMsgs = new ReadonlyMsgInfo*[_READONLY_TABLE_SIZE];;
   _MEMCHECK(_readonlyMsgs);
+  __registerDone = 1;
 }
 
 extern "C"
 int CkRegisterMsg(const char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack, 
                   CkCoerceFnPtr coerce, size_t size)
 {
+  if(!__registerDone)
+    _registerInit();
   _msgTable[_numMsgs] = new MsgInfo(name, pack, unpack, coerce, size);
   _MEMCHECK(_msgTable[_numMsgs]);
   return _numMsgs++;
@@ -55,6 +62,8 @@ int CkRegisterMsg(const char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack,
 extern "C"
 int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx)
 {
+  if(!__registerDone)
+    _registerInit();
   _entryTable[_numEntries] = new EntryInfo(name, call, msgIdx, chareIdx);
   _MEMCHECK(_entryTable[_numEntries]);
   return _numEntries++;
@@ -63,6 +72,8 @@ int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx)
 extern "C"
 int CkRegisterChare(const char *name, int dataSz)
 {
+  if(!__registerDone)
+    _registerInit();
   _chareTable[_numChares] = new ChareInfo(name, dataSz);
   _MEMCHECK(_chareTable[_numChares]);
   return _numChares++;
@@ -71,17 +82,23 @@ int CkRegisterChare(const char *name, int dataSz)
 extern "C"
 void CkRegisterDefaultCtor(int chareIdx, int ctorEpIdx)
 {
+  if(!__registerDone)
+    _registerInit();
   _chareTable[chareIdx]->setDefaultCtor(ctorEpIdx);
 }
 extern "C"
 void CkRegisterMigCtor(int chareIdx, int ctorEpIdx)
 {
+  if(!__registerDone)
+    _registerInit();
   _chareTable[chareIdx]->setMigCtor(ctorEpIdx);
 }
 
 extern "C"
 int CkRegisterMainChare(int chareIdx, int entryIdx)
 {
+  if(!__registerDone)
+    _registerInit();
   _mainTable[_numMains] = new MainInfo(chareIdx, entryIdx);
   _MEMCHECK(_mainTable[_numMains]);
   return _numMains++;
@@ -90,6 +107,8 @@ int CkRegisterMainChare(int chareIdx, int entryIdx)
 extern "C"
 void CkRegisterReadonly(int size, void *ptr)
 {
+  if(!__registerDone)
+    _registerInit();
   _readonlyTable[_numReadonlies] = new ReadonlyInfo(size, ptr);
   _MEMCHECK(_readonlyTable[_numReadonlies]);
   _numReadonlies++;
@@ -99,6 +118,8 @@ void CkRegisterReadonly(int size, void *ptr)
 extern "C"
 void CkRegisterReadonlyMsg(void **pMsg)
 {
+  if(!__registerDone)
+    _registerInit();
   _readonlyMsgs[_numReadonlyMsgs] = new ReadonlyMsgInfo(pMsg);
   _MEMCHECK(_readonlyMsgs[_numReadonlyMsgs]);
   _numReadonlyMsgs++;
@@ -110,6 +131,8 @@ void CkRegisterReadonlyMsg(void **pMsg)
 extern "C"
 int registerEvent(char *name)
 {
+  if(!__registerDone)
+    _registerInit();
   return 0;
 }
 
