@@ -1,4 +1,5 @@
 \subsection{PUP}
+\label{sec:pup}
 
 The \index{PUP} PUP framework is a generic way to describe the data in an object.
 The \charmpp\ system can use this description to pack the object 
@@ -27,7 +28,6 @@ class foo \{
       p(q,3);
     \}
 \};
-PUPmarshall(foo); //<- for passing foo's as marshalled parameters
 \end{alltt}
 
 This class's pup routine describes the fields of a \uw{foo} to \charmpp\.
@@ -36,14 +36,11 @@ send \uw{foo} objects in messages, translate \uw{foo}s across processors,
 inspect and modify \uw{foo} objects in the debugger, and checkpoint 
 calculations involving \uw{foo}s.
 
-The \kw{PUPmarshall(\uw{foo})} statement allows foo objects to be
-marshalled properly when passed as parameters to \charmpp\ entry methods.
-
 As shown, data is described by passing it to an object of type 
 \index{PUP::er} \kw{PUP::er}.  You can apply a \kw{PUP::er} to any 
-primitive variable, as ``p(a)''.
+primitive variable or variable with a pup routine using ``p|a;''.
 For an array of primitive variables, you apply the array and an integer
-that gives the length of the array, as in ``p(q,3)''.  You can pass a 
+that gives the length of the array, as in ``p(q,3);''.  You can pass a 
 simple run of bytes 
 by calling the \kw{PUP::er} with a ``void *'' and number of bytes
 (bytes, however, prevents cross-platform operation).
@@ -63,17 +60,41 @@ The \kw{PUP::er} overhead is very small-- one virtual function call
 for each item or array to be packed/unpacked.  The actual packing/unpacking is
 normally a simple memory-to-memory binary copy. 
 
-Please note that if your object contains Structured Dagger code (see section ``Structured Dagger'') you must use the following syntax to correctly pup the object:
+The pup syntax ``p\verb.|.a'' normally results in a call to a's pup routine. 
+Note that this syntax is also used by parameter marshalling and copying readonly
+variables.
+If the variable a is from the C++ Standard Template Library, you must include the 
+operator\verb.|.'s for STL types by including the header ``pup\_stl.h''.
+If a is from some class \uw{myClass} that does not have a pup routine, you will 
+have to either write a pup routine or else define an operator\verb.|. for \uw{myClass}:
+
+\begin{itemize}
+\item Use the macro \kw{PUPbytes}(\uw{myClass}) in the header, which defines
+an operator\verb.|. to pup the class as sizeof(myClass) raw bytes.
+\item Define an operator\verb.|. for \uw{myClass} that does the appropriate packing.
+For example, if \uw{myClass} contains two fields \uw{a} and \uw{b}, the 
+operator\verb.|. might look like:
 
 \begin{alltt}
-class bar \{
- private:
-    int a,b;
+  inline void operator|(PUP::er &p,myClass &c) \{
+    p|c.a;
+    p|c.b;
+  \}
+\end{alltt}
+
+\end{itemize}
+
+
+Please note that if your object contains Structured Dagger code (see section ``Structured Dagger'') you must call the generated routine \kw{\_\_sdag\_pup} to correctly pup the Structured Dagger state:
+
+\begin{alltt}
+class bar : public barParent \{
  public:
     bar_SDAG_CODE 
     ...other methods...
 
     virtual void pup(PUP::er& p) \{
+      barParent::pup(p);
       __sdag_pup(p);
       ...pup other data here...
     \}
@@ -141,7 +162,6 @@ public:
       p(arr,n);//pup array data
     \}
 \};
-PUPmarshall(bar); //<- for passing foo's as marshalled parameters
 \end{alltt}
 
 
@@ -176,7 +196,8 @@ class has no data that needs to be packed.
 
 An abstract superclass---a superclass that will never actually be 
 packed---only needs to inherit from \kw{PUP::able} and include a 
-\kw{PUPable\_abstract(\uw{className})} macro in their body.  The 
+\kw{PUPable\_abstract(\uw{className})} macro in their body.  For
+these abstract classes, the 
 .ci file, \kw{PUPable\_decl} macro, and constructor are not needed.
 
 For example, if \uw{parent} is a concrete superclass and \uw{child} its
@@ -217,9 +238,6 @@ public:    ... more methods, possibly virtual ...
 \};
 
 \end{alltt}
-
-These declarations supercede the \kw{PUPmarshall} declaration 
-described earlier.
 
 With these declarations, then, we can automatically 
 allocate and pup a pointer to a parent or child
@@ -278,6 +296,14 @@ public:
 
 This same implementation will also work properly even if the tree's
 internal nodes are actually subclasses of treeNode.
+
+You may prefer to use the macros \kw{PUPable\_def(\uw{className})}
+and \kw{PUPable\_reg(\uw{className})} rather than using \kw{PUPable}
+in the .ci file.  \kw{PUPable\_def} provides routine definitions used
+by the \kw{PUP::able} machinery, and should be included in exactly one
+source file at file scope.  \kw{PUPable\_reg} registers this class
+with the runtime system, and should be executed exactly once per node 
+during program startup.
 
 Finally, a \kw{PUP::able} superclass like \uw{parent} above 
 must normally be passed around via a pointer or reference, because the object

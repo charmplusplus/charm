@@ -50,32 +50,37 @@ Array parameters and other parameters can be combined in arbitrary ways, as:
   entry void doGeneral(int nd,int dims[nd],float data[product(dims,nd)]);
 \end{alltt}
 The array length expression between the square brackets can be 
-any valid C++ expression, and may depend in any way on any of the passed
-parameters, global variables, or global data.  The array length expression
-is evaluated exactly once per invocation, on the sending side only.
+any valid C++ expression, including a fixed constant, and may depend 
+in any manner on any of the passed
+parameters or even on global functions or global data.  The array length 
+expression is evaluated exactly once per invocation, on the sending side only.
 Thus executing the \kw{doGeneral} method above will invoke the 
 (user-defined) \kw{product} function exactly once on the sending
 processor.
 
 \subsubsection{Marshalling User-Defined Structures and Classes}
 
-For a ``simple'' struct or class without dynamic allocation,
-virtual methods, or subclasses, the marshalling system will
-copy the type across machines as flat bytes.  Thus these sorts
-of structures will work properly as parameters or in arrays
-with no further effort:
+The marshalling system uses the pup framework to copy data,
+meaning every user class that is marshalled needs either a
+pup routine, a ``PUPbytes'' declaration, or a working operator|.
+See the PUP description in Section~\ref{sec:pup} for more details 
+on these routines.
 
 \begin{alltt}
 //Declarations:
 class point3d \{
 public:
     double x,y,z;    
+    void pup(PUP::er &p) \{
+      p|x; p|y; p|z;
+    \}
 \};
 
 typedef struct \{
     int refCount;
     char data[17];
 \} refChars;
+PUPbytes(date);
 
 class date \{
 public:
@@ -83,6 +88,10 @@ public:
     int year;
     //...non-virtual manipulation routines...
 \};
+inline void operator|(PUP::er &p,date &d) \{
+    p|d.month; p|d.day;
+    p|d.year;
+\}
 
 //In the .ci file:
     entry void pointRefOnDate(point3d &p,refChars r[d.year],date &d);
@@ -93,14 +102,31 @@ before including the ``.decl.h'' file.
 As usual in \CC, it is often dramatically more efficient to pass
 a large structure by reference (as shown) than by value.
 
-Complicated structures, such as those with dynamically
-allocated data or virtual methods can only be passed as
-parameters, but never in arrays.  They also must include a pup
-routine and \CC\ operator| (see the PUP chapter for details).
-\kw{PUP::able} structures may be passed via a pointer,
-but will be copied and then dynamically allocated on the receive side.
-For historical reasons, pointer-accessible structures cannot appear 
-alone in the parameter list (because they are confused with messages).
+For efficiency, arrays (like \uw{refChars} above) are always copied
+as blocks of bytes and passed via pointers.  This means classes
+that need their pup routines to be called, such as those with dynamically
+allocated data or virtual methods cannot be passed as arrays--use CkVec
+or STL vectors to pass lists of complicated user-defined classes. 
+For historical reasons, pointer-accessible structures 
+cannot appear alone in the parameter list (because they are confused 
+with messages).
 
-Large, complicated structures are most efficiently passed 
-via messages; not marshalling.
+The order of marshalling operations on the send side is:
+\begin{itemize}
+\item Call ``p\verb.|.a'' on each marshalled parameter with a sizing PUP::er.
+\item Compute the lengths of each array.
+\item Call ``p\verb.|.a'' on each marshalled parameter with a packing PUP::er.
+\item \kw{memcpy} each arrays' data.
+\end{itemize}
+
+The order of marshalling operations on the receive side is:
+\begin{itemize}
+\item Create an instance of each marshalled parameter using its default constructor.
+\item Call ``p\verb.|.a'' on each marshalled parameter using an unpacking PUP::er.
+\item Compute pointers into the message for each array.
+\end{itemize}
+
+Finally, very large structures are most efficiently passed via messages,
+because messages are an efficient, low-level construct that minimizes copying
+and overhead; but very complicated structures are easiest to pass via 
+marshalling, because marshalling uses the high-level pup framework.
