@@ -80,6 +80,22 @@
 #define MAXPATHLEN 1024
 #endif
 
+static double ftTimer;
+                                                                                
+double GetClock(void)
+{
+#if defined(_WIN32) && !defined(__CYGWIN__)
+  struct _timeb tv;
+  _ftime(&tv);
+  return (tv.time * 1.0 + tv.millitm * 1.0E-3);
+#else
+  struct timeval tv; int ok;
+  ok = gettimeofday(&tv, NULL);
+  if (ok<0) { perror("gettimeofday"); exit(1); }
+  return (tv.tv_sec * 1.0 + tv.tv_usec * 1.0E-6);
+#endif
+}
+
 
 int probefile(path)
     char *path;
@@ -1404,6 +1420,29 @@ int req_handle_scanf(ChMessage *msg,SOCKET fd)
   return REQ_OK;
 }
 
+#ifdef __FAULT__	
+void restart_node(int crashed_node);
+void reconnect_crashed_client(int socket_index,int crashed_node);
+void anounce_crash(int socket_index,int crashed_node);
+
+static int _last_crash = 0;			/* last crashed pe number */
+static int _crash_socket_index = 0;		/* last restart socket */
+
+int req_handle_crashack(ChMessage *msg,SOCKET fd)
+{
+  static int count = 0;
+  count ++;
+  if (count == req_nClients-1) {
+    /* only after everybody else update its nodetab, can this
+       restarted process continue */
+    printf("Charmrun> continue node: %d\n", _last_crash);
+    req_handle_initnodetab(NULL,req_clients[_crash_socket_index]);
+    _last_crash = 0;
+    count = 0;
+  }
+}
+#endif
+
 int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
 {
   char *cmd=msg->header.type;
@@ -1419,6 +1458,9 @@ int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
   else if (strcmp(cmd,"scanf")==0)      return req_handle_scanf(msg,replyFd);
   else if (strcmp(cmd,"ending")==0)     return req_handle_ending(msg,replyFd);
   else if (strcmp(cmd,"abort")==0)      return req_handle_abort(msg,replyFd);
+#ifdef __FAULT__	
+  else if (strcmp(cmd,"crash_ack")==0)   return req_handle_crashack(msg,replyFd);
+#endif
   else {
 #ifndef __FAULT__	
         fprintf(stderr,"Charmrun> Bad control socket request '%s'\n",cmd); 
@@ -1429,23 +1471,45 @@ int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
   return REQ_OK;
 }
 
+#ifdef __FAULT__
 void error_in_req_serve_client(SOCKET fd){
 	SOCKET * new_req_clients=(SOCKET *)malloc((req_nClients-1)*sizeof(SOCKET));
 	int count=0,i;
+	int crashed_node,crashed_pe,node_index,socket_index;
 	fprintf(stdout,"Socket %d failed \n",fd);
-	fflush(stdout);
-	skt_close(fd);
-	for(i=0;i<req_nClients;i++){
-		if(req_clients[i] != fd){
-			new_req_clients[count] = req_clients[i];
-			count++;
-		}else{
+	for(i=0;i<nodetab_max;i++){
+		if(nodetab_ctrlfd(i) == fd){
+			break;
 		}
 	}
-	free(req_clients);
-	req_clients = new_req_clients;
-	req_nClients--;
+	fflush(stdout);
+	skt_close(fd);
+	crashed_pe = i;
+	node_index = i-nodetab_rank(crashed_pe);
+	for(i=0;i<nodetab_rank0_size;i++){
+		if(node_index == nodetab_rank0_table[i]){
+			break;
+		}
+	}
+	crashed_node = i;
+	/** should also send a message to all the other processors telling them that this guy has crashed*/
+	/*anounce_crash(socket_index,crashed_node);*/
+	restart_node(crashed_node);
+	
+	fprintf(stdout,"charmrun says Processor %d failed Node %d\n",crashed_pe,crashed_node);
+	/** after the crashed processor has been recreated 
+	 it connects to charmrun. That data must now be filled 
+	 into the req_nClients array and the nodetab_table*/
+
+	for(i=0;i<req_nClients;i++){
+		if(req_clients[i] == fd){
+			break;
+		}
+	}	
+	socket_index = i;
+	reconnect_crashed_client(socket_index,crashed_node);
 }
+#endif
 
 void req_serve_client(SOCKET fd)
 {
@@ -1497,11 +1561,11 @@ int socket_error_in_poll(int code,const char *msg)
 	fprintf(stderr,"Charmrun: error on request socket--\n"
 			"%s\n",msg);
 #ifndef __FAULT__			
-  for (i=0;i<req_nClients;i++)
+	for (i=0;i<req_nClients;i++)
 		skt_close(req_clients[i]);
 	exit(1);
 #endif	
-	
+	ftTimer = GetClock();
 	return -1;
 }
 
@@ -2452,6 +2516,138 @@ void start_nodes_local(char ** env)
   free(envp[envc]);
   free(envp);
 }
+
+#ifdef __FAULT__
+
+void refill_nodetab_entry(int crashed_node);
+nodetab_host *replacement_host(int pe);
+
+void restart_node(int crashed_node){
+	int pe = nodetab_rank0_table[crashed_node];
+	FILE *f;
+	char startScript[200];
+	int restart_rsh_pid;
+	char **restart_argv;
+	int status=0;
+	int i;
+	/** write the startScript file to be sent**/
+  	sprintf(startScript,"/tmp/charmrun.%d.%d",getpid(),pe);
+  	f=fopen(startScript,"w");
+	
+	/** add an argument to the argv of the new process
+	so that the restarting processor knows that it 
+	is a restarting processor */
+	i=0;
+	while(arg_argv[i]!= NULL){
+		i++;
+	}
+	restart_argv = (char **)malloc(sizeof(char *)*(i+2));
+	i=0;
+	while(arg_argv[i]!= NULL){
+		restart_argv[i] = arg_argv[i];
+		i++;
+	}
+	restart_argv[i] = "+restartaftercrash";
+	restart_argv[i+1]=NULL;
+
+  	rsh_script(f,pe,crashed_node,restart_argv);
+  	fclose(f);
+	/** change the nodetable entry of the crashed
+	processor to connect it to a new one**/
+	refill_nodetab_entry(crashed_node);
+	/**start the new processor */
+	restart_rsh_pid =rsh_fork(pe,startScript);
+	/**wait for the reply from the new process*/
+	status=0;
+	do{
+		waitpid(restart_rsh_pid,&status,0);
+	}while(!WIFEXITED(status));
+  	if (WEXITSTATUS(status)!=0){
+  	 fprintf(stderr,"Charmrun> Error %d returned from new attempted rsh \n",
+         WEXITSTATUS(status));
+         exit(1);
+  	}     
+	printf("Charmrun finished launching new process in %fs\n", GetClock()-ftTimer);
+}
+
+
+
+void refill_nodetab_entry(int crashed_node){
+	int pe =  nodetab_rank0_table[crashed_node];
+	nodetab_host *h = nodetab_table[pe];
+	*h = *(replacement_host(pe));
+}
+
+nodetab_host *replacement_host(int pe){
+	int x=pe;
+	while(x == pe){
+	 x = rand()%nodetab_size;	 
+	}
+	return nodetab_table[x];
+}
+
+void reconnect_crashed_client(int socket_index,int crashed_node){
+	int i;
+	unsigned int clientPort;
+	skt_ip_t clientIP;
+	ChSingleNodeinfo *in;
+	if(0==skt_select1(server_fd,arg_timeout*1000)){
+			client_connect_problem(socket_index,"Timeout waiting forrestarted node-program to connect");
+	}
+	req_clients[socket_index] = skt_accept(server_fd,&clientIP,&clientPort);
+	if(req_clients[socket_index] == SOCKET_ERROR){
+		client_connect_problem(socket_index,"Failure in restarted node accept");
+	}else{
+		ChMessage msg;
+		if(!skt_select1(req_clients[socket_index],arg_timeout*1000)){
+			client_connect_problem(socket_index,"Timeout on IP request for restarted processor");
+		}
+		ChMessage_recv(req_clients[socket_index],&msg);
+		if(msg.len != sizeof(ChSingleNodeinfo)){
+ 	  	fprintf(stderr,"Charmrun: Bad initnode data length. Aborting\n");
+  	  	fprintf(stderr,"Charmrun: possibly because: %s.\n", msg.data);
+		}
+		/** update the nodetab entry corresponding to
+		this node, skip the restarted one */
+		in = (ChSingleNodeinfo *)msg.data;
+		nodeinfo_add(in,req_clients[socket_index]);
+		for(i=0;i<req_nClients;i++){
+			if(i != socket_index){
+				req_handle_initnodetab(NULL,req_clients[i]);
+			}	
+		}
+
+		/* tell every one there is a crash */
+		anounce_crash(socket_index,crashed_node);
+ 		if (_last_crash != 0) {
+          	  fprintf(stderr, "ERROR> Charmrun detected multiple crashes.\n");
+               	  exit(1);
+ 		}
+		_last_crash = crashed_node;
+		_crash_socket_index = socket_index;
+		/*holds the restarted process until I got ack back from
+		  everyone in req_handle_crashack
+		  now the restarted one can only continue until 
+		  req_handle_crashack calls req_handle_initnodetab(socket_index)
+		  req_handle_initnodetab(NULL,req_clients[socket_index]); */
+		ChMessage_free(&msg);
+	}	
+}
+
+void anounce_crash(int socket_index,int crashed_node){
+	int i;
+	ChMessageHeader hdr;
+	ChMessageInt_t crashNo=ChMessageInt_new(crashed_node);
+	ChMessageHeader_new("crashnode",sizeof(ChMessageInt_t),&hdr);
+	for(i=0;i<req_nClients;i++){
+		if(i != socket_index){
+			skt_sendN(req_clients[i],(const char *)&hdr,sizeof(hdr));
+			skt_sendN(req_clients[i],(const char *)&crashNo,sizeof(ChMessageInt_t));
+		}
+	}
+}
+
+#endif
 
 #endif /*CMK_USE_RSH*/
 
