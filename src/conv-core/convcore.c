@@ -1570,15 +1570,13 @@ int CsdScheduler(int maxmsgs)
 #endif
       if (msg==0) FIFO_DeQueue(localqueue, (void **)&msg);
 #if CMK_NODE_QUEUE_AVAILABLE
-      if (msg==0) {
-      	msg = CmiGetNonLocalNodeQ();
-	CmiLock(CsvAccess(CsdNodeQueueLock));
-	if (msg==0 && 
-            !CqsPrioGT(CqsGetPriority(CsvAccess(CsdNodeQueue)), 
-                       CqsGetPriority(CpvAccess(CsdSchedQueue)))) {
-	  CqsDequeue(CsvAccess(CsdNodeQueue),&msg);
-	}
-	CmiUnlock(CsvAccess(CsdNodeQueueLock));
+      if (msg==0) msg = CmiGetNonLocalNodeQ();
+      if (msg==0 && !CqsEmpty(CsvAccess(CsdNodeQueue))
+                 && !CqsPrioGT(CqsGetPriority(CsvAccess(CsdNodeQueue)), 
+                               CqsGetPriority(CpvAccess(CsdSchedQueue)))) {
+        CmiLock(CsvAccess(CsdNodeQueueLock));
+        CqsDequeue(CsvAccess(CsdNodeQueue),&msg);
+        CmiUnlock(CsvAccess(CsdNodeQueueLock));
       }
 #endif
       if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
@@ -1623,17 +1621,14 @@ int CsdScheduler(int maxmsgs)
 #endif
     if (msg==0) FIFO_DeQueue(localqueue, (void**)&msg);
 #if CMK_NODE_QUEUE_AVAILABLE
-    if (msg==0) {
-      msg = CmiGetNonLocalNodeQ();
+    if (msg==0) msg = CmiGetNonLocalNodeQ();
+    if (msg==0 && !CqsEmpty(CsvAccess(CsdNodeQueue))
+               && !CqsPrioGT(CqsGetPriority(CsvAccess(CsdNodeQueue)), 
+                             CqsGetPriority(CpvAccess(CsdSchedQueue)))) {
       CmiLock(CsvAccess(CsdNodeQueueLock));
-      if (msg==0 && 
-            !CqsPrioGT(CqsGetPriority(CsvAccess(CsdNodeQueue)), 
-                       CqsGetPriority(CpvAccess(CsdSchedQueue)))) {
-	  CqsDequeue(CsvAccess(CsdNodeQueue),&msg);
-      }
+      CqsDequeue(CsvAccess(CsdNodeQueue),&msg);
       CmiUnlock(CsvAccess(CsdNodeQueueLock));
     }
-
 #endif
     if (msg==0) CqsDequeue(CpvAccess(CsdSchedQueue),&msg);
     if (msg) {
