@@ -301,6 +301,7 @@ EOF
 fi
 
 $VERSION/tmp/system_ln "../../src/scripts/Makefile" $VERSION/tmp/Makefile
+$VERSION/tmp/system_ln "../../src/scripts/Make.depends" $VERSION/tmp/Make.depends
 
 ConvUsr="$VERSION/tmp/conv-mach-pre.sh"
 echo "Generating $ConvUsr"
