@@ -72,7 +72,9 @@ void dequeue_sending()
   pendinglen --;
 }
 
-static void alarmcallback (void *context);
+static void alarmcallback (void *context) {
+  MACHSTATE(4,"GM Alarm callback executed")
+}
 static int processEvent(gm_recv_event_t *e);
 static void send_progress();
 static void alarmInterrupt(int arg);
@@ -115,10 +117,14 @@ typedef struct {
 
 static CmiIdleState *CmiNotifyGetState(void) { return NULL; }
 
+static void CmiNotifyStillIdle(CmiIdleState *s);
+
 static void CmiNotifyBeginIdle(CmiIdleState *s)
 {
-  
+  CmiNotifyStillIdle(s);
 }
+
+
 
 static void CmiNotifyStillIdle(CmiIdleState *s)
 {
@@ -128,16 +134,20 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
   gm_recv_event_t *e;
   int pollMs = 5;
 
-  if (Cmi_idlepoll) {
-    if (Cmi_netpoll) CommunicationServer(0);
-    return;
-  }
-
-/*
+#define SLEEP_USING_ALARM 1
+#if SLEEP_USING_ALARM /*Enable the alarm, so we don't sleep forever*/
   gm_set_alarm (gmport, &gmalarm, (gm_u64_t) pollMs*1000, alarmcallback,
                     (void *)NULL );
-*/
+#endif
+
+  MACHSTATE(3,"Blocking on receive {")
   e = gm_blocking_receive_no_spin(gmport);
+  MACHSTATE(3,"} receive returned");
+
+#if SLEEP_USING_ALARM /*Cancel the alarm*/
+  gm_cancel_alarm (&gmalarm);
+#endif
+  
   /* have to handle this event now */
   CmiCommLock();
   nreadable = processEvent(e);
@@ -145,7 +155,6 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
   if (nreadable) {
     return;
   }
-  if (Cmi_netpoll) CommunicationServer(5);
 #else
   /*Comm. thread will listen on sockets-- just sleep*/
   CmiIdleLock_sleep(&CmiGetState()->idle,5);
@@ -166,50 +175,37 @@ void CmiNotifyIdle(void) {
  *
  ***********************************************************************/
 
-static void CommunicationServer(int withDelayMs)
-{
+
+static void CommunicationServer_nolock(int withDelayMs) {
   gm_recv_event_t *e;
   int size, len;
   char *msg, *buf;
+  while (1) {
+    CheckSocketsReady(0);
+    if (ctrlskt_ready_read) { ctrl_getone(); }
 
+    MACHSTATE(3,"Non-blocking receive {")
+    e = gm_receive(gmport);
+    MACHSTATE(3,"} Non-blocking receive")
+    if (!processEvent(e)) break;
+  }
+}
+
+static void CommunicationServer(int withDelayMs)
+{
   CmiCommLockOrElse({
     MACHSTATE(3,"Attempted to re-enter comm. server!")
     return;
   });
+  MACHSTATE1(2,"CommunicationServer(%d)",withDelayMs)
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
-/*
-#if CMK_SHARED_VARS_UNAVAILABLE
-  if (terrupt)
-  {
-      return;
-  }
-  terrupt++;
-#endif
-*/
+
   CmiCommLock();
 
-  while (1) {
-    CheckSocketsReady(0);
-/*
-    CmiCommLock();
-*/
-    if (ctrlskt_ready_read) { ctrl_getone(); }
-    e = gm_receive(gmport);
-    if (!processEvent(e)) break;
-/*
-    CmiCommUnlock();
-*/
-  }
-
-/*
-#if CMK_SHARED_VARS_UNAVAILABLE
-  terrupt--;
-#endif
-*/
+  CommunicationServer_nolock(withDelayMs);
 
   CmiCommUnlock();
   MACHSTATE(2,"} CommunicationServer")
-
 }
 
 
@@ -272,11 +268,12 @@ static int processEvent(gm_recv_event_t *e)
   int size, len;
   char *msg, *buf;
   int status = 1;
-
-    switch (gm_ntohc(e->recv.type))
+  int evt=gm_ntohc(e->recv.type);
+    switch (evt)
     {
     case GM_HIGH_RECV_EVENT:
     case GM_RECV_EVENT:
+      MACHSTATE(4,"Incoming message")
       size = gm_ntohc(e->recv.size);
       msg = gm_ntohp(e->recv.buffer);
       len = gm_ntohl(e->recv.length);
@@ -288,6 +285,7 @@ static int processEvent(gm_recv_event_t *e)
     case GM_ALARM_EVENT:
       status = 0;
     default:
+      MACHSTATE1(3,"Unrecognized GM event %d",evt)
       gm_unknown(gmport, e);
     }
     return status;
@@ -375,7 +373,8 @@ void EnqueueOutgoingDgram
     while (pendinglen == MAXPENDINGSEND) {
       /* pending max len exceeded, busy wait until get a token */
 /*      CmiPrintf("pending max len exceeded.\n"); */
-        CommunicationServer(0);
+      MACHSTATE(4,"Polling until token available")
+      CommunicationServer_nolock(0);
     }
     enqueue_sending(buf, len, node, size);
     return;
