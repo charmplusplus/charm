@@ -103,13 +103,13 @@ typedef int CmiNodeLock;
 
 extern int _immdtMsgLock;
 extern int _immdtMsgFlag;
-// before and after critical code
+/* before and after critical code */
 #define CmiLockImmdtMsg() {_immdtMsgLock=1;}
 #define CmiUnlockImmdtMsg() \
   { _immdtMsgLock=0; \
     if(_immdtMsgFlag) \
       CmiProbeImmediateMsg(); }
-// before handling interrupt
+/* before handling interrupt */
 #define CmiTryImmdtMsgLock() \
   (_immdtMsgLock?((_immdtMsgFlag=1),1):0)
 #define CmiClearImmdtMsgFlag() {_immdtMsgFlag=0;}
