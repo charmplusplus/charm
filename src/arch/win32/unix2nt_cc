@@ -11,7 +11,14 @@
 ##############################################################################
 
 #TMP environment variable seems get lost in sub shell
-export TMP=/tmp
+export TMP=`cygpath -w /tmp`
+export TEMP=`cygpath -w /tmp`
+if [ ! -d "$TMP" ]
+then
+	echo "Error no $TMP"
+	echo "unix2nt_cc exiting..." 1>&2
+	exit 1
+fi
 
 # Configurable option: Location of MSDEV
 VCC_DIR="C:/Program Files/Microsoft Visual Studio/Vc98"
