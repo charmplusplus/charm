@@ -183,7 +183,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h RandCentLB.h RecBisectBfLB.h \
 	  RefineLB.h RefineCommLB.h OrbLB.h GreedyLB.h GreedyCommLB.h \
           GreedyAgentLB.h Comm1LB.h MetisLB.h RotateLB.h GridCommLB.h \
-          NborBaseLB.h topology.h manager.h \
+          DummyLB.h NborBaseLB.h topology.h manager.h \
 	  NeighborLB.h NeighborCommLB.h NeighborLBMsg.h WSLB.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h 	\
