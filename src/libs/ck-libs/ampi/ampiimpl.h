@@ -19,7 +19,17 @@
 #define AMPI_DEBUG /* empty */
 #endif
 
-typedef struct mpiComplex_{ double re, im; } mpiComplex;
+void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec);
+PUPmarshallBytes(MPI_Op);
+class AmpiOpHeader {
+public:
+  MPI_User_function* func;
+  MPI_Datatype dtype;  
+  int len;
+  int szdata;
+  AmpiOpHeader(MPI_User_function* f,MPI_Datatype d,int l,int szd):
+    func(f),dtype(d),len(l),szdata(szd) { }
+};
 
 //------------------- added by YAN for one-sided communication -----------
 /* the index is unique within a communicator */
@@ -1262,16 +1272,18 @@ class ampi : public CBase_ampi {
     int winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
 	    	      MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, 
 		      MPI_Op op, WinStruct win);
-    void winRemoteAccumulate(int orgcnt, char* orgaddr, MPI_Datatype orgtype, MPI_Aint targdisp, 
-	  		    int targcnt, MPI_Datatype targtype, 
-		            MPI_Op op, int winIndex, CkFutureID ftHandle, 
-			    int pe_src);
+    void winRemoteAccumulate(int orgcnt, char* orgaddr, MPI_Datatype orgtype, MPI_Aint targdisp,
+			     int targcnt, MPI_Datatype targtype, MPI_Op op, int winIndex, 
+			     CkFutureID ftHandle, int pe_src);
     void winSetName(WinStruct win, char *name);
     void winGetName(WinStruct win, char *name, int *length);
     win_obj* getWinObjInstance(WinStruct win); 
     int getNewSemaId(); 
     //------------------------ End of code by YAN ---------------------
 };
+
+ampiParent *getAmpiParent(void);
+ampi *getAmpiInstance(MPI_Comm comm);
 
 //Use this to mark the start of AMPI interface routines:
 #define AMPIAPI(routineName) TCHARM_API_TRACE(routineName,"ampi")

@@ -27,271 +27,309 @@ static mpi_comm_worlds mpi_worlds;
 int mpi_nworlds; /*Accessed by ampif*/
 int MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS]; /*Accessed by user code*/
 
-// ------------ maxLoc/minLoc reduction support -----------
-// The Sun CC compiler (and possibly others) *can't* build
-//  a function pointer from a template without a templated
-//  argument in the argument list.  Hence these dummy arguments.
-#define STUPID_SUN_TEMPLATES 1
+/* ampiReducer: AMPI's generic reducer type 
+   MPI_Op is function pointer to MPI_User_function
+   so that it can be packed into AmpiOpHeader, shipped 
+   with the reduction message, and then plugged into 
+   the ampiReducer. 
+   One little trick is the ampi::recv which receives
+   the final reduction message will see additional
+   sizeof(AmpiOpHeader) bytes in the buffer before
+   any user data.                             */
+typedef struct { double re, im; } AmpiComplex;
+typedef struct { float val; int idx; } FloatInt;
+typedef struct { double val; int idx; } DoubleInt;
+typedef struct { long val; int idx; } LongInt;
+typedef struct { int val; int idx; } IntInt;
+typedef struct { short val; int idx; } ShortInt;
+typedef struct { long double val; int idx; } LongdoubleInt;
+typedef struct { float val; float idx; } FloatFloat;
+typedef struct { double val; double idx; } DoubleDouble;
 
-template <class VType,class IType>
-CkReductionMsg *maxLoc(int nMsg,CkReductionMsg **msgs
-#if STUPID_SUN_TEMPLATES
-		       ,VType ignored1,IType ignored2
-#endif
-		       )
-{
-  class PairType{
-  public:
-    VType val;
-    IType idx;
-  };
-  int size = msgs[0]->getSize();
-  int count = size/(sizeof(VType)+sizeof(IType));
-  PairType *m;
-  PairType *ret = new PairType [count];
-
-  // assuming nMsg > 0
-  m=(PairType *)msgs[0]->getData();
-  for(int j=0;j<count;j++){
-    ret[j].val = m[j].val;
-    ret[j].idx = m[j].idx;
+void MPI_MAX( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  switch (*datatype) {
+  case MPI_INT:
+    for(int i=0;i<(*len);i++)
+      if(((int *)invec)[i] > ((int *)inoutvec)[i]) ((int *)inoutvec)[i] = ((int *)invec)[i];
+    break;
+  case MPI_FLOAT:
+    for(int i=0;i<(*len);i++)
+      if(((float *)invec)[i] > ((float *)inoutvec)[i]) ((float *)inoutvec)[i] = ((float *)invec)[i];
+    break;
+  case MPI_DOUBLE:
+    for(int i=0;i<(*len);i++)
+      if(((double *)invec)[i] > ((double *)inoutvec)[i]) ((double *)inoutvec)[i] = ((double *)invec)[i];
+    break;
+  default:
+    ckerr << "Type " << *datatype << " with Op MPI_MAX not supported." << endl;
+    CmiAbort("exiting");
   }
-  for (int i=1;i<nMsg;i++){
-      m=(PairType *)msgs[i]->getData();
-      for(int j=0;j<count;j++){
-        if(ret[j].val < m[j].val){
-          ret[j].val = m[j].val;
-          ret[j].idx = m[j].idx;
-        }
-      }
+}
+void MPI_MIN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  switch (*datatype) {
+  case MPI_INT:
+    for(int i=0;i<(*len);i++)
+      if(((int *)invec)[i] < ((int *)inoutvec)[i]) ((int *)inoutvec)[i] = ((int *)invec)[i];
+    break;
+  case MPI_FLOAT:
+    for(int i=0;i<(*len);i++)
+      if(((float *)invec)[i] < ((float *)inoutvec)[i]) ((float *)inoutvec)[i] = ((float *)invec)[i];
+    break;
+  case MPI_DOUBLE:
+    for(int i=0;i<(*len);i++)
+      if(((double *)invec)[i] < ((double *)inoutvec)[i]) ((double *)inoutvec)[i] = ((double *)invec)[i];
+    break;
+  default:
+    ckerr << "Type " << *datatype << " with Op MPI_MIN not supported." << endl;
+    CmiAbort("exiting");
+  }
+}
+void MPI_SUM( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  switch (*datatype) {
+  case MPI_INT:
+    for(int i=0;i<(*len);i++)
+      ((int *)inoutvec)[i] += ((int *)invec)[i];
+    break;
+  case MPI_FLOAT:
+    for(int i=0;i<(*len);i++)
+      ((float *)inoutvec)[i] += ((float *)invec)[i];
+    break;
+  case MPI_DOUBLE:
+    for(int i=0;i<(*len);i++)
+      ((double *)inoutvec)[i] += ((double *)invec)[i];
+    break;
+  case MPI_COMPLEX:
+    for(int i=0;i<(*len);i++){
+      ((AmpiComplex *)inoutvec)[i].re += ((AmpiComplex *)invec)[i].re;
+      ((AmpiComplex *)inoutvec)[i].im += ((AmpiComplex *)invec)[i].im;
     }
-  CkReductionMsg *retmsg = CkReductionMsg::buildNew(size,ret);
-  delete [] ret;
+    break;
+  default:
+    ckerr << "Type " << *datatype << " with Op MPI_SUM not supported." << endl;
+    CmiAbort("exiting");
+  }
+}
+void MPI_PROD( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  switch (*datatype) {
+  case MPI_INT:
+    for(int i=0;i<(*len);i++)
+      ((int *)inoutvec)[i] *= ((int *)invec)[i];
+    break;
+  case MPI_FLOAT:
+    for(int i=0;i<(*len);i++)
+      ((float *)inoutvec)[i] *= ((float *)invec)[i];
+    break;
+  case MPI_DOUBLE:
+    for(int i=0;i<(*len);i++)
+      ((double *)inoutvec)[i] *= ((double *)invec)[i];
+    break;
+  default:
+    ckerr << "Type " << *datatype << " with Op MPI_PROD not supported." << endl;
+    CmiAbort("exiting");
+  }
+}
+void MPI_LAND( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  switch (*datatype) {
+  case MPI_INT:
+  case MPI_LOGICAL:
+    for(int i=0;i<(*len);i++)
+      ((int *)inoutvec)[i] = ((int *)inoutvec)[i] && ((int *)invec)[i];
+    break;
+  default:
+    ckerr << "Type " << *datatype << " with Op MPI_LAND not supported." << endl;
+    CmiAbort("exiting");
+  }
+}
+void MPI_BAND( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  switch (*datatype) {
+  case MPI_INT:
+    for(int i=0;i<(*len);i++)
+      ((int *)inoutvec)[i] = ((int *)inoutvec)[i] & ((int *)invec)[i];
+    break;
+  case MPI_BYTE:
+    for(int i=0;i<(*len);i++)
+      ((char *)inoutvec)[i] = ((char *)inoutvec)[i] & ((char *)invec)[i];
+    break;
+  default:
+    ckerr << "Type " << *datatype << " with Op MPI_BAND not supported." << endl;
+    CmiAbort("exiting");
+  }
+}
+void MPI_LOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  switch (*datatype) {
+  case MPI_INT:
+  case MPI_LOGICAL:
+    for(int i=0;i<(*len);i++)
+      ((int *)inoutvec)[i] = ((int *)inoutvec)[i] || ((int *)invec)[i];
+    break;
+  default:
+    ckerr << "Type " << *datatype << " with Op MPI_LOR not supported." << endl;
+    CmiAbort("exiting");
+  }
+}
+void MPI_BOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  switch (*datatype) {
+  case MPI_INT:
+    for(int i=0;i<(*len);i++)
+      ((int *)inoutvec)[i] = ((int *)inoutvec)[i] | ((int *)invec)[i];
+    break;
+  case MPI_BYTE:
+    for(int i=0;i<(*len);i++)
+      ((char *)inoutvec)[i] = ((char *)inoutvec)[i] & ((char *)invec)[i];
+    break;
+  default:
+    ckerr << "Type " << *datatype << " with Op MPI_BOR not supported." << endl;
+    CmiAbort("exiting");
+  }
+}
+void MPI_LXOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  switch (*datatype) {
+  case MPI_INT:
+  case MPI_LOGICAL:
+    for(int i=0;i<(*len);i++)
+      ((int *)inoutvec)[i] = (((int *)inoutvec)[i]&&(!((int *)invec)[i]))||(!(((int *)inoutvec)[i])&&((int *)invec)[i]); //emulate ^^
+    break;
+  default:
+    ckerr << "Type " << *datatype << " with Op MPI_LXOR not supported." << endl;
+    CmiAbort("exiting");
+  }
+}
+void MPI_BXOR( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  switch (*datatype) {
+  case MPI_INT:
+    for(int i=0;i<(*len);i++)
+      ((int *)inoutvec)[i] = ((int *)inoutvec)[i] ^ ((int *)invec)[i];
+    break;
+  case MPI_BYTE:
+    for(int i=0;i<(*len);i++)
+      ((char *)inoutvec)[i] = ((char *)inoutvec)[i] ^ ((char *)invec)[i];
+    break;
+  default:
+    ckerr << "Type " << *datatype << " with Op MPI_BXOR not supported." << endl;
+    CmiAbort("exiting");
+  }
+}
+void MPI_MAXLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  switch (*datatype) {
+  case MPI_FLOAT_INT:
+    for(int i=0;i<(*len);i++)
+      if(((FloatInt *)invec)[i].val > ((FloatInt *)inoutvec)[i].idx)
+        ((FloatInt *)inoutvec)[i] = ((FloatInt *)invec)[i];
+    break;
+  case MPI_DOUBLE_INT:
+    for(int i=0;i<(*len);i++)
+      if(((DoubleInt *)invec)[i].val > ((DoubleInt *)inoutvec)[i].idx)
+        ((DoubleInt *)inoutvec)[i] = ((DoubleInt *)invec)[i];
+    break;
+  case MPI_LONG_INT:
+    for(int i=0;i<(*len);i++)
+      if(((LongInt *)invec)[i].val > ((LongInt *)inoutvec)[i].idx)
+        ((LongInt *)inoutvec)[i] = ((LongInt *)invec)[i];
+    break;
+  case MPI_2INT:
+    for(int i=0;i<(*len);i++)
+      if(((IntInt *)invec)[i].val > ((IntInt *)inoutvec)[i].idx)
+        ((IntInt *)inoutvec)[i] = ((IntInt *)invec)[i];
+    break;
+  case MPI_SHORT_INT:
+    for(int i=0;i<(*len);i++)
+      if(((ShortInt *)invec)[i].val > ((ShortInt *)inoutvec)[i].idx)
+        ((ShortInt *)inoutvec)[i] = ((ShortInt *)invec)[i];
+    break;
+  case MPI_LONG_DOUBLE_INT:
+    for(int i=0;i<(*len);i++)
+      if(((LongdoubleInt *)invec)[i].val > ((LongdoubleInt *)inoutvec)[i].idx)
+        ((LongdoubleInt *)inoutvec)[i] = ((LongdoubleInt *)invec)[i];
+    break;
+  case MPI_2FLOAT:
+    for(int i=0;i<(*len);i++)
+      if(((FloatFloat *)invec)[i].val > ((FloatFloat *)inoutvec)[i].idx)
+        ((FloatFloat *)inoutvec)[i] = ((FloatFloat *)invec)[i];
+    break;
+  case MPI_2DOUBLE:
+    for(int i=0;i<(*len);i++)
+      if(((DoubleDouble *)invec)[i].val > ((DoubleDouble *)inoutvec)[i].idx)
+        ((DoubleDouble *)inoutvec)[i] = ((DoubleDouble *)invec)[i];
+    break;
+  default:
+    ckerr << "Type " << *datatype << " with Op MPI_MAXLOC not supported." << endl;
+    CmiAbort("exiting");
+  }
+}
+void MPI_MINLOC( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
+  switch (*datatype) {
+  case MPI_FLOAT_INT:
+    for(int i=0;i<(*len);i++)
+      if(((FloatInt *)invec)[i].val < ((FloatInt *)inoutvec)[i].idx)
+        ((FloatInt *)inoutvec)[i] = ((FloatInt *)invec)[i];
+    break;
+  case MPI_DOUBLE_INT:
+    for(int i=0;i<(*len);i++)
+      if(((DoubleInt *)invec)[i].val < ((DoubleInt *)inoutvec)[i].idx)
+        ((DoubleInt *)inoutvec)[i] = ((DoubleInt *)invec)[i];
+    break;
+  case MPI_LONG_INT:
+    for(int i=0;i<(*len);i++)
+      if(((LongInt *)invec)[i].val < ((LongInt *)inoutvec)[i].idx)
+        ((LongInt *)inoutvec)[i] = ((LongInt *)invec)[i];
+    break;
+  case MPI_2INT:
+    for(int i=0;i<(*len);i++)
+      if(((IntInt *)invec)[i].val < ((IntInt *)inoutvec)[i].idx)
+        ((IntInt *)inoutvec)[i] = ((IntInt *)invec)[i];
+    break;
+  case MPI_SHORT_INT:
+    for(int i=0;i<(*len);i++)
+      if(((ShortInt *)invec)[i].val < ((ShortInt *)inoutvec)[i].idx)
+        ((ShortInt *)inoutvec)[i] = ((ShortInt *)invec)[i];
+    break;
+  case MPI_LONG_DOUBLE_INT:
+    for(int i=0;i<(*len);i++)
+      if(((LongdoubleInt *)invec)[i].val < ((LongdoubleInt *)inoutvec)[i].idx)
+        ((LongdoubleInt *)inoutvec)[i] = ((LongdoubleInt *)invec)[i];
+    break;
+  case MPI_2FLOAT:
+    for(int i=0;i<(*len);i++)
+      if(((FloatFloat *)invec)[i].val < ((FloatFloat *)inoutvec)[i].idx)
+        ((FloatFloat *)inoutvec)[i] = ((FloatFloat *)invec)[i];
+    break;
+  case MPI_2DOUBLE:
+    for(int i=0;i<(*len);i++)
+      if(((DoubleDouble *)invec)[i].val < ((DoubleDouble *)inoutvec)[i].idx)
+        ((DoubleDouble *)inoutvec)[i] = ((DoubleDouble *)invec)[i];
+    break;
+  default:
+    ckerr << "Type " << *datatype << " with Op MPI_MINLOC not supported." << endl;
+    CmiAbort("exiting");
+  }
+}
+
+// every msg contains a AmpiOpHeader structure before user data
+CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs){
+  AmpiOpHeader *hdr = (AmpiOpHeader *)msgs[0]->getData();
+  MPI_Datatype dtype;
+  int szhdr, szdata, len;
+  MPI_User_function* func;
+  func = hdr->func;
+  dtype = hdr->dtype;  
+  szdata = hdr->szdata;
+  len = hdr->len;  
+  szhdr = sizeof(AmpiOpHeader);
+
+  //Assuming extent == size
+  void *ret = malloc(szhdr+szdata);
+  memcpy(ret,msgs[0]->getData(),szhdr+szdata);
+  for(int i=1;i<nMsg;i++){
+    (*func)((void *)((char *)msgs[i]->getData()+szhdr),(void *)((char *)ret+szhdr),&len,&dtype);
+  }
+  CkReductionMsg *retmsg = CkReductionMsg::buildNew(szhdr+szdata,ret);
+  free(ret);
   return retmsg;
 }
 
-template <class VType,class IType>
-CkReductionMsg *minLoc(int nMsg,CkReductionMsg **msgs
-#if STUPID_SUN_TEMPLATES
-		       ,VType ignored1,IType ignored2
-#endif
-		       )
-{
-  class PairType{
-  public:
-    VType val;
-    IType idx;
-  };
-  int size = msgs[0]->getSize();
-  int count = size/(sizeof(VType)+sizeof(IType));
-  PairType *m;
-  PairType *ret = new PairType [count];
-
-  // assuming nMsg > 0
-  m=(PairType *)msgs[0]->getData();
-  for(int j=0;j<count;j++){
-    ret[j].val = m[j].val;
-    ret[j].idx = m[j].idx;
-  }
-  for (int i=1;i<nMsg;i++){
-      m=(PairType *)msgs[i]->getData();
-      for(int j=0;j<count;j++)
-        if(ret[j].val > m[j].val){
-          ret[j].val = m[j].val;
-          ret[j].idx = m[j].idx;
-        }
-    }
-  CkReductionMsg *retmsg = CkReductionMsg::buildNew(size,ret);
-  delete [] ret;
-  return retmsg;
-}
-
-// ------------ logical/bitwise and/or/xor reduction support -----------
-// Logical operations are for integer (sometimes disguised as logical)
-// Bitwise operations are for both integer and byte
-// Logical AND and OR have been implemented in Charm++
-CkReductionMsg *LXOR(int nMsg,CkReductionMsg **msgs)
-{
-	int size = msgs[0]->getSize();
-	int count = size/sizeof(int);
-	int *m;
-	int *ret = new int [count];
-	// assuming nMsg > 0
-	m = (int*)msgs[0]->getData();
-	for(int j=0;j<count;j++)  ret[j] = m[j];
-	for(int i=1;i<nMsg;i++){
-		m = (int *)msgs[i]->getData();
-		for(int j=0;j<count;j++)  ret[j] = (ret[j]&&(!m[j]))||(!(ret[j])&&m[j]); //emulate ^^
-	}
-	CkReductionMsg *retmsg = CkReductionMsg::buildNew(size,ret);
-	delete [] ret;
-	return retmsg;
-}
-
-CkReductionMsg *ComplexSum(int nMsg,CkReductionMsg **msgs)
-{
-	int size = msgs[0]->getSize();
-	int count = size/sizeof(mpiComplex);
-	mpiComplex *m;
-	mpiComplex *ret = new mpiComplex [count];
-	// assuming nMsg > 0
-	m = (mpiComplex*)msgs[0]->getData();
-	for(int j=0;j<count;j++)  ret[j] = m[j];
-	for(int i=1;i<nMsg;i++){
-		m = (mpiComplex *)msgs[i]->getData();
-		for(int j=0;j<count;j++){
-			ret[j].re += m[j].re;
-			ret[j].im += m[j].im;
-		}
-	}
-	CkReductionMsg *retmsg = CkReductionMsg::buildNew(size,ret);
-	delete [] ret;
-	return retmsg;
-}
-
-template <class Type>
-CkReductionMsg *BAND(int nMsg,CkReductionMsg **msgs
-#if STUPID_SUN_TEMPLATES
-		       ,Type ignored
-#endif
-			)
-{
-	int size = msgs[0]->getSize();
-	int count = size/sizeof(Type);
-	Type *m;
-	Type *ret = new Type [count];
-	// assuming nMsg > 0
-	m = (Type *)msgs[0]->getData();
-	for(int j=0;j<count;j++)  ret[j] = m[j];
-	for(int i=1;i<nMsg;i++){
-		m = (Type *)msgs[i]->getData();
-		for(int j=0;j<count;j++)  ret[j] = (m[j] & ret[j]);
-	}
-	CkReductionMsg *retmsg = CkReductionMsg::buildNew(size,ret);
-	delete [] ret;
-	return retmsg;
-}
-
-template <class Type>
-CkReductionMsg *BOR(int nMsg,CkReductionMsg **msgs
-#if STUPID_SUN_TEMPLATES
-		       ,Type ignored
-#endif
-			)
-{
-	int size = msgs[0]->getSize();
-	int count = size/sizeof(Type);
-	Type *m;
-	Type *ret = new Type [count];
-	// assuming nMsg > 0
-	m = (Type *)msgs[0]->getData();
-	for(int j=0;j<count;j++)  ret[j] = m[j];
-	for(int i=1;i<nMsg;i++){
-		m = (Type *)msgs[i]->getData();
-		for(int j=0;j<count;j++)  ret[j] = (m[j] | ret[j]);
-	}
-	CkReductionMsg *retmsg = CkReductionMsg::buildNew(size,ret);
-	delete [] ret;
-	return retmsg;
-}
-
-template <class Type>
-CkReductionMsg *BXOR(int nMsg,CkReductionMsg **msgs
-#if STUPID_SUN_TEMPLATES
-		       ,Type ignored
-#endif
-			)
-{
-	int size = msgs[0]->getSize();
-	int count = size/sizeof(Type);
-	Type *m;
-	Type *ret = new Type [count];
-	// assuming nMsg > 0
-	m = (Type *)msgs[0]->getData();
-	for(int j=0;j<count;j++)  ret[j] = m[j];
-	for(int i=1;i<nMsg;i++){
-		m = (Type *)msgs[i]->getData();
-		for(int j=0;j<count;j++)  ret[j] = (m[j] ^ ret[j]);
-	}
-	CkReductionMsg *retmsg = CkReductionMsg::buildNew(size,ret);
-	delete [] ret;
-	return retmsg;
-}
-
-typedef long double longdouble;
-
-// This hideous little macro calls its argument for
-//   every valid combination of maxLoc/minLoc types.
-// This keeps us from having to repeat the list of types over
-//   and over again.
-#define MAXMIN_MAP_TYPES(MACRO) \
-  MACRO(maxLoc,float,int) MACRO(minLoc,float,int) \
-  MACRO(maxLoc,double,int) MACRO(minLoc,double,int) \
-  MACRO(maxLoc,long,int) MACRO(minLoc,long,int) \
-  MACRO(maxLoc,int,int) MACRO(minLoc,int,int) \
-  MACRO(maxLoc,short,int) MACRO(minLoc,short,int) \
-  MACRO(maxLoc,longdouble,int) MACRO(minLoc,longdouble,int) \
-  MACRO(maxLoc,float,float) MACRO(minLoc,float,float) \
-  MACRO(maxLoc,double,double) MACRO(minLoc,double,double)
-#define BITWISE_MAP_TYPES(MACRO) \
-  MACRO(BAND,int) MACRO(BAND,char) \
-  MACRO(BOR,int) MACRO(BOR,char) \
-  MACRO(BXOR,int) MACRO(BXOR,char)
-
-// Declare the maxLoc/minLoc reducerTypes
-#define MAXMIN_REDUCER(fn,V,I) \
-	CkReduction::reducerType fn##V##I##Reducer;
-#define BITWISE_REDUCER(fn,T) \
-	CkReduction::reducerType fn##T##Reducer;
-MAXMIN_MAP_TYPES(MAXMIN_REDUCER)
-BITWISE_MAP_TYPES(BITWISE_REDUCER)
-CkReduction::reducerType LXORReducer;
-CkReduction::reducerType ComplexSumReducer;
-
-// Instantiate the maxLoc/minLoc templates
-#if STUPID_SUN_TEMPLATES
-#  define MAXMIN_INSTANTIATE(fn,V,I) \
-  template CkReductionMsg *fn<V,I>(int n,CkReductionMsg **m,V,I); \
-  typedef CkReductionMsg *(* fn##V##I##Type)(int n,CkReductionMsg **m,V,I);
-#  define BITWISE_INSTANTIATE(fn,T) \
-  template CkReductionMsg *fn<T>(int n,CkReductionMsg **m,T);\
-  typedef CkReductionMsg *(* fn##T##Type)(int n,CkReductionMsg **m,T);
-#else
-#  define MAXMIN_INSTANTIATE(fn,V,I) \
-  template CkReductionMsg *fn<V,I>(int n,CkReductionMsg **m);
-#  define BITWISE_INSTANTIATE(fn,T) \
-  template CkReductionMsg *fn<T>(int n,CkReductionMsg **m);
-#endif
-MAXMIN_MAP_TYPES(MAXMIN_INSTANTIATE)
-BITWISE_MAP_TYPES(BITWISE_INSTANTIATE)
-
-static void ampiSetupReductions(void) {
-  // add reducers for MPI_MINLOC/MPI_MAXLOC
-#if STUPID_SUN_TEMPLATES
-  /* Hideous: specify which version of the template
-     we want by type-casting a function pointer! */
-#  define MAXMIN_REGISTER(fn,V,I) \
-    fn##V##I##Reducer = CkReduction::addReducer( \
-	(CkReduction::reducerFn)(fn##V##I##Type)fn);
-#  define BITWISE_REGISTER(fn,T) \
-    fn##T##Reducer = CkReduction::addReducer( \
-	(CkReduction::reducerFn)(fn##T##Type)fn);
-#else
-  /* Sane compiler: just specify template using <> */
-#  define MAXMIN_REGISTER(fn,V,I) \
-    fn##V##I##Reducer = CkReduction::addReducer(fn<V,I>);
-#  define BITWISE_REGISTER(fn,T) \
-    fn##T##Reducer = CkReduction::addReducer(fn<T>);
-#endif
-  MAXMIN_MAP_TYPES(MAXMIN_REGISTER)
-  BITWISE_MAP_TYPES(BITWISE_REGISTER)
-  LXORReducer=CkReduction::addReducer(LXOR);
-  ComplexSumReducer=CkReduction::addReducer(ComplexSum);
-}
-
+CkReduction::reducerType AmpiReducer;
 
 // ------------ startup support -----------
-
 int _ampi_fallback_setup_count;
 CDECL void AMPI_Setup(void);
 FDECL void FTN_NAME(MPI_SETUP,mpi_setup)(void);
@@ -332,7 +370,7 @@ static void ampiNodeInit(void)
   }
   TCHARM_Set_fallback_setup(AMPI_Setup_Switch);
 
-  ampiSetupReductions();
+  AmpiReducer = CkReduction::addReducer(AmpiReducerFunc);
 
   nodeinit_has_been_called=1;
 }
@@ -1247,7 +1285,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   resumeOnRecv=false;
   if(sts)
     ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
-  if (msg->length > len)
+  if (msg->length > len && msg->length-len!=sizeof(AmpiOpHeader))
   { /* Received more data than we were expecting */
     char einfo[1024];
     sprintf(einfo, "FATAL ERROR in rank %d MPI_Recv (tag=%d, source=%d)\n"
@@ -1261,8 +1299,11 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   }else if(msg->length < len){ // only at rare case shall we reset count by using divide
     count = msg->length/(ddt->getSize(1));
   }
-  ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
-
+  if(msg->length-len==sizeof(AmpiOpHeader))
+    ddt->serialize((char*)buf, (char*)msg->data+sizeof(AmpiOpHeader), count, (-1));
+  else
+    ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
+  
   _LOG_E_BEGIN_AMPI_PROCESSING(thisIndex,s,count)
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_RESUME(thread->getThread(), msg, "RECV_RESUME", curLog);
@@ -1616,145 +1657,6 @@ int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
   return 0;
 }
 
-static CkReduction::reducerType
-getReductionType(int type, int op)
-{
-  CkReduction::reducerType mytype;
-  switch(op) {
-    case MPI_MAX :
-      switch(type) {
-        case MPI_FLOAT : mytype = CkReduction::max_float; break;
-        case MPI_INT : mytype = CkReduction::max_int; break;
-        case MPI_DOUBLE : mytype = CkReduction::max_double; break;
-        default:
-          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
-          CmiAbort("exiting");
-      }
-      break;
-    case MPI_MIN :
-      switch(type) {
-        case MPI_FLOAT : mytype = CkReduction::min_float; break;
-        case MPI_INT : mytype = CkReduction::min_int; break;
-        case MPI_DOUBLE : mytype = CkReduction::min_double; break;
-        default:
-          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
-          CmiAbort("exiting");
-      }
-      break;
-    case MPI_SUM :
-      switch(type) {
-        case MPI_FLOAT : mytype = CkReduction::sum_float; break;
-        case MPI_INT : mytype = CkReduction::sum_int; break;
-        case MPI_DOUBLE : mytype = CkReduction::sum_double; break;
-        case MPI_COMPLEX : mytype = ComplexSumReducer; break;
-        default:
-          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
-          CmiAbort("exiting");
-      }
-      break;
-    case MPI_PROD :
-      switch(type) {
-        case MPI_FLOAT : mytype = CkReduction::product_float; break;
-        case MPI_INT : mytype = CkReduction::product_int; break;
-        case MPI_DOUBLE : mytype = CkReduction::product_double; break;
-        default:
-          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
-          CmiAbort("exiting");
-      }
-      break;
-    case MPI_MAXLOC:
-      switch(type) {
-	case MPI_FLOAT_INT : mytype = maxLocfloatintReducer; break;
-	case MPI_DOUBLE_INT : mytype = maxLocdoubleintReducer; break;
-	case MPI_LONG_INT : mytype = maxLoclongintReducer; break;
-	case MPI_2INT : mytype = maxLocintintReducer; break;
-	case MPI_SHORT_INT : mytype = maxLocshortintReducer; break;
-	case MPI_LONG_DOUBLE_INT : mytype = maxLoclongdoubleintReducer; break;
-	case MPI_2FLOAT : mytype = maxLocfloatfloatReducer; break;
-	case MPI_2DOUBLE : mytype = maxLocdoubledoubleReducer; break;
-        default:
-          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
-          CmiAbort("exiting");
-      }
-      break;
-    case MPI_MINLOC:
-      switch(type) {
-	case MPI_FLOAT_INT : mytype = minLocfloatintReducer; break;
-	case MPI_DOUBLE_INT : mytype = minLocdoubleintReducer; break;
-	case MPI_LONG_INT : mytype = minLoclongintReducer; break;
-	case MPI_2INT : mytype = minLocintintReducer; break;
-	case MPI_SHORT_INT : mytype = minLocshortintReducer; break;
-	case MPI_LONG_DOUBLE_INT : mytype = minLoclongdoubleintReducer; break;
-	case MPI_2FLOAT : mytype = minLocfloatfloatReducer; break;
-	case MPI_2DOUBLE : mytype = minLocdoubledoubleReducer; break;
-        default:
-          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
-          CmiAbort("exiting");
-      }
-      break;
-    case MPI_BAND :
-      switch(type) {
-        case MPI_INT : mytype = BANDintReducer; break;
-        case MPI_BYTE : mytype = BANDcharReducer; break;
-        default:
-          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
-          CmiAbort("exiting");
-      }
-      break;
-    case MPI_BOR :
-      switch(type) {
-        case MPI_INT : mytype = BORintReducer; break;
-        case MPI_BYTE : mytype = BORcharReducer; break;
-        default:
-          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
-          CmiAbort("exiting");
-      }
-      break;
-    case MPI_BXOR :
-      switch(type) {
-        case MPI_INT : mytype = BXORintReducer; break;
-        case MPI_BYTE : mytype = BXORcharReducer; break;
-        default:
-          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
-          CmiAbort("exiting");
-      }
-      break;
-    case MPI_LAND :
-      switch(type) {
-        case MPI_INT :
-        case MPI_LOGICAL : mytype = CkReduction::logical_and; break;
-        default:
-          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
-          CmiAbort("exiting");
-      }
-      break;
-    case MPI_LOR :
-      switch(type) {
-        case MPI_INT :
-        case MPI_LOGICAL : mytype = CkReduction::logical_or; break;
-        default:
-          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
-          CmiAbort("exiting");
-      }
-      break;
-    case MPI_LXOR :
-      switch(type) {
-        case MPI_INT :
-        case MPI_LOGICAL : mytype = LXORReducer; break;
-        default:
-          ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
-          CmiAbort("exiting");
-      }
-      break;
-    case MPI_CONCAT :
-      mytype = CkReduction::concat; break;
-    default:
-      ckerr << "Type " << type << " with Op " << op << " not supported." << endl;
-      CmiAbort("exiting");
-  }
-  return mytype;
-}
-
 /// This routine is called with the results of a Reduce or AllReduce
 const int MPI_REDUCE_SOURCE=0;
 const int MPI_REDUCE_COMM=MPI_COMM_WORLD;
@@ -1767,10 +1669,12 @@ void ampi::reduceResult(CkReductionMsg *msg)
 
 static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int count,int type,MPI_Op op)
 {
-  CkReduction::reducerType redtype = getReductionType(type,op);
-  int size = ddt->getSize(count);
-  CkReductionMsg *msg=CkReductionMsg::buildNew(size,NULL,redtype);
-  ddt->serialize((char*)inbuf, (char*)msg->getData(), count, 1);
+  int szdata = ddt->getSize(count);
+  int szhdr = sizeof(AmpiOpHeader);
+  AmpiOpHeader newhdr(op,type,count,szdata); 
+  CkReductionMsg *msg=CkReductionMsg::buildNew(szdata+szhdr,NULL,AmpiReducer);
+  memcpy(msg->getData(),&newhdr,szhdr);
+  ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, 1);
   return msg;
 }
 
@@ -1802,9 +1706,7 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   CkCallback reduceCB(CkIndex_ampi::reduceResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy(),true);
   msg->setCallback(reduceCB);
   ptr->contribute(msg);
-
   if (ptr->thisIndex == rootIdx){
-    if(op==MPI_CONCAT) count*=ptr->getSize();
     /*HACK: Use recv() to block until reduction data comes back*/
     if(-1==ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM))
       CkAbort("AMPI>MPI_Reduce called with different values on different processors!");
@@ -1883,91 +1785,6 @@ int AMPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
   return 0;
 }
 
-extern "C"
-void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* a, void* b) { // a[i] = a[i] op b[i]
-  int i;
-  switch(datatype){
-  case MPI_FLOAT:
-    switch(op){
-    case MPI_MAX:
-      for(i=0;i<count;i++)
-        if(((float *)a)[i] < ((float *)b)[i])
-          ((float *)a)[i] = ((float *)b)[i];
-      break;
-    case MPI_MIN:
-      for(i=0;i<count;i++)
-        if(((float *)a)[i] > ((float *)b)[i]) 
-          ((float *)a)[i] = ((float *)b)[i];
-      break;
-    case MPI_SUM:
-      for(i=0;i<count;i++)
-        ((float *)a)[i] = (((float *)a)[i]) + (((float *)b)[i]);
-      break;
-    case MPI_PROD:
-      for(i=0;i<count;i++)
-        ((float *)a)[i] = (((float *)a)[i]) * (((float *)b)[i]);
-      break;
-    default:
-      ckerr << "Scan on type " << datatype << " with Op " << op << " not supported." << endl;
-      CmiAbort("MPI_Scan()");
-    }
-    break;
-  case MPI_DOUBLE:
-    switch(op){
-    case MPI_MAX:
-      for(i=0;i<count;i++)
-        if(((double *)a)[i] < ((double *)b)[i]) 
-          ((double *)a)[i] = ((double *)b)[i];
-      break;
-    case MPI_MIN:
-      for(i=0;i<count;i++)
-        if(((double *)a)[i] > ((double *)b)[i]) 
-          ((double *)a)[i] = ((double *)b)[i];
-      break;
-    case MPI_SUM:
-      for(i=0;i<count;i++)
-        ((double *)a)[i] = (((double *)a)[i]) + (((double *)b)[i]);
-      break;
-    case MPI_PROD:
-      for(i=0;i<count;i++)
-        ((double *)a)[i] = (((double *)a)[i]) * (((double *)b)[i]);
-      break;
-    default:
-      ckerr << "Scan on type " << datatype << " with Op " << op << " not supported." << endl;
-      CmiAbort("MPI_Scan()");
-    }
-    break;
-  case MPI_INT:
-    switch(op){
-    case MPI_MAX:
-      for(i=0;i<count;i++)
-        if(((int *)a)[i] < ((int *)b)[i]) 
-          ((int *)a)[i] = ((int *)b)[i];
-      break;
-    case MPI_MIN:
-      for(i=0;i<count;i++)
-        if(((int *)a)[i] > ((int *)b)[i]) 
-          ((int *)a)[i] = ((int *)b)[i];
-      break;
-    case MPI_SUM:
-      for(i=0;i<count;i++)
-        ((int *)a)[i] = (((int *)a)[i]) + (((int *)b)[i]);
-      break;
-    case MPI_PROD:
-      for(i=0;i<count;i++)
-        ((int *)a)[i] = (((int *)a)[i]) * (((int *)b)[i]);
-      break;
-    default:
-      ckerr << "Scan on type " << datatype << " with Op " << op << " not supported." << endl;
-      CmiAbort("MPI_Scan()");
-    }
-    break;
-  default:
-    ckerr << "Scan on type " << datatype << " with Op " << op << " not supported." << endl;
-    CmiAbort("MPI_Scan()");
-  }
-}
-
 /***** MPI_Scan algorithm (from MPICH) *******
    recvbuf = sendbuf;
    partial_scan = sendbuf;
@@ -1993,6 +1810,10 @@ void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* a, void* b) { //
       mask <<= 1;
    }
  ***** MPI_Scan algorithm (from MPICH) *******/
+
+void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec) { // inoutvec[i] = invec[i] op inoutvec[i]
+  (op)(invec,inoutvec,&count,&datatype);
+}
 CDECL
 int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm ){
   AMPIAPI("AMPI_Scan");
@@ -2014,9 +1835,12 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MP
     if(dst < size){
       AMPI_Sendrecv(partial_scan,count,datatype,dst,MPI_SCAN_TAG,
 		   tmp_buf,count,datatype,dst,MPI_SCAN_TAG,comm,&sts);
-      applyOp(datatype,op,count,partial_scan,tmp_buf);
       if(rank > dst){
-        applyOp(datatype,op,count,recvbuf,tmp_buf);
+        (op)(tmp_buf,partial_scan,&count,&datatype);
+	(op)(tmp_buf,recvbuf,&count,&datatype);
+      }else {
+        (op)(partial_scan,tmp_buf,&count,&datatype);
+        memcpy(partial_scan,tmp_buf,blklen);
       }
       mask <<= 1;
     }
@@ -2026,6 +1850,20 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MP
   free(partial_scan);
   return 0;
 }
+
+CDECL
+int AMPI_Op_create(MPI_User_function *function, int commute, MPI_Op *op){
+  AMPIAPI("AMPI_Op_create");
+  *op = function;
+  return 0;
+}
+
+CDECL
+int AMPI_Op_free(MPI_Op *op){
+  AMPIAPI("AMPI_Op_free");
+  return 0;
+}
+
 
 CDECL
 double AMPI_Wtime(void)

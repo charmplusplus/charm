@@ -61,6 +61,8 @@ FDECL {
 #define mpi_iallreduce FTN_NAME( MPI_IALLREDUCE , mpi_iallreduce )
 #define mpi_reduce_scatter FTN_NAME( MPI_REDUCE_SCATTER , mpi_reduce_scatter )
 #define mpi_scan FTN_NAME( MPI_SCAN , mpi_scan )
+#define mpi_op_create FTN_NAME( MPI_OP_CREATE , mpi_op_create )
+#define mpi_op_free FTN_NAME( MPI_OP_FREE , mpi_op_free )
 
 #define mpi_group_size FTN_NAME( MPI_GROUP_SIZE, mpi_group_size)
 #define mpi_group_rank FTN_NAME( MPI_GROUP_RANK, mpi_group_rank)
@@ -168,6 +170,7 @@ FDECL {
 #define mpi_info_free FTN_NAME ( MPI_INFO_FREE , mpi_info_free )
 
 
+ 
 void mpi_init_universe(int *unicomm)
 {
   AMPIAPI("mpi_init_universe");
@@ -256,13 +259,13 @@ void mpi_bcast(void *buf, int *count, int *type, int *root, int *comm,
 void mpi_reduce(void *inbuf, void *outbuf, int *count, int *type,
    int *op, int *root, int *comm, int *ierr)
 {
-  *ierr = AMPI_Reduce(inbuf, outbuf, *count, *type, *op, *root, *comm);
+  *ierr = AMPI_Reduce(inbuf, outbuf, *count, *type, (MPI_Op)op, *root, *comm);
 }
 
 void mpi_allreduce(void *inbuf,void *outbuf,int *count,int *type,
    int *op, int *comm, int *ierr)
 {
-  *ierr = AMPI_Allreduce(inbuf, outbuf, *count, *type, *op, *comm);
+  *ierr = AMPI_Allreduce(inbuf, outbuf, *count, *type, (MPI_Op)op, *comm);
 }
 
 double mpi_wtime(void)
@@ -543,25 +546,33 @@ void mpi_ireduce(void *sendbuf, void *recvbuf, int* count, int* type,
                 int* op, int* root, int* comm, int *request, int* ierr)
 {
   *ierr = AMPI_Ireduce(sendbuf, recvbuf, *count, *type,
-                      *op, *root, *comm, (MPI_Request*) request);
+                      (MPI_Op)op, *root, *comm, (MPI_Request*) request);
 }
 
 void mpi_iallreduce(void *inbuf, void *outbuf, int* count, int* type,
                    int* op, int* comm, int *request, int* ierr)
 {
   *ierr = AMPI_Iallreduce(inbuf, outbuf, *count, *type,
-                         *op, *comm, (MPI_Request*) request);
+                         (MPI_Op)op, *comm, (MPI_Request*) request);
 }
 void mpi_reduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
                        int* datatype, int* op, int* comm, int* ierr)
 {
   *ierr = AMPI_Reduce_scatter(sendbuf, recvbuf, recvcounts,
-                             *datatype, *op, *comm);
+                             *datatype, (MPI_Op)op, *comm);
 }
 
 void mpi_scan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* op, int* comm, int* ierr)
 {
-  *ierr = AMPI_Scan(sendbuf,recvbuf,*count,*datatype,*op,*comm );
+  *ierr = AMPI_Scan(sendbuf,recvbuf,*count,*datatype,*(MPI_Op *)op,*comm );
+}
+
+void mpi_op_create(int* function, int* commute, int* op, int* ierr){
+  *ierr = MPI_Op_create((MPI_User_function *)function, *commute, (MPI_Op *)op);
+}
+
+void mpi_op_free(int* op, int* ierr){
+  *ierr = MPI_Op_free((MPI_Op *)op);
 }
 
 void mpi_comm_dup(int *comm, int *newcomm, int *ierr)
@@ -746,11 +757,8 @@ void mpi_get_count(int *sts, int *dtype, int *cnt, int *ierr)
 
 void mpi_print(char *str, int *len)
 {
-  char *tmpstr = new char[*len+1];
-  memcpy(tmpstr,str,*len);
-  tmpstr[*len] = '\0';
-  AMPI_Print(tmpstr);
-  delete[] tmpstr;
+  str[*len] = '\0';
+  AMPI_Print(str);
 }
 
 void mpi_migrate(void)
@@ -895,7 +903,7 @@ void mpi_get(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
 void mpi_accumulate(void *orgaddr, int *orgcnt, int *orgtype, int *rank,
 		   int *targdisp, int *targcnt, int *targtype, 
 		   int *op, int win, int *ierr){
-  *ierr = AMPI_Accumulate(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, *op, win);
+  *ierr = AMPI_Accumulate(orgaddr, *orgcnt, *orgtype, *rank, *targdisp, *targcnt, *targtype, (MPI_Op)op, win);
 }
 
 void mpi_info_create(int* info, int* ierr){

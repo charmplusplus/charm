@@ -4,7 +4,6 @@
  ****************************************************/
 #include <string.h>
 #include "ampiimpl.h"
-extern ampiParent *getAmpiParent(void);
 
 KeyvalPair::KeyvalPair(char* k, char* v){
   key = strdup(k);

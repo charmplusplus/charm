@@ -90,18 +90,6 @@
        integer, parameter :: MPI_UNEQUAL  = 2
 
        integer, parameter :: MPI_OP_NULL = 0
-       integer, parameter :: MPI_MAX = 1
-       integer, parameter :: MPI_MIN = 2
-       integer, parameter :: MPI_SUM = 3
-       integer, parameter :: MPI_PROD = 4
-       integer, parameter :: MPI_MAXLOC = 5
-       integer, parameter :: MPI_MINLOC = 6
-       integer, parameter :: MPI_LAND = 7
-       integer, parameter :: MPI_LOR = 8
-       integer, parameter :: MPI_LXOR = 9
-       integer, parameter :: MPI_BAND = 10
-       integer, parameter :: MPI_BOR = 11
-       integer, parameter :: MPI_BXOR = 12
 
        integer, parameter :: MPI_GRAPH = 1
        integer, parameter :: MPI_CART = 2
@@ -128,4 +116,15 @@
        integer, external :: MPI_Register
        double precision, external :: MPI_WTIME
        double precision, external :: MPI_WTICK
-
+       external :: MPI_MAX    
+       external :: MPI_MIN    
+       external :: MPI_SUM    
+       external :: MPI_PROD   
+       external :: MPI_LAND   
+       external :: MPI_BAND   
+       external :: MPI_LOR    
+       external :: MPI_BOR    
+       external :: MPI_LXOR   
+       external :: MPI_BXOR   
+       external :: MPI_MAXLOC 
+       external :: MPI_MINLOC 

@@ -5,9 +5,6 @@
  *************************************************************/
 
 #include "ampiimpl.h"
-extern "C" void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* a, void* b);
-extern ampi *getAmpiInstance(MPI_Comm comm);
-extern ampiParent *getAmpiParent(void);
 
 /*************************************************************
  * Local flags used for Win_obj class: 
@@ -314,7 +311,7 @@ ampi::winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote accumulate at [%d]\n", thisIndex, myRank, rank);
   pa[rank].winRemoteAccumulate(orgcnt*sizeof(orgtype), (char*)orgaddr, orgtype, targdisp, targcnt, targtype,
   			       op, win.index, ftHandle, CkMyPe());
-
+            
   // Wait on the Future object 
   AMPI_DEBUG("    Future [%d] waiting\n", ftHandle);
   msg = (AmpiMsg*)CkWaitFuture(ftHandle);
@@ -559,7 +556,6 @@ int AMPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                          targdisp, targcnt, targtype, op, winStruct);   
 }
 
-
 /*
  * int AMPI_Win_fence(int assertion, MPI_Win win)
  *   Synchronizes all one-sided communication calls on this MPI_Win.   
@@ -584,7 +580,6 @@ int AMPI_Win_fence(int assertion, MPI_Win win){
   return MPI_SUCCESS;
 }
 
-
 /*
  * int AMPI_Win_lock(int lock_type, int rank, int assertion, MPI_Win win)
  *   Locks access to this MPI_Win object.   
@@ -605,8 +600,6 @@ int AMPI_Win_lock(int lock_type, int rank, int assertion, MPI_Win win){
   ptr->winLock(lock_type, rank, winStruct);
   return MPI_SUCCESS;
 }
-
-
 
 /*
  * int AMPI_Win_unlock(int rank, MPI_Win win)

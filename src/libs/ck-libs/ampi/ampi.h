@@ -26,7 +26,8 @@ extern "C" {
 #endif
 
 int AMPI_Main(int argc,char **argv); /* prototype for C main routine */
-
+typedef int MPI_Datatype;
+typedef int MPI_Aint;/* should be "long", but must be "int" for f90... */
 
 /********************** MPI-1.1 prototypes and defines ***************************/
 /* MPI-1 Errors */
@@ -137,20 +138,19 @@ int AMPI_Main(int argc,char **argv); /* prototype for C main routine */
 #define MPI_CONGRUENT   2
 #define MPI_UNEQUAL	3
 
-#define MPI_OP_NULL   0
-#define MPI_MAX       1
-#define MPI_MIN       2
-#define MPI_SUM       3
-#define MPI_PROD      4
-#define MPI_MAXLOC    5
-#define MPI_MINLOC    6
-#define MPI_LAND      7
-#define MPI_LOR       8
-#define MPI_LXOR      9
-#define MPI_BAND      10
-#define MPI_BOR       11
-#define MPI_BXOR      12
-#define MPI_CONCAT    13
+#define MPI_OP_NULL  (void *)NULL
+void MPI_MAX      ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
+void MPI_MIN      ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
+void MPI_SUM      ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
+void MPI_PROD     ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
+void MPI_LAND     ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
+void MPI_BAND     ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
+void MPI_LOR      ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
+void MPI_BOR      ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
+void MPI_LXOR     ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
+void MPI_BXOR     ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
+void MPI_MAXLOC   ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
+void MPI_MINLOC   ( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
 
 #define MPI_GRAPH 1
 #define MPI_CART 2
@@ -177,15 +177,11 @@ typedef int MPI_Group;
 extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
 
 
-typedef int MPI_Op;
 typedef int MPI_Request;
 typedef struct {
   int MPI_TAG, MPI_SOURCE, MPI_COMM, MPI_LENGTH;
 } MPI_Status;
 #define MPI_STATUS_IGNORE (MPI_Status *)0
-
-typedef int MPI_Datatype;
-typedef int MPI_Aint;/* should be "long", but must be "int" for f90... */
 
 typedef int MPI_Errhandler;
 #define MPI_ERRORS_RETURN	1
@@ -197,8 +193,10 @@ typedef int  (MPI_Copy_function)(MPI_Comm oldcomm, int keyval,
                     void *attribute_val_out, int *flag);
 typedef int  (MPI_Delete_function)(MPI_Comm comm, int keyval,
                           void *attribute_val, void *extra_state);
-typedef void (MPI_User_function)( void *invec, void *inoutvec, int *len,
-                      MPI_Datatype *datatype);
+typedef void (MPI_User_function) (void *invec, void *inoutvec, 
+                                  int *len, MPI_Datatype *datatype);
+typedef void (*MPI_Op) (void *invec, void *inoutvec, 
+                       int *len, MPI_Datatype *datatype);
 
 #define MPI_NULL_COPY_FN   MPI_null_copy_fn
 #define MPI_NULL_DELETE_FN MPI_null_delete_fn
@@ -210,6 +208,7 @@ int MPI_DUP_FN ( MPI_Comm, int, void *, void *, void *, int * );
 #include "pup_c.h"
 
 typedef void (*MPI_PupFn)(pup_er, void*);
+
 
 /********************** MPI-2 prototypes and defines ***************************/
 /* for the datatype decoders */
@@ -400,8 +399,10 @@ int AMPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
 #define MPI_Scan AMPI_Scan
 int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, 
 		MPI_Op op, MPI_Comm comm );
-/* MPI_Op_create */
-/* MPI_Op_free */
+#define MPI_Op_create AMPI_Op_create
+int AMPI_Op_create(MPI_User_function *function, int commute, MPI_Op *op);
+#define MPI_Op_free AMPI_Op_free
+int AMPI_Op_free(MPI_Op *op);
 
 /***groups,contexts and communicators***/
 #define MPI_Group_size AMPI_Group_size

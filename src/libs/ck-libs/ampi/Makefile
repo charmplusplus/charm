@@ -33,7 +33,7 @@ $(DEST): $(OBJS) headers
 
 $(DESTF): $(OBJS) headers
 	-$(CHARMC) -c ampimod.f90
-	-$(CHARMC) -cpmod ../../../../include mpiincl.M
+	-$(CHARMC) -cpmod ../../../../include mpi.M
 	-$(CHARMC) $(OBJS) ampimod.o -o $@
 	-cp $(LIB)f.dep $(LIBDIR)/$(LIB)f.dep
 
