@@ -90,6 +90,7 @@ public:
     	UChar isPacked:1;
     	UChar isUsed:1;
     	UChar ifNotThere:2; //Used by arrays
+	UChar isImmediate:1;   //Used by immediate msgs
     };
 private:
     u_type type; //Depends on message type (attribs.mtype)
@@ -118,6 +119,8 @@ private:
     UChar  isUsed(void) { return attribs.isUsed; }
     void   setUsed(const UChar u) { attribs.isUsed=u; }
 #endif
+    UChar  isImmediate(void) { return attribs.isImmediate; }
+    void   setImmediate(const UChar u) { attribs.isImmediate=u; }
     UChar  getMsgIdx(void) const { return attribs.msgIdx; }
     void   setMsgIdx(const UChar idx) { attribs.msgIdx = idx; }
     UInt   getTotalsize(void) const { return totalsize; }

@@ -19,6 +19,8 @@ public:
   unsigned int array_getSrcPe(void);
   unsigned int array_ifNotThere(void);
   void array_setIfNotThere(unsigned int);
+  unsigned int array_isImmediate(void);
+  void array_setImmediate(unsigned int);
   
   //This allows us to delete bare CkArrayMessages
   void operator delete(void *p){CkFreeMsg(p);}

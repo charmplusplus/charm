@@ -159,6 +159,14 @@ void CkArrayMessage::array_setIfNotThere(unsigned int i)
 {
 	UsrToEnv((void *)this)->setIfNotThere(i);
 }
+unsigned int CkArrayMessage::array_isImmediate(void)
+{
+	return UsrToEnv((void *)this)->isImmediate();
+}
+void CkArrayMessage::array_setImmediate(unsigned int i)
+{
+	UsrToEnv((void *)this)->setImmediate(i);
+}
 
 /*********************** Array Map ******************
 Given an array element index, an array map tells us 

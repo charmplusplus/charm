@@ -277,7 +277,6 @@ public:
 	
 	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep) const;
-	void ckSendImmediate(CkArrayMessage *m, int ep) const;
 	void *ckSendSync(CkArrayMessage *m, int ep) const;
 	const CkArrayIndex &ckGetIndex() const {return _idx;}
 
@@ -318,7 +317,6 @@ public:
 	
 //	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep) ;
-	void ckSendImmediate(CkArrayMessage *m, int ep) ;
 
 //	ArrayElement *ckLocal(void) const;
 	inline CkSectionCookie &ckGetSectionCookie() {return _sid._cookie;}

@@ -110,4 +110,7 @@ void CkMessage::pup(PUP::er &p) {
 	p((void *)this,userSize);
 }
 
-
+void CkMessage::setImmediate(CmiBool i) {
+	envelope *env=UsrToEnv((void *)this);
+	env->setImmediate(i);
+}

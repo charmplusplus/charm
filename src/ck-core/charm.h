@@ -157,10 +157,8 @@ extern CkGroupID CkCreateNodeGroup(int chareIdx, int constructorIdx, void *msg);
  *****************************************************************************/
 
 extern void CkSendMsg(int entryIndex, void *msg, const CkChareID *chare);
-extern void CkSendMsgImmediate(int entryIndex, void *msg, const CkChareID *chare);
 extern void CkSendMsgBranch(int eIdx, void *msg, int destPE, CkGroupID gID);
 extern void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *chare);
-extern void CkSendMsgBranchImmediate(int eIdx, void *msg, int destPE, CkGroupID gID);
 extern void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID);
 extern void CkSendMsgBranchMulti(int eIdx, void *msg, int npes, int *pes, 
                                  CkGroupID gID);

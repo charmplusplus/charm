@@ -702,7 +702,7 @@ static void _noCldEnqueue(int pe, envelope *env)
 }
 
 
-static int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
+static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
 {
   register envelope *env = UsrToEnv(msg);
   _CHECK_USED(env);
@@ -737,6 +737,17 @@ static int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
   }
 }
 
+static inline int _prepareImmediateMsg(int eIdx,void *msg,const CkChareID *pCid)
+{
+  int destPE = _prepareMsg(eIdx, msg, pCid);
+  if (destPE != -1) {
+    register envelope *env = UsrToEnv(msg);
+    CmiSetHandler(env, CpvAccessOther(CmiImmediateMsgHandlerIdx,0));
+    CmiSetXHandler(env, _charmHandlerIdx);
+  }
+  return destPE;
+}
+
 extern "C"
 void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid)
 {
@@ -754,44 +765,29 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid)
 {
   if (pCid->onPE==CkMyPe())
   { //Just directly call the chare (skip QD handling & scheduler)
-    register envelope *env = (envelope *) msg;
+    register envelope *env = (envelope *) UsrToEnv(msg);
     if (env->isPacked()) CkUnpackMessage(&env);
     _STATS_RECORD_PROCESS_MSG_1();
     _deliverForChareMsg(entryIndex,env,pCid->objPtr);
   }
-  else
+  else {
+#if CMK_IMMEDIATE_MSG
+    register envelope *env = (envelope *) UsrToEnv(msg);
+    if (env->isImmediate()) {
+      env->setImmediate(CmiFalse);
+      int destPE=_prepareImmediateMsg(entryIndex,msg,pCid);
+      // go into VidBlock when destPE is -1
+      if (destPE!=-1) {
+        _TRACE_CREATION_1(env);
+        CpvAccess(_qd)->create();
+        _noCldEnqueue(destPE, env);
+      }
+    }
+    else
+#endif
     //No way to inline a cross-processor message:
     CkSendMsg(entryIndex,msg,pCid);
-}
-
-extern "C"
-void CkSendMsgImmediate(int entryIdx, void *msg, const CkChareID *pCid)
-{
-  register envelope *env = UsrToEnv(msg);
-#if CMK_IMMEDIATE_MSG
-//CmiPrintf("[%d] CkSendMsgImmediate called.\n", CkMyPe());
-  if (pCid->onPE==CkMyPe())
-  { //Just directly call the chare (skip QD handling & scheduler)
-    if (env->isPacked()) CkUnpackMessage(&env);
-    _STATS_RECORD_PROCESS_MSG_1();
-    _SET_USED(env, 0);
-    // don't trace
-   _entryTable[entryIdx]->call(msg, pCid->objPtr);
   }
-  else {
-    int destPE=_prepareMsg(entryIdx,msg,pCid);
-    CmiSetHandler(env, CpvAccessOther(CmiImmediateMsgHandlerIdx,0));
-    CmiSetXHandler(env, _charmHandlerIdx);
-    // go into VidBlock when destPE is -1
-    if (destPE!=-1) {
-      _TRACE_CREATION_1(env);
-      CpvAccess(_qd)->create();
-      _noCldEnqueue(destPE, env);
-    }
-  }
-#else
-  CkSendMsgInline(entryIdx, msg, pCid);
-#endif
 }
 
 static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
@@ -857,25 +853,23 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID)
     }
   }
   //Can't inline-- send the usual way
-  CkSendMsgBranch(eIdx,msg,destPE,gID);
-}
-
-extern "C"
-void CkSendMsgBranchImmediate(int eIdx, void *msg, int pe, CkGroupID gID)
-{
 #if CMK_IMMEDIATE_MSG
-  register envelope *env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
-  if(pe==CLD_BROADCAST_ALL) {
-    _TRACE_CREATION_N(env, CkNumPes());
-  } else {
-    _TRACE_CREATION_1(env);
+  register envelope *env = UsrToEnv(msg);
+  if (env->isImmediate()) {
+    env->setImmediate(CmiFalse);
+    env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
+    if(destPE==CLD_BROADCAST_ALL) {
+      _TRACE_CREATION_N(env, CkNumPes());
+    } else {
+      _TRACE_CREATION_1(env);
+    }
+    _noCldEnqueue(destPE, env);
+    _STATS_RECORD_SEND_BRANCH_1();
+    CpvAccess(_qd)->create();
   }
-  _noCldEnqueue(pe, env);
-  _STATS_RECORD_SEND_BRANCH_1();
-  CpvAccess(_qd)->create();
-#else
-  CkSendMsgBranchInline(eIdx, msg, pe, gID);
+  else
 #endif
+  CkSendMsgBranch(eIdx,msg,destPE,gID);
 }
 
 extern "C"

@@ -109,6 +109,7 @@ public:
 	/* This pup routine only packs the message itself, *not* the
 	message header.  Use CkPupMessage instead of calling this directly. */
 	void pup(PUP::er &p);
+        void setImmediate(CmiBool i);
 };
 class CMessage_CkMessage {
  public:
