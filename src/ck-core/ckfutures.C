@@ -297,10 +297,11 @@ extern "C" void *CkWaitReleaseFuture(CkFutureID futNum)
 	return result;
 }
 
-class FutureBOC: public Group {
+class FutureBOC: public IrrGroup {
 public:
+  FutureBOC(void){ }
   FutureBOC(FutureInitMsg *m) { delete m; }
-  FutureBOC(CkMigrateMessage *m) {}
+  FutureBOC(CkMigrateMessage *m) { }
   void SetFuture(FutureInitMsg * m) { 
 #ifndef CMK_OPTIMIZE
     if (m==NULL) CkAbort("FutureBOC::SetFuture called with NULL!");

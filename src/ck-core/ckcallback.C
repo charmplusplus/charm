@@ -29,6 +29,7 @@ public:
 class ckcallback_group : public CBase_ckcallback_group {
 public:
 	ckcallback_group() { /*empty*/ }
+	ckcallback_group(CkMigrateMessage *m) { /*empty*/ }
 	void registerCcsCallback(const char *name,const CkCallback &cb);
 	void call(CkCallback &c,CkMarshalledMessage &msg) {
 		c.send(msg.getMessage());
@@ -95,7 +96,7 @@ void CkCallback::send(void *msg) const
 	switch(type) {
 	case ignore: //Just ignore the callback
 		if (msg) CkFreeMsg(msg);
-		break; 
+		break;
 	case ckExit: //Call ckExit
 		if (msg) CkFreeMsg(msg);
 		CkExit();
@@ -103,7 +104,7 @@ void CkCallback::send(void *msg) const
 	case resumeThread: //Resume a waiting thread
 		if (d.thread.onPE==CkMyPe()) {
 			CkCallback *dest=d.thread.cb;
-			if (dest==NULL) 
+			if (dest==NULL)
 				CkAbort("Already sent a value to this callback!\n");
 			dest->d.thread.ret=msg; //<- return data
 			dest->d.thread.cb=NULL; //<- mark callback as finished

@@ -70,25 +70,12 @@ inline CkArrayIndexMax &CkArrayMessage::array_index(void)
 
 /*********************** CkVerboseListener ******************/
 #define VL_PRINT ckout<<"VerboseListener on PE "<<CkMyPe()<<" > "
-CkVerboseListenerCreator::CkVerboseListenerCreator(void)
-{
-  createCount=0;
-}
-//Called by the array manager to actually create the listener.
-//  We ignore the index, but you could theoretically use it for something.
-CkComponent *CkVerboseListenerCreator::ckLookupComponent(int useIndex)
-{
-  VL_PRINT<<"Creating listener for index "<<useIndex<<endl;
-  return new CkVerboseListener();
-}
-CkComponentID CkVerboseListenerCreator::createListener(void)
-{
-  createCount++;
-  return CkComponentID(thisgroup,createCount);
-}
 
-CkVerboseListener::CkVerboseListener(int nInts_) 
-  :CkArrayListener(nInts_) {}
+CkVerboseListener::CkVerboseListener(void)
+  :CkArrayListener(0)
+{
+  VL_PRINT<<"INIT  Creating listener"<<endl;
+}
 
 void CkVerboseListener::ckRegister(CkArray *arrMgr,int dataOffset_)
 {
@@ -186,7 +173,7 @@ void ArrayElement::ckJustMigrated(void) {
 }
 
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(ArrayElement,thisArray,
-   *(contributorInfo *)&listenerData[thisArray->reducer.ckGetOffset()]);
+   *(contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()]);
 
 /// Remote method: calls destructor
 void ArrayElement::ckDestroy(void)
@@ -225,29 +212,6 @@ void ArrayElement::CkAbort(const char *str) const
 	CkMigratable::CkAbort(str);
 }
 
-//// Checkpoint: pup to disk file
-void ArrayElement::ckCheckpoint(char* fname)
-{
-  FILE *chkptfile=fopen(fname,"wb");
-  if(chkptfile == NULL){
-    CkAbort("ArrayElement::ckCheckpoint open file failed!");
-  }
-  PUP::toDisk p(chkptfile);
-  this->pup(p);
-  fclose(chkptfile);
-}
-
-void ArrayElement::ckRestart(char* fname)
-{
-  FILE *chkptfile=fopen(fname,"rb");
-  if(chkptfile == NULL){
-    CkAbort("ArrayElement::ckRestart open file failed!");
-  }
-  PUP::fromDisk p(chkptfile);
-  this->pup(p);
-  fclose(chkptfile);
-}
-
 /*********************** Spring Cleaning *****************
 Periodically (every minute or so) remove expired broadcasts
 from the queue.
@@ -256,7 +220,7 @@ from the queue.
 inline void CkArray::springCleaning(void)
 {
   DEBK((AA"Starting spring cleaning #%d\n"AB,nSprings,nSprings))
-  broadcaster.springCleaning();
+  broadcaster->springCleaning();
 }
 
 void CkArray::staticSpringCleaning(void *forArray) {
@@ -272,7 +236,7 @@ CProxyElement_ArrayBase::CProxyElement_ArrayBase(const ArrayElement *e)
 	:CProxy_ArrayBase(e), _idx(e->ckGetArrayIndex())
 	{}
 
-CkLocMgr *CProxy_ArrayBase::ckLocMgr(void) const 
+CkLocMgr *CProxy_ArrayBase::ckLocMgr(void) const
 	{return ckLocalBranch()->getLocMgr(); }
 
 CK_REDUCTION_CLIENT_DEF(CProxy_ArrayBase,ckLocalBranch());
@@ -298,9 +262,9 @@ CkArrayOptions &CkArrayOptions::bindTo(const CkArrayID &b)
 	//setNumInitial(arr->getNumInitial());
 	return setLocationManager(arr->getLocMgr()->getGroupID());
 }
-CkArrayOptions &CkArrayOptions::addListener(const CkComponentID &id)
+CkArrayOptions &CkArrayOptions::addListener(CkArrayListener *listener)
 {
-	arrayListeners.push_back(id);
+	arrayListeners.push_back(listener);
 	return *this;
 }
 
@@ -316,8 +280,15 @@ CkArrayListener::CkArrayListener(int nInts_)
 {
   dataOffset=-1;
 }
+CkArrayListener::CkArrayListener(CkMigrateMessage *m) {
+  nInts=-1; dataOffset=-1;
+}
+void CkArrayListener::pup(PUP::er &p) {
+  p|nInts;
+  p|dataOffset;
+}
 
-void CkArrayListener::ckRegister(CkArray *arrMgr,int dataOffset_) 
+void CkArrayListener::ckRegister(CkArray *arrMgr,int dataOffset_)
 {
   if (dataOffset!=-1) CkAbort("Cannot register an ArrayListener twice!\n");
   dataOffset=dataOffset_;
@@ -326,8 +297,10 @@ void CkArrayListener::ckRegister(CkArray *arrMgr,int dataOffset_)
 CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
 					  const CkArrayOptions &opts_)
 {
-  CkArrayOptions opts(opts_);
-  if (opts.getLocationManager().isZero()) 
+  /* HACK: cast away constness on array options, so we can change ldbd,
+     but not have to copy the vector of listeners (derived classes!). */
+  CkArrayOptions &opts=*(CkArrayOptions *)&opts_;
+  if (opts.getLocationManager().isZero())
   { //Create a new location manager
 #if !CMK_LBDB_ON
     CkGroupID lbdb;
@@ -400,10 +373,10 @@ void _ckArrayInit(void)
   CkDisableTracing(CkIndex_CkArray::recvBroadcast(0));
 }
 
-CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionID)
+CkArray::CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionID)
   : CkReductionMgr(),
-  locMgr(CProxy_CkLocMgr::ckLocalBranch(c.getLocationManager())),
-  thisProxy(thisgroup), reducer(this)
+  locMgr(CProxy_CkLocMgr::ckLocalBranch(c.getLocationManager())),locMgrID(c.getLocationManager()),
+  thisProxy(thisgroup)
 {
   //Registration
   elements=(ArrayElementList *)locMgr->addManager(thisgroup,this);
@@ -417,8 +390,10 @@ CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGrou
 
   //Find, register, and initialize the arrayListeners
   int dataOffset=0;
-  addListener(&broadcaster,dataOffset);
-  addListener(&reducer,dataOffset);
+  broadcaster=new CkArrayBroadcaster();
+  addListener(broadcaster,dataOffset);
+  reducer=new CkArrayReducer(thisgroup);
+  addListener(reducer,dataOffset);
   int lNo,nL=c.getListeners(); //User-added listeners
   for (lNo=0;lNo<nL;lNo++) addListener(c.getListener(lNo),dataOffset);
   if (dataOffset>CK_ARRAYLISTENER_MAXLEN)
@@ -428,13 +403,44 @@ CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGrou
 
   for (int l=0;l<listeners.size();l++) listeners[l]->ckBeginInserting();
 
-  //Set up initial elements (if any)
+  ///Set up initial elements (if any)
   locMgr->populateInitial(numInitial,initMsg.getMessage(),this);
 
-   ///adding code for Reduction using nodegroups
-  
+  ///adding code for Reduction using nodegroups
   nodeProxyPtr = new CProxy_CkArrayReductionMgr(nodereductionID);
+}
 
+CkArray::CkArray(CkMigrateMessage *m)
+	:CkReductionMgr(m), thisProxy(thisgroup)
+{
+  locMgr=NULL;
+  isInserting=CmiTrue;
+}
+
+#ifndef CMK_OPTIMIZE
+inline void testPup(PUP::er &p,int shouldBe) {
+  int a=shouldBe;
+  p|a;
+  if (a!=shouldBe)
+    CkAbort("PUP direction mismatch!");
+}
+#else
+inline void testPup(PUP::er &p,int shouldBe) {}
+#endif
+
+void CkArray::pup(PUP::er &p){
+	CkReductionMgr::pup(p);
+	p|numInitial;
+	p|locMgrID;
+	p|listeners;
+	testPup(p,1234);
+	if(p.isUnpacking()){
+		locMgr = CProxy_CkLocMgr::ckLocalBranch(locMgrID);
+		elements = (ArrayElementList *)locMgr->addManager(thisgroup,this);
+		/// Restore our default listeners:
+		broadcaster=(CkArrayBroadcaster *)(CkArrayListener *)(listeners[0]);
+		reducer=(CkArrayReducer *)(CkArrayListener *)(listeners[1]);
+	}
 }
 
 //Called on send side to prepare array constructor message
@@ -633,27 +639,50 @@ void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArra
 
 
 /*********************** CkArray Reduction *******************/
-CkArrayReducer::CkArrayReducer(CkReductionMgr *mgr_) 
-  :CkArrayListener(sizeof(contributorInfo)/sizeof(int)), 
-   mgr(mgr_)
-{}
+CkArrayReducer::CkArrayReducer(CkGroupID mgrID_)
+  :CkArrayListener(sizeof(contributorInfo)/sizeof(int)),
+   mgrID(mgrID_)
+{
+  mgr=CProxy_CkReductionMgr(mgrID).ckLocalBranch();
+}
+CkArrayReducer::CkArrayReducer(CkMigrateMessage *m)
+  :CkArrayListener(m)
+{
+  mgr=NULL;
+}
+void CkArrayReducer::pup(PUP::er &p) {
+  CkArrayListener::pup(p);
+  p|mgrID;
+  if (p.isUnpacking())
+    mgr=CProxy_CkReductionMgr(mgrID).ckLocalBranch();
+}
 CkArrayReducer::~CkArrayReducer() {}
 
 /*********************** CkArray Broadcast ******************/
 
-CkArrayBroadcaster::CkArrayBroadcaster()
+CkArrayBroadcaster::CkArrayBroadcaster(void)
   :CkArrayListener(1) //Each array element carries a broadcast number
 {
   bcastNo=oldBcastNo=0;
 }
-
-CkArrayBroadcaster::~CkArrayBroadcaster() 
+CkArrayBroadcaster::CkArrayBroadcaster(CkMigrateMessage *m)
+	:CkArrayListener(m) { bcastNo=-1; oldBcastNo=-1; }
+void CkArrayBroadcaster::pup(PUP::er &p) {
+  CkArrayListener::pup(p);
+  /* Assumption: no migrants during checkpoint, so no need to
+     save old broadcasts. */
+  p|bcastNo;
+  if (p.isUnpacking()) {
+    oldBcastNo=bcastNo; /* because we threw away oldBcasts */
+  }
+}
+CkArrayBroadcaster::~CkArrayBroadcaster()
 {
   CkArrayMessage *msg;
   while (NULL!=(msg=oldBcasts.deq())) delete msg;
 }
 
-void CkArrayBroadcaster::incoming(CkArrayMessage *msg) 
+void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 {
   DEBB((AA"Received broadcast %d\n"AB,bcastNo));
   bcastNo++;
@@ -679,17 +708,17 @@ CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
    //been migrating during the broadcast.
     int i,nDeliver=bcastNo-elBcastNo;
     DEBM((AA"Migrator %s missed %d broadcasts--\n"AB,idx2str(el),nDeliver));
-    
+
     //Skip the old junk at the front of the bcast queue
     for (i=oldBcasts.length()-1;i>=nDeliver;i--)
       oldBcasts.enq(oldBcasts.deq());
-    
-    //Deliver the newest messages, in old-to-new order 
+
+    //Deliver the newest messages, in old-to-new order
     for (i=nDeliver-1;i>=0;i--)
     {
       CkArrayMessage *msg=oldBcasts.deq();
       oldBcasts.enq(msg);
-      if (!deliver(msg,el)) 
+      if (!deliver(msg,el))
 	return CmiFalse; //Element migrated away
     }
   }
@@ -697,7 +726,7 @@ CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
   return CmiTrue;
 }
 
-  
+
 void CkArrayBroadcaster::springCleaning(void)
 {
   //Remove old broadcast messages
@@ -736,7 +765,6 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep) const
 	}
 }
 
-
 /// Reflect a broadcast off this Pe:
 void CkArray::sendBroadcast(CkMessage *msg)
 {
@@ -750,12 +778,12 @@ void CkArray::recvBroadcast(CkMessage *m)
 {
 	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
-	broadcaster.incoming(msg);
+	broadcaster->incoming(msg);
 	//Run through the list of local elements
 	int idx=0;
 	ArrayElement *el;
 	while (NULL!=(el=elements->next(idx)))
-		broadcaster.deliver(msg,el);
+		broadcaster->deliver(msg,el);
 }
 
 

@@ -5,7 +5,7 @@ module CkLocation {
 	double packData[];
   };
 
-  group CkLocMgr {
+  group [migratable] CkLocMgr {
 	entry CkLocMgr(CkGroupID map,CkGroupID lbdb,int numInitial);
 	entry void deliverInline(CkMessage *m);
 	entry [immediate] void deliverImmediate(CkMessage *m);
@@ -19,18 +19,18 @@ module CkLocation {
   initcall void _CkLocMgrInit(void);
   
 //Array Map object support:
-  group CkArrayMap {
+  group [migratable] CkArrayMap {
   };
 
   readonly CkGroupID _RRMapID;
-  group RRMap : CkArrayMap {
+  group [migratable] RRMap : CkArrayMap {
     entry RRMap(void);
   };
 
   initcall void _propMapInit(void);
   initcall void _CkMigratable_initInfoInit(void);
 
-  group PropMap : CkArrayMap {
+  group [migratable] PropMap : CkArrayMap {
     entry PropMap(void);
   };
 

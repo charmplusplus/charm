@@ -587,10 +587,11 @@ class CkInPortMsg : public CharismaInPort
     }
 };
 
-class Charisma : public Group
+class Charisma : public IrrGroup
 {
   public:
     Charisma(void) { }
+    Charisma(CkMigrateMessage *m) : IrrGroup(m) { }
 };
 
 #endif

@@ -118,8 +118,9 @@ private:
 class CkGroupInitCallback : public IrrGroup {
 public:
 	CkGroupInitCallback(void);
-	CkGroupInitCallback(CkMigrateMessage *m) {}
+	CkGroupInitCallback(CkMigrateMessage *m):IrrGroup(m) {}
 	void callMeBack(CkGroupCallbackMsg *m);
+	void pup(PUP::er& p){ IrrGroup::pup(p); }
 };
 
 
@@ -130,7 +131,7 @@ private:
   void callBuffered(void);
 public:
 	CkGroupReadyCallback(void);
-	CkGroupReadyCallback(CkMigrateMessage *m) {}
+	CkGroupReadyCallback(CkMigrateMessage *m):IrrGroup(m) {}
 	void callMeBack(CkGroupCallbackMsg *m);
 	int isReady(void) { return _isReady; }
 protected:
@@ -149,10 +150,8 @@ class CkReductionNumberMsg;
  * the reduced message up the reduction tree to node zero, where
  * they're passed to the user's client function.
  */
-
- class CkNodeReductionMgr;
-
- class contributorInfo {
+class CkNodeReductionMgr;
+class contributorInfo {
 	public:
 		int redNo;//Current reduction number
 		contributorInfo() {redNo=0;}
@@ -166,7 +165,8 @@ class countAdjustment {
 		int lcount;//Adjustment to local count (applied continually)
 		int mainRecvd;
 		countAdjustment(int ignored=0) {gcount=lcount=0;mainRecvd=0;}
-	};
+		void pup(PUP::er& p){ p|gcount; p|lcount; p|mainRecvd; }
+};
 class CProxy_CkArrayReductionMgr;
 class CkReductionMgr : public CkGroupInitCallback {
 public:
@@ -243,15 +243,15 @@ private:
 	//Current local and remote contributions
 	int nContrib,nRemote;
 	//Contributions queued for the current reduction
-	CkVec<CkReductionMsg *> msgs;
+	CkMsgQ<CkReductionMsg> msgs;
 
 	//Contributions queued for future reductions (sent to us too early)
-	CkQ<CkReductionMsg *> futureMsgs;
+	CkMsgQ<CkReductionMsg> futureMsgs;
 	//Remote messages queued for future reductions (sent to us too early)
-	CkQ<CkReductionMsg *> futureRemoteMsgs;
+	CkMsgQ<CkReductionMsg> futureRemoteMsgs;
 
-	CkQ<CkReductionMsg *> finalMsgs;
-	
+	CkMsgQ<CkReductionMsg> finalMsgs;
+
 	// to store the message associated callbacks of different reductions in a queue
 	CkQ<CkCallback	*> callbackQ;
 
@@ -276,7 +276,7 @@ private:
 	CmiBool isPresent(int num) const {return (CmiBool)(num==redNo);}
 	CmiBool isFuture(int num) const {return (CmiBool)(num>redNo);}
 
-	
+
 	//This vector of adjustments is indexed by redNo,
 	// starting from the current redNo.
 	CkVec<countAdjustment> adjVec;
@@ -286,12 +286,7 @@ private:
 	void shiftAdjVec(void);
 
 //Checkpointing utilities
-	//pack-unpack method for CkReductionMsg
-        CkReductionMsg* pupCkReductionMsg(CkReductionMsg *m, PUP::er &p);
-        void pupMsgVector(CkVec<CkReductionMsg *> &msgs, PUP::er &p);
-        void pupMsgQ(CkQ<CkReductionMsg *> &msgs, PUP::er &p);
-        void pupAdjVec(CkVec<countAdjustment> &vec, PUP::er &p);
- public:
+public:
 	virtual void pup(PUP::er &p);
 };
 
@@ -316,6 +311,7 @@ public:
 	inline int getLength(void) const {return dataSize;}
 	inline int getSize(void) const {return dataSize;}
 	inline void *getData(void) {return data;}
+
 	inline int getGcount(void){return gcount;}
 	inline CkReduction::reducerType getReducer(void){return reducer;}
 	inline int getRedNo(void){return redNo;}
@@ -357,9 +353,10 @@ private:
         CkSectionCookie sid;   // section cookie for multicast
         char rebuilt;          // indicate if the multicast tree needs rebuilt
 	double dataStorage;//Start of data array (so it's double-aligned)
-	int no;
-	//Default constructor is private so you must use "buildNew", above
 
+	int no;
+
+	//Default constructor is private so you must use "buildNew", above
 	CkReductionMsg();
 };
 
@@ -423,9 +420,9 @@ public:
 	 * This manager will dispose of the callback when replaced or done.
 	 */
 	void ckSetReductionClient(CkCallback *cb);
-		
+
 	void contributorDied(contributorInfo *ci);//Don't expect more contributions
-	
+
 //Contribute-- the given msg can contain any data.  The reducerType
 // field of the message must be valid.
 // Each contributor must contribute exactly once to each reduction.
@@ -451,22 +448,18 @@ private:
 	int gcount;
 	int lcount;//Number of local contributors
 
-	/*Current local and remote contributions*/
+	//Current local and remote contributions
 	int nContrib,nRemote;
-	/*Contributions queued for the current reduction */
-	CkVec<CkReductionMsg *> msgs;
-
-	/*Contributions queued for future reductions (sent to us too early)*/
-	CkQ<CkReductionMsg *> futureMsgs;
-	/*Remote messages queued for future reductions (sent to us too early)*/
-	CkQ<CkReductionMsg *> futureRemoteMsgs;
-
+	//Contributions queued for the current reduction
+	CkMsgQ<CkReductionMsg> msgs;
+	//Contributions queued for future reductions (sent to us too early)
+	CkMsgQ<CkReductionMsg> futureMsgs;
+	//Remote messages queued for future reductions (sent to us too early)
+	CkMsgQ<CkReductionMsg> futureRemoteMsgs;
 
 	//My Big LOCK
 	CmiNodeLock lockEverything;
 
-
-	
 	int interrupt; /* flag for use in non-smp 0 means interrupt can occur 1 means not (also acts as a lock)*/
 
 //State:
@@ -474,7 +467,7 @@ private:
 	void doAddContribution(CkReductionMsg *m);
 	void addContribution(CkReductionMsg *m);
 	void finishReduction(void);
-	
+
 
 //Reduction tree utilities
 /* for binomial trees*/
@@ -501,11 +494,6 @@ private:
 	CmiBool isFuture(int num) const {return (CmiBool)(num>redNo);}
 
 //Checkpointing utilities
-	//pack-unpack method for CkReductionMsg
-        CkReductionMsg* pupCkReductionMsg(CkReductionMsg *m, PUP::er &p);
-        void pupMsgVector(CkVec<CkReductionMsg *> &msgs, PUP::er &p);
-        void pupMsgQ(CkQ<CkReductionMsg *> &msgs, PUP::er &p);
-        void pupAdjVec(CkVec<countAdjustment> &vec, PUP::er &p);
  public:
 	virtual void pup(PUP::er &p);
 
@@ -519,6 +507,7 @@ class NodeGroup : public CkNodeReductionMgr {
   public:
     CmiNodeLock __nodelock;
     NodeGroup();
+    NodeGroup(CkMigrateMessage* m):CkNodeReductionMgr(m) { }
     ~NodeGroup();
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
     inline CkGroupID CkGetNodeGroupID(void) const {return thisgroup;}

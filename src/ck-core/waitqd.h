@@ -19,7 +19,7 @@ class waitqd_QDChare : public Chare {
    void *threadList;
  public:
    waitqd_QDChare(CkArgMsg *ckam);
-   waitqd_QDChare(CkMigrateMessage *m) {}
+   waitqd_QDChare(CkMigrateMessage *m):Chare(m) {}
    void waitQD(void);
    void onQD(CkQdMsg *ckqm);
 };

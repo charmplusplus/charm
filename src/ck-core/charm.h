@@ -99,7 +99,7 @@ typedef struct _ckGroupID{
   void pup(PUP::er &p) {  p(idx); }
   int isZero(void) const { return (idx==0); }
   void setZero(void) { idx=0; }
-  int operator==(const struct _ckGroupID& gid) const { 
+  int operator==(const struct _ckGroupID& gid) const {
     return (gid.idx==idx);
   }
 #endif
@@ -153,11 +153,13 @@ extern CkMarshallUnpackFn CkLookupMarshallUnpackFn(int epIndex);
  * Object Creation Calls
  *
  *****************************************************************************/
-
+class envelope;
 extern void CkCreateChare(int chareIdx, int constructorIdx, void *msg,
                           CkChareID *vid, int destPE);
 extern CkGroupID CkCreateGroup(int chareIdx, int constructorIdx, void *msg);
 extern CkGroupID CkCreateNodeGroup(int chareIdx, int constructorIdx, void *msg);
+extern void CkCreateLocalGroup(CkGroupID groupID, int constructorIdx, envelope *env);
+extern void CkCreateLocalNodeGroup(CkGroupID groupID, int constructorIdx, envelope *env);
 
 /******************************************************************************
  *

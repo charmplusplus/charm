@@ -3,7 +3,7 @@ module CkFutures {
   message CkQdMsg;
   message FutureInitMsg;
 
-  group FutureBOC {
+  group [migratable] FutureBOC {
     entry FutureBOC(FutureInitMsg *);
     entry void SetFuture(FutureInitMsg *);
     entry void SetSema(FutureInitMsg *);

@@ -32,7 +32,7 @@ class VidBlock {
     PtrQ *msgQ;
     CkChareID actualID;
     void msgDeliver(envelope *env) {
-        env->setSrcPe(CkMyPe());           
+        env->setSrcPe(CkMyPe());
         env->setMsgtype(ForChareMsg);
         env->setObjPtr(actualID.objPtr);
         CldEnqueue(actualID.onPE, env, _infoIdx);
@@ -85,17 +85,17 @@ public:
 	CkMessageWatcher *watcher;
 	
 	CkCoreState() 
-		:groupTable(CkpvAccess(_groupTable)), 
+		:groupTable(CkpvAccess(_groupTable)),
 		 qd(CpvAccess(_qd)) { watcher=NULL; }
 	~CkCoreState() { delete watcher;}
-	
+
 	inline GroupTable *getGroupTable() {
  		return groupTable;
 	}
 	inline IrrGroup *localBranch(CkGroupID gID) {
 		return groupTable->find(gID).getObj();
 	}
-	
+
 	inline QdState *getQD() {return qd;}
 	inline void process(int n=1) {qd->process(n);}
 };
@@ -104,15 +104,15 @@ CkpvExtern(CkCoreState *, _coreState);
 
 void CkMessageWatcherInit(char **argv,CkCoreState *ck);
 
-
 extern void _processHandler(void *converseMsg,CkCoreState *ck);
 extern void _processBocInitMsg(CkCoreState *ck,envelope *msg);
 extern void _processNodeBocInitMsg(CkCoreState *ck,envelope *msg);
 extern void _infoFn(void *msg, CldPackFn *pfn, int *len,
                     int *queueing, int *priobits, UInt **prioptr);
-extern void _createGroupMember(CkGroupID groupID, int eIdx, void *env);
-extern void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *env);
+extern void CkCreateLocalGroup(CkGroupID groupID, int eIdx, envelope *env);
+extern void CkCreateLocalNodeGroup(CkGroupID groupID, int eIdx, envelope *env);
 extern void _createGroup(CkGroupID groupID, envelope *env);
 extern void _createNodeGroup(CkGroupID groupID, envelope *env);
 extern int _getGroupIdx(int,int,int);
+
 #endif

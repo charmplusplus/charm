@@ -6,7 +6,7 @@ module CkCallback {
 	mainchare ckcallback_main {
 		entry ckcallback_main(CkArgMsg *m);
 	};
-	group ckcallback_group {
+	group [migratable] ckcallback_group : IrrGroup {
 		entry ckcallback_group();
 		entry void registerCcsCallback(char name[strlen(name)+1],
 			CkCallback cb);

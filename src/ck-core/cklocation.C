@@ -464,7 +464,7 @@ static void _CkMigratable_prefetchInit(void)
  */
 class CkMigratable_initInfo {
 public:
-	CkLocRec_local *locRec;  
+	CkLocRec_local *locRec;
 	int chareType;
 	bool forPrefetch; /* If true, this creation is only a prefetch restore-from-disk.*/
 };
@@ -483,7 +483,7 @@ void CkMigratable::commonInit(void) {
 	CkMigratable_initInfo &i=CkpvAccess(mig_initInfo);
 #if CMK_OUT_OF_CORE
 	isInCore=CmiTrue;
-	if (CkpvAccess(CkSaveRestorePrefetch)) 
+	if (CkpvAccess(CkSaveRestorePrefetch))
 		return; /* Just restoring from disk--don't touch object */
 	prefetchObjID=-1; //Unregistered
 #endif
@@ -629,7 +629,7 @@ interfaces with the load balancer on behalf of the
 represented array elements.
 */
 CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
-  const CkArrayIndex &idx_,int localIdx_) 
+  const CkArrayIndex &idx_,int localIdx_)
 	:CkLocRec(mgr),idx(idx_),localIdx(localIdx_),
 	 running(CmiFalse),deletedMarker(NULL)
 {
@@ -851,7 +851,7 @@ private:
 	int onPe;//The last known Pe for this element
 public:
 	CkLocRec_remote(CkLocMgr *Narr,int NonPe)
-		:CkLocRec_aging(Narr) 
+		:CkLocRec_aging(Narr)
 		{
 			onPe=NonPe;
 #ifndef CMK_OPTIMIZE
@@ -998,14 +998,14 @@ void CkLocMgr::staticSpringCleaning(void *forWhom) {
 }
 
 /*************************** LocMgr: CREATION *****************************/
-CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial) 
+CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 	:thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),
 	 hash(17,0.3)
 {
 	DEBC((AA"Creating new location manager %d\n"AB,thisgroup));
 // moved to _CkMigratable_initInfoInit()
 //	CkpvInitialize(CkMigratable_initInfo,mig_initInfo);
-	
+
 	managers.init();
 	nManagers=0;
   	firstManager=NULL;
@@ -1019,9 +1019,37 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 	map=(CkArrayMap *)CkLocalBranch(mapID);
 	if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
 	mapHandle=map->registerArray(numInitial,thisgroup);
-	
+
 //Find and register with the load balancer
+	lbdbID = lbdbID_;
 	initLB(lbdbID_);
+}
+
+CkLocMgr::CkLocMgr(CkMigrateMessage* m)
+	:IrrGroup(m),thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),hash(17,0.3)
+{
+	managers.init();
+	nManagers=0;
+	firstManager=NULL;
+	firstFree=localLen=0;
+	duringMigration=CmiFalse;
+	nSprings=0;
+	CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
+}
+
+void CkLocMgr::pup(PUP::er &p){
+	IrrGroup::pup(p);
+	p|mapID;
+	p|lbdbID;
+	mapID = _RRMapID;
+	if(p.isUnpacking()){
+		//Register with the map object
+		map=(CkArrayMap *)CkLocalBranch(mapID);
+		if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
+		mapHandle=map->registerArray(0,thisgroup);
+		// lbdb is the fixed global groupID
+		initLB(lbdbID);
+	}
 }
 
 void _CkLocMgrInit(void) {
@@ -1030,9 +1058,8 @@ void _CkLocMgrInit(void) {
   CkDisableTracing(CkIndex_CkLocMgr::deliverImmediate(0));
 }
 
-
 /// Add a new local array manager to our list.
-/// Returns a new CkMigratableList for the manager to store his 
+/// Returns a new CkMigratableList for the manager to store his
 /// elements in.
 CkMigratableList *CkLocMgr::addManager(CkArrayID id,CkArrMgr *mgr)
 {
@@ -1050,7 +1077,7 @@ CkMigratableList *CkLocMgr::addManager(CkArrayID id,CkArrMgr *mgr)
 
 /// Return the next unused local element index.
 int CkLocMgr::nextFree(void) {
-	if (firstFree>=localLen) 
+	if (firstFree>=localLen)
 	{//Need more space in the local index arrays-- enlarge them
 		int oldLen=localLen;
 		localLen=localLen*2+8;
@@ -1080,7 +1107,7 @@ CkLocRec_remote *CkLocMgr::insertRemote(const CkArrayIndex &idx,int nowOnPe)
 //This element now lives on the given Pe
 void CkLocMgr::inform(const CkArrayIndex &idx,int nowOnPe)
 {
-	if (nowOnPe==CkMyPe()) 
+	if (nowOnPe==CkMyPe())
 		return; //Never insert a "remote" record pointing here
 	CkLocRec *rec=elementNrec(idx);
 	if (rec!=NULL && rec->type()==CkLocRec::local)
@@ -1137,7 +1164,7 @@ CmiBool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 	int localIdx=rec->getLocalIndex();
 	if (m->elts.get(localIdx)!=NULL) CkAbort("Cannot insert array element twice!");
 	m->elts.put(elt,localIdx); //Local element table
-	
+
 //Call the element's constructor
 	DEBC((AA"Constructing element %s of array\n"AB,idx2str(rec->getIndex())));
 	CkMigratable_initInfo &i=CkpvAccess(mig_initInfo);
@@ -1472,10 +1499,10 @@ void CkLocMgr::migrateIncoming(CkArrayElementMigrateMessage *msg)
 void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p)
 {
 	CkLocRec_local *rec=createLocal(idx,CmiTrue,CmiTrue /* home doesn't know yet */ );
-	
+
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec);
-	
+
 	callMethod(rec,&CkMigratable::ckJustMigrated);
 }
 
@@ -1587,17 +1614,17 @@ void CkLocMgr::initLB(CkGroupID lbdbID_)
 	myCallbacks.migrate = (LDMigrateFn)CkLocRec_local::staticMigrate;
 	myCallbacks.setStats = NULL;
 	myCallbacks.queryEstLoad = NULL;
-	myLBHandle = the_lbdb->RegisterOM(myId,this,myCallbacks);  
-	
+	myLBHandle = the_lbdb->RegisterOM(myId,this,myCallbacks);
+
 	// Tell the lbdb that I'm registering objects
-	the_lbdb->RegisteringObjects(myLBHandle);  
-	
-	/*Set up the dummy barrier-- the load balancer needs 
+	the_lbdb->RegisteringObjects(myLBHandle);
+
+	/*Set up the dummy barrier-- the load balancer needs
 	  us to call Registering/DoneRegistering during each AtSync,
 	  and this is the only way to do so.
 	*/
 	the_lbdb->AddLocalBarrierReceiver(
-		(LDBarrierFn)staticRecvAtSync,(void*)(this));    	
+		(LDBarrierFn)staticRecvAtSync,(void*)(this));
 	dummyBarrierHandle = the_lbdb->AddLocalBarrierClient(
 		(LDResumeFn)staticDummyResumeFromSync,(void*)(this));
 	dummyAtSync();

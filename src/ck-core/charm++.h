@@ -312,45 +312,25 @@ class Chare {
     CHARM_INPLACE_NEW
 };
 
-///A small piece of a Chare; one that cannot communicate.
-class CkComponent {
- public:
-	virtual ~CkComponent();
-	virtual void pup(PUP::er &p);
-};
-
-///A cross-processor handle for a CkComponent.
-//Components can currently only live inside groups:
-class CkComponentID {
-	CkGroupID gid;
-	int index; //Index to pass to group's ckLookupComponent method
- public:
-	CkComponentID() {index=-1;}
-	CkComponentID(const CkGroupID &gid_,int index_)
-		:gid(gid_), index(index_) {}
-	CkComponent *ckLookup(void) const;
-	void pup(PUP::er &p);
-};
-PUPmarshall(CkComponentID)
-
 //Superclass of all Groups that cannot participate in reductions.
 //  Undocumented: should only be used inside Charm++.
 /*forward*/ class Group;
-class IrrGroup : public Chare { 
+class IrrGroup : public Chare {
   protected:
     CkGroupID thisgroup;
   public:
-    IrrGroup(CkMigrateMessage *m) { }
+    IrrGroup(CkMigrateMessage *m): Chare(m) { }
     IrrGroup();
     virtual ~IrrGroup(); //<- needed for *any* child to have a virtual destructor
 
     virtual void pup(PUP::er &p);//<- pack/unpack routine
+    virtual void ckJustMigrated(void);
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
     inline CkGroupID CkGetGroupID(void) const {return thisgroup;}
-    virtual int isNodeGroup() { return 0; };
 
-    ///Map an index (user-defined meaning) to a component:
-    virtual CkComponent *ckLookupComponent(int userIndex);
+    // Silly run-time type information
+    virtual int isNodeGroup() { return 0; };
+    virtual bool isLocMgr(void){ return false; }
 };
 
 
@@ -377,7 +357,7 @@ template <class Parent1,class Parent2,class CProxy_Derived>
 class CBaseT2 : public Parent1, public Parent2 {
 public:
 	CProxy_Derived thisProxy;
-	CBaseT2(void) :Parent1(), Parent2(), 
+	CBaseT2(void) :Parent1(), Parent2(),
 		CBase_ProxyInits((Parent1 *)this) {}
 	CBaseT2(CkMigrateMessage *m) :Parent1(m), Parent2(m),
 		CBase_ProxyInits((Parent1 *)this) {} 
@@ -387,7 +367,7 @@ public:
 	}
 
 //These overloads are needed to prevent ambiguity for multiple inheritance:
-	inline const CkChareID &ckGetChareID(void) const 
+	inline const CkChareID &ckGetChareID(void) const
 		{return ((Parent1 *)this)->ckGetChareID();}
 	CHARM_INPLACE_NEW
 };
@@ -739,7 +719,9 @@ extern void CkStartQD(const CkCallback& cb);
 #include "tempo.h"
 #include "waitqd.h"
 #include "sdag.h"
+#include "ckcheckpoint.h"
 #include "ckarrayreductionmgr.h"
+
 #endif
 
 

@@ -8,6 +8,9 @@
 #include "ck.h"
 #include "trace.h"
 
+void CkStartCheckpoint(const char* dirname,const CkCallback& cb);
+void CkRestartMain(const char* dirname);
+
 #define  DEBUGF(x)    // CmiPrintf x;
 
 UChar _defaultQueueing = CK_QUEUEING_FIFO;
@@ -38,11 +41,14 @@ CkpvDeclare(CkGroupID,   _currentGroup);
 CkpvDeclare(CkGroupID, _currentGroupRednMgr);
 CkpvDeclare(CkGroupID,   _currentNodeGroup);
 CkpvDeclare(GroupTable*, _groupTable);
+CkpvDeclare(GroupIDTable, _groupIDTable);
 CkpvDeclare(UInt, _numGroups);
+
 CkpvDeclare(CkCoreState *, _coreState);
 
 CksvDeclare(UInt, _numNodeGroups);
 CksvDeclare(GroupTable*, _nodeGroupTable);
+CksvDeclare(GroupIDTable, _nodeGroupIDTable);
 CksvDeclare(CmiNodeLock, _nodeLock);
 CksvStaticDeclare(PtrVec*,_nodeBocInitVec);
 CkpvDeclare(int, _charmEpoch);
@@ -68,8 +74,11 @@ static int   _exitStarted = 0;
 #define _STATS_ON(x) (x) = 1
 #else
 #define _STATS_ON(x) \
-          CmiPrintf("stats unavailable in optimized version. ignoring...\n"); 
+          CmiPrintf("stats unavailable in optimized version. ignoring...\n");
 #endif
+
+static int _doRestart;
+static char* _restartDir;
 
 static inline void _parseCommandLineOpts(char **argv)
 {
@@ -80,15 +89,19 @@ static inline void _parseCommandLineOpts(char **argv)
   if (CmiGetArgFlagDesc(argv,"+fifo", "Default to FIFO queuing"))
       _defaultQueueing = CK_QUEUEING_FIFO;
   if (CmiGetArgFlagDesc(argv,"+lifo", "Default to LIFO queuing"))
-      _defaultQueueing = CK_QUEUEING_LIFO; 
+      _defaultQueueing = CK_QUEUEING_LIFO;
   if (CmiGetArgFlagDesc(argv,"+ififo", "Default to integer-prioritized FIFO queuing"))
-      _defaultQueueing = CK_QUEUEING_IFIFO; 
+      _defaultQueueing = CK_QUEUEING_IFIFO;
   if (CmiGetArgFlagDesc(argv,"+ilifo", "Default to integer-prioritized LIFO queuing"))
       _defaultQueueing = CK_QUEUEING_ILIFO;
   if (CmiGetArgFlagDesc(argv,"+bfifo", "Default to bitvector-prioritized FIFO queuing"))
-      _defaultQueueing = CK_QUEUEING_BFIFO; 
+      _defaultQueueing = CK_QUEUEING_BFIFO;
   if (CmiGetArgFlagDesc(argv,"+blifo", "Default to bitvector-prioritized LIFO queuing"))
       _defaultQueueing = CK_QUEUEING_BLIFO;
+  if(CmiGetArgString(argv,"+restart",&_restartDir))
+      _doRestart=1;
+  else
+      _doRestart=0;
 }
 
 static void _bufferHandler(void *msg)
@@ -115,7 +128,7 @@ static inline void _printStats(void)
       total->combine(_allStats[i]);
     CkPrintf("Charm Kernel Summary Statistics:\n");
     for(i=0;i<CkNumPes();i++) {
-      CkPrintf("Proc %d: [%d created, %d processed]\n", i, 
+      CkPrintf("Proc %d: [%d created, %d processed]\n", i,
                _allStats[i]->getCharesCreated(),
                _allStats[i]->getCharesProcessed());
     }
@@ -141,7 +154,7 @@ static inline void _printStats(void)
                _allStats[i]->getCharesProcessed(),
                _allStats[i]->getForCharesProcessed(),
                _allStats[i]->getGroupsProcessed(),
-               _allStats[i]->getGroupMsgsProcessed(), 
+               _allStats[i]->getGroupMsgsProcessed(),
                _allStats[i]->getNodeGroupsProcessed(),
 	       _allStats[i]->getNodeGroupMsgsProcessed());
     }
@@ -174,7 +187,7 @@ static void _exitHandler(envelope *env)
         CmiFree(env);
         return;
       }
-      _exitStarted = 1; 
+      _exitStarted = 1;
       CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
       CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
@@ -225,7 +238,7 @@ static inline void _processBufferedBocInits(void)
   for(i=0; i<len; i++) {
     envelope *env = inits[i];
     if(env==0) continue;
-    if(env->isPacked()) 
+    if(env->isPacked())
       CkUnpackMessage(&env);
     _processBocInitMsg(CkpvAccess(_coreState),env);
   }
@@ -274,8 +287,8 @@ static int _charmLoadEstimator(void)
 static void _sendTriggers(void)
 {
   int i, num, first;
-  CmiLock(CksvAccess(_nodeLock));
-  if (_triggersSent == 0) 
+  CmiLock(CsvAccess(_nodeLock));
+  if (_triggersSent == 0)
   {
     _triggersSent++;
     num = CmiMyNodeSize();
@@ -294,8 +307,8 @@ static void _sendTriggers(void)
 static inline void _initDone(void)
 {
   DEBUGF(("[%d] _initDone.\n", CkMyPe()));
-  if (!_triggersSent) _sendTriggers(); 
-  CkNumberHandler(_triggerHandlerIdx, (CmiHandler)_discardHandler); 
+  if (!_triggersSent) _sendTriggers();
+  CkNumberHandler(_triggerHandlerIdx, (CmiHandler)_discardHandler);
   if(CkMyRank() == 0) {
     _processBufferedNodeBocInits();
   }
@@ -439,6 +452,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(CkGroupID, _currentGroupRednMgr);
 	CkpvInitialize(CkGroupID, _currentNodeGroup);
 	CkpvInitialize(GroupTable*, _groupTable);
+	CkpvInitialize(GroupIDTable, _groupIDTable);
 	CkpvInitialize(UInt, _numGroups);
 	CkpvInitialize(int, _numInitsRecd);
 	CpvInitialize(QdState*, _qd);
@@ -447,7 +461,8 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(CkCoreState *, _coreState);
 
 	CksvInitialize(UInt, _numNodeGroups);
-	CksvInitialize(GroupTable*,  _nodeGroupTable);
+	CksvInitialize(GroupTable*, _nodeGroupTable);
+	CksvInitialize(GroupIDTable, _nodeGroupIDTable);
 	CksvInitialize(CmiNodeLock, _nodeLock);
 	CksvInitialize(PtrVec*,_nodeBocInitVec);
 	CksvInitialize(UInt,_numInitNodeMsgs);
@@ -456,7 +471,6 @@ void _initCharm(int unused_argc, char **argv)
 
 	CkpvInitialize(_CkOutStream*, _ckout);
 	CkpvInitialize(_CkErrStream*, _ckerr);
-
 	CkpvInitialize(Stats*, _myStats);
 
 	CkpvAccess(_groupTable) = new GroupTable;
@@ -464,8 +478,8 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvAccess(_numGroups) = 1; // make 0 an invalid group number
 	CkpvAccess(_buffQ) = new PtrQ();
 	CkpvAccess(_bocInitVec) = new PtrVec();
-	
-	if(CkMyRank()==0) 
+
+	if(CkMyRank()==0)
 	{
 	  	CksvAccess(_numNodeGroups) = 1; //make 0 an invalid group number
           	CksvAccess(_numInitNodeMsgs) = 0;
@@ -474,16 +488,16 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeGroupTable)->init();
 		CksvAccess(_nodeBocInitVec) = new PtrVec();
 	}
-  
+
 	CmiNodeAllBarrier();
 #ifdef __BLUEGENE__
-	if(BgNodeRank()==0) 
+	if(CkMyRank()==0)
 #endif
 	{
 		CpvAccess(_qd) = new QdState();
         }
 	CkpvAccess(_coreState)=new CkCoreState();
-	
+
 	CkpvAccess(_numInitsRecd) = -1;  /*0;*/
 
 	CkpvAccess(_ckout) = new _CkOutStream();
@@ -495,7 +509,7 @@ void _initCharm(int unused_argc, char **argv)
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 	_nodeBocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 #ifdef __BLUEGENE__
-	if(BgNodeRank()==0) 
+	if(CkMyRank()==0)
 #endif
 	{
 	_qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
@@ -535,11 +549,12 @@ void _initCharm(int unused_argc, char **argv)
 		CkRegisterEp("null", (CkCallFnPtr)_nullFn, 0, 0, 0);
 		_registerCkFutures();
 		_registerCkArray();
+		_registerLBDatabase();
 		_registerCkCallback();
 		_registertempo();
 		_registerwaitqd();
-		_registerLBDatabase();
 		_registercharisma();
+		_registerCkCheckpoint();
 		_registerExternalModules(argv);
 		CkRegisterMainModule();
 	}
@@ -549,8 +564,15 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvAccess(_msgPool) = new MsgPool();
 	CmiNodeAllBarrier();
 
-	if(CkMyPe()==0) 
-	{
+	if(_doRestart){
+CkPrintf("[%d]Restarting...\n",CkMyPe());
+		register int i;
+		_allStats = new Stats*[CkNumPes()];
+		CkRestartMain(_restartDir);
+		//if(CkMyPe()==0)
+		_initDone();
+	}else if(CkMyPe()==0){
+CkPrintf("[%d]Not restarting... you never know...\n",CkMyPe());
 		_allStats = new Stats*[CkNumPes()];
 		register int i;
 		for(i=0;i<_numMains;i++)  /* Create all mainchares */
@@ -569,6 +591,7 @@ void _initCharm(int unused_argc, char **argv)
 
 		_STATS_RECORD_CREATE_CHARE_N(_numMains);
 		_STATS_RECORD_PROCESS_CHARE_N(_numMains);
+
 		for(i=0;i<_numReadonlyMsgs;i++) /* Send out readonly messages */
 		{
 			register void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
@@ -583,22 +606,22 @@ void _initCharm(int unused_argc, char **argv)
 			CkPackMessage(&env);
 			CmiSyncBroadcast(env->getTotalsize(), (char *)env);
 			CpvAccess(_qd)->create(CkNumPes()-1);
-			
+
 			//For processor 0, unpack and re-set the global
 			CkUnpackMessage(&env);
 			_processROMsgMsg(env);
 			_numInitMsgs++;
 		}
-		
+
 		//Determine the size of the RODataMessage
 		PUP::sizer ps;
 		for(i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(ps);
-		
+
 		//Allocate and fill out the RODataMessage
 		envelope *env = _allocEnv(RODataMsg, ps.size());
 		PUP::toMem pp((char *)EnvToUsr(env));
 		for(i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(pp);
-		
+
 		env->setCount(++_numInitMsgs);
 		env->setSrcPe(CkMyPe());
 		CmiSetHandler(env, _initHandlerIdx);
@@ -606,6 +629,7 @@ void _initCharm(int unused_argc, char **argv)
 		CpvAccess(_qd)->create(CkNumPes()-1);
 		_initDone();
 	}
+
 	// when I am a communication thread, I don't participate initDone.
         if (inCommThread) {
                 CkNumberHandlerEx(_bocHandlerIdx,(CmiHandlerEx)_processHandler,
@@ -614,13 +638,12 @@ void _initCharm(int unused_argc, char **argv)
 ,
                                         CkpvAccess(_coreState));
         }
-
 }
 
 #ifdef __BLUEGENE__
 
 #if  CMK_BLUEGENE_THREAD
-void BgEmulatorInit(int argc, char **argv) 
+void BgEmulatorInit(int argc, char **argv)
 {
   BgSetWorkerThreadStart(_initCharm);
 }
@@ -655,7 +678,7 @@ extern "C" void fmain_(int *argc,char _argv[][80],int length[])
 }
 
 // user callable function to register an exit function, this function
-// will perform task of collecting of info from all pes to pe0, and call 
+// will perform task of collecting of info from all pes to pe0, and call
 // CkExit() on pe0 again to recursively traverse the registered exitFn.
 // see trace-summary for an example.
 void registerExitFn(CkExitFn fn)

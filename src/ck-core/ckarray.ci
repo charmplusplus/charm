@@ -3,7 +3,7 @@ module CkArray {
   extern module CkLocation;
   extern module CkArrayReductionMgr;
 
-  group CkArray : CkReductionMgr {
+  group [migratable] CkArray : CkReductionMgr {
 	entry CkArray(CkArrayOptions i,CkMarshalledMessage ctorMsg,CkNodeGroupID nodereductionProxy);
 	//Insertion
 	entry void insertElement(CkMessage *);
@@ -13,9 +13,9 @@ module CkArray {
 	entry void recvBroadcast(CkMessage *);
   };
 
-  group CkVerboseListenerCreator : Group {
-        entry void CkVerboseListenerCreator(void);
-  };
+  PUPable CkVerboseListener;
+  PUPable CkArrayBroadcaster;
+  PUPable CkArrayReducer;
 
   initcall void _ckArrayInit(void);
 

@@ -10,18 +10,16 @@ class CkArrayReductionMgr : public NodeGroup{
 		int size;
 		int redNo;
 		int count;
-		CkVec<CkReductionMsg *> my_msgs;
-		CkQ<CkReductionMsg *> my_futureMsgs;
+		CkMsgQ<CkReductionMsg> my_msgs;
+		CkMsgQ<CkReductionMsg> my_futureMsgs;
 		CmiNodeLock lockCount;
 		void collectAllMessages();
 	public:
 		CkArrayReductionMgr();
+		CkArrayReductionMgr(CkMigrateMessage *m):NodeGroup(m) {}
 		void contributeArrayReduction(CkReductionMsg *m);
 		CkReductionMsg *reduceMessages(void);
 		virtual void pup(PUP::er &p);
-		void pupMsgVector(CkVec<CkReductionMsg *> &msgs, PUP::er &p);
-      		void pupMsgQ(CkQ<CkReductionMsg *> &msgs, PUP::er &p);
-		CkReductionMsg* pupCkReductionMsg(CkReductionMsg *m, PUP::er &p);
 };
 #endif
 

@@ -13,9 +13,12 @@ class IrrGroup;
 class TableEntry {
     IrrGroup *obj;
     PtrQ *pending; //Buffers msgs recv'd before group is created
+    char gName[256];
+    int defCtor,migCtor; // the index of default and migration constructors in _entryTable,
+			 // to be fed in CkCreateLocalGroup
   public:
     TableEntry(void) {init();}
-    void init(void) { obj=0; pending=0; }
+    void init(void) { obj=0; pending=0; defCtor=migCtor=-1; }
     inline IrrGroup* getObj(void) { return obj; }
     void setObj(void *_obj) { obj=(IrrGroup *)_obj; }
     PtrQ* getPending(void) { return pending; }
@@ -24,6 +27,12 @@ class TableEntry {
         pending=new PtrQ();
       pending->enq(msg);
     }
+    inline int getDefCtor(void){ return defCtor; }
+    void setDefCtor(int defCtor_){ defCtor = defCtor_; }
+    inline int getMigCtor(void){ return migCtor; }
+    void setMigCtor(int migCtor_){ migCtor = migCtor_; }
+    inline char* getName(void){ return gName; }
+    void setName(const char* gName_){ strcpy(gName,gName_); }
 };
 
 template <class dtype>
@@ -33,7 +42,7 @@ class GroupIdxArray {
   dtype *tab;                           // direct entry table for processor 0
   CkHashtable_c hashTab;
   int max;
-  
+
   //This non-inline version of "find", below, allows the (much simpler)
   // common case to be inlined.
   dtype& nonInlineFind(CkGroupID n) {
@@ -41,7 +50,7 @@ class GroupIdxArray {
 #ifndef CMK_OPTIMIZE
       if (n.idx==0) CkAbort("Group ID is zero-- invalid!\n");
       else if (n.idx>=max) { CkAbort("Group ID is too large!\n");}
-      else 
+      else
 #endif
       /*n.idx < 0*/
       { /*Groups created on processors other than 0 go into a hashtable:*/
@@ -84,6 +93,7 @@ class GroupIdxArray {
 };
 
 typedef GroupIdxArray<TableEntry> GroupTable;
+typedef CkVec<CkGroupID> GroupIDTable;
 
 extern unsigned int    _printCS;
 extern unsigned int    _printSS;
@@ -97,19 +107,19 @@ extern int     _qdHandlerIdx;
 extern unsigned int   _numInitMsgs;
 
 CksvExtern(unsigned int,  _numInitNodeMsgs);
-CksvExtern(GroupTable*,  _nodeGroupTable);
 CksvExtern(CmiNodeLock, _nodeLock);
+CksvExtern(GroupTable*,  _nodeGroupTable);
+CksvExtern(GroupIDTable, _nodeGroupIDTable);
 CksvExtern(unsigned int, _numNodeGroups);
 CkpvExtern(int, _charmEpoch);
 
 CkpvExtern(CkGroupID,_currentGroup);
-
 CkpvExtern(CkGroupID, _currentGroupRednMgr);
 
-
 CkpvExtern(GroupTable*, _groupTable);
-
+CkpvExtern(GroupIDTable, _groupIDTable);
 CkpvExtern(unsigned int, _numGroups);
+
 CpvExtern(char **,Ck_argv);
 
 static inline IrrGroup *_localBranch(CkGroupID gID)

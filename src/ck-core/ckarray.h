@@ -66,15 +66,18 @@ public:
 #define ALIGN8(x)       (int)((~7)&((x)+7))
 
 /********************* CkArrayListener ****************/
-///An arrayListener is a component that gets informed whenever
+///An arrayListener is an object that gets informed whenever
 /// an array element is created, migrated, or destroyed.
 ///This abstract superclass just ignores everything sent to it.
 class ArrayElement;
-class CkArrayListener : public CkComponent {
+class CkArrayListener : public PUP::able {
   int nInts; //Number of ints of data to store per element
   int dataOffset; //Int offset of our data within the element
  public:
-  CkArrayListener(int nInts_=0);
+  CkArrayListener(int nInts_);
+  CkArrayListener(CkMigrateMessage *m);
+  virtual void pup(PUP::er &p);
+  PUPable_abstract(CkArrayListener)
 
   ///Register this array type.  Our data is stored in the element at dataOffset
   virtual void ckRegister(CkArray *arrMgr,int dataOffset_);
@@ -119,7 +122,9 @@ class CkArrayListener : public CkComponent {
 //This simple arrayListener just prints each event to stdout:
 class CkVerboseListener : public CkArrayListener {
  public:
-  CkVerboseListener(int nInts_=0);
+  CkVerboseListener(void);
+  CkVerboseListener(CkMigrateMessage *m):CkArrayListener(m) {}
+  PUPable_decl(CkVerboseListener);
 
   virtual void ckRegister(CkArray *arrMgr,int dataOffset_);
   virtual void ckBeginInserting(void);
@@ -134,23 +139,13 @@ class CkVerboseListener : public CkArrayListener {
   virtual CmiBool ckElementArriving(ArrayElement *elt);
 };
 
-//Source of CkVerboseListeners:
-class CkVerboseListenerCreator : public IrrGroup {
-  int createCount;
- public:
-  CkVerboseListenerCreator(void);
-  virtual CkComponent *ckLookupComponent(int useIndex);
-  CkComponentID createListener(void);
-};
-
-
 /*********************** CkArrayOptions *******************************/
 /// Arguments for array creation:
 class CkArrayOptions {
 	int numInitial;/// Number of elements to create
 	CkGroupID map;/// Array location map object
 	CkGroupID locMgr;/// Location manager to bind to
-	CkVec<CkComponentID> arrayListeners; //CkArrayListeners for this array
+	CkPupAblePtrVec<CkArrayListener> arrayListeners; //CkArrayListeners for this array
  public:
  //Used by external world:
 	CkArrayOptions(void); /// Default: empty array
@@ -176,16 +171,18 @@ class CkArrayOptions {
 	CkArrayOptions &setLocationManager(const CkGroupID &l)
 		{locMgr=l; return *this;}
 
-	/// Add an array listener component to this array
-	CkArrayOptions &addListener(const CkComponentID &id);
+	/// Add an array listener component to this array (keeps the new'd listener)
+	CkArrayOptions &addListener(CkArrayListener *listener);
 
   //Used by the array manager:
 	int getNumInitial(void) const {return numInitial;}
 	const CkGroupID &getMap(void) const {return map;}
 	const CkGroupID &getLocationManager(void) const {return locMgr;}
 	int getListeners(void) const {return arrayListeners.size();}
-	CkArrayListener *getListener(int listenerNum) const {
-		return (CkArrayListener *)(arrayListeners[listenerNum].ckLookup());
+	CkArrayListener *getListener(int listenerNum) {
+		CkArrayListener *ret=arrayListeners[listenerNum];
+		arrayListeners[listenerNum]=NULL; //Don't throw away this listener
+		return ret;
 	}
 
 	void pup(PUP::er &p);
@@ -382,10 +379,6 @@ public:
 
   const CkArrayID &ckGetArrayID(void) const {return thisArrayID;}
 
-  //// Checkpoint: pup to disk file
-  void ckCheckpoint(char* fname);
-  void ckRestart(char* fname);
-
 protected:
   CkArray *thisArray;//My source array
   CkArrayID thisArrayID;//My source array's ID
@@ -441,14 +434,15 @@ typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 #include "CkArray.decl.h"
 #include "CkArrayReductionMgr.decl.h"
 
-void _ckArrayInit(void);
-
 ///This arrayListener is in charge of delivering broadcasts to the array.
 class CkArrayBroadcaster : public CkArrayListener {
   inline int &getData(ArrayElement *el) {return *ckGetData(el);}
 public:
-  CkArrayBroadcaster();
+  CkArrayBroadcaster(void);
+  CkArrayBroadcaster(CkMigrateMessage *m);
+  virtual void pup(PUP::er &p);
   virtual ~CkArrayBroadcaster();
+  PUPable_decl(CkArrayBroadcaster);
 
   virtual void ckElementStamp(int *eltInfo) {*eltInfo=bcastNo;}
 
@@ -480,13 +474,18 @@ private:
 
 ///This arrayListener is in charge of performing reductions on the array.
 class CkArrayReducer : public CkArrayListener {
+  CkGroupID mgrID;
   CkReductionMgr *mgr;
   typedef  contributorInfo *I;
   inline contributorInfo *getData(ArrayElement *el)
     {return (I)ckGetData(el);}
- public:
-  CkArrayReducer(CkReductionMgr *mgr_);
+public:
+  /// Attach this array to this CkReductionMgr
+  CkArrayReducer(CkGroupID mgrID_);
+  CkArrayReducer(CkMigrateMessage *m);
+  virtual void pup(PUP::er &p);
   virtual ~CkArrayReducer();
+  PUPable_decl(CkArrayReducer);
 
   void ckBeginInserting(void) {mgr->creatingContributors();}
   void ckEndInserting(void) {mgr->doneCreatingContributors();}
@@ -504,6 +503,8 @@ class CkArrayReducer : public CkArrayListener {
     {mgr->contributorArriving(getData(elt)); return CmiTrue; }
 };
 
+void _ckArrayInit(void);
+
 class CkArray : public CkReductionMgr, public CkArrMgr {
   friend class ArrayElement;
   friend class CProxy_ArrayBase;
@@ -511,13 +512,15 @@ class CkArray : public CkReductionMgr, public CkArrMgr {
 
   CkMagicNumber<ArrayElement> magic; //To detect heap corruption
   CkLocMgr *locMgr;
+  CkGroupID locMgrID;
   CProxy_CkArray thisProxy;
   typedef CkMigratableListT<ArrayElement> ArrayElementList;
   ArrayElementList *elements;
 
 public:
 //Array Creation:
-  CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionProxy);
+  CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionProxy);
+  CkArray(CkMigrateMessage *m);
   CkGroupID &getGroupID(void) {return thisgroup;}
 
 //Access & information routines
@@ -559,6 +562,9 @@ public:
   void sendBroadcast(CkMessage *msg);
   void recvBroadcast(CkMessage *msg);
 
+  void pup(PUP::er &p);
+  void ckJustMigrated(void){ doneInserting(); }
+
 private:
   int numInitial;/// Number of 1D initial array elements
   CmiBool isInserting;/// Are we currently inserting elements?
@@ -566,7 +572,7 @@ private:
 /// Allocate space for a new array element
   ArrayElement *allocate(int elChareType,const CkArrayIndex &idx,
 	CkMessage *msg,CmiBool fromMigration);
-  
+
 //Spring cleaning
   void springCleaning(void);
   static void staticSpringCleaning(void *forWhom);
@@ -581,16 +587,16 @@ private:
 		inside;\
 	}\
   } while(0)
- 
-  CkVec<CkArrayListener *> listeners;
+
+  CkPupAblePtrVec<CkArrayListener> listeners;
   void addListener(CkArrayListener *l,int &dataOffset) {
     l->ckRegister(this,dataOffset);
     dataOffset+=l->ckGetLen();
     listeners.push_back(l);
   }
-  
-  CkArrayBroadcaster broadcaster;
-  CkArrayReducer reducer;
 
+  CkArrayReducer *reducer; //Read-only copy of default reducer
+  CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
 };
+
 #endif

@@ -88,7 +88,7 @@ class CkArrayMap : public IrrGroup // : public CkGroupReadyCallback
 {
 public:
   CkArrayMap(void);
-  CkArrayMap(CkMigrateMessage *m) {}
+  CkArrayMap(CkMigrateMessage *m): IrrGroup(m) {}
   virtual ~CkArrayMap();
   virtual int registerArray(int numElements,CkArrayID aid);
   virtual void populateInitial(int arrayHdl,int numElements,void *ctorMsg,CkArrMgr *mgr);
@@ -169,7 +169,7 @@ public:
   void migrateMe(int toPe); //Leave this processor
   void destroy(void); //User called destructor
   virtual ~CkLocRec_local();
-  
+
   /// A new element has been added to this index
   void addedElement(void);
 
@@ -178,7 +178,7 @@ public:
    *  Returns false if the element died during the receive.
    */
   virtual CmiBool deliver(CkArrayMessage *m,CkDeliver_t type);
-  
+
   /** Invoke the given entry method on this element.
    *   Returns false if the element died during the receive.
    *   If doFree is true, the message is freed after send;
@@ -188,7 +188,7 @@ public:
 
   virtual RecType type(void);
   virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx);
-  
+
 #if CMK_LBDB_ON  //For load balancing:
   /// Control the load balancer:
   void startTiming(void);
@@ -201,7 +201,7 @@ public:
   inline const CkArrayIndex &getIndex(void) const {return idx;}
   virtual CkMigratable *lookupElement(CkArrayID aid);
   virtual int lookupProcessor(void);
-  
+
 #if CMK_LBDB_ON
 public:
   inline LBDatabase *getLBDB(void) const {return the_lbdb;}
@@ -365,7 +365,7 @@ class CkMagicNumber : public CkMagicNumber_impl {
 	inline void check(const char *file,int line,void *obj) const {
 		if (magic!=good) badMagicNumber(good,file,line,obj);
 	}
-#ifndef CMK_OPTIMIZE 
+#ifndef CMK_OPTIMIZE
 #   define CK_MAGICNUMBER_CHECK magic.check(__FILE__,__LINE__,this);
 #else
 #   define CK_MAGICNUMBER_CHECK /*empty, for speed*/
@@ -428,18 +428,19 @@ public:
 
 /**
  * A group which manages the location of an indexed set of
- * migratable objects.  Knows about insertions, deletions, 
+ * migratable objects.  Knows about insertions, deletions,
  * home processors, migration, and message forwarding.
  */
 class CkLocMgr : public IrrGroup {
 	CkMagicNumber<CkMigratable> magic; //To detect heap corruption
 public:
 	CkLocMgr(CkGroupID map,CkGroupID lbdb,int numInitial);
-
+	CkLocMgr(CkMigrateMessage *m);
+	inline bool isLocMgr(void) { return true; }
 	CkGroupID &getGroupID(void) {return thisgroup;}
-	inline CProxy_CkLocMgr &getProxy(void) 
+	inline CProxy_CkLocMgr &getProxy(void)
 		{return thisProxy;}
-	inline CProxyElement_CkLocMgr &getLocalProxy(void) 
+	inline CProxyElement_CkLocMgr &getLocalProxy(void)
 		{return thislocalproxy;}
 
 //Interface used by array manager and proxies
@@ -449,28 +450,28 @@ public:
 	CkMigratableList *addManager(CkArrayID aid,CkArrMgr *mgr);
 
 	/// Populate this array with initial elements
-	void populateInitial(int numElements,void *initMsg,CkArrMgr *mgr) 
+	void populateInitial(int numElements,void *initMsg,CkArrMgr *mgr)
 		{map->populateInitial(mapHandle,numElements,initMsg,mgr);}
-	
+
 	/// Add a new local array element, calling element's constructor
 	///  Returns true if the element was successfully added;
 	///  false if the element migrated away or deleted itself.
 	CmiBool addElement(CkArrayID aid,const CkArrayIndex &idx,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
-	
+
 	///Deliver message to this element:
 	inline void deliverViaQueue(CkMessage *m) {deliver(m,CkDeliver_queue);}
 	inline void deliverInline(CkMessage *m) {deliver(m,CkDeliver_inline);}
 	inline void deliverImmediate(CkMessage *m) {deliver(m,CkDeliver_immediate);}
 	void deliver(CkMessage *m, CkDeliver_t type);
-	
+
 	///Done inserting elements for now
 	void doneInserting(void);
 
 //Advisories:
 	///This index now lives on the given processor-- update local records
 	void inform(const CkArrayIndex &idx,int nowOnPe);
-	
+
 	///This index now lives on the given processor-- tell the home processor
 	void informHome(const CkArrayIndex &idx,int nowOnPe);
 
@@ -486,41 +487,40 @@ public:
 #endif
 		return managers.find(arrayID).elts.get(localIdx);
 	}
-	
+
 	//Migrate us to another processor
 	void migrate(CkLocRec_local *rec,int toPe);
-	
+
 #if CMK_LBDB_ON
 	LBDatabase *getLBDB(void) const { return the_lbdb; }
 	const LDOMHandle &getOMHandle(void) const { return myLBHandle; }
 #endif
-	
+
 	//This index will no longer be used-- delete the associated elements
 	void reclaim(const CkArrayIndex &idx,int localIdx);
 
 	int getSpringCount(void) const { return nSprings; }
 
 	CmiBool demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t type);
-	
+
 //Interface used by external users:
 	/// Home mapping
 	inline int homePe(const CkArrayIndex &idx) const
-		{return map->procNum(mapHandle,idx);}	
+		{return map->procNum(mapHandle,idx);}
 	inline CmiBool isHome(const CkArrayIndex &idx) const
 		{return (CmiBool)(homePe(idx)==CkMyPe());}
-	
+
 	/// Look up the object with this array index, or return NULL
 	CkMigratable *lookup(const CkArrayIndex &idx,CkArrayID aid);
-	
+
 	/// Return the "last-known" location (returns a processor number)
 	int lastKnown(const CkArrayIndex &idx) const;
-	
+
 	/// Pass each of our locations (each separate array index) to this destination.
 	void iterate(CkLocIterator &dest);
-	
+
 	/// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
 	void resume(const CkArrayIndex &idx, PUP::er &p);
-	
 
 //Communication:
 	void migrateIncoming(CkArrayElementMigrateMessage *msg);
@@ -528,6 +528,8 @@ public:
 	void reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe);
 	void dummyAtSync(void);
 
+	void pup(PUP::er &p);
+	
 private:
 //Internal interface:
 	//Add given element array record at idx, replacing the existing record
@@ -546,13 +548,13 @@ private:
 
 	friend class CkLocation; //so it can call pupElementsFor
 	void pupElementsFor(PUP::er &p,CkLocRec_local *rec);
-	
+
 	/// Call this member function on each element of this location:
 	typedef void (CkMigratable::* CkMigratable_voidfn_t)(void);
 	void callMethod(CkLocRec_local *rec,CkMigratable_voidfn_t fn);
-	
+
 	CmiBool deliverUnknown(CkArrayMessage *msg,CkDeliver_t type);
-	
+
 	/// Create a new local record at this array index.
 	CkLocRec_local *createLocal(const CkArrayIndex &idx, CmiBool forMigration,
 		CmiBool notifyHome);
@@ -579,32 +581,33 @@ private:
 
 	CmiBool addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
-	
+
 	//For keeping track of free local indices
 	CkVec<int> freeList;//Linked list of free local indices
 	int firstFree;//First free local index
 	int localLen;//Last allocated local index plus one
 	int nextFree(void);
-	
+
 	CProxy_CkLocMgr thisProxy;
 	CProxyElement_CkLocMgr thislocalproxy;
 	/// The core of the location manager: map array index to element representative
 	CkHashtableT<CkArrayIndexMax,CkLocRec *> hash;
-	
+
 	/// This flag is set while we delete an old copy of a migrator
 	CmiBool duringMigration;
-	
+
 	//Occasionally clear out stale remote pointers
 	static void staticSpringCleaning(void *mgr);
 	void springCleaning(void);
 	int nSprings;
-	
+
 	//Map object
 	CkGroupID mapID;
 	int mapHandle;
 	CkArrayMap *map;
-  	
+
 #if CMK_LBDB_ON
+	CkGroupID lbdbID;
 	LBDatabase *the_lbdb;
 	LDBarrierClient dummyBarrierHandle;
 	static void staticDummyResumeFromSync(void* data);

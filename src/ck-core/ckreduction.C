@@ -21,7 +21,7 @@ serially. It carries out the reduction among all elements on
 a processor.
   -CkReductionMsg, the message carrying reduction data
 used by the reduction manager.
-   -CkNodeReductionMgr, a Chare Node Group runs reductions 
+   -CkNodeReductionMgr, a Chare Node Group runs reductions
 on node groups. It is used by the CkReductionMgr to carry out
 the reduction among different nodes.   
 
@@ -80,16 +80,12 @@ Group::Group()
 	contributorCreated(&reductionInfo);
 	doneCreatingContributors();
 	nodeProxyPtr = new CProxy_CkArrayReductionMgr(CkpvAccess(_currentGroupRednMgr));
-
-
 }
-
 
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(Group,
 				    ((CkReductionMgr *)this),
 				    reductionInfo);
 CK_REDUCTION_CLIENT_DEF(CProxy_Group,(CkReductionMgr *)CkLocalBranch(_ck_gid));
-
 
 CkGroupInitCallback::CkGroupInitCallback(void) {}
 /*
@@ -306,11 +302,9 @@ void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
   m->sourceFlag=-1;//A single contribution
   m->gcount=0;
   addContribution(m);
-//  CkPrintf("$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
 }
 
 //////////// Reduction Manager Remote Entry Points /////////////
-
 //Sent down the reduction tree (used by barren PEs)
 void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 {
@@ -362,7 +356,7 @@ void CkReductionMgr::RecvMsg(CkReductionMsg *m)
   if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
     DEBR((AA"Recv'd remote contribution %d for #%d at %d\n"AB,nRemote,m->redNo,this));
     startReduction(m->redNo);
-    msgs.push_back(m);
+    msgs.enq(m);
     nRemote++;
     finishReduction();
   }
@@ -432,7 +426,7 @@ void CkReductionMgr::addContribution(CkReductionMsg *m)
     DEBR((AA"Recv'd local contribution %d for #%d at %d\n"AB,nContrib,m->redNo,this));
    // CkPrintf("[%d] Local Contribution for %d in Mesg %d at %.6f\n",CkMyPe(),redNo,m->redNo,CmiWallTimer());
     startReduction(m->redNo);
-    msgs.push_back(m);
+    msgs.enq(m);
     nContrib++;
     finishReduction();
   }
@@ -441,8 +435,6 @@ void CkReductionMgr::addContribution(CkReductionMsg *m)
 /**function checks if it has got all contributions that it is supposed to
 get at this processor. If it is done it sends the reduced result to the local
 nodegroup */
-
-
 void CkReductionMgr::finishReduction(void)
 {
   /*CkPrintf("[%d]finishReduction called for redNo %d with nContrib %d (!inProgress) | creating) %d at %.6f\n",CkMyPe(),redNo, nContrib,(!inProgress) | creating,CmiWallTimer());*/
@@ -475,16 +467,15 @@ void CkReductionMgr::finishReduction(void)
   CkPrintf("[%d,%d]Callback for redNo %d in group %d id %p Invalid=%d\n",CkMyNode(),CkMyPe(),redNo,thisgroup.idx,ret->secondaryCallback,ret->secondaryCallback.isInvalid());
 #endif
   //callbackQ.enq(secondaryStoredCallback);
-  
+
   //CkPrintf("[%d]Passing things up the NodeGroup reduction tree for redNo %d at %0.6f\n",CkMyPe(),redNo,CmiWallTimer());
   (*nodeProxyPtr)[CkMyNode()].ckLocalBranch()->contributeArrayReduction(ret);
-
 
   //House Keeping Operations will have to check later what needs to be changed
   redNo++;
   //Shift the count adjustment vector down one slot (to match new redNo)
   int i;
-  
+
   if(hasParent()){
 	int i;
 	completedRedNo++;
@@ -508,11 +499,7 @@ void CkReductionMgr::finishReduction(void)
 	  startReduction(redNo);
 	  finishReduction();
   }
-  
 }
-
-
-
 
 //////////// Reduction Manager Utilities /////////////
 int CkReductionMgr::treeRoot(void)
@@ -555,7 +542,6 @@ countAdjustment &CkReductionMgr::adj(int number)
 CkReductionMsg *CkReductionMgr::reduceMessages(void)
 {
   CkReductionMsg *ret=NULL;
-  int nMsgs=msgs.length();
 
   //Look through the vector for a valid reducer, swapping out placeholder messages
   CkReduction::reducerType r=CkReduction::invalid;
@@ -564,12 +550,17 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   int msgs_userFlag=-1;
   CkCallback msgs_callback;
   int i;
-  for (i=0;i<nMsgs;i++)
+  int nMsgs=0;
+  CkReductionMsg **msgArr=new CkReductionMsg*[msgs.length()];
+  CkReductionMsg *m;
+
+  // Copy message queue into msgArr, skipping placeholders:
+  while (NULL!=(m=msgs.deq()))
   {
-    CkReductionMsg *m=msgs[i];
     msgs_gcount+=m->gcount;
     if (m->sourceFlag!=0)
     { //This is a real message from an element, not just a placeholder
+      msgArr[nMsgs++]=m;
       msgs_nSources+=m->nSources();
       r=m->reducer;
       if (!m->callback.isInvalid())
@@ -578,8 +569,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
         msgs_userFlag=m->userFlag;
     }
     else
-    { //This is just a placeholder message-- replace it
-      msgs[i--]=msgs[--nMsgs];
+    { //This is just a placeholder message-- forget it
       delete m;
     }
   }
@@ -590,13 +580,12 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   else
   {//Use the reducer to reduce the messages
     CkReduction::reducerFn f=CkReduction::reducerTable[r];
-    CkReductionMsg **msgArr=&msgs[0];//<-- HACK!
     ret=(*f)(nMsgs,msgArr);
     ret->reducer=r;
   }
 
   //Go back through the vector, deleting old messages
-  for (i=0;i<nMsgs;i++) delete msgs[i];
+  for (i=0;i<nMsgs;i++) delete msgArr[i];
 
   //Set the message counts
   ret->redNo=redNo;
@@ -606,8 +595,6 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   ret->sourceFlag=msgs_nSources;
   DEBR((AA"Reduced gcount=%d; sourceFlag=%d\n"AB,ret->gcount,ret->sourceFlag));
 
-  //Empty out the message vector
-  msgs.length()=0;
   return ret;
 }
 
@@ -617,69 +604,6 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
 //if packing pack the message and then unpack and return it
 //if unpacking allocate memory for it read it off disk and then unapck
 //and return it
-CkReductionMsg* CkReductionMgr::pupCkReductionMsg(CkReductionMsg *m, PUP::er &p)
-{
-  int len;
-  envelope *env;
-
-  if (p.isPacking()) {
-  env = UsrToEnv(CkReductionMsg::pack(m));
-    len = env->getTotalsize();
-  }
-  p(len);
-  if (p.isUnpacking())
-  env = (envelope *) CmiAlloc(len);
-  p((void *)env, len);
-
-  return CkReductionMsg::unpack(EnvToUsr(env));
-}
-
-//pack-unpack method for reduction message vector
-void CkReductionMgr::pupMsgVector(CkVec<CkReductionMsg *> &_msgs, PUP::er &p)
-{
-  int nMsgs;
-  CkReductionMsg *m;
-
-  if (p.isPacking()) nMsgs = _msgs.length();
-  p(nMsgs);
-
-  for(int i = 0; i < nMsgs; i++) {
-    m = p.isPacking() ? _msgs[i] : 0;
-    _msgs.insert(i, pupCkReductionMsg(m, p));
-  }
-}
-
-//pack-unpack method for reduction message Qs
-void CkReductionMgr::pupMsgQ(CkQ<CkReductionMsg *> &_msgs, PUP::er &p)
-{
-  int nMsgs;
-  CkReductionMsg *m;
-
-  if (p.isPacking()) nMsgs = _msgs.length();
-  p(nMsgs);
-
-  for(int i = 0; i < nMsgs; i++) {
-    m = p.isPacking() ? _msgs.deq() : 0;
-    _msgs.enq(pupCkReductionMsg(m, p));
-  }
-}
-
-//pack-unpack method for count adjustment vector
-void CkReductionMgr::pupAdjVec(CkVec<countAdjustment> &vec, PUP::er &p)
-{
-  int nAdjs;
-
-  if (p.isPacking()) nAdjs = vec.length();
-  p(nAdjs);
-
-  for(int i = 0; i < nAdjs; i++) {
-  if (p.isUnpacking()) vec.push_back(countAdjustment());
-  p(vec[i].gcount);
-  p(vec[i].lcount);
-  p(vec[i].mainRecvd);
-  }
-}
-
 void CkReductionMgr::pup(PUP::er &p)
 {
 //We do not store the client function pointer or the client function parameter,
@@ -690,11 +614,12 @@ void CkReductionMgr::pup(PUP::er &p)
   p(inProgress); p(creating); p(startRequested);
   p(gcount); p(lcount);
   p(nContrib); p(nRemote);
-  pupMsgVector(msgs, p);
-  pupMsgQ(futureMsgs, p);
-  pupMsgQ(futureRemoteMsgs, p);
-  pupMsgQ(finalMsgs, p);
-  pupAdjVec(adjVec, p);
+  p|msgs;
+  p|futureMsgs;
+  p|futureRemoteMsgs;
+  p|finalMsgs;
+  p|adjVec;
+  if(p.isUnpacking()) thisProxy = thisgroup;
 }
 
 
@@ -765,8 +690,6 @@ void CkReductionMgr :: endArrayReduction(){
 		return;
 	}
 
-
-
 	if (nMsgs==0||r==CkReduction::invalid)
   		//No valid reducer in the whole vector
     		ret=CkReductionMsg::buildNew(0,NULL);
@@ -783,8 +706,6 @@ void CkReductionMgr :: endArrayReduction(){
 		delete tempMsgs[i];
 	}
 
-
-
 	//CkPrintf("Length of finalMsgs after endReduction %d \n",finalMsgs.length());
 	//CkPrintf("Data size of result = %d Length of finalMsg %d \n",ret->getLength(),finalMsgs.length());
 
@@ -794,11 +715,10 @@ void CkReductionMgr :: endArrayReduction(){
   	ret->callback=msgs_callback;
 	ret->secondaryCallback = msgs_secondaryCallback;
   	ret->sourceFlag=msgs_nSources;
-	
-	
-#if DEBUGRED	
+
+#if DEBUGRED
 	CkPrintf("~~~~~~~~~~~~~~~~~ About to call callback from end of GROUP REDUCTION %d at %.6f\n",completedRedNo,CmiWallTimer());
-#endif	
+#endif
 	if (!ret->secondaryCallback.isInvalid())
 	    ret->secondaryCallback.send(ret);
     else if (storedCallback!=NULL)
@@ -811,17 +731,14 @@ void CkReductionMgr :: endArrayReduction(){
 		    "You must register a client with either SetReductionClient or during contribute.\n");
     }
 	completedRedNo++;
-#if DEBUGRED	
+#if DEBUGRED
        CkPrintf("[%d,%d]------------END OF GROUP REDUCTION %d for group %d at %.6f\n",CkMyNode(),CkMyPe(),completedRedNo,thisgroup.idx,CkWallTimer());
-#endif       
+#endif
 	for (i=1;i<adjVec.length();i++)
     		adjVec[i-1]=adjVec[i];
 	adjVec.length()--;
 	endArrayReduction();
 }
-
-
-
 
 
 /////////////////////////////////////////////////////////////////////////
@@ -838,8 +755,7 @@ CkReductionMsg::CkReductionMsg(){}
 
 //"Constructor"-- builds and returns a new CkReductionMsg.
 //  the "data" array you specify will be copied into this object.
-CkReductionMsg *CkReductionMsg::
-  buildNew(int NdataSize,const void *srcData,
+CkReductionMsg *CkReductionMsg::buildNew(int NdataSize,const void *srcData,
     CkReduction::reducerType reducer)
 {
   int len[1];
@@ -868,11 +784,12 @@ CkReductionMsg::alloc(int msgnum,size_t size,int *sz,int priobits)
   ret->data=(void *)(&ret->dataStorage);
   return (void *) ret;
 }
-  
+
 void *
 CkReductionMsg::pack(CkReductionMsg* in)
 {
   DEBR(("CkReductionMsg::pack %d %d %d %d\n",in->sourceFlag,in->redNo,in->gcount,in->dataSize));
+  //CkPrintf("CkReductionMsg::pack %d %d %d %d\n",in->sourceFlag,in->redNo,in->gcount,in->dataSize);
   in->data = NULL;
   return (void*) in;
 }
@@ -880,8 +797,8 @@ CkReductionMsg::pack(CkReductionMsg* in)
 CkReductionMsg* CkReductionMsg::unpack(void *in)
 {
   CkReductionMsg *ret = (CkReductionMsg *)in;
-  DEBR(("CkReductionMsg::unpack %d %d %d %d\n",
-    ret->sourceFlag,ret->redNo,ret->gcount,ret->dataSize));
+  DEBR(("CkReductionMsg::unpack %d %d %d %d\n",ret->sourceFlag,ret->redNo,ret->gcount,ret->dataSize));
+  //CkPrintf("CkReductionMsg::unpack %d %d %d %d\n",ret->sourceFlag,ret->redNo,ret->gcount,ret->dataSize);
   ret->data=(void *)(&ret->dataStorage);
   return ret;
 }
@@ -1162,7 +1079,8 @@ NodeGroup::~NodeGroup() {
 }
 void NodeGroup::pup(PUP::er &p)
 {
-  IrrGroup::pup(p);
+  CkNodeReductionMgr::pup(p);
+  p|reductionInfo;
 }
 
 //CK_REDUCTION_CLIENT_DEF(CProxy_NodeGroup,(CkNodeReductionMgr *)CkLocalBranch(_ck_gid));
@@ -1250,13 +1168,13 @@ void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMs
   m->redNo=ci->redNo++;
 
   m->gcount=count;
-#if DEBUGRED   
+#if DEBUGRED
  CkPrintf("[%d,%d] contributewithCounter started for %d at %0.6f{{{\n",CkMyNode(),CkMyPe(),m->redNo,CmiWallTimer());
-#endif 
+#endif
   addContribution(m);
-#if DEBUGRED   
+#if DEBUGRED
   CkPrintf("[%d,%d] }}}contributewithCounter finished for %d at %0.6f\n",CkMyNode(),CkMyPe(),m->redNo,CmiWallTimer());
-#endif  
+#endif
 
 }
 
@@ -1278,20 +1196,20 @@ void CkNodeReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
     }
   else //is Past
     DEBR((AA"Ignoring node parent's late request to start #%d\n"AB,m->num));
-  CmiUnlock(lockEverything);		  
+  CmiUnlock(lockEverything);
   delete m;
- 
+
 }
 
 
 void CkNodeReductionMgr::doRecvMsg(CkReductionMsg *m){
-#if DEBUGRED 	
+#if DEBUGRED
 	CkPrintf("[%d,%d] doRecvMsg called for  %d at %.6f[[[[[\n",CkMyNode(),CkMyPe(),m->redNo,CkWallTimer());
-#endif	
+#endif
 	if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
-	    //DEBR((AA"Recv'd remote contribution %d for #%d at %d\n"AB,nRemote,m->redNo,this));   
+	    //DEBR((AA"Recv'd remote contribution %d for #%d at %d\n"AB,nRemote,m->redNo,this));
 	    startReduction(m->redNo);
-	    msgs.push_back(m);        
+	    msgs.enq(m);
 	    nRemote++;
 	    finishReduction();
 	}
@@ -1338,28 +1256,26 @@ void CkNodeReductionMgr::RecvMsg(CkReductionMsg *m)
 
 void CkNodeReductionMgr::startReduction(int number)
 {
-	  if (isFuture(number)) CkAbort("Can't start reductions out of order!\n");
-	  if (isPast(number)) CkAbort("Can't restart reduction that's already finished!\n");
-	  if (inProgress){
-  		DEBR((AA"This Node reduction is already in progress\n"AB));		
-	  	return;//This reduction already started
-	  }
-	  if (creating) //Don't start yet-- we're creating elements
-	  {
-	    DEBR((AA" Node Postponing start request #%d until we're done creating\n"AB,redNo));	    
-	    startRequested=CmiTrue;
-	    return;
-	  }
-	
+	if (isFuture(number)) CkAbort("Can't start reductions out of order!\n");
+	if (isPast(number)) CkAbort("Can't restart reduction that's already finished!\n");
+	if (inProgress){
+  		DEBR((AA"This Node reduction is already in progress\n"AB));
+		return;//This reduction already started
+	}
+	if (creating) //Don't start yet-- we're creating elements
+	{
+		DEBR((AA" Node Postponing start request #%d until we're done creating\n"AB,redNo));
+		startRequested=CmiTrue;
+		return;
+	}
+
 	//If none of these cases, we need to start the reduction--
-	  DEBR((AA"Starting Node reduction #%d\n"AB,redNo));
-	  inProgress=CmiTrue;
-	  //Sent start requests to our kids (in case they don't already know)
-	 
-	  
-	
-	  for (int k=0;k<treeKids();k++)
-	  {
+	DEBR((AA"Starting Node reduction #%d\n"AB,redNo));
+	inProgress=CmiTrue;
+	//Sent start requests to our kids (in case they don't already know)
+
+	for (int k=0;k<treeKids();k++)
+	{
 #ifdef BINOMIAL_TREE
 		DEBR((AA"Asking child Node %d to start #%d\n"AB,kids[k],redNo));
 		thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
@@ -1367,20 +1283,18 @@ void CkNodeReductionMgr::startReduction(int number)
 		DEBR((AA"Asking child Node %d to start #%d\n"AB,firstKid()+k,redNo));
 		thisProxy[firstKid()+k].ReductionStarting(new CkReductionNumberMsg(redNo));
 #endif
-	  }
-	  	    	    
+	}
 }
-
 
 void CkNodeReductionMgr::doAddContribution(CkReductionMsg *m){
 	if (isFuture(m->redNo)) {//An early contribution-- add to future Q
 		DEBR((AA"Contributor %p gives early node contribution-- for #%d\n"AB,m->ci,m->redNo));
-		futureMsgs.enq(m);   
+		futureMsgs.enq(m);
 	} else {// An ordinary contribution
 		DEBR((AA"Recv'd local node contribution %d for #%d at %d\n"AB,nContrib,m->redNo,this));
 		//    CmiPrintf("[%d,%d] Redcv'd Local Contribution for redNo %d number %d at %0.6f \n",CkMyNode(),CkMyPe(),m->redNo,nContrib+1,CkWallTimer());
 		startReduction(m->redNo);
-		msgs.push_back(m);
+		msgs.enq(m);
 		nContrib++;
 		finishReduction();
 	}
@@ -1389,23 +1303,21 @@ void CkNodeReductionMgr::doAddContribution(CkReductionMsg *m){
 //Handle a message from one element for the reduction
 void CkNodeReductionMgr::addContribution(CkReductionMsg *m)
 {
-   interrupt = 1;	
-   CmiLock(lockEverything);   
+   interrupt = 1;
+   CmiLock(lockEverything);
    doAddContribution(m);
   CmiUnlock(lockEverything);
   interrupt = 0;
 }
-/** check if the nodegroup reduction is finished at this node. In that case send it 
+/** check if the nodegroup reduction is finished at this node. In that case send it
 up the reduction tree **/
-
 
 void CkNodeReductionMgr::finishReduction(void)
 {
-  
   DEBR((AA"in Nodegrp finishReduction %d \n"AB,inProgress));
   /***Check if reduction is finished in the next few ifs***/
   if ((!inProgress) | creating){
-  	DEBR((AA"Either not in Progress or creating\n"AB));	
+  	DEBR((AA"Either not in Progress or creating\n"AB));
   	return;
   }
 
@@ -1413,7 +1325,7 @@ void CkNodeReductionMgr::finishReduction(void)
 	DEBR((AA"Nodegrp Need more local messages %d %d\n"AB,nContrib,(lcount)));
 
 	 return;//Need more local messages
-  }    
+  }
   if (nRemote<treeKids()){
 	DEBR((AA"Nodegrp Need more Remote messages %d %d\n"AB,nRemote,treeKids()));
 
@@ -1425,26 +1337,25 @@ void CkNodeReductionMgr::finishReduction(void)
 	   CkAbort("Nodegrp Excess remote reduction message received!\n");
   }
 
-  
   DEBR((AA"Reducing node data...\n"AB));
 
   /**reduce all messages received at this node **/
   CkReductionMsg *result=reduceMessages();
- 
+
   if (hasParent())
   {//Pass data up tree to parent
     DEBR((AA"Passing reduced data up to parent node %d. \n"AB,treeParent()));
-#if DEBUGRED    
+#if DEBUGRED
     CkPrintf("[%d,%d] Passing data up to parentNode %d at %.6f for redNo %d with ncontrib %d\n",CkMyNode(),CkMyPe(),treeParent(),CkWallTimer(),redNo,nContrib);
-#endif    
+#endif
     thisProxy[treeParent()].RecvMsg(result);
 
   }
   else
   {
-	  /** if the reduction is finished and I am the root of the reduction tree 
+	  /** if the reduction is finished and I am the root of the reduction tree
 	  then call the reductionhandler and other stuff ***/
- 
+
 #if DEBUGRED
    CkPrintf("[%d,%d]------------------- END OF REDUCTION %d with %d remote contributions passed to client function at %.6f\n",CkMyNode(),CkMyPe(),redNo,nRemote,CkWallTimer());
 #endif
@@ -1459,28 +1370,20 @@ void CkNodeReductionMgr::finishReduction(void)
 	}
   }
 
- // DEBR((AA"Reduction %d finished in group!\n"AB,redNo));
+  // DEBR((AA"Reduction %d finished in group!\n"AB,redNo));
   //CkPrintf("[%d,%d]Reduction %d finished with %d\n",CkMyNode(),CkMyPe(),redNo,nContrib);
-
   redNo++;
-
   int i;
-
   inProgress=CmiFalse;
   startRequested=CmiFalse;
   nRemote=nContrib=0;
-  
-
 
   //Look through the future queue for messages we can now handle
-  
+  int n=futureMsgs.length();
 
-  int n=futureMsgs.length(); 
-
-  
   for (i=0;i<n;i++)
   {
-    interrupt = 1;	  
+    interrupt = 1;
 
     CkReductionMsg *m=futureMsgs.deq();
 
@@ -1489,7 +1392,7 @@ void CkNodeReductionMgr::finishReduction(void)
       doAddContribution(m);//<- if *still* early, puts it back in the queue
     }
   }
-  
+
   interrupt = 1;
 
   n=futureRemoteMsgs.length();
@@ -1497,7 +1400,7 @@ void CkNodeReductionMgr::finishReduction(void)
   interrupt = 0;
   for (i=0;i<n;i++)
   {
-    interrupt = 1;	  
+    interrupt = 1;
 
     CkReductionMsg *m=futureRemoteMsgs.deq();
 
@@ -1505,15 +1408,9 @@ void CkNodeReductionMgr::finishReduction(void)
     if (m!=NULL)
       doRecvMsg(m);//<- if *still* early, puts it back in the queue
   }
-
-  
 }
 
-
 //////////// Reduction Manager Utilities /////////////
-
-
-
 void CkNodeReductionMgr::init_BinomialTree(){
 	int depth = (int )ceil((log((double )CkNumNodes())/log((double)2)));
 	/*upperSize = (unsigned )pow((double)2,depth);*/
@@ -1552,7 +1449,6 @@ void CkNodeReductionMgr::init_BinomialTree(){
 }
 
 
-
 int CkNodeReductionMgr::treeRoot(void)
 {
   return 0;
@@ -1586,14 +1482,10 @@ int CkNodeReductionMgr::treeKids(void)//Number of children in tree
 #endif
 }
 
-
-
 //Combine (& free) the current message vector msgs.
 CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
 {
-
   CkReductionMsg *ret=NULL;
-  int nMsgs=msgs.length();
 
   //Look through the vector for a valid reducer, swapping out placeholder messages
   CkReduction::reducerType r=CkReduction::invalid;
@@ -1603,25 +1495,28 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   CkCallback msgs_callback;
   CkCallback msgs_secondaryCallback;
   int i;
-  for (i=0;i<nMsgs;i++)
+  int nMsgs=0;
+  CkReductionMsg *m;
+  CkReductionMsg **msgArr=new CkReductionMsg*[msgs.length()];
+
+  while(NULL!=(m=msgs.deq()))
   {
-    CkReductionMsg *m=msgs[i];
     msgs_gcount+=m->gcount;
     if (m->sourceFlag!=0)
     { //This is a real message from an element, not just a placeholder
+      msgArr[nMsgs++]=m;
       msgs_nSources+=m->nSources();
       r=m->reducer;
       if (!m->callback.isInvalid())
         msgs_callback=m->callback;
       if(!m->secondaryCallback.isInvalid()){
-	      msgs_secondaryCallback = m->secondaryCallback;
+        msgs_secondaryCallback = m->secondaryCallback;
       }
       if (m->userFlag!=-1)
         msgs_userFlag=m->userFlag;
     }
     else
     { //This is just a placeholder message-- replace it
-      msgs[i--]=msgs[--nMsgs];
       delete m;
     }
   }
@@ -1632,13 +1527,12 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   else
   {//Use the reducer to reduce the messages
     CkReduction::reducerFn f=CkReduction::reducerTable[r];
-    CkReductionMsg **msgArr=&msgs[0];//<-- HACK!
     ret=(*f)(nMsgs,msgArr);
     ret->reducer=r;
   }
 
   //Go back through the vector, deleting old messages
-  for (i=0;i<nMsgs;i++) delete msgs[i];
+  for (i=0;i<nMsgs;i++) delete msgArr[i];
 
   //Set the message counts
   ret->redNo=redNo;
@@ -1649,65 +1543,8 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   ret->sourceFlag=msgs_nSources;
   DEBR((AA"Reduced gcount=%d; sourceFlag=%d\n"AB,ret->gcount,ret->sourceFlag));
 
-  //Empty out the message vector
-  msgs.length()=0;
-
   return ret;
 }
-
-
-//Checkpointing utilities
-//pack-unpack method for CkReductionMsg
-//if packing pack the message and then unpack and return it
-//if unpacking allocate memory for it read it off disk and then unapck
-//and return it
-CkReductionMsg* CkNodeReductionMgr::pupCkReductionMsg(CkReductionMsg *m, PUP::er &p)
-{
-  int len;
-  envelope *env;
-
-  if (p.isPacking()) {
-  env = UsrToEnv(CkReductionMsg::pack(m));
-    len = env->getTotalsize();
-  }
-  p(len);
-  if (p.isUnpacking())
-  env = (envelope *) CmiAlloc(len);
-  p((void *)env, len);
-
-  return CkReductionMsg::unpack(EnvToUsr(env));
-}
-
-//pack-unpack method for reduction message vector
-void CkNodeReductionMgr::pupMsgVector(CkVec<CkReductionMsg *> &_msgs, PUP::er &p)
-{
-  int nMsgs;
-  CkReductionMsg *m;
-
-  if (p.isPacking()) nMsgs = _msgs.length();
-  p(nMsgs);
-
-  for(int i = 0; i < nMsgs; i++) {
-    m = p.isPacking() ? _msgs[i] : 0;
-    _msgs.insert(i, pupCkReductionMsg(m, p));
-  }
-}
-
-//pack-unpack method for reduction message Qs
-void CkNodeReductionMgr::pupMsgQ(CkQ<CkReductionMsg *> &_msgs, PUP::er &p)
-{
-  int nMsgs;
-  CkReductionMsg *m;
-
-  if (p.isPacking()) nMsgs = _msgs.length();
-  p(nMsgs);
-
-  for(int i = 0; i < nMsgs; i++) {
-    m = p.isPacking() ? _msgs.deq() : 0;
-    _msgs.enq(pupCkReductionMsg(m, p));
-  }
-}
-
 
 void CkNodeReductionMgr::pup(PUP::er &p)
 {
@@ -1719,12 +1556,11 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   p(gcount); p(lcount);
   p(nContrib); p(nRemote);
   p(interrupt);
-  pupMsgVector(msgs, p);
-  pupMsgQ(futureMsgs, p);
-  pupMsgQ(futureRemoteMsgs, p);
- // pupAdjVec(adjVec, p);
+  p|msgs;
+  p|futureMsgs;
+  p|futureRemoteMsgs;
+  if(p.isUnpacking()) thisProxy = thisgroup;
 }
-
 
 
 #include "CkReduction.def.h"

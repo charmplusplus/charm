@@ -23,11 +23,11 @@ Chare::Chare(void) {
 }
 Chare::~Chare() {}
 
-void Chare::pup(PUP::er &p) 
+void Chare::pup(PUP::er &p)
 {
   p(thishandle.onPE);
   thishandle.objPtr=(void *)this;
-} 
+}
 
 IrrGroup::IrrGroup(void) {
   thisgroup = CkpvAccess(_currentGroup);
@@ -40,31 +40,14 @@ void IrrGroup::pup(PUP::er &p)
   p|thisgroup;
 }
 
-
+void IrrGroup::ckJustMigrated(void)
+{
+}
 
 void Group::pup(PUP::er &p)
 {
   CkReductionMgr::pup(p);
   reductionInfo.pup(p);
-}
-
-CkComponent::~CkComponent() {}
-void CkComponent::pup(PUP::er &p) {}
-CkComponent *IrrGroup::ckLookupComponent(int userIndex)
-{
-	return NULL;
-}
-CkComponent *CkComponentID::ckLookup(void) const {
-	CkComponent *ret=_localBranch(gid)->ckLookupComponent(index);
-#ifndef CMK_OPTIMIZE
-	if (ret==NULL) CkAbort("Group returned a NULL component!\n");
-#endif
-	return ret;
-}
-void CkComponentID::pup(PUP::er &p)
-{
-	p|gid;
-	p|index;
 }
 
 void CProxy::pup(PUP::er &p) {
@@ -302,12 +285,16 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   _TRACE_CREATION_DONE(1);
 }
 
-void _createGroupMember(CkGroupID groupID, int epIdx, envelope *env)
+void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
   register int gIdx = _entryTable[epIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
   CkpvAccess(_groupTable)->find(groupID).setObj(obj);
+  CkpvAccess(_groupTable)->find(groupID).setDefCtor(_chareTable[gIdx]->defCtor);
+  CkpvAccess(_groupTable)->find(groupID).setMigCtor(_chareTable[gIdx]->migCtor);
+  CkpvAccess(_groupTable)->find(groupID).setName(_chareTable[gIdx]->name);
+  CkpvAccess(_groupIDTable).push_back(groupID);
   PtrQ *ptrq = CkpvAccess(_groupTable)->find(groupID).getPending();
   if(ptrq) {
     void *pending;
@@ -322,13 +309,17 @@ void _createGroupMember(CkGroupID groupID, int epIdx, envelope *env)
   _STATS_RECORD_PROCESS_GROUP_1();
 }
 
-void _createNodeGroupMember(CkGroupID groupID, int epIdx, envelope *env)
+void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
   register int gIdx = _entryTable[epIdx]->chareIdx;
   register void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
   CmiLock(CksvAccess(_nodeLock));
   CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
+  CksvAccess(_nodeGroupTable)->find(groupID).setDefCtor(_chareTable[gIdx]->defCtor);
+  CksvAccess(_nodeGroupTable)->find(groupID).setMigCtor(_chareTable[gIdx]->migCtor);
+  CksvAccess(_nodeGroupTable)->find(groupID).setName(_chareTable[gIdx]->name);
+  CksvAccess(_nodeGroupIDTable).push_back(groupID);
   CmiUnlock(CksvAccess(_nodeLock));
   PtrQ *ptrq = CksvAccess(_nodeGroupTable)->find(groupID).getPending();
   if(ptrq) {
@@ -363,7 +354,7 @@ void _createGroup(CkGroupID groupID, envelope *env)
     CkUnpackMessage(&env);
   }
   _STATS_RECORD_CREATE_GROUP_1();
-  _createGroupMember(groupID, epIdx, env);
+  CkCreateLocalGroup(groupID, epIdx, env);
 }
 
 void _createNodeGroup(CkGroupID groupID, envelope *env)
@@ -386,7 +377,7 @@ void _createNodeGroup(CkGroupID groupID, envelope *env)
     CkUnpackMessage(&env);
   }
   _STATS_RECORD_CREATE_NODE_GROUP_1();
-  _createNodeGroupMember(groupID, epIdx, env);
+  CkCreateLocalNodeGroup(groupID, epIdx, env);
 }
 
 // new _groupCreate
@@ -578,14 +569,14 @@ void _processBocInitMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register int epIdx = env->getEpIdx();
-  _createGroupMember(groupID, epIdx, env);
+  CkCreateLocalGroup(groupID, epIdx, env);
 }
 
 void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register int epIdx = env->getEpIdx();
-  _createNodeGroupMember(groupID, epIdx, env);
+  CkCreateLocalNodeGroup(groupID, epIdx, env);
 }
 
 /**
@@ -871,7 +862,7 @@ static inline envelope *_prepareImmediateMsgBranch(int eIdx,void *msg,CkGroupID 
   return env;
 }
 
-static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID, 
+static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
                            int pe=CLD_BROADCAST_ALL)
 {
   int numPes;
@@ -882,7 +873,7 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
   _TRACE_CREATION_DONE(numPes);
 }
 
-static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID, 
+static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
                            int npes, int *pes)
 {
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
@@ -902,10 +893,10 @@ void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID)
 extern "C"
 void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID)
 {
-  if (destPE==CkMyPe()) 
-  { 
+  if (destPE==CkMyPe())
+  {
     IrrGroup *obj=(IrrGroup *)_localBranch(gID);
-    if (obj!=NULL) 
+    if (obj!=NULL)
     { //Just directly call the group:
       envelope *env=UsrToEnv(msg);
       _deliverForBocMsg(CkpvAccess(_coreState),eIdx,env,obj);
@@ -953,7 +944,7 @@ void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID)
   CpvAccess(_qd)->create(CkNumPes());
 }
 
-static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID, 
+static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
                            int node=CLD_BROADCAST_ALL)
 {
   int numPes;
