@@ -12,5 +12,5 @@ ar crv libstp.a stp.o
 
 $CC -c meas.c
 as -o qtmdb.o md/ksr1_b.s
-$CC -o run qtmdb.o libstp.a libqt.a
+$CC -o run meas.o qtmdb.o libstp.a libqt.a
 

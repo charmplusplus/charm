@@ -974,7 +974,7 @@ char **argv;
  *
  *****************************************************************************/
 
-#define LOGGING 1
+#define LOGGING 0
 
 #if LOGGING
 
@@ -1148,7 +1148,6 @@ void CheckSocketsReady()
 static mutex_t memmutex;
 void CmiMemLock() { mutex_lock(&memmutex); }
 void CmiMemUnlock() { mutex_unlock(&memmutex); }
-#define CmiMemBusy() 0
 
 static thread_key_t Cmi_state_key;
 static CmiState     Cmi_state_vector;
@@ -1235,7 +1234,6 @@ static void CmiStartThreads()
 static int memflag;
 void CmiMemLock() { memflag=1; }
 void CmiMemUnlock() { memflag=0; }
-#define CmiMemBusy() (memflag)
 
 static struct CmiStateStruct Cmi_state;
 int Cmi_mype;
@@ -1250,6 +1248,7 @@ static int comm_flag;
 static void CommunicationInterrupt()
 {
   if (comm_flag) return;
+  if (memflag) return;
   CommunicationServer();
 }
 
@@ -1962,7 +1961,6 @@ void ReceiveDatagram()
 
 static void CommunicationServer()
 {
-  if (CmiMemBusy()) return;
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
   while (1) {
     Cmi_clock = GetClock();

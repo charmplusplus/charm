@@ -159,7 +159,7 @@ fifo.o: fifo.c $(CVHEADERS)
 	$(CHARMC) fifo.c
 
 threads.o: threads.c $(CVHEADERS)
-	$(CHARMC) -use-reliable-cc -I. -NO threads.c
+	$(CHARMC) threads.c
 
 spantree.o: spantree.c $(CVHEADERS)
 	$(CHARMC) spantree.c

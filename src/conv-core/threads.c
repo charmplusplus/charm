@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.33  1997-05-05 13:47:14  jyelon
+ * Revision 1.34  1997-05-05 16:38:14  jyelon
+ * *** empty log message ***
+ *
+ * Revision 1.33  1997/05/05 13:47:14  jyelon
  * Revamped threads package using quickthreads.
  *
  * Revision 1.32  1997/04/03 19:42:10  jyelon
@@ -282,18 +285,17 @@ void CthInit()
 {
   CthThread t;
 
-  CthCpvInitialize(char *,CthData);
+  CthCpvInitialize(char *,     CthData);
   CthCpvInitialize(CthThread,  CthCurrent);
-  CthCpvInitialize(int,        CthExiting);
-  CthCpvInitialize(int,        CthGrowsdown);
   CthCpvInitialize(int,        CthDatasize);
+  CthCpvInitialize(int,        CthExiting);
   
   t = (CthThread)CmiAlloc(sizeof(struct CthThreadStruct));
   CthThreadInit(t);
+  CthCpvAccess(CthData)=0;
   CthCpvAccess(CthCurrent)=t;
   CthCpvAccess(CthDatasize)=1;
   CthCpvAccess(CthExiting)=0;
-  CthCpvAccess(CthData)=0;
 }
 
 CthThread CthSelf()
