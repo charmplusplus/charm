@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.8  1998-03-05 17:15:06  milind
+ * Revision 1.9  1998-04-17 17:18:20  milind
+ * Added CMK_CCS_AVAILABLE flag.
+ *
+ * Revision 1.8  1998/03/05 17:15:06  milind
  * Fixed conflicts.
  *
  * Revision 1.7  1998/02/19 08:40:22  jyelon
@@ -95,6 +98,8 @@
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
 #define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
 #define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 0
+
+#define CMK_CCS_AVAILABLE                                  0
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 #define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0

@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.28  1998-03-04 17:17:19  milind
+ * Revision 1.29  1998-04-17 17:17:45  milind
+ * Added CMK_CCS_AVAILABLE flag.
+ *
+ * Revision 1.28  1998/03/04 17:17:19  milind
  * Fixed the size_t errors.
  *
  * Revision 1.27  1998/02/19 08:39:31  jyelon
@@ -103,6 +106,8 @@
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
 #define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
 #define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 0
+
+#define CMK_CCS_AVAILABLE                                  1
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 #define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0

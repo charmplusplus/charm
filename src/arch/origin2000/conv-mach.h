@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.9  1998-02-19 08:39:52  jyelon
+ * Revision 1.10  1998-04-17 17:18:00  milind
+ * Added CMK_CCS_AVAILABLE flag.
+ *
+ * Revision 1.9  1998/02/19 08:39:52  jyelon
  * Added multicast code.
  *
  * Revision 1.8  1998/01/16 18:03:12  milind
@@ -96,6 +99,8 @@
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
 #define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
 #define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 0
+
+#define CMK_CCS_AVAILABLE                                  0
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 #define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   0
