@@ -17,7 +17,7 @@ int E;
   return(edgesRec);
 }
 
-addEdge(EdgeList, v,w)
+void addEdge(EdgeList, v,w)
      EdgeListType * EdgeList;
      int v;
      int w;
@@ -37,7 +37,7 @@ addEdge(EdgeList, v,w)
    graph.vertexArray[w].degree++;
 }
 
-printEdges(EdgeList)
+void printEdges(EdgeList)
      EdgeListType * EdgeList;
 {int i;
  Edge * edges;
@@ -49,7 +49,7 @@ printEdges(EdgeList)
 
 int edgeExists(x,y)
 {
-  int deg, i, ind;
+  int i, ind;
   ind = graph.vertexArray[x].adjListInd; 
   
   for(i=0; i< graph.vertexArray[x].degree; i++)

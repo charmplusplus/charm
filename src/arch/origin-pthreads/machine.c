@@ -3,9 +3,6 @@
 #include <sched.h>
 #include <time.h>
 
-#define _POSIX1C
-#define _NO_ANSIMODE
-
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -97,7 +94,7 @@ void CmiDestroyLock(CmiNodeLock lock)
 
 int CmiMyPe()
 {
-  int mype = (int) pthread_getspecific(perThreadKey);
+  int mype = (size_t) pthread_getspecific(perThreadKey);
   return mype;
 }
 
@@ -217,6 +214,7 @@ static void *threadInit(void *arg)
     if (Cmi_usched==0) CsdScheduler(-1);
     ConverseExit();
   }
+  return (void *) 0;
 }
 
 

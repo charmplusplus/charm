@@ -31,10 +31,15 @@ main(int argc, char **argv)
 }
 */
 
-gengraph(int pV, int pC, int pseed)
+void printOut(VerticesListType *vertices);
+void initGraph(void);
+void diameter(void);
+void AddEdges(EdgeListType *EdgeList, int V, int n);
+
+void gengraph(int pV, int pC, int pseed)
 { int i;
   EdgeListType * EdgeList;
-  VerticesListType * vertices;
+  /* VerticesListType * vertices; */
   extern EdgeListType * InitEdgeList();
   extern addEdge();
   char dircmd[20], dirname[10];
@@ -54,21 +59,18 @@ gengraph(int pV, int pC, int pseed)
   for (i=0; i<seed; i++) rand();
   if ((V*C %2) != 0) printf("V*C must be even\n");
   E = V*C/2;
-  initGraph(V, E);
+  initGraph();
   EdgeList = InitEdgeList(E);
   AddEdges(EdgeList, V, E); 
   /*  vertices = (VerticesListType *) InitVertices(EdgeList, V,E); */
 
-  printOut(graph); 
+  printOut(&graph); 
   diameter();
 }
 
 
-AddEdges(EdgeList, V, n)
+void AddEdges(EdgeListType *EdgeList, int V, int n)
    /* Add more edges to make up a total of E edges */
-     EdgeListType * EdgeList;
-     int V;
-     int n;
 {int i,j,w,x,y;
 /* first add edges for a C-way spanning tree.*/
 int c1;
@@ -100,6 +102,11 @@ n -= (V-1);
    }
 }
 
+void fillAdjArray(Edge *edges, VerticesListType *vlist, int V, int E);
+void sortAdjArrays(VerticesListType *vlist);
+void sort(int *adj, int fromIndex, int toIndex);
+void countDegrees(Edge *edges, Vertex *vertRecs, int V, int E);
+
 VerticesListType * 
 InitVertices(EdgeList, V,E)
      EdgeListType * EdgeList;
@@ -128,11 +135,7 @@ InitVertices(EdgeList, V,E)
   return(vlist);
 }
 
-countDegrees(edges, vertRecs, V, E)
-     Edge * edges; /* array of Edge records */
-     Vertex * vertRecs; /* array of Vertex records */
-     int V;
-     int E;
+void countDegrees(Edge *edges, Vertex *vertRecs, int V, int E)
 { /* initialize the degrees of all vertices to 0. 
      Traverse the edge list, incrementing the degree of the 2 nodes for each edge.
      */
@@ -154,11 +157,7 @@ countDegrees(edges, vertRecs, V, E)
    }
 }
 
-fillAdjArray(edges, vlist, V, E)
-     Edge * edges;
-     VerticesListType * vlist;
-     int V;
-     int E;
+void fillAdjArray(Edge *edges, VerticesListType *vlist, int V, int E)
 { /* Insert each edge <x,y> as an entry y in x's adj list, and vice versa. */
   int i, x,y;
  int * adj;
@@ -176,8 +175,7 @@ fillAdjArray(edges, vlist, V, E)
     }
 }
 
-sortAdjArrays(vlist)
-     VerticesListType * vlist;
+void sortAdjArrays(VerticesListType *vlist)
 { /* sort each section of the array corresponding to each vertex. */
   int V, i;
   int dupcount;
@@ -217,10 +215,7 @@ if ((dupcount % 2) != 0) {printf("error. duplicates not even.\n"); }
 E -= dupcount/2;
 }
 
-sort(adj, fromIndex, toIndex)
-     int * adj;
-     int fromIndex;
-     int toIndex;
+void sort(int *adj, int fromIndex, int toIndex)
 { int i,j, tmp;
   short changed;
   changed = 1;
@@ -238,8 +233,7 @@ sort(adj, fromIndex, toIndex)
     }
 }
 
-printOut(vertices)
-VerticesListType * vertices ;
+void printOut(VerticesListType *vertices)
 {int i,j;
  int * adj;
  Vertex * vertexRecs;
@@ -262,7 +256,7 @@ VerticesListType * vertices ;
    }
 }
 
-initGraph()
+void initGraph(void)
 { int i;
   graph.numVertices = V;
   graph.vertexArray = (Vertex *) malloc(V*sizeof(Vertex));
@@ -277,8 +271,9 @@ initGraph()
   }
 }
 
+void enqueue(Q *q, int i);
 
-diameter()
+void diameter(void)
 {
   Q * makeQueue();
   int i,j, k, v, w, start;
@@ -342,7 +337,7 @@ Q * makeQueue()
   return q;
 }
 
-enqueue(Q * q, int i) {
+void enqueue(Q * q, int i) {
   q->tail++;
   if (q->tail == q->size) q->tail = 0; /* no overflows possible */
   q->buf[q->tail] = i;
@@ -357,6 +352,6 @@ int dequeue(Q *q) {
   return r;
 }
 
-isEmpty(Q * q) {
+int isEmpty(Q * q) {
   return (q->numElements == 0) ;
 }

@@ -506,8 +506,6 @@ CthCpvDeclare(char *,    CthData);
 CthCpvStatic(CthThread,  CthCurrent);
 CthCpvStatic(int,        CthExiting);
 CthCpvStatic(int,        CthDatasize);
-CpvStaticDeclare(CthThread, CthSchedThreadVar);
-CpvStaticDeclare(int, CthSchedResumeIndex);
 
 int CthImplemented()
 { return 1; }
@@ -620,7 +618,6 @@ CthThread t;
 
 static void CthOnly(void *arg, void *vt, qt_userf_t fn)
 {
-  CthThread t = (CthThread)vt; CthThread next;
   fn(arg);
   CthCpvAccess(CthExiting) = 1;
   CthSuspend();

@@ -23,8 +23,8 @@ typedef unsigned char  UChar;
 #define D(x)     (A(x)-(x))
 #define PW(x)    ((x+CINTBITS-1)/CINTBITS)
 
-#define QMASK    0x0F
-#define PMASK    0xF0
+#define _QMASK    0x0F
+#define _PMASK    0xF0
 
 #define NewChareMsg    1
 #define NewVChareMsg   2
@@ -82,8 +82,8 @@ class envelope {
     void   setEvent(const UInt e) { event = e; }
     UInt   getRef(void) const { return s2; }
     void   setRef(const UShort r) { s2 = r; }
-    UChar  getQueueing(void) const { return (attribs2 & QMASK); }
-    void   setQueueing(const UChar q) { attribs2 = (attribs2 & PMASK) | q; }
+    UChar  getQueueing(void) const { return (attribs2 & _QMASK); }
+    void   setQueueing(const UChar q) { attribs2 = (attribs2 & _PMASK) | q; }
 #ifndef CMK_OPTIMIZE
     UChar  getMsgtype(void) const { return (attribs1&0x7F); }
     void   setMsgtype(const UChar m) { attribs1 = (attribs1&0x80) | m; }
@@ -97,8 +97,8 @@ class envelope {
     void   setMsgIdx(const UChar idx) { msgIdx = idx; }
     UInt   getTotalsize(void) const { return totalsize; }
     void   setTotalsize(const UInt s) { totalsize = s; }
-    UChar  isPacked(void) const { return ((attribs2 & PMASK)>>4); }
-    void   setPacked(const UChar p) { attribs2 = (attribs2 & QMASK) | (p<<4); }
+    UChar  isPacked(void) const { return ((attribs2 & _PMASK)>>4); }
+    void   setPacked(const UChar p) { attribs2 = (attribs2 & _QMASK) | (p<<4); }
     UShort getPriobits(void) const { return priobits; }
     void   setPriobits(const UShort p) { priobits = p; }
     UShort getPrioWords(void) const { return (priobits+CINTBITS-1)/CINTBITS; }

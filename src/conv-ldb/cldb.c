@@ -1,5 +1,12 @@
 #include "cldb.h"
 
+CpvDeclare(int, CldHandlerIndex);
+CpvDeclare(int, CldBalanceHandlerIndex);
+
+CpvDeclare(int, CldRelocatedMessages);
+CpvDeclare(int, CldLoadBalanceMessages);
+CpvDeclare(int, CldMessageChunks);
+
 /* Estimator stuff.  Of any use? */
 /*
 CpvStaticDeclare(CldEstimatorTable, _estfns);

@@ -271,9 +271,9 @@ void Array1D::RecvForElement(ArrayMessage *msg)
     register int epIdx = msg->entryIndex;
     CkChareID handle = elementIDs[msg->destIndex].elementHandle;
     register void *obj = handle.objPtr;
-    const int index = msg->destIndex;
 
 #if CMK_LBDB_ON
+    const int index = msg->destIndex;
     the_lbdb->ObjectStart(elementIDs[index].ldHandle);
     // Can't use msg after call(): The user may delete it!
     _entryTable[epIdx]->call(msg, obj);

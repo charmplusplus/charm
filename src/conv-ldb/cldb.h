@@ -3,11 +3,11 @@
 
 #define MAXMSGBFRSIZE 100000
 
-CpvDeclare(int, CldHandlerIndex);
-CpvDeclare(int, CldBalanceHandlerIndex);
+CpvExtern(int, CldHandlerIndex);
+CpvExtern(int, CldBalanceHandlerIndex);
 
-CpvDeclare(int, CldRelocatedMessages);
-CpvDeclare(int, CldLoadBalanceMessages);
-CpvDeclare(int, CldMessageChunks);
+CpvExtern(int, CldRelocatedMessages);
+CpvExtern(int, CldLoadBalanceMessages);
+CpvExtern(int, CldMessageChunks);
 
 void CldMultipleSend(int pe, int numToSend);
