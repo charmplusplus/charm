@@ -62,7 +62,7 @@ SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 #
 ###############################################################################
 
-ALLHEADERS=charm++.h charm.h charm++-inc.h charm-inc.h dagger.h cpthreads.h cldb.graph.c converse.h conv-mach.h simplemsg.h trace.h generic_redn.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h # pglib.h
+ALLHEADERS=charm++.h charm.h charm++-inc.h charm-inc.h dagger.h cpthreads.h converse.h conv-mach.h simplemsg.h trace.h generic_redn.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h idl.h # pglib.h
 
 ALLINTERFACES=GENERIC-ACC.int GENERIC-HIST.int GENERIC-REDN.int barrier_redn.int cache.int dacc_count.int dacc_hist.int dcountredn.int dmaxredn.int dminredn.int dprodredn.int dsumredn.int facc_count.int facc_hist.int fcountredn.int fmaxredn.int fminredn.int fprodredn.int fsumredn.int iacc_count.int iacc_hist.int icountredn.int imaxredn.int iminredn.int iprodredn.int isumredn.int pg.int idl.ci
 
@@ -206,7 +206,7 @@ cldb.o: cldb.c $(CVHEADERS)
 libldb-rand.o: cldb.rand.c $(CVHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ cldb.rand.c
 
-libldb-graph.o: cldb.graph.c $(CVHEADERS)
+libldb-graph.o: cldb.graph.c cldb.graph.h $(CVHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ cldb.graph.c
 
 libldb-spray.o: cldb.spray.c $(CVHEADERS)
