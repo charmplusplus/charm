@@ -37,7 +37,11 @@ PairCalculator::PairCalculator(bool sym, int grainSize, int s, int blkSize,  int
     for (int i = 0; i < numExpected; i++)
       inDataRight[i] = NULL;
   }
-  outData = new double[grainSize * grainSize];
+
+  //outData = new double[grainSize * grainSize];
+  outData = new double[S * S];
+  memset(outData, 0 , sizeof(double)* S *S);
+
   newData = NULL;
   sumPartialCount = 0;
   setMigratable(false);
@@ -184,8 +188,9 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	    for(int jkth=0;jkth<iunits;jkth++)
 	      {
 		j=kLeftMark[jkth];
-		outData[i * grainSize + j] = compute_entry(size, inDataLeft[i],
-							   inDataLeft[j], op1);        
+		outData[(i+thisIndex.y)*S + j + thisIndex.x] = 
+                    compute_entry(size, inDataLeft[i],
+                                  inDataLeft[j], op1);        
 	      }
 	  }
       }
@@ -198,8 +203,9 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	    for(int jkth=0;jkth<junits;jkth++)
 	      {
 		j=kRightOffset[jkth];
-		outData[i * grainSize + j] = compute_entry(size, inDataLeft[i],
-								 inDataRight[j],op1);        
+		outData[(i+thisIndex.y)*S + j + thisIndex.x] = 
+                    compute_entry(size, inDataLeft[i],
+                                  inDataRight[j],op1);        
 	      }
 	  }
       }
@@ -212,16 +218,19 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 	  kRightMark+=junits;
 	}
     }
-  if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
-    numRecd = 0;
-    kLeftCount=0;
-    kRightCount=0;
-    kLeftMark=kLeftOffset;
-    kRightMark=kRightOffset;
-    r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
-    r.contribute(this, sparse_sum_double);
-  }
 
+  if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
+      numRecd = 0;
+      kLeftCount=0;
+      kRightCount=0;
+      kLeftMark=kLeftOffset;
+      kRightMark=kRightOffset;
+      //r.add((int)thisIndex.y, (int)thisIndex.x, (int)(thisIndex.y+grainSize-1), (int)(thisIndex.x+grainSize-1), (CkTwoDoubles*)outData);
+      //r.contribute(this, sparse_sum_double);
+      
+      contribute(S * S *sizeof(double), outData, CkReduction::sum_double);
+  }
+  
   /*
   if (numRecd == numExpected * 2 || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected)) {
     //    kLeftCount=kRightCount=0;  
