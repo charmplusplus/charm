@@ -16,9 +16,9 @@
 #include "ccs-auth.h"
 
 typedef struct CcsServer {
-  /*Conv-host:*/
+  /*CCS Server description:*/
   char hostAddr[128];
-  unsigned int hostIP;
+  skt_ip_t hostIP;
   unsigned int hostPort;
 
   /*Authentication*/
@@ -40,7 +40,7 @@ typedef struct CcsServer {
 
 /*All routines return -1 on failure*/
 int CcsConnect(CcsServer *svr, char *host, int port,CcsSec_secretKey *key);
-int CcsConnectIp(CcsServer *svr, int ip, int port,CcsSec_secretKey *key);
+int CcsConnectIp(CcsServer *svr,skt_ip_t ip, int port,CcsSec_secretKey *key);
 int CcsSendRequest(CcsServer *svr, char *hdlrID, int pe, 
 		    unsigned int size, const char *msg);
 int CcsRecvResponse(CcsServer *svr, 

@@ -71,8 +71,9 @@ static void parseInfo(CcsServer *svr,const char *data)
 
 static void printSvr(CcsServer *svr)
 {
+  char ipBuf[200];
   int i;
-  DEBUGF(("hostIP: %d\n", svr->hostIP));
+  DEBUGF(("hostIP: %d\n", skt_print_ip(ipBuf,svr->hostIP)));
   DEBUGF(("hostPort: %d\n", svr->hostPort));
   DEBUGF(("authentication: %d\n", svr->isAuth));
   DEBUGF(("replyFd: %d\n", svr->replyFd));
@@ -133,7 +134,7 @@ int CcsConnect(CcsServer *svr, char *host, int port,CcsSec_secretKey *key)
   skt_init();
   return CcsConnectIp(svr,skt_lookup_ip(host),port,key);
 }
-int CcsConnectIp(CcsServer *svr, int ip, int port,CcsSec_secretKey *key)
+int CcsConnectIp(CcsServer *svr, skt_ip_t ip, int port,CcsSec_secretKey *key)
 {
   unsigned int msg_len;char *msg_data;/*Reply message*/
   skt_init();
