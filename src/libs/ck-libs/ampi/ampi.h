@@ -50,6 +50,12 @@ AMPI, e.g. for our bizarre MPI_Main.
 #define MPI_SUM 3
 #define MPI_PROD 4
 
+/* This is one less than the system-tags defined in ampiimpl.h.
+ * This is so that the tags used by the system dont clash with user-tags.
+ * Is this too small ?
+ */
+#define MPI_TAG_UB     1024
+
 typedef int MPI_Comm;
 typedef int MPI_Op;
 typedef int MPI_Request;

@@ -138,11 +138,12 @@ void pupFromBuf(const void *data,T &t) {
 
 class AmpiMsg : public CMessage_AmpiMsg {
  public:
-  int tag1, tag2, comm, length;
+  int seq, tag, src, comm, length;
   void *data;
 
   AmpiMsg(void) { data = (char *)this + sizeof(AmpiMsg); }
-  AmpiMsg(int t1, int t2, int l, int c):tag1(t1),tag2(t2),length(l),comm(c) {
+  AmpiMsg(int _s, int t, int s, int l, int c) : 
+    seq(_s), tag(t),src(s),length(l),comm(c) {
     data = (char *)this + sizeof(AmpiMsg);
   }
   static void *alloc(int msgnum, size_t size, int *sizes, int pbits) {
@@ -152,16 +153,17 @@ class AmpiMsg : public CMessage_AmpiMsg {
   static AmpiMsg *unpack(void *in) { return new (in) AmpiMsg; }
   static AmpiMsg* pup(PUP::er &p, AmpiMsg *m)
   {
-    int length, tag1, tag2, comm;
+    int seq, length, tag, src, comm;
     if(p.isPacking() || p.isSizing()) {
-      tag1 = m->tag1;
-      tag2 = m->tag2;
+      seq = m->seq;
+      tag = m->tag;
+      src = m->src;
       comm = m->comm;
       length = m->length;
     }
-    p(tag1); p(tag2); p(comm); p(length);
+    p(seq); p(tag); p(src); p(comm); p(length);
     if(p.isUnpacking()) {
-      m = new (&length, 0) AmpiMsg(tag1, tag2, length, comm);
+      m = new (&length, 0) AmpiMsg(seq, tag, src, length, comm);
     }
     p(m->data, length);
     if(p.isDeleting()) {
@@ -172,12 +174,52 @@ class AmpiMsg : public CMessage_AmpiMsg {
   }
 };
 
+class AmpiSeqQ : private CkNoncopyable {
+  int next;
+  CkQ<AmpiMsg*> q;
+ public:
+  AmpiSeqQ() { init(); }
+  void init(void) { next = 0; }
+  AmpiMsg *get(void)
+  {
+    if(q.isEmpty() || (q[0]->seq != next)) {
+      return 0;
+    }
+    next++;
+    return q.deq();
+  }
+  void put(int seq, AmpiMsg *elt)
+  {
+    int i, len;
+    len = q.length();
+    for(i=0;i<len;i++) {
+      if(q[i]->seq > seq)
+        break;
+    }
+    q.insert(i, elt);
+  }
+  void pup(PUP::er &p) {
+    p(next);
+    int len = q.length();
+    p(len);
+    for(int i=0;i<len;i++) {
+     if(p.isUnpacking())
+       q.enq(AmpiMsg::pup(p,0));
+     else
+       AmpiMsg::pup(p, q[i]);
+    }
+  }
+};
+
+PUPmarshall(AmpiSeqQ);
+
 class ampi : public ArrayElement1D {
 	//char str[128];    
     CProxy_TCharm threads;
     TCharm *thread;
     int ampiBlockedThread;
     void prepareCtv(void);
+    void inorder(AmpiMsg *msg);
   public: // entry methods
     ampi(int commidx_,CProxy_TCharm threads_);
     ampi(CkMigrateMessage *msg);
@@ -188,12 +230,12 @@ class ampi : public ArrayElement1D {
     void generic(AmpiMsg *);
     
   public: // to be used by MPI_* functions
-    void send(int t1, int t2, void* buf, int count, int type, int idx, int comm);
-    static void sendraw(int t1, int t2, void* buf, int len, CkArrayID aid, 
+    void send(int t, int s, void* buf, int count, int type, int idx, int comm);
+    static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, 
                         int idx);
-    void recv(int t1,int t2,void* buf,int count,int type,int comm,int *sts=0);
-    void probe(int t1,int t2,int comm,int *sts);
-    int iprobe(int t1,int t2,int comm,int *sts);
+    void recv(int t,int s,void* buf,int count,int type,int comm,int *sts=0);
+    void probe(int t,int s,int comm,int *sts);
+    int iprobe(int t,int s,int comm,int *sts);
     void barrier(void);
     void bcast(int root, void* buf, int count, int type);
     static void bcastraw(void* buf, int len, CkArrayID aid);
@@ -211,6 +253,8 @@ class ampi : public ArrayElement1D {
     int nirequests;
     int firstfree;
     DDT *myDDT ;
+    int *nextseq;
+    AmpiSeqQ *oorder;
 };
 
 //Use this to mark the start of AMPI interface routines:

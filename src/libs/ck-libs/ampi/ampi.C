@@ -85,7 +85,7 @@ ampiAllReduceHandler(void *arg, int dataSize, void *data)
     ampi::bcastraw(data, dataSize, commspec->aid);
   } else 
   { // reduce
-    ampi::sendraw(0, MPI_REDUCE_TAG, data, dataSize, commspec->aid, 
+    ampi::sendraw(MPI_REDUCE_TAG, 0, data, dataSize, commspec->aid, 
                   commspec->rspec.root);
   }
   commspec->rspec.type=-1;
@@ -182,6 +182,12 @@ ampi::ampi(int commidx_,CProxy_TCharm threads_)
     irequests[i].nextfree = (i+1)%100;
     irequests[i].prevfree = ((i-1)+100)%100;
   }
+  oorder = new AmpiSeqQ[numElements];
+  nextseq = new int[numElements];
+  for(i=0;i<numElements;i++) {
+    nextseq[i] = 0;
+    oorder[i].init();
+  }
   thread->ready();
 }
 ampi::ampi(CkMigrateMessage *msg)
@@ -210,42 +216,60 @@ ampi::~ampi()
 void
 ampi::generic(AmpiMsg* msg)
 {
-  int tags[3];
-  tags[0] = msg->tag1; tags[1] = msg->tag2; tags[2] = msg->comm;
-  CmmPut(msgs, 3, tags, msg);
+  if(msg->comm == MPI_COMM_WORLD && msg->tag <= MPI_TAG_UB) {
+    int src = msg->src;
+    oorder[src].put(msg->seq, msg);
+    while((msg=oorder[src].get())!=0) {
+      inorder(msg);
+    }
+  } else {
+    inorder(msg);
+  }
   if(ampiBlockedThread)
 	  thread->resume();
 }
 
+void
+ampi::inorder(AmpiMsg* msg)
+{
+  int tags[3];
+  tags[0] = msg->tag; tags[1] = msg->src; tags[2] = msg->comm;
+  CmmPut(msgs, 3, tags, msg);
+}
+
 void 
-ampi::send(int t1, int t2, void* buf, int count, int type,  int idx, int comm)
+ampi::send(int t, int s, void* buf, int count, int type,  int idx, int comm)
 {
   CkArrayID aid = thisArrayID;
   int mycomm = MPI_COMM_WORLD;
-  if(comm != MPI_COMM_WORLD)
-  {
+  int seq = -1;
+  if(comm != MPI_COMM_WORLD) {
     mycomm = MPI_COMM_UNIVERSE[commidx];
     aid = mpi_comms[comm-1].aid;
+  } else {
+    if(t <= MPI_TAG_UB) {
+      seq = nextseq[idx]++;
+    }
   }
   DDT_DataType *ddt = myDDT->getType(type);
   int len = ddt->getSize(count);
-  AmpiMsg *msg = new (&len, 0) AmpiMsg(t1, t2, len, mycomm);
+  AmpiMsg *msg = new (&len, 0) AmpiMsg(seq, t, s, len, mycomm);
   ddt->serialize((char*)buf, (char*)msg->data, count, 1);
   CProxy_ampi pa(aid);
   pa[idx].generic(msg);
 }
 
 void 
-ampi::sendraw(int t1, int t2, void* buf, int len, CkArrayID aid, int idx)
+ampi::sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx)
 {
-  AmpiMsg *msg = new (&len, 0) AmpiMsg(t1, t2, len, 0);
+  AmpiMsg *msg = new (&len, 0) AmpiMsg(-1, t, s, len, 0);
   memcpy(msg->data, buf, len);
   CProxy_ampi pa(aid);
   pa[idx].generic(msg);
 }
 
 void 
-ampi::recv(int t1, int t2, void* buf, int count, int type, int comm, int *sts)
+ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 {
   int tags[3];
   AmpiMsg *msg = 0;
@@ -253,7 +277,7 @@ ampi::recv(int t1, int t2, void* buf, int count, int type, int comm, int *sts)
   int len = ddt->getSize(count);
   ampiBlockedThread=1;
   while(1) {
-    tags[0] = t1; tags[1] = t2; tags[2] = comm;
+    tags[0] = t; tags[1] = s; tags[2] = comm;
     msg = (AmpiMsg *) CmmGet(msgs, 3, tags, sts);
     if (msg) break;
     thread->suspend();
@@ -271,12 +295,12 @@ ampi::recv(int t1, int t2, void* buf, int count, int type, int comm, int *sts)
 }
 
 void 
-ampi::probe(int t1, int t2, int comm, int *sts)
+ampi::probe(int t, int s, int comm, int *sts)
 {
   int tags[3];
   AmpiMsg *msg = 0;
   while(1) {
-    tags[0] = t1; tags[1] = t2; tags[2] = comm;
+    tags[0] = t; tags[1] = s; tags[2] = comm;
     msg = (AmpiMsg *) CmmProbe(msgs, 3, tags, sts);
     if (msg) break;
     thread->schedule();
@@ -286,11 +310,11 @@ ampi::probe(int t1, int t2, int comm, int *sts)
 }
 
 int 
-ampi::iprobe(int t1, int t2, int comm, int *sts)
+ampi::iprobe(int t, int s, int comm, int *sts)
 {
   int tags[3];
   AmpiMsg *msg = 0;
-  tags[0] = t1; tags[1] = t2; tags[2] = comm;
+  tags[0] = t; tags[1] = s; tags[2] = comm;
   msg = (AmpiMsg *) CmmProbe(msgs, 3, tags, sts);
   if (msg) {
     if(sts)
@@ -331,7 +355,7 @@ ampi::bcast(int root, void* buf, int count, int type)
 void
 ampi::bcastraw(void* buf, int len, CkArrayID aid)
 {
-  AmpiMsg *msg = new (&len, 0) AmpiMsg(0, MPI_BCAST_TAG, len, 0);
+  AmpiMsg *msg = new (&len, 0) AmpiMsg(-1, MPI_BCAST_TAG, 0, len, 0);
   memcpy(msg->data, buf, len);
   CProxy_ampi pa(aid);
   pa.generic(msg);
@@ -392,8 +416,16 @@ void ampi::pup(PUP::er &p)
       irequests[i].nextfree = (i+1)%100;
       irequests[i].prevfree = ((i-1)+100)%100;
     }
+    oorder = new AmpiSeqQ[numElements];
+    nextseq = new int[numElements];
   }
+  for(int i=0; i<numElements; i++)
+    p | oorder[i];
+  p(nextseq, numElements);
   myDDT->pup(p);
+  if(p.isDeleting())
+    delete[] oorder;
+    delete[] nextseq;
 }
 
 //------------------ External Interface -----------------
@@ -593,7 +625,7 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   int size = ptr->myDDT->getType(type)->getSize(count) ;
   ptr->contribute(size, inbuf, mytype);
   if (ptr->thisIndex == root)
-    ptr->recv(0, MPI_REDUCE_TAG, outbuf, count, type, comm);
+    ptr->recv(MPI_REDUCE_TAG, 0, outbuf, count, type, comm);
   return 0;
 }
 
@@ -614,7 +646,7 @@ int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   CkReduction::reducerType mytype = getReductionType(type,op);
   int size = ptr->myDDT->getType(type)->getSize(count) ;
   ptr->contribute(size, inbuf, mytype);
-  ptr->recv(0, MPI_BCAST_TAG, outbuf, count, type, comm);
+  ptr->recv(MPI_BCAST_TAG, 0, outbuf, count, type, comm);
   return 0;
 }
 
