@@ -698,6 +698,7 @@ int ImageData::CopyImageData (byte* dest,
 byte* ImageData::ConstructImage (byte* src,
 				                 liveVizRequest& req)
 {
+    int i;
     int numDataLines = 0;
     int headPos      = 0;
     int dataPos      = 0;
@@ -728,7 +729,7 @@ byte* ImageData::ConstructImage (byte* src,
 
     head = (Header*) (src + headPos);
 
-    for (int i=0; i<numDataLines; i++)
+    for (i=0; i<numDataLines; i++)
     {
         numBytesToCopy = head->m_size*m_bytesPerPixel;
         imagePos = head->m_pos*m_bytesPerPixel;
