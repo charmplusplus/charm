@@ -25,6 +25,14 @@
 #define	MAX_TYPES	100	
 #define NULL		0
 
+#define	DDT_TYPE_NULL	-1
+#define DDT_PRIMITIVE	14
+#define DDT_CONTIGUOUS	15
+#define	DDT_VECTOR		16
+#define	DDT_HVECTOR		17
+#define	DDT_INDEXED		18
+#define	DDT_HINDEXED	19
+#define	DDT_STRUCT		20
 typedef int DDT_Type ;
 class DDT ;
 
@@ -77,6 +85,7 @@ class DDT_DataType {
 		virtual int getExtent();
 		virtual void inrRefCount() ;
 		virtual int getRefCount() ;
+		virtual	void pup(PUP::er  &p) ;
 
 		virtual int copyBuffer(char* oldBuffer, char* NewBuffer);
 };
@@ -93,10 +102,12 @@ class DDT_Contiguous : public DDT_DataType {
 	DDT_DataType* baseType ;
 
 	public:
+	DDT_Contiguous();
 	DDT_Contiguous(int count, DDT_DataType* oldType);
 	DDT_Contiguous(const DDT_Contiguous& obj) ;
 	DDT_Contiguous& operator=(const DDT_Contiguous& obj);
 	virtual int copyBuffer(char* oldBuffer, char* NewBuffer);
+	virtual	void pup(PUP::er  &p) ;
 };
 
 /*
@@ -124,6 +135,7 @@ class DDT_Vector : public DDT_DataType {
 		DDT_Vector() { } ;
 		~DDT_Vector() { } ;
 		virtual int copyBuffer(char* oldBuffer, char* NewBuffer);
+		virtual	void pup(PUP::er  &p) ;
 };
 
 /*
@@ -139,11 +151,13 @@ class DDT_Vector : public DDT_DataType {
 class DDT_HVector : public DDT_Vector {
 
 	public:
+		DDT_HVector() ;
 		DDT_HVector(int nCount, int blength, int strideLength, DDT_DataType* type);
 		~DDT_HVector() { } ;
 		DDT_HVector(const DDT_HVector& obj) ;
 		DDT_HVector& operator=(const DDT_HVector& obj);
 		virtual int copyBuffer(char* oldBuffer, char* NewBuffer);
+		virtual void pup(PUP::er &p);
 };
 
 /*
@@ -174,6 +188,7 @@ class DDT_Indexed : public DDT_DataType {
 		~DDT_Indexed() ;
 
 		virtual int copyBuffer(char* oldBuffer, char* newBuffer);
+		virtual	void pup(PUP::er  &p) ;
 
 };
 
@@ -190,12 +205,13 @@ class DDT_Indexed : public DDT_DataType {
 class DDT_HIndexed : public DDT_Indexed {
 
 	public:
-
+		DDT_HIndexed();
 		DDT_HIndexed(int count, int* arrBlock, int* arrDisp, DDT_DataType* type);
 		DDT_HIndexed(const DDT_HIndexed& obj);
 		DDT_HIndexed& operator=(const DDT_HIndexed& obj) ;
 
 		virtual int copyBuffer(char* oldBuffer, char* newBuffer);
+		virtual void pup(PUP::er &p);
 };
 
 /*
@@ -213,17 +229,17 @@ class DDT_Struct : public DDT_DataType {
 	protected:
 		int* arrayBlockLength ;
 		int* arrayDisplacements ;
-		DDT_DataType* arrayDataType ;
-		int* baseSize ;
-		int* baseExtent ;
+		int* types;
+		DDT_DataType* arrayDataType[MAX_TYPES] ; 
 
 	public:
-
+		DDT_Struct();
 		DDT_Struct(DDT* ddt,int count, int* arrBlock, int* arrDisp, DDT_Type* type);
 		DDT_Struct(const DDT_Struct& obj);
 		DDT_Struct& operator=(const DDT_Struct& obj) ;
 
 		virtual int copyBuffer(char* oldBuffer, char* newBuffer);
+		virtual	void pup(PUP::er  &p) ;
 };
 
 /*
@@ -244,8 +260,9 @@ class DDT_Struct : public DDT_DataType {
 class DDT {
 	private:
 		DDT_DataType*  typeTable[MAX_TYPES] ;
+		int	types[MAX_TYPES] ; //used for pup
 		int currentIndex ;
-		int	nextFreeIndex ;	
+		int	nextFreeIndex ;
 
 	public:
 
@@ -266,6 +283,8 @@ class DDT {
 		typeTable[12] = new DDT_DataType(DDT_UNSIGNED);
 		typeTable[13] = new DDT_DataType(DDT_UNSIGNED_SHORT);
 		typeTable[14] = new DDT_DataType(DDT_LONG_DOUBLE);
+		for(int i = 0 ; i < 15; i++)
+			types[i] = DDT_PRIMITIVE ;
 		currentIndex = 14 ;
 		nextFreeIndex = 15 ;
 	}

@@ -1,4 +1,4 @@
-#include "ddt.h"
+#include "datatype.h"
 
 extern DDT	ddt ;
 
@@ -39,16 +39,50 @@ void DDT::pup(PUP::er	&p)
 {
 	p(currentIndex);
 	p(nextFreeIndex);
+	p(types,MAX_TYPES);
 
-	//Packing
-	if(p.isPacking())
-	{
-	}
 	//unPacking
-	else if(p.isUnpacking())
+	if(p.isUnpacking())
 	{
+		for(int i = 0 ; i < MAX_TYPES; i++)
+		{
+			switch(types[i])
+			{
+				case DDT_PRIMITIVE:
+					typeTable[i] = new DDT_DataType ;
+					break ;
+				case DDT_CONTIGUOUS:
+					typeTable[i] = new DDT_Contiguous ;
+					break ;
+				case DDT_VECTOR:
+					typeTable[i] = new DDT_Vector ;
+					break ;
+				case DDT_HVECTOR:
+					typeTable[i] = new DDT_HVector ;
+					break ;
+				case DDT_INDEXED:
+					typeTable[i] = new DDT_Indexed ;
+					break ;
+				case DDT_HINDEXED:
+					typeTable[i] = new DDT_HIndexed ;
+					break ;
+				case DDT_STRUCT:
+					typeTable[i] = new DDT_Struct ;
+					break ;
+				default:
+					//Not a defined type.
+					break ;
+			}
+		} //End of for loop
+	} //end if p.Unpacking()
+
+	for(int i = 0 ; i < MAX_TYPES ; i++)
+	{
+		if(types[i] != DDT_TYPE_NULL)
+			typeTable[i]->pup(p);
 	}
 }
+
 int	DDT::getNextFreeIndex()
 {
 	bool	indexFound = false ;
@@ -76,6 +110,7 @@ int	DDT::getNextFreeIndex()
 inline	void DDT::freeType(int* index)
 {
 	typeTable[*index] = NULL ;
+	types[*index] = DDT_TYPE_NULL ;
 	*index = -1 ;
 }
 
@@ -89,6 +124,7 @@ int DDT::Type_Contiguous(int count, DDT_Type oldType, DDT_Type *newType)
 	int index = *newType =  getNextFreeIndex() ;
 	DDT_DataType *type  = new DDT_Contiguous(count, typeTable[oldType]);
 	typeTable[index] = type ;
+	types[index] = DDT_CONTIGUOUS ;
 	currentIndex = index ;
 	return 0 ;
 }
@@ -99,6 +135,7 @@ int DDT::Type_Vector(int count, int blocklength, int stride, DDT_Type oldType, D
 	DDT_DataType* type =   new DDT_Vector(count, blocklength, stride, typeTable[oldType]);
 
 	typeTable[index] = type ;
+	types[index] = DDT_VECTOR ;
 	currentIndex = index ;
 	return 0 ;
 }
@@ -109,6 +146,7 @@ int DDT::Type_HVector(int count, int blocklength, int stride, DDT_Type oldtype, 
 	DDT_DataType* type =  new DDT_HVector(count, blocklength, stride, typeTable[oldtype]);
 
 	typeTable[index] = type ;
+	types[index] = DDT_HVECTOR ;
 	currentIndex = index ;
 	return 0 ;
 }
@@ -120,6 +158,7 @@ int DDT::Type_Indexed(int count, int* arrbLength, int* arrDisp, DDT_Type oldtype
 	DDT_DataType* type =  new DDT_Indexed(count, arrbLength, arrDisp, typeTable[oldtype]);
 
 	typeTable[index] = type ;
+	types[index] = DDT_INDEXED ;
 	currentIndex = index ;
 	return 0 ;
 }
@@ -131,6 +170,7 @@ int DDT::Type_HIndexed(int count, int* arrbLength, int* arrDisp, DDT_Type oldtyp
 	DDT_DataType* type =  new DDT_HIndexed(count, arrbLength, arrDisp, typeTable[oldtype]);
 
 	typeTable[index] = type ;
+	types[index] = DDT_HINDEXED ;
 	currentIndex = index ;
 	return 0 ;
 }
@@ -141,6 +181,7 @@ int DDT::Type_Struct(int count, int* arrbLength, int* arrDisp, DDT_Type* oldtype
 	DDT_DataType* type =  new DDT_Struct(this, count, arrbLength, arrDisp, oldtype);
 
 	typeTable[index] = type ;
+	types[index] = DDT_STRUCT ;
 	currentIndex = index ;
 	return 0 ;
 }
@@ -252,6 +293,17 @@ int DDT_DataType::getRefCount()
 	return refCount ;
 }
 
+void DDT_DataType::pup(PUP::er  &p)
+{
+	p(datatype);
+	p(refCount);
+	p(size);
+	p(extent);
+	p(count);
+	p(baseSize);
+	p(baseExtent);
+}
+
 DDT_Contiguous::DDT_Contiguous(int nCount, DDT_DataType* oldType)
 {
 	count = nCount ;
@@ -310,6 +362,17 @@ int DDT_Contiguous::copyBuffer(char* oldBuffer, char* newBuffer)
 	return bytesCopied ;
 }
 
+void DDT_Contiguous::pup(PUP::er &p)
+{
+	p(size);
+	p(extent);
+	p(count);
+	p(baseSize);
+	p(baseExtent);
+
+	baseType->pup(p);
+}
+
 DDT_Vector::DDT_Vector(int nCount, int blength, int stride, DDT_DataType* type)
 {
 	count = nCount ;
@@ -348,6 +411,19 @@ int DDT_Vector::copyBuffer(char* oldBuffer, char* newBuffer)
 
 	if(0) printf("DDT_Vector::copyBuffer , bytesCopied = %d\n", bytesCopied);
 	return bytesCopied ;
+}
+
+void DDT_Vector::pup(PUP::er &p)
+{	
+	p(size);
+	p(extent);
+	p(count);
+	p(baseSize);
+	p(baseExtent);
+	p(blockLength);
+	p(strideLength);
+
+	baseType->pup(p);
 }
 
 DDT_HVector::DDT_HVector(int nCount, int blength, int stride, DDT_DataType* type)
@@ -394,6 +470,10 @@ int DDT_HVector::copyBuffer(char* oldBuffer, char* newBuffer)
 	return bytesCopied ;
 }
 
+void DDT_HVector::pup(PUP::er &p)
+{	
+	DDT_Vector::pup(p);
+}
 
 DDT_Indexed::DDT_Indexed(int nCount, int* arrBlock, int* arrDisp, DDT_DataType* base)
 {
@@ -447,6 +527,23 @@ DDT_Indexed::~DDT_Indexed()
 	delete [] arrayDisplacements ;
 }
 
+void DDT_Indexed::pup(PUP::er &p)
+{
+	p(size);
+	p(extent);
+	p(count);
+	p(baseSize);
+	p(baseExtent);
+
+	if(p.isUnpacking() )	arrayBlockLength = new int[count] ;
+	p(arrayBlockLength, count);
+
+	if(p.isUnpacking() )	arrayDisplacements = new int[count] ;
+	p(arrayDisplacements, count);
+
+	baseType->pup(p);
+}
+
 DDT_HIndexed::DDT_HIndexed(int nCount, int* arrBlock, int* arrDisp, DDT_DataType* base)
 {
 	count = nCount ;
@@ -492,6 +589,11 @@ int DDT_HIndexed::copyBuffer(char* oldBuffer, char* newBuffer)
 	return bytesCopied ;
 }
 
+void DDT_HIndexed::pup(PUP::er &p)
+{
+	DDT_Indexed::pup(p);
+}
+
 DDT_Struct::DDT_Struct(DDT* ddt, int nCount, int* arrBlock, int* arrDisp, DDT_Type* arrBase)
 {
 	int basesize ;
@@ -501,15 +603,16 @@ DDT_Struct::DDT_Struct(DDT* ddt, int nCount, int* arrBlock, int* arrDisp, DDT_Ty
 
 	arrayBlockLength = new int[count] ;
 	arrayDisplacements = new int[count] ;
-	arrayDataType = new DDT_DataType[count] ;
+	//check this...
 
 	for(int i = 0 ; i < count ; i++)
 	{
 		arrayBlockLength[i] = arrBlock[i] ;
 		arrayDisplacements[i] = arrDisp[i] ;
-		arrayDataType[i] =  *( ddt->getType(arrBase[i]));
-		basesize = arrayDataType[i].getSize();
-		baseextent = arrayDataType[i].getExtent();
+
+		arrayDataType[i] =  ddt->getType(arrBase[i]); 
+		basesize = arrayDataType[i]->getSize();
+		baseextent = arrayDataType[i]->getExtent();
 
 		size = size + ( arrBlock[i] * basesize) ;
 		extent = extent + ( (arrBlock[i] * baseextent) + (arrayDisplacements[i] * baseextent) );
@@ -527,9 +630,9 @@ int DDT_Struct::copyBuffer(char* oldBuffer, char* newBuffer)
 		oldBuffer = tempOldBuffer + arrayDisplacements[i] ;
 		for(int j = 0 ; j < arrayBlockLength[i] ; j++)
 		{
-			bytesCopied += arrayDataType[i].copyBuffer(oldBuffer, newBuffer);
-			newBuffer += arrayDataType[i].getSize();
-			oldBuffer += arrayDataType[i].getExtent();
+			bytesCopied += arrayDataType[i]->copyBuffer(oldBuffer, newBuffer);
+			newBuffer += arrayDataType[i]->getSize();
+			oldBuffer += arrayDataType[i]->getExtent();
 		}
 	}
 	oldBuffer = tempOldBuffer ;
@@ -539,3 +642,59 @@ int DDT_Struct::copyBuffer(char* oldBuffer, char* newBuffer)
 	return bytesCopied ;
 }
 
+void DDT_Struct::pup(PUP::er &p)
+{
+	p(size);
+	p(extent);
+	p(count);
+
+	if(p.isUnpacking() )	arrayBlockLength = new int[count] ;
+	p(arrayBlockLength, count);
+
+	if(p.isUnpacking() )	arrayDisplacements = new int[count] ;
+	p(arrayDisplacements, count);
+	
+	if(p.isUnpacking())
+		types = new int[count] ;
+	p(types, count);
+
+	if(p.isUnpacking())
+	{
+		for(int i = 0 ; i < count; i++)
+		{
+			switch(types[i])
+			{
+				case DDT_PRIMITIVE:
+					arrayDataType[i] = new DDT_DataType ;
+					break ;
+				case DDT_CONTIGUOUS:
+					arrayDataType[i] = new DDT_Contiguous ;
+					break ;
+				case DDT_VECTOR:
+					arrayDataType[i] = new DDT_Vector ;
+					break ;
+				case DDT_HVECTOR:
+					arrayDataType[i] = new DDT_HVector ;
+					break ;
+				case DDT_INDEXED:
+					arrayDataType[i] = new DDT_Indexed ;
+					break ;
+				case DDT_HINDEXED:
+					arrayDataType[i] = new DDT_HIndexed ;
+					break ;
+				case DDT_STRUCT:
+					arrayDataType[i] = new DDT_Struct ;
+					break ;
+				default:
+					//Not a defined type.
+					break ;
+			}
+		} //End of for loop
+	} //end if p.Unpacking()
+
+	for(int i = 0 ; i < count ; i++)
+	{
+		if(types[i] != DDT_TYPE_NULL)
+			arrayDataType[i]->pup(p);
+	}
+}
