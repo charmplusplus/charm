@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.11  1996-11-23 02:25:38  milind
+ * Revision 1.12  1997-01-15 16:17:48  milind
+ * Changed CmiAlloc interrupt-safe for HP machines.
+ *
+ * Revision 1.11  1996/11/23 02:25:38  milind
  * Fixed several subtle bugs in the converse runtime for convex
  * exemplar.
  *
@@ -81,8 +84,8 @@
 #define CMK_MACHINE_NAME                                   "net-hp-cc"
 
 #define CMK_MALLOC_USE_GNU                                 0
-#define CMK_MALLOC_USE_GNU_WITH_INTERRUPT_SUPPORT          1
-#define CMK_MALLOC_USE_OS_BUILTIN                          0
+#define CMK_MALLOC_USE_GNU_WITH_INTERRUPT_SUPPORT          0
+#define CMK_MALLOC_USE_OS_BUILTIN                          1
 
 #define CMK_MSG_HEADER_SIZE_BYTES                          4
 
