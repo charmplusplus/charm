@@ -489,6 +489,7 @@ void _initCharm(int argc, char **argv)
 		_nodeLock = CmiCreateLock();
 		_nodeGroupTable = new GroupTable();
 		_MEMCHECK(_nodeGroupTable);
+		_nodeGroupTable->init();
 		_nodeBocInitVec = new PtrVec();
 		_MEMCHECK(_nodeBocInitVec);
 	}
@@ -625,8 +626,6 @@ void GroupTable::enqmsg(CkGroupID n, void *msg)
 void GroupTable::add(CkGroupID n, void *obj)
 {
 	tab[n].obj=obj;
-	if (tab[n].pending==NULL)
-		tab[n].pending=new PtrQ();
 }
 
 
