@@ -42,6 +42,7 @@ init(void)
   double noData[(dim+1)*(dim+1)*tsteps];
 
   int nelems=dim*dim, nnodes=(dim+1)*(dim+1);
+  for (int e=0;e<nelems;e++) elements[e]=0.3;
 
   //Describe the nodes and elements
   FEM_Set_Node(nnodes,tsteps);
@@ -91,15 +92,46 @@ init(void)
 	reduceValues[t]=reduceSum;
   }
   FEM_Set_Node_Data(noData);
+
+//Set up ghost layers:
+  if (0) 
+  { /*Match across single nodes*/
+     static const int quad2node[]={0,1,2,3};
+     FEM_Add_Ghost_Layer(1,1);
+     FEM_Add_Ghost_Elem(0,4,quad2node);
+  } else if (1) 
+  { /*Match edges*/
+     static const int quad2edge[]= {0,1,  1,2,  2,3,  3,0};
+     FEM_Add_Ghost_Layer(2,1);
+     FEM_Add_Ghost_Elem(0,4,quad2edge);
+/*Add a second layer
+     FEM_Add_Ghost_Layer(2,0);
+     FEM_Add_Ghost_Elem(0,4,quad2edge);
+*/
+  }
+
 }
 
 typedef struct _node {
   double val;
+  unsigned char pad;
 } Node;
 
 typedef struct _element {
+  short pad;
   double val;
 } Element;
+
+void testEqual(double is,double shouldBe,const char *what) {
+	if (fabs(is-shouldBe)<0.000001) {
+		//CkPrintf("[chunk %d] %s test passed.\n",FEM_My_Partition(),what);
+	} 
+	else {/*test failed*/
+		CkPrintf("[chunk %d] %s test FAILED-- expected %f, got %f (pe %d)\n",
+                        FEM_My_Partition(),what,shouldBe,is,CkMyPe());
+		CkAbort("FEM Test failed\n");
+	}
+}
 
 void testAssert(int shouldBe,const char *what) {
 	if (shouldBe)
@@ -116,6 +148,7 @@ extern "C" void
 driver(void)
 {
   int nnodes,nelems,nnodeData,nelemData,np;
+  int ngnodes, ngelems; //Counts including ghosts
 
   FEM_Print("Starting driver...");
 
@@ -130,20 +163,47 @@ driver(void)
   FEM_Get_Elem_Data(0,elData);
 
   int myId = FEM_My_Partition();
-  //FEM_Print_Partition();
+  FEM_Print_Partition();
   Node *nodes = new Node[nnodes];
   Element *elements = new Element[nelems];
+  int fid = FEM_Create_Field(FEM_DOUBLE, 1, 
+	(char *)(&nodes[0].val)-(char *)nodes, sizeof(Node));
+  int efid = FEM_Create_Field(FEM_DOUBLE, 1, 
+	(char *)(&elements[0].val)-(char *)elements, sizeof(Element));
   int i;
 
 //Set initial conditions
   for(i=0;i<nnodes;i++) {
     nodes[i].val = 0;
+    nodes[i].pad=123;
   }
-  for(i=0;i<nelems;i++) { elements[i].val = elData[i]; }
-  int fid = FEM_Create_Field(FEM_DOUBLE, 1, 0, sizeof(Node));
+  for(i=0;i<nelems;i++) { 
+    elements[i].val = elData[i]; 
+    elements[i].pad=123;
+  }
+
+//Clip off ghost nodes/elements
+  ngnodes=nnodes; ngelems=nelems;
+  nnodes=FEM_Get_Node_Ghost();
+  nelems=FEM_Get_Elem_Ghost(0);
+
+//Update ghost field test
+  for (i=nelems;i<ngelems;i++) {elements[i].val=-1.0;}
+  FEM_Update_Ghost_Field(efid,0,elements);
+  for (i=0;i<ngelems;i++)
+	  testEqual(elements[i].pad,123,"update element ghost field pad");
+  for (i=0;i<ngelems;i++)
+	  testEqual(elements[i].val,elData[i],"update element ghost field test");
 
 //Test readonly global
-  testAssert(tsteps==nnodeData,"readonly");
+  testEqual(tsteps,nnodeData,"readonly");
+
+//Test barrier
+  FEM_Print("Going to barrier");
+  FEM_Barrier();
+  FEM_Print("Back from barrier");
+
+  int *elList=new int[ngelems];
 
 //Time loop
   for (int t=0;t<tsteps;t++)
@@ -168,15 +228,44 @@ driver(void)
     }
 
 	//Check the update
-    int failed = 0;
     for(i=0;i<nnodes;i++)
-        if(nodes[i].val != nodeData[nnodeData*i+t]) 
-			 failed = 1;
-    testAssert(!failed,"update_field");
+        testEqual(nodes[i].val,nodeData[nnodeData*i+t], "update_field");
 
     double sum = 0.0;
     FEM_Reduce_Field(fid, nodes, &sum, FEM_SUM);
-    testAssert(sum==reduceValues[t],"reduce_field");
+    testEqual(sum,reduceValues[t],"reduce_field");
+
+    //Communicate our ghost elements:
+    FEM_Update_Ghost_Field(efid,0,elements);
+
+    //Communicate our ghost nodes:
+    FEM_Update_Ghost_Field(fid,-1,nodes);
+    for(i=nnodes;i<ngnodes;i++)
+        testEqual(nodes[i].val,nodeData[nnodeData*i+t],
+	   "update_ghost_node_field");
+
+
+    //Make a list of elements with large values
+    int elListLen=0;
+    double thresh=2.0;
+    for (i=0;i<nelems;i++) 
+	    if (elements[i].val>thresh)
+		    elList[elListLen++]=i;
+    //Get a list of ghost elements with large values
+    FEM_Barrier();
+    FEM_Exchange_Ghost_Lists(0,elListLen,elList);
+    elListLen=FEM_Get_Ghost_List_Length();
+    FEM_Print("GHOSTHANG> In");
+    FEM_Get_Ghost_List(elList);
+    FEM_Print("GHOSTHANG>     Back");
+    CkPrintf("[%d] My ghost list has %d entries\n",myId,elListLen);
+    //Make sure everything on the list are actually ghosts and
+    // actually have large values
+    for (i=0;i<elListLen;i++) {
+	    testAssert(elList[i]<ngelems,"Ghost list ghost test (upper)");
+	    testAssert(elList[i]>=nelems,"Ghost list ghost test (lower)");
+	    testAssert(elements[elList[i]].val>thresh,"Ghost list contents test");
+    }
 
     FEM_Set_Node(nnodes,1);
     FEM_Set_Node_Data((double *)nodes);
@@ -185,7 +274,8 @@ driver(void)
 
   double localSum = 1.0,globalSum;
   FEM_Reduce(fid, &localSum, &globalSum, FEM_SUM);
-  testAssert(globalSum==(double)FEM_Num_Partitions(),"reduce");
+  testEqual(globalSum,(double)FEM_Num_Partitions(),"reduce");
+  FEM_Print("All tests passed.\n");
 
   FEM_Done();
 }
