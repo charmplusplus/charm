@@ -4,6 +4,7 @@
  */
 #include "collision.h"
 #include "threadCollide.h"
+#include "collide.h"
 
 #if 1
 //copious annoying debugging output
