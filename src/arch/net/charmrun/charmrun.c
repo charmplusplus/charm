@@ -71,18 +71,6 @@
 
 #define DEBUGF(x) /*printf x*/
 
-#if CMK_WAIT_USES_WAITFLAGS_H
-#include <waitflags.h>
-#endif
-#if CMK_WAIT_USES_SYS_WAIT_H
-#include <sys/wait.h>
-#endif
-
-#if CMK_STRERROR_USE_SYS_ERRLIST
-extern char *sys_errlist[];
-#define strerror(i) (sys_errlist[i])
-#endif
-
 #ifndef MAXPATHLEN
 #define MAXPATHLEN 1024
 #endif
