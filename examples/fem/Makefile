@@ -1,5 +1,4 @@
-DIRS=simple2D matrix
-#broken crack2D
+DIRS=simple2D matrix crack2D
 
 test:
 	for d in $(DIRS); do \
