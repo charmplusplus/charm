@@ -424,8 +424,7 @@ void pparam_printdocs()
       if (len>maxdoc) maxdoc=len;
     }
   fprintf(stderr,"\n");
-  fprintf(stderr,"The parameters Charmrun recognizes are:\n");
-  fprintf(stderr,"\n");
+  fprintf(stderr,"Charmrun Command-line Parameters:\n");
   for (def=ppdefs; def; def=def->next)
     {
       fprintf(stderr,"  %c%c%-*s ",pparam_optc,pparam_optc,maxname,def->lname);
@@ -597,7 +596,7 @@ void arg_init(int argc, char **argv)
 {
   static char buf[1024];
   
-  int local_def=0;
+  int i, local_def=0;
 #if CMK_CHARMRUN_LOCAL
   local_def=1; /*++local is the default*/
 #endif
@@ -635,10 +634,17 @@ void arg_init(int argc, char **argv)
     pparam_printdocs();
     exit(1);
   }
-
+  
+  /* Check for (but do *not* remove) the "-?", "-h", or "--help" flags */
+  for (i=0;argv[i];i++) {
+  	if (0==strcmp(argv[i],"-?") ||
+	    0==strcmp(argv[i],"-h") ||
+	    0==strcmp(argv[i],"--help")) 
+		arg_help=1;
+  }
   if (arg_help) {
     pparam_printdocs();
-    exit(0);
+    /*exit(0);*/
   }
 
   arg_argv = argv+1; /*Skip over charmrun (0) here and program name (1) later*/
