@@ -131,7 +131,7 @@ void _qdHandler(envelope *env)
 }
 
 extern "C"
-void CkStartQD(int eIdx, CkChareID *cid)
+void CkStartQD(int eIdx, const CkChareID *cid)
 {
   register QdMsg *msg = (QdMsg*) CkAllocMsg(0,sizeof(QdMsg),0);
   msg->setPhase(0);
