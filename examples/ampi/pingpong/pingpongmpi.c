@@ -16,8 +16,8 @@ int main(int argc, char **argv)
   char* message_s, *message_r;	/* storage for the message */
   int i, max_msgs, msg_size;
   MPI_Status status;	/* return status for receive */
-  float elapsed_time_sec;
-  float bandwidth;
+  double elapsed_time_sec;
+  double bandwidth;
 
   double startTime = 0;
   
