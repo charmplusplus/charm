@@ -3,6 +3,8 @@ Charm++ File: Checkpoint Library
 added 01/03/2003 by Chao Huang, chuang10@uiuc.edu
 
 More documentation goes here...
+--- Updated 12/14/2003 by Gengbin, gzheng@uiuc.edu
+    see ckcheckpoint.h for change log
 */
 
 #include <stdio.h>
@@ -20,7 +22,7 @@ More documentation goes here...
 
 CkGroupID _sysChkptMgr;
 
-// helper class to pup all elements that belong to same ckLocMgr
+// help class to find how many array elements
 class ElementCounter : public CkLocIterator {
 private:
 	int count;
@@ -39,11 +41,11 @@ public:
         ElementCheckpointer(CkLocMgr* mgr_, PUP::er &p_):locMgr(mgr_),p(p_){};
         void addLocation(CkLocation &loc) {
                 CkArrayIndexMax idx=loc.getIndex();
-		//CkPrintf("[%d] addLocation: ", CkMyPe()), idx.print();
 		CkGroupID gID = locMgr->ckGetGroupID();
-		p|gID;
+		p|gID;	    // store loc mgr's GID as well for easier restore
                 p|idx;
 	        p|loc;
+		//CkPrintf("[%d] addLocation: ", CkMyPe()), idx.print();
         }
 };
 
@@ -63,6 +65,7 @@ static void bdcastRO(void){
 	env->setSrcPe(CkMyPe());
 	CmiSetHandler(env, _roHandlerIdx);
 	CmiSyncBroadcastAndFree(env->getTotalsize(), (char *)env);
+	// since _roHandler calls process()
 	CpvAccess(_qd)->create(CkNumPes()-1);
 }
 
@@ -78,9 +81,6 @@ void printIndex(const CkArrayIndex &idx,char *dest) {
 
 void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	//DEBCHK("[%d]CkCheckpointMgr::Checkpoint called dirname={%s}\n",CkMyPe(),dirname);
-	IrrGroup* obj;
-	int numGroups = CkpvAccess(_groupIDTable)->size();
-
 	char fileName[1024];
 	sprintf(fileName,"%s/arr_%d.dat",dirname, CkMyPe());
 	FILE *datFile=fopen(fileName,"wb");
@@ -92,7 +92,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	restartCB = cb;
 	DEBCHK("[%d]restartCB installed\n",CkMyPe());
 	CkCallback localcb(CkIndex_CkCheckpointMgr::SendRestartCB(NULL),thisgroup);
-	contribute(sizeof(int),&numGroups,CkReduction::sum_int,localcb);
+	contribute(0,NULL,CkReduction::sum_int,localcb);
 }
 
 void CkCheckpointMgr::SendRestartCB(CkReductionMsg *m){ 
@@ -138,7 +138,7 @@ void CkPupMainChareData(PUP::er &p)
 		}
 	}
 	// to update mainchare proxy
-	// only readonly variables of Chare Proxy is taken care of here
+	// only readonly variables of Chare Proxy is taken care of here;
 	// in general, if chare proxy is contained in some data structure
 	// for example CkCallback, it is user's responsibility to
 	// update them after restarting
@@ -156,7 +156,10 @@ void CkPupGroupData(PUP::er &p)
 	}
 	p|numGroups;
 	if (p.isUnpacking()) {
-	  if(CkMyPe()==0) { CkpvAccess(_numGroups) = numGroups+1; }else{ CkpvAccess(_numGroups) = 1; }
+	  if(CkMyPe()==0)  
+            CkpvAccess(_numGroups) = numGroups+1; 
+          else 
+	    CkpvAccess(_numGroups) = 1;
 	}
 	DEBCHK("[%d] CkPupGroupData %s: numGroups = %d\n", CkMyPe(),p.typeString(),numGroups);
 
@@ -175,8 +178,7 @@ void CkPupGroupData(PUP::er &p)
 
 		if(tmpInfo[i].useDefCtor==0 && tmpInfo[i].MigCtor==-1) {
 			char buf[512];
-			sprintf(buf,"Group %s needs a migration constructor and PUP'er routine for restart.\n",
-				     tmpInfo[i].name);
+			sprintf(buf,"Group %s needs a migration constructor and PUP'er routine for restart.\n", tmpInfo[i].name);
 			CkAbort(buf);
 		}
 	  }
@@ -221,13 +223,13 @@ void CkPupNodeGroupData(PUP::er &p)
 	}
 	DEBCHK("[%d] CkPupNodeGroupData %s: numNodeGroups = %d\n",CkMyPe(),p.typeString(),numNodeGroups);
 
-	GroupInfo *tmpInfo2 = new GroupInfo [numNodeGroups];
+	GroupInfo *tmpInfo = new GroupInfo [numNodeGroups];
 	if (!p.isUnpacking()) {
 	  for(i=0;i<numNodeGroups;i++) {
-		tmpInfo2[i].gID = CksvAccess(_nodeGroupIDTable)[i];
-		TableEntry ent2 = CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID);
-		tmpInfo2[i].MigCtor = _chareTable[ent2.getcIdx()]->migCtor;
-		if(tmpInfo2[i].MigCtor==-1) {
+		tmpInfo[i].gID = CksvAccess(_nodeGroupIDTable)[i];
+		TableEntry ent2 = CksvAccess(_nodeGroupTable)->find(tmpInfo[i].gID);
+		tmpInfo[i].MigCtor = _chareTable[ent2.getcIdx()]->migCtor;
+		if(tmpInfo[i].MigCtor==-1) {
 			char buf[512];
 			sprintf(buf,"NodeGroup %s either need a migration constructor and\n\
 				     declared as [migratable] in .ci to be able to checkpoint.",\
@@ -236,38 +238,48 @@ void CkPupNodeGroupData(PUP::er &p)
 		}
 	  }
 	}
-	for (i=0; i<numNodeGroups; i++) p|tmpInfo2[i];
-	for(i=0;i<numNodeGroups;i++) {
-		CkGroupID gID = tmpInfo2[i].gID;
+	for (i=0; i<numNodeGroups; i++) p|tmpInfo[i];
+	for (i=0;i<numNodeGroups;i++) {
+		CkGroupID gID = tmpInfo[i].gID;
 		if (p.isUnpacking()) {
 			CksvAccess(_nodeGroupIDTable).push_back(gID);
-			int eIdx = tmpInfo2[i].MigCtor;
+			int eIdx = tmpInfo[i].MigCtor;
 			void *m = CkAllocSysMsg();
 			envelope* env = UsrToEnv((CkMessage *)m);
 			CkCreateLocalNodeGroup(gID, eIdx, env);
 		}
 		TableEntry ent2 = CksvAccess(_nodeGroupTable)->find(gID);
-		ent2.getObj()->pup(p);
+		IrrGroup *obj = ent2.getObj();
+		obj->pup(p);
 		DEBCHK("Nodegroup PUP'ed: gid = %d, name = %s\n",
-			ent2.getObj()->ckGetGroupID().idx,
+			obj->ckGetGroupID().idx,
 			_chareTable[ent2.getcIdx()]->name);
 	}
-	delete [] tmpInfo2;
+	delete [] tmpInfo;
 }
+
+// loop over all CkLocMgr and do "code"
+#define  CKLOCMGR_LOOP(code)	\
+  for(i=0;i<numGroups;i++) {	\
+    IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();	\
+    if(obj->isLocMgr())  {	\
+      CkLocMgr *mgr = (CkLocMgr*)obj;	\
+      code	\
+    }	\
+  }
 
 // handle chare array elements for this processor
 void CkPupArrayElementsData(PUP::er &p)
 {
-	// safe in both packing/unpakcing
+	int i;
+	// safe in both packing/unpakcing at this stage
         int numGroups = CkpvAccess(_groupIDTable)->size();
 
+	// number of array elements on this processor
 	int numElements;
 	if (!p.isUnpacking()) {
 	  ElementCounter  counter;
-          for(int i=0;i<numGroups;i++) {
-                IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
-                if(obj->isLocMgr())  ((CkLocMgr*)obj)->iterate(counter);
-          }
+	  CKLOCMGR_LOOP(mgr->iterate(counter););
           numElements = counter.getCount();
 	}
 	p|numElements;
@@ -276,17 +288,11 @@ void CkPupArrayElementsData(PUP::er &p)
 
 	if (!p.isUnpacking())
 	{
-          for(int i=0;i<numGroups;i++) {
-                IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
-                if(obj->isLocMgr()){
-			CmiPrintf("Found a location manager\n");
-			CkLocMgr *mgr = (CkLocMgr*)obj;
-                        ElementCheckpointer chk(mgr, p);
-                        mgr->iterate(chk);
-                }
-	  }
+	  // let CkLocMgr to iterate and store every array elements
+          CKLOCMGR_LOOP(ElementCheckpointer chk(mgr, p); mgr->iterate(chk););
         }
 	else {
+	  // loop and create all array elements ourselves
 	  for (int i=0; i<numElements; i++) {
 		CkGroupID gID;
 		CkArrayIndexMax idx;
@@ -313,11 +319,11 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	sprintf(filename,"%s/RO.dat",dirname);
 	FILE* fRO = fopen(filename,"wb");
 	if(!fRO) CkAbort("Failed to create checkpoint file for readonly data!");
-	int _numPes = CkNumPes();
-	fwrite(&_numPes,sizeof(int),1,fRO);
 	PUP::toDisk pRO(fRO);
+	int _numPes = CkNumPes();
+	pRO|_numPes;
 	CkPupROData(pRO);
-	fwrite(&cb,sizeof(CkCallback),1,fRO);
+	pRO((void *)&cb, sizeof(cb));
 	fclose(fRO);
 
 	// save mainchares into MainChares.dat
@@ -369,10 +375,10 @@ void CkRestartMain(const char* dirname){
 	FILE* fRO = fopen(filename,"rb");
 	if(!fRO) CkAbort("Failed to open checkpoint file for readonly data!");
 	int _numPes = -1;
-	fread(&_numPes,sizeof(int),1,fRO);
 	PUP::fromDisk pRO(fRO);
+	pRO|_numPes;
 	CkPupROData(pRO);
-	fread(&cb,sizeof(CkCallback),1,fRO);
+	pRO|cb;
 	fclose(fRO);
 	DEBCHK("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
 
@@ -439,5 +445,4 @@ public:
 };
 
 #include "CkCheckpoint.def.h"
-
 
