@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.81  1998-02-27 11:52:58  jyelon
+ * Revision 2.82  1998-03-20 16:07:49  milind
+ * Fixed exemplar stuff.
+ *
+ * Revision 2.81  1998/02/27 11:52:58  jyelon
  * Cleaned up header files, replaced load-balancer.
  *
  * Revision 2.80  1998/02/19 08:39:01  jyelon
@@ -162,9 +165,9 @@ extern int Cmi_mynodesize;
 #define CmiMyPe()           (my_thread())
 #define CmiMyRank()         (my_thread())
 #define CmiNumPes()         Cmi_numpes
-#define CmiMyNodeSize()     Cmi_mynodesize
+#define CmiMyNodeSize()     Cmi_numpes
 #define CmiMyNode()         0
-#define CmiNumNodes()       Cmi_numpes
+#define CmiNumNodes()       1
 #define CmiNodeFirst(node)  0
 #define CmiNodeSize(node)   Cmi_numpes
 #define CmiNodeOf(pe)       0
@@ -175,8 +178,9 @@ extern int Cmi_mynodesize;
 #define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvInitialize(t,v)\
-    { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0);\
-    else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize()); }}
+    { if (CmiMyRank()) CmiNodeBarrier();\
+    else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize());\
+           CmiNodeBarrier();}}
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
 
 #define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)

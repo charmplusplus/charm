@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.30  1998-02-13 23:55:43  pramacha
+ * Revision 2.31  1998-03-20 16:08:11  milind
+ * Fixed exemplar stuff.
+ *
+ * Revision 2.30  1998/02/13 23:55:43  pramacha
  * Removed CmiAlloc, CmiFree and CmiSize
  * Added CmiAbort
  *
@@ -120,17 +123,15 @@ static char ident[] = "@(#)$Header$";
 #include "converse.h"
 
 
-#define FreeFn		free
 #define BLK_LEN		512
-typedef struct
-	{
-		mem_sema_t sema;
-		void     **blk;
-		unsigned int blk_len;
-		unsigned int first;
-		unsigned int len;
-		unsigned int maxlen;
-}McQueue;
+typedef struct {
+  mem_sema_t sema;
+  void     **blk;
+  unsigned int blk_len;
+  unsigned int first;
+  unsigned int len;
+  unsigned int maxlen;
+} McQueue;
 
 static McQueue *McQueueCreate(void);
 static void McQueueAddToBack(McQueue *queue, void *element);
@@ -140,13 +141,9 @@ static McQueue **MsgQueue;
 
 
 CpvDeclare(void*, CmiLocalQueue);
-int Cmi_numpes;
-int Cmi_mynodesize;
+node_private int Cmi_numpes;
 
 static node_private barrier_t barrier;
-static node_private barrier_t *barr;
-static node_private int *nthreads;
-static node_private int requested_npe;
 
 static void threadInit();
 
@@ -168,16 +165,17 @@ void *CmiSvAlloc(size)
 int size;
 {
   char *res;
-  res =(char *)memory_class_malloc(size+8,NEAR_SHARED_MEM);
-  if (res==0) CmiError("Memory allocation failed.");
+  res = (char *) memory_class_malloc(size+2*sizeof(int),NEAR_SHARED_MEM);
+  if (res==0) CmiAbort("Memory allocation failed.");
   ((int *)res)[0]=size;
-  return (void *)(res+8);
+  ((int *)res)[1]=(-1);
+  return (void *)(res+2*sizeof(int));
 }
 
 void CmiSvFree(blk)
 char *blk;
 {
-  free(blk-8);
+  free(blk-2*sizeof(int));
 }
 
 
@@ -210,224 +208,170 @@ CmiCommHandle msgid;
    return 0;
 }
 
-
 typedef struct {
-   int argc;
-   void *argv;
-   int  npe;
    CmiStartFn fn;
    int usched;
 } USER_PARAMETERS;
 
 
+static node_private int Cmi_argc;
+static node_private char** Cmi_argv;
+static node_private USER_PARAMETERS Cmi_param;
+static node_private CmiStartFn Cmi_fn;
+static node_private int Cmi_usched;
+static node_private int Cmi_initret;
 
 void ConverseInit(int argc, char** argv, CmiStartFn fn, int usched, int initret)
 {
     int i;
-    USER_PARAMETERS usrparam;
-    void *arg = & usrparam;
- 
     spawn_sym_t request;
-
 
     /* figure out number of processors required */
     i =  0;
-    requested_npe = 0; 
-    while (argv[i] != 0)
-    {
-         if (strcmp(argv[i], "+p") == 0)
-           {
-                 sscanf(argv[i + 1], "%d", &requested_npe);
-                 break;
-           }
-         else if (sscanf(argv[i], "+p%d", &requested_npe) == 1) break;
-         i++;
+    Cmi_numpes = 0; 
+    for(i=1;i<argc;i++) {
+      if(strcmp(argv[i], "+p") == 0) {
+        sscanf(argv[i + 1], "%d", &Cmi_numpes);
+        break;
+      } else if(sscanf(argv[i], "+p%d", &Cmi_numpes) == 1) 
+          break;
     }
 
+    if (Cmi_numpes <= 0)
+      CmiAbort("Invalid number of processors\n");
 
-    if (requested_npe <= 0)
-    {
-       CmiError("Error: requested number of processors is invalid %d\n",requested_npe);
-       exit();
-    }
+    Cmi_argc = argc;
+    Cmi_argv = argv;
+    Cmi_fn = fn;
+    Cmi_usched = usched;
+    Cmi_initret = initret;
 
-
-    printf("Requested NP = %d\n", requested_npe);
-    usrparam.argc = argc;
-    usrparam.argv = (void *) argv;
-    usrparam.npe  = requested_npe;
-    usrparam.fn = fn;
-    usrparam.usched = usched;
-    request.node = CPS_ANY_NODE;
-    request.min  = requested_npe;
-    request.max  = requested_npe;
+    request.node = CPS_SAME_NODE;
+    request.min  = Cmi_numpes;
+    request.max  = Cmi_numpes;
     request.threadscope = CPS_THREAD_PARALLEL;
-
    
-    nthreads = &requested_npe;
-    barr     = &barrier; 
+    if(cps_barrier_alloc(&barrier)!=0)
+      CmiAbort("Cannot Alocate Barrier\n");
 
-    cps_barrier_alloc(barr);
-
-    MsgQueue=(McQueue **)g_malloc(requested_npe*sizeof(McQueue *));
+    MsgQueue=(McQueue **)g_malloc(Cmi_numpes*sizeof(McQueue *));
     if (MsgQueue == (McQueue **)0) {
-	CmiError("Cannot Allocate Memory...\n");
-	exit(1);
+	CmiAbort("Cannot Allocate Memory...\n");
     }
-    for(i=0; i<requested_npe; i++) MsgQueue[i] = McQueueCreate();
+    for(i=0; i<Cmi_numpes; i++) MsgQueue[i] = McQueueCreate();
 
-    if (cps_ppcall(&request, threadInit ,arg) < 0) {
-	CmiError("Cannot created threads...\n");
-	exit(1);
+    if (cps_ppcall(&request, threadInit ,(void *) 0) < 0) {
+	CmiAbort("Cannot create threads...\n");
     } 
-    cps_barrier_free(barr);
+    cps_barrier_free(&barrier);
 
 }
-
-void CmiInitMc(char **);
 
 void ConverseExit(void)
 {
    ConverseCommonExit();
-   cps_barrier(barr,nthreads);
+   cps_barrier(&barrier,&Cmi_numpes);
 }
 
 static void threadInit(arg)
 void *arg;
 {
-    USER_PARAMETERS *usrparam;
-    usrparam = (USER_PARAMETERS *) arg;
-
     CpvInitialize(void*, CmiLocalQueue);
 
-    Cmi_numpes =  usrparam->npe;
-    Cmi_mynodesize  = Cmi_numpes;
-
-    CthInit(usrparam->argv);
-    ConverseCommonInit(usrparam->argv);
-    CmiInitMc(usrparam->argv);
-    usrparam->fn(usrparam->argc,usrparam->argv);
-    if (usrparam->usched==0) CsdScheduler(-1);
-    ConverseExit();
-}
-
-
-void CmiInitMc(argv)
-char *argv[];
-{
+    CthInit(Cmi_argv);
+    ConverseCommonInit(Cmi_argv);
     neighbour_init(CmiMyPe());
     CpvAccess(CmiLocalQueue) = (void *) FIFO_Create();
     CmiSpanTreeInit();
     CmiTimerInit();
+    if (Cmi_initret==0) {
+      Cmi_fn(Cmi_argc, Cmi_argv);
+      if (Cmi_usched==0) CsdScheduler(-1);
+      ConverseExit();
+    }
 }
 
-
-
-CmiExit()
+void *CmiGetNonLocal(void)
 {
+     int *buf, *msg;
+     int size;
+     msg = McQueueRemoveFromFront(MsgQueue[CmiMyPe()]);
+     if(msg==0)
+       return 0;
+     size = *(msg-1);
+     if((buf = (int *) CmiAlloc(size))==0)
+       CmiAbort("Cannot allocate memory!\n");
+     memcpy(buf, msg, size);
+     free(msg-1);
+     return buf;
 }
 
 
-CmiDeclareArgs()
+void CmiSyncSendFn(int destPE, int size, char *msg)
 {
+   int *buf;
+
+   buf=(int *)g_malloc(size+sizeof(int));
+   if(buf==(void *)0) {
+     CmiAbort("Cannot allocate memory!\n");
+   }
+   *buf++ = size;
+   memcpy((char *)buf,(char *)msg,size);
+   McQueueAddToBack(MsgQueue[destPE],buf); 
 }
 
 
-void *CmiGetNonLocal()
-{
-     return McQueueRemoveFromFront(MsgQueue[CmiMyPe()]);
-}
-
-
-void CmiSyncSendFn(destPE, size, msg)
-int destPE;
-int size;
-char *msg;
-{
-    /* Send the message of "size" bytes to the destPE.
-       Return only after the message has been sent, i.e.,
-       the buffer (msg) is free for re-use. */
-        char *buf;
-
-        buf=(void *)g_malloc(size+8);
-        if(buf==(void *)0)
-        {
-                CmiError("Cannot allocate memory!\n");
-                exit(1);
-        }
-        ((int *)buf)[0]=size;
-        buf += 8;
-
-
-        memcpy((double *)buf,(double *)msg,size);
-        McQueueAddToBack(MsgQueue[destPE],buf); 
-}
-
-
-CmiCommHandle CmiAsyncSendFn(destPE, size, msg)
-int destPE;
-int size;
-char *msg;
+CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 {
     CmiSyncSendFn(destPE, size, msg); 
     return 0;
 }
 
 
-void CmiFreeSendFn(destPE, size, msg)
-int destPE;
-int size;
-char  *msg;
+void CmiFreeSendFn(int destPE, int size, char *msg)
 {
-        McQueueAddToBack(MsgQueue[destPE],msg); 
+  if (CmiMyPe()==destPE) {
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
+  } else {
+    CmiSyncSendFn(destPE, size, msg);
+    CmiFree(msg);
+  }
 }
 
-void CmiSyncBroadcastFn(size, msg)
-int  size;
-char *msg;
+void CmiSyncBroadcastFn(int size, char *msg)
 {
        int i;
        for(i=0; i<CmiNumPes(); i++)
          if (CmiMyPe() != i) CmiSyncSendFn(i,size,msg);
 }
 
-CmiCommHandle CmiAsyncBroadcastFn(size, msg)
-int  size;
-char *msg;
+CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)
 {
     CmiSyncBroadcastFn(size, msg);
     return 0;
 }
 
-void CmiFreeBroadcastFn(size, msg)
-int  size;
-char *msg;
+void CmiFreeBroadcastFn(int size, char *msg)
 {
     CmiSyncBroadcastFn(size,msg);
     CmiFree(msg);
 }
 
-void CmiSyncBroadcastAllFn(size, msg)
-int  size;
-char *msg;
+void CmiSyncBroadcastAllFn(int size, char *msg)
 {
     int i;
     for(i=0; i<CmiNumPes(); i++) CmiSyncSendFn(i,size,msg);
 }
 
 
-CmiCommHandle CmiAsyncBroadcastAllFn(size, msg)
-int  size;
-char *msg;
+CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)
 {
     CmiSyncBroadcastAllFn(size, msg);
     return 0; 
 }
 
 
-void CmiFreeBroadcastAllFn(size, msg)
-int  size;
-char *msg;
+void CmiFreeBroadcastAllFn(int size, char *msg)
 {
     int i;
     for(i=0; i<CmiNumPes(); i++)
@@ -439,7 +383,8 @@ char *msg;
 
 void CmiNodeBarrier()
 {
-   cps_barrier(barr,nthreads);
+   if(cps_barrier(&barrier,&Cmi_numpes)!=0)
+     CmiAbort("Error in Barrier\n");
 }
 
 
@@ -561,33 +506,25 @@ int p,n;
 
 
 
-static void **
-AllocBlock(len)
-unsigned int len;
+static void ** AllocBlock(unsigned int len)
 {
 	void ** blk;
 
 	blk=(void **)g_malloc(len*sizeof(void *));
 	if(blk==(void **)0)
 	{
-		CmiError("Cannot Allocate Memory!\n");
-		exit(1);
+		CmiAbort("Cannot Allocate Memory!\n");
 	}
 	return blk;
 }
 
-static void
-SpillBlock(srcblk, destblk, first, len)
-void **srcblk, **destblk;
-unsigned int first, len;
+static void SpillBlock(void **srcblk, void **destblk, int first, int len)
 {
 	memcpy(destblk, &srcblk[first], (len-first)*sizeof(void *));
 	memcpy(&destblk[len-first],srcblk,first*sizeof(void *));
 }
 
-static
-McQueue *
-McQueueCreate()
+static McQueue * McQueueCreate(void)
 {
 	McQueue *queue;
 	int one = 1;
@@ -621,7 +558,7 @@ void  *element;
 		queue->blk_len *= 3;
 		blk = AllocBlock(queue->blk_len);
 		SpillBlock(queue->blk, blk, queue->first, queue->len);
-		FreeFn(queue->blk);
+		free(queue->blk);
 		queue->blk = blk;
 		queue->first = 0;
 	}
