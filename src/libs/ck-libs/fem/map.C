@@ -609,7 +609,7 @@ a ghost layer is added, the set of interesting nodes grows.
 class elemList {
 public:
 	int chunk;
-	int localNo;//Local number of this element on this chunk
+	int localNo;//Local number of this element on this chunk (negative for a ghost)
 	int type; //Kind of element
 	FEM_Symmetries_t sym; //Symmetries this element was reached via
 	elemList *next;
@@ -754,13 +754,6 @@ void splitter::addGhosts(const FEM_Partition &partition)
 	  for (n=0;n<nNode;n++)
 	    if (sym[n]!=(FEM_Symmetries_t)0)
 	      ghostNode[n]=1;
-	
-//Add each layer
-	consistencyCheck();
-	for (int i=0;i<nLayers;i++) {
-		addLayer(partition.getLayer(i),partition);
-		consistencyCheck();
-	}
 
 // Add any stencils 
 	totGhostElem=0,totGhostNode=0; //For debugging
@@ -786,6 +779,13 @@ void splitter::addGhosts(const FEM_Partition &partition)
 	  CkPrintf("FEM Ghost stencil> %d new ghost elements, %d new ghost nodes\n",
 	       totGhostElem,totGhostNode);
 	
+//Add each layer
+	consistencyCheck();
+	for (int i=0;i<nLayers;i++) {
+		addLayer(partition.getLayer(i),partition);
+		consistencyCheck();
+	}
+	
 	delete[] ghostNode; ghostNode=NULL;
 }
 
@@ -797,29 +797,29 @@ void splitter::addLayer(const FEM_Ghost_Layer &g,const FEM_Partition &partition)
 	totGhostElem=0,totGhostNode=0; //For debugging
 	
 	//Build table mapping node-tuples to lists of adjacent elements
-	for (int c=0;c<nChunks;c++) {
-	   for (int t=0;t<mesh->elem.size();t++) 
-	   if (mesh->elem.has(t)) {
+	for (int t=0;t<mesh->elem.size();t++) 
+	if (mesh->elem.has(t)) {
 		if (!g.elem[t].add) continue; //Don't add this kind of element to the layer
-		//For every element of every chunk
-		//  (FIXME: should include existing ghosts, too--so use gElem, not dyn!)
-		int nEl=dyn[c].elem[t].size();
-		for (int e=0;e<nEl;e++) {
-			int gNo=dyn[c].elem[t][e];
+		//For every element of this type:
+		int gElemCount=mesh->elem[t].size();
+		for (int gNo=0;gNo<gElemCount;gNo++) 
+		{
 			const int *conn=mesh->elem[t].connFor(gNo);
 			if (hasGhostNodes(conn,mesh->elem[t].getNodesPer()))
-			{ //Loop over this element's tuples:
-			  for (int u=0;u<g.elem[t].tuplesPerElem;u++) {
+			{ //Loop over this element's ghosts and tuples:
+			  for (chunkList *cur=&gElem[t][gNo];cur!=NULL;cur=cur->next)
+			  for (int u=0;u<g.elem[t].tuplesPerElem;u++) 
+			  {
 			  	int tuple[tupleTable::MAX_TUPLE];
 				FEM_Symmetries_t allSym;
 				if (addTuple(tuple,&allSym,
 				    &g.elem[t].elem2tuple[u*g.nodesPerTuple],
-				    g.nodesPerTuple,conn))
-					table.addTuple(tuple,new elemList(c,e,t,allSym));
+				    g.nodesPerTuple,conn)) {
+					table.addTuple(tuple,new elemList(cur->chunk,cur->localNo,t,allSym));
+				}
 			  }
 			}
 	        }
-	   }
 	}
 	
 	//Loop over all the tuples, connecting adjacent elements
@@ -832,7 +832,7 @@ void splitter::addLayer(const FEM_Ghost_Layer &g,const FEM_Partition &partition)
 			//Consider adding ghosts for all element pairs on this tuple:
 			for (const elemList *a=l;a!=NULL;a=a->next)
 			for (const elemList *b=l;b!=NULL;b=b->next) 
-				if (a!=b)
+				if (a!=b && a->localNo>=0) /* only add ghosts of real elements */
 					addGhostPair(*a,*b,g.addNodes);
 		}
 	}
@@ -908,7 +908,8 @@ void splitter::addGhostPair(const elemList &src,const elemList &dest,bool addNod
 		return; //Unless via symmetry, never add interchunk ghosts from same chunk
 	
 	int t=src.type;
-	int gNo=dyn[srcChunk].elem[t][src.localNo]; //FIXME: what if src is itself a ghost (localNo<0)
+	if (src.localNo<0) FEM_Abort("addGhostPair","Cannot add a ghost of a ghost (src num=%d)",src.localNo);
+	int gNo=dyn[srcChunk].elem[t][src.localNo];
 	
 	int newNo=addGhostElement(t,gNo,srcChunk,destChunk,elemSym);
 	if (newNo==-1) return; //Ghost is already there
