@@ -1,6 +1,6 @@
 BGL_BASE=/BlueLight/floor
-BGL_INC=$BGL_BASE/bglsys/include
-BGL_LIB=$BGL_BASE/bglsys/lib
+BGL_INC=$BL_INSTALL/bglsys/include
+BGL_LIB=$BL_INSTALL/bglsys/lib
 BGL_BIN=$BGL_BASE/blrts-gnu/bin
 
 OPTS_CPP="$OPTS_CPP -I$BGL_INC "
