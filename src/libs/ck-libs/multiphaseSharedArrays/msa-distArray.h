@@ -9,20 +9,20 @@
    of data type ENTRY. There are nEntries total numer of ENTRY's, with
    ENTRIES_PER_PAGE data items per "page".  It is implemented as a
    Chare Array of pages, and a Group representing the local cache.
-   
+
    The requirements for the templates are:
      ENTRY: User data class stored in the array, with at least:
         - A default constructor and destructor
-	- A working assignment operator
-	- A working pup routine
+        - A working assignment operator
+        - A working pup routine
      ENTRY_OPS_CLASS: Used to combine values for "accumulate":
         - A method named "getIdentity", taking no arguments and
-	   returning an ENTRY to use before any accumulation.
-	- A method named "accumulate", taking a source/dest ENTRY by reference
-	   and an ENTRY to add to it by value or const reference.
+          returning an ENTRY to use before any accumulation.
+        - A method named "accumulate", taking a source/dest ENTRY by reference
+          and an ENTRY to add to it by value or const reference.
      ENTRIES_PER_PAGE: Optional integer number of ENTRY objects
-        to store and communicate at once.  For good performance, 
-	make sure this value is a power of two.
+        to store and communicate at once.  For good performance,
+        make sure this value is a power of two.
  */
 template<class ENTRY, class ENTRY_OPS_CLASS, unsigned int ENTRIES_PER_PAGE=MSA_DEFAULT_ENTRIES_PER_PAGE>
 class MSA1D
@@ -31,11 +31,11 @@ public:
     typedef MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CacheGroup_t;
     typedef CProxy_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_CacheGroup_t;
     typedef CProxy_MSA_PageArray<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_PageArray_t;
-    
+
 protected:
     /// Total number of ENTRY's in the whole array.
     unsigned int nEntries;
-    
+
     /// Handle to owner of cache.
     CacheGroup_t* cache;
     CProxy_CacheGroup_t cg;
@@ -61,14 +61,14 @@ protected:
 public:
     // @@ Needed for Jade
     inline MSA1D(){}
-    virtual void pup(PUP::er &p){ 
-    	p|nEntries;
-	p|cg;
-	if (p.isUnpacking()) cache=cg.ckLocalBranch();
+    virtual void pup(PUP::er &p){
+        p|nEntries;
+        p|cg;
+        if (p.isUnpacking()) cache=cg.ckLocalBranch();
     }
-	
+
     /**
-      Create a completely new MSA array.  This call creates the 
+      Create a completely new MSA array.  This call creates the
       corresponding groups, so only call it once per array.
     */
     inline MSA1D(unsigned int nEntries_, unsigned int num_wrkrs, unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES) : nEntries(nEntries_)
@@ -78,10 +78,10 @@ public:
         CProxy_PageArray_t pageArray = CProxy_PageArray_t::ckNew(nPages);
         cg = CProxy_CacheGroup_t::ckNew(nPages, pageArray, maxBytes, nEntries, num_wrkrs);
         pageArray.setCacheProxy(cg);
-	pageArray.ckSetReductionClient(new CkCallback(CkIndex_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(), cg));
+        pageArray.ckSetReductionClient(new CkCallback(CkIndex_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(), cg));
         cache = cg.ckLocalBranch();
     }
-    
+
 // Depricated API for accessing CacheGroup directly.
     inline MSA1D(CProxy_CacheGroup_t cg_) : cg(cg_)
     {
@@ -112,7 +112,7 @@ public:
     // ================ Accessor/Utility functions ================
     /// Get the total length of the array, across all processors.
     inline unsigned int length() const { return nEntries; }
-    
+
     inline const CProxy_CacheGroup_t &getCacheGroup() const { return cg; }
 
     // Avoid using the term "page size" because it is confusing: does
@@ -238,8 +238,8 @@ public:
     /// you should not have several adjacent ranges locked.
     inline void Unlock(unsigned int start, unsigned int end)
     {
-        unsigned int page1 = start / ENTRIES_PER_PAGE; 
-        unsigned int page2 = end / ENTRIES_PER_PAGE; 
+        unsigned int page1 = start / ENTRIES_PER_PAGE;
+        unsigned int page2 = end / ENTRIES_PER_PAGE;
         cache->UnlockPages(page1, page2);
     }
 };
@@ -273,14 +273,14 @@ protected:
 public:
     // @@ Needed for Jade
     inline MSA2D() : super() {}
-    virtual void pup(PUP::er &p) { 
+    virtual void pup(PUP::er &p) {
        super::pup(p);
        p|rows; p|cols;
     };
 
-    inline MSA2D(unsigned int rows_, unsigned int cols_, unsigned int numwrkrs, 
-    	unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES) 
-	  :super(rows_*cols_, numwrkrs, maxBytes)
+    inline MSA2D(unsigned int rows_, unsigned int cols_, unsigned int numwrkrs,
+                 unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES)
+        :super(rows_*cols_, numwrkrs, maxBytes)
     {
         rows = rows_; cols = cols_;
     }
@@ -302,7 +302,7 @@ public:
     inline unsigned int getRows(void) const {return rows;}
     inline unsigned int getCols(void) const {return cols;}
     inline unsigned int getColumns(void) const {return cols;}
-    
+
     inline const ENTRY& get(unsigned int row, unsigned int col)
     {
         return super::get(getIndex(row, col));
