@@ -512,7 +512,7 @@ LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats,int count)
   }
 
   int migrate_count=migrateInfo.length();
-  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
+  LBMigrateMsg* msg = new(migrate_count,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
   msg->n_moves = migrate_count;
   for(i=0; i < migrate_count; i++) {
     MigrateInfo* item = (MigrateInfo*) migrateInfo[i];

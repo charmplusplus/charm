@@ -162,7 +162,7 @@ LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
   //  if (migrate_count > 0) {
   //    CkPrintf("PE %d migrating %d elements\n",CkMyPe(),migrate_count);
   //  }
-  LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
+  LBMigrateMsg* msg = new(migrate_count,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
   msg->n_moves = migrate_count;
   for(i=0; i < migrate_count; i++) {
     MigrateInfo* item = (MigrateInfo*) migrateInfo[i];

@@ -60,12 +60,6 @@ public:
   int next_lb;
 
   double * expectedLoad;
-
-  // Other methods & data members
-
-  static void* alloc(int msgnum, size_t size, int* array, int priobits);
-  static void* pack(LBMigrateMsg* in);
-  static LBMigrateMsg* unpack(void* in);
 };
 
 #define CreateLBFunc_Def(x)		\

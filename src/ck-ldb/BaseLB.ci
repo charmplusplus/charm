@@ -2,7 +2,11 @@ module BaseLB {
 
 extern module LBDatabase;
 
-message LBMigrateMsg;
+message LBMigrateMsg {
+  MigrateInfo moves[];
+  char avail_vector[];
+  double expectedLoad[];
+};
 
 group [migratable] BaseLB {
   entry void BaseLB(const CkLBOptions &);  
