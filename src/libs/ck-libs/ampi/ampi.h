@@ -217,6 +217,9 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 int MPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
                   MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
                   int *rdispls, MPI_Datatype recvtype, MPI_Comm comm);
+int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                 MPI_Comm comm, MPI_Request *request);
 int MPI_Reduce(void *inbuf, void *outbuf, int count, int type,
                MPI_Op op, int root, MPI_Comm comm);
 int MPI_Allreduce(void *inbuf, void *outbuf, int count, int type,

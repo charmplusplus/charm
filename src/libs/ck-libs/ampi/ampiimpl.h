@@ -252,7 +252,7 @@ class BlockMap : public CkArrayMap {
 #define MyAlign8(x) (((x)+7)&(~7))
 
 class PersReq {
-  public:
+public:
     int sndrcv; // 1 if send , 2 if recv
     void *buf;
     int count;
@@ -261,6 +261,18 @@ class PersReq {
     int tag;
     int comm;
     int nextfree, prevfree;
+};
+
+class ATAReqs {
+public:
+  int count;
+  PersReq* reqs;
+  ATAReqs(void):count(0),reqs(NULL) { }
+  ~ATAReqs(void) { if(reqs) delete [] reqs; }
+  void init(int c_) {
+    count = c_;
+    reqs = new PersReq [c_];
+  }
 };
 
 //A simple destructive-copy memory buffer
@@ -403,6 +415,8 @@ public:
     PersReq irequests[100];
     int nirequests;
     int firstfree;
+    ATAReqs atarequests[10];
+    int natarequests;
 };
 PUPmarshall(ampiPersRequests);
 
