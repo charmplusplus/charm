@@ -70,6 +70,7 @@ void ComlibManager::init(){
     CkpvInitialize(int, RecvmsgHandle);
     CkpvAccess(RecvmsgHandle) = CkRegisterHandler((CmiHandler)recv_array_msg);
 
+    bcast_pelist = new int [CkNumPes()];
     for(int bcount = 0; bcount < CkNumPes(); bcount++)
         bcast_pelist[bcount] = bcount;
 
