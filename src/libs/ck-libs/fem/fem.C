@@ -27,6 +27,13 @@ DataMsg::alloc(int mnum, size_t size, int *sizes, int pbits)
 static void 
 _allReduceHandler(void *, int datasize, void *data)
 {
+  // the reduction handler is called on processor 0
+  // with available reduction results
+  DataMsg *dmsg = new (&datasize, 0) DataMsg(0,datasize,0);
+  memcpy(dmsg->data, data, datasize);
+  CProxy_chunk carr(_femaid);
+  // broadcast the reduction results to all array elements
+  carr.result(dmsg);
 }
 
 main::main(CkArgMsg *am)
@@ -112,7 +119,7 @@ chunk::run(void)
   CtvAccess(_femptr) = this;
   readChunk();
   // call the application-specific driver
-  driver_(&numNodes, gNodeNums, &numElems, gElemNums, conn);
+  driver_(&numNodes, gNodeNums, &numElems, gElemNums, &numNodesPerElem, conn);
   FEM_Done();
 }
 
@@ -126,6 +133,7 @@ chunk::recv(DataMsg *dm)
     if(nRecd==numPes) {
       wait_for = 0; // done waiting for seqnum
       CthAwaken(tid); // awaken the waiting thread
+      tid = 0;
     }
   } else {
     CmmPut(messages, 1, &(dm->tag), dm);
@@ -142,7 +150,7 @@ chunk::send(int fid, void *nodes)
     int len = dtypes[fid].length(num);
     DataMsg *msg = new (&len, 0) DataMsg(seqnum, thisIndex, fid);
     len = dtypes[fid].length();
-    void *data = msg->getData();
+    void *data = msg->data;
     void *src = (void *) ((char *)nodes + dtypes[fid].init_offset);
     for(j=0;j<num;j++) {
       src = (void *)((char*)nodes+(nodesPerPe[i][j]*dtypes[fid].distance));
@@ -160,7 +168,7 @@ chunk::update(int fid, void *nodes)
   // first send my field values to all the processors that need it
   seqnum++;
   send(fid, nodes);
-  curnodes = nodes;
+  curbuf = nodes;
   nRecd = 0;
   // now, if any of the field values have been received already,
   // process them
@@ -189,15 +197,52 @@ chunk::update_field(DataMsg *msg)
   int i;
   for(i=0;i<nnodes;i++) {
     int cnum = nodesPerPe[from][i];
-    void *cnode = (void*) ((char*)curnodes+cnum*dtypes[msg->dtype].distance);
+    void *cnode = (void*) ((char*)curbuf+cnum*dtypes[msg->dtype].distance);
     combine(dtypes[msg->dtype], cnode, data);
     data = (void *)((char*)data+(dtypes[msg->dtype].length()));
   }
 }
 
 void
-chunk::reduce(int fid, void *nodes, void *outbuf)
+chunk::reduce_field(int fid, void *nodes, void *outbuf)
 {
+  // first reduce over local nodes
+  DType *dt = &dtypes[fid];
+  void *src = (void *) ((char *) nodes + dt->init_offset);
+  for(int i=0; i<numNodes; i++) {
+    if(isPrimary[i]) {
+      combine(*dt, outbuf, src);
+    }
+    src = (void *)((char *)src + dt->distance);
+  }
+  // and now reduce over partitions
+  reduce(fid, outbuf, outbuf);
+}
+
+void
+chunk::reduce(int fid, void *inbuf, void *outbuf)
+{
+  int len = dtypes[fid].length();
+  CkReduction::reducerType rtype;
+  switch(dtypes[fid].base_type) {
+    case FEM_INT: rtype = CkReduction::sum_int; break;
+    case FEM_REAL: rtype = CkReduction::sum_float; break;
+    case FEM_DOUBLE: rtype = CkReduction::sum_double; break;
+  }
+  contribute(len, inbuf, rtype);
+  curbuf = outbuf;
+  tid = CthSelf();
+  CthSuspend();
+}
+
+void
+chunk::result(DataMsg *msg)
+{
+  //msg->from used as length
+  memcpy(curbuf, msg->data, msg->from);
+  CthAwaken(tid);
+  tid = 0;
+  delete msg;
 }
 
 void
@@ -208,6 +253,7 @@ chunk::readNodes(FILE* fp)
   isPrimary = new int[numNodes];
   for(int i=0;i<numNodes;i++) {
     fscanf(fp, "%d%d", &gNodeNums[i], &isPrimary[i]);
+    isPrimary[i] = ((isPrimary[i]==thisIndex) ? 1 : 0);
   }
 }
 
@@ -286,7 +332,21 @@ void
 FEM_Reduce_Field(int fid, void *nodes, void *outbuf)
 {
   chunk *cptr = CtvAccess(_femptr);
-  cptr->reduce(fid, nodes, outbuf);
+  cptr->reduce_field(fid, nodes, outbuf);
+}
+
+void
+FEM_Reduce(int fid, void *inbuf, void *outbuf)
+{
+  chunk *cptr = CtvAccess(_femptr);
+  cptr->reduce(fid, inbuf, outbuf);
+}
+
+int
+FEM_Id(void)
+{
+  chunk *cptr = CtvAccess(_femptr);
+  return cptr->id();
 }
 
 // Fortran Bindings
@@ -307,6 +367,18 @@ extern "C" void
 fem_reduce_field_(int *fid, void *nodes, void *outbuf)
 {
   FEM_Reduce_Field(*fid, nodes, outbuf);
+}
+
+extern "C" void
+fem_reduce_(int *fid, void *inbuf, void *outbuf)
+{
+  FEM_Reduce(*fid, inbuf, outbuf);
+}
+
+extern "C" int
+fem_id_(void)
+{
+  return FEM_Id();
 }
 
 // Utility functions for Fortran

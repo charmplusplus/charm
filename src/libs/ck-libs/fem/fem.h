@@ -60,7 +60,6 @@ class DataMsg : public CMessage_DataMsg
   static void *pack(DataMsg *);
   static DataMsg *unpack(void *);
   static void *alloc(int, size_t, int*, int);
-  void *getData(void)  { return data; }
 };
 
 class main : public Chare
@@ -97,13 +96,14 @@ class chunk : public ArrayElement1D
 
   int seqnum; // sequence number for update operation
   int nRecd; // number of messages received for this seqnum
-  void *curnodes; // data addr for current update operation
+  void *curbuf; // data addr for current update operation
 
  public:
   chunk(void);
   chunk(CkMigrateMessage *) {}
   void run(void);
   void recv(DataMsg *);
+  void result(DataMsg *);
   int new_DT(int base_type, int vec_len=1, int init_offset=0, int distance=0) {
     if(ntypes==MAXDT) {
       CkAbort("FEM: registered datatypes limit exceeded.");
@@ -113,7 +113,9 @@ class chunk : public ArrayElement1D
     return ntypes-1;
   }
   void update(int fid, void *nodes);
-  void reduce(int fid, void *nodes, void *outbuf);
+  void reduce_field(int fid, void *nodes, void *outbuf);
+  void reduce(int fid, void *inbuf, void *outbuf);
+  int id(void) { return thisIndex; }
  private:
   void update_field(DataMsg *);
   void send(int fid, void *nodes);
@@ -127,12 +129,16 @@ void FEM_Done(void);
 int FEM_Create_Field(int base_type, int vec_len, int init_offset, int distance);
 void FEM_Update_Field(int fid, void *nodes);
 void FEM_Reduce_Field(int fid, void *nodes, void *outbuf);
+void FEM_Reduce(int fid, void *inbuf, void *outbuf);
+int FEM_Id(void);
 
 // Fortran Bindings
 
 extern "C" int fem_create_field_(int *bt, int *vl, int *io, int *d);
 extern "C" void fem_update_field_(int *fid, void *nodes);
 extern "C" void fem_reduce_field_(int *fid, void *nodes, void *outbuf);
+extern "C" void fem_reduce_(int *fid, void *inbuf, void *outbuf);
+extern "C" int fem_id_(void);
 
 // Utility functions for Fortran
 
@@ -140,7 +146,7 @@ extern "C" int offsetof_(void *, void *);
 
 // to be provided by the application
 extern "C" void init_(void);
-extern "C" void driver_(int *, int *, int *, int *, int *);
+extern "C" void driver_(int *, int *, int *, int *, int *, int *);
 extern "C" void finalize_(void);
 
 #endif

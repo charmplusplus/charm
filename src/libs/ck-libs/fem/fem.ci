@@ -11,5 +11,6 @@ mainmodule fem {
     entry chunk(void);
     entry [threaded] void run(void);
     entry void recv(DataMsg *);
+    entry void result(DataMsg *);
   };
 };
