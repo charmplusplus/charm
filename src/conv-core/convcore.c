@@ -21,6 +21,7 @@
 
 extern void CqsDequeue(Queue, void **);
 extern void CqsEnqueueFifo(Queue, void *);
+extern void CqsEnqueueGeneral(Queue, void *, unsigned int, unsigned int, unsigned int*);
 extern void CcdModuleInit(char **);
 extern void CmiMemoryInit(char **);
 extern void CldModuleInit(void);
