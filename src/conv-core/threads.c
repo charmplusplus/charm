@@ -112,6 +112,7 @@
 #include <sys/types.h>
 
 #if ! CMK_THREADS_BUILD_DEFAULT
+#undef CMK_THREADS_USE_JCONTEXT
 #undef CMK_THREADS_USE_CONTEXT
 #undef CMK_THREADS_ARE_WIN32_FIBERS
 #undef CMK_THREADS_USE_PTHREADS
@@ -990,7 +991,7 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
-  result->fiber = CreateFiber(0, FiberSetUp, (PVOID) fiberData);
+  result->fiber = CreateFiber(size, FiberSetUp, (PVOID) fiberData);
   if (!result->fiber)
     CmiAbort("CthCreate failed to create fiber!\n");
   
@@ -1208,8 +1209,10 @@ void CthInit(char **argv)
   CpvAccess(doomedThreadPool) = (CthThread)NULL;
 
   /* don't trust the _defaultStackSize */
+#ifdef MINSIGSTKSZ
   if (CthCpvAccess(_defaultStackSize) < MINSIGSTKSZ) 
     CthCpvAccess(_defaultStackSize) = MINSIGSTKSZ;
+#endif
 }
 
 static void CthThreadFree(CthThread t)
@@ -1280,7 +1283,9 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
+#ifdef MINSIGSTKSZ
   if (size<MINSIGSTKSZ) size = CthCpvAccess(_defaultStackSize);
+#endif
   CthAllocateStack(&result->base,&size,migratable);
   stack = result->base.stack;
   
