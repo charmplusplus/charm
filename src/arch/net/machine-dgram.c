@@ -97,6 +97,16 @@ static void setspeed_eth()
   Cmi_ack_delay        = 0.0050;
 }
 
+static void setspeed_gigabit()
+{
+  /* for gigabit net */
+  Cmi_max_dgram_size   = 15000;
+  Cmi_window_size      = 10;
+  Cmi_os_buffer_size   = 200000;
+  Cmi_delay_retransmit = 0.0250;
+  Cmi_ack_delay        = 0.0040;
+}
+
 static void extract_args(char **argv)
 {
   int ms;
@@ -105,6 +115,8 @@ static void extract_args(char **argv)
     setspeed_atm();
   if (CmiGetArgFlagDesc(argv,"+eth","Tune for an ethernet network"))
     setspeed_eth();
+  if (CmiGetArgFlagDesc(argv,"+giga","Tune for a gigabit network"))
+    setspeed_gigabit();
   CmiGetArgIntDesc(argv,"+max_dgram_size",&Cmi_max_dgram_size,"Size of each UDP packet");
   CmiGetArgIntDesc(argv,"+window_size",&Cmi_window_size,"Number of unacknowledged packets");
   CmiGetArgIntDesc(argv,"+os_buffer_size",&Cmi_os_buffer_size, "UDP socket's SO_RCVBUF/SO_SNDBUF");
