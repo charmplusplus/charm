@@ -5,10 +5,9 @@ added 01/03/2003 by Chao Huang, chuang10@uiuc.edu
 More documentation goes here...
 */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include "charm++.h"
 #include "ck.h"
 //#include "ckcheckpoint.h"
@@ -38,8 +37,7 @@ void printIndex(const CkArrayIndex &idx,char *dest) {
 ElementSaver::ElementSaver(const char *dirName_,const int locMgrIdx_) :dirName(dirName_),locMgrIdx(locMgrIdx_){
 	char indexName[1024];
 	//memset(indexName,0,1024);
-	chdir(dirName);
-	sprintf(indexName,"loc_%d_%d.idx",locMgrIdx,CkMyPe());
+	sprintf(indexName,"%s/loc_%d_%d.idx",dirName,locMgrIdx,CkMyPe());
 	//indexName[strlen(\)]='\0';
 	indexFile=fopen(indexName,"w");
 	if (indexFile==NULL){
@@ -64,7 +62,7 @@ void ElementSaver::addLocation(CkLocation &loc) {
 
 	//Save the actual array element data to the file:
 	char pathName[1024];
-	sprintf(pathName,"%s",fileName);
+	sprintf(pathName,"%s/%s",dirName,fileName);
 	FILE* f=fopen(pathName,"wb");
 	if(!f) CkAbort("Could not create checkpoint file");
 	PUP::toDisk p(f);
@@ -73,9 +71,8 @@ void ElementSaver::addLocation(CkLocation &loc) {
 	DEBCHK("Saved array index %s to file %s\n",idxName,pathName);
 }
 
-void CkCheckpointMgr::Checkpoint(int len, char dirname[],CkCallback& cb){
-	dirname[len]='\0';
-	//DEBCHK("[%d]CkCheckpointMgr::Checkpoint called, len=%d, dirname={%s}\n",CkMyPe(),len,dirname);
+void CkCheckpointMgr::Checkpoint(const char *dirname,CkCallback& cb){
+	//DEBCHK("[%d]CkCheckpointMgr::Checkpoint called dirname={%s}\n",CkMyPe(),dirname);
 	IrrGroup* obj;
 	int numGroups = CkpvAccess(_groupIDTable)->size();
 	for(int i=0;i<numGroups;i++) {
@@ -84,7 +81,7 @@ void CkCheckpointMgr::Checkpoint(int len, char dirname[],CkCallback& cb){
 		if(obj->isLocMgr()){
 			DEBCHK("\tThis is a location manager!\n");
 			ElementSaver saver(dirname,obj->ckGetGroupID().idx);
-			dynamic_cast<CkLocMgr*>(obj)->iterate(saver);
+			((CkLocMgr*)(obj))->iterate(saver);
 		}
 	}
 	DEBCHK("[%d]CkCheckpointMgr::Checkpoint DONE. Invoking callback.\n",CkMyPe());
@@ -92,18 +89,18 @@ void CkCheckpointMgr::Checkpoint(int len, char dirname[],CkCallback& cb){
 }
 
 void CkStartCheckpoint(char* dirname,const CkCallback& cb){
+	int i;
 	char filename[1024];
-	int len = strlen(dirname);
-	//dirname[len]='\0';
-	CkPrintf("CkStartCheckpoint() making dir: len=%d,dir=%s\n",len,dirname);
-	mkdir(dirname,0777);
+	CkPrintf("CkStartCheckpoint() making dir %s\n",dirname);
+	CmiMkdir(dirname);
+	
 	// save readonlys, and callback BTW
 	sprintf(filename,"%s/RO.dat",dirname);
 	FILE* fRO = fopen(filename,"wb");
 	if(!fRO) CkAbort("Failed to create checkpoint file for readonly data!");
 	fwrite(&_numReadonlies,sizeof(int),1,fRO);
 	PUP::toDisk pRO(fRO);
-	for(int i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(pRO);
+	for(i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(pRO);
 	fwrite(&cb,sizeof(CkCallback),1,fRO);
 	fclose(fRO);
 
@@ -117,7 +114,7 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	DEBCHK("[%d]CkStartCheckpoint: numGroups = %d\n",CkMyPe(),numGroups);
 
 	GroupInfo *tmpInfo = new GroupInfo [numGroups];
-	for(int i=0;i<numGroups;i++) {
+	for(i=0;i<numGroups;i++) {
 		int tmpCtor;
 		tmpInfo[i].gID = (*CkpvAccess(_groupIDTable))[i];
 		tmpCtor = (tmpInfo[i].eIdx = CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getMigCtor());
@@ -132,7 +129,7 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	}
 	if(numGroups != fwrite(tmpInfo,sizeof(GroupInfo),numGroups,fGroups)) CkAbort("error writing groupinfo");
 	PUP::toDisk pGroups(fGroups);
-	for(int i=0;i<numGroups;i++) {
+	for(i=0;i<numGroups;i++) {
 		CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->pup(pGroups);
 		DEBCHK(" group just PUP'ed out: gid = %d, name = %s\n",\
 			CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->ckGetGroupID().idx,\
@@ -151,7 +148,7 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	DEBCHK("[%d]CkStartCheckpoint: numNodeGroups = %d\n",CkMyPe(),numNodeGroups);
 
 	GroupInfo *tmpInfo2 = new GroupInfo [numNodeGroups];
-	for(int i=0;i<numNodeGroups;i++) {
+	for(i=0;i<numNodeGroups;i++) {
 		int tmpCtor;
 		tmpInfo2[i].gID = CksvAccess(_nodeGroupIDTable)[i];
 		tmpCtor = (tmpInfo2[i].eIdx = CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getMigCtor());
@@ -166,7 +163,7 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	}
 	if(numNodeGroups != fwrite(tmpInfo2,sizeof(GroupInfo),numNodeGroups,fNodeGroups)) CkAbort("error writing nodegroupinfo");
 	PUP::toDisk pNodeGroups(fNodeGroups);
-	for(int i=0;i<numNodeGroups;i++) {
+	for(i=0;i<numNodeGroups;i++) {
 		CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getObj()->pup(pNodeGroups);
 		DEBCHK(" nodegroup just PUP'ed out: gid = %d, name = %s\n",CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getObj()->ckGetGroupID().idx,CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getName());
 	}
@@ -174,7 +171,7 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	fclose(fNodeGroups);
 
 	// hand over to checkpoint managers for per-processor checkpointing
-	CProxy_CkCheckpointMgr(_sysChkptMgr).Checkpoint(len,(char *)dirname, cb);
+	CProxy_CkCheckpointMgr(_sysChkptMgr).Checkpoint((char *)dirname, cb);
 }
 
 /**
@@ -187,8 +184,7 @@ ElementRestorer::ElementRestorer(const char *dirName_,CkLocMgr *dest_)
 	:dirName(dirName_), dest(dest_)
 {
 	char indexName[1024];
-	chdir(dirName);
-	sprintf(indexName,"loc_%d_%d.idx",dest->ckGetGroupID().idx,CkMyPe());
+	sprintf(indexName,"%s/loc_%d_%d.idx",dirName,dest->ckGetGroupID().idx,CkMyPe());
 	indexFile=fopen(indexName,"r");
 	if (indexFile==NULL)  CkAbort("Could not read index file");
 	char ignored[128]; double version; int srcPE; int srcSize;
@@ -211,7 +207,7 @@ bool ElementRestorer::restore(void) {
 
 	//Restore the actual array element data from the file:
 	char pathName[1024];
-	sprintf(pathName,"%s",fileName);
+	sprintf(pathName,"%s/%s",dirName,fileName);
 	FILE *f=fopen(pathName,"rb");
 	if (!f) CkAbort("Could not read checkpoint file");
 	PUP::fromDisk p(f);
@@ -222,6 +218,7 @@ bool ElementRestorer::restore(void) {
 }
 
 void CkRestartMain(const char* dirname){
+	int i;
 	char filename[1024];
 	CkCallback cb;
 	int numGroups,numNodeGroups;
@@ -232,7 +229,7 @@ void CkRestartMain(const char* dirname){
 	if(!fRO) CkAbort("Failed to open checkpoint file for readonly data!");
 	fread(&_numReadonlies,sizeof(int),1,fRO);
 	PUP::fromDisk pRO(fRO);
-	for(int i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(pRO);
+	for(i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(pRO);
 	fread(&cb,sizeof(CkCallback),1,fRO);
 	fclose(fRO);
 	DEBCHK("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
@@ -250,7 +247,7 @@ void CkRestartMain(const char* dirname){
 	if(numGroups != fread(tmpInfo,sizeof(GroupInfo),numGroups,fGroups)) CkAbort("error reading groupinfo");
 
 	PUP::fromDisk pGroups(fGroups);
-	for(int i=0;i<numGroups;i++) {
+	for(i=0;i<numGroups;i++) {
 		CkGroupID gID = tmpInfo[i].gID;
 		//DEBCHK("tmpInfo[%d]:gID = %d, eIdx = %d\n",i,gID.idx,tmpInfo[i].eIdx);
 		CkpvAccess(_groupIDTable)->push_back(gID);
@@ -279,7 +276,7 @@ void CkRestartMain(const char* dirname){
 	if(numNodeGroups != fread(tmpInfo2,sizeof(GroupInfo),numNodeGroups,fNodeGroups)) CkAbort("error reading nodegroupinfo");
 
 	PUP::fromDisk pNodeGroups(fNodeGroups);
-	for(int i=0;i<numNodeGroups;i++) {
+	for(i=0;i<numNodeGroups;i++) {
 		CkGroupID gID = tmpInfo2[i].gID;
 		//DEBCHK("tmpInfo2[%d]:gID = %d, eIdx = %d\n",i,gID.idx,tmpInfo2[i].eIdx);
 		CksvAccess(_nodeGroupIDTable).push_back(gID);
@@ -297,7 +294,7 @@ void CkRestartMain(const char* dirname){
 	// for each location, restore arrays
 	DEBCHK("[%d]Trying to find location manager\n",CkMyPe());
 	IrrGroup* obj;
-	for(int i=0;i<numGroups;i++) {
+	for(i=0;i<numGroups;i++) {
 		CkGroupID gID = tmpInfo[i].gID;
 		obj = CkpvAccess(_groupTable)->find(gID).getObj();
 		//DEBCHK("tmpInfo[%d]:gID = %d, eIdx = %d, obj->ckGetGroupID() = %d\n",i,gID.idx,tmpInfo[i].eIdx, obj->ckGetGroupID().idx);
