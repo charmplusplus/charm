@@ -120,7 +120,7 @@ class PhaseTable {
     }
     int numPhasesCalled() { return phaseCalled; };
     void startPhase(int p) { 
-	if (p>=numPhase) CmiAbort("Too Many Phases. \n");
+	if (p<0 && p>=numPhase) CmiAbort("Invalid Phase number. \n");
 	cur_phase = p; 
 	if (phases[cur_phase] == NULL) {
 	    phases[cur_phase] = new PhaseEntry;
@@ -159,42 +159,7 @@ class LogPool {
     // for phases
     PhaseTable phaseTab;
   public:
-    LogPool(char *pgm) : phaseTab(MAX_PHASES) {
-      int i;
-      poolSize = CpvAccess(CtrLogBufSize);
-      if (poolSize % 2) poolSize++;	// make sure it is even
-      pool = new LogEntry[poolSize];
-      _MEMCHECK(pool);
-      numEntries = 0;
-      char pestr[10];
-      sprintf(pestr, "%d", CkMyPe());
-      int len = strlen(pgm) + strlen(".sum.") + strlen(pestr) + 1;
-      char *fname = new char[len+1];
-      sprintf(fname, "%s.%s.sum", pgm, pestr);
-      fp = NULL;
-      //CmiPrintf("TRACE: %s:%d\n", fname, errno);
-      do {
-      fp = fopen(fname, "w+");
-      } while (!fp && errno == EINTR);
-      delete[] fname;
-      if(!fp) {
-        CmiAbort("Cannot open Projections Trace File for writing...\n");
-      }
-
-      epSize = MAX_ENTRIES;
-      epTime = new double[epSize];
-      _MEMCHECK(epTime);
-      epCount = new int[epSize];
-      _MEMCHECK(epCount);
-      for (i=0; i< epSize; i++) {
-	epTime[i] = 0.0;
-	epCount[i] = 0;
-      };
-
-      // event
-      for (i=0; i<MAX_MARKS; i++) events[i].marks = NULL;
-      markcount = 0;
-    }
+    LogPool(char *pgm);
     ~LogPool() {
       write();
       fclose(fp);
