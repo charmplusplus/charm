@@ -137,16 +137,6 @@ while ($argindex <= $#argv)
 	    @ argindex = $argindex + 1
             breaksw
 
-	case "-modules":
-	    set MOD_LIST = $argv[$argindex]
-	    @ argindex = $argindex + 1
-	    breaksw
-
-	case "-module_file":
-	    set MOD_FILE = $argv[$argindex]
-	    @ argindex = $argindex + 1
-	    breaksw
-
         case "-D*"
             set OPTS_CPP=( $OPTS_CPP "$arg" )
             set OPTS_CC=( $OPTS_CC "$arg" )
@@ -555,41 +545,23 @@ if ( $BALANCE == btok ) then
     endif
 endif
 
-# Create module-init.TMP.o, if needed.
+# Create MODULES.TMP.o
 
-if ( $?MOD_FILE ) then
-  if (! -e $MOD_FILE) then
-    echo 'No such module file '$MOD_FILE
-    goto failure
-  endif
-  if ( $?MOD_LIST ) then
-    echo 'You specified both -modules and -module_list, this is illegal.'
-    goto failure
-  endif
-  set MOD_LIST=(`cat $MOD_FILE`)
-endif
+rm -f MODULES.TMP.dat MODULES.TMP.c MODULES.TMP.o
+touch MODULES.TMP.dat MODULES.TMP.c
+foreach x ($OBJECTFILES)
+    eval "$CMK_NM $x|$CMK_NM_FILTER"|egrep '^_CK_.*_init$' >> MODULES.TMP.dat
+end
+awk '{print "extern void "$1"();";}' < MODULES.TMP.dat >> MODULES.TMP.c
+echo '_CK_module_init_fn()' >> MODULES.TMP.c
+echo '{' >> MODULES.TMP.c
+awk '{print $1"();";}" < MODULES.TMP.dat >> MODULES.TMP.c
+echo '}' >> MODULES.TMP.c
 
-if (( $?MOD_LIST == 0) && (-e module.list)) then
-    set MOD_LIST=(`cat module.list`)
-endif
-
-if ( $?MOD_LIST ) then
-    rm -f module-init.TMP.c module-init.TMP.o
-    echo Modules: $MOD_LIST
-    echo " " > module-init.TMP.c
-    foreach i ( $MOD_LIST)
-      echo 'extern void _CK_'$i'_init();' >> module-init.TMP.c
-    end
-    echo '_CK_module_init_fn()' >> module-init.TMP.c
-      echo '{' >> module-init.TMP.c
-    foreach i ( $MOD_LIST)
-      echo '      _CK_'$i'_init();' >> module-init.TMP.c
-    end
-    echo '}' >> module-init.TMP.c
-    $CMK_CC $OPTS_CC -c module-init.TMP.c
-    if ($status) goto failure
-    set OBJECTFILES = ($OBJECTFILES module-init.TMP.o)
-endif
+$CMK_CC $OPTS_CC -c MODULES.TMP.c
+if ($status) goto failure
+set OBJECTFILES = ($OBJECTFILES MODULES.TMP.o)
+set DELETE=(MODULES.TMP.dat MODULES.TMP.c MODULES.TMP.o $DELETE)
 
 # Identify the libraries to use
 
