@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-13 07:56:43  jyelon
+ * Revision 2.2  1996-04-30 04:44:31  gursoy
+ * CkPrintf to CmiPrintf
+ *
+ * Revision 2.1  1995/06/13  07:56:43  jyelon
  * Fixed silly warnings.
  *
  * Revision 2.0  1995/06/05  18:52:05  brunner
@@ -801,7 +804,7 @@ static emit_epconv()
     writeoutput(temp,NOFREE); WriteReturn();
     writeoutput("{int i; for(i=0;i<n;i++) if(epconv[i] == ep)return i;",NOFREE);
     WriteReturn();
-    writeoutput("CkPrintf(\"dag: invalid entry point\\n\");}",NOFREE);
+    writeoutput("CmiPrintf(\"dag: invalid entry point\\n\");}",NOFREE);
     WriteReturn();
 }
 */
