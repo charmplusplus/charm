@@ -2,7 +2,6 @@ mainmodule fem {
   readonly CkChareID _mainhandle;
   readonly CkArrayID _femaid;
   readonly unsigned int _nchunks;
-  readonly int _migHandle;
   message [varsize] DataMsg;
   message [packed] ChunkMsg;
   message MigrateInfo;
@@ -10,15 +9,12 @@ mainmodule fem {
     entry main();
     entry void done(void);
   };
-  group migrator {
-    entry migrator(void);
-    entry void migrateElement(MigrateInfo *);
-  };
   array [1D] chunk {
     entry chunk(void);
     entry [threaded] void run(void);
     entry [threaded] void run(ChunkMsg*);
     entry void recv(DataMsg *);
     entry void result(DataMsg *);
+    entry void migrate(MigrateInfo *);
   };
 };

@@ -159,7 +159,7 @@ main (int argc, char **argv)
   int *adjncy = mesh2graph(nelems, esize, conn, xadj);
   printf("mesh2graph returned...\n");
   printf("writing graph file...\n");
-  fprintf(fo, "%d %d %d", nelems, nnodes, esize);
+  fprintf(fo, "%d %d %d\n", nelems, nnodes, esize);
   for (i=0;i<nelems;i++)
   {
     for (j=0;j<esize;j++)

@@ -151,6 +151,7 @@ driver(int nn, int *nnums, int ne, int *enums, int npere, int *conn)
   stime = CkTimer();
   for(i=0;i<gd->nTime;i++)
   {
+    CkPrintf("[%d] iteration %d at %lf secs\n", gd->myid, i, CkTimer());
     if (gd->ts_proportion[kk+1] == i)
     {
       kk++;

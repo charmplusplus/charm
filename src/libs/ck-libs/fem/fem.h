@@ -106,23 +106,8 @@ class ChunkMsg : public CMessage_ChunkMsg {
 class MigrateInfo :public CMessage_MigrateInfo
 {
  public:
-  ArrayElement *elem;
   int where;
-  MigrateInfo(ArrayElement *e, int w) : elem(e), where(w) {}
-};
-
-extern int _migHandle;
-
-class migrator : public Group
-{
- public:
-  migrator(void) {}
-  void migrateElement(MigrateInfo *msg)
-  {
-    // CkPrintf("migrator: tid is %p\n", CthSelf());
-    msg->elem->migrateMe(msg->where);
-    delete msg;
-  }
+  MigrateInfo(int w) : where(w) {}
 };
 
 #define MAXDT 20
@@ -170,6 +155,7 @@ class chunk : public ArrayElement1D
   void run(ChunkMsg*);
   void recv(DataMsg *);
   void result(DataMsg *);
+  void migrate(MigrateInfo *msg) { migrateMe(msg->where); delete msg; }
   int new_DT(int base_type, int vec_len=1, int init_offset=0, int distance=0) {
     if(ntypes==MAXDT) {
       CkAbort("FEM: registered datatypes limit exceeded.");

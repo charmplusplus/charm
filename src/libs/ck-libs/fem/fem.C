@@ -2,7 +2,6 @@
 
 CkChareID _mainhandle;
 CkArrayID _femaid;
-int _migHandle;
 unsigned int _nchunks;
 
 CtvStaticDeclare(chunk*, _femptr);
@@ -111,7 +110,6 @@ main::main(CkArgMsg *am)
       break;
     }
   }
-  _migHandle = CProxy_migrator::ckNew();
   _femaid = CProxy_chunk::ckNew(_nchunks);
   CProxy_chunk farray(_femaid);
   farray.setReductionClient(_allReduceHandler, 0);
@@ -804,15 +802,10 @@ chunk::pup(PUP::er &p)
       usize = pksz(userdata);
     p(usize);
     if(p.isPacking())
-    {
       pk(userdata,p.getBuf());
-      p.advance(usize);
-    }
     if(p.isUnpacking())
-    {
       userdata = upk(p.getBuf());
-      p.advance(usize);
-    }
+    p.advance(usize);
   }
 }
 
@@ -914,8 +907,8 @@ FEM_Migrate(void)
   int mype = CkMyPe();
   int npes = CkNumPes();
   int tope = (mype+1)%npes;
-  CProxy_migrator pmg(_migHandle);
-  pmg.migrateElement(new MigrateInfo((ArrayElement*)cptr,(mype+1)%npes));
+  CProxy_chunk cproxy(_femaid);
+  cproxy.migrate(new MigrateInfo(tope));
   CthSuspend();
   if(CkMyPe()!=tope)
   {
