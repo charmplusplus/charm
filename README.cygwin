@@ -3,7 +3,8 @@ Note: This version of cygwin is still under testing.
 Check the FAQ at end of this file for more help.
 
 
---- Setup and Compilation ---
+Setup and Compilation
+=====================
 
 To compile charm on cygwin:
 1. install cygwin from: http://sourceware.cygnus.com/cygwin
@@ -57,7 +58,14 @@ shell     514/tcp    cmd
 4. If you have any problem with it, please check the FAQ below for help.
    Let me know if it works or not by sending email to (ppl@uiuc.edu).
 
---- FAQ ---
+
+
+
+
+
+
+FAQ
+==============
 
  * Why would I use net-cygwin version?
 
@@ -91,5 +99,11 @@ shell     514/tcp    cmd
    of each line. Don't use WinCVS to checkout charm because it will append
    '^M' for each line. Use the cvs that comes free from cygwin.
 
+ * Problem: I got a runtime error "CthCreate failed to create fiber!".
 
+   net-cygwin uses Win32 Fiber in its user threads implementation. However, 
+   there is a limit upon the number of Fibers you can create at one time in 
+   the w32api of cygwin. The current limit (as I tested) is between 50-52. You 
+   have to reduce the number of processors or the number of charm++ threads
+   you create in the program to run it under cygwin.
 
