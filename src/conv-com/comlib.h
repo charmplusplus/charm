@@ -65,6 +65,10 @@ CkpvExtern(int, DummyHandle);
 //Just deletes and ignores the message
 CkpvExtern(int, RecvdummyHandle);
 
+inline double cubeRoot(double d) {
+  return pow(d,1.0/3.0);
+}
+
 
 #include "router.h"
 

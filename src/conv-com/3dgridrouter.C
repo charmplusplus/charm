@@ -31,10 +31,6 @@
 #define RowLen(pe) ColLen3D(pe)
 #define PELISTSIZE ((ROWLEN-1)/sizeof(int)+1)
 
-inline double cubeRoot(double d) {
-  return pow(d,1.0/3.0);
-}
-
 inline int ColLen3D(int npes)
 {
     int len= (int)cubeRoot((double)npes);
