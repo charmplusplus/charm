@@ -7,6 +7,8 @@
 #ifndef _MPI_H
 #define _MPI_H
 
+#include "conv-config.h" 
+
 /* NON-standard define: this lets people #ifdef on
    AMPI, e.g. for our bizarre AMPI_Main. */
 #define AMPI
