@@ -257,6 +257,16 @@ while ($argindex <= $#argv)
             set OPTS_LDRO=( $OPTS_LDRO $arg )
             breaksw
 
+        case "+*"
+            echo "passing unrecognized option $arg to all compilers and linkers"
+	    set OPTS_CPP= ( $OPTS_CPP  $arg )
+            set OPTS_CC=  ( $OPTS_CC   $arg )
+            set OPTS_CXX= ( $OPTS_CXX  $arg )
+            set OPTS_LD=  ( $OPTS_LD   $arg )
+	    set OPTS_LDXX=( $OPTS_LDXX $arg )
+            set OPTS_LDRO=( $OPTS_LDRO $arg )
+            breaksw
+
         case "*.*"
             set FILES=( $FILES "$arg" )
             breaksw
