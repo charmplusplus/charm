@@ -38,7 +38,7 @@ typedef struct _LDOMid {
   CkGroupID id;
 #ifdef __cplusplus
   CmiBool operator==(const struct _LDOMid& omId) const {
-    return (CmiBool)(id == omId.id);
+    return id == omId.id?CmiTrue:CmiFalse;
   }
   inline void pup(PUP::er &p);
 #endif

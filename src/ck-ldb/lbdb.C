@@ -416,7 +416,7 @@ int LDMemusage(LDHandle _db)
 
 CmiBool LDOMidEqual(const LDOMid &i1, const LDOMid &i2)
 {
- return (CmiBool)(i1.id == i2.id);
+ return i1.id == i2.id?CmiTrue:CmiFalse;
 }
 
 CmiBool LDObjIDEqual(const LDObjid &i1, const LDObjid &i2)
