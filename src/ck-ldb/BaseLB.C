@@ -54,7 +54,7 @@ void BaseLB::pup(PUP::er &p) {
 
 #else
 BaseLB::~BaseLB() {} 
-
+void BaseLB::initLB(const CkLBOptions &) {}
 void BaseLB::unregister() {}
 void BaseLB::pup(PUP::er &p) {}
 #endif
