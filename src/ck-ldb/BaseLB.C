@@ -13,19 +13,6 @@
 #include <charm++.h>
 #include <BaseLB.h>
 
-CkpvDeclare(int, numLoadBalancers);  /**< num of lb created */
-CkpvDeclare(int, hasNullLB);         /**< true if NullLB is created */
-
-/// called in Charm Init to initialize Cpv variables.
-void _loadbalancerInit()
-{
-//CmiPrintf("[%d] initLBFrameWork()\n", CkMyPe());
-  CkpvInitialize(int, numLoadBalancers);
-  CkpvInitialize(int, hasNullLB);
-  CkpvAccess(numLoadBalancers) = 0;
-  CkpvAccess(hasNullLB) = 0;
-}
-
 #if CMK_LBDB_ON
 
 BaseLB::BaseLB() {

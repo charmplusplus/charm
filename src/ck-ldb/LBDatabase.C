@@ -23,6 +23,10 @@
 
 CkGroupID lbdb;
 
+CkpvDeclare(int, numLoadBalancers);  /**< num of lb created */
+CkpvDeclare(int, hasNullLB);         /**< true if NullLB is created */
+CkpvDeclare(int, lbdatabaseInited);  /**< true if lbdatabase is inited */
+
 static LBDefaultCreateFn defaultCreate=NULL;
 void LBSetDefaultCreate(LBDefaultCreateFn f)
 {
@@ -82,7 +86,8 @@ LBDBInit::LBDBInit(CkArgMsg *m)
     LBDefaultCreateFn fn = lbRegistry.search(balancer);
     if (!fn) { 
       lbRegistry.displayLBs(); 
-      CmiAbort("Unknown load balancer!"); 
+      CmiPrintf("Abort: Unknown load balancer: '%s'!\n", balancer); 
+      CkExit();
     }
     else  // overwrite defaultCreate.
       lbFn = fn;
@@ -93,6 +98,40 @@ LBDBInit::LBDBInit(CkArgMsg *m)
   (lbFn)();
 #endif
   delete m;
+}
+
+void _loadbalancerInit()
+{
+  CkpvInitialize(int, lbdatabaseInited);
+  CkpvAccess(lbdatabaseInited) = 0;
+  CkpvInitialize(int, numLoadBalancers);
+  CkpvAccess(numLoadBalancers) = 0;
+  CkpvInitialize(int, hasNullLB);
+  CkpvAccess(hasNullLB) = 0;
+}
+
+int LBDatabase::manualOn = 0;
+
+void TurnManualLBOn()
+{
+   LBDatabase * myLbdb = LBDatabase::Object();
+   if (myLbdb) {
+     myLbdb->TurnManualLBOn();
+   }
+   else {
+     LBDatabase::manualOn = 1;
+   }
+}
+
+void TurnManualLBOff()
+{
+   LBDatabase * myLbdb = LBDatabase::Object();
+   if (myLbdb) {
+     myLbdb->TurnManualLBOff();
+   }
+   else {
+     LBDatabase::manualOn = 0;
+   }
 }
 
 /*@}*/

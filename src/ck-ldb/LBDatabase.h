@@ -20,11 +20,14 @@ extern CkGroupID lbdb;
 
 CkpvExtern(int, numLoadBalancers);
 CkpvExtern(int, hasNullLB);
+CkpvExtern(int, lbdatabaseInited);
 
 typedef void (*LBDefaultCreateFn)(void);
 void LBSetDefaultCreate(LBDefaultCreateFn f);
 
 void LBRegisterBalancer(const char *, LBDefaultCreateFn, const char *);
+
+void _LBDBInit();
 
 class LBDBInit : public Chare {
   public:
@@ -32,13 +35,18 @@ class LBDBInit : public Chare {
     LBDBInit(CkMigrateMessage *m) {}
 };
 
+
 class LBDatabase : public Group {
+public:
+  static int manualOn;
 public:
   LBDatabase(void) {
     myLDHandle = LDCreate();  
+    CkpvAccess(lbdatabaseInited) = 1;
+    if (manualOn) TurnManualLBOn();
   };
   LBDatabase(CkMigrateMessage *m) { myLDHandle = LDCreate(); }
-  inline static LBDatabase * Object() { return (LBDatabase *)CkLocalBranch(lbdb); }
+  inline static LBDatabase * Object() { return CkpvAccess(lbdatabaseInited)?(LBDatabase *)CkLocalBranch(lbdb):NULL; }
 
   /*
    * Calls from object managers to load database
@@ -100,6 +108,7 @@ public:
 
   inline void StartLB() { LDStartLB(myLDHandle); }
   inline void TurnManualLBOn() { LDTurnManualLBOn(myLDHandle); }
+  inline void TurnManualLBOff() { LDTurnManualLBOff(myLDHandle); }
  
   inline void CollectStatsOn(void) { LDCollectStatsOn(myLDHandle); };
   inline void CollectStatsOff(void) { LDCollectStatsOff(myLDHandle); };
@@ -153,6 +162,9 @@ private:
   LDHandle myLDHandle;
 
 };
+
+void TurnManualLBOn();
+void TurnManualLBOff();
 
 #endif /* LDATABASE_H */
 

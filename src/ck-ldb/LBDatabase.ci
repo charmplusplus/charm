@@ -4,8 +4,9 @@ module LBDatabase {
   readonly CkGroupID lbdb;
 
   mainchare LBDBInit {
-    entry LBDBInit();
+    entry LBDBInit(CkArgMsg *m);
   };
+
   group LBDatabase {
     entry void LBDatabase(void);  
   };
