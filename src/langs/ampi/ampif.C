@@ -95,7 +95,7 @@ ampi_barrier_
 #endif
   (int *comm, int *ierr)
 {
-  *ierr = AMPI_Comm(*comm);
+  *ierr = AMPI_Barrier(*comm);
 }
 
 extern "C" void 

@@ -58,12 +58,10 @@ ArgsInfo::unpack(void *in)
 }
 
 CtvDeclare(ampi*, ampiPtr);
-static CkArray *ampiArray;
 
 
 ampi::ampi(void)
 {
-  ampiArray = thisArray;
   usesAtSync = CmiTrue;
   msgs = CmmNew();
   thread_id = 0;
@@ -208,7 +206,6 @@ void ampi::pup(PUP::er &p)
     CtvAccessOther(thread_id, ampiPtr) = this;
     myDDT = new DDT;
     nrequests = 0;
-    ampiArray = thisArray;
     nirequests = 0;
     firstfree = 0;
     int i;
