@@ -76,8 +76,9 @@ class ArgsInfo : public CMessage_ArgsInfo {
   public:
     int argc;
     char **argv;
-    ArgsInfo(void) { argc = 0; }
+    ArgsInfo(void) { argc = 0; argv=0; }
     ArgsInfo(int c, char **v) { argc = c; argv = v; }
+    void setargs(int c, char**v) { argc = c; argv = v; }
     static void* pack(ArgsInfo*);
     static ArgsInfo* unpack(void*);
 };
@@ -149,8 +150,11 @@ class ampi : public ArrayElement1D {
     virtual void start(void); // should be overloaded in derived class
     void ResumeFromSync(void)
     {
-      CthAwaken(thread_id);
-      thread_id = 0;
+      if (thread_id)
+      {
+        CthAwaken(thread_id);
+        thread_id = 0;
+      }
     }
 };
 

@@ -24,7 +24,7 @@ int _rednroot;
 void*
 ArgsInfo::pack(ArgsInfo* msg)
 {
-  int argsize, i;
+  int argsize=0, i;
   for(i=0;i<msg->argc;i++) {
     argsize += (strlen(msg->argv[i])+1); // +1 for '\0'
   }
@@ -32,7 +32,7 @@ ArgsInfo::pack(ArgsInfo* msg)
                                (msg->argc*sizeof(char*)) + 
                                 argsize);
   memcpy(p,msg,sizeof(ArgsInfo));
-  char *args = (char *)((char*)p+sizeof(ArgsInfo)+(msg->argc+sizeof(char*)));
+  char *args = (char *)((char*)p+sizeof(ArgsInfo)+(msg->argc*sizeof(char*)));
   for(i=0;i<msg->argc;i++) {
     char *tmp = msg->argv[i];
     while(*tmp) { *args++ = *tmp++; }
@@ -45,11 +45,11 @@ ArgsInfo::pack(ArgsInfo* msg)
 ArgsInfo*
 ArgsInfo::unpack(void *in)
 {
-  int argc = *((int*)in);
+  ArgsInfo* msg = new (in) ArgsInfo();
   char **argv = (char**)((char*)in+sizeof(ArgsInfo));
-  ArgsInfo* msg = new (in) ArgsInfo(argc, argv);
-  char *tmp = ((char*)in+sizeof(ArgsInfo)+(argc*sizeof(char*)));
-  for(int i=0;i<argc;i++) {
+  msg->setargs(msg->argc, argv);
+  char *tmp = ((char*)in+sizeof(ArgsInfo)+(msg->argc*sizeof(char*)));
+  for(int i=0;i<msg->argc;i++) {
     argv[i] = tmp;
     while(*tmp) { tmp++; }
     tmp++;
@@ -67,7 +67,7 @@ ampi::ampi(void)
   thread_id = 0;
   nbcasts = 0;
   nrequests = 0;
-  myDDT = new DDT ;
+  myDDT = new DDT() ;
   nirequests = 0;
   firstfree = 0;
   int i;
@@ -171,7 +171,17 @@ ampi::bcastraw(void* buf, int len, CkArrayID aid)
 void ampi::pup(PUP::er &p)
 {
   ArrayElement1D::pup(p);//Pack superclass
-  msgs = CmmPup((pup_er)&p, msgs);
+  if(p.isPacking())
+  {
+    AmpiMsg *msg;
+    int snum[2];
+    snum[0] = CmmWildCard;
+    snum[1] = CmmWildCard;
+    CProxy_ampi ap(thisArrayID);
+    while(msg = (AmpiMsg*)CmmGet(msgs,2,snum,0))
+      ap[thisIndex].generic(msg);
+    CmmFree(msgs);
+  }
   p(tsize);
   void *tbuf;
   // thread needs to be packed later than user data, but needs to be unpacked
@@ -203,8 +213,9 @@ void ampi::pup(PUP::er &p)
   // to pup them as well.
   if(p.isUnpacking())
   {
+    msgs = CmmNew();
     CtvAccessOther(thread_id, ampiPtr) = this;
-    myDDT = new DDT;
+    myDDT = new DDT((void*)0);
     nrequests = 0;
     nirequests = 0;
     firstfree = 0;
@@ -215,8 +226,6 @@ void ampi::pup(PUP::er &p)
     }
   }
   myDDT->pup(p);
-  if(p.isPacking())
-    CthFree(thread_id);
 }
 
 int
