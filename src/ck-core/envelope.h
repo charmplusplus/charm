@@ -103,6 +103,7 @@ private:
     UInt   totalsize; //Byte count from envelope start to end of priobits
     
   public:
+    void pup(PUP::er &p);
     UInt   getEvent(void) const { return event; }
     void   setEvent(const UInt e) { event = e; }
     UInt   getRef(void) const { return ref; }
