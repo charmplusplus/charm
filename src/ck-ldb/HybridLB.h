@@ -54,6 +54,7 @@ public:
   ThreeLevelTree() {
     nLevels = 3;
     span[0] = CkNumPes()/8;
+    if (span[0] == 0) span[0] = CkNumPes()/4;
     CmiAssert(span[0]>0);
     span[1] = (CkNumPes()+span[0]-1)/span[0];
     toproot = 1;
@@ -116,7 +117,6 @@ public:
   void StatsDone(int level);  // Call when LDStats migration is complete
   void NotifyObjectMigrationDone(int level);	
   void Loadbalancing(int level);	// start load balancing
-  int step() { return mystep; };
   void StartCollectInfo();
   void CollectInfo(Location *loc, int n, int fromlevel);
   void PropagateInfo(Location *loc, int n, int fromlevel);
@@ -139,6 +139,8 @@ protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
   virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
+  virtual void work(LDStats* stats,int count);
+  virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
 
   int NeighborIndex(int pe, int atlevel);   // return the neighbor array index
 
@@ -150,7 +152,6 @@ private:
   CLBStatsMsg * buildCombinedLBStatsMessage(int atlevel);
   void depositLBStatsMessage(CLBStatsMsg *msg, int atlevel);
 
-  int mystep;
   int future_migrates_expected;
   LBMigrateMsg** mig_msgs;
   int mig_msgs_received;

@@ -109,6 +109,7 @@ public:
 
   void unregister(); 
   inline char *lbName() { return lbname; }
+  inline int step() { return theLbdb->step(); }
   virtual void turnOff() { CmiAbort("turnOff not implemented"); }
   virtual void turnOn()  { CmiAbort("turnOn not implemented"); }
   void pup(PUP::er &p);

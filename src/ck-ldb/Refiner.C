@@ -263,7 +263,7 @@ int Refiner::multirefine()
   double dMaxOverload = maxOverload * overloadStep + overloadStart;
   int curOverload;
   int refineDone = 0;
-  if (_lb_args.debug())
+  if (_lb_args.debug()>1)
     CmiPrintf("dMinOverload: %f dMaxOverload: %f\n", dMinOverload, dMaxOverload);
                                                                                 
   overLoad = dMinOverload;
@@ -285,7 +285,7 @@ int Refiner::multirefine()
       curOverload = (maxOverload + minOverload ) / 2;
                                                                                 
       overLoad = curOverload * overloadStep + overloadStart;
-      if (_lb_args.debug())
+      if (_lb_args.debug()>1)
       CmiPrintf("Testing curOverload %d = %f [min,max]= %d, %d\n", curOverload, overLoad, minOverload, maxOverload);
       if (refine())
         maxOverload = curOverload;
@@ -317,7 +317,7 @@ void Refiner::Refine(int count, BaseLB::LDStats* stats,
 
   computeAverage();
 
-  if (_lb_args.debug()>=2)  {
+  if (_lb_args.debug()>2)  {
     CkPrintf("Old PE load: ");
     for (i=0; i<count; i++) CkPrintf("%f(%f) ", processors[i].load, processors[i].backgroundLoad);
     CkPrintf("\n");
@@ -341,12 +341,13 @@ void Refiner::Refine(int count, BaseLB::LDStats* stats,
 	             next((Iterator *)&nextCompute);
     }
   }
-  if (_lb_args.debug()>=2)  {
+  if (_lb_args.debug()>2)  {
     CkPrintf("New PE load: ");
     for (i=0; i<count; i++) CkPrintf("%f ", processors[i].load);
     CkPrintf("\n");
   }
-  if (_lb_args.debug()) CkPrintf("Refiner: moving %d obejcts. \n", nmoves);
+  if (_lb_args.debug()>1) 
+    CkPrintf("Refiner: moving %d obejcts. \n", nmoves);
   delete [] computes;
   delete [] processors;
 };

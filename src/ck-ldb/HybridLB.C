@@ -41,7 +41,6 @@ HybridLB::HybridLB(const CkLBOptions &opt): BaseLB(opt)
 {
 #if CMK_LBDB_ON
   lbname = (char *)"HybridLB";
-  mystep = 0;
   thisProxy = CProxy_HybridLB(thisgroup);
   receiver = theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
@@ -139,7 +138,7 @@ void HybridLB::ProcessAtSync()
     start_lb_time = CkWallTimer();
     if (_lb_args.debug())
       CkPrintf("Load balancing step %d starting at %f\n",
-	       step(),start_lb_time);
+	       step(), CkWallTimer());
   }
 
   // assemble LB database
@@ -299,8 +298,8 @@ void HybridLB::buildStats(int atlevel)
      delete msg;
      statsMsgsList[n]=0;
   }
-  if (_lb_args.debug()) {
-      CmiPrintf("n_obj:%d migratable:%d ncom:%d\n", nobj, nmigobj, ncom);
+  if (_lb_args.debug()>1) {
+      CmiPrintf("[%d] n_obj:%d migratable:%d ncom:%d\n", CkMyPe(), nobj, nmigobj, ncom);
   }
   CmiAssert(statsData->n_objs == nobj);
   CmiAssert(statsData->n_comm == ncom);
@@ -374,9 +373,21 @@ void HybridLB::Loadbalancing(int atlevel)
   // at this time, all objects processor location is relative, and 
   // all incoming objects from outside group belongs to the fake root proc.
 
-  CkPrintf("[%d] Calling Strategy ... \n", CkMyPe());
+  DEBUGF(("[%d] Calling Strategy ... \n", CkMyPe()));
+  double start_lb_time;
+  if (atlevel == tree->numLevels()-1) {
+    start_lb_time = CkWallTimer();
+  }
+
   currentLevel = atlevel;
   LBMigrateMsg* migrateMsg = Strategy(statsData, lData->nChildren);
+
+  if (atlevel == tree->numLevels()-1) {
+    // FIXME
+    double strat_end_time = CkWallTimer();
+    if (_lb_args.debug()>1)
+        CkPrintf("[%d] Level %d Strat elapsed time %f\n", CkMyPe(), atlevel, strat_end_time-start_lb_time);
+  }
 
   // send to children 
   thisProxy.ReceiveMigration(migrateMsg, lData->nChildren, lData->children);
@@ -393,12 +404,6 @@ void HybridLB::Loadbalancing(int atlevel)
     }
   }
 
-  if (CkMyPe() == 0) {
-    // FIXME
-    double strat_end_time = CkWallTimer();
-    if (_lb_args.debug())
-        CkPrintf("Strat elapsed time %f\n",strat_end_time-start_lb_time);
-  }
 }
 
 // migrate only object LDStat in group
@@ -756,8 +761,23 @@ void HybridLB::ResumeClients()
 LBMigrateMsg* HybridLB::Strategy(LDStats* stats,int count)
 {
 #if CMK_LBDB_ON
-  int i;
+  work(stats, count);
 
+  if (_lb_args.debug()>2)  {
+    CkPrintf("Obj Map:\n");
+    for (int i=0; i<stats->n_objs; i++) CkPrintf("%d ", stats->to_proc[i]);
+    CkPrintf("\n");
+  }
+
+  return createMigrateMsg(stats, count);
+#else
+  return NULL;
+#endif
+}
+
+void HybridLB::work(LDStats* stats,int count)
+{
+#if CMK_LBDB_ON
   LevelData *lData = levelData[currentLevel];
 
   // TODO: let's generate LBMigrateMsg ourself
@@ -766,7 +786,16 @@ LBMigrateMsg* HybridLB::Strategy(LDStats* stats,int count)
     refine->work(stats, count);
   else
     greedy->work(stats, count);
+#endif
+}
   
+LBMigrateMsg * HybridLB::createMigrateMsg(LDStats* stats,int count)
+{
+#if CMK_LBDB_ON
+  int i;
+
+  LevelData *lData = levelData[currentLevel];
+
   CkVec<MigrateInfo*> migrateInfo;
   for (i=0; i<stats->n_objs; i++) {
     LDObjData &objData = stats->objData[i];
@@ -816,6 +845,8 @@ LBMigrateMsg* HybridLB::Strategy(LDStats* stats,int count)
   }
 
   return msg;
+#else
+  return NULL;
 #endif
 }
 

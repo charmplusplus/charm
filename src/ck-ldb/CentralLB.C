@@ -281,8 +281,8 @@ void CentralLB::buildStats()
        statsMsgsList[pe]=0;
     }
     statsData->n_migrateobjs = nmigobj;
-    if (_lb_args.debug()) {
-      CmiPrintf("n_obj:%d migratable:%d ncom:%d\n", nobj, nmigobj, ncom);
+    if (_lb_args.debug() > 1) {
+      CmiPrintf("[%d] n_obj:%d migratable:%d ncom:%d\n", CkMyPe(), nobj, nmigobj, ncom);
     }
 }
 

@@ -57,7 +57,6 @@ public:
 
   void turnOn();
   void turnOff();
-  inline int step() { return theLbdb->step(); }
 
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
