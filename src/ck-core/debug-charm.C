@@ -301,8 +301,77 @@ void CpdStartGdb(void)
 #endif
 }
 
+CpvExtern(void *,debugQueue);
+
+
+//following function should interpret data in a message
+//as of now replicate's CkPupMessage function's functionality
+//to do
+void CpdPupMessage(PUP::er &p, void *msg)
+{
+
+  UChar type;
+  int size,prioBits,envSize;
+
+  /* pup this simple flag so that we can handle the NULL msg */
+  int isNull = (msg == NULL);   // be overwritten when unpacking
+  p(isNull);
+  if (isNull) { msg = NULL; return; }
+  envelope *env=UsrToEnv(msg);
+  unsigned char wasPacked=0;
+  p.comment("Begin Charm++ Message {");
+  wasPacked=env->isPacked();
+  type=env->getMsgtype();
+  size=env->getTotalsize();
+  prioBits=env->getPriobits();
+  envSize=sizeof(envelope);
+  p(type);
+  p(wasPacked);
+  p(size);
+  p(prioBits);
+  p(envSize);
+  int userSize=size-envSize-sizeof(int)*PW(prioBits);
+ 
+  p.comment("} End Charm++ Message");
+}
+
+//Cpd Lists for local and scheduler queues
+class CpdList_localQ : public CpdListAccessor {
+
+public:
+  CpdList_localQ() {}
+  virtual const char * getPath(void) const {return "converse/localqueue";}
+  virtual int getLength(void) const {
+    int x = CdsFifo_Length((CdsFifo)(CpvAccess(debugQueue)));
+    //CmiPrintf("*******Returning fifo length %d*********\n", x);
+    //return CdsFifo_Length((CdsFifo)(CpvAccess(CmiLocalQueue)));
+    return x;
+  }
+  virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
+    void ** messages = CdsFifo_Enumerate(CpvAccess(debugQueue));
+    int curObj=0;
+    if ((req.lo>=0) && (req.lo<= getLength()) && (req.hi<=getLength()))
+    {
+       for(curObj=req.lo; curObj<req.hi; curObj++)
+       {
+        beginItem(p,curObj);
+        p.comment("name");
+        char buf[128];
+        sprintf(buf,"%s%d","Message",curObj);
+        p(buf, strlen(buf));
+        CpdPupMessage(p, messages[curObj]);
+        //CkPupMessage(p, &messages[curObj], 0);
+       }
+    }
+
+  }
+};
+
+
+
 extern void CpdExamineArrayElement(char *);
 
+void CpdListRegister(CpdListAccessor *acc);
 
 void CpdCharmInit()
 {
@@ -314,9 +383,8 @@ void CpdCharmInit()
   CcsRegisterHandler("ccs_debug_quit",(CmiHandler)CpdQuitDebug);
   CcsRegisterHandler("ccs_debug_startgdb",(CmiHandler)CpdStartGdb);
   CcsRegisterHandler("ccs_examine_arrayelement",(CmiHandler)CpdExamineArrayElement);
-
+  CpdListRegister(new CpdList_localQ());
 }
-
 
 
 #endif /*CMK_CCS_AVAILABLE*/
