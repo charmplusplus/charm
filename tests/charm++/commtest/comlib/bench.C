@@ -14,7 +14,7 @@
 
 #define USELIB  1
 #define MAXITER 100
-#define NUMPASS 1
+#define NUMPASS 2
 
 /*readonly*/ CkChareID mid;
 /*readonly*/ CProxy_Bench arr;
@@ -97,7 +97,11 @@ public:
         arr.doneInserting();
 
 	curTime = CkWallTimer();
-        arr.start(size);
+
+        for(count = 0; count < nElements; count++)            
+            arr[count].start(size);
+
+        //arr.start();
     };
     
     void send(void) {
@@ -115,8 +119,11 @@ public:
 	
 	if(pass == NUMPASS)
 	  done();
-	else            
-	  arr.start(size);
+	else {
+            for(int count = 0; count < nElements; count++)            
+                arr[count].start(size);
+            //arr.start(size);
+        }
       }
     }
     
@@ -138,7 +145,9 @@ public:
           else if(superpass < 50)
               size += 500;
           
-          arr.start(size);
+          for(int count = 0; count < nElements; count++)            
+              arr[count].start(size);
+          //arr.start(size);
       }
     }
 };
@@ -224,9 +233,11 @@ public:
     void start(int messagesize){
         msize = messagesize;
 
-	if(ite % NUMPASS == NUMPASS/2 || ite % NUMPASS == 1)  
+	if(ite % NUMPASS == NUMPASS/2 || ite % NUMPASS == 1) {
             //Call atsync in the middle and in the end
+            ComlibPrintf("[%d] Calling Atsync\n", CkMyPe());
             AtSync();
+        }
         else
             sendMessage();
         
