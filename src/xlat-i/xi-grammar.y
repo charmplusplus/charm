@@ -96,7 +96,7 @@ extern int macroDefined(char *str, int istrue);
 %type <cattr>		CAttribs CAttribList CAttrib
 %type <tparam>		TParam
 %type <tparlist>	TParamList TParamEList OptTParams
-%type <type>		Type SimpleType OptTypeInit EReturn
+%type <type>		BaseType Type SimpleType OptTypeInit EReturn
 %type <type>		BuiltinType
 %type <ftype>		FuncType
 %type <ntype>		NamedType QualNamedType ArrayIndexType
@@ -284,11 +284,11 @@ PtrType		: OnePtrType '*'
 		{ $1->indirect(); $$ = $1; }
 		;
 
-FuncType	: Type '(' '*' Name ')' '(' ParamList ')'
+FuncType	: BaseType '(' '*' Name ')' '(' ParamList ')'
 		{ $$ = new FuncType($1, $4, $7); }
 		;
 
-Type		: SimpleType
+BaseType	: SimpleType
 		{ $$ = $1; }
 		| OnePtrType
 		{ $$ = $1; }
@@ -296,11 +296,17 @@ Type		: SimpleType
 		{ $$ = $1; }
 		| FuncType
 		{ $$ = $1; }
-		| Type '&'
-		{ $$ = new ReferenceType($1); }
 		//{ $$ = $1; }
-		| CONST Type 
+		| CONST BaseType 
 		{ $$ = $2; }
+		| BaseType CONST
+		{ $$ = $1; }
+		;
+
+Type		: BaseType '&'
+                { $$ = new ReferenceType($1); }
+		| BaseType
+		{ $$ = $1; }
 		;
 
 ArrayDim	: NUMBER
