@@ -467,8 +467,21 @@ void CkReductionMgr::finishReduction(void)
 #if DEBUGRED
   CkPrintf("[%d,%d]Callback for redNo %d in group %d  mesggcount=%d localgcount=%d\n",CkMyNode(),CkMyPe(),redNo,thisgroup.idx,ret->gcount,gcount);
 #endif
-    
-  nodeProxy[CkMyNode()].ckLocalBranch()->contributeArrayReduction(result);
+  
+  // Find our node reduction manager, and pass reduction to him:
+  CkArrayReductionMgr *nodeMgr;
+//FIXME: this race condition resolution code is horrific--
+//  we need to adjust the semantics of nodegroup creation to 
+//  make this code simpler. (OSL, 2003/8/18)
+  while (NULL== (nodeMgr=nodeProxy[CkMyNode()].ckLocalBranch()) ) 
+  { /* Nodegroup creation race: spin until our nodegroup element is created */
+    // CkPrintf("RACE: nodeMgr not initialized yet!\n");
+    CsdScheduler(0);
+  }
+  while (!nodeMgr->ctorDoneFlag) {
+    // CkPrintf("RACE: nodeMgr not done with constructor yet!\n");
+  }
+  nodeMgr->contributeArrayReduction(result);
 
   //House Keeping Operations will have to check later what needs to be changed
   redNo++;
@@ -1121,7 +1134,6 @@ void NodeGroup::contributeWithCounter(CkReductionMsg *msg,int count)
 CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
   : thisProxy(thisgroup)
 {
- if(CkMyRank() == 0){
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
 #endif
@@ -1139,7 +1151,6 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
   creating=CmiFalse;
   interrupt = 0;
   DEBR((AA"In NodereductionMgr constructor at %d \n"AB,this));
-  }
 }
 
 //////////// Reduction Manager Client API /////////////
