@@ -1103,10 +1103,10 @@ sub posefuncmap
 		  $output.="unsigned int _POSE_timeOffset = ".$segments[4].";\n";
 		  $output.="registerTimestamp(_POSE_handle, ".$msg.",_POSE_timeOffset);\n";
 		  $output.="$msg->fromPE = CkMyPe();\n";
-		  $outChandle->print("#ifdef POSE_DOP_ON\n");
+		  $output.="#ifdef POSE_DOP_ON\n";
 		  $output.="parent->ct = CmiWallTimer();\n";
 		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
-		  $outChandle->print("#endif\n");
+		  $output.="#endif\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		  $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		  $output.="parent->srVector[_destPE]++;\n";
@@ -1146,10 +1146,10 @@ sub posefuncmap
 		    $output.="if (!CpvAccess(stateRecovery)) {\n";
 		    $output.="registerTimestamp(_POSE_handle, ".$msg.", _POSE_atTime);\n";
 		    $output.="$msg->fromPE = CkMyPe();\n";
-		  $outChandle->print("#ifdef POSE_DOP_ON\n");
+		  $output.="#ifdef POSE_DOP_ON\n";
 		  $output.="parent->ct = CmiWallTimer();\n";
 		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
-		  $outChandle->print("#endif\n");
+		  $output.="#endif\n";
 		    $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		    $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    $output.="parent->srVector[_destPE]++;\n";
@@ -1182,10 +1182,10 @@ sub posefuncmap
 		      $output.="if (!CpvAccess(stateRecovery)) {\n";
 		      $output.="registerTimestamp(parent->thisIndex, ".$msg.", _POSE_timeOffset);\n";
 		      $output.="$msg->fromPE = CkMyPe();\n";
-		  $outChandle->print("#ifdef POSE_DOP_ON\n");
+		  $output.="#ifdef POSE_DOP_ON\n";
 		  $output.="parent->ct = CmiWallTimer();\n";
 		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
-		  $outChandle->print("#endif\n");
+		  $output.="#endif\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
 		      $output.="parent->srVector[CkMyPe()]++;\n";
 		      $output.="}\n";
