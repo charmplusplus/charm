@@ -344,7 +344,7 @@ extern int _charmHandlerIdx;
 //extern int _infoIdx;
 //#include "cldb.h"
 
-void ComlibManager::ArraySend(int ep, void *msg, 
+void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg, 
                               const CkArrayIndexMax &idx, CkArrayID a){
     
     ComlibPrintf("[%d] In Array Send\n", CkMyPe());
@@ -414,7 +414,7 @@ void ComlibManager::ArraySend(int ep, void *msg,
 #include "qd.h"
 //CpvExtern(QdState*, _qd);
 
-void ComlibManager::GroupSend(int ep, void *msg, int onPE, CkGroupID gid){
+void ComlibManager::GroupSend(CkDelegateData *pd,int ep, void *msg, int onPE, CkGroupID gid){
     
     int dest_proc = onPE;
     /*
@@ -464,7 +464,7 @@ void ComlibManager::GroupSend(int ep, void *msg, int onPE, CkGroupID gid){
     }
 }
 
-void ComlibManager::ArrayBroadcast(int ep,void *m,CkArrayID a){
+void ComlibManager::ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a){
     ComlibPrintf("[%d] Array Broadcast \n", CkMyPe());
 
     register envelope * env = UsrToEnv(m);
@@ -493,7 +493,7 @@ void ComlibManager::ArrayBroadcast(int ep,void *m,CkArrayID a){
     multicast(cmsg);
 }
 
-void ComlibManager::ArraySectionSend(int ep, void *m, CkArrayID a, 
+void ComlibManager::ArraySectionSend(CkDelegateData *pd,int ep, void *m, CkArrayID a, 
                                      CkSectionID &s) {
 
 #ifndef CMK_OPTIMIZE
@@ -535,7 +535,7 @@ void ComlibManager::ArraySectionSend(int ep, void *m, CkArrayID a,
     multicast(cmsg);
 }
 
-void ComlibManager::GroupBroadcast(int ep,void *m,CkGroupID g) {
+void ComlibManager::GroupBroadcast(CkDelegateData *pd,int ep,void *m,CkGroupID g) {
     register envelope * env = UsrToEnv(m);
 
     CpvAccess(_qd)->create(1);

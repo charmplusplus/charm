@@ -129,13 +129,13 @@ class ComlibManager: public CkDelegateMgr {
     void resumeFromBarrier2(void);
     void receiveTable(StrategyWrapper sw);     //Receive table of strategies.
 
-    void ArraySend(int ep, void *msg, const CkArrayIndexMax &idx, 
+    void ArraySend(CkDelegateData *pd,int ep, void *msg, const CkArrayIndexMax &idx, 
                    CkArrayID a);
-    void GroupSend(int ep, void *msg, int onpe, CkGroupID gid);
+    void GroupSend(CkDelegateData *pd,int ep, void *msg, int onpe, CkGroupID gid);
     
-    virtual void ArrayBroadcast(int ep,void *m,CkArrayID a);
-    virtual void GroupBroadcast(int ep,void *m,CkGroupID g);
-    virtual void ArraySectionSend(int ep,void *m,CkArrayID a,CkSectionID &s);
+    virtual void ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a);
+    virtual void GroupBroadcast(CkDelegateData *pd,int ep,void *m,CkGroupID g);
+    virtual void ArraySectionSend(CkDelegateData *pd,int ep,void *m,CkArrayID a,CkSectionID &s);
 
     Strategy *getStrategy(int instid)
         {return strategyTable[instid].strategy;}
