@@ -4,6 +4,7 @@
 #include "pairutil.h"
 #include "cksparsecontiguousreducer.h"
 #include "PipeBroadcastStrategy.h"
+#include "BroadcastStrategy.h"
 
 typedef void (*FuncType) (complex a, complex b);
 PUPmarshallBytes(FuncType);

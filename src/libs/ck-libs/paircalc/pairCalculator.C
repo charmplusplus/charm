@@ -15,10 +15,15 @@ void createPairCalculator(bool sym, int s, int numZ, int* z, int op1, FuncType f
   int blkSize = 1;
 
   int proc = 0, n_paircalc = 0;
-  
+  /*
   Strategy * pstrat = new PipeBroadcastStrategy(USE_HYPERCUBE, pairCalculatorProxy.ckGetArrayID());
+  */
+  Strategy *bstrat = new BroadcastStrategy(pairCalcReducerProxy.ckGetGroupID(),
+                                           CkIndex_PairCalcReducer::
+                                           __idx_broadcastEntireResult_marshall3);
+
   ComlibInstanceHandle bcastInstance = CkGetComlibInstance();
-  bcastInstance.setStrategy(pstrat);
+  bcastInstance.setStrategy(bstrat);
 
   pcid->Init(pairCalculatorProxy.ckGetArrayID(), pairCalcReducerProxy.ckGetGroupID(), grainSize, blkSize, s, sym, comlib_flag, bcastInstance._instid, bcastInstance._dmid);
   
@@ -125,20 +130,14 @@ void finishPairCalc(PairCalcID* pcid, int n, double *ptr, CkCallback cb) {
   CkGroupID pairCalcReducerID = (CkArrayID)pcid->Gid; 
   CProxy_PairCalcReducer pairCalcReducerProxy(pairCalcReducerID);
 
-  CkArrayID pairCalculatorID = (CkArrayID)pcid->Aid; 
-  CProxy_PairCalculator pairProxy(pairCalculatorID);
-
   ComlibInstanceHandle bcastInstance = ComlibInstanceHandle(pcid->instid, pcid->dmid);
 
   if(pcid->useComlib) {
-      ComlibDelegateProxy(&pairProxy);
+      ComlibDelegateProxy(&pairCalcReducerProxy);
       bcastInstance.beginIteration();
   }
 
-  if(pcid->useComlib)
-      pairProxy.acceptEntireResult(n, ptr, cb);
-  else
-      pairCalcReducerProxy.broadcastEntireResult(n, ptr, pcid->Symmetric, cb);
+  pairCalcReducerProxy.broadcastEntireResult(n, ptr, pcid->Symmetric, cb);
   
   if(pcid->useComlib) {
       bcastInstance.endIteration();
