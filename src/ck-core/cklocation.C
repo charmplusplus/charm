@@ -237,6 +237,7 @@ class arrInfo {
    int *_map;
    void distrib(int *speeds);
  public:
+   arrInfo(void):_nelems(-1),_map(NULL){}
    arrInfo(int n, int *speeds)
    {
      _nelems = n;
@@ -245,15 +246,22 @@ class arrInfo {
    }
    ~arrInfo() { delete[] _map; }
    int getMap(const CkArrayIndex &i);
+   void pup(PUP::er& p){
+     p|_nelems;
+     if(p.isUnpacking()){
+       _map = new int[_nelems];
+     }
+     p(_map,_nelems);
+   }
 };
 
 static int cmp(const void *first, const void *second)
 {
   int fi = *((const int *)first);
   int si = *((const int *)second);
-  return ((CkpvAccess(rem)[fi]==CkpvAccess(rem)[si]) ? 
-          0 : 
-          ((CkpvAccess(rem)[fi]<CkpvAccess(rem)[si]) ? 
+  return ((CkpvAccess(rem)[fi]==CkpvAccess(rem)[si]) ?
+          0 :
+          ((CkpvAccess(rem)[fi]<CkpvAccess(rem)[si]) ?
           1 : (-1)));
 }
 
@@ -361,7 +369,7 @@ void _propMapInit(void)
 class PropMap : public CkArrayMap
 {
 private:
-  CkVec<arrInfo *> arrs;
+  CkPupPtrVec<arrInfo> arrs;
 public:
   PropMap(void)
   {
@@ -372,16 +380,21 @@ public:
   int registerArray(int numElements,CkArrayID aid)
   {
     int idx = arrs.length();
-    arrs.insertAtEnd(new arrInfo(numElements, speeds));
+    arrs.setSize(idx+1);
+    arrs.length() = idx+1;
+    arrs[idx] = new arrInfo(numElements, speeds);
     return idx;
   }
   int procNum(int arrayHdl, const CkArrayIndex &i)
   {
     return arrs[arrayHdl]->getMap(i);
   }
+  void pup(PUP::er& p){
+    p|arrs;
+  }
 };
 
-class CkMapsInit : public Chare 
+class CkMapsInit : public Chare
 {
 public:
   CkMapsInit(CkArgMsg *msg) {
@@ -421,11 +434,11 @@ int CkArrayPrefetch_msg2ObjId(void *msg) {
  */
 void CkArrayPrefetch_writeToSwap(FILE *swapfile,void *objptr) {
   CkMigratable *elt=(CkMigratable *)objptr;
-  
+
   //Save the element's data to disk:
   PUP::toDisk p(swapfile);
   elt->pup(p);
-  
+
   //Call the element's destructor in-place (so pointer doesn't change)
   CkpvAccess(CkSaveRestorePrefetch)=1;
   elt->~CkMigratable(); //< because destuctor is virtual, destroys user class too.
