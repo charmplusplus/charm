@@ -410,30 +410,28 @@ class toText : public toTextUtil {
 };
 
 class toTextFile : public er {
-  FILE *f;
  protected:
+  FILE *f;
   virtual void bytes(void *p,int n,size_t itemSize,dataType t);
  public:
   //Begin writing to this file, which should be opened for ascii write.
-  // Closes file when deleted.
+  // You must close the file yourself when done.
   toTextFile(FILE *f_) :er(IS_PACKING), f(f_) {}
-  ~toTextFile() {}
   virtual void comment(const char *message);
 };
 class fromTextFile : public er {
+ protected:
   FILE *f;
   int readInt(const char *fmt="%d");
   unsigned int readUint(const char *fmt="%u");
   double readDouble(void);
   
- protected:
   virtual void bytes(void *p,int n,size_t itemSize,dataType t);
   virtual void parseError(const char *what);
  public:
   //Begin writing to this file, which should be opened for ascii read.
-  // Closes file when deleted.
+  // You must close the file yourself when done.
   fromTextFile(FILE *f_) :er(IS_UNPACKING), f(f_) {}
-  ~fromTextFile() {}
   virtual void comment(const char *message);
 };
 
