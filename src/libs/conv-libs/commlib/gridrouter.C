@@ -43,12 +43,18 @@ GridRouter::GridRouter(int n, int me)
   MyPe=me;
   gpes=NULL;
   COLLEN=ColLen(NumPes);
-  recvExpected = Expect(MyPe, NumPes);
+  LPMsgExpected = Expect(MyPe, NumPes);
+  recvExpected = 0;
 
   int myrow=MyPe/COLLEN;
   int mycol=MyPe%COLLEN;  
   int lastrow = (NumPes - 1)/COLLEN;
   
+  if(myrow < lastrow) 
+      recvExpected = ROWLEN;
+  else
+      recvExpected = (NumPes - 1)%ROWLEN + 1;
+
   if(lastrow * COLLEN + mycol > NumPes - 1) {
       //We have a hole in the lastrow
       if(lastrow * COLLEN + myrow <= NumPes - 1) 
@@ -57,12 +63,7 @@ GridRouter::GridRouter(int n, int me)
       
       if((myrow == 0) && ((NumPes - 1)%COLLEN == COLLEN - 1))
           //Special case with one hole only
-          recvExpected ++;
-      
-      LPMsgExpected = (NumPes - 1)/COLLEN;
-  }
-  else {
-      LPMsgExpected = (NumPes - 1)/COLLEN + 1;
+          recvExpected ++;      
   }
 
   /*
@@ -79,14 +80,14 @@ GridRouter::GridRouter(int n, int me)
     }
   */
   
-  //ComlibPrintf("%d LPMsgExpected=%d\n", MyPe, LPMsgExpected);
+  //CkPrintf("%d LPMsgExpected=%d\n", MyPe, LPMsgExpected);
 
   PeMesh = new PeTable(/*CmiNumPes()*/NumPes);
 
   onerow=(int *)CmiAlloc(ROWLEN*sizeof(int));
   
   InitVars();
-  //  ComlibPrintf("%d:%d:COLLEN=%d, ROWLEN=%d, recvexpected=%d\n", CmiMyPe(), MyPe, COLLEN, ROWLEN, recvExpected);
+  //  CkPrintf("%d:%d:COLLEN=%d, ROWLEN=%d, recvexpected=%d\n", CmiMyPe(), MyPe, COLLEN, ROWLEN, recvExpected);
 }
 
 GridRouter::~GridRouter()
@@ -126,62 +127,61 @@ void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, 
   ComlibPrintf("All messages received %d %d\n", CmiMyPe(), COLLEN);
 
   //Send the messages
-  for (i=0;i<COLLEN;i++) {
+  for (i=0;i<ROWLEN;i++) {
 
       //    ComlibPrintf("ROWLEN = %d, COLLEN =%d\n", ROWLEN, COLLEN);
 
-    int MYROW=MyPe/ROWLEN;
+    int MYROW=MyPe/COLLEN;
     int MYCOL = MyPe%COLLEN;
     
-    int nextrowrep=i*ROWLEN;
-    int myrep=MYROW*ROWLEN;
-    int nextpe=MyPe-myrep+nextrowrep;
-    int nummappedpes=NumPes-nextrowrep;
-    
-    if (nummappedpes <= 0) continue;
+    int myrep=MYROW*COLLEN;
+    int nextpe= myrep + i;
+
     if (nextpe >= NumPes) {
       //Previously hole assigned to elements in the same row as nextpe
       //int mm=(nextpe-NumPes) % nummappedpes;
       //nextpe=nextrowrep+mm;
 
       // Now they are spread across the grid in the same column as nextpe
-      int nextcol = nextpe % COLLEN;
-      nextpe = COLLEN * (MYCOL % MYROW) + nextcol;
+      nextpe = COLLEN * (MYCOL % MYROW) + i;
     }
 
-    int rowlength=ROWLEN;
-    if (ROWLEN > nummappedpes) rowlength=nummappedpes;
-    for (int j=0;j<rowlength;j++) {
-	onerow[j]=nextrowrep+j;
+    int length = (NumPes - 1)/COLLEN + 1;
+    if((length - 1)* COLLEN + i >= NumPes)
+        length --;
+
+    for (int j=0;j<length;j++) {
+	onerow[j]=j * COLLEN + i;
     }
     
     if (nextpe == MyPe) {
         //      ComlibPrintf("%d calling recv directly refno=%d\n", MyPe, KMyActiveRefno(MyID));
-      RecvManyMsg(id, NULL);
-      continue;
+        RecvManyMsg(id, NULL);
+        continue;
     }
     
     //    ComlibPrintf("nummappedpes = %d, NumPes = %d, nextrowrep = %d, nextpe = %d, mype = %d\n", nummappedpes, NumPes, nextrowrep,  nextpe, MyPe);
 
     gmap(nextpe);
     ComlibPrintf("sending to column %d in %d\n", i, CmiMyPe());
-    GRIDSENDFN(MyID, 0, 0, rowlength, onerow, CpvAccess(RecvHandle), nextpe); 
+    GRIDSENDFN(MyID, 0, 0, length, onerow, CpvAccess(RecvHandle), nextpe); 
   }
 }
 
 void GridRouter::RecvManyMsg(comID id, char *msg)
 {
-    //  ComlibPrintf("%d recvcount=%d recvexpected = %d refno=%d\n", MyPe, recvCount, recvExpected, KMyActiveRefno(MyID));
   if (msg)
     PeMesh->UnpackAndInsert(msg);
 
   recvCount++;
   if (recvCount == recvExpected) {
+      //    CkPrintf("%d recvcount=%d recvexpected = %d refno=%d\n", MyPe, recvCount, recvExpected, KMyActiveRefno(MyID));
 
-    for (int i=0;i<ROWLEN;i++) {
+    for (int i=0;i<COLLEN;i++) {
       int myrow=MyPe/COLLEN;
-      int myrep=myrow*ROWLEN;
-      int nextpe=myrep+i;
+      int mycol=MyPe%COLLEN;
+      int nextrowrep=i*COLLEN;
+      int nextpe=nextrowrep+mycol;
       
       ComlibPrintf("sending message %d %d %d\n", nextpe, NumPes, MyPe);
 
@@ -223,15 +223,15 @@ void GridRouter:: ProcManyMsg(comID, char *m)
 
 void GridRouter:: LocalProcMsg()
 {
-    //  ComlibPrintf("%d local procmsg called\n", MyPe);
 
   LPMsgCount++;
   PeMesh->ExtractAndDeliverLocalMsgs(MyPe);
 
   if (LPMsgCount==LPMsgExpected) {
-	PeMesh->Purge();
-	InitVars();
-	KDone(MyID);
+      //      CkPrintf("%d local procmsg called\n", MyPe);
+      PeMesh->Purge();
+      InitVars();
+      KDone(MyID);
   }
 
 }
