@@ -61,6 +61,9 @@ void pup_bar(pup_er p,bar *b)
 extern "C" {
 #endif
 
+/*This is actually a PUP::er *, cast to void *.
+  From C++, you can pass "&p" as a pup_er.
+*/
 typedef void *pup_er;
 
 /*Determine what kind of pup_er we have--
