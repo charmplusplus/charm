@@ -163,8 +163,8 @@ dirs+sources:
 	rm -rf libs
 	rm -rf ../bin ; mkdir ../bin
 	rm -rf ../lib ; mkdir ../lib
-	rm -rf ../pgms
-	rm -rf ../doc ; mkdir ../doc
+	rm -rf ../pgms ; ./system_ln ../pgms ../pgms
+	rm -rf ../doc ; ./system_ln ../doc ../doc
 	../../src/Common/scripts/gatherflat ../../src/Common/scripts .
 	./gatherflat ../../src/Common/conv-core        .
 	./gatherflat ../../src/Common/conv-ldb         .
@@ -183,9 +183,7 @@ dirs+sources:
 	./gathertree ../../src/Common/libs libs
 	./gathertree ../../src/Common/langs langs
 	./gathertree ../../src/Common.`cat .gdir`      .
-	./gatherflat ../../src/`cat .vdir`             .
-	./gathertree ../../pgms ../pgms
-	./gathertree ../../doc doc
+	./gatherflat ../../src/`cat .vdir`
 	rm -f ../bin/charmc ; cp charmc ../bin/
 	chmod +x ../bin/charmc
 	rm -f .gdir
