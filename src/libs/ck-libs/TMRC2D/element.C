@@ -40,7 +40,6 @@ void element::split(int longEdge)
   edgeRef e_prime, newEdge;
   int m = -2, nullNbr=0;
   elemRef newElem, nullRef;
-  node newNode;
 
   // initializations of shortcuts to affected parts of element
   opnode = (longEdge + 2) % 3;
@@ -168,9 +167,10 @@ void element::split(int longEdge)
   }
 }
 
-/*
 void element::coarsen()
 {
+  CkAbort("NOT IMPLEMENTED! element::coarsen()\n");
+/*
   int shortEdge = findShortestEdge();
   int n1, n2, e1, e2;
 
@@ -186,8 +186,8 @@ void element::coarsen()
     }
     nodes[n1].unlock();
   }
-}
 */
+}
 
 
 //void element::collapse(int shortEdge, int n1, int n2, int e1, int e2)

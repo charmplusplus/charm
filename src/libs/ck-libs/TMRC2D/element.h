@@ -130,7 +130,7 @@ class element {  // triangular elements defined by three node references,
     else return 2;
   }
   /// Given an edge index on this element, get the neighboring elemRef 
-  elemRef getElement(int edgeIdx) { return edges[edgeIdx].get(myRef); }
+  elemRef getElement(int edgeIdx) { return edges[edgeIdx].getNbr(myRef); }
   
   void clear() { present = 0; }
   int isPresent() { return present; }
@@ -156,7 +156,7 @@ class element {  // triangular elements defined by three node references,
 
   // coarsen will delete this element (and possibly a neighbor) by squishing 
   // its shortest edge to that edge's midpoint.
-  //void coarsen();
+  void coarsen();
   //void collapse(int shortEdge, int n1, int n2, int e1, int e2);
   //void collapseHelp(edgeRef shortEdgeRef, node n1, node n2);
 

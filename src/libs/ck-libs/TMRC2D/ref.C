@@ -11,19 +11,10 @@ void edgeRef::update(elemRef& oldval, elemRef& newval)
   mesh[cid].updateElement(idx, oldval, newval);
 }
 
-elemRef edgeRef::get(elemRef& m)
+elemRef edgeRef::getNbr(elemRef m)
 {
   refMsg *rm2;
-  rm2 = mesh[cid].getNeighbor(idx, m);
-  elemRef result((elemRef&)rm2->aRef);
-  CkFreeMsg(rm2);
-  return result;
-}
-
-elemRef edgeRef::getNot(elemRef er)
-{
-  refMsg *rm2;
-  rm2 = mesh[cid].getNotElem(idx, er);
+  rm2 = mesh[cid].getNbr(idx, m);
   elemRef result((elemRef&)rm2->aRef);
   CkFreeMsg(rm2);
   return result;
@@ -80,21 +71,6 @@ double elemRef::getArea()
 void elemRef::update(edgeRef& oldval, edgeRef& newval)
 {
   mesh[cid].updateElementEdge(idx, oldval, newval);
-}
-
-int elemRef::isLongestEdge(edgeRef& e)
-{
-  intMsg *im;
-  int result;
-  im = mesh[cid].isLongestEdge(idx, e);
-  result = im->anInt;
-  CkFreeMsg(im);
-  return result;
-}
-
-void elemRef::update(edgeRef& e0, edgeRef& e1, edgeRef& e2)
-{
-  mesh[cid].updateEdges(idx, e0, e1, e2);
 }
 
 void elemRef::setTargetArea(double ta)

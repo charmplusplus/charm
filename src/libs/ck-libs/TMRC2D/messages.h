@@ -11,14 +11,6 @@ public:
   CProxy_TCharm myThreads;
 };
 
-
-// nodeMsg: coordinates of a node
-class nodeMsg : public CMessage_nodeMsg {
-public:
-  int idx;
-  double x, y;
-};
-
 // splitOutMsg: output data from split edge
 class splitOutMsg : public CMessage_splitOutMsg {
 public:

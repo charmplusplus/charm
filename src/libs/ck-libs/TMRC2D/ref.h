@@ -28,8 +28,7 @@ class edgeRef : public objRef {
   edgeRef() { }
   edgeRef(int chunkId, int objIdx) { cid = chunkId; idx = objIdx; }
   void update(elemRef& oldval, elemRef& newval);
-  elemRef get(elemRef& m);
-  elemRef getNot(elemRef er);
+  elemRef getNbr(elemRef m);
   void remove();
   int split(int *m, edgeRef *e_prime, node iNode, node fNode,
 	    elemRef requester, int *local, int *first, int *nullNbr);
@@ -43,11 +42,9 @@ class elemRef : public objRef {
   elemRef() { }
   elemRef(int chunkId, int objIdx) { cid = chunkId; idx = objIdx; }
   void update(edgeRef& oldval, edgeRef& newval);
-  int isLongestEdge(edgeRef& e);
   double getArea();
   void setTargetArea(double ta);
   void resetTargetArea(double ta);
-  void update(edgeRef& e0, edgeRef& e1, edgeRef& e2);
   void remove();
   //void collapseHelp(edgeRef er, nodeRef nr1, nodeRef nr2);
 };

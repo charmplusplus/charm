@@ -126,8 +126,6 @@ class chunk : public TCharmClient1D {
   void sanityCheck(void);
  
   // entry methods
-  void addNode(int idx, double x, double y);
-
   void freshen();
   void deriveBorderNodes();
   void tweakMesh();
@@ -150,8 +148,6 @@ class chunk : public TCharmClient1D {
 
   // The following methods simply provide remote access to local data
   // See above for details of each
-  nodeMsg *getNode(int n);
-  refMsg *getEdge(int idx, edgeRef er, node n1, node n2);
   void setBorder(int n);
   intMsg *safeToMoveNode(int idx, double x, double y);
   splitOutMsg *split(int idx, elemRef e, node in, node fn);
@@ -165,13 +161,9 @@ class chunk : public TCharmClient1D {
   void resetEdge(int n);
   intMsg *lockNode(int n);
   void unlockNode(int n);
-  refMsg *getNeighbor(int idx, objRef aRef);
-  refMsg *getNotElem(int idx, objRef aRef);
-  intMsg *isLongestEdge(int idx, objRef aRef);
+  refMsg *getNbr(int idx, objRef aRef);
   void setTargetArea(int idx, double aDouble);
   void resetTargetArea(int idx, double aDouble);
-  void updateEdges(int idx, edgeRef e0, edgeRef e1, edgeRef e2);
-  void updateNodeCoords(int idx, double x, double y);
   void reportPos(int idx, double x, double y);
 
   // meshLock methods
@@ -188,8 +180,10 @@ class chunk : public TCharmClient1D {
   // create a chunk's mesh data
   void newMesh(int nEl, int nGhost,const int *conn_,const int *gid_, 
 	       int idxOffset);
-  // multipleRefine sets target areas specified by desiredArea, starts refining
+  // Sets target areas specified by desiredArea, starts refining
   void multipleRefine(double *desiredArea, refineClient *client);
+  // Sets target areas specified by desiredArea, starts coarsening
+  void multipleCoarsen(double *desiredArea, refineClient *client);
   // updateNodeCoords sets node coordinates, recalculates element areas
   void updateNodeCoords(int nNode, double *coord, int nEl);
 

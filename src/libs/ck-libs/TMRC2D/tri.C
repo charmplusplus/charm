@@ -28,14 +28,6 @@ chunk::chunk(chunkMsg *m)
   thread->resume();
 }
 
-void chunk::addNode(int idx, double x, double y)
-{
-  accessLock();
-  theNodes[idx].set(x, y);
-  numNodes++;
-  releaseLock();
-}
-
 void chunk::addRemoteEdge(int elem, int localEdge, edgeRef er)
 {
   accessLock();
@@ -44,8 +36,8 @@ void chunk::addRemoteEdge(int elem, int localEdge, edgeRef er)
 }
 
 void chunk::refineElement(int idx, double area)
-{
-  // we indicate a need for refinement by reducing an element's targetArea
+{ // Reduce element's targetArea to indicate need for refinement
+  if (!theElements[idx].isPresent()) return;
   accessLock();
   theElements[idx].setTargetArea(area);
   releaseLock();
@@ -59,37 +51,34 @@ void chunk::refineElement(int idx, double area)
 void chunk::refiningElements()
 {
   int i;
-
-  while (modified) { 
-    // continue trying to refine elements until nothing changes during
-    // a refinement cycle
+  while (modified) { // Refine elements until no changes occur
     i = 0;
     modified = 0;
     while (i < numElements) { // loop through the elements
-      if ((theElements[i].getTargetArea() <= theElements[i].getArea()) 
-	    && (theElements[i].getTargetArea() >= 0.0)) {
-	// the element either needs refining or has been asked to
-	// refine or has asked someone else to refine
+      if (theElements[i].isPresent() && 
+	  (theElements[i].getTargetArea() <= theElements[i].getArea()) && 
+	  (theElements[i].getTargetArea() >= 0.0)) {
+	// element i has a lower target area -- needs to refine
 	modified = 1; // something's bound to change
 	theElements[i].refine(); // refine the element
 	adjustMesh();
       }
       i++;
     }
-    //    if (CkMyPe() == 0) for (int j=0; j<5; j++) mesh[j].print();
     CthYield(); // give other chunks on the same PE a chance
   }
-  // nothing is in need of refinement; turn refine loop off
-  refineInProgress = 0;  
+  refineInProgress = 0; // nothing needs refinement; turn refine loop off
+  //    if (CkMyPe() == 0) for (int j=0; j<5; j++) mesh[j].print();
 }
 
 
 // This initiates a coarsening for a single element
 void chunk::coarsenElement(int idx, double area)
-{
-  // we indicate a need for coarsening by increasing an element's targetArea
+{ // Increase element's targetArea to indicate need for coarsening
   if (!theElements[idx].isPresent()) return;
+  accessLock();
   theElements[idx].resetTargetArea(area);
+  releaseLock();
   modified = 1;  // flag a change in one of the chunk's elements
   if (!coarsenInProgress) { // if coarsen loop not running
     coarsenInProgress = 1;
@@ -100,51 +89,26 @@ void chunk::coarsenElement(int idx, double area)
 // This loops through all elements performing coarsenings as needed
 void chunk::coarseningElements()
 {
-  CkPrintf("TMRC2D: WARNING! chunk::coarseningElements called but not implemented!\n");
-  /*
   int i;
-
   while (modified) { // try to coarsen elements until no changes occur
     i = 0;
     modified = 0;
     while (i < numElements) { // loop through the elements
       if (theElements[i].isPresent() && 
-	  ((theElements[i].getTargetArea() > theElements[i].getArea()) 
-	   && (theElements[i].getTargetArea() >= 0.0))) {
-	// element i needs coarsening
+	  (theElements[i].getTargetArea() > theElements[i].getArea()) && 
+	  (theElements[i].getTargetArea() >= 0.0)) {
+	// element i has higher target area -- needs coarsening
 	modified = 1; // something's bound to change
 	theElements[i].coarsen(); // coarsen the element
-	//if (CkMyPe() == 0) for (int j=0; j<5; j++) mesh[j].print();
       }
       i++;
     }
     CthYield(); // give other chunks on the same PE a chance
   }
   coarsenInProgress = 0;  // turn coarsen loop off
-  */
 }
 
 // many remote access methods follow
-nodeMsg *chunk::getNode(int n)
-{
-  nodeMsg *nm = new nodeMsg;
-  accessLock();
-  nm->x = theNodes[n].X();
-  nm->y = theNodes[n].Y();
-  releaseLock();
-  return nm;
-}
-
-refMsg *chunk::getEdge(int idx, edgeRef er, node n1, node n2)
-{
-  CkPrintf("TMRC2D: WARNING! chunk::getEdge called but not implemented!\n");
-  refMsg *rm = new refMsg;
-  /*
-  rm->aRef = theElements[idx].getEdge(er, n1);
-  */
-  return rm;
-}
-
 void chunk::setBorder(int n)
 {
   accessLock();
@@ -265,30 +229,7 @@ void chunk::unlockNode(int n)
   releaseLock();
 }
 
-intMsg *chunk::isLongestEdge(int idx, objRef aRef)
-{
-  intMsg *im = new intMsg;
-  edgeRef eRef;
-  eRef.idx = aRef.idx; eRef.cid = aRef.cid;
-  accessLock();
-  im->anInt = theElements[idx].isLongestEdge(eRef);
-  releaseLock();
-  return im;
-}
-
-refMsg *chunk::getNeighbor(int idx, objRef aRef)
-{
-  refMsg *rm = new refMsg;
-  elemRef er, ar;
-  ar.cid = aRef.cid; ar.idx = aRef.idx;
-  accessLock();
-  er = theEdges[idx].getNot(ar);
-  releaseLock();
-  rm->aRef = er;
-  return rm;
-}
-
-refMsg *chunk::getNotElem(int idx, objRef aRef)
+refMsg *chunk::getNbr(int idx, objRef aRef)
 {
   refMsg *rm = new refMsg;
   elemRef er, ar;
@@ -318,20 +259,6 @@ void chunk::resetTargetArea(int idx, double aDouble)
   theElements[idx].resetTargetArea(aDouble);
   releaseLock();
   modified = 1;
-}
-
-void chunk::updateEdges(int idx, edgeRef e0, edgeRef e1, edgeRef e2)
-{
-  accessLock();
-  theElements[idx].set(e0, e1, e2);
-  releaseLock();
-}
-
-void chunk::updateNodeCoords(int idx, double x, double y)
-{
-  accessLock();
-  theNodes[idx].set(x, y);
-  releaseLock();
 }
 
 void chunk::reportPos(int idx, double x, double y)
@@ -411,15 +338,6 @@ intMsg *chunk::addNode(node n)
   numNodes++;
   return im;
 }
-
-/*
-int chunk::addNode(node n)
-{
-  theNodes[numNodes] = n;
-  numNodes++;
-  return (numNodes-1);
-}
-*/
 
 edgeRef chunk::addEdge()
 {
@@ -566,7 +484,6 @@ void chunk::updateNodeCoords(int nNode, double *coord, int nEl)
   }
   // recalculate and cache new areas for each element
   for (i=0; i<numElements; i++) theElements[i].calculateArea();
-  sanityCheck();
   CkPrintf("TMRC2D: updateNodeCoords DONE.\n");
 }
 
@@ -575,16 +492,14 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
   int i;
   CkPrintf("TMRC2D: multipleRefine....\n");
   theClient = client; // initialize refine client associated with this chunk
-  sanityCheck();
+  //Uncomment this dump call to see TMRC2D's mesh config
+  //dump();
+  sanityCheck(); // quietly make sure mesh is in shape
 
-  dump();
-
-  // set desired areas for elements
-  for (i=0; i<numElements; i++)
+  for (i=0; i<numElements; i++)  // set desired areas for elements
     if (desiredArea[i] < theElements[i].getArea())
       theElements[i].setTargetArea(desiredArea[i]);
-  
-  // start the refinement loop
+  // start refinement
   modified = 1;
   if (!refineInProgress) {
    refineInProgress = 1;
@@ -593,6 +508,26 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
   CkPrintf("TMRC2D: multipleRefine DONE.\n");
 }
 
+void chunk::multipleCoarsen(double *desiredArea, refineClient *client)
+{
+  int i;
+  CkPrintf("TMRC2D: multipleCoarsen....\n");
+  theClient = client; // initialize refine client associated with this chunk
+  //Uncomment this dump call to see TMRC2D's mesh config
+  //dump();
+  sanityCheck(); // quietly make sure mesh is in shape
+
+  for (i=0; i<numElements; i++)  // set desired areas for elements
+    if (desiredArea[i] > theElements[i].getArea())
+      theElements[i].setTargetArea(desiredArea[i]);
+  // start coarsening
+  modified = 1;
+  if (!coarsenInProgress) {
+   coarsenInProgress = 1;
+   mesh[cid].coarseningElements();
+  }
+  CkPrintf("TMRC2D: multipleCoarsen DONE.\n");
+}
 
 // check this for kosherness....
 void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_, int idxOffset)

@@ -4,7 +4,6 @@
 module refine {
   // ----------------------------- Messages ---------------------------------
   message chunkMsg;
-  message nodeMsg;
   message splitOutMsg;
   message refMsg; 
   message intMsg;
@@ -22,8 +21,6 @@ module refine {
     entry [threaded] void refiningElements();	
     entry void coarsenElement(int, double);
     entry [threaded] void coarseningElements();	
-    entry [sync] nodeMsg *getNode(int);
-    entry [sync] refMsg *getEdge(int, edgeRef, node, node);
     entry [sync] void setBorder(int);
     entry [sync] intMsg *safeToMoveNode(int, double, double);
     entry [sync] splitOutMsg *split(int, elemRef, node, node);
@@ -37,13 +34,9 @@ module refine {
     entry [sync] void resetEdge(int);
     entry [sync] intMsg *lockNode(int);
     entry [sync] void unlockNode(int);
-    entry [sync, threaded] intMsg *isLongestEdge(int, objRef);
-    entry [sync] refMsg *getNeighbor(int, objRef);
-    entry [sync] refMsg *getNotElem(int, objRef);
+    entry [sync] refMsg *getNbr(int, objRef);
     entry [sync] void setTargetArea(int, double);
     entry [sync] void resetTargetArea(int, double);
-    entry [sync] void updateEdges(int, edgeRef, edgeRef, edgeRef);
-    entry [sync] void updateNodeCoords(int, double, double);
     entry void reportPos(int, double, double);
     entry [sync, threaded] void print();
     entry [sync, threaded] void out_print();
@@ -52,8 +45,6 @@ module refine {
     entry void tweakMesh();
     entry void improveChunk();
     entry [sync, threaded] void improve();
- 
-    entry void addNode(int, double, double);
     entry [sync] intMsg *addNode(node n);
     entry [sync] void removeNode(int);
     entry [sync] void removeEdge(int);
