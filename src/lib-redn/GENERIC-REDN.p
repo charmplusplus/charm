@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.3  1995-11-09 01:33:38  gursoy
+ * Revision 1.4  1995-11-09 17:41:37  milind
+ * Fixed a small typo which caused super_install to fail.
+ *
+ * Revision 1.3  1995/11/09  01:33:38  gursoy
  * fixed bugs in f and f_msg, memory leaks collect and DeleteRef
  *
  * Revision 1.2  1995/10/27  22:09:16  jyelon
@@ -129,7 +132,7 @@ BranchOffice reduce {
 	    PrivateCall(AddRef(ref,refnum)) ;
 	}
 	
-        x = (GENERIC_DATATYPE)cMsg->data;
+        x = (GENERIC_DATATYPE *)cMsg->data;
 	ReductionOperation(x,ref->y,ref->numEls,ref->is_first) ;
 
 	ref->is_first = 0 ;
