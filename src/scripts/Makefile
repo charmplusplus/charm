@@ -197,8 +197,8 @@ dirs+sources:
 	chmod +x ../bin/charmc
 	rm -f .gdir
 	rm -rf ../include ; mkdir ../include
-	./system_ln  ../tmp/conv-mach*.*h ../include
-	./system_ln  ../tmp/cc-*.*h ../include
+	-./system_ln  ../tmp/conv-mach*.*h ../include
+	-./system_ln  ../tmp/cc-*.*h ../include
 	if [ ! -f conv-common.h ] ; then ( touch conv-common.h ) ; fi
 	touch dirs+sources
 
