@@ -14,6 +14,13 @@
  *
  ****************************************************************************/
 
+/*****************************************************************************
+ * #define PCQUEUE_LOCK
+ * PCQueue doesn't need any lock, the lock here is only 
+ * for debugging and testing purpose! it only make sense in smp version
+ ****************************************************************************/
+#undef PCQUEUE_LOCK
+
 #define PCQueueSize 0x100
 
 typedef struct CircQueueStruct
@@ -30,6 +37,9 @@ typedef struct PCQueueStruct
   CircQueue head;
   CircQueue tail;
   int  len;
+#ifdef PCQUEUE_LOCK
+  CmiNodeLock  lock;
+#endif
 }
 *PCQueue;
 
@@ -75,6 +85,9 @@ PCQueue PCQueueCreate(void)
   Q->head = circ;
   Q->tail = circ;
   Q->len = 0;
+#ifdef PCQUEUE_LOCK
+  Q->lock = CmiCreateLock();
+#endif
   return Q;
 }
 
@@ -94,6 +107,9 @@ char *PCQueuePop(PCQueue Q)
 {
   CircQueue circ; int pull; char *data;
 
+#ifdef PCQUEUE_LOCK
+    CmiLock(Q->lock);
+#endif
     circ = Q->head;
     pull = circ->pull;
     data = circ->data[pull];
@@ -111,10 +127,16 @@ char *PCQueuePop(PCQueue Q)
                                /* in the last slot. See below. */
       }
       Q->len --;
+#ifdef PCQUEUE_LOCK
+      CmiUnlock(Q->lock);
+#endif
       return data;
     }
     else { /* queue seems to be empty. The producer may be adding something
               to it, but its ok to report queue is empty. */
+#ifdef PCQUEUE_LOCK
+      CmiUnlock(Q->lock);
+#endif
       return 0;
     }
 }
@@ -123,6 +145,9 @@ void PCQueuePush(PCQueue Q, char *data)
 {
   CircQueue circ, circ1; int push;
   
+#ifdef PCQUEUE_LOCK
+  CmiLock(Q->lock);
+#endif
   circ1 = Q->tail;
   push = circ1->push;
   if (push == (PCQueueSize -1)) { /* last slot is about to be filled */
@@ -138,6 +163,9 @@ void PCQueuePush(PCQueue Q, char *data)
   circ1->data[push] = data;
   circ1->push = (push + 1);
   Q->len ++;
+#ifdef PCQUEUE_LOCK
+  CmiUnlock(Q->lock);
+#endif
 }
 
 
