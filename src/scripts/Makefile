@@ -45,7 +45,7 @@ FEMF: FEMC libconv-utilf.a
 
 AMPI: AMPIC AMPIF
 
-AMPIC: charm++ LIBS libampi.a
+AMPIC: charm++ CONVLIBS libampi.a
 
 AMPIF: charm++ libconv-utilf.a LIBS libampif.a
 
@@ -679,8 +679,9 @@ libampi.a: ampi.C ampi.h ampiimpl.h ampi-defmain.C \
            ampi.decl.h ampi.def.h ampimain.decl.h \
            ampimain.def.h
 	$(CHARMC) -DAMPI_FORTRAN=0 -c ampi.C
+	$(CHARMC) -DAMPI_FORTRAN=0 -c ampimain.C
 	$(CHARMC) -DAMPI_FORTRAN=0 -c ampi-defmain.C
-	$(CHARMC) -cp ../lib -o libampi.a ampi.o ampi-defmain.o
+	$(CHARMC) -cp ../lib -o libampi.a ampi.o ampimain.o ampi-defmain.o
 
 libampif.a: ampi.C ampimain.C ampif.C ampimod.f90 ampi.h ampiimpl.h \
             ampi-defmain.C ampi.decl.h ampi.def.h \
