@@ -186,7 +186,7 @@ class CkVec : private CkSTLHelper<T> {
 
 /// Default pup routine for CkVec: pup each of the elements
 template <class T>
-void operator|(PUP::er &p,CkVec<T> &vec) {
+inline void operator|(PUP::er &p,CkVec<T> &vec) {
     int l=vec.pupbase(p);
     for (int i=0;i<l;i++) p|vec[i];
 }
