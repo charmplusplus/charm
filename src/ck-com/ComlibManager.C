@@ -67,7 +67,10 @@ void ComlibManager::init(){
     
     //comm_debug = 1;
     
+    CkpvInitialize(int, RecvmsgHandle);
     CkpvAccess(RecvmsgHandle) = CkRegisterHandler((CmiHandler)recv_array_msg);
+
+    CkpvInitialize(int, RecvCombinedShortMsgHdlrIdx);
     CkpvAccess(RecvCombinedShortMsgHdlrIdx) = 
         CkRegisterHandler((CmiHandler)recv_combined_array_msg);
     
