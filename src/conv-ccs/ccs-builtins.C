@@ -207,6 +207,7 @@ static void CpdList_ccs_list_items_txt(char *msg)
 {
   CpdListItemsRequest req;
   CpdListAccessor *acc=CpdListHeader_ccs_list_items(msg,req);
+  if(acc == NULL) CmiPrintf("Null Accessor\n");
   if (acc!=NULL) {
     int bufLen;
     { 
@@ -250,6 +251,7 @@ public:
 	CpdListAccessor *acc=*(CpdListAccessor **)objp;
 	char *pathName=(char *)acc->getPath();
 	beginItem(p,curObj);
+        p.comment("name");
 	p(pathName,strlen(pathName));
       }
       curObj++;
@@ -257,50 +259,8 @@ public:
   }
 };
 
-//Cpd Lists for local and scheduler queues
-class CpdList_localQ : public CpdListAccessor {
-  
-public:
-  CpdList_localQ() {}
-  virtual const char * getPath(void) const {return "converse/localqueue";}
-  virtual int getLength(void) const {
-    /*CmiPrintf("*******Returning fifo length*********\n");*/
-    return CdsFifo_Length((CdsFifo)(CpvAccess(CmiLocalQueue)));
-  }
-  virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
-    void ** messages = CdsFifo_Enumerate(CpvAccess(CmiLocalQueue));
-    int curObj=0;
-    if ((req.lo>=0) && (req.lo< getLength()) && (req.hi<getLength()))
-    {
-       for(curObj=req.lo; curObj<req.hi; curObj++)
-       {
-	beginItem(p,curObj);
-        p.comment("Message Handler Id");
-        int hdlrid = CmiGetHandler(messages[curObj]); 
-        p(hdlrid);
-        p.comment("Message Info"); 
-        int minfo = CmiGetInfo(messages[curObj]); 
-        p(minfo);
-       }
-    }
-      
-  }
-};
 
 
-class CpdList_schedQ : public CpdListAccessor {
-  
-public:
-  CpdList_schedQ() {}
-  virtual const char * getPath(void) const {return "converse/schedqueue";}
-  virtual int getLength(void) const {
-    /* CmiPrintf("*******Returning prio q length*********\n");*/
-    return (CqsLength((Queue)(CpvAccess(CsdSchedQueue))));
-  }
-  virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
-    
-  }
-};
 
 #endif /*CMK_CCS_AVAILABLE*/
 /*We have to include these virtual functions, even when CCS is
@@ -368,8 +328,6 @@ static void CpdListInit(void) {
 	      CkHashFunction_string,CkHashCompare_string);
   CpdListRegister(new CpdList_introspect(CpvAccess(cpdListTable)));
 
-  CpdListRegister(new CpdList_localQ());
-  CpdListRegister(new CpdList_schedQ());
   CcsRegisterHandler("ccs_list_len",(CmiHandler)CpdList_ccs_list_len);
   CcsRegisterHandler("ccs_list_items.txt",(CmiHandler)CpdList_ccs_list_items_txt);
   //added 9/16/2003
