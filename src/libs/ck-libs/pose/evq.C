@@ -11,6 +11,7 @@ eventQueue::eventQueue()
 #endif
   Event *e;
   eqh = new EqHeap();  // create the heap for incoming events
+  largest = POSE_UnsetTS;
   // create the front sentinel node
   e = new Event();
   e->timestamp = POSE_UnsetTS;
@@ -58,6 +59,7 @@ void eventQueue::InsertEvent(Event *e)
   //sanitize();
   Event *tmp = backPtr->prev; // start at back of queue
 
+  if (e->timestamp > largest) largest = e->timestamp;
   // check if new event should go on heap: 
   // greater than last timestamp in queue, 
   // or currentPtr is at back (presumably because heap is empty)
@@ -96,6 +98,7 @@ void eventQueue::ShiftEvent() {
     e->prev->next = e;
     currentPtr = e;
   }
+  if (currentPtr == backPtr) largest = POSE_UnsetTS;
   //sanitize();
 }
 

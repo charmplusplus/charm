@@ -18,7 +18,7 @@
 
 class adapt3 : public opt3 {
  public:
-  adapt3() { timeLeash = SPEC_WINDOW; STRAT_T = ADAPT3_T; }
+  adapt3() { timeLeash = POSE_TimeMax; STRAT_T = ADAPT3_T; }
   virtual void Step();
 };
 
