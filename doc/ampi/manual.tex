@@ -189,32 +189,20 @@ such variables, which is clearly not the desired semantics.  To ensure correct
 execution of the original source program, it is necessary to make such
 variables ``private'' to individual threads.  
 
-we have employed two strategies to do this privatization transformation. One is
-by argument passing. That is, the global variables are bunched together in a
+We have employed a strategy of argument passing to do this privatization
+transformation. That is, the global variables are bunched together in a
 single user-defined type, which is allocated by each thread dynamically. Then a
 pointer to this type is passed from subroutine to subroutine as an argument.
 Since the subroutine arguments are passed on a stack, which is not shared
 across all threads, each subroutine, when executing within a thread operates on
 a private copy of the global variables. 
 
-The second method we have employed is called ``dimension increment''. Here, the
-dimension of global data items is increased by one. This added dimension is
-used to access thread private data by indexing it with the thread number (which
-can be obtained with \texttt{MPI\_Comm\_rank} subroutine.) This scheme has a
-distinct disadvantage of wastage of space. Therefore it should be used only in
-case of small global data. There is another disadvantage, that of false
-sharing, if the global data items are not aligned properly.  \footnote{ Another
-strategy for doing privatization is also known. It employs registration of
-``thread-local data'' with the system and access to those data using ``keys''.
-This method is suitable for C and \CC{} programs, but the lack of consistency
-in Fortran 90 pointer implementations make it complicated to implement and use
-in Fortran.}
-
-These two schemes are demonstrated in the following examples. The original
+This scheme is demonstrated in the following examples. The original
 Fortran 90 code contains a module \texttt{shareddata}. This module is used in
 the main program and a subroutine \texttt{subA}.
 
 \begin{alltt}
+!FORTRAN EXAMPLE
 MODULE shareddata
   INTEGER :: myrank
   DOUBLE PRECISION :: xyz(100)
@@ -240,29 +228,61 @@ SUBROUTINE subA
     xyz(i) = xyz(i) + 1.0
   END DO
 END SUBROUTINE
+
+//C Example
+#include <mpi.h>
+
+int myrank;
+double xyz[100];
+
+void main\{
+  int i,ierr;
+  ierr = MPI_Init();
+  ierr = MPI_Comm_rank(MPI_COMM_WORLD, myrank);
+  for(i=0;i<100;i++)
+    xyz[i] = i + myrank;
+  subA();
+  ierr = MPI_Finalize();
+\}
+
+void subA()\{
+  int i;
+  for(i=0;i<100;i++)
+    xyz[i] = xyz[i] + 1.0;
+\}
 \end{alltt}
 
 \ampi{} executes the main program inside a user-level thread as a subroutine.
 For this purpose, the main program needs to be changed to be a subroutine with
 the name \verb+MPI_Main+.
 
-Now we transform this program using the first strategy. We first group the
+Now we transform this program using the argument passing strategy. We first group the
 shared data into a user-defined type.
 
 \begin{alltt}
+!FORTRAN EXAMPLE
 MODULE shareddata
   \emph{TYPE chunk}
     INTEGER :: myrank
     DOUBLE PRECISION :: xyz(100)
   \emph{END TYPE}
 END MODULE
+
+//C Example
+struct shareddata\{
+  int myrank;
+  double xyz[100];
+\};
 \end{alltt}
 
 Now we modify the main program to dynamically allocate this data and change the
 references to them. Subroutine \texttt{subA} is then modified to take this data
-as argument.
+as argument. One thing to note is that AMPI programs should rename the main function
+to MPI\_Main. This is to notify the AMPI framework of the entry point of the program.
+If a C++ compiler is used, you must have 'extern "C"' above your MPI\_Main declaration. 
 
 \begin{alltt}
+!FORTRAN EXAMPLE
 SUBROUTINE MPI_Main
   USE shareddata
   USE AMPI
@@ -286,6 +306,25 @@ SUBROUTINE subA(c)
     \emph{c\%xyz(i) = c\%xyz(i) + 1.0}
   END DO
 END SUBROUTINE
+
+//C Example
+void MPI_Main\{
+  int i,ierr;
+  struct shareddata *c;
+  ierr = MPI_Init();
+  c = (struct shareddata*)malloc(sizeof(struct shareddata));
+  ierr = MPI_Comm_rank(MPI_COMM_WORLD, c.myrank);
+  for(i=0;i<100;i++)
+    c.xyz[i] = i + c.myrank;
+  subA(c);
+  ierr = MPI_Finalize();
+\}
+
+void subA(struct shareddata *c)\{
+  int i;
+  for(i=0;i<100;i++)
+    c.xyz[i] = c.xyz[i] + 1.0;
+\}
 \end{alltt}
 
 With these changes, the above program can be made thread-safe. Note that it is
@@ -298,83 +337,71 @@ For large shared data, it would be better to do heap allocation because in
 \ampi{}, the stack sizes are fixed at the beginning (can be specified from the
 command line) and stacks do not grow dynamically.
 
-In the second scheme, we extend the dimension of the shared data, assuming that
-we are going to run with maximum 16 threads.
-
-\begin{alltt}
-MODULE shareddata
-  INTEGER :: myrank(16)
-  DOUBLE PRECISION :: xyz(16, 100)
-END MODULE
-\end{alltt}
-
-Next we change the references to these shared data, by adding an additional
-level of indexing:
-
-\begin{alltt}
-SUBROUTINE MPI_Main
-  USE shareddata
-  USE AMPI
-  INTEGER :: i, trank, ierr
-  CALL MPI_Init(ierr)
-  CALL MPI_Comm_rank(MPI_COMM_WORLD, trank, ierr)
-  \emph{myrank(trank) = trank}
-  DO i = 1, 100
-    \emph{xyz(trank, i) =  i + myrank(trank)}
-  END DO
-  CALL subA()
-  CALL MPI_Finalize(ierr)
-END SUBROUTINE
-
-SUBROUTINE subA(c)
-  USE shareddata
-  USE AMPI
-  INTEGER :: i, trank, ierr
-  CALL MPI_Comm_rank(MPI_COMM_WORLD, trank, ierr)
-  DO i = 1, 100
-    \emph{xyz(trank, i) = xyz(trank, i) + 1.0}
-  END DO
-END SUBROUTINE
-\end{alltt}
-
-Now, this program is also thread-safe and ready to run with \ampi{}.  
 
 \subsection{AMPI Status}
 
 Currently the following subset of MPI 1.1 standard is supported in \ampi{}.
 
 \begin{alltt}
-  MPI_Wtime           MPI_Init          MPI_Comm_rank       
-  MPI_Comm_size       MPI_Finalize      MPI_Send         
-  MPI_Recv            MPI_Isend         MPI_Irecv        
-  MPI_Sendrecv        MPI_Barrier       MPI_Bcast
-  MPI_Reduce          MPI_Allreduce     MPI_Start           
-  MPI_Waitall         MPI_Send_init     MPI_Recv_init    
-  MPI_Type_contiguous MPI_Type_vector   MPI_Type_hvector 
-  MPI_Type_indexed    MPI_Type_hindexed MPI_Type_struct
-  MPI_Type_commit     MPI_Type_free     MPI_Type_extent     
-  MPI_Type_size       MPI_Allgatherv    MPI_Allgather    
-  MPI_Gatherv         MPI_Gather        MPI_Alltoallv    
-  MPI_Alltoall        MPI_Comm_dup      MPI_Comm_free
-  MPI_Abort           MPI_Probe         MPI_Iprobe
-  MPI_Testall         MPI_Get_count     MPI_Pack
-  MPI_Unpack          MPI_Pack_size
+================================================================================================
+Point-to-point      Collective         Groups, Contexts          Environment      Extensions*
+                                       and Communicators         Management
+================================================================================================
+MPI_Send            MPI_Barrier        MPI_Group_size            MPI_Error_string MPI_Migrate
+MPI_Recv            MPI_Bcast          MPI_Group_rank            MPI_Wtime        MPI_Checkpoint
+MPI_Get_count       MPI_Gather         MPI_Group_translate_ranks MPI_Init         MPI_Restart
+MPI_Bsend           MPI_Gatherv        MPI_Group_compare         MPI_Initialized  MPI_Register
+MPI_Ssend           MPI_Scatter        MPI_Comm_group            MPI_Finalize     MPI_Get_userdata
+MPI_Buffer_attach   MPI_Scatterv       MPI_Group_union           MPI_Abort        MPI_Ireduce
+MPI_Buffer_detach   MPI_Allgather      MPI_Group_intersection
+MPI_Isend           MPI_Allgatherv     MPI_Group_difference
+MPI_Ibsend          MPI_Alltoall       MPI_Group_incl
+MPI_Issend          MPI_Alltoallv      MPI_Group_excl
+MPI_Irecv           MPI_Reduce         MPI_Group_range_incl
+MPI_Wait            MPI_Allreduce      MPI_Group_range_excl
+MPI_Waitany         MPI_Reduce_scatter MPI_Group_free
+MPI_Waitall                            MPI_Comm_create
+MPI_Test                               MPI_Comm_size
+MPI_Testall                            MPI_Comm_rank
+MPI_Iprobe                             MPI_Comm_dup
+MPI_Probe                              MPI_Comm_split
+MPI_Send_init                          MPI_Comm_free
+MPI_Recv_init
+MPI_Start
+MPI_Sendrecv
+MPI_Sendrecv_replace
+MPI_Type_contiguous
+MPI_Type_vector
+MPI_Type_hvector
+MPI_Type_indexed
+MPI_Type_hindexed
+MPI_Type_struct
+MPI_Type_commit
+MPI_Type_free
+MPI_Type_extent
+MPI_Type_size
+MPI_Pack
+MPI_Unpack
+MPI_Pack_size
+================================================================================================
+* AMPI extensions are explained later in this manual.
 \end{alltt}
 
-Following MPI 1.1 basic datatypes are supported in \ampi{}.
-
+Following MPI 1.1 basic datatypes are supported in \ampi{}. (Some are not available in
+Fortran binding. Refer to MPI-1.1 Standard for details.)
 \begin{alltt}
-MPI_DOUBLE_PRECISION MPI_INTEGER       MPI_REAL          
-MPI_COMPLEX          MPI_LOGICAL       MPI_CHARACTER     
-MPI_BYTE             MPI_PACKED        MPI_SHORT            
-MPI_LONG             MPI_UNSIGNED_CHAR MPI_UNSIGNED_SHORT
-MPI_UNSIGNED         MPI_UNSIGNED_LONG MPI_LONG_DOUBLE
+MPI_DATATYPE_NULL  MPI_CHAR           MPI_UNSIGNED_SHORT  MPI_LONG_INT
+MPI_DOUBLE         MPI_BYTE           MPI_UNSIGNED        MPI_2INT
+MPI_INT            MPI_PACKED         MPI_UNSIGNED_LONG   MPI_SHORT_INT
+MPI_FLOAT          MPI_SHORT          MPI_LONG_DOUBLE     MPI_LONG_DOUBLE_INT
+MPI_COMPLEX        MPI_LONG           MPI_FLOAT_INT       MPI_2FLOAT
+MPI_LOGICAL        MPI_UNSIGNED_CHAR  MPI_DOUBLE_INT      MPI_2DOUBLE
 \end{alltt}
 
 Following MPI 1.1 reduction operations are supported in \ampi{}.
 
 \begin{alltt}
-MPI_MAX  MPI_MIN  MPI_SUM  MPI_PROD
+MPI_MAX  MPI_MIN  MPI_SUM  MPI_PROD  MPI_MAXLOC  MPI_MINLOC
 \end{alltt}
 
 Also, unlike the MPI 1.1 standard, the Fortran90 statement ``\texttt{use mpi}'' 
@@ -471,6 +498,7 @@ phases performs different tasks. An example will make this clear:
 Suppose the chunk data is defined as a user-defined type in Fortran 90:
 
 \begin{alltt}
+!FORTRAN EXAMPLE
 MODULE chunkmod
   TYPE, PUBLIC :: chunk
       INTEGER , parameter :: nx=4, ny=4, tchunks=16
@@ -479,12 +507,20 @@ MODULE chunkmod
       REAL(KIND=8), dimension(400):: bxm, bxp, bym, byp
   END TYPE chunk
 END MODULE
+
+//C Example
+struct chunk\{
+  double t;
+  int xidx, yidx;
+  double bxm,bxp,bym,byp;
+\};
 \end{alltt}
 
 Then the pack-unpack subroutine \texttt{chunkpup} for this chunk module is
 written as:
 
 \begin{alltt}
+!FORTRAN EXAMPLE
 SUBROUTINE chunkpup(p, c)
   USE pupmod
   USE chunkmod
@@ -500,6 +536,17 @@ SUBROUTINE chunkpup(p, c)
   call pup(p, c\%bym)
   call pup(p, c\%byp)
 end subroutine
+
+//C Example
+void chunkpup(PUP::er& p, struct chunk c)\{
+  p|c.t;
+  p|c.xidx;
+  p|c.yidx;
+  p|c.bxm;
+  p|c.bxp;
+  p|c.bym;
+  p|c.byp;
+\}
 \end{alltt}
 
 There are several things to note in this example. First, the same subroutine
@@ -520,24 +567,32 @@ and when the chunk is unpacked, these data structures should be allocated
 before copying them from the buffers.  For this purpose, one needs to know
 whether the invocation of \texttt{chunkpup} is a packing one or unpacking one.
 For this purpose, the \texttt{pupmod} module provides functions
-\verb+pup_ispk+(\verb+pup_isupk+). These functions return logical value
+\verb+fpup_isdeleting+(\verb+fpup_isunpacking+). These functions return logical value
 \verb+.TRUE.+ if the invocation is for packing (unpacking), and \verb+.FALSE.+
 otherwise. Following example demonstrates this:
 
 Suppose the type \texttt{dchunk} is declared as:
 
 \begin{alltt}
+!FORTRAN EXAMPLE
 MODULE dchunkmod
   TYPE, PUBLIC :: dchunk
       INTEGER :: asize
       REAL(KIND=8), pointer :: xarr(:), yarr(:)
   END TYPE dchunk
 END MODULE
+
+//C Example
+struct dchunk\{
+  int asize;
+  double* xarr, *yarr;
+\};
 \end{alltt}
 
 Then the pack-unpack subroutine is written as:
 
 \begin{alltt}
+!FORTRAN EXAMPLE
 SUBROUTINE dchunkpup(p, c)
   USE pupmod
   USE dchunkmod
@@ -547,7 +602,7 @@ SUBROUTINE dchunkpup(p, c)
 
   pup(p, c\%asize)
   \emph{
-  IF (pup_isupk(p)) THEN       !! if invocation is for unpacking
+  IF (fpup_isunpacking(p)) THEN       !! if invocation is for unpacking
     allocate(c\%xarr(asize))
     ALLOCATE(c\%yarr(asize))
   ENDIF
@@ -555,16 +610,31 @@ SUBROUTINE dchunkpup(p, c)
   pup(p, c\%xarr)
   pup(p, c\%yarr)
   \emph{
-  IF (pup_ispk(p)) THEN        !! if invocation is for packing
+  IF (fpup_isdeleting(p)) THEN        !! if invocation is for packing
     DEALLOCATE(c\%xarr(asize))
     DEALLOCATE(c\%yarr(asize))
   ENDIF
   }
 
 END SUBROUTINE
+
+//C Example
+void dchunkpup(PUP::er& p, struct dchunk c)\{
+  p|c.asize;
+  if(p.isUnpacking())\{
+    c.xarr = (double *)malloc(sizeof(double)*asize);
+    c.yarr = (double *)malloc(sizeof(double)*asize);
+  \}
+  p(asize,xarr);
+  p(asize,yarr);
+  if(p.isPacking())\{
+    free(c.xarr);
+    free(c.yarr);
+  \}
+\}
 \end{alltt}
 
-One more function \verb+pup_issz+ is also available in module \texttt{pupmod}
+One more function \verb+fpup_issizing+ is also available in module \texttt{pupmod}
 that returns \verb+.TRUE.+ when the invocation is a sizing one. In practice one
 almost never needs to use it.
 
@@ -586,6 +656,9 @@ can serve as a checkpoint directory name.) This directory is created, and the
 entire state of the program is checkpointed to this directory.  One can restart
 the program from the checkpointed state by specifying \texttt{"+restart
 dirname"} on the command-line.
+
+This extension is under active refinement and a stable version will be available
+very soon.
 
 \subsection{Extensions for Interoperability}
 
@@ -611,13 +684,18 @@ Solids domain, is integrated with one of Fluids and Solids.} writing a
 subroutine called \texttt{MPI\_Setup}.
 
 \begin{alltt}
+!FORTRAN EXAMPLE
 SUBROUTINE MPI_Setup
   USE ampi
-
   CALL MPI_Register_main(Solids_Main)
   CALL MPI_Register_main(Fluids_Main)
-
 END SUBROUTINE
+
+//C Example
+void MPI_Setup()\{
+  MPI_Register_main(Solids_Main);
+  MPI_Register_main(Fluids_Main);
+\}
 \end{alltt}
 
 This subroutine is called from the internal initialization routines of \ampi{}
@@ -664,18 +742,30 @@ communicator in the call. For example if a Solids chunk number 36 wants to send
 data to chunk number 47 within the Fluids module, it calls:
 
 \begin{alltt}
+!FORTRAN EXAMPLE
 INTEGER , PARAMETER :: Fluids_Comm = 2
-CALL MPI_Send(InitialTime, 1, MPI_Double_Precision, tag, &
-        \emph{47, MPI_Comm_Universe(Fluids_Comm)}, ierr)
+CALL MPI_Send(InitialTime, 1, MPI_Double_Precision, tag, 
+              \emph{47, MPI_Comm_Universe(Fluids_Comm)}, ierr)
+
+//C Example
+int Fluids_Comm = 2;
+ierr = MPI_Send(InitialTime, 1, MPI_DOUBLE, tag,
+                \emph{47, MPI_Comm_Universe(Fluids_Comm)});
 \end{alltt}
 
 The Fluids chunk has to issue a corresponding receive call to receive this
 data:
 
 \begin{alltt}
+!FORTRAN EXAMPLE
 INTEGER , PARAMETER :: Solids_Comm = 1
-CALL MPI_Recv(InitialTime, 1, MPI_Double_Precision, tag, &
-        \emph{36, MPI_Comm_Universe(Solids_Comm)}, stat, ierr)
+CALL MPI_Recv(InitialTime, 1, MPI_Double_Precision, tag, 
+              \emph{36, MPI_Comm_Universe(Solids_Comm)}, stat, ierr)
+
+//C Example
+int Solids_Comm = 1;
+ierr = MPI_Recv(InitialTime, 1, MPI_DOUBLE, tag,
+                \emph{36, MPI_Comm_Universe(Solids_Comm)}, &stat);
 \end{alltt}
 
 \subsection{Compiling AMPI Programs}
@@ -701,10 +791,6 @@ some platform-specific options for compiling and building \ampi{} codes.
 Fortunately, if \charmc{} does not recognize any particular options on its
 command line, it promptly passes it to all the individual compilers and linkers
 it invokes to compile the program.
-
-Currently, \ampi{} is tested to run correctly on Origin 2000, Sun (Solaris 5.7)
-workstation clusters, and Intel Linux clusters. Testing for IBM SP and Intel
-Paragon (ASCI Red) is in progress.
 
 \appendix
 
@@ -745,8 +831,21 @@ communication library one wants to use for running \ampi{} programs.
 See the charm/README file for details on picking the proper version.
 
 
-\section{Running AMPI Programs}
+\section{Building and Running AMPI Programs}
+\subsection{Building}
+\charmpp{} provides a compiler called charmc in your charm/bin/ directory. 
+You can use this compiler to build your AMPI program the same way as other
+compilers like cc. Especially, to build an AMPI program, a command line 
+option \emph{-language ampi} should be applied. All the command line 
+flags that you would use for other compilers can be used with charmc the 
+same way. For example:
 
+\begin{alltt}
+> charmc -language ampi -c pgm.c -O3
+> charmc -language ampi -o pgm pgm.o -lm -O3 
+\end{alltt}
+
+\subsection{Running}
 \charmpp{} distribution contains a script called \texttt{charmrun} that makes
 the job of running \ampi{} programs portable and easier across all parallel
 machines supported by \charmpp{}. \texttt{charmrun} is copied to a directory
