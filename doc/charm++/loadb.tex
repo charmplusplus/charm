@@ -105,11 +105,9 @@ descriptions:
 \item {\bf RefineLB}:     Move objects away from the most overloaded processors to reach average, limits the number of objects migrated;
 \item {\bf RefineCommLB}:     Same idea as in RefineLB, but take communication into account;
 \item {\bf RandCentLB}:   Randomly assigns objects to processors;
-\item {\bf RandRefLB}:    Randomly assigns objects to processors, then refines;
 \item {\bf RecBisectBfLB}:        Recursively partition with Breadth first enumeration;
 \item {\bf MetisLB}:      Use Metis(tm) to partitioning object communication graph;
 \item {\bf GreedyLB}:   Use greedy algorithm, always pick the heaviest object to the least loaded processor.
-\item {\bf GreedyRefLB}:  Apply greedyLB, and then refine;
 \item {\bf GreedyCommLB}:       Greedy algorithm which also takes communication graph into account;
 \item {\bf ComboCentLB}:  A special load balancer that can be used to combine any number of above centralized load balancers;
 \end{itemize}
@@ -286,6 +284,7 @@ configure the load balancer, etc. These functions are:
       functions to control the load balancing statistics instrumentation
       on or off on the calling processor. No implicit broadcast or 
       synchronization exists in these functions.
+      Fortran interface: {\bf FLBTURNINSTRUMENTON()} and {\bf FLBTURNINSTRUMENTOFF()}.
 \item {\bf setMigratable(CmiBool migratable)}: is a member function of array
       element. This function can be called 
       in an array element constructor to tell load balancer whether this object
@@ -420,6 +419,12 @@ that is when some processors start working on computation while the other
 processors are still busy migrating objects, then use this option to force 
 a global barrier on all processors to make sure processors can only resume 
 computation after migrations finish on all processors.
+\item {\em +LBOff} \\
+     Turns off load balancing instrumentation at startup time. This call turns
+off the instrument of both CPU and communication usage.
+\item {\em +LBCommOff} \\
+     Turns off load balancing instrumentation of communication at startup time. 
+The instrument of CPU usage is left on.
 \end{itemize}
 
 \end{enumerate}
