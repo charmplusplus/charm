@@ -305,13 +305,13 @@ CLBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
     for(i=0; i < csz; i++) {
       CkPrintf("Link %d\n",i);
       
-      if (cdata[i].from_proc)
+      if (cdata[i].from_proc())
 	CkPrintf("    sender PE = %d\n",cdata[i].src_proc);
       else
 	CkPrintf("    sender id = %d:%d\n",
 		 cdata[i].senderOM.id,cdata[i].sender.id[0]);
 
-      if (cdata[i].to_proc)
+      if (cdata[i].to_proc())
 	CkPrintf("  receiver PE = %d\n",cdata[i].dest_proc);
       else	
 	CkPrintf("  receiver id = %d:%d\n",

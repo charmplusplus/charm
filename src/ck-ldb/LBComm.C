@@ -154,16 +154,14 @@ void LBCommTable::GetCommData(LDCommData* data)
 
   for(i=0; i < cur_sz; i++, curtable++, curstate++) {
     if (*curstate == InUse) {
-      out->to_proc = CmiFalse;
       if (curtable->from_proc()) {
-	out->from_proc = CmiTrue;
 	out->src_proc = curtable->src_proc;
       } else {
-	out->from_proc = CmiFalse;
 	out->src_proc = -1;
 	out->senderOM = curtable->srcObj.omhandle.id;
 	out->sender = curtable->srcObj.id;
       }
+      out->dest_proc = -1;
       out->receiverOM = curtable->destOM;
       out->receiver = curtable->destObj;
       out->messages = curtable->n_messages;

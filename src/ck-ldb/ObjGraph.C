@@ -35,7 +35,7 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
       const LDCommData newedgedata = stats[pe].commData[index];
 
       // If this isn't an object-to-object message, ignore it
-      if (!newedgedata.from_proc && !newedgedata.to_proc)
+      if (!newedgedata.from_proc() && !newedgedata.to_proc())
 	n_edges++;
     }
   }
@@ -71,7 +71,7 @@ ObjGraph::ObjGraph(int count, CentralLB::LDStats* _stats)
       const LDCommData newedgedata = stats[pe].commData[index];
 
       // If this isn't an object-to-object message, ignore it
-      if (newedgedata.from_proc || newedgedata.to_proc)
+      if (newedgedata.from_proc() || newedgedata.to_proc())
 	continue;
 
       if(cur_edge >= n_edges)

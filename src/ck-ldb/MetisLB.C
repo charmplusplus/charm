@@ -163,7 +163,7 @@ CLBMigrateMsg* MetisLB::Strategy(CentralLB::LDStats* stats, int count)
     LDCommData *cdata = stats[j].commData;
     const int csz = stats[j].n_comm;
     for(i=0; i<csz; i++) {
-      if(cdata[i].from_proc || cdata[i].to_proc)
+      if(cdata[i].from_proc() || cdata[i].to_proc())
         continue;
       int senderID = cdata[i].sender.id[0];
       int recverID = cdata[i].receiver.id[0];

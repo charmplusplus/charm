@@ -64,22 +64,24 @@ typedef struct {
   double wallTime;
   CmiBool migratable;
 #ifdef __cplusplus
-  inline const LDOMid &omID() { return omHandle.id; }
-  inline const LDObjid &id() { return handle.id; }
+  inline const LDOMid &omID() const { return omHandle.id; }
+  inline const LDObjid &id() const { return handle.id; }
 #endif
 } LDObjData;
 
 typedef struct {
-  CmiBool from_proc;
   int src_proc;
   LDOMid senderOM;
   LDObjid sender;
-  CmiBool to_proc;
   int dest_proc;
   LDOMid receiverOM;
   LDObjid receiver;
   int messages;
   int bytes;
+#ifdef __cplusplus
+  inline CmiBool from_proc() const { return src_proc != -1; }
+  inline CmiBool to_proc() const { return dest_proc != -1; }
+#endif
 } LDCommData;
 
 /*

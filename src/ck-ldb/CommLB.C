@@ -205,7 +205,7 @@ CLBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* stats, int count)
     
     for(pe=0; pe < count; pe++) 
 	for(com =0; com< stats[pe].n_comm;com++)
-	    if((!stats[pe].commData[com].from_proc)&&(!stats[pe].commData[com].to_proc)){
+	    if((!stats[pe].commData[com].from_proc())&&(!stats[pe].commData[com].to_proc())){
 		xcoord = search(stats[pe].commData[com].sender,stats[pe].commData[com].senderOM); 
 		ycoord = search(stats[pe].commData[com].receiver,stats[pe].commData[com].receiverOM);
 		if((xcoord == -1)||(ycoord == -1))
