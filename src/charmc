@@ -425,7 +425,7 @@ foreach FILE ($GENCPM)
     set TMP=$BASE:t.TMP
     set DELETE=($DELETE $TMP.c $TMP.i)
     ($ECHOCMD ; /bin/rm -f $BASE.cpm.h $TMP.c)
-    ($ECHOCMD ; /usr/bin/touch $BASE.cpm.h)
+    ($ECHOCMD ; touch $BASE.cpm.h)
     ($ECHOCMD ; /bin/ln -s $FILE $TMP.c)
     ($ECHOCMD ; $CMK_CPP_C $OPTS_CPP -I$CHARMINC $TMP.c > $TMP.i)
     if ($status) goto failure
