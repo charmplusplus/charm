@@ -485,7 +485,7 @@ void CentralLB::readStatsMsgs(const char* filename) {
   // at this stage, we need to rebuild the statsMsgList and
   // statsDataList structures. For that first deallocate the
   // old structures
-  for(int i = 0; i < stats_msg_count; i++)
+  for(i = 0; i < stats_msg_count; i++)
   	delete statsMsgsList[i];
   delete[] statsMsgsList;
 
@@ -542,11 +542,12 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg*
 	int* msgRecvCount = new int[count]; // # of messages received by each PE
 	int* byteSentCount = new int[count];// # of bytes sent by each PE
 	int* byteRecvCount = new int[count];// # of bytes reeived by each PE
+        int i, pe;
 
-	for(int i = 0; i < count; i++)
+	for(i = 0; i < count; i++)
 		msgSentCount[i] = msgRecvCount[i] = byteSentCount[i] = byteRecvCount[i] = 0;
 
-	for(int pe = 0; pe < count; pe++)
+	for(pe = 0; pe < count; pe++)
   	{
     	peLoads[pe] = stats[pe].bg_walltime;
 
@@ -579,7 +580,7 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg*
 
 	// handling of the communication overheads. Here, for each "link" in the communication statistics,
 	// find the sender and receiver PE and if they are not the same, add the costs, else don't add
-	for(int pe = 0; pe < count; pe++)
+	for(pe = 0; pe < count; pe++)
 	{
 		// add the communication loads
 		LDCommData* cdata = stats[pe].commData;
@@ -617,7 +618,7 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg*
 	}
 
 	// now for each processor, add to its load the send and receive overheads
-	for(int i = 0; i < count; i++)
+	for(i = 0; i < count; i++)
 	{
 		peLoads[i] += msgRecvCount[i]  * PER_MESSAGE_RECV_OVERHEAD +
 					  msgSentCount[i]  * PER_MESSAGE_SEND_OVERHEAD +
