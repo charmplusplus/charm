@@ -42,9 +42,9 @@ void barrier::atBarrier(FP *m)
   kidscount++;
   if (kidscount == 3) {
     if (myPe == 0)
-      grp.callFP(CkMyPe());
+      grp[CkMyPe()].callFP();
     else
-      grp.notify(myParent);
+      grp[myParent].notify();
   }
   fnptr = m->fp;
   delete m;
@@ -57,9 +57,9 @@ void barrier::notify(void)
   kidscount++;
   if (kidscount == 3) {
     if (myPe == 0)
-      grp.callFP(CkMyPe());
+      grp[CkMyPe()].callFP();
     else
-      grp.notify(myParent);
+      grp[myParent].notify();
   }
 }
 
@@ -68,9 +68,9 @@ void barrier::callFP(void)
   CProxy_barrier grp(myGroup);
 
   if (myLeft < CkNumPes())
-    grp.callFP(myLeft);
+    grp[myLeft].callFP();
   if (myRight < CkNumPes())
-    grp.callFP(myRight);
+    grp[myRight].callFP();
   fnptr();
 }
 
