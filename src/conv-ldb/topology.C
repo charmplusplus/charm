@@ -41,18 +41,18 @@ int LBTopology::rec_hop_count(int src,int dest,int max_neigh,int count,int *visi
 	int min_hop_cnt=999999;
 	int ret_val=0;
 	int skip_neigh=0;
-
+	int i;
 	
 	neighbors(src,pes,max_neigh);
 	
 	visited_srcs[count-1]=src;
 	
-	for(int i=0;i<max_neigh;i++)
+	for(i=0;i<max_neigh;i++)
 	{
 		if(pes[i]==dest)
 			return count;
 	}
-	for(int i=0;i<max_neigh;i++)
+	for(i=0;i<max_neigh;i++)
 	{
 		for(int j=0;j<count;j++)
 			if(visited_srcs[j]==pes[i])
