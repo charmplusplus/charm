@@ -40,17 +40,26 @@
 #define CMK_BROADCAST_SPANNING_TREE    0
 #else
 #define CMK_BROADCAST_SPANNING_TREE    1
+#define CMK_BROADCAST_HYPERCUBE        0
 #endif
 
-#define BROADCAST_SPANNING_FACTOR      20
+#define BROADCAST_SPANNING_FACTOR      4
 
 #define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
+#define CMI_GET_CYCLE(msg)               ((CmiMsgHeaderBasic *)msg)->root
+
 #define CMI_DEST_RANK(msg)               ((CmiMsgHeaderBasic *)msg)->rank
 
 #if CMK_BROADCAST_SPANNING_TREE
 #  define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
 #else
 #  define CMI_SET_BROADCAST_ROOT(msg, root)
+#endif
+
+#if CMK_BROADCAST_HYPERCUBE
+#  define CMI_SET_CYCLE(msg, cycle)  CMI_GET_CYCLE(msg) = (cycle);
+#else
+#  define CMI_SET_CYCLE(msg, cycle)
 #endif
 
 
@@ -111,6 +120,7 @@ void CmiAbort(const char *message);
 static void PerrorExit(const char *msg);
 
 void SendSpanningChildren(int size, char *msg);
+void SendHypercube(int size, char *msg);
 
 static void PerrorExit(const char *msg)
 {
@@ -313,15 +323,20 @@ static int PumpMsgs(void)
     msg = (char *) CmiAlloc(nbytes);
     if (MPI_SUCCESS != PMPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
       CmiAbort("PumpMsgs: PMPI_Recv failed!\n");
+
 #if CMK_NODE_QUEUE_AVAILABLE
     if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
       PCQueuePush(CsvAccess(NodeRecv), msg);
     else
 #endif
-    CmiPushPE(CMI_DEST_RANK(msg), msg);
+      CmiPushPE(CMI_DEST_RANK(msg), msg);
+
 #if CMK_BROADCAST_SPANNING_TREE
     if (CMI_BROADCAST_ROOT(msg))
       SendSpanningChildren(nbytes, msg);
+#elif CMK_BROADCAST_HYPERCUBE
+    if (CMI_GET_CYCLE(msg))
+      SendHypercube(nbytes, msg);
 #endif
   }
 }
@@ -558,20 +573,56 @@ void SendSpanningChildren(int size, char *msg)
   }
 }
 
+#include <math.h>
+
+/* send msg along the hypercube in broadcast. (Sameer) */
+void SendHypercube(int size, char *msg)
+{
+  CmiState cs = CmiGetState();
+  int curcycle = CMI_GET_CYCLE(msg);
+  int i;
+
+  double logp = CmiNumPes();
+  logp = log(logp)/log(2.0);
+  logp = ceil(logp);
+  
+  //  CmiPrintf("In hypercube\n");
+
+  //  assert(startpe>=0 && startpe<Cmi_numpes);
+
+  for (i = curcycle; i < logp; i++) {
+    int p = cs->pe ^ (1 << i);
+    
+    //    CmiPrintf("p = %d, logp = %5.1f\n", p, logp);
+
+    if(p < CmiNumPes()) {
+      CMI_SET_CYCLE(msg, i + 1);
+      CmiSyncSendFn1(p, size, msg);
+    }
+  }
+}
+
 void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
 {
   CmiState cs = CmiGetState();
 #if CMK_BROADCAST_SPANNING_TREE
   CMI_SET_BROADCAST_ROOT(msg, Cmi_mype+1);
   SendSpanningChildren(size, msg);
+  
+#elif CMK_BROADCAST_HYPERCUBE
+  CMI_SET_CYCLE(msg, 0);
+  SendHypercube(size, msg);
+    
 #else
-  int i ;
-     
+  int i;
+
   for ( i=cs->pe+1; i<Cmi_numpes; i++ ) 
     CmiSyncSendFn(i, size,msg) ;
   for ( i=0; i<cs->pe; i++ ) 
     CmiSyncSendFn(i, size,msg) ;
 #endif
+
+  //CmiPrintf("In  SyncBroadcast broadcast\n");
 }
 
 
@@ -585,6 +636,8 @@ CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)
     CmiAsyncSendFn(i,size,msg) ;
   for ( i=0; i<cs->pe; i++ ) 
     CmiAsyncSendFn(i,size,msg) ;
+
+  //CmiPrintf("In  AsyncBroadcast broadcast\n");
   return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
 
@@ -596,17 +649,27 @@ void CmiFreeBroadcastFn(int size, char *msg)
  
 void CmiSyncBroadcastAllFn(int size, char *msg)        /* All including me */
 {
+ 
 #if CMK_BROADCAST_SPANNING_TREE
   CmiState cs = CmiGetState();
   CmiSyncSendFn(cs->pe, size,msg) ;
   CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
   SendSpanningChildren(size, msg);
+
+#elif CMK_BROADCAST_HYPERCUBE
+  CmiState cs = CmiGetState();
+  CmiSyncSendFn(cs->pe, size,msg) ;
+  CMI_SET_CYCLE(msg, 0);
+  SendHypercube(size, msg);
+
 #else
-  int i ;
+    int i ;
      
   for ( i=0; i<Cmi_numpes; i++ ) 
     CmiSyncSendFn(i,size,msg) ;
 #endif
+
+  //CmiPrintf("In  SyncBroadcastAll broadcast\n");
 }
 
 CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)  
@@ -615,16 +678,27 @@ CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)
 
   for ( i=1; i<Cmi_numpes; i++ ) 
     CmiAsyncSendFn(i,size,msg) ;
+
+  //CmiPrintf("In  AsyncBroadcastAll broadcast\n");
+    
   return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
 
 void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 {
+
 #if CMK_BROADCAST_SPANNING_TREE
   CmiState cs = CmiGetState();
   CmiSyncSendFn(cs->pe, size,msg) ;
   CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
   SendSpanningChildren(size, msg);
+
+#elif CMK_BROADCAST_HYPERCUBE
+  CmiState cs = CmiGetState();
+  CmiSyncSendFn(cs->pe, size,msg) ;
+  CMI_SET_CYCLE(msg, 0);
+  SendHypercube(size, msg);
+
 #else
   int i ;
      
@@ -632,6 +706,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
     CmiSyncSendFn(i,size,msg) ;
 #endif
   CmiFree(msg) ;
+  //CmiPrintf("In FreeBroadcastAll broadcast\n");
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
