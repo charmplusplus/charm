@@ -726,13 +726,9 @@ void       CthAutoYieldUnblock(void);
 
 #endif
 
-#if CMK_THREADS_COPY_STACK
-
 extern int CthPackBufSize(CthThread);
 extern void CthPackThread(CthThread, void *);
 extern CthThread CthUnpackThread(void *);
-
-#endif
 
 CthCpvExtern(char *,CthData);
 extern int CthRegister(int);

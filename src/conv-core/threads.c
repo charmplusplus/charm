@@ -703,4 +703,23 @@ CthThread CthGetNext(CthThread t)
 {
   return t->qnext;
 }
+
+
+int CthPackBufSize(CthThread t)
+{
+  CmiAbort("CthPackBufSize not implemented.\n");
+  return 0;
+}
+
+void CthPackThread(CthThread t, void *buffer)
+{
+  CmiAbort("CthPackThread not implemented.\n");
+}
+
+CthThread CthUnpackThread(void *buffer)
+{
+  CmiAbort("CthUnpackThread not implemented.\n");
+  return (CthThread) 0;
+}
+
 #endif
