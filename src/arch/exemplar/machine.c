@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-07-03 17:57:37  gursoy
+ * Revision 2.6  1995-07-05 23:07:28  gursoy
+ * fixed +p option
+ *
+ * Revision 2.5  1995/07/03  17:57:37  gursoy
  * changed charm_main to user_main
  *
  * Revision 2.4  1995/06/28  15:31:54  gursoy
@@ -154,12 +157,30 @@ char *argv[];
     void *arg = & usrparam;
  
     spawn_sym_t request;
-     
-/* temporary  implementation for testing */
-/* numbers of processors must be extracted from argv */ 
-    requested_npe = 2;
-printf("Enter requested_npe:");
-scanf("%d",&requested_npe);
+
+
+    /* figure out number of processors required */
+    i =  0;
+    while (argv[i] != NULL)
+    {
+         if (strcmp(argv[i], "+p") == 0)
+           {
+                 sscanf(argv[i + 1], "%d", &requested_npe);
+                 break;
+           }
+         else if (sscanf(argv[i], "+p%d", &requested_npe) == 1) break;
+         i++;
+    }
+
+
+    if (requested_npe <= 0)
+    {
+       printf("Error: requested number of processors is invalid %d\n",requested_
+npe);
+       exit();
+    }
+
+
     usrparam.argc = argc;
     usrparam.argv = (void *) argv;
     usrparam.npe  = requested_npe;
