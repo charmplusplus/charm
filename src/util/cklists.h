@@ -208,7 +208,20 @@ public:
 };
 
 
-/// Helper for smart pointer classes: allocate a new copy when pup'd:
+
+/// Helper for smart pointer classes: allocate a new copy when pup'd.
+///  Assumes pointer is non-null
+template <class T> 
+class CkPupAlwaysAllocatePtr {
+public:
+	void pup(PUP::er &p,T *&ptr) {
+		if (p.isUnpacking()) ptr=new T;
+		p|*ptr;
+	}
+};
+
+/// Helper for smart pointer classes: allocate a new copy when pup'd.
+///  Allows pointer to be NULL
 template <class T> 
 class CkPupAllocatePtr {
 public:
@@ -272,12 +285,12 @@ public:
 
 
 ///A vector of zero-initialized heap-allocated objects of type T
-template <class T>
-class CkPupPtrVec : public CkVec< CkZeroPtr<T> >, 
+template <class T, class PUP_PTR=CkPupAllocatePtr<T> >
+class CkPupPtrVec : public CkVec< CkZeroPtr<T, PUP_PTR> >, 
 	public CkNoncopyable {
  public:
-	typedef CkPupPtrVec<T> this_type;
-	typedef CkVec< CkZeroPtr<T> > super;
+	typedef CkPupPtrVec<T,PUP_PTR> this_type;
+	typedef CkVec< CkZeroPtr<T, PUP_PTR> > super;
 	CkPupPtrVec() {}
 	CkPupPtrVec(int size) :super(size) {}
 	~CkPupPtrVec() {
