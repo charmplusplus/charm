@@ -44,4 +44,4 @@ set CMK_SEQ_LDXX='CC'
 set CMK_NM='nm'
 set CMK_NM_FILTER='grep "|GLOB" | sed -e "s@.*|@@"'
 set CMK_CPP_SUFFIX="cc"
-set CMK_XLATPP='charmxlat++ '
+set CMK_XLATPP='charmxlat++ -w '

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.11  1997-03-19 04:31:30  jyelon
+ * Revision 1.12  1997-03-24 16:21:54  milind
+ * removed an alignment bug caused by mycpy. Replaced mycpy with memcpy.
+ *
+ * Revision 1.11  1997/03/19 04:31:30  jyelon
  * Redesigned ConverseInit
  *
  * Revision 1.10  1996/07/24 21:42:32  gursoy
@@ -75,7 +78,6 @@ CpvDeclare(void*, CmiLocalQueue);
 CpvExtern(int, CcdNumChecks);
 CpvExtern(int, disable_sys_msgs);
 
-static void mycpy();
 double CmiTimer();
 
 static void CsiTimerInit();
@@ -153,7 +155,7 @@ char * msg;
     buf              =  (char *)malloc(size+8);
     ((int *)buf)[0]  =  size;
     buf += 8;
-    mycpy((double *)buf,(double *)msg,size);
+    memcpy(buf,msg,size);
 
     sim_send_message(Cmi_mype,buf,size,FALSE,destPE);
 }
@@ -246,7 +248,7 @@ char * msg;
      buf              =  (char *)malloc(size+8);
      ((int *)buf)[0]  =  size; 
      buf += 8;
-     mycpy((double *)buf,(double *)msg,size);
+     memcpy(buf,msg,size);
      FIFO_EnQueue(CpvAccess(CmiLocalQueue),buf);
 }
 
@@ -389,23 +391,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
   while (CsvAccess(CsdStopCount)) simulate();
 
   exit(0);
-}
-
-static void mycpy(dst, src, bytes)
-double *dst; double *src; int bytes;
-{
-  unsigned char *cdst, *csrc;
-
-  while(bytes>8) {
-    *dst++ = *src++;
-    bytes -= 8;
-  }
-  cdst = (unsigned char *) dst;
-  csrc = (unsigned char *) src;
-  while(bytes) {
-    *cdst++ = *csrc++;
-    bytes--;
-  }
 }
 
 void CsdExitScheduler()
