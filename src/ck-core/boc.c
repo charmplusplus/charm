@@ -326,6 +326,52 @@ void *mydata;
         *pChareID = chare->selfID;
 }
 
+void GeneralMulticastMsgBranch(ep, msg, type, bocnum, grp)
+EntryPointType ep;
+void *msg;
+MsgTypes type;
+ChareNumType bocnum;
+CmiGroup grp;
+{
+  ENVELOPE *env;
+  int len, queueing, priobits; unsigned int *prioptr;
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(CpvAccess(CkInfo_Index));
+  CldPackFn pfn;
+ 
+  /* Charm++ translator puts type as -1 to avoid using the
+     BroadcastBocMsg macro. */
+  if ( type == -1 )
+    type = BroadcastBocMsg ;
+ 
+  env = ENVELOPE_UPTR(msg);
+ 
+  SetEnv_msgType(env, type);
+  SetEnv_boc_num(env, bocnum);
+  SetEnv_EP(env, ep);
+ 
+  TRACE(CmiPrintf("[%d] GeneralBroadcast: type=%d, msgType=%d\n",
+                  CmiMyPe(), type, GetEnv_msgType(env)));
+ 
+  /* if (bocnum >= NumSysBoc) */
+  CpvAccess(nodebocMsgsCreated)+=CmiNumPes();
+
+  if(CpvAccess(traceOn))
+    trace_creation(GetEnv_msgType(env), ep, env);
+
+  CmiSetHandler(env,CpvAccess(HANDLE_INCOMING_MSG_Index));
+  ifn((void *)env, &pfn, &len, &queueing, &priobits, &prioptr);
+  if (pfn) {
+      pfn(&env);
+      ifn((void *)env, &pfn, &len, &queueing, &priobits, &prioptr);
+  }
+  CmiFreeMulticastFn(grp, len, (void *)env);
+  /*CldEnqueue(destPE, env, CpvAccess(CkInfo_Index));*/
+
+  if((type!=QdBocMsg)&&(type!=QdBroadcastBocMsg)&&(type!=LdbMsg))
+  QDCountThisCreation(1);
+}
+
+
 void GeneralSendMsgBranch(ep, msg, destPE, type, bocnum)
 EntryPointType ep;
 void *msg;
