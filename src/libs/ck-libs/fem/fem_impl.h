@@ -243,13 +243,15 @@ class MeshChunk : public CkNoncopyable {
 
 /* Unmarshall into a heap-allocated copy */
 template<class T>
-class marshallNewHeapCopy : public CkNoncopyable {
+class marshallNewHeapCopy {
 	T *cur;
 public:
 	marshallNewHeapCopy(T *readFrom) :cur(readFrom) {}
+	marshallNewHeapCopy(const marshallNewHeapCopy &h) :cur(h.cur) {}
 	marshallNewHeapCopy(void) {
 		cur=new T;
 	}
+	
 	void pup(PUP::er &p) {
 		cur->pup(p);
 	}
