@@ -350,7 +350,7 @@ do
 		# fixme: -fpic is only for gcc-- should wait until we read config script
 		OPTS_CC="$OPTS_CC -fpic"
 		OPTS_CXX="$OPTS_CXX -fpic"
-		OPTS_F90="$OPTS_F90 -c"
+		OPTS_F90="$OPTS_F90 -fpic"
 		OPTS_LD="$OPTS_LD -fpic"
 		;;
 
