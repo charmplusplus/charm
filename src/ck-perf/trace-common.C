@@ -21,7 +21,8 @@
 #include "trace-common.h"
 #include "allEvents.h"          //projector
 #include "register.h" // for _entryTable
-CpvExtern(int, _traceCoreOn);   // projector
+
+CpvCExtern(int, _traceCoreOn);   // projector
 
 #define DEBUGF(x)          // CmiPrintf x
 
