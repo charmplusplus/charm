@@ -176,7 +176,10 @@ static void Bcopy (s1,s2,size) char *s1,*s2; int size;
 {
   int i;
   for (i=0;i<size;i++) s2[i]=s1[i];
+  memcpy(s2, s1, size);
 }
+
+#define Bcopy(s1,s2,size) memcpy(s2,s1,size)
 
 static void zap_newline(s) char *s;
 {
@@ -402,7 +405,6 @@ void (*handler)();
  *
  **************************************************************************/
 
-#define DGRAM_BUF_SIZE 60000
 /* This should depend on the OS. So, this may have to be made a m/c specific 
  constant. Set to the largest value possible, unless eats into memory 
  available significantly */ 
@@ -457,7 +459,13 @@ unsigned int *pfd;
   optlen = 4;
   /*  getsockopt(skt, SOL_SOCKET , SO_RCVBUF , (char *) &optval, &optlen); */
   optval = DGRAM_BUF_SIZE;
-  setsockopt(skt, SOL_SOCKET , SO_RCVBUF , (char *) &optval, optlen); 
+  if (setsockopt(skt, SOL_SOCKET , SO_RCVBUF , (char *) &optval, optlen) < 0)
+    {perror("setting socket rcv bufer size");
+     KillEveryoneCode(35782); }
+  if (setsockopt(skt, SOL_SOCKET , SO_SNDBUF , (char *) &optval, optlen) < 0)
+    {perror("setting socket rcv bufer size");
+     KillEveryoneCode(35782); }
+
 
   *pfd = skt;
   *ppo = htons(name.sin_port);
@@ -1010,9 +1018,8 @@ static int NumSends;
 
 CmiNetPrintUdpStatistics()
 {
-CmiPrintf("[%d]: NumIntr = %d\t, NumRetransmits = %d,\t NumAcksSent = %d\n",
-	  CmiMyPe(), NumIntr, NumRetransmits, NumAcksSent);
-CmiPrintf("NumSends= %d\n", NumSends);
+CmiPrintf("[%d]: NumIntr= %d, NumRetransmits= %d, NumAcksSent= %d, NumSends= %d\n",
+	  CmiMyPe(), NumIntr, NumRetransmits, NumAcksSent, NumSends);
 }
 
 /*****************************************************************************
@@ -1132,9 +1139,6 @@ typedef struct new_msg
   PacketQueueElem *packetlist;
 }
 NewMessage;
-
-#define WINDOW_SIZE 14             /* size of sliding window : set to 
-				    (DGRAM_BUF_SIZE/CMK_MAX_DGRAM_SIZE) -1 */
 
 
 #define MAX_SEQ_NUM 0xFFFFFFFF     /* 2^32 - 1 */
@@ -1419,6 +1423,10 @@ int sourcepe;
 	for (i = 0; i < count; i++)
 	{
 	    CmiFree(send_window[sourcepe][index].packet);
+	    /* In the interest of sending more packets early, we should remove 
+	       these calls to cmifree from the critical path. Store the 
+	       pointers in an array, and free them after the SendPackets call 
+	       below. --- Sanjay 1/30/96*/
 	    send_window[sourcepe][index].packet = NULL;
 	    index = (index + 1) % WINDOW_SIZE;
 	}
