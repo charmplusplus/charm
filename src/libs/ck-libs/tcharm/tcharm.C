@@ -121,6 +121,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   CtvAccessOther(tid,_curTCharm)=this;
   TCharm::setState(inInit);
   isStopped=true;
+  resumeAfterMigration=false;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
   threadInfo.thisElement=thisIndex;
   threadInfo.numElements=initMsg->numElements;
@@ -131,10 +132,11 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
 }
 
 TCharm::TCharm(CkMigrateMessage *msg)
-	:ArrayElement1D(msg)
+	:CBase_TCharm(msg)
 {
   initMsg=NULL;
   tid=NULL;
+  resumeAfterMigration=false;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
 }
 
@@ -142,7 +144,7 @@ void TCharm::pup(PUP::er &p) {
 //Pup superclass
   ArrayElement1D::pup(p);
 
-  p(isStopped);
+  p(isStopped); p(resumeAfterMigration);
   p(threadInfo.thisElement);
   p(threadInfo.numElements);
 
@@ -215,6 +217,24 @@ TCharm::~TCharm()
   CmiIsomallocBlockListDelete(heapBlocks);
   CthFree(tid);
   delete initMsg;
+}
+
+void TCharm::migrateTo(int destPE) {
+	if (destPE==CkMyPe()) return;
+	// Make sure migrateMe gets called *after* we suspend:
+	thisProxy[thisIndex].migrateDelayed(destPE);
+	resumeAfterMigration=true;
+	suspend();
+}
+void TCharm::migrateDelayed(int destPE) {
+	migrateMe(destPE);
+}
+void TCharm::ckJustMigrated(void) {
+	ArrayElement::ckJustMigrated();
+	if (resumeAfterMigration) {
+		resumeAfterMigration=false;
+		resume(); //Start the thread running
+	}
 }
 
 // clear the data before restarting from disk
@@ -328,6 +348,7 @@ static void TCHARM_Build_threads(TCharmInitMsg *msg,TCharmSetupCookie &cook)
 /****** TcharmClient ******/
 void TCharmClient1D::ckJustMigrated(void) {
   ArrayElement1D::ckJustMigrated();
+  findThread();
   tcharmClientInit();
 }
 
@@ -336,6 +357,12 @@ void TCharmClient1D::pup(PUP::er &p) {
   p|threadProxy;
 }
 
+CkArrayID TCHARM_Get_threads(void) {
+	TCHARMAPI("TCHARM_Get_threads");
+	if (TCharm::getState()!=inDriver)
+		CkAbort("Can only call TCHARM_Get_threads from driver!\n");
+	return TCharm::get()->getProxy();
+}
 
 /****** Readonlys *****/
 CkVec<TCpupReadonlyGlobal> TCharmReadonlys::entries;
@@ -726,31 +753,29 @@ CDECL void TCHARM_Migrate(void)
 	TCHARMAPI("TCHARM_Migrate");
 	TCharm::get()->migrate();
 }
-FDECL void FTN_NAME(TCHARM_MIGRATE,tcharm_migrate)(void)
+FORTRAN_AS_C(TCHARM_MIGRATE,TCHARM_Migrate,tcharm_migrate,(void),())
+
+CDECL void TCHARM_Migrate_to(int destPE)
 {
-	TCHARMAPI("TCHARM_Migrate");
-	TCharm::get()->migrate();
+	TCHARMAPI("TCHARM_Migrate_to");
+	TCharm::get()->migrateTo(destPE);
 }
+FORTRAN_AS_C(TCHARM_MIGRATE_TO,TCHARM_Migrate_to,tcharm_migrate_to,
+	(int *destPE),(*destPE))
 
 CDECL void TCHARM_Yield(void)
 {
 	TCHARMAPI("TCHARM_Yield");
 	TCharm::get()->schedule();
 }
-FDECL void FTN_NAME(TCHARM_YIELD,tcharm_yield)(void)
-{
-	TCHARM_Yield();
-}
+FORTRAN_AS_C(TCHARM_YIELD,TCHARM_Yield,tcharm_yield,(void),())
 
 CDECL void TCHARM_Barrier(void)
 {
 	TCHARMAPI("TCHARM_Barrier");
 	TCharm::get()->barrier();
 }
-FDECL void FTN_NAME(TCHARM_BARRIER,tcharm_barrier)(void)
-{
-	TCHARM_Barrier();
-}
+FORTRAN_AS_C(TCHARM_BARRIER,TCHARM_Barrier,tcharm_barrier,(void),())
 
 CDECL void TCHARM_Done(void)
 {
@@ -758,10 +783,8 @@ CDECL void TCHARM_Done(void)
 	if (TCharm::getState()!=inDriver) CkExit();
 	else TCharm::get()->done();
 }
-FDECL void FTN_NAME(TCHARM_DONE,tcharm_done)(void)
-{
-	TCHARM_Done();
-}
+FORTRAN_AS_C(TCHARM_DONE,TCHARM_Done,tcharm_done,(void),())
+
 
 CDECL double TCHARM_Wall_timer(void)
 {

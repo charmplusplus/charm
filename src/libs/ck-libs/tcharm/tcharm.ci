@@ -5,6 +5,7 @@ module tcharm {
   array [1D] TCharm {
     entry TCharm(TCharmInitMsg *initMsg);
     entry void run(void);
+    entry void migrateDelayed(int destPE);
     initcall void nodeInit(void);
   };
   mainchare TCharmMain {

@@ -68,7 +68,7 @@ CpvExtern(inState,_stateTCharm);
 CDECL {typedef void (*TCpupUserDataC)(pup_er p,void *data);};
 FDECL {typedef void (*TCpupUserDataF)(pup_er p,void *data);};
 
-class TCharm: public ArrayElement1D
+class TCharm: public CBase_TCharm
 {
  public:
 
@@ -108,7 +108,7 @@ class TCharm: public ArrayElement1D
 	friend class TCharmAPIRoutine; //So he can get to heapBlocks:
 	CmiIsomallocBlockList *heapBlocks; //Migratable heap data
 
-	bool isStopped;
+	bool isStopped, resumeAfterMigration;
 	ThreadInfo threadInfo;
 	double timeOffset; //Value to add to CkWallTimer to get my clock
 
@@ -129,6 +129,9 @@ class TCharm: public ArrayElement1D
 	TCharm(TCharmInitMsg *initMsg);
 	TCharm(CkMigrateMessage *);
 	~TCharm();
+	
+	virtual void ckJustMigrated(void);
+	void migrateDelayed(int destPE);
 
 	void clear();
 
@@ -146,6 +149,9 @@ class TCharm: public ArrayElement1D
 
 	//Sleep till entire array is here
 	void barrier(void);
+	
+	//Block, migrate to destPE, and resume
+	void migrateTo(int destPE);
 
 	//Thread finished running
 	void done(void);

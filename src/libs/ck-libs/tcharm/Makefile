@@ -34,4 +34,4 @@ tcharm.decl.h: tcharm.ci
 	$(CHARMC) tcharm.ci
 
 clean: 
-	-rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) conv-host charmrun
+	-rm -fr *.o *~ *.decl.h *.def.h gmon.out headers $(DEST) conv-host charmrun

@@ -56,6 +56,10 @@ class TCharmClient1D : public ArrayElement1D {
      etc.  
    */
   TCharm *thread; 
+  inline void findThread(void) {
+    thread=threadProxy[thisIndex].ckLocal();  
+    if (thread==NULL) CkAbort("Can't locate TCharm thread!");
+  }
   
   //Clients need to override this function to set their
   // thread-private variables.  You usually use something like:
@@ -68,7 +72,7 @@ class TCharmClient1D : public ArrayElement1D {
   {
     //Argh!  Can't call setupThreadPrivate yet, because
     // virtual functions don't work within constructors!
-    thread=NULL;
+    findThread();
   }
   TCharmClient1D(CkMigrateMessage *m) //Migration, etc. constructor
   {
@@ -77,8 +81,6 @@ class TCharmClient1D : public ArrayElement1D {
   
   //You MUST call this from your constructor:
   inline void tcharmClientInit(void) {
-    thread=threadProxy[thisIndex].ckLocal();  
-    if (thread==NULL) CkAbort("FEM can't locate its thread!\n");
     setupThreadPrivate(thread->getThread());
   }
   
@@ -105,5 +107,8 @@ tracing (once tracing is generalized).
 #endif
 void TCHARM_Api_trace(const char *routineName,const char *libraryName);
 
+
+/* Get the currently running TCharm threads: */
+CkArrayID TCHARM_Get_threads(void);
 
 #endif /*def(thisHeader)*/
