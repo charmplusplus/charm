@@ -334,7 +334,11 @@ for each processor in the node.
 #define CsvAccess(v) CMK_TAG(Csv_,v)
 #endif
 
-
+#if CMK_USE_GM
+extern void CmiBarrier(void);
+#else
+#define CmiBarrier()
+#endif
 
 /******** CMI: TYPE DEFINITIONS ********/
 

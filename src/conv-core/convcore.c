@@ -744,6 +744,10 @@ double  CmiStartTimer(void)
 void CmiTimerInit()
 {
   struct rusage ru;
+
+  CmiBarrier();
+  CmiBarrier();
+
   _cpu_speed_factor = 1.0/(readMHz()*1.0e6); 
   rdtsc(); rdtsc(); rdtsc(); rdtsc(); rdtsc();
   CpvInitialize(double, inittime_walltime);
