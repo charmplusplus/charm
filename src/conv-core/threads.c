@@ -1052,7 +1052,11 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
-  size += SIGSTKSZ;
+  if (size) size += SIGSTKSZ;
+  else size = CthCpvAccess(_defaultStackSize);
+#ifdef CMK_MEMORY_PAGESIZE
+  size = (size/CMK_MEMORY_PAGESIZE + 1) * CMK_MEMORY_PAGESIZE;
+#endif
   CthAllocateStack(&result->base,&size,migratable);
   stack = result->base.stack;
 #if CMK_STACK_GROWUNKNOWN || CMK_STACK_GROWDOWN
