@@ -231,6 +231,11 @@ class CkVec : private CkSTLHelper<T> {
       reserve(newsize); len=newsize;
     }
 
+    /// Set our length to this value
+    void free() {
+      freeBlock();
+    }
+
     //Grow to contain at least this position:
     void growAtLeast(int pos) {
       if (pos>=blklen) reserve(pos*2+16);
