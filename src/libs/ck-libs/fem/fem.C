@@ -1201,6 +1201,7 @@ const int* makeIDXLside(const int *src,IDXL_Side &s) {
 		for (int i=0;i<nComm;i++)
 			s.addNode(*src++ - 1,partnerName); /* nodeID's are 1-based */
 	}
+	return src;
 }
 
 CDECL void FEM_Set_roccom_pconn(int fem_mesh,const int *src,int total_len,int ghost_len)
