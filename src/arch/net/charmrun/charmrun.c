@@ -1742,6 +1742,7 @@ void req_client_connect(void)
 }
 
 void start_one_node_rsh(int rank0no);
+void finish_one_node(int rank0no);
 
 void req_client_start_and_connect(void)
 {
