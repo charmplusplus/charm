@@ -15,11 +15,14 @@ $(LIBDEST) : $(LIB)
 	/bin/cp $(LIB) $(LIBDEST)
 
 $(LIB): $(LIBOBJ)
-	test -d $(CDIR)/include/msa || mkdir $(CDIR)/include/msa/
-	/bin/cp $(HEADERS) $(CDIR)/include/msa/
 	$(CHARMC) -o $(LIB) $(LIBOBJ) 
 
-msa-distArray.o: msa-distArray.C msa-DistPageMgr.ci $(HEADERS)
+headers: $(HEADERS)
+	test -d $(CDIR)/include/msa || mkdir $(CDIR)/include/msa/
+	cp $(HEADERS) $(CDIR)/include/msa/
+	touch headers
+
+msa-distArray.o: msa-distArray.C msa-DistPageMgr.ci headers
 	$(CHARMC) -c msa-distArray.C
 
 $(MODULE).def.h: $(MODULE).decl.h

@@ -4,18 +4,41 @@
 
 #include "msa-DistPageMgr.h"
 
-/* The MSA1D class represents a distributed shared array of items
-   of data type ENTRY, nEntries total numer of ENTRY's, with
+/**
+   The MSA1D class is a handle to a distributed shared array of items
+   of data type ENTRY. There are nEntries total numer of ENTRY's, with
    ENTRIES_PER_PAGE data items per "page".  It is implemented as a
    Chare Array of pages, and a Group representing the local cache.
-   The maximum size of the local cache in bytes is maxBytes. */
+   
+   The requirements for the templates are:
+     ENTRY: User data class stored in the array, with at least:
+        - A default constructor and destructor
+	- A working assignment operator
+	- A working pup routine
+     ENTRY_OPS_CLASS: Used to combine values for "accumulate":
+        - A method named "getIdentity", taking no arguments and
+	   returning an ENTRY to use before any accumulation.
+	- A method named "accumulate", taking a source/dest ENTRY by reference
+	   and an ENTRY to add to it by value or const reference.
+     ENTRIES_PER_PAGE: Optional integer number of ENTRY objects
+        to store and communicate at once.  For good performance, 
+	make sure this value is a power of two.
+ */
 template<class ENTRY, class ENTRY_OPS_CLASS, unsigned int ENTRIES_PER_PAGE=MSA_DEFAULT_ENTRIES_PER_PAGE>
 class MSA1D
 {
+public:
+    typedef MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CacheGroup_t;
+    typedef CProxy_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_CacheGroup_t;
+    typedef CProxy_MSA_PageArray<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_PageArray_t;
+    
 protected:
+    /// Total number of ENTRY's in the whole array.
     unsigned int nEntries;
-    CacheGroup<ENTRY, ENTRY_OPS_CLASS>* cache;
-    CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS> cg;
+    
+    /// Handle to owner of cache.
+    CacheGroup_t* cache;
+    CProxy_CacheGroup_t cg;
 
     inline const ENTRY* readablePage(unsigned int page)
     {
@@ -30,30 +53,37 @@ protected:
 
     // Returns a pointer to the start of the local copy in the cache of the writeable page.
     // @@ what if begin - end span across two or more pages?
-    inline ENTRY* writeablePage(unsigned int page, unsigned int begin, unsigned int end)
+    inline ENTRY* writeablePage(unsigned int page, unsigned int offset)
     {
-        return (ENTRY*)(cache->writeablePage(page, begin*sizeof(ENTRY), (end + 1)*sizeof(ENTRY) - 1));
+        return (ENTRY*)(cache->writeablePage(page, offset));
     }
 
 public:
     // @@ Needed for Jade
     inline MSA1D(){}
-    virtual void pup(PUP::er &p){ ckout << "PUP of MSA1D not implemented yet."; CkExit(); };
-
-    inline MSA1D(unsigned int nEntries_, unsigned int num_wrkrs, unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES)
-        : nEntries(nEntries_)
+    virtual void pup(PUP::er &p){ 
+    	p|nEntries;
+	p|cg;
+	if (p.isUnpacking()) cache=cg.ckLocalBranch();
+    }
+	
+    /**
+      Create a completely new MSA array.  This call creates the 
+      corresponding groups, so only call it once per array.
+    */
+    inline MSA1D(unsigned int nEntries_, unsigned int num_wrkrs, unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES) : nEntries(nEntries_)
     {
-        // first create an array and the cache for the pages
+        // first create the Page Array and the Page Group
         unsigned int nPages = (nEntries + ENTRIES_PER_PAGE - 1)/ENTRIES_PER_PAGE;
-        unsigned int bytesPerPage = ENTRIES_PER_PAGE * sizeof(ENTRY);
-        CProxy_PageArray<ENTRY, ENTRY_OPS_CLASS> pageArray = CProxy_PageArray<ENTRY, ENTRY_OPS_CLASS>::ckNew(nPages);
-        cg = CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS>::ckNew(nPages, bytesPerPage, pageArray, maxBytes, nEntries, num_wrkrs);
-        pageArray.ckSetReductionClient(new CkCallback(CkIndex_CacheGroup<ENTRY, ENTRY_OPS_CLASS>::SyncDone(), cg));
+        CProxy_PageArray_t pageArray = CProxy_PageArray_t::ckNew(nPages);
+        cg = CProxy_CacheGroup_t::ckNew(nPages, pageArray, maxBytes, nEntries, num_wrkrs);
+        pageArray.setCacheProxy(cg);
+	pageArray.ckSetReductionClient(new CkCallback(CkIndex_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(), cg));
         cache = cg.ckLocalBranch();
     }
-
-    inline MSA1D(CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS> cg_)
-        : cg(cg_)
+    
+// Depricated API for accessing CacheGroup directly.
+    inline MSA1D(CProxy_CacheGroup_t cg_) : cg(cg_)
     {
         cache = cg.ckLocalBranch();
         nEntries = cache->getNumEntries();
@@ -80,19 +110,22 @@ public:
     }
 
     // ================ Accessor/Utility functions ================
+    /// Get the total length of the array, across all processors.
     inline unsigned int length() const { return nEntries; }
-
-    inline CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS> getCacheGroup() { return cg; }
+    
+    inline const CProxy_CacheGroup_t &getCacheGroup() const { return cg; }
 
     // Avoid using the term "page size" because it is confusing: does
     // it mean in bytes or number of entries?
     inline unsigned int getNumEntriesPerPage() const { return ENTRIES_PER_PAGE; }
 
+    /// Return the page this entry is stored at.
     inline unsigned int getPageIndex(unsigned int idx)
     {
         return idx / ENTRIES_PER_PAGE;
     }
 
+    /// Return the offset, in entries, that this entry is stored at within a page.
     inline unsigned int getOffsetWithinPage(unsigned int idx)
     {
         return idx % ENTRIES_PER_PAGE;
@@ -115,6 +148,8 @@ public:
         cache->enroll(num_workers);
     }
 
+    /// Return a read-only copy of the element at idx.
+    ///   May block if the element is not already in the cache.
     inline const ENTRY& get(unsigned int idx)
     {
         unsigned int page = idx / ENTRIES_PER_PAGE;
@@ -122,7 +157,10 @@ public:
         return readablePage(page)[offset];
     }
 
-    // known local page
+    /// Return a read-only copy of the element at idx;
+    ///   ONLY WORKS WHEN ELEMENT IS ALREADY IN THE CACHE--
+    ///   WILL SEGFAULT IF ELEMENT NOT ALREADY PRESENT.
+    ///    Never blocks; may crash if element not already present.
     inline const ENTRY& get2(unsigned int idx)
     {
         unsigned int page = idx / ENTRIES_PER_PAGE;
@@ -130,21 +168,28 @@ public:
         return readablePage2(page)[offset];
     }
 
+    /// Return a writeable copy of the element at idx.
+    ///    Never blocks; will create a new blank element if none exists locally.
+    ///    UNDEFINED if two threads set the same element.
     inline ENTRY& set(unsigned int idx)
     {
         unsigned int page = idx / ENTRIES_PER_PAGE;
         unsigned int offset = idx % ENTRIES_PER_PAGE;
-        ENTRY* e=writeablePage(page, offset, offset);
+        ENTRY* e=writeablePage(page, offset);
         return e[offset];
     }
 
+    /// Synchronize reads and writes across the entire array.
     inline void sync(int single=0) { cache->SyncReq(single); }
 
+    /// Add ent to the element at idx.
+    ///   Never blocks.
+    ///   Merges together accumulates from different threads.
     inline void accumulate(unsigned int idx, const ENTRY& ent)
     {
         unsigned int page = idx / ENTRIES_PER_PAGE;
         unsigned int offset = idx % ENTRIES_PER_PAGE;
-        cache->accumulate(page, &ent, offset*sizeof(ENTRY), (offset + 1)*sizeof(ENTRY) - 1);
+        cache->accumulate(page, &ent, offset);
     }
 
     inline void FreeMem()
@@ -152,49 +197,32 @@ public:
         cache->FreeMem();
     }
 
-    // non-blocking prefetch.
-    // prefetch'd pages are locked into the cache
+    /// Non-blocking prefetch of entries from start to end, inclusive.
+    /// Prefetch'd pages are locked into the cache, so you must call
+    ///   unlock afterwards.
     inline void Prefetch(unsigned int start, unsigned int end)
     {
-        if(start > end)
-        {
-            unsigned int temp = start;
-            start = end;
-            end = temp;
-        }
-
         unsigned int page1 = start / ENTRIES_PER_PAGE;
         unsigned int page2 = end / ENTRIES_PER_PAGE;
         cache->Prefetch(page1, page2);
     }
 
+    /// Block until all prefetched pages arrive.
     inline int WaitAll()    { return cache->WaitAll(); }
 
-    // unlocks all locked pages
+    /// Unlock all locked pages
     inline void Unlock()    { return cache->UnlockPages(); }
 
-    // start and end are element indexes.
-    // Unlocks completely spanned pages given a range of elements
-    // index'd from "start" to "end".  If start/end does not span a
-    // page completely, i.e. start/end is in the middle of a page,
-    // that page is not unlocked.
-    //
-    // If start > end, flips them.
+    /// start and end are element indexes.
+    /// Unlocks completely spanned pages given a range of elements
+    /// index'd from "start" to "end", inclusive.  If start/end does not span a
+    /// page completely, i.e. start/end is in the middle of a page,
+    /// the entire page is still unlocked--in particular, this means
+    /// you should not have several adjacent ranges locked.
     inline void Unlock(unsigned int start, unsigned int end)
     {
-        if(start > end)
-        {
-            unsigned int temp = start;
-            start = end;
-            end = temp;
-        }
-
-        unsigned int page1 = start / ENTRIES_PER_PAGE; unsigned int offset1 = start % ENTRIES_PER_PAGE;
-        unsigned int page2 = end / ENTRIES_PER_PAGE; unsigned int offset2 = end % ENTRIES_PER_PAGE;
-
-        if(offset1 != 0) page1++;
-        if(offset2 != ENTRIES_PER_PAGE - 1) page2--;
-
+        unsigned int page1 = start / ENTRIES_PER_PAGE; 
+        unsigned int page2 = end / ENTRIES_PER_PAGE; 
         cache->UnlockPages(page1, page2);
     }
 };
@@ -205,6 +233,10 @@ public:
 template<class ENTRY, class ENTRY_OPS_CLASS, unsigned int ENTRIES_PER_PAGE=MSA_DEFAULT_ENTRIES_PER_PAGE, int ROW_MAJOR=1>
 class MSA2D : public MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>
 {
+public:
+    typedef CProxy_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_CacheGroup_t;
+    typedef MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> super;
+
 protected:
     unsigned int rows, cols;
 
@@ -223,18 +255,21 @@ protected:
 
 public:
     // @@ Needed for Jade
-    inline MSA2D() : MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>() {}
-    virtual void pup(PUP::er &p){ ckout << "PUP of MSA2D not implemented yet."; CkExit(); };
+    inline MSA2D() : super() {}
+    virtual void pup(PUP::er &p) { 
+       super::pup(p);
+       p|rows; p|cols;
+    };
 
-    inline MSA2D(unsigned int rows_, unsigned int cols_, unsigned int numwrkrs,
-                 unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES)
-        : MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>(rows_*cols_, numwrkrs, maxBytes)
+    inline MSA2D(unsigned int rows_, unsigned int cols_, unsigned int numwrkrs, 
+    	unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES) 
+	  :super(rows_*cols_, numwrkrs, maxBytes)
     {
         rows = rows_; cols = cols_;
     }
 
-    inline MSA2D(unsigned int rows_, unsigned int cols_, CProxy_CacheGroup<ENTRY, ENTRY_OPS_CLASS> cg_)
-        : rows(rows_), cols(cols_), MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>(cg_)
+    inline MSA2D(unsigned int rows_, unsigned int cols_, CProxy_CacheGroup_t cg_)
+        : rows(rows_), cols(cols_), super(cg_)
     {}
 
     inline unsigned int getPageIndex(unsigned int row, unsigned int col)
@@ -247,21 +282,25 @@ public:
         return getIndex(row, col)%ENTRIES_PER_PAGE;
     }
 
+    inline unsigned int getRows(void) const {return rows;}
+    inline unsigned int getCols(void) const {return cols;}
+    inline unsigned int getColumns(void) const {return cols;}
+    
     inline const ENTRY& get(unsigned int row, unsigned int col)
     {
-        return MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::get(getIndex(row, col));
+        return super::get(getIndex(row, col));
     }
 
     // known local
     inline const ENTRY& get2(unsigned int row, unsigned int col)
     {
-        return MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::get2(getIndex(row, col));
+        return super::get2(getIndex(row, col));
     }
 
     // MSA2D::
     inline ENTRY& set(unsigned int row, unsigned int col)
     {
-        return MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::set(getIndex(row, col));
+        return super::set(getIndex(row, col));
     }
 
     inline void Prefetch(unsigned int start, unsigned int end)

@@ -6,12 +6,19 @@ enum { MSA_INVALID_PAGE_NO = 0xFFFFFFFF };
 enum { MSA_INVALID_PE = -1 };
 typedef void* page_ptr_t;
 
-enum {
+typedef enum {
  Uninit_State = 0,
  Read_Fault = 1,
  Write_Fault = 2,
  Accumulate_Fault = 3
-};
+} MSA_Page_Fault_t;
+
+/// Allow MSA_Page_Fault_t's to be pupped:
+inline void operator|(PUP::er &p,MSA_Page_Fault_t &f) {
+  int i=f;
+  p|i;
+  f=(MSA_Page_Fault_t)i;
+}
 
 enum { MSA_DEFAULT_ENTRIES_PER_PAGE = 1024 };
 // Therefore, size of page == MSA_DEFAULT_ENTRIES_PER_PAGE * sizeof(element type)
