@@ -184,7 +184,7 @@ void ConverseExit(void)
 #endif
   prctl(PR_SETEXITSIG,0,0);
   ConverseCommonExit();
-//  barrier(barr, nthreads);
+/*  barrier(barr, nthreads); */
   exit(0);
 }
 
