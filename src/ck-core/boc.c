@@ -1,0 +1,549 @@
+/***************************************************************************
+ * RCS INFORMATION:
+ *
+ *	$RCSfile$
+ *	$Author$	$Locker$		$State$
+ *	$Revision$	$Date$
+ *
+ ***************************************************************************
+ * DESCRIPTION:
+ *
+ ***************************************************************************
+ * REVISION HISTORY:
+ *
+ * $Log$
+ * Revision 2.0  1995-06-02 17:27:40  brunner
+ * Reorganized directory structure
+ *
+ * Revision 1.8  1995/05/09  20:04:52  milind
+ * Corrected the SP1 fboc bug.
+ *
+ * Revision 1.7  1995/04/23  20:52:27  sanjeev
+ * Removed Core....
+ *
+ * Revision 1.6  1995/04/13  20:52:44  sanjeev
+ * Changed Mc to Cmi
+ *
+ * Revision 1.5  1995/03/25  18:24:18  sanjeev
+ * ,
+ *
+ * Revision 1.4  1995/03/24  16:41:50  sanjeev
+ * *** empty log message ***
+ *
+ * Revision 1.3  1995/03/17  23:36:38  sanjeev
+ * changes for better message format
+ *
+ * Revision 1.2  1994/12/01  23:55:42  sanjeev
+ * interop stuff
+ *
+ * Revision 1.1  1994/11/03  17:38:52  brunner
+ * Initial revision
+ *
+ ***************************************************************************/
+static char ident[] = "@(#)$Header$";
+#include "chare.h"
+#include "globals.h"
+#include "performance.h"
+
+#define MAXBOC 15
+
+typedef struct msg_element {
+        int ref;
+        int size;
+        void *msg;
+        ChareNumType ep;
+        struct msg_element *next;
+} MSG_ELEMENT;
+
+typedef struct bocdata_queue_element {
+	ChareNumType bocNum;
+	void *dataptr;
+	struct bocdata_queue_element *next;
+} BOCDATA_QUEUE_ELEMENT;
+
+typedef struct bocid_message_count {
+	int count;
+	ChareNumType bocnum;
+	ChareIDType ReturnID;
+	EntryPointType ReturnEP;
+	struct bocid_message_count *next;
+} BOCID_MESSAGE_COUNT;
+
+int number_dynamic_boc = 1;
+MSG_ELEMENT * DynamicBocMsgList; 
+BOCDATA_QUEUE_ELEMENT *BocDataTable[MAXBOC];
+BOCID_MESSAGE_COUNT *BocIDMessageCountTable[MAXBOC];
+
+InitializeDynamicBocMsgList()
+{
+	DynamicBocMsgList = (MSG_ELEMENT *) NULL;
+}
+
+InitializeBocDataTable()
+{
+	int i;
+
+	for (i=0; i<MAXBOC; i++)
+		BocDataTable[i] = (BOCDATA_QUEUE_ELEMENT *) NULL;
+}
+
+InitializeBocIDMessageCountTable()
+{
+	int i;
+
+	for (i=0; i<MAXBOC; i++)
+		BocIDMessageCountTable[i] = (BOCID_MESSAGE_COUNT *) NULL;
+}
+
+GetDynamicBocMsg(ref, msg, ep, size)
+int ref;
+void **msg;
+ChareNumType *ep;
+int *size;
+{
+	MSG_ELEMENT * previous = NULL;
+	MSG_ELEMENT * temp = DynamicBocMsgList; 
+	
+	while (temp != NULL)
+	{
+		if (temp->ref == ref)
+		{
+			*msg = temp->msg;
+			*ep = temp->ep;
+			*size = temp->size;
+
+TRACE(CmiPrintf("[%d] GetDynamicBocMsg: ref=%d, ep=%d, size=%d\n",
+		CmiMyPe(), ref, temp->ref, temp->size)); 
+	
+			if (previous == NULL)
+				DynamicBocMsgList = temp->next; 
+			else
+				previous->next = temp->next;
+			CmiFree(temp);
+			return;
+		}
+		else
+		{
+			previous = temp;
+			temp = temp->next;
+		}
+	}
+	CmiPrintf("[%d] *** ERROR *** Could not locate return address for dynamic creation %d.\n", CmiMyPe(), ref);
+}
+
+
+void * GetBocDataPtr(bocNum)
+ChareNumType bocNum;
+{
+	int index;
+	BOCDATA_QUEUE_ELEMENT *element;
+
+
+	index = bocNum % MAXBOC;
+	element = BocDataTable[index];
+
+TRACE(CmiPrintf("[%d] GetBocDataPtr: bocNum=%d, index=%d, element=0x%x\n",
+		 CmiMyPe(), bocNum, index, element));
+
+	while (element != NULL)
+	{
+		if (element->bocNum == bocNum)
+			return(element->dataptr);
+		else
+			element = element->next;
+	}
+	CmiPrintf("[%d] *** ERROR *** Unable to locate BOC %d data ptr.\n",
+		CmiMyPe(),  bocNum);
+}
+
+
+
+BOCID_MESSAGE_COUNT * GetBocIDMessageCount(bocnum)
+ChareNumType bocnum;
+{
+	int index;
+	BOCID_MESSAGE_COUNT *element;
+
+	index = bocnum % MAXBOC;
+	element = BocIDMessageCountTable[index];
+	while (element != NULL)
+	{
+		if (element->bocnum == bocnum)
+			return(element);
+		else 	
+			element = element->next;
+	}
+	TRACE(CmiPrintf("[%d] *** ERROR *** Incorrect boc number %d in GetBocIDMessageCount\n", 
+			CmiMyPe(), bocnum));
+	return(NULL);
+}
+
+SetDynamicBocMsg(msg,ep,size)
+void *msg;
+ChareNumType ep;
+int size;
+{
+	MSG_ELEMENT * new; 
+	
+	new = (MSG_ELEMENT *) CmiAlloc(sizeof(MSG_ELEMENT));
+	new->ref = number_dynamic_boc++;
+	new->msg = msg;
+	new->ep = ep;
+	new->size = size;
+	new->next = DynamicBocMsgList; 
+	DynamicBocMsgList = new; 
+
+TRACE(CmiPrintf("[%d] SetDynamicBocMsg: ref=%d, ep=%d, size=%d\n",
+	CmiMyPe(), new->ref, new->ep, new->size));
+
+	return (new->ref);
+}
+
+SetBocDataPtr(bocNum, ptr)
+ChareNumType bocNum;
+void *ptr;
+{
+	int index;
+	BOCDATA_QUEUE_ELEMENT *new;
+	BOCDATA_QUEUE_ELEMENT *element;
+
+
+	index = bocNum % MAXBOC;
+	new = (BOCDATA_QUEUE_ELEMENT *) CmiAlloc(sizeof(BOCDATA_QUEUE_ELEMENT));
+	CkMemError(new);
+	new->bocNum = bocNum;
+	new->dataptr = ptr;
+	element = BocDataTable[index];
+	new->next = element;	
+	BocDataTable[index] = new;
+
+TRACE(CmiPrintf("[%d] SetBocDataPtr: bocNum=%d, index=%d, new=0x%x\n",
+		 CmiMyPe(), bocNum, index, new));
+}
+
+
+BOCID_MESSAGE_COUNT * SetBocIDMessageCount(bocnum, count, ReturnEP, ReturnID)
+ChareNumType bocnum;
+int count;
+EntryPointType ReturnEP;
+ChareIDType *ReturnID;
+{
+	int index;
+	BOCID_MESSAGE_COUNT *new, *element;
+
+	index = bocnum % MAXBOC;
+	new = (BOCID_MESSAGE_COUNT *) CmiAlloc(sizeof(BOCID_MESSAGE_COUNT));
+	CkMemError(new);
+	new->bocnum = bocnum;
+	new->count = count;
+	new->ReturnEP = ReturnEP;
+	if (ReturnID != NULL) 
+		new->ReturnID = *ReturnID;
+	element = BocIDMessageCountTable[index];
+	new->next = element;
+	BocIDMessageCountTable[index] = new;
+	return(new);
+}
+
+
+
+
+BOC_BLOCK * CreateBocBlock(sizeData)
+int sizeData;
+{
+	BOC_BLOCK *p;
+
+	p =  (BOC_BLOCK *) CmiAlloc( sizeof(BOC_BLOCK) + sizeData );
+	CkMemError(p);
+	return(p);
+}
+
+
+
+ChareNumType GeneralCreateBoc(SizeData, Entry, Msg, ReturnEP, ReturnID)
+int SizeData;
+EntryNumType Entry;
+void *Msg;
+EntryNumType ReturnEP;
+ChareIDType *ReturnID;
+{
+	ENVELOPE *env ;
+
+TRACE(CmiPrintf("[%d] GeneralCreateBoc: SizeData=%d, Entry=%d, ReturnEP=%d\n",
+		CmiMyPe(), SizeData, Entry, ReturnEP));
+
+	env = (ENVELOPE *) ENVELOPE_UPTR(Msg);
+	SetEnv_category(env, USERcat);
+	SetEnv_destPeFixed(env, 1);
+	SetEnv_destPE(env, (ALL_NODES_EXCEPT_ME));
+
+	if ((CmiMyPe() == 0)  || InsideDataInit)
+	{
+		SetEnv_sizeData(env, SizeData);
+		SetEnv_boc_num(env, ++currentBocNum);
+		SetEnv_EP(env, Entry);
+	}
+	if (InsideDataInit)
+	/* static boc creation */
+	{
+		int executing_boc_num; 
+
+		SetEnv_msgType(env, BocInitMsg);
+		trace_creation(GetEnv_msgType(env), Entry, env);
+		CkCheck_and_BroadcastNoFree(env, Entry);
+		/* env becomes the usrMsg, hence should not be freed by us */
+		executing_boc_num = ProcessBocInitMsg(env);
+		if (ReturnEP >= 0)
+		{
+			ChareNumType *msg;
+
+			msg = (ChareNumType *)
+				 CkAllocMsg(sizeof(ChareNumType));
+			*msg = currentBocNum;
+			SendMsg(ReturnEP, msg, ReturnID); 
+		}
+		return(currentBocNum);
+	}
+	else
+	/* dynamic boc creation */
+	{
+		if (CmiMyPe() == 0)
+		{
+			BOCID_MESSAGE_COUNT *element;
+
+			element = SetBocIDMessageCount(currentBocNum, 
+					CmiNumSpanTreeChildren(CmiMyPe()),
+					ReturnEP, ReturnID);
+			SetEnv_msgType(env, DynamicBocInitMsg);
+
+			trace_creation(GetEnv_msgType(env), Entry, env);
+			CkCheck_and_BroadcastNoFree(env, Entry);
+
+		        CmiSetHandler(env,CallProcessMsg_Index) ;
+			CsdEnqueue(env);
+			QDCountThisCreation(Entry, USERcat, DynamicBocInitMsg, CmiNumPe());
+
+TRACE(CmiPrintf("[%d] GeneralCreateBoc: bocdata=0x%x\n", CmiMyPe(), element));
+		}
+		else
+		{
+			DYNAMIC_BOC_REQUEST_MSG *msg;
+					
+			msg = (DYNAMIC_BOC_REQUEST_MSG *) 
+				CkAllocMsg(sizeof(DYNAMIC_BOC_REQUEST_MSG));
+			msg->source = CmiMyPe();
+			msg->ep = ReturnEP;
+			msg->id = *ReturnID;
+			msg->ref = SetDynamicBocMsg(Msg, Entry, SizeData);
+
+			GeneralSendMsgBranch(OtherCreateBoc_EP, msg,
+			 	0, IMMEDIATEcat, BocMsg,
+				DynamicBocNum);
+		}
+	}
+}
+
+MyBocNum(mydata)
+void *mydata;
+{
+	BOC_BLOCK * boc_block = (BOC_BLOCK * ) ((char *) mydata - sizeof(BOC_BLOCK));
+
+	return(boc_block->boc_num);
+}
+
+MyBranchID(pChareID, mydata)
+ChareIDType *pChareID;
+void *mydata;
+{
+	SetID_onPE((*pChareID), CmiMyPe());
+	SetID_isBOC((*pChareID), 1);
+	SetID_boc_num((*pChareID), MyBocNum(mydata));
+}
+
+GeneralSendMsgBranch(ep, msg, destPe, category, type, bocnum)
+EntryPointType ep;
+void *msg;
+PeNumType destPe;
+MsgCategories category;
+MsgTypes type;
+ChareNumType bocnum;
+{
+	ENVELOPE *env;
+
+	env  = ENVELOPE_UPTR(msg);
+
+	SetEnv_destPE(env, destPe);
+	SetEnv_category(env, category);
+	SetEnv_msgType(env, type);
+	SetEnv_destPeFixed(env, 1);
+	SetEnv_boc_num(env, bocnum);
+	SetEnv_EP(env, ep);
+
+TRACE(CmiPrintf("[%d] GeneralSend: type=%d, msgType=%d\n",
+		CmiMyPe(), type, GetEnv_msgType(env)));
+
+	if (bocnum >= NumSysBoc)
+        	nodebocMsgsCreated++;
+
+
+	trace_creation(GetEnv_msgType(env), ep, env);
+	CkCheck_and_Send(env, ep);
+	QDCountThisCreation(ep, category, type, 1);
+}
+
+
+
+GeneralBroadcastMsgBranch(ep, msg, category, type, bocnum)
+EntryPointType ep;
+void *msg;
+MsgCategories category;
+MsgTypes type;
+ChareNumType bocnum;
+{
+	ENVELOPE *env;
+
+	env = ENVELOPE_UPTR(msg);
+
+	SetEnv_destPE(env, ALL_NODES);
+	SetEnv_category(env, category);
+	SetEnv_msgType(env, type);
+	SetEnv_destPeFixed(env, 1);
+	SetEnv_boc_num(env, bocnum);
+	SetEnv_EP(env, ep);
+
+TRACE(CmiPrintf("[%d] GeneralBroadcast: type=%d, msgType=%d\n",
+		CmiMyPe(), type, GetEnv_msgType(env)));
+
+	if (bocnum >= NumSysBoc)
+        	nodebocMsgsCreated+=CmiNumPe();
+
+	trace_creation(GetEnv_msgType(env), ep, env);
+	CkCheck_and_BroadcastAll(env, ep); /* Asynchronous broadcast */
+	QDCountThisCreation(ep, category, type, CmiNumPe());
+}
+
+
+RegisterDynamicBocInitMsg(bocnumptr, mydata)
+ChareNumType *bocnumptr;
+void *mydata;
+{
+	ChareNumType *msg;
+	int mype = CmiMyPe();
+	BOCID_MESSAGE_COUNT  * bocdata = GetBocIDMessageCount(*bocnumptr);
+
+TRACE(CmiPrintf("[%d] RegisterDynamicBoc: bocnum=%d, bocdata=0x%x\n",
+		 CmiMyPe(), *bocnumptr, bocdata));
+	if (bocdata == NULL)
+		bocdata = SetBocIDMessageCount(*bocnumptr,
+				CmiNumSpanTreeChildren(mype), -1, NULL);
+	bocdata->count--;
+
+	if (bocdata->count < 0)
+	{
+		msg = (ChareNumType *) CkAllocMsg(sizeof(ChareNumType));
+		*msg = *bocnumptr;
+
+		if (mype == 0)
+		{
+			if (bocdata->ReturnEP >= 0)
+				SendMsg(bocdata->ReturnEP, msg,
+					&bocdata->ReturnID);
+		}
+		else
+			GeneralSendMsgBranch(RegisterDynamicBocInitMsg_EP, msg,
+				CmiSpanTreeParent(mype), IMMEDIATEcat, BocMsg,
+				DynamicBocNum);
+	}
+}
+
+
+OtherCreateBoc(msg, mydata)
+DYNAMIC_BOC_REQUEST_MSG *msg;
+char *mydata;
+{
+	DYNAMIC_BOC_NUM_MSG *tmsg;
+        BOCID_MESSAGE_COUNT *element;
+
+        element = SetBocIDMessageCount(++currentBocNum,
+                                        CmiNumSpanTreeChildren(CmiMyPe()),
+                                        msg->ep, &(msg->id));
+	tmsg = (DYNAMIC_BOC_NUM_MSG *) CkAllocMsg(sizeof(DYNAMIC_BOC_NUM_MSG)); 
+	tmsg->boc = currentBocNum;
+	tmsg->ref = msg->ref;
+
+TRACE(CmiPrintf("[%d] OtherCreateBoc: boc=%d, ref=%d\n",
+	CmiMyPe(), tmsg->boc, tmsg->ref));
+
+	GeneralSendMsgBranch(InitiateDynamicBocBroadcast_EP, tmsg,
+                                msg->source, IMMEDIATEcat, BocMsg,
+                                DynamicBocNum);
+}
+
+InitiateDynamicBocBroadcast(msg, mydata)
+DYNAMIC_BOC_NUM_MSG *msg;
+char *mydata;
+{
+	int size;
+	void *tmsg;
+        ENVELOPE * env;
+	ChareNumType ep;
+
+	GetDynamicBocMsg(msg->ref, &tmsg, &ep, &size); 
+
+TRACE(CmiPrintf("[%d] InitiateDynamicBocBroadcast: ref=%d, boc=%d, ep=%d, size=%d\n",
+		CmiMyPe(), msg->ref, msg->boc, ep, size));
+
+        env = (ENVELOPE *) ENVELOPE_UPTR(tmsg);
+        SetEnv_category(env, USERcat);
+        SetEnv_destPeFixed(env, 1);
+        SetEnv_destPE(env, (ALL_NODES_EXCEPT_ME));
+        SetEnv_sizeData(env, size);
+        SetEnv_boc_num(env, msg->boc);
+        SetEnv_EP(env, ep);
+        SetEnv_msgType(env, DynamicBocInitMsg);
+
+	trace_creation(GetEnv_msgType(env), ep, env);
+        CkCheck_and_BroadcastAll(env, ep);
+
+        QDCountThisCreation(ep, USERcat, DynamicBocInitMsg,CmiNumPe());
+
+}
+
+DynamicBocInit()
+{
+    	BOC_BLOCK *bocBlock;
+
+	/* Create a dummy block */
+    	bocBlock = (BOC_BLOCK *) CreateBocBlock(sizeof(int));
+	bocBlock->boc_num = DynamicBocNum;
+    	SetBocDataPtr(DynamicBocNum, (void *) (bocBlock + 1));
+}
+
+
+DynamicAddSysBocEps()
+{
+   	EpTable[RegisterDynamicBocInitMsg_EP] = RegisterDynamicBocInitMsg;
+   	EpTable[OtherCreateBoc_EP] = OtherCreateBoc;
+	EpTable[InitiateDynamicBocBroadcast_EP] = 
+				InitiateDynamicBocBroadcast;
+}
+
+
+
+
+
+
+ChareNumType CreateBoc(id, Entry, Msg, ReturnEP, ReturnID)
+int id;
+EntryNumType Entry;
+void *Msg;
+EntryNumType ReturnEP;
+ChareIDType *ReturnID;
+{
+	if ( IsCharmPlus(Entry) )
+        	return GeneralCreateBoc(id, Entry, Msg, ReturnEP, ReturnID);
+	else
+        	return GeneralCreateBoc(ChareSizesTable[id], Entry, Msg,
+                                         		ReturnEP, ReturnID);
+}
+

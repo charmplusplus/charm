@@ -1,0 +1,584 @@
+#!/bin/csh -f
+############################################################################
+# RCS INFORMATION:
+#
+#       $RCSfile$
+#       $Author$      $Locker$              $State$
+#       $Revision$        $Date$
+#
+############################################################################
+# DESCRIPTION:
+#
+############################################################################
+# REVISION HISTORY:
+#
+############################################################################
+
+
+##############################################################################
+#
+# Initialize the main controlling variables, then setup error handler
+#
+##############################################################################
+
+set OPTS_CC=
+set OPTS_CPLUS=
+set OPTS_LD=
+set OPTS_CPP=
+set FILES=
+set OBJECTFILES=
+set LIBRARIES=
+set CONVERSE=
+onintr failure
+
+##############################################################################
+#
+# The following section attempts to locate charm.
+#
+##############################################################################
+
+set ORIGDIR=$cwd
+
+# Try to find charm root by looking in directory where charmc is
+
+if ($?CHARMROOT == 0) then
+    set SCRIPT=$0
+    if ($SCRIPT:h != $SCRIPT:t) then
+        cd $SCRIPT:h
+        set SCRIPT=$SCRIPT:t
+    else
+        foreach dir ($path)
+            if (-x $dir/$SCRIPT && ! -d $dir/$SCRIPT) then
+                cd $dir
+                break
+            endif
+        end
+    endif
+    while (x`find $SCRIPT -type l -print` == x$SCRIPT)
+        set SCRIPT=`ls -al ./$SCRIPT:t | sed -e "s@.*-> @@"`
+        if ($SCRIPT:h != $SCRIPT:t) then
+            cd $SCRIPT:h
+            set SCRIPT=$SCRIPT:t
+        endif
+    end
+    cd ..
+    set CHARMROOT=`pwd`
+    if (! -e $CHARMROOT/include/conv-mach.csh) unset CHARMROOT
+    if (! -e $CHARMROOT/lib/libckn-core-notrace.a) unset CHARMROOT
+endif
+
+# Give an error message
+
+if ($?CHARMROOT == 0) then
+    echo ''
+    echo 'Error - cannot find the charm directories.'
+    echo ''
+    echo 'Normally, charmc and the other charm scripts automatically'
+    echo 'locate the charm directory, using the following strategy:'
+    echo ''
+    echo '  Step 1. It looks in the directory specified in $CHARMROOT.'
+    echo ''
+    echo '  Step 2. It looks in the directory from which charmc was run.'
+    echo ''
+    echo '  Step 3. It looks in every directory in your $PATH'
+    echo ''
+    echo 'If it searches all these places, and doesnt find the charm'
+    echo 'files, it will give up.'
+    echo ''
+    goto failure
+    endif
+endif
+
+##############################################################################
+#
+# Parse the arguments
+#
+# Don't do any analysis in here, just the parsing.
+#
+##############################################################################
+
+
+set argindex=1
+while ($argindex <= $#argv)
+    set arg=$argv[$argindex]
+    @ argindex = $argindex + 1
+
+    switch ($arg)
+        case "-machine"
+            set MACHTYPE=$argv[$argindex]
+            @ argindex = $argindex + 1
+            breaksw
+
+        case "-language"
+            set LANGUAGE=$argv[$argindex]
+            @ argindex = $argindex + 1
+            breaksw
+
+	case "-balance"
+            set BALANCE=$argv[$argindex]
+            @ argindex = $argindex + 1
+            breaksw
+
+        case "-queue"
+            set QUEUE=$argv[$argindex]
+            @ argindex = $argindex + 1
+            breaksw
+
+        case "-memory"
+            echo "Warning: -memory currently not being dealt with."
+            @ argindex = $argindex + 1
+            breaksw
+
+	case "-execmode"
+            set EXECMODE=$argv[$argindex]
+            @ argindex = $argindex + 1
+            breaksw
+
+        case "-verbose"
+            set VERBOSE=1
+            breaksw
+
+        case "-save"
+            set SAVE=1
+            breaksw
+
+        case "-cc"
+            set OVERRIDE_CC=( $argv[$argindex] )
+            @ argindex = $argindex + 1
+            breaksw
+
+        case "-c++"
+            set OVERRIDE_CPLUS=( $argv[$argindex] )
+            @ argindex = $argindex + 1
+            breaksw
+
+        case "-ld"
+            set OVERRIDE_LD=( $argv[$argindex] )
+            @ argindex = $argindex + 1
+            breaksw
+
+        case "-cc-option"
+            set OPTS_CC=( $OPTS_CC $argv[$argindex] )
+            @ argindex = $argindex + 1
+            breaksw
+
+        case "-c++-option"
+            set OPTS_CPLUS=( $OPTS_CPLUS $argv[$argindex] )
+            @ argindex = $argindex + 1
+            breaksw
+
+        case "-purify"
+            set PURIFY = yes
+            breaksw
+
+        case "-ld-option"
+            set OPTS_LD=( $OPTS_LD $argv[$argindex] )
+            @ argindex = $argindex + 1
+            breaksw
+
+        case "-c":
+            set NOLINK=1
+            breaksw
+
+	case "-o":
+            set OBJECT=$argv[$argindex]
+            @ argindex = $argindex + 1
+            breaksw
+
+	case "-modules":
+	    set MOD_LIST = $argv[$argindex]
+	    @ argindex = $argindex + 1
+	    breaksw
+
+	case "-module_file":
+	    set MOD_FILE = $argv[$argindex]
+	    @ argindex = $argindex + 1
+	    breaksw
+
+        case "-D*"
+            set OPTS_CPP=( $OPTS_CPP "$arg" )
+            set OPTS_CC=( $OPTS_CC "$arg" )
+            set OPTS_CPLUS=( $OPTS_CPLUS "$arg" )
+            breaksw
+
+        case "-I*"
+            set OPTS_CPP=( $OPTS_CPP "$arg" )
+            set OPTS_CC=( $OPTS_CC "$arg" )
+            set OPTS_CPLUS=( $OPTS_CPLUS "$arg" )
+            breaksw
+
+        case "-L*"
+            set OPTS_CC=( $OPTS_CC "$arg" )
+            set OPTS_CPLUS=( $OPTS_CPLUS "$arg" )
+            set OPTS_LD=( $OPTS_LD "$arg" )
+            breaksw
+
+        case "-g"
+            set OPTS_CC=( $OPTS_CC $arg )
+            set OPTS_CPLUS=( $OPTS_CPLUS $arg )
+            set OPTS_LD=( $OPTS_LD $arg )
+            breaksw
+
+        case "-O*"
+            set OPTS_CC=( $OPTS_CC $arg )
+            set OPTS_CPLUS=( $OPTS_CPLUS $arg )
+            breaksw
+
+        case "-l*"
+            set LIBRARIES=( $LIBRARIES $arg )
+            breaksw
+
+        case "-s"
+            set OPTS_LD=( $OPTS_LD $arg )
+            breaksw
+
+        case "-*"
+            echo "passing unrecognized option $arg to all compilers and linkers"
+            set OPTS_CC=( $OPTS_CC $arg )
+            set OPTS_CPLUS=( $OPTS_CPLUS $arg )
+            set OPTS_LD=( $OPTS_LD $arg )
+	    set OPTS_CPP=( $OPTS_CPP $arg )
+            breaksw
+
+        case "*.*"
+            set FILES=( $FILES "$arg" )
+            breaksw
+        
+        default:
+            echo "Unrecognized argument $arg"
+            goto failure
+
+    endsw
+end
+
+##############################################################################
+#
+# Check for valid choice of MACHTYPE, and change CHARMROOT if necessary.
+#
+##############################################################################
+
+if ($?MACHTYPE) then
+    if (-d $CHARMROOT/$MACHTYPE) then
+	set CHARMROOT=$CHARMROOT/$MACHTYPE
+    else
+       if (-d $CHARMROOT/../$MACHTYPE) then
+           set CHARMROOT=$CHARMROOT/../$MACHTYPE
+       else
+           echo 'error - there is no installed charm for "'$MACHTYPE'"'
+           goto failure
+       endif
+    endif
+endif
+
+##############################################################################
+#
+# Load machine-specific configuration data, then handle overrides to it.
+#
+##############################################################################
+
+source $CHARMROOT/include/conv-mach.csh
+
+if ($?OVERRIDE_CC) then
+    set CMK_CC[1]=""
+    set CMK_CC = ( $OVERRIDE_CC $CMK_CC )
+endif
+
+if ($?OVERRIDE_CPLUS) then
+    set CMK_CXX[1]=""
+    set CMK_CXX = ( $OVERRIDE_CPLUS $CMK_CXX )
+endif
+
+if ($?OVERRIDE_LD) then
+    set CMK_LD[1]=""
+    set CMK_LD = ( $OVERRIDE_LD $CMK_LD )
+endif
+
+if ($?OVERRIDE_LD) then
+    set CMK_LDXX[1]=""
+    set CMK_LDXX = ( $OVERRIDE_LD $CMK_LDXX )
+endif
+
+##############################################################################
+#
+# Check for valid choice of LANGUAGE
+#
+##############################################################################
+
+if ($?LANGUAGE == 0) set LANGUAGE=charm
+
+switch ($LANGUAGE)
+    case "charm"
+	set LIBCPLUS=cplus-n
+	set LOADER=($CMK_LD)
+        breaksw
+    case "charm++"
+        set LIBCPLUS=cplus-y
+	set LOADER=($CMK_LDXX)
+        breaksw
+    default:
+        echo "charmc: Unrecognized choice of language $LANGUAGE"
+endsw
+
+##############################################################################
+#
+# Check for valid choice of EXECMODE
+# Check for valid choice of QUEUE
+# Check for valid choice of BALANCE
+#
+##############################################################################
+
+if ($?EXECMODE == 0) set EXECMODE=notrace
+
+if (-e $CHARMROOT/lib/libckn-core-$EXECMODE.a) then
+   set LIBCLASS=ckn
+else
+   if (-e $CHARMROOT/lib/libckd-core-$EXECMODE.a) then
+      set LIBCLASS=ckd
+   else
+      echo "charmc : No such execmode $EXECMODE"
+      (cd $CHARMROOT/lib ; ls -al libck?-core-*)
+      goto failure
+   endif
+endif
+
+if ($?QUEUE == 0) set QUEUE=fifo
+
+if (! -e $CHARMROOT/lib/libconv-qs-$QUEUE.a) then
+   echo "No queue strategy $QUEUE"
+   echo "current choices are:
+   (cd $CHARMROOT/lib ; ls -al libconv-qs-*)
+   goto failure
+endif
+
+if ($?BALANCE == 0) set BALANCE=rand
+
+if (! -e $CHARMROOT/lib/lib${LIBCLASS}-ldb-$BALANCE.a) then
+   echo "charmc : Unknown load balancer $BALANCE"
+   (cd $CHARMROOT/lib ; ls -al lib${LIBCLASS}-ldb-*)
+   goto failure
+endif
+
+##############################################################################
+#
+# Check for compatibility among BALANCE, QUEUE, and EXECMODE
+#
+##############################################################################
+
+# Check that execmode is compatible with queue and balance
+
+if ($EXECMODE == replay) then
+    if ($?QUEUE == 0) set QUEUE=replay
+    if ($?BALANCE == 0) set BALANCE=replay
+    if ($QUEUE != replay) then
+        echo "Ignoring -queue $QUEUE, incompatible with -execmode replay"
+    endif
+    if ($BALANCE != replay) then
+        echo "Ignoring -balance $BALANCE, incompatible with -execmode replay"
+    endif
+    set QUEUE=replay
+    set BALANCE=replay
+endif
+
+if ( $BALANCE == btok ) then
+    if ( ($QUEUE != bfifo) && ($QUEUE != bstack) ) then
+        echo "WARNING : btok strategy needs bfifo or bstack queueing strategy"
+    endif
+endif
+
+##############################################################################
+#
+# Compile all specified files
+#
+# All temporary files named *.TMP.* for easy cleanup.
+#
+##############################################################################
+
+cd $ORIGDIR
+
+foreach FILE ($FILES)
+  set BASE=$FILE:r
+  set TMP=$BASE:t.TMP
+  if ($?OBJECT == 0) set OBJECT=$BASE:t
+  if (${BASE}.o != $FILE) then
+      echo "compiling $FILE."
+      /bin/rm -f $BASE.o $BASE.f.o
+  endif
+  switch ($FILE)
+    case "*.p"
+      if ($?VERBOSE) echo "$CMK_CPP $OPTS_CPP -I$CHARMROOT/include $BASE.p > $TMP.cpp"
+      $CMK_CPP $OPTS_CPP -I$CHARMROOT/include $BASE.p > $TMP.cpp
+      if ($?VERBOSE) echo "$CHARMROOT/bin/charmfilter < $TMP.cpp | $CMK_M4 > $TMP.space"
+      $CHARMROOT/bin/charmfilter < $TMP.cpp | $CMK_M4 > $TMP.space
+      if ($?VERBOSE) echo "$CHARMROOT/bin/charmxlat $TMP.space $TMP.c"
+      $CHARMROOT/bin/charmxlat $TMP.space $TMP.c
+      if ($status) goto failure
+      if ($?VERBOSE) echo "$CMK_CC $OPTS_CC -I$CHARMROOT/include -c $TMP.c -o $TMP.o"
+      $CMK_CC $OPTS_CC -I$CHARMROOT/include -c $TMP.c -o $TMP.o
+      if ($status) goto failure
+      if ($?NOLINK) then
+          if ($?VERBOSE) echo "/bin/mv $TMP.o $BASE.o"
+          /bin/mv $TMP.o $BASE.o
+      else
+          set OBJECTFILES=( $OBJECTFILES $TMP.o )
+      endif
+      breaksw
+    case "*.P"
+      echo 'extern "C" {' > $TMP.P.c
+      echo '#include <stdio.h>' >> $TMP.P.c
+      echo '}' >> $TMP.P.c
+      echo '#line 1 "'$BASE.P'"' >> $TMP.P.c
+      /bin/cat $BASE.P >> $TMP.P.c
+      if ($?VERBOSE) echo "$CMK_CPP $OPTS_CPP -I$CHARMROOT/include $TMP.P.c > $TMP.cpp"
+      $CMK_CPP $OPTS_CPP -I$CHARMROOT/include $TMP.P.c > $TMP.cpp
+      if ($?VERBOSE) echo "$CHARMROOT/bin/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space"
+      $CHARMROOT/bin/charmfilter++ $TMP.cpp | $CMK_M4 > $TMP.space
+      if ($?VERBOSE) echo "$CHARMROOT/bin/charmxlat++ $TMP.space $TMP.C"
+      $CHARMROOT/bin/charmxlat++ $TMP.space $TMP.C
+      if ($status) goto failure
+      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CPLUS -I$CHARMROOT/include $TMP.C -o $TMP.o"
+      $CMK_CXX $OPTS_CPLUS -I$CHARMROOT/include $TMP.C -o $TMP.o
+      if ($status) goto failure
+      if ($?NOLINK) then
+        if ($?VERBOSE) echo "/bin/mv $TMP.o $BASE.o"
+        /bin/mv $TMP.o $BASE.o
+      else
+        set OBJECTFILES=( $OBJECTFILES $TMP.o )
+      endif
+      breaksw
+    case "*.c"
+      if ($?VERBOSE) echo "$CMK_CC $OPTS_CC -I$CHARMROOT/include -c $BASE.c -o $BASE.o"
+      $CMK_CC $OPTS_CC -I$CHARMROOT/include -c $BASE.c -o $BASE.o
+      if ($status) goto failure
+      if ($?NOLINK == 0) then
+        if ($?VERBOSE) echo "/bin/mv $BASE.o $TMP.o"
+        /bin/mv $BASE.o $TMP.o
+        set OBJECTFILES=( $OBJECTFILES $TMP.o )
+      endif
+      breaksw
+    case "*.C"
+      if ($?VERBOSE) echo "$CMK_CXX $OPTS_CPLUS -I$CHARMROOT/include $BASE.c -o $BASE.o"
+      $CMK_CXX $OPTS_CPLUS -I$CHARMROOT/include $BASE.C -o $BASE.o
+      if ($status) goto failure
+      if ($?NOLINK == 0) then
+        if ($?VERBOSE) echo "/bin/mv $BASE.o $TMP.o"
+        /bin/mv $BASE.o $TMP.o
+        set OBJECTFILES=( $OBJECTFILES $TMP.o )
+      endif
+      breaksw
+    case "*.f"
+    case "*.F"
+    case "*.fc"
+    case "*.FC"
+      echo "charmc: I'm not yet smart enough to compile $FILE"
+      goto failure
+    case "*.o"
+      set OBJECTFILES=( $OBJECTFILES $BASE.o )
+      breaksw
+    default:
+      echo "file with unrecognized extension $FILE"
+      goto failure
+  endsw
+end
+
+
+##############################################################################
+#
+# Create module_init_fn.o
+#
+##############################################################################
+
+if ($?NOLINK) goto success
+
+if (-e module-init-fn.c) mv module-init-fn.c module-init-fn.bak
+
+if (( $?MOD_LIST == 0) && ( $?MOD_FILE )) then
+  if (! -e $MOD_FILE) then
+    echo 'No such module file '$MOD_FILE
+    goto failure
+  endif
+  set MOD_LIST=(`cat $MOD_FILE`)
+endif
+
+if (( $?MOD_LIST == 0) && ( -e module.list )) then
+  set MOD_LIST=(`cat module.list`)
+endif
+
+if ( $?MOD_LIST ) then
+    echo Modules: $MOD_LIST
+    echo " " > module-init-fn.c
+    foreach i ( $MOD_LIST)
+      echo 'extern void _CK_'$i'_init();' >> module-init-fn.c
+    end
+    echo '_CK_module_init_fn()' >> module-init-fn.c
+      echo '{' >> module-init-fn.c
+    foreach i ( $MOD_LIST)
+      echo '      _CK_'$i'_init();' >> module-init-fn.c
+    end
+    echo '}' >> module-init-fn.c
+    $CMK_CC $OPTS_CC -c module-init-fn.c
+    set OBJECTFILES = ($OBJECTFILES module-init-fn.o)
+else
+    echo 'Note: no module list specified.'
+endif
+
+##############################################################################
+#
+# Link
+#
+##############################################################################
+
+link:
+
+echo "linking $OBJECT with -language $LANGUAGE"
+
+set LIBRARIES = ($LIBRARIES \
+	-l${LIBCLASS}-core-$EXECMODE \
+	-l${LIBCLASS}-ldb-$BALANCE \
+	-l${LIBCLASS}-$LIBCPLUS \
+	-lconv-core \
+	-lconv-qs-$QUEUE \
+	$CMK_LIBS -lm)
+
+if ($?MAINOBJ) then
+   set OBJECTFILES=($MAINOBJ $OBJECTFILES)
+else
+   set LIBRARIES=(-l${LIBCLASS}-defmain $LIBRARIES)
+endif
+
+if ($?VERBOSE) echo "$LOADER $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMROOT/lib $LIBRARIES"
+$LOADER $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMROOT/lib $LIBRARIES
+if ($status) goto failure
+
+if (-e $CHARMROOT/bin/conv-host) then
+    /bin/rm -f conv-host
+    /bin/ln -s $CHARMROOT/bin/conv-host conv-host
+endif
+
+goto success
+
+########################################################################
+#
+# Clean up files and exit
+#
+########################################################################
+
+
+success:
+    set STATUS=0
+    goto end
+
+failure:
+    echo 'charmc: aborting.'
+    set STATUS=1
+    goto end
+
+end:
+    if ($?SAVE == 0) then
+        foreach FILE ($FILES)
+            set BASE=$FILE:r
+            set TMP=$BASE:t.TMP
+            /bin/rm -f $TMP.P.c $TMP.C $TMP.cpp $TMP.space $TMP.o
+            /bin/rm -f $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h $BASE:t.headers
+        end
+    endif
+    exit ($STATUS)
