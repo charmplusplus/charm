@@ -22,6 +22,8 @@
 int deltaLog;
 int nonDeltaLog;
 
+int checknested=0;		// check illegal nested begin/end execute 
+
 CkpvStaticDeclare(Trace*, _trace);
 CtvStaticDeclare(int,curThreadEvent);
 
@@ -627,6 +629,7 @@ TraceProjections::TraceProjections(char **argv): curevent(0), isIdle(0), inEntry
 
   CtvInitialize(int,curThreadEvent);
   CtvAccess(curThreadEvent)=0;
+  checknested = CmiGetArgFlagDesc(argv,"+checknested","check projections nest begin end execute events");
   int binary = CmiGetArgFlagDesc(argv,"+binary-trace","Write log files in (unreadable) binary format");
 #if CMK_PROJECTIONS_USE_ZLIB
   int compressed = CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
@@ -784,7 +787,7 @@ void TraceProjections::creationDone(int num)
 
 void TraceProjections::beginExecute(CmiObjId *tid)
 {
-  if (inEntry) CmiAbort("Nested Begin Execute!\n");
+  if (checknested && inEntry) CmiAbort("Nested Begin Execute!\n");
   execEvent = CtvAccess(curThreadEvent);
   execEp = (-1);
   _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
@@ -795,7 +798,7 @@ void TraceProjections::beginExecute(CmiObjId *tid)
 void TraceProjections::beginExecute(envelope *e)
 {
   if(e==0) {
-    if (inEntry) CmiAbort("Nested Begin Execute!\n");
+    if (checknested && inEntry) CmiAbort("Nested Begin Execute!\n");
     execEvent = CtvAccess(curThreadEvent);
     execEp = (-1);
     _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
@@ -808,7 +811,7 @@ void TraceProjections::beginExecute(envelope *e)
 
 void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx)
 {
-  if (inEntry) CmiAbort("Nested Begin Execute!\n");
+  if (checknested && inEntry) CmiAbort("Nested Begin Execute!\n");
   execEvent=event;
   execEp=ep;
   execPe=srcPe;
@@ -819,7 +822,7 @@ void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe, int 
 
 void TraceProjections::endExecute(void)
 {
-  if (!inEntry) CmiAbort("Nested EndExecute!\n");
+  if (checknested && !inEntry) CmiAbort("Nested EndExecute!\n");
   if(execEp == (-1)) {
     _logPool->add(END_PROCESSING,0,_threadEP,TraceTimer(),
                              execEvent,CkMyPe());
