@@ -10,6 +10,7 @@
 
 #include "xi-util.h"
 #include "CList.h"
+#include "COverlap.h"
 #include "CEntry.h"
 #include "CParseNode.h"
 #include "sdag-globals.h"
@@ -26,6 +27,7 @@ class CParsedFile {
     void generateInitFunction(XStr& output);
     void generatePupFunction(XStr& output);
   public:
+    TList<COverlap*> overlapList;
     TList<CEntry*> entryList;
     TList<CParseNode*> nodeList;
     CParsedFile(void) {}

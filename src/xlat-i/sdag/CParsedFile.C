@@ -46,7 +46,7 @@ void CParsedFile::propagateState(void)
 void CParsedFile::generateEntryList(void)
 {
   for(CParseNode *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->generateEntryList(entryList, 0);
+    cn->generateEntryList(entryList, overlapList, 0);
   }
 }
 
@@ -71,11 +71,17 @@ void CParsedFile::generateInitFunction(XStr& op)
 {
   op << "private:\n";
   op << "  CDep *__cDep;\n";
+  op << "  COverDep * __cOverDep;\n";
   op << "  void __sdag_init(void) {\n";
+  op << "    __cOverDep = new COverDep("<<numOverlaps<<","<<numWhens<<");\n";
   op << "    __cDep = new CDep("<<numEntries<<","<<numWhens<<");\n";
   CEntry *en;
   for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
     en->generateDeps(op);
+  }
+  COverlap *on;
+  for(on =overlapList.begin(); !overlapList.end(); on=overlapList.next()) {
+    on->generateDeps(op);
   }
   op << "  }\n";
 }
@@ -84,6 +90,7 @@ void CParsedFile::generatePupFunction(XStr& op)
 {
   op << "public:\n";
   op << "  void __sdag_pup(PUP::er& p) {\n";
+  op << "    if (__cOverDep) { __cOverDep->pup(p); }\n";
   op << "    if (__cDep) { __cDep->pup(p); }\n";
   op << "  }\n";
 }

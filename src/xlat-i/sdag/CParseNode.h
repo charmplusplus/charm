@@ -14,6 +14,7 @@
 #include "sdag-globals.h"
 #include "CList.h"
 #include "CStateVar.h"
+#include "COverlap.h"
 #include "CEntry.h"
 
 class CParser;
@@ -30,26 +31,28 @@ class CParseNode {
     int numPtrs;
     int isVoid; 
     int needsParamMarshalling;
+    int isOverlaped;
     CParseNode *con1, *con2, *con3, *con4;
     TList<CParseNode*> *constructs;
     TList<CStateVar*> estateVars;
     TList<CStateVar*> *stateVars;
     TList<CStateVar*> *stateVarsChildren;
+    TList<CStateVar*> *allstateVars;
     CParseNode *next;
     int nextBeginOrEnd;
     CEntry *entryPtr;
-    CParseNode(EToken t, CLexer *cLexer, CParser *cParser);
+    CParseNode(EToken t, CLexer *cLexer, CParser *cParser, int overlaps);
     CParseNode(EToken t, CLexer *cLexer, CParser *cParser, CToken *tokA, CToken *tokB, int pointers);
     CParseNode(EToken t, XStr *txt) : type(t), text(txt), con1(0), con2(0),
                                          con3(0), con4(0), constructs(0) {}
     void numberNodes(void);
     void labelNodes(void);
-    void generateEntryList(TList<CEntry*>&, CParseNode *);
+    void generateEntryList(TList<CEntry*>&, TList<COverlap*>&, CParseNode *);
     void propagateState(int);
     void generateCode(XStr& output);
     void setNext(CParseNode *, int);
   private:
-    void propagateState(TList<CStateVar*>&, int);
+    TList<CStateVar*> propagateState(TList<CStateVar*>&, int);
     void generateWhen(XStr& op);
     void generateOverlap(XStr& op);
     void generateWhile(XStr& op);
