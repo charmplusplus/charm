@@ -11,7 +11,9 @@ CpvExtern(int, CldLoadBalanceMessages);
 CpvExtern(int, CldMessageChunks);
 CpvExtern(int, CldLoadNotify);
 
-void CldMultipleSend(int pe, int numToSend);
+CpvExtern(CmiNodeLock, cldLock);
+
+void CldMultipleSend(int pe, int numToSend, int rank);
 void CldSetPEBitVector(const char *);
 
 int  CldLoad(void);

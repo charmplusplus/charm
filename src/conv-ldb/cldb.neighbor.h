@@ -19,9 +19,11 @@ typedef struct loadmsg_s {
   int pe, load;
 } loadmsg;
 
+/* work request message when idle */
 typedef struct requestmsg_s {
   char header[CmiMsgHeaderSizeBytes];
-  int pe;
+  int from_pe;
+  int to_rank;
 } requestmsg;
 
 CpvDeclare(CldNeighborData, neighbors);

@@ -14,6 +14,9 @@ CpvDeclare(int, CldRelocatedMessages);
 CpvDeclare(int, CldLoadBalanceMessages);
 CpvDeclare(int, CldMessageChunks);
 CpvDeclare(int, CldLoadNotify);
+
+CpvDeclare(CmiNodeLock, cldLock);
+
 extern void LoadNotifyFn(int);
 
 char* _lbtopo = "torus2d";
@@ -127,10 +130,12 @@ void CldPutToken(char *msg)
 {
   CldProcInfo proc = CpvAccess(CldProc);
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
-  CldToken tok = (CldToken)CmiAlloc(sizeof(struct CldToken_s));
+  CldToken tok;
   int len, queueing, priobits; unsigned int *prioptr;
   CldPackFn pfn;
 
+  CmiLock(CpvAccess(cldLock));
+  tok = (CldToken)CmiAlloc(sizeof(struct CldToken_s));
   tok->msg = msg;
 
   /* add token to the doubly-linked circle */
@@ -143,23 +148,44 @@ void CldPutToken(char *msg)
   CmiSetHandler(tok, proc->tokenhandleridx);
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
   CsdEnqueueGeneral(tok, queueing, priobits, prioptr);
+  CmiUnlock(CpvAccess(cldLock));
+}
+
+static void * _CldGetTokenMsg(CldProcInfo proc)
+{
+  CldToken tok;
+  void *msg;
+  
+  tok = proc->sentinel->succ;
+  if (tok == proc->sentinel) {
+    return NULL;
+  }
+  tok->pred->succ = tok->succ;
+  tok->succ->pred = tok->pred;
+  proc->load --;
+  msg = tok->msg;
+  tok->msg = 0;
+  return msg;
 }
 
 void CldGetToken(char **msg)
 {
   CldProcInfo proc = CpvAccess(CldProc);
-  CldToken tok;
-  
-  tok = proc->sentinel->succ;
-  if (tok == proc->sentinel) {
-    *msg = 0; return;
-  }
-  tok->pred->succ = tok->succ;
-  tok->succ->pred = tok->pred;
-  proc->load --;
-  *msg = tok->msg;
-  tok->msg = 0;
-  CpvAccess(CldLoadOffset)++;
+  CmiLock(CpvAccess(cldLock));
+  *msg = _CldGetTokenMsg(proc);
+  if (*msg) CpvAccess(CldLoadOffset)++;
+  CmiUnlock(CpvAccess(cldLock));
+}
+
+/* called at node level */
+/* get token from processor of rank pe */
+static void CldGetTokenFromRank(char **msg, int rank)
+{
+  CldProcInfo proc = CpvAccessOther(CldProc, rank);
+  CmiLock(CpvAccessOther(cldLock, rank));
+  *msg = _CldGetTokenMsg(proc);
+  if (*msg) CpvAccessOther(CldLoadOffset, rank)++;
+  CmiUnlock(CpvAccessOther(cldLock, rank));
 }
 
 /* Bit Vector Stuff */
@@ -211,8 +237,8 @@ void CldModuleGeneralInit(char **argv)
 
   CpvInitialize(CldProcInfo, CldProc);
   CpvInitialize(int, CldLoadOffset);
-  CpvInitialize(int, CldLoadNotify);
   CpvAccess(CldLoadOffset) = 0;
+  CpvInitialize(int, CldLoadNotify);
   CpvInitialize(BitVector, CldPEBitVector);
   CpvAccess(CldPEBitVector) = (char *)malloc(CmiNumPes()*sizeof(char));
   for (i=0; i<CmiNumPes(); i++)
@@ -225,10 +251,15 @@ void CldModuleGeneralInit(char **argv)
   sentinel->succ = sentinel;
   sentinel->pred = sentinel;
 
+  /* lock to protect token queue for immediate message and smp */
+  CpvInitialize(CmiNodeLock, cldLock);
+  CpvAccess(cldLock) = CmiCreateLock();
+
+  /* register load balancing virtual topologies */
   registerLBTopos();
 }
 
-void CldMultipleSend(int pe, int numToSend)
+void CldMultipleSend(int pe, int numToSend, int rank)
 {
   char **msgs;
   int len, queueing, priobits, *msgSizes, i, numSent, done=0, parcelSize;
@@ -245,7 +276,7 @@ void CldMultipleSend(int pe, int numToSend)
     numSent = 0;
     parcelSize = 0;
     for (i=0; i<numToSend; i++) {
-      CldGetToken(&msgs[i]);
+      CldGetTokenFromRank(&msgs[i], rank);
       if (msgs[i] != 0) {
 	done = 1;
 	numSent++;
@@ -253,7 +284,7 @@ void CldMultipleSend(int pe, int numToSend)
 	ifn(msgs[i], &pfn, &len, &queueing, &priobits, &prioptr);
 	msgSizes[i] = len;
 	parcelSize += len;
-	CldSwitchHandler(msgs[i], CpvAccess(CldBalanceHandlerIndex));
+	CldSwitchHandler(msgs[i], CpvAccessOther(CldBalanceHandlerIndex, rank));
       }
       else {
 	done = 1;
@@ -270,14 +301,14 @@ void CldMultipleSend(int pe, int numToSend)
       CmiMultipleSend(pe, numSent, msgSizes, msgs);
       for (i=0; i<numSent; i++)
 	CmiFree(msgs[i]);
-      CpvAccess(CldRelocatedMessages) += numSent;
-      CpvAccess(CldMessageChunks)++;
+      CpvAccessOther(CldRelocatedMessages, rank) += numSent;
+      CpvAccessOther(CldMessageChunks, rank)++;
     }
     else if (numSent == 1) {
       CmiSyncSend(pe, msgSizes[0], msgs[0]);
       CmiFree(msgs[0]);
-      CpvAccess(CldRelocatedMessages)++;
-      CpvAccess(CldMessageChunks)++;
+      CpvAccessOther(CldRelocatedMessages, rank)++;
+      CpvAccessOther(CldMessageChunks, rank)++;
     }
   }
   free(msgs);

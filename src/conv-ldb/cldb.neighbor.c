@@ -1,17 +1,23 @@
 #include <stdlib.h>
-#include "cldb.neighbor.h"
-#define PERIOD 20                /* default: 30 */
-#define MAXOVERLOAD 1
 
 #include "converse.h"
+#include "cldb.neighbor.h"
 #include "queueing.h"
 #include "cldb.h"
 #include "topology.h"
 
+#define IDLE_IMMEDIATE 		1
+#define TRACE_USEREVENTS        0
+
+#define PERIOD 20                /* default: 30 */
+#define MAXOVERLOAD 1
+
 typedef struct CldProcInfo_s {
-  double lastIdle;
+  double lastCheck;
+  int    sent;			/* flag to disable idle work request */
   int    balanceEvt;		/* user event for balancing */
   int    idleEvt;		/* user event for idle balancing */
+  int    idleprocEvt;		/* user event for processing idle req */
 } *CldProcInfo;
 
 extern char *_lbtopo;			/* topology name string */
@@ -27,6 +33,8 @@ CpvDeclare(int, Mindex);
 
 void LoadNotifyFn(int l)
 {
+  CldProcInfo  cldData = CpvAccess(CldData);
+  cldData->sent = 0;
 }
 
 char *CldGetStrategy(void)
@@ -37,58 +45,87 @@ char *CldGetStrategy(void)
 /* since I am idle, ask for work from neighbors */
 static void CldBeginIdle(void *dummy)
 {
-  CpvAccess(CldData)->lastIdle = CmiWallTimer();
+  CpvAccess(CldData)->lastCheck = CmiWallTimer();
 }
 
 static void CldEndIdle(void *dummy)
 {
-  CpvAccess(CldData)->lastIdle = -1;
+  CpvAccess(CldData)->lastCheck = -1;
 }
 
 static void CldStillIdle(void *dummy)
 {
+  int i;
   double startT;
-  loadmsg msg;
+  requestmsg msg;
   int myload;
   CldProcInfo  cldData = CpvAccess(CldData);
 
-  double t = CmiWallTimer();
-  double lt = cldData->lastIdle;
-  /* only ask for work every 5ms */
-  if (lt!=-1 && t-lt<0.005) {
-    return;
-  }
-  cldData->lastIdle = t;
-
-#ifndef CMK_OPTIMIZE
-  startT = CmiWallTimer();
-#endif
+  double now = CmiWallTimer();
+  double lt = cldData->lastCheck;
+  /* only ask for work every 20ms */
+  if (cldData->sent && (lt!=-1 && now-lt< 0.020)) return;
+  cldData->lastCheck = now;
 
   myload = CldLoad();
-/*  CmiAssert(myload == 0); */
+  CmiAssert(myload == 0);
   if (myload > 0) return;
 
-  msg.pe = CmiMyPe();
-  msg.load = myload;
+  msg.from_pe = CmiMyPe();
   CmiSetHandler(&msg, CpvAccess(CldAskLoadHandlerIndex));
-  CmiSyncMulticast(CpvAccess(neighborGroup), sizeof(loadmsg), &msg);
+#if ! IDLE_IMMEDIATE
+  msg.to_rank = -1;
+  CmiSyncMulticast(CpvAccess(neighborGroup), sizeof(requestmsg), &msg);
+#else
+  /* fixme */
+  CmiBecomeImmediate(&msg);
+  for (i=0; i<CpvAccess(numNeighbors); i++) {
+    msg.to_rank = CmiRankOf(CpvAccess(neighbors)[i].pe);
+    CmiSyncNodeSend(CmiNodeOf(CpvAccess(neighbors)[i].pe),sizeof(requestmsg),(char *)&msg);
+  }
+#endif
+  cldData->sent = 1;
 
-#ifndef CMK_OPTIMIZE
-  /* traceUserBracketEvent(cldData->idleEvt, startT, CmiWallTimer()); */
+#if !defined(CMK_OPTIMIZE) && TRACE_USEREVENTS
+  traceUserBracketEvent(cldData->idleEvt, now, CmiWallTimer());
 #endif
 }
 
-static void CldAskLoadHandler(loadmsg *msg)
+/* immediate message handler, work at node level */
+/* send some work to requested proc */
+static void CldAskLoadHandler(requestmsg *msg)
 {
-  /* send some work to this proc */
-  int receiver = msg->pe;
+  int receiver, rank;
   int myload = CldLoad();
+  double now = CmiWallTimer();
 
+  /* only give you work if I have more than 1 */
   if (myload>1) {
-    int sendLoad = myload / CpvAccess(numNeighbors) / 2;
+    int sendLoad;
+    receiver = msg->from_pe;
+    rank = CmiMyRank();
+    if (msg->to_rank != -1) rank = msg->to_rank;
+#if IDLE_IMMEDIATE
+    /* try the lock */
+    if (CmiTryLock(CpvAccessOther(cldLock, rank))) {
+      CmiDelayImmediate();		/* postpone immediate message */
+      return;
+    }
+    CmiUnlock(CpvAccessOther(cldLock, rank));  /* release lock, grab later */
+#endif
+    sendLoad = myload / CpvAccess(numNeighbors) / 2;
     if (sendLoad < 1) sendLoad = 1;
     sendLoad = 1;
-    CldMultipleSend(receiver, sendLoad);
+    CldMultipleSend(receiver, sendLoad, rank);
+#if 0
+#if !defined(CMK_OPTIMIZE) && TRACE_USEREVENTS
+    /* this is dangerous since projections logging is not thread safe */
+    {
+    CldProcInfo  cldData = CpvAccessOther(CldData, rank);
+    traceUserBracketEvent(cldData->idleprocEvt, now, CmiWallTimer());
+    }
+#endif
+#endif
   }
   CmiFree(msg);
 }
@@ -168,16 +205,15 @@ void CldBalance()
             numToMove = overload;
           overload -= numToMove;
 	  CpvAccess(neighbors)[j].load += numToMove;
-          CldMultipleSend(CpvAccess(neighbors)[j].pe, numToMove);
+          CldMultipleSend(CpvAccess(neighbors)[j].pe, numToMove, CmiMyRank());
         }
       }
   }
   CldSendLoad();
-#ifndef CMK_OPTIMIZE
-/*  traceUserBracketEvent(CpvAccess(CldData)->balanceEvt, startT, CmiWallTimer()); */
+#if !defined(CMK_OPTIMIZE) && TRACE_USEREVENTS
+  traceUserBracketEvent(CpvAccess(CldData)->balanceEvt, startT, CmiWallTimer());
 #endif
   CcdCallFnAfterOnPE((CcdVoidFn)CldBalance, NULL, PERIOD, CmiMyPe());
-/*  CcdCallBacksReset(0); */
 }
 
 void CldLoadResponseHandler(loadmsg *msg)
@@ -414,10 +450,12 @@ void CldGraphModuleInit(char **argv)
   CpvInitialize(int, CldAskLoadHandlerIndex);
 
   CpvAccess(CldData) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
-  CpvAccess(CldData)->lastIdle = -1;
+  CpvAccess(CldData)->lastCheck = -1;
+  CpvAccess(CldData)->sent = 0;
 #ifndef CMK_OPTIMIZE
   CpvAccess(CldData)->balanceEvt = traceRegisterUserEvent("CldBalance", -1);
   CpvAccess(CldData)->idleEvt = traceRegisterUserEvent("CldBalanceIdle", -1);
+  CpvAccess(CldData)->idleprocEvt = traceRegisterUserEvent("CldBalanceProcIdle", -1);
 #endif
 
   CpvAccess(MinLoad) = 0;
@@ -461,16 +499,12 @@ void CldGraphModuleInit(char **argv)
     CldBalance();
   }
 
-#if 0
-  /* register an idle handler */
+#if 1
+  /* register idle handlers - when idle, keep asking work from neighbors */
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
       (CcdVoidFn) CldStillIdle, NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
       (CcdVoidFn) CldStillIdle, NULL);
-#endif
-#if 0
-  /* periodic load balancing */
-  CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn) CldBalance, NULL);
 #endif
 }
 
@@ -483,6 +517,8 @@ void CldModuleInit(char **argv)
   CpvAccess(CldHandlerIndex) = CmiRegisterHandler(CldHandler);
   CpvAccess(CldRelocatedMessages) = CpvAccess(CldLoadBalanceMessages) = 
   CpvAccess(CldMessageChunks) = 0;
+
+  CpvAccess(CldLoadNotify) = 1;
 
   CldModuleGeneralInit(argv);
   CldGraphModuleInit(argv);
