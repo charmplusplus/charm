@@ -22,7 +22,7 @@
 
 #define CHARM_MPI 0 
 
-#ifdef CHARM_MPI
+#if CHARM_MPI
 #include "mpi.h"
 #define MPI_MAX_MSG_SIZE 1000
 #define MPI_BUF_SIZE 2000000

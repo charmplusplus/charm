@@ -3,7 +3,7 @@
 CpvDeclare(int, RecvmsgHandle);
 CpvDeclare(int, RecvdummyHandle);
 
-#ifdef CHARM_MPI
+#if CHARM_MPI
 MPI_Comm groupComm;
 MPI_Group group, groupWorld;
 #endif
@@ -254,7 +254,7 @@ void ComlibManager::endIteration(){
 		*/
 	    }
 	    else if(strategy == USE_MPI){
-#ifdef CHARM_MPI
+#if CHARM_MPI
 		
 		ComlibPrintf("[%d] In MPI strategy\n", CkMyPe());
 		
@@ -355,7 +355,7 @@ void ComlibManager::receiveID(int npes, int *pelist, comID id){
 
     memcpy(this->pelist, pelist, sizeof(int) * npes);
 
-#ifdef CHARM_MPI
+#if CHARM_MPI
     if(npes < CkNumPes()){
         PMPI_Comm_group(MPI_COMM_WORLD, &groupWorld);
 	PMPI_Group_incl(groupWorld, npes, pelist, &group);
@@ -411,7 +411,7 @@ void ComlibManager::receiveID(int npes, int *pelist, comID id){
             cmgr[/*yet to decide*/0].receiveNamdMessage(newmsg);
 	}
 	else if(strategy == USE_MPI) {
-#ifdef CHARM_MPI
+#if CHARM_MPI
 	    CharmMessageHolder *cmsg = messageBuf;
 	    char *buf_ptr = mpi_sndbuf;
 	    

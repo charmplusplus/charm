@@ -1,5 +1,5 @@
 module ComlibModule { 
-  readonly CkGroupID cmgrID;
+//  readonly CkGroupID cmgrID;
 
   message DummyMsg;
 
