@@ -18,7 +18,7 @@ barrier::barrier(void)
   myLeft = (myPe*2)+1;
   myRight = myLeft+1;
   myParent = (myPe % 2 == 0) ? ((myPe-2)/2) : ((myPe-1)/2);
-  myGroup = CkGetGroupID();
+  myGroup = thisgroup;
   kidscount = 0;
   if (myRight >= CkNumPes())
     kidscount++;
