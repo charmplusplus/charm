@@ -309,7 +309,7 @@ private:
 		-1 indicates this is a single (non-reduced) contribution.
   		>0 indicates this is a reduced contribution.
   	*/
-  	int nSources(void) {return abs(sourceFlag);}
+  	int nSources(void) {return sourceFlag<0?-sourceFlag:sourceFlag;}
 
 private:
 	CkReduction::reducerType reducer;
