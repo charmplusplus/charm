@@ -230,8 +230,12 @@ void TCharm::pupThread(PUP::er &pc) {
     pup_er p=(pup_er)&pc;
     checkPupMismatch(pc,5138,"before TCHARM thread");
     tid = CthPup(p, tid);
-    if (pc.isUnpacking())
+    if (pc.isUnpacking()) {
       CtvAccessOther(tid,_curTCharm)=this;
+#if CMK_BLUEGENE_CHARM
+      BgAttach(tid);
+#endif
+    }
     CmiIsomallocBlockListPup(p,&heapBlocks);
     threadGlobals=CtgPup(p,threadGlobals);
     checkPupMismatch(pc,5139,"after TCHARM thread");
