@@ -33,6 +33,7 @@ protected:
 public:
   BaseLB(const CkLBOptions &) ;
   BaseLB(CkMigrateMessage *m):IrrGroup(m) { /* empty */ }
+  virtual ~BaseLB();
   void unregister(); 
   inline char *lbName() { return lbname; }
   virtual void turnOff() { CmiAbort("turnOff not implemented"); }

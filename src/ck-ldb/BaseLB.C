@@ -24,11 +24,15 @@ BaseLB::BaseLB(const CkLBOptions &opt) {
 */
   theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
   lbname = "Unknown";
+  // register this load balancer to LBDatabase at the sequence number
   theLbdb->addLoadbalancer(this, seqno);
 }
 
+BaseLB::~BaseLB() {
+  CkpvAccess(numLoadBalancers) --;
+}
+
 void BaseLB::unregister() {
-  theLbdb=CProxy_LBDatabase(lbdb).ckLocalBranch();
   theLbdb->RemoveLocalBarrierReceiver(receiver);
   CkpvAccess(numLoadBalancers) --;
 }
