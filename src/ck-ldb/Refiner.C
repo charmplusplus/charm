@@ -71,6 +71,16 @@ void Refiner::create(int count, CentralLB::LDStats* stats, int** procs)
     LDObjData *odata = stats[j].objData;
     const int osz = stats[j].n_objs;  
     for(i=0; i < osz; i++) {
+        computes[index].id = odata[i].id();
+        computes[index].handle = odata[i].handle;
+        computes[index].load = odata[i].cpuTime;
+        computes[index].originalPE = j;
+        computes[index].originalIdx = i;
+        computes[index].processor = -1;
+        computes[index].oldProcessor = procs[j][i];
+        computes[index].migratable = odata[i].migratable;
+        index ++;
+/*
       if (odata[i].migratable == CmiTrue)
       {
         computes[index].id = odata[i].id();
@@ -87,6 +97,7 @@ void Refiner::create(int count, CentralLB::LDStats* stats, int** procs)
 	processors[j].backgroundLoad += odata[i].cpuTime;
         numComputes --;
       }
+*/
     }
   }
 //  for (i=0; i < numComputes; i++)
@@ -227,6 +238,12 @@ int Refiner::refine()
       // iout << iINFO << "Considering Procsessor : " 
       //      << p->Id << "\n" << endi;
       while (c) {
+        if (!c->migratable) {
+	  nextCompute.id++;
+	  c = (computeInfo *) 
+	    donor->computeSet->next((Iterator *)&nextCompute);
+          continue;
+        }
 	//CkPrintf("c->load: %f p->load:%f overLoad*averageLoad:%f \n",
 	//c->load, p->load, overLoad*averageLoad);
 	if ( c->load + p->load < overLoad*averageLoad) {

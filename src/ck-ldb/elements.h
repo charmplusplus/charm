@@ -46,6 +46,7 @@ public:
    int oldProcessor; // stores the current assignment of the compute object.
    int originalPE;  // These two are used by refiner, but ignored by RefineLB
    int originalIdx;
+   int migratable;
 };
 
 class processorInfo: public InfoRecord
