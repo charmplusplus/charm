@@ -126,9 +126,15 @@ init(void)
      FEM_Add_Ghost_Elem(0,4,quad2node);
   } else if (1) 
   { /*Match edges*/
+#if 1 /*Include ignored "-1" nodes as a test*/
+     static const int quad2edge[]= {0,1,-1,  1,2,-1,  2,3,-1,  3,0,-1};
+     FEM_Add_Ghost_Layer(3,1);
+     FEM_Add_Ghost_Elem(0,4,quad2edge);
+#else
      static const int quad2edge[]= {0,1,  1,2,  2,3,  3,0};
      FEM_Add_Ghost_Layer(2,1);
      FEM_Add_Ghost_Elem(0,4,quad2edge);
+#endif
 /*Add a second layer
      FEM_Add_Ghost_Layer(2,0);
      FEM_Add_Ghost_Elem(0,4,quad2edge);
