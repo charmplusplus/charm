@@ -111,8 +111,6 @@ bgTimeLog::bgTimeLog(char *msg)
   srcnode = msg?CmiBgMsgSrcPe(msg):-1;
   msgID = msg?CmiBgMsgID(msg):-1;
 
-  CmiAssert(srcnode==-1 || srcnode<BgNumNodes());
-
   oldStartTime=startTime;
   effRecvTime = recvTime;
   seqno = 0;

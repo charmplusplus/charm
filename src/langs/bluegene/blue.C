@@ -79,8 +79,7 @@ extern int processCount, corrMsgCount;
   if (cva(numX)==0 || cva(numY)==0 || cva(numZ)==0)  { if (CmiMyPe() == 0) { CmiPrintf("\nMissing parameters for BlueGene machine size!\n<tip> use command line options: +x, +y, or +z.\n");} BgShutdown(); } \
   else if (cva(numCth)==0 || cva(numWth)==0) { if (CmiMyPe() == 0) { CmiPrintf("\nMissing parameters for number of communication/worker threads!\n<tip> use command line options: +cth or +wth.\n");} BgShutdown(); }	\
   else if (cva(numX)*cva(numY)*cva(numZ)<CmiNumPes()) {	\
-    CmiPrintf("\nToo few BlueGene nodes!\n");	\
-    BgShutdown(); 	\
+    CmiAbort("\nToo few BlueGene nodes!\n");	\
   }
 
 
