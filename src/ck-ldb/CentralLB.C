@@ -232,6 +232,62 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
   
 }
 
+// test if sender and receiver in a commData is nonmigratable.
+static int isMigratable(LDObjData *objData, int len, const LDCommData &commData)
+{
+  for (int i=0; i<len; i++)
+    if (LDObjIDEqual(objData[i].id(), commData.sender) ||
+         LDObjIDEqual(objData[i].id(), commData.receiver)) return 0;
+  return 1;
+}
+
+// remove in the LDStats those objects that are non migratable
+void CentralLB::RemoveNonMigratable(LDStats* stats, int count)
+{
+  for (int pe=0; pe<count; pe++) {
+    int n_objs = stats[pe].n_objs;
+    LDObjData *objData = stats[pe].objData; 
+    int n_comm = stats[pe].n_comm;
+    LDCommData *commData = stats[pe].commData;
+    int l=-1, h=n_objs;
+    while (l<h) {
+      while (objData[l+1].migratable && l<h) l++;
+      while (!objData[h-1].migratable && l<h) h--;
+      if (h-l>2) {
+        LDObjData tmp = objData[l+1];
+        objData[l+1] = objData[h-1];
+        objData[h-1] = tmp;
+      }
+      else 
+        break;
+    }
+    stats[pe].n_objs = h;
+    if (n_objs != h) CmiPrintf("Removed %d nonmigratable on pe:%d n_objs:%d migratable:%d\n", n_objs-h, pe, n_objs, h);
+
+    // modify comm data
+    l=-1, h=n_comm;
+    while (l<h) {
+      while (isMigratable(objData+stats[pe].n_objs, n_objs-stats[pe].n_objs, commData[l+1]) && l<h) l++;
+      while (!isMigratable(objData+stats[pe].n_objs, n_objs-stats[pe].n_objs, commData[h-1]) && l<h) h--;
+      if (h-l>2) {
+        LDCommData tmp = commData[l+1];
+        commData[l+1] = commData[h-1];
+        commData[h-1] = tmp;
+      }
+      else 
+        break;
+    }
+    stats[pe].n_comm = h;
+    if (n_comm != h) CmiPrintf("Removed %d nonmigratable on pe:%d n_comm:%d migratable:%d\n", n_comm-h, pe, n_comm, h);
+
+    // now turn nonmigratable to bg load
+    for (int j=stats[pe].n_objs; j<n_objs; j++) {
+      stats[pe].bg_walltime += objData[j].wallTime;
+      stats[pe].bg_cputime += objData[j].cpuTime;
+    }
+  }
+}
+
 void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 {
   DEBUGF(("[%d] in ReceiveMigration %d moves\n",CkMyPe(),m->n_moves));

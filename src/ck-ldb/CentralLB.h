@@ -80,6 +80,8 @@ protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
 
+  void RemoveNonMigratable(LDStats* statsDataList, int count);
+
 private:  
 
   int mystep;
