@@ -18,6 +18,9 @@ CONVERSE_COM_OBJS = $(COMMLIBDIR)/commlib.o $(COMMLIBDIR)/gridrouter.o \
 OBJS = ComlibManager.o $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 
 all: conversecom $(LIB) 
+
+$(LIB): $(OBJS) $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
+	$(CHARMC) -cp $(LIBDIR) -o libmodulecommlib.a $(OBJS)
 	rm -f $(CDIR)/include/ComlibManager.h
 	cp  ComlibManager.h $(CDIR)/include
 	rm -f $(CDIR)/include/EachToManyMulticastStrategy.h
@@ -39,9 +42,6 @@ all: conversecom $(LIB)
 
 conversecom :
 	(cd ../../conv-libs/commlib; make)
-
-libmodulecommlib.a: $(OBJS) $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
-	$(CHARMC) -cp $(LIBDIR) -o libmodulecommlib.a $(OBJS)
 
 ComlibManager.o: ComlibManager.C ComlibManager.h
 	$(CHARMC) -c ComlibManager.C
