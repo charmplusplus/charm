@@ -2248,8 +2248,9 @@ int FEM_Mesh::getGlobalElem(int elType,int elNo) const
 	int base=nElems(elType); //Global number of first element of this type
 #ifndef CMK_OPTIMIZE
 	if (elNo<0 || elNo>=elem[elType].size()) {
-		CkPrintf("FEM> Invalid element number %d used!\n");
-		CkAbort("FEM> Invalid element number");
+		CkPrintf("FEM> Element number %d is invalid-- element type %d has only %d elements\n",
+			elNo,elType,elem[elType].size());
+		CkAbort("FEM> Invalid element number, probably passed via FEM_Set_Sparse_Elem");
 	}
 #endif
 	return base+elNo;
