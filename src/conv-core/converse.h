@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.65  1997-07-23 18:40:22  milind
+ * Revision 2.66  1997-07-24 17:29:36  milind
+ * Added Parallel Java to the CVS repository in Common/langs.
+ * Fixed a problem with size_t in converse.h
+ *
+ * Revision 2.65  1997/07/23 18:40:22  milind
  * Made charm++ to work on exemplar.
  *
  * Revision 2.64  1997/07/22 18:15:59  milind
@@ -635,6 +639,8 @@ void       CthAutoYieldBlock      CMK_PROTO((void));
 void       CthAutoYieldUnblock    CMK_PROTO((void));
 
 /****** CPTHREAD: the posix threads package ******/
+
+#include <sys/types.h>
 
 #define CPTHREAD_ONCE_INIT 0
 
