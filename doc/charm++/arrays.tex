@@ -422,7 +422,7 @@ aF.doneInserting();
 \end{alltt}
 
 The \kw{doneInserting} call starts the the reduction manager (see ``Array
-Reductions'') and load balancer (see ``Load Balancer'')-- since
+Reductions'') and load balancer (see ~\ref{lbFramework})-- since
 these objects need to know about all the array's elements, they
 must be started after the initial elements are inserted.
 You may call \kw{doneInserting} multiple times, but only the first
@@ -540,7 +540,7 @@ AF::AF()
 
 \subsubsection{Migratable Array Elements}
 Array objects can \index{migrate}migrate from one PE to another.
-For example, the load balancer (see section ``Load Balancing Chare Arrays'')
+For example, the load balancer (see section~\ref{lbFramework})
 might migrate array elements to better balance the load between
 processors.  For an array element to migrate, it must implement
 a pack/unpack or ``pup'' method:
@@ -601,7 +601,7 @@ what type of \kw{PUP::er} has been passed to you with the
 An array element can migrate by calling the \kw{migrateMe}(\uw{destination
 processor}) member function-- this call must be the last action
 in an element entry point.  The system can also migrate array elements
-for load balancing (see the ``Load Balancing Chare Arrays'' chapter).
+for load balancing (see the section~\ref{lbarray}).
 
 To migrate your array element to another processor, the \charmpp{}
 runtime will:
@@ -626,59 +626,8 @@ Deallocation is done in the element destructor as usual.
 
 
 \subsubsection{Load Balancing Chare Arrays}
-\charmpp{} includes a run-time load balancer which works
-on array elements.  The idea is to run programs more efficiently
-by migrating array elements away from overloaded processors.
-To use the load balancer, you must make your elements migratable
-(see migration section above) and choose a load balancing 
-``strategy'' (see the load balancing section for a description
-of load balancing strategy routines).
+see section~\ref{lbarray}
 
-There are three ways to use the load balancer-- 
-\begin{itemize}
-
-\item Method 1: By default, the array elements may be asked to migrate at any time
-provided they are not in the middle of executing an entry method. 
-The array element's variable \kw{usesAtSync} being false attributes
-to this default behaviour. 
-
-\item  Method 2: Using the AtSync method, elements can be migrated at certain
-times.  For the AtSync method, set \kw{usesAtSync} to true in your 
-array element constructor.  When an element is ready to migrate,
-call \kw{ArrayElement::AtSync}.  
-After the first \kw{doneInserting} call (which starts the load balancer)
-and once all elements have reached \kw{AtSync},
-the load balancer runs and migrates elements.  Once
-all migrations are complete, the load balancer calls the 
-virtual function \kw{ArrayElement::ResumeFromSync} for each of the
-array element.  One must ensure that no messages are
-sent to an array element between its calls to \kw{AtSync} and
-\kw{ResumeFromSync}. \kw{AtSync}/\kw{ResumeFromSync} is currently
-implemented as a global barrier.
-
-Note: Setting usesAtSync to true makes it mandatory for the array
-element to call \kw{AtSync} and implement the \kw{ResumeFromSync}
- function.
-
-\item Method 3: The load balancer can be programmed to be started
-manually. 
- To use this feature, the LBDatabase object
-can be got explicitly by making the call \kw{LBDatabase::Object()}
-For example, 
-
-\begin{alltt}
-LBDatabase * myLbdb = LBDatabase::Object()
-\end{alltt}
-
-\kw{myLbdb->TurnManualLBOn()} will enable the manual switching on of
-the Load Balancer, so that no Load Balancer will be started automatically.
-\kw{TurnManualLBOn()} should be called as early as possible in the
-program. It must be ideally called in the constructor of a static array and
-definitely before the doneInserting call for a dynamic array.  This call has to be made on all processors. It can be called multiple times on one pe, but the last one takes effect.   
-The function call \kw{myLbdb->StartLB()} will start the load balancer. This call can be made on only one pe as the start message is broadcast to all processors. The load balancing happens in the background and won't stop the chares from functioning. 
-\kw{myLbdb->TurnManualLBOff()} turns off manual load balancing and switches back to the automatic Load balancing mode (using or not using AtSync). 
-
-\end{itemize}
 
 \subsubsection{Local Access}
 \experimental{}

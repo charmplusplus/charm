@@ -1,0 +1,173 @@
+\subsection{Load Balancing Framework}
+\label{lbFramework}
+
+In \charmpp{}, objects(except groups) can even migrate from processor to 
+processor at run-time. Object migration can potentially improve the parallel 
+program to be more efficient by migrating objects from overloaded processors 
+at run-time. However, we can see it is not trivial to decide 
+which objects to move and where to move them in order to achieve load
+balance in a fashion without the knowledge about the application. 
+
+ \charmpp{} implements a generic, measurement-based load balancing framework 
+which automatically instruments all \charmpp{} objects, collects computation 
+load and communication pattern during execution and stores them into a 
+\kw{load balancing database}. \charmpp{} then provides a collection of 
+\kw{load balancing strategies} whose job is to decide on a new mapping of 
+objects to processors based on information from the database.
+This is made possible because we can reasonably assume that objects 
+in \charmpp{} application tend to exhibit temporal correlation in 
+their computation and communication patterns, i.e. future can be to some 
+extent predicted using the historical measurement data, allowing effective 
+measurement-based load balancing without application-specific knowledge. 
+
+Here are the two terms often used in \charmpp{} load balancing framework:
+\begin{itemize}
+\item \kw{Load balancer or strategy} takes the measurement
+   data and produces the new mapping of the objects. In \charmpp{}, it is
+   implemented as Chare Group inherited from BaseLB.
+\item \kw{Load balancing database} provides the interface of almost all
+   load balancing calls. On each processor, it stores the load 
+   balancing instrument data and coordinates the load balancing manager and 
+   balancer. it is implemented as a Chare Group.
+\end{itemize}
+
+\subsubsection{Available Load Balancing Strategies}
+
+Below are the available load balancers and their brief description:
+\begin{itemize}
+\item \kw{RandCentLB}:   Randomly assign objects to processors;
+\item \kw{RandRefLB}:    Randomly assign objects to processors, then refine;
+\item \kw{RefineLB}:     Move a few objects away from the most overloaded processors;
+\item \kw{RecBisectBfLB}:        Recursive partitioning with Breadth first enumeration;
+\item \kw{MetisLB}:      Use Metis(tm) to partition object communication graph;
+\item \kw{CommLB}:       Greedy with communication;
+\item \kw{Comm1LB}:      another variation of CommLB;
+\item \kw{HeapCentLB}:   Heap Centralized;
+\item \kw{GreedyRefLB}:  Apply greedy, then refine;
+\item \kw{NeighborLB}:   The neighborhood load balancer
+\end{itemize}
+
+\subsubsection{Load Balancing Chare Arrays}
+\label{lbarray}
+
+Using load balancer with Chare arrays is considered easy because
+load balancer is well coupled with Chare array implementation - 
+chare array when created automatically registers itself to load balancing
+framework, instrument of compute wall/cpu time and communication is 
+done automatically and APIs are provided for triggering the load balancing; 
+thus load balancing with array is prefered in Charm++, although it is doable 
+for load balancing individule Chares for experienced users.(this is currently
+beyond the scope of this manual)
+
+To use the load balancer, you must make your elements migratable
+(see migration section above) and choose a load balancing 
+``strategy'' (see the load balancing section for a description
+of load balancing strategy routines).
+
+There are three ways to use the load balancer-- 
+\begin{itemize}
+
+\item Method 1: By default, the array elements may be asked to migrate at any time
+provided they are not in the middle of executing an entry method. 
+The array element's variable \kw{usesAtSync} being false attributes
+to this default behaviour. 
+
+\item  Method 2: Using the AtSync method, elements can be migrated at certain
+times.  For the AtSync method, set \kw{usesAtSync} to true in your 
+array element constructor.  When an element is ready to migrate,
+call \kw{ArrayElement::AtSync}.  
+After the first \kw{doneInserting} call (which starts the load balancer)
+and once all elements have reached \kw{AtSync},
+the load balancer runs and migrates elements.  Once
+all migrations are complete, the load balancer calls the 
+virtual function \kw{ArrayElement::ResumeFromSync} for each of the
+array element.  One must ensure that no messages are
+sent to an array element between its calls to \kw{AtSync} and
+\kw{ResumeFromSync}. \kw{AtSync}/\kw{ResumeFromSync} is currently
+implemented as a global barrier.
+
+Note: Setting usesAtSync to true makes it mandatory for the array
+element to call \kw{AtSync} and implement the \kw{ResumeFromSync}
+ function.
+
+\item Method 3: The load balancer can be programmed to be started
+manually. 
+ To use this feature, the LBDatabase object
+can be got explicitly by making the call \kw{LBDatabase::Object()}
+For example, 
+
+\begin{alltt}
+LBDatabase * myLbdb = LBDatabase::Object()
+\end{alltt}
+
+{\kw myLbdb-$>$TurnManualLBOn()} will enable the manual switching on of
+the Load Balancer, so that no Load Balancer will be started automatically.
+\kw{TurnManualLBOn()} should be called as early as possible in the
+program. It must be ideally called in the constructor of a static array and
+definitely before the doneInserting call for a dynamic array.  This call 
+has to be made on all processors. It can be called multiple times on one 
+pe, but the last one takes effect.   
+The function call {\kw myLbdb-$>$StartLB()} will start the load balancer. 
+This call can be made on only one pe as the start message is broadcast 
+to all processors. The load balancing happens in the background and 
+won't stop the chares from functioning. 
+\kw{myLbdb-$>$TurnManualLBOff()} turns off manual load balancing and switches back to the automatic Load balancing mode (using or not using AtSync). 
+
+\end{itemize}
+
+
+\subsubsection{Compiler and run-time options to use load balancing module}
+
+Load balancing strategies are implemented as libraries in \charmpp{}. This
+allow programmers to easily experiment with different existing strategies 
+in the library by simply linking a pool of strateges modules and choose 
+one to use at run-time via command line options.
+
+Linking a load balancing module is different with activating it:
+\begin{itemize}
+\item link a LB module: is to link a Load Balancer module(library) at 
+   compile time; You can link against multiple LB libraries as candidates.
+\item activate a LB: is to actually ask to create a LB strategy and 
+   start it. You can only activate one LB either at compile time or at
+   run-time and the LB module must be one of the LB module linked at 
+   compile time.
+\end{itemize}
+
+
+Below are the descriptions about the compiler and run-time options:
+
+\begin{enumerate}
+\item {\bf compile time options:}
+
+\begin{itemize}
+\item {\em -module NeighborLB -module CommLB ...}
+\item {\em -module EveryLB -lmetis}
+\item {\em -balancer CommLB}
+\end{itemize}
+
+note:
+you can have multiple -module *LBs options. LB modules are
+linked into a program, but they are not activated.
+Using -balancer to activate one LB as default at compile time. Having -balancer A implies -module A, so you don't have to write -module A, although it does't hurt.
+Using EveryLB if you want to link against all existing LBs. One of the load balancer in EveryLB called MetisLB requires METIS library which is located at: charm/net-linux/tmp/libs/conv-libs/metis. You need to compile it first.
+
+\item {\bf run time option:}
+
+\begin{itemize}
+\item {\em +balancer CommLB}
+\end{itemize}
+
+note:
++balancer activates the LB. +balancer option works only if you already link LB using -module *LB at compile time. +balancer with a wrong LB name will show you all the available LBs linked at compile time.
+When you have used -balancer A at compile time, you don't have to use +balancer A to activate it one more time at runtime. However, you can use +balancer B to override -balancer A compile time option and activate another LB - B.
+
+\item {\bf When there is no LB activated}
+
+When you don't activate any of load balancer at compile or runtime, you still 
+can run the program. This is done by creating a NullLB which does nothing 
+but resume from sync. The NullLB will take over when there is
+no LB activated, and will be silent when another LB is doing its job. 
+
+\end{enumerate}
+
+
