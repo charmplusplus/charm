@@ -548,7 +548,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
  *
  ***********************************************************************/
 
-void CmiMachineInit()
+void CmiMachineInit(char **argv)
 {
 #if FRAGMENTATION
   Cmi_dgram_max_data = PACKET_MAX - DGRAM_HEADER_SIZE; 

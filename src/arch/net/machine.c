@@ -2089,7 +2089,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   	Cmi_charmrun_fd=-1;
   }
 
-  CmiMachineInit();
+  CmiMachineInit(argv);
 
   node_addresses_obtain(argv);
 

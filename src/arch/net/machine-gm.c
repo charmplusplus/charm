@@ -510,7 +510,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
  *
  ***********************************************************************/
 
-void CmiMachineInit()
+void CmiMachineInit(char **argv)
 {
   int dataport_max=16; /*number of largest GM port to check*/
   gm_status_t status;
@@ -568,6 +568,7 @@ void CmiMachineInit()
   Cmi_dgram_max_data = 4096 - DGRAM_HEADER_SIZE;
 */
   maxsize = 16;
+  CmiGetArgIntDesc(argv,"+gm_maxsize",&maxsize,"maximum packet size in rank (2^maxsize)");
 
   for (i=1; i<maxsize; i++) {
     int len = gm_max_length_for_size(i);
@@ -576,6 +577,7 @@ void CmiMachineInit()
     maxMsgSize = len;
 
     if (i<5) num = 0;
+    else if (i<9)  num = 4;
     else if (i<17)  num = 20;
     else if (i>22) num = 1;
     for (j=0; j<num; j++) {

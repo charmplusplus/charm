@@ -752,7 +752,7 @@ static void CommunicationServerThread(int sleepTime)
 #endif
 }
 
-void CmiMachineInit()
+void CmiMachineInit(char **argv)
 {
 }
 
