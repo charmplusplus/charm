@@ -139,6 +139,7 @@ public:
 
     affinityQ = new ckMsgQueue[cva(numWth)];
 
+    // timing
     timelines = new BgTimeLine[cva(numWth)];
   }
 
@@ -544,6 +545,17 @@ double BgGetTime()
 
 void BgShutdown()
 {
+  // timing
+#if 0
+#if BLUEGENE_TIMING
+  for (int j=0; j<cva(numNodes); j++)
+  for (int i=0; i<cva(numWth); i++) {
+    BgTimeLine &log = cva(nodeinfo)[j].timelines[i];	
+    BgPrintThreadTimeLine(nodeInfo::Local2Global(j), i, log);
+  }
+#endif
+#endif
+
   int msgSize = CmiBlueGeneMsgHeaderSizeBytes;
   void *sendmsg = CmiAlloc(msgSize);
   CmiSetHandler(sendmsg, cva(exitHandler));
@@ -597,10 +609,15 @@ static void ProcessMessage(char *msg)
   }
 #endif
   CmiSetHandler(msg, CmiBgMsgHandle(msg));
+
   // timing
-  BG_ADDENTRY(msg);
+  BG_ENTRYSTART(msg);
 
   BnvAccess(handlerTable)[handler](msg);
+
+  // timing
+  BG_ENTRYEND();
+
 }
 
 void comm_thread(threadInfo *tinfo)
