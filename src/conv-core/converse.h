@@ -393,6 +393,8 @@ void *CmiTmpAlloc(int size);
 void CmiTmpFree(void *);
 #endif
 
+void CmiMkdir(const char *dirName);
+
 double   CmiCpuTimer(void);
 
 #if CMK_TIMER_USE_RDTSC

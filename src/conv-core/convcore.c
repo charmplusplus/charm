@@ -1662,6 +1662,31 @@ void CmiTmpInit(char **argv) {
   CmiTmpSetup(&CpvAccess(CmiTmpBuf));
 }
 
+/******************************************************************************
+
+  Cross-platform directory creation
+
+  ****************************************************************************/
+#ifdef _MSC_VER
+/* Windows directory creation: */
+#include <windows.h>
+
+void CmiMkdir(const char *dirName) {
+	CreateDirectory(dirName,NULL);
+}
+
+#else /* !_MSC_VER */
+/* UNIX directory creation */
+#include <unistd.h> 
+#include <sys/stat.h> /* from "mkdir" man page */
+#include <sys/types.h>
+
+void CmiMkdir(const char *dirName) {
+	mkdir(dirName,0777);
+}
+
+#endif
+
 
 /******************************************************************************
 
