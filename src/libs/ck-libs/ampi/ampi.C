@@ -178,14 +178,20 @@ ampiParent::~ampiParent() {
 TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration) 
 {
   if (thread==NULL) prepareCtv(); //Prevents CkJustMigrated race condition
-  
+
+  if (s.getComm()>=MPI_COMM_WORLD) 
+  { //We now have our COMM_WORLD-- register it
+    //Note that split communicators don't keep a raw pointer, so 
+    //they don't need to re-register on migration.
+     if (worldPtr!=NULL) CkAbort("One ampiParent has two MPI_COMM_WORLDs");
+     worldPtr=ptr;
+     worldStruct=s;
+  }
+
   if (!forMigration) 
   { //Register the new communicator:
      if (s.getComm()>=MPI_COMM_WORLD) 
-     { //We now have our COMM_WORLD-- start the thread
-       if (worldPtr!=NULL) CkAbort("One ampiParent has two MPI_COMM_WORLDs");
-       worldPtr=ptr;
-       worldStruct=s;
+     { //We finally have our COMM_WORLD--start the thread
        thread->ready();
      }
      else if (isSplit(s.getComm())) {
