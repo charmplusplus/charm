@@ -61,6 +61,9 @@ class CWhenTrigger {
       p|nEntries;
       p(entries, MAXREF);
       p(refnums, MAXREF);
+      // since CCounter is not pup'ed
+      // don't expect Overlap works with load balancer 
+      // as well as checkpointing
       if (p.isUnpacking()) args[1]=0;            // HACK for load balancer
     }
 };
@@ -83,7 +86,7 @@ class TListCWhenTrigger
     void pup(PUP::er& p) {
       int nEntries=0;
       int cur=0;
-      if (p.isPacking()) { 
+      if (!p.isUnpacking()) { 
         for (CWhenTrigger *tmp = first; tmp; tmp=tmp->next, nEntries++)
           if (current == tmp) cur = nEntries;
       }
@@ -176,7 +179,7 @@ class TListCMsgBuffer
     void pup(PUP::er& p) {
       int nEntries=0;
       int cur=0;
-      if (p.isPacking()) { 
+      if (!p.isUnpacking()) { 
         for (CMsgBuffer *tmp = first; tmp; tmp=tmp->next, nEntries++) {
           if (current == tmp) cur = nEntries;
         }
@@ -279,7 +282,7 @@ class CDep {
         allocating of CDep and call addDepends(), so we don't pup whenDepends
         and entryDepends here.
      */ 
-        int i; // , j;
+     int i;
 
      for (i=0; i<numWhens; i++)    whens[i]->pup(p);
      for (i=0; i<numEntries; i++)  buffers[i]->pup(p);
