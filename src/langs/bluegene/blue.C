@@ -45,11 +45,13 @@ typedef CkQ<bgMsg *> 	    ckMsgQueue;
 class nodeInfo;
 class threadInfo;
 
-/* process level variables */
+/* node level variables */
 nodeInfo *nodeinfo;		/* represent a bluegene node */
 
+/* thread level variables */
 CtvDeclare(threadInfo *, threadinfo);	/* represent a bluegene thread */
 
+/* emulator node level variables */
 CpvDeclare(int,msgHandler);
 CmiHandler msgHandlerFunc(char *msg);
 
@@ -61,7 +63,7 @@ static BgHandler *handlerTable;
 static int arg_argc;
 static char **arg_argv;
 
-static msgQueue *inBuffer;	/* simulate the bluegene inbuffer */
+static msgQueue *inBuffer;	/* emulate the bluegene fix-size inbuffer */
 static CmmTable *msgBuffer;	/* if inBuffer is full, put to this buffer */
 
 static int numX, numY, numZ;	/* size of bluegene nodes in cube */
@@ -104,7 +106,7 @@ static int inEmulatorInit=0;
 
 
 /*****************************************************************************
-   used internally, define Queue for scheduler and msgqueue
+   used internally, define Queue for scheduler and fixed size msgqueue
 *****************************************************************************/
 
 /* scheduler queue */
@@ -137,7 +139,7 @@ public:
 
 /*****************************************************************************
       NodeInfo:
-        including a group of functions defining the mapping, terms using here:
+        including a group of functions defining the mapping, terms used here:
         XYZ: (x,y,z)
         Global:  map (x,y,z) to a global serial number
         Local:   local index of this nodeinfo in the node array
@@ -147,13 +149,13 @@ class nodeInfo {
 public:
   int id;
   int x,y,z;
-  threadQueue *commThQ;
-  CthThread *threadTable;
-  ckMsgQueue nodeQ;
-  ckMsgQueue *affinityQ;
+  threadQueue *commThQ;		/* suspended comm threads queue */
+  CthThread *threadTable;	/* thread table for both work and comm threads*/
+  ckMsgQueue nodeQ;		/* non-affinity msg queue */
+  ckMsgQueue *affinityQ;	/* affinity msg queue for each work thread */
   char *udata;
   double startTime;		/* start time for a thread */
-  char started;
+  char started;			/* flag indicate if this node is started up */
 
 public:
   nodeInfo(): udata(NULL), started(0) {
@@ -205,13 +207,13 @@ public:
     Global2XYZ(Local2Global(num), x, y, z);
   }
 
-    /* map virtual node number to PE ++++ */
+    /* map global serial node number to PE ++++ */
   inline static int Global2PE(int num) { return num % CmiNumPes(); }
 
-    /* map virtual node ID to local node array index  ++++ */
+    /* map global serial node ID to local node array index  ++++ */
   inline static int Global2Local(int num) { return num/CmiNumPes(); }
 
-    /* map local node index to virtual node id ++++ */
+    /* map local node index to global serial node id ++++ */
   inline static int Local2Global(int num) { return CmiMyPe()+num*CmiNumPes();}
 
 };	// end of nodeInfo
@@ -229,9 +231,9 @@ public:
   int id;
   int globalId;
   ThreadType  type;
-  CthThread me;
-  nodeInfo *myNode;
-  double  currTime;
+  CthThread me;			/* thread handler */
+  nodeInfo *myNode;		/* the node belonged to */
+  double  currTime;		/* thread timer */
 
 public:
   threadInfo(int _id, ThreadType _type, nodeInfo *_node): id(_id), type(_type), myNode(_node) {
@@ -301,6 +303,7 @@ void addBgNodeInbuffer(bgMsg *msgPtr, int nodeID)
   else {
     inBuffer[nodeID].enq(msgPtr);
   }
+  /* awake a communication thread to schedule it */
   CthThread t=nodeinfo[nodeID].commThQ->deq();
   if (t) CthAwaken(t);
 }
@@ -317,14 +320,17 @@ void addBgThreadMessage(bgMsg *msgPtr, int threadID)
 /* add a message to a node's non-affinity queue */
 void addBgNodeMessage(bgMsg *msgPtr)
 {
-  ckMsgQueue &que = tNODEQ;
-  que.enq(msgPtr);
+  /* find a idle worker thread */
+  /* FIXME:  flat search s bad if there is many work threads */
   for (int i=0; i<numWth; i++)
     if (tMYNODE->affinityQ[i].length() == 0)
     {
+      /* this work thread is idle, schedule the msg here */
+      tMYNODE->affinityQ[i].enq(msgPtr);
       CthAwaken(tTHREADTABLE[i]);
-      break;
+      return;
     }
+  tNODEQ.enq(msgPtr);
 }
 
 int checkReady()
@@ -434,7 +440,7 @@ void BgGetSize(int *sx, int *sy, int *sz)
   *sx = numX; *sy = numY; *sz = numZ;
 }
 
-/* can only called in globalinit */
+/* can only called in emulatorinit */
 void BgSetSize(int sx, int sy, int sz)
 {
   ASSERT(inEmulatorInit);
@@ -500,12 +506,12 @@ double BgGetTime()
 #endif
 }
 
-/* TODO: need broadcast */
 void BgShutdown()
 {
   int msgSize = CmiMsgHeaderSizeBytes;
   void *sendmsg = CmiAlloc(msgSize);
   CmiSetHandler(sendmsg, CpvAccess(exitHandler));
+  /* broadcast to shutdown */
   CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
   
 /*
@@ -551,11 +557,12 @@ void comm_thread(threadInfo *tinfo)
       /* call user registered handler function */
       int handler = msg->handlerID;
       handlerTable[handler](msg->first);
+      /* free the message */
       CmiFree((char *)msg-CmiMsgHeaderSizeBytes); 
     }
     else {
       if (msg->threadID == ANYTHREAD) {
-        addBgNodeMessage(msg);
+        addBgNodeMessage(msg);			/* non-affinity message */
       }
       else {
         addBgThreadMessage(msg, msg->threadID);
@@ -576,24 +583,23 @@ void work_thread(threadInfo *tinfo)
 
   tSTARTTIME = CmiWallTimer();
   for (;;) {
-    bgMsg *m1=NULL, *m2=NULL;
     bgMsg *msg=NULL;
     ckMsgQueue &q1 = tNODEQ;
     ckMsgQueue &q2 = tAFFINITYQ;
-    if (!q1.isEmpty())  m1 = q1[0];
-    if (!q2.isEmpty()) m2 = q2[0];
+    int e1 = q1.isEmpty();
+    int e2 = q2.isEmpty();
 
-    if (!m1 && m2) { msg = m2; q2.deq(); }
-    else if (!m2 && m1) { msg = m1; q1.deq(); }
-    else if (m1 && m2) {
-      if (m1->recvTime < m2->recvTime) {
-        msg = m1; q1.deq();
+    if (e1 && !e2) { msg = q2.deq(); }
+    else if (e2 && !e1) { msg = q1.deq(); }
+    else if (!e1 && !e2) {
+      if (q1[0]->recvTime < q2[0]->recvTime) {
+        msg = q1.deq();
       }
       else {
-        msg = m2; q2.deq();
+        msg = q2.deq();
       }
     }
-    /* if no msg is ready, put it to sleep in workQueue */
+    /* if no msg is ready, put it to sleep */
     if ( msg == NULL ) {
       tCURRTIME += (CmiWallTimer()-tSTARTTIME);
       CthSuspend();
@@ -606,8 +612,11 @@ void work_thread(threadInfo *tinfo)
     /* call user registered handler function */
     handlerTable[handler](msg->first);
       /* free the msg and clear the buffer */
-      /* ??? delete ??? */
     CmiFree((char *)msg-CmiMsgHeaderSizeBytes); 
+    /* let other work thread do their jobs */
+    tCURRTIME += (CmiWallTimer()-tSTARTTIME);
+    CthYield();
+    tSTARTTIME = CmiWallTimer();
   }
 }
 
@@ -621,7 +630,7 @@ void BgNodeInitialize(nodeInfo *ninfo)
   tCURRTIME = 0.0;
   tSTARTTIME = CmiWallTimer();
 
-  /* creat computation threads */
+  /* creat work threads */
   for (i=0; i< numWth; i++)
   {
     threadInfo *tinfo = new threadInfo(i, WORK_THREAD, ninfo);
@@ -646,9 +655,6 @@ void BgNodeInitialize(nodeInfo *ninfo)
 
 CmiHandler exitHandlerFunc(char *msg)
 {
-  if (CmiMyPe() == 0)
-    CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
-
   // TODO: free memory before exit
   int i;
   delete [] nodeinfo;
@@ -657,6 +663,11 @@ CmiHandler exitHandlerFunc(char *msg)
   delete [] msgBuffer;
 
   CsdExitScheduler();
+
+  if (CmiMyPe() == 0)
+    CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
+
+  return 0;
 }
 
 CmiStartFn mymain(int argc, char **argv)
