@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-07-11 16:52:37  gursoy
+ * Revision 2.8  1995-07-11 18:10:26  jyelon
+ * Added CsdEnqueueFifo, etc.
+ *
+ * Revision 2.7  1995/07/11  16:52:37  gursoy
  * CsdExitScheduler is a function for uniprocessor now
  *
  * Revision 2.6  1995/07/07  14:04:35  gursoy
@@ -188,7 +191,13 @@ CpvExtern(int, CsdStopFlag);
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)=1)
 #endif 
 
-#define CsdEnqueue(x)  (CqsEnqueue(CpvAccess(CsdSchedQueue),x))
+#define CsdEnqueue(x)         (CqsEnqueue(CpvAccess(CsdSchedQueue),x))
+#define CsdEnqueueFifo(x)     (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),x))
+#define CsdEnqueueLifo(x)     (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),x))
+#define CsdEnqueueBFifo(x,l,p)(CqsEnqueueBFifo(CpvAccess(CsdSchedQueue),x,l,p))
+#define CsdEnqueueBLifo(x,l,p)(CqsEnqueueBLifo(CpvAccess(CsdSchedQueue),x,l,p))
+#define CsdEnqueueIFifo(x,p)  (CqsEnqueueIFifo(CpvAccess(CsdSchedQueue),x,p))
+#define CsdEnqueueILifo(x,p)  (CqsEnqueueILifo(CpvAccess(CsdSchedQueue),x,p))
 
 #define CsdEmpty()     (CqsEmpty(CpvAccess(CsdSchedQueue)))
 
