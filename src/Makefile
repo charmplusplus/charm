@@ -110,7 +110,7 @@ dirs+sources:
 #
 ###############################################################################
 
-CVHEADERS=converse.h conv-mach.h 
+CVHEADERS=converse.h conv-mach.h conv-mach.csh
 
 CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a
 
@@ -130,10 +130,10 @@ conv-host: conv-host.c
 libconv-core.a: $(LIBCONV_CORE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_CORE)
 
-libconv-cplus-y.a: machine.c
+libconv-cplus-y.a: machine.c $(CVHEADERS)	
 	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=1 machine.c
 
-libconv-cplus-n.a: machine.c
+libconv-cplus-n.a: machine.c $(CVHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=0 machine.c
 
 cpm.o: cpm.c $(CVHEADERS)
