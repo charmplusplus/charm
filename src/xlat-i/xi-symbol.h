@@ -126,15 +126,15 @@ class NamedType : public SimpleType {
     TParamList *tparams;
   public:
     NamedType(const char* n, TParamList* t=0) : name(n), tparams(t) {}
-    void print(XStr& str) { str << name; }
+    void print(XStr& str);
     int isVoid(void) { return 0; }
     const char *getBaseName(void) { return name; }
     int isTemplated(void) { return (tparams!=0); }
     void genProxyName(XStr& str) { genChareProxyName(str); }
-    void genChareProxyName(XStr& str) { str << chare_prefix() << name; }
-    void genGroupProxyName(XStr& str) { str << group_prefix() << name; }
-    void genArrayProxyName(XStr& str) { str << array_prefix() << name; }
-    void genMsgProxyName(XStr& str) { str << msg_prefix() << name; }
+    void genChareProxyName(XStr& str) { str << chare_prefix(); print(str);}
+    void genGroupProxyName(XStr& str) { str << group_prefix() ; print(str);}
+    void genArrayProxyName(XStr& str) { str << array_prefix() ; print(str);}
+    void genMsgProxyName(XStr& str) { str << msg_prefix() ; print(str);}
 };
 
 class PtrType : public EnType {

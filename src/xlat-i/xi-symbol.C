@@ -59,6 +59,18 @@ TParamList::print(XStr& str)
   }
 }
 
+
+void 
+NamedType::print(XStr& str)
+{
+  str << name;
+  if(tparams) {
+    str << "<";
+    tparams->print(str);
+    str << ">";
+  }
+}
+
 void 
 PtrType::print(XStr& str)
 {
@@ -461,6 +473,8 @@ Chare::genArrayDecls(XStr& str)
 void
 Chare::genDecls(XStr& str)
 {
+  if(type->isTemplated())
+    return;
   str << "/* DECLS: "; print(str); str << " */\n";
   if(templat)
     templat->genSpec(str);
@@ -578,6 +592,8 @@ static const char *CIAllocDeclAnsi =
 void
 Message::genDecls(XStr& str)
 {
+  if(type->isTemplated())
+    return;
   str << "/* DECLS: "; print(str); str << " */\n";
   if(templat)
     templat->genSpec(str);
