@@ -728,7 +728,7 @@ static void CWebHandler(char *msg){
       for(i = 0; i < CmiNumPes(); i++)
         valueArray[i] = 0;
 
-      for(i = 1; i < CmiNumPes(); i++){
+      for(i = 0; i < CmiNumPes(); i++){
         msgSize = CmiMsgHeaderSizeBytes + 2*sizeof(int);
         getStuffMsg = (char *)CmiAlloc(msgSize);
         ((int *)(getStuffMsg + CmiMsgHeaderSizeBytes))[0] = appletIP;
@@ -804,6 +804,11 @@ int getUsage()
       usage = (100 * CpvAccess(usedTime))/totalTime;
    CpvAccess(usedTime)  = 0.;
    CpvAccess(beginTime) = time;
+
+   /* jeff */
+   CmiPrintf("PE = %d, usage = %d\n", CmiMyPe(), usage);
+   /* jeff */
+
    return usage;
 }
 
