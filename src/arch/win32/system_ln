@@ -1,0 +1,9 @@
+#!/bin/sh
+src=$1
+dest=$2
+while [ ! -r $src ] 
+do
+#Strip one ../ from the source path
+	src=`echo $src | awk -F/ '{printf "%s",$2;for (i=3;i<=NF;i++) printf "/%s",$i}'`
+done
+cp -f $src $dest
