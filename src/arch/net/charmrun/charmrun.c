@@ -1136,18 +1136,6 @@ CCS Interface:
 sockets.
 ***************************************************************************/
 
-#include <sys/time.h>
-
-double WallTimer(void)
-{
-  struct timeval tv;
-  double currenttime;
-
-  gettimeofday(&tv,0);
-  currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
-  return currenttime;
-}
-
 #if CMK_CCS_AVAILABLE
 
 /*The Ccs Server socket became active-- 
