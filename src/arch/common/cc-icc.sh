@@ -4,6 +4,7 @@ CMK_CXX='icpc '
 CMK_CXXPP='icpc -E '
 CMK_LD='icc -static'
 CMK_LDXX='icpc '
+CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_CF90='ifc '
 CMK_CF90_FIXED="$CMK_CF90 -FI "
 CMK_SEQ_F90="$CMK_CF90"
