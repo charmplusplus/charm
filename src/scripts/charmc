@@ -846,6 +846,11 @@ then
     BALANCE=replay
 fi
 
+if test x$LANGUAGE = x"bgcharm++"
+then 
+    BALANCE=bluegene
+fi
+
 BAL_EXT=`getExtention $BALANCE`
 if [ -z "$BAL_EXT" ]
 then
@@ -934,6 +939,9 @@ case "$LANGUAGE" in
 "ckbluegene")
         POST_LIBRARIES="$POST_LIBRARIES -lbluegene"
 	;;
+"bgcharm++")
+        PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene"
+	;;
 esac
 
 if [ $IS_F90 = "y" ]
@@ -992,7 +1000,7 @@ LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRAR
 CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ $MEM_OBJ "
 
 case "$LANGUAGE" in
-"charm"|"charm++"|"f90charm"|"tcharm"|"tcharmf"|"ckbluegene")
+"charm"|"charm++"|"f90charm"|"tcharm"|"tcharmf"|"ckbluegene"|"bgcharm++")
 	Do $CMK_LDXX $OPTSL $OPTS_LDXX -o $OBJECT \
 		$LANG_LIBS -lck -lconv-cplus-y $CORE_LIBS -lm $CMK_LIBS $POST_LIBRARIES
 	;;
