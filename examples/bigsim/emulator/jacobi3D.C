@@ -869,7 +869,7 @@ void outputData(char *info) {
   CmiPrintf("Final output at Node (%d,%d,%d) with iteration count = %d:\n",
 	   x, y, z,
 	   localdata->iteration_count);
-  printArray(localdata->maindata,x_size,y_size,z_size);
+//  printArray(localdata->maindata,x_size,y_size,z_size);
 
   if ((x == 0) && (y == 0) && (z == 0)) {
     BgShutdown();
