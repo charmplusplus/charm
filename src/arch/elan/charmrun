@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Conv-host for Lemieux:
+# Conv-host for HP/Compaq prun-style Supercomputers:
 #  Translates +pN-style charmrun options into prun options
 
 args=""
@@ -39,7 +39,7 @@ extra="-N $nodes -n $pes "
 # Prepend path to executable
 args=`pwd`/"$args"
 
-if [ ! "$PBS_JOBID" = "" ]
+if [ ! "$RMS_NODES" = "" ]
 then
 # Running from a batch script: just use prun
 	echo "Charmrun running> prun $extra $args"
