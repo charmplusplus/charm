@@ -52,9 +52,11 @@ public:
 	}
 	int operator>(const AmpiComplex &a) {
 		CkAbort("Cannot compare complex numbers with MPI_MAX");
+		return 0;
 	}
 	int operator<(const AmpiComplex &a) {
 		CkAbort("Cannot compare complex numbers with MPI_MIN");
+		return 0;
 	}
 };
 typedef struct { float val; int idx; } FloatInt;
