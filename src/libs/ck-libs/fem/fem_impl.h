@@ -574,6 +574,7 @@ public:
 		const int *elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
 		elemGhostInfo(void) {add=false;tuplesPerElem=0; elem2tuple=NULL;}
 		~elemGhostInfo(void) {delete[] elem2tuple;}
+		void pup(PUP::er &p) {CkAbort("FEM> Shouldn't call elemGhostInfo::pup!\n");}
 	};
 	NumberedVec<elemGhostInfo> elem;
 };
