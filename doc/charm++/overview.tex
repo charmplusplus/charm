@@ -111,7 +111,8 @@ a unique system-wide name.
 Every \charmpp\ program must have at least one \kw{mainchare}.  Each
 \kw{mainchare} is created by the system on processor 0 when the \charmpp\
 program starts up.  Execution of a \charmpp\ program begins with the Charm
-Kernel constructing all the designated \kw{mainchare}s.  Typically, the
+Kernel constructing all the designated \kw{mainchare}s.  For a \kw{mainchare} named X, execution starts at constructor X() or X(CkArgMsg *) which are equivalent.
+Typically, the
 \kw{mainchare} constructor starts the computation by creating arrays, other
 chares, and groups.  It can also be used to initialize shared \kw{readonly}
 objects.
