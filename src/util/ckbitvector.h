@@ -1,7 +1,7 @@
 #ifndef __UIUC_CHARM_BITVECTOR_H
 #define __UIUC_CHARM_BITVECTOR_H
 
-#include <charm++.h>
+//#include <charm++.h>
 #include <ckstream.h>
 
 /* *********************************************************************
