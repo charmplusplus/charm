@@ -1613,6 +1613,15 @@ _ACEOF
 
 
 #### check if dlopen works ####
+skip_dl=0
+#for pgcc 4.0, -ldl crash linking, so skip it here.
+case "$CMK_CXX" in
+pgCC*) skip_dl=1 ;;
+esac
+
+if test $skip_dl -eq 0
+then
+
 cat > $t <<EOT
 #include "ckdll_dlopen.C"
 int main() {
@@ -1651,6 +1660,7 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+fi    # end of skip_dl
 
 #### check if socklen_t exists ####
 cat > $t <<EOT

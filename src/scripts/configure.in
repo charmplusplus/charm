@@ -339,6 +339,15 @@ test_cxx "whether to use signal-safe system() " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_SIGSAFE_SYSTEM, $pass, [whether to use signal-safe system()])
 
 #### check if dlopen works ####
+skip_dl=0
+#for pgcc 4.0, -ldl crash linking, so skip it here.
+case "$CMK_CXX" in
+pgCC*) skip_dl=1 ;;
+esac
+
+if test $skip_dl -eq 0 
+then
+
 cat > $t <<EOT
 #include "ckdll_dlopen.C"
 int main() {
@@ -369,6 +378,7 @@ EOT
 test_cxx "whether getProcAddress works" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_DLL_USE_WIN32, $pass, [whether getProcAddress works])
 
+fi    # end of skip_dl
 
 #### check if socklen_t exists ####
 cat > $t <<EOT
