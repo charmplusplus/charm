@@ -253,7 +253,7 @@ void FEMcoordinator::updateMesh(marshallMeshChunk &chk)
       }
       //Save what to do with the mesh
       int callMeshUpdated=cmsgs[0]->callMeshUpdated;
-      int doRepartition=cmsgs[0]->doRepartition;
+      int doWhat=cmsgs[0]->doWhat;
       //Assemble the current chunks into a serial mesh
       delete _meshptr;
       _meshptr=fem_assemble(_nchunks,cmsgs);
@@ -270,9 +270,11 @@ void FEMcoordinator::updateMesh(marshallMeshChunk &chk)
 	mesh_updated(callMeshUpdated);
 	TCharm::setState(inDriver);
       }
-      if (doRepartition) {
+      if (doWhat==1) { /*repartition the mesh*/
 	MeshChunkOutputUpdate u(femChunks);
 	mesh_split(_nchunks,&u);
+      } else if (doWhat=2) { /*just broadcast meshUpdatedComplete*/
+        femChunks.meshUpdatedComplete();
       }
 
       //Check for relevant messages in the future buffer
@@ -1278,13 +1280,13 @@ FEMchunk::reductionResult(FEM_DataMsg *msg)
 
 //Called by user to ask us to contribute our updated mesh chunk
 void 
-FEMchunk::updateMesh(int callMeshUpdated,int doRepartition) {
+FEMchunk::updateMesh(int callMeshUpdated,int doWhat) {
   if (updated_mesh==NULL)
     CkAbort("FEM_Update_Mesh> You must first set the mesh before updating it!\n");
   updated_mesh->updateCount=updateCount++;
   updated_mesh->fromChunk=thisIndex;
   updated_mesh->callMeshUpdated=callMeshUpdated;
-  updated_mesh->doRepartition=doRepartition;
+  updated_mesh->doWhat=doWhat;
 
   int t,i;
   int newElemTot=updated_mesh->m.nElems();
@@ -1325,7 +1327,7 @@ FEMchunk::updateMesh(int callMeshUpdated,int doRepartition) {
   coord.updateMesh(updated_mesh);
   delete updated_mesh;
   updated_mesh=NULL;
-  if (doRepartition)
+  if (doWhat!=0)
     thread->suspend();//Sleep until repartitioned mesh arrives
 }
 
@@ -1419,10 +1421,10 @@ static FEMchunk *getCurChunk(void)
   return cptr;
 }
 
-CDECL void FEM_Update_Mesh(int callMeshUpdated,int doRepartition) 
+CDECL void FEM_Update_Mesh(int callMeshUpdated,int doWhat) 
 { 
   FEMAPI("FEM_Update_Mesh");
-  getCurChunk()->updateMesh(callMeshUpdated,doRepartition); 
+  getCurChunk()->updateMesh(callMeshUpdated,doWhat); 
 }
 
 CDECL int FEM_Register(void *_ud,FEM_PupFn _pup_ud)
@@ -2278,7 +2280,7 @@ void MeshChunk::pup(PUP::er &p) {
 	}
 	p.comment(" Misc. data: ");	
 	p(updateCount); p(fromChunk);
-	p(callMeshUpdated); p(doRepartition);
+	p(callMeshUpdated); p(doWhat);
 }
 
 void

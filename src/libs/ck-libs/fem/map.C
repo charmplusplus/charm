@@ -355,7 +355,7 @@ splitter::splitter(FEM_Mesh *mesh_,const int *elem2chunk_,int nchunks_)
 	int c;//chunk number (to receive message)
 	for (c=0;c<nchunks;c++) {
 		msgs[c]=new MeshChunk; //Ctor starts all node and element counts at zero
-		msgs[c]->m.elem.makeLonger(mesh->elem.size()-1);
+		msgs[c]->m.makeRoom(*mesh);
 		dyn[c].elem.makeLonger(mesh->elem.size()-1);
 	}
 	
@@ -566,6 +566,7 @@ void fem_split(FEM_Mesh *mesh,int nchunks,const int *elem2chunk,
 	checkMesh(mesh);
 	checkGhost(ghosts,mesh);
 	
+	mesh->setSymList(ghosts.getSymList());
 	splitter s(mesh,elem2chunk,nchunks);
 
 	s.buildCommLists();
@@ -762,7 +763,6 @@ void splitter::addGhosts(const FEM_Ghost &ghosts)
 	  for (n=0;n<nNode;n++)
 	    if (sym[n]!=(FEM_Symmetries_t)0)
 	      ghostNode[n]=1;
-	for (c=0;c<nchunks;c++) msgs[c]->m.setSymList(ghosts.getSymList());
 	
 //Add each layer
 	consistencyCheck();
@@ -1011,6 +1011,7 @@ FEM_Mesh *fem_assemble(int nchunks,MeshChunk **msgs)
 	if (minOld_n>maxOld_n) minOld_n=maxOld_n;
 	m->node.allocate((maxOld_n-minOld_n)+new_n,msgs[0]->m.node.getDataPer());
 	m->node.setUdata().set(0.0);
+	m->makeRoom(msgs[0]->m);
 	
 	int nElemTypes=msgs[0]->m.elem.size();
 	int *minOld_e=new int[nElemTypes];

@@ -16,6 +16,7 @@ module fem {
     entry void recv(FEM_DataMsg *);
     entry void reductionResult(FEM_DataMsg *);
     entry void meshUpdated(marshallMeshChunk);
+    entry void meshUpdatedComplete(void);
     entry void recvList(int elType,int fmChk,int nidx,int idx[nidx]);
   };
 };

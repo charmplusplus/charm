@@ -575,6 +575,12 @@ public:
 	FEM_Item node; //Describes the nodes in the mesh
 	NumberedVec<FEM_Elem> elem; //Describes the different types of elements in the mesh
 	
+	//Set up our fields based on this mesh:
+	void makeRoom(const FEM_Mesh &src) {
+		elem.makeLonger(src.elem.size()-1);
+		setSymList(src.getSymList());
+	}
+	
 	//Return this type of element, given an element type
 	FEM_Item &setCount(int elTypeOrMinusOne) {
 		if (elTypeOrMinusOne==-1) return node;
@@ -609,7 +615,8 @@ class MeshChunk : public CkNoncopyable {
 	int *isPrimary; // Indicates us as owner of node  [m.node.n]
 	//These fields are (only) used during an updateMesh
 	int updateCount,fromChunk;
-	int callMeshUpdated,doRepartition;
+	int callMeshUpdated; //if 0, skip meshUpdated call; else pass to mesh_updated
+	int doWhat; //If 0, do nothing; if 1, repartition; if 2, resume
 
 	MeshChunk(void);
 	~MeshChunk();
@@ -733,6 +740,7 @@ private:
   void reductionResult(FEM_DataMsg *);
   void updateMesh(int callMeshUpdated,int doRepartition);
   void meshUpdated(marshallMeshChunk &);
+  void meshUpdatedComplete(void) {thread->resume();}
 
   int new_DT(const DType &d) {
     if(ntypes>=MAXDT) {
