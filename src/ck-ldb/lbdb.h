@@ -303,7 +303,9 @@ int LDMemusage(LDHandle _db);
 #endif /* _cplusplus */
 
 #ifdef __cplusplus
+#if CMK_LBDB_ON
 PUPbytes(LDHandle)
+#endif
 /* put outside of __cplusplus */
 inline void LDOMid::pup(PUP::er &p) {
   id.pup(p);
