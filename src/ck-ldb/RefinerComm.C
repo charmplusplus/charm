@@ -17,11 +17,12 @@
 #include "RefinerComm.h"
 
 
-void RefinerComm::create(int count, CentralLB::LDStats* stats, int* procs)
+void RefinerComm::create(int count, CentralLB::LDStats* _stats, int* procs)
 {
-  Refiner::create(count, stats, procs);
+  stats = _stats;
+  Refiner::create(count, _stats, procs);
 
-  // fill communication
+  // fill communication hash table
   stats->makeCommHash();
   LDCommData *cdata = stats->commData;
   for (int i=0; i<stats->n_comm; i++) 
@@ -34,20 +35,24 @@ void RefinerComm::create(int count, CentralLB::LDStats* stats, int* procs)
   }
 }
 
-void RefinerComm::computeAverage()
+void RefinerComm::computeAverageWithComm()
 {
   int i;
   double total = 0;
   for (i=0; i<numComputes; i++) total += computes[i].load;
 
-  for (i=0; i<P; i++)
-    if (processors[i].available == CmiTrue) 
+  for (i=0; i<P; i++) {
+    if (processors[i].available == CmiTrue) {
 	total += processors[i].backgroundLoad;
+        total += commOverheadOnPe(i);
+    }
+  }
 
   averageLoad = total/numAvail;
+CmiPrintf("averageLoad: %f\n", averageLoad);
 }
 
-void RefinerComm::commSummary(CentralLB::LDStats* stats)
+void RefinerComm::addProcessorCommCost()
 {
   int i;
   msgSentCount = new int[P]; // # of messages sent by each PE
@@ -66,7 +71,7 @@ void RefinerComm::commSummary(CentralLB::LDStats* stats)
     else {
       int idx = stats->getHash(cdata.sender);
       CmiAssert(idx != -1);
-      senderPE = stats->from_proc[idx];	       // object's original processor
+      senderPE = computes[idx].processor;	// object's original processor
       CmiAssert(senderPE != -1);
     }
     if (cdata.receiver.get_type() == LD_PROC_MSG)
@@ -74,7 +79,7 @@ void RefinerComm::commSummary(CentralLB::LDStats* stats)
     else {
       int idx = stats->getHash(cdata.receiver.get_destObj());
       CmiAssert(idx != -1);
-      receiverPE = stats->from_proc[idx];
+      receiverPE = computes[idx].processor;
       CmiAssert(receiverPE != -1);
     }
     if(senderPE != receiverPE)
@@ -86,14 +91,74 @@ void RefinerComm::commSummary(CentralLB::LDStats* stats)
        byteRecvCount[receiverPE] += cdata.bytes;
      }
   }
+
+  for(i = 0; i < P; i++)
+    processors[i].load += commOverheadOnPe(i);
 }
 
-double RefinerComm::commCost(int pe)
+double RefinerComm::commOverheadOnPe(int pe)
 {
   return msgRecvCount[pe]  * PER_MESSAGE_RECV_OVERHEAD +
 	 msgSentCount[pe]  * PER_MESSAGE_SEND_OVERHEAD +
 	 byteRecvCount[pe] * PER_BYTE_RECV_OVERHEAD +
 	 byteSentCount[pe] * PER_BYTE_SEND_OVERHEAD;
+}
+
+void RefinerComm::updateCommunication(int c, int oldpe, int newpe)
+{
+}
+
+void RefinerComm::assign(computeInfo *c, int processor)
+{
+  assign(c, &(processors[processor]));
+}
+
+void RefinerComm::assign(computeInfo *c, processorInfo *p)
+{
+   c->processor = p->Id;
+   p->computeSet->insert((InfoRecord *) c);
+   p->computeLoad += c->load;
+   p->load = p->computeLoad + p->backgroundLoad;
+}
+
+void  RefinerComm::deAssign(computeInfo *c, processorInfo *p)
+{
+   c->processor = -1;
+   p->computeSet->remove(c);
+   p->computeLoad -= c->load;
+   p->load = p->computeLoad + p->backgroundLoad;
+}
+
+// how much communication from compute c  to pe
+double RefinerComm::commAffinity(int c, int pe)
+{
+  int byteSent=0, msgSent=0;
+  computeInfo &obj = computes[c];
+  int nMsgs = obj.messages.length();
+  for (int i=0; i<nMsgs; i++) {
+    LDCommData &cdata = stats->commData[obj.messages[i]];
+    bool sendtope = false;
+    if (cdata.receiver.get_type() == LD_OBJ_MSG) {
+      int recvCompute = stats->getHash(cdata.receiver.get_destObj());
+      int recvProc = computes[recvCompute].processor;
+      if (recvProc == pe) sendtope = true;
+    }
+    else if (cdata.receiver.get_type() == LD_OBJLIST_MSG) {  // multicast
+      int nobjs;
+      LDObjKey *recvs = cdata.receiver.get_destObjs(nobjs);
+      for (int j=0; j<nobjs; j++) {
+        int recvCompute = stats->getHash(recvs[j]);
+        int recvProc = computes[recvCompute].processor;	// FIXME
+        if (recvProc == pe) { sendtope = true; continue; }
+      }  
+    }
+    if (sendtope) {
+      byteSent += cdata.bytes;
+      msgSent += cdata.messages;
+    }
+  }  // end of for
+  return msgSent  * PER_MESSAGE_SEND_OVERHEAD + 
+	 byteSent * PER_BYTE_SEND_OVERHEAD;
 }
 
 int RefinerComm::refine()
@@ -117,7 +182,7 @@ int RefinerComm::refine()
   int done = 0;
 
   while (!done) {
-    double bestSize;
+    double bestSize, bestComm;
     computeInfo *bestCompute;
     processorInfo *bestP;
     
@@ -129,8 +194,9 @@ int RefinerComm::refine()
     processorInfo *p = (processorInfo *) 
       lightProcessors->iterator((Iterator *) &nextProcessor);
     bestSize = 0;
-    bestP = 0;
-    bestCompute = 0;
+    bestComm = -1e8;
+    bestP = NULL;
+    bestCompute = NULL;
 
     while (p) {
       Iterator nextCompute;
@@ -148,12 +214,20 @@ int RefinerComm::refine()
         }
 	//CkPrintf("c->load: %f p->load:%f overLoad*averageLoad:%f \n",
 	//c->load, p->load, overLoad*averageLoad);
+	double commgain = commAffinity(c->Id, c->processor) -
+			  commAffinity(c->Id, p->Id);
 	if ( c->load + p->load < overLoad*averageLoad) {
 	  // iout << iINFO << "Considering Compute : " 
 	  //      << c->Id << " with load " 
 	  //      << c->load << "\n" << endi;
-	  if(c->load > bestSize) {
-	    bestSize = c->load;
+	  if(c->load + commgain > bestSize) {
+CmiPrintf("comm gain %f bestSize:%f\n", commgain, bestSize);
+    // show the load
+    for (i=0; i<P; i++) 
+      CmiPrintf("%f ", processors[i].load), 
+    CmiPrintf("\n");
+
+	    bestSize = c->load + commgain;
 	    bestCompute = c;
 	    bestP = p;
 	  }
@@ -167,23 +241,31 @@ int RefinerComm::refine()
     }
 
     if (bestCompute) {
-      //      CkPrintf("Assign: [%d] with load: %f from %d to %d \n",
-      //	       bestCompute->id.id[0], bestCompute->load, 
-      //	       donor->Id, bestP->Id);
+            CkPrintf("Assign: [%d] with load: %f from %d to %d \n",
+      	       bestCompute->id.id[0], bestCompute->load, 
+               donor->Id, bestP->Id);
       deAssign(bestCompute, donor);      
       assign(bestCompute, bestP);
+      // update commnication
     } else {
       finish = 0;
       break;
     }
 
-    if (bestP->load > averageLoad)
+
+    if (bestP->load > averageLoad) {
+CmiPrintf("bestpe %d is not light anymore\n", bestP->Id);
       lightProcessors->remove(bestP);
+    }
     
-    if (isHeavy(donor))
+    if (isHeavy(donor)) {
+CmiPrintf("doner pe %d is heavy anymore\n", donor->Id);
       heavyProcessors->insert((InfoRecord *) donor);
-    else if (isLight(donor))
+}
+    else if (isLight(donor)) {
+CmiPrintf("doner pe %d is light %f %f\n", donor->Id, donor->load, averageLoad);
       lightProcessors->insert((InfoRecord *) donor);
+}
   }  
 
   delete heavyProcessors;
@@ -211,7 +293,9 @@ void RefinerComm::Refine(int count, CentralLB::LDStats* stats,
 
   removeComputes();
 
-  computeAverage();
+  addProcessorCommCost();
+
+  computeAverageWithComm();
 
   refine();
 
@@ -230,6 +314,9 @@ void RefinerComm::Refine(int count, CentralLB::LDStats* stats,
     }
   }
   delete [] msgSentCount;
+  delete [] msgRecvCount;
+  delete [] byteSentCount;
+  delete [] byteRecvCount;
 
   delete [] computes;
   delete [] processors;

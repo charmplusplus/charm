@@ -4,6 +4,7 @@ module EveryLB {
    extern module RecBisectBfLB;
    extern module MetisLB;
    extern module RefineLB;
+   extern module RefineCommLB;
    extern module CommLB;
    extern module Comm1LB;
    extern module GreedyLB;

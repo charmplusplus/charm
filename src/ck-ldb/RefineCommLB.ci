@@ -1,0 +1,9 @@
+module RefineCommLB {
+
+extern module CentralLB;
+initnode void lbinit(void);
+group [migratable] RefineCommLB : RefineLB {
+  entry void RefineCommLB(const CkLBOptions &);  
+};
+
+};
