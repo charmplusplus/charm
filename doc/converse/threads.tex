@@ -48,6 +48,28 @@ with {\tt CthCreate}, but it can be retrieved (say, by calling {\tt
 CthSelf} in {\tt main}), and it can be used like any other {\tt
 CthThread}.}
 
+\function{CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size)}
+\index{CthCreateMigratable}
+\desc{
+Create a thread that can later be moved to other processors.
+Otherwise identical to CthCreate.
+
+This is only a hint to the runtime system; some threads
+implementations cannot migrate threads, others always create
+migratable threads.  In these cases, CthCreateMigratable is
+equivalent to CthCreate.
+}
+
+\function{CthThread CthPup(pup\_er p,CthThread t)}
+\index{CthPup}
+\desc{
+Pack/Unpack a thread.  This can be used to save a thread to disk,
+migrate a thread between processors, or checkpoint the state of a thread.
+
+Only a suspended thread can be Pup'd.  Only a thread created with
+CthCreateMigratable can be Pup'd.
+}
+
 \function{void CthFree(CthThread t)}
 \index{CthFree}
 \desc{Frees thread {\tt t}.  You may ONLY free the
