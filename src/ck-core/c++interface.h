@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1995-09-21 16:39:01  sanjeev
+ * Revision 2.14  1995-09-26 19:46:46  sanjeev
+ * moved new operator to cplus.C
+ *
+ * Revision 2.13  1995/09/21  16:39:01  sanjeev
  * *** empty log message ***
  *
  * Revision 2.12  1995/09/20  23:09:47  sanjeev
@@ -181,9 +184,7 @@ public:	void operator delete(void *msg) {
 		CkFreeMsg(msg) ;
 	}
 
-	void *operator new(int size) {
-		CmiPrintf("[%d] ERROR: wrong new operator for message allocation\n",CmiMyPe()) ;
-	}
+	void *operator new(int size) ;
 
 	void *operator new(int size, int id) {
 		return (void *)GenericCkAlloc(id, size, 0) ;
