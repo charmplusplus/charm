@@ -92,7 +92,7 @@ typedef void *CmiNodeLock;
 #define CmiCreateLock() ((void *)0)
 #define CmiLock(lock) /*empty*/
 #define CmiUnlock(lock) /*empty*/
-#define CmiTryLock(lock) /*empty*/
+#define CmiTryLock(lock)  (0)
 #define CmiDestroyLock(lock) /*empty*/
 
 #endif
