@@ -568,7 +568,7 @@ public:
   void prepareCtorMsg(CkMessage *m,int &onPe,const CkArrayIndex &idx);
 
   /// Create initial array elements:
-  virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg);
+  virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg,int local=1);
   virtual void doneInserting(void);
   void remoteDoneInserting(void);
 

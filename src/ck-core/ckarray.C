@@ -556,12 +556,19 @@ CmiBool CkArray::demandCreateElement(const CkArrayIndex &idx,
 	return CmiTrue;
 }
 
-void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg)
+void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg, int local)
 {
 	CkArrayMessage *m=(CkArrayMessage *)ctorMsg;
-	int onPe=CkMyPe();
-	prepareCtorMsg(m,onPe,idx);
-	insertElement(m);
+	if (local) {
+	  int onPe=CkMyPe();
+	  prepareCtorMsg(m,onPe,idx);
+	  insertElement(m);
+  	}
+	else {
+	  int onPe=-1;
+	  prepareCtorMsg(m,onPe,idx);
+	  CkArrayManagerInsert(onPe,m,getGroupID());
+	}
 }
 
 /********************* CkArray Messaging ******************/

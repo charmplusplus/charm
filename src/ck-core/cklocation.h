@@ -439,7 +439,7 @@ enum CkElementCreation_t {
 class CkArrMgr {
 public:
 	/// Insert this initial element on this processor
-	virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg)=0;
+	virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg, int local=1)=0;
 	
 	/// Done with initial insertions
 	virtual void doneInserting(void)=0;

@@ -260,6 +260,20 @@ public:
   {
      return CLD_ANYWHERE;   // -1
   }
+  void populateInitial(int arrayHdl,int numElements,void *ctorMsg,CkArrMgr *mgr)  {
+        if (numElements==0) {
+          CkFreeMsg(ctorMsg);
+          return;
+        }
+        int thisPe=CkMyPe();
+        int numPes=CkNumPes();
+        for (int i=0;i<numElements;i++)
+                        if(i%numPes==thisPe)
+                                mgr->insertInitial(CkArrayIndex1D(i),CkCopyMsg(&ctorMsg),0);
+        mgr->doneInserting();
+        CkFreeMsg(ctorMsg);
+  }
+
 };
 
 CkpvStaticDeclare(double*, rem);
