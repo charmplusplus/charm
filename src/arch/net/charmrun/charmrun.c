@@ -679,6 +679,13 @@ void arg_init(int argc, char **argv)
 	arg_argv[arg_argc++]="++debug";
   }
 
+#ifdef CMK_BPROC
+  if (arg_local) {
+    fprintf(stderr,"Warning> ++local cannot be used in bproc version, ignored!\n");
+    arg_local = 0;
+  }
+#endif
+
 #if CMK_USE_RSH
   /* Find the current value of the CONV_RSH variable */
   if(!arg_shell) arg_shell = getenv_rsh();
