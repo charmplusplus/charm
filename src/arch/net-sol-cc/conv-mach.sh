@@ -28,4 +28,4 @@ CMK_CPP_SUFFIX="cc"
 CMK_XLATPP='charmxlat++ -w -p '
 CMK_QT='solaris-cc'
 CMK_XIOPTS=''
-CMK_F90LIBS='-lfsu -lsunmath -lfsumai -lfminvai -lfmaxvai -lfui'
+CMK_F90LIBS='-lfsu -lsunmath -lfsumai -lfminvai -lfmaxvai -lfui -lfai'
