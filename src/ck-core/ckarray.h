@@ -176,7 +176,7 @@ public:
 	CProxySection_ArrayBase(const CkSectionID &sid, CkGroupID dTo)
 		:CProxy_ArrayBase(sid._cookie.aid, dTo), _sid(sid){}
 	
-	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
+//	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep) ;
 
 //	ArrayElement *ckLocal(void) const;
@@ -189,8 +189,6 @@ public:
 PUPmarshall(CProxySection_ArrayBase);
 #define CK_DISAMBIG_ARRAY_SECTION(super) \
 	CK_DISAMBIG_ARRAY(super) \
-	inline void ckInsert(CkArrayMessage *m,int ctor,int onPe) \
-	  { super::ckInsert(m,ctor,onPe); }\
 	inline void ckSend(CkArrayMessage *m, int ep) \
 	  { super::ckSend(m,ep); } \
         inline CkSectionCookie &ckGetSectionCookie() \
