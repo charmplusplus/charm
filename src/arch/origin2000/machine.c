@@ -39,6 +39,7 @@ int Cmi_myrank;
 
 static int nthreads;
 static int requested_npe;
+static int arena_size_meg;
 
 static void threadInit(void *arg);
 
@@ -83,12 +84,19 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
  
   i =  0;
   requested_npe = 0; 
+  arena_size_meg = 16;
   while (argv[i] != 0) {
-    if (strcmp(argv[i], "+p") == 0) {
-      sscanf(argv[i+1], "%d", &requested_npe);
-      break;
-    } else {
-      if (sscanf(argv[i], "+p%d", &requested_npe) == 1) break;
+    if (strncmp(argv[i], "+p",2) == 0) {
+      if (strlen(argv[i]) > 2)
+	sscanf(argv[i], "+p%d", &requested_npe);
+      else
+	sscanf(argv[i+1], "%d", &requested_npe);
+    } 
+    else if (strncmp(argv[i], "+memsize",8) == 0) {
+      if (strlen(argv[i]) > 8 )
+	sscanf(argv[i], "+memsize%d", &arena_size_meg);
+      else
+	sscanf(argv[i+1], "%d", &arena_size_meg);
     }
     i++;
   }
@@ -102,7 +110,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
   usconfig(CONF_INITUSERS, requested_npe+1);
   usconfig(CONF_ARENATYPE, US_SHAREDONLY);
-  if(usconfig(CONF_INITSIZE,  16<<20)==(-1)) {
+  if(usconfig(CONF_INITSIZE,  (arena_size_meg * 1<<20))==(-1)) {
     CmiPrintf("Cannot set size of arena\n");
     abort();
   }
