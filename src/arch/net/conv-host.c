@@ -507,7 +507,7 @@ static ppdef pparam_hfind(lname)
 {
   ppdef def = pparam_find(lname);
   if (def) return def;
-  printf("No such program parameter %s\n",lname);
+  fprintf(stderr,"No such program parameter %s\n",lname);
   exit(1);
 }
 
@@ -599,20 +599,20 @@ void pparam_printdocs()
       len = strlen(def->doc);
       if (len>maxdoc) maxdoc=len;
     }
-  printf("\n");
-  printf("parameters recognized are:\n");
-  printf("\n");
+  fprintf(stderr,"\n");
+  fprintf(stderr,"parameters recognized are:\n");
+  fprintf(stderr,"\n");
   for (def=ppdefs; def; def=def->next)
     {
       len = strlen(def->lname);
-      printf("  %c%c%s ",pparam_optc,pparam_optc,def->lname);
-      for(i=0; i<maxname-len; i++) printf(" ");
+      fprintf(stderr,"  %c%c%s ",pparam_optc,pparam_optc,def->lname);
+      for(i=0; i<maxname-len; i++) fprintf(stderr," ");
       len = strlen(def->doc);
-      printf("  %s ",def->doc);
-      for(i=0; i<maxdoc-len; i++) printf(" ");
-      printf("[%s]\n",pparam_getdef(def));
+      fprintf(stderr,"  %s ",def->doc);
+      for(i=0; i<maxdoc-len; i++) fprintf(stderr," ");
+      fprintf(stderr,"[%s]\n",pparam_getdef(def));
     }
-  printf("\n");
+  fprintf(stderr,"\n");
 }
 
 void pparam_delarg(i)
