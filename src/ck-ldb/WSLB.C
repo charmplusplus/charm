@@ -13,8 +13,8 @@ CkGroupID wslb;
 // Temporary vacating flags
 // Set PROC to -1 to disable
 
-//#define VACATE_PROC -1
-#define VACATE_PROC (CkNumPes()/2)
+#define VACATE_PROC -1
+//#define VACATE_PROC (CkNumPes()/2)
 #define VACATE_AFTER 30
 #define UNVACATE_AFTER 15
 
@@ -71,6 +71,7 @@ WSLB::WSLB()
 
   vacate = CmiFalse;
   usage = 1.0;
+  usage_int_err = 0.;
 
   theLbdb->CollectStatsOn();
 }
@@ -163,16 +164,23 @@ WSLBStatsMsg* WSLB::AssembleStats()
 //     myusage = myobjcpu / myobjwall;
 //   else
 
- if (myload > 0)
+  if (myload > 0)
     myusage = myStats.total_cputime / myload;
   else myusage = 1.0;
+  // Apply proportional-integral control on usage changes
+  const double usage_err = myusage - usage;
+  usage_int_err += usage_err;
+  usage += usage_err * 0.1 + usage_int_err * 0.01;
+  //  CkPrintf("[%d] Usage err = %f %f\n",CkMyPe(),usage_err,usage_int_err);
  
-  if (myusage > usage)
-    usage += (myusage-usage) * 0.1;
-  else usage = myusage;
+  // Allow usage to decrease quickly, but increase slowly
+  //   if (myusage > usage)
+  //     usage += (myusage-usage) * 0.1;
+  //   else usage = myusage;
+ 
 
-  CkPrintf("PE %d myload = %f myusage = %f usage = %f\n",
-	   CkMyPe(),myload,myusage,usage);
+  //  CkPrintf("PE %d myload = %f myusage = %f usage = %f\n",
+  //	   CkMyPe(),myload,myusage,usage);
 
   msg->from_pe = CkMyPe();
   msg->serial = rand();

@@ -105,6 +105,7 @@ private:
   double start_lb_time;
   double first_step_time;
   double usage;
+  double usage_int_err;
   CmiBool vacate;
 };
 
