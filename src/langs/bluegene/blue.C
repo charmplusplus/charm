@@ -21,37 +21,9 @@
 
 #include "blue.h"
 
-/* define system parameters */
-#define INBUFFER_SIZE	32
-
-#define CYCLES_PER_HOP     5
-#define CYCLES_PER_CORNER  75
-#define CYCLE_TIME_FACTOR  0.001  /* one cycle = nanosecond = 10^(-3) us */
-/* end of system parameters */
-
-#define MAX_HANDLERS	100
+#include "blue_impl.h"
 
 template<class T> class bgQueue;
-
-typedef char ThreadType;
-const char UNKNOWN_THREAD=0, COMM_THREAD=1, WORK_THREAD=2;
-
-/* converse message send to other bgnodes */
-#if 0
-class bgMsg {
-public:
-  char core[CmiMsgHeaderSizeBytes];
-  int node;		/* bluegene node serial number */
-  int threadID;		/* the thread ID in the node */
-  int handlerID;	/* handler function registered */
-  WorkType type;	/* work type */
-  int len;
-  double recvTime;
-  char  first[1];	/* first byte of user data */
-public:
-  bgMsg() {};
-};
-#endif
 
 typedef bgQueue<int>  	    threadIDQueue;
 typedef bgQueue<CthThread>  threadQueue;
@@ -60,9 +32,6 @@ typedef CkQ<char *> 	    ckMsgQueue;
 
 class nodeInfo;
 class threadInfo;
-
-#define cva CpvAccess
-#define cta CtvAccess
 
 /* node level variables */
 CpvDeclare(nodeInfo*, nodeinfo);		/* represent a bluegene node */
@@ -80,39 +49,10 @@ typedef void (*BgStartHandler) (int, char **);
 BnvStaticDeclare(int, handlerTableCount);
 BnvStaticDeclare(BgHandler *, handlerTable);
 
-static int arg_argc;
-static char **arg_argv;
-
 CpvStaticDeclare(msgQueue *,inBuffer);	/* emulate the bluegene fix-size inbuffer */
 CpvStaticDeclare(CmmTable *,msgBuffer);	/* if inBuffer is full, put to this buffer */
 
-CpvStaticDeclare(int, numX);	/* size of bluegene nodes in cube */
-CpvStaticDeclare(int, numY);
-CpvStaticDeclare(int, numZ);
-CpvStaticDeclare(int, numCth);	/* number of threads */
-CpvStaticDeclare(int, numWth);
-CpvStaticDeclare(int, numNodes);	/* number of bg nodes on this PE */
-
 CpvDeclare(int, inEmulatorInit);
-
-#define tMYID		cta(threadinfo)->id
-#define tMYGLOBALID	cta(threadinfo)->globalId
-#define tTHREADTYPE	cta(threadinfo)->type
-#define tMYNODE		cta(threadinfo)->myNode
-#define tSTARTTIME	tMYNODE->startTime
-#define tCURRTIME	cta(threadinfo)->currTime
-#define tMYX		tMYNODE->x
-#define tMYY		tMYNODE->y
-#define tMYZ		tMYNODE->z
-#define tMYNODEID	tMYNODE->id
-#define tCOMMTHQ	tMYNODE->commThQ
-#define tINBUFFER	cva(inBuffer)[tMYNODE->id]
-#define tMSGBUFFER	cva(msgBuffer)[tMYNODE->id]
-#define tUSERDATA	tMYNODE->udata
-#define tTHREADTABLE    tMYNODE->threadTable
-#define tAFFINITYQ      tMYNODE->affinityQ[tMYID]
-#define tNODEQ          tMYNODE->nodeQ
-#define tSTARTED        tMYNODE->started
 
 #define ASSERT(x)	if (!(x)) { CmiPrintf("Assert failure at %s:%d\n", __FILE__,__LINE__); CmiAbort("Abort!"); }
 
@@ -171,8 +111,10 @@ public:
         Global:  map (x,y,z) to a global serial number
         Local:   local index of this nodeinfo in the emulator's node 
 *****************************************************************************/
+class BlockMapInfo;
+class CyclicMapInfo;
 
-class nodeInfo {
+class nodeInfo: public CyclicMapInfo  {
 public:
   int id;
   int x,y,z;
@@ -200,51 +142,6 @@ public:
     delete [] threadTable;
   }
   
-    /* return the number of bg nodes on this physical emulator PE */
-  inline static int numLocalNodes()
-  {
-    int n, m;
-    n = (cva(numX) * cva(numY) * cva(numZ)) / CmiNumPes();
-    m = (cva(numX) * cva(numY) * cva(numZ)) % CmiNumPes();
-    if (CmiMyPe() < m) n++;
-    return n;
-  }
-
-    /* map global serial number to (x,y,z) ++++ */
-  inline static void Global2XYZ(int seq, int *x, int *y, int *z) {
-    *x = seq / (cva(numY) * cva(numZ));
-    *y = (seq - *x * cva(numY) * cva(numZ)) / cva(numZ);
-    *z = (seq - *x * cva(numY) * cva(numZ)) % cva(numZ);
-  }
-
-    /* calculate global serial number of (x,y,z) ++++ */
-  inline static int XYZ2Global(int x, int y, int z) {
-    return x*(cva(numY) * cva(numZ)) + y*cva(numZ) + z;
-  }
-
-    /* map (x,y,z) to emulator PE ++++ */
-  inline static int XYZ2PE(int x, int y, int z) {
-    return Global2PE(XYZ2Global(x,y,z));
-  }
-
-  inline static int XYZ2Local(int x, int y, int z) {
-    return Global2Local(XYZ2Global(x,y,z));
-  }
-
-    /* local node index number to x y z ++++ */
-  inline static void Local2XYZ(int num, int *x, int *y, int *z)  {
-    Global2XYZ(Local2Global(num), x, y, z);
-  }
-
-    /* map global serial node number to PE ++++ */
-  inline static int Global2PE(int num) { return num % CmiNumPes(); }
-
-    /* map global serial node ID to local node array index  ++++ */
-  inline static int Global2Local(int num) { return num/CmiNumPes(); }
-
-    /* map local node index to global serial node id ++++ */
-  inline static int Local2Global(int num) { return CmiMyPe()+num*CmiNumPes();}
-
 };	// end of nodeInfo
 
 /*****************************************************************************
@@ -540,7 +437,7 @@ void BgGetSize(int *sx, int *sy, int *sz)
 
 int BgGetTotalSize()
 {
-  return cva(numX)*cva(numY)*cva(numZ);
+  return bgSize;
 }
 
 /* can only called in emulatorinit */
@@ -880,6 +777,8 @@ CmiStartFn bgMain(int argc, char **argv)
 
   /* check if all bluegene node size and thread information are set */
   BGARGSCHECK;
+
+  bgSize = cva(numX)*cva(numY)*cva(numZ);
 
   CtvInitialize(threadInfo *, threadinfo);
 
