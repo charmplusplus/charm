@@ -9,7 +9,7 @@ extern unsigned int CqsLength(Queue);
 #include "cldb.h"
 #include <math.h>
 
-typedef unsigned int BitVector;
+typedef char *BitVector;
 
 CpvDeclare(int, CldHandlerIndex);
 CpvDeclare(BitVector, CldPEBitVector);
@@ -168,8 +168,7 @@ void CldGetToken(char **msg)
 
 int CldPresentPE(int pe)
 {
-  unsigned int shift = CpvAccess(CldPEBitVector) >> pe;
-  return (shift % 2);
+  return CpvAccess(CldPEBitVector)[pe];
 }
 
 void CldMoveAllSeedsAway()
@@ -192,9 +191,12 @@ void CldMoveAllSeedsAway()
   }
 }
 
-void CldSetPEBitVector(unsigned int newBV)
+void CldSetPEBitVector(const char *newBV)
 {
-  CpvAccess(CldPEBitVector) = newBV;
+  int i;
+  
+  for (i=0; i<CmiNumPes(); i++)
+    CpvAccess(CldPEBitVector)[i] = newBV[i];
   if (!CldPresentPE(CmiMyPe()))
     CldMoveAllSeedsAway();
 }
@@ -205,11 +207,14 @@ void CldModuleGeneralInit()
 {
   CldToken sentinel = (CldToken)CmiAlloc(sizeof(struct CldToken_s));
   CldProcInfo proc;
+  int i;
 
   CpvInitialize(CldProcInfo, CldProc);
   CpvInitialize(int, CldLoadOffset);
   CpvInitialize(BitVector, CldPEBitVector);
-  CpvAccess(CldPEBitVector) = (unsigned int)(pow(2.0, (double)CmiNumPes())-1.0);
+  CpvAccess(CldPEBitVector) = (char *)malloc(CmiNumPes()*sizeof(char));
+  for (i=0; i<CmiNumPes(); i++)
+    CpvAccess(CldPEBitVector)[i] = 1;
   CpvAccess(CldLoadOffset) = 0;
   CpvAccess(CldProc) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
   proc = CpvAccess(CldProc);

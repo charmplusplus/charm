@@ -12,4 +12,4 @@ CpvExtern(int, CldMessageChunks);
 CpvExtern(int, CldLoadNotify);
 
 void CldMultipleSend(int pe, int numToSend);
-void CldSetPEBitVector(unsigned int);
+void CldSetPEBitVector(const char *);
