@@ -1634,7 +1634,7 @@ void Chare::lookforCEntry(CEntry *centry)
   if(list)
     list->lookforCEntry(centry);
   if (centry->decl_entry == NULL)  {
-    cerr<<"Function \""<<*centry->entry
+    cerr<<"Function \""<<centry->entry->get_string_const()
         <<"\" appears in Sdag When construct, but not defined as an entry function. "
         << endl;
     die("(FATAL ERROR)");
