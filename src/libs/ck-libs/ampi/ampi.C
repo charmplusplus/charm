@@ -2990,13 +2990,9 @@ int AMPI_Intercomm_create(MPI_Comm lcomm, int lleader, MPI_Comm rcomm, int rlead
     delete [] larr;
     delete [] rarr;
 
-    if(rsize==0) CkAbort("MPI_Intercomm_create: remote size = 0!\n");
+    if(rsize==0) CkAbort("MPI_Intercomm_create: remote size = 0! Does it really make sense to create an empty communicator?\n");
   }
   
-  // a strange line(bug??) has been commented out. 
-  // All the processes that are not a local leader who call this should not abort! --Isaac
-  // if(rvec.size()==0) CkAbort("AMPI> Abort: Does it really make sense to create an empty communicator?");
-
   ptr->intercommCreate(rvec,root,newintercomm);
   return 0;
 }
