@@ -37,10 +37,10 @@ public:
 		for (int i=0;i<nId;i++) if (id[i]!=v.id[i]) return 0;
 		return 1;
 	}
-	static unsigned int staticHash(const void *key,unsigned int keyLen) {
+	static unsigned int staticHash(const void *key,size_t keyLen) {
 		return ((const CkViewableID *)key)->hash();
 	}
-	static int staticCompare(const void *a,const void *b,unsigned int keyLen) {
+	static int staticCompare(const void *a,const void *b,size_t keyLen) {
 		return ((const CkViewableID *)a)->compare(*(const CkViewableID *)b);
 	}
 	
