@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1995-07-27 20:29:34  jyelon
+ * Revision 2.6  1995-09-01 02:13:17  jyelon
+ * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
+ *
+ * Revision 2.5  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.4  1995/07/24  01:54:40  jyelon
@@ -44,7 +47,7 @@ static char ident[] = "@(#)$Header$";
 #include "performance.h"
 
 #define SIZE_CHARE_ID sizeof(ChareIDType)
-
+extern CHARE_BLOCK *CreateChareBlock();
 
 typedef struct tbl_element *TBL_ELEMENT_[MAX_TBL_SIZE];
 CpvStaticDeclare(TBL_ELEMENT_, table);
@@ -61,12 +64,11 @@ void tblModuleInit()
 
 TblBocInit()
 {
-    	BOC_BLOCK *bocBlock;
+    	CHARE_BLOCK *bocBlock;
 	int i;
 
-    	bocBlock = (BOC_BLOCK *) CreateBocBlock(sizeof(DATA_BR_TBL));
-    	/*TRACE(CmiPrintf("Node %d: TblBocInit:created block with size %d\n",CmiMyPe(), sizeof(DATA_BR_VID))); */
-	bocBlock->boc_num = TblBocNum;
+    	bocBlock = CreateChareBlock(sizeof(DATA_BR_TBL), CHAREKIND_BOCNODE, 0);
+        bocBlock->x.boc_num = TblBocNum;
     	SetBocDataPtr(TblBocNum, (void *) (bocBlock + 1));
 
 	for (i=0; i<MAX_TBL_SIZE; i++)

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-07-27 20:29:34  jyelon
+ * Revision 2.12  1995-09-01 02:13:17  jyelon
+ * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
+ *
+ * Revision 2.11  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.10  1995/07/24  01:54:40  jyelon
@@ -135,7 +138,7 @@ CsvStaticDeclare(int, sharedReadCount); /* it holds the value of readCount, */
 extern void CPlus_ProcessBocInitMsg();	/* in cplus_node_init.c */
 extern void CPlus_CallCharmInit();	/* in cplus_node_init.c */
 extern void CPlus_SetMainChareID();	/* in cplus_node_init.c */
-extern void *CreateChareBlock();
+extern CHARE_BLOCK *CreateChareBlock();
 
 
 extern void HANDLE_INCOMING_MSG() ;
@@ -143,7 +146,6 @@ extern void CkProcess_ForChareMsg();
 extern void CkProcess_DynamicBocInitMsg();
 extern void CkProcess_NewChareMsg();
 extern void CkProcess_BocMsg();
-extern void CkProcess_VidEnqueueMsg();
 extern void CkProcess_VidSendOverMsg();
 
 void initModuleInit()
@@ -231,13 +233,8 @@ char **argv;
                                 CsvAccess(ChareSizesTable)[CsvAccess(_CK_MainChareIndex)];
 			CpvAccess(mainChareBlock) = 
                                 CpvAccess(currentChareBlock) = (CHARE_BLOCK *) 
-                                CreateChareBlock(CpvAccess(MainDataSize));
+                                CreateChareBlock(CpvAccess(MainDataSize),CHAREKIND_CHARE,rand());
 
-			SetID_chare_magic_number(CpvAccess(mainChareBlock)->selfID,
-						 rand());
-			SetID_onPE(CpvAccess(mainChareBlock)->selfID,0);
-                        SetID_chareBlockPtr(CpvAccess(mainChareBlock)->selfID,
-                                    mainChareBlock);
 			/* Calling CharmInit entry point */
 			CpvAccess(NumReadMsg) = 0;
 			CpvAccess(InsideDataInit) = 1;
@@ -383,11 +380,6 @@ CharmInitLoop()
 	  CkEnqueue(envelope);
 	  break;
 	  
-	case VidEnqueueMsg:
-	  CmiSetHandler(envelope,CsvAccess(CkProcIdx_VidEnqueueMsg));
-	  CkEnqueue(envelope);
-	  break;
-	  
         default:
           CmiPrintf("** ERROR ** Unknown message type %d\n",type);
 	}
@@ -411,22 +403,23 @@ CharmInitLoop()
 ProcessBocInitMsg(envelope)
 ENVELOPE       *envelope;
 {
-  BOC_BLOCK      *bocBlock;
+  CHARE_BLOCK    *bocBlock;
   void           *usrMsg = USER_MSG_PTR(envelope);
   int             current_ep = GetEnv_EP(envelope);
   EP_STRUCT      *current_epinfo = CsvAccess(EpInfoTable) + current_ep;
   int             current_bocnum = GetEnv_boc_num(envelope);
   int             current_msgType = GetEnv_msgType(envelope);
   int             current_chare = current_epinfo->chareindex;
+  int             current_magic = rand();
 
   if (current_epinfo->language == CHARMPLUSPLUS)
     CPlus_ProcessBocInitMsg(envelope, usrMsg, current_bocnum, 
 			    current_msgType, current_ep);
   else
     {
-      bocBlock = (BOC_BLOCK *)CreateBocBlock
-                    (CsvAccess(ChareSizesTable)[current_chare]);
-      bocBlock->boc_num = current_bocnum;
+      bocBlock = CreateChareBlock
+                    (CsvAccess(ChareSizesTable)[current_chare], CHAREKIND_BOCNODE, current_magic);
+      bocBlock->x.boc_num = current_bocnum;
       SetBocDataPtr(current_bocnum, (void *) (bocBlock + 1));
       trace_begin_execute(envelope);
       (current_epinfo->function)(usrMsg, GetBocDataPtr(current_bocnum));
@@ -649,8 +642,6 @@ InitializeEPTables()
     = CmiRegisterHandler(CkProcess_NewChareMsg);
   CsvAccess(CkProcIdx_BocMsg)
     = CmiRegisterHandler(CkProcess_BocMsg);
-  CsvAccess(CkProcIdx_VidEnqueueMsg)
-    = CmiRegisterHandler(CkProcess_VidEnqueueMsg);
   CsvAccess(CkProcIdx_VidSendOverMsg)
     = CmiRegisterHandler(CkProcess_VidSendOverMsg);
   
@@ -671,7 +662,6 @@ AddSysBocEps()
 {
 	CldAddSysBocEps();
 	QDAddSysBocEps();
-	VidAddSysBocEps();
 	WOVAddSysBocEps();
 	TblAddSysBocEps();
 	AccAddSysBocEps();

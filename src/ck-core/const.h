@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1995-07-27 20:29:34  jyelon
+ * Revision 2.10  1995-09-01 02:13:17  jyelon
+ * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
+ *
+ * Revision 2.9  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.8  1995/07/25  00:29:31  jyelon
@@ -105,6 +108,11 @@
 #define USERcat    	1
 
 
+#define CHAREKIND_CHARE    0   /* Plain old chare */
+#define CHAREKIND_BOCNODE  1   /* BOC node */
+#define CHAREKIND_UVID     2   /* Unfilled-VID */
+#define CHAREKIND_FVID     3   /* Filled-VID */
+
 /* MsgTypes */
 /* The performance tools use these also. */
 /**********		USERcat			*******/
@@ -123,12 +131,11 @@
 
 /**********		IMMEDIATEcat		*******/
 #define LdbMsg			12  /* never used??? */
-#define VidEnqueueMsg   	13
-#define VidSendOverMsg          14
-#define QdBocMsg		15
-#define QdBroadcastBocMsg	16
-#define ImmBocMsg               17
-#define ImmBroadcastBocMsg      18
+#define VidSendOverMsg          13
+#define QdBocMsg		14
+#define QdBroadcastBocMsg	15
+#define ImmBocMsg               16
+#define ImmBroadcastBocMsg      17
 
 
 #endif

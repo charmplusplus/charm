@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-22 23:44:13  jyelon
+ * Revision 2.4  1995-09-01 02:13:17  jyelon
+ * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
+ *
+ * Revision 2.3  1995/07/22  23:44:13  jyelon
  * *** empty log message ***
  *
  * Revision 2.2  1995/07/12  16:28:45  jyelon
@@ -55,29 +58,20 @@ typedef int 		FunctionRefType;
 typedef int 		WriteOnceID;    
 
 typedef struct chare_id_type  {
-  unsigned int   i_tag1;
-  unsigned short onPE;
-  unsigned short magic;
+  unsigned short        onPE;
+  unsigned short        magic;
+  struct chare_block   *chareBlockPtr;
 } ChareIDType;
 
-typedef struct boc_block {
-  ChareNumType boc_num;             /* boc instance number */
-  double dummy;  /* to pad this struct to one word length */
-} BOC_BLOCK;
-
 typedef struct chare_block { 
- ChareIDType selfID;
- int dataSize;
- double dummy;
+ char charekind;                   /* CHAREKIND: CHARE BOCNODE UVID FVID */
+ ChareIDType selfID;               /* My chare ID. */
+ union {
+     ChareNumType boc_num;         /* if a BOC node */
+     ChareIDType  realID;          /* if a Filled-VID */
+     struct fifo_queue *vid_queue; /* if an Unfilled-VID */
+ } x;
+ double dummy;                     /* Pad it to 8 bytes */
 } CHARE_BLOCK ;  
-
-typedef struct vid_block {
-  PeNumType vidPenum;
-  unsigned short chare_magic_number;
-  union infoblock {
- 	struct fifo_queue * vid_queue;
- 	CHARE_BLOCK      * chareBlockPtr;
-  } info_block;
-} VID_BLOCK;
 
 #endif

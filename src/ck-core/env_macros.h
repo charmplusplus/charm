@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1995-07-27 20:29:34  jyelon
+ * Revision 2.8  1995-09-01 02:13:17  jyelon
+ * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
+ *
+ * Revision 2.7  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.6  1995/07/25  00:29:31  jyelon
@@ -60,23 +63,14 @@
 #ifndef ENV_MACROS_H
 #define ENV_MACROS_H
 
-#define GetID_onPE(id) 		((id).onPE)
-#define SetID_onPE(id,x) 	((id).onPE=(x))
+#define GetID_onPE(id) 		        ((id).onPE)
+#define SetID_onPE(id,x) 	        ((id).onPE=(x))
 
 #define GetID_chare_magic_number(id)	((id).magic)
 #define SetID_chare_magic_number(id,x)	((id).magic=(x))
 
-#define GetID_isBOC(id) 	((id).i_tag1&1)
-#define GetID_isVID(id) 	((id).i_tag1&2)
-
-#define GetID_boc_num(id)		((id).i_tag1>>2)
-#define SetID_boc_num(id,x)             ((id).i_tag1=((x)<<2)|1)
-
-#define GetID_chareBlockPtr(id)		((CHARE_BLOCK *)((id).i_tag1&(~3)))
-#define SetID_chareBlockPtr(id,x)       ((id).i_tag1=((int)(x)))
-
-#define GetID_vidBlockPtr(id)		((VID_BLOCK *)((id).i_tag1&(~3)))
-#define SetID_vidBlockPtr(id,x)         ((id).i_tag1=((int)(x))|2)
+#define GetID_chareBlockPtr(id)	        ((id).chareBlockPtr)
+#define SetID_chareBlockPtr(id,x)       ((id).chareBlockPtr=(x))
 
 /*
  * Current envelope size: 256 bits = 32 bytes = 4 doubles.
@@ -133,7 +127,7 @@ typedef struct envelope {
 #define SetEnv_chareBlockPtr(e,x)	(env(e)->i_tag2=((int)(x)))
 
 #define SetEnv_vidBlockPtr(e,x)	        (env(e)->i_tag2=((int)(x)))
-#define GetEnv_vidBlockPtr(e)		((VID_BLOCK *)(env(e)->i_tag2))
+#define GetEnv_vidBlockPtr(e)		((CHARE_BLOCK *)(env(e)->i_tag2))
 
 #define GetEnv_boc_num(e) 		(env(e)->i_tag2)
 #define SetEnv_boc_num(e,x) 		(env(e)->i_tag2=(x))

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-07-27 20:29:34  jyelon
+ * Revision 2.7  1995-09-01 02:13:17  jyelon
+ * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
+ *
+ * Revision 2.6  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.5  1995/07/24  01:54:40  jyelon
@@ -278,20 +281,6 @@ ChareIDType *ReturnID;
 }
 
 
-
-
-BOC_BLOCK *CreateBocBlock(sizeData)
-int sizeData;
-{
-	BOC_BLOCK *p;
-
-	p =  (BOC_BLOCK *)CmiAlloc( sizeof(BOC_BLOCK) + sizeData);
-	CkMemError(p);
-	return(p);
-}
-
-
-
 ChareNumType CreateBoc(id, Entry, Msg, ReturnEP, ReturnID)
 int id;
 EntryNumType Entry;
@@ -370,17 +359,16 @@ char *mydata;
 MyBocNum(mydata)
 void *mydata;
 {
-	BOC_BLOCK * boc_block = (BOC_BLOCK * ) ((char *) mydata - sizeof(BOC_BLOCK));
-
-	return(boc_block->boc_num);
+        CHARE_BLOCK *chare = ((CHARE_BLOCK *)mydata)-1;
+        return chare->x.boc_num;
 }
 
 MyBranchID(pChareID, mydata)
 ChareIDType *pChareID;
 void *mydata;
 {
-	SetID_onPE((*pChareID), CmiMyPe());
-	SetID_boc_num((*pChareID), MyBocNum(mydata));
+        CHARE_BLOCK *chare = ((CHARE_BLOCK *)mydata)-1;
+        *pChareID = chare->selfID;
 }
 
 GeneralSendMsgBranch(ep, msg, destPE, type, bocnum)
@@ -498,11 +486,11 @@ TRACE(CmiPrintf("[%d] InitiateDynamicBocBroadcast: ref=%d, boc=%d, ep=%d\n",
 
 DynamicBocInit()
 {
-    	BOC_BLOCK *bocBlock;
+    	CHARE_BLOCK *bocBlock;
 
 	/* Create a dummy block */
-    	bocBlock = (BOC_BLOCK *) CreateBocBlock(sizeof(int));
-	bocBlock->boc_num = DynamicBocNum;
+    	bocBlock = CreateChareBlock(sizeof(int), CHAREKIND_BOCNODE, 0);
+        bocBlock->x.boc_num = DynamicBocNum;
     	SetBocDataPtr(DynamicBocNum, (void *) (bocBlock + 1));
 }
 

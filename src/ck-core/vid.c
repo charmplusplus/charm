@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-07-27 20:29:34  jyelon
+ * Revision 2.7  1995-09-01 02:13:17  jyelon
+ * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
+ *
+ * Revision 2.6  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.5  1995/07/24  01:54:40  jyelon
@@ -61,39 +64,23 @@ EpLanguageTable to be indexed by 65535 in CallProcessMsg.
 #include "performance.h"
 #include "vid.h"
 
-
-/************************************************************************/
-/*			VidQueueUpInVidBlock				*/
-/*	The message msgPtr has been sent to a chare created with a	*/
-/*	virtual id. The address of the virtual id block is available	*/
-/*	as part of the message, and is used to determine whether or	*/
-/*	not the chare has been created. If the chare hasn't been	*/
-/*	created, then msgPtr is queued up in the virtual block, else	*/
-/*	the message is forwarded to the processor on which the chare	*/
-/*	was created.							*/
-/************************************************************************/
-
-VidQueueUpInVidBlock(msgPtr, data_area)
-void *msgPtr;
-void *data_area;
+VidEnqueueMsg(env)
+ENVELOPE *env;
 {
-    ENVELOPE * env = ENVELOPE_UPTR(msgPtr);
-    VID_BLOCK * vidblock;
-    void *vidqueue;
+  CHARE_BLOCK *vid = GetEnv_chareBlockPtr(env);
+  void *vidqueue = vid->x.vid_queue;
+  FIFO_EnQueue(vidqueue, env);
+}
 
-    vidblock = (VID_BLOCK *) GetEnv_vidBlockPtr(env);
-    vidqueue = vidblock->info_block.vid_queue;
-    if (vidblock->vidPenum == -1)
-	FIFO_EnQueue(vidqueue, env);
-    else
-    {
-	SetEnv_msgType(env,ForChareMsg);
-	SetEnv_chareBlockPtr(env, (int) vidblock->info_block.chareBlockPtr);
-	SetEnv_chare_magic_number(env, vidblock->chare_magic_number);
-	trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
-	CkCheck_and_Send(vidblock->vidPenum, env);
-	QDCountThisCreation(GetEnv_EP(env), USERcat, ForChareMsg, 1);
-    }
+VidForwardMsg(env)
+ENVELOPE *env;
+{
+  CHARE_BLOCK *vid = GetEnv_chareBlockPtr(env);
+  SetEnv_chareBlockPtr(env, GetID_chareBlockPtr(vid->x.realID));
+  SetEnv_chare_magic_number(env, GetID_chare_magic_number(vid->x.realID));
+  trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
+  CkCheck_and_Send(GetID_onPE(vid->x.realID), env);
+  QDCountThisCreation(GetEnv_EP(env), USERcat, ForChareMsg, 1);
 }
 
 /************************************************************************/
@@ -101,11 +88,8 @@ void *data_area;
 /*	Once the chare ha been created it needs to get the messages	*/
 /*	that were sent to it while it hadn't been created. These	*/
 /* 	messages are queued up in its virtual id block, whose address	*/
-/* 	it has available. The chare on creation sends a messages to	*/
-/* 	the branch office chare, on which the virtual block resides	*/
-/* 	asking it to send over the messages to it. The messages are 	*/
-/* 	then dequeued and sent over to the processor on which the	*/
-/* 	was finally created. 						*/
+/* 	it has available. The messages are then dequeued and sent over  */
+/*      to the processor on which the chare was finally created.        */
 /************************************************************************/
 
 VidSendOverMessages(msgPtr, data_area)
@@ -114,58 +98,54 @@ void *data_area;
 {
     ChareIDType         ID=msgPtr->ID;
     ENVELOPE 		*env = ENVELOPE_UPTR(msgPtr);
-    VID_BLOCK 		*vidblock = (VID_BLOCK *) GetEnv_vidBlockPtr(env);
+    CHARE_BLOCK		*vidblock = GetEnv_vidBlockPtr(env);
     void 		*vidqueue;
     int 		chare_magic = GetID_chare_magic_number(ID);
     int                 chare_pe    = GetID_onPE(ID);
     CHARE_BLOCK        *chare_block = GetID_chareBlockPtr(ID);
 
-    vidqueue = vidblock->info_block.vid_queue;
+    if (vidblock->charekind != CHAREKIND_UVID) {
+      CmiPrintf("system error #12983781\n");
+      exit(1);
+    }
+    vidqueue = vidblock->x.vid_queue;
     while (!FIFO_Empty(vidqueue))
     {
 	FIFO_DeQueue(vidqueue, &env);
-	SetEnv_msgType(env, ForChareMsg);
 	SetEnv_chareBlockPtr(env, chare_block);
 	SetEnv_chare_magic_number(env, chare_magic);
 	trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
 	CkCheck_and_Send(chare_pe, env);
 	QDCountThisCreation(GetEnv_EP(env), USERcat, ForChareMsg, 1);
    }
-   vidblock->vidPenum = chare_pe;
-   vidblock->chare_magic_number = chare_magic;
-   vidblock->info_block.chareBlockPtr = chare_block;
-}
-
-
-VidAddSysBocEps()
-{
+   vidblock->charekind = CHAREKIND_FVID;
+   vidblock->x.realID = ID;
 }
 
 
 /************************************************************************/
-/*			VidSend						*/
-/*	This call is replication of the SendMsgBranch call, but sends 	*/
-/* 	the message with the category field as VIDcat.			*/
+/*			VidRetrieveMessages                             */
+/*	This is used by the newly-created chare to request the          */
+/*      messages that were stored in its VID                            */
 /************************************************************************/
 
-VidSend(chareblockPtr,destPE,vidPtr)
+VidRetrieveMessages(chareblockPtr,vidPE,vidBlockPtr)
 CHARE_BLOCK * chareblockPtr;
-PeNumType   destPE;
-VID_BLOCK *vidPtr;
+PeNumType  vidPE;
+CHARE_BLOCK *vidBlockPtr;
 {
     CHARE_ID_MSG * msg;
     ENVELOPE * env;
 
     msg = (CHARE_ID_MSG *)CkAllocMsg(sizeof(CHARE_ID_MSG));
-    msg->ID = CpvAccess(currentChareBlock)->selfID;
     CkMemError(msg);
+    msg->ID = CpvAccess(currentChareBlock)->selfID;
     env = ENVELOPE_UPTR(msg);
     SetEnv_msgType(env, VidSendOverMsg);
-    SetEnv_vidBlockPtr(env, (int)  vidPtr);
+    SetEnv_vidBlockPtr(env, (int)vidBlockPtr);
     SetEnv_EP(env, 0);
-
 
     QDCountThisCreation(0, IMMEDIATEcat, VidSendOverMsg, 1);
     trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
-    CkCheck_and_Send(destPE, env);
+    CkCheck_and_Send(vidPE, env);
 }

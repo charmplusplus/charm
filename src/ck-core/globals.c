@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-27 20:29:34  jyelon
+ * Revision 2.4  1995-09-01 02:13:17  jyelon
+ * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
+ *
+ * Revision 2.3  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.2  1995/06/13  14:33:55  gursoy
@@ -122,7 +125,6 @@ CsvDeclare(int, CkProcIdx_ForChareMsg);
 CsvDeclare(int, CkProcIdx_DynamicBocInitMsg);
 CsvDeclare(int, CkProcIdx_NewChareMsg);
 CsvDeclare(int, CkProcIdx_BocMsg);
-CsvDeclare(int, CkProcIdx_VidEnqueueMsg);
 CsvDeclare(int, CkProcIdx_VidSendOverMsg);
 
 /* System-defined chare numbers */

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1995-07-27 20:29:34  jyelon
+ * Revision 2.9  1995-09-01 02:13:17  jyelon
+ * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
+ *
+ * Revision 2.8  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.7  1995/07/24  01:54:40  jyelon
@@ -107,6 +110,7 @@ unsigned int msgbytes;
   envptr = (ENVELOPE *)CmiAlloc(totalsize);
   CkMemError(envptr);
   SetEnv_isPACKED(envptr, NO_PACK);
+  ClrEnv_LdbFull(envptr);
   SetEnv_TotalSize(envptr, totalsize);
   SetEnv_packid(envptr, 0);
   SetEnv_queueing(envptr, CK_QUEUEING_FIFO);
@@ -207,6 +211,7 @@ unsigned int priobits;
 
     SetEnv_priosize(env, priobits);
     SetEnv_queueing(env, CK_QUEUEING_BFIFO);
+    ClrEnv_LdbFull(env);
 
     if (CsvAccess(MsgToStructTable)[msgno].packfn != NULL)
     {

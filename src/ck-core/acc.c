@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-27 20:29:34  jyelon
+ * Revision 2.4  1995-09-01 02:13:17  jyelon
+ * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
+ *
+ * Revision 2.3  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.2  1995/07/24  01:54:40  jyelon
@@ -113,7 +116,7 @@ ACC_DATA *mydata;
 		mydata->AlreadyDone = 1;
 		GeneralBroadcastMsgBranch(CsvAccess(CkEp_ACC_LeafNodeCollect), tmsg,
 			ImmBroadcastBocMsg,
-			((BOC_BLOCK *) mydata - 1)->boc_num);
+                        MyBocNum(mydata));
 	}
 }
 
@@ -138,7 +141,7 @@ TRACE(CmiPrintf("[%d] ACC_NodeCollect : Sent message to parent\n",
 			GeneralSendMsgBranch(CsvAccess(CkEp_ACC_InteriorNodeCollect), 
 					GetAccMsgPtr(mydata), mydata->Penum,
 					ImmBocMsg,
-					((BOC_BLOCK *) mydata - 1)->boc_num);
+                                        MyBocNum(mydata));
 		}
 	}
 }
@@ -168,7 +171,7 @@ TRACE(CmiPrintf("[%d] ACC_NodeCollect : Sent message to parent\n",
 			GeneralSendMsgBranch(CsvAccess(CkEp_ACC_InteriorNodeCollect), 
 					GetAccMsgPtr(mydata), mydata->Penum,
 					ImmBocMsg,
-					((BOC_BLOCK *) mydata - 1)->boc_num);
+                                        MyBocNum(mydata));
 		}
 	}
 }

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1995-07-27 20:29:34  jyelon
+ * Revision 2.7  1995-09-01 02:13:17  jyelon
+ * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
+ *
+ * Revision 2.6  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.5  1995/07/24  01:54:40  jyelon
@@ -61,7 +64,7 @@ CpvStaticDeclare(ARRAY_, HostMemStatistics);
 CpvStaticDeclare(int, NumPe);
 
 extern CollectPerfFromNodes();
-
+extern CHARE_BLOCK *CreateChareBlock();
 
 
 void statModuleInit()
@@ -77,7 +80,7 @@ void statModuleInit()
 
 StatInit()
 {
-	BOC_BLOCK *bocBlock;
+	CHARE_BLOCK *bocBlock;
 	int i;
 
 	CpvAccess(NumPe) = CmiNumPe();
@@ -88,10 +91,10 @@ StatInit()
 
 StatisticBocInit()
 {
-	BOC_BLOCK *bocBlock;
+	CHARE_BLOCK *bocBlock;
 
-	bocBlock = (BOC_BLOCK *) CreateBocBlock(0);
-	bocBlock->boc_num = StatisticBocNum;
+	bocBlock = CreateChareBlock(0, CHAREKIND_BOCNODE, 0);
+        bocBlock->x.boc_num = StatisticBocNum;
 	SetBocDataPtr(StatisticBocNum, (void *) (bocBlock + 1));
 }
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-08-24 15:48:26  gursoy
+ * Revision 2.11  1995-09-01 02:13:17  jyelon
+ * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
+ *
+ * Revision 2.10  1995/08/24  15:48:26  gursoy
  * worng cpv-macro usage for EpInfoTable (it is a Csv type not Cpv)
  * fixed
  *
@@ -96,6 +99,7 @@ static char ident[] = "@(#)$Header$";
 
 extern void *FIFO_Create();
 void CkLdbSend();
+extern CHARE_BLOCK *CreateChareBlock();
 
 CpvStaticDeclare(int, num_exits);
 CpvStaticDeclare(int, done);
@@ -244,13 +248,11 @@ CpvAccess(RecdPerfMsg), CpvAccess(RecdStatMsg)));
         CsdExitScheduler();
 }
 
-
 ChareExit()
 {
-	SetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID,-1) ;
+	SetID_chare_magic_number(CpvAccess(currentChareBlock)->selfID,-1);
 	CmiFree(CpvAccess(currentChareBlock));
 }
-
 
 SendNodeStatistics()
 {
@@ -258,17 +260,17 @@ SendNodeStatistics()
 }
 
 
-void * CreateChareBlock(sizeData)
-int sizeData;
+CHARE_BLOCK *CreateChareBlock(sizeData, kind, magic)
+int sizeData, magic, kind;
 {
-	char *p;
-
-	p = (char *) CmiAlloc( sizeof(CHARE_BLOCK) + sizeData );
-	CkMemError(p);
-	return((void *) p);
+  CHARE_BLOCK *p = (CHARE_BLOCK *)CmiAlloc(sizeof(CHARE_BLOCK) + sizeData);
+  CkMemError(p);
+  SetID_chare_magic_number(p->selfID, magic);
+  SetID_onPE(p->selfID, CmiMyPe());
+  SetID_chareBlockPtr(p->selfID, p);
+  p->charekind = kind;
+  return((void *) p);
 }
-
-
 
 IsChareLocal(chareid)
 ChareIDType * chareid;
@@ -324,8 +326,8 @@ void *Msg;
 ChareIDType *vid;
 int destPE;
 {
-  ENVELOPE * env;
-  VID_BLOCK * vidblock;
+  ENVELOPE *env;
+  CHARE_BLOCK *vidblock;
 
   if (id!=CsvAccess(EpInfoTable)[Entry].chareindex) 
     CmiPrintf("** ERROR ** Illegal combination of CHAREINDEX/EP in CreateChare\n");
@@ -337,44 +339,28 @@ int destPE;
   
   SetEnv_EP(env, Entry);
   
-  if (vid != NULL_VID)
-    {
-      vidblock   = (VID_BLOCK *)  CmiAlloc(sizeof(VID_BLOCK));
-      CkMemError(vidblock);
-      vidblock->vidPenum = -1;
-      vidblock->info_block.vid_queue = (void *) FIFO_Create();
-      SetID_onPE((*vid), CmiMyPe());
-      SetID_vidBlockPtr((*vid),  (struct vid_block *) vidblock);
-      SetEnv_vidPE(env, CmiMyPe());
-      SetEnv_vidBlockPtr(env, (int) vidblock);
-    }
-  else
-    {
-      SetEnv_vidPE(env, -1);
-      SetEnv_vidBlockPtr(env, NULL);
-    }
+  if (vid != NULL_VID) {
+    vidblock = (CHARE_BLOCK *)CreateChareBlock(0, CHAREKIND_UVID, rand());
+    vidblock->x.vid_queue = (void *)FIFO_Create();
+    (*vid) = vidblock->selfID;
+    SetEnv_vidPE(env, GetID_onPE(vidblock->selfID));
+    SetEnv_vidBlockPtr(env, GetID_chareBlockPtr(vidblock->selfID));
+  } else {
+    SetEnv_vidPE(env, -1);
+    SetEnv_vidBlockPtr(env, NULL);
+  }
   
-  TRACE(CmiPrintf("[%d] CreateChare: vid=0x%x\n",
-		  CmiMyPe(), vid));
-  
-  TRACE(CmiPrintf("[%d] CreateChare: msgType=%d, ep=%d\n",
-		  CmiMyPe(), GetEnv_msgType(env), GetEnv_EP(env)));
-  
-  
+  trace_creation(NewChareMsg, Entry, env);
   QDCountThisCreation(Entry, USERcat, NewChareMsg, 1);
-  
-  
-  /********************  SANJEEV May 24, 93 **************************/
-  /* The CldNewChareFromLocal, FIFO_EnQueue, and CkCheck_and_Send
-     calls were moved inside this if-then-else  */
-  
-  trace_creation(GetEnv_msgType(env), Entry, env);
+
   if (CK_PE_SPECIAL(destPE)) {
     if (destPE != CK_PE_ANY) {
       CmiPrintf("** ERROR ** Illegal destPE in CreateChare\n");
     }
     SetEnv_msgType(env, NewChareMsg);
-    CmiSetHandler(env,CsvAccess(CkProcIdx_NewChareMsg)) ;
+    /* This CmiSetHandler is here because load balancer will fail to call */
+    /* CkCheck_and_Send on local messages.  Fix this.                     */
+    CmiSetHandler(env, CsvAccess(HANDLE_INCOMING_MSG_Index));
     CldNewSeedFromLocal(env, LDB_ELEMENT_PTR(env),
 			CkLdbSend,
 			GetEnv_queueing(env),
@@ -384,6 +370,7 @@ int destPE;
     SetEnv_msgType(env, NewChareNoBalanceMsg);
     CkCheck_and_Send(destPE, env);
   }
+
 }
 
 
@@ -394,34 +381,17 @@ void * Msg;
 ChareIDType * pChareID;
 {
   ENVELOPE * env;
-  
-  if (GetID_isBOC((*pChareID)))
-    GeneralSendMsgBranch(Entry, Msg, 
-			 GetID_onPE((*pChareID)), BocMsg, GetID_boc_num((*pChareID)));
-  else
-    {
-      int destPE = GetID_onPE((*pChareID));
-      CpvAccess(nodeforCharesCreated)++;
-      env = ENVELOPE_UPTR(Msg);
-      SetEnv_msgType(env, ForChareMsg);
-      SetEnv_EP(env, Entry);
-      if (!GetID_isVID((*pChareID)))
-	{
-	  SetEnv_chareBlockPtr(env, (int)
-			       GetID_chareBlockPtr((*pChareID)));
-	  SetEnv_chare_magic_number(env,
-				    GetID_chare_magic_number((*pChareID)));
-	  QDCountThisCreation(Entry, USERcat, ForChareMsg, 1);
-	}
-      else 
-	{
-	  SetEnv_msgType(env, VidEnqueueMsg);
-	  SetEnv_vidBlockPtr(env, (int) GetID_vidBlockPtr((*pChareID)));
-	  QDCountThisCreation(0, IMMEDIATEcat, VidEnqueueMsg, 1);
-	}
-      trace_creation(GetEnv_msgType(env), Entry, env);
-      CkCheck_and_Send(destPE, env);
-    }
+  int destPE = GetID_onPE((*pChareID));
+
+  CpvAccess(nodeforCharesCreated)++;
+  env = ENVELOPE_UPTR(Msg);
+  SetEnv_msgType(env, ForChareMsg);
+  SetEnv_EP(env, Entry);
+  SetEnv_chareBlockPtr(env, (int)GetID_chareBlockPtr((*pChareID)));
+  SetEnv_chare_magic_number(env, GetID_chare_magic_number((*pChareID)));
+  QDCountThisCreation(Entry, USERcat, ForChareMsg, 1);
+  trace_creation(GetEnv_msgType(env), Entry, env);
+  CkCheck_and_Send(destPE, env);
 }
 
 
@@ -479,7 +449,6 @@ void CkLdbSend(msgst, destPE)
      int destPE;
 {
   ENVELOPE *env = (ENVELOPE *)msgst;
-  CmiSetHandler(env, CsvAccess(HANDLE_INCOMING_MSG_Index));
   trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env); 
   CkCheck_and_Send(destPE, env);
 }

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-27 20:29:34  jyelon
+ * Revision 2.4  1995-09-01 02:13:17  jyelon
+ * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
+ *
+ * Revision 2.3  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.2  1995/07/24  01:54:40  jyelon
@@ -42,21 +45,20 @@ static char ident[] = "@(#)$Header$";
 #include "globals.h"
 #include "wrtone.h"
 
-
+extern CHARE_BLOCK *CreateChareBlock();
 
 /*****************************************************************************
 *****************************************************************************/
 void WOVBocInit()
 {
-	BOC_BLOCK *bocBlock;
+	CHARE_BLOCK *bocBlock;
 	WOV_Boc_Data *bocData;
 	int       i;
 
 	TRACE(CmiPrintf("[%d]: WOVBocInit() called\n", CmiMyPe()));
 
-	bocBlock  = (BOC_BLOCK *) CreateBocBlock(sizeof(WOV_Boc_Data));
-	bocBlock->boc_num  = WOVBocNum;
-
+	bocBlock = CreateChareBlock(sizeof(WOV_Boc_Data), CHAREKIND_BOCNODE, 0);
+        bocBlock->x.boc_num = WOVBocNum;
 	SetBocDataPtr(WOVBocNum, (void *) (bocBlock+1));
 	bocData  = (WOV_Boc_Data *) (bocBlock + 1);
 

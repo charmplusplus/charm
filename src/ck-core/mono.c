@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1995-07-27 20:29:34  jyelon
+ * Revision 2.4  1995-09-01 02:13:17  jyelon
+ * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
+ *
+ * Revision 2.3  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.2  1995/07/24  01:54:40  jyelon
@@ -94,7 +97,7 @@ char *x;
 	if ((*(CsvAccess(PseudoTable)[mydata->id].pseudo_type.mono.updatefn))
 		(mydata->dataptr, x))
 	{
-		_CK_BroadcastMono(GetMonoMsgPtr(mydata), ((BOC_BLOCK *)mydata-1)->boc_num) ;
+		_CK_BroadcastMono(GetMonoMsgPtr(mydata), MyBocNum(mydata));
 	}
 }
 

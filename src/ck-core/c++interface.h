@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-07-27 20:29:34  jyelon
+ * Revision 2.5  1995-09-01 02:13:17  jyelon
+ * VID_BLOCK, CHARE_BLOCK, BOC_BLOCK consolidated.
+ *
+ * Revision 2.4  1995/07/27  20:29:34  jyelon
  * Improvements to runtime system, general cleanup.
  *
  * Revision 2.3  1995/07/22  23:44:13  jyelon
@@ -222,7 +225,7 @@ extern "C" int CmiNumSpanTreeChildren(int) ;
 extern "C" int CmiSpanTreeParent(int) ;
 extern "C" void CmiSpanTreeChild(int node, int *children) ;
 
-extern "C" void VidSend(CHARE_BLOCK *, PeNumType, VID_BLOCK *) ;
+extern "C" void VidRetrieveMessages(CHARE_BLOCK *, PeNumType, CHARE_BLOCK *) ;
 // extern "C" void RegisterDynamicBocInitMsg(int *) ;
 // extern "C" void OtherCreateBoc(void *) ;
 extern "C" void SendNodeStatistics() ;
