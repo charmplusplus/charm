@@ -7,7 +7,7 @@
 
 use FileHandle;
 use English;
-use strict; 
+use strict;
 use Getopt::Std;
 my %opts;
 our($opt_s);
@@ -21,7 +21,7 @@ my $outci = "$infile\_sim.ci";
 my $outh = "$infile\_sim.h";
 #my $outC = "$infile\_sim.C";
 my (@strategies,@representations,@posera,@groups,@newline);
-my (%posers,%strat, %methods,%rep,%base,%events,%nonevents,%messages,%needsopeq,%puppy,%cppuppy,%emessages);
+my (%posers,%strat, %methods,%rep,%base,%events,%nonevents,%messages,%needsopeq,%puppy,%cppuppy,%emessages,%extradecl);
 my ($class,$method,$message);
 my ($template,$tdef, $classpattern); #for template support
 my $wantindent=0;
@@ -212,7 +212,7 @@ while (@line=split(' ',($thisline=getcodeline($inhhandle)))) {
       $outhhandle->print("\n");
     } elsif ($issim) {
       #take care of first class copy
-      $outhhandle->print("class $class : public ".$base{$class}." {\n");
+      $outhhandle->print("class $class : public ".$base{$class}.$extradecl{$class}." {\n");
       $outhhandle->print(" private:\n   void ResolveFn(int fnIdx, void *msg);\n") if ($#{$events{$class}}>=0);
       $outhhandle->print("   void ResolveCommitFn(int fnIdx, void *msg);\n") if($#{$events{$class}}>=0);
       $outhhandle->print(" public:\n");
@@ -250,7 +250,7 @@ while (@line=split(' ',($thisline=getcodeline($inhhandle)))) {
 	}
       }
       $outhhandle->print("};\n\n");
-      if (($curstrat eq "opt") || ($currep eq "chpt")) {
+      if (($curstrat =~ /((opt)|(adapt))/) || ($currep eq "chpt")) {
 	print "warning ! no ::operator= in class $class" if (exists($needsopeq{$class}) &&( $opeq!=1));
 	print "warning ! no ~ destructor in $class" if $destructor!=1;
       }
@@ -259,9 +259,9 @@ while (@line=split(' ',($thisline=getcodeline($inhhandle)))) {
       }
       #2nd copy
       if ($currep eq "chpt") {
-	$outhhandle->print("class state_$class : public $currep<state_$class> {\n");
+	$outhhandle->print("class state_$class : public $currep<state_$class>".$extradecl{$class}." {\n");
       } else {
-	$outhhandle->print("class state_$class : public $currep {\n");
+	$outhhandle->print("class state_$class : public $currep ".$extradecl{$class}." {\n");
       }
       $outhhandle->print("  friend class $class;\n");
       my $declout=0;
@@ -319,11 +319,26 @@ while (@line=split(' ',($thisline=getcodeline($inhhandle)))) {
       $tdef='';
       $classpattern=$class;
       if ($thisline =~ /:/) {
-	$outhhandle->print($thisline."\n");
-	$issim=0;
-	$isconstructor=0;
-	$ismessage=0;
-	delete($emessages{$class}) if exists($emessages{$class});
+	if (exists($base{$class})) {
+	  $isconstructor=1;
+	  $issim=1;
+	  $ismessage=0;
+	  $curstrat=$strat{$class};
+	  $currep = $rep{$class};
+	  my $extradecl=$POSTMATCH;
+	  if($extradecl =~ /:\s*([^\{]+)/) {
+	    $extradecl{$class}=", ".$1;
+	  }
+	  print "$curstrat... $currep...$class...$extradecl\n";
+	}
+	else
+	  {
+	    $outhhandle->print($thisline."\n");
+	    $issim=0;
+	    $isconstructor=0;
+	    $ismessage=0;
+	    delete($emessages{$class}) if exists($emessages{$class});
+	  }
       } elsif (defined($messages{$class})) {
 	$ismessage=1;
 	$issim=0;
@@ -929,7 +944,7 @@ sub poserdeal
     my $strat;
     my $rep;
     if (($openblock{$inhandle}==1) && ($blocklevel{$inhandle}==1)) {
-      if ($thisline =~ /^\s*(poser)\s+(\S+)\s+\:\s+(sim)\s+(\S+)\s+(\S+)\s*\{\s*$/) {
+      if ($thisline =~ /^\s*(poser)\s+(\S+)\s+\:\s+(\S+)\s+(\S+)\s+(\S+)\s*\{\s*$/) {
 
 	$line[0]="chare";
 	$class=$2;
@@ -954,32 +969,6 @@ sub poserdeal
 	$needsopeq{$class}=1 if($strat{$class} eq "opt");
 	$needsopeq{$class}=1 if($rep{$class} eq "chpt");
       }
-      elsif ($thisline =~ /^\s*(poser)\s+(\S+)\s+\:\s+(\S+)\s*\{\s*$/) 
-	{
-	$line[0]="chare";
-	$class=$2;
-	$sim='sim';
-	$strat='opt';
-	$rep='chpt';
-	if($opt_s)
-	{
-	    $strat='seq';
-	    $rep='rep'
-	}
-	print " poserdeal class $class \n";
-	push(@strategies, 'opt');
-	push(@representations , 'chpt');
-	$base{$class}='sim';
-	$strat{$class}='opt';
-	$rep{$class}='chpt';
-	$events{$class}=[];
-	push(@{$poser->{outarr}}, "  @line\n");
-	push(@{$poser->{literal}}, "array [1D] ".$class." : ".$3." \{");
-	print  "chare ".$class." : ".$3."\{\n";
-	$needsopeq{$class}=1 if($strat{$class} eq "opt");
-	$needsopeq{$class}=1 if($rep{$class} eq "chpt");
-
-	}
       else {
 	print $thisline;
 	die "bad poser declaration";
