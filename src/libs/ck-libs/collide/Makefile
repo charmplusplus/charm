@@ -17,12 +17,13 @@ LIB=libmodulecollide
 DEST=$(LIBDIR)/$(LIB).a
 
 all: $(DEST) $(CDEST)
+	$(MAKE)  headers
 
-$(DEST): $(OBJS) $(COMPAT) headers
+$(DEST): $(OBJS) $(COMPAT) 
 	$(CHARMC) $(OBJS) $(COMPAT) -o $@
 	cp $(LIB).dep $(LIBDIR)/$(LIB).dep
 
-$(CDEST): $(COBJS) $(COMPAT) headers
+$(CDEST): $(COBJS) $(COMPAT) 
 	$(CHARMC) $(COBJS) $(COMPAT) -o $@
 #	cp $(CLIB).dep $(LIBDIR)/$(CLIB).dep
 
@@ -45,8 +46,12 @@ collide_buffers.o: collide_buffers.C $(HEADDEP)
 threadCollide.o: threadCollide.C $(HEADDEP)
 	$(CHARMC) -c threadCollide.C
 
+collide.def.h: collide.decl.h
+
 collide.decl.h: threadCollide.ci
 	$(CHARMC) threadCollide.ci
+
+collidecharm.def.h: collidecharm.decl.h
 
 collidecharm.decl.h: collidecharm.ci
 	$(CHARMC) collidecharm.ci
