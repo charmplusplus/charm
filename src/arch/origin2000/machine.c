@@ -91,6 +91,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   int i;
   requested_npe = 1; 
   CmiGetArgInt(argv,"+p",&requested_npe);
+  CmiGetArgInt(argv,"++p",&requested_npe);
   arena_size_meg = 16;
   CmiGetArgInt(argv,"+memsize",&arena_size_meg);
 
