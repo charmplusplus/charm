@@ -76,7 +76,7 @@ extern int traceBluegeneLinked;
         if(CpvAccess(traceOn)) CthTraceResume(t);
 # define TRACE_BG_AMPI_START(t, str)  { \
         void* _bgParentLog = NULL;      \
-        _TRACE_BG_TLINE_END(&_bgParentLog);	\
+        /*_TRACE_BG_TLINE_END(&_bgParentLog);*/	\
         _TRACE_BG_BEGIN_EXECUTE_NOMSG(str, &_bgParentLog);      \
         if(CpvAccess(traceOn) && t) CthTraceResume(t);	\
         }
