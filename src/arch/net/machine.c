@@ -1678,8 +1678,8 @@ static void ConverseRunPE(int everReturn)
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
 
-  /* all non 0 pe use the copied one while pe 0 will modify the actual argv */
-  if (CmiMyPe())
+  /* all non 0 rank use the copied one while rank 0 will modify the actual argv */
+  if (CmiMyRank())
     CmiMyArgv = CmiCopyArgs(Cmi_argvcopy);
   else
     CmiMyArgv = Cmi_argv;
