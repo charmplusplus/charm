@@ -17,6 +17,7 @@
 */
 #define CMK_NO_OUTSTANDING_SENDS                        1
 
+#define CMK_BAD_MMAP_ADDRESS                              0xd0000000u
 
 #define CMK_GETPAGESIZE_AVAILABLE                          0
 
