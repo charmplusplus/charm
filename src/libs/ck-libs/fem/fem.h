@@ -62,7 +62,8 @@ extern "C" {
 #define FEM_MESH_FIRST 1650000000 /*This is the first mesh ID:*/
   /* mesh creation */
   int FEM_Mesh_allocate(void); /* build new mesh */
-  void FEM_Mesh_deallocate(int fem_mesh); /* delete this local mesh */
+  int FEM_Mesh_copy(int fem_mesh); /* copy existing mesh */
+  void FEM_Mesh_deallocate(int fem_mesh); /* delete this mesh */
 
   int FEM_Mesh_read(const char *prefix,int partNo,int nParts);
   void FEM_Mesh_write(int fem_mesh,const char *prefix,int partNo,int nParts); 

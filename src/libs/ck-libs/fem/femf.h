@@ -121,6 +121,9 @@
        
        integer function FEM_Mesh_allocate()
        end function
+       integer function FEM_Mesh_copy(mesh)
+          integer, intent(in) :: mesh
+       end function
        subroutine FEM_Mesh_deallocate(mesh) 
           integer, intent(in) :: mesh
        end subroutine

@@ -138,6 +138,27 @@ FEM_Mesh_allocate(void) /* build new mesh */
 FORTRAN_AS_C_RETURN(int,
 	FEM_MESH_ALLOCATE,FEM_Mesh_allocate,fem_mesh_allocate, (void),())
 
+/// Return a new'd copy of this class, by calling pup.
+template <class T>
+T *clonePointerViaPup(T *old) {
+	int len=PUP::size(*old);
+	char *buf=new char[len];
+	PUP::toMemBuf(*old,buf,len);
+	T *nu=new T;
+	PUP::fromMemBuf(*nu,buf,len);
+	return nu;
+}
+
+CDECL int
+FEM_Mesh_copy(int fem_mesh) {
+	const char *caller="FEM_Mesh_copy";FEMAPI(caller);
+	FEMchunk *c=FEMchunk::get(caller);
+	return c->meshes.put(clonePointerViaPup(c->meshes.lookup(fem_mesh,caller)));
+}
+FORTRAN_AS_C_RETURN(int,
+	FEM_MESH_COPY,FEM_Mesh_copy,fem_mesh_copy, (int *m),(*m))
+
+
 CDECL void 
 FEM_Mesh_deallocate(int fem_mesh) /* delete this local mesh */
 {
@@ -243,8 +264,14 @@ CDECL void
 FEM_Mesh_partition(int fem_mesh,int nParts,int *destMeshes) {
 	const char *caller="FEM_Mesh_partition"; FEMAPI(caller);
 	FEMchunk *c=FEMchunk::get(caller);
+	FEM_Mesh *m=c->lookup(fem_mesh,caller);
 	FEM_Mesh_Partition_List l(c,destMeshes);
-	FEM_Mesh_partition(c->lookup(fem_mesh,caller),nParts,&l);
+	if (m->node.size()>0) { /* partition normally */
+		FEM_Mesh_partition(m,nParts,&l);
+	} else { /* no geometric data in mesh-- just copy mesh */
+		for (int i=0;i<nParts;i++)
+			destMeshes[i]=FEM_Mesh_copy(fem_mesh);
+	}
 }
 FORTRAN_AS_C(FEM_MESH_PARTITION,FEM_Mesh_partition,fem_mesh_partition,
 	(int *mesh,int *nParts,int *dest),(*mesh,*nParts,dest))
