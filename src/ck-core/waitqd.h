@@ -47,7 +47,7 @@ class waitGC_chare : public Chare {
   public:
     waitGC_chare(void) { 
       thr=0; mgid=0;
-      retEP = CProxy_waitGC_chare::ckIdx_recvGroupID((ckGroupIDMsg *)0);
+      retEP = CkIndex_waitGC_chare::recvGroupID((ckGroupIDMsg *)0);
     }
     waitGC_chare(CkMigrateMessage *m) {}
     ckGroupIDMsg *createGroup(ckGroupCreateMsg *msg) {

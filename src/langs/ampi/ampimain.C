@@ -77,7 +77,7 @@ ampimain::checkpoint(void)
 {
   qwait++;
   if(qwait == nobjs)
-    CkStartQD(CProxy_ampimain::ckIdx_checkpointOnQd(), &thishandle);
+    CkStartQD(CkIndex_ampimain::checkpointOnQd(), &thishandle);
 }
 
 void

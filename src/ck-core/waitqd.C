@@ -20,7 +20,7 @@ extern "C" CkGroupID CkCreateGroupSync(int cidx, int considx, void *msg)
   if(CkMyPe()==0) {
     return CkCreateGroup(cidx, considx, msg, 0, 0);
   } else {
-    CProxy_waitGC_chare waitChare(CkMyPe());
+    CProxy_waitGC_chare waitChare=CProxy_waitGC_chare::ckNew(CkMyPe());
     ckGroupCreateMsg *inmsg = new ckGroupCreateMsg(cidx, considx, msg);
     ckGroupIDMsg *retmsg = waitChare.createGroup(inmsg);
     CkGroupID gid = retmsg->gid;
@@ -34,7 +34,7 @@ extern "C" CkGroupID CkCreateNodeGroupSync(int cidx, int considx, void *msg)
   if(CkMyPe()==0) {
     return CkCreateNodeGroup(cidx, considx, msg, 0, 0);
   } else {
-    CProxy_waitGC_chare waitChare(CkMyPe());
+    CProxy_waitGC_chare waitChare=CProxy_waitGC_chare::ckNew(CkMyPe());
     ckGroupCreateMsg *inmsg = new ckGroupCreateMsg(cidx, considx, msg);
     ckGroupIDMsg *retmsg = waitChare.createNodeGroup(inmsg);
     CkGroupID gid = retmsg->gid;
@@ -57,7 +57,7 @@ void waitqd_QDChare::waitQD(void) {
     waitStarted = 1;
     threadList = (void*) CdsFifo_Create();
     CdsFifo_Enqueue((CdsFifo) threadList, (void *)CthSelf());
-    CkStartQD(CProxy_waitqd_QDChare::ckIdx_onQD((CkQdMsg*)0), &thishandle);
+    CkStartQD(CkIndex_waitqd_QDChare::onQD((CkQdMsg*)0), &thishandle);
   }
   CthSuspend();
 }
