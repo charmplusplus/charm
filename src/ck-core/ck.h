@@ -22,6 +22,12 @@
 #include "ckstream.h"
 #include "waitqd.h"
 
+#ifndef CMK_OPTIMIZE
+#define _CHECK_VALID(p, msg) {if((p)==0){CkAbort(msg);}}
+#else
+#define _CHECK_VALID(p, msg)
+#endif
+
 class VidBlock {
     enum VidState {FILLED, UNFILLED};
     VidState state;

@@ -97,6 +97,7 @@ static inline void _processForBocMsg(envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register void *obj = CpvAccess(_groupTable)->find(groupID);
+  _CHECK_VALID(obj, "ForGroupMsg: Not a valid groupID\n");
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
   CpvAccess(_currentGroup) = groupID;
@@ -110,6 +111,7 @@ static inline void _processForNodeBocMsg(envelope *env)
   CmiLock(_nodeLock);
   obj = _nodeGroupTable->find(groupID);
   CmiUnlock(_nodeLock);
+  _CHECK_VALID(obj, "ForNodeGroupMsg: Not a valid groupID\n");
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
   CpvAccess(_currentNodeGroup) = groupID;
@@ -119,7 +121,9 @@ static inline void _processForNodeBocMsg(envelope *env)
 static inline void _processFillVidMsg(envelope *env)
 {
   register VidBlock *vptr = (VidBlock *) env->getVidPtr();
+  _CHECK_VALID(vptr, "FillVidMsg: Not a valid VIdPtr\n");
   register CkChareID *pcid = (CkChareID *) EnvToUsr(env);
+  _CHECK_VALID(pcid, "FillVidMsg: Not a valid pCid\n");
   vptr->fill(pcid->onPE, pcid->objPtr);
   CmiFree(env);
 }
@@ -127,6 +131,7 @@ static inline void _processFillVidMsg(envelope *env)
 static inline void _processForVidMsg(envelope *env)
 {
   VidBlock *vptr = (VidBlock *) env->getVidPtr();
+  _CHECK_VALID(vptr, "ForVidMsg: Not a valid VIdPtr\n");
   _SET_USED(env, 1);
   vptr->send(env);
 }
