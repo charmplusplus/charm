@@ -2795,12 +2795,6 @@ void ConverseInitPE()
   CpvAccess(internal_printf_buffer) = (char *) malloc(PRINTBUFSIZE);
   _MEMCHECK(CpvAccess(internal_printf_buffer));
   CthInit(Cmi_argv);
-#if CMK_CCS_AVAILABLE
-  CpvInitialize(void *, CcsRequestQueue);
-  CpvAccess(CcsRequestQueue) = FIFO_Create();
-  CpvInitialize(int, stateAvailable);
-  CpvAccess(stateAvailable) = 0;
-#endif
   ConverseCommonInit(Cmi_argv);
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
@@ -2842,6 +2836,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
   parse_netstart();
   extract_args(argv);
   log_init();
+#if CMK_CCS_AVAILABLE
+  CpvInitialize(void *, CcsRequestQueue);
+  CpvAccess(CcsRequestQueue) = FIFO_Create();
+  CpvInitialize(int, stateAvailable);
+  CpvAccess(stateAvailable) = 0;
+#endif
   signal(SIGPIPE, KillOnSIGPIPE);
   signal(SIGSEGV, KillOnAllSigs);
   signal(SIGBUS, KillOnAllSigs);
