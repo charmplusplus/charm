@@ -66,7 +66,7 @@ and execute them.
 
 Methods of a \index{chare}chare that can be remotely invoked are called
 \index{entry method}{\em entry} methods.  Entry methods may take marshalled
-paramters, or a pointer to a message object.  Since \index{chare}chares can
+parameters, or a pointer to a message object.  Since \index{chare}chares can
 be created on remote processors, obviously some constructor of a chare needs
 to be an entry method.  Ordinary entry methods\footnote{``Threaded'' or
 ``synchronous'' methods are different.} are completely non-preemptive--
@@ -80,7 +80,7 @@ one can imagine chare creation as generating only a seed for the new chare,
 which may {\em take root} on the most {\em fertile} processor. Charm Kernel
 identifies a \index{chare}chare by a {\em ChareID}.  Since user code does not
 need to name a chares' processor, chares can potentially migrate from one
-processor to another.  (This behaviour is used by the dynamic load-balancing
+processor to another.  (This behavior is used by the dynamic load-balancing
 framework for chare containers, such as arrays.)
 
 Other \charmpp\ objects are collections of chares. They are: {\em
@@ -106,10 +106,10 @@ For this purpose, Charm Kernel needs to know the types of
 \index{chare}chares in the user program, the methods that can be invoked on
 these chares from remote processors, the arguments these methods take as
 input etc. Therefore, when the program starts up, these user-defined
-entities need to b registered with Charm Kernel, which assigns a unique
+entities need to be registered with Charm Kernel, which assigns a unique
 identifier to each of them. While invoking a method on a remote object,
 these identifiers need to be specified to Charm Kernel. Registration of
-user-defind entities, and maintaining these identifiers can be cumbersome.
+user-defined entities, and maintaining these identifiers can be cumbersome.
 Fortunately, it is done automatically by the \charmpp\ interface translator.
 The \charmpp\ interface translator generates definitions for {\em proxy}
 objects. A proxy object acts as a {\em handle} to a remote chare. One
@@ -182,7 +182,7 @@ Semantically, they are different from \CC\ objects because they can be created
 asynchronously from remote processors, and their entry methods also could be
 invoked asynchronously from the remote processors. Since the constructor method
 is invoked from remote processor (while creating a chare), every chare should
-have its constuctors as entry methods (with at most one message pointer
+have its constructors as entry methods (with at most one message pointer
 parameter). These chares and their entry methods have to be specified in the
 interface file.
 
@@ -220,7 +220,7 @@ declaration in the interface specification file.
 \subsubsection{Chare Nodegroups}
 
 Chare nodegroups are very similar to chare groups except that instead of having
-one groupmember on each processor, the nodegroup has one member on each shared
+one group member on each processor, the nodegroup has one member on each shared
 memory multiprocessor node. Note that \charmpp\ (and its underlying runtime
 system Converse) distinguish between processors and nodes. A node consists of
 one or more processors that share an address space. The last few years have
