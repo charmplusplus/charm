@@ -491,6 +491,7 @@ class Chare : public TEntity {
     int  isGroup(void) {return attrib&CGROUP;}
     int  isNodeGroup(void) {return attrib&CNODEGROUP;}
     int  isForElement(void) const {return forElement==forIndividual;}
+    int  isForSection(void) const {return forElement==forSection;}
     forWhom getForWhom(void) const {return forElement;}
     void print(XStr& str);
     void genDefs(XStr& str);

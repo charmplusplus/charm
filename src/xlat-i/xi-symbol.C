@@ -1582,7 +1582,7 @@ void Entry::genArrayDecl(XStr& str)
     genArrayStaticConstructorDecl(str);
   } else {
     if (isSync() && !container->isForElement()) return; //No sync broadcast
-    str << "    "<<retType<<" "<<name<<"("<<paramType(1)<<") const;\n";
+    str << "    "<<retType<<" "<<name<<"("<<paramType(1)<<") ;\n"; //no const
   }
 }
 
@@ -1599,7 +1599,7 @@ void Entry::genArrayDefs(XStr& str)
     if (isSync() && !container->isForElement()) return; //No sync broadcast
     
     XStr retStr; retStr<<retType;
-    str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0)<<") const\n"; //no const
+    str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0)<<") \n"; //no const
     str << "{\n"<<marshallMsg();
     str << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
     str << "  impl_amsg->array_setIfNotThere("<<ifNot<<");\n";
@@ -1608,7 +1608,7 @@ void Entry::genArrayDefs(XStr& str)
     } 
     else 
     {
-      if (container->isForElement())
+      if (container->isForElement() || container->isForSection())
         str << "    ckSend(impl_amsg, "<<epIdx()<<");\n";
       else
         str << "    ckBroadcast(impl_amsg, "<<epIdx()<<");\n";
