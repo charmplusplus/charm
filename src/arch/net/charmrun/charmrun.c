@@ -762,9 +762,8 @@ void nodetab_reset(nodetab_host *h)
 #endif
 }
 
-void showIP(unsigned int nip, char *str)
+void showIP(unsigned int ip, char *str)
 {
-  unsigned int ip = ntohl(nip);
   int a1 = ip >> 24;
   int a2 = (ip & 0xFF0000) >> 16;
   int a3 = (ip & 0xFF00) >> 8;
@@ -781,7 +780,7 @@ void nodetab_add(nodetab_host *h)
   if (arg_verbose) {
     char ips[100];
     showIP(h->ip, ips);
-    printf("Charmrun> adding client %d:\"%s\", IP:%s\n", nodetab_size, h->name, ips);
+    printf("Charmrun> adding client %d: \"%s\", IP:%s\n", nodetab_size, h->name, ips);
   }
 
   *nodetab_table[nodetab_size++] = *h;
@@ -1379,7 +1378,7 @@ void req_client_connect(void)
 	for (client=0;client<req_nClients;client++)
 	{/*Wait for the next client to connect to our server port.*/
 		unsigned int clientIP,clientPort;/*These are actually ignored*/
-		if (arg_verbose) printf("Charmrun> Waiting %d-th client to connect.\n",client);
+		if (arg_verbose) printf("Charmrun> Waiting %d-th client to connect.\n",client+1);
 		if (0==skt_select1(server_fd,arg_timeout*1000))
 			client_connect_problem(client,"Timeout waiting for node-program to connect");
 		req_clients[client]=skt_accept(server_fd,&clientIP,&clientPort);
