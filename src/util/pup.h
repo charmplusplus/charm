@@ -3,7 +3,7 @@ Pack/UnPack Library for UIUC Parallel Programming Lab
 Orion Sky Lawlor, olawlor@uiuc.edu, 4/5/2000
 
 This library allows you to easily pack an array, structure,
-or object into a memory buffer or disk file, and then read 
+or object into a memory buffer or disk file, and then read
 the object back later.  The library can also handle translating
 between different machine representations for integers and floats.
 
@@ -117,7 +117,7 @@ public:
 	void seek(int toSection);
 	//Finish with this seeker (must be called)
 	void endBlock(void);
-	
+
 	//An evil hack to avoid inheritance and virtual functions among seekers--
 	// stores the PUP::er specific block start information.
 	union {
@@ -147,7 +147,7 @@ class er {
               {PUP_er_state=inType;}
  public:
   virtual ~er();//<- does nothing, but might be needed by some child
-  
+
   //State queries (exactly one of these will be true)
   CmiBool isSizing(void) const {return (PUP_er_state&IS_SIZING)!=0?CmiTrue:CmiFalse;}
   CmiBool isPacking(void) const {return (PUP_er_state&IS_PACKING)!=0?CmiTrue:CmiFalse;}
@@ -156,11 +156,11 @@ class er {
   //This indicates that the pup routine should free memory during packing.
   void becomeDeleting(void) {PUP_er_state|=IS_DELETING;}
   CmiBool isDeleting(void) const {return (PUP_er_state&IS_DELETING)!=0?CmiTrue:CmiFalse;}
-  
+
   //This indicates that the pup routine should not call system objects' pups.
   void becomeUserlevel(void) {PUP_er_state|=IS_USERLEVEL;}
   CmiBool isUserlevel(void) const {return (PUP_er_state&IS_USERLEVEL)!=0?CmiTrue:CmiFalse;}
-  
+
 //For single elements, pretend it's an array containing one element
   void operator()(signed char &v)     {(*this)(&v,1);}
 #if CMK_SIGNEDCHAR_DIFF_CHAR
@@ -186,21 +186,21 @@ class er {
 
 //For arrays:
   //Integral types:
-  void operator()(signed char *a,int nItems) 
+  void operator()(signed char *a,int nItems)
     {bytes((void *)a,nItems,sizeof(signed char),Tchar);}
 #if CMK_SIGNEDCHAR_DIFF_CHAR
-  void operator()(char *a,int nItems) 
+  void operator()(char *a,int nItems)
     {bytes((void *)a,nItems,sizeof(char),Tchar);}
 #endif
-  void operator()(short *a,int nItems) 
+  void operator()(short *a,int nItems)
     {bytes((void *)a,nItems,sizeof(short),Tshort);}
   void operator()(int *a,int nItems)
     {bytes((void *)a,nItems,sizeof(int),Tint);}
   void operator()(long *a,int nItems)
     {bytes((void *)a,nItems,sizeof(long),Tlong);}
-  
+
   //Unsigned integral types:
-  void operator()(unsigned char *a,int nItems) 
+  void operator()(unsigned char *a,int nItems)
     {bytes((void *)a,nItems,sizeof(unsigned char),Tuchar);}
   void operator()(unsigned short *a,int nItems)
     {bytes((void *)a,nItems,sizeof(unsigned short),Tushort);}
@@ -208,33 +208,33 @@ class er {
     {bytes((void *)a,nItems,sizeof(unsigned int),Tuint);}
   void operator()(unsigned long *a,int nItems)
     {bytes((void *)a,nItems,sizeof(unsigned long),Tulong);}
-  
+
   //Floating-point types:
   void operator()(float *a,int nItems)
     {bytes((void *)a,nItems,sizeof(float),Tfloat);}
   void operator()(double *a,int nItems)
     {bytes((void *)a,nItems,sizeof(double),Tdouble);}
-  
+
 #if CMK_LONG_DOUBLE_DEFINED
   void operator()(long double *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(long double),Tlongdouble);} 
+    {bytes((void *)a,nItems,sizeof(long double),Tlongdouble);}
 #endif
-   
+
   //For bools:
   void operator()(CmiBool *a,int nItems)
     {bytes((void *)a,nItems,sizeof(CmiBool),Tbool);}
-  
+
 #ifdef CMK_PUP_LONG_LONG
   void operator()(CMK_PUP_LONG_LONG *a,int nItems)
-    {bytes((void *)a,nItems,sizeof(CMK_PUP_LONG_LONG),Tlonglong);} 
-  void operator()(unsigned CMK_PUP_LONG_LONG *a,int nItems) 
+    {bytes((void *)a,nItems,sizeof(CMK_PUP_LONG_LONG),Tlonglong);}
+  void operator()(unsigned CMK_PUP_LONG_LONG *a,int nItems)
     {bytes((void *)a,nItems,sizeof(unsigned CMK_PUP_LONG_LONG),Tulonglong);}
 #endif
-  
+
   //For raw memory (n gives number of bytes)
   void operator()(void *a,int nBytes)
     {bytes((void *)a,nBytes,1,Tbyte);}
-  
+
   //For allocatable objects (system will new/delete object and call pup routine)
   void operator()(able** a)
     {object(a);}
@@ -247,14 +247,14 @@ class er {
 
   //A 32-bit synchronization marker (not human readable)
   virtual void synchronize(unsigned int m);
- 
+
  protected:
-  //Generic bottleneck: pack/unpack n items of size itemSize 
+  //Generic bottleneck: pack/unpack n items of size itemSize
   // and data type t from p.  Desc describes the data item
   friend class xlater;
   virtual void bytes(void *p,int n,size_t itemSize,dataType t) =0;
   virtual void object(able** a);
-  
+
   //For seeking (pack/unpack in different orders)
   friend class seekBlock;
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
@@ -319,7 +319,6 @@ class disk : public er {
  protected:
   FILE *F;//Disk file to read from/write to
   disk(unsigned int type,FILE *f):er(type),F(f) {}
-  virtual ~disk();
 
   //For seeking (pack/unpack in different orders)
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
@@ -333,9 +332,9 @@ class toDisk : public disk {
   //Generic bottleneck: pack n items of size itemSize from p.
   virtual void bytes(void *p,int n,size_t itemSize,dataType t);
  public:
-  //Write data to the given file pointer 
+  //Write data to the given file pointer
   // (must be opened for binary write)
-  // Closes file when deleted.
+  // You must close the file yourself when done.
   toDisk(FILE *f):disk(IS_PACKING,f) {}
 };
 
@@ -347,7 +346,7 @@ class fromDisk : public disk {
  public:
   //Write data to the given file pointer 
   // (must be opened for binary read)
-  // Closes file when deleted.
+  // You must close the file yourself when done.
   fromDisk(FILE *f):disk(IS_UNPACKING,f) {}
 };
 
@@ -491,7 +490,7 @@ public:
 		PUP_ID(const char *name) {setName(name);}
 		void setName(const char *name);//Write name into hash
 		CmiBool operator==(const PUP_ID &other) const {
-			for (int i=0;i<len;i++) 
+			for (int i=0;i<len;i++)
 				if (hash[i]!=other.hash[i])
 					return CmiFalse;
 			return CmiTrue;

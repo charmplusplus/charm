@@ -464,6 +464,7 @@ void CentralLB::writeStatsMsgs(const char* filename) {
   for (i = 0; i < stats_msg_count; i++) {
     CkPupMessage(p, (void **)&statsMsgsList[i], 0);
   }
+  fclose(f);
   CmiPrintf("writeStatsMsgs to %s\n", filename);
 }
 

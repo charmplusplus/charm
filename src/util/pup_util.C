@@ -126,8 +126,6 @@ void PUP::fromMem::bytes(void *p,int n,size_t itemSize,dataType t)
 }
 
 /*Disk PUP::er's*/
-PUP::disk::~disk() 
-	{fclose(F);}
 void PUP::toDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
 	{fwrite(p,itemSize,n,F);}
 void PUP::fromDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
