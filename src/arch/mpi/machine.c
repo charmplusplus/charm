@@ -1246,7 +1246,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CsvInitialize(CmiNodeState, NodeState);
   CmiNodeStateInit(&CsvAccess(NodeState));
 
-  procState = (ProcState *)malloc(Cmi_mynodesize * sizeof(ProcState));
+  procState = (ProcState *)malloc((Cmi_mynodesize+1) * sizeof(ProcState));
   for (i=0; i<Cmi_mynodesize+1; i++) {
 /*    procState[i].sendMsgBuf = PCQueueCreate();   */
     procState[i].recvLock = CmiCreateLock();
