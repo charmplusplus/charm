@@ -115,7 +115,11 @@ void traceUserEvent(int e)
 extern "C"
 int traceRegisterUserEvent(const char*x)
 {
+#ifndef CMK_OPTIMIZE
   return CpvAccess(_traces)->traceRegisterUserEvent(x);
+#else
+  return 0;
+#endif
 }
 
 extern "C"
