@@ -344,15 +344,23 @@ static void KillOnAllSigs(int sigNo)
   if (sigNo==SIGKILL) sig="caught signal KILL";
   if (sigNo==SIGQUIT) sig="caught signal QUIT";
   if (sigNo==SIGTERM) sig="caught signal TERM";
-  
   MACHSTATE1(5,"     Caught signal %s ",sig);
-  CmiError("------------- Processor %d Exiting: Caught Signal ------------\n"
+//ifdef this part	
+#ifdef __FAULT__
+  if(sigNo == SIGKILL || sigNo == SIGQUIT || sigNo == SIGTERM){
+		CmiPrintf("[%d] Caught but ignoring signal\n",CmiMyPe());
+  }else{
+#else
+	{
+#endif
+   CmiError("------------- Processor %d Exiting: Caught Signal ------------\n"
   	"Signal: %s\n",CmiMyPe(),sig);
-  if (0!=suggestion[0])
-  	CmiError("Suggestion: %s",suggestion);
-  CmiPrintStackTrace(1);
-  charmrun_abort(sig);
-  machine_exit(1);
+  	if (0!=suggestion[0])
+  		CmiError("Suggestion: %s",suggestion);
+  	CmiPrintStackTrace(1);
+  	charmrun_abort(sig);
+  	machine_exit(1);		
+	}	
 }
 
 static void machine_atexit_check(void)
