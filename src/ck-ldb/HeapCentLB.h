@@ -9,16 +9,19 @@ void CreateHeapCentLB();
 class HeapCentLB : public CentralLB {
 
 struct HeapData {
-	float cpuTime;
-	int   pe;
-	int   id;
+	double load;
+	int    pe;
+	int    id;
 };
 
 public:
   HeapCentLB();
 private:
-  void    Heapify(HeapData *, int, int);
-  CmiBool QueryBalanceNow(int step);
+  void           Heapify(HeapData *, int, int);
+  void           InsertObject(HeapData *, int);
+  HeapData*      BuildCpuArray(CentralLB::LDStats*, int, int *);      
+  HeapData*      BuildObjectArray(CentralLB::LDStats*, int, int *);      
+  CmiBool        QueryBalanceNow(int step);
   CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
 };
 
