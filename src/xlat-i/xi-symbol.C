@@ -288,7 +288,7 @@ Module::generate()
   "#define _DECL_"<<name<<"_H_\n"
   "#include \"charm++.h\"\n";
   if (fortranMode) declstr << "#include \"charm-api.h\"\n";
-  clist->genDecls(declstr);
+  if (clist) clist->genDecls(declstr);
   declstr << "extern void _register"<<name<<"(void);\n";
   if(isMain()) {
     declstr << "extern \"C\" void CkRegisterMainModule(void);\n";
@@ -296,13 +296,13 @@ Module::generate()
   declstr << "#endif"<<endx;
   // defstr << "#ifndef _DEFS_"<<name<<"_H_"<<endx;
   // defstr << "#define _DEFS_"<<name<<"_H_"<<endx;
-  clist->genDefs(defstr);
+  if (clist) clist->genDefs(defstr);
   defstr << 
   "#ifndef CK_TEMPLATES_ONLY\n"
   "void _register"<<name<<"(void)\n"
   "{\n"
   "  static int _done = 0; if(_done) return; _done = 1;\n";
-  clist->genReg(defstr);
+  if (clist) clist->genReg(defstr);
   defstr << "}\n";
   if(isMain()) {
     if (fortranMode) defstr << "extern void _registerf90main(void);\n";
@@ -1299,7 +1299,7 @@ Module::genDecls(XStr& str)
   if(external) {
     str << "#include \""<<name<<".decl.h\"\n";
   } else {
-    clist->genDecls(str);
+    if (clist) clist->genDecls(str);
   }
 }
 
@@ -1307,7 +1307,8 @@ void
 Module::genDefs(XStr& str)
 {
   if(!external)
-    clist->genDefs(str);
+    if (clist) 
+      clist->genDefs(str);
 }
 
 void
@@ -1316,7 +1317,7 @@ Module::genReg(XStr& str)
   if(external) {
     str << "      _register"<<name<<"();"<<endx;
   } else {
-    clist->genDefs(str);
+    if (clist) clist->genDefs(str);
   }
 }
 
