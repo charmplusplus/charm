@@ -143,7 +143,8 @@ int _GETIDX(int cidx)
 
 void _REGISTER_BASE(int didx, int bidx)
 {
-  _chareTable[didx]->addBase(bidx);
+  if (bidx!=-1)
+    _chareTable[didx]->addBase(bidx);
 }
 
 void _REGISTER_DONE(void)
