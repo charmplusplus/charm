@@ -1,0 +1,9 @@
+Simple integration in Charm++.
+
+Parameters are the number of slices and the number of chares.  Where
+the former should be an even multiple of the latter.
+
+Demonstrates basic problem decomposition in an chare array
+context. Work is divided up evenly across the chares and each one
+calculates the results for its slice and passes the result to the
+mainproxy.

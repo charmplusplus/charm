@@ -1,0 +1,9 @@
+Simple integration in Charm++ with reduction.
+
+Parameters are the number of slices and the number of chares.  Where
+the former should be an even multiple of the latter.
+
+Demonstrates basic problem decomposition in an chare array context and
+using a reduction to capture results. Work is divided up evenly across
+the chares and each one calculates the results for its slice and the
+total is accumulated in a global reduction.
