@@ -200,7 +200,7 @@ dirs+sources:
 	rm -rf libs
 	rm -rf ../bin ; mkdir ../bin
 	rm -rf ../lib ; mkdir ../lib
-	rm -rf ../lib_so ; mkdir ../lib_so
+	rm -rf ../lib_so ; mkdir ../lib_so; touch ../lib_so/.charmso
 	rm -rf ../pgms
 	rm -rf ../doc ; ln -s ../doc ../doc
 	../../src/scripts/gatherflat ../../src/scripts .

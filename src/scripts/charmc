@@ -70,7 +70,7 @@ PROG_EXT=""
 
 COPY_EXIT="true"
 CHARM_SHARED="0"
-BUILD_SHARE="0"
+BUILD_SHARE="1"
 SWAPGLOBALS="0"
 
 ####################################################################
@@ -500,7 +500,11 @@ do
 		;;
 	-build-shared|-bs)
 		# used internally when building Charm++ to create lib_so
-		BUILD_SHARE="1"
+		# obsolete, do nothing since BUILD_SHARE is on by default
+		;;
+	-no-build-shared|-nobs)
+		# used internally not to build Charm++ lib_so
+		BUILD_SHARE="0"
 		;;
 	"-O")
 		OPTIMIZE_MODE=true
@@ -1048,12 +1052,14 @@ case "$OBJECT" in
 	  COPYTO_SAVE=$COPYTO
 	  if [ -z "$COPYTO" ]
 	  then
+	    DESTDIR=`echo $OBJECT | sed -e 's@lib/[^/]*\.a$@lib_so@'`
 	    OBJECT=`echo $OBJECT | sed -e 's@lib/\([^/]*\)\.a$@lib_so/\1.a@'`
 	  else
 	    COPYTO=`echo $COPYTO | sed -e 's@lib[/]*$@lib_so@'`
+	    DESTDIR=COPYTO
 	  fi
 	  OBJECT=`echo $OBJECT | sed -e 's/\.a$/.'"$CMK_SHARED_SUF"'/'`
-	  MakeSO
+	  [ -f $DESTDIR/.charmso ] && MakeSO
 	  COPYTO=$COPYTO_SAVE
 	  OBJECT=$OBJECT_SAVE
 	  COPY_EXIT="true"
@@ -1213,7 +1219,7 @@ MEM_OBJ="$CHARMLIB/libmemory-$MEMORY.o"
 
 if [ ! -r $MEM_OBJ -o ! -s $MEM_OBJ ] 
 then
-  (cd $CHARMLIB ; for i in `ls libmemory-*`; do [ -s $i ] && ls -l $i; done )
+  (cd $CHARMLIB ; list=`ls libmemory-* 2>/dev/null`; test -n "$list" && for i in $list; do [ -s $i ] && ls -l $i; done )
   Abort "charmc : No such memory mode $MEMORY"
 fi
 
@@ -1227,7 +1233,7 @@ THREAD_OBJ="$CHARMLIB/libthreads-$THREAD.o"
 
 if [ ! -r $THREAD_OBJ -o ! -s $THREAD_OBJ ] 
 then
-  (cd $CHARMLIB ; for i in `ls libthreads-*`; do [ -s $i ] && ls -l $i; done )
+  (cd $CHARMLIB ; list=`ls libthreads-* 2>/dev/null`; test -n "$list" && for i in $list; do [ -s $i ] && ls -l $i; done )
   Abort "charmc : No such thread mode $THREAD"
 fi
 
