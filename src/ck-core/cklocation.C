@@ -1043,6 +1043,9 @@ void CkLocMgr::pup(PUP::er &p){
 	p|lbdbID;
 	mapID = _RRMapID;
 	if(p.isUnpacking()){
+		thisProxy=thisgroup;
+		CProxyElement_CkLocMgr newlocalproxy(thisgroup,CkMyPe());
+		thislocalproxy=newlocalproxy;
 		//Register with the map object
 		map=(CkArrayMap *)CkLocalBranch(mapID);
 		if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");

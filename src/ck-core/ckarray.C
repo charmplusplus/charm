@@ -433,6 +433,7 @@ void CkArray::pup(PUP::er &p){
 	p|listeners;
 	testPup(p,1234);
 	if(p.isUnpacking()){
+		thisProxy=thisgroup;
 		locMgr = CProxy_CkLocMgr::ckLocalBranch(locMgrID);
 		elements = (ArrayElementList *)locMgr->addManager(thisgroup,this);
 		/// Restore our default listeners:

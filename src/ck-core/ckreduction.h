@@ -408,7 +408,8 @@ class Group : public CkReductionMgr
 
 
 class CkNodeReductionMgr : public IrrGroup {
-    	CProxy_CkNodeReductionMgr thisProxy;
+public:
+	CProxy_CkNodeReductionMgr thisProxy;
 public:
 	CkNodeReductionMgr(void);
 	CkNodeReductionMgr(CkMigrateMessage *m) : IrrGroup(m) {}

@@ -349,6 +349,7 @@ public:
 	CBaseT(CkMigrateMessage *m) :Parent(m), CBase_ProxyInits(this) {}
 	void pup(PUP::er &p) {
 		Parent::pup(p);
+		p|thisProxy;
 	}
 };
 
@@ -446,7 +447,7 @@ class CProxy_Chare : public CProxy {
   private:
     CkChareID _ck_cid;
   public:
-    CProxy_Chare() { 
+    CProxy_Chare() {
 #ifndef CMK_OPTIMIZE
 	_ck_cid.onPE=0; _ck_cid.objPtr=0;
 #endif
@@ -522,7 +523,6 @@ class CkReductionClientBundle : public CkCallback {
 class CProxy_NodeGroup;
 class CProxy_CkArrayReductionMgr;
 class CProxy_Group : public CProxy {
-
   private:
     CkGroupID _ck_gid;
 
@@ -532,12 +532,10 @@ class CProxy_Group : public CProxy {
 	_ck_gid.setZero();
 #endif
 	//CkPrintf(" In CProxy_Group Constructor\n");
-
     }
     CProxy_Group(CkGroupID g)
     	:CProxy(),_ck_gid(g) {
 	//CkPrintf(" In CProxy_Group Constructor\n");
-
 	}
     CProxy_Group(CkGroupID g,CkGroupID dTo)
     	:CProxy(dTo),_ck_gid(g) {
@@ -570,7 +568,7 @@ class CProxy_Group : public CProxy {
     void ckSetGroupID(CkGroupID g) {_ck_gid=g;}
     void pup(PUP::er &p) {
     	CProxy::pup(p);
-	p | _ck_gid;
+	p|_ck_gid;
     }
     CK_REDUCTION_CLIENT_DECL
 };

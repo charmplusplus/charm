@@ -38,11 +38,14 @@ void printIndex(const CkArrayIndex &idx,char *dest) {
 ElementSaver::ElementSaver(const char *dirName_,const int locMgrIdx_) :dirName(dirName_),locMgrIdx(locMgrIdx_){
 	char indexName[1024];
 	//memset(indexName,0,1024);
-	//chdir(dirName);
-	sprintf(indexName,"%s/loc_%d_%d.idx",dirName,locMgrIdx,CkMyPe());
-	indexName[strlen(indexName)]='\0';
+	chdir(dirName);
+	sprintf(indexName,"loc_%d_%d.idx",locMgrIdx,CkMyPe());
+	//indexName[strlen(\)]='\0';
 	indexFile=fopen(indexName,"w");
-	if (indexFile==NULL)  CkAbort("Could not create index file");
+	if (indexFile==NULL){
+		CkPrintf("Could not create index file %s\n",indexName);
+		CkAbort("Could not create index file");
+	}
 	fprintf(indexFile,"CHARM++_Checkpoint_File 1.0 %d %d\n",CkMyPe(),CkNumPes());
 }
 ElementSaver::~ElementSaver() {
@@ -130,12 +133,10 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	if(numGroups != fwrite(tmpInfo,sizeof(GroupInfo),numGroups,fGroups)) CkAbort("error writing groupinfo");
 	PUP::toDisk pGroups(fGroups);
 	for(int i=0;i<numGroups;i++) {
-		if(1||0!=strcmp("LBDatabase",CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getName())){
-			CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->pup(pGroups);
-			DEBCHK(" group just PUP'ed out: gid = %d, name = %s\n",CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->ckGetGroupID().idx,CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getName());
-		}else{
-			DEBCHK(" group NOT PUP'ed out: gid = %d, name = %s\n",CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->ckGetGroupID().idx,CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getName());
-		}
+		CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->pup(pGroups);
+		DEBCHK(" group just PUP'ed out: gid = %d, name = %s\n",\
+			CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getObj()->ckGetGroupID().idx,\
+			CkpvAccess(_groupTable)->find(tmpInfo[i].gID).getName());
 	}
 	delete [] tmpInfo;
 	fclose(fGroups);
@@ -149,27 +150,27 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb){
 	fwrite(&numNodeGroups,sizeof(UInt),1,fNodeGroups);
 	DEBCHK("[%d]CkStartCheckpoint: numNodeGroups = %d\n",CkMyPe(),numNodeGroups);
 
-	tmpInfo = new GroupInfo [numNodeGroups];
+	GroupInfo *tmpInfo2 = new GroupInfo [numNodeGroups];
 	for(int i=0;i<numNodeGroups;i++) {
 		int tmpCtor;
-		tmpInfo[i].gID = CksvAccess(_nodeGroupIDTable)[i];
-		tmpCtor = (tmpInfo[i].eIdx = CksvAccess(_nodeGroupTable)->find(tmpInfo[i].gID).getMigCtor());
-		//DEBCHK("[%d]tmpInfo[%d].gID:%d,migCtor:%d\n",CkMyPe(),i,tmpInfo[i].gID.idx,tmpCtor);
+		tmpInfo2[i].gID = CksvAccess(_nodeGroupIDTable)[i];
+		tmpCtor = (tmpInfo2[i].eIdx = CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getMigCtor());
+		//DEBCHK("[%d]tmpInfo2[%d].gID:%d,migCtor:%d\n",CkMyPe(),i,tmpInfo2[i].gID.idx,tmpCtor);
 		if(tmpCtor==-1) {
 			char buf[512];
 			sprintf(buf,"NodeGroup %s either need a migration constructor and\n\
 				     declared as [migratable] in .ci to be able to checkpoint.",\
-				     CksvAccess(_nodeGroupTable)->find(tmpInfo[i].gID).getName());
+				     CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getName());
 			CkAbort(buf);
 		}
 	}
-	if(numNodeGroups != fwrite(tmpInfo,sizeof(GroupInfo),numNodeGroups,fNodeGroups)) CkAbort("error writing nodegroupinfo");
+	if(numNodeGroups != fwrite(tmpInfo2,sizeof(GroupInfo),numNodeGroups,fNodeGroups)) CkAbort("error writing nodegroupinfo");
 	PUP::toDisk pNodeGroups(fNodeGroups);
 	for(int i=0;i<numNodeGroups;i++) {
-		CksvAccess(_nodeGroupTable)->find(tmpInfo[i].gID).getObj()->pup(pNodeGroups);
-		DEBCHK(" nodegroup just PUP'ed out: gid = %d, name = %s\n",CksvAccess(_nodeGroupTable)->find(tmpInfo[i].gID).getObj()->ckGetGroupID().idx,CksvAccess(_nodeGroupTable)->find(tmpInfo[i].gID).getName());
+		CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getObj()->pup(pNodeGroups);
+		DEBCHK(" nodegroup just PUP'ed out: gid = %d, name = %s\n",CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getObj()->ckGetGroupID().idx,CksvAccess(_nodeGroupTable)->find(tmpInfo2[i].gID).getName());
 	}
-	delete [] tmpInfo;
+	delete [] tmpInfo2;
 	fclose(fNodeGroups);
 
 	// hand over to checkpoint managers for per-processor checkpointing
@@ -186,8 +187,8 @@ ElementRestorer::ElementRestorer(const char *dirName_,CkLocMgr *dest_)
 	:dirName(dirName_), dest(dest_)
 {
 	char indexName[1024];
-	//chdir(dirName);
-	sprintf(indexName,"%s/loc_%d_%d.idx",dirName,dest->ckGetGroupID().idx,CkMyPe());
+	chdir(dirName);
+	sprintf(indexName,"loc_%d_%d.idx",dest->ckGetGroupID().idx,CkMyPe());
 	indexFile=fopen(indexName,"r");
 	if (indexFile==NULL)  CkAbort("Could not read index file");
 	char ignored[128]; double version; int srcPE; int srcSize;
@@ -257,31 +258,12 @@ void CkRestartMain(const char* dirname){
 		CkMigrateMessage m;
 		envelope* env = UsrToEnv(&m);
 		CkCreateLocalGroup(gID, eIdx, env);
-		if(1){//0!=strcmp("LBDatabase",CkpvAccess(_groupTable)->find(gID).getName())){
-			CkpvAccess(_groupTable)->find(gID).getObj()->pup(pGroups);
-			DEBCHK(" group just PUP'ed out: gid = %d, name = %s\n",CkpvAccess(_groupTable)->find(gID).getObj()->ckGetGroupID().idx,CkpvAccess(_groupTable)->find(gID).getName());
-		}else{
-			DEBCHK(" group NOT PUP'ed out: gid = %d, name = %s\n",CkpvAccess(_groupTable)->find(gID).getObj()->ckGetGroupID().idx,CkpvAccess(_groupTable)->find(gID).getName());
-		}
+		CkpvAccess(_groupTable)->find(gID).getObj()->pup(pGroups);
+		DEBCHK(" group just PUP'ed out: gid = %d, name = %s\n",\
+			CkpvAccess(_groupTable)->find(gID).getObj()->ckGetGroupID().idx,\
+			CkpvAccess(_groupTable)->find(gID).getName());
 	}
 	fclose(fGroups);
-
-	// for each location, restore arrays
-	DEBCHK("[%d]Trying to find location manager\n",CkMyPe());
-	IrrGroup* obj;
-	for(int i=0;i<numGroups;i++) {
-		CkGroupID gID = tmpInfo[i].gID;
-		obj = CkpvAccess(_groupTable)->find(gID).getObj();
-		//DEBCHK("tmpInfo[%d]:gID = %d, eIdx = %d, obj->ckGetGroupID() = %d\n",i,gID.idx,tmpInfo[i].eIdx, obj->ckGetGroupID().idx);
-		if(obj->isLocMgr()){
-			CkLocMgr *mgr = (CkLocMgr *)obj;
-			DEBCHK("\tThis is a location manager! obj=%d\n",gID.idx);
-			ElementRestorer restorer(dirname,mgr);
-			while (restorer.restore()) {}
-		}
-		obj->ckJustMigrated();
-	}
-	delete [] tmpInfo;
 
 	// restore nodegroups
 	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
@@ -293,15 +275,15 @@ void CkRestartMain(const char* dirname){
 	if(CkMyPe()==0){ CksvAccess(_numNodeGroups) = numNodeGroups+1; }
 	else { CksvAccess(_numNodeGroups) = 1; }
 
-	tmpInfo = new GroupInfo [numNodeGroups];
-	if(numNodeGroups != fread(tmpInfo,sizeof(GroupInfo),numNodeGroups,fNodeGroups)) CkAbort("error reading nodegroupinfo");
+	GroupInfo* tmpInfo2 = new GroupInfo [numNodeGroups];
+	if(numNodeGroups != fread(tmpInfo2,sizeof(GroupInfo),numNodeGroups,fNodeGroups)) CkAbort("error reading nodegroupinfo");
 
 	PUP::fromDisk pNodeGroups(fNodeGroups);
 	for(int i=0;i<numNodeGroups;i++) {
-		CkGroupID gID = tmpInfo[i].gID;
-		//DEBCHK("tmpInfo[%d]:gID = %d, eIdx = %d\n",i,gID.idx,tmpInfo[i].eIdx);
+		CkGroupID gID = tmpInfo2[i].gID;
+		//DEBCHK("tmpInfo2[%d]:gID = %d, eIdx = %d\n",i,gID.idx,tmpInfo2[i].eIdx);
 		CksvAccess(_nodeGroupIDTable).push_back(gID);
-		int eIdx = tmpInfo[i].eIdx;
+		int eIdx = tmpInfo2[i].eIdx;
 		CkMigrateMessage m;
 		envelope* env = UsrToEnv(&m);
 		CkCreateLocalNodeGroup(gID, eIdx, env);
@@ -309,8 +291,25 @@ void CkRestartMain(const char* dirname){
 		DEBCHK(" nodegroup just PUP'ed out: gid = %d, name = %s\n",CksvAccess(_nodeGroupTable)->find(gID).getObj()->ckGetGroupID().idx,CksvAccess(_nodeGroupTable)->find(gID).getName());
 	}
 	fclose(fNodeGroups);
-	delete [] tmpInfo;
+	delete [] tmpInfo2;
 	}
+
+	// for each location, restore arrays
+	DEBCHK("[%d]Trying to find location manager\n",CkMyPe());
+	IrrGroup* obj;
+	for(int i=0;i<numGroups;i++) {
+		CkGroupID gID = tmpInfo[i].gID;
+		obj = CkpvAccess(_groupTable)->find(gID).getObj();
+		//DEBCHK("tmpInfo[%d]:gID = %d, eIdx = %d, obj->ckGetGroupID() = %d\n",i,gID.idx,tmpInfo[i].eIdx, obj->ckGetGroupID().idx);
+		if(obj->isLocMgr()){
+			CkLocMgr *mgr = (CkLocMgr *)obj;
+			DEBCHK("\tThis is a location manager! lbdb=%d\n",lbdb.idx);
+			ElementRestorer restorer(dirname,mgr);
+			while (restorer.restore()) {}
+		}
+		obj->ckJustMigrated();
+	}
+	delete [] tmpInfo;
 
 	if(CkMyPe()==0) {
 		DEBCHK("[%d]CkRestartMain done. sending out callback.\n",CkMyPe());
