@@ -136,7 +136,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h manager.h \
 	  MetisLB.h NborBaseLB.h \
 	  NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h \
-	  BlueGene.h \
+	  BlueGene.h middle.h middle-blue.h \
 	  $(CVHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
@@ -204,7 +204,7 @@ dirs+sources:
 # Converse Libraries
 #
 ###############################################################################
-CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-graph.o $(L)/libldb-test.o
+CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-graph.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
 TRACELIBS=$(L)/libtrace-none.a $(L)/libtrace-projections.a $(L)/libtrace-summary.a
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
    $(L)/libmemory-verbose.o $(L)/libmemory-paranoid.o
@@ -359,6 +359,9 @@ $(L)/libldb-spray.o: cldb.spray.c $(CVHEADERS)
 
 $(L)/libldb-test.o: cldb.test.c $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.test.c
+
+$(L)/libldb-bluegene.o: cldb.bluegene.c $(CVHEADERS)
+	$(CHARMC) -o $@ cldb.bluegene.c
 
 ## Memory allocation libraries (-memory)
 MEM_DEPS=memory.c memory-gnu.c converse.h conv-mach.h
@@ -711,7 +714,7 @@ libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
 	$(CHARMC) -c BlueGene.C
 	$(CHARMC) -cp ../lib -o libbluegene.a BlueGene.o
 
-blue.o:  blue.h blue.C
+blue.o:  blue.h blue_impl.h blue.C
 	$(CHARMC) -c blue.C
 
 libconv-bluegene.a:   blue.o
