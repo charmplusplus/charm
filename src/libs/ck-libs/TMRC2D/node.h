@@ -21,7 +21,7 @@ class node {  // a 2D double coordinate
   
   node() {
     x=-1.0; y=-1.0; theLock = reports = border = 0; 
-    sumReports[0]=sumReports[1]=0.0;
+    sumReports[0]=sumReports[1]=0.0; present = 0;
   }
   node(double a, double b) { 
     x = a;  y = b;  reports = border = theLock = 0; 
@@ -29,7 +29,7 @@ class node {  // a 2D double coordinate
   }
   node(const node& n) { 
     x = n.x;  y = n.y;  reports = n.reports; border = n.border; 
-    theLock = n.theLock; present = 1;
+    theLock = n.theLock; present = n.present;
     sumReports[0] = n.sumReports[0];  sumReports[1] = n.sumReports[1];
   }
   void set(double a, double b) { 
@@ -38,7 +38,7 @@ class node {  // a 2D double coordinate
   void setBorder() { border = 1; }
   void reset() { 
     x = -1.0; y = -1.0;  theLock = reports = border = 0;
-    sumReports[0] = sumReports[1] = 0.0;
+    sumReports[0] = sumReports[1] = 0.0; present = 0;
   }
   int operator==(const node& n) { return ((x == n.x) && (y == n.y)); }
   node& operator=(const node& n) { 

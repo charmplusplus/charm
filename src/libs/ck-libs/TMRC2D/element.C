@@ -187,7 +187,7 @@ void element::collapse(int shortEdge)
                      shortEdge            
              
                         nbr                      */  
-  node m;  // midpoint on edge
+
   int opnode, delNode, keepNode, delEdge, keepEdge, result;
   elemRef delNbr;
 
@@ -197,8 +197,8 @@ void element::collapse(int shortEdge)
   keepEdge = (shortEdge + 1) % 3;
   keepNode = keepEdge;
 
-  if ((result=edges[shortEdge].collapse(&m, myRef, 
-					C->theNodes[nodes[keepNode]],
+  /*
+  if ((result=edges[shortEdge].collapse(myRef, C->theNodes[nodes[keepNode]],
 					C->theNodes[nodes[delNode]])) == 1) {
     // collapse successful; keepNode is node to keep
     // tell delNbr to replace delEdge with keepEdge
@@ -235,6 +235,28 @@ void element::collapse(int shortEdge)
     // update of keepNode
   }
   // else collapse failed; try again later
+  */
+}
+
+int element::nodeLockup(node n, edgeRef from, edgeRef start, elemRef end, 
+			double l)
+{
+  int nIdx, fIdx, nextIdx;
+  for (int i=0; i<3; i++) {
+    if (n == C->theNodes[nodes[i]]) nIdx = i;
+    if (from == edges[i]) fIdx = i;
+  }
+  /*
+  int lockResult = C->theNodes[nIdx].lock(start, l);
+  if (!lockResult) return 0;
+  if (myRef == end) return 1;
+  if (nIdx == fIdx) nextIdx = (nIdx + 2) % 3;
+  else nextIdx = nIdx;
+  edgeRef nextRef = edges[nextIdx];
+  intMsg *im = mesh[nextRef.cid].nodeLockupER(nextRef.idx, n, start, end, 
+					      myRef, l);
+  return im->anInt;
+  */
 }
 
 int element::findLongestEdge()
@@ -243,8 +265,8 @@ int element::findLongestEdge()
   double maxlen = 0.0, len[3];
   // fine lengths of sides
   len[0] = C->theNodes[nodes[0]].distance(C->theNodes[nodes[1]]);
-  len[1] = C->theNodes[nodes[0]].distance(C->theNodes[nodes[2]]);
-  len[2] = C->theNodes[nodes[1]].distance(C->theNodes[nodes[2]]);
+  len[1] = C->theNodes[nodes[1]].distance(C->theNodes[nodes[2]]);
+  len[2] = C->theNodes[nodes[2]].distance(C->theNodes[nodes[0]]);
   for (i=0; i<3; i++) // find max length of a side
     if (len[i] > maxlen) {
       longEdge = i;

@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include "tri.h"
 
+// I will keep this code until I die!
+//#define accessLock() {printf("%s : %d calling accessLock \n",__FILE__,__LINE__); accessLock1();}
 //readonlys
 CProxy_chunk mesh;
 CtvDeclare(chunk *, _refineChunk);
@@ -140,7 +142,7 @@ collapseOutMsg *chunk::collapse(int idx, elemRef e, node kn, node dn)
 {
   collapseOutMsg *com = new collapseOutMsg;
   accessLock();
-  com->result = theEdges[idx].collapse(&(com->n), e, kn, dn);
+  com->result = theEdges[idx].collapse(e, kn, dn);
   releaseLock();
   return com;
 }
@@ -149,6 +151,26 @@ void chunk::collapseHelp(int idx, edgeRef er, node n1, node n2)
 {
   CkPrintf("TMRC2D: WARNING! chunk::collapseHelp called but not implemented!\n");
   //  theElements[idx].collapseHelp(er, n1, n2);
+}
+
+intMsg *chunk::nodeLockup(int idx, node n, edgeRef from, edgeRef start, 
+			  elemRef end, double l)
+{
+  intMsg *im = new intMsg;
+  accessLock();
+  im->anInt = theElements[idx].nodeLockup(n, from, start, end, l);
+  releaseLock();
+  return im;
+}
+
+intMsg *chunk::nodeLockupER(int idx, node n, edgeRef start, elemRef from, 
+			    elemRef end, double l)
+{
+  intMsg *im = new intMsg;
+  accessLock();
+  im->anInt = theEdges[idx].nodeLockup(n, start, from, end, l);
+  releaseLock();
+  return im;
 }
 
 void chunk::checkPending(int idx, objRef aRef)
@@ -281,7 +303,7 @@ void chunk::reportPos(int idx, double x, double y)
 // to the chunk components
 void chunk::accessLock()
 {
-  while (meshExpandFlag)
+  while (meshExpandFlag && (meshLock==0))
     CthYield();
   meshLock--;
 }
@@ -310,19 +332,27 @@ void chunk::adjustRelease()
 
 void chunk::allocMesh(int nEl)
 {
+  int i;
   sizeElements = nEl * 2;
   sizeNodes = sizeEdges = sizeElements * 3;
+  elementSlots = nEl;
+  firstFreeElement = nEl;
   theElements.resize(sizeElements);
   theNodes.resize(sizeNodes);
   theEdges.resize(sizeEdges);
-  for (int i=0; i<sizeElements; i++)
+  for (i=0; i<sizeElements; i++)
     theElements[i].set(); 
+  for (i=0; i<sizeNodes; i++) {
+    theNodes[i].present = 0; 
+    theEdges[i].present = 0; 
+  }
   conn = new int[3*numGhosts];
   gid = new int[2*numGhosts];
 }
 
 void chunk::adjustMesh()
 {
+  int i;
   if (sizeElements <= elementSlots+100) {
     adjustFlag();
     adjustLock();
@@ -333,6 +363,12 @@ void chunk::adjustMesh()
     theElements.resize(sizeElements);
     theEdges.resize(sizeEdges);
     theNodes.resize(sizeNodes);
+    for (i=elementSlots; i<sizeElements; i++)
+      theElements[i].present = 0;
+    for (i=nodeSlots; i<sizeNodes; i++)
+      theNodes[i].present = 0;
+    for (i=edgeSlots; i<sizeEdges; i++)
+      theEdges[i].present = 0;
     CkPrintf("TMRC2D: [%d] Done adjusting mesh size...\n", cid);
     adjustRelease();
   }
@@ -343,6 +379,7 @@ intMsg *chunk::addNode(node n)
   intMsg *im = new intMsg;
   im->anInt = firstFreeNode;
   theNodes[firstFreeNode] = n;
+  theNodes[firstFreeNode].present = 1;
   numNodes++;
   firstFreeNode++;
   if (firstFreeNode-1 == nodeSlots)  nodeSlots++;
@@ -385,12 +422,15 @@ elemRef chunk::addElement(int n1, int n2, int n3,
 			  edgeRef er1, edgeRef er2, edgeRef er3)
 {
   CkPrintf("TMRC2D: New element %d added with nodes %d, %d and %d\n", 
-	   numElements, n1, n2, n3);
-  elemRef eRef(cid, numElements);
-  theElements[numElements].set(cid, numElements, this);
-  theElements[numElements].set(n1, n2, n3, er1, er2, er3);
-  theElements[numElements].calculateArea();
+	   firstFreeElement, n1, n2, n3);
+  elemRef eRef(cid, firstFreeElement);
+  theElements[firstFreeElement].set(cid, firstFreeElement, this);
+  theElements[firstFreeElement].set(n1, n2, n3, er1, er2, er3);
+  theElements[firstFreeElement].calculateArea();
   numElements++;
+  firstFreeElement++;
+  if (firstFreeElement-1 == elementSlots)  elementSlots++;
+  else  while (theElements[firstFreeElement].isPresent()) firstFreeElement++;
   modified = 1;
   if (!refineInProgress) {
     refineInProgress = 1;
@@ -401,7 +441,7 @@ elemRef chunk::addElement(int n1, int n2, int n3,
 
 void chunk::removeNode(int n)
 {
-  theEdges[n].present = 0;
+  theNodes[n].present = 0;
   theNodes[n].reset();
   if (n < firstFreeNode) firstFreeNode = n;
   else if ((n == firstFreeNode) && (firstFreeNode == nodeSlots)) {
@@ -576,6 +616,7 @@ void chunk::newMesh(int nEl, int nGhost, const int *conn_, const int *gid_,
   numElements=nEl;
   numGhosts = nGhost;
   allocMesh(nEl);
+  CkWaitQD();
   int *conn = new int[3*numGhosts];
   int *gid = new int[2*numGhosts];
 
@@ -652,6 +693,10 @@ void chunk::deriveEdges(int *conn, int *gid)
       }
     }
   }
+  nodeSlots = numNodes;
+  firstFreeNode = numNodes;
+  edgeSlots = numEdges;
+  firstFreeEdge = numEdges;
   CkPrintf("TMRC2D: Done deriving edges...\n");
 }
 
@@ -668,6 +713,7 @@ void chunk::deriveNodes()
       CkAssert(aNode > -1);
       if ((aNode + 1) > numNodes)
 	numNodes = aNode + 1;
+      theNodes[aNode].present = 1;
     }
   }
   CkPrintf("TMRC2D: NumNodes = %d; max node idx = %d\n", numNodes, numNodes-1);
@@ -763,6 +809,15 @@ void chunk::sanityCheck(void)
         CkAbort("-> TMRC2D: numEdges or vector size insane!");
   if (numNodes<0 || (int)theNodes.size()<numNodes)
         CkAbort("-> TMRC2D: numNodes or vector size insane!");
+  i=0; 
+  while (theElements[i].isPresent()) i++;
+  CkAssert(firstFreeElement == i);
+  i=0; 
+  while (theEdges[i].isPresent()) i++;
+  CkAssert(firstFreeEdge == i);
+  i=0; 
+  while (theNodes[i].isPresent()) i++;
+  CkAssert(firstFreeNode == i);
   for (i=0; i<elementSlots; i++) 
     if (theElements[i].isPresent())
       theElements[i].sanityCheck(this, elemRef(cid,i));

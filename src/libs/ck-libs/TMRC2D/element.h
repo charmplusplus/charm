@@ -28,10 +28,10 @@ class element {  // triangular elements defined by three node references,
      orientation:
                        0
                       / \
-                    1/   \0
+                    2/   \0
                     /     \
                    2_______1
-	               2                              */
+	               1                              */
  public:
   int nodes[3];
   edgeRef edges[3];
@@ -72,8 +72,10 @@ class element {  // triangular elements defined by three node references,
   }
 
   /// Basic set operation
-  void set() { targetArea = currentArea = -1.0;  present = 1; } 
-  void set(int c, int i, chunk *ck) { set(); myRef.set(c, i); C = ck; }
+  void set() { targetArea = currentArea = -1.0;  present = 0; } 
+  void set(int c, int i, chunk *ck) { 
+    set(); myRef.set(c, i); C = ck; present = 1; 
+  }
   void set(int *n) { present = 1; for (int i=0; i<3; i++)  nodes[i] = n[i]; }
   void set(int *n, edgeRef *e) {
     present = 1;
@@ -154,7 +156,7 @@ class element {  // triangular elements defined by three node references,
   void split(int longEdge);
   void coarsen();
   void collapse(int shortEdge);
-
+  int nodeLockup(node n, edgeRef from, edgeRef start, elemRef end, double l);
   int findLongestEdge();
   int findShortestEdge();
   int isLongestEdge(edgeRef& e);

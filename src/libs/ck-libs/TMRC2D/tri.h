@@ -156,6 +156,10 @@ class chunk : public TCharmClient1D {
   splitOutMsg *split(int idx, elemRef e, node in, node fn);
   collapseOutMsg *collapse(int idx, elemRef e, node kn, node dn);
   void collapseHelp(int idx, edgeRef er, node n1, node n2);
+  intMsg *nodeLockup(int idx, node n, edgeRef from, edgeRef start, elemRef end,
+		     double l);
+  intMsg *nodeLockupER(int idx, node n, edgeRef start, elemRef from, 
+		       elemRef end, double l);
   void checkPending(int idx, objRef aRef);
   void checkPending(int idx, objRef aRef1, objRef aRef2);
   void updateElement(int idx, objRef oldval, objRef newval);

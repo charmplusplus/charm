@@ -91,18 +91,20 @@ int edge::split(int *m, edgeRef *e_prime, node iNode, node fNode,
   }
 }
 
-int edge::collapse(node *m, elemRef requester, node kNode, node dNode)
+int edge::collapse(elemRef requester, node kNode, node dNode)
 {
   return -1;
   // element requester has asked this edge to collapse and give back new node
   // coordinates resulting node; return value is 1 if successful, 0 if
   // dNode is the node that is kept
+  /*
   elemRef nbr = getNot(requester), nullRef;
   nullRef.reset();
-  if (pending && (waitingFor == requester)) { 
-    // already collapsed; waiting for requester
+  if (pending && (waitingFor == requester)) { // collapsed; awaiting requester
     CkPrintf("TMRC2D: edge::collapse: ** PART 2! ** On edge=%d on chunk=%d, requester=(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);
-    *m = newNode;
+    //remove this edge
+    //update & unlock kNode or dNode
+    //delete dNode or kNode
     if (dNode == incidentNode) return 1; // incidence as planned
     else return 0; // incidence is on kNode
   }
@@ -111,21 +113,49 @@ int edge::collapse(node *m, elemRef requester, node kNode, node dNode)
     return -1;
   }
   else { // Need to do the collapse
+    // need to lock adjacent nodes
+    intMsg *im = mesh[requester.cid].nodeLockup(requester.idx, kNode, myRef, myRef,
+						nbr, length);
+    if (im->anInt == -1) 
+      im = mesh[nbr.cid].nodeLockup(nbr.idx, kNode, myRef, myRef, requester, 
+				    length);
+    if (!im->anInt) return -1;
+    else {
+      im = mesh[requester.cid].nodeLockup(requester.idx, dNode, myRef, myRef,
+					  nbr, length);
+      if (im->anInt == -1) 
+	im = mesh[nbr.cid].nodeLockup(nbr.idx, kNode, myRef, myRef, requester, 
+				      length);
+      if (!im->anInt) return -1;
+    }
+    // both nodes locked
   CkPrintf("TMRC2D: edge::collapse: ** PART 1! ** On edge=%d on chunk=%d, requester==(%d,%d) with nbr=(%d,%d)\n", myRef.idx, myRef.cid, requester.cid, requester.idx, nbr.cid, nbr.idx);
     setPending();
-    present = 0;
-    // should call a "remove edge" operation for the chunk
     kNode.midpoint(dNode, newNode);
     incidentNode = dNode;
     fixNode = kNode;
-    *m = newNode;
     if (nbr.cid != -1) {
       waitingFor = nbr;
       double nbrArea = nbr.getArea();
       mesh[nbr.cid].coarsenElement(nbr.idx, nbrArea);
     }
+    else {
+      //remove this edge
+      //update and unlock kNode
+      //delete dNode
+    }
     return 1;
   }
+  */
+}
+
+int edge::nodeLockup(node n, edgeRef start, elemRef from, elemRef end, 
+		     double l)
+{
+  elemRef next = getNot(from);
+  if (next.cid == -1) return -1;
+  intMsg *im = mesh[next.cid].nodeLockup(next.idx, n, myRef, start, end, l);
+  return im->anInt;
 }
 
 void edge::sanityCheck(chunk *c, edgeRef shouldRef) 

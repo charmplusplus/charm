@@ -16,9 +16,9 @@ class edge {
   edgeRef myRef;
   elemRef elements[2];  // the elements on either side of the edge
   int present;  // indicates this is an edge present in the mesh
-  edge() { unsetPending(); }
+  edge() { unsetPending(); present = 0; }
   edge(int idx, int cid, chunk *myChk) { 
-    unsetPending(); myRef.set(cid, idx); C = myChk; 
+    unsetPending(); myRef.set(cid, idx); C = myChk; present = 1;
   }
   edge(elemRef e1, elemRef e2, int p) {
     elements[0] = e1;  elements[1] = e2;  pending = p; 
@@ -37,9 +37,10 @@ class edge {
     fixNode = e.fixNode;
     newEdgeRef = e.newEdgeRef;
     myRef = e.myRef;
+    present = e.present;
   }
   void set(int idx, int cid, chunk *myChk)  { 
-    unsetPending(); myRef.set(cid, idx); C = myChk; 
+    unsetPending(); myRef.set(cid, idx); C = myChk; present = 1;
   }
   void set(elemRef e1, elemRef e2) { elements[0] = e1;  elements[1] = e2; }
   void set(elemRef *e) { elements[0] = e[0]; elements[1] = e[1]; }
@@ -55,6 +56,7 @@ class edge {
     fixNode = e.fixNode;
     newEdgeRef = e.newEdgeRef;
     myRef = e.myRef;
+    present = e.present;
     return *this; 
   }
   int isPresent() { return present; }
@@ -78,8 +80,9 @@ class edge {
   void checkPending(elemRef e, elemRef ne);
   int split(int *m, edgeRef *e_prime, node iNode, node fNode,
 	    elemRef requester, int *local, int *first, int *nullNbr);
-  int collapse(node *m, elemRef requester, node kNode, node dNode);
+  int collapse(elemRef requester, node kNode, node dNode);
   void sanityCheck(chunk *c, edgeRef shouldRef);
+  int nodeLockup(node n, edgeRef start, elemRef from, elemRef end, double l);
 };
 
 #endif
