@@ -22,8 +22,8 @@ class foo \{
 
     //pack/unpack routine: describe my fields to charm++
     void pup(PUP::er &p) \{
-      p(a);
-      p(x);p(y);p(z);
+      p|a;
+      p|x; p|y; p|z;
       p(q,3);
     \}
 \};
@@ -123,7 +123,7 @@ class bar \{
 private:
     foo *f; /*Heap-allocated foo object*/
     int n;
-    double *arr;/*Dynamically allocated array of n doubles*/
+    double *arr;/*malloc'd array of n doubles*/
 public:
     ...other methods...
     //Destructor is the usual
@@ -135,7 +135,7 @@ public:
          f=new foo;
       f->pup(p);//pup f's fields
       
-      p(n);//pup the array length n
+      p|n;//pup the array length n
       if (p.isUnpacking()) 
          arr=(double *)malloc(sizeof(double)*n);
       p(arr,n);//pup array data
@@ -146,26 +146,46 @@ PUPmarshall(bar); //<- for passing foo's as marshalled parameters
 
 
 \subsubsection{Automatic allocation via PUP::able}
-If the \uw{foo *} above might have been a subclass, instead of
+If the class \uw{foo} above might have been a subclass, instead of
 simply using \uw{new foo} above we would have had to allocate 
 an object of the appropriate subclass.  Since determining the
-proper subclass and calling the appropriate constructor can be 
+proper subclass and calling the appropriate constructor yourself can be 
 difficult, the PUP framework provides a scheme for automatically
 determining and dynamically allocating subobjects of the appropriate type.
 
-You enable this by inheriting the root of your inheritance heirarchy 
-from \kw{PUP::able}, adding empty \kw{CkMigrateMessage *} constructors,
-and including a few \#defines for each class.
-Each class needs a \kw{PUPable\_decl(\uw{className})} in its 
-declaration body, a \kw{PUPable\_def(\uw{className})} exactly once
-at file scope, and a \kw{PUPable\_reg(\uw{className})} executed
-exactly once on each processor at initialization time (usually
-via the ``initcall'' mechanism, see chapter of the same name).
-For example,
+Your superclass must inherit from \kw{PUP::able}, which provides 
+the basic machinery used to move the class.  
+A concrete superclass and all its concrete subclasses require these
+four features:
+
+\begin{itemize}
+\item A line declaring \kw{PUPable \uw{className};} in the .ci file.
+This registers the class's constructor.
+
+\item A call to the macro \kw{PUPable\_decl(\uw{className})} in the
+class's declaration, in the header file.  This adds a virtual 
+method to your class to allow \kw{PUP::able} to determine your class's type.
+
+\item A migration constructor---a constructor that takes \kw{CkMigrateMessage *}.
+This is used to create the new object on the receive side, immediately
+before calling the new object's \kw{pup} routine.
+
+\item A working, virtual \kw{pup} method.  You can omit this if your
+class has no data that needs to be packed.
+\end{itemize}
+
+An abstract superclass---a superclass that will never actually be 
+packed---only needs to inherit from \kw{PUP::able} and include a 
+\kw{PUPable\_abstract(\uw{className})} macro in their body.  The 
+.ci file, \kw{PUPable\_decl} macro, and constructor are not needed.
+
+For example, if \uw{parent} is a concrete superclass and \uw{child} its
+subclass,
 
 \begin{alltt}
-//Somewhere in the .ci file:
-   initcall void parentChildInit(void);
+//In the .ci file:
+   PUPable parent;
+   PUPable child; //Could also have said ``PUPable parent, child;''
 
 //In the .h file:
 class parent : public PUP::able \{
@@ -173,34 +193,29 @@ class parent : public PUP::able \{
 public:
     ... other methods ...
     parent() \{...\}
+    
+    //PUP::able support: decl, migration constructor, and pup
+    PUPable\_decl(parent);  
     parent(CkMigrateMessage *m) : PUP::able(m) \{\}
     virtual void pup(PUP::er &p) \{
         PUP::able::pup(p);//Call base class
         ... pup data members as usual ...
-    \}
-    PUPable\_decl(parent);    
+    \}  
 \};
 class child : public parent \{
     ... more data members ...
 public:    ... more methods, possibly virtual ...
     child() \{...\}
+    
+    //PUP::able support: decl, migration constructor, and pup
+    PUPable\_decl(child);  
     child(CkMigrateMessage *m) : parent(m) \{\}
     virtual void pup(PUP::er &p) \{
         parent::pup(p);//Call base class
         ... pup child's data members as usual ...
-    \}
-    PUPable\_decl(child);    
+    \}  
 \};
 
-//Somewhere in a .C file:
-PUPable\_def(parent);
-PUPable\_def(child);
-
-void parentChildInit(void)
-\{//Called once on each processor
-    PUPable\_reg(parent);
-    PUPable\_reg(child);
-\}
 \end{alltt}
 
 These declarations supercede the \kw{PUPmarshall} declaration 
@@ -208,7 +223,8 @@ described earlier.
 
 With these declarations, then, we can automatically 
 allocate and pup a pointer to a parent or child
-using the vertical bar \kw{PUP::er} syntax:
+using the vertical bar \kw{PUP::er} syntax, which on the receive
+side will create a new object of the appropriate type:
 
 \begin{alltt}
 class keepsParent \{
@@ -233,29 +249,84 @@ and extra private data.
 
 If obj is NULL when packed, it will be restored to NULL when unpacked.
 For example, if the nodes of a binary tree are \kw{PUP::able},
-one may write the tree's pup routine easily:
+one may write a recursive pup routine for the tree quite easily:
 
 \begin{alltt}
+// In the .ci file:
+    PUPable treeNode;
+
+// In the .h file
 class treeNode : public PUP::able \{
     treeNode *left;//Left subtree
     treeNode *right;//Right subtree
     ... other fields ...
 public:
-    ... usual PUP::able support: ...
-    treeNode(CkMigrateMessage *m) : PUP::able(m) \{\}
+    treeNode(treeNode *l=NULL, treeNode *r=NULL);
     ~treeNode() \{delete left; delete right;\}
+    
+    // The usual PUP::able support:
+    PUPable\_decl(treeNode);
+    treeNode(CkMigrateMessage *m) : PUP::able(m) \{ left=right=NULL; \}
     void pup(PUP::er &p) \{
         PUP::able::pup(p);//Call base class
         p|left;
         p|right;
         ... pup other fields as usual ...
     \}
-    PUPable\_decl(treeNode);
 \};
 \end{alltt}
 
-This same implementation will work properly if the tree's
+This same implementation will also work properly even if the tree's
 internal nodes are actually subclasses of treeNode.
+
+Finally, a \kw{PUP::able} superclass like \uw{parent} above 
+must normally be passed around via a pointer or reference, because the object
+might actually be some subclass like \uw{child}.  Because
+pointers and references cannot be passed across processors,
+for parameter marshalling you must use the special templated 
+smart pointer classes \kw{CkPointer} and \kw{CkReference},
+which only need to be listed in the .ci file.
+
+A \kw{CkReference} is a read-only reference to a \kw{PUP::able} object---it
+is only valid for the duration of the method call.  A \kw{CkPointer}
+transfers ownership of the unmarshalled \kw{PUP::able} to the method, so the 
+pointer can be kept and the object used indefinitely.  
+
+For example, if the entry method \uw{bar} needs a \kw{PUP::able} \uw{parent}
+object for in-call processing, you would use a \kw{CkReference} like this:
+
+\begin{alltt}
+// In the .ci file:
+    entry void barRef(int x,CkReference<parent> p);
+
+// In the .h file:
+    void barRef(int x,parent &p) \{
+      // can use p here, but only during this method invocation
+    \}
+\end{alltt}
+
+If the entry method needs to keep its parameter, use a \kw{CkPointer} like this:
+\begin{alltt}
+// In the .ci file:
+    entry void barPtr(int x,CkPointer<parent> p);
+
+// In the .h file:
+    void barPtr(int x,parent *p) \{
+      // can keep this pointer indefinitely, but must eventually delete it
+    \}
+\end{alltt}
+
+Both \kw{CkReference} and \kw{CkPointer} are read-only from the send 
+side---unlike messages, which are consumed when sent, the same object 
+can be passed to several parameter marshalled entry methods.
+In the example above, we could do:
+
+\begin{alltt}
+   parent *p=new child;
+   someProxy.barRef(x,*p);
+   someProxy.barPtr(x,p); // Makes a copy of p
+   delete p; // We allocated p, so we destroy it.
+\end{alltt}
 
 
 \subsubsection{Common PUP::ers}
