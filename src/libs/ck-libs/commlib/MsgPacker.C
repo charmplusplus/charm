@@ -1,6 +1,6 @@
+#include "ComlibManager.h"
 #include "MsgPacker.h"
 #include "register.h"
-#include "ComlibManager.h"
 
 CkpvExtern(int, RecvCombinedShortMsgHdlrIdx);
 
