@@ -8,7 +8,7 @@ CpvDeclare(int, RecvdummyHandle);
 //CpvDeclare(int, AllDoneHandle);
 
 CkGroupID cmgrID;
-//extern CkGroupID delegateManagerID;
+extern CkGroupID delegateMgr;
 
 void recv_msg(void *msg){
 
@@ -27,7 +27,7 @@ void recv_msg(void *msg){
 }
 
 void recv_dummy(void *msg){
-    ComlibPrintf("Received Dummy%d\n", CkMyPe());    
+    ComlibPrintf("Received Dummy %d\n", CkMyPe());    
     CmiFree(msg);
 }
 
@@ -51,7 +51,10 @@ ComlibManager::ComlibManager(int s, int n, int nmFlush, int bFlush){
 
 void ComlibManager::init(int s, int n, int nmFlush, int bFlush){
     
-    comm_debug = 1;
+    //comm_debug = 1;
+
+    npes = 0;
+    pelist = NULL;
 
     cmgrID = thisgroup;
 
@@ -81,12 +84,15 @@ void ComlibManager::init(int s, int n, int nmFlush, int bFlush){
     CpvInitialize(int, RecvdummyHandle);
     CpvAccess(RecvdummyHandle) = CmiRegisterHandler((CmiHandler)recv_dummy);
     
+    /*
     if(CkMyPe() == 0) {
-	//printf("before createinstance\n");
-        comid = ComlibInstance(strategy, CkNumPes());
-	//printf("after createInstance\n");
-	//        idSet = 1;
+    //printf("before createinstance\n");
+    comid = ComlibInstance(strategy, CkNumPes());
+    //printf("after createInstance\n");
+    //        idSet = 1;
     }
+    */
+    
     //else
     idSet = 0;
     
@@ -101,6 +107,9 @@ void ComlibManager::init(int s, int n, int nmFlush, int bFlush){
     
     CProxy_ComlibManager cgproxy(cmgrID);
     cgproxy[0].done();
+
+    createDone = 0;
+    doneReceived = 0;
 }
 
 void ComlibManager::done(){
@@ -108,10 +117,62 @@ void ComlibManager::done(){
 
     nrecvd ++;
 
-    if(nrecvd == CkNumPes()){
+    if(nrecvd == CkNumPes()) {
+      if(createDone){
         CProxy_ComlibManager cgproxy(cmgrID);
-	cgproxy.receiveID(comid);
+
+        if(npes != 0)
+            cgproxy.receiveID(npes, pelist, comid);
+        else
+            cgproxy.receiveID(comid);
+      }
+      doneReceived = 1;
     }
+}
+
+void ComlibManager::createId(){
+  comid = ComlibInstance(strategy, CkNumPes());
+
+  if(doneReceived){
+    CProxy_ComlibManager cgproxy(cmgrID);
+    //    cgproxy.receiveID(npes, pelist, comid);
+    if(npes != 0)
+        cgproxy.receiveID(npes, pelist, comid);
+    else
+        cgproxy.receiveID(comid);
+  }
+  createDone = 1;
+}
+
+void ComlibManager::createId(int *pelist, int npes){
+    comid = ComlibInstance(strategy, npes);
+    comid = ComlibEstablishGroup(comid, npes, pelist);
+
+    this->pelist = pelist;
+    this->npes = npes;
+
+    ComlibPrintf("Creating comid with %d processors\n", npes);
+
+    if(doneReceived){
+      CProxy_ComlibManager cgproxy(cmgrID);
+      //      cgproxy.receiveID(npes, pelist, comid);
+      if(npes != 0)
+          cgproxy.receiveID(npes, pelist, comid);
+      else
+          cgproxy.receiveID(comid);
+    }
+    createDone = 1;
+    
+    //    setReverseMap(pelist, npes);
+}
+
+void ComlibManager::setReverseMap(int *pelist, int npes){
+    
+    for(int pcount = 0; pcount < CkNumPes(); pcount++)
+        procMap[pcount] = -1;
+    
+    for(int pcount = 0; pcount < npes; pcount++)
+        procMap[pelist[pcount]] = pcount;
 }
 
 void ComlibManager::localElement(){
@@ -139,14 +200,14 @@ void ComlibManager::endIteration(){
         iterationFinished = 1;
         
         if((messageCount == 0) && (CkNumPes() > 0)) {
-            char *newmsg = (char *) CmiAlloc(CmiMsgHeaderSizeBytes);
+            DummyMsg * dummymsg = new DummyMsg;
             
             ComlibPrintf("Creating a dummy message\n");
             
-            CmiSetHandler(UsrToEnv(newmsg), 
+            CmiSetHandler(UsrToEnv(dummymsg), 
                           CpvAccess(RecvdummyHandle));
             
-            messageBuf = new CharmMessageHolder((char *)newmsg, CmiMyPe());
+            messageBuf = new CharmMessageHolder((char *)dummymsg, CkMyPe());
             messageCount ++;
         }
         
@@ -161,8 +222,9 @@ void ComlibManager::endIteration(){
                 for(count = 0; count < messageCount; count ++) {
                     if(strategy != USE_DIRECT) {
                         char * msg = cmsg->getCharmMessage();
-                        ComlibPrintf("Calling EachToMany %d %d %d\n", 
-                                     UsrToEnv(msg)->getTotalsize(), CkMyPe(), cmsg->dest_proc);
+                        ComlibPrintf("Calling EachToMany %d %d %d procMap=%d\n", 
+                                     UsrToEnv(msg)->getTotalsize(), CkMyPe(), cmsg->dest_proc,
+                                     procMap[cmsg->dest_proc]);
                         EachToManyMulticast(comid, UsrToEnv(msg)->getTotalsize(), UsrToEnv(msg), 
                                             1, &procMap[cmsg->dest_proc]);
                     }
@@ -212,11 +274,18 @@ void ComlibManager::endIteration(){
 }
 
 void ComlibManager::receiveID(comID id){
+    receiveID(0, NULL, id);
+}
+
+void ComlibManager::receiveID(int npes, int *pelist, comID id){
     
     //    ComlibPrintf("received id in %d\n", CkMyPe());
     
     if(idSet)
         return;
+
+    if(npes != 0)
+        setReverseMap(pelist, npes);
 
     comid = id; 
     idSet = 1;
@@ -232,8 +301,11 @@ void ComlibManager::receiveID(comID id){
             for(int count = 0; count < messageCount; count ++) {
                 if(strategy != USE_DIRECT) {
                     char * msg = cmsg->getCharmMessage();
-                    ComlibPrintf("Calling EachToMany %d %d %d\n", UsrToEnv(msg)->getTotalsize(), 
-                                 CkMyPe(), cmsg->dest_proc);
+
+                    ComlibPrintf("Calling EachToMany %d %d %d procMap=%d\n", 
+                                 UsrToEnv(msg)->getTotalsize(), CkMyPe(), cmsg->dest_proc,
+                                 procMap[cmsg->dest_proc]);
+
                     EachToManyMulticast(comid, UsrToEnv(msg)->getTotalsize(), UsrToEnv(msg), 
                                         1, &procMap[cmsg->dest_proc]);
                 }
@@ -326,17 +398,23 @@ void ComlibManager::ArraySend(int ep, void *msg,
     messageBuf = cmsg;    
 }
 
+#include "qd.h"
+//CpvExtern(QdState*, _qd);
+
 void ComlibManager::GroupSend(int ep, void *msg, int onPE, CkGroupID gid){
     
     int dest_proc = onPE;
     ComlibPrintf("Send Data %d %d %d\n", CkMyPe(), dest_proc, UsrToEnv(msg)->getTotalsize());
 
+    register envelope * env = UsrToEnv(msg);
     if(dest_proc == CkMyPe()){
+        _SET_USED(env, 0);
         CkSendMsgBranch(ep, msg, dest_proc, gid);
         return;
     }
     
-    register envelope * env = UsrToEnv(msg);
+    CpvAccess(_qd)->create(1);
+
     env->setMsgtype(ForBocMsg);
     env->setEpIdx(ep);
     env->setGroupNum(gid);

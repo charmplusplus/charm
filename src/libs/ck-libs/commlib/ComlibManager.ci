@@ -1,5 +1,8 @@
 module ComlibModule { 
   readonly CkGroupID cmgrID;
+
+  message DummyMsg;
+
   message ComlibMsg {
     char data[];
   };
@@ -11,7 +14,10 @@ module ComlibModule {
     entry ComlibManager(int s, int n, int nMessages, int nBytes);
 
     entry void done(void);
+
     entry void receiveID(comID id);
+    entry void receiveID(int n, int p[n], comID id);
+
     entry void localElement(void);
     entry void ArraySend(int ep, void *msg, CkArrayIndexMax &idx, CkArrayID a);
     entry void GroupSend(int ep, void *msg, int onpe, CkGroupID gid);
@@ -21,5 +27,7 @@ module ComlibModule {
     entry void endIteration();
 
     entry void receiveNamdMessage(ComlibMsg * msg);
+    entry void createId(void);
+    entry void createId(int *, int);
   }
 };

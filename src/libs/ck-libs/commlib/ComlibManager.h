@@ -34,6 +34,10 @@ class CharmMessageHolder {
     void setRefcount(char * root_msg);
 };
 
+class DummyMsg: public CMessage_DummyMsg {
+    int dummy;
+};
+
 class ComlibMsg: public CMessage_ComlibMsg {
  public:
     int nmessages;
@@ -51,6 +55,11 @@ class ComlibManager: public CkDelegateMgr{
 
     int *procMap;
 
+    int createDone, doneReceived;
+
+    int npes;
+    int *pelist;
+
     int messagesBeforeFlush;
     int bytesBeforeFlush;
 
@@ -65,7 +74,8 @@ class ComlibManager: public CkDelegateMgr{
     int idSet, iterationFinished;
     
     void init(int s, int n, int Messages, int nBytes); //strategy, nelements 
-    
+    void setReverseMap(int *, int);
+
  public:
     ComlibManager(int s); //strategy, nelements 
     ComlibManager(int s, int n); //strategy, nelements 
@@ -74,7 +84,10 @@ class ComlibManager: public CkDelegateMgr{
 
     void done();
     void localElement();
+
     void receiveID(comID id);
+    void receiveID(int npes, int *pelist, comID id);
+
     void ArraySend(int ep, void *msg, const CkArrayIndexMax &idx, CkArrayID a);
     void GroupSend(int ep, void *msg, int onpe, CkGroupID gid);
     void setNumMessages(int nmessages);
@@ -82,7 +95,9 @@ class ComlibManager: public CkDelegateMgr{
     void beginIteration();
     void endIteration();
 
-    void ComlibManager::receiveNamdMessage(ComlibMsg * msg);
+    void receiveNamdMessage(ComlibMsg * msg);
+    void createId();
+    void createId(int *, int);
 };
 
 #endif
