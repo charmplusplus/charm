@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-06-20 14:50:24  gursoy
+ * removed SHARED_DECL
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.3  1995/05/03  20:57:54  sanjeev
@@ -28,8 +31,6 @@
 #ifndef CONST_H
 #define CONST_H
 
-/* There is no shared declaration for nonshared machines */
-#define SHARED_DECL
 
 /* constants for denoting illegal values (used as flags) */
 #define NULL_VID       NULL
