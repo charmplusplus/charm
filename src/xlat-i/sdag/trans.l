@@ -51,6 +51,14 @@ while			{Return(WHILE);}
 forall			{Return(FORALL);}
 for			{Return(FOR);}
 atomic			{Return(ATOMIC);}
+int			{Return(INT);}
+short			{Return(SHORT);}
+long			{Return(LONG);}
+float			{Return(FLOAT);}
+double			{Return(DOUBLE);}
+unsigned		{Return(UNSIGNED);}
+void			{Return(VOID);}
+const			{Return(CONST);}
 
 {identifier}		{Return(IDENT);}
 
@@ -70,7 +78,7 @@ atomic			{Return(ATOMIC);}
 
 "#"			{Return(DEFAULT);}
 "."			{Return(DEFAULT);}
-"&"			{Return(DEFAULT);}
+"&"			{Return(AMPERESIGN);}
 "+"			{Return(DEFAULT);}
 "-"			{Return(DEFAULT);}
 "~"			{Return(DEFAULT);}
@@ -82,7 +90,7 @@ atomic			{Return(ATOMIC);}
 "^"			{Return(DEFAULT);}
 "|"			{Return(DEFAULT);}
 "?"			{Return(DEFAULT);}
-"="			{Return(DEFAULT);}
+"="			{Return(EQUAL);}
 
 {decimal_constant}  	{Return(DEFAULT);}
 {octal_constant}    	{Return(DEFAULT);}

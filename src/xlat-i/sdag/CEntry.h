@@ -11,24 +11,34 @@
 #include "xi-util.h"
 #include "sdag-globals.h"
 #include "CList.h"
+#include "CStateVar.h"
 
 class CParseNode;
 
 class CEntry{
   public:
     XStr *entry;
-    XStr *msgType;
+    CParseNode *paramlist;
     int entryNum;
+    int needsParamMarshalling;
     int refNumNeeded;
+    TList<CStateVar*> *myParameters;
     TList<CParseNode*> whenList;
-    CEntry(XStr *e, XStr *m) : entry(e), msgType(m) {
-      entryNum = numEntries++;
-      refNumNeeded=0;
+    CEntry(XStr *e, CParseNode *p, TList<CStateVar*>& list, int pm) : entry(e), paramlist(p), needsParamMarshalling(pm) {
+       myParameters = new TList<CStateVar*>();
+       CStateVar *sv;
+       for(sv=list.begin(); !list.end(); sv=list.next()) {
+	  myParameters->append(sv);
+       }
+       entryNum = numEntries++;
+       refNumNeeded =0;
     }
+
     void print(int indent) {
       Indent(indent);
-      printf("entry %s (%s *)", entry->charstar(), msgType->charstar());
-    }
+//      printf("entry %s (%s *)", entry->charstar(), msgType->charstar());
+    } 
+
     void generateCode(XStr& op);
     void generateDeps(XStr& op);
 };

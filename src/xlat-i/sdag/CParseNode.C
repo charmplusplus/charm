@@ -89,7 +89,6 @@ void CParseNode::print(int indent)
       con4->print(0); printf(")");
       break;
     case ATOMIC:
-      printf("atomic\n");
       text->print(indent+1);
       break;
     default:
@@ -108,6 +107,9 @@ static void syntaxError(CLexer *cLexer)
 CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser)
 {
   CToken *tok;
+  CToken *tok1;
+  int numberOfPointers;
+  int count;
 
   type = t; text = 0; constructs = new TList<CParseNode*>();
   con1 = con2 = con3 = con4 = 0;
@@ -116,12 +118,7 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser)
       tok = cParser->lookForToken(IDENT);
       con1 = new CParseNode(IDENT, tok->text);
       tok = cParser->lookForToken(LP); delete tok;
-      tok = cParser->lookForToken(IDENT);
-      con2 = new CParseNode(IDENT, tok->text);
-      tok = cParser->lookForToken(STAR); delete tok;
-      tok = cParser->lookForToken(IDENT);
-      con3 = new CParseNode(IDENT, tok->text);
-      tok = cParser->lookForToken(RP); delete tok;
+      con2 = new CParseNode(PARAMLIST, cLexer, cParser); 
       tok = cLexer->getNextToken();
       if(tok->type == LBRACE) {
         delete tok;
@@ -143,7 +140,13 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser)
       tok = cLexer->getNextToken();
       if(tok->type == LBRACE) {
         delete tok;
-        constructs->append(new CParseNode(SLIST, cLexer, cParser));
+        tok = cLexer->lookAhead();
+        if (tok->type == RBRACE) {
+           tok = cLexer->getNextToken(); 
+           delete tok;
+        }
+        else
+           constructs->append(new CParseNode(SLIST, cLexer, cParser));
       } else {
         constructs->append(new CParseNode(tok->type, cLexer, cParser));
       }
@@ -236,6 +239,7 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser)
       tok = cParser->lookForToken(IDENT);
       con1 = new CParseNode(IDENT, tok->text);
       tok = cParser->lookForToken2(LB, LP);
+      con2 = 0;
       if(tok->type == LB) {
         delete tok;
         tok = cLexer->getIntExpr(RB);
@@ -243,12 +247,8 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser)
         tok = cParser->lookForToken(RB); delete tok;
         tok = cParser->lookForToken(LP); delete tok;
       }
-      tok = cParser->lookForToken(IDENT);
-      con3 = new CParseNode(IDENT, tok->text);
-      tok = cParser->lookForToken(STAR); delete tok;
-      tok = cParser->lookForToken(IDENT);
-      con4 = new CParseNode(IDENT, tok->text);
-      tok = cParser->lookForToken(RP); delete tok;
+      con3 = new CParseNode(PARAMLIST, cLexer, cParser);
+      isVoid = con3->isVoid;
       tok = cLexer->lookAhead();
       if(tok->type == COMMA) {
         delete tok;
@@ -278,9 +278,174 @@ CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser)
         constructs->append(new CParseNode(tok->type, cLexer, cParser));
       }
       break;
+   case PARAMLIST:
+      tok = cLexer->lookAhead();
+      if (tok->type == RP)  {
+            isVoid = 1;
+      }
+      else 
+         isVoid = 0;
+     
+      while (tok->type != RP) {
+        CParseNode *parameter1 = new CParseNode(PARAMETER, cLexer, cParser);
+	if (parameter1->isVoid == 1) {
+	   isVoid = 1;
+        }
+      	constructs->append(parameter1);
+        tok = cLexer->lookAhead();
+        if (tok->type != RP) {
+ 	   tok = cParser->lookForToken(COMMA); delete tok;
+	   tok = cLexer->lookAhead();
+ 	}
+      }
+      tok = cParser->lookForToken(RP); delete tok;
+      break;
+   case PARAMETER:
+      tok = cLexer->lookAhead();
+      con1 = new CParseNode(VARTYPE, cLexer, cParser);  // con1 holds the type
+      isVoid = con1->isVoid;
+      con2 = 0; con3 = 0; con4 = 0;
+      tok = cLexer->lookAhead();
+      if (tok->type == IDENT) { // Case where it is "Type Name" 
+         tok = cParser->lookForToken(IDENT);
+         con2 = new CParseNode(IDENT, tok->text);  // con2 holds the Name
+        tok = cLexer->lookAhead();
+         if (tok->type == LB) {  // Case where it is "Type Name [ArrayLengthExpression]"
+	    tok = cParser->lookForToken(LB);  delete tok;
+            tok = cLexer->getNextToken();
+	    int q = 0;
+	    XStr *arrayExp = new XStr("");;
+	    while (tok->type != RB) {
+	      q++;
+	      arrayExp->append(*(tok->text));
+	      tok = cLexer->getNextToken();
+	    }
+	    if (q == 0)
+	      printf("ERROR: Need to have the length of the array specified\n");
+	    delete tok;
+            con3 = new CParseNode(IDENT, arrayExp); // con3 holds the expression for the array length
+         }
+         else if (tok->type == EQUAL) {  // Case where it is "Type Name = DEFAULTPARAMETER"
+	    tok = cLexer->getNextToken(); delete tok;
+	    tok = cLexer->getNextToken();
+	    if ((tok->type == LITERAL) || (tok->type == NUMBER))
+	      con4 = new CParseNode(tok->type, tok->text); //con4 holds the DEFAULTPARAMETER 
+            else {
+              delete tok;
+              count = 0;
+              tok = cLexer->lookAhead();
+	      while (((tok->type != RP) && (tok->type != COMMA)) || (count != 0)) {
+                 if (tok->type == LP)
+                    count++;
+                 else if (tok->type == RP)
+                    count--;
+                 tok = cLexer->getNextToken(); delete tok;
+	         tok = cLexer->lookAhead();
+	      }
+	    }
+ 	 }
+      }
+      break;
+   case VARTYPE:
+      isVoid = 0;
+      tok = cLexer->getNextToken();
+      con1 = 0; con2 = 0; con3 = 0; con4 = 0;
+      if (tok->type == CONST) {
+         con1 = new CParseNode(CONST, tok->text);
+	 con2 = new CParseNode(VARTYPE, cLexer, cParser);
+      }
+      else {
+        if ((tok->type == INT) || (tok->type == LONG) || (tok->type == SHORT) || (tok->type == DOUBLE) 
+	      || (tok->type == FLOAT) || (tok->type == UNSIGNED) || (tok->type == VOID)
+	      || (tok->type == CHAR) || (tok->type == IDENT)) {
+           tok1 = cLexer->lookAhead();
+	   if ((tok->type == VOID) && (tok1->type == RP)) {
+	      isVoid = 1;
+              delete tok;
+	   }
+	   else {
+	     if (tok->type == UNSIGNED) {
+      	       tok1 = cLexer->getNextToken(); 
+      	     }
+             else if (tok->type == LONG) {
+     	       tok1 = cLexer->lookAhead();
+               if ((tok1->type == LONG) || (tok1->type == DOUBLE))
+                 tok1 = cLexer->getNextToken();
+	       else
+	         tok1 = 0;
+       	     }
+      	     else {
+	       tok1 = 0;
+             }
+	     CToken *temptok;
+             temptok = cLexer->lookAhead();
+             numberOfPointers = 0;
+             while (temptok->type == STAR) {
+ 	        temptok = cParser->lookForToken(STAR); delete temptok;
+	        numberOfPointers = numberOfPointers + 1;
+	        temptok = cLexer->lookAhead();
+             }
+             if (numberOfPointers  == 0) {
+	        con3 = new CParseNode(SIMPLETYPE, cLexer, cParser, tok, tok1, 0);
+             }
+	     else if (numberOfPointers >= 1) {
+                con3 = new CParseNode(PTRTYPE, cLexer, cParser, tok, tok1, numberOfPointers);
+	     } 
+           }
+	}
+      }  
+      tok = cLexer->lookAhead();
+      if (tok->type == AMPERESIGN) {
+	tok = cLexer->getNextToken();
+        con4 = new CParseNode(AMPERESIGN, tok->text);
+      }
+      else if (tok->type == LP) {
+         tok = cLexer->getNextToken(); delete tok;
+         con4 = new CParseNode(FUNCTYPE, cLexer, cParser);
+      }
+      break;
+    case FUNCTYPE:
+      tok = cParser->lookForToken(STAR); delete tok;     
+      tok = cParser->lookForToken(IDENT);
+      con1 = new CParseNode(IDENT, tok->text);
+      tok = cParser->lookForToken(RP); delete tok;
+      tok = cParser->lookForToken(LP); delete tok;
+      con2 = new CParseNode(PARAMLIST, cLexer, cParser);
+      break;
     default:
       syntaxError(cLexer);
       break;
   }
 }
+
+CParseNode::CParseNode(EToken t, CLexer *cLexer, CParser *cParser, CToken *tokA, CToken *tokB, int pointers)
+{
+  CToken *tok;
+
+  type = t; text = 0; constructs = new TList<CParseNode*>();
+  con1 = con2 = con3 = con4 = 0;
+  switch (t) {
+    case SIMPLETYPE:
+      if ((tokA->type == INT) || (tokA->type == LONG) || (tokA->type == CHAR) || (tokA->type == SHORT)
+	|| (tokA->type == UNSIGNED) || (tokA->type == FLOAT) || (tokA->type == DOUBLE) || (tokA->type == VOID) || (tokA->type == IDENT))
+	   con1 = new CParseNode(BUILTINTYPE, cLexer, cParser, tokA, tokB, pointers);
+      else
+          printf("ERROR: The parser doesn't handle this type \n");
+      break;
+    case BUILTINTYPE:
+      con2 = 0;
+      con1 = new CParseNode(tokA->type, tokA->text);
+      if (tokB != 0)
+         con2 = new CParseNode(tokB->type, tokB->text);
+      break;
+    case PTRTYPE:
+      numPtrs = pointers;
+      con1 = new CParseNode(SIMPLETYPE, cLexer, cParser, tokA, tokB, 0);
+      break;
+    default:
+      syntaxError(cLexer);
+      break;
+    }
+}
+
 
