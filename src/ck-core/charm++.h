@@ -101,6 +101,7 @@ class CkArrayIndexMax : public CkArrayIndex {
 	}
 public:
 	CkArrayIndexMax(void) { }
+	CkArrayIndexMax(int i) {}   // used for CkVec
 	CkArrayIndexMax(const CkArrayIndex &that) 
 		{copyFrom(that);}
 	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
