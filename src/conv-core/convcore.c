@@ -360,6 +360,7 @@ char **argv;
   ConverseParseOptions(argv);
   CmiInit(argv);
   CsdInit(argv);
+  CthInit();
 }
 
 ConverseExit()

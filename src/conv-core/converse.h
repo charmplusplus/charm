@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.19  1995-09-20 17:22:14  jyelon
+ * Revision 2.20  1995-09-26 18:26:00  jyelon
+ * Added CthSetStrategyDefault, and cleaned up a bit.
+ *
+ * Revision 2.19  1995/09/20  17:22:14  jyelon
  * Added CthImplemented
  *
  * Revision 2.18  1995/09/20  16:36:56  jyelon
@@ -93,7 +96,9 @@ extern "C" {
 #define CMK_CONCAT(x,y) x##y
 #endif
 
-/******** MACROS AND PROTOTYPES FOR CPV AND CSV *******/
+
+
+/******** CPV, CSV: PRIVATE AND SHARED VARIABLES *******/
 
 #ifdef CMK_NO_SHARED_VARS_AT_ALL
 
@@ -140,11 +145,6 @@ extern "C" {
 
 #ifdef CMK_SHARED_VARS_UNIPROCESSOR
 
-extern int Cmi_mype;
-extern int Cmi_numpe;
-#define CmiMyPe() Cmi_mype
-#define CmiNumPe() Cmi_numpe
-
 #define SHARED_DECL
 #define CpvDeclare(t,v) t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
@@ -167,25 +167,16 @@ extern int Cmi_numpe;
 
 
 
+/******** CMI, CSD: MANY LOW-LEVEL OPERATIONS ********/
 
-
-
-
-
-
-/******** PROTOTYPES FOR CONVERSE TYPES ********/
+#define CmiMsgHeaderSizeBytes 4
 
 typedef void (*CmiHandler)();
 typedef void  *CmiCommHandle;
 
 CsvExtern(CmiHandler*, CmiHandlerTable);
-
-
-
-/******** PROTOTYPES FOR CMI FUNCTIONS AND MACROS *******/
-
-
-#define CmiMsgHeaderSizeBytes 4
+CpvExtern(void*,       CsdSchedQueue);
+CpvExtern(int,         CsdStopFlag);
 
 extern int CmiRegisterHandler CMK_PROTO((CmiHandler));
 
@@ -193,9 +184,37 @@ extern int CmiRegisterHandler CMK_PROTO((CmiHandler));
 
 #define CmiSetHandler(env,x)  (*((int *)(env)) = x)
 
-#define CmiGetHandlerFunction(env) (CsvAccess(CmiHandlerTable)[CmiGetHandler(env)])
+#define CmiGetHandlerFunction(env)\
+    (CsvAccess(CmiHandlerTable)[CmiGetHandler(env)])
 
-void *CmiGetMsg CMK_PROTO(());
+void    *CmiGetMsg CMK_PROTO(());
+
+void    *CmiAlloc  CMK_PROTO((int size));
+int      CmiSize   CMK_PROTO(());
+void     CmiFree   CMK_PROTO((void *));
+
+double   CmiTimer  CMK_PROTO(());
+
+int      CmiSpanTreeRoot         CMK_PROTO(()) ;
+int      CmiNumSpanTreeChildren  CMK_PROTO((int)) ;
+int      CmiSpanTreeParent       CMK_PROTO((int)) ;
+void     CmiSpanTreeChildren     CMK_PROTO((int node, int *children)) ;
+
+
+#define CsdEnqueueGeneral(x,s,i,p)\
+    (CqsEnqueueGeneral(CpvAccess(CsdSchedQueue),x,s,i,p))
+#define CsdEnqueueFifo(x)     (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),x))
+#define CsdEnqueueLifo(x)     (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),x))
+#define CsdEnqueue(x)         (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),x))
+#define CsdEmpty()            (CqsEmpty(CpvAccess(CsdSchedQueue)))
+
+extern  void  CsdScheduler CMK_PROTO((int));
+extern  void *CsdGetMsg    CMK_PROTO(());
+
+/* for uniprocessor CsdExitScheduler() is a function in machine.c */
+#ifndef CMK_SHARED_VARS_UNIPROCESSOR
+#define CsdExitScheduler()  (CpvAccess(CsdStopFlag)=1)
+#endif 
 
 #ifdef CMK_CMIMYPE_IS_A_BUILTIN
 int CmiMyPe CMK_PROTO((void));
@@ -209,11 +228,12 @@ CpvExtern(int, Cmi_numpe);
 #define CmiNumPe() CpvAccess(Cmi_numpe)
 #endif
 
-void *CmiAlloc  CMK_PROTO((int size));
-int   CmiSize   CMK_PROTO(());
-void  CmiFree   CMK_PROTO((void *));
-
-double CmiTimer CMK_PROTO(());
+#ifdef CMK_CMIMYPE_UNIPROCESSOR
+extern int Cmi_mype;
+extern int Cmi_numpe;
+#define CmiMyPe() Cmi_mype
+#define CmiNumPe() Cmi_numpe
+#endif
 
 #ifdef CMK_CMIPRINTF_IS_A_BUILTIN
 void  CmiPrintf CMK_PROTO(());
@@ -227,13 +247,7 @@ int   CmiScanf  CMK_PROTO(());
 #define CmiScanf  scanf
 #endif
 
-int CmiSpanTreeRoot CMK_PROTO(()) ;
-int CmiNumSpanTreeChildren CMK_PROTO((int)) ;
-int CmiSpanTreeParent CMK_PROTO((int)) ;
-void CmiSpanTreeChildren CMK_PROTO((int node, int *children)) ;
-
-
-/******** CONSTANTS FOR CONVERSE QUEUEING SYSTEM ********/
+/******** CQS: THE QUEUEING SYSTEM ********/
 
 #define CQS_QUEUEING_FIFO 0
 #define CQS_QUEUEING_LIFO 1
@@ -242,9 +256,9 @@ void CmiSpanTreeChildren CMK_PROTO((int node, int *children)) ;
 #define CQS_QUEUEING_BFIFO 4
 #define CQS_QUEUEING_BLIFO 5
 
-/******** PROTOTYPES FOR CTH FUNCTIONS AND MACROS ********/
+/****** CTH: THE THREADS PACKAGE ******/
 
-typedef struct StructCthThread *CthThread;
+typedef struct CthThreadStruct *CthThread;
 
 typedef void        (*CthVoidFn)();
 typedef CthThread   (*CthThFn)();
@@ -256,35 +270,17 @@ CthThread  CthCreate   CMK_PROTO((CthVoidFn, void *, int));
 void       CthResume   CMK_PROTO((CthThread));
 void       CthFree     CMK_PROTO((CthThread));
 
-void       CthSuspend      CMK_PROTO((void));
-void       CthAwaken       CMK_PROTO((CthThread));
-void       CthSetStrategy  CMK_PROTO((CthThread, CthVoidFn, CthThFn));
-void       CthYield        CMK_PROTO((void));
+void       CthSuspend             CMK_PROTO((void));
+void       CthAwaken              CMK_PROTO((CthThread));
+void       CthSetStrategy         CMK_PROTO((CthThread, CthVoidFn, CthThFn));
+void       CthSetStrategyDefault  CMK_PROTO((CthThread));
+void       CthYield               CMK_PROTO((void));
 
 void       CthSetVar   CMK_PROTO((CthThread, void **, void *));
 void      *CthGetVar   CMK_PROTO((CthThread, void **));
 
 
 /******** PROTOTYPES FOR CSD FUNCTIONS AND MACROS ********/
-
-CpvExtern(void*, CsdSchedQueue);
-CpvExtern(int, CsdStopFlag);
-
-/* for uniprocessor CsdExitScheduler() is a function in machine.c */
-#ifndef CMK_SHARED_VARS_UNIPROCESSOR
-#define CsdExitScheduler()  (CpvAccess(CsdStopFlag)=1)
-#endif 
-
-#define CsdEnqueueGeneral(x,s,i,p)\
-    (CqsEnqueueGeneral(CpvAccess(CsdSchedQueue),x,s,i,p))
-#define CsdEnqueueFifo(x)     (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),x))
-#define CsdEnqueueLifo(x)     (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),x))
-#define CsdEnqueue(x)         (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),x))
-
-#define CsdEmpty()     (CqsEmpty(CpvAccess(CsdSchedQueue)))
-
-extern  void  CsdScheduler CMK_PROTO((int));
-extern  void *CsdGetMsg CMK_PROTO(());
 
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 

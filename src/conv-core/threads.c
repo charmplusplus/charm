@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.6  1995-09-20 17:22:14  jyelon
+ * Revision 1.7  1995-09-26 18:26:00  jyelon
+ * Added CthSetStrategyDefault, and cleaned up a bit.
+ *
+ * Revision 1.6  1995/09/20  17:22:14  jyelon
  * Added CthImplemented
  *
  * Revision 1.5  1995/09/20  16:36:56  jyelon
@@ -64,15 +67,7 @@
  * void CthFree(CthThread t)
  *
  *   - Frees thread t.  You may free the currently-executing thread, although
- *     the free will actually be postponed until the thread exits.
- *
- *
- *     It is the user's job to manage the ready-pool.  This gives the user
- *     maximum control over prioritization and scheduling.  The user must
- *     provide two functions: one that inserts a thread into the ready-pool,
- *     and one that selects a next-thread from the ready-pool (deleting it
- *     from the ready-pool at the same time).  These functions are called
- *     ready_insert_fn and ready_choose_fn respectively:
+ *     the free will actually be postponed until the thread suspends.
  *
  *
  * In addition to the routines above, the threads package assumes that there
@@ -118,6 +113,14 @@
  *     thread.)  Of course, you may use the same functions for all threads
  *     (the common case), but the specification on a per-thread basis gives
  *     you maximum flexibility in controlling scheduling.
+ *
+ * void CthSetStrategyDefault(CthThread t)
+ *
+ *     Sets the scheduling strategy for thread t to be the default strategy.
+ *     All threads, when created, are set for the default strategy.  The
+ *     default strategy is to awaken threads by inserting them into the
+ *     main CsdScheduler queue, and to suspend them by returning control
+ *     to the thread running the CsdScheduler.
  *
  * void CthYield()
  *
@@ -169,6 +172,50 @@
 
 /*****************************************************************************
  *
+ * threads: common code.
+ *
+ * This section contains the following functions, which are common across
+ * all implementations:
+ *
+ * CthSetStrategyDefault
+ *
+ *****************************************************************************/
+
+CpvStaticDeclare(CthThread, CthSchedThreadVar);
+CpvStaticDeclare(int, CthSchedResumeIndex);
+
+static CthThread CthSchedThread()
+{
+  return CpvAccess(CthSchedThreadVar);
+}
+
+static void CthSchedResume(CthThread t)
+{
+  CpvAccess(CthSchedThreadVar) = CthSelf();
+  CthResume(t);
+}
+
+static void CthSchedEnqueue(CthThread t)
+{
+  CmiSetHandler(t, CpvAccess(CthSchedResumeIndex));
+  CsdEnqueueFifo(t);
+}
+
+static void CthSchedInit()
+{
+  CpvInitialize(CthThread, CthSchedThreadVar);
+  CpvInitialize(int, CthSchedResumeIndex);
+  CpvAccess(CthSchedResumeIndex) = CmiRegisterHandler(CthSchedResume);
+}
+
+void CthSetStrategyDefault(CthThread t)
+{
+  CthSetStrategy(t, CthSchedEnqueue, CthSchedThread);
+}
+
+
+/*****************************************************************************
+ *
  * threads: implementation CMK_THREADS_USE_ALLOCA.
  *
  * This particular implementation of threads works on most machines that
@@ -186,8 +233,9 @@
 #define STACKSIZE (32768)
 #define SLACK     256
 
-struct StructCthThread
+struct CthThreadStruct
 {
+  char cmicore[CmiMsgHeaderSizeBytes]; /* So we can enqueue them */
   jmp_buf    jb;
   CthVoidFn  fn;
   void      *arg;
@@ -215,15 +263,17 @@ static void CthInit()
   char *sp2 = alloca(8);
   if (sp2<sp1) thread_growsdown = 1;
   else         thread_growsdown = 0;
-  thread_current = (CthThread)malloc(sizeof(struct StructCthThread));
+  thread_current = (CthThread)malloc(sizeof(struct CthThreadStruct));
   thread_current->fn=0;
   thread_current->arg=0;
   thread_current->data_count=0;
+  thread_current->awakenfn = CthSchedEnqueue;
+  thread_current->choosefn = CthSchedThread;
+  CthSchedInit();
 }
 
 CthThread CthSelf()
 {
-  if (thread_current==0) CthInit();
   return thread_current;
 }
 
@@ -265,8 +315,7 @@ CthThread CthCreate(fn, arg, size)
 {
   CthThread  result; char *oldsp, *newsp; int offs, erralloc;
   if (size==0) size = STACKSIZE;
-  if (thread_current == 0) CthInit();
-  result = (CthThread)malloc(sizeof(struct StructCthThread) + size);
+  result = (CthThread)malloc(sizeof(struct CthThreadStruct) + size);
   oldsp = alloca(0);
   if (thread_growsdown) {
       newsp = ((char *)(result->stack)) + size - SLACK;
@@ -278,8 +327,8 @@ CthThread CthCreate(fn, arg, size)
   result->fn = fn;
   result->arg = arg;
   result->top = newsp;
-  result->awakenfn = 0;
-  result->choosefn = 0;
+  result->awakenfn = CthSchedEnqueue;
+  result->choosefn = CthSchedThread;
   result->data_count = 0;
   erralloc = (char *)alloca(offs) - newsp;
   if (ABS(erralloc) >= SLACK) 
@@ -421,5 +470,8 @@ void CthSetVar(t, var, val)
 void *CthGetVar(t, var)
     CthThread t; void **var;
     { CthFail(); }
+
+void CthInit()
+    { CthSchedInit(); }
 
 #endif /* CMK_THREADS_UNAVAILABLE */
