@@ -202,8 +202,9 @@ void element::collapse(int shortEdge)
 					C->theNodes[nodes[delNode]])) == 1) {
     // collapse successful; keepNode is node to keep
     // tell delNbr to replace delEdge with keepEdge
-    delNbr = edges[delEdge].getNot(myRef);
-    mesh[delNbr.cid].updateElementEdge(delEdge, keepEdge);
+    delNbr = edges[delEdge].getNbr(myRef);
+    mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
+				       edges[keepEdge]);
     // tell keepEdge to replace myRef with delNbr
     edges[keepEdge].update(myRef, delNbr);
     // remove self
@@ -221,8 +222,9 @@ void element::collapse(int shortEdge)
     delEdge = (shortEdge + 1) % 3;
     delNode = delEdge;
     // tell delNbr to replace delEdge with keepEdge
-    delNbr = edges[delEdge].getNot(myRef);
-    mesh[delNbr.cid].updateElementEdge(delEdge, keepEdge);
+    delNbr = edges[delEdge].getNbr(myRef);
+    mesh[delNbr.cid].updateElementEdge(delNbr.idx, edges[delEdge], 
+				       edges[keepEdge]);
     // tell keepEdge to replace myRef with delNbr
     edges[keepEdge].update(myRef, delNbr);
     // remove self

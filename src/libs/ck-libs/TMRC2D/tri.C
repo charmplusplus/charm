@@ -346,7 +346,7 @@ intMsg *chunk::addNode(node n)
   numNodes++;
   firstFreeNode++;
   if (firstFreeNode-1 == nodeSlots)  nodeSlots++;
-  else  while (theNodes[firstFreeNode].present) firstFreeNode++;
+  else  while (theNodes[firstFreeNode].isPresent()) firstFreeNode++;
   return im;
 }
 
@@ -359,7 +359,7 @@ edgeRef chunk::addEdge()
   numEdges++;
   firstFreeEdge++;
   if (firstFreeEdge-1 == edgeSlots)  edgeSlots++;
-  else  while (theEdges[firstFreeEdge].present) firstFreeEdge++;
+  else  while (theEdges[firstFreeEdge].isPresent()) firstFreeEdge++;
   return eRef;
 }
 
@@ -372,7 +372,7 @@ elemRef chunk::addElement(int n1, int n2, int n3)
   numElements++;
   firstFreeElement++;
   if (firstFreeElement-1 == elementSlots)  elementSlots++;
-  else  while (theElements[firstFreeElement].present) firstFreeElement++;
+  else  while (theElements[firstFreeElement].isPresent()) firstFreeElement++;
   modified = 1;
   if (!refineInProgress) {
     refineInProgress = 1;

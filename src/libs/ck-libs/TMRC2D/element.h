@@ -23,7 +23,6 @@ class element {  // triangular elements defined by three node references,
   // the triangle that was cached most recently.  This gets updated by
   // calls to either getArea or calculateArea.
   double targetArea, currentArea;
-  int present;  // indicates this is an element present in the mesh
 
   /* node and edge numberings follow this convention regardless of 
      orientation:
@@ -38,6 +37,7 @@ class element {  // triangular elements defined by three node references,
   edgeRef edges[3];
   elemRef myRef;
   chunk *C;
+  int present;  // indicates this is an element present in the mesh
 
   /// Basic element constructor
   element() {   targetArea = currentArea = -1.0; }

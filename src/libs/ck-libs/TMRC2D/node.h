@@ -15,8 +15,8 @@ class node {  // a 2D double coordinate
   int reports;  // for smoothing
   double sumReports[DIM];  // for smoothing
   int theLock; // locking is for coarsening
-  int present;  // indicates this is an edge present in the mesh
  public:
+  int present;  // indicates this is an edge present in the mesh
   int border; // mesh boundary info
   
   node() {
