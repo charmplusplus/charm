@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1996-01-17 08:04:13  jyelon
+ * Revision 2.15  1996-01-30 20:17:19  kale
+ * moved defs of WINDOW_SIZE and DGRAM_BUF_SIZE here from machine.h
+ *
+ * Revision 2.14  1996/01/17  08:04:13  jyelon
  * added CmiMsgHeaderSizeBytes
  *
  * Revision 2.13  1995/10/31 20:38:39  jyelon
@@ -116,7 +119,6 @@
 /* #define CMK_SIGNAL_USE_SIGACTION_AND_SIGEMPTYSET */
 #define CMK_SIGNAL_IS_A_BUILTIN
 
-#define CMK_MAX_DGRAM_SIZE 4096
 
 /* #define CMK_STRERROR_IS_A_BUILTIN */
 #define CMK_STRERROR_USE_SYS_ERRLIST
@@ -135,3 +137,9 @@
 #define CMK_SIZE_T long unsigned int
 
 #endif
+
+#define CMK_MAX_DGRAM_SIZE 4096
+#define DGRAM_BUF_SIZE 52000
+#define WINDOW_SIZE 12             /* size of sliding window : set to
+				                                          (DGRAM_BUF_SIZE/CMK_MAX_DGRAM_SIZE) -1 */
+
