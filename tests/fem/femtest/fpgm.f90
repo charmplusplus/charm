@@ -9,26 +9,28 @@ include 'femf.h'
   call FEM_Print('init called')
   open(20, file='fmesh.dat')
   read(20,*) nelems, nnodes, esize
-  allocate(conn(nelems, esize))
+  
+  allocate(nodeData(2,nnodes))
+  do i=1,nnodes
+     nodeData(1,i)=0
+     nodeData(2,i)=0
+  enddo
+  nodeData(1,1)=1
+  nodeData(2,1)=0.25
+  nodeData(2,2)=0.25
+  nodeData(2,4)=0.25
+  nodeData(2,5)=0.25
+  call FEM_Set_node(nnodes,2)
+  call FEM_Set_node_data_r(nodeData)
+  
+  allocate(conn(esize,nelems))
   do i=1,nelems
-    read(20,*) (conn(i,j),j=1,esize)
+    read(20,*) (conn(j,i),j=1,esize)
   enddo
   close(20)
   call FEM_Set_elem(1,nelems,0,esize)
-  call FEM_Set_elem_conn_c(1,conn)
+  call FEM_Set_elem_conn_r(1,conn)
   
-  allocate(nodeData(nnodes,2))
-  do i=1,nnodes
-     nodeData(i,1)=0
-     nodeData(i,2)=0
-  enddo
-  nodeData(1,1)=1
-  nodeData(1,2)=0.25
-  nodeData(2,2)=0.25
-  nodeData(4,2)=0.25
-  nodeData(5,2)=0.25
-  call FEM_Set_node(nnodes,2)
-  call FEM_Set_node_data_c(nodeData)
 end subroutine init
 
 subroutine driver()
@@ -48,10 +50,10 @@ include 'femf.h'
   call FEM_Get_elem(1,nelems,elemData,npere)
   call FEM_Get_node(nnodes,nodeDataP)
 
-  allocate(conn(nelems, npere))
-  call FEM_Get_elem_conn_c(1,conn)
-  allocate(nodeData(nnodes,nodeDataP))
-  call FEM_Get_node_data_c(nodeData);
+  allocate(conn(npere, nelems))
+  call FEM_Get_elem_conn_r(1,conn)
+  allocate(nodeData(nodeDataP, nnodes))
+  call FEM_Get_node_data_r(nodeData);
 
   allocate(nodes(nnodes))
   allocate(elements(nelems))
@@ -61,25 +63,25 @@ include 'femf.h'
   nodes = 0.0
   elements = 0.0
   do i=1,nnodes
-     nodes(i)=nodeData(i,1)
+     nodes(i)=nodeData(1,i)
   enddo
   fid = FEM_Create_field(FEM_DOUBLE, 1, 0, 8)
   do i=1,nelems
     do j=1,npere
-      elements(i) = elements(i) + nodes(conn(i,j))
+      elements(i) = elements(i) + nodes(conn(j,i))
     enddo
     elements(i) = elements(i)/npere
   enddo
   nodes = 0.0
   do i=1,nelems
     do j=1,npere
-      nodes(conn(i,j)) = nodes(conn(i,j)) + elements(i)
+      nodes(conn(j,i)) = nodes(conn(j,i)) + elements(i)
     enddo
   enddo
   call FEM_Update_field(fid, nodes(1))
   failed = .FALSE.
   do i=1,nnodes
-    if (nodes(i) .ne. nodeData(i,2)) failed= .TRUE.
+    if (nodes(i) .ne. nodeData(2,i)) failed= .TRUE.
   enddo
   if (failed) then
     call FEM_Print('update_field test failed.')

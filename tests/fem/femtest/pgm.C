@@ -5,6 +5,12 @@
 #include "tcharmc.h"
 #include "fem.h"
 
+#define TEST_ARGS 0 /* Test out command-line arguments */
+#define TEST_SPARSE 1 /* Test out sparse data */
+#define TEST_GHOST 1 /* Test out ghost layers */
+#define TEST_SERIAL 0 /* Test out bizarre FEM_Serial_split */
+#define TEST_MESHUPDATE 1 /* Test out FEM_Update_mesh */
+
 //These values are the sum of the node values
 // after each timestep.
 double *reduceValues=NULL;
@@ -42,11 +48,17 @@ void printargs(void) {
   CkPrintf("\n");
 }
 
+void tryPrint(void) {
+  int nNodes, ignored;
+  FEM_Get_node(&nNodes,&ignored);
+  if (nNodes<500) FEM_Print_partition();
+}
+
 extern "C" void
 init(void)
 {
   CkPrintf("init called\n");
-  printargs();
+  if (TEST_ARGS) printargs();
   tsteps=10;
   reduceValues=new double[tsteps];
   int *conn=new int[dim*dim*np];
@@ -55,7 +67,6 @@ init(void)
   double *noData=new double[(dim+1)*(dim+1)*tsteps];
 
   int nelems=dim*dim, nnodes=(dim+1)*(dim+1);
-  for (int e=0;e<nelems;e++) elements[e]=0.3;
 
   //Describe the nodes and elements
   FEM_Set_node(nnodes,tsteps);
@@ -68,37 +79,40 @@ init(void)
 	   conn[(y*dim+x)*np+2]=(y+1)*(dim+1)+(x+1);
 	   conn[(y*dim+x)*np+3]=(y  )*(dim+1)+(x+1);
   }
-  
-  //Create some random sparse data.  The first set
-  // will run down the left side of the domain; the second set
-  // down the diagonal.
-  for (int sparseNo=0;sparseNo<2;sparseNo++) {
-    int nSparse=dim;
-    int *nodes=new int[2*nSparse];
-    int *elems=new int[2*nSparse];
-    double *data=new double[3*nSparse];
-    sparseSum[sparseNo]=0.0;
-    for (int y=0;y<nSparse;y++) {
-      int x=y*sparseNo;
-      nodes[2*y+0]=(y  )*(dim+1)+(x  );
-      nodes[2*y+1]=(y+1)*(dim+1)+(x+1);
-      elems[2*y+0]=0; //Always element type 0
-      elems[2*y+1]=y*dim+x;
-      double val=1.0+y*0.2+23.0*sparseNo;
-      sparseSum[sparseNo]+=val;
-      data[3*y+0]=data[3*y+1]=val;
-      data[3*y+2]=10.0;
+
+  if (TEST_SPARSE) {
+    //Create some random sparse data.  The first set
+    // will run down the left side of the domain; the second set
+    // down the diagonal.
+    for (int sparseNo=0;sparseNo<2;sparseNo++) {
+      int nSparse=dim;
+      int *nodes=new int[2*nSparse];
+      int *elems=new int[2*nSparse];
+      double *data=new double[3*nSparse];
+      sparseSum[sparseNo]=0.0;
+      for (int y=0;y<nSparse;y++) {
+  	int x=y*sparseNo;
+  	nodes[2*y+0]=(y  )*(dim+1)+(x  );
+  	nodes[2*y+1]=(y+1)*(dim+1)+(x+1);
+  	elems[2*y+0]=0; //Always element type 0
+  	elems[2*y+1]=y*dim+x;
+  	double val=1.0+y*0.2+23.0*sparseNo;
+  	sparseSum[sparseNo]+=val;
+  	data[3*y+0]=data[3*y+1]=val;
+  	data[3*y+2]=10.0;
+      }
+      FEM_Set_sparse(sparseNo,nSparse, nodes,2, data,3,FEM_DOUBLE);
+      FEM_Set_sparse_elem(sparseNo,elems);
+      delete[] nodes;
+      delete[] elems;
+      delete[] data;
     }
-    FEM_Set_sparse(sparseNo,nSparse, nodes,2, data,3,FEM_DOUBLE);
-    FEM_Set_sparse_elem(sparseNo,elems);
-    delete[] nodes;
-    delete[] elems;
-    delete[] data;
   }
   
   //Set the initial conditions
-  elements[3*dim+1]=256;
-  elements[2*dim+1]=256;
+  for (int e=0;e<nelems;e++) elements[e]=0.0;
+  elements[dim+2]=256;
+  elements[dim+3]=256;
   FEM_Set_elem_data(0,elements);
   FEM_Set_elem_conn(0,conn);
 
@@ -133,14 +147,15 @@ init(void)
   }
   FEM_Set_node_data(noData);
 
-//Set up ghost layers:
-  if (0) 
-  { /*Match across single nodes*/
+  if (TEST_GHOST) {
+  //Set up ghost layers:
+    if (0) 
+    { /*Match across single nodes*/
      static const int quad2node[]={0,1,2,3};
      FEM_Add_ghost_layer(1,1);
      FEM_Add_ghost_elem(0,4,quad2node);
-  } else if (1) 
-  { /*Match edges*/
+    } else if (1) 
+    { /*Match edges*/
 #if 1 /*Include ignored "-1" nodes as a test*/
      static const int quad2edge[]= {0,1,-1,  1,2,-1,  2,3,-1,  3,0,-1};
      FEM_Add_ghost_layer(3,1);
@@ -154,25 +169,27 @@ init(void)
      FEM_Add_ghost_layer(2,0);
      FEM_Add_ghost_elem(0,4,quad2edge);
 */
+    }
   }
   delete[] conn;
   delete[] nodes;
   delete[] elements;
   delete[] noData;
 
-#if 0 //Test out the serial split routines
-  int nchunks=10;
-  printf("Splitting into %d pieces:\n");
-  FEM_Serial_split(nchunks);
-  for (int i=0;i<nchunks;i++) {
-    FEM_Serial_begin(i);
-    int node,elem,ignored;
-    FEM_Get_node(&node,&ignored);
-    FEM_Get_elem(0,&elem,&ignored,&ignored);
-    printf(" partition[%d] has %d nodes, %d elems\n",i,node,elem);
+  if (TEST_SERIAL) //Test out the serial split routines
+  {
+    int nchunks=10;
+    printf("Splitting into %d pieces:\n",nchunks);
+    FEM_Serial_split(nchunks);
+    for (int i=0;i<nchunks;i++) {
+      FEM_Serial_begin(i);
+      int node,elem,ignored;
+      FEM_Get_node(&node,&ignored);
+      FEM_Get_elem(0,&elem,&ignored,&ignored);
+      printf(" partition[%d] has %d nodes, %d elems\n",i,node,elem);
+    }
+    FEM_Done();
   }
-  FEM_Done();
-#endif
 }
 
 typedef struct _node {
@@ -210,6 +227,19 @@ void testAssert(int shouldBe,const char *what,int myPartition=-1)
 	}
 }
 
+// Return an array of the real and ghost global entity numbers:
+int *getGlobalNums(int mesh,int entity) {
+	int nReal=FEM_Mesh_get_length(mesh,entity);
+	int nGhost=FEM_Mesh_get_length(mesh,FEM_GHOST+entity);
+	int nTot=nReal+nGhost;
+	int *Gnum=new int[nTot];
+	FEM_Mesh_get_data(mesh,entity,FEM_GLOBALNO,
+	  &Gnum[0], 0,nReal, FEM_INDEX_0, 1);
+	FEM_Mesh_get_data(mesh,FEM_GHOST+entity,FEM_GLOBALNO,
+	  &Gnum[nReal], 0,nGhost, FEM_INDEX_0, 1);
+	return Gnum;
+}
+
 extern "C" void
 mesh_updated(int param);
 
@@ -233,7 +263,7 @@ printargs();
   FEM_Get_elem_data(0,elData);
 
   int myId = FEM_My_partition();
-  //FEM_Print_partition();
+  tryPrint();
   Node *nodes = new Node[nnodes];
   Element *elements = new Element[nelems];
   int doubleField=FEM_Create_simple_field(FEM_DOUBLE,1);
@@ -252,26 +282,28 @@ printargs();
 
 //Test barrier
   FEM_Barrier();
-
-//Grab and check the sparse data:
-  for (int sparseNo=0;sparseNo<2;sparseNo++) {
-    int nSparse=FEM_Get_sparse_length(sparseNo);
-    //CkPrintf("FEM Chunk %d has %d sparse entries (pass %d)\n",myId,nSparse,sparseNo);
-    int *nodes=new int[2*nSparse];
-    double *data=new double[3*nSparse];
-    FEM_Get_sparse(sparseNo,nodes,data);
-    double sum=0.0;
-    for (int y=0;y<nSparse;y++) {
-      testAssert(nodes[2*y]>=0 && nodes[2*y]<nnodes,"Sparse nodes");
-      testEqual(data[3*y+0],data[3*y+1],"Sparse data[0],[1]");
-      testEqual(data[3*y+2],10.0,"Sparse data[2]");
-      sum+=data[3*y];
+  
+  if (TEST_SPARSE) 
+  { //Grab and check the sparse data:
+    for (int sparseNo=0;sparseNo<2;sparseNo++) {
+      int nSparse=FEM_Get_sparse_length(sparseNo);
+      //CkPrintf("FEM Chunk %d has %d sparse entries (pass %d)\n",myId,nSparse,sparseNo);
+      int *nodes=new int[2*nSparse];
+      double *data=new double[3*nSparse];
+      FEM_Get_sparse(sparseNo,nodes,data);
+      double sum=0.0;
+      for (int y=0;y<nSparse;y++) {
+    	testAssert(nodes[2*y]>=0 && nodes[2*y]<nnodes,"Sparse nodes");
+    	testEqual(data[3*y+0],data[3*y+1],"Sparse data[0],[1]");
+    	testEqual(data[3*y+2],10.0,"Sparse data[2]");
+    	sum+=data[3*y];
+      }
+      double globalSum=0.0;
+      FEM_Reduce(doubleField,&sum,&globalSum,FEM_SUM);
+      testEqual(globalSum,sparseSum[sparseNo],"sparse data global sum");
+      delete[] nodes;
+      delete[] data;
     }
-    double globalSum=0.0;
-    FEM_Reduce(doubleField,&sum,&globalSum,FEM_SUM);
-    testEqual(globalSum,sparseSum[sparseNo],"sparse data global sum");
-    delete[] nodes;
-    delete[] data;
   }
 
 //Set initial conditions
@@ -288,15 +320,32 @@ printargs();
   ngnodes=nnodes; ngelems=nelems;
   nnodes=FEM_Get_node_ghost();
   nelems=FEM_Get_elem_ghost(0);
-
-//Update ghost field test
-  for (i=nelems;i<ngelems;i++) {elements[i].val=-1.0;}
-  FEM_Update_ghost_field(efid,0,elements);
-  for (i=0;i<ngelems;i++)
-	  testEqual(elements[i].pad,123,"update element ghost field pad");
-  for (i=0;i<ngelems;i++)
-	  testEqual(elements[i].val,elData[i],"update element ghost field test");
-
+  CkPrintf("Chunk %d: %d (%dg) nodes; %d (%dg) elems\n",
+  	myId, nnodes,ngnodes, nelems,ngelems);
+  
+  if (TEST_GHOST) {//Update ghost field test
+    // Write crap into our ghost values:
+    for (i=0;i<nelems;i++) {elements[i].val=elData[i];}
+    for (i=nelems;i<ngelems;i++) {elements[i].val=-1.0;}
+    if (1) { //Use IDXL routines directly
+      IDXL_t elComm=FEM_Comm_ghost(FEM_Mesh_default_read(),FEM_ELEM+0);
+      IDXL_t sumComm=IDXL_Create();
+      IDXL_Combine(sumComm,elComm, 0, nelems); //Shift ghosts down to nelems..ngelems
+      if (myId==0) IDXL_Print(sumComm);
+      IDXL_Comm_sendrecv(0,sumComm, efid, elements);
+      IDXL_Destroy(sumComm);
+    }
+    else { //Use compatability FEM_Update_ghost_field
+      FEM_Update_ghost_field(efid,0, elements);
+    }
+    
+    // Now check to see if our ghosts got the values:
+    for (i=0;i<ngelems;i++)
+      testEqual(elements[i].pad,123,"update element ghost field pad");
+    for (i=0;i<ngelems;i++)
+      testEqual(elements[i].val,elData[i],"update element ghost field test");
+  }
+  
   int *elList=new int[100+ngelems];
 
 //Time loop
@@ -326,42 +375,45 @@ printargs();
     double sum = 0.0;
     FEM_Reduce_field(fid, nodes, &sum, FEM_SUM);
     testEqual(sum,reduceValues[t],"reduce_field");
+    
+    if (TEST_GHOST) {//Update ghost field test
+      //Communicate our ghost elements:
+      for (i=nelems;i<ngelems;i++) elements[i].val=-1;
+      FEM_Update_ghost_field(efid,0,elements);
+      for (i=nelems;i<ngelems;i++) {
+    	testAssert(elements[i].val!=-1,"update_ghost_field");
+      }
 
-    //Communicate our ghost elements:
-    for (i=nelems;i<ngelems;i++) elements[i].val=-1;
-    FEM_Update_ghost_field(efid,0,elements);
-    for (i=nelems;i<ngelems;i++) {
-      testAssert(elements[i].val!=-1,"update_ghost_field");
-    }
-
-    //Communicate our ghost nodes:
-    FEM_Update_ghost_field(fid,-1,nodes);
-    for(i=nnodes;i<ngnodes;i++)
-        testEqual(nodes[i].val,nodeData[nnodeData*i+t],
-	   "update_ghost_node_field");
+      //Communicate our ghost nodes:
+      FEM_Update_ghost_field(fid,-1,nodes);
+      for(i=nnodes;i<ngnodes;i++)
+    	  testEqual(nodes[i].val,nodeData[nnodeData*i+t],
+    	     "update_ghost_node_field");
 
 
-    //Make a list of elements with odd global numbers
-    const int *elGnum=FEM_Get_elem_nums();
-    int elListLen=0;
-    double thresh=2.0;
-    for (i=0;i<nelems;i++) 
-	    if (elGnum[i]%2) {
-	    	    //CkPrintf("[%d] List: Local %d, global %d)\n",myId,i,elGnum[i]);
-		    elList[elListLen++]=i;
-	    }
-
-    //Get a list of ghost elements with odd global numbers
-    FEM_Exchange_ghost_lists(0,elListLen,elList);
-    elListLen=FEM_Get_ghost_list_length();
-    FEM_Get_ghost_list(elList);
-    //CkPrintf("[%d] My ghost list has %d entries\n",myId,elListLen);
-    //Make sure everything on the list are actually ghosts and
-    // actually have large values
-    for (i=0;i<elListLen;i++) {
-	    testAssert(elList[i]<ngelems,"Ghost list ghost test (upper)");
-	    testAssert(elList[i]>=nelems,"Ghost list ghost test (lower)");
-	    testAssert(elGnum[elList[i]]%2,"Ghost list contents test");
+      //Make a list of elements with odd global numbers
+      int *elGnum=getGlobalNums(FEM_Mesh_default_read(),FEM_ELEM+0);
+      int elListLen=0;
+      double thresh=2.0;
+      for (i=0;i<nelems;i++)
+    	      if (elGnum[i]%2) {
+    		      //CkPrintf("[%d] List: Local %d, global %d)\n",myId,i,elGnum[i]);
+    		      elList[elListLen++]=i;
+    	      }
+      
+      //Get a list of ghost elements with odd global numbers
+      FEM_Exchange_ghost_lists(0,elListLen,elList);
+      elListLen=FEM_Get_ghost_list_length();
+      FEM_Get_ghost_list(elList);
+      //CkPrintf("[%d] My ghost list has %d entries\n",myId,elListLen);
+      //Make sure everything on the list are actually ghosts and
+      // actually have large values
+      for (i=0;i<elListLen;i++) {
+    	      testAssert(elList[i]<ngelems,"Ghost list ghost test (upper)");
+    	      testAssert(elList[i]>=nelems,"Ghost list ghost test (lower)");
+    	      testAssert(elGnum[elList[i]]%2,"Ghost list contents test");
+      }
+      delete[] elGnum;
     }
 
 #if ENABLE_MIG /*Only works with -memory isomalloc*/
@@ -372,9 +424,9 @@ printargs();
 
   }
 
-#if 1
+  if (TEST_MESHUPDATE) {
 /*Try reassembling the mesh*/
-    const int *noGnum=FEM_Get_node_nums();
+    int *noGnum=getGlobalNums(FEM_Mesh_default_read(),FEM_NODE);
     double *nodeOut=new double[nnodes];
     FEM_Set_node(nnodes,1);
     for (i=0;i<nnodes;i++) {
@@ -382,7 +434,8 @@ printargs();
     }
     FEM_Set_node_data(nodeOut);
     delete[] nodeOut;
-    const int *elGnum=FEM_Get_elem_nums();
+    delete[] noGnum;
+    int *elGnum=getGlobalNums(FEM_Mesh_default_read(),FEM_ELEM+0);
     double *elOut=new double[nelems];
     FEM_Set_elem(0,nelems,1,0);
     for (i=0;i<nelems;i++) {
@@ -390,9 +443,23 @@ printargs();
     }
     FEM_Set_elem_data(0,elOut);
     delete[] elOut;
+    delete[] elGnum;
+  if (TEST_SPARSE) 
+  { //Grab and copy over the sparse data:
+    for (int sparseNo=0;sparseNo<2;sparseNo++) {
+      int nSparse=FEM_Get_sparse_length(sparseNo);
+      int *nodes=new int[2*nSparse];
+      double *data=new double[3*nSparse];
+      FEM_Get_sparse(sparseNo,nodes,data);
+      FEM_Set_sparse(sparseNo,nSparse,nodes,2,data,3,FEM_DOUBLE);
+      delete[] nodes;
+      delete[] data;
+    }
+  }
+  
     FEM_Update_mesh(mesh_updated,123,2);
-#endif
-
+  }
+  
   FEM_Print("All tests passed.");
 }
 
@@ -402,6 +469,8 @@ mesh_updated(int param)
   int nnodes,nelems,i,nodePer,dataPer;
   CkPrintf("mesh_updated(%d) called.\n",param);
   testEqual(param,123,"mesh_updated param");
+
+  tryPrint();
   
   FEM_Get_node(&nnodes,&dataPer);
   CkPrintf("Getting %d nodes (%d data per)\n",nnodes,dataPer);
