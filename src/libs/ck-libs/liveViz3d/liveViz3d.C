@@ -50,7 +50,7 @@ class liveViz3dManager : public CBase_liveViz3dManager {
 		}
 		
 		// views.clear();
-		views.erase(views.begin(),n+views.begin());
+		views.erase(views.begin(),views.begin()+n);
 		CcsSendDelayedReply(repl,len,retMsg);
 		delete[] retMsg;
 		CmiPrintf("Done sending off %d views\n",n);
