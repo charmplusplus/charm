@@ -52,7 +52,10 @@ Topo::Topo(TopoInitMsg* _m)
   if (CkMyPe()==0)
     CkPrintf("Generating topology %d for %d elements\n",topo,elements);
 
-  if (elemlist) return;
+  if (elemlist) {
+    delete _m;
+    return; 
+  }
 
   elemlist = new Elem[elements];
 
