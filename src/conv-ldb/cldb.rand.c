@@ -1,5 +1,9 @@
 #include "converse.h"
 
+CpvDeclare(int, CldRelocatedMessages);
+CpvDeclare(int, CldLoadBalanceMessages);
+CpvDeclare(int, CldMessageChunks);
+
 void CldHandler(char *msg)
 {
   int len, queueing, priobits;
@@ -18,7 +22,11 @@ void CldEnqueue(int pe, void *msg, int infofn)
   int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
-  if (pe == CLD_ANYWHERE) pe = (((rand()+CmiMyPe())&0x7FFFFFFF)%CmiNumPes());
+  if (pe == CLD_ANYWHERE) {
+    pe = (((rand()+CmiMyPe())&0x7FFFFFFF)%CmiNumPes());
+    if (pe != CmiMyPe())
+      CpvAccess(CldRelocatedMessages)++;
+  }
   if (pe == CmiMyPe()) {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
@@ -40,5 +48,10 @@ void CldModuleInit()
 {
   CpvInitialize(int, CldHandlerIndex);
   CpvAccess(CldHandlerIndex) = CmiRegisterHandler(CldHandler);
+  CpvInitialize(int, CldRelocatedMessages);
+  CpvInitialize(int, CldLoadBalanceMessages);
+  CpvInitialize(int, CldMessageChunks);
+  CpvAccess(CldRelocatedMessages) = CpvAccess(CldLoadBalanceMessages) = 
+    CpvAccess(CldMessageChunks) = 0;
   CldModuleGeneralInit();
 }
