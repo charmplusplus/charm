@@ -224,7 +224,9 @@ AC_DEFINE_UNQUOTED(CMK_HAS_MMAN_H, $pass)
 cat > $t <<EOT
 #include <zlib.h>
 void foo(void) { 
-  gzclose(gzopen("/tmp/x","r"));
+  gzFile f = gzopen("/tmp/x","r");
+  gzprintf(f, "test...\n");
+  gzclose(f);
 }
 EOT
 test_cxx "whether it has zlib" "yes" "no" "-lz"
