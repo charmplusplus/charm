@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.6  1995-11-01 22:01:32  jyelon
+% Revision 1.7  1995-11-01 22:06:30  jyelon
+% *** empty log message ***
+%
+% Revision 1.6  1995/11/01  22:01:32  jyelon
 % *** empty log message ***
 %
 % Revision 1.5  1995/11/01  21:36:09  jyelon
@@ -126,10 +129,10 @@ to this rule are the network versions {\tt net-sun}, {\tt net-sol},
 of the networked versions, all other users may skip it.
 
 The network versions utilize many unix processes communicating with
-each other via UDP.  No explicit attempt is currently being made to
-filter out unauthorized packets.  Therefore, networked charm programs
-pose a minor security vulnerability: they can be attacked by sending
-UDP packets to the charm program's sockets.
+each other via UDP.  No attempt is currently being made to filter out
+unauthorized packets.  Therefore, it is theoretically possible to
+mount a security attack by sending UDP packets to a executing
+charm program's sockets.
 
 The second security issue associated with networked charm programs is
 associated with the fact that we, the charm developers, need evidence
@@ -139,12 +142,9 @@ have inserted code in the network {\tt conv-host} program (described
 later) to notify us that our software is being used.
 Implementationally speaking, the {\tt conv-host} program sends a
 single {\tt UDP} packet to {\tt charm.cs.uiuc.edu}.  This data is put
-to one use only: it is gathered into tables recording the names of
-the institutions using our software, the number of individuals
-at each institution, and the frequency with which it is used.
-
-Please note that this notification code {\tt only} exists within the
-network version.  It does {\em not} exist within any other version.
+to one use only: it is gathered into tables recording the internet
+domains in which our software is being used, the number of individuals
+at each internet domain, and the frequency with which it is used.
 
 We recognize that some users may have objections to our notification
 code.  Therefore, we have provided a second copy of the {\tt
@@ -167,6 +167,12 @@ notification code:
     % cd /usr/local/charm/bin
     % cp conv-host.silent conv-host
 \end{verbatim}
+
+Note: even though the other versions contain programs named {\tt
+conv-host.notify} and {\tt conv-host.silent}, they never actually
+notify us.  The existence of the extra files is just to make our
+compilation scripts more consistent across versions.  The {\em only}
+versions that ever notify us are the network versions.
 
 \subsection{Reducing disk usage}
 
