@@ -22,6 +22,7 @@ CL_COMMON=' /nologo /W3 /GB /GX /DWIN32 /D_WINDOWS /FD'
 CL_O=$CL_COMMON" /DNDEBUG /MT /Ox"
 CL_DEF=$CL_COMMON" /MT"
 CL_G=$CL_COMMON" /Z7 /MTd /Od"
+CL_DLL="/LD"
 
 #LINK command-line options for -O and -g mode
 LINK_CMD="$VCC_DIR/BIN/LINK.EXE"
@@ -200,6 +201,9 @@ do
 		then
 #It's a .o output filename-- tell CL
 			OUTPUT="/Fo`cygpath -w $out`"
+		elif [ "x`getExtention $out`" = "x.so" ]
+		then
+			OUTPUT="/Fo`cygpath -w $out`"
 		else
 #It's an exe filename-- tell LINK
 			LINK="$LINK /out:$out.exe"
@@ -209,8 +213,13 @@ do
 	
 #Object file or library-- add to link
 	*.o|*.a|*.lib)
-		LINK="$LINK `cygpath -w $arg`"
-		DOLINK="yes"
+		if [ "$DOCOMPILE" = "yes" ]
+		then
+		  CL="$CL `cygpath -w $arg`"
+		else
+		  LINK="$LINK `cygpath -w $arg`"
+		  DOLINK="yes"
+		fi
 		;;
 #C source file
 	*.c)
@@ -226,6 +235,12 @@ do
 		CL="$CL /Tp`cygpath -w $arg`"
 #		OUTPUT="/Fo$base.o"
 		LINK="$LINK $base.o"
+		DOCOMPILE="yes"
+		;;
+	-shared)
+#skip building a DLL
+		End 0;
+		CL="$CL $CL_DLL"
 		DOCOMPILE="yes"
 		;;
 # Default
