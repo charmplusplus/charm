@@ -42,11 +42,11 @@ public:
   virtual ~eventMsg() { }
   void sanitize() {
     CkAssert(timestamp > -1);
-    CkAssert(timestamp < 2000);
     CkAssert(evID.getPE() > -1);
     CkAssert(evID.getPE() < CkNumPes());
     CkAssert(parent == NULL);
     CkAssert(str == NULL);
+    CkAssert(msgSize > 0);
   }
   /// Timestamps this message and generates a unique event ID
   /** Timestamps this message and generates a unique event ID for the event

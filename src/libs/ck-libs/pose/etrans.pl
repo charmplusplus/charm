@@ -522,8 +522,10 @@ foreach my $incfile ($inC,@otherfiles)
       if ($iseventmethod &&  ($messagename ne '')) {
 
 	$outChandle->print("$declaration\n");
-    
-	#$outChandle->print("$messagename->sanitize();\n");
+
+	$outChandle->print("#ifndef CMK_OPTIMIZE\n");
+	$outChandle->print("$messagename->sanitize();\n");
+	$outChandle->print("#endif\n");
 	$outChandle->print("#ifdef POSE_STATS_ON\n");
 	$outChandle->print("  int tstat = localStats->TimerRunning();\n");
 	$outChandle->print("  if (tstat)\n");
@@ -1166,7 +1168,9 @@ sub posefuncmap
 		  #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
 		  $output.="char str[30];\n";
 		  #$output.="if (parent->fp) fprintf(parent->fp, \"[%d] SEND(Event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, _POSE_handle, $msg->timestamp, $msg->evID.sdump(str));\n";
-		  #$output.="$msg->sanitize();\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="$msg->sanitize();\n";
+		  $output.="#endif\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		  $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 
@@ -1185,7 +1189,9 @@ sub posefuncmap
 		  #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
 		  $output.="char str[30];\n";
 		  #$output.="if (parent->fp) fprintf(parent->fp, \"[%d] SEND(Event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, _POSE_handle, $msg->timestamp, $msg->evID.sdump(str));\n";
-		  #$output.="$msg->sanitize();\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="$msg->sanitize();\n";
+		  $output.="#endif\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		  $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		  $output.="parent->srVector[_destPE]++;\n";
@@ -1214,7 +1220,9 @@ sub posefuncmap
 		    #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
 		  $output.="char str[30];\n";
 		    #$output.="if (parent->fp) fprintf(parent->fp, \"[%d] SEND(Event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, _POSE_handle, $msg->timestamp, $msg->evID.sdump(str));\n";
-		    #$output.="$msg->sanitize();\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="$msg->sanitize();\n";
+		  $output.="#endif\n";
 		    $output.="(*(CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		    $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    $output.="parent->srVector[_destPE]++;\n";
@@ -1235,7 +1243,9 @@ sub posefuncmap
 		    #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
 		  $output.="char str[30];\n";
 		    #$output.="if (parent->fp) fprintf(parent->fp, \"[%d] SEND(Event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, _POSE_handle, $msg->timestamp, $msg->evID.sdump(str));\n";
-		    #$output.="$msg->sanitize();\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="$msg->sanitize();\n";
+		  $output.="#endif\n";
 		    $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		    $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    $output.="parent->srVector[_destPE]++;\n";
@@ -1262,7 +1272,9 @@ sub posefuncmap
 		      #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
 		  $output.="char str[30];\n";
 		      #$output.="if (parent->fp) fprintf(parent->fp, \"[%d] SEND(Event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, parent->thisIndex, $msg->timestamp, $msg->evID.sdump(str));\n";
-		      #$output.="$msg->sanitize();\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="$msg->sanitize();\n";
+		  $output.="#endif\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
 
 		      $output.="parent->srVector[CkMyPe()]++;\n";
@@ -1279,7 +1291,9 @@ sub posefuncmap
 		      #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
 		  $output.="char str[30];\n";
 		      #$output.="if (parent->fp) fprintf(parent->fp, \"[%d] SEND(Event) to [%d] @ %d: Event=%s\\n\", parent->thisIndex, parent->thisIndex, $msg->timestamp, $msg->evID.sdump(str));\n";
-		      #$output.="$msg->sanitize();\n";
+		  $output.="#ifndef CMK_OPTIMIZE\n";
+		  $output.="$msg->sanitize();\n";
+		  $output.="#endif\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
 		      $output.="parent->srVector[CkMyPe()]++;\n";
 		      $output.="}\n";

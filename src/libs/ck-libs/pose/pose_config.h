@@ -14,7 +14,7 @@
 //#define POSE_DOP_ON 1
 
 /// Set this to use 64 bit timestamps
-#define USE_LONG_TIMESTAMPS 0
+//#define USE_LONG_TIMESTAMPS 1
 
 /// Uncomment to force determinism in event ordering
 #define DETERMINISTIC_EVENTS 1

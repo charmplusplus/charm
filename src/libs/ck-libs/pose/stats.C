@@ -96,6 +96,10 @@ void globalStat::localStatReport(localStatSummary *m)
     maxTime = tmpMax;
   reporting++;
 
+#ifdef SEQUENTIAL_POSE
+  totalLoops = totalDos;
+  totalGvts = 1;
+#endif
   CkAssert(totalGvts > 0);
   CkAssert(totalDos > 0);
   CkAssert(totalLoops > 0);

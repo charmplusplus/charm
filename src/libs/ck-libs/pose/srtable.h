@@ -125,8 +125,8 @@ class SRtable {
   void Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS, int firstSR);
   /// Compress and pack table into an UpdateMsg and return it
   UpdateMsg *PackTable(POSE_TimeType pvt);
-  /// CompressAndSort all buckets with timestamps <= pvt
-  void PartialSortTable(POSE_TimeType pvt);
+  /// CompressAndSort all buckets
+  void SortTable();
   /// Compress a bucket so all SRentries have unique timestamps and are sorted
   void CompressAndSortBucket(int i, int is_overflow);
   /// Free all buckets and overflows, reset all counts

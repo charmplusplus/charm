@@ -212,7 +212,7 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
   int destBkt = (pvt-offset)/size_b;  // which bucket?
   SRentry *tmp;
 
-  PartialSortTable(pvt);
+  SortTable();
   nBkts = destBkt;
   if (destBkt > b) { 
     nEntries += numOverflow;
@@ -247,20 +247,14 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
 }
 
 /// CompressAndSort all buckets with timestamps <= pvt
-void SRtable::PartialSortTable(POSE_TimeType pvt)
+void SRtable::SortTable()
 {
 #ifdef SR_SANITIZE
   sanitize();
 #endif
   register int i;
-  int sortall = 0, sortTo, destBkt = (pvt-offset)/size_b;  // which bucket?
-  sortTo = destBkt;
-  if (destBkt >= b) {
-    sortall = 1; 
-    sortTo = b-1;
-  }
-  for (i=0; i<=sortTo; i++) CompressAndSortBucket(i, 0);
-  if (sortall) CompressAndSortBucket(b, 1);
+  for (i=0; i<b; i++) CompressAndSortBucket(i, 0);
+  CompressAndSortBucket(b, 1);
 #ifdef SR_SANITIZE
   sanitize();
 #endif
