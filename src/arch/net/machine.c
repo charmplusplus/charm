@@ -581,7 +581,7 @@ unsigned int ip; int port; int seconds;
     if (ok>=0) break;
     close(fd);
     switch (errno) {
-    case EINTR: case EBADF: case EALREADY: break;
+    case EINTR: case EBADF: case EALREADY: case EISCONN:break;
     case ECONNREFUSED: jsleep(1,0); break;
     case EADDRINUSE: jsleep(1,0); break;
     case EADDRNOTAVAIL: jsleep(1,0); break;
