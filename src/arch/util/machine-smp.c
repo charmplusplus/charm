@@ -491,6 +491,7 @@ void CmiNodeStateInit(CmiNodeState *nodeState)
 {
 #if CMK_IMMEDIATE_MSG
   nodeState->imm = PCQueueCreate();
+  nodeState->CmiImmLock = CmiCreateLock();
 #endif
 #if CMK_NODE_QUEUE_AVAILABLE
   nodeState->CmiNodeRecvLock = CmiCreateLock();

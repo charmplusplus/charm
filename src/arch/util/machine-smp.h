@@ -57,6 +57,7 @@ typedef struct CmiStateStruct
 typedef struct CmiNodeStateStruct
 {
   PCQueue     imm; 		/* immediate message queue */
+  CmiNodeLock CmiImmLock;	/* lock for immediate message queue */
 #if CMK_NODE_QUEUE_AVAILABLE
   CmiNodeLock CmiNodeRecvLock;
   PCQueue     NodeRecv;

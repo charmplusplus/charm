@@ -10,9 +10,9 @@
 */
 void CmiPushImmediateMsg(void *msg)
 {
-  CmiCommLock();
+  CmiLock(CsvAccess(NodeState).CmiImmLock);
   PCQueuePush(CsvAccess(NodeState).imm, (char *)msg);
-  CmiCommUnlock();
+  CmiUnlock(CsvAccess(NodeState).CmiImmLock);
 }
 
 
@@ -30,8 +30,11 @@ void CmiDelayImmediate()
 
 void CmiHandleImmediate()
 {
+   static int intr = 0;
    int qlen, i;
-   if (PCQueueEmpty(CsvAccess(NodeState).imm)) return;
+   if (intr) { return; }
+   intr = 1;
+   if (PCQueueEmpty(CsvAccess(NodeState).imm)) { intr=0; return; }
    qlen = PCQueueLength(CsvAccess(NodeState).imm);
    {
 #ifdef CMK_CPV_IS_SMP
@@ -52,6 +55,7 @@ void CmiHandleImmediate()
      cs->rank = oldRank;
 #endif
    }
+   intr = 0;
 }
 
 #endif
