@@ -25,6 +25,7 @@ class Trace {
     virtual void dequeue(envelope *) {}
     virtual void beginComputation(void) {}
     virtual void endComputation(void) {}
+    virtual void writeEvent(void) {}
 };
 
 CpvExtern(Trace*, _trace);

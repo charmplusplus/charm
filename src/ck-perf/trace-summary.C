@@ -104,14 +104,19 @@ extern "C"
 void traceClose(void)
 {
   CpvAccess(_trace)->endComputation();
+  if(CmiMyPe()==0)
+      CpvAccess(_logPool)->writeSts();
+  // destructor call the write()
   delete CpvAccess(_logPool);
+  CpvAccess(_trace)->writeEvent();
 }
 
 void LogPool::writeSts(void)
 {
   char *fname = new char[strlen(CpvAccess(pgmName))+strlen(".sts")+1];
   sprintf(fname, "%s.sts", CpvAccess(pgmName));
-  FILE *sts = fopen(fname, "w");
+  FILE *sts = fopen(fname, "w+");
+  //CmiPrintf("File: %s \n", fname);
   if(sts==0)
     CmiAbort("Cannot open projections sts file for writing.\n");
   delete[] fname;
@@ -165,6 +170,13 @@ void TraceProjections::creation(envelope *e, int num)
 
 void TraceProjections::beginExecute(envelope *e)
 {
+  if (e==NULL) {
+    execEp = (-1);
+  }
+  else {
+    execEp = e->getEpIdx();
+    epCount[execEp] ++;
+  }
   double t = CmiTimer();
 CmiPrintf("start: %f \n", start);
 /*
@@ -195,6 +207,12 @@ CmiPrintf("end:msgNum: %d bin:%f\n", msgNum, bin);
   double t = CmiTimer();
   double ts = start;
   double nts = binStart;
+
+  if (execEp != -1)
+  {
+    epTime[execEp] += t - ts;
+  }
+
   while ((nts = nts + CpvAccess(binSize)) < t)
   {
      bin += nts-ts;
@@ -269,3 +287,23 @@ void TraceProjections::endComputation(void)
   }
 }
 
+void TraceProjections::writeEvent(void)
+{
+  char pestr[10];
+  sprintf(pestr, "%d", CkMyPe());
+  int len = strlen(CpvAccess(pgmName)) + strlen(".eps.") + strlen(pestr) + 1;
+  char *fname = new char[len];
+  sprintf(fname, "%s.%s.eps", CpvAccess(pgmName), pestr);
+  FILE *sts = fopen(fname, "w+");
+  //CmiPrintf("File: %s \n", fname);
+  if(sts==0)
+    CmiAbort("Cannot open projections sts file for writing.\n");
+  delete[] fname;
+  for (int i=0; i<_numEntries; i++)
+    fprintf(sts, "%d ", (int)(epTime[i]*1.0e6));
+  fprintf(sts, "\n");
+  for (int i=0; i<_numEntries; i++)
+    fprintf(sts, "%d ", epCount[i]);
+  fprintf(sts, "\n");
+  fclose(sts);
+}

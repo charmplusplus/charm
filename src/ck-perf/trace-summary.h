@@ -51,12 +51,14 @@ class LogEntry {
     void write(FILE *fp);
 };
 
+#include <errno.h>
+
 class LogPool {
   private:
     UInt poolSize;
     UInt numEntries;
     LogEntry *pool;
-    FILE *fp;
+    FILE *fp ;
   public:
     LogPool(char *pgm) {
       poolSize = CpvAccess(CtrLogBufSize);
@@ -72,10 +74,16 @@ class LogPool {
       int len = strlen(pgm) + strlen(".log.") + strlen(pestr) + 1;
       char *fname = new char[len];
       sprintf(fname, "%s.%s.sum", pgm, pestr);
+      fp = NULL;
+      //CmiPrintf("TRACE: %s:%d\n", fname, errno);
+      do
+      {
       fp = fopen(fname, "w");
+      } while (!fp && errno == EINTR);
       delete[] fname;
-      if(!fp)
+      if(!fp) {
         CmiAbort("Cannot open Projections Trace File for writing...\n");
+      }
 //      fprintf(fp, "SUMMARY-RECORD\n");
       fprintf(fp, "%d", CmiMyPe());
     }
@@ -123,12 +131,26 @@ class TraceProjections : public Trace {
     int execEp;
     int execPe;
 
+    double  *epTime;
+    int *epCount;
+    int epSize;
+
     double binStart;
     double start;
     double bin;
     int msgNum;
   public:
-    TraceProjections() { curevent=0; msgNum=0; binStart=0.0;}
+    TraceProjections() { 
+      curevent=0; msgNum=0; binStart=0.0;
+      epSize = 1000;
+      CkPrintf("NUM OF ENTRIES: %d\n", _numEntries);
+      epTime = new double[epSize];
+      epCount = new int[epSize];
+      for (int i=0; i< epSize; i++) {
+	epTime[i] = 0.0;
+	epCount[i] = 0;
+      };
+    }
     void userEvent(int e);
     void creation(envelope *e, int num=1);
     void beginExecute(envelope *e);
@@ -145,6 +167,7 @@ class TraceProjections : public Trace {
     void dequeue(envelope *e);
     void beginComputation(void);
     void endComputation(void);
+    void writeEvent(void);
 };
 
 #endif
