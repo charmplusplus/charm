@@ -30,7 +30,7 @@ void LBDB::batsyncer::gotoSync(void *bs)
 void LBDB::batsyncer::resumeFromSync(void *bs)
 {
   LBDB::batsyncer *s=(LBDB::batsyncer *)bs;
-  CcdCallFnAfter((CcdVoidFn)gotoSync,(void *)s,(int)(1000*s->period));
+  CcdCallFnAfterOnPE((CcdVoidFn)gotoSync,(void *)s,(int)(1000*s->period), CkMyPe());
 }
 
 void LBDB::batsyncer::init(LBDB *_db,double initPeriod)
