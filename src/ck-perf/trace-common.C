@@ -39,9 +39,9 @@ extern "C" void traceBegin(void) {
   OPTIMIZE_WARNING
   if (CpvAccess(traceOn)==1) return;
   CpvAccess(tracecommon).cancel_beginIdle=
-    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,traceBeginIdle,0);
+    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceBeginIdle,0);
   CpvAccess(tracecommon).cancel_endIdle=
-    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,traceEndIdle,0);
+    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceEndIdle,0);
   CpvAccess(traceOn) = 1;
 }
 
