@@ -14,7 +14,7 @@
 
 #define DEBUGF(x)  // CmiPrintf x
 
-#define VER   3.0
+#define VER   4.0
 
 #define INVALIDEP     -2
 
@@ -60,6 +60,7 @@ PhaseEntry::PhaseEntry()
   for (int i=0; i<MAX_ENTRIES; i++) {
     count[i] = 0;
     times[i] = 0.0;
+    maxtimes[i] = 0.;
   }
 }
 

@@ -53,6 +53,7 @@ class PhaseEntry {
   private:
     int count[MAX_ENTRIES];
     double times[MAX_ENTRIES];
+    double maxtimes[MAX_ENTRIES];
   public:
     PhaseEntry();
     /// one entry is called for 'time' seconds.
@@ -60,6 +61,7 @@ class PhaseEntry {
 	if (epidx>=MAX_ENTRIES) CmiAbort("Too many entry functions!\n");
 	count[epidx]++;
 	times[epidx] += time;
+	if (maxtimes[epidx] < time) maxtimes[epidx] = time;
     }
     /**
         write two lines for each phase:
@@ -72,9 +74,15 @@ class PhaseEntry {
 	for (i=0; i<_numEntries; i++) 
 	    fprintf(fp, "%d ", count[i]);
 	fprintf(fp, "\n");
+
 	fprintf(fp, "[%d] ", seq);
 	for (i=0; i<_numEntries; i++) 
 	    fprintf(fp, "%ld ", (long)(times[i]*1.0e6) );
+	fprintf(fp, "\n");
+
+	fprintf(fp, "[%d] ", seq);
+	for (i=0; i<_numEntries; i++) 
+	    fprintf(fp, "%ld ", (long)(maxtimes[i]*1.0e6) );
 	fprintf(fp, "\n");
     }
 };
