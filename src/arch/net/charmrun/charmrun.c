@@ -601,7 +601,12 @@ int   arg_startpe;
 void arg_init(int argc, char **argv)
 {
   static char buf[1024];
-
+  
+  int local_def=0;
+#if CMK_CHARMRUN_LOCAL
+  local_def=1; /*++local is the default*/
+#endif
+  
   pparam_int(&arg_requested_pes, 1, "p",             "number of processes to create");
   pparam_int(&arg_timeout,      60, "timeout",       "seconds to wait per host connection");
   pparam_flag(&arg_verbose,      0, "verbose",       "Print diagnostic messages");
@@ -613,7 +618,7 @@ void arg_init(int argc, char **argv)
   pparam_int(&arg_server_port,   0, "server-port",   "Port to listen for CCS requests");
   pparam_str(&arg_server_auth,   0, "server-auth",   "CCS Authentication file");
 #endif
-  pparam_flag(&arg_local,	0, "local", "Start node programs locally without daemon");
+  pparam_flag(&arg_local,	local_def, "local", "Start node programs locally without daemon");
   pparam_flag(&arg_usehostname,  0, "usehostname", "Send nodes our symbolic hostname instead of IP address");
 #if CMK_USE_RSH
   pparam_flag(&arg_debug,         0, "debug",         "Run each node under gdb in an xterm window");
