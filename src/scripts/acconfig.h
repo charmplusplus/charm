@@ -28,6 +28,9 @@
 
 #undef CMK_USE_POLL
 
+#undef CMK_DLL_USE_DLOPEN
+#undef CMK_DLL_USE_WIN32
+
 #undef CMK_HAS_MMAP
 #undef CMK_HAS_MMAP_ANON
 

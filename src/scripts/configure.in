@@ -276,6 +276,42 @@ EOT
 test_cxx "whether the poll() syscall exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass)
 
+#### check if dlopen works ####
+cat > $t <<EOT
+#include "ckdll_dlopen.C"
+int main() {
+	CkDll dll("foo.so");
+	return 0;
+}
+EOT
+test_link "whether dlopen links without -ldl" "yes" "no" ""
+noldl=$pass
+test_link "whether dlopen links with -ldl" "yes" "no" "-ldl"
+if test $pass -eq 1
+then 
+#dlopen requires -ldl: add it to our link line
+	cat >> ./conv-mach-opt.sh << EOT
+
+# Option added by configure script's dlopen section
+CMK_LIBS="\$CMK_LIBS -ldl"
+
+EOT
+fi
+
+if test $pass -eq 1 -o $noldl -eq 1
+then
+# One version or another of dlopen worked: compile it in
+	AC_DEFINE_UNQUOTED(CMK_DLL_USE_DLOPEN, 1)
+fi
+
+
+#### check if getProcAddress works ####
+cat > $t <<EOT
+#include "ckdll_win32.C"
+EOT
+test_cxx "whether getProcAddress works" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_DLL_USE_WIN32, $pass)
+
 
 #### check if mmap exists ####
 cat > $t <<EOT
