@@ -64,7 +64,9 @@ ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
 	pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h \
 	TList.h idl.h ckarray.h tempo.h waitqd.h LBDatabase.h \
 	lbdb.h LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
-	Refiner.h ObjGraph.h CentralLB.h RandCentLB.h RefineLB.h MetisLB.h \
+	Refiner.h ObjGraph.h CentralLB.h RandCentLB.h \
+	RecBisectBfLB.h graph.h fifoInt.h bitvecset.h \
+	RefineLB.h MetisLB.h \
 	HeapCentLB.h Set.h elements.h heap.h conv-ccs.h NeighborLB.h \
 	WSLB.h CkLists.h GreedyRefLB.h RandRefLB.h CommLB.h CommLBHeap.h
 
@@ -136,6 +138,7 @@ CVHEADERS=converse.h conv-mach.h conv-mach.sh \
           ../include/LBDatabase.decl.h LBDatabase.def.h \
           ../include/CentralLB.decl.h CentralLB.def.h \
           ../include/RandCentLB.decl.h RandCentLB.def.h \
+          ../include/RecBisectBfLB.decl.h RecBisectBfLB.def.h \
           ../include/MetisLB.decl.h MetisLB.def.h \
           ../include/RefineLB.decl.h RefineLB.def.h \
           ../include/HeapCentLB.decl.h HeapCentLB.def.h \
@@ -253,7 +256,8 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
           ckfutures.h ckarray.h tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h\
-	  CentralLB.h RandCentLB.h RefineLB.h HeapCentLB.h CommLB.h\
+	  CentralLB.h RandCentLB.h RecBisectBfLB.h \
+	  RefineLB.h HeapCentLB.h CommLB.h\
 	  MetisLB.h NeighborLB.h WSLB.h GreedyRefLB.h RandRefLB.h CkLists.h \
 	  $(CVHEADERS)
 
@@ -263,7 +267,8 @@ LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            ckarray.o tempo.o waitqd.o LBDatabase.o lbdb.o \
 	   LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o Refiner.o \
 	   ObjGraph.o \
-	   CentralLB.o RandCentLB.o MetisLB.o RefineLB.o Set.o CommLB.o\
+	   CentralLB.o RandCentLB.o RecBisectBfLB.o graph.o bitvecset.o fifoInt.o \
+	   MetisLB.o RefineLB.o Set.o CommLB.o\
            HeapCentLB.o heap.o NeighborLB.o WSLB.o GreedyRefLB.o \
 	   RandRefLB.o CommLBHeap.o
 
@@ -296,6 +301,9 @@ libtrace-summary.a: $(LIBTRACE_SUMM)
 
 ../include/RandCentLB.decl.h : RandCentLB.decl.h
 	/bin/cp RandCentLB.decl.h ../include
+
+../include/RecBisectBfLB.decl.h : RecBisectBfLB.decl.h
+	/bin/cp RecBisectBfLB.decl.h ../include
 
 ../include/MetisLB.decl.h : MetisLB.decl.h
 	/bin/cp MetisLB.decl.h ../include
@@ -350,6 +358,9 @@ CentralLB.decl.h Central.def.h : CentralLB.ci charmxi
 
 RandCentLB.decl.h RandCent.def.h : RandCentLB.ci charmxi
 	$(CHARMC) RandCentLB.ci
+
+RecBisectBfLB.decl.h RandCent.def.h : RecBisectBfLB.ci charmxi
+	$(CHARMC) RecBisectBfLB.ci
 
 MetisLB.decl.h MetisLB.def.h : MetisLB.ci charmxi
 	$(CHARMC) MetisLB.ci
@@ -425,6 +436,18 @@ CentralLB.o: CentralLB.C $(CKHEADERS)
 
 RandCentLB.o: RandCentLB.C $(CKHEADERS)
 	$(CHARMC) -o RandCentLB.o RandCentLB.C
+
+RecBisectBfLB.o: RecBisectBfLB.C $(CKHEADERS) graph.h fifoInt.h bitvecset.h
+	$(CHARMC) -o RecBisectBfLB.o RecBisectBfLB.C
+
+graph.o: graph.c 
+	$(CHARMC) -o graph.o graph.c
+
+fifoInt.o: fifoInt.c fifoInt.h
+	$(CHARMC) -o fifoInt.o fifoInt.c
+
+bitvecset.o: bitvecset.c bitvecset.h
+	$(CHARMC) -o bitvecset.o bitvecset.c
 
 MetisLB.o: MetisLB.C $(CKHEADERS)
 	$(CHARMC) -o MetisLB.o MetisLB.C
