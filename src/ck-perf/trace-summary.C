@@ -113,7 +113,7 @@ void traceClose(void)
 void LogPool::write(void) 
 {
   int i;
-  fprintf(fp, "%d/%d entries:%d ep:%d interval:%le\n", CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize));
+  fprintf(fp, "%d/%d count:%d ep:%d interval:%le\n", CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize));
   for(i=0; i<numEntries; i++)
     pool[i].write(fp);
   fprintf(fp, "\n");
