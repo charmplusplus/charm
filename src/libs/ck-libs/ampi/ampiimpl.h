@@ -288,6 +288,7 @@ extern int mpi_nworlds;
 #define MPI_GATHER_TAG  MPI_TAG_UB+13
 #define MPI_SCATTER_TAG MPI_TAG_UB+14
 #define MPI_SCAN_TAG 	MPI_TAG_UB+15
+#define MPI_ATA_TAG	MPI_TAG_UB+16
 
 #if 0
 // This is currently not used.
@@ -475,12 +476,12 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
     }
     void push_back(AmpiRequest* elt) {insertAt(len,elt);}
     int insert(AmpiRequest* elt){
-      //search for invalidated slot
+/*      //search for invalidated slot
       for(int i=0;i<len;i++)
         if(!block[i]->isValid()){
 	  block[i] = elt;
 	  return i;
-        }
+        } */
       push_back(elt);
       return len-1;
     }

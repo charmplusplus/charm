@@ -2050,7 +2050,7 @@ int MPI_Wait(MPI_Request *request, MPI_Status *sts)
 }
 
 CDECL
-int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts)
+int MPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 {
   AMPIAPI("MPI_Waitall");
   for(int i=0;i<count;i++) {
@@ -2606,7 +2606,7 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   // commlib support
   CProxy_ampi arrproxy = ptr->comlibBegin();
   for(i=0;i<size;i++) {
-    ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i), sendcount,
+    ptr->delesend(MPI_ATA_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i), sendcount,
                   sendtype, i, comm, arrproxy);
   }
   ptr->comlibEnd();
@@ -2617,7 +2617,7 @@ int MPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   for(i=0;i<size;i++) {
     MPI_Recv(((char*)recvbuf)+(itemsize*i), recvcount, recvtype,
-              i, MPI_GATHER_TAG, comm, &status);
+              i, MPI_ATA_TAG, comm, &status);
   }
   return 0;
 }
@@ -2631,7 +2631,9 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Ialltoall not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   ampi *ptr = getAmpiInstance(comm);
+  AmpiRequestList* reqs = getReqs();
   int size = ptr->getSize();
+  int reqsSize = reqs->size();
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
   int itemsize = dttype->getSize(sendcount) ;
   int i;
@@ -2639,16 +2641,15 @@ int MPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   // commlib support
   CProxy_ampi arrproxy = ptr->comlibBegin();
   for(i=0;i<size;i++) {
-    ptr->delesend(MPI_GATHER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i), sendcount,
+    ptr->delesend(MPI_ATA_TAG+reqsSize, ptr->getRank(), ((char*)sendbuf)+(itemsize*i), sendcount,
                   sendtype, i, comm, arrproxy);
   }
   ptr->comlibEnd();
 
   // copy+paste from MPI_Irecv
-  AmpiRequestList* reqs = getReqs();
   ATAReq *newreq = new ATAReq(size);
   for(i=0;i<size;i++){
-    if(newreq->addReq(((char*)recvbuf)+(itemsize*i),recvcount,recvtype,i,MPI_GATHER_TAG,comm)!=(i+1))
+    if(newreq->addReq(((char*)recvbuf)+(itemsize*i),recvcount,recvtype,i,MPI_ATA_TAG+reqsSize,comm)!=(i+1))
       CkAbort("MPI_Ialltoall: Error adding requests into ATAReq!");
   }
   *request = reqs->insert(newreq);
