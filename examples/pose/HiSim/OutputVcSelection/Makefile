@@ -8,6 +8,8 @@ RedStorm: $(OBJDIR)/maxAvailBuffer.o
 
 HypCubeArch: $(OBJDIR)/maxAvailBuffer.o  
 
+HypCubeArchOB: $(OBJDIR)/outputBuffer.o  
+
 BlueGene: $(OBJDIR)/maxAvailBufferBubbleVc.o
 
 IB: $(OBJDIR)/maxAvailBufferSwitch.o
