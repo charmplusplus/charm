@@ -535,6 +535,14 @@ class FEM_Entity {
 	CkVec<FEM_Attribute *> attributes;
 	
 	/**
+	 * Coordinates of each entity, from FEM_COORD.
+	 * Datatype is always FEM_DOUBLE, width is always 2 or 3.
+	 *  If NULL, coordinates are unknown.
+	 */
+	FEM_DataAttribute *coord; 
+	void allocateCoord(void);
+	
+	/**
 	 * Symmetries of each entity, from FEM_SYMMETRIES.  This bitvector per
 	 * entity indicates which symmetry conditions the entity belongs to.
 	 * Datatype is always FEM_BYTE (same as FEM_Symmetries_t), width 
@@ -644,7 +652,9 @@ public:
 		return &attributes;
 	}
 	
-
+	// Stupidest possible coordinate access
+	inline FEM_DataAttribute *getCoord(void) {return coord;}
+	inline const FEM_DataAttribute *getCoord(void) const {return coord;}
 	
 	//Symmetry array access:
 	const FEM_Symmetries_t *getSymmetries(void) const {

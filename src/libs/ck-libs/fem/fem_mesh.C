@@ -900,7 +900,7 @@ CDECL const char *FEM_Get_entity_name(int entity,char *storage)
 }
 
 FEM_Entity::FEM_Entity(FEM_Entity *ghost_) //Default constructor
-	:length(-1), max(-1),ghost(ghost_), sym(0), globalno(0), 
+	:length(-1), max(-1),ghost(ghost_), coord(0), sym(0), globalno(0), 
 	 ghostIDXL(ghost?&ghostSend:NULL, ghost?&ghost->ghostRecv:NULL),resize(NULL)
 {
 	//No attributes initially
@@ -1065,8 +1065,9 @@ void FEM_Entity::create(int attr,const char *caller) {
 	if (attr<=FEM_ATTRIB_TAG_MAX) 
 	{ //It's a valid user data tag
 		add(new FEM_DataAttribute(this,attr));
-	}
-	else if (attr==FEM_SYMMETRIES) {
+	} else if (attr==FEM_COORD) {
+		allocateCoord();
+	} else if (attr==FEM_SYMMETRIES) {
 		allocateSym();
 	} else if (attr==FEM_GLOBALNO) {
 		allocateGlobalno();
@@ -1077,6 +1078,13 @@ void FEM_Entity::create(int attr,const char *caller) {
 			FEM_Get_attr_name(attr,attrNameStorage), getName());
 		FEM_Abort(caller,msg);
 	}
+}
+
+void FEM_Entity::allocateCoord(void) {
+	if (coord) CkAbort("FEM_Entity::allocateCoord called, but already allocated");
+	coord=new FEM_DataAttribute(this,FEM_COORD);
+	add(coord); // coord will be deleted by FEM_Entity now
+	coord->setDatatype(FEM_DOUBLE);
 }
 
 void FEM_Entity::allocateSym(void) {
@@ -1126,6 +1134,7 @@ void FEM_Entity::copyOldGlobalno(const FEM_Entity &e) {
 FEM_Node::FEM_Node(FEM_Node *ghost_) 
 	:FEM_Entity(ghost_), primary(0), sharedIDXL(&shared,&shared)
 {}
+
 void FEM_Node::allocatePrimary(void) {
 	if (primary) CkAbort("FEM_Node::allocatePrimary called, but already allocated");
 	primary=new FEM_DataAttribute(this,FEM_NODE_PRIMARY);

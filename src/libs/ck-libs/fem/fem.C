@@ -277,7 +277,9 @@ FEM_Mesh_recv(int fromRank,int tag,FEM_Comm_t comm_context)
 	FEMchunk *c=FEMchunk::get(caller);
 	marshallNewHeapCopy<FEM_Mesh> m;
 	MPI_Recv_pup(m,fromRank,tag,(MPI_Comm)comm_context);
-	return c->meshes.put(m);
+	FEM_Mesh *msh=m; 
+	msh->becomeGetting();
+	return c->meshes.put(msh);
 }
 FORTRAN_AS_C_RETURN(int,FEM_MESH_RECV,FEM_Mesh_recv,fem_mesh_recv, 
 	(int *from,int *tag,int *comm),(*from,*tag,*comm))
