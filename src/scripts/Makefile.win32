@@ -35,7 +35,7 @@ CHARM++ : CONVERSE CHARMLIBS TRANSLATORS
 
 TRANSLATORS : $(CHARMXI) $(CONV_CPM)
 
-AMPI: CHARM++ $(LIBS_DIR)\libampi.lib $(LIBS_DIR)\libampif.lib
+AMPI: CHARM++ $(LIBS_DIR)\libampi.a $(LIBS_DIR)\libampif.a
 
 #.SILENT:
 
@@ -132,9 +132,9 @@ DIRSSOURCES :
 #
 ###############################################################################
 
-TRACELIBS=libtrace-none.lib libtrace-projections.lib libtrace-summary.lib
+TRACELIBS=libtrace-none.a libtrace-projections.a libtrace-summary.a
 
-CVLIBS=$(LIBS_DIR)\libconv-core.lib $(LIBS_DIR)\libconv-cplus-n.lib $(LIBS_DIR)\libconv-cplus-y.lib $(LIBS_DIR)\libconv-util.lib $(LIBS_DIR)\libldb-rand.obj $(LIBS_DIR)\libldb-spray.obj $(LIBS_DIR)\libldb-graph.obj $(LIBS_DIR)\libldb-test.obj $(TRACELIBS)
+CVLIBS=$(LIBS_DIR)\libconv-core.a $(LIBS_DIR)\libconv-cplus-n.a $(LIBS_DIR)\libconv-cplus-y.a $(LIBS_DIR)\libconv-util.a $(LIBS_DIR)\libldb-rand.o $(LIBS_DIR)\libldb-spray.o $(LIBS_DIR)\libldb-graph.o $(LIBS_DIR)\libldb-test.o $(TRACELIBS)
 
 LIBCONV_CORE=threads.obj convcore.obj conv-conds.obj queueing.obj msgmgr.obj memory.obj cpm.obj cpthreads.obj futures.obj cldb.obj random.obj debug-message.obj debug-object.obj info.obj generate.obj edgelist.obj conv-ccs.obj quiescence.obj 
 
@@ -162,7 +162,7 @@ CONVLIBS : MASTER-SLAVE PACKLIB COMMLIB UTIL
 
 MASTER-SLAVE : $(CONVLIBS_SRC)\master-slave\cms.c
 	$(CPP) $(CPP_PROJ) $(CONVLIBS_SRC)\master-slave\cms.c
-	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libcms.lib" cms.obj
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libcms.a" cms.obj
 	@if exist ..\include\cms.h del /q ..\include\cms.h
 	@copy $(CONVLIBS_SRC)\master-slave\cms.h ..\include\cms.h
 
@@ -170,7 +170,7 @@ MASTER-SLAVE : $(CONVLIBS_SRC)\master-slave\cms.c
 UTIL_SRC=pup_util.C pup_xlater.C pup_c.C ckhashtable.C
 UTIL: $(UTIL_SRC)
 	$(CPP) $(CPP_PROJ) /TP $(UTIL_SRC)
-	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-util.lib" \
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-util.a" \
 	  $(LIBCONV_UTIL)
 
 COMMLIB_SRC=charm_bind.C commlib.C overlapper.C treerouter.C gridrouter.C \
@@ -179,32 +179,32 @@ COMMLIB_OBJ=charm_bind.obj commlib.obj overlapper.obj treerouter.obj gridrouter.
 	de.obj bcast.obj rsend.obj petable.obj 
 COMMLIB :  $(COMMLIB_SRC)
 	$(CPP) $(CPP_PROJ) /TP $(COMMLIB_SRC)
-	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libcomm.lib" \
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libcomm.a" \
 	  $(COMMLIB_OBJ)
 
 PACKLIB_SRC=packc.C packf77.C
 PACKLIB_OBJ=packc.obj packf77.obj
 PACKLIB : $(PACKLIB_SRC)
 	$(CPP) $(CPP_PROJ) /TP $(PACKLIB_SRC)
-	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libpacklib.lib" \
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libpacklib.a" \
 	  $(PACKLIB_OBJ)
 
-$(LIBS_DIR)\libconv-core.lib : $(LIBCONV_CORE)
-	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-core.lib" \
+$(LIBS_DIR)\libconv-core.a : $(LIBCONV_CORE)
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-core.a" \
 	$(LIBCONV_CORE)
 
-$(LIBS_DIR)\libconv-cplus-y.lib : machine.c $(CVHEADERS)
+$(LIBS_DIR)\libconv-cplus-y.a : machine.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) /D "_LIB" /D"FOR_CPLUS=1" machine.c
-	$(LINK) -lib $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-cplus-y.lib" \
+	$(LINK) -lib $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-cplus-y.a" \
 	machine.obj
 
-$(LIBS_DIR)\libconv-cplus-n.lib : machine.c $(CVHEADERS)
+$(LIBS_DIR)\libconv-cplus-n.a : machine.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) /D"FOR_CPLUS=0" machine.c
-	$(LINK) -lib $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-cplus-y.lib" \
+	$(LINK) -lib $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-cplus-y.a" \
 	machine.obj
 
-$(LIBS_DIR)\libconv-util.lib : $(LIBCONV_UTIL)
-	$(LINK) -lib $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-util.lib" \
+$(LIBS_DIR)\libconv-util.a : $(LIBCONV_UTIL)
+	$(LINK) -lib $(LINK_FLAGS) /out:"$(LIBS_DIR)\libconv-util.a" \
 	$(LIBCONV_UTIL)
 
 cpm.obj : cpm.c $(CVHEADERS)
@@ -255,21 +255,21 @@ cldb.obj : cldb.c cldb.h $(CVHEADERS)
 quiescence.obj: quiescence.c $(CVHEADERS) 
 	$(CPP) $(CPP_PROJ) quiescence.c
 
-$(LIBS_DIR)\libldb-rand.obj : cldb.rand.c $(CVHEADERS)
+$(LIBS_DIR)\libldb-rand.o : cldb.rand.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) cldb.rand.c
-	@copy cldb.rand.obj ..\lib\libldb-rand.obj
+	@copy cldb.rand.obj ..\lib\libldb-rand.o
 
-$(LIBS_DIR)\libldb-graph.obj : cldb.graph.c cldb.graph.h $(CVHEADERS)
+$(LIBS_DIR)\libldb-graph.o : cldb.graph.c cldb.graph.h $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) cldb.graph.c 
-	@copy cldb.graph.obj ..\lib\libldb-graph.obj
+	@copy cldb.graph.obj ..\lib\libldb-graph.o
 
-$(LIBS_DIR)\libldb-spray.obj : cldb.spray.c $(CVHEADERS)
+$(LIBS_DIR)\libldb-spray.o : cldb.spray.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ)  cldb.spray.c
-	@copy cldb.spray.obj ..\lib\libldb-spray.obj
+	@copy cldb.spray.obj ..\lib\libldb-spray.o
 
-$(LIBS_DIR)\libldb-test.obj : cldb.test.c $(CVHEADERS)
+$(LIBS_DIR)\libldb-test.o : cldb.test.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) cldb.test.c
-	@copy cldb.test.obj ..\lib\libldb-test.obj
+	@copy cldb.test.obj ..\lib\libldb-test.o
 
 pup_util.obj : pup_util.C $(UTILHEADERS)
 	$(CPP) $(CPP_PROJ) /TP pup_util.C
@@ -292,7 +292,7 @@ conv-lists.obj : conv-lists.C $(UTILHEADERS)
 #
 ########################################################################################################
 
-CK_LIBS_CORE=$(LIBS_DIR)\libck.lib
+CK_LIBS_CORE=$(LIBS_DIR)\libck.a
 
 LIBCK_CORE=init.obj register.obj qd.obj ck.obj main.obj msgalloc.obj ckfutures.obj \
            ckarray.obj ckreduction.obj \
@@ -309,25 +309,25 @@ LIBCK_CORE=init.obj register.obj qd.obj ck.obj main.obj msgalloc.obj ckfutures.o
 CHARMLIBS : CONVERSE $(CK_LIBS_CORE)
 
 $(CK_LIBS_CORE) : $(LIBCK_CORE)
-	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libck.lib" \
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libck.a" \
 	$(LIBCK_CORE)
 
 LIBTRACE_NONE=trace-none.obj
 
-libtrace-none.lib : $(LIBTRACE_NONE)
-	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libtrace-none.lib" \
+libtrace-none.a : $(LIBTRACE_NONE)
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libtrace-none.a" \
 	$(LIBTRACE_NONE)
 
 LIBTRACE_PROJ=trace-projections.obj
 
-libtrace-projections.lib : $(LIBTRACE_PROJ)
-	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libtrace-projections.lib" \
+libtrace-projections.a : $(LIBTRACE_PROJ)
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libtrace-projections.a" \
 	$(LIBTRACE_PROJ)
 
 LIBTRACE_SUMM=trace-summary.obj
 
-libtrace-summary.lib: $(LIBTRACE_SUMM)
-	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libtrace-summary.lib" \
+libtrace-summary.a: $(LIBTRACE_SUMM)
+	$(LIBR) $(LINK_FLAGS) /out:"$(LIBS_DIR)\libtrace-summary.a" \
 	$(LIBTRACE_SUMM)
 
 ampi.decl.h ampi.def.h : ampi.ci $(CHARMXI)
