@@ -34,7 +34,7 @@ void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits)
 extern "C"
 void* CkAllocBuffer(void *msg, int bufsize)
 {
-  bufsize = _ALIGN(bufsize);
+  bufsize = CkMsgAlignLength(bufsize);
   register envelope *env = UsrToEnv(msg);
   register envelope *packbuf;
   packbuf = _allocEnv(env->getMsgtype(), bufsize, 

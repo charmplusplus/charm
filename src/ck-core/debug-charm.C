@@ -136,7 +136,7 @@ void CpdPupMessage(PUP::er &p, void *msg)
   int prioBits=env->getPriobits();
   PUPn(wasPacked);
   PUPn(prioBits);
-  int userSize=size-sizeof(envelope)-sizeof(int)*PW(prioBits);
+  int userSize=size-sizeof(envelope)-sizeof(int)*CkPriobitsToInts(prioBits);
   PUPn(userSize);
   
   p.synchronize(PUP::sync_last_system);

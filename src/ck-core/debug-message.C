@@ -56,7 +56,7 @@ void CkPupMessage(PUP::er &p,void **atMsg,int pack_mode) {
 	p(size);
 	p(prioBits);
 	p(envSize);
-	int userSize=size-envSize-sizeof(int)*PW(prioBits);
+	int userSize=size-envSize-sizeof(int)*CkPriobitsToInts(prioBits);
 	if (p.isUnpacking())
 		env=_allocEnv(type,userSize,prioBits);
 	if (pack_mode == 1) {
