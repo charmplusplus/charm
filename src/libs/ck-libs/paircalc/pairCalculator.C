@@ -1,11 +1,8 @@
+
 #include "ckPairCalculator.h"
 #include "pairCalculator.h"
 
 void createPairCalculator(bool sym, int s, int numZ, int* z, int op1, FuncType f1, int op2, FuncType f2, CkCallback cb, PairCalcID* pcid, int comlib_flag) {
-
-  Strategy * pstrat = new PipeBroadcastStrategy();
-  ComlibInstanceHandle bcastInstance = CkGetComlibInstance();
-  bcastInstance.setStrategy(pstrat);
 
   CProxy_PairCalcReducer pairCalcReducerProxy = CProxy_PairCalcReducer::ckNew();
   pairCalcReducerProxy.ckSetReductionClient(&cb); 
@@ -18,7 +15,13 @@ void createPairCalculator(bool sym, int s, int numZ, int* z, int op1, FuncType f
   int blkSize = 1;
 
   int proc = 0, n_paircalc = 0;
+  
+  Strategy * pstrat = new PipeBroadcastStrategy(USE_HYPERCUBE, pairCalculatorProxy.ckGetArrayID());
+  ComlibInstanceHandle bcastInstance = CkGetComlibInstance();
+  bcastInstance.setStrategy(pstrat);
+
   pcid->Init(pairCalculatorProxy.ckGetArrayID(), pairCalcReducerProxy.ckGetGroupID(), grainSize, blkSize, s, sym, comlib_flag, bcastInstance._instid, bcastInstance._dmid);
+  
 
   if(sym){
     for(int numX = 0; numX < numZ; numX += blkSize){
@@ -52,7 +55,6 @@ void createPairCalculator(bool sym, int s, int numZ, int* z, int op1, FuncType f
   }
      
   pairCalculatorProxy.doneInserting();
-  
 
 #ifdef _DEBUG_
   CkPrintf("    Finished init {grain=%d, sym=%d, blk=%d, Z=%d, S=%d}\n", grainSize, sym, blkSize, numZ, s);
@@ -120,24 +122,31 @@ void finishPairCalc(PairCalcID* pcid, int n, complex*ptr, CkCallback cb) {
   CkPrintf("     Calc Finish\n");
 #endif
 
-  CkArrayID pairCalcReducerID = (CkArrayID)pcid->Gid; 
+  CkGroupID pairCalcReducerID = (CkArrayID)pcid->Gid; 
   CProxy_PairCalcReducer pairCalcReducerProxy(pairCalcReducerID);
+
+  CkArrayID pairCalculatorID = (CkArrayID)pcid->Aid; 
+  CProxy_PairCalculator pairProxy(pairCalculatorID);
+
   ComlibInstanceHandle bcastInstance = ComlibInstanceHandle(pcid->instid, pcid->dmid);
 
   if(pcid->useComlib) {
-      ComlibDelegateProxy(&pairCalcReducerProxy);
+      ComlibDelegateProxy(&pairProxy);
       bcastInstance.beginIteration();
   }
 
-  pairCalcReducerProxy.broadcastEntireResult(n, ptr, pcid->Symmetric, cb);
-
+  if(pcid->useComlib)
+      pairProxy.acceptEntireResult(n, ptr, cb);
+  else
+      pairCalcReducerProxy.broadcastEntireResult(n, ptr, pcid->Symmetric, cb);
+  
   if(pcid->useComlib) {
       bcastInstance.endIteration();
   }
 }
 
 void startPairCalcLeftAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
-
+    
 }
 
 void startPairCalcRightAndFinish(PairCalcID* pcid, int n, complex* ptr, int myS, int myZ){
