@@ -1205,6 +1205,31 @@ int CmiMyRank(void)
 }
 #endif
 
+/*Add a message to this processor's receive queue 
+  Must be called while holding comm. lock
+*/
+static void CmiPushPE(int pe,void *msg)
+{
+  CmiState cs=CmiGetStateN(pe);
+  MACHSTATE1(2,"Pushing message into %d's queue",pe);
+  PCQueuePush(cs->recv,msg);
+  CmiIdleLock_addMessage(&cs->idle);
+}
+
+/*Add a message to the node queue.  
+  Must be called while holding comm. lock
+*/
+static void CmiPushNode(void *msg)
+{
+  CmiState cs=CmiGetStateN(0);
+  MACHSTATE1(2,"Pushing message into node queue",pe);
+  PCQueuePush(CsvAccess(NodeRecv),msg);
+  /*Silly: always try to wake up processor 0, so at least *somebody*
+    will be awake to handle the message*/
+  CmiIdleLock_addMessage(&cs->idle);
+}
+
+
 /***************************************************************
  Communication with charmrun:
  We can send (ctrl_sendone) and receive (ctrl_getone)
@@ -1292,15 +1317,6 @@ static void charmrun_abort(const char *s)
 }
 
 /* ctrl_getone */
-
-/*Add a message to this processor's receive queue */
-static void CmiPushPE(int pe,void *msg)
-{
-  CmiState cs=CmiGetStateN(pe);
-  MACHSTATE1(2,"Pushing message into %d's queue",pe);
-  CmiIdleLock_addMessage(&cs->idle);
-  PCQueuePush(cs->recv,msg);
-}
 
 static void ctrl_getone(void)
 {
@@ -1740,7 +1756,7 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
   dst = ogm->dst;
   switch (dst) {
   case NODE_BROADCAST_ALL:
-    PCQueuePush(CsvAccess(NodeRecv),CopyMsg(ogm->data,ogm->size));
+    CmiPushNode(CopyMsg(ogm->data,ogm->size));
     /*case-fallthrough (no break)-- deliver to all other processors*/
   case NODE_BROADCAST_OTHERS:
     for (i=0; i<Cmi_numnodes; i++)
@@ -1756,10 +1772,10 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
       GarbageCollectMsg(ogm);
     } else {
       if (ogm->freemode == 'A') {
-	PCQueuePush(CsvAccess(NodeRecv),CopyMsg(ogm->data,ogm->size));
+	CmiPushNode(CopyMsg(ogm->data,ogm->size));
 	ogm->freemode = 'X';
       } else {
-	PCQueuePush(CsvAccess(NodeRecv), ogm->data);
+	CmiPushNode(ogm->data);
 	FreeOutgoingMsg(ogm);
       }
     }
@@ -2291,6 +2307,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
         dataskt=-1;
 #endif
   	Cmi_charmrun_fd = skt_connect(Cmi_charmrun_IP, Cmi_charmrun_port, 1800);
+	MACHSTATE1(5,"Opened data socket at port %d",dataport);
 	CmiStdoutInit();
   } else {/*Standalone operation*/
   	printf("Charm++: standalone mode (not using charmrun)\n");
