@@ -13,7 +13,8 @@ Orion Sky Lawlor, olawlor@acm.org, 5/30/2001
 typedef double real;
 
 #include <charm++.h>
-#include "vector3d.h"
+#include "ckvector3d.h"
+typedef CkVector3d vector3d;
 
 //An i,j,k location in one 3D grid block
 class blockDim;

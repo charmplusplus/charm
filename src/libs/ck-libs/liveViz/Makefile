@@ -1,7 +1,7 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=liveViz.h liveViz.decl.h liveViz0.h vector3d.h
+HEADERS=liveViz.h liveViz.decl.h liveViz0.h
 HEADDEP=$(HEADERS) liveViz.def.h networkVar.h image.h
 OBJS=liveViz0.o liveViz.o networkVar.o
 DEST=$(CDIR)/lib/libmoduleliveViz.a

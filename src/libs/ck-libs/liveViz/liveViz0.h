@@ -10,8 +10,7 @@ Orion Sky Lawlor, olawlor@acm.org, 6/11/2002
 #include "conv-ccs.h"
 
 typedef unsigned char byte;
-typedef float real;
-#include "vector3d.h"
+#include "ckvector3d.h"
 
 struct liveVizRequest {
 	CcsDelayedReply replyToken;
@@ -20,7 +19,7 @@ struct liveVizRequest {
 };
 
 struct liveVizRequest3d : public liveVizRequest {
-	vector3d x,y,z,o; //Coordinate axes & origin of screen
+	CkVector3d x,y,z,o; //Coordinate axes & origin of screen
 	double minZ,maxZ; //Range of Z values to display
 };
 
@@ -58,7 +57,7 @@ class liveVizConfig {
 	bool serverPush;
 	
 	bool is3d; //If true, show 3d camera motion tools
-	bbox3d box; //If 3d, the viewed object's bounding box, universe coords
+	CkBbox3d box; //If 3d, the viewed object's bounding box, universe coords
 	
 	int verbose; //If nonzero, printf status info; higher numbers give more prints
 public:
@@ -73,7 +72,7 @@ public:
 	}
 	
 	//3D constructor:
-	liveVizConfig(bool isColor_,bool serverPush_,const bbox3d &box_) {
+	liveVizConfig(bool isColor_,bool serverPush_,const CkBbox3d &box_) {
 		isColor=isColor_;
 		serverPush=serverPush_;
 		is3d=true;
@@ -89,7 +88,7 @@ public:
 	int getBytesPerPixel(void) const {return isColor?3:1;}
 	bool getPush(void) const {return serverPush;}
 	bool get3d(void) const {return is3d;}
-	const bbox3d &getBox(void) const {return box;}
+	const CkBbox3d &getBox(void) const {return box;}
 	bool getVerbose(int thanLevel) const {return verbose>=thanLevel;}
 };
 void liveViz0Init(const liveVizConfig &cfg);

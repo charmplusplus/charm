@@ -14,13 +14,13 @@ Orion Sky Lawlor, olawlor@acm.org, 6/2002
 //  This is data that never changes during the course of a run.
 static liveVizConfig config; 
 
-void copy(const networkVector3d &src,vector3d &dest)
+void copy(const networkVector3d &src,CkVector3d &dest)
 {
 	dest.x=src.x;
 	dest.y=src.y;
 	dest.z=src.z;
 }
-void copy(const vector3d &src,networkVector3d &dest)
+void copy(const CkVector3d &src,networkVector3d &dest)
 {
 	dest.x=src.x;
 	dest.y=src.y;
@@ -45,7 +45,7 @@ extern "C" void getImageConfigHandler(char * msg)
   ret.isColor=config.getColor()?1:0;
   ret.isPush=config.getPush()?1:0;
   ret.is3d=config.get3d()?1:0;
-  bbox3d box; box.empty(); box.add(vector3d(0,0,0));
+  CkBbox3d box; box.empty(); box.add(CkVector3d(0,0,0));
   if (config.get3d()) box=config.getBox();
   copy(box.min,ret.min); copy(box.max,ret.max);
   if (config.getVerbose(1))
