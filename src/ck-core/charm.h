@@ -93,17 +93,17 @@ typedef struct {
 } CkChareID;
 
 typedef struct _ckGroupID{
-  int pe;
-  int idx;
+  int idx;			// pe(processor number) is removed from the structure
 #ifdef __cplusplus
-  void pup(PUP::er &p) { p(pe); p(idx); }
+  void pup(PUP::er &p) {  p(idx); }
   int isZero(void) const { return (idx==0); }
   void setZero(void) { idx=0; }
   int operator==(const struct _ckGroupID& gid) const { 
-    return ((gid.pe==pe) && (gid.idx==idx));
+    return (gid.idx==idx);
   }
 #endif
 } CkGroupID;
+
 
 typedef int CkFutureID;
 

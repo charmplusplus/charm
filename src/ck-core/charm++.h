@@ -375,6 +375,7 @@ special delegateMgr group.
 */
 class CkDelegateMgr;
 
+/*
 class CProxy {
   private:
     CkGroupID delegatedTo;
@@ -393,6 +394,29 @@ class CProxy {
       p|delegatedTo;
     }
 };
+*/
+
+// changed CProxy
+
+class CProxy {
+  private:
+    CkGroupID delegatedTo;
+  protected: //Never allocate CProxy's-- only subclass them.
+    CProxy() { /*delegatedTo.idx = -1;*/ delegatedTo.setZero(); }
+    CProxy(CkGroupID dTo) { delegatedTo = dTo; }
+  public:
+    void ckDelegate(CkGroupID to) {delegatedTo=to;}
+    void ckUndelegate(void) {/*delegatedTo.idx = -1;*/ delegatedTo.setZero();}
+    int ckIsDelegated(void) const {/*return (delegatedTo.idx != -1);*/ return(!delegatedTo.isZero());}
+    CkGroupID ckDelegatedIdx(void) const {return delegatedTo;}
+    CkDelegateMgr *ckDelegatedTo(void) const {
+    	return (CkDelegateMgr *)CkLocalBranch(delegatedTo);
+    }
+    void pup(PUP::er &p) {
+      p|delegatedTo;
+    }
+};
+
 PUPmarshall(CProxy)
 
 /*These disambiguation macros are needed to support

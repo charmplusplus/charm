@@ -10,9 +10,8 @@
 
 #include <string.h>
 #include <stdlib.h>
-
+#include <math.h>
 #include "charm++.h"
-
 #include "envelope.h"
 #include "qd.h"
 #include "register.h"
@@ -71,4 +70,5 @@ extern void _createGroupMember(CkGroupID groupID, int eIdx, void *env);
 extern void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *env);
 extern void _createGroup(CkGroupID groupID, envelope *env);
 extern void _createNodeGroup(CkGroupID groupID, envelope *env);
+extern int _getGroupIdx(int,int,int);
 #endif

@@ -117,7 +117,6 @@ void CkDelegateMgr::ArraySectionSend(int ep,void *m, CkArrayID a,CkSectionCookie
 */
 }
 
-
 CkSectionID::CkSectionID(const CkArrayID &aid, const CkArrayIndexMax *elems, const int nElems): _nElems(nElems) {
   _cookie.aid = aid;
   _cookie.pe = CkMyPe();
@@ -341,24 +340,51 @@ void _createNodeGroup(CkGroupID groupID, envelope *env)
   _createNodeGroupMember(groupID, epIdx, msg);
 }
 
+// new _groupCreate
+
 static CkGroupID _groupCreate(envelope *env)
 {
   register CkGroupID groupNum;
-  groupNum.pe = CkMyPe();
-  groupNum.idx = CkpvAccess(_numGroups)++;
+
+  // check CkMyPe(). if it is 0 then idx is _numGroups++
+  // if not, then something else...
+  if(CkMyPe() == 0)
+     groupNum.idx = CkpvAccess(_numGroups)++;
+  else
+     groupNum.idx = _getGroupIdx(CkNumPes(),CkMyPe(),CkpvAccess(_numGroups)++);
   _createGroup(groupNum, env);
   return groupNum;
 }
 
+// new _nodeGroupCreate
 static CkGroupID _nodeGroupCreate(envelope *env)
 {
   register CkGroupID groupNum;
-  groupNum.pe = CkMyNode();
-  CmiLock(_nodeLock);
-  groupNum.idx = _numNodeGroups++;
+  CmiLock(_nodeLock);                           // change for proc 0 and other processors
+  if(CkMyNode() == 0)				// should this be CkMyPe() or CkMyNode()?
+          groupNum.idx = _numNodeGroups++;
+   else
+          groupNum.idx = _getGroupIdx(CkNumNodes(),CkMyNode(),_numNodeGroups++);
   CmiUnlock(_nodeLock);
   _createNodeGroup(groupNum, env);
   return groupNum;
+}
+
+/**** generate the group idx when group is creator pe is not pe0 
+ **** the 32 bit index has msb set to 1 (+ve indices are used by proc 0)
+ **** remaining bits contain the group creator processor number and 
+ **** the idx number which starts from 1(_numGroups or _numNodeGroups) on each proc ****/
+   	
+int _getGroupIdx(int numNodes,int myNode,int numGroups)
+{
+        int idx;
+        int x = (int)ceil(log(numNodes)/log(2));                // number of bits needed to store node number
+        int n = 32 - (x+1);                                     // number of bits remaining for the index
+        idx = (myNode<<n) + numGroups;                          // add number of processors, shift by the no. of bits needed,
+                                                                // then add the next available index
+        idx |= 0x80000000;                                      // set the most significant bit to 1
+								// if int is not 32 bits, wouldn't this be wrong?
+        return idx;
 }
 
 extern "C"
@@ -384,7 +410,6 @@ CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg)
   _TRACE_CREATION_N(env, CkNumNodes());
   return _nodeGroupCreate(env);
 }
-
 
 static inline void *_allocNewChare(envelope *env)
 {

@@ -2,6 +2,8 @@
 #define _INIT_H
 
 #include <charm.h> // For CkNumPes
+#include <new.h>   // for in-place new operator
+#include "ckhashtable.h"
 
 typedef CkQ<void *> PtrQ;
 typedef CkVec<void *> PtrVec;
@@ -11,6 +13,7 @@ class TableEntry {
     IrrGroup *obj;
     PtrQ *pending; //Buffers msgs recv'd before group is created
   public:
+    TableEntry(void) {init();}
     void init(void) { obj=0; pending=0; }
     IrrGroup* getObj(void) { return obj; }
     void setObj(void *_obj) { obj=(IrrGroup *)_obj; }
@@ -22,47 +25,56 @@ class TableEntry {
     }
 };
 
+// new GroupIdxArray
 template <class dtype>
-class GroupIdxArrayEntry {
-  dtype *tab;
-  int max;
-  public:
-    GroupIdxArrayEntry() { tab=NULL; max=0; }
-    void init(int _max) {
-      max = _max;
-      tab = new dtype[max];
-      for(int i=0;i<max;i++)
-       tab[i].init(); 
-    }
-    dtype &find(int n) {
-#ifndef CMK_OPTIMIZE
-       if (n<0) CkAbort("Group ID is negative-- invalid!\n");
-       if (n==0) CkAbort("Group ID is zero-- invalid!\n");
-       if (n>=max) CkAbort("Group ID is too large!\n");
-#endif
-      return tab[n];
-    }
-};
-
-template <class dtype> 
 class GroupIdxArray {
 #if CMK_BLUEGENE_CHARM
-  enum {MAXBINSPE0=256,MAXBINSOTHER=0};
+  enum {MAXBINSPE0=256,MAXBINSOTHER=0};			// MAXBINSOTHER is not used now
 #else
   enum {MAXBINSPE0=256,MAXBINSOTHER=16};
 #endif
-  GroupIdxArrayEntry<dtype> *tab;
+
+  dtype *tab;                           // direct entry table for processor 0
+  CkHashtable_c hashTab;
+  int max;
+
   public:
-     GroupIdxArray() {}
+     GroupIdxArray() {tab=NULL;max=0;hashTab=NULL;}
      void init(void) {
-       tab = new GroupIdxArrayEntry<dtype>[CkNumPes()];
-       tab[0].init(MAXBINSPE0); 
-       if (MAXBINSOTHER)
-         for(int i=1;i<CkNumPes();i++) {
-           tab[i].init(MAXBINSOTHER); 
-         }
+      max = MAXBINSPE0;
+      tab = new dtype[max];
+      for(int i=0;i<max;i++)
+       tab[i].init();
+      hashTab=NULL;
      }
-    dtype& find(CkGroupID n) {return tab[n.pe].find(n.idx);}
+
+    dtype& find(CkGroupID n) {
+#ifndef CMK_OPTIMIZE
+       if (n.idx==0) CkAbort("Group ID is zero-- invalid!\n");
+       if (n.idx>=max) { CkAbort("Group ID is too large!\n");}
+#endif
+
+// TODO: make the table extensible. i.e. if (unsigned)n.idx<max then return tab[n.idx]
+// else if (n.idx<0)    then hashtable things
+// else extend the table
+
+      if(n.idx>0)
+        return tab[n.idx];
+      else
+      {
+        if(hashTab == NULL)
+                hashTab = CkCreateHashtable_int(sizeof(dtype),17);
+
+        dtype *ret = (dtype *)CkHashtableGet(hashTab,&(n.idx));
+
+        if(ret == NULL)                                 // insert data into the table
+        {
+                ret = (dtype *)CkHashtablePut(hashTab,&(n.idx));
+                new (ret) dtype; //Call dtype's constructor (ICK!)
+        }
+        return *ret;
+      }
+    }
 };
 
 typedef GroupIdxArray<TableEntry> GroupTable;
@@ -90,7 +102,7 @@ static inline IrrGroup *_localBranch(CkGroupID gID)
   return CkpvAccess(_groupTable).find(gID).getObj();
 }
 
-extern GroupTable*    _nodeGroupTable;
+extern GroupTable*  _nodeGroupTable;
 
 extern void _initCharm(int argc, char **argv);
 
