@@ -29,10 +29,4 @@
 # define CMK_USE_HP_MAIN_FIX 0
 #endif
 
-/*
-#ifndef CMK_STACK_GROWDOWN
-# define CMK_STACK_GROWDOWN 1
-#endif
-*/
-
 #endif
