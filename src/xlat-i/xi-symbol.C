@@ -1473,6 +1473,9 @@ Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz) :
 }
 void Entry::setChare(Chare *c) {
 	Member::setChare(c);
+        // mainchare constructor parameter is not allowed
+        if (isConstructor()&&container->isMainChare() && param != NULL)
+           die("MainChare Constructor doesn't allow parameter!", line);
 	if (param==NULL) 
 	{//Fake a parameter list of the appropriate type
 		Type *t;
