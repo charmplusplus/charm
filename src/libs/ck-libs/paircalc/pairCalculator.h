@@ -11,13 +11,16 @@ class PairCalcID {
   int BlkSize;
   int S; 
   bool Symmetric;
-  int instid;
-  CkGroupID dmid;
+
+  ComlibInstanceHandle cinst;
+
   bool useComlib;
   bool isDoublePacked;
   PairCalcID() {}
   ~PairCalcID() {}
-  void Init(CkArrayID aid, CkGroupID gid, int grain, int blk, int s, bool sym, bool _useComlib, int _instid, CkGroupID _dmid, bool _dp) {
+
+  void Init(CkArrayID aid, CkGroupID gid, int grain, int blk, int s, bool sym, bool _useComlib,  ComlibInstanceHandle h, bool _dp) {
+      
     Aid = aid;
     Gid = gid;
     GrainSize = grain;
@@ -25,10 +28,12 @@ class PairCalcID {
     S = s;
     Symmetric = sym;
     useComlib = _useComlib;
-    instid = _instid; 
-    dmid = _dmid; 
+
+    cinst = h;
+    
     isDoublePacked = _dp;
   }
+
   void pup(PUP::er &p) {
     p|Aid;
     p|Gid;
@@ -36,8 +41,7 @@ class PairCalcID {
     p|BlkSize;
     p|S;
     p|Symmetric;
-    p|instid;
-    p|dmid;
+    p|cinst;
     p|useComlib;
     p|isDoublePacked;
   }
