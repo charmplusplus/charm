@@ -74,42 +74,10 @@ class _CK_GID : public _CK_CID {
     void _setChare(int c) { _chare = c; }
 };
 
-class _CK_NGID : public _CK_CID {
-  private:
-    int _chare;
-  protected:
-    CkGroupID _ck_ngid;
-    int _isChare(void) { return _chare; }
-    void _setChare(int c) { _chare = c; }
+class _CK_NGID : public _CK_GID {
 };
 
 class Array1D;
-
-class _CK_AID {
-  private:
-    int _chare;
-  public:
-    CkChareID _cid;
-    CkGroupID _ck_aid;
-    Array1D *_array;
-    int _elem;
-    void _setAid(CkGroupID aid) {
-      _ck_aid = aid;
-      _array = (Array1D*) CkLocalBranch(aid);
-    }
-    _CK_AID(CkGroupID aid) {
-      _setAid(aid);
-      _elem = -1;
-    }
-    _CK_AID(CkGroupID aid, int elem) {
-      _setAid(aid);
-      _elem = elem;
-    }
-    _CK_AID() {}
-    void _setCid(CkChareID cid) { _cid = cid; }
-    int _isChare(void) { return _chare; }
-    void _setChare(int c) { _chare = c; }
-};
 
 class CkArrayID {
   public:
@@ -120,18 +88,26 @@ class CkArrayID {
       _ck_aid = aid;
       _array = (Array1D*) CkLocalBranch(aid);
     }
-    CkArrayID(CkGroupID aid) {
-      _setAid(aid);
-      _elem = -1;
-    }
-    CkArrayID(CkGroupID aid, int elem) {
+    CkArrayID(CkGroupID aid, int elem=-1) {
       _setAid(aid);
       _elem = elem;
     }
     CkArrayID() {}
 };
 
-typedef CkArrayID CkAID;  /* Depricated usage */
+typedef CkArrayID CkAID;/* Depricated usage */
+
+class _CK_AID:public CkArrayID {
+  private:
+    int _chare;
+  public:
+    CkChareID _cid;
+    _CK_AID(CkGroupID aid, int elem=-1):CkArrayID(aid,elem) {}
+    _CK_AID() {}
+    void _setCid(CkChareID cid) { _cid = cid; }
+    int _isChare(void) { return _chare; }
+    void _setChare(int c) { _chare = c; }
+};
 
 class CkQdMsg {
   public:
