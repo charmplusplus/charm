@@ -70,7 +70,12 @@ public:
 	//This is how you create ignore, ckExit, and resumeThreads:
 	CkCallback(callbackType t) 
 		:type(t) { if (t==resumeThread) impl_thread_init(); }
-	CkCallback(CkCallbackFn fn,void *param=NULL)
+
+	CkCallback(CkCallbackFn fn)
+		:type(callCFn) 
+		{d.cfn.onPE=0; d.cfn.fn=fn; d.cfn.param=NULL;}
+
+	CkCallback(CkCallbackFn fn,void *param)
 		:type(callCFn) 
 		{d.cfn.onPE=CkMyPe(); d.cfn.fn=fn; d.cfn.param=param;}
 
