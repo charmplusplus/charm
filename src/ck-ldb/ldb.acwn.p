@@ -12,7 +12,14 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-07-09 17:54:13  narain
+ * Revision 2.2  1995-08-14 16:08:02  brunner
+ * I corrected the function names to agree with those in use in ldb.rand.p.
+ * I also tracked down a bug in FillLDB.  It used to call
+ * SentUpdateStatus(destPe) i destPe != CmiNumPe().  Now it
+ * calls it only if 0 <= destPe < CmiNumPe.  It doesn't seg fault now,
+ * but this may not be a valid solution.
+ *
+ * Revision 2.1  1995/07/09  17:54:13  narain
  * Cleaned up working version.. interfaces with functions in ldbcfns.c
  *
  * Revision 2.0  1995/06/29  21:19:36  narain
@@ -76,69 +83,69 @@ extern int CldPickSeedAndSend();
 #define MODERATE 2
 #define HEAVY 3
 
-export_to_C getLdbSize()
+export_to_C CldGetLdbSize()
 {
        return sizeof(LDB_ELEMENT);
 }
 
 
-export_to_C LdbCreateBoc()
+export_to_C CldCreateBoc()
 {
   DUMMYMSG *msg;
   msg = (DUMMYMSG *)CkAllocMsg(DUMMYMSG);	
   CreateBoc(LDB, LDB@BranchInit, msg);
 }
 
-export_to_C LdbFillLDB(destPe, ldb)
+export_to_C CldFillLdb(destPe, ldb)
 int destPe;
 void *ldb;
 {
 	BranchCall(ReadValue(LdbBocNum), LDB@FillLDB(destPe, (LDB_ELEMENT *)ldb));
 }
 
-export_to_C LdbStripLDB(ldb)
+export_to_C CldStripLdb(ldb)
 void *ldb;
 {
 	BranchCall(ReadValue(LdbBocNum), LDB@StripLDB((LDB_ELEMENT *)ldb));
 }
 
 
-export_to_C Ldb_NewSeed_FromNet(msgst, ldb, sendfn) 
+export_to_C CldNewSeedFromNet(msgst, ldb, sendfn) 
 void *msgst, *ldb;
 void (*sendfn)();
 {
 	BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromNet(msgst, ldb, sendfn));
 }
 
-export_to_C Ldb_NewSeed_FromLocal(msgst, ldb, sendfn)
+export_to_C CldNewSeedFromLocal(msgst, ldb, sendfn)
 void *msgst, *ldb;
 void (*sendfn)();
 {
 	BranchCall(ReadValue(LdbBocNum), LDB@NewMsg_FromLocal(msgst, ldb, sendfn));
 }
 
-export_to_C LdbProcessMsg(msgPtr, localdataPtr)
+export_to_C CldProcessMsg(msgPtr, localdataPtr)
 void *msgPtr, *localdataPtr;
 {
 	BranchCall(ReadValue(LdbBocNum), LDB@ProcessMsg(msgPtr, localdataPtr));
 }
 
-export_to_C LdbProcessorIdle()
+export_to_C CldProcessorIdle()
 {
 	BranchCall(ReadValue(LdbBocNum), LDB@ProcessorIdle());
 }
 
-export_to_C void LdbPeriodicRedist()
+export_to_C void CldPeriodicRedist()
 {
 	BranchCall(ReadValue(LdbBocNum), LDB@PeriodicRedist());
 }
 
-export_to_C void LdbPeriodicStatus()
+export_to_C void CldPeriodicStatus()
 {
 	BranchCall(ReadValue(LdbBocNum), LDB@PeriodicStatus());
 }
 
-export_to_C void LdbPeriodicCheckInit()
+export_to_C void CldPeriodicCheckInit()
 {
 	BranchCall(ReadValue(LdbBocNum), LDB@PeriodicCheckInit());
 }
@@ -172,15 +179,18 @@ int peNum;
 {
     int i;
 
+    printf("Starting SentUpdateStatus(%d)\n",peNum);
     if (peNum >=0)
     {
     	i = CmiNeighboursIndex(myPE, peNum);
     	if (i > -1)
     	{
+	        printf("i=%d\n",i);
 	 	statusList[i].myLoadSent = CldMyLoad();
 	 	/*statusList[i].timeLoadSent = CmiTimer();*/
     	}
     }
+    printf("Done with SentUpdateStatus(%d)\n",peNum);
 }
 
 
@@ -356,7 +366,10 @@ entry BranchInit : (message DUMMYMSG * dmsg)
 	    neighboursList = (int *) CmiAlloc( numNeighbours * sizeof(int) );
 /*            CkMemError(neighboursList); */
 	    CmiGetNodeNeighbours(myPE, neighboursList );
+	    printf("Allocating statusList[%d]\n",numNeighbours);
 	    statusList = (LDB_STATUS *) CmiAlloc(numNeighbours * sizeof(LDB_STATUS)); 
+	    printf("statusList=%x\n",statusList);
+	    
 /*            CkMemError(statusList); */
 	    PrivateCall(PrintNodeNeighbours());
 
@@ -456,7 +469,7 @@ LDB_ELEMENT *ldb;
     ldb->piggybackLoad = CldMyLoad();
     /* ldb->msgHops = 0; shouldn't be here. Moved to NewChare From Local
 	on 5/22/93 by Sanjay */
-    if (destPe != CmiNumPe())
+    if ((destPe >= 0) && (destPe < CmiNumPe()))
       PrivateCall(SentUpdateStatus(destPe));
 }
 
@@ -480,7 +493,7 @@ ChareNumType bocNum;
  }
 
     /* call LdbPeriodicRedist() AGAIN after REDIST_UPDATE_INTERVAL time */
-    CallBocAfter(LdbPeriodicRedist, LdbBoc, REDIST_UPDATE_INTERVAL);
+    CallBocAfter(CldPeriodicRedist, LdbBoc, REDIST_UPDATE_INTERVAL);
 }
 
 
@@ -510,7 +523,7 @@ ChareNumType bocNum;
 	}
 
     /* call LdbPeriodicStatus() AGAIN after STATUS_UPDATE_INTERVAL time */
-    CallBocAfter(LdbPeriodicStatus, LdbBoc, STATUS_UPDATE_INTERVAL);
+    CallBocAfter(CldPeriodicStatus, LdbBoc, STATUS_UPDATE_INTERVAL);
 }
 
 
@@ -525,8 +538,8 @@ public void PeriodicCheckInit()
 {
  if (numPe > 1)
  {  
-   CallBocAfter(LdbPeriodicRedist, ReadValue(LdbBocNum), REDIST_UPDATE_INTERVAL);
-   CallBocAfter(LdbPeriodicStatus, ReadValue(LdbBocNum), STATUS_UPDATE_INTERVAL); 
+   CallBocAfter(CldPeriodicRedist, ReadValue(LdbBocNum), REDIST_UPDATE_INTERVAL);
+   CallBocAfter(CldPeriodicStatus, ReadValue(LdbBocNum), STATUS_UPDATE_INTERVAL); 
  }
 }
 
