@@ -13,6 +13,9 @@ typedef unsigned char  UChar;
 #define D(x)     (A(x)-(x))
 #define PW(x)    ((x+CINTBITS-1)/CINTBITS)
 
+#define QMASK    0x0F
+#define PMASK    0xF0
+
 #define NewChareMsg  1
 #define NewVChareMsg 2
 #define BocInitMsg   3
@@ -53,25 +56,24 @@ class envelope {
     UShort priobits;
     UChar  msgtype;
     UChar  msgIdx;
-    UChar  queueing;
-    UChar  packed;
+    UChar  attribs;
     // to make envelope void* aligned
-    UChar padding[D(3*sizeof(UShort)+4*sizeof(UChar))];
+    UChar padding[D(3*sizeof(UShort)+3*sizeof(UChar))];
   public:
     UInt   getEvent(void) const { return event; }
     void   setEvent(const UInt e) { event = e; }
     UInt   getRef(void) const { return s2; }
     void   setRef(const UShort r) { s2 = r; }
-    UChar  getQueueing(void) const { return queueing; }
-    void   setQueueing(const UChar q) { queueing = q; }
+    UChar  getQueueing(void) const { return (attribs & QMASK); }
+    void   setQueueing(const UChar q) { attribs = (attribs & PMASK) | q; }
     UChar  getMsgtype(void) const { return msgtype; }
     void   setMsgtype(const UChar m) { msgtype = m; }
     UChar  getMsgIdx(void) const { return msgIdx; }
     void   setMsgIdx(const UChar idx) { msgIdx = idx; }
     UInt   getTotalsize(void) const { return totalsize; }
     void   setTotalsize(const UInt s) { totalsize = s; }
-    UChar  isPacked(void) const { return packed; }
-    void   setPacked(const UChar p) { packed = p; }
+    UChar  isPacked(void) const { return ((attribs & PMASK)>>4); }
+    void   setPacked(const UChar p) { attribs = (attribs & QMASK) | (p<<4); }
     UShort getPriobits(void) const { return priobits; }
     void   setPriobits(const UShort p) { priobits = p; }
     UShort getPrioWords(void) const { return (priobits+CINTBITS-1)/CINTBITS; }
@@ -91,7 +93,7 @@ class envelope {
       env->msgtype = type;
       env->totalsize = tsize;
       env->priobits = prio;
-      env->packed = 0;
+      env->setPacked(0);
       return env;
     }
     UShort getEpIdx(void) const {

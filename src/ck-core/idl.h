@@ -2,13 +2,13 @@
 #define _IDL_H_
 
 #include "charm++.h"
-#include "idl.top.h"
+#include "idl.decl.h"
 
 #define CI_PE_ANY         CK_PE_ANY
 #define CI_PE_ALL         CK_PE_ALL
 #define CI_PE_ALL_BUT_ME  CK_PE_ALL_BUT_ME
 
-class CIMsgEmpty : public comm_object {
+class CIMsgEmpty : public CMessage_CIMsgEmpty {
 };
 
 class CIHandle {
@@ -16,8 +16,8 @@ class CIHandle {
     int chare;
     int proc;
     union {
-      ChareIDType cid;
-      GroupIdType gid;
+      CkChareID cid;
+      int gid;
     } u;
   public:
    CIHandle() {
@@ -32,14 +32,14 @@ class CIHandle {
    void ciSetProc(int _proc) { proc = _proc; }
    int ciGetProc(void) { return proc; }
    // For ITC++ -> IDL Interoperability
-   CIHandle(ChareIDType _cid) : chare(1) { u.cid = _cid; }
-   CIHandle(GroupIdType _gid) : chare(0) { u.gid = _gid; }
-   void setCID(ChareIDType _cid) { chare=1; u.cid = _cid; }
+   CIHandle(CkChareID _cid) : chare(1) { u.cid = _cid; }
+   CIHandle(int _gid) : chare(0) { u.gid = _gid; }
+   void setCID(CkChareID _cid) { chare=1; u.cid = _cid; }
    void setGID(int _gid) { chare=0; u.gid = _gid; }
    // For IDL -> ITC++ Interoperability
    int isChare(void) { return chare; }
-   ChareIDType ciCID(void) { return u.cid; }
-   GroupIdType ciGID(void) { return u.gid; }
+   CkChareID ciCID(void) { return u.cid; }
+   int ciGID(void) { return u.gid; }
 };
 
 class CIMethodParams {

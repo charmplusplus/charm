@@ -1,1 +1,3 @@
-message CIMsgEmpty;
+module idl {
+  message CIMsgEmpty;
+};

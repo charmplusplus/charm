@@ -24,7 +24,7 @@ class Stats {
       groupMsgsCreated = 0; 
       groupMsgsProcessed = 0; 
     }
-    void combine(Stats* other) {
+    void combine(const Stats* const other) {
       charesCreated += other->charesCreated; 
       charesProcessed += other->charesProcessed; 
       forCharesCreated += other->forCharesCreated; 
@@ -42,14 +42,14 @@ class Stats {
     void recordProcessGroup(int x=1) { groupInitsProcessed += x; }
     void recordSendBranch(int x=1) { groupMsgsCreated += x; }
     void recordProcessBranch(int x=1) { groupMsgsProcessed += x; }
-    UInt getCharesCreated(void) { return charesCreated; }
-    UInt getCharesProcessed(void) { return charesProcessed; }
-    UInt getForCharesCreated(void) { return forCharesCreated; }
-    UInt getForCharesProcessed(void) { return forCharesProcessed; }
-    UInt getGroupsCreated(void) { return groupInitsCreated; }
-    UInt getGroupsProcessed(void) { return groupInitsProcessed; }
-    UInt getGroupMsgsCreated(void) { return groupMsgsCreated; }
-    UInt getGroupMsgsProcessed(void) { return groupMsgsProcessed; }
+    UInt getCharesCreated(void) const { return charesCreated; }
+    UInt getCharesProcessed(void) const { return charesProcessed; }
+    UInt getForCharesCreated(void) const { return forCharesCreated; }
+    UInt getForCharesProcessed(void) const { return forCharesProcessed; }
+    UInt getGroupsCreated(void) const { return groupInitsCreated; }
+    UInt getGroupsProcessed(void) const { return groupInitsProcessed; }
+    UInt getGroupMsgsCreated(void) const { return groupMsgsCreated; }
+    UInt getGroupMsgsProcessed(void) const { return groupMsgsProcessed; }
 };
 
 CpvExtern(Stats*, _myStats);

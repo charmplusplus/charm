@@ -7,4 +7,4 @@ CIHandle ciThisHandle(void *obj)
   return *pHandle;
 }
 
-#include "idl.bot.h"
+#include "idl.def.h"
