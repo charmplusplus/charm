@@ -15,7 +15,7 @@ $(LIBDEST) : $(LIB)
 	/bin/cp $(LIB) $(LIBDEST)
 
 $(LIB): $(LIBOBJ)
-	test -e $(CDIR)/include/msa || mkdir $(CDIR)/include/msa/
+	test -d $(CDIR)/include/msa || mkdir $(CDIR)/include/msa/
 	/bin/cp $(HEADERS) $(CDIR)/include/msa/
 	$(CHARMC) -o $(LIB) $(LIBOBJ) 
 
