@@ -11,6 +11,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/3/1999
 #define __UIUC_PPL_CHARM_VECTOR_3D_H
 
 #include <math.h>
+#include "pup.h"
 
 //MS Visual C++ defines max/min as a (cursed) macro
 #ifdef max
@@ -105,6 +106,11 @@ public:
 		if (y<by.y) y=by.y;
 		if (z<by.z) z=by.z;     
 	}
+
+	void pup(PUP::er &p) {
+		p|x; p|y; p|z;
+	}
+	friend inline void operator|(PUP::er &p,vec &v) {v.pup(p);}
 };
 
 typedef CkVector3dT<double> CkVector3d;
