@@ -819,6 +819,8 @@ class ampi : public CBase_ampi {
     static void sendraw(int t, int s, void* buf, int len, CkArrayID aid,
                         int idx);
     void delesend(int t, int s, const void* buf, int count, int type,  int rank, MPI_Comm destcomm, CProxy_ampi arrproxy);
+    AmpiMsg *recvMsg(int t,int s,void* buf,int count,int type,int comm,int *sts);
+    void recvNoTrace(int t,int s,void* buf,int count,int type,int comm,int *sts=0);
     void recv(int t,int s,void* buf,int count,int type,int comm,int *sts=0);
     void probe(int t,int s,int comm,int *sts);
     int iprobe(int t,int s,int comm,int *sts);
@@ -847,6 +849,7 @@ class ampi : public CBase_ampi {
     }
 
     CkDDT *getDDT(void) {return parent->myDDT;}
+    CthThread getThread() { return thread->getThread(); }
   public:
     //These are directly used by API routines, which is hideous
     /*

@@ -456,6 +456,7 @@ static ampi *ampiInit(char **argv)
   ampi *ptr=(ampi *)TCharm::get()->semaGet(AMPI_TCHARM_SEMAID);
   CtvAccess(ampiInitDone)=1;
   STARTUP_DEBUG("ampiInit> complete")
+  TRACE_BG_START(ptr->getThread(), "AMPI_START")
 
   return ptr;
 }
@@ -1060,11 +1061,9 @@ MSG_ORDER_DEBUG(
 #endif
 }
 
-void
-ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
+AmpiMsg *
+ampi::recvMsg(int t,int s,void* buf,int count,int type,int comm,int *sts)
 {
-  _LOG_E_END_AMPI_PROCESSING(thisIndex)
-
   int tags[3];
   AmpiMsg *msg = 0;
   CkDDT_DataType *ddt = getDDT()->getType(type);
@@ -1094,9 +1093,28 @@ MSG_ORDER_DEBUG(
     CkAbort(einfo);
   }
   ddt->serialize((char*)buf, (char*)msg->data, msg->length/(ddt->getSize(1)), (-1));
+  return msg;
+}
+
+void
+ampi::recvNoTrace(int t, int s, void* buf, int count, int type, int comm, int *sts)
+{
+  AmpiMsg *msg = recvMsg(t, s, buf, count, type, comm, sts);
   delete msg;
+}
+
+void
+ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
+{
+  _LOG_E_END_AMPI_PROCESSING(thisIndex)
+  TRACE_BG_SUSPEND()
+
+  AmpiMsg *msg = recvMsg(t, s, buf, count, type, comm, sts);
   
   _LOG_E_BEGIN_AMPI_PROCESSING(thisIndex,s,count)
+  TRACE_BG_RESUME(thread->getThread(), msg)
+
+  delete msg;
 }
 
 void
@@ -1257,6 +1275,7 @@ CDECL
 int MPI_Finalize(void)
 {
   AMPIAPI("MPI_Finalize");
+  TRACE_BG_SUSPEND()
   MPI_Exit(0);
   return 0;
 }
@@ -1543,7 +1562,7 @@ int MPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   if (ptr->thisIndex == rootIdx){
     /*HACK: Use recv() to block until reduction data comes back*/
     if(op==MPI_CONCAT) count*=ptr->getSize();
-    ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM);
+    ptr->recvNoTrace(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM);
   }
   return 0;
 }
@@ -1748,20 +1767,20 @@ int MPI_Startall(int count, MPI_Request *requests){
 
 int PersReq::wait(MPI_Status *sts){
 	if(sndrcv == 2) {
-		getAmpiInstance(comm)->recv(tag, src, buf, count,
+		getAmpiInstance(comm)->recvNoTrace(tag, src, buf, count,
 				type, comm, (int*)sts);
 	}
 	return 0;
 }
 int IReq::wait(MPI_Status *sts){
-	getAmpiInstance(comm)->recv(tag, src, buf, count,
+	getAmpiInstance(comm)->recvNoTrace(tag, src, buf, count,
 			type, comm, (int*)sts);
 	return 0;
 }
 int ATAReq::wait(MPI_Status *sts){
 	int i;
 	for(i=0;i<count;i++){
-		getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
+		getAmpiInstance(myreqs[i].comm)->recvNoTrace(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
 				myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int *)sts);
 	}
 	return 0;
@@ -1837,14 +1856,14 @@ CmiBool PersReq::test(MPI_Status *sts){
 
 }
 void PersReq::complete(MPI_Status *sts){
-	getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts);
+	getAmpiInstance(comm)->recvNoTrace(tag, src, buf, count, type, comm, (int*)sts);
 }
 
 CmiBool IReq::test(MPI_Status *sts){
 	return getAmpiInstance(comm)->iprobe(tag, src, comm, (int*)sts);
 }
 void IReq::complete(MPI_Status *sts){
-	getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts);
+	getAmpiInstance(comm)->recvNoTrace(tag, src, buf, count, type, comm, (int*)sts);
 }
 
 CmiBool ATAReq::test(MPI_Status *sts){
@@ -1858,7 +1877,7 @@ CmiBool ATAReq::test(MPI_Status *sts){
 void ATAReq::complete(MPI_Status *sts){
 	int i;
 	for(i=0;i<count;i++){
-	getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
+	getAmpiInstance(myreqs[i].comm)->recvNoTrace(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
 			myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int*)sts);
 	}
 }
