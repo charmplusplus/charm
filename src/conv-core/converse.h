@@ -91,9 +91,9 @@ extern void CmiMemUnlock();
 
 typedef int CmiNodeLock;
 #define CmiCreateLock() (0)
-#define CmiLock(lock) {lock++;}
-#define CmiUnlock(lock)  {lock--;}
-#define CmiTryLock(lock)  ((lock)?1:(lock=1,0))
+#define CmiLock(lock) {(lock)++;}
+#define CmiUnlock(lock)  {(lock)--;}
+#define CmiTryLock(lock)  ((lock)?1:((lock)=1,0))
 #define CmiDestroyLock(lock) /*empty*/
 
 #endif
