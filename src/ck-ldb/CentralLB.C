@@ -615,7 +615,10 @@ void CentralLB::readStatsMsgs(const char* filename) {
 
   int i;
   FILE *f = fopen(filename, "r");
-  if (f==NULL) CmiAbort("Fatal Error> Cannot open LB Dump file!\n");
+  if (f==NULL) {
+    CmiPrintf("Fatal Error> Cannot open LB Dump file %s!\n", filename);
+    CmiAbort("");
+  }
 
   // at this stage, we need to rebuild the statsMsgList and
   // statsDataList structures. For that first deallocate the
@@ -651,8 +654,10 @@ void CentralLB::readStatsMsgs(const char* filename) {
 void CentralLB::writeStatsMsgs(const char* filename) {
 
   FILE *f = fopen(filename, "w");
-  if (f == NULL) 
-    CmiAbort("writeStatsMsgs failed to open the output file!\n");
+  if (f==NULL) {
+    CmiPrintf("Fatal Error> writeStatsMsgs failed to open the output file %s!\n", filename);
+    CmiAbort("");
+  }
 
   const PUP::machineInfo &machInfo = PUP::machineInfo::current();
   PUP::toDisk p(f);
@@ -730,6 +735,8 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count,
 	    }
 	    if(senderPE != receiverPE)
 	    {
+		CmiAssert(senderPE < count && senderPE >= 0);
+		CmiAssert(receiverPE < count && receiverPE >= 0);
 	  	msgSentCount[senderPE] += cdata.messages;
 		byteSentCount[senderPE] += cdata.bytes;
 
