@@ -924,7 +924,7 @@ CmiStartFn bgMain(int argc, char **argv)
   cva(bgMach).nullify();
 
   CmiArgGroup("Charm++","BlueGene Simulator");
-  if (CmiGetArgStringDesc(argv, "+config", &configFile, "BlueGene machine config file")) {
+  if (CmiGetArgStringDesc(argv, "+bgconfig", &configFile, "BlueGene machine config file")) {
    cva(bgMach). read(configFile);
   }
   CmiGetArgIntDesc(argv, "+x", &cva(bgMach).x, 
