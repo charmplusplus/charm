@@ -1,0 +1,616 @@
+/***************************************************************************
+ * RCS INFORMATION:
+ *
+ *	$RCSfile$
+ *	$Author$	$Locker$		$State$
+ *	$Revision$	$Date$
+ *
+ ***************************************************************************
+ * DESCRIPTION:
+ *
+ ***************************************************************************
+ * REVISION HISTORY:
+ *
+ * $Log$
+ * Revision 1.1  1996-05-16 15:59:43  gursoy
+ * Initial revision
+ *
+ ***************************************************************************/
+static char ident[] = "@(#)$Header$";
+
+#include <time.h>
+#include <unistd.h>
+#include <math.h>
+#include "converse.h"
+#include "fm.h"
+
+CpvDeclare(int,  Cmi_mype);
+CpvDeclare(int, Cmi_numpes);
+CpvDeclare(void*, CmiLocalQueue);
+CpvDeclare(int, CmiBufferGrabbed);
+
+static int _MC_neighbour[4]; 
+static int _MC_numofneighbour;
+static long ticksPerSecond;
+static long beginTicks;
+static int  remainingMsgCount;
+
+
+static void singlepkt_msg_handler();
+static void mulpkt_header_handler();
+static void mulpkt_data_handler();
+static void mulpkt_send();
+
+#define MAX_PACKET_SIZE 16384
+#define DATA_PACKET_SIZE (MAX_PACKET_SIZE - sizeof(int))
+#define machine_send(dest, size, msg)  \
+    ((size <= MAX_PACKET_SIZE) \
+     ? (FMf_send(dest, singlepkt_msg_handler, msg, size))\
+     : (mulpkt_send(dest, size, msg)) \
+    )
+
+typedef void (*FM_HANDLER)(void *, int) ;
+typedef int (*FUNCTION_PTR)();   
+
+
+
+void *CmiAlloc(size)
+int size;
+{
+char *res;
+res =(char *)malloc(size+8);
+if (res==0) printf("Memory allocation failed.");
+((int *)res)[0]=size;
+return (void *)(res+8);
+}
+
+int CmiSize(blk)
+void *blk;
+{
+return ((int *)( ((char *)blk)-8))[0];
+}
+
+void CmiFree(blk)
+void *blk;
+{
+free( ((char *)blk)-8);
+}
+
+
+
+/**************************  TIMER FUNCTIONS **************************/
+
+double CmiTimer()
+{
+     double t;
+     t = (double) (rtclock() - beginTicks); 
+     return (double) (t/(double)ticksPerSecond) ;
+}
+
+
+
+
+static void CmiTimerInit()
+{
+     ticksPerSecond = sysconf(_SC_CLK_TCK) ;
+     beginTicks = rtclock() ;
+}
+
+
+
+
+
+
+
+/********************* MESSAGE RECEIVE FUNCTIONS ******************/
+
+void CmiDeliversInit()
+{
+  CpvInitialize(int, CmiBufferGrabbed);
+  CpvAccess(CmiBufferGrabbed) = 0;
+}
+
+
+
+void CmiGrabBuffer()
+{
+  CpvAccess(CmiBufferGrabbed) = 1;
+}
+
+
+int CmiDeliverMsgs(maxmsgs)
+int maxmsgs;
+{
+    int n;
+    void *msg;
+
+    remainingMsgCount = maxmsgs;
+
+    while (1)
+    {
+        n = FMf_extract_1();
+        if (remainingMsgCount==0) break;
+
+        FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg);
+        if (msg) 
+        {
+            CpvAccess(CmiBufferGrabbed)=0;
+            (CmiGetHandlerFunction(msg))(msg);
+            if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
+            remainingMsgCount--; if (remainingMsgCount==0) break;
+        }
+ 
+        if(n==0 && msg==0) break;
+
+    }
+
+    return remainingMsgCount;
+}
+
+
+
+
+
+
+
+
+
+
+/* not implemented */ 
+int CmiAsyncMsgSent(c)
+CmiCommHandle c ;
+{
+    return 0;
+}
+
+
+/* not implemented */
+void CmiReleaseCommHandle(c)
+CmiCommHandle c ;
+{
+}
+
+
+
+
+
+
+
+
+
+
+/********************* MESSAGE SEND FUNCTIONS ******************/
+
+
+
+void CmiSyncSendFn(destPE, size, msg)
+int destPE;
+int size;
+char * msg;
+{
+    char *temp;
+    if (CpvAccess(Cmi_mype) == destPE)
+       {
+          temp = (char *)CmiAlloc(size) ;
+          memcpy(temp, msg, size) ;
+          FIFO_EnQueue(CpvAccess(CmiLocalQueue), temp);
+       }
+    else
+          machine_send(destPE, size, msg);
+}
+
+
+CmiCommHandle CmiAsyncSendFn(destPE, size, msg)  
+int destPE;
+int size;
+char * msg;
+{
+    CmiSyncSendFn(destPE, size, msg);
+    return 0;
+}
+
+
+
+
+
+void CmiFreeSendFn(destPE, size, msg)
+     int destPE, size;
+     char *msg;
+{
+    if (CpvAccess(Cmi_mype) == destPE)
+       {
+          FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
+       }
+    else
+       {  
+          machine_send(destPE, size, msg);
+          CmiFree(msg);
+       }
+}
+
+
+
+void CmiSyncBroadcastFn(size, msg)        /* ALL_EXCEPT_ME  */
+int size;
+char * msg;
+{
+    int i;
+    if (CpvAccess(Cmi_numpes) > 1) 
+    {
+        for(i=0; i<CpvAccess(Cmi_numpes); i++)
+          if (i!= CpvAccess(Cmi_mype)) {machine_send(i, size, msg);}
+    }
+}
+
+
+
+CmiCommHandle CmiAsyncBroadcastFn(size, msg) /* ALL_EXCEPT_ME  */
+int size;
+char * msg;
+{
+    CmiSyncBroadcastFn(size, msg);
+}
+
+
+
+
+void CmiFreeBroadcastFn(size, msg)
+    int size;
+    char *msg;
+{
+    CmiSyncBroadcastFn(size,msg);
+    CmiFree(msg);
+}
+
+
+
+
+ 
+void CmiSyncBroadcastAllFn(size, msg)
+int size;
+char * msg;
+{
+    int i;
+    char *temp;
+    if (CpvAccess(Cmi_numpes) > 1) 
+    {
+       for(i=0; i<CpvAccess(Cmi_numpes); i++) 
+          if (i!= CpvAccess(Cmi_mype)) {machine_send(i, size, msg);}
+    } 
+    temp = (char *)CmiAlloc(size) ;
+    memcpy(temp, msg, size) ;
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue), temp); 
+}
+
+
+CmiCommHandle CmiAsyncBroadcastAllFn(size, msg)
+int size;
+char * msg;
+{
+    CmiSyncBroadcastAllFn(size, msg);
+}
+
+
+
+void CmiFreeBroadcastAllFn(size, msg)
+int size;
+char * msg;
+{
+    int i;
+    if (CpvAccess(Cmi_numpes) > 1)
+    {
+        for(i=0; i<CpvAccess(Cmi_numpes); i++) 
+          if (i!= CpvAccess(Cmi_mype)) {machine_send(i, size, msg);}
+
+    }
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue), msg);
+}
+
+
+
+/************************** SETUP ***********************************/
+
+void CmiInitMc(argv)
+char *argv[];
+{
+    CpvInitialize(int, Cmi_mype);
+    CpvInitialize(int, Cmi_numpes);
+    CpvInitialize(void*, CmiLocalQueue);
+
+
+    CpvAccess(Cmi_mype)  = _my_pe();
+    CpvAccess(Cmi_numpes) = _num_pes();
+    neighbour_init(CpvAccess(Cmi_mype));
+    CpvAccess(CmiLocalQueue)= (void *) FIFO_Create();
+    CmiSpanTreeInit();
+
+    FM_set_parameter(MAX_MSG_SIZE_FINC, MAX_PACKET_SIZE) ;
+    FM_set_parameter(MSG_BUFFER_SIZE_FINC, 64) ;
+    FM_initialize() ;
+
+    CmiTimerInit();
+}
+
+
+
+void CmiExit()
+{}
+
+
+main(argc,argv)
+int   argc;
+char  *argv[];
+{
+user_main(argc,argv);    
+}
+
+
+
+/**********************  LOAD BALANCER NEEDS **********************/
+
+
+
+long CmiNumNeighbours(node)
+int node;
+{
+    if (node == CpvAccess(Cmi_mype) )
+     return  _MC_numofneighbour;
+    else
+     return 0;
+}
+
+
+CmiGetNodeNeighbours(node, neighbours)
+int node, *neighbours;
+{
+    int i;
+
+    if (node == CpvAccess(Cmi_mype) )
+       for(i=0; i<_MC_numofneighbour; i++) neighbours[i] = _MC_neighbour[i];
+
+}
+
+
+int CmiNeighboursIndex(node, neighbour)
+int node, neighbour;
+{
+    int i;
+
+    for(i=0; i<_MC_numofneighbour; i++)
+       if (_MC_neighbour[i] == neighbour) return i;
+    return(-1);
+}
+
+
+
+/* internal functions                                                 */
+/* Following functions establish a two dimensional torus connection */
+/* among the procesors (for any number of processors > 0              */
+   
+
+
+static neighbour_init(p)
+int p;
+{
+    int a,b,n;
+
+    a = (int) floor(sqrt((double) CpvAccess(Cmi_numpes)));
+    b = (int) ceil( ((double)CpvAccess(Cmi_numpes) / (double)a) );
+
+   
+    _MC_numofneighbour = 0;
+   
+    /* east neighbour */
+    if ( (p+1)%b == 0 )
+           n = p-b+1;
+    else {
+           n = p+1;
+           if (n>=CpvAccess(Cmi_numpes)) n = (a-1)*b; /* west-south corner */
+    }
+    if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
+
+    /* west neigbour */
+    if ( (p%b) == 0) {
+          n = p+b-1;
+          if (n >= CpvAccess(Cmi_numpes)) n = CpvAccess(Cmi_numpes)-1;
+       }
+    else
+          n = p-1;
+    if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
+
+    /* north neighbour */
+    if ( (p/b) == 0) {
+          n = (a-1)*b+p;
+          if (n >= CpvAccess(Cmi_numpes)) n = n-b;
+       }
+    else
+          n = p-b;
+    if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
+    
+    /* south neighbour */
+    if ( (p/b) == (a-1) )
+           n = p%b;
+    else {
+           n = p+b;
+           if (n >= CpvAccess(Cmi_numpes)) n = n%b;
+    } 
+    if (neighbour_check(p,n) ) _MC_neighbour[_MC_numofneighbour++] = n;
+
+}
+
+static neighbour_check(p,n)
+int p,n;
+{
+    int i; 
+    if (n==p) return 0;
+    for(i=0; i<_MC_numofneighbour; i++) if (_MC_neighbour[i] == n) return 0;
+    return 1; 
+}
+
+
+
+
+
+/* ******************************************************************* */
+/* Following functions performs packetizing and work with FM           */
+/* ******************************************************************* */
+
+
+
+typedef struct _MsgStruct {
+	char *beginPtr ;
+	char *currentPtr ;
+	int  length;
+        int  remainingPckts;
+} MsgStruct ;
+
+
+static MsgStruct MsgTable[512] ;
+
+
+
+
+static void singlepkt_msg_handler(buf,len)
+int *buf;
+int len;
+{
+   void *msg = (void *) CmiAlloc(len);
+   memcpy(msg, buf, len);
+   ( (FUNCTION_PTR) CmiGetHandlerFunction(msg) ) (msg);
+   if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg); 
+   remainingMsgCount--;
+}
+
+
+
+
+static void mulpkt_header_handler(len,sourcePe,nPackets,firstWord)
+int len ; /* in bytes */
+int sourcePe;
+int nPackets;
+int firstWord;
+{ 
+	/* This is the control information for multi packet message */
+        /* it has the following info 
+           1-      message length in bytes 
+           2-      source  processor number 
+           3-      number of packets that will follow this 
+           4-      the first word of the first packet in the sequence
+
+           The fourth filed is necessary because packey will have the 
+           source pe in its first word. Therefore, The data of that word
+           will be sent with previous word.
+        */
+
+	MsgTable[sourcePe].length         = len ;
+        MsgTable[sourcePe].remainingPckts = nPackets;
+	MsgTable[sourcePe].beginPtr       = (char *) CmiAlloc(len) ;
+	MsgTable[sourcePe].currentPtr     = MsgTable[sourcePe].beginPtr;
+
+        /* save the first of the first data packet */
+
+        *((int *) MsgTable[sourcePe].beginPtr) = firstWord;
+        MsgTable[sourcePe].currentPtr +=  sizeof(int);
+}
+
+
+
+
+
+
+
+static void mulpkt_data_handler(buf, len)
+int *buf ;
+int len ; /* in bytes */
+{
+	int  i,sourcePe;
+        
+	sourcePe = *buf;
+
+        buf++; /* skip the control word */
+        len -= sizeof(int);
+
+        MsgTable[sourcePe].remainingPckts--;
+
+        if (MsgTable[sourcePe].remainingPckts == 0)  /* last packet */
+        {
+            /* the last data packet is received */
+            char *msgPtr;     
+            /* byte by byte copy */
+            msgPtr =  MsgTable[sourcePe].beginPtr;
+            for(i=0; i<len; i++) *(msgPtr++) = *(buf++);
+
+            msgPtr = MsgTable[sourcePe].beginPtr;
+            ((FUNCTION_PTR)CmiGetHandlerFunction(msgPtr))(msgPtr) ;
+            if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msgPtr);
+
+            remainingMsgCount--;
+
+            MsgTable[sourcePe].length         = 0;
+            MsgTable[sourcePe].remainingPckts = 0;
+            MsgTable[sourcePe].beginPtr       = 0;
+            MsgTable[sourcePe].currentPtr     = 0;
+	}
+
+        else
+ 
+        {
+           /* a data packet is received (not the last one) */
+           /* do a word by word copy for a faster transfer */
+           int *bufPtr = buf;
+           int *msgPtr =  (int *) MsgTable[sourcePe].currentPtr;
+           MsgTable[sourcePe].currentPtr += len;
+           len = len >> 3; /* divide by 8 */
+           for(i=0; i<len; i++) *msgPtr++ = *buf++;
+        }
+}
+
+
+
+
+
+
+
+
+static void mulpkt_send(dest, size, msg)
+int  dest, size;
+int *msg;
+{
+/* msg size (in bytes) is bigger than MAX_PACKET_SIZE, so packetize */
+
+     int i, numPackets,lastsize;
+     char *nextPacketPtr;
+
+
+     /* data packets are of length (DATA_PACKET_SIZE + 1 == MAX_PACKET_SIZE) */
+     /* the last word carries the value of the first word of the next packet */
+     /* we need this trick beacause the first word of each packet has control*/
+     /* info (which is source pe number                                      */
+
+     numPackets = size / DATA_PACKET_SIZE;
+
+     lastsize = size % DATA_PACKET_SIZE;
+     if ( lastsize ) 
+        numPackets++; /* add the last short packet */
+     else
+        lastsize = DATA_PACKET_SIZE; /* there is no shoart packet at the end */
+
+
+     /* send header packet */
+     FMf_send_4(dest,mulpkt_header_handler,size,CmiMyPe(),numPackets,*msg);
+
+     /* send the data packets */
+     /* numPackets-1  packets are of size  MAX_PACKET_SIZE, for sure */
+
+     *msg = CmiMyPe(); /* first word was sent already */
+     nextPacketPtr = (char *) msg; 
+     for(i=0; i<numPackets-1; i++)
+     {
+         FMf_send(dest, mulpkt_data_handler, nextPacketPtr, MAX_PACKET_SIZE);
+         nextPacketPtr += MAX_PACKET_SIZE;
+         *((int *)nextPacketPtr) = CmiMyPe();
+     }
+
+     /* last packet could be shorter */
+     FMf_send(dest, mulpkt_data_handler, nextPacketPtr, lastsize);
+}
