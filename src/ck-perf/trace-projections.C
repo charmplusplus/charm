@@ -734,12 +734,13 @@ void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe, int 
 void TraceProjections::endExecute(void)
 {
   if (checknested && !inEntry) CmiAbort("Nested EndExecute!\n");
+  double cputime = TraceCpuTimer();
   if(execEp == (-1)) {
     _logPool->add(END_PROCESSING,0,_threadEP,TraceTimer(),
-                             execEvent,CkMyPe(),0,0,0.0,TraceCpuTimer());
+                             execEvent,CkMyPe(),0,0,0.0,cputime);
   } else {
     _logPool->add(END_PROCESSING,0,execEp,TraceTimer(),
-                             execEvent,execPe,0,0,0.0,TraceCpuTimer());
+                             execEvent,execPe,0,0,0.0,cputime);
   }
   inEntry = 0;
 }
