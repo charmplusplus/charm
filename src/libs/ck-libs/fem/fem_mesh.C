@@ -169,6 +169,7 @@ FORTRAN_AS_C(FEM_MESH_DATA_OFFSET,FEM_Mesh_data_offset,fem_mesh_data_offset,
 	 *type,*width,*offset,*distance,*skew)
 )
 
+
 void FEM_Register_array(int fem_mesh,int entity,int attr,
 	void *data, int datatype,int width,int firstItem){
 	IDXL_Layout lo(datatype,width);
@@ -728,7 +729,8 @@ void FEM_DataAttribute::copyEntity(int dstEntity,const FEM_Attribute &src,int sr
 	const FEM_DataAttribute *dsrc=(const FEM_DataAttribute *)&src;
 	switch(getDatatype()) {
 	case FEM_BYTE:  char_data->setRow(dstEntity,dsrc->char_data->getRow(srcEntity)); break;
-	case FEM_INT: int_data->setRow(dstEntity,dsrc->int_data->getRow(srcEntity)); break;
+	case FEM_INT: 
+			int_data->setRow(dstEntity,dsrc->int_data->getRow(srcEntity)); break;
 	case FEM_FLOAT: float_data->setRow(dstEntity,dsrc->float_data->getRow(srcEntity)); break;
 	case FEM_DOUBLE: double_data->setRow(dstEntity,dsrc->double_data->getRow(srcEntity)); break;
 	}
@@ -753,10 +755,10 @@ inline void minAttrs(AllocTable2d<T> *data,int A,int B,int D,double frac,int wid
 	T *rowB = data->getRow(B);
 	T *rowD = data->getRow(D);
 	for(int i=0;i<width;i++){
-		if(rowA[i] < rowB[i]){
+		if(rowA[i] == rowB[i]){
 			rowD[i] = rowA[i];
 		}else{
-			rowD[i] = rowB[i];
+			rowD[i] = 0;
 		}
 	}
 }
@@ -969,6 +971,7 @@ void FEM_Entity::copyShape(const FEM_Entity &src) {
 }
 
 void FEM_Entity::setLength(int newlen) {
+	CkPrintf("in SetLength %d %d \n",newlen,max);
 	if(!resize){
 		if (size()!=newlen) {
 			length=newlen;
@@ -992,12 +995,14 @@ void FEM_Entity::setLength(int newlen) {
 				}
 			}	
 			//		call resize with args max n;
+			CkPrintf("Resize called \n");
 			resize(args,&length,&max);
 		}
 	}
 }
 
 void FEM_Entity::setMaxLength(int newLen,int newMaxLen,void *pargs,FEM_Mesh_alloc_fn fn){
+	CkPrintf("resize fn %p \n",fn);
 	max = newMaxLen;
 	resize = fn;
 	args = pargs;
