@@ -543,7 +543,7 @@ void CHostRegister(void)
   CmiSyncSendAndFree(0, msgSize, msg);
 }
 
-unsigned int clientIP, clientPort;
+unsigned int clientIP, clientPort, clientKillPort;
 
 void CHostGetOne()
 {
@@ -646,7 +646,6 @@ void CHostGetOne()
     }
     else if (strncmp(line, "clientdata", strlen("clientdata"))==0){
       int nread;
-      int clientKillPort;
       char cmd[20];
       
       nread = sscanf(line, "%s%d", cmd, &clientKillPort);
@@ -2542,7 +2541,7 @@ extern void CrnInit(void);
 void ConverseCommonInit(char **argv)
 {
 #if NODE_0_IS_CONVHOST
-  int i;
+  int i, j;
 #endif
   CrnInit();
   CmiTimerInit();
@@ -2571,10 +2570,12 @@ void ConverseCommonInit(char **argv)
   CHostRegister();
   
   if(CmiMyPe() == 0){
-    for(i = 1; i < argc; i++)
-      if(strcmp(argv[i], "++server") == 0) {
+    char *ptr;
+    for(ptr = argv[0]; ptr != 0; i++, ptr = argv[i])
+      if(strcmp(ptr, "++server") == 0) {
 	serverFlag = 1;
-	break;
+	for(j = i; argv[j] != 0; j++)
+	  argv[j] = argv[j+1];
       }
   }
 #endif
