@@ -461,6 +461,8 @@ extern "C" int LDMemusage(LDHandle _db)
   return db->useMem();
 }
 
+#else
+extern "C" int LDProcessorSpeed() { return 1; }
 #endif // CMK_LBDB_ON
 
 CmiBool LDOMidEqual(const LDOMid &i1, const LDOMid &i2)
