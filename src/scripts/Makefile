@@ -437,7 +437,7 @@ $(L)/libglobal-swap.o: global-elfgot.C $(CVHEADERS)
 CK_LIBS_CORE=$(L)/libck.a
 
 LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o \
-	   ckfutures.o debug-message.o ckcallback.o \
+	   ckfutures.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
            tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o ckcheckpoint.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \

@@ -360,6 +360,14 @@ debug-message.o: debug-message.C ck.h charm++.h charm.h converse.h \
   queueing.h
 	$(CHARMC) -c -I. debug-message.C
 
+debug-charm.o: debug-charm.C converse.h conv-config.h conv-common.h \
+  conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h \
+  conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
+  persistent.h debug-conv.h ckhashtable.h conv-ccs.h sockRoutines.h \
+  ccs-server.h queueing.h charm.h pup.h middle.h middle-conv.h cklists.h \
+  register.h
+	$(CHARMC) -c -I. debug-charm.C
+
 ckcallback.o: ckcallback.C charm++.h charm.h converse.h conv-config.h \
   conv-common.h conv-mach.h conv-autoconfig.h conv-mach-opt.h pup_c.h \
   conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
