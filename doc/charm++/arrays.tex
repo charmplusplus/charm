@@ -2,76 +2,73 @@
 
 Chare arrays \index{arrays} are arbitrarily-sized collections of chares,
 referenced by a globally unique array identifier of type \keyword{CkArrayID}
-\index{CkArrayID} and an index. 
-
-\uw{ArrayType} is specified in the interface file as:
-
-\begin{tabbing}
-~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
-\> \kw{array} \uw{ArrayType} \{ \\
-\> \> \kw{entry} \uw{ArrayType}(\uw{MessageType1} *); \\
-\> \> \kw{entry void} \uw{EntryPointName2}(\uw{MessageType2} *); \\
-\> \};
-\end{tabbing}
-
-The definition has the form:
-
-\begin{tabbing}
-~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \=~~~~ \kill
-\> \kw{class} \uw{ArrayType} : \kw{public ArrayElement} [: superclass
-names] \{ \\
-\> \> // Data and member functions as in C++ \\
-\> \> // One or more {\it entry method} \index{entry method}
-definitions of the form \\
-\> \kw{public}: \\
-\> \> \uw{ArrayType}(\uw{MessageType1} *{\it MsgPointer}) \\
-\> \> \> \{ // C++ code block  \} \\
-\> \> \kw{void} \uw{EntryPointName2}(\uw{MessageType2} *{\it MsgPointer}) \\
-\> \> \> \{ // C++ code block  \} \\
-\> \};
-\end{tabbing}
+\index{CkArrayID} and an integer index. 
 
 In most respects, array elements are identical to chares.  Differences
 include variations in the creation and remote invocation syntax, to
-include the array size and array index.  Also, the messages handled by
+include the array size and array index.  Also, the messages received by
 array elements must be subclasses of the \keyword{ArrayMessage}
 \index{ArrayMessage} type.
 
+Array elements can be migrated, allowing arrays to be efficiently
+load balanced.  Array elements can receive array broadcasts and
+contribute to array reductions.
 
 \subsubsection{Chare Array Creation}
 
-Given the following code for a \index{array}\index{chare array}chare array declaration:
-In the ``.ci'' file:
+Given the following code for a \index{array}\index{chare array}chare array declaration in the ``.ci'' file:
 
 \begin{verbatim}
-array G {
-  entry G(M1 *);
-  entry void someEntry(M2 *);
+array A {
+  entry A();
+  entry void someEntry(M1 *);
 };
 \end{verbatim}
 
 and in the ``.h'' file:
 
 \begin{verbatim}
-class G : public ArrayElement {
-  public:
-    G(M1 *);
-    void someEntry(M2 *);
+class M1:public ArrayMessage, public CMessage_M1 {
+//...message fields...
+};
 
-    // Optional, for migratable elements
-    G(ArrayElementMigrateMsg *);
-    void packsize();
-    void pack();
+class A : public ArrayElement {
+  public:
+    A(ArrayElementCreateMessage *);
+    A(ArrayElementMigrateMessage *);
+
+    void someEntry(M1 *);
 };
 \end{verbatim}
+
+Note A's odd constructors, which must end with calls 
+to ``finishConstruction'' and ``finishMigration'', as:
+
+\begin{verbatim}
+A::A(ArrayElementCreateMessage *m) : ArrayElement(m)
+{
+  //your constructor code goes here
+  finishConstruction();
+}
+A::A(ArrayElementMigrateMessage *m) : ArrayElement(m)
+{
+  //your migration unpacking code (if any) here
+  finishMigration();
+}
+\end{verbatim}
+
+Read the section ``Migratable Array Elements'' for more
+information on the ArrayElementMigrateMessage
+constructor. 
+
 
 An \index{array}array can be created as follows:
 
 \begin{verbatim}
 CProxy_A *pA = new CProxy_A(num_elements);
    // or
-CkArrayID aid = CProxy_G::ckNew(num_elements);
-CProxy_G g(aid);
+CkArrayID aid = CProxy_A::ckNew(num_elements);
+CProxy_A a(aid);
 \end{verbatim}
 
 
@@ -82,16 +79,246 @@ for it.  If you have a global array id (of type CkArrayID) for the
 array, you can construct the proxy as follows:
 
 \begin{verbatim}
-CkArrayID aid = CProxy_G::ckNew(num_elements);
+int i=3,num_elements=15;
+CkArrayID aid = CProxy_A::ckNew(num_elements);
 // aid may be passed in messages to other objects
-CProxy_G g(aid);
+CProxy_A a(aid);
 
 // Chare array message invocation
-g[i].f(msg);
+a[i].someEntry(msg);
 
-// Chare array broadcast
-g.f(msg);
+// Chare array broadcast (msg goes to all elements)
+a.someEntry(msg);
 \end{verbatim}
+
+Array elements are numbered consecutively starting from zero.
+
+
+
+\subsubsection{Migratable Array Elements}
+Array objects can \index{migrate}migrate from one PE to another.
+For example, the load balancer (see section ``Load Balancing Chare Arrays'')
+might migrate array elements to better balance the load between
+processors.  To allow your array elements to migrate, you need
+to implement several methods in your .h file (the .ci file is 
+unchanged):
+
+\begin{verbatim}
+class A:public ArrayElement {
+public:
+    //...other declarations
+
+    //Packing routines
+    int packsize(void);
+    void pack(void *buf);
+
+    //Migration constructor
+    A(ArrayElementMigrateMessage *m);
+};
+\end{verbatim}
+
+The packing routines are called before your element is moved
+to another processor.  Pack(buf) should write the element's
+data into the given buffer, which will contain at least
+packsize() bytes.
+
+The migration constructor is called after your element has been
+moved to another processor.  The ArrayElementMigrateMessage passed
+in has a packData field which will contain the data from
+the previous call to pack(buf).
+
+One convenient idiom for packing and unpacking fixed-sized
+objects is to declare all your element data inside a structure, 
+as:
+
+\begin{verbatim}
+class A:public ArrayElement {
+protected:
+    typedef struct {
+      //All of A's fields
+    } A_data;
+    A_data myFields;
+public:
+    //...other declarations
+};
+\end{verbatim}
+
+This makes the packing/unpacking routines very simple:
+
+\begin{verbatim}
+//Packing routines
+int A::packsize(void)
+{ return sizeof(myFields); }
+void A::pack(void *buf)
+{ *(A_data *)buf = myFields; }
+
+//Migration constructor
+A::A(ArrayElementMigrateMessage *m)
+{
+  myFields=*(A_data *)m->packData;
+  finishMigration();
+}
+\end{verbatim}
+
+\subsubsection{Load Balancing Chare Arrays}
+\charmpp includes a run-time load balancer which works
+on array elements.  
+
+\huge
+ADD THIS SECTION-- How does the load balancer work?  What
+load balancers are there?  What calls do I make to let the
+load balancer work?
+\normalsize
+
+
+\subsubsection{Reductions on Chare Arrays}
+A \index{reduction}reduction applies a single operation (e.g. add, max, min, ...) to data items scattered across many processors and collects the result in one place.  \charmpp supports reductions on the elements of a Chare array.
+
+The data to be reduced comes from each array element, which must call the contribute method:
+\begin{verbatim}
+ArrayElement::contribute(int nBytes,void *data,ArrayReductionFn type);
+\end{verbatim}
+
+This call contributes \kw{nBytes} bytes starting at \kw{data} to the reduction \kw{type} (see reduction types, below).  All array elements must call contribute, and all must use the same reduction type.  At least one array element must reside on each processor, or the reduction will hang.
+
+If we want to sum each array element's single integer myInt, we would use:
+\begin{verbatim}
+    //Inside any array element method
+    int myInt=get_myInt();
+    contribute(sizeof(int),(void *)&myInt,CkReduction_sum_int);
+\end{verbatim}
+
+The built-in reduction types (see below) can also handle arrays of numbers.  For example, if each element of an array has a pair of doubles \kw{forces}[2] which need to be summed up (separately) across all array elements, from each array element call:
+\begin{verbatim}
+    //Inside any array element method
+    double forces[2]=get_my_forces();
+    contribute(2*sizeof(double),(void *)forces,CkReduction_sum_double);
+\end{verbatim}
+Note that since C++ arrays (like forces[2]) are already pointers, we don't use (void *)\&forces.
+
+
+After the data is reduced, it is passed to a handler function on node zero.  This is an ordinary C or C++ function that you pass to the CkRegisterArrayReductionHandler call:
+\begin{verbatim}
+void ArrayReductionClientFn(void *param,int dataSize,void *data);
+void CkRegisterArrayReductionHandler(CkArrayID aid,
+            ArrayReductionClientFn handler,void *param);
+\end{verbatim}
+
+\kw{aid} must be a valid array ID, \kw{handler} is the function which will be called when the reduction is complete, and \kw{param} is an arbitrary parameter which will be passed unmodified to \kw{handler}.  A handler function must be registered before any reduction completes, but new handler functions may be installed at any time.
+
+Reduction handlers are typically registered from your main Chare's constructor.  When the reduction is complete, the reduction handler will be called with the reduced value, as in:
+\begin{verbatim}
+//Outside any class definition:
+void myHandler(void *param,int dataSize,void *data)
+{
+  double *forceSum=(double *)data;
+  cout<<``First force sum is ``<<forceSum[0]<<endl;
+  cout<<``Second force sum is ``<<forceSum[1]<<endl;
+}
+
+...
+    //Inside main::main
+    CkArrayID aid=my_get_array_ID();
+    CkRegisterArrayReductionHandler(aid,myHandler,(void *)NULL);
+\end{verbatim}
+
+This simple handler prints out the double values received, and does not use the \kw{param} value passed in (\kw{NULL}, in this case).  The handler can use param, dataSize, and the data in any fashion.
+
+
+\subsubsection{Built-in Array Reduction Types}
+\charmpp includes several built-in reduction types, used to combine the contributions from different array elements.  Any of them may be passed as an \kw{ArrayReductionFn} type to \kw{ArrayElement}::\kw{contribute}.
+
+The first four reductions (sum, product, max, and min) work on int, float, or double data as indicated by the suffix.  The logical reductions (and, or) only work on integer data.  All the built-in reductions work on single numbers (pass a pointer) or arrays-- just pass the correct number of bytes to \kw{ArrayElement}::\kw{contribute}.
+
+\begin{enumerate}
+\item \kw{CkReduction\_sum\_int}, \kw{\_float}, \kw{\_double}-- the result will be the sum of the given numbers.
+
+\item \kw{CkReduction\_product\_int}, \kw{\_float}, \kw{\_double}-- the result will be the product of the given numbers.
+
+\item \kw{CkReduction\_max\_int}, \kw{\_float}, \kw{\_double}-- the result will be the largest of the given numbers.
+
+\item \kw{CkReduction\_min\_int}, \kw{\_float}, \kw{\_double}-- the result will be the smallest of the given numbers.
+
+\item \kw{CkReduction\_and}-- the result will be the logical AND of the given integers.  0 is false, nonzero is true.
+
+\item \kw{CkReduction\_or}-- the result will be the logical OR of the given integers.
+
+\item \kw{CkReduction\_set}-- the result will be a verbatim concatenation of all the contributed data, separated into \kw{CkReduction\_set\_element} records.  The data contributed can be of any length, and can vary across array elements or reductions.  To extract the data from each element, see the description below.
+
+\end{enumerate}
+
+
+\kw{CkReduction\_set} returns a collection of \kw{CkReduction\_set\_element} records, one per array element.  This record has definition:
+\begin{verbatim}
+typedef struct {
+  int sourceElement;//The array element number from which the data came
+  int dataSize;//The length of the data array below
+  char data[1];//The (dataSize-long) array of data
+} CkReduction_set_element;
+\end{verbatim}
+
+To extract the contributions of each array element from a reduction set, use the \kw{CkReduction\_set\_element\_next} routine repeatedly:
+\begin{verbatim}
+  //Inside a reduction handler-- 
+  //  data is our reduced data from CkReduction_set
+  CkReduction_set_element *cur=(CkReduction_set_element *)data;
+  while (cur!=NULL)
+  {
+    ... //Use cur->data
+    //Now advance to the next element's contribution
+    cur=CkReduction_set_element_next(cur);
+  }
+\end{verbatim}
+
+The reduction set is not ordered by array element number.  Use the \kw{sourceElement} field of \kw{CkReduction\_set\_element} if you need to know the source array element number.
+
+\subsubsection{User-defined Array Reduction Types}
+\charmpp allows you to define your own reduction types in addition to those listed above.  Note that \kw{CkReduction\_set} can also be used to easily perform arbitrary combinations of the element data-- the main difference is that \kw{CkReduction\_set} returns all the data to processor zero, while user-defined reductions combine the data as it is collected.  Hence user-defined reductions can be more efficient, but are more restrictive since the data is combined piecewise instead of all at once.
+
+To use a user-defined reduction type, pass your own function pointer in the \kw{type} field of \kw{ArrayElement}::\kw{contribute}.  A user-defined reduction function has the prototype:
+\begin{verbatim}
+ArrayReductionMessage *myReductionType(
+         int nMsg,ArrayReductionMessage **msg);
+\end{verbatim}
+
+The reduction function is called to combine the input array of \kw{nMsg} \kw{ArrayReductionMessage}s into the one return \kw{ArrayReductionMessage}.  \kw{ArrayReductionMessage} is defined as:
+\begin{verbatim}
+class ArrayReductionMessage: ... {
+public:
+    int dataSize; //Length of array below, in bytes
+    void *data; //Reduction data
+    int source; //array element number, or a negative for a composite
+    //Create a new reduction message, copying the given data
+    static ArrayReductionMessage *buildNew(int dataSize,void *srcData);
+    ...
+};
+\end{verbatim}
+
+Thus, a user-defined reduction function to take the product of the contributed double-precision elements would be:
+\begin{verbatim}
+ArrayReductionMessage *myReductionType(int nMsg,ArrayReductionMessage **msg)
+{
+  double product=1.0;
+  int i;
+  for (i=0;i<nMsg;i++)
+    product *= *(double *)(msg[i]->data);
+  return ArrayReductionMessage::buildNew(sizeof(double),(void *)&product);
+}
+\end{verbatim}
+
+Since multiplication is associative and commutative, the order of execution of the
+reduction functions is irrelevant here.  However, \charmpp calls the reduction function 
+at each node to combine the contributions of local array elements, then at each
+non-leaf node of a 4-way reduction tree to combine the composite contributions.  
+The reduction tree is derived in the usual way from the node number (node zero
+is the root, nodes 1-4 are the root's children, nodes 5-8 are 1's children, 
+9-12 are 2's children, and so on). If your operation has special ordering 
+requirements not met by this tree structure,
+use \kw{CkReduction\_set} instead of defining your own reduction function.
+
+
+
+
 
 
 
