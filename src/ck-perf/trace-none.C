@@ -28,3 +28,6 @@ extern "C" void traceUserEvent(int) {}
 extern "C" int  traceRegisterUserEvent(const char*) {return 0;}
 extern "C" void traceClearEps(void) {}
 extern "C" void traceClose(void) {}
+
+extern "C" void CkSummary_MarkEvent(int) {}
+extern "C" void CkSummary_StartPhase(int) {}
