@@ -25,10 +25,10 @@ Summary of New Features:
    marshalling instead of defining messages.
 
 3. Easier running - standalone mode
-   For net-* version running locally, you can now run Charm program without 
-   charmrun. Running node program directly from command line, this is virtually
-   same as "charmrun +p1 <program>", for SMP version, you can also specify 
-   number of processors greater than 1: "program +p2".
+   For net-* version running locally, you can now run Charm programs without 
+   charmrun. Running a node program directly from command line is now the
+   same as "charmrun +p1 <program>"; for SMP version, you can also specify 
+   multiple (local) processors, as in "program +p2".
    
 
 --------------------------------------------------------------------------------
@@ -87,10 +87,9 @@ Summary of New Features:
    legacy MPI application on Charm++ will gain from Charm++'s adptive 
    load balancing ability.
 
-5. Easy running
-   Charm++ is making running Charm++ program easier in this new release. 
-   "Charmrun" now available on all platforms with uniform command line syntax.
-   You can forget the difference between net-* versions and MPI versions,
+5. Easier invocation
+   "Charmrun" is now available on all platforms, with a uniform command line 
+   syntax. You can forget the difference between net-* versions and MPI versions,
    and run charm++ application with this same charmrun command syntax. 
    ++local option is added in charmrun for net-* version, it provides
    simple local use of Charm and no longer require the ability to 
