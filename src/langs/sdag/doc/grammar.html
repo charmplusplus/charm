@@ -1,0 +1,78 @@
+<HTML>
+<HEAD>
+   <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+   <META NAME="Author" CONTENT="Milind Bhandarkar">
+   <META NAME="GENERATOR" CONTENT="Mozilla/4.02 [en] (X11; I; IRIX 6.3 IP32) [Netscape]">
+   <TITLE>Structured Dagger: Grammar</TITLE>
+</HEAD>
+<BODY TEXT="#000000" BGCOLOR="#FFFFFF" LINK="#0000EE" VLINK="#551A8B" ALINK="#FE0000">
+
+<CENTER>
+<H1>
+<U><FONT COLOR="#CC0000">Structured Dagger: Grammar</FONT></U></H1></CENTER>
+&nbsp;
+<H2>
+<FONT COLOR="#000099"><B>Tokens</B>:</FONT></H2>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <B><TT><FONT SIZE=+1>&lt;ident> = Valid
+C++ identifier</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; &lt;int-expr> = Valid C++ integer expression</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; &lt;c++-code> = Valid C++ code</FONT></TT></B>
+<BR>&nbsp;
+<BR>&nbsp;
+<H2>
+<FONT COLOR="#000099">Grammar in EBNF Form:</FONT></H2>
+<B><TT><FONT SIZE=+1>&lt;sdag> := &lt;class-decl> &lt;sdagentry>+</FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&lt;class-decl> := "class" &lt;ident></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&lt;sdagentry> := "sdagentry" &lt;ident> "(" &lt;ident>
+"*" &lt;ident> ")" &lt;body></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&lt;body> := &lt;stmt></FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | "{"
+&lt;stmt>+ "}"</FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&lt;stmt> := &lt;overlap-stmt></FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | &lt;when-stmt></FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | &lt;atomic-stmt></FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | &lt;if-stmt></FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | &lt;while-stmt></FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | &lt;for-stmt></FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | &lt;forall-stmt></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&lt;overlap-stmt> := "overlap" &lt;body></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&lt;atomic-stmt> := "atomic" "{" &lt;c++-code>
+"}"</FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&lt;if-stmt> := "if" "(" &lt;int-expr> ")" &lt;body>
+[&lt;else-stmt>]</FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&lt;else-stmt> := "else" &lt;body></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&lt;while-stmt> := "while" "(" &lt;int-expr> ")"
+&lt;body></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&lt;for-stmt> := "for" "(" &lt;c++-code> ";" &lt;int-expr>
+";" &lt;c++-code> ")" &lt;body></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&lt;forall-stmt> := "forall" "[" &lt;ident> "]"
+"(" &lt;range-stride> ")" &lt;body></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&lt;range-stride> := &lt;int-expr> ":" &lt;int-expr>
+"," &lt;int-expr></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&lt;when-stmt> := "when" &lt;entry-list>&nbsp;
+&lt;body></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&lt;entry-list> := &lt;entry></FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+| &lt;entry> [ "," &lt;entry-list> ]</FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&lt;entry> := &lt;ident> [ "[" &lt;int-expr> "]"
+] "(" &lt;ident> "*" &lt;ident> ")"</FONT></TT></B>
+<BR>&nbsp;
+<BR>&nbsp;
+<BR>&nbsp;
+</BODY>
+</HTML>

@@ -1,0 +1,12 @@
+class mult_chare
+sdagentry init(MSG *msg)
+{
+  atomic
+  {
+    MyChareID(&mychareid);
+    TblFind(ATable, msg->row_index, recv_row, &mychareid, TBL_NEVER_WAIT);
+    TblFind(BTable, msg->col_index, revc_col, &mychareid, TBL_NEVER_WAIT);
+  }
+  when recv_row(TBL_MSG *row), recv_col(TBL_MSG *col)
+    atomic { multiply(row->data, col->data); }
+}

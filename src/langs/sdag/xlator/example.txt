@@ -1,0 +1,194 @@
+Structured Dagger Code:
+=======================
+forall [i] (1:N,1) {
+  atomic { 
+    sum[i] = 0;
+  }
+  forall [j] (M:1,-1) {
+    when e1[i-1](MSG *m1), e2[j-1](MSG *m2) {
+      atomic {
+        sum[i] += m1->data * m2->data;
+      }
+    }
+  }
+  atomic {
+    CPrintf("Sum = %d\n", sum[i]);
+  }
+}
+
+Translated Code:
+================
+forall_1_begin()
+{
+  int start = 1, end = N, incr = 1;
+  if (start > end) {
+    swap(&start, &end);
+    incr = -incr;
+  }
+  Counter *c1 = new Counter(1,N,1)
+  for(int i=start; i != end; i+=incr) {
+    _slist_1_begin(i, c1);
+  }
+  forall_1_end(c1);
+}
+
+forall_1_end(Counter *c1)
+{
+  c1->done();
+  if(c1->finished()) {
+    delete c1;
+    // call next
+  }
+}
+
+slist_1_begin(int i, Counter *c1)
+{
+  atomic_1(i, c1);
+}
+
+slist_1_end(int i, Counter *c1)
+{
+  forall_1_end(c1);
+}
+
+forall_2_begin(int i, Counter *c1)
+{
+  int start = M, end = 1, incr = -1;
+  if (start > end) {
+    swap(&start, &end);
+    incr = -incr;
+  }
+  if(start > end)
+  Counter *c2 = new Counter(M,1,-1);
+  for(int j=start; j >= end; j+= incr) {
+    when_1(i, j, c1, c2);
+  }
+  forall_2_end(i, c1, c2);
+}
+
+forall_2_end(int i, Counter *c1, Counter *c2)
+{
+  c2->done();
+  if(c2->finished()) {
+    delete c2;
+    atomic_3(i, c1);
+  }
+}
+
+#define E1	1
+#define E2	1
+
+#define WHEN_1	1
+
+int when_1(int i, int j, Counter *c1, Counter *c2)
+{
+  MSG *m1;
+  MSG *m2;
+
+  m1 = e1_A->access(i-1);
+  m2 = e2_A->access(j-1);
+  if(m1 != 0 && m2 != 0) {
+    m1 = e1_A->remove(i-1);
+    m2 = e2_A->remove(j-1);
+    atomic_2(i,j,m1,m2,c1,c2);
+    return 1;
+  } else {
+    int *tmp_entry = new int[2];
+    int *tmp_ref = new int[2];
+    size_t *args = new size_t[4];
+    tmp_entry[0] = E1;
+    tmp_ref[0] = i-1;
+    tmp_entry[1] = E2;
+    tmp_ref[0] = j-1;
+    args[0] = i;
+    args[1] = j;
+    args[2] = c1;
+    args[3] = c2;
+    when_1_A->register(2, tmp_entry, tmp_ref, args);
+    return 0;
+  }
+}
+
+atomic_1(int i, Counter *c1)
+{
+  {
+    sum[i] = 0;
+  }
+  forall_2_begin(i, c1);
+}
+
+atomic_2(int i, int j, MSG *m1, MSG *m2, Counter *c1, Counter *c2)
+{
+  {
+    sum[i] += m1->data * m2->data;
+  }
+  forall_2_end(i, c1, c2);
+}
+
+atomic_3(int i, Counter *c1)
+{
+  {
+    CPrintf("Sum = %d\n", sum[i]);
+  }
+  slist_1_end(i, c1);
+}
+
+void e1(MSG *m)
+{
+  int refnum = GetRefNum(m);
+  // buffer the message first
+  e1_Buffer->putElement(refnum, m);
+  // get a list of when blocks waiting for this msg
+  TList<someStruct> *e1_A = e1_Buffer->getList(refnum);
+  // no one is waiting, so return
+  if(e1_A == 0) {
+    return;
+  }
+  for(WhenStruct *tmp=e1_A.begin();!e1_A.end();tmp=e1_A.next()){
+    switch(tmp->id) {
+      case WHEN_1:
+        if(tmp->allDependenciesSatisfied()) {
+          // deregister removes element from all entryLists
+          tmp->deregister();
+          when_1(tmp->args[0], tmp->args[1], tmp->args[2], tmp->args[3]);
+          goto out;
+        }
+        break;
+    }
+  }
+out:
+  return;
+}
+
+void e2(MSG *m)
+{
+  int refnum = GetRefNum(m);
+  // buffer the message first
+  e2_Buffer->putElement(refnum, m);
+  // get a list of when blocks waiting for this msg
+  TList<someStruct> *e2_A = e2_Buffer->getList(refnum);
+  // no one is waiting, so return
+  if(e2_A == 0) {
+    return;
+  }
+  for(WhenStruct *tmp=e2_A.begin();!e2_A.end();tmp=e2_A.next()){
+    switch(tmp->id) {
+      case WHEN_1:
+        if(tmp->allDependenciesSatisfied()) {
+          // deregister removes element from all entryLists
+          tmp->deregister();
+          when_1(tmp->args[0], tmp->args[1], tmp->args[2], tmp->args[3]);
+          goto out;
+        }
+        break;
+    }
+  }
+out:
+  return;
+}
+
+_sdag_classname_init()
+{
+  // Initialize all the data structures
+}
+

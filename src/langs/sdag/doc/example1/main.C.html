@@ -1,0 +1,53 @@
+<HTML>
+<HEAD>
+   <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+   <META NAME="Author" CONTENT="Milind Bhandarkar">
+   <META NAME="GENERATOR" CONTENT="Mozilla/4.02 [en] (X11; I; IRIX 6.3 IP32) [Netscape]">
+   <TITLE>main.C</TITLE>
+</HEAD>
+<BODY TEXT="#000000" BGCOLOR="#FFFFFF" LINK="#0000EE" VLINK="#551A8B" ALINK="#FE0000">
+<B><TT><FONT SIZE=+1>#include "ckdefs.h"</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>#include "chare.h"</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>#include "c++interface.h"</FONT></TT></B><B><TT><FONT SIZE=+1></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>#include "main.top.h"</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>#include "main.h"</FONT></TT></B><B><TT><FONT SIZE=+1></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>#include "test.top.h"</FONT></TT></B><B><TT><FONT SIZE=+1></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>main::main(int argc, char **argv)</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>{</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; int i, j;</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; // create Test chare</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; TestMsg *msg = new (MsgIndex(TestMsg))
+TestMsg;</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; ChareIDType testChare;</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; new_chare2(Test, msg, &amp;testChare, 0);</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; // send message to teststart</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; msg = new (MsgIndex(TestMsg)) TestMsg;</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; CSendMsg(Test, teststart, msg, &amp;testChare);</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; for(i=1;i&lt;=100;i++) {</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp; for(j=10;j>=1;j--) {</FONT></TT></B><B><TT><FONT SIZE=+1></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Msg *msg = new (MsgIndex(Msg))
+Msg;</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; SetRefNumber(msg,
+i);</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; msg->data = i;</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; CSendMsg(Test,
+entry1, msg, &amp;testChare);</FONT></TT></B><B><TT><FONT SIZE=+1></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; msg = new (MsgIndex(Msg))
+Msg;</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; SetRefNumber(msg,
+j);</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; msg->data = j;</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; CSendMsg(Test,
+entry2, msg, &amp;testChare);</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp; }</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; }</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>}</FONT></TT></B><B><TT><FONT SIZE=+1></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>#include "main.bot.h"</FONT></TT></B>
+</BODY>
+</HTML>

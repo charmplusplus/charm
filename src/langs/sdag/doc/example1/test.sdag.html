@@ -1,0 +1,39 @@
+<HTML>
+<HEAD>
+   <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+   <META NAME="Author" CONTENT="Milind Bhandarkar">
+   <META NAME="GENERATOR" CONTENT="Mozilla/4.02 [en] (X11; I; IRIX 6.3 IP32) [Netscape]">
+   <TITLE>test.sdag</TITLE>
+</HEAD>
+<BODY TEXT="#000000" BGCOLOR="#FFFFFF" LINK="#0000EE" VLINK="#551A8B" ALINK="#FE0000">
+<B><TT><FONT SIZE=+1><FONT COLOR="#CC0000">class </FONT>Test</FONT></TT></B><B><TT><FONT SIZE=+1></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1><FONT COLOR="#CC0000">sdagentry </FONT>teststart
+(TestMsg *msg) {</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; <FONT COLOR="#CC0000">atomic </FONT>{</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp; CPrintf("Starting forall loops\n");</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; }</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; <FONT COLOR="#CC0000">forall</FONT>[i]
+(1:100,1) {</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp; <FONT COLOR="#CC0000">for </FONT>(j[i-1]=1;j[i-1]&lt;=10;j[i-1]++)
+{</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <FONT COLOR="#CC0000">when
+</FONT>entry1[i](Msg *m1),entry2[j[i-1]](Msg *m2) {</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <FONT COLOR="#CC0000">atomic
+</FONT>{</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+CPrintf("processing entry1[%d] &amp; entry2[%d]\n", i, j[i-1]);</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+sum += (m1->data * m2->data);</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp; }</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; }</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; <FONT COLOR="#CC0000">atomic </FONT>{</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp; CPrintf("Ended forall loops.
+Sum = %d\n", sum);</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp; CharmExit();</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp; }</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>}</FONT></TT></B>
+</BODY>
+</HTML>

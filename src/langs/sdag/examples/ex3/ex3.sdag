@@ -1,0 +1,27 @@
+class jacobi
+
+sdagentry init(MSGINIT *msg)
+{
+  atomic {
+    initialize();
+    convdone = FALSE;
+  }
+  while(!convdone) {
+    atomic {
+      for (dir=0; dir<4; dir++) {
+        m[dir] = copy_boundary(dir);
+        SendMsgBranch(entry_no[dir],m[dir],nbr[dir]);
+      }
+    }
+    when NORTH(BOUNDARY *north), SOUTH(BOUNDARY *south), 
+         EAST(BOUNDARY *east), WEST(BOUNDARY *west) {
+      atomic {
+        update(north, south, east, west);
+        reduction(my_conv, CONVERGE, &mycid);
+      }
+    }
+    when CONVERGE(CONV *conv)
+      atomic{convdone = conv->done;}
+  }
+  atomic { print_results(); }
+}

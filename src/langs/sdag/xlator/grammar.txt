@@ -1,0 +1,48 @@
+Tokens:
+  <ident>
+  <int-expr>
+  <brace-matched-c++-code>
+  <parenthesis-matched-c++-code>
+
+Grammar in EBNF Form:
+
+<sdag> := <class-decl> <sdagentry>+
+
+<class-decl> := "class" <ident>
+
+<sdagentry> := "sdagentry" <ident> "(" <ident> "*" <ident> ")" <body>
+
+<body> := <stmt>
+        | "{" <stmt>+ "}"
+
+<stmt> := <overlap-stmt>
+        | <when-stmt>
+        | <atomic-stmt>
+        | <if-stmt>
+        | <while-stmt>
+        | <for-stmt>
+        | <forall-stmt>
+        
+<overlap-stmt> := "overlap" <body>
+
+<atomic-stmt> := "atomic" <brace-matched-C++-code>
+
+<if-stmt> := "if" <parenthesis-matched-c++-condition> <body> [<else-stmt>]
+
+<else-stmt> := "else" <body>
+
+<while-stmt> := "while" <parenthesis-matched-c++-condition> <body>
+
+<for-stmt> := "for" <parenthesis-matched-c++-condition> <body>
+
+<forall-stmt> := "forall" "[" <ident> "]" "(" <range-stride> ")" <body>
+
+<range-stride> := <int-expr> ":" <int-expr> "," <int-expr>
+
+<when-stmt> := "when" <entry-list>  <body>
+
+<entry-list> := <entry>
+              | <entry> [ "," <entry-list> ]
+              
+<entry> := <ident> [ "[" <int-expr> "]" ] "(" <ident> "*" <ident> ")"
+

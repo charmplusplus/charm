@@ -1,0 +1,29 @@
+class Harlow_Welch
+
+sdagentry init(MSGINIT *msg)
+{
+  atomic { initialize(); }
+  forall[i](0:Z-1,1)
+    atomic { convdone[i] = FALSE; }
+  forall[i](0:Z-1,1) {
+    while(!convdone[i]) {
+      atomic {
+        for (dir=0; dir<4; dir++) {
+          m[i][dir] = copy_boundary(i,dir);
+          SendMsgBranch(entry_no[dir],m[i][dir],nbr[i][dir]);
+        }
+      }
+      when NORTH(BOUNDARY *north), SOUTH(BOUNDARY *south), 
+           EAST(BOUNDARY *east), WEST(BOUNDARY *west) {
+        atomic {
+          update(i, north, south, east, west);
+          reduction(my_conv, i, CONVERGE, &mycid);
+        }
+      }
+      when CONVERGE[i](CONV *conv)
+        atomic{convdone[i] = conv->done;}
+    }
+  }
+  atomic { print_results(); }
+}
+

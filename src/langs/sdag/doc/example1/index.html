@@ -1,0 +1,42 @@
+<HTML>
+<HEAD>
+   <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+   <META NAME="Author" CONTENT="Milind Bhandarkar">
+   <META NAME="GENERATOR" CONTENT="Mozilla/4.02 [en] (X11; I; IRIX 6.3 IP32) [Netscape]">
+   <TITLE>Example Structured Dagger Program</TITLE>
+</HEAD>
+<BODY TEXT="#000000" BGCOLOR="#FFFFFF" LINK="#0000EE" VLINK="#551A8B" ALINK="#FE0000">
+
+<CENTER>
+<H1>
+Example of a Structured Dagger Program</H1></CENTER>
+
+<H2>
+What does it do ?</H2>
+
+
+<P><FONT SIZE=+1><TT><FONT COLOR="#CC0000">main </FONT></TT>chare gets
+created. It then creates a <TT><FONT COLOR="#CC0000">test </FONT></TT>chare.
+<TT><FONT COLOR="#CC0000">main </FONT></TT>then invokes the <FONT COLOR="#CC0000"><U>sdagentry
+</U><TT>teststart</TT></FONT>, and sends 1000 messages with appropriate
+reference number set. the <TT><FONT COLOR="#CC0000">teststart </FONT></TT>entry
+function of <TT><FONT COLOR="#CC0000">test </FONT></TT>chare waits in <U><FONT COLOR="#CC0000">forall
+</FONT></U>loop for messages with appropriate reference numbers, and adds
+the data member of the messages to a member of the chare called <TT><FONT COLOR="#CC0000">sum</FONT></TT>.
+After all the messages arrive, it prints out the <TT><FONT COLOR="#CC0000">sum
+</FONT></TT>and exits program.</FONT>
+<BR>&nbsp;
+<H2>
+Files:</H2>
+
+
+<P><FONT SIZE=+1><A HREF="Makefile.html">Makefile</A></FONT>
+<BR><FONT SIZE=+1><A HREF="main.C.html">main.C</A></FONT>
+<BR><FONT SIZE=+1><A HREF="main.h.html">main.h</A></FONT>
+<BR><FONT SIZE=+1><A HREF="main.ci.html">main.ci</A></FONT>
+<BR><FONT SIZE=+1><A HREF="test.sdag.html">test.sdag</A></FONT>
+<BR><FONT SIZE=+1><A HREF="test.C.html">test.C</A></FONT>
+<BR><FONT SIZE=+1><A HREF="test.h.html">test.h</A></FONT>
+<BR><FONT SIZE=+1><A HREF="test.ci.html">test.ci</A></FONT>
+</BODY>
+</HTML>

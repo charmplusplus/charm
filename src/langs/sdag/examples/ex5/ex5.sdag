@@ -1,0 +1,24 @@
+class example 
+
+sdagentry sample (M *msg)
+{
+  atomic{
+    i=0;
+    MyChareID(&thisID);
+    buf1 = (M *) CkAllocMsg(M);
+    SendMsg(ep1, buf1, &thisID);
+    buf1 = (M *) CkAllocMsg(M);
+    SendMsg(ep3, buf1, &thisID);
+    buf1 = (M *) CkAllocMsg(M);
+    SendMsg(ep2, buf1, &thisID);
+  }
+  overlap {
+    when ep1(M *m1), ep2(M *m2) {
+      atomic { i++; }
+    }
+    when ep3(M *m3) {
+      atomic { i += 2; }
+    }
+  }
+  atomic{CkPrintf("i = %d\n");}
+}

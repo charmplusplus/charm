@@ -1,0 +1,16 @@
+class example1
+sdagentry init (INIT *m)
+{
+  atomic
+  { 
+    initialize(m); 
+    i = 0;
+    j = 1;
+  }
+  when rcv(MSG *m1)
+    atomic{process(m1);}
+  atomic { i++; }
+  atomic { j++; }
+  atomic { i--; }
+}
+

@@ -1,0 +1,41 @@
+<HTML>
+<HEAD>
+   <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+   <META NAME="Author" CONTENT="Milind Bhandarkar">
+   <META NAME="GENERATOR" CONTENT="Mozilla/4.02 [en] (X11; I; IRIX 6.3 IP32) [Netscape]">
+   <TITLE>Makefile</TITLE>
+</HEAD>
+<BODY TEXT="#000000" BGCOLOR="#FFFFFF" LINK="#0000EE" VLINK="#551A8B" ALINK="#FE0000">
+<B><TT><FONT SIZE=+1>INC=-I../../runtime</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>LIB=-L../../runtime</FONT></TT></B><B><TT><FONT SIZE=+1></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>all: cifiles <FONT COLOR="#CC0000">sdagfiles </FONT>pgm</FONT></TT></B><B><TT><FONT SIZE=+1></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>cifiles:</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; charmxi
+main.ci</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; charmxi
+test.ci</FONT></TT></B><B><TT><FONT SIZE=+1></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>sdagfiles:</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <FONT COLOR="#CC0000">sdagx
+test.sdag</FONT></FONT></TT></B><B><TT><FONT SIZE=+1></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>pgm: main.o test.o</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; charmc
+-g -language charm++ -o pgm main.o test.o $(LIB) <FONT COLOR="#CC0000">-lsdag</FONT></FONT></TT></B><B><TT><FONT SIZE=+1></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>main.o: main.C main.h</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; charmc
+-g -c main.C $(INC)</FONT></TT></B><B><TT><FONT SIZE=+1></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>test.o: test.C test.h</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; charmc
+-g -c test.C $(INC)</FONT></TT></B><B><TT><FONT SIZE=+1></FONT></TT></B>
+
+<P><B><TT><FONT SIZE=+1>clean:</FONT></TT></B>
+<BR><B><TT><FONT SIZE=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; rm
+-f pgm *.o <FONT COLOR="#CC0000">test.sdag.h test.sdag.C</FONT> *.top.h
+*.bot.h</FONT></TT></B>
+</BODY>
+</HTML>

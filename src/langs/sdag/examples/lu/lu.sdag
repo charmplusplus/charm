@@ -1,0 +1,89 @@
+class cube
+
+sdagentry iterations (InitMessage *mesg)
+{
+  atomic {
+    Initialization(); 
+    SendMessage(xmnbr,rhs_entry_xp1,xmmsg); 
+    SendMessage(xpnbr,rhs_entry_xm1,xpmsg);
+    SendMessage(ymnbr,rhs_entry_yp1,ymmsg); 
+    SendMessage(ypnbr,rhs_entry_ym1,ypmsg);
+    SendMessage(zmnbr,rhs_entry_zp1,zmmsg); 
+    SendMessage(zpnbr,rhs_entry_zm1,zpmsg);
+  }
+  while(iter<maxiter) {
+    atomic { rhs_init(); }
+    overlap {
+      when rhs_entry_xm1(Boundary *xm1), 
+           rhs_entry_xp1(Boundary *xp1) {
+        atomic {rhs_x(xm1,xp1);}
+      }
+      when rhs_entry_ym1(Boundary *ym1), 
+           rhs_entry_yp1(Boundary *yp1) {
+        atomic {rhs_y(ym1,yp1); }
+      }
+      when rhs_entry_zm1(Boundary *zm1), 
+           rhs_entry_yp1(Boundary *zp1) {
+        atomic {rhs_z(zm1,zp1); }
+      }
+    }
+    if(x==0 && y==0 && z==0) {
+      atomic {
+        SendMessage(xpnbr,XmBoundary,xmsg);
+        SendMessage(ypnbr,YmBoundary,ymsg);
+        SendMessage(zpnbr,ZmBoundary,zmsg);
+      }
+    }
+    overlap {
+      when XmBoundary(Boundary *xmmsg) {
+        atomic {CopyMessageX(xmmsg); }
+      }
+      when YmBoundary(Boundary *ymmsg) {
+        atomic {CopyMessageY(ymmsg); }
+      }
+      when ZmBoundary(Boundary *zmmsg) {
+        atomic {CopyMessageZ(zmmsg); }
+      }
+    }
+    atomic {
+      blts();
+      jacld();
+      SendMessage(xpnbr);
+      SendMessage(ypnbr);
+      SendMessage(zpnbr);
+    }
+    if(x==maxx && y==maxy && z==maxz) {
+      atomic {
+        SendMessage(xmnbr,XpBoundary,xmsg);
+        SendMessage(ymnbr,YpBoundary,ymsg);
+        SendMessage(zmnbr,ZpBoundary,zmsg);
+      }
+    }
+    overlap {
+      when XpBoundary(Boundary *xmsg) {
+        atomic {CopyMessageX(xmsg); }
+      }
+      when YpBoundary(Boundary *ymsg) {
+        atomic {CopyMessageY(ymsg); }
+      }
+      when ZpBoundary(Boundary *zmsg) {
+        atomic {CopyMessageZ(zmsg); }
+      }
+    }
+    atomic {
+      buts();
+      jacu();
+      SendMessage(xmnbr);
+      SendMessage(xpnbr);
+      SendMessage(xpnbr);
+      updateu();
+      SendMessage(xmnbr,rhs_entry_xp1,xmmsg); 
+      SendMessage(xpnbr,rhs_entry_xm1,xpmsg);
+      SendMessage(ymnbr,rhs_entry_yp1,ymmsg); 
+      SendMessage(ypnbr,rhs_entry_ym1,ypmsg);
+      SendMessage(zmnbr,rhs_entry_zp1,zmmsg); 
+      SendMessage(zpnbr,rhs_entry_zm1,zpmsg);
+      iter++;
+    }
+  }
+}

@@ -1,0 +1,21 @@
+class example1
+sdagentry init (INIT *m)
+{
+  atomic { initialize(m); }
+  overlap
+  {
+    when e1(MSGTYPE1 *m1)
+      atomic {c1(m1);}
+    when e2(MSGTYPE2 *m2)
+      atomic {c2(m2);}
+    {
+      when e3(MSGTYPE *m3)
+        atomic {c3(m3);}
+      when e4(MSGTYPE *m4)
+        atomic {c4(m4);}
+    }
+  }
+  when e3(MSGTYPE *m3)
+    atomic{c3(m3);}
+}
+

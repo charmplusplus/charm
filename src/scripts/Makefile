@@ -23,7 +23,7 @@
 
 SHELL=/bin/sh
 
-all: charm++ smsg pvm
+all: charm++ smsg pvm sdag
 
 charm: converse charmxlat charmlibs libcharm
 
@@ -33,7 +33,9 @@ smsg: converse libsimplemsg.a
 
 pvm: converse libpvmc.a
 
-translators: charmxlat charmfilter charmxlat++ charmfilter++ charmxi conv-cpm
+sdag: charm++ sdagx libsdag.a
+
+translators: sdagx charmxlat charmfilter charmxlat++ charmfilter++ charmxi conv-cpm
 
 test-all: all
 	(cd ../pgms ; make test-all)
@@ -49,7 +51,7 @@ test-charm++: charm++
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
-SEQCHARMC=../bin/charmc $(CHARMOPTS)
+SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 
 
 ###############################################################################
@@ -58,7 +60,7 @@ SEQCHARMC=../bin/charmc $(CHARMOPTS)
 #
 ###############################################################################
 
-ALLHEADERS=charm++.h charm.h charm++-inc.h charm-inc.h dagger.h cpthreads.h converse.h conv-mach.h simplemsg.h trace.h generic_redn.h pvmc.h pvm3.h # pglib.h
+ALLHEADERS=charm++.h charm.h charm++-inc.h charm-inc.h dagger.h cpthreads.h converse.h conv-mach.h simplemsg.h trace.h generic_redn.h pvmc.h pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h TList.h # pglib.h
 
 ALLINTERFACES=GENERIC-ACC.int GENERIC-HIST.int GENERIC-REDN.int barrier_redn.int cache.int dacc_count.int dacc_hist.int dcountredn.int dmaxredn.int dminredn.int dprodredn.int dsumredn.int facc_count.int facc_hist.int fcountredn.int fmaxredn.int fminredn.int fprodredn.int fsumredn.int iacc_count.int iacc_hist.int icountredn.int imaxredn.int iminredn.int iprodredn.int isumredn.int pg.int
 
@@ -92,6 +94,8 @@ dirs+sources:
 	./gatherflat ../../src/Common/ck-perf          .
 	./gatherflat ../../src/Common/langs/simplemsg  .
 	./gatherflat ../../src/Common/langs/pvmc       .
+	./gatherflat ../../src/Common/langs/sdag/xlator       .
+	./gatherflat ../../src/Common/langs/sdag/runtime      .
 	./gatherflat ../../src/Common/lib-acc          .
 	./gatherflat ../../src/Common/lib-misc         .
 	./gatherflat ../../src/Common/lib-redn         .
@@ -437,44 +441,44 @@ dcountredn.o: dcountredn.int $(GENERIC_REDN_H)
 CHARMXLAT=xl-main.o xl-yacc.tab.o xl-sym.o xl-str.o xl-lex.o xl-lexsp.o xl-rdtok.o xl-parse.o xl-outh.o xl-srch.o xl-dag.o
 
 charmxlat charmfilter: $(CHARMXLAT) xl-sfspec.o
-	$(SEQCHARMC) -seq -o charmxlat   -cp ../bin/ $(CHARMXLAT)
-	$(SEQCHARMC) -seq -o charmfilter -cp ../bin/ xl-sfspec.o
+	$(SEQCHARMC) -o charmxlat   -cp ../bin/ $(CHARMXLAT)
+	$(SEQCHARMC) -o charmfilter -cp ../bin/ xl-sfspec.o
 
 xl-main.o: xl-main.c
-	$(SEQCHARMC) -seq xl-main.c
+	$(SEQCHARMC) xl-main.c
 
 xl-sym.o: xl-sym.c xl-sym.h
-	$(SEQCHARMC) -seq xl-sym.c
+	$(SEQCHARMC) xl-sym.c
 
 xl-str.o: xl-str.c
-	$(SEQCHARMC) -seq xl-str.c
+	$(SEQCHARMC) xl-str.c
 
 xl-lex.o: xl-lex.c xl-lex.h xl-sym.h
-	$(SEQCHARMC) -seq xl-lex.c
+	$(SEQCHARMC) xl-lex.c
 
 xl-rdtok.o: xl-rdtok.c xl-lex.h xl-sym.h
-	$(SEQCHARMC) -seq xl-rdtok.c
+	$(SEQCHARMC) xl-rdtok.c
 
 xl-parse.o: xl-parse.c xl-lex.h xl-sym.h
-	$(SEQCHARMC) -seq xl-parse.c
+	$(SEQCHARMC) xl-parse.c
 
 xl-outh.o: xl-outh.c xl-lex.h xl-sym.h
-	$(SEQCHARMC) -seq xl-outh.c
+	$(SEQCHARMC) xl-outh.c
 
 xl-srch.o: xl-srch.c xl-lex.h xl-sym.h
-	$(SEQCHARMC) -seq xl-srch.c
+	$(SEQCHARMC) xl-srch.c
 
 xl-dag.o: xl-dag.c
-	$(SEQCHARMC) -seq xl-dag.c
+	$(SEQCHARMC) xl-dag.c
 
 xl-yacc.tab.o: xl-yacc.tab.c xl-lex.h xl-sym.h
-	$(SEQCHARMC) -seq xl-yacc.tab.c
+	$(SEQCHARMC) xl-yacc.tab.c
 
 xl-lexsp.o: xl-lexsp.c	
-	$(SEQCHARMC) -seq xl-lexsp.c
+	$(SEQCHARMC) xl-lexsp.c
 
 xl-sfspec.o: xl-sfspec.c
-	$(SEQCHARMC) -seq xl-sfspec.c
+	$(SEQCHARMC) xl-sfspec.c
 
 ###############################################################################
 #
@@ -487,23 +491,23 @@ XPHEADERS=xp-extn.h xp-t.tab.c
 CHARMXLATXX=xp-process.o xp-table.o xp-t.tab.o xp-lexer.o
 
 charmxlat++: $(CHARMXLATXX) xp-sfilter.o
-	$(SEQCHARMC) -seq -o charmxlat++   -cp ../bin/ $(CHARMXLATXX)
-	$(SEQCHARMC) -seq -o charmfilter++ -cp ../bin/ xp-sfilter.o
+	$(SEQCHARMC) -o charmxlat++   -cp ../bin/ $(CHARMXLATXX)
+	$(SEQCHARMC) -o charmfilter++ -cp ../bin/ xp-sfilter.o
 
 xp-process.o: xp-process.c $(XPHEADERS)
-	$(SEQCHARMC) -seq xp-process.c
+	$(SEQCHARMC) xp-process.c
 
 xp-table.o: xp-table.c $(XPHEADERS)
-	$(SEQCHARMC) -seq xp-table.c
+	$(SEQCHARMC) xp-table.c
 
 xp-t.tab.o: xp-t.tab.c $(XPHEADERS)
-	$(SEQCHARMC) -seq -DYYDEBUG xp-t.tab.c
+	$(SEQCHARMC) -DYYDEBUG xp-t.tab.c
 
 xp-lexer.o: xp-lexer.c $(XPHEADERS)
-	$(SEQCHARMC) -seq xp-lexer.c
+	$(SEQCHARMC) xp-lexer.c
 
 xp-sfilter.o: xp-sfilter.c $(XPHEADERS)
-	$(SEQCHARMC) -seq xp-sfilter.c
+	$(SEQCHARMC) xp-sfilter.c
 
 ###############################################################################
 #
@@ -512,10 +516,10 @@ xp-sfilter.o: xp-sfilter.c $(XPHEADERS)
 ###############################################################################
 
 conv-cpm: conv-cpm.o
-	$(SEQCHARMC) -seq -o conv-cpm -cp ../bin/ conv-cpm.o
+	$(SEQCHARMC) -o conv-cpm -cp ../bin/ conv-cpm.o
 
 conv-cpm.o: conv-cpm.c
-	$(SEQCHARMC) -seq conv-cpm.c
+	$(SEQCHARMC) conv-cpm.c
 
 ###############################################################################
 #
@@ -527,22 +531,22 @@ XIHEADERS=xi-symbol.h xi-parse.tab.C
 CHARMXI=xi-main.o xi-symbol.o xi-generate.o xi-parse.tab.o xi-scan.o
 
 charmxi: $(CHARMXI)
-	$(SEQCHARMC) -seq -language c++ -cp ../bin/ -o charmxi $(CHARMXI)
+	$(SEQCHARMC) -language c++ -cp ../bin/ -o charmxi $(CHARMXI)
 
 xi-main.o: xi-main.C $(XIHEADERS)
-	$(SEQCHARMC) -seq xi-main.C
+	$(SEQCHARMC) xi-main.C
 
 xi-symbol.o: xi-symbol.C $(XIHEADERS)
-	$(SEQCHARMC) -seq xi-symbol.C
+	$(SEQCHARMC) xi-symbol.C
 
 xi-generate.o: xi-generate.C $(XIHEADERS)
-	$(SEQCHARMC) -seq xi-generate.C
+	$(SEQCHARMC) xi-generate.C
 
 xi-parse.tab.o: xi-parse.tab.C $(XIHEADERS)
-	$(SEQCHARMC) -seq xi-parse.tab.C
+	$(SEQCHARMC) xi-parse.tab.C
 
 xi-scan.o: xi-scan.C $(XIHEADERS)
-	$(SEQCHARMC) -seq xi-scan.C
+	$(SEQCHARMC) xi-scan.C
 
 ###############################################################################
 #
@@ -582,6 +586,47 @@ pvmc_groups.o: pvmc_groups.c pvmc.h pvm3.h
 pvmc_main.o: pvmc_main.c pvmc.h pvm3.h
 	$(CHARMC) -o $@ pvmc_main.c
 
+libsdag.a: CDep.o
+	$(CHARMC) -cp ../lib -o libsdag.a CDep.o
+
+CDep.o: CDep.C CDep.h CMsgBuffer.h CWhenTrigger.h
+	$(CHARMC) -c CDep.C
+
+SDAGOBJ=sdag-main.o trans.o CLexer.o CParser.o CParsedFile.o CParseNode.o \
+	sdag-globals.o CParseNodeProcess.o CEntry.o
+
+sdagx: $(SDAGOBJ)
+	$(SEQCHARMC) -cp ../bin -o sdagx -language c++ $(SDAGOBJ)
+
+sdag-main.o: sdag-main.C CLexer.h CToken.h
+	$(SEQCHARMC) -c sdag-main.C
+
+trans.o: trans.c EToken.h
+	$(SEQCHARMC) -c trans.c
+
+trans.c: trans.l
+	flex -otrans.c trans.l
+
+CLexer.o: CLexer.C CLexer.h
+	$(SEQCHARMC) -c CLexer.C
+
+CParser.o: CParser.C CParser.h
+	$(SEQCHARMC) -c CParser.C
+
+CParsedFile.o: CParsedFile.C CParsedFile.h
+	$(SEQCHARMC) -c CParsedFile.C
+
+CParseNode.o: CParseNode.C CParseNode.h
+	$(SEQCHARMC) -c CParseNode.C
+
+sdag-globals.o: sdag-globals.C sdag-globals.h
+	$(SEQCHARMC) -c sdag-globals.C
+
+CParseNodeProcess.o: CParseNodeProcess.C CParseNode.h
+	$(SEQCHARMC) -c CParseNodeProcess.C
+
+CEntry.o: CEntry.C CEntry.h
+	$(SEQCHARMC) -c CEntry.C
 
 ###############################################################################
 #

@@ -1,0 +1,20 @@
+class example 
+sdagentry sample (M *msg)
+{
+  atomic {
+    i=0;
+    MyChareID(&thisID);
+    buf1 = (M *) CkAllocMsg(M);
+    SendMsg(ep1, buf1, &thisID);
+  }
+  while(i<NITER)
+  {
+    when ep1(M *m1){
+      atomic {SendMsg(ep2, m1, &thisID);}
+    }
+    when ep2(M *m2) {
+      atomic{SendMsg(ep1, m2, &thisID);}
+    }
+    atomic { i++; }
+  }
+}
