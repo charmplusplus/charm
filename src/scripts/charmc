@@ -39,7 +39,7 @@ OVERRIDE_LDXX=""
 #Generic options, passed to everything
 OPTS=""
 #Specific options
-OPTS_CPP="-DCHARM=1 "
+OPTS_CPP="-D__CHARMC__=1 "
 OPTS_LDRO="" 
 OPTS_CC=""
 OPTS_CXX="" 
@@ -52,6 +52,7 @@ POST_LANGUAGE=""
 POST_LIBRARIES=""    
 PRE_LIBRARIES=""  
 USE_F90_LIBRARIES="0"  
+AMPIMAIN=""
 COPYTO=""        
 MODCOPIES=""        
 MODULES=""
@@ -279,8 +280,8 @@ do
 		case "$1" in
 		"ampi") AddModules tcharmmain ampi ;;
 		"ampif") AddModules tcharmmain ampif ; USE_F90_LIBRARIES="1" ;;
-		"fem") AddModules tcharmmain fem ;;
-		"femf") AddModules tcharmmain fem ; USE_F90_LIBRARIES="1" ;;
+		"fem") AddModules tcharmmain fem ; AMPIMAIN="femmain";;
+		"femf") AddModules tcharmmain fem ; AMPIMAIN="femmain"; USE_F90_LIBRARIES="1" ;;
 		"mblock") AddModules tcharmmain mblock ;;
 		"mblockf") AddModules tcharmmain mblock ; USE_F90_LIBRARIES="1" ;;
 		*) 
@@ -1023,6 +1024,11 @@ case "$LANGUAGE" in
         PRE_LIBRARIES="$PRE_LIBRARIES -lconv-bluegene"
 	;;
 esac
+
+if [ "$AMPIMAIN" != "" ]
+then
+	OBJECTFILES="$CHARMLIB/lib$AMPIMAIN.o $OBJECTFILES"
+fi
 
 if [ $USE_F90_LIBRARIES = "1" ]
 then
