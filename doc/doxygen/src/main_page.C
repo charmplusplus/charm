@@ -32,6 +32,7 @@ Charm Kernel:
 <a href="group__CkQD.html">Quiescence detection</a>, 
 <a href="group__CkFutures.html">Thread support</a>,
 <a href="group__CkInit.html">Startup</a>,
+<a href="group__CkEnvelope.html">Message Envelope</a>,
 Translator, SDAG.
 
 </td></tr><tr><td>
