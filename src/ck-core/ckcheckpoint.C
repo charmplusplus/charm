@@ -242,7 +242,7 @@ void CkPupNodeGroupData(PUP::er &p)
 	  if(CkMyPe()==0){ CksvAccess(_numNodeGroups) = numNodeGroups+1; }
 	  else { CksvAccess(_numNodeGroups) = 1; }
 	}
-	DEBCHK("[%d] CkPupNodeGroupData %s: numNodeGroups = %d\n",CkMyPe(),p.typeString(),numNodeGroups);
+	DEBCHK("[%d] CkPupNodeGroupData %s: numNpapers/ampiSC2002/odeGroups = %d\n",CkMyPe(),p.typeString(),numNodeGroups);
 
 	GroupInfo *tmpInfo = new GroupInfo [numNodeGroups];
 	if (!p.isUnpacking()) {
@@ -419,7 +419,7 @@ void CkRestartMain(const char* dirname){
 	// restore groups
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
 	// restore from PE0's copy if shrink/expand
-	if(CkMyPe() != _numPes)
+	if(CkNumPes() != _numPes)
 		sprintf(filename,"%s/Groups_0.dat",dirname);
 	else
 		sprintf(filename,"%s/Groups_%d.dat",dirname,CkMyPe());
@@ -432,7 +432,7 @@ void CkRestartMain(const char* dirname){
 	// restore nodegroups
 	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
 	if(CkMyRank()==0){
-		if(CkMyPe() != _numPes)
+		if(CkNumPes() != _numPes)
 			sprintf(filename,"%s/NodeGroups_0.dat",dirname);
 		else
 			sprintf(filename,"%s/NodeGroups_%d.dat",dirname,CkMyPe());
