@@ -234,6 +234,7 @@ public:
 	void ckBroadcast(CkArrayMessage *m, int ep) const;
 	CkArrayID ckGetArrayID(void) const { return _aid; }
 	CkArray *ckLocalBranch(void) const { return _aid.ckLocalBranch(); }
+	CkLocMgr *ckLocMgr(void) const;
 	inline operator CkArrayID () const {return ckGetArrayID();}
 
 	void doneInserting(void);
@@ -259,6 +260,8 @@ PUPmarshall(CProxy_ArrayBase);
 	  { return super::ckGetArrayID();} \
 	inline CkArray *ckLocalBranch(void) const \
 	  { return super::ckLocalBranch(); } \
+	inline CkLocMgr *ckLocMgr(void) const \
+	  { return super::ckLocMgr(); } \
 	inline void doneInserting(void) { super::doneInserting(); }\
 	CK_REDUCTION_CLIENT_DISAMBIG(super) \
 
@@ -590,5 +593,9 @@ private:
   CkArrayReducer reducer;
 
 };
+
+inline CkLocMgr *CProxy_ArrayBase::ckLocMgr(void) const 
+	{return ckLocalBranch()->getLocMgr(); }
+
 
 #endif
