@@ -2,6 +2,11 @@ module CkArray {
   extern module CkReduction;
 	
   readonly CkGroupID _RRMapID;
+/*This really doesn't belong here: need a marshall.ci */
+  message CkMarshallMsg {
+	char msgBuf[];
+  };
+
   message CkArrayMessage;
   message CkArrayElementCreateMsg;
   message CkArrayElementMigrateMessage;

@@ -108,7 +108,7 @@ public:
   unsigned short &array_ep(void);
   unsigned char &array_hops(void);
   unsigned int array_getSrcPe(void);
-  void array_setSrcPe(void);
+  unsigned int array_ifNotThere(void);
   
   //This allows us to delete bare CkArrayMessages
   void operator delete(void *p){CkFreeMsg(p);}
@@ -156,13 +156,20 @@ class CkArrayCreateMsg;
 class CkArrayRemoveMsg;
 class CkArrayUpdateMsg;
 
+//What to do if an entry method is invoked on
+// an array element that does not (yet) exist:
+typedef enum {
+	CkArray_IfNotThere_buffer=0, //Wait for it to be created
+	CkArray_IfNotThere_createhere=1, //Make it on sending PE
+	CkArray_IfNotThere_createhome=2 //Make it on (a) home PE
+} CkArray_IfNotThere;
+
 //This class is a wrapper around a CkArrayIndex and ArrayID,
 // used by array element proxies.  This makes the translator's
 // job simpler, and the translated code smaller. 
 class CProxy_CkArrayBase :public CkArrayID {
 protected:
 	CkArrayIndexMax _idx;//<- our element's array index; nInts=-1 if none
-
 public:
 	CProxy_CkArrayBase() {}
 	CProxy_CkArrayBase(const CkArrayID &aid) {_aid=aid._aid;_idx.nInts=-1;}
@@ -176,12 +183,14 @@ protected:
 	void base_insert(int ctorIndex,int onPE,const CkArrayIndex &idx,CkArrayMessage *m=NULL);
 	
 //Messaging:
-	void base_send(CkArrayMessage *msg, int entryIndex) const;
-	void base_broadcast(CkArrayMessage *msg, int entryIndex) const;
+	void base_send(CkArrayMessage *msg, 
+		int entryIndex, CkArray_IfNotThere nt) const;
+	void base_broadcast(CkArrayMessage *msg, 
+		int entryIndex, CkArray_IfNotThere nt) const;
 public:
 	CkGroupID ckGetGroupID(void) { return _aid; }
 	
-	void doneInserting(void);//Call on after last insert (for load balancer)
+	void doneInserting(void);//Call after last insert (for load balancer)
 	
 //Register the given reduction client
 	void setReductionClient(CkReductionMgr::clientFn fn,void *param=NULL);
@@ -400,10 +409,12 @@ private:
 
   //Allocate a new, uninitialized array element of the given (chare) type
   // and owning the given index.
-  ArrayElement *newElement(int type,const CkArrayIndex &ind);
+  ArrayElement *allocateElement(int type,const CkArrayIndex &ind);
   //Call the user's given constructor, passing the given message.
   // Add the element to the hashtable.
   void ctorElement(ArrayElement *el,int ctor,void *msg);
+  //Create, initialize, and register this new element
+  ArrayElement *newElement(int ctor,void *msg,const CkArrayIndex &ind);
 
 //Broadcast support
   int bcastNo;//Number of broadcasts received (also serial number)
@@ -444,6 +455,10 @@ public:
 
 #include "CkArray.decl.h"
 
+/*This really doesn't belong here: need a marshall.h */
+class CkMarshallMsg : public CMessage_CkMarshallMsg {
+public: char *msgBuf;
+};
 
 //This is the default creation message sent to a new array element
 class CkArrayElementCreateMsg:public CMessage_CkArrayElementCreateMsg {};

@@ -164,12 +164,10 @@ inline unsigned int CkArrayMessage::array_getSrcPe(void)
 {
 	return UsrToEnv((void *)this)->array_srcPe();
 }
-inline void CkArrayMessage::array_setSrcPe(void)
+inline unsigned int CkArrayMessage::array_ifNotThere(void)
 {
-	UsrToEnv((void *)this)->array_srcPe()=CkMyPe();
+	return UsrToEnv((void *)this)->getIfNotThere();
 }
-
-
 
 /*********************** Array Map ******************
 Given an array element index, an array map tells us 
@@ -361,6 +359,11 @@ There are arrayRecs for just-created objects, objects that live here,
 objects that live somewhere else, objects that are moving somewhere else,
 etc. 
 */
+
+//Map ArrayRec->type() to human-readable string description
+const static char * rec2str[]={
+	"base (invalid)","local","remote","buffering","dead"
+};
 //This is the abstract superclass
 class CkArrayRec {
   friend class CkArray;
@@ -593,8 +596,10 @@ void CkArray::insertRec(CkArrayRec *rec,const CkArrayIndex &idx)
 {
   CkArrayRec *old=NULL;
   old=elementNrec(idx);
+  DEBC((AA"  adding new rec(%s) for %s\n"AB,rec2str[rec->type()],idx2str(idx)));
   hash.put(*(CkArrayIndexMax *)&idx)=rec;
   if (old!=NULL) {
+    DEBC((AA"  replaces old rec(%s) for %s\n"AB,rec2str[old->type()],idx2str(idx)));
     //There was an old element at this location
     if (old->type()==CkArrayRec::local && rec->type()==CkArrayRec::local) {
       CkPrintf("ERROR! Duplicate array index: %s\n",idx2str(idx));
@@ -734,6 +739,21 @@ void CProxy_CkArrayBase::base_insert(int ctorIndex,int onPE,CkArrayMessage *m)
   base_insert(ctorIndex,onPE,_idx,m);
 }
 
+void CProxy_CkArrayBase::base_insert(int ctorIndex,int onPE,
+	const CkArrayIndex &idx,CkArrayMessage *m)
+{
+  if (m==NULL) m=new CkArrayElementCreateMsg;
+  m->array_index()=idx;
+  m->array_ep()=ctorIndex;
+  CkArray *arr=ckLocalBranch();
+  if (onPE==-1) onPE=arr->homePE(idx);
+  if (onPE!=CkMyPe()) //Let the local manager know where this el't is
+  	arr->insertRec(new CkArrayRec_remote(arr,onPE),idx);
+  
+  DEBC((AA"Proxy inserting element %s on PE %d\n"AB,idx2str(idx),onPE));
+  CProxy_CkArray(_aid).InsertElement(m,onPE);
+}
+
 //pack-unpack method for CProxy_CkArrayBase
 void CProxy_CkArrayBase::pup(PUP::er &p)
 {
@@ -787,7 +807,7 @@ CkArray::CkArray(CkMigrateMessage *) :CkReductionMgr(),
 }
 
 CkArray::CkArray(CkArrayCreateMsg *msg) :CkReductionMgr(),
-	hash(17,0.75,CkArrayIndex_hashN,CkArrayIndex_compareN)
+	hash(17,0.3,CkArrayIndex_hashN,CkArrayIndex_compareN)
 {
   //Set class variables
   numInitial=msg->numInitial;
@@ -835,7 +855,7 @@ void CkArray::initAfterMap(void)
 
 //Allocate a new, uninitialized array element of the given (chare) type
 // and owning the given index.
-ArrayElement *CkArray::newElement(int chareType,const CkArrayIndex &ind)
+ArrayElement *CkArray::allocateElement(int chareType,const CkArrayIndex &ind)
 {
   ArrayElement *el=(ArrayElement *)malloc(_chareTable[chareType]->size);
   el->thisindex=ind;
@@ -851,12 +871,32 @@ void CkArray::ctorElement(ArrayElement *el,int ctor,void *msg)
   curElementIsDead=CmiFalse;
   
   //Call the user's constructor
-  void *tmpobj = CpvAccess(_currentChare);
   CpvAccess(_currentChare) = (void*) el;
+  CpvAccess(_currentChareType) = _entryTable[ctor]->chareIdx;
   _entryTable[ctor]->call(msg, (void *)el);
-  CpvAccess(_currentChare) = tmpobj;
 }
 
+//Create a new element of the given chare type, 
+// invoke the given constructor on it, and register.
+ArrayElement *CkArray::newElement(int ctor,
+	void *msg,const CkArrayIndex &idx)
+{
+  ArrayElement *el=allocateElement(_entryTable[ctor]->chareIdx,idx);
+#if CMK_LBDB_ON //Load balancer utilities:
+  el->usesAtSync=CmiFalse;
+#endif
+  el->bcastNo=bcastNo;
+  contributorCreated(&el->reductionInfo);
+  ctorElement(el,ctor,msg);
+  if (!curElementIsDead) { 
+    //<- element may have immediately migrated away or died.
+    el->lbRegister();// Register the object with the load balancer
+    insertRec(new CkArrayRec_local(this,el),el->thisindex);
+    DEBC((AA"  finished adding local element %s\n"AB,idx2str(el->thisindex)));
+    return el;
+  }
+  return NULL;
+}
 
 //This method is called by the user to add an element.
 void CkArray::InsertElement(CkArrayMessage *m)
@@ -871,21 +911,7 @@ void CkArray::InsertElement(CkArrayMessage *m)
     thisproxy.UpdateLocation(new CkArrayUpdateMsg(idx),homePe);
   }
   //Build the element
-  ArrayElement *el=newElement(_entryTable[m->array_ep()]->chareIdx,idx);
-#if CMK_LBDB_ON //Load balancer utilities:
-  el->usesAtSync=CmiFalse;
-#endif
-  el->bcastNo=bcastNo;
-  contributorCreated(&el->reductionInfo);
-  
-  //Call the element's constructor (keeps message m)
-  ctorElement(el,m->array_ep(),(void *)m);
-  
-  if (!curElementIsDead) { 
-    //<- element may have immediately migrated away or died.
-    el->lbRegister();// Register the object with the load balancer
-    insertRec(new CkArrayRec_local(this,el),el->thisindex);
-  }
+  newElement(m->array_ep(),(void *)m,idx);
 }
 
 void CProxy_CkArrayBase::doneInserting(void)
@@ -995,7 +1021,7 @@ void CkArray::RecvMigratedElement(CkArrayElementMigrateMessage *msg)
   }
 
   //Create the new element on this PE (passing on the msg)
-  ArrayElement *el=newElement(_entryTable[msg->array_ep()]->chareIdx,idx);
+  ArrayElement *el=allocateElement(_entryTable[msg->array_ep()]->chareIdx,idx);
   ctorElement(el,msg->array_ep(),(CkMigrateMessage *)NULL);
   
   if (curElementIsDead) {CkFreeMsg((void *)msg);return;}
@@ -1084,25 +1110,56 @@ inline void CkArray::deliverRemote(CkArrayMessage *msg,int onPE)
 	thisproxy.RecvForElement(msg, onPE);
 }
 
-
-inline void CkArray::deliverUnknown(CkArrayMessage *msg)
-{//This index is not hashed-- send to its "home" processor
+void CkArray::deliverUnknown(CkArrayMessage *msg)
+{//This index is not hashed-- send to its home processor
 	const CkArrayIndex &idx=msg->array_index();
 	int onPE=homePE(idx);
-	if (onPE!=CkMyPe())
+	if (onPE!=CkMyPe()) {
+		DEBM((AA"Forwarding message for unknown %s\n"AB,idx2str(idx)));
 		deliverRemote(msg,onPE);
+	}
 	else
-	{// We *are* the home processor-- this element will be created soon
+	{// We *are* the home processor-- decide what to do
+	  int nt=msg->array_ifNotThere();
+	  if (nt==CkArray_IfNotThere_buffer)
+	  {//Just buffer the message
 		DEBC((AA"Adding buffer for unknown element %s\n"AB,idx2str(idx)));
 		CkArrayRec *rec=new CkArrayRec_buffering(this);
 		insertRec(rec,idx);
 		rec->send(msg);
+	  }
+	  else 
+	  {//Create the element somewhere
+	  	int chareType=_entryTable[msg->array_ep()]->chareIdx;
+	  	int ctor=_chareTable[chareType]->getDefaultCtor();
+	  	if (ctor==-1) CkAbort("Can't create array element to handle message--\n"
+	  		"The element has no default constructor in the .ci file!\n");
+	  	int srcPe=msg->array_getSrcPe();
+	  	if (nt==CkArray_IfNotThere_createhere && srcPe!=CkMyPe())
+	  	{
+			DEBC((AA"Demand-creating %s on PE %d\n"AB,idx2str(idx),srcPe));
+	  		CkArrayMessage *createMsg=new CkArrayElementCreateMsg;
+			createMsg->array_index()=idx;
+			createMsg->array_ep()=ctor;
+			createMsg->array_hops()=0;
+			insertRec(new CkArrayRec_remote(this,srcPe),idx);
+			thisproxy.InsertElement(createMsg,srcPe);
+			thisproxy.RecvForElement(msg,srcPe);
+	  	} 
+	  	else // nt==CkArray_IfNotThere_createhome or "here" *is* home
+	  	{ //Create the element locally
+			DEBC((AA"Demand-creating %s locally\n"AB,idx2str(idx)));
+	  		ArrayElement *el=newElement(ctor,CkAllocSysMsg(),idx);
+	  		if (el) deliverLocal(msg,el);
+	  		else Send(msg); //el probably migrated away
+	  	}
+	  }
 	}
 }
 
 
 //Deliver given (pre-addressed) message 
-inline void CkArray::Send(CkArrayMessage *msg)
+void CkArray::Send(CkArrayMessage *msg)
 {
 	const CkArrayIndex &idx=msg->array_index();
 #if CMK_LBDB_ON
@@ -1126,23 +1183,20 @@ inline void CkArray::RecvForElement(CkArrayMessage *msg)
 	else deliverUnknown(msg);
 }
 
-void CProxy_CkArrayBase::base_insert(int ctorIndex,int onPE,
-	const CkArrayIndex &idx,CkArrayMessage *m)
+//Fill out a message's array fields before sending it
+static void msg_prepareSend(CkArrayMessage *msg, 
+	int entryIndex, CkArray_IfNotThere nt)
 {
-  if (m==NULL) m=new CkArrayElementCreateMsg;
-  m->array_index()=idx;
-  m->array_ep()=ctorIndex;
-  if (onPE==-1) onPE=ckLocalBranch()->homePE(idx);
-  
-  DEBC((AA"Proxy inserting element %s on PE %d\n"AB,idx2str(idx),onPE));
-  CProxy_CkArray(_aid).InsertElement(m,onPE);
+	envelope *env=UsrToEnv((void *)msg);
+	env->array_srcPe()=CkMyPe();
+	env->array_ep()=entryIndex;
+	env->array_hops()=0;
+	env->setIfNotThere((UChar)nt);
 }
-
-void CProxy_CkArrayBase::base_send(CkArrayMessage *msg, int entryIndex) const
+void CProxy_CkArrayBase::base_send(CkArrayMessage *msg, 
+	int entryIndex, CkArray_IfNotThere nt) const
 {
-	msg->array_setSrcPe();
-	msg->array_ep() = entryIndex;
-	msg->array_hops() = 0;
+	msg_prepareSend(msg,entryIndex,nt);
 #ifndef CMK_OPTIMIZE
 	if (_idx.nInts<0) CkAbort("Array index length is negative!\n");
 	if (_idx.nInts>CK_ARRAYINDEX_MAXLEN)
@@ -1156,11 +1210,10 @@ void CProxy_CkArrayBase::base_send(CkArrayMessage *msg, int entryIndex) const
 
 /*********************** CkArray Broadcast ******************/
 
-void CProxy_CkArrayBase::base_broadcast(CkArrayMessage *msg, int entryIndex) const
+void CProxy_CkArrayBase::base_broadcast(CkArrayMessage *msg, 
+	int entryIndex, CkArray_IfNotThere nt) const
 {
-	msg->array_setSrcPe();
-	msg->array_ep()=entryIndex;
-	msg->array_hops()=0;
+	msg_prepareSend(msg,entryIndex,nt);
 	int serializer=0;//1623802937%CkNumPes();
 	if (CkMyPe()==serializer)
 	{
@@ -1357,7 +1410,7 @@ CkArrayRemoveMsg::CkArrayRemoveMsg(const CkArrayIndex &idx)
 CkArrayUpdateMsg::CkArrayUpdateMsg(const CkArrayIndex &idx) 
 {
 	array_index()=idx;
-	array_setSrcPe();
+	UsrToEnv((void *)this)->array_srcPe()=CkMyPe();
 }
 
 void *
@@ -1433,7 +1486,7 @@ CkArrayRec* CkArray::pupArrayRec(PUP::er &p, CkArrayRec *rec, CkArrayIndex *idx)
       int elType;
       lrec = new CkArrayRec_local();
       p(elType);
-	  el = newElement(elType, *idx);
+	  el = allocateElement(elType, *idx);
 	  ctorElement(el, _chareTable[elType]->getMigCtor(), 0);
       rec = lrec;
     }
