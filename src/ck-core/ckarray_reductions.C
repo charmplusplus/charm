@@ -26,8 +26,6 @@ To keep the code small and easy to change, the implementations below
 are built with preprocessor macros.  They also include debugging information.
 */
 //#include <stdio.h>
-#include <limits.h> //for MAX_INT, MIN_INT, etc.
-#include <values.h> //for MAXDOUBLE, MINDOUBLE, etc.
 /* #include "charm++.h" #include "reductions.h" */
 
 //A simple debugging routine-- turn on to get status messages
@@ -36,70 +34,67 @@ are built with preprocessor macros.  They also include debugging information.
 #endif
 
 //////////////////////////// simple reductions ///////////////////
-//A define used to quickly and tersely construct simple reductions
-#define SIMPLE_REDUCTION(name,dataType,initRet,typeStr,loop) \
+/*A define used to quickly and tersely construct simple reductions.
+The basic idea is to use the first message's data array as 
+(pre-initialized!) scratch space for folding in the other messages.
+ */
+
+#define SIMPLE_REDUCTION(name,dataType,typeStr,loop) \
 ArrayReductionMessage *name(int nMsg,ArrayReductionMessage **msg)\
 {\
-	RED_DEB(("/ PE_%d: " #name " invoked\n",CkMyPe()));\
-	int i;\
-	dataType ret=initRet;\
-	for (i=0;i<nMsg;i++)\
+	RED_DEB(("/ PE_%d: " #name " invoked on %d messages\n",CkMyPe(),nMsg));\
+	int m,i;\
+	int nElem=msg[0]->dataSize/sizeof(dataType);\
+	dataType *ret=(dataType *)(msg[0]->data);\
+	for (m=1;m<nMsg;m++)\
 	{\
-		dataType value=*(dataType *)(msg[i]->data);\
-		RED_DEB(("|\tmsg[%d (from %d)]="typeStr"\n",i,msg[i]->source,value));\
-		loop\
+		dataType *value=(dataType *)(msg[m]->data);\
+		for (i=0;i<nElem;i++)\
+		{\
+			RED_DEB(("|\tmsg%d (from %d)[%d]="typeStr"\n",m,msg[m]->source,i,value[i]));\
+			loop\
+		}\
 	}\
 	RED_DEB(("\\ PE_%d: " #name " finished\n",CkMyPe()));\
-	return ArrayReductionMessage::buildNew(sizeof(dataType),(void *)&ret);\
+	return ArrayReductionMessage::buildNew(nElem*sizeof(dataType),(void *)ret);\
 }
 
-//Compute the sum the integers passed by each element.
-SIMPLE_REDUCTION(CkReduction_sum_int,int,0,"%d",
-	ret+=value;
-)
+//Use this macro for reductions that have the same type for all inputs
+#define SIMPLE_POLYMORPH_REDUCTION(nameBase,loop) \
+  SIMPLE_REDUCTION(nameBase##_int,int,"%d",loop) \
+  SIMPLE_REDUCTION(nameBase##_float,float,"%f",loop) \
+  SIMPLE_REDUCTION(nameBase##_double,double,"%f",loop)
 
-//Compute the largest integer passed by any element.
-SIMPLE_REDUCTION(CkReduction_max_int,int,INT_MIN,"%d",
-	if (ret<value) 
-		ret=value;
-)
+
+//Compute the sum the numbers passed by each element.
+SIMPLE_POLYMORPH_REDUCTION(CkReduction_sum,ret[i]+=value[i];)
+
+//Compute the product of the numbers passed by each element.
+SIMPLE_POLYMORPH_REDUCTION(CkReduction_product,ret[i]*=value[i];)
+
+//Compute the largest number passed by any element.
+SIMPLE_POLYMORPH_REDUCTION(CkReduction_max,if (ret[i]<value[i]) ret[i]=value[i];)
 
 //Compute the smallest integer passed by any element.
-SIMPLE_REDUCTION(CkReduction_min_int,int,INT_MAX,"%d",
-	if (ret>value) 
-		ret=value;
-)
+SIMPLE_POLYMORPH_REDUCTION(CkReduction_min,if (ret[i]>value[i]) ret[i]=value[i];)
+
 
 //Compute the logical AND of the integers passed by each element.
 // The resulting integer will be zero if any source integer is zero; else 1.
-SIMPLE_REDUCTION(CkReduction_and,int,1,"%d",
-	if (value==0) 
-		ret=0;
+SIMPLE_REDUCTION(CkReduction_and,int,"%d",
+        if (value[i]==0) 
+		 ret[i]=0; 
+	ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
 )
 
 //Compute the logical OR of the integers passed by each element.
 // The resulting integer will be 1 if any source integer is nonzero; else 0.
-SIMPLE_REDUCTION(CkReduction_or,int,0,"%d",
-	if (value!=0) 
-		ret=1;
+SIMPLE_REDUCTION(CkReduction_or,int,"%d",
+	if (value[i]!=0) 
+	         ret[i]=1; 
+	ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
 )
 
-//Compute the sum the doubles passed by each element.
-SIMPLE_REDUCTION(CkReduction_sum_double,double,0.0,"%f",
-	ret+=value;
-)
-
-//Compute the largest double passed by any element.
-SIMPLE_REDUCTION(CkReduction_max_double,double,MINDOUBLE,"%f",
-	if (ret<value) 
-		ret=value;
-)
-
-//Compute the smallest double passed by any element.
-SIMPLE_REDUCTION(CkReduction_min_double,double,MAXDOUBLE,"%f",
-	if (ret>value) 
-		ret=value;
-)
 
 /////////////////////// non-simple reductions: set ////////////////
 /*
