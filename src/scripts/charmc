@@ -221,6 +221,24 @@ AddList() {
     echo $ret
 }
 
+# Append the last word to this list, avoiding duplicates
+AppendList() {
+	ret=""
+	search=$1
+	shift
+	while [ $# -gt 0 ] 
+	do
+		if notInList $search $@
+		then
+			ret="$ret $search"
+		fi
+		search=$1
+		shift
+	done
+	echo $ret $search
+}
+
+
 
 # TEMP_BASE is appended with this script's process ID (PID),
 # so multiple charmcs can run in parallel without overwriting
@@ -458,9 +476,9 @@ do
 	-l*)
 		if [ -n "$POST_LANGUAGE" ]
 		then
-			POST_LIBRARIES=`AddList $POST_LIBRARIES $arg`
+			POST_LIBRARIES=`AppendList $POST_LIBRARIES $arg`
 		else
-			PRE_LIBRARIES=`AddList $PRE_LIBRARIES $arg`
+			PRE_LIBRARIES=`AppendList $PRE_LIBRARIES $arg`
 		fi
 		;;
 
