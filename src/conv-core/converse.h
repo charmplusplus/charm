@@ -981,12 +981,14 @@ void CmiDelayImmediate();
 #  define CmiBecomeImmediate(msg) /* empty */
 #endif
 
-/******** Object ID ********/
+/******** Trace ********/
 
 /* this is the type for thread ID, mainly used for projection. */
 typedef struct {
 int id[3];
 } CmiObjId;
+
+void CthTraceResume(CthThread t);
 
 #include "conv-cpm.h"
 #include "conv-cpath.h"
