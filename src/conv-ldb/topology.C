@@ -240,10 +240,13 @@ public:
   }
   //Note: if abs(difference)*2 = cardinality, the difference is set to zero
   virtual bool coordinate_difference(const int* my_coordinates, const int* target_coordinates, int* difference) { 
+//    CkPrintf("[%d] coordiate_difference begin\n", CkMyPe());
     CmiAssert( my_coordinates != NULL);
     CmiAssert( target_coordinates != NULL);
     CmiAssert( difference != NULL);
-    for(int i=0;i<dimension;i--) {
+//    CkPrintf("[%d] after assert\n", CkMyPe());
+    for(int i=0;i<dimension;i++) {
+//      CkPrintf("[%d] coordiate_difference iteration %d\n", i);
       difference[i] = target_coordinates[i] - my_coordinates[i];
       if (abs(difference[i])*2 > Cardinality[i]) {
         difference[i] += (difference[i]>0) ? -Cardinality[i] : Cardinality[i];
@@ -251,6 +254,7 @@ public:
         difference[i] = 0;
       }
     }
+//    CkPrintf("[%d] coordiate_difference just before return\n");
     return true;
   }
   //Note: if abs(difference)*2 = cardinality, the difference is set to zero
