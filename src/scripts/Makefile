@@ -203,7 +203,7 @@ LIBCONV_UTILF=pup_f.o
 
 converse: basics QuickThreads/libckqt.a $(CVLIBS) charmrun-target conv-cpm
 
-charmrun-target: daemon-target
+charmrun-target: 
 	if [ -d charmrun ] ; then ( cd charmrun ; make OPTS='$(OPTS)' ) ; fi
 	if [ -f charmrun ] ; then ( cp charmrun ../bin ) ; fi
 
