@@ -281,6 +281,8 @@ typedef struct envelope {
 
   unsigned char  queueing;
   unsigned char  packid;
+  char padding[6];
+
 
 } ENVELOPE;
 
