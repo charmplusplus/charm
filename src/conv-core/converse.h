@@ -57,12 +57,12 @@ extern int Cmi_numpes;
 #define CpvDeclare(t,v) t CMK_CONCAT(Cpv_Var_,v)
 #define CpvExtern(t,v)  extern t CMK_CONCAT(Cpv_Var_,v)
 #define CpvStaticDeclare(t,v) static t CMK_CONCAT(Cpv_Var_,v)
-#define CpvInitialize(t,v) 
+#define CpvInitialize(t,v) do {} while(0)
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)
 
 #define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
 #define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
-#define CsvInitialize(t,v) 
+#define CsvInitialize(t,v) do{}while(0)
 #define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
 #define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
@@ -76,11 +76,7 @@ typedef void *CmiNodeLock;
 #define CmiLock(lock) 0
 #define CmiUnlock(lock) 0
 #define CmiTryLock(lock) 0
-#define CmiDestroyLock(lock) {}
-  /* Used to be:
-     #define CmiDestroyLock(lock) 0
-     But this caused lots of compiler warnings
-  */
+#define CmiDestroyLock(lock) do{}while(0)
 
 #endif
 
@@ -108,15 +104,15 @@ extern int Cmi_mynodesize;
 #define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvInitialize(t,v)\
-    { if (CmiMyRank()) CmiNodeBarrier();\
+    do { if (CmiMyRank()) CmiNodeBarrier();\
     else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize());\
-           CmiNodeBarrier();}}
+           CmiNodeBarrier();}} while(0)
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
 
 #define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
 #define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
 #define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
-#define CsvInitialize(t,v)
+#define CsvInitialize(t,v) do{}while(0)
 #define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
 
@@ -162,14 +158,15 @@ extern int CmiRankOf(int pe);
 #define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvInitialize(t,v)\
-  { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0) thr_yield();\
-    else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize()); }}
+  do { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0) thr_yield();\
+       else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize()); }}\
+  while(0)
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
 
 #define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
 #define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
 #define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
-#define CsvInitialize(t,v)
+#define CsvInitialize(t,v) do{}while(0)
 #define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
 extern void CmiMemLock();
@@ -214,14 +211,15 @@ extern int CmiRankOf(int pe);
 #define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvInitialize(t,v)\
-  { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0) sched_yield();\
-    else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize()); }}
+  do { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0) sched_yield();\
+       else { CMK_CONCAT(Cpv_Var_,v)=(t*)malloc(sizeof(t)*CmiMyNodeSize()); }}\
+  while(0)
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
 
 #define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
 #define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
 #define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
-#define CsvInitialize(t,v)
+#define CsvInitialize(t,v) do{}while(0)
 #define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
 extern void CmiMemLock();
@@ -261,14 +259,15 @@ extern int Cmi_numpes;
 #define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvInitialize(t,v)\
-    { if (CMK_CONCAT(Cpv_Var_,v)==0)\
-        { CMK_CONCAT(Cpv_Var_,v) = (t *)CmiAlloc(CmiNumPes()*sizeof(t)); }}
+  do  { if (CMK_CONCAT(Cpv_Var_,v)==0)\
+        { CMK_CONCAT(Cpv_Var_,v) = (t *)CmiAlloc(CmiNumPes()*sizeof(t)); }}\
+  while(0)
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyPe()]
 
 #define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
 #define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
 #define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
-#define CsvInitialize(t,v)
+#define CsvInitialize(t,v) do{}while(0)
 #define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
 #define CmiMemLock() 0
@@ -309,14 +308,15 @@ extern int Cmi_numpes;
 #define CpvExtern(t,v)  extern t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvStaticDeclare(t,v) static t* CMK_CONCAT(Cpv_Var_,v)
 #define CpvInitialize(t,v)\
-  { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0) sched_yield();\
-    else { CMK_CONCAT(Cpv_Var_,v)=(t*)CmiAlloc(sizeof(t)*CmiMyNodeSize()); }}
+  do { if (CmiMyRank()) while (CMK_CONCAT(Cpv_Var_,v)==0) sched_yield();\
+       else {CMK_CONCAT(Cpv_Var_,v)=(t*)CmiAlloc(sizeof(t)*CmiMyNodeSize());}}\
+  while(0)
 #define CpvAccess(v) CMK_CONCAT(Cpv_Var_,v)[CmiMyRank()]
 
 #define CsvDeclare(t,v) t CMK_CONCAT(Csv_Var_,v)
 #define CsvStaticDeclare(t,v) static t CMK_CONCAT(Csv_Var_,v)
 #define CsvExtern(t,v) extern t CMK_CONCAT(Csv_Var_,v)
-#define CsvInitialize(t,v)
+#define CsvInitialize(t,v) do{}while(0)
 #define CsvAccess(v) CMK_CONCAT(Csv_Var_,v)
 
 extern void CmiMemLock();
@@ -430,9 +430,9 @@ extern void CmiNumberHandler(int, CmiHandler);
 #define CmiGetXHandler(m) (((CmiMsgHeaderExt*)m)->xhdl)
 #define CmiGetInfo(m)     (((CmiMsgHeaderExt*)m)->info)
 
-#define CmiSetHandler(m,v)  ((((CmiMsgHeaderExt*)m)->hdl)=(v))
-#define CmiSetXHandler(m,v) ((((CmiMsgHeaderExt*)m)->xhdl)=(v))
-#define CmiSetInfo(m,v)     ((((CmiMsgHeaderExt*)m)->info)=(v))
+#define CmiSetHandler(m,v)  do {((((CmiMsgHeaderExt*)m)->hdl)=(v));} while(0)
+#define CmiSetXHandler(m,v) do {((((CmiMsgHeaderExt*)m)->xhdl)=(v));} while(0)
+#define CmiSetInfo(m,v)     do {((((CmiMsgHeaderExt*)m)->info)=(v));} while(0)
 
 #define CmiHandlerToFunction(n) (CpvAccess(CmiHandlerTable)[n])
 #define CmiGetHandlerFunction(env) (CmiHandlerToFunction(CmiGetHandler(env)))
@@ -447,38 +447,38 @@ double   CmiCpuTimer();
 
 #if CMK_NODE_QUEUE_AVAILABLE
 
-#define CsdNodeEnqueueGeneral(x,s,i,p) { \
+#define CsdNodeEnqueueGeneral(x,s,i,p) do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
           CqsEnqueueGeneral(CsvAccess(CsdNodeQueue),(x),(s),(i),(p)); \
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
-        }
-#define CsdNodeEnqueueFifo(x)     { \
+        } while(0)
+#define CsdNodeEnqueueFifo(x)     do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
           CqsEnqueueFifo(CsvAccess(CsdNodeQueue),(x)); \
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
-        }
-#define CsdNodeEnqueueLifo(x)     { \
+        } while(0)
+#define CsdNodeEnqueueLifo(x)     do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
           CqsEnqueueLifo(CsvAccess(CsdNodeQueue),(x))); \
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
-        }
-#define CsdNodeEnqueue(x)     { \
+        } while(0)
+#define CsdNodeEnqueue(x)     do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
           CqsEnqueueFifo(CsvAccess(CsdNodeQueue),(x));\
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
-        }
+        } while(0)
 
 #define CsdNodeEmpty()            (CqsEmpty(CpvAccess(CsdNodeQueue)))
 #define CsdNodeLength()           (CqsLength(CpvAccess(CsdNodeQueue)))
 
 #else
 
-#define CsdNodeEnqueueGeneral(x,s,i,p)  (CsdEnqueueGeneral(x,s,i,p))
-#define CsdNodeEnqueueFifo(x)     (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
-#define CsdNodeEnqueueLifo(x)     (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),(x)))
-#define CsdNodeEnqueue(x)         (CsdEnqueue(x))
-#define CsdNodeEmpty()            (CqsEmpty(CpvAccess(CsdSchedQueue)))
-#define CsdNodeLength()           (CqsLength(CpvAccess(CsdSchedQueue)))
+#define CsdNodeEnqueueGeneral(x,s,i,p) (CsdEnqueueGeneral(x,s,i,p))
+#define CsdNodeEnqueueFifo(x) (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
+#define CsdNodeEnqueueLifo(x) (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),(x)))
+#define CsdNodeEnqueue(x)     (CsdEnqueue(x))
+#define CsdNodeEmpty()        (CqsEmpty(CpvAccess(CsdSchedQueue)))
+#define CsdNodeLength()       (CqsLength(CpvAccess(CsdSchedQueue)))
 
 #endif
 
@@ -521,8 +521,8 @@ typedef void (*CmiStartFn)(int argc, char **argv);
 /********* CSD - THE SCHEDULER ********/
 
 extern  int CsdScheduler(int);
-#define CsdSetNotifyIdle(f1,f2) {CpvAccess(CsdNotifyIdle)=(f1);\
-                                 CpvAccess(CsdNotifyBusy)=(f2);}
+#define CsdSetNotifyIdle(f1,f2) do {CpvAccess(CsdNotifyIdle)=(f1);\
+                                 CpvAccess(CsdNotifyBusy)=(f2);} while(0)
 #define CsdStartNotifyIdle() (CpvAccess(CsdStopNotifyFlag)=0)
 #define CsdStopNotifyIdle() (CpvAccess(CsdStopNotifyFlag)=1)
 
@@ -542,13 +542,13 @@ void     CmiReleaseBuffer(void *pbuf);
 #define SPANTREE_W  (CMK_SPANTREE_MAXSPAN)
 #define NN (CmiNumNodes())
 #define CmiNodeSpanTreeParent(n) ((n)?(((n)-1)/SPANTREE_W):(-1))
-#define CmiNodeSpanTreeChildren(n,c) {\
+#define CmiNodeSpanTreeChildren(n,c) do {\
           int _i; \
           for(_i=0; _i<SPANTREE_W; _i++) { \
             int _x = (n)*SPANTREE_W+_i+1; \
             if(_x<NN) (c)[_i]=_x; \
           }\
-        }
+        } while(0)
 #define CmiNumNodeSpanTreeChildren(n) ((((n)+1)*SPANTREE_W<NN)? SPANTREE_W : \
           ((((n)*SPANTREE_W+1)>=NN)?0:((NN-1)-(n)*SPANTREE_W)))
 #define R(p) (CmiRankOf(p))
@@ -560,7 +560,7 @@ void     CmiReleaseBuffer(void *pbuf);
 #define C(p) (((R(p)+1)*SPANTREE_W<NS(p))?SPANTREE_W:(((R(p)*SPANTREE_W+1)>=NS(p))?0:((NS(p)-1)-R(p)*SPANTREE_W)))
 #define SC(p) (CmiNumNodeSpanTreeChildren(ND(p)))
 #define CmiNumSpanTreeChildren(p) (R(p)?C(p):(SC(p)+C(p)))
-#define CmiSpanTreeChildren(p,c) {\
+#define CmiSpanTreeChildren(p,c) do {\
           int _i,_c=0; \
           if(R(p)==0) { \
             for(_i=0;_i<SPANTREE_W;_i++) { \
@@ -572,7 +572,7 @@ void     CmiReleaseBuffer(void *pbuf);
             int _x = R(p)*SPANTREE_W+_i+1; \
             if(_x<NS(p)) (c)[_c++]=NF(ND(p))+_x; \
           }\
-        }
+        } while(0)
 #endif
 
 #if CMK_SPANTREE_USE_SPECIAL_CODE
@@ -666,27 +666,27 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 #define CmiSyncNodeSend(n,s,m)        CmiSyncSend(CmiNodeFirst(n),s,m)
 #define CmiAsyncNodeSend(n,s,m)       CmiAsyncSend(CmiNodeFirst(n),s,m)
 #define CmiSyncNodeSendAndFree(n,s,m) CmiSyncSendAndFree(CmiNodeFirst(n),s,m)
-#define CmiSyncNodeBroadcast(s,m)           { \
+#define CmiSyncNodeBroadcast(s,m)           do { \
           int _i; \
           for(_i=0; _i<CmiNumNodes(); _i++) \
             if(_i != CmiMyNode()) \
               CmiSyncSend(CmiNodeFirst(_i),s,m); \
-        }
+        } while(0)
 #define CmiAsyncNodeBroadcast(s,m)          CmiSyncNodeBroadcast(s,m)
-#define CmiSyncNodeBroadcastAndFree(s,m)    { \
+#define CmiSyncNodeBroadcastAndFree(s,m)    do { \
           CmiSyncNodeBroadcast(s,m); \
           CmiFree(m); \
-        }
-#define CmiSyncNodeBroadcastAll(s,m)           { \
+        } while(0)
+#define CmiSyncNodeBroadcastAll(s,m)           do { \
           int _i; \
           for(_i=0; _i<CmiNumNodes(); _i++) \
             CmiSyncSend(CmiNodeFirst(_i),s,m); \
-        }
+        } while(0)
 #define CmiAsyncNodeBroadcastAll(s,m)       CmiSyncNodeBroadcastAll(s,m)
-#define CmiSyncNodeBroadcastAllAndFree(s,m) { \
+#define CmiSyncNodeBroadcastAllAndFree(s,m) do { \
           CmiSyncNodeBroadcastAll(s,m); \
           CmiFree(m); \
-        }
+        } while(0)
 #endif
 
 /******** CMI MESSAGE RECEPTION ********/
@@ -741,7 +741,7 @@ void       CthAutoYieldUnblock(void);
 #define CthCpvDeclare(t,v)    t v
 #define CthCpvExtern(t,v)     extern t v
 #define CthCpvStatic(t,v)     static t v
-#define CthCpvInitialize(t,v) 
+#define CthCpvInitialize(t,v) do {} while(0)
 #define CthCpvAccess(x)       x
 
 #else
@@ -842,44 +842,44 @@ struct CpmHeader
  **********************************************************************/
 
 CpmDeclareSimple(char);
-#define CpmPack_char(v)
-#define CpmUnpack_char(v)
+#define CpmPack_char(v) do{}while(0)
+#define CpmUnpack_char(v) do{}while(0)
 
 CpmDeclareSimple(short);
-#define CpmPack_short(v)
-#define CpmUnpack_short(v)
+#define CpmPack_short(v) do{}while(0)
+#define CpmUnpack_short(v) do{}while(0)
 
 CpmDeclareSimple(int);
-#define CpmPack_int(v)
-#define CpmUnpack_int(v)
+#define CpmPack_int(v) do{}while(0)
+#define CpmUnpack_int(v) do{}while(0)
 
 CpmDeclareSimple(long);
-#define CpmPack_long(v)
-#define CpmUnpack_long(v)
+#define CpmPack_long(v) do{}while(0)
+#define CpmUnpack_long(v) do{}while(0)
 
 CpmDeclareSimple(float);
-#define CpmPack_float(v)
-#define CpmUnpack_float(v)
+#define CpmPack_float(v) do{}while(0)
+#define CpmUnpack_float(v) do{}while(0)
 
 CpmDeclareSimple(double);
-#define CpmPack_double(v)
-#define CpmUnpack_double(v)
+#define CpmPack_double(v) do{}while(0)
+#define CpmUnpack_double(v) do{}while(0)
 
 typedef int CpmDim;
 CpmDeclareSimple(CpmDim);
-#define CpmPack_CpmDim(v)
-#define CpmUnpack_CpmDim(v)
+#define CpmPack_CpmDim(v) do{}while(0)
+#define CpmUnpack_CpmDim(v) do{}while(0)
 
 CpmDeclareSimple(Cfuture);
-#define CpmPack_Cfuture(v)
-#define CpmUnpack_Cfuture(v)
+#define CpmPack_Cfuture(v) do{}while(0)
+#define CpmUnpack_Cfuture(v) do{}while(0)
 
 typedef char *CpmStr;
 CpmDeclarePointer(CpmStr);
 #define CpmPtrSize_CpmStr(v) (strlen(v)+1)
 #define CpmPtrPack_CpmStr(p, v) (strcpy(p, v))
-#define CpmPtrUnpack_CpmStr(v)
-#define CpmPtrFree_CpmStr(v)
+#define CpmPtrUnpack_CpmStr(v) do{}while(0)
+#define CpmPtrFree_CpmStr(v) do{}while(0)
 
 /****** CFUTURE: CONVERSE FUTURES ******/
 
@@ -952,9 +952,11 @@ void ConverseExit(void);
 void CmiAbort(const char *);
 
 #ifndef CMK_OPTIMIZE
-#define _MEMCHECK(p) { if ((p)==0) CmiAbort("Memory Allocation Failure.\n"); }
+#define _MEMCHECK(p) do { \
+                         if ((p)==0) CmiAbort("Memory Allocation Failure.\n");\
+                     } while(0)
 #else
-#define _MEMCHECK(p)
+#define _MEMCHECK(p) do{}while(0)
 #endif
 
 /*********** CPATH ***********/

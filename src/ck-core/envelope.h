@@ -5,12 +5,12 @@
 
 #ifndef CMK_OPTIMIZE
 #define _SET_USED(env, x) (env)->setUsed((x))
-#define _CHECK_USED(env) if(env->isUsed()) { \
+#define _CHECK_USED(env) do { if(env->isUsed()) \
                            CmiAbort("Message being re-sent. Aborting...\n"); \
-                         }
+                         } while(0)
 #else
-#define _SET_USED(env, x)
-#define _CHECK_USED(env)
+#define _SET_USED(env, x) do{}while(0)
+#define _CHECK_USED(env) do{}while(0)
 #endif
 
 typedef unsigned int   UInt;

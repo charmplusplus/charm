@@ -23,9 +23,9 @@
 #include "ckstream.h"
 
 #ifndef CMK_OPTIMIZE
-#define _CHECK_VALID(p, msg) {if((p)==0){CkAbort(msg);}}
+#define _CHECK_VALID(p, msg) do {if((p)==0){CkAbort(msg);}} while(0)
 #else
-#define _CHECK_VALID(p, msg)
+#define _CHECK_VALID(p, msg) do { } while(0)
 #endif
 
 class VidBlock {
