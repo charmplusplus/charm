@@ -15,6 +15,9 @@ int comm_debug;
 
 CkpvDeclare(ConvComlibManager *, conv_comm_ptr);
 CkpvDeclare(int, RecvdummyHandle);
+CkpvExtern(int, RecvmsgHandle);
+CkpvExtern(int, RecvCombinedShortMsgHdlrIdx);
+
 
 ConvComlibManager::ConvComlibManager(): strategyTable(10){
     nstrats = 0;
