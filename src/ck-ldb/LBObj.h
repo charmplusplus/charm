@@ -50,6 +50,7 @@ public:
   void StartTimer(void);
   void StopTimer(double* walltime, double* cputime);
 
+  inline const LDObjHandle &GetLDObjHandle() const { return myhandle; }
 private:
   inline LDObjData ObjData() { return data; };
 

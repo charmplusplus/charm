@@ -110,12 +110,19 @@ public:
   };
   void BackgroundLoad(double* walltime, double* cputime);
   void ClearLoads(void);
+
+  /**
+    runningObj records the obj handler index so that load balancer
+    knows if an event(e.g. Send) is in an entry function or not.
+    An index is enough here because LDObjHandle can be retrieved from 
+    objs array. Copyinh LDObjHandle is expensive.
+  */
   inline void SetRunningObj(const LDObjHandle &_h) {
-    runningObj = _h; obj_running = CmiTrue;
+    runningObj = _h.handle; obj_running = CmiTrue;
   };
+  inline const LDObjHandle &RunningObj() const { return objs[runningObj]->GetLDObjHandle(); };
   inline void NoRunningObj() { obj_running = CmiFalse; };
   inline CmiBool ObjIsRunning() const { return obj_running; };
-  inline const LDObjHandle &RunningObj() const { return runningObj; };
   
   inline LDBarrierClient AddLocalBarrierClient(LDResumeFn fn, void* data) { 
     return localBarrier.AddClient(fn,data);
@@ -169,12 +176,15 @@ private:
   OMList oms;
   int omCount;
   int oms_registering;
+
   ObjList objs;
   int objCount;
+
   CmiBool statsAreOn;
   MigrateCBList migrateCBList;
+
   CmiBool obj_running;
-  LDObjHandle runningObj;
+  int runningObj;		// index of the runningObj in ObjList
 
   batsyncer batsync;
 

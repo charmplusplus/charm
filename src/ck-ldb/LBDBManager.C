@@ -135,16 +135,17 @@ void LBDB::Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int by
   LBCommData* item_ptr;
 
   if (obj_running) {
+    const LDObjHandle &runObj = RunningObj();
 
     // Don't record self-messages from an object to an object
-    if ( LDOMidEqual(runningObj.omhandle.id,destOM.id)
-	 && LDObjIDEqual(runningObj.id,destid) )
+    if ( LDOMidEqual(runObj.omhandle.id,destOM.id)
+	 && LDObjIDEqual(runObj.id,destid) )
       return;
 
     // In the future, we'll have to eliminate processor to same 
     // processor messages as well
 
-    LBCommData item(runningObj,destOM.id,destid);
+    LBCommData item(runObj,destOM.id,destid);
     item_ptr = commTable->HashInsertUnique(item);
   } else {
     LBCommData item(CkMyPe(),destOM.id,destid);
