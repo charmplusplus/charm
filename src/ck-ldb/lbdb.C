@@ -411,6 +411,16 @@ double LDGetLBPeriod(LDHandle _db)   // s is in seconds
   return db->GetPeriod();
 }
 
+// to be implemented
+void LDEstObjLoad(LDObjHandle h, double load)
+{
+}
+
+// to be implemented
+void LDQueryEstLoad(LDHandle bdb)
+{
+}
+
 int LDMemusage(LDHandle _db) 
 {
   LBDB *const db = (LBDB*)(_db.handle);
