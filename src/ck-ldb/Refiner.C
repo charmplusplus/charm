@@ -46,16 +46,16 @@ void Refiner::create(int count, BaseLB::LDStats* stats, int* procs)
     if (processors[i].available == CmiTrue) numAvail++;
   }
 
-  LDObjData *odata = stats->objData;
   for (i=0; i<stats->n_objs; i++)
   {
+	LDObjData &odata = stats->objData[i];
 	computes[i].Id = i;
-        computes[i].id = odata[i].objID();
-        computes[i].handle = odata[i].handle;
-        computes[i].load = odata[i].wallTime;     // was cpuTime
+        computes[i].id = odata.objID();
+        computes[i].handle = odata.handle;
+        computes[i].load = odata.wallTime;     // was cpuTime
         computes[i].processor = -1;
         computes[i].oldProcessor = procs[i];
-        computes[i].migratable = odata[i].migratable;
+        computes[i].migratable = odata.migratable;
         if (computes[i].oldProcessor >= P) 
           CmiAbort("LB Panic: the old processor in RefineLB cannot be found, is this in a simulation mode?");
 /*

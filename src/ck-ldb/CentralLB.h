@@ -108,13 +108,13 @@ public:
     FutureModel(int n): n_stats(n), cur_stats(0), start_stats(0), n_objs(0),
 	 parameters(NULL) {
       collection = new LDStats[n];
-      for (int i=0;i<n;++i) collection[i].objData=NULL;
+      //for (int i=0;i<n;++i) collection[i].objData=NULL;
       predictor = new DefaultFunction();
     }
 
     FutureModel(int n, LBPredictorFunction *myfunc): n_stats(n), cur_stats(0), start_stats(0), n_objs(0), parameters(NULL) {
       collection = new LDStats[n];
-      for (int i=0;i<n;++i) collection[i].objData=NULL;
+      //for (int i=0;i<n;++i) collection[i].objData=NULL;
       predictor = myfunc;
     }
 

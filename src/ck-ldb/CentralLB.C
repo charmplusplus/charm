@@ -245,10 +245,12 @@ void CentralLB::MissMigrate(int waitForBarrier)
 void CentralLB::buildStats()
 {
     statsData->count = stats_msg_count;
-    statsData->objData = new LDObjData[statsData->n_objs];
-    statsData->from_proc = new int[statsData->n_objs];
-    statsData->to_proc = new int[statsData->n_objs];
-    statsData->commData = new LDCommData[statsData->n_comm];
+    // allocate space
+    statsData->objData.resize(statsData->n_objs);
+    statsData->from_proc.resize(statsData->n_objs);
+    statsData->to_proc.resize(statsData->n_objs);
+    statsData->commData.resize(statsData->n_comm);
+
     int nobj = 0;
     int ncom = 0;
     int nmigobj = 0;
@@ -391,9 +393,11 @@ void CentralLB::removeNonMigratable(LDStats* stats, int count)
 {
   int i;
 
-  LDObjData *nonmig = new LDObjData[stats->n_migrateobjs];
-  int *new_from_proc = new int[stats->n_migrateobjs];
-  int *new_to_proc = new int[stats->n_migrateobjs];
+  CkVec<LDObjData> nonmig;
+  CkVec<int> new_from_proc, new_to_proc;
+  nonmig.resize(stats->n_migrateobjs);
+  new_from_proc.resize(stats->n_migrateobjs);
+  new_to_proc.resize(stats->n_migrateobjs);
   int n_objs = 0;
   for (i=0; i<stats->n_objs; i++) 
   {
@@ -413,7 +417,8 @@ void CentralLB::removeNonMigratable(LDStats* stats, int count)
 
   stats->makeCommHash();
   
-  LDCommData *newCommData = new LDCommData[stats->n_comm];
+  CkVec<LDCommData> newCommData;
+  newCommData.resize(stats->n_comm);
   int n_comm = 0;
   for (i=0; i<stats->n_comm; i++) 
   {
@@ -443,16 +448,11 @@ void CentralLB::removeNonMigratable(LDStats* stats, int count)
   if (n_objs != stats->n_objs) CmiPrintf("Removed %d nonmigratable %d comms - n_objs:%d migratable:%d\n", stats->n_objs-n_objs, stats->n_objs, stats->n_migrateobjs, stats->n_comm-n_comm);
 
   // swap to new data
-  delete [] stats->objData;
-  delete [] stats->from_proc;
-  delete [] stats->to_proc;
-
   stats->objData = nonmig;
   stats->from_proc = new_from_proc;
   stats->to_proc = new_to_proc;
   stats->n_objs = n_objs;
 
-  delete [] stats->commData;
   stats->commData = newCommData;
   stats->n_comm = n_comm;
 

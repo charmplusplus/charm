@@ -233,8 +233,8 @@ void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
 
   if (predicted_model->cur_stats < _lb_predict_delay) {
     // not yet ready to create the model, just store the relevant statistic
-    predicted_model->collection[predicted_model->start_stats].objData = new LDObjData[stats->n_objs];
-    predicted_model->collection[predicted_model->start_stats].commData = new LDCommData[stats->n_comm];
+    predicted_model->collection[predicted_model->start_stats].objData.resize(stats->n_objs);
+    predicted_model->collection[predicted_model->start_stats].commData.resize(stats->n_comm);
     predicted_model->collection[predicted_model->start_stats].n_objs = stats->n_objs;
     predicted_model->collection[predicted_model->start_stats].n_migrateobjs = stats->n_migrateobjs;
     predicted_model->collection[predicted_model->start_stats].n_comm = stats->n_comm;
@@ -286,12 +286,8 @@ void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
       if (predicted_model->start_stats >= predicted_model->n_stats) predicted_model->start_stats -= predicted_model->n_stats;
       if (predicted_model->cur_stats < predicted_model->n_stats) ++predicted_model->cur_stats;
 
-      if (predicted_model->collection[predicted_model->start_stats].objData != NULL) {
-	delete predicted_model->collection[predicted_model->start_stats].objData;
-	delete predicted_model->collection[predicted_model->start_stats].commData;
-      }
-      predicted_model->collection[predicted_model->start_stats].objData = new LDObjData[stats->n_objs];
-      predicted_model->collection[predicted_model->start_stats].commData = new LDCommData[stats->n_comm];
+      predicted_model->collection[predicted_model->start_stats].objData.resize(stats->n_objs);
+      predicted_model->collection[predicted_model->start_stats].commData.resize(stats->n_comm);
 
       predicted_model->collection[predicted_model->start_stats].n_objs = stats->n_objs;
       predicted_model->collection[predicted_model->start_stats].n_migrateobjs = stats->n_migrateobjs;

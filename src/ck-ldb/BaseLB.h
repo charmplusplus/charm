@@ -64,10 +64,10 @@ public:
     
     int   n_objs;
     int   n_migrateobjs;
-    LDObjData* objData;
+    CkVec<LDObjData> objData;
     int   n_comm;
-    LDCommData* commData;
-    int  *from_proc, *to_proc;
+    CkVec<LDCommData> commData;
+    CkVec<int>  from_proc, to_proc;
 
     int *objHash; 
     int  hashSize;
@@ -83,10 +83,10 @@ public:
     int getRecvHash(LDCommData &cData);
     void clear() {
       n_objs = n_comm = 0;
-      delete [] objData;
-      delete [] commData;
-      delete [] from_proc;
-      delete [] to_proc;
+      objData.resize(0);
+      commData.resize(0);
+      from_proc.resize(0);
+      to_proc.resize(0);
       deleteCommHash();
     }
     void print();

@@ -23,10 +23,9 @@ void RefinerComm::create(int count, BaseLB::LDStats* _stats, int* procs)
   stats = _stats;
   Refiner::create(count, _stats, procs);
 
-  LDCommData *cdata = stats->commData;
   for (i=0; i<stats->n_comm; i++) 
   {
-     	LDCommData &comm = cdata[i];
+     	LDCommData &comm = stats->commData[i];
 	if (!comm.from_proc()) {
           // out going message
 	  int computeIdx = stats->getSendHash(comm);

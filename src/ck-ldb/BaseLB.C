@@ -75,10 +75,10 @@ inline static int ObjKey(const LDObjid &oid, const int hashSize) {
 	 |i_abs(oid.id[0])) % hashSize;
 }
 
-BaseLB::LDStats::LDStats():  
-	n_objs(0), n_migrateobjs(0), objData(NULL), 
-        n_comm(0), commData(NULL), from_proc(NULL), to_proc(NULL), 
-        objHash(NULL) { 
+BaseLB::LDStats::LDStats()
+	: n_objs(0), n_migrateobjs(0), n_comm(0), 
+          objHash(NULL) 
+{
   procs = new ProcStats[CkNumPes()]; 
 }
 
@@ -247,7 +247,7 @@ void BaseLB::LDStats::print()
   }
 
   CkPrintf("------------- Comm Data: %d records -------------\n", n_comm);
-  LDCommData *cdata = commData;
+  CkVec<LDCommData> &cdata = commData;
   for(i=0; i < n_comm; i++) {
       CkPrintf("Link %d\n",i);
 
@@ -301,10 +301,10 @@ void BaseLB::LDStats::pup(PUP::er &p)
     // user can specify simulated processors other than the real # of procs.
     int maxpe = count>LBSimulation::simProcs?count:LBSimulation::simProcs;
     procs = new ProcStats[maxpe];
-    objData = new LDObjData[n_objs];
-    commData = new LDCommData[n_comm];
-    from_proc = new int[n_objs];
-    to_proc = new int[n_objs];
+    objData.resize(n_objs);
+    commData.resize(n_comm);
+    from_proc.resize(n_objs);
+    to_proc.resize(n_objs);
     objHash = NULL;
   }
   // ignore the background load when unpacking if the user change the # of procs
@@ -316,8 +316,8 @@ void BaseLB::LDStats::pup(PUP::er &p)
   else
     for (i=0; i<count; i++) p|procs[i];
   for (i=0; i<n_objs; i++) p|objData[i]; 
-  p(from_proc, n_objs);
-  p(to_proc, n_objs);
+  for (i=0; i<n_objs; i++) p|from_proc[i]; 
+  for (i=0; i<n_objs; i++) p|to_proc[i]; 
   // reset to_proc when unpacking
   if (p.isUnpacking())
     for (i=0; i<n_objs; i++) to_proc[i] = from_proc[i];
