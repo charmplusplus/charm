@@ -170,66 +170,44 @@
  *
  ****************************************************************************/
 
-/*
- * I_Hate_C because the ansi prototype for a varargs function is incompatible
- * with the K&R definition of that varargs function.  Eg, this doesn't compile:
- *
- * void CmiPrintf(char *, ...);
- *
- * void CmiPrintf(va_alist) va_dcl
- * {
- *    ...
- * }
- *
- * I can't define the function in an ANSI way, because our stupid SUNs dont
- * yet have stdarg.h, even though they have gcc (which is ANSI).  So I have
- * to leave the definition of CmiPrintf as a K&R form, but I have to
- * deactivate the protos or the compiler barfs.  That's why I_Hate_C.
- *
- */
-
-
 /* About CMK_TRUECRASH:  
    When debugging Charm++/Converse, CmiAbort is your enemy.
    Uncommenting the define below will cause the program to crash where the 
    problem occurs instead of calling host_abort which lets the program 
    exit gracefully and lose all the debugging info... */
 
-#define CmiPrintf I_Hate_C_1
-#define CmiError  I_Hate_C_2
-#define CmiScanf  I_Hate_C_3
 #include "converse.h"
-#undef CmiPrintf
-#undef CmiError
-#undef CmiScanf
-void CmiPrintf();
-void CmiError();
-int  CmiScanf();
 
-#include <sys/types.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include <fcntl.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <rpc/rpc.h>
 #include <errno.h>
 #include <setjmp.h>
-#include <pwd.h>
-#include <stdlib.h>
 #include <signal.h>
-#include <varargs.h>
-#include <unistd.h>
-#include <sys/file.h>
-#include <sys/param.h>
-#include <sys/resource.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <varargs.h>
+#include <stdarg.h> /*<- was <varargs.h>*/
 
 #include "fifo.h"
+#include "conv-ccs.h"
+#include "ccs-server.h"
+#include "sockRoutines.h"
+
+#ifdef _WIN32
+/*For windows systems:*/
+#  include <windows.h>
+#  include <wincon.h>
+#  include <sys/types.h>
+#  include <sys/timeb.h>
+#  define fdopen _fdopen
+#  define SIGBUS -1  /*These signals don't exist in Win32*/
+#  define SIGKILL -1
+#  define SIGQUIT -1
+
+#else /*UNIX*/
+#  include <pwd.h>
+#  include <unistd.h>
+#  include <sys/file.h>
+#endif
 
 #if CMK_STRINGS_USE_STRINGS_H
 #include <strings.h>
@@ -245,11 +223,12 @@ char *strchr(), *strrchr(), *strdup();
 
 #define PRINTBUFSIZE 16384
 
-static void CommunicationServer();
+static void CommunicationServer(int withDelayMs);
 extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
-void ConverseInitPE(void);
+static void ConverseRunPE(int everReturn);
 void CmiYield();
+void ConverseCommonExit(void);
 
 /****************************************************************************
  *
@@ -284,18 +263,34 @@ int n;
   exit(1);
 }
 
-static void KillOnAllSigs(int dummy)
+static void KillOnAllSigs(int sigNo)
 {
   char _s[100];
-  sprintf(_s, "[%d] Node program received signal\n", CmiMyPe());
+  const char *sig=" received signal";
+  if (sigNo==SIGSEGV) sig=": segmentation violation.\nDid you dereference a null pointer?";
+  if (sigNo==SIGFPE) sig=": floating point exception.\nDid you divide by zero?";
+  if (sigNo==SIGILL) sig=": illegal instruction";
+  if (sigNo==SIGBUS) sig=": bus error";
+  if (sigNo==SIGKILL) sig=": caught signal KILL";
+  if (sigNo==SIGQUIT) sig=": caught signal QUIT";
+  
+  sprintf(_s, "ERROR> Node program on PE %d%s\n", CmiMyPe(),sig);
   host_abort(_s);
   exit(1);
 }
 
+#ifndef _WIN32
 static void HandleUserSignals(int signum)
 {
   int condnum = ((signum==SIGUSR1) ? CcdSIGUSR1 : CcdSIGUSR2);
   CcdRaiseCondition(condnum);
+}
+#endif
+
+static void PerrorExit(const char *msg)
+{
+  perror(msg);
+  exit(1);
 }
 
 static void KillOnSIGPIPE(int dummy)
@@ -308,60 +303,21 @@ static void KillOnSIGPIPE(int dummy)
 /*****************************************************************************
  *
  *     Utility routines for network machine interface.
- *
- *
- * zap_newline(char *s)
- *
- *   - Remove the '\n' from the end of a string.
- *
- * char *skipblanks(char *s)
- *
- *   - advance pointer over blank characters
- *
- * char *skipstuff(char *s)
- *
- *   - advance pointer over nonblank characters
- *
- * char *strdupl(char *s)
- *
- *   - return a freshly-allocated duplicate of a string
- *
+*
  *****************************************************************************/
-
-static void zap_newline(s) char *s;
-{
-  char *p;
-  p = s + strlen(s)-1;
-  if (*p == '\n') *p = '\0';
-}
-
-static char *skipblanks(p) char *p;
-{
-  while ((*p==' ')||(*p=='\t')||(*p=='\n')) p++;
-  return p;
-}
-
-static char *skipstuff(p) char *p;
-{
-  while ((*p)&&(*p!=' ')&&(*p!='\t')) p++;
-  return p;
-}
-
-static char *strdupl(s) char *s;
-{
-  int len = strlen(s);
-  char *res = (char *)malloc(len+1);
-  _MEMCHECK(res);
-  strcpy(res, s);
-  return res;
-}
 
 double GetClock()
 {
+#ifdef _WIN32
+  struct _timeb tv; 
+  _ftime(&tv);
+  return (tv.time * 1.0 + tv.millitm * 1.0E-3);
+#else
   struct timeval tv; int ok;
   ok = gettimeofday(&tv, NULL);
   if (ok<0) { perror("gettimeofday"); KillEveryoneCode(9343112); }
   return (tv.tv_sec * 1.0 + tv.tv_usec * 1.0E-6);
+#endif
 }
 
 char *CopyMsg(char *msg, int len)
@@ -371,16 +327,6 @@ char *CopyMsg(char *msg, int len)
       fprintf(stderr, "Out of memory\n");
   memcpy(copy, msg, len);
   return copy;
-}
-
-static char *parseint(p, value) char *p; int *value;
-{
-  int val = 0;
-  while (((*p)==' ')||((*p)=='.')) p++;
-  if (((*p)<'0')||((*p)>'9')) KillEveryone("badly-formed number");
-  while ((*p>='0')&&(*p<='9')) { val*=10; val+=(*p)-'0'; p++; }
-  *value = val;
-  return p;
 }
 
 static char *DeleteArg(argv)
@@ -399,205 +345,17 @@ static int CountArgs(char **argv)
   return count;
 }
 
-
-static void jsleep(int sec, int usec)
+static char** CopyArgs(char **argv) 
 {
-  int ntimes,i;
-  struct timeval tm;
+	int  i, count;
+	char **tmp;
+	
+	count = CountArgs(argv);
+	tmp   = (char **) malloc(sizeof(char *)*(count+1));
+	for (i=0; i <= count; i++)
+		tmp[i] = argv[i];
 
-  ntimes = sec*200 + usec/5000;
-  for(i=0;i<ntimes;i++) {
-    tm.tv_sec = 0;
-    tm.tv_usec = 5000;
-    while(1) {
-      if (select(0,NULL,NULL,NULL,&tm)==0) break;
-      if ((errno!=EBADF)&&(errno!=EINTR)) return;
-    }
-  }
-}
-
-void writeall(int fd, char *buf, int size)
-{
-  int ok;
-  while (size) {
-    retry:
-    CmiYield();
-    ok = write(fd, buf, size);
-    if ((ok<0)&&((errno==EBADF)||(errno==EINTR))) goto retry;
-    if (ok<=0) {
-      fprintf(stderr, "Write failed ..\n");
-      KillOnSIGPIPE(0);
-    }
-    size-=ok; buf+=ok;
-  }
-}
-
-static int wait_readable(fd, sec) int fd; int sec;
-{
-  fd_set rfds;
-  struct timeval tmo;
-  int begin, nreadable;
-  
-  begin = time(0);
-  FD_ZERO(&rfds);
-  FD_SET(fd, &rfds);
-  while(1) {
-    tmo.tv_sec = (time(0) - begin) + sec;
-    tmo.tv_usec = 0;
-    nreadable = select(FD_SETSIZE, &rfds, NULL, NULL, &tmo);
-    if ((nreadable<0)&&((errno==EINTR)||(errno==EBADF))) continue;
-    if (nreadable == 0) { errno=ETIMEDOUT; return -1; }
-    return 0;
-  }
-}
-
-/**************************************************************************
- *
- * SKT - socket routines
- *
- *
- * void skt_server(unsigned int *ppo, unsigned int *pfd)
- *
- *   - create a tcp server socket.  Performs the whole socket/bind/listen
- *     procedure.  Returns the the port of the socket and the file descriptor.
- *
- * void skt_datagram(unsigned int *ppo, unsigned int *pfd, int bufsize)
- *
- *   - creates a UDP datagram socket.  Performs the whole socket/bind/
- *     getsockname procedure.  Returns the port of the socket and
- *     the file descriptor.  Bufsize, if nonzero, controls the amount
- *     of buffer space the kernel sets aside for the socket.
- *
- * void skt_accept(int src,
- *                 unsigned int *pip, unsigned int *ppo, unsigned int *pfd)
- *
- *   - accepts a connection to the specified socket.  Returns the
- *     IP of the caller, the port number of the caller, and the file
- *     descriptor to talk to the caller.
- *
- * int skt_connect(unsigned int ip, int port, int timeout)
- *
- *   - Opens a connection to the specified server.  Returns a socket for
- *     communication.
- *
- *
- **************************************************************************/
-
-static void skt_server(ppo, pfd)
-unsigned int *ppo;
-unsigned int *pfd;
-{
-  int fd= -1;
-  int ok, len;
-  struct sockaddr_in addr;
-  
-retry:
-  CmiYield();
-  fd = socket(PF_INET, SOCK_STREAM, 0);
-  if ((fd<0)&&((errno==EINTR)||(errno==EBADF))) goto retry;
-  if (fd < 0) { perror("socket 1"); KillEveryoneCode(93483); }
-  memset(&addr, 0, sizeof(addr));
-  addr.sin_family = AF_INET;
-  ok = bind(fd, (struct sockaddr *)&addr, sizeof(addr));
-  if (ok < 0) { perror("bind"); KillEveryoneCode(22933); }
-  ok = listen(fd,5);
-  if (ok < 0) { perror("listen"); KillEveryoneCode(3948); }
-  len = sizeof(addr);
-  ok = getsockname(fd, (struct sockaddr *)&addr, &len);
-  if (ok < 0) { perror("getsockname"); KillEveryoneCode(93583); }
-
-  *pfd = fd;
-  *ppo = ntohs(addr.sin_port);
-}
-
-static void skt_datagram(ppo, pfd, bufsize)
-unsigned int *ppo;
-unsigned int *pfd;
-unsigned int  bufsize;
-{
-  struct sockaddr_in name;
-  int length, ok, skt;
-  
-  /* Create data socket */
-retry:
-  CmiYield();
-  skt = socket(AF_INET,SOCK_DGRAM,0);
-  if ((skt<0)&&((errno==EINTR)||(errno==EBADF))) goto retry;
-  if (skt < 0)
-    { perror("socket 2"); KillEveryoneCode(8934); }
-  name.sin_family = AF_INET;
-  name.sin_port = 0;
-  name.sin_addr.s_addr = htonl(INADDR_ANY);
-  if (bind(skt, (struct sockaddr *)&name, sizeof(name)) == -1)
-    { perror("binding data socket"); KillEveryoneCode(2983); }
-  length = sizeof(name);
-  if (getsockname(skt, (struct sockaddr *)&name , &length))
-    { perror("getting socket name"); KillEveryoneCode(39483); }
-
-  if (bufsize) {
-    int len = sizeof(int);
-    ok = setsockopt(skt, SOL_SOCKET , SO_RCVBUF , (char *)&bufsize, len);
-    if (ok < 0) { perror("setsockopt 1"); KillEveryoneCode(35782); }
-    ok = setsockopt(skt, SOL_SOCKET , SO_SNDBUF , (char *)&bufsize, len);
-    if (ok < 0) { perror("setsockopt 2"); KillEveryoneCode(35783); }
-  }     
-
-  *pfd = skt;
-  *ppo = htons(name.sin_port);
-}
-
-static void skt_accept(src, pip, ppo, pfd)
-int src;
-unsigned int *pip;
-unsigned int *ppo;
-unsigned int *pfd;
-{
-  int i, fd, ok;
-  struct sockaddr_in remote;
-  i = sizeof(remote);
- acc:
-  CmiYield();
-  fd = accept(src, (struct sockaddr *)&remote, &i);
-  if ((fd<0)&&((errno==EINTR)||(errno==EBADF)||(errno==EPROTO))) goto acc;
-  if (fd<0) { perror("accept"); KillEveryoneCode(39489); }
-  *pip=htonl(remote.sin_addr.s_addr);
-  *ppo=htons(remote.sin_port);
-  *pfd=fd;
-}
-
-int skt_connect(ip, port, seconds)
-unsigned int ip; int port; int seconds;
-{
-  struct sockaddr_in remote; short sport=port;
-  int fd, ok, len, retry, begin;
-    
-  /* create an address structure for the server */
-  memset(&remote, 0, sizeof(remote));
-  remote.sin_family = AF_INET;
-  remote.sin_port = htons(sport);
-  remote.sin_addr.s_addr = htonl(ip);
-    
-  begin = time(0); ok= -1;
-  while (time(0)-begin < seconds) {
-  sock:
-    fd = socket(AF_INET, SOCK_STREAM, 0);
-    if ((fd<0)&&((errno==EINTR)||(errno==EBADF))) goto sock;
-    if (fd < 0) KillEveryone("skt_connect failure");
-    
-  conn:
-    ok = connect(fd, (struct sockaddr *)&(remote), sizeof(remote));
-    if (ok>=0) break;
-    close(fd);
-    switch (errno) {
-    case EINTR: case EBADF: case EALREADY: case EISCONN:break;
-    case ECONNREFUSED: jsleep(1,0); break;
-    case EADDRINUSE: jsleep(1,0); break;
-    case EADDRNOTAVAIL: jsleep(1,0); break;
-    default: return -1;
-    }
-  }
-  if (ok<0) return -1;
-  return fd;
+	return tmp;
 }
 
 /*****************************************************************************
@@ -834,7 +592,7 @@ typedef struct ImplicitDgramStruct
 typedef struct OtherNodeStruct
 {
   int nodestart, nodesize;
-  unsigned int IP, dataport, ctrlport;
+  unsigned int IP, dataport;
   struct sockaddr_in addr;
 
   double                   send_primer;  /* time to send primer packet */
@@ -954,23 +712,16 @@ static OutgoingMsg   Cmi_freelist_outgoing;
  *
  *****************************************************************************/
 
-
-int               Cmi_numpes;    /* Total number of processors */
-int               Cmi_mynodesize;/* Number of processors in my address space */
 int               Cmi_mynode;    /* Which address space am I */
+int               Cmi_mynodesize;/* Number of processors in my address space */
 int               Cmi_numnodes;  /* Total number of address spaces */
+int               Cmi_numpes;    /* Total number of processors */
 static int        Cmi_nodestart; /* First processor in this address space */
-static CmiStartFn Cmi_startfn;   /* The start function */
-static int        Cmi_usrsched;  /* Continue after start function finishes? */
-static char     **Cmi_argv;
 static int        Cmi_host_IP;
 static int        Cmi_self_IP;
 static int        Cmi_host_port;
 static int        Cmi_host_pid;
-static char       Cmi_host_IP_str[16];
-static char       Cmi_self_IP_str[16];
 static int        Cmi_host_fd;
-
 static int    Cmi_max_dgram_size;
 static int    Cmi_os_buffer_size;
 static int    Cmi_window_size;
@@ -1069,20 +820,14 @@ static void parse_netstart()
   int nread;
   ns = getenv("NETSTART");
   if (ns==0) goto abort;
-  nread = sscanf(ns, "%d%d%d%d%d%d%d%d",
-		 &Cmi_numnodes, &Cmi_mynode,
-		 &Cmi_nodestart, &Cmi_mynodesize, &Cmi_numpes,
-		 &Cmi_self_IP, &Cmi_host_IP, &Cmi_host_port, &Cmi_host_pid);
-  if (nread!=8) goto abort;
-  sprintf(Cmi_self_IP_str,"%d.%d.%d.%d",
-	  (Cmi_self_IP>>24)&0xFF,(Cmi_self_IP>>16)&0xFF,
-	  (Cmi_self_IP>>8)&0xFF,Cmi_self_IP&0xFF);
-  sprintf(Cmi_host_IP_str,"%d.%d.%d.%d",
-	  (Cmi_host_IP>>24)&0xFF,(Cmi_host_IP>>16)&0xFF,
-	  (Cmi_host_IP>>8)&0xFF,Cmi_host_IP&0xFF);
+  nread = sscanf(ns, "%d%d%d%d",
+		 &Cmi_mynode,&Cmi_host_IP, &Cmi_host_port, &Cmi_host_pid);
+  
+  if (nread!=4) goto abort;
   return;
  abort:
-  KillEveryone("program not started using 'conv-host' utility. aborting.\n");
+  fprintf(stderr,"You must run this program with 'conv-host <progName> <args>'.\n");
+  exit(1);
 }
 
 static void extract_args(argv)
@@ -1206,10 +951,9 @@ void printLog(void)
  *
  *****************************************************************************/
 
-static int        ctrlport, dataport, ctrlskt, dataskt;
+static int       dataport, dataskt;
 
 static CmiNodeLock    Cmi_scanf_mutex;
-static volatile char *Cmi_scanf_data;
 static double         Cmi_clock;
 static double         Cmi_check_last = 0.0;
 static double         Cmi_check_delay = 3.0;
@@ -1226,37 +970,32 @@ static double         Cmi_check_delay = 3.0;
  ***************************************************************************/
 
 static int ctrlskt_ready_read;
-static int ctrlskt_ready_write;
 static int dataskt_ready_read;
 static int dataskt_ready_write;
 
-void CheckSocketsReady()
+void CheckSocketsReady(int withDelayMs)
 {
   static fd_set rfds; 
   static fd_set wfds; 
   struct timeval tmo;
   int nreadable;
   
+  FD_SET(Cmi_host_fd, &rfds);
   FD_SET(dataskt, &rfds);
-  FD_SET(ctrlskt, &rfds);
   FD_SET(dataskt, &wfds);
-  FD_SET(ctrlskt, &wfds);
   tmo.tv_sec = 0;
-  tmo.tv_usec = 0;
+  tmo.tv_usec = withDelayMs*1000;
   nreadable = select(FD_SETSIZE, &rfds, &wfds, NULL, &tmo);
   if (nreadable <= 0) {
     ctrlskt_ready_read = 0;
-    ctrlskt_ready_write = 0;
     dataskt_ready_read = 0;
     dataskt_ready_write = 0;
     return;
   }
-  ctrlskt_ready_read = (FD_ISSET(ctrlskt, &rfds));
+  ctrlskt_ready_read = (FD_ISSET(Cmi_host_fd, &rfds));
   dataskt_ready_read = (FD_ISSET(dataskt, &rfds));
-  ctrlskt_ready_write = (FD_ISSET(ctrlskt, &wfds));
   dataskt_ready_write = (FD_ISSET(dataskt, &wfds));
 }
-
 /******************************************************************************
  *
  * OS Threads
@@ -1281,9 +1020,7 @@ void CheckSocketsReady()
  *    that calls CmiStartThreads), as well as the communication
  *    thread.  Each processor thread (other than 0) must call ConverseInitPE
  *    followed by Cmi_startfn.  The communication thread must be an infinite
- *    loop that calls the function CommunicationServer over and over,
- *    with a short delay between each call (ideally, the delay should end
- *    when a datagram arrives or when somebody notifies: see below).
+ *    loop that calls the function CommunicationServer over and over.
  *
  * CmiGetState()
  *
@@ -1309,7 +1046,164 @@ void CheckSocketsReady()
  *    The usual.  Implemented here, since a highly-optimized version
  *    is possible in the nonthreaded case.
  *
+
+  
+  FIXME: There is horrible duplication of code (e.g. locking code)
+   both here and in converse.h.  It could be much shorter.  OSL 9/9/2000
+
  *****************************************************************************/
+
+#if CMK_SHARED_VARS_NT_THREADS
+
+static HANDLE memmutex;
+void CmiMemLock() { WaitForSingleObject(memmutex, INFINITE); }
+void CmiMemUnlock() { ReleaseMutex(memmutex); }
+
+static DWORD Cmi_state_key = 0xFFFFFFFF;
+static CmiState     Cmi_state_vector = 0;
+
+CmiState CmiGetState()
+{
+    CmiState result = 0;
+
+  if(Cmi_state_key == 0xFFFFFFFF) return 0;
+  
+  result = (CmiState)TlsGetValue(Cmi_state_key);
+  if(result == 0) PerrorExit("CmiGetState: TlsGetValue");
+  return result;
+}
+
+int CmiMyPe()
+{  
+  CmiState result = 0;
+
+  if(Cmi_state_key == 0xFFFFFFFF) return -1;
+  result = (CmiState)TlsGetValue(Cmi_state_key);
+
+  if(result == 0) PerrorExit("CmiMyPe: TlsGetValue");
+
+  return result->pe;
+}
+
+int CmiMyRank()
+{
+  CmiState result = 0;
+
+  if(Cmi_state_key == 0xFFFFFFFF) return 0;
+  result = (CmiState)TlsGetValue(Cmi_state_key);
+  if(result == 0) PerrorExit("CmiMyRank: TlsGetValue");
+  return result->rank;
+}
+
+int CmiNodeFirst(int node) { return nodes[node].nodestart; }
+int CmiNodeSize(int node)  { return nodes[node].nodesize; }
+int CmiNodeOf(int pe)      { return (nodes_by_pe[pe] - nodes); }
+int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe]->nodestart); }
+
+CmiNodeLock CmiCreateLock()
+{
+  HANDLE hMutex = CreateMutex(NULL, FALSE, NULL);
+  return hMutex;
+}
+
+void CmiDestroyLock(CmiNodeLock lk)
+{
+  CloseHandle(lk);
+}
+
+void CmiYield() 
+{ 
+  Sleep(0);
+}
+
+#define CmiGetStateN(n) (Cmi_state_vector+(n))
+
+static HANDLE comm_mutex;
+#define CmiCommLock() (WaitForSingleObject(comm_mutex, INFINITE))
+#define CmiCommUnlock() (ReleaseMutex(comm_mutex))
+
+static DWORD WINAPI comm_thread(LPVOID dummy)
+{  
+  while (1) CommunicationServer(500);
+  return 0;//should never get here
+}
+
+static DWORD WINAPI call_startfn(LPVOID vindex)
+{
+  int index = (int)vindex;
+ 
+  CmiState state = Cmi_state_vector + index;
+  if(Cmi_state_key == 0xFFFFFFFF) PerrorExit("TlsAlloc");
+  if(TlsSetValue(Cmi_state_key, (LPVOID)state) == 0) PerrorExit("TlsSetValue");
+
+  ConverseRunPE(0);
+  return 0;
+}
+
+
+/*Classic sense-reversing barrier algorithm.
+FIXME: This should be the barrier implementation for 
+all thread types.
+*/
+static HANDLE barrier_mutex;
+static volatile int    barrier_wait[2] = {0,0};
+static volatile int    barrier_which = 0;
+
+void  CmiNodeBarrier(void)
+{
+  int doWait = 1;
+  int which;
+
+  WaitForSingleObject(barrier_mutex, INFINITE);
+  which=barrier_which;
+  barrier_wait[which]++;
+  if (barrier_wait[which] == Cmi_mynodesize) {
+    barrier_which = !which;
+    barrier_wait[barrier_which] = 0;/*Reset new counter*/
+    doWait = 0;
+  }
+  ReleaseMutex(barrier_mutex);
+
+  if (doWait)
+      while(barrier_wait[which] != Cmi_mynodesize)
+		  sleep(0);/*<- could also just spin here*/
+}
+
+static void CmiStartThreads()
+{
+  int     i;
+  DWORD   threadID;
+  HANDLE  thr;
+  int     val = 0;
+
+  comm_mutex = CmiCreateLock();
+  memmutex = CmiCreateLock();
+  barrier_mutex = CmiCreateLock();
+
+  Cmi_state_key = TlsAlloc();
+  if(Cmi_state_key == 0xFFFFFFFF) PerrorExit("TlsAlloc main");
+  
+  Cmi_state_vector =
+    (CmiState)calloc(Cmi_mynodesize, sizeof(struct CmiStateStruct));
+  
+  for (i=0; i<Cmi_mynodesize; i++)
+    CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
+  
+  for (i=1; i<Cmi_mynodesize; i++) {
+    if((thr = CreateThread(NULL, 0, call_startfn, (LPVOID)i, 0, &threadID)) 
+       == NULL) PerrorExit("CreateThread");
+    CloseHandle(thr);
+  }
+  
+  if(TlsSetValue(Cmi_state_key, (LPVOID)Cmi_state_vector) == 0) 
+    PerrorExit("TlsSetValue");
+  
+  if((thr = CreateThread(NULL, 0, comm_thread, 0, 0, &threadID)) == NULL) 
+     PerrorExit("CreateThread");
+  CloseHandle(thr);
+}
+
+#endif
 
 #if CMK_SHARED_VARS_SUN_THREADS
 
@@ -1387,19 +1281,7 @@ static mutex_t comm_mutex;
 
 static void comm_thread(void)
 {
-  struct timeval tmo; fd_set rfds;
-  while (1) {
-    CmiCommLock();
-    CommunicationServer();
-    CmiCommUnlock();
-    tmo.tv_sec = 0;
-    tmo.tv_usec = Cmi_tickspeed;
-    FD_ZERO(&rfds);
-    FD_SET(dataskt, &rfds);
-    FD_SET(ctrlskt, &rfds);
-    select(FD_SETSIZE, &rfds, 0, 0, &tmo);
-  }
-  /* thr_exit(0); */
+  while (1) CommunicationServer(500);
 }
 
 static void *call_startfn(void *vindex)
@@ -1407,11 +1289,7 @@ static void *call_startfn(void *vindex)
   int index = (int)vindex;
   CmiState state = Cmi_state_vector + index;
   thr_setspecific(Cmi_state_key, state);
-  ConverseInitPE();
-  Cmi_startfn(CountArgs(Cmi_argv), Cmi_argv);
-  if (Cmi_usrsched == 0) CsdScheduler(-1);
-  ConverseExit();
-  thr_exit(0);
+  ConverseRunPE(0);
 }
 
 static void CmiStartThreads()
@@ -1427,11 +1305,11 @@ static void CmiStartThreads()
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
   for (i=1; i<Cmi_mynodesize; i++) {
     ok = thr_create(0, 256000, call_startfn, (void *)i, THR_DETACHED|THR_BOUND, &pid);
-    if (ok<0) { perror("thr_create"); exit(1); }
+    if (ok<0) PerrorExit("thr_create");
   }
   thr_setspecific(Cmi_state_key, Cmi_state_vector);
   ok = thr_create(0, 256000, (void *(*)(void *))comm_thread, 0, 0, &pid);
-  if (ok<0) { perror("thr_create"); exit(1); }
+  if (ok<0) PerrorExit("thr_create comm");
 }
 
 #endif
@@ -1513,19 +1391,7 @@ static pthread_mutex_t comm_mutex;
 
 static void comm_thread(void)
 {
-  struct timeval tmo; fd_set rfds;
-  while (1) {
-    CmiCommLock();
-    CommunicationServer();
-    CmiCommUnlock();
-    tmo.tv_sec = 0;
-    tmo.tv_usec = Cmi_tickspeed;
-    FD_ZERO(&rfds);
-    FD_SET(dataskt, &rfds);
-    FD_SET(ctrlskt, &rfds);
-    select(FD_SETSIZE, &rfds, 0, 0, &tmo);
-  }
-  pthread_exit(0);
+  while (1) CommunicationServer(500);
 }
 
 static void *call_startfn(void *vindex)
@@ -1533,11 +1399,8 @@ static void *call_startfn(void *vindex)
   int index = (int)vindex;
   CmiState state = Cmi_state_vector + index;
   pthread_setspecific(Cmi_state_key, state);
-  ConverseInitPE();
-  Cmi_startfn(CountArgs(Cmi_argv), Cmi_argv);
-  if (Cmi_usrsched == 0) CsdScheduler(-1);
-  ConverseExit();
-  pthread_exit(0);
+  ConverseRunPE(0);
+  return 0;
 }
 
 static void CmiStartThreads()
@@ -1553,11 +1416,11 @@ static void CmiStartThreads()
     CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
   for (i=1; i<Cmi_mynodesize; i++) {
     ok = pthread_create(&pid, NULL, call_startfn, (void *)i);
-    if (ok<0) { perror("pthread_create"); exit(1); }
+    if (ok<0) PerrorExit("pthread_create"); 
   }
   pthread_setspecific(Cmi_state_key, Cmi_state_vector);
   ok = pthread_create(&pid, NULL, (void *(*)(void *))comm_thread, 0);
-  if (ok<0) { perror("pthread_create"); exit(1); }
+  if (ok<0) PerrorExit("pthread_create comm"); 
 }
 
 #endif
@@ -1578,7 +1441,7 @@ static int comm_flag;
 #define CmiCommLock() (comm_flag=1)
 #define CmiCommUnlock() (comm_flag=0)
 
-void CmiYield() { jsleep(0,100); }
+void CmiYield() { sleep(0); }
 
 int interruptFlag;
 
@@ -1589,9 +1452,7 @@ static void CommunicationInterrupt(int arg)
   if (comm_flag) return;
   if (memflag) return;
   nodes[CmiMyNode()].stat_proc_intr++;
-  interruptFlag = 109;
-  CommunicationServer();
-  interruptFlag = 0;
+  CommunicationServer(0);
 }
 
 static void CmiStartThreads()
@@ -1611,9 +1472,11 @@ static void CmiStartThreads()
 #else
   CmiSignal(SIGALRM, SIGIO, 0, CommunicationInterrupt);
   CmiEnableAsyncIO(dataskt);
-  CmiEnableAsyncIO(ctrlskt);
+  CmiEnableAsyncIO(Cmi_host_fd);
 #endif
   
+  /*This will send us a SIGALRM every Cmi_tickspeed microseconds,
+  which will call the CommunicationInterrupt routine above.*/
   i.it_interval.tv_sec = 0;
   i.it_interval.tv_usec = Cmi_tickspeed;
   i.it_value.tv_sec = 0;
@@ -1624,137 +1487,100 @@ static void CmiStartThreads()
 #endif
 
 CpvDeclare(void *, CmiLocalQueue);
-static char ctrl_sendone_buffer[PRINTBUFSIZE];
 CpvStaticDeclare(char *, internal_printf_buffer);
 
 /****************************************************************************
  *
  * ctrl_sendone
  *
- * Careful, don't call this from inside the communication thread,
- * you'll mess up the communications mutex.
+ * Careful, don't call the locking version from inside the 
+ * communication thread, you'll mess up the communications mutex.
  *
  ****************************************************************************/
 
-static void ctrl_sendone(va_alist) va_dcl
+static void sendone_abort_fn(int code,const char *msg) {
+	fprintf(stderr,"Socket error %d in ctrl_sendone! %s\n",code,msg);
+	exit(1);
+}
+
+static void ctrl_sendone_nolock(const char *type,
+				const char *data1,int dataLen1,
+				const char *data2,int dataLen2)
 {
-  char *f; int fd, delay; char c;
-  char *buffer = ctrl_sendone_buffer;
-  va_list p;
-  va_start(p);
-  delay = va_arg(p, int);
-  f = va_arg(p, char *);
+  ChMessageHeader hdr;
+  ChMessageHeader_new(type,dataLen1+dataLen2,&hdr);
+  skt_sendN(Cmi_host_fd,(const unsigned char *)&hdr,sizeof(hdr));
+  if (dataLen1>0)
+    skt_sendN(Cmi_host_fd,(const unsigned char *)data1,dataLen1);
+  if (dataLen2>0)
+    skt_sendN(Cmi_host_fd,(const unsigned char *)data2,dataLen2);
+}
+
+static void ctrl_sendone_locking(const char *type,
+				const char *data1,int dataLen1,
+				const char *data2,int dataLen2)
+{
   CmiCommLock();
-  vsprintf(buffer, f, p);
-  writeall(Cmi_host_fd, buffer, strlen(buffer)+1);
+  skt_set_abort(sendone_abort_fn);
+  ctrl_sendone_nolock(type,data1,dataLen1,data2,dataLen2);
   CmiCommUnlock();
 }
 
+static void ignore_further_errors(int c,const char *msg) {exit(2);}
 static void host_abort(const char *s)
 {
-  char *buffer = ctrl_sendone_buffer;
-  sprintf(buffer, "abort %s", s);
-  writeall(Cmi_host_fd, buffer, strlen(buffer)+1);
+  skt_set_abort(ignore_further_errors);
+  ctrl_sendone_nolock("abort",s,strlen(s)+1,NULL,0);
 }
 
 /****************************************************************************
  *
  * ctrl_getone
  *
- * This is handled only by the communication interrupt.
+ * This is handled only by the communications thread.
  *
  ****************************************************************************/
 
-static void node_addresses_store();
-
-#if CMK_CCS_AVAILABLE
-static CmiNodeLock ccs_mutex;
-extern int strHandlerID;
-static void *ccs_request_q;
-static int stateAvailable;
-typedef struct CcsRequestNode {
-  char *ptr;
-  int pe;
-} *CcsRequest;
-#endif
-
-#if CMK_WEB_MODE
-extern int appletFd;
-#endif
 
 static void ctrl_getone()
 {
-  char line[10000];
-  int ok, ip, port, fd;  FILE *f;
-#if CMK_WEB_MODE
-  char hndlrId[100];
-  int dont_close = 0;
-  int svrip, svrport;
-#endif
+  ChMessage msg;
+  ChMessage_recv(Cmi_host_fd,&msg);
 
-  skt_accept(ctrlskt, &ip, &port, &fd);
-  f = fdopen(fd,"r");
-  while (fgets(line, 9999, f)) {
-    if (strncmp(line,"aval addr ",10)==0) {
-      node_addresses_store(line);
-    }
-    else if (strncmp(line,"scanf-data ",11)==0) {
-      Cmi_scanf_data=strdupl(line+11);
+  if (strcmp(msg.header.type,"die")==0) {
+    fprintf(stderr,"aborting: %s\n",msg.data);
+    log_done();
+    ConverseCommonExit();
+    exit(0);
 #if CMK_CCS_AVAILABLE
-    } else if (strncmp(line, "req ", 4)==0) {
-      char cmd[5], *msg;
-      int pe, size, len;
-#if CMK_WEB_MODE   
-      sscanf(line, "%s%d%d%d%d%s", cmd, &pe, &size, &svrip, &svrport, hndlrId);
-      if(strcmp(hndlrId, "MonitorHandler") == 0) {
-	appletFd = fd;
-	dont_close = 1;
-      }
-#else
-      sscanf(line, "%s%d%d", cmd, &pe, &size);
+  } else if (strcmp(msg.header.type, "req_fw")==0) {
+    CcsImplHeader *hdr=(CcsImplHeader *)msg.data;
+	/*Sadly, I *can't* do a:
+      CcsImpl_netRequest(hdr,msg.data+sizeof(CcsImplHeader));
+	here, because I can't send converse messages in the
+	communcation thread.  I *can* poke this message into 
+	any convenient processor's queue, though:  (OSL, 9/14/2000)
+	*/
+	int pe=0;/*<- node-local processor number. Any one will do.*/
+	char *cmsg=CcsImpl_ccs2converse(hdr,msg.data+sizeof(CcsImplHeader),NULL);
+	PCQueuePush(CmiGetStateN(pe)->recv,cmsg);
 #endif
-      len = strlen(line);
-      msg = (char *) CmiAlloc(len+size+CmiMsgHeaderSizeBytes+1);
-      if (!msg)
-        CmiPrintf("%d: Out of mem\n", Cmi_mynode);
-      CmiSetHandler(msg, strHandlerID);
-      strcpy(msg+CmiMsgHeaderSizeBytes, line);
-      fread(msg+CmiMsgHeaderSizeBytes+len, 1, size, f);
-      msg[CmiMsgHeaderSizeBytes+len+size] = '\0';
-      CmiLock(ccs_mutex);
-      if(stateAvailable < Cmi_mynodesize){
-	CcsRequest qmsg = (CcsRequest)malloc(sizeof(struct CcsRequestNode));
-        _MEMCHECK(qmsg);
-	qmsg->ptr = msg;
-	qmsg->pe = pe;
-	FIFO_EnQueue(ccs_request_q, qmsg);
-      } else {
-	PCQueuePush(CmiGetStateN(pe)->recv, msg);
-      }
-      CmiUnlock(ccs_mutex);
-
-#if CMK_USE_PERSISTENT_CCS
-      if(dont_close == 1) break;
-#endif
-
-#endif
-    } else if (strncmp(line,"die ",4)==0) {
-      fprintf(stderr,"aborting: %s\n",line+4);
-      log_done();
-      ConverseCommonExit();
-      exit(0);
-    }
-    else KillEveryoneCode(2932);
-  }
-#if CMK_WEB_MODE
-  if(dont_close==0) {
-#endif
-    fclose(f);
-    close(fd);
-#if CMK_WEB_MODE
-  }
-#endif
+  } else /*Unrecognized message header type*/ 
+    KillEveryoneCode(2932);
+  
+  ChMessage_free(&msg);
 }
+
+#if CMK_CCS_AVAILABLE
+/*Deliver this reply data to this reply socket.
+  The data is forwarded to CCS server via conv-host.*/
+void CcsImpl_reply(SOCKET replFd,int repLen,const char *repData)
+{
+  ChMessageInt_t skt=ChMessageInt_new(replFd);
+  ctrl_sendone_locking("reply_fw",(const char *)&skt,sizeof(skt),
+		       repData,repLen);  
+}
+#endif
 
 /*****************************************************************************
  *
@@ -1766,64 +1592,84 @@ static void ctrl_getone()
  *   This node, like all others, first sends its own address to the host
  *   using this command:
  *
- *     aset addr <my-nodeno> <ip-addr>.<ctrlport>.<dataport>.<nodestart>.<nodesize>
+ *     Type: nodeinfo
+ *     Data: Big-endian 4-byte ints
+ *           <my-node #><Dataport>
  *
- *   Then requests all addresses from the host using this command:
+ *   When the host has all the addresses, he sends this table to me:
  *
- *     aget <my-ip-addr> <my-ctrlport> addr 0 <numnodes>
- *
- *   when the host has all the addresses, he sends a table to me:
- *
- *     aval addr <ip-addr-0>.<ctrlport-0>.<dataport-0> ...
+ *     Type: nodes
+ *     Data: Big-endian 4-byte ints
+ *           <number of nodes n>
+ *           <#PEs><IP><Dataport> Node 0
+ *           <#PEs><IP><Dataport> Node 1
+ *           ...
+ *           <#PEs><IP><Dataport> Node n-1
  *
  *****************************************************************************/
 
+static void node_addresses_store(ChMessage *msg);
+
+/*Note: node_addresses_obtain is called before starting
+  threads, so no locks are needed (or valid!)*/
 static void node_addresses_obtain()
 {
-  ctrl_sendone(120, "aset addr %d %s.%d.%d.%d.%d",
-	       Cmi_mynode, Cmi_self_IP_str, ctrlport, dataport,
-	       Cmi_nodestart, Cmi_mynodesize);
-  ctrl_sendone(120, "aget %s %d addr 0 %d",
-	       Cmi_self_IP_str,ctrlport,Cmi_numnodes-1);
-  while (nodes == 0) {
-    if (wait_readable(ctrlskt, 60*Cmi_numnodes)<0)
-      KillEveryoneCode(21323);
-    ctrl_getone();
-  }
+  ChMessageInt_t info[2]; /*Info. about my node for conv-host*/
+  int infoLen=2*sizeof(ChMessageInt_t);
+  ChMessage nodetabmsg; /*Reply, info about all nodes*/
+  info[0]=ChMessageInt_new(Cmi_mynode);
+  info[1]=ChMessageInt_new(dataport);
+
+  /*Send our node info. to conv-host.
+  CommLock hasn't been initialized yet-- 
+  use non-locking version*/  
+  ctrl_sendone_nolock("initnode",(const char *)&info[0],infoLen,NULL,0);
+  
+  /*We get the other node addresses from a message sent
+    back via the conv-host control port.*/
+  if (!skt_select1(Cmi_host_fd,60000)) CmiAbort("Timeout waiting for nodetab!\n");
+  ChMessage_recv(Cmi_host_fd,&nodetabmsg);
+  node_addresses_store(&nodetabmsg);
+  ChMessage_free(&nodetabmsg);
 }
 
-static void node_addresses_store(addrs) char *addrs;
+/* initnode node table reply format:
+ +------------------------------------------------------- 
+ | 4 bytes  |   Number of nodes n                       ^
+ |          |   (big-endian binary integer)       4+12*n bytes
+ +-------------------------------------------------     |
+ ^  |        (one entry for each node)            ^     |
+ |  | 4 bytes  |   Number of PEs for this node    |     |
+ n  | 4 bytes  |   IP address of this node   12*n bytes |
+ |  | 4 bytes  |   Data (UDP) port of this node   |     |
+ v  |          |   (big-endian binary integers)   v     v
+ ---+----------------------------------------------------
+*/
+static void node_addresses_store(ChMessage *msg)
 {
-  char *p, *e; int i, j, lo, hi;
+  ChMessageInt_t *d=(ChMessageInt_t *)msg->data;
+  int nodestart;
+  int i,j;
   OtherNode ntab, *bype;
-  if (strncmp(addrs,"aval addr ",10)!=0) KillEveryoneCode(83473);
+  Cmi_numnodes=ChMessageInt(*d++);
+  if (sizeof(ChMessageInt_t)*(1+3*Cmi_numnodes)!=(unsigned int)msg->len)
+    {printf("Node table has inconsistent length!");abort();}
   ntab = (OtherNode)calloc(Cmi_numnodes, sizeof(struct OtherNodeStruct));
-  p = skipblanks(addrs+10);
-  p = parseint(p,&lo);
-  p = parseint(p,&hi);
-  if ((lo!=0)||(hi!=Cmi_numnodes - 1)) KillEveryoneCode(824793);
+  nodestart=0;
   for (i=0; i<Cmi_numnodes; i++) {
-    unsigned int ip0,ip1,ip2,ip3,cport,dport,nodestart,nodesize,ip;
-    p = parseint(p,&ip0);
-    p = parseint(p,&ip1);
-    p = parseint(p,&ip2);
-    p = parseint(p,&ip3);
-    p = parseint(p,&cport);
-    p = parseint(p,&dport);
-    p = parseint(p,&nodestart);
-    p = parseint(p,&nodesize);
-    ip = (ip0<<24)+(ip1<<16)+(ip2<<8)+ip3;
     ntab[i].nodestart = nodestart;
-    ntab[i].nodesize  = nodesize;
-    ntab[i].IP = ip;
-    ntab[i].ctrlport = cport;
-    ntab[i].dataport = dport;
-    ntab[i].addr.sin_family      = AF_INET;
-    ntab[i].addr.sin_port        = htons(dport);
-    ntab[i].addr.sin_addr.s_addr = htonl(ip);
+    ntab[i].nodesize  = ChMessageInt(*d++);
+    ntab[i].IP = ChMessageInt(*d++);;
+    if (i==Cmi_mynode) {
+      Cmi_nodestart=ntab[i].nodestart;
+      Cmi_mynodesize=ntab[i].nodesize;
+      Cmi_self_IP=ntab[i].IP;
+    }
+    ntab[i].dataport = ChMessageInt(*d++);
+    ntab[i].addr = skt_build_addr(ntab[i].IP,ntab[i].dataport);
+    nodestart+=ntab[i].nodesize;
   }
-  p = skipblanks(p);
-  if (*p!=0) KillEveryoneCode(82283);
+  Cmi_numpes=nodestart;
   bype = (OtherNode*)malloc(Cmi_numpes * sizeof(OtherNode));
   _MEMCHECK(bype);
   for (i=0; i<Cmi_numnodes; i++) {
@@ -1853,20 +1699,21 @@ static void InternalPrintf(f, l) char *f; va_list l;
 {
   char *buffer = CpvAccess(internal_printf_buffer);
   vsprintf(buffer, f, l);
-  ctrl_sendone(120, "print %s", buffer);
+  ctrl_sendone_locking("print", buffer,strlen(buffer)+1,NULL,0);
 }
 
 static void InternalError(f, l) char *f; va_list l;
 {
   char *buffer = CpvAccess(internal_printf_buffer);
   vsprintf(buffer, f, l);
-  ctrl_sendone(120, "printerr %s", buffer);
+  ctrl_sendone_locking("printerr", buffer,strlen(buffer)+1,NULL,0);
 }
 
 static int InternalScanf(fmt, l)
     char *fmt;
     va_list l;
 {
+  ChMessage replymsg;
   char *ptr[20];
   char *p; int nargs, i;
   nargs=0;
@@ -1880,18 +1727,45 @@ static int InternalScanf(fmt, l)
   if (nargs > 18) KillEveryone("CmiScanf only does 18 args.\n");
   for (i=0; i<nargs; i++) ptr[i]=va_arg(l, char *);
   CmiLock(Cmi_scanf_mutex);
-  ctrl_sendone(120, "scanf %s %d %s", Cmi_self_IP_str, ctrlport, fmt);
-  while (Cmi_scanf_data == 0) jsleep(0, 250000);
-  i = sscanf((char*)Cmi_scanf_data, fmt,
+  /*Send conv-host the format string*/
+  ctrl_sendone_locking("scanf", fmt, strlen(fmt)+1,NULL,0);
+  /*Wait for the reply (characters to scan) from conv-host*/
+  CmiCommLock();
+  ChMessage_recv(Cmi_host_fd,&replymsg);
+  i = sscanf((char*)replymsg.data, fmt,
 	     ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
 	     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
 	     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
-  free((char*)Cmi_scanf_data);
-  Cmi_scanf_data=0;
+  ChMessage_free(&replymsg);
+  CmiCommUnlock();
   CmiUnlock(Cmi_scanf_mutex);
   return i;
 }
 
+/*New stdarg.h declarations*/
+void CmiPrintf(const char *fmt, ...)
+{
+  va_list p; va_start(p, fmt);
+  InternalPrintf(fmt, p);
+  va_end(p);
+}
+
+void CmiError(const char *fmt, ...)
+{
+  va_list p; va_start (p, fmt);
+  InternalError(fmt, p);
+  va_end(p);
+}
+
+int CmiScanf(const char *fmt, ...)
+{
+  va_list p; int i; va_start(p, fmt);
+  i = InternalScanf(fmt, p);
+  va_end(p);
+  return i;
+}
+
+#if 0 /*Old varargs.h declarations:  Obsolete?  OSL 9/10/2000*/
 void CmiPrintf(va_alist) va_dcl
 {
   va_list p; char *f; va_start(p); f = va_arg(p, char *);
@@ -1909,7 +1783,7 @@ int CmiScanf(va_alist) va_dcl
   va_list p; char *f; va_start(p); f = va_arg(p, char *);
   return InternalScanf(f, p);
 }
-
+#endif
 
 /******************************************************************************
  *
@@ -1948,9 +1822,9 @@ void DiscardImplicitDgram(ImplicitDgram dg)
  * packets, mark packets as received, etc. This system also prevents
  * multiple retransmissions/acks when acks are lost.
  ***********************************************************************/
-int TransmitAckDatagram(OtherNode node)
+void TransmitAckDatagram(OtherNode node)
 {
-  DgramAck ack; unsigned int i, seqno, slot; ExplicitDgram dg;
+  DgramAck ack; int i, seqno, slot; ExplicitDgram dg;
   int retval;
   
   seqno = node->recv_next;
@@ -2068,7 +1942,8 @@ int TransmitAcknowledgement()
 int TransmitDatagram()
 {
   ImplicitDgram dg; OtherNode node;
-  static int nextnode=0; unsigned int skip, count, slot, seqno;
+  static int nextnode=0; int skip, count, slot;
+  unsigned int seqno;
   
   for (skip=0; skip<Cmi_numnodes; skip++) {
     node = nodes+nextnode;
@@ -2114,7 +1989,7 @@ int TransmitDatagram()
 void EnqueueOutgoingDgram
         (OutgoingMsg ogm, char *ptr, int len, OtherNode node, int rank)
 {
-  unsigned int seqno, slot; int dst, src, dstrank; ImplicitDgram dg;
+  int seqno, dst, src; ImplicitDgram dg;
   src = ogm->src;
   dst = ogm->dst;
   seqno = node->send_next;
@@ -2148,7 +2023,7 @@ void EnqueueOutgoingDgram
  ***********************************************************************/
 void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank)
 {
-  int size, seqno; char *data;
+  int size; char *data;
   OtherNode myNode = nodes+CmiMyNode();
  
   size = ogm->size - DGRAM_HEADER_SIZE;
@@ -2285,7 +2160,8 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
  ***********************************************************************/
 void AssembleDatagram(OtherNode node, ExplicitDgram dg)
 {
-  int i, size; char *msg;
+  int i;
+  unsigned int size; char *msg;
   OtherNode myNode = nodes+CmiMyNode();
   
   LOG(Cmi_clock, Cmi_nodestart, 'X', dg->srcpe, dg->seqno);
@@ -2372,7 +2248,8 @@ void AssembleReceivedDatagrams(OtherNode node)
 
 void IntegrateMessageDatagram(ExplicitDgram dg)
 {
-  unsigned int seqno, slot; OtherNode node;
+  int seqno;
+  unsigned int slot; OtherNode node;
 
   LOG(Cmi_clock, Cmi_nodestart, 'M', dg->srcpe, dg->seqno);
   node = nodes_by_pe[dg->srcpe];
@@ -2455,7 +2332,8 @@ void IntegrateMessageDatagram(ExplicitDgram dg)
 void IntegrateAckDatagram(ExplicitDgram dg)
 {
   OtherNode node; DgramAck *ack; ImplicitDgram idg;
-  int i; unsigned int slot, rxing, dgseqno, seqno, diff, ackseqno;
+  int i; unsigned int slot, rxing, dgseqno, seqno, ackseqno;
+  int diff;
   unsigned int tmp;
 
   node = nodes_by_pe[dg->srcpe];
@@ -2561,7 +2439,7 @@ void ReceiveDatagram()
  * are ready, the corresponding tasks are called
  *
  ***********************************************************************/
-static void CommunicationServer()
+static void CommunicationServer(int withDelayMs)
 {
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
 #if CMK_SHARED_VARS_UNAVAILABLE
@@ -2571,19 +2449,21 @@ static void CommunicationServer()
   }
   terrupt++;
 #endif
+  CmiCommLock();
+  Cmi_clock = GetClock();
+  if (Cmi_clock > Cmi_check_last + Cmi_check_delay) {
+    ctrl_sendone_nolock("ping",NULL,0,NULL,0);
+    Cmi_check_last = Cmi_clock;
+  }
   while (1) {
-    Cmi_clock = GetClock();
-    if (Cmi_clock > Cmi_check_last + Cmi_check_delay) {
-      writeall(Cmi_host_fd, "ping", 5);
-      Cmi_check_last = Cmi_clock;
-    }
-    CheckSocketsReady();
+    CheckSocketsReady(withDelayMs);
     if (ctrlskt_ready_read) { ctrl_getone(); continue; }
-    if (dataskt_ready_write) { if (TransmitAcknowledgement()) continue; }
     if (dataskt_ready_read) { ReceiveDatagram(); continue; }
+    if (dataskt_ready_write) { if (TransmitAcknowledgement()) continue; }
     if (dataskt_ready_write) { if (TransmitDatagram()) continue; }
     break;
   }
+  CmiCommUnlock();
 #if CMK_SHARED_VARS_UNAVAILABLE
   terrupt--;
 #endif
@@ -2635,9 +2515,7 @@ void CmiNotifyIdle()
   tv.tv_sec=0; tv.tv_usec=5000;
   select(0,0,0,0,&tv);
 #else
-  CmiCommLock();
-  CommunicationServer();
-  CmiCommUnlock();
+  CommunicationServer(5);
 #endif
 }
 
@@ -2677,8 +2555,8 @@ CmiCommHandle CmiGeneralNodeSend(int pe, int size, int freemode, char *data)
   ogm->refcount = 0;
   CmiCommLock();
   DeliverOutgoingNodeMessage(ogm);
-  CommunicationServer();
   CmiCommUnlock();
+  CommunicationServer(0);
   return (CmiCommHandle)ogm;
 }
 #endif
@@ -2726,8 +2604,8 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   ogm->refcount = 0;
   CmiCommLock();
   DeliverOutgoingMessage(ogm);
-  CommunicationServer();
   CmiCommUnlock();
+  CommunicationServer(0);
   return (CmiCommHandle)ogm;
 }
 
@@ -2863,31 +2741,35 @@ void CmiReleaseCommHandle(CmiCommHandle handle)
  * Main code, Init, and Exit
  *
  *****************************************************************************/
+extern void CthInit(char **argv);
+extern void ConverseCommonInit(char **);
 
-void ConverseInitPE()
+static char     **Cmi_argv;
+static CmiStartFn Cmi_startfn;   /* The start function */
+static int        Cmi_usrsched;  /* Continue after start function finishes? */
+CpvDeclare(char**, CmiMyArgv); /*Thread-private copy of args.*/
+
+static void ConverseRunPE(int everReturn)
 {
-  CmiState cs = CmiGetState();
+  CmiState cs;
+  CmiNodeBarrier();
+  cs = CmiGetState();
   CpvInitialize(char *, internal_printf_buffer);
+  CpvInitialize(char **,CmiMyArgv);
   CpvAccess(internal_printf_buffer) = (char *) malloc(PRINTBUFSIZE);
   _MEMCHECK(CpvAccess(internal_printf_buffer));
-  CthInit(Cmi_argv);
-#if CMK_CCS_AVAILABLE
-  stateAvailable = 0;
-#endif
-  ConverseCommonInit(Cmi_argv);
+  if (CmiMyRank()) CpvAccess(CmiMyArgv) = CopyArgs(Cmi_argv);
+  else CpvAccess(CmiMyArgv) = Cmi_argv;
+  CthInit(CpvAccess(CmiMyArgv));
+  ConverseCommonInit(CpvAccess(CmiMyArgv));
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
-#if CMK_CCS_AVAILABLE
-  CmiLock(ccs_mutex); 
-  stateAvailable++; 
-  while(stateAvailable==Cmi_mynodesize && !FIFO_Empty(ccs_request_q)) {
-    CcsRequest queuedMsg;
-    FIFO_DeQueue(ccs_request_q, (void **)&queuedMsg);
-    CmiSetHandler(queuedMsg->ptr, strHandlerID);
-    PCQueuePush(CmiGetStateN(queuedMsg->pe)->recv, queuedMsg->ptr);
+
+  if (!everReturn) {
+    Cmi_startfn(CountArgs(CpvAccess(CmiMyArgv)), CpvAccess(CmiMyArgv));
+    if (Cmi_usrsched==0) CsdScheduler(-1);
+    ConverseExit();
   }
-  CmiUnlock(ccs_mutex);
-#endif
 }
 
 void ConverseExit()
@@ -2899,55 +2781,104 @@ void ConverseExit()
     ConverseCommonExit();
   }
 
-  ctrl_sendone(120,"ending"); /* this causes host to go away */
-  Cmi_check_delay = 2.0;
-  while (1) CmiYield(); /* loop until host disappearance causes exit */
+  ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes host to go away */
+  while (1) CmiYield();/*Loop until host dies, which will be caught by comm. thread*/
 }
 
-void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
+static void exitDelay(void)
+{
+  printf("Program finished.\n");
+#if 0
+  fgetc(stdin);
+#endif
+}
+
+static void machine_init(void)
+{
+  skt_init();
+  atexit(exitDelay);
+#if !CMK_TRUECRASH
+  signal(SIGSEGV, KillOnAllSigs);
+  signal(SIGFPE, KillOnAllSigs);
+  signal(SIGILL, KillOnAllSigs);
+  signal(SIGINT, KillOnAllSigs);
+  signal(SIGTERM, KillOnAllSigs);
+  signal(SIGABRT, KillOnAllSigs);
+#  ifndef _WIN32 /*UNIX-only signals*/
+  signal(SIGQUIT, KillOnAllSigs);
+  signal(SIGBUS, KillOnAllSigs);
+  signal(SIGPIPE, KillOnSIGPIPE);
+#    if CMK_HANDLE_SIGUSR
+  signal(SIGUSR1, HandleUserSignals);
+  signal(SIGUSR2, HandleUserSignals);
+#    endif
+#  endif /*UNIX*/
+#endif /*CMK_TRUECRASH*/
+}
+
+void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 {
 #if CMK_USE_HP_MAIN_FIX
 #if FOR_CPLUS
   _main(argc,argv);
 #endif
 #endif
-  Cmi_argv = argv;
-  Cmi_startfn = fn;
-  Cmi_usrsched = usc;
+  Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usc;
+  machine_init();
+/*See the win32 debugging instructions below:
+  * putenv("NETSTART=0 2130706433 1596 241");/**/
   parse_netstart();
   extract_args(argv);
   log_init();
-  Cmi_check_delay = Cmi_numnodes * 0.5;
   Cmi_scanf_mutex = CmiCreateLock();
-#if CMK_CCS_AVAILABLE
-  ccs_mutex = CmiCreateLock();
-  ccs_request_q = FIFO_Create();
-#endif
-  signal(SIGPIPE, KillOnSIGPIPE);
-#if CMK_TRUECRASH
-#else
-  signal(SIGSEGV, KillOnAllSigs);
-  signal(SIGBUS, KillOnAllSigs);
-  signal(SIGFPE, KillOnAllSigs);
-  signal(SIGILL, KillOnAllSigs);
-  signal(SIGINT, KillOnAllSigs);
-  signal(SIGTERM, KillOnAllSigs);
-  signal(SIGQUIT, KillOnAllSigs);
-  signal(SIGABRT, KillOnAllSigs);
-#endif
-#if CMK_HANDLE_SIGUSR
-  signal(SIGUSR1, HandleUserSignals);
-  signal(SIGUSR2, HandleUserSignals);
-#endif
-  skt_datagram(&dataport, &dataskt, Cmi_os_buffer_size);
-  skt_server(&ctrlport, &ctrlskt);
+
+  dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
   Cmi_host_fd = skt_connect(Cmi_host_IP, Cmi_host_port, 60);
   node_addresses_obtain();
+  Cmi_check_delay = 2.0+0.5*Cmi_numnodes;
   CmiStartThreads();
-  ConverseInitPE();
-  if (ret==0) {
-    fn(CountArgs(argv), argv);
-    if (usc==0) CsdScheduler(-1);
-    ConverseExit();
-  }
+  ConverseRunPE(everReturn);
 }
+
+/*********** For NT testing: *****************
+The putenv line above allows you to start up a 
+node-program's machine.c in the Visual C++ debugger.  
+The steps are:
+	1.) Make a Visual C++ project containing your node-program.
+I do a command-line build first (win32-install.bat)
+Your node-program source files, if C++, need to be renamed to "Cxx".
+
+You need the headers in charm/net-win32/include:
+Choose Project->Settings...->C/C++->Preprocessor->
+Additional Include Directories-> absolute path name to includes.
+
+You need the Winsock library:
+Choose Project->Settings...->Link->Object/library modules:->
+add "ws2_32.lib" to list; add "/NODEFAULTLIB:LIBCMT" to link params.
+
+You'll need the libraries: 
+libldb-rand.obj, libtrace-none.lib, libconv-cplus-y.lib, 
+libpacklib.lib, libck.lib
+
+And also the conv-core sources:
+	cldb.c (from conv-ldb), conv-ccs.c, conv-conds.c, cpm.c, 
+cpthreads.c, fifo.c, futures.c, machine.c (this file, from Common.net), 
+memory.c, msgmgr.c, queueing.c, quiescence.c, random.c, threads.c, sockRoutines.c
+ (whew!)
+
+	2.) Now, start the daemon, if it's not already running.
+	3.) Run conv-host.exe with the *wrong* executable name
+	(e.g., c:\winnt\notepad.exe).  This prepares a conv-host for
+	your node-program to connect to.
+	4.) Read the last 4 numbers (2 IP's, a socket number and PID)
+	from the "NETSTART" line of the daemon's output.
+	5.) Copy those numbers to the last 4 places in the NETSTART
+	line below. (On a given machine, only the last 2 numbers will change).
+	6.) Recompile and run your program.  It will connect to the 
+	waiting conv-host and all will continue normally.
+	Note, however, that conv-host has a 60-second timeout, so if steps
+	4-6 don't happen fast enough, conv-host will die with a 
+	"timeout waiting for nodes to connect" error message.
+	If you have your windows arranged properly, you should have plenty 
+	of time.
+*/
