@@ -197,7 +197,6 @@ double CmiCpuTimer(void)
 
 #endif
 
-#if CMK_SMP
 
 typedef struct ProcState {
 /* PCQueue      sendMsgBuf; */      /* per processor message sending queue */
@@ -205,6 +204,8 @@ CmiNodeLock  recvLock;		    /* for cs->recv */
 } ProcState;
 
 static ProcState  *procState;
+
+#if CMK_SMP
 
 static PCQueue sendMsgBuf;
 static CmiNodeLock  sendMsgBufLock = NULL;        /* for sendMsgBuf */
@@ -1241,12 +1242,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CsvInitialize(CmiNodeState, NodeState);
   CmiNodeStateInit(&CsvAccess(NodeState));
 
-#if CMK_SMP
   procState = (ProcState *)malloc(Cmi_mynodesize * sizeof(ProcState));
   for (i=0; i<Cmi_mynodesize; i++) {
 /*    procState[i].sendMsgBuf = PCQueueCreate();   */
     procState[i].recvLock = CmiCreateLock();
   }
+#if CMK_SMP
   sendMsgBuf = PCQueueCreate();
   sendMsgBufLock = CmiCreateLock();
 #endif
