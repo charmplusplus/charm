@@ -27,7 +27,7 @@
 
 #define CORRECTSENDLEN  5
 
-#define PRIO_FACTOR      (1e8)
+#define PRIO_FACTOR      (1e7)
 
 //Reads the logs from disk to do seq correction
 #define SEQ_CORRECT 0

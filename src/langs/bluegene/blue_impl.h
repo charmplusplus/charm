@@ -394,11 +394,15 @@ public:
 }; 
 
 class workThreadInfo : public threadInfo {
+private:
+  int CsdStopFlag;
 public:
   workThreadInfo(int _id, ThreadType _type, nodeInfo *_node): 
-        threadInfo(_id, _type, _node) {}
+        threadInfo(_id, _type, _node) { CsdStopFlag=0; }
   void addAffMessage(char *msgPtr);        ///  add msg to affinity queue
   void run();
+  void scheduler(int count);
+  void stopScheduler() { CsdStopFlag++; }
 };
 
 class commThreadInfo : public threadInfo {

@@ -67,27 +67,51 @@ void commThreadInfo::run()
   }
 }
 
-void workThreadInfo::run()
+void BgScheduler(int nmsg)
 {
-  tSTARTTIME = CmiWallTimer();
-
-//  InitHandlerTable();
-  // before going into scheduler loop, call workStartFunc
-  // in bg charm++, it normally is initCharm
-  if (workStartFunc) {
-    DEBUGF(("[N%d] work thread %d start.\n", BgMyNode(), id));
-    // timing
-    startVTimer();
-    BG_ENTRYSTART((char*)NULL);
-    char **Cmi_argvcopy = CmiCopyArgs(BgGetArgv());
-    workStartFunc(BgGetArgc(), Cmi_argvcopy);
-    BG_ENTRYEND();
-    stopVTimer();
+  ASSERT(tTHREADTYPE == WORK_THREAD);
+  // end current log
+  int isinterrupt = 0;
+  if (genTimeLog) {
+    if (BgIsInALog(tTIMELINEREC)) {
+      isinterrupt = 1;
+      BgLogEntryCommit(tTIMELINEREC);
+      tTIMELINEREC.bgPrevLog = BgCurrentLog(tTIMELINEREC);
+    }
   }
+  stopVTimer();
 
+  ((workThreadInfo*)cta(threadinfo))->scheduler(nmsg);
+
+  // begin a new log, and make dependency
+  startVTimer();
+  if (genTimeLog && isinterrupt) 
+  {
+    bgTimeLog *curlog = BgCurrentLog(tTIMELINEREC);
+    bgTimeLog *newLog = BgStartLogByName(tTIMELINEREC, -1, "BgSchedulerEnd", BgGetCurTime(), curlog);
+  }
+}
+
+void BgExitScheduler()
+{
+  ASSERT(tTHREADTYPE == WORK_THREAD);
+  ((workThreadInfo*)cta(threadinfo))->stopScheduler();
+}
+
+void BgDeliverMsgs(int nmsg)
+{
+  if (nmsg == 0) nmsg=1;
+  BgScheduler(nmsg);
+}
+
+void workThreadInfo::scheduler(int count)
+{
   ckMsgQueue &q1 = myNode->nodeQ;
   ckMsgQueue &q2 = myNode->affinityQ[id];
 
+  int cycle = CsdStopFlag;
+
+  int recvd = 0;
   for (;;) {
     char *msg=NULL;
     int e1 = q1.isEmpty();
@@ -121,9 +145,13 @@ void workThreadInfo::run()
     if (correctTimeLog) {
       if (CmiBgMsgRecvTime(msg) > gvt+ LEASH) {
 	double nextT = CmiBgMsgRecvTime(msg);
-	unsigned int prio = (unsigned int)(nextT*PRIO_FACTOR)+1;
- // CmiPrintf("Thread %d YieldPrio: %g gvt: %g leash: %g\n", id, nextT, gvt, LEASH);
-	CthYieldPrio(CQS_QUEUEING_IFIFO, sizeof(int), &prio);
+	int prio = (int)(nextT*PRIO_FACTOR)+1;
+	if (prio < 0) {
+	  CmiPrintf("PRIO_FACTOR %e is too small. \n", PRIO_FACTOR);
+	  CmiAbort("BigSim time correction abort!\n");
+	}
+//CmiPrintf("Thread %d YieldPrio: %g gvt: %g leash: %g\n", id, nextT, gvt, LEASH);
+	CthYieldPrio(CQS_QUEUEING_IFIFO, sizeof(int), (unsigned int*)&prio);
 	continue;
       }
     }
@@ -138,6 +166,11 @@ void workThreadInfo::run()
       tCURRTIME = CmiBgMsgRecvTime(msg);
     }
 
+#if 1
+    if (fromQ2 == 1) q2.deq();
+    else q1.deq();
+#endif
+
     BG_ENTRYSTART(msg);
     // BgProcessMessage may trap into scheduler
     BgProcessMessage(msg);
@@ -146,10 +179,18 @@ void workThreadInfo::run()
     // counter of processed real mesgs
     stateCounters.realMsgProcCnt++;
 
+    // NOTE: I forgot why I delayed the dequeue after processing it
+#if 0
     if (fromQ2 == 1) q2.deq();
     else q1.deq();
+#endif
 
     DEBUGF(("[N%d] work thread T%d finish a msg.\n", BgMyNode(), id));
+
+    recvd ++;
+    if ( recvd == count) return;
+
+    if (cycle != CsdStopFlag) break;
 
     /* let other work thread do their jobs */
 #if SCHEDULE_WORK
@@ -160,6 +201,31 @@ void workThreadInfo::run()
     CthYield();
 #endif
   }
+
+  CsdStopFlag --;
+}
+
+void workThreadInfo::run()
+{
+  tSTARTTIME = CmiWallTimer();
+
+//  InitHandlerTable();
+  // before going into scheduler loop, call workStartFunc
+  // in bg charm++, it normally is initCharm
+  if (workStartFunc) {
+    DEBUGF(("[N%d] work thread %d start.\n", BgMyNode(), id));
+    // timing
+    startVTimer();
+    BG_ENTRYSTART((char*)NULL);
+    char **Cmi_argvcopy = CmiCopyArgs(BgGetArgv());
+    workStartFunc(BgGetArgc(), Cmi_argvcopy);
+    BG_ENTRYEND();
+    stopVTimer();
+  }
+
+  scheduler(-1);
+
+  CmiAbort("worker thread should never end!\n");
 }
 
 void workThreadInfo::addAffMessage(char *msgPtr)

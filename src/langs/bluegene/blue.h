@@ -218,6 +218,12 @@ void bgUpdateProj(int eType);
 double BgGetRecvTime();
 void BgResetRecvTime();
 
+/************************ Scheduler  ************************/
+
+void BgScheduler(int ret);
+void BgExitScheduler();
+void BgDeliverMsgs(int);
+
 /************************ Supporting AMPI ************************/
 
 void BgAttach(CthThread t);
