@@ -567,6 +567,7 @@ int   arg_debug_no_pause;
 int   arg_local;	/* start node programs directly by exec on localhost */
 
 int   arg_help;		/* print help message */
+int   arg_ppn;		/* pes per node */
 int   arg_usehostname;
 
 #if CMK_USE_RSH
@@ -628,6 +629,7 @@ void arg_init(int argc, char **argv)
   pparam_int(&arg_startpe,   0, "startpe",   "first pe to start job(SCYLD)");
 #endif
   pparam_flag(&arg_help,	0, "help", "print help messages");
+  pparam_int(&arg_ppn,          0, "ppn",             "number of pes per node");
 
   if (pparam_parsecmd('+', argv) < 0) {
     fprintf(stderr,"ERROR> syntax: %s\n",pparam_error);
@@ -857,7 +859,10 @@ char *nodetab_args(char *args,nodetab_host *h)
     else 
 #endif
     if (subeqs(b1,e1,"speed")) h->speed = atof(b2);
-    else if (subeqs(b1,e1,"cpus")) h->cpus = atol(b2);
+    else if (subeqs(b1,e1,"cpus")) {
+      if (arg_ppn>0) h->cpus = arg_ppn;
+      else h->cpus = atol(b2);			/* ignore if there is ++ppn */
+    }
     else if (subeqs(b1,e1,"pathfix")) {
       char *b3 = skipblanks(e2), *e3 = skipstuff(b3);
       args = skipblanks(e3);
@@ -879,7 +884,7 @@ char *nodetab_args(char *args,nodetab_host *h)
 /*  setup nodetab as localhost only */
 void nodetab_init_for_local()
 {
-  int tablesize, i;
+  int tablesize, i, done=0;
   nodetab_host group;
 
   tablesize = arg_requested_pes;
@@ -888,9 +893,21 @@ void nodetab_init_for_local()
   nodetab_max=tablesize;
 
   nodetab_reset(&group);
-  for (i=0; i<tablesize; i++) {
+  if (arg_ppn==0) arg_ppn=1;
+#if CMK_SHARED_VARS_UNAVAILABLE
+  if (arg_ppn > 1) {
+    fprintf(stderr,"Warning> Invalid ppn %d in nodelist ignored.\n", arg_ppn);
+    arg_ppn=1;
+  }
+#endif
+  group.cpus = arg_ppn;
+  i = 0;
+  while (!done) {
     char *hostname = "localhost";
-    nodetab_makehost(hostname, &group);
+    for (group.rank = 0; group.rank<arg_ppn; group.rank++) {
+      nodetab_makehost(hostname, &group);
+      if (++i == arg_requested_pes) { done = 1; break; }
+    }
   }
 }
 
@@ -905,7 +922,7 @@ void nodetab_init()
   /* if arg_local is set, ignore the nodelist file */
   if (arg_local) {
     nodetab_init_for_local();
-    return;
+    goto fin;
   }
 
   /* Open the NODES_FILE. */
@@ -967,6 +984,7 @@ void nodetab_init()
   while ((nodetab_size < arg_requested_pes)&&(arg_requested_pes!=MAX_NODES))
      nodetab_add(nodetab_table[nodetab_size%basicsize]);
   
+fin:
   /*Clip off excess CPUs at end*/
   for (i=0; i<nodetab_size; i++) {
     if (nodetab_table[i]->rank == 0)
@@ -2150,7 +2168,7 @@ void kill_nodes()
 void start_nodes_local(char ** env)
 {
   char **envp;
-  int i, envc;
+  int envc, rank0no, i;
 
   /* copy environ and expanded to hold NETSTART */ 
   for (envc=0; env[envc]; envc++);  envc--;
@@ -2159,14 +2177,15 @@ void start_nodes_local(char ** env)
   envp[envc] = (char *)malloc(256);
   envp[envc+1] = 0;
 
-  for (i=0; i<arg_requested_pes; i++)
+  for (rank0no=0;rank0no<nodetab_rank0_size;rank0no++)
   {
     int status = 0;
     int pid;
+    int pe=nodetab_rank0_table[rank0no];
 
     if (arg_verbose)
-      printf("Charmrun> start %d node program on localhost.\n", i);
-    sprintf(envp[envc], "NETSTART=%s",  create_netstart(i));
+      printf("Charmrun> start %d node program on localhost.\n", pe);
+    sprintf(envp[envc], "NETSTART=%s",  create_netstart(rank0no));
     pid = 0;
     pid = fork();
     if (pid < 0) exit(1);
