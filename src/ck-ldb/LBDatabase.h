@@ -17,7 +17,7 @@
 #include "lbdb.h"
 #include "LBDBManager.h"
 
-#define LB_FORMAT_VERSION     1
+#define LB_FORMAT_VERSION     2
 
 // command line options
 class CkLBArgs
