@@ -21,6 +21,8 @@ class PipeBroadcastStrategy : public CharmStrategy {
   void doneInserting();
   void conversePipeBcast(envelope *env, int size);
 
+  void beginProcessing(int x);
+
   void deliverer(char *msg, int dim);
 
   virtual void pup(PUP::er &p);

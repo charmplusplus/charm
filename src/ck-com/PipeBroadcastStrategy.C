@@ -97,10 +97,17 @@ void PipeBroadcastStrategy::pup(PUP::er &p){
 
   if (p.isUnpacking()) {
     //propagateHandle = CmiRegisterHandler((CmiHandler)propagate_handler);
+
     ComlibPrintf("[%d] registered handler single to %d\n",CmiMyPe(),CsvAccess(pipeBcastPropagateHandle));
     messageBuf = new CkQ<CharmMessageHolder *>;
     converseStrategy->setHigherLevel(this);
   }
+}
+
+
+void PipeBroadcastStrategy::beginProcessing(int x){ 
+  CsvAccess(pipeBcastPropagateHandle) = CmiRegisterHandler((CmiHandler)propagate_handler);
+
 }
 
 //PUPable_def(PipeBroadcastStrategy);
