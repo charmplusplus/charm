@@ -18,6 +18,8 @@
 
 #define  DEBUGF(x)   /*CmiPrintf x;*/
 
+#if CMK_BLUEGENE_CHARM
+
 extern int CldPresentPE(int pe);
 
 void LoadNotifyFn(int l)
@@ -251,3 +253,5 @@ void CldModuleInit()
   CldModuleGeneralInit();
 }
 
+
+#endif

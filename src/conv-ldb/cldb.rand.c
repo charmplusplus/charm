@@ -52,8 +52,6 @@ void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
   CmiSyncListSendAndFree(npes, pes, len, msg);
 }
 
-extern int immRunning;
-
 void CldEnqueue(int pe, void *msg, int infofn)
 {
   int len, queueing, priobits; unsigned int *prioptr;
