@@ -232,6 +232,8 @@ int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, unsign
   hdr.pe=ChMessageInt_new(pe);
   strncpy(hdr.handler,hdlrID,CCS_HANDLERLEN);
 
+  if (svr->replyFd!=-1) skt_close(svr->replyFd); /*We'll never ask for reply*/
+
   /*Connect to conv-host, and send the message */
   svr->replyFd=skt_connect(svr->hostIP, svr->hostPort,timeout);
   if (svr->replyFd==-1) return -1;
@@ -318,6 +320,10 @@ int CcsRecvResponse(CcsServer *svr,  unsigned int maxsize, char *recvBuffer,int 
 int CcsProbe(CcsServer *svr)
 {
   return skt_select1(svr->replyFd,0);
+}
+int CcsProbeTimeout(CcsServer *svr,int timeoutMs)
+{
+  return skt_select1(svr->replyFd,timeoutMs);
 }
 
 void CcsFinalize(CcsServer *svr)

@@ -64,6 +64,7 @@ int CcsNumPes(CcsServer *svr);
 int CcsNodeFirst(CcsServer *svr, int node);
 int CcsNodeSize(CcsServer *svr,int node);
 int CcsProbe(CcsServer *svr);
+int CcsProbeTimeout(CcsServer *svr,int timeoutMs);
 void CcsFinalize(CcsServer *svr);
 
 #ifdef __cplusplus
