@@ -4,7 +4,7 @@ module ampi {
   };
 
   message MigrateInfo;
-  message ArgsInfo;
+  message [packed] ArgsInfo;
   message [varsize] AmpiMsg;
 
   group migrator {

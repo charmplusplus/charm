@@ -6,6 +6,8 @@
  *****************************************************************************/
 
 #include "ampiimpl.h"
+// for strlen
+#include <string.h>
 
 #if AMPI_FORTRAN
 #include "ampimain.decl.h"
@@ -16,8 +18,43 @@ extern "C" void get_size_(int *, int *, int *, int *);
 extern "C" void pack_(char*,int*,int*,int*,float*,int*,int*,int*);
 extern "C" void unpack_(char*,int*,int*,int*,float*,int*,int*,int*);
 
-int migHandle;
+void*
+ArgsInfo::pack(ArgsInfo* msg)
+{
+  int argsize, i;
+  for(i=0;i<msg->argc;i++) {
+    argsize += (strlen(msg->argv[i])+1); // +1 for '\0'
+  }
+  void *p = CkAllocBuffer(msg, sizeof(ArgsInfo) +
+                               (msg->argc*sizeof(char*)) + 
+			        argsize);
+  memcpy(p,msg,sizeof(ArgsInfo));
+  char *args = (char *)((char*)p+sizeof(ArgsInfo)+(msg->argc+sizeof(char*)));
+  for(i=0;i<msg->argc;i++) {
+    char *tmp = msg->argv[i];
+    while(*tmp) { *args++ = *tmp++; }
+    *args++ = '\0';
+  }
+  delete msg;
+  return p;
+}
 
+ArgsInfo*
+ArgsInfo::unpack(void *in)
+{
+  int argc = *((int*)in);
+  char **argv = (char**)((char*)in+sizeof(ArgsInfo));
+  ArgsInfo* msg = new (in) ArgsInfo(argc, argv);
+  char *tmp = ((char*)in+sizeof(ArgsInfo)+(argc*sizeof(char*)));
+  for(int i=0;i<argc;i++) {
+    argv[i] = tmp;
+    while(*tmp) { tmp++; }
+    tmp++;
+  }
+  return msg;
+}
+
+int migHandle;
 CtvDeclare(ampi *, ampiPtr);
 CtvDeclare(int, numMigrateCalls);
 static CkArray *ampiArray;

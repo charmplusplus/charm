@@ -55,7 +55,10 @@ class ArgsInfo : public CMessage_ArgsInfo {
   public:
     int argc;
     char **argv;
+    ArgsInfo(void) { argc = 0; }
     ArgsInfo(int c, char **v) { argc = c; argv = v; }
+    static void* pack(ArgsInfo*);
+    static ArgsInfo* unpack(void*);
 };
 
 class AmpiMsg : public CMessage_AmpiMsg {
