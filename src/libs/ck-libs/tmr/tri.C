@@ -879,8 +879,7 @@ void chunk::refiningElements()
       }
       i++;
     }
-    // if (CkMyPe() == 0) for (i=0; i<1; i++) mesh[i].out_print();
-    if (CkMyPe() == 0) for (int j=0; j<2; j++) mesh[j].print();
+    if (CkMyPe() == 0) for (int j=0; j<numChunks; j++) mesh[j].print();
     CthYield(); // give other chunks on the same PE a chance
   }
   // nothing is in need of refinement; turn refine loop off
@@ -1267,7 +1266,7 @@ void chunk::multipleRefine(double *desiredArea, refineClient *client)
     }
   
   if (CkMyPe() == 0)
-    for (i=0; i<2; i++) 
+    for (i=0; i<numChunks; i++) 
       mesh[i].out_print();
 
   // start the refinement loop
