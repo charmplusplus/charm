@@ -159,7 +159,7 @@ The handler is given a pointer to the message as  its parameter.
 Normally, the delivered message is owned by CMI,  and so the handler
 should not free it, or store it for later use.  
 If the handler wishes to  use the message later (for example, by
-enqueing the message with the scheduler), it must call
+enqueueing the message with the scheduler), it must call
 \param{CmiGrabBuffer()} to
 acquire the  ownership of the message buffer.}
 
@@ -296,7 +296,7 @@ strategies will be incorporated into converse.}}
 \function{void CmiFree(void *ptr)}
 \index{CmiFree}
 \desc{This function frees the memory pointed to by \param{ptr}. \param{ptr}
-should be returned by an earlier callto \param{CmiAlloc}.}
+should be returned by an earlier call to \param{CmiAlloc}.}
 
 
 \section{Input/Output}
@@ -357,7 +357,7 @@ in the processor-group \param{group}.}
 \function{void CmiChildren(Pgrp *group, int node, int *children)}
 \desc{Fills in array \param{children} with processor ids of all the
 children processor \param{node} in processor-group \param{group}. This
-array should atleast be of size \param{CmiNumChildren()}.}
+array should at least be of size \param{CmiNumChildren()}.}
 }
 
 \section{Spanning Tree Calls}
