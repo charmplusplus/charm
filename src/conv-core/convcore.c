@@ -391,7 +391,11 @@ CpvStaticDeclare(double, inittime_virtual);
 
 void CmiTimerInit()
 {
+#ifdef __CYGWIN__
+	struct timeb tv;
+#else
 	struct _timeb tv;
+#endif
 	clock_t       ru;
 
 	CpvInitialize(double, inittime_wallclock);
@@ -415,7 +419,11 @@ double CmiCpuTimer()
 
 double CmiWallTimer()
 {
+#ifdef __CYGWIN__
+	struct timeb tv;
+#else
 	struct _timeb tv;
+#endif
 	double currenttime;
 
 	_ftime(&tv);
@@ -913,20 +921,20 @@ CpvStaticDeclare(int      , CthResumeSchedulingThreadIdx);
 CpvDeclare(CthThread, curThread);
 /* end addition */
 
-static void CthStandinCode()
+void CthStandinCode()
 {
   while (1) CsdScheduler(0);
 }
 
-static CthThread CthSuspendNormalThread()
+CthThread CthSuspendNormalThread()
 {
   return CpvAccess(CthSchedulingThread);
 }
 
-static void CthEnqueueSchedulingThread(CthThread t, int, int, unsigned int*);
-static CthThread CthSuspendSchedulingThread();
+void CthEnqueueSchedulingThread(CthThread t, int, int, unsigned int*);
+CthThread CthSuspendSchedulingThread();
 
-static CthThread CthSuspendSchedulingThread()
+CthThread CthSuspendSchedulingThread()
 {
   CthThread succ = CpvAccess(CthSleepingStandins);
 
@@ -943,7 +951,7 @@ static CthThread CthSuspendSchedulingThread()
   return succ;
 }
 
-static void CthResumeNormalThread(CthThread t)
+void CthResumeNormalThread(CthThread t)
 {
   CmiGrabBuffer((void**)&t);
   /** addition for tracing */
@@ -959,7 +967,7 @@ static void CthResumeNormalThread(CthThread t)
   CthResume(t);
 }
 
-static void CthResumeSchedulingThread(CthThread t)
+void CthResumeSchedulingThread(CthThread t)
 {
   CthThread me = CthSelf();
   CmiGrabBuffer((void**)&t);
@@ -973,14 +981,14 @@ static void CthResumeSchedulingThread(CthThread t)
   CthResume(t);
 }
 
-static void CthEnqueueNormalThread(CthThread t, int s, 
+void CthEnqueueNormalThread(CthThread t, int s, 
 				   int pb,unsigned int *prio)
 {
   CmiSetHandler(t, CpvAccess(CthResumeNormalThreadIdx));
   CsdEnqueueGeneral(t, s, pb, prio);
 }
 
-static void CthEnqueueSchedulingThread(CthThread t, int s, 
+void CthEnqueueSchedulingThread(CthThread t, int s, 
 				       int pb,unsigned int *prio)
 {
   CmiSetHandler(t, CpvAccess(CthResumeSchedulingThreadIdx));
