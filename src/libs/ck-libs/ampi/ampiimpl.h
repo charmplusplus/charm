@@ -21,7 +21,9 @@ class WinStruct{
 public:
   MPI_Comm comm;
   int index;
+  WinStruct(void):comm(MPI_COMM_NULL),index(-1){ }
   WinStruct(MPI_Comm comm_, int index_):comm(comm_),index(index_){ }
+  void pup(PUP::er &p){ p|comm; p|index; }
 };
 
 class ampi;
