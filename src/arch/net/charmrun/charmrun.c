@@ -684,6 +684,9 @@ void arg_init(int argc, char **argv)
     fprintf(stderr,"Warning> ++local cannot be used in bproc version, ignored!\n");
     arg_local = 0;
   }
+  if (arg_debug || arg_debug_no_pause) {
+    fprintf(stderr,"Warning> bproc version doesnot support ++debug option.\n");
+  }
 #endif
 
 #if CMK_USE_RSH
@@ -1951,7 +1954,7 @@ void start_nodes_scyld(void)
     if (pid == 0)
     {
       int fd, fd1 = dup(1);
-      if (!arg_verbose) {
+      if (!(arg_debug || arg_debug_no_pause)) {   /* debug mode */
         if (fd = open("/dev/null", O_RDWR)) {
           dup2(fd, 0); dup2(fd, 1); dup2(fd, 2);
         }
