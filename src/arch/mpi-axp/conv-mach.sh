@@ -10,4 +10,6 @@ CMK_LIBS='-lckqt -lmpi '
 CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/"
 CMK_QT='axp-gcc'
 CMK_XIOPTS='-ansi'
+CMK_F90LIBS="-lUfor -lfor -lFutil"
+CMK_F77LIBS="$CMK_F90LIBS "
 
