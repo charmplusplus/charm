@@ -39,7 +39,8 @@ then
 elif [ -n "$LSB_HOSTS" ]
 then
 # Tungsten
-  cmpirun -lsf -poll -no_smp $args
+  echo cmpirun -lsf -poll -no_smp -gm_long 200000 $args 
+  cmpirun -lsf -poll -no_smp -gm_long 200000 $args 
 elif [ -n "$PBS_QUEUE" -o -n "$LSF_QUEUE" ]
 then
 # Interactive mode: create, and submit a batch job
@@ -114,7 +115,7 @@ echo \$status > $result
 EOF
 	else
 #  use LSF
-	  mpirun=cmpirun
+	  mpirun="cmpirun -lsf -poll -no_smp -gm_long 200000"
           cat > $script << EOF
 #!/bin/sh
 # This is a charmrun-generated PBS batch job script.
@@ -127,7 +128,7 @@ EOF
 
 cd $indir
 echo \$LSB_MCPU_HOSTS
-$mpirun -lsf -poll -no_smp $args
+$mpirun $args
 # Save mpirun exit status
 status=\$?
 echo \$status > $result
