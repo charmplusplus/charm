@@ -26,7 +26,7 @@ public:
 	sendGroup, //Send to a group (d.group)
 	sendArray, //Send to an array (d.array)
 	bcastGroup, //Broadcast to a group (d.group)
-	bcastArray, //Broadcast to an array (d.array)
+	bcastArray //Broadcast to an array (d.array)
 	} callbackType;
 private:
 	union callbackData {

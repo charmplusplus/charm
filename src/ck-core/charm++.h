@@ -178,11 +178,11 @@ void CkPupMessage(PUP::er &p,void **atMsg,int fast_and_dirty=1);
 class CkMarshalledMessage {
 	void *msg;
 	//Don't use these: only pass by reference
-	CkMarshalledMessage(const CkMarshalledMessage &);
 	void operator=(const CkMarshalledMessage &);
  public:
 	CkMarshalledMessage(void) {msg=NULL;}
 	CkMarshalledMessage(CkMessage *m) {msg=m;} //Takes ownership of message
+	CkMarshalledMessage(const CkMarshalledMessage &);
 	~CkMarshalledMessage() {if (msg) CkFreeMsg(msg);}
 	CkMessage *getMessage(void) {void *ret=msg; msg=NULL; return (CkMessage *)ret;}
 	void pup(PUP::er &p) {CkPupMessage(p,&msg,1);}
