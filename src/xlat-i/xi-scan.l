@@ -2,13 +2,15 @@
 #include <string.h>
 #include "xi-symbol.h"
 #include "xi-grammar.tab.h"
+#include "CList.h"
 #include <ctype.h>
 
 /* Global Variables and Functions - used in grammar.y */
 unsigned int lineno = 1;
 int in_bracket=0; /*Horrific hack to get "array length" code snippets (between []'s)*/
 int in_braces=0; /*Horrific hack to get SDAG entry code snippets (between {}'s)*/
-
+int in_int_expr=0;
+TList<Entry *> *connectEntries = new TList<Entry *>();
 /* Local to file */
 static unsigned char in_comment=0;
 int search(char *s);
@@ -49,10 +51,12 @@ literal	{number}|{real}|{string}
 
 nonBracket [^][]*
 nonBraces [^{}]*
+nonIntExpr [^();,:]*
 
 %%
 {nonBracket}	{ if (in_bracket) {Yval;return Token(CPROGRAM);} else REJECT;}
 {nonBraces}	{ if (in_braces) {Yval;return Token(CPROGRAM);} else REJECT;}
+{nonIntExpr}	{ if (in_int_expr) {Yval;return Token(CPROGRAM);} else REJECT;}
 "//".*		{ /* ignore single line comments */ }
 "\r"		{ /* ignore ^M characters for dos-unix compat */ }
 "/*"		{ in_comment = 1; /* Single line C-style comments */ }
@@ -108,7 +112,18 @@ struct rwtable rwtable[] = {
   "unsigned",   UNSIGNED,
   "void",	VOID,
   "const",	CONST,
-  "",		0,
+  "atomic", 	ATOMIC,
+  "forward", 	FORWARD,
+  "when", 	WHEN, 
+  "while", 	WHILE,
+  "for",	FOR,
+  "forall", 	FORALL, 
+  "if", 	IF, 
+  "else", 	ELSE,
+  "overlap", 	OVERLAP,
+  "connect",    CONNECT,
+  "publishes",  PUBLISHES,
+  "",		0
 };
 
 int search(char *s)
