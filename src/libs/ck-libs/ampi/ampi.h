@@ -28,6 +28,7 @@ extern "C" {
 #endif
 
 int AMPI_Main(int argc,char **argv); /* prototype for C main routine */
+
 typedef int MPI_Datatype;
 typedef int MPI_Aint;/* should be "long", but must be "int" for f90... */
 typedef int MPI_Fint;
@@ -587,6 +588,8 @@ void AMPI_Datatype_iscontig(MPI_Datatype datatype, int *flag);
 typedef void (*MPI_MainFn) (int,char**);
 #define MPI_Register_main AMPI_Register_main
 void AMPI_Register_main(MPI_MainFn mainFn, const char *name);
+/* Execute this shell command (just like "system()") */
+int AMPI_System(const char *cmd);
 
 /*** MPI-2 Functions (Unsorted, no Fortran support) ***/
 #define MPI_Type_get_envelope AMPI_Type_get_envelope

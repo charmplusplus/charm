@@ -3818,6 +3818,8 @@ int AMPI_Type_get_contents(MPI_Datatype datatype, int ni, int na, int nd, int i[
   return getDDT()->getContents(datatype,ni,na,nd,i,a,d);
 }
 
+/******** AMPI-specific (not standard MPI) calls *********/
+
 CDECL
 int AMPI_Suspend(int comm) {
 	AMPIAPI("AMPI_Suspend");
@@ -3838,6 +3840,12 @@ int AMPI_Resume(int dest, int comm) {
 	getAmpiInstance(comm)->getProxy()[dest].unblock();
 	return 0;
 }
+
+CDECL
+int AMPI_System(const char *cmd) {
+	return TCHARM_System(cmd);
+}
+
 
 #include "ampi.def.h"
 
