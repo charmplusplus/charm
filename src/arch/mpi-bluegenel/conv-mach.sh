@@ -2,12 +2,12 @@ BGL_INC=/BlueLight/floor/bglsys/include
 BGL_LIB=/BlueLight/floor/bglsys/lib
 BGL_BIN=/BlueLight/floor/blrts-gnu/bin
 
-BGL_CFLAGS="-I$BGL_INC -gdwarf-2 -Wno-deprecated"
+OPTS_CPP="${OPTS_CPP} -I$BGL_INC -gdwarf-2 -Wno-deprecated"
 
 CMK_CPP_CHARM="$BGL_BIN/powerpc-bgl-blrts-gnu-cpp -P"
 CMK_CPP_C="$BGL_BIN/powerpc-bgl-blrts-gnu-cpp -E "
-CMK_CC="$BGL_BIN/powerpc-bgl-blrts-gnu-gcc $BGL_CFLAGS "
-CMK_CXX="$BGL_BIN/powerpc-bgl-blrts-gnu-g++ $BGL_CFLAGS "
+CMK_CC="$BGL_BIN/powerpc-bgl-blrts-gnu-gcc "
+CMK_CXX="$BGL_BIN/powerpc-bgl-blrts-gnu-g++ "
 CMK_CXXPP="$BGL_BIN/powerpc-bgl-blrts-gnu-g++ -E "
 CMK_CF77="$BGL_BIN/powerpc-bgl-blrts-gnu-g77 "
 CMK_CF90='f90'
