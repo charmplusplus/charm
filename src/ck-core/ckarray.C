@@ -392,6 +392,10 @@ CkArray::CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID no
   addListener(broadcaster,dataOffset);
   reducer=new CkArrayReducer(thisgroup);
   addListener(reducer,dataOffset);
+
+  calistener = new ComlibArrayListener();
+  addListener(calistener,dataOffset);
+
   int lNo,nL=c.getListeners(); //User-added listeners
   for (lNo=0;lNo<nL;lNo++) addListener(c.getListener(lNo),dataOffset);
   if (dataOffset>CK_ARRAYLISTENER_MAXLEN)

@@ -520,6 +520,8 @@ public:
 
 void _ckArrayInit(void);
 
+#include "ComlibArrayListener.h"
+
 class CkArray : public CkReductionMgr, public CkArrMgr {
   friend class ArrayElement;
   friend class CProxy_ArrayBase;
@@ -580,6 +582,9 @@ public:
 
   void pup(PUP::er &p);
   void ckJustMigrated(void){ doneInserting(); }
+
+  ComlibArrayListener * calistener;
+  ComlibArrayListener * getComlibArrayListener() {return calistener;}
 
 private:
   int numInitial;/// Number of 1D initial array elements
