@@ -1028,7 +1028,7 @@ static void CpdDebugHandler(char *msg)
     }
 
     else if (strcmp(name, "quit") == 0){
-      CpdUnfreeze();
+      CpdUnFreeze();
       CsdExitScheduler();
 #if NODE_0_IS_CONVHOST
       if((CmiMyPe() == 0) && (clientIP != 0)){
