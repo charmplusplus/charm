@@ -144,7 +144,7 @@ FDECL void FTN_NAME(FEM_SET_SPARSE_ELEM,fem_set_sparse_elem)
 /***************** Mesh Get ******************/
 // Renumber connectivity from bizarre new double-ended indexing to 
 //  sensible old "first real, then ghost" connectivity.
-static void renumberGhostConn(int nodeGhostStart, //Index of first ghost node
+static void renumberGhostConn(int nodeGhosts, //Number of real nodes
 	int *conn,int per,int n,int idxbase) 
 {
 	for (int r=0;r<n;r++)
@@ -153,10 +153,10 @@ static void renumberGhostConn(int nodeGhostStart, //Index of first ghost node
 		int i=conn[r*per+c];
 		if (idxbase==0) { /* C version: */
 			if (FEM_Is_ghost_index(i))
-				conn[r*per+c]=nodeGhostStart+FEM_From_ghost_index(i);
+				conn[r*per+c]=nodeGhosts+FEM_From_ghost_index(i);
 		} else { /* f90 version: */
 			if (i<0)
-				conn[r*per+c]=nodeGhostStart-1+(-i);
+				conn[r*per+c]=nodeGhosts+(-i);
 		}
 	}
 }
