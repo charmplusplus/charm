@@ -38,7 +38,7 @@ class CentralLB : public CBase_CentralLB
 public:
   CentralLB();
   ~CentralLB();
-  CentralLB(CkMigrateMessage *m):IrrGroup(m) {}
+  CentralLB(CkMigrateMessage *m):CBase_CentralLB(m) {}
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
