@@ -552,10 +552,6 @@ compat_regmm.o: compat_regmm.c
 	$(CHARMC) -c compat_regmm.c
 
 ## Tracing libraries (profiling, -tracemode)
-LIBTRACE_NONE=trace-none.o trace-common.o
-$(L)/libtrace-none.a: $(LIBTRACE_NONE)
-	$(CHARMC) -o $@ $(LIBTRACE_NONE)
-
 LIBTRACE_PROJ=trace-projections.o trace-common.o
 $(L)/libtrace-projections.a: $(LIBTRACE_PROJ)
 	$(CHARMC) -o $@ $(LIBTRACE_PROJ)
@@ -567,13 +563,10 @@ $(L)/libtrace-summary.a: $(LIBTRACE_SUMM)
 trace-common.o: trace-common.C $(CKHEADERS)
 	$(CHARMC) trace-common.C
 
-trace-none.o : trace-none.C trace.h $(CKHEADERS)
-	$(CHARMC) -o trace-none.o trace-none.C
-
-trace-projections.o:trace-projections.C trace-projections.h trace.h $(CKHEADERS)
+trace-projections.o:trace-projections.C trace-projections.h trace.h trace-common.h $(CKHEADERS)
 	$(CHARMC) -o trace-projections.o trace-projections.C
 
-trace-summary.o:trace-summary.C trace-summary.h trace.h $(CKHEADERS)
+trace-summary.o:trace-summary.C trace-summary.h trace.h trace-common.h $(CKHEADERS)
 	$(CHARMC) -o trace-summary.o trace-summary.C
 
 
