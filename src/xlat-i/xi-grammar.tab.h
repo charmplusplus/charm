@@ -6,7 +6,6 @@ typedef union {
   TParam *tparam;
   TParamList *tparlist;
   Type *type;
-  EnType *rtype;
   PtrType *ptype;
   NamedType *ntype;
   FuncType *ftype;
@@ -14,6 +13,8 @@ typedef union {
   Message *message;
   Chare *chare;
   Entry *entry;
+  Parameter *pname;
+  ParamList *plist;
   Template *templat;
   TypeList *typelist;
   MemberList *mbrlist;
@@ -26,39 +27,44 @@ typedef union {
   MsgVarList *mvlist;
   char *strval;
   int intval;
+  Chare::attrib_t cattr;
 } YYSTYPE;
 #define	MODULE	257
 #define	MAINMODULE	258
 #define	EXTERN	259
 #define	READONLY	260
 #define	CHARE	261
-#define	GROUP	262
-#define	NODEGROUP	263
-#define	ARRAY	264
-#define	MESSAGE	265
-#define	CLASS	266
-#define	STACKSIZE	267
-#define	THREADED	268
-#define	MIGRATABLE	269
+#define	MAINCHARE	262
+#define	GROUP	263
+#define	NODEGROUP	264
+#define	ARRAY	265
+#define	MESSAGE	266
+#define	CLASS	267
+#define	STACKSIZE	268
+#define	THREADED	269
 #define	TEMPLATE	270
 #define	SYNC	271
 #define	EXCLUSIVE	272
 #define	VIRTUAL	273
-#define	VOID	274
-#define	PACKED	275
-#define	VARSIZE	276
-#define	ENTRY	277
-#define	MAINCHARE	278
-#define	IDENT	279
-#define	NUMBER	280
-#define	LITERAL	281
-#define	INT	282
-#define	LONG	283
-#define	SHORT	284
-#define	CHAR	285
-#define	FLOAT	286
-#define	DOUBLE	287
-#define	UNSIGNED	288
+#define	MIGRATABLE	274
+#define	CREATEHERE	275
+#define	CREATEHOME	276
+#define	VOID	277
+#define	CONST	278
+#define	PACKED	279
+#define	VARSIZE	280
+#define	ENTRY	281
+#define	IDENT	282
+#define	NUMBER	283
+#define	LITERAL	284
+#define	CPROGRAM	285
+#define	INT	286
+#define	LONG	287
+#define	SHORT	288
+#define	CHAR	289
+#define	FLOAT	290
+#define	DOUBLE	291
+#define	UNSIGNED	292
 
 
 extern YYSTYPE yylval;

@@ -6,15 +6,17 @@
 
 /* Global Variables and Functions - used in grammar.y */
 unsigned int lineno = 1;
+int in_bracket=0; /*Horrific hack to get "array length" code snippets (between []'s)*/
+int in_braces=0; /*Horrific hack to get SDAG entry code snippets (between {}'s)*/
 
 /* Local to file */
 static unsigned char in_comment=0;
 int search(char *s);
 
 /* We return Tokens only when not in a comment. */
-
 #define Return if (!in_comment) return
 #define	Token(x) x
+#define Yval yylval.strval = strcpy(new char[yyleng+1], yytext)
 
 #ifdef yywrap
 #undef yywrap
@@ -45,17 +47,20 @@ real	{real1}|{real2}
 
 literal	{number}|{real}|{string}
 
+nonBracket [^][]*
+nonBraces [^{}]*
+
 %%
+{nonBracket}	{ if (in_bracket) {Yval;return Token(CPROGRAM);} else REJECT;}
+{nonBraces}	{ if (in_braces) {Yval;return Token(CPROGRAM);} else REJECT;}
 "//".*		{ /* ignore single line comments */ }
 "\r"		{ /* ignore ^M characters for dos-unix compat */ }
 "/*"		{ in_comment = 1; /* Single line C-style comments */ }
 "*/"		{ in_comment = 0; }
 {ws}		{ /* ignore white space */ }
 {nl}		{ lineno++;}
-{number}	{ yylval.strval = strcpy(new char[yyleng+1], yytext); 
-		  Return Token(NUMBER); }
-{literal}	{ yylval.strval = strcpy(new char[yyleng+1], yytext); 
-		  Return Token(LITERAL); }
+{number}	{ Yval; Return Token(NUMBER); }
+{literal}	{ Yval; Return Token(LITERAL); }
 {name}		{ Return Token(search(yytext)); }
 .		{ Return Token(yytext[0]); }
 %%
@@ -78,12 +83,15 @@ struct rwtable rwtable[] = {
   "stacksize",	STACKSIZE,
   "threaded",	THREADED,
   "migratable",	MIGRATABLE,
+  "createhere",	CREATEHERE,
+  "createhome",	CREATEHOME,
   "template",	TEMPLATE,
   "class",	CLASS,
   "sync",	SYNC,
   "exclusive",	EXCLUSIVE,
   "virtual",    VIRTUAL,
   "void",	VOID,
+  "const",	CONST,
   "mainchare",	MAINCHARE,
   "packed",     PACKED,
   "varsize",    VARSIZE,

@@ -7,14 +7,22 @@
 
 #include <iostream.h>
 #include <fstream.h>
-//  #include <string>
 #include <stdlib.h>
 #include "xi-symbol.h"
 #include <ctype.h> // for tolower()
 
-CompileMode compilemode;
-MessageList message_list;
 int fortranMode;
+const char *cur_file;
+
+//Fatal error function
+void die(const char *why,int line)
+{
+	if (line==-1)
+		fprintf(stderr,"%s: Charmxi fatal error> %s\n",cur_file,why);
+	else
+		fprintf(stderr,"%s:%d: Charmxi fatal error> %s\n",cur_file,line,why);
+	exit(1);
+}
 
 // Make the name lower case
 char* fortranify(const char *s)
@@ -86,8 +94,12 @@ TParamList::print(XStr& str)
 void 
 Type::genProxyName(XStr &str) 
 {
-  cerr<< getBaseName() << " type has no proxy!!\n";
-  exit(1);
+  die("type::genProxyName called (INTERNAL ERROR)");
+}
+void 
+Type::genMsgProxyName(XStr &str) 
+{
+  die("type::genMsgProxyName called (INTERNAL ERROR)");
 }
     
 void 
@@ -114,6 +126,35 @@ TypeList::print(XStr& str)
   if(next) {
     str << ", ";
     next->print(str);
+  }
+}void TypeList::genProxyNames(XStr& str, const char *prefix, 
+                             const char *suffix, const char *sep)
+{
+  if(type) {
+    str << prefix;
+    type->genProxyName(str);
+    str << suffix;
+  }
+  if(next) {
+    str << sep;
+    next->genProxyNames(str, prefix, suffix, sep);
+  }
+}
+
+void TypeList::genProxyNames2(XStr& str, const char *prefix, 
+                             const char *middle, const char *suffix, 
+                             const char *sep)
+{
+  if(type) {
+    str << prefix;
+    type->genProxyName(str);
+    str << middle;
+    type->genProxyName(str);
+    str << suffix;
+  }
+  if(next) {
+    str << sep;
+    next->genProxyNames2(str, prefix, middle, suffix, sep);
   }
 }
 
@@ -279,7 +320,7 @@ Module::generate()
   if(!decl || !def) {
     cerr<<"Cannot open "<<topname.get_string()<<"or "
 	<<botname.get_string()<<" for writing!!\n";
-    exit(1);
+    die("cannot create output files (check directory permissions)\n");
   }
   decl<<declstr.get_string();
   def<<defstr.get_string();
@@ -381,22 +422,24 @@ static const char *CIChareEnd =
 "};\n"
 ;
 
-Chare::Chare(int ln, NamedType *t, TypeList *b, MemberList *l, int mig)
-	 : type(t), list(l), bases(b), migratable(mig) 
+Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, MemberList *l)
+	 : attrib(Nattr), type(t), list(l), bases(b)
 {
 	line = ln;
+	entryCount=1;
 	setTemplate(0); 
-	abstract=0;
 	if (list)
 	{
 		list->setChare(this);
-		if (list->isPure()) abstract=1;
+		if (list->isPure()) setAbstract(1);
 		else /*not at abstract class--*/
       		//Add migration constructor to MemberList
-		  if(!t->isTemplated() && migratable) {
+		  if(!t->isTemplated() && isMigratable()) {
 			Entry *e=new Entry(ln,SMIGRATE,NULL,
-			(char *)type->getBaseName(),
-			new PtrType(new NamedType("CkMigrateMessage")));
+			  (char *)type->getBaseName(),
+			  new ParamList(new Parameter(line,
+				new PtrType(new NamedType("CkMigrateMessage"))
+			  )));
 			e->setChare(this);
 			list=new MemberList(e,list);
 		  }
@@ -431,10 +474,6 @@ Chare::genRegisterMethodDef(XStr& str)
     bases->genProxyNames(str, "  _REGISTER_BASE(__idx, ", "::__idx);\n", "");
   if(list)
     list->genReg(str);
-  if(migratable) {
-    str << "      CkRegisterMigCtor(__idx, " << 
-	            "__idx_"<<type->getBaseName()<<"_CkMigrateMessage);\n";
-  }
   str << "    }\n";
   str << "#endif\n";
 }
@@ -553,9 +592,9 @@ Group::genSubDecls(XStr& str)
 
 
 //Array Constructor
-Array::Array(int ln, NamedType *index,
+Array::Array(int ln, attrib_t Nattr, NamedType *index,
 	NamedType *t, TypeList *b, MemberList *l)  
-    : Chare(ln,t,b,l,0x01) 
+    : Chare(ln,Nattr|CARRAY|CMIGRATABLE,t,b,l) 
 {
 	index->print(indexSuffix);
 	if (indexSuffix!=(const char*)"none")
@@ -623,7 +662,7 @@ Array::genSubDecls(XStr& str)
   if (indexSuffix!=(const char*)"none")
   {
     str <<
-    "//Generalized array indexing: (these KEEP the index you pass in!)\n"
+    "//Generalized array indexing:\n"
     "    "<<ptype<<" operator [] (const "<<indexType<<" &idx) const\n"
     "        {return "<<ptype<<"(_aid, idx);}\n"
     "    "<<ptype<<" operator() (const "<<indexType<<" &idx) const\n"
@@ -658,42 +697,6 @@ void
 Chare::genDefs(XStr& str)
 {
   str << "/* DEFS: "; print(str); str << " */\n";
-  if (fortranMode) { // For Fortran90
-    if (!isArray()) { // Currently, only arrays are supported
-      cerr << (char *)baseName() << ": only chare arrays are currently supported\n";
-      exit(1);
-    }
-    // We have to generate the chare array itself
-    str << "/* FORTRAN */\n";
-    str << "extern \"C\" void " << fortranify(baseName()) << "_allocate_(char **, void *, int *);\n";
-    str << "\n";
-    str << "class " << baseName() << " : public ArrayElement1D\n";
-    str << "{\n";
-    str << "public:\n";
-    str << "  char user_data[64];\n";
-    str << "public:\n";
-    str << "  " << baseName() << "()\n";
-    str << "  {\n";
-//    str << "    CkPrintf(\"" << baseName() << " %d created\\n\",thisIndex);\n";
-    str << "    CkArrayID *aid = &thisArrayID;\n";
-    str << "    " << fortranify(baseName()) << "_allocate_((char **)&user_data, &aid, &thisIndex);\n";
-    str << "  }\n";
-    str << "\n";
-    str << "  " << baseName() << "(CkMigrateMessage *m)\n";
-    str << "  {\n";
-    str << "    CkPrintf(\"" << baseName() << " %d migrating\\n\",thisIndex);\n";
-    str << "  }\n";
-    str << "\n";
-    str << "};\n";
-    str << "\n";
-    str << "extern \"C\" void " << fortranify(baseName()) << "_cknew_(int *numElem, long *aindex)\n";
-    str << "{\n";
-    str << "    CkArrayID *aid = new CkArrayID;\n";
-    str << "    *aid = CProxy_" << baseName() << "::ckNew(*numElem); \n";
-    str << "    *aindex = (long)aid;\n";
-    str << "}\n";
-
-  }
   if(!type->isTemplated()) {
     if(!templat) {
       str << "#ifndef CK_TEMPLATES_ONLY\n";
@@ -731,19 +734,6 @@ Chare::genReg(XStr& str)
   str << type<<"::__register(\""<<type<<"\", sizeof("<<type<<"));\n";
 }
 
-static const char *CIMsgClass =
-"{\n"
-"  public:\n"
-"    static int __idx;\n"
-"    void* operator new(size_t, const int);\n"
-"    void* operator new(size_t);\n"
-"    void operator delete(void *p){CkFreeMsg(p);}\n"
-"    void* operator new(size_t, void*p) {return p;}\n"
-"    void* operator new(size_t, int*, const int);\n"
-"    void* operator new(size_t, int*);\n"
-"    static void*alloc(int,size_t,int*,int);\n"
-;
-
 static const char *CIMsgClassAnsi =
 "{\n"
 "  public:\n"
@@ -768,9 +758,7 @@ Message::genAllocDecl(XStr &str)
   XStr mtype;
   mtype << type;
   if(templat) templat->genVars(mtype);
-  if(compilemode==ansi)
-    str << CIMsgClassAnsi;
-  else str << CIMsgClass;
+  str << CIMsgClassAnsi;
   str << "    CMessage_" << mtype << "() {};\n";
   str << "    static void *pack(" << mtype << " *p);\n";
   str << "    static " << mtype << "* unpack(void* p);\n";
@@ -780,12 +768,10 @@ Message::genAllocDecl(XStr &str)
     for(i=0;i<num;i++)
       str << "int, ";
     str << "const int);\n";
-    if(compilemode==ansi) {
-      str << "    void operator delete(void *p,";
-      for(i=0;i<num;i++)
+    str << "    void operator delete(void *p,";
+    for(i=0;i<num;i++)
         str << "int, ";
-      str << "const int){CkFreeMsg(p);}\n";
-    }
+    str << "const int){CkFreeMsg(p);}\n";
   }
 }
 
@@ -845,17 +831,6 @@ Message::genDefs(XStr& str)
     str << "#ifdef CK_TEMPLATES_ONLY\n";
   }
   if(!(external||type->isTemplated())) {
-
-    // Define the Marshalling message for Fortran
-    if (fortranMode)
-    {
-      str << "/* FORTRAN message */\n";
-      str << "class " << type 
-          << " : public CMessage_" << type << "\n";
-      str << "{\npublic:\n";
-      contents->genUnmarshalList2(str);
-      str << "};\n\n";
-    }
 
     // new (size_t)
     str << tspec << "void *" << ptype << "::operator new(size_t s){\n";
@@ -1069,19 +1044,6 @@ void
 Readonly::genDecls(XStr& str)
 {
   str << "/* DECLS: "; print(str); str << " */\n";
-  /*
-  if(container) { // local static var
-  } else { // global var
-    str << "extern ";
-    type->print(str);
-    if(msg)
-      str << "*";
-    str << " "<<name;
-    if(dims)
-      dims->print(str);
-    str << ";";
-  }
-  */
 }
 
 void
@@ -1114,10 +1076,7 @@ Readonly::genReg(XStr& str)
   if(external)
     return;
   if(msg) {
-    if(dims) {
-      cerr<<"line "<<line<<":Readonly Message cannot be an array!!\n";
-      exit(1);
-    }
+    if(dims) die("readonly Message cannot be an array",line);
     str << "  CkRegisterReadonlyMsg((void **) &";
     if(container) {
       str << container->baseName()<<"::";
@@ -1143,106 +1102,6 @@ void TParamList::genSpec(XStr& str)
   if(next) {
     str << ", ";
     next->genSpec(str);
-  }
-}
-
-void TypeList::genProxyNames(XStr& str, const char *prefix, 
-                             const char *suffix, const char *sep)
-{
-  if(type) {
-    str << prefix;
-    type->genProxyName(str);
-    str << suffix;
-  }
-  if(next) {
-    str << sep;
-    next->genProxyNames(str, prefix, suffix, sep);
-  }
-}
-
-void TypeList::genProxyNames2(XStr& str, const char *prefix, 
-                             const char *middle, const char *suffix, 
-                             const char *sep)
-{
-  if(type) {
-    str << prefix;
-    type->genProxyName(str);
-    str << middle;
-    type->genProxyName(str);
-    str << suffix;
-  }
-  if(next) {
-    str << sep;
-    next->genProxyNames2(str, prefix, middle, suffix, sep);
-  }
-}
-
-void TypeList::genUnmarshalList0(XStr& str, int depth)
-{
-  if(type) {
-//    type->print(str);
-    str << type->getBaseName();
-    str << "*";
-  }
-  if(next) {
-    str << ", ";
-    next->genUnmarshalList0(str, depth+1);
-  }
-}
-
-void TypeList::genUnmarshalList1(XStr& str, const char* message_name, int depth)
-{
-  if(type) {
-    if (type->typeName() != arrayType)
-      str << "&((" << message_name << "*)msg)->p" << depth;
-    else
-      str << "((" << message_name << "*)msg)->p" << depth;
-  }
-  if(next) {
-    str << ", ";
-    next->genUnmarshalList1(str, message_name, depth+1);
-  }
-}
-
-void TypeList::genUnmarshalList2(XStr& str, int depth)
-{
-  if(type) {
-//    str << "  " << type->getBaseName() << " p" << depth << ";\n";
-    char p[10];
-    sprintf(p, "p%d", depth);
-    type->printVar(str, p);
-    str<<";\n";
-  }
-  if(next) {
-    next->genUnmarshalList2(str, depth+1);
-  }
-}
-
-void TypeList::genUnmarshalList3(XStr& str, int depth)
-{
-  if(type) {
-    str << type->getBaseName() << " *p" << depth;
-  }
-  if(next) {
-    str << ", ";
-    next->genUnmarshalList3(str, depth+1);
-  }
-}
-
-void TypeList::genUnmarshalList4(XStr& str, int depth)
-{
-  if(type) {
-    if (type->typeName() != arrayType) 
-      str << "  msg->p" << depth << " = *p" << depth << ";\n";
-    else {
-      ArrayType *atype = (ArrayType *)type;
-      str << "  memcpy(msg->p" << depth << ", p" << depth << ", ";
-      atype->printDim(str);
-      str << "*sizeof(" << atype->getBaseName() << "));\n";
-    }
-  }
-  if(next) {
-    next->genUnmarshalList4(str, depth+1);
   }
 }
 
@@ -1279,64 +1138,67 @@ void MemberList::genReg(XStr& str)
 ///////////////////////////// ENTRY ////////////////////////////
 
 
-Entry::Entry(int l, int a, EnType *r, char *n, EnType *p, Value *sz) :
+Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz) :
       attribs(a), retType(r), name(n), param(p), stacksize(sz)
 { 
-  line=l; setChare(0); 
-  if(!isVirtual() && isPure()) {
-    cerr << "Line "<<line<<": Non-virtual methods cannot be pure virtual!!\n";
-    abort();
-  }
-  if(!isThreaded() && stacksize) {
-    cerr << "Line "<<line<<": Non-Threaded methods cannot have stacksize spec.!!\n";
-    abort();
-  }
-  if(retType && !isSync() && !retType->isVoid()) {
-    cerr << "Line "<<line<<": Async methods cannot have non-void return type!!\n";
-    abort();
-  }
+  line=l; container=NULL; 
+  entryCount=-1;
+  if(!isVirtual() && isPure()) die("Non-virtual methods cannot be pure virtual",line);
+  if(!isThreaded() && stacksize) die("Non-Threaded methods cannot have stacksize",line);
+  if(retType && !isSync() && !retType->isVoid()) 
+    die("Async methods cannot have non-void return type",line);
 }
-
+void Entry::setChare(Chare *c) {
+	Member::setChare(c);
+	if (param==NULL) 
+	{//Fake a parameter list of the appropriate type
+		Type *t;
+		if (isConstructor()&&container->isMainChare())
+			//Main chare always magically takes CkArgMsg
+			t=new PtrType(new NamedType("CkArgMsg"));
+		else
+			t=new BuiltinType("void");
+		param=new ParamList(new Parameter(line,t));
+	}
+	entryCount=c->nextEntry();
+}
 
 // "parameterType *msg" or "void".
 // Suitable for use as the only parameter
-XStr Entry::paramType(void)
+XStr Entry::paramType(int withDefaultVals)
 {
   XStr str;
-  if(param) {
-    str << param;
-    if(!param->isVoid())  
-    	str << "msg";
-  }
+  param->print(str,withDefaultVals);
   return str;
 }
 
 // "parameterType *msg," if there is a non-void parameter, 
 // else empty.  Suitable for use with another parameter following.
-XStr Entry::paramComma(void)
+XStr Entry::paramComma(int withDefaultVals)
 {
   XStr str;
-  if(param&&!param->isVoid())  
-  	str << param<<"msg, ";
+  if (!param->isVoid()) {
+  	param->print(str,withDefaultVals);
+  	str << ", ";
+  }
   return str;
 }
 
-// Returns a dummy message declaration if the current
-// parameter type is void.
-XStr Entry::voidParamDecl(void)
+XStr Entry::marshallMsg(int orMakeVoid)
 {
-  if((!param) || param->isVoid())
-    return "      void *msg = CkAllocSysMsg();\n";
-  else
-    return "";
+  XStr ret;
+  param->marshall(ret,orMakeVoid);
+  return ret;
 }
 
 XStr Entry::epIdx(int include__idx_)
 {
   XStr str;
   if(include__idx_) str << "__idx_";
-  str << name;
-  if(param) str << "_"<<param->getBaseName();
+  str << name << "_";
+  if (param->isMessage()) str<<param->getBaseName();
+  else if (param->isVoid()) str<<"void";
+  else str<<"marshall"<<entryCount;
   return str;
 }
 
@@ -1362,10 +1224,10 @@ void Entry::genChareDecl(XStr& str)
     genChareStaticConstructorDecl(str);
   } else {
     // entry method declaration
-    str << "    "<<Virtual()<<retType<<" "<<name<<"("<<paramType()<<");\n";
+    str << "    "<<Virtual()<<retType<<" "<<name<<"("<<paramType(1)<<");\n";
     // entry method declaration with future
     if(isSync()) {
-      str << "    "<<Virtual()<<" void "<<name<<"("<<paramComma()<<"CkFutureID*);\n";
+      str << "    "<<Virtual()<<" void "<<name<<"("<<paramComma(1)<<"CkFutureID*);\n";
     }
   }
 }
@@ -1377,25 +1239,23 @@ void Entry::genChareDefs(XStr& str)
   } else {
     // entry method definition
     container->genTSpec(str);
-    str << retType<<" "<<container->proxyName()<<"::"<<name<<"("<<paramType()<<")\n";
-    str << "{\n";
-    if(param->isVoid())
-      str << "  void *msg = CkAllocSysMsg();\n";
+    str << retType<<" "<<container->proxyName()<<"::"<<name<<"("<<paramType(0)<<")\n";
+    str << "{\n"<<marshallMsg();
     if(isSync()) {
       if(retType->isVoid()) {
-        str << "  CkFreeSysMsg(CkRemoteCall("<<epIdx()<<", msg, &_ck_cid));\n";
+        str << "  CkFreeSysMsg(CkRemoteCall("<<epIdx()<<", impl_msg, &_ck_cid));\n";
       } else {
-        str << "  return ("<<retType<<") CkRemoteCall("<<epIdx()<<", msg, &_ck_cid);\n";
+        str << "  return ("<<retType<<") CkRemoteCall("<<epIdx()<<", impl_msg, &_ck_cid);\n";
       }
     } else {
-      str << "  CkSendMsg("<<epIdx()<<", msg, &_ck_cid);\n";
+      str << "  CkSendMsg("<<epIdx()<<", impl_msg, &_ck_cid);\n";
     }
     str << "}\n";
     // entry method definition with future
     if(isSync()) {
-      str << makeDecl(" void")<<"::"<<name<<"("<<paramComma()<<"CkFutureID *fut)\n";
-      str << "{\n"<<voidParamDecl();
-      str << "  *fut = CkRemoteCallAsync("<<epIdx()<<", msg, &_ck_cid);\n";
+      str << makeDecl(" void")<<"::"<<name<<"("<<paramComma(0)<<"CkFutureID *fut)\n";
+      str << "{\n"<<marshallMsg();
+      str << "  *fut = CkRemoteCallAsync("<<epIdx()<<", impl_msg, &_ck_cid);\n";
       str << "}\n";
     }
   }
@@ -1405,28 +1265,27 @@ void Entry::genChareStaticConstructorDecl(XStr& str)
 {
   if(container->isAbstract()) return;
 
-  str << "    static void ckNew("<<paramComma()<<"int onPE=CK_PE_ANY);\n";
-  str << "    static void ckNew("<<paramComma()<<"CkChareID* pcid, int onPE=CK_PE_ANY);\n";
-  str << "    "<<container->proxyName(0)<<"("<<paramComma()<<"int onPE=CK_PE_ANY);\n";
-    
+  str << "    static void ckNew("<<paramComma(1)<<"int onPE=CK_PE_ANY);\n";
+  str << "    static void ckNew("<<paramComma(1)<<"CkChareID* pcid, int onPE=CK_PE_ANY);\n";
+  str << "    "<<container->proxyName(0)<<"("<<paramComma(1)<<"int onPE=CK_PE_ANY);\n";
 }
 
 void Entry::genChareStaticConstructorDefs(XStr& str)
 {
   if(container->isAbstract()) return;
   
-  str << makeDecl("void")<<"::ckNew("<<paramComma()<<"int onPE)\n";
-  str << "{\n"<<voidParamDecl();
-  str << "  CkCreateChare(__idx, "<<epIdx()<<", msg, 0, onPE);\n";
+  str << makeDecl("void")<<"::ckNew("<<paramComma(0)<<"int onPE)\n";
+  str << "{\n"<<marshallMsg();
+  str << "  CkCreateChare(__idx, "<<epIdx()<<", impl_msg, 0, onPE);\n";
   str << "}\n";
 
-  str << makeDecl("void")<<"::ckNew("<<paramComma()<<"CkChareID* pcid, int onPE)\n";
-  str << "{\n"<<voidParamDecl();
-  str << "  CkCreateChare(__idx, "<<epIdx()<<", msg, pcid, onPE);\n";
+  str << makeDecl("void")<<"::ckNew("<<paramComma(0)<<"CkChareID* pcid, int onPE)\n";
+  str << "{\n"<<marshallMsg();
+  str << "  CkCreateChare(__idx, "<<epIdx()<<", impl_msg, pcid, onPE);\n";
   str << "}\n";
-  str << makeDecl(" ")<<"::"<<container->proxyName(0)<<"("<<paramComma()<<"int onPE)\n";
-  str << "{\n"<<voidParamDecl();
-  str << "  CkCreateChare(__idx, "<<epIdx()<<", msg, &_ck_cid, onPE);\n";
+  str << makeDecl(" ")<<"::"<<container->proxyName(0)<<"("<<paramComma(0)<<"int onPE)\n";
+  str << "{\n"<<marshallMsg();
+  str << "  CkCreateChare(__idx, "<<epIdx()<<", impl_msg, &_ck_cid, onPE);\n";
   str << "}\n";
 }
 
@@ -1438,7 +1297,7 @@ void Entry::genArrayDecl(XStr& str)
     genArrayStaticConstructorDecl(str);
   } else {
     // entry method broadcast declaration
-    str << "    "<<Virtual()<<retType<<" "<<name<<"("<<paramType()<<") const;\n";
+    str << "    "<<Virtual()<<retType<<" "<<name<<"("<<paramType(1)<<") const;\n";
   }
 }
 
@@ -1448,15 +1307,19 @@ void Entry::genArrayDefs(XStr& str)
     genArrayStaticConstructorDefs(str);
   else
   {//Define array entry method
+    const char *ifNot="CkArray_IfNotThere_buffer";
+    if (isCreateHere()) ifNot="CkArray_IfNotThere_createhere";
+    if (isCreateHome()) ifNot="CkArray_IfNotThere_createhome";
     container->genTSpec(str);
-    str<<retType<<" "<<container->proxyName()<<"::"<<name<<"("<<paramType()<<") const\n";
-    str<< "{\n";
-    if (!param||param->isVoid())
-      str << "      CkArrayMessage *msg=(CkArrayMessage*)CkAllocMsg(0, sizeof(CkArrayMessage),0);\n";
-    str << "      if(_idx.nInts==-1) \n";
-    str << "        base_broadcast(msg, "<<epIdx()<<");\n";
-    str << "      else\n";
-    str << "        base_send(msg, "<<epIdx()<<");\n";
+    str<<retType<<" "<<container->proxyName()<<
+    		"::"<<name<<"("<<paramType(0)<<") const\n";
+    str << "{\n"<<marshallMsg();
+    str << "  if(_idx.nInts==-1) \n";
+    str << "    base_broadcast((CkArrayMessage *)impl_msg, "
+    		<<epIdx()<<", "<<ifNot<<");\n";
+    str << "  else\n";
+    str << "    base_send((CkArrayMessage *)impl_msg, "
+    		<<epIdx()<<", "<<ifNot<<");\n";
     str << "}\n";
   }
 }
@@ -1467,28 +1330,30 @@ void Entry::genArrayStaticConstructorDecl(XStr& str)
   
   if ( ((Array *)container) ->is1D())
       str<< //With numInitial
-      "    static CkArrayID ckNew("<<paramComma()<<"int numInitial,CkGroupID mapID=_RRMapID);\n";
+      "    static CkArrayID ckNew("<<paramComma(1)<<"int numInitial,CkGroupID mapID=_RRMapID);\n";
     
   str<<
-    "    void insert("<<paramComma()<<"int onPE=-1);";
+    "    void insert("<<paramComma(1)<<"int onPE=-1);";
 }
 
 void Entry::genArrayStaticConstructorDefs(XStr& str)
 {
     if(container->isAbstract()) return;
     
-    const char *callMsg;//"msg" or "NULL"
-    if (!param||param->isVoid()) callMsg="NULL"; else callMsg="msg";
+    const char *callMsg;//"impl_msg" or "NULL"
+    if (param->isVoid()) callMsg="NULL"; else callMsg="(CkArrayMessage *)impl_msg";
     
     //Add user-callable array constructors--
     if (((Array *)container)->is1D())
     //1D element constructors can take a number of initial elements
        str<< //With numInitial
-       makeDecl("CkArrayID")<<"::ckNew("<<paramComma()<<"int numElements,CkGroupID mapID)\n"
-       "{ return CkArrayID(buildArrayGroup("<<epIdx()<<",numElements,mapID,"<<callMsg<<"));}\n";
+       makeDecl("CkArrayID")<<"::ckNew("<<paramComma(0)<<"int numElements,CkGroupID mapID)\n"
+       "{ \n"<<marshallMsg(0)<<
+       "   return CkArrayID(buildArrayGroup("<<epIdx()<<",numElements,mapID,"<<callMsg<<"));\n}\n";
     str<<
-    makeDecl("void")<<"::insert("<<paramComma()<<"int onPE)\n"
-    "{ base_insert("<<epIdx()<<",onPE,"<<callMsg<<");}\n";
+    makeDecl("void")<<"::insert("<<paramComma(0)<<"int onPE)\n"
+    "{ \n"<<marshallMsg(0)<<
+    "   base_insert("<<epIdx()<<",onPE,"<<callMsg<<");\n}\n";
 }
 
 
@@ -1504,51 +1369,51 @@ void Entry::genGroupDecl(XStr& str)
   } else {
     // entry method broadcast declaration
     if(!isSync()) {
-      str << "    "<<Virtual()<<retType<<" "<<name<<"("<<paramType()<<")";
-      str << "{\n"<<voidParamDecl();
+      str << "    "<<Virtual()<<retType<<" "<<name<<"("<<paramType(1)<<")";
+      str << "{\n"<<marshallMsg();
       str << "      if(_isChare())\n";
-      str << "        CkSendMsg("<<epIdx()<<", msg, &_ck_cid);\n";
+      str << "        CkSendMsg("<<epIdx()<<", impl_msg, &_ck_cid);\n";
       str << "      else\n";
-      str << "        CkBroadcastMsg"<<node<<"Branch("<<epIdx()<<", msg, _ck_gid);\n";
+      str << "        CkBroadcastMsg"<<node<<"Branch("<<epIdx()<<", impl_msg, _ck_gid);\n";
       str << "    }\n";
     }
     // entry method onPE declaration
-    str << "    "<<Virtual()<<retType<<" "<<name<<"("<<paramComma()<<"int onPE)";
-    str << " {\n"<<voidParamDecl();
+    str << "    "<<Virtual()<<retType<<" "<<name<<"("<<paramComma(1)<<"int onPE)";
+    str << " {\n"<<marshallMsg();
     if(isSync()) {
       if(retType->isVoid()) {
         str << "    CkFreeSysMsg(";
       } else {
         str << "    return ("<<retType<<") ";
       }
-      str << "(CkRemote"<<node<<"BranchCall("<<epIdx()<<", "<<paramComma()<<"_ck_gid, onPE));\n";
+      str << "(CkRemote"<<node<<"BranchCall("<<epIdx()<<", "<<paramComma(1)<<"_ck_gid, onPE));\n";
       str << "    }\n";
     } else {
-      str << "      CkSendMsg"<<node<<"Branch("<<epIdx()<<", msg, onPE, _ck_gid);\n";
+      str << "      CkSendMsg"<<node<<"Branch("<<epIdx()<<", impl_msg, onPE, _ck_gid);\n";
       str << "    }\n";
     }
     // entry method on multi PEs declaration
     if(!isSync() && !container->isNodeGroup()) {
-      str << "    "<<Virtual()<<retType<<" "<<name<<"("<<paramComma();
+      str << "    "<<Virtual()<<retType<<" "<<name<<"("<<paramComma(1);
       str << "int npes, int *pes)";
-      str << " {\n"<<voidParamDecl();
+      str << " {\n"<<marshallMsg();
       str << "      CkSendMsg"<<node<<"BranchMulti(";
-      str <<epIdx()<<", msg, npes, pes, _ck_gid);\n";
+      str <<epIdx()<<", impl_msg, npes, pes, _ck_gid);\n";
       str << "    }\n";
     }
     // entry method onPE declaration with future
     if(isSync()) {
-      str << "    "<<Virtual()<<"void "<<name<<"("<<paramComma()<<"int onPE, CkFutureID *fut)";
-      str << " {\n"<<voidParamDecl();
+      str << "    "<<Virtual()<<"void "<<name<<"("<<paramComma(1)<<"int onPE, CkFutureID *fut)";
+      str << " {\n"<<marshallMsg();
       str << "      *fut = ";
-      str << "CkRemote"<<node<<"BranchCallAsync("<<epIdx()<<", msg, _ck_gid, onPE);\n";
+      str << "CkRemote"<<node<<"BranchCallAsync("<<epIdx()<<", impl_msg, _ck_gid, onPE);\n";
       str << "    }\n";
     }
     // entry method forChare declaration with future
     if(isSync()) {
-      str << "    "<<Virtual()<<"void "<<name<<"("<<paramComma()<<"CkFutureID *fut)";
-      str << " {\n"<<voidParamDecl();
-      str << "      *fut = CkRemoteCallAsync("<<epIdx()<<", msg, &_ck_cid);\n";
+      str << "    "<<Virtual()<<"void "<<name<<"("<<paramComma(1)<<"CkFutureID *fut)";
+      str << " {\n"<<marshallMsg();
+      str << "      *fut = CkRemoteCallAsync("<<epIdx()<<", impl_msg, &_ck_cid);\n";
       str << "    }\n";
     }
   }
@@ -1565,10 +1430,10 @@ void Entry::genGroupStaticConstructorDecl(XStr& str)
 {
   if(container->isAbstract()) return;
 
-  str << "    static CkGroupID ckNew("<<paramType()<<");\n";
-  str << "    static CkGroupID ckNewSync("<<paramType()<<");\n";
-  str << "    "<<container->proxyName(0)<<"("<<paramComma()<<"int retEP, CkChareID *cid);\n";
-  str << "    "<<container->proxyName(0)<<"("<<paramType()<<");\n";
+  str << "    static CkGroupID ckNew("<<paramType(1)<<");\n";
+  str << "    static CkGroupID ckNewSync("<<paramType(1)<<");\n";
+  str << "    "<<container->proxyName(0)<<"("<<paramComma(1)<<"int retEP, CkChareID *cid);\n";
+  str << "    "<<container->proxyName(0)<<"("<<paramType(1)<<");\n";
 }
 
 void Entry::genGroupStaticConstructorDefs(XStr& str)
@@ -1577,26 +1442,26 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
   
   //Selects between NodeGroup and Group
   char *node = (char *)(container->isNodeGroup()?"Node":"");
-  str << makeDecl("CkGroupID")<<"::ckNew("<<paramType()<<")\n";
-  str << "{\n"<<voidParamDecl();
-  str << "  return CkCreate"<<node<<"Group(__idx, "<<epIdx()<<", msg, 0, 0);\n";
+  str << makeDecl("CkGroupID")<<"::ckNew("<<paramType(0)<<")\n";
+  str << "{\n"<<marshallMsg();
+  str << "  return CkCreate"<<node<<"Group(__idx, "<<epIdx()<<", impl_msg, 0, 0);\n";
   str << "}\n";
 
-  str << makeDecl("CkGroupID")<<"::ckNewSync("<<paramType()<<")\n";
-  str << "{\n"<<voidParamDecl();
-  str << "  return CkCreate"<<node<<"GroupSync(__idx, "<<epIdx()<<", msg);\n";
+  str << makeDecl("CkGroupID")<<"::ckNewSync("<<paramType(0)<<")\n";
+  str << "{\n"<<marshallMsg();
+  str << "  return CkCreate"<<node<<"GroupSync(__idx, "<<epIdx()<<", impl_msg);\n";
   str << "}\n";
 
   str << makeDecl(" ")<<"::"<<container->proxyName(0)<<
-         "("<<paramComma()<<"int retEP, CkChareID *cid)\n";
-  str << "{\n"<<voidParamDecl();
-  str << "  _ck_gid = CkCreate"<<node<<"Group(__idx, "<<epIdx()<<", msg, retEP, cid);\n";
+         "("<<paramComma(0)<<"int retEP, CkChareID *cid)\n";
+  str << "{\n"<<marshallMsg();
+  str << "  _ck_gid = CkCreate"<<node<<"Group(__idx, "<<epIdx()<<", impl_msg, retEP, cid);\n";
   str << "  _setChare(0);\n";
   str << "}\n";
 
-  str << makeDecl(" ")<<"::"<<container->proxyName(0)<<"("<<paramType()<<")\n";
-  str << "{\n"<<voidParamDecl();
-  str << "  _ck_gid = CkCreate"<<node<<"Group(__idx, "<<epIdx()<<", msg, 0, 0);\n";
+  str << makeDecl(" ")<<"::"<<container->proxyName(0)<<"("<<paramType(0)<<")\n";
+  str << "{\n"<<marshallMsg();
+  str << "  _ck_gid = CkCreate"<<node<<"Group(__idx, "<<epIdx()<<", impl_msg, 0, 0);\n";
   str << "  _setChare(0);\n";
   str << "}\n";
 }
@@ -1605,18 +1470,13 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
 
 void Entry::genDecls(XStr& str)
 {
-  if(container->isArray()&&param==NULL) {param=new BuiltinType("void");}
-  if(isConstructor() && retType && !retType->isVoid()) {
-    cerr << "Line "<<line<<": Constructors cannot return a value!!\n";
-    abort();
-  }
+  if(isConstructor() && retType && !retType->isVoid())
+    die("Constructors cannot return a value",line);
   
   str << "/* DECLS: "; print(str); str << " */\n";
-  if(retType==0 && !isConstructor()) {
-      cerr<<"line "<<line<<":Entry methods must specify a return type. ";
-      cerr<<"use void if necessary\n";
-      exit(1);
-  }  
+  if(retType==0 && !isConstructor())
+      die("Entry methods must specify a return type-- \n"
+      	"use void if necessary",line);
   
   if (attribs&SMIGRATE) 
     {} //User cannot call the migration constructor
@@ -1632,30 +1492,19 @@ void Entry::genDecls(XStr& str)
   str << "    static int  "<<epIdx()<<";\n";
   
   // ckIdx, so user can find the entry point number
-  str << "    static int  ckIdx_"<<name<<"("<<paramType()<<") { return "<<epIdx()<<"; }\n"; 
+  str << "    static int  ckIdx_"<<name<<"("<<paramType(1)<<") { return "<<epIdx()<<"; }\n"; 
 
   // call function declaration
   if(isConstructor() && container->isAbstract())
     return;
   else {
-    str << "    static void _call_"<<epIdx(0)<<"(";
-    if(param) {
-      str << "void* msg, ";
-    } else {
-      if(!isConstructor()) {
-        cerr <<"line "<<line<<" Only constructors allowed to have empty parameter list\n";
-        exit(1);
-      }
-      str << "CkArgMsg* msg, ";
-    }
-    str << container->baseName()<< "* obj);\n";
+    str << "    static void _call_"<<epIdx(0)<<"(void* impl_msg, ";
+    str << container->baseName()<< "* impl_obj);\n";
     if(isThreaded()) {
       str << "    static void _callthr_"<<epIdx(0)<<"(CkThrCallArg *);\n";
     }
   }
 }
-
-
 
 //This routine is only used in Entry::genDefs.
 // It ends the current procedure with a call to awaken another thread,
@@ -1668,32 +1517,19 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
   procFull<<procName;
   
   str << "  CthAwaken(CthCreate((CthVoidFn)"<<procFull
-   <<", new CkThrCallArg(msg,obj), "<<getStackSize()<<"));\n}\n";
-  str << makeDecl("void")<<"::"<<procFull<<"(CkThrCallArg *arg)\n";
+   <<", new CkThrCallArg(impl_msg,impl_obj), "<<getStackSize()<<"));\n}\n";
+  str << makeDecl("void")<<"::"<<procFull<<"(CkThrCallArg *impl_arg)\n";
   str << "{\n";\
-  str << "  void *msg = arg->msg;\n";
-  str << "  "<<container->baseName()<<" *obj = ("<<container->baseName()<<" *) arg->obj;\n";
-  str << "  delete arg;\n";
+  str << "  void *impl_msg = impl_arg->msg;\n";
+  str << "  "<<container->baseName()<<" *impl_obj = ("<<container->baseName()<<" *) impl_arg->obj;\n";
+  str << "  delete impl_arg;\n";
   return str;
 }
 
 void Entry::genDefs(XStr& str)
 {
   XStr containerType=container->baseName();
-  XStr cpType,cpComma;
-  char *freeMsgVoid=(char*) "";
-  if((!param)||(param->isVoid()))
-  {
-    if(container->isArray())
-      freeMsgVoid=(char*) "  CkFreeMsg(msg);\n";
-    else
-      freeMsgVoid=(char*) "  CkFreeSysMsg(msg);\n";
-  }
-  if(param&&!param->isVoid())
-  {//Add type casts for the message parameter
-     cpType<<"("<<param<<")msg";
-     cpComma<<"("<<param<<")msg,";
-  }
+  XStr preCall,postCall;
   
   str << "/* DEFS: "; print(str); str << " */\n";
   
@@ -1710,135 +1546,47 @@ void Entry::genDefs(XStr& str)
   } else
     genChareDefs(str);
   
-  // call function
+  // Add special pre- and post- call code
   if(isConstructor() && container->isAbstract())
     return; // no call function for a constructor of an abstract chare
   else if(isSync()) {
   //A synchronous method can return a value, and must finish before
   // the caller can proceed.
-    if(isConstructor()) {
-      cerr<<"line "<<line<<":Constructors cannot be sync methods."<<endl;
-      exit(1);
-    }
-    str << makeDecl("void")<<"::_call_"<<epIdx(0)<<"(void* msg, "<<containerType<<"* obj)\n";
-    str << "{\n";
-    if(isThreaded()) str << callThread(epIdx(0));
-    str << "  int ref = CkGetRefNum(msg), src = CkGetSrcPe(msg);\n";
-    str << "  void *retMsg=";
+    if(isConstructor()) die("Constructors cannot be [sync]",line);
+    preCall<< "  int impl_ref = CkGetRefNum(impl_msg), impl_src = CkGetSrcPe(impl_msg);\n";
+    preCall << "  void *impl_retMsg=";
     if(retType->isVoid()) {
-      str << "CkAllocSysMsg();\n  ";
+      preCall << "CkAllocSysMsg();\n  ";
     } else {
-      str << "(void *) ";
+      preCall << "(void *) ";
     }
-    str << "obj->"<<name<<"("<<cpType<<");\n"<<freeMsgVoid;
-    str << "  CkSendToFuture(ref, retMsg, src);\n";
-    str << "}\n";
+    
+    postCall << "  CkSendToFuture(impl_ref, impl_retMsg, impl_src);\n";
   } else if(isExclusive()) {
   //An exclusive method 
-    if(!container->isNodeGroup()) {
-      cerr<<"line "<<line<<":Only entry methods of a nodegroup can be exclusive."<<endl;
-      exit(1);
-    }
-    if(isConstructor()) {
-      cerr<<"line "<<line<<":Constructors cannot be exclusive methods."<<endl;
-      exit(1);
-    }
-    if(param==0) {
-      cerr<<"line "<<line<<":Entry methods must specify a message parameter. ";
-      cerr<<"use void if necessary\n";
-      exit(1);
-    }
-    str << makeDecl("void")<<"::_call_"<<epIdx(0)<<"(void* msg, "<<containerType<<"* obj)\n";
-    str << "{\n";
-    if(isThreaded()) str << callThread(epIdx(0));
-    str << "  if(CmiTryLock(obj->__nodelock)) {\n";
-    str << "    "<<container->proxyName()<<" pobj(CkGetNodeGroupID());\n";
-    str << "    pobj."<<name<<"("<<cpComma<<"CkMyNode());\n"<<freeMsgVoid;
-    str << "    return;\n";
-    str << "  }\n";
-    str << "  obj->"<<name<<"("<<cpType<<");\n"<<freeMsgVoid;
-    str << "  CmiUnlock(obj->__nodelock);\n";
-    str << "}\n";
-  } else {//Not sync, exclusive, or an array constructor-- just a regular method
-
-    if (!isConstructor() && fortranMode) { // Fortran90
-      const char* msg_name = param->getBaseName();
-      TypeList *msg_contents = (message_list.find(msg_name))->getContents();
-
-      str << "/* FORTRAN SECTION */\n";
-
-      // Declare the Fortran Entry Function
-      // This is called from C++
-      str << "extern \"C\" void " << fortranify(name) << "_(char **, int*, ";
-      msg_contents->genUnmarshalList0(str);
-      str << ");\n";
-
-/*
-      // Define the Marshalling message
-      str << "class " << msg_name 
-          << " : public CMessage_" << msg_name << "\n";
-      str << "{\npublic:\n";
-      msg_contents->genUnmarshalList2(str);
-      str << "};\n";
-*/
-
-      // Define the Fortran interface function
-      // This is called from Fortran to send the message to a chare.
-      str << "extern \"C\" void "
-        //<< container->proxyName() << "_" 
-          << fortranify("SendTo_")
-	  << fortranify(container->baseName())
-          << "_" << fortranify(name)
-          << "_(long* aindex, int *index, ";
-      msg_contents->genUnmarshalList3(str);
-      str << ")\n";
-      str << "{\n";
-      str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
-      str << "\n";
-      str << "  // marshalling\n";
-      str << "  " << container->proxyName() << " h(*aid);\n";
-      str << "  " << msg_name <<" *msg = new " << msg_name <<";\n";
-      //      str << "    msg->data = *data;\n";
-      msg_contents->genUnmarshalList4(str);
-      str << "  h[*index]." << name << "(msg);\n";
-      str << "}\n";
-    }
-
-    str << makeDecl("void")<<"::_call_"<<epIdx(0)
-      <<"("<<((param)?"void":"CkArgMsg")<<"* msg, "<<containerType<<"* obj)\n";
-    str << "{\n";
-    if(isThreaded()) str << callThread(epIdx(0));
-    if(isConstructor()) {
-      str << "  new (obj) "<<containerType;
-      if(param) {
-        if(!param->isVoid()) {
-          str << "(("<<param<<")msg);\n";
-        } else {//Constructor takes no msg-- must blow away old parameter
-          str << "();\n";
-          if (container->isArray()) str << "  CkFreeMsg(msg);\n";
-          else str << "  CkFreeSysMsg(msg);\n";
-        }
-      } else {//For main chare--
-        str << "((CkArgMsg*)msg);\n";
-      }
-    } else {//Not a constructor
-      if (fortranMode) { // Fortran90
-        str << "  int index = obj->getIndex();\n";
-        str << "  " << fortranify(name)
-            << "_((char **)(obj->user_data), &index, ";
-        const char* msg_name = param->getBaseName();
-        TypeList *msg_contents = (message_list.find(msg_name))->getContents();
-        msg_contents->genUnmarshalList1(str, param->getBaseName());
-        str << ");\n";
-      } else {
-        if(isThreaded()&&(param->isVoid()))
-          str << freeMsgVoid<<"  obj->"<<name<<"("<<cpType<<");\n";
-	else
-          str << "  obj->"<<name<<"("<<cpType<<");\n"<<freeMsgVoid;
-      }
-    }
-    str << "}\n";
+    if(!container->isNodeGroup()) die("only nodegroup methods can be exclusive",line);
+    if(isConstructor()) die("Constructors cannot be [exclusive]",line);
+    preCall << "  if(CmiTryLock(impl_obj->__nodelock)) {\n"; /*Resend msg. if lock busy*/
+    /******* DANGER-- RESEND CODE UNTESTED **********/
+    preCall << "    CkSendMsgNodeBranch("<<epIdx(1)<<",impl_msg,CkMyNode(),CkGetNodeGroupID());\n";
+    preCall << "    return;\n";
+    preCall << "  }\n";
+    
+    postCall << "  CmiUnlock(impl_obj->__nodelock);\n";
   }
+  
+  //Generate the call-method body
+  str << makeDecl("void")<<"::_call_"<<epIdx(0)<<"(void* impl_msg, "<<containerType<<"* impl_obj)\n";
+  str << "{\n";
+  if(isThreaded()) str << callThread(epIdx(0));
+  str << preCall;
+  param->beginUnmarshall(str);
+  if(isConstructor()) str << "  new (impl_obj) "<<containerType;
+  else str << "  impl_obj->"<<name;
+  str<<"("; param->unmarshall(str); str<<");\n";
+  param->endUnmarshall(str);
+  str << postCall;
+  str << "}\n";
 }
 
 void Entry::genReg(XStr& str)
@@ -1846,30 +1594,199 @@ void Entry::genReg(XStr& str)
   str << "    /* REG: "<<*this << "*/\n";
   if(isConstructor() && container->isAbstract())
     return;
-    
-  str << "      "<<epIdx()<<" = CkRegisterEp(\""<<name 
- <<"\", (CkCallFnPtr)_call_"<<epIdx(0)<<", ";
-  if(param && !param->isVoid() && !(attribs&SMIGRATE)) {
+  
+  str << "      "<<epIdx()<<" = CkRegisterEp(\""<<name<<"("<<paramType(0)
+  	<<")\", (CkCallFnPtr)_call_"<<epIdx(0)<<", ";
+  if (param->isMarshalled()) {
+    str<<"CkMarshallMsg::__idx";
+  } else if(!param->isVoid() && !(attribs&SMIGRATE)) {
     param->genMsgProxyName(str);
-    str << "::__idx, ";
+    str <<"::__idx";
   } else {
-    str << "0, ";
+    str << "0";
   }
-  str << "__idx);\n";
-  if(container->isMainChare() && isConstructor()) {
-    str << "      CkRegisterMainChare(__idx, "<<epIdx()<<");\n";
+  str << ", __idx);\n";
+  if (isConstructor()) {
+    if(container->isMainChare())
+      str << "      CkRegisterMainChare(__idx, "<<epIdx()<<");\n";
+    if(param->isVoid())
+      str << "      CkRegisterDefaultCtor(__idx, "<<epIdx()<<");\n";
+    if(attribs&SMIGRATE)
+      str << "      CkRegisterMigCtor(__idx, "<<epIdx()<<");\n";
   }
 }
 
 
+/******************* C/C++ Parameter Marshalling ******************
+For entry methods like:
+	entry void foo(int nx,double xarr[nx],complex<float> yarr[ny],long ny);
 
+We generate code on the call-side (in the proxy entry method) to 
+create a message and copy the user's parameters into it.  Scalar
+fields are PUP'd, arrays are just memcpy'd.
 
+The message looks like this:
 
+messagestart>--------- PUP'd data ----------------
+	|  PUP'd nx
+	|  PUP'd offset-to-xarr (from array start, int byte count)
+	|  PUP'd offset-to-yarr
+	|  PUP'd ny
+	+-------------------------------------------
+	|  alignment gap (to multiple of 16 bytes)
+arraystart>------- xarr data ----------
+	| xarr[0]
+	| xarr[1]
+	| ...
+	| xarr[nx-1]
+	+------------------------------
+	|  alignment gap (for yarr-elements)
+	+--------- yarr data ----------
+	| yarr[0]
+	| yarr[1]
+	| ...
+	| yarr[ny-1]
+	+------------------------------
 
+On the recieve side, all the scalar fields are PUP'd to fresh
+stack copies, and the arrays are passed to the user as pointers
+into the message data-- so there's no copy on the receive side.
 
+The message is freed after the user entry returns.
+*/
+Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
+	const char *NarrLen,Value *Nvalue)
+    	:type(Ntype), name(Nname), arrLen(NarrLen), val(Nvalue),line(Nline)
+{
+	if (isMessage())
+		name="impl_msg";
+	if (name==NULL && !isVoid()) 
+	{/*Fabricate a unique name for this marshalled param.*/
+		static int unnamedCount=0;
+		name=new char[50];
+		sprintf((char *)name,"impl_noname_%x",unnamedCount++);
+	}
+}
 
+void ParamList::print(XStr &str,int withDefaultValues)
+{
+    	param->print(str,withDefaultValues);
+    	if (next) {
+    		str<<", ";
+    		next->print(str,withDefaultValues);
+    	}
+}
+void Parameter::print(XStr &str,int withDefaultValues) 
+{
+    	type->print(str);
+    	if (arrLen!=NULL)
+    		str<<"*";
+    	if (name!=NULL)
+    		str<<" "<<name;
+    	if (withDefaultValues)
+	    	if (val!=NULL) {str<<" = ";val->print(str);}
+}
 
+void ParamList::callEach(fn_t f,XStr &str)
+{
+	ParamList *cur=this;
+	do { 
+		((cur->param)->*f)(str);
+	} while (NULL!=(cur=cur->next));
+}
 
+/** marshalling: pack fields into flat byte buffer **/
+void ParamList::marshall(XStr &str,int makeVoid)
+{
+	if (isVoid() && makeVoid)
+		str<<"  void *impl_msg = CkAllocSysMsg();\n";
+	else if (isMarshalled()) 
+	{
+		str<<"  //Marshall: ";print(str,0);str<<"\n";
+		//First pass: find sizes
+		str<<"  int impl_off=0, impl_arrstart=0;\n";
+		callEach(&Parameter::marshallArraySizes,str);
+		str<<"  { //Find the size of the PUP'd data\n";
+		str<<"    PUP::sizer p;\n";
+		callEach(&Parameter::pup,str);
+		str<<"    impl_off+=(impl_arrstart=CK_ALIGN(p.size(),16));\n";
+		str<<"  }\n";
+		//Now that we know the size, allocate the packing buffer
+		str<<"  CkMarshallMsg *impl_msg=new (impl_off,0)CkMarshallMsg();\n";
+		//Second pass: write the data
+		str<<"  { //Copy over the PUP'd data\n";
+		str<<"    PUP::toMem p((void *)impl_msg->msgBuf);\n";
+		callEach(&Parameter::pup,str);
+		str<<"  }\n";
+		str<<"  char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
+		callEach(&Parameter::marshallArrayData,str);
+	}
+}
+void Parameter::marshallArraySizes(XStr &str)
+{
+	Type *dt=type->deref();//Type, without &
+	if (dt->isPointer()) 
+		die("can't pass pointers across processors--\n"
+		    "Indicate the array length with []'s, or pass a reference",line);
+	if (isArray()) {
+		str<<"  int impl_off_"<<name<<", impl_cnt_"<<name<<";\n";
+		str<<"  impl_off_"<<name<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<dt<<"));\n";
+		str<<"  impl_off+=(impl_cnt_"<<name<<"=sizeof("<<dt<<")*("<<arrLen<<"));\n";
+	}
+}
+void Parameter::pup(XStr &str) {
+	if (isArray())  str<<"    p|impl_off_"<<name<<";\n";
+	else  str<<"    p|"<<name<<";\n";
+}
+void Parameter::marshallArrayData(XStr &str)
+{
+	if (isArray())
+		str<<"  memcpy(impl_buf+impl_off_"<<name<<
+			","<<name<<",impl_cnt_"<<name<<");\n";
+}
 
-
-
+/** unmarshalling: unpack fields from flat buffer **/
+void ParamList::beginUnmarshall(XStr &str) 
+{
+    	if (isMarshalled()) 
+    	{
+    		str<<"  //Unmarshall: ";print(str,0);str<<"\n";
+    		str<<"  char *impl_buf=((CkMarshallMsg *)impl_msg)->msgBuf;\n";
+    		str<<"  PUP::fromMem p(impl_buf);\n";
+    		callEach(&Parameter::beginUnmarshall,str);
+    		str<<"  impl_buf+=CK_ALIGN(p.size(),16);\n";
+    	}
+}
+void Parameter::beginUnmarshall(XStr &str) 
+{
+	Type *dt=type->deref();//Type, without &
+	if (isArray())
+		str<<"  int impl_off_"<<name<<"; p|impl_off_"<<name<<";\n";
+	else
+		str<<"  "<<dt<<" "<<name<<"; p|"<<name<<";\n";
+}
+void ParamList::unmarshall(XStr &str) 
+{
+    	if (isMessage()) str<<"("<<param->type<<")impl_msg";
+    	else if (isMarshalled()) {
+    		param->unmarshall(str);
+    		if (next) {
+    			str<<", ";
+    			next->unmarshall(str);
+    		}
+    	}
+}
+void Parameter::unmarshall(XStr &str)
+{
+	if (isArray())
+		str<<"("<<type->deref()<<" *)(impl_buf+impl_off_"<<name<<")";
+	else
+		str<<name;
+}
+void ParamList::endUnmarshall(XStr &str) 
+{
+    	if (isVoid()) {str<<"  CkFreeSysMsg(impl_msg);\n";}
+    	else if (isMarshalled()) {
+    		str<<"  delete (CkMarshallMsg *)impl_msg;\n";
+    	}
+}

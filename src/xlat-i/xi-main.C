@@ -19,6 +19,7 @@ extern ModuleList *modlist;
 
 ModuleList *Parse(char *interfacefile)
 {
+  cur_file=interfacefile;
   FILE * fp = fopen (interfacefile, "r") ;
   if (fp) {
     yyin = fp ;
@@ -42,7 +43,6 @@ main(int argc, char *argv[])
   char *fname;
   char *option=0;
 
-  compilemode = original;
   fortranMode = 0;
 
   switch (argc) {
@@ -63,9 +63,6 @@ main(int argc, char *argv[])
   default:
     abortxi(argv[0]);
   }
-  
-  if (option != 0 && strcmp(option,"-ansi")==0)
-    compilemode = ansi;
 
   if (option != 0 && strcmp(option,"-f90")==0)
     fortranMode = 1;

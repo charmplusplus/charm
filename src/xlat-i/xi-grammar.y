@@ -5,6 +5,7 @@
 extern int yylex (void) ;
 void yyerror(const char *);
 extern unsigned int lineno;
+extern int in_bracket,in_braces;
 ModuleList *modlist;
 
 %}
@@ -17,7 +18,6 @@ ModuleList *modlist;
   TParam *tparam;
   TParamList *tparlist;
   Type *type;
-  EnType *rtype;
   PtrType *ptype;
   NamedType *ntype;
   FuncType *ftype;
@@ -25,6 +25,8 @@ ModuleList *modlist;
   Message *message;
   Chare *chare;
   Entry *entry;
+  Parameter *pname;
+  ParamList *plist;
   Template *templat;
   TypeList *typelist;
   MemberList *mbrlist;
@@ -37,56 +39,57 @@ ModuleList *modlist;
   MsgVarList *mvlist;
   char *strval;
   int intval;
+  Chare::attrib_t cattr;
 }
 
 %token MODULE
 %token MAINMODULE
 %token EXTERN
 %token READONLY
-%token <intval> CHARE GROUP NODEGROUP ARRAY
+%token <intval> CHARE MAINCHARE GROUP NODEGROUP ARRAY
 %token MESSAGE
 %token CLASS
 %token STACKSIZE
 %token THREADED
-%token MIGRATABLE
 %token TEMPLATE
-%token SYNC EXCLUSIVE VIRTUAL
+%token SYNC EXCLUSIVE VIRTUAL MIGRATABLE CREATEHERE CREATEHOME
 %token VOID
+%token CONST
 %token PACKED
 %token VARSIZE
 %token ENTRY
-%token <intval> MAINCHARE
-%token <strval> IDENT NUMBER LITERAL
+%token <strval> IDENT NUMBER LITERAL CPROGRAM
 %token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED
 
 %type <modlist>		ModuleEList File
 %type <module>		Module
 %type <conslist>	ConstructEList ConstructList
 %type <construct>	Construct
-%type <strval>		Name QualName OptNameInit
+%type <strval>		Name QualName CCode OptNameInit
 %type <val>		OptStackSize
 %type <intval>		OptExtern OptSemiColon MAttribs MAttribList MAttrib
 %type <intval>		EAttribs EAttribList EAttrib OptPure
-%type <intval>		CAttribs CAttribList CAttrib
+%type <cattr>		CAttribs CAttribList CAttrib
 %type <tparam>		TParam
 %type <tparlist>	TParamList TParamEList OptTParams
-%type <type>		Type SimpleType OptTypeInit 
-%type <rtype>		OptType EParam
-%type <type>		BuiltinType ArrayType
+%type <type>		Type SimpleType OptTypeInit EReturn
+%type <type>		BuiltinType
 %type <ftype>		FuncType
-%type <ntype>		NamedType ArrayIndexType
+%type <ntype>		NamedType QualNamedType ArrayIndexType
 %type <ptype>		PtrType OnePtrType
 %type <readonly>	Readonly ReadonlyMsg
 %type <message>		Message TMessage
 %type <chare>		Chare Group NodeGroup Array TChare TGroup TNodeGroup TArray
 %type <entry>		Entry
 %type <templat>		Template
-%type <typelist>	BaseList OptBaseList TypeList
+%type <pname>           Parameter ParamBracketStart
+%type <plist>           ParamList EParameters
+%type <typelist>	BaseList OptBaseList
 %type <mbrlist>		MemberEList MemberList
 %type <member>		Member
 %type <tvar>		TVar
 %type <tvarlist>	TVarList TemplateSpec
-%type <val>		ArrayDim Dim
+%type <val>		ArrayDim Dim DefaultParameter
 %type <vallist>		DimList
 %type <mv>		Var
 %type <mvlist>		VarList
@@ -189,11 +192,11 @@ TParamEList	: /* Empty */
 		{ $$ = $1; }
 		;
 
-OptTParams	: /* Empty */
-		{ $$ = 0; }
-		| '<' TParamEList '>'
-		{ $$ = $2; }
-		;
+OptTParams	:  /* Empty */
+                { $$ = 0; }
+                | '<' TParamEList '>'
+                { $$ = $2; }
+                ;
 
 BuiltinType	: INT
 		{ $$ = new BuiltinType("int"); }
@@ -206,11 +209,11 @@ BuiltinType	: INT
 		| UNSIGNED INT
 		{ $$ = new BuiltinType("unsigned int"); }
 		| UNSIGNED LONG
-		{ $$ = new BuiltinType("long"); }
+		{ $$ = new BuiltinType("unsigned long"); }
 		| UNSIGNED SHORT
-		{ $$ = new BuiltinType("short"); }
+		{ $$ = new BuiltinType("unsigned short"); }
 		| UNSIGNED CHAR
-		{ $$ = new BuiltinType("char"); }
+		{ $$ = new BuiltinType("unsigned char"); }
 		| LONG LONG
 		{ $$ = new BuiltinType("long long"); }
 		| FLOAT
@@ -223,13 +226,12 @@ BuiltinType	: INT
 		{ $$ = new BuiltinType("void"); }
 		;
 
-NamedType	: Name OptTParams
-		{ $$ = new NamedType($1, $2); }
-		;
+NamedType	: Name OptTParams { $$ = new NamedType($1,$2); };
+QualNamedType	: QualName OptTParams { $$ = new NamedType($1,$2); };
 
 SimpleType	: BuiltinType
 		{ $$ = $1; }
-		| NamedType
+		| QualNamedType
 		{ $$ = $1; }
 		;
 
@@ -243,38 +245,30 @@ PtrType		: OnePtrType '*'
 		{ $1->indirect(); $$ = $1; }
 		;
 
-ArrayDim	: NUMBER
-		{ $$ = new Value($1); }
-		| Name
-		{ $$ = new Value($1); }
-		;
-
-ArrayType	: Type '[' ArrayDim ']'
-		{ $$ = new ArrayType($1, $3); }
-		;
-
-FuncType	: Type '(' '*' Name ')' '(' TypeList ')'
+FuncType	: Type '(' '*' Name ')' '(' ParamList ')'
 		{ $$ = new FuncType($1, $4, $7); }
 		;
 
 Type		: SimpleType
 		{ $$ = $1; }
 		| OnePtrType
-		{ $$ = (Type*) $1; }
+		{ $$ = $1; }
 		| PtrType
-		{ $$ = (Type*) $1; }
-		| ArrayType
 		{ $$ = $1; }
 		| FuncType
 		{ $$ = $1; }
+		| Type '[' ArrayDim ']'
+		{ $$ = new ArrayType($1,$3); }
+		| Type '&'
+		{ $$ = new ReferenceType($1); }
+/*		| CONST Type   ...Causes ambiguity somehow...
+		{ $$ = new ConstType($2); }  */
 		;
-
-TypeList	: /* Empty */
-		{ $$ = 0; }
-		| Type
-		{ $$ = new TypeList($1); }
-		| Type ',' TypeList
-		{ $$ = new TypeList($1, $3); }
+		
+ArrayDim	: NUMBER
+		{ $$ = new Value($1); }
+		| QualName
+		{ $$ = new Value($1); }
 		;
 
 Dim		: '[' ArrayDim ']'
@@ -332,7 +326,7 @@ CAttribList	: CAttrib
 		;
 
 CAttrib		: MIGRATABLE
-		{ $$ = 0x01; }
+		{ $$ = Chare::CMIGRATABLE; }
 		;
 
 Var		: Type Name '[' ']' ';'
@@ -347,10 +341,8 @@ VarList		: Var
 
 Message		: MESSAGE MAttribs NamedType
 		{ $$ = new Message(lineno, $3); }
-		| MESSAGE MAttribs NamedType '{' TypeList '}'
-		{ $$ = new Message(lineno, $3, $5); }
 		| MESSAGE MAttribs NamedType '{' VarList '}'
-		{ $$ = new Message(lineno, $3, 0, $5); }
+		{ $$ = new Message(lineno, $3, $5); }
 		;
 
 OptBaseList	: /* Empty */
@@ -366,17 +358,17 @@ BaseList	: NamedType
 		;
 
 Chare		: CHARE CAttribs NamedType OptBaseList MemberEList
-		{ $$ = new Chare(lineno, $3, $4, $5, $2); }
+		{ $$ = new Chare(lineno, $2, $3, $4, $5); }
 		| MAINCHARE CAttribs NamedType OptBaseList MemberEList
-		{ $$ = new MainChare(lineno, $3, $4, $5, $2); }
+		{ $$ = new MainChare(lineno, $2, $3, $4, $5); }
 		;
 
 Group		: GROUP CAttribs NamedType OptBaseList MemberEList
-		{ $$ = new Group(lineno, $3, $4, $5, $2); }
+		{ $$ = new Group(lineno, $2, $3, $4, $5); }
 		;
 
 NodeGroup	: NODEGROUP CAttribs NamedType OptBaseList MemberEList
-		{ $$ = new NodeGroup(lineno, $3, $4, $5, $2); }
+		{ $$ = new NodeGroup(lineno, $2, $3, $4, $5); }
 		;
 
 ArrayIndexType	: '[' NUMBER Name ']'
@@ -390,25 +382,25 @@ ArrayIndexType	: '[' NUMBER Name ']'
 		;
 
 Array		: ARRAY ArrayIndexType NamedType OptBaseList MemberEList
-		{ $$ = new Array(lineno, $2, $3, $4, $5); }
+		{ $$ = new Array(lineno, 0, $2, $3, $4, $5); }
 		;
 
 TChare		: CHARE CAttribs Name OptBaseList MemberEList
-		{ $$ = new Chare(lineno, new NamedType($3), $4, $5, $2);}
+		{ $$ = new Chare(lineno, $2, new NamedType($3), $4, $5);}
 		| MAINCHARE CAttribs Name OptBaseList MemberEList
-		{ $$ = new MainChare(lineno, new NamedType($3), $4, $5, $2); }
+		{ $$ = new MainChare(lineno, $2, new NamedType($3), $4, $5); }
 		;
 
 TGroup		: GROUP CAttribs Name OptBaseList MemberEList
-		{ $$ = new Group(lineno, new NamedType($3), $4, $5, $2); }
+		{ $$ = new Group(lineno, $2, new NamedType($3), $4, $5); }
 		;
 
 TNodeGroup	: NODEGROUP CAttribs Name OptBaseList MemberEList
-		{ $$ = new NodeGroup( lineno, new NamedType($3), $4, $5, $2); }
+		{ $$ = new NodeGroup( lineno, $2, new NamedType($3), $4, $5); }
 		;
 
 TArray		: ARRAY ArrayIndexType Name OptBaseList MemberEList
-		{ $$ = new Array( lineno, $2, new NamedType($3), $4, $5); }
+		{ $$ = new Array( lineno, 0, $2, new NamedType($3), $4, $5); }
 		;
 
 TMessage	: MESSAGE MAttribs Name ';'
@@ -479,12 +471,16 @@ Member		: Entry ';'
 		{ $$ = $1; }
 		;
 
-Entry		: ENTRY EAttribs VOID Name EParam OptPure OptStackSize
-		{ $$ = new Entry(lineno, $2|$6, new BuiltinType("void"), $4, $5, $7); }
-		| ENTRY EAttribs OnePtrType Name EParam OptPure OptStackSize
+Entry		: ENTRY EAttribs EReturn Name EParameters OptPure OptStackSize
 		{ $$ = new Entry(lineno, $2|$6, $3, $4, $5, $7); }
-		| ENTRY EAttribs Name EParam
-		{ $$ = new Entry(lineno, $2, 0, $3, $4, 0); }
+		| ENTRY EAttribs Name EParameters /*Constructor*/
+		{ $$ = new Entry(lineno, $2,     0, $3, $4,  0); }
+		;
+
+EReturn		: VOID
+		{ $$ = new BuiltinType("void"); }
+		| OnePtrType
+		{ $$ = $1; }
 		;
 
 EAttribs	: /* Empty */
@@ -507,18 +503,66 @@ EAttrib		: THREADED
 		{ $$ = SLOCKED; }
 		| VIRTUAL
 		{ $$ = SVIRTUAL; }
+		| CREATEHERE
+		{ $$ = SCREATEHERE; }
+		| CREATEHOME
+		{ $$ = SCREATEHOME; }
 		;
 
-OptType		: /* Empty */
-		{ $$ = 0; }
-		| VOID
-		{ $$ = new BuiltinType("void"); }
-		| OnePtrType
+DefaultParameter: LITERAL
+		{ $$ = new Value($1); }
+		| NUMBER
+		{ $$ = new Value($1); }
+		| QualName
+		{ $$ = new Value($1); }
+		;
+
+CCode		: CPROGRAM
 		{ $$ = $1; }
+		| CPROGRAM '[' CPROGRAM ']' CPROGRAM
+		{  /*Returned only when in_bracket*/
+			char *tmp = new char[strlen($1)+strlen($3)+strlen($5)+3];
+			sprintf(tmp,"%s[%s]%s", $1, $3, $5);
+			$$ = tmp;
+		}
+		| CPROGRAM '{' CPROGRAM '}' CPROGRAM
+		{ /*Returned only when in_braces*/
+			char *tmp = new char[strlen($1)+strlen($3)+strlen($5)+3];
+			sprintf(tmp,"%s{%s}%s", $1, $3, $5);
+			$$ = tmp;
+		}
 		;
 
-EParam		: '(' OptType ')'
+ParamBracketStart : Type Name '['
+		{  /*Start grabbing CPROGRAM segments*/
+			in_bracket=1;
+			$$ = new Parameter(lineno, $1,$2);
+		}
+		;
+
+Parameter	: Type
+		{ $$ = new Parameter(lineno, $1);}
+		| Type Name
+		{ $$ = new Parameter(lineno, $1,$2);}
+		| Type Name '=' DefaultParameter
+		{ $$ = new Parameter(lineno, $1,$2,0,$4);} 
+		| ParamBracketStart CCode ']'
+		{ /*Stop grabbing CPROGRAM segments*/
+			in_bracket=0;
+			$$ = new Parameter(lineno, $1->getType(), $1->getName() ,$2);
+		} 
+		;
+
+ParamList	: Parameter
+		{ $$ = new ParamList($1); }
+		| Parameter ',' ParamList
+		{ $$ = new ParamList($1,$3); }
+		;
+
+EParameters	: '(' ParamList ')'
 		{ $$ = $2; }
+		| '(' ')'
+		{ $$ = 0; }
 		;
 
 OptStackSize	: /* Empty */
@@ -530,13 +574,13 @@ OptStackSize	: /* Empty */
 OptPure		: /* Empty */
 		{ $$ = 0; }
 		| '=' NUMBER
-		{ if(strcmp($2, "0")) { yyerror("expected 0"); exit(1); }
+		{ if(strcmp($2, "0")) { yyerror("pure virtual must '=0'"); exit(1); }
 		  $$ = SPURE; 
 		}
 		;
 %%
 void yyerror(const char *mesg)
 {
-  cout << "Syntax error at line " << lineno << ": " << mesg << endl;
+  cout << cur_file<<":"<<lineno<<": Charmxi syntax error> " << mesg << endl;
   // return 0;
 }
