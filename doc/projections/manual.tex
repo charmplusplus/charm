@@ -1,6 +1,19 @@
-\documentclass[10pt,dvips]{article}
-\usepackage{../pplmanual,epsfig,graphicx}
+%\documentclass[10pt,dvips]{article}
+\documentclass[10pt]{article}
+\usepackage{../pplmanual}
+\usepackage[pdftex]{graphicx}
+%\usepackage[dvips]{graphicx}
+%\usepackage[usenames,dvipsnames]{color}
+%\usepackage[pdftex]{hyperref}
+\usepackage{epsfig}
 \input{../pplmanual}
+
+\ifpdf
+\DeclareGraphicsExtensions{.jpg,.pdf,.mps,.png}
+\else
+\DeclareGraphicsExtensions{.eps}
+\fi
+
 
 \title{\projections{} Manual}
 \version{2.1}
@@ -323,12 +336,14 @@ Supplying the optional {\tt NAME.sts} file in the command line will
 cause projections to load data from the file at startup. This shortcut
 saves time selecting the desired dataset via the GUI's file dialog.
 
-\begin{figure}[htb]
+\begin{figure}[hbt]
 \center
-\epsfig{figure=fig/front-with-summary.eps,height=4in}
+%\epsfig{figure=fig/front-with-summary.eps,height=4in}
+\includegraphics[width=4.0in]{fig/front-with-summary}
 \caption{\projections{} main window}
 \label{mainwindow}
 \end{figure}
+
 
 When \projections{} is started, it will display a main window as shown
 in figure \ref{mainwindow}. If summary (.sum) files are available in
@@ -413,12 +428,15 @@ implemented at this time, you can look at the console window to see
 which log file is being analyzed.  Even for large amounts of data,
 this step should not take more than a few minutes, though.
 
-\begin{figure}[htb]
-\center 
-\epsfig{figure=fig/graph.eps,height=4.3in}
+\begin{figure}[hbt]
+\center
+%\epsfig{figure=fig/graph.eps,height=4.3in}
+\includegraphics[width=4.3in]{fig/graph}
 \caption{Graph module}
 \label{graph}
 \end{figure}
+
+
 
 The Graph Window has 3 components in its display:
 \begin{enumerate}
@@ -523,7 +541,8 @@ doing at each moment of the program.
 
 \begin{figure}[htb]
 \center
-\epsfig{figure=fig/timeline.eps,height=3.8in}
+%\epsfig{figure=fig/timeline.eps,height=3.8in}
+\includegraphics[width=3.8in]{fig/timeline}
 \caption{Timeline module}
 \label{timeline}
 \end{figure}
@@ -625,7 +644,8 @@ Checkboxes:
 
    \begin{figure}[htb]
    \center
-   \epsfig{figure=fig/userevent.eps,height=1.5in}
+%\epsfig{figure=fig/userevent.eps,height=1.5in}
+   \includegraphics[height=1.5in]{fig/userevent}
    \caption{User Event Window}
    \label{userevent}
    \end{figure}
@@ -686,7 +706,8 @@ look at.  This is similar to the dialog for the Timelines.
 
 \begin{figure}[htb]
 \center
-\epsfig{figure=fig/usageprofile.eps,height=4in}
+%\epsfig{figure=fig/usageprofile.eps,height=4in}
+\includegraphics[width=4.0in]{fig/usageprofile}
 \caption{Usage Profile}
 \label{usage profile}
 \end{figure}
@@ -712,7 +733,8 @@ DESCRIPTION OF COMMUNICATION HISTOGRAM FUNCTIONALITY HERE PLEASE ...
 
 \begin{figure}[htb]
 \center
-\epsfig{figure=fig/commhistogram.eps,height=4in}
+%\epsfig{figure=fig/commhistogram.eps,height=4in}
+\includegraphics[width=4.0in]{fig/commhistogram}
 \caption{Communication Histogram View}
 \label{communication histogram}
 \end{figure}
@@ -739,7 +761,8 @@ execution time falling in different time bins.
 
 \begin{figure}[htb]
 \center
-\epsfig{figure=fig/histogram.eps,height=4in}
+%\epsfig{figure=fig/histogram.eps,height=4in}
+\includegraphics[width=4.0in]{fig/histogram}
 \caption{Histogram view}
 \label{histogram}
 \end{figure}
@@ -769,7 +792,8 @@ during the execution.
 
 \begin{figure}[htb]
 \center
-\epsfig{figure=fig/overview.eps,height=4in}
+%\epsfig{figure=fig/overview.eps,height=4in}
+\includegraphics[width=4.0in]{fig/overview}
 \caption{Overview}
 \label{overview}
 \end{figure}
@@ -794,7 +818,8 @@ time and a specified interval size.
 
 \begin{figure}[htb]
 \center
-\epsfig{figure=fig/animation.eps,height=4in}
+%\epsfig{figure=fig/animation.eps,height=4in}
+\includegraphics[width=4.0in]{fig/animation}
 \caption{Animation View}
 \label{animation}
 \end{figure}
@@ -821,7 +846,8 @@ DESCRIPTION OF THE TIME PROFILE GRAPH TOOL.
 
 \begin{figure}[htb]
 \center
-\epsfig{figure=fig/timeprofile.eps,height=4in}
+%\epsfig{figure=fig/timeprofile.eps,height=4in}
+\includegraphics[width=4.0in]{fig/timeprofile}
 \caption{Time Profile Graph View}
 \label{time profile}
 \end{figure}
