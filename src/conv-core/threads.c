@@ -118,6 +118,8 @@
 
 #if CMK_THREADS_BUILD_CONTEXT
 #define CMK_THREADS_USE_CONTEXT       1
+#elif CMK_THREADS_BUILD_JCONTEXT
+#define CMK_THREADS_USE_JCONTEXT       1
 #elif  CMK_THREADS_BUILD_FIBERS
 #define CMK_THREADS_ARE_WIN32_FIBERS  1
 #elif  CMK_THREADS_BUILD_PTHREADS
@@ -980,17 +982,35 @@ Note: on some machine like Sun and IBM SP, one needs to link with memory gnuold
 
 Written by Gengbin Zheng around April 2001
 */
-#elif  CMK_THREADS_USE_CONTEXT
+#elif (CMK_THREADS_USE_CONTEXT || CMK_THREADS_USE_JCONTEXT)
 
 #include <signal.h>
-#include <ucontext.h>
 #include <errno.h>
+
+#if CMK_THREADS_USE_CONTEXT
+/* system builtin context routines: */
+#include <ucontext.h>
+
+#define uJcontext_t ucontext_t
+#define setJcontext setcontext
+#define getJcontext getcontext
+#define swapJcontext swapcontext
+#define makeJcontext makecontext
+typedef void (*uJcontext_fn_t)(void);
+
+#else /* CMK_THREADS_USE_JCONTEXT */
+/* Orion's setjmp-based context routines: */
+#include <uJcontext.h>
+#include <uJcontext.c>
+
+#endif
+
 
 struct CthThreadStruct
 {
   CthThreadBase base;
   double * dummy;
-  ucontext_t context;
+  uJcontext_t context;
 };
 
 
@@ -1000,7 +1020,8 @@ CthThread t;
   CthThreadBaseInit(&t->base);
 }
 
-CpvStaticDeclare(void *, stackPool);
+/* Threads waiting to be destroyed */
+CpvStaticDeclare(CthThread , doomedThreadPool);
 
 void CthInit(char **argv)
 {
@@ -1010,9 +1031,11 @@ void CthInit(char **argv)
   t = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(t);
   CthCpvAccess(CthCurrent)=t;
+  if (0 != getJcontext(&t->context))
+    CmiAbort("CthInit: getcontext failed.\n");
   CthThreadInit(t);
-  CpvInitialize(void *, stackPool);
-  CpvAccess(stackPool) = NULL;
+  CpvInitialize(CthThread, doomedThreadPool);
+  CpvAccess(doomedThreadPool) = (CthThread)NULL;
 
   /* don't trust the _defaultStackSize */
   if (CthCpvAccess(_defaultStackSize) < MINSIGSTKSZ) 
@@ -1021,20 +1044,21 @@ void CthInit(char **argv)
 
 static void CthThreadFree(CthThread t)
 {
-  /* avoid freeing stack since it is being used, store in stackPool and 
-     free it next time, note the last stack in stackPool won't be free'd! */
-  if (CpvAccess(stackPool) != NULL) free(CpvAccess(stackPool));
-  CpvAccess(stackPool) = t->base.stack;
-  t->base.stack = NULL;
-  CthThreadBaseFree(&t->base);
-  free(t);
+  /* avoid freeing thread while it is being used, store in pool and 
+     free it next time. Note the last thread in pool won't be free'd! */
+  CthThread doomed=CpvAccess(doomedThreadPool);
+  CpvAccess(doomedThreadPool) = t;
+  if (doomed != NULL) {
+    CthThreadBaseFree(&doomed->base);
+    free(doomed);
+  }
 }
 
 void CthFree(CthThread t)
 {
   if (t==NULL) return;
   if (t==CthCpvAccess(CthCurrent)) {
-    t->base.exiting = 1;
+    t->base.exiting = 1; /* thread is already running-- free on next swap out */
   } else {
     CthThreadFree(t);
   }
@@ -1045,14 +1069,18 @@ CthThread t;
 {
   CthThread tc;
   tc = CthCpvAccess(CthCurrent);
-  if (t == tc) return;
-  CthBaseResume(t);
-  if (tc->base.exiting) {
-    CthThreadFree(tc);
-    setcontext(&t->context);
-  } else {
-    if (0 != swapcontext(&tc->context, &t->context)) 
-      CmiAbort("CthResume: swapcontext failed.\n");
+  if (t != tc) { /* Actually switch threads */
+    CthBaseResume(t);
+    if (!tc->base.exiting) 
+    {
+      if (0 != swapJcontext(&tc->context, &t->context)) 
+        CmiAbort("CthResume: swapcontext failed.\n");
+    } 
+    else /* tc->base.exiting, so jump directly to next context */ 
+    {
+      CthThreadFree(tc);
+      setJcontext(&t->context);
+    }
   }
 /*This check will mistakenly fail if the thread migrates (changing tc)
   if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
@@ -1068,37 +1096,54 @@ void CthStartThread(qt_userf_t fn,void *arg)
 #define STP_STKALIGN(sp, alignment) \
   ((void *)((((qt_word_t)(sp)) + (alignment) - 1) & ~((alignment)-1)))
 
+int ptrDiffLen(const void *a,const void *b) {
+	char *ac=(char *)a, *bc=(char *)b;
+	int ret=ac-bc;
+	if (ret<0) ret=-ret;
+	return ret;
+}
+
 static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
 {
   CthThread result;
-  char *stack;
+  char *stack, *ss_sp, *ss_end;
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
-  if (size) size += SIGSTKSZ;
-  else size = CthCpvAccess(_defaultStackSize);
-#ifdef CMK_MEMORY_PAGESIZE
-  size = (size/CMK_MEMORY_PAGESIZE + 1) * CMK_MEMORY_PAGESIZE;
-#endif
+  if (size<MINSIGSTKSZ) size = CthCpvAccess(_defaultStackSize);
   CthAllocateStack(&result->base,&size,migratable);
   stack = result->base.stack;
-#if CMK_STACK_GROWUNKNOWN || CMK_STACK_GROWDOWN
-#if CMK_STACK_GROWUNKNOWN
-  stack = stack +  size/2;
-#elif CMK_STACK_GROWDOWN
-  stack = stack +  size - MINSIGSTKSZ;
-#endif
-  stack=STP_STKALIGN(stack, sizeof(char*)*8);
-  size = stack - (char *)result->base.stack;
-#endif
-  if (0 != getcontext(&result->context))
+  
+  if (0 != getJcontext(&result->context))
     CmiAbort("CthCreateInner: getcontext failed.\n");
-  result->context.uc_stack.ss_sp = stack;
-  result->context.uc_stack.ss_size = size;
+
+  ss_end = stack + size;
+
+/**
+ Decide where to point the uc_stack.ss_sp field of our "context"
+ structure.  The configuration values CMK_CONTEXT_STACKBEGIN, 
+ CMK_CONTEXT_STACKEND, and CMK_CONTEXT_STACKMIDDLE determine where to
+ point ss_sp: to the beginning, end, and middle of the stack buffer
+ respectively.  The default, used by most machines, is CMK_CONTEXT_STACKBEGIN.
+*/
+#if CMK_THREADS_USE_JCONTEXT /* Jcontext is always STACKBEGIN */
+  ss_sp = stack;
+#elif CMK_CONTEXT_STACKEND /* ss_sp should point to *end* of buffer */
+  ss_sp = stack+size-MINSIGSTKSZ; /* the MINSIGSTKSZ seems like a hack */
+  ss_end = stack;
+#elif CMK_CONTEXT_STACKMIDDLE /* ss_sp should point to *middle* of buffer */
+  ss_sp = stack+size/2;
+#else /* CMK_CONTEXT_STACKBEGIN, the usual case  */
+  ss_sp = stack;
+#endif
+  
+  result->context.uc_stack.ss_sp = STP_STKALIGN(ss_sp,sizeof(char *)*8);
+  result->context.uc_stack.ss_size = ptrDiffLen(result->context.uc_stack.ss_sp,ss_end);
   result->context.uc_stack.ss_flags = 0;
   result->context.uc_link = 0;
+  
   errno = 0;
-  makecontext(&result->context, (void (*) (void))CthStartThread, 2, fn, arg);
+  makeJcontext(&result->context, (uJcontext_fn_t)CthStartThread, 2, (void *)fn,(void *)arg);
   if(errno !=0) { 
     perror("makecontext"); 
     CmiAbort("CthCreateInner: makecontext failed.\n");
