@@ -308,4 +308,9 @@ public:
 #define BpvAccessOther(v, r)        CtvAccess(v, r)
 #endif
 
+#include "blue-conv.h"
+
 #endif
+
+
+

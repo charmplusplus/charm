@@ -848,7 +848,7 @@ static void beginExitHandlerFunc(void *msg);
 static void writeToDisk();
 static void sendCorrectionStats();
 
-CmiHandler exitHandlerFunc(char *msg)
+static CmiHandler exitHandlerFunc(char *msg)
 {
   // TODO: free memory before exit
   int i,j;
