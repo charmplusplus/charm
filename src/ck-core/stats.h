@@ -69,11 +69,84 @@ class Stats {
     UInt getNodeGroupsCreated(void) const { return nodeGroupInitsCreated; }
     UInt getNodeGroupsProcessed(void) const { return nodeGroupInitsProcessed; }
     UInt getNodeGroupMsgsCreated(void) const { return nodeGroupMsgsCreated; }
-    UInt getNodeGroupMsgsProcessed(void) const { return nodeGroupMsgsProcessed; }
+    UInt getNodeGroupMsgsProcessed(void) const {return nodeGroupMsgsProcessed;}
 };
 
-#ifndef CMK_OPTIMIZE
 CpvExtern(Stats*, _myStats);
-#endif
 
+#ifndef CMK_OPTIMIZE
+#define _STATS_RECORD_CREATE_CHARE_1() \
+          CpvAccess(_myStats)->recordCreateChare()
+#define _STATS_RECORD_CREATE_CHARE_N(x) \
+          CpvAccess(_myStats)->recordCreateChare(x)
+#define _STATS_RECORD_PROCESS_CHARE_1() \
+          CpvAccess(_myStats)->recordProcessChare()
+#define _STATS_RECORD_PROCESS_CHARE_N(x) \
+          CpvAccess(_myStats)->recordProcessChare(x)
+#define _STATS_RECORD_SEND_MSG_1() \
+          CpvAccess(_myStats)->recordSendMsg()
+#define _STATS_RECORD_SEND_MSG_N(x) \
+          CpvAccess(_myStats)->recordSendMsg(x)
+#define _STATS_RECORD_PROCESS_MSG_1() \
+          CpvAccess(_myStats)->recordProcessMsg()
+#define _STATS_RECORD_PROCESS_MSG_N(x) \
+          CpvAccess(_myStats)->recordProcessMsg(x)
+#define _STATS_RECORD_CREATE_GROUP_1() \
+          CpvAccess(_myStats)->recordCreateGroup()
+#define _STATS_RECORD_CREATE_GROUP_N(x) \
+          CpvAccess(_myStats)->recordCreateGroup(x)
+#define _STATS_RECORD_PROCESS_GROUP_1() \
+          CpvAccess(_myStats)->recordProcessGroup()
+#define _STATS_RECORD_PROCESS_GROUP_N(x) \
+          CpvAccess(_myStats)->recordProcessGroup(x)
+#define _STATS_RECORD_SEND_BRANCH_1() \
+          CpvAccess(_myStats)->recordSendBranch()
+#define _STATS_RECORD_SEND_BRANCH_N(x) \
+          CpvAccess(_myStats)->recordSendBranch(x)
+#define _STATS_RECORD_PROCESS_BRANCH_1() \
+          CpvAccess(_myStats)->recordProcessBranch()
+#define _STATS_RECORD_PROCESS_BRANCH_N(x) \
+          CpvAccess(_myStats)->recordProcessBranch(x)
+#define _STATS_RECORD_CREATE_NODE_GROUP_1() \
+          CpvAccess(_myStats)->recordCreateNodeGroup()
+#define _STATS_RECORD_CREATE_NODE_GROUP_N(x) \
+          CpvAccess(_myStats)->recordCreateNodeGroup(x)
+#define _STATS_RECORD_PROCESS_NODE_GROUP_1() \
+          CpvAccess(_myStats)->recordProcessNodeGroup()
+#define _STATS_RECORD_PROCESS_NODE_GROUP_N(x) \
+          CpvAccess(_myStats)->recordProcessNodeGroup(x)
+#define _STATS_RECORD_SEND_NODE_BRANCH_1() \
+          CpvAccess(_myStats)->recordSendNodeBranch()
+#define _STATS_RECORD_SEND_NODE_BRANCH_N(x) \
+          CpvAccess(_myStats)->recordSendNodeBranch(x)
+#define _STATS_RECORD_PROCESS_NODE_BRANCH_1() \
+          CpvAccess(_myStats)->recordProcessNodeBranch()
+#define _STATS_RECORD_PROCESS_NODE_BRANCH_N(x) \
+          CpvAccess(_myStats)->recordProcessNodeBranch(x)
+#else
+#define _STATS_RECORD_CREATE_CHARE_1()
+#define _STATS_RECORD_CREATE_CHARE_N(x)
+#define _STATS_RECORD_PROCESS_CHARE_1()
+#define _STATS_RECORD_PROCESS_CHARE_N(x)
+#define _STATS_RECORD_SEND_MSG_1()
+#define _STATS_RECORD_SEND_MSG_N(x)
+#define _STATS_RECORD_PROCESS_MSG_1()
+#define _STATS_RECORD_PROCESS_MSG_N(x)
+#define _STATS_RECORD_CREATE_GROUP_1()
+#define _STATS_RECORD_CREATE_GROUP_N(x)
+#define _STATS_RECORD_PROCESS_GROUP_1()
+#define _STATS_RECORD_PROCESS_GROUP_N(x)
+#define _STATS_RECORD_SEND_BRANCH_1()
+#define _STATS_RECORD_SEND_BRANCH_N(x)
+#define _STATS_RECORD_PROCESS_BRANCH_1()
+#define _STATS_RECORD_PROCESS_BRANCH_N(x)
+#define _STATS_RECORD_CREATE_NODE_GROUP_1()
+#define _STATS_RECORD_CREATE_NODE_GROUP_N(x)
+#define _STATS_RECORD_PROCESS_NODE_GROUP_1()
+#define _STATS_RECORD_PROCESS_NODE_GROUP_N(x)
+#define _STATS_RECORD_SEND_NODE_BRANCH_1()
+#define _STATS_RECORD_SEND_NODE_BRANCH_N(x)
+#define _STATS_RECORD_PROCESS_NODE_BRANCH_1()
+#define _STATS_RECORD_PROCESS_NODE_BRANCH_N(x)
+#endif
 #endif

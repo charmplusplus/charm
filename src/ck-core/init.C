@@ -3,10 +3,8 @@
 
 UChar _defaultQueueing = CK_QUEUEING_FIFO;
 
-#ifndef CMK_OPTIMIZE
 UInt  _printCS = 0;
 UInt  _printSS = 0;
-#endif
 
 UInt  _numGroups = 0;
 UInt  _numNodeGroups = 0;
@@ -26,15 +24,12 @@ CkErrStream ckerr;
 CkInStream  ckin;
 
 CpvDeclare(void*,       _currentChare);
-CpvDeclare(CkGroupID,         _currentGroup);
-CpvDeclare(CkGroupID,         _currentNodeGroup);
+CpvDeclare(CkGroupID,   _currentGroup);
+CpvDeclare(CkGroupID,   _currentNodeGroup);
 CpvDeclare(GroupTable*, _groupTable);
 GroupTable* _nodeGroupTable = 0;
 
-#ifndef CMK_OPTIMIZE
 CpvDeclare(Stats*, _myStats);
-#endif
-
 CpvDeclare(MsgPool*, _msgPool);
 
 CpvDeclare(_CkOutStream*, _ckout);
@@ -47,12 +42,17 @@ CpvStaticDeclare(PtrQ*, _nodeBocInitQ);
 
 static int    _exitHandlerIdx;
 
-#ifndef CMK_OPTIMIZE
 static Stats** _allStats = 0;
-#endif
 
 static UInt   _numStatsRecd = 0;
 static int    _exitStarted = 0;
+
+#ifndef CMK_OPTIMIZE
+#define _STATS_ON(x) (x) = 1
+#else
+#define _STATS_ON(x) \
+          CmiPrintf("stats unavailable in optimized version. ignoring...\n"); 
+#endif
 
 static inline int _parseCommandLineOpts(int argc, char **argv)
 {
@@ -60,18 +60,10 @@ static inline int _parseCommandLineOpts(int argc, char **argv)
   while(*argv) {
     found = 0;
     if(strcmp(*argv, "+cs")==0) {
-#ifndef CMK_OPTIMIZE
-      _printCS = 1; 
-#else
-      CmiPrintf("+cs is not enabled in this optimized version. ignoring...\n");
-#endif
+      _STATS_ON(_printCS);
       found = 1;
     } else if(strcmp(*argv, "+ss")==0) {
-#ifndef CMK_OPTIMIZE
-      _printSS = 1; 
-#else
-      CmiPrintf("+ss is not enabled in this optimized version. ignoring...\n");
-#endif
+      _STATS_ON(_printSS);
       found = 1;
     } else if(strcmp(*argv, "+fifo")==0) {
       _defaultQueueing = CK_QUEUEING_FIFO; found = 1;
@@ -149,6 +141,8 @@ static inline void _printStats(void)
     }
   }
 }
+#else
+static inline void _printStats(void) {}
 #endif
 
 static inline void _sendStats(void)
@@ -197,9 +191,7 @@ static void _exitHandler(envelope *env)
 #endif
       _numStatsRecd++;
       if(_numStatsRecd==CkNumPes()) {
-#ifndef CMK_OPTIMIZE
         _printStats();
-#endif
         _TRACE_END_COMPUTATION();
         CsdExitScheduler();
       }
@@ -437,9 +429,7 @@ void _initCharm(int argc, char **argv)
   CpvInitialize(_CkOutStream*, _ckout);
   CpvInitialize(_CkErrStream*, _ckerr);
 
-#ifndef CMK_OPTIMIZE
   CpvInitialize(Stats*, _myStats);
-#endif
 
   CpvAccess(_buffQ) = new PtrQ();
   CpvAccess(_bocInitQ) = new PtrQ();
@@ -486,15 +476,11 @@ void _initCharm(int argc, char **argv)
     CkRegisterMainModule();
   }
   _TRACE_BEGIN_COMPUTATION();
-#ifndef CMK_OPTIMIZE
   CpvAccess(_myStats) = new Stats();
-#endif
   CpvAccess(_msgPool) = new MsgPool();
   CmiNodeBarrier();
   if(CmiMyPe()==0) {
-#ifndef CMK_OPTIMIZE
     _allStats = new Stats*[CkNumPes()];
-#endif
     register int i;
     for(i=0;i<_numMains;i++) {
       register int size = _chareTable[_mainTable[i]->chareIdx]->size;
@@ -505,10 +491,8 @@ void _initCharm(int argc, char **argv)
       msg->argv = argv;
       _entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
     }
-#ifndef CMK_OPTIMIZE
-    CpvAccess(_myStats)->recordCreateChare(_numMains);
-    CpvAccess(_myStats)->recordProcessChare(_numMains);
-#endif
+    _STATS_RECORD_CREATE_CHARE_N(_numMains);
+    _STATS_RECORD_PROCESS_CHARE_N(_numMains);
     for(i=0;i<_numReadonlyMsgs;i++) {
       register void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
       if(roMsg==0)

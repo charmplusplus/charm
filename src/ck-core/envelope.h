@@ -13,8 +13,6 @@
 #define _CHECK_USED(env)
 #endif
 
-#ifndef CMK_OPTIMIZE
-#endif
 typedef unsigned int   UInt;
 typedef unsigned short UShort;
 typedef unsigned char  UChar;

@@ -197,17 +197,13 @@ void _processHandler(void *msg)
       CpvAccess(_qd)->process();
       if(env->isPacked()) _unpackFn((void **)&env);
       _processNewChareMsg(env);
-#ifndef CMK_OPTIMIZE
-      CpvAccess(_myStats)->recordProcessChare();
-#endif
+      _STATS_RECORD_PROCESS_CHARE_1();
       break;
     case NewVChareMsg :
       CpvAccess(_qd)->process();
       if(env->isPacked()) _unpackFn((void **)&env);
       _processNewVChareMsg(env);
-#ifndef CMK_OPTIMIZE
-      CpvAccess(_myStats)->recordProcessChare();
-#endif
+      _STATS_RECORD_PROCESS_CHARE_1();
       break;
     case BocInitMsg :
       CpvAccess(_qd)->process();
@@ -239,25 +235,19 @@ void _processHandler(void *msg)
       CpvAccess(_qd)->process();
       if(env->isPacked()) _unpackFn((void **)&env);
       _processForChareMsg(env);
-#ifndef CMK_OPTIMIZE
-      CpvAccess(_myStats)->recordProcessMsg();
-#endif
+      _STATS_RECORD_PROCESS_MSG_1();
       break;
     case ForBocMsg :
       CpvAccess(_qd)->process();
       if(env->isPacked()) _unpackFn((void **)&env);
       _processForBocMsg(env);
-#ifndef CMK_OPTIMIZE
-      CpvAccess(_myStats)->recordProcessBranch();
-#endif
+      _STATS_RECORD_PROCESS_BRANCH_1();
       break;
     case ForNodeBocMsg :
       CpvAccess(_qd)->process();
       if(env->isPacked()) _unpackFn((void **)&env);
       _processForNodeBocMsg(env);
-#ifndef CMK_OPTIMIZE
-      CpvAccess(_myStats)->recordProcessNodeBranch();
-#endif
+      _STATS_RECORD_PROCESS_NODE_BRANCH_1();
       break;
     case ForVidMsg   :
       CpvAccess(_qd)->process();
@@ -340,9 +330,7 @@ void CkSendMsg(int entryIdx, void *msg, CkChareID *pCid)
     CpvAccess(_qd)->create();
     CldEnqueue(pCid->onPE, env, _infoIdx);
   }
-#ifndef CMK_OPTIMIZE
-  CpvAccess(_myStats)->recordSendMsg();
-#endif
+  _STATS_RECORD_SEND_MSG_1();
 }
 
 extern "C"
@@ -364,9 +352,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   CmiSetHandler(env, _charmHandlerIdx);
   _TRACE_CREATION_1(env);
   CpvAccess(_qd)->create();
-#ifndef CMK_OPTIMIZE
-  CpvAccess(_myStats)->recordCreateChare();
-#endif
+  _STATS_RECORD_CREATE_CHARE_1();
   _SET_USED(env, 1);
   if(destPE == CK_PE_ANY)
     env->setForAnyPE(1);
@@ -388,9 +374,7 @@ void _createGroupMember(CkGroupID groupID, int eIdx, void *msg)
   _entryTable[eIdx]->call(msg, obj);
   CpvAccess(_currentChare) = prev;
   CpvAccess(_currentGroup) = prevGrp;
-#ifndef CMK_OPTIMIZE
-  CpvAccess(_myStats)->recordProcessGroup();
-#endif
+  _STATS_RECORD_PROCESS_GROUP_1();
 }
 
 void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *msg)
@@ -408,9 +392,7 @@ void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *msg)
   _entryTable[eIdx]->call(msg, obj);
   CpvAccess(_currentChare) = prev;
   CpvAccess(_currentNodeGroup) = prevGrp;
-#ifndef CMK_OPTIMIZE
-  CpvAccess(_myStats)->recordProcessNodeGroup();
-#endif
+  _STATS_RECORD_PROCESS_NODE_GROUP_1();
 }
 
 void _createGroup(CkGroupID groupID, envelope *env, int retEp, CkChareID *retChare)
@@ -441,9 +423,7 @@ void _createGroup(CkGroupID groupID, envelope *env, int retEp, CkChareID *retCha
       _TRACE_END_UNPACK();
     }
   }
-#ifndef CMK_OPTIMIZE
-  CpvAccess(_myStats)->recordCreateGroup();
-#endif
+  _STATS_RECORD_CREATE_GROUP_1();
   _createGroupMember(groupID, epIdx, msg);
   if(retEp) {
     msg = CkAllocMsg(0, sizeof(int), 0); // 0 is a system msg of size int
@@ -481,9 +461,7 @@ void _createNodeGroup(CkGroupID groupID, envelope *env, int retEp, CkChareID *re
       _TRACE_END_UNPACK();
     }
   }
-#ifndef CMK_OPTIMIZE
-  CpvAccess(_myStats)->recordCreateNodeGroup();
-#endif
+  _STATS_RECORD_CREATE_NODE_GROUP_1();
   _createNodeGroupMember(groupID, epIdx, msg);
   if(retEp) {
     msg = CkAllocMsg(0, sizeof(int), 0); // 0 is a system msg of size int
@@ -605,9 +583,7 @@ extern "C"
 void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID)
 {
   _TRACE_CREATION_1(UsrToEnv(msg));
-#ifndef CMK_OPTIMIZE
-  CpvAccess(_myStats)->recordSendBranch();
-#endif
+  _STATS_RECORD_SEND_BRANCH_1();
   _sendMsgBranch(eIdx, msg, gID, pe);
   CpvAccess(_qd)->create();
 }
@@ -616,9 +592,7 @@ extern "C"
 void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID)
 {
   _TRACE_CREATION_N(UsrToEnv(msg), CkNumPes());
-#ifndef CMK_OPTIMIZE
-  CpvAccess(_myStats)->recordSendBranch(CkNumPes());
-#endif
+  _STATS_RECORD_SEND_BRANCH_N(CkNumPes());
   _sendMsgBranch(eIdx, msg, gID);
   CpvAccess(_qd)->create(CkNumPes());
 }
@@ -641,9 +615,7 @@ extern "C"
 void CkSendMsgNodeBranch(int eIdx, void *msg, int node, CkGroupID gID)
 {
   _TRACE_CREATION_1(UsrToEnv(msg));
-#ifndef CMK_OPTIMIZE
-  CpvAccess(_myStats)->recordSendNodeBranch();
-#endif
+  _STATS_RECORD_SEND_NODE_BRANCH_1();
   _sendMsgNodeBranch(eIdx, msg, gID, node);
   CpvAccess(_qd)->create();
 }
@@ -652,9 +624,7 @@ extern "C"
 void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID)
 {
   _TRACE_CREATION_N(UsrToEnv(msg), CkNumNodes());
-#ifndef CMK_OPTIMIZE
-  CpvAccess(_myStats)->recordSendNodeBranch(CkNumNodes());
-#endif
+  _STATS_RECORD_SEND_NODE_BRANCH_N(CkNumNodes());
   _sendMsgNodeBranch(eIdx, msg, gID);
   CpvAccess(_qd)->create(CkNumNodes());
 }
