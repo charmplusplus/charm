@@ -73,14 +73,15 @@ int bgSize = 0;
 static int printTimeLog = 0;
 static int genTimeLog = 0;
 static int correctTimeLog = 0;
+static int timingMethod = BG_ELAPSE;
 
 #define ASSERT(x)	if (!(x)) { CmiPrintf("Assert failure at %s:%d\n", __FILE__,__LINE__); CmiAbort("Abort!"); }
 
 #define BGARGSCHECK   	\
-  if (cva(numX)==0 || cva(numY)==0 || cva(numZ)==0)  { CmiPrintf("\nMissing parameters for BlueGene machine size!\n<tip> use command line options: +x, +y, or +z.\n"); BgShutdown(); } \
-  if (cva(numCth)==0 || cva(numWth)==0) { CmiAbort("\nMissing parameters for number of communication/worker threads!\n<tip> use command line options: +cth or +wth.\n"); BgShutdown(); }	\
-  if (cva(numX)*cva(numY)*cva(numZ)<CmiNumPes()) {	\
-    CmiAbort("\nToo few BlueGene nodes!\n");	\
+  if (cva(numX)==0 || cva(numY)==0 || cva(numZ)==0)  { if (CmiMyPe() == 0) { CmiPrintf("\nMissing parameters for BlueGene machine size!\n<tip> use command line options: +x, +y, or +z.\n");} BgShutdown(); } \
+  else if (cva(numCth)==0 || cva(numWth)==0) { if (CmiMyPe() == 0) { CmiPrintf("\nMissing parameters for number of communication/worker threads!\n<tip> use command line options: +cth or +wth.\n");} BgShutdown(); }	\
+  else if (cva(numX)*cva(numY)*cva(numZ)<CmiNumPes()) {	\
+    CmiPrintf("\nToo few BlueGene nodes!\n");	\
     BgShutdown(); 	\
   }
 
@@ -722,11 +723,18 @@ void BgSetNumCommThread(int num)
 double BgGetTime()
 {
 #if 1
-  /* accumulate time since last starttime, and reset starttime */
-  double tp2= CmiWallTimer();
-  tCURRTIME += (tp2 - tSTARTTIME);
-  tSTARTTIME = tp2;
-  return tCURRTIME;
+  if (timingMethod == BG_WALLTIME) {
+    /* accumulate time since last starttime, and reset starttime */
+    double tp2= CmiWallTimer();
+    tCURRTIME += (tp2 - tSTARTTIME);
+    tSTARTTIME = tp2;
+    return tCURRTIME;
+  }
+  else if (timingMethod == BG_ELAPSE) {
+    return tCURRTIME;
+  }
+  else 
+    CmiAbort("Unknown Timing Method.");
 #else
   /* sometime I am interested in real wall time */
   tCURRTIME = CmiWallTimer();
@@ -827,12 +835,15 @@ static inline void ProcessMessage(char *msg)
   CmiSetHandler(msg, CmiBgMsgHandle(msg));
 
   // don't count thread overhead and timinmg overhead
-  tSTARTTIME = CmiWallTimer();
+  if (timingMethod == BG_WALLTIME)
+    tSTARTTIME = CmiWallTimer();
 
   entryFunc(msg);
 
-  tCURRTIME += (CmiWallTimer()-tSTARTTIME);
-  tSTARTTIME = CmiWallTimer();
+  if (timingMethod == BG_WALLTIME) {
+    tCURRTIME += (CmiWallTimer()-tSTARTTIME);
+    tSTARTTIME = CmiWallTimer();
+  }
 }
 
 void correctTime(char *msg);
@@ -887,6 +898,14 @@ void comm_thread(threadInfo *tinfo)
     CthYield();
     tSTARTTIME = CmiWallTimer();
   }
+}
+
+extern "C" 
+void BgElapse(double t)
+{
+  ASSERT(tTHREADTYPE == WORK_THREAD);
+  if (timingMethod == BG_ELAPSE)
+    tCURRTIME += t;
 }
 
 void work_thread(threadInfo *tinfo)
@@ -1024,6 +1043,20 @@ CmiStartFn bgMain(int argc, char **argv)
   genTimeLog = CmiGetArgFlag(argv, "+bglog");
   correctTimeLog = CmiGetArgFlag(argv, "+bgcorrect");
   if (correctTimeLog) genTimeLog = 1;
+
+  // for timing method, default using elapse calls.
+  timingMethod = BG_ELAPSE;
+  if(CmiGetArgFlag(argv, "+bgwalltime"))  timingMethod = BG_WALLTIME;
+
+  CmiPrintf("BG info> Simulating %dx%dx%d nodes with %d comm + %d work threads each.\n", cva(numX), cva(numY), cva(numZ), cva(numCth), cva(numWth));
+  if (timingMethod == BG_ELAPSE) 
+    CmiPrintf("BG info> Using BgElapse calls for timing method. \n");
+  else if (timingMethod == BG_WALLTIME)
+    CmiPrintf("BG info> Using WallTimer for timing method. \n");
+  if (genTimeLog)
+    CmiPrintf("BG info> Generating timing log. \n");
+  if (correctTimeLog)
+    CmiPrintf("BG info> Perform timing log correction. \n");
 
   arg_argv = argv;
   arg_argc = CmiGetArgc(argv);

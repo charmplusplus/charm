@@ -182,6 +182,13 @@ CpvExtern(int, inEmulatorInit);
 char *BgGetNodeData();
 void BgSetNodeData(char *data);
 
+/************************ Timing utility functions ************************/
+
+#define BG_ELAPSE      1
+#define BG_WALLTIME    2
+
+void BgElapse(double t);
+
 #if defined(__cplusplus)
 }
 #endif
