@@ -269,6 +269,10 @@ void CmiBarrier()
         CmiAbort("Timernit: MPI_Barrier failed!\n");
 }
 
+void CmiBarrierZero()
+{
+}
+
 typedef struct ProcState {
 /* PCQueue      sendMsgBuf; */      /* per processor message sending queue */
 CmiNodeLock  recvLock;		    /* for cs->recv */
