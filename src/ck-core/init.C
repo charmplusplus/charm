@@ -425,6 +425,8 @@ extern void _loadbalancerInit();
 
 void _initCharm(int unused_argc, char **argv)
 { 
+	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
+
 	CkpvInitialize(PtrQ*,_buffQ);
 	CkpvInitialize(PtrVec*,_bocInitVec);
 	CkpvInitialize(void*, _currentChare);
@@ -467,7 +469,7 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeBocInitVec) = new PtrVec();
 	}
   
-	CmiNodeBarrier();
+	CmiNodeAllBarrier();
 #ifdef __BLUEGENE__
 	if(BgNodeRank()==0) 
 #endif
@@ -533,10 +535,10 @@ void _initCharm(int unused_argc, char **argv)
 		CkRegisterMainModule();
 	}
 
-	_TRACE_BEGIN_COMPUTATION();
+	if (!inCommThread) _TRACE_BEGIN_COMPUTATION();
 	CkpvAccess(_myStats) = new Stats();
 	CkpvAccess(_msgPool) = new MsgPool();
-	CmiNodeBarrier();
+	CmiNodeAllBarrier();
 
 	if(CkMyPe()==0) 
 	{
@@ -595,6 +597,14 @@ void _initCharm(int unused_argc, char **argv)
 		CpvAccess(_qd)->create(CkNumPes()-1);
 		_initDone();
 	}
+	// when I am a communication thread, I don't participate initDone.
+        if (inCommThread) {
+                CkNumberHandlerEx(_bocHandlerIdx,(CmiHandlerEx)_processHandler,
+                                        CkpvAccess(_coreState));
+                CkNumberHandlerEx(_charmHandlerIdx,(CmiHandlerEx)_processHandler
+,
+                                        CkpvAccess(_coreState));
+        }
 
 }
 
