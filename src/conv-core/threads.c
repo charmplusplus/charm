@@ -751,6 +751,454 @@ CthThread CthUnpackThread(void *buffer)
   return (CthThread) 0;
 }
 
+#elif CMK_THREADS_USE_ISOMALLOC
+
+#include <stdlib.h>
+#include <alloca.h>
+#include <sys/types.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#define STACKSIZE (32768)
+CpvStaticDeclare(int, _stksize);
+
+typedef struct _slotset
+{
+  int maxbuf;
+  int *buf;
+  int emptyslots;
+} slotset;
+
+/*
+ * creates a new slotset of nslots entries, starting with all
+ * empty slots. The slot numbers are [startslot,startslot+nslot-1]
+ */
+static slotset *
+new_slotset(int startslot, int nslots)
+{
+  int i;
+  slotset *ss = (slotset*) malloc(sizeof(slotset));
+  _MEMCHECK(ss);
+  ss->maxbuf = nslots*2;
+  ss->buf = (int *) malloc(sizeof(int)*ss->maxbuf);
+  _MEMCHECK(ss->buf);
+  ss->emptyslots = nslots;
+  for (i=0; i<nslots; i++)
+    ss->buf[i] = startslot+i;
+  for (i=nslots; i<(ss->maxbuf); i++)
+    ss->buf[i] = (-1);
+  return ss;
+}
+
+/*
+ * returns a new empty slot. if it cannot find any, returns (-1).
+ */
+static int
+get_slot(slotset *ss)
+{
+  int i;
+  if(ss->emptyslots==0)
+    return (-1);
+  for(i=0;i<(ss->maxbuf);i++)
+  {
+    if(ss->buf[i] >= 0)
+    {
+      int slot = ss->buf[i];
+      ss->buf[i] = (-1);
+      ss->emptyslots--;
+      return slot;
+    }
+  }
+  return (-1);
+}
+
+/*
+ * Frees slot by adding it to the list of empty slots.
+ * If the buffer fills up, it adds up extra buffer space.
+ */
+static void
+free_slot(slotset *ss, int slot)
+{
+  int pos;
+  for (pos=0; pos < (ss->maxbuf); pos++)
+  {
+    if (ss->buf[pos]==(-1))
+      break;
+  }
+  if (pos == ss->maxbuf)
+  {
+    int i;
+    int newsize = ss->maxbuf*2;
+    int *newbuf = (int *) malloc(sizeof(int)*newsize);
+    _MEMCHECK(newbuf);
+    for (i=0; i<(ss->maxbuf); i++)
+      newbuf[i] = ss->buf[i];
+    for (i=ss->maxbuf; i<newsize; i++)
+      newbuf[i] = (-1);
+    free(ss->buf);
+    ss->buf = newbuf;
+    ss->maxbuf = newsize;
+  }
+  ss->buf[pos] = slot;
+  ss->emptyslots++;
+  return;
+}
+
+/*
+ * destroys slotset
+ */
+static void
+delete_slotset(slotset* ss)
+{
+  free(ss->buf);
+  free(ss);
+}
+
+struct CthThreadStruct
+{
+  char cmicore[CmiMsgHeaderSizeBytes];
+  CthAwkFn  awakenfn;
+  CthThFn    choosefn;
+  int        autoyield_enable;
+  int        autoyield_blocks;
+  char      *data;
+  int        datasize;
+  int        suspendable;
+  int        Event;
+  CthThread  qnext;
+  int        slotnum;
+  qt_t      *stack;
+  qt_t      *stackp;
+};
+
+CthCpvDeclare(char *,    CthData);
+CthCpvStatic(CthThread,  CthCurrent);
+CthCpvStatic(int,        CthExiting);
+CthCpvStatic(int,        CthDatasize);
+
+static void CthThreadInit(t)
+CthThread t;
+{
+  t->awakenfn = 0;
+  t->choosefn = 0;
+  t->data=0;
+  t->datasize=0;
+  t->qnext=0;
+  t->autoyield_enable = 0;
+  t->autoyield_blocks = 0;
+  t->suspendable = 1;
+  t->slotnum = (-1);
+}
+
+void CthFixData(t)
+CthThread t;
+{
+  int datasize = CthCpvAccess(CthDatasize);
+  if (t->data == 0) {
+    t->datasize = datasize;
+    t->data = (char *)malloc(datasize);
+    _MEMCHECK(t->data);
+    return;
+  }
+  if (t->datasize != datasize) {
+    t->datasize = datasize;
+    t->data = (char *)realloc(t->data, datasize);
+    _MEMCHECK(t->data);
+    return;
+  }
+}
+
+CpvStaticDeclare(slotset *, myss);
+CpvStaticDeclare(void *, heapbdry);
+CpvStaticDeclare(int, zerofd);
+
+/*
+ * maps the virtual memory associated with slot using mmap
+ */
+static void *
+map_slot(int slot)
+{
+  void *pa;
+  char *addr;
+  size_t sz = CpvAccess(_stksize);
+  addr = (char*) CpvAccess(heapbdry) + slot*sz;
+  pa = mmap((void*) addr, sz, 
+            PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED,
+            CpvAccess(zerofd), 0);
+  if(pa== (void*)(-1))
+    CmiAbort("mmap call failed to allocate requested memory.\n");
+  return pa;
+}
+
+/*
+ * unmaps the virtual memory associated with slot using munmap
+ */
+static void
+unmap_slot(int slot)
+{
+  size_t sz = CpvAccess(_stksize);
+  char *addr = (char*) CpvAccess(heapbdry) + slot*sz;
+  int retval = munmap((void*) addr, sz);
+  if (retval==(-1))
+    CmiAbort("munmap call failed to deallocate requested memory.\n");
+}
+
+void CthInit(char **argv)
+{
+  CthThread t;
+  int i, numslots;
+
+  CpvInitialize(int, _stksize);
+  CpvAccess(_stksize) = 0;
+
+  for(i=0;argv[i];i++) {
+    if(strncmp("+stacksize",argv[i],10)==0) {
+      if (strlen(argv[i]) > 10) {
+        sscanf(argv[i], "+stacksize%d", &CpvAccess(_stksize));
+      } else {
+        if (argv[i+1]) {
+          sscanf(argv[i+1], "%d", &CpvAccess(_stksize));
+        }
+      }
+    }
+  }
+
+  CpvAccess(_stksize) = CpvAccess(_stksize) ? CpvAccess(_stksize) : STACKSIZE;
+  CpvAccess(_stksize) = (CpvAccess(_stksize)+(CMK_MEMORY_PAGESIZE*2)-1) & 
+                       ~(CMK_MEMORY_PAGESIZE-1);
+  CmiPrintf("[%d] Using stacksize of %d\n", CmiMyPe(), CpvAccess(_stksize));
+
+  CpvInitialize(void *, heapbdry);
+  CpvInitialize(int, zerofd);
+  /*
+   * calculate the number of slots according to stacksize
+   * divide up into number of available processors
+   * and allocate the slotset.
+   */
+  do {
+    void *heap = (void*) malloc(1);
+    void *stack = alloca(0);
+    void *stackbdry;
+    int stacksize = CpvAccess(_stksize);
+    _MEMCHECK(heap);
+    _MEMCHECK(stack);
+    CmiPrintf("[%d] heap=%p\tstack=%p\n",CmiMyPe(),heap,stack);
+    /* FIXME: Portability for 64bit systems? */
+    /* FIXME: Assumes heap grows down */
+    /* FIXME: Assumes stack grows up */
+    CpvAccess(heapbdry) = (void *)(((size_t)heap+(1<<30))&(~((1<<30)-1)));
+    stackbdry = (void *)(((size_t)stack-(1<<28))&(~((1<<28)-1)));
+    CmiPrintf("[%d] heapbdry=%p\tstackbdry=%p\n",
+              CmiMyPe(),CpvAccess(heapbdry),stackbdry);
+    /* FIXME: assumes stackbdry > heapbdry, also assumes heapbdry as base */
+    numslots = (((size_t)stackbdry-(size_t)CpvAccess(heapbdry))/stacksize)
+                 / CmiNumPes();
+    CmiPrintf("[%d] numthreads per pe=%d\n",CmiMyPe(),numslots);
+    CpvAccess(zerofd) = open("/dev/zero", O_RDWR);
+    if(CpvAccess(zerofd)<0)
+      CmiAbort("Cannot open /dev/zero. Aborting.\n");
+    free(heap);
+  } while(0);
+
+  CpvInitialize(slotset *, myss);
+  CpvAccess(myss) = new_slotset(CmiMyPe()*numslots, numslots);
+
+  CpvInitialize(int, _numSwitches);
+  CpvAccess(_numSwitches) = 0;
+
+  CthCpvInitialize(char *,     CthData);
+  CthCpvInitialize(CthThread,  CthCurrent);
+  CthCpvInitialize(int,        CthDatasize);
+  CthCpvInitialize(int,        CthExiting);
+
+  t = (CthThread)malloc(sizeof(struct CthThreadStruct));
+  _MEMCHECK(t);
+  CthThreadInit(t);
+  CthCpvAccess(CthData)=0;
+  CthCpvAccess(CthCurrent)=t;
+  CthCpvAccess(CthDatasize)=1;
+  CthCpvAccess(CthExiting)=0;
+  CthSetStrategyDefault(t);
+}
+
+CthThread CthSelf()
+{
+  return CthCpvAccess(CthCurrent);
+}
+
+void CthFree(t)
+CthThread t;
+{
+  if (t==CthCpvAccess(CthCurrent)) {
+    CthCpvAccess(CthExiting) = 1;
+  } else {
+    CmiError("Not implemented CthFree.\n");
+    exit(1);
+  }
+}
+
+static void *
+CthAbortHelp(qt_t *sp, CthThread old, void *null)
+{
+  if (old->data) free(old->data);
+  if(old->slotnum != (-1))
+  {
+    free_slot(CpvAccess(myss), old->slotnum);
+    unmap_slot(old->slotnum);
+  }
+  free(old);
+  return (void *) 0;
+}
+
+static void *CthBlockHelp(qt_t *sp, CthThread old, void *null)
+{
+  old->stackp = sp;
+  return (void *) 0;
+}
+
+void CthResume(t)
+CthThread t;
+{
+  CthThread tc;
+  tc = CthCpvAccess(CthCurrent);
+  if (t == tc) return;
+  CpvAccess(_numSwitches)++;
+  CthFixData(t);
+  CthCpvAccess(CthCurrent) = t;
+  CthCpvAccess(CthData) = t->data;
+  if (CthCpvAccess(CthExiting)) {
+    CthCpvAccess(CthExiting)=0;
+    QT_ABORT((qt_helper_t*)CthAbortHelp, tc, 0, t->stackp);
+  } else {
+    QT_BLOCK((qt_helper_t*)CthBlockHelp, tc, 0, t->stackp);
+  }
+  if (tc!=CthCpvAccess(CthCurrent)) { CmiError("Stack corrupted?\n"); exit(1); }
+}
+
+static void CthOnly(void *arg, void *vt, qt_userf_t fn)
+{
+  fn(arg);
+  CthCpvAccess(CthExiting) = 1;
+  CthSuspend();
+}
+
+CthThread CthCreate(fn, arg, size)
+CthVoidFn fn; void *arg; int size;
+{
+  CthThread result; qt_t *stack, *stackbase, *stackp;
+  /* FIXME: not checking for return value of (-1) as yet. */
+  int slotnum = get_slot(CpvAccess(myss));
+  /* FIXME: warn size!=0 */
+  if(size!=0 && size>CpvAccess(_stksize))
+  {
+    CmiPrintf("[%d] Nonzero stacksize %d bytes specified. Using %d bytes.\n",
+      CmiMyPe(), size, CpvAccess(_stksize));
+  }
+  size = CpvAccess(_stksize);
+  stack = (qt_t*) map_slot(slotnum);
+  _MEMCHECK(stack);
+  result = (CthThread)malloc(sizeof(struct CthThreadStruct));
+  _MEMCHECK(result);
+  CthThreadInit(result);
+  result->slotnum = slotnum;
+  stackbase = QT_SP(stack, size);
+  stackp = QT_ARGS(stackbase, arg, result, (qt_userf_t *)fn, CthOnly);
+  result->stack = stack;
+  result->stackp = stackp;
+  CthSetStrategyDefault(result);
+  return result;
+}
+
+void CthSuspend()
+{
+  CthThread next;
+#if CMK_WEB_MODE
+  void usageStop();
+#endif
+  if(!(CthCpvAccess(CthCurrent)->suspendable))
+    CmiAbort("trying to suspend main thread!!\n");
+  if (CthCpvAccess(CthCurrent)->choosefn == 0) CthNoStrategy();
+  next = CthCpvAccess(CthCurrent)->choosefn();
+#ifndef CMK_OPTIMIZE
+  if(CpvAccess(traceOn))
+    traceSuspend();
+#endif
+#if CMK_WEB_MODE
+  usageStop();
+#endif
+  CthResume(next);
+}
+
+void CthAwaken(th)
+CthThread th;
+{
+  if (th->awakenfn == 0) CthNoStrategy();
+  CpvAccess(curThread) = th;
+#ifndef CMK_OPTIMIZE
+  if(CpvAccess(traceOn))
+    traceAwaken();
+#endif
+  th->awakenfn(th, CQS_QUEUEING_FIFO, 0, 0);
+}
+
+void CthYield()
+{
+  CthAwaken(CthCpvAccess(CthCurrent));
+  CthSuspend();
+}
+
+void CthAwakenPrio(CthThread th, int s, int pb, int *prio)
+{
+  if (th->awakenfn == 0) CthNoStrategy();
+  CpvAccess(curThread) = th;
+#ifndef CMK_OPTIMIZE
+  if(CpvAccess(traceOn))
+    traceAwaken();
+#endif
+  th->awakenfn(th, s, pb, prio);
+}
+
+void CthYieldPrio(int s, int pb, int *prio)
+{
+  CthAwakenPrio(CthCpvAccess(CthCurrent), s, pb, prio);
+  CthSuspend();
+}
+
+int CthRegister(size)
+int size;
+{
+  int result;
+  int align = 1;
+  while (size>align) align<<=1;
+  CthCpvAccess(CthDatasize) = (CthCpvAccess(CthDatasize)+align-1) & ~(align-1);
+  result = CthCpvAccess(CthDatasize);
+  CthCpvAccess(CthDatasize) += size;
+  CthFixData(CthCpvAccess(CthCurrent));
+  CthCpvAccess(CthData) = CthCpvAccess(CthCurrent)->data;
+  return result;
+}
+
+int CthPackBufSize(CthThread t)
+{
+  /* FIXME: import from copy_stack case */
+  CmiAbort("CthPackBufSize not implemented.\n");
+  return 0;
+}
+
+void CthPackThread(CthThread t, void *buffer)
+{
+  /* FIXME: import from copy_stack case */
+  CmiAbort("CthPackThread not implemented.\n");
+}
+
+CthThread CthUnpackThread(void *buffer)
+{
+  /* FIXME: import from copy_stack case */
+  CmiAbort("CthUnpackThread not implemented.\n");
+  return (CthThread) 0;
+}
+
 #else
 
 #define STACKSIZE (32768)
