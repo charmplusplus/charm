@@ -26,11 +26,20 @@ class MsgInfo {
     {}
 };
 
+
 class ChareInfo {
   public:
     const char *name;
     int size;
-    ChareInfo(const char *n, int s) : name(n), size(s) {}
+    int classIdx;
+    int numbases;
+    int bases[16];
+    ChareInfo(const char *n, int s) : name(n), size(s), classIdx(1) {
+      numbases = 0;
+    }
+    void setClassIdx(int idx) { classIdx = idx; }
+    int getClassIdx(void) { return classIdx; }
+    void addBase(int idx) { bases[numbases++] = idx; }
 };
 
 class MainInfo {
@@ -74,5 +83,4 @@ extern int _numReadonlyMsgs;
 #define _READONLY_TABLE_SIZE  128
 
 extern void _registerInit(void);
-
 #endif

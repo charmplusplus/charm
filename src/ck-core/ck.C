@@ -29,6 +29,7 @@ extern "C"
 void CkGetChareID(CkChareID *pCid) {
   pCid->onPE = CkMyPe();
   pCid->objPtr = CpvAccess(_currentChare);
+  pCid->magic = _GETIDX(CpvAccess(_currentChareType));
 }
 
 extern "C"
@@ -53,6 +54,7 @@ static void _processNewChareMsg(envelope *env)
   register void *obj = _allocNewChare(env);
   register void *msg = EnvToUsr(env);
   CpvAccess(_currentChare) = obj;
+  CpvAccess(_currentChareType)=_entryTable[env->getEpIdx()]->chareIdx;
   _TRACE_BEGIN_EXECUTE(env);
   _SET_USED(env, 0);
   _entryTable[env->getEpIdx()]->call(msg, obj);
@@ -66,6 +68,7 @@ static void _processNewVChareMsg(envelope *env)
       _allocMsg(FillVidMsg, sizeof(CkChareID));
   pCid->onPE = CkMyPe();
   pCid->objPtr = obj;
+  pCid->magic = _GETIDX(_entryTable[env->getEpIdx()]->chareIdx);
   register envelope *ret = UsrToEnv(pCid);
   ret->setVidPtr(env->getVidPtr());
   register int srcPe = env->getSrcPe();
@@ -74,6 +77,7 @@ static void _processNewVChareMsg(envelope *env)
   CmiSyncSendAndFree(srcPe, ret->getTotalsize(), ret);
   CpvAccess(_qd)->create();
   CpvAccess(_currentChare) = obj;
+  CpvAccess(_currentChareType)=_entryTable[env->getEpIdx()]->chareIdx;
   register void *msg = EnvToUsr(env);
   _TRACE_BEGIN_EXECUTE(env);
   _SET_USED(env, 0);
@@ -87,6 +91,7 @@ static inline void _processForChareMsg(envelope *env)
   register int epIdx = env->getEpIdx();
   register void *obj = env->getObjPtr();
   CpvAccess(_currentChare) = obj;
+  CpvAccess(_currentChareType)=_entryTable[epIdx]->chareIdx;
   _TRACE_BEGIN_EXECUTE(env);
   _SET_USED(env, 0);
   _entryTable[epIdx]->call(msg, obj);
@@ -135,7 +140,7 @@ static inline void _processFillVidMsg(envelope *env)
   _CHECK_VALID(vptr, "FillVidMsg: Not a valid VIdPtr\n");
   register CkChareID *pcid = (CkChareID *) EnvToUsr(env);
   _CHECK_VALID(pcid, "FillVidMsg: Not a valid pCid\n");
-  vptr->fill(pcid->onPE, pcid->objPtr);
+  vptr->fill(pcid->onPE, pcid->objPtr, pcid->magic);
   CmiFree(env);
 }
 
@@ -393,12 +398,15 @@ void _createGroupMember(CkGroupID groupID, int eIdx, void *msg)
       CldEnqueue(CkMyPe(), pending, _infoIdx);
   }
   register void *prev = CpvAccess(_currentChare);
+  register int prevtype = CpvAccess(_currentChareType);
   CpvAccess(_currentChare) = obj;
+  CpvAccess(_currentChareType) = gIdx;
   register int prevGrp = CpvAccess(_currentGroup);
   CpvAccess(_currentGroup) = groupID;
   _SET_USED(UsrToEnv(msg), 0);
   _entryTable[eIdx]->call(msg, obj);
   CpvAccess(_currentChare) = prev;
+  CpvAccess(_currentChareType) = prevtype;
   CpvAccess(_currentGroup) = prevGrp;
   _STATS_RECORD_PROCESS_GROUP_1();
 }
@@ -418,12 +426,15 @@ void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *msg)
       CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
   }
   register void *prev = CpvAccess(_currentChare);
+  register int prevtype = CpvAccess(_currentChareType);
   CpvAccess(_currentChare) = obj;
+  CpvAccess(_currentChareType) = gIdx;
   register int prevGrp = CpvAccess(_currentNodeGroup);
   CpvAccess(_currentNodeGroup) = groupID;
   _SET_USED(UsrToEnv(msg), 0);
   _entryTable[eIdx]->call(msg, obj);
   CpvAccess(_currentChare) = prev;
+  CpvAccess(_currentChareType) = prevtype;
   CpvAccess(_currentNodeGroup) = prevGrp;
   _STATS_RECORD_PROCESS_NODE_GROUP_1();
 }

@@ -137,6 +137,7 @@ extern int     _qdHandlerIdx;
 extern CmiNodeLock _nodeLock;
 
 CpvExtern(void*,       _currentChare);
+CpvExtern(int,       _currentChareType);
 CpvExtern(CkGroupID,         _currentGroup);
 CpvExtern(CkGroupID,         _currentNodeGroup);
 CpvExtern(GroupTable*, _groupTable);

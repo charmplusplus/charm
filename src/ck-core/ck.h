@@ -46,10 +46,11 @@ class VidBlock {
         CpvAccess(_qd)->create();
       }
     }
-    void fill(int onPE, void *oPtr) {
+    void fill(int onPE, void *oPtr, int magic) {
       state = FILLED;
       actualID.onPE = onPE;
       actualID.objPtr = oPtr;
+      actualID.magic = magic;
       envelope *env;
       while(env=(envelope*)msgQ->deq()) {
         env->setSrcPe(CkMyPe());

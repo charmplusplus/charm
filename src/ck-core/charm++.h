@@ -120,10 +120,27 @@ class CkThrCallArg {
     CkThrCallArg(void *m, void *o) : msg(m), obj(o) {}
 };
 
+extern unsigned int _primesTable[];
+
+extern int _GETIDX(int cidx);
+extern void _REGISTER_BASE(int didx, int bidx);
+extern void _REGISTER_DONE(void);
+
+#ifndef CMK_OPTIMIZE
+static inline void _CHECK_CID(CkChareID cid, int idx)
+{
+  if(_GETIDX(idx)% cid.magic)
+    CkAbort("Illegal ChareID assignment to proxy.\n");
+}
+#else
+static inline void _CHECK_CID(CkChareID, int){}
+#endif
+
 #include "ckstream.h"
 #include "CkFutures.decl.h"
 #include "CkArray.decl.h"
 #include "ckarray.h"
 #include "tempo.h"
 #include "waitqd.h"
+
 #endif

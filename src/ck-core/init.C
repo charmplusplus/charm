@@ -24,6 +24,7 @@ CkErrStream ckerr;
 CkInStream  ckin;
 
 CpvDeclare(void*,       _currentChare);
+CpvDeclare(int,         _currentChareType);
 CpvDeclare(CkGroupID,   _currentGroup);
 CpvDeclare(CkGroupID,   _currentNodeGroup);
 CpvDeclare(GroupTable*, _groupTable);
@@ -435,6 +436,7 @@ void _initCharm(int argc, char **argv)
   CpvInitialize(PtrVec*,_bocInitVec);
   CpvInitialize(PtrVec*,_nodeBocInitVec);
   CpvInitialize(void*, _currentChare);
+  CpvInitialize(int,   _currentChareType);
   CpvInitialize(CkGroupID, _currentGroup);
   CpvInitialize(CkGroupID, _currentNodeGroup);
   CpvInitialize(GroupTable*, _groupTable);
@@ -514,6 +516,7 @@ void _initCharm(int argc, char **argv)
       register void *obj = malloc(size);
       _MEMCHECK(obj);
       CpvAccess(_currentChare) = obj;
+      CpvAccess(_currentChareType) = _mainTable[i]->chareIdx;
       register CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
       msg->argc = argc;
       msg->argv = argv;
