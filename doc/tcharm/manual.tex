@@ -564,7 +564,7 @@ available if \charmpp{} was compiled with CMK\_OPTIMIZE.
 
 Until now, things were presented from a client's (one who writes a program that
 depends on a library written using TCharm) perspective. This section gives an
-overview of how to go about writinfg a library that uses TCharm.
+overview of how to go about writing a library that uses TCharm.
 
 The overall scheme for writing a TCharm-based library "Foo" is
 
@@ -663,8 +663,8 @@ protected:
 }
 \end{alltt}
 
-\item Block a thread for communication using \kw{thread\_suspend} and
-\kw{thread\_resume}
+\item Block a thread for communication using thread->suspend and
+thread->resume
 
 \begin{alltt}
 int FooChunk::doCommunicate(...)
