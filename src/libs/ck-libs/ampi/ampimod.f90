@@ -40,8 +40,10 @@ module AMPI
   external AMPI_Comm_size
   external AMPI_Finalize
   external AMPI_Send
+  external AMPI_Ssend
   external AMPI_Recv
   external AMPI_Isend
+  external AMPI_Issend
   external AMPI_Irecv
   external AMPI_Sendrecv
   external AMPI_Barrier

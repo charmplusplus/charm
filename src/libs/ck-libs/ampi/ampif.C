@@ -8,10 +8,12 @@ FDECL {
 #define ampi_comm_size FTN_NAME( AMPI_COMM_SIZE , ampi_comm_size )
 #define ampi_finalize FTN_NAME( AMPI_FINALIZE , ampi_finalize )
 #define ampi_send FTN_NAME( AMPI_SEND , ampi_send )
+#define ampi_ssend FTN_NAME( AMPI_SSEND , ampi_ssend )
 #define ampi_recv FTN_NAME( AMPI_RECV , ampi_recv )
 #define ampi_probe FTN_NAME( AMPI_PROBE , ampi_probe )
 #define ampi_iprobe FTN_NAME( AMPI_IPROBE , ampi_iprobe )
 #define ampi_isend FTN_NAME( AMPI_ISEND , ampi_isend )
+#define ampi_issend FTN_NAME( AMPI_ISSEND , ampi_issend )
 #define ampi_irecv FTN_NAME( AMPI_IRECV , ampi_irecv )
 #define ampi_sendrecv FTN_NAME( AMPI_SENDRECV , ampi_sendrecv )
 #define ampi_barrier FTN_NAME( AMPI_BARRIER , ampi_barrier )
@@ -83,6 +85,12 @@ void ampi_send(void *msg, int *count, int *type, int *dest,
   int *tag, int *comm, int *ierr)
 {
   *ierr = AMPI_Send(msg, *count, *type, *dest, *tag, *comm);
+}
+
+void ampi_ssend(void *msg, int *count, int *type, int *dest, 
+  int *tag, int *comm, int *ierr)
+{
+  *ierr = AMPI_Ssend(msg, *count, *type, *dest, *tag, *comm);
 }
 
 void ampi_recv(void *msg, int *count, int *type, int *src, 
@@ -264,6 +272,12 @@ void ampi_isend(void *buf, int *count, int *datatype, int *dest,
    int *tag, int *comm, int *request, int *ierr)
 {
   *ierr = AMPI_Isend(buf, *count, *datatype, *dest, *tag, *comm, request);
+}
+
+void ampi_issend(void *buf, int *count, int *datatype, int *dest,
+   int *tag, int *comm, int *request, int *ierr)
+{
+  *ierr = AMPI_Issend(buf, *count, *datatype, *dest, *tag, *comm, request);
 }
 
 void ampi_irecv(void *buf, int *count, int *datatype, int *src,

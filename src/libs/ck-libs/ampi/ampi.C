@@ -445,6 +445,15 @@ int AMPI_Send(void *msg, int count, AMPI_Datatype type, int dest,
 }
 
 extern "C" 
+int AMPI_Ssend(void *msg, int count, AMPI_Datatype type, int dest, 
+                        int tag, AMPI_Comm comm)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  ptr->send(tag, ptr->getIndex(), msg, count, type, dest, comm);
+  return 0;
+}
+
+extern "C" 
 int AMPI_Recv(void *msg, int count, AMPI_Datatype type, int src, int tag, 
               AMPI_Comm comm, AMPI_Status *status)
 {
@@ -884,6 +893,17 @@ int AMPI_Type_size(AMPI_Datatype datatype, AMPI_Aint size)
 
 extern "C" 
 int AMPI_Isend(void *buf, int count, AMPI_Datatype type, int dest, 
+              int tag, AMPI_Comm comm, AMPI_Request *request)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  
+  ptr->send(tag, ptr->getIndex(), buf, count, type, dest, comm);
+  *request = (-1);
+  return 0;
+}
+
+extern "C" 
+int AMPI_Issend(void *buf, int count, AMPI_Datatype type, int dest, 
               int tag, AMPI_Comm comm, AMPI_Request *request)
 {
   ampi *ptr = CtvAccess(ampiPtr);

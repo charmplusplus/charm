@@ -63,6 +63,8 @@ int AMPI_Comm_size(AMPI_Comm comm, int *size);
 int AMPI_Finalize(void);
 int AMPI_Send(void *msg, int count, AMPI_Datatype type, int dest,
              int tag, AMPI_Comm comm);
+int AMPI_Ssend(void *msg, int count, AMPI_Datatype type, int dest,
+             int tag, AMPI_Comm comm);
 int AMPI_Recv(void *msg, int count, int type, int src, int tag,
              AMPI_Comm comm, AMPI_Status *status);
 int AMPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
@@ -114,6 +116,8 @@ int AMPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
 int AMPI_Pack_size(int incount,AMPI_Datatype datatype,AMPI_Comm comm,int *sz);
 
 int AMPI_Isend(void *buf, int count, AMPI_Datatype datatype, int dest, 
+              int tag, AMPI_Comm comm, AMPI_Request *request);
+int AMPI_Issend(void *buf, int count, AMPI_Datatype datatype, int dest, 
               int tag, AMPI_Comm comm, AMPI_Request *request);
 int AMPI_Irecv(void *buf, int count, AMPI_Datatype datatype, int src, 
               int tag, AMPI_Comm comm, AMPI_Request *request);
