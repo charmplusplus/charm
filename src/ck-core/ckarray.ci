@@ -3,6 +3,7 @@ module CkArray {
   message ArrayCreateMessage;
   message ArrayMessage;
   message ArrayElementAckMessage;
+  message ArrayElementUpdateMessage;
   message [varsize] ArrayMigrateMessage;
   
   message [varsize] ArrayReductionMessage;
@@ -12,7 +13,7 @@ module CkArray {
     entry void RecvForElement(ArrayMessage *);
     entry void RecvMigratedElement(ArrayMigrateMessage *);
     entry void AckMigratedElement(ArrayElementAckMessage *);
-    
+    entry void UpdateLocation(ArrayElementUpdateMessage *);
     entry void RecvReductionMessage(ArrayReductionMessage *);
   };
 

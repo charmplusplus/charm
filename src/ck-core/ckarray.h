@@ -122,6 +122,7 @@ class ArrayCreateMessage;
 class ArrayMessage;
 class ArrayMigrateMessage;
 class ArrayElementAckMessage;
+class ArrayElementUpdateMessage;
 
 class Array1D : public Group {
 friend class ArrayElement;
@@ -143,6 +144,7 @@ public:
   void RecvMigratedElement(ArrayMigrateMessage *msg);
   void RecvMigratedElementID(int index, ArrayElement *elem, CkChareID handle);
   void AckMigratedElement(ArrayElementAckMessage *msg);
+  void UpdateLocation(ArrayElementUpdateMessage *msg);
   int array_size(void) { return numElements; };
   int num_local(void) { return numLocalElements; };
   int ckGetGroupId(void) { return thisgroup; }
@@ -265,6 +267,7 @@ public:
 class ArrayMessage
 {
 public:
+  int from_pe;
   int destIndex;
   EntryIndexType entryIndex;
   int hopCount;
@@ -279,6 +282,14 @@ public:
   int deleteElement;
   CkChareID handle;
   int hopCount;
+};
+
+class ArrayElementUpdateMessage : public CMessage_ArrayElementUpdateMessage
+{
+public:
+  int index;
+  int hopCount;
+  int pe;
 };
 
 class ArrayMigrateMessage : public CMessage_ArrayMigrateMessage
