@@ -1,15 +1,15 @@
 
-CC=gcc -I.
+CHARMC = ../../bin/charmc -seq -I.
 
 all: qt stp testpgm
 
 qt: md/setjmp_d.h qt.c md/setjmp64.c
 	rm -f qtmd.h
-	ln -s md/setjmp_d.h qtmd.h
-	$(CC) -pedantic -Wall -c -o qt.o qt.c
-	$(CC) -c -o qtmds.o md/setjmp64.c
+	../system_ln  md/setjmp_d.h qtmd.h
+	$(CHARMC) -pedantic -Wall -c -o qt.o qt.c
+	$(CHARMC) -c -o qtmds.o md/setjmp64.c
 	ar q libqt.a qt.o qtmds.o
-	$(CC) -shared -o libqt.so qt.o qtmds.o
+	$(CHARMC) -shared -o libqt.so qt.o qtmds.o
 
 stp:
 	$(CC) -c stp.c
