@@ -216,6 +216,9 @@ public:
 
 	// 1D
 	inline T& getElement(int i) {
+		return data[i];
+	}
+	inline T& getElementSlow(int i) {
 		uint idx[] = { i };
 		return getElement(idx);
 	}
@@ -243,6 +246,9 @@ public:
 
 	// 3D
 	inline T& getElement(int i, int j, int k) {
+		return data[i*dimSize[0]+j*dimSize[1]+k];
+	}
+	inline T& getElementSlow(int i, int j, int k) {
 		uint idx[] = { i, j, k };
 		return getElement(idx);
 	}
