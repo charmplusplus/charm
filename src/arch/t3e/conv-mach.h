@@ -32,6 +32,7 @@
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { char gap[56]; CmiUInt2 hdl,xhdl,info,d3; }
+#define CMK_MSG_HEADER_BLUEGENE    { char gap[56]; CmiUInt2 hdl,xhdl,info,d3; int nd, n; double rt; CmiUInt2 tID, hID; char t;}
 
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
