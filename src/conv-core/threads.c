@@ -798,7 +798,6 @@ CthThread CthPup(pup_er p, CthThread t)
 #elif CMK_THREADS_USE_ISOMALLOC
 
 #include <stdlib.h>
-#include <alloca.h>
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -1100,6 +1099,11 @@ unmap_slots(int slot, int nslots)
   if (retval==(-1))
     CmiAbort("munmap call failed to deallocate requested memory.\n");
 }
+static void *__cur_stack_frame(void)
+{
+  char __dummy;
+  return (void*) &__dummy;
+}
 
 void CthInit(char **argv)
 {
@@ -1125,11 +1129,10 @@ void CthInit(char **argv)
    */
   do {
     void *heap = (void*) malloc(1);
-    void *stack = alloca(0);
+    void *stack = __cur_stack_frame();
     void *stackbdry;
     int stacksize = CpvAccess(_stksize);
     _MEMCHECK(heap);
-    _MEMCHECK(stack);
 #if CMK_THREADS_DEBUG
     CmiPrintf("[%d] heap=%p\tstack=%p\n",CmiMyPe(),heap,stack);
 #endif
