@@ -77,8 +77,8 @@ int MID_MESSAGE_SIZE=65536;     /* Queue for larger messages
 
 #define NON_BLOCKING_MSG  16     /* Message sizes greater 
                                     than this will be sent asynchronously*/
-#define RECV_MSG_Q_SIZE 8
-#define MID_MSG_Q_SIZE  4
+#define RECV_MSG_Q_SIZE 4
+#define MID_MSG_Q_SIZE  2
 
 ELAN_EVENT *esmall[RECV_MSG_Q_SIZE], *emid[MID_MSG_Q_SIZE], *elarge;
 
@@ -198,50 +198,22 @@ static void PerrorExit(const char *msg)
 #include <sys/timers.h>
 void CmiTimerInit(void)
 {
-    struct timespec tp;
-    //starttimer =  elan_clock(elan_base->state); 
-    getclock(TIMEOFDAY, &tp);
-    starttimer = tp.tv_nsec;
-    starttimer /= 1e9;
-    starttimer += tp.tv_sec;
+    starttimer =  elan_clock(elan_base->state); 
 }
 
 double CmiTimer(void)
 {
-    struct timespec tp;
-    double cur_time;
-    getclock(TIMEOFDAY, &tp);
-    cur_time = tp.tv_nsec;
-    cur_time  /= 1e9;
-    cur_time += tp.tv_sec;
-    return cur_time - starttimer;
-    //return (elan_clock(elan_base->state) - starttimer)/1e9;
+    return (elan_clock(elan_base->state) - starttimer)/1e9;
 }
 
 double CmiWallTimer(void)
 {
-    struct timespec tp;
-    double cur_time;
-    getclock(TIMEOFDAY, &tp);
-    cur_time = tp.tv_nsec;
-    cur_time  *= 0.000000001; // converting to seconds 1/1e9;
-    cur_time += tp.tv_sec;
-    return cur_time - starttimer;
-
-    //return (elan_clock(elan_base->state) - starttimer)/1e9;
+    return (elan_clock(elan_base->state) - starttimer)/1e9;
 }
 
 double CmiCpuTimer(void)
 {
-    struct timespec tp;
-    double cur_time;
-    getclock(TIMEOFDAY, &tp);
-    cur_time = tp.tv_nsec;
-    cur_time  *= 0.000000001; //1e9;
-    cur_time += tp.tv_sec;
-    return cur_time - starttimer;
-
-    //return (elan_clock(elan_base->state) - starttimer)/1e9;
+    return (elan_clock(elan_base->state) - starttimer)/1e9;
 }
 
 #endif
