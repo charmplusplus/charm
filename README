@@ -96,7 +96,7 @@ see README.win32; for net- version, see README.net
 Once you have decided on a version, unpack Charm++, cd into charm,
 and run
 
-     > ./SUPER_INSTALL _target_ _version_ _opts_
+     > ./build _target_ _version_ _opts_
 
 Where _target_ is one of
 	"charm++"  The basic Charm++ language.
@@ -108,7 +108,7 @@ Common compile time options such as -g, -O, -Ipath, -Lpath, -llib are
 accepted.
 
 For example, on a Linux machine, you would run
-     > ./SUPER_INSTALL charm++ net-linux -O
+     > ./build charm++ net-linux -O
 
 
 This will construct a _version_ directory, link over all
