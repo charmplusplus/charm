@@ -169,8 +169,6 @@ void element::split(int longEdge)
 
 void element::coarsen()
 {
-  CkAbort("NOT IMPLEMENTED! element::coarsen()\n");
-/*
   int shortEdge = findShortestEdge();
   int n1, n2, e1, e2;
 
@@ -186,12 +184,11 @@ void element::coarsen()
     }
     nodes[n1].unlock();
   }
-*/
 }
 
 
-//void element::collapse(int shortEdge, int n1, int n2, int e1, int e2)
-//{
+void element::collapse(int shortEdge, int n1, int n2, int e1, int e2)
+{
 /*                       @n3
                         / \  
                        /   \
@@ -200,6 +197,8 @@ void element::coarsen()
                     /         \
                  n1@_____m_____@n2
                      shortEdge                         */  
+
+  CkAbort("NOT IMPLEMENTED! element::collapse()\n");
 
 /*
   node m;  // midpoint on edge to collapse;
@@ -266,8 +265,9 @@ void element::coarsen()
   edges[e2].remove();
   edges[shortEdge].remove();
   myRef.remove();
-}
 */
+}
+
 
 //void element::collapseHelp(edgeRef shortEdgeRef, nodeRef n1ref, nodeRef n2ref)
 //{

@@ -18,7 +18,6 @@ chunk::chunk(chunkMsg *m)
     additions(0), debug_counter(0), refineInProgress(0), coarsenInProgress(0),
     modified(0), meshLock(0), meshExpandFlag(0), 
     numElements(0), numEdges(0), numNodes(0), numGhosts(0), theClient(NULL)
-
 {
   refineResultsStorage=NULL;
   cid = thisIndex;
@@ -72,7 +71,6 @@ void chunk::refiningElements()
 }
 
 
-// This initiates a coarsening for a single element
 void chunk::coarsenElement(int idx, double area)
 { // Increase element's targetArea to indicate need for coarsening
   if (!theElements[idx].isPresent()) return;
@@ -86,7 +84,6 @@ void chunk::coarsenElement(int idx, double area)
   }
 }
 
-// This loops through all elements performing coarsenings as needed
 void chunk::coarseningElements()
 {
   int i;
