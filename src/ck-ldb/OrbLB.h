@@ -39,7 +39,7 @@ private:
     int v[3];
     double load;
     int  refno;
-    int  tv;
+    double  tv;
     Partition * partition;
   };
   

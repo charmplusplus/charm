@@ -69,6 +69,9 @@ void OrbLB::rec_divide(int n, Partition &p)
   n1 = n-n2;
 
   load1 = (1.0*n1/n) * p.load;
+#ifdef DEBUG
+  CmiPrintf("divide goal: n1: %d load1: %f, n2: %d\n", n1, load1, n2);
+#endif
 
   p1 = p;
   p1.refno = ++refno;
@@ -117,8 +120,8 @@ void OrbLB::rec_divide(int n, Partition &p)
       }
     }
   }
-//  CmiPrintf("X:cur:%d, prev:%d load:%f %f\n", cur, prev, currentload, prevload);
 #ifdef DEBUG
+//  CmiPrintf("X:cur:%d, prev:%d load:%f %f\n", cur, prev, currentload, prevload);
   CmiPrintf("DIR:%d %d load:%f\n", maxdir, midpos, currentload);
 #endif
 
@@ -141,8 +144,8 @@ void OrbLB::setVal(int x, int y, int z)
 {
   int i;
   for (i=0; i<nObjs; i++) {
-    computeLoad[i].tv = 1000000*computeLoad[i].v[x]+
-			1000*computeLoad[i].v[y]+
+    computeLoad[i].tv = 1000000.0*computeLoad[i].v[x]+
+			1000.0*computeLoad[i].v[y]+
 			computeLoad[i].v[z];
   }
 #if 0
@@ -155,7 +158,7 @@ void OrbLB::setVal(int x, int y, int z)
 
 int OrbLB::sort_partition(int x, int p, int r)
 {
-  int mid = computeLoad[vArray[x][p].id].tv;
+  double mid = computeLoad[vArray[x][p].id].tv;
   int i= p;
   int j= r;
   while (1) {
@@ -196,8 +199,8 @@ void OrbLB::quicksort(int x)
   qsort(x, 0, nObjs-1);
 
 #if 0
-  CmiPrintf("result:%d\n", x);
-  for (int i=0; i<numComputes; i++) 
+  CmiPrintf("result for :%d\n", x);
+  for (int i=0; i<nObjs; i++) 
     CmiPrintf("%d ", computeLoad[vArray[x][i].id].tv);
   CmiPrintf("\n");
 #endif
@@ -253,9 +256,11 @@ void OrbLB::mapPartitionsToNodes()
   delete [] pool;
 #endif
 
-  CmiPrintf("partitions to nodes mapping: ");
-  for (i=0; i<P; i++) CmiPrintf("%d ", partitions[i].node);
-  CmiPrintf("\n");
+  if (_lb_debug) {
+    CmiPrintf("partitions to nodes mapping: ");
+    for (i=0; i<P; i++) CmiPrintf("%d ", partitions[i].node);
+    CmiPrintf("\n");
+  }
 }
 
 void OrbLB::work(CentralLB::LDStats* stats, int count)
@@ -289,6 +294,9 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
         vArray[k][objIdx].id = objIdx;
         vArray[k][objIdx].v = computeLoad[objIdx].v[k];
     }
+#ifdef DEBUG
+    CmiPrintf("Object %d: %d %d %d load:%f\n", objIdx, computeLoad[objIdx].v[XDIR], computeLoad[objIdx].v[YDIR], computeLoad[objIdx].v[ZDIR], computeLoad[objIdx].load);
+#endif
     objIdx ++;
   }
 
@@ -337,9 +345,11 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
   // recursively divide
   rec_divide(npartition, top_partition);
 
-  CmiPrintf("After partitioning: \n");
-  for (i=0; i<P; i++) {
-    CmiPrintf("[%d] (%d,%d,%d) (%d,%d,%d) load:%f count:%d\n", i, partitions[i].origin[0], partitions[i].origin[1], partitions[i].origin[2], partitions[i].corner[0], partitions[i].corner[1], partitions[i].corner[2], partitions[i].load, partitions[i].count);
+  if (_lb_debug) {
+    CmiPrintf("After partitioning: \n");
+    for (i=0; i<P; i++) {
+      CmiPrintf("[%d] (%d,%d,%d) (%d,%d,%d) load:%f count:%d\n", i, partitions[i].origin[0], partitions[i].origin[1], partitions[i].origin[2], partitions[i].corner[0], partitions[i].corner[1], partitions[i].corner[2], partitions[i].load, partitions[i].count);
+  }
   }
 
   // mapping partitions to nodes
@@ -368,11 +378,11 @@ void OrbLB::work(CentralLB::LDStats* stats, int count)
   // Save output
   for(int obj=0;obj<stats->n_objs;obj++) {
       int frompe = stats->from_proc[obj];
-      if (frompe != computeLoad[objIdx].partition->node) {
+      if (frompe != computeLoad[obj].partition->node) {
         //      CkPrintf("[%d] Obj %d migrating from %d to %d\n",
-        //             CkMyPe(),obj,frompe,computeLoad[objIdx].partition->node);
+        //             CkMyPe(),obj,frompe,computeLoad[obj].partition->node);
 	CmiAssert(frompe == stats->from_proc[obj]);
-	stats->to_proc[obj] = computeLoad[objIdx].partition->node;
+	stats->to_proc[obj] = computeLoad[obj].partition->node;
       }
   }
 
