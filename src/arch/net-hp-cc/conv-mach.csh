@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.10  1998-05-22 22:06:55  milind
+# Revision 1.11  1998-08-17 16:51:42  milind
+# *** empty log message ***
+#
+# Revision 1.10  1998/05/22 22:06:55  milind
 # Added Charm-IDL
 #
 # Revision 1.9  1997/07/15 21:15:43  jyelon
@@ -64,7 +67,7 @@ set CMK_C_OPTIMIZE='+O3 +Onolimit '
 set CMK_CXX_DEBUG='-g'
 set CMK_CXX_OPTIMIZE='+O3 +Onolimit '
 set CMK_LD='cc -Aa -D_HPUX_SOURCE '
-set CMK_LDXX='CC '
+set CMK_LDXX='CC -Aa -D_HPUX_SOURCE -Wl,+n'
 set CMK_LD77=''
 set CMK_M4='m4'
 set CMK_SUF='o'
