@@ -358,9 +358,9 @@ int main() {
 	return 0;
 }
 EOT
-test_link "whether dlopen links without -ldl" "yes" "no" ""
+test_link "whether dlopen links without $dl_opt" "yes" "no" ""
 noldl=$pass
-test_link "whether dlopen links with -ldl" "yes" "no" "$dl_opt"
+test_link "whether dlopen links with $dl_opt" "yes" "no" "$dl_opt"
 if test $pass -eq 1
 then 
 #dlopen requires -ldl: add it to our link line
