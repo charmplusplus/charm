@@ -416,12 +416,17 @@ void CkReductionMgr::startReduction(int number)
   //making it a broadcast done only by PE 0
 
   if(CkMyPe()==0){
-	int temp = completedRedNo;
+	int temp = completedRedNo+1;
 	if(temp < 0)
 		temp = 0;  
 	for(int i=temp;i<=number;i++){
 		DEBR((AA"Asking all child PEs to start #%d \n"AB,i));
-		thisProxy.ReductionStarting(new CkReductionNumberMsg(i));
+		//thisProxy.ReductionStarting(new CkReductionNumberMsg(i));
+	  for (int k=0;k<treeKids();k++)
+	  {
+	    DEBR((AA"Asking child PE %d to start #%d\n"AB,firstKid()+k,redNo));
+	    thisProxy[firstKid()+k].ReductionStarting(new CkReductionNumberMsg(i));
+  	 }
 	}
   }
   else{
@@ -483,7 +488,7 @@ void CkReductionMgr::finishReduction(void)
   //CkPrintf("[%d] Got all local Messages in finishReduction %d in redNo %d\n",CkMyPe(),nContrib,redNo);
 
 #if DEBUGRED
-  CkPrintf("[%d,%d]Callback for redNo %d in group %d  mesggcount=%d localgcount=%d\n",CkMyNode(),CkMyPe(),redNo,thisgroup.idx,ret->gcount,gcount);
+ // CkPrintf("[%d,%d]Callback for redNo %d in group %d  mesggcount=%d localgcount=%d\n",CkMyNode(),CkMyPe(),redNo,thisgroup.idx,ret->gcount,gcount);
 #endif
   
   // Find our node reduction manager, and pass reduction to him:
