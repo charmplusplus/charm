@@ -12,7 +12,10 @@
 % REVISION HISTORY:
 %
 % $Log$
-% Revision 1.7  1997-06-26 05:16:22  jyelon
+% Revision 1.8  1997-07-19 23:51:52  wilmarth
+% Several changes to correct/clarify test were made.
+%
+% Revision 1.7  1997/06/26 05:16:22  jyelon
 % Still improving manual.
 %
 % Revision 1.6  1997/06/25 06:53:48  jyelon
@@ -39,7 +42,7 @@
 \chapter{Machine Model and Global Variables}
 
 Converse treats the parallel machine as a collection of nodes, where
-each node comprises of a number of processors that share memory.  In
+each node is comprised of a number of processors that share memory.  In
 some cases, the number of processors per node may be exactly one.  In
 addition, each of the processors may have multiple threads running on
 them which share code and data but have different stacks.
@@ -130,7 +133,7 @@ CtvAccess(variable)
 
 A sample code to illustrate the usage of the macros is provided
 in Figure~\ref{fig:cpv}.
-There are a few rules that user must pay attention: The
+There are a few rules that the user must pay attention to: The
 {\tt type} and {\tt variable} fields of the macros must be a single
 word. Therefore, structures or pointer types can be used by defining
 new types with the {\tt typedef}. In the sample code, for example,
@@ -179,11 +182,11 @@ File Module1.c
 \section{Utility Functions}
 \label{utility}
 
-To further simplify programming with global variables on shared memory machines,
-Converse provides following functions and/or macros. \note{These functions
-are defined on machines other than shared-memory machines also, and
-have the effect of only one processor per node and only one thread per 
-processor.}
+To further simplify programming with global variables on shared memory
+machines, Converse provides the following functions and/or
+macros. \note{These functions are defined on machines other than
+shared-memory machines also, and have the effect of only one processor
+per node and only one thread per processor.}
 
 \function{int CmiMyRank()}
 \index{CmiMyRank}

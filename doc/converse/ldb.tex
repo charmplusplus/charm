@@ -3,12 +3,11 @@
 Converse provides the programmer with a number of Load Balancing
 strategies in order to distribute work among the processors in the
 system. The load balancing strategy to be used in the program can be
-specified at the link time. \note{In the future versions, we will
-provide the users with ability to write their own load balancing
+specified at the link time. \note{In future versions, we will
+provide users with the ability to write their own load balancing
 strategies. However, in this version, the choice is limited to certain
-predefined load balancing strategies.} Following functions are provided
-for interfacing the converse program with the load balancing module of
-Converse.
+predefined load balancing strategies.} The following functions are provided
+for interfacing a Converse program with the load balancing module.
 
 \function{void CldNewSeedFromLocal(void *msg, void *ldb, void (*sendfn)(),int queueing, int priolen, int *prioptr)}
 \index{CldNewSeedFromLocal}
@@ -43,14 +42,14 @@ different use of the parameter \param{ldb}. Some of the currently
 implemented language specific load balancing strategies use this area
 in the message for sending the load information on local processor
 piggy-backed onto the message periodically; some of them may not need
-this area at all. \note{The only ldb strategy available to converse
+this area at all. \note{The only ldb strategy available to Converse
 users currently, i.e. random, does not use this area and the user could
 specify \param{void * (0))} there.}
 
-Some of the parallel languages or libraries built on top of converse
+Some of the parallel languages or libraries built on top of Converse
 may have the message packing mechanisms which have to be called before
 any message crosses address boundaries. Therefore the load balancing
-module cannot use the built-in function such as \param{CmiAsyncSend()}
+module cannot use built-in functions such as \param{CmiAsyncSend()}
 for sending the work off to another processor. For this reason, the
 user needs to specify a function \param{sendfn()} which takes two
 parameters:  \param{void *msgptr} and \param{int destPE}. Languages or

@@ -35,21 +35,21 @@ The launcher has this prototype:
     void Cpm_myfunc(CpmDestination destination, int x, int y);
 \end{verbatim}
 
-If I were to call {\tt Cpm\_myfunc} as follows:
+If one were to call {\tt Cpm\_myfunc} as follows:
 
 \begin{verbatim}
     Cpm_myfunc(CpmSend(3), 8, 9);
 \end{verbatim}
 
-A message would be sent to processor 3 ordering it to call {\tt
+a message would be sent to processor 3 ordering it to call {\tt
 myfunc(8,9)}.  Notice that the {\it destination} argument isn't just an
 integer processor number.  The possible destinations for a message are
 described later.
 
 When the CPM scanner is applied to a C source file with a particular
-name, it generates a great deal of parameter packing and unpacking
-code, and this code is inserted into an include file with a name
-similar to the original C file: the {\tt .c} is replaced with {\tt
+name, it generates a certain amount of parameter packing and unpacking
+code, and this code is placed in an include file named
+similarly to the original C file: the {\tt .c} is replaced with {\tt
 .cpm.h}.  The include file must be included in the original {\tt .c}
 file, after the declarations of the types which are being packed and
 unpacked, but before all uses of the CPM invocation mechanisms.
@@ -67,7 +67,6 @@ possible to have one in each {\tt .cpm.h} file without conflicts.  It
 is the responsibility of the CPM user to call each of these {\tt
 CpmInitializeThisModule} functions before using any of the CPM
 mechanisms.
-
 
 We demonstrate the use of the CPM mechanisms using the following
 short program {\tt myprog.c}:
@@ -108,7 +107,7 @@ the {\it i}'th processor.
 
 The effect of this program is that the first processor orders each of
 the other processors to print a random number.  Note that the example
-is somewhat minimalist, for example, it doesn't contain any code for
+is somewhat minimalist since it doesn't contain any code for
 terminating itself.  Also note that it would have been more efficient
 to use an explicit broadcast.  Broadcasts are described later.
 
@@ -172,7 +171,7 @@ example,
 Cpm_print_integer(CpmMakeThread(CPM_ALL), 5);
 \end{verbatim}
 
-Would broadcast a message to all the processors causing each processor
+would broadcast a message to all the processors causing each processor
 to create a thread, which would in turn invoke {\tt print\_integer}
 with the argument 5.
 
@@ -201,7 +200,7 @@ CpmDim} argument to be the size of the array.  Given a pointer to the
 array, its size, and its element-type, CPM handles the packing of
 array values as automatically as it handles single values.
 
-Here is a second program, {\tt example2.c}, which uses array arguments:
+A second program, {\tt example2.c}, uses array arguments:
 
 \begin{verbatim}
  1:    #include "example2.cpm.h"
@@ -354,9 +353,9 @@ Note that the inclusion of the {\tt .cpm.h} file comes after these
 type and pack declarations: the {\tt .cpm.h} file will reference these
 functions and macros, therefore, they must already be defined.
 
-\section{Inventing new kinds of CpmDestinations}
+\section{Inventing New Types of CpmDestinations}
 
-It is possible for the user to invent new kinds of CpmDestinations,
+It is possible for the user to create new types of CpmDestinations,
 and to write functions that return these new destinations.  In order
 to do this, one must have a mental model of the steps performed when a
 Cpm message is sent.  This knowledge is only necessary to those
@@ -551,6 +550,6 @@ It can access the envelope of the message using CpmEnv:
     int *CpmEnv(void *msg);
 \end{verbatim}
 
-And it can also access the data stored in the destination-structure
+It can also access the data stored in the destination-structure
 by the destination-function.
 

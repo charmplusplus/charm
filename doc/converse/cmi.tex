@@ -21,7 +21,7 @@ Converse maintains a table mapping handler numbers to function
 pointers.  Each processor has its own copy of the mapping.  There is a
 caution associated with this approach: it is the user's responsibility
 to ensure that all processors have identical mappings.  This is easy
-to do, nonetheless, the user must be aware that this is (usually)
+to do, nonetheless, and the user must be aware that this is (usually)
 required.
 
 The following functions are provided to define the handler numbers:
@@ -169,7 +169,7 @@ continues working in the background.  The background job transfers the
 data from the message buffer into the network.  Since the background job
 is still using the message buffer when the function returns, you can't
 reuse the message buffer immediately.  The background job sets a flag
-when it is done and you can reuse the message buffer.}
+when it is done and you can then reuse the message buffer.}
 
 \item{{\bf sync and free}: a version that returns almost instantaneously,
 and then continues working in the background.  The background job
@@ -374,7 +374,7 @@ priority.}
 The message is enqueued with the middle priority ``1000...'', and is
 pushed behind all other messages with this priority.}
 
-\item{{\tt CQS\_QUEUEING\_FIFO}: the prioptr and priobits are ignored.
+\item{{\tt CQS\_QUEUEING\_LIFO}: the prioptr and priobits are ignored.
 The message is enqueued with the middle priority ``1000...'', and is
 pushed in front of all other messages with this priority.}
 
@@ -517,7 +517,7 @@ and usually has at least microsecond accuracy.}
 
 \function{int CmiNumPe(void)}
 \index{CmiNumPe}
-\desc{Returns total number of processors in the machine on which the 
+\desc{Returns the total number of processors on which the 
 parallel program is being run.}
 
 \function{int CmiMyPe(void)}

@@ -55,7 +55,7 @@ To ``match'', the array {\tt tags} must be of the same length as the
 stored array.  Similarly, all the individual tags in the stored array
 must ``match'' the tags in the {\tt tags} array.  Two tags match if they
 are equal to each other, or if {\tt either} tag is equal to {\tt
-CmmWildCard} (yes, that means if I can {\tt store} messages with
+CmmWildCard} (this means one can {\tt store} messages with
 wildcard tags, making it easier to find those messages on retrieval).}
 
 \function{void *CmmProbe(CmmTable t, int ntags, int *tags, int *ret\_tags)}

@@ -3,7 +3,7 @@
 The calls in this chapter can be used to put together runtime systems
 for languages that support threads.
 This threads package, like most thread packages, provides basic
-functionality like creating threads, destroying threads, yielding, 
+functionality for creating threads, destroying threads, yielding, 
 suspending, and awakening a suspended thread. In
 addition, it provides facilities whereby you can write your own thread
 schedulers.  
@@ -57,7 +57,7 @@ CthThread}.}
 \desc{Frees thread {\tt t}.  You may ONLY free the
 currently-executing thread (yes, this sounds strange, it's
 historical).  Naturally, the free will actually be postponed until the
-thread suspends.  This is how a thread terminates itself: it calls
+thread suspends.  To terminate itself, a thread calls
 {\tt CthFree(CthSelf())}, then gives up control to another thread.}
 
 \function{void CthSuspend()}
