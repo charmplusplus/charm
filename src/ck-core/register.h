@@ -26,7 +26,7 @@ class MsgInfo {
     CkPackFnPtr pack;
     CkUnpackFnPtr unpack;
     CkCoerceFnPtr coerce;
-    int size;
+    size_t size;
 
     MsgInfo(const char *n,CkPackFnPtr p,CkUnpackFnPtr u,CkCoerceFnPtr c,int s):
       name(n), pack(p), unpack(u), coerce(c), size(s)

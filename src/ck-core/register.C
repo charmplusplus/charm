@@ -45,7 +45,7 @@ void _registerInit(void)
 
 extern "C"
 int CkRegisterMsg(const char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack, 
-                  CkCoerceFnPtr coerce, int size)
+                  CkCoerceFnPtr coerce, size_t size)
 {
   _msgTable[_numMsgs] = new MsgInfo(name, pack, unpack, coerce, size);
   _MEMCHECK(_msgTable[_numMsgs]);

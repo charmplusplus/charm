@@ -111,7 +111,7 @@ typedef void  (*CkCallFnPtr) (void *msg, void *obj);
  *****************************************************************************/
 
 extern int CkRegisterMsg(const char *name, CkPackFnPtr pack, 
-                         CkUnpackFnPtr unpack, CkCoerceFnPtr coerce, int size);
+                       CkUnpackFnPtr unpack, CkCoerceFnPtr coerce, size_t size);
 extern int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, 
                         int chareIdx);
 extern int CkRegisterChare(const char *name, int dataSz);
