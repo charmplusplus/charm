@@ -28,6 +28,8 @@ public:
   void closeLog();
   void addMsg(char *msg);
   void print(int node, int th);
+
+  void adjustTimingLog(double tAdjust);
 };
 
 typedef CkQ< bgTimingLog *> BgTimeLine;
@@ -35,6 +37,8 @@ typedef CkQ< bgTimingLog *> BgTimeLine;
 extern void BgInitTiming();
 extern void BgMsgSetTiming(char *msg);
 extern void BgPrintThreadTimeLine(int node, int th, BgTimeLine &tline);
+extern void BgAdjustTimeLineInit(bgTimingLog* tlog, BgTimeLine &tline);
+extern void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline);
 
 #if BLUEGENE_TIMING
 

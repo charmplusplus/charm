@@ -21,14 +21,14 @@
 
 #include "blue.h"
 
-#include "blue_impl.h"         // implementation header file
+#include "blue_impl.h"    	// implementation header file
 #include "blue_timing.h" 	// timing module
 
 template<class T> class bgQueue;
 
 typedef bgQueue<int>  	    threadIDQueue;
 typedef bgQueue<CthThread>  threadQueue;
-typedef bgQueue<char *>    msgQueue;
+typedef bgQueue<char *>     msgQueue;
 typedef CkQ<char *> 	    ckMsgQueue;
 
 class nodeInfo;
@@ -120,12 +120,12 @@ public:
   int id;
   int x,y,z;
   threadQueue *commThQ;		/* suspended comm threads queue */
-  CthThread *threadTable;	/* thread table for both work and comm threads*/
-  ckMsgQueue nodeQ;		/* non-affinity msg queue */
-  ckMsgQueue *affinityQ;	/* affinity msg queue for each work thread */
-  char *udata;			/* node specific data pointer */
-  double startTime;		/* start time for a thread */
-  char started;			/* flag indicate if this node is started */
+  CthThread   *threadTable;	/* thread table for both work and comm threads*/
+  ckMsgQueue   nodeQ;		/* non-affinity msg queue */
+  ckMsgQueue  *affinityQ;	/* affinity msg queue for each work thread */
+  char        *udata;		/* node specific data pointer */
+  double       startTime;	/* start time for a thread */
+  char         started;		/* flag indicate if this node is started */
  
   // for timing
   BgTimeLine *timelines;
