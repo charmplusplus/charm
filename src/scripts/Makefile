@@ -732,13 +732,11 @@ RefineLB.o: RefineLB.C RefineLB.decl.h $(CKHEADERS)
 $(L)/libmoduleRefineLB.a: RefineLB.o 
 	$(CHARMC) -o $(L)/libmoduleRefineLB.a RefineLB.o 
 	
-
 CommLB.decl.h: CommLB.ci charmxi
 	$(CHARMC) CommLB.ci
+
 CommLB.o: CommLB.C CommLB.decl.h manager.h $(CKHEADERS)
 	$(CHARMC) -c CommLB.C 
-manager.o: manager.C manager.h 
-	$(CHARMC) -c manager.C
 
 $(L)/libmoduleCommLB.a: CommLB.o manager.o
 	$(CHARMC) -o $(L)/libmoduleCommLB.a CommLB.o manager.o
