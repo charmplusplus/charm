@@ -108,8 +108,9 @@ void traceAwaken(CthThread t)
 extern "C"
 void traceUserEvent(int e)
 {
-  OPTIMIZE_WARNING
+#ifndef CMK_OPTIMIZE
   CpvAccess(_traces)->userEvent(e);
+#endif
 }
 
 extern "C"
