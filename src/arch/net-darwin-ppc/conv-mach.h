@@ -62,6 +62,8 @@
 #define CMK_SIGNAL_USE_SIGACTION                           1
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
+#define CMK_NETPOLL					   1
+
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
 #define CMK_SPANTREE_USE_SPECIAL_CODE                      0
