@@ -104,10 +104,10 @@ typeDefinition
             IDENT { J.tmp.push(#IDENT.getText()); }
             e:extendsClause {
 
-                if (((ASTJ)c).status)
-                    System.out.println("pass3: " + #IDENT.getText() + "is main");
-                else
-                    System.out.println("pass3: " + #IDENT.getText() + "is NOT main");
+//                 if (((ASTJ)c).status)
+//                     System.out.println("pass3: " + #IDENT.getText() + "is main");
+//                 else
+//                     System.out.println("pass3: " + #IDENT.getText() + "is NOT main");
 
                 //{ //((ASTJ)#IDENT).genID(J.h);
                 if (J.isX(m, "synchronized")) { // is a chare
@@ -267,7 +267,7 @@ objBlock[AST className, boolean insertMigrateConstructor]
                 // Generate the class PUP method here
                 J.h.append(J.indent() + "public: virtual void pup(PUP::er &p);\n");
                 J.c.append(J.indent() + "void "+J.pE(className)+"::pup(PUP::er &p) {\n");
-                J.genPup(J.globalStack, J.pE(className));
+                J.genPup(J.pE(className));
                 J.c.append(J.indent() + "}\n");
                 ((StringBuffer)J.classInit.peek()).append("};\n");
 
@@ -456,8 +456,7 @@ variableDef[boolean classVarq, boolean outputOnNewLine]
 
                 String varName = J.printVariableDeclarator(vd);
                 if (!classVarq){
-                    J.localStack.push(varName);
-                    J.localStackShadow.push(v);
+                    J.localStackPush(varName, v);
                 }
 
                 // class variable def
@@ -631,8 +630,7 @@ variableDef[boolean classVarq, boolean outputOnNewLine]
 // Adds parameter to localStack.
 parameterDef
 	:	#(p:PARAMETER_DEF modifiers typeSpec i:IDENT {
-                    J.localStack.push(i.getText());
-                    J.localStackShadow.push(p);
+                    J.localStackPush(i.getText(), p);
             })
 	;
 
@@ -714,7 +712,7 @@ stat
             {
                 J.c.append( ((e1!=null)? J.printExpression(e1): "") +";"
                     + J.printExpression(e2) + ";"
-                    + J.printExpression(e3) + ")");
+                    + J.printExpression(e3) + ")\n");
             }
 			stat
 		)

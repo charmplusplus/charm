@@ -141,8 +141,7 @@ methodDecl
 methodDef
 	:	#(METHOD_DEF modifiers typeSpec mh:methodHead
             {
-                J.globalStack.push(new String(J.fullName(mh.getText())));
-                J.globalStackShadow.push(#METHOD_DEF);
+                J.globalStackPush(new String(J.fullName(mh.getText())), #METHOD_DEF);
                 J.tmp.push(new String(mh.getText()));
             }
             (slist)? { J.tmp.pop(); })
@@ -153,8 +152,7 @@ variableDef
             v:variableDeclarator {
                 //System.out.println("pass1: " + v.getText() + J.tmp + "\n");
                 if (J.tmp.size() == 2) {
-                    J.globalStack.push(new String(J.fullName(v.getText())));
-                    J.globalStackShadow.push(#VARIABLE_DEF);
+                    J.globalStackPush(new String(J.fullName(v.getText())), #VARIABLE_DEF);
                 } else {
                     // should print this only for public static final
                     if ( ((ASTJ)m).isX("static") )
