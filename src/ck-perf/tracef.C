@@ -5,11 +5,11 @@
 #include<charm++.h>
 #include<charm-api.h>
                                                                                 
-CpvDeclare(int, a);
+CpvStaticDeclare(int, a);
                                                                                 
 static int isInitialized=0;
                                                                                 
-void checkInit(void) {
+static void checkInit(void) {
         if (isInitialized) return;
         isInitialized=1;
         CpvInitialize(int,a);
@@ -17,7 +17,13 @@ void checkInit(void) {
 }
 
 FDECL {
-void FTN_NAME(FTRACEBEGIN, ftracebegin)()
+
+#define ftracebegin              FTN_NAME(FTRACEBEGIN, ftracebegin)
+#define ftraceend		 FTN_NAME(FTRACEEND, ftraceend)
+#define ftraceregisteruserevent  FTN_NAME(FTRACEREGISTERUSEREVENT, ftraceregisteruserevent)
+#define ftraceuserbracketevent   FTN_NAME(FTRACEUSERBRACKETEVENT, ftraceuserbracketevent)
+
+void ftracebegin()
 {
           checkInit();
           if ( CpvAccess(a) ==0)
@@ -42,7 +48,7 @@ void FTN_NAME(FTRACEEND, ftraceend)()
                                                                                 
 }
 
-void FTN_NAME(FTRACEREGISTERUSEREVENT, ftraceregisteruserevent)(char *x, int *ein, int *eout, int len)
+void ftraceregisteruserevent(char *x, int *ein, int *eout, int len)
 {
   char *newstr = new char[len + 1];
   _MEMCHECK(newstr);
@@ -52,14 +58,9 @@ void FTN_NAME(FTRACEREGISTERUSEREVENT, ftraceregisteruserevent)(char *x, int *ei
   *eout = newe;
 }
 
-void FTN_NAME(FTRACEUSERBRACKETEVENT, ftraceuserbracketevent)(int *e, double *begint, double *endt)
+void ftraceuserbracketevent(int *e, double *begint, double *endt)
 {
   traceUserBracketEvent(*e, *begint, *endt);
-}
-
-void FTN_NAME(FCMIWALLTIMER, fcmiwalltimer)(double *t)
-{
-  *t = CmiWallTimer();
 }
 
 }  // FDECL
