@@ -2,16 +2,23 @@
 #include "converse.h"
 
 #define MAX_BUF_SIZE 165000
+#define MAX_SENDS_PER_BATCH 16
+#define MULTICAST_DELAY 5
 
 static NodeMulticast *nm_mgr;
 
-void* NodeMulticastHandler(void *msg){
+static void call_doneInserting(void *ptr){
+    NodeMulticast *mgr = (NodeMulticast *)ptr;
+    mgr->doneInserting();
+}
+
+static void* NodeMulticastHandler(void *msg){
     ComlibPrintf("In Node MulticastHandler\n");
     nm_mgr->recvHandler(msg);
     return NULL;
 }
 
-void* NodeMulticastCallbackHandler(void *msg){
+static void* NodeMulticastCallbackHandler(void *msg){
     ComlibPrintf("[%d]:In Node MulticastCallbackHandler\n", CkMyPe());
     register envelope *env = (envelope *)msg;
     CkUnpackMessage(&env);
@@ -29,8 +36,8 @@ void NodeMulticast::setDestinationArray(CkArrayID a, int nelem,
     mode = ARRAY_MODE;
     messageBuf = NULL;
     pes_per_node = 4;
-    //if(getenv("RMS_NODES") != NULL)
-    //  pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
+    if(getenv("RMS_NODES") != NULL)
+        pes_per_node = CkNumPes()/atoi(getenv("RMS_NODES"));
 
     mAid = a;
     nelements = nelem;
@@ -192,6 +199,7 @@ void NodeMulticast::doneInserting(){
         */
     }
     else if (messageBuf->length() == 1){
+        static int prevCount = 0;
         int count = 0;
         ComlibPrintf("Sending Node Multicast\n");
         cmsg = messageBuf->deq();
@@ -206,16 +214,19 @@ void NodeMulticast::doneInserting(){
         ComlibPrintf("After set handler\n");
 
         //CmiPrintf("cursedtpes = %d, %d\n", cmsg->npes, numCurDestPes);
-
+        
         if((mode != ARRAY_MODE) && cmsg->npes < numCurDestPes) {
             numCurDestPes = cmsg->npes;
+            for(count = 0; count < numNodes; count++) 
+                nodeMap[count] = 0;        
+            
             for(count = 0; count < cmsg->npes; count++) 
                 nodeMap[(cmsg->pelist[count])/pes_per_node] = 1;        
         }
         
-        for(count = 0; count < numNodes; count++) {
-	    int dest_node = count;
-	    //int dest_node = count ^ (CkMyPe()/pes_per_node);
+        for(count = prevCount; count < numNodes; count++) {
+	    //int dest_node = count;
+	    int dest_node = (count + (CkMyPe()/pes_per_node))%numNodes;
 	    if(nodeMap[dest_node]) {
                 void *newcharmmsg;
                 envelope* newenv;
@@ -242,7 +253,15 @@ void NodeMulticast::doneInserting(){
 		if(env->getTotalsize() < MAX_BUF_SIZE)
                     CmiUsePersistentHandle(NULL, 0);
 #endif          
-	  }
+            }
+            prevCount ++;
+            if((prevCount % MAX_SENDS_PER_BATCH == 0) &&
+               (prevCount != numNodes)) {
+                CcdCallFnAfter(call_doneInserting, (void *)this, 
+                               MULTICAST_DELAY);
+                return;
+            }
+            prevCount = 0;
 	}
 
         ComlibPrintf("[%d] CmiFree (Code) (%x)\n", CkMyPe(), (char *)env - 2*sizeof(int));
