@@ -555,6 +555,7 @@ exelink:
 
 if ($?SEQUENTIAL) then
     switch ($LANGUAGE)
+        case "charm"
         case "c"
         case "C"
             ($ECHOCMD ; $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES -L$CHARMLIB $LIBRARIES $CMK_SEQ_LIBS)

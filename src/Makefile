@@ -96,7 +96,7 @@ dirs+sources:
 	rm -rf ../src ; mkdir ../src
 	cp xl-*.c xl-*.h ../src
 	cp xp-*.c xp-*.h ../src
-	cp xi-*.c xi-*.h ../src
+	cp xi-*.C xi-*.h ../src
 	cp Maketrans ../src/Makefile
 	@echo
 	@rm -f .vdir .gdir
