@@ -12,7 +12,11 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.10  1999-07-15 23:24:06  jmwrght1
+# Revision 1.11  1999-07-27 21:04:39  jmwrght1
+# Filled in some of the CCS functions.  Changed Makefile and manual.tex to
+# generate the index.
+#
+# Revision 1.10  1999/07/15 23:24:06  jmwrght1
 # Added the chapter on CCS to the Converse manual.  At this point, it is
 # basically copied verbatim from the html file in the tech notes function.
 # I need to fix some of the tex code (still learning this stuff) and elaborate
@@ -60,6 +64,7 @@ thsync.tex ccs.tex
 ps:
 	latex manual.tex
 	latex manual.tex
+	makeindex -o index.tex manual.idx
 	latex manual.tex
 	dvips -o manual.ps manual.dvi
 

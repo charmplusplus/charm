@@ -1,31 +1,27 @@
 \chapter{Converse Client-Server Interface}
 
-This note attempts at explaining the design of CCS module of
-Converse. This module is responsible for enabling parallel
-servers to be written using Converse. Currently, this module
-will be implemented only on network of workstations. Other
-parallel architectures will follow.
+This note attempts at explaining the design of CCS module of Converse. This
+module is responsible for enabling parallel servers to be written using
+Converse. Currently, this module will be implemented only on network of
+workstations. Other parallel architectures will follow.
 
-CCS module is split into two parts. One part consists of
-functions that can be used in Converse programs which act as
-servers. The other part consists of functions that can be used
-with clients that try to connect to servers written using
-CCS. The following sections describe both these parts. {\tt conv-host} 
-is sometimes also referred to as {\tt server-host} 
-in order to distinguish it from the individual converse processes which 
-are sometimes referred to as {\tt server-processes}. Together, the 
-{\tt server-host} and the {\tt  server-processes} constitute a
-server. In general, the client does not need to know the
-difference.
+The CCS module is split into two parts. One part consists of functions that can
+be used in Converse programs which act as servers. The other part consists of
+functions that can be used with clients that try to connect to servers written
+using CCS. The following sections describe both these parts. {\tt conv-host} is
+sometimes also referred to as {\tt server-host} in order to distinguish it from
+the individual converse processes which are sometimes referred to as {\tt
+server-processes}. Together, the {\tt server-host} and the {\tt
+server-processes} constitute a server. In general, the client does not need to
+know the difference.
 
 
 \section{CCS: Server-Side}
 
-
 On the network of workstations, any converse program is started using
 \begin{quotation} conv-host pgmname +pN conv-host-opts pgm-opts \end{quotation}
 In addition to the original options, now conv-host accepts one more option:
-{\tt ++server}. Currently this option makes conv-host print out its own
+{\tt ++server}.  Currently this option makes conv-host print out its own
 (randomly allocated) port number, which can then be used to connect to it from
 the client. Note that this is the same port number over which the processes
 belonging to the server contact conv-host (for {\tt CmiPrintf} etc.)
@@ -33,8 +29,8 @@ belonging to the server contact conv-host (for {\tt CmiPrintf} etc.)
 In addition to the usual commands (aset, aget etc.), conv-host now accepts one
 more command {\tt getinfo} over the abovementioned port. This command is issued
 only by the client and not by any of the constituent server processes. The
-response to {\tt getinfo} command is as follows:
-\["info" \, N \, P_{0} \,  P_{1} \, .. \, P_{N} \, IP_{0} \, IP_{1} \, .. \, 
+response to {\tt getinfo} command is as follows: 
+\[info \, N \, P_{0} \, P_{1} \, .. \, P_{N} \, IP_{0} \, IP_{1} \, .. \,
 IP_{N} \, Port_{0} \, Port_{1} \, .. \, Port_{N} \]
 
 Where \(N\)  is the number of SMP nodes, \(P_{i}\)  are number of processors in
@@ -52,8 +48,8 @@ In the server-processes, a new type of handler mechanism is introduced. These
 handlers have a character string associated with it that identifies the handler
 function. These handlers are registered using a {\tt  CcsRegisterHandler()}.
 The handler index returned by {\tt  CcsRegisterhandler() } can be used for
-normal remote invocation too. ({\tt CcsRegisterHandler} internally calls 
-{\tt CmiRegisterHandlerLocal}.)
+normal remote invocation too. ({\tt CcsRegisterHandler} internally calls
+\linebreak {\tt CmiRegisterHandlerLocal}.)
 
 Handler functions responsible for remote requests have the same syntax and
 semantics as the normal Converse handlers. However, in the handler function
@@ -65,12 +61,38 @@ Once the server process gets hold of IP and port of the caller, it can use that
 anytime for replying to the client using {\tt  CcsSendReply } function.
 
 \function{void CcsInit(void);} 
+\index{CcsInit}
+\desc{Initializes some internal variables that CCS uses.}
+
 \function{int CcsRegisterHandler(char *id, CmiHandlerFn fn);}
+\index{CcsRegisterHandler}
+\desc{Register the handler function {\tt fn} with the handler identified by
+{\tt id}.  Returns the id number of the handler.}
+
 \function{void CcsUseHandler(char *id, int hdlr);}
+\index{CcsUseHandler}
+\desc{Add the handler name specified by {\tt id} to the list of handlers,
+with the handler number specified by {\tt hdlr}.  This function is used by
+{\tt CcsRegisterHandler()}}
+
 \function{int CcsEnabled(void);}
+\index{CcsEnabled}
+\desc{Returns 1 if CCS is enabled}
+
 \function{int CcsIsRemoteRequest(void);}
-\function{int CcsCallerId(int *pip, int *pport);}
+\index{CcsIsRemoteRequest}
+\desc{Returns non-zero if the caller is remote.}
+
+\function{void CcsCallerId(int *pip, int *pport);}
+\index{CcsCallerId}
+\desc{Assigns the caller's IP addres to {\tt pip} and the port number to 
+{\tt pport}.}
+
 \function{void CcsSendReply(int ip, int port, int size, void *msg);}
+\index{CcsSendReply}
+\desc{Send a message to the CCS client with the IP address and port specified
+by {\tt ip} and {\tt port}.  {\tt size} indicates the number of bytes in the
+message, which is referenced by the pointer {\tt msg}.}
 
 \section{CCS: Client-Side}
 
@@ -92,14 +114,33 @@ free to choose whatever is appropriate. All functions return {\tt  -1 } on
 error.
 
 \function{int CcsConnect(CcsServer *svr);}
+\index{CcsConnect}
+
 \function{int CcsNumNodes(CcsServer *svr);}
+\index{CcsNumNodes}
+
 \function{int CcsNumPes(CcsServer *svr);}
+\index{CcsNumPes}
+
 \function{int CcsNodeFirst(CcsServer *svr, int node);}
+\index{CcsNodeFirst}
+
 \function{int CcsNodeSize(CcsServer *svr,int node);}
+\index{CcsNodeSize}
+
 \function{int CcsSendRequest(CcsServer *svr, char *hdlrID, int pe, uint size, void *msg);}
+\index{CcsSendRequest}
+
 \function{int CcsRecvResponse(CcsServer *svr, uint maxsize, void *recvBuffer);}
+\index{CcsSendRequest}
+
 \function{int CcsProbe(CcsServer *svr);}
+\index{CcsProbe}
+
 \function{int CcsResponseHandler(CcsServer *svr, CcsHandlerFn fn);}
+\index{CcsResponseHandler}
+
 \function{int CcsFinalize(CcsServer *svr);}
+\index{CcsFinalize}
 
 
