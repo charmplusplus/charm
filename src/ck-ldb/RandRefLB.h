@@ -16,6 +16,7 @@ void CreateRandRefLB();
 class RandRefLB : public CentralLB {
 public:
   RandRefLB();
+  RandRefLB(CkMigrateMessage *m) {}
 private:
   CmiBool QueryBalanceNow(int step);
   CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);

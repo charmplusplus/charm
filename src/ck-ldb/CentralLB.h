@@ -22,6 +22,7 @@ class CentralLB : public Group
 {
 public:
   CentralLB();
+  CentralLB(CkMigrateMessage *m) {}
   ~CentralLB();
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier

@@ -69,6 +69,12 @@ int CkRegisterChare(const char *name, int dataSz)
 }
 
 extern "C"
+void CkRegisterMigCtor(int chareIdx, int ctorEpIdx)
+{
+  _chareTable[chareIdx]->setMigCtor(ctorEpIdx);
+}
+
+extern "C"
 int CkRegisterMainChare(int chareIdx, int entryIdx)
 {
   _mainTable[_numMains] = new MainInfo(chareIdx, entryIdx);

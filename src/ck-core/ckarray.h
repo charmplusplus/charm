@@ -177,15 +177,12 @@ extern CkGroupID _RRMapID;
 typedef int MessageIndexType;
 typedef int ChareIndexType;
 typedef int EntryIndexType;
-typedef struct {
-	ChareIndexType chareType;
-	EntryIndexType migrateType;
-} CkArrayElementType;
 
 //Forward declarations
 class CkArray;
 class ArrayElement;
 class CkArrayMessage;
+class CkArrayElementMigrateMessage;
 class CkArrayCreateMsg;
 class CkArrayRemoveMsg;
 class CkArrayUpdateMsg;
@@ -233,19 +230,19 @@ class CkArrayMap : public CkGroupInitCallback
 {
 public:
   CkArrayMap(void);
+  CkArrayMap(CkMigrateMessage *m) {}
   virtual int registerArray(CkArrayMapRegisterMessage *);
   virtual int procNum(int arrayHdl,const CkArrayIndex &element);
 };
 
 /************************ Array Element *********************/
-class ArrayElementMigrateMessage;
 
 class ArrayElement : public Chare
 {
 	friend class CkArray;
 public:
   ArrayElement(void) {}
-  ArrayElement(ArrayElementMigrateMessage *msg) {}
+  ArrayElement(CkMigrateMessage *m) {}
 
   virtual ~ArrayElement();//Deletes heap-allocated array index
   
@@ -293,7 +290,7 @@ class ArrayElement1D : public ArrayElement
 {
 public:
   ArrayElement1D(void);
-  ArrayElement1D(ArrayElementMigrateMessage *msg);
+  ArrayElement1D(CkMigrateMessage *m);
   int getIndex(void) {return thisIndex;}
   int getSize(void)  {return numElements;}
   
@@ -311,7 +308,7 @@ class ArrayElementT : public ArrayElement
 {
 public:
   ArrayElementT(void) {thisIndex=*(T *)thisindex->data();}
-  ArrayElementT(ArrayElementMigrateMessage *msg) {thisIndex=*(T *)thisindex->data();}
+  ArrayElementT(CkMigrateMessage *msg) {thisIndex=*(T *)thisindex->data();}
   
   T thisIndex;//Object array index
 };
@@ -342,10 +339,10 @@ public:
 //Array Creation:
   static  CkGroupID CreateArray(int numInitial,
   				CkGroupID mapID,
-				ChareIndexType elementChare,
-				EntryIndexType elementMigrator);
+				ChareIndexType elementChare);
 
   CkArray(CkArrayCreateMsg *);
+  CkArray(CkMigrateMessage *) {}
   CkGroupID &getGroupID(void) {return thisgroup;}
 
 //Element creation/destruction:
@@ -371,7 +368,7 @@ public:
   void migrateMe(ArrayElement *elem, int where);
   
   //Internal:
-  void RecvMigratedElement(ArrayElementMigrateMessage *msg);
+  void RecvMigratedElement(CkArrayElementMigrateMessage *msg);
   void UpdateLocation(CkArrayUpdateMsg *msg);
 
 //Load balancing:
@@ -419,7 +416,7 @@ private:
   	int migrating;//Just left
   } num;//<- array element counts
   
-  CkArrayElementType type;
+  ChareIndexType elementType;
   int numInitial;//Initial array size (used only for 1D case)
   CmiBool isInserting;//Are we currently inserting elements?
 
@@ -428,7 +425,7 @@ private:
   ArrayElement *newElement(int type,CkArrayIndex *ind);
   //Call the user's given constructor, passing the given message.
   // Add the element to the hashtable.
-  void ctorElement(ArrayElement *el,int ctor,CkArrayMessage *m);
+  void ctorElement(ArrayElement *el,int ctor,void *msg);
 
 //Broadcast support
   int bcastNo;//Number of broadcasts received (also serial number)
@@ -469,20 +466,17 @@ public:
 //This is the default creation message sent to a new array element
 class CkArrayElementCreateMsg:public CMessage_CkArrayElementCreateMsg {};
 
-class ArrayElementMigrateMessage : public CMessage_ArrayElementMigrateMessage {
+class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessage {
 protected:
 	friend class CkArray;
-/*These fields are protected because you, the user, aren't supposed
-to do *anything* with an ArrayElementMigrateMessage-- don't create, read, or delete it!
-*/
 	void* packData;
-	~ArrayElementMigrateMessage() {}
+	~CkArrayElementMigrateMessage() {}
 public:
 	static void *alloc(int msgnum, int size, int *array, int priobits);
-	static void *pack(ArrayElementMigrateMessage *);
-	static ArrayElementMigrateMessage *unpack(void *in);
+	static void *pack(CkArrayElementMigrateMessage *);
+	static CkArrayElementMigrateMessage *unpack(void *in);
 
-	CkArrayIndexMsg_insert(ArrayElementMigrateMessage)
+	CkArrayIndexMsg_insert(CkArrayElementMigrateMessage)
 };
 
 //Message: Remove the array element at the given index.

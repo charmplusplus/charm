@@ -18,6 +18,7 @@ void CreateNeighborLB();
 class NeighborLB : public NborBaseLB {
 public:
   NeighborLB();
+  NeighborLB(CkMigrateMessage *m) {}
 private:
   CmiBool QueryBalanceNow(int step) { return CmiTrue; };
   virtual int num_neighbors() {

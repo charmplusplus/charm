@@ -24,6 +24,7 @@ struct HeapData {
 
 public:
   GreedyRefLB();
+  GreedyRefLB(CkMigrateMessage *m) {}
 private:
 	enum           GreedyCmp {GT = '>', LT = '<'};
 	CmiBool        Compare(double, double, GreedyCmp);

@@ -4,7 +4,7 @@ module CkArray {
   readonly CkGroupID _RRMapID;
   message CkArrayMessage;
   message CkArrayElementCreateMsg;
-  message [varsize] ArrayElementMigrateMessage;
+  message [varsize] CkArrayElementMigrateMessage;
   
   message CkArrayCreateMsg;
   message CkArrayRemoveMsg;
@@ -20,7 +20,7 @@ module CkArray {
 	entry void Send(CkArrayMessage *);
 	entry void RecvForElement(CkArrayMessage *);
 	//Migration:
-	entry void RecvMigratedElement(ArrayElementMigrateMessage *);
+	entry void RecvMigratedElement(CkArrayElementMigrateMessage *);
 	entry void UpdateLocation(CkArrayUpdateMsg *);
 	//Load balancing:
 	entry void DummyAtSync(void);

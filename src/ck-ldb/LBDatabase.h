@@ -16,6 +16,7 @@ extern CkGroupID lbdb;
 class LBDBInit : public Chare {
   public:
     LBDBInit(CkArgMsg*);
+    LBDBInit(CkMigrateMessage *m) {}
 };
 
 class LBDatabase : public Group {
@@ -23,6 +24,7 @@ public:
   LBDatabase(void) {
     myLDHandle = LDCreate();  
   };
+  LBDatabase(CkMigrateMessage *m) {}
 
   /*
    * Calls from object managers to load database

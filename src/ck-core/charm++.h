@@ -24,10 +24,16 @@ extern void putObject(Chare *);
 extern void removeObject(Chare *);
 #endif
 
+//We need CkMigrateMessage only to distinguish the migration
+// constructor from all other constructors-- the type
+// itself has no meaningful fields.
+typedef struct {int is_only_a_name;} CkMigrateMessage;
+
 class Chare {
   protected:
     CkChareID thishandle;
   public:
+    /*Chare(CkMigrateMessage *m) {}*/
     void *operator new(size_t, void *ptr) { return ptr; };
 #if CMK_COMPILEMODE_ANSI
     void operator delete(void*, void*) {};
@@ -50,7 +56,9 @@ class Group : public Chare {
   protected:
     CkGroupID thisgroup;
   public:
+    /*Group(CkMigrateMessage *m) {}*/
     Group() { thisgroup = CkGetGroupID(); }
+    virtual void pup(PUP::er &p);//<- pack/unpack routine
 };
 
 class NodeGroup : public Chare {

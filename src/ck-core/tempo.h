@@ -60,12 +60,14 @@ class TempoChare : public Chare, public Tempo
 {
   public:
     TempoChare(void) {};
+    TempoChare(CkMigrateMessage *) {};
 };
 
 class TempoGroup : public Group, public Tempo
 {
   public :
     TempoGroup(void) {};
+    TempoGroup(CkMigrateMessage *) {};
     static void ckTempoBcast(int tag, void *buffer, int buflen, CkGroupID bocid);
     static void ckTempoSendBranch(int tag1, int tag2, void *buffer, int buflen,
                                   CkGroupID bocid, int processor);
@@ -91,7 +93,7 @@ class TempoArray : public ArrayElement1D, public Tempo
   int nGOps;
   public:
     TempoArray(void) { nGOps=0; }
-    TempoArray(ArrayElementMigrateMessage *msg) { }
+    TempoArray(CkMigrateMessage *msg) { }
     static void ckTempoSendElem(int tag1, int tag2, void *buffer, int buflen,
                                 CkArrayID aid, int idx);
     static void ckTempoSendElem(int tag, void *buffer, int buflen,

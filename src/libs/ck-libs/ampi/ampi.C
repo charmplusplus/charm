@@ -127,7 +127,7 @@ ampi::ampi(void)
   nbcasts = 0;
 }
 
-ampi::ampi(ArrayElementMigrateMessage *msg)
+ampi::ampi(CkMigrateMessage *msg)
 {
   ampiArray = thisArray;
   nrequests = 0;

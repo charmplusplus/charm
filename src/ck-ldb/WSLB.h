@@ -20,6 +20,7 @@ class WSLB : public Group
 {
 public:
   WSLB();
+  WSLB(CkMigrateMessage *m) {}
   ~WSLB();
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier

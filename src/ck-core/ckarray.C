@@ -163,6 +163,7 @@ public:
   {
   // CkPrintf("PE %d creating RRMap\n",CkMyPe());
   }
+  RRMap(CkMigrateMessage *m) {}
   int registerArray(CkArrayMapRegisterMessage *msg)
   {
     delete msg;
@@ -192,6 +193,7 @@ public:
     _RRMapID = CProxy_RRMap::ckNew();
     delete msg;
   }
+  CkArrayInit(CkMigrateMessage *m) {}
 };
 
 /************************** ArrayElement *******************
@@ -301,7 +303,7 @@ ArrayElement1D::ArrayElement1D(void)
 	numElements=thisArray->numInitial;
 	thisIndex=*(int *)thisindex->data();
 }
-ArrayElement1D::ArrayElement1D(ArrayElementMigrateMessage *msg)
+ArrayElement1D::ArrayElement1D(CkMigrateMessage *msg)
 {
 	numElements=thisArray->numInitial;
 	thisIndex=*(int *)thisindex->data();
@@ -671,13 +673,12 @@ public:
   int numInitial;
   CkGroupID mapID;
   CkGroupID loadbalancer;
-  CkArrayElementType type;
+  ChareIndexType elementType;
 };
 
 CkGroupID CkArray::CreateArray(int numInitialElements,
                                CkGroupID mapID,
-                               ChareIndexType elementChare,
-                               EntryIndexType elementMigrator)
+                               ChareIndexType elementChare)
 {
   CkGroupID group;
 
@@ -685,8 +686,7 @@ CkGroupID CkArray::CreateArray(int numInitialElements,
 
   msg->numInitial=numInitialElements;
   msg->mapID = mapID;
-  msg->type.chareType = elementChare;
-  msg->type.migrateType = elementMigrator;
+  msg->elementType = elementChare;
 #if CMK_LBDB_ON
   msg->loadbalancer = lbdb;
 #endif
@@ -697,7 +697,7 @@ CkGroupID CkArray::CreateArray(int numInitialElements,
 CkArray::CkArray(CkArrayCreateMsg *msg) : CkReductionMgr()
 {
   //Set class variables
-  type = msg->type;
+  elementType = msg->elementType;
   numInitial=msg->numInitial;
   num.local=num.migrating=0;
   bcastNo=oldBcastNo=0;
@@ -826,12 +826,12 @@ ArrayElement *CkArray::newElement(int chareType,CkArrayIndex *ind)
 }
 
 //Call the user's given constructor, passing the given message.
-void CkArray::ctorElement(ArrayElement *el,int ctor,CkArrayMessage *m)
+void CkArray::ctorElement(ArrayElement *el,int ctor,void *msg)
 {
 	curElementIsDead=CmiFalse;
 	
 	//Call the user's constructor
-	_entryTable[ctor]->call(m, (void *)el);
+	_entryTable[ctor]->call(msg, (void *)el);
 }
 
 
@@ -851,7 +851,7 @@ void CkArray::InsertElement(CkArrayMessage *m)
 	
 	//Build the element
 	CkArrayIndex *elIdx=m->copyIndex();
-	ArrayElement *el=newElement(type.chareType,elIdx);
+	ArrayElement *el=newElement(elementType,elIdx);
 #if CMK_LBDB_ON //Load balancer utilities:
 	el->usesAtSync=CmiFalse;
 #endif
@@ -859,7 +859,7 @@ void CkArray::InsertElement(CkArrayMessage *m)
 	contributorCreated(&el->reductionInfo);
 	
 	//Call the element's constructor (keeps message m)
-	ctorElement(el,m->type.create.ctorIndex,m);
+	ctorElement(el,m->type.create.ctorIndex,(void *)m);
 		
 	if (!curElementIsDead) //<- element may have immediately migrated away or died.
 	{
@@ -944,9 +944,9 @@ void CkArray::migrateMe(ArrayElement *el, int where)
 	//Pack the element and send it off
 	int bufSize;
 	{ PUP::sizer p; el->pup(p); bufSize=p.size(); }
-	ArrayElementMigrateMessage *msg = new (&bufSize, 0) ArrayElementMigrateMessage;
+	CkArrayElementMigrateMessage *msg = new (&bufSize, 0) CkArrayElementMigrateMessage;
 	msg->type.create.fromPE=CkMyPe();
-	msg->type.create.ctorIndex=type.migrateType;
+	msg->type.create.ctorIndex=_chareTable[elementType]->getMigCtor();
 	{ PUP::toMem p(msg->packData); el->pup(p);}
 	msg =msg->insert(idx);
 	DEBM((AA"Migrated index size %s\n"AB,idx2str(msg->index())));
@@ -959,7 +959,7 @@ void CkArray::migrateMe(ArrayElement *el, int where)
 	insertRec(new CkArrayRec_buffering_migrated(this),idx);
 }
 
-void CkArray::RecvMigratedElement(ArrayElementMigrateMessage *msg)
+void CkArray::RecvMigratedElement(CkArrayElementMigrateMessage *msg)
 {
 	{
 		const CkArrayIndexConst &idx=msg->index();
@@ -976,8 +976,8 @@ void CkArray::RecvMigratedElement(ArrayElementMigrateMessage *msg)
 /*Was: CkCreateChare(type.chareType, type.migrateType, msg, 0, CkMyPe());*/
 	//Create the new element on this PE (passing on the msg)
 	CkArrayIndex *elIdx=msg->copyIndex();
-	ArrayElement *el=newElement(type.chareType,elIdx);
-	ctorElement(el,msg->type.create.ctorIndex,msg);
+	ArrayElement *el=newElement(elementType,elIdx);
+	ctorElement(el,msg->type.create.ctorIndex,(CkMigrateMessage *)NULL);
 	
 	if (curElementIsDead) //<- element may have immediately migrated away or died.
 		{CkFreeMsg((void *)msg);return;}
@@ -1378,11 +1378,11 @@ CkArrayUpdateMsg::CkArrayUpdateMsg(void)
 }
 
 void *
-ArrayElementMigrateMessage::alloc(int msgnum,int size,int *array,int priobits)
+CkArrayElementMigrateMessage::alloc(int msgnum,int size,int *array,int priobits)
 {
   int totalsize;
   totalsize = size + array[0] + 8;
-  ArrayElementMigrateMessage *newMsg = (ArrayElementMigrateMessage *)
+  CkArrayElementMigrateMessage *newMsg = (CkArrayElementMigrateMessage *)
     CkAllocMsg(msgnum,totalsize,priobits);
   DEBM((AA"  Allocated varsize message %d, %d bytes at %p\n"AB,msgnum,totalsize,newMsg));
   newMsg->packData = (char *)newMsg + ALIGN8(size);
@@ -1390,16 +1390,16 @@ ArrayElementMigrateMessage::alloc(int msgnum,int size,int *array,int priobits)
 }
 
 void *
-ArrayElementMigrateMessage::pack(ArrayElementMigrateMessage* in)
+CkArrayElementMigrateMessage::pack(CkArrayElementMigrateMessage* in)
 {
   in->packData = (void*)((char*)in->packData-(char *)&(in->packData));
   return (void*) in;
 }
 
-ArrayElementMigrateMessage* 
-ArrayElementMigrateMessage::unpack(void *in)
+CkArrayElementMigrateMessage* 
+CkArrayElementMigrateMessage::unpack(void *in)
 {
-  ArrayElementMigrateMessage *me = new (in) ArrayElementMigrateMessage;
+  CkArrayElementMigrateMessage *me = new (in) CkArrayElementMigrateMessage;
   me->packData = (char *)&(me->packData) + (size_t)me->packData;
   return me;
 }

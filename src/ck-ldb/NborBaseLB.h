@@ -22,6 +22,7 @@ class NborBaseLB : public Group
 {
 public:
   NborBaseLB();
+  NborBaseLB(CkMigrateMessage *m) {}
   ~NborBaseLB();
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier

@@ -32,6 +32,7 @@ char *Chare::showContents(void) {
 Chare::~Chare() {}
 #endif
 void Chare::pup(PUP::er &p) {} 
+void Group::pup(PUP::er &p) {} 
 
 
 extern "C"

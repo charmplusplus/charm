@@ -142,6 +142,7 @@ class  FutureMain : public Chare {
       _fbocID = CProxy_FutureBOC::ckNew(new FutureInitMsg);
       delete m;
     }
+    FutureMain(CkMigrateMessage *m) {}
 };
 
 extern "C" 
@@ -207,6 +208,7 @@ void *CkRemoteCall(int ep, void *m, CkChareID *ID)
 class FutureBOC: public Group {
 public:
   FutureBOC(FutureInitMsg *m) { delete m; }
+  FutureBOC(CkMigrateMessage *m) {}
   void SetFuture(FutureInitMsg * m) { 
     int key;
     key = UsrToEnv((void *)m)->getRef();

@@ -34,6 +34,7 @@ class waitqd_QDChare : public Chare {
    void *threadList;
  public:
    waitqd_QDChare(CkArgMsg *ckam);
+   waitqd_QDChare(CkMigrateMessage *m) {}
    void waitQD(void);
    void onQD(CkQdMsg *ckqm);
 };
@@ -48,6 +49,7 @@ class waitGC_chare : public Chare {
       thr=0; mgid=0;
       retEP = CProxy_waitGC_chare::ckIdx_recvGroupID((ckGroupIDMsg *)0);
     }
+    waitGC_chare(CkMigrateMessage *m) {}
     ckGroupIDMsg *createGroup(ckGroupCreateMsg *msg) {
       mgid = 0;
       CkCreateGroup(msg->cidx, msg->consIdx, msg->msg, retEP, &thishandle);

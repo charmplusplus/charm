@@ -303,18 +303,7 @@ class Chare : public TEntity, public Construct {
     void genRegisterMethodDecl(XStr& str);
     void genRegisterMethodDef(XStr& str);
   public:
-    Chare(int ln, NamedType *t, TypeList *b=0, MemberList *l=0) : 
-      type(t), list(l), bases(b) 
-    {
-      line = ln;
-      setTemplate(0); 
-      abstract=0;
-      if (l)
-      {
-      	l->setChare(this);
-      	if (l->isPure()) abstract=1;
-      }
-    }
+    Chare(int ln, NamedType *t, TypeList *b=0, MemberList *l=0);
     void genProxyBases(XStr& str,const char* p,const char* s,const char* sep) {
       bases->genProxyNames(str, p, s, sep);
     }
@@ -510,7 +499,7 @@ class TVarList : public Printable {
 #define SLOCKED   0x04
 #define SVIRTUAL  0x08
 #define SPURE     0x10
-#define SARRAY_MIGRATE 0x20 //<- is magic migration constructor
+#define SMIGRATE 0x20 //<- is magic migration constructor
 
 class Entry : public Member {
   private:

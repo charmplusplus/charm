@@ -17,7 +17,7 @@ receiver::receiver()
   startwaiting = 0;
 }
 
-receiver::receiver(ArrayElementMigrateMessage *m) : ArrayElement1D(m)
+receiver::receiver(CkMigrateMessage *m)
 {
   msgTbl = CmmNew();
   reqTbl = CmmNew();

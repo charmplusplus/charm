@@ -8,6 +8,7 @@ class ampimain : public Chare
   CkArrayID arr;
   public:
     ampimain(CkArgMsg *);
+    ampimain(CkMigrateMessage *m) {}
     void done(void);
     void qd(void);
 };

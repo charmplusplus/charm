@@ -71,7 +71,7 @@ private:
 
 public:
   receiver();
-  receiver(ArrayElementMigrateMessage *);
+  receiver(CkMigrateMessage *);
   ~receiver();
 
   // interface

@@ -109,6 +109,7 @@ private:
 class CkGroupInitCallback : public Group {
 public:
 	CkGroupInitCallback(void);
+	CkGroupInitCallback(CkMigrateMessage *m) {}
 	void callMeBack(CkGroupInitCallbackMsg *m);
 };
 
@@ -123,6 +124,7 @@ they're passed to the user's client function.
 class CkReductionMgr : public CkGroupInitCallback {
 public:
 	CkReductionMgr(void);
+	CkReductionMgr(CkMigrateMessage *m) {}
 	
 	//A clientFn is called on PE 0 when all contributions
 	// have been received and reduced.

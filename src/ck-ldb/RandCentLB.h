@@ -16,6 +16,7 @@ void CreateRandCentLB();
 class RandCentLB : public CentralLB {
 public:
   RandCentLB();
+  RandCentLB(CkMigrateMessage *m) {}
 private:
   CmiBool QueryBalanceNow(int step);
   CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);

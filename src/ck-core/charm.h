@@ -116,6 +116,7 @@ extern int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx,
                         int chareIdx);
 extern int CkRegisterChare(const char *name, int dataSz);
 extern int CkRegisterMainChare(int chareIndex, int epIndex);
+extern void CkRegisterMigCtor(int chareIndex, int ctorEpIndex);
 extern void CkRegisterReadonly(int size, void *ptr);
 extern void CkRegisterReadonlyMsg(void** pMsg);
 extern void CkRegisterMainModule(void);

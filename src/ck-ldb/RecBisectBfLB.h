@@ -35,6 +35,7 @@ typedef struct {
 class RecBisectBfLB : public CentralLB {
 public:
   RecBisectBfLB();
+  RecBisectBfLB(CkMigrateMessage *m) {}
 private:
   CmiBool QueryBalanceNow(int step);
   CLBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);

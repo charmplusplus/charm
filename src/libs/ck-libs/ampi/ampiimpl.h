@@ -21,6 +21,7 @@ class ampimain : public Chare
   CkArrayID arr;
   public:
     ampimain(CkArgMsg *);
+    ampimain(CkMigrateMessage *m) {}
     void done(void);
     void qd(void);
 };
@@ -32,6 +33,7 @@ class BlockMap : public CkArrayMap {
  public:
   BlockMap(void) {
   }
+  BlockMap(CkMigrateMessage *m) {}
   int registerArray(CkArrayMapRegisterMessage *m) {
     delete m;
     return 0;
@@ -88,7 +90,7 @@ class ampi : public TempoArray {
     int niRecvs, niSends, biRecv, biSend;
 
     ampi(void);
-    ampi(ArrayElementMigrateMessage *msg); 
+    ampi(CkMigrateMessage *msg); 
     
     virtual void pup(PUP::er &p);
     
@@ -103,6 +105,7 @@ extern int migHandle;
 class migrator : public Group {
   public:
     migrator(void) { migHandle = thisgroup; }
+    migrator(CkMigrateMessage *m) {}
     void migrateElement(MigrateInfo *msg) {
       msg->elem->migrateMe(msg->where);
       delete msg;
