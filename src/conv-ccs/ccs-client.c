@@ -182,9 +182,7 @@ int CcsRecvResponse(CcsServer *svr,  unsigned int maxsize, char *recvBuffer,int 
 
 int CcsProbe(CcsServer *svr)
 {
-  fprintf(stderr, "CcsProbe not implemented.\n");
-  exit(1);
-  return 1;
+  return skt_select1(svr->replyFd,0);
 }
 
 void CcsFinalize(CcsServer *svr)
