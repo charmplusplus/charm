@@ -107,6 +107,8 @@ void myReductionEntry(CkReductionMsg *msg)
 \}
 \end{alltt}
 
+(See \kw{pgms/charm++/RedExample} for a complete example).
+
 For backward compatability, rather than a general callback you can
 specify a peculiar kind of C function using \kw{ckSetReductionClient}
 or \kw{setReductionClient}.  This C function takes a user-defined
@@ -201,8 +203,20 @@ To extract the contribution of each array element from a reduction set, use the
   \}
 \end{alltt}
 
-The reduction set order is undefined.  Add a source field to your contribution
-if you need to know which array element gave a particular contribution.
+The reduction set order is undefined.  Add a source field to your
+contribution if you need to know which array element gave a particular
+contribution.  This will require you to do your own
+serialize/unserialize operation on your element structure if your
+reduction element data is complex.  Consider using the \kw{PUP}
+interface see ~\ref{sec:pup} to simplify your object serialization
+needs.
+
+If your data is order dependant, or if your data is just too
+heterogenous to be handled elegantly by the predefined types and you
+don't want to undertake multiple reductions, it may be best to define
+your own reduction type.  See the next section
+(Section~\ref{new_type_reduction}) for details.
+
 
 \subsubsection{Defining a New Reduction Type}
 \label{new_type_reduction}
