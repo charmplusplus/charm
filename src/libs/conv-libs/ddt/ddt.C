@@ -1,4 +1,4 @@
-#include "datatype.h"
+#include "ddt.h"
 
 extern DDT	ddt ;
 
