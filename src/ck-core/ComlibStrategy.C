@@ -317,11 +317,19 @@ void ComlibArrayInfo::getCombinedPeList(int *&pelist, int &npes) {
     }
 }
 
-
-void ComlibArrayInfo::localMulticast(envelope *env){
-    localMulticast(&localDestIndexVec, env);
+void ComlibArrayInfo::localBroadcast(envelope *env) {
+    ComlibArrayInfo::localMulticast(&localDestIndexVec, env);
 }
 
+/*
+  This method multicasts the message to all the indices in vec.  It
+  also takes care to check if the entry method is readonly or not? If
+  readonly (nokeep) the message is not copied.
+
+  It also makes sure that the entry methods are logged in projections
+  and that the array manager is notified about array element
+  migrations.  Hence this function should be used extensively in the
+  communication library strategies */
 
 #include "register.h"
 void ComlibArrayInfo::localMulticast(CkVec<CkArrayIndexMax>*vec,
@@ -338,7 +346,7 @@ void ComlibArrayInfo::localMulticast(CkVec<CkArrayIndexMax>*vec,
     int ep = env->getsetArrayEp();
     CkUnpackMessage(&env);
 
-    env->getsetArrayMgr() = dest_aid;
+    CkArrayID dest_aid = env->getsetArrayMgr();
     env->setPacked(0);
     env->getsetArrayHops()=1;
     env->setUsed(0);
@@ -363,80 +371,14 @@ void ComlibArrayInfo::localMulticast(CkVec<CkArrayIndexMax>*vec,
     CmiFree(env);
 }
 
-void ComlibArrayInfo::initSectionID(CkSectionID *sid){
+/* Delivers a message to an array element, making sure that
+   projections is notified */
+void ComlibArrayInfo::deliver(envelope *env){
     
-    if(sid->npes > 0) 
-        return;
-
-    sid->pelist = new int[CkNumPes()];
-    sid->npes = 0;
+    env->setUsed(0);
+    env->getsetArrayHops()=1;
+    CkUnpackMessage(&env);
     
-    int count = 0, acount = 0;
-
-    for(acount = 0; acount < sid->_nElems; acount++){
-        int p = CkArrayID::CkLocalBranch(dest_aid)->
-            lastKnown(sid->_elems[acount]);
-        
-        //p = procMap[p];
-        if(p == -1) CkAbort("Invalid Section\n");
-        
-        for(count = 0; count < sid->npes; count ++)
-            if(sid->pelist[count] == p)
-                break;
-        
-        if(count == sid->npes) {
-            sid->pelist[sid->npes ++] = p;
-        }
-    }   
+    CkArray *a=(CkArray *)_localBranch(env->getsetArrayMgr());
+    a->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_queue, CmiTrue);    
 }
-
-/*
-int MaxSectionID;
-
-ComlibMulticastMsg * ComlibArrayInfo::getNewMulticastMessage
-(CharmMessageHolder *cmsg){
-    
-    if(cmsg->sec_id == NULL || cmsg->sec_id->_nElems == 0)
-        return NULL;
-
-    void *m = cmsg->getCharmMessage();
-    envelope *env = UsrToEnv(m);
-    
-    if(cmsg->sec_id->_cookie.sInfo.cInfo.id == 0) {  //New Section ID;
-        CkPackMessage(&env);
-        int sizes[2];
-        sizes[0] = cmsg->sec_id->_nElems;
-        sizes[1] = env->getTotalsize();                
-
-        cmsg->sec_id->_cookie.sInfo.cInfo.id = MaxSectionID ++;
-
-        ComlibMulticastMsg *msg = new(sizes, 0) ComlibMulticastMsg;
-        msg->nIndices = cmsg->sec_id->_nElems;
-        msg->_cookie.sInfo.cInfo.instId = myInstanceID;
-        msg->_cookie.type = COMLIB_MULTICAST_MESSAGE;
-        msg->_cookie.sInfo.cInfo.id = MaxSectionID - 1;
-        msg->_cookie.sInfo.cInfo.status = COMLIB_MULTICAST_NEW_SECTION;
-        msg->_cookie.pe = CkMyPe();
-
-        memcpy(msg->indices, cmsg->sec_id->_elems, 
-               sizes[0] * sizeof(CkArrayIndexMax));
-        memcpy(msg->usrMsg, env, sizes[1] * sizeof(char));         
-        envelope *newenv = UsrToEnv(msg);
-        
-        newenv->getsetArrayMgr() = env->getsetArrayMgr();
-        newenv->getsetArraySrcPe() = env->getsetArraySrcPe();
-        newenv->getsetArrayEp() = env->getsetArrayEp();
-        newenv->getsetArrayHops() = env->getsetArrayHops();
-        newenv->getsetArrayIndex() = env->getsetArrayIndex();
-	// for trace projections
-        newenv->setEvent(env->getEvent());
-        newenv->setSrcPe(env->getSrcPe());
-
-        CkPackMessage(&newenv);        
-        return (ComlibMulticastMsg *)EnvToUsr(newenv);
-    }   
-
-    return NULL;
-}
-*/
-

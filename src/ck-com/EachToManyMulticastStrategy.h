@@ -2,15 +2,12 @@
 #define EACH_TO_MANY_MULTICAST_STRATEGY
 
 #include "ComlibManager.h"
-#include "DirectMulticastStrategy.h"
+#include "ComlibSectionInfo.h"
 #include "routerstrategy.h"
 
 class EachToManyMulticastStrategy: public CharmStrategy {
  protected:
-    //CkQ <CharmMessageHolder*> *messageBuf;
     int routerID;      //Which topology
-    //comID comid;
-    
     int npes, *pelist; //Domain of the topology
     int MyPe;          //My id in that domain
 
@@ -18,16 +15,9 @@ class EachToManyMulticastStrategy: public CharmStrategy {
 
     int handlerId;
     
-    //CkVec<CkArrayIndexMax> localDestIndices;
-    
     //Dynamically set by the application
     CkHashtableT<ComlibSectionHashKey, void *> sec_ht;
 
-    //void localMulticast(CkVec<CkArrayIndexMax> *vec, envelope *env);
-    
-    ComlibMulticastMsg *getPackedMulticastMessage(CharmMessageHolder *cmsg);
-    //void setReverseMap();    
-    
     //Executes common code just after array and group constructors
     virtual void commonInit();
     virtual void initSectionID(CkSectionID *sid);
@@ -35,6 +25,7 @@ class EachToManyMulticastStrategy: public CharmStrategy {
     int MaxSectionID;
 
     RouterStrategy *rstrat;
+    ComlibSectionInfo sinfo;
 
  public:
     //Group constructor
@@ -59,10 +50,6 @@ class EachToManyMulticastStrategy: public CharmStrategy {
     virtual void beginProcessing(int nelements);
     virtual void localMulticast(void *msg);
     
-    //virtual void setDestArray(CkArrayID dest) {destArrayID=dest;}
-    
-    ComlibMulticastMsg *getNewMulticastMessage(CharmMessageHolder *m);
-
     PUPable_decl(EachToManyMulticastStrategy);
 
 };

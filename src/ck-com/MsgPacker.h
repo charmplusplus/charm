@@ -19,6 +19,7 @@ class short_envelope {
     
     void pup(PUP::er &p);
 };
+
 PUPmarshall(short_envelope);
 
 struct CombinedMessage{
@@ -28,6 +29,8 @@ struct CombinedMessage{
     int srcPE;
     int nmsgs;
 };
+
+PUPbytes(CombinedMessage);
 
 class MsgPacker {        
     CkArrayID aid;

@@ -195,7 +195,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  EachToManyMulticastStrategy.h MsgPacker.h StreamingStrategy.h \
 	  NodeMulticast.h PipeBroadcastStrategy.h MeshStreamingStrategy.h \
           PrioStreaming.h MPIStrategy.h MsgPacker.h StreamingStrategy.h \
-	  BroadcastStrategy.h $(CVHEADERS)
+	  BroadcastStrategy.h ComlibSectionInfo.h $(CVHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h \
@@ -880,7 +880,7 @@ loadbalancers: $(LOADBALANCERS) $(L)/libmoduleEveryLB.a
 
 STRATEGY_OBJS = MPIStrategy.o StreamingStrategy.o \
                 DummyStrategy.o NodeMulticast.o \
-		EachToManyMulticastStrategy.o \
+		EachToManyMulticastStrategy.o ComlibSectionInfo.o \
                 MsgPacker.o DirectMulticastStrategy.o \
 		RingMulticastStrategy.o \
                 PipeBroadcastStrategy.o MeshStreamingStrategy.o \

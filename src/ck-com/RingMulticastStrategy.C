@@ -56,13 +56,7 @@ void RingMulticastStrategy::doneInserting(){
             if(dest_pe != -1)
                 CmiSyncSend(dest_pe, env->getTotalsize(), (char *)env); 
             
-            if(isDestinationArray) {
-                /*
-                if(robj != NULL)
-                    localMulticast(&robj->indices, env);
-                else
-                    localMulticast(&localDestIndices, env);
-                */
+            if(getType() == ARRAY_STRATEGY) {
                 CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), (char *)env);
             }
             else {
@@ -106,7 +100,7 @@ void RingMulticastStrategy::handleMulticastMessage(void *msg){
        
     CkMcastBaseMsg *cbmsg = (CkMcastBaseMsg *)EnvToUsr(env);
     int src_pe = cbmsg->_cookie.pe;
-    if(isDestinationGroup){               
+    if(getType() == GROUP_STRATEGY){               
 
         if(!isEndOfRing(nextPE, src_pe)) {
             ComlibPrintf("[%d] Forwarding Message to %d\n", CkMyPe(), nextPE);
@@ -127,11 +121,7 @@ void RingMulticastStrategy::handleMulticastMessage(void *msg){
             CmiSyncSend(nextPE, env->getTotalsize(), (char *)env); 
         }
 
-        //Multicast to all destination elements on current processor        
-        ComlibPrintf("[%d] Local multicast sending all %d\n", CkMyPe(), 
-                     localDestIndices.size());
-        
-        localMulticast(&localDestIndices, env);
+        ainfo.localBroadcast(env);
     }   
     else if(status == COMLIB_MULTICAST_NEW_SECTION){        
         CkUnpackMessage(&env);
@@ -148,7 +138,7 @@ void RingMulticastStrategy::handleMulticastMessage(void *msg){
         envelope *newenv = (envelope *)CmiAlloc(usrenv->getTotalsize());
         memcpy(newenv, usrenv, usrenv->getTotalsize());
 
-        localMulticast(&robj->indices, newenv);
+        ComlibArrayInfo::localMulticast(&robj->indices, newenv);
 
         ComlibSectionHashKey key(cbmsg->_cookie.pe, 
                                  cbmsg->_cookie.sInfo.cInfo.id);
@@ -186,7 +176,7 @@ void RingMulticastStrategy::handleMulticastMessage(void *msg){
                          robj->nextPE);
         }
         
-        localMulticast(&robj->indices, env);
+        ComlibArrayInfo::localMulticast(&robj->indices, env);
     }
 }
 
@@ -213,8 +203,13 @@ RingMulticastHashObject *RingMulticastStrategy::createHashObject
     int min_dest = CkNumPes();
     for(acount = 0; acount < nelements; acount++){
         //elements[acount].print();
-        int p = CkArrayID::CkLocalBranch(destArrayID)->
-            lastKnown(elements[acount]);
+        
+        CkArrayID dest;
+        int nidx;
+        CkArrayIndexMax *idx_list;        
+        ainfo.getDestinationArray(dest, idx_list, nidx);
+
+        int p = CkArrayID::CkLocalBranch(dest)->lastKnown(elements[acount]);
         
         if(p < min_dest)
             min_dest = p;

@@ -96,16 +96,14 @@ class ComlibArrayInfo {
     int isDestinationArray(){return isDestArray;}
     void getDestinationArray(CkArrayID &aid, CkArrayIndexMax *&e, int &nind);
 
-    void localMulticast(envelope *env);
-    void localMulticast(CkVec<CkArrayIndexMax> *idx_vec,envelope *env);
+    void localBroadcast(envelope *env);
+    static void localMulticast(CkVec<CkArrayIndexMax> *idx_vec,envelope *env);
+    static void deliver(envelope *env);
 
     void getSourcePeList(int *&pelist, int &npes);
     void getDestinationPeList(int *&pelist, int &npes);
     void getCombinedPeList(int *&pelist, int &npes);
     
-    void initSectionID(CkSectionID *sid);
-    ComlibMulticastMsg * getNewMulticastMessage(CharmMessageHolder *cmsg);
-
     void pup(PUP::er &p);
 };
 

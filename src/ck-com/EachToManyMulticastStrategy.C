@@ -24,7 +24,7 @@ void *itrDoneHandler(void *msg){
     int nexpected = sentry->numElements;
     
     if(nexpected == 0) {             
-        CkPrintf("[%d] Calling Dummy Done Inserting\n", CkMyPe());
+        //CkPrintf("[%d] Calling Dummy Done Inserting\n", CkMyPe());
         nm_mgr = (EachToManyMulticastStrategy *)sentry->strategy;    
         nm_mgr->doneInserting();
     }
@@ -139,7 +139,7 @@ EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy,
     //CkPrintf("%d, ", pelist[count]);
     //}    
     //CkPrintf("\n");
-
+    
     commonInit();
 }
 
@@ -173,17 +173,14 @@ void EachToManyMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
                  CkMyPe());   
 
     if(cmsg->dest_proc == IS_MULTICAST && cmsg->sec_id != NULL) {        
-        int cur_sec_id = cmsg->sec_id->_cookie.sInfo.cInfo.id;
+        int cur_sec_id = ComlibSectionInfo::getSectionID(*cmsg->sec_id);
 
         if(cur_sec_id > 0) {        
-            //Old section id, send the id with the message
-            CkMcastBaseMsg *cbmsg = (CkMcastBaseMsg *)cmsg->getCharmMessage();
-            cbmsg->_cookie.sInfo.cInfo.id = cur_sec_id;
-            cbmsg->_cookie.sInfo.cInfo.status = COMLIB_MULTICAST_OLD_SECTION;
+            sinfo.processOldSectionMessage(cmsg);
         }
         else {
             //New sec id, so send it along with the message
-            void *newmsg = (void *)getNewMulticastMessage(cmsg);
+            void *newmsg = sinfo.getNewMulticastMessage(cmsg);
             CkFreeMsg(cmsg->getCharmMessage());
             CkSectionID *sid = cmsg->sec_id;
             delete cmsg;
@@ -250,6 +247,8 @@ void EachToManyMulticastStrategy::pup(PUP::er &p){
 
 void EachToManyMulticastStrategy::beginProcessing(int numElements){
 
+    ComlibPrintf("Begin processing %d\n", numElements);
+
     int expectedDeposits = 0;
     MaxSectionID = 0;
 
@@ -278,11 +277,19 @@ void EachToManyMulticastStrategy::beginProcessing(int numElements){
         sentry->numElements = expectedDeposits;
     }
     
+    CkArrayID dest;
+    int nidx;
+    CkArrayIndexMax *idx_list;
+    
+    ainfo.getDestinationArray(dest, idx_list, nidx);
+    sinfo = ComlibSectionInfo(dest, myInstanceID);
+    
     if(expectedDeposits > 0)
         return;
     
     if(expectedDeposits == 0 && MyPe >= 0)
-        doneInserting();
+        //doneInserting();
+        ConvComlibScheduleDoneInserting(myInstanceID);
 }
 
 void EachToManyMulticastStrategy::localMulticast(void *msg){
@@ -295,38 +302,15 @@ void EachToManyMulticastStrategy::localMulticast(void *msg){
     ComlibPrintf("[%d] In local multicast %d\n", CkMyPe(), status);
         
     if(status == COMLIB_MULTICAST_ALL) {        
-        ainfo.localMulticast(env);
+        ainfo.localBroadcast(env);
         return;
     }   
 
     CkVec<CkArrayIndexMax> *dest_indices;    
     if(status == COMLIB_MULTICAST_NEW_SECTION){        
-
-        dest_indices = new CkVec<CkArrayIndexMax>;
-
-        //CkPrintf("[%d] Received message for new section\n", CkMyPe());
-
-        CkArrayID destArrayID;
-        int nDestElements;
-        CkArrayIndexMax *destelements;
-        ainfo.getSourceArray(destArrayID, destelements, nDestElements);
-
-        ComlibMulticastMsg *ccmsg = (ComlibMulticastMsg *)cbmsg;
-        for(int count = 0; count < ccmsg->nIndices; count++){
-            CkArrayIndexMax idx = ccmsg->indices[count];
-            //idx.print();
-            int dest_proc =CkArrayID::CkLocalBranch(destArrayID)
-                ->lastKnown(idx);
-            
-            if(dest_proc == CkMyPe())
-                dest_indices->insertAtEnd(idx);                        
-        }            
-
-        envelope *usrenv = (envelope *) ccmsg->usrMsg;
-        envelope *newenv = (envelope *)CmiAlloc(usrenv->getTotalsize());
-        memcpy(newenv, ccmsg->usrMsg, usrenv->getTotalsize());
-
-        ainfo.localMulticast(dest_indices, newenv);
+        envelope *newenv;
+        sinfo.unpack(env, dest_indices, newenv);        
+        ComlibArrayInfo::localMulticast(dest_indices, newenv);
 
         CkVec<CkArrayIndexMax> *old_dest_indices;
         ComlibSectionHashKey key(cbmsg->_cookie.pe, 
@@ -349,61 +333,12 @@ void EachToManyMulticastStrategy::localMulticast(void *msg){
     if(dest_indices == NULL)
         CkAbort("Destination indices is NULL\n");
 
-    ainfo.localMulticast(dest_indices, env);
+    ComlibArrayInfo::localMulticast(dest_indices, env);
 }
-
-ComlibMulticastMsg * EachToManyMulticastStrategy::getNewMulticastMessage
-(CharmMessageHolder *cmsg){
-    
-    if(cmsg->sec_id == NULL || cmsg->sec_id->_nElems == 0)
-        return NULL;
-
-    void *m = cmsg->getCharmMessage();
-    envelope *env = UsrToEnv(m);
-    
-    if(cmsg->sec_id->_cookie.sInfo.cInfo.id == 0) {  //New Section ID;
-        CkPackMessage(&env);
-        int sizes[2];
-        sizes[0] = cmsg->sec_id->_nElems;
-        sizes[1] = env->getTotalsize();                
-
-        cmsg->sec_id->_cookie.sInfo.cInfo.id = MaxSectionID ++;
-
-        ComlibPrintf("Creating new comlib multicast message %d, %d\n", sizes[0], sizes[1]);
-
-        ComlibMulticastMsg *msg = new(sizes, 0) ComlibMulticastMsg;
-        msg->nIndices = cmsg->sec_id->_nElems;
-        msg->_cookie.sInfo.cInfo.instId = myInstanceID;
-        msg->_cookie.type = COMLIB_MULTICAST_MESSAGE;
-        msg->_cookie.sInfo.cInfo.id = MaxSectionID - 1;
-        msg->_cookie.sInfo.cInfo.status = COMLIB_MULTICAST_NEW_SECTION;
-        msg->_cookie.pe = CkMyPe();
-
-        memcpy(msg->indices, cmsg->sec_id->_elems, 
-               sizes[0] * sizeof(CkArrayIndexMax));
-        memcpy(msg->usrMsg, env, sizes[1] * sizeof(char));         
-        envelope *newenv = UsrToEnv(msg);
-        
-        newenv->getsetArrayMgr() = env->getsetArrayMgr();
-        newenv->getsetArraySrcPe() = env->getsetArraySrcPe();
-        newenv->getsetArrayEp() = env->getsetArrayEp();
-        newenv->getsetArrayHops() = env->getsetArrayHops();
-        newenv->getsetArrayIndex() = env->getsetArrayIndex();
-	// for trace projections
-        newenv->setEvent(env->getEvent());
-        newenv->setSrcPe(env->getSrcPe());
-
-        CkPackMessage(&newenv);        
-        return (ComlibMulticastMsg *)EnvToUsr(newenv);
-    }   
-
-    return NULL;
-}
-
 
 void EachToManyMulticastStrategy::initSectionID(CkSectionID *sid){
 
-    ainfo.initSectionID(sid);    
+    sinfo.initSectionID(sid);    
 
     //Convert real processor numbers to virtual processors in the all
     //to all multicast group

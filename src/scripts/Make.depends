@@ -1343,11 +1343,11 @@ ComlibManager.o: ComlibManager.C ComlibManager.h charm++.h charm.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
   envelope.h comlib.h router.h convcomlibmanager.h comlib.decl.h \
   EachToManyMulticastStrategy.h DirectMulticastStrategy.h \
-  routerstrategy.h gridrouter.h petable.h graphrouter.h de.h treerouter.h \
-  3dgridrouter.h StreamingStrategy.h DummyStrategy.h MPIStrategy.h \
-  NodeMulticast.h MsgPacker.h RingMulticastStrategy.h \
-  PipeBroadcastStrategy.h BroadcastStrategy.h MeshStreamingStrategy.h \
-  PrioStreaming.h qd.h comlib.def.h
+  ComlibSectionInfo.h routerstrategy.h gridrouter.h petable.h \
+  graphrouter.h de.h treerouter.h 3dgridrouter.h StreamingStrategy.h \
+  DummyStrategy.h MPIStrategy.h NodeMulticast.h MsgPacker.h \
+  RingMulticastStrategy.h PipeBroadcastStrategy.h BroadcastStrategy.h \
+  MeshStreamingStrategy.h PrioStreaming.h qd.h comlib.def.h
 	$(CHARMC) -c -I. ComlibManager.C
 
 MPIStrategy.o: MPIStrategy.C MPIStrategy.h ComlibManager.h charm++.h \
@@ -1439,9 +1439,27 @@ EachToManyMulticastStrategy.o: EachToManyMulticastStrategy.C \
   tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
   envelope.h comlib.h router.h convcomlibmanager.h comlib.decl.h \
-  DirectMulticastStrategy.h routerstrategy.h gridrouter.h petable.h \
-  graphrouter.h de.h treerouter.h 3dgridrouter.h
+  DirectMulticastStrategy.h ComlibSectionInfo.h routerstrategy.h \
+  gridrouter.h petable.h graphrouter.h de.h treerouter.h 3dgridrouter.h
 	$(CHARMC) -c -I. EachToManyMulticastStrategy.C
+
+ComlibSectionInfo.o: ComlibSectionInfo.C ComlibManager.h charm++.h \
+  charm.h converse.h conv-config.h conv-common.h conv-mach.h \
+  conv-autoconfig.h conv-mach-opt.h pup_c.h conv-cpm.h conv-cpath.h \
+  conv-qd.h conv-random.h conv-lists.h conv-trace.h persistent.h \
+  debug-conv.h pup.h middle.h middle-conv.h cklists.h ckbitvector.h \
+  ckstream.h init.h ckhashtable.h debug-charm.h CkMarshall.decl.h \
+  cksection.h ckcallback.h conv-ccs.h sockRoutines.h ccs-server.h \
+  ckobjQ.h ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
+  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDatabase.decl.h \
+  NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
+  CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
+  waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
+  ckarrayreductionmgr.h trace.h trace-bluegene.h envelope.h comlib.h \
+  router.h convcomlibmanager.h comlib.decl.h ComlibSectionInfo.h
+	$(CHARMC) -c -I. ComlibSectionInfo.C
 
 MsgPacker.o: MsgPacker.C ComlibManager.h charm++.h charm.h converse.h \
   conv-config.h conv-common.h conv-mach.h conv-autoconfig.h \
@@ -1458,7 +1476,7 @@ MsgPacker.o: MsgPacker.C ComlibManager.h charm++.h charm.h converse.h \
   tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
   envelope.h comlib.h router.h convcomlibmanager.h comlib.decl.h \
-  MsgPacker.h register.h
+  MsgPacker.h register.h pup_cmialloc.h
 	$(CHARMC) -c -I. MsgPacker.C
 
 DirectMulticastStrategy.o: DirectMulticastStrategy.C \
@@ -1477,7 +1495,7 @@ DirectMulticastStrategy.o: DirectMulticastStrategy.C \
   tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
   envelope.h comlib.h router.h convcomlibmanager.h comlib.decl.h \
-  register.h
+  ComlibSectionInfo.h
 	$(CHARMC) -c -I. DirectMulticastStrategy.C
 
 RingMulticastStrategy.o: RingMulticastStrategy.C RingMulticastStrategy.h \
@@ -1495,7 +1513,8 @@ RingMulticastStrategy.o: RingMulticastStrategy.C RingMulticastStrategy.h \
   convcomlibstrategy.h CkFutures.decl.h charisma.h charisma.decl.h \
   tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
-  envelope.h comlib.h router.h convcomlibmanager.h comlib.decl.h
+  envelope.h comlib.h router.h convcomlibmanager.h comlib.decl.h \
+  ComlibSectionInfo.h
 	$(CHARMC) -c -I. RingMulticastStrategy.C
 
 PipeBroadcastStrategy.o: PipeBroadcastStrategy.C PipeBroadcastStrategy.h \

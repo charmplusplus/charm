@@ -78,3 +78,8 @@ Strategy *ConvComlibGetStrategy(int loc) {
 void ConvComlibRegisterStrategy(Strategy *s) {
     (CkpvAccess(conv_comm_ptr))->insertStrategy(s);    
 }
+
+void ConvComlibScheduleDoneInserting(int loc) {
+    (* (CkpvAccess(conv_comm_ptr))->getStrategyTable())[loc].
+        call_doneInserting++;
+}

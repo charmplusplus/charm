@@ -1,6 +1,7 @@
 #include "ComlibManager.h"
 #include "MsgPacker.h"
 #include "register.h"
+#include "pup_cmialloc.h"
 
 CkpvExtern(int, RecvCombinedShortMsgHdlrIdx);
 
@@ -9,9 +10,10 @@ void short_envelope::pup(PUP::er &p){
     p | epIdx;
     p | size;
     
-    if(p.isUnpacking()) 
-        data = new char[size];    
-    p(data, size);
+    //if(p.isUnpacking()) 
+    //  data = new char[size];
+
+    p.pupCmiAllocBuf((void **)&data, size);
 }
 
 short_envelope::short_envelope(){
@@ -22,7 +24,7 @@ short_envelope::short_envelope(){
 short_envelope::~short_envelope(){
     /*
       if(data) 
-      delete [] data;        
+      CmiFree(data);        
       data = NULL;
     */
 }
@@ -47,7 +49,8 @@ MsgPacker::MsgPacker(CkQ<CharmMessageHolder *> &msgq, int n_msgs){
 
         if(count == 0) {
             aid = env->getsetArrayMgr();
-            if(aid.isZero()) CkAbort("Array packing set and ArrayID is zero");
+            if(aid.isZero()) 
+                CkAbort("Array packing set and ArrayID is zero");
         }        
         
         msgList[count].epIdx = env->getsetArrayEp();
@@ -73,40 +76,45 @@ MsgPacker::~MsgPacker(){
 
 void MsgPacker::getMessage(CombinedMessage *&cmb_msg, int &total_size){
     int count;
-    PUP::sizer sp;
+    PUP_cmiAllocSizer sp;
+
+    CombinedMessage cmb_hdr;
+    cmb_hdr.aid = aid;
+    cmb_hdr.srcPE = CkMyPe();
+    cmb_hdr.nmsgs = nShortMsgs;
+
+    sp | cmb_hdr;
     for(count = 0; count < nShortMsgs; count ++)
         sp | msgList[count];
-
-    int size = sp.size();  
-    total_size = ALIGN8(sizeof(CombinedMessage)) + size;
     
-    //CkPrintf("In MsgPacker with %d bytes and %d messages\n", total_size, 
-    //           nShortMsgs);
+    total_size = sp.size();
+    ComlibPrintf("In MsgPacker with %d bytes and %d messages\n", total_size, 
+                 nShortMsgs);
 
-    cmb_msg = (CombinedMessage *)CmiAlloc(total_size);
+    cmb_msg = (CombinedMessage *)CmiAlloc(sp.size());
 
-    PUP::toMem mp((char *)cmb_msg + ALIGN8(sizeof(CombinedMessage)));
+    PUP_toCmiAllocMem mp(cmb_msg);
+    mp | cmb_hdr;
+
     for(count = 0; count < nShortMsgs; count ++)
         mp | msgList[count];
-
-    cmb_msg->aid = aid;
-    cmb_msg->srcPE = CkMyPe();
-    cmb_msg->nmsgs = nShortMsgs;
 
     CmiSetHandler(cmb_msg, CkpvAccess(RecvCombinedShortMsgHdlrIdx));
 }
 
 
 void MsgPacker::deliver(CombinedMessage *cmb_msg){
-    int nmsgs = cmb_msg->nmsgs;
+
+    CombinedMessage cmb_hdr;
+
+    PUP_fromCmiAllocMem fp(cmb_msg);
+    fp | cmb_hdr;
+
+    int nmsgs = cmb_hdr.nmsgs;
 
     ComlibPrintf("In MsgPacker::deliver\n");
-
-    char *from_addr = (char *)cmb_msg + ALIGN8(sizeof(CombinedMessage));
-    PUP::fromMem fp(from_addr);
-    CkArrayID aid = cmb_msg->aid;
-
-    int src_pe = cmb_msg->srcPE;
+    CkArrayID aid = cmb_hdr.aid;
+    int src_pe = cmb_hdr.srcPE;
 
     for(int count = 0; count < nmsgs; count ++){
         short_envelope senv;
@@ -125,11 +133,12 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
             //Unpack the message
             senv.data = (char *)_msgTable[msgIdx]->unpack(senv.data); 
             CkDeliverMessageReadonly(ep, senv.data, a_elem);            
-            delete[] senv.data;
+            CmiFree(senv.data);
         }
         else {
             //envelope *env = (envelope *)CmiAlloc(sizeof(envelope) + size);
-            envelope *env = _allocEnv(ForArrayEltMsg, sizeof(envelope) + size);
+            envelope *env = _allocEnv(ForArrayEltMsg, 
+                                      sizeof(envelope) + size);
 
             void *data = EnvToUsr(env);
             memcpy(data, senv.data, size);
@@ -156,7 +165,7 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
             
             a->deliver((CkArrayMessage *)data, CkDeliver_queue, CmiTrue);
 
-            delete[] senv.data;
+            CmiFree(senv.data);
         }        
     }      
         

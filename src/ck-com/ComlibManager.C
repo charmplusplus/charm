@@ -293,21 +293,21 @@ void ComlibManager::resumeFromBarrier2(){
     
     ComlibPrintf("[%d] Barrier 2 reached\n", CkMyPe());
 
-    if(flushTable) {
-      for (int count = 0; count < nstrats; count ++) {
-          if (!(* strategyTable)[count].tmplist.isEmpty()) {
-              CharmMessageHolder *cptr;
-              while (!(* strategyTable)[count].tmplist.isEmpty())
-                  (* strategyTable)[count].strategy->insertMessage
-                      ((* strategyTable)[count].tmplist.deq());
-          }
-          
-          if ((* strategyTable)[count].call_doneInserting) {
-              ComlibPrintf("[%d] Calling done inserting \n", CkMyPe());
-              (* strategyTable)[count].strategy->doneInserting();
-          }
-      }
+    //    if(flushTable) {
+    for (int count = 0; count < nstrats; count ++) {
+        if (!(* strategyTable)[count].tmplist.isEmpty()) {
+            CharmMessageHolder *cptr;
+            while (!(* strategyTable)[count].tmplist.isEmpty())
+                (* strategyTable)[count].strategy->insertMessage
+                    ((* strategyTable)[count].tmplist.deq());
+        }
+        
+        if ((* strategyTable)[count].call_doneInserting) {
+            ComlibPrintf("[%d] Calling done inserting \n", CkMyPe());
+            (* strategyTable)[count].strategy->doneInserting();
+        }
     }
+    //}
     
     ComlibPrintf("[%d] After Barrier2\n", CkMyPe());
 }
@@ -648,6 +648,8 @@ void ComlibManager::receiveRemoteSend(CkQ<CharmMessageHolder *> &rq,
     
     int nmsgs = rq.length();
 
+    ComlibPrintf("%d: Receiving remote message\n", CkMyPe());
+
     for(int count = 0; count < nmsgs; count++) {
         char *msg = rq.deq()->getCharmMessage();
         envelope *env = UsrToEnv(msg);
@@ -663,8 +665,10 @@ void ComlibManager::sendRemote(){
     
     int nmsgs = remoteQ.length();
 
-    if(nmsgs == 0)
-        return;
+    //if(nmsgs == 0)
+    //  return;
+
+    ComlibPrintf("%d: Sending remote message \n", CkMyPe());
 
     CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID)); 
     cgproxy[remotePe].receiveRemoteSend(remoteQ, curStratID);

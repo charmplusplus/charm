@@ -33,5 +33,6 @@ class ConvComlibManager {
 void initComlibManager();
 Strategy *ConvComlibGetStrategy(int loc);
 void ConvComlibRegisterStrategy(Strategy *s);
+void ConvComlibScheduleDoneInserting(int loc);
 
 #endif

@@ -196,9 +196,11 @@ void GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes, 
           onerow[j]=j * COLLEN + i;
       }
       
+      gmap(nextpe);
+
       ComlibPrintf("%d: before gmap sending to %d of column %d\n",
                    MyPe, nextpe, i);
-      gmap(nextpe);
+
       ComlibPrintf("%d:sending to %d of column %d\n", MyPe, nextpe, i);
       
       GRIDSENDFN(id, 0, 0, length, onerow, CkpvAccess(RecvHandle), nextpe); 

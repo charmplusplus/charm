@@ -53,7 +53,7 @@ class Router
     //Utility function
     void SendDummyMsg(comID id, int pe, int magic) {
         
-        ComlibPrintf("[%d] Send Dummy to %d\n", pe);
+        ComlibPrintf("[%d] Send Dummy to %d\n", CkMyPe(), pe);
 
         DummyMsg *m=(DummyMsg *)CmiAlloc(sizeof(DummyMsg));
         CmiSetHandler(m, CkpvAccess(DummyHandle));
@@ -67,6 +67,9 @@ class Router
     }
 
     void Done(comID id) {
+
+        ComlibPrintf("Router Iteration Finished %d", CkMyPe());
+
         if(doneHandle == 0)
             return;
 
