@@ -12,7 +12,11 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.1  1997-07-08 22:10:54  milind
+# Revision 1.2  1997-07-09 21:06:25  milind
+# Fixed the nm bug on SP3. Charm module finding still seems to be broken.
+# Will try to fix it soon.
+#
+# Revision 1.1  1997/07/08 22:10:54  milind
 # Added IBM SP3 version. Developed and Tested on ANL machine.
 #
 # Revision 2.23  1997/05/05 14:25:27  jyelon
@@ -104,8 +108,8 @@ set CMK_C_DEBUG      = '-g'
 set CMK_C_OPTIMIZE   = '-O3 -qstrict -Q -qarch=pwr -qtune=pwr  '
 set CMK_CXX_DEBUG    = '-g'
 set CMK_CXX_OPTIMIZE = '-O3 -qstrict -Q -qarch=pwr -qtune=pwr  '
-set CMK_LD           = 'mpcc  '
-set CMK_LDXX         = 'mpCC  '
+set CMK_LD           = 'mpcc  -w '
+set CMK_LDXX         = 'mpCC  -w '
 set CMK_LD77         = ''
 set CMK_M4           = 'm4'
 set CMK_SUF          = 'o'
@@ -118,7 +122,7 @@ set CMK_SEQ_LD       = 'gcc'
 set CMK_SEQ_CXX      = 'g++'
 set CMK_SEQ_LDXX     = 'g++'
 set CMK_NM           = '/bin/nm'
-set CMK_NM_FILTER    = "grep ^_CK_ | grep :F | cut -f 1 -d :"
+set CMK_NM_FILTER    = "grep ^_CK_ | cut -f 1 -d ' '"
 set CMK_CPP_SUFFIX   = "i"
 set CMK_XLATPP       = 'charmxlat++ '
 set CMK_QT='aix32-gcc'
