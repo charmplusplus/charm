@@ -844,7 +844,8 @@ CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
   index = new int[count];
   //check this...
 
-  for(int i=0 ; i < count ; i++) {
+  int i;
+  for(i=0 ; i < count ; i++) {
     arrayBlockLength[i] = arrBlock[i] ;
     arrayDisplacements[i] = arrDisp[i] ;
     arrayDataType[i] =  arrBase[i];
@@ -859,7 +860,7 @@ CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
 
   lblb = lb = 1>>31;//arrDisp[0] + arrBase[0]->getLB();
   ubub = ub = (-1)*lb;//arrDisp[0] + arrBase[0]->getUB();
-  for(int i=0 ; i < count ; i++) {
+  for(i=0 ; i < count ; i++) {
     if(arrayDataType[i]->getType() == CkDDT_LB){
       if(lblb > arrDisp[i])
         lblb = arrDisp[i];
