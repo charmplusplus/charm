@@ -40,8 +40,8 @@ public:
   explicit complex(fftw_real r) {re=r; im=0;}
   complex(fftw_real r,fftw_real i) {re=r; im=i;}
   double getMagSqr(void) const { return re*re+im*im; }
-  complex operator+(complex a) { return complex(re+a.re,im+a.im); }
-  complex conj(void) { return complex(re, -im); }
+  inline complex operator+(complex a) { return complex(re+a.re,im+a.im); }
+  inline complex conj(void) { return complex(re, -im); }
   inline void operator+=(complex a) { re+=a.re; im+=a.im; }
   inline void operator*=(complex a) {        
     double treal, tim;
@@ -50,7 +50,7 @@ public:
     re = treal;
     im = tim;
   }
-  complex operator*(complex a) {
+  inline complex operator*(complex a) {
     return complex( re * a.re - im * a.im, re * a.im + im * a.re); }
   void pup(PUP::er &p) {
     p|re;
