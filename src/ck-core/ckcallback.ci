@@ -1,0 +1,10 @@
+module CkCallback {
+	readonly CProxy_ckcallback_group ckcallbackgroup;
+	mainchare ckcallback_main {
+		entry ckcallback_main();
+	};
+	group ckcallback_group {
+		entry ckcallback_group();
+		entry void call(CkCallback c,CkMarshalledMessage msg);
+	};
+};

@@ -436,6 +436,11 @@ void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep)
         }
 }
 
+void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx)
+{
+	CProxyElement_ArrayBase bp(aID,idx);
+	bp.ckSend((CkArrayMessage *)msg,entryIndex);
+}
 
 /*********************** CkArray Broadcast ******************/
 
@@ -521,6 +526,12 @@ CmiBool CkArray::bringBroadcastUpToDate(ArrayElement *el)
 	}
 	//Otherwise, the element survived
 	return CmiTrue;
+}
+
+void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID)
+{
+	CProxy_ArrayBase ap(aID);
+	ap.ckBroadcast((CkArrayMessage *)msg,entryIndex);
 }
 
 #include "CkArray.def.h"

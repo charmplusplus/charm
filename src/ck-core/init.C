@@ -488,6 +488,7 @@ void _initCharm(int argc, char **argv)
 		CkRegisterEp("null", (CkCallFnPtr)_nullFn, 0, 0);
 		_registerCkFutures();
 		_registerCkArray();
+		_registerCkCallback();
 		_registertempo();
 		_registerwaitqd();
 		_registerLBDatabase();

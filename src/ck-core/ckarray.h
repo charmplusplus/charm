@@ -35,6 +35,33 @@ Orion Sky Lawlor, olawlor@acm.org
 */
 extern void _registerCkArray(void);
 
+
+//Simple ArrayIndex classes: the key is just integer indices.
+class CkArrayIndex1D : public CkArrayIndex {
+public: int index;
+	CkArrayIndex1D(int i0) {index=i0;nInts=1;}
+};
+class CkArrayIndex2D : public CkArrayIndex {
+public: int index[2];
+	CkArrayIndex2D(int i0,int i1) {index[0]=i0;index[1]=i1;
+		nInts=2;}
+};
+class CkArrayIndex3D : public CkArrayIndex {
+public: int index[3];
+	CkArrayIndex3D(int i0,int i1,int i2) {index[0]=i0;index[1]=i1;index[2]=i2;
+		nInts=3;}
+};
+
+//A slightly more complex array index: the key is an object
+// whose size is fixed at compile time.
+template <class object> //Key object
+class CkArrayIndexT : public CkArrayIndex {
+public:
+	object obj;
+	CkArrayIndexT(const object &srcObj) {obj=srcObj; 
+		nInts=sizeof(obj)/sizeof(int);}
+};
+
 #define ALIGN8(x)       (int)((~7)&((x)+7))
 
 //Arguments for array creation:
@@ -221,6 +248,9 @@ PUPmarshall(CProxySection_ArrayBase);
         inline int ckGetNumElements() const \
 	  { return super::ckGetNumElements(); }  \
 
+//Simple C-like API:
+void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx);
+void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID);
 
 /************************ Array Element *********************/
 
