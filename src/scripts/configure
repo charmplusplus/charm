@@ -528,7 +528,7 @@ CHARMINC="."
 test -r ./conv-config.sh && . ./conv-config.sh
 
 #turn out to be in octal number, don't use digit >= 8
-VERSION=050610
+VERSION=050611
 cat >> confdefs.h <<EOF
 #define CHARM_VERSION $VERSION
 EOF
