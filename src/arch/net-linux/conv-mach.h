@@ -57,7 +57,6 @@
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 #define CMK_THREADS_USE_PTHREADS                           0
 #define CMK_THREADS_ARE_WIN32_FIBERS                       0
-#define CMK_LINUX_PTHREAD_HACK                             1
 
 #define CMK_SIGNAL_NOT_NEEDED                              0
 #define CMK_SIGNAL_USE_SIGACTION                           1
