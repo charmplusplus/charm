@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include "converse.h"
-#define PERIOD 40
+#define PERIOD 10000
 
 typedef struct CldField
 {
