@@ -1153,7 +1153,7 @@ sub posefuncmap
 	    $output.="int _POSE_handle = ".$segments[3].";\n";
 	    $output.="POSE_TimeType _POSE_atTime = ".$segments[4].";\n" if ($#segments>=4);
 	    $output.=$msg."->Timestamp(_POSE_handle);\n";
-	    $output.="(*(CProxy_".$sim." *)&POSE_Objects)[".$segments[2]."].insert(".$msg;
+	    $output.="(*(CProxy_".$sim." *)&parent->thisProxy)[".$segments[2]."].insert(".$msg;
 	    if ($#segments>=4) {
 	      $output.=",_POSE_atTime";
 	    }
@@ -1163,7 +1163,7 @@ sub posefuncmap
 	  }
 	} elsif ($type==2)	#create_complete
 	  {
-	    $output=$preline."POSE_Objects.doneInserting();\n";
+	    $output=$preline."parent->thisProxy.doneInserting();\n";
 	  } elsif ($type==3)	#invoke
 	    {
 	      if (!$issim) {
@@ -1198,11 +1198,11 @@ sub posefuncmap
 		  $output.="#ifdef POSE_STATS_ON\n";
 		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
-		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
+		  $output.="(* (CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
 		  $output.="#ifdef POSE_STATS_ON\n";
 		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
-		  #$output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
+		  #$output.="int _destPE = parent->thisProxy.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 
 		  #$output.="parent->srVector[_destPE]++;\n";
 		  $output.="}\n";
@@ -1224,11 +1224,11 @@ sub posefuncmap
 		  $output.="#ifdef POSE_STATS_ON\n";
 		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
-		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
+		  $output.="(* (CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
 		  $output.="#ifdef POSE_STATS_ON\n";
 		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
-		  #$output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
+		  #$output.="int _destPE = parent->thisProxy.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		  #$output.="parent->srVector[_destPE]++;\n";
 		  $output.="}\n";
 		  $output.="else delete ".$msg.";}\n";
@@ -1262,11 +1262,11 @@ sub posefuncmap
 		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
 
-		    $output.="(*(CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
+		    $output.="(*(CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
 		  $output.="#ifdef POSE_STATS_ON\n";
 		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
-		    #$output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
+		    #$output.="int _destPE = parent->thisProxy.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    #$output.="parent->srVector[_destPE]++;\n";
 		    $output.="}\n";
 	      
@@ -1290,11 +1290,11 @@ sub posefuncmap
 		  $output.="#ifdef POSE_STATS_ON\n";
 		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
-		    $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
+		    $output.="(* (CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
 		  $output.="#ifdef POSE_STATS_ON\n";
 		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
-		    #$output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
+		    #$output.="int _destPE = parent->thisProxy.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    #$output.="parent->srVector[_destPE]++;\n";
 		    $output.="}\n";
 		    $output.="else delete ".$msg.";}\n";
@@ -1324,7 +1324,7 @@ sub posefuncmap
 		  $output.="#ifdef POSE_STATS_ON\n";
 		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
-		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
+		      $output.="(* (CProxy_".$simobjtype." *)&parent->thisProxy)[parent->thisIndex].".$segments[1].";\n";
 		  $output.="#ifdef POSE_STATS_ON\n";
 		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";
@@ -1348,7 +1348,7 @@ sub posefuncmap
 		  $output.="#ifdef POSE_STATS_ON\n";
 		  $output.="  parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
-		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
+		      $output.="(* (CProxy_".$simobjtype." *)&parent->thisProxy)[parent->thisIndex].".$segments[1].";\n";
 		  $output.="#ifdef POSE_STATS_ON\n";
 		  $output.="  parent->localStats->SwitchTimer(DO_TIMER);\n";
 		  $output.="#endif\n";

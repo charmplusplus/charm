@@ -180,7 +180,7 @@ public:
     inherit from this class, and act as wrappers around the actual user 
     object's representation to control the simulation behavior.  These 
     objects are plugged into the POSE_objects array which is of this type. */
-class sim : public ArrayElement1D {
+class sim : public CBase_sim {
  protected:
   /// Flag to indicate that a Step message is scheduled
   /** Need to re-evaluate the need/function of this... also, how is it used
