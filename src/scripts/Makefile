@@ -246,7 +246,8 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o random.o traceCore.o traceCoreCommon.o \
 	converseProjections.o machineProjections.o \
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
-	quiescence.o isomalloc.o
+	quiescence.o isomalloc.o \
+	global-nop.o
 
 LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o pup_paged.o\
 	ckimage.o ckdll.o ckhashtable.o ckbitvector.o sockRoutines.o \
@@ -254,7 +255,7 @@ LIBCONV_UTIL=pup_util.o pup_xlater.o pup_c.o pup_paged.o\
 
 LIBCONV_UTILF=pup_f.o
 
-converse: basics QuickThreads/libqt.a $(CVLIBS) fmain-ok charmrun-target conv-cpm
+converse: basics QuickThreads/libqt.a $(CVLIBS) fmain-ok charmrun-target swapglobal-target conv-cpm
 
 charmrun-target: daemon-target sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h
 	if [ -d charmrun ] ; then ( cd charmrun ; make OPTS='$(OPTS)' ) ; fi
@@ -459,6 +460,15 @@ $(L)/libthreads-pthreads.o: threads.c $(CVHEADERS)
 
 $(L)/libthreads-fibers.o: threads.c $(CVHEADERS)
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_FIBERS=1 -IQuickThreads threads.c 2> /dev/null
+
+## Global swapping (-swapglobal)
+global-nop.o: global-nop.c $(CVHEADERS)
+	$(CHARMC) -c global-nop.c -o $@
+
+swapglobal-target: $(L)/libglobal-swap.o
+
+$(L)/libglobal-swap.o: global-elfgot.C $(CVHEADERS)
+	-$(CHARMC) -c global-elfgot.C -o $@
 
 
 ###############################################################################
