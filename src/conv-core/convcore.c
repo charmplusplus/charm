@@ -830,6 +830,12 @@ void CmiTimerInit()
   int size = sizeof(BGLPersonality);
   rts_get_personality(&dst, size);
   CpvAccess(clocktick) = 1.0 / dst.clockHz;
+
+  /* try to synchronize calling barrier */
+  CmiBarrier();
+  CmiBarrier();
+  CmiBarrier();
+
   inittime_wallclock = rts_get_timebase();
 }
 
