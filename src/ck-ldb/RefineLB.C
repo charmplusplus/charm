@@ -137,8 +137,6 @@ int RefineLB::refine()
    }
    int done = 0;
 
-   CkPrintf("Enter while loop. \n");
-
    while (!done)
    {
       double bestSize;
@@ -165,6 +163,7 @@ int RefineLB::refine()
          // iout << iINFO << "Considering Procsessor : " << p->Id << "\n" << endi;
          while (c)
          {
+//CkPrintf("c->load: %f p->load:%f overLoad*averageLoad:%f \n", c->load, p->load, overLoad*averageLoad);
             if ( c->load + p->load < overLoad*averageLoad) 
             {
                // iout << iINFO << "Considering Compute : " << c->Id << " with load " 
@@ -176,11 +175,9 @@ int RefineLB::refine()
                   bestP = p;
                }
             }
-	 CkPrintf("next nextCompute. \n");
             nextCompute.id++;
             c = (computeInfo *) donor->computeSet->next((Iterator *)&nextCompute);
          }
-	 CkPrintf("next lightProcessors. \n");
          p = (processorInfo *) 
          lightProcessors->next((Iterator *) &nextProcessor);
       }
@@ -188,6 +185,7 @@ int RefineLB::refine()
       //we have narrowed the choice to 3 candidates.
       if (bestCompute)
       {
+//CkPrintf("Assign: from %d to %d \n", donor->Id, bestP->Id);
         deAssign(bestCompute, donor);      
         assign(bestCompute, bestP);
       }
@@ -213,20 +211,14 @@ CLBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
 
   create(stats, count);
 
-  CkPrintf("[%d] created statastics. \n", CkMyPe());
-
   for (int i=0; i<numComputes; i++)
     assign((computeInfo *) &(computes[i]),
            (processorInfo *) &(processors[computes[i].oldProcessor]));
 
-  CkPrintf("[%d] finished assign. \n", CkMyPe());
-
   computeAverage();
   overLoad = 1.02;
 
-  CkPrintf("[%d] begin refine. \n", CkMyPe());
   refine();
-  CkPrintf("[%d] refine finished. \n", CkMyPe());
 
 #if CMK_STL_USE_DOT_H
   queue<MigrateInfo> migrateInfo;
@@ -241,11 +233,15 @@ CLBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
          processors[pe].computeSet->iterator((Iterator *)&nextCompute);
     while(c)
     {
+      if (c->oldProcessor != c->processor)
+      {
+CkPrintf("Migrate: from %d to %d\n", c->oldProcessor, c->processor);
 	MigrateInfo migrateMe;
 	migrateMe.obj = c->handle;
-	migrateMe.from_pe = pe;
+	migrateMe.from_pe = c->oldProcessor;
 	migrateMe.to_pe = c->processor;
 	migrateInfo.push(migrateMe);
+      }
 
         nextCompute.id++;
         c = (computeInfo *) processors[pe].computeSet->next((Iterator *)&nextCompute);
