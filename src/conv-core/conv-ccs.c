@@ -589,10 +589,10 @@ void CHostProcess(void)
   char *data;
   if (1!=skt_select1(CcsServer_fd(),0)) return;
   inside_comm=1;
-  printf("Got CCS connect...\n");
+  //printf("Got CCS connect...\n");
   if (CcsServer_recvRequest(&hdr,&data))
   {/*We got a network request*/
-    printf("Got CCS request...\n");
+    //printf("Got CCS request...\n");
     CcsImpl_netRequest(&hdr,data);
     free(data);
   }
