@@ -50,6 +50,7 @@ basics: dirs+sources $(ALLHEADERS) $(ALLINTERFACES) charmc conv-mach.csh
 	cp $(ALLHEADERS) ../include/
 	cp $(ALLINTERFACES) ../include/
 	rm -f ../bin/charmc ; cp charmc ../bin/
+	chmod 755 ../bin/charmc
 	cp conv-mach.csh ../include/
 	touch basics
 
