@@ -807,6 +807,13 @@ void ComlibInitSectionID(CkSectionID &sid){
     sid.pelist = NULL;
 }
 
+// for backward compatibility - for old name commlib
+void _registercommlib(void)
+{
+  static int _done = 0; if(_done) return; _done = 1;
+  _registercomlib();
+}
+
 #include "comlib.def.h"
 
 
