@@ -791,7 +791,7 @@ void nodetab_add(nodetab_host *h)
 void nodetab_makehost(char *name,nodetab_host *h)
 {
   h->name=strdup(name);
-  h->ip = skt_lookup_ip(name);
+  h->ip = skt_innode_lookup_ip(name);
   if (h->ip==-1) {
     fprintf(stderr,"ERROR> Cannot obtain IP address of %s\n", name);
     exit(1);
@@ -1427,7 +1427,7 @@ void req_client_connect(void)
 void req_start_server(void)
 {
   server_port = 0;
-  server_ip=skt_my_ip();
+  server_ip=skt_innode_my_ip();
   server_fd=skt_server(&server_port);
 
   if (arg_verbose) {
