@@ -133,16 +133,20 @@ void PUP::fromDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
 
 /** Paged Disk PUP::ers's*/
 CpvDeclare(pup_pagetable *,_pagetable);
+CpvDeclare(int,_openPagetableFile); /*checks if the data file has been openned. 
+																			if not it is openned during a constructor call to pagedDisk.
+																			this prevents the data file from being created if no
+																			pagedDisk pupper is created.*/
 void PUP::_pupModuleInit(){
 	CpvInitialize(pup_pagetable *,_pagetable);
+	CpvInitialize(int,_openPagetableFile);
 	CpvAccess(_pagetable) = new pup_pagetable;
 	CpvAccess(_pagetable)->freelist = NULL;
 	CpvAccess(_pagetable)->table = NULL;
 	CpvAccess(_pagetable)->maxblk=0;
 	sprintf(CpvAccess(_pagetable)->fName,"_data%d.dat",CkMyPe());
-	CpvAccess(_pagetable)->fp = fopen(CpvAccess(_pagetable)->fName,"wb");
-	fclose(CpvAccess(_pagetable)->fp);
-	CpvAccess(_pagetable)->fp = fopen(CpvAccess(_pagetable)->fName,"r+b");
+	CpvAccess(_openPagetableFile)=0;
+	
 }
 
 void PUP::toPagedDisk::addpageentry(){

@@ -70,6 +70,7 @@ class bar {
 typedef struct {int is_only_a_name;} CkMigrateMessage;
 #include "pup_paged.h"
 CpvExtern(pup_pagetable *,_pagetable);
+CpvExtern(int,_openPagetableFile);
 
 class PUP {//<- Should be "namespace", once all compilers support them
  public:
@@ -359,6 +360,12 @@ class pagedDisk : public er {
 	protected:
 	void  *handle; // handle of the object to be restored
 	pagedDisk(unsigned int type,void *objhandle):er(type),handle(objhandle){
+		if(CpvAccess(_openPagetableFile) == 0){
+			CpvAccess(_pagetable)->fp = fopen(CpvAccess(_pagetable)->fName,"wb");
+			fclose(CpvAccess(_pagetable)->fp);
+			CpvAccess(_pagetable)->fp = fopen(CpvAccess(_pagetable)->fName,"r+b");
+			CpvAccess(_openPagetableFile) = 1;
+		}
 	};
 
 };
