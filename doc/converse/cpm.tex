@@ -233,8 +233,8 @@ null-terminated string:
 	typedef char *CpmStr;
 \end{verbatim}
 
-Therefore, the function {\tt print_program_arguments} takes exactly
-the same arguments as {\tt user_main}.  In this example, the main
+Therefore, the function {\tt print\_program\_arguments} takes exactly
+the same arguments as {\tt user\_main}.  In this example, the main
 program running on processor 0 transmits the arguments to processor 1,
 which prints them out.
 
@@ -338,8 +338,8 @@ packs in place.  The unpack function is similar.
 The second type declared in this file is the intptr, which we intend
 to mean a pointer to a single integer.  On line 18 we notify CPM that
 the type is a pointer, and that it should therefore use
-CpmPtrSize_intptr, CpmPtrPack_intptr, CpmPtrUnpack_intptr, and
-CpmPtrFree_intptr.  Line 20 shows the size function, a constant: we
+CpmPtrSize\_intptr, CpmPtrPack\_intptr, CpmPtrUnpack\_intptr, and
+CpmPtrFree\_intptr.  Line 20 shows the size function, a constant: we
 always need just enough space to store one integer.  The pack function
 copies the int into the message buffer, and packs it in place.  The
 unpack function unpacks it in place, and returns an intptr, which
