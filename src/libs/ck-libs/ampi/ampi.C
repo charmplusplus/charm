@@ -341,14 +341,6 @@ void ampiCreateMain(MPI_MainFn mainFn)
 			  b.getData(), b.getSize());
 }
 
-static char *copyCountedStr(const char *src,int len)
-{
-	char *ret=new char[len+1];
-	memcpy(ret,src,len);
-	ret[len] = '\0';
-	return ret;
-}
-
 static void ampiAttach(const char *name,int namelen)
 {
 	TCharmSetupCookie *tc=TCharmSetupCookie::get();
@@ -382,7 +374,7 @@ static void ampiAttach(const char *name,int namelen)
 
 	//Record info. in the mpi_worlds array
 	mpi_worlds[new_idx].comm=ampiCommStruct(new_world,arr,_nchunks);
-	mpi_worlds[new_idx].name = copyCountedStr(name,namelen);
+	mpi_worlds[new_idx].setName(name,namelen);
 
 	// CommLib support
 	int strat = USE_DIRECT;

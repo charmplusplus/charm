@@ -71,14 +71,26 @@ PUPmarshall(ampiCommStruct);
 
 struct mpi_comm_world
 {
-  ampiCommStruct comm;
+  mpi_comm_world(const mpi_comm_world &m); //DO NOT USE
+  void operator=(const mpi_comm_world &m);
   char *name; //new'd human-readable zero-terminated string name, or NULL
+public:
+  ampiCommStruct comm;
   mpi_comm_world() {
     name=NULL;
   }
   ~mpi_comm_world() {
-    if (name) delete[] name;
+	  if (name) { delete[] name; name=0; }
   }
+  void setName(const char *src) {
+    setName(src,strlen(src));
+  }
+  void setName(const char *src,int len) {
+	name=new char[len+1];
+	memcpy(name,src,len);
+	name[len] = '\0';
+  }
+  const char *getName(void) const { return name; }
   void pup(PUP::er &p) {
     p|comm;
     int len=0;
