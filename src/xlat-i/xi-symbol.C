@@ -116,8 +116,6 @@ TParamList::print(XStr& str)
   if(next) { 
     str << ","; 
     next->print(str); 
-  } else {
-    str << " ";
   }
 }
 
@@ -239,8 +237,6 @@ TVarList::print(XStr& str)
   if(next) {
     str << ", ";
     next->print(str);
-  } else {
-    str << " ";
   }
 }
 
@@ -1547,8 +1543,6 @@ void TParamList::genSpec(XStr& str)
   if(next) {
     str << ", ";
     next->genSpec(str);
-  } else {
-    str << " ";
   }
 }
 
