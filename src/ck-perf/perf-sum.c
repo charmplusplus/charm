@@ -24,26 +24,47 @@ static char ident[] = "@(#)$Header$";
 #undef MAIN_PERF
 #include "stat.h"
 
-char *pgm;
-int RecdPerfMsg; 
-char *log_file_name; 	/* log file name      	*/
+CpvDeclare(char*,pgm);
+CpvDeclare(int,RecdPerfMsg); 
 
-int display_index;
-int last_time_interval, current_time_interval;
-int display_table[NUMBER_DISPLAYS][MAXLOGMSGSIZE];
-int time, timestep, init_time, start_processing_time;
+CpvDeclare(int,display_index);
+CpvDeclare(int,last_time_interval);
+CpvDeclare(int,current_time_interval);
 
-extern int RecdStatMsg;
+typedef int display_table_type[NUMBER_DISPLAYS][MAXLOGMSGSIZE];
+CpvDeclare(display_table_type,display_table);
+
+CpvDeclare(int,time);
+CpvDeclare(int,timestep);
+CpvDeclare(int,init_time);
+CpvDeclare(int,start_processing_time);
+
+CpvExtern(int,RecdStatMsg);
+CpvExtern(int,LdbBocNum);
+
+init_globals()
+{
+  CpvInitialize(char*,pgm);
+  CpvInitialize(int,RecdPerfMsg);
+  CpvInitialize(int,display_index);
+  CpvInitialize(int,last_time_interval);
+  CpvInitialize(int,current_time_interval);
+  CpvInitialize(display_table_type,display_table);
+  CpvInitialize(int,time);
+  CpvInitialize(int,timestep);
+  CpvInitialize(int,init_time);
+  CpvInitialize(int,start_processing_time);
+}
 
 trace_creation(msg_type, entry, envelope)
 int msg_type, entry;
 ENVELOPE *envelope;
 {
-	time = CkTimer(); 
-	adjust_time_interval(time);
-	display_index = get_creation_display_index(msg_type); 
-	if (display_index >=0)
-		display_table[display_index][current_time_interval] += 1;
+	CpvAccess(time) = CkTimer(); 
+	adjust_time_interval(CpvAccess(time));
+	CpvAccess(display_index) = get_creation_display_index(msg_type); 
+	if (CpvAccess(display_index) >=0)
+		CpvAccess(display_table)[CpvAccess(display_index)][CpvAccess(current_time_interval)] += 1;
 }
 
 trace_begin_execute(envelope)
@@ -55,27 +76,27 @@ ENVELOPE *envelope;
 		(GetEnv_EP(envelope) < NumSysBocEps))
 		return;
 
-	time = CkTimer(); 
-	adjust_time_interval(time);
-	start_processing_time = time;
-	last_time_interval = current_time_interval;
+	CpvAccess(time) = CkTimer(); 
+	adjust_time_interval(CpvAccess(time));
+	CpvAccess(start_processing_time) = CpvAccess(time);
+	CpvAccess(last_time_interval) = CpvAccess(current_time_interval);
 }
 
 
 trace_end_execute(id, msg_type, entry)
 int id, msg_type, entry;
 {
-	if (start_processing_time == -1)
+	if (CpvAccess(start_processing_time) == -1)
 		return;
-	time = CkTimer(); 
-	adjust_time_interval(time);
-   	display_index = get_processing_display_index(msg_type);
-	compute_busy(start_processing_time, time, last_time_interval, 
-			current_time_interval);
-	if (display_index >= 0) 
-		update_display(display_index, last_time_interval,
-				current_time_interval); 
-	start_processing_time = last_time_interval = -1;
+	CpvAccess(time) = CkTimer(); 
+	adjust_time_interval(CpvAccess(time));
+   	CpvAccess(display_index) = get_processing_display_index(msg_type);
+	compute_busy(CpvAccess(start_processing_time), CpvAccess(time), CpvAccess(last_time_interval), 
+			CpvAccess(current_time_interval));
+	if (CpvAccess(display_index) >= 0) 
+		update_display(CpvAccess(display_index), CpvAccess(last_time_interval),
+				CpvAccess(current_time_interval)); 
+	CpvAccess(start_processing_time) = CpvAccess(last_time_interval) = -1;
 }
 
 trace_enqueue(envelope)
@@ -100,21 +121,21 @@ unsigned int time;
 {
 	int temp_time_interval = MAXLOGMSGSIZE - 1;
 
-	current_time_interval = (time - init_time) / timestep;
-	while (current_time_interval >= MAXLOGMSGSIZE)
+	CpvAccess(current_time_interval) = (time - CpvAccess(init_time)) / CpvAccess(timestep);
+	while (CpvAccess(current_time_interval) >= MAXLOGMSGSIZE)
 	{
 TRACE(CmiPrintf("[%d] adjust_time_interval: current_time_interval=%d\n", 
-CmiMyPe(), current_time_interval));
+CmiMyPe(), CpvAccess(current_time_interval)));
 
-		adjust_timestep(&timestep, &temp_time_interval,
-				display_table, 2);
-		current_time_interval = (time - init_time) / timestep;
-		if (start_processing_time != -1)
-			last_time_interval = (start_processing_time -
-						 init_time) / timestep;
+		adjust_timestep(&CpvAccess(timestep), &temp_time_interval,
+				CpvAccess(display_table), 2);
+		CpvAccess(current_time_interval) = (time - CpvAccess(init_time)) / CpvAccess(timestep);
+		if (CpvAccess(start_processing_time) != -1)
+			CpvAccess(last_time_interval) = (CpvAccess(start_processing_time) -
+						 CpvAccess(init_time)) / CpvAccess(timestep);
 
 TRACE(CmiPrintf("[%d] adjust_time_interval: current_time_interval=%d\n", 
-CmiMyPe(), current_time_interval));
+CmiMyPe(), CpvAccess(current_time_interval)));
 	}
 }
 
@@ -127,15 +148,16 @@ CmiMyPe(), current_time_interval));
 log_init()
 { 
 	int i, j;
-	timestep = INITIAL_TIMESTEP;
+	CpvAccess(timestep) = INITIAL_TIMESTEP;
 
 
-	RecdPerfMsg = 0;
-	init_time = CkTimer();
-	start_processing_time = -1;
+	init_globals();
+	CpvAccess(RecdPerfMsg) = 0;
+	CpvAccess(init_time) = CkTimer();
+	CpvAccess(start_processing_time) = -1;
         for (i=0; i<NUMBER_DISPLAYS; i++)
         for (j=0; j<MAXLOGMSGSIZE; j++)
-		display_table[i][j] = 0;
+		CpvAccess(display_table)[i][j] = 0;
 }
 
 
@@ -151,30 +173,31 @@ close_log()
 		int i, j; 
 		int length;
 		FILE *log_file_desc;
+		char *log_file_name; 	/* log file name      	*/
 
 		/* build log file name from pgm name and pe number */
 		/* flush out the log buffer before closing the log file */
 	
-		length = strlen(pgm) + strlen(".pgm") + 1;
+		length = strlen(CpvAccess(pgm)) + strlen(".pgm") + 1;
 		log_file_name = (char *) CmiAlloc(length);
-		sprintf(log_file_name, "%s.log", pgm);
+		sprintf(log_file_name, "%s.log", CpvAccess(pgm));
 	
 		if((log_file_desc = fopen(log_file_name, "w+")) == NULL)
 			printf("*** ERROR *** Cannot Create %s",
 					log_file_name);
 		fprintf(log_file_desc, "%d %d %d\n", CmiNumPe(),
-			timestep, current_time_interval+1);
+			CpvAccess(timestep), CpvAccess(current_time_interval)+1);
 			
 
-		for (j=0; j<current_time_interval+1; j++)
-			display_table[IDLE_TIME][j] =
-				(display_table[IDLE_TIME][j]*100)/
-				(CmiNumPe()*timestep);
+		for (j=0; j<CpvAccess(current_time_interval)+1; j++)
+			CpvAccess(display_table)[IDLE_TIME][j] =
+				(CpvAccess(display_table)[IDLE_TIME][j]*100)/
+				(CmiNumPe()*CpvAccess(timestep));
 		for (i=0; i<NUMBER_DISPLAYS; i++)
 		{
-			for (j=0; j<current_time_interval+1; j++)
+			for (j=0; j<CpvAccess(current_time_interval)+1; j++)
 				fprintf(log_file_desc, "%d ", 
-					display_table[i][j]); 
+					CpvAccess(display_table)[i][j]); 
 			fprintf(log_file_desc, "\n");
 		}
 	}
@@ -225,24 +248,24 @@ PERF_MSG *msg;
 {
 	int i, j;
 
-	if ((msg->timestep != 0) && (msg->timestep != timestep))
-		if (msg->timestep > timestep)
-			adjust_timestep(&timestep, &current_time_interval,
-					display_table,
-					(msg->timestep/timestep));
+	if ((msg->timestep != 0) && (msg->timestep != CpvAccess(timestep)))
+		if (msg->timestep > CpvAccess(timestep))
+			adjust_timestep(&CpvAccess(timestep), &CpvAccess(current_time_interval),
+					CpvAccess(display_table),
+					(msg->timestep/CpvAccess(timestep)));
 		else
 			adjust_timestep(&(msg->timestep),
 					&(msg->current_time_interval),
 					msg->display_table,
-					(timestep/msg->timestep));
+					(CpvAccess(timestep)/msg->timestep));
 
 	/* flush out the log buffer before closing the log file */
 	for (i=0; i<NUMBER_DISPLAYS; i++)
-		for (j=0; j<current_time_interval+1; j++)
-			display_table[i][j] += msg->display_table[i][j];
+		for (j=0; j<CpvAccess(current_time_interval)+1; j++)
+			CpvAccess(display_table)[i][j] += msg->display_table[i][j];
 	/*
-	for (j=0; j<current_time_interval+1; j++)
-		display_table[IDLE_TIME][j] /= 2;
+	for (j=0; j<CpvAccess(current_time_interval)+1; j++)
+		CpvAccess(display_table)[IDLE_TIME][j] /= 2;
 	*/
 
 }
@@ -258,20 +281,20 @@ int mype;
 
 	msg = (PERF_MSG *) CkAllocMsg(sizeof(PERF_MSG));
 
-	msg->current_time_interval = current_time_interval;
-	msg->timestep = timestep;
+	msg->current_time_interval = CpvAccess(current_time_interval);
+	msg->timestep = CpvAccess(timestep);
 	for (i=0; i<NUMBER_DISPLAYS; i++)
 	{
-	for (j=0; j<current_time_interval+1; j++)
-		msg->display_table[i][j] = display_table[i][j];	
-	for (j=current_time_interval+1; j<MAXLOGMSGSIZE; j++)
+	for (j=0; j<CpvAccess(current_time_interval)+1; j++)
+		msg->display_table[i][j] = CpvAccess(display_table)[i][j];	
+	for (j=CpvAccess(current_time_interval)+1; j<MAXLOGMSGSIZE; j++)
 		msg->display_table[i][j] = 0;
 	}
 TRACE(CmiPrintf("[%d] Send out perf message to %d\n", 
 		mype, CmiSpanTreeParent(mype)));
 
 	GeneralSendMsgBranch(StatPerfCollectNodes_EP, msg,
-		CmiSpanTreeParent(mype), USERcat, BocMsg, LdbBocNum);
+		CmiSpanTreeParent(mype), USERcat, BocMsg, CpvAccess(LdbBocNum));
 }
 
 
@@ -283,7 +306,7 @@ send_log()
 	int mype = CmiMyPe();
 	if (CmiNumSpanTreeChildren(mype) == 0)
 	{
-		RecdPerfMsg = 1;
+		CpvAccess(RecdPerfMsg) = 1;
 		if (mype != 0)
 			SendOutPerfMsg(mype);
 	}
@@ -307,11 +330,11 @@ TRACE(CmiPrintf("[%d] CollectPerf..: recd=%d,  span=%d\n",
 		mype, recd, CmiNumSpanTreeChildren(mype)));
 	if (recd == CmiNumSpanTreeChildren(mype))
 	{
-		RecdPerfMsg = 1;
+		CpvAccess(RecdPerfMsg) = 1;
 		if (mype != 0)
 			SendOutPerfMsg(mype);
-TRACE(CmiPrintf("[%d] RecdStatMsg=%d\n", CmiMyPe(), RecdStatMsg));
-		if (RecdStatMsg) ExitNode(); 	
+TRACE(CmiPrintf("[%d] RecdStatMsg=%d\n", CmiMyPe(), CpvAccess(RecdStatMsg)));
+		if (CpvAccess(RecdStatMsg)) ExitNode(); 	
 	}  
 }
 
@@ -322,8 +345,8 @@ TRACE(CmiPrintf("[%d] RecdStatMsg=%d\n", CmiMyPe(), RecdStatMsg));
 program_name(s, m)
 char *s, *m;
 {
-	pgm = (char *) malloc(strlen(s)+1);
-	strcpy(pgm, s);
+	CpvAccess(pgm) = (char *) malloc(strlen(s)+1);
+	strcpy(CpvAccess(pgm), s);
 }
 
 
@@ -341,9 +364,9 @@ int last_interval, current_interval;
 
 	/*
 	for (i=last_interval; i<=current_interval; i++)
-		(display_table[index][i])++;
+		(CpvAccess(display_table)[index][i])++;
 	*/
-	display_table[index][last_interval]++;
+	CpvAccess(display_table)[index][last_interval]++;
 }
 
 
@@ -367,19 +390,19 @@ TRACE(CmiPrintf("[%d] compute_busy: begin=%d, end=%d, last_interval=%d, current_
 	{
 		for (i=last_interval; i<current_interval; i++)
 		{
-			border = timestep*(i+1) + init_time; 
-			display_table[IDLE_TIME][i] += border - begin;
-				 /* ((border - begin)*100)/timestep; */
+			border = CpvAccess(timestep)*(i+1) + CpvAccess(init_time); 
+			CpvAccess(display_table)[IDLE_TIME][i] += border - begin;
+				 /* ((border - begin)*100)/CpvAccess(timestep); */
 			begin = border;
 		}
-		display_table[IDLE_TIME][current_interval] +=
+		CpvAccess(display_table)[IDLE_TIME][current_interval] +=
 				 end - border;
-				 /* ((end - border)*100)/timestep; */
+				 /* ((end - border)*100)/CpvAccess(timestep); */
 	}
 	else
-		display_table[IDLE_TIME][current_interval] +=
+		CpvAccess(display_table)[IDLE_TIME][current_interval] +=
 			 end - begin;
-			 /* ((end - begin)*100)/timestep; */
+			 /* ((end - begin)*100)/CpvAccess(timestep); */
 }
 
 
@@ -458,11 +481,11 @@ int X;
 	string = (char *) malloc(1000);
 
 	CmiPrintf("[%d] print_idle: X=%d, current_time_interval=%d\n",
-			 CmiMyPe(), X, current_time_interval);
+			 CmiMyPe(), X, CpvAccess(current_time_interval));
 	sprintf(string, "");
 	for (j=0; j<X+1; j++)
 	{
-		sprintf(str, "%d ", display_table[0][j]);
+		sprintf(str, "%d ", CpvAccess(display_table)[0][j]);
 		strcat(string, str);
 	}
 	CmiPrintf("[%d] print_idle: %s \n", CmiMyPe(), string);
