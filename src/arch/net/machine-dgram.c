@@ -484,13 +484,14 @@ void CommunicationsClock(void)
     Cmi_check_last = Cmi_clock; 
     ctrl_sendone_locking("ping",NULL,0,NULL,0); /*Charmrun may have died*/
   }
+  CcdCallFnAfter(CommunicationsClock,NULL,100);
 }
 #if CMK_SHARED_VARS_UNAVAILABLE
 void CommunicationPeriodic(void *ignored) 
 { /*Poll on the communications server*/
   CommunicationServer(0);
   if (!Cmi_netpoll)
-    CcdCallFnAfter(CommunicationPeriodic,NULL,20);
+    CcdCallFnAfter(CommunicationPeriodic,NULL,100);
 }
 #endif
 

@@ -196,9 +196,9 @@ extremely verbose, 2 shows most procedure entrance/exits,
 Displaying lower priority messages doesn't stop higher priority ones.
 */
 #define MACHINE_DEBUG_PRIO 3
-#define MACHINE_DEBUG_LOG 1 /*Controls whether output goes to log file*/
+#define MACHINE_DEBUG_LOG 0 /*Controls whether output goes to log file*/
 
-FILE *debugLog=stdout;
+FILE *debugLog;
 # define MACHSTATE_I(prio,args) if ((prio)>=MACHINE_DEBUG_PRIO) {\
 	fprintf args ; fflush(debugLog); }
 # define MACHSTATE(prio,str) \
@@ -1241,16 +1241,20 @@ int CmiMyRank(void)
 }
 #endif
 
+/***************************************************************
+ Communication with charmrun:
+ We can send (ctrl_sendone) and receive (ctrl_getone)
+ messages on a TCP socket connected to charmrun.
+ This is used for printfs, CCS, etc; and also for
+ killing ourselves if charmrun dies.
+*/
 
-/****************************************************************************
- *
- * ctrl_sendone
- *
- * Careful, don't call the locking version from inside the 
- * communication thread, you'll mess up the communications mutex.
- *
- ****************************************************************************/
+/*This flag prevents simultanious outgoing
+messages on the charmrun socket.  It is protected
+by the commlock.*/
+static int Cmi_charmrun_fd_sendflag=0;
 
+/* ctrl_sendone */
 static int sendone_abort_fn(int code,const char *msg) {
 	fprintf(stderr,"Socket error %d in ctrl_sendone! %s\n",code,msg);
 	machine_exit(1);
@@ -1264,10 +1268,12 @@ static void ctrl_sendone_nolock(const char *type,
   ChMessageHeader hdr;
   if (Cmi_charmrun_fd==-1) 
   	charmrun_abort("ctrl_sendone called in standalone!\n");
+  Cmi_charmrun_fd_sendflag=1;
   ChMessageHeader_new(type,dataLen1+dataLen2,&hdr);
   skt_sendN(Cmi_charmrun_fd,(const char *)&hdr,sizeof(hdr));
   if (dataLen1>0) skt_sendN(Cmi_charmrun_fd,data1,dataLen1);
   if (dataLen2>0) skt_sendN(Cmi_charmrun_fd,data2,dataLen2);
+  Cmi_charmrun_fd_sendflag=0;
 }
 
 static void ctrl_sendone_locking(const char *type,
@@ -1282,6 +1288,22 @@ static void ctrl_sendone_locking(const char *type,
   CmiCommUnlock();
 }
 
+static double Cmi_check_last;
+
+static void pingCharmrun(int ignored) 
+{
+  double clock=GetClock();
+  if (clock > Cmi_check_last + Cmi_check_delay) {
+    MACHSTATE(1,"CommunicationsClock pinging charmrun");       
+    Cmi_check_last = clock; 
+    CmiCommLockOrElse(return;); /*Already busy doing communication*/
+    if (Cmi_charmrun_fd_sendflag) return; /*Busy talking to charmrun*/
+    CmiCommLock();
+    ctrl_sendone_nolock("ping",NULL,0,NULL,0); /*Charmrun may have died*/
+    CmiCommUnlock();
+  }
+}
+
 static int ignore_further_errors(int c,const char *msg) {machine_exit(2);return -1;}
 static void charmrun_abort(const char *s)
 {
@@ -1289,18 +1311,14 @@ static void charmrun_abort(const char *s)
   	fprintf(stderr,"Charm++ fatal error:\n%s\n",s);
   	abort();
   } else {
+	char msgBuf[80];
   	skt_set_abort(ignore_further_errors);
-  	ctrl_sendone_nolock("abort",s,strlen(s)+1,NULL,0);
+	sprintf(msgBuf,"Fatal error on PE %d> ",CmiMyPe());
+  	ctrl_sendone_nolock("abort",msgBuf,strlen(msgBuf),s,strlen(s)+1);
   }
 }
 
-/****************************************************************************
- *
- * ctrl_getone
- *
- * This is handled only by the communications thread.
- *
- ****************************************************************************/
+/* ctrl_getone */
 
 /*Add a message to this processor's receive queue */
 static void CmiPushPE(int pe,void *msg)
@@ -1353,6 +1371,7 @@ void CcsImpl_reply(CcsImplHeader *hdr,int repLen,const void *repData)
 		       repData,repLen);  
 }
 #endif
+
 /*****************************************************************************
  *
  * CmiPrintf, CmiError, CmiScanf
@@ -1991,11 +2010,24 @@ static void ConverseRunPE(int everReturn)
   if (Cmi_netpoll) /*Repeatedly call CommServer*/
     CcdPeriodicCallKeep(CommunicationPeriodic,NULL);
   else /*Only need this for retransmits*/
-    CcdCallFnAfter(CommunicationPeriodic,NULL,20);
+    CcdCallFnAfter(CommunicationPeriodic,NULL,100);
 #endif
 
-  if (CmiMyRank()==0 && Cmi_charmrun_fd!=-1)
-    CcdPeriodicCallKeep(CommunicationsClock,NULL);
+  if (CmiMyRank()==0 && Cmi_charmrun_fd!=-1) {
+#if CMK_SHARED_VARS_UNAVAILABLE
+    //Occasionally ping charmrun, to test if it's dead
+    struct itimerval i;
+    CmiSignal(SIGALRM, 0, 0, pingCharmrun);
+    i.it_interval.tv_sec = 1;
+    i.it_interval.tv_usec = 0;
+    i.it_value.tv_sec = 1;
+    i.it_value.tv_usec = 0;
+    setitimer(ITIMER_REAL, &i, NULL);
+#endif
+    
+    //Occasionally check for retransmissions, outgoing acks, etc.
+    CcdCallFnAfter(CommunicationsClock,NULL,100);
+  }
 
   if (!everReturn) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
@@ -2058,6 +2090,9 @@ static void obtain_idleFn(void) {sleep(0);}
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 {
+#if MACHINE_DEBUG
+  debugLog=stdout;
+#endif
 #if CMK_USE_HP_MAIN_FIX
 #if FOR_CPLUS
   _main(argc,argv);
@@ -2078,6 +2113,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
     /* idlesleep use sleep instead if busywait when idle */
   if (CmiGetArgFlag(argv,"+idlesleep")) Cmi_idlepoll = 0;
   Cmi_syncprint = CmiGetArgFlag(argv,"+syncprint");
+
+  MACHSTATE2(5,"Init: (netpoll=%d), (idlepoll=%d)",Cmi_netpoll,Cmi_idlepoll);
+
   skt_init();
   atexit(exitDelay);
   parse_netstart();
