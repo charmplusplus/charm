@@ -1,7 +1,7 @@
 #include <converse.h>
 
-#if CMK_LBDB_ON
 
+#if CMK_LBDB_ON
 
 #include "LBObj.h"
 #include "LBOM.h"
@@ -41,4 +41,4 @@ void LBObj::StopTimer(double* walltime, double* cputime)
   *cputime = endCTime - startCTime;
 }
 
-#endif // CMK_LBDB_ON
+#endif

@@ -265,4 +265,4 @@ void LocalBarrier::ResumeClients(void)
       clients[i]->fn(clients[i]->data);
 }
 
-#endif // CMK_LBDB_ON
+#endif

@@ -8,9 +8,13 @@ extern "C" {
   /*  User-defined object IDs will be 4 ints long */
 #define OBJ_ID_SZ 4
 
+#if CMK_LBDB_ON
 typedef struct {
   void *handle;
 } LDHandle;
+#else
+typedef int LDHandle;
+#endif
 
 typedef struct {
   int id;
@@ -73,7 +77,12 @@ typedef struct {
 /*
  * Calls from object managers to load database
  */
+#if CMK_LBDB_ON
 LDHandle LDCreate(void);
+#else
+#define LDCreate() 0
+#endif
+
 LDOMHandle LDRegisterOM(LDHandle lbdb, LDOMid userID, 
 			void *userptr, LDCallbacks cb);
 void LDRegisteringObjects(LDOMHandle _h);
