@@ -1,55 +1,57 @@
 \chapter{Initialization and Completion}
 
 The program utilizing Converse begins executing at {\tt main}, like
-any other C program.  However, depending on the machine and the
-implementation decisions of the machine's vendor, {\tt main} may be
-executed by more than one processor.  On some machines, every
-processor executes {\tt main}.  On others, only one processor executes
-{\tt main}.  All processors which don't execute {\tt main} are asleep
-when the program begins.
-
-There are two ways for the program to start up the Converse system.
-The first method is to use ConverseInit:
+any other C program.  The initialization process is somewhat
+complicated by the fact that vendors don't agree about which
+processors should execute main.  On some machines, every processor
+executes {\tt main}.  On others, only one processor executes {\tt
+main}.  All processors which don't execute {\tt main} are asleep when
+the program begins.  The function ConverseInit is used to start the
+converse system, and to wake up the sleeping processors:
 
 \function{typedef void (*CmiStartFn)(int argc, char **argv);}
-\function{void ConverseInit(int argc, char *argv[], CmiStartFn fn)}
+\function{void ConverseInit(int argc, char *argv[], CmiStartFn fn, int usched, int initret)}
 \index{ConverseInit}
-\desc{This must be called by every processor which initially executed
-{\tt main}.  Initializes the entire Converse system, then causes all
-processors to begin executing the function {\tt fn}, which should
-perform all your computation.  ConverseInit never returns.  You may
-not call any other Converse function until initialization is complete,
-that is, until {\tt fn} begins executing. \param{argc} and
-\param{argv} are in the same format as the arguments passed to
-\param{main(argc, argv)}.}
+\desc{This function starts up the Converse system.  It can execute
+in one of several modes, described below.
 
-ConverseInit is the initialization method one would use in most
-programs.  However, some programs may find it difficult to work around
-the constraint that ConverseInit never returns.  Thus, we provide
-ConverseStart, an alternate initialization method.  Currently,
-ConverseStart is supported on all machines, however, it is {\em
-potentially} possible that it will be unimplementable on some
-machines.  Thus, we do not guarantee its presence.  Use it only when
-you absolutely need a startup function that returns.
+Normal Mode: {\tt usched=0, initret=0}
 
-\function{void ConverseStart(int argc, char *argv[], CmiStartFn fn)}
-\index{ConverseInit}
-\desc{This must be called by every processor which initially executed
-{\tt main}.  Initializes the entire Converse system, then causes all
-processors {\em which did not initially execute {\tt main}} to begin
-executing the function {\tt fn}.  Once these threads have been
-launched, ConverseStart returns.  You may not call any other Converse
-function until initialization is complete, that is, until {\tt fn}
-begins executing and ConverseStart returns. \param{argc} and
-\param{argv} are in the same format as the arguments as passed to
-\param{main(argc, argv)}.}
+When you run your program, some of the processors automatically invoke
+main, others remain asleep.  All processors which automatically
+invoked {\tt main} must must call ConverseInit.  This initializes the
+entire Converse system.  Converse then initiates, on {\em all}
+processors, the execution of the user-supplied initialization function
+{\tt fn(argc, argv)} followed by the Converse scheduler.  Once the
+scheduler exits on all processors, the Converse system shuts down, and
+your program terminates.  Note that in this case, ConverseInit never
+returns.  The user is not allowed to call the Converse scheduler
+manually.
 
-Regardless which startup method is used, all processors should call
-ConverseExit during termination:
+ConverseInit Returns Mode: {\tt initret=1}
+
+This option is used when you want ConverseInit to return.  All
+processors which automatically invoked {\tt main} must call
+ConverseInit.  This initializes the entire Converse System.  On all
+processors which {\em did not} automatically invoke main, Converse
+initiates the user-supplied initialization function {\tt fn(argc,
+argv)} followed by the Converse scheduler.  Meanwhile, on those
+processors which {\em did} automatically invoke main, ConverseInit
+returns.  Shutdown is initiated when the processors that {\em did}
+automatically invoke main call ConverseExit, and when the other
+processors exit the scheduler.  This option is not supported
+by the sim version.
+
+User Calls Scheduler Mode: {\tt usched=1}
+
+This is how the user initializes charm if he wants to call the
+Converse scheduler manually.  It is assumed that the user will call
+the scheduler from inside the initialization function.  Thus,
+ConverseInit will not automatically execute the scheduler for you.
+This mode can be combined with ConverseInit returns mode.
 
 \function{void ConverseExit(void)}
 \index{ConverseExit}
-\desc{This function frees the resources acquired by Converse and wraps up. 
-Any other Converse function should not be called after a call to this
-function.}
+\desc{This function is only used in ConverseInit returns mode, see
+above.}
 
