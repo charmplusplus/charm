@@ -275,7 +275,7 @@ void CkRestartMain(const char* dirname){
 		//DEBCHK("tmpInfo[%d]:gID = %d, eIdx = %d, obj->ckGetGroupID() = %d\n",i,gID.idx,tmpInfo[i].eIdx, obj->ckGetGroupID().idx);
 		if(obj->isLocMgr()){
 			CkLocMgr *mgr = (CkLocMgr *)obj;
-			DEBCHK("\tThis is a location manager! lbdb=%d\n",lbdb.idx);
+			DEBCHK("\tThis is a location manager! obj=%d\n",gID.idx);
 			ElementRestorer restorer(dirname,mgr);
 			while (restorer.restore()) {}
 		}
