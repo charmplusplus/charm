@@ -28,7 +28,6 @@
 #ifndef CMK_USE_HP_MAIN_FIX
 # define CMK_USE_HP_MAIN_FIX 0
 #endif
-#define CMK_DONT_USE_HP_MAIN_FIX  (!CMK_USE_HP_MAIN_FIX)
 
 /*
 #ifndef CMK_STACK_GROWDOWN
