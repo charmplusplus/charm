@@ -65,7 +65,7 @@ bgTimeLog::bgTimeLog(bgTimeLog *log)
 bgTimeLog::bgTimeLog(int epc, char* namestr,double sTime)
 { 
   if(namestr == NULL)
-    namestr = "dummyname";
+    namestr = "dummyname1";
   strncpy(name,namestr,20);
   ep = epc;
   startTime = sTime;
@@ -83,7 +83,7 @@ bgTimeLog::bgTimeLog(int epc, char* namestr,double sTime)
 bgTimeLog::bgTimeLog(int epc, char* namestr, double sTime, double eTime)
 {
   if(namestr == NULL)
-    namestr = "dummyname";
+    namestr = "dummyname2";
   strncpy(name,namestr, 20);
   ep = epc;
   startTime = sTime;
