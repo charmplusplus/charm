@@ -126,14 +126,14 @@
        end function
        subroutine FEM_Mesh_set_length(mesh,ent,newLength)
          integer, intent(in) :: mesh,ent,newLength
-       end function
+       end subroutine
        function FEM_Mesh_get_width(mesh,ent)
          integer, intent(in) :: mesh,ent
 	 integer :: FEM_Mesh_get_width
        end function
        subroutine FEM_Mesh_set_width(mesh,ent,attr,newWidth)
          integer, intent(in) :: mesh,ent,attr,newWidth
-       end function
+       end subroutine
        function FEM_Mesh_get_datatype(mesh,ent,attr)
          integer, intent(in) :: mesh,ent,attr
 	 integer :: FEM_Mesh_get_datatype
