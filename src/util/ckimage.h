@@ -63,8 +63,10 @@ public:
 };
 PUPmarshall(CkRect);
 
-/*This class describes a flat byte array interpreted as an image.
-Pixels are stored first by color (r,g,b), then by row.  
+/**
+This class describes an image, represented as a flat byte array.
+Pixels are stored first by color (r,g,b), then by row in the usual
+raster order.  
 */
 class CkImage {
 public:
@@ -86,6 +88,7 @@ public:
 	void setData(pixel_t *d) {data=d;}
 	
 	CkRect getRect(void) const {return CkRect(0,0,wid,ht);}
+	int getRow(void) const {return row;}
 	int getColors(void) const {return colors;}
 	
 	int getWidth(void) const {return wid;}
@@ -95,6 +98,11 @@ public:
 	inline void copyPixel(const pixel_t *src,pixel_t *dest) {
 		for (int i=0;i<colors;i++)
 			dest[i]=src[i];
+	}
+	//Set this pixel to this value
+	inline void setPixel(const pixel_t src,pixel_t *dest) {
+		for (int i=0;i<colors;i++)
+			dest[i]=src;
 	}
 	//Add the pixel at src to the one at dest, ignoring overflow
 	inline void addPixel(const pixel_t *src,pixel_t *dest) {
@@ -165,6 +173,19 @@ public:
 		allocData=getData();
 	}
 	~CkAllocImage() {delete[] allocData;}
+	
+	// Allocate the image with its current size.
+	void allocate(void) {
+		int len=getRect().area()*getColors();
+		allocData=new pixel_t[len];
+		setData(allocData);
+	}
+	
+	// Deallocate the image data (does not change size).
+	void deallocate(void) {
+		delete[] allocData; allocData=0;
+		setData(allocData);
+	}
 	
 	//Pup both image size as well as image data.
 	void pup(PUP::er &p);

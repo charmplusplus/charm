@@ -6,15 +6,14 @@ array of pixels.
 Orion Sky Lawlor, olawlor@acm.org, 5/15/2002
 */
 #include "ckimage.h"
+#include <string.h>
 
 /*
 Zero out this image-- make it all black.
 */
 void CkImage::clear(void) {
 	for (int y=0;y<ht;y++)
-	for (int x=0;x<wid;x++)
-	for (int i=0;i<colors;i++)
-		data[x*colors+y*row+i]=(pixel_t)0;
+		memset(&data[y*row],0,wid*colors);
 }
 
 	/*
@@ -64,10 +63,7 @@ void CkImage::clear(void) {
 //Pup both image size as well as image data.
 void CkAllocImage::pup(PUP::er &p) {
 	CkImage::pup(p);
+	if (p.isUnpacking()) allocate();
 	int len=getRect().area()*getColors();
-	if (p.isUnpacking()) {
-		allocData=new pixel_t[len];
-		setData(allocData);
-	}
 	p(allocData,len);
 }
