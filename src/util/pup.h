@@ -69,8 +69,7 @@ class bar {
 // itself has no meaningful fields.
 typedef struct {int is_only_a_name;} CkMigrateMessage;
 
-class PUP {//<- Should be "namespace", once all compilers support them
- public:
+namespace PUP {
 
 #if CMK_LONG_LONG_DEFINED
 #define CMK_PUP_LONG_LONG long long
@@ -239,8 +238,7 @@ class er {
   void operator()(able** a)
     {object(a);}
   //For pre- or stack-allocated PUP::able objects-- just call object's pup
-  void operator()(able& a)
-    {a.pup(*this);}
+  void operator()(able& a);
 
   //A descriptive (but entirely optional) human-readable comment field
   virtual void comment(const char *message);
@@ -278,6 +276,11 @@ class sizer : public er {
   int size(void) const {return nBytes;}
 };
 
+template <class T>
+inline int size(T &t) {
+	PUP::sizer p; p|t; return p.size();
+}
+
 /********** PUP::er -- Binary memory buffer pack/unpack *********/
 class mem : public er { //Memory-buffer packers and unpackers
  protected:
@@ -303,6 +306,13 @@ class toMem : public mem {
   //Write data to the given buffer
   toMem(void *Nbuf):mem(IS_PACKING,(myByte *)Nbuf) {}
 };
+template <class T>
+inline void toMemBuf(T &t,void *buf,int len) {
+	PUP::toMem p(buf);
+	p|t;
+	if (p.size()!=len) CmiAbort("Size mismatch during PUP::toMemBuf!\n"
+		"This means your pup routine doesn't match during sizing and packing");
+}
 
 //For unpacking from a memory buffer
 class fromMem : public mem {
@@ -313,6 +323,13 @@ class fromMem : public mem {
   //Read data from the given buffer
   fromMem(const void *Nbuf):mem(IS_UNPACKING,(myByte *)Nbuf) {}
 };
+template <class T>
+inline void fromMemBuf(T &t,void *buf,int len) {
+	PUP::fromMem p(buf);
+	p|t;
+	if (p.size()!=len) CmiAbort("Size mismatch during PUP::fromMemBuf!\n"
+		"This means your pup routine doesn't match during packing and unpacking");
+}
 
 /********** PUP::er -- Binary disk file pack/unpack *********/
 class disk : public er {
@@ -565,7 +582,7 @@ public:\
     className::register_PUP_ID();
 
 
-};//<- End "namespace" PUP
+};//<- End namespace PUP
 
 
 //Holds a pointer to a (possibly dynamically allocated) PUP::able.

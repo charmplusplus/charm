@@ -23,6 +23,9 @@ virtual functions are defined here.
 
 PUP::er::~er() {}
 
+void PUP::er::operator()(able& a)
+  {a.pup(*this);}
+
 void PUP::er::comment(const char *message)
   { /* ignored by default */ }
 
@@ -619,17 +622,26 @@ void PUP::fromTextFile::parseError(const char *what) {
 }
 int PUP::fromTextFile::readInt(const char *fmt) {
   int ret=0;
-  if (1!=fscanf(f,fmt,&ret)) parseError("could not match integer");
+  if (1!=fscanf(f,fmt,&ret)) {
+	if (feof(f)) return 0; /* start spitting out zeros at EOF */
+  	else parseError("could not match integer");
+  }
   return ret;
 }
 unsigned int PUP::fromTextFile::readUint(const char *fmt) {
   unsigned int ret=0;
-  if (1!=fscanf(f,fmt,&ret)) parseError("could not match unsigned integer");
+  if (1!=fscanf(f,fmt,&ret))  {
+	if (feof(f)) return 0u; /* start spitting out zeros at EOF */
+	else parseError("could not match unsigned integer");
+  }
   return ret;  
 }
 double PUP::fromTextFile::readDouble(void) {
   double ret=0;
-  if (1!=fscanf(f,"%lg",&ret)) parseError("could not match double");
+  if (1!=fscanf(f,"%lg",&ret)) {
+  	if (feof(f)) return 0.0; /* start spitting out zeros at EOF */
+	else parseError("could not match double");
+  }
   return ret;
 }
 void PUP::fromTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
