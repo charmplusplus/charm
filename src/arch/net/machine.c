@@ -2011,9 +2011,9 @@ static void ConverseRunPE(int everReturn)
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,CmiNotifyStillIdle,(void *)s);
 #if CMK_SHARED_VARS_UNAVAILABLE
   if (Cmi_netpoll) /*Repeatedly call CommServer*/
-    CcdPeriodicCallKeep(CommunicationPeriodic,NULL);
+    CcdCallOnConditionKeep(CcdPERIODIC,CommunicationPeriodic,NULL);
   else /*Only need this for retransmits*/
-    CcdCallFnAfter(CommunicationPeriodicCaller,NULL,Cmi_comm_periodic_delay);
+    CcdCallOnConditionKeep(CcdPERIODIC_10ms,CommunicationPeriodic,NULL);
 #endif
 
   if (CmiMyRank()==0 && Cmi_charmrun_fd!=-1) {
@@ -2149,6 +2149,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   node_addresses_obtain(argv);
   skt_set_idle(CmiYield);
   Cmi_check_delay = 2.0+0.5*Cmi_numnodes;
+  if (Cmi_charmrun_fd==-1) /*Don't bother with check in standalone mode*/
+	Cmi_check_delay=1.0e30;
   CmiStartThreads(argv);
   ConverseRunPE(everReturn);
 }
