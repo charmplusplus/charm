@@ -35,16 +35,13 @@ class BinEntry {
 #ifdef WIN32
     void operator delete(void *, void *) { }
 #endif
-    BinEntry(): time(0.) {}
-    BinEntry(double t): time(t) {}
-    inline double getTime() { return time; }
-    void setTime(double t) { time = t; }
-    double &Time() { return time; }
+    BinEntry(): _time(0.) {}
+    BinEntry(double t): _time(t) {}
+    double &time() { return _time; }
     void write(FILE *fp);
-    void writeU(FILE *fp, int u);
     int  getU();
   private:
-    double time;
+    double _time;
 };
 
 /// a phase entry for trace summary

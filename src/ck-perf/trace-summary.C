@@ -57,6 +57,10 @@ void CkSummary_MarkEvent(int eventType)
    CkpvAccess(_trace)->addEventType(eventType);
 }
 
+static inline void writeU(FILE* fp, int u)
+{
+  fprintf(fp, "%4d", u);
+}
 
 PhaseEntry::PhaseEntry() 
 {
@@ -76,9 +80,9 @@ PhaseEntry::PhaseEntry()
 SumLogPool::~SumLogPool() 
 {
   if (!sumonly) {
-  write();
-  fclose(fp);
-  if (sumDetail) fclose(sdfp);
+    write();
+    fclose(fp);
+    if (sumDetail) fclose(sdfp);
   }
   // free memory for mark
   if (markcount > 0)
@@ -206,7 +210,7 @@ void SumLogPool::write(void)
   // write bin time
 #if 1
   int last=pool[0].getU();
-  pool[0].writeU(fp, last);
+  writeU(fp, last);
   int count=1;
   for(j=1; j<numBins; j++) {
     int u = pool[j].getU();
@@ -215,7 +219,7 @@ void SumLogPool::write(void)
     }
     else {
       if (count > 1) fprintf(fp, "+%d", count);
-      pool[j].writeU(fp, u);
+      writeU(fp, u);
       last = u;
       count = 1;
     }
@@ -396,7 +400,7 @@ void SumLogPool::shrink(void)
   int entries = numBins/2;
   for (int i=0; i<entries; i++)
   {
-     pool[i].setTime(pool[i*2].getTime() + pool[i*2+1].getTime());
+     pool[i].time() = pool[i*2].time() + pool[i*2+1].time();
      if (sumDetail)
      for (int e=0; e < epInfoSize; e++) {
          setCPUtime(i, e, getCPUtime(i*2, e) + getCPUtime(i*2+1, e));
@@ -414,19 +418,14 @@ void SumLogPool::shrink(void)
 //CkPrintf("Shrinked binsize: %f entries:%d takes %fs!!!!\n", CkpvAccess(binSize), numEntries, CmiWallTimer()-t);
 }
 
-int  BinEntry::getU() { 
-  return (int)(time * 100.0 / CkpvAccess(binSize)); 
+int  BinEntry::getU() 
+{ 
+  return (int)(_time * 100.0 / CkpvAccess(binSize)); 
 }
 
 void BinEntry::write(FILE* fp)
 {
-  int per = (int)(time * 100.0 / CkpvAccess(binSize));
-  fprintf(fp, "%4d", per);
-}
-
-void BinEntry::writeU(FILE* fp, int u)
-{
-  fprintf(fp, "%4d", u);
+  writeU(fp, getU());
 }
 
 TraceSummary::TraceSummary(char **argv):curevent(0),binStart(0.0),bin(0.0),msgNum(0)
@@ -621,74 +620,67 @@ void TraceSummary::startPhase(int phase)
 
 CkGroupID traceSummaryGID;
 
-void TraceSummaryBOC::askSummary()
+void TraceSummaryBOC::startSumOnly()
+{
+  CmiAssert(CkMyPe() == 0);
+
+  CProxy_TraceSummaryBOC p(traceSummaryGID);
+  int size = CkpvAccess(_trace)->pool()->getNumEntries();
+  p.askSummary(size);
+}
+
+void TraceSummaryBOC::askSummary(int size)
 {
   if (CkpvAccess(_trace) == NULL) return;
 
-#if 0
-#if CMK_TRACE_IN_CHARM
-  TRACE_CHARM_PE() = 0;
-#endif
-#endif
-
-  int n=0;
-  BinEntry *bins = NULL;
   int traced = TRACE_CHARM_PE();
+
+  BinEntry *bins = new BinEntry[size+1];
+  bins[size] = traced;		// last element is the traced pe count
   if (traced) {
-  CkpvAccess(_trace)->endComputation();
-  n = CkpvAccess(_trace)->pool()->getNumEntries();
-  bins = CkpvAccess(_trace)->pool()->bins();
-#if 1
-  CmiPrintf("askSummary on [%d] numEntried=%d\n", CkMyPe(), n);
+    CkpvAccess(_trace)->endComputation();
+    int n = CkpvAccess(_trace)->pool()->getNumEntries();
+    BinEntry *localBins = CkpvAccess(_trace)->pool()->bins();
 #if 0
-  for (int i=0; i<n; i++) 
-    CmiPrintf("%4d", bins[i].getU());
+  CmiPrintf("askSummary on [%d] numEntried=%d\n", CkMyPe(), n);
+#if 1
+  for (int i=0; i<n; i++) CmiPrintf("%4d", localBins[i].getU());
   CmiPrintf("\n");
 #endif
 #endif
+    if (n>size) n=size;
+    for (int i=0; i<n; i++) bins[i] = localBins[i];
   }
-  CProxy_TraceSummaryBOC p(traceSummaryGID);
-  p[0].sendSummaryBOC(traced, n, bins);
+
+  contribute(sizeof(BinEntry)*(size+1), bins, CkReduction::sum_double);
+  delete [] bins;
 }
 
 extern "C" void _CkExit();
 
-void TraceSummaryBOC::sendSummaryBOC(int traced, int n, BinEntry *b)
+void TraceSummaryBOC::sendSummaryBOC(CkReductionMsg *msg)
 {
-  int i;
   if (CkpvAccess(_trace) == NULL) return;
 
   CkAssert(CkMyPe() == 0);
 
-#if 0
-#if CMK_TRACE_IN_CHARM
-  TRACE_CHARM_PE() = 0;
-#endif
-#endif
+  int n = msg->getSize()/sizeof(BinEntry);
+  nBins = n-1;
+  bins = (BinEntry *)msg->getData();
+  nTracedPEs = (int)bins[n-1].time();
+  //CmiPrintf("traced: %d entry:%d\n", nTracedPEs, nBins);
 
-  count ++;
-  if (bins == NULL) {
-    nBins = CkpvAccess(_trace)->pool()->getNumEntries();
-    bins = new BinEntry[nBins];
-  }
-  if (traced) {
-    nTracedPEs ++;
-    if (n>nBins) n = nBins;
-    for (i=0; i<n; i++) {
-      bins[i].Time() += b[i].Time();
-    }
-  }
-  if (count == CkNumPes()) {
-    write();
-    _CkExit();
-  }
+  write();
+
+  delete msg;
+
+  _CkExit();
 }
 
 void TraceSummaryBOC::write(void) 
 {
   int i;
   unsigned int j;
-  int _numEntries=_entryTable.size();
 
   char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sum")+1];
   sprintf(fname, "%s.sum", CkpvAccess(traceRoot));
@@ -698,13 +690,14 @@ void TraceSummaryBOC::write(void)
       CmiAbort("Cannot open summary sts file for writing.\n");
   delete[] fname;
 
+  int _numEntries=_entryTable.size();
   fprintf(sumfp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e numTracedPE:%d", CkpvAccess(version), CkMyPe(), CkNumPes(), nBins, _numEntries, CkpvAccess(binSize), nTracedPEs);
   fprintf(sumfp, "\n");
 
   // write bin time
 #if 0
   int last=pool[0].getU();
-  pool[0].writeU(fp, last);
+  writeU(fp, last);
   int count=1;
   for(j=1; j<numEntries; j++) {
     int u = pool[j].getU();
@@ -713,7 +706,7 @@ void TraceSummaryBOC::write(void)
     }
     else {
       if (count > 1) fprintf(fp, "+%d", count);
-      pool[j].writeU(fp, u);
+      writeU(fp, u);
       last = u;
       count = 1;
     }
@@ -721,7 +714,7 @@ void TraceSummaryBOC::write(void)
   if (count > 1) fprintf(fp, "+%d", count);
 #else
   for(j=0; j<nBins; j++) {
-    bins[j].Time() /= nTracedPEs;
+    bins[j].time() /= nTracedPEs;
     bins[j].write(sumfp);
   }
 #endif
@@ -732,10 +725,12 @@ void TraceSummaryBOC::write(void)
 
 extern "C" void CombineSummary()
 {
-//CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());
+  CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());
   if (sumonly) {
-CmiPrintf("[%d] Sum Only start!\n", CkMyPe());
-    CProxy_TraceSummaryBOC(traceSummaryGID).askSummary();
+    CmiPrintf("[%d] Sum Only start!\n", CkMyPe());
+      // pe 0 start the sumonly process
+    CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
+    sumProxy[0].startSumOnly();
   }
   else CkExit();
 }

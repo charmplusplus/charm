@@ -11,8 +11,9 @@ module TraceSummary {
 
   group [migratable] TraceSummaryBOC {
     entry TraceSummaryBOC(void);
-    entry void askSummary();
-    entry void sendSummaryBOC(int traced, int n, BinEntry s[n]);
+    entry void startSumOnly();
+    entry void askSummary(int size);
+    entry void sendSummaryBOC(CkReductionMsg *);
   };
 
 };
