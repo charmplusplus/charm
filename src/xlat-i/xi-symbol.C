@@ -5,6 +5,7 @@
 extern FILE *yyin;
 extern void yyrestart ( FILE *input_file );
 extern int yyparse (void);
+extern int yyerror(char *);
 
 // Global Variable - used in parse.y
 Module *thismodule;	// current module
@@ -42,10 +43,24 @@ Entry::Entry(char *n, char *m, int t, char *r)
 	strcpy(name,n) ;
 
 	msgtype = thismodule->FindMsg(m) ;
+	if (msgtype == NULL) {
+		char *mesg = (char *) malloc(strlen(m) + 100);
+		strcpy(mesg, m);
+		strcat(mesg, " not declared");
+		yyerror(mesg);
+		exit(1);
+	}
 	next = NULL ;
 
 	isthreaded = t;
 	returnMsg = thismodule->FindMsg(r) ;
+	if (returnMsg == NULL) {
+		char *mesg = (char *) malloc(strlen(m) + 100);
+		strcpy(mesg, m);
+		strcat(mesg, " not declared");
+		yyerror(mesg);
+		exit(1);
+	}
 }
 
 
