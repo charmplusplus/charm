@@ -65,7 +65,7 @@ int buflen;
 }
 
 int GeneralBroadcast(rootpe, ntags, tags, buffer, buflen, rtags)
-int pe, ntags;
+int rootpe, ntags;
 int *tags, *rtags;
 void *buffer;
 int buflen;
@@ -78,7 +78,6 @@ int buflen;
     totsize = headsize + buflen;
     msg = (SMMessage)CmiAlloc(totsize);
     CmiSetHandler(msg, CpvAccess(SMHandlerIndex));
-    msg->seqno = (CpvAccess(SMSeqOut)[pe])++;
     msg->size = buflen;
     msg->ntags = ntags;
     for (i=0; i<ntags; i++) msg->tags[i] = tags[i];
