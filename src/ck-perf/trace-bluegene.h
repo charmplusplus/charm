@@ -100,6 +100,20 @@ extern int traceBluegeneLinked;
     	  _TRACE_BG_ADD_BACKWARD_DEP(log);	\
         }	\
 	}
+#define TRACE_BG_AMPI_BARRIER_START(barrierLog)	\
+	{	\
+  	_TRACE_BG_TLINE_END(&barrierLog);	\
+  	TRACE_BG_AMPI_SUSPEND();	\
+  	_TRACE_BG_BEGIN_EXECUTE_NOMSG("AMPI_Barrier", &barrierLog);	\
+	}
+#define TRACE_BG_AMPI_BARRIER_END(barrierLog)	\
+	{	\
+	void *curLog;    /* store current log in timeline */	\
+  	_TRACE_BG_TLINE_END(&curLog);	\
+  	TRACE_BG_AMPI_SUSPEND();	\
+  	_TRACE_BG_BEGIN_EXECUTE_NOMSG("AMPI_Barrier_END", &curLog);	\
+  	_TRACE_BG_ADD_BACKWARD_DEP(barrierLog);	\
+	}
 extern "C" void BgSetStartEvent();
 #else
 # define BgPrint(x)  
@@ -116,6 +130,7 @@ extern "C" void BgSetStartEvent();
 # define TRACE_BG_NEWSTART(t, str, events, count)
 #define TRACE_BG_AMPI_WAITALL(reqs)
 #endif   /* CMK_TRACE_IN_CHARM */
+extern "C" void BgPrintf(char *str);
 
 #endif
 
