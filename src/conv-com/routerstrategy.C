@@ -149,7 +149,17 @@ RouterStrategy::RouterStrategy(int stratid, int handle, int _npes,
 void RouterStrategy::insertMessage(MessageHolder *cmsg){
 
     if(routerID == USE_DIRECT) {
-        CmiSyncSendAndFree(cmsg->dest_proc, cmsg->size, cmsg->getMessage());
+        if(cmsg->dest_proc == IS_MULTICAST) {
+            for(int count = 0; count < cmsg->npes-1; count ++)
+                CmiSyncSend(cmsg->pelist[count], cmsg->size, 
+                            cmsg->getMessage());
+            if(cmsg->npes > 0)
+                CmiSyncSendAndFree(cmsg->pelist[cmsg->npes-1], cmsg->size, 
+                                   cmsg->getMessage());
+        }
+        else
+            CmiSyncSendAndFree(cmsg->dest_proc, cmsg->size, 
+                               cmsg->getMessage());
         delete cmsg;
     }
     else

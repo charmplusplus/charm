@@ -193,10 +193,12 @@ void EachToManyMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
         if(cmsg->sec_id != NULL && cmsg->sec_id->pelist != NULL) {
             cmsg->pelist = cmsg->sec_id->pelist;
             cmsg->npes = cmsg->sec_id->npes;
-        }
-        
-        CmiSetHandler(UsrToEnv(cmsg->getCharmMessage()), handlerId);
+        }        
     }
+
+    //For section multicasts and broadcasts
+    if(cmsg->dest_proc == IS_MULTICAST)
+        CmiSetHandler(UsrToEnv(cmsg->getCharmMessage()), handlerId);
     
     rstrat->insertMessage(cmsg);
 }

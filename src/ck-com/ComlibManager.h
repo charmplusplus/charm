@@ -100,6 +100,8 @@ class ComlibInstanceHandle {
 class ComlibManager: public CkDelegateMgr {
     friend class ComlibInstanceHandle;
 
+    int *bcast_pelist;  //Pelist passed to all broadcast operations
+
     int section_send_event;
 
     int remotePe;

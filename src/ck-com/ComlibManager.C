@@ -70,6 +70,9 @@ void ComlibManager::init(){
     CkpvInitialize(int, RecvmsgHandle);
     CkpvAccess(RecvmsgHandle) = CkRegisterHandler((CmiHandler)recv_array_msg);
 
+    for(int bcount = 0; bcount < CkNumPes(); bcount++)
+        bcast_pelist[bcount] = bcount;
+
     CkpvInitialize(int, RecvCombinedShortMsgHdlrIdx);
     CkpvAccess(RecvCombinedShortMsgHdlrIdx) = 
         CkRegisterHandler((CmiHandler)recv_combined_array_msg);
@@ -463,8 +466,8 @@ void ComlibManager::ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a
 
     CharmMessageHolder *cmsg = new 
         CharmMessageHolder((char *)m, IS_MULTICAST);
-    cmsg->npes = 0;
-    cmsg->pelist = NULL;
+    cmsg->npes = CkNumPes();
+    cmsg->pelist = bcast_pelist;
     cmsg->sec_id = NULL;
 
     multicast(cmsg);
