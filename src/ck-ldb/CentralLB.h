@@ -236,7 +236,7 @@ protected:
   void simulationWrite();
   void findSimResults(LDStats* stats, int count, 
                       LBMigrateMsg* msg, LBSimulation* simResults);
-//  void removeNonMigratable(LDStats* statsDataList, int count);
+  void removeNonMigratable(LDStats* statsDataList, int count);
 
 private:  
   CProxy_CentralLB thisProxy;

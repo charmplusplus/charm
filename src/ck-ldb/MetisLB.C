@@ -97,9 +97,10 @@ void MetisLB::work(CentralLB::LDStats* stats, int count)
   // CkPrintf("[%d] MetisLB strategy\n",CkMyPe());
   int i, j, m;
   int option = 0;
-  int numobjs = stats->n_objs;
 
-  stats->makeCommHash();
+  removeNonMigratable(stats, count);
+
+  int numobjs = stats->n_objs;
 
   // allocate space for the computing data
   double *objtime = new double[numobjs];

@@ -388,62 +388,81 @@ static int isMigratable(LDObjData **objData, int *len, int count, const LDCommDa
   return 1;
 }
 
-#if 0
-// remove in the LDStats those objects that are non migratable
+// rebuild LDStats and remove all non-migratble objects and related things
 void CentralLB::removeNonMigratable(LDStats* stats, int count)
 {
-  int pe;
-  LDObjData **nonmig = new LDObjData*[count];
-  int   *lens = new int[count];
-  int n_objs = stats->n_objs;
-    LDObjStats *objStat = stats.objData[n]; 
-    int l=-1, h=n_objs;
-    while (l<h) {
-      while (objStat[l+1].data.migratable && l<h) l++;
-      while (h>0 && !objStat[h-1].data.migratable && l<h) h--;
-      if (h-l>2) {
-        LDObjStats tmp = objStat[l+1];
-        objStat[l+1] = objStat[h-1];
-        objStat[h-1] = tmp;
-      }
-    }
-    stats->n_objs = h;
-    if (n_objs != h) CmiPrintf("Removed %d nonmigratable on pe:%d n_objs:%d migratable:%d\n", n_objs-h, pe, n_objs, h);
-    nonmig[pe] = objData+stats[pe].n_objs;
-    lens[pe] = n_objs-stats[pe].n_objs;
+  int i;
 
-    // now turn nonmigratable to bg load
-    for (int j=stats[pe].n_objs; j<n_objs; j++) {
-      stats[pe].bg_walltime += objData[j].wallTime;
-      stats[pe].bg_cputime += objData[j].cpuTime;
+  LDObjData *nonmig = new LDObjData[stats->n_migrateobjs];
+  int *new_from_proc = new int[stats->n_migrateobjs];
+  int *new_to_proc = new int[stats->n_migrateobjs];
+  int n_objs = 0;
+  for (i=0; i<stats->n_objs; i++) 
+  {
+    LDObjData &odata = stats->objData[i];
+    if (odata.migratable) {
+      nonmig[n_objs] = odata;
+      new_from_proc[n_objs] = stats->from_proc[i];
+      new_to_proc[n_objs] = stats->to_proc[i];
+      n_objs ++;
     }
-
-  // modify comm data
-  for (pe=0; pe<count; pe++) {
-    int n_comm = stats[pe].n_comm;
-    if (n_comm == 0) continue;
-    LDCommData *commData = stats[pe].commData;
-    int l=-1, h=n_comm;
-    while (l<h) {
-      while (isMigratable(nonmig, lens, count, commData[l+1]) && l<h) l++;
-      while (!isMigratable(nonmig, lens, count, commData[h-1]) && l<h) h--;
-      if (h-l>2) {
-        LDCommData tmp = commData[l+1];
-        commData[l+1] = commData[h-1];
-        commData[h-1] = tmp;
-      }
-      else 
-        break;
+    else {
+      stats->procs[stats->from_proc[i]].bg_walltime += odata.wallTime;
+      stats->procs[stats->from_proc[i]].bg_cputime += odata.cpuTime;
     }
-    if (l==-1 && h==-1) h=0;
-    stats[pe].n_comm = h;
-    if (n_comm != h) CmiPrintf("Removed %d nonmigratable on pe:%d n_comm:%d migratable:%d\n", n_comm-h, pe, n_comm, h);
   }
-  delete [] nonmig;
-  delete [] lens;
+  CmiAssert(stats->n_migrateobjs == n_objs);
+
+  stats->makeCommHash();
+  
+  LDCommData *newCommData = new LDCommData[stats->n_comm];
+  int n_comm = 0;
+  for (i=0; i<stats->n_comm; i++) 
+  {
+    LDCommData& cdata = stats->commData[i];
+    if (!cdata.from_proc()) 
+    {
+      int idx = stats->getSendHash(cdata);
+      CmiAssert(idx != -1);
+      if (!stats->objData[idx].migratable) continue;
+    }
+    switch (cdata.receiver.get_type()) {
+    case LD_PROC_MSG:
+      break;
+    case LD_OBJ_MSG:  {
+      int idx = stats->getRecvHash(cdata);
+      CmiAssert(idx != -1);
+      if (!stats->objData[idx].migratable) continue;
+      break;
+      }
+    case LD_OBJLIST_MSG:    // object message FIXME add multicast
+      break;
+    }
+    newCommData[n_comm] = cdata;
+    n_comm ++;
+  }
+
+  if (n_objs != stats->n_objs) CmiPrintf("Removed %d nonmigratable %d comms - n_objs:%d migratable:%d\n", stats->n_objs-n_objs, stats->n_objs, stats->n_migrateobjs, stats->n_comm-n_comm);
+
+  // swap to new data
+  delete [] stats->objData;
+  delete [] stats->from_proc;
+  delete [] stats->to_proc;
+
+  stats->objData = nonmig;
+  stats->from_proc = new_from_proc;
+  stats->to_proc = new_to_proc;
+  stats->n_objs = n_objs;
+
+  delete [] stats->commData;
+  stats->commData = newCommData;
+  stats->n_comm = n_comm;
+
+  stats->deleteCommHash();
+  stats->makeCommHash();
+
 }
 
-#endif
 
 void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 {
