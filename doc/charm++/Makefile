@@ -1,6 +1,6 @@
-PSDIR=../../../doc/ps
-PDFDIR=../../../doc/pdf
-HDIR=../../../doc/html
+PSDIR=../../../ps
+PDFDIR=../../../pdf
+HDIR=../../../html
 
 all: ps pdf html
 
