@@ -40,7 +40,7 @@ CpvDeclare(_CkErrStream*, _ckerr);
 
 CpvStaticDeclare(int,  _numInitsRecd); /* UInt changed to int */
 CpvStaticDeclare(PtrQ*, _buffQ);
-CpvStaticDeclare(PtrVec*, _bocInitVec) = 0;
+CpvStaticDeclare(PtrVec*, _bocInitVec);
 
 static PtrVec* _nodeBocInitVec;
 
