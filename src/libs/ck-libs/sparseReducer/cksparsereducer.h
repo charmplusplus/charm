@@ -40,7 +40,6 @@ extern CkReduction::reducerType sparse_min_double;
 **    create an object of CkSparseReducer1D<T> r(numOfElements). Here 'numOfElements' is the # elements to contribute.
 **    call r.add(index, data) 'numOfElements' times, to add all the elements to the object r.
 **    call r.contribute(...)
-**  NOTE that sparse reduction library expects data contributed (added to r) to be sorted on index.
 */
 
 template <class T>
@@ -64,10 +63,24 @@ class CkSparseReducer1D
 				delete[] records;
 		}
 
-		void add(int i, T data)
+		/*void add(int i, T data)
 		{
 			records[index].index = i;
 			records[index].data = data;
+			index++;
+		}*/
+
+		void add(int i, T data)
+		{
+                	int ind = index;
+                        // simple insertion sort
+                       	while((ind != 0)&&(records[ind-1].index > i))
+                        {
+                        	records[ind] = records[ind-1];
+                                ind--;
+                        }
+			records[ind].index = i;
+			records[ind].data = data;
 			index++;
 		}
 
