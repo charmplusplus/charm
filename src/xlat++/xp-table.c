@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.18  1996-08-01 21:07:30  jyelon
+ * Revision 2.19  1997-03-19 16:28:04  milind
+ * Found and corrected a small initialization bug that cause Charm++
+ * translator to crash on Origin2000.
+ *
+ * Revision 2.18  1996/08/01 21:07:30  jyelon
  * *** empty log message ***
  *
  * Revision 2.17  1995/11/09 16:28:23  sanjeev
@@ -624,6 +628,7 @@ char *name ;
 		chare = (ChareInfo *) malloc(sizeof(ChareInfo)) ;
 		strcpy(chare->name,CurrentChare) ;
 		chare->eps = NULL ;
+		chare->fns = NULL ;
 		chare->parents = NULL ;
 		if ( CurrentAggType == CHARE )
 			ChareTable[num] = chare ;
