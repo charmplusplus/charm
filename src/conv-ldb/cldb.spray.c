@@ -5,8 +5,10 @@
 extern void CldModuleGeneralInit();
 extern void CmiHandleMessage(void *);
 extern void CqsEnqueueGeneral(Queue, void *, unsigned int, unsigned int, unsigned int *);
+/*
 void srand48(long);
 long lrand48(void);
+*/
 #endif
 
 #include "converse.h"
@@ -128,7 +130,8 @@ void CldHopHandler(char *msg)
       pfn(&msg);
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     }
-    do pe = ((lrand48()&0x7FFFFFFF)%CmiNumPes());
+    /* do pe = ((lrand48()&0x7FFFFFFF)%CmiNumPes()); */
+    do pe = ((CrnRand()&0x7FFFFFFF)%CmiNumPes());
     while (pe == pinf->mype);
     CmiSyncSendAndFree(pe, len, msg);
     pinf->rebalance--;
@@ -168,7 +171,8 @@ void CldModuleInit()
 {
   peinfo *pinf;
   CpvInitialize(peinfo, peinf);
-  srand48(time(0)+CmiMyPe());
+  /* srand48(time(0)+CmiMyPe()); */
+  CrnSrand((int) (time(0)+CmiMyPe()));
   pinf = &CpvAccess(peinf);
   pinf->mype = CmiMyPe();
   pinf->EnqueueHandler = CmiRegisterHandler(CldEnqueueHandler);

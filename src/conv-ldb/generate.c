@@ -66,7 +66,8 @@ void gengraph(int pV, int pC, int pseed)
   sprintf(dircmd, "mkdir %s", dirname);
   system(dircmd);
   
-  for (i=0; i<seed; i++) rand();
+  /* for (i=0; i<seed; i++) rand(); */
+  for (i=0; i<seed; i++) CrnRand();
   if ((V*C %2) != 0) printf("V*C must be even\n");
   E = V*C/2;
   initGraph();
@@ -102,10 +103,12 @@ n -= (V-1);
    {
      do {
        do {
-	 x = rand() % V;
+	 /* x = rand() % V; */
+	 x = CrnRand() % V;
        } while (connections(x) >= C);
        do {
-	 y = rand() % V; 
+	 /* y = rand() % V; */
+	 y = CrnRand() % V; 
        } while ((y == x) || connections(y) >= C);
      } while (edgeExists(x,y));
      addEdge(EdgeList, x, y);
