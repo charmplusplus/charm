@@ -157,8 +157,7 @@ void sim::Cancel(cancelMsg *m)
   if (fp)
     fprintf(fp, "[%d] RECV(Cancel) @ %d: Event=%s\n", thisIndex, m->timestamp,
 	    m->evID.sdump(str));
-  //  CkPrintf("Received cancellation %s at %d...\n", m->evID.sdump(str), m->timestamp);
-
+  //CkPrintf("[%d] recv cancel %s at %d...\n", CkMyPe(), m->evID.sdump(str), m->timestamp);      
   localPVT = (PVT *)CkLocalBranch(ThePVT);
   cancels.Insert(m->timestamp, m->evID); // add to cancellations list
   localPVT->objUpdate(m->timestamp, RECV); // tell PVT branch about recv

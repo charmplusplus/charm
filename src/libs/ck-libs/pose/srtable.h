@@ -122,7 +122,9 @@ class SRtable {
   /// Restructure the table according to new GVT estimate and first send/recv
   /** Number of buckets and bucket size are determined from firstTS, and
       entries below newGVTest are discarded. */
-  void Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS, int firstSR);
+  void Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,int firstSR);
+  /// Move contents of bkt to new bucket structure
+  void MapToBuckets(SRentry *bkt, SRentry *endBkt, int *s, int *r);
   /// Compress and pack table into an UpdateMsg and return it
   UpdateMsg *PackTable(POSE_TimeType pvt);
   /// CompressAndSort all buckets

@@ -8,13 +8,13 @@
 /// Unique identifier for a POSE event
 class eventID 
 {
-  /// Large number for identifier unique on creation PE
-  unsigned int id; 
   /// PE identifier field ensures uniqueness across PEs
   int pe;
   /// Object identifier field for ordering
   int obj;
  public:
+  /// Large number for identifier unique on creation PE
+  unsigned int id; 
   /// Basic Constructor
   eventID() { id = 0; pe = CkMyPe(); obj = 0; }          
   /// Get next value for eventID

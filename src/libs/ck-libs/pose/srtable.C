@@ -125,15 +125,15 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
   // Backup the table to make new one in its place
   int keepBkt = (newGVTest-offset)/size_b;
   int b_old = b, size_b_old = size_b, offset_old = offset;
-  SRentry *buckets_old[MAX_B], *overflow_old = overflow, *tmp;
+  SRentry *buckets_old[MAX_B], *end_bucket_old[MAX_B], 
+    *overflow_old = overflow, *end_overflow_old = end_overflow, *tmp;
   int sends_old[MAX_B], recvs_old[MAX_B];
   int ofSends_old = ofSends, ofRecvs_old = ofRecvs;
   for (i=0; i<b_old; i++) {
     buckets_old[i] = buckets[i];
-    buckets[i] = end_bucket[i] = NULL;
+    end_bucket_old[i] = end_bucket[i];
     sends_old[i] = sends[i];
     recvs_old[i] = recvs[i];
-    sends[i] = recvs[i] = 0;
   }
   overflow = end_overflow = NULL;
   ofSends = ofRecvs = 0;
@@ -142,6 +142,14 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
   b = firstTS - offset;
   if ((b > MAX_B) || (b == 0)) b = MAX_B;
   size_b = 1 + (firstTS - offset)/b;
+  for (i=0; i<b; i++) {
+    buckets[i] = end_bucket[i] = NULL;
+    sends[i] = recvs[i] = 0;
+  }
+
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
 
   if (keepBkt < b_old) {
     for (i=0; i<keepBkt; i++) { // throw all these away
@@ -152,29 +160,38 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
 	tmp = buckets_old[i];
       }
     }
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
     // carefully sort through this bucket
     tmp = buckets_old[keepBkt];
-    while (tmp) {
+    while (tmp && (tmp->timestamp < offset)) {
       buckets_old[keepBkt] = tmp->next;
-      if (tmp->timestamp < offset) delete tmp;
-      else Insert(tmp);
+      sends_old[keepBkt] -= tmp->sends;
+      recvs_old[keepBkt] -= tmp->recvs;
+      delete tmp;
       tmp = buckets_old[keepBkt];
     }
+    if (tmp) 
+      MapToBuckets(buckets_old[keepBkt], end_bucket_old[keepBkt], 
+		   &sends_old[keepBkt], &recvs_old[keepBkt]);
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
     for (i=keepBkt+1; i<b_old; i++) { // keep all of these
-      tmp = buckets_old[i];
-      while (tmp) {
-	buckets_old[i] = tmp->next;
-	Insert(tmp);
-	tmp = buckets_old[i];
-      }
+      if (buckets_old[i])
+	MapToBuckets(buckets_old[i], end_bucket_old[i], 
+		   &sends_old[i], &recvs_old[i]);
     }
-    tmp = overflow_old;
-    // keep all of overflow
-    while (tmp) {
-      overflow_old = tmp->next;
-      Insert(tmp);
-      tmp = overflow_old;
-    }
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
+    if (overflow_old)     // keep all of overflow
+	MapToBuckets(overflow_old, end_overflow_old, &ofSends_old, 
+		     &ofRecvs_old);
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
   }
   else { // throw all buckets away
     for (i=0; i<b_old; i++) {
@@ -185,20 +202,122 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS,
 	tmp = buckets_old[i];
       }
     }
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
     tmp = overflow_old;
     // carefully sort through overflow
-    while (tmp) {
+    while (tmp && (tmp->timestamp < offset)) {
       overflow_old = tmp->next;
-      if (tmp->timestamp < offset) delete tmp;
-      else Insert(tmp);
+      ofSends_old -= tmp->sends;
+      ofRecvs_old -= tmp->recvs;
+      delete tmp;
       tmp = overflow_old;
     }
+    if (overflow_old) 
+      MapToBuckets(overflow_old, end_overflow_old, &ofSends_old, &ofRecvs_old);
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
   }
 
   if (firstSR != -1) Insert(firstTS, firstSR);
 #ifdef SR_SANITIZE
   sanitize();
 #endif
+}
+
+void SRtable::MapToBuckets(SRentry *bkt, SRentry *endBkt, int *s, 
+			   int *r)
+{
+  int destBkt1 = (bkt->timestamp-offset)/size_b;  
+  int destBkt2 = (endBkt->timestamp-offset)/size_b;
+  SRentry *tmp = bkt;
+  while (destBkt1 != destBkt2) {
+    if (destBkt1 >= b) break;
+    bkt = tmp->next;
+    (*s) -= tmp->sends;
+    (*r) -= tmp->recvs;
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
+    if (end_bucket[destBkt1]) { // bucket is non-empty
+      if (end_bucket[destBkt1]->timestamp == tmp->timestamp) {
+	end_bucket[destBkt1]->sends += tmp->sends;
+	end_bucket[destBkt1]->recvs += tmp->recvs;
+	sends[destBkt1] += tmp->sends;
+	recvs[destBkt1] += tmp->recvs;
+	delete tmp;
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
+      }
+      else {
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
+	end_bucket[destBkt1]->next = tmp;
+	end_bucket[destBkt1] = tmp;
+	tmp->next = NULL;
+	sends[destBkt1] += tmp->sends;
+	recvs[destBkt1] += tmp->recvs;
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
+      }
+    }
+    else { // bucket is empty
+      buckets[destBkt1] = end_bucket[destBkt1] = tmp;
+      tmp->next = NULL;
+      sends[destBkt1] = tmp->sends;
+      recvs[destBkt1] = tmp->recvs;
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
+    }
+    tmp = bkt;
+    destBkt1 = (bkt->timestamp-offset)/size_b;
+  }
+  if (destBkt1 >= b) {
+    if (end_overflow) { // overflow is non-empty
+      end_overflow->next = bkt;
+      end_overflow = endBkt;
+      ofSends += (*s);
+      ofRecvs += (*r);
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
+    }
+    else { // overflow is empty
+      overflow = bkt;
+      end_overflow = endBkt;
+      ofSends = (*s);
+      ofRecvs = (*r);
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
+    }
+  }
+  else { // destBkt1 == destBkt2
+    if (end_bucket[destBkt1]) { // bucket is non-empty
+      end_bucket[destBkt1]->next = bkt;
+      end_bucket[destBkt1] = endBkt;
+      sends[destBkt1] += (*s);
+      recvs[destBkt1] += (*r);
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
+    }
+    else { // bucket is empty
+      buckets[destBkt1] = bkt; 
+      end_bucket[destBkt1] = endBkt;
+      sends[destBkt1] = (*s);
+      recvs[destBkt1] = (*r);
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
+    }
+  }
 }
 
 /// Compress and pack table into an UpdateMsg and return it

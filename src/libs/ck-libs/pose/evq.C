@@ -200,12 +200,12 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
 #ifdef EQ_SANITIZE
   sanitize();
 #endif
+  PVT *localPVT = (PVT *)CkLocalBranch(ThePVT);
   Event *target = frontPtr->next, *commitPtr = frontPtr->next;
   if (ts == POSE_UnsetTS) {
     CommitAll(obj);
     return;
   }
-  ts++;
 
   // first commit the events
   if (obj->objID->usesAntimethods()) {

@@ -100,7 +100,7 @@ void opt::Rollback()
 void opt::UndoEvent(Event *e)
 {
   if (e->done == 1) {
-    //CkPrintf("Undoing event "); e->evID.dump(); CkPrintf("...\n");
+    //CkPrintf("[%d] undo ", CkMyPe()); e->evID.dump(); CkPrintf("...\n");
     eq->eventCount++;
     currentEvent = e;
     CancelSpawn(e); // cancel spawned events
@@ -149,7 +149,7 @@ void opt::CancelEvents()
 	}
 	if (!found) { // not in linked list; check the heap
 	  found = eq->eqh->DeleteEvent(it->evID, it->timestamp);
-	  if (found)  ev = NULL; // make ev NULL so we know it was deleted
+	  if (found) ev = NULL; // make ev NULL so we know it was deleted
 	}
       }
       if (!found) { 
@@ -276,16 +276,23 @@ void opt::CancelUnexecutedEvents()
       }
     }
 
-    // something was found!
     if (ev && (ev->done == 0)) { // found it to be unexecuted; get rid of it
       if (ev == eq->currentPtr) eq->ShiftEvent(); // adjust currentPtr
       eq->DeleteEvent(ev); // delete the event
+      if (it == last) {
+	parent->cancels.RemoveItem(it); // Clean up
+	return;
+      }
+      else parent->cancels.RemoveItem(it); // Clean up
     }
-    if (it == last) {
-      parent->cancels.RemoveItem(it); // Clean up
-      return;
+    else if (ev && (ev->done == 1)) { if (it == last) return; }
+    else if (!ev) {
+      if (it == last) {
+	parent->cancels.RemoveItem(it); // Clean up
+	return;
+      }
+      else parent->cancels.RemoveItem(it); // Clean up
     }
-    else parent->cancels.RemoveItem(it); // Clean up
   } // end outer while which loops through entire cancellations list
 #ifdef POSE_STATS_ON
   localStats->SwitchTimer(SIM_TIMER);      
