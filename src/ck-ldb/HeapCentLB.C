@@ -26,7 +26,7 @@ void CreateHeapCentLB()
 
 static void lbinit(void) {
 //        LBSetDefaultCreate(CreateHeapCentLB);        
-  LBRegisterBalancer("HeapCentLB", CreateHeapCentLB, "Heap Centralized");
+  LBRegisterBalancer("HeapCentLB", CreateHeapCentLB, "Similar to RefineLB, but using heap to sort by load");
 }
 
 #include "HeapCentLB.def.h"

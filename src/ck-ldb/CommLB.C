@@ -29,7 +29,7 @@ void CreateCommLB()
 
 static void lbinit(void) {
 //        LBSetDefaultCreate(CreateCommLB);        
-  LBRegisterBalancer("CommLB", CreateCommLB, "Greedy with communication");
+  LBRegisterBalancer("CommLB", CreateCommLB, "Greedy algorithm which takes communication graph into account");
 }
 
 #include "CommLB.def.h"

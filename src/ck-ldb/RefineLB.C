@@ -26,7 +26,7 @@ void CreateRefineLB()
 
 static void lbinit(void) {
 //  LBSetDefaultCreate(CreateRefineLB);        
-  LBRegisterBalancer("RefineLB", CreateRefineLB, "Move a very few objects away from most heavily-loaded processor");
+  LBRegisterBalancer("RefineLB", CreateRefineLB, "Move objects away from overloaded processor to reach average");
 }
 
 #include "RefineLB.def.h"
