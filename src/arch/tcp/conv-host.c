@@ -151,7 +151,7 @@ void ping_developers()
   int skt;
   skt = socket(AF_INET, SOCK_DGRAM, 0);
   if (skt < 0) return;
-  bzero(addr, sizeof(addr));
+  memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
   addr.sin_port = htons(6571);
   addr.sin_addr.s_addr = htonl(0x80aef1d3);
