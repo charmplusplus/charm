@@ -109,11 +109,28 @@ class SRbucket { // A bucket for holding a range of SRentries
     }
     return 0;
   }
-  void emptyOutBucket(SRentry *recyc, SRentry *recycTail) {
-    if (bucket) { 
-      bucketTail->next = recyc; 
-      recyc = bucket;
-      if (!recycTail) recycTail = bucketTail;
+  void emptyOutBucket(SRentry *recyc, SRentry *recycTail, int *recycCount) {
+    SRentry *tmp;
+    if (bucket) {
+      if (recycCount == NULL) { // actually moves bucket contents to residuals
+	bucketTail->next = recyc; 
+	recyc = bucket;
+	if (!recycTail) recycTail = bucketTail;
+      }
+      else if (*recycCount < 500) { // stores bucket entries for recycling
+	*recycCount += count;
+	bucketTail->next = recyc; 
+	recyc = bucket;
+	if (!recycTail) recycTail = bucketTail;
+      }
+      else { // frees the bucket entries
+	tmp = bucket;
+	while (tmp) {
+	  bucket = bucket->next;
+	  delete(tmp);
+	  tmp = bucket;
+	}
+      }
       bucket = bucketTail = NULL;
       count = 0;
     }
@@ -124,6 +141,7 @@ class SRtable {
  private:
   SRentry *residuals, *residualsTail;  // all other send/recv events
   SRentry *recyc, *recycTail;          // SRentries that can be reused
+  int recycCount;
  public:
   SRbucket *sends, *recvs; // send/recv events occurring 
                                 // at timestamps between gvt and gvt+gvtWindow
@@ -172,17 +190,19 @@ class SRtable {
   void FreeTable() {            // reset counters & ptrs; free all
     // Clears all data from the table
     //sanitize();
+    SRentry *tmp;
     for (int i=0; i<numBuckets; i++) {
-      sends[i].emptyOutBucket(recyc, recycTail);
-      recvs[i].emptyOutBucket(recyc, recycTail);
+      sends[i].emptyOutBucket(recyc, recycTail, &recycCount);
+      recvs[i].emptyOutBucket(recyc, recycTail, &recycCount);
     }
     inBuckets = offset = 0;
-    if (residuals) { 
-      residualsTail->next = recyc; 
-      recyc = residuals;
-      if (!recycTail) recycTail = residualsTail;
-      residuals = residualsTail = NULL;
+    tmp = residuals;
+    while (tmp) { 
+      residuals = tmp->next;
+      delete(tmp);
+      tmp = residuals;
     }
+    residuals = residualsTail = NULL;
     offset = -1;
     //sanitize();
   }

@@ -97,8 +97,8 @@ void SRtable::PurgeBelow(int ts)
     offset = offset + gvtWindow;
     int bktOffset;
     for (i=0; i<numBuckets; i++) {
-      sends[i].emptyOutBucket(recyc, recycTail);
-      recvs[i].emptyOutBucket(recyc, recycTail);
+      sends[i].emptyOutBucket(recyc, recycTail, &recycCount);
+      recvs[i].emptyOutBucket(recyc, recycTail, &recycCount);
       bktOffset = offset+i*bktSz;
       sends[i].setBucketOffset(bktOffset);
       recvs[i].setBucketOffset(bktOffset);
@@ -113,13 +113,13 @@ void SRtable::PurgeBelow(int ts)
       offIdx = i-start;
       bktOffset = offset+i*bktSz;
       inBuckets -= sends[offIdx].count;
-      sends[offIdx].emptyOutBucket(recyc, recycTail);
+      sends[offIdx].emptyOutBucket(recyc, recycTail, &recycCount);
       sends[offIdx].count = sends[i].count;
       sends[offIdx].bucket = sends[i].bucket;
       sends[offIdx].bucketTail = sends[i].bucketTail;
       sends[i].initBucket(bktSz, bktOffset);
       inBuckets -= recvs[offIdx].count;
-      recvs[offIdx].emptyOutBucket(recyc, recycTail);
+      recvs[offIdx].emptyOutBucket(recyc, recycTail, &recycCount);
       recvs[offIdx].count = recvs[i].count;
       recvs[offIdx].bucket = recvs[i].bucket;
       recvs[offIdx].bucketTail = recvs[i].bucketTail;
@@ -131,8 +131,8 @@ void SRtable::PurgeBelow(int ts)
       bktOffset = offset+i*bktSz;
       inBuckets -= sends[i].count;
       inBuckets -= recvs[i].count;
-      sends[i].emptyOutBucket(recyc, recycTail);
-      recvs[i].emptyOutBucket(recyc, recycTail);
+      sends[i].emptyOutBucket(recyc, recycTail, &recycCount);
+      recvs[i].emptyOutBucket(recyc, recycTail, &recycCount);
       sends[i].setBucketOffset(bktOffset);
       recvs[i].setBucketOffset(bktOffset);
     }
@@ -145,9 +145,7 @@ void SRtable::PurgeBelow(int ts)
     tmp = sends[0].bucket;
     sends[0].bucket = tmp->next;
     sends[0].count--;
-    tmp->next = recyc;
-    if (!recyc) recyc = recycTail = tmp;
-    else recyc = tmp;
+    delete(tmp);
     inBuckets--;
   }
   if (!sends[0].bucket) sends[0].bucketTail = NULL;
@@ -155,9 +153,7 @@ void SRtable::PurgeBelow(int ts)
     tmp = recvs[0].bucket;
     recvs[0].bucket = tmp->next;
     recvs[0].count--;
-    tmp->next = recyc;
-    if (!recyc) recyc = recycTail = tmp;
-    else recyc = tmp;
+    delete(tmp);
     inBuckets--;
   }
   if (!recvs[0].bucket) recvs[0].bucketTail = NULL;
@@ -234,17 +230,17 @@ void SRtable::addEntries(UpdateMsg *um)
   SRentry *entry;
 
   // first, resize if necessary
-  if ((gvtWindow != um->gvtW) || (numBuckets != um->numB)) {
+  if ((gvtWindow != um->gvtW) || (numBuckets != um->numB) || 
+      (offset != um->offset)) {
     int oldNumBuckets = numBuckets;
     gvtWindow = um->gvtW;
     numBuckets = um->numB;
-    if (offset == -1)
-      offset = um->offset;
+    offset = um->offset;
     //CmiAssert(offset == um->offset);
     // move all elements to residuals
     for (i=0; i<oldNumBuckets; i++) {
-      sends[i].emptyOutBucket(residuals, residualsTail);
-      recvs[i].emptyOutBucket(residuals, residualsTail);
+      sends[i].emptyOutBucket(residuals, residualsTail, NULL);
+      recvs[i].emptyOutBucket(residuals, residualsTail, NULL);
     }
     // free and realloc arrays
     free(sends);
@@ -256,7 +252,7 @@ void SRtable::addEntries(UpdateMsg *um)
     SetOffset(offset);
     FileResiduals();
   }
-  else if (offset == -1)  SetOffset(um->offset);
+  else if (offset != um->offset)  SetOffset(um->offset);
 
   // now move the new stuff in
   for (i=0; i<um->msgCount; i++) {
@@ -288,8 +284,8 @@ void SRtable::shrink()
   numBuckets = gvtWindow/8;
   // move all elements to residuals
   for (i=0; i<oldNumBuckets; i++) {
-    sends[i].emptyOutBucket(residuals, residualsTail);
-    recvs[i].emptyOutBucket(residuals, residualsTail);
+    sends[i].emptyOutBucket(residuals, residualsTail, NULL);
+    recvs[i].emptyOutBucket(residuals, residualsTail, NULL);
   }
   // free and re-malloc arrays
   free(sends);
@@ -314,8 +310,8 @@ void SRtable::expand()
   numBuckets = gvtWindow/8;
   // move all elements to residuals
   for (i=0; i<oldNumBuckets; i++) {
-    sends[i].emptyOutBucket(residuals, residualsTail);
-    recvs[i].emptyOutBucket(residuals, residualsTail);
+    sends[i].emptyOutBucket(residuals, residualsTail, NULL);
+    recvs[i].emptyOutBucket(residuals, residualsTail, NULL);
   }
   // free and re-malloc arrays (fastest for expand -- avoids unnecessary copy)
   free(sends);
