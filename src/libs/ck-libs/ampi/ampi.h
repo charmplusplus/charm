@@ -47,6 +47,12 @@ This is needed so we can call the routine as a new thread.
 #define MPI_UNSIGNED    12
 #define MPI_UNSIGNED_LONG  13
 #define MPI_LONG_DOUBLE  14
+#define MPI_FLOAT_INT 15
+#define MPI_DOUBLE_INT 16
+#define MPI_LONG_INT 17
+#define MPI_2INT 18
+#define MPI_SHORT_INT 19
+#define MPI_LONG_DOUBLE_INT 20
 
 #define MPI_ANY_SOURCE   (-1)
 #define MPI_ANY_TAG      (-1)
@@ -65,6 +71,8 @@ This is needed so we can call the routine as a new thread.
 #define MPI_MIN 2
 #define MPI_SUM 3
 #define MPI_PROD 4
+#define MPI_MAXLOC 5
+#define MPI_MINLOC 6
 
 /* This is one less than the system-tags defined in ampiimpl.h.
  * This is so that the tags used by the system dont clash with user-tags.
