@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 2.35  1997-12-22 21:57:42  jyelon
+ * Revision 2.36  1998-02-19 08:39:24  jyelon
+ * Added multicast code.
+ *
+ * Revision 2.35  1997/12/22 21:57:42  jyelon
  * Changed LDB initialization scheme.
  *
  * Revision 2.34  1997/08/06 20:35:39  jyelon
@@ -111,6 +114,11 @@
 
 #define CMK_MSG_HEADER_SIZE_BYTES                          4
 #define CMK_MSG_HEADER_BLANK_SPACE                         0
+
+#define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
+#define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
+#define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
+#define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 
 #define CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION           0
 #define CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION  1

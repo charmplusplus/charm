@@ -863,31 +863,205 @@ char **msgs;
 
 /*****************************************************************************
  *
- * Converse Initialization
+ * Multicast groups
  *
- *****************************************************************************/
+ ****************************************************************************/
 
-void ConverseCommonInit(char **argv)
+#if CMK_MULTICAST_DEF_USE_COMMON_CODE
+
+typedef struct GroupDef
 {
-  CstatsInit(argv);
-  CcdModuleInit(argv);
-  CmiHandlerInit();
-  CmiMemoryInit(argv);
-  CmiDeliversInit();
-  CsdInit(argv);
-  CthSchedInit();
-  CldModuleInit();
+  union {
+    char core[CmiMsgHeaderSizeBytes];
+    struct GroupDef *next;
+  } core;
+  CmiGroup group;
+  int npes;
+  int pes[1];
+}
+*GroupDef;
+
+#define GROUPTAB_SIZE 101
+
+CpvStaticDeclare(int, CmiGroupHandlerIndex);
+CpvStaticDeclare(int, CmiGroupCounter);
+CpvStaticDeclare(GroupDef *, CmiGroupTable);
+
+void CmiGroupHandler(GroupDef def)
+{
+  /* receive group definition, insert into group table */
+  int i;
+  GroupDef *table = CpvAccess(CmiGroupTable);
+  unsigned int hashval, bucket;
+  CmiGrabBuffer((void*)&def);
+  hashval = (def->group.id ^ def->group.pe);
+  bucket = hashval % GROUPTAB_SIZE;
+  def->core.next = table[bucket];
+  table[bucket] = def;
 }
 
-void ConverseCommonExit(void)
+CmiGroup CmiEstablishGroup(int npes, int *pes)
 {
-  close_log();
+  /* build new group definition, broadcast it */
+  CmiGroup grp; GroupDef def; int len, i;
+  grp.id = CpvAccess(CmiGroupCounter)++;
+  grp.pe = CmiMyPe();
+  len = sizeof(struct GroupDef)+(npes*sizeof(int));
+  def = (GroupDef)CmiAlloc(len);
+  def->group = grp;
+  def->npes = npes;
+  for (i=0; i<npes; i++)
+    def->pes[i] = pes[i];
+  CmiSetHandler(def, CpvAccess(CmiGroupHandlerIndex));
+  CmiSyncBroadcastAllAndFree(len, def);
+  return grp;
 }
+
+void CmiLookupGroup(CmiGroup grp, int *npes, int **pes)
+{
+  unsigned int hashval, bucket;  GroupDef def;
+  GroupDef *table = CpvAccess(CmiGroupTable);
+  hashval = (grp.id ^ grp.pe);
+  bucket = hashval % GROUPTAB_SIZE;
+  for (def=table[bucket]; def; def=def->core.next) {
+    if ((def->group.id == grp.id)&&(def->group.pe == grp.pe)) {
+      *npes = def->npes;
+      *pes = def->pes;
+      return;
+    }
+  }
+  *npes = 0; *pes = 0;
+}
+
+void CmiGroupInit()
+{
+  CpvInitialize(int, CmiGroupHandlerIndex);
+  CpvInitialize(int, CmiGroupCounter);
+  CpvInitialize(GroupDef *, CmiGroupTable);
+  CpvAccess(CmiGroupHandlerIndex) = CmiRegisterHandler(CmiGroupHandler);
+  CpvAccess(CmiGroupCounter) = 0;
+  CpvAccess(CmiGroupTable) =
+    (GroupDef*)calloc(GROUPTAB_SIZE, sizeof(GroupDef));
+}
+
+#endif
+
+/*****************************************************************************
+ *
+ * Common List-Cast and Multicast Code
+ *
+ ****************************************************************************/
+
+#if CMK_MULTICAST_LIST_USE_COMMON_CODE
+
+void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
+{
+  CmiError("ListSend not implemented.");
+}
+
+CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
+{
+  CmiError("ListSend not implemented.");
+}
+
+void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
+{
+  CmiError("ListSend not implemented.");
+}
+
+#endif
+
+#if CMK_MULTICAST_GROUP_USE_COMMON_CODE
+
+typedef struct MultiMsg
+{
+  char core[CmiMsgHeaderSizeBytes];
+  CmiGroup group;
+  int pos;
+  int origlen;
+}
+*MultiMsg;
+
+CpvDeclare(int, CmiMulticastHandlerIndex);
+
+void CmiMulticastDeliver(MultiMsg msg)
+{
+  int npes, *pes; int olen, nlen, pos, child1, child2;
+  olen = msg->origlen;
+  nlen = olen + sizeof(struct MultiMsg);
+  CmiLookupGroup(msg->group, &npes, &pes);
+  if (pes==0) {
+    CmiSyncSendAndFree(CmiMyPe(), nlen, msg);
+    return;
+  }
+  if (npes==0) {
+    CmiFree(msg);
+    return;
+  }
+  if (msg->pos == -1) {
+    msg->pos=0;
+    CmiSyncSendAndFree(pes[0], nlen, msg);
+    return;
+  }
+  pos = msg->pos;
+  child1 = ((pos+1)<<1);
+  child2 = child1-1;
+  if (child1 < npes) {
+    msg->pos = child1;
+    CmiSyncSend(pes[child1], nlen, msg);
+  }
+  if (child2 < npes) {
+    msg->pos = child2;
+    CmiSyncSend(pes[child2], nlen, msg);
+  }
+  memcpy(msg, (((char*)msg)+olen), sizeof(struct MultiMsg));
+  CmiSyncSendAndFree(CmiMyPe(), nlen, msg);
+}
+
+void CmiMulticastHandler(MultiMsg msg)
+{
+  CmiGrabBuffer((void*)&msg);
+  CmiMulticastDeliver(msg);
+}
+
+void CmiSyncMulticastFn(CmiGroup grp, int len, char *msg)
+{
+  int newlen; MultiMsg newmsg;
+  if (len < sizeof(struct MultiMsg)) len = sizeof(struct MultiMsg);
+  newlen = len + sizeof(struct MultiMsg);
+  newmsg = (MultiMsg)CmiAlloc(newlen);
+  memcpy(newmsg+1, msg+sizeof(struct MultiMsg), len-sizeof(struct MultiMsg));
+  memcpy((((char*)newmsg)+len), msg, sizeof(struct MultiMsg));
+  newmsg->group = grp;
+  newmsg->origlen = len;
+  newmsg->pos = -1;
+  CmiSetHandler(newmsg, CpvAccess(CmiMulticastHandlerIndex));
+  CmiMulticastDeliver(newmsg);
+}
+
+void CmiFreeMulticastFn(CmiGroup grp, int len, char *msg)
+{
+  CmiSyncMulticastFn(grp, len, msg);
+  CmiFree(msg);
+}
+
+CmiCommHandle CmiAsyncMulticastFn(CmiGroup grp, int len, char *msg)
+{
+  CmiError("Async Multicast not implemented.");
+}
+
+void CmiMulticastInit()
+{
+  CpvInitialize(int, CmiMulticastHandlerIndex);
+  CpvAccess(CmiMulticastHandlerIndex) =
+    CmiRegisterHandler(CmiMulticastHandler);
+}
+
+#endif
 
 /***************************************************************************
  *
  *  Memory Allocation routines 
- *
  *
  ***************************************************************************/
 
@@ -900,7 +1074,6 @@ int size;
   ((int *)res)[0]=size;
   ((int *)((char *)res + sizeof(int)))[0]=-1;    /* Reference count value */
   return (void *)(res+2*sizeof(int));
-
 }
 
 int CmiSize(blk)
@@ -957,11 +1130,11 @@ void *blk;
   }
 }
 
-/*********************************************************************************
+/******************************************************************************
 
   Multiple Send function                               
 
-  ********************************************************************************/
+  ****************************************************************************/
 
 CpvDeclare(int, CmiMainHandlerIDP); /* Main handler that is run on every node */
 
@@ -1038,10 +1211,11 @@ void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[]
 
 static CmiHandler CmiMultiMsgHandler(char *msgWhole);
 
-void CmiInitMultipleSendRoutine(void)
+void CmiInitMultipleSend(void)
 {
   CpvInitialize(int,CmiMainHandlerIDP); 
-  CpvAccess(CmiMainHandlerIDP) = CmiRegisterHandler(CmiMultiMsgHandler);
+  CpvAccess(CmiMainHandlerIDP) =
+    CmiRegisterHandler((CmiHandler)CmiMultiMsgHandler);
 }
 
 /****************************************************************************
@@ -1124,3 +1298,32 @@ static void memChop(char *msgWhole)
     offset += sizes[i];
   }
 }
+
+/*****************************************************************************
+ *
+ * Converse Initialization
+ *
+ *****************************************************************************/
+
+void ConverseCommonInit(char **argv)
+{
+  CstatsInit(argv);
+  CcdModuleInit(argv);
+  CmiHandlerInit();
+  CmiMemoryInit(argv);
+  CmiDeliversInit();
+  CsdInit(argv);
+  CthSchedInit();
+  CldModuleInit();
+  CmiGroupInit();
+  CmiMulticastInit();
+  CmiGroupInit();
+  CmiInitMultipleSend();
+}
+
+void ConverseCommonExit(void)
+{
+  close_log();
+}
+
+

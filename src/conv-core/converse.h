@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.79  1998-02-16 17:12:17  milind
+ * Revision 2.80  1998-02-19 08:39:01  jyelon
+ * Added multicast code.
+ *
+ * Revision 2.79  1998/02/16 17:12:17  milind
  * fixed a couple of declarations in converse.h.
  *
  * Revision 2.78  1998/02/13 23:54:19  pramacha
@@ -492,20 +495,38 @@ int      CmiNumSpanTreeChildren  CMK_PROTO((int)) ;
 int      CmiSpanTreeParent       CMK_PROTO((int)) ;
 void     CmiSpanTreeChildren     CMK_PROTO((int node, int *children)) ;
 
+/****** MULTICAST GROUPS ******/
+
+typedef CMK_MULTICAST_GROUP_TYPE CmiGroup;
+
+CmiGroup CmiEstablishGroup(int npes, int *pes);
+void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
+
 /****** CMI MESSAGE TRANSMISSION ******/
 
-void          CmiSyncSendFn        CMK_PROTO((int, int, char *));
-CmiCommHandle CmiAsyncSendFn       CMK_PROTO((int, int, char *));
-void          CmiFreeSendFn        CMK_PROTO((int, int, char *));
+void          CmiSyncSendFn             CMK_PROTO((int, int, char *));
+CmiCommHandle CmiAsyncSendFn            CMK_PROTO((int, int, char *));
+void          CmiFreeSendFn             CMK_PROTO((int, int, char *));
 
-void          CmiSyncBroadcastFn      CMK_PROTO((int, char *));
-CmiCommHandle CmiAsyncBroadcastFn     CMK_PROTO((int, char *));
-void          CmiFreeBroadcastFn      CMK_PROTO((int, char *));
+void          CmiSyncBroadcastFn        CMK_PROTO((int, char *));
+CmiCommHandle CmiAsyncBroadcastFn       CMK_PROTO((int, char *));
+void          CmiFreeBroadcastFn        CMK_PROTO((int, char *));
 
-void          CmiSyncBroadcastAllFn   CMK_PROTO((int, char *));
-CmiCommHandle CmiAsyncBroadcastAllFn  CMK_PROTO((int, char *));
-void          CmiFreeBroadcastAllFn   CMK_PROTO((int, char *));
+void          CmiSyncBroadcastAllFn     CMK_PROTO((int, char *));
+CmiCommHandle CmiAsyncBroadcastAllFn    CMK_PROTO((int, char *));
+void          CmiFreeBroadcastAllFn     CMK_PROTO((int, char *));
 
+void          CmiSyncListSendFn         CMK_PROTO((int, int *, int, char*));
+CmiCommHandle CmiAsyncListSendFn        CMK_PROTO((int, int *, int, char*));
+void          CmiFreeListSendFn         CMK_PROTO((int, int *, int, char*));
+
+void          CmiSyncMulticastFn        CMK_PROTO((CmiGroup, int, char*));
+CmiCommHandle CmiAsyncMulticastFn       CMK_PROTO((CmiGroup, int, char*));
+void          CmiFreeMulticastFn        CMK_PROTO((CmiGroup, int, char*));
+
+void          CmiSyncVectorSend         CMK_PROTO((int, int, int *, char **));
+CmiCommHandle CmiAsyncVectorSend        CMK_PROTO((int, int, int *, char **));
+void          CmiSyncVectorSendAndFree  CMK_PROTO((int, int, int *, char **));
 
 #define CmiSyncSend(p,s,m)              (CmiSyncSendFn((p),(s),(char *)(m)))
 #define CmiAsyncSend(p,s,m)             (CmiAsyncSendFn((p),(s),(char *)(m)))
@@ -519,11 +540,13 @@ void          CmiFreeBroadcastAllFn   CMK_PROTO((int, char *));
 #define CmiAsyncBroadcastAll(s,m)       (CmiAsyncBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncBroadcastAllAndFree(s,m) (CmiFreeBroadcastAllFn((s),(char *)(m)))
 
-/****** CMI VECTOR MESSAGE TRANSMISSION ******/
+#define CmiSyncListSend(n,l,s,m)        (CmiSyncListSendFn((n),(l),(s),(char *)(m)))
+#define CmiAsyncListSend(n,l,s,m)       (CmiAsyncListSendFn((n),(l),(s),(char *)(m)))
+#define CmiSyncListSendAndFree(n,l,s,m) (CmiFreeListSendFn((n),(l),(s),(char *)(m)))
 
-void CmiSyncVectorSend CMK_PROTO((int, int, int *, char **));
-CmiCommHandle CmiAsyncVectorSend CMK_PROTO((int, int, int *, char **));
-void CmiSyncVectorSendAndFree CMK_PROTO((int, int, int *, char **));
+#define CmiSyncMulticast(g,s,m)         (CmiSyncMulticastFn((g),(s),(char*)(m)))
+#define CmiAsyncMulticast(g,s,m)        (CmiAsyncMulticastFn((g),(s),(char*)(m)))
+#define CmiSyncMulticastAndFree(g,s,m)  (CmiFreeMulticastFn((g),(s),(char*)(m)))
 
 /******** CMI MESSAGE RECEPTION ********/
 

@@ -8,7 +8,10 @@
  ***************************************************************************
  *
  * $Log$
- * Revision 1.6  1998-01-28 00:37:33  rbrunner
+ * Revision 1.7  1998-02-19 08:40:31  jyelon
+ * Added multicast code.
+ *
+ * Revision 1.6  1998/01/28 00:37:33  rbrunner
  * Implemented a new broadcast scheme, to eliminate copying the message once
  * for each receiver.
  *
@@ -116,6 +119,11 @@
 
 #define CMK_MSG_HEADER_SIZE_BYTES                          64
 #define CMK_MSG_HEADER_BLANK_SPACE                         56
+
+#define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
+#define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
+#define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
+#define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 
 #define CMK_PREPROCESSOR_CANNOT_DO_CONCATENATION           0
 #define CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION  1
