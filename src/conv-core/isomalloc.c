@@ -466,6 +466,7 @@ static slotmsg *prepare_slotmsg(int slot,int nslots)
 	m->pe=CmiMyPe();
 	m->slot=slot;
 	m->nslots=nslots;
+	return m;
 }
 
 static void grab_remote(slotmsg *msg)
