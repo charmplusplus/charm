@@ -606,10 +606,21 @@ int MPI_Comm_size(MPI_Comm comm, int *size)
   return 0;
 }
 
+CDECL void MPI_Exit(int /*exitCode*/)
+{
+	AMPIAPI("MPI_Exit");
+	TCharmDone();
+}
+FDECL void FTN_NAME(MPI_EXIT,mpi_exit)(int *exitCode)
+{
+	MPI_Exit(*exitCode);
+}
+
 CDECL
 int MPI_Finalize(void)
 {
   AMPIAPI("MPI_Finalize");
+  MPI_Exit(0);
   return 0;
 }
 
@@ -1471,15 +1482,6 @@ FDECL void FTN_NAME(MPI_ATTACH,mpi_attach)(const char *name,int nameLen)
 	ampiAttach(name,nameLen);
 }
 
-CDECL void MPI_Exit(int /*exitCode*/)
-{
-	AMPIAPI("MPI_Exit");
-	TCharmDone();
-}
-FDECL void FTN_NAME(MPI_EXIT,mpi_exit)(int *exitCode)
-{
-	MPI_Exit(*exitCode);
-}
 
 void _registerampif(void)
 {
