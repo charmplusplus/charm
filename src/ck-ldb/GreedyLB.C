@@ -214,7 +214,7 @@ void GreedyLB::work(BaseLB::LDStats* stats, int count)
     const int id   = objData[obj].id;
     if (dest != pe) {
       stats->to_proc[id] = dest;
-      if (_lb_args.debug()>1) 
+      if (_lb_args.debug()>2) 
         CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),obj,pe,dest);
     }
 
