@@ -335,7 +335,7 @@ public:
 	void pup(PUP::er &p){
 		if(!p.isUnpacking()){
 			/*packing phase: loop through the hashtable values*/
-			CkHashtableIterator *it=iterator();
+			CkHashtableIterator *it=CkHashtable::iterator();
 			int hasNext=1;
 			OBJ *o; KEY *k;
 			while (NULL!=(o=(OBJ *)it->next((void **)&k))) {
