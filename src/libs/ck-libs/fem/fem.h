@@ -185,7 +185,11 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
   
   void FEM_Set_sym_nodes(const int *canon,const int *sym);
   void FEM_Get_sym(int who,int *destSym);
-  
+  /**
+    Based on shared node communication list, compute 
+    FEM_NODE FEM_GLOBALNO and FEM_NODE_PRIMARY
+  */
+  void FEM_Make_node_globalno(int fem_mesh,FEM_Comm_t comm_context);
 
 /* Communication: see idxlc.h */
   IDXL_Layout_t FEM_Create_simple_field(int base_type,int vec_len);
@@ -197,7 +201,7 @@ to mark the chunk to which a ghost node or element belongs datatype=FEM_INDEX*/
 
   void FEM_Get_roccom_pconn_size(int fem_mesh,int *total_len,int *ghost_len);
   void FEM_Get_roccom_pconn(int fem_mesh,int *pconn);
-
+  void FEM_Set_roccom_pconn(int fem_mesh,const int *src,int total_len,int ghost_len);
 
   /*Migration */
   int FEM_Register(void *userData,FEM_PupFn _pup_ud);

@@ -969,6 +969,9 @@ FDECL void FTN_NAME(FEM_ADD_GHOST_LAYER,fem_add_ghost_layer)
 static void add_ghost_elem(int elType,int tuplesPerElem,const int *elem2tuple,int idxBase) {
 	FEMAPI("FEM_Add_ghost_elem");
 	FEM_Ghost_Layer *cur=FEM_curPartition().curLayer();
+	if (elType>=FEM_ELEM) elType-=FEM_ELEM;
+	if (elType>=FEM_GHOST) elType-=FEM_GHOST;
+	if (elType>=FEM_MAX_ELTYPE) CkAbort("Element exceeds (stupid) hardcoded maximum element types\n");
 	cur->elem[elType].add=true;
 	cur->elem[elType].tuplesPerElem=tuplesPerElem;
 	cur->elem[elType].elem2tuple=CkCopyArray(elem2tuple,
@@ -1189,6 +1192,104 @@ FORTRAN_AS_C(FEM_GET_ROCCOM_PCONN,FEM_Get_roccom_pconn,fem_get_roccom_pconn,
         (int *mesh,int *dest), (*mesh,dest)
 )
 
+
+const int* makeIDXLside(const int *src,IDXL_Side &s) {
+	int nPartner=*src++;
+	for (int p=0;p<nPartner;p++) {
+		int partnerName=*src++ - 1; /* paneID's are 1-based */
+		int nComm=*src++;
+		for (int i=0;i<nComm;i++)
+			s.addNode(*src++ - 1,partnerName); /* nodeID's are 1-based */
+	}
+}
+
+CDECL void FEM_Set_roccom_pconn(int fem_mesh,const int *src,int total_len,int ghost_len)
+{
+	const char *caller="FEM_Set_roccom_pconn"; FEMAPI(caller);
+	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
+	/// FIXME: only sets shared nodes for now (should grab ghosts too)
+	makeIDXLside(src,m->node.shared);
+}
+FORTRAN_AS_C(FEM_SET_ROCCOM_PCONN,FEM_Set_roccom_pconn,fem_set_roccom_pconn,
+        (int *mesh,const int *src,int *tl,int *gl), (*mesh,src,*tl,*gl)
+)
+
+enum {comm_unshared, comm_shared, comm_primary};
+int commState(int entityNo,const IDXL_Side &s)
+{
+	const IDXL_Rec *r=s.getRec(entityNo);
+	if (r==NULL || r->getShared()==0) return comm_unshared;
+	int thisChunk=FEM_My_partition();
+	for (int p=0;p<r->getShared();p++) {
+		if (r->getChk(p)<thisChunk) // not primary -- somebody else smaller
+			return comm_shared;
+		// FIXME: handle symmetry nodes here too (r->getChk(p)==thisChunk)
+	}
+	// If we get here, we're the smallest chunk holding this entity,
+	//   so we're primary.
+	return comm_primary;
+}
+
+/**
+    Based on shared node communication list, compute 
+    FEM_NODE FEM_GLOBALNO and FEM_NODE_PRIMARY
+*/
+CDECL void FEM_Make_node_globalno(int fem_mesh,FEM_Comm_t comm_context)
+{
+	const char *caller="FEM_Make_node_globalno"; FEMAPI(caller);
+	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
+	int n, nNo=m->node.size();
+	const IDXL_Side &shared=m->node.shared;
+	CkVec<int> globalNo(nNo);
+	CkVec<char> nodePrimary(nNo);
+	
+	// Figure out how each of our nodes is shared
+	int nLocal=0;
+	for (n=0;n<nNo;n++) {
+		switch (commState(n,shared)) {
+		case comm_unshared: 
+			nodePrimary[n]=0;
+			globalNo[n]=nLocal++; 
+			break;
+		case comm_shared: 
+			nodePrimary[n]=0;
+			globalNo[n]=-1; // will be filled in during sendsum, below
+			break;
+		case comm_primary: 
+			nodePrimary[n]=1;
+			globalNo[n]=nLocal++; 
+			break;
+		};
+	}
+	
+	// Compute global numbers across processors
+	//  as the sum of local (unshared and primary) nodes:
+	MPI_Comm comm=(MPI_Comm)comm_context;
+	int firstGlobal=0; // global number of first local element
+	MPI_Scan(&nLocal,&firstGlobal, 1,MPI_INT, MPI_SUM,comm);
+	firstGlobal-=nLocal; /* sum of all locals before me, but *not* including */
+	for (n=0;n<nNo;n++) {
+		if (globalNo[n]==-1) globalNo[n]=0;
+		else globalNo[n]+=firstGlobal;
+	}
+	
+	// Get globalNo for shared nodes, by copying from primary.
+	IDXL_Layout_t l=IDXL_Layout_create(IDXL_INT,1);
+	IDXL_Comm_t c=IDXL_Comm_begin(72173841,comm_context);
+	IDXL_Comm_sendsum(c,FEM_Comm_shared(fem_mesh,FEM_NODE),l,&globalNo[0]);
+	IDXL_Comm_wait(c);
+	IDXL_Layout_destroy(l);
+	
+	// Copy globalNo and primary into fem
+	FEM_Mesh_set_data(fem_mesh,FEM_NODE, FEM_GLOBALNO,
+		&globalNo[0], 0,nNo, FEM_INDEX_0,1);
+	FEM_Mesh_set_data(fem_mesh,FEM_NODE, FEM_NODE_PRIMARY,
+		&nodePrimary[0], 0,nNo, FEM_BYTE,1);
+}
+
+FORTRAN_AS_C(FEM_MAKE_NODE_GLOBALNO,FEM_Make_node_globalno,fem_make_node_globalno,
+        (int *mesh,int *comm), (*mesh,*comm)
+)
 
 /********* Debugging mesh printouts *******/
 
