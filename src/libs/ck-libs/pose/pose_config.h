@@ -29,17 +29,15 @@
 #define MSG_RECYCLING 1
 
 /// Uncomment to make use of the Streaming Communication Library optimizations
-#define POSE_COMM_ON 1
+//#define POSE_COMM_ON 1
 
 /// Uncomment to turn on POSE load balancer
-//#define LB_ON 1
-#ifdef POSE_COMM_ON
+#define LB_ON 1
+
 #include <StreamingStrategy.h>
 #include <PrioStreaming.h>
-#include <DummyStrategy.h> 
 #define COMM_TIMEOUT 1
 #define COMM_MAXMSG 20
-#endif 
 
 /// Synchronization strategy constants
 #define MAX_ITERATIONS 100  // maximum forward executions per Step call
@@ -51,8 +49,8 @@
 
 /// Load balancer constants
 #define LB_SKIP 51          // LB done 1/LB_SKIP times GVT iterations
-#define LB_THRESHOLD 2000   // 20 heavy objects
-#define LB_DIFF 10000       // min diff between min and max load PEs
+#define LB_THRESHOLD 4000   // 20 heavy objects
+#define LB_DIFF 20000       // min diff between min and max load PEs
 
 // MISC
 #define MAX_POOL_SIZE 40    // maximum size of a memory pool

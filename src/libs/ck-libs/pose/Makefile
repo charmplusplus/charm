@@ -13,7 +13,7 @@ OBJECTS=	eventID.o stats.o pose.o srtable.o cancel.o mempool.o \
 		pvtobj.o lbObject.o ldbal.o gvt.o event.o eqheap.o \
 		evq.o sim.o rep.o strat.o seq.o cons.o opt.o opt2.o opt3.o \
 		spec.o adapt.o adapt2.o adapt3.o
-LIB = libpose.a
+LIB = libmodulepose.a
 LIBDEST =  $(CDIR)/lib/$(LIB)
 CIFILES = mempool.def.h gvt.def.h ldbal.def.h pose.def.h sim.def.h stats.def.h
 
@@ -24,6 +24,7 @@ $(LIBDEST):	$(OBJECTS)
 	$(CHARMC) -o $(LIBDEST) $(OBJECTS) 
 	test ! -d $(POSEINCDIR) && mkdir $(POSEINCDIR) || true
 	/bin/cp -f  *.h $(POSEINCDIR)
+	/bin/cp libmodulepose.dep $(CDIR)/lib/.
 	/bin/cp -f  etrans.pl $(CHARMBIN)
 
 # POSE COMPILATION RULES 

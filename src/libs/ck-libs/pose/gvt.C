@@ -113,9 +113,10 @@ void PVT::setGVT(GVTMsg *m)
 #endif
   CProxy_PVT p(ThePVT);
   estGVT = m->estGVT;
+#ifdef POSE_COMM_ON  
   PrioStreaming *pstrat = (PrioStreaming *)(POSE_commlib_insthndl.getStrategy());
   pstrat->setBasePriority(estGVT);
-
+#endif
   simdone = m->done;
   CkFreeMsg(m);
   waitForFirst = 1;
@@ -129,7 +130,7 @@ void PVT::setGVT(GVTMsg *m)
 /// Register poser with PVT
 int PVT::objRegister(int arrIdx, int safeTime, int sync, sim *myPtr)
 {
-  int i = objs.Insert(arrIdx, safeTime, sync, myPtr); // add to object list
+  int i = objs.Insert(arrIdx, -1, sync, myPtr); // add to object list
   return(i*1000 + CkMyPe());                          // return unique PVT idx
 }
 

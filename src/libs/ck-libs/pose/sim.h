@@ -244,17 +244,15 @@ class sim : public ArrayElement1D {
 #ifdef POSE_STATS_ON
       localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
-#ifdef LB_ON
-      localLBG = TheLBG.ckLocalBranch();
-#endif
-      active = 0;
 #ifndef SEQUENTIAL_POSE
       localPVT = (PVT *)CkLocalBranch(ThePVT);
       myPVTidx = localPVT->objRegister(thisIndex, localPVT->getGVT(), sync, this);
 #endif
 #ifdef LB_ON
+      localLBG = TheLBG.ckLocalBranch();
       myLBidx = localLBG->objRegister(thisIndex, sync, this);
 #endif
+      active = 0;
     }
     else if (p.isPacking()) { // deactivate migrating object
       active = -1;

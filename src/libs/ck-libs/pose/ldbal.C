@@ -110,7 +110,7 @@ void LBgroup::calculateLocalLoad(void)
   lr->PE = CkMyPe();
   lr->peLoad = computePeLoad();
 
-  //CkPrintf("PE%d reporting load of %d.\n", CkMyPe(), lr->peLoad);
+  CkPrintf("PE%d reporting load of %d.\n", CkMyPe(), lr->peLoad);
 
   // reduce loads to strategy
   rootLB[reportTo].recvLoadReport(lr);
@@ -145,7 +145,7 @@ void LBgroup::balance(BalanceSpecs *bs)
 	(bs->sortArray[myIndex].peLoad - 
 	 bs->sortArray[bs->sortArray[myIndex].startPEidx].peLoad 
 	 > LB_THRESHOLD)) {
-      //CkPrintf("[%d] overload: checking balancing prospects.\n", CkMyPe());
+      CkPrintf("[%d] overload: checking balancing prospects.\n", CkMyPe());
       // Load up the table with movable objects
       for (i=0; i<CkNumPes(); i++)
 	movableObjs[i][0] = 0;
@@ -189,7 +189,7 @@ void LBgroup::balance(BalanceSpecs *bs)
 	    dm = new destMsg;
 	    dm->destPE = bs->sortArray[i].PE;
 	    //CkPrintf("%d->%d ", CkMyPe(), dm->destPE);
-	    //CkPrintf("PE[%d] to migrate %d to PE %d: contrib %f to load %f with diff %f\n", CkMyPe(), objs.objs[objIdx].index, dm->destPE, contrib, bs->sortArray[i].peLoad, underLoad);
+	    CkPrintf("PE[%d] to migrate %d to PE %d: contrib %d to load %d with diff %d\n", CkMyPe(), objs.objs[objIdx].index, dm->destPE, contrib, bs->sortArray[i].peLoad, underLoad);
 	    POSE_Objects[objs.objs[objIdx].index].Migrate(dm);
 	    objs.objs[objIdx].present = 0;
 	    underLoad -= contrib;
@@ -200,7 +200,7 @@ void LBgroup::balance(BalanceSpecs *bs)
 	}
       }
     }
-    //else CkPrintf("[%d] underload.\n", CkMyPe());
+    else CkPrintf("[%d] underload.\n", CkMyPe());
   }
   CkFreeMsg(bs);
   busy = 0;
@@ -275,10 +275,10 @@ void LBstrategy::computeLoadMap(int avgLd, int ttlLd)
     pe--;
   }
 
-  //CkPrintf("LB balance info: Total Load = %d; Avg load = %d\n", dm->totalLoad, dm->avgLoad);
-  //for (i=0; i<CkNumPes(); i++) CkPrintf("[%d] PE:%d PE Load:%d start:%d end:%d\n", i, dm->sortArray[i].PE, dm->sortArray[i].peLoad, dm->sortArray[i].startPEidx, dm->sortArray[i].endPEidx);
+  CkPrintf("LB balance info: Total Load = %d; Avg load = %d\n", dm->totalLoad, dm->avgLoad);
+  for (i=0; i<CkNumPes(); i++) CkPrintf("[%d] PE:%d PE Load:%d start:%d end:%d\n", i, dm->sortArray[i].PE, dm->sortArray[i].peLoad, dm->sortArray[i].startPEidx, dm->sortArray[i].endPEidx);
   TheLBG.balance(dm);
-  //CkPrintf("...DONE load balancing]\n");
+  CkPrintf("...DONE load balancing]\n");
 }
 
 int LBstrategy::findMinPE()
@@ -310,12 +310,12 @@ void LBstrategy::recvLoadReport(LoadReport *lr)
   done++;  
 
   if (done == CkNumPes()) {
-    //CkPrintf("[BEGIN load balancing on %d...\n", CkMyPe());
+    CkPrintf("[BEGIN load balancing on %d...\n", CkMyPe());
     for (i=0; i<CkNumPes(); i++)
       totalLd += peLoads[i];
     avgLd = totalLd / CkNumPes();
 
-    //CkPrintf("LB[%d] totalLd=%d avgLd=%d\n", CkMyPe(), totalLd, avgLd);
+    CkPrintf("LB[%d] totalLd=%d avgLd=%d\n", CkMyPe(), totalLd, avgLd);
     computeLoadMap(avgLd, totalLd);
 
     done = 0;

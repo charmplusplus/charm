@@ -96,19 +96,24 @@ void CancelList::pup(PUP::er &p)
   p(count); p(earliest);
   if (p.isUnpacking()) {
     i = count;
-    if (i == 0) cancellations = NULL;
-    while (i > 0) {
-      if (i == count) {
-	tmp = new CancelNode;
-	tmp->pup(p);
-	cancellations = tmp;
+    if (i == 0) {
+      cancellations = NULL;
+    }
+    else {
+      while (i > 0) {
+	if (i == count) {
+	  tmp = new CancelNode;
+	  tmp->pup(p);
+	  cancellations = tmp;
+	}
+	else {
+	  tmp->next = new CancelNode;
+	  tmp = tmp->next;
+	  tmp->pup(p);
+	}
+	i--;
       }
-      else {
-	tmp->next = new CancelNode;
-	tmp = tmp->next;
-	tmp->pup(p);
-      }
-      i--;
+      tmp->next = NULL;
     }
     current = cancellations;
   }
