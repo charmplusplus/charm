@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.6  1995-10-13 22:36:29  jyelon
+ * Revision 1.7  1995-10-18 22:22:53  jyelon
+ * I forget.
+ *
+ * Revision 1.6  1995/10/13  22:36:29  jyelon
  * changed exit() --> exit(1)
  *
  * Revision 1.5  1995/10/13  22:34:42  jyelon
@@ -332,6 +335,7 @@ static void CmiNext()
     index = (index+1) % Cmi_numpe;
     if (index == orig) exit(0);
   }
+  Cmi_mype = index;
   CthResume(t);
 }
 
@@ -446,7 +450,7 @@ char * msg;
 {
   int i;
   for(i=0; i<Cmi_numpe; i++)
-    if (i!= Cmi_mype) CmiSyncSendFn(i,size,msg);
+    if (i!=Cmi_mype) CmiSyncSendFn(i,size,msg);
   FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
 }
 
@@ -517,11 +521,11 @@ char *argv[];
   /* Create threads for all PE except PE 0 */
   for(i=0; i<Cmi_numpe; i++) {
     t = (i==0) ? CthSelf() : CthCreate(CmiCallMain, 0, Cmi_stacksize);
-    CthSetVar(t, (void **)(&Cmi_mype), (void *)i);
     CmiThreads[i] = t;
     CmiBarred[i] = 0;
     CmiQueues[i] = (Fifo)FIFO_Create();
   }
+  Cmi_mype = 0;
   CmiCallMain();
 }
 
