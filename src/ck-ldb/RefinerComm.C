@@ -75,25 +75,39 @@ void RefinerComm::processorCommCost()
       CmiAssert(idx != -1);
       senderPE = computes[idx].oldProcessor;	// object's original processor
     }
-    switch (cdata.receiver.get_type()) {
-    case LD_PROC_MSG:
-      receiverPE = cdata.receiver.proc();
-      break;
-    case LD_OBJ_MSG:  {
-      int idx = stats->getRecvHash(cdata);
-      CmiAssert(idx != -1);
-      receiverPE = computes[idx].oldProcessor;
-      break;
-      }
-    case LD_OBJLIST_MSG:    // object message FIXME add multicast
-      break;
-    }
     CmiAssert(senderPE != -1);
-    CmiAssert(receiverPE != -1);
-    if(senderPE != receiverPE)
-    {
-       commTable->increase(true, senderPE, cdata.messages, cdata.bytes);
-       commTable->increase(false, receiverPE, cdata.messages, cdata.bytes);
+    int ctype = cdata.receiver.get_type();
+    if (ctype==LD_PROC_MSG || ctype==LD_OBJ_MSG) {
+      if (ctype==LD_PROC_MSG)
+        receiverPE = cdata.receiver.proc();
+      else {    // LD_OBJ_MSG
+        int idx = stats->getRecvHash(cdata);
+        CmiAssert(idx != -1);
+        receiverPE = computes[idx].oldProcessor;
+      }
+      CmiAssert(receiverPE != -1);
+      if(senderPE != receiverPE)
+      {
+        commTable->increase(true, senderPE, cdata.messages, cdata.bytes);
+        commTable->increase(false, receiverPE, cdata.messages, cdata.bytes);
+      }
+    }
+    else if (ctype == LD_OBJLIST_MSG) {
+      int nobjs;
+      LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+      for (i=0; i<nobjs; i++) {
+        int idx = stats->getHash(objs[i]);
+        if(idx == -1)
+             if (_lb_args.migObjOnly()) continue;
+             else CkAbort("Error in search\n");
+        receiverPE = computes[idx].oldProcessor;
+        CmiAssert(receiverPE != -1);
+        if(senderPE != receiverPE)
+        {
+          commTable->increase(true, senderPE, cdata.messages, cdata.bytes);
+          commTable->increase(false, receiverPE, cdata.messages, cdata.bytes);
+        }
+      }
     }
   }
   // recalcualte the cpu load

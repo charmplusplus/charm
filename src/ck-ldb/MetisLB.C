@@ -143,14 +143,28 @@ void MetisLB::work(CentralLB::LDStats* stats, int count)
   const int csz = stats->n_comm;
   for(i=0; i<csz; i++) {
       LDCommData &cdata = stats->commData[i];
-      if(cdata.from_proc() || cdata.receiver.get_type() != LD_OBJ_MSG)
-        continue;
-      int senderID = stats->getHash(cdata.sender);
-      int recverID = stats->getHash(cdata.receiver.get_destObj());
-      CmiAssert(senderID < numobjs);
-      CmiAssert(recverID < numobjs);
-      comm[senderID][recverID] += cdata.messages;
-      comm[recverID][senderID] += cdata.messages;
+      if(!cdata.from_proc() && cdata.receiver.get_type() == LD_OBJ_MSG)
+      {
+        int senderID = stats->getHash(cdata.sender);
+        int recverID = stats->getHash(cdata.receiver.get_destObj());
+        CmiAssert(senderID < numobjs);
+        CmiAssert(recverID < numobjs);
+        comm[senderID][recverID] += cdata.messages;
+        comm[recverID][senderID] += cdata.messages;
+      }
+      else if (cdata.receiver.get_type() == LD_OBJLIST_MSG) {
+        int nobjs;
+        LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+        int senderID = stats->getHash(cdata.sender);
+        for (j=0; j<nobjs; j++) {
+           int recverID = stats->getHash(objs[j]);
+           if((senderID == -1)||(recverID == -1))
+              if (_lb_args.migObjOnly()) continue;
+              else CkAbort("Error in search\n");
+           comm[senderID][recverID] += cdata.messages;
+           comm[recverID][senderID] += cdata.messages;
+        }
+      }
     }
 
 // ignore messages sent from an object to itself
