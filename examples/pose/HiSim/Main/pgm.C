@@ -21,6 +21,9 @@ main::main(CkArgMsg *m)
   if (CmiGetArgFlag(m->argv, "-check")) {
     config.check_on = 1;
   }
+  if (CmiGetArgFlag(m->argv, "-tproj")) {
+    config.tproj_on = 1;
+  }
 
   config.sourceRouting = 0;
   config.readConfig(m);
