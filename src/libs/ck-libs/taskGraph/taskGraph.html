@@ -14,6 +14,7 @@ fib(n-2).
 <p>
 
 The dependency representation for Fibonacci may look something like this:
+<p>
 
 <table>
 <tr><th>X'th Fibonacci</th><th>Depends On</th></tr>
@@ -24,6 +25,7 @@ The dependency representation for Fibonacci may look something like this:
 <tr><td>3</td><td>1, 2</td></tr>
 <tr><td>4</td><td>2, 3</td></tr>
 </table>
+<p>
 
 And so on until the number you desire. It is not designed to solve problems
 such as Jacobi relaxation; it is not an iterative framework. You could contort
@@ -113,10 +115,11 @@ class main : public Chare {
 The taskGraphSolver class is an abstract class that allows the library to pass
 around your data/solver class with ease. taskGraphSolver contains the
 following methods;
+<p>
 
 <table>
 
-<tr><td>
+<tr><td width=40%>
 taskGraphSolver(CkArrayID, int x)<br>
 taskGraphSolver(CkArrayID, int x, int y)<br>
 taskGraphSolver(CkArrayID, int x, int y, int z)<br>
@@ -190,6 +193,7 @@ your computation will hang!
 </td></tr>
 
 </table>
+<p>
 
 For a simple example, check out a current CVS charm build, and look at
 the charm/pgms/charm++/taskGraph/fib/ example. Fib does what is described
