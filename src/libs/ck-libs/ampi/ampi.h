@@ -56,6 +56,9 @@ int MPI_Recv_init(void *buf, int count, int type, int src, int tag,
                   MPI_Comm comm, MPI_Request *req);
 int MPI_Send_init(void *buf, int count, int type, int dest, int tag,
                   MPI_Comm comm, MPI_Request *req);
+int MPI_Type_contiguous(int count, MPI_Datatype oldtype, MPI_Datatype *newtype);
+int MPI_Type_commit(MPI_Datatype *datatype);
+int MPI_Type_free(MPI_Datatype *datatype);
 
 #ifdef __cplusplus
 }

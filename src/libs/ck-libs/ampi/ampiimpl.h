@@ -58,6 +58,8 @@ class ampi : public TempoArray {
     int totsize;
     PersReq requests[100];
     int nrequests;
+    int types[100]; // currently just gives the size
+    int ntypes;
     void *packedBlock;
 
     ampi(ArrayElementCreateMessage *msg);

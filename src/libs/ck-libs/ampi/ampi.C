@@ -73,6 +73,7 @@ ampi::ampi(ArrayElementCreateMessage *msg) : TempoArray(msg)
 {
   ampiArray = thisArray;
   nrequests = 0;
+  ntypes = 0;
   // delete msg;
 }
 
@@ -243,7 +244,7 @@ extern "C" void mpi_finalize_(int *ierr)
   *ierr = MPI_Finalize();
 }
 
-static int typesize(int type, int count)
+static int typesize(int type, int count, ampi* ptr)
 {
   switch(type) {
     case MPI_DOUBLE_PRECISION : return count*sizeof(double);
@@ -255,6 +256,12 @@ static int typesize(int type, int count)
     case MPI_BYTE: return count;
     case MPI_PACKED: return count;
     default:
+      if((type >= 100) && 
+         (type-100 < ptr->ntypes))
+      { 
+        // user-defined type
+        return count*(ptr->types[type-100]);
+      }
       CmiError("Type %d not supported yet!\n", type);
       CmiAbort("");
       return 0; // keep compiler happy
@@ -264,8 +271,8 @@ static int typesize(int type, int count)
 extern "C" int MPI_Send(void *msg, int count, MPI_Datatype type, int dest, 
                         int tag, MPI_Comm comm)
 {
-  int size = typesize(type, count);
   ampi *ptr = CtvAccess(ampiPtr);
+  int size = typesize(type, count, ptr);
   //CkPrintf("[%d] sending %d bytes to %d tagged %d\n", ptr->getIndex(), 
            //size, dest, tag);
   ptr->ckTempoSendElem(tag, ptr->getIndex(), msg, size, dest);
@@ -281,8 +288,8 @@ extern "C" void mpi_send_(void *msg, int *count, int *type, int *dest,
 extern "C" int MPI_Recv(void *msg, int count, int type, int src, int tag,
                         MPI_Comm comm, MPI_Status *status)
 {
-  int size = typesize(type, count);
   ampi *ptr = CtvAccess(ampiPtr);
+  int size = typesize(type, count, ptr);
   //CkPrintf("[%d] waits for %d bytes tagged %d\n",ptr->getIndex(),size,tag);
   ptr->ckTempoRecv(tag, src, msg, size);
   //CkPrintf("[%d] received %d bytes tagged %d\n", ptr->getIndex(), size, tag);
@@ -331,8 +338,8 @@ extern "C" void mpi_barrier_(int *comm, int *ierr)
 extern "C" int MPI_Bcast(void *buf, int count, int type, int root, 
                          MPI_Comm comm)
 {
-  int size = typesize(type, count);
   ampi *ptr = CtvAccess(ampiPtr);
+  int size = typesize(type, count, ptr);
   //CkPrintf("[%d] Broadcast called size=%d\n", ptr->getIndex(), size);
   ptr->ckTempoBcast(((root)==ptr->getIndex())?1:0, MPI_BCAST_TAG, buf, size);
   //CkPrintf("[%d] Broadcast finished\n", ptr->getIndex());
@@ -454,7 +461,7 @@ extern "C" int MPI_Recv_init(void *buf, int count, int type, int src, int tag,
   if(ptr->nrequests == 100) {
     CmiAbort("Too many persistent commrequests.\n");
   }
-  int size = typesize(type, count);
+  int size = typesize(type, count, ptr);
   ptr->requests[ptr->nrequests].sndrcv = 2;
   ptr->requests[ptr->nrequests].buf = buf;
   ptr->requests[ptr->nrequests].size = size;
@@ -480,7 +487,7 @@ extern "C" int MPI_Send_init(void *buf, int count, int type, int dest, int tag,
   if(ptr->nrequests == 100) {
     CmiAbort("Too many persistent commrequests.\n");
   }
-  int size = typesize(type, count);
+  int size = typesize(type, count, ptr);
   ptr->requests[ptr->nrequests].sndrcv = 1;
   ptr->requests[ptr->nrequests].buf = buf;
   ptr->requests[ptr->nrequests].size = size;
@@ -497,6 +504,43 @@ extern "C" void mpi_send_init_(void *buf, int *count, int *type, int *destpe,
                                int *tag, int *comm, int *req, int *ierr)
 {
   *ierr = MPI_Send_init(buf,*count,*type,*destpe,*tag,*comm,(MPI_Request*)req);
+}
+
+extern "C" int MPI_Type_contiguous(int count, MPI_Datatype oldtype, 
+                                   MPI_Datatype *newtype)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  *newtype = ptr->ntypes;
+  ptr->types[*newtype] =  typesize(oldtype, count, ptr);
+  ptr->ntypes ++;
+  *newtype += 100;
+  return 0;
+}
+
+extern "C" int MPI_Type_commit(MPI_Datatype *datatype)
+{
+  return 0;
+}
+
+extern "C" int MPI_Type_free(MPI_Datatype *datatype)
+{
+  return 0;
+}
+
+extern "C" void mpi_type_contiguous_(int *count, int *oldtype, int *newtype, 
+                                int *ierr)
+{
+  *ierr = MPI_Type_contiguous(*count, *oldtype, newtype);
+}
+
+extern "C" void mpi_type_commit_(int *type, int *ierr)
+{
+  *ierr = MPI_Type_commit(type);
+}
+
+extern "C" void mpi_type_free_(int *type, int *ierr)
+{
+  *ierr = MPI_Type_free(type);
 }
 
 #include "ampi.def.h"
