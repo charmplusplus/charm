@@ -24,17 +24,75 @@ DataMsg::alloc(int mnum, size_t size, int *sizes, int pbits)
   return CkAllocMsg(mnum, size+sizes[0], pbits);
 }
 
+#define PACK(buf,sz) do { memcpy(pos,(buf),(sz)); pos += (sz); } while(0)
+
+void *
+ChunkMsg::pack(ChunkMsg *in)
+{
+  int totalsize = sizeof(ChunkMsg);
+  totalsize += in->nnodes*sizeof(int); // gNodeNums
+  totalsize += in->nnodes*sizeof(int); // primaryPart
+  totalsize += in->nelems*sizeof(int); // gElemNums
+  totalsize += in->nelems*in->nconn*sizeof(int); // conn
+  totalsize += in->npes*sizeof(int); // peNums
+  totalsize += in->npes*sizeof(int); // numNodesPerPe
+  int tnodes=0;
+  int i;
+  for(i=0;i<(in->npes);i++) { tnodes += in->numNodesPerPe[i]; }
+  totalsize += tnodes*sizeof(int); // nodesPerPe
+  void *retmsg = CkAllocBuffer(in, totalsize); CHK(retmsg);
+  char *pos = (char *) retmsg;
+  PACK(in, sizeof(ChunkMsg));
+  PACK(in->gNodeNums, in->nnodes*sizeof(int));
+  PACK(in->primaryPart, in->nnodes*sizeof(int));
+  PACK(in->gElemNums, in->nelems*sizeof(int));
+  PACK(in->conn, in->nelems*in->nconn*sizeof(int));
+  PACK(in->peNums, in->npes*sizeof(int));
+  PACK(in->numNodesPerPe, in->npes*sizeof(int));
+  PACK(in->nodesPerPe, tnodes*sizeof(int));
+  delete[] in->gNodeNums;
+  delete[] in->primaryPart;
+  delete[] in->gElemNums;
+  delete[] in->conn;
+  delete[] in->peNums;
+  delete[] in->numNodesPerPe;
+  delete[] in->nodesPerPe;
+  delete in;
+
+  return retmsg;
+}
+
+#define UNPACK(buf,sz) do { buf = (int *) pos; pos += (sz); } while(0)
+
+ChunkMsg *
+ChunkMsg::unpack(void *in)
+{
+  ChunkMsg* msg = new (in) ChunkMsg;
+  char *pos = (char *) in + sizeof(ChunkMsg);
+  UNPACK(msg->gNodeNums,msg->nnodes*sizeof(int));
+  UNPACK(msg->primaryPart,msg->nnodes*sizeof(int));
+  UNPACK(msg->gElemNums,msg->nelems*sizeof(int));
+  UNPACK(msg->conn,msg->nelems*msg->nconn*sizeof(int));
+  UNPACK(msg->peNums, msg->npes*sizeof(int));
+  UNPACK(msg->numNodesPerPe, msg->npes*sizeof(int));
+  msg->nodesPerPe = (int*) pos;
+
+  return msg;
+}
+
 static void 
 _allReduceHandler(void *, int datasize, void *data)
 {
   // the reduction handler is called on processor 0
   // with available reduction results
-  DataMsg *dmsg = new (&datasize, 0) DataMsg(0,datasize,0);
+  DataMsg *dmsg = new (&datasize, 0) DataMsg(0,datasize,0); CHK(dmsg);
   memcpy(dmsg->data, data, datasize);
   CProxy_chunk carr(_femaid);
   // broadcast the reduction results to all array elements
   carr.result(dmsg);
 }
+
+static main* _mainptr = 0;
 
 main::main(CkArgMsg *am)
 {
@@ -55,14 +113,69 @@ main::main(CkArgMsg *am)
   _femaid = CProxy_chunk::ckNew(_nchunks);
   CProxy_chunk farray(_femaid);
   farray.setReductionClient(_allReduceHandler, 0);
-  for(i=0;i<_nchunks;i++) {
-    farray[i].run();
-  }
-  delete am;
   _mainhandle = thishandle;
   numdone = 0;
+  isMeshSet = 0;
   // call application-specific initialization
+  _mainptr = this;
   init_();
+  _mainptr = 0;
+  if(!isMeshSet) {
+    for(i=0;i<_nchunks;i++) {
+      farray[i].run();
+    }
+  }
+  delete am;
+}
+
+extern "C" void
+METIS_PartMeshDual(int*,int*,int*,int*,int*,int*,int*,int*,int*);
+
+extern void fem_map(int nelem, int nnodes, int ctype, int *connmat,
+                    int nparts, int *epart, int *npart, ChunkMsg *msgs[]);
+void
+main::setMesh(int nelem, int nnodes, int ctype, int *connmat)
+{
+  int *epart = new int[nelem]; CHK(epart);
+  int *npart = new int[nnodes]; CHK(npart);
+  int numflag, ecut;
+#if FEM_FORTRAN
+  numflag = 1;
+#else
+  numflag = 0;
+#endif
+  // pass mesh to metis to be partitioned
+  METIS_PartMeshDual(&nelem, &nnodes, connmat, &ctype, &numflag, 
+                     (int*)&_nchunks, &ecut, epart, npart);
+  // call the map function to compute communication info needed by the framework
+  ChunkMsg **msgs = new ChunkMsg*[_nchunks]; CHK(msgs);
+  fem_map(nelem, nnodes, ctype, connmat, _nchunks, epart, npart, msgs);
+  delete[] epart;
+  delete[] npart;
+  // send messages to individual chunks with these partitions
+  isMeshSet = 1;
+  _femaid = CProxy_chunk::ckNew(_nchunks);
+  CProxy_chunk farray(_femaid);
+  // each chunk is sent a message containing its meshdata
+  for(int i=0;i<_nchunks;i++) {
+    farray[i].run(msgs[i]);
+  }
+  delete[] msgs;
+}
+
+void FEM_Set_Mesh(int nelem, int nnodes, int ctype, int *connmat)
+{
+  if(_mainptr == 0) {
+    CkAbort("FEM_Set_Mesh can be called from within _init only.\n");
+  }
+  _mainptr->setMesh(nelem, nnodes, ctype, connmat);
+}
+
+extern "C" void
+fem_set_mesh_
+(int *nelem, int *nnodes, int *ctype, int *connmat)
+{
+  FEM_Set_Mesh(*nelem, *nnodes, *ctype, connmat);
 }
 
 void
@@ -157,6 +270,17 @@ chunk::chunk(void)
 }
 
 void
+chunk::run(ChunkMsg *msg)
+{
+  CtvInitialize(chunk*, _femptr);
+  CtvAccess(_femptr) = this;
+  readChunk(msg);
+  // call the application-specific driver
+  driver_(&numNodes, gNodeNums, &numElems, gElemNums, &numNodesPerElem, conn);
+  FEM_Done();
+}
+
+void
 chunk::run(void)
 {
   CtvInitialize(chunk*, _femptr);
@@ -192,7 +316,7 @@ chunk::send(int fid, void *nodes)
     int dest = peNums[i];
     int num = numNodesPerPe[i];
     int len = dtypes[fid].length(num);
-    DataMsg *msg = new (&len, 0) DataMsg(seqnum, thisIndex, fid);
+    DataMsg *msg = new (&len, 0) DataMsg(seqnum, thisIndex, fid); CHK(msg);
     len = dtypes[fid].length();
     void *data = msg->data;
     void *src = (void *) ((char *)nodes + dtypes[fid].init_offset);
@@ -315,7 +439,7 @@ chunk::readField(int fid, void *nodes, char *fname)
   int btypelen = dtypes[fid].length()/typelen;
   char *data = (char *)nodes + dtypes[fid].init_offset;
   int distance = dtypes[fid].distance;
-  FILE* fp = fopen(fname, "r");
+  fp = fopen(fname, "r");
   if(fp==0) {
     CkError("Cannot open file %s for reading.\n", fname);
     CkAbort("Exiting");
@@ -356,73 +480,119 @@ chunk::readField(int fid, void *nodes, char *fname)
 }
 
 void
-chunk::readNodes(FILE* fp)
+chunk::readNodes(ChunkMsg *msg)
 {
-  fscanf(fp, "%d", &numNodes);
-  gNodeNums = new int[numNodes];
-  isPrimary = new int[numNodes];
-  for(int i=0;i<numNodes;i++) {
-    fscanf(fp, "%d%d", &gNodeNums[i], &isPrimary[i]);
-    isPrimary[i] = ((isPrimary[i]==thisIndex) ? 1 : 0);
-  }
-}
-
-void
-chunk::readElems(FILE* fp)
-{
-  fscanf(fp, "%d%d", &numElems, &numNodesPerElem);
-  gElemNums = new int[numElems];
-  conn = new int[numElems*numNodesPerElem]; 
-
-for(int i=0; i<numElems; i++) {
-    fscanf(fp, "%d", &gElemNums[i]);
-    for(int j=0;j<numNodesPerElem;j++) {
-#if FEM_FORTRAN
-      fscanf(fp, "%d", &conn[j*numElems+i]);
-      // FIXME: This will go away once map is part of the library
-      // map will generate 1-based node numbers
-      conn[j*numElems+i]++;
-#else
-      fscanf(fp, "%d", &conn[i*numNodesPerElem+j]);
-#endif
+  if(msg==0) {
+    fscanf(fp, "%d", &numNodes);
+    gNodeNums = new int[numNodes]; CHK(gNodeNums);
+    isPrimary = new int[numNodes]; CHK(isPrimary);
+    for(int i=0;i<numNodes;i++) {
+      fscanf(fp, "%d%d", &gNodeNums[i], &isPrimary[i]);
+      isPrimary[i] = ((isPrimary[i]==thisIndex) ? 1 : 0);
+    }
+  } else {
+    numNodes = msg->nnodes;
+    gNodeNums = new int[numNodes]; CHK(gNodeNums);
+    isPrimary = new int[numNodes]; CHK(isPrimary);
+    for(int i=0;i<numNodes;i++) {
+      gNodeNums[i] = msg->gNodeNums[i];
+      isPrimary[i] = ((msg->primaryPart[i]==thisIndex) ? 1 : 0);
     }
   }
 }
 
 void
-chunk::readComm(FILE* fp)
+chunk::readElems(ChunkMsg *msg)
 {
-  gPeToIdx = new int[numElements];
+  if(msg==0) {
+    fscanf(fp, "%d%d", &numElems, &numNodesPerElem);
+    gElemNums = new int[numElems]; CHK(gElemNums);
+    conn = new int[numElems*numNodesPerElem]; CHK(conn);
+
+    for(int i=0; i<numElems; i++) {
+      fscanf(fp, "%d", &gElemNums[i]);
+      for(int j=0;j<numNodesPerElem;j++) {
+#if FEM_FORTRAN
+        fscanf(fp, "%d", &conn[j*numElems+i]);
+        // FIXME: This will go away once map is part of the library
+        // map will generate 1-based node numbers
+        conn[j*numElems+i]++;
+#else
+        fscanf(fp, "%d", &conn[i*numNodesPerElem+j]);
+#endif
+      }
+    }
+  } else {
+    numElems = msg->nelems;
+    numNodesPerElem = msg->nconn;
+    gElemNums = new int[numElems]; CHK(gElemNums);
+    conn = new int[numElems*numNodesPerElem]; CHK(conn);
+    for(int i=0; i<numElems; i++) {
+      gElemNums[i] = msg->gElemNums[i];
+      for(int j=0;j<numNodesPerElem;j++) {
+        conn[i*numNodesPerElem+j] = msg->conn[i*numNodesPerElem+j];
+      }
+    }
+  }
+}
+
+void
+chunk::readComm(ChunkMsg *msg)
+{
+  gPeToIdx = new int[numElements]; CHK(gPeToIdx);
   for(int p=0;p<numElements;p++) {
     gPeToIdx[p] = (-1);
   }
-  fscanf(fp, "%d", &numPes);
-  peNums = new int[numPes];
-  numNodesPerPe = new int[numPes];
-  nodesPerPe = new int*[numPes];
-  for(int i=0;i<numPes;i++) {
-    fscanf(fp, "%d%d", &peNums[i], &numNodesPerPe[i]);
-    gPeToIdx[peNums[i]] = i;
-    nodesPerPe[i] = new int[numNodesPerPe[i]];
-    for(int j=0;j<numNodesPerPe[i];j++) {
-      fscanf(fp, "%d", &nodesPerPe[i][j]);
+  if(msg==0) {
+    fscanf(fp, "%d", &numPes);
+    peNums = new int[numPes]; CHK(peNums);
+    numNodesPerPe = new int[numPes]; CHK(numNodesPerPe);
+    nodesPerPe = new int*[numPes]; CHK(nodesPerPe);
+    for(int i=0;i<numPes;i++) {
+      fscanf(fp, "%d%d", &peNums[i], &numNodesPerPe[i]);
+      gPeToIdx[peNums[i]] = i;
+      nodesPerPe[i] = new int[numNodesPerPe[i]]; CHK(nodesPerPe[i]);
+      for(int j=0;j<numNodesPerPe[i];j++) {
+        fscanf(fp, "%d", &nodesPerPe[i][j]);
+      }
+    }
+  } else {
+    numPes = msg->npes;
+    peNums = new int[numPes]; CHK(peNums);
+    numNodesPerPe = new int[numPes]; CHK(numNodesPerPe);
+    nodesPerPe = new int*[numPes]; CHK(nodesPerPe);
+    int k = 0;
+    for(int i=0;i<numPes;i++) {
+      peNums[i] = msg->peNums[i];
+      numNodesPerPe[i] = msg->nodesPerPe[i];
+      gPeToIdx[peNums[i]] = i;
+      nodesPerPe[i] = new int[numNodesPerPe[i]]; CHK(nodesPerPe[i]);
+      for(int j=0;j<numNodesPerPe[i];j++) {
+        nodesPerPe[i][j] = msg->nodesPerPe[k++];
+      }
     }
   }
 }
 
 void
-chunk::readChunk(void)
+chunk::readChunk(ChunkMsg *msg)
 {
-  char fname[32];
-  sprintf(fname, "meshdata.Pe%d", thisIndex);
-  FILE *fp = fopen(fname, "r");
-  if(fp==0) {
-    CkAbort("FEM: unable to open input file.\n");
+  if(msg==0) {
+    char fname[32];
+    sprintf(fname, "meshdata.Pe%d", thisIndex);
+    fp = fopen(fname, "r");
+    if(fp==0) {
+      CkAbort("FEM: unable to open input file.\n");
+    }
+    readNodes();
+    readElems();
+    readComm();
+    fclose(fp);
+  } else {
+    readNodes(msg);
+    readElems(msg);
+    readComm(msg);
   }
-  readNodes(fp);
-  readElems(fp);
-  readComm(fp);
-  fclose(fp);
 }
 
 void 
@@ -538,9 +708,13 @@ FEM_READ_FIELD
 #else
 fem_read_field_
 #endif
-  (int *fid, void *nodes, char *fname)
+  (int *fid, void *nodes, char *fname, int len)
 {
-  FEM_Read_Field(*fid, nodes, fname);
+  char *tmp = new char[len+1]; CHK(tmp);
+  memcpy(tmp, fname, len);
+  tmp[len] = '\0';
+  FEM_Read_Field(*fid, nodes, tmp);
+  delete[] tmp;
 }
 
 extern "C" int
@@ -587,7 +761,7 @@ fem_print_
   (char *str, int len)
 {
   chunk *ptr = CtvAccess(_femptr);
-  char *tmpstr = new char[len+1];
+  char *tmpstr = new char[len+1]; CHK(tmpstr);
   memcpy(tmpstr,str,len);
   tmpstr[len] = '\0';
   FEM_Print(tmpstr);

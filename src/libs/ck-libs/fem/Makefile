@@ -4,13 +4,15 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 all: libfem.a libfemf.a $(CDIR)/include/fem.h $(CDIR)/include/fem.decl.h \
      $(CDIR)/include/femf.h $(CDIR)/lib/fmain.o
 
-libfem.a: fem.C fem.h femf.h fem.decl.h fem.def.h
+libfem.a: fem.C fem.h femf.h fem.decl.h fem.def.h map.C
 	$(CHARMC) -DFEM_FORTRAN=0 -c fem.C
-	$(CHARMC) -cp $(CDIR)/lib -o libfem.a fem.o
+	$(CHARMC) -DFEM_FORTRAN=0 -c map.C
+	$(CHARMC) -cp $(CDIR)/lib -o libfem.a fem.o map.o
 
-libfemf.a: fem.C fem.h femf.h fem.decl.h fem.def.h
+libfemf.a: fem.C fem.h femf.h fem.decl.h fem.def.h map.C
 	$(CHARMC) -DFEM_FORTRAN=1 -c fem.C
-	$(CHARMC) -cp $(CDIR)/lib -o libfemf.a fem.o
+	$(CHARMC) -DFEM_FORTRAN=1 -c map.C
+	$(CHARMC) -cp $(CDIR)/lib -o libfemf.a fem.o map.o
 
 fmain.o: fmain.f90
 	$(CHARMC) -c fmain.f90

@@ -3,6 +3,7 @@ mainmodule fem {
   readonly CkArrayID _femaid;
   readonly unsigned int _nchunks;
   message [varsize] DataMsg;
+  message [packed] ChunkMsg;
   mainchare main {
     entry main();
     entry void done(void);
@@ -10,6 +11,7 @@ mainmodule fem {
   array [1D] chunk {
     entry chunk(void);
     entry [threaded] void run(void);
+    entry [threaded] void run(ChunkMsg*);
     entry void recv(DataMsg *);
     entry void result(DataMsg *);
   };

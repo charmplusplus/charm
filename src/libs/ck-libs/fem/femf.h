@@ -8,6 +8,11 @@
   integer, parameter :: FEM_MAX=1
   integer, parameter :: FEM_MIN=2
 
+  integer, parameter :: FEM_TRIANGULAR=1
+  integer, parameter :: FEM_TETRAHEDRAL=2
+  integer, parameter :: FEM_HEXAHEDRAL=3
+  integer, parameter :: FEM_QUADRILATERAL=4
+
 
   interface
   function FEM_Create_Field(base_type, vec_len, init_offset, distance)
@@ -50,4 +55,7 @@
      double precision        :: first, second
   end function offsetof
 
+  function FEM_Set_Mesh(nelem, nnodes, ctype, mesh)
+    integer :: nelem, nnodes, ctype
+  end function FEM_Set_Mesh
   end interface
