@@ -452,6 +452,12 @@ do
 	"-fortran"|"-flib"|"-flibs")
 		USE_F90_LIBRARIES="1" 
 		;;
+	"-f77")
+		USE_F77="1" 
+		;;
+	"-fortran77"|"-f77lib"|"-f77libs")
+		USE_F77_LIBRARIES="1" 
+		;;
 	"-M"|"-E"|"-P"|"-S")
 # Run preprocessor/assembler only
 		SKIPLINK="yes"
@@ -705,6 +711,13 @@ fi
 if [ -n "$USE_FASTEST_CC" ]
 then
     CMK_CC="$CMK_CC_FASTEST"
+fi
+
+if [ -n "$USE_F77" ]
+then
+    CMK_CF90=$CMK_CF77
+    CMK_CF90_FIXED=$CMK_CF77
+    CMK_F90LIBS=$CMK_F77LIBS
 fi
 
 if [ -n "$CMK_F90_MODINC" ]
@@ -1132,6 +1145,11 @@ then
 	else
 		OBJECTFILES="$swapo $OBJECTFILES"
 	fi
+fi
+
+if [ $USE_F77_LIBRARIES = "1" ]
+then
+	POST_LIBRARIES="$POST_LIBRARIES $CMK_F77LIBS"
 fi
 
 if [ $USE_F90_LIBRARIES = "1" ]
