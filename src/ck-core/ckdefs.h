@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1995-11-02 18:24:35  sanjeev
+ * Revision 2.12  1995-11-02 20:23:01  sanjeev
+ * removed CFunctionRefToName and CFunctionNameToRef
+ *
+ * Revision 2.11  1995/11/02  18:24:35  sanjeev
  * modified Charm++ macros
  *
  * Revision 2.10  1995/10/27  21:31:25  jyelon
@@ -169,8 +172,6 @@
 #define CPrioritySizeWords          CkPrioSizeWords
 #define CPriorityConcat             CkPrioConcat
 
-#define CFunctionNameToRef	FunctionNameToRef
-#define CFunctionRefToName	FunctionRefToName
 #define CStartQuiescence	CPlus_StartQuiescence
 #define CharmExit               CkExit
 #define CSetQueueing            CkSetQueueing
