@@ -34,6 +34,10 @@ class PairCalcID {
     isDoublePacked = _dp;
   }
 
+  void set(PairCalcID pid) {
+    Init(pid.Aid, pid.Gid, pid.GrainSize, pid.BlkSize, pid.S, pid.Symmetric, pid.useComlib, pid.cinst, pid.isDoublePacked);
+  }
+
   void pup(PUP::er &p) {
     p|Aid;
     p|Gid;
