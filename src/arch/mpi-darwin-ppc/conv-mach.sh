@@ -17,9 +17,9 @@ CMK_LIBS="-Wl,-u,_gmpi_macosx_malloc_hack -lckqt -lmpich -lpmpich"
 CMK_RANLIB="ranlib"
 
 # Assumes IBM xlf90 compiler:
-CMK_CF77="f77 -qextname "
-CMK_CF90="f90 -qnocommon -qextname "
-CMK_CF90_FIXED="xlf90 -qnocommon -qextname -qsuffix=f=f"
+CMK_CF77="f77 -qnocommon -qextname -qthreaded "
+CMK_CF90="f90 -qnocommon -qextname -qthreaded "
+CMK_CF90_FIXED="xlf90 -qnocommon -qextname -qthreaded -qsuffix=f=f"
 CMK_F90LIBS="-L/opt/ibmcmp/xlf/8.1/lib -lxlf90 -lxlopt -lxl -lxlfmath"
 CMK_MOD_EXT="mod"
 
