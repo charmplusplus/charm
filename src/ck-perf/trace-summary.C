@@ -619,7 +619,7 @@ void TraceSummary::startPhase(int phase)
 
 void TraceSummary::creation(envelope *e, int ep, int num)
 {
-  e->setEvent(curevent++);
+  if (e) e->setEvent(curevent++);
 }
 
 
