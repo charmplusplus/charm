@@ -13,15 +13,15 @@ CMK_C_DEBUG='-g'
 CMK_C_OPTIMIZE='-xO5'
 CMK_CXX_DEBUG='-g'
 CMK_CXX_OPTIMIZE='-xO5'
-CMK_LD='cc '
+CMK_LD="cc $CMK_CFLAGS "
 CMK_LDXX="CC -library=Cstd $CMK_CXXFLAGS"
 CMK_AR='CC -xar -o'
 CMK_LIBS='-lnsl -lsocket -lckqt'
 CMK_SEQ_LIBS='-lnsl -lsocket'
-CMK_SEQ_CC='cc'
-CMK_SEQ_LD='cc'
-CMK_SEQ_CXX='CC -library=Cstd'
-CMK_SEQ_LDXX='CC -library=Cstd'
+CMK_SEQ_CC="cc $CMK_CFLAGS "
+CMK_SEQ_LD="cc $CMK_CFLAGS "
+CMK_SEQ_CXX="CC -library=Cstd $CMK_CXXFLAGS "
+CMK_SEQ_LDXX="CC -library=Cstd $CMK_CXXFLAGS "
 CMK_CPP_SUFFIX="cc"
 CMK_XLATPP='charmxlat++ -w -p '
 CMK_QT='solaris-cc'
