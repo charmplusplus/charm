@@ -1064,6 +1064,8 @@ static DATA_HDR ack;
 
 static MsgQueueElem *recd_msg_head, *recd_msg_tail;
 
+CpvDeclare(void *,CmiLocalQueue);
+
 
 /****************************************************************************/
 /* ROUTINES FOR SENDING/RECEIVING MESSAGES
@@ -1710,48 +1712,46 @@ static void InterruptInit()
 ** -CW
 */
 static int netSend(destPE, size, msg, msg_type) 
-    int destPE, size; 
-    char * msg; 
-    int msg_type;
-    {
-    int saveflag ;
-
-    if (!Communication_init) return -1;
-
-    if (destPE==CpvAccess(Cmi_mype)) 
-        {
-	CmiError("illegal send to myself\n");
-	return -1;
-        } 
-
-    saveflag = Cmi_insidemachine ;
-    Cmi_insidemachine = TRUE ;
-
-    if (size > MAX_FRAG_SIZE) 
-        {
-	/* Break the message into pieces and send each piece; start numbering
-	 ** fragments with one.
-	 */
-	int i;
-	int frags = ((size-1)/MAX_FRAG_SIZE) + 1;
-
-	for(i=1;i<frags;i++) 
-	    fragment_send(destPE, MAX_FRAG_SIZE, msg+((i-1)*MAX_FRAG_SIZE), 
-			  size, msg_type, frags);
-
-	/* Last fragment is (probably) a different size. */
-	fragment_send(destPE, size - MAX_FRAG_SIZE*(frags-1),
-		      msg+(frags-1)*MAX_FRAG_SIZE,  size, msg_type, frags);
-
-        } 
-    else fragment_send(destPE, size, msg, size, msg_type, 1);
-
-    SendPackets(destPE);
-
-    Cmi_insidemachine = saveflag ;
-    }
-
-CpvDeclare(void *,CmiLocalQueue);
+     int destPE, size; 
+     char * msg; 
+     int msg_type;
+{
+  int saveflag ;
+  
+  if (!Communication_init) return -1;
+  
+  if (destPE==CpvAccess(Cmi_mype)) {
+    char *msg1 = (char *)CmiAlloc(size);
+    memcpy(msg1,msg,size);
+    FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg1);
+    return 0;
+  } 
+  
+  saveflag = Cmi_insidemachine ;
+  Cmi_insidemachine = TRUE ;
+  
+  if (size > MAX_FRAG_SIZE) {
+    /* Break the message into pieces and send each piece; start numbering
+     ** fragments with one.
+     */
+    int i;
+    int frags = ((size-1)/MAX_FRAG_SIZE) + 1;
+    
+    for(i=1;i<frags;i++) 
+      fragment_send(destPE, MAX_FRAG_SIZE, msg+((i-1)*MAX_FRAG_SIZE), 
+		    size, msg_type, frags);
+    
+    /* Last fragment is (probably) a different size. */
+    fragment_send(destPE, size - MAX_FRAG_SIZE*(frags-1),
+		  msg+(frags-1)*MAX_FRAG_SIZE,  size, msg_type, frags);
+    
+  } 
+  else fragment_send(destPE, size, msg, size, msg_type, 1);
+  
+  SendPackets(destPE);
+  
+  Cmi_insidemachine = saveflag ;
+}
 
 static int CmiProbe() 
 {
