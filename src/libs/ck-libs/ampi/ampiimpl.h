@@ -27,7 +27,7 @@ class ampiCommStruct {
 	int ndims;
 	CkPupBasicVec<int> dims;
 	CkPupBasicVec<int> periods;
-	
+
 	// graph virtual topology parameters
 	int nvertices;
 	CkPupBasicVec<int> index;
@@ -70,13 +70,14 @@ public:
 
 	int getSize(void) const {return size;}
 
-	/* For cartesian topologies 
+	/* For cartesian topologies
 	   Hack -- fix this
 	*/
 	inline int getndims() {return ndims;}
+	inline const CkPupBasicVec<int> &getindices() const {return indices;}
 	inline const CkPupBasicVec<int> &getdims() const {return dims;}
 	inline const CkPupBasicVec<int> &getperiods() const {return periods;}
-	
+
 	inline void setndims(int ndims_) {ndims = ndims_; }
 	inline void setdims(const CkPupBasicVec<int> &dims_) { dims = dims_; }
 	inline void setperiods(const CkPupBasicVec<int> &periods_) { periods = periods_; }
@@ -800,6 +801,8 @@ class ampi : public CBase_ampi {
     ~ampi();
 
     virtual void pup(PUP::er &p);
+    void block(void);
+    void unblock(void);
     void generic(AmpiMsg *);
     void reduceResult(CkReductionMsg *m);
     void splitPhase1(CkReductionMsg *msg);
@@ -834,6 +837,7 @@ class ampi : public CBase_ampi {
     inline int getRank(void) const {return myRank;}
     inline int getSize(void) const {return myComm.getSize();}
     inline MPI_Comm getComm(void) const {return myComm.getComm();}
+    inline CkPupBasicVec<int> getIndices(void) const { return myComm.getindices(); }
     inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
 
     inline CProxy_ampi comlibBegin(void) const {

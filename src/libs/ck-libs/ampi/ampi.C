@@ -977,6 +977,14 @@ const ampiCommStruct &universeComm2proxy(MPI_Comm universeNo)
   CkAbort("Bad communicator passed to universeComm2proxy");
 }
 
+void ampi::block(void){
+	thread->suspend();
+}
+
+void ampi::unblock(void){
+	thread->resume();
+}
+
 void
 ampi::generic(AmpiMsg* msg)
 {
@@ -996,7 +1004,7 @@ MSG_ORDER_DEBUG(
   }
   if(resumeOnRecv){
     thread->resume();
-  }	
+  }
 }
 
 void
@@ -1258,6 +1266,26 @@ int MPI_Comm_size(MPI_Comm comm, int *size)
 {
   AMPIAPI("MPI_Comm_size");
   *size = (comm==MPI_COMM_SELF)?1:getAmpiInstance(comm)->getSize();
+  return 0;
+}
+
+CDECL
+int MPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result)
+{
+  AMPIAPI("MPI_Comm_compare");
+  if(comm1==comm2) *result=MPI_IDENT;
+  else{
+    int equal=1;
+    CkPupBasicVec<int> ind1, ind2;
+    ind1 = getAmpiInstance(comm1)->getIndices();
+    ind2 = getAmpiInstance(comm2)->getIndices();
+    if(ind1.size()==ind2.size()){
+      for(int i=0;i<ind1.size();i++)
+        if(ind1[i] != ind2[i]) { equal=0; break; }
+    }
+    if(equal==1) *result=MPI_CONGRUENT;
+    else *result=MPI_UNEQUAL;
+  }
   return 0;
 }
 
@@ -2489,6 +2517,7 @@ int MPI_Get_elements(MPI_Status *sts, MPI_Datatype dtype, int *count){
   AMPIAPI("MPI_Get_elements");
   CkDDT_DataType* dttype = getDDT()->getType(dtype) ;
   int basesize = dttype->getBaseSize() ;
+  if(basesize==0) basesize=dttype->getSize();
   *count = sts->MPI_LENGTH/basesize;
   return 0;
 }
@@ -2529,7 +2558,7 @@ CDECL
 int MPI_Get_processor_name(char *name, int *resultlen){
   AMPIAPI("MPI_Get_processor_name");
   ampiParent *ptr = getAmpiParent();
-  sprintf(name,"AMPI_VP[%d]_PE[%d]\n",ptr->thisIndex,ptr->getMyPe());
+  sprintf(name,"AMPI_VP[%d]_PE[%d]",ptr->thisIndex,ptr->getMyPe());
   *resultlen = strlen(name);
   return 0;
 }
@@ -2571,7 +2600,6 @@ int MPI_Error_class(int errorcode, int *errorclass){
 	*errorclass = errorcode;
 	return MPI_SUCCESS;
 }
-
 
 CDECL
 int MPI_Error_string(int errorcode, char *string, int *resultlen)
@@ -3255,7 +3283,7 @@ void _registerampif(void)
 }
 
 void MPI_Datatype_iscontig(MPI_Datatype datatype, int *flag){
-  *flag = getDDT()->iscontig(datatype);
+  *flag = getDDT()->isContig(datatype);
 }
 
 CDECL
@@ -3269,6 +3297,22 @@ int MPI_Type_get_contents(MPI_Datatype datatype, int ni, int na, int nd, int i[]
   AMPIAPI("MPI_Type_get_contents");
   return getDDT()->getContents(datatype,ni,na,nd,i,a,d);
 }
+
+CDECL
+int MPI_Yield(int comm) {
+	AMPIAPI("MPI_Yield");
+	getAmpiInstance(comm)->block();
+	return 0;
+}
+
+CDECL
+int MPI_Resume(int dest, int comm) {
+	AMPIAPI("MPI_Resume");
+	getAmpiInstance(comm)->getProxy()[dest].unblock();
+	return 0;
+}
+
+
 
 #include "ampi.def.h"
 

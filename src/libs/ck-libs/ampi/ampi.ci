@@ -12,6 +12,7 @@ module ampi {
   array[1D] ampi {
     entry ampi();
     entry ampi(CkArrayID parent_,ampiCommStruct s);
+    entry void unblock(void);
     entry void generic(AmpiMsg *);
     entry void reduceResult(CkReductionMsg *m);
     entry void splitPhase1(CkReductionMsg *msg);

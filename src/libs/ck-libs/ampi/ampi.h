@@ -132,8 +132,8 @@ This is needed so we can call the routine as a new thread.
 
 #define MPI_IDENT	0
 #define MPI_SIMILAR	1
-#define MPI_UNEQUAL	2
-#define MPI_CONGRUENT   3
+#define MPI_CONGRUENT   2
+#define MPI_UNEQUAL	3
 
 #define MPI_OP_NULL   0
 #define MPI_MAX       1
@@ -356,6 +356,7 @@ int MPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm);
 
 int MPI_Comm_size(MPI_Comm comm, int *size);
 int MPI_Comm_rank(MPI_Comm comm, int *rank);
+int MPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result);
 int MPI_Comm_dup(MPI_Comm src, MPI_Comm *dest);
 int MPI_Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest);
 int MPI_Comm_free(MPI_Comm *comm);
@@ -416,6 +417,8 @@ int MPI_Abort(MPI_Comm comm, int errorcode);
 /* int MPI_Pcontrol(const int level, ...); */
 
 /***extras***/
+int MPI_Yield(int comm);
+int MPI_Resume(int dest, int comm);
 void MPI_Print(char *str);
 int MPI_Register(void *, MPI_PupFn);
 void MPI_Migrate(void);
