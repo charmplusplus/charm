@@ -1,0 +1,18 @@
+CMK_CPP_C='cc -Aa -E '
+CMK_CC='cc -Aa -D_HPUX_SOURCE +DAportable -w '
+CMK_CC_RELIABLE='cc -Aa -D_HPUX_SOURCE +DAportable '
+CMK_CC_FASTEST='cc -Aa -D_HPUX_SOURCE +DAportable '
+CMK_CXX='CC -D_HPUX_SOURCE +DAportable -w '
+CMK_CXXPP='CC -Aa -D_HPUX_SOURCE -E +DAportable '
+CMK_C_OPTIMIZE='+O3 +Onolimit '
+CMK_CXX_OPTIMIZE='+O3 +Onolimit '
+CMK_LD='cc -Aa -D_HPUX_SOURCE +DAportable '
+CMK_LDXX='CC -Aa -D_HPUX_SOURCE -Wl,+n +DAportable '
+CMK_SEQ_CC='cc -Aa -D_HPUX_SOURCE +DAportable '
+CMK_SEQ_LD='cc -Aa -D_HPUX_SOURCE +DAportable '
+CMK_SEQ_CXX='CC -Aa -D_HPUX_SOURCE +DAportable '
+CMK_SEQ_LDXX='CC -Aa -D_HPUX_SOURCE +DAportable '
+CMK_CPP_SUFFIX="i"
+CMK_XLATPP='charmxlat++ '
+CMK_QT='hpux-cc'
+

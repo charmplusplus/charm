@@ -55,8 +55,11 @@
 
 #define CMK_SHARED_VARS_EXEMPLAR                           0
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
-#define CMK_SHARED_VARS_SUN_THREADS                            0
+#define CMK_SHARED_VARS_SUN_THREADS                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
+
+#define CMK_THREADS_USE_CONTEXT                            0
+#define CMK_STACK_GROWUP                                   1
 
 #define CMK_SIGNAL_NOT_NEEDED                              0
 #define CMK_SIGNAL_USE_SIGACTION                           1
@@ -97,12 +100,11 @@
 #define CMK_USE_HP_MAIN_FIX                                0
 #define CMK_DONT_USE_HP_MAIN_FIX                           1
 
+#define CMK_DEBUG_MODE                                     0
+#define CMK_WEB_MODE                                       1
 
-#define CMK_LBDB_ON					   0
-#define CMK_LBDB_OFF					   1
-
-
-
+#define CMK_LBDB_ON					   1
+#define CMK_LBDB_OFF					   0
 
 
 #endif
