@@ -9,12 +9,19 @@
 #define _XI_UTIL_H
 
 #include <string.h>
-#include <iostream>
-using std::cout;
-using std::cerr;
-using std::endl;
 #include <stdlib.h>
 #include <stdio.h>
+#include "conv-config.h"
+
+#if CMK_STL_USE_DOT_H /* Pre-standard C++ */
+#  include <iostream.h>
+#else /* ISO C++ */
+#  include <iostream>
+   using std::cout;
+   using std::cerr;
+   using std::endl;
+#endif
+
 
 #define SZ 1024
 

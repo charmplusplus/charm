@@ -8,8 +8,13 @@
 #include <stdlib.h>
 #include "xi-symbol.h"
 #include <ctype.h> // for tolower()
-#include <fstream>
-using std::ofstream;
+
+#if CMK_STL_USE_DOT_H  /* Pre-standard C++ */
+#  include <fstream.h>
+#else /* ISO C++ */
+#  include <fstream>
+   using std::ofstream;
+#endif
 
 int fortranMode;
 const char *cur_file;
