@@ -31,6 +31,7 @@ extern CkReduction::reducerType sparse_product_double;
 extern CkReduction::reducerType sparse_max_int;
 extern CkReduction::reducerType sparse_max_float;
 extern CkReduction::reducerType sparse_max_double;
+
 extern CkReduction::reducerType sparse_min_int;
 extern CkReduction::reducerType sparse_min_float;
 extern CkReduction::reducerType sparse_min_double;
@@ -39,7 +40,7 @@ extern CkReduction::reducerType sparse_min_double;
 ** To contribute a sparse array,
 **    create an object of CkSparseReducer1D<T> r(numOfElements). Here 'numOfElements' is the # elements to contribute.
 **    call r.add(index, data) 'numOfElements' times, to add all the elements to the object r.
-**    call r.contribute(...)
+**    call r.contribute[Sum | Product | Max | Min](ArrayElement *) e.g. to using 'sum' operation call contributeSum(this)
 */
 
 template <class T>
@@ -63,13 +64,6 @@ class CkSparseReducer1D
 				delete[] records;
 		}
 
-		/*void add(int i, T data)
-		{
-			records[index].index = i;
-			records[index].data = data;
-			index++;
-		}*/
-
 		void add(int i, T data)
 		{
                 	int ind = index;
@@ -84,14 +78,92 @@ class CkSparseReducer1D
 			index++;
 		}
 
-                void contribute(ArrayElement *elem, CkReduction::reducerType type)
-		{
-			elem->contribute(size*sizeof(rec), records, type);
+                // contribute to sum reducers
+                void contributeSum(ArrayElement *elem, const CkCallback &cb)
+                {
+			T dummy; // to resolve the function to be called
+                        contributeSum(elem, cb, dummy);
                 }
 
-		void contribute(ArrayElement *elem, CkReduction::reducerType type, const CkCallback &cb)
+                void contributeSum(ArrayElement *elem, const CkCallback &cb, int dummy)
 		{
-			elem->contribute(size*sizeof(rec), records, type, cb);
+			elem->contribute(size*sizeof(rec), records, sparse_sum_int, cb);
+		}
+
+                void contributeSum(ArrayElement *elem, const CkCallback &cb, float dummy)
+		{
+			elem->contribute(size*sizeof(rec), records, sparse_sum_float, cb);
+		}
+
+                void contributeSum(ArrayElement *elem, const CkCallback &cb, double dummy)
+		{
+			elem->contribute(size*sizeof(rec), records, sparse_sum_double, cb);
+		}
+
+                // contribute to product reducers
+                void contributeProduct(ArrayElement *elem, const CkCallback &cb)
+                {
+			T dummy;
+                        contributeProduct(elem, cb, dummy);
+                }
+
+                void contributeProduct(ArrayElement *elem, const CkCallback &cb, int dummy)
+		{
+			elem->contribute(size*sizeof(rec), records, sparse_product_int, cb);
+		}
+
+                void contributeProduct(ArrayElement *elem, const CkCallback &cb, float dummy)
+		{
+			elem->contribute(size*sizeof(rec), records, sparse_product_float, cb);
+		}
+
+                void contributeProduct(ArrayElement *elem, const CkCallback &cb, double dummy)
+		{
+			elem->contribute(size*sizeof(rec), records, sparse_product_double, cb);
+		}
+
+                // contribute to max reducers
+                void contributeMax(ArrayElement *elem, const CkCallback &cb)
+                {
+			T dummy;
+                        contributeMax(elem, cb, dummy);
+                }
+
+                void contributeMax(ArrayElement *elem, const CkCallback &cb, int dummy)
+		{
+			elem->contribute(size*sizeof(rec), records, sparse_max_int, cb);
+		}
+
+                void contributeMax(ArrayElement *elem, const CkCallback &cb, float dummy)
+		{
+			elem->contribute(size*sizeof(rec), records, sparse_max_float, cb);
+		}
+
+                void contributeMax(ArrayElement *elem, const CkCallback &cb, double dummy)
+		{
+			elem->contribute(size*sizeof(rec), records, sparse_max_double, cb);
+		}
+
+                // contribute to min reducers
+                void contributeMin(ArrayElement *elem, const CkCallback &cb)
+                {
+			T dummy;
+                        contributeMin(elem, cb, dummy);
+                }
+
+                void contributeMin(ArrayElement *elem, const CkCallback &cb, int dummy)
+		{
+			elem->contribute(size*sizeof(rec), records, sparse_min_int, cb);
+		}
+
+                void contributeMin(ArrayElement *elem, const CkCallback &cb, float dummy)
+		{
+			elem->contribute(size*sizeof(rec), records, sparse_min_float, cb);
+		}
+
+                void contributeMin(ArrayElement *elem, const CkCallback &cb, double dummy)
+		{
+			elem->contribute(size*sizeof(rec), records, sparse_min_double, cb);
 		}
 
 	protected:
