@@ -232,6 +232,7 @@ void skt_server(pip,ppo,pfd)
   if (fd < 0) { perror("ERROR> socket"); exit(1); }
   memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
+  if(*ppo != 0) { addr.sin_port = htons(*ppo); }
   ok = bind(fd, (struct sockaddr *)&addr, sizeof(addr));
   if (ok < 0) { perror("ERROR> bind"); exit(1); }
   ok = listen(fd,5);
@@ -1354,6 +1355,7 @@ char *arg_shell;
 
 #if CMK_CCS_AVAILABLE
 int   arg_server;
+int   arg_server_port;
 #endif
 
 #if CMK_DEBUG_MODE
@@ -1372,6 +1374,7 @@ void arg_init(int argc, char **argv)
   pparam_defflag("debug-no-pause"    );
 #if CMK_CCS_AVAILABLE
   pparam_defflag("server"            );
+  pparam_defint ("server-port"   , 0 );
 #endif
 #if CMK_DEBUG_MODE
   pparam_defflag("gdbinterface"      );
@@ -1391,6 +1394,7 @@ void arg_init(int argc, char **argv)
   pparam_doc("debug-no-pause","Like debug, except doesn't pause at beginning");
 #if CMK_CCS_AVAILABLE
   pparam_doc("server",        "Enable client-server mode");
+  pparam_doc("server-port",   "Port to listen for CCS requests");
 #endif
 #if CMK_DEBUG_MODE
   pparam_doc("gdbinterface",  "Allow the gdb interface to be integrated");
@@ -1417,6 +1421,7 @@ void arg_init(int argc, char **argv)
   arg_debug_no_pause = pparam_getflag("debug-no-pause");
 #if CMK_CCS_AVAILABLE
   arg_server         = pparam_getflag("server");
+  arg_server_port    = pparam_getint("server-port");
 #endif
 #if CMK_DEBUG_MODE
   arg_gdbinterface   = pparam_getflag("gdbinterface");
@@ -2499,6 +2504,7 @@ void req_worker(int workerno)
   hostfd = req_pipes[workerno].fd[1];
   numclients = req_pipes[workerno].endnode - req_pipes[workerno].startnode;
   for (i=3; i<512; i++) if (i!=hostfd) close(i);
+  master_port = 0;
   skt_server(&master_ip, &master_port, &master_fd);
   sprintf(reply,"worker %d %d %d", workerno, master_ip, master_port);
   req_write_to_host(hostfd, reply, strlen(reply)+1);
@@ -2946,6 +2952,7 @@ main(argc, argv)
 
 #if CMK_CCS_AVAILABLE
   if(arg_server == 1){
+    myPortNo = arg_server_port;
     skt_server(&myIP, &myPortNo, &myFd);
     printf("ccs: %s\nccs: Server IP = %u, Server port = %u $\n", 
            CMK_CCS_VERSION, myIP, myPortNo);
