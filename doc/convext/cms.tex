@@ -102,7 +102,7 @@ int worker(Task *t, Response **r)
     CmiPrintf("%d: in worker %f \verb+\n+", CmiMyPe(), t->a);
     *r = (Response *) malloc(sizeof(Response));
     (*r)->result = t->a * t->a;
-    return sizeof(Rseponse);
+    return sizeof(Response);
 \}
 
 int consumer(Response * r, int refnum)
