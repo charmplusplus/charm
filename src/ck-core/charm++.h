@@ -267,10 +267,11 @@ class Chare {
     CkChareID thishandle;
   public:
     Chare(CkMigrateMessage *m) {}
-    Chare() { CkGetChareID(&thishandle); }
+    Chare();
     virtual ~Chare(); //<- needed for *any* child to have a virtual destructor
     virtual void pup(PUP::er &p);//<- pack/unpack routine
     inline const CkChareID &ckGetChareID(void) const {return thishandle;}
+    inline void CkGetChareID(CkChareID *dest) const {*dest=thishandle;}
     CHARM_INPLACE_NEW
 };
 
@@ -306,11 +307,12 @@ class IrrGroup : public Chare {
     inline CmiBool ckTracingEnabled(void) {return ckEnableTracing;}
 
     IrrGroup(CkMigrateMessage *m) { }
-    IrrGroup() { thisgroup = CkGetGroupID(); ckEnableTracing=CmiTrue; }
+    IrrGroup();
     virtual ~IrrGroup(); //<- needed for *any* child to have a virtual destructor
 
     virtual void pup(PUP::er &p);//<- pack/unpack routine
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
+    inline CkGroupID CkGetGroupID(void) const {return thisgroup;}
 
     ///Map an index (user-defined meaning) to a component:
     virtual CkComponent *ckLookupComponent(int userIndex);
@@ -319,9 +321,10 @@ class IrrGroup : public Chare {
 class NodeGroup : public IrrGroup { //Superclass of all NodeGroups
   public:
     CmiNodeLock __nodelock;
-    NodeGroup() { thisgroup=CkGetNodeGroupID(); __nodelock=CmiCreateLock();}
-    ~NodeGroup() { CmiDestroyLock(__nodelock); }
+    NodeGroup();
+    ~NodeGroup();
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
+    inline CkGroupID CkGetNodeGroupID(void) const {return thisgroup;}
 };
 
 
@@ -425,7 +428,6 @@ class CProxy_Chare : public CProxy {
     void pup(PUP::er &p) {
     	CProxy::pup(p);
     	p(_ck_cid.onPE);
-    	p(_ck_cid.magic);
     	//Copy the pointer as straight bytes
     	p((void *)&_ck_cid.objPtr,sizeof(_ck_cid.objPtr));
     }
@@ -508,7 +510,6 @@ class CProxy_Group : public CProxy {
     CkChareID ckGetChareID(void) const { 
     	CkChareID ret;
     	ret.onPE=CkMyPe();
-    	ret.magic=0;//<- fake "chare type" value
     	ret.objPtr=CkLocalBranch(_ck_gid);
     	return ret; 
     }

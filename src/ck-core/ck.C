@@ -16,24 +16,39 @@ int CkIndex_Chare::__idx;
 int CkIndex_Group::__idx;
 int CkIndex_ArrayBase::__idx=-1;
 
-IrrGroup::~IrrGroup() {}
-
-//Chare virtual functions: declaring these here results in a smaller executable
+//Charm++ virtual functions: declaring these here results in a smaller executable
+Chare::Chare(void) {
+  thishandle.onPE=CkMyPe();
+  thishandle.objPtr=this;
+}
 Chare::~Chare() {}
 
 void Chare::pup(PUP::er &p) 
 {
-	 p(thishandle.onPE);
-	 p(thishandle.magic);
-	 thishandle.objPtr=(void *)this;
+  p(thishandle.onPE);
+  thishandle.objPtr=(void *)this;
 } 
+
+IrrGroup::IrrGroup(void) {
+  thisgroup = CkpvAccess(_currentGroup); 
+  ckEnableTracing=CmiTrue; 
+}
+IrrGroup::~IrrGroup() {}
 
 void IrrGroup::pup(PUP::er &p) 
 {
-	Chare::pup(p);
-	p|thisgroup;
-	p|ckEnableTracing;
-} 
+  Chare::pup(p);
+  p|thisgroup;
+  p|ckEnableTracing;
+}
+
+NodeGroup::NodeGroup(void) {
+  __nodelock=CmiCreateLock();
+}
+NodeGroup::~NodeGroup() {
+  CmiDestroyLock(__nodelock);
+}
+
 
 CkComponent::~CkComponent() {}
 void CkComponent::pup(PUP::er &p) {}
@@ -148,23 +163,6 @@ int CkGetSrcNode(void *msg)
 }
 
 extern "C"
-void CkGetChareID(CkChareID *pCid) {
-  pCid->onPE = CkMyPe();
-  pCid->objPtr = CkpvAccess(_currentChare);
-  //  pCid->magic = _GETIDX(CkpvAccess(_currentChareType));
-}
-
-extern "C"
-CkGroupID CkGetGroupID(void) {
-  return CkpvAccess(_currentGroup);
-}
-
-extern "C"
-CkGroupID CkGetNodeGroupID(void) {
-  return CkpvAccess(_currentNodeGroup);
-}
-
-extern "C"
 void *CkLocalBranch(CkGroupID gID) {
   return _localBranch(gID);
 }
@@ -241,17 +239,9 @@ void _createGroupMember(CkGroupID groupID, int eIdx, void *msg)
       CldEnqueue(CkMyPe(), pending, _infoIdx);
     delete ptrq;
   }
-  register void *prev = CkpvAccess(_currentChare);
-  register int prevtype = CkpvAccess(_currentChareType);
-  CkpvAccess(_currentChare) = obj;
-  CkpvAccess(_currentChareType) = gIdx;
-  register CkGroupID prevGrp = CkpvAccess(_currentGroup);
   CkpvAccess(_currentGroup) = groupID;
   _SET_USED(UsrToEnv(msg), 0);
   _entryTable[eIdx]->call(msg, obj);
-  CkpvAccess(_currentChare) = prev;
-  CkpvAccess(_currentChareType) = prevtype;
-  CkpvAccess(_currentGroup) = prevGrp;
   _STATS_RECORD_PROCESS_GROUP_1();
 }
 
@@ -270,17 +260,9 @@ void _createNodeGroupMember(CkGroupID groupID, int eIdx, void *msg)
       CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
     delete ptrq;
   }
-  register void *prev = CkpvAccess(_currentChare);
-  register int prevtype = CkpvAccess(_currentChareType);
-  CkpvAccess(_currentChare) = obj;
-  CkpvAccess(_currentChareType) = gIdx;
-  register CkGroupID prevGrp = CkpvAccess(_currentNodeGroup);
-  CkpvAccess(_currentNodeGroup) = groupID;
+  CkpvAccess(_currentGroup) = groupID;
   _SET_USED(UsrToEnv(msg), 0);
   _entryTable[eIdx]->call(msg, obj);
-  CkpvAccess(_currentChare) = prev;
-  CkpvAccess(_currentChareType) = prevtype;
-  CkpvAccess(_currentNodeGroup) = prevGrp;
   _STATS_RECORD_PROCESS_NODE_GROUP_1();
 }
 
@@ -405,8 +387,6 @@ static void _processNewChareMsg(envelope *env)
 {
   register void *obj = _allocNewChare(env);
   register void *msg = EnvToUsr(env);
-  CkpvAccess(_currentChare) = obj;
-  CkpvAccess(_currentChareType)=_entryTable[env->getEpIdx()]->chareIdx;
   _TRACE_BEGIN_EXECUTE(env);
   _SET_USED(env, 0);
   _entryTable[env->getEpIdx()]->call(msg, obj);
@@ -428,8 +408,6 @@ static void _processNewVChareMsg(envelope *env)
   CmiSetHandler(ret, _charmHandlerIdx);
   CmiSyncSendAndFree(srcPe, ret->getTotalsize(), (char *)ret);
   CpvAccess(_qd)->create();
-  CkpvAccess(_currentChare) = obj;
-  CkpvAccess(_currentChareType)=_entryTable[env->getEpIdx()]->chareIdx;
   register void *msg = EnvToUsr(env);
   _TRACE_BEGIN_EXECUTE(env);
   _SET_USED(env, 0);
@@ -442,8 +420,6 @@ static void _processNewVChareMsg(envelope *env)
 static inline void _deliverForChareMsg(int epIdx,envelope *env,void *obj)
 {
   register void *msg = EnvToUsr(env);
-  CkpvAccess(_currentChare) = obj;
-  CkpvAccess(_currentChareType)=_entryTable[epIdx]->chareIdx;
   _TRACE_BEGIN_EXECUTE(env);
   _SET_USED(env, 0);
   _entryTable[epIdx]->call(msg, obj);
@@ -477,7 +453,6 @@ static inline void _processForBocMsg(envelope *env)
     return;
   }
   CpvAccess(_qd)->process();
-  CkpvAccess(_currentGroup) = groupID;
   register int epIdx = env->getEpIdx();
   _deliverForBocMsg(epIdx,env,obj);
 }
@@ -497,7 +472,6 @@ static inline void _processForNodeBocMsg(envelope *env)
   CpvAccess(_qd)->process();
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
-  CkpvAccess(_currentNodeGroup) = groupID;
   _processForChareMsg(env);
   _STATS_RECORD_PROCESS_NODE_BRANCH_1();
 }
@@ -508,7 +482,7 @@ static inline void _processFillVidMsg(envelope *env)
   _CHECK_VALID(vptr, "FillVidMsg: Not a valid VIdPtr\n");
   register CkChareID *pcid = (CkChareID *) EnvToUsr(env);
   _CHECK_VALID(pcid, "FillVidMsg: Not a valid pCid\n");
-  vptr->fill(pcid->onPE, pcid->objPtr, pcid->magic);
+  vptr->fill(pcid->onPE, pcid->objPtr);
   CmiFree(env);
 }
 

@@ -611,9 +611,6 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,int epIdx) {
 	DEBS((AA"   Invoking entry %d on element %s\n"AB,epIdx,idx2str(idx)));
 	CmiBool isDeleted=CmiFalse; //Enables us to detect deletion during processing
 	deletedMarker=&isDeleted;
-	//The currentChare globals are used by CkGetChareID()
-	CkpvAccess(_currentChare) = (void*) obj;
-	CkpvAccess(_currentChareType) = _entryTable[epIdx]->chareIdx;
 	startTiming();
 	if (msg) {
 		envelope *env=UsrToEnv(msg);

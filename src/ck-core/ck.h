@@ -46,11 +46,10 @@ class VidBlock {
         msgDeliver(env);
       }
     }
-    void fill(int onPE, void *oPtr, int magic) {
+    void fill(int onPE, void *oPtr) {
       state = FILLED;
       actualID.onPE = onPE;
       actualID.objPtr = oPtr;
-      actualID.magic = magic;
       envelope *env;
       while(NULL!=(env=(envelope*)msgQ->deq())) {
         msgDeliver(env);

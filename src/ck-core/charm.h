@@ -89,7 +89,6 @@ typedef struct _ckargmsg {
 
 typedef struct {
   int   onPE;
-  int   magic;
   void* objPtr;
 } CkChareID;
 
@@ -217,9 +216,6 @@ extern void CkWaitQD(void);
 extern void *CkLocalBranch(CkGroupID gID);
 extern void *CkLocalNodeBranch(CkGroupID gID);
 extern void *CkLocalChare(const CkChareID *chare);
-extern void  CkGetChareID(CkChareID *pcid);
-extern CkGroupID   CkGetGroupID(void);
-extern CkGroupID   CkGetNodeGroupID(void);
 extern void  CkExit(void);
 extern void CkPrintEntryMethod(int epIdx);
 extern void CkPrintChareName(int chareIdx);

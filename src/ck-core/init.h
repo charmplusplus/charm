@@ -80,10 +80,7 @@ extern int     _nodeBocHandlerIdx;
 extern int     _qdHandlerIdx;
 extern CmiNodeLock _nodeLock;
 
-CkpvExtern(void*,       _currentChare);
-CkpvExtern(int,       _currentChareType);
-CkpvExtern(CkGroupID,         _currentGroup);
-CkpvExtern(CkGroupID,         _currentNodeGroup);
+CkpvExtern(CkGroupID,_currentGroup);
 CkpvExtern(GroupTable, _groupTable);
 CkpvExtern(unsigned int, _numGroups);
 extern unsigned int _numNodeGroups;
