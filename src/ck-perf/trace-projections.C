@@ -422,8 +422,8 @@ double LogEntry::write(FILE* fp, double prevTime, double *timeErr)
       fprintf(fp, "%u %d\n", intTimeDiff, pe);
       break;
     case BEGIN_PROCESSING:
-      fprintf(fp, "%d %d %u %d %d %d %d %d %d %d\n", mIdx, intTimeDiff, 
-	      eIdx, event, pe, msglen, (UInt)(recvTime*1.e6), 
+      fprintf(fp, "%d %d %u %d %d %d %d %d %d %d\n", mIdx, eIdx, 
+	      intTimeDiff, event, pe, msglen, (UInt)(recvTime*1.e6), 
 	      id.id[0], id.id[1], id.id[2]);
       break;
     case CREATION:
