@@ -252,8 +252,13 @@ int  portFinish = 0;
 
 #define PRINTBUFSIZE 16384
 
-static void CommunicationServer(int withDelayMs);
-static void CommunicationServerThread(int withDelayMs);
+/*
+0: from smp thread
+1: from interrupt
+2: from worker thread
+*/
+static void CommunicationServer(int withDelayMs, int where);
+
 void CmiHandleImmediate();
 extern int CmemInsideMem();
 extern void CmemCallWhenMemAvail();
@@ -578,6 +583,7 @@ static int        Cmi_charmrun_pid;
 static int        Cmi_charmrun_fd=-1;
 
 static int    Cmi_netpoll;
+static int    Cmi_asyncio;
 static int    Cmi_idlepoll;
 static int    Cmi_syncprint;
 static int Cmi_print_stats = 0;
@@ -781,7 +787,7 @@ static void CommunicationInterrupt(int ignored)
     /*Make sure any malloc's we do in here are NOT migratable:*/
     CmiIsomallocBlockList *oldList=CmiIsomallocBlockListActivate(NULL);
 /*    _Cmi_myrank=1; */
-    CommunicationServerThread(0);
+    CommunicationServer(0, 1);     /* from interrupt */
 /*    _Cmi_myrank=0; */
     CmiIsomallocBlockListActivate(oldList);
   }
@@ -805,7 +811,8 @@ static void CmiStartThreads(char **argv)
   _Cmi_myrank=0;
   
 #if !CMK_ASYNC_NOT_NEEDED
-  if (!Cmi_netpoll) {
+  if (Cmi_asyncio)
+  {
     CmiSignal(SIGIO, 0, 0, CommunicationInterrupt);
     if (dataskt!=-1) CmiEnableAsyncIO(dataskt);
     if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
@@ -1205,8 +1212,9 @@ static void CmiStdoutInit(void) {
 #if 0 /*Keep writes from blocking.  This just drops excess output, which is bad.*/
 		CmiEnableNonblockingIO(srcFd);
 #endif
-#if CMK_SHARED_VARS_UNAVAILABLE && !CMK_USE_GM
-                if (!Cmi_netpoll) {
+#if CMK_SHARED_VARS_UNAVAILABLE
+                if (Cmi_asyncio)
+		{
   /*No communication thread-- get a SIGIO on each write(), which keeps the buffer clean*/
 			CmiEnableAsyncIO(readStdout[i]);
 		}
@@ -1618,7 +1626,7 @@ CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
   DeliverOutgoingNodeMessage(ogm);
   CmiCommUnlock();
   /* Check if any packets have arrived recently (preserves kernel network buffers). */
-  CommunicationServer(0);
+  CommunicationServer(0, 2);
   return (CmiCommHandle)ogm;
 }
 
@@ -1686,7 +1694,7 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   DeliverOutgoingMessage(ogm);
   CmiCommUnlock();
   /* Check if any packets have arrived recently (preserves kernel network buffers). */
-  CommunicationServer(0);
+  CommunicationServer(0, 2);
   return (CmiCommHandle)ogm;
 }
 
@@ -1858,16 +1866,16 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 #if CMK_IMMEDIATE_MSG
 void CmiProbeImmediateMsg()
 {
-  CommunicationServerThread(0);
+  CommunicationServer(0, 0);
 }
 #endif
 */
 
 /* Network progress function is used to poll the network when for
-   messages. This flushes receive buffers on some  implementations*/ 
+   messages. This flushes receive buffers on some implementations*/ 
 void CmiMachineProgressImpl()
 {
-    CommunicationServerThread(0);
+    CommunicationServer(0, 0);
 }
 
 /******************************************************************************
@@ -1954,7 +1962,7 @@ static void ConverseRunPE(int everReturn)
 
 #if ! CMK_USE_GM && ! CMK_USE_TCP
     /*Occasionally check for retransmissions, outgoing acks, etc.*/
-    /*no need in GM case */
+    /*no need for GM case */
     CcdCallFnAfter((CcdVoidFn)CommunicationsClockCaller,NULL,Cmi_comm_clock_delay);
 #endif
 #endif
@@ -1974,7 +1982,7 @@ static void ConverseRunPE(int everReturn)
   if (CmiMyRank() == CmiMyNodeSize()) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
     if (Cmi_charmrun_fd!=-1)
-          while (1) CommunicationServerThread(5);
+          while (1) CommunicationServer(5, 0);
   }
   else
   if (!everReturn) {
@@ -2001,7 +2009,7 @@ void ConverseExit(void)
   if (Cmi_charmrun_fd!=-1) {
   	ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away */
 #if CMK_SHARED_VARS_UNAVAILABLE
- 	while (1) CommunicationServer(500);
+ 	while (1) CommunicationServer(500, 2);
 #endif
   }
 /*Comm. thread will kill us.*/
@@ -2071,6 +2079,13 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
     /* idlesleep use sleep instead if busywait when idle */
   if (CmiGetArgFlagDesc(argv,"+idlesleep","Make sleep calls when idle")) Cmi_idlepoll = 0;
   Cmi_syncprint = CmiGetArgFlagDesc(argv,"+syncprint", "Flush each CmiPrintf to the terminal");
+
+  Cmi_asyncio= 1;
+  if (Cmi_netpoll) Cmi_asyncio = 0;     /* netpoll turn off async io */
+#if CMK_USE_GM
+  Cmi_asyncio = 1;			/* gm use async io */
+#endif
+  if (CmiGetArgFlagDesc(argv,"+asyncio","Use async IO")) Cmi_asyncio = 1;
 
   MACHSTATE2(5,"Init: (netpoll=%d), (idlepoll=%d)",Cmi_netpoll,Cmi_idlepoll);
 

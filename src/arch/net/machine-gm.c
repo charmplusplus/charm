@@ -5,7 +5,6 @@
   * CmiNotifyIdle()
   * DeliverViaNetwork()
   * CommunicationServer()
-  * CommunicationServerThread()
 
   written by 
   Gengbin Zheng, gzheng@uiuc.edu  4/22/2001
@@ -239,16 +238,24 @@ int CheckSocketsReady(int withDelayMs)
  *
  ***********************************************************************/
 
+static void ServiceCharmrun()
+{
+  int again = 1;
+  CmiCommLock();
+  while (again)
+  {
+  again = 0;
+  CheckSocketsReady(0);
+  if (ctrlskt_ready_read) { ctrl_getone(); again=1; }
+  if (CmiStdoutNeedsService()) { CmiStdoutService(); }
+  }
+  CmiCommUnlock();
+}
 
 static void CommunicationServer_nolock(int withDelayMs) {
   gm_recv_event_t *e;
-  int size, len;
-  char *msg, *buf;
-  while (1) {
-    CheckSocketsReady(0);
-    if (ctrlskt_ready_read) { ctrl_getone(); }
-    if (CmiStdoutNeedsService()) { CmiStdoutService(); }
 
+  while (1) {
     MACHSTATE(3,"Non-blocking receive {")
     e = gm_receive(gmport);
     MACHSTATE(3,"} Non-blocking receive")
@@ -256,30 +263,32 @@ static void CommunicationServer_nolock(int withDelayMs) {
   }
 }
 
-static void CommunicationServer(int withDelayMs)
+/*
+0: from smp thread
+1: from interrupt
+2: from worker thread
+*/
+static void CommunicationServer(int withDelayMs, int where)
 {
-  MACHSTATE1(2,"CommunicationServer(%d)",withDelayMs)
-  LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
-
   /* standalone mode */
   if (Cmi_charmrun_pid == 0 && gmport == NULL) return;
 
+  ServiceCharmrun();
+  if (where == 1) return;
+
+  MACHSTATE1(2,"CommunicationServer(%d)",withDelayMs)
+  LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
+
   CmiCommLock();
-
   CommunicationServer_nolock(withDelayMs);
-
   CmiCommUnlock();
-  MACHSTATE(2,"} CommunicationServer")
-}
 
-/* similar to CommunicationServer, but it is called by communication thread
-   or in interrupt */
-static void CommunicationServerThread(int sleepTime)
-{
-  CommunicationServer(sleepTime);
 #if CMK_IMMEDIATE_MSG
+  if (where == 0)
   CmiHandleImmediate();
 #endif
+
+  MACHSTATE(2,"} CommunicationServer")
 }
 
 static void processMessage(char *msg, int len)

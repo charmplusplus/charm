@@ -6,7 +6,6 @@
   * CmiNotifyIdle()
   * DeliverViaNetwork()
   * CommunicationServer()
-  * CommunicationServerThread()
 
   written by 
   Gengbin Zheng, 12/21/2001
@@ -63,7 +62,7 @@ static void CmiNotifyBeginIdle(CmiIdleState *s)
 static void CmiNotifyStillIdle(CmiIdleState *s)
 {
 #if CMK_SHARED_VARS_UNAVAILABLE
-  CommunicationServerThread(1);
+  CommunicationServer(1, 0);
 #else
   int nSpins=20; /*Number of times to spin before sleeping*/
   s->nIdles++;
@@ -242,8 +241,12 @@ here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK.
  *
  ***********************************************************************/
 
-
-static void CommunicationServer(int sleepTime)
+/*
+0: from smp thread
+1: from interrupt
+2: from worker thread
+*/
+static void CommunicationServer(int sleepTime, int where)
 {
   unsigned int nTimes=0; /* Loop counter */
   CmiCommLockOrElse({
@@ -281,18 +284,18 @@ static void CommunicationServer(int sleepTime)
     }
   }
   CmiCommUnlock();
-  MACHSTATE(2,"} CommunicationServer") 
-}
 
-/* similar to CommunicationServer, but it is called by communication thread
-   or in interrupt */
-static void CommunicationServerThread(int sleepTime)
-{
-  CommunicationServer(sleepTime);
+  /* when called by communication thread or in interrupt */
+  if (where == 0 || where == 1)
+  {
 #if CMK_IMMEDIATE_MSG
   CmiHandleImmediate();
 #endif
+  }
+
+  MACHSTATE(2,"} CommunicationServer") 
 }
+
 
 #if FRAGMENTATION
 /* keep one buffer of PACKET_MAX size to ensure copy free operation 

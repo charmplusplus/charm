@@ -5,7 +5,6 @@
   * CmiNotifyIdle()
   * DeliverViaNetwork()
   * CommunicationServer()
-  * CommunicationServerThread()
 
   moved from machine.c by 
   Gengbin Zheng, gzheng@uiuc.edu  4/22/2001
@@ -43,7 +42,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
 #if CMK_SHARED_VARS_UNAVAILABLE
   /*No comm. thread-- listen on sockets for incoming messages*/
   MACHSTATE(3,"idle commserver {")
-  CommunicationServerThread(10);
+  CommunicationServer(10, 0);
   MACHSTATE(3,"} idle commserver")
 #else
   int nSpins=20; /*Number of times to spin before sleeping*/
@@ -696,7 +695,12 @@ void ReceiveDatagram()
  ***********************************************************************/
 void CmiHandleImmediate();
 
-static void CommunicationServer(int sleepTime)
+/*
+0: from smp thread
+1: from interrupt
+2: from worker thread
+*/
+static void CommunicationServer(int sleepTime, int where)
 {
   unsigned int nTimes=0; /* Loop counter */
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
@@ -735,21 +739,18 @@ static void CommunicationServer(int sleepTime)
     }
   }
   CmiCommUnlock();
-  MACHSTATE(1,"} CommunicationServer") 
-}
 
-/* similar to CommunicationServer, but it is called by communication thread
-   or in interrupt */
-static void CommunicationServerThread(int sleepTime)
-{
-  MACHSTATE(2,"CommunicationServerThread");
-  CommunicationServer(sleepTime);
+  /* when called by communication thread or in interrupt */
+  if (where == 0 || where == 1) {
 #if CMK_IMMEDIATE_MSG
   CmiHandleImmediate();
 #endif
 #if CMK_PERSISTENT_COMM
   PumpPersistent();
 #endif
+  }
+
+  MACHSTATE(1,"} CommunicationServer") 
 }
 
 void CmiMachineInit(char **argv)

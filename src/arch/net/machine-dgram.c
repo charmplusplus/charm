@@ -551,7 +551,7 @@ static void CommunicationsClockCaller(void *ignored)
 
 static void CommunicationPeriodic(void) 
 { /*Poll on the communications server*/
-  CommunicationServerThread(0);
+  CommunicationServer(0, 0);
 }
 
 static void CommunicationPeriodicCaller(void *ignored)
