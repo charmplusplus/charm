@@ -4,6 +4,7 @@
 #include "conv-trace.h"
 #include "conv-ccs.h"
 #include <errno.h>
+#include <sys/file.h>
 
 /*
 #if NODE_0_IS_CONVHOST
