@@ -53,11 +53,10 @@ static void expand_cblist(ccd_cblist *l, unsigned int ml)
 {
   ccd_cblist_elem *old_elems = l->elems;
   int i = 0;
-  int idx;
   l->elems = (ccd_cblist_elem*) malloc(ml*sizeof(ccd_cblist_elem));
   _MEMCHECK(l->elems);
   for(i=0;i<(l->len);i++)
-    l->elems[i] = old_elems[idx];
+    l->elems[i] = old_elems[i];
   free(old_elems);
   for(i=l->len;i<ml;i++) {
     l->elems[i].next = i+1;
