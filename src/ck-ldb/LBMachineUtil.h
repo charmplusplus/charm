@@ -30,6 +30,7 @@ private:
   double start_totalcpu;
   double start_idle;
 
+  int cancel_idleStart, cancel_idleEnd;
 };
 
 #endif  // _LDMACHINEUTIL_H_

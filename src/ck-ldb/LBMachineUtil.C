@@ -8,16 +8,14 @@
 #include "LBMachineUtil.h"
 #include <stdlib.h>
 
-CpvStaticDeclare(void*,machineUtilPtr);
-
-extern "C" void staticIdleStart()
+extern "C" void staticIdleStart(LBMachineUtil* obj)
 {
-  ((LBMachineUtil*)(CpvAccess(machineUtilPtr)))->IdleStart();
+  obj->IdleStart();
 }
 
-extern "C" void staticIdleEnd()
+extern "C" void staticIdleEnd(LBMachineUtil* obj)
 {
-  ((LBMachineUtil*)(CpvAccess(machineUtilPtr)))->IdleEnd();
+  obj->IdleEnd();
 }
 
 
@@ -39,9 +37,6 @@ LBMachineUtil::LBMachineUtil()
   state = off;
   total_walltime = total_cputime = -1.;
   total_idletime = 0;
-  CpvInitialize(void*,machineUtilPtr);
-  CpvAccess(machineUtilPtr) = (void*)this;
-  CsdSetNotifyIdle(staticIdleStart,staticIdleEnd);
   start_totalwall = start_totalcpu = -1.;
   total_idletime = 0;
 };
@@ -52,7 +47,10 @@ void LBMachineUtil::StatsOn()
   const double cur_cpu = CmiCpuTimer();
 
   if (state == off) {
-    CsdStartNotifyIdle();
+    cancel_idleStart=CcdCallOnConditionKeep(
+	 CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)staticIdleStart,(void *)this);
+    cancel_idleEnd=CcdCallOnConditionKeep(
+         CcdPROCESSOR_END_IDLE,(CcdVoidFn)staticIdleEnd,(void *)this);
     state = on;
   }
 
@@ -67,7 +65,8 @@ void LBMachineUtil::StatsOn()
 void LBMachineUtil::StatsOff()
 {
   if (state == on) {
-    CsdStopNotifyIdle();
+    CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,cancel_idleStart);
+    CcdCancelCallOnConditionKeep(CcdPROCESSOR_END_IDLE,cancel_idleEnd);
     state = off;
   }
 
