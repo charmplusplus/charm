@@ -30,9 +30,6 @@ typedef unsigned char  UChar;
 #define D(x)     (A(x)-(x))
 #define PW(x)    ((x+CINTBITS-1)/CINTBITS)
 
-#define _QMASK    0x0F
-#define _PMASK    0xF0
-
 #define NewChareMsg    1
 #define NewVChareMsg   2
 #define BocInitMsg     3
@@ -85,43 +82,47 @@ public:
       } roMsg;
     };
 private:
-    u_type type; //Depends on message type (attribs1)
-    UChar  attribs1; // stores message type as well as the Used bit
-    UChar  attribs2; // stores queueing strategy as well as packed/unpacked
-    UChar  msgIdx;
-    UShort ref;//Used by futures
-    UChar align[D(sizeof(u_type)+sizeof(UShort)+3*sizeof(UChar))];
+    u_type type; //Depends on message type (attribs.mtype)
+    UShort ref; //Used by futures
+    struct s_attribs { //Packed bitwise struct
+    	UChar msgIdx; //Usertype of message (determines pack routine)
+	UChar mtype;
+    	UChar queueing:4; //Queueing strategy (FIFO, LIFO, PFIFO, ...)
+    	UChar isPacked:1;
+    	UChar isUsed:1;
+    	UChar ifNotThere:2; //Used by arrays
+    };
+    s_attribs attribs;
+    UChar align[D(sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];
     
     //This struct should now be sizeof(void*) aligned.
     UShort priobits;
-    UShort epIdx;
+    UShort epIdx;  //Entry point to call
     UInt   pe;    // source processor
     UInt   event; // used by projections
-    UInt   totalsize;
+    UInt   totalsize; //Byte count from envelope start to end of priobits
     
   public:
-  
     UInt   getEvent(void) const { return event; }
     void   setEvent(const UInt e) { event = e; }
     UInt   getRef(void) const { return ref; }
     void   setRef(const UShort r) { ref = r; }
-    UChar  getQueueing(void) const { return (attribs2 & _QMASK); }
-    void   setQueueing(const UChar q) { attribs2 = (attribs2 & _PMASK) | q; }
+    UChar  getQueueing(void) const { return attribs.queueing; }
+    void   setQueueing(const UChar q) { attribs.queueing=q; }
+    UChar  getMsgtype(void) const { return attribs.mtype; }
+    void   setMsgtype(const UChar m) { attribs.mtype = m; }
 #ifndef CMK_OPTIMIZE
-    UChar  getMsgtype(void) const { return (attribs1&0x7F); }
-    void   setMsgtype(const UChar m) { attribs1 = (attribs1&0x80) | m; }
-    UChar  isUsed(void) { return (attribs1&0x80); }
-    void   setUsed(const UChar u) { attribs1 = (attribs1 & 0x7F) | (u<<7); }
-#else
-    UChar  getMsgtype(void) const { return attribs1; }
-    void   setMsgtype(const UChar m) { attribs1  = m; }
+    UChar  isUsed(void) { return attribs.isUsed; }
+    void   setUsed(const UChar u) { attribs.isUsed=u; }
 #endif
-    UChar  getMsgIdx(void) const { return msgIdx; }
-    void   setMsgIdx(const UChar idx) { msgIdx = idx; }
+    UChar  getMsgIdx(void) const { return attribs.msgIdx; }
+    void   setMsgIdx(const UChar idx) { attribs.msgIdx = idx; }
     UInt   getTotalsize(void) const { return totalsize; }
     void   setTotalsize(const UInt s) { totalsize = s; }
-    UChar  isPacked(void) const { return ((attribs2 & _PMASK)>>4); }
-    void   setPacked(const UChar p) { attribs2 = (attribs2 & _QMASK) | (p<<4); }
+    UChar  getIfNotThere(void) const { return attribs.ifNotThere; }
+    void   setIfNotThere(const UChar s) { attribs.ifNotThere = s; }
+    UChar  isPacked(void) const { return attribs.isPacked; }
+    void   setPacked(const UChar p) { attribs.isPacked = p; }
     UShort getPriobits(void) const { return priobits; }
     void   setPriobits(const UShort p) { priobits = p; }
     UShort getPrioWords(void) const { return (priobits+CINTBITS-1)/CINTBITS; }
