@@ -1050,9 +1050,18 @@ typedef void (*CcdVoidFn)(void *);
 /*User-defined conditions start here*/
 #define CcdUSER    48
 
+#define CcdIGNOREPE   -2
+#if CMK_CONDS_USE_SPECIAL_CODE
+int CmiSwitchToPE(int pe);
+#else
+#define CmiSwitchToPE(pe)  pe
+#endif
 void CcdCallFnAfter(CcdVoidFn fnp, void *arg, unsigned int msecs);
 int CcdCallOnCondition(int condnum, CcdVoidFn fnp, void *arg);
 int CcdCallOnConditionKeep(int condnum, CcdVoidFn fnp, void *arg);
+void CcdCallFnAfterOnPE(CcdVoidFn fnp, void *arg, unsigned int msecs, int pe);
+int CcdCallOnConditionOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe);
+int CcdCallOnConditionKeepOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe);
 void CcdCancelCallOnCondition(int condnum, int idx);
 void CcdCancelCallOnConditionKeep(int condnum, int idx);
 void CcdRaiseCondition(int condnum);

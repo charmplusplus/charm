@@ -13,6 +13,7 @@
 typedef struct _ccd_callback {
   CcdVoidFn fn;
   void *arg;
+  int pe;			/* the pe that sets the callback */
 } ccd_callback;
 
 typedef struct _ccd_cblist_elem {
@@ -105,7 +106,7 @@ static void remove_n_elems(ccd_cblist *l, int n)
 
 /* append callback to the given cblist, and return the index.
  */
-static int append_elem(ccd_cblist *l, CcdVoidFn fn, void *arg)
+static int append_elem(ccd_cblist *l, CcdVoidFn fn, void *arg, int pe)
 {
   register int idx;
   register ccd_cblist_elem *e;
@@ -123,6 +124,7 @@ static int append_elem(ccd_cblist *l, CcdVoidFn fn, void *arg)
   l->last = idx;
   e[idx].cb.fn = fn;
   e[idx].cb.arg = arg;
+  e[idx].cb.pe = pe;
   l->len++;
   return idx;
 }
@@ -136,7 +138,9 @@ static void call_cblist_keep(ccd_cblist *l)
 {
   int i, len = l->len, idx;
   for(i=0, idx=l->first;i<len;i++) {
+    int old = CmiSwitchToPE(l->elems[idx].cb.pe);
     (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg);
+    CmiSwitchToPE(old);
     idx = l->elems[idx].next;
   }
 }
@@ -150,7 +154,9 @@ static void call_cblist_remove(ccd_cblist *l)
 {
   int i, len = l->len, idx;
   for(i=0, idx=l->first;i<len;i++) {
+    int old = CmiSwitchToPE(l->elems[idx].cb.pe);
     (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg);
+    CmiSwitchToPE(old);
     idx = l->elems[idx].next;
   }
   remove_n_elems(l,len);
@@ -205,7 +211,7 @@ static void ccd_heap_swap(int index1, int index2)
   h[index2] = temp;
 }
 
-static void ccd_heap_insert(double t, CcdVoidFn fnp, void *arg)
+static void ccd_heap_insert(double t, CcdVoidFn fnp, void *arg, int pe)
 {
   int child, parent;
   ccd_heap_elem *h = CpvAccess(ccd_heap);
@@ -217,6 +223,7 @@ static void ccd_heap_insert(double t, CcdVoidFn fnp, void *arg)
     e->time = t;
     e->cb.fn = fnp;
     e->cb.arg = arg;
+    e->cb.pe = pe;
     child  = CpvAccess(ccd_heaplen);    
     parent = child / 2;
     while((parent>0) && (h[child].time<h[parent].time)) {
@@ -311,12 +318,22 @@ void CcdModuleInit(void)
  */
 int CcdCallOnCondition(int condnum, CcdVoidFn fnp, void *arg)
 {
-  return append_elem(&(CpvAccess(conds).condcb[condnum]), fnp, arg);
+  return append_elem(&(CpvAccess(conds).condcb[condnum]), fnp, arg, CcdIGNOREPE);
+} 
+
+int CcdCallOnConditionOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe)
+{
+  return append_elem(&(CpvAccess(conds).condcb[condnum]), fnp, arg, pe);
 } 
 
 int CcdCallOnConditionKeep(int condnum, CcdVoidFn fnp, void *arg)
 {
-  return append_elem(&(CpvAccess(conds).condcb_keep[condnum]), fnp, arg);
+  return append_elem(&(CpvAccess(conds).condcb_keep[condnum]), fnp, arg, CcdIGNOREPE);
+} 
+
+int CcdCallOnConditionKeepOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe)
+{
+  return append_elem(&(CpvAccess(conds).condcb_keep[condnum]), fnp, arg, pe);
 } 
 
 void CcdCancelCallOnCondition(int condnum, int idx)
@@ -331,11 +348,16 @@ void CcdCancelCallOnConditionKeep(int condnum, int idx)
 
 /* Call the function with the provided argument after a minimum delay of deltaT
  */
-void CcdCallFnAfter(CcdVoidFn fnp, void *arg, unsigned int deltaT)
+void CcdCallFnAfterOnPE(CcdVoidFn fnp, void *arg, unsigned int deltaT, int pe)
 {
   double ctime  = CmiWallTimer();
   double tcall = ctime + (double)deltaT/1000.0;
-  ccd_heap_insert(tcall, fnp, arg);
+  ccd_heap_insert(tcall, fnp, arg, pe);
+} 
+
+void CcdCallFnAfter(CcdVoidFn fnp, void *arg, unsigned int deltaT)
+{
+  CcdCallFnAfterOnPE(fnp, arg, deltaT, CcdIGNOREPE);
 } 
 
 /* Call all the functions that are waiting for this condition to be raised
