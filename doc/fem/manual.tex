@@ -330,110 +330,19 @@ are the new, more flexible way to perform communication.)
 
 The FEM framework handles the updating of the values of shared nodes-- that
 is, it combines shared nodes' values across all processors.  The basic
-mechanism to do this update is the field-- numeric data items associated
+mechanism to do this update is the ``field''-- numeric data items associated
 with each node. We make no assumptions about the meaning of the node data,
-and allow various data types and non-communicated data associated with each
-node.  To do this, the framework must be able to find the data items
+allow various data types, and allow a mix of communicated and non-communicated 
+data associated with each node.  The framework uses IDXL layouts to find the data items
 associated with each node in memory.
 
-Each field represents a (set of) node data items stored in a contiguous array,
-indexed by node number.  You create a field once, with \kw{FEM\_Create\_field},
+Each field represents a (set of) data records stored in a contiguous array,
+often indexed by node number.  You create a field once, with the IDXL layout 
+routines or \kw{FEM\_Create\_field},
 then pass the resulting field ID to \kw{FEM\_Update\_field} (which does the
-shared node communication) and/or \kw{FEM\_Reduce\_field} (which applies a
-reduction over node values).
+shared node communication), \kw{FEM\_Reduce\_field} (which applies a
+reduction over node values), or one of the other routines described below.
 
-\prototype{FEM\_Create\_simple\_field}
-\function{int FEM\_Create\_simple\_field(int base\_type,int rec\_len);}
-\function{function integer :: FEM\_Create\_simple\_field(base\_type, rec\_len)}
-  \args{integer, intent(in)  :: base\_type, rec\_len}
-    
-    Creates and returns a FEM field ID, which can be passed to
-\kw{FEM\_Update\_field} and \kw{FEM\_Reduce\_field.}  Can only be called from
-\kw{driver()}.  A field is a range of values stored in your array that the framework
-can access.  For example, a field that describes data associated with each local 
-node can be used by \kw{FEM\_Update\_field} to find and update the values of 
-shared nodes.
-
-    \kw{base\_type} describes the kind of data item associated with each
-record, one of:
-
-     \begin{itemize}
-        \item \kw{FEM\_BYTE}-- unsigned char, INTEGER*1, or CHARACTER*1
-        \item \kw{FEM\_INT}-- int or INTEGER*4
-        \item \kw{FEM\_REAL}-- float or REAL*4
-        \item \kw{FEM\_DOUBLE}-- double, DOUBLE PRECISION, or REAL*8
-     \end{itemize}
-
-     \kw{rec\_len} describes the number of data items associated with each
-record, an integer at least 1.
-
-     For example, if you store a 3D force for each node \kw{n}, in an array
-indexed by 3*\kw{n}, \kw{base\_type} is \kw{FEM\_DOUBLE} and \kw{rec\_len} is 3.
-You can register this node force for update with:
-
-\begin{alltt}
-          /* C */
-          double *nodeForce; ... allocated as 3*n_nodes...
-          int Fid=FEM_Create_simple_field(FEM_DOUBLE,3);
- 
-          ! - Fortran90
-          REAL*8 ALLOCATABLE, dimension(:) :: nodeForce
-          INTEGER :: Fid
-          Fid=FEM_Create_simple_field(FEM_DOUBLE,3)
-\end{alltt}
-
-
-
-\prototype{FEM\_Create\_field}
-\function{int FEM\_Create\_field(int base\_type,int rec\_len,int offset,int dist);}
-\function{function integer :: FEM\_Create\_field(base\_type, rec\_len, offset, dist)}
-  \args{integer, intent(in)  :: base\_type, rec\_len, offset, dist}
-
-     A more sophisticated version of \kw{FEM\_Create\_simple\_field}, for 
-when your data is padded or stored in a complex structure.
-
-     \kw{offset} is the byte offset from the start of your array to the
-first data item, a non-negative integer.  In \kw{FEM\_Create\_simple\_field},
-\kw{offset} is always zero.
-
-     \kw{dist} is the byte offset from the first record to the
-second, a positive integer.  In \kw{FEM\_Create\_simple\_field}, this is
-always equal to \kw{rec\_len} times the size of one item.
-
-\begin{figure}[h]
-\begin{center}
-\includegraphics[width=4in]{fig/create_field}
-\end{center}
-\caption{Creating a complex Node Field.}
-\label{fig:createfield}
-\end{figure}
-
-
-If the 3D force is a member \kw{fXYZ} of a structure (in C) or named type
-(in Fortran 90) \kw{node\_type}, in an array called \kw{nodes}, you can
-register this node force for update with:
-
-\begin{alltt}
-          /* C */
-          node_type *nodes;
-          ...allocate nodes array as n_nodes...
-          int Fid=FEM_Create_field(FEM_DOUBLE,3,
-              (int)((char *)\&nodes[0].fXYZ-(char *)nodes),
-              (int)((char *)\&nodes[1]-(char *)\&nodes[0]) );
- 
-          ! - Fortran90
-          TYPE(node_type), ALLOCATABLE, dimension(:) :: nodes
-          INTEGER :: Fid
-          ...allocate nodes array as n_nodes...
-          Fid=FEM_Create_field(FEM_DOUBLE,3,
-              foffsetof(nodes(1), nodes(1)%fXYZ),
-              foffsetof(nodes(1), nodes(2)) )
-\end{alltt}
-
-     This example uses the Fortran-only helper routine \kw{foffsetof}, which
-     returns the offset in bytes of memory between its two given
-     variables.  The C version uses pointer arithmetic to achieve the
-     same result.
 
 \prototype{FEM\_Update\_field}
 \function{void FEM\_Update\_field(int Fid,void *nodes);}
@@ -452,6 +361,8 @@ register this node force for update with:
 
      After this routine returns, the given field of each shared node
      will be the same across all processors that share the node.
+     
+     This routine is eqivalent to an \kw{IDXL\_Comm\_Sendsum} operation.
 
 \prototype{FEM\_Read\_field}
 \function{void FEM\_Read\_field(int Fid,void *nodes,char *fName);}
@@ -479,7 +390,9 @@ register this node force for update with:
 \end{alltt}
 
      \kw{FEM\_Read\_field} must be called from driver at any time, independent
-     of other chunks.
+     of other chunks. 
+     
+     This routine has no IDXL equivalent.
 
 \prototype{FEM\_Reduce\_field}
 \function{void FEM\_Reduce\_field(int Fid,const void *nodes,void *out,int op);}
@@ -488,8 +401,8 @@ register this node force for update with:
   \args{varies, intent(in) :: nodes}
   \args{varies, intent(out) :: outVal}
 
-Combine a field from each node, according to op, across all chunks.
-Shared nodes are not double-counted-- only once copy will contribute to the
+Combine one record per node of this field, according to op, across all chunks.
+Shared nodes are not double-counted-- only one copy will contribute to the
 reduction.  After \kw{Reduce\_field} returns, all chunks will have identical
 values in \kw{outVal,} which must be \kw{vec\_len} copies of \kw{base\_type}.
 
@@ -507,6 +420,8 @@ smallest value among the corresponding field of all nodes
 value among the corresponding field of all nodes
 \end{itemize}
 
+     This routine has no IDXL equivalent.
+
 
 \prototype{FEM\_Reduce}
 \function{void FEM\_Reduce(int Fid,const void *inVal,void *outVal,int op);}
@@ -515,7 +430,8 @@ value among the corresponding field of all nodes
   \args{varies, intent(in) :: inVal}
   \args{varies, intent(out) :: outVal}
 
-     Combine a field from each chunk, acoording to \kw{op}, across all chunks.
+     Combine one record of this field from each chunk, acoording to \kw{op}, 
+ across all chunks.
 \kw{Fid} is only used for the \kw{base\_type} and \kw{vec\_len}-- offset and
 \kw{dist} are not used.  After this call returns, all chunks will have
 identical values in \kw{outVal}.  Op has the same values and meaning as
@@ -536,6 +452,8 @@ identical values in \kw{outVal}.  Op has the same values and meaning as
    fid=IDXL_Layout_create(FEM_DOUBLE,3)
    CALL FEM_Reduce(fid,inArr,outArr,FEM_SUM)
 \end{alltt}
+
+     This routine has no IDXL equivalent.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

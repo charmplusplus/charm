@@ -120,6 +120,8 @@ This routine only affects the current chunk-- no other chunks are affected.  To 
 \label{sec:IDXL_Layout}
 IDXL is designed to send and receive data directly out of your arrays, with no intermediate copying.  This means IDXL needs a completely general method for specifying how you store your data in your arrays.  Since you probably don't change your storage layout at runtime, you can create a ``data layout'' once at the beginning of your program, then use it repeatedly for communication.
 
+IDXL Layouts are normally used to describe arrays of data associated with nodes or elements.  The layout abstraction allows you to use IDXL routines to communicate any sort of data, stored in a variety of formats.
+
 Like Index Lists, Layouts are referred to via an opaque handle---in a C program via the integer typedef IDXL\_Layout\_t, and in Fortran via a bare integer.
 
 \subsubsection{Layout Routines}
@@ -191,13 +193,10 @@ In C, the offsetof and sizeof keywords are useful for finding these values.  In 
 
 \begin{alltt}
 // C++ version:
-     typedef struct {
-        double d[3];
-        double v[3];
-        double force[3];
-        double a[3];
+     typedef struct \{
+        double d[3], v[3], force[3], a[3];
         double m;
-     } node;
+     \} node;
      node *nodes=new node[n];
      IDXL\_Layout\_t force\_layout=IDXL\_Layout\_offset(IDXL\_DOUBLE,3,
               offsetof(node,force),sizeof(node),0);
@@ -289,7 +288,7 @@ If \kw{comm} is not zero, this routine is non-blocking and equivalent to a call 
 \kw{IDXL\_Comm\_send} followed by a call to \kw{IDXL\_Comm\_sum}.
 
 This routine is typically used to sum up partial values on shared nodes.
-
+It is a more general version of the old FEM routine \kw{FEM\_Update\_field}.
 
 \prototype{IDXL\_Comm\_sendrecv}
 \function{void IDXL\_Comm\_sendrecv(IDXL\_Comm\_t comm,IDXL\_t indices,IDXL\_Layout\_t layout,void *data);}
@@ -306,6 +305,7 @@ If \kw{comm} is not zero, this routine is non-blocking and equivalent to a call 
 \kw{IDXL\_Comm\_send} followed by a call to \kw{IDXL\_Comm\_sum}.
 
 This routine is typically used to obtain the values of ghost entities.
+It is a more general version of the old FEM routine \kw{FEM\_Update\_ghost\_field}.
 
 
 
