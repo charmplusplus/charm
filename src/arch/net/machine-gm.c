@@ -405,7 +405,7 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
       }
     }
 #else
-     CmiAbort("send_callback");
+     CmiAbort("gm send_callback failed");
 #endif
   }
 
@@ -589,6 +589,7 @@ void CmiBarrier()
   /* printf("[%d] OUT of barrier \n", CmiMyPe()); */
 }
 
+/* everyone sends a message to pe 0 and go on */
 void CmiBarrierZero()
 {
   int i;

@@ -574,3 +574,14 @@ static void CommunicationPeriodicCaller(void *ignored)
 #include "machine-eth.c"
 
 #endif
+
+#if ! CMK_USE_GM
+void CmiBarrier()
+{
+}
+
+void CmiBarrierZero()
+{
+}
+
+#endif
