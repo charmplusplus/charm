@@ -172,7 +172,12 @@ static void simulate()
 }
 
 /***********************************************************************/
-
+void CmiHandleMessage(void *msg)
+{
+        CpvAccess(CmiBufferGrabbed)=0;
+        (CmiGetHandlerFunction(msg))(msg);
+        if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
+}
 
 static cpu_event(pno)
 int pno;
@@ -197,9 +202,7 @@ int pno;
       {
          
          FIFO_DeQueue(CpvAccess(CmiLocalQueue), &msg); 
-         CpvAccess(CmiBufferGrabbed)=0;
-         (CmiGetHandlerFunction(msg))(msg);
-         if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
+         CmiHandleMessage(msg);
 
          elapsed_time = (REL_TIME) (CsiTimer() - Csi_start_time); 
          elapsed_time += (REL_TIME) MIN_INC;
@@ -218,9 +221,7 @@ int pno;
         msg = sim_msg->envelope;
         sim_msg->envelope = NULL;
 
-        CpvAccess(CmiBufferGrabbed)=0;
-        (CmiGetHandlerFunction(msg))(msg);
-        if (!CpvAccess(CmiBufferGrabbed)) CmiFree(msg);
+        CmiHandleMessage(msg);
 
         cpu_recv_cost = (REL_TIME) (CsiTimer() - Csi_start_time);
         cpu_recv_cost += (REL_TIME) MIN_INC;

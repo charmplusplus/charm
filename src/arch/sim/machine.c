@@ -49,7 +49,7 @@ void CmiDeliversInit()
 }
 
 
-void CmiGrabBuffer()
+void CmiGrabBuffer(void **ppbuf)
 {
   CpvAccess(CmiBufferGrabbed) = 1;
 }
@@ -246,7 +246,6 @@ char * msg;
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
 {
-  char *argvec[1000];
   void simulate();
   int i, requested_npe;
   
@@ -273,6 +272,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
 
   McQueue = (void **) malloc(requested_npe * sizeof(void *)); 
   for(i=0; i<requested_npe; i++) McQueue[i] = (void *) FIFO_Create();
+  CrnInit();
   sim_initialize("sim.param",requested_npe);
   
   CsiTimerInit();
@@ -283,8 +283,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
     CthInit(argv);
     ConverseCommonInit(argv);
     argc=CmiGetArgc(argv);
-    memcpy(argvec, argv, argc*sizeof(char*));
-    fn(argc, argvec);
+    fn(argc, CmiCopyArgs(argv));
     CpvAccess(CsdStopFlag) = 0;
   }
   
@@ -366,7 +365,7 @@ static double CsiTimer() {
 static double Csi_global_time;
 static double Csi_start_time;
 
-
+void CmiTimerInit(void) { }
 
 double CmiTimer()
 {
@@ -381,6 +380,39 @@ double CmiWallTimer()
 double CmiCpuTimer()
 {
   return (CsiTimer() - Csi_start_time  + Csi_global_time);
+}
+
+CmiNodeLock CmiCreateLock()
+{
+  CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(int));
+  *lk = 0;
+  return lk;
+}
+
+void CmiLock(CmiNodeLock lk)
+{
+  while (*lk) CmiGetNonLocal();
+  *lk = 1;
+}
+
+void CmiUnlock(CmiNodeLock lk)
+{
+  if (*lk==0) {
+    CmiError("CmiNodeLock not locked, can't unlock.");
+    exit(1);
+  }
+  *lk = 0;
+}
+
+int CmiTryLock(CmiNodeLock lk)
+{
+  if (*lk==0) { *lk=1; return 0; }
+  return -1;
+}
+
+void CmiDestroyLock(CmiNodeLock lk)
+{
+  free(lk);
 }
 
 #include "ext_func.h"

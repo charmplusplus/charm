@@ -2,4 +2,6 @@
 #
 # Conv-host for pthreads:
 # Just executes all its arguments.
+PATH=.:$PATH
+export PATH
 $*
