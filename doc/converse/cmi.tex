@@ -118,7 +118,9 @@ The following functions are provided to help build message buffers:
 \desc{Allocates memory of size \uw{size} in heap and returns pointer to 
 the usable space.  There are some message-sending functions that
 accept only message buffers that were allocated with \kw{CmiAlloc}.  Thus,
-this is the preferred way to allocate message buffers.}
+this is the preferred way to allocate message buffers. The returned pointer
+point to the message header, the user data will follow it. See
+\kw{CmiMsgHeaderSizeBytes} for this.}
 
 \function{void CmiFree(void *ptr)}
 \index{CmiFree}
