@@ -1951,8 +1951,10 @@ void start_nodes_scyld(void)
     if (pid == 0)
     {
       int fd, fd1 = dup(1);
-      if (fd = open("/dev/null", O_RDWR)) {
-        dup2(fd, 0); dup2(fd, 1); dup2(fd, 2);
+      if (!arg_verbose) {
+        if (fd = open("/dev/null", O_RDWR)) {
+          dup2(fd, 0); dup2(fd, 1); dup2(fd, 2);
+        }
       }
       if (nodeno == -1) {
         status = execve(pparam_argv[1], pparam_argv+1, envp);
