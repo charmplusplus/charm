@@ -55,6 +55,7 @@ class bar {
 #if 0
 #  include <converse.h> // <- for CmiBool
 #else
+#  include <conv-mach.h>
 #  define CmiBool bool
 #  define CmiTrue true
 #  define CmiFalse false
