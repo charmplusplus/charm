@@ -1,4 +1,8 @@
-#CMK_DEFS=' -D_REENTRANT '
+CMK_DEFS=' -D_REENTRANT '
+if echo "$CMK_CC" | grep "gcc" > /dev/null 2>/dev/null
+then
+  CMK_DEFS="$CMK_DEFS -fpic"
+fi
 CMK_CPP_C="$CMK_CPP_C $CMK_DEFS"
 CMK_CC="$CMK_CC $CMK_DEFS"
 CMK_CC_RELIABLE="$CMK_CC_RELIABLE $CMK_DEFS "
