@@ -2,20 +2,21 @@
 #include "converse.h"
 
 typedef struct _PersistentSendsTable {
+  int used;
   int destPE;
   int sizeMax;
+  PersistentHandle   destHandle;  
   void *destAddress;
   void *destSlotFlagAddress;
-  void *messagePtr;
+  void *messageBuf;
   int messageSize;
-  int flag;
 } PersistentSendsTable;
 
 typedef struct _PersistentReceivesTable {
-  int flag;
+  int recvSize;
   int sizeMax;
   void *messagePtr;
-  int messageSize;
+  char used;
 } PersistentReceivesTable;
 
 #define TABLESIZE 1024
@@ -23,7 +24,9 @@ PersistentSendsTable persistentSendsTable[TABLESIZE];
 int persistentSendsTableCount = 0;
 PersistentReceivesTable persistentReceivesTable[TABLESIZE];
 int persistentReceivesTableCount = 0;
+int persistentReceivesTableCountMax = 0;
 
+/* Converse message type */
 typedef struct _PersistentRequestMsg {
   char core[CmiMsgHeaderSizeBytes];
   int maxBytes;
@@ -36,15 +39,22 @@ typedef struct _PersistentReqGrantedMsg {
   void *slotFlagAddress;
   void *msgAddr;
   PersistentHandle sourceHandlerIndex;
+  PersistentHandle destHandlerIndex;
 } PersistentReqGrantedMsg;
+
+typedef struct _PersistentDestoryMsg {
+  char core[CmiMsgHeaderSizeBytes];
+  PersistentHandle destHandlerIndex;
+} PersistentDestoryMsg;
 
 /* Converse handler */
 int persistentRequestHandlerIdx;
-int persistenceReqGrantedHandlerIdx;
+int persistentReqGrantedHandlerIdx;
+int persistentDestoryHandlerIdx;
 
-#define RESET 0
-#define SET 1
-
+/****************************************************************************
+       Pending send messages
+****************************************************************************/
 typedef struct pmsg_list {
   ELAN_EVENT *e;
   char *msg;
@@ -74,31 +84,81 @@ static PMSG_LIST *end_pending_persistent_msgs = NULL;
     end_pending_persistent_msgs->next = msg_tmp;	\
   end_pending_persistent_msgs = msg_tmp;
 
+/******************************************************************************
+     Utilities
+******************************************************************************/
+
+void initSendSlot(PersistentSendsTable *slot)
+{
+  slot->used = 0;
+  slot->destPE = -1;
+  slot->sizeMax = 0;
+  slot->destHandle = 0; 
+  slot->destAddress = NULL;
+  slot->destSlotFlagAddress = NULL;
+  slot->messageBuf = 0;
+  slot->messageSize = 0;
+}
+
+void initRecvSlot(PersistentReceivesTable *slot)
+{
+  slot->recvSize = 0;
+  slot->sizeMax = 0;
+  slot->messagePtr = NULL;
+  slot->used = 0;
+}
+
 int getFreeSendSlot()
 {
+  int i;
   if (persistentSendsTableCount == TABLESIZE) CmiAbort("persistentSendsTable full.\n");
-  return ++persistentSendsTableCount;
+  persistentSendsTableCount++;
+  for (i=1; i<TABLESIZE; i++)
+    if (persistentSendsTable[i].used == 0) break;
+  return i;
 }
 
 int getFreeRecvSlot()
 {
+  int i;
   if (persistentReceivesTableCount == TABLESIZE) CmiAbort("persistentReceivesTable full.\n");
-  return ++persistentReceivesTableCount;
+  persistentReceivesTableCount++;
+  for (i=1; i<TABLESIZE; i++)
+    if (persistentReceivesTable[i].used == 0) break;
+  if (i>persistentReceivesTableCountMax) persistentReceivesTableCountMax=i;
+  return i;
 }
+
+/******************************************************************************
+     Create Persistent Comm handler
+     When creating a persistent comm with destPE and maxSize
+     1. allocate a free PersistentSendsTable entry, send a 
+        PersistentRequestMsg message to destPE
+        buffer persistent message before  Persistent Comm is setup;
+     2. destPE execute Converse handler persistentRequestHandler() on the
+        PersistentRequestMsg message:
+        allocate a free PersistentReceivesTable entry;
+        allocate a message buffer of size maxSize for the communication;
+        Send back a PersistentReqGrantedMsg with message address, etc for
+        elan_put;
+     3. Converse handler persistentReqGrantedHandler() executed on
+        sender for the PersistentReqGrantedMsg. setup finish, send buffered
+        message.
+******************************************************************************/
 
 PersistentHandle CmiCreatePersistent(int destPE, int maxBytes)
 {
   PersistentSendsTable *slot;
   PersistentHandle h = getFreeSendSlot();
-  if (h >= TABLESIZE) CmiAbort("persistentSendsTable full.\n");
 
   slot = &persistentSendsTable[h];
+  slot->used = 1;
   slot->destPE = destPE;
   slot->sizeMax = maxBytes;
   slot->destAddress = NULL;
   slot->destSlotFlagAddress = NULL;
-  slot->messagePtr = NULL;
-  slot->flag = SET;
+  slot->destHandle = 0;
+  slot->messageBuf = NULL;
 
   PersistentRequestMsg *msg = (PersistentRequestMsg *)CmiAlloc(sizeof(PersistentRequestMsg));
   msg->maxBytes = maxBytes;
@@ -122,39 +182,45 @@ void persistentRequestHandler(void *env)
   slot = &persistentReceivesTable[slotIdx];
   slot->messagePtr = CmiAlloc(msg->maxBytes);
   _MEMCHECK(slot->messagePtr);
-  slot->flag = RESET;
+  slot->used = 1;
+  slot->recvSize = 0;
   slot->sizeMax = msg->maxBytes;
 
   PersistentReqGrantedMsg *gmsg = CmiAlloc(sizeof(PersistentReqGrantedMsg));
-  gmsg->slotFlagAddress = &slot->flag;
+  gmsg->slotFlagAddress = &slot->recvSize;
   gmsg->msgAddr = slot->messagePtr;
   gmsg->sourceHandlerIndex = msg->sourceHandlerIndex;
+  gmsg->destHandlerIndex = slotIdx;
 
-  CmiSetHandler(gmsg, persistenceReqGrantedHandlerIdx);
+  CmiSetHandler(gmsg, persistentReqGrantedHandlerIdx);
   CmiSyncSendAndFree(msg->requestorPE,sizeof(PersistentReqGrantedMsg),gmsg);
 }
 
-void persistenceReqGrantedHandler(void *env)
+void persistentReqGrantedHandler(void *env)
 {
   PersistentSendsTable *slot;
   PersistentReqGrantedMsg *msg = (PersistentReqGrantedMsg *)env;
-  int h = msg->sourceHandlerIndex;
+
+  PersistentHandle h = msg->sourceHandlerIndex;
   slot = &persistentSendsTable[h];
   slot->destSlotFlagAddress = msg->slotFlagAddress;
   slot->destAddress = msg->msgAddr;
+  slot->destHandle = msg->destHandlerIndex;
 
-  if (slot->messagePtr) {
-    CmiSendPersistentMsg(h, slot->destPE, slot->messageSize, slot->messagePtr);
-    slot->messagePtr = NULL;
+  if (slot->messageBuf) {
+    CmiSendPersistentMsg(h, slot->destPE, slot->messageSize, slot->messageBuf);
+    slot->messageBuf = NULL;
   }
 }
 
 void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
 {
+  CmiAssert(h>0);
   PersistentSendsTable *slot = &persistentSendsTable[h];
+  CmiAssert(slot->used == 1);
   if (size > slot->sizeMax) {
     CmiPrintf("size: %d sizeMax: %d\n", size, slot->sizeMax);
-    CmiAbort("Invalid size\n");
+    CmiAbort("Abort: Invalid size\n");
   }
 
 /*
@@ -178,11 +244,11 @@ CmiPrintf("[%d] CmiSendPersistentMsg handle: %d\n", CmiMyPe(), h);
   }
   else {
 #if 1
-    if (slot->messagePtr != NULL) {
+    if (slot->messageBuf != NULL) {
       CmiPrintf("Unexpected message in buffer on %d\n", CmiMyPe());
       CmiAbort("");
     }
-    slot->messagePtr = m;
+    slot->messageBuf = m;
     slot->messageSize = size;
 #else
   /* normal send */
@@ -243,15 +309,17 @@ void release_pmsg_list()
 void PumpPersistent()
 {
   int i;
-  for (i=1; i<= persistentReceivesTableCount; i++) {
+  for (i=1; i <= persistentReceivesTableCountMax; i++) {
     PersistentReceivesTable *slot = &persistentReceivesTable[i];
-    if (slot->flag != RESET) {
-      int size = slot->flag;
+    if (slot->used && slot->recvSize)
+    {
+      int size = slot->recvSize;
       void *msg = slot->messagePtr;
 
 #if 1
       // should return messagePtr directly and make sure keep it.
       void *dupmsg = CmiAlloc(size);
+      _MEMCHECK(dupmsg);
       memcpy(dupmsg, msg, size);
       msg = dupmsg;
 #endif
@@ -262,29 +330,53 @@ void PumpPersistent()
         if (CMI_BROADCAST_ROOT(msg))
           SendSpanningChildren(size, msg);
 #endif
-      slot->flag = RESET;
+      slot->recvSize = 0;
     }
   }
 }
 
-void CmiPersistentInit()
+/******************************************************************************
+     destory Persistent Comm handler
+******************************************************************************/
+
+/* Converse Handler */
+void persistentDestoryHandler(void *env)
+{             
+  PersistentDestoryMsg *msg = (PersistentDestoryMsg *)env;
+  PersistentHandle h = msg->destHandlerIndex;
+  PersistentReceivesTable *slot = &persistentReceivesTable[h];
+  CmiAssert(slot->used);
+
+  persistentReceivesTableCount --;
+  if (h == persistentReceivesTableCountMax) 
+    persistentReceivesTableCountMax--;
+
+  slot->used = 0;
+  slot->recvSize = 0;
+  if (slot->messagePtr) CmiFree(slot->messagePtr);
+  slot->messagePtr = NULL;
+  slot->sizeMax = 0;
+}
+
+/* FIXME: need to buffer until ReqGranted message come back? */
+void CmiDestoryPersistent(PersistentHandle h)
 {
-  int i;
-  persistentRequestHandlerIdx = CmiRegisterHandler((CmiHandler)persistentRequestHandler);
-  persistenceReqGrantedHandlerIdx = CmiRegisterHandler((CmiHandler)persistenceReqGrantedHandler);
-//CmiPrintf("CmiPersistentInit: %d %d \n", persistentRequestHandlerIdx, persistenceReqGrantedHandlerIdx);
-  for (i=0; i<TABLESIZE; i++) {
-    persistentSendsTable[i].destAddress = NULL;
-    persistentSendsTable[i].destSlotFlagAddress = NULL;
-    persistentSendsTable[i].messagePtr = NULL;
-    persistentSendsTable[i].flag = RESET;
-  }
-  persistentSendsTableCount = 0;
-  for (i=0; i<TABLESIZE; i++) {
-    persistentReceivesTable[i].flag = RESET;
-    persistentReceivesTable[i].messagePtr = NULL;
-  }
-  persistentReceivesTableCount = 0;
+  if (h <= 0) CmiAbort("CmiDestoryPersistent: not a valid PersistentHandle\n");
+
+  PersistentSendsTable *slot = &persistentSendsTable[h];
+  CmiAssert(slot->destHandle > 0);
+
+  PersistentDestoryMsg *msg = (PersistentDestoryMsg *)
+                              CmiAlloc(sizeof(PersistentDestoryMsg));
+  msg->destHandlerIndex = slot->destHandle;
+
+  CmiSetHandler(msg, persistentDestoryHandlerIdx);
+  CmiSyncSendAndFree(slot->destPE,sizeof(PersistentDestoryMsg),msg);
+
+  /* free this slot */
+  initSendSlot(slot);
+
+  persistentSendsTableCount --;
 }
 
 
@@ -292,20 +384,39 @@ void CmiDestoryAllPersistent()
 {
   int i;
   for (i=0; i<TABLESIZE; i++) {
-    persistentSendsTable[i].destAddress = NULL;
-    persistentSendsTable[i].destSlotFlagAddress = NULL;
-    persistentSendsTable[i].messagePtr = NULL;
-    persistentSendsTable[i].flag = RESET;
+    if (persistentSendsTable[i].messageBuf) 
+      CmiPrintf("Warning: CmiDestoryAllPersistent destoried buffered unsend message.\n");
+    initSendSlot(&persistentSendsTable[i]);
   }
   persistentSendsTableCount = 0;
-  for (i=0; i<persistentReceivesTableCount; i++) {
-    persistentReceivesTable[i].flag = RESET;
-    if (persistentReceivesTable[i].messagePtr)
-      CmiFree(persistentReceivesTable[i].messagePtr);
-    persistentReceivesTable[i].messagePtr = NULL;
-    persistentReceivesTable[i].messageSize = 0;
+
+  for (i=0; i<TABLESIZE; i++) {
+    PersistentReceivesTable *slot = &persistentReceivesTable[i];
+    if (slot->recvSize)
+      CmiPrintf("Warning: CmiDestoryAllPersistent destoried buffered undelivered message.\n");
+    if (slot->messagePtr) CmiFree(slot->messagePtr);
+    initRecvSlot(slot);
   }
   persistentReceivesTableCount = 0;
+  persistentReceivesTableCountMax = 0;
+}
+
+void CmiPersistentInit()
+{
+  int i;
+  persistentRequestHandlerIdx = 
+       CmiRegisterHandler((CmiHandler)persistentRequestHandler);
+  persistentReqGrantedHandlerIdx = 
+       CmiRegisterHandler((CmiHandler)persistentReqGrantedHandler);
+  persistentDestoryHandlerIdx = 
+       CmiRegisterHandler((CmiHandler)persistentDestoryHandler);
+  for (i=0; i<TABLESIZE; i++) {
+    initSendSlot(&persistentSendsTable[i]);
+    initRecvSlot(&persistentReceivesTable[i]);
+  }
+  persistentSendsTableCount = 0;
+  persistentReceivesTableCount = 0;
+  persistentReceivesTableCountMax = 0;
 }
 
 
