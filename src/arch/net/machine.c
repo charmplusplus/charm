@@ -957,8 +957,8 @@ static OutgoingMsg   Cmi_freelist_outgoing;
 
 int               Cmi_numpes;    /* Total number of processors */
 int               Cmi_mynodesize;/* Number of processors in my address space */
-static int        Cmi_mynode;    /* Which address space am I */
-static int        Cmi_numnodes;  /* Total number of address spaces */
+int               Cmi_mynode;    /* Which address space am I */
+int               Cmi_numnodes;  /* Total number of address spaces */
 static int        Cmi_nodestart; /* First processor in this address space */
 static CmiStartFn Cmi_startfn;   /* The start function */
 static int        Cmi_usrsched;  /* Continue after start function finishes? */
