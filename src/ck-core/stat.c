@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1997-10-29 23:52:53  milind
+ * Revision 2.17  1998-02-27 11:52:16  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.16  1997/10/29 23:52:53  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 2.15  1997/10/03 19:51:36  milind
@@ -95,10 +98,8 @@
 static char ident[] = "@(#)$Header$";
 #define NODESTAT
 
-#include "chare.h"
-#include "globals.h"
+#include "charm.h"
 #include "trace.h"
-#include "stat.h"
 
 typedef int **ARRAY_;
 CpvStaticDeclare(ARRAY_, HostStat);
@@ -186,10 +187,10 @@ TRACE(CmiPrintf("Node %d: Enter NodeCollectStatistics() \n", CmiMyPe()));
 
 void CollectStatistics(void)
 {
-	DUMMY_STAT_MSG *mPtr;
+	DUMMY_MSG *mPtr;
 
 	TRACE(CmiPrintf("Host: Enter CollectStatistics(): and Call BroadcastMsgBranch()\n"));
-	mPtr = (DUMMY_STAT_MSG *) CkAllocMsg(sizeof(DUMMY_STAT_MSG));
+	mPtr = (DUMMY_MSG *) CkAllocMsg(sizeof(DUMMY_MSG));
 	CkMemError(mPtr);
 	GeneralBroadcastMsgBranch(CsvAccess(CkEp_Stat_Data), mPtr,
 				 ImmBroadcastBocMsg,

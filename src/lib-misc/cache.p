@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.1  1995-06-13 11:32:16  jyelon
+ * Revision 1.2  1998-02-27 11:53:01  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 1.1  1995/06/13 11:32:16  jyelon
  * Initial revision
  *
  * Revision 1.1  1995/06/13  10:06:34  jyelon
@@ -27,7 +30,7 @@
 
 module Cache {
 
-#include "tbl.h"
+#include "charm-inc.h"
 
 #define INSERT 100
 #define FIND 101

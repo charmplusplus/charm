@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.28  1998-01-28 17:52:49  milind
+ * Revision 2.29  1998-02-27 11:52:06  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.28  1998/01/28 17:52:49  milind
  * Removed unnecessary function calls to tracing functions.
  * Added macros to turn tracing on and off at runtime.
  *
@@ -156,8 +159,8 @@ static char ident[] = "@(#)$Header$";
     The core (scheduler/Converse) part is in converse.c 		 */
 /*************************************************************************/
 
-#include "chare.h"
-#include "globals.h"
+#include "charm.h"
+
 #include "trace.h"
 
 CHARE_BLOCK *GetBocBlockPtr();
@@ -167,6 +170,17 @@ void HANDLE_INCOMING_MSG();
 
 void mainModuleInit()
 {
+}
+
+void CheckMagicNumber(chare, env)
+    CHARE_BLOCK *chare; ENVELOPE *env;
+{
+  if (GetID_chare_magic_number(chare->selfID) !=
+      GetEnv_chare_magic_number(env)) {
+    CmiPrintf("[%d] *** ERROR *** dead chare or bad chareID used at entry point %s.\n", 
+	      CmiMyPe(), CsvAccess(EpInfoTable)[GetEnv_EP(env)].name);
+    exit(1);
+  }
 }
 
 void CkProcess_ForChareMsg_to_UVID(env)
@@ -180,13 +194,6 @@ ENVELOPE *env;
   QDCountThisProcessing(ForChareMsg);
 }
 
-void CkGrabProcess_ForChareMsg_to_UVID(env)
-ENVELOPE *env;
-{
-  CmiGrabBuffer(&env);
-  CkProcess_ForChareMsg_to_UVID(env);
-}
-
 void CkProcess_ForChareMsg_to_FVID(env)
 ENVELOPE *env;
 {
@@ -198,14 +205,7 @@ ENVELOPE *env;
   QDCountThisProcessing(ForChareMsg);
 }
 
-void CkGrabProcess_ForChareMsg_to_FVID(env)
-ENVELOPE *env;
-{
-  CmiGrabBuffer(&env);
-  CkProcess_ForChareMsg_to_FVID(env);
-}
-
-void CkProcess_ForChareMsg(env)
+void CkProcess_ForChareMsg_to_Chare(env)
 ENVELOPE *env;
 {
   CHARE_BLOCK *chareblock;
@@ -232,11 +232,26 @@ ENVELOPE *env;
   QDCountThisProcessing(current_msgType);
 }
 
-void CkGrabProcess_ForChareMsg(env)
+void CkProcess_ForChareMsg(env)
 ENVELOPE *env;
 {
-  CmiGrabBuffer(&env);
-  CkProcess_ForChareMsg(env);
+  CHARE_BLOCK *chare = GetEnv_chareBlockPtr(env);
+  CheckMagicNumber(chare, env);
+  switch (chare->charekind) {
+  case CHAREKIND_UVID: CkProcess_ForChareMsg_to_UVID(env); break;
+  case CHAREKIND_FVID: CkProcess_ForChareMsg_to_FVID(env); break;
+  case CHAREKIND_CHARE: CkProcess_ForChareMsg_to_Chare(env); break;
+  case CHAREKIND_BOCNODE: CkProcess_ForChareMsg_to_Chare(env); break;
+  }
+}
+
+void CkProcess_BocMsg(env)
+ENVELOPE *env;
+{
+  CHARE_BLOCK *chare;
+  chare = GetBocBlockPtr(GetEnv_boc_num(env));
+  SetEnv_chareBlockPtr(env, chare);
+  CkProcess_ForChareMsg_to_Chare(env);
 }
 
 void CkProcess_DynamicBocInitMsg(env)
@@ -251,13 +266,6 @@ ENVELOPE *env;
   executing_boc_num = ProcessBocInitMsg(env);
   RegisterDynamicBocInitMsg(&executing_boc_num, NULL);
   QDCountThisProcessing(current_msgType);
-}
-
-void CkGrabProcess_DynamicBocInitMsg(env)
-ENVELOPE *env;
-{
-  CmiGrabBuffer(&env);
-  CkProcess_DynamicBocInitMsg(env);
 }
 
 void CkProcess_NewChareMsg(env)
@@ -301,13 +309,6 @@ ENVELOPE *env;
   QDCountThisProcessing(current_msgType);
 }
 
-void CkGrabProcess_NewChareMsg(env)
-ENVELOPE *env;
-{
-  CmiGrabBuffer(&env);
-  CkProcess_NewChareMsg(env);
-}
-
 void CkProcess_VidSendOverMsg(env)
 ENVELOPE *env;
 {
@@ -321,25 +322,6 @@ ENVELOPE *env;
   if(CpvAccess(traceOn))
     trace_end_execute(0, current_msgType, 0);
   QDCountThisProcessing(current_msgType);
-}
-
-void CkGrabProcess_VidSendOverMsg(env)
-ENVELOPE *env;
-{
-  CmiGrabBuffer(&env);
-  CkProcess_VidSendOverMsg(env);
-}
-
-
-void CheckMagicNumber(chare, env)
-    CHARE_BLOCK *chare; ENVELOPE *env;
-{
-  if (GetID_chare_magic_number(chare->selfID) !=
-      GetEnv_chare_magic_number(env)) {
-    CmiPrintf("[%d] *** ERROR *** dead chare or bad chareID used at entry point %s.\n", 
-	      CmiMyPe(), CsvAccess(EpInfoTable)[GetEnv_EP(env)].name);
-    exit(1);
-  }
 }
 
 
@@ -365,68 +347,26 @@ ENVELOPE *env;
 void HANDLE_INCOMING_MSG(env)
 ENVELOPE *env;
 {
-  CHARE_BLOCK *chare;
-  int ep, type = GetEnv_msgType(env);  
-  
   CmiGrabBuffer(&env);
   UNPACK(env);
   if(CpvAccess(traceOn))
     trace_enqueue(env);
-  if(!CpvAccess(InsideDataInit))
-    CldStripLdb(LDB_ELEMENT_PTR(env));
-  switch (type) {
-  case NewChareMsg:
-    CmiSetHandler(env,CsvAccess(CkProcIdx_NewChareMsg));
-    CldNewSeedFromNet(env, LDB_ELEMENT_PTR(env),
-		      CkLdbSend,
-		      GetEnv_queueing(env),
-		      GetEnv_priosize(env),
-		      GetEnv_priobgn(env));
-    break;
+  switch (GetEnv_msgType(env)) {
+  case NewChareMsg:          CkProcess_NewChareMsg(env); break;
+  case ForChareMsg:          CkProcess_ForChareMsg(env); break;
+  case LdbMsg:               CkProcess_BocMsg(env); break;
+  case QdBocMsg:             CkProcess_BocMsg(env); break;
+  case QdBroadcastBocMsg:    CkProcess_BocMsg(env); break;
+  case ImmBocMsg:            CkProcess_BocMsg(env); break;
+  case ImmBroadcastBocMsg:   CkProcess_BocMsg(env); break;
+  case BocMsg:               CkProcess_BocMsg(env); break;
+  case BroadcastBocMsg:      CkProcess_BocMsg(env); break;
+  case VidSendOverMsg:       CkProcess_VidSendOverMsg(env); break;
+  case DynamicBocInitMsg:    CkProcess_DynamicBocInitMsg(env); break;
   case NewChareNoBalanceMsg:
-    CmiSetHandler(env,CsvAccess(CkProcIdx_NewChareMsg));
-    CkEnqueue(env);
-    break;
-  case ForChareMsg:
-    chare = GetEnv_chareBlockPtr(env);
-    CheckMagicNumber(chare, env);
-    switch (chare->charekind)
-      {
-      case CHAREKIND_UVID: CkProcess_ForChareMsg_to_UVID(env); break;
-      case CHAREKIND_FVID: CkProcess_ForChareMsg_to_FVID(env); break;
-      case CHAREKIND_CHARE:
-      case CHAREKIND_BOCNODE:
-	CmiSetHandler(env,CsvAccess(CkProcIdx_ForChareMsg));
-	CkEnqueue(env);
-	break;
-      default: CmiPrintf("System error #128937\n"); exit(1);
-      }
-    break;
-  case LdbMsg:
-  case QdBocMsg:
-  case QdBroadcastBocMsg:
-  case ImmBocMsg:
-  case ImmBroadcastBocMsg:
-    chare = GetBocBlockPtr(GetEnv_boc_num(env));
-    SetEnv_chareBlockPtr(env, chare);
-    CkProcess_ForChareMsg(env);
-    break;
-  case BocMsg:
-  case BroadcastBocMsg:
-    chare = GetBocBlockPtr(GetEnv_boc_num(env));
-    SetEnv_chareBlockPtr(env, chare);
-    CmiSetHandler(env,CsvAccess(CkProcIdx_ForChareMsg));
-    CkEnqueue(env);
-    break;
-  case VidSendOverMsg:
-    CkProcess_VidSendOverMsg(env);
-    break;
-  case DynamicBocInitMsg:
-    CmiSetHandler(env,CsvAccess(CkProcIdx_DynamicBocInitMsg));
-    CkEnqueue(env);
-    break;
+    CmiAbort("** ERROR ** obsolete message type.\n");
   default:
-    CmiPrintf("** ERROR ** bad message type: %d\n",type);
+    CmiAbort("** ERROR ** bad message type.\n");
   }
 }
 

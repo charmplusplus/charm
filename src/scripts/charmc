@@ -492,9 +492,7 @@ foreach FILE ($FILES)
       breaksw
     case "*.P"
       # Put pgm.P into pgm.TMP.P.C because CC needs source files to end with .C
-      echo '#include "ckdefs.h"' > $TMP.P.C
-      echo '#include "chare.h"' >> $TMP.P.C
-      echo '#include "c++interface.h"' >> $TMP.P.C
+      echo '#include "charm++.h"' >> $TMP.P.C
       echo '#line 1 "'$BASE.P'"' >> $TMP.P.C
       /bin/cat $BASE.P >> $TMP.P.C
       ($ECHOCMD ; $CMK_CXXPP $OPTS_CPP -I$CHARMINC $TMP.P.C > $TMP.cpp)

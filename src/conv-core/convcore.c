@@ -178,7 +178,7 @@ CpvDeclare(CmiHandler*, CmiHandlerTable);
 CpvStaticDeclare(int  , CmiHandlerCount);
 CpvStaticDeclare(int  , CmiHandlerLocal);
 CpvStaticDeclare(int  , CmiHandlerGlobal);
-CpvStaticDeclare(int  , CmiHandlerMax);
+CpvDeclare(int,         CmiHandlerMax);
 
 void CmiNumberHandler(n, h)
 int n; CmiHandler h;

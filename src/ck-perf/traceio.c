@@ -1,6 +1,5 @@
 #include <stdio.h>
-#include "chare.h"
-#include "globals.h"
+#include "charm.h"
 #include "trace.h"
 
 read_in_debug_line(fp, replay, type, mtype, entry, time, event, dest, pe)

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1997-10-29 23:52:51  milind
+ * Revision 2.10  1998-02-27 11:52:14  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.9  1997/10/29 23:52:51  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 2.8  1997/07/18 21:21:10  milind
@@ -65,8 +68,8 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
-#include "chare.h"
-#include "globals.h"
+#include "charm.h"
+
 #include "trace.h"
 
 
@@ -113,8 +116,8 @@ struct chare_block * mainChareBlock;
 	SetEnv_chareBlockPtr(env, mainChareBlock);
 	SetEnv_chare_magic_number(env, 
 			GetID_chare_magic_number(mainChareBlock->selfID));
-
-        CkCheck_and_BcastInitNL(env);
+	CmiSetHandler(env,CsvAccess(HANDLE_INIT_MSG_Index));
+	CmiSyncBroadcastAndFree(GetEnv_TotalSize(env), env);
 }
 
 
@@ -133,7 +136,9 @@ int id;
 		packed = 1;
 	else
 		 packed = 0;
-
-        CkCheck_and_BcastInitNFNL(env); 
+        PACK(env);
+        CmiSetHandler(env,CsvAccess(HANDLE_INIT_MSG_Index));
+	CmiSyncBroadcast(GetEnv_TotalSize(env), env);
+	UNPACK(env);
 }
 

@@ -1,4 +1,4 @@
-#include "chare.h"
+#include "charm.h"
 
 CpvExtern(int, CtrRecdTraceMsg);
 CpvExtern(CthThread, cThread);

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.19  1997-03-19 16:28:04  milind
+ * Revision 2.20  1998-02-27 11:53:11  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.19  1997/03/19 16:28:04  milind
  * Found and corrected a small initialization bug that cause Charm++
  * translator to crash on Origin2000.
  *
@@ -450,7 +453,7 @@ char **charename ;
 	if ( SendType == SIMPLE ) {
 		ind = SearchHandleTable(ChareHandleTable,ChareHandleTableSize,ident) ;
 		if ( ind == -1 ) {
-			sprintf(errstr,"%s is not a Chare handle or is a complex expression",ident) ;
+			sprintf(errstr,"%s is not a charm.handle or is a complex expression",ident) ;
 			CharmError(errstr) ;
 			scopestr = NULL ;
 			*charename = NULL ;

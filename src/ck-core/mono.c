@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.5  1997-10-29 23:52:49  milind
+ * Revision 2.6  1998-02-27 11:52:07  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.5  1997/10/29 23:52:49  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 2.4  1995/09/01 02:13:17  jyelon
@@ -38,9 +41,7 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
-#include "chare.h"
-#include "globals.h"
-#include "mono.h"
+#include "charm.h"
 
 void * GetMonoMsgPtr() ;
 

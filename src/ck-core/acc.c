@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.6  1997-10-29 23:52:42  milind
+ * Revision 2.7  1998-02-27 11:51:45  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.6  1997/10/29 23:52:42  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 2.5  1995/10/13 18:15:53  jyelon
@@ -41,9 +44,7 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
-#include "chare.h"
-#include "globals.h"
-#include "acc.h"
+#include "charm.h"
 
 void *GetAccMsgPtr() ;
 extern void * CPlus_CallAccInit() ;
@@ -110,7 +111,7 @@ ACC_COLLECT_MSG *msg;
 ACC_DATA *mydata;
 {
 	int i;
-	DummyMsg *tmsg;
+	DUMMY_MSG *tmsg;
 
 	if (mydata->AlreadyDone)
 		CmiPrintf("***ERROR*** Accumulation already done\n");	
@@ -118,7 +119,7 @@ ACC_DATA *mydata;
 	{
 		mydata->EP = msg->EP;
 		mydata->CID = msg->cid;
-		tmsg = (DummyMsg *) CkAllocMsg(sizeof(DummyMsg));
+		tmsg = (DUMMY_MSG *) CkAllocMsg(sizeof(DUMMY_MSG));
 		mydata->AlreadyDone = 1;
 		GeneralBroadcastMsgBranch(CsvAccess(CkEp_ACC_LeafNodeCollect), tmsg,
 			ImmBroadcastBocMsg,
@@ -130,7 +131,7 @@ ACC_DATA *mydata;
 
 
 static void ACC_LeafNodeCollect_Fn(msg, mydata)
-DummyMsg *msg;
+DUMMY_MSG *msg;
 ACC_DATA *mydata;
 {
 

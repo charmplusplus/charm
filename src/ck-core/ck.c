@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.25  1998-01-28 17:52:47  milind
+ * Revision 2.26  1998-02-27 11:51:51  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.25  1998/01/28 17:52:47  milind
  * Removed unnecessary function calls to tracing functions.
  * Added macros to turn tracing on and off at runtime.
  *
@@ -150,30 +153,40 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
-#include "chare.h"
-#include "globals.h"
+#include "charm.h"
+
 #include "trace.h"
 #include "converse.h"
 
 #include <varargs.h>
 
-extern void *FIFO_Create();
-void CkLdbSend();
-extern CHARE_BLOCK *CreateChareBlock();
+void CkUnpack(ENVELOPE **msg);
+void CkPack(ENVELOPE **msg);
+void CkInfo(void *msg, 
+	      int *len, void *ldbo, int *qs, int *pb, unsigned int **pp);
 
+extern void *FIFO_Create();
+extern CHARE_BLOCK *CreateChareBlock();
 
 CpvStaticDeclare(int, num_exits);
 CpvStaticDeclare(int, num_endcharms);
-
-
+CpvDeclare(int, CkInfo_Index);
+CpvDeclare(int, CkPack_Index);
+CpvDeclare(int, CkUnpack_Index);
 
 void ckModuleInit()
 {
    CpvInitialize(int, num_exits);
    CpvInitialize(int, num_endcharms);
+   CpvInitialize(int, CkInfo_Index);
+   CpvInitialize(int, CkPack_Index);
+   CpvInitialize(int, CkUnpack_Index);
 
    CpvAccess(num_exits)=0;
    CpvAccess(num_endcharms)=0;
+   CpvAccess(CkInfo_Index) = CldRegisterInfoFn(CkInfo);
+   CpvAccess(CkPack_Index) = CldRegisterPackFn((CldPackFn)CkPack);
+   CpvAccess(CkUnpack_Index) = CldRegisterPackFn((CldPackFn)CkUnpack);
 }
 
 
@@ -412,26 +425,11 @@ int destPE;
     trace_creation(NewChareMsg, Entry, env);
   QDCountThisCreation(Entry, USERcat, NewChareMsg, 1);
 
-  if (CK_PE_SPECIAL(destPE)) {
-    if (destPE != CK_PE_ANY) {
-      CmiPrintf("** ERROR ** Illegal destPE in CreateChare\n");
-    }
-    SetEnv_msgType(env, NewChareMsg);
-    /* This CmiSetHandler is here because load balancer will fail to call */
-    /* CkCheck_and_Send on local messages.  Fix this.                     */
-    CmiSetHandler(env, CpvAccess(HANDLE_INCOMING_MSG_Index));
-    CldNewSeedFromLocal(env, LDB_ELEMENT_PTR(env),
-			CkLdbSend,
-			GetEnv_queueing(env),
-			GetEnv_priosize(env),
-			GetEnv_priobgn(env));
-  } else {
-    SetEnv_msgType(env, NewChareNoBalanceMsg);
-    CkCheck_and_Send(destPE, env);
-  }
-
+  SetEnv_msgType(env, NewChareMsg);
+  if (destPE == CK_PE_ANY) destPE = CLD_ANYWHERE;
+  CmiSetHandler(env, CpvAccess(HANDLE_INCOMING_MSG_Index));
+  CldEnqueue(destPE, env, CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
 }
-
 
 
 SendMsg(Entry, Msg, pChareID)
@@ -451,9 +449,9 @@ ChareIDType * pChareID;
   QDCountThisCreation(Entry, USERcat, ForChareMsg, 1);
   if(CpvAccess(traceOn))
     trace_creation(GetEnv_msgType(env), Entry, env);
-  CkCheck_and_Send(destPE, env);
+  CmiSetHandler(env, CpvAccess(HANDLE_INCOMING_MSG_Index));
+  CldEnqueue(destPE, env, CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
 }
-
 
 /*****************************************************************/
 /** Gets reference number.					**/
@@ -488,18 +486,78 @@ int kind;
 }
 
 /*****************************************************************************
- * CkLdbSend is a function that is passed to the Ldb strategy to send out a
- * message to another processor
+ * Load balancer needs.
  *****************************************************************************/
 
-void CkLdbSend(msgst, destPE)
-     void *msgst;
-     int destPE;
+void CkUnpack(ENVELOPE **henv)
 {
-  ENVELOPE *env = (ENVELOPE *)msgst;
-
-  CkCheck_and_Send(destPE, env);
+  ENVELOPE *envelope = *henv;
+  if (GetEnv_isPACKED(envelope) == PACKED) {
+    void *unpackedUsrMsg; 
+    void *usrMsg = USER_MSG_PTR(envelope); 
+    if(CpvAccess(traceOn)) 
+      trace_begin_unpack(); 
+    (*(CsvAccess(MsgToStructTable)[GetEnv_packid(envelope)].unpackfn)) 
+      (usrMsg, &unpackedUsrMsg); 
+    if(CpvAccess(traceOn)) 
+      trace_end_unpack(); 
+    if (usrMsg != unpackedUsrMsg) 
+      /* else unpacked in place */ 
+      { 
+	int temp_i; 
+	int temp_size; 
+	char *temp1, *temp2; 
+	/* copy envelope */ 
+	temp1 = (char *) envelope; 
+	temp2 = (char *) ENVELOPE_UPTR(unpackedUsrMsg); 
+	temp_size = (char *) usrMsg - temp1; 
+	for (temp_i = 0; temp_i<temp_size; temp_i++) 
+	  *temp2++ = *temp1++; 
+	CmiFree(envelope); 
+	envelope = ENVELOPE_UPTR(unpackedUsrMsg); 
+      } 
+    SetEnv_isPACKED(envelope, UNPACKED); 
+  }
+  *henv = envelope;
 }
+
+void CkPack(ENVELOPE **henv)
+{
+  ENVELOPE *env = *henv;
+  if (GetEnv_isPACKED(env) == UNPACKED) {
+    /* needs packing and not already packed */ 
+    int size; 
+    char *usermsg, *packedmsg; 
+    /* make it +ve to connote a packed msg */ 
+    SetEnv_isPACKED(env, PACKED); 
+    usermsg = USER_MSG_PTR(env); 
+    if(CpvAccess(traceOn)) 
+      trace_begin_pack(); 
+    (*(CsvAccess(MsgToStructTable)[GetEnv_packid(env)].packfn)) 
+      (usermsg, &packedmsg, &size); 
+    if(CpvAccess(traceOn)) 
+      trace_end_pack(); 
+    if (usermsg != packedmsg) { 
+      /* Free the usermsg here. */ 
+      CkFreeMsg(usermsg); 
+      env = ENVELOPE_UPTR(packedmsg); 
+    }
+  }
+  *henv = env;
+}
+
+
+void CkInfo(void *msg, int *len, void *ldbfield,
+	    int *queueing, int *priobits, unsigned int **prioptr)
+{
+  ENVELOPE *env = (ENVELOPE *)msg;
+  *len = GetEnv_TotalSize(env);
+  *(void**)ldbfield = LDB_ELEMENT_PTR(env);
+  *queueing = GetEnv_queueing(env);
+  *priobits = GetEnv_priosize(env);
+  *prioptr = GetEnv_priobgn(env);
+}
+
 
 CkEnqueue(env)
 void *env;

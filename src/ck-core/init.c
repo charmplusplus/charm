@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.51  1998-01-28 17:52:48  milind
+ * Revision 2.52  1998-02-27 11:52:04  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.51  1998/01/28 17:52:48  milind
  * Removed unnecessary function calls to tracing functions.
  * Added macros to turn tracing on and off at runtime.
  *
@@ -234,8 +237,8 @@ static char     ident[] = "@(#)$Header$";
 /* This is the main process that runs on each pe                           */
 /* */
 /***************************************************************************/
-#include "chare.h"
-#include "globals.h"
+#include "charm.h"
+
 #include "trace.h"
 
 
@@ -287,10 +290,6 @@ extern CHARE_BLOCK *CreateChareBlock();
 extern void BUFFER_INCOMING_MSG() ;
 extern void HANDLE_INCOMING_MSG() ;
 extern void HANDLE_INIT_MSG();
-extern void CkGrabProcess_ForChareMsg();
-extern void CkGrabProcess_DynamicBocInitMsg();
-extern void CkGrabProcess_NewChareMsg();
-extern void CkGrabProcess_VidSendOverMsg();
 
 void SysPeriodicCheckInit(void);
 void CharmRegisterHandlers();
@@ -389,7 +388,6 @@ static void EndInitPhase()
 
 static void PropagateInitBarrier()
 {
-
   if (CpvAccess(CkInitPhase) == 0) return;
 
   if (CpvAccess(CkCountArrived) && CpvAccess(CkInitCount)==0) {
@@ -402,10 +400,12 @@ static void PropagateInitBarrier()
       EndInitPhase();
       if (parent == -1) {
 	SetEnv_msgType(henv, InitBarrierPhase2);
-	CkCheck_and_BcastInitNL(henv);
+	CmiSetHandler(henv, CsvAccess(HANDLE_INIT_MSG_Index));
+	CmiSyncBroadcastAndFree(GetEnv_TotalSize(henv), henv); 
       } else {
 	SetEnv_msgType(henv, InitBarrierPhase1);
-	CkCheck_and_Send_Init(parent, henv);
+        CmiSetHandler(henv, CsvAccess(HANDLE_INIT_MSG_Index));
+        CmiSyncSendAndFree(parent,GetEnv_TotalSize(henv), henv);
       }
     }
   }
@@ -466,8 +466,6 @@ FUNCTION_PTR donehandler;
 				 * every one. if there is a difference, have
 				 * to modify this somewhat */
 		CpvAccess(InsideDataInit) = 1;
-
-		CldCreateBoc();
 
 		futuresCreateBOC();
 
@@ -758,14 +756,6 @@ void CharmRegisterHandlers()
     = CmiRegisterHandler(HANDLE_INCOMING_MSG) ;
   CsvAccess(HANDLE_INIT_MSG_Index)
     = CmiRegisterHandler(HANDLE_INIT_MSG);
-  CsvAccess(CkProcIdx_ForChareMsg)
-    = CmiRegisterHandler(CkGrabProcess_ForChareMsg);
-  CsvAccess(CkProcIdx_DynamicBocInitMsg)
-    = CmiRegisterHandler(CkGrabProcess_DynamicBocInitMsg);
-  CsvAccess(CkProcIdx_NewChareMsg)
-    = CmiRegisterHandler(CkGrabProcess_NewChareMsg);
-  CsvAccess(CkProcIdx_VidSendOverMsg)
-    = CmiRegisterHandler(CkGrabProcess_VidSendOverMsg);
 }
 
 void InitializeEPTables(void)
@@ -926,8 +916,8 @@ void BroadcastCount(void)
 	SetEnv_msgType(env, InitCountMsg);
 
 	SetEnv_count(env, CpvAccess(currentBocNum) - NumSysBoc + 2 + CpvAccess(NumReadMsg));
-
-        CkCheck_and_BcastInitNL(env);
+	CmiSetHandler(env,CsvAccess(HANDLE_INIT_MSG_Index));
+	CmiSyncBroadcastAndFree(GetEnv_TotalSize(env),env);
 }
 
 static int 

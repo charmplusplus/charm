@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1998-01-28 17:52:50  milind
+ * Revision 2.13  1998-02-27 11:52:19  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.12  1998/01/28 17:52:50  milind
  * Removed unnecessary function calls to tracing functions.
  * Added macros to turn tracing on and off at runtime.
  *
@@ -73,10 +76,55 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
-#include "chare.h"
-#include "table.h"
-#include "globals.h"
+#include "charm.h"
 #include "trace.h"
+
+#define TBL_WAITFORDATA 1
+#define TBL_NOWAITFORDATA 2
+
+#define TBL_REPLY 1
+#define TBL_NOREPLY 2
+
+#define TBL_WAIT_AFTER_FIRST 1
+#define TBL_NEVER_WAIT 2
+#define TBL_ALWAYS_WAIT 3
+
+#define MAX_TBL_SIZE 211
+
+typedef struct {
+	int penum;
+	int index;
+} map;
+
+typedef struct {
+	int key;
+	char *data;
+} TBL_MSG;
+
+
+typedef struct address {
+	int entry;
+	ChareIDType  chareid;
+	struct address *next;
+} ADDRESS;
+
+typedef struct tbl_element {
+	int isDefined;
+	int tbl;
+	int key;
+	char *data;
+	int size_data;
+	struct address *reply;
+	struct tbl_element *next;
+}	TBL_ELEMENT;
+
+typedef struct {
+	int i;
+} DATA_BR_TBL;
+
+typedef struct {
+	int i;
+} DATA_MNGR_TBL;
 
 #define SIZE_CHARE_ID sizeof(ChareIDType)
 extern CHARE_BLOCK *CreateChareBlock();
@@ -93,8 +141,6 @@ void tblModuleInit()
 {
     CpvInitialize(TBL_ELEMENT_, table);
 }
-
-
 
 
 

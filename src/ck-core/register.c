@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1997-10-29 23:52:52  milind
+ * Revision 2.11  1998-02-27 11:52:15  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.10  1997/10/29 23:52:52  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 2.9  1997/08/22 19:29:07  milind
@@ -61,8 +64,8 @@
 static char ident[] = "@(#)$Header$";
 
 
-#include "chare.h"
-#include "globals.h"
+#include "charm.h"
+
 
 
 /* indexes */

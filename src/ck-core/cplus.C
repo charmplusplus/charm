@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.13  1997-07-18 21:39:46  milind
+ * Revision 2.14  1998-02-27 11:51:59  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.13  1997/07/18 21:39:46  milind
  * Fixed a minor bug caused by recent projections changes.
  *
  * Revision 2.12  1995/11/02 22:50:47  knauff
@@ -59,13 +62,8 @@
 static char ident[] = "@(#)$Header$";
 
 #include <varargs.h>
-#include "chare.h"
-#include "msg_macros.h"
-#include "globals.h"
+#include "charm++.h"
 #include "trace.h"
-
-#include "c++interface.h"
-
 #include <stdio.h>
 
 /* this is the handle of the main chare, used in place of MainChareID */

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1998-01-28 17:52:45  milind
+ * Revision 2.17  1998-02-27 11:51:48  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.16  1998/01/28 17:52:45  milind
  * Removed unnecessary function calls to tracing functions.
  * Added macros to turn tracing on and off at runtime.
  *
@@ -102,8 +105,8 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
-#include "chare.h"
-#include "globals.h"
+#include "charm.h"
+
 #include "trace.h"
 
 #define MAXBOC 15
@@ -242,8 +245,7 @@ TRACE(CmiPrintf("[%d] GetBocBlockPtr: bocNum=%d, index=%d, element=0x%x\n",
 }
 
 
-void * GetBocDataPtr(bocNum)
-ChareNumType bocNum;
+void * GetBocDataPtr(ChareNumType bocNum)
 {
     return GetBocBlockPtr(bocNum)->chareptr;
 }
@@ -359,7 +361,11 @@ ChareIDType *ReturnID;
       SetEnv_msgType(env, BocInitMsg);
       if(CpvAccess(traceOn))
         trace_creation(GetEnv_msgType(env), Entry, env);
-      CkCheck_and_BcastInitNFNL(env);
+      PACK(env);
+      CmiSetHandler(env,CsvAccess(HANDLE_INIT_MSG_Index));
+      CmiSyncBroadcast(GetEnv_TotalSize(env),env);
+      UNPACK(env);
+      
       /* env becomes the usrMsg, hence should not be freed by us */
       executing_boc_num = ProcessBocInitMsg(env);
       if (ReturnEP >= 0)
@@ -434,31 +440,32 @@ PeNumType destPE;
 MsgTypes type;
 ChareNumType bocnum;
 {
-	ENVELOPE *env;
+  ENVELOPE *env;
 
-	/* Charm++ translator puts type as -1 to avoid using the 
-	   BocMsg macro. */
-	if ( type == -1 ) 
-		type = BocMsg ;
-
-	env  = ENVELOPE_UPTR(msg);
-
-	SetEnv_msgType(env, type);
-	SetEnv_boc_num(env, bocnum);
-	SetEnv_EP(env, ep);
-
-TRACE(CmiPrintf("[%d] GeneralSend: type=%d, msgType=%d\n",
-		CmiMyPe(), type, GetEnv_msgType(env)));
-
-	/* if (bocnum >= NumSysBoc) */
-        CpvAccess(nodebocMsgsCreated)++;
-
-        if(CpvAccess(traceOn))
-	  trace_creation(GetEnv_msgType(env), ep, env);
-	CkCheck_and_Send(destPE, env);
-	QDCountThisCreation(ep, category, type, 1);
+  /* Charm++ translator puts type as -1 to avoid using the 
+     BocMsg macro. */
+  if ( type == -1 ) 
+    type = BocMsg ;
+  
+  env  = ENVELOPE_UPTR(msg);
+  
+  SetEnv_msgType(env, type);
+  SetEnv_boc_num(env, bocnum);
+  SetEnv_EP(env, ep);
+  
+  TRACE(CmiPrintf("[%d] GeneralSend: type=%d, msgType=%d\n",
+		  CmiMyPe(), type, GetEnv_msgType(env)));
+  
+  /* if (bocnum >= NumSysBoc) */
+  CpvAccess(nodebocMsgsCreated)++;
+  
+  if(CpvAccess(traceOn))
+    trace_creation(GetEnv_msgType(env), ep, env);
+  
+  CmiSetHandler(env, CpvAccess(HANDLE_INCOMING_MSG_Index));
+  CldEnqueue(destPE, env, CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
+  QDCountThisCreation(ep, category, type, 1);
 }
-
 
 
 void GeneralBroadcastMsgBranch(ep, msg, type, bocnum)
@@ -467,29 +474,30 @@ void *msg;
 MsgTypes type;
 ChareNumType bocnum;
 {
-	ENVELOPE *env;
-
-	/* Charm++ translator puts type as -1 to avoid using the 
-	   BroadcastBocMsg macro. */
-	if ( type == -1 ) 
-		type = BroadcastBocMsg ;
-
-	env = ENVELOPE_UPTR(msg);
-
-	SetEnv_msgType(env, type);
-	SetEnv_boc_num(env, bocnum);
-	SetEnv_EP(env, ep);
-
-TRACE(CmiPrintf("[%d] GeneralBroadcast: type=%d, msgType=%d\n",
-		CmiMyPe(), type, GetEnv_msgType(env)));
-
-	/* if (bocnum >= NumSysBoc) */
-        CpvAccess(nodebocMsgsCreated)+=CmiNumPes();
-
-        if(CpvAccess(traceOn))
-	  trace_creation(GetEnv_msgType(env), ep, env);
-	CkCheck_and_BroadcastAll(env); /* Asynchronous broadcast */
-	QDCountThisCreation(ep, category, type, CmiNumPes());
+  ENVELOPE *env;
+  
+  /* Charm++ translator puts type as -1 to avoid using the 
+     BroadcastBocMsg macro. */
+  if ( type == -1 ) 
+    type = BroadcastBocMsg ;
+  
+  env = ENVELOPE_UPTR(msg);
+  
+  SetEnv_msgType(env, type);
+  SetEnv_boc_num(env, bocnum);
+  SetEnv_EP(env, ep);
+  
+  TRACE(CmiPrintf("[%d] GeneralBroadcast: type=%d, msgType=%d\n",
+		  CmiMyPe(), type, GetEnv_msgType(env)));
+  
+  /* if (bocnum >= NumSysBoc) */
+  CpvAccess(nodebocMsgsCreated)+=CmiNumPes();
+  
+  if(CpvAccess(traceOn))
+    trace_creation(GetEnv_msgType(env), ep, env);
+  CmiSetHandler(env,CpvAccess(HANDLE_INCOMING_MSG_Index));
+  CldEnqueue(CLD_BROADCAST_ALL, env, CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
+  QDCountThisCreation(ep, category, type, CmiNumPes());
 }
 
 
@@ -530,27 +538,27 @@ void InitiateDynamicBocBroadcast(msg, mydata)
 DYNAMIC_BOC_NUM_MSG *msg;
 char *mydata;
 {
-	int dataSize;
-	void *tmsg;
-        ENVELOPE * env;
-	ChareNumType ep;
-
-	GetDynamicBocMsg(msg->ref, &tmsg, &ep); 
-
-TRACE(CmiPrintf("[%d] InitiateDynamicBocBroadcast: ref=%d, boc=%d, ep=%d\n",
-		CmiMyPe(), msg->ref, msg->boc, ep));
-
-        env = (ENVELOPE *) ENVELOPE_UPTR(tmsg);
-        SetEnv_boc_num(env, msg->boc);
-        SetEnv_EP(env, ep);
-        SetEnv_msgType(env, DynamicBocInitMsg);
-
-        if(CpvAccess(traceOn))
-	  trace_creation(GetEnv_msgType(env), ep, env);
-        CkCheck_and_BroadcastAll(env);
-
-        QDCountThisCreation(ep, USERcat, DynamicBocInitMsg,CmiNumPes());
-
+  int dataSize;
+  void *tmsg;
+  ENVELOPE * env;
+  ChareNumType ep;
+  
+  GetDynamicBocMsg(msg->ref, &tmsg, &ep); 
+  
+  TRACE(CmiPrintf("[%d] InitiateDynamicBocBroadcast: ref=%d, boc=%d, ep=%d\n",
+		  CmiMyPe(), msg->ref, msg->boc, ep));
+  
+  env = (ENVELOPE *) ENVELOPE_UPTR(tmsg);
+  SetEnv_boc_num(env, msg->boc);
+  SetEnv_EP(env, ep);
+  SetEnv_msgType(env, DynamicBocInitMsg);
+  
+  if(CpvAccess(traceOn))
+    trace_creation(GetEnv_msgType(env), ep, env);
+  CmiSetHandler(env,CpvAccess(HANDLE_INCOMING_MSG_Index));
+  CldEnqueue(CLD_BROADCAST_ALL, env, CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
+  
+  QDCountThisCreation(ep, USERcat, DynamicBocInitMsg,CmiNumPes());
 }
 
 void DynamicBocInit(void)

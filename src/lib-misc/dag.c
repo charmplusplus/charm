@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.4  1997-08-18 18:02:03  milind
+ * Revision 1.5  1998-02-27 11:53:02  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 1.4  1997/08/18 18:02:03  milind
  * Located and fixed a bug reported by Ed. dag.c was using CmiFree to free
  * charm messages instead of CkFreeMsg.
  *
@@ -33,8 +36,69 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
-#include "chare.h"
-#include "dag.h"
+
+#include "charm.h"
+
+/* _dag3_WLIMIT is defien d in dag.c dagger..h also */
+#define _dag3_WLIMIT 8
+#define _dag3_FREEBLIMIT 4
+#define _dag3_FREECLIMIT 4
+#define _dag3_FREERLIMIT 4
+
+struct s_dag3_DAGVAR {
+    int index;
+    int init_value;
+    int counter;
+};
+
+struct s_dag3_RLNODE {
+    int    wno;
+    int    refnum;
+    struct s_dag3_RLNODE *next;
+};
+
+struct s_dag3_BUFFER {
+    int eno;
+    int refnum;
+    int expect;
+    int ecount;
+    int free_count;
+    void *msg;
+    struct s_dag3_BUFFER **prev;
+    struct s_dag3_BUFFER *next;
+};
+
+
+struct s_dag3_COUNT {
+    int refnum;
+    int value;
+    int bix;
+    struct s_dag3_BUFFER *bpa[_dag3_WLIMIT];
+    struct s_dag3_COUNT  **prev;
+    struct s_dag3_COUNT  *next;
+};
+
+struct s_dag3_FREELIST {
+    int bcount;
+    int ccount;
+    struct s_dag3_BUFFER *b;
+    struct s_dag3_COUNT  *c;
+};
+
+struct s_dag3_RL {
+    int    dagexit;
+    struct s_dag3_COUNT *head;
+    struct s_dag3_COUNT *tail;
+};
+
+typedef struct s_dag3_COUNT _dag3_RLNODE;
+typedef struct s_dag3_RL     _dag3_RL;
+typedef struct s_dag3_BUFFER _dag3_BUFFER;
+typedef struct s_dag3_COUNT  _dag3_COUNT;
+typedef struct s_dag3_FREELIST _dag3_FREELIST;
+typedef struct s_dag3_DAGVAR _dag3_DAGVAR;
+typedef struct s_dag3_DAGVAR DAGVAR;
+
 
 _dag3_BUFFER *_dag4_allocb();
 _dag3_COUNT  *_dag4_allocc();
@@ -59,14 +123,13 @@ _dag3_COUNT  *_dag4_allocc();
 #define ANY      4
 #define AVAILABLE ((void *) NULL)
 #define PROCESSED ((void *) 1)
-#define NULL 0
+
 #ifndef TRUE
 #define TRUE 1
 #endif
 #ifndef FALSE
 #define FALSE 0
 #endif
-
 
 /* matching_find_count */
 /* ****************************************************************** */

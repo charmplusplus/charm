@@ -2,12 +2,10 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "chare.h"
-#include "globals.h"
+#include "charm.h"
 #define MAIN_PERF
 #include "trace.h"
 #undef MAIN_PERF
-#include "stat.h"
 
 CpvDeclare(char*,pgm);
 CpvExtern(int,CtrRecdTraceMsg); 

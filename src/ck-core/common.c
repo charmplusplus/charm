@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1997-10-29 23:52:44  milind
+ * Revision 2.4  1998-02-27 11:51:53  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.3  1997/10/29 23:52:44  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 2.2  1997/07/18 21:21:04  milind
@@ -45,8 +48,8 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
-#include "chare.h"
-#include "globals.h"
+#include "charm.h"
+
 #include "trace.h"
 
 
@@ -69,7 +72,7 @@ void InitializeMessageMacros(void)
 #define ENVELOPE_SIZE sizeof(ENVELOPE)
 
 /* count everything except the padding, then add the padding if needed */ 
-	CpvAccess(HEADER_SIZE) = ENVELOPE_SIZE + CpvAccess(LDB_ELEM_SIZE) ;
+	CpvAccess(HEADER_SIZE) = ENVELOPE_SIZE + CLD_FIELDSIZE ;
 
 	if (CpvAccess(HEADER_SIZE) % 8 == 0)
 		CpvAccess(PAD_SIZE) = 0;
@@ -80,16 +83,16 @@ void InitializeMessageMacros(void)
 
 	/********************* ENVELOPE **************************************/
 
-	CpvAccess(_CK_Env_To_Usr) = ENVELOPE_SIZE + CpvAccess(LDB_ELEM_SIZE) + CpvAccess(PAD_SIZE) ;
+	CpvAccess(_CK_Env_To_Usr) = ENVELOPE_SIZE + CLD_FIELDSIZE + CpvAccess(PAD_SIZE) ;
 
 
 	/******************** LDB ********************************************/
 
- 	CpvAccess(_CK_Ldb_To_Usr) = CpvAccess(LDB_ELEM_SIZE) + CpvAccess(PAD_SIZE) ;
+ 	CpvAccess(_CK_Ldb_To_Usr) = CLD_FIELDSIZE + CpvAccess(PAD_SIZE) ;
 
 
 	/******************* USR *********************************************/
 
- 	CpvAccess(_CK_Usr_To_Env) = -(ENVELOPE_SIZE + CpvAccess(LDB_ELEM_SIZE) + CpvAccess(PAD_SIZE)) ;
- 	CpvAccess(_CK_Usr_To_Ldb) = -(CpvAccess(LDB_ELEM_SIZE) + CpvAccess(PAD_SIZE));
+ 	CpvAccess(_CK_Usr_To_Env) = -(ENVELOPE_SIZE + CLD_FIELDSIZE + CpvAccess(PAD_SIZE)) ;
+ 	CpvAccess(_CK_Usr_To_Ldb) = -(CLD_FIELDSIZE + CpvAccess(PAD_SIZE));
 }	

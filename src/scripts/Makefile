@@ -58,7 +58,7 @@ SEQCHARMC=../bin/charmc $(CHARMOPTS)
 #
 ###############################################################################
 
-ALLHEADERS=acc.h c++interface.h chare.h ckdefs.h common.h communication.h condsend.h const.h cpthreads.h dagger.h dtable.h env_macros.h globals.h mono.h msg_macros.h prio_macros.h qd.h stat.h sys_macros.h table.h tbl.h trans_decls.h trans_defs.h trans_externs.h user_macros.h vid.h wrtone.h converse.h conv-mach.h internal.h quiescence.h simplemsg.h trace.h dag.h generic_redn.h pvmc.h pvm3.h # pglib.h
+ALLHEADERS=charm++.h charm.h charm++-inc.h charm-inc.h dagger.h cpthreads.h converse.h conv-mach.h simplemsg.h trace.h generic_redn.h pvmc.h pvm3.h # pglib.h
 
 ALLINTERFACES=GENERIC-ACC.int GENERIC-HIST.int GENERIC-REDN.int barrier_redn.int cache.int dacc_count.int dacc_hist.int dcountredn.int dmaxredn.int dminredn.int dprodredn.int dsumredn.int facc_count.int facc_hist.int fcountredn.int fmaxredn.int fminredn.int fprodredn.int fsumredn.int iacc_count.int iacc_hist.int icountredn.int imaxredn.int iminredn.int iprodredn.int isumredn.int pg.int
 
@@ -80,14 +80,15 @@ dirs+sources:
 	@echo 'Gathering source code.'
 	@echo
 	find . -type l -exec rm {} \;
+	rm -rf QuickThreads
 	rm -rf ../bin ; mkdir ../bin
 	rm -rf ../lib ; mkdir ../lib
 	rm -rf ../src ; mkdir ../src
 	rm -rf ../pgms
 	../../src/Common/scripts/gatherflat ../../src/Common/scripts .
 	./gatherflat ../../src/Common/conv-core        .
+	./gatherflat ../../src/Common/conv-ldb         .
 	./gatherflat ../../src/Common/ck-core          .
-	./gatherflat ../../src/Common/ck-ldb           .
 	./gatherflat ../../src/Common/ck-perf          .
 	./gatherflat ../../src/Common/langs/simplemsg  .
 	./gatherflat ../../src/Common/langs/pvmc       .
@@ -126,7 +127,7 @@ TRACELIBS=libtrace-none.a libtrace-summary.a libtrace-projections.a
 
 CVLIBS=libconv-core.a libconv-cplus-n.a libconv-cplus-y.a libldb-rand.o $(TRACELIBS)
 
-LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o ldbcfns.o
+LIBCONV_CORE=threads.o convcore.o conv-conds.o spantree.o queueing.o fifo.o msgmgr.o memory.o cpm.o cpthreads.o futures.o cldb.o
 
 converse: basics QuickThreads/libqt.a $(CVLIBS) conv-host-if-needed conv-cpm
 
@@ -188,11 +189,11 @@ cpthreads.o: cpthreads.c $(CVHEADERS)
 memory.o: memory.c $(CVHEADERS)
 	$(CHARMC) memory.c
 
-ldbcfns.o: ldbcfns.c $(CVHEADERS)
-	$(CHARMC) ldbcfns.c
+cldb.o: cldb.c $(CVHEADERS)
+	$(CHARMC) cldb.c
 
-libldb-rand.o: ldb.rand.c $(CVHEADERS)
-	$(CHARMC) -cp ../lib/ -o $@ ldb.rand.c
+libldb-rand.o: cldb.rand.c $(CVHEADERS)
+	$(CHARMC) -cp ../lib/ -o $@ cldb.rand.c
 
 
 ###############################################################################
@@ -201,12 +202,11 @@ libldb-rand.o: ldb.rand.c $(CVHEADERS)
 #
 ###############################################################################
 
-CKHEADERS=chare.h const.h msg_macros.h prio_macros.h env_macros.h globals.h\
-	  sys_macros.h communication.h trace.h $(CVHEADERS)
+CKHEADERS=charm.h trace.h $(CVHEADERS)
 
 CK_LIBS_CORE=libck-core.a
 
-CK_LIBS_LDB=libldb-acwn.o libldb-mngr.o
+CK_LIBS_LDB=
 
 CK_LIBS_CPLUS=libck-cplus-n.a libck-defmain-std.a
 
@@ -258,31 +258,31 @@ init.o: init.c $(CKHEADERS)
 boc.o: boc.c $(CKHEADERS)
 	$(CHARMC) -o boc.o boc.c
 
-condsend.o: condsend.c condsend.h $(CKHEADERS)
+condsend.o: condsend.c $(CKHEADERS)
 	$(CHARMC) -o condsend.o condsend.c
 
-qd.o: qd.c qd.h $(CKHEADERS)
+qd.o: qd.c $(CKHEADERS)
 	$(CHARMC) -o qd.o qd.c
 
-vid.o: vid.c vid.h $(CKHEADERS)
+vid.o: vid.c $(CKHEADERS)
 	$(CHARMC) -o vid.o vid.c
 
-stat.o: stat.c stat.h $(CKHEADERS)
+stat.o: stat.c $(CKHEADERS)
 	$(CHARMC) -o stat.o stat.c
 
 rdonly.o: rdonly.c $(CKHEADERS)
 	$(CHARMC) -o rdonly.o rdonly.c
 
-acc.o: acc.c acc.h $(CKHEADERS)
+acc.o: acc.c $(CKHEADERS)
 	$(CHARMC) -o acc.o acc.c
 
-mono.o: mono.c mono.h $(CKHEADERS)
+mono.o: mono.c $(CKHEADERS)
 	$(CHARMC) -o mono.o mono.c
 
-tbl.o: tbl.c tbl.h $(CKHEADERS)
+tbl.o: tbl.c $(CKHEADERS)
 	$(CHARMC) -o tbl.o tbl.c
 
-wrtone.o: wrtone.c wrtone.h $(CKHEADERS)
+wrtone.o: wrtone.c $(CKHEADERS)
 	$(CHARMC) -o wrtone.o wrtone.c
 
 memstuff.o: memstuff.c $(CKHEADERS)
@@ -318,11 +318,11 @@ trace-projections.o : trace-projections.c trace.h $(CKHEADERS)
 #
 ###############################################################################
 
-ckfutures.o: ckfutures.C ckfutures.ci c++interface.h $(CKHEADERS)
+ckfutures.o: ckfutures.C ckfutures.ci charm++.h $(CKHEADERS)
 	$(CHARMC) ckfutures.ci
 	$(CHARMC) -c ckfutures.C
 
-cplus.o: cplus.C c++interface.h $(CKHEADERS)
+cplus.o: cplus.C charm++.h $(CKHEADERS)
 	$(CHARMC) -o cplus.o cplus.C
 
 libck-cplus-y.a: cplus.o ckfutures.o 
@@ -360,7 +360,7 @@ pglib.o: pglib.p pglib.h pg.int $(CKHEADERS)
 cache.o: cache.p cache.int $(CKHEADERS)
 	$(CHARMC) cache.p
 
-dag.o: dag.c dag.h $(CKHEADERS)
+dag.o: dag.c $(CKHEADERS)
 	$(CHARMC) dag.c
 
 barrier_redn.o: barrier_redn.p barrier_redn.int $(CKHEADERS)

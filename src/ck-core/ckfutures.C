@@ -1,7 +1,5 @@
 
-#include "ckdefs.h"
-#include "chare.h"
-#include "c++interface.h"
+#include "charm++.h"
 #include "ckfutures.top.h"
 #include <stdlib.h>
 

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.12  1998-01-28 17:52:51  milind
+ * Revision 2.13  1998-02-27 11:52:24  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.12  1998/01/28 17:52:51  milind
  * Removed unnecessary function calls to tracing functions.
  * Added macros to turn tracing on and off at runtime.
  *
@@ -90,10 +93,16 @@ EpLanguageTable to be indexed by 65535 in CallProcessMsg.
 
 
 
-#include "chare.h"
-#include "globals.h"
+#include "charm.h"
 #include "trace.h"
-#include "vid.h"
+
+typedef struct data_brnch_vid {
+	int dummy;
+} DATA_BR_VID;
+
+typedef struct chare_id_msg{
+        ChareIDType ID;
+} CHARE_ID_MSG;
 
 void VidEnqueueMsg(env)
 ENVELOPE *env;
@@ -111,13 +120,14 @@ ENVELOPE *env;
   SetEnv_chare_magic_number(env, GetID_chare_magic_number(vid->x.realID));
   if(CpvAccess(traceOn))
     trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
-  CkCheck_and_Send(GetID_onPE(vid->x.realID), env);
+  CldEnqueue(GetID_onPE(vid->x.realID), env,
+	     CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
   QDCountThisCreation(GetEnv_EP(env), USERcat, ForChareMsg, 1);
 }
 
 /************************************************************************/
 /*			VidSendOverMessage				*/
-/*	Once the chare ha been created it needs to get the messages	*/
+/*	Once the charm.ha been created it needs to get the messages	*/
 /*	that were sent to it while it hadn't been created. These	*/
 /* 	messages are queued up in its virtual id block, whose address	*/
 /* 	it has available. The messages are then dequeued and sent over  */
@@ -155,7 +165,8 @@ void *data_area;
 	SetEnv_chare_magic_number(env, chare_magic);
         if(CpvAccess(traceOn))
 	  trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
-	CkCheck_and_Send(chare_pe, env);
+	CldEnqueue(chare_pe, env,
+		   CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
 	QDCountThisCreation(GetEnv_EP(env), USERcat, ForChareMsg, 1);
    }
    vidblock->charekind = CHAREKIND_FVID;
@@ -188,5 +199,7 @@ CHARE_BLOCK *vidBlockPtr;
     QDCountThisCreation(0, IMMEDIATEcat, VidSendOverMsg, 1);
     if(CpvAccess(traceOn))
       trace_creation(GetEnv_msgType(env), GetEnv_EP(env), env);
-    CkCheck_and_Send(vidPE, env);
+    CmiSetHandler(env, CpvAccess(HANDLE_INCOMING_MSG_Index));
+    CldEnqueue(vidPE, env,
+	       CpvAccess(CkInfo_Index), CpvAccess(CkPack_Index));
 }

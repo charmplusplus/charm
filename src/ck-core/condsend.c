@@ -13,7 +13,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.7  1997-10-29 23:52:45  milind
+ * Revision 2.8  1998-02-27 11:51:57  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.7  1997/10/29 23:52:45  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 2.6  1995/10/19 18:21:18  jyelon
@@ -34,12 +37,32 @@
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
 
+#include "charm.h"
 
-#include "converse.h"
-#include "const.h"
-#include "chare.h"
-#include "globals.h"
-#include "condsend.h"
+typedef struct {
+  int entry;
+  void *msg;
+  ChareIDType *cid;
+} SendMsgStuff;
+
+typedef struct {
+  FUNCTION_PTR fn_ptr;
+  int bocNum;
+} CallBocStuff;
+
+/* Function implemented but not to be used .. */
+static void SendMsgIfConditionArises  CMK_PROTO((int condnum, int entry, void *msg, int size, ChareIDType *cid));
+
+void CallBocIfConditionArises CMK_PROTO((int condnum, FUNCTION_PTR fnp, int bocNum));
+
+void SendMsgAfter CMK_PROTO((unsigned int deltaT, int entry, void *msg, int size, ChareIDType *cid));
+
+void CallBocAfter CMK_PROTO((FUNCTION_PTR fnp, int bocNum, unsigned int deltaT));
+
+void CallBocOnCondition CMK_PROTO((FUNCTION_PTR fnp, int bocNum));
+
+int NoDelayedMsgs CMK_PROTO((void));
+
 
 CpvStaticDeclare(int, outstanding_sends);
 

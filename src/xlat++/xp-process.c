@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.11  1997-07-17 15:51:40  milind
+ * Revision 2.12  1998-02-27 11:53:10  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.11  1997/07/17 15:51:40  milind
  * Fixed module initialization on SP3.
  *
  * Revision 2.10  1997/07/15 21:09:58  jyelon
@@ -213,10 +216,8 @@ char *argv[] ;
 	}
 	
 /**** not needed any more : these are added by charmc 
-	fprintf(outfile,"#define CPLUS_FILE\n") ;
-	fprintf(outfile,"#include \"ckdefs.h\" \n") ;
-	fprintf(outfile,"#include \"chare.h\" \n") ;
-	fprintf(outfile,"#include \"c++interface.h\" \n") ;
+        fprintf(outfile,"#define CPLUS_FILE\n") ;
+	fprintf(outfile,"#include \"charm++.h\" \n") ;
 	fprintf(outfile,"#include \"%s\"\n",headername) ;
 */
 

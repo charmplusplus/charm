@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.6  1997-10-29 23:52:50  milind
+ * Revision 1.7  1998-02-27 11:52:11  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 1.6  1997/10/29 23:52:50  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 1.5  1997/02/13 17:32:40  milind
@@ -65,8 +68,8 @@ a branch- office-chare. These are the routines that deal with
 the node part of the boc.
 ***********************************************************************/
 
-#include "chare.h"
-#include "globals.h"
+#include "charm.h"
+
 #include "converse.h"
 #include <stdio.h>
 #include <string.h>

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.3  1997-10-29 23:53:11  milind
+ * Revision 2.4  1998-02-27 11:53:08  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.3  1997/10/29 23:53:11  milind
  * Fixed CthInitialize bug on uth machines.
  *
  * Revision 2.2  1996/08/01 21:03:16  jyelon
@@ -82,8 +85,8 @@ char *argv[];
 }
 
 void InitOutputFile()
-{ fprintf(outfile,"#include \"ckdefs.h\"\n"); 
-  fprintf(outfile,"#include \"trans_externs.h\"\n"); 
+{
+  fprintf(outfile,"#include \"charm.h\"\n"); 
   fprintf(outfile,"#include \"%s.0.h\"\n",outhfilename);
   fprintf(outfile,"#include \"%s.1.h\"\n",outhfilename);
   OUT0=GetOutStruct(outh0);

@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.0  1995-06-02 17:40:29  brunner
+ * Revision 2.1  1998-02-27 11:52:49  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.0  1995/06/02 17:40:29  brunner
  * Reorganized directory structure
  *
  * Revision 1.1  1994/10/14  21:00:47  brunner
@@ -31,7 +34,7 @@
 
 #define MAXLENGTH 1024
 
-/** Needs to be changed in altered in chare.h **/
+/** Needs to be changed in altered in charm.h **/
 #define NewChareMsg             0
 #define ForChareMsg             1
 #define BocInitMsg              2

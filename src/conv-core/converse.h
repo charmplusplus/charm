@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.80  1998-02-19 08:39:01  jyelon
+ * Revision 2.81  1998-02-27 11:52:58  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.80  1998/02/19 08:39:01  jyelon
  * Added multicast code.
  *
  * Revision 2.79  1998/02/16 17:12:17  milind
@@ -377,11 +380,12 @@ typedef struct { char c[16]; }  CFloat16;
 /******** CMI, CSD: MANY LOW-LEVEL OPERATIONS ********/
 
 CpvExtern(CmiHandler*, CmiHandlerTable);
+CpvExtern(int,         CmiHandlerMax);
 CpvExtern(void*,       CsdSchedQueue);
 CpvExtern(int,         CsdStopFlag);
-CpvExtern(CmiHandler, CsdNotifyIdle);
-CpvExtern(CmiHandler, CsdNotifyBusy);
-CpvExtern(int,        CsdStopNotifyFlag);
+CpvExtern(CmiHandler,  CsdNotifyIdle);
+CpvExtern(CmiHandler,  CsdNotifyBusy);
+CpvExtern(int,         CsdStopNotifyFlag);
 
 extern int CmiRegisterHandler CMK_PROTO((CmiHandler));
 extern int CmiRegisterHandlerLocal CMK_PROTO((CmiHandler));
@@ -756,6 +760,31 @@ void          CfutureStoreBuffer(Cfuture f, void *value);
 #define       CfuturePE(f) ((f).pe)
 
 void CfutureInit();
+
+/****** CLD: THE LOAD BALANCER ******/
+
+extern int Cld_fieldsize;
+
+#define CLD_ANYWHERE (-1)
+#define CLD_BROADCAST (-2)
+#define CLD_BROADCAST_ALL (-3)
+#define CLD_FIELDSIZE (Cld_fieldsize)
+
+#define CLD_STANDARD_FIELD_STUFF int stdsave[2];
+
+typedef void (*CldInfoFn)(void *msg, 
+			  int *len,
+			  void *ldbfield,
+			  int *queueing,
+			  int *priobits, 
+			  unsigned int **prioptr);
+
+typedef void (*CldPackFn)(void **msg);
+
+int CldRegisterInfoFn(CldInfoFn fn);
+int CldRegisterPackFn(CldPackFn fn);
+
+void CldEnqueue(int pe, void *msg, int infofn, int packfn);
 
 /****** CMM: THE MESSAGE MANAGER ******/
 

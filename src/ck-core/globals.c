@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.16  1997-10-03 19:51:33  milind
+ * Revision 2.17  1998-02-27 11:52:02  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.16  1997/10/03 19:51:33  milind
  * Made charmc to work again, after inserting trace calls in converse part,
  * i.e. threads and user events.
  *
@@ -96,8 +99,7 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
-#include "chare.h"
-#include "trans_defs.h"
+#include "charm.h"
 #include <stdio.h>
 
 /**********************************************************************/
@@ -125,7 +127,6 @@ CpvDeclare(int, MsgCount); 	/* for the initial, pre-loop phase.
 		 		being sent out to nodes 		*/
 CpvDeclare(int, InsideDataInit);
 CpvDeclare(int, mainChare_magic_number);
-typedef struct chare_block *CHARE_BLOCK_;
 CpvDeclare(CHARE_BLOCK_,  mainChareBlock);
 CpvDeclare(CHARE_BLOCK_, currentChareBlock);
 CpvDeclare(int, currentBocNum);
@@ -177,10 +178,6 @@ CpvDeclare(int, HANDLE_INCOMING_MSG_Index);
 CsvDeclare(int, BUFFER_INCOMING_MSG_Index);
 CsvDeclare(int, MAIN_HANDLE_INCOMING_MSG_Index);
 CsvDeclare(int, HANDLE_INIT_MSG_Index);
-CsvDeclare(int, CkProcIdx_ForChareMsg);
-CsvDeclare(int, CkProcIdx_DynamicBocInitMsg);
-CsvDeclare(int, CkProcIdx_NewChareMsg);
-CsvDeclare(int, CkProcIdx_VidSendOverMsg);
 
 /* System-defined chare numbers */
 CsvDeclare(int, CkChare_ACC);

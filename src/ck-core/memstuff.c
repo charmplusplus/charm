@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.17  1998-02-03 21:27:45  milind
+ * Revision 2.18  1998-02-27 11:52:07  jyelon
+ * Cleaned up header files, replaced load-balancer.
+ *
+ * Revision 2.17  1998/02/03 21:27:45  milind
  * Added pack and unpack events to tracing modules.
  *
  * Revision 2.16  1997/10/29 23:52:48  milind
@@ -82,16 +85,13 @@
 #include <stdio.h>
 
 #define _CK_MEMORY_MANAGER
-#include "chare.h"
+#include "charm.h"
 #undef _CK_MEMORY_MANAGER
 
 #define align(var) ((var+sizeof(void *)-1)&(~(sizeof(void *)-1)))
 
 #include "trace.h" 
-#include "globals.h" 
-#include "trans_defs.h"
-#include "trans_decls.h"
-
+ 
 void *CkAllocPackBuffer(msg, bytespacked)
 char *msg;
 unsigned int bytespacked;
@@ -123,6 +123,8 @@ unsigned int bytespacked;
 }
 
 
+ENVELOPE *badmsg;
+
 void *CkAllocMsg(msgbytes)
 unsigned int msgbytes;
 {
@@ -132,6 +134,9 @@ unsigned int msgbytes;
   msgbytes = align(msgbytes);
   totalsize = TOTAL_MSG_SIZE(msgbytes, 0);
   envptr = (ENVELOPE *)CmiAlloc(totalsize);
+  if (envptr == badmsg) {
+    CmiPrintf("Bad Message.\n");
+  }
   CkMemError(envptr);
   SetEnv_isPACKED(envptr, NO_PACK);
   SetEnv_TotalSize(envptr, totalsize);
@@ -216,10 +221,7 @@ allocfn(id, msgsize, sizearray, prio)
 
 *****************************************************************/
 
-void *GenericCkAlloc(msgno, msgbytes, priobits)
-int msgno;
-unsigned int msgbytes;
-unsigned int priobits;
+void *GenericCkAlloc(int msgno, unsigned int msgbytes, unsigned int priobits)
 {
     unsigned int msgwords;
     unsigned int priowords;
