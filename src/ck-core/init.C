@@ -595,7 +595,6 @@ void _initCharm(int unused_argc, char **argv)
         // initialize trace module in ck
         traceCharmInit(argv);
 #endif
-	_pupModuleInit();
 #if CMK_RECORD_REPLAY
 	CkMessageWatcherInit(argv,CkpvAccess(_coreState));
 #endif
