@@ -7,6 +7,8 @@
 #include "blue_defs.h"
 #include "cklists.h"
 
+extern int bglog_version;
+
 extern int bgcorroff;
 
 // identifier for a message which records the source node that generate
@@ -45,24 +47,26 @@ public:
 #endif
   CmiInt2 tID;		// destination worker thread ID
   int msgsize;		// message size
+  int group;		// number of messages in this group
 private:
   BgMsgEntry() {}
 public:
-  BgMsgEntry(char *msg, int node, int tid, int local);
+  BgMsgEntry(char *msg, int node, int tid, int local, int g=1);
   inline void print() {
-    CmiPrintf("msgID:%d sent:%f recvtime:%f dstPe:%d\n", msgID, sendTime, recvTime, dstPe);
+    CmiPrintf("msgID:%d sent:%f recvtime:%f dstPe:%d group:%d\n", msgID, sendTime, recvTime, dstPe, group);
   }
   void write(FILE *fp) {
-    fprintf(fp, "msgID:%d sent:%f recvtime:%f dstPe:%d size:%d\n", msgID, sendTime, recvTime, dstPe, msgsize);
+    fprintf(fp, "msgID:%d sent:%f recvtime:%f dstPe:%d size:%d group:%d\n", msgID, sendTime, recvTime, dstPe, msgsize, group);
   }
 #if DELAY_SEND
   void send();
 #endif
   void pup(PUP::er &p) {
-    p|msgID; p|dstPe; p|sendTime; p|recvTime; p|tID; p|msgsize;
+    p|msgID; p|dstPe; p|sendTime; p|recvTime; p|tID; p|msgsize; 
+    if (p.isUnpacking()) group = 1;    // default value
+    if (bglog_version>0) p|group;
   }
 };
-
 
 /**
   event for higher level of tracing like trace projections
@@ -132,8 +136,8 @@ public:
              execTime = 0.0;
            CmiAssert(execTime >= 0.0);
          }
-  inline void addMsg(char *msg, int node, int tid, int local) { 
-           msgs.push_back(new BgMsgEntry(msg, node, tid, local)); 
+  inline void addMsg(char *msg, int node, int tid, int local, int group=1) { 
+           msgs.push_back(new BgMsgEntry(msg, node, tid, local, group)); 
          }
   void closeLog();
   void print(int node, int th);

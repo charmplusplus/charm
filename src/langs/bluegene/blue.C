@@ -414,7 +414,7 @@ void sendPacket_(nodeInfo *myNode, int x, int y, int z, int threadID, int handle
   
 
   // timing
-  BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, local);
+  BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, local, 1);
 
   if (local)
     addBgNodeInbuffer(sendmsg, myNode->id);
@@ -440,7 +440,7 @@ static inline void nodeBroadcastPacketExcept_(int node, CmiInt2 threadID, int ha
 
   // timing
   // FIXME
-  BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, 0);
+  BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, 0, 1);
 
   DEBUGF(("[%d]CmiSyncBroadcastAllAndFree node: %d\n", BgMyNode(), node));
 #if DELAY_SEND
@@ -480,7 +480,7 @@ static inline void threadBroadcastPacketExcept_(int node, CmiInt2 threadID, int 
   }
 #else
   // FIXME
-  BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, 0);
+  BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, 0, 1);
 #endif
 
   DEBUGF(("[%d]CmiSyncBroadcastAllAndFree node: %d tid:%d recvT:%f\n", BgMyNode(), node, threadID, CmiBgMsgRecvTime(sendmsg)));
@@ -544,6 +544,54 @@ void BgThreadBroadcastPacketExcept(int node, CmiInt2 threadID, int handlerID, Wo
 void BgThreadBroadcastAllPacket(int handlerID, WorkType type, int numbytes, char * data)
 {
   threadBroadcastPacketExcept_(BG_BROADCASTALL, ANYTHREAD, handlerID, type, numbytes, data);
+}
+
+/**
+ send a msg to a list of processors (processors represented in global seq #
+*/
+void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, int numbytes, char *msg)
+{
+  nodeInfo *myNode = cta(threadinfo)->myNode;
+
+  CmiSetHandler(msg, cva(simState).msgHandler);
+  CmiBgMsgHandle(msg) = handlerID;
+  CmiBgMsgType(msg) = type;
+  CmiBgMsgLength(msg) = numbytes;
+
+  // send one by one
+  for (int i=0; i<npes; i++)
+  {
+    int local = 0;
+    int x,y,z,t;
+    int pe = pes[i];
+#if CMK_BLUEGENE_NODE
+    CmiAbort("Not implemented yet!");
+#else
+    t = pe%BgGetNumWorkThread();
+    pe = pe/BgGetNumWorkThread();
+    BgGetXYZ(pe, &x, &y, &z);
+#endif
+
+    char *sendmsg = CmiCopyMsg(msg, numbytes);
+    CmiBgMsgNodeID(sendmsg) = nodeInfo::XYZ2Global(x,y,z);
+    CmiBgMsgThreadID(sendmsg) = t;
+    BgElapse(cva(bgMach).network->alphacost());
+    double latency = MSGTIME(myNode->x, myNode->y, myNode->z, x,y,z, numbytes);
+    CmiAssert(latency >= 0);
+    CmiBgMsgRecvTime(sendmsg) = latency + BgGetTime();
+
+    if (myNode->x == x && myNode->y == y && myNode->z == z) local = 1;
+
+    // timing
+    BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), t, local, npes);
+
+    if (myNode->x == x && myNode->y == y && myNode->z == z)
+      addBgNodeInbuffer(sendmsg, myNode->id);
+    else
+      CmiSendPacket(x, y, z, numbytes, sendmsg);
+  }
+
+  CmiFree(msg);
 }
 
 /*****************************************************************************
@@ -1462,14 +1510,14 @@ static void writeToDisk()
       CmiPrintf("[%d] Creating trace file %s  failed\n", CmiMyPe(), d);
       CmiAbort("BG> Abort");
     }
-//    PUP::toDisk p(f2);
     PUP::toDisk p(f2);
     p((char *)&machInfo, sizeof(machInfo));
     p|totalProcs;
     p|cva(bgMach);
     p|numPes;
+    p|bglog_version;
     
-    CmiPrintf("[0] Number is numX:%d numY:%d numZ:%d numCth:%d numWth:%d numPes:%d totalProcs:%d\n",cva(bgMach).x,cva(bgMach).y,cva(bgMach).z,cva(bgMach).numCth,cva(bgMach).numWth,numPes,totalProcs);
+    CmiPrintf("[0] Number is numX:%d numY:%d numZ:%d numCth:%d numWth:%d numPes:%d totalProcs:%d bglog_ver:%d\n",cva(bgMach).x,cva(bgMach).y,cva(bgMach).z,cva(bgMach).numCth,cva(bgMach).numWth,numPes,totalProcs,bglog_version);
     
     fclose(f2);
   }
@@ -1492,16 +1540,9 @@ static void writeToDisk()
 
   for (int j=0; j<cva(numNodes); j++){
     for(int i=0;i<cva(bgMach).numWth;i++){
-    BgTimeLineRec &t = cva(nodeinfo)[j].timelines[i];
-    procOffsets[j*cva(bgMach).numWth + i] = ftell(f);
-    //  CmiPrintf("Timeline %d is has offset: %d\n",j,procOffsets[j]);
-    /*    CmiPrintf("\nTimeline j is\n");
-    for(int i=0;i<t.length();i++)
-      CmiPrintf("\tName: %s",t[i]->name);
-    */
-    // t[i]->print(-1,-1);
-    
-    t.pup(p);
+      BgTimeLineRec &t = cva(nodeinfo)[j].timelines[i];
+      procOffsets[j*cva(bgMach).numWth + i] = ftell(f);
+      t.pup(p);
     }
   }
   

@@ -95,6 +95,10 @@ int BgLoadTraceSummary(char *fname, int &totalProcs, int &numX, int &numY, int &
   numCth = bgMach.numCth;
   numWth = bgMach.numWth;
   p|numPes;
+
+  bglog_version = 0;
+  if (!feof(f)) p|bglog_version;
+
   fclose(f);
   return 0;
 }

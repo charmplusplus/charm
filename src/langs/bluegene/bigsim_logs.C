@@ -3,6 +3,8 @@
 
 #include "blue_logs.h"
 
+int bglog_version = 1;
+
 int genTimeLog = 0;			// was 1 for guna 's seq correction
 int correctTimeLog = 0;
 int schedule_flag = 0;
@@ -19,7 +21,7 @@ static double nullTimer() { return 0.; }
 double (*timerFunc) (void) = nullTimer;
 
 // dstNode is the dest bg node, can be -1
-BgMsgEntry::BgMsgEntry(char *msg, int dstNode, int tid, int local)
+BgMsgEntry::BgMsgEntry(char *msg, int dstNode, int tid, int local, int g)
 {
   msgID = CmiBgMsgID(msg);
   sendTime = timerFunc();
@@ -27,6 +29,7 @@ BgMsgEntry::BgMsgEntry(char *msg, int dstNode, int tid, int local)
   dstPe = dstNode;
   tID = tid;                   // CmiBgMsgThreadID(msg);
   msgsize = CmiBgMsgLength(msg);
+  group = g;
   CmiAssert(msgsize > 0);
 #if DELAY_SEND
   sendMsg = NULL;

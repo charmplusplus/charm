@@ -154,7 +154,7 @@ void BgSendNonLocalPacket(int x, int y, int z, int threadID, int handlerID,
 void BgSendPacket(int x, int y, int z, int threadID, int handlerID, 
                   WorkType type, int numbytes, char* data);
 
-/************************ broadcast functions ************************/
+/************************ collective functions ************************/
 
 /**
   Broadcast a packet to all Blue Gene nodes;
@@ -179,7 +179,13 @@ void BgThreadBroadcastAllPacket(int handlerID, WorkType type, int numbytes,
   each BG thread receive one message.
 */
 void BgThreadBroadcastPacketExcept(int node, CmiInt2 threadID, int handlerID, 
-                                   WorkType type, int numbytes, char * data);
+                                WorkType type, int numbytes, char * data);
+
+/*
+  Multicast a message to a list of processors
+*/
+void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, 
+				int numbytes, char *data);
 
 /************************ utility functions ************************/
 
