@@ -376,9 +376,10 @@ void CentralLB::MigrationDone(int balancing)
     double end_lb_time = CmiWallTimer();
     CkPrintf("[%s] Load balancing step %d finished at %f\n",
 	     lbName(), step(),end_lb_time);
-    CkPrintf("[%s] duration %f memUsage:%dKB\n", lbName(),
-	     end_lb_time - start_lb_time,
-	     useMem() + LBDatabase::Object()->useMem()/1000);
+    double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
+    CkPrintf("[%s] duration %f memUsage: LBManager:%dKB CentralLB:%dKB\n", 
+	     lbName(), end_lb_time - start_lb_time,
+	     lbdbMemsize/1000, useMem()/1000);
   }
   migrates_completed = 0;
   migrates_expected = -1;
@@ -452,6 +453,8 @@ void CentralLB::simulation() {
   {
     // here we are supposed to dump the database
     writeStatsMsgs(CkpvAccess(dumpFile));
+    CmiPrintf("LBDump: Dumped the load balancing data.\n");
+    CmiPrintf("Charm++> Exiting...\n");
     CkExit();
     return;
   }
@@ -469,10 +472,11 @@ void CentralLB::simulation() {
     FindSimResults(statsDataList, stats_msg_count, migrateMsg, &simResults);
 
     // now we have the simulation data, so print it and exit
-    CmiPrintf("LBSim: Simulation of one load balancing step done.\n");
+    CmiPrintf("Charm++> LBSim: Simulation of one load balancing step done.\n");
     simResults.PrintSimulationResults();
 
     delete migrateMsg;
+    CmiPrintf("Charm++> Exiting...\n");
     CkExit();
   }
 }
@@ -497,11 +501,10 @@ void CentralLB::readStatsMsgs(const char* filename) {
   statsDataList = new LDStats[stats_msg_count];
 
   for (i = 0; i < stats_msg_count; i++) {
-  	statsMsgsList[i] = new CLBStatsMsg;
+    statsMsgsList[i] = new CLBStatsMsg;
     CkPupMessage(p, (void **)&statsMsgsList[i], 1);
 
-	CLBStatsMsg* m = statsMsgsList[i];
-
+    CLBStatsMsg* m = statsMsgsList[i];
     statsDataList[i].total_walltime = m->total_walltime;
     statsDataList[i].total_cputime = m->total_cputime;
     statsDataList[i].idletime = m->idletime;
@@ -515,6 +518,7 @@ void CentralLB::readStatsMsgs(const char* filename) {
     statsDataList[i].objData = m->objData;
     statsDataList[i].n_comm = m->n_comm;
     statsDataList[i].commData = m->commData;
+//CmiPrintf("i:%d bg_walltime: %f total_walltime: %f\n", i, m->bg_walltime, m->total_walltime);
   }
 
   // file f is closed in the destructor of PUP::fromDisk
@@ -536,7 +540,6 @@ void CentralLB::writeStatsMsgs(const char* filename) {
   fclose(f);
 
   CmiPrintf("writeStatsMsgs to %s\n", filename);
-  CmiPrintf("LBDump: Dumped the load balancing data.\n");
 }
 
 static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg* msg, double *peLoads)
@@ -580,7 +583,6 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg*
 		peLoads[from] -= wallTime;
 		peLoads[to] += wallTime;
 	}
-
 	// handling of the communication overheads. Here, for each "link" in the communication statistics,
 	// find the sender and receiver PE and if they are not the same, add the costs, else don't add
 	for(pe = 0; pe < count; pe++)
@@ -621,6 +623,7 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg*
 	}
 
 	// now for each processor, add to its load the send and receive overheads
+#if 0
 	for(i = 0; i < count; i++)
 	{
 		peLoads[i] += msgRecvCount[i]  * PER_MESSAGE_RECV_OVERHEAD +
@@ -628,7 +631,7 @@ static void getPredictedLoad(CentralLB::LDStats* stats, int count, LBMigrateMsg*
 					  byteRecvCount[i] * PER_BYTE_RECV_OVERHEAD +
 					  byteSentCount[i] * PER_BYTE_SEND_OVERHEAD;
 	}
-
+#endif
 	delete msgRecvCount;
 	delete msgSentCount;
 	delete byteRecvCount;
@@ -639,6 +642,9 @@ void CentralLB::FindSimResults(LDStats* stats, int count, LBMigrateMsg* msg, CLB
 {
     CkAssert(simResults != NULL && count == simResults->numPes);
     // estimate the new loads of the processors. As a first approximation, this is the
+    // get background load
+    for(int pe = 0; pe < count; pe++)
+    	  simResults->bgLoads[pe] = stats[pe].bg_walltime;
     // sum of the cpu times of the objects on that processor
     getPredictedLoad(stats, count, msg, simResults->peLoads);
 }
