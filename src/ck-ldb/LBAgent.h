@@ -25,73 +25,21 @@ public:
 	Agent(int p): npes(p) { }
 	virtual ~Agent() { }
 
-	virtual Elem* my_preferred_procs(int *existing_map,int object,int *trialpes){ return NULL; }
+	virtual Elem* my_preferred_procs(int *existing_map,int object,int *trialpes,int metric){ }
 };
 
-class topoAgent : public Agent {
+class TopologyAgent : public Agent {
 //protected:
 public:
 	CentralLB::LDStats* stats;
-	//Elem *preferred_list;
 	LBTopology *topo;
 	
-	/*typedef struct{
-		int obj;
-		int bytesComm;
-	}CommObj;
-*/
-	//CommObj
 	int **commObjs;
 	int **hopCount;
 //public:			
-	topoAgent(CentralLB::LDStats* lbDB,void* comlibDB,LBTopology *topology,int p): stats(lbDB), topo(topology), Agent(p){
-		int i;
-		stats->makeCommHash();
-		preferred_list = new Elem[p];
-		commObjs = new int*[stats->n_objs];
-		for(i=0;i<stats->n_objs;i++){
-			commObjs[i] = new int[stats->n_objs];
-			for(int j=0;j<stats->n_objs;j++)
-				commObjs[i][j] = 0;
-		}
-
-		hopCount = new int*[npes];
-		for(i=0;i<npes;i++){
-			hopCount[i] = new int[npes];
-			for(int j=0;j<npes;j++)
-				hopCount[i][j] = 0;
-		}
-
-		for(i=0;i<stats->n_comm;i++){
-			//DO I consider other comm too....i.e. to or from a processor
-			//CkPrintf("in loop..\n");
-			LDCommData &cdata = stats->commData[i];
-			if(cdata.from_proc() || cdata.receiver.get_type() != LD_OBJ_MSG)
-    		continue;
-    	int senderID = stats->getHash(cdata.sender);
-			CmiAssert(senderID < stats->n_objs);
-    	int recverID = stats->getHash(cdata.receiver.get_destObj());
-    	CmiAssert(recverID < stats->n_objs);
-		
-			//Check with Gengbin if 2 different commData have the same pair of processors as role reversed
-			//for(int j=0;j<num_comm;j++)
-				
-			commObjs[senderID][recverID] += cdata.bytes;
-			commObjs[recverID][senderID] += cdata.bytes;
-		}
-		
-		//Pre-calculate the hop counts
-		/*for(int i=0;i<npes;i++){
-			CkPrintf("for proc num :%d calculating hop counts\n",i);
-			for(int j=0;j<npes;j++)
-				if(i!=j && !hopCount[i][j]){
-					hopCount[i][j]=topo->get_hop_count(i,j);
-					hopCount[j][i]=hopCount[i][j];
-				}
-		}*/	
-	}
-	~topoAgent() { }
-	Agent::Elem* my_preferred_procs(int *existing_map,int object,int *trialpes);
+	TopologyAgent(CentralLB::LDStats* lbDB,int p);
+	~TopologyAgent() { }
+	Agent::Elem* my_preferred_procs(int *existing_map,int object,int *trialpes,int metric);
 	static int compare(const void *p,const void *q);
 };
 
@@ -102,7 +50,7 @@ class comlibAgent : public Agent {
 		comlibAgent(int p): Agent(p) { }
 		~comlibAgent() { }
 
-	Agent::Elem* my_preferred_procs(int *existing_map,int object,int *trialpes);
+	Agent::Elem* my_preferred_procs(int *existing_map,int object,int *trialpes,int metric);
 
 };
 
@@ -122,7 +70,8 @@ public:
 	MulticastAgent(BaseLB::LDStats* lbDB, int p);
 	virtual ~MulticastAgent() { delete [] objmap; }
 
-	virtual Elem* my_preferred_procs(int *existing_map,int object,int *trialpes);
+	virtual Elem* my_preferred_procs(int *existing_map,int object,int *trialpes,int metric);
+	
 };
 
 #endif
