@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.4  1995-09-19 22:41:19  sanjeev
+ * Revision 2.5  1995-09-19 22:49:08  sanjeev
+ * *** empty log message ***
+ *
+ * Revision 2.4  1995/09/19  22:41:19  sanjeev
  * fixed "handle" bug
  *
  * Revision 2.0  1995/06/05  19:01:24  brunner
@@ -35,9 +38,9 @@
  *
  ***************************************************************************/
 static char ident[] = "@(#)$Header$";
-#include "y.tab.h"
-#include "t.h"
-#include "externs.h"
+#include "xp-ytab.h"
+#include "xp-t.h"
+#include "xp-extn.h"
 
 
 char *CheckSendError() ;
