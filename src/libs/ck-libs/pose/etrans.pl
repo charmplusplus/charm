@@ -514,6 +514,7 @@ while (@line=split(' ',($thisline=getcodeline($inChandle)))) {
       $outChandle->print("    e->fnIdx = $thefnidx;\n");
       $outChandle->print("    e->next = e->prev = NULL;\n");
       $outChandle->print("    e->spawnedList = NULL;\n");
+      #$outChandle->print("    CkPrintf(\"POSE_RECV\\n\");\n");
       $outChandle->print("    eq->InsertEvent(e);\n");
       $outChandle->print("    if ((e->timestamp < eq->currentPtr->timestamp)\n");
       $outChandle->print("        || (eq->currentPtr == eq->backPtr)) {\n");
@@ -1063,7 +1064,6 @@ sub posefuncmap
 	    $output.="int _POSE_atTime = ".$segments[4].";\n" if ($#segments>=4);
 	    $output.=$msg."->Timestamp(_POSE_handle);\n";
 	    $output.="$msg->rst = 0.0;\n";
-
 	    $output.="(*(CProxy_".$sim." *)&POSE_Objects)[".$segments[2]."].insert(".$msg;
 	    if ($#segments>=4) {
 	      $output.=",_POSE_atTime";
@@ -1093,6 +1093,7 @@ sub posefuncmap
 		  $output.="pvt->objUpdate(ovt+(_POSE_timeOffset), SEND);\n";
 		  $output.="$msg->fromPE = CkMyPe();\n";
 		  $output.="$msg->rst = 0.0;\n";
+		  #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		  $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		  $output.="parent->srVector[_destPE]++;\n";
@@ -1108,6 +1109,7 @@ sub posefuncmap
 		  $output.="parent->ct = CmiWallTimer();\n";
 		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
 		  $output.="#endif\n";
+		  #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
 		  $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		  $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		  $output.="parent->srVector[_destPE]++;\n";
@@ -1132,7 +1134,8 @@ sub posefuncmap
 		    $output.=$msg."->Timestamp(_POSE_atTime);\n";
 		    $output.="pvt->objUpdate(_POSE_atTime, SEND);\n";
 		    $output.="$msg->fromPE = CkMyPe();\n";
-		  $output.="$msg->rst = 0.0;\n";
+		    $output.="$msg->rst = 0.0;\n";
+		    #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
 		    $output.="(*(CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		    $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    $output.="parent->srVector[_destPE]++;\n";
@@ -1151,6 +1154,7 @@ sub posefuncmap
 		  $output.="parent->ct = CmiWallTimer();\n";
 		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
 		  $output.="#endif\n";
+		    #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
 		    $output.="(* (CProxy_".$segments[2]." *)&POSE_Objects)[_POSE_handle].".$segments[1].";\n";
 		    $output.="int _destPE = POSE_Objects.ckLocalBranch()->lastKnown(CkArrayIndex1D(_POSE_handle));\n";
 		    $output.="parent->srVector[_destPE]++;\n";
@@ -1174,6 +1178,7 @@ sub posefuncmap
 		      $output.="pvt->objUpdate(ovt+(_POSE_timeOffset), SEND);\n";
 		      $output.="$msg->fromPE = CkMyPe();\n";
 		  $output.="$msg->rst = 0.0;\n";
+		      #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
 		      $output.="parent->srVector[CkMyPe()]++;\n";
 		      $output.="}\n";
@@ -1187,6 +1192,7 @@ sub posefuncmap
 		  $output.="parent->ct = CmiWallTimer();\n";
 		  $output.="$msg->rst = parent->ct - parent->st + parent->eq->currentPtr->srt;\n";
 		  $output.="#endif\n";
+		      #$output.="    CkPrintf(\"POSE_SEND\\n\");\n";
 		      $output.="(* (CProxy_".$simobjtype." *)&POSE_Objects)[parent->thisIndex].".$segments[1].";\n";
 		      $output.="parent->srVector[CkMyPe()]++;\n";
 		      $output.="}\n";

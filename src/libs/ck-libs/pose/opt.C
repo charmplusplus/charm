@@ -99,6 +99,7 @@ void opt::UndoEvent(Event *e)
     localStats->Undo();
 #endif
     parent->UNDOs++;
+    //CkPrintf("POSE_UNDO\n");
     parent->ResolveFn(((e->fnIdx) * -1), e->msg); // execute the anti-method
     if (e->commitBfrLen > 0) free(e->commitBfr); // clean up buffered output
     e->commitBfr = NULL;
@@ -162,6 +163,7 @@ void opt::CancelEvents()
     if (ev && (ev->done == 0)) { // found it to be unexecuted; get rid of it
       if (ev == eq->currentPtr) eq->ShiftEvent(); // adjust currentPtr
       //CkPrintf("Cancelled event "); ev->evID.dump(); CkPrintf(" deleted!\n");
+      //CkPrintf("POSE_CANCEL_DELETE\n");
       eq->DeleteEvent(ev); // delete the event
     }
     else if (ev) { // it's been executed, so rollback
@@ -193,6 +195,7 @@ void opt::CancelEvents()
       }
       eq->SetCurrentPtr(recoveryPoint->next); // adjust currentPtr 
       //CkPrintf("Cancelled event "); ev->evID.dump(); CkPrintf(" deleted!\n");
+      //CkPrintf("POSE_CANCEL_DELETE_UNDO\n");
       eq->DeleteEvent(recoveryPoint); // delete the targetEvent
       targetEvent = NULL;
       // currentPtr may have unexecuted events in front of it

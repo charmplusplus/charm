@@ -140,7 +140,9 @@ void PVT::objUpdate(POSE_TimeType timestamp, int sr)
     waitForFirst = 0;
     SendsAndRecvs->Restructure(estGVT, timestamp, sr);
   }
-  else SendsAndRecvs->Insert(timestamp, sr);
+  else { 
+    SendsAndRecvs->Insert(timestamp, sr);
+  }
   //CkPrintf("[%d] %s at %d\n", CkMyPe(), (sr == SEND)?"SEND":"RECV", timestamp);
 #ifdef POSE_STATS_ON
   if (tstat)
@@ -163,6 +165,7 @@ void PVT::objUpdate(int pvtIdx, POSE_TimeType safeTime, POSE_TimeType timestamp,
       ((objs.objs[index].getOVT() > safeTime) || 
        (objs.objs[index].getOVT() < 0)))
     objs.objs[index].setOVT(safeTime);
+  //CkPrintf("[%d] %d's safeTime is %d\n", CkMyPe(), index, safeTime);
   //if ((sr == SEND) || (sr == RECV)) SendsAndRecvs->Insert(timestamp, sr);
   // sr could be POSE_UnsetTS in which case we just ignore it here
 }

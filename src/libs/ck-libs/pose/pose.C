@@ -8,12 +8,26 @@ CpvDeclare(int, stateRecovery);
 extern int comm_debug;
 #endif
 double busyWait;
+double sim_timer;
+int POSE_inactDetect;
 POSE_TimeType POSE_endtime;
 
 // Main initialization for all of POSE
-void POSE_init()
+void POSE_init() // use inactivity detection by default
+{
+  POSE_init(1, POSE_UnsetTS);
+}
+
+void POSE_init(int ET) // a single parameter specifies endtime
+{
+  POSE_init(0, ET);
+}
+
+void POSE_init(int IDflag, int ET) // can specify both
 {
   CkPrintf("Initializing POSE...  \n");
+  POSE_inactDetect = IDflag;
+  POSE_endtime = ET;
 #ifdef POSE_COMM_ON
   // Create the communication library for POSE
   ComlibInstanceHandle cinst = CkGetComlibInstance();
@@ -34,7 +48,6 @@ void POSE_init()
   // Make POSE_Objects use the comm lib
   ComlibDelegateProxy(&POSE_Objects);
 #endif
-  CProxy_pose::ckNew(&POSE_Coordinator_ID);
   // Initialize statistics collection if desired
 #ifdef POSE_STATS_ON
   theLocalStats = CProxy_localStat::ckNew();
@@ -53,29 +66,29 @@ void POSE_init()
   CkPrintf("Load balancing is ON.\n");
 #endif
   CkPrintf("POSE initialization complete.\n");
+  CProxy_pose::ckNew(&POSE_Coordinator_ID);
+  if (POSE_inactDetect) CkPrintf("Using Inactivity Detection for termination.\n");
+  else CkPrintf("Using endTime of %d for termination.\n", POSE_endtime);
+  CkPrintf("Starting simulation...\n"); 
+  sim_timer = CmiWallTimer(); 
 }
 
 /// Use Inactivity Detection to terminate program
 void POSE_useID() 
 {
-  CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
-  POSE_Coordinator.IDon();
-  POSE_endtime = POSE_UnsetTS;
+  CkPrintf("WARNING: POSE_useID obsolete. See POSE_init params.\n");
 }
 
 /// Use a user-specified end time to terminate program
 void POSE_useET(POSE_TimeType et) 
 {
-  CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
-  POSE_Coordinator.ETon();
-  POSE_endtime = et;
+  CkPrintf("WARNING: POSE_useET obsolete. See POSE_init params.\n");
 }
 
 /// Start POSE simulation timer and event processing
 void POSE_start()
 {
-  CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
-  POSE_Coordinator.start();
+  CkPrintf("WARNING: POSE_Start obsolete.\n");
 }
 
 /// Specify an optional callback to be called when simulation terminates

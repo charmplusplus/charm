@@ -12,6 +12,7 @@
 #define SPEC_T 3
 #define ADAPT_T 4
 #define ADAPT2_T 5
+#define ADAPT3_T 6
 
 /// Base synchronization strategy class
 class strat

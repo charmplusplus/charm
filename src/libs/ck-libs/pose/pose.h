@@ -42,18 +42,18 @@ class strat; // defined later in strat.h
 #include "spec.h"
 #include "adapt.h"
 #include "adapt2.h"
+#include "adapt3.h"
 #include "cons.h"
 #include "chpt.h"
 
 /// Main initialization for all of POSE
 void POSE_init(); 
+void POSE_init(int ET); 
+void POSE_init(int IDflag, int ET); 
 /// Start POSE simulation timer and event processing
 void POSE_start(); 
 /// Use Inactivity Detection to terminate program
 void POSE_useID();
-/// Simulation end time
-
-extern POSE_TimeType POSE_endtime;
 
 /// Use a user-specified end time to terminate program
 /** Also uses inactivity detection in conjunction with end time */
@@ -69,6 +69,16 @@ void POSE_exit();
 
 /// User specified busy wait time (for grainsize testing)
 extern double busyWait;
+
+/// Simulation start time
+extern double sim_timer;
+
+/// Simulation end time
+extern POSE_TimeType POSE_endtime;
+
+/// Inactivity detection flag
+extern int POSE_inactDetect;
+
 /// Set busy wait time
 void POSE_set_busy_wait(double n);
 /// Busy wait for busyWait
@@ -94,33 +104,16 @@ class callBack : public CMessage_callBack
 /// Coordinator of simulation initialization, start and termination
 class pose : public Chare {
  private:
-  /// The simulation timer
-  double sim_timer;
   /// A callback to execute on termination
   /** If this is used, control is turned over to this at the very end of the
       simulation. */
   CkCallback cb;
   /// Flag to indicate if a callback will be used
   int callBackSet;
-  /// Flag to indicate if inactivity detection will be used
-  int useID;
-  /// Flag to indicate if an end time will be used
-  int useET;
  public:
   /// Basic Constructor
-  pose(void) { callBackSet = 0; useID = useET = 0; }
+  pose(void) { callBackSet = 0; }
   pose(CkMigrateMessage *) { }
-  /// Turn on inactivity detection
-  void IDon() { useID = 1; }
-  /// Turn on end time termination
-  void ETon() { useET = 1; }
-  /// Start the simulation timer
-  void start() { 
-    if (useID) CkPrintf("Using Inactivity Detection for termination.\n");
-    else CkPrintf("Using endTime of %d for termination.\n", POSE_endtime);
-    CkPrintf("Starting simulation...\n"); 
-    sim_timer = CmiWallTimer(); 
-  }
   /// Register the callback with POSE
   void registerCallBack(callBack *);
   /// Stop the simulation

@@ -6,6 +6,8 @@
 #include "srtable.h"
 #include "gvt.h"
 
+//#define SR_SANITIZE 1
+
 /// Basic constructor
 SRtable::SRtable() 
 { 
@@ -21,17 +23,23 @@ SRtable::SRtable()
 void SRtable::Initialize()
 {
   offset = 0; b = MAX_B; size_b = 1;
-  //sanitize();
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
 }
 
 /// Insert send/recv record sr at timestamp ts
 /* NOTE: buckets roughly ordered with decreasing timestamps */
 void SRtable::Insert(POSE_TimeType ts, int sr)
 {
-  //sanitize();
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
+  //SRentry *foo = new SRentry(0, 0, NULL);
   CmiAssert(ts >= offset);
   CmiAssert((sr == 0) || (sr == 1));
   int destBkt = (int)(((float)(ts-offset))/((float)size_b));  // which bucket?
+  //SRentry *foo = new SRentry(0, 0, NULL);
   SRentry *e;
   if (destBkt >= b) { // put in overflow bucket
     e = new SRentry(ts, sr, overflow);
@@ -41,13 +49,17 @@ void SRtable::Insert(POSE_TimeType ts, int sr)
     e = new SRentry(ts, sr, buckets[destBkt]);
     buckets[destBkt] = e;
   }
-  //sanitize();
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
 }
 
 /// Insert an existing SRentry e
 void SRtable::Insert(SRentry *e)
 {
-  //sanitize();
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
   CmiAssert(e != NULL);
   CmiAssert(e->timestamp >= offset);
   int destBkt = (int)(((float)(e->timestamp-offset))/((float)size_b));
@@ -59,7 +71,9 @@ void SRtable::Insert(SRentry *e)
     e->next = buckets[destBkt];
     buckets[destBkt] = e;
   }
-  //sanitize();
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
 }
 
 /// Restructure the table according to new GVT estimate and first send/recv
@@ -67,7 +81,9 @@ void SRtable::Insert(SRentry *e)
     entries below newGVTest are discarded. */
 void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS, int firstSR)
 {
-  //sanitize();
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
   //CkPrintf("SRtable::Restructure(%d, %d, %d)\n", newGVTest, firstTS, firstSR);
   // Backup the table to make new one in its place
   int b_old = b, size_b_old = size_b, offset_old = offset;
@@ -100,13 +116,17 @@ void SRtable::Restructure(POSE_TimeType newGVTest, POSE_TimeType firstTS, int fi
     tmp = overflow_old;
   }
   if (firstSR != -1) Insert(firstTS, firstSR);
-  //sanitize();
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
 }
 
 /// Compress and pack table into an UpdateMsg and return it
 UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
 {
-  //sanitize();
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
   int packSize = 0, nEntries = 0, entryIdx = 0, nBkts = 0;
   int destBkt = (int)(((float)(pvt-offset))/((float)size_b));  // which bucket?
   SRentry *tmp;
@@ -139,14 +159,18 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt)
   }
   CkAssert(entryIdx <= nEntries);
   um->numEntries = entryIdx;
-  //sanitize();
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
   return um;
 }
 
 /// CompressAndSort all buckets with timestamps <= pvt
 void SRtable::PartialSortTable(POSE_TimeType pvt)
 {
-  //sanitize();
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
   int sortall = 0, sortTo,
     destBkt = (int)(((float)(pvt-offset))/((float)size_b));  // which bucket?
   sortTo = destBkt;
@@ -156,13 +180,17 @@ void SRtable::PartialSortTable(POSE_TimeType pvt)
   }
   for (int i=0; i<=sortTo; i++) CompressAndSortBucket(i, 0);
   if (sortall) CompressAndSortBucket(b, 1);
-  //sanitize();
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
 }
 
 /// Compress a bucket so all SRentries have unique timestamps and are sorted
 void SRtable::CompressAndSortBucket(int i, int is_overflow)
 {
-  //sanitize();
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
   SRentry *tmp, *e, *newBucket = NULL, *lastInserted = NULL;
   int nEntries = 0;
   if (is_overflow) tmp = overflow;
@@ -251,13 +279,17 @@ void SRtable::CompressAndSortBucket(int i, int is_overflow)
     buckets[i] = newBucket;
     numEntries[i] = nEntries;
   }
-  //sanitize();
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
 }
 
 /// Free all buckets and overflows, reset all counts
 void SRtable::FreeTable() 
 {
-  //sanitize();
+#ifdef SR_SANITIZE
+  sanitize();
+#endif
   SRentry *tmp;
   for (int i=0; i<b; i++) {
     tmp = buckets[i];
@@ -299,7 +331,7 @@ void SRtable::dump()
   CkPrintf("\n");
 }
 
-/// Check validity of data fields
+/// Check validity of data field
 void SRtable::sanitize()
 {
   int bktMin, bktMax;
