@@ -221,8 +221,9 @@ void GreedyLB::work(CentralLB::LDStats* stats, int count)
 
 LBMigrateMsg * GreedyLB::createMigrateMsg(LDStats* stats,int count)
 {
+  int i;
   CkVec<MigrateInfo*> migrateInfo;
-  for (int i=0; i<stats->n_objs; i++) {
+  for (i=0; i<stats->n_objs; i++) {
     LDObjData &objData = stats->objData[i];
     int frompe = stats->from_proc[i];
     int tope = stats->to_proc[i];
@@ -241,7 +242,7 @@ LBMigrateMsg * GreedyLB::createMigrateMsg(LDStats* stats,int count)
   CkPrintf("GreedyLB migrating %d elements\n",migrate_count);
   LBMigrateMsg* msg = new(&migrate_count,1) LBMigrateMsg;
   msg->n_moves = migrate_count;
-  for(int i=0; i < migrate_count; i++) {
+  for(i=0; i < migrate_count; i++) {
     MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
     msg->moves[i] = *item;
     delete item;
