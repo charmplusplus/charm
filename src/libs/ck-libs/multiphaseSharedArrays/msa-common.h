@@ -15,9 +15,9 @@ typedef enum {
 
 /// Allow MSA_Page_Fault_t's to be pupped:
 inline void operator|(PUP::er &p,MSA_Page_Fault_t &f) {
-  int i=f;
+  int i=f; // if packing
   p|i;
-  f=(MSA_Page_Fault_t)i;
+  f=(MSA_Page_Fault_t)i; // if unpacking
 }
 
 enum { MSA_DEFAULT_ENTRIES_PER_PAGE = 1024 };

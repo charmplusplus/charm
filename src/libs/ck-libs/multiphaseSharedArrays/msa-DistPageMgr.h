@@ -6,7 +6,6 @@
 #include <charm++.h>
 #include <string.h>
 #include <list>
-#include <vector>
 #include <stack>
 #include <map>
 #include "msa-common.h"
@@ -47,7 +46,7 @@ public:
 
 /// Keeps a list of MSA_Listeners
 class MSA_Listeners {
-	std::vector<MSA_Listener *> listeners;
+	CkVec<MSA_Listener *> listeners;
 public:
 	MSA_Listeners();
 	~MSA_Listeners();
@@ -952,7 +951,7 @@ public:
 //               <<  " numberOfWorkerThreads=" << numberOfWorkerThreads
 //               <<  " local=" << numberLocalWorkerThreads << endl;
         enrollDoneq = 1;
-        enrollWaiters.signal(-1);
+        enrollWaiters.signal(0);
     }
 
 /******************************** Sync & writeback ***********************/
@@ -1037,7 +1036,7 @@ public:
     {
         //ckout << "[" << CkMyPe() << "] Sync Done indication" << endl;
         //ckout << "[" << CkMyPe() << "] Sync Done indication" << endl;
-        syncWaiters.signal(-2);
+        syncWaiters.signal(0);
     }
 
     inline void FreeMem()
