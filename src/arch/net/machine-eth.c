@@ -53,7 +53,6 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
 #if CMK_SHARED_VARS_UNAVAILABLE
   /*No comm. thread-- listen on sockets for incoming messages*/
   MACHSTATE(3,"idle commserver {")
-  if (s->nIdles%4 ==3) CommunicationsClock();
   CommunicationServer(s->sleepMs);
   MACHSTATE(3,"} idle commserver")
 #else
@@ -576,6 +575,12 @@ int ReceiveDatagram()
  * are ready, the corresponding tasks are called
  *
  ***********************************************************************/
+static void ClockAndRetransmit(void) {
+  CommunicationsClock();
+  if (writeableAcks) TransmitAcknowledgement();
+  if (writeableDgrams) TransmitDatagram();
+}
+
 static void CommunicationServer(int sleepTime)
 {
   unsigned int nTimes=0; /* Loop counter */
@@ -600,14 +605,12 @@ static void CommunicationServer(int sleepTime)
     MACHSTATE(2," -> Sockets Readable") 
     if (ctrlskt_ready_read) ctrl_getone();
     if (dataskt_ready_read) ReceiveDatagram();
-    if (nTimes++ > 20) {
+    if ((nTimes++ &16)==15) {
       /*We just grabbed a whole pile of packets-- try to retire a few*/
-      CommunicationsClock();
-      break;
+      ClockAndRetransmit();
     }
   }
-  if (writeableAcks) TransmitAcknowledgement();
-  if (writeableDgrams) TransmitDatagram();
+  ClockAndRetransmit();
   CmiCommUnlock();
   MACHSTATE(2,"} CommunicationServer")  
 }
