@@ -890,6 +890,17 @@ void CcsSendReply CMK_PROTO((unsigned int ip, unsigned int port, int size, void 
 
 #endif
 
+typedef struct rngen_
+{
+  unsigned int prime;
+  double state[3], multiplier[3];/* simulate 64 bit arithmetic */
+} CrnState;
+
+void CrnInitState(CrnState *, int, int);
+int CrnInt(CrnState *);
+double CrnDouble(CrnState *);
+float CrnFloat(CrnState *);
+
 /**** DEAL WITH DIFFERENCES: KERNIGHAN-RITCHIE-C, ANSI-C, AND C++ ****/
 
 #if defined(__cplusplus)
