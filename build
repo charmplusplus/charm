@@ -19,6 +19,16 @@ syntax() {
   exit 1
 }
 
+printOption() {
+  echo
+  ( cd src/$BASEVERSION; 
+    str=`ls conv-mach-*.h | sed 's/conv-mach-\([^.]*\).*/\1/'`; 
+    printf 'supported options: '
+    echo $str )
+  echo
+  exit 1
+}
+
   [ $# -lt 2 ] && syntax
 
 MAKEOPTS=""
@@ -41,18 +51,16 @@ do
             then
               if [ ! -f src/$VERSION/conv-mach-$1.h ]
               then
-                echo; 
-                echo "Error> option: $1 is not supported in this version!"; echo
-                exit 1
+                echo; echo "Error> option: $1 is not supported in this version!"; 
+                printOption
               fi
               COMPILER=$1; shift;
             elif test "$1" = "gm" || test "$1" = "vmi"
             then
               if [ ! -f src/$VERSION/conv-mach-$1.h ]
               then
-                echo; 
-                echo "Error> option: $1 is not supported in this version!"; echo
-                exit 1
+                echo; echo "Error> option: $1 is not supported in this version!";
+                printOption
               fi
               MORE="$MORE $1"; shift;
             else
@@ -68,6 +76,7 @@ done
 ( echo $BASEVERSION | egrep -s '^Common' ) && syntax
 [ -d src/$BASEVERSION ] || syntax
 
+#generate VERSION name combining all options.
 if test -n "$MORE"
 then
   for i in $MORE
