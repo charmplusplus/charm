@@ -802,6 +802,13 @@ void nodetab_makehost(char *name,nodetab_host *h)
 
 char *nodetab_args(char *args,nodetab_host *h)
 {
+#if CMK_USE_GM
+  /*  host [hostname] [port] ...  */
+  char *b1, *e1;
+  b1 = skipblanks(args); e1 = skipstuff(b1);
+  h->dataport = atoi(b1);
+  args = e1;
+#endif
   while(*args != 0) {
     char *b1 = skipblanks(args), *e1 = skipstuff(b1);
     char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
@@ -988,8 +995,13 @@ void nodeinfo_add(const ChMessageInt_t *nodeInfo,SOCKET ctrlfd)
 		{fprintf(stderr,"Unexpected node %d registered!\n",node);exit(1);}
 	nt=nodetab_rank0_table[node];/*Nodetable index for this node*/
 	i.nPE=ChMessageInt_new(nodetab_cpus(nt));
+#if CMK_USE_GM
+        i.IP=nodeInfo[1];
+        i.dataport=ChMessageInt_new(nodetab_dataport(nt));
+#else
 	i.IP=ChMessageInt_new(nodetab_ip(nt));
 	i.dataport=nodeInfo[1];
+#endif
 	nodeinfo_arr[node]=i;
 	for (pe=0;pe<nodetab_cpus(nt);pe++)
 	  {
@@ -1519,7 +1531,12 @@ string return idiom.
 char *create_netstart(int node)
 {
   static char dest[80];
+#if CMK_USE_GM
+  /* send dataport to node program */
+  sprintf(dest,"%d %d %d %d %d",node,server_ip,server_port,getpid()&0x7FFF, nodetab_dataport(node));
+#else
   sprintf(dest,"%d %d %d %d",node,server_ip,server_port,getpid()&0x7FFF);
+#endif
   return dest;
 }
 
