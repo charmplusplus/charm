@@ -2354,7 +2354,7 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op,
   if (ptr->thisIndex == rootIdx){
     // using irecv instead recv to non-block the call and get request pointer
     AmpiRequestList* reqs = getReqs();
-    IReq *newreq = new IReq(recvbuf,count,type,0,MPI_REDUCE_TAG,comm);
+    IReq *newreq = new IReq(recvbuf,count,type,0,MPI_REDUCE_TAG,MPI_REDUCE_COMM);
     *request = reqs->insert(newreq);
   }
   return 0;
