@@ -321,7 +321,23 @@ class CkInPort : public CharismaInPort
 {
   private:
     CkCallback cb;
+    CkInPort() {} // prevent illegal inports
   public:
+    CkInPort(int ep,const CkChareID &id)
+    {
+      CkCallback _cb(ep,id);
+      cb = _cb;
+    }
+    CkInPort(int ep,int onPE,const CkGroupID &id)
+    {
+      CkCallback _cb(ep,onPE,id);
+      cb = _cb;
+    }
+    CkInPort(int ep,const CkArrayIndex &idx,const CkArrayID &id)
+    {
+      CkCallback _cb(ep,idx,id);
+      cb = _cb;
+    }
     void send(void *data, int len)
     {
       send((d&) (*((d*)data)));
@@ -359,7 +375,23 @@ class CkInPortString : public CharismaInPort
 {
   private:
     CkCallback cb;
+    CkInPortString() {} // prevent illegal inports
   public:
+    CkInPortString(int ep,const CkChareID &id)
+    {
+      CkCallback _cb(ep,id);
+      cb = _cb;
+    }
+    CkInPortString(int ep,int onPE,const CkGroupID &id)
+    {
+      CkCallback _cb(ep,onPE,id);
+      cb = _cb;
+    }
+    CkInPortString(int ep,const CkArrayIndex &idx,const CkArrayID &id)
+    {
+      CkCallback _cb(ep,idx,id);
+      cb = _cb;
+    }
     void send(void *data, int len)
     {
       send((char *) data);
@@ -389,7 +421,23 @@ class CkInPortArray : public CharismaInPort
 {
   private:
     CkCallback cb;
+    CkInPortArray() {} // prevent illegal inports
   public:
+    CkInPortArray(int ep,const CkChareID &id)
+    {
+      CkCallback _cb(ep,id);
+      cb = _cb;
+    }
+    CkInPortArray(int ep,int onPE,const CkGroupID &id)
+    {
+      CkCallback _cb(ep,onPE,id);
+      cb = _cb;
+    }
+    CkInPortArray(int ep,const CkArrayIndex &idx,const CkArrayID &id)
+    {
+      CkCallback _cb(ep,idx,id);
+      cb = _cb;
+    }
     void send(void *data, int len)
     {
       send(len/sizeof(d), (const d*) data);
@@ -432,7 +480,23 @@ class CkInPortVoid : public CharismaInPort
 {
   private:
     CkCallback cb;
+    CkInPortVoid() {} // prevent illegal inports
   public:
+    CkInPortVoid(int ep,const CkChareID &id)
+    {
+      CkCallback _cb(ep,id);
+      cb = _cb;
+    }
+    CkInPortVoid(int ep,int onPE,const CkGroupID &id)
+    {
+      CkCallback _cb(ep,onPE,id);
+      cb = _cb;
+    }
+    CkInPortVoid(int ep,const CkArrayIndex &idx,const CkArrayID &id)
+    {
+      CkCallback _cb(ep,idx,id);
+      cb = _cb;
+    }
     void send(void *data, int len)
     {
       send();
@@ -460,7 +524,23 @@ class CkInPortMsg : public CharismaInPort
 {
   private:
     CkCallback cb;
+    CkInPortMsg() {} // prevent illegal inports
   public:
+    CkInPortMsg(int ep,const CkChareID &id)
+    {
+      CkCallback _cb(ep,id);
+      cb = _cb;
+    }
+    CkInPortMsg(int ep,int onPE,const CkGroupID &id)
+    {
+      CkCallback _cb(ep,onPE,id);
+      cb = _cb;
+    }
+    CkInPortMsg(int ep,const CkArrayIndex &idx,const CkArrayID &id)
+    {
+      CkCallback _cb(ep,idx,id);
+      cb = _cb;
+    }
     void send(void *data, int len)
     {
       send((d*) _d);
