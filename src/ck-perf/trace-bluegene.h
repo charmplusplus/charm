@@ -72,6 +72,7 @@ extern int traceBluegeneLinked;
         if(CpvAccess(traceOn)) traceSuspend();  \
         _TRACE_BG_END_EXECUTE(1);
 # define TRACE_BG_AMPI_RESUME(t, msg, str, log)        \
+	/* using the actual received message's time */	\
         _TRACE_BG_AMPI_BEGIN_EXECUTE((char *)UsrToEnv(msg), str, log); \
         if(CpvAccess(traceOn)) CthTraceResume(t);
 # define TRACE_BG_AMPI_START(t, str)  { \
@@ -90,6 +91,7 @@ extern int traceBluegeneLinked;
 	}
 #define TRACE_BG_AMPI_WAITALL(reqs) 	\
         {	\
+	TRACE_BG_AMPI_SUSPEND();	\
 	CthThread th = getAmpiInstance(MPI_COMM_WORLD)->getThread();	\
   	TRACE_BG_AMPI_START(th, "AMPI_WAITALL")	\
   	for(int i=0;i<count;i++) {	\
