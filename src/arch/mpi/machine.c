@@ -445,7 +445,7 @@ static void PumpMsgsBlocking(void)
 {
   static int maxbytes = 20000000;
   static char *buf = NULL;
-  int nbytes, flg, res;
+  int nbytes, flg;
   MPI_Status sts;
   char *msg;
   int recd=0;
@@ -855,7 +855,6 @@ void SendHypercube(int size, char *msg)
 
 void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
 {
-  CmiState cs = CmiGetState();
 #if CMK_BROADCAST_SPANNING_TREE
   CMI_SET_BROADCAST_ROOT(msg, Cmi_mype+1);
   SendSpanningChildren(size, msg);
@@ -865,6 +864,7 @@ void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
   SendHypercube(size, msg);
     
 #else
+  CmiState cs = CmiGetState();
   int i;
 
   for ( i=cs->pe+1; i<Cmi_numpes; i++ ) 
@@ -1113,8 +1113,9 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
 #endif
 
 #if 1
-  MACHSTATE1(2,"still idle (%d) begin {",CmiMyPe())
+  {
   int nSpins=20; /*Number of times to spin before sleeping*/
+  MACHSTATE1(2,"still idle (%d) begin {",CmiMyPe())
   s->nIdles++;
   if (s->nIdles>nSpins) { /*Start giving some time back to the OS*/
     s->sleepMs+=2;
@@ -1127,6 +1128,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
     MACHSTATE1(2,"} idle lock(%d)",CmiMyPe())
   }       
   MACHSTATE1(2,"still idle (%d) end {",CmiMyPe())
+  }
 #endif
 }
 
@@ -1173,7 +1175,7 @@ static void ConverseRunPE(int everReturn)
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
-  int n,i ;
+  int n,i;
 #if MACHINE_DEBUG
   debugLog=NULL;
 #endif
@@ -1213,7 +1215,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   for ( Cmi_dim=0,n=Cmi_numpes; n>1; n/=2 )
     Cmi_dim++ ;
  /* CmiSpanTreeInit();*/
-  i=0;
   request_max=MAX_QLEN;
   CmiGetArgInt(argv,"+requestmax",&request_max);
   /*printf("request max=%d\n", request_max);*/
