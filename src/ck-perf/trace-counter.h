@@ -24,24 +24,22 @@
 
 #define MAX_ENTRIES 500
 
-// track statistics for all entry points
+//! track statistics for all entry points
 class StatTable {
   public:
     StatTable();
     ~StatTable();
-    /** one entry is called for 'time' seconds, value is counter reading */
+    //! one entry is called for 'time' seconds, value is counter reading 
     void setEp(int epidx, int stat, UInt value, double time);
-    /**
-       write three lines for each stat:
-       1. number of calls for each entry
-       2. average count for each entry
-       3. total time in us spent for each entry
-    */
+    //! write three lines for each stat:
+    //!   1. number of calls for each entry
+    //!   2. average count for each entry
+    //!   3. total time in us spent for each entry
     void write(FILE* fp);
     void clear();
 
   private:
-    // struct to maintain statistics
+    //! struct to maintain statistics
     struct Statistics {
       char*  name;                  // name of stat being tracked
       UInt   count[MAX_ENTRIES];    // total number times called
@@ -71,13 +69,11 @@ class CountLogPool {
     StatTable stats_;
 };
 
-/**
-  For each processor, TraceCounter calculates mean, stdev, etc of 
-  CPU performance counters for each entry point.
-*/
+//! For each processor, TraceCounter calculates mean, stdev, etc of 
+//! CPU performance counters for each entry point.
 class TraceCounter : public Trace {
   public:
-    TraceCounter() { }
+    TraceCounter();
     void userEvent(int e) { }
     void creation(envelope *e, int num=1) { }
     void beginExecute(envelope *e);
@@ -103,12 +99,36 @@ class TraceCounter : public Trace {
     void traceClose();
     void traceBegin() { }
     void traceEnd() { }
+ 
+    //! CounterArg is a linked list of strings that allows 
+    //! processing of command line args 
+    struct CounterArg {
+      int         code;
+      char*       arg;
+      char*       desc;
+      CounterArg* next;
+
+      CounterArg(int c, char* a, char* d): 
+	code(c), arg(a), desc(d), next(NULL) { }
+    };
 
   private:
-    int    execEP_;       // id currently executing entry point
-    double startEP_;      // start time of currently executing ep
-    double startPack_;    // start time of pack operation
-    double startUnpack_;  // start time of unpack operation
+    int         execEP_;       // id currently executing entry point
+    double      startEP_;      // start time of currently executing ep
+    double      startPack_;    // start time of pack operation
+    double      startUnpack_;  // start time of unpack operation
+    CounterArg* firstArg_;     // pointer to start of linked list of args
+    CounterArg* lastArg_;      // pointer to end of linked list of args
+    int         argStrSize_;   // size of maximum arg string (formatted output)
+
+    //! add the argument parameters to the linked list of args choices
+    void registerArg(CounterArg* arg);
+    //! see if the arg (str or code) matches any in the linked list of choices
+    //! and sets arg->code to the SGI code
+    //! return true if arg matches, false otherwise
+    bool matchArg(CounterArg* arg);
+    //! print out all arguments in the linked-list of choices
+    void printHelp();
 };
 
 #endif  // __trace_counter_h__

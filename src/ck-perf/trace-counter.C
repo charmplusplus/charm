@@ -15,7 +15,7 @@
 
 #include "trace-counter.h"
 
-#define DEBUGF(x) CmiPrintf x
+#define DEBUGF(x) CmiPrintf("DEBUG: "); CmiPrintf x
 #define VER 1.0
 
 CpvStaticDeclare(Trace*, _trace);
@@ -27,16 +27,27 @@ static int _packMsg, _packChare, _packEP;
 static int _unpackMsg, _unpackChare, _unpackEP;
 CpvDeclare(double, version);
 
-static char* helpString =
-"0 = Cycles
-1 = Issued instructions
-2 = Issued loads
-3 = Issued stores
-4 = Issued store conditionals
-5 = Failed store conditionals
-6 = Decoded branches.  (This changes meaning in 3.x
-    versions of R10000.  It becomes resolved branches).
-7 = Quadwords written back from secondary cache
+//! the following is the list of arguments that can be passed to 
+//! the +counter{1|2} command line arguments
+//! to add or change, create a CounterArg struct with 
+//! three constructor arguments:
+//!   1) the code (for SGI libperfex) associated with counter
+//!   2) the string to be entered on the command line
+//!   3) a string that is the description of the counter
+//! then go to the TraceCounter::TraceCounter() definition and make 
+//! sure the CounterArg struct is registered via the registerArg call
+static TraceCounter::CounterArg arg0(0, "CYCLE",      "Cycles");
+static TraceCounter::CounterArg arg1(1, "INSTR",      "Issued instructions");
+static TraceCounter::CounterArg arg2(2, "STORE",      "Issued stores");
+// FIXME!!!
+static TraceCounter::CounterArg arg3(3, "FOO",        "foo");
+static TraceCounter::CounterArg arg4(4, "STORE_COND", "Issued store conditionals");
+static TraceCounter::CounterArg arg5(5, "FAIL_COND",  "Failed store conditionals");
+static TraceCounter::CounterArg arg6(6, "DECODE_BR",  "Decoded branches.  (This changes meaning in 3.x versions of R10000.  It becomes resolved branches)");
+static TraceCounter::CounterArg arg7(7, "QUADWORDS",  "Quadwords written back from secondary cache");
+
+/*
+7 = 
 8 = Correctable secondary cache data array ECC errors
 9 = Primary (L1) instruction cache misses
 10 = Secondary (L2) instruction cache misses
@@ -63,6 +74,7 @@ static char* helpString =
 29 = External invalidation hits in secondary cache
 30 = Store/prefetch exclusive to clean block in secondary cache
 31 = Store/prefetch exclusive to shared block in secondary cache";
+*/
 
 void _createTracecounter(char **argv)
 {
@@ -76,7 +88,7 @@ void _createTracecounter(char **argv)
 
 StatTable::StatTable(): stats_(NULL), numStats_(0) 
 {
-  CmiPrintf("StatTable::StatTable %08x\n", this);
+  DEBUGF(("StatTable::StatTable %08x\n", this));
 
   stats_ = new Statistics[2];
   numStats_ = 2;
@@ -85,7 +97,7 @@ StatTable::StatTable(): stats_(NULL), numStats_(0)
 
 StatTable::~StatTable() { if (stats_ != NULL) { delete [] stats_; } }
 
-// one entry is called for 'time' seconds, value is counter reading
+//! one entry is called for 'time' seconds, value is counter reading
 void StatTable::setEp(int epidx, int stat, UInt value, double time) 
 {
   // CmiPrintf("StatTable::setEp %08x %d %d %d %f\n", 
@@ -101,6 +113,10 @@ void StatTable::setEp(int epidx, int stat, UInt value, double time)
   stats_[stat].totTime[epidx] += time;
 }
 
+//! write three lines for each stat:
+//!   1. number of calls for each entry
+//!   2. average count for each entry
+//!   3. total time in us spent for each entry
 void StatTable::write(FILE* fp) 
 {
   int i, j;
@@ -139,16 +155,16 @@ void StatTable::clear()
 
 CountLogPool::CountLogPool(char* pgm)
 {
-  CmiPrintf("CountLogPool::CountLogPool() %08x\n", this);
+  DEBUGF(("CountLogPool::CountLogPool() %08x\n", this));
 
   int i;
   char pestr[10];
   sprintf(pestr, "%d", CkMyPe());
-  int len = strlen(pgm) + strlen(".sum.") + strlen(pestr) + 1;
+  int len = strlen(pgm) + strlen(".count.") + strlen(pestr) + 1;
   char* fname = new char[len+1];
-  sprintf(fname, "%s.%s.sum", pgm, pestr);
+  sprintf(fname, "%s.%s.count", pgm, pestr);
   fp_ = NULL;
-  CmiPrintf("TRACE: %s:%d\n", fname, errno);
+  DEBUGF(("TRACE: %s:%d\n", fname, errno));
   do {
     fp_ = fopen(fname, "w+");
   } while (!fp_ && errno == EINTR);
@@ -178,7 +194,7 @@ void CountLogPool::writeSts(void)
   char *fname = new char[strlen(CpvAccess(pgmName))+strlen(".sts")+1];
   sprintf(fname, "%s.count.sts", CpvAccess(pgmName));
   FILE *sts = fopen(fname, "w+");
-  //CmiPrintf("File: %s \n", fname);
+  // DEBUGF(("File: %s \n", fname));
   if(sts==0)
     CmiAbort("Cannot open summary sts file for writing.\n");
   delete[] fname;
@@ -205,15 +221,33 @@ void CountLogPool::writeSts(void)
 
 void CountLogPool::setEp(int epidx, int count1, int count2, double time) 
 {
-  // CmiPrintf("CountLogPool::setEp %08x %d %d %d %f\n", 
-  //           this, epidx, count1, count2, time);
+  // DEBUGF(("CountLogPool::setEp %08x %d %d %d %f\n", 
+  //         this, epidx, count1, count2, time));
 
   if (epidx >= MAX_ENTRIES) {
     CmiAbort("CountLogPool::setEp too many entry points!\n");
   }
-  // CmiPrintf("set EP: %d %e \n", epidx, time);
   stats_.setEp(epidx, 0, count1, time);
   stats_.setEp(epidx, 1, count2, time);
+}
+
+TraceCounter::TraceCounter() :
+  execEP_      (-1),
+  startEP_     (0.0),
+  startPack_   (0.0),
+  startUnpack_ (0.0),
+  firstArg_    (NULL),
+  lastArg_     (NULL),
+  argStrSize_  (0)
+{
+  registerArg(&arg0);
+  registerArg(&arg1);
+  registerArg(&arg2);
+  registerArg(&arg3);
+  registerArg(&arg4);
+  registerArg(&arg5);
+  registerArg(&arg6);
+  registerArg(&arg7);
 }
 
 void TraceCounter::traceInit(char **argv)
@@ -227,29 +261,55 @@ void TraceCounter::traceInit(char **argv)
   CpvAccess(version) = VER;
 
   // parse command line args
-  int  arg1, arg2;
+  int arg1, arg2;
+  CounterArg counterArg1(0,NULL,NULL);
+  CounterArg counterArg2(0,NULL,NULL);
   bool arg1valid = false;
   bool arg2valid = false;
-  if (CmiGetArgInt(argv,"+counter1",&arg1)) {
-    CmiPrintf("arg1 is %d\n", arg1); 
-  }
-  if (CmiGetArgInt(argv,"+counter2",&arg2)) {
-    CmiPrintf("arg2 is %d\n", arg2); 
-  }
-  if (CmiGetArgFlag(argv,"+counter-help")) {
-    if (CkMyPe() == 0) { CmiPrintf("%s\n", helpString); }
-    ConverseExit();
-  }
-  if (!arg1valid || !arg2valid) {
-    if (CkMyPe() == 0) {
-      CmiPrintf("ERROR: When you've linked with '+tracemode counter', you\n"
-		"  must specify '+counter1 <arg1>' and '+counter2 <arg2>' to run.\n"
-		"  Type +counter-help to get list of counters.\n");
+  bool badArg = false;
+  if (CmiGetArgString(argv,"+counter1",&counterArg1.arg)) {
+    arg1valid = matchArg(&counterArg1);
+    if (CkMyPe() == 0) { 
+      DEBUGF(("arg1 is %s\n", counterArg1.arg)); 
+      if (!arg1valid) { CmiPrintf("Bad +counter1 arg %s\n", counterArg1.arg); }
     }
-    ConverseExit();
+    badArg = !arg1valid;
+  }
+  if (CmiGetArgString(argv,"+counter2",&counterArg2.arg)) {
+    arg2valid = matchArg(&counterArg2);
+    if (CkMyPe() == 0) { 
+      DEBUGF(("arg2 is %s\n", counterArg2.arg)); 
+      if (!arg2valid) { CmiPrintf("Bad +counter2 arg %s\n", counterArg2.arg); }
+    }
+    badArg = badArg || !arg2valid;
+  }
+
+  // check to see if args are valid, output if not
+  if (badArg || CmiGetArgFlag(argv, "+counter-help")) {
+    if (CkMyPe() == 0) { printHelp(); }
+    ConverseExit();  return;
+  }
+  else if (!arg1valid || !arg2valid) {
+    if (CkMyPe() == 0) {
+      CmiPrintf("ERROR: You've linked with '+tracemode counter', therefore you\n"
+		"  must specify '+counter1 <arg1>' and '+counter2 <arg2>' to run.\n"
+		"  Type '+counter-help' to get list of counters.\n");
+    }
+    ConverseExit();  return;
+  }
+
+  // all args valid, now set up logging
+  if (CkMyPe() == 0) {
+    CmiPrintf("Running with tracemode=counter and args:\n"
+	      "  <counter1>=%s\n"
+	      "     %s\n"
+	      "  <counter2>=%s\n"
+	      "     %s\n",
+	      counterArg1.arg, counterArg1.code, 
+	      counterArg2.arg, counterArg2.code);
   }
   CpvAccess(_logPool) = new CountLogPool(CpvAccess(pgmName));
-  CmiPrintf("%d Created _logPool at %08x\n", CkMyPe(), CpvAccess(_logPool));
+  DEBUGF(("%d Created _logPool at %08x\n", CkMyPe(), CpvAccess(_logPool)));
 }
 
 void TraceCounter::traceClearEps(void)
@@ -288,7 +348,7 @@ void TraceCounter::beginExecute
 {
   execEP_=ep;
   startEP_=TraceTimer();
-  // CmiPrintf("start: %f \n", start);
+  // DEBUGF(("start: %f \n", start));
 }
 
 void TraceCounter::endExecute(void)
@@ -333,6 +393,70 @@ void TraceCounter::beginComputation(void)
     _unpackMsg = CkRegisterMsg("dummy_unpack_msg", 0, 0, 0, 0);
     _unpackChare = CkRegisterChare("dummy_unpack_chare", 0);
     _unpackEP = CkRegisterEp("dummy_unpack_ep", 0, _unpackMsg,_unpackChare);
+  }
+}
+
+//! add the argument parameters to the linked list of args choices
+void TraceCounter::registerArg(CounterArg* arg)
+{
+  if (firstArg_ == NULL) {
+    firstArg_ = lastArg_ = arg;
+    argStrSize_ = strlen(arg->arg);
+  }
+  else { 
+    lastArg_->next = arg;
+    lastArg_ = arg;
+    int len = strlen(arg->arg);
+    if (len > argStrSize_) { argStrSize_ = len; }
+  }
+}
+
+//! see if the arg (str or code) matches any in the linked list of choices
+//! and sets arg->code to the SGI code
+//! return true if arg matches, false otherwise
+bool TraceCounter::matchArg(CounterArg* arg)
+{
+  bool match = false;                // will be set to true if arg matches
+  CounterArg* matchArg = firstArg_;  // traverse linked list
+  int matchCode = atoi(arg->arg);    // in case user specs num on commline
+  if (matchCode == 0) {
+    if (arg->arg[0] != '0' || arg->arg[1] != '\0') { matchCode = -1; }
+  }
+  DEBUGF(("Matching %s or %d\n", arg->arg, matchCode));
+  while (matchArg != NULL && !match) {
+    DEBUGF(("  Examining %d %s\n", matchArg->code, matchArg->arg));
+    if (strcmp(matchArg->arg, arg->arg)==0) {
+      match = true;
+      arg->code = matchArg->code;
+      arg->desc = matchArg->desc;
+    }
+    else if (matchArg->code == matchCode) {
+      match = true;
+      arg->arg = matchArg->arg;
+      arg->desc = matchArg->desc;
+    }
+    matchArg = matchArg->next;
+  }
+  DEBUGF(("Match = %d\n", match));
+  return match;
+}
+
+//! print out all arguments in the linked-list of choices
+void TraceCounter::printHelp()
+{
+  CmiPrintf(
+    "Specify one of the following (code or str) after +counter1 and +counter2:\n\n"
+    "  code  str\n"
+    "  ----  ---\n");
+
+  // create a format so that all the str line up 
+  char format[64];
+  snprintf(format, 64, "    %%2d  %%-%ds  %%s\n", argStrSize_);
+
+  CounterArg* help = firstArg_;
+  while (help != NULL) {
+    CmiPrintf(format, help->code, help->arg, help->desc);
+    help = help->next;
   }
 }
 
