@@ -53,7 +53,7 @@ extern VMIStreamRecv recvFn;
   and the count of the total number of processes in the computation.
 */
 int _Cmi_mype;
-int _Cmi_numpe;
+int _Cmi_numpes;
 
 int _Cmi_myrank = 0;
 
