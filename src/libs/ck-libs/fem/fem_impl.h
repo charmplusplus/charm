@@ -282,8 +282,10 @@ private:
   void readyToMigrate(void)
   {
     // CkPrintf("[%d] going to sync\n", thisIndex);
+#if CMK_LBDB_ON
     AtSync();
     thread_suspend();
+#endif
   }
   void ResumeFromSync(void)
   {
@@ -298,11 +300,15 @@ private:
   void start_running(void)
   {
     ampi::prepareCtv();
+#if CMK_LBDB_ON
     thisArray->the_lbdb->ObjectStart(ldHandle);
+#endif
   }
   void stop_running(void)
   {
+#if CMK_LBDB_ON
     thisArray->the_lbdb->ObjectStop(ldHandle);
+#endif
   }
 
   FILE *fp;

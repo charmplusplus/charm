@@ -233,8 +233,10 @@ private:
   void readyToMigrate(void)
   {
     // CkPrintf("[%d] going to sync\n", thisIndex);
+#if CMK_LBDB_ON
     AtSync();
     thread_suspend();
+#endif
   }
   void ResumeFromSync(void)
   {
@@ -248,11 +250,15 @@ private:
   void thread_resume(void);  //Start thread running again
   void start_running(void)
   {
+#if CMK_LBDB_ON
     thisArray->the_lbdb->ObjectStart(ldHandle);
+#endif
   }
   void stop_running(void)
   {
+#if CMK_LBDB_ON
     thisArray->the_lbdb->ObjectStop(ldHandle);
+#endif
   }
   void send(int fid,const extrudeMethod &m,const void *grid);
   void update_field(DataMsg *m);

@@ -218,7 +218,9 @@ combine(const DType& dt, int op)
 
 chunk::chunk(ChunkMsg *msg)
 {
+#if CMK_LBDB_ON
   usesAtSync = CmiTrue;
+#endif
   nfields = 0;
 
   CpvInitialize(mblk_state_t,_mblk_state);
