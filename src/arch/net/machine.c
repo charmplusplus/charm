@@ -787,7 +787,9 @@ int node, nbr;
 #define DGRAM_MAGIC_MASK    (0xFFFF)
 #define DGRAM_SEQNO_MASK    (0xFFFFFF)
 
+#if CMK_NODE_QUEUE_AVAILABLE
 #define DGRAM_NODEMESSAGE   (0xFB)
+#endif
 #define DGRAM_DSTRANK_MAX   (0xFC)
 #define DGRAM_SIMPLEKILL    (0xFD)
 #define DGRAM_BROADCAST     (0xFE)
@@ -899,12 +901,16 @@ typedef struct CmiStateStruct
 {
   int pe, rank;
   PCQueue recv;
+#if CMK_NODE_QUEUE_AVAILABLE
   PCQueue noderecv;
+#endif
   void *localqueue;
 }
 *CmiState;
 
+#if CMK_NODE_QUEUE_AVAILABLE
 CsvDeclare(PCQueue, NodeRecv);
+#endif
 
 void CmiStateInit(int pe, int rank, CmiState state)
 {
@@ -912,14 +918,18 @@ void CmiStateInit(int pe, int rank, CmiState state)
   state->rank = rank;
   state->recv = PCQueueCreate();
   state->localqueue = FIFO_Create();
+#if CMK_NODE_QUEUE_AVAILABLE
   if (rank==0) {
-	CsvInitialize(PCQueue, NodeRecv);
-	state->noderecv=PCQueueCreate();
-  	CsvAccess(NodeRecv)=state->noderecv;
-  }	
-  else {
-	state->noderecv=CsvAccess(NodeRecv);
+    CsvInitialize(PCQueue, NodeRecv);
+    state->noderecv=PCQueueCreate();
+    CsvAccess(NodeRecv)=state->noderecv;
+    CmiNodeBarrier();
+  } else {
+    CsvInitialize(PCQueue, NodeRecv);
+    CmiNodeBarrier();
+    state->noderecv=CsvAccess(NodeRecv);
   }
+#endif
 }
 
 static ExplicitDgram Cmi_freelist_explicit;
@@ -1500,7 +1510,7 @@ void CmiNodeBarrier(void)
 {
   pthread_mutex_lock(&barrier_mutex);
   barrier++;
-  if(barrier != CmiNumPes())
+  if(barrier != CmiMyNodeSize())
     pthread_cond_wait(&barrier_cond, &barrier_mutex);
   else{
     barrier = 0;
@@ -2153,7 +2163,7 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
 
 #else
 
-#define DeliverOutgoingNodeMessage() DeliverOutgoingMessage()
+#define DeliverOutgoingNodeMessage(msg) DeliverOutgoingMessage(msg)
 
 #endif
 
@@ -2252,12 +2262,16 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
 	PCQueuePush(CmiGetStateN(i)->recv, CopyMsg(msg, len));
       PCQueuePush(CmiGetStateN(0)->recv, msg);
     } else {
+#if CMK_NODE_QUEUE_AVAILABLE
          if (node->asm_rank==DGRAM_NODEMESSAGE) {
 	   PCQueuePush(CmiGetStateN(0)->noderecv, msg);
          }
 	 else {
+#endif
 	   PCQueuePush(CmiGetStateN(node->asm_rank)->recv, msg);
+#if CMK_NODE_QUEUE_AVAILABLE
 	 }
+#endif
     }
     node->asm_msg = 0;
   node->recd_msgs++;
