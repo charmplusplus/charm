@@ -305,6 +305,6 @@ class DDT {
 
 };
 
-int	DDT_Send(void* msg, int count, DDT_Type	type, void* recvMsg);
+int	DDT_Send(DDT* ddt, void* msg, int count, DDT_Type	type, void* recvMsg);
 
 #endif

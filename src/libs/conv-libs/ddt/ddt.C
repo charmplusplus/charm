@@ -1,8 +1,6 @@
 #include "ddt.h"
 
-extern DDT	ddt ;
-
-int DDT_Send(void* msg, int count, DDT_Type type, void* recvMsg)
+int DDT_Send(DDT* ddt, void* msg, int count, DDT_Type type, void* recvMsg)
 {
 	int bytesCopied , extentType ;
 	char* oldBuffer = (char*) msg ;
@@ -11,7 +9,7 @@ int DDT_Send(void* msg, int count, DDT_Type type, void* recvMsg)
 
 	char* tempOldBuffer = oldBuffer ;
 	char* tempNewBuffer = newBuffer ;
-	DDT_DataType* dttype = ddt.getType(type) ;
+	DDT_DataType* dttype = ddt->getType(type) ;
 	extentType = dttype->getExtent();
 
 	for(int i = 0 ; i < count ; i++)
@@ -107,7 +105,7 @@ int	DDT::getNextFreeIndex()
 	return -1 ; //No free Index Available
 }
 
-inline	void DDT::freeType(int* index)
+void DDT::freeType(int* index)
 {
 	typeTable[*index] = NULL ;
 	types[*index] = DDT_TYPE_NULL ;
