@@ -94,8 +94,8 @@ public:
   };
 
   struct LDStats {  // Passed to Strategy
-    struct ProcStats  *procs;
-    int count;
+    ProcStats  *procs;
+    int count; 
     
     int   n_objs;
     int   n_migrateobjs;
@@ -107,9 +107,9 @@ public:
     int *objHash; 
     int  hashSize;
 
-    LDStats(): n_objs(0), n_migrateobjs(0), n_comm(0), 
-               objData(NULL), commData(NULL), from_proc(NULL), to_proc(NULL), 
-               objHash(NULL) {  procs = new ProcStats[CkNumPes()]; }
+    LDStats(): n_objs(0), n_migrateobjs(0), objData(NULL), 
+               n_comm(0), commData(NULL), from_proc(NULL), to_proc(NULL), 
+               objHash(NULL) { procs = new ProcStats[CkNumPes()]; }
     void assign(int oid, int pe) { CmiAssert(procs[pe].available); to_proc[oid] = pe; }
       // build hash table
     void makeCommHash();
