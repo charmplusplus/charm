@@ -9,10 +9,6 @@
 static void *currentImmediateMsg=NULL; /* immediate message currently being executed */
 static int immRunning=0; /* if set, somebody's inside an immediate message */
 
-#if CMK_SHARED_VARS_UNAVAILABLE
-extern int comm_flag; /* for MACHLOCK_ASSERT below */
-#endif
-
 /*  push immediate messages into imm queue. Immediate messages can be pushed
     from both processor threads or comm. thread.
     
@@ -24,8 +20,10 @@ SMP:  This routine does its own locking.
 void CmiPushImmediateMsg(void *msg)
 {
   MACHSTATE(4,"pushing immediate message {");
-  MACHLOCK_ASSERT(immRunning||comm_flag,"CmiPushImmediateMsg");
-
+  /* This lock check needs portable access to comm_flag, which is tough:
+     MACHLOCK_ASSERT(immRunning||comm_flag,"CmiPushImmediateMsg");
+  */
+  
   CmiLock(CsvAccess(NodeState).immSendLock);
   PCQueuePush(CsvAccess(NodeState).immQ, (char *)msg);
   CmiUnlock(CsvAccess(NodeState).immSendLock);
