@@ -53,7 +53,7 @@ public:
 
 
 #include <stdio.h> //<- for FILE *
-#include <converse.h> // <- for CmiBool
+#include <converse.h> // <- for CmiBool, and CthThread
 
 class PUP {//<- Should be "namespace", once all compilers support them
 public:
@@ -288,18 +288,30 @@ void operator|(PUP::er &p,T &t)
          p((void *)&t,sizeof(T));
 }
 
+typedef int (*CkPacksizeFn)(void*);
+typedef void (*CkPackFn)(void*, void*);
+typedef void* (*CkUnpackFn)(void*);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+static inline void*
+pupOpaqueObject(PUP::er &p, void *t, int &tsize, CkPacksizeFn pksz,
+                CkPackFn pk, CkUnpackFn upk)
+{
+  void* retval;
+  if(p.isSizing())
+  {
+    tsize = pksz(t);
+    retval = t;
+  }
+  p(tsize);
+  if(p.isPacking())
+  {
+    pk(t,p.getBuf());
+    retval = 0;
+  }
+  if(p.isUnpacking())
+  {
+    retval = upk(p.getBuf());
+  }
+  p.advance(tsize);
+  return retval;
+}

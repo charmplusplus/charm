@@ -27,9 +27,9 @@ extern unsigned int _nchunks;
 #define FEM_HEXAHEDRAL    3
 #define FEM_QUADRILATERAL 4
 
-typedef int (*FEM_Packsize_Fn)(void*);
-typedef void (*FEM_Pack_Fn)(void*, void*);
-typedef void* (*FEM_Unpack_Fn)(void*);
+typedef CkPacksizeFn FEM_Packsize_Fn;
+typedef CkPackFn     FEM_Pack_Fn;
+typedef CkUnpackFn   FEM_Unpack_Fn;
 
 // temporary Datatype representation
 // will go away once MPI user-defined datatypes are ready
@@ -124,6 +124,7 @@ class chunk : public ArrayElement1D
   int ntypes;
 
   CmmTable messages; // messages to be processed
+  int tblsz; // cached packbuf size for msg table
   int wait_for; // which tag is tid waiting for ? 0 if not waiting
   int tsize; // cached packbuf size for thread
 
@@ -133,9 +134,9 @@ class chunk : public ArrayElement1D
 
   int valid_udata;
   void *userdata;
-  FEM_Packsize_Fn pksz;
-  FEM_Pack_Fn pk;
-  FEM_Unpack_Fn upk;
+  CkPacksizeFn pksz;
+  CkPackFn pk;
+  CkUnpackFn upk;
   int usize; // cached size of user's data structure
  public:
 
@@ -180,8 +181,8 @@ class chunk : public ArrayElement1D
   int *get_elemnums(void) { return gElemNums; }
   int *get_conn(void) { return conn; }
   void *get_userdata(void) { return userdata; }
-  void register_userdata(void *_userdata, FEM_Packsize_Fn _pksz,
-                         FEM_Pack_Fn _pk, FEM_Unpack_Fn _upk)
+  void register_userdata(void *_userdata, CkPacksizeFn _pksz,
+                         CkPackFn _pk, CkUnpackFn _upk)
   {
     userdata = _userdata;
     pksz = _pksz;
@@ -223,8 +224,8 @@ extern "C" {
   void FEM_Set_Mesh_Transform(int nelem, int nnodes, int ctype, int* connmat, 
                               int *permute);
   void FEM_Print_Partition(void);
-  void FEM_Register(void *_userdata, FEM_Packsize_Fn _pksz, FEM_Pack_Fn _pk,
-                    FEM_Unpack_Fn _upk);
+  void FEM_Register(void *_userdata, CkPacksizeFn _pksz, CkPackFn _pk,
+                    CkUnpackFn _upk);
   int *FEM_Get_Node_Nums(void);
   int *FEM_Get_Elem_Nums(void);
   int *FEM_Get_Conn(void);

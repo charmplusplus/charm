@@ -119,3 +119,56 @@ CmmTable t;
   return n;
 }
 
+#define MSGSIZE(msg) (((int*)((char*)(msg)-(2*sizeof(int))))[0])
+
+int CmmPackBufSize(CmmTable t)
+{
+  int nentries = CmmEntries(t);
+  CmmEntry e = t->first;
+  int size = sizeof(int); /* store nentries */
+  while(e) {
+    /* messages are always allocated with CmiAlloc */
+    int msize = MSGSIZE(e->msg);
+    /* first two integers store ntags, and msize */
+    size += 2*sizeof(int)+(e->ntags*sizeof(int))+msize;
+  }
+  return size;
+}
+
+void CmmPackTable(CmmTable t, void *buffer)
+{
+  char *buf = (char*) buffer;
+  int nentries = CmmEntries(t);
+  CmmEntry e = t->first;
+  memcpy(buf, &nentries, sizeof(int)); buf += sizeof(int);
+  while(e) {
+    int msize = MSGSIZE(e->msg);
+    memcpy(buf, &(e->ntags), sizeof(int)); buf += sizeof(int);
+    memcpy(buf, &msize, sizeof(int)); buf += sizeof(int);
+    memcpy(buf, e->tags, e->ntags*sizeof(int)); buf += e->ntags*sizeof(int);
+    memcpy(buf, e->msg, msize); buf += msize;
+  }
+  CmmFree(t);
+}
+
+CmmTable CmmUnpackTable(void *buffer)
+{
+  char *buf = (char*) buffer;
+  int i, nentries;
+  CmmTable t = CmmNew();
+  memcpy(&nentries, buf, sizeof(int)); buf += sizeof(int);
+  for(i=0;i<nentries;i++)
+  {
+    int ntags, msize, *tags;
+    void *msg;
+    memcpy(&ntags, buf, sizeof(int)); buf += sizeof(int);
+    memcpy(&msize, buf, sizeof(int)); buf += sizeof(int);
+    tags = (int*) buf;
+    buf += ntags*sizeof(int);
+    msg = CmiAlloc(msize);
+    memcpy(msg, buf, msize); buf += msize;
+    CmmPut(t, ntags, tags, msg);
+  }
+  return t;
+}
+

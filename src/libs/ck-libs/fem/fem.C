@@ -825,6 +825,7 @@ chunk::pup(PUP::er &p)
   }
   p(ntypes);
   p((void*)dtypes, MAXDT*sizeof(DType));
+  /*
   if(p.isUnpacking())
     messages = CmmNew();
   if(p.isPacking())
@@ -835,23 +836,18 @@ chunk::pup(PUP::er &p)
     while (dm = (DataMsg*)CmmGet(messages, 1, &snum, 0))
       cp[thisIndex].recv(dm);
   }
+  */
   p(wait_for);
-  if(p.isSizing())
-  {
-    tsize = CthPackBufSize(tid);
-  }
-  p(tsize);
-  if(p.isPacking())
-  {
-    CthPackThread(tid,p.getBuf());
-  }
+  messages = (CmmTable) pupOpaqueObject(p, (void*)messages, tblsz,
+                                        (CkPacksizeFn) CmmPackBufSize, 
+					(CkPackFn) CmmPackTable,
+                                        (CkUnpackFn) CmmUnpackTable);
+  tid = (CthThread) pupOpaqueObject(p, (void*)tid, tsize, 
+                                    (CkPacksizeFn) CthPackBufSize,
+                                    (CkPackFn) CthPackThread, 
+				    (CkUnpackFn) CthUnpackThread);
   if(p.isUnpacking())
-  {
-    tid = CthUnpackThread(p.getBuf());
-    // CthAwaken(tid);
     CtvAccessOther(tid,_femptr) = this;
-  }
-  p.advance(tsize);
   p(seqnum);
   p(nRecd);
   // update should not be in progress when migrating, so curbuf is not valid
@@ -860,17 +856,10 @@ chunk::pup(PUP::er &p)
   p(valid_udata);
   if(valid_udata != 0)
   {
-    p((void*)&pksz,sizeof(FEM_Packsize_Fn));
-    p((void*)&pk,sizeof(FEM_Pack_Fn));
-    p((void*)&upk,sizeof(FEM_Unpack_Fn));
-    if(p.isSizing())
-      usize = pksz(userdata);
-    p(usize);
-    if(p.isPacking())
-      pk(userdata,p.getBuf());
-    if(p.isUnpacking())
-      userdata = upk(p.getBuf());
-    p.advance(usize);
+    p((void*)&pksz,sizeof(CkPacksizeFn));
+    p((void*)&pk,sizeof(CkPackFn));
+    p((void*)&upk,sizeof(CkUnpackFn));
+    userdata = pupOpaqueObject(p, userdata, usize, pksz, pk, upk);
   }
 }
 
@@ -927,8 +916,8 @@ chunk::print(void)
 }
 
 extern "C" void 
-FEM_Register(void *_userdata, FEM_Packsize_Fn _pksz, FEM_Pack_Fn _pk,
-                    FEM_Unpack_Fn _upk)
+FEM_Register(void *_userdata, CkPacksizeFn _pksz, CkPackFn _pk,
+                    CkUnpackFn _upk)
 {
   chunk *cptr = CtvAccess(_femptr);
   cptr->register_userdata(_userdata,_pksz, _pk, _upk);

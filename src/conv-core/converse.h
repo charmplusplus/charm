@@ -1011,6 +1011,10 @@ int        CmmEntries(CmmTable t);
 #define    CmmGet(t,nt,tg,rt)   (CmmFind((t),(nt),(tg),(rt),1))
 #define    CmmProbe(t,nt,tg,rt) (CmmFind((t),(nt),(tg),(rt),0))
 
+int CmmPackBufSize(CmmTable t);
+void CmmPackTable(CmmTable t, void *buf);
+CmmTable CmmUnpackTable(void *buf);
+
 /******** ConverseInit and ConverseExit ********/
 
 void ConverseInit(int, char**, CmiStartFn, int, int);
