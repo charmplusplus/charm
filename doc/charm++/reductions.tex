@@ -24,7 +24,8 @@ processor.  The
 reduction will complete properly even if members are migrated
 or deleted during the reduction. 
 
-If we want to sum each member's single integer myInt, we would use:
+For example, if we want to sum each member's single integer myInt, 
+we would use:
 
 \begin{alltt}
     //Inside any member method
@@ -35,10 +36,9 @@ If we want to sum each member's single integer myInt, we would use:
 The built-in reduction types (see below) can also handle arrays of
 numbers.  For example, if each element of an array has a pair of
 doubles \uw{forces}[2] which need to be summed up (separately) across
-all array elements, from each array element call:
+every element, from each element call:
 
 \begin{alltt}
-    //Inside any array element method
     double forces[2]=get_my_forces();
     contribute(2*sizeof(double),forces,CkReduction::sum_double);
 \end{alltt}
@@ -46,34 +46,56 @@ all array elements, from each array element call:
 Note that since C++ arrays (like \uw{forces}[2]) are already pointers, we 
 don't use \&\uw{forces}.
 
+\subsubsection{Reduction Clients}
 
-After the data is reduced, it is passed to a ``client'' function on
-node zero.  This is an ordinary C or C++ function that you pass to
-the proxy \kw{setReductionClient} routine.  Reduction clients are
-typically registered from your main Chare's constructor, as in:
+After the data is reduced, it is passed to a you via a callback object,
+as described in section~\ref{callbacks}.  The message passed to
+the callback is of type \kw{CkReductionMsg}.
+The important members of \kw{CkReductionMsg} are
+\kw{getSize()}, which returns the number of bytes of reduction data; and
+\kw{getData()}, which returns a ``void *'' to the actual reduced data.
+
+You may pass the client callback as an additional parameter to contribute.
+If different contribute calls pass different callbacks, some (unspecified,
+unreliable) callback will be chosen for use.
+\begin{alltt}
+    double forces[2]=get_my_forces();
+    //When done, broadcast the CkReductionMsg to ``myReductionEntry''
+    CkCallback cb(CkIndex_myArrayType::myReductionEntry(NULL),thisProxy);
+    contribute(2*sizeof(double),forces,CkReduction::sum_double,cb);
+\end{alltt}
+
+
+If no member passes a callback to contribute, the reduction will use
+the default callback. You set the default callback for an array or group
+using the \kw{ckSetReductionClient} proxy call on processor zero.
+Again, a \kw{CkReductionMsg} message will be passed to this callback,
+which must delete the message when done.
 
 \begin{alltt}
-//Outside any class definition:
+    //Somewhere on processor zero:
+    myProxy.ckSetReductionClient(new CkCallback(...));
+\end{alltt}
+
+
+For backward compatability, rather than a general callback you can
+specify a peculiar kind of C function using \kw{ckSetReductionClient}
+or \kw{setReductionClient}.  This C function takes a user-defined
+parameter (passed to setReductionClient) and the actual reduction data,
+which it must not deallocate.
+
+\begin{alltt}
+  //Somewhere on processor zero:
+  myProxy.setReductionClient(myClient,(void *)NULL);
+
 void myClient(void *param,int dataSize,void *data)
 \{
   double *forceSum=(double *)data;
   cout<<``First force sum is ``<<forceSum[0]<<endl;
   cout<<``Second force sum is ``<<forceSum[1]<<endl;
 \}
-
-...
-    //Inside main::main
-    myProxy.setReductionClient(myClient,(void *)NULL);
 \end{alltt}
 
-This simple client prints out the double values received, and does not
-use the \uw{param} value passed in (\kw{NULL}, in this case).  The
-handler can use \uw{param}, \uw{dataSize}, and the data in any
-fashion.  The system will reclaim the passed-in ``void *data''
-after the handler returns.
-
-Within a reduction client, you may register a new reduction client 
-to handle the next reduction; the default is to call the same client.
 
 
 \subsubsection{Built-in Reduction Types}
@@ -160,9 +182,12 @@ combines separate contributions (from this or other processors)
 into a single combined value.
 
 The input to a reduction function is a list of \kw{CkReductionMsg}s.
-A \kw{CkReductionMsg} is a thin wrapper around a buffer of untyped data.
+A \kw{CkReductionMsg} is a thin wrapper around a buffer of untyped data
+to be reduced.  
 The output of a reduction function is a single CkReductionMsg
-containing the reduced data.  
+containing the reduced data, which you should create using the
+\kw{CkReductionMsg::buildNew(int nBytes,const void *data)} method.  
+
 Thus every reduction function has the prototype:
 \begin{alltt}
 CkReductionMsg *\uw{reductionFn}(int nMsg,CkReductionMsg **msgs);
@@ -178,9 +203,9 @@ CkReductionMsg *sumTwoShorts(int nMsg,CkReductionMsg **msgs)
   short ret[2]={0,0};
   for (int i=0;i<nMsg;i++) \{
     //Sanity check:
-    CkAssert(msgs[i]->dataSize==2*sizeof(short));
+    CkAssert(msgs[i]->getSize()==2*sizeof(short));
     //Extract this message's data
-    short *m=(short *)msgs[i]->data;
+    short *m=(short *)msgs[i]->getData();
     ret[0]+=m[0];
     ret[1]+=m[1];
   \}
