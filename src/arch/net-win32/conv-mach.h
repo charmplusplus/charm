@@ -104,7 +104,7 @@
 #define CMK_LBDB_ON					   1
 #define CMK_LBDB_OFF					   0
 
-
+#define CMK_COMPILEMODE_ANSI				   1
 
 
 #endif
