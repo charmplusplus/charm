@@ -275,6 +275,16 @@ class er {
   virtual int impl_tell(seekBlock &s); /*Give the current offset*/
   virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
   virtual void impl_endSeek(seekBlock &s);/*End a seeking block*/
+
+  //See more documentation before PUP_cmiAllocSizer in pup_cmialloc.h
+  //Must be a CmiAlloced buf while packing
+  virtual void pupCmiAllocBuf(void **msg) 
+      {CmiAbort("Undefined PUPer:Did you use PUP_toMem or PUP_fromMem?\n");}
+
+  //In case source is not CmiAlloced the size can be passed and any
+  //user buf can be converted into a cmialloc'ed buf
+  virtual void pupCmiAllocBuf(void **msg, int size)
+      {CmiAbort("Undefined PUPer:Did you use PUP_toMem or PUP_fromMem?\n");}
 };
 
 /**
@@ -593,7 +603,6 @@ public:
 //Target methods:
 	virtual void pup(er &p);
 	virtual const PUP_ID &get_PUP_ID(void) const=0;
-
 };
 
 //Declarations to include in a PUP::able's body.
