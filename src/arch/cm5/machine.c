@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.9  1996-03-05 16:25:32  sanjeev
+ * Revision 2.10  1996-03-22 23:01:26  sanjeev
+ * *** empty log message ***
+ *
+ * Revision 2.9  1996/03/05 16:25:32  sanjeev
  * fixed spanning tree bugs
  *
  * Revision 2.8  1995/11/08 23:32:31  sanjeev
@@ -313,7 +316,7 @@ char * msg;
 		FIFO_EnQueue(CpvAccess(CmiLocalQueue),msg);
 	} 
 	else {
-		CmiSyncSendFn(destPE, size, msg);
+		CMMD_send_noblock(destPE, CMMD_DEFAULT_TAG, msg, size) ;
 		CmiFree(msg);
 	}
 }
