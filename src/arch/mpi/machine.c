@@ -182,7 +182,7 @@ void CmiTimerInit(void)
   if (flag) {
     _is_global = *(int*)v;
     if (_is_global && CmiMyPe() == 0) 
-      printf("Charm++> MPI timer is synchronized!\n", CmiMyPe());
+      printf("Charm++> MPI timer is synchronized!\n");
   }
 
   if (CmiMyRank() == 0) {
