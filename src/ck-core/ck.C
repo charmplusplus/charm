@@ -230,6 +230,8 @@ CkSectionID::CkSectionID(const CkArrayID &aid, const CkArrayIndexMax *elems, con
   _cookie.get_pe() = CkMyPe();
   _elems = new CkArrayIndexMax[nElems];
   for (int i=0; i<nElems; i++) _elems[i] = elems[i];
+  pelist = NULL;
+  npes  = 0;
 }
 
 CkSectionID::CkSectionID(const CkSectionID &sid) {
@@ -237,6 +239,8 @@ CkSectionID::CkSectionID(const CkSectionID &sid) {
   _nElems = sid._nElems;
   _elems = new CkArrayIndexMax[_nElems];
   for (int i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
+  pelist = NULL;
+  npes = 0;
 }
 
 void CkSectionID::operator=(const CkSectionID &sid) {
@@ -246,7 +250,11 @@ void CkSectionID::operator=(const CkSectionID &sid) {
   for (int i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
 }
 
-CkSectionID::~CkSectionID() { delete [] _elems; }
+CkSectionID::~CkSectionID() { 
+    delete [] _elems; 
+    if(pelist != NULL)
+        delete [] pelist;
+}
 
 void CkSectionID::pup(PUP::er &p) {
     p | _cookie;

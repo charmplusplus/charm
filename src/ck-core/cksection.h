@@ -109,7 +109,7 @@ public:
   //Two reasons, (i) potentially extend sections to groups. (ii) For
   //array sections these point to the processors (ranks in the
   //commlib) the destinations array elements are on.
-  int *pelist;    
+  int *pelist;   // Currently not saped when pupped across processors 
   int npes;
   
 public:
