@@ -108,7 +108,7 @@ private:
   
   void Resize();
 
-  enum { initial_sz = 1024 };
+  enum { initial_sz = 65536 };
   enum TableState { nil, InUse } ;
   LBCommData* set;
   TableState* state;
