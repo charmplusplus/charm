@@ -194,8 +194,6 @@
 #undef CmiPrintf
 #undef CmiError
 #undef CmiScanf
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -210,9 +208,10 @@
 #include <direct.h>
 #include <stdarg.h>
 #include <signal.h>
-#include <winsock2.h>
+#include <windows.h>
+#include <wincon.h>
 
-#define DEBUGF(x)  printf x ; 
+#define DEBUGF(x)  /*printf x*/ 
 
 #define  MAXPATHLEN   1024
 #define  PIPE_SIZE    1024
@@ -1055,6 +1054,7 @@ static int    Cmi_dgram_max_data;
 static int    Cmi_tickspeed;
 
 static int Cmi_print_stats = 0;
+static int Cmi_in_console = 0;
 
 /**
  * Printing Net Statistics -- milind
@@ -1180,7 +1180,13 @@ static void extract_args(char **argv)
     {
       Cmi_print_stats = 1;
       DeleteArg(argv);
-    } else argv++;
+    }
+    else if ((!strcmp(*argv, "++in-xterm")) 
+	     || (!strcmp(*argv, "++in-console"))) {
+      Cmi_in_console = 1;
+      DeleteArg(argv);
+    }
+    else argv++;
   }
   Cmi_dgram_max_data = Cmi_max_dgram_size - DGRAM_HEADER_SIZE;
   Cmi_half_window = Cmi_window_size >> 1;
@@ -3430,12 +3436,15 @@ void ConverseExit()
 void exitDelay(void)
 {
   printf("Program finished.\n");
+  getchar();
 }
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
 {
-
   WSADATA wsaData;
+  int     inCrt, outCrt;
+  FILE    *hIn,  *hOut;
+//  HANDLE  inHandle, outHandle;
 
   WSAStartup(0x0002, &wsaData);
 
@@ -3457,7 +3466,16 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
 
   Cmi_check_delay = Cmi_numnodes * 0.5;
   Cmi_scanf_mutex = CmiCreateLock();
-
+  if (Cmi_in_console) {
+    AllocConsole();
+    outCrt = _open_osfhandle((long)GetStdHandle(STD_OUTPUT_HANDLE), _O_TEXT);
+    inCrt  = _open_osfhandle((long)GetStdHandle(STD_INPUT_HANDLE), _O_TEXT);
+    hOut   = _fdopen(outCrt, "w");
+    hIn    = _fdopen(inCrt, "r");
+    *stdin  = *hIn;
+    *stdout = *hOut;
+    *stderr = *hOut;
+  }
 #if CMK_CCS_AVAILABLE
   ccs_mutex = CmiCreateLock();
   stateAvailable = 0;
@@ -3490,6 +3508,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int ret)
     WSACleanup();
   }
   DEBUGF(("ConverseInit: I should never get here\n"));
+  if (Cmi_in_console) FreeConsole();
 }
-
 
