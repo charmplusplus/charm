@@ -144,13 +144,9 @@ void TraceProjector::userBracketEvent(int e, double bt, double et)
 	_LOG_E_USER_EVENT_PAIR_CHARM(e,bt,et);
 }
 
-void TraceProjector::creation(envelope *e)
+void TraceProjector::creation(envelope *e, int ep,int num)
 {
-	_LOG_E_CREATION_1(e);
-}
-void TraceProjector::creation(envelope *e, int num)
-{
-	_LOG_E_CREATION_N(e, num);
+	_LOG_E_CREATION_N(e, ep, num);
 }
 
 void TraceProjector::beginExecute(envelope *e)

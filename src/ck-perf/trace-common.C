@@ -20,6 +20,7 @@
 #include "trace.h"
 #include "trace-common.h"
 #include "allEvents.h"          //projector
+#include "register.h" // for _entryTable
 CpvExtern(int, _traceCoreOn);   // projector
 
 #define DEBUGF(x)          // CmiPrintf x
@@ -204,7 +205,7 @@ extern "C"
 void traceAwaken(CthThread t)
 {
 #if ! CMK_TRACE_IN_CHARM
-  CkpvAccess(_traces)->creation(0);
+  CkpvAccess(_traces)->creation(0, _threadEP);
 #endif
 }
 
@@ -298,6 +299,12 @@ int  traceAvailable()
 double CmiTraceTimer()
 {
   return TraceTimer();
+}
+
+void TraceArray::creation(envelope *env, int ep, int num=1)
+{ 
+    if (_entryTable[ep]->traceEnabled)
+        ALLDO(creation(env, ep, num));
 }
 
 /*@}*/

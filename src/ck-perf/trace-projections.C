@@ -578,18 +578,18 @@ void TraceProjections::userBracketEvent(int e, double bt, double et)
   _logPool->add(USER_EVENT_PAIR, e, 0, TraceTimer(et), curevent++, CkMyPe());
 }
 
-void TraceProjections::creation(envelope *e, int num)
+void TraceProjections::creation(envelope *e, int ep, int num)
 {
   double curTime = TraceTimer();
   if(e==0) {
     CtvAccess(curThreadEvent)=curevent;
-    _logPool->add(CREATION,ForChareMsg,_threadEP,curTime,
+    _logPool->add(CREATION,ForChareMsg,ep,curTime,
                     curevent++,CkMyPe(), 0, 0, 0.0);
   } else {
     int type=e->getMsgtype();
     e->setEvent(curevent);
     for(int i=0; i<num; i++) {
-      _logPool->add(CREATION,type,e->getEpIdx(), curTime,
+      _logPool->add(CREATION,type,ep, curTime,
                     curevent+i,CkMyPe(),e->getTotalsize(), 0, 0.0);
     }
     curevent += num;

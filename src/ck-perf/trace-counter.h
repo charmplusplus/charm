@@ -117,7 +117,7 @@ class TraceCounter : public Trace {
       // CmiPrintf("%d/%d userEvent %d\n", CkMyPe(), CkNumPes(), e); 
     }
     //! creation of message(s)
-    void creation(envelope *e, int num=1) { }
+    void creation(envelope *e, int epIdx, int num=1) { }
     //! ???
     void messageRecv(char *env, int pe) { }
     //! begin/end execution of a Charm++ entry point
