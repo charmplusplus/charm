@@ -638,7 +638,7 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
 void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
 {
   int i;
-  CkSectionInfo &id = msg->sid;
+  CkSectionInfo id = msg->sid;
   mCastEntry *entry = (mCastEntry *)id.get_val();
 //CmiPrintf("[%d] recvRedMsg: entry: %p\n", CkMyPe(), entry);
 
