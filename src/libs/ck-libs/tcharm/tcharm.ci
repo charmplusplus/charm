@@ -1,0 +1,13 @@
+module tcharm {
+  message TCharmInitMsg {
+	char data[];
+  };
+  array [1D] TCharm {
+    entry TCharm(TCharmInitMsg *initMsg);
+    entry void run(void);
+    initcall void nodeInit(void);
+  };
+  mainchare TCharmMain {
+    entry TCharmMain();
+  };
+};
