@@ -38,8 +38,6 @@ public:
   int nobj,npe;
   double ** alloc_array;
   graph * object_graph;
-  obj_id * translate;
-  int * htable;
   CommLB();
   CommLB(CkMigrateMessage *m);
 private:
@@ -48,9 +46,7 @@ private:
   LBMigrateMsg* Strategy(CentralLB::LDStats* stats, int count);
   void alloc(int pe, int id, double load);
   double compute_com(int id,int pe); 
-  int search(LDObjid oid, LDOMid mid);
   void add_graph(int x, int y, int data, int nmsg);
-  void make_hash();
   void update(int id, int pe);
 };
 

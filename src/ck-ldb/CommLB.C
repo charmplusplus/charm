@@ -55,21 +55,6 @@ CmiBool CommLB::QueryBalanceNow(int _step)
     return CmiTrue;
 }
 
-int CommLB::search(LDObjid oid, LDOMid mid){
-    int id,hash;
-
-    hash = (oid.id[0] | oid.id[1]) % nobj;
-
-    for(id=0;id<nobj;id++){
-	int index = (id+hash)%nobj;
-        if (LDObjIDEqual(translate[htable[index]].oid, oid) &&
-	    LDOMidEqual(translate[htable[index]].mid, mid))
-	    return htable[index];
-    }
-    //  CkPrintf("not found \n");
-    return -1;
-}
-
 // assign id to processor pe, load including both computation and communication
 void CommLB::alloc(int pe,int id,double load){
     //  CkPrintf("alloc %d ,%d\n",pe,id);
@@ -114,7 +99,6 @@ void CommLB::update(int id, int pe){
         double total_time = alpha*com_msg + beeta*com_data;
         alloc_array[destPe][nobj] += total_time;
     }
-    
 }
 
 // add comm between obj x and y
@@ -145,25 +129,6 @@ void CommLB::add_graph(int x, int y, int data, int nmsg){
     ptr->next = temp;
 }
   
-void CommLB::make_hash(){
-    int i, hash;
-    LDObjid oid;
-    
-    htable = new int[nobj];
-    for(i=0;i<nobj;i++)
-	htable[i] = -1;
-    
-    for(i=0;i<nobj;i++){
-	oid = translate[i].oid;
-	hash = ((oid.id[0])|(oid.id[1])) % nobj;
-	while(htable[hash] != -1)
-	    hash = (hash+1)%nobj;
-    
-	htable[hash] = i;
-    }
-
-}
-    
 void init(double **a, graph * object_graph, int l, int b){
     int i,j;
     
@@ -203,17 +168,8 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* _stats, int count)
     }
 
     npe = count;
-    translate = new obj_id[nobj];
-    int objno=0;
 
-    for(obj=0; obj < stats->n_objs; obj++){
-      LDObjData &objData = stats->objData[obj];
-      translate[objno].mid.id = objData.omID().id;
-      translate[objno].oid = objData.id();
-      objno++;
-    }
-
-    make_hash();
+    stats->makeCommHash();
 
     object_graph = new graph[nobj];
 
@@ -227,8 +183,8 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* _stats, int count)
     for(com =0; com< stats->n_comm;com++) {
 	 LDCommData &commData = stats->commData[com];
 	 if((!commData.from_proc())&&(!commData.to_proc())){
-		xcoord = search(commData.sender, commData.senderOM);
-		ycoord = search(commData.receiver, commData.receiverOM);
+		xcoord = stats->getHash(commData.sender, commData.senderOM);
+		ycoord = stats->getHash(commData.receiver, commData.receiverOM);
 		if((xcoord == -1)||(ycoord == -1))
 		    if (lb_ignoreBgLoad) continue;
 		    else CkAbort("Error in search\n");
@@ -324,8 +280,6 @@ LBMigrateMsg* CommLB::Strategy(CentralLB::LDStats* _stats, int count)
     for(pe=0;pe <= count;pe++)
 	delete alloc_array[pe];
     delete alloc_array;
-    delete htable;
-    delete translate;   
 
     for(int oindex= 0; oindex < nobj; oindex++){
       graph * ptr = &object_graph[oindex];
