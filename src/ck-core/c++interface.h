@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.25  1995-11-03 02:48:29  sanjeev
+ * Revision 2.26  1995-11-15 16:45:28  sanjeev
+ * fixes to prevent iCC from complaining about unused variables
+ *
+ * Revision 2.25  1995/11/03  02:48:29  sanjeev
  * *** empty log message ***
  *
  * Revision 2.24  1995/11/02  20:23:20  sanjeev
@@ -232,7 +235,7 @@ class GroupIdMessage {	// sizeof(GroupIdMessage) MUST be 4
 public:	GroupIdType groupid ;
 
 	void *operator new(size_t size) {	// should never be called
-		size = 0 ;	// to prevent CC from generating "size unused"
+		size += 0 ;	// to prevent CC from generating "size unused"
 		return NULL ;
 	}
 
@@ -245,7 +248,7 @@ class QuiescenceMessage {// used in quiescence module
 public:	int emptyfield ;
 
 	void *operator new(size_t size) {	// should never be called
-		size = 0 ;	// to prevent CC from generating "size unused"
+		size += 0 ;	// to prevent CC from generating "size unused"
 		return NULL ;
 	}
 
@@ -261,7 +264,7 @@ public: int key ;
         char *data ;
  
 	void *operator new(size_t size) {	// should never be called
-		size = 0 ;	// to prevent CC from generating "size unused"
+		size += 0 ;	// to prevent CC from generating "size unused"
 		return NULL ;
 	}
 
@@ -317,7 +320,7 @@ public:
         void * operator new(size_t size, void *buf) ;
 
  	void operator delete(void *obj) {
-		obj = 0 ;	// to prevent CC from generating "obj unused"
+		obj += 0 ;	// to prevent CC from generating "obj unused"
 		ChareExit() ;
 	}
 } ;
