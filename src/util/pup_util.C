@@ -552,12 +552,12 @@ void PUP::fromTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tlonglong: {
       CMK_PUP_LONG_LONG ret=0;
       if (1!=fscanf(f,"%lld",&ret)) parseError("could not match long long");
-      ((long double *)p)[i]=ret;
+      ((CMK_PUP_LONG_LONG *)p)[i]=ret;
     } break;
     case Tulonglong: {
       unsigned CMK_PUP_LONG_LONG ret=0;
       if (1!=fscanf(f,"%llu",&ret)) parseError("could not match unsigned long long");
-      ((long double *)p)[i]=ret;
+      ((unsigned CMK_PUP_LONG_LONG *)p)[i]=ret;
     } break;
 #endif
     case Tbool: {
