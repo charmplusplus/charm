@@ -28,21 +28,22 @@ class Trace {
     virtual int traceRegisterUserEvent(const char* eventName) { return 0; }
     // a user event has just occured
     virtual void userEvent(int eventID) {}
-    // creation of message(s)
+    // ???
     virtual void creation(envelope *, int num=1) {}
     // ???
     virtual void messageRecv(char *env, int pe) {}
     // **************************************************************
     // begin/end execution of a Charm++ entry point
+    // ??? for envelope
     // NOTE: begin/endPack and begin/endUnpack can be called in between
     //       a beginExecute and its corresponding endExecute.
     virtual void beginExecute(envelope *) {}
     virtual void beginExecute(
-      int event,   // event type defined in trace-common.h
-      int msgType, // message type
+      int event,   // ???
+      int msgType, // ???
       int ep,      // Charm++ entry point (will correspond to sts file) 
       int srcPe,   // Which PE originated the call
-      int ml)      // message size
+      int ml)      // ???
     { }
     virtual void endExecute(void) {}
     // begin/end idle time for this pe
@@ -56,14 +57,17 @@ class Trace {
     virtual void beginUnpack(void) {}
     virtual void endUnpack(void) {}
     // ???
+    virtual void beginCharmInit(void) {}
+    virtual void endCharmInit(void) {}
+    // ???
     virtual void enqueue(envelope *) {}
     virtual void dequeue(envelope *) {}
-    // begin/end of execution
+    // ???
     virtual void beginComputation(void) {}
     virtual void endComputation(void) {}
     // clear all data collected for entry points
     virtual void traceClearEps() {}
-    // write the summary sts file for this trace
+    // write the summary file (??? what is abbreviation) for this trace
     virtual void traceWriteSts() {}
     // do any clean-up necessary for tracing
     virtual void traceClose() {}
@@ -96,6 +100,8 @@ public:
     inline void endPack(void) {ALLDO(endPack());}
     inline void beginUnpack(void) {ALLDO(beginUnpack());}
     inline void endUnpack(void) {ALLDO(endUnpack());}
+    inline void beginCharmInit(void) {ALLDO(beginCharmInit()); }
+    inline void endCharmInit(void) {ALLDO(endCharmInit());}
     inline void enqueue(envelope *e) {ALLDO(enqueue(e));}
     inline void dequeue(envelope *e) {ALLDO(dequeue(e));}
     inline void beginComputation(void) {ALLDO(beginComputation());}
@@ -148,6 +154,8 @@ CkpvExtern(int, traceOnPe);
 #define _TRACE_END_PACK() _TRACE_ONLY(CkpvAccess(_traces)->endPack())
 #define _TRACE_BEGIN_UNPACK() _TRACE_ONLY(CkpvAccess(_traces)->beginUnpack())
 #define _TRACE_END_UNPACK() _TRACE_ONLY(CkpvAccess(_traces)->endUnpack())
+#define _TRACE_BEGIN_CHARMINIT() _TRACE_ONLY(CkpvAccess(_traces)->beginCharmInit())
+#define _TRACE_END_CHARMINIT() _TRACE_ONLY(CkpvAccess(_traces)->endCharmInit())
 #define _TRACE_BEGIN_COMPUTATION() _TRACE_ONLY(CkpvAccess(_traces)->beginComputation())
 #define _TRACE_END_COMPUTATION() _TRACE_ONLY(CkpvAccess(_traces)->endComputation())
 #define _TRACE_ENQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->enqueue(env))
