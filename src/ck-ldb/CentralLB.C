@@ -250,7 +250,7 @@ void CentralLB::buildStats()
     int nobj = 0;
     int ncom = 0;
     int nmigobj = 0;
-    // copy all data in individule message to this big structure
+    // copy all data from individule message to this big structure
     for (int pe=0; pe<stats_msg_count; pe++) {
        int i;
        CLBStatsMsg *msg = statsMsgsList[pe];
@@ -295,16 +295,9 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
     struct ProcStats &procStat = statsData->procs[pe];
     procStat.total_walltime = m->total_walltime;
     procStat.total_cputime = m->total_cputime;
-    if (_lb_args.ignoreBgLoad()) {
-      procStat.idletime = 0.0;
-      procStat.bg_walltime = 0.0;
-      procStat.bg_cputime = 0.0;
-    }
-    else {
-      procStat.idletime = m->idletime;
-      procStat.bg_walltime = m->bg_walltime;
-      procStat.bg_cputime = m->bg_cputime;
-    }
+    procStat.idletime = m->idletime;
+    procStat.bg_walltime = m->bg_walltime;
+    procStat.bg_cputime = m->bg_cputime;
     procStat.pe_speed = m->pe_speed;
     procStat.utilization = 1.0;
     procStat.available = CmiTrue;
@@ -344,10 +337,10 @@ void CentralLB::LoadBalance()
   for(proc = 0; proc < clients; proc++)
       statsData->procs[proc].available = (CmiBool)availVector[proc];
 
-  // Call the predictor for the future
-  if (_lb_predict) FuturePredictor(statsData);
+  preprocess(statsData, clients);
 
 //    CkPrintf("Before Calling Strategy\n");
+
   LBMigrateMsg* migrateMsg = Strategy(statsData, clients);
 
 //    CkPrintf("returned successfully\n");
@@ -590,6 +583,22 @@ void CentralLB::CheckMigrationComplete()
 #endif
 }
 
+void CentralLB::preprocess(LDStats* stats,int count)
+{
+  for (int pe=0; pe<count; pe++)
+  {
+    struct ProcStats &procStat = statsData->procs[pe];
+    if (_lb_args.ignoreBgLoad()) {
+      procStat.idletime = 0.0;
+      procStat.bg_walltime = 0.0;
+      procStat.bg_cputime = 0.0;
+    }
+  }
+
+  // Call the predictor for the future
+  if (_lb_predict) FuturePredictor(statsData);
+}
+
 // default load balancing strategy
 LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
 {
@@ -750,6 +759,7 @@ void CentralLB::simulationRead() {
 
     // now pass it to the strategy routine
     double startT = CkWallTimer();
+    preprocess(statsData, LBSimulation::simProcs);
     CmiPrintf("%s> Strategy starts ... \n", lbname);
     LBMigrateMsg* migrateMsg = Strategy(statsData, LBSimulation::simProcs);
     CmiPrintf("%s> Strategy took %fs memory usage: CentralLB:%dKB. \n", 
@@ -1152,6 +1162,9 @@ void CentralLB::LDStats::pup(PUP::er &p)
   for (i=0; i<n_objs; i++) p|objData[i]; 
   p(from_proc, n_objs);
   p(to_proc, n_objs);
+  // reset to_proc when unpacking
+  if (p.isUnpacking())
+    for (i=0; i<n_objs; i++) to_proc[i] = from_proc[i];
   for (i=0; i<n_comm; i++) p|commData[i];
   if (p.isUnpacking())
     count = LBSimulation::simProcs;
