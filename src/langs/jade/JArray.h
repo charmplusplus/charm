@@ -201,7 +201,8 @@ public:
 	inline T& getElement(uint idx[]) {
 		uint index = 0;
 		for(uint i=0; i<numDimensions; i++) {
-			assert(idx[i] >= 0 && idx[i] <= dims[i]);
+			assert(//idx[i] >= 0 && 
+				idx[i] <= dims[i]);
 			index += idx[i] * dimSize[i];
 		}
 		return data[index];
@@ -270,6 +271,7 @@ public:
 		end[0] = e;
 		stride[0] = str;
 		useVirtual = 1;
+		return *this;
 	}
 
 	// 2D
