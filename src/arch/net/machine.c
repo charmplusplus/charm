@@ -1810,6 +1810,8 @@ void CmiReleaseCommHandle(CmiCommHandle handle)
   FreeOutgoingMsg(((OutgoingMsg)handle));
 }
 
+#if ! CMK_MULTICAST_LIST_USE_COMMON_CODE
+
 /*****************************************************************************
  *
  * NET version List-Cast and Multicast Code
@@ -1841,6 +1843,8 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
   }
   CmiFree(msg);
 }
+
+#endif
 
 #if CMK_IMMEDIATE_MSG
 void CmiProbeImmediateMsg()
