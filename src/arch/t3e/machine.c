@@ -898,3 +898,10 @@ double CmiTimer()
   return (clocktick * (now - inittime_wallclock));
 }
 
+/*   Memory lock and unlock functions */
+/*      --- on T3E, no shared memory and quickthreads are used, so memory */
+/*          calls reentrant problem. these are only dummy functions */
+
+static volatile int memflag;
+void CmiMemLock() { memflag=1; }
+void CmiMemUnlock() { memflag=0; }
