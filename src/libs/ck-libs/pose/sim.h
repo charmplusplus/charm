@@ -64,7 +64,7 @@ public:
     evID = obj.evID;
     parent = obj.parent;
     str = obj.str;
-    msgSize = obj.msgSize;
+    //msgSize = obj.msgSize;
     rst = obj.rst;
     setPriority(timestamp-POSE_TimeMax); 
     return *this;
