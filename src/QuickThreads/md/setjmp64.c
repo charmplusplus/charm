@@ -42,7 +42,7 @@ static void qt_args_1(qt_t *rjb, void *u, void *t,
   rhelp = (struct helpdesc *)pbuf[index];
   if (rhelp == 0) {
     SHIFTSP(rjb);
-    longjmp((int*)rjb, push_buf((void *)jb));
+    longjmp((unsigned long*)rjb, push_buf((void *)jb));
   }
   rhelp->hfn(rhelp->jb, rhelp->old, rhelp->new);
   only(u, t, userf);
@@ -77,7 +77,7 @@ void *qt_block(qt_helper_t *hfn, void *old, void *new, qt_t *sp)
   rhelp = (struct helpdesc *)pbuf[index];
   if (rhelp==0) {
     SHIFTSP(sp);
-    longjmp((int*)sp, push_buf((void *)&help));
+    longjmp((unsigned long*)sp, push_buf((void *)&help));
   }
   rhelp->hfn(rhelp->jb, rhelp->old, rhelp->new);
 }
@@ -90,5 +90,5 @@ void *qt_abort(qt_helper_t *hfn, void *old, void *new, qt_t *sp)
   help.old = old;
   help.new = new;
   SHIFTSP(sp);
-  longjmp((int*)sp, push_buf((void *)&help));
+  longjmp((unsigned long*)sp, push_buf((void *)&help));
 }
