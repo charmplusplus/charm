@@ -53,7 +53,7 @@ class TCharmInitMsg : public CMessage_TCharmInitMsg {
 	int numElements;
 	//Data to pass to thread:
 	char *data;
-	
+
 	TCharmInitMsg(CthVoidFn threadFn_,int stackSize_)
 		:threadFn(threadFn_), stackSize(stackSize_) {}
 };
@@ -71,7 +71,7 @@ FDECL {typedef void (*TCpupUserDataF)(pup_er p,void *data);};
 class TCharm: public ArrayElement1D
 {
  public:
-	
+
 	//User's heap-allocated/global data:
 	class UserData {
 		void *data; //user data pointer
@@ -91,7 +91,7 @@ class TCharm: public ArrayElement1D
 	};
 	//New interface for user data:
 	CkVec<UserData> sud;
-	
+
 	//One-time initialization
 	static void nodeInit(void);
  private:
@@ -102,12 +102,12 @@ class TCharm: public ArrayElement1D
 		int thisElement; //Index of current element
 		int numElements; //Number of array elements
 	};
-	
+
 	TCharmInitMsg *initMsg; //Thread initialization data
 	CthThread tid; //Our migratable thread
 	friend class TCharmAPIRoutine; //So he can get to heapBlocks:
 	CmiIsomallocBlockList *heapBlocks; //Migratable heap data
-	
+
 	bool isStopped;
 	ThreadInfo threadInfo;
 	double timeOffset; //Value to add to CkWallTimer to get my clock
@@ -129,7 +129,11 @@ class TCharm: public ArrayElement1D
 	TCharm(TCharmInitMsg *initMsg);
 	TCharm(CkMigrateMessage *);
 	~TCharm();
-	
+
+	void clear();
+	void ckCheckpoint(char* fname);
+	void ckRestart(char* fname);
+
 	//Pup routine packs the user data and migrates the thread
 	virtual void pup(PUP::er &p);
 

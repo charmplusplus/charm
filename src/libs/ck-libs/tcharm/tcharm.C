@@ -72,7 +72,7 @@ void TCharm::nodeInit(void)
   	while (CmiGetArgInt(argv,"-vp",&ignored)) {}
   	while (CmiGetArgInt(argv,"+vp",&ignored)) {}
   }
-  
+
   TCharm::setState(inNodeSetup);
   TCHARM_User_node_setup();
   FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)();
@@ -105,16 +105,17 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
 {
   initMsg=initMsg_;
   timeOffset=0.0;
-  if (tcharm_nothreads) 
+  if (tcharm_nothreads)
   { //Don't even make a new thread-- just use main thread
     tid=CthSelf();
-  } 
+  }
   else /*Create a thread normally*/
   {
-    if (tcharm_nomig) /*Nonmigratable version, for debugging*/ 
+    if (tcharm_nomig) { /*Nonmigratable version, for debugging*/
       tid=CthCreate((CthVoidFn)startTCharmThread,initMsg,initMsg->stackSize);
-    else
+    } else {
       tid=CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->stackSize);
+    }
   }
   CtvAccessOther(tid,_curTCharm)=this;
   TCharm::setState(inInit);
@@ -133,12 +134,12 @@ TCharm::TCharm(CkMigrateMessage *msg)
 {
   initMsg=NULL;
   tid=NULL;
-  threadInfo.tProxy=CProxy_TCharm(thisArrayID);  
+  threadInfo.tProxy=CProxy_TCharm(thisArrayID);
 }
 
 void TCharm::pup(PUP::er &p) {
 //Pup superclass
-  ArrayElement1D::pup(p);  
+  ArrayElement1D::pup(p);
 
   p(isStopped);
   p(threadInfo.thisElement);
@@ -156,7 +157,7 @@ void TCharm::pup(PUP::er &p) {
   // This is needed because the userData depends on the thread's stack
   // and heap data both at pack and unpack time.
   PUP::seekBlock s(p,2);
-  if (p.isUnpacking()) 
+  if (p.isUnpacking())
   {//In this case, unpack the thread & heap before the user data
     s.seek(1);
     tid = CthPup((pup_er) &p, tid);
@@ -167,17 +168,17 @@ void TCharm::pup(PUP::er &p) {
     p(packTime);
     timeOffset=packTime-CkWallTimer();
   }
-  
+
   //Pack all user data
   TCharm::setState(inPup);
   s.seek(0);
   p(nUd);
-  for(int i=0;i<nUd;i++) 
+  for(int i=0;i<nUd;i++)
     ud[i].pup(p);
   sud.pup(p);
   TCharm::setState(inFramework);
 
-  if (!p.isUnpacking()) 
+  if (!p.isUnpacking())
   {//In this case, pack the thread & heap after the user data
     s.seek(1);
     tid = CthPup((pup_er) &p, tid);
@@ -200,20 +201,55 @@ void TCharm::UserData::pup(PUP::er &p)
     //FIXME: function pointers may not be valid across processors
     p((void*)&cfn, sizeof(TCpupUserDataC));
     if (cfn) cfn(pext,data);
-  } 
+  }
   else { //Fortran version
     //FIXME: function pointers may not be valid across processors
-    p((void*)&ffn, sizeof(TCpupUserDataF));        
+    p((void*)&ffn, sizeof(TCpupUserDataF));
     if (ffn) ffn(pext,data);
   }
 }
 
-
-TCharm::~TCharm() 
+TCharm::~TCharm()
 {
   CmiIsomallocBlockListDelete(heapBlocks);
   CthFree(tid);
   delete initMsg;
+}
+
+// clear the data before restarting from disk
+void TCharm::clear()
+{
+  CmiIsomallocBlockListDelete(heapBlocks);
+  CthFree(tid);
+  delete initMsg;
+}
+
+// checkpoint and restart for TCharm
+// difference is set pup'er to userlevel
+void TCharm::ckCheckpoint(char* fname)
+{
+  FILE *chkptfile=fopen(fname,"wb");
+  if(chkptfile == NULL){
+    CkAbort("TCharm::ckCheckpoint open file failed!");
+  }
+  PUP::toDisk p(chkptfile);
+  p.becomeUserlevel();
+  this->pup(p);
+  fclose(chkptfile);
+  CkPrintf("[%d]TCharm::ckCheckpoint, tid = %x\n",thisIndex,tid);
+}
+
+void TCharm::ckRestart(char* fname)
+{
+  FILE *chkptfile=fopen(fname,"rb");
+  if(chkptfile == NULL){
+    CkAbort("TCharm::ckRestart open file failed!");
+  }
+  PUP::fromDisk p(chkptfile);
+  p.becomeUserlevel();
+  this->pup(p);
+  fclose(chkptfile);
+  CkPrintf("[%d]TCharm::ckRestart, tid = %x\n",thisIndex,tid);
 }
 
 //Register user data to be packed with the thread
@@ -276,7 +312,7 @@ void TCharm::start(void)
 void TCharm::migrate(void)
 {
 #if CMK_LBDB_ON
-  DBG("going to sync");  
+  DBG("going to sync");
   AtSync();
   stop();
 #else
@@ -287,6 +323,7 @@ void TCharm::migrate(void)
 //Resume from sync: start the thread again
 void TCharm::ResumeFromSync(void)
 {
+CkPrintf("ResumeFromSync!\n");
   start();
 }
 
@@ -567,7 +604,7 @@ void TCHARM_Attach_finish(const CkArrayID &libraryArray)
 #define cookie (*TCharmSetupCookie::get())
 
 /**********************************
-Callable from UserSetup: 
+Callable from UserSetup:
 */
 
 /*Set the size of the thread stack*/
@@ -695,7 +732,7 @@ CDECL void TCHARM_Set_global(int globalID,void *new_value,TCHARM_Pup_global_fn p
 {
 	TCHARMAPI("TCHARM_Set_global");
 	TCharm *tc=TCharm::get();
-	if (tc->sud.length()<=globalID) 
+	if (tc->sud.length()<=globalID)
 	{ //We don't have room for this ID yet: make room
 		int newLen=2*globalID;
 		tc->sud.setSize(newLen);
@@ -754,7 +791,7 @@ FDECL void FTN_NAME(TCHARM_DONE,tcharm_done)(void)
 	TCHARM_Done();
 }
 
-CDECL double TCHARM_Wall_timer(void) 
+CDECL double TCHARM_Wall_timer(void)
 {
   TCHARMAPI("TCHARM_Wall_timer");
   if(TCharm::getState()!=inDriver) return CkWallTimer();
@@ -773,7 +810,7 @@ FDECL int FTN_NAME(TCHARM_IARGC,tcharm_iargc)(void) {
 }
 
 FDECL void FTN_NAME(TCHARM_GETARG,tcharm_getarg)
-	(int *i_p,char *dest,int destLen) 
+	(int *i_p,char *dest,int destLen)
 {
   TCHARMAPI("tcharm_getarg");
   int i=*i_p;
@@ -793,7 +830,7 @@ CDECL void TCHARM_Init(int *argc,char ***argv) {
 	_initCharm(*argc,*argv);
 }
 
-FDECL void FTN_NAME(TCHARM_INIT,tcharm_init)(void) 
+FDECL void FTN_NAME(TCHARM_INIT,tcharm_init)(void)
 {
 	int argc=1;
 	char *argv[2]={"foo",NULL};
