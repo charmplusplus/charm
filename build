@@ -211,13 +211,12 @@ do
 		CheckDir $incdir
           	INCDIR="$INCDIR -I$incdir"; shift
  	  	;;
-	    --no-build-shared|-nobs|--build-shared|-bs)
-		# obsolete
-		BUILD_SHARED="$1"; shift
-		;;
-	    --no-shared)
-		# obsolete
+	    --no-build-shared|-nobs|--no-shared)
 		BUILD_SHARED="-nobs"; shift
+		;;
+	    --build-shared|-bs)
+		# obsolete, do nothing
+		shift
 		;;
 	    -j*)
                 PMAKENUM=`echo $1 | awk -Fj '{print $2}'`
@@ -347,6 +346,10 @@ then
       echo '#include "'conv-mach-$i.h'"' >> $ConvHeader
       echo '. $CHARMINC/'"conv-mach-$i.sh" >> $ConvSh
     done
+fi
+if test  -n "$BUILD_SHARED" 
+then
+    echo "CMK_NO_BUILD_SHARED=true" >> $ConvSh
 fi
 
 
