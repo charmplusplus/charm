@@ -491,6 +491,10 @@ void DiscardImplicitDgram(ImplicitDgram dg)
   FreeImplicitDgram(dg);
 }
 
+/*
+ Check the real-time clock and perform periodic tasks.
+ Must be called with comm. lock held.
+ */
 static double Cmi_ack_last, Cmi_check_last;
 static void CommunicationsClock(void)
 {
@@ -506,17 +510,19 @@ static void CommunicationsClock(void)
   if (Cmi_clock > Cmi_check_last + Cmi_check_delay) {
     MACHSTATE(4,"CommunicationsClock pinging charmrun");       
     Cmi_check_last = Cmi_clock; 
-    ctrl_sendone_locking("ping",NULL,0,NULL,0); /*Charmrun may have died*/
+    ctrl_sendone_nolock("ping",NULL,0,NULL,0); /*Charmrun may have died*/
   }
 }
 
+#if CMK_SHARED_VARS_UNAVAILABLE
 static void CommunicationsClockCaller(void *ignored)
 {
+  CmiCommLock();
   CommunicationsClock();
+  CmiCommUnlock();
   CcdCallFnAfter(CommunicationsClockCaller,NULL,Cmi_comm_clock_delay);  
 }
 
-#if CMK_SHARED_VARS_UNAVAILABLE
 static void CommunicationPeriodic(void) 
 { /*Poll on the communications server*/
   CommunicationServer(0);
