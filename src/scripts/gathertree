@@ -3,6 +3,8 @@
 SRC=$1
 DST=$2
 
+[ ! -d $SRC ] && exit 0;
+
 # remove all temporary files
 rm -f temp.d temp.f temp.m temp.l tmp*.awk
 # find all directories including and below SRC
