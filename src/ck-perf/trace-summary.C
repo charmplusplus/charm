@@ -20,6 +20,7 @@ static int _threadMsg, _threadChare, _threadEP;
 static int _packMsg, _packChare, _packEP;
 static int _unpackMsg, _unpackChare, _unpackEP;
 CpvDeclare(double, binSize);
+CpvDeclare(int, version);
 
 extern "C" void setEvent(CthThread t, int event);
 extern "C" int getEvent(CthThread t);
@@ -33,6 +34,7 @@ void traceInit(int* argc, char **argv)
   CpvInitialize(int, CtrLogBufSize);
   CpvInitialize(char*, pgmName);
   CpvInitialize(double, binSize);
+  CpvInitialize(int, version);
   CpvAccess(_trace) = new TraceProjections();
   CpvAccess(traceOn) = 1;
   CpvAccess(pgmName) = (char *) malloc(strlen(argv[0])+1);
@@ -40,6 +42,7 @@ void traceInit(int* argc, char **argv)
   strcpy(CpvAccess(pgmName), argv[0]);
   CpvAccess(CtrLogBufSize) = LogBufSize;
   CpvAccess(binSize) = BIN_SIZE;
+  CpvAccess(version) = VER;
   int i;
   for(i=1;i<*argc;i++) {
     if(strcmp(argv[i], "+logsize")==0) {
@@ -63,6 +66,21 @@ void traceInit(int* argc, char **argv)
     }
   }
   if(i!=*argc) { // +binsize parameter was found, delete it and its arg
+    while((i+2)<= *argc) {
+      argv[i] = argv[i+2];
+      i++;
+    }
+    *argc -= 2;
+  }
+  for(i=1;i<*argc;i++) {
+    if(strcmp(argv[i], "+version")==0) {
+      int d;
+      sscanf(argv[i+1], "%d", &d);
+      CpvAccess(version) = d;
+      break;
+    }
+  }
+  if(i!=*argc) { // +version parameter was found, delete it and its arg
     while((i+2)<= *argc) {
       argv[i] = argv[i+2];
       i++;
@@ -207,7 +225,7 @@ void LogPool::write(void)
 {
   int i;
   unsigned int j;
-  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%le phases:%d\n", VER, CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize), phaseTab.numPhasesCalled());
+  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%le phases:%d\n", CpvAccess(version), CmiMyPe(), CmiNumPes(), numEntries, _numEntries, CpvAccess(binSize), phaseTab.numPhasesCalled());
   // write bin time
   for(j=0; j<numEntries; j++)
     pool[j].write(fp);
@@ -221,7 +239,7 @@ void LogPool::write(void)
     fprintf(fp, "%d ", epCount[i]);
   fprintf(fp, "\n");
   // write marks
-  if (VER>=2.0) 
+  if (CpvAccess(version)>=2.0) 
   {
   fprintf(fp, "%d ", markcount);
   for (i=0; i<MAX_MARKS; i++) {
@@ -231,7 +249,10 @@ void LogPool::write(void)
   fprintf(fp, "\n");
   }
   // write phases
+  if (CpvAccess(version)>=3.0)
+  {
   phaseTab.write(fp);
+  }
 }
 
 void LogPool::writeSts(void)
