@@ -211,6 +211,9 @@ void testAssert(int shouldBe,const char *what,int myPartition=-1)
 }
 
 extern "C" void
+mesh_updated(int param);
+
+extern "C" void
 driver(void)
 {
   int i,j;
@@ -387,7 +390,7 @@ printargs();
     }
     FEM_Set_elem_data(0,elOut);
     delete[] elOut;
-    FEM_Update_mesh(123,2);
+    FEM_Update_mesh(mesh_updated,123,2);
 #endif
 
   FEM_Print("All tests passed.");
@@ -420,7 +423,7 @@ mesh_updated(int param)
 }
 
 extern "C" void
-finalize(void)
+finalize(int ignored)
 {
   CkPrintf("finalize called\n");
 }
