@@ -109,7 +109,7 @@ void CkDelegateMgr::ArrayBroadcast(int ep,void *m,CkArrayID a)
 	ap.ckBroadcast((CkArrayMessage *)m,ep);
 }
 
-void CkDelegateMgr::ArraySectionSend(int ep,void *m, CkArrayID a,CkSectionInfo &s)
+void CkDelegateMgr::ArraySectionSend(int ep,void *m, CkArrayID a,CkSectionID &s)
 {
 	CmiAbort("ArraySectionSend is not implemented!\n");
 /*

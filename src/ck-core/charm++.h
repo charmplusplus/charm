@@ -393,7 +393,7 @@ class CkDelegateMgr : public IrrGroup {
     virtual void ArrayCreate(int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a);
     virtual void ArraySend(int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a);
     virtual void ArrayBroadcast(int ep,void *m,CkArrayID a);
-    virtual void ArraySectionSend(int ep,void *m,CkArrayID a,CkSectionInfo &s);
+    virtual void ArraySectionSend(int ep,void *m,CkArrayID a,CkSectionID &s);
 };
 
 
