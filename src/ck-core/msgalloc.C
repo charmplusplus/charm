@@ -8,15 +8,6 @@
 #include "ck.h"
 #include "queueing.h"
 
-#if CONVERSE_VERSION_ELAN
-extern int SMALL_MESSAGE_SIZE;
-#define ELAN_MESSAGE_SIZE SMALL_MESSAGE_SIZE
-#define SIZEFIELD(m) ((int *)((char *)(m)-2*sizeof(int)))[0]
-#define CMI_MSG_TYPE(msg)    ((CmiMsgHeaderBasic *)msg)->type
-
-extern Queue localMsgBuf;
-#endif
-
 extern "C"
 void *CkAllocSysMsg(void)
 {
@@ -33,29 +24,7 @@ extern "C"
 void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits)
 {
   register envelope* env;
-#if CONVERSE_VERSION_ELAN
-  register int tsize = sizeof(envelope) + ALIGN(msgBytes) 
-    + sizeof(int)*PW(prioBits);
-
-  if(tsize < ELAN_MESSAGE_SIZE) {
-    if(!CqsEmpty(localMsgBuf)) {
-      //      CkPrintf("Getting message from queue\n");
-      CqsDequeue(localMsgBuf, (void **)&env);
-    }
-    else 
-      env = (envelope *)CmiAlloc(ELAN_MESSAGE_SIZE);
-    
-    env->setMsgtype(ForChareMsg);
-    env->setTotalsize(tsize);
-    env->setPriobits(prioBits);
-    env->setPacked(0);
-    _SET_USED(env, 0);
-    
-   CMI_MSG_TYPE(env) = 1;
-  }
-  else 
-#endif 
-    env = _allocEnv(ForChareMsg, msgBytes, prioBits);
+  env = _allocEnv(ForChareMsg, msgBytes, prioBits);
   
   env->setQueueing(_defaultQueueing);
   env->setMsgIdx(msgIdx);
@@ -68,31 +37,8 @@ void* CkAllocBuffer(void *msg, int bufsize)
   bufsize = ALIGN(bufsize);
   register envelope *env = UsrToEnv(msg);
   register envelope *packbuf;
-
-#if CONVERSE_VERSION_ELAN
-  register int tsize = sizeof(envelope) + ALIGN(bufsize) 
-    + sizeof(int)*PW(env->getPriobits());
-  
-  if(tsize < ELAN_MESSAGE_SIZE) {
-    if(!CqsEmpty(localMsgBuf)) {
-      //      CkPrintf("Getting message from queue\n");
-      CqsDequeue(localMsgBuf, (void **)&packbuf);
-    }
-    else 
-      packbuf = (envelope *)CmiAlloc(ELAN_MESSAGE_SIZE);
-    
-    packbuf->setMsgtype(env->getMsgtype());
-    packbuf->setTotalsize(tsize);
-    packbuf->setPriobits(env->getPriobits());
-    packbuf->setPacked(0);
-    _SET_USED(packbuf, 0);
-    
-    CMI_MSG_TYPE(packbuf) = 1;
-  }
-  else 
-#endif  
-    packbuf = _allocEnv(env->getMsgtype(), bufsize, 
-			env->getPriobits());
+  packbuf = _allocEnv(env->getMsgtype(), bufsize, 
+                      env->getPriobits());
   
   register int size = packbuf->getTotalsize();
   memcpy(packbuf, env, sizeof(envelope));
@@ -106,14 +52,6 @@ extern "C"
 void  CkFreeMsg(void *msg)
 {
   if (msg!=NULL) {
-#if CONVERSE_VERSION_ELAN
-    register envelope *env = UsrToEnv(msg);
-    if(SIZEFIELD(env) ==  ELAN_MESSAGE_SIZE) {
-      CqsEnqueue(localMsgBuf, env);
-      //      CkPrintf("Returning message to queue\n");    
-    }
-    else
-#endif
       CmiFree(UsrToEnv(msg));
   }
 }
