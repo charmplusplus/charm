@@ -83,11 +83,11 @@ convcore.o: convcore.c $(CVHEADERS)
 	charmc -cwd -c convcore.c
 
 cmk_extras:
-	csh -fc "source conv-mach.csh ; $$CMK_EXTRAS"
+	csh -fc 'source conv-mach.csh ; set echo ; $$CMK_EXTRAS'
 	touch cmk_extras
 
 cmk_clean:
-	csh -fc "source conv-mach.csh ; $$CMK_CLEAN"
+	csh -fc 'source conv-mach.csh ; set echo ; $$CMK_CLEAN'
 	rm -f cmk_extras
 
 ###############################################################################
