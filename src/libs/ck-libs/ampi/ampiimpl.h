@@ -9,7 +9,7 @@
 #define _AMPIIMPL_H
 
 #include "ampi.h"
-#include "ampiQ.h"
+#include "ampiOOQ.h"
 #include "charm++.h"
 #include "EachToManyMulticastStrategy.h" /* for ComlibManager Strategy*/
 #include <string.h> /* for strlen */
@@ -559,40 +559,49 @@ class AmpiMsg : public CMessage_AmpiMsg {
 };
 
 class AmpiSeqQ : private CkNoncopyable {
-  int next;
-  AmpiQ<AmpiMsg*> q;
- public:
-  AmpiSeqQ() { init(); }
-  void init(void) { next = 0; }
-  AmpiMsg *get(void)
+  int *next;
+  AmpiOOQ<AmpiMsg*> q;
+  int seqEntries;
+  
+  public:
+  
+  AmpiSeqQ () {}
+ 
+  AmpiSeqQ(int p) { init(p); }
+  
+  ~AmpiSeqQ () { delete [] next; }
+  
+  void init(int p) {
+    seqEntries = p;
+    q.init (p);
+    next = new int [p]; 
+    for (int i=0; i<p; i++)
+      next [i] = 0;
+  }
+  
+  AmpiMsg *get(int p)
   {
-    if(q.isEmpty() || (q[0]->seq != next)) {
+    if(q.isEmpty(p) || ((q.peek(p,0))->seq != next [p])) {
       return 0;
     }
-    next++;
-    return q.deq();
+    next [p]++;
+    return q.deq(p);
   }
-  void put(int seq, AmpiMsg *elt)
+  void put(int p, int seq, AmpiMsg *elt)
   {
     int i, len;
-    len = q.length();
+    len = q.length(p);
     for(i=0;i<len;i++) {
-      if(q[i]->seq > seq)
+      if((q.peek(p,i))->seq > seq)
         break;
     }
     if (i>1000) CkAbort("Logic error in AmpiSeqQ::put");
-    q.insert(i, elt);
+    q.insert(p, i, elt);
   }
   void pup(PUP::er &p) {
-    p(next);
-    int len = q.length();
-    p(len);
-    for(int i=0;i<len;i++) {
-     if(p.isUnpacking())
-       q.enq(AmpiMsg::pup(p,0));
-     else
-       AmpiMsg::pup(p, q[i]);
-    }
+    p|seqEntries;
+    p(next,seqEntries);
+    p|q;
   }
 };
 
@@ -871,7 +880,7 @@ class ampi : public CBase_ampi {
 
     int seqEntries; //Number of elements in below arrays
     int *nextseq;
-    AmpiSeqQ *oorder;
+    AmpiSeqQ oorder;
     void inorder(AmpiMsg *msg);
 
     void init(void);

@@ -683,11 +683,10 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
   nbcasts = 0;
 
   seqEntries=parent->numElements;
-  oorder = new AmpiSeqQ[seqEntries];
+  oorder.init (seqEntries);
   nextseq = new int[seqEntries];
   for(int i=0;i<seqEntries;i++) {
     nextseq[i] = 0;
-    oorder[i].init();
   }
 }
 
@@ -727,16 +726,14 @@ void ampi::pup(PUP::er &p)
   p|seqEntries;
   if(p.isUnpacking())
   {
-    oorder = new AmpiSeqQ[seqEntries];
     nextseq = new int[seqEntries];
   }
-  for(int i=0; i<seqEntries; i++) p | oorder[i];
+  p | oorder;
   p(nextseq, seqEntries);
 }
 
 ampi::~ampi()
 {
-  delete[] oorder;
   delete[] nextseq;
   CmmFree(msgs);
 }
@@ -1123,8 +1120,8 @@ MSG_ORDER_DEBUG(
 //	AmpiMsg *msgcopy = msg;
   if(msg->seq != -1) {
     int srcIdx = msg->srcIdx;
-    oorder[srcIdx].put(msg->seq, msg);
-    while((msg=oorder[srcIdx].get())!=0) {
+    oorder.put(srcIdx,msg->seq, msg);
+    while((msg=oorder.get(srcIdx))!=0) {
       inorder(msg);
     }
   } else { //Cross-world or system messages are unordered
