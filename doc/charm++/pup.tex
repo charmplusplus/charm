@@ -1,11 +1,11 @@
 \subsection{PUP}
 \label{sec:pup}
 
-The \index{PUP} PUP framework is a generic way to describe the data in an object.
+The \index{PUP} PUP framework is a generic way to describe the data in an object and to use that description for any task requiring serialization.
 The \charmpp\ system can use this description to pack the object 
 into a message, and unpack the message into a new object on another 
-processor.
-The name thus is a contraction of the words Pack and UnPack (PUP).
+processor. 
+The name thus is a contraction of the words Pack and UnPack (PUP). 
 
 Like many \CC\ concepts, the PUP framework is easier to use than 
 describe: 
@@ -45,12 +45,36 @@ simple run of bytes
 by calling the \kw{PUP::er} with a ``void *'' and number of bytes
 (bytes, however, prevents cross-platform operation).
 
+
+\subsubsection{Using PUPs}
+\label{sec:pupmodes}
+
 The system uses the one pup routine to do both packing and unpacking by
 passing different types of \kw{PUP::er}s to it.  You can determine
 what type of \kw{PUP::er} has been passed to you with the
 \kw{p.isPacking()}, \kw{p.isUnpacking()}, and \kw{p.isSizing()} methods.
 The \kw{p.isDeleting()} method returns true if the pupped object
 will be deleted after packing.
+
+Your \kw{PUP::er} will be called in one of the modes (i.e. packing,
+unpacking, deleting, sizing) at various points in its usage.  It must
+support the behavior correct for your data fields in all modes in
+which you expect the \kw{PUP::er} to be used.  Note that packing and
+unpacking are used in migration and parameter marshalling and
+therefore must be supported if you intend to use those features.
+Simple data types, and objects with their own
+\kw{PUP::er} methods, are handled automatically for you in the ``p|a''
+syntax.  Complex types, particularly dynamically allocated data types,
+usually require special attention. Typically this only requires
+conditional blocks for
+\kw{p.isPacking()} and
+\kw{p.isUnpacking()} where you perform the appropriate allocation and deallocation.  See Section~\ref{sec:pupdynalloc} for more
+information and examples.   
+
+
+
+\paragraph{PUP overhead}
+\label{sec:pupoverhead}
 
 Note that the same data must be passed to the \kw{PUP::er} 
 in the same order regardless of the pack direction.
@@ -63,6 +87,10 @@ normally a simple memory-to-memory binary copy.
 The pup syntax ``p\verb.|.a'' normally results in a call to a's pup routine. 
 Note that this syntax is also used by parameter marshalling and copying readonly
 variables.
+
+\paragraph{PUPs for STL}
+\label{sec:pupstl}
+
 If the variable a is from the C++ Standard Template Library, you must include the 
 operator\verb.|.'s for STL types by including the header ``pup\_stl.h''.
 If a is from some class \uw{myClass} that does not have a pup routine, you will 
@@ -84,6 +112,8 @@ operator\verb.|. might look like:
 
 \end{itemize}
 
+\paragraph{PUP structured dagger}
+\label{sec:pupsdag}
 
 Please note that if your object contains Structured Dagger code (see section ``Structured Dagger'') you must call the generated routine \kw{\_\_sdag\_pup} to correctly pup the Structured Dagger state:
 
@@ -134,6 +164,7 @@ seeking, or write custom \kw{PUP::er}s. Using the \CC\
 interface is recommended.
 
 \subsubsection{Dynamic Allocation}
+\label{sec:pupdynalloc}
 
 If your class has fields that are dynamically allocated, when unpacking
 these need to be allocated (in the usual way) before you pup them.
