@@ -1017,8 +1017,8 @@ static void InternalPrintf(const char *f, va_list l)
   CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
-  	  ctrl_sendone_locking("printsyn", buffer,strlen(buffer)+1,NULL,0);
 	  CmiCommLock();
+  	  ctrl_sendone_nolock("printsyn", buffer,strlen(buffer)+1,NULL,0);
   	  ChMessage_recv(Cmi_charmrun_fd,&replymsg);
   	  ChMessage_free(&replymsg);
 	  CmiCommUnlock();
