@@ -66,11 +66,13 @@ messages can be executed in an "immediate" fashion when they are received
 either by an interrupt(Network version) or by a communication 
 thread(SMP version). Such messages can be useful for 
 implementing multicasts/reductions as well as data lookup, in which case 
-processing of critical messages won't be blocked by some entry functions that
-could take long time to finish. Immediate entry methods should be reentrant,
-and it cannot depend on any processor private data. 
-It is user's responsibility to use lock to protect critical data. 
-Function \kw{CmiPollImmediateMsg()} can be called in users code to 
+processing of critical messages won't be delayed (in the scheduler queue) 
+by entry functions that could take long time to finish. Using immediate
+messages currently is tricky. Immediate entry 
+methods should be reentrant, and it cannot depend on any processor 
+private data. Immediate array messages cannot be sent to a nonexisting array
+element. Also, it is user's responsibility to use lock to protect critical 
+data. Function \kw{CmiProbeImmediateMsg()} can be called in users code to 
 probe and process immediate messages periodically.
 
 
