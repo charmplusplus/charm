@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.26  1997-07-29 16:09:48  milind
+ * Revision 2.27  1997-08-01 22:38:50  milind
+ * Fixed gatherflat problem.
+ * Also fixed optimization flags.
+ *
+ * Revision 2.26  1997/07/29 16:09:48  milind
  * Added CmiNodeLock macros and functions to the machine layer for all except
  * solaris SMP.
  *
@@ -180,14 +184,14 @@ CmiNotifyIdle()
 {
 }
 
-CmiNodeLock_t CmiCreateLock(void)
+CmiNodeLock CmiCreateLock(void)
 {
-  CmiNodeLock_t *plock = (CmiNodeLock_t *)malloc(sizeof(CmiNodeLock_t));
+  CmiNodeLock *plock = (CmiNodeLock *)malloc(sizeof(CmiNodeLock));
   cps_mutex_alloc(*plock);
   return *plock;
 }
 
-int CmiProbeLock(CmiNodeLock_t lock)
+int CmiProbeLock(CmiNodeLock lock)
 {
   if(cps_mutex_trylock(lock) == 0){
     cps_mutex_unlock(lock);

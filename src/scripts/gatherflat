@@ -1,5 +1,7 @@
 #!/bin/sh
 
+if [ -d $1 ] ; then
+
 SRC=`(cd $1 ; pwd)`
 DST=$2
 
@@ -9,3 +11,5 @@ if [ ! -d $DST ] ; then mkdir $DST ; fi
 awk '{print "ln -s '$SRC'"$1" '$DST'";}' < temp.f > temp.l
 sh temp.l
 rm -f temp.d temp.l
+
+fi
