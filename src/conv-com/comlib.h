@@ -4,6 +4,7 @@
 
 #include <converse.h>
 #include <stdlib.h>
+#include <math.h>
 #include "charm++.h"
 
 #if CMK_BLUEGENE_CHARM
