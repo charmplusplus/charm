@@ -368,7 +368,11 @@ extern double cpu_speed_factor;
 static __inline__ unsigned long long int rdtsc(void)
 {
         unsigned long long int x;
+#ifdef CMK_IA64
+	__asm__ __volatile__("mov %0=ar.itc" : "=r"(x) :: "memory");
+#else
         __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
+#endif
         return x;
 }
 
