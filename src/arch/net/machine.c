@@ -188,6 +188,10 @@
 #include <stdarg.h> /*<- was <varargs.h>*/
 #include <string.h>
 
+#if CMK_USE_POLL
+#include <poll.h>
+#endif
+
 #include "conv-ccs.h"
 #include "ccs-server.h"
 #include "sockRoutines.h"
@@ -1024,6 +1028,7 @@ static int dataskt_ready_write;
 
 int CheckSocketsReady(int withDelayMs)
 {
+#if !CMK_USE_POLL
   static fd_set rfds; 
   static fd_set wfds; 
   struct timeval tmo;
@@ -1051,6 +1056,36 @@ int CheckSocketsReady(int withDelayMs)
   	dataskt_ready_read = (FD_ISSET(dataskt, &rfds));
   	dataskt_ready_write = (FD_ISSET(dataskt, &wfds));
   }
+#else
+  struct pollfd fds[3]; int n = 0;
+  int nreadable;
+  if (Cmi_charmrun_fd!=-1) {
+    fds[n].fd = Cmi_charmrun_fd;
+    fds[n].events = POLLIN;
+    n++;
+  }
+  if (dataskt!=-1) {
+    fds[n].fd = dataskt;
+    fds[n].events = POLLIN | POLLOUT;
+    n++;
+  }
+  nreadable = poll(fds, n, withDelayMs);
+  if (nreadable <= 0) {
+    ctrlskt_ready_read = 0;
+    dataskt_ready_read = 0;
+    dataskt_ready_write = 0;
+    return nreadable;
+  }
+  if (dataskt!=-1) {
+    n--;
+    dataskt_ready_read = fds[n].revents & POLLIN;
+    dataskt_ready_write = fds[n].revents & POLLOUT;
+  }
+  if (Cmi_charmrun_fd!=-1) {
+    n--;
+    ctrlskt_ready_read = fds[n].revents & POLLIN;
+  }
+#endif
   return nreadable;
 }
 /******************************************************************************
@@ -2644,6 +2679,7 @@ void CmiNotifyIdle(void)
   struct timeval tv;
 #if CMK_SHARED_VARS_UNAVAILABLE
   /*No comm. thread-- listen on sockets for incoming messages*/
+#if !CMK_USE_POLL
   static fd_set rfds;
   static fd_set wfds;
   tv.tv_sec=0; tv.tv_usec=5000;
@@ -2656,6 +2692,22 @@ void CmiNotifyIdle(void)
       FD_SET(dataskt, &wfds); /*Outgoing queue is nonempty*/
   }
   select(FD_SETSIZE,&rfds,&wfds,0,&tv);
+#else
+  struct pollfd fds[2]; int n = 0;
+  int nreadable;
+  if (Cmi_charmrun_fd!=-1) {
+    fds[n].fd = Cmi_charmrun_fd;
+    fds[n].events = POLLIN;
+    n++;
+  }
+  if (dataskt!=-1) {
+    fds[n].fd = dataskt;
+    fds[n].events = POLLIN;
+    if (writeableDgrams || writeableAcks)  fds[n].events |= POLLOUT;
+    n++;
+  }
+  poll(fds, n, 5);
+#endif
   if (Cmi_netpoll) CommunicationServer(5);
 #else
   /*Comm. thread will listen on sockets-- just sleep*/
