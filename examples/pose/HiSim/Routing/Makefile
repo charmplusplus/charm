@@ -1,39 +1,30 @@
 OPTS=-g -Dcompile #-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
 
-CHARMBASE=../../../../
-CHARMBIN=$(CHARMBASE)/bin
-CHARMINC=$(CHARMBASE)/include
-
-CHARMC=$(CHARMBIN)/charmc -I$(CHARMINC)/pose $(OPTS) 
+include ../Makefile.common
 
 LIBS=-Lstdc++ -lm
 
-RedStorm: DirectionOrdered3D.o
-	cp DirectionOrdered3D.o ../tmp
+RedStorm: $(OBJDIR)/DirectionOrdered3D.o
 
-HypCubeArch: HammingDistance.o
-	cp HammingDistance.o ../tmp
+HypCubeArch: $(OBJDIR)/HammingDistance.o
 
-BlueGene: TorusRouting.o
-	cp TorusRouting.o ../tmp
+BlueGene: $(OBJDIR)/TorusRouting.o
 
-IB: UpDown.o
-	cp UpDown.o ../tmp
+IB: $(OBJDIR)/UpDown.o
 
-OB: UpDown.o
-	cp UpDown.o ../tmp
+OB: $(OBJDIR)/UpDown.o
 
-DirectionOrdered3D.o: DirectionOrdered3D.C DirectionOrdered3D.h
-	$(CHARMC) -o DirectionOrdered3D.o -seq DirectionOrdered3D.C -I$(MACHINE)
+$(OBJDIR)/DirectionOrdered3D.o: DirectionOrdered3D.C DirectionOrdered3D.h
+	$(CHARMC) -o $@ -seq DirectionOrdered3D.C -I$(MACHINE)
 
-HammingDistance.o: HammingDistance.C HammingDistance.h
-	$(CHARMC) -o HammingDistance.o -seq HammingDistance.C -I$(MACHINE)
+$(OBJDIR)/HammingDistance.o: HammingDistance.C HammingDistance.h
+	$(CHARMC) -o $@ -seq HammingDistance.C -I$(MACHINE)
 
-TorusRouting.o: TorusRouting.C TorusRouting.h
-	$(CHARMC) -o TorusRouting.o -seq TorusRouting.C -I$(MACHINE)
+$(OBJDIR)/TorusRouting.o: TorusRouting.C TorusRouting.h
+	$(CHARMC) -o $@ -seq TorusRouting.C -I$(MACHINE)
 
-UpDown.o: UpDown.C UpDown.h
-	$(CHARMC) -o UpDown.o -seq UpDown.C -I$(MACHINE)
+$(OBJDIR)/UpDown.o: UpDown.C UpDown.h
+	$(CHARMC) -o $@ -seq UpDown.C -I$(MACHINE)
 
 clean:
 	rm -f charmrun conv-host *.o

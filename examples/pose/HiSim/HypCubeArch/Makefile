@@ -14,11 +14,7 @@
 # *******************************************************
 OPTS=-g#-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
 
-CHARMBASE=../../../../
-CHARMBIN=$(CHARMBASE)/bin
-CHARMINC=$(CHARMBASE)/include
-
-CHARMC=$(CHARMBIN)/charmc -I$(CHARMINC)/pose $(OPTS)
+include ../Makefile.common
 
 # Default Location variables
 # **************************

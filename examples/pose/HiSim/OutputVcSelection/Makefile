@@ -1,39 +1,30 @@
 OPTS=-g -Dcompile #-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
 
-CHARMBASE=../../../../
-CHARMBIN=$(CHARMBASE)/bin
-CHARMINC=$(CHARMBASE)/include
-
-CHARMC=$(CHARMBIN)/charmc -I$(CHARMINC)/pose $(OPTS) 
+include ../Makefile.common
 
 LIBS=-Lstdc++ -lm
 
-RedStorm: maxAvailBuffer.o
-	cp maxAvailBuffer.o ../tmp
+RedStorm: $(OBJDIR)/maxAvailBuffer.o
 
-HypCubeArch: maxAvailBuffer.o  
-	cp maxAvailBuffer.o ../tmp
+HypCubeArch: $(OBJDIR)/maxAvailBuffer.o  
 
-BlueGene: maxAvailBufferBubbleVc.o
-	cp maxAvailBufferBubbleVc.o ../tmp
+BlueGene: $(OBJDIR)/maxAvailBufferBubbleVc.o
 
-IB: maxAvailBufferSwitch.o
-	cp maxAvailBufferSwitch.o ../tmp
+IB: $(OBJDIR)/maxAvailBufferSwitch.o
 
-OB: outputBuffer.o
-	cp outputBuffer.o ../tmp
+OB: $(OBJDIR)/outputBuffer.o
 
-maxAvailBuffer.o: maxAvailBuffer.C maxAvailBuffer.h
-	$(CHARMC) -o maxAvailBuffer.o -seq maxAvailBuffer.C -I$(MACHINE)
+$(OBJDIR)/maxAvailBuffer.o: maxAvailBuffer.C maxAvailBuffer.h
+	$(CHARMC) -o $@ -seq maxAvailBuffer.C -I$(MACHINE)
 
-maxAvailBufferBubbleVc.o: maxAvailBufferBubbleVc.C maxAvailBufferBubbleVc.h
-	$(CHARMC) -o maxAvailBufferBubbleVc.o -seq maxAvailBufferBubbleVc.C -I$(MACHINE)
+$(OBJDIR)/maxAvailBufferBubbleVc.o: maxAvailBufferBubbleVc.C maxAvailBufferBubbleVc.h
+	$(CHARMC) -o $@ -seq maxAvailBufferBubbleVc.C -I$(MACHINE)
 
-maxAvailBufferSwitch.o: maxAvailBufferSwitch.C maxAvailBufferSwitch.h
-	$(CHARMC) -o maxAvailBufferSwitch.o -seq maxAvailBufferSwitch.C -I$(MACHINE)
+$(OBJDIR)/maxAvailBufferSwitch.o: maxAvailBufferSwitch.C maxAvailBufferSwitch.h
+	$(CHARMC) -o $@ -seq maxAvailBufferSwitch.C -I$(MACHINE)
 	
-outputBuffer.o: outputBuffer.C outputBuffer.h
-	$(CHARMC) -o outputBuffer.o -seq outputBuffer.C -I$(MACHINE)
+$(OBJDIR)/outputBuffer.o: outputBuffer.C outputBuffer.h
+	$(CHARMC) -o $@ -seq outputBuffer.C -I$(MACHINE)
 
 clean:
 	rm -f charmrun conv-host *.o

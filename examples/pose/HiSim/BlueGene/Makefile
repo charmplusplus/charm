@@ -14,11 +14,7 @@
 # *******************************************************
 OPTS=-g#-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
 
-CHARMBASE=../../../../
-CHARMBIN=$(CHARMBASE)/bin
-CHARMINC=$(CHARMBASE)/include
-
-CHARMC=$(CHARMBIN)/charmc -I$(CHARMINC)/pose $(OPTS)
+include ../Makefile.common
 
 # Default Location variables
 # **************************
@@ -43,22 +39,27 @@ OTHER = -lconv-bluegene-logs
 LIBS = -Lstdc++ -lm
 MACHINE = BlueGene
 
-all:
+all:  
 	@echo
+	test -d ../tmp || mkdir ../tmp;
 	for i in $(SUBDIRS) ; do \
 	( cd $$i ; $(MAKE) $(MACHINE) MACHINE="../$(MACHINE)" ) || exit 1; \
 	done
 
-	$(CHARMC) -o InitNetwork.o -seq InitNetwork.C -I../Main -I./
-	$(CHARMC) -o util.o -seq util.C
-	test -d ../tmp || mkdir ../tmp; cp *.o ../tmp
+	make $(OBJDIR)/InitNetwork.o  $(OBJDIR)/util.o
 
 	cd ../tmp; /bin/rm -f moduleinit.o; $(CHARMC) *.o $(OTHER) $(LIBS) -o $(PGM) -lpose -ltrace-projections -language charm++ -module commlib
+
+$(OBJDIR)/InitNetwork.o: InitNetwork.C
+	$(CHARMC) -o $@ -seq InitNetwork.C -I../Main -I./
+
+$(OBJDIR)/util.o: util.C
+	$(CHARMC) -o $@ -seq util.C
 
 clean:
 	@echo
 	for i in $(SUBDIRS) ; do \
 	( cd $$i ; $(MAKE) clean ) ; \
 	done
-	cd ../tmp; rm -f *.o; rm -f charmrun; rm -f module*; rm -f $(PGM)
+	-cd ../tmp; rm -f *.o; rm -f charmrun; rm -f module*; rm -f $(PGM)
 	rm -f *.o
