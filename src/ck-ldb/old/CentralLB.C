@@ -11,27 +11,12 @@
 #include "CentralLB.def.h"
 
 CkGroupID loadbalancer;
-char ** avail_vector_address;
-int * lb_ptr;
-int load_balancer_created;
 
 #if CMK_LBDB_ON
 
 void CreateCentralLB()
 {
   loadbalancer = CProxy_CentralLB::ckNew();
-}
-
-void set_avail_vector(char * bitmap){
-    int count;
-    int assigned = 0;
-    for(count = 0; count < CkNumPes(); count++){
-	(*avail_vector_address)[count] = bitmap[count];
-	if((bitmap[count] == 1) && !assigned){
-	    *lb_ptr = count;
-	    assigned = 1;
-	}
-    }   
 }
 
 void CentralLB::staticMigrated(void* data, LDObjHandle h)
@@ -51,7 +36,6 @@ void CentralLB::staticAtSync(void* data)
 CentralLB::CentralLB()
 {
   mystep = 0;
-  //  CkPrintf("Construct in %d\n",CkMyPe());
   theLbdb = CProxy_LBDatabase(lbdb).ckLocalBranch();
   theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),(void*)(this));
@@ -68,17 +52,6 @@ CentralLB::CentralLB()
   theLbdb->CollectStatsOn();
   migrates_completed = 0;
   migrates_expected = -1;
-
-  cur_ld_balancer = 0;
-  new_ld_balancer = 0;
-  int num_proc = CkNumPes();
-  avail_vector = new char[num_proc];
-  for(int proc = 0; proc < num_proc; proc++)
-      avail_vector[proc] = 1;
-  avail_vector_address = &(avail_vector);
-  lb_ptr = &new_ld_balancer;
-
-  load_balancer_created = 1;
 }
 
 CentralLB::~CentralLB()
@@ -95,10 +68,10 @@ void CentralLB::AtSync()
     return;
   }
 
-  if (CkMyPe() == cur_ld_balancer) {
+  if (CkMyPe() == 0) {
     start_lb_time = CmiWallTimer();
-    CkPrintf("Load balancing step %d starting at %f in %d\n",
-    	     step(),start_lb_time, cur_ld_balancer);
+    CkPrintf("Load balancing step %d starting at %f\n",
+	     step(),start_lb_time);
   }
   // Send stats
   int sizes[2];
@@ -124,20 +97,9 @@ void CentralLB::AtSync()
   msg->n_comm = csz;
   theLbdb->GetCommData(msg->commData);
   theLbdb->ClearLoads();
-  CkPrintf("PE %d sending %d to ReceiveStats %d objs, %d comm\n",
-  	   CkMyPe(),msg->serial,msg->n_objs,msg->n_comm);
-
-  // Scheduler PART.
-
-  if(CkMyPe() == 0){
-      int num_proc = CkNumPes();
-      for(int proc = 0; proc < num_proc; proc++){
-	  msg->avail_vector[proc] = avail_vector[proc];
-      } 
-      msg->next_lb = new_ld_balancer;
-  }
-
-  CProxy_CentralLB(thisgroup).ReceiveStats(msg,cur_ld_balancer);
+  //  CkPrintf("PE %d sending %d to ReceiveStats %d objs, %d comm\n",
+  //	   CkMyPe(),msg->serial,msg->n_objs,msg->n_comm);
+  CProxy_CentralLB(thisgroup).ReceiveStats(msg,0);
 }
 
 void CentralLB::Migrated(LDObjHandle h)
@@ -153,16 +115,8 @@ void CentralLB::Migrated(LDObjHandle h)
 void CentralLB::ReceiveStats(CLBStatsMsg *m)
 {
   const int pe = m->from_pe;
-  CkPrintf("Stats msg received, %d %d %d %d %p\n",
-  	   pe,stats_msg_count,m->n_objs,m->serial,m);
-
-  if((pe == 0) && (CkMyPe() != 0)){
-      new_ld_balancer = m->next_lb;
-      int num_proc = CkNumPes();
-      for(int proc = 0; proc < num_proc; proc++)
-	  avail_vector[proc] = m->avail_vector[proc]; 
-  }
-
+  //  CkPrintf("Stats msg received, %d %d %d %d %p\n",
+  //	   pe,stats_msg_count,m->n_objs,m->serial,m);
   if (statsMsgsList[pe] != 0) {
     CkPrintf("*** Unexpected CLBStatsMsg in ReceiveStats from PE %d ***\n",
 	     pe);
@@ -187,23 +141,8 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
   const int clients = CkNumPes();
   if (stats_msg_count == clients) {
     double strat_start_time = CmiWallTimer();
-
-    CkPrintf("Before setting bitmap\n");
-    for(int proc = 0; proc < clients; proc++)
-      statsDataList[proc].available = avail_vector[proc];
     
-    CkPrintf("Before Calling Strategy\n");
-
     CLBMigrateMsg* migrateMsg = Strategy(statsDataList,clients);
-
-    CkPrintf("returned successfully\n");
-    int num_proc = CkNumPes();
-
-    for(int proc = 0; proc < num_proc; proc++)
-	migrateMsg->avail_vector[proc] = avail_vector[proc];
-    migrateMsg->next_lb = new_ld_balancer;
-
-    CkPrintf("calling recv migration\n");
     CProxy_CentralLB(thisgroup).ReceiveMigration(migrateMsg);
 
     // Zero out data structures for next cycle
@@ -213,34 +152,26 @@ void CentralLB::ReceiveStats(CLBStatsMsg *m)
     }
     stats_msg_count=0;
     double strat_end_time = CmiWallTimer();
-    //    CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
+    CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
   }
   
 }
 
 void CentralLB::ReceiveMigration(CLBMigrateMsg *m)
 {
-  CkPrintf("[%d] in ReceiveMigration %d moves\n",CkMyPe(),m->n_moves);
+  //  CkPrintf("[%d] in ReceiveMigration %d moves\n",CkMyPe(),m->n_moves);
   migrates_expected = 0;
   for(int i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
     const int me = CkMyPe();
     if (move.from_pe == me && move.to_pe != me) {
-	//      CkPrintf("[%d] migrating object to %d\n",move.from_pe,move.to_pe);
+      //      CkPrintf("[%d] migrating object to %d\n",move.from_pe,move.to_pe);
       theLbdb->Migrate(move.obj,move.to_pe);
     } else if (move.from_pe != me && move.to_pe == me) {
-	//  CkPrintf("[%d] expecting object from %d\n",move.to_pe,move.from_pe);
+      //      CkPrintf("[%d] expecting object from %d\n",move.to_pe,move.from_pe);
       migrates_expected++;
     }
   }
-  
-  cur_ld_balancer = m->next_lb;
-  if((CkMyPe() == cur_ld_balancer) && (cur_ld_balancer != 0)){
-      int num_proc = CkNumPes();
-      for(int proc = 0; proc < num_proc; proc++)
-	  avail_vector[proc] = m->avail_vector[proc];
-  }
-
   if (migrates_expected == 0 || migrates_completed == migrates_expected)
     MigrationDone();
   delete m;
@@ -249,7 +180,7 @@ void CentralLB::ReceiveMigration(CLBMigrateMsg *m)
 
 void CentralLB::MigrationDone()
 {
-  if (CkMyPe() == cur_ld_balancer) {
+  if (CkMyPe() == 0) {
     double end_lb_time = CmiWallTimer();
     CkPrintf("Load balancing step %d finished at %f duration %f\n",
 	     step(),end_lb_time,end_lb_time - start_lb_time);
@@ -263,7 +194,7 @@ void CentralLB::MigrationDone()
 
 void CentralLB::ResumeClients()
 {
-  CkPrintf("Resuming clients on PE %d\n",CkMyPe());
+  //  CkPrintf("Resuming clients on PE %d\n",CkMyPe());
   theLbdb->ResumeClients();
 }
 
@@ -321,10 +252,64 @@ CLBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
   return msg;
 }
 
+void CentralLB::dumpLDStats(CentralLB::LDStats* statsList, char *file)
+{
+  FILE *fp = fopen(file, "wb");
+  if (fp == NULL){
+     perror("dumpLDStats");
+     return;
+  }
+  for (int i=0; i<CkNumPes(); i++) 
+  {
+     fwrite(&statsList[i], sizeof(LDStats), 1, fp);
+     fwrite(statsList[i].objData, sizeof(LDObjData), statsList[i].n_objs, fp);
+     fwrite(statsList[i].commData, sizeof(LDCommData), statsList[i].n_comm, fp);
+  }
+  fclose(fp);
+}
+
+CentralLB::LDStats* CentralLB::loadLDStats(char *file, int pe)
+{
+  unsigned int nread;
+  FILE *fp = fopen(file, "rb");
+  if (fp == NULL){
+     perror("loadLDStats");
+     return NULL;
+  }
+  LDStats* statsList = new LDStats[pe];
+  for (int i=0; i<pe; i++) 
+  {
+    if (fread(&statsList[i], sizeof(LDStats), 1, fp) < sizeof(LDStats)) {
+      if (ferror(fp)) {
+	perror("loadLDStats"); 
+	return NULL;
+      }
+    }
+    statsList[i].objData = new LDObjData[statsList[i].n_objs];
+    if (statsList[i].n_objs) {
+      nread = fread(statsList[i].objData, sizeof(LDObjData), statsList[i].n_objs, fp);
+      if (nread < statsList[i].n_objs*sizeof(LDObjData) && ferror(fp)) { 
+	perror("loadLDStats"); 
+	return NULL; 
+      }
+    }
+    statsList[i].commData = new LDCommData[statsList[i].n_comm];
+    if (statsList[i].n_comm) {
+      nread = fread(statsList[i].commData, sizeof(LDCommData), statsList[i].n_comm, fp); 
+      if (nread < statsList[i].n_comm*sizeof(LDCommData) && ferror(fp)) { 
+	perror("loadLDStats"); 
+	return NULL; 
+      }
+    }
+    fclose(fp);
+  }
+  return statsList;
+}
+
 void* CLBStatsMsg::alloc(int msgnum, size_t size, int* array, int priobits)
 {
   int totalsize = size + array[0] * sizeof(LDObjData) 
-    + array[1] * sizeof(LDCommData) + CkNumPes() * sizeof(char);
+    + array[1] * sizeof(LDCommData);
 
   CLBStatsMsg* ret =
     (CLBStatsMsg*)(CkAllocMsg(msgnum,totalsize,priobits));
@@ -332,9 +317,7 @@ void* CLBStatsMsg::alloc(int msgnum, size_t size, int* array, int priobits)
   ret->objData = (LDObjData*)(((char*)(ret) + size));
   ret->commData = (LDCommData*)(ret->objData + array[0]);
 
-  ret->avail_vector = reinterpret_cast<char *>(ret->commData + array[1]);
-
-  return static_cast<void*>(ret);
+  return (void*)(ret);
 }
 
 void* CLBStatsMsg::pack(CLBStatsMsg* m)
@@ -342,13 +325,8 @@ void* CLBStatsMsg::pack(CLBStatsMsg* m)
   m->objData = 
     (LDObjData*)((char*)(m->objData) - (char*)(&m->objData));
   m->commData = 
-    reinterpret_cast<LDCommData*>(reinterpret_cast<char*>(m->commData)
-      - reinterpret_cast<char*>(&m->commData));
-
-  m->avail_vector =reinterpret_cast<char*>(m->avail_vector
-      - reinterpret_cast<char*>(&m->avail_vector));
-
-  return static_cast<void*>(m);
+    (LDCommData*)((char*)(m->commData) - (char*)(&m->commData));
+  return (void*)(m);
 }
 
 CLBStatsMsg* CLBStatsMsg::unpack(void *m)
@@ -358,37 +336,26 @@ CLBStatsMsg* CLBStatsMsg::unpack(void *m)
   ret_val->objData = 
     (LDObjData*)((char*)(&ret_val->objData) + (size_t)(ret_val->objData));
   ret_val->commData = 
-    reinterpret_cast<LDCommData*>(reinterpret_cast<char*>(&ret_val->commData)
-	     + reinterpret_cast<size_t>(ret_val->commData));
-
-  ret_val->avail_vector =
-    reinterpret_cast<char*>(reinterpret_cast<char*>(&ret_val->avail_vector)
-			    +reinterpret_cast<size_t>(ret_val->avail_vector));
-
+    (LDCommData*)((char*)(&ret_val->commData) + (size_t)(ret_val->commData));
   return ret_val;
 }
 
 void* CLBMigrateMsg::alloc(int msgnum, size_t size, int* array, int priobits)
 {
-  int totalsize = size + array[0] * sizeof(CentralLB::MigrateInfo) 
-    + CkNumPes() * sizeof(char);
+  int totalsize = size + array[0] * sizeof(CentralLB::MigrateInfo);
 
   CLBMigrateMsg* ret =
     (CLBMigrateMsg*)(CkAllocMsg(msgnum,totalsize,priobits));
 
   ret->moves = (CentralLB::MigrateInfo*) ((char*)(ret)+ size);
 
-  ret->avail_vector = reinterpret_cast<char *>(ret->moves + array[0]);
-  return static_cast<void*>(ret);
+  return (void*)(ret);
 }
 
 void* CLBMigrateMsg::pack(CLBMigrateMsg* m)
 {
-  m->moves = reinterpret_cast<CentralLB::MigrateInfo*>
-    (reinterpret_cast<char*>(m->moves) - reinterpret_cast<char*>(&m->moves));
-
-  m->avail_vector =reinterpret_cast<char*>(m->avail_vector
-      - reinterpret_cast<char*>(&m->avail_vector));
+  m->moves = (CentralLB::MigrateInfo*)
+    ((char*)(m->moves) - (char*)(&m->moves));
 
   return (void*)(m);
 }
@@ -397,15 +364,27 @@ CLBMigrateMsg* CLBMigrateMsg::unpack(void *m)
 {
   CLBMigrateMsg* ret_val = (CLBMigrateMsg*)(m);
 
-  ret_val->moves = reinterpret_cast<CentralLB::MigrateInfo*>
-    (reinterpret_cast<char*>(&ret_val->moves) 
-     + reinterpret_cast<size_t>(ret_val->moves));
-
-  ret_val->avail_vector =
-    reinterpret_cast<char*>(reinterpret_cast<char*>(&ret_val->avail_vector)
-			    +reinterpret_cast<size_t>(ret_val->avail_vector));
+  ret_val->moves = (CentralLB::MigrateInfo*)
+    ((char*)(&ret_val->moves) + (size_t)(ret_val->moves));
 
   return ret_val;
 }
 
 #endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -14,7 +14,6 @@
 extern CkGroupID loadbalancer;
 
 void CreateCentralLB();
-void set_avail_vector(char * bitmap);
 
 class CLBStatsMsg;
 class CLBMigrateMsg;
@@ -23,6 +22,7 @@ class CentralLB : public Group
 {
 public:
   CentralLB();
+  CentralLB(CkMigrateMessage *m) {}
   ~CentralLB();
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
@@ -38,8 +38,6 @@ public:
 
   void MigrationDone(void);  // Call when migration is complete
   int step() { return mystep; };
-
-  void set_avail_vector(char *new_vector);
 
   struct MigrateInfo {  // Used in CLBMigrateMsg
     LDObjHandle obj;
@@ -67,20 +65,14 @@ public:
 	return Strategy(stats,count);
    };
 
-  int cur_ld_balancer;
-  char *avail_vector;
-  /* for Node 0 */
-  int new_ld_balancer;
-
+   void dumpLDStats(LDStats* statsList, char *file);
+   LDStats* loadLDStats(char *file, int pe);
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CLBMigrateMsg* Strategy(LDStats* stats,int count);
   LBDatabase* theLbdb;
 
 private:  
-
-
-
   int mystep;
   int myspeed;
   int stats_msg_count;
@@ -106,9 +98,6 @@ public:
   int n_comm;
   LDCommData *commData;
 
-  char * avail_vector;
-  int next_lb;
-
   // Other methods & data members 
 
   static void* alloc(int msgnum, size_t size, int* array, int priobits); 
@@ -120,10 +109,7 @@ class CLBMigrateMsg : public CMessage_CLBMigrateMsg {
 public:
   int n_moves;
   CentralLB::MigrateInfo* moves;
-  
-  char * avail_vector;
-  int next_lb;
-  
+
   // Other methods & data members 
 
   static void* alloc(int msgnum, size_t size, int* array, int priobits); 
@@ -132,8 +118,3 @@ public:
 }; 
 
 #endif /* CENTRALLB_H */
-
-
-
-
-
