@@ -28,7 +28,7 @@ INC=../include
 all: charm++ bluegene LIBS AMPI f90charm TSM SM PVM doc
 
 charm++: basics
-	$(MAKE) converse $(L)/libck.a loadbalancers charmxi default_libs
+	$(MAKE) charmxi converse $(L)/libck.a loadbalancers default_libs
 
 bgampi: bluegene AMPI
 
@@ -324,21 +324,6 @@ $(L)/libconv-utilf.a: $(LIBCONV_UTILF)
 $(L)/libccs-client.a: ccs-client.o
 	$(CHARMC) -o $@ ccs-client.o
 
-cpm.o: cpm.c $(CVHEADERS)
-	$(CHARMC) cpm.c
-
-isomalloc.o: isomalloc.c $(CVHEADERS)
-	$(CHARMC) isomalloc.c
-
-convcore.o: convcore.c $(CVHEADERS)
-	$(CHARMC) convcore.c
-
-conv-ccs.o: conv-ccs.c $(CVHEADERS)
-	$(CHARMC) conv-ccs.c
-
-ccs-builtins.o: ccs-builtins.C $(CVHEADERS)
-	$(CHARMC) ccs-builtins.C
-
 ccs-client.o: ccs-client.c $(CVHEADERS)
 	$(CHARMC) ccs-client.c
 
@@ -347,39 +332,6 @@ sockRoutines.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
 
 sockRoutines-seq.o: sockRoutines.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -seq -o sockRoutines-seq.o sockRoutines.c
-
-random.o: random.c $(CVHEADERS)
-	$(CHARMC) random.c
-
-queueing.o: queueing.c $(CVHEADERS)
-	$(CHARMC) queueing.c
-
-conv-conds.o: conv-conds.c $(CVHEADERS)
-	$(CHARMC) conv-conds.c
-
-futures.o: futures.c $(CVHEADERS)
-	$(CHARMC) futures.c
-
-msgmgr.o: msgmgr.c $(CVHEADERS)
-	$(CHARMC) msgmgr.c
-
-cpthreads.o: cpthreads.c $(CVHEADERS)
-	$(CHARMC) cpthreads.c
-
-debug-conv.o: debug-conv.c $(CVHEADERS)
-	$(CHARMC) debug-conv.c
-
-edgelist.o : edgelist.c typedefs.h $(CVHEADERS)
-	$(CHARMC) edgelist.c
-
-generate.o : generate.c typedefs.h $(CVHEADERS)
-	$(CHARMC) generate.c
-
-cldb.o: cldb.c cldb.h $(CVHEADERS)
-	$(CHARMC) cldb.c
-
-quiescence.o: quiescence.c $(CVHEADERS)
-	$(CHARMC) quiescence.c
 
 pup_util.o: pup_util.C $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o pup_util.o pup_util.C
@@ -476,9 +428,6 @@ $(L)/libthreads-fibers.o: threads.c $(CVHEADERS)
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_FIBERS=1 -IQuickThreads threads.c 2> /dev/null
 
 ## Global swapping (-swapglobal)
-global-nop.o: global-nop.c $(CVHEADERS)
-	$(CHARMC) -c global-nop.c -o $@
-
 swapglobal-target: $(L)/libglobal-swap.o
 
 $(L)/libglobal-swap.o: global-elfgot.C $(CVHEADERS)
@@ -544,9 +493,6 @@ TraceSummary.def.h: TraceSummary.decl.h
 
 TraceSummary.decl.h: trace-summary.ci charmxi
 	$(CHARMC) trace-summary.ci
-
-debug-message.o: debug-message.C $(CKHEADERS)
-	$(CHARMC) -I. debug-message.C
 
 CkReduction.def.h: CkReduction.decl.h
 
@@ -815,7 +761,7 @@ LB_OBJ=EveryLB.o \
 
 EveryLB.def.h: EveryLB.decl.h
 
-EveryLB.decl.h: EveryLB.ci $(CVHEADERS)
+EveryLB.decl.h: EveryLB.ci charmxi
 	$(CHARMC) EveryLB.ci
 
 $(L)/libmoduleEveryLB.a: $(LB_OBJ)
@@ -996,14 +942,19 @@ veryclean:
 configure: configure.in
 	-autoconf && autoheader
 
-depends:  
+depends: basics 
 	echo "Creating " $(DEPENDFILE) " ..."; 
 	if [ -f $(DEPENDFILE) ]; then \
            /bin/cp -f $(DEPENDFILE) $(DEPENDFILE).old; \
         fi; \
 	echo > $(DEPENDFILE); \
-        for i in $(LIBCK_CORE) $(LB_OBJ) $(BLUE_OBJS) $(BLUE_IO_OBJS); do \
+        for i in $(LIBCONV_CORE) $(LIBCK_CORE) $(LB_OBJ) $(BLUE_OBJS) $(BLUE_IO_OBJS); do \
 	      [ $$i = "charmProjections.o" ] && continue;	\
+	      [ $$i = "traceCore.o" ] && continue;	\
+	      [ $$i = "traceCoreCommon.o" ] && continue;	\
+	      [ $$i = "converseProjections.o" ] && continue;	\
+	      [ $$i = "machineProjections.o" ] && continue;	\
+	      [ $$i = "trace-common.o" ] && continue;	\
 	      SRCFILE=`basename $$i .o`.C ; \
 	      [ ! -f $$SRCFILE ] && SRCFILE=`basename $$i .o`.c ;	\
               echo "checking dependencies for $$SRCFILE" ; \

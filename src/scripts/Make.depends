@@ -1,7 +1,6 @@
 
-common.o: \
-	trace-common.C \
-	charm.h \
+convcore.o: \
+	convcore.c \
 	converse.h \
 	conv-config.h \
 	conv-common.h \
@@ -17,26 +16,349 @@ common.o: \
 	conv-trace.h \
 	persistent.h \
 	debug-conv.h \
-	pup.h \
-	middle.h \
-	middle-conv.h \
-	cklists.h \
-	trace.h \
-	trace-bluegene.h \
-	trace-common.h \
-	allEvents.h \
-	charmEvents.h \
-	charmProjections.h \
-	traceCoreAPI.h \
+	sockRoutines.h \
+	queueing.h \
+	conv-ccs.h \
+	ccs-server.h \
+	memory-isomalloc.h \
 	converseEvents.h \
+	traceCoreAPI.h \
 	converseProjections.h \
+	traceCoreCommon.h \
 	machineEvents.h \
 	machineProjections.h \
-	traceCore.h \
-	threadEvents.h \
-	traceCoreCommon.h \
-	register.h
-	$(CHARMC) -c trace-common.C
+	quiescence.h \
+	cmibacktrace.c
+	$(CHARMC) -c convcore.c
+
+conv-conds.o: \
+	conv-conds.c \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h
+	$(CHARMC) -c conv-conds.c
+
+queueing.o: \
+	queueing.c \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h \
+	queueing.h
+	$(CHARMC) -c queueing.c
+
+msgmgr.o: \
+	msgmgr.c \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h
+	$(CHARMC) -c msgmgr.c
+
+cpm.o: \
+	cpm.c \
+	queueing.h \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h
+	$(CHARMC) -c cpm.c
+
+cpthreads.o: \
+	cpthreads.c \
+	cpthreads.h \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h
+	$(CHARMC) -c cpthreads.c
+
+futures.o: \
+	futures.c \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h
+	$(CHARMC) -c futures.c
+
+cldb.o: \
+	cldb.c \
+	queueing.h \
+	cldb.h \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h
+	$(CHARMC) -c cldb.c
+
+random.o: \
+	random.c \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h
+	$(CHARMC) -c random.c
+
+debug-conv.o: \
+	debug-conv.c \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h \
+	queueing.h \
+	conv-ccs.h \
+	sockRoutines.h \
+	ccs-server.h
+	$(CHARMC) -c debug-conv.c
+
+generate.o: \
+	generate.c \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h \
+	typedefs.h
+	$(CHARMC) -c generate.c
+
+edgelist.o: \
+	edgelist.c \
+	typedefs.h \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h
+	$(CHARMC) -c edgelist.c
+
+conv-ccs.o: \
+	conv-ccs.c \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h \
+	conv-ccs.h \
+	sockRoutines.h \
+	ccs-server.h \
+	queueing.h \
+	ckhashtable.h
+	$(CHARMC) -c conv-ccs.c
+
+ccs-builtins.o: \
+	ccs-builtins.C \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h \
+	ckhashtable.h \
+	pup.h \
+	debug-charm.h \
+	conv-ccs.h \
+	sockRoutines.h \
+	ccs-server.h \
+	queueing.h
+	$(CHARMC) -c ccs-builtins.C
+
+quiescence.o: \
+	quiescence.c \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h \
+	quiescence.h
+	$(CHARMC) -c quiescence.c
+
+isomalloc.o: \
+	isomalloc.c \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h \
+	memory-isomalloc.h
+	$(CHARMC) -c isomalloc.c
+
+global-nop.o: \
+	global-nop.c \
+	converse.h \
+	conv-config.h \
+	conv-common.h \
+	conv-mach.h \
+	conv-autoconfig.h \
+	conv-mach-opt.h \
+	pup_c.h \
+	conv-cpm.h \
+	conv-cpath.h \
+	conv-qd.h \
+	conv-random.h \
+	conv-lists.h \
+	conv-trace.h \
+	persistent.h \
+	debug-conv.h
+	$(CHARMC) -c global-nop.c
 
 init.o: \
 	init.C \
@@ -518,7 +840,7 @@ ckfutures.o: \
 	CkFutures.def.h
 	$(CHARMC) -c ckfutures.C
 
-message.o: \
+debug-message.o: \
 	debug-message.C \
 	ck.h \
 	charm++.h \
