@@ -115,7 +115,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       ccs-server.h ccs-auth.c ccs-auth.h \
       memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
       conv-common.h conv-mach.h conv-mach.sh \
-      CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkReduction.decl.h \
+      CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkReduction.decl.h CkArrayReductionMgr.decl.h\
       CkFutures.decl.h LBDatabase.decl.h CentralLB.decl.h NullLB.decl.h \
       RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h \
       MetisLB.decl.h DummyLB.decl.h RefineLB.decl.h OrbLB.decl.h \
@@ -136,7 +136,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_toNetwork4.h \
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h \
-	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h \
+	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h ckarrayreductionmgr.h \
 	  ckarray.h cklocation.h ckreduction.h \
 	  readonly.h charisma.h \
 	  $(UTILHEADERS) \
@@ -166,7 +166,7 @@ conv-autoconfig.h: configure
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
 	@echo "Soft-linking headers..."
 	-@for hdr in $(ALLHEADERS) ; do test ! -f "../include/$$hdr" && ./system_ln "../tmp/$$hdr" ../include ; done
-	touch headerlinks	
+	touch headerlinks
 
 dirs+sources:
 	rm -f .gdir
@@ -249,9 +249,9 @@ charmrun-target: daemon-target sockRoutines.c sockRoutines.h ccs-server.c ccs-se
 
 daemon-target: sockRoutines-seq.o
 	if test -f daemon.c ; then $(CHARMC) -seq daemon.c \
-		sockRoutines-seq.o -o ../bin/charmd; fi 
+		sockRoutines-seq.o -o ../bin/charmd; fi
 	if test -f daemon.c ; then $(CHARMC) -DFACELESS -seq daemon.c \
-		sockRoutines-seq.o -o ../bin/charmd_faceless; fi 
+		sockRoutines-seq.o -o ../bin/charmd_faceless; fi
 	touch daemon-target
 
 fmain-ok: fmain.f90
@@ -265,7 +265,7 @@ QuickThreads/libqt.a:
 	cd QuickThreads ; make qt  OPTS='$(OPTS)'
 	cp QuickThreads/libqt.a ../lib/libckqt.a
 
-METIS:   
+METIS:
 	cd libs/conv-libs/metis; make OPTS='$(OPTS)'
 
 CONVLIBS: converse
@@ -274,13 +274,13 @@ CONVLIBS: converse
 libconv-core.a: $(LIBCONV_CORE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_CORE)
 
-libconv-cplus-y.a: machine.c $(CVHEADERS)	
+libconv-cplus-y.a: machine.c $(CVHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=1 machine.c
 
 libconv-cplus-n.a: machine.c $(CVHEADERS)
 	$(CHARMC) -cp ../lib/ -o $@ -DFOR_CPLUS=0 machine.c
 
-libconv-util.a: $(LIBCONV_UTIL) 
+libconv-util.a: $(LIBCONV_UTIL)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCONV_UTIL)
 
 libconv-utilf.a: $(LIBCONV_UTILF)
@@ -384,7 +384,7 @@ $(L)/libldb-rand.o: cldb.rand.c cldb.h $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.rand.c
 
 $(L)/libldb-graph.o: cldb.graph.c graph.h $(CVHEADERS)
-	$(CHARMC) -o $@ cldb.graph.c 
+	$(CHARMC) -o $@ cldb.graph.c
 
 $(L)/libldb-spray.o: cldb.spray.c $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.spray.c
@@ -429,7 +429,7 @@ $(L)/libmemory-isomalloc.o: memory-isomalloc.c $(MEM_DEPS)
 CK_LIBS_CORE=libck.a
 
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
-           debug-message.o ckcallback.o cklocation.o ckarray.o ckreduction.o \
+           debug-message.o ckcallback.o cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
            tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o \
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o ObjGraph.o graph.o  \
@@ -502,11 +502,20 @@ ckreduction.o: ckreduction.C $(CKHEADERS)
 CkMarshall.decl.h CkMarshall.def.h : ckmarshall.ci charmxi
 	$(CHARMC) ckmarshall.ci
 
+CkArrayReductionMgr.decl.h CkArrayReductionMgr.def.h : ckarrayreductionmgr.ci charmxi
+	$(CHARMC) ckarrayreductionmgr.ci
+
+ckarrayreductionmgr.o : ckarrayreductionmgr.C $(CKHEADERS)
+	$(CHARMC) -o ckarrayreductionmgr.o ckarrayreductionmgr.C
+
+
 CkArray.decl.h CkArray.def.h : ckarray.ci charmxi
 	$(CHARMC) ckarray.ci
 
 ckarray.o: ckarray.C $(CKHEADERS)
 	$(CHARMC) -o ckarray.o ckarray.C
+
+
 
 CkLocation.decl.h: cklocation.ci charmxi
 	$(CHARMC) cklocation.ci
@@ -726,9 +735,10 @@ $(L)/libmoduleRefineLB.a: RefineLB.o
 
 CommLB.decl.h: CommLB.ci charmxi
 	$(CHARMC) CommLB.ci
-
-CommLB.o: CommLB.C CommLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c CommLB.C
+CommLB.o: CommLB.C CommLB.decl.h manager.h $(CKHEADERS)
+	$(CHARMC) -c CommLB.C 
+manager.o: manager.C manager.h 
+	$(CHARMC) -c manager.C
 
 $(L)/libmoduleCommLB.a: CommLB.o manager.o
 	$(CHARMC) -o $(L)/libmoduleCommLB.a CommLB.o manager.o
