@@ -209,7 +209,7 @@ protected:
     unsigned int rows, cols;
 
     // get the index of the given entry as per the row major/column major format
-    unsigned int getIndex(unsigned int row, unsigned int col)
+    inline unsigned int getIndex(unsigned int row, unsigned int col)
     {
         unsigned int index;
 

@@ -78,8 +78,8 @@ public:
 
 /** This is the interface used to perform the accumulate operation on
     an Entry.  T is the data type.  It may be a primitive one or a
-    class.  It must support assignment, copy constructor, += operator,
-    and typecast from 0.
+    class.  It must support the default constructor, assignment, copy
+    constructor, += operator, typecast from int 0, 1, and pup.
 */
 template <class T>
 class DefaultEntry {
@@ -517,7 +517,7 @@ protected:
         // allocate a buffer for creating the run
         unsigned int numRuns = writes[page]->size();
         unsigned int buffSize = 3*sizeof(unsigned int)*numRuns + getBPP();
-        char* buffer = (char*)malloc(buffSize);
+        char* buffer = (char*)calloc(1, buffSize);
 
         //ckout << "[" << CkMyPe() << "] doing RLE encoding for page " << page << " with " << numRuns << "run(s)" << endl;
 
