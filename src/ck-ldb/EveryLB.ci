@@ -1,4 +1,5 @@
 module EveryLB {
+   extern module DummyLB;
    extern module RandCentLB;
    extern module RecBisectBfLB;
    extern module MetisLB;
@@ -8,6 +9,7 @@ module EveryLB {
    extern module HeapCentLB;
    extern module NeighborLB;
    extern module GreedyRefLB;
+   extern module OrbLB;
    extern module RandRefLB;
    extern module WSLB;
    initcall void initEveryLB(void);
