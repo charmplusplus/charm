@@ -161,13 +161,15 @@ static void r2c(int nx, int ny, int *mat)
 extern "C" void
 METIS_PartMeshNodal(int*,int*,int*,int*,int*,int*,int*,int*,int*);
 
-extern void fem_map(int nelem, int nnodes, int ctype, int *connmat,
-                    int nparts, int *epart, int *npart, ChunkMsg *msgs[]);
+extern void fem_map(int nelem, int nnodes, int esize, int *connmat,
+                    int nparts, int *epart, ChunkMsg *msgs[]);
 void
 main::setMesh(int nelem, int nnodes, int ctype, int *connmat, int *xconn)
 {
   int *epart = new int[nelem]; CHK(epart);
-  int *npart = new int[nnodes]; CHK(npart);
+  int esize = (ctype==FEM_TRIANGULAR) ? 3:
+              (ctype==FEM_HEXAHEDRAL) ? 8:
+	      4;
   int numflag, ecut;
 #if FEM_FORTRAN
   numflag = 1;
@@ -177,18 +179,18 @@ main::setMesh(int nelem, int nnodes, int ctype, int *connmat, int *xconn)
   if(_nchunks==1) { // Metis cannot handle this case
     int i;
     for(i=0;i<nelem;i++) { epart[i] = numflag; }
-    for(i=0;i<nnodes;i++) { npart[i] = numflag; }
     ecut = 0;
   } else {
+    int *npart = new int[nnodes]; CHK(npart);
     // pass mesh to metis to be partitioned. xconn is always in row order
     METIS_PartMeshNodal(&nelem, &nnodes, xconn, &ctype, &numflag, 
                        (int*)&_nchunks, &ecut, epart, npart);
+    delete[] npart;
   }
   // call the map function to compute communication info needed by the framework
   ChunkMsg **msgs = new ChunkMsg*[_nchunks]; CHK(msgs);
-  fem_map(nelem, nnodes, ctype, connmat, _nchunks, epart, npart, msgs);
+  fem_map(nelem, nnodes, esize, connmat, _nchunks, epart, msgs);
   delete[] epart;
-  delete[] npart;
   // send messages to individual chunks with these partitions
   isMeshSet = 1;
   CProxy_chunk farray(_femaid);
