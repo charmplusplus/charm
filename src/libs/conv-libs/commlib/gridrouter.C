@@ -175,7 +175,7 @@ void GridRouter::RecvManyMsg(comID id, char *msg)
 
   recvCount++;
   if (recvCount == recvExpected) {
-      //    CkPrintf("%d recvcount=%d recvexpected = %d refno=%d\n", MyPe, recvCount, recvExpected, KMyActiveRefno(MyID));
+      CkPrintf("%d recvcount=%d recvexpected = %d refno=%d\n", MyPe, recvCount, recvExpected, KMyActiveRefno(MyID));
 
     for (int i=0;i<COLLEN;i++) {
       int myrow=MyPe/COLLEN;
@@ -228,7 +228,7 @@ void GridRouter:: LocalProcMsg()
   PeMesh->ExtractAndDeliverLocalMsgs(MyPe);
 
   if (LPMsgCount==LPMsgExpected) {
-      //      CkPrintf("%d local procmsg called\n", MyPe);
+      CkPrintf("%d local procmsg called\n", MyPe);
       PeMesh->Purge();
       InitVars();
       KDone(MyID);
