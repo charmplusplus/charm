@@ -37,6 +37,8 @@ A more readable summary is at:
  *  in the GOT. Pointers to remote function calls may be an exception
  *  to this.
  */
+#if CMK_HAS_ELF_H
+
 #include "converse.h"
 #include "cklists.h"
 #include <string.h>
@@ -315,3 +317,10 @@ void CtgFree(CtgGlobals g) {
 	if (g->installed) CmiAbort("CtgFree called on currently installed globals!\n");
 	delete g;
 }
+
+
+#else
+
+#include "global-nop.c"
+
+#endif
