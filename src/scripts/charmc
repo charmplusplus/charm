@@ -50,6 +50,7 @@ DEBUG_MODE=""
 OPTIMIZE_MODE=""
 USE_RELIABLE_CC=""
 USE_FASTEST_CC=""
+IS_WINDOWS=""
 
 ####################################################################
 #
@@ -424,7 +425,11 @@ then
 # <------------------ End C Shell -----------------------------
 fi
 
-Debug "Found charmbin..."
+FIRST_THREE=`uname -s | awk '{print substr($1,1,3)}' `
+if [ "$FIRST_THREE" = "CYG" ]
+then
+	IS_WINDOWS="true"
+fi
 
 if [ -n "$MACHTYPE" ]
 then
@@ -456,7 +461,7 @@ cd $ORIGDIR
 #
 ##############################################################################
 
-if [ ! -r "$CHARMINC/conv-mach.sh" ]
+if [ ! -r $CHARMINC/conv-mach.sh ]
 then
 	Abort "Can't find conv-mach.sh in $CHARMINC directory."
 fi
@@ -571,6 +576,14 @@ Copyobj() {
 		if [ "a$COPY" != "a$OBJECT" ] 
 		then
 			[ -d $COPY ] && COPY="$COPY/$OBJECT"
+			if [ -n "$IS_WINDOWS" ] ; then
+				if [ -r "$OBJECT.exe" ] ; then
+# Object is (probably) an executable-- append
+				echo "Appending .exe to object file name"
+				OBJECT="$OBJECT.exe"
+				COPY="$COPY.exe"
+				fi
+			fi
 			DoNoErrCheck $RM $COPY 
 			Do $CP $OBJECT $COPY
 		fi
@@ -739,21 +752,16 @@ esac
 #
 ##############################################################################
 
-Debug "About to check TRACEMODE=$TRACEMODE..."
+Debug "About to check TRACEMODE=$TRACEMODE and BALANCE=$BALANCE..."
 
 # Check for valid choice of TRACEMODE
 
-[ -r "$CHARMLIB/libtrace-none.a" ] || Abort "trace libraries not installed."
-
-Debug "trace libraries exist..."
+[ -e $CHARMLIB/libtrace-none.a ] || Abort "trace libraries not installed."
 
 [ -z "$TRACEMODE" ] && TRACEMODE="none"
 
-Debug "trace $TRACEMODE selected.."
+[ ! -e $CHARMLIB/libtrace-$TRACEMODE.a ] && Abort "charmc : No such tracemode $TRACEMODE"
 
-[ ! -r "$CHARMLIB/libtrace-$TRACEMODE.a" ] && Abort "charmc : No such tracemode $TRACEMODE"
-
-Debug "About to check BALANCE=$BALANCE..."
 
 # Check for valid choice of BALANCE
 
@@ -765,14 +773,9 @@ then
     BALANCE=replay
 fi
 
-Debug "About to get extension..."
-
 BAL_EXT=`getExtention $BALANCE`
 if [ -z "$BAL_EXT" ]
 then
-
-Debug "got extension=$BAL_EXT ..."
-
 # Balance has no extention-- is a library reference
     BAL_OBJ="$CHARMLIB/libldb-$BALANCE.o"
 else
@@ -782,7 +785,7 @@ fi
 
 Debug "Finished with BAL_OBJ=$BAL_OBJ, TRACEMODE=$TRACEMODE..."
 
-if [ ! -r "$BAL_OBJ" ]
+if [ ! -e "$BAL_OBJ" ]
 then
 	if [ "$BALANCE" = "$BAL_OBJ" ]
 	then
@@ -829,7 +832,7 @@ esac
 #
 ########################################################################
 
-if [ -x $CHARMBIN/conv-host ]
+if [ -e $CHARMBIN/conv-host ]
 then
 	DoNoErrCheck $RM conv-host
 	Do $CP $CHARMBIN/conv-host conv-host
