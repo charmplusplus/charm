@@ -102,7 +102,7 @@ class DDT_Contiguous : public DDT_DataType {
 	DDT_DataType* baseType ;
 
 	public:
-	DDT_Contiguous();
+	DDT_Contiguous() { };
 	DDT_Contiguous(int count, DDT_DataType* oldType);
 	DDT_Contiguous(const DDT_Contiguous& obj) ;
 	DDT_Contiguous& operator=(const DDT_Contiguous& obj);
@@ -151,7 +151,7 @@ class DDT_Vector : public DDT_DataType {
 class DDT_HVector : public DDT_Vector {
 
 	public:
-		DDT_HVector() ;
+		DDT_HVector() { } ;
 		DDT_HVector(int nCount, int blength, int strideLength, DDT_DataType* type);
 		~DDT_HVector() { } ;
 		DDT_HVector(const DDT_HVector& obj) ;
@@ -205,7 +205,7 @@ class DDT_Indexed : public DDT_DataType {
 class DDT_HIndexed : public DDT_Indexed {
 
 	public:
-		DDT_HIndexed();
+		DDT_HIndexed() { } ;
 		DDT_HIndexed(int count, int* arrBlock, int* arrDisp, DDT_DataType* type);
 		DDT_HIndexed(const DDT_HIndexed& obj);
 		DDT_HIndexed& operator=(const DDT_HIndexed& obj) ;
@@ -233,7 +233,7 @@ class DDT_Struct : public DDT_DataType {
 		DDT_DataType* arrayDataType[MAX_TYPES] ; 
 
 	public:
-		DDT_Struct();
+		DDT_Struct() { } ;
 		DDT_Struct(DDT* ddt,int count, int* arrBlock, int* arrDisp, DDT_Type* type);
 		DDT_Struct(const DDT_Struct& obj);
 		DDT_Struct& operator=(const DDT_Struct& obj) ;
@@ -299,6 +299,8 @@ class DDT {
 	int 	getNextFreeIndex() ;
 	void pup(PUP::er	&p);
 	DDT_DataType*	getType(int nIndex);
+	int	getSize(int nIndex);
+	int getExtent(int nIndex);
 	~DDT() ;
 
 };

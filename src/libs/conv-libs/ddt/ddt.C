@@ -119,6 +119,19 @@ DDT::~DDT()
 	delete [] typeTable ;
 }
 
+
+int DDT::getSize(int nIndex)
+{
+	DDT_DataType* dttype = getType(nIndex);
+	return dttype->getSize();
+}
+
+int DDT::getExtent(int nIndex)
+{
+	DDT_DataType* dttype = getType(nIndex);
+	return dttype->getExtent();
+}
+
 int DDT::Type_Contiguous(int count, DDT_Type oldType, DDT_Type *newType)
 {
 	int index = *newType =  getNextFreeIndex() ;
