@@ -2,7 +2,8 @@ CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 all: libfem.a libfemf.a $(CDIR)/include/fem.h $(CDIR)/include/fem.decl.h \
-     $(CDIR)/include/femf.h $(CDIR)/lib/fmain.o map fmap gmap fgmap
+     $(CDIR)/include/femf.h $(CDIR)/lib/fmain.o map fmap gmap fgmap \
+     mesh2graph
 
 libfem.a: fem.C fem.h femf.h fem.decl.h fem.def.h map.C
 	$(CHARMC) -DFEM_FORTRAN=0 -c fem.C
@@ -29,6 +30,10 @@ gmap: map.C fem.h
 fgmap: map.C fem.h
 	$(CHARMC) -seq -DMAP_MAIN=1 -DMAP_GRAPH=1 -DFEM_FORTRAN=1 -c map.C
 	$(CHARMC) -seq -cp $(CDIR)/bin -o fgmap map.o -lmetis -lm -language c++
+
+mesh2graph: mesh2graph.C
+	$(CHARMC) -seq -c mesh2graph.C
+	$(CHARMC) -seq -cp $(CDIR)/bin -o mesh2graph mesh2graph.o -language c++
 
 fmain.o: fmain.f90
 	$(CHARMC) -c fmain.f90

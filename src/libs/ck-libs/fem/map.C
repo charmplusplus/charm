@@ -344,119 +344,6 @@ write_partitions (ChunkMsg **msgs, int nparts, int esize)
   }
 }
 
-#if MAP_GRAPH
-
-class vertex
-{
- private:
-  int nn; // number of current neighbors
-  int sn; // size of array n
-  int *nbrs; // list of nbrs
- public:
-  void init(int _sn)
-  {
-    sn = _sn;
-    nbrs = new int[sn]; CHK(nbrs);
-    nn = 0;
-  }
-  void add(int nbr)
-  {
-    // see if nbrs is full
-    // if yes, allocate more space, and copy existing nbrs there
-    // delete old space
-    if (sn <= nn)
-    {
-      sn *= 2;
-      int *tnbrs = new int[sn];
-      for (int i=0; i<nn; i++)
-        tnbrs[i] = nbrs[i];
-      delete[] nbrs;
-      nbrs = tnbrs;
-    }
-    // add new neighbor
-    nbrs[nn++] = nbr;
-  }
-  void destroy(void)
-  {
-    delete[] nbrs;
-  }
-  int getnn(void)
-  {
-    return nn;
-  }
-  int *getnbrs(void)
-  {
-    return nbrs;
-  }
-};
-
-// Converts given mesh to graph (CSR) required by Metis Graph Partitioner
-// ne: (in) number of elements
-// esize: (in) number of nodes per element
-// conn[ne][esize]: (in) connectivity matrix
-// xadj[ne+1]: (out) xadj[i] is the starting index of the adjacency list of 
-//             element i.
-// returns adj[2m] : (out) m is the number of edges. allocated inside this
-//                   function, since number of edges is not known in advance.
-static int*
-mesh2graph(int ne, int esize, int *conn, int *xadj)
-{
-  int i, j, k, l;
-  vertex *v = new vertex[ne]; CHK(v);
-  for (i=0;i<ne;i++)
-    v[i].init(esize);
-  for (i=0; i<(ne-1); i++)
-  {
-    if(i%100 == 0) printf("processing element %d\n", i);
-    for (k=i+1; k<ne; k++)
-    {
-      int found = 0;
-      for (j=0; j<esize && !found; j++)
-      {
-        int n1 = conn[i*esize+j];
-        for (l=0; l<esize; l++)
-        {
-          int n2 = conn[k*esize+l];
-          if (n1 == n2) // elements i and k share a node
-          {
-            v[i].add(k);
-            v[k].add(i);
-            found = 1;
-            break;
-          }
-        }
-      }
-    }
-  }
-  int m = 0;
-  xadj[0] = 0;
-  for (i=0;i<ne;i++)
-  {
-    m += v[i].getnn();
-    xadj[i+1] = m;
-  }
-  int *adjncy = new int[m]; CHK(adjncy);
-  for (k=0, i=0; i<ne; i++)
-  {
-    int nn = v[i].getnn();
-    if (nn==0)
-    { 
-      fprintf(stderr, "Disconnected Mesh? Element %d has no nbrs\n", i);
-      exit(1);
-    }
-    int *nbrs = v[i].getnbrs();
-    for (j=0; j<nn; j++)
-    {
-      adjncy[k++] = nbrs[j];
-    }
-  }
-  for (i=0;i<ne;i++)
-    v[i].destroy();
-  delete[] v;
-  return adjncy;
-}
-
-#endif
 static void
 usage (char *pgm)
 {
@@ -493,6 +380,15 @@ main (int argc, char **argv)
     for (j=0;j<esize;j++)
       fscanf(fp, "%d", &conn[i*esize+j]);
   }
+#if MAP_GRAPH
+  int *xadj = new int[nelems+1]; CHK(xadj);
+  for(i=0;i<=nelems;i++)
+    fscanf(fp, "%d", &xadj[i]);
+  int *adjncy = new int[xadj[nelems]]; CHK(adjncy);
+  for(i=0;i<nelems;i++)
+    for(j=xadj[i]; j<xadj[i+1]; j++)
+      fscanf(fp, "%d", &adjncy[j]);
+#endif
   fclose(fp);
   printf("finished reading mesh file...\n");
   int ecut;
@@ -504,10 +400,6 @@ main (int argc, char **argv)
   if (nparts>1)
   {
 #if MAP_GRAPH
-    int *xadj = new int[nelems+1]; CHK(xadj);
-    printf("calling mesh2graph...\n");
-    int *adjncy = mesh2graph(nelems, esize, conn, xadj);
-    printf("mesh2graph returned...\n");
     int wgtflag = 0; // no weights associated with elements or edges
     int opts[5];
     opts[0] = 0; //use default values
