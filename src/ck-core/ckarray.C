@@ -1,6 +1,9 @@
 #include "charm++.h"
-#include "register.h"
+#include "ck.h"
 #include "CkArray.def.h"
+#include "init.h"
+
+CkGroupID _RRMapID;
 
 void *
 ArrayMigrateMessage::alloc(int msgnum,int size,int *array,int priobits)
@@ -38,8 +41,7 @@ ArrayMigrateMessage::unpack(void *in)
 }
 
 CkGroupID Array1D::CreateArray(int numElements,
-                               ChareIndexType mapChare,
-                               EntryIndexType mapConstructor,
+                               CkGroupID mapID,
                                ChareIndexType elementChare,
                                EntryIndexType elementConstructor,
                                EntryIndexType elementMigrator)
@@ -49,8 +51,7 @@ CkGroupID Array1D::CreateArray(int numElements,
   ArrayCreateMessage *msg = new ArrayCreateMessage;
 
   msg->numElements = numElements;
-  msg->mapChareType = mapChare;
-  msg->mapConstType = mapConstructor;
+  msg->mapID = mapID;
   msg->elementChareType = elementChare;
   msg->elementConstType = elementConstructor;
   msg->elementMigrateType = elementMigrator;
@@ -66,25 +67,27 @@ Array1D::Array1D(ArrayCreateMessage *msg)
   elementConstType = msg->elementConstType;
   elementMigrateType = msg->elementMigrateType;
 
-  if (CkMyPe()==0) {
-    ArrayMapCreateMessage *mapMsg = new ArrayMapCreateMessage;
-    mapMsg->numElements = numElements;
-    mapMsg->arrayID = thishandle;
-    mapMsg->groupID = thisgroup;
-    CkCreateGroup(msg->mapChareType,msg->mapConstType,mapMsg,0,0);
-  }
+  CProxy_ArrayMap pmap(msg->mapID);
+  ArrayMapRegisterMessage *mapMsg = new ArrayMapRegisterMessage;
+  mapMsg->numElements = numElements;
+  mapMsg->arrayID = thishandle;
+  mapMsg->groupID = thisgroup;
+  pmap.registerArray(mapMsg, CkMyPe());
+
+  bufferedForElement = new PtrQ();
+  bufferedMigrated = new PtrQ();
+  map = 0;
+
   /*
   CkPrintf("Array1D constructed\n");
   */
   delete msg;
 }
 
-void Array1D::RecvMapID(ArrayMap *mPtr, CkChareID mHandle,
-                        CkGroupID mGroup)
+void Array1D::RecvMapID(ArrayMap *mPtr, int mHandle)
 {
   map = mPtr;
   mapHandle = mHandle;
-  mapGroup = mGroup;
 
   elementIDs = new ElementIDs[numElements];
   _MEMCHECK(elementIDs);
@@ -93,7 +96,7 @@ void Array1D::RecvMapID(ArrayMap *mPtr, CkChareID mHandle,
   int i;
   for(i=0; i < numElements; i++)
   {
-    elementIDs[i].originalPE = elementIDs[i].pe = map->procNum(i);
+    elementIDs[i].originalPE = elementIDs[i].pe = map->procNum(mapHandle, i);
     elementIDs[i].curHop = 0;
     if (elementIDs[i].pe != CkMyPe())
     {
@@ -115,6 +118,17 @@ void Array1D::RecvMapID(ArrayMap *mPtr, CkChareID mHandle,
       CkCreateChare(elementChareType, elementConstType, msg, 0, CkMyPe());
     }
   }
+  CProxy_Array1D arr(thisgroup);
+  ArrayMessage *amsg;
+  while((amsg = (ArrayMessage *) bufferedForElement->deq())) {
+    arr.RecvForElement(amsg, CkMyPe());
+  }
+  delete bufferedForElement;
+  ArrayMigrateMessage *mmsg;
+  while((mmsg = (ArrayMigrateMessage *) bufferedMigrated->deq())) {
+    arr.RecvMigratedElement(mmsg, CkMyPe());
+  }
+  delete bufferedMigrated;
 }
 
 void Array1D::RecvElementID(int index, ArrayElement *elem, CkChareID handle)
@@ -182,6 +196,10 @@ void Array1D::RecvForElement(ArrayMessage *msg)
   /*
   CkPrintf("PE %d RecvForElement sending to index %d\n",CkMyPe(),msg->destIndex);
   */
+  if(!map) {
+    bufferedForElement->enq((void *)msg);
+    return;
+  }
   msg->hopCount++;
   if (elementIDs[msg->destIndex].state == here) {
     // CkPrintf("PE %d DELIVERING index %d RecvForElement state %d\n",
@@ -232,6 +250,10 @@ void Array1D::migrateMe(int index, int where)
 
 void Array1D::RecvMigratedElement(ArrayMigrateMessage *msg)
 {
+  if(!map) {
+    bufferedMigrated->enq(msg);
+    return;
+  }
   int index =msg->index;
 
   elementIDs[index].state = arriving;
@@ -320,8 +342,9 @@ ArrayElement::ArrayElement(ArrayElementCreateMessage *msg)
   arrayChareID = msg->arrayID;
   arrayGroupID = msg->groupID;
   thisArray = msg->arrayPtr;
-  thisAID.setAid(thisArray->ckGetGroupId());
+  thisAID._setAid(thisArray->ckGetGroupId());
   thisAID._elem = (-1);
+  thisAID._setChare(0);
   thisIndex = msg->index;
 }
 
@@ -331,8 +354,9 @@ ArrayElement::ArrayElement(ArrayElementMigrateMessage *msg)
   arrayChareID = msg->arrayID;
   arrayGroupID = msg->groupID;
   thisArray = msg->arrayPtr;
-  thisAID.setAid(thisArray->ckGetGroupId());
+  thisAID._setAid(thisArray->ckGetGroupId());
   thisAID._elem = (-1);
+  thisAID._setChare(0);
   thisIndex = msg->index;
 }
 
@@ -365,35 +389,23 @@ void ArrayElement::exit(ArrayElementExitMessage *msg)
   delete this;
 }
 
-ArrayMap::ArrayMap(ArrayMapCreateMessage *msg)
-{
-  // CkPrintf("PE %d creating ArrayMap\n",CkMyPe());
-  arrayChareID = msg->arrayID;
-  arrayGroupID = msg->groupID;
-  array = CProxy_Array1D::ckLocalBranch(arrayGroupID);
-  numElements = msg->numElements;
-
-  delete msg;
-}
-
-void ArrayMap::finishConstruction(void)
-{
-  array->RecvMapID(this, thishandle, thisgroup);
-}
-
-RRMap::RRMap(ArrayMapCreateMessage *msg) : ArrayMap(msg)
+RRMap::RRMap(void)
 {
   // CkPrintf("PE %d creating RRMap for %d elements\n",CkMyPe(),numElements);
-
-  finishConstruction();
+  arrayVec = new PtrVec();
 }
 
-RRMap::~RRMap()
-{
-  // CkPrintf("Bye from RRMap\n");
-}
-
-int RRMap::procNum(int element)
+int RRMap::procNum(int /*arrayHdl*/, int element)
 {
   return ((element+1) % CkNumPes());
 }
+
+void RRMap::registerArray(ArrayMapRegisterMessage *msg)
+{
+  int hdl = arrayVec->length();
+  arrayVec->insert(hdl, (void *)(msg->numElements));
+  Array1D* array = (Array1D *) CkLocalBranch(msg->groupID);
+  delete msg;
+  array->RecvMapID(this, hdl);
+}
+

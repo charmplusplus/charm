@@ -86,23 +86,29 @@ class _CK_NGID : public _CK_CID {
 class Array1D;
 
 class _CK_AID {
+  private:
+    int _chare;
   public:
+    CkChareID _cid;
     CkGroupID _ck_aid;
     Array1D *_array;
     int _elem;
-    void setAid(CkGroupID aid) {
+    void _setAid(CkGroupID aid) {
       _ck_aid = aid;
       _array = (Array1D*) CkLocalBranch(aid);
     }
     _CK_AID(CkGroupID aid) {
-      setAid(aid);
+      _setAid(aid);
       _elem = -1;
     }
     _CK_AID(CkGroupID aid, int elem) {
-      setAid(aid);
+      _setAid(aid);
       _elem = elem;
     }
     _CK_AID() {}
+    void _setCid(CkChareID cid) { _cid = cid; }
+    int _isChare(void) { return _chare; }
+    void _setChare(int c) { _chare = c; }
 };
 
 typedef _CK_AID CkAID;
@@ -138,7 +144,6 @@ static inline void _CHECK_CID(CkChareID, int){}
 
 #include "ckstream.h"
 #include "CkFutures.decl.h"
-#include "CkArray.decl.h"
 #include "ckarray.h"
 #include "tempo.h"
 #include "waitqd.h"

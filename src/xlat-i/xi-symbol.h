@@ -298,7 +298,7 @@ class Chare : public TEntity, public Construct {
     int  isTemplated(void) { return (templat!=0); }
     int  isDerived(void) { return (bases!=0); }
     int  isAbstract(void) { return abstract; }
-    int  setAbstract(int a) { abstract = a; }
+    void setAbstract(int a) { abstract = a; }
     void print(XStr& str);
     void genChareDecls(XStr& str);
     void genGroupDecls(XStr& str);

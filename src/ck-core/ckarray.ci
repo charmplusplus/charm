@@ -1,4 +1,5 @@
 module CkArray {
+  readonly CkGroupID _RRMapID;
   message ArrayCreateMessage;
   message ArrayMessage;
   message ArrayElementAckMessage;
@@ -15,13 +16,23 @@ module CkArray {
   message ArrayElementMigrateMessage;
   message ArrayElementExitMessage;
 
-  chare ArrayElement {
+  array ArrayElement {
+    entry ArrayElement();
     entry void exit(ArrayElementExitMessage *);
   };
 
-  message ArrayMapCreateMessage;
+  message ArrayMapRegisterMessage;
 
-  group RRMap {
-    entry RRMap(ArrayMapCreateMessage *);
+  group ArrayMap {
+    entry [virtual] void registerArray(ArrayMapRegisterMessage *) = 0;
+  };
+
+  group RRMap : ArrayMap {
+    entry RRMap(void);
+    entry void registerArray(ArrayMapRegisterMessage *);
+  };
+
+  mainchare ArrayInit {
+    entry ArrayInit();
   };
 };

@@ -2,7 +2,9 @@
 #define _CKARRAY_H
 
 #include "charm++.h"
-#include "CkArray.decl.h"
+
+class PtrQ;
+class PtrVec;
 
 #define ALIGN8(x)       (int)(8*(((x)+7)/8))
 
@@ -15,40 +17,27 @@ typedef int MessageIndexType;
 typedef int ChareIndexType;
 typedef int EntryIndexType;
 
-class Array1D;
-
-class ArrayMapCreateMessage : public CMessage_ArrayMapCreateMessage
-{
-public:
-  int numElements;
-  CkChareID arrayID;
-  CkGroupID groupID;
-};
-
-class ArrayMap : public Group
-{
-public:
-  virtual int procNum(int element) = 0;
-
-protected:
-  ArrayMap(ArrayMapCreateMessage *msg);
-  void finishConstruction(void);
-
-  CkChareID arrayChareID;
-  CkGroupID arrayGroupID;
-  Array1D *array;
-  int numElements;
-};
+extern CkGroupID _RRMapID;
 
 class Array1D;
+class ArrayMapRegisterMessage;
 class ArrayElementCreateMessage;
 class ArrayElementMigrateMessage;
 class ArrayElementExitMessage;
 
-class ArrayElement : public Group
+class ArrayMap : public Group
+{
+public:
+  virtual int procNum(int arrayHdl, int element) = 0;
+  virtual void registerArray(ArrayMapRegisterMessage *) = 0;
+};
+
+
+class ArrayElement : public Chare
 {
 friend class Array1D;
 public:
+  ArrayElement(void) {};
   ArrayElement(ArrayElementCreateMessage *msg);
   ArrayElement(ArrayElementMigrateMessage *msg);
   void finishConstruction(void);
@@ -70,33 +59,6 @@ protected:
   int thisIndex;
 };
 
-class ArrayElementCreateMessage : public CMessage_ArrayElementCreateMessage
-{
-public:
-  int numElements;
-  CkChareID arrayID;
-  CkGroupID groupID;
-  Array1D *arrayPtr;
-  int index;
-};
-
-class ArrayElementMigrateMessage : public CMessage_ArrayElementMigrateMessage
-{
-public:
-  int numElements;
-  CkChareID arrayID;
-  CkGroupID groupID;
-  Array1D *arrayPtr;
-  int index;
-  void* packData;
-};
-
-class ArrayElementExitMessage : public CMessage_ArrayElementExitMessage
-{
-public:
-  int dummy;
-};
-
 enum {unknownPe = -1};
 
 class ArrayCreateMessage;
@@ -108,8 +70,7 @@ class Array1D : public Group
 {
 public:
   static  CkGroupID CreateArray(int numElements,
-				ChareIndexType mapChare,
-				EntryIndexType mapConstructor,
+				CkGroupID mapID,
 				ChareIndexType elementChare,
 				EntryIndexType elementConstructor,
 				EntryIndexType elementMigrator);
@@ -117,7 +78,7 @@ public:
   Array1D(ArrayCreateMessage *);
   void send(ArrayMessage *msg, int index, EntryIndexType ei);
   void broadcast(ArrayMessage *msg, EntryIndexType ei);
-  void RecvMapID(ArrayMap *mapPtr,CkChareID mapHandle, CkGroupID mapGroup);
+  void RecvMapID(ArrayMap *mapPtr,int mapHandle);
   void RecvElementID(int index, ArrayElement *elem, CkChareID handle);
   void RecvForElement(ArrayMessage *msg);
   void RecvMigratedElement(ArrayMigrateMessage *msg);
@@ -145,7 +106,7 @@ private:
   };
 
   int numElements;
-  CkChareID mapHandle;
+  int mapHandle;
   CkGroupID mapGroup;
   ArrayMap *map;
   ChareIndexType elementChareType;
@@ -154,14 +115,17 @@ private:
   ElementIDs *elementIDs;
   int elementIDsReported;
   int numLocalElements;
+  PtrQ *bufferedForElement;
+  PtrQ *bufferedMigrated;
 };
+
+#include "CkArray.decl.h"
 
 class ArrayCreateMessage : public CMessage_ArrayCreateMessage
 {
 public:
   int numElements;
-  ChareIndexType mapChareType;
-  EntryIndexType mapConstType;
+  CkGroupID mapID;
   ChareIndexType elementChareType;
   EntryIndexType elementConstType;
   EntryIndexType elementMigrateType;
@@ -202,11 +166,56 @@ public:
 
 class RRMap : public ArrayMap
 {
+private:
+  PtrVec *arrayVec;
 public:
-  RRMap(ArrayMapCreateMessage *msg);
-  ~RRMap(void);
+  RRMap(void);
+  void registerArray(ArrayMapRegisterMessage *);
+  int procNum(int arrayHdl, int element);
+};
 
-  int procNum(int element);
+class ArrayInit : public Chare 
+{
+public:
+  ArrayInit(CkArgMsg *msg) {
+    _RRMapID = CProxy_RRMap::ckNew();
+    delete msg;
+  }
+};
+
+class ArrayMapRegisterMessage : public CMessage_ArrayMapRegisterMessage
+{
+public:
+  int numElements;
+  CkChareID arrayID;
+  CkGroupID groupID;
+};
+
+class ArrayElementCreateMessage : public CMessage_ArrayElementCreateMessage
+{
+public:
+  int numElements;
+  CkChareID arrayID;
+  CkGroupID groupID;
+  Array1D *arrayPtr;
+  int index;
+};
+
+class ArrayElementMigrateMessage : public CMessage_ArrayElementMigrateMessage
+{
+public:
+  int numElements;
+  CkChareID arrayID;
+  CkGroupID groupID;
+  Array1D *arrayPtr;
+  int index;
+  void* packData;
+};
+
+class ArrayElementExitMessage : public CMessage_ArrayElementExitMessage
+{
+public:
+  int dummy;
 };
 
 #endif

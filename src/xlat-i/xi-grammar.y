@@ -335,7 +335,9 @@ NodeGroup	: NODEGROUP NamedType OptBaseList MemberEList
 		;
 
 Array		: ARRAY NamedType OptBaseList MemberEList
-		{ $$ = new Chare(SARRAY, $2, $3, $4); if($4) $4->setChare($$);
+		{ if(strcmp($2->getBaseName(), "ArrayElement"))
+                    $3 = new TypeList(new NamedType("ArrayElement"), $3);
+                  $$ = new Chare(SARRAY, $2, $3, $4); if($4) $4->setChare($$);
 		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
 
@@ -362,7 +364,9 @@ TNodeGroup	: NODEGROUP Name OptBaseList MemberEList
 		;
 
 TArray		: ARRAY Name OptBaseList MemberEList
-		{ $$ = new Chare(SARRAY, new NamedType($2), $3, $4); 
+		{ if(strcmp($2, "ArrayElement"))
+		    $3 = new TypeList(new NamedType("ArrayElement"), $3);
+		  $$ = new Chare(SARRAY, new NamedType($2), $3, $4); 
                   if($4) $4->setChare($$);
 		  if($4 && $4->isPure()) $$->setAbstract(1);}
 		;
