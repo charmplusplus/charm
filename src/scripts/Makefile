@@ -113,6 +113,9 @@ CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
 SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 
+DEPENDFILE = Make.depends
+
+include $(DEPENDFILE)
 
 ###############################################################################
 #
@@ -155,7 +158,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
-	  Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h \
+	  Refiner.h RefinerComm.h ObjGraph.h heap.h elements.h CommLBHeap.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h RandCentLB.h RecBisectBfLB.h \
 	  RefineLB.h OrbLB.h GreedyLB.h CommLB.h Comm1LB.h manager.h \
 	  MetisLB.h NborBaseLB.h \
@@ -496,7 +499,7 @@ LIBCK_CORE=trace-common.o init.o register.o qd.o ck.o main.o msgalloc.o \
            tempo.o waitqd.o LBDatabase.o lbdb.o charisma.o ckcheckpoint.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o \
 	   BaseLB.o CentralLB.o NborBaseLB.o WSLB.o ObjGraph.o graph.o  \
-           Refiner.o bitvecset.o Set.o heap.o CommLBHeap.o \
+           Refiner.o RefinerComm.o bitvecset.o Set.o heap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o 	\
 	   ComlibStrategy.o ComlibArrayListener.o  \
 	   charmProjections.o
@@ -507,172 +510,95 @@ CHARMLIBS: charm++
 $(L)/libck.a: $(LIBCK_CORE)
 	$(CHARMC) -o $@ $(LIBCK_CORE)
 
-CkFutures.decl.h CkFutures.def.h : ckfutures.ci charmxi
+CkFutures.def.h: CkFutures.decl.h
+
+CkFutures.decl.h: ckfutures.ci charmxi
 	$(CHARMC) ckfutures.ci
 
-tempo.decl.h tempo.def.h : tempo.ci charmxi
+tempo.def.h: tempo.decl.h
+
+tempo.decl.h: tempo.ci charmxi
 	$(CHARMC) tempo.ci
 
-waitqd.decl.h waitqd.def.h : waitqd.ci charmxi
+waitqd.def.h: waitqd.decl.h
+
+waitqd.decl.h: waitqd.ci charmxi
 	$(CHARMC) waitqd.ci
 
-LBDatabase.decl.h LBDatabase.def.h : LBDatabase.ci charmxi
+LBDatabase.def.h: LBDatabase.decl.h
+
+LBDatabase.decl.h: LBDatabase.ci charmxi
 	$(CHARMC) LBDatabase.ci
 
-NullLB.decl.h NullLB.def.h : NullLB.ci charmxi
+NullLB.def.h: NullLB.decl.h
+
+NullLB.decl.h: NullLB.ci charmxi
 	$(CHARMC) NullLB.ci
 
-BaseLB.decl.h BaseLB.def.h : BaseLB.ci charmxi
+BaseLB.def.h: BaseLB.decl.h
+
+BaseLB.decl.h: BaseLB.ci charmxi
 	$(CHARMC) BaseLB.ci
 
-TraceSummary.decl.h TraceSummary.def.h: trace-summary.ci charmxi
+TraceSummary.def.h: TraceSummary.decl.h
+
+TraceSummary.decl.h: trace-summary.ci charmxi
 	$(CHARMC) trace-summary.ci
-
-init.o: init.C $(CKHEADERS)
-	$(CHARMC) -o init.o init.C
-
-msgalloc.o: msgalloc.C $(CKHEADERS)
-	$(CHARMC) -o msgalloc.o msgalloc.C
-
-register.o: register.C $(CKHEADERS)
-	$(CHARMC) -o register.o register.C
-
-ckfutures.o: ckfutures.C $(CKHEADERS)
-	$(CHARMC) -o ckfutures.o ckfutures.C
-
-tempo.o: tempo.C $(CKHEADERS)
-	$(CHARMC) -o tempo.o tempo.C
-
-qd.o: qd.C $(CKHEADERS)
-	$(CHARMC) -o qd.o qd.C
-
-main.o: main.C $(CKHEADERS)
-	$(CHARMC) -o main.o main.C
 
 debug-message.o: debug-message.C $(CKHEADERS)
 	$(CHARMC) -I. debug-message.C
 
-ck.o: ck.C $(CKHEADERS)
-	$(CHARMC) -o ck.o ck.C
+CkReduction.def.h: CkReduction.decl.h
 
-waitqd.o: waitqd.C $(CKHEADERS)
-	$(CHARMC) -o waitqd.o waitqd.C
-
-CkReduction.decl.h CkReduction.def.h: ckreduction.ci charmxi
+CkReduction.decl.h: ckreduction.ci charmxi
 	$(CHARMC) ckreduction.ci
 
-ckreduction.o: ckreduction.C $(CKHEADERS)
-	$(CHARMC) -o ckreduction.o ckreduction.C
+CkCheckpoint.def.h: CkCheckpoint.decl.h
 
-CkCheckpoint.decl.h CkCheckpoint.def.h: ckcheckpoint.ci charmxi
+CkCheckpoint.decl.h: ckcheckpoint.ci charmxi
 	$(CHARMC) ckcheckpoint.ci
 
-ckcheckpoint.o: ckcheckpoint.C $(CKHEADERS)
-	$(CHARMC) -o ckcheckpoint.o ckcheckpoint.C
+CkMarshall.def.h: CkMarshall.decl.h
 
-CkMarshall.decl.h CkMarshall.def.h : ckmarshall.ci charmxi
+CkMarshall.decl.h: ckmarshall.ci charmxi
 	$(CHARMC) ckmarshall.ci
 
-CkArrayReductionMgr.decl.h CkArrayReductionMgr.def.h : ckarrayreductionmgr.ci charmxi
+CkArrayReductionMgr.def.h: CkArrayReductionMgr.decl.h
+
+CkArrayReductionMgr.decl.h: ckarrayreductionmgr.ci charmxi
 	$(CHARMC) ckarrayreductionmgr.ci
 
-ckarrayreductionmgr.o : ckarrayreductionmgr.C $(CKHEADERS)
-	$(CHARMC) -o ckarrayreductionmgr.o ckarrayreductionmgr.C
+CkArray.def.h: CkArray.decl.h
 
-
-CkArray.decl.h CkArray.def.h : ckarray.ci charmxi
+CkArray.decl.h : ckarray.ci charmxi
 	$(CHARMC) ckarray.ci
 
-ckarray.o: ckarray.C $(CKHEADERS)
-	$(CHARMC) -o ckarray.o ckarray.C
-
+CkLocation.def.h: CkLocation.decl.h
 
 CkLocation.decl.h: cklocation.ci charmxi
 	$(CHARMC) cklocation.ci
 
-cklocation.o: cklocation.C $(CKHEADERS)
-	$(CHARMC) -c cklocation.C
-
-ckcallback.o: ckcallback.C $(CKHEADERS) CkCallback.decl.h
-	$(CHARMC) -c ckcallback.C
+CkCallback.def.h: CkCallback.decl.h
 
 CkCallback.decl.h: ckcallback.ci charmxi
 	$(CHARMC) ckcallback.ci
 
-charisma.decl.h charisma.def.h : charisma.ci charmxi
-	$(CHARMC) charisma.ci
+charisma.def.h: charisma.decl.h
 
-charisma.o: charisma.C $(CKHEADERS)
-	$(CHARMC) -o charisma.o charisma.C
+charisma.decl.h: charisma.ci charmxi
+	$(CHARMC) charisma.ci
 
 ## Charm++ Load balancer (Dynamic load balancer)
 
-BaseLB.o: BaseLB.C $(CKHEADERS)
-	$(CHARMC) -c BaseLB.C
-
-lbdb.o: lbdb.C $(CKHEADERS)
-	$(CHARMC) -o lbdb.o lbdb.C
-
-LBDBManager.o:	LBDBManager.C $(CKHEADERS)
-	$(CHARMC) -o LBDBManager.o LBDBManager.C
-
-LBComm.o:	LBComm.C $(CKHEADERS)
-	$(CHARMC) -o LBComm.o LBComm.C
-
-LBObj.o: LBObj.C $(CKHEADERS)
-	$(CHARMC) -o LBObj.o LBObj.C
-
-LBMachineUtil.o: LBMachineUtil.C $(CKHEADERS)
-	$(CHARMC) -o LBMachineUtil.o LBMachineUtil.C
-
-LBDatabase.o: LBDatabase.C $(CKHEADERS)
-	$(CHARMC) -o LBDatabase.o LBDatabase.C
-
-NullLB.o: NullLB.C $(CKHEADERS)
-	$(CHARMC) -c NullLB.C
-
-Refiner.o: Refiner.C $(CKHEADERS)
-	$(CHARMC) -o Refiner.o Refiner.C
-
-ObjGraph.o: ObjGraph.C $(CKHEADERS)
-	$(CHARMC) -o ObjGraph.o ObjGraph.C
-
-graph.o: graph.c  $(CVHEADERS)
-	$(CHARMC) -o graph.o graph.c
-
-bitvecset.o: bitvecset.c bitvecset.h $(CVHEADERS)
-	$(CHARMC) -o bitvecset.o bitvecset.c
-
-Set.o: Set.C $(CKHEADERS) Set.h elements.h
-	$(CHARMC) -o Set.o Set.C
-
-heap.o: heap.C $(CKHEADERS) elements.h heap.h
-	$(CHARMC) -o heap.o heap.C
+CentralLB.def.h: CentralLB.decl.h
 
 CentralLB.decl.h: CentralLB.ci charmxi
 	$(CHARMC) CentralLB.ci
 
-CentralLB.o: CentralLB.C CentralLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c CentralLB.C
+NborBaseLB.def.h: NborBaseLB.decl.h
 
 NborBaseLB.decl.h: NborBaseLB.ci charmxi
 	$(CHARMC) NborBaseLB.ci
-
-NborBaseLB.o: NborBaseLB.C NborBaseLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c NborBaseLB.C
-
-CommLBHeap.o: CommLBHeap.C $(CKHEADERS)
-	$(CHARMC) -c CommLBHeap.C
-
-LBSimulation.o : LBSimulation.h LBSimulation.C $(CVHEADERS)
-	$(CHARMC) -c LBSimulation.C
-
-## Communication Library array listener code
-ComlibArrayListener.o : ComlibArrayListener.C ComlibArrayListener.h $(CVHEADERS)
-	$(CHARMC) -c ComlibArrayListener.C
-
-ComlibStrategy.o : ComlibStrategy.C ComlibStrategy.h $(CVHEADERS)
-	$(CHARMC) -c ComlibStrategy.C
 
 
 ## Tracing libraries (profiling, -tracemode)
@@ -764,136 +690,109 @@ LOADBALANCERS=\
    $(L)/libmoduleGreedyRefLB.a \
    $(L)/libmoduleOrbLB.a \
    $(L)/libmoduleRandRefLB.a \
-   $(L)/libmoduleWSLB.a \
    manager.o
 
-manager.o: manager.C manager.h $(CVHEADERS)
-	$(CHARMC) -c manager.C
+DummyLB.def.h: DummyLB.decl.h
 
 DummyLB.decl.h: DummyLB.ci charmxi
 	$(CHARMC) DummyLB.ci
 
-DummyLB.o: DummyLB.C DummyLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c DummyLB.C
-
 $(L)/libmoduleDummyLB.a: DummyLB.o 
 	$(CHARMC) -o $(L)/libmoduleDummyLB.a DummyLB.o 
 	
+RandCentLB.def.h: RandCentLB.decl.h
 
 RandCentLB.decl.h: RandCentLB.ci charmxi
 	$(CHARMC) RandCentLB.ci
 
-RandCentLB.o: RandCentLB.C RandCentLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c RandCentLB.C
-
 $(L)/libmoduleRandCentLB.a: RandCentLB.o 
 	$(CHARMC) -o $(L)/libmoduleRandCentLB.a RandCentLB.o 
 	
+RecBisectBfLB.def.h: RecBisectBfLB.decl.h
 
 RecBisectBfLB.decl.h: RecBisectBfLB.ci charmxi
 	$(CHARMC) RecBisectBfLB.ci
 
-RecBisectBfLB.o: RecBisectBfLB.C RecBisectBfLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c RecBisectBfLB.C
-
 $(L)/libmoduleRecBisectBfLB.a: RecBisectBfLB.o 
 	$(CHARMC) -o $(L)/libmoduleRecBisectBfLB.a RecBisectBfLB.o 
 	
+MetisLB.def.h: MetisLB.decl.h
 
 MetisLB.decl.h: MetisLB.ci charmxi
 	$(CHARMC) MetisLB.ci
-
-MetisLB.o: MetisLB.C MetisLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c MetisLB.C
 
 $(L)/libmoduleMetisLB.a: MetisLB.o 
 	$(CHARMC) -o $(L)/libmoduleMetisLB.a MetisLB.o 
 	cp libmoduleMetisLB.dep $(L)/
 
+RefineLB.def.h: RefineLB.decl.h
+
 RefineLB.decl.h: RefineLB.ci charmxi
 	$(CHARMC) RefineLB.ci
-
-RefineLB.o: RefineLB.C RefineLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c RefineLB.C
 
 $(L)/libmoduleRefineLB.a: RefineLB.o 
 	$(CHARMC) -o $(L)/libmoduleRefineLB.a RefineLB.o 
 	
+CommLB.def.h: CommLB.decl.h
+
 CommLB.decl.h: CommLB.ci charmxi
 	$(CHARMC) CommLB.ci
-
-CommLB.o: CommLB.C CommLB.decl.h manager.h $(CKHEADERS)
-	$(CHARMC) -c CommLB.C 
 
 $(L)/libmoduleCommLB.a: CommLB.o manager.o
 	$(CHARMC) -o $(L)/libmoduleCommLB.a CommLB.o manager.o
 	
+Comm1LB.def.h: Comm1LB.decl.h
 
 Comm1LB.decl.h: Comm1LB.ci charmxi
 	$(CHARMC) Comm1LB.ci
 
-Comm1LB.o: Comm1LB.C Comm1LB.decl.h $(CKHEADERS)
-	$(CHARMC) -c Comm1LB.C
-
 $(L)/libmoduleComm1LB.a: Comm1LB.o 
 	$(CHARMC) -o $(L)/libmoduleComm1LB.a Comm1LB.o 
 	
+GreedyLB.def: GreedyLB.decl.h
 
 GreedyLB.decl.h: GreedyLB.ci charmxi
 	$(CHARMC) GreedyLB.ci
 
-GreedyLB.o: GreedyLB.C GreedyLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c GreedyLB.C
-
 $(L)/libmoduleGreedyLB.a: GreedyLB.o 
 	$(CHARMC) -o $(L)/libmoduleGreedyLB.a GreedyLB.o 
 	
+NeighborLB.def.h: NeighborLB.decl.h
 
 NeighborLB.decl.h: NeighborLB.ci charmxi
 	$(CHARMC) NeighborLB.ci
 
-NeighborLB.o: NeighborLB.C NeighborLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c NeighborLB.C
-
 $(L)/libmoduleNeighborLB.a: NeighborLB.o 
 	$(CHARMC) -o $(L)/libmoduleNeighborLB.a NeighborLB.o 
 	
+GreedyRefLB.def.h: GreedyRefLB.decl.h
 
 GreedyRefLB.decl.h: GreedyRefLB.ci charmxi
 	$(CHARMC) GreedyRefLB.ci
 
-GreedyRefLB.o: GreedyRefLB.C GreedyRefLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c GreedyRefLB.C
-
 $(L)/libmoduleGreedyRefLB.a: GreedyRefLB.o 
 	$(CHARMC) -o $(L)/libmoduleGreedyRefLB.a GreedyRefLB.o 
 	
+OrbLB.def.h: OrbLB.decl.h
 
 OrbLB.decl.h: OrbLB.ci charmxi
 	$(CHARMC) OrbLB.ci
 
-OrbLB.o: OrbLB.C OrbLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c OrbLB.C
-
 $(L)/libmoduleOrbLB.a: OrbLB.o 
 	$(CHARMC) -o $(L)/libmoduleOrbLB.a OrbLB.o 
-	
+
+RandRefLB.def.h: RandRefLB.decl.h
 
 RandRefLB.decl.h: RandRefLB.ci charmxi
 	$(CHARMC) RandRefLB.ci
 
-RandRefLB.o: RandRefLB.C RandRefLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c RandRefLB.C
-
 $(L)/libmoduleRandRefLB.a: RandRefLB.o 
 	$(CHARMC) -o $(L)/libmoduleRandRefLB.a RandRefLB.o 
-	
+
+WSLB.def.h: WSLB.decl.h
 
 WSLB.decl.h: WSLB.ci charmxi
 	$(CHARMC) WSLB.ci
-
-WSLB.o: WSLB.C WSLB.decl.h $(CKHEADERS)
-	$(CHARMC) -c WSLB.C
 
 $(L)/libmoduleWSLB.a: WSLB.o 
 	$(CHARMC) -o $(L)/libmoduleWSLB.a WSLB.o 
@@ -912,11 +811,9 @@ LB_OBJ=EveryLB.o \
     GreedyRefLB.o \
     OrbLB.o \
     RandRefLB.o \
-    WSLB.o \
     manager.o
 
-EveryLB.o: EveryLB.C EveryLB.decl.h $(CVHEADERS)
-	$(CHARMC) -c EveryLB.C
+EveryLB.def.h: EveryLB.decl.h
 
 EveryLB.decl.h: EveryLB.ci $(CVHEADERS)
 	$(CHARMC) EveryLB.ci
@@ -947,27 +844,6 @@ $(L)/libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
 BLUE_HEADERS = blue_types.h blue_timing.h blue_defs.h blue_logs.h blue.h blue_impl.h
 BLUE_OBJS = blue.o blue_node.o blue_proc.o blue_init.o blue_timing.o
 BLUE_IO_OBJS = blue_IO.o blue_logs.o
-
-blue.o:  blue.C $(BLUE_HEADERS) $(CVHEADERS)
-	$(CHARMC) -c blue.C
-
-blue_node.o:  blue_node.C $(BLUE_HEADERS) $(CVHEADERS)
-	$(CHARMC) -c blue_node.C
-
-blue_proc.o:  blue_proc.C $(BLUE_HEADERS) $(CVHEADERS)
-	$(CHARMC) -c blue_proc.C
-
-blue_timing.o:  blue_timing.C $(BLUE_HEADERS) $(CVHEADERS)
-	$(CHARMC) -c blue_timing.C
-
-blue_init.o:  blue_init.C $(BLUE_HEADERS) $(CVHEADERS)
-	$(CHARMC) -c blue_init.C
-
-blue_logs.o:  blue_logs.C $(BLUE_HEADERS) $(CVHEADERS)
-	$(CHARMC) -c blue_logs.C
-
-blue_IO.o:  blue_IO.C $(BLUE_HEADERS) $(CVHEADERS)
-	$(CHARMC) -c blue_IO.C
 
 $(L)/libconv-bluegene.a: $(BLUE_OBJS)
 	$(CHARMC) -o $@  $(BLUE_OBJS)
@@ -1119,3 +995,21 @@ veryclean:
 
 configure: configure.in
 	-autoconf && autoheader
+
+depends:  
+	echo "Creating " $(DEPENDFILE) " ..."; 
+	if [ -f $(DEPENDFILE) ]; then \
+           /bin/cp -f $(DEPENDFILE) $(DEPENDFILE).old; \
+        fi; \
+	echo > $(DEPENDFILE); \
+        for i in $(LIBCK_CORE) $(LB_OBJ) $(BLUE_OBJS) $(BLUE_IO_OBJS); do \
+	      [ $$i = "charmProjections.o" ] && continue;	\
+	      SRCFILE=`basename $$i .o`.C ; \
+	      [ ! -f $$SRCFILE ] && SRCFILE=`basename $$i .o`.c ;	\
+              echo "checking dependencies for $$SRCFILE" ; \
+              g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE | \
+              perl ../bin/dep.pl $(INC) /usr/include /usr/local >> $(DEPENDFILE); \
+              echo '	$$(CHARMC) -c '$$SRCFILE >> $(DEPENDFILE) ; \
+	      echo '' >> $(DEPENDFILE) ; \
+        done; 
+
