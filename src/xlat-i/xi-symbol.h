@@ -401,9 +401,7 @@ class Entry : public Member {
     void genChareStaticConstructorDefs(XStr& str);
     void genChareDefs(XStr& str);
     void genGroupStaticConstructorDefs(XStr& str);
-    void genArrayStaticConstructorDefs(XStr& str);
     void genGroupDefs(XStr& str);
-    void genArrayDefs(XStr& str);
   public:
     Entry(int a, EnType *r, char *n, EnType *p, Value *sz=0) :
       attribs(a), retType(r), name(n), param(p), stacksize(sz)

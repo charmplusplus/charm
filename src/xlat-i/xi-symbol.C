@@ -1057,10 +1057,32 @@ void Entry::genGroupStaticConstructorDecl(XStr& str)
 
 void Entry::genArrayStaticConstructorDecl(XStr& str)
 {
-  str << "    static CkAID ckNew(int numElements);\n";
+  str << "    static CkAID ckNew(int numElements)\n";
+  str << "{\n";
+  str << "  return CkAID(Array1D::CreateArray(numElements,ChareIndex(RRMap),\n";
+  str << "    ConstructorIndex(RRMap,ArrayMapCreateMessage),\n";
+  str << "    __idx, ConstructorIndex(";
+  str << name;
+  str << ", ArrayElementCreateMessage), ConstructorIndex(";
+  str << name;
+  str << ", ArrayElementMigrateMessage)),-1);\n";
+  str << "}\n";
   str << "    ";
   container->genProxyName(str);
-  str << "(int numElements);\n";
+  str << "(int numElements)";
+  if(container->isDerived()) {
+    str << ": ";
+    container->genProxyBases(str, "", "(numElements)", ", ");
+  }
+  str << "\n{\n";
+  str << "  setAid(Array1D::CreateArray(numElements, ChareIndex(RRMap),\n";
+  str << "    ConstructorIndex(RRMap,ArrayMapCreateMessage),\n";
+  str << "    __idx, ConstructorIndex(";
+  str << name;
+  str << ", ArrayElementCreateMessage), ConstructorIndex(";
+  str << name;
+  str << ", ArrayElementMigrateMessage))); _elem=-1;\n";
+  str << "}\n";
   // entry ptr declaration
   str << "    static int ckIdx_" << name << "(";
   if(param!=0)
@@ -1509,50 +1531,6 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
   str << "}\n";
 }
 
-void Entry::genArrayStaticConstructorDefs(XStr& str)
-{
-  if(container->isTemplated())
-    container->genSpec(str);
-  str << "CkAID ";
-  container->genProxyName(str);
-  if(container->isTemplated())
-    container->genVars(str);
-  str << "::ckNew(int numElements)\n";
-  assert(param==0);
-  str << "{\n";
-  str << "  return CkAID(Array1D::CreateArray(numElements,ChareIndex(RRMap),\n";
-  str << "    ConstructorIndex(RRMap,ArrayMapCreateMessage),\n";
-  str << "    __idx, ConstructorIndex(";
-  str << name;
-  str << ", ArrayElementCreateMessage), ConstructorIndex(";
-  str << name;
-  str << ", ArrayElementMigrateMessage)),-1);\n";
-  str << "}\n";
-
-  if(container->isTemplated())
-    container->genSpec(str);
-  str << " ";
-  container->genProxyName(str);
-  if(container->isTemplated())
-    container->genVars(str);
-  str << "::";
-  container->genProxyName(str);
-  str << "(int numElements)";
-  if(container->isDerived()) {
-    str << ": ";
-    container->genProxyBases(str, "", "(numElements)", ", ");
-  }
-  str << "\n{\n";
-  str << "  setAid(Array1D::CreateArray(numElements, ChareIndex(RRMap),\n";
-  str << "    ConstructorIndex(RRMap,ArrayMapCreateMessage),\n";
-  str << "    __idx, ConstructorIndex(";
-  str << name;
-  str << ", ArrayElementCreateMessage), ConstructorIndex(";
-  str << name;
-  str << ", ArrayElementMigrateMessage))); _elem=-1;\n";
-  str << "}\n";
-}
-
 void Entry::genChareDefs(XStr& str)
 {
   if(isConstructor()) {
@@ -1603,14 +1581,6 @@ void Entry::genGroupDefs(XStr& str)
   }
 }
 
-void Entry::genArrayDefs(XStr& str)
-{
-  if(isConstructor()) {
-    genArrayStaticConstructorDefs(str);
-  } else {
-  }
-}
-
 void Entry::genDefs(XStr& str)
 {
   str << "/* DEFS: "; print(str); str << " */\n";
@@ -1618,7 +1588,6 @@ void Entry::genDefs(XStr& str)
   if(container->getChareType()==SGROUP||container->getChareType()==SNODEGROUP){
     genGroupDefs(str);
   } else if (container->getChareType()==SARRAY) {
-    genArrayDefs(str);
   } else
     genChareDefs(str);
   // call function
