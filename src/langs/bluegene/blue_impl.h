@@ -346,6 +346,7 @@ public:
 #endif
 public:
   nodeInfo();
+  void initThreads(int _id);  		/* init threads */
   ~nodeInfo();
   /**
    *  add a message to this bluegene node's inbuffer queue
@@ -372,7 +373,7 @@ public:
 class threadInfo {
 public:
   short id;
-//  int globalId;
+  int globalId;
   ThreadType  type;		/* worker or communication thread */
   CthThread me;			/* Converse thread handler */
   nodeInfo *myNode;		/* the node belonged to */
@@ -384,10 +385,7 @@ public:
 
 public:
   threadInfo(int _id, ThreadType _type, nodeInfo *_node): 
-  	id(_id), type(_type), myNode(_node), currTime(0.0) 
-  {
-//    if (id != -1) globalId = nodeInfo::Local2Global(_node->id)*(cva(numCth)+cva(numWth))+_id;
-  }
+  	id(_id), globalId(-1), type(_type), myNode(_node), currTime(0.0) {}
   inline void setThread(CthThread t) { me = t; }
   inline CthThread getThread() const { return me; }
   virtual void run() { CmiAbort("run not imlplemented"); }
@@ -397,8 +395,13 @@ class workThreadInfo : public threadInfo {
 private:
   int CsdStopFlag;
 public:
-  workThreadInfo(int _id, ThreadType _type, nodeInfo *_node): 
-        threadInfo(_id, _type, _node) { CsdStopFlag=0; }
+  workThreadInfo(int _id, nodeInfo *_node): 
+        threadInfo(_id, WORK_THREAD, _node) { 
+    CsdStopFlag=0; 
+    if (_id != -1) {
+      globalId = nodeInfo::Local2Global(_node->id)*(cva(bgMach).numWth)+_id;
+    }
+  }
   void addAffMessage(char *msgPtr);        ///  add msg to affinity queue
   void run();
   void scheduler(int count);
@@ -407,8 +410,8 @@ public:
 
 class commThreadInfo : public threadInfo {
 public:
-  commThreadInfo(int _id, ThreadType _type, nodeInfo *_node): 
-        threadInfo(_id, _type, _node) {}
+  commThreadInfo(int _id, nodeInfo *_node): 
+     threadInfo(_id, COMM_THREAD, _node) {}
   void run();
 };
 

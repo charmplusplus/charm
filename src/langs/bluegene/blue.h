@@ -133,6 +133,7 @@ void BgNumberHandler(int, BgHandler h);
 void BgNumberHandlerEx(int, BgHandlerEx h, void *userPtr);
 
 /************************ send packet functions ************************/
+#if 0
 /**
   Send a packet to a thread in same Blue Gene node
 */
@@ -143,8 +144,9 @@ void BgSendLocalPacket(int threadID, int handlerID, WorkType type,
 */
 void BgSendNonLocalPacket(int x, int y, int z, int threadID, int handlerID, 
                           WorkType type, int numbytes, char* data);
+#endif
 /**
-  Send a packet to a thread(threadID) to Blue Gene node (x,y,z)
+  Send a packet to a thread(threadID) on Blue Gene node (x,y,z)
   this is a wrapper of above two.
 */
 void BgSendPacket(int x, int y, int z, int threadID, int handlerID, 
@@ -296,12 +298,21 @@ public:
       }
     }
   }
+/*
+  inline d getThreadData() {
+    ASSERT(tTHREADTYPE == WORK_THREAD || tTHREADTYPE == COMM_THREAD);
+    ASSERT(!cva(simState).inEmulatorInit);
+    threadInfo *tinfo = cta(threadinfo);
+    return data[CmiMyRank()][thinfo->myNode->id][thinfo->id];
+  }
+*/
 };
 #define BpvDeclare(T,v)        Cpv<T> CMK_CONCAT(Bpv_Var, v); 
 #define BpvStaticDeclare(T,v)  static Cpv<T> CMK_CONCAT(Bpv_Var, v); 
 #define BpvExtern(T,v)         extern Cpv<T> CMK_CONCAT(Bpv_Var, v);
 #define BpvInitialize(T,v)     CMK_CONCAT(Bpv_Var, v).init()
 #define BpvAccess(v)           CMK_CONCAT(Bpv_Var, v).data[CmiMyRank()][BgMyRank()][BgGetThreadID()]
+/*#define BpvAccess(v)           (CMK_CONCAT(Bpv_Var, v).getThreadData())*/
 #define BpvAccessOther(v, r)   CMK_CONCAT(Bpv_Var, v).data[CmiMyRank()][BgMyRank()][r]
 #endif
 

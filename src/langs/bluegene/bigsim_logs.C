@@ -143,19 +143,23 @@ BgTimeLog::BgTimeLog(int epc, char* namestr, double sTime, double eTime)
   flag = 0;
 }
 
+// create a new log from a message
 BgTimeLog::BgTimeLog(char *msg, char *str)
 {
   if (str)
     strcpy(name,str);
   else
     strcpy(name,"msgep");
-  ep = msg?CmiBgMsgHandle(msg):-1;
   startTime = timerFunc();
-  recvTime = msg?CmiBgMsgRecvTime(msg):0;//startTime;
   endTime = 0.0;
   execTime = 0.0;
-  if (msg)
+  recvTime = 0.0;
+  ep = -1;
+  if (msg) {
+    ep = CmiBgMsgHandle(msg);
+    recvTime = CmiBgMsgRecvTime(msg);  //startTime;
     msgId = BgMsgID(CmiBgMsgSrcPe(msg), CmiBgMsgID(msg));
+  }
 
   oldStartTime=startTime;
   effRecvTime = recvTime;
@@ -327,6 +331,7 @@ void BgTimeLog::pup(PUP::er &p){
 // create a log with msg and insert into timeline
 void BgTimeLineRec::logEntryStart(char *msg) {
 //CmiPrintf("[%d] BgTimeLineRec::logEntryStart\n", BgGetGlobalWorkerThreadID());
+  CmiAssert(genTimeLog);
   if (!genTimeLog) return;
   CmiAssert(bgCurLog == NULL);
   bgCurLog = new BgTimeLog(msg);
@@ -336,6 +341,7 @@ void BgTimeLineRec::logEntryStart(char *msg) {
 // insert an log into timeline
 void BgTimeLineRec::logEntryInsert(BgTimeLog* log)
 {
+  CmiAssert(genTimeLog);
   if (!genTimeLog) return;
 //CmiPrintf("[%d] BgTimeLineRec::logEntryInsert\n", BgGetGlobalWorkerThreadID());
   CmiAssert(bgCurLog == NULL);
@@ -356,6 +362,7 @@ void BgTimeLineRec::logEntryStart(BgTimeLog* log)
 }
 
 void BgTimeLineRec::logEntryClose() {
+  CmiAssert(genTimeLog);
   if (!genTimeLog) return;
 //CmiPrintf("[%d] BgTimeLineRec::logEntryClose\n", BgGetGlobalWorkerThreadID());
   BgTimeLog *lastlog = timeline[timeline.length()-1];
@@ -367,6 +374,7 @@ void BgTimeLineRec::logEntryClose() {
 void BgTimeLineRec::logEntrySplit()
 {
 //CmiPrintf("BgTimeLineRec::logEntrySplit\n");
+  CmiAssert(genTimeLog);
   if (!genTimeLog) return;
   CmiAssert(bgCurLog != NULL);
   BgTimeLog *rootLog = bgCurLog;

@@ -8,7 +8,7 @@ BgTimeLineRec* currTline = NULL;
 int currTlineIdx=0;
 
 //Used for parallel file I/O
-void BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec){
+int BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec){
 
   /*Right now works only for cyclicMapInfo - needs a more general scheme*/
   int nodeNum = procNum/numWth;
@@ -28,6 +28,10 @@ void BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNod
  
   sprintf(fName,"bgTrace%d",fileNum);
   FILE*  f = fopen(fName,"r");
+  if (f == NULL) {
+    printf("Error> Open failed with %s. \n", fName);
+    return -1;
+  }
 //  PUP::fromDisk p(f);
   PUP::fromDisk pd(f);
   PUP::machineInfo machInfo;
@@ -39,7 +43,7 @@ void BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNod
   tlinerec.pup(p);
   fclose(f);
 
-  return;
+  return fileNum;
 }
 
 
@@ -74,6 +78,10 @@ int BgLoadTraceSummary(char *fname, int &totalProcs, int &numX, int &numY, int &
   PUP::machineInfo machInfo;
 
   FILE* f = fopen(fname,"r");
+  if (f == NULL) {
+    printf("Error> Open failed with %s. \n", fname);
+    return -1;
+  }
 
   PUP::fromDisk pd(f);
   pd((char *)&machInfo, sizeof(machInfo));	// load machine info

@@ -58,10 +58,10 @@ inline int isEqual(double v1, double v2){
 #if BLUEGENE_TIMING
 
 #define BG_ENTRYSTART(m)  \
-	tTIMELINEREC.logEntryStart(m);
+	if (genTimeLog) tTIMELINEREC.logEntryStart(m);
 
 #define BG_ENTRYEND()  \
-	BgLogEntryCommit(tTIMELINEREC);
+	if (genTimeLog) BgLogEntryCommit(tTIMELINEREC);
 
 #define BG_ADDMSG(m, node, tid, local)  	\
         BgGetTime();		\
@@ -87,6 +87,7 @@ inline int isEqual(double v1, double v2){
             }						\
 	    /* log[log.length()-1]->print(); */		\
           }	\
+	  /* reset start time bypassing the previous code */	\
 	  if (cva(bgMach).timingMethod == BG_WALLTIME)\
                 tSTARTTIME = CmiWallTimer();\
           else if (cva(bgMach).timingMethod == BG_ELAPSE)\

@@ -374,7 +374,7 @@ void CmiSendPacket(int x, int y, int z, int msgSize,char *msg)
 
 /* send will copy data to msg buffer */
 /* user data is not freeed in this routine, user can reuse the data ! */
-void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* sendmsg, int local)
+void sendPacket_(nodeInfo *myNode, int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* sendmsg, int local)
 {
   CmiSetHandler(sendmsg, cva(simState).msgHandler);
   CmiBgMsgNodeID(sendmsg) = nodeInfo::XYZ2Global(x,y,z);
@@ -383,7 +383,7 @@ void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type
   CmiBgMsgType(sendmsg) = type;
   CmiBgMsgLength(sendmsg) = numbytes;
   BgElapse(cva(bgMach).network->alphacost());
-  double latency = MSGTIME(tMYX, tMYY, tMYZ, x,y,z, numbytes);
+  double latency = MSGTIME(myNode->x, myNode->y, myNode->z, x,y,z, numbytes);
   CmiAssert(latency >= 0);
   CmiBgMsgRecvTime(sendmsg) = latency + BgGetTime();
   
@@ -392,7 +392,7 @@ void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type
   BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, local);
 
   if (local)
-    addBgNodeInbuffer(sendmsg, tMYNODEID);
+    addBgNodeInbuffer(sendmsg, myNode->id);
   else
     CmiSendPacket(x, y, z, numbytes, sendmsg);
 }
@@ -400,6 +400,7 @@ void sendPacket_(int x, int y, int z, int threadID, int handlerID, WorkType type
 /* broadcast will copy data to msg buffer */
 static inline void nodeBroadcastPacketExcept_(int node, CmiInt2 threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
 {
+  nodeInfo *myNode = cta(threadinfo)->myNode;
   CmiSetHandler(sendmsg, cva(simState).nBcastMsgHandler);
   if (node >= 0)
     CmiBgMsgNodeID(sendmsg) = -node-100;
@@ -410,7 +411,7 @@ static inline void nodeBroadcastPacketExcept_(int node, CmiInt2 threadID, int ha
   CmiBgMsgType(sendmsg) = type;	
   CmiBgMsgLength(sendmsg) = numbytes;
   /* FIXME */
-  CmiBgMsgRecvTime(sendmsg) = MSGTIME(tMYX, tMYY, tMYZ, 0,0,0, numbytes) + BgGetTime();
+  CmiBgMsgRecvTime(sendmsg) = MSGTIME(myNode->x, myNode->y, myNode->z, 0,0,0, numbytes) + BgGetTime();
 
   // timing
   // FIXME
@@ -466,28 +467,31 @@ static inline void threadBroadcastPacketExcept_(int node, CmiInt2 threadID, int 
 
 /* sendPacket to route */
 /* this function can be called by any thread */
-void BgSendNonLocalPacket(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char * data)
+void BgSendNonLocalPacket(nodeInfo *myNode, int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char * data)
 {
+#ifndef CMK_OPTIMIZE
   if (x<0 || y<0 || z<0 || x>=cva(bgMach).x || y>=cva(bgMach).y || z>=cva(bgMach).z) {
     CmiPrintf("Trying to send packet to a nonexisting node: (%d %d %d)!\n", x,y,z);
     CmiAbort("Abort!\n");
   }
+#endif
 
-  sendPacket_(x, y, z, threadID, handlerID, type, numbytes, data, 0);
+  sendPacket_(myNode, x, y, z, threadID, handlerID, type, numbytes, data, 0);
 }
 
-void BgSendLocalPacket(int threadID, int handlerID, WorkType type, int numbytes, char * data)
+void BgSendLocalPacket(nodeInfo *myNode, int threadID, int handlerID, WorkType type, int numbytes, char * data)
 {
-  sendPacket_(tMYX, tMYY, tMYZ, threadID, handlerID, type, numbytes, data, 1);
+  sendPacket_(myNode, myNode->x, myNode->y, myNode->z, threadID, handlerID, type, numbytes, data, 1);
 }
 
 /* wrapper of the previous two functions */
 void BgSendPacket(int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char * data)
 {
-  if (tMYX == x && tMYY==y && tMYZ==z)
-    BgSendLocalPacket(threadID, handlerID, type, numbytes, data);
+  nodeInfo *myNode = cta(threadinfo)->myNode;
+  if (myNode->x == x && myNode->y == y && myNode->z == z)
+    BgSendLocalPacket(myNode,threadID, handlerID, type, numbytes, data);
   else
-    BgSendNonLocalPacket(x,y,z,threadID,handlerID, type, numbytes, data);
+    BgSendNonLocalPacket(myNode,x,y,z,threadID,handlerID, type, numbytes, data);
 }
 
 void BgBroadcastPacketExcept(int node, CmiInt2 threadID, int handlerID, WorkType type, int numbytes, char * data)
@@ -576,24 +580,26 @@ int BgNodeToPE(int node)
   return nodeInfo::Global2PE(node);
 }
 
+// thread ID on a BG node
 int BgGetThreadID()
 {
   ASSERT(tTHREADTYPE == WORK_THREAD || tTHREADTYPE == COMM_THREAD);
+//  if (cva(bgMach).numWth == 1) return 0;   // accessing ctv is expensive
   return tMYID;
 }
 
 int BgGetGlobalThreadID()
 {
   ASSERT(tTHREADTYPE == WORK_THREAD || tTHREADTYPE == COMM_THREAD);
-  return nodeInfo::Local2Global(tMYNODE->id)*(cva(bgMach).numTh())+tMYID;
-//  return tMYGLOBALID;
+  return nodeInfo::Local2Global(tMYNODEID)*(cva(bgMach).numTh())+tMYID;
+  //return tMYGLOBALID;
 }
 
 int BgGetGlobalWorkerThreadID()
 {
   ASSERT(tTHREADTYPE == WORK_THREAD);
-  return nodeInfo::Local2Global(tMYNODE->id)*cva(bgMach).numWth+tMYID;
-//  return tMYGLOBALID;
+//  return nodeInfo::Local2Global(tMYNODEID)*cva(bgMach).numWth+tMYID;
+  return tMYGLOBALID;
 }
 
 char *BgGetNodeData()
@@ -662,6 +668,13 @@ void startVTimer()
 #endif
 }
 
+static inline void advanceTime(double inc)
+{
+  CmiAssert(inc>=0.0);
+  inc *= cva(bgMach).cpufactor;
+  tCURRTIME += inc;
+}
+
 void stopVTimer()
 {
   CmiAssert(tTIMERON == 1);
@@ -669,10 +682,8 @@ void stopVTimer()
   if (cva(bgMach).timingMethod == BG_WALLTIME) {
     const double tp = CmiWallTimer();
     double inc = tp-tSTARTTIME;
-    CmiAssert(inc>=0.0);
-    inc *= cva(bgMach).cpufactor;
-    tCURRTIME += inc;
-    tSTARTTIME = tp;
+    advanceTime(inc);
+//    tSTARTTIME = CmiWallTimer();	// skip the above time
   }
   else if (cva(bgMach).timingMethod == BG_ELAPSE) {
     // if no bgelapse called, assume it takes 1us
@@ -696,11 +707,10 @@ double BgGetTime()
     /* accumulate time since last starttime, and reset starttime */
     if (tTIMERON) {
       const double tp2= CmiWallTimer();
-      double inc = tp2 - tSTARTTIME;
-      CmiAssert(inc>=0.0);
-      inc *= cva(bgMach).cpufactor;
-      tCURRTIME += inc;
-      tSTARTTIME = tp2;
+      double &startTime = tSTARTTIME;
+      double inc = tp2 - startTime;
+      advanceTime(inc);
+      startTime = CmiWallTimer();
     }
     return tCURRTIME;
   }
@@ -1060,8 +1070,8 @@ CmiStartFn bgMain(int argc, char **argv)
   for (i=0; i<cva(numNodes); i++)
   {
     nodeInfo *ninfo = cva(nodeinfo) + i;
-    ninfo->id = i;
-    nodeInfo::Local2XYZ(i, &ninfo->x, &ninfo->y, &ninfo->z);
+    // create threads
+    ninfo->initThreads(i);
 
     /* pretend that I am a thread */
     cta(threadinfo)->myNode = ninfo;

@@ -80,47 +80,4 @@ extern void BgSendPendingCorrections(BgTimeLineRec &tlinerec, int mynode);
 extern void BgLogEntryCommit(BgTimeLineRec &tlinerec);
 
 
-#if 0
-#if BLUEGENE_TIMING
-
-#define BG_ENTRYSTART(handler, m)  \
-	tTIMELINEREC.logEntryStart(handler, m);
-
-#define BG_ENTRYEND()  \
-	tTIMELINEREC.logEntryCommit();
-
-#define BG_ADDMSG(m, node, tid, local)  	\
-        if (genTimeLog)	{ \
-          BgGetTime();		\
-	  BgMsgSetTiming(m); 	\
-	  if (tTHREADTYPE == WORK_THREAD) {	\
-            BgTimeLineRec &tlinerec = tTIMELINEREC;	\
-            int n = tlinerec.length();			\
-            if (n>0) {					\
-              BgTimeLog *tlog = tlinerec[n-1];		\
-	      if (tlog->endTime == 0.0)			\
-                tlog->addMsg(m, node, tid, local);	\
-	      else {	 /* standalone msg */		\
-		  double curT = CmiBgMsgRecvTime(m);		\
-		  BgTimeLog *newLog = new BgTimeLog(-1, "addMsg", curT, curT); \
-		  newLog->recvTime = newLog->effRecvTime = curT;	\
-                  newLog->addMsg(m, node, tid, local);		\
-		  tlinerec.logEntryInsert(newLog);			\
-		  tlinerec.clearSendingLogs();		\
-		}					\
-            }						\
-	    /* log[log.length()-1]->print(); */		\
-          }	\
-	  if (timingMethod == BG_WALLTIME)\
-                tSTARTTIME = CmiWallTimer();\
-          else if (timingMethod == BG_ELAPSE)\
-                tSTARTTIME = tCURRTIME;	\
-	}
-#else
-#define BG_ENTRYSTART(handler, m)
-#define BG_ENTRYEND()
-#define BG_ADDMSG(m, node, tid)
-#endif
-#endif
-
 #endif

@@ -78,7 +78,9 @@ void *BgCreateEvent(int eidx)
 // the parent log is bgCurLog
 void BgEntrySplit()
 {
+  stopVTimer();
   tTIMELINEREC.logEntrySplit();
+  startVTimer();
 }
 
 // must be called inside a timelog

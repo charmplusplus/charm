@@ -28,22 +28,30 @@ nodeInfo::nodeInfo(): lastW(0), udata(NULL), started(0), timeron_flag(0)
     affinityQ = new ckMsgQueue[numWth];
     _MEMCHECK(affinityQ);
 
-    // create threadinfo
-    for (i=0; i< numWth; i++)
-    {
-      threadinfo[i] = new workThreadInfo(i, WORK_THREAD, this);
-      _MEMCHECK(threadinfo[i]);
-    }
-    for (i=0; i< cva(bgMach).numCth; i++)
-    {
-      threadinfo[i+numWth] = new commThreadInfo(i+numWth, COMM_THREAD, this);
-      _MEMCHECK(threadinfo[i+numWth]);
-    }
 #if BLUEGENE_TIMING
     timelines = new BgTimeLineRec[numWth]; // set default size 1024
     _MEMCHECK(timelines);
 #endif
+}
+
+void nodeInfo::initThreads(int _id)
+{
+  id = _id;
+  Local2XYZ(id, &x, &y, &z);
+  // create threadinfo
+  const int numWth = cva(bgMach).numWth;
+  int i;
+  for (i=0; i< numWth; i++)
+  {
+      threadinfo[i] = new workThreadInfo(i, this);
+      _MEMCHECK(threadinfo[i]);
   }
+  for (i=0; i< cva(bgMach).numCth; i++)
+  {
+      threadinfo[i+numWth] = new commThreadInfo(i+numWth, this);
+      _MEMCHECK(threadinfo[i+numWth]);
+  }
+}
 
 nodeInfo::~nodeInfo() 
 {
@@ -141,7 +149,7 @@ void nodeInfo::addBgNodeMessage(char *msgPtr)
       CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
   }
 #else
-    // only awake rank 0 thread, which is a comm thread
+    // only awake rank 0 thread, which is a comm thread ????
   ((workThreadInfo *)threadinfo[0])->addAffMessage(msgPtr);
 /*
   affinityQ[0].enq(msgPtr);
