@@ -179,7 +179,7 @@ The data to be reduced comes from each array element, which must call the contri
 ArrayElement::contribute(int nBytes,void *data,ArrayReductionFn type);
 \end{verbatim}
 
-This call contributes \kw{nBytes} bytes starting at \kw{data} to the reduction \kw{type} (see reduction types, below).  All array elements must call contribute, and all must use the same reduction type.  At least one array element must reside on each processor, or the reduction will hang.
+This call contributes \kw{nBytes} bytes starting at \kw{data} to the reduction \kw{type} (see reduction types, below).  Unlike sending a message, you may use \kw{data} after the call to \kw{contribute}.  All array elements must call contribute, and all must use the same reduction type.
 
 If we want to sum each array element's single integer myInt, we would use:
 \begin{verbatim}
