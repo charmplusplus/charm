@@ -5,7 +5,7 @@
 
 #include "LBObj.h"
 #include "LBOM.h"
-#include "LBDB.h"
+#include "LBDBManager.h"
 
 /*************************************************************
  * LBObj Object-data Code

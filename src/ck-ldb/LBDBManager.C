@@ -3,7 +3,7 @@
 #if CMK_LBDB_ON
 
 #include <iostream.h>
-#include "LBDB.h"
+#include "LBDBManager.h"
 
 struct MigrateCB;
 

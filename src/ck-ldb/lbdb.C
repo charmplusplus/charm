@@ -5,7 +5,7 @@
 #include "lbdb.h"
 #include "LBObj.h"
 #include "LBOM.h"
-#include "LBDB.h"
+#include "LBDBManager.h"
   
 extern "C" LDHandle LDCreate(void)
 {

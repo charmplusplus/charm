@@ -63,7 +63,7 @@ ALLHEADERS=charm++.h ckstream.h charm.h cpthreads.h converse.h \
 	conv-trace.h conv-mach.h simplemsg.h sm.h trace.h pvmc.h \
 	pvm3.h sdag.h CDep.h CCounter.h CMsgBuffer.h CWhenTrigger.h \
 	TList.h idl.h ckarray.h tempo.h waitqd.h LBDatabase.h \
-	lbdb.h LBDB.h LBComm.h LBOM.h LBObj.h CentralLB.h RandCentLB.h \
+	lbdb.h LBDBManager.h LBComm.h LBOM.h LBObj.h CentralLB.h RandCentLB.h \
 	RefineLB.h MetisLB.h HeapCentLB.h Set.h elements.h heap.h conv-ccs.h
 
 ALLINTERFACES=idl.ci
@@ -244,7 +244,7 @@ libldb-test.o: cldb.test.c $(CVHEADERS)
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h trace.h \
           ckfutures.h ckarray.h tempo.h waitqd.h \
-	  LBDatabase.h lbdb.h LBDB.h LBComm.h LBOM.h LBObj.h \
+	  LBDatabase.h lbdb.h LBDBManager.h LBComm.h LBOM.h LBObj.h \
 	  CentralLB.h RandCentLB.h RefineLB.h HeapCentLB.h MetisLB.h \
 	  $(CVHEADERS)
 
@@ -252,7 +252,7 @@ CK_LIBS_CORE=libck.a
 
 LIBCK_CORE=init.o register.o qd.o ck.o main.o msgalloc.o ckfutures.o \
            ckarray.o tempo.o waitqd.o \
-	   LBDatabase.o lbdb.o LBDB.o LBComm.o LBObj.o CentralLB.o \
+	   LBDatabase.o lbdb.o LBDBManager.o LBComm.o LBObj.o CentralLB.o \
 	   RandCentLB.o MetisLB.o RefineLB.o Set.o HeapCentLB.o heap.o
 
 charmlibs: converse $(CK_LIBS_CORE)
@@ -357,8 +357,8 @@ ckarray.o: ckarray.C $(CKHEADERS)
 lbdb.o: lbdb.C $(CKHEADERS)
 	$(CHARMC) -o lbdb.o lbdb.C
 
-LBDB.o:	LBDB.C $(CKHEADERS)
-	$(CHARMC) -o LBDB.o LBDB.C
+LBDBManager.o:	LBDBManager.C $(CKHEADERS)
+	$(CHARMC) -o LBDBManager.o LBDBManager.C
 
 LBComm.o:	LBComm.C $(CKHEADERS)
 	$(CHARMC) -o LBComm.o LBComm.C
