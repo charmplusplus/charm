@@ -485,14 +485,13 @@ static void LV3D_save_finish(void) {
 	fclose(CkpvAccess(LV3D_save_views));
 	CkpvAccess(LV3D_save_views)=0;
 	if (LV3D_copy_view_dest) { /* Copy view file to dest directory */
-		char fSrc[1024], fDest[1024];
+		char fSrc[1024], fDest[1024], cmd[2048];
 		sprintf(fSrc,LV3D_copy_view_src,CkMyPe());
 		sprintf(fDest,LV3D_copy_view_dest,CkMyPe());
+		sprintf(cmd,"cp '%s' '%s' && rm '%s'", fSrc,fDest, fSrc);
 		CkPrintf("Copying views file from %s to %s\n",fSrc,fDest);
-		if (-1==rename(fSrc,fDest)) {
-			perror(fDest);
-			CmiAbort("Error copying server file");
-		}
+		system(cmd);
+		CkPrintf("Views file copied.\n");
 	}
 }
 
