@@ -47,9 +47,15 @@ typedef unsigned char  UChar;
 
 #include <charm.h> // for CkGroupID
 
+#if CMK_BLUEGENE_CHARM
+#define CmiReservedHeaderSize   CmiBlueGeneMsgHeaderSizeBytes
+#else
+#define CmiReservedHeaderSize   CmiExtHeaderSizeBytes
+#endif
+
 class envelope {
   private:
-    char   core[CmiExtHeaderSizeBytes];
+    char   core[CmiReservedHeaderSize];
  //This union allows the different kinds of messages to have different
  // fields/types in an alignment-safe way without wasting any storage.
 public:
@@ -89,7 +95,7 @@ private:
     u_type type; //Depends on message type (attribs.mtype)
     UShort ref; //Used by futures
     s_attribs attribs;
-    UChar align[_D(CmiExtHeaderSizeBytes+sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];
+    UChar align[_D(CmiReservedHeaderSize+sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];
     
     //This struct should now be sizeof(void*) aligned.
     UShort priobits;
@@ -257,7 +263,7 @@ class MsgPool {
     }
 };
 
-CpvExtern(MsgPool*, _msgPool);
+CkpvExtern(MsgPool*, _msgPool);
 extern void _processBocInitMsg(envelope *);
 extern void _processNodeBocInitMsg(envelope *);
 
