@@ -32,7 +32,8 @@ public:
 
   LBCommData(LDObjHandle _srcObj, LDOMid _destOM, LDObjid _destObj) {
     src_proc = -1;
-    srcObj = _srcObj;
+    srcObj = _srcObj.id;
+    srcOM = _srcObj.omhandle.id;
     destOM = _destOM;
     destObj = _destObj;
     n_messages = 0;
@@ -80,7 +81,9 @@ private:
 
   int mykey;
   int src_proc;
-  LDObjHandle srcObj;
+//  LDObjHandle srcObj;
+  LDOMid srcOM;
+  LDObjid srcObj;
   LDOMid destOM;
   LDObjid destObj;
   int n_messages;
