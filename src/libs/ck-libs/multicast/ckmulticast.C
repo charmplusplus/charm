@@ -132,7 +132,7 @@ void CkMulticastMgr::setSection(CkSectionInfo &id)
   initCookie(id);
 }
 
-// this is used
+// this is deprecated
 void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
 {
   CkSectionInfo &_id = proxy.ckGetSectionInfo();
@@ -142,7 +142,25 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
   for (int i=0; i<proxy.ckGetNumElements(); i++) {
     entry->allElem.push_back(al[i]);
   }
+  _id.type = MulticastMsg;
   _id.aid = proxy.ckGetArrayID();
+  _id.get_val() = entry;		// allocate table for this section
+  initCookie(_id);
+}
+
+// this is used
+void CkMulticastMgr::initDelegateMgr(CProxy *cproxy)
+{
+  CProxySection_ArrayBase *proxy = (CProxySection_ArrayBase *)cproxy;
+  CkSectionInfo &_id = proxy->ckGetSectionInfo();
+  mCastEntry *entry = new mCastEntry;
+
+  const CkArrayIndexMax *al = proxy->ckGetArrayElements();
+  for (int i=0; i<proxy->ckGetNumElements(); i++) {
+    entry->allElem.push_back(al[i]);
+  }
+  _id.type = MulticastMsg;
+  _id.aid = proxy->ckGetArrayID();
   _id.get_val() = entry;		// allocate table for this section
   initCookie(_id);
 }
@@ -345,10 +363,11 @@ void CkMulticastMgr::resetCookie(CkSectionInfo s)
   initCookie(s);
 }
 
-void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionInfo &s)
+void CkMulticastMgr::ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionID &sid)
 {
   DEBUGF(("ArraySectionSend\n"));
 
+  CkSectionInfo &s = sid._cookie;
   if (s.get_pe() == CkMyPe()) {
     mCastEntry *entry = (mCastEntry *)s.get_val();   
     if (entry == NULL) {
@@ -424,6 +443,7 @@ void CkGetSectionInfo(CkSectionInfo &id, void *msg)
   CkMcastBaseMsg *m = (CkMcastBaseMsg *)msg;
   if (CkMcastBaseMsg::checkMagic(m) == 0) 
     CmiAbort("Did you remember inherit multicast message from CkMcastBaseMsg?");
+  id.type = MulticastMsg;
   id.get_pe() = m->gpe();
   id.get_val() = m->cookie();
   // note: retain old redNo

@@ -64,7 +64,8 @@ class CkMulticastMgr: public CkDelegateMgr {
     void setSection(CkSectionInfo &id, CkArrayID aid, CkArrayIndexMax *, int n);
     void setSection(CkSectionInfo &id);
     void setSection(CProxySection_ArrayElement &proxy);
-    void ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionInfo &s);
+    virtual void initDelegateMgr(CProxy *proxy);
+    void ArraySectionSend(int ep,void *m, CkArrayID a, CkSectionID &s);
     // entry
     void teardown(CkSectionInfo s);  /**< entry: tear down the tree */
     void freeup(CkSectionInfo s);    /**< entry: free old tree */
