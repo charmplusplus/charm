@@ -41,7 +41,7 @@ class VoidMsg: public CMessage_VoidMsg {
 
 class Chunk: public CBase_Chunk {
 
-Chunk_SDAG_CODE;
+Chunk_SDAG_CODE
 
 private:
  int  myxdim, myydim,total,counter,iterations;
