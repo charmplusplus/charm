@@ -47,6 +47,7 @@ int main()
 {
   unsigned int myPortNumber = DAEMON_IP_PORT;
   int myfd;
+  int i;
   
   int remotefd;         /* Remote Process Connecting */
   skt_ip_t remoteIP;         /* Remote Process's IP */
@@ -145,7 +146,6 @@ int main()
 #else
     c1 = '/'; c2 = '\\';
 #endif
-    int i;
     /* modify \ to / in path */
     for (i=0; task.pgm[i]!=0; i++) 
       if (task.pgm[i]==c1) task.pgm[i]=c2;
