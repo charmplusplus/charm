@@ -4,23 +4,17 @@ syntax() {
   echo ''
   echo 'Usage: SUPER-INSTALL <target> <version> [charmc-options ...]'
   echo ''
-  echo 'targets: converse, charm++ libs ampi IDL tsm sm pvm sdag'
-  echo 'targets: doc ps-doc pdf-doc html-doc'
+  echo '<targets>: converse, charm++ libs ampi IDL tsm sm pvm sdag'
+  echo '<targets>: doc ps-doc pdf-doc html-doc'
+  echo '<versions>: ' 
+  ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | pr -4t )
   echo ''
-  echo 'versions: ' 
-  ( cd src ; ls -1 | egrep -v '(^Common)|(^CVS)|(^QuickThreads)|(^ccs-client)' | sort | pr -4t )
-  echo ''
-  echo 'example charmc-options: -g -save -verbose'
-  echo ''
-  echo ''
+  echo 'example <charmc-options>: -g -save -verbose'
   echo 'Note: This script is trivial.  It'
-  echo ''
-  echo ' 1. Creates directories <version> and <version>/tmp'
-  echo ' 2. Copies src/Common/scripts/Makefile into <version>/tmp'
+  echo ' 1. Creates directories <version> and <version>/tmp';
+  echo ' 2. Copies src/Common/scripts/Makefile into <version>/tmp';
   echo ' 3. Does a "make <target> <version> OPTS=<charmc-options>" in <version>/tmp.'
-  echo ''
   echo "That's all SUPER_INSTALL does.  The rest is handled by the Makefile."
-  echo ''
   exit 1
 }
 
