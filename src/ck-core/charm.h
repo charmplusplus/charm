@@ -687,6 +687,8 @@ FUNCTION_PTR _CK_9GetMonoCompareFn();
 
 #define new_group2(ChareType, msgtype, msg, returnEP, returnID)	CreateBoc(CMK_CONCAT(_CK_chare_,ChareType), GetEntryPtr(ChareType,ChareType,msgtype), msg, returnEP, returnID)
 
+#define newMessage(msgtype)  new (MsgIndex(msgtype)) msgtype
+
 CsvExtern(int, TotalEps);
 CpvExtern(int, TotalMsgs);
 CpvExtern(int, TotalPseudos);
