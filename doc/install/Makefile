@@ -12,7 +12,10 @@
 # REVISION HISTORY:
 #
 # $Log$
-# Revision 1.4  1996-11-14 18:41:13  milind
+# Revision 1.5  1997-08-18 18:37:34  jyelon
+# *** empty log message ***
+#
+# Revision 1.4  1996/11/14 18:41:13  milind
 # Modified to reflect the changes made to the nodesfile format.
 # Also, changed the Makefile to install into proper directories.
 #
@@ -29,13 +32,21 @@
 #
 ############################################################################
 
-ps: manual.ps
+TEXFILES=manual.tex install.tex compile.tex run.tex
 
-html: manual/manual.html
+ps:
+	latex manual.tex
+	latex manual.tex
+	latex manual.tex
+	dvips -o manual.ps manual.dvi
+
+html:
+	latex manual.tex
+	latex2html manual.tex
 
 install:
-	cp manual.ps /expand1/groupMosaic/distrib/install.manual.ps
 	rm -f /expand1/groupMosaic/distrib/install.manual.ps.gz
+	cp manual.ps /expand1/groupMosaic/distrib/install.manual.ps
 	gzip /expand1/groupMosaic/distrib/install.manual.ps
 	chmod 664 /expand1/groupMosaic/distrib/install.manual.ps.gz
 	rm -f /expand1/groupMosaic/html-manuals/install.manual/*
@@ -43,18 +54,6 @@ install:
 	chmod 664 /expand1/groupMosaic/html-manuals/install.manual/*
 
 all: ps html install
-
-TEXFILES=manual.tex install.tex compile.tex run.tex
-
-manual.ps:	manual.dvi
-	dvips -o manual.ps manual.dvi
-
-manual.dvi:	$(TEXFILES)
-	latex manual
-	latex manual
-
-manual/manual.html: $(TEXFILES)
-	latex2html manual.tex
 
 co:
 	co Makefile $(TEXFILES)
