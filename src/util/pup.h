@@ -51,6 +51,9 @@ class bar {
 };
 */
 
+#ifndef __CK_PUP_H
+#define __CK_PUP_H
+
 #include <stdio.h> /*<- for "FILE *" */
 
 #ifndef __cplusplus
@@ -219,6 +222,9 @@ class er {
   //For allocatable objects (system will new/delete object and call pup routine)
   void operator()(able** a,const char *desc=NULL)
     {object(a,desc);}
+  //For pre- or stack-allocated PUP::able objects-- just call object's pup
+  void operator()(able& a,const char *desc=NULL)
+    {a.pup(*this);}
  
  protected:
   //Generic bottleneck: pack/unpack n items of size itemSize 
@@ -267,8 +273,8 @@ public:
 	able(constructor *) {}
 	virtual ~able();//Virtual destructor may be needed by some child
 	virtual void pup(er &p);
-	virtual const ID &get_PUP_ID(void) const =0;
-	
+	virtual const ID &get_PUP_ID(void) const=0;
+	friend void operator|(er &p,able &a) {p(a);}
 };
 
 //Declarations to include in a PUP::able's body
@@ -306,13 +312,17 @@ class sizer : public er {
 /********** PUP::er -- Binary memory buffer pack/unpack *********/
 class mem : public er { //Memory-buffer packers and unpackers
  protected:
+  myByte *origBuf;//Start of memory buffer
   myByte *buf;//Memory buffer (stuff gets packed into/out of here)
-  mem(unsigned int type,myByte *Nbuf):er(type),buf(Nbuf) {}
+  mem(unsigned int type,myByte *Nbuf):er(type),origBuf(Nbuf),buf(Nbuf) {}
 
   //For seeking (pack/unpack in different orders)
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
   virtual int impl_tell(seekBlock &s); /*Give the current offset*/
   virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+ public:
+  //Return the current number of buffer bytes used
+  int size(void) const {return buf-origBuf;}
 };
 
 //For packing into a preallocated, presized memory buffer
@@ -430,15 +440,41 @@ class xlater : public er {
 
 };//<- End "namespace" PUP
 
-//This catches "p|t"'s for user-defined types T:
+/******** PUP via pipe: another way to access PUP::ers ******/
+
+//This catches "p|t" for all user-defined types T:
 template <class T>
-void operator|(PUP::er &p,T &t)
+inline void operator|(PUP::er &p,T &t)
 {
          p((void *)&t,sizeof(T));
 }
 
+class PUPableTbase : public PUP::able {
+public:
+	virtual const ID &get_PUP_ID(void) const;
+};
+template <class T> class PUPableT : public PUPableTbase {
+public:
+	friend void operator|(PUP::er &p,T &t) {t.pup(p);}
+};
 
-
-
-
-
+//These more specific versions map p|t to p(t) for all handled types
+inline void operator|(PUP::er &p,signed char &t) {p(t);}
+#if CMK_SIGNEDCHAR_DIFF_CHAR
+inline void operator|(PUP::er &p,char &t) {p(t);}
+#endif
+inline void operator|(PUP::er &p,unsigned char &t) {p(t);}
+inline void operator|(PUP::er &p,short &t) {p(t);}
+inline void operator|(PUP::er &p,int &t) {p(t);}
+inline void operator|(PUP::er &p,long &t) {p(t);}
+inline void operator|(PUP::er &p,unsigned short &t) {p(t);}
+inline void operator|(PUP::er &p,unsigned int &t) {p(t);}
+inline void operator|(PUP::er &p,unsigned long &t) {p(t);}
+inline void operator|(PUP::er &p,float &t) {p(t);}
+inline void operator|(PUP::er &p,double &t) {p(t);}
+inline void operator|(PUP::er &p,CmiBool &t) {p(t);}
+/*These don't seem to get called for subclasses (oh well...)
+ *inline void operator|(PUP::er &p,PUP::able& t) {p(t);}
+ *inline void operator|(PUP::er &p,PUP::able** t) {p(t);}
+ */
+#endif //def __CK_PUP_H

@@ -260,6 +260,10 @@ void PUP::er::object(able** a,const char *desc)
 PUP::able::~able() {}
 void PUP::able::pup(PUP::er &p) {}
 
+//Default ID
+static const PUP::able::ID nonAllocatableID;
+const PUP::able::ID &PUPableTbase::get_PUP_ID(void) const
+	{return nonAllocatableID;}
 
 //Compute a good hash of the given string 
 // (registration-time only-- allowed to be slow)
