@@ -27,8 +27,8 @@ INC=../include
 
 all: charm++ bluegene LIBS AMPI f90charm TSM SM PVM doc
 
-charm++: converse
-	$(MAKE) $(L)/libck.a loadbalancers charmxi default_libs
+charm++: basics
+	$(MAKE) converse $(L)/libck.a loadbalancers charmxi default_libs
 
 bgampi: bluegene AMPI
 
@@ -66,10 +66,10 @@ f90charm: charm++ $(L)/libf90charm.a
 
 default_libs: commlib multicast
 
-multicast: $(L)/libck.a
+multicast:
 	cd libs/ck-libs/multicast && $(MAKE)
 
-commlib: $(L)/libck.a
+commlib: 
 	cd libs/ck-libs/commlib && $(MAKE)
 
 translators: charmxi conv-cpm
@@ -86,16 +86,16 @@ test: test-charm test-AMPI test-fem
 	@echo "--- All tests passed ---"
 
 test-converse: converse
-	cd ../pgms ; make test-converse  OPTS='$(OPTS)'
+	cd ../pgms ; $(MAKE) test-converse  OPTS='$(OPTS)'
 
 test-charm: charm++
-	cd ../pgms ; make test-charm  OPTS='$(OPTS)'
+	cd ../pgms ; $(MAKE) test-charm  OPTS='$(OPTS)'
 
 test-AMPI: AMPI
-	cd ../pgms ; make test-AMPI  OPTS='$(OPTS)'
+	cd ../pgms ; $(MAKE) test-AMPI  OPTS='$(OPTS)'
 
 test-fem: FEM
-	cd ../pgms ; make test-fem  OPTS='$(OPTS)'
+	cd ../pgms ; $(MAKE) test-fem  OPTS='$(OPTS)'
 
 ps-doc: basics
 	cd ../doc ; make ps
