@@ -218,7 +218,8 @@ CLBMigrateMsg* RefineLB::Strategy(CentralLB::LDStats* stats, int count)
 
   create(stats, count);
 
-  for (int i=0; i<numComputes; i++)
+  int i;
+  for (i=0; i<numComputes; i++)
     assign((computeInfo *) &(computes[i]),
            (processorInfo *) &(processors[computes[i].oldProcessor]));
 
@@ -277,7 +278,7 @@ CkPrintf("Migrate: from %d to %d\n", c->oldProcessor, c->processor);
   int migrate_count=migrateInfo.size();
   CLBMigrateMsg* msg = new(&migrate_count,1) CLBMigrateMsg;
   msg->n_moves = migrate_count;
-  for(int i=0; i < migrate_count; i++) {
+  for(i=0; i < migrate_count; i++) {
     msg->moves[i] = migrateInfo.front();
     migrateInfo.pop();
   }
