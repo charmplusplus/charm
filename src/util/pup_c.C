@@ -29,8 +29,26 @@ C_CALLABLE int pup_isUnpacking(const pup_er p)
 C_CALLABLE int pup_isSizing(const pup_er p)
   { return (mp.isSizing())?1:0;}
 
+#if CMK_FORTRAN_USES_ALLCAPS
+C_CALLABLE int PUP_ISPACKING(const pup_er p)
+  { return (mp.isPacking())?1:0;}
+C_CALLABLE int PUP_ISUNPACKING(const pup_er p)
+  { return (mp.isUnpacking())?1:0;}
+C_CALLABLE int PUP_ISSIZING(const pup_er p)
+  { return (mp.isSizing())?1:0;}
+
+#else
+C_CALLABLE int pup_ispacking_(const pup_er p)
+  { return (mp.isPacking())?1:0;}
+C_CALLABLE int pup_isunpacking_(const pup_er p)
+  { return (mp.isUnpacking())?1:0;}
+C_CALLABLE int pup_issizing_(const pup_er p)
+  { return (mp.isSizing())?1:0;}
+
+#endif
 
 #undef PUP_BASIC_DATATYPE /*from pup_c.h*/
+#undef PUP_BASIC_DATATYPEF /*from pup_c.h*/
 
 /*Pack/unpack data items, declared with macros for brevity.
 The macros expand like:
@@ -45,6 +63,30 @@ void pup_ints(pup_er p,int *iarr,int nItems) <- array pack/unpack
  C_CALLABLE void pup_##typeName##s(pup_er p,type *arr,int nItems) \
    {mp(arr,nItems);}
 
+#if CMK_FORTRAN_USES_ALLCAPS
+#define PUP_BASIC_DATATYPEF(typeName,type) \
+ C_CALLABLE void PUP_##typeName(pup_er p,type *v) \
+   {mp(*v);} \
+ C_CALLABLE void PUP_##typeName##S(pup_er p,type *arr,int *nItems) \
+   {mp(arr,*nItems);}
+PUP_BASIC_DATATYPEF(CHAR,char)
+PUP_BASIC_DATATYPEF(SHORT,short)
+PUP_BASIC_DATATYPEF(INT,int)
+PUP_BASIC_DATATYPEF(REAL,float)
+PUP_BASIC_DATATYPEF(DOUBLE,double)
+#else
+#define PUP_BASIC_DATATYPEF(typeName,type) \
+ C_CALLABLE void pup_##typeName##_(pup_er p,type *v) \
+   {mp(*v);} \
+ C_CALLABLE void pup_##typeName##s_(pup_er p,type *arr,int *nItems) \
+   {mp(arr,*nItems);}
+PUP_BASIC_DATATYPEF(char,char)
+PUP_BASIC_DATATYPEF(short,short)
+PUP_BASIC_DATATYPEF(int,int)
+PUP_BASIC_DATATYPEF(real,float)
+PUP_BASIC_DATATYPEF(double,double)
+#endif
+
 PUP_BASIC_DATATYPE(char,char)
 PUP_BASIC_DATATYPE(short,short)
 PUP_BASIC_DATATYPE(int,int)
@@ -57,8 +99,20 @@ PUP_BASIC_DATATYPE(float,float)
 PUP_BASIC_DATATYPE(double,double)
 
 /*Pack/unpack untyped byte array:*/
-void pup_bytes(pup_er p,void *ptr,int nBytes)
+C_CALLABLE void pup_bytes(pup_er p,void *ptr,int nBytes)
 {
   mp(ptr,nBytes);
 }
+
+#if CMK_FORTRAN_USES_ALLCAPS
+C_CALLABLE void PUP_BYTES(pup_er p,void *ptr,int *nBytes)
+{
+  mp(ptr,*nBytes);
+}
+#else
+C_CALLABLE void pup_bytes_(pup_er p,void *ptr,int *nBytes)
+{
+  mp(ptr,*nBytes);
+}
+#endif
 

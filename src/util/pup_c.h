@@ -69,6 +69,16 @@ int pup_isPacking(const pup_er p);
 int pup_isUnpacking(const pup_er p);
 int pup_isSizing(const pup_er p);
 
+#if CMK_FORTRAN_USES_ALLCAPS
+int PUP_ISPACKING(const pup_er p);
+int PUP_ISUNPACKING(const pup_er p);
+int PUP_ISSIZING(const pup_er p);
+#else
+int pup_ispacking_(const pup_er p);
+int pup_isunpacking_(const pup_er p);
+int pup_issizing_(const pup_er p);
+#endif
+
 /*Pack/unpack data items, declared with macros for brevity.
 The macros expand like:
 void pup_int(pup_er p,int *i); <- single integer pack/unpack
@@ -77,6 +87,26 @@ void pup_ints(pup_er p,int *iarr,int nItems); <- array pack/unpack
 #define PUP_BASIC_DATATYPE(typeName,type) \
   void pup_##typeName(pup_er p,type *v); \
   void pup_##typeName##s(pup_er p,type *arr,int nItems);
+
+#if CMK_FORTRAN_USES_ALLCAPS
+#define PUP_BASIC_DATATYPEF(typeName,type) \
+  void PUP_##typeName(pup_er p,type *v); \
+  void PUP_##typeName##S(pup_er p,type *arr,int *nItems);
+PUP_BASIC_DATATYPEF(CHAR,char)
+PUP_BASIC_DATATYPEF(SHORT,short)
+PUP_BASIC_DATATYPEF(INT,int)
+PUP_BASIC_DATATYPEF(REAL,float)
+PUP_BASIC_DATATYPEF(DOUBLE,double)
+#else
+#define PUP_BASIC_DATATYPEF(typeName,type) \
+  void pup_##typeName##_(pup_er p,type *v); \
+  void pup_##typeName##s_(pup_er p,type *arr,int *nItems);
+PUP_BASIC_DATATYPEF(char,char)
+PUP_BASIC_DATATYPEF(short,short)
+PUP_BASIC_DATATYPEF(int,int)
+PUP_BASIC_DATATYPEF(real,float)
+PUP_BASIC_DATATYPEF(double,double)
+#endif
 
 PUP_BASIC_DATATYPE(char,char)
 PUP_BASIC_DATATYPE(short,short)
@@ -91,6 +121,11 @@ PUP_BASIC_DATATYPE(double,double)
 
 /*Pack/unpack untyped byte array:*/
 void pup_bytes(pup_er p,void *ptr,int nBytes);
+#if CMK_FORTRAN_USES_ALLCAPS
+void PUP_BYTES(pup_er p,void *ptr,int *nBytes);
+#else
+void pup_bytes_(pup_er p,void *ptr,int *nBytes);
+#endif
 
 #ifdef __cplusplus
 };
