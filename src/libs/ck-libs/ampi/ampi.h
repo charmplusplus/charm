@@ -96,6 +96,7 @@ typedef int MPI_Group;
 #define MPI_COMM_FIRST_SPLIT (MPI_Comm)(1000000) /*Communicator from a "split"*/
 #define MPI_COMM_FIRST_GROUP (MPI_Comm)(2000000) /*Communicator from a process group*/
 #define MPI_COMM_FIRST_RESVD (MPI_Comm)(3000000) /*Communicator reserved for now*/
+#define MPI_COMM_SELF (MPI_Comm)(4000000)
 
 #define MPI_COMM_WORLD (MPI_Comm)(8000000) /*Start of universe*/
 #define MPI_MAX_COMM_WORLDS 8

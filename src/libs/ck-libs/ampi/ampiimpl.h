@@ -378,7 +378,6 @@ PUPmarshall(AmpiSeqQ);
 inline CProxy_ampi ampiCommStruct::getProxy(void) const {return ampiID;}
 const ampiCommStruct &universeComm2proxy(MPI_Comm universeNo);
 
-
 /* Manages persistent requests.  A hideous design-- rewrite it! */
 class ampiPersRequests {
 public:
@@ -397,7 +396,7 @@ PUPmarshall(ampiPersRequests);
 An ampiParent holds all the communicators and the TCharm thread
 for its children, which are bound to it.
 */
-class ampiParent : public ArrayElement1D {
+class ampiParent : public CBase_ampiParent {
     CProxy_TCharm threads;
     TCharm *thread;
     void prepareCtv(void);
@@ -405,6 +404,7 @@ class ampiParent : public ArrayElement1D {
     MPI_Comm worldNo; //My MPI_COMM_WORLD
     ampi *worldPtr; //AMPI element corresponding to MPI_COMM_WORLD
     ampiCommStruct worldStruct;
+    ampiCommStruct selfStruct;
 
     CkPupPtrVec<ampiCommStruct> splitComm; //Communicators from MPI_Comm_split
     CkPupPtrVec<ampiCommStruct> groupComm; //Communicators from MPI_Comm_group
@@ -457,6 +457,7 @@ public:
 
     inline const ampiCommStruct &comm2proxy(MPI_Comm comm) {
       if (comm==MPI_COMM_WORLD) return worldStruct;
+      if (comm==MPI_COMM_SELF) return selfStruct;
       if (comm==worldNo) return worldStruct;
       if (isSplit(comm)) return getSplit(comm);
       if (isGroup(comm)) return getGroup(comm);
@@ -464,6 +465,7 @@ public:
     }
     inline ampi *comm2ampi(MPI_Comm comm) {
       if (comm==MPI_COMM_WORLD) return worldPtr;
+      if (comm==MPI_COMM_SELF) return worldPtr;
       if (comm==worldNo) return worldPtr;
       if (isSplit(comm)) {
          const ampiCommStruct &st=getSplit(comm);
@@ -517,7 +519,7 @@ public:
 An ampi manages the communication of one thread over
 one MPI communicator.
 */
-class ampi : public ArrayElement1D {
+class ampi : public CBase_ampi {
     CProxy_ampiParent parentProxy;
     void findParent(bool forMigration);
     ampiParent *parent;
