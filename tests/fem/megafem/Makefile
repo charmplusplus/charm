@@ -1,4 +1,4 @@
-CHARMC=../../../../bin/charmc $(OPTS) 
+CHARMC=../../../bin/charmc $(OPTS) 
 OBJS=pgm.o ctests.o 
 FOBJS=$(OBJS) ftests.o
 COBJS=$(OBJS) ftests_fallback.o
