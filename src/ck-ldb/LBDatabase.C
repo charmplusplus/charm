@@ -113,11 +113,12 @@ LBAllocFn getLBAllocFn(char *lbname) {
 static void createLoadBalancer(const char *lbname)
 {
     LBCreateFn fn = lbRegistry.search(lbname);
-    if (!fn) {
+    if (!fn) {    // invalid lb name
       CmiPrintf("Abort: Unknown load balancer: '%s'!\n", lbname);
-      lbRegistry.displayLBs();
+      lbRegistry.displayLBs();    // display help page
       CkExit();
     }
+    // invoke function to create load balancer 
     fn();
 }
 
@@ -140,12 +141,14 @@ LBDBInit::LBDBInit(CkArgMsg *m)
     }
   }
   else {
-    // NullLB is the default
-    // user may create his own load balancer in his code, but never mind
-    // NullLB can disable itself if there is a non NULL LB.
+    // NullLB is the default when none of above lb created
+    // note user may create his own load balancer in his code manually like
+    // in NAMD, but never mind NullLB can disable itself if there is 
+    // a non NULL LB.
     createLoadBalancer("NullLB");
   }
 
+  // simulation mode
   if (LBSimulation::doSimulation) {
     CmiPrintf("Charm++> Entering Load Balancer Simulation Mode ... \n");
     CProxy_LBDatabase(_lbdb).ckLocalBranch()->StartLB();
@@ -154,7 +157,7 @@ LBDBInit::LBDBInit(CkArgMsg *m)
   delete m;
 }
 
-
+// called from init.C
 void _loadbalancerInit()
 {
   CkpvInitialize(int, lbdatabaseInited);
@@ -172,7 +175,7 @@ void _loadbalancerInit()
   }
 
   // set up init value for LBPeriod time in seconds
-  // it can also be set calling LDSetLBPeriod()
+  // it can also be set by calling LDSetLBPeriod()
   CmiGetArgDoubleDesc(argv,"+LBPeriod", &_lb_args.lbperiod(),"the minimum time period in seconds allowed for two consecutive automatic load balancing");
 
   // now called in cldb.c: CldModuleGeneralInit()
@@ -221,8 +224,9 @@ void _loadbalancerInit()
   LBSimulation::simProcs = 0;
   CmiGetArgIntDesc(argv, "+LBSimProcs", &LBSimulation::simProcs, "Number of target processors.");
 
+  // force a global barrier after migration done
   _lb_args.syncResume() = CmiGetArgFlagDesc(argv, "+LBSyncResume", 
-                  "LB performs a barrier after migration is finished globally");
+                  "LB performs a barrier after migration is finished");
 
   // both +LBDebug and +LBDebug level should work
   if (!CmiGetArgIntDesc(argv, "+LBDebug", &_lb_args.debug(), 
@@ -230,17 +234,24 @@ void _loadbalancerInit()
     _lb_args.debug() = CmiGetArgFlagDesc(argv, "+LBDebug", 
   					     "Turn on LB debugging printouts");
 
+  // to ignore baclground load
   _lb_args.ignoreBgLoad() = CmiGetArgFlagDesc(argv, "+LBObjOnly", 
                       "Load balancer ignores the background load.");
 
+  // assume all CPUs are identical
   _lb_args.samePeSpeed() = CmiGetArgFlagDesc(argv, "+LBSameCpus", 
                       "Load balancer assumes all CPUs are of same speed.");
 
   _lb_args.useCpuTime() = CmiGetArgFlagDesc(argv, "+LBUseCpuTime", 
                       "Load balancer uses CPU time instead of wallclock time.");
 
+  // turn instrumentation off at startup
   _lb_args.statsOn() = !CmiGetArgFlagDesc(argv, "+LBOff",
 			"Turn load balancer instrumentation off");
+
+  // turn instrumentation of communicatin off at startup
+  _lb_args.traceComm() = !CmiGetArgFlagDesc(argv, "+LBCommOff",
+		"Turn load balancer instrumentation of communication off");
 
   if (CkMyPe() == 0) {
     if (_lb_args.debug()) {
@@ -257,6 +268,8 @@ void _loadbalancerInit()
       CmiPrintf("LB> Load balancer running in simulation mode.\n");
     if (_lb_args.statsOn()==0)
       CkPrintf("LB> Load balancing instrumentation is off.\n");
+    if (_lb_args.traceComm()==0)
+      CkPrintf("LB> Load balancing instrumentation for communication is off.\n");
   }
 }
 
@@ -377,6 +390,8 @@ void LBDatabase::pup(PUP::er& p)
   }
   p(avail_vector, np);
 }
+
+
 /*
   callable from user's code
 */
