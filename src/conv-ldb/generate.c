@@ -31,7 +31,7 @@ main(int argc, char **argv)
 }
 */
 
-gengraph(int V, int C, int seed)
+gengraph(int pV, int pC, int pseed)
 { int i;
   EdgeListType * EdgeList;
   VerticesListType * vertices;
@@ -39,6 +39,11 @@ gengraph(int V, int C, int seed)
   extern addEdge();
   char dircmd[20], dirname[10];
 
+
+  V = pV;
+  C = pC;
+  seed = pseed;
+  
   CmiPrintf("for %d PEs, connectivity %d... ", V, C);
 
   /* make a directory */
