@@ -28,4 +28,5 @@ CMK_CPP_SUFFIX="ii"
 CMK_XLATPP='charmxlat++ '
 CMK_QT='axp-gcc'
 CMK_XIOPTS='-ansi'
-
+CMK_F90LIBS='-lUfor -lfor -lFutil'
+CMK_MOD_EXT="mod"
