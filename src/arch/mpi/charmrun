@@ -33,4 +33,74 @@ done
 
 echo "Running on $pes processors: $args"
 
+if [ x"$PBS_TEST" = x ]
+then
+  mpirun -np $pes $args
+else
+# Interactive mode: create, and submit a batch job
+        script="charmrun_script.$$.sh"
+        indir=`pwd`
+        output="$indir/charmrun_script.$$.stdout"
+        echo "Submitting batch job for> mpirun -np $pes $args"
+        echo " using the command> qsub $script"
+        cat > $script << EOF
+#!/bin/sh
+# This is a charmrun-generated PBS batch job script.
+# The lines starting with #PBS are queuing system flags:
+
+# This determines the number of nodes and pes (here $nodes and $pes):
+#PBS -l ncpus=$pes
+
+# This determines the wall-clock time limit (here 5 minutes):
+#PBS -l walltime=5:00
+
+# Set memory limit to 500 Mbytes
+#PBS -l mem=500mb
+
+# Queue name (see info about other queues in web documentation)
+#PBS -q standard
+#
+# Export all my environment variables to the job
+#PBS -V
+#
+# Charge job to project abc (recommended for users with multiple projects)
+# [If project is invalid, a valid project will be automatically selected]
+##PBS -A abc
+#
+# Job name (default = name of script file)
+#PBS -N autobuild
+#
+# Filename for standard output (default = <job_name>.o<job_id>)
+#PBS -o $output
+#
+# Filename for standard error (default = <job_name>.e<job_id>)
+#PBS -e testjob.err
+
+cd $indir
+
+# This is the actual command to run the job:
 mpirun -np $pes $args
+EOF
+        chmod 755 $script
+        jobid=`qsub $script|tail -1`
+	echo "Job enqueued under job ID $jobid"
+# Wait for the job to complete, by checking its status
+        while [ true ]
+        do
+                qstat $jobid > tmp.$$
+                if [ ! $? -eq 0 ]
+                then
+# The job is done-- print its output
+                        rm tmp.$$
+                        exec cat $output
+                fi
+# The job is still queued or running-- print status and wait
+                tail -1 tmp.$$
+                rm tmp.$$
+                sleep 10
+        done
+
+fi
+
+
+
