@@ -182,7 +182,7 @@ BGproc::BGproc(BGprocMsg *m)
 
   nodePID = m->nodePID;		// node pose index
   useAntimethods();
-  BgLoadTraceSummary("bgTrace", totalProcs, numX, numY, numZ, numCth, numWth, numPes);
+  if (-1==BgLoadTraceSummary("bgTrace", totalProcs, numX, numY, numZ, numCth, numWth, numPes)) CmiAbort("Failed");
   
   int* allNodeOffsets = BgLoadOffsets(totalProcs,numPes);
   BgTimeLineRec tline;
