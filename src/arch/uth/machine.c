@@ -12,7 +12,11 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 1.33  1998-02-13 23:55:30  pramacha
+ * Revision 1.34  1998-06-29 16:51:31  milind
+ * Fixed the argv passing to all the processors as only processor 0 was
+ * processing and removing the command-line arguments.
+ *
+ * Revision 1.33  1998/02/13 23:55:30  pramacha
  * Removed CmiAlloc, CmiFree and CmiSize
  * Added CmiAbort
  *
@@ -457,25 +461,28 @@ char **argv;
   }
 }
 
-void CmiInitPE()
-{
-  CpvAccess(CmiLocalQueue) = CmiQueues[CmiMyPe()];
-  CmiSpanTreeInit();
-  CmiTimerInit();
-  ConverseCommonInit(CmiArgv);
-}
-
-void CmiCallMain()
+char **CmiInitPE()
 {
   int argc; char **argv;
   for (argc=0; CmiArgv[argc]; argc++);
   argv = (char **)CmiAlloc((argc+1)*sizeof(char *));
   memcpy(argv, CmiArgv, (argc+1)*sizeof(char *));
-  CmiInitPE();
+  CpvAccess(CmiLocalQueue) = CmiQueues[CmiMyPe()];
+  CmiSpanTreeInit();
+  CmiTimerInit();
+  ConverseCommonInit(argv);
+  return argv;
+}
+
+void CmiCallMain()
+{
+  char **argv;
+  int argc;
+  argv = CmiInitPE();
+  for (argc=0; argv[argc]; argc++);
   CmiStart(argc, argv);
   if (CmiUsched==0) CsdScheduler(-1);
-  CmiThreads[CmiMyPe()] = 0;
-  CmiNext();
+  ConverseExit();
 }
 
 void ConverseExit()
@@ -487,7 +494,7 @@ void ConverseExit()
 
 void ConverseInit(argc,argv,fn,usched,initret)
 int argc;
-char *argv[];
+char **argv;
 CmiStartFn fn;
 int usched, initret;
 {
@@ -517,7 +524,7 @@ int usched, initret;
     CmiQueues[i] = FIFO_Create();
   }
   Cmi_mype = 0;
-  CmiInitPE();
+  argv = CmiInitPE();
   if (initret==0) {
     fn(CountArgs(argv), argv);
     if (usched==0) CsdScheduler(-1);
