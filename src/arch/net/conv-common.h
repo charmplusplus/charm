@@ -22,9 +22,10 @@
    Stratid is the stratgy id and root is used in the broadcast.
    - Sameer 10/06/04 
 */
-#define CMK_MSG_HEADER_BASIC  {CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,stratid,root,padding1,padding2,padding3;}
-#define CMK_MSG_HEADER_EXT    {CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,xhdl,info,stratid,root,padding1;}
-#define CMK_MSG_HEADER_BLUEGENE    { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,xhdl,info,stratid,root; CmiUInt4 padding; int nd, n; double rt; CmiInt2 tID; CmiUInt2 hID; char t; int msgID; int srcPe;}
+#define CMK_MSG_HEADER_BASIC  {CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,stratid,root,pad9;}
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,stratid,root,xhdl,info,pad11;
+#define CMK_MSG_HEADER_EXT     { CMK_MSG_HEADER_EXT_ }
+#define CMK_MSG_HEADER_BLUEGENE    { CMK_MSG_HEADER_EXT_ CmiInt4 nd,n; double rt; CmiInt2 tID; CmiUInt2 hID; char t; CmiInt4 msgID,srcPe;}
 
 #define CMK_REDUCTION_USES_COMMON_CODE                     1
 #define CMK_REDUCTION_USES_SPECIAL_CODE                    0
