@@ -261,24 +261,42 @@ void DirectMulticastStrategy::localMulticast(CkVec<CkArrayIndexMax>*vec,
         return;
     }
     
-    void *msg = EnvToUsr(env);
+    void *msg = EnvToUsr(env);    
     int ep = env->getsetArrayEp();
-    
     CkUnpackMessage(&env);
+
+    env->getsetArrayMgr() = destArrayID;
+    env->setPacked(0); 
+    env->getsetArrayHops()=1;  
+    env->setUsed(0);
+
     for(int count = 0; count < nelements; count ++){        
         CkArrayIndexMax idx = (*vec)[count];
         
         ComlibPrintf("[%d] Sending multicast message to ", CkMyPe());        
         if(comm_debug) idx.print();     
-        
+        /*
         CProxyElement_ArrayBase ap(destArrayID, idx);
         ArrayElement *elem = ap.ckLocal();
-        if(elem != NULL)
+        if(elem != NULL) {
             CkDeliverMessageReadonly(ep, msg, elem);        
+        }
         else { //Element migrated away?
             void *newmsg = CkCopyMsg(&msg);
             ap.ckSend((CkArrayMessage *)newmsg, ep);            
+        }        
+        */        
+
+        env->getsetArrayIndex() = idx;
+
+        CkArray *a=(CkArray *)_localBranch(destArrayID);
+        if(_entryTable[ep]->noKeep) 
+            a->deliver((CkArrayMessage *)msg, CkDeliver_inline, CmiFalse);        
+        else {
+            void *newmsg = CkCopyMsg(&msg);
+            a->deliver((CkArrayMessage *)newmsg, CkDeliver_queue, CmiTrue);             
         }
+        
     }
     
     CmiFree(env);

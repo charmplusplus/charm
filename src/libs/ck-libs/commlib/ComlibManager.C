@@ -28,12 +28,18 @@ void recv_msg(void *msg){
 
     register envelope* env = (envelope *)msg;
     env->setUsed(0);
+    env->getsetArrayHops()=1;
     CkUnpackMessage(&env);
-
+    
+    /*
     CProxyElement_ArrayBase ap(env->getsetArrayMgr(), env->getsetArrayIndex());
     ComlibPrintf("%d:Array Base created\n", CkMyPe());
     ap.ckSend((CkArrayMessage *)EnvToUsr(env), env->getsetArrayEp());
+    */
     
+    CkArray *a=(CkArray *)_localBranch(env->getsetArrayMgr());
+    a->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_queue, CmiTrue);    
+
     ComlibPrintf("%d:Out of recv_msg\n", CkMyPe());
     return;
 }

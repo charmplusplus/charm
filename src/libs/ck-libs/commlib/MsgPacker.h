@@ -25,6 +25,7 @@ struct CombinedMessage{
 
     char header[CmiReservedHeaderSize];
     CkArrayID aid;
+    int srcPE;
     int nmsgs;
 };
 

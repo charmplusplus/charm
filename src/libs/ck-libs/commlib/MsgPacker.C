@@ -90,6 +90,7 @@ void MsgPacker::getMessage(CombinedMessage *&cmb_msg, int &total_size){
         mp | msgList[count];
 
     cmb_msg->aid = aid;
+    cmb_msg->srcPE = CkMyPe();
     cmb_msg->nmsgs = nShortMsgs;
 
     CmiSetHandler(cmb_msg, CkpvAccess(RecvCombinedShortMsgHdlrIdx));
@@ -105,6 +106,8 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
     PUP::fromMem fp(from_addr);
     CkArrayID aid = cmb_msg->aid;
 
+    int src_pe = cmb_msg->srcPE;
+
     for(int count = 0; count < nmsgs; count ++){
         short_envelope senv;
         fp | senv;
@@ -115,13 +118,13 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
 
         CProxyElement_ArrayBase ap(aid, idx);
         ArrayElement *a_elem = ap.ckLocal();
+        CkArray *a=(CkArray *)_localBranch(aid);
 
         int msgIdx = _entryTable[ep]->msgIdx;
         if(_entryTable[ep]->noKeep && a_elem != NULL) {
             //Unpack the message
             senv.data = (char *)_msgTable[msgIdx]->unpack(senv.data); 
-
-            CkDeliverMessageReadonly(ep, senv.data, a_elem);
+            CkDeliverMessageReadonly(ep, senv.data, a_elem);            
             delete[] senv.data;
         }
         else {
@@ -133,13 +136,13 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
             
             //Unpack the message
             data = (char *)_msgTable[msgIdx]->unpack(data); 
-
+            
             env->getsetArrayMgr() = aid;
             env->getsetArrayIndex() = idx;
             env->getsetArrayEp() = ep;
             env->setPacked(0); 
-            env->getsetArraySrcPe()=CkMyPe();  //FOO Bar change later
-            env->getsetArrayHops()=0;  //FOO BAR change later
+            env->getsetArraySrcPe()=src_pe;  
+            env->getsetArrayHops()=1;  
             env->setQueueing(CK_QUEUEING_FIFO);            
             env->setUsed(0);
             env->setMsgIdx(msgIdx);
@@ -149,8 +152,10 @@ void MsgPacker::deliver(CombinedMessage *cmb_msg){
             //if(a_elem)
             //  CkDeliverMessageFree(ep, data, a_elem);                     
             //else
-            ap.ckSend((CkArrayMessage *)data, ep);
+            //ap.ckSend((CkArrayMessage *)data, ep);
             
+            a->deliver((CkArrayMessage *)data, CkDeliver_queue, CmiTrue);
+
             delete[] senv.data;
         }        
     }      
