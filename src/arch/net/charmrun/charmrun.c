@@ -555,6 +555,8 @@ char *arg_nodegroup;
 int   arg_debug;
 int   arg_debug_no_pause;
 
+int   arg_local;	/* start node programs directly by exec on localhost */
+
 #if CMK_USE_RSH
 int   arg_maxrsh;
 char *arg_shell;
@@ -590,6 +592,7 @@ void arg_init(int argc, char **argv)
 #if CMK_USE_RSH
   pparam_flag(&arg_debug,         0, "debug",         "Run each node under gdb in an xterm window");
   pparam_flag(&arg_debug_no_pause,0, "debug-no-pause","Like debug, except doesn't pause at beginning");
+  pparam_flag(&arg_local,	0, "local", "Start node programs locally without daemon");
   pparam_int(&arg_maxrsh,        16, "maxrsh",        "Maximum number of rsh's to run at a time");
   pparam_str(&arg_shell,          0, "remote-shell",  "which remote shell to use");
   pparam_str(&arg_debugger,       0, "debugger",      "which debugger to use");
@@ -791,11 +794,29 @@ char *nodetab_args(char *args,nodetab_host *h)
       args = skipblanks(e3);
       h->pathfixes=pathfix_append(substr(b2,e2),substr(b3,e3),h->pathfixes);
     } 
-	else if (subeqs(b1,e1,"ext")) h->ext = substr(b2,e2);
-	else return args;
+    else if (subeqs(b1,e1,"ext")) h->ext = substr(b2,e2);
+    else return args;
     args = skipblanks(e2);
   }
   return args;
+}
+
+/*  setup nodetab as localhost only */
+void nodetab_init_for_local()
+{
+  int tablesize, i;
+  nodetab_host group;
+
+  tablesize = arg_requested_pes;
+  nodetab_table=(nodetab_host**)malloc(tablesize*sizeof(nodetab_host*));
+  nodetab_rank0_table=(int*)malloc(tablesize*sizeof(int));
+  nodetab_max=tablesize;
+
+  nodetab_reset(&group);
+  for (i=0; i<tablesize; i++) {
+    char *hostname = "localhost";
+    nodetab_makehost(hostname, &group);
+  }
 }
 
 void nodetab_init()
@@ -806,6 +827,12 @@ void nodetab_init()
   char input_line[MAX_LINE_LENGTH];
   int rightgroup, basicsize, i, remain;
   
+  /* if arg_local is set, ignore the nodelist file */
+  if (arg_local) {
+    nodetab_init_for_local();
+    return;
+  }
+
   /* Open the NODES_FILE. */
   nodesfile = nodetab_file_find();
   if(arg_verbose)
@@ -1366,6 +1393,7 @@ void start_nodes_rsh(void);
 void nodetab_init_for_scyld(void);
 void start_nodes_scyld(void);
 #endif
+void start_nodes_local(void);
 
 static void fast_idleFn(void) {sleep(0);}
 
@@ -1401,7 +1429,10 @@ int main(int argc, char **argv)
 #if CMK_SCYLD
     start_nodes_scyld();
 #else
-    start_nodes_rsh();
+    if (!arg_local)
+      start_nodes_rsh();
+    else
+      start_nodes_local();
 #endif
 
   if(arg_verbose) fprintf(stderr, "Charmrun> node programs all started\n");
@@ -1537,7 +1568,6 @@ void nodetab_init_for_scyld()
 
 void start_nodes_scyld(void)
 {
-  char *rshargv[6];
   char *envp[2];
   int i;
 
@@ -1557,14 +1587,21 @@ void start_nodes_scyld(void)
     if (pid < 0) exit(1);
     if (pid == 0)
     {
+      int fd, fd1 = dup(1);
+      if (fd = open("/dev/null", O_RDWR)) {
+        dup2(fd, 0); dup2(fd, 1); dup2(fd, 2);
+      }
       if (nodeno == -1) {
         status = execve(pparam_argv[1], pparam_argv+1, envp);
-        printf("execle failed to start remote process %s status: %d\n", pparam_argv[1], status);
+        dup2(fd1, 1);
+        printf("execve failed to start process \"%s\" with status: %d\n", pparam_argv[1], status);
       }
       else {
         status = bproc_execmove(nodeno, pparam_argv[1], pparam_argv+1, envp);
-        printf("bproc_execmove failed to start remote process %s status: %d\n", pparam_argv[1], status);
+        dup2(fd1, 1);
+        printf("bproc_execmove failed to start remote process \"%s\" with status: %d\n", pparam_argv[1], status);
       }
+      kill(getppid(), 9);
       exit(1);
     }
   }
@@ -2327,6 +2364,7 @@ void rsh_pump(p, nodeno, rank0no, argv)
 #endif
 }
 
+
 void start_nodes_rsh(void)
 {
   prog        rsh_prog[200];
@@ -2413,6 +2451,42 @@ void start_nodes_rsh(void)
       rsh_nstarted++;
     }
   }
+}
+
+/* simple version of charmrun that avoids the rshd or charmd,   */
+/* it spawn the node program just on local machine using exec. */
+void start_nodes_local(void)
+{
+  char *envp[2];
+  int i;
+
+  envp[0] = (char *)malloc(256);
+  envp[1] = 0;
+  for (i=0; i<arg_requested_pes; i++)
+  {
+    int status = 0;
+    int pid;
+
+    if (arg_verbose)
+      printf("Charmrun> start %d node program on localhost.\n", i);
+    sprintf(envp[0], "NETSTART=%s",  create_netstart(i));
+    pid = 0;
+    pid = fork();
+    if (pid < 0) exit(1);
+    if (pid == 0)
+    {
+      int fd, fd1 = dup(1);
+      if (fd = open("/dev/null", O_RDWR)) {
+        dup2(fd, 0); dup2(fd, 1); dup2(fd, 2);
+      }
+      status = execve(pparam_argv[1], pparam_argv+1, envp);
+      dup2(fd1, 1);
+      printf("execve failed to start process \"%s\" with status: %d\n", pparam_argv[1], status);
+      kill(getppid(), 9);
+      exit(1);
+    }
+  }
+  free(envp[0]);
 }
 
 #endif /*CMK_USE_RSH*/
