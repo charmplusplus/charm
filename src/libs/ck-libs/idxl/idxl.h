@@ -37,7 +37,9 @@ void IDXL_Abort(const char *callingRoutine,const char *msg,int m0=0,int m1=0,int
  *   -recv(msg) until isDone returns true
  */
 class IDXL_Comm {
+public: //<- Sun CC demands op_t be public for use in inner class
 	typedef enum { add_t=17,recv_t,sum_t} op_t;
+private:
 	class sto_t { public:
 		const IDXL_Side *idx; //Indices to read from/write to
 		const IDXL_Layout *dtype; //Format of user data
