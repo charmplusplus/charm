@@ -215,9 +215,8 @@ int MPI_Recv(void *msg, int count, int type, int src, int tag,
              MPI_Comm comm, MPI_Status *status);
 int MPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count);
 #define MPI_Bsend MPI_Send
-int MPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
-             int tag, MPI_Comm comm);
-/* MPI_Rsend */
+#define MPI_Rsend MPI_Send   // FIXME: MPI_Rsend can be posted only after recv
+#define MPI_Ssend MPI_Send   // FIXME: MPI_Ssend blocks until recv has been posted
 #define MPI_Buffer_attach(buf,len) /*LIE: emtpy*/ /*Silly: default send is buffering in Charm++*/
 #define MPI_Buffer_detach(buf,len) /*LIE: emtpy*/
 int MPI_Isend(void *buf, int count, MPI_Datatype datatype, int dest,
@@ -234,21 +233,21 @@ int MPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Stat
 int MPI_Waitall(int count, MPI_Request *request, MPI_Status *sts);
 int MPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts);
 /* int MPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount, int *array_of_indices, MPI_Status *array_of_statuses) */
-/* MPI_Testsome */
+/* int MPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount, int *array_of_indices, MPI_Status *array_of_statuses) */
 int MPI_Request_free(MPI_Request *request);
-/* MPI_Cancel */
-/* MPI_Test_cancel */
+int MPI_Cancel(MPI_Request *request);
+/* int MPI_Test_cancelled(MPI_Status *status, int *flag); */
 int MPI_Iprobe(int src, int tag, MPI_Comm comm, int *flag, MPI_Status *sts);
 int MPI_Probe(int source, int tag, MPI_Comm comm, MPI_Status *sts);
 int MPI_Send_init(void *buf, int count, int type, int dest, int tag,
                   MPI_Comm comm, MPI_Request *req);
-/* MPI_Bsend_init */
-/* MPI_Ssend_init */
-/* MPI_Rsend_init */
+#define MPI_Bsend_init MPI_Send_init
+#define MPI_Ssend_init MPI_Send_init  // FIXME: see MPI_Ssend
+#define MPI_Rsend_init MPI_Send_init  // FIXME: see MPI_Rsend
 int MPI_Recv_init(void *buf, int count, int type, int src, int tag,
                   MPI_Comm comm, MPI_Request *req);
 int MPI_Start(MPI_Request *reqnum);
-/* MPI_Startall */
+int MPI_Startall(int count, MPI_Request *array_of_requests);
 int MPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
                  int stag, void *rbuf, int rcount, int rtype,
                  int src, int rtag, MPI_Comm comm, MPI_Status *sts);

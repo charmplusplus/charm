@@ -1104,15 +1104,6 @@ int MPI_Send(void *msg, int count, MPI_Datatype type, int dest,
   return common_send(msg,count,type,dest,tag,comm);
 }
 
-//FIXME: This doesn't give the semantics of SSEND:
-CDECL
-int MPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
-                        int tag, MPI_Comm comm)
-{
-  AMPIAPI("MPI_Ssend");
-  return common_send(msg,count,type,dest,tag,comm);
-}
-
 CDECL
 int MPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
               MPI_Comm comm, MPI_Status *status)
@@ -1481,6 +1472,17 @@ int MPI_Start(MPI_Request *request)
   return 0;
 }
 
+CDECL
+int MPI_Startall(int count, MPI_Request *requests){
+  AMPIAPI("MPI_Startall");
+  AmpiRequestList *reqs = getReqs();
+  for(int i=0;i<count;i++){
+    if(-1==(*reqs)[requests[i]]->start())
+      CkAbort("MPI_Start could be used only on persistent communication requests!");
+  }
+  return 0;
+}
+
 int PersReq::wait(MPI_Status *sts){
 	if(sndrcv == 2) {
   _LOG_E_END_AMPI_PROCESSING(getAmpiInstance(comm)->thisIndex)
@@ -1636,6 +1638,12 @@ int MPI_Request_free(MPI_Request *request){
   AmpiRequestList* reqs = getReqs();
   (*reqs)[*request]->free();
   return 0;
+}
+
+CDECL
+int MPI_Cancel(MPI_Request *request){
+  AMPIAPI("MPI_Request_free");
+  return MPI_Request_free(request);
 }
 
 CDECL

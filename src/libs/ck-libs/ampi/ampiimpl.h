@@ -280,7 +280,7 @@ public:
 	virtual int wait(MPI_Status *sts) =0;
 
 	/// Frees up the request: invalidate it
-	virtual inline void free(void){ isvalid=false; }
+	virtual void free(void){ isvalid=false; }
 	inline bool isValid(void){ return isvalid; }
 
 	/// Returns the type of request: 1-PersReq, 2-IReq, 3-ATAReq
