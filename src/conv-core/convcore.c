@@ -122,9 +122,10 @@ and sets argv={"a.out","foo","bar"};
 int CmiGetArgString(char **argv,const char *arg,char **optDest)
 {
 	int i;
-	for (i=0;argv[i+1]!=NULL;i++)
+	for (i=0;argv[i]!=NULL;i++)
 		if (0==strcmp(argv[i],arg))
 		{/*We found the argument*/
+			if (argv[i+1]==NULL) CmiAbort("Argument not complete!");
 			*optDest=argv[i+1];
 			CmiDeleteArgs(&argv[i],2);
 			return 1;
