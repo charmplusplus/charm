@@ -33,10 +33,11 @@ done
 
 echo "Running on $pes processors: $args"
 
-if [ x"$PBS_QUEUE" = x ]
+if [ -n "$PBS_NODEFILE" ]
 then
   mpirun -np $pes $args
-else
+elif [ -n "$PBS_QUEUE" ]
+then
 # Interactive mode: create, and submit a batch job
         script="charmrun_script.$$.sh"
         indir=`pwd`
@@ -119,7 +120,9 @@ EOF
                 rm tmp.$$
                 sleep 20
         done
-
+else
+	echo "Charmrun> failed."
+	exit 1
 fi
 
 
