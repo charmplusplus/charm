@@ -162,7 +162,7 @@ cmk_clean:
 CKHEADERS=chare.h const.h msg_macros.h prio_macros.h env_macros.h globals.h\
 	  sys_macros.h communication.h performance.h $(CVHEADERS)
 
-CK_LIBS_CORE=libck-core-notrace.a libck-core-summary.a libck-core-projections.a
+CK_LIBS_CORE=libck-core-notrace.a libck-core-projections.a
 
 CK_LIBS_LDB=libck-ldb-rand.o libck-ldb-acwn.o libck-ldb-mngr.o # libck-ldb-priomngr.o libck-ldb-recv.o libck-ldb-tok.o libck-ldb-btok.o
 
@@ -179,10 +179,6 @@ charmlibs: converse $(CK_LIBS)
 LIBCK_CORE_NOTRACE=$(LIBCK_CORE) perf-none.o
 libck-core-notrace.a: $(LIBCK_CORE_NOTRACE)
 	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_NOTRACE)
-
-LIBCK_CORE_SUMMARY=$(LIBCK_CORE) perf-sum.o
-libck-core-summary.a: $(LIBCK_CORE_SUMMARY)
-	$(CHARMC) -cp ../lib/ -o $@ $(LIBCK_CORE_SUMMARY)
 
 LIBCK_CORE_PROJ=$(LIBCK_CORE) perf-proj.o perfio.o
 libck-core-projections.a: $(LIBCK_CORE_PROJ)
