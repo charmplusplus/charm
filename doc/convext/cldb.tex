@@ -1,10 +1,10 @@
 \chapter{Load Balancing}
 
-This module defines a function CldEnqueue that sends a message
+This module defines a function {\bf CldEnqueue} that sends a message
 to a lightly-loaded processor.  It automates the process of finding a
 lightly-loaded processor.  
 
-The function CldEnqueue is extremely sophisticated.  It does not
+The function {\bf CldEnqueue} is extremely sophisticated.  It does not
 choose a processor, send the message, and forget it.  Rather, it puts
 the message into a pool of movable work.  The pool of movable work
 gradually shrinks as it is consumed (processed), but in most programs,
@@ -13,51 +13,52 @@ time.  As load conditions shift, the load balancers shifts the pool
 around, compensating.  Any given message may be shifted more than
 once, as part of the pool.
 
-CldEnqueue also accounts for priorities.  Normal load-balancers
+{\bf CldEnqueue} also accounts for priorities.  Normal load-balancers
 try to make sure that all processors have some work to do.  The
-function CldEnqueue goes a step further: it tries to make sure
+function {\bf CldEnqueue} goes a step further: it tries to make sure
 that all processors have some reasonably high-priority work to do.
 This can be extremely helpful in AI search applications.
 
-The two assertions above should be qualified: CldEnqueue can use
+The two assertions above should be qualified: {\bf CldEnqueue} can use
 these sophisticated strategies, but it is also possible to configure
-it for simpler behavior.  When you compile and link your program, you
-choose a ``load-balancing strategy''.  That means you link in one of
+it for different behavior.  When you compile and link your program, you
+choose a {\sl load-balancing strategy}.  That means you link in one of
 several implementations of the load-balancer.  Most are sophisticated,
 as described above.  But some are simple and cheap, like the random
 strategy.  The process of choosing a strategy is described in the
 manual {\em Converse Installation and Usage}.
 
-For efficiency reasons, the load-balancing module needs to be able to
-cache some data in the messages it manipulates.  Every message sent
-using CldEnqueue must contain a small empty space where the
-load-balancer can cache its data.  This region is called the CLD
-field.  The size of the empty space must be {\tt CLD\_FIELDSIZE}.
-There is no particular place in the message where this empty space has
-to be, but it must be in there somewhere.
+%For efficiency reasons, the load-balancing module needs to be able to
+%cache some data in the messages it manipulates.  Every message sent
+%using CldEnqueue must contain a small empty space where the
+%load-balancer can cache its data.  This region is called the CLD
+%field.  The size of the empty space must be {\tt CLD\_FIELDSIZE}.
+%There is no particular place in the message where this empty space has
+%to be, but it must be in there somewhere.
 
-Before you send a message using CldEnqueue, you must write an
-``info'' function with this prototype:
+Before you send a message using {\bf CldEnqueue}, you must write an
+{\sl info} function with this prototype:
 
-\function{void InfoFn(void *msg, int *len, void *cldfield, int *queueing, int *priobits, int **prioptr);}
+\function{void InfoFn(void *msg, CldPackFn *pfn, int *len, int
+*queueing, int *priobits, unsigned int *prioptr);}
 \desc{The load balancer will call the info function when it
 needs to know various things about the message.  The load balancer
 will pass in the message via the parameter \param{msg}.  The info
 function's job is to ``fill in'' the other parameters.  It must
 compute the length of the message, and store it at \param{*len}.  It
-must find the CLD field in the message, and store a pointer to it at
-\param{*cldfield}.  It must identify the priority of the message, and
-the queueing strategy that must be used, storing this information
-at \param{*queueing}, \param{*priobits}, and \param{*prioptr}.
-Caution: the priority will not be copied, so the \param{*prioptr} should
-probably be made to point to the message itself.}
+must determine the {\sl pack} function for the message, and store a
+pointer to it at \param{*pfm}.  It must identify the priority of the
+message, and the queueing strategy that must be used, storing this
+information at \param{*queueing}, \param{*priobits}, and
+\param{*prioptr}.  Caution: the priority will not be copied, so the
+\param{*prioptr} should probably be made to point to the message itself.}
 
-After the user of CldEnqueue writes the ``info'' function, the
+After the user of {\bf CldEnqueue} writes the ``info'' function, the
 user must register it, using this:
 
-\function{int CldRegisterInfoFn(void *fn)}
+\function{int CldRegisterInfoFn(CldInfoFn fn)}
 \desc{Accepts a pointer to an info-function.  Returns an integer
-index for the info-function.  This index will be needed in CldEnqueue.}
+index for the info-function.  This index will be needed in {\bf CldEnqueue}.}
 
 Normally, when you send a message, you pack up a bunch of data into a
 message, send it, and unpack it at the receiving end.  It is sometimes
@@ -74,7 +75,7 @@ going to cross address-space boundaries or not.  If it's to cross
 address spaces, you need to use the ``long form'', but if it's to stay
 inside an address space, you want to use the faster ``short form''.
 We call this ``conditional packing.''  When you send a message with
-CldEnqueue, you should initially assume it will not cross
+{\bf CldEnqueue}, you should initially assume it will not cross
 address space boundaries.  In other words, you should send the ``short
 form'' of the message, containing pointers.  If the message is about
 to leave the address space, the load balancer will call your pack
@@ -95,11 +96,11 @@ function can be a no-op.
 
 Pack functions must be registered using this:
 
-\function{int CldRegisterInfoFn(void *fn)}
+\function{int CldRegisterPackFn(CldPackFn fn)}
 \desc{Accepts a pointer to an pack-function.  Returns an integer
-index for the pack-function.  This index will be needed in CldEnqueue.}
+index for the pack-function.  This index will be needed in {\bf CldEnqueue}.}
 
-Normally, CldEnqueue sends a message to a lightly-loaded
+Normally, {\bf CldEnqueue} sends a message to a lightly-loaded
 processor.  After doing this, it enqueues the message with the
 appropriate priority.  The function CldEnqueue can also be used
 as a mechanism to simply enqueue a message on a remote processor with
@@ -108,9 +109,9 @@ send-function.  To do this, one of the CldEnqueue parameters
 allows you to override the load-balancing behavior and lets you choose
 a processor yourself.
 
-The prototype for CldEnqueue is as follows:
+The prototype for {\bf CldEnqueue} is as follows:
 
-\function{void CldEnqueue(int pe, void *msg, int infofn, int packfn)}
+\function{void CldEnqueue(int pe, void *msg, int infofn)}
 \index{CldEnqueue}
 \desc{The argument \param{msg} is a pointer to the message.
 The parameter \param{infofn} represents a function that can analyze
@@ -119,6 +120,92 @@ can pack the message.  If the parameter \param{pe} is {\tt CLD\_ANYWHERE},
 the message is sent to a lightly-loaded processor and enqueued with
 the appropriate priority.  If the parameter \param{pe} is a processor
 number, the message is sent to the specified processor and enqueued
-with the appropriate priority.  CldEnqueue frees the message buffer
-using CmiFree.}
+with the appropriate priority.  {\bf CldEnqueue} frees the message buffer
+using {\bf CmiFree}.}
+
+The following simple example illustrates how a Converse program can
+make use of the load balancers.
+
+\noindent {\tt hello.c:}
+
+\begin{verbatim}
+#include <stdio.h>
+#include "converse.h"
+#define CHARES 10
+
+void startup(int argc, char *argv[]);
+void registerAndInitialize();
+
+typedef struct pemsgstruct
+{
+  char header[CmiExtHeaderSizeBytes];
+  int pe, id, pfnx;
+  int queuing, priobits;
+  unsigned int prioptr;
+} pemsg;
+
+CpvDeclare(int, MyHandlerIndex);
+CpvDeclare(int, InfoFnIndex);
+CpvDeclare(int, PackFnIndex);
+
+int main(int argc, char *argv[]) 
+{
+  ConverseInit(argc, argv, startup, 0, 0);
+  CsdScheduler(-1);
+}
+
+void startup(int argc, char *argv[])
+{
+  pemsg *msg;
+  int i;
+  
+  registerAndInitialize();
+  for (i=0; i<CHARES; i++) {
+    msg = (pemsg *)malloc(sizeof(pemsg));
+    msg->pe = CmiMyPe();
+    msg->id = i;
+    msg->pfnx = CpvAccess(PackFnIndex);
+    msg->queuing = CQS_QUEUEING_FIFO;
+    msg->priobits = 0;
+    msg->prioptr = 0;
+    CmiSetHandler(msg, CpvAccess(MyHandlerIndex));
+    CmiPrintf("[%d] sending message %d\n", msg->pe, msg->id);
+    CldEnqueue(CLD_ANYWHERE, msg, CpvAccess(InfoFnIndex));
+    /*    CmiSyncSend(i, sizeof(pemsg), &msg); */
+  }
+}
+
+void MyHandler(pemsg *msg)
+{
+  CmiPrintf("Message %d created on %d handled by %d.\n", msg->id, msg->pe, 
+	    CmiMyPe());
+}
+
+void InfoFn(pemsg *msg, CldPackFn *pfn, int *len, int *queuing, int *priobits, 
+	    unsigned int *prioptr)
+{
+  *pfn = (CldPackFn)CmiHandlerToFunction(msg->pfnx);
+  *len = sizeof(pemsg);
+  *queuing = msg->queuing;
+  *priobits = msg->priobits;
+  prioptr = &(msg->prioptr);
+}
+
+void PackFn(pemsg **msg)
+{
+}
+
+void registerAndInitialize()
+{
+  CpvInitialize(int, MyHandlerIndex);
+  CpvAccess(MyHandlerIndex) = CmiRegisterHandler(MyHandler);
+  CpvInitialize(int, InfoFnIndex);
+  CpvAccess(InfoFnIndex) = CldRegisterInfoFn((CldInfoFn)InfoFn);
+  CpvInitialize(int, PackFnIndex);
+  CpvAccess(PackFnIndex) = CldRegisterPackFn((CldPackFn)PackFn);
+}
+\end{verbatim}
+
+
+
 
