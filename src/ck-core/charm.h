@@ -186,7 +186,11 @@ typedef CkGroupID CkNodeGroupID;
  * Object Creation Calls
  *
  *****************************************************************************/
+#ifdef __cplusplus
+class envelope;
+#else
 typedef struct envelope envelope;
+#endif
 extern void CkCreateChare(int chareIdx, int constructorIdx, void *msg,
                           CkChareID *vid, int destPE);
 extern CkGroupID CkCreateGroup(int chareIdx, int constructorIdx, void *msg);
