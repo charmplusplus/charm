@@ -56,7 +56,8 @@ void CComlibEachToManyMulticast(comID id, int ep, void *msg, int bocnum, int npe
 }
 #endif
 
-void CComlibEachToManyMulticast(comID id, int ep, void *msg, int bocnum, int npe, int *pelist)
+void CComlibEachToManyMulticast(comID id, int ep, void *msg, 
+	CkGroupID bocnum, int npe, int *pelist)
 {
   int len, queueing, priobits; 
   unsigned int *prioptr;

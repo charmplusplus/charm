@@ -49,7 +49,8 @@ void EachToAllMulticast(comID  id, int size, void * msg);
 void EachToManyMulticast(comID id, int size, void *msg, int npe, int * pelist);
 
 /* Charm++ messages */
-void CComlibEachToManyMulticast(comID, int, void *, int, int, int *);
+#include "charm.h"
+void CComlibEachToManyMulticast(comID, int, void *, CkGroupID, int, int *);
 
 /**************** Declarations for the Developer *************/
 CpvExtern(int, RecvHandle);
