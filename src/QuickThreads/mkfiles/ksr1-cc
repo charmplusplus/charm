@@ -4,6 +4,7 @@ CC=cc -ansi -I. -O
 all: qt stp testpgm
 
 qt:
+	rm -f qtmd.h
 	ln -s md/ksr1.h qtmd.h
 	$(CC) -c -o qt.o qt.c
 	as -o qtmds.o md/ksr1.s
