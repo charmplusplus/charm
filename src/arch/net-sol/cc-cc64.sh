@@ -8,7 +8,8 @@ CMK_CC_FASTEST="cc $CMK_CFLAGS"
 CMK_CXX="CC -library=Cstd $CMK_CXXFLAGS -instances=global "
 CMK_CXXPP='CC -E '
 CMK_CF77='f77'
-CMK_CF90='f90 -C -stackvar -g -xarch=v9a -KPIC'
+CMK_CF90='f90 -C -stackvar -xarch=v9a -KPIC'
+CMK_CF90_FIXED="$CMK_CF90 -fixed"
 CMK_C_DEBUG='-g'
 CMK_C_OPTIMIZE='-xO5'
 CMK_CXX_DEBUG='-g'
