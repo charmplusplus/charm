@@ -81,6 +81,18 @@ void LDNotifyMigrated(LDHandle _db, LDMigratedFn fn, void* data)
   db->NotifyMigrated(fn,data);
 }
 
+void LDAddStartLBFn(LDHandle _db, LDStartLBFn fn, void* data)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->AddStartLBFn(fn,data);
+}
+
+void LDStartLB(LDHandle _db)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->StartLB();
+}
+
 extern "C" void LDCollectStatsOn(LDHandle _db)
 {
   LBDB *const db = (LBDB*)(_db.handle);

@@ -105,6 +105,10 @@ public:
   void Migrate(LDObjHandle h, int dest);
   void Migrated(LDObjHandle h);
   void NotifyMigrated(LDMigratedFn fn, void* data);
+
+  void AddStartLBFn(LDStartLBFn fn, void* data);
+  void StartLB();
+
   inline void IdleTime(double* walltime) { 
     machineUtil.IdleTime(walltime); 
   };
@@ -171,9 +175,15 @@ private:
     void* data;
   };
 
+  struct StartLBCB {
+    LDStartLBFn fn;
+    void* data;
+  };
+
   typedef CkVec<LBOM*> OMList;
   typedef CkVec<LBObj*> ObjList;
   typedef CkVec<MigrateCB*> MigrateCBList;
+  StartLBCB *            startLBFn;
 
   LBCommTable* commTable;
   OMList oms;

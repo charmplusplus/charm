@@ -40,6 +40,13 @@ void set_avail_vector(char * bitmap){
     }   
 }
 
+void CentralLB::staticStartLB(void* data)
+{
+  CentralLB *me = (CentralLB*)(data);
+
+  me->StartLB();
+}
+
 void CentralLB::staticMigrated(void* data, LDObjHandle h)
 {
   CentralLB *me = (CentralLB*)(data);
@@ -63,6 +70,8 @@ CentralLB::CentralLB()
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),(void*)(this));
   theLbdb->
     NotifyMigrated((LDMigratedFn)(staticMigrated),(void*)(this));
+  theLbdb->
+    AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
 
   stats_msg_count = 0;
   statsMsgsList = new CLBStatsMsg*[CkNumPes()];

@@ -60,6 +60,7 @@ LBDB::LBDB()
     commTable = new LBCommTable;
     obj_walltime = obj_cputime = 0;
     batsync.init(this,1.0);
+    startLBFn = NULL;
 }
 
 LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData, 
@@ -222,6 +223,25 @@ void LBDB::NotifyMigrated(LDMigratedFn fn, void* data)
   callbk->fn = fn;
   callbk->data = data;
   migrateCBList.insertAtEnd(callbk);
+}
+
+void LBDB::AddStartLBFn(LDStartLBFn fn, void* data)
+{
+  CkAssert(startLBFn == NULL);
+  // Save startLB function
+  StartLBCB* callbk = new StartLBCB;
+
+  callbk->fn = fn;
+  callbk->data = data;
+  startLBFn = callbk;
+}
+
+void LBDB::StartLB()
+{
+  if (startLBFn == NULL) {
+    CmiAbort("StartLB is not supported in this LB");
+  }
+  startLBFn->fn(startLBFn->data);
 }
 
 void LBDB::BackgroundLoad(double* walltime, double* cputime)

@@ -87,6 +87,11 @@ public:
     LDNotifyMigrated(myLDHandle,fn,data);
   };
  
+  inline void AddStartLBFn(LDStartLBFn fn, void *data) 
+  {
+    LDAddStartLBFn(myLDHandle,fn,data);
+  };
+ 
   inline void CollectStatsOn(void) { LDCollectStatsOn(myLDHandle); };
   inline void CollectStatsOff(void) { LDCollectStatsOff(myLDHandle); };
   inline void QueryEstLoad(void) { LDQueryEstLoad(myLDHandle); };

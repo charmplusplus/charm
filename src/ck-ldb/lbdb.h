@@ -147,6 +147,10 @@ void LDDumpDatabase(LDHandle lbdb);
 typedef void (*LDMigratedFn)(void* data, LDObjHandle handle);
 void LDNotifyMigrated(LDHandle lbdb, LDMigratedFn fn, void* data);
 
+typedef void (*LDStartLBFn)(void *user_ptr);
+void LDAddStartLBFn(LDHandle lbdb, LDStartLBFn fn, void* data);
+void LDStartLB(LDHandle _db);
+
 void LDCollectStatsOn(LDHandle lbdb);
 void LDCollectStatsOff(LDHandle lbdb);
 void LDQueryEstLoad(LDHandle bdb);
