@@ -318,7 +318,7 @@ int ImageData::AddImage (const liveVizRequest* req,
     {
         for (int y=0; y<sizey; y++)
         {
-            int startPos = y*sizex;
+            int startPos = y*sizex*m_bytesPerPixel;
             int endPos   = startPos + (sizex-1)*m_bytesPerPixel;
             int xoffset  = 0;
             int bytesToCopy = 0;
