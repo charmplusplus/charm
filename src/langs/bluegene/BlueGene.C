@@ -94,8 +94,8 @@ void Main::CreateBlueGene(CreateBgNodeMsg *msg)
 void Main::Finish(void) 
 {
   endtime = CkWallTimer();
-  ckout << "Total time : " << (endtime-starttime)*10.0 
-        << " microseconds per ring" << endl;
+  ckout << "Total time for simulation: " << endtime-starttime << " seconds." 
+        << endl;
   CkExit() ;
 }
 
