@@ -707,7 +707,6 @@ void TraceProjections::traceWriteSts(void)
 
 void TraceProjections::traceClose(void)
 {
-  
   if(CkMyPe()==0){
     _logPool->writeSts();
   }

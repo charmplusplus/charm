@@ -115,14 +115,14 @@ public:
         for (i=0; i<n; i++) if (tr == traces[i]) break;
         CmiAssert(i<n);
         traces[i] = NULL;
-        n--;
     }
     inline void clearTrace() {    // remove void Trace from TraceArray
 	int len = traces.length();
 	int removed = 0;
         for (int i=0; i<len; i++) {
-          if (traces[i] == NULL) { traces.remove(i-removed); removed++; }
+          if (traces[i-removed] == NULL) { traces.remove(i-removed); removed++; }
         }
+        n -= removed;
     }
     inline const int length() const { return n; }
 

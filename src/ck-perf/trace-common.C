@@ -67,7 +67,7 @@ static void traceCommonInit(char **argv)
 #if CMK_TRACE_IN_CHARM
   CkpvInitialize(int, traceOnPe);
   CkpvAccess(traceOnPe) = 1;
-#if 1
+#if 0
   // example for choosing subset of processors for tracing
   CkpvAccess(traceOnPe) = 0;
   if (CkMyPe() < 20 && CkMyPe() > 15) CkpvAccess(traceOnPe) = 1;
