@@ -553,7 +553,8 @@ void TraceSummary::beginPack(void)
 void TraceSummary::endPack(void)
 {
     _logPool->setEp(_packEP, CmiWallTimer() - packstart);
-    _logPool->updateSummaryDetail(_packEP,  TraceTimer(packstart), TraceTimer(CmiWallTimer()));
+    if (sumDetail)
+        _logPool->updateSummaryDetail(_packEP,  TraceTimer(packstart), TraceTimer(CmiWallTimer()));
 }
 
 void TraceSummary::beginUnpack(void)
@@ -564,7 +565,8 @@ void TraceSummary::beginUnpack(void)
 void TraceSummary::endUnpack(void)
 {
     _logPool->setEp(_unpackEP, CmiWallTimer()-unpackstart);
-    _logPool->updateSummaryDetail(_unpackEP,  TraceTimer(unpackstart), TraceTimer(CmiWallTimer()));
+    if (sumDetail)
+        _logPool->updateSummaryDetail(_unpackEP,  TraceTimer(unpackstart), TraceTimer(CmiWallTimer()));
 }
 
 void TraceSummary::beginComputation(void)
