@@ -1693,11 +1693,19 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   CmiState cs = CmiGetState(); OutgoingMsg ogm;
 
   if (freemode == 'S') {
+#if CMK_USE_GM
+    if (pe != cs->pe) {
+      freemode = 'G';
+    }
+    else
+#endif
+    {
     char *copy = (char *)CmiAlloc(size);
     if (!copy)
       fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);
     memcpy(copy, data, size);
     data = copy; freemode = 'F';
+    }
   }
   
   if (pe == cs->pe) {

@@ -543,7 +543,7 @@ void GarbageCollectMsg(OutgoingMsg ogm)
     if (ogm->freemode == 'A') {
       ogm->freemode = 'X';
     } else {
-      CmiFree(ogm->data);
+      if (ogm->freemode != 'G') CmiFree(ogm->data);
       FreeOutgoingMsg(ogm);
     }
   }
