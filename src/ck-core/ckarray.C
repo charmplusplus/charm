@@ -79,6 +79,7 @@ public:
   CkArray *thisArray;
   CkArrayID thisArrayID;
   int bcastNo,numInitial;
+  bool fromMigration;
 };
 
 CpvStaticDeclare(ArrayElement_initInfo,initInfo);
@@ -90,12 +91,13 @@ void ArrayElement::initBasics(void)
   thisArrayID=info.thisArrayID;
   numElements=info.numInitial;
   bcastNo=info.bcastNo;
+  if (!info.fromMigration)
+    thisArray->contributorCreated(&reductionInfo);
 }
 
 ArrayElement::ArrayElement(void) 
 {
 	initBasics();
-	thisArray->contributorCreated(&reductionInfo);
 }
 ArrayElement::ArrayElement(CkMigrateMessage *m) 
 {
@@ -178,60 +180,52 @@ void CkArray::staticSpringCleaning(void *forArray) {
 void CProxy_ArrayBase::setReductionClient(CkReductionMgr::clientFn fn,void *param)
 { ckLocalBranch()->setClient(fn,param); }
 
-CkGroupID CProxy_ArrayBase::ckCreateArray(int numInitial,CkGroupID mapID,CkArrayID boundTo)
+CkArrayOptions::CkArrayOptions(void) //Default: empty array
+	:numInitial(0),map(_RRMapID)
 {
-	CkGroupID locMgr;
-	if (CkGroupID(boundTo).isZero()) 
-	{ //Create a new location manager
-		if (mapID.isZero()) mapID=_RRMapID;
-#if !CMK_LBDB_ON
-		CkGroupID lbdb();
-#endif
-		locMgr=CProxy_CkLocMgr::ckNew(mapID,lbdb,numInitial);
-	} 
-	else 
-	{ //Use the boundTo array's location manager
-		CkArray *arr=CProxy_CkArray(boundTo).ckLocalBranch();
-		locMgr=arr->getLocMgr()->getGroupID();
-	}
-	
-	//Attach an array to that location manager
-	CkGroupID ag=CProxy_CkArray::ckNew(CkArrayCreateInfo(locMgr,numInitial));
-	return ag;
+	locMgr.setZero();
 }
 
-//Create 1D initial array elements
-CkGroupID CProxy_ArrayBase::ckCreateArray1D(
-	    int ctorIndex,CkArrayMessage *inM,
-	    int numInitial,CkGroupID mapID)
+CkArrayOptions::CkArrayOptions(int ni) //With initial elements
+	:numInitial(ni),map(_RRMapID)
 {
-  //First build the array
-  CkArrayID id=ckCreateArray(numInitial,mapID,CkArrayID());
-  CProxy_ArrayBase prox(id);
-  DEBC(("In createInitial-- will build %d elements\n",numInitial));
-  if (numInitial>0) {
-    //Build some 1D elements: (mostly for backward compatability)
-    for (int i=0;i<numInitial;i++) {
-      CkArrayMessage *m=NULL;
-      if (inM!=NULL) { 
-	if (i!=numInitial-1)
-	  m=(CkArrayMessage *)CkCopyMsg((void **)&inM);
-	else
-	  m=inM;//Last time around, send off the original message
-      }
-      prox.ckInsertIdx(m,ctorIndex,-1,CkArrayIndex1D(i));
-    }
-    DEBC(("Done building elements\n"));
-    prox.doneInserting();
-  }
-  return id;
+	locMgr.setZero();
+}
+
+//Bind our elements to this array
+CkArrayOptions &CkArrayOptions::bindTo(const CkArrayID &b)
+{
+	CkArray *arr=CProxy_CkArray(b).ckLocalBranch();
+	setNumInitial(arr->getNumInitial());
+	return setLocationManager(arr->getLocMgr()->getGroupID());
+}
+
+CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,CkArrayOptions opts)
+{
+	if (opts.getLocationManager().isZero()) 
+	{ //Create a new location manager
+#if !CMK_LBDB_ON
+		CkGroupID lbdb;
+#endif
+		opts.setLocationManager(CProxy_CkLocMgr::ckNew(
+			  opts.getMap(),lbdb,opts.getNumInitial()
+			));
+	}
+	//Create the array manager
+	m->array_ep()=ctor;
+	CkMarshalledMessage marsh(m);
+	CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh);
+	return (CkArrayID)ag;
+}
+CkArrayID CProxy_ArrayBase::ckCreateEmptyArray(void)
+{
+	return ckCreateArray((CkArrayMessage *)CkAllocSysMsg(),0,CkArrayOptions());
 }
 
 static void prepareArrayCtorMsg(CkArray *arr,CkArrayMessage *m,
-	   int ctor,int &onPe,const CkArrayIndex &idx)
+	   int &onPe,const CkArrayIndex &idx)
 {
   m->array_index()=idx;
-  m->array_ep()=ctor;
   UsrToEnv((void *)m)->array_broadcastCount()=arr->getBcastNo();  
   
   if (onPe==-1) onPe=arr->homePe(idx);
@@ -244,7 +238,8 @@ void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,
 	const CkArrayIndex &idx)
 {
   if (m==NULL) m=(CkArrayMessage *)CkAllocSysMsg();
-  prepareArrayCtorMsg(ckLocalBranch(),m,ctor,onPe,idx);
+  m->array_ep()=ctor;
+  prepareArrayCtorMsg(ckLocalBranch(),m,onPe,idx);
   if (ckIsDelegated()) {
   	ckDelegatedTo()->ArrayCreate(ctor,m,idx,onPe,_aid);
   	return;
@@ -287,9 +282,9 @@ void CProxySection_ArrayBase::pup(PUP::er &p)
 }
 
 /*********************** CkArray Creation *************************/
-CkArray::CkArray(const CkArrayCreateInfo &c)
+CkArray::CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg)
         : CkReductionMgr(), 
-	locMgr(CProxy_CkLocMgr::ckLocalBranch(c.locMgrID)),
+	locMgr(CProxy_CkLocMgr::ckLocalBranch(c.getLocationManager())),
 	thisproxy(thisgroup)
 {
   //Registration
@@ -298,19 +293,22 @@ CkArray::CkArray(const CkArrayCreateInfo &c)
   CcdCallOnConditionKeep(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this);
 
   //Set class variables
-  numInitial=c.numInitial;
+  numInitial=c.getNumInitial();
   isInserting=CmiTrue;
   bcastNo=oldBcastNo=0;
 
   //Don't start reduction until all elements have been inserted.
   CkReductionMgr::creatingContributors();
+
+  //Set up initial elements (if any)
+  locMgr->populateInitial(numInitial,initMsg.getMessage(),this);
 }
 
 CkMigratable *CkArray::allocateMigrated(int elChareType,const CkArrayIndex &idx) 
 {
-	return allocate(elChareType,idx,-1);
+	return allocate(elChareType,idx,-1,true);
 }
-ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,int bcast) 
+ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,int bcast,bool fromMigration) 
 {
 	//Stash the element's initialization information in the global "initInfo"
 	ArrayElement_initInfo &init=CpvAccess(initInfo);
@@ -318,6 +316,7 @@ ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,int bcas
 	init.thisArray=this;
 	init.thisArrayID=thisgroup;
 	init.bcastNo=bcast;
+	init.fromMigration=fromMigration;
 	
 	//Build the element
 	int elSize=_chareTable[elChareType]->size;
@@ -325,13 +324,14 @@ ArrayElement *CkArray::allocate(int elChareType,const CkArrayIndex &idx,int bcas
 }
 
 //This method is called by the user to add an element.
-bool CkArray::insertElement(CkArrayMessage *m)
+bool CkArray::insertElement(CkMessage *me)
 {
   magic.check();
+  CkArrayMessage *m=(CkArrayMessage *)me;
   const CkArrayIndex &idx=m->array_index();
   int ctorIdx=m->array_ep();
   int chareType=_entryTable[ctorIdx]->chareIdx;
-  ArrayElement *elt=allocate(chareType,idx,UsrToEnv(m)->array_broadcastCount());
+  ArrayElement *elt=allocate(chareType,idx,UsrToEnv(m)->array_broadcastCount(),false);
   if (!locMgr->addElement(thisgroup,idx,elt,ctorIdx,(void *)m)) return false;
   if (!bringBroadcastUpToDate(elt)) return false;
   return true;
@@ -341,11 +341,16 @@ void CProxy_ArrayBase::doneInserting(void)
 {
   DEBC((AA"Broadcasting a doneInserting request\n"AB));
   //Broadcast a DoneInserting
-  CProxy_CkArray(_aid).doneInserting();
+  CProxy_CkArray(_aid).remoteDoneInserting();
+}
+
+void CkArray::doneInserting(void)
+{
+  thisproxy[CkMyPe()].remoteDoneInserting();
 }
 
 //This is called after the last array insertion.
-void CkArray::doneInserting(void)
+void CkArray::remoteDoneInserting(void)
 {
   magic.check();
   if (isInserting) {
@@ -359,13 +364,21 @@ void CkArray::doneInserting(void)
 bool CkArray::demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor)
 {
 	CkArrayMessage *m=(CkArrayMessage *)CkAllocSysMsg();
-	prepareArrayCtorMsg(this,m,ctor,onPe,idx);
+	prepareArrayCtorMsg(this,m,onPe,idx);
 	
 	if (onPe==CkMyPe()) //Call local constructor directly
 		return insertElement(m);
 	else
 		thisproxy[onPe].insertElement(m);
 	return true;
+}
+
+void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg)
+{
+	CkArrayMessage *m=(CkArrayMessage *)ctorMsg;
+	int onPe=CkMyPe();
+	prepareArrayCtorMsg(this,m,onPe,idx);
+	insertElement(m);
 }
 
 /********************* CkArray Messaging ******************/
@@ -397,7 +410,14 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep) const
 	}
 }
 
-void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep) 
+void *CProxyElement_ArrayBase::ckSendSync(CkArrayMessage *msg, int ep) const
+{
+	CkFutureID f=CkCreateAttachedFuture(msg);
+	ckSend(msg,ep);
+	return CkWaitReleaseFuture(f);
+}
+
+void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep) const
 {
 	msg_prepareSend(msg,ep,ckGetArrayID());
 	if (ckIsDelegated()) //Just call our delegateMgr
@@ -441,7 +461,7 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep) const
 
 
 //Reflect a broadcast off this Pe:
-void CkArray::sendBroadcast(CkArrayMessage *msg)
+void CkArray::sendBroadcast(CkMessage *msg)
 {
 	magic.check();
 	//Broadcast the message to all processors
@@ -449,13 +469,13 @@ void CkArray::sendBroadcast(CkArrayMessage *msg)
 }
 
 //Increment broadcast count; deliver to all local elements
-void CkArray::recvBroadcast(CkArrayMessage *msg)
+void CkArray::recvBroadcast(CkMessage *msg)
 {
 	magic.check();
 	bcastNo++;
 	DEBB((AA"Received broadcast %d\n"AB,bcastNo));
-	deliverBroadcast(msg);
-	oldBcasts.enq(msg);//Stash the message for later use
+	deliverBroadcast((CkArrayMessage *)msg);
+	oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
 }
 
 //Deliver a copy of the given broadcast to all local elements

@@ -95,7 +95,7 @@ public:
 };
 
 /*********************** Array Messages ************************/
-class CkArrayMessage : public Message {
+class CkArrayMessage : public CkMessage {
 public:
   //These routines are implementation utilities
   inline CkArrayIndexMax &array_index(void);
@@ -107,11 +107,6 @@ public:
   
   //This allows us to delete bare CkArrayMessages
   void operator delete(void *p){CkFreeMsg(p);}
-  static void* alloc(int idx, size_t sz, int *szs, int pb) {
-    return CkAllocMsg(idx, sz, pb);
-  }
-  static void *pack(CkArrayMessage *m) { return (void *) m; }
-  static CkArrayMessage *unpack(void *buf) { return (CkArrayMessage*) buf; }
 };
 
 /* Utility */
@@ -155,6 +150,7 @@ public:
 
 extern CkGroupID _RRMapID;
 class CkLocMgr;
+class CkArrMgr;
 
 class CkArrayMap : public Group // : public CkGroupReadyCallback
 {
@@ -163,6 +159,7 @@ public:
   CkArrayMap(CkMigrateMessage *m) {}
   virtual ~CkArrayMap();
   virtual int registerArray(int numElements,CkArrayID aid);
+  virtual void populateInitial(int arrayHdl,int numElements,void *ctorMsg,CkArrMgr *mgr);
   virtual int procNum(int arrayHdl,const CkArrayIndex &element) =0;
 //  virtual void pup(PUP::er &p) { CkGroupReadyCallback::pup(p); }
 };
@@ -396,6 +393,12 @@ class CkMagicNumber : public CkMagicNumber_impl {
 //Abstract superclass of all array manager objects 
 class CkArrMgr {
 public:
+	//Insert this initial element on this processor
+	virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg)=0;
+	
+	//Done with initial insertions
+	virtual void doneInserting(void)=0;
+	
 	//Create an uninitialized element after migration
 	//  The element's constructor will be called immediately after.
 	virtual CkMigratable *allocateMigrated(int elChareType,const CkArrayIndex &idx);
@@ -424,6 +427,10 @@ public:
 	// must be registered in the same order on all processors.
 	//Returns a list which will contain that array's local elements
 	CkMigratableList *addManager(CkArrayID aid,CkArrMgr *mgr);
+
+	//Populate this array with initial elements
+	void populateInitial(int numElements,void *initMsg,CkArrMgr *mgr) 
+		{map->populateInitial(mapHandle,numElements,initMsg,mgr);}
 	
 	//Add a new local array element, calling element's constructor
 	// Returns true if the element was successfully added;
@@ -432,7 +439,7 @@ public:
 		CkMigratable *elt,int ctorIdx,void *ctorMsg);
 	
 	//Deliver message to this element, going via the scheduler if local
-	void deliverViaQueue(CkArrayMessage *m);
+	void deliverViaQueue(CkMessage *m);
 
 	//Done inserting elements for now
 	void doneInserting(void);
@@ -484,7 +491,7 @@ public:
 	int lastKnown(const CkArrayIndex &idx) const;
 
 //Communication:
-	bool deliver(CkArrayMessage *m);
+	bool deliver(CkMessage *m);
 	void migrateIncoming(CkArrayElementMigrateMessage *msg);
 	void updateLocation(const CkArrayIndexMax &idx,int nowOnPe);
 	void reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe);
@@ -524,6 +531,7 @@ private:
 		}
 	};
 	GroupIdxArray<ManagerRec> managers;
+	int nManagers;
 	ManagerRec *firstManager; //First non-null array manager
 
 	bool addElementToRec(CkLocRec_local *rec,ManagerRec *m,

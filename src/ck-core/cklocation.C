@@ -171,6 +171,20 @@ CkArrayMap::~CkArrayMap() { }
 int CkArrayMap::registerArray(int numElements,CkArrayID aid)
 {return 0;}
 
+void CkArrayMap::populateInitial(int arrayHdl,int numElements,void *ctorMsg,CkArrMgr *mgr)
+{
+	if (numElements==0) return;
+	int thisPe=CkMyPe();
+	for (int i=0;i<numElements;i++) {
+		//Make 1D indices
+		CkArrayIndex1D idx(i);
+		if (procNum(arrayHdl,idx)==thisPe)
+			mgr->insertInitial(idx,CkCopyMsg(&ctorMsg));
+	}
+	mgr->doneInserting();
+	CkFreeMsg(ctorMsg);
+}
+
 CkGroupID _RRMapID;
 
 class RRMap : public CkArrayMap
@@ -820,6 +834,7 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 	CpvInitialize(CkMigratable_initInfo,mig_initInfo);
 	
 	managers.init();
+	nManagers=0;
   	firstManager=NULL;
 	firstFree=localLen=0;
 	duringMigration=false;
@@ -841,11 +856,13 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,int numInitial)
 CkMigratableList *CkLocMgr::addManager(CkArrayID id,CkArrMgr *mgr)
 {
 	magic.check();
-	DEBC((AA"Adding new array manager %d\n"AB,(int)id));
+	DEBC((AA"Adding new array manager\n"AB));
+	//Link new manager into list
 	ManagerRec *n=&managers.find(id);
 	n->next=firstManager;
 	n->mgr=mgr;
 	n->elts.setSize(localLen);
+	nManagers++;
 	firstManager=n;
 	return &n->elts;
 }
@@ -980,8 +997,9 @@ void CkLocMgr::reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe) {
 
 /************************** LocMgr: MESSAGING *************************/
 //Deliver message to this element, going via the scheduler if local
-void CkLocMgr::deliverViaQueue(CkArrayMessage *msg) {
+void CkLocMgr::deliverViaQueue(CkMessage *m) {
 	magic.check();
+	CkArrayMessage *msg=(CkArrayMessage *)m;
 	const CkArrayIndex &idx=msg->array_index();
 	DEBS((AA"deliverViaQueue %s\n"AB,idx2str(idx)));
 #if CMK_LBDB_ON
@@ -993,8 +1011,9 @@ void CkLocMgr::deliverViaQueue(CkArrayMessage *msg) {
 	else deliverUnknown(msg);
 }
 //Deliver message directly to this element
-bool CkLocMgr::deliver(CkArrayMessage *msg) {
+bool CkLocMgr::deliver(CkMessage *m) {
 	magic.check();
+	CkArrayMessage *msg=(CkArrayMessage *)m;
 	const CkArrayIndex &idx=msg->array_index();
 	DEBS((AA"deliver %s\n"AB,idx2str(idx)));
 	CkLocRec *rec=elementNrec(idx);
@@ -1129,6 +1148,7 @@ void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 	int bufSize;
 	{ 
 		PUP::sizer p; 
+		p(nManagers);
 		pupElementsFor(p,rec);
 		bufSize=p.size(); 
 	}
@@ -1142,6 +1162,7 @@ void CkLocMgr::migrate(CkLocRec_local *rec,int toPe)
 	{
 		PUP::toMem p(msg->packData); 
 		p.becomeDeleting(); 
+		p(nManagers);
 		pupElementsFor(p,rec);
 		if (p.size()!=bufSize) {
 			CkError("ERROR! Array element claimed it was %d bytes to a"
@@ -1167,27 +1188,42 @@ void CkLocMgr::migrateIncoming(CkArrayElementMigrateMessage *msg)
 {
 	CkArrayMessage *amsg=(CkArrayMessage *)msg;
 	const CkArrayIndex &idx=amsg->array_index();
+	PUP::fromMem p(msg->packData); 
+	
+	int nMsgMan;
+	p(nMsgMan);
+	if (nMsgMan<nManagers)
+		CkAbort("Array element arrived from location with fewer managers!\n");
+	if (nMsgMan>nManagers) {
+		//Some array managers haven't registered yet-- throw it back
+		DEBM((AA"Busy-waiting for array registration on migrating %s\n"AB,idx2str(idx)));
+		thisproxy[CkMyPe()].migrateIncoming(msg);
+		return;
+	}
+
 	//Create a record for this element
 	int localIdx=nextFree();
 	CkLocRec_local *rec=new CkLocRec_local(this,true,idx,localIdx);
 	insertRec(rec,idx); //Add to global hashtable
-
+	
 	//Create the new elements as we unpack the message
-	{ 
-		PUP::fromMem p(msg->packData); 
-		pupElementsFor(p,rec);
-		if (p.size()!=msg->length) {
-			CkError("ERROR! Array element claimed it was %d bytes to a"
-				"packing PUP::er, but %d bytes in the unpacking PUP::er!\n",
-				msg->length,p.size());
-			CkAbort("Array element's pup routine has a direction mismatch.\n");
-		}
+	pupElementsFor(p,rec);
+	if (p.size()!=msg->length) {
+		CkError("ERROR! Array element claimed it was %d bytes to a"
+			"packing PUP::er, but %d bytes in the unpacking PUP::er!\n",
+			msg->length,p.size());
+		CkError("(I have %d managers; he claims %d managers)\n",
+			nManagers,nMsgMan);
+		
+		CkAbort("Array element's pup routine has a direction mismatch.\n");
 	}
+	
 	//Let all the elements know we've arrived
 	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
 		CkMigratable *el=m->element(localIdx);
 		if (el) el->ckJustMigrated();
 	}
+	delete msg;
 }
 
 /********************* LocMgr: UTILITY ****************/

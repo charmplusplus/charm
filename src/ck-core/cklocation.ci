@@ -1,14 +1,13 @@
 module CkLocation {
   extern module CkMarshall;
 
-  message CkArrayMessage;
   message CkArrayElementMigrateMessage {
 	double packData[];
   };
 
   group CkLocMgr {
 	entry CkLocMgr(CkGroupID map,CkGroupID lbdb,int numInitial);
-	entry void deliver(CkArrayMessage *m);
+	entry void deliver(CkMessage *m);
 	entry void migrateIncoming(CkArrayElementMigrateMessage *msg);
 	entry void updateLocation(CkArrayIndexMax idx,int nowOnPe);
 	entry void reclaimRemote(CkArrayIndexMax idx,int deletedOnPe);

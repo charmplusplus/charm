@@ -38,6 +38,47 @@ extern void _registerCkArray(void);
 
 #define ALIGN8(x)       (int)((~7)&((x)+7))
 
+//Arguments for array creation:
+class CkArrayOptions {
+	int numInitial;//Number of elements to create
+	CkGroupID map;//Array location map object
+	CkGroupID locMgr;//Location manager to bind to
+ public:
+ //Used by external world:
+	CkArrayOptions(void); //Default: empty array
+	CkArrayOptions(int numInitial_); //With initial elements
+
+	//These functions return a copy of this so you can string them together, e.g.:
+	//  foo(CkArrayOptions().setMap(mid).bindTo(aid));
+
+	//Create this many initial elements
+	CkArrayOptions &setNumInitial(int ni)
+		{numInitial=ni; return *this;}
+
+	//Use this location map
+	CkArrayOptions &setMap(const CkGroupID &m)
+		{map=m; return *this;}
+
+	//Bind our elements to this array
+	CkArrayOptions &bindTo(const CkArrayID &b);
+	
+	//Use this location manager
+	CkArrayOptions &setLocationManager(const CkGroupID &l)
+		{locMgr=l; return *this;}
+	
+  //Used by the array manager:
+	int getNumInitial(void) const {return numInitial;}
+	const CkGroupID &getMap(void) const {return map;}
+	const CkGroupID &getLocationManager(void) const {return locMgr;}
+
+	void pup(PUP::er &p) {
+		p|numInitial;
+		p|locMgr;
+		p|map;
+	}
+};
+PUPmarshall(CkArrayOptions);
+
 
 //This class is a wrapper around a CkArrayIndex and ArrayID,
 // used by array element proxies.  This makes the translator's
@@ -52,9 +93,9 @@ public:
 	CProxy_ArrayBase(const CkArrayID &aid) 
 		:CProxyBase_Delegatable(), _aid(aid) { }
 
-	static CkGroupID ckCreateArray(int numInitial,CkGroupID mapID,CkArrayID boundToArray);
-	static CkGroupID ckCreateArray1D(int ctorIndex,CkArrayMessage *m,
-	     int numInitial,CkGroupID mapID);
+	static CkArrayID ckCreateEmptyArray(void);
+	static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,CkArrayOptions opts);
+
 	void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx);	
 	void ckBroadcast(CkArrayMessage *m, int ep) const;
 	CkArrayID ckGetArrayID(void) const { return _aid; }
@@ -70,11 +111,10 @@ PUPmarshall(CProxy_ArrayBase);
 #define CK_DISAMBIG_ARRAY(super) \
 	CK_DISAMBIG_DELEGATABLE(super) \
 	inline operator CkArrayID () const {return ckGetArrayID();}\
-	inline static CkGroupID ckCreateArray(int numInitial,CkGroupID mapID,CkArrayID boundToArray)\
-	  { return super::ckCreateArray(numInitial,mapID,boundToArray); }\
-	inline static CkGroupID ckCreateArray1D(int ctorIndex,CkArrayMessage *m,\
-	     int numInitial,CkGroupID mapID)\
-	  { return super::ckCreateArray1D(ctorIndex,m,numInitial,mapID); }\
+	inline static CkArrayID ckCreateEmptyArray(void)\
+	  { return super::ckCreateEmptyArray(); }\
+	inline static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts)\
+	  { return super::ckCreateArray(m,ctor,opts); }\
 	inline void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx) \
 	  { super::ckInsertIdx(m,ctor,onPe,idx); }\
 	inline void ckBroadcast(CkArrayMessage *m, int ep) const \
@@ -101,6 +141,7 @@ public:
 	
 	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep) const;
+	void *ckSendSync(CkArrayMessage *m, int ep) const;
 	const CkArrayIndex &ckGetIndex() const {return _idx;}
 
 	ArrayElement *ckLocal(void) const;
@@ -113,6 +154,8 @@ PUPmarshall(CProxyElement_ArrayBase);
 	  { super::ckInsert(m,ctor,onPe); }\
 	inline void ckSend(CkArrayMessage *m, int ep) const \
 	  { super::ckSend(m,ep); }\
+	inline void *ckSendSync(CkArrayMessage *m, int ep) const \
+	  { return super::ckSendSync(m,ep); }\
 	inline const CkArrayIndex &ckGetIndex() const \
 	  { return super::ckGetIndex(); }\
 
@@ -137,12 +180,12 @@ public:
         ~CProxySection_ArrayBase() { delete [] _elems; }
 	
 	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
-	void ckSend(CkArrayMessage *m, int ep) ;
+	void ckSend(CkArrayMessage *m, int ep) const;
 
 //	ArrayElement *ckLocal(void) const;
-	CkSectionID &ckGetSectionID() {return _sid;}
-        inline CkArrayIndexMax *ckGetArrayElements() const { return _elems; }
-	inline const int ckGetNumElements() const { return _nElems; }
+	const CkSectionID &ckGetSectionID() const {return _sid;}
+        inline const CkArrayIndexMax *ckGetArrayElements() const { return _elems; }
+	inline int ckGetNumElements() const { return _nElems; }
 	void pup(PUP::er &p);
 };
 PUPmarshall(CProxySection_ArrayBase);
@@ -150,8 +193,14 @@ PUPmarshall(CProxySection_ArrayBase);
 	CK_DISAMBIG_ARRAY(super) \
 	inline void ckInsert(CkArrayMessage *m,int ctor,int onPe) \
 	  { super::ckInsert(m,ctor,onPe); }\
-	inline void ckSend(CkArrayMessage *m, int ep) \
+	inline void ckSend(CkArrayMessage *m, int ep) const\
 	  { super::ckSend(m,ep); }\
+	inline const CkSectionID &ckGetSectionID() const \
+		{return super::ckGetSectionID();} \
+        inline const CkArrayIndexMax *ckGetArrayElements() const \
+		{ return super::ckGetArrayElements(); }\
+	inline int ckGetNumElements() const \
+		{ return ckGetNumElements(); }
 
 
 /************************ Array Element *********************/
@@ -199,7 +248,9 @@ class ArrayElementT : public ArrayElement
 {
 public:
   ArrayElementT(void) {thisIndex=*(T *)thisIndexMax.data();}
-  ArrayElementT(CkMigrateMessage *msg) {thisIndex=*(T *)thisIndexMax.data();}
+  ArrayElementT(CkMigrateMessage *msg) 
+	:ArrayElement(msg)
+	{thisIndex=*(T *)thisIndexMax.data();}
   
   T thisIndex;//Object array index
 };
@@ -214,21 +265,8 @@ typedef struct {int x,y,z;} CkIndex3D;
 void operator|(PUP::er &p,CkIndex3D &i);
 typedef ArrayElementT<CkIndex3D> ArrayElement3D;
 
-/*********************** Array Manager BOC *******************/
 
-class CkArrayCreateInfo {
- public:
-	CkGroupID locMgrID;
-	int numInitial;
-	CkArrayCreateInfo() {}
-	CkArrayCreateInfo(CkGroupID locMgrID_,int numInitial_)
-		:locMgrID(locMgrID_), numInitial(numInitial_) { }
-	void pup(PUP::er &p) {
-		p|locMgrID;
-		p|numInitial;
-	}
-};
-PUPmarshall(CkArrayCreateInfo);
+/*********************** Array Manager BOC *******************/
 
 #include "CkArray.decl.h"
 
@@ -245,12 +283,13 @@ class CkArray : public CkReductionMgr, public CkArrMgr {
 
 public:
 //Array Creation:
-  CkArray(const CkArrayCreateInfo &c);
+  CkArray(const CkArrayOptions &c,CkMarshalledMessage &initMsg);
   CkGroupID &getGroupID(void) {return thisgroup;}
 
 //Access & information routines
   inline CkLocMgr *getLocMgr(void) {return locMgr;}
   inline int getBcastNo(void) const {return bcastNo;}
+  inline int getNumInitial(void) const {return numInitial;}
   inline int homePe(const CkArrayIndex &idx) const {return locMgr->homePe(idx);}
 
   /* Return the last known processor for this array index.
@@ -258,32 +297,40 @@ public:
   inline int lastKnown(const CkArrayIndex &idx) const
 	  {return locMgr->lastKnown(idx);}
   //Deliver message to this element (directly if local)
-  inline void deliver(CkArrayMessage *m) 
+  inline void deliver(CkMessage *m) 
 	  {locMgr->deliver(m);}
-  inline void deliverViaQueue(CkArrayMessage *m) 
+  inline void deliverViaQueue(CkMessage *m) 
 	  {locMgr->deliverViaQueue(m);}
   //Fetch a local element via its index (return NULL if not local)
   inline ArrayElement *lookup(const CkArrayIndex &index)
 	  {return (ArrayElement *)locMgr->lookup(index,thisgroup);}
 
 //Creation:
+  //Create-after-migrate:
   virtual CkMigratable *allocateMigrated(int elChareType,const CkArrayIndex &idx);
-  virtual bool insertElement(CkArrayMessage *);
+  
+  //Create initial:
+  virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg);
   virtual void doneInserting(void);
+  void remoteDoneInserting(void);
+
+  //Create manually:
+  virtual bool insertElement(CkMessage *);
 
 //Demand-creation:
   bool demandCreateElement(const CkArrayIndex &idx,int onPe,int ctor);
 
 //Broadcast communication:
-  void sendBroadcast(CkArrayMessage *msg);
-  void recvBroadcast(CkArrayMessage *msg);
+  void sendBroadcast(CkMessage *msg);
+  void recvBroadcast(CkMessage *msg);
   
 private:
-  int numInitial;//Number of 1D initial array elements (backward-compatability)
+  int numInitial;//Number of 1D initial array elements
   CmiBool isInserting;//Are we currently inserting elements?
 
 //Allocate space for a new array element
-  ArrayElement *allocate(int elChareType,const CkArrayIndex &idx,int bcast);
+  ArrayElement *allocate(int elChareType,const CkArrayIndex &idx,
+	int bcast,bool fromMigration);
   
 //Broadcast support
   int bcastNo;//Number of broadcasts received (also serial number)
