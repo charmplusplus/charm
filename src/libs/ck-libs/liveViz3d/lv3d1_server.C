@@ -185,11 +185,11 @@ void LV3D_RenderMsg::delete_(LV3D_RenderMsg *m) {
 	delete m;
 }
 
-void LV3D1_Init(const CkBbox3d &box,CkArrayID aid)
+void LV3D1_Init(const CkBbox3d &box,CkArrayID aid,LV3D_Universe *theUniverse)
 {
 	// Broadcast to LV3D_Viewpoint when the viewpoint changes.
 	CkCallback frameUpdate(CkIndex_LV3D_Array::LV3D_Viewpoint(0),aid);
-	LV3D0_Init(new LV3D_Universe(),frameUpdate);
+	LV3D0_Init(theUniverse,frameUpdate);
 }
 
 

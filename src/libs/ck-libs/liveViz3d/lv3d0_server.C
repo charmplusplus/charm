@@ -319,6 +319,8 @@ must be called exactly once on processor 0.
 */
 void LV3D0_Init(LV3D_Universe *clientUniverse,const CkCallback &frameUpdate_)
 {
+	if (clientUniverse==0)
+		clientUniverse=new LV3D_Universe();
 	theUniverse=clientUniverse;
 	frameUpdate=frameUpdate_;
 	CcsRegisterHandler("lv3d_setup",(CmiHandler)LV3D0_setup);

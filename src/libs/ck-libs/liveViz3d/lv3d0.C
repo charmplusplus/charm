@@ -45,6 +45,27 @@ void LV3D_Universe::pup(PUP::er &p) {
 	if (object_table) CkAbort("Cannot migrate a LV3D_Universe with objects!\n");
 }
 
+#ifdef CMK_LIVEVIZ3D_CLIENT
+/**
+  Set up this client.  Should set any needed drawing options.
+  Default does nothing, which gives you no lighting,
+  no depth, with alpha, and clear blue background color.
+*/
+void LV3D_Universe::setupClient(oglOptions &i)
+{
+	/* nothing */
+}
+
+/**
+  Return the client GUI controller.  Default is a trackball,
+  centered on the middle of the unit cube.
+*/
+oglController *LV3D_Universe::makeController(void)
+{
+	return new oglTrackballController(3.0,40.0, CkVector3d(0.5,0.5,0.5));
+}
+#endif
+
 /**
   Add this view to the universe.  This is called
   once per incoming network view on the client.

@@ -18,7 +18,7 @@
  * The array, which must inherit from LV3D_Array,
  * will be used for all communication.
  */
-void LV3D1_Init(const CkBbox3d &box,CkArrayID LV3D_ArrayID);
+void LV3D1_Init(const CkBbox3d &box,CkArrayID LV3D_ArrayID,LV3D_Universe *theUniverse=0);
 
 
 /**

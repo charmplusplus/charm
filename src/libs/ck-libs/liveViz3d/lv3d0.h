@@ -11,6 +11,14 @@
 #include "ckvector3d.h"
 #include "ckviewpoint.h"
 #include "ckviewable.h"
+#if CMK_LIVEVIZ3D_CLIENT
+/* Client side */
+#  include "ogl/main.h"
+#else
+/* Server side */
+#define CMK_LIVEVIZ3D_SERVER 1
+#endif
+
 
 /// Private class that stores object data for the universe client side.
 class LV3D_Universe_Table;
@@ -43,6 +51,21 @@ public:
 	PUPable_decl(LV3D_Universe);
 	
 // CLIENT ONLY
+#ifdef CMK_LIVEVIZ3D_CLIENT
+	/**
+	  Set up this client.  Should set any needed drawing options.
+	  Default does nothing, which gives you no lighting,
+	  no depth, with alpha, and clear blue background color.
+	*/
+	virtual void setupClient(oglOptions &i);
+	
+	/**
+	  Return the client GUI controller.  Default is a trackball,
+	  centered on the middle of the unit cube.
+	*/
+	virtual oglController *makeController(void);
+#endif
+
 	/**
 	  Add this view to the universe.  This is called
 	  once per incoming network view on the client.
