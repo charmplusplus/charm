@@ -20,8 +20,6 @@
 #define FNAME(x) x##__
 #elif CMK_FORTRAN_USES_ONESCORE
 #define FNAME(x) x##_
-#else
-#define FNAME(x) x
 #endif
 
 #if AMPI_FORTRAN
@@ -29,7 +27,7 @@
 #    define ampi_setup         AMPI_SETUP
 #    define ampi_register_main AMPI_REGISTER_MAIN
 #    define ampi_main          AMPI_MAIN
-#  else
+#  elif defined(FNAME)
 #    define ampi_setup         FNAME(ampi_setup)
 #    define ampi_register_main FNAME(ampi_register_main)
 #    define ampi_main          FNAME(ampi_main)
@@ -41,6 +39,7 @@
 #endif
 
 extern "C" void ampi_setup(void);
+extern "C" void ampi_register_main(void (*)(int, char **), char *, int);
 
 struct ampi_redn_spec
 {

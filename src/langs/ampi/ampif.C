@@ -54,7 +54,7 @@ extern "C" {
 #define ampi_register                AMPI_REGISTER
 #define ampi_get_count               AMPI_GET_COUNT
 
-#else
+#elif defined(FNAME)
 
 #define ampi_init_universe           FNAME(ampi_init_universe)
 #define ampi_comm_rank               FNAME(ampi_comm_rank)

@@ -105,6 +105,7 @@ ampimain::register_main(void (*mainfunc)(int, char **), char *name, int namelen)
   ampi_comms[ncomms].name[namelen] = '\0';
   ncomms++;
 }
+
 extern "C" void 
 ampi_register_main(void (*mainfunc)(int, char **), char *name, int namelen)
 {
