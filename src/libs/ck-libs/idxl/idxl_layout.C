@@ -167,10 +167,10 @@ reduction_combine_fn reduction_combine(const IDXL_Layout& dt, int op,const char 
 // Bizarre macro: call the appropriate version of fn for this IDXL type:
 #define idxl_type_call(type,fn,args) \
       switch(type) {\
-        case IDXL_BYTE : fn args(byte);\
-        case IDXL_INT : fn args(int);\
-        case IDXL_REAL : fn args(float);\
-        case IDXL_DOUBLE : fn args(double);\
+        case IDXL_BYTE : fn args(byte); break; \
+        case IDXL_INT : fn args(int); break; \
+        case IDXL_REAL : fn args(float); break; \
+        case IDXL_DOUBLE : fn args(double); break; \
       }
 
 // Even more bizarre macro: pass typecast arguments for typical scatter/gather 
