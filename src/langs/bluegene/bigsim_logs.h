@@ -62,6 +62,7 @@ public:
   void pup(PUP::er &p) {  p|eType; p|index; p|rTime; }
 };
 
+class BgTimeLineRec;
 /**
   one time log for an handler function;
   it record a list of message sent events in an execution of handler
