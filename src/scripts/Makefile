@@ -116,7 +116,7 @@ UTILHEADERS=pup.h pup_c.h ckhashtable.h cklists.h conv-lists.h \
 	sockRoutines.h sockRoutines.c
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
-	  ckfutures.h ckarray.h ckreduction.h $(UTILHEADERS) \
+	  ckfutures.h ckarray.h ckreduction.h readonly.h $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h \
