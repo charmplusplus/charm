@@ -1,0 +1,9 @@
+#!/bin/sh
+
+rm -f bin include lib lib_so tmp
+
+ln -s $1/bin bin
+ln -s $1/include include
+ln -s $1/lib lib
+ln -s $1/lib_so lib_so
+ln -s $1/tmp tmp
