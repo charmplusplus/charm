@@ -11,6 +11,7 @@
 /*@{*/
 
 #include "trace-summary.h"
+#include "trace-summaryBOC.h"
 
 #define DEBUGF(x)  // CmiPrintf x
 
@@ -25,6 +26,8 @@ static int _packMsg, _packChare, _packEP;
 static int _unpackMsg, _unpackChare, _unpackEP;
 CkpvDeclare(double, binSize);
 CkpvDeclare(double, version);
+
+int sumonly = 0;
 
 /**
   For each TraceFoo module, _createTraceFoo() must be defined.
@@ -66,8 +69,10 @@ PhaseEntry::PhaseEntry()
 
 SumLogPool::~SumLogPool() 
 {
+  if (!sumonly) {
   write();
   fclose(fp);
+  }
   // free memory for mark
   if (markcount > 0)
   for (int i=0; i<MAX_MARKS; i++) {
@@ -106,12 +111,14 @@ SumLogPool::SumLogPool(char *pgm) : phaseTab(MAX_PHASES)
    sprintf(fname, "%s.%s.sum", pgm, pestr);
    fp = NULL;
    //CmiPrintf("TRACE: %s:%d\n", fname, errno);
-   do {
-    fp = fopen(fname, "w+");
+   if (!sumonly) {
+    do {
+      fp = fopen(fname, "w+");
     } while (!fp && errno == EINTR);
     delete[] fname;
     if(!fp) {
       CmiAbort("Cannot open Summary Trace File for writing...\n");
+    }
    }
 
    epSize = MAX_ENTRIES;
@@ -137,6 +144,7 @@ void SumLogPool::write(void)
 {
   int i;
   unsigned int j;
+
   fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e", CkpvAccess(version), CkMyPe(), CkNumPes(), numEntries, _numEntries, CkpvAccess(binSize));
   if (CkpvAccess(version)>=3.0)
   {
@@ -284,8 +292,6 @@ TraceSummary::TraceSummary(char **argv):curevent(0),binStart(0.0),bin(0.0),msgNu
   	sscanf(tmpStr,"%lf",&CkpvAccess(binSize));
   if (CmiGetArgString(argv,"+version",&tmpStr))
   	sscanf(tmpStr,"%lf",&CkpvAccess(version));
-  _logPool = new SumLogPool(CkpvAccess(traceRoot));
-  execEp=INVALIDEP;
 
   epThreshold = 0.001; 
   if (CmiGetArgString(argv,"+epThreshold",&tmpStr))
@@ -293,6 +299,11 @@ TraceSummary::TraceSummary(char **argv):curevent(0),binStart(0.0),bin(0.0),msgNu
   epInterval = 0.001; 
   if (CmiGetArgString(argv,"+epInterval",&tmpStr))
   	sscanf(tmpStr,"%lf",&epInterval);
+
+  sumonly = CmiGetArgFlag(argv, "+sumonly");
+
+  _logPool = new SumLogPool(CkpvAccess(traceRoot));
+  execEp=INVALIDEP;
 }
 
 void TraceSummary::traceClearEps(void)
@@ -445,6 +456,123 @@ void TraceSummary::startPhase(int phase)
    _logPool->startPhase(phase);
 }
 
+
+/// for TraceSummaryBOC
+
+CkGroupID traceSummaryGID;
+
+void TraceSummaryBOC::askSummary()
+{
+  if (CkpvAccess(_trace) == NULL) return;
+
+#if 0
+#if CMK_TRACE_IN_CHARM
+  TRACE_CHARM_PE() = 0;
+#endif
+#endif
+
+  int n = CkpvAccess(_trace)->pool()->getNumEntries();
+  BinEntry *bins = CkpvAccess(_trace)->pool()->bins();
+#if 1
+CmiPrintf("askSummary on [%d] numEntried=%d\n", CkMyPe(), n);
+for (int i=0; i<n; i++) 
+  CmiPrintf("%4d", bins[i].getU());
+CmiPrintf("\n");
+#endif
+  CProxy_TraceSummaryBOC p(traceSummaryGID);
+  p[0].sendSummaryBOC(n, bins);
+}
+
+extern "C" void _CkExit();
+
+void TraceSummaryBOC::sendSummaryBOC(int n, BinEntry *b)
+{
+  int i;
+  if (CkpvAccess(_trace) == NULL) return;
+
+  CkAssert(CkMyPe() == 0);
+
+#if 0
+#if CMK_TRACE_IN_CHARM
+  TRACE_CHARM_PE() = 0;
+#endif
+#endif
+
+  count ++;
+  if (bins == NULL) {
+    nBins = CkpvAccess(_trace)->pool()->getNumEntries();
+    bins = new BinEntry[nBins];
+  }
+  if (n>nBins) n = nBins;
+  for (i=0; i<n; i++) {
+    bins[i].Time() += b[i].Time();
+  }
+  if (count == CkNumPes()) {
+    write();
+    _CkExit();
+  }
+}
+
+void TraceSummaryBOC::write(void) 
+{
+  int i;
+  unsigned int j;
+
+  char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sum")+1];
+  sprintf(fname, "%s.sum", CkpvAccess(traceRoot));
+  FILE *sumfp = fopen(fname, "w+");
+  //CmiPrintf("File: %s \n", fname);
+  if(sumfp == 0)
+      CmiAbort("Cannot open summary sts file for writing.\n");
+  delete[] fname;
+
+  fprintf(sumfp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e", CkpvAccess(version), CkMyPe(), CkNumPes(), nBins, _numEntries, CkpvAccess(binSize));
+  fprintf(sumfp, "\n");
+
+  // write bin time
+#if 0
+  int last=pool[0].getU();
+  pool[0].writeU(fp, last);
+  int count=1;
+  for(j=1; j<numEntries; j++) {
+    int u = pool[j].getU();
+    if (last == u) {
+      count++;
+    }
+    else {
+      if (count > 1) fprintf(fp, "+%d", count);
+      pool[j].writeU(fp, u);
+      last = u;
+      count = 1;
+    }
+  }
+  if (count > 1) fprintf(fp, "+%d", count);
+#else
+  for(j=0; j<nBins; j++) {
+    bins[j].Time() /= CkNumPes();
+    bins[j].write(sumfp);
+  }
+#endif
+  fprintf(sumfp, "\n");
+  fclose(sumfp);
+
+}
+
+extern "C" void CombineSummary()
+{
+CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());
+  if (sumonly) CProxy_TraceSummaryBOC(traceSummaryGID).askSummary();
+  else CkExit();
+}
+
+void initTraceSummaryBOC()
+{
+  if (CkMyRank() == 0) {
+    registerExitFn(CombineSummary);
+  }
+}
+
+#include "TraceSummary.def.h"
 
 
 /*@}*/

@@ -1,0 +1,19 @@
+
+module TraceSummary {
+
+  mainchare TraceSummaryInit {
+    entry TraceSummaryInit();
+  };
+
+  initcall void initTraceSummaryBOC();
+  
+  readonly CkGroupID traceSummaryGID;
+
+  group TraceSummaryBOC {
+    entry TraceSummaryBOC(void);
+    entry void askSummary();
+    entry void sendSummaryBOC(int n, BinEntry s[n]);
+  };
+
+};
+

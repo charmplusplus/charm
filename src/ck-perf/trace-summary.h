@@ -37,10 +37,11 @@ class BinEntry {
 #ifdef WIN32
     void operator delete(void *, void *) { }
 #endif
-    BinEntry() {}
+    BinEntry(): time(0.) {}
     BinEntry(double t): time(t) {}
     inline double getTime() { return time; }
     void setTime(double t) { time = t; }
+    double &Time() { return time; }
     void write(FILE *fp);
     void writeU(FILE *fp, int u);
     int  getU();
@@ -197,6 +198,8 @@ class SumLogPool {
     void shrink(void) ;
     void addEventType(int eventType, double time);
     void startPhase(int phase) { phaseTab.startPhase(phase); }
+    BinEntry *bins() { return pool; }
+    int getNumEntries() { return numEntries; }
 };
 
 /// class for recording trace summary events 
@@ -239,6 +242,11 @@ class TraceSummary : public Trace {
        for starting a new phase
     */
     void startPhase(int phase);
+
+    /**
+       query utilities
+    */
+    SumLogPool *pool() { return _logPool; }
 };
 
 #endif
