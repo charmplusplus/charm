@@ -1005,8 +1005,11 @@ CmiStartFn bgMain(int argc, char **argv)
     bgverbose = 1;
 
   // for timing method, default using elapse calls.
+  if(CmiGetArgFlagDesc(argv, "+bgelapse", 
+                       "Use user provided BgElapse for time prediction")) 
+      cva(bgMach).timingMethod = BG_ELAPSE;
   if(CmiGetArgFlagDesc(argv, "+bgwalltime", 
-                       "Use walltime, not estimated time, for time estimate")) 
+                       "Use walltime method for time prediction")) 
       cva(bgMach).timingMethod = BG_WALLTIME;
 #ifdef CMK_ORIGIN2000
   if(CmiGetArgFlagDesc(argv, "+bgcounter", "Use performance counter")) 
