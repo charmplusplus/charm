@@ -13,7 +13,7 @@
 /*
 Status:
   * support nonmigratable attrib
-  * does not support processor avail bitvector
+  * support processor avail bitvector
 */
 
 #include <charm++.h>
@@ -42,13 +42,25 @@ CmiBool RandCentLB::QueryBalanceNow(int _step)
   return CmiTrue;
 }
 
+inline int chooseProc(int count)
+{
+  return (int)(CrnDrand()*(count-1) + 0.5);
+}
+
 void RandCentLB::work(CentralLB::LDStats* stats, int count)
 {
+  int proc;
+  for (proc=0; proc<count; proc++) {
+    if (stats->procs[proc].available) break;
+  }
+  if (proc == count) CmiAbort("RandCentLB> no available processor!");
+
   int nmigrated = 0;
   for(int obj=0; obj < stats->n_objs; obj++) {
       LDObjData &odata = stats->objData[obj];
       if (odata.migratable) {
-	const int dest = (int)(CrnDrand()*(count-1) + 0.5);
+	int dest = chooseProc(count);
+	while (!stats->procs[dest].available) dest = chooseProc(count);
 	if (dest != stats->from_proc[obj]) {
           //CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),obj,stats->from_proc[obj],dest);
           nmigrated ++;

@@ -20,8 +20,10 @@ void CreateRandCentLB();
 
 class RandCentLB : public CentralLB {
 public:
-  RandCentLB(const CkLBOptions &);
+  RandCentLB(const CkLBOptions &opt);
   RandCentLB(CkMigrateMessage *m):CentralLB(m) {}
+  void pup(PUP::er &p){ CentralLB::pup(p); }
+
   void work(CentralLB::LDStats* stats, int count);
 private:
   CmiBool QueryBalanceNow(int step);
