@@ -154,7 +154,7 @@ void TCharm::pup(PUP::er &p) {
   TCharm::setState(inFramework);
 
   if (!p.isUnpacking()) 
-  {//In this case, pack the thread after the user data
+  {//In this case, pack the thread & heap after the user data
     s.seek(1);
     tid = CthPup((pup_er) &p, tid);
     CmiIsomallocBlockListPup((pup_er) &p,&heapBlocks);
@@ -186,7 +186,7 @@ void TCharm::UserData::pup(PUP::er &p)
 
 TCharm::~TCharm() 
 {
-  CmiIsomallocBlockListFree(heapBlocks);
+  CmiIsomallocBlockListDelete(heapBlocks);
   CthFree(tid);
   delete initMsg;
 }
