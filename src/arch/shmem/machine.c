@@ -612,6 +612,7 @@ static void McEnqueueRemote(void *msg, int msg_sz, int dst_pe)
   shmem_int_get((int*)msg_link, (int*)&head, sizeof(McDistList)/sizeof(int), dst_pe);
   /* Next, write the new message into the top of the list */
   shmem_int_put((int*)&head, (int*)&tmp_link, sizeof(McDistList)/sizeof(int),dst_pe);
+  shmem_quiet();
 
 #ifdef DEBUG
   printf("[%d] Adding Message to pe %d\n",Cmi_mype,dst_pe);
@@ -715,6 +716,7 @@ static void McRetrieveRemote(void)
 
       shmem_int_put(&(cur_msg->bcast.ptr->bcast.count),
 		&bcast_ptr->bcast.count,1,cur_node->nxt_node);
+      shmem_quiet();
       clear_lock(&bcast_lock[cur_node->nxt_node], cur_node->nxt_node);
     }
     else bcast_msg = false;
@@ -722,6 +724,7 @@ static void McRetrieveRemote(void)
     /* Mark the remote message for future deletion */
     shmem_int_put(&(cur_node->nxt_addr->received_f),&received_f,
               1, cur_node->nxt_node);
+    shmem_quiet();
 
     /* Add to list for reversing */
     if (bcast_msg)
