@@ -374,15 +374,16 @@ void SumLogPool::updateSummaryDetail(int epIdx, double startTime, double endTime
 
         double binSz = CkpvAccess(binSize);
         int startingBinIdx, endingBinIdx;
-        endingBinIdx = (int)(endTime/binSz);
-        if (endingBinIdx >= poolSize) {
-	  shrink();
-          binSz = CkpvAccess(binSize);
-	}
 	startingBinIdx = (int)(startTime/binSz);
         endingBinIdx = (int)(endTime/binSz);
-        CmiAssert(startingBinIdx < poolSize);
-        CmiAssert(endingBinIdx < poolSize);
+	// shrink if needed
+	while (endingBinIdx >= poolSize) {
+	  shrink();
+	  CmiAssert(CkpvAccess(binSize) > binSz);
+          binSz = CkpvAccess(binSize);
+	  startingBinIdx = (int)(startTime/binSz);
+          endingBinIdx = (int)(endTime/binSz);
+	}
 
         if (startingBinIdx == endingBinIdx) {
             addToCPUtime(startingBinIdx, epIdx, endTime - startTime);
