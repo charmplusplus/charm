@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include "bitvecset.h"
 
 BV_Set * makeSet(int *list, int size, int max);

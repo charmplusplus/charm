@@ -1,3 +1,4 @@
+#include <converse.h>
 #include "graph.h"
 
 #define printf CmiPrintf

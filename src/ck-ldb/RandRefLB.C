@@ -8,6 +8,10 @@
 #include "RandRefLB.h"
 #include "RandRefLB.def.h"
 
+#ifdef WIN32
+double drand48(void);
+#endif
+
 void CreateRandRefLB()
 {
   //  CkPrintf("[%d] creating RandRefLB %d\n",CkMyPe(),loadbalancer);

@@ -1,4 +1,6 @@
+#ifndef  WIN32
 #include <unistd.h>
+#endif
 #include <charm++.h>
 #include <LBDatabase.h>
 #include <CkLists.h>

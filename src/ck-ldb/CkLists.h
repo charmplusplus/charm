@@ -1,7 +1,9 @@
 #ifndef _CKLISTS_H_
 #define _CKLISTS_H_
 
+#ifndef  WIN32
 #include <unistd.h>
+#endif
 
 class CkVector {
 public:

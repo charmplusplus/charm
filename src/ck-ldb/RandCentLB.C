@@ -7,6 +7,10 @@
 #include "RandCentLB.h"
 #include "RandCentLB.def.h"
 
+#ifdef WIN32
+double drand48(void);
+#endif
+
 void CreateRandCentLB()
 {
   //  CkPrintf("[%d] creating RandCentLB %d\n",CkMyPe(),loadbalancer);

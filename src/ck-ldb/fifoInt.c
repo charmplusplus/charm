@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include "fifoInt.h"
 
 IntQueue * fifoInt_create(int size) {
@@ -25,7 +27,7 @@ int fifoInt_empty(IntQueue *q) {
   return (q->size == 0);
 }
 
-fifoInt_enqueue(IntQueue *q, int value) {
+void fifoInt_enqueue(IntQueue *q, int value) {
   if (q->size >= q->max) {
     printf("queue overflow\n");
     return;
@@ -38,7 +40,7 @@ fifoInt_enqueue(IntQueue *q, int value) {
 
 int fifoInt_dequeue(IntQueue *q) {
   int v;
-  if (q->size <= 0) { printf("queue underflow\n"); return; }
+  if (q->size <= 0) { printf("queue underflow\n"); return 0; }
   q->size--;
   v = q->vector[q->head];
   q->head = (q->head+1) % q->max;
