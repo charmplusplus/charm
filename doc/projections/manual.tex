@@ -1,0 +1,581 @@
+\documentclass[10pt,dvips]{article}
+\usepackage{../pplmanual,epsfig,graphicx}
+\input{../pplmanual}
+
+\title{\projections{} Manual}
+\version{2.1}
+\credits{
+By Mike DeNardo, Sid Cammeresi, Theckla Loucios, Orion Lawlor, Gengbin Zheng,
+Chee Wai Lee, and Sindhura Bandhakavi
+}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+\projections{} is a visualization tool to help you understand and analyze what it
+happening in your parallel (\charmpp{}) program. This performance visualization and
+feedback tool has a much more refined understanding of user computation than is
+possible in traditional tools.
+
+\projections{} displays information about the request for creation and the
+actual creation of tasks in \charmpp{} programs. \projections{} also provides the
+function of post-mortem clock synchronization. Additionally, it can also
+automatically partition the execution of the running program into logically
+separate units, and automatically analyzes each individual partition.
+
+Future versions will be able to provide recommendations/suggestions for
+improving performance as well.
+
+\section{Preparing the \charmpp{} Program}
+
+In order to use \projections{} to analyse your program, you need to apply
+necessary compile options and command line options. Also, \charmpp{} allows
+you to insert user events that are detectable to \projections{}, by employing
+a set of function calls in your program.
+
+\subsection{Tracemodes}
+To use \projections{}, you first have to make sure your \charmpp{} program is
+compiled with proper \projections{} tracemode by giving corresponding compile
+option. Besides compile options, there are a few command line options for
+\projections{}.
+
+\
+
+Currently there are 3 tracemodes available:
+\begin{itemize}
+\item
+Projections mode
+
+Compile option: {\tt -tracemode projections}
+
+This tracemode generates log files that contain information about events like
+entry method calling and message packing during the execution of the program.
+These data are used by \projections{} in visualization and analysis.
+
+When you run your program compiled with this tracemode, a log file will be
+created for each processor.  An additional symbol table file will also be
+created.  The names of the log files will be NAME.\#.log, where NAME is the
+name of your executable and \# is the processor \#.  The name of the symbol
+table file is NAME.sts.
+
+Related command line options and their uses:
+
+{\tt +binary-trace}:  generate projections log in binary form
+
+{\tt +gz-trace}:      compress projections log.
+
+\item
+Summary mode
+
+Compile option: {\tt -tracemode sum}
+
+In this tracemode, only a rough summary of CPU utilization is created in running
+thusede program. A snap shot is taken every "bin-size" period of time. This brief
+information can be used to quickly outline the execution of the program. It helps
+user to find interesting spots in their program faster.
+
+Similarly, a summary file named NAME.\#.sum will be generated for each processor,
+plus a symbol table file NAME.sum.sts, where NAME is the name of the executable.
+
+Related command line options and their uses:
+
+{\tt +binsize TIME}:   set bin size for summary
+
+{\tt +version}:        set summary version to generate
+
+\item
+Counter mode \footnote{Currently implemented on Irix only}
+
+Compile option: {\tt -tracemode counter}
+
+This tracemode generates performance counter information like number of cache
+misses and number of entry point calls. These data are not used in the current
+version of \projections{} but will be supported in very near future.
+
+The counter files created are named NAME.\#.count and the symbol table file
+NAME.count.sts respectively, where NAME is the name of the executable.
+
+\end{itemize}
+
+Compile option {\tt +tracemode all} can be used to generate all available types
+of tracing data files.
+
+Other command line options valid for all tracemodes and their uses include:
+
+{\tt +logsize SIZE}: to specify a logsize (actually log line number).
+
+{\tt +traceroot DIR}: to specify an existing directory for putting log/sum/count/sts
+files.
+
+{\tt +traceoff}: to turn off tracing at the beginning.
+
+\
+
+Also, \charmpp{} allows user to start/stop tracing the execution at certain
+point of time by two \charmpp{} function calls {\tt traceBegin()} and {\tt traceEnd()}.
+They set/reset a flag to start/stop dumping tracing data from the local processor,
+so they should be called on all processors. Obviously tracing should be turned
+off at first (by command line option {\tt +traceoff}) if some period of time in
+middle of the execution is of interest to the user.
+
+\subsection{User Events}
+
+\projections{} has the ability to display in \projections{} the "user events"
+that have been added by the programmer into the code. The user events are
+like markers inserted in various places in the program and can then be inspected
+to see where they show up in relationship to the other \charmpp{} system events.
+This ability allows the user to participate more actively in the performance analysis
+of the program.
+
+There are a few \charmpp{} calls that insert user events into the program.
+
+\begin{itemize}
+\item
+{\tt int traceRegisterUserEvent(char* EventDesc, int EventNum=-1) }
+
+This function registers a user event by associating an integer event number to
+the string description. Event number has to be the same on all processors. There
+are 3 ways to ensure that, and correspondingly 3 ways to call the function:
+
+\begin{enumerate}
+\item
+Call {\tt traceRegisterUserEvent} on node 0 in main::main without specifying
+an event number, and store returned event number into a readonly variable.
+\item
+Call {\tt traceRegisterUserEvent} on all nodes without specifying an event
+number. The returned value is the common event number that is agreed on system-wide.
+\item
+Call {\tt traceRegisterUserEvent} and specify the event number on processor 0.
+Doing this on other processors would have no effect. Afterwards, the event number
+can be used in the following user event calls.
+\end{enumerate}
+
+Eg. {\tt traceRegisterUserEvent("Time Step Begin", 10);}
+
+\item
+{\tt void traceUserEvent(int EventNum) }
+
+This function works like a marker, indicating an occurrence of the user event
+with the given {\tt EventNum}. It can be used to signalize a user event, in
+relationship to other system events.
+
+Eg. {\tt traceUserEvent(10);}
+
+\item
+{\tt void userBracketEvent(int EventNum, double StartTime, double EndTime) }
+
+This function brackets an event that lasts the period of time between
+{\tt StartTime} and {\tt EndTime}. Both times can be obtained from function call
+{\tt CmiWallTimer()} in second.
+
+Eg.
+\begin{verbatim}
+   traceRegisterUserEvent("Critical Code", 20);
+   double critStart;  // times of start
+   critStart = TraceTimer();
+   // do the critical code
+   userBracketEvent(20, critStart,CmiWallTimer());
+\end{verbatim}
+
+\end{itemize}
+
+\section{Compiling And Running \projections{}}
+
+\subsection{Compiling \projections{}}
+\begin{enumerate}
+\item[1)]
+   Make sure the JDK commands "java", "javac" and "jar"
+   are in your path
+\item[2)]
+   Type "make"
+\item[3)]
+   The following files will be placed in 'bin':
+
+      {\tt projections}           : Starts projections, for UNIX machines
+
+      {\tt projections.bat}       : Starts projections, for Windows machines
+
+      {\tt projections.jar}       : archive of all the java and image files
+\end{enumerate}
+
+\subsection{Running \projections{}}
+From any location, type
+\begin{alltt}
+> PROJECTIONS_LOCATION/bin/projections
+\end{alltt}
+where {\tt PROJECTIONS\_LOCATION} is the path to the main projections
+directory.
+
+\section{Using \projections{}}
+When \projections{} starts, you will see the main window with a title and
+six buttons:
+
+\begin{figure}[htb]
+\center
+\epsfig{figure=fig/mainwindow.eps,height=3in}
+\caption{\projections{} main window}
+\label{mainwindow}
+\end{figure}
+
+1. Open File
+
+2. Graphs
+
+3. Timelines
+
+4. Usage Profile
+
+5. Animations
+
+6. View Log Files
+
+7. Histograms
+
+8. Overview
+
+Clicking on any of the buttons will bring up the appropriate next window, as
+described in the following sections.  Initially, only the Open File button
+will be active.
+
+\subsection{Open File}
+
+   Clicking on the Open File button brings up a dialog box to let you select
+   the location of the data you want to look at.  Navigate to the directory
+   containing your data and select the *.sts file.  Click on 'OK'.  If you
+   have selected a valid file, \projections{} will load in some preliminary data
+   from the files and then activate the rest of the buttons in the main window.
+   If your file is invalid, you will be shown an error dialog.
+
+\subsection{Graphs}
+
+   The Graphs window is where you can analyze your data by breaking it into
+   any number of intervals and look at what goes on in each of those intervals.
+
+   When the Graph Window first appears, a dialog box will also appear, asking
+   you what interval settings you want to use.  It will show you the total
+   amount of time your program run took (in microseconds) and ask you to enter
+   either the interval size you want or the number of intervals you want.
+   Entering a number in either box will recalculate the other number, so you
+   will know both items. Click on 'OK' when you are satisifed with your choice.
+   Your data will then be analyzed.
+
+   The amount of time to analyze your data depends on several factors, including
+   the number of processors, number of entries, and number of intervals you have
+   selected.  Although a progress meter has not been implemented at this time,
+   you can look at the console window to see which log file is being analyzed.
+   Even for large amounts of data, this step should not take more than a few
+   minutes, though.
+
+   \begin{figure}[htb]
+   \center
+   \epsfig{figure=fig/graph.eps,height=4.3in}
+   \caption{Graph module}
+   \label{graph}
+   \end{figure}
+
+      The Graph Window has 3 components in its display:
+   \begin{enumerate}
+   \item[1)]
+   Display Panel:
+      \begin{itemize}
+      \item[-]
+        Largest Component in top/left corner
+      \item[-]
+        Displays title, graph, and axes
+      \item[-]
+        Allows you to toggle display between a line graph and a bar graph
+      \item[-]
+        Allows you to scale the graph along the X-axis.  You can either enter
+        a scale value $>=$ 1.0 in the text box, or you can use the $<<$ and $>>$
+        buttons to increment/decrement the scale by .25.  Clicking on Reset
+        sets the scale back to 1.0.  When the scale is greater than 1.0, a
+        scrollbar will appear along the bottom of the graph to let you
+        scroll back and forth.
+      \end{itemize}
+
+   \item[2)]
+   Legend Panel:
+      \begin{itemize}
+      \item[-]
+        Top right side of the display
+      \item[-]
+        Shows what is currently being displayed on the graph and what color it
+        is.
+      \item[-]
+        Click on the 'Select Display Items' button to bring up a window to
+        add/remove items from the graph and to change the colors of the items.
+        \begin{itemize}
+	\item[*]
+          The Select Display Items window shows a list of items that you can
+          display on the graph.  There are 3 main sections:
+            System Usage, System Msgs, and User Entries
+          The System Usage and System Msgs are the same for all programs.  The
+          User Entries section has program-specific items in it.
+	\item[*]
+          Click on the checkbox next to an item to have it displayed on the
+          graph.
+	\item[*]
+          Click on the colorbox next to an item to modify its color.
+	\item[*]
+          Click on 'Select All' to choose all of the items
+	\item[*]
+          Click on 'Clear All' to remove all of the items
+	\item[*]
+          Click on 'Apply' to apply you choices/changes to the graph
+	\item[*]
+          Click on 'Close' to exit
+	\end{itemize}
+      \end{itemize}
+   \item[3)]
+   Control Panel:
+      \begin{itemize}
+      \item[-]
+        Bottom of the display
+      \item[-]
+        Allows you to toggle what is displayed on the X-axis.  You can either
+        have the x-axis display the data by interval or by processor.
+      \item[-]
+        Allows you to toggle what is displayed on the Y-axis.  You can either
+        have the y-axis display the data by the number of msgs sent or
+        by the amount of time taken.
+      \item[-]
+        Allows you to change what data is being displayed by iterating through
+        the selections.  If you have selected an x-axis type of 'interval',
+        that means you are looking at what goes on in each interval for a
+        specific processor.  Clicking on the $<<, <, >, >>$ buttons will change
+        the processor you are looking at by either -5, -1, +1, or +5.
+        Conversely, if you have an x-axis of 'processor', then the iterate
+        buttons will change the value of the interval that you are looking at
+        for each processor.
+      \item[-]
+        Allows you to indicate which intervals/processors you want to examine.
+        Instead of just looking at one processor or one interval, the box and
+        buttons on the right side of this panel let you choose any number or
+        processors/intervals to look at.  Just enter the number(s) in the box.
+        If you want to look at multiple items, separate them with commas.  If
+        your selections include a range of items, you can separate those with
+        a dash.
+
+        ex: Want to see processors 1,3,5,7:  Enter 1,3,5,7
+
+	ex: Want to see processors 1,2,3,4:  Enter 1-4
+
+	ex: Want to see processors 1,2,3,7:  Enter 1-3,7
+
+        Clicking on 'Apply' updates the graph with your choices.
+        Clicking on 'Select All' chooses the entire range.  When you select more
+        than one set of data to display, the graph will show the TOTAL amount of
+        the data for all of those items, EXCEPT for the processor usage, which
+        shows the average amount.
+      \end{itemize}
+    \end{enumerate}
+
+\subsection{Timelines}
+
+   The Timeline window lets you look at what a specific processor is doing at
+   each moment of the program.
+
+   \begin{figure}[htb]
+   \center
+   \epsfig{figure=fig/timeline.eps,height=3.8in}
+   \caption{Timeline module}
+   \label{timeline}
+   \end{figure}
+
+      When the Timeline window first appears, a dialog box appears along with it.
+   The box asks for the following information:
+   \begin{itemize}
+   \item[-]
+     Processor(s):  Choose which processor(s) you want to see a timeline for.
+                    To enter multiple values, separate them with a comma or a
+                    dash (for ranges).  (See the Graphs section for examples)
+   \item[-]
+     Begin Time  : Choose what time you want your timeline to start at.
+   \item[-]
+     End Time    : Choose what time you want your timeline to end at.
+   \item[-]
+     Length      : Choose the length of your timeline.
+   \end{itemize}
+
+   The dialog box tells you what the valid processor choices are as well as what
+   the valid time ranges are.
+
+   Instead of entering a BeginTime, you can have the dialog box choose a
+   BeginTime for you based on the occurrence of a specific entry.  To do this,
+   you go to the bottom portion of the dialog box and select an entry to find an
+   occurrence of.  Then, you choose the processor you want to find an occurrence
+   on, and which occurrence you want to find (N).  Click on 'Search for Begin
+   Time'.  The dialog box will display a message telling you if your occurrence
+   was found and when it was found.  If valid, the time is automatically entered
+   as the begin time.
+
+   When you are satisifed with your time and processor ranges, click on 'OK'.
+   \projections{} will then get the Timeline data for you.  The time for this step
+   depends on the number of items in your time range and the number of
+   processors you have chosen.
+
+   The Timeline Window consists of two parts:
+   \begin{enumerate}
+   \item[1)]
+      Display Panel:
+      This is where the timelines are displayed and is the largest portion of
+      the window.  The time axes are displayed at the top and the bottom of the
+      panel, and the units are microseconds.  The left side of the panel shows
+      the processor labels.  Underneath each label is a percentage telling you
+      what amount of the total time in your timeline was actually spent working
+      on this program.
+
+      The timeline itself consists of colored bars for each
+      work item.  Placing the cursor over one of these bars will bring up a
+      pop-up window telling you the name of that item, the begin time, the end
+      time, and the total time.  It will also tell you what amount of time was
+      spent packing, how many messages were created during this work item, and
+      which processor created this item.  If you click on the item, a window
+      will appear telling you similar information to the pop-up window.  This
+      window will also list all of the messages created during this work item,
+      and it will tell you what time they were sent at and to which entry.
+
+   \item[2)]
+      Control Panel:
+
+	It's located at the bottom of the window. Its components are described
+	as follows.
+
+      Checkboxes:
+      \begin{itemize}
+      \item[-]
+        Display Pack Times\\
+        Lets you toggle display of Time spent packing
+      \item[-]
+        Display Message Creations\\
+        Lets you toggle display of message creations. These are represented
+        by little vertical lines at the time a message was created.
+      \item[-]
+	Display Idle Time\\
+        Lets you toggle display of idle time
+      \item[-]
+        View User Event ({\bf really cool new feature!!!})\\
+	Checking this box will bring up a new window showing the string description,
+	begin time, end time and duration of all user events on each processor.
+	Especially, the user event caught by function {\tt traceUserEvent} has
+	a duration of 0.
+
+      \begin{figure}[htb]
+      \center
+      \epsfig{figure=fig/userevent.eps,height=1.5in}
+      \caption{User Event Window}
+      \label{userevent}
+      \end{figure}
+
+        Like system events, user events are also displayed as thin lines or bars
+	above in the disply area.
+      \end{itemize}
+      Buttons:
+      \begin{itemize}
+      \item[-]
+        Select Ranges\\
+        Brings up the initial dialog box
+      \item[-]
+        Change Colors\\
+        Lets you change colors for the work items
+      \item[-]
+        Scale\\
+        Enter a scale $>=$ 1.0 in the box, or click on the $<<$ and $>>$ buttons to
+        adjust the scale by 0.25 increments.  Click on Reset to set the scale
+        back to 1.0
+      \end{itemize}
+
+      Another really cool new feature {\bf zoomability} has been implemented in
+      timeline module.
+
+      To determine the exact time of any event on the timeline, move your mouse
+      along either the top or bottom axis and a white vertical highlight line
+      will show where your cursor is along the timeline.  The "Highlight Time"
+      box on the bottom of the Timeline window will show the exact time of your
+      cursor.
+
+      To select an area, click on the axis to define the start of the area and
+      drag the mouse to the end of the area to be defined.  Two yellow vertical
+      lines will bracket the area of interest.  The exact times of the selected
+      area will be shown in the "Selection Start Time" text area and the
+      "Selection End Time" text area.  The difference between these times is
+      shown in ms in the "Selected Length" text area.  Thus, this feature can be
+      used to measure the time between two events of interest across processors,
+      and is an easy way to measure the time of an entry point (instead of
+      getting the "Tool Tip" balloon by putting the cursor in the entry point.
+
+      To zoom into a selected area (instead of using the scale field and/or the
+      "<<" and ">>" buttons) simply select an area and click on either the "Zoom
+      Selected" or the "Load Selected" buttons.  The difference between these
+      two buttons is that the "Load Selected" zooms into the selected area and
+      discards any events that are outside the time range.  This is useful
+      because it will be a lot faster to zoom because the "Zoom Selected" draws
+      all the events on a virtual canvas and then zooms into the canvas.
+      However, if the "Load Selected" button is used, to zoom back out, you need
+      to start over from "Select Ranges" button and that will slow down the processing.
+
+   \end{enumerate}
+
+\subsection{Usage Profile}
+
+   The Usage Profile window lets you see percentage-wise what each processor
+   spends its time on during a specified period.
+
+   When the window first comes up, a dialog box appears asking for the
+   processor(s) you want to look at as well as the time range you want to look
+   at.  This is similar to the dialog for the Timelines.
+
+   The bottom portion of the Usage Profile window lets you adjust the scales in
+   both the X and Y directions.  The X direction is useful if you are looking at
+   a large number of processors.  The Y direction is useful if there are
+   small-percentage items for a processor.
+
+   The left side of the display shows a scale from 0\% to 100\%.  The main part of
+   the display shows the statistics.  Each processor is represented by a
+   vertical bar.  The top of the bar always shows the overhead time.  Below that
+   is always (if exists) the idle time and then the message packing/unpacking
+   times.  The rest of the bar is ordered from the bottom with the largest
+   percentage items being closest to the bottom.  If you place the cursor over a
+   portion of the bar, a pop-up window will appear telling you the name of the
+   item, what percent of the usage it has, and the processor it is on.
+
+\subsection{Animations}
+
+   This window animates the processor usage by displaying
+   different colors for different amount of usage.
+
+   The left box allows you to select the real time between frames;
+   the right box the processor time between frames.
+
+
+\subsection{View Log Files}
+
+   This window lets you see a translation of a log file from a bunch of numbers
+   to an English version.  A dialog box asks which processor you want to look
+   at.  After choosing and pressing OK, the translated version appears.
+
+   Each line has:
+   \begin{itemize}
+   \item[-] a line number (starting at 0)
+   \item[-] the time the event occurred at
+   \item[-] a description of what happened.
+   \end{itemize}
+
+\subsection{Histograms}
+
+This module allows you to examine the execution time distribution of all your
+entry points(EP). It gives a histogram of different number of EP's that have
+execution time falling in different time bins. Under the graph there are also
+statistics given in numbers.
+
+\subsection{Overview}
+
+Overview gives user an overview of the utilization of all processors during the
+execution. Each processor has a row of colored bars in the display, different colors
+indicating different utilization at that time. Moving a mouse over the graph
+will invoke a display of the processor usage of the specific processor at the
+specific time in the status bar below the graph. Vertical and horizontal zoom is
+enabled by two zooming bars to the right and lower of the graph.
+
+\end{document}
