@@ -107,7 +107,7 @@ TRACELIBS=libtrace-none.lib libtrace-projections.lib libtrace-summary.lib
 
 CVLIBS=libconv-core.lib libconv-cplus-n.lib libconv-cplus-y.lib libldb-rand.obj libldb-spray.obj libldb-graph.obj libldb-test.obj $(TRACELIBS)
 	
-LIBCONV_CORE=threads.obj convcore.obj conv-conds.obj spantree.obj queueing.obj fifo.obj msgmgr.obj memory.obj cpm.obj cpthreads.obj futures.obj cldb.obj random.obj debug-message.obj debug-object.obj info.obj generate.obj edgelist.obj conv-ccs.obj quiescence.obj
+LIBCONV_CORE=threads.obj convcore.obj conv-conds.obj queueing.obj fifo.obj msgmgr.obj memory.obj cpm.obj cpthreads.obj futures.obj cldb.obj random.obj debug-message.obj debug-object.obj info.obj generate.obj edgelist.obj conv-ccs.obj quiescence.obj
 
 CONVERSE : BASICS $(CVLIBS) CONV-HOST CONVLIBS DAEMON CONVCPM
 
@@ -185,9 +185,6 @@ fifo.obj : fifo.c $(CVHEADERS)
 
 threads.obj : threads.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) /I"QuickThreads" $(COMMON_SRC)\threads.c
-
-spantree.obj : spantree.c $(CVHEADERS)
-	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\spantree.c
 
 convcore.obj : convcore.c $(CVHEADERS)
 	$(CPP) $(CPP_PROJ) $(COMMON_SRC)\convcore.c
