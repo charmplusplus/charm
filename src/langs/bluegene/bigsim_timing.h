@@ -48,8 +48,8 @@ public:
 public:
   bgTimeLog(int epc, char *msg);
   ~bgTimeLog();
-  void closeLog();
-  void addMsg(char *msg);
+  void closeLog(); 
+  inline void addMsg(char *msg) { msgs.push_back(new bgMsgEntry(msg)); }
   void print(int node, int th);
   void write(FILE *fp);
 
@@ -90,6 +90,7 @@ extern void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline
 
 #define BG_ADDMSG(m)  	\
         if (genTimeLog)	{ \
+          BgGetTime();		\
 	  BgMsgSetTiming(m); 	\
 	  if (tTHREADTYPE == WORK_THREAD) {	\
             BgTimeLine &log = tMYNODE->timelines[tMYID];	\
@@ -100,6 +101,7 @@ extern void BgAdjustTimeLineForward(int msgID, double tAdjust, BgTimeLine &tline
             }						\
 	    /* log[log.length()-1]->print(); */		\
           }	\
+          tSTARTTIME = CmiWallTimer();	\
 	}
 #else
 #define BG_ENTRYSTART(handler, m)

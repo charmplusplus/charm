@@ -52,14 +52,15 @@ CpvDeclare(int,tBcastMsgHandler);
 CpvDeclare(int,bgCorrectionHandler);
 CpvDeclare(int,exitHandler);
 
+/* message handlers */
 CmiHandler msgHandlerFunc(char *msg);
 CmiHandler nodeBCastMsgHandlerFunc(char *msg);
 CmiHandler threadBCastMsgHandlerFunc(char *msg);
 
 extern "C" void defaultBgHandler(char *);
 
-CpvStaticDeclare(msgQueue *,inBuffer);	/* emulate the bluegene fix-size inbuffer */
-CpvStaticDeclare(CmmTable *,msgBuffer);	/* if inBuffer is full, put to this buffer */
+CpvStaticDeclare(msgQueue *,inBuffer);	/* emulate the fix-size inbuffer */
+CpvStaticDeclare(CmmTable *,msgBuffer);	/* buffer when inBuffer is full */
 
 CpvDeclare(int, inEmulatorInit);
 
@@ -186,11 +187,11 @@ public:
   char         started;		/* flag indicate if this node is started */
  
   HandlerTable handlerTable; /* node level handler table */
-
+#if BLUEGENE_TIMING
   // for timing
   BgTimeLine *timelines;
   bgCorrectionQ cmsg;
-
+#endif
 public:
   nodeInfo();
 
@@ -225,12 +226,13 @@ public:
 #endif
 
 public:
-  threadInfo(int _id, ThreadType _type, nodeInfo *_node): id(_id), type(_type), myNode(_node) {
-    currTime=0.0;
+  threadInfo(int _id, ThreadType _type, nodeInfo *_node): 
+  	id(_id), type(_type), myNode(_node), currTime(0.0) 
+  {
 //    if (id != -1) globalId = nodeInfo::Local2Global(_node->id)*(cva(numCth)+cva(numWth))+_id;
   }
   inline void setThread(CthThread t) { me = t; }
-  inline CthThread getThread() { return me; }
+  inline const CthThread getThread() const { return me; }
 }; 
 
 
@@ -257,9 +259,9 @@ nodeInfo::nodeInfo(): udata(NULL), started(0)
     {
       threadinfo[i+cva(numWth)] = new threadInfo(i+cva(numWth), COMM_THREAD, this);
     }
-
-    // timing
+#if BLUEGENE_TIMING
     timelines = new BgTimeLine[cva(numWth)];
+#endif
   }
 
 /*****************************************************************************
@@ -836,7 +838,7 @@ static void InitHandlerTable()
 }
 #endif
 
-static void ProcessMessage(char *msg)
+static inline void ProcessMessage(char *msg)
 {
   int handler = CmiBgMsgHandle(msg);
   DEBUGF(("[%d] call handler %d\n", BgMyNode(), handler));
@@ -885,7 +887,7 @@ void comm_thread(threadInfo *tinfo)
 //      tCURRTIME += (CmiWallTimer()-tSTARTTIME);
       tCOMMTHQ->enq(CthSelf());
       CthSuspend(); 
-      tSTARTTIME = CmiWallTimer();
+//      tSTARTTIME = CmiWallTimer();
       continue;
     }
     DEBUGF(("[%d] comm thread has a msg.\n", BgMyNode()));
@@ -950,7 +952,6 @@ void work_thread(threadInfo *tinfo)
     if ( msg == NULL ) {
 //      tCURRTIME += (CmiWallTimer()-tSTARTTIME);
       CthSuspend();
-      tSTARTTIME = CmiWallTimer();
       DEBUGF(("[%d] work thread %d awakened.\n", BgMyNode(), tMYID));
       continue;
     }
@@ -958,13 +959,9 @@ void work_thread(threadInfo *tinfo)
 
     if (CmiBgMsgRecvTime(msg) > tCURRTIME) tCURRTIME = CmiBgMsgRecvTime(msg);
 
-    // timing
     BG_ENTRYSTART(CmiBgMsgHandle(msg), msg);
-
     // ProcessMessage may trap into scheduler
     ProcessMessage(msg);
-
-    // timing
     BG_ENTRYEND();
 
     if (fromQ2 == 1) q2.deq();
@@ -973,7 +970,6 @@ void work_thread(threadInfo *tinfo)
 
     /* let other work thread do their jobs */
     CthYield();
-    tSTARTTIME = CmiWallTimer();
   }
 }
 
@@ -1065,11 +1061,13 @@ CmiStartFn bgMain(int argc, char **argv)
   CpvInitialize(int,tBcastMsgHandler);
   cva(tBcastMsgHandler) = CmiRegisterHandler((CmiHandler)threadBCastMsgHandlerFunc);
 
-  CpvInitialize(int,bgCorrectionHandler);
-  cva(bgCorrectionHandler) = CmiRegisterHandler((CmiHandler) bgCorrectionFunc);
-
   CpvInitialize(int,exitHandler);
   cva(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
+
+#if BLUEGENE_TIMING
+  CpvInitialize(int,bgCorrectionHandler);
+  cva(bgCorrectionHandler) = CmiRegisterHandler((CmiHandler) bgCorrectionFunc);
+#endif
 
   CpvInitialize(int, inEmulatorInit);
   cva(inEmulatorInit) = 1;

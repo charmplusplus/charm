@@ -9,6 +9,9 @@
 
 CpvStaticDeclare(int, msgCounter);
 
+/**
+  init Cpvs of timing module
+*/
 void BgInitTiming()
 {
   CpvInitialize(int, msgCounter);
@@ -56,13 +59,8 @@ bgTimeLog::~bgTimeLog()
 }
 
 void bgTimeLog::closeLog()
-{
-  endTime = BgGetCurTime();
-}
-
-void bgTimeLog::addMsg(char *msg)
-{
-  msgs.push_back(new bgMsgEntry(msg));
+{ 
+  endTime = BgGetCurTime(); 
 }
 
 void bgTimeLog::print(int node, int th)
