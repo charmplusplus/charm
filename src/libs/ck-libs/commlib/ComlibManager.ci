@@ -1,35 +1,39 @@
-module ComlibModule {
-  initnode void initComlibManager();
-  message DummyMsg;
+module commlib {
+  initproc void initComlibManager();
+
+  message ComlibDummyMsg;
+  //  message PrioMsg;
+  message ComlibMulticastMsg {
+	CkArrayIndexMax indices[];
+	char usrMsg[];
+  };
 
   group [migratable] ComlibManager {
-    entry ComlibManager(int s,int n=1);
-    entry ComlibManager(CkPointer<Strategy> s, int n=0);
     entry ComlibManager();
 
     entry void barrier(void);
     entry void barrier2(void);
     entry void resumeFromBarrier2(void);
 
+    //entry void beginIteration();
+    //entry void endIteration();
+    //entry void prioEndIteration(PrioMsg *);
+
     entry void receiveTable(StrategyWrapper sw);
-    entry void localElement(void);
-
-    //Called by each array element
-    entry void beginIteration();
-    entry void endIteration();
-
-    //entry void receiveNamdMessage(ComlibMsg * msg);
-    //entry void createId(void);
-    //entry void createId(int *, int);
-
     entry void learnPattern(int, int);
   }
 
-  PUPable Strategy;
+  mainchare ComlibManagerMain {
+    entry ComlibManagerMain();	
+  }
+
+  //PUPable Strategy;
   PUPable DummyStrategy;
   PUPable EachToManyStrategy;
   PUPable NodeMulticast;
   PUPable StreamingStrategy;
   PUPable MPIStrategy;
   PUPable EachToManyMulticastStrategy;	
+
+  //PUPable ComlibArrayListener;
 };

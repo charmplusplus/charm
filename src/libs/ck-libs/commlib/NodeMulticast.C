@@ -24,7 +24,7 @@ static void* NodeMulticastCallbackHandler(void *msg){
     CkUnpackMessage(&env);
     //nm_mgr->getCallback().send(EnvToUsr(env));
 
-    nm_mgr->getHandler()(env);
+    //nm_mgr->getHandler()(env);
     return NULL;
 }
 
@@ -64,7 +64,7 @@ void NodeMulticast::setDestinationArray(CkArrayID a, int nelem,
 
     ComlibPrintf("After SetDestinationArray\n");
 }
-
+/*
 void NodeMulticast::setPeList(int npes, int *pelist, ComlibMulticastHandler handler){
     mode = PROCESSOR_MODE;
     messageBuf = NULL;
@@ -93,6 +93,7 @@ void NodeMulticast::setPeList(int npes, int *pelist, ComlibMulticastHandler hand
     
     ComlibPrintf("After setPeList\n");
 }
+*/
 
 void NodeMulticast::recvHandler(void *msg) {
     register envelope* env = (envelope *)msg;

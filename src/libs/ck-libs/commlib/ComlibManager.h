@@ -2,7 +2,7 @@
 #define COMMLIBMANAGER_H
 
 #include "charm++.h"
-#include "converse.h"
+#include "cksection.h"
 #include "envelope.h"
 #include "commlib.h"
 #include <math.h>
@@ -15,163 +15,156 @@
 #define USE_GROUP_BY_PROCESSOR 4 //Groups messages by destination processor 
                                  //(does not work as of now)
 #define USE_GRID 5            //Virtual topology is a 3d grid
-#define NAMD_STRAT 6          //A speciliazed strategy for Namd, commented out
-#define USE_MPI 7             //Calls MPI_Alltoall
-#define USE_STREAMING 8       //Creates a message stream with periodic combining
 
 #define CHARM_MPI 0 
 #define MAX_NSTRAT 1024
-#define LEARNING_PERIOD 1000     //Number of iterations after which the 
-                              //learning framework will discover the appropriate 
-                              //strategy, not completely implemented
+#define LEARNING_PERIOD 1000 //Number of iterations after which the
+                             //learning framework will discover 
+                             //the appropriate strategy, not completely 
+                             //implemented
+#define IS_MULTICAST -1
+
 #define ALPHA 5E-6
 #define BETA 3.33E-9
 
 PUPbytes(comID);
 
-//Handler for calling multicast messages on the receiver
-typedef void (*ComlibMulticastHandler)(void *msg);
-
-//An abstract data structure that holds a charm++ message 
-//and provides utility functions to manage it.
-class CharmMessageHolder {
- public:
-    int dest_proc;
-    char *data;
-    CharmMessageHolder *next; // also used for the refield at the receiver
-    
-    //For multicast, the user can pass the pelist and list of Pes he
-    //wants to send the data to.
-    int npes;
-    int *pelist;
-    int isDummy;
-
-    CharmMessageHolder(char * msg, int dest_proc);
-    char * getCharmMessage();
-    void copy(char *buf);
-    int getSize();
-    void init(char *root);
-    void setRefcount(char * root_msg);
-};
-
-//Class that defines the entry methods that a strategy must define. 
-//To write a new strategy inherit from this class and define the methods. 
-//Notice there is no constructor. Every strategy can define its own 
-//constructor and have any number of arguments.
-//But for now the strategies can only receive an int in their constructor.
-class Strategy : public PUP::able{
- public:
-    Strategy() {};
-    Strategy(CkMigrateMessage *) {};
-
-    //Called for each message
-    virtual void insertMessage(CharmMessageHolder *msg) {};
-
-    //Called after all chares and groups have finished depositing their 
-    //messages on that processor.
-    virtual void doneInserting() {};
-
-    //Each strategy must define his own Pup interface.
-    virtual void pup(PUP::er &p){ }
-
-    virtual void beginProcessing(int nelements){};
-
-    PUPable_decl(Strategy);
-};
-
-class StrategyWrapper  {
- public:
-    Strategy **s_table;
-    int nstrats;
-
-    void pup(PUP::er &p);
-};
-PUPmarshall(StrategyWrapper);
-
-#include "ComlibModule.decl.h"
+#include "commlib.decl.h"
 
 //Dummy message to be sent incase there are no messages to send. 
 //Used by only the EachToMany strategy!
-class DummyMsg: public CMessage_DummyMsg {
+class ComlibDummyMsg: public CMessage_ComlibDummyMsg {
     int dummy;
 };
 
-struct StrategyTable {
-    Strategy *strategy;
-    CkQ<CharmMessageHolder*> tmplist;
-    int numElements;
-    int elementCount;
-    int call_doneInserting;
+/*
+//Priority message to call end iteration
+class PrioMsg: public CMessage_PrioMsg {
+ public:
+    int instID;
+};
+*/
+
+class ComlibMulticastMsg : public CkMcastBaseMsg, 
+               public CMessage_ComlibMulticastMsg {
+    
+  public:
+    int size;
+    char *usrMsg;        
+    CkArrayIndexMax *indices;
 };
 
-class ComlibManager: public CkDelegateMgr{
+extern CkGroupID cmgrID;
 
-    CkGroupID cmgrID;
+//An Instance of the communication library.
+class ComlibInstanceHandle {
+ public:    
+    
+    int _instid;
+    CkGroupID _dmid;
+    
+    ComlibInstanceHandle();
+    ComlibInstanceHandle(int instid, CkGroupID dmid);    
+    //    ComlibInstanceHandle(ComlibInstanceHandle &that);
+    
+    void beginIteration();
+    void endIteration();
+    
+    CkGroupID getComlibManagerID();
+};
+
+PUPbytes(ComlibInstanceHandle);
+
+class ComlibManager: public CkDelegateMgr {
 
     int npes;
     int *pelist;
+
+    //CkArrayID dummyArrayID;
+    CkArrayIndexMax dummyArrayIndex;
 
     //For compatibility and easier use!
     int strategyID; //Identifier of the strategy
 
     StrategyTable strategyTable[MAX_NSTRAT]; //A table of strategy pointers
     CkQ<Strategy *> ListOfStrategies;
-    int nstrats, curStratID;      
+    int nstrats, curStratID, prevStratID;      
     //Number of strategies created by the user.
 
     //flags
     int receivedTable, flushTable, barrierReached, barrier2Reached;
     int totalMsgCount, totalBytes, nIterations;
 
+    ComlibArrayListener *alistener;
+    int prioEndIterationFlag;
+
     void init(); //initialization function
+
+    //charm_message for multicast for a section of that group
+    void multicast(void *charm_msg); //charm_message here.
+    void multicast(void *charm_msg, int npes, int *pelist);     
 
  public:
     ComlibManager();  //Receommended constructor
 
-    ComlibManager(int strategyID, int eltPerPE=0);
-    ComlibManager(Strategy *strat, int eltPerPE=0);
+    //ComlibManager(int strategyID, int eltPerPE=0);
+    //ComlibManager(Strategy *strat, int eltPerPE=0);
 
     ComlibManager::ComlibManager(CkMigrateMessage *m){ }
-    int useDefCtor(void){ return 1; }
+    //int useDefCtor(void){ return 1; }
 
     void barrier(void);
     void barrier2(void);
     void resumeFromBarrier2(void);
 
-    void localElement();
-    void registerElement(int strat);    //Register a chare for an instance
-    void unRegisterElement(int strat);  //UnRegister a chare for an instance
+    //Depricated by the use of array listeners
+    //void localElement();
+    //void registerElement(int strat);   //Register a chare for an instance
+    //void unRegisterElement(int strat); //UnRegister a chare for an instance
 
     void receiveID(comID id);                        //Depricated
     void receiveID(int npes, int *pelist, comID id); //Depricated
-    void receiveTable(StrategyWrapper sw);      //Receive table of strategies.
+    void receiveTable(StrategyWrapper sw);     //Receive table of strategies.
 
-    void ArraySend(int ep, void *msg, const CkArrayIndexMax &idx, CkArrayID a);
+    void ArraySend(int ep, void *msg, const CkArrayIndexMax &idx, 
+                   CkArrayID a);
     void GroupSend(int ep, void *msg, int onpe, CkGroupID gid);
-    void multicast(void *charm_msg); //charm_message here.
-    void multicast(void *charm_msg, int npes, int *pelist); 
-    //charm_message for multicast for a section of that group
+    
+    virtual void ArrayBroadcast(int ep,void *m,CkArrayID a);
+    virtual void GroupBroadcast(int ep,void *m,CkGroupID g);
+    virtual void ArraySectionSend(int ep,void *m,CkArrayID a,CkSectionID &s);
 
-    void beginIteration();
-    void beginIteration(int id); //Notify begining of an iteration 
-                                 //with strategy identifier
-    void endIteration();         //Notify end
+    void beginIteration();     //Notify begining of a bracket 
+                               //with strategy identifier
+    void endIteration();       //Notify end, endIteration must be called if 
+                               //a beginIteration is called. Otherwise 
+                               //end of the entry method is assumed to 
+                               //be the end of the bracket.
 
-    void createId();                 //depricated
-    void createId(int *, int);       //depricated
-    int createInstance(Strategy *);  //To create a new strategy, 
-                                     //returns index to the strategy table;
+    void setInstance(int id); 
+    //void prioEndIteration(PrioMsg *pmsg);
+
+    Strategy *getStrategy(int instid)
+        {return strategyTable[instid].strategy;}
+    StrategyTable *getStrategyTableEntry(int instid)
+        {return &strategyTable[instid];}
+
+    //To create a new strategy, returns handle to the strategy table;
+    ComlibInstanceHandle createInstance(Strategy *);  
+
     void doneCreating();             //Done creating instances
 
     //Learning functions
     void learnPattern(int totalMessageCount, int totalBytes);
     void switchStrategy(int strat);
+
+    static ComlibMulticastMsg *
+        getPackedMulticastMessage(CharmMessageHolder *m);
 };
 
+ComlibInstanceHandle  ComlibRegisterStrategy(Strategy *);
+ComlibInstanceHandle  ComlibRegisterStrategy(Strategy *, CkArrayID aid);
+ComlibInstanceHandle  ComlibRegisterStrategy(Strategy *, CkGroupID gid);
+
+void ComlibDelegateProxy(CProxy *proxy);
 #endif
-
-
-
-
-
-

@@ -1,114 +1,358 @@
 #include "EachToManyMulticastStrategy.h"
+#include "commlib.h"
 
 CpvExtern(int, RecvdummyHandle);
-
-static EachToManyMulticastStrategy *nm_mgr;
+CpvExtern(CkGroupID, cmgrID);
 
 void *itrDoneHandler(void *msg){
-    ComlibPrintf("[%d] Iteration finished\n", CkMyPe());
-    nm_mgr->doneInserting();
+
+    EachToManyMulticastStrategy *nm_mgr;
+    
+    DummyMsg *dmsg = (DummyMsg *)msg;
+    comID id = dmsg->id;
+    int instid = id.instanceID;
+
+    ComlibPrintf("[%d] Iteration finished %d\n", CkMyPe(), instid);
+
+    StrategyTable *sentry = 
+        CProxy_ComlibManager(CpvAccess(cmgrID)).ckLocalBranch()
+        ->getStrategyTableEntry(instid);
+    int nexpected = sentry->numElements;
+    
+    if(nexpected == 0) {               
+        nm_mgr = (EachToManyMulticastStrategy *)sentry->strategy;    
+        nm_mgr->doneInserting();
+    }
+    
     return NULL;
 }
 
 void *E2MHandler(void *msg){
-  ComlibPrintf("[%d]:In EachtoMany CallbackHandler\n", CkMyPe());
-  register envelope *env = (envelope *)msg;
-  CkUnpackMessage(&env);
-  
-  nm_mgr->getHandler()(env);
-  return NULL;
+    //ComlibPrintf("[%d]:In EachtoMany CallbackHandler\n", CkMyPe());
+    EachToManyMulticastStrategy *nm_mgr;    
+    
+    CkMcastBaseMsg *bmsg = (CkMcastBaseMsg *)EnvToUsr((envelope *)msg);
+    int instid = bmsg->_cookie.sInfo.cInfo.instId;
+    
+    nm_mgr = (EachToManyMulticastStrategy *) CProxy_ComlibManager(CpvAccess(cmgrID)).
+        ckLocalBranch()->getStrategy(instid);
+    
+    nm_mgr->localMulticast(msg);
+    return NULL;
 }
 
-EachToManyMulticastStrategy::EachToManyMulticastStrategy
-(int substrategy,ComlibMulticastHandler h){
+void EachToManyMulticastStrategy::setReverseMap(){
+    int pcount;
+    for(pcount = 0; pcount < CkNumPes(); pcount++)
+        procMap[pcount] = -1;
+    
+    for(pcount = 0; pcount < npes; pcount++) 
+        procMap[pelist[pcount]] = pcount;
+}
 
-    ComlibPrintf("In constructor, %d\n", substrategy);
-    routerID = substrategy;
+//Group Constructors
+EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy, 
+                                                         int n_srcpes,
+                                                         int *src_pelist)
+
+    : routerID(substrategy) {
+    isGroup = 1;
+    if (n_srcpes == 0) {
+        npes = CkNumPes();
+        pelist = new int[npes];
+        for(int count =0; count < npes; count ++)
+            pelist[count] = count;
+
+        srcpelist = destpelist = pelist;
+        nsrcpes = ndestpes = npes;
+
+        init();
+        return;
+    }
+
+    npes   = nsrcpes   = ndestpes   = n_srcpes;
+    pelist = srcpelist = destpelist = src_pelist;
+    
+    init();
+}
+
+EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy, 
+                                                         int n_srcpes, 
+                                                         int *src_pelist,
+                                                         int n_destpes, 
+                                                         int *dest_pelist) 
+    : routerID(substrategy) {
+    
+    isGroup = 1;
+    srcpelist = src_pelist;
+    nsrcpes = n_srcpes;
+    
+    int count = 0;
+    if(n_destpes == 0 || n_destpes == CkNumPes()) {
+        ndestpes = npes = CkNumPes();
+        destpelist = pelist = new int[npes];
+        for(count =0; count < npes; count ++)
+            pelist[count] = count;
+
+        init();
+        return;
+    }
+
+    ndestpes = n_destpes;
+    destpelist = dest_pelist;
+
+    pelist = new int[CkNumPes()];
+    npes = nsrcpes;
+    memcpy(pelist, srcpelist, nsrcpes * sizeof(int));
+    
+    for(int dcount = 0; dcount < ndestpes; dcount++) {
+        int p = destpelist[dcount];
+        for(count = 0; count < npes; count ++)
+            if(pelist[count] == p)
+                break;
+        
+        if(count == npes)
+            pelist[npes++] = p;
+    }    
+}
+
+
+//Array Constructors
+void EachToManyMulticastStrategy::init() {
+
     messageBuf = 0;
 
     ComlibPrintf("Before instance\n");
     comid = ComlibInstance(routerID, CkNumPes());
-    this->npes = CkNumPes();
-    ComlibPrintf("After instance\n");
-
-    npes = CkNumPes();
-    this->pelist = new int[npes];
-    for(int count =0; count < npes; count ++)
-      this->pelist[count] = count;
-    
-    handler = (long) h;
-
-    //procMap = new int[CkNumPes()];
-    //for(int count = 0; count < CkNumPes(); count ++){
-    //  procMap[count] = count;
-    //}
-    ComlibPrintf("After Constructor\n");
-}
-
-void EachToManyMulticastStrategy::checkPeList(){
-    int flag = 0, count , pos;
-    for(count = 0; count < npes; count++){
-	for(pos = 0; pos < npes; pos ++)
-	    if(pelist[count] == pelist[pos] && count!=pos){
-		flag = 1;
-		break;
-	    }
-	if( flag )
-	    break;
-    }
-    
-    int *newpelist = new int[npes], newpos = 0;
-    
-    for(count = 0; count < npes; count++)
-	newpelist[count] = -1;
-    
-    if( flag ) {
-	for(count = 0; count < npes; count++){
-	    int flag1 = 0;
-	    for(pos = 0; pos < newpos; pos ++)
-		if(newpelist[pos] == pelist[count])
-		    flag1 = 1;
-	    
-	    if(!flag1)
-		newpelist[newpos++] = pelist[count];
-	    
-	    flag1 = 0;
-	}
-    }
-    
-    npes = newpos;
-    pelist = newpelist;
-}
-
-EachToManyMulticastStrategy::EachToManyMulticastStrategy
-(int substrategy, int npes,int *pelist, ComlibMulticastHandler h){
-  
-    this->npes = npes;
-    //checkPeList();
-
-    routerID = substrategy;
-    messageBuf = NULL;
-
-    comid = ComlibInstance(routerID, CkNumPes());
     if(npes < CkNumPes())
 	comid = ComlibEstablishGroup(comid, this->npes, pelist);
+    ComlibPrintf("After instance\n");    
 
-    this->pelist = new int[npes];
-    for(int count =0; count < npes; count ++) {
-	this->pelist[count] = pelist[count];
-        if(pelist[count] == CkMyPe())
-            MyPe = count;
+    handler = 0;
+
+    int count = 0;
+    if(ndestpes < CkNumPes()){
+        for(int dcount = 0; dcount < ndestpes; dcount ++) {            
+            for(count = 0; count < npes; count ++)
+                if(pelist[count] == destpelist[dcount])
+                    break;
+            destMap[dcount] = count;
+        }
     }
+    else
+        destMap = pelist;
+
+    procMap = new int[CkNumPes()];
+    setReverseMap();
 }
+
+EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy, 
+                                                         CkArrayID src, 
+                                                         int nsrc, 
+                                                         CkArrayIndexMax 
+                                                         *srcelements)
+    :routerID(substrategy) {
+    
+    aid = src; //Source array id.
+    isArray = 1; //the source is an array.
+    
+    nIndices = nsrc;  //0 for all array elements
+    elements = srcelements; //Null for all array elements
+
+    if(nsrc > 0 && elements == NULL)
+        CkAbort("Invalid parameters to EachToMany Consrtuctor \n");
+
+    destArrayID = aid;
+    nDestElements = nsrc;  //0 for all array elements
+    destIndices = srcelements; //Null for all array elements
+    
+    int count = 0, acount =0;
+
+    npes = CkNumPes();
+    pelist = new int[npes];
+    memset(pelist, 0, npes * sizeof(int));
+
+    if(nIndices == 0){
+        for(count =0; count < npes; count ++)
+            pelist[count] = count;                   
+        
+        ndestpes = npes;
+        destpelist = pelist;  //All same as the set of 
+                                          //all the processors
+        init();
+        return;
+    }
+
+    npes = 0;
+    for(acount = 0; acount < nsrc; acount++) {
+        int p = CkArrayID::CkLocalBranch(src)->
+            lastKnown(srcelements[acount]);
+        
+        for(count = 0; count < npes; count ++)
+            if(pelist[count] == p)
+                break;
+        if(count == npes) {
+            pelist[npes++] = p;
+        }
+    }       
+    
+    ndestpes = npes;   
+    destpelist = pelist;   //All same but a subset of total
+    
+    init();
+}
+
+EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy, 
+                                                         CkArrayID src, 
+                                                         CkArrayID dest, 
+                                                         int ndest, 
+                                                         CkArrayIndexMax 
+                                                         *destelements)
+    :routerID(substrategy) {
+    
+    aid = src; //Source array id.
+    isArray = 1; //the source is an array.
+    
+    nIndices = 0;  //0 for all array elements
+    elements = 0; //Null for all array elements
+
+    destArrayID = dest;
+    nDestElements = ndest;  //0 for all array elements
+    destIndices = destelements; //Null for all array elements
+    
+    int count = 0, acount =0;
+
+    npes = CkNumPes();
+    pelist = new int[npes];
+    
+    ndestpes = CkNumPes();
+    destpelist = new int[npes];
+
+    memset(pelist, 0, npes * sizeof(int));
+    memset(destpelist, 0, ndestpes * sizeof(int));    
+
+    for(count =0; count < npes; count ++) {
+        pelist[count] = count;             
+        if(ndest == 0)
+            destpelist[count] = count;
+    }
+    
+    if(ndest != 0) {
+        ndestpes = 0;
+        for(acount = 0; acount < ndest; acount++) {
+            int p = CkArrayID::CkLocalBranch(dest)->
+                lastKnown(destelements[acount]);
+            
+            for(count = 0; count < ndestpes; count ++)
+                if(destpelist[count] == p)
+                    break;
+            if(count == ndestpes)
+                destpelist[ndestpes ++] = p;
+        }                            
+    }
+    
+    init();
+}
+
+
+EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy, 
+                                                         CkArrayID src, 
+                                                         int nsrc, 
+                                                         CkArrayIndexMax 
+                                                         *srcelements, 
+                                                         CkArrayID dest, 
+                                                         int ndest, 
+                                                         CkArrayIndexMax 
+                                                         *destelements)
+    :routerID(substrategy) {
+    
+    aid = src; //Source array id.
+    isArray = 1; //the source is an array.
+    
+    nIndices = nsrc;  //0 for all array elements
+    elements = srcelements; //Null for all array elements
+
+    if(nsrc == 0)
+        CkAbort("Invalid parameters to EachToMany Consrtuctor \n");
+
+    if(nsrc > 0 && elements == NULL)
+        CkAbort("Invalid parameters to EachToMany Consrtuctor \n");
+
+    destArrayID = dest;    
+    nDestElements = ndest;  //0 for all array elements
+    destIndices = destelements; //Null for all array elements
+
+    if(ndest > 0 && destIndices == NULL)
+        CkAbort("Invalid parameters to EachToMany Consrtuctor \n");
+
+    int count = 0, acount =0;
+
+    npes = CkNumPes();
+    pelist = new int[npes];
+    
+    ndestpes = CkNumPes();
+    destpelist = new int[npes];
+
+    memset(pelist, 0, npes * sizeof(int));
+    memset(destpelist, 0, npes * sizeof(int));    
+
+    npes = 0;
+    for(acount = 0; acount < nsrc; acount++) {
+        int p = CkArrayID::CkLocalBranch(src)->lastKnown(srcelements[acount]);
+        
+        for(count = 0; count < npes; count ++)
+            if(pelist[count] == p)
+                break;
+        if(count == npes)
+            pelist[npes ++] = p;
+    }                        
+
+
+    if(ndest == 0){
+        for(count =0; count < npes; count ++) {
+            pelist[count] = count;            
+            destpelist[count] = count;        
+        }
+        
+        init();
+        return;
+    }
+    
+    ndestpes = 0;
+    for(acount = 0; acount < ndest; acount++) {
+        int p = CkArrayID::CkLocalBranch(dest)->
+            lastKnown(destelements[acount]);        
+        
+        for(count = 0; count < npes; count ++)
+            if(pelist[count] == p)
+                break;
+        if(count == npes) {
+            pelist[npes ++] = p; 
+            destpelist[ndestpes ++] = p; 
+        }       
+    }                            
+
+    init();
+}
+
 
 void EachToManyMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
     
     if(messageBuf == NULL) {
-	ComlibPrintf("ERROR MESSAGE BUF IS NULL\n");
+	CkPrintf("ERROR MESSAGE BUF IS NULL\n");
 	return;
     }
-    ComlibPrintf("EachToMany: insertMessage\n");
-
+    ComlibPrintf("[%d] EachToManyMulticast: insertMessage, %d\n", CkMyPe(), cmsg->nIndices);
+        
+    if(cmsg->nIndices != nDestElements && cmsg->nIndices > 0){
+        void *newmsg = (void *)ComlibManager::
+            getPackedMulticastMessage(cmsg);
+        CkFreeMsg(cmsg->getCharmMessage());
+        delete cmsg;
+        
+        cmsg = new CharmMessageHolder((char *)newmsg, -1);
+    }
+    
     messageBuf->enq(cmsg);
 }
 
@@ -116,7 +360,7 @@ void EachToManyMulticastStrategy::doneInserting(){
     ComlibPrintf("%d: DoneInserting \n", CkMyPe());
     
     if((messageBuf->length() == 0) && (CkNumPes() > 0)) {
-        DummyMsg * dummymsg = new DummyMsg;
+        ComlibDummyMsg * dummymsg = new ComlibDummyMsg;
         
         ComlibPrintf("[%d] Creating a dummy message\n", CkMyPe());
         
@@ -125,7 +369,7 @@ void EachToManyMulticastStrategy::doneInserting(){
         
         CharmMessageHolder *cmsg = new CharmMessageHolder((char *)dummymsg, 
                                                           CkMyPe());
-        cmsg->isDummy = 1;
+cmsg->isDummy = 1;
         messageBuf->enq(cmsg);
     }
 
@@ -137,13 +381,20 @@ void EachToManyMulticastStrategy::doneInserting(){
 
         ComlibPrintf("Calling EachToMany %d %d %d\n", 
                      UsrToEnv(msg)->getTotalsize(), CkMyPe(), 
-                     cmsg->dest_proc);
+                     ndestpes);
         	
-        if(!cmsg->isDummy) {
-            CmiSetHandler(UsrToEnv(msg), handlerId);
-            EachToManyMulticast(comid, UsrToEnv(msg)->getTotalsize(), 
-                                UsrToEnv(msg), npes, pelist);
-        }
+        if(!cmsg->isDummy)  {
+            if(cmsg->dest_proc == IS_MULTICAST) {
+                CmiSetHandler(UsrToEnv(msg), handlerId);
+                EachToManyMulticast(comid, UsrToEnv(msg)->getTotalsize(), 
+                                    UsrToEnv(msg), ndestpes, destMap);
+            }
+            else {
+                EachToManyMulticast(comid, UsrToEnv(msg)->getTotalsize(), 
+                                    UsrToEnv(msg), 1, 
+                                    &procMap[cmsg->dest_proc]);
+            }
+        }        
         else
             EachToManyMulticast(comid, UsrToEnv(msg)->getTotalsize(), 
                                 UsrToEnv(msg), 1, &MyPe);
@@ -154,35 +405,146 @@ void EachToManyMulticastStrategy::doneInserting(){
 
 void EachToManyMulticastStrategy::pup(PUP::er &p){
 
-    ComlibPrintf("Each To many :: pup\n");
-
+    int count = 0;
+    ComlibPrintf("Each To many :: pup\n"); 
     Strategy::pup(p);
-    
+
+    p | destArrayID;
     p | routerID;
     p | comid;
-    p | npes;
+    p | npes; p | ndestpes;
     p | handler;
+    p | nDestElements;
 
-    if(p.isUnpacking()) 
-      pelist = new int[npes];
-    p(pelist, npes);
-    
+    if(npes > 0) {
+        if(p.isUnpacking()) {
+            pelist = new int[npes];    
+            procMap = new int[CkNumPes()];
+        }
+        p(pelist, npes);
+        p(procMap, CkNumPes());
+    }
+
+    if(ndestpes > 0) {
+        if(p.isUnpacking()) {
+            destpelist = new int[ndestpes];    
+            destMap = new int[ndestpes];
+        };
+        p(destpelist, ndestpes);
+        p(destMap, ndestpes);
+    }
+        
+    if(nDestElements >0){
+        if(p.isUnpacking())
+            destIndices = new CkArrayIndexMax[nDestElements];
+        p(destIndices, nDestElements);
+    }
+
     if(p.isUnpacking()){
 	messageBuf = new CkQ<CharmMessageHolder *>;
 	handlerId = CmiRegisterHandler((CmiHandler)E2MHandler);
-	nm_mgr = this;
-        MyPe = CkMyPe();
+
+        MyPe = procMap[CkMyPe()];
+        
+        CkArray *dest_array = CkArrayID::CkLocalBranch(destArrayID);
+        if(nDestElements == 0){            
+            dest_array->getComlibArrayListener()->getLocalIndices
+                (localDestIndices);
+        }
+        else {
+            for(count = 0; count < nDestElements; count++) 
+                if(dest_array->lastKnown(destIndices[count]) == CkMyPe())
+                    localDestIndices.insertAtEnd(destIndices[count]);
+        }
     }
+
     ComlibPrintf("End of pup\n");
 }
 
 void EachToManyMulticastStrategy::beginProcessing(int numElements){
     int handler = CmiRegisterHandler((CmiHandler)itrDoneHandler);
-    if(numElements > 0)
-        return;
-
     ComlibPrintf("[%d]Registering Callback Handler\n", CkMyPe());
-
     comid.callbackHandler = handler;
-    doneInserting();
+    comid.instanceID = myInstanceID;
+    
+    int expectedDeposits;
+    if(isArray) 
+        expectedDeposits = CProxy_ComlibManager(CpvAccess(cmgrID)).ckLocalBranch()->
+            getStrategyTableEntry(myInstanceID)->numElements;        
+    if(isGroup)
+        for(int count = 0; count < nsrcpes; count ++)
+            if(srcpelist[count] == CkMyPe())
+                expectedDeposits = 1;
+
+    if(expectedDeposits > 0)
+        return;
+    
+    if(MyPe != -1)
+        doneInserting();
+}
+
+void EachToManyMulticastStrategy::localMulticast(void *msg){
+    register envelope *env = (envelope *)msg;
+    CkUnpackMessage(&env);
+    
+    CkMcastBaseMsg *cbmsg = (CkMcastBaseMsg *)EnvToUsr(env);
+
+    int nto_send = cbmsg->_cookie.sInfo.cInfo.nIndices;
+    ComlibPrintf("[%d] In local multicast %d\n", CkMyPe(), nto_send);
+        
+    if(nto_send == 0) {        
+        //Multicast to all destination elements on current processor
+        
+        ComlibPrintf("[%d] Local multicast sending all %d\n", CkMyPe(), localDestIndices.size());
+
+        localMulticast(localDestIndices, env);
+        return;
+    }   
+
+    CkVec<CkArrayIndexMax> dest_indices;
+    ComlibMulticastMsg *ccmsg = (ComlibMulticastMsg *)cbmsg;
+    
+    for(int count = 0; count < nto_send; count++){
+        CkArrayIndexMax idx = ccmsg->indices[count];
+        //idx.print();
+        int dest_proc =CkArrayID::CkLocalBranch(destArrayID)->lastKnown(idx);
+        if(dest_proc == CkMyPe())
+            dest_indices.insertAtEnd(idx);
+    }
+    
+    envelope *newenv = (envelope *)CmiAlloc(ccmsg->size);
+    memcpy(newenv, ccmsg->usrMsg, ccmsg->size);
+    CmiFree(env);
+    localMulticast(dest_indices, newenv);
+}
+
+void EachToManyMulticastStrategy::localMulticast(CkVec<CkArrayIndexMax> vec, 
+                                         envelope *env){
+    
+    //Multicast the messages to all elements in vec
+    void *msg = EnvToUsr(env);
+    int nelements = vec.size();
+
+    void *newmsg;
+    envelope *newenv;
+    for(int count = 0; count < nelements; count ++){
+
+        CkArrayIndexMax idx = vec[count];
+        
+        //CkPrintf("[%d] Sending multicast message to", CkMyPe());
+        //idx.print();     
+        
+        if(count < nelements - 1) {
+            newmsg = CkCopyMsg(&msg); 
+            newenv = UsrToEnv(newmsg);
+            newenv->setUsed(0);            
+        }
+        else {
+            newmsg = msg;
+            newenv = env;
+        }
+        
+        CProxyElement_ArrayBase ap(destArrayID, idx);
+        ap.ckSend((CkArrayMessage *)newmsg, newenv->array_ep());
+    }
 }

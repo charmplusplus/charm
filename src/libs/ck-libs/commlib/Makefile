@@ -3,15 +3,16 @@ COMMLIBDIR=../../conv-libs/commlib
 CDIR=../../../..
 LIBDIR=$(CDIR)/lib
 
-LIB = libcomm.a
+LIB = libmodulecommlib.a
 
 STRATEGY_OBJS = EachToManyStrategy.o MPIStrategy.o StreamingStrategy.o \
 		DummyStrategy.o NodeMulticast.o EachToManyMulticastStrategy.o
 
 CONVERSE_COM_OBJS = $(COMMLIBDIR)/commlib.o $(COMMLIBDIR)/gridrouter.o \
-	$(COMMLIBDIR)/de.o $(COMMLIBDIR)/treerouter.o $(COMMLIBDIR)/petable.o \
-	$(COMMLIBDIR)/overlapper.o $(COMMLIBDIR)/rsend.o $(COMMLIBDIR)/bcast.o \
-	$(COMMLIBDIR)/3dgridrouter.o  $(COMMLIBDIR)/graphrouter.o  $(COMMLIBDIR)/hypercubetopology.o
+	$(COMMLIBDIR)/de.o $(COMMLIBDIR)/treerouter.o $(COMMLIBDIR)/petable.o\
+	$(COMMLIBDIR)/overlapper.o $(COMMLIBDIR)/rsend.o \
+	$(COMMLIBDIR)/bcast.o $(COMMLIBDIR)/3dgridrouter.o  \
+	$(COMMLIBDIR)/graphrouter.o  $(COMMLIBDIR)/hypercubetopology.o
 
 OBJS = ComlibManager.o $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 
@@ -28,18 +29,16 @@ all: cifiles conversecom $(LIB)
 	cp  NodeMulticast.h $(CDIR)/include
 	rm -f $(CDIR)/include/StreamingStrategy.h
 	cp  StreamingStrategy.h $(CDIR)/include
-	rm -f $(CDIR)/include/ComlibModule.decl.h
-	cp  ComlibModule.decl.h $(CDIR)/include
-	rm -f $(CDIR)/include/ComlibModule.def.h
-	cp  ComlibModule.def.h $(CDIR)/include
-	rm -f $(CDIR)/tmp/ComlibManager.ci
-	cp  ComlibManager.ci $(CDIR)/tmp
+	rm -f $(CDIR)/include/commlib.decl.h
+	cp  commlib.decl.h $(CDIR)/include
+	rm -f $(CDIR)/include/commlib.def.h
+	cp  commlib.def.h $(CDIR)/include
 
 conversecom :
 	(cd ../../conv-libs/commlib; make)
 
-libcomm.a: $(OBJS) $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
-	$(CHARMC) -cp $(LIBDIR) -o libcomm.a $(OBJS)
+libmodulecommlib.a: $(OBJS) $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
+	$(CHARMC) -cp $(LIBDIR) -o libmodulecommlib.a $(OBJS)
 
 ComlibManager.o: ComlibManager.C ComlibManager.h
 	$(CHARMC) -c ComlibManager.C
@@ -67,4 +66,14 @@ cifiles: ComlibManager.ci
 	$(CHARMC) ComlibManager.ci
 
 clean:
-	rm -f *~ ComlibModule.decl.h ComlibModule.def.h *.o $(LIB)
+	rm -f *~ *.decl.h *.def.h *.o $(LIB) \
+	$(CDIR)/include/ComlibManager.h      \
+	$(CDIR)/include/EachToManyStrategy.h \
+	$(CDIR)/include/EachToManyMulticastStrategy.h \
+	$(CDIR)/include/DummyStrategy.h      \
+	$(CDIR)/include/NodeMulticast.h      \
+	$(CDIR)/include/StreamingStrategy.h  \
+	$(CDIR)/include/commlib.decl.h       \
+	$(CDIR)/include/commlib.def.h        \
+        $(CDIR)/lib/libcomm.a                \
+	$(CDIR)/lib/libmodulecomlib.a

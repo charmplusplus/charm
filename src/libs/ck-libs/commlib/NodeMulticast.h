@@ -34,7 +34,7 @@ class NodeMulticast : public Strategy {
 			     CkArrayIndexMax **idx, int ep);
 
     //void setPeList(int npes, int *pelist, CkCallback callback);
-    void setPeList(int npes, int *pelist, ComlibMulticastHandler handler);
+    //void setPeList(int npes, int *pelist, ComlibMulticastHandler handler);
     
     NodeMulticast(CkMigrateMessage *){}
     void recvHandler(void *msg);
@@ -42,7 +42,7 @@ class NodeMulticast : public Strategy {
     void doneInserting();
 
     CkCallback getCallback() { return cb;}
-    ComlibMulticastHandler getHandler() { return (ComlibMulticastHandler)handler;}
+    //ComlibMulticastHandler getHandler() { return (ComlibMulticastHandler)handler;}
 
     virtual void pup(PUP::er &p);
     PUPable_decl(NodeMulticast);

@@ -9,6 +9,7 @@
 
 CpvDeclare(int, RecvmsgHandle);
 CpvDeclare(int, RecvdummyHandle);
+CpvDeclare(CkGroupID, cmgrID);
 
 //handler to receive array messages
 void recv_msg(void *msg){
@@ -20,6 +21,8 @@ void recv_msg(void *msg){
 
     register envelope* env = (envelope *)msg;
     env->setUsed(0);
+    CkUnpackMessage(&env);
+
     CProxyElement_ArrayBase ap(env->array_mgr(), env->array_index());
     ComlibPrintf("%d:Array Base created\n", CkMyPe());
     ap.ckSend((CkArrayMessage *)EnvToUsr(env), env->array_ep());
@@ -34,29 +37,9 @@ void recv_dummy(void *msg){
     CmiFree(msg);
 }
 
-//Creates a strategy, to write a new strategy add the appropriate constructor call!
-Strategy* createStrategy(int s){
-    Strategy *strategy;
-    switch (s) {
-    case USE_MESH: 
-    case USE_HYPERCUBE : 
-    case USE_GRID : strategy = new EachToManyStrategy(s);
-        break;
-    case USE_DIRECT: strategy = new DummyStrategy();
-        break;
-    case USE_STREAMING : strategy = new StreamingStrategy(0);
-        break;
-    case USE_MPI: strategy = new MPIStrategy();
-        break;
-    default : CkPrintf("Illegal Strategy\n");
-        CkExit();
-        break;
-    }         
-    return strategy;
-}
-
 //An initialization routine which does prelimnary initialization of the 
-//communications library and registers the strategies with the PUP:able interface.
+//communications library and registers the strategies with the 
+//PUP:able interface.
 void initComlibManager(void){
     //comm_debug = 1;
     ComlibInit();
@@ -72,23 +55,6 @@ void initComlibManager(void){
     //ComlibPrintf("After Init Call\n");
 }
 
-//ComlibManager Constructor with 1 int the strategy id being passed
-//s = Strategy (0 = tree, 1 = tree, 2 = mesh, 3 = hypercube) 
-ComlibManager::ComlibManager(int stratID,int eltPerPE){
-    init();
-    strategyID = stratID;
-    strategyTable[0].numElements = eltPerPE;
-    Strategy *strat = createStrategy(stratID);
-    createInstance(strat);
-}
-
-ComlibManager::ComlibManager(Strategy *strat,int eltPerPE){
-    init();
-    strategyID = -1;
-    strategyTable[0].numElements = eltPerPE;
-    createInstance(strat);
-}
-
 ComlibManager::ComlibManager(){
     init();
     ComlibPrintf("In comlibmanager constructor\n");
@@ -102,9 +68,14 @@ void ComlibManager::init(){
     pelist = NULL;
     nstrats = 0;
 
-    cmgrID = thisgroup;
+    CpvInitialize(CkGroupID, cmgrID);
+    CpvAccess(cmgrID) = thisgroup;
+
+    dummyArrayIndex.nInts = 0;
 
     curStratID = 0;
+    prevStratID = -1;
+    //prioEndIterationFlag = 1;
 
     //initialize the strategy table.
     //    bzero(strategyTable, MAX_NSTRAT * sizeof(StrategyTable));
@@ -113,6 +84,7 @@ void ComlibManager::init(){
       strategyTable[count].numElements = 0;
       strategyTable[count].elementCount = 0;
       strategyTable[count].call_doneInserting = 0;
+      strategyTable[count].nEndItr = 0;
     }
         
     //procMap = new int[CkNumPes()];
@@ -127,10 +99,12 @@ void ComlibManager::init(){
     barrierReached = 0;
     barrier2Reached = 0;
 
-    CProxy_ComlibManager cgproxy(cmgrID);
+    CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));
     cgproxy[0].barrier();
 }
 
+//First barrier makes sure that the communication library group 
+//has been created on all processors
 void ComlibManager::barrier(){
   static int bcount = 0;
   ComlibPrintf("In barrier %d\n", bcount);
@@ -143,47 +117,36 @@ void ComlibManager::barrier(){
   }
 }
 
+//Has finished passing the strategy list to all the processors
 void ComlibManager::barrier2(){
   static int bcount = 0;
   if(CkMyPe() == 0) {
     bcount ++;
     ComlibPrintf("In barrier2 %d\n", bcount);
     if(bcount == CkNumPes()) {
-      CProxy_ComlibManager cgproxy(cmgrID);
-      cgproxy.resumeFromBarrier2();
+        CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));
+        cgproxy.resumeFromBarrier2();
     }
   }
 }
 
-void ComlibManager::createId(){
-    doneCreating();
-}
-
-void ComlibManager::createId(int *pelist, int npes){
-    
-    Strategy *strat;
-    if(strategyID != USE_MPI) 
-        strat = new EachToManyStrategy(strategyID, npes, pelist);
-    else 
-        strat = new MPIStrategy(npes, pelist);
-
-    //createInstance(strat);        
-    ListOfStrategies.insert(0, strat);
-    doneCreating();
-}
-
-int ComlibManager::createInstance(Strategy *strat) {
+//Registers a set of strategies with the communication library
+ComlibInstanceHandle ComlibManager::createInstance(Strategy *strat) {
   
   ListOfStrategies.enq(strat);
   nstrats++;
-  return nstrats - 1;
+
+  ComlibInstanceHandle cinst(nstrats - 1, CpvAccess(cmgrID));  
+  return cinst;
 }
 
+//End of registering function, if barriers have been reached send them over
 void ComlibManager::doneCreating() {
     if(!barrierReached)
       return;
 
-    ComlibPrintf("Sending Strategies %d, %d\n", nstrats, ListOfStrategies.length());
+    ComlibPrintf("Sending Strategies %d, %d\n", nstrats, 
+                 ListOfStrategies.length());
 
     StrategyWrapper sw;
     sw.s_table = new Strategy* [nstrats];
@@ -193,15 +156,18 @@ void ComlibManager::doneCreating() {
     for (int count=0; count<nstrats; count++)
         sw.s_table[count] = ListOfStrategies.deq();
 
-    CProxy_ComlibManager cgproxy(cmgrID);
+    CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));
     cgproxy.receiveTable(sw);
 }
 
+//Registration now done through array listeners
+/*
 void ComlibManager::localElement(){
     ComlibPrintf("In Local Element\n");
     strategyTable[0].numElements ++;
 }
-
+*/
+/*
 void ComlibManager::registerElement(int stratID){
     ComlibPrintf("In Register Element\n");
     strategyTable[stratID].numElements ++;
@@ -211,26 +177,30 @@ void ComlibManager::unRegisterElement(int stratID){
     ComlibPrintf("In Un Register Element\n");
     strategyTable[stratID].numElements --;
 }
+*/
 
-//Called when the array element starts sending messages
-//should rather be a function call ?
+//Called when the array/group element starts sending messages
 void ComlibManager::beginIteration(){
     //right now does not do anything might need later
-     
     ComlibPrintf("[%d]:In Begin Iteration %d\n", CkMyPe(), strategyTable[0].elementCount);
-    curStratID = 0;
+    //prioEndIterationFlag = 0;
 }
 
-//Called when the array element starts sending messages
-//should rather be a function call ?
-void ComlibManager::beginIteration(int stratID){
+void ComlibManager::setInstance(int instID){
 
-    curStratID = stratID;
-    ComlibPrintf("[%d]:In Begin Iteration%d\n", CkMyPe(), strategyTable[stratID].elementCount);
+    curStratID = instID;
+    ComlibPrintf("[%d]:In setInstance\n", CkMyPe(), strategyTable[instID].elementCount);
 }
 
 //called when the array elements has finished sending messages
 void ComlibManager::endIteration(){
+    //    prioEndIterationFlag = 1;
+    prevStratID = -1;
+
+    if(!receivedTable) {
+        strategyTable[curStratID].nEndItr++;
+        return;
+    }        
     
     ComlibPrintf("[%d]:In End Iteration(%d) %d, %d\n", CkMyPe(), curStratID, 
                  strategyTable[curStratID].elementCount, strategyTable[curStratID].numElements);
@@ -240,18 +210,18 @@ void ComlibManager::endIteration(){
     flushTable = 1;
 
     if(strategyTable[curStratID].elementCount == strategyTable[curStratID].numElements) {
-      
+        
         ComlibPrintf("[%d]:In End Iteration %d\n", CkMyPe(), strategyTable[curStratID].elementCount);
         
         nIterations ++;
 
         if(nIterations == LEARNING_PERIOD) {
             //CkPrintf("Sending %d, %d\n", totalMsgCount, totalBytes);
-            CProxy_ComlibManager cgproxy(cmgrID);
+            CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));
             cgproxy[0].learnPattern(totalMsgCount, totalBytes);
         }
         
-        if(receivedTable) {	    
+        if(barrier2Reached) {	    
 	    strategyTable[curStratID].strategy->doneInserting();
         }
 	else strategyTable[curStratID].call_doneInserting = 1;
@@ -261,49 +231,64 @@ void ComlibManager::endIteration(){
     ComlibPrintf("After EndIteration\n");
 }
 
+//receive the list of strategies
 void ComlibManager::receiveTable(StrategyWrapper sw){
     
+    receivedTable = 1;
     nstrats = sw.nstrats;
 
+    CkArrayID st_aid;
+    int st_nelements;
+    CkArrayIndexMax *st_elem;
+
     int count = 0;
-    for(count = 0; count < nstrats; count ++)
+    for(count = 0; count < nstrats; count ++) {
         strategyTable[count].strategy = sw.s_table[count];
-    receivedTable = 1;
+        
+        strategyTable[count].strategy->setInstance(count);               
+        
+        if(strategyTable[count].strategy->isSourceArray()){           
+            strategyTable[count].strategy->
+                getSourceArray(st_aid, st_elem, st_nelements);
+            
+            //CkPrintf("[%d] Calling Array listener for array\n", CkMyPe());
+            ComlibArrayListener *calistener = 
+                CkArrayID::CkLocalBranch(st_aid)->getComlibArrayListener();
+            
+            calistener->registerStrategy(&strategyTable[count]);
 
+            curStratID = count;
+            
+            ComlibPrintf("[%d] endIteration from receiveTable %d\n", 
+                         CkMyPe(), strategyTable[count].nEndItr);
+            
+            for(int itr = 0; itr < strategyTable[count].nEndItr; itr++) 
+                endIteration();            
+        }              
+  
+        if(strategyTable[count].strategy->isSourceGroup()){
+            strategyTable[count].numElements = 1;
+
+            for(int itr = 0; itr < strategyTable[count].nEndItr; itr++) 
+                endIteration();            
+        }
+        
+        strategyTable[count].strategy->beginProcessing
+            (strategyTable[count].numElements);
+    }           
+    
     ComlibPrintf("receivedTable %d\n", nstrats);
-
-    CProxy_ComlibManager cgproxy(cmgrID);
+    
+    CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));
     cgproxy[0].barrier2();
-
-    /*
-    if (flushTable && barrier2Reached) {
-      for (count = 0; count < nstrats; count ++) {
-	if (!strategyTable[count].tmplist.isEmpty()) {
-	  CharmMessageHolder *cptr;
-	  while (!strategyTable[count].tmplist.isEmpty())
-	    strategyTable[count].strategy->insertMessage
-	      (strategyTable[count].tmplist.deq());
-	}
-	
-	if (strategyTable[count].call_doneInserting)
-	  strategyTable[count].strategy->doneInserting();
-      }
-      flushTable = 0;
-    }
-    */
 }
 
 void ComlibManager::resumeFromBarrier2(){
-  barrier2Reached = 1;
+    barrier2Reached = 1;
+    
+    ComlibPrintf("[%d] Barrier 2 reached\n", CkMyPe());
 
-  ComlibPrintf("[%d] Barrier 2 reached\n", CkMyPe());
-
-  for (int count = 0; count < nstrats; count ++) {
-      strategyTable[count].strategy->beginProcessing
-          (strategyTable[count].numElements);
-  }
-
-  if(flushTable) {
+    if(flushTable) {
       for (int count = 0; count < nstrats; count ++) {
           if (!strategyTable[count].tmplist.isEmpty()) {
               CharmMessageHolder *cptr;
@@ -315,9 +300,9 @@ void ComlibManager::resumeFromBarrier2(){
           if (strategyTable[count].call_doneInserting)
               strategyTable[count].strategy->doneInserting();
       }
-  }
-
-  ComlibPrintf("[%d] After Barrier2\n", CkMyPe());
+    }
+    
+    ComlibPrintf("[%d] After Barrier2\n", CkMyPe());
 }
 
 extern int _charmHandlerIdx;
@@ -327,14 +312,32 @@ extern int _charmHandlerIdx;
 void ComlibManager::ArraySend(int ep, void *msg, 
                               const CkArrayIndexMax &idx, CkArrayID a){
     
+    ComlibPrintf("[%d] In Array Send\n", CkMyPe());
+    /*
+    if(curStratID != prevStratID && prioEndIterationFlag) {        
+        CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));
+        ComlibPrintf("[%d] Array Send calling prio end iteration\n", 
+                     CkMyPe());
+        PrioMsg *pmsg = new(8 * sizeof(int)) PrioMsg();
+        int mprio = -100;
+        *(int *)CkPriorityPtr(pmsg) = mprio;
+        pmsg->instID = curStratID;
+        CkSetQueueing(pmsg, CK_QUEUEING_BFIFO);
+        cgproxy[CkMyPe()].prioEndIteration(pmsg);
+        prioEndIterationFlag = 0;
+    }        
+    prevStratID = curStratID;            
+    */
+
     CkArrayIndexMax myidx = idx;
     int dest_proc = CkArrayID::CkLocalBranch(a)->lastKnown(myidx);
     
-    ComlibPrintf("Send Data %d %d %d %d\n", CkMyPe(), dest_proc, 
-		 UsrToEnv(msg)->getTotalsize(), receivedTable);
+    //ComlibPrintf("Send Data %d %d %d %d\n", CkMyPe(), dest_proc, 
+    //	 UsrToEnv(msg)->getTotalsize(), receivedTable);
 
     if(dest_proc == CkMyPe()){
-        //CkArrayID::CkLocalBranch(a)->deliverViaQueue((CkArrayMessage *) msg);
+        //CkArrayID::CkLocalBranch(a)->deliverViaQueue((CkArrayMessage *)msg);
+
         CProxyElement_ArrayBase ap(a,idx);
         ap.ckSend((CkArrayMessage *)msg, ep);
         return;
@@ -356,7 +359,7 @@ void ComlibManager::ArraySend(int ep, void *msg,
     totalMsgCount ++;
     totalBytes += UsrToEnv(msg)->getTotalsize();
 
-    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg, dest_proc); 
+    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg, dest_proc);
     //get rid of the new.
 
     //CmiPrintf("Before Insert\n");
@@ -372,19 +375,46 @@ void ComlibManager::ArraySend(int ep, void *msg,
     //CmiPrintf("After Insert\n");
 }
 
+void ComlibManager::ArrayBroadcast(int ep,void *m,CkArrayID a){
+    ComlibPrintf("[%d] Array Broadcast \n", CkMyPe());
+
+    register envelope * env = UsrToEnv(m);
+    env->array_mgr()=a;
+    env->array_srcPe()=CkMyPe();
+    env->array_ep()=ep;
+    env->array_hops()=0;
+    env->array_index()= dummyArrayIndex;
+    
+    CmiSetHandler(env, CpvAccess(RecvmsgHandle));
+    
+    multicast(m);
+}
+
+void ComlibManager::GroupBroadcast(int ep,void *m,CkGroupID g) {
+    register envelope * env = UsrToEnv(m);
+
+    env->setEpIdx(ep);
+    env->setSrcPe(CkMyPe());
+    env->setGroupNum(g);
+    CmiSetHandler(env, _charmHandlerIdx);
+    
+    multicast(m);
+}
+
 void ComlibManager::multicast(void *msg) {
+
     register envelope * env = UsrToEnv(msg);
     
     ComlibPrintf("[%d]: In multicast\n", CkMyPe());
 
     env->setUsed(0);    
     CkPackMessage(&env);
-    CmiSetHandler(env, CpvAccess(RecvmsgHandle));
+    //CmiSetHandler(env, CpvAccess(RecvmsgHandle));
     
     totalMsgCount ++;
     totalBytes += env->getTotalsize();
 
-    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg, 0); 
+    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg,IS_MULTICAST);
     //Provide a dummy dest proc as it does not matter for mulitcast 
     //get rid of the new.
     cmsg->npes = CkNumPes();
@@ -402,6 +432,7 @@ void ComlibManager::multicast(void *msg) {
     ComlibPrintf("After multicast\n");
 }
 
+/*
 void ComlibManager::multicast(void *msg, int npes, int *pelist) {
     register envelope * env = UsrToEnv(msg);
     
@@ -414,7 +445,7 @@ void ComlibManager::multicast(void *msg, int npes, int *pelist) {
     totalMsgCount ++;
     totalBytes += env->getTotalsize();
 
-    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg, 0);
+    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg,IS_MULTICAST);
     cmsg->npes = npes;
     cmsg->pelist = pelist;
     //Provide a dummy dest proc as it does not matter for mulitcast 
@@ -431,6 +462,7 @@ void ComlibManager::multicast(void *msg, int npes, int *pelist) {
 
     ComlibPrintf("After multicast\n");
 }
+*/
 
 
 #include "qd.h"
@@ -439,6 +471,20 @@ void ComlibManager::multicast(void *msg, int npes, int *pelist) {
 void ComlibManager::GroupSend(int ep, void *msg, int onPE, CkGroupID gid){
     
     int dest_proc = onPE;
+    /*
+    if(curStratID != prevStratID && prioEndIterationFlag) {        
+        CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));
+        ComlibPrintf("[%d] Array Send calling prio end iteration\n", 
+                     CkMyPe());
+        PrioMsg *pmsg = new(8 * sizeof(int)) PrioMsg;
+        *(int *)CkPriorityPtr(pmsg) = -0x7FFFFFFF;
+        CkSetQueueing(pmsg, CK_QUEUEING_IFIFO);
+        cgproxy[CkMyPe()].prioEndIteration(pmsg);
+        prioEndIterationFlag = 0;
+    }        
+    prevStratID = curStratID;            
+    */
+
     ComlibPrintf("Send Data %d %d %d\n", CkMyPe(), dest_proc, 
                  UsrToEnv(msg)->getTotalsize());
 
@@ -468,6 +514,47 @@ void ComlibManager::GroupSend(int ep, void *msg, int onPE, CkGroupID gid){
     else {
         flushTable = 1;
         cmsg->next = NULL;
+        strategyTable[curStratID].tmplist.enq(cmsg);
+    }
+}
+
+void ComlibManager::ArraySectionSend(int ep, void *m, CkArrayID a, 
+                                     CkSectionID &s) {
+    ComlibPrintf("[%d] Array Section Send \n", CkMyPe());
+
+    register envelope * env = UsrToEnv(m);
+    env->array_mgr()=a;
+    env->array_srcPe()=CkMyPe();
+    env->array_ep()=ep;
+    env->array_hops()=0;
+    env->array_index()= dummyArrayIndex;
+    
+    CmiSetHandler(env, CpvAccess(RecvmsgHandle));
+    
+    env->setUsed(0);    
+    CkPackMessage(&env);
+    
+    totalMsgCount ++;
+    totalBytes += env->getTotalsize();
+
+    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)m, IS_MULTICAST); 
+    //Provide a dummy dest proc as it does not matter for mulitcast 
+    //get rid of the new.
+    cmsg->npes = 0;
+    cmsg->nIndices = s._nElems;
+    cmsg->indexlist = new CkArrayIndexMax[cmsg->nIndices];
+    memcpy(cmsg->indexlist, s._elems, s._nElems * sizeof(CkArrayIndexMax));
+
+    ((CkMcastBaseMsg *)m)->_cookie.type = COMMLIB_MULTICAST_MESSAGE;
+    ((CkMcastBaseMsg *)m)->_cookie.sInfo.cInfo.instId = curStratID;
+    ((CkMcastBaseMsg *)m)->_cookie.sInfo.cInfo.nIndices = 0;
+
+    if (receivedTable)
+	strategyTable[curStratID].strategy->insertMessage(cmsg);
+    else {
+        flushTable = 1;
+	cmsg->next = NULL;
+	ComlibPrintf("Enqueuing message in tmplist\n");
         strategyTable[curStratID].tmplist.enq(cmsg);
     }
 }
@@ -516,147 +603,118 @@ void ComlibManager::switchStrategy(int strat){
     //CkPrintf("Switching to %d\n", strat);
 }
 
-CharmMessageHolder::CharmMessageHolder(char * msg, int proc) {
-    data = (char *)UsrToEnv(msg);
-    dest_proc = proc;
-    isDummy = 0;
-}
 
-void CharmMessageHolder::init(char * root_msg) {
+ComlibMulticastMsg *ComlibManager::getPackedMulticastMessage(CharmMessageHolder *cmsg){
 
-    data = (char *)this + sizeof(CharmMessageHolder);
+    void *m = cmsg->getCharmMessage();
+    envelope *env = UsrToEnv(m);
     
-    register envelope * env = (envelope *)data;
-    CkUnpackMessage(&env);
+    CkPackMessage(&env);
+    m = EnvToUsr(env);
 
-    setRefcount(root_msg);
+    if(cmsg->nIndices > 0) {
+        int sizes[2];
+        sizes[0] = cmsg->nIndices;
+        sizes[1] = env->getTotalsize();                
+
+        ComlibPrintf("Creating new comlib multicast message %d, %d\n", sizes[0], sizes[1]);
+
+        ComlibMulticastMsg *msg = new(sizes, 0) ComlibMulticastMsg;
+        msg->size = sizes[1];
+        msg->_cookie.sInfo.cInfo =((CkMcastBaseMsg *)m)->_cookie.sInfo.cInfo;
+        msg->_cookie.sInfo.cInfo.nIndices = cmsg->nIndices;
+
+        memcpy(msg->indices, cmsg->indexlist, sizes[0] * sizeof(CkArrayIndexMax));
+        memcpy(msg->usrMsg, env, sizes[1] * sizeof(char));        
+        
+        envelope *newenv = UsrToEnv(msg);
+        
+        newenv->array_mgr() = env->array_mgr();
+        newenv->array_srcPe() = env->array_srcPe();
+        newenv->array_ep() = env->array_ep();
+        newenv->array_hops() = env->array_hops();
+        newenv->array_index() = env->array_index();
+
+        CkPackMessage(&newenv);        
+        return (ComlibMulticastMsg *)EnvToUsr(newenv);
+    }   
+    return NULL;
 }
 
-char * CharmMessageHolder::getCharmMessage(){
-    return (char *)EnvToUsr((envelope *) data);
-}
-
-void CharmMessageHolder::copy(char *buf){
-    *((CharmMessageHolder *)buf) = *this;
-    memcpy(buf + sizeof(CharmMessageHolder), data, ((envelope *)data)->getTotalsize());
-}
-
-int CharmMessageHolder::getSize(){
-    return sizeof(CharmMessageHolder) + ((envelope *)data)->getTotalsize();
-}
-
-#define REFFIELD(m) ((int *)((char *)(m)-sizeof(int)))[0]
-void CharmMessageHolder::setRefcount(char *msg){
-    char *env = (char *)UsrToEnv(msg);
-    int pref = REFFIELD(env);
-    int ref =  REFFIELD(data);
-    
-    while (pref < 0) {
-        env = env + pref;
-        pref =  REFFIELD(env);
-    }
-    
-    pref ++;
-    ref = (unsigned int)((char *) env - (char *) data);
-    
-    REFFIELD(data) = ref;
-    REFFIELD(env) = pref;    
-}
 
 /*
-void ComlibMsg::insert(CharmMessageHolder *msg){
-    nmessages ++;
-    
-    msg->copy(data + curSize);
-    curSize += msg->getSize();
-    //CkPrintf("CurSize = %d\n", curSize);
-}
-
-CharmMessageHolder * ComlibMsg::next(){
-    
-    if(nmessages == 0){
-        CkPrintf("ComlibMsg::next OVEFLOW\n");
-        return NULL;
-    }
-
-    nmessages --;
-    CharmMessageHolder *cmsg = (CharmMessageHolder *)(data + curSize);
-    
-    cmsg->init((char *) this);
-    curSize += cmsg->getSize();
-    return cmsg;
+void ComlibManager::prioEndIteration(PrioMsg *pmsg){
+    CkPrintf("[%d] In Prio End Iteration\n", CkMyPe());
+    setInstance(pmsg->instID);
+    endIteration();
+    delete pmsg;
 }
 */
 
-
-void StrategyWrapper::pup (PUP::er &p) {
-
-    //CkPrintf("In PUP of StrategyWrapper\n");
-
-    p | nstrats;
-    if(p.isUnpacking())
-	s_table = new Strategy * [nstrats];
-    
-    for(int count = 0; count < nstrats; count ++)
-        p | s_table[count];
+ComlibInstanceHandle ComlibRegisterStrategy(Strategy *s){
+    CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));    
+    ComlibInstanceHandle cinst;
+    cinst = (cgproxy.ckLocalBranch())->createInstance(s);
+    return cinst;
 }
 
-#include "ComlibModule.def.h"
+ComlibInstanceHandle ComlibRegisterStrategy(Strategy *s, CkArrayID aid){
+    s->setSourceArray(aid);
+    ComlibPrintf("Setting aid\n");
+
+    CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));    
+    ComlibInstanceHandle cinst;
+    cinst = (cgproxy.ckLocalBranch())->createInstance(s);
+    return cinst;
+}
+
+ComlibInstanceHandle ComlibRegisterStrategy(Strategy *s, CkGroupID gid){
+    s->setSourceGroup(gid);
+
+    CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));    
+    ComlibInstanceHandle cinst;
+    cinst = (cgproxy.ckLocalBranch())->createInstance(s);
+    return cinst;
+}
+
+void ComlibDelegateProxy(CProxy *proxy){
+    CProxy_ComlibManager cgproxy(CpvAccess(cmgrID));
+    proxy->ckDelegate(cgproxy.ckLocalBranch());
+}
+
+class ComlibManagerMain {
+public:
+    ComlibManagerMain(CkArgMsg *msg) {
+        CProxy_ComlibManager::ckNew();
+    }
+};
+
+ComlibInstanceHandle::ComlibInstanceHandle(){}
+ComlibInstanceHandle::ComlibInstanceHandle(int instid, CkGroupID dmid){
+    _instid = instid;
+    _dmid   = dmid;
+}
 
 /*
-void ComlibManager::receiveNamdMessage(ComlibMsg * msg){
-    CharmMessageHolder *cmsg = msg->next();
-    char *charm_msg = cmsg->getCharmMessage();
-
-    CkPrintf("In receive namd message\n");
-
-    while(charm_msg != NULL){
-        register envelope * env = UsrToEnv(charm_msg);
-        CkSendMsgBranch(env->getEpIdx(), charm_msg, cmsg->dest_proc, env->getGroupNum());
-
-        cmsg = msg->next();
-        charm_msg = cmsg->getCharmMessage();
-    }
-    
-    CkPrintf("After receive namd message\n");
-
-    delete msg;
-}
+ComlibInstanceHandle::ComlibInstanceHandle(ComlibInstanceHandle &that){
+    _instid = that._instid;
+    _dmid   = that._dmid;
+}        
 */
 
-/*
-void callNamdStrategy(){
-    if(strategy == NAMD_STRAT) {
-        // In the Namd Strategy half the messages are sent to a remote 
-        //processor and the remaining half are sent directly.
-        
-        CharmMessageHolder *cmsg = messageBuf;
-        envelope *env = (envelope *)cmsg->data;
-        for(int count = 0; count < elementCount/2; count ++) {
-            CkSendMsgBranch(env->getEpIdx(), cmsg->getCharmMessage(), 
-                            cmsg->dest_proc, env->getGroupNum());
-            cmsg = cmsg->next;
-        }
-        
-        CharmMessageHolder *tmpbuf = cmsg;
-        int tot_size = 0;
-        for(int count = elementCount/2; count < elementCount; count ++) {
-            tot_size += cmsg->getSize();
-            cmsg =  cmsg->next;
-        }
-        
-        ComlibMsg *newmsg = new(&tot_size, 0) ComlibMsg;
-        
-        cmsg = tmpbuf;
-        for(int count = elementCount/2; count < elementCount; count ++) {
-            newmsg->insert(cmsg);
-            delete tmpbuf;
-            cmsg = cmsg->next;
-            tmpbuf = cmsg;
-        }
-        
-        CProxy_ComlibManager cmgr(thisgroup);
-        cmgr[0].receiveNamdMessage(newmsg); // yet to decide!
-    }
+void ComlibInstanceHandle::beginIteration() { 
+    CProxy_ComlibManager cgproxy(_dmid);
+    (cgproxy.ckLocalBranch())->setInstance(_instid);
+    (cgproxy.ckLocalBranch())->beginIteration();
 }
-*/
+
+void ComlibInstanceHandle::endIteration() {
+    CProxy_ComlibManager cgproxy(_dmid);
+    (cgproxy.ckLocalBranch())->endIteration();
+}
+
+CkGroupID ComlibInstanceHandle::getComlibManagerID() {return _dmid;}    
+
+#include "commlib.def.h"
+
+

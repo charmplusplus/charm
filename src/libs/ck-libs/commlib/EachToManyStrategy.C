@@ -100,7 +100,7 @@ void EachToManyStrategy::doneInserting(){
     //ComlibPrintf("%d:Setting Num Deposit to %d\n", CkMyPe(), messageCount);
 
     if((messageBuf->length() == 0) && (CkNumPes() > 0)) {
-        DummyMsg * dummymsg = new DummyMsg;
+        ComlibDummyMsg * dummymsg = new ComlibDummyMsg;
         
         ComlibPrintf("Creating a dummy message\n");
         
