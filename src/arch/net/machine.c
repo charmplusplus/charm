@@ -170,9 +170,9 @@
  *
  ****************************************************************************/
 
-/* About CMK_TRUECRASH:  
+/* About +truecrash (Cmi_truecrash=1):  
    When debugging Charm++/Converse, CmiAbort is your enemy.
-   Uncommenting the define below will cause the program to crash where the 
+   +truecrash command-line option will cause the program to crash where the 
    problem occurs instead of calling host_abort which lets the program 
    exit gracefully and lose all the debugging info... */
 
@@ -478,15 +478,17 @@ void PCQueuePush(PCQueue Q, char *data)
  *
  ************************************************************************/
 
+static int    Cmi_truecrash;
+
 void CmiAbort(const char *message)
 {
-#if CMK_TRUECRASH
-  CmiPrintf("%s", message);
-  *(int *)NULL = 0; /*Write to null, causing bus error*/
-#else
-  charmrun_abort(message);
-  machine_exit(1);
-#endif
+  if(Cmi_truecrash) {
+    CmiPrintf("%s", message);
+    *(int *)NULL = 0; /*Write to null, causing bus error*/
+  } else {
+    charmrun_abort(message);
+    machine_exit(1);
+  }
 }
 
 
@@ -2455,23 +2457,23 @@ static void exitDelay(void)
 
 static void set_signals(void)
 {
-#if !CMK_TRUECRASH
-  signal(SIGSEGV, KillOnAllSigs);
-  signal(SIGFPE, KillOnAllSigs);
-  signal(SIGILL, KillOnAllSigs);
-  signal(SIGINT, KillOnAllSigs);
-  signal(SIGTERM, KillOnAllSigs);
-  signal(SIGABRT, KillOnAllSigs);
-#  if !defined(_WIN32) || defined(__CYGWIN__) /*UNIX-only signals*/
-  signal(SIGQUIT, KillOnAllSigs);
-  signal(SIGBUS, KillOnAllSigs);
-  signal(SIGPIPE, KillOnSIGPIPE);
-#    if CMK_HANDLE_SIGUSR
-  signal(SIGUSR1, HandleUserSignals);
-  signal(SIGUSR2, HandleUserSignals);
-#    endif
-#  endif /*UNIX*/
-#endif /*CMK_TRUECRASH*/
+  if(!Cmi_truecrash) {
+    signal(SIGSEGV, KillOnAllSigs);
+    signal(SIGFPE, KillOnAllSigs);
+    signal(SIGILL, KillOnAllSigs);
+    signal(SIGINT, KillOnAllSigs);
+    signal(SIGTERM, KillOnAllSigs);
+    signal(SIGABRT, KillOnAllSigs);
+#   if !defined(_WIN32) || defined(__CYGWIN__) /*UNIX-only signals*/
+    signal(SIGQUIT, KillOnAllSigs);
+    signal(SIGBUS, KillOnAllSigs);
+    signal(SIGPIPE, KillOnSIGPIPE);
+#     if CMK_HANDLE_SIGUSR
+    signal(SIGUSR1, HandleUserSignals);
+    signal(SIGUSR2, HandleUserSignals);
+#     endif
+#   endif /*UNIX*/
+  }
 }
 
 /*Socket idle function to use before addresses have been
@@ -2495,6 +2497,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #else
   Cmi_idlepoll = 1;
 #endif
+  Cmi_truecrash = 0;
+  if (CmiGetArgFlag(argv,"+truecrash")) Cmi_truecrash = 1;
     /* netpoll disable signal */
   if (CmiGetArgFlag(argv,"+netpoll")) Cmi_netpoll = 1;
     /* idlepoll use poll instead if sleep when idle */

@@ -209,12 +209,6 @@ debugging tols such as purify are incompatible with Converse's default
 user-level threads. The implementation based on posix threads can be used for
 memory debugging with purify.
 
-CMK_TRUECRASH: The net-* version of Converse trap a number of signals such as
-SIGSEGV and SIGBUS to gracefully handle premature termination of Converse
-programs. The downside to this is that these signals do not produce core dumps
-for post-mortem debugging. Setting CMK_TRUECRASH to 1 while building
-Converse/Charm++ on these machines allows core dumps to be produced on abnormal
-terminations.
 
 BUILDING A PROGRAM
 ==================
@@ -269,6 +263,15 @@ To use this option, just type:
      > ./charmrun ++local ./pgm 12 100 +p2
 
 However, for best performance, you should launch one node program per processor.
+
+Commandline Options:
+
++truecrash: The net-* version of Converse trap a number of signals such as
+SIGSEGV and SIGBUS to gracefully handle premature termination of Converse
+programs. The downside to this is that these signals do not produce core dumps
+for post-mortem debugging. Specifying +truecrash while running
+Converse/Charm++ programs on these machines allows core dumps to be produced 
+on abnormal terminations.
 
 For more detailed information, please check the "INSTALLATION MANUAL" and "RUN MANUAL" under doc/install.
 
