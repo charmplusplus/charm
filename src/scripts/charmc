@@ -1063,10 +1063,12 @@ MakeSO() {
 	Do_res=$?
 	if [ $Do_res -ne 0 ] 
 	then
-	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-	echo "!!      Failed to compile Charm++ shared library               !!"
-	echo "!!      compile Charm++ again with -no-build-shared option     !!"
-	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	echo "!!  Failed to compile Charm++ shared library. You can disable shared  !!"
+	echo "!!  lib compilation by providing --no-build-shared build option like: !!"
+	echo "!!     ./build charm++ net-linux --no-build-shared -O                 !!"
+	echo "!!  or reexecute this charmc command with -nobs compile option        !!"
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 	Abort "Command $soCmd returned error code $Do_res"
 	fi
 	Copyobj
