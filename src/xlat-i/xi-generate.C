@@ -220,7 +220,7 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
 
   /* for allocked MsgTypes output the pack - unpack stub functions */
   for ( m=thismodule->messages; m!=NULL; m=m->next ) {
-    if ( !m->packable )
+    if ( !m->allocked )
       continue ;
     sprintf(str,
     "static void *_CK_alloc_%s(int msgno, int size, int *array, int prio)\n{\n",
