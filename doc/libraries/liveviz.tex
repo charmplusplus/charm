@@ -1,36 +1,42 @@
 \section{Introduction}
 
-If array elements compute a small piece of a large 2D-image, then these 
-chucks can be combined to form one large image using liveViz. In other 
-words, liveViz is a reducer for 2D-image data, which combines small chunks
+If array elements compute a small piece of a large 2D image, then these 
+image chunks can be combined across processors to form one large 
+image using the liveViz library. In other 
+words, liveViz provides a way to reduce 2D-image data, which 
+combines small chunks
  of images deposited by chares into one large image.
 
-This visualization library follows client server model, i.e. image 
-assembly is done on server side and final image can be viewed using 
-liveViz client avaliable at:
+This visualization library follows the client server model.
+The server, a parallel Charm++ program, does all image assembly, 
+and opens a network (CCS) socket which clients use to request and 
+download images.  The client is a small Java program.
+A typical use of this is:
 \begin{alltt}
-           .../charm/pgms/charm++/ccs/liveViz/client
+	cd charm/pgms/charm++/ccs/liveViz/server
+	make
+	./charmrun ./pgm +p2 ++server ++server-port 1234 &
+	~/charm/bin/liveViz localhost 1234
 \end{alltt}
 
-A sample liveViz server example is available at:
-\begin{alltt}
-           .../charm/pgms/charm++/ccs/liveViz/server
-\end{alltt}
+
 
 \section{How to use liveViz with \charmpp{} program}
 
-A program must provide a chare array with one entry fuction having 
-following prototype:
+The liveViz routines are in the Charm++ header ``liveViz.h''.
+
+A typical program provides a chare array with one entry method 
+with the following prototype:
 
 \begin{alltt}
-  void functionName (liveVizRequestMsg *m)
+  entry void functionName(liveVizRequestMsg *m);
 \end{alltt}
 
 This entry method is supposed to deposit its (array element's) chunk of 
-image. This entry method has following structure:
+the image. This entry method has following structure:
 
 \begin{alltt}
-  void functionName (liveVizRequestMsg *m)
+  void myArray::functionName (liveVizRequestMsg *m)
   \{
     // prepare image chunk
        ...
@@ -41,73 +47,141 @@ image. This entry method has following structure:
   \}
 \end{alltt}
 
-To know the width and height of image data m->req.wid and m->req.ht can 
-be used, here 'm' is the pointer to 'liveVizRequestMsg'. 
+Here, ``width'' and ``height'' are the size, in pixels, of this array
+element's portion of the image, contributed in ``imageBuff'' (described below).
+This will show up on the client's assembled image at 0-based pixel
+(startX,startY).  The client's display width and height are stored
+in m->req.wid and m->req.ht.
 
 By default liveViz combines image chunks by doing a saturating sum of 
 overlapping pixel values. If you want liveViz to combine image chunks by using 
 max (i.e. for overlapping pixels in deposited image chunks, final image will 
 have the pixel with highest intensity or in other words largest value), you need
-to pass one more parameter (reducerType) to 'liveVizDeposit' function.
+to pass one more parameter (liveVizCombine\_t) to the ``liveVizDeposit'' function:
 
 \begin{alltt}
- > liveVizDeposit (m, startX, startY, width, height, imageBuff, this, 
+ liveVizDeposit (m, startX, startY, width, height, imageBuff, this, 
                    max\_image\_data);
 \end{alltt}
 
-For this to compile, you must declare 
+You can also reduce floating-point image data using
+ sum\_float\_image\_data or max\_float\_image\_data.
 
-\begin{alltt}
- > extern CkReduction::reducerType max\_image\_data;
-\end{alltt}
 
 \section{Format of deposit image}
 
-'imageBuff' is run of bytes representing image.This buffer represents image in 
-row-major format. if image is gray-scale each byte represents one pixel 
-otherwise 3 consecutive bytes (starting at array index which is a multiple of 3)
- represents a pixel.
+``imageBuff'' is run of bytes representing a rectangular portion
+of the image.  This buffer represents image using a row-major format,
+so 0-based pixel (x,y) (x increasing to the right, y increasing downward
+in typical graphics fashion) is stored at array offset ``x+y*width''.
+
+If the image is gray-scale (as determined by liveVizConfig, below), each pixel
+is represented by one byte.  If the image is color, each pixel is represented
+by 3 consecutive bytes representing red, green, and blue intensity.
+
+If the image is floating-point, each pixel is represented by a single
+`float', and after assembly colorized by calling the user-provided
+routine below.  This routine converts fully assembled `float' pixels 
+to RGB 3-byte pixels, and is called only on processor 0 after each
+client request.
+
+\begin{alltt}
+extern "C"
+void liveVizFloatToRGB(liveVizRequest &req, 
+        const float *floatSrc, unsigned char *destRgb,
+        int nPixels);
+\end{alltt}
+
 
 \section{liveViz Initialization}
 
 liveViz library needs to be initialized before it can be used for 
-visualization. For initialization follow the following steps:
-\begin{itemize}
-\item create the chare array (array proxy object 'a') with the entry 
-      method 'functionName' (described above).
-\item create a CkCallback object ('c'), specifying 'functionName' as the 
-      callback function.
-\item create a liveVizConfig object ('cfg'). if image to be deposited is color 
-      image (3 bytes per pixel) then liveVizConfig object need to be initialized
-      as:
-\begin{alltt}
-          liveVizConfig cfg (true);// first parameter specifies color/gray-scale
-                                   // image
-\end{alltt}
+visualization. For initialization follow the following steps
+from your main chare:
 
-\item call liveVizInit (cfg, a, c)
+\begin{enumerate}
+\item Create your chare array (array proxy object 'a') with the entry 
+      method 'functionName' (described above).
+\item Create a CkCallback object ('c'), specifying 'functionName' as the 
+      callback function.  This callback will be invoked whenever the
+      client requests a new image.
+\item Create a liveVizConfig object ('cfg').  LiveVizConfig takes a number
+     of parameters, as described below.
+\item Call liveVizInit (cfg, a, c).
+\end{enumerate}
+
+The liveVizConfig parameters are:
+\begin{itemize}
+  \item The first parameter is the pixel type to be reduced:
+     \begin{itemize}
+       \item ``false'' or liveVizConfig::pix\_greyscale means a greyscale image (1 byte per pixel).
+       \item ``true'' or liveVizConfig::pix\_color means a color image (3 RGB bytes per pixel).
+       \item liveVizConfig::pix\_float means a floating-point color image (1 float per pixel, can only be used with sum\_float\_image\_data or max\_float\_image\_data).
+     \end{itemize}
+   \item The second parameter is the flag ``serverPush'', which means:
+      \begin{itemize}
+     	\item serverPush==false: Client only sends request when client view changes or image is resized.
+     	\item serverPush==true: Client will repeatedly request new images from the server.
+      \end{itemize}
+   \item The third parameter is an optional 3D bounding box (type CkBbox3d).  If present, this puts the client into a 3D visualization mode.
 \end{itemize}
+
+A typical 2D, RGB, non-push call to liveVizConfig looks like this:
+\begin{alltt}
+   liveVizConfig cfg(true,false);
+\end{alltt}
 
 \section{Compilation}
 
-\charmpp{} program using liveViz must be linked with '-module liveViz'. Before
-compiling liveViz program, liveViz library needs to be compiled. To compile
-liveViz library:
+A \charmpp{} program that uses liveViz must be linked with '-module liveViz'. 
+
+Before compiling a liveViz program, the liveViz library may need to be compiled. 
+To compile the liveViz library:
 \begin{itemize}
 \item go to .../charm/tmp/libs/ck-libs/liveViz
 \item make
 \end{itemize}
 
-\section{Extensions}
 
-In above example, liveViz client repeated (or once) asks for image, getting
-this request liveViz library asks array elements for image chunks, combines
-image chunks and sends the image to client.
+\section{Poll Mode}
 
-There is another method by which server sends image to client (whether it
-requested it or not). Fot this mode, second parameter passed to liveVizConfig
-constructor must be true. Further details on how to use this mode will be
-updated soon.
+Because liveVizDeposit, above, performs its image reduction over your array, 
+you must ensure that your own reductions are not interleaved with the 
+liveVizDeposits.  This is trivial if your program performs no reductions,
+but if you do reductions you must somehow prevent this interleaving.
+One method to do this is to buffer the liveViz request message until 
+you can handle it safely.  Another method is to use liveVizPoll,
+which creates a separate ``shadow'' array that liveViz uses to do
+its reductions.
 
-For 3-d images, third parameter to liveVizConfig constructor needs to be
-'true'. Further details for this also will be updated soon. 
+liveVizPoll must get control during the creation of your array,
+so you call liveVizPollInit with a liveVizConfig object (just like
+liveVizInit) and a CkArrayOptions object, like:
+
+\begin{alltt}
+        CkArrayOptions opts(nElements);
+        liveVizPollInit(cfg,opts);
+        CProxy_myArr arr=CProxy_myArr::ckNew(opts);
+\end{alltt}
+
+You get requests from liveVizPoll in a polling fashion.
+The routine ``liveVizPoll'' returns a liveVizPollRequestMsg
+if one is available.  If a non-NULL message is returned, you
+must then call liveVizPollDeposit and repeat the call.
+
+An idiomatic use of these routines is:
+\begin{alltt}
+	... in some user compute routine ...
+        timestep++;
+        liveVizPollRequestMsg *req;
+        while (NULL!=(req=liveVizPoll(this,timestep))) {
+                //...prepare image for request...
+                liveVizPollDeposit(this,timestep,req,
+                        startx,starty,sizex,sizey,img);
+        }
+\end{alltt}
+
+A sample liveVizPoll server example is available at:
+\begin{alltt}
+           .../charm/pgms/charm++/ccs/liveViz/pollserver
+\end{alltt}
