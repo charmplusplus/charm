@@ -128,6 +128,10 @@ int event, pe;
 	/*************************************************/
 	switch (type)
 	{
+        case USER_EVENT:
+                fprintf(fp, "%d %u %d %d", mtype, time, event, pe);
+                break;
+
 	case CREATION:
 	case BEGIN_PROCESSING:
 	case END_PROCESSING:

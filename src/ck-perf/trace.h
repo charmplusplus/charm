@@ -10,6 +10,7 @@
 #define  INSERT				10
 #define  DELETE 			11
 #define  FIND			    12
+#define  USER_EVENT                 13
 
 
 #define  NUMBER_DISPLAYS	7

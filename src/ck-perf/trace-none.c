@@ -8,6 +8,9 @@ program_name(s,m) char *s, *m; {}
 
 log_init() {CpvAccess(RecdTraceMsg) = 1;}
 
+trace_user_event(int eventNum)
+{}
+
 trace_creation(msg_type,entry,envelope)
 int msg_type, entry;
 void *envelope;

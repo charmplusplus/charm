@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.8  1996-03-28 14:45:11  kale
+ * Revision 2.9  1997-08-22 19:29:07  milind
+ * Added user-event tracing.
+ *
+ * Revision 2.8  1996/03/28 14:45:11  kale
  * added registration of threaded  entry points.
  *
  * Revision 2.7  1995/10/11 17:52:51  sanjeev
@@ -71,6 +74,7 @@ CpvDeclare(int, chareCount);
 CpvDeclare(int, pseudoCount);
 CpvDeclare(int, readCount);
 CpvDeclare(int, readMsgCount);
+CpvDeclare(int, eventCount);
 
 
 void registerModuleInit()
@@ -82,6 +86,7 @@ void registerModuleInit()
      CpvInitialize(int, pseudoCount);
      CpvInitialize(int, readCount);
      CpvInitialize(int, readMsgCount);
+     CpvInitialize(int, eventCount);
 
      CpvAccess(fnCount) = 0;
      CpvAccess(chareEpsCount) = 0;
@@ -90,8 +95,17 @@ void registerModuleInit()
      CpvAccess(pseudoCount) = 0;
      CpvAccess(readCount) = 0;
      CpvAccess(readMsgCount) = 0;
+     CpvAccess(eventCount) = 0;
 }
 
+
+int registerEvent(name)
+char *name;
+{
+  CsvAccess(EventTable)[CpvAccess(eventCount)] = name;
+  CpvAccess(eventCount) ++ ;
+  return(CpvAccess(eventCount)-1) ;
+}
 
 int registerMsg(name,allocf,packf,unpackf,size)
 char *name;

@@ -35,6 +35,7 @@ CpvDeclare(FILE*,state_file_fd);
 
 CpvExtern(int,chareCount);
 CpvExtern(int,pseudoCount);
+CpvExtern(int,eventCount);
 CpvExtern(int,msgCount);
 CpvExtern(int, chareEpsCount);
 
@@ -88,6 +89,14 @@ char *str ;
 
 
 /**********All the trace functions *****************/
+trace_user_event(int eventNum)
+{
+    add_to_buffer(USER_EVENT, eventNum, -1,
+                            CkUTimer(), CpvAccess(current_event),
+                            CmiMyPe());
+    CpvAccess(current_event) += 1;
+}
+
 trace_creation(msg_type, entry, envelope)
 int msg_type, entry;
 ENVELOPE *envelope;
@@ -361,6 +370,9 @@ close_log()
 		fprintf(CpvAccess(state_file_fd), "TOTAL_PSEUDOS %d\n", 
 												CpvAccess(pseudoCount));
 
+		fprintf(CpvAccess(state_file_fd), "TOTAL_EVENTS %d\n", 
+												CpvAccess(eventCount));
+
 		/* first 3 chares are NULLCHARE, CkChare_ACC, CkChare_MONO */
 		for (i=0; i<CpvAccess(chareCount); i++)
 			fprintf(CpvAccess(state_file_fd), "CHARE %d %s\n", i, 
@@ -390,6 +402,9 @@ close_log()
                					i, CsvAccess(PseudoTable)[i].type,
 								CsvAccess(PseudoTable)[i].name);
 
+   		for (i=0; i<CpvAccess(eventCount); i++)
+   			fprintf(CpvAccess(state_file_fd), "EVENT %d %s\n",
+               					i, CsvAccess(EventTable)[i]);
 
    		fprintf(CpvAccess(state_file_fd), "END\n");
 		fflush(CpvAccess(state_file_fd));

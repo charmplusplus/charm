@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.45  1997-07-30 17:30:59  jyelon
+ * Revision 2.46  1997-08-22 19:29:06  milind
+ * Added user-event tracing.
+ *
+ * Revision 2.45  1997/07/30 17:30:59  jyelon
  * *** empty log message ***
  *
  * Revision 2.44  1997/07/26 16:41:14  jyelon
@@ -759,6 +762,7 @@ InitializeEPTables()
   int             TotalModules;
   int             TotalReadMsgs;
   int             TotalPseudos;
+  int             TotalEvents;
   EP_STRUCT      *epinfo;
   
   /*
@@ -774,6 +778,7 @@ InitializeEPTables()
   TotalModules = TABLE_SIZE;
   TotalReadMsgs = TABLE_SIZE;
   TotalPseudos = TABLE_SIZE;
+  TotalEvents = TABLE_SIZE;
   
   /*
    * this table is used to store all ReadOnly Messages on processors
@@ -832,6 +837,8 @@ InitializeEPTables()
       CkMemError(CsvAccess(ChareNamesTable));
     }
   
+  CsvAccess(EventTable) = (char **) CmiSvAlloc(TotalEvents * sizeof(char *));
+
   CsvAccess(PseudoTable) = (PSEUDO_STRUCT *) 
     CmiSvAlloc((TotalPseudos + 1) * sizeof(PSEUDO_STRUCT));
   

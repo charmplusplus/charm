@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.14  1997-07-18 21:21:05  milind
+ * Revision 2.15  1997-08-22 19:29:04  milind
+ * Added user-event tracing.
+ *
+ * Revision 2.14  1997/07/18 21:21:05  milind
  * all files of the form perf-*.c have been changed to trace-*.c, with
  * name expansions. For example, perf-proj.c has been changed to
  * trace-projections.c.
@@ -130,6 +133,7 @@ CsvDeclare(FUNCTION_PTR*, ROCopyToBufferTable);
 CsvDeclare(EP_STRUCT*, EpInfoTable);
 CsvDeclare(MSG_STRUCT*, MsgToStructTable);
 CsvDeclare(PSEUDO_STRUCT*, PseudoTable);
+CsvDeclare(char**, EventTable);
 CsvDeclare(int*, ChareSizesTable);
 CsvDeclare(char**, ChareNamesTable);
 
