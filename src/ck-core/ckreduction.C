@@ -489,32 +489,32 @@ CkReductionMsg* CkReductionMgr::pupCkReductionMsg(CkReductionMsg *m, PUP::er &p)
 }
 
 //pack-unpack method for reduction message vector
-void CkReductionMgr::pupMsgVector(CkVec<CkReductionMsg *> &msgs, PUP::er &p)
+void CkReductionMgr::pupMsgVector(CkVec<CkReductionMsg *> &_msgs, PUP::er &p)
 {
   int nMsgs;
   CkReductionMsg *m;
 
-  if (p.isPacking()) nMsgs = msgs.length();
+  if (p.isPacking()) nMsgs = _msgs.length();
   p(nMsgs);
 
   for(int i = 0; i < nMsgs; i++) {
-  m = p.isPacking() ? msgs[i] : 0;
-  msgs.insert(i, pupCkReductionMsg(m, p));
+    m = p.isPacking() ? _msgs[i] : 0;
+    _msgs.insert(i, pupCkReductionMsg(m, p));
   }
 }
 
 //pack-unpack method for reduction message Qs
-void CkReductionMgr::pupMsgQ(CkQ<CkReductionMsg *> &msgs, PUP::er &p)
+void CkReductionMgr::pupMsgQ(CkQ<CkReductionMsg *> &_msgs, PUP::er &p)
 {
   int nMsgs;
   CkReductionMsg *m;
 
-  if (p.isPacking()) nMsgs = msgs.length();
+  if (p.isPacking()) nMsgs = _msgs.length();
   p(nMsgs);
 
   for(int i = 0; i < nMsgs; i++) {
-  m = p.isPacking() ? msgs.deq() : 0;
-  msgs.enq(pupCkReductionMsg(m, p));
+    m = p.isPacking() ? _msgs.deq() : 0;
+    _msgs.enq(pupCkReductionMsg(m, p));
   }
 }
 
