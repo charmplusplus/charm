@@ -603,7 +603,7 @@ private:
 
 //Spring cleaning
   void springCleaning(void);
-  static void staticSpringCleaning(void *forWhom);
+  static void staticSpringCleaning(void *forWhom,double curWallTime);
 
 //ArrayListeners:
 //Iterate over the CkArrayListeners in this vector, calling "inside" each time.

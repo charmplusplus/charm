@@ -547,7 +547,7 @@ static void CommunicationsClockCaller(void *ignored)
   CmiCommLock();
   CommunicationsClock();
   CmiCommUnlock();
-  CcdCallFnAfter(CommunicationsClockCaller,NULL,Cmi_comm_clock_delay);  
+  CcdCallFnAfter((CcdVoidFn)CommunicationsClockCaller,NULL,Cmi_comm_clock_delay);  
 }
 
 static void CommunicationPeriodic(void) 
@@ -558,7 +558,7 @@ static void CommunicationPeriodic(void)
 static void CommunicationPeriodicCaller(void *ignored)
 {
   CommunicationPeriodic();
-  CcdCallFnAfter(CommunicationPeriodicCaller,NULL,Cmi_comm_periodic_delay);
+  CcdCallFnAfter((CcdVoidFn)CommunicationPeriodicCaller,NULL,Cmi_comm_periodic_delay);
 }
 #endif
 

@@ -7,7 +7,7 @@
 
 static NodeMulticast *nm_mgr;
 
-static void call_doneInserting(void *ptr){
+static void call_doneInserting(void *ptr,double curWallTime){
     NodeMulticast *mgr = (NodeMulticast *)ptr;
     mgr->doneInserting();
 }
@@ -258,7 +258,7 @@ void NodeMulticast::doneInserting(){
             prevCount ++;
             if((prevCount % MAX_SENDS_PER_BATCH == 0) &&
                (prevCount != numNodes)) {
-                CcdCallFnAfter(call_doneInserting, (void *)this, 
+                CcdCallFnAfter((CcdVoidFn)call_doneInserting, (void *)this, 
                                MULTICAST_DELAY);
                 return;
             }

@@ -13,28 +13,26 @@
 #include "LBMachineUtil.h"
 #include <stdlib.h>
 
-extern "C" void staticIdleStart(LBMachineUtil* obj)
+inline void LBMachineUtil::IdleStart(double curWallTime)
 {
-  obj->IdleStart();
+  start_idle = curWallTime;
 }
 
-extern "C" void staticIdleEnd(LBMachineUtil* obj)
-{
-  obj->IdleEnd();
-}
-
-
-void LBMachineUtil::IdleStart()
-{
-  start_idle = CmiWallTimer();
-}
-
-void LBMachineUtil::IdleEnd()
+inline void LBMachineUtil::IdleEnd(double curWallTime)
 {
   if (state == on) {
-    const double stop_idle = CmiWallTimer();
+    const double stop_idle = curWallTime;
     total_idletime += (stop_idle - start_idle);
   }
+}
+
+void LBMachineUtil::staticIdleStart(LBMachineUtil* obj,double curWallTime)
+{
+  obj->IdleStart(curWallTime);
+}
+void LBMachineUtil::staticIdleEnd(LBMachineUtil* obj,double curWallTime)
+{
+  obj->IdleEnd(curWallTime);
 }
 
 LBMachineUtil::LBMachineUtil()

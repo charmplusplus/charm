@@ -134,12 +134,12 @@ static int append_elem(ccd_cblist *l, CcdVoidFn fn, void *arg, int pe)
  * ignored. callbacks are kept in the list even after they are called.
  * Note: it is illegal to cancel callbacks from within ccd callbacks.
  */
-static void call_cblist_keep(ccd_cblist *l)
+static void call_cblist_keep(ccd_cblist *l,double curWallTime)
 {
   int i, len = l->len, idx;
   for(i=0, idx=l->first;i<len;i++) {
     int old = CmiSwitchToPE(l->elems[idx].cb.pe);
-    (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg);
+    (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg,curWallTime);
     CmiSwitchToPE(old);
     idx = l->elems[idx].next;
   }
@@ -150,20 +150,20 @@ static void call_cblist_keep(ccd_cblist *l)
  * ignored. callbacks are removed from the list after they are called.
  * Note: it is illegal to cancel callbacks from within ccd callbacks.
  */
-static void call_cblist_remove(ccd_cblist *l)
+static void call_cblist_remove(ccd_cblist *l,double curWallTime)
 {
   int i, len = l->len, idx;
 #if ! CMK_BLUEGENE_CHARM
   for(i=0, idx=l->first;i<len;i++) {
     int old = CmiSwitchToPE(l->elems[idx].cb.pe);
-    (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg);
+    (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg,curWallTime);
     CmiSwitchToPE(old);
     idx = l->elems[idx].next;
   }
 #else
   for(i=0, idx=l->last;i<len;i++) {
     int old = CmiSwitchToPE(l->elems[idx].cb.pe);
-    (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg);
+    (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg,curWallTime);
     CmiSwitchToPE(old);
     idx = l->elems[idx].prev;
   }
@@ -306,13 +306,13 @@ static void ccd_heap_remove(void)
 
 /* If any of the CallFnAfter functions can now be called, call them 
  */
-static void ccd_heap_update(double ctime)
+static void ccd_heap_update(double curWallTime)
 {
   ccd_heap_elem *h = CpvAccess(ccd_heap);
   ccd_heap_elem *e = h+CpvAccess(ccd_heapmaxlen);
   int i,ne=0;
   /* Pull out all expired heap entries */
-  while ((CpvAccess(ccd_heaplen)>0) && (h[1].time<ctime)) {
+  while ((CpvAccess(ccd_heaplen)>0) && (h[1].time<curWallTime)) {
     e[ne++]=h[1];
     ccd_heap_remove();
   }
@@ -326,12 +326,12 @@ static void ccd_heap_update(double ctime)
       ccd_heap_elem *e = h+CpvAccess(ccd_heapmaxlen);
 */
       int old = CmiSwitchToPE(e[i].cb.pe);
-      (*(e[i].cb.fn))(e[i].cb.arg);
+      (*(e[i].cb.fn))(e[i].cb.arg,curWallTime);
       CmiSwitchToPE(old);
   }
 }
 
-void CcdCallBacksReset(void *ignored);
+void CcdCallBacksReset(void *ignored,double curWallTime);
 
 void CcdModuleInit(void)
 {
@@ -415,8 +415,9 @@ void CcdCallFnAfter(CcdVoidFn fnp, void *arg, unsigned int deltaT)
  */
 void CcdRaiseCondition(int condnum)
 {
-  call_cblist_remove(&(CpvAccess(conds).condcb[condnum]));
-  call_cblist_keep(&(CpvAccess(conds).condcb_keep[condnum]));
+  double curWallTime=CmiWallTimer();
+  call_cblist_remove(&(CpvAccess(conds).condcb[condnum]),curWallTime);
+  call_cblist_keep(&(CpvAccess(conds).condcb_keep[condnum]),curWallTime);
 }
 
 /* call functions to be called periodically, and also the time-indexed
@@ -428,12 +429,12 @@ void CcdCallBacks(void)
   ccd_periodic_callbacks *o=&CpvAccess(pcb);
   
   /* Figure out how many times to skip Ccd processing */
-  double currTime = CmiWallTimer();
+  double curWallTime = CmiWallTimer();
 
   unsigned int nSkip=o->nSkip;
 #if 1
 /* Dynamically adjust the number of messages to skip */
-  double elapsed = currTime - o->lastCheck;
+  double elapsed = curWallTime - o->lastCheck;
 #define targetElapsed 5.0e-3
   if (elapsed<targetElapsed) nSkip*=2; /* too short: process more */
   else /* elapsed>targetElapsed */ nSkip/=2; /* too long: process fewer */
@@ -449,14 +450,14 @@ void CcdCallBacks(void)
 #endif
 
   CpvAccess(_ccd_numchecks)=o->nSkip=nSkip;
-  o->lastCheck=currTime;
+  o->lastCheck=curWallTime;
   
-  ccd_heap_update(currTime);
+  ccd_heap_update(curWallTime);
   
   for (i=0;i<CCD_PERIODIC_MAX;i++) 
-    if (o->nextCall[i]<=currTime) {
+    if (o->nextCall[i]<=curWallTime) {
       CcdRaiseCondition(CcdPERIODIC+i);
-      o->nextCall[i]=currTime+periodicCallInterval[i];
+      o->nextCall[i]=curWallTime+periodicCallInterval[i];
     }
     else 
       break; /*<- because intervals are multiples of one another*/
@@ -464,12 +465,11 @@ void CcdCallBacks(void)
 
 /*Called when something drastic changes-- restart ccd_num_checks
 */
-void CcdCallBacksReset(void *ignored)
+void CcdCallBacksReset(void *ignored,double curWallTime)
 {
   ccd_periodic_callbacks *o=&CpvAccess(pcb);
-  double currTime=CmiWallTimer();
   CpvAccess(_ccd_numchecks)=o->nSkip=1;
-  o->lastCheck=currTime;
+  o->lastCheck=curWallTime;
 }
 
 

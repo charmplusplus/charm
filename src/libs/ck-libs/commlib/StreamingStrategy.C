@@ -78,7 +78,7 @@ void StreamingStrategy::periodicFlush(){
 }
 
 /// This routine is called via CcdCallFnAfter to flush all messages:
-static void call_delayFlush(void *arg){
+static void call_delayFlush(void *arg,double curWallTime){
     StreamingStrategy *s=(StreamingStrategy *)arg;
     s->periodicFlush();
     s->registerFlush(); //Set ourselves up to be called again
@@ -86,11 +86,11 @@ static void call_delayFlush(void *arg){
 
 void StreamingStrategy::registerFlush(void) {
     // CkPrintf("[%d] Will call function again every %d ms\n",CkMyPe(),PERIOD);
-    CcdCallFnAfter(call_delayFlush, (void *)this, PERIOD);
+    CcdCallFnAfter((CcdVoidFn)call_delayFlush, (void *)this, PERIOD);
 }
 
 /// This routine is called via CcdCallOnCondition to flush all messages:
-static void call_idleFlush(void *arg){
+static void call_idleFlush(void *arg,double curWallTime){
     StreamingStrategy *s=(StreamingStrategy *)arg;
     s->periodicFlush();
 }
@@ -98,7 +98,7 @@ static void call_idleFlush(void *arg){
 // When we're finally ready to go, register for timeout and idle flush.
 void StreamingStrategy::beginProcessing(int ignored) {
     registerFlush();
-    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,call_idleFlush,
+    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)call_idleFlush,
                            (void *)this);
 }
 

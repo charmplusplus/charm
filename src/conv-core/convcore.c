@@ -1945,7 +1945,7 @@ typedef struct {
   int call_count;/*Number of timeout calls currently in flight*/
 } cmi_cpu_idlerec;
 
-static void on_timeout(cmi_cpu_idlerec *rec)
+static void on_timeout(cmi_cpu_idlerec *rec,double curWallTime)
 {
   rec->call_count--;
   if(rec->call_count==0 && rec->is_idle==1) {
@@ -1953,13 +1953,13 @@ static void on_timeout(cmi_cpu_idlerec *rec)
     CmiAbort("Exiting.\n");
   }
 }
-static void on_idle(cmi_cpu_idlerec *rec)
+static void on_idle(cmi_cpu_idlerec *rec,double curWallTime)
 {
   CcdCallFnAfter((CcdVoidFn)on_timeout, rec, rec->idle_timeout);
   rec->call_count++; /*Keeps track of overlapping timeout calls.*/  
   rec->is_idle = 1;
 }
-static void on_busy(cmi_cpu_idlerec *rec)
+static void on_busy(cmi_cpu_idlerec *rec,double curWallTime)
 {
   rec->is_idle = 0;
 }

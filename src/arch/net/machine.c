@@ -949,7 +949,7 @@ static void pingCharmrun(void *ignored)
 static void pingCharmrunPeriodic(void *ignored)
 {
   pingCharmrun(ignored);
-  CcdCallFnAfter(pingCharmrunPeriodic,NULL,1000);
+  CcdCallFnAfter((CcdVoidFn)pingCharmrunPeriodic,NULL,1000);
 }
 
 static int ignore_further_errors(int c,const char *msg) {machine_exit(2);return -1;}
@@ -1852,7 +1852,7 @@ static void ConverseRunPE(int everReturn)
 #if CMK_SHARED_VARS_UNAVAILABLE
     if (Cmi_netpoll == 1) {
     /* gm cannot live with setitimer */
-    CcdCallFnAfter(pingCharmrunPeriodic,NULL,1000);
+    CcdCallFnAfter((CcdVoidFn)pingCharmrunPeriodic,NULL,1000);
     }
     else {
     /*Occasionally ping charmrun, to test if it's dead*/
@@ -1868,7 +1868,7 @@ static void ConverseRunPE(int everReturn)
 #if ! CMK_USE_GM && ! CMK_USE_TCP
     /*Occasionally check for retransmissions, outgoing acks, etc.*/
     /*no need in GM case */
-    CcdCallFnAfter(CommunicationsClockCaller,NULL,Cmi_comm_clock_delay);
+    CcdCallFnAfter((CcdVoidFn)CommunicationsClockCaller,NULL,Cmi_comm_clock_delay);
 #endif
 #endif
     

@@ -1055,7 +1055,7 @@ inline void CkLocMgr::springCleaning(void)
   }
   delete it;
 }
-void CkLocMgr::staticSpringCleaning(void *forWhom) {
+void CkLocMgr::staticSpringCleaning(void *forWhom,double curWallTime) {
 	DEBK((AA"Starting spring cleaning at %.2f\n"AB,CkWallTimer()));
 	((CkLocMgr *)forWhom)->springCleaning();
 }

@@ -23,9 +23,7 @@ public:
   void Clear();
   void TotalTime(double* walltime, double* cputime);
   void IdleTime(double* walltime) { *walltime = total_idletime; };
-  void IdleStart();
-  void IdleEnd();
-  
+
 private:
   enum { off, on } state;
   double total_walltime;
@@ -36,6 +34,11 @@ private:
   double start_idle;
 
   int cancel_idleStart, cancel_idleEnd;
+
+  void IdleStart(double curWallTime);
+  void IdleEnd(double curWallTime);
+  static void staticIdleStart(LBMachineUtil *util,double curWallTime);
+  static void staticIdleEnd(LBMachineUtil *util,double curWallTime);
 };
 
 #endif  // _LDMACHINEUTIL_H_

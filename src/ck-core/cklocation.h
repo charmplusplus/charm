@@ -621,7 +621,7 @@ private:
 	CmiBool duringMigration;
 
 	//Occasionally clear out stale remote pointers
-	static void staticSpringCleaning(void *mgr);
+	static void staticSpringCleaning(void *mgr,double curWallTime);
 	void springCleaning(void);
 	int nSprings;
 

@@ -259,7 +259,7 @@ inline void CkArray::springCleaning(void)
   broadcaster->springCleaning();
 }
 
-void CkArray::staticSpringCleaning(void *forArray) {
+void CkArray::staticSpringCleaning(void *forArray,double curWallTime) {
 	((CkArray *)forArray)->springCleaning();
 }
 

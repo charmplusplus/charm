@@ -944,7 +944,7 @@ void CmiOutOfMemory(int nBytes);
 
 /******** CONVCONDS ********/
 
-typedef void (*CcdVoidFn)(void *);
+typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 
 /*CPU conditions*/
 #define CcdPROCESSOR_BEGIN_BUSY 0
