@@ -10,7 +10,6 @@
   File: Blue.C -- Converse BlueGene Emulator Code
   Emulator written by Gengbin Zheng, gzheng@uiuc.edu on 2/20/2001
 */ 
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -26,6 +25,11 @@
 #ifdef CMK_ORIGIN2000
 extern "C" int start_counters(int e0, int e1);
 extern "C" int read_counters(int e0, long long *c0, int e1, long long *c1);
+inline double Count2Time(long long c) { return c*5.e-7; }
+#elif CMK_PAPI
+#include <papi.h>
+int papiEvents[2] = { PAPI_TOT_CYC, PAPI_FP_INS };
+long_long papiValues[2];
 inline double Count2Time(long long c) { return c*5.e-7; }
 #endif
 
@@ -66,6 +70,31 @@ FILE *bgDebugLog;			// for debugging
 
 char **BgGetArgv() { return arg_argv; }
 int    BgGetArgc() { return arg_argc; }
+
+/***************************************************************************
+     Implementation of the same counter interface currently used for the
+     Origin2000 using PAPI in the underlying layer.
+
+     Because of the difference in counter numbering, it is assumed that
+     the two counters desired are CYCLES and FLOPS and hence the numbers
+     e0 and e1 are ignored.
+
+     start_counters is also not implemented because PAPI does things in
+     a different manner.
+****************************************************************************/
+
+#ifdef CMK_PAPI
+int read_counters(int e0, long long *c0, int e1, long long *c1) {
+  // PAPI_read_counters resets the counter, hence it behaves like the perfctr
+  // code for Origin2000
+  if (PAPI_read_counters(papiValues, 2) != PAPI_OK) {
+    CmiAbort("Failed to read PAPI counters!\n");
+  }
+  *c0 = papiValues[0];
+  *c1 = papiValues[1];
+  return 0;
+}
+#endif
 
 /*****************************************************************************
      Handler Table, one per thread
@@ -627,6 +656,15 @@ void startVTimer()
       perror("start_counters");;
     }
   }
+#elif CMK_PAPI
+  else if (timingMethod == BG_COUNTER) {
+    // do a fake read to reset the counters. It would be more efficient
+    // to use the low level API, but that would be a lot more code to
+    // write for now.
+    if (PAPI_read_counters(papiValues, 2) != PAPI_OK) {
+      CmiAbort("Failed to read PAPI counters!!\n");
+    }
+  }
 #endif
 }
 
@@ -646,7 +684,7 @@ void stopVTimer()
 //      tCURRTIME += 1e-6;
     }
   }
-#ifdef CMK_ORIGIN2000
+#if CMK_ORIGIN2000 || CMK_PAPI
   else if (timingMethod == BG_COUNTER)  {
     long long c0, c1;
     if (read_counters(0, &c0, 21, &c1) < 0) perror("read_counters");
@@ -671,13 +709,16 @@ double BgGetTime()
   else if (timingMethod == BG_ELAPSE) {
     return tCURRTIME;
   }
-#ifdef CMK_ORIGIN2000
+#if CMK_ORIGIN2000 || CMK_PAPI
   else if (timingMethod == BG_COUNTER) {
     if (tTIMERON) {
       long long c0, c1;
       if (read_counters(0, &c0, 21, &c1) <0) perror("read_counters");;
       tCURRTIME += Count2Time(c1);
+      // origin 2000 only
+#ifdef CMK_ORIGIN2000
       if (start_counters(0, 21)<0) perror("start_counters");;
+#endif
     }
     return tCURRTIME;
   }
@@ -911,6 +952,14 @@ CmiStartFn bgMain(int argc, char **argv)
 #ifdef CMK_ORIGIN2000
   if(CmiGetArgFlagDesc(argv, "+bgcounter", "Use performance counter")) 
       timingMethod = BG_COUNTER;
+#elif CMK_PAPI
+  if (CmiGetArgFlagDesc(argv, "+bgpapi", "Use PAPI Performance counters")) {
+    timingMethod = BG_COUNTER;
+    // PAPI high level API does not require explicit library intialization
+    if (PAPI_start_counters(papiEvents, 2) != PAPI_OK) {
+      CmiAbort("Unable to start PAPI counters!\n");
+    }
+  }
 #endif
   
   bgcorroff = 0;
