@@ -686,14 +686,16 @@ then
 	TRACEMODE=`AddList $TRACEMODE bluegene`
 fi
 
-if [ "$BUILD_SHARE" = "1" -a -n "$CMK_NO_BUILD_SHARED" ]
+if [ "$BUILD_SHARE" = "1" ]
 then
-	BUILD_SHARE="0"
+	if [ -n "$CMK_NO_BUILD_SHARED" -o -z "$CHARMLIBSO" ]
+	then
+		BUILD_SHARE="0"
+	fi
 fi
 
 if [ "$BUILD_SHARE" = "1" ]
 then
- 	[ -z "$CHARMLIBSO" ] &&  Abort "Charm++ lib_so not found!"
 	# ignore BUILD_SHARE if the target is not .a or .so
 	case "$OBJECT" in
 	*.a|*.so|*.sl)
