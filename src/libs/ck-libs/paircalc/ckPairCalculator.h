@@ -6,9 +6,19 @@
 #include "PipeBroadcastStrategy.h"
 #include "BroadcastStrategy.h"
 
-#define FUNDER
+// Flag to use sparse reduction or regular reduction
+//#define _SPARSECONT_ 
 
-#ifdef FUNDER
+// Debugging flag for Verbose output
+//#define _PAIRCALC_DEBUG_
+
+// Optimize flags: 
+//#define _PAIRCALC_FIRSTPHASE_STREAM_
+#define _PAIRCALC_USE_ZGEMM_
+// Flags not yet correct
+//#define _PAIRCALC_SECONDPHASE_LOADBAL_
+
+#ifdef _FUNDER_
 #define ZGEMM zgemm_ 
 #define DCOPY dcopy_
 #define ZTODO ztodo_
@@ -89,8 +99,7 @@ class PairCalculator: public CBase_PairCalculator {
   PairCalculator(CkMigrateMessage *);
   ~PairCalculator();
   void calculatePairs(int, complex *, int, bool, bool); 
-  void acceptEntireResult(int size, double *matrix);
-  void acceptResult(int size, double *matrix, int rowNum);
+  void acceptResult(int size, double *matrix);
   void sumPartialResult(int size, complex *result, int offset);
   void sumPartialResult(priorSumMsg *msg);
   void sumPartialResult(partialResultMsg *msg);
@@ -145,7 +154,6 @@ class PairCalcReducer : public Group {
       tmp_matrix = NULL;
   }
   ~PairCalcReducer() {}
-  void acceptPartialResult(int size, complex* matrix, int fromRow, int fromCol);
   void broadcastEntireResult(int size, double* matrix, bool symmtype);
   void doRegister(PairCalculator *, bool);
 

@@ -2,11 +2,6 @@
 
 #define PARTITION_SIZE 500
 
-//#define _SPARSECONT_ 
-//#define _PAIRCALC_DEBUG_
-
-#define _PAIRCALC_FIRSTPHASE_STREAM_
-
 PairCalculator::PairCalculator(CkMigrateMessage *m) { }
 	
 
@@ -112,12 +107,12 @@ PairCalculator::pup(PUP::er &p)
     inDataLeft = new complex*[numExpected];
     if(N>0)
       for (int i = 0; i < numExpected; i++)
-	inDataLeft[i] = new complex[N];
+	inDataLeft[i] = new complex[N * blkSize];
     if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y)){
       inDataRight = new complex*[numExpected];
       if(N>0)
 	for (int i = 0; i < numExpected; i++)
-	  inDataRight[i] = new complex[N];
+	  inDataRight[i] = new complex[N * blkSize];
     }
     kRightOffset= new int[numExpected];
     kLeftOffset= new int[numExpected];
@@ -128,11 +123,11 @@ PairCalculator::pup(PUP::er &p)
   }
   if(N>0)
     for (int i = 0; i < numExpected; i++)
-      p(inDataLeft[i], N);
+      p(inDataLeft[i], N * blkSize);
   if(!symmetric || (symmetric&&thisIndex.x!=thisIndex.y)){
     if(N>0)  
       for (int i = 0; i < numExpected; i++)
-	p(inDataRight[i], N);
+	p(inDataRight[i], N * blkSize);
   }
   p(kRightOffset, numExpected);
   p(kLeftOffset, numExpected);
@@ -180,7 +175,7 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 
   int offset = -1;
   complex **inData;
-  if (fromRow) {
+  if (fromRow) {   // This could be the symmetric diagnoal case
     offset = sender - thisIndex.x;
     inData = inDataLeft;
 #ifdef _PAIRCALC_FIRSTPHASE_STREAM_
@@ -196,16 +191,16 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
     kRightCount++;
 #endif
   }
+  /*
   if(symmetric && thisIndex.x == thisIndex.y){
     inData = inDataLeft;
 #ifdef _PAIRCALC_FIRSTPHASE_STREAM_
-    if(!fromRow)
-    { //switch
-	kLeftOffset[kLeftDoneCount + kLeftCount]=offset;
-	kLeftCount++;
-    }
+    if(!fromRow)  CkAbort("Wrong call: fromRow flag should only be true here! \n");
+    kLeftOffset[kLeftDoneCount + kLeftCount]=offset;
+    kLeftCount++;
 #endif
   }
+  */
 
   N = size; // N is init here with the size of the data chunk. 
             // Assuming that data chunk of the same plane across all states are of the same size
@@ -243,32 +238,38 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
       // Ready to do  kLeftReady in left matrix, and kRightReady in right matrix.
       // Both in multiples of kUnits
       int kLeftReady = kLeftCount - kLeftCount % kUnits;
-      int kRightReady = kRightCount - kRightCount % kUnits;
+      int kRightReady;
+      if(! (symmetric && thisIndex.x == thisIndex.y))
+	  kRightReady = kRightCount - kRightCount % kUnits;
 
       if (numRecd == numExpected * 2 
 	  || (symmetric && thisIndex.x==thisIndex.y && numRecd==numExpected))
 	{ // if all has arrived, then finish whatever is remained
 	  kLeftReady = kLeftCount;
-	  kRightReady = kRightCount;
+	  if(! (symmetric && thisIndex.x == thisIndex.y))
+	      kRightReady = kRightCount;
 	}
 
       if(symmetric && thisIndex.x == thisIndex.y) {
 	  // if the symmetric but diagonal case
-	  for(int kLeft=kLeftDoneCount; kLeft<kLeftDoneCount + kLeftReady; kLeft++)
+
+          // NEW left compute with every entry in left (old+new)
+  	  int leftoffset1=0, leftoffset2=0;
+	  for(int kLeft1=kLeftDoneCount; kLeft1<kLeftDoneCount + kLeftReady; kLeft1++)
 	  {
-	    leftoffset=kLeftOffset[kLeft];
-	    for(int kRight=0; kRight<kRightDoneCount + kRightReady; kRight++)
+	    leftoffset1=kLeftOffset[kLeft1];
+	    for(int kLeft2=0; kLeft2<kLeftDoneCount + kLeftReady; kLeft2++)
 	      {
-		  rightoffset = kRightOffset[kRight];
-		  if(leftoffset > rightoffset) {
+		  leftoffset2 = kLeftOffset[kLeft2];
+		  // if(leftoffset1 <= leftoffset2) {
 #ifdef _SPARSECONT_
-		      outData[leftoffset * grainSize + rightoffset] = 
-			  compute_entry(size, inDataLeft[leftoffset], inDataLeft[rightoffset],op1);   
+		  outData[leftoffset1 * grainSize + leftoffset2] = 
+		    compute_entry(size, inDataLeft[leftoffset1], inDataLeft[leftoffset2],op1);   
 #else
-		      outData[(leftoffset+thisIndex.y)*S + rightoffset + thisIndex.x] = 
-			  compute_entry(size, inDataLeft[leftoffset], inDataLeft[rightoffset],op1);   
+		  outData[(leftoffset1+thisIndex.y)*S + leftoffset2 + thisIndex.x] = 
+		    compute_entry(size, inDataLeft[leftoffset1], inDataLeft[leftoffset2],op1);   
 #endif	 
-		  }
+		  //}
 	      }
 	  }
       }
@@ -315,12 +316,12 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
       }
       // Decrement the undone session count
       kLeftCount -= kLeftReady;
-      if(!symmetric || thisIndex.x != thisIndex.y)
+      if(! (symmetric && thisIndex.x == thisIndex.y))
 	  kRightCount -= kRightReady;
 
       // Increment the done session count
       kLeftDoneCount +=kLeftReady;
-      if(!symmetric || thisIndex.x != thisIndex.y)
+      if(! (symmetric && thisIndex.x == thisIndex.y))
 	  kRightDoneCount += kRightReady;
     }
 
@@ -419,22 +420,14 @@ PairCalculator::calculatePairs(int size, complex *points, int sender, bool fromR
 #endif
 }
 
-void
-PairCalculator::acceptEntireResult(int size, double *matrix)
-{
-#ifdef _PAIRCALC_DEBUG_
-  CkPrintf("[%d %d %d %d]: Accept EntireResult with size %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, size);
-#endif
-  acceptResult(size, matrix, thisIndex.x);
-}
-
 
 void
-PairCalculator::acceptResult(int size, double *matrix, int rowNum)
+PairCalculator::acceptResult(int size, double *matrix)
 {
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("[%d %d %d %d]: Accept Result with size %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z, size);
 #endif
+
   complex *mynewData = new complex[N*grainSize];
 
   complex *othernewData;
@@ -447,7 +440,10 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
   //ASSUMING TMATRIX IS REAL (LOSS OF GENERALITY)
   register double m=0;  
 
-#ifdef _PAIRCALC_SECONDPHASE_BLOCKING_
+#ifdef _PAIRCALC_SECONDPHASE_BLOCKING_  
+  // Obsolete Opt: substitute with ZGEMM 
+  // Note: This is not correct, need to be fixed or removed!!!
+  memset(mynewData, 0, grainSize*N*sizeof(complex));
   int size1 = 0;
   for(size1 = 0; size1 + PARTITION_SIZE < N; size1 += PARTITION_SIZE) {
     for (int i = 0; i < grainSize; i++) {
@@ -474,7 +470,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
       }
     }
   }
-#endif
+#else
 
   // replace with zgemm mynewData=inDataLeft * matrix
   // convert matrix to complex
@@ -491,7 +487,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
   char transform='N';
   char transformT='T';
   complex *leftptr = inDataLeft[0];
-
+  complex *rightptr = inDataRight[0];
 
   index = thisIndex.x*S + thisIndex.y;
   memset(amatrix, 0, matrixSize*sizeof(complex));
@@ -506,35 +502,37 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
   for (int i = 0; i < grainSize; i++) {
     for (int j = 0; j < grainSize; j++){ 
       m = matrix[index + j + i*S];
-      if(m!=amatrix[i*grainSize+j].re){CkPrintf("Dcopy broken in back path\n");}
+      if(m!=amatrix[i*grainSize+j].re){CkPrintf("Dcopy broken in back path: %2.5g != %2.5g \n",
+						m, amatrix[i*grainSize+j]);}
     }
   }
 
-
-
-#define _MANUAL_OFF_
-#ifndef _MANUAL_
-
-
   ZGEMM(&transform, &transformT, &n_in, &m_in, &k_in, &alpha, &(inDataLeft[0][0]), &n_in, 
         &(amatrix[0]), &k_in, &beta, &(mynewData[0]), &n_in);
-
+  /*
   if(symmetric && thisIndex.x != thisIndex.y){
     index = thisIndex.x*S + thisIndex.y;
     localMatrix=matrix+index;
-    for(int i=0;i<grainSize;i++)
-      DCOPY(&grainSize,localMatrix+i*S,&incx,(double *) (amatrix+i*grainSize),&incy);
-      ZGEMM(&transform, &transform, &n_in, &m_in, &k_in, &alpha, &(inDataRight[0][0]), &n_in, 
-            &(amatrix[0]), &k_in, &beta, &(othernewData[0]), &n_in);
+    for(int i=0;i<grainSize;i++){
+      localMatrix=matrix+index+i*S;
+      outMatrix   = (double*)(amatrix+i*grainSize);
+      DCOPY(&grainSize,localMatrix,&incx,outMatrix,&incy);
+    }
+    ZGEMM(&transform, &transform, &n_in, &m_in, &k_in, &alpha, &(inDataRight[0][0]), &n_in, 
+	  &(amatrix[0]), &k_in, &beta, &(othernewData[0]), &n_in);
   }
+  */
+
   delete [] amatrix;
 
-
 #else
-  
-// manual calculation
+
+  complex *leftptr = inDataLeft[0];
+  complex *rightptr = inDataRight[0];
+
+  // Original calculation : without optimize
   memset(mynewData, 0, N*grainSize*sizeof(complex));
-  index = thisIndex.x*S + thisIndex.y;
+  index = thisIndex.y*S + thisIndex.x;
   for (int i = 0; i < grainSize; i++) {
     for (int j = 0; j < grainSize; j++){ 
       m = matrix[index + j + i*S];
@@ -543,42 +541,22 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
       }
     }
   }
-
-#endif
-
-//  if(thisIndex.w==0 && thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0){
-//    CkPrintf("Index = %d, S = %d, N = %d, grainSize = %d, \n", index, S, N, grainSize);
-//      FILE *fp = fopen("zgemmtest2.out", "w");
-//      for(int i=0;i<grainSize; i++)
-//	  for(int j=0; j<N; j++)
-//	      fprintf(fp, "[%d %d]: %2.5g %2.5g\n", i, j, mynewData[i*N+j].re,  mynewData[i*N+j].im);
-//      fclose(fp);
-//  }
-
-
-#else
-
-#ifndef _PAIRCALC_SECONDPHASE_BLOCKING_
-  //  this one reads better but may take longer
-  for (int i = 0; i < grainSize; i++) {
-    for (int j = 0; j < grainSize; j++){ 
-      m = matrix[index + j + i*S];
-      for (int p = 0; p < N; p++)
-	mynewData[p + i*N] += inDataLeft[j][p] * m;
-    }
-  }
   index = thisIndex.x*S + thisIndex.y;
+  /*
   if(symmetric && thisIndex.x != thisIndex.y){
+      memset(othernewData, 0, N*grainSize*sizeof(complex));
       for (int i = 0; i < grainSize; i++) {
 	  for (int j = 0; j < grainSize; j++){ 
 	      m = matrix[index + j + i*S];
 	      for (int p = 0; p < N; p++)
-		  othernewData[p + i*N] += inDataRight[j][p] * m;
+		  othernewData[p + i*N] += rightptr[j*N + p] * m;
 	  }
       }
   }
+  */
 #endif
 #endif
+
   /* revise this to partition the data into S/M objects 
    * add new message and entry method for sumPartial result
    * to avoid message copying.
@@ -593,10 +571,10 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
   else {
     CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     thisProxy(idx).sumPartialResult(N*grainSize, mynewData, thisIndex.z);
-   if (rowNum != thisIndex.x){
+    if (thisIndex.y != thisIndex.x){   // FIXME: rowNum will alway == thisIndex.x
       CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
       thisProxy(idx).sumPartialResult(N*grainSize, othernewData, thisIndex.z);
-   }
+    }
   }
 
 #else
@@ -618,8 +596,8 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
 	thisProxy(idx).sumPartialResult(msg);  
       }
   }
-  else 
-  {
+  else { // else part is NOT load balanced yet!!!
+
     CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.y, thisIndex.z);
     priorSumMsg *pmsg = new (N*grainSize, 8*sizeof(int) )priorSumMsg();
     pmsg->N=N*grainSize;
@@ -628,7 +606,7 @@ PairCalculator::acceptResult(int size, double *matrix, int rowNum)
     *((int*)CkPriorityPtr(pmsg)) = priority;
     CkSetQueueing(pmsg, CK_QUEUEING_IFIFO); 
     thisProxy(idx).sumPartialResult(pmsg);
-    if (rowNum != thisIndex.x){
+    if (thisIndex.y != thisIndex.x){
       CkArrayIndexIndex4D idx(thisIndex.w, 0, thisIndex.x, thisIndex.z);
       priorSumMsg *pmsg = new (N*grainSize, 8*sizeof(int) )priorSumMsg();
       pmsg->N=N*grainSize;
@@ -653,33 +631,9 @@ PairCalculator::sumPartialResult(partialResultMsg *msg)
 #ifdef _PAIRCALC_DEBUG_
   CkPrintf("[%d %d %d %d]: sum result from grain %d  count %d\n", thisIndex.w,thisIndex.x,thisIndex.y,thisIndex.z,msg->N, sumPartialCount);
 #endif
-  int segments=S/grainSize;
-  if(S%grainSize!=0)
-    segments+=1;
-  segments*=blkSize;
-  int psumblocksize=grainSize/segments;
-  if(symmetric)
-    segments+=thisIndex.x;
-  sumPartialCount++;
 
-  if(!newData){
-    newData = new complex[N*psumblocksize];
-  }  
-  for(int i=0; i<N*psumblocksize; i++){
-    newData[i] += msg->result[i];  
-  }
-  if (sumPartialCount == segments) {
-    for(int i=0;i<psumblocksize;i++)
-      {
-	CkCallback mycb(cb_ep, CkArrayIndex2D(/*thisIndex.y/grainSize+i+thisIndex.x/grainSize*psumblocksize*/thisIndex.y+i+thisIndex.x/grainSize*psumblocksize, thisIndex.w), cb_aid);
-          mySendMsg *outmsg = new (N,0)mySendMsg; 
-          memcpy(outmsg->data, newData+i*psumblocksize, N * sizeof(complex));
-          outmsg->N = N;
-          mycb.send(outmsg);
-      }
-    sumPartialCount = 0;
-    memset(newData,0,N*psumblocksize*sizeof(complex));
-  }
+  sumPartialResult(N, msg->result, 0);
+
   delete msg;
 }
 
@@ -692,26 +646,8 @@ PairCalculator::sumPartialResult(priorSumMsg *msg)
   CkPrintf("[%d %d %d %d]: sum result \n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z );
 #endif
 
-  sumPartialCount++;
+  sumPartialResult(N, msg->result, 0);
 
-  if(!newData){
-    newData = new complex[N*grainSize];
-  }  
-  for(int i=0; i<N*grainSize; i++){
-    newData[i] += msg->result[i];  // should be adjusted with offset
-  }
-  if (sumPartialCount == (S/grainSize)*blkSize) {
-    for(int j=0; j<grainSize; j++){
-        CkCallback mycb(cb_ep, CkArrayIndex2D(thisIndex.y+j, thisIndex.w), cb_aid);
-        mySendMsg *outmsg = new (N, 0)mySendMsg; // msg with newData (size N)
-        memcpy(outmsg->data, newData+j*N, N * sizeof(complex));
-        outmsg->N = N;
-        
-      mycb.send(outmsg);
-    }
-    sumPartialCount = 0;
-    memset(newData,0,N*grainSize*sizeof(complex));
-  }
   delete msg;
 }
 
@@ -744,12 +680,6 @@ PairCalculator::sumPartialResult(int size, complex *result, int offset)
     memset(newData,0,N*grainSize*sizeof(complex));
   }
 }
-
-
-void
-PairCalcReducer::acceptPartialResult(int size, complex* matrix, int fromRow, int fromCol){
-}
-
 
 void add_double(void *in, void *inout, int *red_size, void *handle) {
     double * matrix1 = (double *)in;
@@ -842,7 +772,7 @@ void PairCalcReducer::startMachineReduction() {
 void
 PairCalcReducer::broadcastEntireResult(int size, double* matrix, bool symmtype){
   for (int i = 0; i < localElements[symmtype].length(); i++)
-    (localElements[symmtype])[i]->acceptEntireResult(size, matrix); 
+    (localElements[symmtype])[i]->acceptResult(size, matrix); 
 }
 
 void
