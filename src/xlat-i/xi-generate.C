@@ -147,6 +147,8 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
         commonStuff(top, bot, c, e);
 
         bot << "\tCmiFree(elt);" << endl;
+        bot << "\tCthFree(CthSelf());" << endl;
+        bot << "\tCthSuspend();" << endl;
         bot << "}" << endl ;
 
         sprintf(str,"void _CK_call_%s_%s(void *m, void *obj)",
@@ -161,7 +163,7 @@ void GenerateStructsFns(ofstream& top, ofstream& bot)
             << endl;
 
         sprintf(str,
-          "\tt = CthCreate( (void (*)(...)) _CK_call_threaded_%s_%s, (void *) element,%d);",
+          "\tt = CthCreate( (CthVoidFn) _CK_call_threaded_%s_%s, (void *) element,%d);",
           c->name,e->name,e->get_stackSize()) ;
         bot << str << endl;
         bot << "\tCthSetStrategyDefault(t);" << endl;
