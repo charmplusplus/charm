@@ -1,0 +1,8 @@
+module idxl {
+	message IDXL_DataMsg;
+	initcall void IDXLnodeInit(void);
+	array [1D] IDXL_Chunk {
+		entry void IDXL_Chunk(CkArrayID threadArrayID);
+		entry void idxl_recv(IDXL_DataMsg *m);
+	}
+};
