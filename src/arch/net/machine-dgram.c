@@ -82,11 +82,19 @@ static void setspeed_eth()
 
 static void extract_args(char **argv)
 {
+  int ms;
   setspeed_eth();
   if (CmiGetArgFlag(argv,"+atm"))
     setspeed_atm();
   if (CmiGetArgFlag(argv,"+eth"))
     setspeed_eth();
+  CmiGetArgInt(argv,"+max_dgram_size",&Cmi_max_dgram_size);
+  CmiGetArgInt(argv,"+window_size",&Cmi_window_size);
+  CmiGetArgInt(argv,"+os_buffer_size",&Cmi_os_buffer_size);
+  if (CmiGetArgInt(argv,"+delay_retransmit",&ms))
+	  Cmi_delay_retransmit=0.001*ms;
+  if (CmiGetArgInt(argv,"+ack_delay",&ms))
+	  Cmi_delay_retransmit=0.001*ms;
   extract_common_args(argv);
   Cmi_dgram_max_data = Cmi_max_dgram_size - DGRAM_HEADER_SIZE;
   Cmi_half_window = Cmi_window_size >> 1;
