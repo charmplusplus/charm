@@ -61,13 +61,9 @@ On T3E, we need to have file number control by open/close files only when needed
 #endif
 
 #if CMK_HAS_COUNTER_PAPI
-// these variables should be Ckpvs (I think) since the trace module is created
-// for each processor (group).
-//
 // For now, we trace only two events - # Floating Point Instructions &
 // # of L2 Cache Misses.
 int numPAPIEvents = 2;
-int papiEventSet = PAPI_NULL;
 int papiEvents[] = {PAPI_TOT_INS, PAPI_L1_DCM};
 char *papiEventNames[] = {"PAPI_TOT_INS", "PAPI_L1_DCM"};
 #endif
@@ -142,10 +138,6 @@ void LogPool::closeLog(void)
 */
 void _createTraceprojections(char **argv)
 {
-#if CMK_HAS_COUNTER_PAPI
-  int papiRetValue = 0;
-#endif
-
   DEBUGF(("%d createTraceProjections\n", CkMyPe()));
   CkpvInitialize(CkVec<char *>, usrEventlist);
   CkpvInitialize(CkVec<UsrEvent *>*, usrEvents);
@@ -157,27 +149,6 @@ void _createTraceprojections(char **argv)
   CkpvInitialize(Trace*, _trace);
   CkpvAccess(_trace) = new  TraceProjections(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
-
-#if CMK_HAS_COUNTER_PAPI
-  // We initialize and create the event sets for use with PAPI here.
-  papiRetValue = PAPI_library_init(PAPI_VER_CURRENT);
-  if (papiRetValue != PAPI_VER_CURRENT) {
-    CmiAbort("PAPI Library initialization failure!\n");
-  }
-  if (PAPI_create_eventset(&papiEventSet) != PAPI_OK) {
-    CmiAbort("PAPI failed to create event set!\n");
-  }
-  papiRetValue = PAPI_add_events(papiEventSet, papiEvents, numPAPIEvents);
-  if (papiRetValue != PAPI_OK) {
-    if (papiRetValue == PAPI_ECNFLCT) {
-      CmiAbort("PAPI events conflict! Please re-assign event types!\n");
-    } else {
-      CmiAbort("PAPI failed to add designated events!\n");
-    }
-  }
-  CkpvAccess(_trace)->papiValues = new long_long[numPAPIEvents];
-  memset(CkpvAccess(_trace)->papiValues, 0, numPAPIEvents*sizeof(long_long));
-#endif
 }
 
 LogPool::LogPool(char *pgm) {
@@ -439,12 +410,10 @@ void LogPool::flushLogBuffer()
 }
 
 void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,
-		  int pe, int ml, CmiObjId *id, double recvT, double cpuT, 
-		  int numPap, int *pap_ids, LONG_LONG_PAPI *papVals) 
+		  int pe, int ml, CmiObjId *id, double recvT, double cpuT)
 {
   new (&pool[numEntries++])
-    LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT, numPap,
-	     pap_ids, papVals);
+    LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT);
   if(poolSize==numEntries) {
     flushLogBuffer();
 #if CMK_BLUEGENE_CHARM
@@ -523,16 +492,10 @@ LogEntry::LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
     }
 }
 
-LogEntry::LogEntry(double tm, unsigned char t, unsigned short m, 
-		   unsigned short e, int ev,
-		   int p, int ml, CmiObjId *d, double rt,
-		   double cpuT, int numPapiEvts, int *papi_ids,
-		   LONG_LONG_PAPI *papiVals)
+void LogEntry::addPapi(int numPapiEvts, int *papi_ids, LONG_LONG_PAPI *papiVals)
 {
-  type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
-  if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0;};
-  recvTime = rt;
-  numPapiEvents = numPapiEvts; cputime = cpuT;
+#if CMK_HAS_COUNTER_PAPI
+  numPapiEvents = numPapiEvts;
   if (papiVals != NULL) {
     papiIDs = new int[numPapiEvents];
     papiValues = new LONG_LONG_PAPI[numPapiEvents];
@@ -540,10 +503,8 @@ LogEntry::LogEntry(double tm, unsigned char t, unsigned short m,
       papiIDs[i] = papi_ids[i];
       papiValues[i] = papiVals[i];
     }
-  } else {
-    papiIDs = NULL;
-    papiValues = NULL;
   }
+#endif
 }
 
 void LogEntry::pup(PUP::er &p)
@@ -574,12 +535,14 @@ void LogEntry::pup(PUP::er &p)
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; 
       p|msglen; p|irecvtime; p|id.id[0]; p|id.id[1]; p|id.id[2];
       p|icputime;
+#if CMK_HAS_COUNTER_PAPI
       p|numPapiEvents;
       for (i=0; i<numPapiEvents; i++) {
 	// not yet!!!
 	//	p|papiIDs[i]; 
 	p|papiValues[i];
       }
+#endif
       if (p.isUnpacking()) {
 	recvTime = irecvtime/1.0e6;
 	cputime = icputime/1.0e6;
@@ -588,12 +551,14 @@ void LogEntry::pup(PUP::er &p)
     case END_PROCESSING:
       if (p.isPacking()) icputime = (int)(1.0e6*cputime);
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; p|msglen; p|icputime;
+#if CMK_HAS_COUNTER_PAPI
       p|numPapiEvents;
       for (i=0; i<numPapiEvents; i++) {
 	// not yet!!!
 	//	p|papiIDs[i];
 	p|papiValues[i];
       }
+#endif
       if (p.isUnpacking()) cputime = icputime/1.0e6;
       break;
     case CREATION:
@@ -689,7 +654,29 @@ curevent(0), inEntry(0), computationStarted(0)
   _logPool->setCompressed(compressed);
 #endif
   _logPool->creatFiles();
-	funcCount=1;
+
+  funcCount=1;
+
+#if CMK_HAS_COUNTER_PAPI
+  // We initialize and create the event sets for use with PAPI here.
+  int papiRetValue = PAPI_library_init(PAPI_VER_CURRENT);
+  if (papiRetValue != PAPI_VER_CURRENT) {
+    CmiAbort("PAPI Library initialization failure!\n");
+  }
+  if (PAPI_create_eventset(&papiEventSet) != PAPI_OK) {
+    CmiAbort("PAPI failed to create event set!\n");
+  }
+  papiRetValue = PAPI_add_events(papiEventSet, papiEvents, numPAPIEvents);
+  if (papiRetValue != PAPI_OK) {
+    if (papiRetValue == PAPI_ECNFLCT) {
+      CmiAbort("PAPI events conflict! Please re-assign event types!\n");
+    } else {
+      CmiAbort("PAPI failed to add designated events!\n");
+    }
+  }
+  papiValues = new long_long[numPAPIEvents];
+  memset(papiValues, 0, numPAPIEvents*sizeof(long_long));
+#endif
 }
 
 int TraceProjections::traceRegisterUserEvent(const char* evt, int e)
@@ -829,21 +816,17 @@ void TraceProjections::creationDone(int num)
 void TraceProjections::beginExecute(CmiObjId *tid)
 {
 #if CMK_HAS_COUNTER_PAPI
-  if (PAPI_read(papiEventSet, CkpvAccess(_trace)->papiValues) != PAPI_OK) {
+  if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
     CmiAbort("PAPI failed to read at begin execute!\n");
   }
 #endif
   if (checknested && inEntry) CmiAbort("Nested Begin Execute!\n");
   execEvent = CtvAccess(curThreadEvent);
   execEp = (-1);
-#if CMK_HAS_COUNTER_PAPI
-  _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
-		execEvent,CkMyPe(), 0, tid, 0.0, TraceCpuTimer(),
-		numPAPIEvents, papiEvents,
-		CkpvAccess(_trace)->papiValues);
-#else
   _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
                              execEvent,CkMyPe(), 0, tid);
+#if CMK_HAS_COUNTER_PAPI
+  _logPool->addPapi(numPAPIEvents, papiEvents, papiValues);
 #endif
   inEntry = 1;
 }
@@ -852,21 +835,17 @@ void TraceProjections::beginExecute(envelope *e)
 {
   if(e==0) {
 #if CMK_HAS_COUNTER_PAPI
-    if (PAPI_read(papiEventSet, CkpvAccess(_trace)->papiValues) != PAPI_OK) {
+    if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
       CmiAbort("PAPI failed to read at begin execute!\n");
     }
 #endif
     if (checknested && inEntry) CmiAbort("Nested Begin Execute!\n");
     execEvent = CtvAccess(curThreadEvent);
     execEp = (-1);
-#if CMK_HAS_COUNTER_PAPI
-    _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
-		  execEvent,CkMyPe(), 0, 0, 0.0, TraceCpuTimer(),
-		  numPAPIEvents, papiEvents,
-		  CkpvAccess(_trace)->papiValues);
-#else
     _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
 		  execEvent,CkMyPe(), 0, 0, 0.0, TraceCpuTimer());
+#if CMK_HAS_COUNTER_PAPI
+    _logPool->addPapi(numPAPIEvents, papiEvents, papiValues);
 #endif
     inEntry = 1;
   } else {
@@ -877,7 +856,7 @@ void TraceProjections::beginExecute(envelope *e)
 void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx)
 {
 #if CMK_HAS_COUNTER_PAPI
-  if (PAPI_read(papiEventSet, CkpvAccess(_trace)->papiValues) != PAPI_OK) {
+  if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
     CmiAbort("PAPI failed to read at begin execute!\n");
   }
 #endif
@@ -885,14 +864,10 @@ void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe, int 
   execEvent=event;
   execEp=ep;
   execPe=srcPe;
-#if CMK_HAS_COUNTER_PAPI
-  _logPool->add(BEGIN_PROCESSING,msgType,ep,TraceTimer(),event,
-		srcPe, mlen, idx, 0.0, TraceCpuTimer(),
-		numPAPIEvents, papiEvents,
-		CkpvAccess(_trace)->papiValues);
-#else
   _logPool->add(BEGIN_PROCESSING,msgType,ep,TraceTimer(),event,
 		srcPe, mlen, idx, 0.0, TraceCpuTimer());
+#if CMK_HAS_COUNTER_PAPI
+  _logPool->addPapi(numPAPIEvents, papiEvents, papiValues);
 #endif
   inEntry = 1;
 }
@@ -900,25 +875,12 @@ void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe, int 
 void TraceProjections::endExecute(void)
 {
 #if CMK_HAS_COUNTER_PAPI
-  if (PAPI_read(papiEventSet, CkpvAccess(_trace)->papiValues) != PAPI_OK) {
+  if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
     CmiAbort("PAPI failed to read at end execute!\n");
   }
 #endif
   if (checknested && !inEntry) CmiAbort("Nested EndExecute!\n");
   double cputime = TraceCpuTimer();
-#if CMK_HAS_COUNTER_PAPI
-  if(execEp == (-1)) {
-    _logPool->add(END_PROCESSING,0,_threadEP,TraceTimer(),
-		  execEvent,CkMyPe(),0,0,0.0,cputime,
-		  numPAPIEvents, papiEvents,
-		  CkpvAccess(_trace)->papiValues);
-  } else {
-    _logPool->add(END_PROCESSING,0,execEp,TraceTimer(),
-		  execEvent,execPe,0,0,0.0,cputime,
-		  numPAPIEvents, papiEvents,
-		  CkpvAccess(_trace)->papiValues);
-  }
-#else
   if(execEp == (-1)) {
     _logPool->add(END_PROCESSING,0,_threadEP,TraceTimer(),
                              execEvent,CkMyPe(),0,0,0.0,cputime);
@@ -926,6 +888,8 @@ void TraceProjections::endExecute(void)
     _logPool->add(END_PROCESSING,0,execEp,TraceTimer(),
                              execEvent,execPe,0,0,0.0,cputime);
   }
+#if CMK_HAS_COUNTER_PAPI
+  _logPool->addPapi(numPAPIEvents, papiEvents, papiValues);
 #endif
   inEntry = 0;
 }
@@ -1003,8 +967,7 @@ void TraceProjections::endComputation(void)
 #if CMK_HAS_COUNTER_PAPI
   // we stop the counters here. A silent failure is alright since we
   // are already at the end of the program.
-  if (PAPI_stop(papiEventSet,
-		CkpvAccess(_trace)->papiValues) != PAPI_OK) {
+  if (PAPI_stop(papiEventSet, papiValues) != PAPI_OK) {
     CkPrintf("Warning: PAPI failed to stop correctly!\n");
   }
   // NOTE: We should not do a complete close of PAPI until after the

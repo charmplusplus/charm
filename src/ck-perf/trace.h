@@ -47,10 +47,6 @@ typedef CMK_TYPEDEF_INT8 LONG_LONG_PAPI;
 // 
 class Trace {
   public:
-
-    int *papiIDs;
-    LONG_LONG_PAPI *papiValues;
-
     virtual int traceOnPE() { return TRACE_CHARM_PE(); }
     // turn trace on/off, note that charm will automatically call traceBegin()
     // at the beginning of every run unless the command line option "+traceoff"

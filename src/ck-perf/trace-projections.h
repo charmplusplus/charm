@@ -53,9 +53,11 @@ class LogEntry {
     CmiObjId   id;
     int numpes;
     int *pes;
+#if CMK_HAS_COUNTER_PAPI
     int numPapiEvents;
     int *papiIDs;
     LONG_LONG_PAPI *papiValues;
+#endif
     unsigned char type; 
     char *fName;
     int flen;
@@ -65,6 +67,11 @@ class LogEntry {
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
       recvTime = rt; cputime = cputm;
+#if CMK_HAS_COUNTER_PAPI
+      numPapiEvents = 0;
+      papiIDs = NULL;
+      papiValues = NULL;
+#endif
     }
     LogEntry(double _time,unsigned char _type,unsigned short _funcID,int _lineNum,char *_fileName){
 			time = _time;
@@ -84,12 +91,8 @@ class LogEntry {
     // **CW** new constructor for multicast data
     LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
 	     int ml, CmiObjId *d, double rt, int num, int *pelist);
-    // **CW** this prototype is used for PAPI events (which has a dynamic
-    // structure to copy).
-    LogEntry(double tm, unsigned char t, unsigned short m, unsigned short e, 
-	     int ev, int p,
-	     int ml, CmiObjId *d, double rt, double cpuT, int numPap, 
-	     int *pap_ids, LONG_LONG_PAPI *papVals);
+    // complementary function for adding papi data
+    void addPapi( int numPapiEvts, int *papi_ids, LONG_LONG_PAPI *papiVals);
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
     void operator delete(void *ptr) {free(ptr); }
@@ -147,7 +150,12 @@ class LogPool {
     void writeSts(void);
     void writeSts(TraceProjections *traceProj);
 
-    void add(unsigned char type,unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., double cpuT=0.0, int numPap=0, int *pap_ids=NULL, LONG_LONG_PAPI *papVals=NULL);
+    void add(unsigned char type,unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., double cpuT=0.0);
+      // complementary function to set papi info to current log entry
+      // must be called after an add()
+    void addPapi(int numPap, int *pap_ids, LONG_LONG_PAPI *papVals) {
+      pool[numEntries-1].addPapi(numPap, pap_ids, papVals);
+    }
     void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
     void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int num=0, int *pelist=NULL);
     void flushLogBuffer();
@@ -222,6 +230,10 @@ class TraceProjections : public Trace {
 
     int funcCount;
     CkHashtableT<StrKey,int> funcHashtable;
+#if CMK_HAS_COUNTER_PAPI
+    int papiEventSet;
+    LONG_LONG_PAPI *papiValues;
+#endif
   public:
     TraceProjections(char **argv);
     void userEvent(int e);
