@@ -68,11 +68,11 @@ ELAN_EVENT *esmall[RECV_MSG_Q_SIZE], *emid[MID_MSG_Q_SIZE], *elarge;
 #define TAG_MID   0x10
 #define TAG_LARGE 0x100
 
-int Cmi_numpes;
-int               Cmi_mynode;    /* Which address space am I */
-int               Cmi_mynodesize;/* Number of processors in my address space */
-int               Cmi_numnodes;  /* Total number of address spaces */
-int               Cmi_numpes;    /* Total number of processors */
+int _Cmi_numpes;
+int               _Cmi_mynode;    /* Which address space am I */
+int               _Cmi_mynodesize;/* Number of processors in my address space */
+int               _Cmi_numnodes;  /* Total number of address spaces */
+int               _Cmi_numpes;    /* Total number of processors */
 static int        Cmi_nodestart; /* First processor in this address space */ 
 CpvDeclare(void*, CmiLocalQueue);
 
@@ -217,8 +217,8 @@ static PCQueue   msgBuf;
 CsvDeclare(CmiNodeState, NodeState);
 
 static struct CmiStateStruct Cmi_state;
-int Cmi_mype;
-int Cmi_myrank;
+int _Cmi_mype;
+int _Cmi_myrank;
 
 void CmiMemLock(void) {}
 void CmiMemUnlock(void) {}
@@ -229,8 +229,8 @@ void CmiMemUnlock(void) {}
 static void CmiStartThreads(char **argv)
 {
   CmiStateInit(Cmi_nodestart, 0, &Cmi_state);
-  Cmi_mype = Cmi_nodestart;
-  Cmi_myrank = 0;
+  _Cmi_mype = Cmi_nodestart;
+  _Cmi_myrank = 0;
 }      
 
 /*Add a message to this processor's receive queue */
@@ -265,13 +265,13 @@ int CmiMyRank(void)
 #endif
 
 #ifndef CmiNodeFirst
-int CmiNodeFirst(int node) { return node*Cmi_mynodesize; }
-int CmiNodeSize(int node)  { return Cmi_mynodesize; }
+int CmiNodeFirst(int node) { return node*_Cmi_mynodesize; }
+int CmiNodeSize(int node)  { return _Cmi_mynodesize; }
 #endif
 
 #ifndef CmiNodeOf
-int CmiNodeOf(int pe)      { return (pe/Cmi_mynodesize); }
-int CmiRankOf(int pe)      { return pe%Cmi_mynodesize; }
+int CmiNodeOf(int pe)      { return (pe/_Cmi_mynodesize); }
+int CmiRankOf(int pe)      { return pe%_Cmi_mynodesize; }
 #endif
 
 int CmiAllAsyncMsgsSent(void)
@@ -911,16 +911,16 @@ void SendSpanningChildren(int size, char *msg)
   int startpe = CMI_BROADCAST_ROOT(msg)-1;
   int i;
   
-  assert(startpe>=0 && startpe<Cmi_numpes);
+  assert(startpe>=0 && startpe<_Cmi_numpes);
 
   for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
     int p = cs->pe-startpe;
-    if (p<0) p+=Cmi_numpes;
+    if (p<0) p+=_Cmi_numpes;
     p = BROADCAST_SPANNING_FACTOR*p + i;
-    if (p > Cmi_numpes - 1) break;
+    if (p > _Cmi_numpes - 1) break;
     p += startpe;
-    p = p%Cmi_numpes;
-    assert(p>=0 && p<Cmi_numpes && p!=cs->pe);
+    p = p%_Cmi_numpes;
+    assert(p>=0 && p<_Cmi_numpes && p!=cs->pe);
     CmiSyncSendFn1(p, size, msg);
   }
 }
@@ -929,12 +929,12 @@ void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
 {
   CmiState cs = CmiGetState();
 #if CMK_BROADCAST_SPANNING_TREE
-  CMI_SET_BROADCAST_ROOT(msg, Cmi_mype+1);
+  CMI_SET_BROADCAST_ROOT(msg, _Cmi_mype+1);
   SendSpanningChildren(size, msg);
 #else
   int i ;
      
-  for ( i=cs->pe+1; i<Cmi_numpes; i++ ) 
+  for ( i=cs->pe+1; i<_Cmi_numpes; i++ ) 
     CmiSyncSendFn(i, size,msg) ;
   for ( i=0; i<cs->pe; i++ ) 
     CmiSyncSendFn(i, size,msg) ;
@@ -947,7 +947,7 @@ CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)
   CmiState cs = CmiGetState();
   int i ;
 
-  for ( i=cs->pe+1; i<Cmi_numpes; i++ ) 
+  for ( i=cs->pe+1; i<_Cmi_numpes; i++ ) 
     CmiAsyncSendFn(i,size,msg) ;
   for ( i=0; i<cs->pe; i++ ) 
     CmiAsyncSendFn(i,size,msg) ;
@@ -970,7 +970,7 @@ void CmiSyncBroadcastAllFn(int size, char *msg)        /* All including me */
 #else
   int i ;
   
-  for ( i=0; i<Cmi_numpes; i++ ) 
+  for ( i=0; i<_Cmi_numpes; i++ ) 
     CmiSyncSendFn(i,size,msg) ;
 #endif
 }
@@ -979,7 +979,7 @@ CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)
 {
   int i ;
 
-  for ( i=1; i<Cmi_numpes; i++ ) 
+  for ( i=1; i<_Cmi_numpes; i++ ) 
     CmiAsyncSendFn(i,size,msg) ;
   return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
@@ -994,7 +994,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 #else
   int i ;
      
-  for ( i=0; i<Cmi_numpes; i++ ) 
+  for ( i=0; i<_Cmi_numpes; i++ ) 
     CmiSyncSendFn(i,size,msg) ;
 #endif
   CmiFree(msg) ;
@@ -1212,21 +1212,21 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   
   elan_gsync(elan_base->allGroup);
 
-  Cmi_numnodes = elan_base->state->nvp;
-  Cmi_mynode =  elan_base->state->vp;
+  _Cmi_numnodes = elan_base->state->nvp;
+  _Cmi_mynode =  elan_base->state->vp;
 
   /* processor per node */
-  Cmi_mynodesize = 1;
-  CmiGetArgInt(argv,"+ppn", &Cmi_mynodesize);
+  _Cmi_mynodesize = 1;
+  CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize);
 
-  if (Cmi_mynodesize > 1 && Cmi_mynode == 0) 
+  if (_Cmi_mynodesize > 1 && _Cmi_mynode == 0) 
     CmiAbort("+ppn cannot be used in non SMP version!\n");
   
-  Cmi_numpes = Cmi_numnodes * Cmi_mynodesize;
-  Cmi_nodestart = Cmi_mynode * Cmi_mynodesize;
+  _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
+  Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
   Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usched;
   /* find dim = log2(numpes), to pretend we are a hypercube */
-  for ( Cmi_dim=0,n=Cmi_numpes; n>1; n/=2 )
+  for ( Cmi_dim=0,n=_Cmi_numpes; n>1; n/=2 )
     Cmi_dim++ ;
  /* CmiSpanTreeInit();*/
   i=0;

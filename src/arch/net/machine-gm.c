@@ -277,7 +277,7 @@ static void processMessage(char *msg, int len)
         size = CmiMsgHeaderGetLength(msg);
         newmsg = (char *)CmiAlloc(size);
         if (!newmsg)
-          fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
+          fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);
         if (size < len) KillEveryoneCode(4559312);
         memcpy(newmsg, msg, len);
         node->asm_rank = rank;
@@ -293,7 +293,7 @@ static void processMessage(char *msg, int len)
          CmiAbort("\n\n\t\tLength mismatch!!\n\n");
       if (node->asm_fill == node->asm_total) {
         if (rank == DGRAM_BROADCAST) {
-          for (i=1; i<Cmi_mynodesize; i++)
+          for (i=1; i<_Cmi_mynodesize; i++)
             CmiPushPE(i, CopyMsg(newmsg, len));
           CmiPushPE(0, newmsg);
         } else {
@@ -481,7 +481,7 @@ void CmiMachineInit()
   device = 0;
   for (dataport=2;dataport<dataport_max;dataport++) {
     char portname[200];
-    sprintf(portname, "converse_port%d_%d", Cmi_charmrun_pid, Cmi_mynode);
+    sprintf(portname, "converse_port%d_%d", Cmi_charmrun_pid, _Cmi_mynode);
     status = gm_open(&gmport, device, dataport, portname, GM_API_VERSION_1_1);
     if (status == GM_SUCCESS) { break; }
   }
@@ -543,7 +543,7 @@ void CmiCheckGmStatus()
   int i;
   int doabort = 0;
   if (gmport == NULL) machine_exit(1);
-  for (i=0; i<Cmi_numnodes; i++) {
+  for (i=0; i<_Cmi_numnodes; i++) {
     gm_status_t status;
     char uid[6], str[100];
     unsigned int mach_id=nodes[i].mach_id;

@@ -308,21 +308,21 @@ static void node_addresses_store(ChMessage *msg)
   ChNodeinfo *d=(ChNodeinfo *)(n32+1);
   int nodestart;
   int i,j,n;
-  Cmi_numnodes=ChMessageInt(n32[0]);
+  _Cmi_numnodes=ChMessageInt(n32[0]);
   
-  if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*Cmi_numnodes)
+  if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes)
          !=(unsigned int)msg->len)
     {printf("Node table has inconsistent length!");machine_exit(1);}
-  nodes = (OtherNode)malloc(Cmi_numnodes * sizeof(struct OtherNodeStruct));
+  nodes = (OtherNode)malloc(_Cmi_numnodes * sizeof(struct OtherNodeStruct));
   nodestart=0;
-  for (i=0; i<Cmi_numnodes; i++) {
+  for (i=0; i<_Cmi_numnodes; i++) {
     nodes[i].nodestart = nodestart;
     nodes[i].nodesize  = ChMessageInt(d[i].nPE);
     nodes[i].mach_id = ChMessageInt(d[i].mach_id);
     nodes[i].IP=d[i].IP;
-    if (i==Cmi_mynode) {
+    if (i==_Cmi_mynode) {
       Cmi_nodestart=nodes[i].nodestart;
-      Cmi_mynodesize=nodes[i].nodesize;
+      _Cmi_mynodesize=nodes[i].nodesize;
       Cmi_self_IP=nodes[i].IP;
     }
     nodes[i].dataport = ChMessageInt(d[i].dataport);
@@ -335,14 +335,14 @@ static void node_addresses_store(ChMessage *msg)
 #endif
     nodestart+=nodes[i].nodesize;
   }
-  Cmi_numpes=nodestart;
-  n = Cmi_numpes;
+  _Cmi_numpes=nodestart;
+  n = _Cmi_numpes;
 #ifdef CMK_CPV_IS_SMP
-  n += Cmi_numnodes;
+  n += _Cmi_numnodes;
 #endif
   nodes_by_pe = (OtherNode*)malloc(n * sizeof(OtherNode));
   _MEMCHECK(nodes_by_pe);
-  for (i=0; i<Cmi_numnodes; i++) {
+  for (i=0; i<_Cmi_numnodes; i++) {
     OtherNode node = nodes + i;
     OtherNode_init(node);
     for (j=0; j<node->nodesize; j++)
@@ -350,8 +350,8 @@ static void node_addresses_store(ChMessage *msg)
   }
 #ifdef CMK_CPV_IS_SMP
   /* index for communication threads */
-  for (i=Cmi_numpes; i<Cmi_numpes+Cmi_numnodes; i++) {
-    OtherNode node = nodes + i-Cmi_numpes;
+  for (i=_Cmi_numpes; i<_Cmi_numpes+_Cmi_numnodes; i++) {
+    OtherNode node = nodes + i-_Cmi_numpes;
     nodes_by_pe[i] = node;
   }
 #endif

@@ -1,4 +1,4 @@
-/*****************************************************************************
+/_*****************************************************************************
  * $Source$
  * $Author$
  * $Date$
@@ -41,9 +41,9 @@ int inside_comm = 0;
 #endif
 
 CpvDeclare(void*, CmiLocalQueue);
-int Cmi_mype;
-int Cmi_numpes;
-int Cmi_myrank;
+int _Cmi_mype;
+int _Cmi_numpes;
+int _Cmi_myrank;
 
 static int nthreads;
 static int requested_npe;
@@ -151,9 +151,9 @@ static void threadInit(void *arg)
 
 
   CpvInitialize(void*, CmiLocalQueue);
-  Cmi_mype  = usrparam->mype;
-  Cmi_myrank = 0;
-  Cmi_numpes =  usrparam->npe;
+  _Cmi_mype  = usrparam->mype;
+  _Cmi_myrank = 0;
+  _Cmi_numpes =  usrparam->npe;
 #ifdef DEBUG
   printf("thread %d/%d started \n", CmiMyPe(), CmiNumPes());
 #endif
@@ -162,7 +162,7 @@ static void threadInit(void *arg)
   CthInit(usrparam->argv);
   CpvAccess(CmiLocalQueue) = CdsFifo_Create();
   CmiTimerInit();
-  /*  neighbour_init(Cmi_mype); */
+  /*  neighbour_init(_Cmi_mype); */
   usadd(arena);
   ConverseCommonInit(usrparam->argv);
   if (usrparam->initret==0 || usrparam->mype) {
@@ -234,7 +234,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 
 void CmiFreeSendFn(int destPE, int size, char *msg)
 {
-  if (Cmi_mype==destPE) {
+  if (_Cmi_mype==destPE) {
     CQdCreate(CpvAccess(cQdState), 1);
     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
   } else {

@@ -813,7 +813,7 @@ int           nodetab_rank0_size;
 void nodetab_reset(nodetab_host *h)
 {
   h->name="SET_H->NAME";
-  h->ip=skt_invalid_ip;
+  h->ip=_skt_invalid_ip;
   h->pathfixes = 0;
   h->ext = "*";
   h->speed = 1.0;
@@ -850,7 +850,7 @@ void nodetab_makehost(char *name,nodetab_host *h)
 {
   h->name=strdup(name);
   h->ip = skt_innode_lookup_ip(name);
-  if (skt_ip_match(h->ip,skt_invalid_ip)) {
+  if (skt_ip_match(h->ip,_skt_invalid_ip)) {
     fprintf(stderr,"ERROR> Cannot obtain IP address of %s\n", name);
     exit(1);
   }

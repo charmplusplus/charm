@@ -13,9 +13,9 @@
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 
-int Cmi_mype;
-int Cmi_numpes;
-int Cmi_myrank;
+int _Cmi_mype;
+int _Cmi_numpes;
+int _Cmi_myrank;
 CpvDeclare(void*, CmiLocalQueue);
 
 #define BLK_LEN  512
@@ -173,7 +173,7 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
 {
   char *dupmsg = (char *) CmiAlloc(size);
   memcpy(dupmsg, msg, size);
-  if (Cmi_mype==destPE) {
+  if (_Cmi_mype==destPE) {
     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
     CQdCreate(CpvAccess(cQdState), 1);
   }
@@ -203,7 +203,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 
 void CmiFreeSendFn(int destPE, int size, char *msg)
 {
-  if (Cmi_mype==destPE) {
+  if (_Cmi_mype==destPE) {
     CQdCreate(CpvAccess(cQdState), 1);
     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
   } else {
@@ -218,9 +218,9 @@ void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
 {
   int i ;
      
-  for ( i=Cmi_mype+1; i<Cmi_numpes; i++ ) 
+  for ( i=_Cmi_mype+1; i<_Cmi_numpes; i++ ) 
     CmiSyncSendFn(i, size,msg) ;
-  for ( i=0; i<Cmi_mype; i++ ) 
+  for ( i=0; i<_Cmi_mype; i++ ) 
     CmiSyncSendFn(i, size,msg) ;
 }
 
@@ -229,9 +229,9 @@ CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)
 {
   int i ;
 
-  for ( i=Cmi_mype+1; i<Cmi_numpes; i++ ) 
+  for ( i=_Cmi_mype+1; i<_Cmi_numpes; i++ ) 
     CmiAsyncSendFn(i,size,msg) ;
-  for ( i=0; i<Cmi_mype; i++ ) 
+  for ( i=0; i<_Cmi_mype; i++ ) 
     CmiAsyncSendFn(i,size,msg) ;
   return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
@@ -246,7 +246,7 @@ void CmiSyncBroadcastAllFn(int size, char *msg)        /* All including me */
 {
   int i ;
      
-  for ( i=0; i<Cmi_numpes; i++ ) 
+  for ( i=0; i<_Cmi_numpes; i++ ) 
     CmiSyncSendFn(i,size,msg) ;
 }
 
@@ -254,7 +254,7 @@ CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)
 {
   int i ;
 
-  for ( i=1; i<Cmi_numpes; i++ ) 
+  for ( i=1; i<_Cmi_numpes; i++ ) 
     CmiAsyncSendFn(i,size,msg) ;
   return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
@@ -263,7 +263,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 {
   int i ;
      
-  for ( i=0; i<Cmi_numpes; i++ ) 
+  for ( i=0; i<_Cmi_numpes; i++ ) 
     CmiSyncSendFn(i,size,msg) ;
   CmiFree(msg) ;
 }
@@ -284,8 +284,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   int n ;
   int nbuf[4];
   
-  Cmi_myrank = 0;
-  mpc_environ(&Cmi_numpes, &Cmi_mype);
+  _Cmi_myrank = 0;
+  mpc_environ(&_Cmi_numpes, &_Cmi_mype);
   mpc_task_query(nbuf, 4, 3);
   dontcare = nbuf[0];
   allmsg = nbuf[1];
@@ -293,7 +293,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   msgtype = nbuf[0];
   
   /* find dim = log2(numpes), to pretend we are a hypercube */
-  for ( Cmi_dim=0,n=Cmi_numpes; n>1; n/=2 )
+  for ( Cmi_dim=0,n=_Cmi_numpes; n>1; n/=2 )
     Cmi_dim++ ;
   /* CmiSpanTreeInit(); */
   CmiTimerInit();

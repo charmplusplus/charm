@@ -560,10 +560,10 @@ void CmiEnableNonblockingIO(int fd) { }
  *
  *****************************************************************************/
 
-int               Cmi_mynode;    /* Which address space am I */
-int               Cmi_mynodesize;/* Number of processors in my address space */
-int               Cmi_numnodes;  /* Total number of address spaces */
-int               Cmi_numpes;    /* Total number of processors */
+int               _Cmi_mynode;    /* Which address space am I */
+int               _Cmi_mynodesize;/* Number of processors in my address space */
+int               _Cmi_numnodes;  /* Total number of address spaces */
+int               _Cmi_numpes;    /* Total number of processors */
 static int        Cmi_nodestart; /* First processor in this address space */
 static skt_ip_t   Cmi_self_IP;
 static skt_ip_t   Cmi_charmrun_IP; /*Address of charmrun machine*/
@@ -586,7 +586,7 @@ static void parse_netstart(void)
   {/*Read values set by Charmrun*/
         char Cmi_charmrun_name[1024];
         nread = sscanf(ns, "%d%s%d%d%d",
-                 &Cmi_mynode,
+                 &_Cmi_mynode,
                  Cmi_charmrun_name, &Cmi_charmrun_port,
                  &Cmi_charmrun_pid, &port);
 	Cmi_charmrun_IP=skt_lookup_ip(Cmi_charmrun_name);
@@ -597,8 +597,8 @@ static void parse_netstart(void)
         }
   } else 
   {/*No charmrun-- set flag values for standalone operation*/
-  	Cmi_mynode=0;
-  	Cmi_charmrun_IP=skt_invalid_ip;
+  	_Cmi_mynode=0;
+  	Cmi_charmrun_IP=_skt_invalid_ip;
   	Cmi_charmrun_port=0;
   	Cmi_charmrun_pid=0;
         dataport = -1;
@@ -657,7 +657,7 @@ static void log_init(void)
 static void log_done(void)
 {
   char logname[100]; FILE *f; int i, size;
-  sprintf(logname, "log.%d", Cmi_mynode);
+  sprintf(logname, "log.%d", _Cmi_mynode);
   f = fopen(logname, "w");
   if (f==0) KillEveryone("fopen problem");
   if (log_wrap) size = 50000; else size=log_pos;
@@ -676,8 +676,8 @@ void printLog(void)
   if (logged)
       return;
   logged = 1;
-  CmiPrintf("Logging: %d\n", Cmi_mynode);
-  sprintf(logname, "log.%d", Cmi_mynode);
+  CmiPrintf("Logging: %d\n", _Cmi_mynode);
+  sprintf(logname, "log.%d", _Cmi_mynode);
   f = fopen(logname, "w");
   if (f==0) KillEveryone("fopen problem");
   for (i = 5000; i; i--)
@@ -698,7 +698,7 @@ void printLog(void)
     }
   }
   fclose(f);
-  CmiPrintf("Done Logging: %d\n", Cmi_mynode);
+  CmiPrintf("Done Logging: %d\n", _Cmi_mynode);
 }
 
 #define LOG(t,s,k,d,q) { if (log_pos==50000) { log_pos=0; log_wrap=1;} { logent ent=log+log_pos; ent->time=t; ent->srcpe=s; ent->kind=k; ent->dstpe=d; ent->seqno=q; log_pos++; }}
@@ -755,8 +755,8 @@ void CmiCommUnlock(void) {
 #endif
 
 static struct CmiStateStruct Cmi_state;
-int Cmi_mype;
-int Cmi_myrank=0; /* Normally zero; only 1 during SIGIO handling */
+int _Cmi_mype;
+int _Cmi_myrank=0; /* Normally zero; only 1 during SIGIO handling */
 #define CmiGetState() (&Cmi_state)
 #define CmiGetStateN(n) (&Cmi_state)
 
@@ -764,8 +764,8 @@ void CmiYield(void) { sleep(0); }
 
 static void CommunicationInterrupt(int ignored)
 {
-  MACHLOCK_ASSERT(!Cmi_myrank,"CommunicationInterrupt");
-  if (memflag || comm_flag || immRunning) 
+  MACHLOCK_ASSERT(!_Cmi_myrank,"CommunicationInterrupt");
+  if (memflag || comm_flag || _immRunning) 
   { /* Already busy inside malloc, comm, or immediate messages */
     MACHSTATE(5,"--SKIPPING SIGIO--");
     return;
@@ -774,9 +774,9 @@ static void CommunicationInterrupt(int ignored)
   {
     /*Make sure any malloc's we do in here are NOT migratable:*/
     CmiIsomallocBlockList *oldList=CmiIsomallocBlockListActivate(NULL);
-/*    Cmi_myrank=1; */
+/*    _Cmi_myrank=1; */
     CommunicationServerThread(0);
-/*    Cmi_myrank=0; */
+/*    _Cmi_myrank=0; */
     CmiIsomallocBlockListActivate(oldList);
   }
   MACHSTATE(2,"--END SIGIO--")
@@ -786,17 +786,17 @@ extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)());
 
 static void CmiStartThreads(char **argv)
 {
-  if ((Cmi_numpes != Cmi_numnodes) || (Cmi_mynodesize != 1))
+  if ((_Cmi_numpes != _Cmi_numnodes) || (_Cmi_mynodesize != 1))
     KillEveryone
       ("Multiple cpus unavailable, don't use cpus directive in nodesfile.\n");
   
   CmiStateInit(Cmi_nodestart, 0, &Cmi_state);
-  Cmi_mype = Cmi_nodestart;
+  _Cmi_mype = Cmi_nodestart;
 
   /* Prepare Cpv's for immediate messages: */
-  Cmi_myrank=1;
+  _Cmi_myrank=1;
   CommunicationServerInit();
-  Cmi_myrank=0;
+  _Cmi_myrank=0;
   
 #if !CMK_ASYNC_NOT_NEEDED
   if (!Cmi_netpoll) {
@@ -1357,18 +1357,18 @@ static void node_addresses_obtain(char **argv)
 	fakeTab->nodeNo=ChMessageInt_new(1); /* <- hack */
 	fakeTab->info.nPE=ChMessageInt_new(npes);
 	fakeTab->info.dataport=ChMessageInt_new(0);
-	fakeTab->info.IP=skt_invalid_ip;
+	fakeTab->info.IP=_skt_invalid_ip;
   }
   else 
   { /*Contact charmrun for machine info.*/
 	ChSingleNodeinfo me;
 
-  	me.nodeNo=ChMessageInt_new(Cmi_mynode);
+  	me.nodeNo=ChMessageInt_new(_Cmi_mynode);
 	/*The nPE and IP fields are set by charmrun--
 	  these values don't matter.
 	*/
 	me.info.nPE=ChMessageInt_new(0);
-	me.info.IP=skt_invalid_ip;
+	me.info.IP=_skt_invalid_ip;
 	me.info.mach_id=ChMessageInt_new(Cmi_mach_id);
   	me.info.dataport=ChMessageInt_new(dataport);
 
@@ -1408,15 +1408,15 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
     CmiPushNode(CopyMsg(ogm->data,ogm->size));
     /*case-fallthrough (no break)-- deliver to all other processors*/
   case NODE_BROADCAST_OTHERS:
-    for (i=0; i<Cmi_numnodes; i++)
-      if (i!=Cmi_mynode)
+    for (i=0; i<_Cmi_numnodes; i++)
+      if (i!=_Cmi_mynode)
 	DeliverViaNetwork(ogm, nodes + i, DGRAM_NODEMESSAGE);
     GarbageCollectMsg(ogm);
     break;
   default:
     node = nodes+dst;
     rank=DGRAM_NODEMESSAGE;
-    if (dst != Cmi_mynode) {
+    if (dst != _Cmi_mynode) {
       DeliverViaNetwork(ogm, node, rank);
       GarbageCollectMsg(ogm);
     } else {
@@ -1454,21 +1454,21 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
   dst = ogm->dst;
   switch (dst) {
   case PE_BROADCAST_ALL:
-    for (rank = 0; rank<Cmi_mynodesize; rank++) {
+    for (rank = 0; rank<_Cmi_mynodesize; rank++) {
       CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
     }
-    for (i=0; i<Cmi_numnodes; i++)
-      if (i!=Cmi_mynode)
+    for (i=0; i<_Cmi_numnodes; i++)
+      if (i!=_Cmi_mynode)
 	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
     GarbageCollectMsg(ogm);
     break;
   case PE_BROADCAST_OTHERS:
-    for (rank = 0; rank<Cmi_mynodesize; rank++)
+    for (rank = 0; rank<_Cmi_mynodesize; rank++)
       if (rank + Cmi_nodestart != ogm->src) {
 	CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
       }
-    for (i = 0; i<Cmi_numnodes; i++)
-      if (i!=Cmi_mynode)
+    for (i = 0; i<_Cmi_numnodes; i++)
+      if (i!=_Cmi_mynode)
 	DeliverViaNetwork(ogm, nodes + i, DGRAM_BROADCAST);
     GarbageCollectMsg(ogm);
     break;
@@ -1568,7 +1568,7 @@ CmiCommHandle CmiGeneralNodeSend(int pe, int size, int freemode, char *data)
   if (freemode == 'S') {
     char *copy = (char *)CmiAlloc(size);
     if (!copy)
-      fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
+      fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);
     memcpy(copy, data, size);
     data = copy; freemode = 'F';
   }
@@ -1604,13 +1604,13 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   if (freemode == 'S') {
     char *copy = (char *)CmiAlloc(size);
     if (!copy)
-      fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
+      fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);
     memcpy(copy, data, size);
     data = copy; freemode = 'F';
   }
   if (pe == cs->pe) 
 #if ! CMK_SMP
-  if (!immRunning) /* CdsFifo_Enqueue, below, isn't SIGIO or thread safe.  
+  if (!_immRunning) /* CdsFifo_Enqueue, below, isn't SIGIO or thread safe.  
                       The SMP comm thread never gets here, because of the pe test. */
 #endif
   {
@@ -1968,7 +1968,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   Cmi_scanf_mutex = CmiCreateLock();
 
   skt_set_idle(obtain_idleFn);
-  if (!skt_ip_match(Cmi_charmrun_IP,skt_invalid_ip)) {
+  if (!skt_ip_match(Cmi_charmrun_IP,_skt_invalid_ip)) {
   	set_signals();
 #if CMK_USE_TCP
   	dataskt=skt_server(&dataport);
@@ -1995,7 +1995,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #endif
 
   skt_set_idle(CmiYield);
-  Cmi_check_delay = 2.0+0.5*Cmi_numnodes;
+  Cmi_check_delay = 2.0+0.5*_Cmi_numnodes;
   if (Cmi_charmrun_fd==-1) /*Don't bother with check in standalone mode*/
 	Cmi_check_delay=1.0e30;
 

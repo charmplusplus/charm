@@ -35,7 +35,7 @@ static McQueue **MsgQueue;
 CpvDeclare(void*, CmiLocalQueue);
 
 int Cmi_argc;
-int Cmi_numpes;
+int _Cmi_numpes;
 int Cmi_usched;
 int Cmi_initret;
 CmiStartFn Cmi_startFn;
@@ -142,24 +142,24 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   USER_PARAMETERS *usrparam;
   pthread_t *aThread;
  
-  Cmi_numpes = 0; 
+  _Cmi_numpes = 0; 
   Cmi_usched = usched;
   Cmi_initret = initret;
   Cmi_startFn = fn;
 
-  CmiGetArgInt(argv,"+p",&Cmi_numpes);
-  if (Cmi_numpes <= 0)
+  CmiGetArgInt(argv,"+p",&_Cmi_numpes);
+  if (_Cmi_numpes <= 0)
   {
     CmiError("Error: requested number of processors is invalid %d\n",
-              Cmi_numpes);
+              _Cmi_numpes);
     abort();
   }
 
 
   pthread_mutex_init(&memory_mutex, (pthread_mutexattr_t *) 0);
 
-  MsgQueue=(McQueue **)CmiAlloc(Cmi_numpes*sizeof(McQueue *));
-  for(i=0; i<Cmi_numpes; i++) 
+  MsgQueue=(McQueue **)CmiAlloc(_Cmi_numpes*sizeof(McQueue *));
+  for(i=0; i<_Cmi_numpes; i++) 
     MsgQueue[i] = McQueueCreate();
 
   pthread_key_create(&perThreadKey, (void *) 0);
@@ -168,11 +168,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   pthread_mutex_init(&barrier_mutex, (pthread_mutexattr_t *) 0);
 
   /* suggest to IRIX that we actually use the right number of processors */
-  pthread_setconcurrency(Cmi_numpes);
+  pthread_setconcurrency(_Cmi_numpes);
 
   Cmi_argc = CmiGetArgc(argv);
-  aThread = (pthread_t *) CmiAlloc(sizeof(pthread_t) * Cmi_numpes);
-  for(i=1; i<Cmi_numpes; i++) {
+  aThread = (pthread_t *) CmiAlloc(sizeof(pthread_t) * _Cmi_numpes);
+  for(i=1; i<_Cmi_numpes; i++) {
     usrparam = (USER_PARAMETERS *) CmiAlloc(sizeof(USER_PARAMETERS));
     usrparam->argv = CmiCopyArgs(argv);
     usrparam->mype = i;
@@ -274,7 +274,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
 void CmiSyncBroadcastFn(int size, char *msg)
 {
   int i;
-  for(i=0; i<Cmi_numpes; i++)
+  for(i=0; i<_Cmi_numpes; i++)
     if (CmiMyPe() != i) CmiSyncSendFn(i,size,msg);
 }
 

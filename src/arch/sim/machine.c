@@ -23,8 +23,8 @@
 
 static void **McQueue;
 
-int Cmi_mype;
-int Cmi_numpes;
+int _Cmi_mype;
+int _Cmi_numpes;
 
 
 CsvDeclare(int, CsdStopCount);
@@ -67,7 +67,7 @@ int handler;
 CmiUniContextSwitch(i)
 int i;
 {
-  Cmi_mype = i; 
+  _Cmi_mype = i; 
 }
 
 void CmiNotifyIdle()
@@ -107,7 +107,7 @@ char * msg;
 
     buf =  (char *) CmiAlloc(size);
     memcpy(buf,msg,size);
-    sim_send_message(Cmi_mype,buf,size,FALSE,destPE);
+    sim_send_message(_Cmi_mype,buf,size,FALSE,destPE);
 }
 
 
@@ -129,7 +129,7 @@ int destPE;
 int size;
 char * msg;
 {
-     sim_send_message(Cmi_mype,msg,size,FALSE,destPE);
+     sim_send_message(_Cmi_mype,msg,size,FALSE,destPE);
 }
 
 
@@ -170,8 +170,8 @@ int size;
 char * msg;
 {
     int i;
-    for(i=0; i<Cmi_numpes; i++)
-       if (i!= Cmi_mype) CmiSyncSendFn(i,size,msg);
+    for(i=0; i<_Cmi_numpes; i++)
+       if (i!= _Cmi_mype) CmiSyncSendFn(i,size,msg);
          
     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
 }
@@ -182,8 +182,8 @@ int size;
 char * msg;
 {
     int i;
-    for(i=0; i<Cmi_numpes; i++)
-       if (i!= Cmi_mype) CmiSyncSendFn(i,size,msg);
+    for(i=0; i<_Cmi_numpes; i++)
+       if (i!= _Cmi_mype) CmiSyncSendFn(i,size,msg);
 }
 
 
@@ -195,8 +195,8 @@ char * msg;
 
      char *buf;
 
-     for(i=0; i<Cmi_numpes; i++)
-        if (i!= Cmi_mype) CmiSyncSendFn(i,size,msg);
+     for(i=0; i<_Cmi_numpes; i++)
+        if (i!= _Cmi_mype) CmiSyncSendFn(i,size,msg);
 
      buf =  (char *) CmiAlloc(size);
      memcpy(buf,msg,size);
@@ -262,8 +262,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
     exit(1);
   }
 
-  Cmi_numpes = requested_npe;
-  Cmi_mype   = 0;
+  _Cmi_numpes = requested_npe;
+  _Cmi_mype   = 0;
 
   McQueue = (void **) malloc(requested_npe * sizeof(void *)); 
   for(i=0; i<requested_npe; i++) McQueue[i] = CdsFifo_Create();

@@ -15,8 +15,8 @@
 #define ALL_NODES -1
 
 
-int  Cmi_mype;
-int  Cmi_numpes;
+int  _Cmi_mype;
+int  _Cmi_numpes;
 CpvDeclare(void*, CmiLocalQueue);
 
 
@@ -148,7 +148,7 @@ int size;
 char * msg;
 {
     char *temp;
-    if (Cmi_mype == destPE)
+    if (_Cmi_mype == destPE)
        {
           temp = (char *)CmiAlloc(size) ;
           memcpy(temp, msg, size) ;
@@ -179,7 +179,7 @@ void CmiFreeSendFn(destPE, size, msg)
      int destPE, size;
      char *msg;
 {
-    if (Cmi_mype == destPE)
+    if (_Cmi_mype == destPE)
        {
           CdsFifo_Enqueue(CpvAccess(CmiLocalQueue), msg);
        }
@@ -197,9 +197,9 @@ void CmiSyncBroadcastFn(size, msg)        /* ALL_EXCEPT_ME  */
 int size;
 char * msg;
 {
-    if (Cmi_numpes > 1) 
+    if (_Cmi_numpes > 1) 
        csend(MSG_TYPE, msg, size, ALL_NODES,PROCESS_PID);
-    CQdCreate(CpvAccess(cQdState), Cmi_numpes-1);
+    CQdCreate(CpvAccess(cQdState), _Cmi_numpes-1);
 }
 
 
@@ -209,7 +209,7 @@ char * msg;
 {
         long msgid;
         msgid = isend(MSG_TYPE, msg, size, ALL_NODES, PROCESS_PID);
-        CQdCreate(CpvAccess(cQdState), Cmi_numpes-1);
+        CQdCreate(CpvAccess(cQdState), _Cmi_numpes-1);
         return (CmiCommHandle) msgid;
 }
 
@@ -226,12 +226,12 @@ int size;
 char * msg;
 {
     char *temp;
-    if (Cmi_numpes > 1) 
+    if (_Cmi_numpes > 1) 
        csend(MSG_TYPE, msg, size, ALL_NODES,PROCESS_PID);
     temp = (char *)CmiAlloc(size) ;
     memcpy(temp, msg, size) ;
     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue), temp); 
-    CQdCreate(CpvAccess(cQdState), Cmi_numpes);
+    CQdCreate(CpvAccess(cQdState), _Cmi_numpes);
 }
 
 
@@ -245,7 +245,7 @@ char * msg;
         temp = (char *)CmiAlloc(size) ;
         memcpy(temp, msg, size) ;
         CdsFifo_Enqueue(CpvAccess(CmiLocalQueue), temp);
-        CQdCreate(CpvAccess(cQdState), Cmi_numpes);
+        CQdCreate(CpvAccess(cQdState), _Cmi_numpes);
         return (CmiCommHandle) msgid;
 }
 
@@ -255,10 +255,10 @@ void CmiFreeBroadcastAllFn(size, msg)
 int size;
 char * msg;
 {
-    if (Cmi_numpes > 1)
+    if (_Cmi_numpes > 1)
        csend(MSG_TYPE, msg, size, ALL_NODES,PROCESS_PID);
     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue), msg);
-    CQdCreate(CpvAccess(cQdState), Cmi_numpes);
+    CQdCreate(CpvAccess(cQdState), _Cmi_numpes);
 }
 
 
@@ -278,9 +278,9 @@ CmiStartFn fn;
 int usched, initret;
 {
   CpvInitialize(void*, CmiLocalQueue);
-  Cmi_mype = mynode();
-  Cmi_numpes = numnodes();
-  /*  neighbour_init(Cmi_mype); */
+  _Cmi_mype = mynode();
+  _Cmi_numpes = numnodes();
+  /*  neighbour_init(_Cmi_mype); */
   CpvAccess(CmiLocalQueue)= CdsFifo_Create();
   /*  CmiTimerInit(); */
   CthInit(argv);

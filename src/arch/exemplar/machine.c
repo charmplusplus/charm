@@ -30,7 +30,7 @@ static McQueue **MsgQueue;
 
 
 CpvDeclare(void*, CmiLocalQueue);
-node_private int Cmi_numpes;
+node_private int _Cmi_numpes;
 
 static node_private barrier_t barrier;
 
@@ -117,9 +117,9 @@ void ConverseInit(int argc, char** argv, CmiStartFn fn, int usched, int initret)
 
     /* figure out number of processors required */
     i =  0;
-    Cmi_numpes = 0; 
-    CmiGetArgInt(argv,"+p",&Cmi_numpes);
-    if (Cmi_numpes <= 0)
+    _Cmi_numpes = 0; 
+    CmiGetArgInt(argv,"+p",&_Cmi_numpes);
+    if (_Cmi_numpes <= 0)
       CmiAbort("Invalid number of processors\n");
 
     Cmi_argc = argc;
@@ -129,18 +129,18 @@ void ConverseInit(int argc, char** argv, CmiStartFn fn, int usched, int initret)
     Cmi_initret = initret;
 
     request.node = CPS_SAME_NODE;
-    request.min  = Cmi_numpes;
-    request.max  = Cmi_numpes;
+    request.min  = _Cmi_numpes;
+    request.max  = _Cmi_numpes;
     request.threadscope = CPS_THREAD_PARALLEL;
    
     if(cps_barrier_alloc(&barrier)!=0)
       CmiAbort("Cannot Alocate Barrier\n");
 
-    MsgQueue=(McQueue **)g_malloc(Cmi_numpes*sizeof(McQueue *));
+    MsgQueue=(McQueue **)g_malloc(_Cmi_numpes*sizeof(McQueue *));
     if (MsgQueue == (McQueue **)0) {
 	CmiAbort("Cannot Allocate Memory...\n");
     }
-    for(i=0; i<Cmi_numpes; i++) MsgQueue[i] = McQueueCreate();
+    for(i=0; i<_Cmi_numpes; i++) MsgQueue[i] = McQueueCreate();
 
     if (cps_ppcall(&request, threadInit ,(void *) 0) < 0) {
 	CmiAbort("Cannot create threads...\n");
@@ -152,7 +152,7 @@ void ConverseInit(int argc, char** argv, CmiStartFn fn, int usched, int initret)
 void ConverseExit(void)
 {
    ConverseCommonExit();
-   cps_barrier(&barrier,&Cmi_numpes);
+   cps_barrier(&barrier,&_Cmi_numpes);
 }
 
 static void threadInit(arg)
@@ -268,7 +268,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
 
 void CmiNodeBarrier()
 {
-   if(cps_barrier(&barrier,&Cmi_numpes)!=0)
+   if(cps_barrier(&barrier,&_Cmi_numpes)!=0)
      CmiAbort("Error in Barrier\n");
 }
 

@@ -151,7 +151,7 @@ static void simulate()
     int pno;
     
     while ( (pno = select_processor())  )  {
-        Cmi_mype = pno-1;
+        _Cmi_mype = pno-1;
         if (IS_CPU(pno)) {
 
             if (  CpvAccess(CsdStopFlag) == 0)

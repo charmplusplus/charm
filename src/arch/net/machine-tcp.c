@@ -213,7 +213,7 @@ here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK.
     if (Cmi_charmrun_fd!=-1)
 	ctrlskt_ready_read = CMK_PIPE_CHECKREAD(Cmi_charmrun_fd);
     if (dataskt!=-1) {
-      for (i=0; i<Cmi_numnodes; i++)
+      for (i=0; i<_Cmi_numnodes; i++)
       {
         if (i == CmiMyNode()) continue;
         if (nodes[i].send_queue_h) {
@@ -345,7 +345,7 @@ static void IntegrateMessageDatagram(char **msg, int len)
 	else {
           newmsg = (char *)CmiAlloc(size);
           if (!newmsg)
-            fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
+            fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);
           memcpy(newmsg, *msg, len);
 	  freeMaxBuf(*msg);		/* free buffer, must be max size */
 	}
@@ -368,7 +368,7 @@ static void IntegrateMessageDatagram(char **msg, int len)
          CmiAbort("\n\n\t\tLength mismatch!!\n\n");
       if (node->asm_fill == node->asm_total) {
         if (rank == DGRAM_BROADCAST) {
-          for (i=1; i<Cmi_mynodesize; i++)
+          for (i=1; i<_Cmi_mynodesize; i++)
             CmiPushPE(i, CopyMsg(newmsg, node->asm_total));
           CmiPushPE(0, newmsg);
         } else {
@@ -565,8 +565,8 @@ static void open_tcp_sockets()
   SOCKET skt;
   int val;
 
-  mype = Cmi_mynode;
-  numpes = Cmi_numnodes;
+  mype = _Cmi_mynode;
+  numpes = _Cmi_numnodes;
   MACHSTATE2(2,"  open_tcp_sockets (%d:%d)", mype, numpes);
   for (i=0; i<mype; i++) {
     unsigned int clientPort;

@@ -219,9 +219,9 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
 int TransmitAcknowledgement()
 {
   int skip; static int nextnode=0; OtherNode node;
-  for (skip=0; skip<Cmi_numnodes; skip++) {
+  for (skip=0; skip<_Cmi_numnodes; skip++) {
     node = nodes+nextnode;
-    nextnode = (nextnode + 1) % Cmi_numnodes;
+    nextnode = (nextnode + 1) % _Cmi_numnodes;
     if (node->recv_ack_cnt) {
       if ((node->recv_ack_cnt > Cmi_half_window) ||
 	  (Cmi_clock >= node->recv_ack_time)) {
@@ -254,9 +254,9 @@ int TransmitDatagram()
   static int nextnode=0; int skip, count, slot;
   unsigned int seqno;
   
-  for (skip=0; skip<Cmi_numnodes; skip++) {
+  for (skip=0; skip<_Cmi_numnodes; skip++) {
     node = nodes+nextnode;
-    nextnode = (nextnode + 1) % Cmi_numnodes;
+    nextnode = (nextnode + 1) % _Cmi_numnodes;
     dg = node->send_queue_h;
     if (dg) {
       seqno = dg->seqno;
@@ -379,7 +379,7 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
     	dg->seqno,node->nodestart,size)
     msg = (char *)CmiAlloc(size);
     if (!msg)
-      fprintf(stderr, "%d: Out of mem\n", Cmi_mynode);
+      fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);
     if (size < dg->len) KillEveryoneCode(4559312);
     memcpy(msg, (char*)(dg->data), dg->len);
     node->asm_rank = dg->rank;
@@ -401,7 +401,7 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
   if (node->asm_fill == node->asm_total) {
     if (node->asm_rank == DGRAM_BROADCAST) {
       int len = node->asm_total;
-      for (i=1; i<Cmi_mynodesize; i++)
+      for (i=1; i<_Cmi_mynodesize; i++)
          CmiPushPE(i, CopyMsg(msg, len));
       CmiPushPE(0, msg);
     } else {

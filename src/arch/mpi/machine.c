@@ -69,11 +69,11 @@
 
 #define TAG     1375
 
-int Cmi_numpes;
-int               Cmi_mynode;    /* Which address space am I */
-int               Cmi_mynodesize;/* Number of processors in my address space */
-int               Cmi_numnodes;  /* Total number of address spaces */
-int               Cmi_numpes;    /* Total number of processors */
+int _Cmi_numpes;
+int               _Cmi_mynode;    /* Which address space am I */
+int               _Cmi_mynodesize;/* Number of processors in my address space */
+int               _Cmi_numnodes;  /* Total number of address spaces */
+int               _Cmi_numpes;    /* Total number of processors */
 static int        Cmi_nodestart; /* First processor in this address space */ 
 CpvDeclare(void*, CmiLocalQueue);
 
@@ -229,8 +229,8 @@ CsvDeclare(CmiNodeState, NodeState);
 #if ! CMK_SMP
 /************ non SMP **************/
 static struct CmiStateStruct Cmi_state;
-int Cmi_mype;
-int Cmi_myrank;
+int _Cmi_mype;
+int _Cmi_myrank;
 
 void CmiMemLock(void) {}
 void CmiMemUnlock(void) {}
@@ -243,8 +243,8 @@ void CmiYield(void) { sleep(0); }
 static void CmiStartThreads(char **argv)
 {
   CmiStateInit(Cmi_nodestart, 0, &Cmi_state);
-  Cmi_mype = Cmi_nodestart;
-  Cmi_myrank = 0;
+  _Cmi_mype = Cmi_nodestart;
+  _Cmi_myrank = 0;
 }      
 #endif	/* non smp */
 
@@ -314,13 +314,13 @@ int CmiMyRank(void)
 #endif
 
 #ifndef CmiNodeFirst
-int CmiNodeFirst(int node) { return node*Cmi_mynodesize; }
-int CmiNodeSize(int node)  { return Cmi_mynodesize; }
+int CmiNodeFirst(int node) { return node*_Cmi_mynodesize; }
+int CmiNodeSize(int node)  { return _Cmi_mynodesize; }
 #endif
 
 #ifndef CmiNodeOf
-int CmiNodeOf(int pe)      { return (pe/Cmi_mynodesize); }
-int CmiRankOf(int pe)      { return pe%Cmi_mynodesize; }
+int CmiNodeOf(int pe)      { return (pe/_Cmi_mynodesize); }
+int CmiRankOf(int pe)      { return pe%_Cmi_mynodesize; }
 #endif
 
 static int CmiAllAsyncMsgsSent(void)
@@ -494,7 +494,7 @@ static int MsgQueueEmpty()
 {
   int i;
 #if 0
-  for (i=0; i<Cmi_mynodesize; i++)
+  for (i=0; i<_Cmi_mynodesize; i++)
     if (!PCQueueEmpty(procState[i].sendMsgBuf)) return 0;
 #else
   return PCQueueEmpty(sendMsgBuf);
@@ -508,7 +508,7 @@ static int SendMsgBuf();
 static int RecvQueueEmpty()
 {
   int i;
-  for (i=0; i<Cmi_mynodesize; i++) {
+  for (i=0; i<_Cmi_mynodesize; i++) {
     CmiState cs=CmiGetStateN(i);
     if (!PCQueueEmpty(cs->recv)) return 0;
   }
@@ -672,7 +672,7 @@ static int SendMsgBuf()
 
   MACHSTATE(2,"SendMsgBuf begin {");
 #if 0
-  for (i=0; i<Cmi_mynodesize; i++)
+  for (i=0; i<_Cmi_mynodesize; i++)
   {
     while (!PCQueueEmpty(procState[i].sendMsgBuf))
     {
@@ -812,16 +812,16 @@ void SendSpanningChildren(int size, char *msg)
   int startpe = CMI_BROADCAST_ROOT(msg)-1;
   int i;
 
-  assert(startpe>=0 && startpe<Cmi_numpes);
+  assert(startpe>=0 && startpe<_Cmi_numpes);
 
   for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
     int p = cs->pe-startpe;
-    if (p<0) p+=Cmi_numpes;
+    if (p<0) p+=_Cmi_numpes;
     p = BROADCAST_SPANNING_FACTOR*p + i;
-    if (p > Cmi_numpes - 1) break;
+    if (p > _Cmi_numpes - 1) break;
     p += startpe;
-    p = p%Cmi_numpes;
-    assert(p>=0 && p<Cmi_numpes && p!=cs->pe);
+    p = p%_Cmi_numpes;
+    assert(p>=0 && p<_Cmi_numpes && p!=cs->pe);
     CmiSyncSendFn1(p, size, msg);
   }
 }
@@ -841,7 +841,7 @@ void SendHypercube(int size, char *msg)
   
   /*  CmiPrintf("In hypercube\n"); */
 
-  /* assert(startpe>=0 && startpe<Cmi_numpes); */
+  /* assert(startpe>=0 && startpe<_Cmi_numpes); */
 
   for (i = curcycle; i < logp; i++) {
     int p = cs->pe ^ (1 << i);
@@ -858,7 +858,7 @@ void SendHypercube(int size, char *msg)
 void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
 {
 #if CMK_BROADCAST_SPANNING_TREE
-  CMI_SET_BROADCAST_ROOT(msg, Cmi_mype+1);
+  CMI_SET_BROADCAST_ROOT(msg, _Cmi_mype+1);
   SendSpanningChildren(size, msg);
   
 #elif CMK_BROADCAST_HYPERCUBE
@@ -869,7 +869,7 @@ void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
   CmiState cs = CmiGetState();
   int i;
 
-  for ( i=cs->pe+1; i<Cmi_numpes; i++ ) 
+  for ( i=cs->pe+1; i<_Cmi_numpes; i++ ) 
     CmiSyncSendFn(i, size,msg) ;
   for ( i=0; i<cs->pe; i++ ) 
     CmiSyncSendFn(i, size,msg) ;
@@ -885,7 +885,7 @@ CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)
   CmiState cs = CmiGetState();
   int i ;
 
-  for ( i=cs->pe+1; i<Cmi_numpes; i++ ) 
+  for ( i=cs->pe+1; i<_Cmi_numpes; i++ ) 
     CmiAsyncSendFn(i,size,msg) ;
   for ( i=0; i<cs->pe; i++ ) 
     CmiAsyncSendFn(i,size,msg) ;
@@ -919,7 +919,7 @@ void CmiSyncBroadcastAllFn(int size, char *msg)        /* All including me */
 #else
     int i ;
      
-  for ( i=0; i<Cmi_numpes; i++ ) 
+  for ( i=0; i<_Cmi_numpes; i++ ) 
     CmiSyncSendFn(i,size,msg) ;
 #endif
 
@@ -930,7 +930,7 @@ CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)
 {
   int i ;
 
-  for ( i=1; i<Cmi_numpes; i++ ) 
+  for ( i=1; i<_Cmi_numpes; i++ ) 
     CmiAsyncSendFn(i,size,msg) ;
 
   CmiAbort("In  AsyncBroadcastAll broadcast\n");
@@ -956,7 +956,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 #else
   int i ;
      
-  for ( i=0; i<Cmi_numpes; i++ ) 
+  for ( i=0; i<_Cmi_numpes; i++ ) 
     CmiSyncSendFn(i,size,msg) ;
 #endif
   CmiFree(msg) ;
@@ -979,16 +979,16 @@ CmiCommHandle CmiAsyncNodeSendFn(int dstNode, int size, char *msg)
     PCQueuePush(CsvAccess(NodeState).NodeRecv,(char *)CopyMsg(msg,size));
     CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
   case NODE_BROADCAST_OTHERS:
-    CQdCreate(CpvAccess(cQdState), Cmi_numnodes-1);
-    for (i=0; i<Cmi_numnodes; i++)
-      if (i!=Cmi_mynode) {
+    CQdCreate(CpvAccess(cQdState), _Cmi_numnodes-1);
+    for (i=0; i<_Cmi_numnodes; i++)
+      if (i!=_Cmi_mynode) {
         EnqueueMsg((char *)CopyMsg(msg,size), size, i);
       }
     break;
   default:
     CQdCreate(CpvAccess(cQdState), 1);
     dupmsg = (char *)CopyMsg(msg,size);
-    if(dstNode == Cmi_mynode) {
+    if(dstNode == _Cmi_mynode) {
       CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
       PCQueuePush(CsvAccess(NodeState).NodeRecv, dupmsg);
       CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
@@ -1195,33 +1195,33 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
   
   PMPI_Init(&argc, &argv);
-  PMPI_Comm_size(MPI_COMM_WORLD, &Cmi_numnodes);
-  PMPI_Comm_rank(MPI_COMM_WORLD, &Cmi_mynode);
+  PMPI_Comm_size(MPI_COMM_WORLD, &_Cmi_numnodes);
+  PMPI_Comm_rank(MPI_COMM_WORLD, &_Cmi_mynode);
   /* processor per node */
-  Cmi_mynodesize = 1;
-  CmiGetArgInt(argv,"+ppn", &Cmi_mynodesize);
+  _Cmi_mynodesize = 1;
+  CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize);
 #if ! CMK_SMP
-  if (Cmi_mynodesize > 1 && Cmi_mynode == 0) 
+  if (_Cmi_mynodesize > 1 && _Cmi_mynode == 0) 
     CmiAbort("+ppn cannot be used in non SMP version!\n");
 #endif
   idleblock = CmiGetArgFlag(argv, "+idleblocking");
-  if (idleblock && Cmi_mynode == 0) {
+  if (idleblock && _Cmi_mynode == 0) {
     CmiPrintf("Charm++: Running in idle blocking mode.\n");
   }
 
 #if CMK_NO_OUTSTANDING_SENDS
   no_outstanding_sends=1;
 #endif
-  if (CmiGetArgInt(argv,"+no_outstanding_sends",&no_outstanding_sends) && Cmi_mynode == 0) {
+  if (CmiGetArgInt(argv,"+no_outstanding_sends",&no_outstanding_sends) && _Cmi_mynode == 0) {
      CmiPrintf("Charm++: Will%s consume outstanding sends in scheduler loop\n",
      	no_outstanding_sends?"":" not");
   }
-  Cmi_numpes = Cmi_numnodes * Cmi_mynodesize;
-  Cmi_nodestart = Cmi_mynode * Cmi_mynodesize;
+  _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
+  Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
   Cmi_argvcopy = CmiCopyArgs(argv);
   Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usched;
   /* find dim = log2(numpes), to pretend we are a hypercube */
-  for ( Cmi_dim=0,n=Cmi_numpes; n>1; n/=2 )
+  for ( Cmi_dim=0,n=_Cmi_numpes; n>1; n/=2 )
     Cmi_dim++ ;
  /* CmiSpanTreeInit();*/
   request_max=MAX_QLEN;
@@ -1229,7 +1229,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   /*printf("request max=%d\n", request_max);*/
   if (CmiGetArgFlag(argv,"++debug"))
   {   /*Pause so user has a chance to start and attach debugger*/
-    printf("CHARMDEBUG> Processor %d has PID %d\n",Cmi_mynode,getpid());
+    printf("CHARMDEBUG> Processor %d has PID %d\n",_Cmi_mynode,getpid());
     if (!CmiGetArgFlag(argv,"++debug-no-pause"))
       sleep(10);
   }
@@ -1250,8 +1250,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CsvInitialize(CmiNodeState, NodeState);
   CmiNodeStateInit(&CsvAccess(NodeState));
 
-  procState = (ProcState *)malloc((Cmi_mynodesize+1) * sizeof(ProcState));
-  for (i=0; i<Cmi_mynodesize+1; i++) {
+  procState = (ProcState *)malloc((_Cmi_mynodesize+1) * sizeof(ProcState));
+  for (i=0; i<_Cmi_mynodesize+1; i++) {
 /*    procState[i].sendMsgBuf = PCQueueCreate();   */
     procState[i].recvLock = CmiCreateLock();
   }
