@@ -102,23 +102,8 @@
        integer, parameter :: MPI_BOR = 11
        integer, parameter :: MPI_BXOR = 12
 
-       integer, parameter :: MPI_ANY_SOURCE = -1
-       integer, parameter :: MPI_ANY_TAG = -1
-       integer, parameter :: MPI_GROUP_NULL = -1
-       integer, parameter :: MPI_COMM_NULL = -1
-       integer, parameter :: MPI_REQUEST_NULL = -1
-       integer, parameter :: MPI_UNDEFINED = -32766
-
        integer, parameter :: MPI_GRAPH = 1
        integer, parameter :: MPI_CART = 2
-
-       integer, parameter :: MPI_PROC_NULL = -1
-
-       integer, parameter :: MPI_IDENT    = 0
-       integer, parameter :: MPI_SIMILAR  = 1
-       integer, parameter :: MPI_UNEQUAL  = 2
-
-       integer, parameter :: MPI_TYPE_NULL = -1
 
        integer, parameter :: MPI_TAG_UB = 1073741824
 
