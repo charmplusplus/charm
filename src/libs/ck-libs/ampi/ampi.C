@@ -651,6 +651,75 @@ int AMPI_Waitall(int count, AMPI_Request *request, AMPI_Status *sts)
 }
 
 extern "C" 
+int AMPI_Waitany(int count, AMPI_Request *request, int *idx, AMPI_Status *sts)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  while(1) {
+    for(*idx=0;(*idx)<count;(*idx)++) {
+      if(request[*idx] == (-1))
+        return 0;
+      if(request[*idx] < 100) { // persistent request
+        PersReq *req = &(ptr->requests[request[*idx]]);
+        if(req->sndrcv == 2) { // recv request
+          if(ptr->iprobe(req->tag, req->proc, req->comm, (int*) sts)) {
+            ptr->recv(req->tag, req->proc, req->buf, req->count, 
+                      req->type, req->comm, (int*)sts);
+            return 0;
+          }
+        }
+      } else { // irecv request
+        int index = request[*idx] - 100;
+        PersReq *req = &(ptr->irequests[index]);
+        if(ptr->iprobe(req->tag, req->proc, req->comm, (int*) sts)) {
+          ptr->recv(req->tag, req->proc, req->buf, req->count, 
+                    req->type, req->comm, (int*)sts);
+          // now free the request
+          ptr->nirequests--;
+          PersReq *ireq = &(ptr->irequests[0]);
+          req->nextfree = ptr->firstfree;
+          req->prevfree = ireq[ptr->firstfree].prevfree;
+          ireq[req->prevfree].nextfree = index;
+          ireq[req->nextfree].prevfree = index;
+          ptr->firstfree = index;
+          return 0;
+        }
+      }
+    }
+  }
+  // should never come here
+  return 0;
+}
+
+extern "C" 
+int AMPI_Wait(AMPI_Request *request, AMPI_Status *sts)
+{
+  ampi *ptr = CtvAccess(ampiPtr);
+  if(*request == (-1))
+      return 0;
+  if(*request < 100) { // persistent request
+    PersReq *req = &(ptr->requests[*request]);
+    if(req->sndrcv == 2) { // recv request
+      ptr->recv(req->tag, req->proc, req->buf, req->count, 
+                req->type, req->comm, (int*)sts);
+    }
+  } else { // irecv request
+    int index = *request - 100;
+    PersReq *req = &(ptr->irequests[index]);
+    ptr->recv(req->tag, req->proc, req->buf, req->count, 
+              req->type, req->comm, (int*) sts);
+    // now free the request
+    ptr->nirequests--;
+    PersReq *ireq = &(ptr->irequests[0]);
+    req->nextfree = ptr->firstfree;
+    req->prevfree = ireq[ptr->firstfree].prevfree;
+    ireq[req->prevfree].nextfree = index;
+    ireq[req->nextfree].prevfree = index;
+    ptr->firstfree = index;
+  }
+  return 0;
+}
+
+extern "C" 
 int AMPI_Test(AMPI_Request *request, int *flag, AMPI_Status *sts)
 {
   ampi *ptr = CtvAccess(ampiPtr);

@@ -80,6 +80,8 @@ int AMPI_Start(AMPI_Request *reqnum);
 int AMPI_Probe(int source, int tag, AMPI_Comm comm, AMPI_Status *sts);
 int AMPI_Iprobe(int src, int tag, AMPI_Comm comm, int *flag, AMPI_Status *sts);
 int AMPI_Waitall(int count, AMPI_Request *request, AMPI_Status *sts);
+int AMPI_Waitany(int count, AMPI_Request *request, int *index,AMPI_Status *sts);
+int AMPI_Wait(AMPI_Request *request, AMPI_Status *sts);
 int AMPI_Test(AMPI_Request *request, int *flag, AMPI_Status *sts);
 int AMPI_Testall(int count, AMPI_Request *request, int *flag, AMPI_Status *sts);
 int AMPI_Get_count(AMPI_Status *sts, AMPI_Datatype dtype, int *count);

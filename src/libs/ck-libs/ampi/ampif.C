@@ -21,6 +21,8 @@ FDECL {
 #define ampi_wtime FTN_NAME( AMPI_WTIME , ampi_wtime )
 #define ampi_start FTN_NAME( AMPI_START , ampi_start )
 #define ampi_waitall FTN_NAME( AMPI_WAITALL , ampi_waitall )
+#define ampi_waitany FTN_NAME( AMPI_WAITANY , ampi_waitany )
+#define ampi_wait FTN_NAME( AMPI_WAIT , ampi_wait )
 #define ampi_testall FTN_NAME( AMPI_TESTALL , ampi_testall )
 #define ampi_test FTN_NAME( AMPI_TEST , ampi_test )
 #define ampi_send_init FTN_NAME( AMPI_SEND_INIT , ampi_send_init )
@@ -146,6 +148,17 @@ void ampi_start(int *reqnum, int *ierr)
 void ampi_waitall(int *count, int *request, int *status, int *ierr)
 {
   *ierr = AMPI_Waitall(*count, (AMPI_Request*) request, (AMPI_Status*) status);
+}
+
+void ampi_waitany(int *count, int *request, int *index, int *status, int *ierr)
+{
+  *ierr = AMPI_Waitany(*count, (AMPI_Request*) request, index, 
+                       (AMPI_Status*) status);
+}
+
+void ampi_wait(int *request, int *status, int *ierr)
+{
+  *ierr = AMPI_Wait((AMPI_Request*) request, (AMPI_Status*) status);
 }
 
 void ampi_testall(int *count, int *request, int *flag, int *status, int *ierr)

@@ -50,6 +50,8 @@ module AMPI
   external AMPI_Allreduce
   external AMPI_Start
   external AMPI_Waitall
+  external AMPI_Waitany
+  external AMPI_Wait
   external AMPI_Send_init
   external AMPI_Recv_init
   external AMPI_Type_contiguous
