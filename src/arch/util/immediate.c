@@ -2,12 +2,13 @@
   support immediate message in Converse
 */
 
-#if CMK_IMMEDIATE_MSG
 
+static int immRunning=0; /* if set, somebody's inside an immediate message */
+
+#if CMK_IMMEDIATE_MSG
 
 /* SMP: These variables are protected by immRecvLock. */
 static void *currentImmediateMsg=NULL; /* immediate message currently being executed */
-static int immRunning=0; /* if set, somebody's inside an immediate message */
 
 /*  push immediate messages into imm queue. Immediate messages can be pushed
     from both processor threads or comm. thread.
