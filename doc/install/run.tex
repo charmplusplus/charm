@@ -131,7 +131,7 @@ the properties of all hosts that follow them.  The qualifiers are:
 shell\\
 %{\tt passwd <passwd>}     \> - subsequent hosts use the specified password\\
 {\tt setup <cmd>  }       \> - subsequent hosts should execute cmd\\
-{\tt home <dir> }         \> - subsequent hosts should find programs under dir\\
+{\tt pathfix <dir1> <dir2>}         \> - subsequent hosts should replace dir1 with dir2 in the program path\\
 {\tt cpus <n>}            \> - subsequent hosts should use N light-weight processes\\
 {\tt speed <s>}           \> - subsequent hosts have relative speed rating\\
 {\tt ext <extn>}          \> - subsequent hosts should append extn to the pgm name\\
@@ -212,9 +212,9 @@ follows:
 	or the current working directory, the beginning part of the 
         path 
 	is replaced with the environment variable {\bf \$HOME} or the 
-	current working directory. However, if {\tt exec\_home} is 
-        specified in the nodes file (see below), the beginning part of
-        the path is replaced with {\tt exec\_home}.
+	current working directory. However, if {\tt ++pathfix dir1 dir2} is 
+        specified in the nodes file (see above), the part of
+        the path matching {\tt dir1} is replaced with {\tt dir2}.
 	\item The system tries to locate this program (with modified 
 	pathname and appended extension if specified) on all nodes.
 \end{enumerate}
