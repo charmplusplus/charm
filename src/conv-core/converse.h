@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.10  1995-09-07 21:14:15  jyelon
+ * Revision 2.11  1995-09-19 18:57:17  jyelon
+ * added CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION and other goodies.
+ *
+ * Revision 2.10  1995/09/07  21:14:15  jyelon
  * Added prefix to Cpv and Csv macros, then fixed bugs thereby revealed.
  *
  * Revision 2.9  1995/07/19  22:18:54  jyelon
@@ -49,15 +52,22 @@
 extern "C" {
 #endif
 
-#if defined(__cplusplus)||defined(__STDC__)
+#ifdef CMK_COMPILER_SUPPORTS_PROTOTYPES
 #define CMK_PROTO(x) x
-#define CMK_CONCAT(x,y) x##y
-#else
+#endif
+
+#ifdef CMK_COMPILER_DISLIKES_PROTOTYPES
 #define CMK_PROTO(x) ()
-#define CMK_QUOTE(x) x
+#endif
+
+#ifdef CMK_PREPROCESSOR_USES_K_AND_R_STANDARD_CONCATENATION
+#define CMK_QUOTE(x)x
 #define CMK_CONCAT(x,y) CMK_QUOTE(x)y
 #endif
 
+#ifdef CMK_PREPROCESSOR_USES_ANSI_STANDARD_CONCATENATION
+#define CMK_CONCAT(x,y) x##y
+#endif
 
 /******** MACROS AND PROTOTYPES FOR CPV AND CSV *******/
 
