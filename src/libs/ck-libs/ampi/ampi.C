@@ -470,7 +470,7 @@ static ampi *ampiInit(char **argv)
         ComlibInstanceHandle cinst;
 
 #if AMPI_COMLIB
-	cinst=CkGetComlibInstance()
+	cinst=CkGetComlibInstance();
 #endif
         
         //Create and attach the ampiParent array
