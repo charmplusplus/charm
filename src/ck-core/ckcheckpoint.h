@@ -47,21 +47,13 @@ public:
 	void pup(PUP::er& p){ CBase_CkCheckpointMgr::pup(p); p|restartCB; }
 };
 
-typedef struct _GroupInfo{
-        CkGroupID gID;
-        int MigCtor, DefCtor;
-        int useDefCtor;
-        char name[256];
-} GroupInfo;
-PUPbytes(GroupInfo)
-PUPmarshall(GroupInfo)
-
 // utility functions to pup system global tables
 void CkPupROData(PUP::er &p);
 void CkPupMainChareData(PUP::er &p);
 void CkPupGroupData(PUP::er &p);
 void CkPupNodeGroupData(PUP::er &p);
 void CkPupArrayElementsData(PUP::er &p);
+void CkPupProcessorData(PUP::er &p);
 
 void CkStartCheckpoint(char* dirname,const CkCallback& cb);
 void CkRestartMain(const char* dirname);

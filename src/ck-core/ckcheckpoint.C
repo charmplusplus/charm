@@ -22,6 +22,14 @@ More documentation goes here...
 
 CkGroupID _sysChkptMgr;
 
+typedef struct _GroupInfo{
+        CkGroupID gID;
+        int MigCtor, DefCtor;
+        char name[256];
+} GroupInfo;
+PUPbytes(GroupInfo)
+PUPmarshall(GroupInfo)
+
 // help class to find how many array elements
 class ElementCounter : public CkLocIterator {
 private:
@@ -168,15 +176,13 @@ void CkPupGroupData(PUP::er &p)
 	  for(i=0;i<numGroups;i++) {
 		tmpInfo[i].gID = (*CkpvAccess(_groupIDTable))[i];
 		TableEntry ent = CkpvAccess(_groupTable)->find(tmpInfo[i].gID);
-		tmpInfo[i].useDefCtor = ent.getObj()->useDefCtor();
 		tmpInfo[i].MigCtor = _chareTable[ent.getcIdx()]->migCtor;
 		tmpInfo[i].DefCtor = _chareTable[ent.getcIdx()]->defCtor;
 		strncpy(tmpInfo[i].name,_chareTable[ent.getcIdx()]->name,255);
-		DEBCHK("[%d] CkPupGroupData: %s group %s has useDefCtor=%d\n",
-			CkMyPe(), p.typeString(), tmpInfo[i].name,
-			tmpInfo[i].useDefCtor);
+		DEBCHK("[%d] CkPupGroupData: %s group %s \n",
+			CkMyPe(), p.typeString(), tmpInfo[i].name);
 
-		if(tmpInfo[i].useDefCtor==0 && tmpInfo[i].MigCtor==-1) {
+		if(tmpInfo[i].MigCtor==-1) {
 			char buf[512];
 			sprintf(buf,"Group %s needs a migration constructor and PUP'er routine for restart.\n", tmpInfo[i].name);
 			CkAbort(buf);
@@ -185,26 +191,25 @@ void CkPupGroupData(PUP::er &p)
   	}
 	for (i=0; i<numGroups; i++) p|tmpInfo[i];
 
-	for(i=0;i<numGroups;i++) {
-		CkGroupID gID = tmpInfo[i].gID;
-		if (p.isUnpacking()) {
-		  //CkpvAccess(_groupIDTable)->push_back(gID);
-		  int eIdx = (tmpInfo[i].useDefCtor)?(tmpInfo[i].DefCtor):(tmpInfo[i].MigCtor);
-		  void *m = CkAllocSysMsg();
-		  envelope* env = UsrToEnv((CkMessage *)m);
-		  CkCreateLocalGroup(gID, eIdx, env);
-		}
-		IrrGroup *gobj = CkpvAccess(_groupTable)->find(gID).getObj();
-		if(!tmpInfo[i].useDefCtor) {
-                        gobj->pup(p);
-                        DEBCHK("Group PUP'ed: gid = %d, name = %s\n",
-				gobj->ckGetGroupID().idx,
-				tmpInfo[i].name);
-		}else{
-                        DEBCHK("Group NOT PUP'ed : gid = %d, name = %s\n",
-				gobj->ckGetGroupID().idx,
-				tmpInfo[i].name);
-		}
+	for(i=0;i<numGroups;i++) 
+	{
+	  CkGroupID gID = tmpInfo[i].gID;
+	  if (p.isUnpacking()) {
+	    //CkpvAccess(_groupIDTable)->push_back(gID);
+	    int eIdx = tmpInfo[i].MigCtor;
+	    // error checking
+	    if (eIdx == -1) {
+	      CkPrintf("[%d] ERROR> Group %s's migration constructor is not defined!\n", CkMyPe(), tmpInfo[i].name); CkAbort("Abort");
+	    }
+	    void *m = CkAllocSysMsg();
+	    envelope* env = UsrToEnv((CkMessage *)m);
+	    CkCreateLocalGroup(gID, eIdx, env);
+	  }   // end of unPacking
+	  IrrGroup *gobj = CkpvAccess(_groupTable)->find(gID).getObj();
+	  // if using migration constructor, you'd better have a pup
+          gobj->pup(p);
+          DEBCHK("Group PUP'ed: gid = %d, name = %s\n",
+			gobj->ckGetGroupID().idx, tmpInfo[i].name);
 	}
 	delete [] tmpInfo;
 }
@@ -307,6 +312,26 @@ void CkPupArrayElementsData(PUP::er &p)
                 IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
 	  	obj->ckJustMigrated();
 	}
+}
+
+void CkPupProcessorData(PUP::er &p)
+{
+    // save readonlys, and callback BTW
+    CkPupROData(p);
+
+    // save mainchares into MainChares.dat
+    if(CkMyPe()==0) {
+	CkPupMainChareData(p);
+    }
+	
+    // save groups into Groups.dat
+    CkPupGroupData(p);
+
+    // save nodegroups into NodeGroups.dat
+    CkPupNodeGroupData(p);
+
+    // pup array elements
+    CkPupArrayElementsData(p);
 }
 
 void CkStartCheckpoint(char* dirname,const CkCallback& cb){
