@@ -12,7 +12,10 @@
  * REVISION HISTORY:
  *
  * $Log$
- * Revision 2.1  1995-06-08 17:07:12  gursoy
+ * Revision 2.2  1995-06-14 19:38:29  gursoy
+ * CmiAllocPackBuffer -> CkAllocPackBuffer
+ *
+ * Revision 2.1  1995/06/08  17:07:12  gursoy
  * Cpv macro changes done
  *
  * Revision 1.5  1995/04/25  04:32:43  narain
@@ -40,7 +43,7 @@
 #include "trans_defs.h"
 #include "trans_decls.h"
 
-void * CmiAllocPackBuffer(msg, size)
+void *CkAllocPackBuffer(msg, size)
 char *msg;
 int size;
 {
